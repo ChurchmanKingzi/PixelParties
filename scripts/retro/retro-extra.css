@@ -1,0 +1,46 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   RETRO-ZUSATZ — von Hand geschriebene Regeln, die zusätzlich zur automatischen Umwandlung gelten (scripts/retro/build-css.js hängt sie an
+   style.css an und lässt sie durch denselben Umwandler laufen). Nur Farben der Retro-Palette (data/palette-retro.json).
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* Schrift: Pixelschrift ohne Glättung/Ligaturen-Spielereien */
+html[data-retro] body { text-rendering: optimizeSpeed; font-kerning: none; }
+
+/* ── Knöpfe: flache Farbfläche mit Kantenlicht (oben/links hell, unten/rechts dunkel) wie auf dem SNES; gedrückt = eingedrückt ── */
+html[data-retro] .btn {
+  background-color: #1a1a2e;
+  background-image: none;
+  border-width: 2px;
+  box-shadow: inset 2px 2px 0 #3e3e51, inset -2px -2px 0 #000000, 0 2px 0 #000000;
+  text-shadow: 1px 1px 0 #000000;
+}
+html[data-retro] .btn::before, html[data-retro] .btn::after { display: none; }
+html[data-retro] .btn:hover:not(:disabled) {
+  background-color: #291f3d;
+  box-shadow: inset 2px 2px 0 #59606e, inset -2px -2px 0 #000000, 0 2px 0 #000000;
+}
+html[data-retro] .btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: inset 2px 2px 0 #000000, inset -2px -2px 0 #3e3e51;
+}
+
+/* ── Fenster: harte Doppelkante + Versatzschatten statt Glühen ── */
+html[data-retro] .modal {
+  box-shadow: 0 0 0 2px #000000, 6px 6px 0 2px #000000, inset 2px 2px 0 #3e3e51, inset -2px -2px 0 #000000;
+}
+html[data-retro] .panel {
+  box-shadow: inset 2px 2px 0 #3e3e51, inset -2px -2px 0 #000000;
+}
+
+/* ── Eingabefelder: eingelassen ── */
+html[data-retro] input:not([type="range"]):not([type="color"]):not([type="checkbox"]):not([type="radio"]),
+html[data-retro] textarea,
+html[data-retro] select {
+  box-shadow: inset 2px 2px 0 #000000, inset -2px -2px 0 #291f3d;
+}
+
+/* ── Reiter: Unterstreichung als dicker Block ── */
+html[data-retro] .tab.active { border-bottom-width: 4px; }
+
+/* ── Bewegung in ganzen Pixeln ── */
+html[data-retro] .btn:active { transition: none; }

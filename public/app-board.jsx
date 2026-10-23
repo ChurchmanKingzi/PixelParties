@@ -420,12 +420,12 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
         <div style={{
           position: 'absolute', top: 3, left: 3,
           background: 'rgba(0,0,0,.85)',
-          color: stampBonus > 0 ? '#c4a8ff' : '#fff',
+          color: stampBonus > 0 ? '#d6b3f9' : '#fff',
           padding: '2px 6px', borderRadius: 4,
           fontSize: 11, fontWeight: 700,
-          border: '1px solid ' + (stampBonus > 0 ? '#a288ff' : 'rgba(255,255,255,0.3)'),
+          border: '1px solid ' + (stampBonus > 0 ? '#b278ed' : 'rgba(255,255,255,0.3)'),
           pointerEvents: 'none', zIndex: 4,
-          boxShadow: stampBonus > 0 ? '0 0 6px rgba(162,136,255,.6)' : 'none',
+          boxShadow: stampBonus > 0 ? '0 0 6px rgba(178,120,237,.6)' : 'none',
         }}>Lv {effectiveLevel}{stampBonus > 0 ? ` (+${stampBonus})` : ''}</div>
       )}
       {hp != null && maxHp != null && hp > maxHp && (
@@ -440,7 +440,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
           <div className="board-card-stats-hero">
             {hp != null && (
               <div className="board-card-hp-num"
-                style={maxHp != null && hp > maxHp ? { color: '#44ff88' } : undefined}>
+                style={maxHp != null && hp > maxHp ? { color: '#4ceb70' } : undefined}>
                 {hp}
               </div>
             )}
@@ -452,7 +452,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
       ) : (
         hp != null && hpPosition && (
           <div className={'board-card-hp board-card-hp-' + hpPosition}
-            style={maxHp != null && hp > maxHp ? { color: '#44ff88' } : undefined}>
+            style={maxHp != null && hp > maxHp ? { color: '#4ceb70' } : undefined}>
             {hp}
           </div>
         )
@@ -1058,18 +1058,18 @@ function HandFxParticles() {
     groesse: 3 + Math.random() * 5,
     dur: 620 + Math.random() * 420,
     delay: Math.random() * 260,
-    farbe: ['#fff3c0', '#ffd77a', '#ffffff', '#ffe6a8'][Math.floor(Math.random() * 4)],
+    farbe: ['#f9ecb3', '#fbe181', '#ffffff', '#f9ecb3'][Math.floor(Math.random() * 4)],
   })), []);
   return (
     <>
       <div style={{
         position: 'absolute', left: -90, top: -60, width: 180, height: 120, borderRadius: '50%',
-        background: 'radial-gradient(ellipse, rgba(255,235,160,.75) 0%, rgba(255,200,80,.35) 45%, transparent 78%)',
+        background: 'radial-gradient(ellipse, rgba(255,241,150,.75) 0%, rgba(255,208,102,.35) 45%, transparent 78%)',
         animation: 'handFxGlow 900ms ease-out forwards', opacity: 0,
       }} />
       <div style={{
         position: 'absolute', left: -54, top: -36, width: 108, height: 72, borderRadius: '50%',
-        border: '2px solid rgba(255,225,140,.9)', boxShadow: '0 0 18px rgba(255,205,90,.8)',
+        border: '2px solid rgba(251,225,129,.9)', boxShadow: '0 0 18px rgba(255,208,102,.8)',
         animation: 'handFxRing 700ms ease-out forwards', opacity: 0,
       }} />
       {funken.map((f, i) => (
@@ -1256,7 +1256,7 @@ function BirthdayPresentReveal({ state, interactive, onPick }) {
 // des Servers: Laden (Slot → Brackle) → Halten (Karte zittert auf Brackle) → Abschuss (Brackle → Ziel) → Einschlag (Karte sitzt am Ziel, zittert,
 // während die Explosion läuft) → Ablage (Ziel → Ablagestapel, schrumpft in Stufen).
 const BRACKLE_TAKT_MS = 33;
-const BRACKLE_FUNKEN = ['#fff3a8', '#ffd23a', '#ff7a14', '#ffffff'];
+const BRACKLE_FUNKEN = ['#f7f7ad', '#f8ca21', '#ff7d00', '#ffffff'];
 function BrackleCatapultCard({ sx, sy, mx, my, ex, ey, dx, dy, cardName, loadMs, holdMs, fireMs, impactMs, discardMs }) {
   const card = CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name) : null;
@@ -1391,7 +1391,7 @@ function OppDrawAnimCard({ id, startX, startY, endX, endY, cardName, cardbackUrl
     const an = [];
     if (window.PP_ZONE_WATCH) an.push('PP_ZONE_WATCH (Zonen-Renderstelle)');
     if (window.PP_FLIGHT_WATCH) an.push('PP_FLIGHT_WATCH (Flug-Neustarts)');
-    if (an.length) console.log('%c[Diagnose] AKTIV: ' + an.join(', '), 'color:#e08a5e;font-weight:bold');
+    if (an.length) console.log('%c[Diagnose] AKTIV: ' + an.join(', '), 'color:#c7855b;font-weight:bold');
     else console.log('[Diagnose] keine Browser-Sonde aktiv — ?watch=alle an die Adresse haengen.');
   } catch (e) { /* egal */ }
 })();
@@ -1750,7 +1750,7 @@ function tokenZerfallSpielen(srcEl, cardName) {
   const bild = document.createElement('img');
   bild.draggable = false;
   bild.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;border-radius:4px;opacity:1;transition:opacity 320ms linear;';
-  if (url) bild.src = url; else bild.style.background = 'linear-gradient(135deg,#2a1a4a,#1a0a3a)';
+  if (url) bild.src = url; else bild.style.background = 'linear-gradient(135deg,#1a0a3a,#1a0a3a)';
   inhalt.appendChild(bild);
   (anker.welt && window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(card);
   if (reduziert) {
@@ -2984,10 +2984,10 @@ function HeroEiskruste({ quelleRef, breite, hoehe, rand, stil, schmilzt }) {
 // ═══════════════════════════════════════════
 const HERO_TOENUNGEN = [
   { status: 'negated',      grau: 0.8 },
-  { status: 'poisoned',     farbe: 'rgba(150,60,215,0.38)' },
-  { status: 'burned',       farbe: 'rgba(255,110,30,0.2)' },
-  { status: 'berserked',    farbe: 'rgba(205,25,40,0.24)' },
-  { status: 'healReversed', farbe: 'rgba(110,255,150,0.14)' },
+  { status: 'poisoned',     farbe: 'rgba(149,68,213,0.38)' },
+  { status: 'burned',       farbe: 'rgba(248,116,32,0.2)' },
+  { status: 'berserked',    farbe: 'rgba(192,20,28,0.24)' },
+  { status: 'healReversed', farbe: 'rgba(102,255,162,0.14)' },
   // ★ v1460 (Als Vorgabe 27.9.): Cursed „flasht lila", Charmed pink —
   // pulsierende Tönung (Stärke zwischen min und max, siehe `puls` im
   // Zeichenschritt).
@@ -3126,7 +3126,7 @@ function HeroStatusPartikel({ effekte, kern, s, mitteX, fw, fh, saat }) {
       const z = heroFxZufall(saat + (bers ? 'wut' : 'umkehr'));
       const n = 8;
       for (let i = 0; i < n; i++) {
-        const farbe = bers ? (z() < 0.5 ? '#9b3cff' : '#ff3a2a') : (z() < 0.5 ? '#66ff99' : '#cc66ff');
+        const farbe = bers ? (z() < 0.5 ? '#a040ff' : '#ef2929') : (z() < 0.5 ? '#66ffa2' : '#b866ff');
         const schaedel = !bers && z() < 0.25;
         aus.push({ art: schaedel ? 'schaedel' : 'funke', farbe, x: kern.x0 + cw * z(), y: kern.y0 + ch * (0.3 + z() * 0.6),
           groesse: schaedel ? 9 : 6 + z() * 4, dauer: 1.4 + z() * 1.0, verz: z() * 2.4 });
@@ -3294,7 +3294,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
         if (st.stein < 1 && top > 0) {
           ctx.save();
           ctx.globalCompositeOperation = 'source-atop';
-          ctx.fillStyle = 'rgba(225,220,210,0.85)';
+          ctx.fillStyle = 'rgba(226,216,203,0.85)';
           ctx.fillRect(0, top, fw, 1);
           ctx.restore();
         }
@@ -3699,7 +3699,7 @@ function CardRevealEntry({ cardName, onDone, fizzled }) {
         {fizzled && <div className="card-reveal-fizzle-label orbit-font">FIZZLED</div>}
         {imgUrl ? (
           <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6,
-            border: foilType === 'diamond_rare' ? '3px solid rgba(120,200,255,.7)' : foilType === 'secret_rare' ? '3px solid rgba(255,215,0,.6)' : '2px solid var(--bg4)' }} draggable={false} />
+            border: foilType === 'diamond_rare' ? '3px solid rgba(104,198,253,.7)' : foilType === 'secret_rare' ? '3px solid rgba(255,214,26,.6)' : '2px solid var(--bg4)' }} draggable={false} />
         ) : (
           <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             background: 'var(--bg3)', borderRadius: 6, border: '2px solid var(--bg4)', padding: 16, textAlign: 'center' }}>
@@ -3724,7 +3724,7 @@ function ExplosionEffect({ x, y, opacity }) {
       dx: Math.cos(angle) * speed,
       dy: Math.sin(angle) * speed,
       size: 4 + Math.random() * 9,
-      color: ['#ff4400','#ff8800','#ffcc00','#ff2200','#ffaa00','#fff','#ffe98a'][Math.floor(Math.random() * 7)],
+      color: ['#ff491a','#ff8b1a','#ffd61a','#ff1a1a','#f9ac20','#fff','#fbe181'][Math.floor(Math.random() * 7)],
       delay: Math.random() * 80,
       dur: 380 + Math.random() * 420,
     };
@@ -3735,20 +3735,20 @@ function ExplosionEffect({ x, y, opacity }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 6 + Math.random() * 6, dreh: (Math.random() < 0.5 ? -1 : 1) * (180 + Math.random() * 360),
-      farbe: ['#5a2a1a', '#7a3a20', '#3a2a2a', '#c04a18'][Math.floor(Math.random() * 4)],
+      farbe: ['#68332a', '#7d3911', '#323232', '#b62600'][Math.floor(Math.random() * 4)],
       delay: 40 + Math.random() * 60, dur: 620 + Math.random() * 200,
     };
   }), []);
   const glut = useMemo(() => Array.from({ length: ppFxN(12) }, () => ({
     dx: -34 + Math.random() * 68, dy: -(30 + Math.random() * 45),
     size: 3 + Math.random() * 3,
-    farbe: ['#ffe066', '#ffaa22', '#ff6a00'][Math.floor(Math.random() * 3)],
+    farbe: ['#ffe469', '#f9ac20', '#ff7d00'][Math.floor(Math.random() * 3)],
     delay: 220 + Math.random() * 180, dur: 450 + Math.random() * 250,
   })), []);
   const rauch = useMemo(() => Array.from({ length: ppFxN(7) }, (_, i) => ({
     dx: -26 + Math.random() * 52, dy: -(22 + Math.random() * 30),
     size: 30 + Math.random() * 22, delay: 180 + i * 35, dur: 560 + Math.random() * 160,
-    ton: Math.random() < 0.5 ? '#5a5560' : '#3e3a44',
+    ton: Math.random() < 0.5 ? '#59606e' : '#3e3e51',
   })), []);
   // Optional `opacity` prop — passed through from playAnimation options
   // so callers can dim the burst (Laser Volley wants its impacts more
@@ -3804,7 +3804,7 @@ function SurpriseCreatureRevealEffect({ x, y, w, h }) {
       sx: Math.cos(winkel) * rad, sy: Math.sin(winkel) * rad * 0.8,   // Start auf dem Kreis
       dx: (Math.random() - 0.5) * 18, dy: -(26 + Math.random() * 42), // steigen auf
       size: 3 + Math.floor(Math.random() * 3) * 2,
-      farbe: ['#3dff7a', '#8dffb0', '#1fcf5a', '#d6ffe3', '#66ff99'][i % 5],
+      farbe: ['#1aff73', '#75f091', '#00cc50', '#e5fae7', '#66ffa2'][i % 5],
       delay: Math.floor(Math.random() * 260), dur: 480 + Math.random() * 360,
     };
   }), [d]);
@@ -3839,7 +3839,7 @@ function FreezeEffect({ x, y, w, h }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 3 + Math.random() * 7,
-      color: ['#aaddff','#88ccff','#cceeFF','#ffffff','#66bbff'][Math.floor(Math.random() * 5)],
+      color: ['#b3d8f9','#7bbeea','#bddcef','#ffffff','#66b6ff'][Math.floor(Math.random() * 5)],
       delay: 400 + Math.random() * 200,
       dur: 400 + Math.random() * 300,
     };
@@ -3874,7 +3874,7 @@ function ThawEffect({ x, y }) {
     size: 3 + Math.random() * 5,
     delay: Math.random() * 300,
     dur: 500 + Math.random() * 400,
-    color: ['#aaddff','#88ccff','#cceeFF','#ddf4ff'][Math.floor(Math.random() * 4)],
+    color: ['#b3d8f9','#7bbeea','#bddcef','#e5f5fa'][Math.floor(Math.random() * 4)],
   })), []);
   return (
     <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
@@ -3962,7 +3962,7 @@ function MoniaJetTrail({ r }) {
       groesse: 3 + Math.random() * 5,
       dauer: 300 + Math.random() * 200,
       verzug: (JET.igniteAt + t * (JET.arriveAt - JET.igniteAt)) * dur + Math.random() * 55,
-      farbe: ['#fff3c4', '#ffd166', '#ff9a1f', '#ff5b00'][Math.floor(Math.random() * 4)],
+      farbe: ['#fffbd2', '#ffd066', '#ff9a1a', '#ff491a'][Math.floor(Math.random() * 4)],
     };
   }), []);
 
@@ -4032,7 +4032,7 @@ function ElectricStrikeEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 2 + Math.random() * 5,
-      color: ['#ffe033','#fff','#ffcc00','#ffffaa','#ffd700'][Math.floor(Math.random() * 5)],
+      color: ['#ffe23d','#fff','#ffd61a','#f7f7ad','#ffd61a'][Math.floor(Math.random() * 5)],
       delay: 250 + Math.random() * 150,
       dur: 250 + Math.random() * 250,
     };
@@ -4118,7 +4118,7 @@ function BlackFlameStrikeEffect({ x, y, intensity = 1 }) {
       size: 2 + Math.random() * 5 * sizeMult,
       // Deep-violet / black-purple shrapnel — matches the central
       // flash's palette so all colored bits stay in the same family.
-      color: ['#1a0028','#2a0040','#3d0050','#440066','#1f0033'][Math.floor(Math.random() * 5)],
+      color: ['#19062d','#2b0b47','#2e0a51','#47117e','#1a0a3a'][Math.floor(Math.random() * 5)],
       delay: 320 + Math.random() * 160,
       dur: 320 + Math.random() * 260,
     };
@@ -4173,7 +4173,7 @@ function DemonFirePillarEffect({ x, y, w = 80, h = 110, intensity = 1 }) {
     xOff: (-0.5 + Math.random()) * width,
     rise: 80 + Math.random() * height,
     size: 2 + Math.random() * 4,
-    color: ['#ffd23a', '#ff9a1f', '#ff6a00', '#ff3d00', '#ffe7a0'][Math.floor(Math.random() * 5)],
+    color: ['#f8ca21', '#ff9a1a', '#ff7d00', '#ff491a', '#f9ecb3'][Math.floor(Math.random() * 5)],
     delay: 200 + Math.random() * 450,
     dur: 450 + Math.random() * 350,
   })), []);
@@ -4222,7 +4222,7 @@ function CavalryChargeEffect({ x, y, w = 80, h = 110 }) {
     size: 6 + Math.random() * 12,
     delay: 120 + Math.random() * 480,
     dur: 380 + Math.random() * 300,
-    color: ['#c9a86a', '#b08d55', '#d9c08f', '#8f7040'][Math.floor(Math.random() * 4)],
+    color: ['#e0c085', '#b29466', '#e0c085', '#886c44'][Math.floor(Math.random() * 4)],
   })), []);
   return (
     <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
@@ -4313,7 +4313,7 @@ function LightningRainEffect({ x, y, w = 80, h = 110 }) {
       <svg style={{ position: 'absolute', left: -600, top: -1000, overflow: 'visible' }} width="1200" height="1200" viewBox="-600 -1000 1200 1200" xmlns="http://www.w3.org/2000/svg">
         {bolts.map((b, i) => (
           <g key={'lrb'+i} className="anim-lightning-rain-bolt" style={{ animationDelay: b.delay + 'ms' }}>
-            <polyline points={b.pts} fill="none" stroke="#7fd3ff" strokeWidth={b.width + 4} strokeLinejoin="round" strokeLinecap="round" opacity="0.45" />
+            <polyline points={b.pts} fill="none" stroke="#77c8ee" strokeWidth={b.width + 4} strokeLinejoin="round" strokeLinecap="round" opacity="0.45" />
             <polyline points={b.pts} fill="none" stroke="#ffffff" strokeWidth={b.width} strokeLinejoin="round" strokeLinecap="round" />
           </g>
         ))}
@@ -4354,7 +4354,7 @@ function CoreExplosionEffect({ x, y, w = 80 }) {
     return {
       dx: Math.cos(winkel) * weite, dy: Math.sin(winkel) * weite,
       groesse: 4 + Math.random() * 6,
-      farbe: ['#8ff4ff', '#ffffff', '#ff6fd8', '#5ad1ff'][Math.floor(Math.random() * 4)],
+      farbe: ['#6be9fa', '#ffffff', '#fc69c6', '#66d9ff'][Math.floor(Math.random() * 4)],
       verzug: 80 + Math.random() * 200,
     };
   }), [r]);
@@ -4400,7 +4400,7 @@ function MemoryWipeEffect({ x, y, w = 80 }) {
     sx: (Math.random() - 0.5) * r * 1.1,
     sy: (Math.random() - 0.5) * r * 0.9,
     groesse: 3 + Math.random() * 4,
-    farbe: ['#b98cff', '#8a5cff', '#9ff3ff', '#ffffff'][Math.floor(Math.random() * 4)],
+    farbe: ['#c98aff', '#a952ff', '#b6eff7', '#ffffff'][Math.floor(Math.random() * 4)],
     verzug: 380 + Math.random() * 380,
   })), [r]);
   useEffect(() => {
@@ -4479,7 +4479,7 @@ function FuriousAngerEffect({ x, y, w = 80, h = 110 }) {
       ))}
       <svg className="anim-fa-zeichen" width={s * 2.4} height={s * 2.4} viewBox={`${-s * 1.2} ${-s * 1.2} ${s * 2.4} ${s * 2.4}`}
         style={{ position: 'absolute', left: -s * 1.2 + w * 0.15, top: -h * 0.55 - s * 1.2, overflow: 'visible' }}>
-        <polygon points={zacken} fill="#ffffff" stroke="#111" strokeWidth="3" strokeLinejoin="miter" />
+        <polygon points={zacken} fill="#ffffff" stroke="#141414" strokeWidth="3" strokeLinejoin="miter" />
         <rect x={-s * 0.28} y={-s * 0.42} width={s * 0.16} height={s * 0.55} fill="#8b0d0d" />
         <rect x={-s * 0.28} y={s * 0.2} width={s * 0.16} height={s * 0.16} fill="#8b0d0d" />
         <rect x={s * 0.1} y={-s * 0.42} width={s * 0.16} height={s * 0.55} fill="#8b0d0d" />
@@ -4502,7 +4502,7 @@ const PP_APPLAUSE_ICON = (() => {
     '.KSSSSSSKSSSSSSSK.', '.KDSSSSSDDSSSSSDK.', '.KSSSSSDKKDSSSSSK.', 'KDSSSSDK..KDSSSSDK',
     'KDDSSDK....KDSSDDK', 'KKDDDK......KDDDKK', '.KKKK........KKKK.',
   ];
-  const FARBE = { K: '#1a0f08', S: '#ffd24a', H: '#fff2b0', D: '#e08a1e', M: '#ffffff' };
+  const FARBE = { K: '#1f0f04', S: '#fad54a', H: '#f9ecb3', D: '#c68206', M: '#ffffff' };
   let rects = '';
   zeilen.forEach((z, y) => [...z].forEach((c, x) => {
     if (FARBE[c]) rects += `<rect x="${x}" y="${y}" width="1" height="1" fill="${FARBE[c]}"/>`;
@@ -4579,10 +4579,10 @@ const ppFlammenSprite = (FARBE) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${bilder.length * 8}" height="12" viewBox="0 0 ${bilder.length * 8} 12" shape-rendering="crispEdges">${rects}</svg>`;
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 };
-const PP_PIXELFLAMME = ppFlammenSprite({ R: '#b8200e', O: '#ff7a14', Y: '#ffd23a', W: '#fff3a8' });
+const PP_PIXELFLAMME = ppFlammenSprite({ R: '#be0e0e', O: '#ff7d00', Y: '#f8ca21', W: '#f7f7ad' });
 // Lila Totenflamme (Sett, the Adept of Necromancy): dieselben fuenf
 // Bilder, Palette dunkelviolett → violett → hellviolett → fast weiss.
-const PP_NECROFLAMME = ppFlammenSprite({ R: '#2b0b47', O: '#6b21b8', Y: '#a54ae8', W: '#e9c8ff' });
+const PP_NECROFLAMME = ppFlammenSprite({ R: '#2b0b47', O: '#6618b4', Y: '#9544d5', W: '#d6bbf1' });
 
 // ── Totes Flackern (Sett, Als Vorgabe 29.9.) ────────────────────────
 // Dauer-Aura um jede Kreatur in Setts Support Zones, solange sein Effekt
@@ -4641,7 +4641,7 @@ function TorchureEffect({ x, y, w = 80, h = 110 }) {
     '..ddrdrdrd....',
     '...dddddd.....',
   ];
-  const FARBE = { r: '#f4a2b4', d: '#c86a82', h: '#ffd6de', s: '#ff8fa6', n: '#6b2436', k: '#1a1016', o: '#9c4a60', m: '#4a1422' };
+  const FARBE = { r: '#f8b4c8', d: '#e58092', h: '#fae5eb', s: '#e58092', n: '#4b1021', k: '#08060c', o: '#ae264c', m: '#4b1021' };
   const fackel = [
     '..y..',
     '.ywy.',
@@ -4654,7 +4654,7 @@ function TorchureEffect({ x, y, w = 80, h = 110 }) {
     '..b..',
     '..B..',
   ];
-  const FF = { w: '#fff8d0', y: '#ffe36b', o: '#ff9a2e', r: '#e8421c', b: '#8a5a2e', B: '#5a3a1c' };
+  const FF = { w: '#fffbd2', y: '#ffe469', o: '#ff9b3a', r: '#cc2b00', b: '#9d612f', B: '#5a341a' };
   const TP = 4;                                       // Fackel etwas groeber
   const pixel = (zeilen, farben, key, q = P) => zeilen.flatMap((z, zy) => [...z].map((c, zx) => (
     farben[c] ? <rect key={key + zx + '-' + zy} x={zx * q} y={zy * q} width={q} height={q} fill={farben[c]} /> : null
@@ -4664,7 +4664,7 @@ function TorchureEffect({ x, y, w = 80, h = 110 }) {
     size: 4 + Math.random() * 7,
     delay: 1250 + Math.random() * 350,
     dur: 500 + Math.random() * 400,
-    color: ['#9933cc', '#7722aa', '#bb55ee', '#5fbf3a', '#8fdc4a'][Math.floor(Math.random() * 5)],
+    color: ['#9544d5', '#702db3', '#b866ff', '#20ac37', '#87cc00'][Math.floor(Math.random() * 5)],
     wobble: -8 + Math.random() * 16,
   })), []);
   useEffect(() => {
@@ -4764,18 +4764,18 @@ function AnklageEffect({ x, y, w = 80, h = 110, cardName }) {
             <defs>
               <clipPath id={`${uid}-form`}><path d={pfad} /></clipPath>
               <pattern id={`${uid}-d1`} width="4" height="4" patternUnits="userSpaceOnUse">
-                <rect x="0" y="0" width="2" height="2" fill="#c4baa5" />
-                <rect x="2" y="2" width="2" height="2" fill="#c4baa5" />
+                <rect x="0" y="0" width="2" height="2" fill="#c5b7a0" />
+                <rect x="2" y="2" width="2" height="2" fill="#c5b7a0" />
               </pattern>
               <pattern id={`${uid}-d2`} width="4" height="4" patternUnits="userSpaceOnUse">
-                <rect x="0" y="0" width="4" height="4" fill="#c4baa5" />
-                <rect x="2" y="0" width="2" height="2" fill="#8f8570" />
-                <rect x="0" y="2" width="2" height="2" fill="#8f8570" />
+                <rect x="0" y="0" width="4" height="4" fill="#c5b7a0" />
+                <rect x="2" y="0" width="2" height="2" fill="#a89370" />
+                <rect x="0" y="2" width="2" height="2" fill="#a89370" />
               </pattern>
               <pattern id={`${uid}-d3`} width="4" height="4" patternUnits="userSpaceOnUse">
-                <rect x="0" y="0" width="4" height="4" fill="#8f8570" />
-                <rect x="0" y="0" width="2" height="2" fill="#5e5647" />
-                <rect x="2" y="2" width="2" height="2" fill="#5e5647" />
+                <rect x="0" y="0" width="4" height="4" fill="#a89370" />
+                <rect x="0" y="0" width="2" height="2" fill="#535353" />
+                <rect x="2" y="2" width="2" height="2" fill="#535353" />
               </pattern>
               <mask id={`${uid}-m1`} maskUnits="userSpaceOnUse" x={-B} y={-H * 2} width={B * 2} height={H * 3}>
                 <rect x={-B} y={-H * 2} width={B * 2} height={H * 3} fill="#fff" />
@@ -4791,12 +4791,12 @@ function AnklageEffect({ x, y, w = 80, h = 110, cardName }) {
               </mask>
             </defs>
             <path d={pfad} fill="#141414" opacity=".55" transform="translate(3 4)" />
-            <path d={pfad} fill="#f4efe2" />
+            <path d={pfad} fill="#fff8e8" />
             <g clipPath={`url(#${uid}-form)`} shapeRendering="crispEdges">
               <rect x={-B} y={-H * 2} width={B * 2} height={H * 3} fill={`url(#${uid}-d1)`} mask={`url(#${uid}-m1)`} />
               <rect x={-B} y={-H * 2} width={B * 2} height={H * 3} fill={`url(#${uid}-d2)`} mask={`url(#${uid}-m2)`} />
               <rect x={-B} y={-H * 2} width={B * 2} height={H * 3} fill={`url(#${uid}-d3)`} mask={`url(#${uid}-m3)`} />
-              <ellipse cx={-B * 0.16} cy={-H * 0.7} rx={B * 0.22} ry={H * 0.2} fill="#fffef9" />
+              <ellipse cx={-B * 0.16} cy={-H * 0.7} rx={B * 0.22} ry={H * 0.2} fill="#ffffff" />
               <rect x={-B * 0.38} y={-H * 0.88} width="8" height="4" fill="#ffffff" />
               <rect x={-B * 0.38 + 10} y={-H * 0.88} width="4" height="4" fill="#ffffff" />
               <rect x={-B * 0.38} y={-H * 0.88 + 6} width="4" height="6" fill="#ffffff" />
@@ -4805,8 +4805,8 @@ function AnklageEffect({ x, y, w = 80, h = 110, cardName }) {
           </svg>
           <svg className="anklage-ausruf" width={H} height={H} viewBox="-10 -10 20 20"
             style={{ position: 'absolute', left: -H / 2, top: -H * 0.5 - H / 2 }}>
-            <rect x="-2.6" y="-8" width="5.2" height="10.5" fill="#d0121b" stroke="#5a0508" strokeWidth=".8" />
-            <rect x="-2.6" y="4.2" width="5.2" height="4.4" fill="#d0121b" stroke="#5a0508" strokeWidth=".8" />
+            <rect x="-2.6" y="-8" width="5.2" height="10.5" fill="#be0e0e" stroke="#5b0102" strokeWidth=".8" />
+            <rect x="-2.6" y="4.2" width="5.2" height="4.4" fill="#be0e0e" stroke="#5b0102" strokeWidth=".8" />
           </svg>
           {bild && (
             <div className="anklage-karte" style={{ width: kw, height: kh, left: -kw / 2, top: -H * 0.5 - kh / 2 }}>
@@ -4825,7 +4825,7 @@ function AnklageEffect({ x, y, w = 80, h = 110, cardName }) {
         <svg key={'ad' + i} className="anklage-ader" width="34" height="34" viewBox="-17 -17 34 34"
           style={{ left: (i ? -1 : 1) * B * 0.5 - 17, top: oben - H - 10 - 17 + i * 6, animationDelay: t + 'ms' }}>
           {[0, 90, 180, 270].map(g => (
-            <path key={g} d="M 3 -13 Q 3 -4 12 -3" fill="none" stroke="#e0161f" strokeWidth="4.2" strokeLinecap="round"
+            <path key={g} d="M 3 -13 Q 3 -4 12 -3" fill="none" stroke="#ef2929" strokeWidth="4.2" strokeLinecap="round"
               transform={`rotate(${g})`} />
           ))}
         </svg>
@@ -4865,7 +4865,7 @@ function ppNetzPfade(rx, ry, speichen = 10, ringe = 5) {
 }
 
 // Kleine Pixel-Spinne (Baby Spider): Leib, Kopf, rote Augen, acht Beine.
-function PpSpinne({ g = 18, farbe = '#161018' }) {
+function PpSpinne({ g = 18, farbe = '#08060c' }) {
   const beine = [-1, 1].flatMap(s => [-0.55, -0.2, 0.15, 0.5].map((v, i) => ({ s, v, i })));
   return (
     <svg className="ppspinne" width={g * 2.2} height={g * 2.2} viewBox="-22 -22 44 44"
@@ -4875,11 +4875,11 @@ function PpSpinne({ g = 18, farbe = '#161018' }) {
           d={`M ${b.s * 3} ${b.v * 10} L ${b.s * 11} ${b.v * 10 - 6} L ${b.s * 17} ${b.v * 14 + 4}`}
           fill="none" stroke={farbe} strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round" />
       ))}
-      <ellipse cx="0" cy="5" rx="7" ry="8.5" fill={farbe} stroke="#3a2a40" strokeWidth="1" />
-      <circle cx="0" cy="-6" r="5" fill={farbe} stroke="#3a2a40" strokeWidth="1" />
-      <rect x="-3.2" y="-8" width="2.2" height="2.2" fill="#ff2a3a" />
-      <rect x="1" y="-8" width="2.2" height="2.2" fill="#ff2a3a" />
-      <path d="M -4 2 L 4 2 M -3 6 L 3 6" stroke="#4a3450" strokeWidth="1.2" />
+      <ellipse cx="0" cy="5" rx="7" ry="8.5" fill={farbe} stroke="#291f3d" strokeWidth="1" />
+      <circle cx="0" cy="-6" r="5" fill={farbe} stroke="#291f3d" strokeWidth="1" />
+      <rect x="-3.2" y="-8" width="2.2" height="2.2" fill="#f03232" />
+      <rect x="1" y="-8" width="2.2" height="2.2" fill="#f03232" />
+      <path d="M -4 2 L 4 2 M -3 6 L 3 6" stroke="#3e3e51" strokeWidth="1.2" />
     </svg>
   );
 }
@@ -5003,7 +5003,7 @@ function StyxTorEffect({ x, y, w = 80, h = 110 }) {
   const seelen = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => ({
     dx: (Math.random() - 0.5) * w * 0.9, hoch: h * (0.55 + Math.random() * 0.5),
     g: 8 + Math.random() * 8, verzug: 250 + Math.random() * 700, dauer: 700 + Math.random() * 400,
-    farbe: ['#bff6ff', '#8fe3ff', '#d6c8ff', '#ffffff'][i % 4],
+    farbe: ['#b6eff7', '#7fdfff', '#d6bbf1', '#ffffff'][i % 4],
   })), [w, h]);
   useEffect(() => {
     const spiel = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
@@ -5033,7 +5033,7 @@ function TodesgabeErweckungEffect({ x, y, w = 80, h = 110 }) {
   const funken = useMemo(() => Array.from({ length: ppFxN(18) }, (_, i) => ({
     dx: (Math.random() - 0.5) * w * 1.1, hoch: h * (0.5 + Math.random() * 0.7),
     g: 4 + Math.random() * 5, verzug: 1300 + Math.random() * 900,
-    farbe: ['#e8fbff', '#9ff0ff', '#fff6d0', '#c9b8ff'][i % 4],
+    farbe: ['#e5f5fa', '#b6eff7', '#fffbd2', '#d6b3f9'][i % 4],
   })), [w, h]);
   const K = Math.max(56, w * 0.95);                // oberer Kreis
   const obenY = -h * 0.5 - K * 0.62;               // Mitte des oberen Kreises
@@ -5041,7 +5041,7 @@ function TodesgabeErweckungEffect({ x, y, w = 80, h = 110 }) {
     const a = (i / 16) * Math.PI * 2;
     const r = K * (1.05 + (i % 3) * 0.22);
     return { sx: Math.cos(a) * r, sy: Math.sin(a) * r * 0.8, dreh: (i % 2 ? 1 : -1) * 120,
-      g: 4 + (i % 3) * 2, verzug: 150 + (i % 8) * 90, farbe: ['#d9c4ff', '#9ff0ff', '#ffffff', '#b58cff'][i % 4] };
+      g: 4 + (i % 3) * 2, verzug: 150 + (i % 8) * 90, farbe: ['#d6bbf1', '#b6eff7', '#ffffff', '#c98aff'][i % 4] };
   }), [K]);
   const hexa = useMemo(() => {
     const p = (off) => [0, 1, 2].map(k => { const a = off + k * 2 * Math.PI / 3 - Math.PI / 2; return `${(Math.cos(a) * 34).toFixed(1)},${(Math.sin(a) * 34).toFixed(1)}`; }).join(' ');
@@ -5219,7 +5219,7 @@ function HeldenRammkarte({ r }) {
 function GewaltsameErweckungEffect({ x, y, w = 70, h = 100 }) {
   const brocken = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => ({
     w: ((i * 360) / 14 + (i % 3) * 9) * Math.PI / 180, d: 36 + (i % 4) * 14, g: 4 + (i % 3) * 2,
-    ton: ['#6b4e2a', '#8a6a3a', '#4f3a20', '#a3843f'][i % 4],
+    ton: ['#6b4a2a', '#886c44', '#4a2a10', '#b29466'][i % 4],
   })), []);
   const sterne = useMemo(() => Array.from({ length: 8 }, (_, i) => ({ w: i * 45 + 12, d: 44 + (i % 3) * 14, verzug: (i % 4) * 25 })), []);
   const staub = useMemo(() => Array.from({ length: ppFxN(6) }, (_, i) => ({ dx: (i - 2.5) * w * 0.28, g: w * (0.35 + (i % 3) * 0.1), verzug: 120 + i * 40 })), [w]);
@@ -5446,9 +5446,9 @@ function SuperAuraEffect({ x, y, w = 80, h = 110 }) {
       g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
       return c;
     };
-    const SP_KERN = sprite([[0, 'rgba(255,255,235,1)'], [0.35, 'rgba(255,240,150,.8)'], [1, 'rgba(255,200,40,0)']]);
-    const SP_GOLD = sprite([[0, 'rgba(255,230,110,.95)'], [0.45, 'rgba(255,190,30,.55)'], [1, 'rgba(255,150,0,0)']]);
-    const SP_ROT  = sprite([[0, 'rgba(255,190,60,.7)'], [0.5, 'rgba(255,120,10,.35)'], [1, 'rgba(255,80,0,0)']]);
+    const SP_KERN = sprite([[0, 'rgba(255,248,232,1)'], [0.35, 'rgba(255,241,150,.8)'], [1, 'rgba(255,198,28,0)']]);
+    const SP_GOLD = sprite([[0, 'rgba(255,228,105,.95)'], [0.45, 'rgba(255,185,26,.55)'], [1, 'rgba(255,154,26,0)']]);
+    const SP_ROT  = sprite([[0, 'rgba(255,185,26,.7)'], [0.5, 'rgba(255,125,0,.35)'], [1, 'rgba(255,73,26,0)']]);
 
     // Punkt auf dem (leicht vergroesserten) Kartenrand; Seiten und Boden
     // bekommen mehr Flammen als die Oberkante (dort schlaegt die Aura zusammen).
@@ -5492,7 +5492,7 @@ function SuperAuraEffect({ x, y, w = 80, h = 110 }) {
         const g = ctx.createRadialGradient(0, 0, R * 0.2, 0, 0, R);
         g.addColorStop(0, `rgba(255,225,90,${0.42 * env})`);
         g.addColorStop(0.55, `rgba(255,180,20,${0.22 * env})`);
-        g.addColorStop(1, 'rgba(255,140,0,0)');
+        g.addColorStop(1, 'rgba(255,139,26,0)');
         ctx.fillStyle = g;
         ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
@@ -5505,7 +5505,7 @@ function SuperAuraEffect({ x, y, w = 80, h = 110 }) {
         const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
         g.addColorStop(0, `rgba(255,255,255,${0.9 * (1 - q)})`);
         g.addColorStop(0.5, `rgba(255,240,160,${0.5 * (1 - q)})`);
-        g.addColorStop(1, 'rgba(255,210,60,0)');
+        g.addColorStop(1, 'rgba(248,202,33,0)');
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = `rgba(255,236,150,${0.85 * (1 - q)})`;
         ctx.lineWidth = 4 * k * (1 - q) + 1;
@@ -5553,7 +5553,7 @@ function SuperAuraEffect({ x, y, w = 80, h = 110 }) {
       // Leuchtender Kartenrand.
       if (env > 0) {
         ctx.save();
-        ctx.shadowColor = 'rgba(255,215,60,1)';
+        ctx.shadowColor = 'rgba(250,213,74,1)';
         ctx.shadowBlur = 14 * k;
         ctx.strokeStyle = `rgba(255,236,140,${0.75 * env})`;
         ctx.lineWidth = 2.5 * k;
@@ -5581,8 +5581,8 @@ function SuperAuraEffect({ x, y, w = 80, h = 110 }) {
         const e = entladungen[i];
         if (t > e.bis) { entladungen.splice(i, 1); continue; }
         ctx.save();
-        ctx.shadowColor = '#7fdcff'; ctx.shadowBlur = 10 * k;
-        ctx.strokeStyle = 'rgba(235,250,255,.95)'; ctx.lineWidth = 1.8 * k; ctx.lineJoin = 'round';
+        ctx.shadowColor = '#7fdfff'; ctx.shadowBlur = 10 * k;
+        ctx.strokeStyle = 'rgba(229,245,250,.95)'; ctx.lineWidth = 1.8 * k; ctx.lineJoin = 'round';
         ctx.beginPath(); e.pts.forEach(([a, b], j) => (j ? ctx.lineTo(a, b) : ctx.moveTo(a, b))); ctx.stroke();
         ctx.restore();
       }
@@ -5658,7 +5658,7 @@ function MeteorCrashEffect({ x, y, w = 80, intensity = 1 }) {
     const a = Math.PI + Math.random() * Math.PI;               // nach oben faechernd
     const sp = 40 + Math.random() * (70 + k * 20);
     return { dx: Math.cos(a) * sp, dy: Math.sin(a) * sp * 0.8, size: 4 + Math.random() * 7,
-      color: ['#6b4a2a', '#8a5a30', '#ff8a1f', '#ffd25a', '#3a2412', '#ff4d00'][Math.floor(Math.random() * 6)],
+      color: ['#6b4a2a', '#9d612f', '#ff8b1a', '#ffd966', '#3a2412', '#ff491a'][Math.floor(Math.random() * 6)],
       delay: 520 + Math.random() * 80, dur: 420 + Math.random() * 320 };
   }), []);
   return (
@@ -5701,7 +5701,7 @@ function FlameStrikeEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 2 + Math.random() * 5,
-      color: ['#ff4400','#ff8800','#ffcc00','#ff2200','#ffaa00'][Math.floor(Math.random() * 5)],
+      color: ['#ff491a','#ff8b1a','#ffd61a','#ff1a1a','#f9ac20'][Math.floor(Math.random() * 5)],
       delay: 300 + Math.random() * 150,
       dur: 300 + Math.random() * 250,
     };
@@ -5758,7 +5758,7 @@ function HandAmbiance({ color }) {
   }, []);
   return (
     <div className="hand-ambiance" aria-hidden="true"
-      style={{ '--amb-me': color || '#00f0ff' }}>
+      style={{ '--amb-me': color || '#1aedff' }}>
       <div className="hand-bloom" />
       <div className="hand-particles">
         {motes.map((p, i) => (
@@ -5815,7 +5815,7 @@ function BoardAmbiance({ colorMe, colorOpp }) {
   }, []);
   return (
     <div className="board-ambiance" aria-hidden="true"
-      style={{ '--amb-board-me': colorMe || '#00f0ff', '--amb-board-opp': colorOpp || '#ff5577' }}>
+      style={{ '--amb-board-me': colorMe || '#1aedff', '--amb-board-opp': colorOpp || '#ec2d62' }}>
       {motes.map((p, i) => (
         <span key={i} className="board-mote" style={{
           top: p.top + '%', left: p.left + '%',
@@ -5843,7 +5843,7 @@ function BoardAmbiance({ colorMe, colorOpp }) {
 // dicht in einer leicht gestreckten Wolke. Ein Teil davon RIESELT im Flug
 // nach hinten unten ab (`streu`) — das ist die Spur, die vorher ein
 // grosser Leuchtfleck vortaeuschte.
-const SAND_FARBEN = ['#f3dfa6', '#e2c07a', '#c9995a', '#a8783f'];
+const SAND_FARBEN = ['#f9ecb3', '#e0c085', '#ca874e', '#9d612f'];
 const sandZufall = (start) => {
   let t = start >>> 0;
   return () => { t = (t * 1664525 + 1013904223) >>> 0; return t / 4294967296; };
@@ -5982,7 +5982,7 @@ function WeissPfeil({ p }) {
           <span className="sf-schweif" />
           <svg className="sf-pfeil" viewBox="0 0 96 12" width="96" height="12" xmlns="http://www.w3.org/2000/svg">
             <polygon points="0,0.5 12,6 0,11.5" fill="#ffffff" />
-            <polygon points="8,0.5 20,6 8,11.5" fill="#eef6ff" />
+            <polygon points="8,0.5 20,6 8,11.5" fill="#e5f5fa" />
             <rect x="12" y="5" width="62" height="2" fill="#ffffff" />
             <polygon points="72,0 96,6 72,12" fill="#ffffff" />
           </svg>
@@ -6013,7 +6013,7 @@ function WeissPfeil({ p }) {
 //  Eigene Zeichenschleife, keine Keyframes. Klänge: Start `elem_wind` (Handler),
 //  Einschlag aus der Komponente.
 // ═══════════════════════════════════════════════════════════════════
-const PP_DRUCK_FARBEN = ['#ffffff', '#e2f9ff', '#a8edff', '#63c8f6', '#3b90d9', '#2b5cab', '#1b3472']
+const PP_DRUCK_FARBEN = ['#ffffff', '#e5f5fa', '#b3e8f9', '#77c8ee', '#4e82cb', '#2f539d', '#2b457e']
   .map(h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]);
 const PP_DRUCK_BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => v / 16);
 
@@ -6151,7 +6151,7 @@ function DruckGeschoss({ p }) {
   return (
     <div aria-hidden="true" style={{ position: 'fixed', left: x0, top: y0, pointerEvents: 'none', zIndex: 10200 }}>
       <canvas ref={cvs} width={gw} height={gh}
-        style={{ width: gw * s, height: gh * s, imageRendering: 'pixelated', display: 'block', filter: 'drop-shadow(0 0 5px rgba(99,200,246,.7))' }} />
+        style={{ width: gw * s, height: gh * s, imageRendering: 'pixelated', display: 'block', filter: 'drop-shadow(0 0 5px rgba(119,200,238,.7))' }} />
     </div>
   );
 }
@@ -6308,7 +6308,7 @@ function GatheringStormOverlay() {
       <div style={{
         position: 'absolute', inset: 0,
         background:
-          'radial-gradient(ellipse at 50% 50%, rgba(80,8,12,0.32) 0%, rgba(50,4,8,0.22) 55%, rgba(20,2,4,0.18) 100%)',
+          'radial-gradient(ellipse at 50% 50%, rgba(82,10,12,0.32) 0%, rgba(42,4,4,0.22) 55%, rgba(8,6,12,0.18) 100%)',
         mixBlendMode: 'multiply',
       }} />
       {/* Layer 2: drifting crimson cloud sprites. The keyframe drives
@@ -6325,25 +6325,25 @@ function GatheringStormOverlay() {
             opacity: c.opacity,
             '--gscScale': c.scale,
             animation: `gatheringStormCloud${c.reverse ? 'Rev' : ''} ${c.dur}s linear ${c.delay}s infinite`,
-            filter: 'drop-shadow(0 4px 18px rgba(120,12,16,0.5))',
+            filter: 'drop-shadow(0 4px 18px rgba(120,0,20,0.5))',
           }}>
             {/* Stacked ellipses make a single cloud sprite. */}
             <div style={{
               position: 'absolute', left: -65, top: -18,
               width: 130, height: 36, borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(105,12,18,0.92) 0%, rgba(75,8,14,0.7) 55%, rgba(30,2,6,0) 95%)',
+              background: 'radial-gradient(circle, rgba(91,1,2,0.92) 0%, rgba(82,10,12,0.7) 55%, rgba(39,13,12,0) 95%)',
               filter: 'blur(2px)',
             }} />
             <div style={{
               position: 'absolute', left: -32, top: -32,
               width: 78, height: 36, borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(125,18,24,0.88) 0%, rgba(85,10,16,0.6) 60%, rgba(30,2,6,0) 95%)',
+              background: 'radial-gradient(circle, rgba(120,0,20,0.88) 0%, rgba(82,10,12,0.6) 60%, rgba(39,13,12,0) 95%)',
               filter: 'blur(2px)',
             }} />
             <div style={{
               position: 'absolute', left: 5, top: -26,
               width: 65, height: 30, borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(95,10,16,0.85) 0%, rgba(60,6,12,0.55) 60%, rgba(20,1,4,0) 95%)',
+              background: 'radial-gradient(circle, rgba(91,1,2,0.85) 0%, rgba(58,0,0,0.55) 60%, rgba(8,6,12,0) 95%)',
               filter: 'blur(2px)',
             }} />
             {/* A crimson "underbelly" smear hints at active rain inside
@@ -6351,7 +6351,7 @@ function GatheringStormOverlay() {
             <div style={{
               position: 'absolute', left: -45, top: 4,
               width: 95, height: 14, borderRadius: '50%',
-              background: 'radial-gradient(ellipse, rgba(60,4,8,0.7) 0%, rgba(30,2,4,0) 80%)',
+              background: 'radial-gradient(ellipse, rgba(58,0,0,0.7) 0%, rgba(39,13,12,0) 80%)',
               filter: 'blur(4px)',
             }} />
           </div>
@@ -6379,16 +6379,16 @@ function GatheringStormOverlay() {
             }}
           >
             {/* Outer red glow */}
-            <path d={b.main} stroke="#ff1830" strokeWidth="1.4"
+            <path d={b.main} stroke="#ef2929" strokeWidth="1.4"
                   fill="none" strokeLinecap="round"
                   filter="url(#gatheringStormGlow)" opacity="0.9" />
-            <path d={b.fork} stroke="#ff1830" strokeWidth="1.0"
+            <path d={b.fork} stroke="#ef2929" strokeWidth="1.0"
                   fill="none" strokeLinecap="round"
                   filter="url(#gatheringStormGlow)" opacity="0.85" />
             {/* Inner bright core */}
-            <path d={b.main} stroke="#ffd0d8" strokeWidth="0.55"
+            <path d={b.main} stroke="#f0bfbc" strokeWidth="0.55"
                   fill="none" strokeLinecap="round" />
-            <path d={b.fork} stroke="#ffd0d8" strokeWidth="0.4"
+            <path d={b.fork} stroke="#f0bfbc" strokeWidth="0.4"
                   fill="none" strokeLinecap="round" />
           </g>
         ) : null)}
@@ -6452,12 +6452,12 @@ function TempesteRainOverlay() {
     <div className="tempeste-rain-overlay" style={{
       position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 178,
       overflow: 'hidden',
-      background: 'linear-gradient(180deg, rgba(20,30,55,0.18) 0%, rgba(10,20,40,0.30) 100%)',
+      background: 'linear-gradient(180deg, rgba(26,26,46,0.18) 0%, rgba(26,26,46,0.30) 100%)',
     }}>
       {/* Background lightning flicker — full-overlay desaturated flash. */}
       <div key={'tflk' + flickerSerial} style={{
         position: 'absolute', inset: 0,
-        background: 'radial-gradient(ellipse at 50% 30%, rgba(220,230,255,0.45) 0%, rgba(160,180,220,0.18) 35%, transparent 70%)',
+        background: 'radial-gradient(ellipse at 50% 30%, rgba(229,237,250,0.45) 0%, rgba(155,163,202,0.18) 35%, transparent 70%)',
         opacity: 0,
         animation: 'tempesteFlicker 700ms ease-out forwards',
       }} />
@@ -6466,7 +6466,7 @@ function TempesteRainOverlay() {
           position: 'absolute',
           left: d.left + '%', top: '-10%',
           width: d.w + 'px', height: d.h + 'px',
-          background: 'linear-gradient(180deg, rgba(80,110,160,0) 0%, rgba(120,150,200,' + d.opacity + ') 30%, rgba(170,200,235,' + d.opacity + ') 70%, rgba(220,235,255,' + d.opacity + ') 100%)',
+          background: 'linear-gradient(180deg, rgba(64,95,140,0) 0%, rgba(120,150,200,' + d.opacity + ') 30%, rgba(170,200,235,' + d.opacity + ') 70%, rgba(220,235,255,' + d.opacity + ') 100%)',
           boxShadow: '0 0 3px rgba(150,180,220,' + (d.opacity * 0.5) + ')',
           borderRadius: d.w + 'px',
           animation: 'tempesteRainDrop ' + d.dur + 's linear ' + d.delay + 's infinite',
@@ -6477,7 +6477,7 @@ function TempesteRainOverlay() {
           position: 'absolute',
           left: s.left + '%', top: s.top + '%',
           width: s.size + 'px', height: (s.size * 0.45) + 'px',
-          border: '1.5px solid rgba(190,215,245,0.7)',
+          border: '1.5px solid rgba(179,216,249,0.7)',
           borderTop: 'transparent',
           borderRadius: '50%',
           animation: 'tempesteRainSplash ' + s.dur + 's ease-out ' + s.delay + 's infinite',
@@ -6601,7 +6601,7 @@ const TypeDeclarationOverlay = React.memo(function TypeDeclarationOverlay({ decl
       }}>
         <div style={{
           fontSize: 15, letterSpacing: '3px', textTransform: 'uppercase',
-          color: '#d8d8e4', textShadow: '0 2px 6px rgba(0,0,0,.9)', marginBottom: 6,
+          color: '#d2d2db', textShadow: '0 2px 6px rgba(0,0,0,.9)', marginBottom: 6,
         }}>
           {decl.declaredBy} declares
         </div>
@@ -6614,7 +6614,7 @@ const TypeDeclarationOverlay = React.memo(function TypeDeclarationOverlay({ decl
           padding: '10px 34px',
           border: `3px solid ${decl.color}`,
           borderRadius: 10,
-          background: 'rgba(8,8,16,.82)',
+          background: 'rgba(8,6,12,.82)',
           boxShadow: `0 0 30px ${decl.color}66, inset 0 0 24px ${decl.color}22`,
         }}>
           {decl.label}
@@ -6772,7 +6772,7 @@ function HealReversedOverlay() {
         <span key={i} className="heal-reversed-particle" style={{
           left: p.x + '%', top: p.y + '%', fontSize: p.size,
           animationDelay: p.delay + 's', animationDuration: p.dur + 's',
-          color: p.isSkull ? '#ddd' : p.color ? '#66ff99' : '#cc66ff',
+          color: p.isSkull ? '#e6e6e6' : p.color ? '#66ffa2' : '#b866ff',
         }}>{p.isSkull ? '💀' : '✦'}</span>
       ))}
     </div>
@@ -6885,7 +6885,7 @@ function ShadowSummonEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 2 + Math.random() * 4,
-      color: ['#6633aa','#442288','#553399','#221144','#7744bb'][Math.floor(Math.random() * 5)],
+      color: ['#7e41ba','#58238c','#663597','#1a0a3a','#7e41ba'][Math.floor(Math.random() * 5)],
       delay: 300 + Math.random() * 200,
       dur: 300 + Math.random() * 300,
     };
@@ -6931,7 +6931,7 @@ function DoomCounterEffect({ x, y, h }) {
   DOOM_SCHAEDEL.forEach((row, yy) => [...row].forEach((ch, xx) => {
     if (ch === '.') return;
     // helle Seite rechts oben, Schatten links unten
-    const c = ch === 'o' ? '#ff2a22' : (xx >= 6 || yy <= 1 ? '#f4ecde' : (xx <= 1 || yy >= 6 ? '#b8ab9c' : '#e2d7c6'));
+    const c = ch === 'o' ? '#ff1a1a' : (xx >= 6 || yy <= 1 ? '#fff8e8' : (xx <= 1 || yy >= 6 ? '#c5b7a0' : '#e2d8cb'));
     rects.push(<rect key={xx + '-' + yy} x={xx} y={yy} width="1" height="1" fill={c} />);
   }));
   const oben = y - (h || 60) / 2 - 8;
@@ -6939,7 +6939,7 @@ function DoomCounterEffect({ x, y, h }) {
     <div className="anim-doom-counter" style={{ position: 'fixed', left: x, top: oben, pointerEvents: 'none', zIndex: 10100 }}>
       <div className="anim-doom-counter-inhalt">
         <svg width={9 * px} height={8 * px} viewBox="0 0 9 8" shapeRendering="crispEdges"
-          style={{ filter: 'drop-shadow(0 0 1px #2a0404) drop-shadow(0 0 1px #2a0404) drop-shadow(0 0 6px rgba(255,30,20,.6))' }}>
+          style={{ filter: 'drop-shadow(0 0 1px #2a0404) drop-shadow(0 0 1px #2a0404) drop-shadow(0 0 6px rgba(255,26,26,.6))' }}>
           {rects}
         </svg>
         <span className="anim-doom-counter-plus">+1</span>
@@ -6955,7 +6955,7 @@ function GoldSparkleEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 3 + Math.random() * 5,
-      color: ['#ffd700','#ffcc00','#ffee55','#fff','#ffaa00'][Math.floor(Math.random() * 5)],
+      color: ['#ffd61a','#ffd61a','#ffe23d','#fff','#f9ac20'][Math.floor(Math.random() * 5)],
       delay: Math.random() * 150,
       dur: 400 + Math.random() * 400,
     };
@@ -7016,7 +7016,7 @@ function SpiderSummonEffect({ x, y }) {
             <line key={'sp' + i}
               x1={0} y1={0}
               x2={Math.cos(a) * 56} y2={Math.sin(a) * 56}
-              stroke="rgba(240,240,255,0.85)"
+              stroke="rgba(229,237,250,0.85)"
               strokeWidth={0.8}
               strokeLinecap="round"
             />
@@ -7027,7 +7027,7 @@ function SpiderSummonEffect({ x, y }) {
           <circle key={'arc' + i}
             cx={0} cy={0} r={r}
             fill="none"
-            stroke="rgba(220,225,235,0.7)"
+            stroke="rgba(229,237,250,0.7)"
             strokeWidth={0.6}
             strokeDasharray="3 5"
           />
@@ -7039,10 +7039,10 @@ function SpiderSummonEffect({ x, y }) {
           position: 'absolute',
           left: s.xOff, top: -70,
           width: 1.4, height: s.len,
-          background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(240,240,255,0.7) 30%, rgba(240,240,255,0.85) 100%)',
+          background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(229,237,250,0.7) 30%, rgba(229,237,250,0.85) 100%)',
           transformOrigin: 'top center',
           animation: `spiderSummonStrand ${s.dur}ms ease-out ${s.delay}ms forwards`,
-          filter: 'drop-shadow(0 0 2px rgba(180,200,255,0.5))',
+          filter: 'drop-shadow(0 0 2px rgba(180,207,248,0.5))',
         }} />
       ))}
       {/* Burst spiders crawling outward */}
@@ -7070,16 +7070,16 @@ function SpiderSummonEffect({ x, y }) {
               return (
                 <g key={'leg' + li}>
                   <polyline points={`${-x1},${y1} ${-kx},${ky} ${-x2},${y2}`}
-                    fill="none" stroke="rgba(20,15,25,0.95)" strokeWidth={1.4} strokeLinecap="round" />
+                    fill="none" stroke="rgba(18,16,31,0.95)" strokeWidth={1.4} strokeLinecap="round" />
                   <polyline points={`${x1},${y1} ${kx},${ky} ${x2},${y2}`}
-                    fill="none" stroke="rgba(20,15,25,0.95)" strokeWidth={1.4} strokeLinecap="round" />
+                    fill="none" stroke="rgba(18,16,31,0.95)" strokeWidth={1.4} strokeLinecap="round" />
                 </g>
               );
             })}
             <ellipse cx={0} cy={0} rx={5.5} ry={4}
-              fill="rgba(20,15,25,1)" stroke="rgba(45,30,50,1)" strokeWidth={0.6} />
-            <circle cx={-1.6} cy={-1.2} r={0.7} fill="rgba(220,60,60,0.95)" />
-            <circle cx={1.6} cy={-1.2} r={0.7} fill="rgba(220,60,60,0.95)" />
+              fill="rgba(18,16,31,1)" stroke="rgba(41,31,61,1)" strokeWidth={0.6} />
+            <circle cx={-1.6} cy={-1.2} r={0.7} fill="rgba(231,59,65,0.95)" />
+            <circle cx={1.6} cy={-1.2} r={0.7} fill="rgba(231,59,65,0.95)" />
           </svg>
         </div>
       ))}
@@ -7115,7 +7115,7 @@ function DiamondSparkleEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 3 + Math.random() * 5,
-      color: ['#ffffff','#cdeeff','#88c8ff','#e0f6ff','#a6e1ff','#ddccff'][Math.floor(Math.random() * 6)],
+      color: ['#ffffff','#bddcef','#68c6fd','#e5f5fa','#b4dff8','#d9c0ec'][Math.floor(Math.random() * 6)],
       delay: Math.random() * 150,
       dur: 400 + Math.random() * 400,
     };
@@ -7140,7 +7140,7 @@ function BeerBubblesEffect({ x, y }) {
     size: 4 + Math.random() * 8,
     delay: Math.random() * 300,
     dur: 500 + Math.random() * 500,
-    color: ['#ffd700','#ffcc33','#fff8dc','#ffe680','#fff'][Math.floor(Math.random() * 5)],
+    color: ['#ffd61a','#f8ca21','#fff8e8','#fbe181','#fff'][Math.floor(Math.random() * 5)],
     wobble: -8 + Math.random() * 16,
   })), []);
   return (
@@ -7162,7 +7162,7 @@ function CreatureDeathEffect({ x, y }) {
     dx: -20 + Math.random() * 40,
     dy: -(40 + Math.random() * 60),
     size: 4 + Math.random() * 6,
-    color: ['#ffffff','#aaccff','#88aaff','#ccddff','#ddeeff'][Math.floor(Math.random() * 5)],
+    color: ['#ffffff','#b4cff8','#6d9bf8','#b3d8f9','#e5edfa'][Math.floor(Math.random() * 5)],
     delay: Math.random() * 200,
     dur: 600 + Math.random() * 500,
   })), []);
@@ -7173,7 +7173,7 @@ function CreatureDeathEffect({ x, y }) {
       dx: Math.cos(angle) * speed,
       dy: Math.sin(angle) * speed,
       size: 2 + Math.random() * 4,
-      color: ['#ff4444','#ff6666','#ffaaaa','#ff8888','#cc3333'][Math.floor(Math.random() * 5)],
+      color: ['#f03232','#ff6666','#f9b3b3','#ec7f79','#b5171c'][Math.floor(Math.random() * 5)],
       delay: 50 + Math.random() * 150,
       dur: 400 + Math.random() * 400,
     };
@@ -7299,7 +7299,7 @@ function CosmicSummonEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 3 + Math.random() * 5,
-      color: ['#b488ff','#8a4bff','#d0a8ff','#ffffff','#6a2dcf'][Math.floor(Math.random() * 5)],
+      color: ['#c98aff','#a040ff','#d6b3f9','#ffffff','#7a2bd0'][Math.floor(Math.random() * 5)],
       delay: 350 + Math.random() * 150,
       dur: 400 + Math.random() * 300,
     };
@@ -7353,12 +7353,12 @@ function CosmicSummonEffect({ x, y }) {
           background:
             radial-gradient(circle at 50% 50%,
               #000 0%,
-              rgba(40, 8, 80, 0.95) 30%,
-              rgba(120, 40, 220, 0.55) 60%,
-              rgba(80, 24, 180, 0.0) 100%);
+              rgba(46,10,81,0.95) 30%,
+              rgba(110,0,204,0.55) 60%,
+              rgba(102,24,180,0.0) 100%);
           box-shadow:
-            0 0 40px rgba(140, 60, 255, 0.75),
-            inset 0 0 30px rgba(20, 0, 50, 0.9);
+            0 0 40px rgba(160,64,255,0.75),
+            inset 0 0 30px rgba(26,10,58,0.9);
           transform: translate(-50%, -50%) scale(0.1);
           animation: cosmic-void-pulse 900ms ease-out forwards;
           filter: blur(0.5px);
@@ -7367,9 +7367,9 @@ function CosmicSummonEffect({ x, y }) {
           position: absolute; left: 0; top: 0;
           width: 100px; height: 100px;
           border-radius: 50%;
-          border: 3px solid rgba(220, 180, 255, 0.9);
+          border: 3px solid rgba(214,179,249,0.9);
           box-shadow:
-            0 0 20px rgba(180, 100, 255, 0.9),
+            0 0 20px rgba(184,102,255,0.9),
             inset 0 0 14px rgba(255, 255, 255, 0.65);
           transform: translate(-50%, -50%) scale(0.3);
           animation: cosmic-ring-expand 700ms ease-out forwards;
@@ -7379,10 +7379,10 @@ function CosmicSummonEffect({ x, y }) {
           position: absolute; left: 0; top: 0;
           width: var(--csize); height: var(--csize);
           border-radius: 50%;
-          background: radial-gradient(circle, #fff 0%, rgba(220, 200, 255, 0.95) 45%, rgba(180, 140, 255, 0) 100%);
+          background: radial-gradient(circle, #fff 0%, rgba(214,187,241,0.95) 45%, rgba(201,138,255,0) 100%);
           box-shadow:
             0 0 10px rgba(255, 255, 255, 0.95),
-            0 0 20px rgba(180, 120, 255, 0.75);
+            0 0 20px rgba(186,116,255,0.75);
           transform: translate(calc(-50% + var(--cstartX)), calc(-50% + var(--cstartY))) scale(0.6);
           animation: cosmic-star-converge ease-in forwards;
         }
@@ -7410,7 +7410,7 @@ function BomblebeeBlastEffect({ x, y }) {
       dx: Math.cos(angle) * speed,
       dy: Math.sin(angle) * speed,
       size: 3 + Math.random() * 7,
-      color: ['#ffcc00', '#ffaa00', '#ff8800', '#222', '#000', '#fff8aa'][Math.floor(Math.random() * 6)],
+      color: ['#ffd61a', '#f9ac20', '#ff8b1a', '#222', '#000', '#f7f7ad'][Math.floor(Math.random() * 6)],
       delay: Math.random() * 60,
       dur: 380 + Math.random() * 320,
     };
@@ -7420,7 +7420,7 @@ function BomblebeeBlastEffect({ x, y }) {
       <div style={{
         position: 'absolute', width: 90, height: 90, left: -45, top: -45,
         borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(255,240,160,0.95) 0%, rgba(255,180,0,0.6) 35%, rgba(120,60,0,0.4) 70%, transparent 100%)',
+        background: 'radial-gradient(circle, rgba(255,241,150,0.95) 0%, rgba(255,185,26,0.6) 35%, rgba(125,57,17,0.4) 70%, transparent 100%)',
         animation: 'bb-blast-flash 480ms ease-out forwards',
       }} />
       {particles.map((p, i) => (
@@ -7482,7 +7482,7 @@ function BomblebeeCarpetEffect({ x, y, w, h }) {
           width: b.size + 'px', height: b.size + 'px',
           marginLeft: -b.size / 2, marginTop: -b.size / 2,
           borderRadius: '50%',
-          background: `radial-gradient(circle, hsl(${b.hue}, 100%, 70%) 0%, hsl(${b.hue}, 100%, 45%) 45%, rgba(50,15,0,0.6) 90%, transparent 100%)`,
+          background: `radial-gradient(circle, hsl(${b.hue}, 100%, 70%) 0%, hsl(${b.hue}, 100%, 45%) 45%, rgba(49,20,2,0.6) 90%, transparent 100%)`,
           boxShadow: `0 0 12px hsl(${b.hue}, 100%, 55%)`,
           opacity: 0,
           animation: `bb-carpet-burst ${b.dur}ms ease-out ${b.delay}ms forwards`,
@@ -7495,7 +7495,7 @@ function BomblebeeCarpetEffect({ x, y, w, h }) {
           width: s.size + 'px', height: s.size + 'px',
           marginLeft: -s.size / 2, marginTop: -s.size / 2,
           borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(80,60,50,0.65) 0%, rgba(40,30,25,0.35) 60%, transparent 100%)',
+          background: 'radial-gradient(circle, rgba(57,49,35,0.65) 0%, rgba(39,24,12,0.35) 60%, transparent 100%)',
           opacity: 0,
           animation: `bb-carpet-smoke ${s.dur}ms ease-out ${s.delay}ms forwards`,
         }} />
@@ -7528,7 +7528,7 @@ function BomblebeeDiveEffect({ x, y }) {
       dx: Math.cos(angle) * speed,
       dy: Math.sin(angle) * speed,
       size: 3 + Math.random() * 5,
-      color: ['#ffffff', '#ddeeff', '#aaccff', '#88aadd'][Math.floor(Math.random() * 4)],
+      color: ['#ffffff', '#e5edfa', '#b4cff8', '#89abdc'][Math.floor(Math.random() * 4)],
       delay: 220 + Math.random() * 80,
       dur: 360 + Math.random() * 200,
     };
@@ -7539,12 +7539,12 @@ function BomblebeeDiveEffect({ x, y }) {
       <div style={{
         position: 'absolute',
         left: 60, top: -90, width: 6, height: 140,
-        background: 'linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.95) 60%, rgba(160,200,255,0.85) 100%)',
+        background: 'linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.95) 60%, rgba(180,207,248,0.85) 100%)',
         borderRadius: '50%',
         transform: 'rotate(35deg)',
         transformOrigin: '50% 100%',
         opacity: 0,
-        boxShadow: '0 0 10px rgba(180,220,255,0.7)',
+        boxShadow: '0 0 10px rgba(179,216,249,0.7)',
         animation: 'bb-dive-streak 280ms ease-in forwards',
       }} />
       {/* Impact poof — short, soft white burst at landing point */}
@@ -7552,7 +7552,7 @@ function BomblebeeDiveEffect({ x, y }) {
         position: 'absolute',
         width: 70, height: 70, left: -35, top: -35,
         borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(180,210,255,0.6) 50%, transparent 100%)',
+        background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(180,207,248,0.6) 50%, transparent 100%)',
         opacity: 0,
         animation: 'bb-dive-poof 500ms ease-out 230ms forwards',
       }} />
@@ -7604,8 +7604,8 @@ function BomblebeeTickEffect({ x, y }) {
         position: 'absolute',
         width: 28, height: 28, left: -14, top: -14,
         borderRadius: '50%',
-        border: '2px solid rgba(255,200,80,0.85)',
-        boxShadow: '0 0 10px rgba(255,180,60,0.7), inset 0 0 6px rgba(255,220,120,0.6)',
+        border: '2px solid rgba(255,208,102,0.85)',
+        boxShadow: '0 0 10px rgba(249,172,32,0.7), inset 0 0 6px rgba(251,225,129,0.6)',
         opacity: 0,
         animation: 'bb-tick-ring 700ms ease-out forwards',
       }} />
@@ -7615,8 +7615,8 @@ function BomblebeeTickEffect({ x, y }) {
           left: -3 + 'px', top: -3 + 'px',
           width: 6, height: 6,
           borderRadius: '50%',
-          background: '#ffe066',
-          boxShadow: '0 0 6px #ffaa22',
+          background: '#ffe469',
+          boxShadow: '0 0 6px #f9ac20',
           opacity: 0,
           animation: `bb-tick-spark 600ms ease-out ${s.delay}ms forwards`,
           '--tdx': Math.cos(s.angle) * 22 + 'px',
@@ -7650,7 +7650,7 @@ function BomblebeeDetonateEffect({ x, y }) {
       dx: Math.cos(angle) * speed,
       dy: Math.sin(angle) * speed,
       size: 4 + Math.random() * 9,
-      color: ['#fff', '#ffeecc', '#ffaa22', '#ff5500', '#ffcc00', '#882200'][Math.floor(Math.random() * 6)],
+      color: ['#fff', '#fffbd2', '#f9ac20', '#ff491a', '#ffd61a', '#7a1900'][Math.floor(Math.random() * 6)],
       delay: Math.random() * 120,
       dur: 500 + Math.random() * 500,
     };
@@ -7664,7 +7664,7 @@ function BomblebeeDetonateEffect({ x, y }) {
           width: 110, height: 110, left: -55, top: -55,
           borderRadius: '50%',
           border: `${4 - i}px solid rgba(255,180,80,${0.85 - i * 0.2})`,
-          boxShadow: '0 0 14px rgba(255,140,40,0.8)',
+          boxShadow: '0 0 14px rgba(255,139,26,0.8)',
           opacity: 0,
           animation: `bb-deto-wave 700ms ease-out ${delay}ms forwards`,
         }} />
@@ -7673,7 +7673,7 @@ function BomblebeeDetonateEffect({ x, y }) {
         position: 'absolute',
         width: 80, height: 80, left: -40, top: -40,
         borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(255,255,240,1) 0%, rgba(255,180,60,0.85) 30%, rgba(180,40,0,0.5) 70%, transparent 100%)',
+        background: 'radial-gradient(circle, rgba(255,248,232,1) 0%, rgba(249,172,32,0.85) 30%, rgba(182,38,0,0.5) 70%, transparent 100%)',
         animation: 'bb-deto-core 600ms ease-out forwards',
       }} />
       {particles.map((p, i) => (
@@ -7729,7 +7729,7 @@ function BomblebeeClusterEffect({ x, y }) {
           width: b.size + 'px', height: b.size + 'px',
           marginLeft: -b.size / 2, marginTop: -b.size / 2,
           borderRadius: '50%',
-          background: `radial-gradient(circle, hsl(${b.hue},100%,75%) 0%, hsl(${b.hue},100%,50%) 40%, rgba(40,20,0,0.6) 85%, transparent 100%)`,
+          background: `radial-gradient(circle, hsl(${b.hue},100%,75%) 0%, hsl(${b.hue},100%,50%) 40%, rgba(39,24,12,0.6) 85%, transparent 100%)`,
           boxShadow: `0 0 14px hsl(${b.hue},100%,55%)`,
           opacity: 0,
           animation: `bb-cluster-pop 520ms ease-out ${b.delay}ms forwards`,
@@ -7747,8 +7747,8 @@ function BomblebeeClusterEffect({ x, y }) {
             position: 'absolute',
             left: -3, top: -3, width: 6, height: 6,
             borderRadius: '50%',
-            background: isBlack ? '#1a1100' : '#ffd040',
-            boxShadow: isBlack ? '0 0 3px #000' : '0 0 6px #ffaa20',
+            background: isBlack ? '#1f0f04' : '#fad54a',
+            boxShadow: isBlack ? '0 0 3px #000' : '0 0 6px #f9ac20',
             opacity: 0,
             animation: `bb-cluster-speck 700ms ease-out ${100 + i * 25}ms forwards`,
             '--cdx': dx + 'px', '--cdy': dy + 'px',
@@ -7789,7 +7789,7 @@ function BomblebeeFuseEffect({ x, y, w }) {
         position: 'absolute',
         left: -cw * 0.45 + 'px', top: -2 + 'px',
         width: cw * 0.9 + 'px', height: 4 + 'px',
-        background: 'linear-gradient(90deg, rgba(120,80,40,0.6) 0%, rgba(180,140,80,0.85) 50%, rgba(120,80,40,0.6) 100%)',
+        background: 'linear-gradient(90deg, rgba(110,68,33,0.6) 0%, rgba(178,148,102,0.85) 50%, rgba(110,68,33,0.6) 100%)',
         borderRadius: 2,
         opacity: 0.85,
       }} />
@@ -7799,8 +7799,8 @@ function BomblebeeFuseEffect({ x, y, w }) {
         left: -cw * 0.45 + 'px', top: -10 + 'px',
         width: 18, height: 18,
         borderRadius: '50%',
-        background: 'radial-gradient(circle, #ffeecc 0%, #ff8800 50%, transparent 90%)',
-        boxShadow: '0 0 14px #ff7700, 0 0 28px #ff5500',
+        background: 'radial-gradient(circle, #fffbd2 0%, #ff8b1a 50%, transparent 90%)',
+        boxShadow: '0 0 14px #ff7d00, 0 0 28px #ff491a',
         opacity: 0,
         animation: `bb-fuse-travel 700ms cubic-bezier(0.4, 0, 0.6, 1) forwards`,
         '--fW': (cw * 0.9) + 'px',
@@ -7813,8 +7813,8 @@ function BomblebeeFuseEffect({ x, y, w }) {
           top: -2 + 'px',
           width: s.size + 'px', height: s.size + 'px',
           borderRadius: '50%',
-          background: '#ffcc44',
-          boxShadow: '0 0 5px #ff9900',
+          background: '#fad54a',
+          boxShadow: '0 0 5px #ff9a1a',
           opacity: 0,
           animation: `bb-fuse-spark ${s.dur}ms ease-out ${s.delay}ms forwards`,
         }} />
@@ -7825,7 +7825,7 @@ function BomblebeeFuseEffect({ x, y, w }) {
         width: 50, height: 50,
         left: cw * 0.45 - 25 + 'px', top: -25 + 'px',
         borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(255,255,200,1) 0%, rgba(255,160,40,0.7) 50%, transparent 100%)',
+        background: 'radial-gradient(circle, rgba(248,248,189,1) 0%, rgba(255,154,26,0.7) 50%, transparent 100%)',
         opacity: 0,
         animation: 'bb-fuse-pop 400ms ease-out 600ms forwards',
       }} />
@@ -7868,7 +7868,7 @@ function BloodSplatterEffect({ x, y }) {
       size: 3 + Math.random() * 8,
       delay: Math.random() * 90,
       dur: 380 + Math.random() * 320,
-      color: ['#b3001b', '#d40f2b', '#8a0014', '#e0324c', '#6e000f'][Math.floor(Math.random() * 5)],
+      color: ['#b5171c', '#e92f38', '#8c0014', '#e94e53', '#780014'][Math.floor(Math.random() * 5)],
       stretch: 1 + Math.random() * 1.6,
       rot: angle * 180 / Math.PI,
     };
@@ -7929,7 +7929,7 @@ function BloodyCutEffect({ x, y }) {
       {spurts.map((d, i) => (
         <div key={'cs' + i} className="anim-blood-drop" style={{
           '--bdx': d.dx + 'px', '--bdy': d.dy + 'px', '--bgy': (d.dy + 30) + 'px',
-          width: d.size, height: d.size * 1.6, background: '#c1121f',
+          width: d.size, height: d.size * 1.6, background: '#c0141c',
           animationDelay: d.delay + 'ms', animationDuration: d.dur + 'ms',
         }} />
       ))}
@@ -7976,7 +7976,7 @@ function StunStrikeEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 3 + Math.random() * 6,
-      color: ['#7ddcff','#aef','#fff','#9be8ff','#cff'][Math.floor(Math.random() * 5)],
+      color: ['#7fdfff','#b3e8f9','#fff','#b3e8f9','#b2eeee'][Math.floor(Math.random() * 5)],
       delay: 280 + Math.random() * 200,
       dur: 300 + Math.random() * 300,
     };
@@ -8015,7 +8015,7 @@ function NiuPowerUpEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed - 8,
       size: 4 + Math.random() * 6,
-      color: ['#ffd700','#fff4a3','#ffe455','#fff','#ffb84a'][Math.floor(Math.random() * 5)],
+      color: ['#ffd61a','#fff196','#fad54a','#fff','#f9ac20'][Math.floor(Math.random() * 5)],
       delay: Math.random() * 200,
       dur: 400 + Math.random() * 350,
     };
@@ -8075,7 +8075,7 @@ function SnakeBiteEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed - 4,
       size: 3 + Math.random() * 5,
-      color: ['#9be84a','#c8ff5a','#7bcc2a','#dffaa0','#aef27c'][Math.floor(Math.random() * 5)],
+      color: ['#87cc00','#cbff66','#87cc00','#f7f7ad','#cbff66'][Math.floor(Math.random() * 5)],
       delay: 320 + Math.random() * 120,
       dur: 320 + Math.random() * 240,
     };
@@ -8126,7 +8126,7 @@ function SharkBiteEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed - 6,
       size: 3 + Math.random() * 5,
-      color: ['#bfefff', '#7fd4ee', '#e8fbff', '#5ec8e5', '#a9e6f7'][Math.floor(Math.random() * 5)],
+      color: ['#b3e8f9', '#7fdfff', '#e5f5fa', '#66d9ff', '#b3e8f9'][Math.floor(Math.random() * 5)],
       delay: 300 + Math.random() * 140,
       dur: 320 + Math.random() * 260,
     };
@@ -8172,7 +8172,7 @@ function CannibalismChompEffect({ x, y }) {
       endY: -68 - Math.random() * 70,
       size: 4 + Math.random() * 6,
       glyph: Math.random() < 0.55 ? '+' : '✦',
-      color: ['#7dff90','#9bff77','#48e860','#bfff9b','#aaffba'][Math.floor(Math.random() * 5)],
+      color: ['#75f091','#66ff71','#3ddc57','#b3f9b8','#b3f9b8'][Math.floor(Math.random() * 5)],
       delay: 220 + Math.random() * 380,
       dur: 480 + Math.random() * 320,
     };
@@ -8618,8 +8618,8 @@ const LiquidRainbowEffect = (() => {
 //  Feste Palette, kein Alpha, kein Schein; ~30 Bilder/s; die Wurzel trägt `data-pp-px="aus"`.
 // ═══════════════════════════════════════════════════════════════════
 function ppGlasWand(modus) {
-  const GLAS = ['#f4fcff', '#bfe6f7', '#86c4e6', '#4f8fc0'].map(ppHex);
-  const STERN = ['#ffffff', '#fff3a0', '#ffd24a'].map(ppHex);
+  const GLAS = ['#ffffff', '#bddcef', '#77c8ee', '#1788bd'].map(ppHex);
+  const STERN = ['#ffffff', '#fff196', '#fad54a'].map(ppHex);
   const S = 3, TAKT = 33, ENDE = 1000, PAD = 16;
   const AUFBAU = 300, TREFFER = modus === 'up' ? 360 : 140, BRUCH = 420;
   const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -8796,8 +8796,8 @@ function ppGlasWand(modus) {
 //  nach ~560 ms aus der Ablage herüber (Flug der Engine).
 // ═══════════════════════════════════════════════════════════════════
 function ppBeute() {
-  const SACK = { '#': ppHex('#2a1a10'), b: ppHex('#8a5a2e'), l: ppHex('#b8824a'), d: ppHex('#5a3818'), g: ppHex('#ffd24a'), s: ppHex('#e8a02a') };
-  const MUENZE = ['#ffffff', '#fff3a0', '#ffd24a', '#e8a02a'].map(ppHex);
+  const SACK = { '#': ppHex('#27180c'), b: ppHex('#9d612f'), l: ppHex('#ca874e'), d: ppHex('#5a341a'), g: ppHex('#fad54a'), s: ppHex('#cc8e00') };
+  const MUENZE = ['#ffffff', '#fff196', '#fad54a', '#cc8e00'].map(ppHex);
   const FORM = [
     '....##..##....',
     '.....#bb#.....',
@@ -8931,7 +8931,7 @@ const ANIM_REGISTRY = {
           dx: Math.cos(winkel) * L.breite * 0.5 * weite,
           dy: Math.sin(winkel) * L.hoehe * 0.45 * weite,
           groesse: 5 + Math.random() * 13,
-          farbe: ['#fff3c4', '#ffcc44', '#ff8822', '#ff4400', '#ffffff'][Math.floor(Math.random() * 5)],
+          farbe: ['#fffbd2', '#fad54a', '#ff8b1a', '#ff491a', '#ffffff'][Math.floor(Math.random() * 5)],
           verzug: Math.random() * 260,
           dauer: 700 + Math.random() * 700,
         };
@@ -9370,7 +9370,7 @@ const ANIM_REGISTRY = {
             width: '230vmax', height: '230vmax',
             marginLeft: '-115vmax', marginTop: '-115vmax',
             borderRadius: '50%',
-            background: 'radial-gradient(circle, #ffffff 0%, rgba(255,246,205,.98) 9%, rgba(255,170,40,.95) 22%, rgba(255,90,0,.88) 40%, rgba(150,20,0,.62) 60%, rgba(50,8,0,.30) 78%, transparent 90%)',
+            background: 'radial-gradient(circle, #ffffff 0%, rgba(255,251,210,.98) 9%, rgba(249,172,32,.95) 22%, rgba(255,73,26,.88) 40%, rgba(143,0,0,.62) 60%, rgba(42,4,4,.30) 78%, transparent 90%)',
             opacity: 0,
             animation: 'corpseExplodeFlash 1300ms ease-out forwards',
           }} />
@@ -9385,9 +9385,9 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -70, top: -70,
             width: 140, height: 140,
-            border: '16px solid rgba(255,140,30,.85)',
+            border: '16px solid rgba(255,139,26,.85)',
             borderRadius: '50%', opacity: 0,
-            boxShadow: '0 0 70px rgba(255,110,0,.75), inset 0 0 50px rgba(255,170,0,.6)',
+            boxShadow: '0 0 70px rgba(255,125,0,.75), inset 0 0 50px rgba(249,172,32,.6)',
             animation: 'corpseExplodeShockwave 1150ms ease-out forwards',
           }} />
           {/* Charred embers / skulls flung outward */}
@@ -9395,7 +9395,7 @@ const ANIM_REGISTRY = {
             <div key={i} style={{
               position: 'absolute', left: 0, top: 0,
               fontSize: e.size + 'px', opacity: 0,
-              filter: 'drop-shadow(0 0 7px #ff4400)',
+              filter: 'drop-shadow(0 0 7px #ff491a)',
               '--ceDx': e.dx + 'px', '--ceDy': e.dy + 'px',
               animation: `corpseExplodeEmber ${e.dur}ms ease-out ${e.delay}ms forwards`,
             }}>{e.char}</div>
@@ -9452,8 +9452,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', width: 110, height: 110, left: -55, top: -55,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,240,180,0.85) 0%, rgba(255,210,80,0.55) 45%, transparent 75%)',
-            boxShadow: '0 0 36px rgba(255,225,140,0.85), 0 0 14px rgba(255,200,80,0.6)',
+            background: 'radial-gradient(circle, rgba(249,236,179,0.85) 0%, rgba(250,213,74,0.55) 45%, transparent 75%)',
+            boxShadow: '0 0 36px rgba(251,225,129,0.85), 0 0 14px rgba(255,208,102,0.6)',
             opacity: 0,
             animation: 'johanna-halo 1100ms ease-out forwards',
           }} />
@@ -9461,7 +9461,7 @@ const ANIM_REGISTRY = {
           {beams.map((b, i) => (
             <div key={'b' + i} style={{
               position: 'absolute', width: 4, height: 70, left: -2, top: -35,
-              background: 'linear-gradient(to top, transparent 0%, rgba(255,235,150,0.95) 40%, rgba(255,255,220,1) 100%)',
+              background: 'linear-gradient(to top, transparent 0%, rgba(255,241,150,0.95) 40%, rgba(255,251,210,1) 100%)',
               borderRadius: 2,
               transformOrigin: '50% 50%',
               transform: `rotate(${b.angle}deg) translateY(-30px) scaleY(0)`,
@@ -9475,8 +9475,8 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: -s.size / 2, top: -s.size / 2,
               width: s.size + 'px', height: s.size + 'px',
               borderRadius: '50%',
-              background: '#fff5c8',
-              boxShadow: '0 0 8px #ffd86a, 0 0 16px rgba(255,200,80,0.7)',
+              background: '#fffbd2',
+              boxShadow: '0 0 8px #ffd966, 0 0 16px rgba(255,208,102,0.7)',
               opacity: 0,
               animation: `johanna-sparkle 1200ms ease-out ${s.delay}ms forwards`,
               '--jcx': Math.cos(s.angle) * s.dist + 'px',
@@ -9543,8 +9543,8 @@ const ANIM_REGISTRY = {
               left: d.lx + 'px', top: d.startY + 'px',
               width: d.wid + 'px', height: d.len + 'px',
               borderRadius: d.wid + 'px',
-              background: 'linear-gradient(to bottom, rgba(255,250,210,0.95) 0%, rgba(255,205,90,0.85) 55%, rgba(255,180,60,0) 100%)',
-              boxShadow: '0 0 6px rgba(255,210,110,0.85), 0 0 2px rgba(255,240,190,0.95)',
+              background: 'linear-gradient(to bottom, rgba(255,251,210,0.95) 0%, rgba(255,208,102,0.85) 55%, rgba(249,172,32,0) 100%)',
+              boxShadow: '0 0 6px rgba(255,208,102,0.85), 0 0 2px rgba(249,236,179,0.95)',
               opacity: 0,
               animation: `pskill-rain-fall ${d.dur}ms linear ${d.delay}ms forwards`,
               '--pf': d.fall + 'px',
@@ -9557,7 +9557,7 @@ const ANIM_REGISTRY = {
               position: 'absolute',
               left: g.lx + 'px', top: g.startY + 'px',
               width: g.size + 'px', height: g.size + 'px',
-              background: 'radial-gradient(circle, #fffbe6 0%, #ffd86a 45%, rgba(255,190,70,0) 70%)',
+              background: 'radial-gradient(circle, #fff8e8 0%, #ffd966 45%, rgba(249,172,32,0) 70%)',
               clipPath: 'polygon(50% 0%, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0% 50%, 40% 40%)',
               opacity: 0,
               animation: `pskill-rain-glint ${g.dur}ms ease-in ${g.delay}ms forwards`,
@@ -9571,7 +9571,7 @@ const ANIM_REGISTRY = {
             left: -(W * 0.55), top: (H * 0.10),
             width: W * 1.1, height: H * 0.5,
             borderRadius: '50%',
-            background: 'radial-gradient(ellipse at center, rgba(255,230,150,0.55) 0%, rgba(255,200,80,0.30) 45%, transparent 75%)',
+            background: 'radial-gradient(ellipse at center, rgba(255,241,150,0.55) 0%, rgba(255,208,102,0.30) 45%, transparent 75%)',
             filter: 'blur(1px)',
             opacity: 0,
             animation: 'pskill-rain-pool 1500ms ease-out forwards',
@@ -9633,8 +9633,8 @@ const ANIM_REGISTRY = {
               fontFamily: "'Pixel Intv', 'Press Start 2P', Georgia, serif",
               fontWeight: 'bold',
               fontSize: z.size + 'px',
-              color: '#dbe9ff',
-              textShadow: '0 0 6px rgba(120,170,255,0.85), 1px 2px 0 rgba(40,60,110,0.9)',
+              color: '#e5edfa',
+              textShadow: '0 0 6px rgba(109,155,248,0.85), 1px 2px 0 rgba(43,69,126,0.9)',
               opacity: 0,
               animation: `ua-zzz-float ${z.dur}ms ease-out ${z.delay}ms forwards`,
               '--uaRise': (-z.rise) + 'px',
@@ -9668,7 +9668,7 @@ const ANIM_REGISTRY = {
         return {
           dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
           size: 3 + Math.random() * 7,
-          color: ['#9ad13c', '#7ec428', '#bfe06a', '#5fa01e', '#d4f08a', '#eaffc0'][Math.floor(Math.random() * 6)],
+          color: ['#87cc00', '#87cc00', '#f0f075', '#5b9438', '#f0f075', '#f8f8bd'][Math.floor(Math.random() * 6)],
           delay: Math.random() * 70, dur: 360 + Math.random() * 380,
         };
       }), []);
@@ -9677,18 +9677,18 @@ const ANIM_REGISTRY = {
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100, opacity: wrapperOpacity }}>
           <div style={{
             position: 'absolute', left: -46, top: -46, width: 92, height: 92, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(170,230,70,.85) 0%, rgba(120,196,40,.5) 40%, rgba(80,150,20,0) 75%)',
-            boxShadow: '0 0 26px rgba(150,214,60,.8), 0 0 50px rgba(110,180,40,.5)',
+            background: 'radial-gradient(circle, rgba(203,255,102,.85) 0%, rgba(135,204,0,.5) 40%, rgba(91,148,56,0) 75%)',
+            boxShadow: '0 0 26px rgba(135,204,0,.8), 0 0 50px rgba(128,191,89,.5)',
             animation: 'disruptImpactFlash 620ms ease-out forwards',
           }} />
           <div style={{
             position: 'absolute', left: -20, top: -20, width: 40, height: 40, borderRadius: '50%',
-            border: '3px solid rgba(180,235,90,.9)',
+            border: '3px solid rgba(203,255,102,.9)',
             animation: 'disruptImpactRing 700ms ease-out forwards',
           }} />
           <div style={{
             position: 'absolute', left: -20, top: -20, width: 40, height: 40, borderRadius: '50%',
-            border: '2px solid rgba(140,205,55,.7)',
+            border: '2px solid rgba(135,204,0,.7)',
             animation: 'disruptImpactRing 900ms ease-out 120ms forwards',
           }} />
           {particles.map((p, i) => (
@@ -9724,7 +9724,7 @@ const ANIM_REGISTRY = {
         return {
           dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed - 30,
           size: 5 + Math.random() * 11,
-          color: ['#8a4a2a', '#b5651d', '#ff8a2a', '#6a3a1e', '#ffc070', '#ff5a1a'][Math.floor(Math.random() * 6)],
+          color: ['#8e503a', '#ad6100', '#ff8b1a', '#6e4421', '#f4ae64', '#ff491a'][Math.floor(Math.random() * 6)],
           delay: 60 + Math.random() * 90, dur: 560 + Math.random() * 520,
         };
       }), []);
@@ -9735,21 +9735,21 @@ const ANIM_REGISTRY = {
           {/* dunkelroter Druckkegel unter allem */}
           <div style={{
             position: 'absolute', left: -120, top: -120, width: 240, height: 240, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(90,10,0,.75) 0%, rgba(150,30,5,.45) 45%, rgba(100,20,0,0) 72%)',
+            background: 'radial-gradient(circle, rgba(91,1,2,.75) 0%, rgba(143,0,0,.45) 45%, rgba(106,28,20,0) 72%)',
             animation: 'roolDisruptDark 1500ms ease-out forwards',
           }} />
           {/* gleissender Aufschlag */}
           <div style={{
             position: 'absolute', left: -95, top: -95, width: 190, height: 190, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,235,170,1) 0%, rgba(255,150,50,.85) 32%, rgba(220,70,15,.45) 58%, rgba(120,30,5,0) 78%)',
-            boxShadow: '0 0 60px rgba(255,150,50,.95), 0 0 120px rgba(220,70,20,.7)',
+            background: 'radial-gradient(circle, rgba(249,236,179,1) 0%, rgba(255,155,58,.85) 32%, rgba(204,43,0,.45) 58%, rgba(122,25,0,0) 78%)',
+            boxShadow: '0 0 60px rgba(255,155,58,.95), 0 0 120px rgba(204,43,0,.7)',
             animation: 'roolDisruptFlash 760ms ease-out forwards',
           }} />
           {[0, 150].map((dl, k) => (
             <div key={'r' + k} style={{
               position: 'absolute', left: -40, top: -40, width: 80, height: 80, borderRadius: '50%',
-              border: (k ? 5 : 8) + 'px solid rgba(255,175,80,.95)',
-              boxShadow: '0 0 18px rgba(255,120,40,.9)',
+              border: (k ? 5 : 8) + 'px solid rgba(255,155,58,.95)',
+              boxShadow: '0 0 18px rgba(248,116,32,.9)',
               animation: `roolDisruptRing ${900 + k * 250}ms ease-out ${dl}ms forwards`,
             }} />
           ))}
@@ -9757,8 +9757,8 @@ const ANIM_REGISTRY = {
             <div key={i} style={{
               position: 'absolute', left: 0, top: -4, width: r.len, height: 8, transformOrigin: '0 50%',
               transform: `rotate(${r.w}deg) scaleX(0)`,
-              background: 'linear-gradient(90deg, #fff0c0 0%, #ffa040 30%, #e0501a 65%, #4a1204 100%)',
-              boxShadow: '0 0 12px rgba(255,140,50,1), 0 0 24px rgba(220,70,20,.8)',
+              background: 'linear-gradient(90deg, #f9ecb3 0%, #ff9b3a 30%, #cc2b00 65%, #520a0c 100%)',
+              boxShadow: '0 0 12px rgba(255,139,26,1), 0 0 24px rgba(204,43,0,.8)',
               clipPath: 'polygon(0 35%, 14% 0, 30% 62%, 48% 8%, 66% 72%, 84% 20%, 100% 50%, 84% 100%, 62% 66%, 40% 100%, 20% 70%, 0 65%)',
               animation: `roolDisruptCrack 1100ms ease-out ${50 + i * 30}ms forwards`,
               '--rw': r.w + 'deg',
@@ -9773,8 +9773,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -70, top: -62, width: 140, textAlign: 'center',
             fontFamily: 'var(--font-display, var(--font-body)), sans-serif', fontWeight: 900, fontSize: 76,
-            color: '#fff1c8', WebkitTextStroke: '3px #7a1c04',
-            textShadow: '0 0 14px rgba(255,140,40,1), 0 0 34px rgba(255,90,20,.95), 4px 6px 0 rgba(70,15,2,.95)',
+            color: '#fffbd2', WebkitTextStroke: '3px #7a1900',
+            textShadow: '0 0 14px rgba(255,139,26,1), 0 0 34px rgba(255,73,26,.95), 4px 6px 0 rgba(82,10,12,.95)',
             opacity: 0, animation: 'roolDisruptX2 1500ms cubic-bezier(.2,.9,.3,1) 160ms forwards',
           }}>×2</div>
           <style>{`
@@ -9824,7 +9824,7 @@ const ANIM_REGISTRY = {
     // Je Tentakel: Pfad von draussen spiralfoermig um das Ziel; jeder Pfadpunkt stempelt eine Scheibe, ein Tiefenpuffer haelt die
     // naechste Mittellinie je Pixel (Zylinder-Look); Licht von oben links, 4×4-Bayer-Dithering zwischen fuenf Rosa-/Purpurtoenen,
     // dunkle Kontur, helle Saugnaepfe auf der Innenseite.
-    const FARBEN = ['#2b1229', '#5b2a4e', '#8e4a76', '#c97a9d', '#f2b6ca'].map(h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]);
+    const FARBEN = ['#170b28', '#5a023a', '#5a023a', '#e58092', '#f8b4c8'].map(h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]);
     const KONTUR = [26, 9, 24];
     const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => v / 16);
     function tentakelFrame(gw, gh, t, seed) {
@@ -9964,7 +9964,7 @@ const ANIM_REGISTRY = {
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100, transform: 'translate(-50%, -50%)' }}>
           <canvas ref={cvs} width={gw} height={gh}
-            style={{ width: gw * s, height: gh * s, imageRendering: 'pixelated', display: 'block', filter: 'drop-shadow(0 0 6px rgba(120,30,90,.55))' }} />
+            style={{ width: gw * s, height: gh * s, imageRendering: 'pixelated', display: 'block', filter: 'drop-shadow(0 0 6px rgba(90,2,58,.55))' }} />
         </div>
       );
     };
@@ -10053,7 +10053,7 @@ const ANIM_REGISTRY = {
       return (
         <div aria-hidden="true" style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100, transform: 'translate(-50%, -50%)' }}>
           <canvas ref={cvs} width={gw} height={gh}
-            style={{ width: gw * s, height: gh * s, imageRendering: 'pixelated', display: 'block', filter: 'drop-shadow(0 0 5px rgba(99,200,246,.65))' }} />
+            style={{ width: gw * s, height: gh * s, imageRendering: 'pixelated', display: 'block', filter: 'drop-shadow(0 0 5px rgba(119,200,238,.65))' }} />
         </div>
       );
     };
@@ -10088,7 +10088,7 @@ const ANIM_REGISTRY = {
           // Two purple shades — primary (vivid) and secondary
           // (lighter pink-purple) — alternated so the cluster
           // reads as varied rather than uniform.
-          color: Math.random() < 0.65 ? '#c64bff' : '#e896ff',
+          color: Math.random() < 0.65 ? '#a952ff' : '#c98aff',
         };
       }), []);
       return (
@@ -10099,7 +10099,7 @@ const ANIM_REGISTRY = {
               left: h.startX, top: h.startY,
               fontSize: h.size,
               color: h.color,
-              textShadow: `0 0 6px ${h.color}, 0 0 10px rgba(180,80,255,.6)`,
+              textShadow: `0 0 6px ${h.color}, 0 0 10px rgba(169,82,255,.6)`,
               animation: `miniHeartsFloat ${h.dur}ms ease-out ${h.delay}ms forwards`,
               opacity: 0,
               '--mhRise': '-' + h.rise + 'px',
@@ -10163,7 +10163,7 @@ const ANIM_REGISTRY = {
               fontSize: 22, lineHeight: 1,
               opacity: 0,
               animation: `fsRallyTrumpet 1000ms ease-out ${t.delay}ms forwards`,
-              textShadow: '0 0 6px #ffe680, 0 0 12px rgba(255,200,80,0.85)',
+              textShadow: '0 0 6px #fbe181, 0 0 12px rgba(255,208,102,0.85)',
               '--fsDx': t.dx + 'px',
               '--fsDy': t.dy + 'px',
             }}>🎺</div>
@@ -10175,7 +10175,7 @@ const ANIM_REGISTRY = {
               fontSize: c.size, lineHeight: 1,
               opacity: 0,
               animation: `fsRallyCheer ${c.dur}ms ease-out ${c.delay}ms forwards`,
-              textShadow: '0 0 4px rgba(255,210,90,0.7)',
+              textShadow: '0 0 4px rgba(255,217,102,0.7)',
               '--fsDx': c.dx + 'px',
               '--fsDy': c.dy + 'px',
             }}>{c.glyph}</div>
@@ -10211,7 +10211,7 @@ const ANIM_REGISTRY = {
           dx: Math.cos(angle) * speed,
           dy: Math.sin(angle) * speed - (10 + Math.random() * 25),
           size: 3 + Math.random() * 6,
-          color: ['#1a1a1a', '#2a1a08', '#3a2410', '#0d0d0d', '#4a2e15'][Math.floor(Math.random() * 5)],
+          color: ['#141414', '#27180c', '#3a2412', '#141414', '#4a2a10'][Math.floor(Math.random() * 5)],
           delay: Math.random() * 120,
           dur: 500 + Math.random() * 350,
         };
@@ -10230,7 +10230,7 @@ const ANIM_REGISTRY = {
           {/* Dark earth disc — the mound of upturned soil. */}
           <div style={{
             position: 'absolute', left: -34, top: 6, width: 68, height: 18,
-            background: 'radial-gradient(ellipse at center, rgba(20,12,4,.85) 0%, rgba(10,6,2,.55) 60%, transparent 90%)',
+            background: 'radial-gradient(ellipse at center, rgba(20,20,20,.85) 0%, rgba(0,0,0,.55) 60%, transparent 90%)',
             borderRadius: '50%',
             animation: 'graveWormMound 700ms ease-out forwards',
           }} />
@@ -10292,8 +10292,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', width: 130, height: 130, left: -65, top: -65,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(170,235,255,0.85) 0%, rgba(70,180,230,0.55) 45%, transparent 75%)',
-            boxShadow: '0 0 40px rgba(120,210,255,0.85), 0 0 18px rgba(180,235,255,0.7)',
+            background: 'radial-gradient(circle, rgba(179,232,249,0.85) 0%, rgba(104,198,253,0.55) 45%, transparent 75%)',
+            boxShadow: '0 0 40px rgba(119,200,238,0.85), 0 0 18px rgba(179,232,249,0.7)',
             opacity: 0,
             animation: 'coolness-halo 1200ms ease-out forwards',
           }} />
@@ -10301,8 +10301,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', width: 120, height: 120, left: -60, top: -60,
             borderRadius: '50%',
-            border: '3px solid rgba(255,215,140,0.85)',
-            boxShadow: '0 0 18px rgba(255,200,100,0.8), inset 0 0 12px rgba(255,200,100,0.4)',
+            border: '3px solid rgba(251,225,129,0.85)',
+            boxShadow: '0 0 18px rgba(251,200,106,0.8), inset 0 0 12px rgba(251,200,106,0.4)',
             opacity: 0,
             animation: 'coolness-ring-cw 1100ms cubic-bezier(.2,.6,.3,1) forwards',
           }} />
@@ -10310,8 +10310,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', width: 84, height: 84, left: -42, top: -42,
             borderRadius: '50%',
-            border: '2px solid rgba(140,225,255,0.95)',
-            boxShadow: '0 0 14px rgba(140,225,255,0.75)',
+            border: '2px solid rgba(127,223,255,0.95)',
+            boxShadow: '0 0 14px rgba(127,223,255,0.75)',
             opacity: 0,
             animation: 'coolness-ring-ccw 1100ms cubic-bezier(.2,.6,.3,1) forwards',
           }} />
@@ -10319,7 +10319,7 @@ const ANIM_REGISTRY = {
           {beams.map((b, i) => (
             <div key={'cb' + i} style={{
               position: 'absolute', width: 4, height: 80, left: -2, top: -40,
-              background: 'linear-gradient(to top, transparent 0%, rgba(180,235,255,0.95) 50%, rgba(255,255,255,1) 100%)',
+              background: 'linear-gradient(to top, transparent 0%, rgba(179,232,249,0.95) 50%, rgba(255,255,255,1) 100%)',
               borderRadius: 2,
               transformOrigin: '50% 50%',
               transform: `rotate(${b.angle}deg) translateY(-32px) scaleY(0)`,
@@ -10333,10 +10333,10 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: -s.size / 2, top: -s.size / 2,
               width: s.size + 'px', height: s.size + 'px',
               borderRadius: '50%',
-              background: s.cyan ? '#c8f4ff' : '#ffe6a8',
+              background: s.cyan ? '#b6eff7' : '#f9ecb3',
               boxShadow: s.cyan
-                ? '0 0 8px #6cdcff, 0 0 16px rgba(120,200,255,0.7)'
-                : '0 0 8px #ffd86a, 0 0 16px rgba(255,200,80,0.7)',
+                ? '0 0 8px #66d9ff, 0 0 16px rgba(104,198,253,0.7)'
+                : '0 0 8px #ffd966, 0 0 16px rgba(255,208,102,0.7)',
               opacity: 0,
               animation: `coolness-sparkle 1300ms ease-out ${s.delay}ms forwards`,
               '--ccx': Math.cos(s.angle) * s.dist + 'px',
@@ -10347,7 +10347,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -22, top: -22,
             fontSize: 38,
-            filter: 'drop-shadow(0 0 6px rgba(180,235,255,0.95)) drop-shadow(0 0 14px rgba(120,210,255,0.7))',
+            filter: 'drop-shadow(0 0 6px rgba(179,232,249,0.95)) drop-shadow(0 0 14px rgba(119,200,238,0.7))',
             opacity: 0,
             animation: 'coolness-emoji 1100ms cubic-bezier(.2,.7,.3,1) 80ms forwards',
           }}>🆒</div>
@@ -10450,8 +10450,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', width: 36, height: 36, left: -18, top: -18,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(220,180,255,0.95) 0%, rgba(120,60,200,0.7) 50%, transparent 100%)',
-            boxShadow: '0 0 20px rgba(170,100,255,0.7)',
+            background: 'radial-gradient(circle, rgba(214,179,249,0.95) 0%, rgba(112,45,179,0.7) 50%, transparent 100%)',
+            boxShadow: '0 0 20px rgba(184,102,255,0.7)',
             opacity: 0,
             animation: 'cosmic-cnt-flash 600ms ease-out forwards',
           }} />
@@ -10460,8 +10460,8 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: -s.size / 2, top: -s.size / 2,
               width: s.size + 'px', height: s.size + 'px',
               borderRadius: '50%',
-              background: '#e0c8ff',
-              boxShadow: '0 0 8px #aa66ff',
+              background: '#d6bbf1',
+              boxShadow: '0 0 8px #b866ff',
               opacity: 0,
               animation: `cosmic-cnt-spark 700ms ease-out ${s.delay}ms forwards`,
               '--cdx': Math.cos(s.angle) * 28 + 'px',
@@ -10498,8 +10498,8 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: -s.size / 2, top: -s.size / 2,
               width: s.size + 'px', height: s.size + 'px',
               borderRadius: '50%',
-              background: '#7744cc',
-              boxShadow: '0 0 6px #aa66ff',
+              background: '#702db3',
+              boxShadow: '0 0 6px #b866ff',
               opacity: 0,
               animation: `cosmic-cnt-r-spark 600ms ease-in ${s.delay}ms forwards`,
               '--cdx': Math.cos(s.angle) * 30 + 'px',
@@ -10509,7 +10509,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', width: 14, height: 14, left: -7, top: -7,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(170,100,255,0.7) 60%, transparent 100%)',
+            background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(184,102,255,0.7) 60%, transparent 100%)',
             opacity: 0,
             animation: 'cosmic-cnt-r-flash 350ms ease-out 400ms forwards',
           }} />
@@ -10536,16 +10536,16 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', width: 60, height: 14, left: -30, top: -30,
             borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(180,100,255,0.9) 0%, rgba(80,30,150,0.7) 50%, transparent 100%)',
-            boxShadow: '0 0 14px rgba(170,100,255,0.85)',
+            background: 'radial-gradient(ellipse, rgba(184,102,255,0.9) 0%, rgba(80,0,140,0.7) 50%, transparent 100%)',
+            boxShadow: '0 0 14px rgba(184,102,255,0.85)',
             opacity: 0,
             animation: 'cosmic-token-portal 800ms ease-out forwards',
           }} />
           <div style={{
             position: 'absolute', width: 18, height: 18, left: -9, top: -25,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, #ddccff 0%, #6633aa 70%, #220033 100%)',
-            boxShadow: '0 0 10px #aa66ff',
+            background: 'radial-gradient(circle, #d9c0ec 0%, #7e41ba 70%, #1a0a3a 100%)',
+            boxShadow: '0 0 10px #b866ff',
             opacity: 0,
             animation: 'cosmic-token-fall 700ms cubic-bezier(0.5,0,0.7,1) 200ms forwards',
           }} />
@@ -10639,11 +10639,11 @@ const ANIM_REGISTRY = {
       // deeper, more menacing under the spatter.
       const jawGradient = (top) => goreLevel > 0
         ? (top
-          ? 'linear-gradient(180deg, #2b401a 0%, #20361a 35%, #102206 80%, #060f02 100%)'
-          : 'linear-gradient(0deg,   #2b401a 0%, #20361a 35%, #102206 80%, #060f02 100%)')
+          ? 'linear-gradient(180deg, #18300a 0%, #18300a 35%, #0f2412 80%, #141414 100%)'
+          : 'linear-gradient(0deg,   #18300a 0%, #18300a 35%, #0f2412 80%, #141414 100%)')
         : (top
-          ? 'linear-gradient(180deg, #3a5a25 0%, #2f4e1d 35%, #1f3a10 80%, #0f2208 100%)'
-          : 'linear-gradient(0deg,   #3a5a25 0%, #2f4e1d 35%, #1f3a10 80%, #0f2208 100%)');
+          ? 'linear-gradient(180deg, #3a5a25 0%, #2f4e1d 35%, #18300a 80%, #0f2412 100%)'
+          : 'linear-gradient(0deg,   #3a5a25 0%, #2f4e1d 35%, #18300a 80%, #0f2412 100%)');
 
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
@@ -10667,7 +10667,7 @@ const ANIM_REGISTRY = {
                 left: tooth.x, top: jawH - 2,
                 width: toothW, height: toothH,
                 marginLeft: -toothW / 2,
-                background: 'linear-gradient(180deg, #ffffff 0%, #f4f1d8 55%, #b8b48c 100%)',
+                background: 'linear-gradient(180deg, #ffffff 0%, #fff8e8 55%, #ccb799 100%)',
                 clipPath: 'polygon(0 0, 100% 0, 50% 100%)',
                 transform: `rotate(${tooth.rot}deg) scale(${tooth.scale})`,
                 transformOrigin: '50% 0',
@@ -10696,7 +10696,7 @@ const ANIM_REGISTRY = {
                 left: tooth.x, top: -toothH + 2,
                 width: toothW, height: toothH,
                 marginLeft: -toothW / 2,
-                background: 'linear-gradient(0deg, #ffffff 0%, #f4f1d8 55%, #b8b48c 100%)',
+                background: 'linear-gradient(0deg, #ffffff 0%, #fff8e8 55%, #ccb799 100%)',
                 clipPath: 'polygon(50% 0, 0 100%, 100% 100%)',
                 transform: `rotate(${tooth.rot}deg) scale(${tooth.scale})`,
                 transformOrigin: '50% 100%',
@@ -10714,8 +10714,8 @@ const ANIM_REGISTRY = {
             left: -lerp(45, 130) * goreScale, top: -lerp(18, 50) * goreScale,
             borderRadius: '50%',
             background: goreLevel > 0
-              ? 'radial-gradient(ellipse, rgba(220,30,20,.95) 0%, rgba(140,10,10,.55) 45%, transparent 78%)'
-              : 'radial-gradient(ellipse, rgba(255,80,40,.9) 0%, rgba(180,30,10,.45) 45%, transparent 75%)',
+              ? 'radial-gradient(ellipse, rgba(200,0,0,.95) 0%, rgba(139,13,13,.55) 45%, transparent 78%)'
+              : 'radial-gradient(ellipse, rgba(255,73,26,.9) 0%, rgba(182,38,0,.45) 45%, transparent 75%)',
             opacity: 0,
             animation: `dino-bite-flash 520ms ease-out ${lerp(360, 460)}ms forwards`,
           }} />
@@ -10730,11 +10730,11 @@ const ANIM_REGISTRY = {
               marginLeft: -s.size / 2, marginTop: -s.size / 2,
               borderRadius: '50%',
               background: goreLevel > 0
-                ? 'radial-gradient(circle, #b81810 0%, #5e0a08 50%, #200404 100%)'
-                : 'radial-gradient(circle, #d31a08 0%, #821010 60%, #3a0808 100%)',
+                ? 'radial-gradient(circle, #be0e0e 0%, #5b0102 50%, #270d0c 100%)'
+                : 'radial-gradient(circle, #c80000 0%, #780000 60%, #3a0000 100%)',
               boxShadow: goreLevel > 0
-                ? '0 0 6px rgba(160,10,10,.85)'
-                : '0 0 4px rgba(180,30,10,.7)',
+                ? '0 0 6px rgba(143,0,0,.85)'
+                : '0 0 4px rgba(182,38,0,.7)',
               opacity: 0,
               '--sdx': s.dx + 'px', '--sdy': s.dy + 'px',
               animation: `dino-bite-blood ${lerp(450, 720)}ms ease-out ${s.delay}ms forwards`,
@@ -10750,9 +10750,9 @@ const ANIM_REGISTRY = {
               left: d.xOff, top: 0,
               width: 4, height: d.len,
               marginLeft: -2,
-              background: 'linear-gradient(180deg, rgba(110,10,10,0) 0%, #8e0c08 35%, #4a0808 100%)',
+              background: 'linear-gradient(180deg, rgba(120,0,20,0) 0%, #8b0d0d 35%, #520a0c 100%)',
               borderRadius: '2px 2px 50% 50%',
-              filter: 'drop-shadow(0 1px 2px rgba(60,4,4,.7))',
+              filter: 'drop-shadow(0 1px 2px rgba(58,0,0,.7))',
               opacity: 0,
               '--dripLen': d.len + 'px',
               animation: `dino-bite-drip ${d.dur}ms ease-in ${d.delay}ms forwards`,
@@ -10766,10 +10766,10 @@ const ANIM_REGISTRY = {
             <div style={{
               position: 'absolute', left: 0, top: 0,
               fontSize: lerp(36, 62) + 'px',
-              color: '#ffd0c0',
+              color: '#f0bfbc',
               fontWeight: 900,
               fontStyle: 'italic',
-              textShadow: '2px 2px 0 #200404, -1px -1px 0 #200404, 1px -1px 0 #200404, -1px 1px 0 #200404, 0 0 14px rgba(200,30,20,.9)',
+              textShadow: '2px 2px 0 #270d0c, -1px -1px 0 #270d0c, 1px -1px 0 #270d0c, -1px 1px 0 #270d0c, 0 0 14px rgba(190,14,14,.9)',
               opacity: 0,
               whiteSpace: 'nowrap',
               animation: `dino-bite-roar 760ms ease-out ${lerp(400, 460)}ms forwards`,
@@ -10779,10 +10779,10 @@ const ANIM_REGISTRY = {
             <div style={{
               position: 'absolute', left: 0, top: 0,
               fontSize: lerp(28, 60) + 'px',
-              color: '#ffe8aa',
+              color: '#f9ecb3',
               fontWeight: 900,
               fontStyle: 'italic',
-              textShadow: '2px 2px 0 #220500, -1px -1px 0 #220500, 1px -1px 0 #220500, -1px 1px 0 #220500, 0 0 12px rgba(255,100,40,.8)',
+              textShadow: '2px 2px 0 #270d0c, -1px -1px 0 #270d0c, 1px -1px 0 #270d0c, -1px 1px 0 #270d0c, 0 0 12px rgba(248,116,32,.8)',
               opacity: 0,
               whiteSpace: 'nowrap',
               animation: `dino-bite-roar 720ms ease-out ${lerp(400, 460)}ms forwards`,
@@ -10860,8 +10860,8 @@ const ANIM_REGISTRY = {
               width: b.size + 'px', height: (b.size * 0.55) + 'px',
               marginLeft: -b.size / 2,
               borderRadius: '50% 50% 0 0 / 100% 100% 0 0',
-              background: 'radial-gradient(ellipse, #ff3322 0%, #aa0000 60%, #440000 100%)',
-              boxShadow: '0 0 4px rgba(255,40,20,0.7), inset 0 -1px 1px rgba(0,0,0,0.6)',
+              background: 'radial-gradient(ellipse, #ff1a1a 0%, #be0e0e 60%, #520a0c 100%)',
+              boxShadow: '0 0 4px rgba(255,26,26,0.7), inset 0 -1px 1px rgba(0,0,0,0.6)',
               transform: `rotate(${b.rot}deg)`,
               opacity: 0,
               animation: `piranha-bite ${b.dur}ms ease-out ${b.delay}ms forwards`,
@@ -10917,7 +10917,7 @@ const ANIM_REGISTRY = {
               width: 70, height: 70, left: -35, top: -35,
               borderRadius: '50%',
               border: `${3 - i * 0.6}px solid rgba(120,200,255,${0.85 - i * 0.18})`,
-              boxShadow: '0 0 12px rgba(160,220,255,0.8)',
+              boxShadow: '0 0 12px rgba(179,216,249,0.8)',
               opacity: 0,
               animation: `deepsea-idol-wave 700ms ease-out ${delay}ms forwards`,
             }} />
@@ -10926,7 +10926,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             width: 50, height: 50, left: -25, top: -25,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(120,200,255,0.7) 50%, transparent 100%)',
+            background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(104,198,253,0.7) 50%, transparent 100%)',
             opacity: 0,
             animation: 'deepsea-idol-core 500ms ease-out forwards',
           }} />
@@ -10935,8 +10935,8 @@ const ANIM_REGISTRY = {
               position: 'absolute',
               left: -s.size / 2, top: -s.size / 2,
               width: s.size + 'px', height: s.size + 'px',
-              background: '#e0f4ff',
-              boxShadow: '0 0 6px #88ccff',
+              background: '#e5f5fa',
+              boxShadow: '0 0 6px #7bbeea',
               transform: 'rotate(45deg)',
               opacity: 0,
               animation: `deepsea-idol-spark 600ms ease-out ${s.delay}ms forwards`,
@@ -10977,8 +10977,8 @@ const ANIM_REGISTRY = {
               position: 'absolute',
               left: 0, top: 0, width: 4, height: 60,
               marginLeft: -2, marginTop: -60,
-              background: 'linear-gradient(180deg, transparent 0%, rgba(220,140,255,0.9) 30%, rgba(255,255,255,1) 100%)',
-              boxShadow: '0 0 6px rgba(180,100,255,0.85)',
+              background: 'linear-gradient(180deg, transparent 0%, rgba(201,138,255,0.9) 30%, rgba(255,255,255,1) 100%)',
+              boxShadow: '0 0 6px rgba(184,102,255,0.85)',
               transform: `rotate(${b.angle * 180 / Math.PI + 90}deg)`,
               transformOrigin: '50% 100%',
               opacity: 0,
@@ -10988,7 +10988,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', width: 50, height: 50, left: -25, top: -25,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(170,80,255,0.6) 50%, transparent 100%)',
+            background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(169,82,255,0.6) 50%, transparent 100%)',
             opacity: 0,
             animation: 'cosmic-invader-pop 600ms ease-out 250ms forwards',
           }} />
@@ -11026,7 +11026,7 @@ const ANIM_REGISTRY = {
         delay: i * 18 + Math.random() * 60,
         dur: 320 + Math.random() * 180,
         size: 4 + Math.random() * 6,
-        color: ['#cc1100', '#ff2200', '#dd3300', '#aa0000', '#ee4400', '#b81022'][Math.floor(Math.random() * 6)],
+        color: ['#c80000', '#ff1a1a', '#cc2b00', '#be0e0e', '#ff491a', '#b5171c'][Math.floor(Math.random() * 6)],
       })), [cw]);
       // Splat marks — viscous oil pooling at impact points.
       const splats = useMemo(() => Array.from({ length: ppFxN(9) }, () => ({
@@ -11068,8 +11068,8 @@ const ANIM_REGISTRY = {
               left: s.x + 'px', top: s.y + 'px',
               width: (s.rx * 2) + 'px', height: (s.ry * 2) + 'px',
               borderRadius: '50%',
-              background: 'radial-gradient(ellipse, #ee2200 0%, #aa0500 50%, #440000 90%)',
-              boxShadow: '0 0 7px rgba(220, 30, 0, 0.85), inset 0 -2px 3px rgba(0,0,0,0.5)',
+              background: 'radial-gradient(ellipse, #ff1a1a 0%, #be0e0e 50%, #520a0c 90%)',
+              boxShadow: '0 0 7px rgba(200,0,0,0.85), inset 0 -2px 3px rgba(0,0,0,0.5)',
               opacity: 0,
               animation: `boiling-oil-splat ${s.dur}ms ease-out ${s.delay}ms forwards`,
             }} />
@@ -11080,7 +11080,7 @@ const ANIM_REGISTRY = {
               left: st.x + 'px', top: st.y + 'px',
               width: st.size + 'px', height: (st.size * 1.4) + 'px',
               borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(255,210,190,0.7) 0%, rgba(255,160,110,0.35) 65%, transparent 100%)',
+              background: 'radial-gradient(circle, rgba(240,191,188,0.7) 0%, rgba(244,174,100,0.35) 65%, transparent 100%)',
               opacity: 0,
               animation: `boiling-oil-steam ${st.dur}ms ease-out ${st.delay}ms forwards`,
             }} />
@@ -11134,7 +11134,7 @@ const ANIM_REGISTRY = {
           dx: Math.cos(angle) * speed,
           dy: Math.sin(angle) * speed,
           size: 3 + Math.random() * 4,
-          color: ['#ff2200', '#ff8800', '#ffaa00', '#ffcc33', '#ffe066'][Math.floor(Math.random() * 5)],
+          color: ['#ff1a1a', '#ff8b1a', '#f9ac20', '#f8ca21', '#ffe469'][Math.floor(Math.random() * 5)],
           delay: 230 + Math.random() * 220,
           dur: 500 + Math.random() * 320,
         };
@@ -11149,7 +11149,7 @@ const ANIM_REGISTRY = {
             width: cw * 0.84 + 'px',
             height: ch * 0.32 + 'px',
             borderRadius: '50%',
-            background: 'radial-gradient(ellipse, #fff8aa 0%, #ffaa22 30%, #ff4400aa 60%, transparent 85%)',
+            background: 'radial-gradient(ellipse, #f7f7ad 0%, #f9ac20 30%, #ff491aaa 60%, transparent 85%)',
             opacity: 0,
             animation: 'flame-pillar-base 380ms ease-out forwards',
             filter: 'blur(2px)',
@@ -11161,7 +11161,7 @@ const ANIM_REGISTRY = {
               left: p.startX + 'px',
               top: ch * 0.45 + 'px',
               fontSize: p.size + 'px',
-              filter: 'drop-shadow(0 0 4px #ff6600)',
+              filter: 'drop-shadow(0 0 4px #f87420)',
               opacity: 0,
               animation: `flame-pillar-rise ${p.dur}ms cubic-bezier(0.3, 0.7, 0.3, 1) ${p.delay}ms forwards`,
               '--fpdy': (-p.rise) + 'px',
@@ -11233,8 +11233,8 @@ const ANIM_REGISTRY = {
           // Range of purple tints — deep violet, mid amethyst,
           // bright neon, with a couple of sickly pink-magenta to
           // avoid the spray feeling monochromatic.
-          color: ['#5a189a', '#7b2cbf', '#9d4edd', '#c77dff',
-                  '#b338ff', '#e0aaff', '#ff5cd6', '#a855f7'][Math.floor(Math.random() * 8)],
+          color: ['#50008c', '#702db3', '#9544d5', '#ba74ff',
+                  '#a040ff', '#d6b3f9', '#fa6bed', '#a952ff'][Math.floor(Math.random() * 8)],
         };
       }), []);
       // ── Splats: oozing patches that LAND on the target and stick.
@@ -11264,7 +11264,7 @@ const ANIM_REGISTRY = {
             left: -cw * 0.45 + 'px', top: -ch * 0.35 + 'px',
             width: cw * 0.9 + 'px', height: ch * 0.7 + 'px',
             borderRadius: '50%',
-            background: 'radial-gradient(ellipse, #f0c4ff 0%, #c77dff 25%, #7b2cbf99 55%, transparent 80%)',
+            background: 'radial-gradient(ellipse, #d6bbf1 0%, #ba74ff 25%, #702db399 55%, transparent 80%)',
             opacity: 0,
             animation: 'hydra-goo-flash 360ms ease-out forwards',
             filter: 'blur(2px)',
@@ -11276,8 +11276,8 @@ const ANIM_REGISTRY = {
               left: s.x + 'px', top: s.y + 'px',
               width: (s.rx * 2) + 'px', height: (s.ry * 2) + 'px',
               borderRadius: '50%',
-              background: 'radial-gradient(ellipse, #b338ff 0%, #7b2cbf 50%, #4a0e75 90%)',
-              boxShadow: '0 0 8px rgba(155, 60, 230, 0.85), inset 0 -2px 4px rgba(0,0,0,0.4)',
+              background: 'radial-gradient(ellipse, #a040ff 0%, #702db3 50%, #47117e 90%)',
+              boxShadow: '0 0 8px rgba(144,58,230,0.85), inset 0 -2px 4px rgba(0,0,0,0.4)',
               transform: `rotate(${s.rot}deg)`,
               opacity: 0,
               animation: `hydra-goo-splat ${s.dur}ms ease-out ${s.delay}ms forwards`,
@@ -11304,8 +11304,8 @@ const ANIM_REGISTRY = {
               left: b.x + 'px', top: b.y + 'px',
               width: b.size + 'px', height: b.size + 'px',
               borderRadius: '50%',
-              background: 'radial-gradient(circle, #ffffff 0%, #e0aaff 60%, #c77dff 100%)',
-              boxShadow: '0 0 4px rgba(255, 200, 255, 0.9)',
+              background: 'radial-gradient(circle, #ffffff 0%, #d6b3f9 60%, #ba74ff 100%)',
+              boxShadow: '0 0 4px rgba(248,180,223,0.9)',
               opacity: 0,
               animation: `hydra-goo-bubble ${b.dur}ms ease-out ${b.delay}ms forwards`,
             }} />
@@ -11355,8 +11355,8 @@ const ANIM_REGISTRY = {
           size: 5 + Math.random() * 7,
           delay: i * 14 + Math.random() * 50,
           dur: 380 + Math.random() * 220,
-          color: ['#52b788', '#74c69d', '#95d5b2', '#80ed99',
-                  '#38b000', '#a3e635', '#b7e4c7', '#2d6a4f'][Math.floor(Math.random() * 8)],
+          color: ['#5bbd7e', '#92d3a9', '#92d3a9', '#75f091',
+                  '#20ac37', '#87cc00', '#b3f9cf', '#29663f'][Math.floor(Math.random() * 8)],
         };
       }), []);
       const splats = useMemo(() => Array.from({ length: ppFxN(6) }, () => ({
@@ -11383,7 +11383,7 @@ const ANIM_REGISTRY = {
             left: -cw * 0.45 + 'px', top: -ch * 0.35 + 'px',
             width: cw * 0.9 + 'px', height: ch * 0.7 + 'px',
             borderRadius: '50%',
-            background: 'radial-gradient(ellipse, #d8f3dc 0%, #95d5b2 25%, #52b78899 55%, transparent 80%)',
+            background: 'radial-gradient(ellipse, #e5fae7 0%, #92d3a9 25%, #5bbd7e99 55%, transparent 80%)',
             opacity: 0,
             animation: 'slimy-heal-flash 360ms ease-out forwards',
             filter: 'blur(2px)',
@@ -11395,8 +11395,8 @@ const ANIM_REGISTRY = {
               left: s.x + 'px', top: s.y + 'px',
               width: (s.rx * 2) + 'px', height: (s.ry * 2) + 'px',
               borderRadius: '50%',
-              background: 'radial-gradient(ellipse, #80ed99 0%, #38b000 50%, #1b4332 90%)',
-              boxShadow: '0 0 8px rgba(80, 230, 130, 0.85), inset 0 -2px 4px rgba(0,0,0,0.35)',
+              background: 'radial-gradient(ellipse, #75f091 0%, #20ac37 50%, #1a4128 90%)',
+              boxShadow: '0 0 8px rgba(117,240,145,0.85), inset 0 -2px 4px rgba(0,0,0,0.35)',
               transform: `rotate(${s.rot}deg)`,
               opacity: 0,
               animation: `slimy-heal-splat ${s.dur}ms ease-out ${s.delay}ms forwards`,
@@ -11421,7 +11421,7 @@ const ANIM_REGISTRY = {
             <div key={'shh' + i} style={{
               position: 'absolute', left: hp.xOff + 'px', top: hp.startY + 'px',
               fontSize: hp.size + 'px',
-              filter: 'drop-shadow(0 0 4px rgba(100,255,140,0.85))',
+              filter: 'drop-shadow(0 0 4px rgba(76,235,112,0.85))',
               opacity: 0,
               animation: `slimy-heal-heart ${hp.dur}ms ease-out ${hp.delay}ms forwards`,
             }}>💚</div>
@@ -11524,7 +11524,7 @@ const ANIM_REGISTRY = {
       '.............KKK..KnnnK..KKK............',
       '...................KKK..................'
     ];
-    const FARBE = { K: '#1d1d26', '1': '#3c3c4a', '2': '#575766', '3': '#75758a', '4': '#9494a8', '5': '#b7b7ca', '6': '#d6d6e4', N: '#f4eed6', M: '#d8cfae', n: '#8e866c' };
+    const FARBE = { K: '#282834', '1': '#3e3e51', '2': '#59606e', '3': '#7e7d9b', '4': '#9aa3b6', '5': '#a5b0c0', '6': '#d2d2db', N: '#fff8e8', M: '#ebdcc1', n: '#a89370' };
     let rects = '';
     ZEILEN.forEach((z, yy) => [...z].forEach((c, xx) => {
       if (FARBE[c]) rects += `<rect x="${xx}" y="${yy}" width="1" height="1" fill="${FARBE[c]}"/>`;
@@ -11540,7 +11540,7 @@ const ANIM_REGISTRY = {
           dx: seite * (fw * 0.35 + Math.random() * fw * 0.7),
           dy: -(6 + Math.random() * fh * 0.55),
           gross: (Math.random() < 0.4 ? 2 : 1) * Math.max(3, px),
-          farbe: ['#b9b3a1', '#8e8878', '#d8d2be', '#6f6a5c'][i % 4],
+          farbe: ['#c5b7a0', '#7f7f7f', '#e2d8cb', '#686868'][i % 4],
         };
       }), [fw, fh, px]);
       useEffect(() => {
@@ -11576,7 +11576,7 @@ const ANIM_REGISTRY = {
           {risse.map((grad, i) => (
             <div key={'er' + i} style={{
               position: 'absolute', left: 0, top: -px / 2, width: fw * (0.42 + (i % 3) * 0.1), height: px,
-              background: '#1a1a22', transformOrigin: '0 50%', transform: `rotate(${grad}deg)`, opacity: 0,
+              background: '#12101f', transformOrigin: '0 50%', transform: `rotate(${grad}deg)`, opacity: 0,
               animation: 'ele-riss 1000ms steps(4, end) forwards',
             }} />
           ))}
@@ -11643,7 +11643,7 @@ const ANIM_REGISTRY = {
         size: 4 + Math.random() * 6,
         delay: (i / 34) * (laufzeit - 500) + Math.random() * 140,
         dur: 520 + Math.random() * 380,
-        farbe: ['#ffe680', '#ffc23d', '#fff3c4'][i % 3],
+        farbe: ['#fbe181', '#ffb91a', '#fffbd2'][i % 3],
       })), [laufzeit]);
       const flitter = useMemo(() => Array.from({ length: ppFxN(12) }, (_, i) => ({
         x: -40 + Math.random() * 80,
@@ -11660,7 +11660,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -52, top: -66, width: 104, height: 132,
             borderRadius: 10,
-            background: 'radial-gradient(ellipse at center, rgba(255,215,110,.55) 0%, rgba(255,190,60,.22) 45%, transparent 72%)',
+            background: 'radial-gradient(ellipse at center, rgba(255,208,102,.55) 0%, rgba(255,185,26,.22) 45%, transparent 72%)',
             opacity: 0,
             animation: `golden-apple-glow ${Math.round(laufzeit * 0.8)}ms ease-out forwards`,
           }} />
@@ -11669,7 +11669,7 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: 0, top: 16,
               width: f.size, height: f.size, borderRadius: '50%',
               background: f.farbe,
-              boxShadow: `0 0 12px ${f.farbe}, 0 0 4px #fff8e0`,
+              boxShadow: `0 0 12px ${f.farbe}, 0 0 4px #fff8e8`,
               opacity: 0,
               animation: `golden-apple-spark ${f.dur}ms ease-out ${f.delay}ms forwards`,
               '--gadx': f.dx + 'px', '--gady': f.dy + 'px',
@@ -11679,8 +11679,8 @@ const ANIM_REGISTRY = {
             <div key={'gal' + i} style={{
               position: 'absolute', left: fl.x, top: -34,
               width: fl.w, height: fl.h, borderRadius: 2,
-              background: 'linear-gradient(135deg, #fff2b0 0%, #ffc23d 55%, #c98a1b 100%)',
-              boxShadow: '0 0 6px rgba(255,200,80,.85)',
+              background: 'linear-gradient(135deg, #f9ecb3 0%, #ffb91a 55%, #c68206 100%)',
+              boxShadow: '0 0 6px rgba(255,208,102,.85)',
               opacity: 0,
               animation: `golden-apple-leaf ${fl.dur}ms ease-in ${fl.delay}ms forwards`,
               '--galdy': fl.dy + 'px', '--galrot': fl.dreh + 'deg',
@@ -11734,7 +11734,7 @@ const ANIM_REGISTRY = {
         delay: (i / 14) * (laufzeit - 520) + Math.random() * 110,
         dur: 780 + Math.random() * 380,
         opacity: 0.30 + Math.random() * 0.3,
-        shade: Math.random() < 0.5 ? '#f2f4f8' : '#d7dde6',
+        shade: Math.random() < 0.5 ? '#ffffff' : '#d2d2db',
       })), [laufzeit]);
       const funken = useMemo(() => Array.from({ length: ppFxN(22) }, (_, i) => ({
         dx: -40 + Math.random() * 80,
@@ -11742,7 +11742,7 @@ const ANIM_REGISTRY = {
         size: 4 + Math.random() * 5,
         delay: (i / 22) * (laufzeit - 420) + Math.random() * 130,
         dur: 460 + Math.random() * 280,
-        farbe: ['#fff6c8', '#bde9ff', '#ffd9f2'][i % 3],
+        farbe: ['#fffbd2', '#b4dff8', '#f1e5fa'][i % 3],
       })), [laufzeit]);
       const sterne = useMemo(() => Array.from({ length: ppFxN(9) }, (_, i) => ({
         x: -36 + Math.random() * 72,
@@ -11782,7 +11782,7 @@ const ANIM_REGISTRY = {
               width: st.size + 'px', height: st.size + 'px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: st.size + 'px', lineHeight: 1,
-              color: '#fff3b0', textShadow: '0 0 12px rgba(255,225,130,1), 0 0 4px #fff',
+              color: '#f9ecb3', textShadow: '0 0 12px rgba(251,225,129,1), 0 0 4px #fff',
               opacity: 0,
               animation: `tempeluna-infuse-star ${st.dur}ms ease-out ${st.delay}ms forwards`,
               '--tisrot': st.dreh + 'deg',
@@ -11842,8 +11842,8 @@ const ANIM_REGISTRY = {
           {/* Der Wasserspiegel steigt von unten ueber die Karte. */}
           <div style={{
             position: 'absolute', left: 0, bottom: 0, width: '100%', height: '100%',
-            background: 'linear-gradient(to top, rgba(28,96,150,.82) 0%, rgba(58,148,208,.62) 55%, rgba(120,200,240,.30) 100%)',
-            borderTop: '2px solid rgba(190,235,255,.85)',
+            background: 'linear-gradient(to top, rgba(64,95,140,.82) 0%, rgba(57,158,223,.62) 55%, rgba(119,200,238,.30) 100%)',
+            borderTop: '2px solid rgba(179,232,249,.85)',
             transform: 'translateY(100%)',
             animation: `dive-down-flood ${laufzeit}ms ease-in forwards`,
           }} />
@@ -11852,8 +11852,8 @@ const ANIM_REGISTRY = {
               position: 'absolute',
               left: breite / 2 + b.dx, bottom: -10,
               width: b.size, height: b.size, borderRadius: '50%',
-              background: 'radial-gradient(circle at 32% 30%, rgba(255,255,255,.95), rgba(170,225,255,.55) 60%, rgba(120,190,230,.2) 100%)',
-              boxShadow: '0 0 5px rgba(200,240,255,.7)',
+              background: 'radial-gradient(circle at 32% 30%, rgba(255,255,255,.95), rgba(180,223,248,.55) 60%, rgba(123,190,234,.2) 100%)',
+              boxShadow: '0 0 5px rgba(179,232,249,.7)',
               opacity: 0,
               animation: `dive-down-bubble ${b.dur}ms ease-out ${b.delay}ms forwards`,
               '--ddx': b.drift + 'px', '--ddy': -(hoehe + 16) + 'px',
@@ -11863,7 +11863,7 @@ const ANIM_REGISTRY = {
             <div key={'ddr' + i} style={{
               position: 'absolute', left: '50%', top: '32%',
               width: 10, height: 6, marginLeft: -5,
-              border: '2px solid rgba(205,240,255,.8)', borderRadius: '50%',
+              border: '2px solid rgba(179,232,249,.8)', borderRadius: '50%',
               opacity: 0,
               animation: `dive-down-ring ${r.dur}ms ease-out ${r.delay}ms forwards`,
             }} />
@@ -11908,7 +11908,7 @@ const ANIM_REGISTRY = {
         delay: (i / 26) * (laufzeit - 700) + Math.random() * 160,
         dur: 1100 + Math.random() * 600,
         opacity: 0.30 + Math.random() * 0.34,
-        shade: Math.random() < 0.5 ? '#f2f4f8' : '#d7dde6',
+        shade: Math.random() < 0.5 ? '#ffffff' : '#d2d2db',
       })), [laufzeit]);
       // Ein paar warme Funken, weil Lunas Flamme darin steckt.
       const funken = useMemo(() => Array.from({ length: ppFxN(9) }, (_, i) => ({
@@ -11938,7 +11938,7 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: 0, top: 26,
               width: f.size + 'px', height: f.size + 'px',
               borderRadius: '50%',
-              background: '#ffd27a', boxShadow: '0 0 7px #ffab3d',
+              background: '#fbc86a', boxShadow: '0 0 7px #ff9b3a',
               opacity: 0,
               animation: `tempeluna-steam-spark ${f.dur}ms ease-out ${f.delay}ms forwards`,
               '--tlfdx': f.dx + 'px', '--tlfdy': f.dy + 'px',
@@ -11971,7 +11971,7 @@ const ANIM_REGISTRY = {
         delay: i * 45 + Math.random() * 100,
         dur: 700 + Math.random() * 400,
         opacity: 0.55 + Math.random() * 0.35,
-        shade: Math.random() < 0.5 ? '#e8e8ec' : '#c8c8d0',
+        shade: Math.random() < 0.5 ? '#e6e6e6' : '#d2d2db',
       })), []);
       const sparks = useMemo(() => Array.from({ length: 5 }, () => ({
         dx: -15 + Math.random() * 30,
@@ -11999,7 +11999,7 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: 0, top: 20,
               width: s.size + 'px', height: s.size + 'px',
               borderRadius: '50%',
-              background: '#ffcc44', boxShadow: '0 0 6px #ffaa22',
+              background: '#fad54a', boxShadow: '0 0 6px #f9ac20',
               opacity: 0,
               animation: `steam-spark-pop ${s.dur}ms ease-out ${s.delay}ms forwards`,
               '--ssdx': s.dx + 'px', '--ssdy': s.dy + 'px',
@@ -12056,7 +12056,7 @@ const ANIM_REGISTRY = {
           dx: Math.cos(angle) * speed,
           dy: Math.sin(angle) * speed,
           size: 3 + Math.random() * 4,
-          color: ['#ff3300', '#ff8800', '#ffaa00', '#ffcc33'][Math.floor(Math.random() * 4)],
+          color: ['#ff491a', '#ff8b1a', '#f9ac20', '#f8ca21'][Math.floor(Math.random() * 4)],
           delay: 350 + Math.random() * 250,
           dur: 500 + Math.random() * 400,
         };
@@ -12069,7 +12069,7 @@ const ANIM_REGISTRY = {
             left: -cw * 0.45 + 'px', top: -ch * 0.45 + 'px',
             width: cw * 0.9 + 'px', height: ch * 0.9 + 'px',
             borderRadius: '50%',
-            background: 'radial-gradient(ellipse, #fff8dd 0%, #ffaa22 30%, #ff4400aa 60%, transparent 85%)',
+            background: 'radial-gradient(ellipse, #fff8e8 0%, #f9ac20 30%, #ff491aaa 60%, transparent 85%)',
             opacity: 0,
             animation: 'flame-douse-flash 360ms ease-out forwards',
           }} />
@@ -12080,7 +12080,7 @@ const ANIM_REGISTRY = {
               left: (-cw * 0.7) + 'px',
               top: p.endY + 'px',
               fontSize: p.size + 'px',
-              filter: `drop-shadow(0 0 4px #ff6600)`,
+              filter: `drop-shadow(0 0 4px #f87420)`,
               opacity: 0,
               animation: `flame-jet-streak ${p.dur}ms cubic-bezier(0.2, 0.7, 0.4, 1) ${p.delay}ms forwards`,
               '--jtdx': (p.endX + cw * 0.7) + 'px',
@@ -12093,7 +12093,7 @@ const ANIM_REGISTRY = {
               position: 'absolute',
               left: f.x + 'px', top: f.y + 'px',
               fontSize: f.size + 'px',
-              filter: 'drop-shadow(0 0 3px #ff4400)',
+              filter: 'drop-shadow(0 0 3px #ff491a)',
               opacity: 0,
               animation: `flame-linger ${f.dur}ms ease-out ${f.delay}ms forwards`,
             }}>🔥</div>
@@ -12180,7 +12180,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: '-80px', top: '-80px',
             fontSize: '56px',
-            filter: 'drop-shadow(0 0 12px #ff6600) drop-shadow(0 0 24px #ff3300)',
+            filter: 'drop-shadow(0 0 12px #f87420) drop-shadow(0 0 24px #ff491a)',
             opacity: 0,
             animation: 'fireball-incoming 280ms ease-in forwards',
           }}>🔥</div>
@@ -12189,7 +12189,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: '-60px', top: '-60px',
             width: '120px', height: '10px',
-            background: 'linear-gradient(90deg, transparent 0%, #ff440088 40%, #ffaa22 100%)',
+            background: 'linear-gradient(90deg, transparent 0%, #ff491a88 40%, #f9ac20 100%)',
             borderRadius: '5px',
             transformOrigin: '100% 50%',
             transform: 'rotate(45deg)',
@@ -12202,7 +12202,7 @@ const ANIM_REGISTRY = {
             left: (-cw * 0.6) + 'px', top: (-ch * 0.6) + 'px',
             width: cw * 1.2 + 'px', height: ch * 1.2 + 'px',
             borderRadius: '50%',
-            background: 'radial-gradient(circle, #ffffee 0%, #ffcc22 20%, #ff4400cc 50%, #ff220055 75%, transparent 90%)',
+            background: 'radial-gradient(circle, #fff8e8 0%, #f8ca21 20%, #ff491acc 50%, #ff1a1a55 75%, transparent 90%)',
             opacity: 0,
             animation: 'fireball-flash 600ms ease-out 280ms forwards',
           }} />
@@ -12214,8 +12214,8 @@ const ANIM_REGISTRY = {
               width: '8px', height: '8px',
               marginLeft: '-4px', marginTop: '-4px',
               borderRadius: '50%',
-              border: '3px solid #ff6600',
-              boxShadow: '0 0 12px #ff4400',
+              border: '3px solid #f87420',
+              boxShadow: '0 0 12px #ff491a',
               opacity: 0,
               animation: `fireball-ring ${r.dur}ms ease-out ${r.delay}ms forwards`,
               '--ringSize': r.maxSize + 'px',
@@ -12226,7 +12226,7 @@ const ANIM_REGISTRY = {
             <div key={'fs' + i} style={{
               position: 'absolute', left: 0, top: 0,
               fontSize: s.size + 'px',
-              filter: 'drop-shadow(0 0 4px #ff4400)',
+              filter: 'drop-shadow(0 0 4px #ff491a)',
               opacity: 0,
               animation: `fireball-shard ${s.dur}ms ease-out ${s.delay}ms forwards`,
               '--fsdx': s.dx + 'px', '--fsdy': s.dy + 'px',
@@ -12239,7 +12239,7 @@ const ANIM_REGISTRY = {
               width: sm.size + 'px', height: sm.size + 'px',
               marginLeft: -sm.size / 2 + 'px', marginTop: -sm.size / 2 + 'px',
               borderRadius: '50%',
-              background: 'radial-gradient(circle, #55555599 0%, #33333366 50%, transparent 80%)',
+              background: 'radial-gradient(circle, #53535399 0%, #32323266 50%, transparent 80%)',
               opacity: 0,
               animation: `fireball-smoke ${sm.dur}ms ease-out ${sm.delay}ms forwards`,
               '--smdx': sm.dx + 'px', '--smdy': sm.dy + 'px',
@@ -12735,12 +12735,12 @@ const ANIM_REGISTRY = {
           {shield && <span className="moe-heart-ring" style={{ width: R * 0.82, height: R * 0.82 }} />}
           <svg className="moe-heart-main" width={R} height={R} viewBox="0 0 32 32" aria-hidden="true">
             <path d="M16 29S3.5 20.6 3.5 12.2C3.5 7.9 6.9 4.7 11 4.7c2.4 0 4.2 1.2 5 2.6.8-1.4 2.6-2.6 5-2.6 4.1 0 7.5 3.2 7.5 7.5C28.5 20.6 16 29 16 29z"
-              fill="url(#moeHeartFill)" stroke="#ffd7ef" strokeWidth="1.1" />
+              fill="url(#moeHeartFill)" stroke="#f1e5fa" strokeWidth="1.1" />
             <defs>
               <radialGradient id="moeHeartFill" cx="42%" cy="34%">
-                <stop offset="0%" stopColor="#ffd9f1" />
-                <stop offset="45%" stopColor="#ff5fb4" />
-                <stop offset="100%" stopColor="#d81b78" />
+                <stop offset="0%" stopColor="#f1e5fa" />
+                <stop offset="45%" stopColor="#fc69c6" />
+                <stop offset="100%" stopColor="#ea2f80" />
               </radialGradient>
             </defs>
           </svg>
@@ -12849,7 +12849,7 @@ const ANIM_REGISTRY = {
           animation: `armaBeben ${Math.round(welle + 500)}ms linear 80ms both`,
         }}>
           <div className="arma-tint" style={{
-            background: `radial-gradient(circle at ${oX}px ${oY}px, rgba(255,210,120,.55) 0%, rgba(255,90,20,.5) 18%, rgba(170,20,0,.55) 45%, rgba(40,0,0,.72) 100%)`,
+            background: `radial-gradient(circle at ${oX}px ${oY}px, rgba(251,200,106,.55) 0%, rgba(255,73,26,.5) 18%, rgba(182,38,0,.55) 45%, rgba(42,4,4,.72) 100%)`,
             '--arma-tint': (0.35 + 0.55 * p).toFixed(2),
             animation: `armaTint ${dauer}ms ease-out forwards`,
           }} />
@@ -13077,7 +13077,7 @@ const ANIM_REGISTRY = {
     };
   })(),
   gift_shower: (() => {
-    const FARBEN = ['#e4484f', '#3fa34d', '#f0b429', '#4a7fd4', '#b05fc9'];
+    const FARBEN = ['#e94e53', '#2ca058', '#ffb91a', '#4e77ca', '#b278ed'];
     const PAKETE = Array.from({ length: ppFxN(9) }, (_, i) => ({
       x: -46 + i * 11 + (i % 3) * 4,
       groesse: 13 + (i % 4) * 4,
@@ -13205,9 +13205,9 @@ const ANIM_REGISTRY = {
             position: 'absolute', left: -breite / 2, top: -26,
             width: breite, height: 52,
             clipPath: zacken,
-            background: 'linear-gradient(90deg, transparent 0%, rgba(232,226,214,.25) 8%,'
-              + ' rgba(255,252,245,.95) 38%, rgba(255,255,255,1) 50%,'
-              + ' rgba(214,60,48,.9) 62%, rgba(120,22,18,.55) 86%, transparent 100%)',
+            background: 'linear-gradient(90deg, transparent 0%, rgba(226,216,203,.25) 8%,'
+              + ' rgba(255,255,255,.95) 38%, rgba(255,255,255,1) 50%,'
+              + ' rgba(230,62,51,.9) 62%, rgba(120,0,20,.55) 86%, transparent 100%)',
             transform: 'translateX(-120%) scaleY(.5)',
             animation: 'superKillCut 260ms cubic-bezier(.05,.9,.2,1) forwards',
             opacity: 0,
@@ -13216,14 +13216,14 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -ww * 0.9, top: -30,
             width: ww * 1.8, height: 30,
-            background: 'linear-gradient(180deg, transparent 0%, rgba(18,10,10,.0) 55%, rgba(18,10,10,.85) 100%)',
+            background: 'linear-gradient(180deg, transparent 0%, rgba(8,6,12,.0) 55%, rgba(8,6,12,.85) 100%)',
             animation: 'superKillGapUp 520ms ease-out 180ms forwards',
             opacity: 0,
           }} />
           <div style={{
             position: 'absolute', left: -ww * 0.9, top: 0,
             width: ww * 1.8, height: 30,
-            background: 'linear-gradient(0deg, transparent 0%, rgba(18,10,10,.0) 55%, rgba(18,10,10,.85) 100%)',
+            background: 'linear-gradient(0deg, transparent 0%, rgba(8,6,12,.0) 55%, rgba(8,6,12,.85) 100%)',
             animation: 'superKillGapDown 520ms ease-out 180ms forwards',
             opacity: 0,
           }} />
@@ -13233,7 +13233,7 @@ const ANIM_REGISTRY = {
               position: 'absolute',
               left: (-breite / 2) + (sp.links / 100) * breite, top: -3,
               width: sp.size + 'px', height: (sp.size * 0.6) + 'px',
-              background: sp.hoch ? 'rgba(238,232,220,.95)' : 'rgba(196,52,42,.9)',
+              background: sp.hoch ? 'rgba(226,216,203,.95)' : 'rgba(181,23,28,.9)',
               ['--skx']: sp.drift + 'px',
               ['--sky']: (sp.hoch ? -sp.weite : sp.weite) + 'px',
               ['--skr']: sp.rot + 'deg',
@@ -13303,9 +13303,9 @@ const ANIM_REGISTRY = {
               position: 'absolute',
               left: b.links, top: -b.hoehe,
               width: b.breite + 'px', height: b.hoehe + 'px',
-              background: 'linear-gradient(180deg, rgba(255,120,120,0) 0%, rgba(255,70,70,.85) 25%,'
-                + ' rgba(255,235,235,1) 70%, rgba(255,40,40,.9) 100%)',
-              boxShadow: '0 0 10px rgba(255,60,60,.95), 0 0 26px rgba(180,0,0,.7)',
+              background: 'linear-gradient(180deg, rgba(254,116,118,0) 0%, rgba(233,47,56,.85) 25%,'
+                + ' rgba(250,229,235,1) 70%, rgba(255,26,26,.9) 100%)',
+              boxShadow: '0 0 10px rgba(240,50,50,.95), 0 0 26px rgba(190,14,14,.7)',
               clipPath: `polygon(${b.zacken.map(z => z).join(', ')}, ${b.zacken.slice().reverse().map(z => {
                 const [px, py] = z.split(' ');
                 return `calc(${px} + ${b.breite}px) ${py}`;
@@ -13318,7 +13318,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -ww * 0.6, top: -18,
             width: ww * 1.2, height: 36, borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(255,240,240,.95) 0%, rgba(255,60,60,.6) 45%, transparent 78%)',
+            background: 'radial-gradient(ellipse, rgba(250,229,235,.95) 0%, rgba(240,50,50,.6) 45%, transparent 78%)',
             animation: 'divinePunishFlash 420ms ease-out 180ms forwards',
             opacity: 0,
           }} />
@@ -13395,7 +13395,7 @@ const ANIM_REGISTRY = {
           sx: Math.cos(winkel) * weite,
           sy: Math.sin(winkel) * weite * 0.5,
           groesse: 2 + Math.random() * 4,
-          farbe: ['#ffffff', '#cbb0ff', '#8fe7ff', '#b98bff'][Math.floor(Math.random() * 4)],
+          farbe: ['#ffffff', '#d6b3f9', '#7fdfff', '#c98aff'][Math.floor(Math.random() * 4)],
           delay: Math.random() * 320,
           dur: 420 + Math.random() * 320,
         };
@@ -13424,8 +13424,8 @@ const ANIM_REGISTRY = {
                   marginLeft: -scheibe * 0.46, marginTop: -scheibe * 0.15,
                   borderRadius: '50%',
                   background: i % 2
-                    ? 'radial-gradient(ellipse at 30% 50%, rgba(160,120,255,.75) 0%, rgba(120,70,230,.4) 38%, rgba(90,220,255,.18) 62%, transparent 82%)'
-                    : 'radial-gradient(ellipse at 70% 50%, rgba(200,170,255,.8) 0%, rgba(140,90,255,.42) 36%, rgba(70,190,255,.2) 64%, transparent 84%)',
+                    ? 'radial-gradient(ellipse at 30% 50%, rgba(163,106,251,.75) 0%, rgba(122,43,208,.4) 38%, rgba(102,217,255,.18) 62%, transparent 82%)'
+                    : 'radial-gradient(ellipse at 70% 50%, rgba(214,179,249,.8) 0%, rgba(169,82,255,.42) 36%, rgba(104,198,253,.2) 64%, transparent 84%)',
                   filter: 'blur(7px)',
                   transform: `rotate(${rot}deg)`,
                 }} />
@@ -13437,8 +13437,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -ww * 0.28, top: -ww * 0.28,
             width: ww * 0.56, height: ww * 0.56, borderRadius: '50%',
-            background: 'radial-gradient(circle, #ffffff 0%, #e9dcff 22%, rgba(150,90,255,.85) 48%, rgba(60,20,120,.55) 70%, transparent 84%)',
-            boxShadow: '0 0 28px rgba(170,120,255,.9), 0 0 70px rgba(80,40,180,.7)',
+            background: 'radial-gradient(circle, #ffffff 0%, #f1e5fa 22%, rgba(169,82,255,.85) 48%, rgba(71,17,126,.55) 70%, transparent 84%)',
+            boxShadow: '0 0 28px rgba(186,116,255,.9), 0 0 70px rgba(102,24,180,.7)',
             animation: 'cosmicCoreFlare 1000ms ease-out forwards',
             opacity: 0,
           }} />
@@ -13461,8 +13461,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -ww * 0.5, top: -hh * 0.34,
             width: ww, height: hh * 0.68, borderRadius: '50%',
-            border: '2px solid rgba(200,170,255,.85)',
-            boxShadow: '0 0 22px rgba(130,80,255,.8), inset 0 0 18px rgba(120,220,255,.55)',
+            border: '2px solid rgba(214,179,249,.85)',
+            boxShadow: '0 0 22px rgba(144,58,230,.8), inset 0 0 18px rgba(127,223,255,.55)',
             animation: 'cosmicWarpRing 620ms ease-out 260ms forwards',
             opacity: 0,
           }} />
@@ -13533,9 +13533,9 @@ const ANIM_REGISTRY = {
             position: 'absolute', left: -ww * 0.46, top: -hh * 0.54,
             width: ww * 0.92, height: hh * 1.08,
             borderRadius: `${ww * 0.46}px ${ww * 0.46}px ${ww * 0.2}px ${ww * 0.2}px`,
-            background: 'linear-gradient(180deg, rgba(160,240,255,.15) 0%, rgba(70,190,255,.42) 38%,'
-              + ' rgba(30,120,220,.5) 72%, rgba(10,70,160,.55) 100%)',
-            boxShadow: 'inset 0 0 26px rgba(180,250,255,.55), 0 0 30px rgba(60,180,255,.45)',
+            background: 'linear-gradient(180deg, rgba(182,239,247,.15) 0%, rgba(104,198,253,.42) 38%,'
+              + ' rgba(78,119,202,.5) 72%, rgba(2,57,140,.55) 100%)',
+            boxShadow: 'inset 0 0 26px rgba(182,239,247,.55), 0 0 30px rgba(102,182,255,.45)',
             transformOrigin: 'center bottom',
             animation: 'waterBlessColumn 1100ms cubic-bezier(.2,.8,.35,1) forwards',
             opacity: 0,
@@ -13546,8 +13546,8 @@ const ANIM_REGISTRY = {
             <div key={'wc' + i} style={{
               position: 'absolute', left: -ww * 0.5, top: hh * 0.46,
               width: ww, height: ww * 0.26, borderRadius: '50%',
-              border: '2px solid rgba(225,252,255,.9)',
-              boxShadow: '0 0 16px rgba(140,235,255,.85)',
+              border: '2px solid rgba(229,245,250,.9)',
+              boxShadow: '0 0 16px rgba(107,233,250,.85)',
               '--wcrise': (hh * 1.05) + 'px',
               animation: `waterBlessCrest ${760 + i * 60}ms ease-out ${i * 190}ms forwards`,
               opacity: 0,
@@ -13560,8 +13560,8 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: b.links, top: hh * 0.46,
               width: b.groesse, height: b.groesse, borderRadius: '50%',
               marginLeft: -b.groesse / 2,
-              background: 'radial-gradient(circle at 35% 30%, rgba(255,255,255,.95) 0%, rgba(175,240,255,.6) 45%, rgba(90,200,255,.25) 100%)',
-              boxShadow: '0 0 6px rgba(170,240,255,.8)',
+              background: 'radial-gradient(circle at 35% 30%, rgba(255,255,255,.95) 0%, rgba(182,239,247,.6) 45%, rgba(104,198,253,.25) 100%)',
+              boxShadow: '0 0 6px rgba(182,239,247,.8)',
               '--wbdx': b.drift + 'px', '--wbrise': (-hh * (0.9 + Math.random() * 0.25)) + 'px',
               '--wbop': b.deckkraft,
               animation: `waterBlessBubble ${b.dur}ms ease-in-out ${b.delay}ms forwards`,
@@ -13575,7 +13575,7 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: 0, top: hh * 0.4,
               fontSize: f.groesse, lineHeight: 1,
               marginLeft: -f.groesse / 2,
-              filter: 'drop-shadow(0 0 8px rgba(120,225,255,.9))',
+              filter: 'drop-shadow(0 0 8px rgba(127,223,255,.9))',
               '--wfvon': f.von + 'px', '--wfnach': f.nach + 'px',
               '--wfrise': (-hh * 0.95) + 'px',
               '--wfflip': f.spiegel ? '-1' : '1',
@@ -13588,15 +13588,15 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -ww * 0.44, top: -hh * 0.3,
             width: ww * 0.88, height: hh * 0.6, borderRadius: '50%',
-            border: '3px solid rgba(210,250,255,.95)',
-            boxShadow: '0 0 24px rgba(120,225,255,.9), inset 0 0 20px rgba(90,200,255,.6)',
+            border: '3px solid rgba(182,239,247,.95)',
+            boxShadow: '0 0 24px rgba(127,223,255,.9), inset 0 0 20px rgba(104,198,253,.6)',
             animation: 'waterBlessSeal 520ms ease-out 620ms forwards',
             opacity: 0,
           }} />
           <div style={{
             position: 'absolute', left: -ww * 0.3, top: -ww * 0.3,
             width: ww * 0.6, height: ww * 0.6, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,.9) 0%, rgba(150,235,255,.55) 45%, transparent 75%)',
+            background: 'radial-gradient(circle, rgba(255,255,255,.9) 0%, rgba(127,223,255,.55) 45%, transparent 75%)',
             animation: 'waterBlessGlow 620ms ease-out 600ms forwards',
             opacity: 0,
           }} />
@@ -13662,10 +13662,10 @@ const ANIM_REGISTRY = {
       const durch = Math.min(breite * 0.98, hoehe * 2.0);
 
       const ringe = [
-        { anteil: 1.00, dur: 2000, richtung: 1, strich: '3px dashed rgba(190,245,255,.5)' },
-        { anteil: 0.82, dur: 1650, richtung: -1, strich: '4px dashed rgba(150,235,255,.65)' },
-        { anteil: 0.63, dur: 1300, richtung: 1, strich: '5px dashed rgba(210,250,255,.8)' },
-        { anteil: 0.45, dur: 1000, richtung: -1, strich: '4px solid rgba(235,253,255,.85)' },
+        { anteil: 1.00, dur: 2000, richtung: 1, strich: '3px dashed rgba(182,239,247,.5)' },
+        { anteil: 0.82, dur: 1650, richtung: -1, strich: '4px dashed rgba(127,223,255,.65)' },
+        { anteil: 0.63, dur: 1300, richtung: 1, strich: '5px dashed rgba(182,239,247,.8)' },
+        { anteil: 0.45, dur: 1000, richtung: -1, strich: '4px solid rgba(229,245,250,.85)' },
         { anteil: 0.28, dur: 780, richtung: 1, strich: '3px dashed rgba(255,255,255,.9)' },
       ];
 
@@ -13693,9 +13693,9 @@ const ANIM_REGISTRY = {
             <div style={{
               position: 'absolute', left: 0, top: 0, width: '100%', height: '100%',
               borderRadius: '50%',
-              background: 'radial-gradient(ellipse at 50% 50%, rgba(4,22,48,.88) 0%, rgba(10,60,120,.7) 34%,'
-                + ' rgba(30,130,200,.45) 62%, rgba(90,200,255,.22) 82%, transparent 96%)',
-              boxShadow: 'inset 0 0 60px rgba(150,240,255,.35)',
+              background: 'radial-gradient(ellipse at 50% 50%, rgba(0,33,63,.88) 0%, rgba(43,69,126,.7) 34%,'
+                + ' rgba(78,130,203,.45) 62%, rgba(104,198,253,.22) 82%, transparent 96%)',
+              boxShadow: 'inset 0 0 60px rgba(107,233,250,.35)',
               animation: 'maelstromPool 2000ms ease-out forwards',
               opacity: 0,
             }} />
@@ -13705,7 +13705,7 @@ const ANIM_REGISTRY = {
                 width: durch * r.anteil, height: durch * r.anteil * 0.5,
                 marginLeft: -durch * r.anteil / 2, marginTop: -durch * r.anteil * 0.25,
                 borderRadius: '50%', border: r.strich,
-                boxShadow: '0 0 18px rgba(120,225,255,.5)',
+                boxShadow: '0 0 18px rgba(127,223,255,.5)',
                 '--mdir': String(r.richtung),
                 animation: `maelstromSpin ${r.dur}ms linear ${i * 60}ms forwards`,
                 opacity: 0,
@@ -13717,8 +13717,8 @@ const ANIM_REGISTRY = {
               width: durch * 0.2, height: durch * 0.1,
               marginLeft: -durch * 0.1, marginTop: -durch * 0.05,
               borderRadius: '50%',
-              background: 'radial-gradient(ellipse, #000814 0%, rgba(4,26,60,.92) 45%, rgba(20,90,160,.5) 78%, transparent 100%)',
-              boxShadow: '0 0 40px rgba(10,40,90,.9)',
+              background: 'radial-gradient(ellipse, #08060c 0%, rgba(0,33,63,.92) 45%, rgba(47,83,157,.5) 78%, transparent 100%)',
+              boxShadow: '0 0 40px rgba(20,40,90,.9)',
               animation: 'maelstromFunnel 2000ms ease-in-out forwards',
               opacity: 0,
             }} />
@@ -13730,8 +13730,8 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: 0, top: 0,
               width: g.groesse, height: g.groesse, borderRadius: '50%',
               marginLeft: -g.groesse / 2, marginTop: -g.groesse / 2,
-              background: 'radial-gradient(circle at 35% 30%, #ffffff 0%, rgba(180,245,255,.8) 50%, rgba(80,190,255,.3) 100%)',
-              boxShadow: '0 0 8px rgba(170,240,255,.85)',
+              background: 'radial-gradient(circle at 35% 30%, #ffffff 0%, rgba(182,239,247,.8) 50%, rgba(104,198,253,.3) 100%)',
+              boxShadow: '0 0 8px rgba(182,239,247,.85)',
               '--mgdx': g.dx + 'px', '--mgdy': g.dy + 'px',
               animation: `maelstromSpray ${g.dur}ms ease-out ${g.delay}ms forwards`,
               opacity: 0,
@@ -13790,7 +13790,7 @@ const ANIM_REGISTRY = {
         hoehe: hh * (0.5 + Math.random() * 0.5),
         delay: 120 + Math.random() * 420,
         dur: 620 + Math.random() * 420,
-        farbe: ['#7bff9e', '#a855ff', '#5de0c0', '#c77dff'][Math.floor(Math.random() * 4)],
+        farbe: ['#66ffa2', '#a952ff', '#3adfcb', '#ba74ff'][Math.floor(Math.random() * 4)],
       })), [ww, hh]);
 
       const knochen = useMemo(() => Array.from({ length: 5 }, (_, i) => ({
@@ -13812,14 +13812,14 @@ const ANIM_REGISTRY = {
           }}>
             <div style={{
               position: 'absolute', inset: 0, borderRadius: '50%',
-              border: '3px dashed rgba(150,90,255,.85)',
-              boxShadow: '0 0 22px rgba(120,40,220,.8), inset 0 0 26px rgba(90,255,160,.35)',
+              border: '3px dashed rgba(169,82,255,.85)',
+              boxShadow: '0 0 22px rgba(110,0,204,.8), inset 0 0 26px rgba(102,255,162,.35)',
               animation: 'undeadCircle 1400ms linear forwards',
               opacity: 0,
             }} />
             <div style={{
               position: 'absolute', left: '18%', top: '18%', width: '64%', height: '64%',
-              borderRadius: '50%', border: '2px solid rgba(110,255,180,.6)',
+              borderRadius: '50%', border: '2px solid rgba(104,253,193,.6)',
               animation: 'undeadCircleInner 1400ms linear forwards',
               opacity: 0,
             }} />
@@ -13832,7 +13832,7 @@ const ANIM_REGISTRY = {
               width: f.groesse, height: f.groesse * 2.1,
               marginLeft: -f.groesse / 2,
               borderRadius: '50% 50% 45% 45%',
-              background: `radial-gradient(ellipse at 50% 80%, ${f.farbe} 0%, rgba(80,20,140,.55) 55%, transparent 85%)`,
+              background: `radial-gradient(ellipse at 50% 80%, ${f.farbe} 0%, rgba(80,0,140,.55) 55%, transparent 85%)`,
               filter: 'blur(1px)',
               '--ufrise': (-f.hoehe) + 'px',
               animation: `undeadFlame ${f.dur}ms ease-out ${f.delay}ms forwards`,
@@ -13846,7 +13846,7 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: k.links, top: hh * 0.22,
               fontSize: k.groesse, lineHeight: 1,
               marginLeft: -k.groesse / 2,
-              filter: 'drop-shadow(0 0 6px rgba(150,90,255,.9))',
+              filter: 'drop-shadow(0 0 6px rgba(169,82,255,.9))',
               '--ukrise': (-hh * 0.7) + 'px', '--ukdreh': k.dreh + 'deg',
               animation: `undeadBone ${k.dur}ms ease-out ${k.delay}ms forwards`,
               opacity: 0,
@@ -13857,8 +13857,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -ww * 0.42, top: -hh * 0.22,
             width: ww * 0.84, height: hh * 0.52, borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(230,210,255,.9) 0%, rgba(140,60,240,.6) 40%, rgba(40,0,80,.35) 70%, transparent 88%)',
-            boxShadow: '0 0 34px rgba(130,50,230,.85)',
+            background: 'radial-gradient(ellipse, rgba(217,192,236,.9) 0%, rgba(144,58,230,.6) 40%, rgba(46,10,81,.35) 70%, transparent 88%)',
+            boxShadow: '0 0 34px rgba(144,58,230,.85)',
             animation: 'undeadBurst 520ms ease-out 760ms forwards',
             opacity: 0,
           }} />
@@ -13929,7 +13929,7 @@ const ANIM_REGISTRY = {
           dx: Math.cos(winkel) * weite,
           dy: Math.sin(winkel) * weite * 0.82,
           groesse: 5 + Math.random() * 18,
-          farbe: ['#fff', '#fff4d0', '#ffe9b0', '#ffb347', '#ff7518', '#d94a12', '#8a8f98', '#5a5f66'][Math.floor(Math.random() * 8)],
+          farbe: ['#fff', '#fffbd2', '#f9ecb3', '#f9ac20', '#f87420', '#cc2b00', '#808898', '#59606e'][Math.floor(Math.random() * 8)],
           delay: Math.random() * 190,
           dur: 620 + Math.random() * 760,
           dreh: (Math.random() - 0.5) * 1440,
@@ -14003,7 +14003,7 @@ const ANIM_REGISTRY = {
           dx: Math.cos(winkel) * weite,
           dy: Math.sin(winkel) * weite * 0.8,
           groesse: 3 + Math.random() * 7,
-          farbe: ['#fff6c4', '#ffd447', '#ffae1a', '#fff', '#e8a000'][Math.floor(Math.random() * 5)],
+          farbe: ['#fffbd2', '#fad54a', '#f9ac20', '#fff', '#f9ac20'][Math.floor(Math.random() * 5)],
           delay: Math.random() * 180,
           dur: 420 + Math.random() * 380,
         };
@@ -14025,7 +14025,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -ww * 0.55, top: -ww * 0.55,
             width: ww * 1.1, height: ww * 1.1, borderRadius: '50%',
-            background: 'radial-gradient(circle, #ffffff 0%, #fff2b0 30%, rgba(255,190,40,.6) 55%, transparent 78%)',
+            background: 'radial-gradient(circle, #ffffff 0%, #f9ecb3 30%, rgba(255,185,26,.6) 55%, transparent 78%)',
             animation: 'goldBoomFlash 420ms ease-out forwards',
             opacity: 0,
           }} />
@@ -14033,8 +14033,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -ww * 0.38, top: -ww * 0.38,
             width: ww * 0.76, height: ww * 0.76, borderRadius: '50%',
-            background: 'radial-gradient(circle at 42% 38%, #fffbe0 0%, #ffd447 34%, #ffa514 62%, rgba(150,80,0,.55) 85%, transparent 100%)',
-            boxShadow: '0 0 30px rgba(255,190,60,.9), 0 0 70px rgba(255,150,0,.55)',
+            background: 'radial-gradient(circle at 42% 38%, #fff8e8 0%, #fad54a 34%, #f9ac20 62%, rgba(170,83,0,.55) 85%, transparent 100%)',
+            boxShadow: '0 0 30px rgba(255,185,26,.9), 0 0 70px rgba(255,154,26,.55)',
             animation: 'goldBoomCore 720ms ease-out forwards',
             opacity: 0,
           }} />
@@ -14042,8 +14042,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -ww * 0.5, top: -ww * 0.28,
             width: ww, height: ww * 0.56, borderRadius: '50%',
-            border: '3px solid rgba(255,225,130,.9)',
-            boxShadow: '0 0 20px rgba(255,200,60,.8)',
+            border: '3px solid rgba(251,225,129,.9)',
+            boxShadow: '0 0 20px rgba(255,198,28,.8)',
             animation: 'goldBoomRing 620ms ease-out 80ms forwards',
             opacity: 0,
           }} />
@@ -14066,7 +14066,7 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: 0, top: 0,
               fontSize: m.groesse, lineHeight: 1,
               marginLeft: -m.groesse / 2, marginTop: -m.groesse / 2,
-              filter: 'drop-shadow(0 0 5px rgba(255,200,60,.9))',
+              filter: 'drop-shadow(0 0 5px rgba(255,198,28,.9))',
               '--gmdx': m.dx + 'px', '--gmup': m.hoch + 'px', '--gmrot': m.dreh + 'deg',
               animation: `goldBoomCoin ${m.dur}ms ease-out ${m.delay}ms forwards`,
               opacity: 0,
@@ -14140,7 +14140,7 @@ const ANIM_REGISTRY = {
             return {
               sx: Math.cos(wi) * r, sy: Math.sin(wi) * r * 0.8 - ww * 0.08,
               g: 3 + Math.random() * 4,
-              farbe: ['#efe6d2', '#ffb347', '#ff5a2a', '#7a1f2e'][Math.floor(Math.random() * 4)],
+              farbe: ['#ebdcc1', '#f9ac20', '#ff491a', '#710122'][Math.floor(Math.random() * 4)],
             };
           }),
         };
@@ -14209,7 +14209,7 @@ const ANIM_REGISTRY = {
           funken: Array.from({ length: 3 }, (_, k) => ({
             verzug: (k + 1) * 60,
             groesse: 3 + Math.random() * 4,
-            farbe: ['#fff1b8', '#ffc24a', '#ff7a18', '#ff3b0f'][k % 4],
+            farbe: ['#f9ecb3', '#ffd066', '#f87420', '#ff491a'][k % 4],
           })),
         };
       }), [ww]);
@@ -14246,9 +14246,9 @@ const ANIM_REGISTRY = {
                 }}>
                   <div style={{
                     position: 'absolute', inset: 0,
-                    background: 'linear-gradient(90deg, rgba(255,60,10,.15) 0%, #ff7a18 38%, #ffd447 72%, #fffbe0 100%)',
+                    background: 'linear-gradient(90deg, rgba(255,73,26,.15) 0%, #f87420 38%, #fad54a 72%, #fff8e8 100%)',
                     clipPath: 'polygon(100% 50%, 55% 32%, 62% 0%, 34% 30%, 0% 22%, 22% 50%, 0% 78%, 34% 70%, 62% 100%, 55% 68%)',
-                    filter: 'drop-shadow(0 0 8px rgba(255,150,30,.95))',
+                    filter: 'drop-shadow(0 0 8px rgba(255,154,26,.95))',
                     animation: 'phoenixFlap 220ms ease-in-out infinite',
                   }} />
                 </div>
@@ -14258,8 +14258,8 @@ const ANIM_REGISTRY = {
                 position: 'absolute', left: 0, top: 0,
                 width: ww * 0.62, height: ww * 0.62, borderRadius: '50%',
                 marginLeft: -ww * 0.31, marginTop: -ww * 0.31,
-                background: 'radial-gradient(circle, #fffbe0 0%, #ffd447 26%, #ff7a18 52%, rgba(180,40,0,.45) 74%, transparent 92%)',
-                boxShadow: '0 0 26px rgba(255,140,30,.9)',
+                background: 'radial-gradient(circle, #fff8e8 0%, #fad54a 26%, #f87420 52%, rgba(182,38,0,.45) 74%, transparent 92%)',
+                boxShadow: '0 0 26px rgba(255,139,26,.9)',
                 animation: `phoenixBoom 460ms ease-out ${v.ankunft}ms forwards`,
                 opacity: 0,
               }} />
@@ -14315,7 +14315,7 @@ const ANIM_REGISTRY = {
           dreh: (winkel * 180) / Math.PI + 180,
           delay: Math.random() * 620,
           dur: 130 + Math.random() * 90,
-          farbe: ['#eaf6ff', '#9fd8ff', '#5eb8ff', '#fff'][Math.floor(Math.random() * 4)],
+          farbe: ['#e5f5fa', '#b3d8f9', '#66b6ff', '#fff'][Math.floor(Math.random() * 4)],
         };
       }), [radius]);
 
@@ -14342,7 +14342,7 @@ const ANIM_REGISTRY = {
             }}>
               <div style={{
                 position: 'absolute', inset: 0,
-                background: `linear-gradient(90deg, ${b.farbe} 0%, rgba(140,220,255,.85) 55%, rgba(90,180,255,0) 100%)`,
+                background: `linear-gradient(90deg, ${b.farbe} 0%, rgba(127,223,255,.85) 55%, rgba(102,182,255,0) 100%)`,
                 clipPath: 'polygon(0% 45%, 18% 15%, 30% 48%, 48% 8%, 60% 50%, 78% 20%, 100% 46%, 100% 54%, 78% 80%, 60% 50%, 48% 92%, 30% 52%, 18% 85%, 0% 55%)',
                 filter: `drop-shadow(0 0 6px ${b.farbe})`,
               }} />
@@ -14353,9 +14353,9 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -ww * 0.46, top: -hh * 0.46,
             width: ww * 0.92, height: hh * 0.92,
-            border: '2px solid rgba(160,225,255,.9)',
+            border: '2px solid rgba(180,223,248,.9)',
             borderRadius: 6,
-            boxShadow: '0 0 18px rgba(110,190,255,.85), inset 0 0 22px rgba(150,220,255,.55)',
+            boxShadow: '0 0 18px rgba(102,182,255,.85), inset 0 0 22px rgba(127,223,255,.55)',
             animation: 'paraCage 1200ms ease-out forwards',
             opacity: 0,
           }} />
@@ -14365,8 +14365,8 @@ const ANIM_REGISTRY = {
             <div key={'pf' + i} style={{
               position: 'absolute', left: f.links, top: f.oben,
               width: f.groesse, height: f.groesse, borderRadius: '50%',
-              background: '#eaf8ff',
-              boxShadow: '0 0 7px #7cc8ff',
+              background: '#e5f5fa',
+              boxShadow: '0 0 7px #68c6fd',
               animation: `paraSpark ${f.dur}ms steps(2, end) ${f.delay}ms 2 forwards`,
               opacity: 0,
             }} />
@@ -14428,8 +14428,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -ww * 0.16, top: -hoehe - ww * 0.2,
             width: ww * 0.32, height: ww * 0.32, borderRadius: '50%',
-            background: 'radial-gradient(circle at 38% 34%, #f2f8ff 0%, #cfe4ff 45%, #8fb6e8 78%, rgba(120,160,220,0) 100%)',
-            boxShadow: '0 0 26px rgba(170,205,255,.9)',
+            background: 'radial-gradient(circle at 38% 34%, #e5f5fa 0%, #bddcef 45%, #89abdc 78%, rgba(137,171,220,0) 100%)',
+            boxShadow: '0 0 26px rgba(180,207,248,.9)',
             animation: 'moonDisc 1400ms ease-out forwards',
             opacity: 0,
           }} />
@@ -14438,7 +14438,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -ww * 0.52, top: -hoehe,
             width: ww * 1.04, height: hoehe + hh * 0.35,
-            background: 'linear-gradient(180deg, rgba(190,220,255,.05) 0%, rgba(165,205,255,.30) 35%, rgba(150,195,255,.42) 78%, rgba(140,190,255,.12) 100%)',
+            background: 'linear-gradient(180deg, rgba(179,216,249,.05) 0%, rgba(180,207,248,.30) 35%, rgba(137,171,220,.42) 78%, rgba(102,182,255,.12) 100%)',
             clipPath: 'polygon(40% 0%, 60% 0%, 96% 100%, 4% 100%)',
             filter: 'blur(1px)',
             transformOrigin: '50% 0%',
@@ -14450,7 +14450,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -ww * 0.2, top: -hoehe,
             width: ww * 0.4, height: hoehe + hh * 0.3,
-            background: 'linear-gradient(180deg, rgba(235,245,255,.1) 0%, rgba(225,240,255,.45) 45%, rgba(210,235,255,.25) 100%)',
+            background: 'linear-gradient(180deg, rgba(229,237,250,.1) 0%, rgba(229,237,250,.45) 45%, rgba(189,220,239,.25) 100%)',
             clipPath: 'polygon(42% 0%, 58% 0%, 88% 100%, 12% 100%)',
             transformOrigin: '50% 0%',
             animation: 'moonShaft 1400ms ease-out 120ms forwards',
@@ -14462,8 +14462,8 @@ const ANIM_REGISTRY = {
             <div key={'mb' + i} style={{
               position: 'absolute', left: s.links, top: -s.start,
               width: s.groesse, height: s.groesse, borderRadius: '50%',
-              background: 'rgba(240,250,255,.95)',
-              boxShadow: '0 0 6px rgba(180,215,255,.9)',
+              background: 'rgba(229,245,250,.95)',
+              boxShadow: '0 0 6px rgba(180,207,248,.9)',
               '--mbx': s.weite + 'px',
               animation: `moonDust ${s.dur}ms linear ${s.delay}ms infinite`,
               opacity: 0,
@@ -14474,7 +14474,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -ww * 0.48, top: hh * 0.14,
             width: ww * 0.96, height: ww * 0.34, borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(225,240,255,.75) 0%, rgba(160,200,255,.4) 45%, transparent 78%)',
+            background: 'radial-gradient(ellipse, rgba(229,237,250,.75) 0%, rgba(180,207,248,.4) 45%, transparent 78%)',
             animation: 'moonPool 1400ms ease-out 160ms forwards',
             opacity: 0,
           }} />
@@ -14555,7 +14555,7 @@ const ANIM_REGISTRY = {
           }}>
             <div style={{
               position: 'absolute', inset: 0,
-              background: 'radial-gradient(circle at 34% 28%, #9c9a95 0%, #6f6c66 42%, #4a4844 72%, #302e2b 100%)',
+              background: 'radial-gradient(circle at 34% 28%, #929292 0%, #686868 42%, #535353 72%, #323232 100%)',
               clipPath: 'polygon(30% 4%, 64% 0%, 88% 22%, 100% 54%, 82% 84%, 52% 100%, 20% 92%, 2% 62%, 6% 26%)',
               boxShadow: 'inset -6px -8px 12px rgba(0,0,0,.55), inset 6px 6px 10px rgba(255,255,255,.14)',
             }} />
@@ -14565,7 +14565,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -ww * 0.5, top: hh * 0.06,
             width: ww, height: ww * 0.42, borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(190,180,165,.85) 0%, rgba(150,140,125,.45) 45%, transparent 78%)',
+            background: 'radial-gradient(ellipse, rgba(197,183,160,.85) 0%, rgba(146,146,146,.45) 45%, transparent 78%)',
             animation: 'boulderDust 620ms ease-out 470ms forwards',
             opacity: 0,
           }} />
@@ -14576,7 +14576,7 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: 0, top: hh * 0.1,
               width: g.groesse, height: g.groesse, borderRadius: 2,
               marginLeft: -g.groesse / 2,
-              background: 'linear-gradient(135deg, #8c8982 0%, #52504b 100%)',
+              background: 'linear-gradient(135deg, #929292 0%, #535353 100%)',
               '--fbdx': g.dx + 'px', '--fbdy': g.dy + 'px', '--fbrot': g.dreh + 'deg',
               animation: `boulderDebris ${g.dur}ms ease-out 470ms forwards`,
               opacity: 0,
@@ -14634,7 +14634,7 @@ const ANIM_REGISTRY = {
         hoch: hh * (0.9 + Math.random() * 0.9),
         dur: 620 + Math.random() * 520,
         delay: Math.random() * 520,
-        farbe: ['#fff6c4', '#ffd447', '#ffffff', '#ffe9a0'][Math.floor(Math.random() * 4)],
+        farbe: ['#fffbd2', '#fad54a', '#ffffff', '#f9ecb3'][Math.floor(Math.random() * 4)],
       })), [ww, hh]);
 
       const ringe = useMemo(() => [0, 1, 2].map(i => ({
@@ -14648,7 +14648,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -ww * 0.52, top: hh * 0.2,
             width: ww * 1.04, height: ww * 0.34, borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(255,235,150,.9) 0%, rgba(255,200,60,.45) 45%, transparent 78%)',
+            background: 'radial-gradient(ellipse, rgba(255,241,150,.9) 0%, rgba(255,198,28,.45) 45%, transparent 78%)',
             animation: 'promoBase 1100ms ease-out forwards',
             opacity: 0,
           }} />
@@ -14657,7 +14657,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -ww * 0.34, top: -hh * 0.9,
             width: ww * 0.68, height: hh * 1.25,
-            background: 'linear-gradient(0deg, rgba(255,214,90,.55) 0%, rgba(255,236,170,.3) 55%, rgba(255,255,255,0) 100%)',
+            background: 'linear-gradient(0deg, rgba(255,217,102,.55) 0%, rgba(249,236,179,.3) 55%, rgba(255,255,255,0) 100%)',
             clipPath: 'polygon(14% 100%, 86% 100%, 66% 0%, 34% 0%)',
             filter: 'blur(1px)',
             transformOrigin: '50% 100%',
@@ -14670,8 +14670,8 @@ const ANIM_REGISTRY = {
             <div key={'pr' + i} style={{
               position: 'absolute', left: -ww * 0.44, top: hh * 0.16,
               width: ww * 0.88, height: ww * 0.3, borderRadius: '50%',
-              border: '3px solid rgba(255,226,130,.95)',
-              boxShadow: '0 0 16px rgba(255,200,70,.85)',
+              border: '3px solid rgba(251,225,129,.95)',
+              boxShadow: '0 0 16px rgba(250,213,74,.85)',
               '--prUp': (-hh * 1.05) + 'px',
               animation: `promoRing ${r.dur}ms ease-out ${r.delay}ms forwards`,
               opacity: 0,
@@ -14695,8 +14695,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -ww * 0.42, top: -hh * 0.12,
             width: ww * 0.84, height: ww * 0.84, borderRadius: '50%',
-            border: '4px solid rgba(255,236,170,.95)',
-            boxShadow: '0 0 26px rgba(255,205,70,.9), inset 0 0 18px rgba(255,230,140,.6)',
+            border: '4px solid rgba(249,236,179,.95)',
+            boxShadow: '0 0 26px rgba(250,213,74,.9), inset 0 0 18px rgba(251,225,129,.6)',
             animation: 'promoCrown 640ms cubic-bezier(.2,.8,.3,1) 620ms forwards',
             opacity: 0,
           }} />
@@ -14775,8 +14775,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -ww * 0.95, top: -5,
             width: ww * 1.9, height: 10,
-            background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(210,245,255,.95) 45%, rgba(255,255,255,1) 55%, rgba(180,230,255,0) 100%)',
-            boxShadow: '0 0 18px rgba(190,240,255,.9)',
+            background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(229,245,250,.95) 45%, rgba(255,255,255,1) 55%, rgba(180,223,248,0) 100%)',
+            boxShadow: '0 0 18px rgba(179,232,249,.9)',
             transformOrigin: '50% 50%',
             animation: 'glassSlash 320ms cubic-bezier(.2,.7,.3,1) forwards',
             opacity: 0,
@@ -14786,7 +14786,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -ww * 0.3, top: -ww * 0.3,
             width: ww * 0.6, height: ww * 0.6,
-            background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(200,240,255,.5) 35%, transparent 72%)',
+            background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(179,232,249,.5) 35%, transparent 72%)',
             animation: 'glassCrack 420ms ease-out 220ms forwards',
             opacity: 0,
           }} />
@@ -14796,8 +14796,8 @@ const ANIM_REGISTRY = {
             <div key={'gs' + i} style={{
               position: 'absolute', left: 0, top: 0,
               width: s.breite, height: s.laenge,
-              background: 'linear-gradient(160deg, rgba(255,255,255,.98) 0%, rgba(190,235,255,.85) 45%, rgba(120,190,225,.7) 100%)',
-              boxShadow: '0 0 6px rgba(210,245,255,.8)',
+              background: 'linear-gradient(160deg, rgba(255,255,255,.98) 0%, rgba(179,232,249,.85) 45%, rgba(119,200,238,.7) 100%)',
+              boxShadow: '0 0 6px rgba(229,245,250,.8)',
               clipPath: 'polygon(50% 0%, 100% 78%, 22% 100%)',
               '--gsdx': s.dx + 'px', '--gsdy': s.dy + 'px', '--gsrot': s.dreh + 'deg',
               '--gstilt': s.kippen + 'deg',
@@ -14854,17 +14854,17 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: 0, top: s * 0.25,
             width: s * 0.55, height: s * 0.55, borderRadius: '50%',
-            background: 'radial-gradient(circle at 35% 30%, #d4173a 0%, #8e0a22 100%)',
+            background: 'radial-gradient(circle at 35% 30%, #e73b41 0%, #8c0014 100%)',
           }} />
           <div style={{
             position: 'absolute', left: s * 0.45, top: s * 0.25,
             width: s * 0.55, height: s * 0.55, borderRadius: '50%',
-            background: 'radial-gradient(circle at 35% 30%, #d4173a 0%, #8e0a22 100%)',
+            background: 'radial-gradient(circle at 35% 30%, #e73b41 0%, #8c0014 100%)',
           }} />
           <div style={{
             position: 'absolute', left: s * 0.145, top: s * 0.38,
             width: s * 0.71, height: s * 0.71,
-            background: 'linear-gradient(135deg, #c2142f 0%, #7d071d 100%)',
+            background: 'linear-gradient(135deg, #b21a29 0%, #780014 100%)',
             transform: 'rotate(45deg)',
           }} />
         </div>
@@ -14878,7 +14878,7 @@ const ANIM_REGISTRY = {
               '--chrot': hz.kippen + 'deg',
               animation: `cuteHeartRise ${hz.dur}ms cubic-bezier(.25,.6,.4,1) ${hz.delay}ms forwards`,
               opacity: 0,
-              filter: 'drop-shadow(0 0 6px rgba(190,20,50,.75))',
+              filter: 'drop-shadow(0 0 6px rgba(178,26,41,.75))',
             }}>
               <Herz s={hz.groesse} />
             </div>
@@ -14945,14 +14945,14 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -R * 0.35, top: -R * 0.35, width: R * 0.7, height: R * 0.7,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, #ffffff 0%, #fff3c4 45%, rgba(255,220,140,0) 72%)',
+            background: 'radial-gradient(circle, #ffffff 0%, #fffbd2 45%, rgba(251,225,129,0) 72%)',
             animation: 'lrCore 380ms ease-out forwards', opacity: 0,
           }} />
           {/* ② Feuerball */}
           <div style={{
             position: 'absolute', left: -R / 2, top: -R / 2, width: R, height: R,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,246,214,.98) 0%, #ffb03a 26%, #f2591b 52%, #8c1c07 74%, rgba(60,10,4,0) 88%)',
+            background: 'radial-gradient(circle, rgba(255,251,210,.98) 0%, #f9ac20 26%, #ff491a 52%, #8b0d0d 74%, rgba(58,0,0,0) 88%)',
             animation: 'lrBall 980ms cubic-bezier(.15,.75,.35,1) forwards', opacity: 0,
             filter: 'blur(1px)',
           }} />
@@ -14960,8 +14960,8 @@ const ANIM_REGISTRY = {
           {[0, 190].map((d, i) => (
             <div key={'lrw' + i} style={{
               position: 'absolute', left: -R / 2, top: -R / 2, width: R, height: R,
-              borderRadius: '50%', border: '4px solid rgba(255,226,170,.85)',
-              boxShadow: '0 0 26px rgba(255,180,80,.7) inset',
+              borderRadius: '50%', border: '4px solid rgba(249,236,179,.85)',
+              boxShadow: '0 0 26px rgba(244,174,100,.7) inset',
               animation: `lrWave 760ms ease-out ${d}ms forwards`, opacity: 0,
             }} />
           ))}
@@ -14969,7 +14969,7 @@ const ANIM_REGISTRY = {
           {splitter.map((s, i) => (
             <div key={'lrs' + i} style={{
               position: 'absolute', left: 0, top: 0, width: s.breite, height: s.laenge,
-              background: 'linear-gradient(160deg, #ffd89a 0%, #d9601f 55%, #5b1a06 100%)',
+              background: 'linear-gradient(160deg, #e0c085 0%, #cf5f00 55%, #6a1c14 100%)',
               clipPath: 'polygon(50% 0%, 100% 72%, 18% 100%)',
               '--lrdx': s.dx + 'px', '--lrdy': s.dy + 'px', '--lrrot': s.dreh + 'deg',
               animation: `lrShard ${s.dur}ms cubic-bezier(.2,.6,.4,1) ${s.delay}ms forwards`,
@@ -14980,8 +14980,8 @@ const ANIM_REGISTRY = {
           {funken.map((f, i) => (
             <div key={'lrf' + i} style={{
               position: 'absolute', left: 0, top: 0, width: f.gr, height: f.gr, borderRadius: '50%',
-              background: 'radial-gradient(circle, #fffbe8 0%, #ffb648 60%, rgba(255,140,40,0) 100%)',
-              boxShadow: '0 0 10px rgba(255,190,110,.95)',
+              background: 'radial-gradient(circle, #fff8e8 0%, #f9ac20 60%, rgba(255,139,26,0) 100%)',
+              boxShadow: '0 0 10px rgba(244,174,100,.95)',
               '--lrdx': f.dx + 'px', '--lrdy': f.dy + 'px',
               animation: `lrSpark ${f.dur}ms ease-out ${f.delay}ms forwards`, opacity: 0,
             }} />
@@ -15049,33 +15049,33 @@ const ANIM_REGISTRY = {
           {/* ① Siegelring, zieht sich zusammen */}
           <div style={{
             position: 'absolute', left: -R / 2, top: -R / 2, width: R, height: R,
-            borderRadius: '50%', border: '3px solid rgba(178,150,214,.85)',
-            boxShadow: '0 0 18px rgba(150,120,190,.55), 0 0 22px rgba(80,60,110,.5) inset',
+            borderRadius: '50%', border: '3px solid rgba(179,142,215,.85)',
+            boxShadow: '0 0 18px rgba(128,102,178,.55), 0 0 22px rgba(43,69,126,.5) inset',
             animation: 'silenceRing 880ms cubic-bezier(.3,.7,.35,1) forwards', opacity: 0,
           }} />
           {/* ② Verbotszeichen */}
           <div style={{
             position: 'absolute', left: -R * 0.22, top: -R * 0.22, width: R * 0.44, height: R * 0.44,
-            borderRadius: '50%', border: `${Math.max(3, R * 0.045)}px solid rgba(206,186,230,.92)`,
+            borderRadius: '50%', border: `${Math.max(3, R * 0.045)}px solid rgba(217,192,236,.92)`,
             animation: 'silenceMark 760ms ease-out 140ms forwards', opacity: 0,
           }}>
             <div style={{
               position: 'absolute', left: '50%', top: '-6%', width: Math.max(3, R * 0.045), height: '112%',
-              background: 'rgba(206,186,230,.92)', transform: 'translateX(-50%) rotate(45deg)',
+              background: 'rgba(217,192,236,.92)', transform: 'translateX(-50%) rotate(45deg)',
               transformOrigin: '50% 50%',
             }} />
           </div>
           {/* ③ Schwade */}
           <div style={{
             position: 'absolute', left: -ww * 0.55, top: -hh * 0.55, width: ww * 1.1, height: hh * 1.1,
-            background: 'radial-gradient(ellipse at center, rgba(40,28,60,.62) 0%, rgba(40,28,60,.28) 55%, transparent 80%)',
+            background: 'radial-gradient(ellipse at center, rgba(41,31,61,.62) 0%, rgba(41,31,61,.28) 55%, transparent 80%)',
             animation: 'silenceVeil 980ms ease-out forwards', opacity: 0,
           }} />
           {/* ④ Zeichen, die nach innen fallen */}
           {zeichen.map((z, i) => (
             <div key={'sz' + i} style={{
               position: 'absolute', left: 0, top: 0, width: z.gr, height: z.gr, borderRadius: '2px',
-              background: 'linear-gradient(140deg, rgba(214,198,235,.95), rgba(120,96,160,.7))',
+              background: 'linear-gradient(140deg, rgba(217,192,236,.95), rgba(128,102,178,.7))',
               '--szdx': z.dx + 'px', '--szdy': z.dy + 'px',
               animation: `silenceGlyph 700ms ease-in ${z.delay}ms forwards`, opacity: 0,
             }} />
@@ -15126,8 +15126,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -80, top: -80, width: 160, height: 160,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,240,.9) 0%, rgba(255,200,60,.55) 35%, rgba(220,40,40,.35) 65%, transparent 85%)',
-            boxShadow: '0 0 45px rgba(255,220,100,.9), 0 0 90px rgba(255,80,40,.55)',
+            background: 'radial-gradient(circle, rgba(255,248,232,.9) 0%, rgba(255,198,28,.55) 35%, rgba(230,62,51,.35) 65%, transparent 85%)',
+            boxShadow: '0 0 45px rgba(255,217,102,.9), 0 0 90px rgba(255,73,26,.55)',
             animation: 'criticalShockwave 480ms ease-out forwards',
             opacity: 0,
           }} />
@@ -15135,8 +15135,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -len / 2, top: -4,
             width: len, height: 8,
-            background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,240,.15) 10%, rgba(255,230,110,.95) 44%, rgba(255,255,255,1) 50%, rgba(255,200,60,.95) 56%, rgba(255,120,60,.5) 85%, transparent 100%)',
-            boxShadow: '0 0 18px rgba(255,230,120,.95), 0 0 34px rgba(255,80,40,.75)',
+            background: 'linear-gradient(90deg, transparent 0%, rgba(255,248,232,.15) 10%, rgba(255,228,105,.95) 44%, rgba(255,255,255,1) 50%, rgba(255,198,28,.95) 56%, rgba(248,116,32,.5) 85%, transparent 100%)',
+            boxShadow: '0 0 18px rgba(255,228,105,.95), 0 0 34px rgba(255,73,26,.75)',
             transform: 'rotate(-35deg) translateX(-130%)',
             transformOrigin: 'center center',
             animation: 'criticalSlashA 220ms cubic-bezier(0.15, 0.95, 0.25, 1) forwards',
@@ -15146,8 +15146,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -len / 2, top: -4,
             width: len, height: 8,
-            background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,240,.15) 10%, rgba(255,230,110,.95) 44%, rgba(255,255,255,1) 50%, rgba(255,200,60,.95) 56%, rgba(255,120,60,.5) 85%, transparent 100%)',
-            boxShadow: '0 0 18px rgba(255,230,120,.95), 0 0 34px rgba(255,80,40,.75)',
+            background: 'linear-gradient(90deg, transparent 0%, rgba(255,248,232,.15) 10%, rgba(255,228,105,.95) 44%, rgba(255,255,255,1) 50%, rgba(255,198,28,.95) 56%, rgba(248,116,32,.5) 85%, transparent 100%)',
+            boxShadow: '0 0 18px rgba(255,228,105,.95), 0 0 34px rgba(255,73,26,.75)',
             transform: 'rotate(35deg) translateX(-130%)',
             transformOrigin: 'center center',
             animation: 'criticalSlashB 220ms cubic-bezier(0.15, 0.95, 0.25, 1) 110ms forwards',
@@ -15157,8 +15157,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -30, top: -30, width: 60, height: 60,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,240,180,.85) 45%, transparent 80%)',
-            boxShadow: '0 0 50px rgba(255,255,220,1), 0 0 90px rgba(255,190,80,.7)',
+            background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(249,236,179,.85) 45%, transparent 80%)',
+            boxShadow: '0 0 50px rgba(255,251,210,1), 0 0 90px rgba(255,208,102,.7)',
             animation: 'criticalGlint 360ms ease-out 180ms forwards',
             opacity: 0,
           }} />
@@ -15168,8 +15168,8 @@ const ANIM_REGISTRY = {
             textAlign: 'center',
             fontFamily: '"Orbitron", "Rajdhani", sans-serif',
             fontSize: 28, fontWeight: 900, letterSpacing: '2px',
-            color: '#fff7c0',
-            textShadow: '0 0 8px rgba(255,60,20,.95), 0 0 18px rgba(255,120,40,.85), 2px 2px 0 #6b0010, -2px 2px 0 #6b0010, 2px -2px 0 #6b0010, -2px -2px 0 #6b0010',
+            color: '#f8f8bd',
+            textShadow: '0 0 8px rgba(255,73,26,.95), 0 0 18px rgba(248,116,32,.85), 2px 2px 0 #780014, -2px 2px 0 #780014, 2px -2px 0 #780014, -2px -2px 0 #780014',
             animation: 'criticalText 620ms cubic-bezier(0.2, 1.4, 0.4, 1) 180ms forwards',
             opacity: 0,
             transform: 'scale(0.3)',
@@ -15180,8 +15180,8 @@ const ANIM_REGISTRY = {
             <div key={'cs'+i} style={{
               position: 'absolute', left: 0, top: 0,
               width: s.size, height: s.size, borderRadius: '50%',
-              background: s.gold ? '#ffe066' : '#ff4830',
-              boxShadow: `0 0 ${s.size * 2}px ${s.gold ? 'rgba(255,220,100,.9)' : 'rgba(255,80,40,.9)'}`,
+              background: s.gold ? '#ffe469' : '#ef2929',
+              boxShadow: `0 0 ${s.size * 2}px ${s.gold ? 'rgba(255,217,102,.9)' : 'rgba(255,73,26,.9)'}`,
               animation: `criticalSpark ${s.dur}ms ease-out ${s.delay}ms forwards`,
               opacity: 0,
               '--csAngle': s.angle + 'deg',
@@ -15215,8 +15215,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'fixed', left: x - 18, top: 6, width: 36, height: 36,
             borderRadius: '50%',
-            background: 'radial-gradient(circle at 40% 40%, #ffd0d0 0%, #ff2a3e 50%, #6e0008 100%)',
-            boxShadow: '0 0 24px rgba(255,50,70,.95), 0 0 44px rgba(200,0,30,.7)',
+            background: 'radial-gradient(circle at 40% 40%, #f0bfbc 0%, #f03232 50%, #780014 100%)',
+            boxShadow: '0 0 24px rgba(233,47,56,.95), 0 0 44px rgba(192,20,28,.7)',
             animation: 'orbitalLaserCharge 260ms ease-out forwards',
             opacity: 0,
           }} />
@@ -15225,8 +15225,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'fixed', left: x - 5, top: 20,
             width: 10, height: beamHeight - 20,
-            background: 'linear-gradient(to bottom, rgba(255,180,190,.9), rgba(220,30,50,.95) 35%, rgba(140,0,20,.8))',
-            boxShadow: '0 0 12px rgba(255,60,80,.85), 0 0 28px rgba(200,0,30,.7)',
+            background: 'linear-gradient(to bottom, rgba(249,179,179,.9), rgba(233,47,56,.95) 35%, rgba(140,0,20,.8))',
+            boxShadow: '0 0 12px rgba(254,81,84,.85), 0 0 28px rgba(192,20,28,.7)',
             transformOrigin: 'center top',
             animation: 'orbitalLaserBeam 520ms cubic-bezier(0.4, 0, 0.2, 1) 260ms forwards',
             opacity: 0,
@@ -15234,7 +15234,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'fixed', left: x - 22, top: 20,
             width: 44, height: beamHeight - 20,
-            background: 'linear-gradient(to bottom, rgba(255,80,100,.5), rgba(180,0,20,.55) 40%, rgba(100,0,10,.35))',
+            background: 'linear-gradient(to bottom, rgba(254,81,84,.5), rgba(192,20,28,.55) 40%, rgba(91,1,2,.35))',
             filter: 'blur(2px)',
             transformOrigin: 'center top',
             animation: 'orbitalLaserBeam 520ms cubic-bezier(0.4, 0, 0.2, 1) 260ms forwards',
@@ -15244,8 +15244,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -55, top: -55, width: 110, height: 110,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,80,100,.85) 30%, rgba(180,0,20,.5) 60%, transparent 85%)',
-            boxShadow: '0 0 40px rgba(255,60,80,.9), 0 0 80px rgba(200,0,30,.7)',
+            background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(254,81,84,.85) 30%, rgba(192,20,28,.5) 60%, transparent 85%)',
+            boxShadow: '0 0 40px rgba(254,81,84,.9), 0 0 80px rgba(192,20,28,.7)',
             animation: 'orbitalLaserImpact 580ms ease-out 540ms forwards',
             opacity: 0,
           }} />
@@ -15254,8 +15254,8 @@ const ANIM_REGISTRY = {
             <div key={'ol'+i} style={{
               position: 'absolute', left: 0, top: 0,
               width: s.size, height: s.size, borderRadius: '50%',
-              background: i % 3 === 0 ? '#ffdfe4' : '#ff2a3e',
-              boxShadow: `0 0 ${s.size * 2}px rgba(255,60,80,.85)`,
+              background: i % 3 === 0 ? '#fae5eb' : '#f03232',
+              boxShadow: `0 0 ${s.size * 2}px rgba(254,81,84,.85)`,
               animation: `orbitalLaserSpark ${s.dur}ms ease-out ${s.delay}ms forwards`,
               opacity: 0,
               '--olAngle': s.angle + 'deg',
@@ -15295,8 +15295,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -55, top: -55, width: 110, height: 110,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(160,10,20,.55) 0%, rgba(80,0,10,.35) 40%, transparent 80%)',
-            boxShadow: '0 0 22px rgba(200,20,40,.75), inset 0 0 14px rgba(120,0,20,.55)',
+            background: 'radial-gradient(circle, rgba(143,0,0,.55) 0%, rgba(82,10,12,.35) 40%, transparent 80%)',
+            boxShadow: '0 0 22px rgba(192,20,28,.75), inset 0 0 14px rgba(120,0,20,.55)',
             animation: 'bloodMoonHalo 1100ms ease-out forwards',
             opacity: 0,
           }} />
@@ -15304,8 +15304,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -18, top: -74, width: 36, height: 36,
             borderRadius: '50%',
-            background: 'radial-gradient(circle at 35% 30%, #c42a3a, #7a0010 55%, #3a0008 100%)',
-            boxShadow: '0 0 22px rgba(220,30,50,.85), 0 0 36px rgba(140,0,20,.6)',
+            background: 'radial-gradient(circle at 35% 30%, #b21a29, #780014 55%, #3a0000 100%)',
+            boxShadow: '0 0 22px rgba(233,47,56,.85), 0 0 36px rgba(140,0,20,.6)',
             animation: 'bloodMoonOrb 1000ms ease-out forwards',
             opacity: 0,
           }} />
@@ -15314,12 +15314,12 @@ const ANIM_REGISTRY = {
             <div key={'bmr'+i} style={{
               position: 'absolute', left: 0, top: -58,
               width: 3, height: r.len,
-              background: 'linear-gradient(to bottom, rgba(220,40,60,.9), rgba(140,0,20,.5) 60%, transparent)',
+              background: 'linear-gradient(to bottom, rgba(231,59,65,.9), rgba(140,0,20,.5) 60%, transparent)',
               borderRadius: 3,
               transform: `rotate(${r.angle}deg) scaleY(0)`,
               transformOrigin: 'center top',
               animation: `bloodMoonRay ${r.dur}ms ease-out ${r.delay}ms forwards`,
-              boxShadow: '0 0 6px rgba(220,40,60,.75)',
+              boxShadow: '0 0 6px rgba(231,59,65,.75)',
             }} />
           ))}
           {/* Red droplets trickling down past the card */}
@@ -15327,8 +15327,8 @@ const ANIM_REGISTRY = {
             <div key={'bmd'+i} style={{
               position: 'absolute', left: d.xOff, top: d.startY,
               width: d.size, height: d.size * 1.4, borderRadius: '50% 50% 50% 50% / 40% 40% 60% 60%',
-              background: 'radial-gradient(circle at 40% 30%, #ff3048, #8a0010)',
-              boxShadow: '0 0 5px rgba(200,20,40,.8)',
+              background: 'radial-gradient(circle at 40% 30%, #e92f38, #8c0014)',
+              boxShadow: '0 0 5px rgba(192,20,28,.8)',
               animation: `bloodMoonDrop ${d.dur}ms ease-in ${d.delay}ms forwards`,
               opacity: 0,
               '--bmEndY': d.endY + 'px',
@@ -15340,7 +15340,7 @@ const ANIM_REGISTRY = {
   })(),
   // Lunar Eclipse — same structure/keyframes as `blood_moon_pulse`
   // but recoloured to Lunatic Golem's pale yellow-white moonlight
-  // palette (core rgba(255,252,236) / glow rgba(244,240,205)), so the
+  // palette (core rgba(255,248,232) / glow rgba(255,251,210)), so the
   // whole Lunatic archetype shares one moon-light identity. Kept as a
   // SEPARATE effect so Blood Moon under the Sea's red pulse is
   // untouched. Reuses the bloodMoon* keyframes (colour-agnostic
@@ -15367,8 +15367,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -55, top: -55, width: 110, height: 110,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,252,236,.55) 0%, rgba(244,240,205,.35) 40%, transparent 80%)',
-            boxShadow: '0 0 22px rgba(255,252,236,.75), inset 0 0 14px rgba(244,240,205,.55)',
+            background: 'radial-gradient(circle, rgba(255,248,232,.55) 0%, rgba(255,251,210,.35) 40%, transparent 80%)',
+            boxShadow: '0 0 22px rgba(255,248,232,.75), inset 0 0 14px rgba(255,251,210,.55)',
             animation: 'bloodMoonHalo 1100ms ease-out forwards',
             opacity: 0,
           }} />
@@ -15376,8 +15376,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -18, top: -74, width: 36, height: 36,
             borderRadius: '50%',
-            background: 'radial-gradient(circle at 35% 30%, #fffdf2, #f4f0cd 55%, #d8d2a0 100%)',
-            boxShadow: '0 0 22px rgba(255,252,236,.85), 0 0 36px rgba(244,240,205,.6)',
+            background: 'radial-gradient(circle at 35% 30%, #fff8e8, #fffbd2 55%, #f7e0b5 100%)',
+            boxShadow: '0 0 22px rgba(255,248,232,.85), 0 0 36px rgba(255,251,210,.6)',
             animation: 'bloodMoonOrb 1000ms ease-out forwards',
             opacity: 0,
           }} />
@@ -15386,12 +15386,12 @@ const ANIM_REGISTRY = {
             <div key={'ler'+i} style={{
               position: 'absolute', left: 0, top: -58,
               width: 3, height: r.len,
-              background: 'linear-gradient(to bottom, rgba(255,252,236,.9), rgba(244,240,205,.5) 60%, transparent)',
+              background: 'linear-gradient(to bottom, rgba(255,248,232,.9), rgba(255,251,210,.5) 60%, transparent)',
               borderRadius: 3,
               transform: `rotate(${r.angle}deg) scaleY(0)`,
               transformOrigin: 'center top',
               animation: `bloodMoonRay ${r.dur}ms ease-out ${r.delay}ms forwards`,
-              boxShadow: '0 0 6px rgba(255,252,236,.75)',
+              boxShadow: '0 0 6px rgba(255,248,232,.75)',
             }} />
           ))}
           {/* Pale moonlight motes trickling down past the card */}
@@ -15399,8 +15399,8 @@ const ANIM_REGISTRY = {
             <div key={'led'+i} style={{
               position: 'absolute', left: d.xOff, top: d.startY,
               width: d.size, height: d.size * 1.4, borderRadius: '50% 50% 50% 50% / 40% 40% 60% 60%',
-              background: 'radial-gradient(circle at 40% 30%, #fffdf2, #e8e2b0)',
-              boxShadow: '0 0 5px rgba(255,252,236,.8)',
+              background: 'radial-gradient(circle at 40% 30%, #fff8e8, #f9ecb3)',
+              boxShadow: '0 0 5px rgba(255,248,232,.8)',
               animation: `bloodMoonDrop ${d.dur}ms ease-in ${d.delay}ms forwards`,
               opacity: 0,
               '--bmEndY': d.endY + 'px',
@@ -15419,7 +15419,7 @@ const ANIM_REGISTRY = {
     return function RainOfSporesRainEffect({ x, y, w, h }) {
       const W = Math.max(w || window.innerWidth, 480);
       const H = Math.max(h || window.innerHeight, 320);
-      const palette = ['#fff066', '#ffd428', '#ffe88a', '#f5b800', '#fff7b2'];
+      const palette = ['#ffe469', '#ffd61a', '#fbe181', '#ffb91a', '#f7f7ad'];
       const spores = useMemo(() => Array.from({ length: ppFxN(200) }, () => ({
         xStart: Math.random() * W - W / 2,
         yStart: -H / 2 - 40,
@@ -15437,7 +15437,7 @@ const ANIM_REGISTRY = {
           {/* Soft golden wash over the play area */}
           <div style={{
             position: 'absolute', left: -W / 2, top: -H / 2, width: W, height: H,
-            background: 'radial-gradient(ellipse at center, rgba(255,220,80,.10) 0%, rgba(255,200,40,.04) 55%, transparent 85%)',
+            background: 'radial-gradient(ellipse at center, rgba(250,213,74,.10) 0%, rgba(255,198,28,.04) 55%, transparent 85%)',
             animation: 'deepseaSporesWash 2400ms ease-in-out forwards',
             opacity: 0,
           }} />
@@ -15468,7 +15468,7 @@ const ANIM_REGISTRY = {
     return function DeepseaSporesRainEffect({ x, y, w, h }) {
       const W = Math.max(w || window.innerWidth, 480);
       const H = Math.max(h || window.innerHeight, 320);
-      const palette = ['#6adbc4', '#3a86d9', '#1a3ea8', '#c42842', '#6a0e1c'];
+      const palette = ['#7ce9dc', '#4e82cb', '#0351c9', '#b21a29', '#710122'];
       const spores = useMemo(() => Array.from({ length: ppFxN(180) }, () => ({
         xStart: Math.random() * W - W / 2,
         yStart: -H / 2 - 40,
@@ -15486,7 +15486,7 @@ const ANIM_REGISTRY = {
           {/* Ambient ominous red wash over the whole play area */}
           <div style={{
             position: 'absolute', left: -W / 2, top: -H / 2, width: W, height: H,
-            background: 'radial-gradient(ellipse at center, rgba(140,0,10,.12) 0%, rgba(30,10,50,.05) 55%, transparent 85%)',
+            background: 'radial-gradient(ellipse at center, rgba(139,13,13,.12) 0%, rgba(25,6,45,.05) 55%, transparent 85%)',
             animation: 'deepseaSporesWash 2400ms ease-in-out forwards',
             opacity: 0,
           }} />
@@ -15521,7 +15521,7 @@ const ANIM_REGISTRY = {
         delay: Math.random() * 200,
         dur:   800 + Math.random() * 300,
         width: 2.5 + Math.random() * 2,
-        shade: (i % 3 === 0) ? '#8b1025' : (i % 3 === 1 ? '#5a9a7a' : '#1e4a8a'),
+        shade: (i % 3 === 0) ? '#780014' : (i % 3 === 1 ? '#3b9159' : '#2b457e'),
       })), []);
       const fronds = useMemo(() => Array.from({ length: 5 }, () => ({
         xOff: -18 + Math.random() * 36,
@@ -15535,8 +15535,8 @@ const ANIM_REGISTRY = {
           {/* Ominous red pulse covering the creature card */}
           <div style={{
             position: 'absolute', left: -35, top: -48, width: 70, height: 96,
-            background: 'radial-gradient(ellipse at center, rgba(200,20,40,.55) 0%, rgba(120,0,20,.3) 55%, transparent 85%)',
-            boxShadow: '0 0 18px rgba(180,20,40,.7), inset 0 0 12px rgba(100,0,20,.5)',
+            background: 'radial-gradient(ellipse at center, rgba(192,20,28,.55) 0%, rgba(120,0,20,.3) 55%, transparent 85%)',
+            boxShadow: '0 0 18px rgba(178,26,41,.7), inset 0 0 12px rgba(91,1,2,.5)',
             borderRadius: 6,
             animation: 'deepseaSporeRedPulse 1600ms ease-out forwards',
             opacity: 0,
@@ -15559,7 +15559,7 @@ const ANIM_REGISTRY = {
             <div key={'df'+i} style={{
               position: 'absolute', left: f.xOff, top: -8,
               fontSize: f.size,
-              filter: 'drop-shadow(0 0 4px rgba(140,0,30,.8))',
+              filter: 'drop-shadow(0 0 4px rgba(140,0,20,.8))',
               animation: `deepseaFrondPop ${f.dur}ms ease-out ${f.delay}ms forwards`,
               opacity: 0,
             }}>{f.emoji}</div>
@@ -15587,9 +15587,9 @@ const ANIM_REGISTRY = {
             <div key={'bb'+i} style={{
               position: 'absolute', left: b.xOff, top: b.startY,
               width: b.size, height: b.size, borderRadius: '50%',
-              background: 'radial-gradient(circle at 35% 35%, rgba(100,160,220,.6), rgba(20,50,100,.3))',
-              border: '1px solid rgba(80,140,200,.4)',
-              boxShadow: `inset 0 -2px 4px rgba(10,30,60,.3), 0 0 ${b.size/2}px rgba(40,80,140,.3)`,
+              background: 'radial-gradient(circle at 35% 35%, rgba(57,158,223,.6), rgba(20,40,90,.3))',
+              border: '1px solid rgba(57,158,223,.4)',
+              boxShadow: `inset 0 -2px 4px rgba(0,33,63,.3), 0 0 ${b.size/2}px rgba(43,69,126,.3)`,
               animation: `bubbleRise ${b.dur}ms ease-out ${b.delay}ms forwards`,
               opacity: 0,
               '--endY': b.endY + 'px',
@@ -15629,7 +15629,7 @@ const ANIM_REGISTRY = {
           dx: Math.cos(rad + streu) * weite * richtung,
           dy: Math.sin(rad + streu) * weite * richtung,
           groesse: 4 + Math.random() * 4,
-          farbe: Math.random() < 0.6 ? '#e8ecff' : '#b48cff',
+          farbe: Math.random() < 0.6 ? '#e5edfa' : '#c98aff',
           delay: 300 + Math.random() * 120,
           dur: 420 + Math.random() * 260,
         };
@@ -15688,14 +15688,14 @@ const ANIM_REGISTRY = {
         delay: 180 + Math.random() * 220,
         dur: 420 + Math.random() * 220,
         size: 3 + Math.random() * 5,
-        shade: Math.random() < 0.7 ? '#a00010' : '#550008',
+        shade: Math.random() < 0.7 ? '#b5171c' : '#520a0c',
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           {/* Background rage haze */}
           <div className="anim-flame-flash" style={{
             width: 110, height: 110, marginLeft: -55, marginTop: -55,
-            background: 'radial-gradient(circle, rgba(180,0,0,.45) 0%, rgba(100,0,0,.2) 40%, transparent 75%)',
+            background: 'radial-gradient(circle, rgba(190,14,14,.45) 0%, rgba(91,1,2,.2) 40%, transparent 75%)',
             animationDuration: '500ms',
           }} />
           {gashes.map((g, i) => (
@@ -15704,8 +15704,8 @@ const ANIM_REGISTRY = {
               <div style={{
                 position: 'absolute', left: -len / 2, top: g.offY - 2,
                 width: len, height: g.thick,
-                background: 'linear-gradient(90deg, transparent 0%, rgba(255,240,230,.1) 20%, rgba(255,245,240,.95) 48%, rgba(255,255,255,1) 52%, rgba(255,220,210,.7) 70%, transparent 100%)',
-                boxShadow: '0 0 8px rgba(255,220,210,.85), 0 0 14px rgba(200,60,60,.55)',
+                background: 'linear-gradient(90deg, transparent 0%, rgba(255,248,232,.1) 20%, rgba(255,255,255,.95) 48%, rgba(255,255,255,1) 52%, rgba(226,216,203,.7) 70%, transparent 100%)',
+                boxShadow: '0 0 8px rgba(226,216,203,.85), 0 0 14px rgba(178,26,41,.55)',
                 transform: `rotate(-32deg) scale(${g.scale}) translateX(-120%)`,
                 transformOrigin: 'center center',
                 animation: `clawSlash 380ms cubic-bezier(0.2, 0.9, 0.3, 1) ${g.delay}ms forwards`,
@@ -15715,8 +15715,8 @@ const ANIM_REGISTRY = {
               <div style={{
                 position: 'absolute', left: -ww * 0.55, top: g.offY - 1.5,
                 width: ww * 1.1, height: g.thick + 1,
-                background: 'linear-gradient(90deg, transparent 0%, rgba(140,0,8,.7) 18%, rgba(200,25,30,.95) 50%, rgba(140,0,8,.7) 82%, transparent 100%)',
-                boxShadow: '0 0 9px rgba(170,15,20,.85)',
+                background: 'linear-gradient(90deg, transparent 0%, rgba(139,13,13,.7) 18%, rgba(192,20,28,.95) 50%, rgba(139,13,13,.7) 82%, transparent 100%)',
+                boxShadow: '0 0 9px rgba(181,23,28,.85)',
                 transform: `rotate(-32deg) scale(${g.scale})`,
                 transformOrigin: 'center center',
                 animation: `clawWound 580ms ease-out ${g.delay + 160}ms forwards`,
@@ -15730,7 +15730,7 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: d.dx, top: -4,
               width: d.size, height: d.size, borderRadius: '50%',
               background: d.shade,
-              boxShadow: `0 0 4px rgba(120,0,10,.8)`,
+              boxShadow: `0 0 4px rgba(120,0,0,.8)`,
               animation: `clawGore ${d.dur}ms ease-in ${d.delay}ms forwards`,
               opacity: 0,
               '--cmGy': d.dy + 'px',
@@ -15769,7 +15769,7 @@ const ANIM_REGISTRY = {
           angleRad: angleDeg * Math.PI / 180,
           dist: 36 + Math.random() * 50,
           size: 2 + Math.random() * 5,
-          color: ['#ffd066','#ff8a1a','#ff4a08','#ffae3a','#ffeab3'][Math.floor(Math.random() * 5)],
+          color: ['#ffd066','#ff8b1a','#ff491a','#f9ac20','#f9ecb3'][Math.floor(Math.random() * 5)],
           delay: 200 + Math.random() * 200,
           dur: 380 + Math.random() * 260,
         };
@@ -15792,7 +15792,7 @@ const ANIM_REGISTRY = {
             position: 'absolute', left: -ww * 0.7, top: -hh * 0.65,
             width: ww * 1.4, height: hh * 1.3,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,180,60,0.55) 0%, rgba(255,90,20,0.4) 35%, rgba(180,30,0,0.15) 70%, transparent 90%)',
+            background: 'radial-gradient(circle, rgba(249,172,32,0.55) 0%, rgba(255,73,26,0.4) 35%, rgba(182,38,0,0.15) 70%, transparent 90%)',
             opacity: 0,
             animation: 'flameSlashHeat 620ms ease-out 60ms forwards',
           }} />
@@ -15801,8 +15801,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -len / 2, top: -3,
             width: len, height: 6,
-            background: 'linear-gradient(90deg, transparent 0%, rgba(255,160,40,.18) 18%, rgba(255,210,90,.95) 46%, rgba(255,255,220,1) 52%, rgba(255,140,30,.85) 62%, rgba(220,40,0,.5) 82%, transparent 100%)',
-            boxShadow: '0 0 14px rgba(255,160,40,.95), 0 0 28px rgba(255,100,20,.75), 0 0 48px rgba(220,40,0,.55)',
+            background: 'linear-gradient(90deg, transparent 0%, rgba(255,154,26,.18) 18%, rgba(255,217,102,.95) 46%, rgba(255,251,210,1) 52%, rgba(255,139,26,.85) 62%, rgba(204,43,0,.5) 82%, transparent 100%)',
+            boxShadow: '0 0 14px rgba(255,154,26,.95), 0 0 28px rgba(248,116,32,.75), 0 0 48px rgba(204,43,0,.55)',
             transform: 'rotate(-42deg) translateX(-130%)',
             transformOrigin: 'center center',
             animation: 'flameSlashBlade 460ms cubic-bezier(0.2, 0.9, 0.3, 1) forwards',
@@ -15812,8 +15812,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -16, top: -16, width: 32, height: 32,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,230,1) 0%, rgba(255,210,80,.8) 35%, rgba(255,90,20,.5) 65%, transparent 80%)',
-            boxShadow: '0 0 18px rgba(255,200,80,1), 0 0 32px rgba(255,120,30,.8)',
+            background: 'radial-gradient(circle, rgba(255,248,232,1) 0%, rgba(250,213,74,.8) 35%, rgba(255,73,26,.5) 65%, transparent 80%)',
+            boxShadow: '0 0 18px rgba(255,208,102,1), 0 0 32px rgba(248,116,32,.8)',
             animation: 'flameSlashGlint 400ms ease-out 200ms forwards',
             opacity: 0,
           }} />
@@ -15822,8 +15822,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -ww * 0.6, top: -4,
             width: ww * 1.2, height: 8,
-            background: 'linear-gradient(90deg, transparent 0%, rgba(255,80,10,.7) 18%, rgba(255,160,40,.95) 50%, rgba(255,80,10,.7) 82%, transparent 100%)',
-            boxShadow: '0 0 12px rgba(255,120,30,.85), 0 0 22px rgba(220,40,0,.55)',
+            background: 'linear-gradient(90deg, transparent 0%, rgba(255,73,26,.7) 18%, rgba(255,154,26,.95) 50%, rgba(255,73,26,.7) 82%, transparent 100%)',
+            boxShadow: '0 0 12px rgba(248,116,32,.85), 0 0 22px rgba(204,43,0,.55)',
             transform: 'rotate(-42deg)',
             transformOrigin: 'center center',
             animation: 'flameSlashTrail 680ms ease-out 240ms forwards',
@@ -15834,7 +15834,7 @@ const ANIM_REGISTRY = {
             <div key={'fsf'+i} style={{
               position: 'absolute', left: 0, top: 0,
               fontSize: f.size,
-              filter: 'drop-shadow(0 0 4px rgba(255,140,30,.9))',
+              filter: 'drop-shadow(0 0 4px rgba(255,139,26,.9))',
               opacity: 0,
               animation: `flameSlashFlame ${f.dur}ms ease-out ${f.delay}ms forwards`,
               '--fsfStartX': f.startX + 'px',
@@ -15846,7 +15846,7 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: -e.size / 2, top: -e.size / 2,
               width: e.size, height: e.size, borderRadius: '50%',
               background: e.color,
-              boxShadow: `0 0 6px ${e.color}, 0 0 12px rgba(255,140,30,.7)`,
+              boxShadow: `0 0 6px ${e.color}, 0 0 12px rgba(255,139,26,.7)`,
               animation: `flameSlashEmber ${e.dur}ms ease-out ${e.delay}ms forwards`,
               opacity: 0,
               '--fsAngle': e.angleRad + 'rad',
@@ -15876,8 +15876,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -len / 2, top: -2,
             width: len, height: 4,
-            background: 'linear-gradient(90deg, transparent 0%, rgba(220,230,255,.1) 20%, rgba(240,250,255,.95) 48%, rgba(255,255,255,1) 52%, rgba(200,220,255,.7) 70%, transparent 100%)',
-            boxShadow: '0 0 12px rgba(200,220,255,.9), 0 0 24px rgba(150,190,230,.6)',
+            background: 'linear-gradient(90deg, transparent 0%, rgba(229,237,250,.1) 20%, rgba(229,245,250,.95) 48%, rgba(255,255,255,1) 52%, rgba(179,216,249,.7) 70%, transparent 100%)',
+            boxShadow: '0 0 12px rgba(179,216,249,.9), 0 0 24px rgba(123,190,234,.6)',
             transform: 'rotate(-42deg) translateX(-120%)',
             transformOrigin: 'center center',
             animation: 'scytheSlash 420ms cubic-bezier(0.2, 0.9, 0.3, 1) forwards',
@@ -15887,7 +15887,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -14, top: -14, width: 28, height: 28,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(220,230,255,.7) 30%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(229,237,250,.7) 30%, transparent 70%)',
             animation: 'scytheGlint 360ms ease-out 180ms forwards',
             opacity: 0,
           }} />
@@ -15895,8 +15895,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -ww * 0.6, top: -3,
             width: ww * 1.2, height: 6,
-            background: 'linear-gradient(90deg, transparent 0%, rgba(160,0,10,.7) 20%, rgba(220,30,40,.95) 50%, rgba(160,0,10,.7) 80%, transparent 100%)',
-            boxShadow: '0 0 10px rgba(180,20,30,.85)',
+            background: 'linear-gradient(90deg, transparent 0%, rgba(143,0,0,.7) 20%, rgba(233,47,56,.95) 50%, rgba(143,0,0,.7) 80%, transparent 100%)',
+            boxShadow: '0 0 10px rgba(181,23,28,.85)',
             transform: 'rotate(-42deg)',
             transformOrigin: 'center center',
             animation: 'scytheWound 620ms ease-out 220ms forwards',
@@ -15907,8 +15907,8 @@ const ANIM_REGISTRY = {
             <div key={'sd'+i} style={{
               position: 'absolute', left: d.dx, top: -2,
               width: d.size, height: d.size, borderRadius: '50%',
-              background: '#b00010',
-              boxShadow: '0 0 4px rgba(120,0,10,.8)',
+              background: '#b5171c',
+              boxShadow: '0 0 4px rgba(120,0,0,.8)',
               animation: `scytheDrop ${d.dur}ms ease-in ${d.delay}ms forwards`,
               opacity: 0,
               '--scDropY': d.dy + 'px',
@@ -15941,13 +15941,13 @@ const ANIM_REGISTRY = {
       // a horizontal scythe strike. Negative control-Y pulls the
       // peak above the path's drawing area.
       const path = `M ${arcW * 0.05} ${arcH * 0.78} Q ${arcW * 0.5} ${-arcH * 0.18}, ${arcW * 0.95} ${arcH * 0.78}`;
-      const outerStroke = lethal ? '#0a0008' : '#dde6ff';
-      const innerStroke = lethal ? 'rgba(220,30,40,0.92)' : 'rgba(255,255,255,0.95)';
+      const outerStroke = lethal ? '#08060c' : '#e5edfa';
+      const innerStroke = lethal ? 'rgba(233,47,56,0.92)' : 'rgba(255,255,255,0.95)';
       const animKey = lethal ? 'crescentReapLethal' : 'crescentReapNormal';
       const animDur = lethal ? 850 : 420;
       const blade = lethal
-        ? 'drop-shadow(0 0 24px rgba(180,15,30,0.95)) drop-shadow(0 0 48px rgba(60,0,15,0.85))'
-        : 'drop-shadow(0 0 8px rgba(180,210,255,0.9))';
+        ? 'drop-shadow(0 0 24px rgba(181,23,28,0.95)) drop-shadow(0 0 48px rgba(58,0,0,0.85))'
+        : 'drop-shadow(0 0 8px rgba(180,207,248,0.9))';
       return (
         <div style={{
           position: 'fixed', left: x, top: y,
@@ -15997,7 +15997,7 @@ const ANIM_REGISTRY = {
                 width: arcW * 0.85, height: arcH * 0.55,
                 left: -arcW * 0.42, top: -arcH * 0.05,
                 borderRadius: '50%',
-                background: 'radial-gradient(ellipse, rgba(50,5,30,0.85) 0%, rgba(20,0,12,0.55) 45%, transparent 80%)',
+                background: 'radial-gradient(ellipse, rgba(75,16,33,0.85) 0%, rgba(8,6,12,0.55) 45%, transparent 80%)',
                 animation: 'crescentReapAura 1100ms ease-out 180ms forwards',
                 opacity: 0,
               }} />
@@ -16008,7 +16008,7 @@ const ANIM_REGISTRY = {
                 fontSize: 76,
                 animation: 'crescentReapSkull 1200ms ease-out 280ms forwards',
                 opacity: 0,
-                filter: 'drop-shadow(0 0 14px rgba(180,20,40,0.85)) drop-shadow(0 0 28px rgba(60,0,15,0.7))',
+                filter: 'drop-shadow(0 0 14px rgba(178,26,41,0.85)) drop-shadow(0 0 28px rgba(58,0,0,0.7))',
               }}>💀</div>
             </>
           )}
@@ -16031,21 +16031,21 @@ const ANIM_REGISTRY = {
         dur: 700 + Math.random() * 500,
         size: 4 + Math.random() * 8,
         wobble: -12 + Math.random() * 24,
-        shade: Math.random() < 0.5 ? 'rgba(200,180,255,.55)' : 'rgba(160,220,200,.45)',
+        shade: Math.random() < 0.5 ? 'rgba(214,179,249,.55)' : 'rgba(145,230,230,.45)',
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           {/* Violet haze flash */}
           <div className="anim-flame-flash" style={{
             width: 140, height: 140, marginLeft: -70, marginTop: -70,
-            background: 'radial-gradient(circle, rgba(180,140,255,.55) 0%, rgba(90,60,160,.3) 45%, transparent 75%)',
+            background: 'radial-gradient(circle, rgba(201,138,255,.55) 0%, rgba(102,53,151,.3) 45%, transparent 75%)',
             animationDuration: '900ms',
           }} />
           {/* Main ghost */}
           <div style={{
             position: 'absolute', left: -22, top: -4,
             fontSize: 44,
-            filter: 'drop-shadow(0 0 10px rgba(190,150,255,.8)) drop-shadow(0 0 18px rgba(120,80,200,.6))',
+            filter: 'drop-shadow(0 0 10px rgba(201,138,255,.8)) drop-shadow(0 0 18px rgba(126,65,186,.6))',
             animation: 'spookyGhostFloat 1200ms ease-in-out forwards',
             opacity: 0,
           }}>
@@ -16091,7 +16091,7 @@ const ANIM_REGISTRY = {
           groesse: 3 + Math.random() * 5,
           verzug: Math.random() * 260,
           dauer: 520 + Math.random() * 420,
-          farbe: ['#ffffff', '#f2f8ff', '#e8f4ff', '#dcecff'][Math.floor(Math.random() * 4)],
+          farbe: ['#ffffff', '#e5f5fa', '#e5edfa', '#e5edfa'][Math.floor(Math.random() * 4)],
         };
       }), []);
       return (
@@ -16100,13 +16100,13 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', width: 150, height: 150, marginLeft: -75, marginTop: -75,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,.92) 0%, rgba(226,240,255,.45) 38%, rgba(200,225,255,.12) 62%, transparent 78%)',
+            background: 'radial-gradient(circle, rgba(255,255,255,.92) 0%, rgba(229,237,250,.45) 38%, rgba(179,216,249,.12) 62%, transparent 78%)',
             animation: `${herein ? 'shiftGlowIn' : 'shiftGlowOut'} 820ms ease-out forwards`,
           }} />
           <div style={{
             position: 'absolute', width: 84, height: 84, marginLeft: -42, marginTop: -42,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,.98) 0%, rgba(245,250,255,.55) 45%, transparent 72%)',
+            background: 'radial-gradient(circle, rgba(255,255,255,.98) 0%, rgba(255,255,255,.55) 45%, transparent 72%)',
             animation: `${herein ? 'shiftGlowIn' : 'shiftGlowOut'} 620ms ease-out 120ms forwards`,
             opacity: 0,
           }} />
@@ -16156,7 +16156,7 @@ const ANIM_REGISTRY = {
         rise: 70 + Math.random() * 160,
         sway: (Math.random() - 0.5) * 50,
         size: 16 + Math.random() * 18,
-        color: ['#ffd700', '#fff3b0', '#ffffff', '#ffb347', '#ffe9a8'][Math.floor(Math.random() * 5)],
+        color: ['#ffd61a', '#f9ecb3', '#ffffff', '#f9ac20', '#f9ecb3'][Math.floor(Math.random() * 5)],
         delay: 100 + i * 55 + Math.random() * 60,
         dur: 900 + Math.random() * 600,
       })), []);
@@ -16229,12 +16229,12 @@ const ANIM_REGISTRY = {
         delay: 200 + Math.random() * 600,
         dur: 500 + Math.random() * 500,
         size: 4 + Math.random() * 8,
-        color: ['#fffbe6','#ffd700','#fff','#ffe082','#fff9c4'][Math.floor(Math.random() * 5)],
+        color: ['#fff8e8','#ffd61a','#fff','#fbe181','#f8f8bd'][Math.floor(Math.random() * 5)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ width: 160, height: 160, marginLeft: -80, marginTop: -80, background: 'radial-gradient(circle, rgba(255,255,240,.9) 0%, rgba(255,215,0,.4) 35%, rgba(255,255,200,.1) 60%, transparent 80%)', animationDuration: '800ms' }} />
-          <div className="anim-flame-flash" style={{ width: 100, height: 100, marginLeft: -50, marginTop: -50, background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,240,180,.5) 40%, transparent 70%)', animationDelay: '200ms', animationDuration: '600ms' }} />
+          <div className="anim-flame-flash" style={{ width: 160, height: 160, marginLeft: -80, marginTop: -80, background: 'radial-gradient(circle, rgba(255,248,232,.9) 0%, rgba(255,214,26,.4) 35%, rgba(248,248,189,.1) 60%, transparent 80%)', animationDuration: '800ms' }} />
+          <div className="anim-flame-flash" style={{ width: 100, height: 100, marginLeft: -50, marginTop: -50, background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(249,236,179,.5) 40%, transparent 70%)', animationDelay: '200ms', animationDuration: '600ms' }} />
           {rays.map((r, i) => (
             <div key={'hr'+i} style={{
               position: 'absolute', left: 0, top: 0,
@@ -16243,7 +16243,7 @@ const ANIM_REGISTRY = {
             }}>
               <div style={{
                 width: r.width, height: r.len, marginLeft: -r.width/2,
-                background: 'linear-gradient(to top, rgba(255,215,0,.8), rgba(255,255,240,.3) 70%, transparent)',
+                background: 'linear-gradient(to top, rgba(255,214,26,.8), rgba(255,248,232,.3) 70%, transparent)',
                 borderRadius: r.width,
                 transformOrigin: 'center bottom',
                 animation: `holyRayGrow ${r.dur}ms ease-out ${r.delay}ms forwards`,
@@ -16281,11 +16281,11 @@ const ANIM_REGISTRY = {
         delay: 250 + Math.random() * 500,
         dur: 300 + Math.random() * 200,
         size: 3 + Math.random() * 5,
-        color: ['#ffcc44','#ff8800','#ffaa22','#ddaa00','#ffe066'][Math.floor(Math.random() * 5)],
+        color: ['#fad54a','#ff8b1a','#f9ac20','#c79e05','#ffe469'][Math.floor(Math.random() * 5)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ width: 80, height: 80, marginLeft: -40, marginTop: -40, background: 'radial-gradient(circle, rgba(255,200,50,.5) 0%, rgba(255,150,0,.2) 50%, transparent 80%)', animationDelay: '300ms' }} />
+          <div className="anim-flame-flash" style={{ width: 80, height: 80, marginLeft: -40, marginTop: -40, background: 'radial-gradient(circle, rgba(255,198,28,.5) 0%, rgba(255,154,26,.2) 50%, transparent 80%)', animationDelay: '300ms' }} />
           {arrows.map((a, i) => (
             <div key={'ar'+i} style={{
               position: 'absolute', left: a.xOff, top: a.startY,
@@ -16294,13 +16294,13 @@ const ANIM_REGISTRY = {
             }}>
               <div style={{
                 width: 2, height: a.len,
-                background: 'linear-gradient(to bottom, transparent 0%, #ffdd66 20%, #ffaa22 80%, #ff8800 100%)',
+                background: 'linear-gradient(to bottom, transparent 0%, #ffd966 20%, #f9ac20 80%, #ff8b1a 100%)',
                 borderRadius: '0 0 1px 1px',
-                boxShadow: '0 0 4px rgba(255,200,50,.6)',
+                boxShadow: '0 0 4px rgba(255,198,28,.6)',
                 transform: `rotate(${a.rot}deg)`,
                 transformOrigin: 'center top',
               }}>
-                <div style={{ position: 'absolute', bottom: -4, left: -3, width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: '6px solid #ff8800' }} />
+                <div style={{ position: 'absolute', bottom: -4, left: -3, width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: '6px solid #ff8b1a' }} />
               </div>
             </div>
           ))}
@@ -16412,7 +16412,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: oX - 80, top: oY - 80, width: 160, height: 160,
             borderRadius: '50%', mixBlendMode: 'screen',
-            background: 'radial-gradient(circle, rgba(255,245,205,.95) 0%, rgba(255,150,30,.75) 34%, rgba(200,40,0,.35) 66%, transparent 80%)',
+            background: 'radial-gradient(circle, rgba(255,251,210,.95) 0%, rgba(255,154,26,.75) 34%, rgba(204,43,0,.35) 66%, transparent 80%)',
             animation: `faMuendung ${Math.round(dauer * 0.8)}ms ease-out forwards`,
           }} />
           {bahnen.map((b, i) => (
@@ -16428,15 +16428,15 @@ const ANIM_REGISTRY = {
                 width: b.groesse * 2.6, height: b.groesse * 0.68,
                 transformOrigin: '100% 50%', transform: `rotate(${b.winkel}deg)`,
                 borderRadius: '50%', mixBlendMode: 'screen', filter: 'blur(2px)',
-                background: `linear-gradient(to right, transparent 0%, rgba(255,90,0,.5) 55%, rgba(255,190,90,.85) 100%)`,
+                background: `linear-gradient(to right, transparent 0%, rgba(255,73,26,.5) 55%, rgba(251,200,106,.85) 100%)`,
               }} />
               {/* Kopf */}
               <div style={{
                 position: 'absolute', left: -b.groesse / 2, top: -b.groesse / 2,
                 width: b.groesse, height: b.groesse * 0.82,
                 borderRadius: '48% 52% 56% 44% / 54% 46% 54% 46%',
-                background: 'radial-gradient(circle at 42% 38%, #fff6d2 0%, #ffc44a 30%, #ff5a00 62%, #8e1a00 100%)',
-                boxShadow: '0 0 14px rgba(255,130,25,.95)', mixBlendMode: 'screen',
+                background: 'radial-gradient(circle at 42% 38%, #fffbd2 0%, #ffd066 30%, #ff491a 62%, #8f0000 100%)',
+                boxShadow: '0 0 14px rgba(255,125,0,.95)', mixBlendMode: 'screen',
               }} />
             </div>
           ))}
@@ -16446,7 +16446,7 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: b.zx - b.groesse, top: b.zy - b.groesse,
               width: b.groesse * 2, height: b.groesse * 2, borderRadius: '50%',
               mixBlendMode: 'screen', opacity: 0,
-              background: 'radial-gradient(circle, rgba(255,250,220,.95) 0%, rgba(255,150,30,.7) 40%, transparent 72%)',
+              background: 'radial-gradient(circle, rgba(255,251,210,.95) 0%, rgba(255,154,26,.7) 40%, transparent 72%)',
               animation: `faTreffer ${Math.round(320 + b.groesse * 6)}ms ease-out ${b.verzug + b.laenge}ms forwards`,
             }} />
           ))}
@@ -16514,7 +16514,7 @@ const ANIM_REGISTRY = {
       let t = start >>> 0;
       return () => { t = (t * 1664525 + 1013904223) >>> 0; return t / 4294967296; };
     };
-    const FARBEN = ['#ff3a2a', '#c8141d', '#ff7a5a', '#8e0c10', '#ffd0c0'];
+    const FARBEN = ['#ef2929', '#c0141c', '#ff8566', '#8b0d0d', '#f0bfbc'];
     const SPLITTER_GESAMT_MAX = 90;
     const ZUSCHNAPP_MS = 1900;
     const UMLAUF_GRAD = 560;           // wie weit die Bahn um das Loch dreht
@@ -16608,7 +16608,7 @@ const ANIM_REGISTRY = {
           {ziele.map((z, i) => (
             <div key={'hsg' + i} style={{
               position: 'absolute', left: z.zx - 40, top: z.zy - 54, width: 80, height: 108,
-              border: '4px solid #ff3a2a', boxShadow: '0 0 16px rgba(255,40,30,.9), inset 0 0 14px rgba(200,20,29,.7)',
+              border: '4px solid #ef2929', boxShadow: '0 0 16px rgba(255,26,26,.9), inset 0 0 14px rgba(192,20,28,.7)',
               opacity: 0,
               animation: `hitsGepackt 760ms ease-out 20ms forwards`,
             }} />
@@ -16617,7 +16617,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: mx - kern * 0.8, top: my - kern * 0.8,
             width: kern * 1.6, height: kern * 1.6, borderRadius: '50%',
-            background: 'repeating-conic-gradient(from 0deg, rgba(255,58,42,.9) 0deg 7deg, rgba(0,0,0,0) 7deg 22deg)',
+            background: 'repeating-conic-gradient(from 0deg, rgba(239,41,41,.9) 0deg 7deg, rgba(0,0,0,0) 7deg 22deg)',
             WebkitMaskImage: 'radial-gradient(circle, transparent 38%, #000 41%, #000 60%, transparent 64%)',
             maskImage: 'radial-gradient(circle, transparent 38%, #000 41%, #000 60%, transparent 64%)',
             opacity: 0,
@@ -16626,8 +16626,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: mx - kern / 2, top: my - kern / 2, width: kern, height: kern,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, #050000 0%, #1a0003 44%, #6e080b 60%, rgba(255,60,40,.9) 68%, rgba(255,60,40,0) 78%)',
-            boxShadow: '0 0 40px rgba(255,30,20,.7)', opacity: 0,
+            background: 'radial-gradient(circle, #000000 0%, #270d0c 44%, #780014 60%, rgba(239,41,41,.9) 68%, rgba(239,41,41,0) 78%)',
+            boxShadow: '0 0 40px rgba(255,26,26,.7)', opacity: 0,
             animation: `hitsKern ${dauer}ms ease-in-out forwards`,
           }} />
           {/* Pixelsplitter, die ins Loch strudeln */}
@@ -16667,7 +16667,7 @@ const ANIM_REGISTRY = {
                   <div style={{
                     width: '100%', height: '100%', borderRadius: 4, overflow: 'hidden',
                     backgroundImage: `url("${k.url}")`, backgroundSize: '100% 100%',
-                    boxShadow: '0 0 14px rgba(255,40,30,.9), 0 0 4px rgba(120,0,0,.8)',
+                    boxShadow: '0 0 14px rgba(255,26,26,.9), 0 0 4px rgba(120,0,0,.8)',
                     '--hs-kipp': kippen.toFixed(1) + 'deg',
                     transform: 'rotateX(var(--hs-kipp))',
                     animation: `hitsAufrichten ${Math.round(k.flug * 0.35)}ms ease-out ${k.verzug}ms forwards`,
@@ -16680,7 +16680,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: mx - kern, top: my - kern, width: kern * 2, height: kern * 2,
             borderRadius: '50%', mixBlendMode: 'screen', opacity: 0,
-            background: 'radial-gradient(circle, rgba(255,240,230,.95) 0%, rgba(255,70,40,.8) 30%, rgba(160,10,10,.35) 58%, transparent 74%)',
+            background: 'radial-gradient(circle, rgba(255,248,232,.95) 0%, rgba(255,73,26,.8) 30%, rgba(143,0,0,.35) 58%, transparent 74%)',
             animation: `hitsBlitz 560ms ease-out ${ZUSCHNAPP_MS - 30}ms forwards`,
           }} />
           <style>{`
@@ -16764,27 +16764,27 @@ const ANIM_REGISTRY = {
           <div style={{ position: 'absolute', left: 0, top: 0, animation: 'gtBeben 260ms linear 300ms both' }}>
             {/* Rahmen: zwei Pfosten + Querbalken */}
             <div style={{ position: 'absolute', left: -44, top: -86, width: 8, height: 130,
-              background: 'linear-gradient(90deg, #5a3418, #8a5428 50%, #4a2a12)', opacity: 0,
+              background: 'linear-gradient(90deg, #5a341a, #9d612f 50%, #4a2a10)', opacity: 0,
               animation: 'gtRahmen 900ms ease-out forwards' }} />
             <div style={{ position: 'absolute', left: 36, top: -86, width: 8, height: 130,
-              background: 'linear-gradient(90deg, #5a3418, #8a5428 50%, #4a2a12)', opacity: 0,
+              background: 'linear-gradient(90deg, #5a341a, #9d612f 50%, #4a2a10)', opacity: 0,
               animation: 'gtRahmen 900ms ease-out forwards' }} />
             <div style={{ position: 'absolute', left: -48, top: -92, width: 96, height: 10,
-              background: 'linear-gradient(180deg, #8a5428, #4a2a12)', opacity: 0,
+              background: 'linear-gradient(180deg, #9d612f, #4a2a10)', opacity: 0,
               animation: 'gtRahmen 900ms ease-out forwards' }} />
             {/* Das Fallbeil: schraege Unterkante per clip-path */}
             <div style={{ position: 'absolute', left: -36, top: -82, width: 72, height: 46,
-              background: 'linear-gradient(180deg, #6f7680 0%, #c9d2dc 45%, #f4f8fb 70%, #9aa3ad 100%)',
+              background: 'linear-gradient(180deg, #7f7f7f 0%, #d2d2db 45%, #ffffff 70%, #9aa3b6 100%)',
               clipPath: 'polygon(0 0, 100% 0, 100% 62%, 0 100%)',
-              boxShadow: '0 0 10px rgba(220,235,255,.55)', opacity: 0,
+              boxShadow: '0 0 10px rgba(229,237,250,.55)', opacity: 0,
               animation: 'gtBeil 420ms cubic-bezier(.55,0,.9,.35) 120ms forwards' }} />
             {/* Einschlag: roter Schnitt quer ueber die Zone */}
             <div style={{ position: 'absolute', left: -52, top: 6, width: 104, height: 6,
-              background: 'linear-gradient(90deg, transparent, #ff2a2a 20%, #ffd0c8 50%, #ff2a2a 80%, transparent)',
-              boxShadow: '0 0 12px rgba(255,40,40,.9)', opacity: 0, transform: 'rotate(-12deg)',
+              background: 'linear-gradient(90deg, transparent, #ef2929 20%, #f0bfbc 50%, #ef2929 80%, transparent)',
+              boxShadow: '0 0 12px rgba(255,26,26,.9)', opacity: 0, transform: 'rotate(-12deg)',
               animation: 'gtSchnitt 520ms ease-out 480ms forwards' }} />
             <div style={{ position: 'absolute', left: -46, top: -40, width: 92, height: 92, borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(255,60,50,.65) 0%, rgba(140,0,0,.3) 50%, transparent 72%)',
+              background: 'radial-gradient(circle, rgba(239,41,41,.65) 0%, rgba(143,0,0,.3) 50%, transparent 72%)',
               opacity: 0, animation: 'gtGlut 560ms ease-out 480ms forwards' }} />
           </div>
           <style>{`
@@ -16836,7 +16836,7 @@ const ANIM_REGISTRY = {
             steig: 40 + Math.random() * 55,
             drift: (Math.random() - 0.5) * 22,
             g: stern ? 6 + Math.random() * 6 : 3 + Math.random() * 4,
-            farbe: ['#fff6c8', '#ffe066', '#ffd23f', '#ffffff', '#ffc21a'][i % 5],
+            farbe: ['#fffbd2', '#ffe469', '#fad54a', '#ffffff', '#ffc61c'][i % 5],
             verzug: Math.round(Math.random() * 520),
             dauer: Math.round(760 + Math.random() * 520),
           };
@@ -16846,7 +16846,7 @@ const ANIM_REGISTRY = {
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           <div style={{
             position: 'absolute', left: -58, top: -72, width: 116, height: 144, borderRadius: '46%',
-            background: 'radial-gradient(ellipse at 50% 55%, rgba(255,235,150,.55) 0%, rgba(255,205,60,.3) 42%, rgba(255,190,40,0) 72%)',
+            background: 'radial-gradient(ellipse at 50% 55%, rgba(255,241,150,.55) 0%, rgba(248,202,33,.3) 42%, rgba(255,185,26,0) 72%)',
             mixBlendMode: 'screen', opacity: 0,
             animation: 'eggGlanzHof 1500ms ease-out forwards',
           }} />
@@ -16901,16 +16901,16 @@ const ANIM_REGISTRY = {
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           <div style={{
             position: 'absolute', left: -48, top: -48, width: 96, height: 96, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(200,20,29,.75) 0%, rgba(80,4,8,.45) 50%, transparent 72%)',
+            background: 'radial-gradient(circle, rgba(192,20,28,.75) 0%, rgba(82,10,12,.45) 50%, transparent 72%)',
             opacity: 0, animation: 'hitsRissGlut 720ms ease-out forwards',
           }} />
           <svg width="80" height="80" viewBox="-40 -40 80 80" shapeRendering="crispEdges" style={{
             position: 'absolute', left: -40, top: -40, overflow: 'visible', opacity: 0,
             animation: 'hitsRiss 720ms ease-out forwards',
           }}>
-            <path d={RISSE} fill="none" stroke="#3a0105" strokeWidth="6" />
-            <path d={RISSE} fill="none" stroke="#e0202a" strokeWidth="3" />
-            <path d={RISSE} fill="none" stroke="#ff8a70" strokeWidth="1" />
+            <path d={RISSE} fill="none" stroke="#3a0000" strokeWidth="6" />
+            <path d={RISSE} fill="none" stroke="#f03232" strokeWidth="3" />
+            <path d={RISSE} fill="none" stroke="#ff8566" strokeWidth="1" />
           </svg>
           <style>{`
             @keyframes hitsRiss {
@@ -16948,7 +16948,7 @@ const ANIM_REGISTRY = {
             <div key={'psp' + i} style={{
               position: 'absolute', left: -f.g / 2, top: -f.g / 2,
               width: f.g, height: f.g * 0.72, borderRadius: '50%',
-              background: 'radial-gradient(circle at 42% 38%, #ffffff 0%, #ffd9ec 55%, rgba(255,150,200,0) 78%)',
+              background: 'radial-gradient(circle at 42% 38%, #ffffff 0%, #fae5eb 55%, rgba(241,116,171,0) 78%)',
               '--psp-dx': f.dx.toFixed(0) + 'px', '--psp-dy': f.dy.toFixed(0) + 'px',
               animation: `pinkSkyPuff 760ms ease-out ${f.verzug}ms forwards`,
             }} />
@@ -16984,12 +16984,12 @@ const ANIM_REGISTRY = {
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           <div style={{
             position: 'absolute', left: -90, top: -90, width: 180, height: 180, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,40,40,.85) 22%, rgba(190,0,0,.45) 52%, rgba(120,0,0,0) 75%)',
+            background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,26,26,.85) 22%, rgba(200,0,0,.45) 52%, rgba(120,0,0,0) 75%)',
             animation: 'redLightningGlow 780ms ease-out forwards',
           }} />
           <div style={{
             position: 'absolute', left: -50, top: -50, width: 100, height: 100, borderRadius: '50%',
-            border: '3px solid rgba(255,70,70,.95)', boxShadow: '0 0 18px rgba(255,0,0,.9)',
+            border: '3px solid rgba(233,47,56,.95)', boxShadow: '0 0 18px rgba(255,26,26,.9)',
             animation: 'redLightningRing 640ms ease-out forwards',
           }} />
           {blitze.map((b, i) => (
@@ -16997,7 +16997,7 @@ const ANIM_REGISTRY = {
               style={{ position: 'absolute', left: b.dx - 60, top: -80, overflow: 'visible',
                 animation: `redLightningBolt 520ms linear ${b.verzug}ms forwards`, opacity: 0 }}>
               <polyline points={b.pts} fill="none" stroke="#ff1a1a" strokeWidth="7" strokeLinejoin="round" strokeLinecap="round"
-                style={{ filter: 'drop-shadow(0 0 7px #ff0000)' }} />
+                style={{ filter: 'drop-shadow(0 0 7px #ff1a1a)' }} />
               <polyline points={b.pts} fill="none" stroke="#ffffff" strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round" />
             </svg>
           ))}
@@ -17045,11 +17045,11 @@ const ANIM_REGISTRY = {
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           <svg width="72" height="64" viewBox="0 0 9 8" shapeRendering="crispEdges"
             style={{ position: 'absolute', left: -36, top: -32, overflow: 'visible',
-              filter: 'drop-shadow(0 0 6px rgba(255,60,110,.9))',
+              filter: 'drop-shadow(0 0 6px rgba(236,45,98,.9))',
               animation: 'heartExpandFade 1000ms ease-out forwards' }}>
             {FELDER.map(([fx, fy]) => (
               <rect key={fx + '-' + fy} x={fx} y={fy} width="1" height="1"
-                fill={fy <= 1 && fx <= 1 ? '#ffd1de' : (fy >= 4 ? '#e0194f' : '#ff3b6b')} />
+                fill={fy <= 1 && fx <= 1 ? '#f3bad3' : (fy >= 4 ? '#ec2d62' : '#ec2d62')} />
             ))}
           </svg>
           <style>{`
@@ -17078,7 +17078,7 @@ const ANIM_REGISTRY = {
           <ExplosionEffect x={0} y={0} opacity={opacity} />
           <div style={{
             position: 'absolute', left: -60, top: -60, width: 120, height: 120, borderRadius: '50%',
-            border: '4px solid rgba(255,190,80,.95)', boxShadow: '0 0 22px rgba(255,120,20,.9)',
+            border: '4px solid rgba(255,208,102,.95)', boxShadow: '0 0 22px rgba(255,125,0,.9)',
             animation: 'megaExplosionRing 700ms ease-out forwards',
           }} />
           <style>{`
@@ -17096,7 +17096,7 @@ const ANIM_REGISTRY = {
     // ein heller Frostblitz, ein Stossring und Eissplitter (rautenfoermig),
     // die nach aussen fliegen und dabei verblassen. Eigene Keyframes im
     // eigenen <style> (siehe check-anim-keyframes).
-    const FARBEN = ['#e8f8ff', '#bfe6ff', '#8fd0f5', '#cfeeff', '#6fb9e6'];
+    const FARBEN = ['#e5f5fa', '#b4dff8', '#77c8ee', '#bddcef', '#7bbeea'];
     return function GolemSmashIceEffect({ x, y }) {
       const splitter = useMemo(() => Array.from({ length: ppFxN(34) }, () => {
         const w = Math.random() * Math.PI * 2;
@@ -17113,16 +17113,16 @@ const ANIM_REGISTRY = {
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           <div style={{ position: 'absolute', left: -46, top: -46, width: 92, height: 92, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(235,250,255,.95) 0%, rgba(150,215,255,.55) 45%, rgba(150,215,255,0) 72%)',
+            background: 'radial-gradient(circle, rgba(229,245,250,.95) 0%, rgba(119,200,238,.55) 45%, rgba(119,200,238,0) 72%)',
             animation: 'golemIceFlash 380ms ease-out forwards' }} />
           <div style={{ position: 'absolute', left: -40, top: -40, width: 80, height: 80, borderRadius: '50%',
-            border: '3px solid #bfe6ff', boxShadow: '0 0 14px #8fd0f5',
+            border: '3px solid #b4dff8', boxShadow: '0 0 14px #77c8ee',
             animation: 'golemIceRing 520ms ease-out forwards' }} />
           {splitter.map((k, i) => (
             <i key={'gsi' + i} style={{
               position: 'absolute', left: 0, top: 0, width: k.size, height: k.size,
               marginLeft: -k.size / 2, marginTop: -k.size / 2,
-              background: k.color, boxShadow: '0 0 5px #cfeeff',
+              background: k.color, boxShadow: '0 0 5px #bddcef',
               '--dx': k.dx + 'px', '--dy': k.dy + 'px', '--rot': k.rot + 'deg',
               animation: `golemIceShard ${k.dur}ms cubic-bezier(.15,.7,.35,1) ${k.delay}ms forwards`,
             }} />
@@ -17151,7 +17151,7 @@ const ANIM_REGISTRY = {
     // dazwischen steigen Notensymbole auf, am Boden spritzt ein Ring. Eigene Keyframes im
     // eigenen <style> (siehe check-anim-keyframes).
     const NOTEN = ['♪', '♫', '♩', '♬'];
-    const FARBEN = ['#d8f0ff', '#9fd4ff', '#6db8f5', '#bfe3ff', '#4f9de0'];
+    const FARBEN = ['#e5edfa', '#b3d8f9', '#66b6ff', '#b4dff8', '#399edf'];
     return function MoanaRainEffect({ x, y }) {
       const tropfen = useMemo(() => Array.from({ length: ppFxN(46) }, () => ({
         left: Math.round(Math.random() * 130 - 65),
@@ -17170,7 +17170,7 @@ const ANIM_REGISTRY = {
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           <div style={{ position: 'absolute', left: -70, top: -50, width: 140, height: 100, borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(110,180,245,.45) 0%, rgba(110,180,245,0) 70%)',
+            background: 'radial-gradient(ellipse, rgba(102,182,255,.45) 0%, rgba(102,182,255,0) 70%)',
             animation: 'moanaMist 1100ms ease-out forwards' }} />
           {tropfen.map((d, i) => (
             <i key={'mr' + i} style={{
@@ -17182,13 +17182,13 @@ const ANIM_REGISTRY = {
           ))}
           {noten.map((n, i) => (
             <b key={'mn' + i} style={{
-              position: 'absolute', left: n.left, top: 10, fontSize: n.size, color: '#eaf6ff',
-              textShadow: '0 0 8px #6db8f5', opacity: 0,
+              position: 'absolute', left: n.left, top: 10, fontSize: n.size, color: '#e5f5fa',
+              textShadow: '0 0 8px #66b6ff', opacity: 0,
               animation: `moanaNote ${n.dur}ms ease-out ${n.delay}ms forwards`,
             }}>{n.glyph}</b>
           ))}
           <div style={{ position: 'absolute', left: -46, top: -16, width: 92, height: 32, borderRadius: '50%',
-            border: '2px solid #bfe3ff', boxShadow: '0 0 12px #6db8f5', opacity: 0,
+            border: '2px solid #b4dff8', boxShadow: '0 0 12px #66b6ff', opacity: 0,
             animation: 'moanaSplash 520ms ease-out 480ms forwards' }} />
           <style>{`
             @keyframes moanaMist {
@@ -17224,18 +17224,18 @@ const ANIM_REGISTRY = {
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           <div style={{ position: 'absolute', left: -60, top: -60, width: 120, height: 120, borderRadius: '50%',
-            border: '2px solid #e8c77a', boxShadow: '0 0 14px #d9a93c', opacity: 0,
+            border: '2px solid #e0c085', boxShadow: '0 0 14px #d1a148', opacity: 0,
             animation: 'rewindRing 700ms ease-in forwards' }} />
           <div style={{ position: 'absolute', left: -60, top: -60, width: 120, height: 120, borderRadius: '50%',
-            border: '2px dashed #f4e2b0', opacity: 0,
+            border: '2px dashed #f7e0b5', opacity: 0,
             animation: 'rewindRing 700ms ease-in 160ms forwards' }} />
           <div style={{ position: 'absolute', left: -34, top: -34, width: 68, height: 68, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,244,214,.92) 0%, rgba(233,196,106,.55) 60%, rgba(233,196,106,0) 74%)',
-            border: '3px solid #c99a2e', boxShadow: '0 0 18px #e8c77a', opacity: 0,
+            background: 'radial-gradient(circle, rgba(255,251,210,.92) 0%, rgba(251,200,106,.55) 60%, rgba(251,200,106,0) 74%)',
+            border: '3px solid #d1a148', boxShadow: '0 0 18px #e0c085', opacity: 0,
             animation: 'rewindFace 900ms ease-out forwards' }}>
-            <i style={{ position: 'absolute', left: 31, top: 8, width: 3, height: 26, background: '#5a3f0e', borderRadius: 2,
+            <i style={{ position: 'absolute', left: 31, top: 8, width: 3, height: 26, background: '#5a3c14', borderRadius: 2,
               transformOrigin: '50% 100%', animation: 'rewindHand 800ms cubic-bezier(.4,0,.2,1) forwards' }} />
-            <i style={{ position: 'absolute', left: 31, top: 16, width: 3, height: 18, background: '#5a3f0e', borderRadius: 2,
+            <i style={{ position: 'absolute', left: 31, top: 16, width: 3, height: 18, background: '#5a3c14', borderRadius: 2,
               transformOrigin: '50% 100%', animation: 'rewindHandSlow 800ms cubic-bezier(.4,0,.2,1) forwards' }} />
           </div>
           <style>{`
@@ -17289,18 +17289,18 @@ const ANIM_REGISTRY = {
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           <div style={{ position: 'absolute', left: -46, top: -46, width: 92, height: 92, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(150,60,200,.55) 0%, rgba(90,20,140,.3) 50%, rgba(90,20,140,0) 72%)',
+            background: 'radial-gradient(circle, rgba(149,68,213,.55) 0%, rgba(71,17,126,.3) 50%, rgba(71,17,126,0) 72%)',
             animation: 'levelDownGlow 800ms ease-out forwards' }} />
           {pfeile.map((a, i) => (
             <span key={'ld' + i} style={{
               position: 'absolute', left: a.dx, top: -30, fontSize: a.size, lineHeight: 1,
-              color: '#c07bff', textShadow: '0 0 6px #7a1fc2',
+              color: '#ba74ff', textShadow: '0 0 6px #7a2bd0',
               animation: `levelDownArrow 700ms ease-in ${a.delay}ms forwards`, opacity: 0,
             }}>▼</span>
           ))}
           <span className="orbit-font" style={{
-            position: 'absolute', left: -18, top: -16, fontSize: 26, fontWeight: 800, color: '#e3b8ff',
-            textShadow: '0 0 8px #8a2be2, 0 2px 0 #3b0a5c', animation: 'levelDownText 900ms ease-out forwards',
+            position: 'absolute', left: -18, top: -16, fontSize: 26, fontWeight: 800, color: '#d6b3f9',
+            textShadow: '0 0 8px #903ae6, 0 2px 0 #401a66', animation: 'levelDownText 900ms ease-out forwards',
           }}>-1</span>
           <style>{`
             .loom-swell-card { animation: loomSwellCard 1100ms ease-in-out; z-index: 50; position: relative; }
@@ -17352,7 +17352,7 @@ const ANIM_REGISTRY = {
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           <div style={{ position: 'absolute', left: -54, top: -66, width: 108, height: 132, borderRadius: 10,
-            background: 'radial-gradient(ellipse, rgba(40,0,70,.65) 0%, rgba(20,0,40,.4) 60%, rgba(20,0,40,0) 78%)',
+            background: 'radial-gradient(ellipse, rgba(46,10,81,.65) 0%, rgba(25,6,45,.4) 60%, rgba(25,6,45,0) 78%)',
             animation: 'loomSwellShade 1100ms ease-in-out forwards', opacity: 0 }} />
           <style>{`
             .loom-swell-card { animation: loomSwellCard 1100ms ease-in-out; z-index: 50; position: relative; }
@@ -17379,23 +17379,23 @@ const ANIM_REGISTRY = {
   dragonegg_shimmer: DragoneggShimmerEffect,
   liquid_rainbow: LiquidRainbowEffect,
   // ── Circles of Hell (Animationen) ──────────────────────────────────
-  // Farben aus den Pixelart-Hintergruenden der Kreise (Flammen #F8F5B5 … #550A04).
+  // Farben aus den Pixelart-Hintergruenden der Kreise (Flammen #f8f8bd … #520a0c).
   // ★ The Sixth Circle: Hoellen-Charme — blutrote Siegelringe, aufsteigende Schlieren, dunkler Blitz.
   hell_charm: (() => {
     return function HellCharmEffect({ x, y }) {
       const schlieren = useMemo(() => Array.from({ length: ppFxN(10) }, (_, i) => ({
         left: Math.round((i - 4.5) * 9 + (Math.random() - .5) * 6), delay: Math.round(Math.random() * 420),
         dur: Math.round(780 + Math.random() * 360), h: 26 + Math.random() * 26,
-        farbe: ['#C92E26', '#8a1a18', '#a02ca8', '#F27525'][i % 4],
+        farbe: ['#c0141c', '#8c0014', '#7e41ba', '#f87420'][i % 4],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           <div style={{ position: 'absolute', left: -60, top: -60, width: 120, height: 120, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(201,46,38,.7) 0%, rgba(90,10,40,.45) 50%, rgba(20,0,20,0) 72%)',
+            background: 'radial-gradient(circle, rgba(192,20,28,.7) 0%, rgba(85,1,26,.45) 50%, rgba(18,16,31,0) 72%)',
             opacity: 0, animation: 'hcCharmFlash 1100ms ease-out forwards' }} />
           {[0, 1].map(i => (
             <div key={'r' + i} style={{ position: 'absolute', left: -42, top: -42, width: 84, height: 84, borderRadius: '50%',
-              border: `2px ${i ? 'dashed' : 'solid'} ${i ? '#F27525' : '#C92E26'}`, boxShadow: '0 0 10px #C92E26',
+              border: `2px ${i ? 'dashed' : 'solid'} ${i ? '#f87420' : '#c0141c'}`, boxShadow: '0 0 10px #c0141c',
               opacity: 0, animation: `hcCharmRing 1000ms ease-out ${i * 200}ms forwards` }} />
           ))}
           {schlieren.map((d, i) => (
@@ -17415,7 +17415,7 @@ const ANIM_REGISTRY = {
   // ★ The Seventh Circle: Lavasaeule — Glutpfuetze und Risse am Boden, eine gewaltige Hauptsaeule mit Seitenstrahlen
   // schiesst weit ueber das Ziel hinaus, oben quillt ein Feuerpilz, Brocken und Tropfen regnen in weiten Boegen herab.
   lava_fountain: (() => {
-    const FARBEN = ['#F8F5B5', '#F6E318', '#EEAF2E', '#F27525', '#C92E26', '#8a1a18'];
+    const FARBEN = ['#f8f8bd', '#ffeb1a', '#f9ac20', '#f87420', '#c0141c', '#8c0014'];
     return function LavaFountainEffect({ x, y }) {
       const strahlen = useMemo(() => [
         { k: 0,  w: 40, h: 230, delay: 0 },
@@ -17431,25 +17431,25 @@ const ANIM_REGISTRY = {
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           <div style={{ position: 'absolute', left: -150, top: -230, width: 300, height: 300, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(246,120,24,.5) 0%, rgba(201,46,38,.28) 45%, rgba(85,10,4,0) 72%)',
+            background: 'radial-gradient(circle, rgba(248,116,32,.5) 0%, rgba(192,20,28,.28) 45%, rgba(82,10,12,0) 72%)',
             opacity: 0, animation: 'lvfHaze 1500ms ease-out forwards' }} />
           <div style={{ position: 'absolute', left: -120, top: -4, width: 240, height: 84, borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(248,245,181,.95) 0%, rgba(246,227,24,.8) 22%, rgba(242,117,37,.7) 48%, rgba(201,46,38,.4) 68%, rgba(85,10,4,0) 80%)',
+            background: 'radial-gradient(ellipse, rgba(248,248,189,.95) 0%, rgba(255,235,26,.8) 22%, rgba(248,116,32,.7) 48%, rgba(192,20,28,.4) 68%, rgba(82,10,12,0) 80%)',
             opacity: 0, animation: 'lvfPool 1600ms ease-out forwards' }} />
           {risse.map((r, i) => (
             <i key={'r' + i} style={{ position: 'absolute', left: 0, top: 36, width: r.len, height: 3, transformOrigin: '0 50%',
-              background: 'linear-gradient(to right, #F8F5B5, #F27525 55%, rgba(201,46,38,0))', boxShadow: '0 0 6px #F27525',
+              background: 'linear-gradient(to right, #f8f8bd, #f87420 55%, rgba(192,20,28,0))', boxShadow: '0 0 6px #f87420',
               transform: `rotate(${r.winkel}deg) scaleX(0)`, opacity: 0, '--w': r.winkel + 'deg', animation: 'lvfCrack 1100ms ease-out 60ms forwards' }} />
           ))}
           {strahlen.map((s, i) => (
             <i key={'j' + i} style={{ position: 'absolute', left: s.left, top: 38 - s.h, width: s.w, height: s.h, transformOrigin: '50% 100%',
               clipPath: 'polygon(32% 100%, 4% 70%, 20% 42%, 34% 22%, 50% 0%, 66% 22%, 80% 42%, 96% 70%, 68% 100%)',
-              background: 'linear-gradient(to top, #8a1a18 0%, #C92E26 14%, #F27525 40%, #EEAF2E 68%, #F8F5B5 100%)',
-              boxShadow: '0 0 14px #F27525', opacity: 0, animation: `lvfJet ${s.dur}ms cubic-bezier(.15,.8,.3,1) ${s.delay}ms forwards` }} />
+              background: 'linear-gradient(to top, #8c0014 0%, #c0141c 14%, #f87420 40%, #f9ac20 68%, #f8f8bd 100%)',
+              boxShadow: '0 0 14px #f87420', opacity: 0, animation: `lvfJet ${s.dur}ms cubic-bezier(.15,.8,.3,1) ${s.delay}ms forwards` }} />
           ))}
           <div style={{ position: 'absolute', left: -58, top: -226, width: 116, height: 70, borderRadius: '50%',
-            background: 'radial-gradient(ellipse, #F8F5B5 0%, #F6E318 28%, #F27525 58%, rgba(201,46,38,0) 78%)',
-            boxShadow: '0 0 22px #F27525', opacity: 0, animation: 'lvfCap 1100ms ease-out 260ms forwards' }} />
+            background: 'radial-gradient(ellipse, #f8f8bd 0%, #ffeb1a 28%, #f87420 58%, rgba(192,20,28,0) 78%)',
+            boxShadow: '0 0 22px #f87420', opacity: 0, animation: 'lvfCap 1100ms ease-out 260ms forwards' }} />
           {tropfen.map((d, i) => (
             <b key={'t' + i} style={{ position: 'absolute', left: 0, top: 30, width: d.size, height: d.size * 1.2, borderRadius: '50%',
               background: d.farbe, boxShadow: `0 0 6px ${d.farbe}`, opacity: 0, '--dx': d.dx + 'px', '--hoch': -d.hoch + 'px',
@@ -17457,7 +17457,7 @@ const ANIM_REGISTRY = {
           ))}
           {[0, 1].map(i => (
             <div key={'q' + i} style={{ position: 'absolute', left: -86, top: 12, width: 172, height: 48, borderRadius: '50%',
-              border: `3px solid ${i ? '#F27525' : '#F6E318'}`, boxShadow: '0 0 14px #F27525', opacity: 0, animation: `lvfRing 760ms ease-out ${140 + i * 150}ms forwards` }} />
+              border: `3px solid ${i ? '#f87420' : '#ffeb1a'}`, boxShadow: '0 0 14px #f87420', opacity: 0, animation: `lvfRing 760ms ease-out ${140 + i * 150}ms forwards` }} />
           ))}
           <style>{`
             @keyframes lvfHaze { 0% { opacity: 0; transform: scale(.5); } 30% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.25); } }
@@ -17482,19 +17482,19 @@ const ANIM_REGISTRY = {
       }))), [punkte.length]);
       const funken = useMemo(() => punkte.map(() => Array.from({ length: ppFxN(5) }, () => ({
         pos: Math.random(), delay: Math.round(200 + Math.random() * 900), dx: Math.round((Math.random() - .5) * 30),
-        farbe: ['#F8F5B5', '#F6E318', '#EEAF2E', '#F27525'][Math.floor(Math.random() * 4)],
+        farbe: ['#f8f8bd', '#ffeb1a', '#f9ac20', '#f87420'][Math.floor(Math.random() * 4)],
       }))), [punkte.length]);
       return (
         <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10100 }}>
           {punkte.map((p, i) => (
             <div key={'f' + i} style={{ position: 'absolute', left: p.x - p.w / 2, top: p.y - p.h / 2, width: p.w, height: p.h }}>
               <div style={{ position: 'absolute', inset: -6, borderRadius: 8,
-                background: 'radial-gradient(ellipse at 50% 80%, rgba(246,227,24,.55), rgba(242,117,37,.4) 45%, rgba(201,46,38,0) 75%)',
+                background: 'radial-gradient(ellipse at 50% 80%, rgba(255,235,26,.55), rgba(248,116,32,.4) 45%, rgba(192,20,28,0) 75%)',
                 opacity: 0, animation: 'fcfGlow 1900ms ease-in-out forwards' }} />
               {zungen[i].map((z, k) => (
                 <i key={'z' + k} style={{ position: 'absolute', bottom: -4, left: `calc(${z.pos * 100}% - ${p.w * .09}px)`, width: p.w * .18, height: p.h * (.85 * z.h), transformOrigin: '50% 100%',
                   clipPath: 'polygon(50% 0%, 78% 38%, 100% 100%, 0% 100%, 22% 38%)',
-                  background: 'linear-gradient(to top, #C92E26 0%, #F27525 40%, #EEAF2E 72%, #F8F5B5 100%)',
+                  background: 'linear-gradient(to top, #c0141c 0%, #f87420 40%, #f9ac20 72%, #f8f8bd 100%)',
                   opacity: 0, animation: `fcfTongue ${z.dur}ms ease-out ${z.delay}ms forwards` }} />
               ))}
               {funken[i].map((f, k) => (
@@ -17541,17 +17541,17 @@ const ANIM_REGISTRY = {
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           <div style={{ position: 'absolute', left: -cw / 2 - 8, top: -ch / 2 - 8, width: cw + 16, height: ch + 16, borderRadius: 8,
-            background: 'radial-gradient(ellipse at center, rgba(8,0,16,.88) 0%, rgba(20,0,36,.6) 55%, rgba(20,0,36,0) 100%)',
+            background: 'radial-gradient(ellipse at center, rgba(8,6,12,.88) 0%, rgba(23,11,40,.6) 55%, rgba(23,11,40,0) 100%)',
             opacity: 0, animation: 'ddShade 1500ms ease-in-out forwards' }} />
           {nebel.map((n, i) => (
             <i key={'n' + i} style={{ position: 'absolute', left: n.sx - n.size / 2, top: n.sy - n.size / 2, width: n.size, height: n.size, borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(6,0,12,.95) 0%, rgba(28,6,44,.7) 50%, rgba(28,6,44,0) 76%)', filter: 'blur(5px)',
+              background: 'radial-gradient(circle, rgba(8,6,12,.95) 0%, rgba(25,6,45,.7) 50%, rgba(25,6,45,0) 76%)', filter: 'blur(5px)',
               opacity: 0, '--dx': n.dx + 'px', '--dy': n.dy + 'px', animation: `ddMist ${n.dur}ms ease-in-out ${n.delay}ms forwards` }} />
           ))}
           {muenzen.map((m, i) => (
             <b key={'c' + i} style={{ position: 'absolute', left: -m.size / 2, top: -m.size / 2, width: m.size, height: m.size, borderRadius: '50%',
-              background: 'radial-gradient(circle at 35% 30%, #F8F5B5 0%, #F6E318 40%, #EEAF2E 75%, #9a6a10 100%)', border: '1px solid #6a4408',
-              boxShadow: '0 0 6px rgba(246,227,24,.8)', opacity: 0,
+              background: 'radial-gradient(circle at 35% 30%, #f8f8bd 0%, #ffeb1a 40%, #f9ac20 75%, #8b5b04 100%)', border: '1px solid #72541d',
+              boxShadow: '0 0 6px rgba(255,235,26,.8)', opacity: 0,
               '--x0': m.x0 + 'px', '--y0': m.y0 + 'px', '--x1': m.x1 + 'px', '--y1': m.y1 + 'px', '--x2': m.x2 + 'px', '--y2': m.y2 + 'px',
               animation: `ddCoin ${m.dur}ms ease-in-out ${m.delay}ms forwards` }} />
           ))}
@@ -17588,15 +17588,15 @@ const ANIM_REGISTRY = {
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           <div style={{ position: 'absolute', left: -cw / 2 - 10, top: -ch / 2 - 10, width: cw + 20, height: ch + 20, borderRadius: 8,
-            background: 'radial-gradient(ellipse at center, rgba(4,0,8,.95) 0%, rgba(24,0,16,.75) 55%, rgba(60,0,20,.0) 100%)',
+            background: 'radial-gradient(ellipse at center, rgba(8,6,12,.95) 0%, rgba(18,16,31,.75) 55%, rgba(75,16,33,.0) 100%)',
             opacity: 0, animation: 'remShade 1700ms ease-in-out forwards' }} />
           {schwaden.map((n, i) => (
             <i key={'s' + i} style={{ position: 'absolute', left: n.sx - n.size / 2, top: n.sy - n.size / 2, width: n.size, height: n.size, borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(2,0,6,.97) 0%, rgba(20,0,18,.8) 48%, rgba(60,0,24,0) 76%)', filter: 'blur(6px)',
+              background: 'radial-gradient(circle, rgba(8,6,12,.97) 0%, rgba(18,16,31,.8) 48%, rgba(75,16,33,0) 76%)', filter: 'blur(6px)',
               opacity: 0, '--dx': n.dx + 'px', '--dy': n.dy + 'px', animation: `remMist ${n.dur}ms ease-in-out ${n.delay}ms forwards` }} />
           ))}
           {funken.map((f, i) => (
-            <b key={'f' + i} style={{ position: 'absolute', left: f.x, top: ch * 0.2, width: f.size, height: f.size, background: '#8a1a18', boxShadow: '0 0 6px #C92E26',
+            <b key={'f' + i} style={{ position: 'absolute', left: f.x, top: ch * 0.2, width: f.size, height: f.size, background: '#8c0014', boxShadow: '0 0 6px #c0141c',
               opacity: 0, animation: `remAsh ${f.dur}ms ease-out ${f.delay}ms forwards` }} />
           ))}
           <style>{`
@@ -17618,11 +17618,11 @@ const ANIM_REGISTRY = {
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           <div style={{ position: 'absolute', left: -50, top: -30, width: 100, height: 60, borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(246,227,24,.65), rgba(238,175,46,.3) 55%, rgba(238,175,46,0) 76%)',
+            background: 'radial-gradient(ellipse, rgba(255,235,26,.65), rgba(249,172,32,.3) 55%, rgba(249,172,32,0) 76%)',
             opacity: 0, animation: 'hcnGlow 1200ms ease-out forwards' }} />
           {muenzen.map((m, i) => (
             <b key={'c' + i} style={{ position: 'absolute', left: -m.size / 2, top: 0, width: m.size, height: m.size, borderRadius: '50%',
-              background: 'radial-gradient(circle at 35% 30%, #F8F5B5 0%, #F6E318 40%, #EEAF2E 75%, #9a6a10 100%)', border: '1px solid #6a4408',
+              background: 'radial-gradient(circle at 35% 30%, #f8f8bd 0%, #ffeb1a 40%, #f9ac20 75%, #8b5b04 100%)', border: '1px solid #72541d',
               opacity: 0, '--dx': m.dx + 'px', '--hoch': -m.hoch + 'px', animation: `hcnCoin ${m.dur}ms cubic-bezier(.3,.7,.5,1) ${m.delay}ms forwards` }} />
           ))}
           <style>{`
@@ -17657,13 +17657,13 @@ const ANIM_REGISTRY = {
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           <div style={{
             position: 'absolute', left: -46, top: -46, width: 92, height: 92,
-            borderRadius: '50%', border: '3px solid #ffd76f',
-            boxShadow: '0 0 22px rgba(255,215,110,.9), inset 0 0 18px rgba(255,215,110,.55)',
+            borderRadius: '50%', border: '3px solid #ffd066',
+            boxShadow: '0 0 22px rgba(255,208,102,.9), inset 0 0 18px rgba(255,208,102,.55)',
             animation: 'pp-monkee-shield 900ms ease-out forwards',
           }} />
           <div style={{
             position: 'absolute', left: -14, top: -18, fontSize: 30,
-            filter: 'drop-shadow(0 0 8px rgba(255,215,110,.95))',
+            filter: 'drop-shadow(0 0 8px rgba(255,208,102,.95))',
             animation: 'pp-monkee-shield-icon 900ms ease-out forwards',
           }}>🛡️</div>
           {/* ★★ v1194: die beiden Keyframes fehlten SEIT v347 — weder
@@ -17708,13 +17708,13 @@ const ANIM_REGISTRY = {
       })), [anzahl]);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(255,215,60,.75) 0%, rgba(220,170,20,.28) 42%, transparent 72%)' }} />
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(250,213,74,.75) 0%, rgba(199,158,5,.28) 42%, transparent 72%)' }} />
           {bananas.map((b, i) => (
             <div key={i}
               style={{
                 position: 'absolute', left: b.xOff, top: -70,
                 fontSize: b.size,
-                filter: 'drop-shadow(0 0 6px rgba(255,210,60,.95))',
+                filter: 'drop-shadow(0 0 6px rgba(248,202,33,.95))',
                 animation: `pp-banana-fall ${b.dur}ms cubic-bezier(.45,.05,.55,.95) ${b.delay}ms both`,
                 ['--pp-banana-spin']: `${b.spin}deg`,
                 ['--pp-banana-tilt']: `${b.tilt}px`,
@@ -17744,7 +17744,7 @@ const ANIM_REGISTRY = {
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           <div className="anim-gold-flash" style={{
-            background: 'radial-gradient(circle, rgba(255,80,80,.6) 0%, rgba(180,40,40,.25) 45%, transparent 72%)',
+            background: 'radial-gradient(circle, rgba(254,81,84,.6) 0%, rgba(178,26,41,.25) 45%, transparent 72%)',
           }} />
           {muenzen.map((m, i) => (
             <div key={i}
@@ -17752,7 +17752,7 @@ const ANIM_REGISTRY = {
                 position: 'absolute',
                 left: m.xOff - m.size / 2, top: -m.size / 2,
                 fontSize: m.size,
-                filter: 'drop-shadow(0 0 6px rgba(255,90,90,.85)) hue-rotate(-35deg) saturate(1.6)',
+                filter: 'drop-shadow(0 0 6px rgba(254,81,84,.85)) hue-rotate(-35deg) saturate(1.6)',
                 animation: `pp-debt-coin-rise ${m.dur}ms cubic-bezier(.3,.5,.4,1) ${m.delay}ms both`,
                 ['--pp-debt-spin']: `${m.spin}deg`,
                 ['--pp-debt-drift']: `${m.drift}px`,
@@ -17798,7 +17798,7 @@ const ANIM_REGISTRY = {
               sich selbst ueber den Ankerpunkt. */}
           <div className="anim-gold-flash" style={{
             transform: `scale(${1 + stufe * 1.5})`,
-            background: 'radial-gradient(circle, rgba(255,180,60,.6) 0%, rgba(255,90,20,.28) 45%, transparent 72%)',
+            background: 'radial-gradient(circle, rgba(249,172,32,.6) 0%, rgba(255,73,26,.28) 45%, transparent 72%)',
           }} />
           {flammen.map((f, i) => (
             <div key={i}
@@ -17807,7 +17807,7 @@ const ANIM_REGISTRY = {
                 left: f.xOff - f.size / 2,
                 top: -f.size / 2,
                 fontSize: f.size,
-                filter: `drop-shadow(0 0 ${4 + stufe * 8}px rgba(255,140,40,.85))`,
+                filter: `drop-shadow(0 0 ${4 + stufe * 8}px rgba(255,139,26,.85))`,
                 animation: `pp-debt-flame-rise ${f.dur}ms cubic-bezier(.25,.6,.4,1) ${f.delay}ms both`,
                 ['--pp-flame-drift']: `${f.drift}px`,
                 ['--pp-flame-rise']: `${-f.hoehe}px`,
@@ -17851,7 +17851,7 @@ const ANIM_REGISTRY = {
               Ankerpunkt (left/top -20 bei 40x40). Ein Ueberschreiben
               haette den Blitz an seiner oberen linken Ecke aufgehaengt. */}
           <div className="anim-gold-flash" style={{
-            background: 'radial-gradient(circle, rgba(190,180,150,.55) 0%, rgba(120,110,90,.22) 45%, transparent 72%)',
+            background: 'radial-gradient(circle, rgba(197,183,160,.55) 0%, rgba(104,104,104,.22) 45%, transparent 72%)',
           }} />
           {muenzen.map((m, i) => (
             <div key={i}
@@ -17867,7 +17867,7 @@ const ANIM_REGISTRY = {
                 left: m.xOff - m.size / 2,
                 top: -m.size / 2,
                 fontSize: m.size,
-                filter: 'drop-shadow(0 0 5px rgba(190,170,110,.7))',
+                filter: 'drop-shadow(0 0 5px rgba(224,192,133,.7))',
                 animation: `pp-invest-coin-drop ${m.dur}ms cubic-bezier(.35,.02,.6,1) ${m.delay}ms both`,
                 ['--pp-invest-spin']: `${m.spin}deg`,
                 ['--pp-invest-drift']: `${m.drift}px`,
@@ -17886,12 +17886,12 @@ const ANIM_REGISTRY = {
         size: 4 + Math.random() * 8,
         delay: Math.random() * 300,
         dur: 500 + Math.random() * 500,
-        color: ['#ff8c00','#ffa033','#ffcc66','#ff6600','#ffe0b0'][Math.floor(Math.random() * 5)],
+        color: ['#ff8b1a','#ff9b3a','#ffd066','#f87420','#f7e0b5'][Math.floor(Math.random() * 5)],
         wobble: -8 + Math.random() * 16,
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(255,140,0,.8) 0%, rgba(255,100,0,.3) 40%, transparent 70%)' }} />
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(255,139,26,.8) 0%, rgba(248,116,32,.3) 40%, transparent 70%)' }} />
           {bubbles.map((b, i) => (
             <div key={'jb'+i} className="anim-beer-bubble" style={{
               '--xOff': b.xOff + 'px', '--size': b.size + 'px', '--wobble': b.wobble + 'px',
@@ -17909,12 +17909,12 @@ const ANIM_REGISTRY = {
         size: 4 + Math.random() * 7,
         delay: Math.random() * 250,
         dur: 400 + Math.random() * 400,
-        color: ['#9933cc','#7722aa','#bb55ee','#6611aa','#dd88ff'][Math.floor(Math.random() * 5)],
+        color: ['#9544d5','#702db3','#b866ff','#6618b4','#c98aff'][Math.floor(Math.random() * 5)],
         wobble: -8 + Math.random() * 16,
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-gold-flash" style={pxHintergrund('radial-gradient(circle, rgba(130,0,180,.8) 0%, rgba(100,0,160,.3) 40%, transparent 70%)', 40)} />
+          <div className="anim-gold-flash" style={pxHintergrund('radial-gradient(circle, rgba(102,24,180,.8) 0%, rgba(102,24,180,.3) 40%, transparent 70%)', 40)} />
           {bubbles.map((b, i) => (
             <div key={'pt'+i} className="anim-beer-bubble" style={{
               '--xOff': b.xOff + 'px', '--size': b.size + 'px', '--wobble': b.wobble + 'px',
@@ -17933,7 +17933,7 @@ const ANIM_REGISTRY = {
         delay: Math.random() * 200,
         dur: 500 + Math.random() * 500,
         wobble: -10 + Math.random() * 20,
-        color: ['#7722bb','#9933dd','#6611aa','#aa44ee','#551199'][Math.floor(Math.random() * 5)],
+        color: ['#6618b4','#903ae6','#6618b4','#a952ff','#50008c'][Math.floor(Math.random() * 5)],
       })), []);
       const skulls = useMemo(() => Array.from({ length: 5 }, () => ({
         xOff: -20 + Math.random() * 40,
@@ -17942,7 +17942,7 @@ const ANIM_REGISTRY = {
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-gold-flash" style={pxHintergrund('radial-gradient(circle, rgba(100,0,160,.9) 0%, rgba(80,0,140,.4) 40%, transparent 70%)', 40)} />
+          <div className="anim-gold-flash" style={pxHintergrund('radial-gradient(circle, rgba(102,24,180,.9) 0%, rgba(80,0,140,.4) 40%, transparent 70%)', 40)} />
           {ooze.map((o, i) => (
             <div key={'po'+i} className="anim-beer-bubble" style={{
               '--xOff': o.xOff + 'px', '--size': o.size + 'px', '--wobble': o.wobble + 'px',
@@ -17952,7 +17952,7 @@ const ANIM_REGISTRY = {
           {skulls.map((s, i) => (
             <div key={'ps'+i} className="anim-beer-bubble" style={{
               '--xOff': s.xOff + 'px', '--size': '14px', '--wobble': '0px',
-              '--color': 'rgba(150,50,200,.6)', animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+              '--color': 'rgba(149,68,213,.6)', animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
               fontSize: 14, opacity: 0,
             }}><PxZeichen z="💀" /></div>
           ))}
@@ -17968,12 +17968,12 @@ const ANIM_REGISTRY = {
         delay: Math.random() * 300,
         dur: 500 + Math.random() * 500,
         char: ['🍃','~','≈','☁','·','🍃'][Math.floor(Math.random() * 6)],
-        color: ['#88cc66','#aaddaa','#66aa44','#ccddbb','#bbeeaa'][Math.floor(Math.random() * 5)],
+        color: ['#80bf59','#92d3a9','#80bf59','#ebdcc1','#b3f9b8'][Math.floor(Math.random() * 5)],
         wobble: -8 + Math.random() * 16,
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(100,180,80,.7) 0%, rgba(80,150,60,.3) 40%, transparent 70%)' }} />
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(128,191,89,.7) 0%, rgba(91,148,56,.3) 40%, transparent 70%)' }} />
           {particles.map((p, i) => (
             <div key={'ts'+i} className="anim-beer-bubble" style={{
               '--xOff': p.xOff + 'px', '--size': p.size + 'px', '--wobble': p.wobble + 'px',
@@ -17993,12 +17993,12 @@ const ANIM_REGISTRY = {
         delay: Math.random() * 300,
         dur: 500 + Math.random() * 500,
         char: ['☕','~','≈','☁','·','♨'][Math.floor(Math.random() * 6)],
-        color: ['#3a2a1a','#5c3d1e','#2a1a0a','#8b6b4a','#4a3020'][Math.floor(Math.random() * 5)],
+        color: ['#3a2412','#5a3c14','#27180c','#886c44','#3a2412'][Math.floor(Math.random() * 5)],
         wobble: -8 + Math.random() * 16,
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(60,40,20,.8) 0%, rgba(40,25,10,.4) 40%, transparent 70%)' }} />
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(58,36,18,.8) 0%, rgba(39,24,12,.4) 40%, transparent 70%)' }} />
           {particles.map((p, i) => (
             <div key={'cs'+i} className="anim-beer-bubble" style={{
               '--xOff': p.xOff + 'px', '--size': p.size + 'px', '--wobble': p.wobble + 'px',
@@ -18024,7 +18024,7 @@ const ANIM_REGISTRY = {
           dx: Math.cos(angle) * speed,
           dy: -Math.abs(Math.sin(angle) * speed) - 5,
           size: 2 + Math.random() * 4,
-          color: ['#ccc','#fff','#aaa','#ff8','#ffa'][Math.floor(Math.random() * 5)],
+          color: ['#d2d2db','#fff','#a8a8a8','#f0f075','#f7f7ad'][Math.floor(Math.random() * 5)],
           delay: 320 + Math.random() * 80,
           dur: 250 + Math.random() * 200,
         };
@@ -18071,8 +18071,8 @@ const ANIM_REGISTRY = {
   //  Kegel nach oben-aussen (mit Fall und Drehung) und ein flacher
   //  Staubring. Gleicher Nachbar-Squash wie beim Hammer.
   shattering_strike: (() => {
-    const CLODS = ['#6b4a2b', '#8a6238', '#4e3419', '#a37a4a', '#5c3f22', '#7d5a33'];
-    const DUST = ['#b79a70', '#d2b98e', '#9a7f5b'];
+    const CLODS = ['#6b4a2a', '#886c44', '#4a2a10', '#886c44', '#6b4a2a', '#6b4a2a'];
+    const DUST = ['#b29466', '#ccb799', '#a89370'];
     return function ShatteringStrikeEffect({ x, y, w, h }) {
       const targetH = h || 90;
       const hammerW = 38, hammerH = 56;
@@ -18152,7 +18152,7 @@ const ANIM_REGISTRY = {
           dx: Math.cos(angle) * speed,
           dy: -Math.abs(Math.sin(angle) * speed) - 6,
           size: 3 + Math.random() * 5,
-          color: ['#4a2c12', '#7a5228', '#96682f', '#c9a271', '#e8dcc4'][Math.floor(Math.random() * 5)],
+          color: ['#4a2a10', '#6e4421', '#9d612f', '#b29466', '#ebdcc1'][Math.floor(Math.random() * 5)],
           delay: 375 + Math.random() * 90,
           dur: 280 + Math.random() * 220,
         };
@@ -18231,7 +18231,7 @@ const ANIM_REGISTRY = {
           dx: Math.cos(angle) * speed,
           dy: -Math.abs(Math.sin(angle) * speed) - 6,
           size: 4 + Math.random() * 8,
-          color: ['#7a5a35','#5c4220','#8a6a40','#3e2d18','#a07a48','#4a3520'][Math.floor(Math.random() * 6)],
+          color: ['#6b4a2a','#5a3c14','#886c44','#3a2412','#886c44','#3a2412'][Math.floor(Math.random() * 6)],
           delay: 360 + Math.random() * 120,
           dur: 380 + Math.random() * 320,
         };
@@ -18296,7 +18296,7 @@ const ANIM_REGISTRY = {
           dy: -Math.abs(Math.sin(angle) * speed) - 6,
           size: 4 + Math.random() * 9,
           // Mammoth-fur browns + a few earth tones for the dust.
-          color: ['#6b4a2a','#4a3018','#825a32','#3a2812','#a8784a','#5a3c1f'][Math.floor(Math.random() * 6)],
+          color: ['#6b4a2a','#4a2a10','#6b4a2a','#3a2412','#c7855b','#5a341a'][Math.floor(Math.random() * 6)],
           delay: 360 + Math.random() * 130,
           dur: 380 + Math.random() * 340,
         };
@@ -18351,14 +18351,14 @@ const ANIM_REGISTRY = {
   // aber in Tuerkis-Blau — eigener Typ mit eigenem Klang (Vorbild trex_chomp).
   glass_shatter: (function () {
     const PAL = {
-      shards: ['#8ff3ff', '#5fd9f2', '#c9fbff', '#38bfe0', '#a6eefc'],
-      dust: ['#effdff', '#bff2fb', '#7fdcf0'],
+      shards: ['#6be9fa', '#6be9fa', '#b6eff7', '#07aec5', '#b6eff7'],
+      dust: ['#e5f5fa', '#b6eff7', '#7fdfff'],
       vars: {
-        '--gp-pane-a': 'rgba(170,240,255,.45)', '--gp-pane-b': 'rgba(70,190,225,.35)', '--gp-pane-c': 'rgba(220,250,255,.5)',
-        '--gp-border': 'rgba(140,225,245,.9)', '--gp-glow': 'rgba(90,205,235,.8)',
-        '--gp-crack': 'rgba(230,252,255,.9)',
-        '--gp-ring-a': 'rgba(215,250,255,.95)', '--gp-ring-b': 'rgba(120,215,240,.55)', '--gp-ring-c': 'rgba(50,160,200,.25)',
-        '--gp-shard-deep': 'rgba(30,120,165,.9)',
+        '--gp-pane-a': 'rgba(182,239,247,.45)', '--gp-pane-b': 'rgba(119,200,238,.35)', '--gp-pane-c': 'rgba(229,245,250,.5)',
+        '--gp-border': 'rgba(127,223,255,.9)', '--gp-glow': 'rgba(102,217,255,.8)',
+        '--gp-crack': 'rgba(229,245,250,.9)',
+        '--gp-ring-a': 'rgba(229,245,250,.95)', '--gp-ring-b': 'rgba(127,223,255,.55)', '--gp-ring-c': 'rgba(23,136,189,.25)',
+        '--gp-shard-deep': 'rgba(23,136,189,.9)',
       },
     };
     return function GlassShatterEffect(props) {
@@ -18377,8 +18377,8 @@ const ANIM_REGISTRY = {
     // (`--gp-*`, Defaults in style.css sind das Rosa des Tridents).
     return function PinkGlassShatterEffect({ x, y, palette }) {
       const pal = palette || {};
-      const SHARDS = pal.shards || ['#ffb3de', '#ff8ccf', '#ffd6ec', '#f574bd', '#ffc2e6'];
-      const DUST = pal.dust || ['#fff0f8', '#ffc8e8', '#ff9ad6'];
+      const SHARDS = pal.shards || ['#f8b4df', '#f174ab', '#f3bad3', '#f174ab', '#f8b4df'];
+      const DUST = pal.dust || ['#fae5eb', '#f3bad3', '#f8b4df'];
       const shards = useMemo(() => Array.from({ length: ppFxN(22) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const speed = 34 + Math.random() * 78;
@@ -18437,7 +18437,7 @@ const ANIM_REGISTRY = {
           dx: Math.cos(angle) * speed,
           dy: Math.sin(angle) * speed - 8,
           size: 4 + Math.random() * 7,
-          color: ['#cfeaff','#9fd0f0','#e0f4ff','#7fb8d8','#bfe2f8'][Math.floor(Math.random() * 5)],
+          color: ['#bddcef','#b3d8f9','#e5f5fa','#7bbeea','#bddcef'][Math.floor(Math.random() * 5)],
           delay: 360 + Math.random() * 80,
           dur: 380 + Math.random() * 220,
         };
@@ -18482,7 +18482,7 @@ const ANIM_REGISTRY = {
           dx: Math.cos(angle) * speed,
           dy: -Math.abs(Math.sin(angle) * speed) - 6,
           size: 5 + Math.random() * 9,
-          color: ['#9a8868','#6b5235','#c4b48c','#3a2818','#a08055','#1a1308'][Math.floor(Math.random() * 6)],
+          color: ['#a89370','#6b4a2a','#ccb799','#3a2412','#b29466','#1f0f04'][Math.floor(Math.random() * 6)],
           delay: 380 + Math.random() * 140,
           dur: 380 + Math.random() * 340,
         };
@@ -18600,7 +18600,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -20, top: -14,
             fontSize: 40, color: '#fff',
-            filter: 'drop-shadow(0 0 10px rgba(220,240,255,.8))',
+            filter: 'drop-shadow(0 0 10px rgba(229,237,250,.8))',
             animation: 'cloudFormCenter 400ms ease-out 600ms forwards',
             opacity: 0,
           }}>☁️</div>
@@ -18686,7 +18686,7 @@ const ANIM_REGISTRY = {
             left: -48, top: -68,
             width: 96, height: 96,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(110,240,240,.7) 0%, rgba(60,200,210,.32) 40%, transparent 72%)',
+            background: 'radial-gradient(circle, rgba(124,233,220,.7) 0%, rgba(8,211,239,.32) 40%, transparent 72%)',
             animation: 'spectralArmorHalo 700ms ease-out forwards',
             opacity: 0,
           }} />
@@ -18696,7 +18696,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -36, top: -80,
             fontSize: 64,
-            filter: 'drop-shadow(0 0 12px rgba(110,240,240,.95)) drop-shadow(0 0 26px rgba(60,200,210,.65))',
+            filter: 'drop-shadow(0 0 12px rgba(124,233,220,.95)) drop-shadow(0 0 26px rgba(8,211,239,.65))',
             animation: 'spectralArmorRise 700ms cubic-bezier(.2,.6,.3,1) forwards',
             opacity: 0,
             lineHeight: 1,
@@ -18707,7 +18707,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -22, top: -28,
             fontSize: 36,
-            filter: 'drop-shadow(0 0 8px rgba(110,240,240,.85))',
+            filter: 'drop-shadow(0 0 8px rgba(124,233,220,.85))',
             animation: 'spectralArmorRise 700ms cubic-bezier(.2,.6,.3,1) 60ms forwards',
             opacity: 0,
             lineHeight: 1,
@@ -18719,8 +18719,8 @@ const ANIM_REGISTRY = {
               left: s.x, top: s.y,
               width: s.size, height: s.size,
               borderRadius: '50%',
-              background: '#cfffff',
-              boxShadow: '0 0 8px rgba(120,240,240,.9)',
+              background: '#b6eff7',
+              boxShadow: '0 0 8px rgba(124,233,220,.9)',
               animation: `spectralArmorSpark ${s.dur}ms ease-out ${s.delay}ms forwards`,
               opacity: 0,
             }} />
@@ -18767,7 +18767,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -20, top: -14,
             fontSize: 40, color: '#fff',
-            filter: 'drop-shadow(0 0 10px rgba(220,240,255,.8))',
+            filter: 'drop-shadow(0 0 10px rgba(229,237,250,.8))',
             animation: 'cloudDisperseCenter 350ms ease-in forwards',
             opacity: 1,
           }}>☁️</div>
@@ -18795,17 +18795,17 @@ const ANIM_REGISTRY = {
           delay: Math.random() * 500,
           dur: 600 + Math.random() * 600,
           size: isHeart ? (12 + Math.random() * 14) : (10 + Math.random() * 12),
-          color: isHeart ? undefined : (Math.random() > 0.5 ? '#ff4466' : '#44cc66'),
+          color: isHeart ? undefined : (Math.random() > 0.5 ? '#ec2d62' : '#4bcd7c'),
         };
       }), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(100,255,120,.7) 0%, rgba(50,200,80,.3) 40%, transparent 70%)' }} />
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(102,255,113,.7) 0%, rgba(0,204,80,.3) 40%, transparent 70%)' }} />
           {particles.map((p, i) => (
             <div key={'hh'+i} style={{
               position: 'absolute', left: p.xOff, top: 10,
               fontSize: p.size, color: p.color,
-              filter: `drop-shadow(0 0 4px ${p.color || 'rgba(100,255,120,0.6)'})`,
+              filter: `drop-shadow(0 0 4px ${p.color || 'rgba(102,255,113,0.6)'})`,
               animation: `holySparkleRise ${p.dur}ms ease-out ${p.delay}ms forwards`,
               opacity: 0,
             }}>{p.char}</div>
@@ -18826,12 +18826,12 @@ const ANIM_REGISTRY = {
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(255,120,160,.6) 0%, rgba(255,80,120,.25) 45%, transparent 70%)' }} />
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(254,103,148,.6) 0%, rgba(236,45,98,.25) 45%, transparent 70%)' }} />
           {particles.map((p, i) => (
             <div key={'hb'+i} style={{
               position: 'absolute', left: p.xOff, top: 10,
               fontSize: p.size,
-              filter: 'drop-shadow(0 0 4px rgba(255,80,120,0.7))',
+              filter: 'drop-shadow(0 0 4px rgba(236,45,98,0.7))',
               animation: `holySparkleRise ${p.dur}ms ease-out ${p.delay}ms forwards`,
               opacity: 0,
             }}>{p.char}</div>
@@ -18876,7 +18876,7 @@ const ANIM_REGISTRY = {
               <div style={{
                 fontSize: k.size,
                 transform: `rotate(${k.dreh}deg)`,
-                filter: 'drop-shadow(0 0 3px rgba(120,220,255,.75))',
+                filter: 'drop-shadow(0 0 3px rgba(127,223,255,.75))',
               }}>
                 {/* Fluegel als eigenes Zeichen daneben — flattert schneller
                     als die Bahn, damit es lebendig wirkt. */}
@@ -18915,7 +18915,7 @@ const ANIM_REGISTRY = {
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           <div className="anim-gold-flash" style={{
-            background: 'radial-gradient(circle, rgba(255,255,255,.55) 0%, rgba(220,235,255,.22) 45%, transparent 72%)',
+            background: 'radial-gradient(circle, rgba(255,255,255,.55) 0%, rgba(229,237,250,.22) 45%, transparent 72%)',
           }} />
           {teile.map((t, i) => (
             <div key={'lb' + i} style={{
@@ -18947,13 +18947,13 @@ const ANIM_REGISTRY = {
           size: istHerz ? 12 + Math.random() * 8 : 3 + Math.random() * 4,
           delay: Math.random() * 260,
           dur: 640 + Math.random() * 380,
-          ton: ['#7fd4ff', '#4aa8ff', '#a8e4ff', '#2f8fe0'][Math.floor(Math.random() * 4)],
+          ton: ['#77c8ee', '#1ca9fd', '#b4dff8', '#4e82cb'][Math.floor(Math.random() * 4)],
         };
       }), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           <div className="anim-gold-flash" style={{
-            background: 'radial-gradient(circle, rgba(90,180,255,.55) 0%, rgba(40,120,220,.25) 45%, transparent 72%)',
+            background: 'radial-gradient(circle, rgba(102,182,255,.55) 0%, rgba(78,119,202,.25) 45%, transparent 72%)',
           }} />
           {teile.map((t, i) => (
             <div key={'ks' + i} style={{
@@ -18990,21 +18990,21 @@ const ANIM_REGISTRY = {
           size: 13 + Math.random() * 12,
           delay: Math.random() * 220,
           dur: 620 + Math.random() * 320,
-          shade: ['#b3001b', '#8b0010', '#c61026', '#7a0010', '#9b0014'][Math.floor(Math.random() * 5)],
+          shade: ['#b5171c', '#8c0014', '#c0141c', '#780014', '#8c0014'][Math.floor(Math.random() * 5)],
         };
       }), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           {/* Dark blood flash behind the Creature. */}
           <div className="anim-gold-flash" style={{
-            background: 'radial-gradient(circle, rgba(150,0,15,.6) 0%, rgba(90,0,10,.3) 45%, transparent 72%)',
+            background: 'radial-gradient(circle, rgba(143,0,0,.6) 0%, rgba(91,1,2,.3) 45%, transparent 72%)',
           }} />
           {hearts.map((h, i) => (
             <div key={'bh' + i} style={{
               position: 'absolute', left: 0, top: 0,
               fontSize: h.size + 'px', lineHeight: 1,
               color: h.shade,
-              textShadow: '0 0 6px rgba(150,0,18,.9), 0 0 12px rgba(90,0,10,.6)',
+              textShadow: '0 0 6px rgba(140,0,20,.9), 0 0 12px rgba(91,1,2,.6)',
               ['--bhx']: h.dx + 'px', ['--bhy']: h.dy + 'px',
               animation: `bloodHeartsBloom ${h.dur}ms ease-out ${h.delay}ms forwards`,
               opacity: 0,
@@ -19046,17 +19046,17 @@ const ANIM_REGISTRY = {
         delay: 200 + Math.random() * 600,
         dur: 500 + Math.random() * 500,
         size: 3 + Math.random() * 7,
-        color: ['#ffd700','#ffec80','#fff5cc','#ffb300','#ffe066'][Math.floor(Math.random() * 5)],
+        color: ['#ffd61a','#fbe181','#fffbd2','#ffb91a','#ffe469'][Math.floor(Math.random() * 5)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ width: 150, height: 150, marginLeft: -75, marginTop: -75, background: 'radial-gradient(circle, rgba(255,215,0,.85) 0%, rgba(255,180,0,.4) 35%, rgba(255,240,150,.1) 60%, transparent 80%)', animationDuration: '900ms' }} />
-          <div className="anim-flame-flash" style={{ width: 90, height: 90, marginLeft: -45, marginTop: -45, background: 'radial-gradient(circle, rgba(255,255,220,.95) 0%, rgba(255,215,0,.5) 40%, transparent 70%)', animationDelay: '250ms', animationDuration: '700ms' }} />
+          <div className="anim-flame-flash" style={{ width: 150, height: 150, marginLeft: -75, marginTop: -75, background: 'radial-gradient(circle, rgba(255,214,26,.85) 0%, rgba(255,185,26,.4) 35%, rgba(255,241,150,.1) 60%, transparent 80%)', animationDuration: '900ms' }} />
+          <div className="anim-flame-flash" style={{ width: 90, height: 90, marginLeft: -45, marginTop: -45, background: 'radial-gradient(circle, rgba(255,251,210,.95) 0%, rgba(255,214,26,.5) 40%, transparent 70%)', animationDelay: '250ms', animationDuration: '700ms' }} />
           {ankhs.map((a, i) => (
             <div key={'ak'+i} style={{
               position: 'absolute', left: a.xOff, top: a.startY,
-              fontSize: a.size, color: '#ffd700',
-              filter: 'drop-shadow(0 0 6px rgba(255,200,0,.9))',
+              fontSize: a.size, color: '#ffd61a',
+              filter: 'drop-shadow(0 0 6px rgba(255,198,28,.9))',
               transform: `rotate(${a.rot}deg)`,
               animation: `ankhFloat ${a.dur}ms ease-out ${a.delay}ms forwards`,
               opacity: 0,
@@ -19104,11 +19104,11 @@ const ANIM_REGISTRY = {
         delay: 100 + Math.random() * 500,
         dur: 500 + Math.random() * 400,
         size: 3 + Math.random() * 5,
-        color: ['#ff66aa','#ffaa44','#66ccff','#ffdd55','#cc88ff','#44ffaa'][Math.floor(Math.random() * 6)],
+        color: ['#f174ab','#ff9b3a','#68c6fd','#fad54a','#c98aff','#66ffa2'][Math.floor(Math.random() * 6)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ width: 100, height: 100, marginLeft: -50, marginTop: -50, background: 'radial-gradient(circle, rgba(255,100,200,.4) 0%, rgba(200,100,255,.2) 40%, transparent 70%)' }} />
+          <div className="anim-flame-flash" style={{ width: 100, height: 100, marginLeft: -50, marginTop: -50, background: 'radial-gradient(circle, rgba(252,105,198,.4) 0%, rgba(184,102,255,.2) 40%, transparent 70%)' }} />
           {notes.map((n, i) => (
             <div key={'mn'+i} style={{
               position: 'absolute', left: n.startX, top: n.startY,
@@ -19118,7 +19118,7 @@ const ANIM_REGISTRY = {
               '--endX': n.endX + 'px', '--endY': n.endY + 'px',
               '--noteOpacity': n.opacity,
               filter: `hue-rotate(${Math.random() * 360}deg)`,
-              textShadow: '0 0 8px rgba(255,150,255,.6)',
+              textShadow: '0 0 8px rgba(201,138,255,.6)',
             }}>{n.char}</div>
           ))}
           {sparkles.map((s, i) => (
@@ -19158,7 +19158,7 @@ const ANIM_REGISTRY = {
         return {
           dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed - 20,
           size: 4 + Math.random() * 8,
-          color: ['#8b00ff','#6a0dad','#9932cc','#4b0082','#7b2d8e','#cc44ff','#220033'][Math.floor(Math.random() * 7)],
+          color: ['#751ff9','#6618b4','#9544d5','#50008c','#663597','#a952ff','#1a0a3a'][Math.floor(Math.random() * 7)],
           delay: Math.random() * 400,
           dur: 400 + Math.random() * 400,
         };
@@ -19174,8 +19174,8 @@ const ANIM_REGISTRY = {
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ width: 120, height: 120, marginLeft: -60, marginTop: -60, background: 'radial-gradient(circle, rgba(100,0,180,.7) 0%, rgba(60,0,120,.4) 40%, transparent 70%)' }} />
-          <div className="anim-flame-flash" style={{ width: 80, height: 80, marginLeft: -40, marginTop: -40, animationDelay: '100ms', background: 'radial-gradient(circle, rgba(180,50,255,.5) 0%, rgba(100,0,200,.2) 50%, transparent 70%)' }} />
+          <div className="anim-flame-flash" style={{ width: 120, height: 120, marginLeft: -60, marginTop: -60, background: 'radial-gradient(circle, rgba(102,24,180,.7) 0%, rgba(71,17,126,.4) 40%, transparent 70%)' }} />
+          <div className="anim-flame-flash" style={{ width: 80, height: 80, marginLeft: -40, marginTop: -40, animationDelay: '100ms', background: 'radial-gradient(circle, rgba(160,64,255,.5) 0%, rgba(110,0,204,.2) 50%, transparent 70%)' }} />
           {skulls.map((s, i) => (
             <div key={'ns'+i} style={{
               position: 'absolute', left: s.startX, top: s.startY,
@@ -19184,7 +19184,7 @@ const ANIM_REGISTRY = {
               animation: `musicNoteFloat ${s.dur}ms ease-out ${s.delay}ms forwards`,
               '--endX': s.endX + 'px', '--endY': s.endY + 'px',
               '--noteOpacity': 0.85,
-              textShadow: '0 0 12px rgba(130,0,220,.8), 0 0 24px rgba(80,0,160,.4)',
+              textShadow: '0 0 12px rgba(110,0,204,.8), 0 0 24px rgba(102,24,180,.4)',
             }}>{s.char}</div>
           ))}
           {particles.map((p, i) => (
@@ -19197,8 +19197,8 @@ const ANIM_REGISTRY = {
             <div key={'nw'+i} style={{
               position: 'absolute', left: w.xOff, top: w.startY,
               width: w.size, height: w.size, borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(150,50,255,.6), rgba(80,0,150,.2))',
-              boxShadow: '0 0 8px rgba(130,0,220,.5)',
+              background: 'radial-gradient(circle, rgba(160,64,255,.6), rgba(80,0,140,.2))',
+              boxShadow: '0 0 8px rgba(110,0,204,.5)',
               animation: `holySparkleRise ${w.dur}ms ease-out ${w.delay}ms forwards`,
               opacity: 0,
             }} />
@@ -19217,7 +19217,7 @@ const ANIM_REGISTRY = {
           dx: Math.cos(angle) * speed - speed / 2,
           dy: -Math.abs(Math.sin(angle) * speed),
           size: 2 + Math.random() * 4,
-          color: ['#ffcc00','#ff8800','#ffaa33','#ffe066','#fff'][Math.floor(Math.random() * 5)],
+          color: ['#ffd61a','#ff8b1a','#f9ac20','#ffe469','#fff'][Math.floor(Math.random() * 5)],
           delay: 480 + Math.random() * 60,
           dur: 300 + Math.random() * 200,
         };
@@ -19229,14 +19229,14 @@ const ANIM_REGISTRY = {
           dx: Math.cos(angle) * speed - speed / 2,
           dy: -Math.abs(Math.sin(angle) * speed),
           size: 2 + Math.random() * 4,
-          color: ['#ffcc00','#ff8800','#ffaa33','#ffe066','#fff'][Math.floor(Math.random() * 5)],
+          color: ['#ffd61a','#ff8b1a','#f9ac20','#ffe469','#fff'][Math.floor(Math.random() * 5)],
           delay: 1080 + Math.random() * 60,
           dur: 300 + Math.random() * 200,
         };
       }), []);
       const weightStyle = {
         width: 10, height: 36,
-        background: 'linear-gradient(to right, #999, #555)',
+        background: 'linear-gradient(to right, #929292, #535353)',
         borderRadius: 3,
         boxShadow: '0 2px 6px rgba(0,0,0,.5), inset 0 1px 2px rgba(255,255,255,.3)',
       };
@@ -19250,7 +19250,7 @@ const ANIM_REGISTRY = {
             <div style={weightStyle} />
             <div style={{
               width: 50, height: 8,
-              background: 'linear-gradient(to bottom, #bbb, #888, #bbb)',
+              background: 'linear-gradient(to bottom, #b9b9b9, #7f7f7f, #b9b9b9)',
               boxShadow: 'inset 0 0 4px rgba(0,0,0,.3)',
             }} />
             <div style={weightStyle} />
@@ -19289,7 +19289,7 @@ const ANIM_REGISTRY = {
           size: 4 + Math.random() * 7,
           delay: 200 + Math.random() * 280,
           dur: 600 + Math.random() * 350,
-          color: ['#0a2a3a','#143a55','#1c4a66','#0e2030','#22526e','#0c1c2a'][Math.floor(Math.random() * 6)],
+          color: ['#282834','#2d4362','#2d4362','#1a1a2e','#2d4362','#12101f'][Math.floor(Math.random() * 6)],
         };
       }), []);
       const ripples = useMemo(() => Array.from({ length: 3 }, (_, i) => ({
@@ -19306,8 +19306,8 @@ const ANIM_REGISTRY = {
         width: cw,
         height: ch,
         borderRadius: '46% 54% 38% 62% / 60% 50% 50% 40%',
-        background: 'radial-gradient(ellipse at 50% 70%, rgba(8,18,28,0.96) 0%, rgba(14,40,60,0.92) 35%, rgba(20,60,80,0.7) 65%, rgba(30,90,120,0.25) 90%, transparent 100%)',
-        boxShadow: 'inset 0 -16px 32px rgba(0,0,0,0.6), 0 0 24px rgba(20,60,90,0.5)',
+        background: 'radial-gradient(ellipse at 50% 70%, rgba(18,16,31,0.96) 0%, rgba(0,33,63,0.92) 35%, rgba(45,67,98,0.7) 65%, rgba(45,67,98,0.25) 90%, transparent 100%)',
+        boxShadow: 'inset 0 -16px 32px rgba(0,0,0,0.6), 0 0 24px rgba(45,67,98,0.5)',
         '--engulf-h': ch + 'px',
         animation: 'darkWaveRise 950ms ease-out forwards',
       };
@@ -19319,7 +19319,7 @@ const ANIM_REGISTRY = {
         width: cw,
         height: 14,
         borderRadius: '50%',
-        background: 'linear-gradient(to bottom, rgba(180,220,235,0.0) 0%, rgba(160,200,220,0.85) 45%, rgba(80,140,170,0.7) 70%, transparent 100%)',
+        background: 'linear-gradient(to bottom, rgba(189,220,239,0.0) 0%, rgba(189,220,239,0.85) 45%, rgba(23,136,189,0.7) 70%, transparent 100%)',
         filter: 'blur(1px)',
         '--engulf-h': ch + 'px',
         animation: 'darkWaveCrest 950ms ease-out forwards',
@@ -19331,7 +19331,7 @@ const ANIM_REGISTRY = {
             <div key={'dwr'+i} style={{
               position: 'absolute', left: -r.size / 2, top: ch / 2 - 10,
               width: r.size, height: r.size * 0.32, borderRadius: '50%',
-              border: '2px solid rgba(40,90,120,.65)',
+              border: '2px solid rgba(45,67,98,.65)',
               animation: `waterRipple ${r.dur}ms ease-out ${r.delay}ms forwards`,
               opacity: 0,
             }} />
@@ -19344,7 +19344,7 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: -d.size / 2, top: -ch / 2,
               width: d.size, height: d.size, borderRadius: '50%',
               background: d.color,
-              boxShadow: `0 0 ${d.size}px rgba(20,60,90,0.6)`,
+              boxShadow: `0 0 ${d.size}px rgba(45,67,98,0.6)`,
               '--dx': d.dx + 'px', '--dy': d.dy + 'px',
               animation: `darkSprayDrop ${d.dur}ms ease-out ${d.delay}ms forwards`,
               opacity: 0,
@@ -19366,7 +19366,7 @@ const ANIM_REGISTRY = {
           size: 4 + Math.random() * 8,
           delay: Math.random() * 200,
           dur: 500 + Math.random() * 400,
-          color: ['#4488cc','#66aaee','#3377bb','#88ccff','#aaddff','#2266aa'][Math.floor(Math.random() * 6)],
+          color: ['#4e82cb','#66b6ff','#4e82cb','#7bbeea','#b3d8f9','#2f539d'][Math.floor(Math.random() * 6)],
         };
       }), []);
       const ripples = useMemo(() => Array.from({ length: 3 }, (_, i) => ({
@@ -19376,12 +19376,12 @@ const ANIM_REGISTRY = {
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ top: -35, width: 120, height: 60, marginLeft: -60, marginTop: -10, background: 'radial-gradient(ellipse, rgba(60,140,220,.7) 0%, rgba(40,100,180,.3) 50%, transparent 80%)' }} />
+          <div className="anim-flame-flash" style={{ top: -35, width: 120, height: 60, marginLeft: -60, marginTop: -10, background: 'radial-gradient(ellipse, rgba(78,130,203,.7) 0%, rgba(47,83,157,.3) 50%, transparent 80%)' }} />
           {ripples.map((r, i) => (
             <div key={'wr'+i} style={{
               position: 'absolute', left: -r.size/2, top: -8,
               width: r.size, height: r.size * 0.35, borderRadius: '50%',
-              border: '2px solid rgba(100,180,255,.5)',
+              border: '2px solid rgba(102,182,255,.5)',
               animation: `waterRipple ${r.dur}ms ease-out ${r.delay}ms forwards`,
               opacity: 0,
             }} />
@@ -19406,7 +19406,7 @@ const ANIM_REGISTRY = {
         delay: 1000 + Math.random() * 400,
         dur: 500 + Math.random() * 400,
         size: 3 + Math.random() * 5,
-        color: ['#ffdd44','#fff','#ffcc00','#ffe088','#ffffff'][Math.floor(Math.random() * 5)],
+        color: ['#ffe23d','#fff','#ffd61a','#fbe181','#ffffff'][Math.floor(Math.random() * 5)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
@@ -19445,7 +19445,7 @@ const ANIM_REGISTRY = {
           size: 5 + Math.random() * 9,
           delay: 460 + Math.random() * 160,
           dur: 460 + Math.random() * 320,
-          color: ['#2a1808', '#4a2c12', '#7a4f24', '#c08440', '#ffd070', '#fff5b0'][Math.floor(Math.random() * 6)],
+          color: ['#27180c', '#4a2a10', '#6e4421', '#ca874e', '#fbc86a', '#f7f7ad'][Math.floor(Math.random() * 6)],
         };
       }), []);
       const debrisChunks = useMemo(() => Array.from({ length: ppFxN(10) }, () => {
@@ -19481,7 +19481,7 @@ const ANIM_REGISTRY = {
             fontSize: 96, lineHeight: '56px',
             transform: 'rotate(-90deg)',
             transformOrigin: '50% 50%',
-            filter: 'drop-shadow(0 0 10px rgba(0,0,0,0.85)) drop-shadow(0 0 4px rgba(120,80,30,0.7))',
+            filter: 'drop-shadow(0 0 10px rgba(0,0,0,0.85)) drop-shadow(0 0 4px rgba(114,84,29,0.7))',
             animation: 'clubBashHorizontalSlam 460ms cubic-bezier(0.4, 0, 0.9, 1) forwards',
           }}>🏏</div>
 
@@ -19489,7 +19489,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -90, top: -18,
             width: 180, height: 180, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,220,1) 0%, rgba(255,210,100,0.8) 30%, rgba(220,120,40,0.45) 60%, rgba(120,60,20,0.15) 80%, transparent 95%)',
+            background: 'radial-gradient(circle, rgba(255,251,210,1) 0%, rgba(255,208,102,0.8) 30%, rgba(227,116,53,0.45) 60%, rgba(125,57,17,0.15) 80%, transparent 95%)',
             opacity: 0,
             animation: 'clubBashHardFlash 520ms ease-out 440ms forwards',
           }} />
@@ -19498,7 +19498,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -42, top: -8,
             width: 84, height: 84, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,240,160,0.8) 50%, transparent 80%)',
+            background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,241,150,0.8) 50%, transparent 80%)',
             opacity: 0,
             animation: 'clubBashCore 360ms ease-out 460ms forwards',
           }} />
@@ -19507,7 +19507,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -38, top: -8,
             width: 76, height: 76, borderRadius: '50%',
-            border: '5px solid rgba(140, 80, 30, 0.9)',
+            border: '5px solid rgba(157,97,47,0.9)',
             opacity: 0,
             animation: 'clubBashShockwave 720ms ease-out 460ms forwards',
           }} />
@@ -19515,7 +19515,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -32, top: -6,
             width: 64, height: 64, borderRadius: '50%',
-            border: '4px solid rgba(255, 210, 90, 0.9)',
+            border: '4px solid rgba(255,217,102,0.9)',
             opacity: 0,
             animation: 'clubBashShockwave 580ms ease-out 480ms forwards',
           }} />
@@ -19523,7 +19523,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -24, top: -4,
             width: 48, height: 48, borderRadius: '50%',
-            border: '3px solid rgba(255, 250, 220, 0.95)',
+            border: '3px solid rgba(255,251,210,0.95)',
             opacity: 0,
             animation: 'clubBashShockwave 440ms ease-out 500ms forwards',
           }} />
@@ -19532,7 +19532,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -38, top: -22,
             fontSize: 76, lineHeight: '52px',
-            filter: 'drop-shadow(0 0 10px rgba(255,180,40,0.85)) drop-shadow(0 0 4px rgba(255,255,200,0.6))',
+            filter: 'drop-shadow(0 0 10px rgba(249,172,32,0.85)) drop-shadow(0 0 4px rgba(248,248,189,0.6))',
             opacity: 0,
             animation: 'clubBashImpactGlyph 720ms ease-out 460ms forwards',
           }}>💥</div>
@@ -19571,7 +19571,7 @@ const ANIM_REGISTRY = {
             <div key={'cbd' + i} style={{
               position: 'absolute', left: d.xOff + 'px', top: d.startY + 'px',
               width: d.size + 'px', height: d.size + 'px', borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(190,150,100,0.75) 0%, rgba(140,100,60,0.45) 55%, transparent 90%)',
+              background: 'radial-gradient(circle, rgba(178,148,102,0.75) 0%, rgba(136,108,68,0.45) 55%, transparent 90%)',
               opacity: 0,
               '--cbRiseY': d.riseY + 'px',
               animation: `clubBashDust ${d.dur}ms ease-out ${d.delay}ms forwards`,
@@ -19649,7 +19649,7 @@ const ANIM_REGISTRY = {
           display: 'flex', alignItems: 'center', justifyContent: 'center', width: 0, height: 0 }}>
           <div style={{
             fontSize: 52,
-            filter: 'drop-shadow(0 0 8px rgba(255,180,200,0.7))',
+            filter: 'drop-shadow(0 0 8px rgba(248,180,200,0.7))',
             animation: 'weirdDollGrow 700ms ease-out forwards',
           }}>🪆</div>
           <style>{`
@@ -19671,7 +19671,7 @@ const ANIM_REGISTRY = {
   // Heilung, rot für Vergeltung); Fallback ist neutrales Gold.
   equip_flash: (() => {
     return function EquipFlashEffect({ x, y, w, h, color }) {
-      const c = color || '#ffd700';
+      const c = color || '#ffd61a';
       const bw = Math.max(60, w || 80), bh = Math.max(80, h || 110);
       return (
         <div style={{ position: 'fixed', left: x - bw / 2, top: y - bh / 2, width: bw, height: bh,
@@ -19711,7 +19711,7 @@ const ANIM_REGISTRY = {
               position: 'absolute',
               left: p.x, top: p.y,
               width: p.size, height: p.size,
-              ...pxHintergrund('radial-gradient(circle, #88ffaa, #44ff88, #22cc66)', p.size),   // v1445 Pixel
+              ...pxHintergrund('radial-gradient(circle, #75f091, #4ceb70, #00cc50)', p.size),   // v1445 Pixel
               opacity: 0,
               animation: `healSparkleParticle ${p.dur}s ease-out ${p.delay}s forwards`,
               '--spark-tx': `${Math.cos(p.angle) * p.dist}px`,
@@ -19755,7 +19755,7 @@ const ANIM_REGISTRY = {
               left: 0, top: 0,
               fontSize: h.size + 'px',
               opacity: 0,
-              filter: 'drop-shadow(0 0 4px rgba(255,180,220,.85)) drop-shadow(0 0 8px rgba(255,140,200,.5))',
+              filter: 'drop-shadow(0 0 4px rgba(248,180,223,.85)) drop-shadow(0 0 8px rgba(241,116,171,.5))',
               animation: `loveBurstHeart ${h.dur}ms ease-out ${h.delay}ms forwards`,
               '--lbDx': h.dx + 'px',
               '--lbDy': h.dy + 'px',
@@ -19804,7 +19804,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -65, top: -65, width: 130, height: 130,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,200,.95) 0%, rgba(255,220,80,.85) 30%, rgba(255,170,0,.5) 60%, rgba(255,120,0,0) 100%)',
+            background: 'radial-gradient(circle, rgba(248,248,189,.95) 0%, rgba(250,213,74,.85) 30%, rgba(249,172,32,.5) 60%, rgba(255,125,0,0) 100%)',
             filter: 'blur(2px)',
             animation: 'ssjFlash 1.3s ease-out forwards',
           }} />
@@ -19812,9 +19812,9 @@ const ANIM_REGISTRY = {
           {[0, 0.15, 0.3].map((d, i) => (
             <div key={`r${i}`} style={{
               position: 'absolute', left: -45, top: -45, width: 90, height: 90,
-              border: '3px solid rgba(255,215,0,.9)',
+              border: '3px solid rgba(255,214,26,.9)',
               borderRadius: '50%',
-              boxShadow: '0 0 22px rgba(255,200,0,.95), inset 0 0 14px rgba(255,235,120,.7)',
+              boxShadow: '0 0 22px rgba(255,198,28,.95), inset 0 0 14px rgba(255,228,105,.7)',
               opacity: 0,
               animation: `ssjRing 1.1s ease-out ${d}s forwards`,
             }} />
@@ -19826,7 +19826,7 @@ const ANIM_REGISTRY = {
               left: s.x, top: 30,
               width: s.width,
               height: s.height,
-              background: 'linear-gradient(to top, rgba(255,140,0,0), rgba(255,210,40,.95) 40%, rgba(255,250,200,1) 90%)',
+              background: 'linear-gradient(to top, rgba(255,139,26,0), rgba(248,202,33,.95) 40%, rgba(255,251,210,1) 90%)',
               borderRadius: '50%',
               filter: 'blur(1.5px)',
               transformOrigin: 'bottom center',
@@ -19840,8 +19840,8 @@ const ANIM_REGISTRY = {
               left: 0, top: 0,
               width: p.size, height: p.size,
               borderRadius: '50%',
-              background: 'radial-gradient(circle, #fff7c0, #ffd700, #cc8800)',
-              boxShadow: '0 0 8px #ffd700, 0 0 16px #ffaa00',
+              background: 'radial-gradient(circle, #f8f8bd, #ffd61a, #c68206)',
+              boxShadow: '0 0 8px #ffd61a, 0 0 16px #f9ac20',
               opacity: 0,
               animation: `ssjSpark ${p.dur}s ease-out ${p.delay}s forwards`,
               '--ssj-tx': `${Math.cos(p.angle) * p.dist}px`,
@@ -19898,8 +19898,8 @@ const ANIM_REGISTRY = {
               left: p.x, top: p.y,
               width: p.isSkull ? 'auto' : p.size, height: p.isSkull ? 'auto' : p.size,
               borderRadius: p.isSkull ? 0 : '50%',
-              background: p.isSkull ? 'none' : `radial-gradient(circle, ${p.color ? '#88ff99' : '#cc66ff'}, ${p.color ? '#44ff88' : '#9933cc'})`,
-              boxShadow: p.isSkull ? 'none' : `0 0 6px ${p.color ? '#44ff88' : '#9933cc'}`,
+              background: p.isSkull ? 'none' : `radial-gradient(circle, ${p.color ? '#75f091' : '#b866ff'}, ${p.color ? '#4ceb70' : '#9544d5'})`,
+              boxShadow: p.isSkull ? 'none' : `0 0 6px ${p.color ? '#4ceb70' : '#9544d5'}`,
               fontSize: p.isSkull ? p.size : 0,
               opacity: 0,
               animation: `healSparkleParticle ${p.dur}s ease-out ${p.delay}s forwards`,
@@ -19932,8 +19932,8 @@ const ANIM_REGISTRY = {
               left: p.x, top: p.y,
               width: p.isSkull ? 'auto' : p.size, height: p.isSkull ? 'auto' : p.size,
               borderRadius: p.isSkull ? 0 : '50%',
-              background: p.isSkull ? 'none' : `radial-gradient(circle, #9933cc, #660099)`,
-              boxShadow: p.isSkull ? 'none' : `0 0 6px #9933cc`,
+              background: p.isSkull ? 'none' : `radial-gradient(circle, #9544d5, #50008c)`,
+              boxShadow: p.isSkull ? 'none' : `0 0 6px #9544d5`,
               fontSize: p.isSkull ? p.size : 0,
               opacity: 0,
               animation: `healSparkleParticle ${p.dur}s ease-out ${p.delay}s forwards`,
@@ -19953,7 +19953,7 @@ const ANIM_REGISTRY = {
         delay: Math.random() * 120,
         dur: 500 + Math.random() * 600,
         wobble: -20 + Math.random() * 40,
-        color: ['#cc1111','#ee3322','#ff4433','#dd2200','#aa0000','#ff6644','#ff2200','#cc0000'][Math.floor(Math.random() * 8)],
+        color: ['#c80000','#ef2929','#ef2929','#c80000','#be0e0e','#e63e33','#ff1a1a','#c80000'][Math.floor(Math.random() * 8)],
       })), []);
       const splats = useMemo(() => Array.from({ length: ppFxN(6) }, () => ({
         xOff: -25 + Math.random() * 50,
@@ -19964,7 +19964,7 @@ const ANIM_REGISTRY = {
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(220,0,0,.95) 0%, rgba(180,0,0,.5) 35%, rgba(120,0,0,.2) 60%, transparent 80%)', width: 120, height: 120, marginLeft: -60, marginTop: -60 }} />
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(200,0,0,.95) 0%, rgba(190,14,14,.5) 35%, rgba(120,0,0,.2) 60%, transparent 80%)', width: 120, height: 120, marginLeft: -60, marginTop: -60 }} />
           {drops.map((d, i) => (
             <div key={'ad'+i} className="anim-beer-bubble" style={{
               '--xOff': d.xOff + 'px', '--size': d.size + 'px', '--wobble': d.wobble + 'px',
@@ -19974,7 +19974,7 @@ const ANIM_REGISTRY = {
           {splats.map((s, i) => (
             <div key={'as'+i} className="anim-beer-bubble" style={{
               '--xOff': s.xOff + 'px', '--size': s.size + 'px', '--wobble': '0px',
-              '--color': 'rgba(200,20,0,.7)', animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+              '--color': 'rgba(200,0,0,.7)', animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
               fontSize: s.size, opacity: 0, left: s.yOff,
             }}>🧪</div>
           ))}
@@ -20000,14 +20000,14 @@ const ANIM_REGISTRY = {
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(255,0,0,.9) 0%, rgba(200,0,0,.4) 40%, transparent 70%)', width: 80, height: 80, marginLeft: -40, marginTop: -40 }} />
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(255,26,26,.9) 0%, rgba(200,0,0,.4) 40%, transparent 70%)', width: 80, height: 80, marginLeft: -40, marginTop: -40 }} />
           {beams.map((b, i) => (
             <div key={'lb'+i} style={{
               position: 'absolute',
               left: 0, top: 0,
               width: b.length, height: b.width,
-              background: `linear-gradient(90deg, #ff2222, #ff4444, transparent)`,
-              boxShadow: '0 0 6px #ff2222, 0 0 12px rgba(255,0,0,.4)',
+              background: `linear-gradient(90deg, #ff1a1a, #f03232, transparent)`,
+              boxShadow: '0 0 6px #ff1a1a, 0 0 12px rgba(255,26,26,.4)',
               transform: `rotate(${b.angle}deg)`,
               transformOrigin: '0 50%',
               opacity: 0,
@@ -20021,8 +20021,8 @@ const ANIM_REGISTRY = {
               top: Math.sin(s.angle * Math.PI / 180) * s.dist,
               width: s.size, height: s.size,
               borderRadius: '50%',
-              background: '#ff4444',
-              boxShadow: '0 0 4px #ff2222',
+              background: '#f03232',
+              boxShadow: '0 0 4px #ff1a1a',
               opacity: 0,
               animation: `healSparkleParticle ${s.dur}ms ease-out ${s.delay}ms forwards`,
               '--spark-tx': `${Math.cos(s.angle * Math.PI / 180) * 15}px`,
@@ -20137,24 +20137,24 @@ const ANIM_REGISTRY = {
               width: '100%', height: '100%', borderRadius: '50%',
               background:
                 'radial-gradient(circle at 34% 30%, rgba(255,255,255,.28) 0%, rgba(255,255,255,0) 28%),' +
-                'radial-gradient(circle at 62% 66%, #4d443c 0%, #4d443c 9%, rgba(0,0,0,0) 10%),' +
-                'radial-gradient(circle at 28% 62%, #5a5048 0%, #5a5048 7%, rgba(0,0,0,0) 8%),' +
-                'radial-gradient(circle at 70% 30%, #5e544b 0%, #5e544b 6%, rgba(0,0,0,0) 7%),' +
-                'radial-gradient(circle at 45% 50%, #8a7d70 0%, #6f6358 55%, #4a4038 100%)',
-              boxShadow: 'inset -14px -18px 30px rgba(0,0,0,.55), inset 10px 12px 20px rgba(255,255,255,.12), 0 0 0 3px rgba(40,32,26,.7)',
+                'radial-gradient(circle at 62% 66%, #535353 0%, #535353 9%, rgba(0,0,0,0) 10%),' +
+                'radial-gradient(circle at 28% 62%, #535353 0%, #535353 7%, rgba(0,0,0,0) 8%),' +
+                'radial-gradient(circle at 70% 30%, #535353 0%, #535353 6%, rgba(0,0,0,0) 7%),' +
+                'radial-gradient(circle at 45% 50%, #7f7f7f 0%, #686868 55%, #393123 100%)',
+              boxShadow: 'inset -14px -18px 30px rgba(0,0,0,.55), inset 10px 12px 20px rgba(255,255,255,.12), 0 0 0 3px rgba(34,34,34,.7)',
               filter: 'drop-shadow(0 10px 8px rgba(0,0,0,.4))',
             }}>
               {/* Risse, damit die Drehung sichtbar ist */}
-              <div style={{ position: 'absolute', left: '22%', top: '18%', width: '46%', height: 3, background: 'rgba(30,24,20,.75)', transform: 'rotate(-28deg)', borderRadius: 2 }} />
-              <div style={{ position: 'absolute', left: '55%', top: '58%', width: '30%', height: 3, background: 'rgba(30,24,20,.7)', transform: 'rotate(40deg)', borderRadius: 2 }} />
-              <div style={{ position: 'absolute', left: '12%', top: '66%', width: '26%', height: 2, background: 'rgba(30,24,20,.6)', transform: 'rotate(12deg)', borderRadius: 2 }} />
+              <div style={{ position: 'absolute', left: '22%', top: '18%', width: '46%', height: 3, background: 'rgba(20,20,20,.75)', transform: 'rotate(-28deg)', borderRadius: 2 }} />
+              <div style={{ position: 'absolute', left: '55%', top: '58%', width: '30%', height: 3, background: 'rgba(20,20,20,.7)', transform: 'rotate(40deg)', borderRadius: 2 }} />
+              <div style={{ position: 'absolute', left: '12%', top: '66%', width: '26%', height: 2, background: 'rgba(20,20,20,.6)', transform: 'rotate(12deg)', borderRadius: 2 }} />
             </div>
           </div>
           {/* Aufprall: Staubwolke + Splitter, exakt beim Ueberrollen (T_IN) */}
           {staub.map((st, i) => (
             <span key={'rbd'+i} style={{
               position: 'absolute', left: -st.size/2, top: -st.size/2 + 30, width: st.size, height: st.size,
-              borderRadius: '50%', background: 'radial-gradient(circle, rgba(190,175,150,.85) 0%, rgba(150,135,115,.4) 60%, rgba(150,135,115,0) 100%)',
+              borderRadius: '50%', background: 'radial-gradient(circle, rgba(197,183,160,.85) 0%, rgba(168,147,112,.4) 60%, rgba(168,147,112,0) 100%)',
               opacity: 0, animation: `rbDust ${st.dur}ms ease-out ${st.delay}ms forwards`,
               '--rb-tx': `${st.dx}px`, '--rb-ty': `${st.dy}px`,
             }} />
@@ -20162,14 +20162,14 @@ const ANIM_REGISTRY = {
           {splitter.map((sp, i) => (
             <span key={'rbs'+i} style={{
               position: 'absolute', left: -sp.size/2, top: -sp.size/2, width: sp.size, height: sp.size * 0.8,
-              borderRadius: 2, background: '#6b5f55', boxShadow: '0 0 3px rgba(0,0,0,.5)',
+              borderRadius: 2, background: '#686868', boxShadow: '0 0 3px rgba(0,0,0,.5)',
               opacity: 0, animation: `rbDust ${sp.dur}ms ease-out ${sp.delay}ms forwards`,
               '--rb-tx': `${sp.dx}px`, '--rb-ty': `${sp.dy}px`,
             }} />
           ))}
           <div style={{
             position: 'absolute', left: -70, top: -36, width: 140, height: 72, borderRadius: '50%',
-            border: '3px solid rgba(180,160,130,.7)', opacity: 0,
+            border: '3px solid rgba(168,147,112,.7)', opacity: 0,
             animation: `rbRing 420ms ease-out ${T_IN}ms forwards`,
           }} />
           <style>{`
@@ -20226,11 +20226,11 @@ const ANIM_REGISTRY = {
         delay: 240 + Math.random() * 480,
         dur: 320 + Math.random() * 220,
         size: 3 + Math.random() * 5,
-        color: ['#9fe4ff','#5fc4f5','#2f9fe0','#c9f2ff','#77d3ff'][Math.floor(Math.random() * 5)],
+        color: ['#b3e8f9','#68c6fd','#399edf','#b3e8f9','#77c8ee'][Math.floor(Math.random() * 5)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ width: 80, height: 80, marginLeft: -40, marginTop: -40, background: 'radial-gradient(circle, rgba(120,210,255,.5) 0%, rgba(60,160,230,.22) 50%, transparent 80%)', animationDelay: '280ms' }} />
+          <div className="anim-flame-flash" style={{ width: 80, height: 80, marginLeft: -40, marginTop: -40, background: 'radial-gradient(circle, rgba(119,200,238,.5) 0%, rgba(57,158,223,.22) 50%, transparent 80%)', animationDelay: '280ms' }} />
           {arrows.map((a, i) => (
             <div key={'aw'+i} style={{
               position: 'absolute', left: a.xOff, top: a.startY,
@@ -20239,13 +20239,13 @@ const ANIM_REGISTRY = {
             }}>
               <div style={{
                 width: 2.5, height: a.len,
-                background: 'linear-gradient(to bottom, transparent 0%, #c9f2ff 20%, #5fc4f5 75%, #1f8fd6 100%)',
+                background: 'linear-gradient(to bottom, transparent 0%, #b3e8f9 20%, #68c6fd 75%, #399edf 100%)',
                 borderRadius: '0 0 1px 1px',
-                boxShadow: '0 0 5px rgba(110,205,255,.75)',
+                boxShadow: '0 0 5px rgba(104,198,253,.75)',
                 transform: `rotate(${a.rot}deg)`,
                 transformOrigin: 'center top',
               }}>
-                <div style={{ position: 'absolute', bottom: -4, left: -3, width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: '6px solid #1f8fd6' }} />
+                <div style={{ position: 'absolute', bottom: -4, left: -3, width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: '6px solid #399edf' }} />
               </div>
             </div>
           ))}
@@ -20274,7 +20274,7 @@ const ANIM_REGISTRY = {
           size: 3 + Math.random() * 4,
           delay: 120 + Math.random() * 120,
           dur: 300 + Math.random() * 200,
-          color: ['#dff3ff','#a9dcff','#7fc4ff','#e8f9ff'][Math.floor(Math.random() * 4)],
+          color: ['#e5f5fa','#b3d8f9','#68c6fd','#e5f5fa'][Math.floor(Math.random() * 4)],
         };
       }), []);
       return (
@@ -20283,8 +20283,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -42, top: -50, width: 84, height: 100,
             clipPath: 'polygon(50% 0, 96% 25%, 96% 75%, 50% 100%, 4% 75%, 4% 25%)',
-            background: 'linear-gradient(160deg, rgba(200,236,255,.65) 0%, rgba(120,190,255,.35) 45%, rgba(70,140,230,.5) 100%)',
-            boxShadow: '0 0 18px rgba(130,200,255,.8), inset 0 0 14px rgba(220,245,255,.7)',
+            background: 'linear-gradient(160deg, rgba(189,220,239,.65) 0%, rgba(102,182,255,.35) 45%, rgba(109,155,248,.5) 100%)',
+            boxShadow: '0 0 18px rgba(104,198,253,.8), inset 0 0 14px rgba(229,245,250,.7)',
             opacity: 0,
             animation: 'shieldBlockPlate 620ms ease-out forwards',
           }} />
@@ -20292,7 +20292,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -18, top: -18, width: 36, height: 36,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(170,220,255,.7) 45%, transparent 75%)',
+            background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(179,216,249,.7) 45%, transparent 75%)',
             opacity: 0,
             animation: 'shieldBlockFlash 300ms ease-out 90ms forwards',
           }} />
@@ -20300,8 +20300,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -30, top: -30, width: 60, height: 60,
             borderRadius: '50%',
-            border: '3px solid rgba(150,210,255,.85)',
-            boxShadow: '0 0 10px rgba(150,210,255,.6)',
+            border: '3px solid rgba(123,190,234,.85)',
+            boxShadow: '0 0 10px rgba(123,190,234,.6)',
             opacity: 0,
             animation: 'shieldBlockRing 460ms ease-out 110ms forwards',
           }} />
@@ -20391,22 +20391,22 @@ const ANIM_REGISTRY = {
               <div style={{
                 position: 'absolute', left: -6, bottom: -2, width: 18, height: 30,
                 clipPath: 'polygon(50% 100%, 0 18%, 50% 0, 100% 18%)',
-                background: 'linear-gradient(180deg, #d8f6ff 0%, #6fd4ff 45%, #1b7fd4 100%)',
-                boxShadow: '0 0 10px rgba(90,200,255,.9)',
-                filter: 'drop-shadow(0 0 4px rgba(150,230,255,.8))',
+                background: 'linear-gradient(180deg, #e5f5fa 0%, #66d9ff 45%, #4e82cb 100%)',
+                boxShadow: '0 0 10px rgba(104,198,253,.9)',
+                filter: 'drop-shadow(0 0 4px rgba(127,223,255,.8))',
               }} />
               {/* Schaft */}
               <div style={{
                 position: 'absolute', left: 0, bottom: 26, width: 6, height: 94,
                 borderRadius: 3,
-                background: 'linear-gradient(180deg, rgba(120,220,255,.25) 0%, #3aa8e8 30%, #1d6fb8 100%)',
-                boxShadow: '0 0 8px rgba(80,190,255,.7)',
+                background: 'linear-gradient(180deg, rgba(127,223,255,.25) 0%, #399edf 30%, #4e82cb 100%)',
+                boxShadow: '0 0 8px rgba(104,198,253,.7)',
               }} />
               {/* Wasserschweif am Schaftende */}
               <div style={{
                 position: 'absolute', left: -4, bottom: 96, width: 14, height: 46,
                 borderRadius: '50% 50% 40% 40% / 70% 70% 30% 30%',
-                background: 'linear-gradient(180deg, rgba(150,230,255,0) 0%, rgba(110,210,255,.55) 70%, rgba(80,190,255,.8) 100%)',
+                background: 'linear-gradient(180deg, rgba(127,223,255,0) 0%, rgba(119,200,238,.55) 70%, rgba(104,198,253,.8) 100%)',
                 filter: 'blur(2px)',
               }} />
             </div>
@@ -20416,7 +20416,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -22, top: -22, width: 44, height: 44,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(140,225,255,.8) 40%, rgba(60,170,255,0) 75%)',
+            background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(127,223,255,.8) 40%, rgba(28,169,253,0) 75%)',
             opacity: 0,
             animation: 'aquaSpearFlash 260ms ease-out 280ms forwards',
           }} />
@@ -20424,8 +20424,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -26, top: -26, width: 52, height: 52,
             borderRadius: '50%',
-            border: '3px solid rgba(90,200,255,.85)',
-            boxShadow: '0 0 12px rgba(90,200,255,.7), inset 0 0 8px rgba(140,225,255,.5)',
+            border: '3px solid rgba(104,198,253,.85)',
+            boxShadow: '0 0 12px rgba(104,198,253,.7), inset 0 0 8px rgba(127,223,255,.5)',
             opacity: 0,
             animation: 'aquaSpearRing 420ms ease-out 290ms forwards',
           }} />
@@ -20436,8 +20436,8 @@ const ANIM_REGISTRY = {
                 position: 'absolute', left: -sc.size/2, top: -sc.size/2,
                 width: sc.size, height: sc.size * 1.6,
                 borderRadius: '50% 50% 60% 60%',
-                background: 'linear-gradient(180deg, #cdefff 0%, #58b9ef 100%)',
-                boxShadow: '0 0 5px rgba(110,210,255,.8)',
+                background: 'linear-gradient(180deg, #bddcef 0%, #68c6fd 100%)',
+                boxShadow: '0 0 5px rgba(119,200,238,.8)',
                 opacity: 0,
                 animation: `aquaSpearShard ${sc.dur}ms ease-out ${sc.delay}ms forwards`,
                 '--as-tx': `${Math.cos(rad) * sc.dist}px`,
@@ -20513,8 +20513,8 @@ const ANIM_REGISTRY = {
             return (
               <span key={'d'+i} style={{
                 position: 'absolute', width: d.size, height: d.size, borderRadius: '50%',
-                background: 'rgba(60,180,255,0.9)',
-                boxShadow: '0 0 6px rgba(80,200,255,0.8)',
+                background: 'rgba(102,182,255,0.9)',
+                boxShadow: '0 0 6px rgba(104,198,253,0.8)',
                 left: Math.cos(rad) * d.dist - d.size/2,
                 top: Math.sin(rad) * d.dist - d.size/2,
                 opacity: 0,
@@ -20527,7 +20527,7 @@ const ANIM_REGISTRY = {
           <span style={{
             position: 'absolute', fontSize: 40, left: -20, top: -20, opacity: 0,
             animation: 'whirlEmoji 900ms ease-in 50ms forwards',
-            filter: 'drop-shadow(0 0 8px rgba(60,180,255,0.8))',
+            filter: 'drop-shadow(0 0 8px rgba(102,182,255,0.8))',
           }}>🌊</span>
           <style>{`
             @keyframes whirlSpin {
@@ -20597,7 +20597,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -130, top: -130, width: 260, height: 260,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(90,0,30,.9) 0%, rgba(40,0,15,.75) 40%, rgba(0,0,0,0) 78%)',
+            background: 'radial-gradient(circle, rgba(85,1,26,.9) 0%, rgba(42,4,4,.75) 40%, rgba(0,0,0,0) 78%)',
             filter: 'blur(3px)',
             animation: 'hodAura 1500ms ease-out forwards',
           }} />
@@ -20606,7 +20606,7 @@ const ANIM_REGISTRY = {
             position: 'absolute', left: -60, top: 0, width: 120, height: 120,
             fontSize: 108,
             textAlign: 'center', lineHeight: '120px',
-            filter: 'drop-shadow(0 0 22px rgba(240,40,70,1)) drop-shadow(0 0 44px rgba(160,0,0,.85))',
+            filter: 'drop-shadow(0 0 22px rgba(233,47,56,1)) drop-shadow(0 0 44px rgba(143,0,0,.85))',
             animation: 'hodDescend 750ms cubic-bezier(0.5, 0, 0.7, 1) forwards',
           }}>💀</div>
           {/* Crimson lightning bolts converging on impact */}
@@ -20614,9 +20614,9 @@ const ANIM_REGISTRY = {
             <div key={'lb' + lb.id} style={{
               position: 'absolute', left: -3, top: -190,
               width: 6, height: 190,
-              background: 'linear-gradient(to bottom, transparent, rgba(255,90,130,.95) 28%, #fff 100%)',
+              background: 'linear-gradient(to bottom, transparent, rgba(254,103,148,.95) 28%, #fff 100%)',
               borderRadius: '50%',
-              filter: 'drop-shadow(0 0 9px #ff3060) drop-shadow(0 0 16px #ff0040)',
+              filter: 'drop-shadow(0 0 9px #fc1c5f) drop-shadow(0 0 16px #e92f38)',
               transform: `rotate(${lb.ang}deg)`,
               transformOrigin: 'bottom center',
               opacity: 0,
@@ -20627,23 +20627,23 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -140, top: -140, width: 280, height: 280,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, #fff 0%, #ffdcdc 14%, rgba(255,80,80,.85) 32%, rgba(180,0,30,.55) 55%, rgba(60,0,0,0) 80%)',
+            background: 'radial-gradient(circle, #fff 0%, #fae5eb 14%, rgba(254,81,84,.85) 32%, rgba(181,23,28,.55) 55%, rgba(58,0,0,0) 80%)',
             opacity: 0,
             animation: 'hodFlash 850ms ease-out 720ms forwards',
           }} />
           {/* Expanding shockwave ring */}
           <div style={{
             position: 'absolute', left: -30, top: -30, width: 60, height: 60,
-            border: '6px solid rgba(255,40,80,.95)',
+            border: '6px solid rgba(252,28,95,.95)',
             borderRadius: '50%',
-            boxShadow: '0 0 28px rgba(220,0,40,.9), inset 0 0 18px rgba(255,80,120,.65)',
+            boxShadow: '0 0 28px rgba(233,47,56,.9), inset 0 0 18px rgba(236,45,98,.65)',
             opacity: 0,
             animation: 'hodShockwave 950ms ease-out 740ms forwards',
           }} />
           {/* Inner blood-rim shockwave (slightly larger, slower) */}
           <div style={{
             position: 'absolute', left: -40, top: -40, width: 80, height: 80,
-            border: '4px solid rgba(140,0,30,.85)',
+            border: '4px solid rgba(140,0,20,.85)',
             borderRadius: '50%',
             opacity: 0,
             animation: 'hodShockwave 1200ms ease-out 800ms forwards',
@@ -20654,7 +20654,7 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: 0, top: 0,
               fontSize: s.size,
               opacity: 0,
-              filter: 'drop-shadow(0 0 10px rgba(220,40,70,1))',
+              filter: 'drop-shadow(0 0 10px rgba(231,59,65,1))',
               '--hod-tx': `${Math.cos(s.angle) * s.dist}px`,
               '--hod-ty': `${Math.sin(s.angle) * s.dist - 22}px`,
               animation: `hodSkull ${s.dur}ms ease-out ${s.delay}ms forwards`,
@@ -20666,7 +20666,7 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: 0, top: 0,
               fontSize: b.size,
               opacity: 0,
-              filter: 'drop-shadow(0 0 6px rgba(255,150,150,.8))',
+              filter: 'drop-shadow(0 0 6px rgba(236,127,121,.8))',
               '--hod-tx': `${Math.cos(b.angle) * b.dist}px`,
               '--hod-ty': `${Math.sin(b.angle) * b.dist - 10}px`,
               '--hod-rot': `${b.rot}deg`,
@@ -20679,8 +20679,8 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: 0, top: 0,
               width: p.size, height: p.size,
               borderRadius: '50%',
-              background: 'radial-gradient(circle, #ffe0e0, #ff3060, #80001a)',
-              boxShadow: '0 0 6px #ff2050, 0 0 14px #aa0030',
+              background: 'radial-gradient(circle, #fae5eb, #fc1c5f, #780014)',
+              boxShadow: '0 0 6px #fc1c5f, 0 0 14px #a60f39',
               opacity: 0,
               '--hod-tx': `${Math.cos(p.angle) * p.dist}px`,
               '--hod-ty': `${Math.sin(p.angle) * p.dist - 15}px`,
@@ -20785,7 +20785,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -130, top: -130, width: 260, height: 260,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(160,220,255,.85) 0%, rgba(80,160,230,.65) 38%, rgba(20,80,180,.35) 65%, rgba(0,0,0,0) 82%)',
+            background: 'radial-gradient(circle, rgba(179,216,249,.85) 0%, rgba(57,158,223,.65) 38%, rgba(3,81,201,.35) 65%, rgba(0,0,0,0) 82%)',
             filter: 'blur(3px)',
             animation: 'igAura 1500ms ease-out forwards',
           }} />
@@ -20794,7 +20794,7 @@ const ANIM_REGISTRY = {
             position: 'absolute', left: -60, top: 0, width: 120, height: 120,
             fontSize: 108,
             textAlign: 'center', lineHeight: '120px',
-            filter: 'drop-shadow(0 0 22px rgba(140,220,255,1)) drop-shadow(0 0 44px rgba(60,160,230,.85))',
+            filter: 'drop-shadow(0 0 22px rgba(127,223,255,1)) drop-shadow(0 0 44px rgba(57,158,223,.85))',
             animation: 'igDescend 760ms cubic-bezier(0.5, 0, 0.7, 1) forwards',
           }}>❄</div>
           {/* Ground-rising frost spikes — four jagged ice columns erupting around the target */}
@@ -20803,9 +20803,9 @@ const ANIM_REGISTRY = {
               position: 'absolute',
               left: sp.x - 12, top: 0,
               width: 24, height: sp.h,
-              background: 'linear-gradient(to top, rgba(180,230,255,.4), rgba(220,245,255,.95) 60%, #ffffff 100%)',
+              background: 'linear-gradient(to top, rgba(180,223,248,.4), rgba(229,245,250,.95) 60%, #ffffff 100%)',
               clipPath: 'polygon(50% 0%, 100% 100%, 0% 100%)',
-              filter: 'drop-shadow(0 0 10px rgba(120,220,255,.95)) drop-shadow(0 0 22px rgba(60,160,230,.6))',
+              filter: 'drop-shadow(0 0 10px rgba(127,223,255,.95)) drop-shadow(0 0 22px rgba(57,158,223,.6))',
               transformOrigin: 'bottom center',
               opacity: 0,
               animation: `igSpike ${sp.dur}ms cubic-bezier(0.2, 0.8, 0.3, 1) ${sp.delay}ms forwards`,
@@ -20815,23 +20815,23 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -140, top: -140, width: 280, height: 280,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, #fff 0%, #e6f7ff 14%, rgba(120,200,255,.85) 32%, rgba(40,130,220,.55) 55%, rgba(10,60,120,0) 80%)',
+            background: 'radial-gradient(circle, #fff 0%, #e5f5fa 14%, rgba(104,198,253,.85) 32%, rgba(78,119,202,.55) 55%, rgba(43,69,126,0) 80%)',
             opacity: 0,
             animation: 'igFlash 850ms ease-out 720ms forwards',
           }} />
           {/* Expanding shockwave ring (cyan-bright) */}
           <div style={{
             position: 'absolute', left: -30, top: -30, width: 60, height: 60,
-            border: '6px solid rgba(140,220,255,.95)',
+            border: '6px solid rgba(127,223,255,.95)',
             borderRadius: '50%',
-            boxShadow: '0 0 28px rgba(60,180,255,.95), inset 0 0 18px rgba(180,235,255,.7)',
+            boxShadow: '0 0 28px rgba(102,182,255,.95), inset 0 0 18px rgba(179,232,249,.7)',
             opacity: 0,
             animation: 'igShockwave 950ms ease-out 740ms forwards',
           }} />
           {/* Inner frost-rim shockwave (slower, deeper blue) */}
           <div style={{
             position: 'absolute', left: -40, top: -40, width: 80, height: 80,
-            border: '4px solid rgba(40,120,200,.85)',
+            border: '4px solid rgba(78,130,203,.85)',
             borderRadius: '50%',
             opacity: 0,
             animation: 'igShockwave 1200ms ease-out 800ms forwards',
@@ -20842,7 +20842,7 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: 0, top: 0,
               fontSize: s.size,
               opacity: 0,
-              filter: 'drop-shadow(0 0 10px rgba(120,220,255,1))',
+              filter: 'drop-shadow(0 0 10px rgba(127,223,255,1))',
               '--ig-tx': `${Math.cos(s.angle) * s.dist}px`,
               '--ig-ty': `${Math.sin(s.angle) * s.dist - 22}px`,
               animation: `igShard ${s.dur}ms ease-out ${s.delay}ms forwards`,
@@ -20854,7 +20854,7 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: 0, top: 0,
               fontSize: f.size,
               opacity: 0,
-              filter: 'drop-shadow(0 0 6px rgba(180,230,255,.95))',
+              filter: 'drop-shadow(0 0 6px rgba(180,223,248,.95))',
               '--ig-tx': `${Math.cos(f.angle) * f.dist}px`,
               '--ig-ty': `${Math.sin(f.angle) * f.dist - 10}px`,
               '--ig-rot': `${f.rot}deg`,
@@ -20867,8 +20867,8 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: 0, top: 0,
               width: p.size, height: p.size,
               borderRadius: '50%',
-              background: 'radial-gradient(circle, #fff, #88d8ff, #1a5090)',
-              boxShadow: '0 0 6px #6ad0ff, 0 0 14px #2080d0',
+              background: 'radial-gradient(circle, #fff, #77c8ee, #2b457e)',
+              boxShadow: '0 0 6px #68c6fd, 0 0 14px #4e82cb',
               opacity: 0,
               '--ig-tx': `${Math.cos(p.angle) * p.dist}px`,
               '--ig-ty': `${Math.sin(p.angle) * p.dist - 15}px`,
@@ -20960,8 +20960,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute',
             left: 0, bottom: 0, width: '100vw', height: '130vh',
-            background: 'linear-gradient(180deg, rgba(140,200,255,.85) 0%, rgba(50,130,220,.9) 22%, rgba(20,80,180,.92) 55%, rgba(10,50,130,.93) 100%)',
-            boxShadow: 'inset 0 40px 80px rgba(255,255,255,.25), inset 0 -40px 100px rgba(0,30,90,.5)',
+            background: 'linear-gradient(180deg, rgba(123,190,234,.85) 0%, rgba(78,119,202,.9) 22%, rgba(3,81,201,.92) 55%, rgba(2,57,140,.93) 100%)',
+            boxShadow: 'inset 0 40px 80px rgba(255,255,255,.25), inset 0 -40px 100px rgba(20,40,90,.5)',
             transform: 'translateY(100%)',
             animation: 'floodWaterRise 2400ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards',
           }} />
@@ -20970,7 +20970,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute',
             left: 0, bottom: 0, width: '100vw', height: '130vh',
-            background: 'linear-gradient(180deg, rgba(255,255,255,.9) 0%, rgba(200,235,255,.55) 3%, transparent 8%)',
+            background: 'linear-gradient(180deg, rgba(255,255,255,.9) 0%, rgba(189,220,239,.55) 3%, transparent 8%)',
             transform: 'translateY(100%)',
             animation: 'floodWaterRise 2400ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards',
             mixBlendMode: 'screen',
@@ -20984,7 +20984,7 @@ const ANIM_REGISTRY = {
               left: b.x + 'px', top: vh + 'px',
               width: b.size + 'px', height: b.size + 'px',
               borderRadius: '50%',
-              background: 'radial-gradient(circle at 35% 35%, rgba(255,255,255,.95), rgba(180,220,255,.65) 50%, rgba(80,160,230,.4) 80%, transparent)',
+              background: 'radial-gradient(circle at 35% 35%, rgba(255,255,255,.95), rgba(179,216,249,.65) 50%, rgba(57,158,223,.4) 80%, transparent)',
               opacity: 0,
               '--fb-drift': b.drift + 'px',
               animation: `floodBubble ${b.dur}ms ease-out ${b.delay}ms forwards`,
@@ -20997,7 +20997,7 @@ const ANIM_REGISTRY = {
               left: s.x + 'px', top: '12vh',
               fontSize: s.size + 'px',
               opacity: 0,
-              filter: 'drop-shadow(0 0 8px rgba(140,210,255,.85))',
+              filter: 'drop-shadow(0 0 8px rgba(119,200,238,.85))',
               animation: `floodSplash ${s.dur}ms ease-out ${s.delay}ms forwards`,
             }}>💧</div>
           ))}
@@ -21031,7 +21031,7 @@ const ANIM_REGISTRY = {
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
           <span style={{
             position: 'absolute', fontSize: 48, left: -24, top: -35, opacity: 0,
-            filter: 'drop-shadow(0 0 10px rgba(80,180,255,0.8)) drop-shadow(0 0 20px rgba(60,140,220,0.5))',
+            filter: 'drop-shadow(0 0 10px rgba(102,182,255,0.8)) drop-shadow(0 0 20px rgba(78,130,203,0.5))',
             animation: 'gateShieldPop 900ms ease-out forwards',
           }}>🛡️</span>
           {Array.from({ length: ppFxN(8) }).map((_, i) => {
@@ -21041,8 +21041,8 @@ const ANIM_REGISTRY = {
               <div key={i} style={{
                 position: 'absolute',
                 width: 6, height: 6, borderRadius: '50%',
-                background: 'rgba(100,200,255,0.9)',
-                boxShadow: '0 0 6px rgba(80,180,255,0.7)',
+                background: 'rgba(104,198,253,0.9)',
+                boxShadow: '0 0 6px rgba(102,182,255,0.7)',
                 left: Math.cos(rad) * 30 - 3,
                 top: Math.sin(rad) * 30 - 3,
                 opacity: 0,
@@ -21087,7 +21087,7 @@ const ANIM_REGISTRY = {
               animation: `sandTwist ${p.dur}ms ease-out ${p.delay}ms forwards`,
               '--tw-r': `${p.radius}px`, '--tw-rise': `${p.rise}px`,
               '--tw-a': `${p.angle}deg`,
-              boxShadow: '0 0 3px rgba(190,160,100,0.4)',
+              boxShadow: '0 0 3px rgba(178,148,102,0.4)',
             }} />
           ))}
           <span style={{
@@ -21130,8 +21130,8 @@ const ANIM_REGISTRY = {
               <div key={i} style={{
                 position: 'absolute',
                 width: s.width, height: s.height, borderRadius: 1,
-                background: `linear-gradient(90deg, rgba(220,200,160,0.9), rgba(180,160,120,0.7))`,
-                boxShadow: '0 0 3px rgba(180,160,120,0.4)',
+                background: `linear-gradient(90deg, rgba(204,183,153,0.9), rgba(168,147,112,0.7))`,
+                boxShadow: '0 0 3px rgba(168,147,112,0.4)',
                 left: -s.width / 2, top: -s.height / 2,
                 opacity: 0,
                 transform: `rotate(${s.rot}deg)`,
@@ -21245,7 +21245,7 @@ const ANIM_REGISTRY = {
                 left: -p.size / 2, top: -p.size / 2, opacity: 0,
                 animation: `cactusPop ${p.dur}ms ease-out ${p.delay}ms forwards`,
                 '--cact-tx': `${tx}px`, '--cact-ty': `${ty}px`,
-                boxShadow: '0 0 4px rgba(80,180,60,0.5)',
+                boxShadow: '0 0 4px rgba(32,172,55,0.5)',
               }} />
             );
           })}
@@ -21328,13 +21328,13 @@ const ANIM_REGISTRY = {
             return (
               <span key={i} style={{
                 position: 'absolute', width: p.size, height: p.size, borderRadius: '50%',
-                background: `radial-gradient(circle, rgba(${120+Math.random()*40},${20+Math.random()*30},${160+Math.random()*60},0.9), rgba(40,0,60,0.7))`,
+                background: `radial-gradient(circle, rgba(${120+Math.random()*40},${20+Math.random()*30},${160+Math.random()*60},0.9), rgba(43,11,71,0.7))`,
                 left: -p.size / 2, top: -p.size / 2,
                 opacity: 0,
                 animation: `darkSwarmFly ${p.dur}ms ease-in-out ${p.delay}ms forwards`,
                 '--swarm-tx': `${tx}px`, '--swarm-ty': `${ty}px`,
                 '--swarm-orbit': `${p.orbit}px`,
-                boxShadow: '0 0 6px 2px rgba(130,30,180,0.6)',
+                boxShadow: '0 0 6px 2px rgba(112,45,179,0.6)',
               }} />
             );
           })}
@@ -21397,7 +21397,7 @@ const ANIM_REGISTRY = {
         size: 2 + Math.random() * 4,
         delay: 50 + Math.random() * 100,
         dur: 200 + Math.random() * 200,
-        color: ['#ffffff','#ffffcc','#ffeeaa','#ccddff'][Math.floor(Math.random() * 4)],
+        color: ['#ffffff','#f8f8bd','#f9ecb3','#b3d8f9'][Math.floor(Math.random() * 4)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
@@ -21408,17 +21408,17 @@ const ANIM_REGISTRY = {
           }} />
           <div style={{
             position: 'absolute', left: -30, top: 0, width: 60, height: 3,
-            background: 'linear-gradient(90deg, transparent, #fff, #ffffaa, #fff, transparent)',
+            background: 'linear-gradient(90deg, transparent, #fff, #f7f7ad, #fff, transparent)',
             transform: 'rotate(-35deg)', transformOrigin: 'center',
             animation: 'slashStrike1 180ms ease-out forwards',
-            boxShadow: '0 0 8px 2px rgba(255,255,200,.8)',
+            boxShadow: '0 0 8px 2px rgba(248,248,189,.8)',
           }} />
           <div style={{
             position: 'absolute', left: -25, top: 2, width: 50, height: 2,
-            background: 'linear-gradient(90deg, transparent, #fff, #ffddaa, #fff, transparent)',
+            background: 'linear-gradient(90deg, transparent, #fff, #f7e0b5, #fff, transparent)',
             transform: 'rotate(25deg)', transformOrigin: 'center',
             animation: 'slashStrike2 200ms ease-out 40ms forwards',
-            boxShadow: '0 0 6px 1px rgba(255,255,180,.6)',
+            boxShadow: '0 0 6px 1px rgba(247,247,173,.6)',
           }} />
           {sparks.map((s, i) => {
             const rad = (s.angle * Math.PI) / 180;
@@ -21487,7 +21487,7 @@ const ANIM_REGISTRY = {
         groesse: 2 + Math.random() * 4.5,
         start: 60 + Math.random() * 520,
         dauer: 380 + Math.random() * 320,
-        farbe: ['#c0121a', '#8f0d14', '#e02a20', '#6d0a10'][Math.floor(Math.random() * 4)],
+        farbe: ['#c0141c', '#8c0014', '#ef2929', '#780014'][Math.floor(Math.random() * 4)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
@@ -21496,8 +21496,8 @@ const ANIM_REGISTRY = {
               position: 'absolute',
               left: c.vx - c.laenge / 2, top: c.vy,
               width: c.laenge, height: c.dicke,
-              background: 'linear-gradient(90deg, transparent, #ff6b6b, #fff, #d81b23, transparent)',
-              boxShadow: '0 0 7px 2px rgba(200,20,30,.75)',
+              background: 'linear-gradient(90deg, transparent, #ff6666, #fff, #f03232, transparent)',
+              boxShadow: '0 0 7px 2px rgba(192,20,28,.75)',
               transform: `rotate(${c.winkel}deg)`, transformOrigin: 'center',
               opacity: 0,
               animation: `massacreCut ${c.dauer}ms ease-out ${c.start}ms forwards`,
@@ -21520,7 +21520,7 @@ const ANIM_REGISTRY = {
           })}
           <div style={{
             position: 'absolute', left: -46, top: -46, width: 92, height: 92, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(190,15,25,.55) 0%, rgba(120,8,14,0) 70%)',
+            background: 'radial-gradient(circle, rgba(192,20,28,.55) 0%, rgba(120,0,20,0) 70%)',
             opacity: 0,
             animation: 'massacreAfterglow 620ms ease-out 300ms forwards',
           }} />
@@ -21566,7 +21566,7 @@ const ANIM_REGISTRY = {
           {/* Abdunklung */}
           <div style={{
             position: 'absolute', inset: 0,
-            background: 'radial-gradient(circle at 50% 45%, rgba(10,6,24,.55) 0%, rgba(4,2,12,.92) 85%)',
+            background: 'radial-gradient(circle at 50% 45%, rgba(18,16,31,.55) 0%, rgba(8,6,12,.92) 85%)',
             opacity: 0, animation: 'nightHowlDark 1400ms ease-in-out forwards',
           }} />
           {/* Verzerrungsschlieren — schraeg laufende Baender */}
@@ -21574,7 +21574,7 @@ const ANIM_REGISTRY = {
             <div key={i} style={{
               position: 'absolute', left: '-20%', right: '-20%',
               top: `${18 + i * 28}%`, height: '14%',
-              background: 'linear-gradient(90deg, transparent, rgba(150,120,220,.22), transparent)',
+              background: 'linear-gradient(90deg, transparent, rgba(172,135,222,.22), transparent)',
               filter: 'blur(6px)', opacity: 0,
               animation: `nightHowlWarp 1200ms ease-in-out ${140 + i * 130}ms forwards`,
             }} />
@@ -21586,8 +21586,8 @@ const ANIM_REGISTRY = {
               display: 'flex', gap: a.groesse * 0.8, opacity: 0,
               animation: `nightHowlEyes ${a.dauer}ms ease-in-out ${a.start}ms forwards`,
             }}>
-              <div style={{ width: a.groesse, height: a.groesse * 0.5, borderRadius: '50%', background: '#ffd166', boxShadow: '0 0 10px 3px rgba(255,200,80,.7)' }} />
-              <div style={{ width: a.groesse, height: a.groesse * 0.5, borderRadius: '50%', background: '#ffd166', boxShadow: '0 0 10px 3px rgba(255,200,80,.7)' }} />
+              <div style={{ width: a.groesse, height: a.groesse * 0.5, borderRadius: '50%', background: '#ffd066', boxShadow: '0 0 10px 3px rgba(255,208,102,.7)' }} />
+              <div style={{ width: a.groesse, height: a.groesse * 0.5, borderRadius: '50%', background: '#ffd066', boxShadow: '0 0 10px 3px rgba(255,208,102,.7)' }} />
             </div>
           ))}
           <style>{`
@@ -21622,8 +21622,8 @@ const ANIM_REGISTRY = {
         delay: Math.random() * 300,
         dur: 500 + Math.random() * 400,
         color: Math.random() < 0.5
-          ? ['#9933cc','#7722aa','#bb55ee','#aa44dd'][Math.floor(Math.random() * 4)]
-          : ['#ddcc33','#ccbb22','#eedd55','#bbaa11'][Math.floor(Math.random() * 4)],
+          ? ['#9544d5','#702db3','#b866ff','#9544d5'][Math.floor(Math.random() * 4)]
+          : ['#e3ce36','#e3ce36','#ffe469','#c79e05'][Math.floor(Math.random() * 4)],
         wobble: -6 + Math.random() * 12,
         emoji: Math.random() < 0.2 ? (Math.random() < 0.5 ? '🍄' : '✨') : null,
       })), []);
@@ -21631,7 +21631,7 @@ const ANIM_REGISTRY = {
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           <div style={{
             position: 'absolute', left: -30, top: -30, width: 60, height: 60,
-            background: 'radial-gradient(circle, rgba(150,50,200,.5) 0%, rgba(200,180,40,.3) 40%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(149,68,213,.5) 0%, rgba(227,206,54,.3) 40%, transparent 70%)',
             animation: 'pollenFlash 400ms ease-out forwards',
           }} />
           {spores.map((s, i) => (
@@ -21687,8 +21687,8 @@ const ANIM_REGISTRY = {
         driftX: -10 + Math.random() * 20,
         driftY: -14 - Math.random() * 12,
         hue: Math.random() < 0.5
-          ? ['rgba(130,40,180,0.75)','rgba(110,30,160,0.7)','rgba(150,60,200,0.7)'][Math.floor(Math.random() * 3)]
-          : ['rgba(80,120,50,0.55)','rgba(100,140,60,0.5)'][Math.floor(Math.random() * 2)],
+          ? ['rgba(112,45,179,0.75)','rgba(112,45,179,0.7)','rgba(149,68,213,0.7)'][Math.floor(Math.random() * 3)]
+          : ['rgba(58,90,37,0.55)','rgba(91,148,56,0.5)'][Math.floor(Math.random() * 2)],
       })), [cw, ch]);
       const skulls = useMemo(() => Array.from({ length: 4 }, () => ({
         xOff: -cw / 2 + 10 + Math.random() * (cw - 20),
@@ -21704,7 +21704,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -cw / 2, top: -ch / 2,
             width: cw, height: ch,
-            background: 'radial-gradient(ellipse at center, rgba(90,160,60,0.35) 0%, rgba(60,120,40,0.2) 50%, transparent 85%)',
+            background: 'radial-gradient(ellipse at center, rgba(91,148,56,0.35) 0%, rgba(22,121,39,0.2) 50%, transparent 85%)',
             filter: 'blur(2px)',
             animation: 'toxicFumesHaze 1200ms ease-in-out forwards',
             opacity: 0,
@@ -21732,8 +21732,8 @@ const ANIM_REGISTRY = {
               position: 'absolute',
               left: s.xOff, top: s.startY,
               fontSize: s.size,
-              color: '#d6b3f2',
-              textShadow: '0 0 6px rgba(150,60,200,0.9)',
+              color: '#d6b3f9',
+              textShadow: '0 0 6px rgba(149,68,213,0.9)',
               opacity: 0,
               animation: `toxicFumesSkull ${s.dur}ms ease-in-out ${s.delay}ms forwards`,
             }}>☠</span>
@@ -21782,7 +21782,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -35, top: -35, width: 70, height: 70,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(30,0,50,.9) 0%, rgba(80,20,120,.5) 40%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(26,10,58,.9) 0%, rgba(71,17,126,.5) 40%, transparent 70%)',
             animation: 'snakeVortex 800ms ease-in forwards',
           }} />
           {/* Coiling segments */}
@@ -21837,7 +21837,7 @@ const ANIM_REGISTRY = {
         fontSize: 0, width: 0, height: 0,
         borderLeft: '8px solid transparent',
         borderRight: '8px solid transparent',
-        borderTop: side === 'left' ? '22px solid #e8e0d0' : '22px solid #d8d0c0',
+        borderTop: side === 'left' ? '22px solid #e2d8cb' : '22px solid #e2d8cb',
         filter: 'drop-shadow(0 2px 4px rgba(0,0,0,.6))',
         transition: 'transform 0.25s ease-in',
         transform: phase === 'open'
@@ -21864,7 +21864,7 @@ const ANIM_REGISTRY = {
           {phase === 'shut' && <div style={{
             position: 'absolute', left: -20, top: -20, width: 40, height: 40,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(200,120,255,.7), transparent 70%)',
+            background: 'radial-gradient(circle, rgba(186,116,255,.7), transparent 70%)',
             animation: 'warlordBiteFlash .5s ease-out forwards',
           }} />}
           <style>{`
@@ -21893,8 +21893,8 @@ const ANIM_REGISTRY = {
             <div key={i} style={{
               position: 'absolute', left: d.dx, top: -10,
               width: d.size, height: d.size, borderRadius: '50% 50% 50% 20%',
-              background: 'radial-gradient(circle at 35% 35%, rgba(180,60,255,.8), rgba(100,0,180,.5))',
-              boxShadow: '0 0 6px rgba(150,30,220,.6)',
+              background: 'radial-gradient(circle at 35% 35%, rgba(160,64,255,.8), rgba(102,24,180,.5))',
+              boxShadow: '0 0 6px rgba(144,58,230,.6)',
               opacity: 0,
               animation: `poisonDrip ${d.dur}ms ease-in ${d.delay}ms forwards`,
               '--dripEndY': d.endY + 'px',
@@ -21904,7 +21904,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -25, top: 5, width: 50, height: 20,
             borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(150,30,220,.6), rgba(100,0,160,.2) 70%, transparent)',
+            background: 'radial-gradient(ellipse, rgba(144,58,230,.6), rgba(102,24,180,.2) 70%, transparent)',
             animation: 'poisonPoolSpread 0.8s ease-out 300ms forwards',
             opacity: 0,
           }} />
@@ -21930,7 +21930,7 @@ const ANIM_REGISTRY = {
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100, transform: 'translate(-50%, -50%)' }}>
           <div style={{
             fontSize: 64,
-            filter: 'drop-shadow(0 0 16px rgba(255,215,0,.9)) drop-shadow(0 0 32px rgba(255,180,0,.6))',
+            filter: 'drop-shadow(0 0 16px rgba(255,214,26,.9)) drop-shadow(0 0 32px rgba(255,185,26,.6))',
             animation: 'goldenScaleGrow 800ms ease-out forwards',
           }}>⚖️</div>
           <style>{`
@@ -21965,14 +21965,14 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             width: 70, height: 70, marginLeft: -35, marginTop: -35,
             borderRadius: '50%',
-            border: '3px solid rgba(255,60,60,.9)',
-            boxShadow: '0 0 20px rgba(255,40,40,.6), inset 0 0 14px rgba(255,60,60,.3)',
+            border: '3px solid rgba(240,50,50,.9)',
+            boxShadow: '0 0 20px rgba(255,26,26,.6), inset 0 0 14px rgba(240,50,50,.3)',
             animation: 'guardianShieldFlash 1000ms ease-out forwards',
           }} />
           <div style={{
             position: 'absolute', width: 40, height: 40, marginLeft: -20, marginTop: -20,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 32, filter: 'drop-shadow(0 0 8px rgba(255,40,40,.8))',
+            fontSize: 32, filter: 'drop-shadow(0 0 8px rgba(255,26,26,.8))',
             animation: 'guardianShieldFlash 1000ms ease-out forwards',
           }}>🛡️</div>
           <style>{`
@@ -22012,7 +22012,7 @@ const ANIM_REGISTRY = {
           size: 3 + Math.random() * 5,
           delay: 350 + Math.random() * 300,
           dur: 450 + Math.random() * 300,
-          color: ['#ffffff','#fffbe0','#fff2aa','#ffe680'][Math.floor(Math.random() * 4)],
+          color: ['#ffffff','#fff8e8','#f7f7ad','#fbe181'][Math.floor(Math.random() * 4)],
         };
       }), []);
       const beamHeight = Math.max(window.innerHeight, 1200);
@@ -22023,7 +22023,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -80, top: -beamHeight,
             width: 160, height: beamHeight,
-            background: 'linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,250,200,0.15) 20%, rgba(255,245,180,0.35) 70%, rgba(255,240,160,0.5) 100%)',
+            background: 'linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,251,210,0.15) 20%, rgba(249,236,179,0.35) 70%, rgba(255,241,150,0.5) 100%)',
             filter: 'blur(8px)',
             transformOrigin: 'center top',
             animation: 'sunBeamDescend 320ms ease-out forwards, sunBeamFade 500ms ease-in 600ms forwards',
@@ -22034,7 +22034,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -30, top: -beamHeight,
             width: 60, height: beamHeight,
-            background: 'linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,220,0.6) 30%, rgba(255,255,250,0.85) 100%)',
+            background: 'linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,251,210,0.6) 30%, rgba(255,255,255,0.85) 100%)',
             filter: 'blur(3px)',
             transformOrigin: 'center top',
             animation: 'sunBeamDescend 260ms ease-out 40ms forwards, sunBeamFade 500ms ease-in 650ms forwards',
@@ -22046,7 +22046,7 @@ const ANIM_REGISTRY = {
             left: -10, top: -beamHeight,
             width: 20, height: beamHeight,
             background: 'linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.95) 40%, #ffffff 100%)',
-            boxShadow: '0 0 24px rgba(255,255,220,0.9), 0 0 48px rgba(255,240,150,0.5)',
+            boxShadow: '0 0 24px rgba(255,251,210,0.9), 0 0 48px rgba(255,241,150,0.5)',
             transformOrigin: 'center top',
             animation: 'sunBeamDescend 220ms ease-out 80ms forwards, sunBeamFade 400ms ease-in 700ms forwards',
             opacity: 0,
@@ -22055,7 +22055,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -70, top: -70,
             width: 140, height: 140, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,245,180,0.6) 30%, rgba(255,220,120,0.25) 55%, transparent 75%)',
+            background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(249,236,179,0.6) 30%, rgba(251,225,129,0.25) 55%, transparent 75%)',
             animation: 'sunBeamImpact 700ms ease-out 260ms forwards',
             opacity: 0,
           }} />
@@ -22129,7 +22129,7 @@ const ANIM_REGISTRY = {
           size: 2 + Math.random() * 3,
           delay: 100 + Math.random() * 400,
           dur: 600 + Math.random() * 300,
-          color: ['#d3b3ff','#e8d6ff','#a978d9','#f0e0ff'][Math.floor(Math.random() * 4)],
+          color: ['#d6b3f9','#d9c0ec','#ac87de','#f1e5fa'][Math.floor(Math.random() * 4)],
         };
       }), []);
       return (
@@ -22139,7 +22139,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -cw / 2, top: -ch / 2,
             width: cw, height: ch, borderRadius: 6,
-            background: 'radial-gradient(ellipse at center, rgba(60,15,95,0.85) 0%, rgba(30,5,55,0.55) 55%, transparent 100%)',
+            background: 'radial-gradient(ellipse at center, rgba(64,26,102,0.85) 0%, rgba(26,10,58,0.55) 55%, transparent 100%)',
             mixBlendMode: 'multiply',
             opacity: 0,
             animation: 'pollutionAuraFade 850ms ease-out forwards',
@@ -22150,7 +22150,7 @@ const ANIM_REGISTRY = {
               position: 'absolute',
               left: wp.startX - wp.size / 2, top: -wp.size / 2,
               width: wp.size, height: wp.size, borderRadius: '50%',
-              background: 'radial-gradient(circle at 40% 40%, rgba(170,110,220,0.75), rgba(70,30,130,0.55) 55%, transparent 85%)',
+              background: 'radial-gradient(circle at 40% 40%, rgba(178,120,237,0.75), rgba(71,17,126,0.55) 55%, transparent 85%)',
               filter: 'blur(2px)',
               opacity: 0,
               animation: `pollutionWisp ${wp.dur}ms ease-out ${wp.delay}ms forwards`,
@@ -22222,7 +22222,7 @@ const ANIM_REGISTRY = {
           size: 2 + Math.random() * 4,
           delay: 80 + Math.random() * 400,
           dur: 500 + Math.random() * 300,
-          color: ['#d3b3ff','#8f55d9','#1a0033','#4b1a7a'][Math.floor(Math.random() * 4)],
+          color: ['#d6b3f9','#a159e9','#1a0a3a','#47117e'][Math.floor(Math.random() * 4)],
         };
       }), []);
       return (
@@ -22232,8 +22232,8 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -cw / 2, top: -ch / 2,
             width: cw, height: ch, borderRadius: 6,
-            background: 'radial-gradient(ellipse at center, rgba(60,15,95,0.9) 0%, rgba(30,5,55,0.75) 45%, rgba(10,0,20,0.4) 80%, transparent 100%)',
-            boxShadow: 'inset 0 0 24px rgba(80,20,130,0.95), 0 0 28px rgba(50,10,90,0.7)',
+            background: 'radial-gradient(ellipse at center, rgba(64,26,102,0.9) 0%, rgba(26,10,58,0.75) 45%, rgba(18,16,31,0.4) 80%, transparent 100%)',
+            boxShadow: 'inset 0 0 24px rgba(71,17,126,0.95), 0 0 28px rgba(46,10,81,0.7)',
             mixBlendMode: 'multiply',
             opacity: 0,
             animation: 'pollutionAura 1100ms ease-in-out forwards',
@@ -22243,7 +22243,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -cw / 2, top: -ch / 2,
             width: cw, height: ch, borderRadius: 6,
-            background: 'linear-gradient(180deg, rgba(18,2,32,0.0) 0%, rgba(25,5,45,0.7) 40%, rgba(40,10,70,0.85) 100%)',
+            background: 'linear-gradient(180deg, rgba(23,11,40,0.0) 0%, rgba(25,6,45,0.7) 40%, rgba(43,11,71,0.85) 100%)',
             filter: 'blur(2px)',
             opacity: 0,
             animation: 'pollutionVeil 1100ms ease-out forwards',
@@ -22252,8 +22252,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -34, top: -34,
             width: 68, height: 68, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(140,60,200,0.9) 0%, rgba(70,20,130,0.7) 40%, rgba(20,0,50,0.3) 70%, transparent 100%)',
-            boxShadow: '0 0 22px rgba(140,60,200,0.9), 0 0 44px rgba(70,20,130,0.55)',
+            background: 'radial-gradient(circle, rgba(149,68,213,0.9) 0%, rgba(71,17,126,0.7) 40%, rgba(26,10,58,0.3) 70%, transparent 100%)',
+            boxShadow: '0 0 22px rgba(149,68,213,0.9), 0 0 44px rgba(71,17,126,0.55)',
             opacity: 0,
             animation: 'pollutionSigil 700ms ease-out 100ms forwards',
           }} />
@@ -22262,8 +22262,8 @@ const ANIM_REGISTRY = {
             <div key={'pd'+i} style={{
               position: 'absolute', left: 0, top: 0,
               width: d.size, height: d.size * 1.1, borderRadius: '45% 45% 55% 55% / 60% 60% 40% 40%',
-              background: 'radial-gradient(circle at 35% 30%, #7a3ec4, #2a0a55 70%, #0a0014)',
-              boxShadow: '0 0 6px rgba(90,30,150,0.8), inset 0 -2px 4px rgba(0,0,0,0.6)',
+              background: 'radial-gradient(circle at 35% 30%, #702db3, #2e0a51 70%, #12101f)',
+              boxShadow: '0 0 6px rgba(88,35,140,0.8), inset 0 -2px 4px rgba(0,0,0,0.6)',
               filter: 'blur(0.5px)',
               opacity: 0,
               animation: `pollutionDrip ${d.dur}ms ease-out ${d.delay}ms forwards`,
@@ -22346,7 +22346,7 @@ const ANIM_REGISTRY = {
           size: 3 + Math.random() * 5,
           delay: 480 + Math.random() * 300,
           dur: 500 + Math.random() * 300,
-          color: ['#ffd700','#ffec80','#fff5cc','#ffb300','#ffe066'][Math.floor(Math.random() * 5)],
+          color: ['#ffd61a','#fbe181','#fffbd2','#ffb91a','#ffe469'][Math.floor(Math.random() * 5)],
         };
       }), []);
       return (
@@ -22356,8 +22356,8 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -cw / 2, top: -ch / 2,
             width: cw, height: ch, borderRadius: 4,
-            background: 'radial-gradient(circle at center, rgba(255,215,0,0.85) 0%, rgba(255,180,0,0.6) 50%, rgba(255,165,0,0.3) 85%, transparent 100%)',
-            boxShadow: '0 0 18px rgba(255,200,40,0.7), inset 0 0 22px rgba(255,235,120,0.7)',
+            background: 'radial-gradient(circle at center, rgba(255,214,26,0.85) 0%, rgba(255,185,26,0.6) 50%, rgba(249,172,32,0.3) 85%, transparent 100%)',
+            boxShadow: '0 0 18px rgba(255,198,28,0.7), inset 0 0 22px rgba(255,228,105,0.7)',
             mixBlendMode: 'color-dodge',
             opacity: 0,
             animation: 'goldifySheen 600ms ease-in forwards',
@@ -22366,7 +22366,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -60, top: -60,
             width: 120, height: 120, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,220,0.95) 0%, rgba(255,215,0,0.6) 40%, transparent 75%)',
+            background: 'radial-gradient(circle, rgba(255,251,210,0.95) 0%, rgba(255,214,26,0.6) 40%, transparent 75%)',
             opacity: 0,
             animation: 'goldifyBurst 400ms ease-out 450ms forwards',
           }} />
@@ -22375,7 +22375,7 @@ const ANIM_REGISTRY = {
             <div key={'gc'+i} style={{
               position: 'absolute', left: 0, top: 0,
               fontSize: c.size, opacity: 0,
-              filter: 'drop-shadow(0 0 6px rgba(255,210,60,0.9))',
+              filter: 'drop-shadow(0 0 6px rgba(248,202,33,0.9))',
               animation: `goldifyCoin ${c.dur}ms ease-out ${c.delay}ms forwards`,
               '--gcDx': c.dx + 'px', '--gcDy': c.dy + 'px', '--gcRot': c.rot + 'deg',
             }}>🪙</div>
@@ -22445,25 +22445,25 @@ const ANIM_REGISTRY = {
         { // top slab — slides down
           w: cw * 0.95, h: ch * 0.4,
           startX: 0, startY: -ch * 1.2, endX: 0, endY: -ch * 0.25,
-          gradient: 'linear-gradient(to bottom, rgba(220,240,255,0.95) 0%, rgba(180,220,240,0.85) 50%, rgba(210,235,250,0.9) 100%)',
+          gradient: 'linear-gradient(to bottom, rgba(229,237,250,0.95) 0%, rgba(189,220,239,0.85) 50%, rgba(229,237,250,0.9) 100%)',
           delay: 0,
         },
         { // bottom slab — slides up
           w: cw * 0.95, h: ch * 0.4,
           startX: 0, startY: ch * 1.2, endX: 0, endY: ch * 0.25,
-          gradient: 'linear-gradient(to top, rgba(220,240,255,0.95) 0%, rgba(180,220,240,0.85) 50%, rgba(210,235,250,0.9) 100%)',
+          gradient: 'linear-gradient(to top, rgba(229,237,250,0.95) 0%, rgba(189,220,239,0.85) 50%, rgba(229,237,250,0.9) 100%)',
           delay: 40,
         },
         { // left slab — slides right
           w: cw * 0.35, h: ch * 0.75,
           startX: -cw * 1.2, startY: 0, endX: -cw * 0.30, endY: 0,
-          gradient: 'linear-gradient(to right, rgba(200,230,250,0.9) 0%, rgba(175,215,240,0.85) 60%, rgba(210,235,250,0.95) 100%)',
+          gradient: 'linear-gradient(to right, rgba(189,220,239,0.9) 0%, rgba(180,223,248,0.85) 60%, rgba(229,237,250,0.95) 100%)',
           delay: 80,
         },
         { // right slab — slides left
           w: cw * 0.35, h: ch * 0.75,
           startX: cw * 1.2, startY: 0, endX: cw * 0.30, endY: 0,
-          gradient: 'linear-gradient(to left, rgba(200,230,250,0.9) 0%, rgba(175,215,240,0.85) 60%, rgba(210,235,250,0.95) 100%)',
+          gradient: 'linear-gradient(to left, rgba(189,220,239,0.9) 0%, rgba(180,223,248,0.85) 60%, rgba(229,237,250,0.95) 100%)',
           delay: 120,
         },
       ];
@@ -22474,7 +22474,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -cw / 2 - 10, top: -ch / 2 - 10,
             width: cw + 20, height: ch + 20, borderRadius: 6,
-            background: 'radial-gradient(ellipse at center, rgba(230,245,255,0.7) 0%, rgba(200,230,250,0.5) 50%, rgba(180,220,245,0.2) 90%, transparent 100%)',
+            background: 'radial-gradient(ellipse at center, rgba(229,245,250,0.7) 0%, rgba(189,220,239,0.5) 50%, rgba(180,223,248,0.2) 90%, transparent 100%)',
             filter: 'blur(4px)',
             opacity: 0,
             animation: 'coldCoffinFog 1000ms ease-in 250ms forwards',
@@ -22486,7 +22486,7 @@ const ANIM_REGISTRY = {
               left: slab.startX - slab.w / 2, top: slab.startY - slab.h / 2,
               width: slab.w, height: slab.h, borderRadius: 3,
               background: slab.gradient,
-              boxShadow: '0 0 12px rgba(180,220,245,0.7), inset 0 0 18px rgba(255,255,255,0.5), inset 0 2px 6px rgba(255,255,255,0.6)',
+              boxShadow: '0 0 12px rgba(180,223,248,0.7), inset 0 0 18px rgba(255,255,255,0.5), inset 0 2px 6px rgba(255,255,255,0.6)',
               border: '1px solid rgba(255,255,255,0.5)',
               animation: `coldCoffinSlab 400ms cubic-bezier(0.25, 0.9, 0.35, 1) ${slab.delay}ms forwards`,
               opacity: 0,
@@ -22498,7 +22498,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -50, top: -50,
             width: 100, height: 100, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(220,240,255,0.5) 40%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(229,237,250,0.5) 40%, transparent 70%)',
             opacity: 0,
             animation: 'coldCoffinSlam 350ms ease-out 380ms forwards',
           }} />
@@ -22507,7 +22507,7 @@ const ANIM_REGISTRY = {
             <div key={'cs'+i} style={{
               position: 'absolute', left: s.x, top: s.startY,
               fontSize: s.size, color: '#ffffff',
-              filter: 'drop-shadow(0 0 3px rgba(200,230,250,0.9))',
+              filter: 'drop-shadow(0 0 3px rgba(189,220,239,0.9))',
               transform: `rotate(${s.rot}deg)`,
               opacity: 0,
               animation: `coldCoffinSnow ${s.dur}ms ease-in ${s.delay}ms forwards`,
@@ -22567,9 +22567,9 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -cw * 0.9, top: -cw * 0.9,
             width: cw * 1.8, height: cw * 1.8, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,240,180,.85) 0%, rgba(255,206,90,.45) 40%,'
-              + ' rgba(198,150,40,.18) 68%, transparent 82%)',
-            boxShadow: '0 0 40px rgba(255,214,110,.85)',
+            background: 'radial-gradient(circle, rgba(249,236,179,.85) 0%, rgba(255,208,102,.45) 40%,'
+              + ' rgba(209,161,72,.18) 68%, transparent 82%)',
+            boxShadow: '0 0 40px rgba(255,208,102,.85)',
             animation: 'gfFlash 460ms ease-out forwards',
           }} />
           {feathers.map((f, i) => (
@@ -22577,8 +22577,8 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: -f.size / 2, top: -f.size / 2,
               width: f.size, height: f.size * 0.42,
               borderRadius: '60% 8% 60% 8%',
-              background: 'linear-gradient(120deg, #fff3c4 0%, #ffd766 42%, #c8951f 100%)',
-              boxShadow: '0 0 8px rgba(255,214,110,.9)',
+              background: 'linear-gradient(120deg, #fffbd2 0%, #ffd966 42%, #cc8e00 100%)',
+              boxShadow: '0 0 8px rgba(255,208,102,.9)',
               opacity: 0,
               '--gfX': f.dx + 'px',
               '--gfY': f.dy + 'px',
@@ -22638,32 +22638,32 @@ const ANIM_REGISTRY = {
             {/* Stiel — vom Griff bis zum Kopf */}
             <div style={{
               position: 'absolute', left: '45%', top: '4%', width: '10%', height: '80%',
-              background: 'linear-gradient(90deg, #5c3d1c 0%, #a97c40 45%, #6b4a24 100%)',
+              background: 'linear-gradient(90deg, #5a3c14 0%, #ca874e 45%, #6b4a2a 100%)',
               borderRadius: 3,
             }} />
             {/* Knauf am Griffende */}
             <div style={{
               position: 'absolute', left: '38%', top: '2%', width: '24%', height: '4%',
-              background: 'linear-gradient(180deg, #c9a763 0%, #7a5a24 100%)',
+              background: 'linear-gradient(180deg, #e0c085 0%, #72541d 100%)',
               borderRadius: 3,
             }} />
             {/* Kopf: zwei Klingen links und rechts, am UNTEREN Ende */}
             <div style={{
               position: 'absolute', left: '-52%', top: '70%', width: '102%', height: '26%',
-              background: 'linear-gradient(180deg, #f2f6fa 0%, #b9c6d4 55%, #7b8998 100%)',
+              background: 'linear-gradient(180deg, #ffffff 0%, #d2d2db 55%, #808898 100%)',
               borderRadius: '90% 6% 90% 6% / 90% 6% 90% 6%',
-              boxShadow: '0 0 16px rgba(220,240,255,.9)',
+              boxShadow: '0 0 16px rgba(229,237,250,.9)',
             }} />
             <div style={{
               position: 'absolute', left: '50%', top: '70%', width: '102%', height: '26%',
-              background: 'linear-gradient(180deg, #f2f6fa 0%, #b9c6d4 55%, #7b8998 100%)',
+              background: 'linear-gradient(180deg, #ffffff 0%, #d2d2db 55%, #808898 100%)',
               borderRadius: '6% 90% 6% 90% / 6% 90% 6% 90%',
-              boxShadow: '0 0 16px rgba(220,240,255,.9)',
+              boxShadow: '0 0 16px rgba(229,237,250,.9)',
             }} />
             {/* Zwinge, wo Kopf und Stiel sitzen */}
             <div style={{
               position: 'absolute', left: '36%', top: '72%', width: '28%', height: '20%',
-              background: 'linear-gradient(180deg, #8f9aa6 0%, #58636e 100%)',
+              background: 'linear-gradient(180deg, #9aa3b6 0%, #59606e 100%)',
               borderRadius: 3,
             }} />
           </div>
@@ -22672,8 +22672,8 @@ const ANIM_REGISTRY = {
             position: 'absolute', left: -90, top: -4,
             width: 180, height: 8, borderRadius: 4,
             background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,.95) 20%,'
-              + ' rgba(255,230,190,.9) 50%, rgba(255,255,255,.95) 80%, transparent 100%)',
-            boxShadow: '0 0 22px rgba(255,240,220,.95)',
+              + ' rgba(247,224,181,.9) 50%, rgba(255,255,255,.95) 80%, transparent 100%)',
+            boxShadow: '0 0 22px rgba(255,248,232,.95)',
             opacity: 0,
             animation: 'axCut 420ms ease-out 250ms forwards',
           }} />
@@ -22681,8 +22681,8 @@ const ANIM_REGISTRY = {
             <span key={'ax' + i} style={{
               position: 'absolute', left: 0, top: 0,
               width: sp.size, height: sp.size, borderRadius: '50%',
-              background: '#ffe9b0',
-              boxShadow: `0 0 ${sp.size * 2}px rgba(255,220,150,.9)`,
+              background: '#f9ecb3',
+              boxShadow: `0 0 ${sp.size * 2}px rgba(224,192,133,.9)`,
               opacity: 0,
               '--axAngle': sp.angle + 'deg',
               '--axDist': sp.dist + 'px',
@@ -22737,8 +22737,8 @@ const ANIM_REGISTRY = {
             position: 'absolute', left: -cw * 1.5, top: -ch * 0.75,
             width: cw * 2.2, height: ch * 1.5,
             borderRadius: '46% 54% 40% 60% / 60% 45% 55% 40%',
-            background: 'linear-gradient(115deg, rgba(10,60,120,.92) 0%, rgba(30,120,200,.9) 38%, rgba(90,200,240,.85) 68%, rgba(235,252,255,.95) 92%)',
-            boxShadow: '0 0 40px rgba(60,160,230,.75), inset 0 -14px 26px rgba(255,255,255,.5)',
+            background: 'linear-gradient(115deg, rgba(43,69,126,.92) 0%, rgba(78,130,203,.9) 38%, rgba(119,200,238,.85) 68%, rgba(229,245,250,.95) 92%)',
+            boxShadow: '0 0 40px rgba(57,158,223,.75), inset 0 -14px 26px rgba(255,255,255,.5)',
             filter: 'blur(0.6px)',
             opacity: 0,
             animation: 'dgWave 900ms cubic-bezier(.3,.7,.35,1) forwards',
@@ -22748,7 +22748,7 @@ const ANIM_REGISTRY = {
             position: 'absolute', left: -cw * 1.5, top: -ch * 0.8,
             width: cw * 2.2, height: ch * 0.5,
             borderRadius: '50%',
-            background: 'radial-gradient(ellipse at 60% 60%, rgba(255,255,255,.95) 0%, rgba(210,245,255,.7) 45%, transparent 75%)',
+            background: 'radial-gradient(ellipse at 60% 60%, rgba(255,255,255,.95) 0%, rgba(229,245,250,.7) 45%, transparent 75%)',
             filter: 'blur(3px)',
             opacity: 0,
             animation: 'dgFoam 900ms cubic-bezier(.3,.7,.35,1) 40ms forwards',
@@ -22757,8 +22757,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -cw * 0.85, top: -ch * 0.6,
             width: cw * 1.7, height: ch * 1.2, borderRadius: '50%',
-            border: '3px solid rgba(200,245,255,.9)',
-            boxShadow: '0 0 26px rgba(120,210,255,.8) inset, 0 0 20px rgba(120,210,255,.7)',
+            border: '3px solid rgba(182,239,247,.9)',
+            boxShadow: '0 0 26px rgba(119,200,238,.8) inset, 0 0 20px rgba(119,200,238,.7)',
             opacity: 0,
             animation: 'dgSplash 520ms ease-out 330ms forwards',
           }} />
@@ -22767,7 +22767,7 @@ const ANIM_REGISTRY = {
             <div key={'dg' + i} style={{
               position: 'absolute', left: -d.size / 2, top: -d.size / 2,
               width: d.size, height: d.size, borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(150,225,255,.9) 50%, transparent 78%)',
+              background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(127,223,255,.9) 50%, transparent 78%)',
               opacity: 0,
               '--dgX': d.dx + 'px',
               '--dgY': d.dy + 'px',
@@ -22849,8 +22849,8 @@ const ANIM_REGISTRY = {
               left: -j.len / 2, top: -j.thick / 2,
               width: j.len, height: j.thick,
               borderRadius: j.thick,
-              background: 'linear-gradient(90deg, rgba(40,120,255,0) 0%, rgba(60,150,255,0.55) 22%, rgba(120,215,255,0.95) 62%, rgba(240,252,255,1) 88%, rgba(255,255,255,0) 100%)',
-              filter: 'blur(1.5px) drop-shadow(0 0 10px rgba(90,190,255,0.95))',
+              background: 'linear-gradient(90deg, rgba(56,102,240,0) 0%, rgba(109,155,248,0.55) 22%, rgba(102,217,255,0.95) 62%, rgba(229,245,250,1) 88%, rgba(255,255,255,0) 100%)',
+              filter: 'blur(1.5px) drop-shadow(0 0 10px rgba(104,198,253,0.95))',
               mixBlendMode: 'screen',
               opacity: 0,
               transformOrigin: '50% 50%',
@@ -22864,7 +22864,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -cw * 0.9, top: -ch * 0.9,
             width: cw * 1.8, height: ch * 1.8, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(190,240,255,0.95) 25%, rgba(80,170,255,0.6) 55%, transparent 78%)',
+            background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(179,232,249,0.95) 25%, rgba(28,169,253,0.6) 55%, transparent 78%)',
             mixBlendMode: 'screen', opacity: 0,
             animation: 'bidCore 620ms ease-out 300ms forwards',
           }} />
@@ -22872,8 +22872,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -cw * 1.5, top: -ch * 1.5,
             width: cw * 3, height: ch * 3, borderRadius: '50%',
-            border: '3px solid rgba(150,220,255,0.85)',
-            boxShadow: '0 0 26px rgba(110,190,255,0.7) inset, 0 0 20px rgba(110,190,255,0.6)',
+            border: '3px solid rgba(127,223,255,0.85)',
+            boxShadow: '0 0 26px rgba(102,182,255,0.7) inset, 0 0 20px rgba(102,182,255,0.6)',
             opacity: 0,
             animation: 'bidShock 520ms ease-out 380ms forwards',
           }} />
@@ -22882,7 +22882,7 @@ const ANIM_REGISTRY = {
             <div key={'e' + i} style={{
               position: 'absolute', left: -e.size / 2, top: -e.size / 2,
               width: e.size, height: e.size, borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(140,215,255,0.9) 45%, transparent 75%)',
+              background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(119,200,238,0.9) 45%, transparent 75%)',
               mixBlendMode: 'screen', opacity: 0,
               '--bidEX': e.dx + 'px',
               '--bidEY': e.dy + 'px',
@@ -22975,7 +22975,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -cw * 2.2, top: -ch * 2.2,
             width: cw * 4.4, height: ch * 4.4, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(160,210,255,0.6) 0%, rgba(120,180,240,0.35) 35%, rgba(90,150,220,0.15) 60%, transparent 80%)',
+            background: 'radial-gradient(circle, rgba(180,207,248,0.6) 0%, rgba(102,182,255,0.35) 35%, rgba(78,130,203,0.15) 60%, transparent 80%)',
             opacity: 0,
             animation: 'biseriaShockwave 700ms ease-out 0ms forwards',
             mixBlendMode: 'screen',
@@ -22984,7 +22984,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -cw * 1.6, top: -ch * 1.6,
             width: cw * 3.2, height: ch * 3.2, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(220,240,255,0.55) 0%, rgba(170,215,250,0.4) 40%, rgba(130,185,235,0.15) 70%, transparent 100%)',
+            background: 'radial-gradient(circle, rgba(229,237,250,0.55) 0%, rgba(179,216,249,0.4) 40%, rgba(123,190,234,0.15) 70%, transparent 100%)',
             filter: 'blur(8px)',
             opacity: 0,
             animation: 'biseriaHalo 1500ms ease-in-out 200ms forwards',
@@ -22994,7 +22994,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -cw * 0.8, top: -ch * 0.8,
             width: cw * 1.6, height: ch * 1.6, borderRadius: 8,
-            background: 'radial-gradient(ellipse at center, rgba(245,252,255,0.85) 0%, rgba(210,235,250,0.65) 50%, rgba(170,210,240,0.3) 90%, transparent 100%)',
+            background: 'radial-gradient(ellipse at center, rgba(255,255,255,0.85) 0%, rgba(229,237,250,0.65) 50%, rgba(179,216,249,0.3) 90%, transparent 100%)',
             filter: 'blur(6px)',
             opacity: 0,
             animation: 'biseriaFog 1800ms ease-in 350ms forwards',
@@ -23005,8 +23005,8 @@ const ANIM_REGISTRY = {
               position: 'absolute',
               left: slab.sx - slab.w / 2, top: slab.sy - slab.h / 2,
               width: slab.w, height: slab.h, borderRadius: 4,
-              background: 'linear-gradient(135deg, rgba(245,252,255,0.97) 0%, rgba(195,225,250,0.92) 35%, rgba(155,200,240,0.88) 65%, rgba(220,240,255,0.95) 100%)',
-              boxShadow: '0 0 24px rgba(140,195,240,0.85), 0 0 50px rgba(110,170,225,0.5), inset 0 0 28px rgba(255,255,255,0.7), inset 0 4px 10px rgba(255,255,255,0.85), inset 0 -2px 6px rgba(120,180,235,0.4)',
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.97) 0%, rgba(189,220,239,0.92) 35%, rgba(180,207,248,0.88) 65%, rgba(229,237,250,0.95) 100%)',
+              boxShadow: '0 0 24px rgba(123,190,234,0.85), 0 0 50px rgba(137,171,220,0.5), inset 0 0 28px rgba(255,255,255,0.7), inset 0 4px 10px rgba(255,255,255,0.85), inset 0 -2px 6px rgba(137,171,220,0.4)',
               border: '1.5px solid rgba(255,255,255,0.7)',
               opacity: 0,
               animation: `biseriaSlab 480ms cubic-bezier(0.22, 0.95, 0.3, 1) ${slab.delay}ms forwards`,
@@ -23019,7 +23019,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -cw * 0.9, top: -ch * 0.9,
             width: cw * 1.8, height: ch * 1.8, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(220,240,255,0.85) 25%, rgba(170,215,250,0.4) 55%, transparent 80%)',
+            background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(229,237,250,0.85) 25%, rgba(179,216,249,0.4) 55%, transparent 80%)',
             opacity: 0,
             animation: 'biseriaSlam 600ms ease-out 360ms forwards',
             mixBlendMode: 'screen',
@@ -23029,9 +23029,9 @@ const ANIM_REGISTRY = {
             <div key={'bsh' + i} style={{
               position: 'absolute', left: -s.size / 2, top: -s.size,
               width: s.size * 0.45, height: s.size * 1.4,
-              background: 'linear-gradient(to bottom, rgba(245,252,255,0.95), rgba(180,220,250,0.85), rgba(140,195,240,0.5))',
+              background: 'linear-gradient(to bottom, rgba(255,255,255,0.95), rgba(179,216,249,0.85), rgba(123,190,234,0.5))',
               borderRadius: '50% 50% 35% 35% / 60% 60% 40% 40%',
-              boxShadow: '0 0 8px rgba(160,210,250,0.8)',
+              boxShadow: '0 0 8px rgba(179,216,249,0.8)',
               transform: `rotate(${s.rot}deg)`,
               opacity: 0,
               animation: `biseriaShard ${s.dur}ms ease-out ${s.delay}ms forwards`,
@@ -23044,7 +23044,7 @@ const ANIM_REGISTRY = {
             <div key={'bf' + i} style={{
               position: 'absolute', left: s.x, top: s.startY,
               fontSize: s.size, color: '#ffffff',
-              filter: 'drop-shadow(0 0 5px rgba(170,215,250,0.95))',
+              filter: 'drop-shadow(0 0 5px rgba(179,216,249,0.95))',
               transform: `rotate(${s.rot}deg)`,
               opacity: 0,
               animation: `biseriaSnow ${s.dur}ms ease-in ${s.delay}ms forwards`,
@@ -23121,7 +23121,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -45, top: -45,
             width: 90, height: 90, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,0.55) 0%, rgba(220,220,255,0.25) 50%, transparent 80%)',
+            background: 'radial-gradient(circle, rgba(255,255,255,0.55) 0%, rgba(241,229,250,0.25) 50%, transparent 80%)',
             filter: 'blur(4px)',
             opacity: 0,
             animation: 'forgettingHalo 800ms ease-out 0ms forwards',
@@ -23130,7 +23130,7 @@ const ANIM_REGISTRY = {
             <div key={'fqm' + i} style={{
               position: 'absolute', left: m.startX, top: m.startY,
               fontSize: m.size, fontWeight: 'bold', color: '#ffffff',
-              textShadow: '0 0 8px rgba(255,255,255,0.95), 0 0 16px rgba(180,180,255,0.7), 0 2px 4px rgba(0,0,0,0.8)',
+              textShadow: '0 0 8px rgba(255,255,255,0.95), 0 0 16px rgba(214,179,249,0.7), 0 2px 4px rgba(0,0,0,0.8)',
               transform: `rotate(${m.rotStart}deg)`,
               opacity: 0,
               fontFamily: 'serif',
@@ -23201,7 +23201,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -cw, top: -ch,
             width: cw * 2, height: ch * 2, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(8,12,30,0.7) 0%, rgba(15,20,45,0.45) 45%, rgba(20,30,60,0.2) 75%, transparent 100%)',
+            background: 'radial-gradient(circle, rgba(18,16,31,0.7) 0%, rgba(26,26,46,0.45) 45%, rgba(0,33,63,0.2) 75%, transparent 100%)',
             filter: 'blur(6px)',
             opacity: 0,
             animation: 'deepseaInk 1500ms ease-in-out 0ms both',
@@ -23226,8 +23226,8 @@ const ANIM_REGISTRY = {
             return (
               <span key={'dsd' + i} style={{
                 position: 'absolute', width: d.size, height: d.size, borderRadius: '50%',
-                background: 'radial-gradient(circle at 35% 30%, rgba(50,60,90,0.95) 0%, rgba(15,20,40,0.95) 60%, rgba(5,8,20,1) 100%)',
-                boxShadow: '0 0 6px rgba(20,30,55,0.85), inset 0 0 4px rgba(80,90,130,0.5)',
+                background: 'radial-gradient(circle at 35% 30%, rgba(45,67,98,0.95) 0%, rgba(26,26,46,0.95) 60%, rgba(8,6,12,1) 100%)',
+                boxShadow: '0 0 6px rgba(26,26,46,0.85), inset 0 0 4px rgba(64,95,140,0.5)',
                 left: startX - d.size / 2,
                 top:  startY - d.size / 2,
                 opacity: 0,
@@ -23242,9 +23242,9 @@ const ANIM_REGISTRY = {
             <span key={'dsb' + i} style={{
               position: 'absolute', left: b.startX, top: b.startY,
               width: b.size, height: b.size, borderRadius: '50%',
-              background: 'radial-gradient(circle at 30% 30%, rgba(220,235,250,0.85) 0%, rgba(150,180,220,0.55) 40%, rgba(60,90,130,0.35) 80%, rgba(15,25,50,0.4) 100%)',
-              boxShadow: '0 0 6px rgba(120,160,200,0.6), inset 0 0 4px rgba(255,255,255,0.5)',
-              border: '1px solid rgba(200,220,240,0.4)',
+              background: 'radial-gradient(circle at 30% 30%, rgba(229,237,250,0.85) 0%, rgba(137,171,220,0.55) 40%, rgba(64,95,140,0.35) 80%, rgba(26,26,46,0.4) 100%)',
+              boxShadow: '0 0 6px rgba(137,171,220,0.6), inset 0 0 4px rgba(255,255,255,0.5)',
+              border: '1px solid rgba(189,220,239,0.4)',
               opacity: 0,
               animation: `deepseaBubble ${b.dur}ms ease-out ${b.delay}ms both`,
               '--dsbDy': `${b.endY - b.startY}px`,
@@ -23320,7 +23320,7 @@ const ANIM_REGISTRY = {
           size: 10 + Math.random() * 16,
           delay: 100 + Math.random() * 400,
           dur: 800 + Math.random() * 500,
-          color: ['#ffd84a', '#ffe88c', '#e8c8ff', '#fff5b8', '#c8a8ff', '#ffffff'][Math.floor(Math.random() * 6)],
+          color: ['#fad54a', '#fbe181', '#d6bbf1', '#f9ecb3', '#d6b3f9', '#ffffff'][Math.floor(Math.random() * 6)],
           rot: Math.random() * 720 - 360,
         };
       }), []);
@@ -23331,7 +23331,7 @@ const ANIM_REGISTRY = {
         size: 6 + Math.random() * 10,
         delay: 50 + Math.random() * 600,
         dur: 1100 + Math.random() * 400,
-        color: ['#ffd060', '#ffe8a0', '#fff2c8', '#ffc848'][Math.floor(Math.random() * 4)],
+        color: ['#ffd066', '#f9ecb3', '#fffbd2', '#fad54a'][Math.floor(Math.random() * 4)],
       })), [cw, ch]);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
@@ -23339,7 +23339,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -cw, top: -ch,
             width: cw * 2, height: ch * 2, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,228,140,0.85) 0%, rgba(220,180,255,0.55) 35%, rgba(180,130,240,0.3) 65%, transparent 95%)',
+            background: 'radial-gradient(circle, rgba(251,225,129,0.85) 0%, rgba(214,179,249,0.55) 35%, rgba(178,120,237,0.3) 65%, transparent 95%)',
             filter: 'blur(4px)',
             mixBlendMode: 'screen',
             opacity: 0,
@@ -23349,7 +23349,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -cw * 0.45, top: -ch * 1.1,
             width: cw * 0.9, height: ch * 2.2,
-            background: 'linear-gradient(to top, rgba(255,200,80,0) 0%, rgba(255,225,140,0.5) 35%, rgba(255,235,180,0.7) 60%, rgba(255,240,200,0.4) 85%, transparent 100%)',
+            background: 'linear-gradient(to top, rgba(255,208,102,0) 0%, rgba(251,225,129,0.5) 35%, rgba(249,236,179,0.7) 60%, rgba(255,251,210,0.4) 85%, transparent 100%)',
             filter: 'blur(3px)',
             opacity: 0,
             animation: 'blessedColumn 1500ms ease-out 100ms both',
@@ -23359,8 +23359,8 @@ const ANIM_REGISTRY = {
             <div key={'bsr' + i} style={{
               position: 'absolute', left: -r.size, top: -r.size,
               width: r.size * 2, height: r.size * 2, borderRadius: '50%',
-              border: '4px solid rgba(255,210,90,0.95)',
-              boxShadow: '0 0 20px rgba(255,210,90,0.85), inset 0 0 14px rgba(255,235,160,0.6)',
+              border: '4px solid rgba(255,217,102,0.95)',
+              boxShadow: '0 0 20px rgba(255,217,102,0.85), inset 0 0 14px rgba(255,241,150,0.6)',
               opacity: 0, transform: 'scale(0.3)',
               animation: `blessedRing ${r.dur}ms ease-out ${r.delay}ms both`,
             }} />
@@ -23369,7 +23369,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -50, top: -55,
             fontSize: 100, lineHeight: 1,
-            filter: 'drop-shadow(0 0 18px rgba(255,210,90,1)) drop-shadow(0 0 36px rgba(220,170,255,0.85))',
+            filter: 'drop-shadow(0 0 18px rgba(255,217,102,1)) drop-shadow(0 0 36px rgba(214,179,249,0.85))',
             opacity: 0, transform: 'rotate(-30deg) scale(0.4)',
             animation: 'blessedGlyph 1400ms cubic-bezier(0.34, 1.56, 0.64, 1) 80ms both',
           }}>🎓</div>
@@ -23381,8 +23381,8 @@ const ANIM_REGISTRY = {
               <div key={'bso' + i} style={{
                 position: 'absolute', left: ox - 14, top: oy - 14,
                 fontSize: 26,
-                color: '#fff8d8',
-                textShadow: '0 0 8px rgba(255,210,90,0.95), 0 0 16px rgba(220,170,255,0.7)',
+                color: '#fffbd2',
+                textShadow: '0 0 8px rgba(255,217,102,0.95), 0 0 16px rgba(214,179,249,0.7)',
                 opacity: 0,
                 animation: `blessedOrbital ${o.dur}ms ease-in-out ${o.delay}ms both`,
                 '--bsoStartX': '0px',
@@ -23398,7 +23398,7 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: 0, top: 0,
               fontSize: s.size,
               color: s.color,
-              textShadow: `0 0 6px ${s.color}, 0 0 12px rgba(255,220,140,0.7)`,
+              textShadow: `0 0 6px ${s.color}, 0 0 12px rgba(251,225,129,0.7)`,
               opacity: 0, transform: 'translate(0,0) scale(0.3)',
               animation: `blessedSparkle ${s.dur}ms ease-out ${s.delay}ms both`,
               '--bsDx': s.dx + 'px',
@@ -23413,7 +23413,7 @@ const ANIM_REGISTRY = {
               top: ch * 0.5 + 10,
               width: a.size, height: a.size, borderRadius: '50%',
               background: a.color,
-              boxShadow: `0 0 10px ${a.color}, 0 0 20px rgba(255,220,140,0.7)`,
+              boxShadow: `0 0 10px ${a.color}, 0 0 20px rgba(251,225,129,0.7)`,
               opacity: 0,
               animation: `blessedAura ${a.dur}ms ease-out ${a.delay}ms both`,
               '--bsaRise': a.riseY + 'px',
@@ -23488,7 +23488,7 @@ const ANIM_REGISTRY = {
           g: 4 + (i % 4) * 3,
           dreh: Math.round((i % 2 ? 1 : -1) * (120 + i * 25)),
           verzug: (i % 5) * 45,
-          ton: ['#8e8e8e', '#6a6a6a', '#a3a3a3', '#767676'][i % 4],
+          ton: ['#929292', '#686868', '#a8a8a8', '#7f7f7f'][i % 4],
         };
       }), []);
       return (
@@ -23539,7 +23539,7 @@ const ANIM_REGISTRY = {
         g: 3 + (i % 4) * 2,
         dreh: (i % 2 ? 1 : -1) * (90 + i * 20),
         verzug: 1150 + (i % 5) * 50,
-        ton: ['#8e8e8e', '#6a6a6a', '#a3a3a3', '#767676'][i % 4],
+        ton: ['#929292', '#686868', '#a8a8a8', '#7f7f7f'][i % 4],
       })), [W, H]);
       const funken = useMemo(() => Array.from({ length: ppFxN(10) }, (_, i) => ({
         sx: -W / 2 + W * (((i * 29) % 100) / 100),
@@ -23605,7 +23605,7 @@ const ANIM_REGISTRY = {
           size: 3 + Math.random() * 4,
           delay: 500 + Math.random() * 400,
           dur: 500 + Math.random() * 300,
-          shade: ['#7a7a7a','#8e8e8e','#6a6a6a','#a0a0a0'][Math.floor(Math.random() * 4)],
+          shade: ['#7f7f7f','#929292','#686868','#a8a8a8'][Math.floor(Math.random() * 4)],
         };
       }), [cw, ch]);
       // Speckle positions pre-computed once for stability
@@ -23613,7 +23613,7 @@ const ANIM_REGISTRY = {
         left: -cw / 2 + Math.random() * cw,
         top: -ch / 2 + Math.random() * ch,
         size: 1 + Math.random() * 2.5,
-        shade: ['#555','#666','#3a3a3a','#777'][Math.floor(Math.random() * 4)],
+        shade: ['#535353','#686868','#323232','#7f7f7f'][Math.floor(Math.random() * 4)],
         opacity: 0.45 + Math.random() * 0.35,
       })), [cw, ch]);
       return (
@@ -23622,7 +23622,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -cw / 2 - 8, top: -ch / 2 - 8,
             width: cw + 16, height: ch + 16, borderRadius: 6,
-            background: 'radial-gradient(ellipse at center, rgba(80,190,100,0.7) 0%, rgba(60,150,80,0.35) 50%, transparent 85%)',
+            background: 'radial-gradient(ellipse at center, rgba(75,205,124,0.7) 0%, rgba(44,160,88,0.35) 50%, transparent 85%)',
             opacity: 0,
             animation: 'petrifyGlow 500ms ease-out forwards',
           }} />
@@ -23630,8 +23630,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -cw / 2, top: -ch / 2,
             width: cw, height: ch, borderRadius: 4,
-            background: 'linear-gradient(135deg, rgba(140,140,145,0.82) 0%, rgba(90,90,95,0.75) 45%, rgba(120,120,125,0.78) 80%, rgba(70,70,75,0.82) 100%)',
-            boxShadow: 'inset 0 0 16px rgba(50,50,55,0.7), inset 0 -3px 8px rgba(40,40,45,0.6)',
+            background: 'linear-gradient(135deg, rgba(146,146,146,0.82) 0%, rgba(83,83,83,0.75) 45%, rgba(127,127,127,0.78) 80%, rgba(83,83,83,0.82) 100%)',
+            boxShadow: 'inset 0 0 16px rgba(50,50,50,0.7), inset 0 -3px 8px rgba(34,34,34,0.6)',
             mixBlendMode: 'multiply',
             opacity: 0,
             animation: 'petrifyStone 600ms ease-out 150ms forwards',
@@ -23707,17 +23707,17 @@ const ANIM_REGISTRY = {
         delay: 200 + Math.random() * 600,
         dur: 500 + Math.random() * 500,
         size: 3 + Math.random() * 7,
-        color: ['#ffd700','#ffec80','#fff5cc','#ffffff','#ffe066'][Math.floor(Math.random() * 5)],
+        color: ['#ffd61a','#fbe181','#fffbd2','#ffffff','#ffe469'][Math.floor(Math.random() * 5)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ width: 150, height: 150, marginLeft: -75, marginTop: -75, background: 'radial-gradient(circle, rgba(255,250,220,.9) 0%, rgba(255,215,0,.45) 35%, rgba(255,240,180,.15) 60%, transparent 80%)', animationDuration: '900ms' }} />
-          <div className="anim-flame-flash" style={{ width: 90, height: 90, marginLeft: -45, marginTop: -45, background: 'radial-gradient(circle, rgba(255,255,250,.98) 0%, rgba(255,230,100,.55) 40%, transparent 70%)', animationDelay: '250ms', animationDuration: '700ms' }} />
+          <div className="anim-flame-flash" style={{ width: 150, height: 150, marginLeft: -75, marginTop: -75, background: 'radial-gradient(circle, rgba(255,251,210,.9) 0%, rgba(255,214,26,.45) 35%, rgba(249,236,179,.15) 60%, transparent 80%)', animationDuration: '900ms' }} />
+          <div className="anim-flame-flash" style={{ width: 90, height: 90, marginLeft: -45, marginTop: -45, background: 'radial-gradient(circle, rgba(255,255,255,.98) 0%, rgba(255,228,105,.55) 40%, transparent 70%)', animationDelay: '250ms', animationDuration: '700ms' }} />
           {angels.map((a, i) => (
             <div key={'agl'+i} style={{
               position: 'absolute', left: a.xOff, top: a.startY,
               fontSize: a.size,
-              filter: 'drop-shadow(0 0 8px rgba(255,230,120,.9)) drop-shadow(0 0 14px rgba(255,255,220,.6))',
+              filter: 'drop-shadow(0 0 8px rgba(255,228,105,.9)) drop-shadow(0 0 14px rgba(255,251,210,.6))',
               transform: `rotate(${a.rot}deg)`,
               animation: `ankhFloat ${a.dur}ms ease-out ${a.delay}ms forwards`,
               opacity: 0,
@@ -23764,7 +23764,7 @@ const ANIM_REGISTRY = {
         size: 3 + Math.random() * 5,
         delay: 200 + Math.random() * 900,
         dur: 350 + Math.random() * 300,
-        color: ['#aa1111','#661111','#880808','#440404','#cc2222'][Math.floor(Math.random() * 5)],
+        color: ['#b5171c','#6a1c14','#8b0d0d','#3a0000','#c0141c'][Math.floor(Math.random() * 5)],
       })), [cw]);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
@@ -23772,7 +23772,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -70, top: -70,
             width: 140, height: 140, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(120,10,10,0.55) 0%, rgba(70,5,5,0.35) 45%, transparent 80%)',
+            background: 'radial-gradient(circle, rgba(120,0,0,0.55) 0%, rgba(82,10,12,0.35) 45%, transparent 80%)',
             filter: 'blur(3px)',
             opacity: 0,
             animation: 'rainOfDeathFog 1400ms ease-in-out 200ms forwards',
@@ -23782,11 +23782,11 @@ const ANIM_REGISTRY = {
             <div key={'rd'+i} style={{
               position: 'absolute', left: d.xOff, top: d.startY,
               fontSize: d.size,
-              filter: 'drop-shadow(0 0 4px rgba(130,10,10,0.85)) drop-shadow(0 0 7px rgba(80,0,0,0.6))',
+              filter: 'drop-shadow(0 0 4px rgba(120,0,0,0.85)) drop-shadow(0 0 7px rgba(82,10,12,0.6))',
               transform: `rotate(${d.rot}deg)`,
               animation: `rainOfDeathFall ${d.dur}ms ease-in ${d.delay}ms forwards`,
               opacity: 0,
-              color: '#aa0000',
+              color: '#be0e0e',
             }}>{d.char}</div>
           ))}
           {/* Impact splatters at target level */}
@@ -23843,7 +23843,7 @@ const ANIM_REGISTRY = {
           size: 3 + Math.random() * 5,
           delay: 250 + Math.random() * 600,
           dur: 600 + Math.random() * 400,
-          color: ['#ffd700','#fff5cc','#ffec80','#ffffff'][Math.floor(Math.random() * 4)],
+          color: ['#ffd61a','#fffbd2','#fbe181','#ffffff'][Math.floor(Math.random() * 4)],
         };
       }), []);
       return (
@@ -23853,8 +23853,8 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -cw / 2, top: -ch / 2,
             width: cw, height: ch, borderRadius: 4,
-            background: 'linear-gradient(135deg, rgba(255,230,120,0.0) 20%, rgba(255,225,100,0.55) 50%, rgba(255,230,120,0.0) 80%)',
-            boxShadow: 'inset 0 0 22px rgba(255,215,80,0.5), 0 0 16px rgba(255,200,40,0.6)',
+            background: 'linear-gradient(135deg, rgba(255,228,105,0.0) 20%, rgba(255,228,105,0.55) 50%, rgba(255,228,105,0.0) 80%)',
+            boxShadow: 'inset 0 0 22px rgba(250,213,74,0.5), 0 0 16px rgba(255,198,28,0.6)',
             mixBlendMode: 'screen',
             opacity: 0,
             animation: 'goldenWingsSheen 1100ms ease-in-out 100ms forwards',
@@ -23865,8 +23865,8 @@ const ANIM_REGISTRY = {
             left: -cw * 0.55, top: -ch * 0.15,
             fontSize: Math.max(cw, ch) * 0.55,
             transformOrigin: 'right center',
-            filter: 'drop-shadow(0 0 10px rgba(255,215,80,0.9)) drop-shadow(0 0 18px rgba(255,240,160,0.55)) hue-rotate(30deg) saturate(1.4) brightness(1.2)',
-            color: '#ffd700',
+            filter: 'drop-shadow(0 0 10px rgba(250,213,74,0.9)) drop-shadow(0 0 18px rgba(255,241,150,0.55)) hue-rotate(30deg) saturate(1.4) brightness(1.2)',
+            color: '#ffd61a',
             opacity: 0,
             animation: 'goldenWingLeft 1100ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards',
           }}>
@@ -23878,8 +23878,8 @@ const ANIM_REGISTRY = {
             left: cw * 0.05, top: -ch * 0.15,
             fontSize: Math.max(cw, ch) * 0.55,
             transformOrigin: 'left center',
-            filter: 'drop-shadow(0 0 10px rgba(255,215,80,0.9)) drop-shadow(0 0 18px rgba(255,240,160,0.55)) hue-rotate(30deg) saturate(1.4) brightness(1.2)',
-            color: '#ffd700',
+            filter: 'drop-shadow(0 0 10px rgba(250,213,74,0.9)) drop-shadow(0 0 18px rgba(255,241,150,0.55)) hue-rotate(30deg) saturate(1.4) brightness(1.2)',
+            color: '#ffd61a',
             opacity: 0,
             animation: 'goldenWingRight 1100ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards',
           }}>🕊️</div>
@@ -23959,7 +23959,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -cw / 2 - 10, top: -ch / 2 - 10,
             width: cw + 20, height: ch + 20, borderRadius: 8,
-            background: 'radial-gradient(ellipse at center, rgba(70,10,120,0.75) 0%, rgba(90,25,160,0.55) 40%, rgba(40,5,80,0.25) 75%, transparent 100%)',
+            background: 'radial-gradient(ellipse at center, rgba(71,17,126,0.75) 0%, rgba(80,0,140,0.55) 40%, rgba(46,10,81,0.25) 75%, transparent 100%)',
             filter: 'blur(3px)',
             opacity: 0,
             animation: 'nullZoneHaze 1100ms ease-in-out 100ms forwards',
@@ -23968,8 +23968,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -32, top: -32,
             width: 64, height: 64, borderRadius: '50%',
-            background: 'radial-gradient(circle, #0b0014 0%, #2a0845 45%, rgba(90,20,160,0.6) 75%, transparent 100%)',
-            boxShadow: '0 0 28px rgba(140,60,220,0.85), inset 0 0 20px rgba(30,0,60,0.9)',
+            background: 'radial-gradient(circle, #12101f 0%, #2b0b47 45%, rgba(80,0,140,0.6) 75%, transparent 100%)',
+            boxShadow: '0 0 28px rgba(144,58,230,0.85), inset 0 0 20px rgba(43,11,71,0.9)',
             opacity: 0,
             animation: 'nullZoneCore 1100ms ease-out 150ms forwards',
           }} />
@@ -23993,8 +23993,8 @@ const ANIM_REGISTRY = {
                 left: Math.cos(rad) * s.dist - s.size / 2,
                 top: Math.sin(rad) * s.dist - s.size / 2,
                 fontSize: s.size + 6,
-                color: ['#e9d6ff','#c49bff','#a277ff','#ffffff'][i % 4],
-                textShadow: '0 0 6px rgba(180,110,255,0.9)',
+                color: ['#d9c0ec','#ac87de','#a36afb','#ffffff'][i % 4],
+                textShadow: '0 0 6px rgba(186,116,255,0.9)',
                 opacity: 0,
                 animation: `nullZoneStar ${s.dur}ms ease-in ${s.delay}ms forwards`,
                 '--nzTx': `${-Math.cos(rad) * s.dist * 0.95}px`,
@@ -24062,8 +24062,8 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -44, top: -44,
             width: 88, height: 88, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,252,220,1) 0%, rgba(255,235,160,0.95) 30%, rgba(255,200,90,0.7) 60%, transparent 95%)',
-            boxShadow: '0 0 40px rgba(255,240,180,0.95), 0 0 80px rgba(255,210,100,0.55)',
+            background: 'radial-gradient(circle, rgba(255,251,210,1) 0%, rgba(255,241,150,0.95) 30%, rgba(255,208,102,0.7) 60%, transparent 95%)',
+            boxShadow: '0 0 40px rgba(249,236,179,0.95), 0 0 80px rgba(255,208,102,0.55)',
             opacity: 0,
             animation: 'vhcCore 900ms ease-out forwards',
           }} />
@@ -24072,7 +24072,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -cw / 2, top: -ch / 2,
             width: cw, height: ch, borderRadius: 6,
-            background: 'radial-gradient(ellipse at center, rgba(255,245,200,0.6) 0%, rgba(255,215,140,0.3) 45%, transparent 80%)',
+            background: 'radial-gradient(ellipse at center, rgba(255,251,210,0.6) 0%, rgba(251,225,129,0.3) 45%, transparent 80%)',
             opacity: 0,
             animation: 'vhcHalo 1000ms ease-out forwards',
           }} />
@@ -24081,8 +24081,8 @@ const ANIM_REGISTRY = {
             <div key={'vhr' + i} style={{
               position: 'absolute', left: -4, top: -72,
               width: 8, height: 144,
-              background: 'linear-gradient(180deg, transparent 0%, rgba(255,250,220,0.95) 40%, rgba(255,250,220,0.95) 60%, transparent 100%)',
-              boxShadow: '0 0 14px rgba(255,240,180,0.9)',
+              background: 'linear-gradient(180deg, transparent 0%, rgba(255,251,210,0.95) 40%, rgba(255,251,210,0.95) 60%, transparent 100%)',
+              boxShadow: '0 0 14px rgba(249,236,179,0.9)',
               transform: `rotate(${r.rot}deg)`,
               transformOrigin: '50% 50%',
               opacity: 0,
@@ -24094,8 +24094,8 @@ const ANIM_REGISTRY = {
             <div key={'vhm' + i} style={{
               position: 'absolute', left: 0, top: 0,
               width: m.size, height: m.size, borderRadius: '50%',
-              background: '#fffae0',
-              boxShadow: `0 0 ${m.size + 5}px rgba(255,240,180,0.95)`,
+              background: '#fff8e8',
+              boxShadow: `0 0 ${m.size + 5}px rgba(249,236,179,0.95)`,
               opacity: 0,
               animation: `vhcMote ${m.dur}ms ease-out ${m.delay}ms forwards`,
               '--vhmDx': m.dx + 'px', '--vhmDy': m.dy + 'px',
@@ -24161,7 +24161,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -cw / 2 + 4, top: -ch / 2 + 4,
             width: cw - 8, height: ch - 8, borderRadius: 6,
-            background: 'radial-gradient(ellipse at center, rgba(200,30,30,0.75) 0%, rgba(120,10,15,0.55) 45%, transparent 80%)',
+            background: 'radial-gradient(ellipse at center, rgba(192,20,28,0.75) 0%, rgba(120,0,20,0.55) 45%, transparent 80%)',
             opacity: 0,
             animation: 'pbFlash 650ms ease-out forwards',
           }} />
@@ -24179,7 +24179,7 @@ const ANIM_REGISTRY = {
                 borderLeft: `${t.sizeW / 2}px solid transparent`,
                 borderRight: `${t.sizeW / 2}px solid transparent`,
                 borderTop: `${t.sizeH}px solid #fff`,
-                filter: 'drop-shadow(0 0 3px rgba(255,255,255,0.9)) drop-shadow(0 2px 3px rgba(120,10,15,0.7))',
+                filter: 'drop-shadow(0 0 3px rgba(255,255,255,0.9)) drop-shadow(0 2px 3px rgba(120,0,20,0.7))',
               }} />
             ))}
           </div>
@@ -24197,7 +24197,7 @@ const ANIM_REGISTRY = {
                 borderLeft: `${t.sizeW / 2}px solid transparent`,
                 borderRight: `${t.sizeW / 2}px solid transparent`,
                 borderBottom: `${t.sizeH}px solid #fff`,
-                filter: 'drop-shadow(0 0 3px rgba(255,255,255,0.9)) drop-shadow(0 -2px 3px rgba(120,10,15,0.7))',
+                filter: 'drop-shadow(0 0 3px rgba(255,255,255,0.9)) drop-shadow(0 -2px 3px rgba(120,0,20,0.7))',
               }} />
             ))}
           </div>
@@ -24206,8 +24206,8 @@ const ANIM_REGISTRY = {
             <div key={'pbs' + i} style={{
               position: 'absolute', left: 0, top: 0,
               width: s.size, height: s.size, borderRadius: '50% 55% 40% 60% / 60% 40% 60% 40%',
-              background: 'radial-gradient(circle at 35% 30%, #d62a2a, #700808 70%)',
-              boxShadow: '0 0 6px rgba(180,20,20,0.7)',
+              background: 'radial-gradient(circle at 35% 30%, #e63e33, #780014 70%)',
+              boxShadow: '0 0 6px rgba(181,23,28,0.7)',
               opacity: 0,
               animation: `pbSplat ${s.dur}ms ease-out ${s.delay}ms forwards`,
               '--pbsDx': s.dx + 'px', '--pbsDy': s.dy + 'px',
@@ -24267,7 +24267,7 @@ const ANIM_REGISTRY = {
         size:    4 + Math.random() * 7,
         delay:   Math.random() * 600,
         dur:     500 + Math.random() * 500,
-        color:   ['#ff2200','#ff5500','#ff8800','#ffaa00','#ffd700'][Math.floor(Math.random() * 5)],
+        color:   ['#ff1a1a','#ff491a','#ff8b1a','#f9ac20','#ffd61a'][Math.floor(Math.random() * 5)],
       })), [cw, ch]);
       // Ground plume — wide hot glow at the base.
       return (
@@ -24277,7 +24277,7 @@ const ANIM_REGISTRY = {
             left: -cw * 0.6, top: ch * 0.35,
             width: cw * 1.2, height: 50,
             borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(255,140,0,.85) 0%, rgba(255,60,0,.5) 50%, transparent 80%)',
+            background: 'radial-gradient(ellipse, rgba(255,139,26,.85) 0%, rgba(255,73,26,.5) 50%, transparent 80%)',
             opacity: 0,
             animation: 'fwGroundFlash 900ms ease-out forwards',
           }} />
@@ -24288,7 +24288,7 @@ const ANIM_REGISTRY = {
               top: ch * 0.45 + 'px',
               fontSize: c.size + 'px',
               opacity: 0,
-              filter: 'drop-shadow(0 0 8px rgba(255,120,0,.85)) drop-shadow(0 0 14px rgba(255,60,0,.5))',
+              filter: 'drop-shadow(0 0 8px rgba(255,125,0,.85)) drop-shadow(0 0 14px rgba(255,73,26,.5))',
               animation: `fwColumnRise ${c.dur}ms ease-out ${c.delay}ms forwards`,
               transformOrigin: '50% 100%',
             }}>{c.char}</div>
@@ -24355,7 +24355,7 @@ const ANIM_REGISTRY = {
         return {
           dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
           size: 5 + Math.random() * 9,
-          color: ['#ff2200','#ff4400','#ff8800','#ffcc00','#ffaa00','#ff0000'][Math.floor(Math.random() * 6)],
+          color: ['#ff1a1a','#ff491a','#ff8b1a','#ffd61a','#f9ac20','#ff1a1a'][Math.floor(Math.random() * 6)],
           delay: 1300 + Math.random() * 200,
           dur: 600 + Math.random() * 500,
         };
@@ -24409,7 +24409,7 @@ const ANIM_REGISTRY = {
                 left: (-TAIL_LEN) + 'px', top: (-TAIL_H / 2) + 'px',
                 width: TAIL_LEN + 'px', height: TAIL_H + 'px',
                 borderRadius: TAIL_H + 'px',
-                background: 'linear-gradient(90deg, transparent 0%, rgba(255,60,0,.35) 22%, rgba(255,140,0,.7) 55%, rgba(255,210,80,.92) 82%, #fff 100%)',
+                background: 'linear-gradient(90deg, transparent 0%, rgba(255,73,26,.35) 22%, rgba(255,139,26,.7) 55%, rgba(250,213,74,.92) 82%, #fff 100%)',
                 filter: 'blur(9px)',
               }} />
               {/* Rock head — charred boulder with a molten leading edge.
@@ -24420,9 +24420,9 @@ const ANIM_REGISTRY = {
                 left: (-ROCK_R) + 'px', top: (-ROCK_R) + 'px',
                 width: ROCK + 'px', height: ROCK + 'px',
                 borderRadius: '50%',
-                background: 'radial-gradient(circle at 62% 50%, #fff2c0 0%, #ffae2e 14%, #ff6a00 32%, #b32d00 56%, #571800 78%, #2a0c00 100%)',
-                boxShadow: 'inset -14px 0 26px rgba(0,0,0,.55), inset 16px 0 30px rgba(255,180,60,.5)',
-                filter: 'drop-shadow(0 0 26px #ff5500) drop-shadow(0 0 52px #ff2200) drop-shadow(0 0 84px #ff0000)',
+                background: 'radial-gradient(circle at 62% 50%, #f9ecb3 0%, #f9ac20 14%, #ff7d00 32%, #b62600 56%, #6a1c14 78%, #270d0c 100%)',
+                boxShadow: 'inset -14px 0 26px rgba(0,0,0,.55), inset 16px 0 30px rgba(249,172,32,.5)',
+                filter: 'drop-shadow(0 0 26px #ff491a) drop-shadow(0 0 52px #ff1a1a) drop-shadow(0 0 84px #ff1a1a)',
               }} />
             </div>
           </div>
@@ -24437,7 +24437,7 @@ const ANIM_REGISTRY = {
             width: '220vmax', height: '220vmax',
             marginLeft: '-110vmax', marginTop: '-110vmax',
             borderRadius: '50%',
-            background: 'radial-gradient(circle, #ffffff 0%, rgba(255,246,205,.98) 8%, rgba(255,193,46,.95) 20%, rgba(255,110,0,.85) 38%, rgba(200,40,0,.6) 58%, rgba(90,12,0,.28) 75%, transparent 88%)',
+            background: 'radial-gradient(circle, #ffffff 0%, rgba(255,251,210,.98) 8%, rgba(255,185,26,.95) 20%, rgba(255,125,0,.85) 38%, rgba(204,43,0,.6) 58%, rgba(91,1,2,.28) 75%, transparent 88%)',
             opacity: 0,
             animation: 'cataclysmFlash 1150ms ease-out 1300ms forwards',
           }} />
@@ -24453,10 +24453,10 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: endX - 60 + 'px', top: endY - 60 + 'px',
             width: '120px', height: '120px',
-            border: '14px solid rgba(255,160,40,.85)',
+            border: '14px solid rgba(255,154,26,.85)',
             borderRadius: '50%',
             opacity: 0,
-            boxShadow: '0 0 60px rgba(255,120,0,.7), inset 0 0 40px rgba(255,170,0,.6)',
+            boxShadow: '0 0 60px rgba(255,125,0,.7), inset 0 0 40px rgba(249,172,32,.6)',
             animation: 'cataclysmShockwave 1250ms ease-out 1300ms forwards',
           }} />
           {/* Lingering flames at impact */}
@@ -24466,7 +24466,7 @@ const ANIM_REGISTRY = {
               left: endX + f.x + 'px', top: endY + f.y + 'px',
               fontSize: f.size + 'px',
               opacity: 0,
-              filter: 'drop-shadow(0 0 6px #ff4400)',
+              filter: 'drop-shadow(0 0 6px #ff491a)',
               animation: `cataclysmEmber ${f.dur}ms ease-out ${f.delay}ms forwards`,
             }}>{f.char}</div>
           ))}
@@ -24581,7 +24581,7 @@ const ANIM_REGISTRY = {
         size: 3 + Math.random() * 5,
         delay: 60 + Math.random() * 220,
         dur: 380 + Math.random() * 300,
-        farbe: ['#ffd23f', '#ff8a1c', '#ff5200'][Math.floor(Math.random() * 3)],
+        farbe: ['#fad54a', '#ff8b1a', '#ff491a'][Math.floor(Math.random() * 3)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
@@ -24591,8 +24591,8 @@ const ANIM_REGISTRY = {
               left: (-h.laenge / 2) + 'px', top: (-h.dicke / 2) + 'px',
               width: h.laenge + 'px', height: h.dicke + 'px',
               borderRadius: '50%',
-              background: 'linear-gradient(90deg, transparent, #fff2b0 18%, #ff9d1c 48%, #ff3b00 78%, transparent)',
-              boxShadow: '0 0 16px #ff7a1c, 0 0 34px #ff3b0088',
+              background: 'linear-gradient(90deg, transparent, #f9ecb3 18%, #ff9a1a 48%, #ff491a 78%, transparent)',
+              boxShadow: '0 0 16px #f87420, 0 0 34px #ff491a88',
               transform: `rotate(${h.rot}deg) scaleX(0)`,
               opacity: 0,
               '--slashRot': h.rot + 'deg',
@@ -24603,7 +24603,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -30, top: -30,
             width: 60, height: 60, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,190,90,.55), transparent 68%)',
+            background: 'radial-gradient(circle, rgba(251,200,106,.55), transparent 68%)',
             opacity: 0,
             animation: 'flamingSlashGlow 620ms ease-out 120ms forwards',
           }} />
@@ -24652,7 +24652,7 @@ const ANIM_REGISTRY = {
           breite: 5 + Math.random() * 8,
           delay: Math.abs(mitte) * 90 + Math.random() * 60,
           dur: 520 + Math.random() * 260,
-          farbe: ['#ffd23f', '#ff9d1c', '#ff6a00', '#ff3b00', '#fff1a8'][Math.floor(Math.random() * 5)],
+          farbe: ['#fad54a', '#ff9a1a', '#ff7d00', '#ff491a', '#f7f7ad'][Math.floor(Math.random() * 5)],
         };
       }), []);
       const funken = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
@@ -24668,7 +24668,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -34, top: 6,
             width: 68, height: 22, borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(255,170,60,.75), transparent 70%)',
+            background: 'radial-gradient(ellipse, rgba(255,155,58,.75), transparent 70%)',
             opacity: 0,
             animation: 'flameJetBase 760ms ease-out forwards',
           }} />
@@ -24689,8 +24689,8 @@ const ANIM_REGISTRY = {
             <div key={'fs' + i} style={{
               position: 'absolute', left: 0, top: 0,
               width: f.size + 'px', height: f.size + 'px', borderRadius: '50%',
-              background: '#ffe08a',
-              boxShadow: '0 0 8px #ffb43c',
+              background: '#fbe181',
+              boxShadow: '0 0 8px #f9ac20',
               opacity: 0,
               '--fjx': f.dx + 'px', '--fjy': f.dy + 'px',
               animation: `flameJetSpark ${f.dur}ms ease-out ${f.delay}ms forwards`,
@@ -24733,7 +24733,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -42, top: -56,
             width: 84, height: 112, borderRadius: 8,
-            background: 'radial-gradient(ellipse at 50% 40%, rgba(40,52,110,0.42), rgba(12,16,40,0.30) 70%, transparent)',
+            background: 'radial-gradient(ellipse at 50% 40%, rgba(20,40,90,0.42), rgba(26,26,46,0.30) 70%, transparent)',
             opacity: 0,
             animation: 'sleepVeil 1700ms ease-in-out forwards',
           }} />
@@ -24741,8 +24741,8 @@ const ANIM_REGISTRY = {
             <div key={'zzz' + i} style={{
               position: 'absolute', left: z.dx + 'px', top: '-10px',
               fontSize: z.size + 'px', fontWeight: 700,
-              color: '#dfe6ff',
-              textShadow: '0 0 8px rgba(120,150,255,.9), 0 2px 3px rgba(0,0,0,.8)',
+              color: '#e5edfa',
+              textShadow: '0 0 8px rgba(109,155,248,.9), 0 2px 3px rgba(0,0,0,.8)',
               opacity: 0,
               '--zKipp': z.kipp + 'deg',
               animation: `sleepZzzRise ${z.dur}ms ease-out ${z.delay}ms forwards`,
@@ -24792,7 +24792,7 @@ const ANIM_REGISTRY = {
           size: 4 + Math.random() * 8,
           delay: FLUG + Math.random() * 110,
           dur: 380 + Math.random() * 260,
-          color: ['#a01010', '#c01818', '#7f0808', '#d62a2a', '#8b0000'][Math.floor(Math.random() * 5)],
+          color: ['#8f0000', '#c0141c', '#780000', '#e63e33', '#8f0000'][Math.floor(Math.random() * 5)],
         };
       }), [vonLinks]);
       const flecken = useMemo(() => Array.from({ length: ppFxN(8) }, () => ({
@@ -24800,7 +24800,7 @@ const ANIM_REGISTRY = {
         fy: 4 + Math.random() * 24,
         size: 7 + Math.random() * 12,
         delay: FLUG + 30 + Math.random() * 120,
-        color: ['#7f0808', '#a01010', '#6b0505'][Math.floor(Math.random() * 3)],
+        color: ['#780000', '#8f0000', '#780014'][Math.floor(Math.random() * 3)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
@@ -24834,7 +24834,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -26, top: -6,
             width: 52, height: 52, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,190,190,0.45) 40%, transparent 75%)',
+            background: 'radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(249,179,179,0.45) 40%, transparent 75%)',
             opacity: 0,
             animation: `knifeThrowImpact 300ms ease-out ${FLUG}ms forwards`,
           }} />
@@ -24842,7 +24842,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -14, top: 0,
             width: 30, height: 30, borderRadius: '50%',
-            border: '3px solid rgba(190, 25, 25, 0.9)',
+            border: '3px solid rgba(192,20,28,0.9)',
             opacity: 0,
             animation: `knifeThrowShock 460ms ease-out ${FLUG}ms forwards`,
           }} />
@@ -24922,11 +24922,11 @@ const ANIM_REGISTRY = {
   knife_sacrifice: (() => {
     const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
     const SPRITE_FARBE = {
-      k: hex('#1b1626'),                                                    // Kontur
-      p: hex('#f2b632'), q: hex('#b9791a'),                                 // Knauf
-      g: hex('#7a3b1e'), h: hex('#4a2410'),                                 // Griff
-      G: hex('#f2b632'), H: hex('#b9791a'),                                 // Parierstange
-      W: hex('#ffffff'), L: hex('#d8ecff'), M: hex('#9fc3e6'), D: hex('#6a8db3'),   // Klinge: Glanzkante, hell, mittel, dunkel
+      k: hex('#1a1a2e'),                                                    // Kontur
+      p: hex('#f9ac20'), q: hex('#c68206'),                                 // Knauf
+      g: hex('#7d3911'), h: hex('#4a2a10'),                                 // Griff
+      G: hex('#f9ac20'), H: hex('#c68206'),                                 // Parierstange
+      W: hex('#ffffff'), L: hex('#e5edfa'), M: hex('#b4cff8'), D: hex('#7e7d9b'),   // Klinge: Glanzkante, hell, mittel, dunkel
     };
     // Spitze NACH UNTEN. 9 × 23 Pixel; `SPITZE` = Spalte/Zeile der Klingenspitze.
     const DOLCH = [
@@ -24955,10 +24955,10 @@ const ANIM_REGISTRY = {
       '.....k...',
     ];
     const SPITZE = [5, 22];
-    const BLUT = ['#d62a2a', '#b01414', '#8b0a0a', '#6b0505'].map(hex);
-    const FUNKEN = ['#ffffff', '#fff1b8', '#ffc864', '#ff8a4a', '#c8501e'].map(hex);
-    const RESTE = ['#ffe2d6', '#ffb09a', '#ff6a5a', '#d63a3a'].map(hex);
-    const STREIFEN = hex('#bcd4ee');
+    const BLUT = ['#e63e33', '#b5171c', '#8b0d0d', '#780014'].map(hex);
+    const FUNKEN = ['#ffffff', '#f9ecb3', '#fbc86a', '#e37435', '#e37435'].map(hex);
+    const RESTE = ['#e2d8cb', '#f9b3b3', '#ff6666', '#e73b41'].map(hex);
+    const STREIFEN = hex('#bddcef');
     const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16);
     const S = 3;                                  // Bildschirmpixel je Rasterpixel
     const GW = 80, GH = 72;                       // Raster
@@ -25126,11 +25126,11 @@ const ANIM_REGISTRY = {
   //  Massstab folgt der Heldenzone (`w`/`h`), Lebensdauer < 1 s (deckt sich mit FLUG_MS in test-flight.js).
   // ═════════════════════════════════════════════════════════════════
   test_flight: (() => {
-    const KONTUR = ppHex('#1b1626'), DUESE = ppHex('#4a4a58'), DUESE_HELL = ppHex('#a4a4b8');
-    const FLAMME = ['#ffffff', '#fff3a0', '#ffc93a', '#ff8a1e', '#e0481c', '#8c2412'].map(ppHex);
-    const RAUCH = ['#cfcfd6', '#aeaeb9', '#8a8a97', '#666673'].map(ppHex);
-    const WIND = ['#ffffff', '#d8efff', '#a8d4f4'].map(ppHex);
-    const FUNKEN = ['#ffffff', '#fff3a0', '#ffc93a', '#ff8a1e'].map(ppHex);
+    const KONTUR = ppHex('#1a1a2e'), DUESE = ppHex('#3e3e51'), DUESE_HELL = ppHex('#9aa3b6');
+    const FLAMME = ['#ffffff', '#fff196', '#ffc61c', '#ff8b1a', '#cc2b00', '#7a1900'].map(ppHex);
+    const RAUCH = ['#d2d2db', '#a5b0c0', '#808898', '#59606e'].map(ppHex);
+    const WIND = ['#ffffff', '#e5edfa', '#b3d8f9'].map(ppHex);
+    const FUNKEN = ['#ffffff', '#fff196', '#ffc61c', '#ff8b1a'].map(ppHex);
     const S = 3, TAKT = 33, ENDE = 980;
     const PADX = 22, PAD_OBEN = 16, PAD_UNTEN = 48;              // Platz um die Karte (Rasterpixel): Flammen/Rauch ragen darunter
     const ZUENDEN = 110, BRENNT_BIS = 640, AUS = 840, LAENGE = 14;
@@ -25277,9 +25277,9 @@ const ANIM_REGISTRY = {
   //  Lebensdauer 1 s (deckt sich mit BILD_MS in surprising-opportunity.js).
   // ═════════════════════════════════════════════════════════════════
   surprising_opportunity: (() => {
-    const KONTUR = ppHex('#1b1626');
-    const WEISS = ppHex('#ffffff'), SCHATTEN = ppHex('#c9cfe0');
-    const FUNKEN = ['#ffffff', '#fff3a0', '#ffc93a', '#ff8a1e'].map(ppHex);
+    const KONTUR = ppHex('#1a1a2e');
+    const WEISS = ppHex('#ffffff'), SCHATTEN = ppHex('#d2d2db');
+    const FUNKEN = ['#ffffff', '#fff196', '#ffc61c', '#ff8b1a'].map(ppHex);
     const FRAGEZEICHEN = ['.###.', '#...#', '....#', '..##.', '..#..', '.....', '..#..'];
     const S = 3, TAKT = 33, ENDE = 1000, AUFSPRUNG = 200, AUS_AB = 700;
     const PADX = 18, PAD_OBEN = 42, PAD_UNTEN = 10;               // Platz um die Karte (Rasterpixel): das Fragezeichen steht darueber
@@ -25402,10 +25402,10 @@ const ANIM_REGISTRY = {
   //  (deckt sich mit LASSO_MS in capture.js).
   // ═════════════════════════════════════════════════════════════════
   capture_lasso: (() => {
-    const KONTUR = ppHex('#1b1626');
-    const ROT = ['#ff6a5c', '#d81f26', '#8a1018'].map(ppHex);              // Lichtkante, Flaeche, Schatten
-    const SEIL = ['#f3d9a4', '#cfa05e', '#9a6c34', '#5f3f1d'].map(ppHex);  // Licht, hell, mittel, dunkel
-    const FUNKEN = ['#ffffff', '#fff3a0', '#ffc93a', '#ff8a1e'].map(ppHex);
+    const KONTUR = ppHex('#1a1a2e');
+    const ROT = ['#ff6666', '#e92f38', '#8c0014'].map(ppHex);              // Lichtkante, Flaeche, Schatten
+    const SEIL = ['#f7e0b5', '#d1a148', '#9d612f', '#5a3c14'].map(ppHex);  // Licht, hell, mittel, dunkel
+    const FUNKEN = ['#ffffff', '#fff196', '#ffc61c', '#ff8b1a'].map(ppHex);
     const AUSRUF = ['##', '##', '##', '##', '..', '##'];
     const S = 3, TAKT = 33, ENDE = 1000, AUFSPRUNG = 190, AUS_AB = 700;
     const SCHLINGE_AB = 140, ZU_BIS = 520, ENGER_BIS = 640, BLITZ_BIS = 700;
@@ -25551,9 +25551,9 @@ const ANIM_REGISTRY = {
   // ═════════════════════════════════════════════════════════════════
   big_oopsie: (() => {
     // Waerme-Palette: weiss → hellgelb → gelb → orange → rotorange → rot → dunkelrot → Rauch (hell → dunkel)
-    const PAL = ['#ffffff', '#fff6b8', '#ffd94a', '#ff9a1e', '#e8531a', '#b3281a', '#6a1c14', '#5c4f49', '#443a36', '#2d2624'].map(ppHex);
-    const FUNKEN = ['#ffffff', '#ffe27a', '#ff9a1e', '#e8531a'].map(ppHex);
-    const WELLE = ['#ffffff', '#fff6b8', '#ffd94a'].map(ppHex);
+    const PAL = ['#ffffff', '#f8f8bd', '#fad54a', '#ff9a1a', '#cc2b00', '#b5171c', '#6a1c14', '#535353', '#323232', '#222222'].map(ppHex);
+    const FUNKEN = ['#ffffff', '#fbe181', '#ff9a1a', '#cc2b00'].map(ppHex);
+    const WELLE = ['#ffffff', '#f8f8bd', '#fad54a'].map(ppHex);
     const S = 3, TAKT = 33, ENDE = 1500, FADE_AB = 1050;
     const PADX = 40, PAD_OBEN = 64, PAD_UNTEN = 12;
     const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -25707,11 +25707,11 @@ const ANIM_REGISTRY = {
   // ═════════════════════════════════════════════════════════════════
   frost_breaker: (() => {
     // Flammen: weiss → hellgelb → gelb → orange → rotorange → rot → dunkelrot (heiss → kalt)
-    const FL = ['#ffffff', '#fff6b8', '#ffd94a', '#ff9a1e', '#e8531a', '#b3281a', '#6a1c14'].map(ppHex);
+    const FL = ['#ffffff', '#f8f8bd', '#fad54a', '#ff9a1a', '#cc2b00', '#b5171c', '#6a1c14'].map(ppHex);
     // Eis: weiss → hellblau → mittelblau → tiefblau
-    const EIS = ['#ffffff', '#e4f8ff', '#b9ecff', '#86d4f7', '#58aee9', '#3a82d2'].map(ppHex);
-    const DAMPF = ['#f4fbff', '#d6e6ee', '#aab9c2', '#7f8c95'].map(ppHex);
-    const FUNKEN = ['#fff6b8', '#ffd94a', '#ff9a1e', '#e8531a'].map(ppHex);
+    const EIS = ['#ffffff', '#e5f5fa', '#b3e8f9', '#77c8ee', '#399edf', '#4e82cb'].map(ppHex);
+    const DAMPF = ['#ffffff', '#e5edfa', '#a5b0c0', '#808898'].map(ppHex);
+    const FUNKEN = ['#f8f8bd', '#fad54a', '#ff9a1a', '#cc2b00'].map(ppHex);
     const S = 3, TAKT = 33, ENDE = 1500, FADE_AB = 1150, BERSTEN = 540;
     const PADX = 26, PAD_UNTEN = 10;
     const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -25935,10 +25935,10 @@ const ANIM_REGISTRY = {
   //  traegt `data-pp-px="aus"`: die Grafik IST schon Pixelart (der Pixelierer fasst sie nicht an).
   // ═════════════════════════════════════════════════════════════════
   the_melting: (() => {
-    const FL = ['#ffffff', '#fff6b8', '#ffd94a', '#ff9a1e', '#e8531a', '#b3281a', '#6a1c14'].map(ppHex);
-    const EIS = ['#ffffff', '#e4f8ff', '#b9ecff', '#86d4f7', '#58aee9', '#3a82d2'].map(ppHex);
-    const DAMPF = ['#f4fbff', '#d6e6ee', '#aab9c2', '#7f8c95'].map(ppHex);
-    const STERN = ['#ffffff', '#fff6b8', '#b9ecff'].map(ppHex);
+    const FL = ['#ffffff', '#f8f8bd', '#fad54a', '#ff9a1a', '#cc2b00', '#b5171c', '#6a1c14'].map(ppHex);
+    const EIS = ['#ffffff', '#e5f5fa', '#b3e8f9', '#77c8ee', '#399edf', '#4e82cb'].map(ppHex);
+    const DAMPF = ['#ffffff', '#e5edfa', '#a5b0c0', '#808898'].map(ppHex);
+    const STERN = ['#ffffff', '#f8f8bd', '#b3e8f9'].map(ppHex);
     const ENDE = 1450, FADE_AB = 1100, SCHMELZ = 900, STERN_AB = 760;
     const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -26063,10 +26063,10 @@ const ANIM_REGISTRY = {
   //  weg. Feste Palette, KEINE Unschärfe, KEIN Leuchten; die Wurzel trägt `data-pp-px="aus"`.
   // ═════════════════════════════════════════════════════════════════
   sky_shaman_chant: (() => {
-    const FED_ROT = ['#8f1a1a', '#c8302a', '#e8553d'].map(ppHex);
-    const WEISS = ['#ffffff', '#e9e1cf', '#bdb29a'].map(ppHex);
-    const TUERKIS = ['#d8fff9', '#33d1c4', '#1f9e96', '#146e69'].map(ppHex);
-    const GOLD = ['#fff6b8', '#ffd94a', '#e8a33a'].map(ppHex);
+    const FED_ROT = ['#8c0014', '#b5171c', '#e63e33'].map(ppHex);
+    const WEISS = ['#ffffff', '#e2d8cb', '#c5b7a0'].map(ppHex);
+    const TUERKIS = ['#e5fae7', '#3adfcb', '#66a1a1', '#29663f'].map(ppHex);
+    const GOLD = ['#f8f8bd', '#fad54a', '#cc8e00'].map(ppHex);
     const ENDE = 1300, FADE_AB = 950, STRAHL_AB = 600, FUNKEN_AB = 780;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const vorbereiten = (sz) => {
@@ -26166,11 +26166,11 @@ const ANIM_REGISTRY = {
   //  Feste Palette, KEINE Unschärfe, KEIN Leuchten; die Wurzel trägt `data-pp-px="aus"`.
   // ═════════════════════════════════════════════════════════════════
   sky_dig: (() => {
-    const HOLZ = ['#b8793e', '#8a5426', '#5a3417'].map(ppHex);
-    const EISEN = ['#eef3f6', '#b9c4cc', '#7d8c97', '#4a5762', '#262f37'].map(ppHex);
-    const STEIN = ['#c8c3d6', '#9a93ad', '#6c6584', '#463f5a'].map(ppHex);
-    const GOLD = ['#ffffff', '#fff1a8', '#ffd94a', '#e8a33a'].map(ppHex);
-    const KARTE = ['#2c4a9a', '#1c2f66', '#ffd94a', '#fff1a8'].map(ppHex);
+    const HOLZ = ['#ca874e', '#9d612f', '#5a341a'].map(ppHex);
+    const EISEN = ['#e5f5fa', '#b9b9b9', '#808898', '#59606e', '#282834'].map(ppHex);
+    const STEIN = ['#d2d2db', '#9aa3b6', '#7e7d9b', '#3e3e51'].map(ppHex);
+    const GOLD = ['#ffffff', '#f7f7ad', '#fad54a', '#cc8e00'].map(ppHex);
+    const KARTE = ['#2f539d', '#14285a', '#fad54a', '#f7f7ad'].map(ppHex);
     const ENDE = 1200, FADE_AB = 900, SCHLAG1 = 280, SCHLAG2 = 600;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -26267,8 +26267,8 @@ const ANIM_REGISTRY = {
   //  KEINE Unschärfe, KEIN Leuchten; die Wurzel trägt `data-pp-px="aus"`.
   // ═════════════════════════════════════════════════════════════════
   slave_chains: (() => {
-    const GOLD = ['#fff6c0', '#ffd94a', '#e8a33a', '#a35a24', '#5c3414'].map(ppHex);
-    const EISEN = ['#f3f7fa', '#b9c4cc', '#7d8c97', '#3a4852'].map(ppHex);
+    const GOLD = ['#f9ecb3', '#fad54a', '#cc8e00', '#9d612f', '#5a341a'].map(ppHex);
+    const EISEN = ['#ffffff', '#b9b9b9', '#808898', '#3e3e51'].map(ppHex);
     const ENDE = 1200, FADE_AB = 800, KLIRR = 520;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const vorbereiten = () => ({ w0: Math.random() * Math.PI * 2, funken: Array.from({ length: ppFxN(14) }, () => ({ w: Math.random() * Math.PI * 2, v: 20 + Math.random() * 40, leben: 260 + Math.random() * 180, farbe: Math.floor(Math.random() * 3) })) });
@@ -26333,10 +26333,10 @@ const ANIM_REGISTRY = {
   //  KEINE Unschärfe, KEIN Leuchten; die Wurzel trägt `data-pp-px="aus"`.
   // ═════════════════════════════════════════════════════════════════
   front_soldier_block: (() => {
-    const STAHL = ['#f3f7fa', '#c9d4dc', '#97a6b2', '#667886', '#3a4852', '#222b33'].map(ppHex);
-    const MESSING = ['#fff1a8', '#ffd94a', '#e8a33a', '#a35a24'].map(ppHex);
-    const FUNKEN = ['#ffffff', '#fff1a8', '#ffd94a', '#e8a33a'].map(ppHex);
-    const STAUB = ['#c9c2b4', '#a39b8a', '#7d7566'].map(ppHex);
+    const STAHL = ['#ffffff', '#d2d2db', '#9aa3b6', '#808898', '#3e3e51', '#282834'].map(ppHex);
+    const MESSING = ['#f7f7ad', '#fad54a', '#cc8e00', '#9d612f'].map(ppHex);
+    const FUNKEN = ['#ffffff', '#f7f7ad', '#fad54a', '#cc8e00'].map(ppHex);
+    const STAUB = ['#c5b7a0', '#929292', '#7f7f7f'].map(ppHex);
     const ENDE = 1060, FADE_AB = 700, AUFPRALL = 280;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -26429,11 +26429,11 @@ const ANIM_REGISTRY = {
   //  die Wurzel trägt `data-pp-px="aus"` (die Grafik IST schon Pixelart).
   // ═════════════════════════════════════════════════════════════════
   mimic_chomp: (() => {
-    const HOLZ = ['#6b3a1c', '#4a2512', '#2e170c'].map(ppHex);
-    const MESSING = ['#fff1a8', '#ffd94a', '#e8a33a', '#a35a24'].map(ppHex);
-    const ZAHN = ['#ffffff', '#e9e1cf', '#bdb29a'].map(ppHex);
-    const RACHEN = ['#8f1620', '#5c0c14', '#2a0508'].map(ppHex);
-    const MUENZE = ['#fff6b8', '#ffd94a', '#e8a33a', '#a35a24'].map(ppHex);
+    const HOLZ = ['#6e4421', '#4a2a10', '#311402'].map(ppHex);
+    const MESSING = ['#f7f7ad', '#fad54a', '#cc8e00', '#9d612f'].map(ppHex);
+    const ZAHN = ['#ffffff', '#e2d8cb', '#c5b7a0'].map(ppHex);
+    const RACHEN = ['#8c0014', '#520a0c', '#2a0404'].map(ppHex);
+    const MUENZE = ['#f8f8bd', '#fad54a', '#cc8e00', '#9d612f'].map(ppHex);
     const ENDE = 1100, FADE_AB = 800, BISS1 = 260, BISS2 = 560;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     // Schliessgrad 0 (offen, Kiefer an den Kartenkanten) … 1 (zu, Kiefer treffen sich in der Mitte)
@@ -26556,11 +26556,11 @@ const ANIM_REGISTRY = {
   // ═════════════════════════════════════════════════════════════════
   biseria_fist: (() => {
     // Eispalette: weiss → hellblau → mittelblau → tiefblau (hell → dunkel)
-    const PAL = ['#ffffff', '#e4f8ff', '#b9ecff', '#86d4f7', '#58aee9', '#3a82d2', '#2a58aa', '#1c3a7e'].map(ppHex);
-    const KONTUR = ppHex('#0d1b45');
-    const SPLITTER = ['#ffffff', '#c9f1ff', '#86d4f7', '#58aee9'].map(ppHex);
-    const RISS = ppHex('#f2ffff'), RISS2 = ppHex('#6fb6e8');
-    const WELLE = ['#ffffff', '#c9f1ff', '#86d4f7'].map(ppHex);
+    const PAL = ['#ffffff', '#e5f5fa', '#b3e8f9', '#77c8ee', '#399edf', '#4e82cb', '#2f539d', '#2b457e'].map(ppHex);
+    const KONTUR = ppHex('#14285a');
+    const SPLITTER = ['#ffffff', '#b3e8f9', '#77c8ee', '#399edf'].map(ppHex);
+    const RISS = ppHex('#e5f5fa'), RISS2 = ppHex('#7bbeea');
+    const WELLE = ['#ffffff', '#b3e8f9', '#77c8ee'].map(ppHex);
     const S = 3, TAKT = 33, ENDE = 1500, TREFFER = 400, ZERFALL_AB = 820, ZERFALL_BIS = 1180, FADE_AB = 1100;
     const PADX = 50, PAD_OBEN = 118, PAD_UNTEN = 14;
     const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -26794,7 +26794,7 @@ const ANIM_REGISTRY = {
   //  weg. Ohne Flaeche (Region fehlt im DOM) umhuellt er die Ziele samt Rand. Alle Masse folgen der Flaechenhoehe.
   // ═══════════════════════════════════════════════════════════════════
   biseria_blizzard: (() => {
-    const WEISS = ppHex('#ffffff'), EIS1 = ppHex('#e4f8ff'), EIS2 = ppHex('#b9ecff'), EIS3 = ppHex('#86d4f7'), EIS4 = ppHex('#58aee9');
+    const WEISS = ppHex('#ffffff'), EIS1 = ppHex('#e5f5fa'), EIS2 = ppHex('#b3e8f9'), EIS3 = ppHex('#77c8ee'), EIS4 = ppHex('#399edf');
     const ENDE = 2400, FROST_MS = 1150, ABFLAUEN_AB = 1700;
     const glatt = (u) => { const x = Math.min(1, Math.max(0, u)); return x * x * (3 - 2 * x); };
     const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -26930,12 +26930,12 @@ const ANIM_REGISTRY = {
   // ═══════════════════════════════════════════════════════════════════
   potion_juggle: (() => {
     const FARBEN = [
-      { glas: ppHex('#f0405a'), hell: ppHex('#ff9aa8'), dunkel: ppHex('#9a1030') },
-      { glas: ppHex('#3cc860'), hell: ppHex('#a4f0b0'), dunkel: ppHex('#1a7a36') },
-      { glas: ppHex('#3d86f0'), hell: ppHex('#a6cdff'), dunkel: ppHex('#1c4a9c') },
+      { glas: ppHex('#e94e53'), hell: ppHex('#e58092'), dunkel: ppHex('#a60f39') },
+      { glas: ppHex('#00cc50'), hell: ppHex('#b3f9b8'), dunkel: ppHex('#167927') },
+      { glas: ppHex('#4580f6'), hell: ppHex('#b4cff8'), dunkel: ppHex('#2f539d') },
     ];
-    const KONTUR = ppHex('#160e2a'), KORK = ppHex('#c08a48'), KORK2 = ppHex('#8a5a28'), GLANZ = ppHex('#ffffff');
-    const STERN = [ppHex('#ffffff'), ppHex('#ffe27a'), ppHex('#9ad8ff')];
+    const KONTUR = ppHex('#170b28'), KORK = ppHex('#ca874e'), KORK2 = ppHex('#9d612f'), GLANZ = ppHex('#ffffff');
+    const STERN = [ppHex('#ffffff'), ppHex('#fbe181'), ppHex('#b3d8f9')];
     const S = 3, TAKT = 33, ENDE = 1200, EIN = 150, FADE_AB = 1000;
     const PADX = 34, PAD_OBEN = 44, PAD_UNTEN = 8;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -27044,8 +27044,8 @@ const ANIM_REGISTRY = {
   //  schon Pixelart. Massstab folgt der Zielzone (`w`/`h`).
   // ═══════════════════════════════════════════════════════════════════
   triumphant_return: (() => {
-    const GOLD = ['#ffffff', '#fff6b8', '#ffe27a', '#ffc83a', '#f0a020', '#b8741a'].map(ppHex);
-    const KONF = ['#ff4a5a', '#ffd23a', '#3d9cff', '#ffffff', '#5ae070'].map(ppHex);
+    const GOLD = ['#ffffff', '#f8f8bd', '#fbe181', '#ffc61c', '#f9ac20', '#ad6100'].map(ppHex);
+    const KONF = ['#fe5154', '#f8ca21', '#6d9bf8', '#ffffff', '#4ceb70'].map(ppHex);
     const S = 3, TAKT = 33, ENDE = 1300, EIN = 120, FADE_AB = 1000;
     const PADX = 40, PAD_OBEN = 92, PAD_UNTEN = 16;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -27162,9 +27162,9 @@ const ANIM_REGISTRY = {
   //  2100 ms ist es weg. Alle Masse folgen der Flächenhöhe (`sk`).
   // ═══════════════════════════════════════════════════════════════════
   point_blank_blast: (() => {
-    const PAL = ['#ffffff', '#fff6b8', '#ffd94a', '#ff9a1e', '#e8531a', '#b3281a', '#6a1c14', '#5c4f49', '#443a36', '#2d2624'].map(ppHex);
-    const FUNKEN = ['#ffffff', '#ffe27a', '#ff9a1e', '#e8531a'].map(ppHex);
-    const WELLE = ['#ffffff', '#fff6b8', '#ffd94a', '#ff9a1e'].map(ppHex);
+    const PAL = ['#ffffff', '#f8f8bd', '#fad54a', '#ff9a1a', '#cc2b00', '#b5171c', '#6a1c14', '#535353', '#323232', '#222222'].map(ppHex);
+    const FUNKEN = ['#ffffff', '#fbe181', '#ff9a1a', '#cc2b00'].map(ppHex);
+    const WELLE = ['#ffffff', '#f8f8bd', '#fad54a', '#ff9a1a'].map(ppHex);
     const ENDE = 2100, FADE_AB = 1500, WELLE_V = 0.3, WELLE_ANF = 200, G = 210;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -27273,8 +27273,8 @@ const ANIM_REGISTRY = {
   //  Muendungsfeuer und Einschlag am selben Platz. Dieselbe Salve zeigt die Ziele des Kontrolleurs UND die des Gegners.
   // ═══════════════════════════════════════════════════════════════════
   gunfire_volley: (() => {
-    const WEISS = ppHex('#ffffff'), GELB = ppHex('#ffe27a'), ORANGE = ppHex('#ff9b2f'), DUNKEL = ppHex('#c2551a'), ROT = ppHex('#7a2a14');
-    const GOLD = ppHex('#f2b632'), GOLD2 = ppHex('#b9791a'), RAUCH = [ppHex('#b9b9c4'), ppHex('#8a8a96'), ppHex('#5e5e6a')];
+    const WEISS = ppHex('#ffffff'), GELB = ppHex('#fbe181'), ORANGE = ppHex('#ff9b3a'), DUNKEL = ppHex('#aa5300'), ROT = ppHex('#6a1c14');
+    const GOLD = ppHex('#f9ac20'), GOLD2 = ppHex('#c68206'), RAUCH = [ppHex('#b9b9b9'), ppHex('#808898'), ppHex('#59606e')];
     const FUNKEN = [WEISS, GELB, ORANGE, DUNKEL, ROT];
     const FLUG = 190, LUECKE = 105, SCHUESSE = 3, G = 150;
     const vorbereiten = (sz) => sz.ziele.map(z => ({
@@ -27361,10 +27361,10 @@ const ANIM_REGISTRY = {
   //  1100 ms ist es weg. Feste Palette, KEINE Unschärfe, KEIN Leuchten; die Wurzel trägt `data-pp-px="aus"`.
   // ═════════════════════════════════════════════════════════════════
   spearman_thrust: (() => {
-    const HOLZ = ['#d49a52', '#a8693a', '#6d4122'].map(ppHex);
-    const STAHL = ['#ffffff', '#d3dce3', '#93a4b1', '#4d5b67'].map(ppHex);
-    const ROT = ['#ff7a68', '#d62f3e', '#7a1427'].map(ppHex);
-    const WEISS = ppHex('#ffffff'), GELB = ppHex('#ffe27a'), ORANGE = ppHex('#ff9b2f');
+    const HOLZ = ['#d1a148', '#9d612f', '#6e4421'].map(ppHex);
+    const STAHL = ['#ffffff', '#d2d2db', '#9aa3b6', '#59606e'].map(ppHex);
+    const ROT = ['#ff8566', '#e73b41', '#710122'].map(ppHex);
+    const WEISS = ppHex('#ffffff'), GELB = ppHex('#fbe181'), ORANGE = ppHex('#ff9b3a');
     const ENDE = 1100, FADE_AB = 800, AUS = 170, FLUG = 150, TREFFER = AUS + FLUG, RING = 380;
     const LAENGE = 19;                                                        // Speerlänge in Rasterpixeln
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -27467,10 +27467,10 @@ const ANIM_REGISTRY = {
   //  Rauchringlein. Ausgelöst vom Tod des Clowns (the-creepy-clown-of-heaven.js: POP_MS, Einbau-Versatz 100 ms eingerechnet).
   // ═══════════════════════════════════════════════════════════════════
   clown_pop: (() => {
-    const NASE = ['#ff9a90', '#e5303f', '#8a1230'].map(ppHex);
-    const KONFETTI = ['#ff4fd8', '#ffe14a', '#3fe0ff', '#59e36b', '#ff9b2f', '#ffffff'].map(ppHex);
-    const RAUCH = ['#f6efff', '#c4b2e8', '#8f78c4'].map(ppHex);
-    const WEISS = ppHex('#ffffff'), GELB = ppHex('#ffe27a');
+    const NASE = ['#ec7f79', '#e73b41', '#710122'].map(ppHex);
+    const KONFETTI = ['#fa6bed', '#ffe23d', '#08d3ef', '#4ceb70', '#ff9b3a', '#ffffff'].map(ppHex);
+    const RAUCH = ['#f1e5fa', '#d6bbf1', '#8066b2'].map(ppHex);
+    const WEISS = ppHex('#ffffff'), GELB = ppHex('#fbe181');
     const ENDE = 1100, FADE_AB = 800, PLATZT = 420, SCHLAG = 110, RAUCH_MS = 420;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const vorbereiten = () => {
@@ -27555,10 +27555,10 @@ const ANIM_REGISTRY = {
   //  oberste Karte auf (super-fan.js: FAN_MS, Einbau-Versatz 100 ms eingerechnet).
   // ═══════════════════════════════════════════════════════════════════
   fan_cheer: (() => {
-    const GLOW = ['#ffffff', '#b8f6ff', '#3fe0ff', '#1b8fc4', '#0b4f7a'].map(ppHex);
-    const FLARE = ['#fff7c2', '#ffe14a', '#ffb02e'].map(ppHex);
-    const ROSA = ['#ffd0ec', '#ff5fc4', '#c2308c'].map(ppHex);
-    const GRUEN = ['#c8ffd0', '#4be06a', '#1f9a3e'].map(ppHex);
+    const GLOW = ['#ffffff', '#b6eff7', '#08d3ef', '#1788bd', '#405f8c'].map(ppHex);
+    const FLARE = ['#f8f8bd', '#ffe23d', '#f9ac20'].map(ppHex);
+    const ROSA = ['#f3bad3', '#fc69c6', '#c80480'].map(ppHex);
+    const GRUEN = ['#b3f9cf', '#4ceb70', '#2ca058'].map(ppHex);
     const WEISS = ppHex('#ffffff');
     const ENDE = 1100, FADE_AB = 820;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -27640,9 +27640,9 @@ const ANIM_REGISTRY = {
   //  eingerechnet).
   // ═══════════════════════════════════════════════════════════════════
   oracle_vision: (() => {
-    const AUGEN = [['#fff3a0', '#ffe14a', '#c79a12'], ['#c6ffd2', '#4be06a', '#1f9a3e'], ['#ffc1b8', '#ff4a3a', '#a01e14'], ['#c6e4ff', '#4a9bff', '#1f56b8']].map(pal => pal.map(ppHex));
-    const KRISTALL = ['#f6e6ff', '#c78bff', '#8a3fd6', '#4b1d8a'].map(ppHex);
-    const STRAHL = ppHex('#e8e4ff'), WEISS = ppHex('#ffffff');
+    const AUGEN = [['#fff196', '#ffe23d', '#c79e05'], ['#b3f9cf', '#4ceb70', '#2ca058'], ['#f0bfbc', '#f03232', '#8f0000'], ['#b4dff8', '#6d9bf8', '#0351c9']].map(pal => pal.map(ppHex));
+    const KRISTALL = ['#f1e5fa', '#c98aff', '#9544d5', '#47117e'].map(ppHex);
+    const STRAHL = ppHex('#f1e5fa'), WEISS = ppHex('#ffffff');
     const ENDE = 1150, FADE_AB = 850, BLITZ = 640;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const ECKEN = [[-0.78, -0.72], [0.78, -0.72], [-0.78, 0.78], [0.78, 0.78]];
@@ -27713,9 +27713,9 @@ const ANIM_REGISTRY = {
   //  Sternchen stieben auseinander und zwei kleine rosa Herzen steigen auf.
   // ═══════════════════════════════════════════════════════════════════
   crown_flutter: (() => {
-    const GOLD = ['#fff7c2', '#ffd94a', '#e8a33a', '#a8661c'].map(ppHex);
-    const FEDER = ['#ffffff', '#dfe9f2', '#a9bccd', '#6d84a0'].map(ppHex);
-    const ROSA = ['#ffd0ec', '#ff5fc4', '#c2308c'].map(ppHex);
+    const GOLD = ['#f8f8bd', '#fad54a', '#cc8e00', '#ad6100'].map(ppHex);
+    const FEDER = ['#ffffff', '#e5edfa', '#a5b0c0', '#7e7d9b'].map(ppHex);
+    const ROSA = ['#f3bad3', '#fc69c6', '#c80480'].map(ppHex);
     const WEISS = ppHex('#ffffff');
     const ENDE = 1100, FADE_AB = 800;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -27782,8 +27782,8 @@ const ANIM_REGISTRY = {
   //  Der Zauber loescht die Karten bei `SCHNAPP_MS` (disarm.js) — also genau, wenn der Ring zugeschnappt ist.
   // ═══════════════════════════════════════════════════════════════════
   disarm_snap: (() => {
-    const GRUEN = ['#e4ff9a', '#9bdc4a', '#5fa82a', '#2f6a1a'].map(ppHex);
-    const VIOLETT = ['#f0d4ff', '#c08cf6', '#8a48d4', '#4a2087'].map(ppHex);
+    const GRUEN = ['#f0f075', '#87cc00', '#80bf59', '#167927'].map(ppHex);
+    const VIOLETT = ['#d9c0ec', '#c98aff', '#9544d5', '#58238c'].map(ppHex);
     const WEISS = ppHex('#ffffff');
     const ENDE = 1100, SNAPP = 420, FADE_AB = 860;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -27856,8 +27856,8 @@ const ANIM_REGISTRY = {
   //  Scheibe: Druckring, kantige Scherben in Rot/Gold fliegen mit Schwerkraft nach aussen. Der Zauber legt die Karte bei `SHATTER_MS` (breakthrough.js) ab.
   // ═══════════════════════════════════════════════════════════════════
   breakthrough_shatter: (() => {
-    const ROT = ['#ffd6d0', '#e8584a', '#b0262a', '#6a1020'].map(ppHex);
-    const GOLD = ['#fff2a8', '#ffd24a', '#d99a22'].map(ppHex);
+    const ROT = ['#f0bfbc', '#e94e53', '#b21a29', '#710122'].map(ppHex);
+    const GOLD = ['#f7f7ad', '#fad54a', '#cc8e00'].map(ppHex);
     const WEISS = ppHex('#ffffff');
     const ENDE = 1100, BRUCH = 460, FADE_AB = 860;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -27918,8 +27918,8 @@ const ANIM_REGISTRY = {
   //  weisse Funken stieben nach oben. Danach decken die Aufdeck-Fluege der Engine die Karten auf (amazing-finding.js).
   // ═══════════════════════════════════════════════════════════════════
   finding_glint: (() => {
-    const PINK = ['#ffe3f6', '#ff7ad0', '#c0369a'].map(ppHex);
-    const VIO = ['#d9b8ff', '#9a5cf0', '#5a2aa8'].map(ppHex);
+    const PINK = ['#f1e5fa', '#fc69c6', '#c80480'].map(ppHex);
+    const VIO = ['#d6b3f9', '#a159e9', '#702db3'].map(ppHex);
     const WEISS = ppHex('#ffffff');
     const ENDE = 1100, POP = 520, FADE_AB = 840;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -27976,11 +27976,11 @@ const ANIM_REGISTRY = {
   //  auf (Funken) — in dem Moment fliegt die Kreatur von ihrer Zone auf die Hand (kidnapping.js, ab ~1150 ms).
   // ═════════════════════════════════════════════════════════════════
   kidnap_sack: (() => {
-    const JUTE = ['#f0d79a', '#cfa35c', '#946c34', '#5e4119'].map(ppHex);          // hell, Mitte, dunkel, Kontur
-    const STRICK = ['#efe2b4', '#b08f55'].map(ppHex);
-    const FLICKEN = ['#c9605a', '#8c3a36'].map(ppHex);
-    const STAUB = ['#f4ead0', '#d3bf94'].map(ppHex);
-    const FUNKEN = ['#ffffff', '#ffd1ec', '#b9f0ff'].map(ppHex);
+    const JUTE = ['#e0c085', '#d1a148', '#9d612f', '#5a3c14'].map(ppHex);          // hell, Mitte, dunkel, Kontur
+    const STRICK = ['#f7e0b5', '#b29466'].map(ppHex);
+    const FLICKEN = ['#ec7f79', '#9d342f'].map(ppHex);
+    const STAUB = ['#ebdcc1', '#ccb799'].map(ppHex);
+    const FUNKEN = ['#ffffff', '#f3bad3', '#b3e8f9'].map(ppHex);
     const ENDE = 1350, FALL_BIS = 380, STAUCH_BIS = 560, BINDEN_BIS = 760, ZAPPELN_BIS = 1100, AUS_AB = 1100;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const vorbereiten = () => ({
@@ -28085,9 +28085,9 @@ const ANIM_REGISTRY = {
   //  Gespielt wird sie, bevor die Hand aufgedeckt wird (gather-intel.js).
   // ═════════════════════════════════════════════════════════════════
   intel_peek: (() => {
-    const MESSING = ['#fff1b0', '#e8b94a', '#a8741c'].map(ppHex);
-    const GLAS = ['#e6f6ff', '#9ad3ff', '#4a90d9'].map(ppHex);
-    const GRIFF = ['#8a5a2e', '#5a3818'].map(ppHex);
+    const MESSING = ['#f9ecb3', '#ffd066', '#a87c00'].map(ppHex);
+    const GLAS = ['#e5f5fa', '#b3d8f9', '#4e82cb'].map(ppHex);
+    const GRIFF = ['#9d612f', '#5a341a'].map(ppHex);
     const WEISS = ppHex('#ffffff');
     const ENDE = 1300, ANFLUG = 420, TASTEN_BIS = 1020;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -28144,10 +28144,10 @@ const ANIM_REGISTRY = {
   //  durch die Strahlen. Zuletzt blendet alles aus. Gespielt wird sie, bevor die Hand aufgedeckt wird (live-show.js).
   // ═════════════════════════════════════════════════════════════════
   live_show_spot: (() => {
-    const ROT = ['#e8606a', '#b02e40', '#641628'].map(ppHex);
-    const GOLD = ['#fff1b0', '#e8b94a', '#a8741c'].map(ppHex);
-    const LICHT = ['#ffffff', '#fff3a0'].map(ppHex);
-    const KONFETTI = ['#ff6fb5', '#5fd6ff', '#ffe45e', '#7dff9a', '#b58cff'].map(ppHex);
+    const ROT = ['#fe7476', '#a60f39', '#55011a'].map(ppHex);
+    const GOLD = ['#f9ecb3', '#ffd066', '#a87c00'].map(ppHex);
+    const LICHT = ['#ffffff', '#fff196'].map(ppHex);
+    const KONFETTI = ['#f174ab', '#66d9ff', '#ffe469', '#75f091', '#c98aff'].map(ppHex);
     const ENDE = 1300, AUF_AB = 260, AUF_BIS = 780, LICHT_AB = 360, AUS_AB = 1060;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const glatt = (u) => { const x = klemme(u, 0, 1); return x * x * (3 - 2 * x); };
@@ -28236,7 +28236,7 @@ const ANIM_REGISTRY = {
   //  Plus-Zeichen (Heilung) in goldenem Licht auf und ein Ring weitet sich um die Karte. Zuletzt blendet alles aus. Gespielt, bevor die HP umgebucht werden (inheritance-ceremony.js).
   // ═════════════════════════════════════════════════════════════════
   inheritance_flow: (() => {
-    const GOLD = ['#ffffff', '#fff3a0', '#ffd24a', '#e8a02a'].map(ppHex);
+    const GOLD = ['#ffffff', '#fff196', '#fad54a', '#cc8e00'].map(ppHex);
     const ENDE = 1000, FLUG = 520, ABSTAND = 35, AUS_AB = 760;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const glatt = (u) => { const q = klemme(u, 0, 1); return q * q * (3 - 2 * q); };
@@ -28307,10 +28307,10 @@ const ANIM_REGISTRY = {
   //  im Aufprall (_hero-duel-shared.js); die Zeiten stehen dort, in `ppHeldenRammenBahn` und hier.
   // ═════════════════════════════════════════════════════════════════
   duel_clash: (() => {
-    const BLAU = ['#ffffff', '#9ad3ff', '#4a90d9'].map(ppHex);
-    const ORANGE = ['#ffffff', '#ffd08a', '#e8742a'].map(ppHex);
-    const STERN = ['#ffffff', '#fff3a0', '#ffd24a'].map(ppHex);
-    const RISS = ['#ffffff', '#ffb35a', '#7a2a10'].map(ppHex);
+    const BLAU = ['#ffffff', '#b3d8f9', '#4e82cb'].map(ppHex);
+    const ORANGE = ['#ffffff', '#e0c085', '#e37435'].map(ppHex);
+    const STERN = ['#ffffff', '#fff196', '#fad54a'].map(ppHex);
+    const RISS = ['#ffffff', '#f4ae64', '#7d3911'].map(ppHex);
     const ENDE = 900;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const funkenSatz = (n, v0, leben0) => Array.from({ length: ppFxN(n) }, () => ({
@@ -28426,10 +28426,10 @@ const ANIM_REGISTRY = {
   //  Einlegen der Karte (create-secret-room.js) und wenn der Raum ausloest (_secret-room-shared.js).
   // ═══════════════════════════════════════════════════════════════════
   secret_room_open: (() => {
-    const STEIN = ['#a09dab', '#8a8794', '#767380', '#625f6c'].map(ppHex);
-    const FUGE = ppHex('#34323d'), KANTE = ppHex('#c4c1cf');
-    const RAUM = ['#1b1410', '#2b1f15', '#3d2c1a'].map(ppHex);
-    const GOLD = ['#fff6c2', '#ffd96a', '#e6a93a', '#a8741c'].map(ppHex);
+    const STEIN = ['#9aa3b6', '#808898', '#808898', '#59606e'].map(ppHex);
+    const FUGE = ppHex('#282834'), KANTE = ppHex('#d2d2db');
+    const RAUM = ['#141414', '#27180c', '#3a2412'].map(ppHex);
+    const GOLD = ['#f9ecb3', '#ffd966', '#cc8e00', '#a87c00'].map(ppHex);
     const ENDE = 1000, AUF = 380, ZU_AB = 640, ZU_BIS = 940;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const glatt = (u) => { const x = klemme(u, 0, 1); return x * x * (3 - 2 * x); };
@@ -28496,10 +28496,10 @@ const ANIM_REGISTRY = {
   //  `data-pp-px="aus"`: die Grafik IST schon Pixelart.
   // ═══════════════════════════════════════════════════════════════════
   masterpiece_paint: (() => {
-    const GOLD = ['#fff6c2', '#ffd96a', '#e6a93a', '#a8741c'].map(ppHex);
-    const LEINWAND = ['#f6ecd0', '#e8dcb8'].map(ppHex);
-    const FARBEN = ['#e8453c', '#f28a30', '#ffd24a', '#5fc25a', '#3f8fe0', '#8a5ad8', '#f4a0c8'].map(ppHex);
-    const HOLZ = ['#8a5a2e', '#5a3818'].map(ppHex);
+    const GOLD = ['#f9ecb3', '#ffd966', '#cc8e00', '#a87c00'].map(ppHex);
+    const LEINWAND = ['#ebdcc1', '#ebdcc1'].map(ppHex);
+    const FARBEN = ['#e63e33', '#ff9b3a', '#fad54a', '#80bf59', '#4e82cb', '#7e41ba', '#f8b4df'].map(ppHex);
+    const HOLZ = ['#9d612f', '#5a341a'].map(ppHex);
     const WEISS = ppHex('#ffffff');
     const ENDE = 1100, RAHMEN = 140, MAL_AB = 150, STRICH = 70, STRICH_DAUER = 150, GLANZ_AB = 640, FADE_AB = 880;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -28584,10 +28584,10 @@ const ANIM_REGISTRY = {
   //  Ziel (Ersatzeffekt: Ziehen über dem Deck, `selbst`), blättert sich nur das Buch auf und eine Seite steigt auf.
   // ═══════════════════════════════════════════════════════════════════
   spellbook_pages: (() => {
-    const PAPIER = ['#ffffff', '#e8e2d2', '#b9b09a'].map(ppHex);
-    const LEDER = ['#9a5a2e', '#6e3a1c', '#46230f'].map(ppHex);
-    const VIO = ['#e6ccff', '#a46cf0', '#5e2ca8'].map(ppHex);
-    const GOLD = ['#fff6c2', '#ffd96a', '#e6a93a'].map(ppHex);
+    const PAPIER = ['#ffffff', '#e2d8cb', '#c5b7a0'].map(ppHex);
+    const LEDER = ['#9d612f', '#6e4421', '#4a2a10'].map(ppHex);
+    const VIO = ['#d9c0ec', '#ba74ff', '#702db3'].map(ppHex);
+    const GOLD = ['#f9ecb3', '#ffd966', '#cc8e00'].map(ppHex);
     const ENDE = 1100, FLUG = 520, AUFSCHLAG = 560, FADE_AB = 860;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const glatt = (u) => { const x = klemme(u, 0, 1); return x * x * (3 - 2 * x); };
@@ -28683,8 +28683,8 @@ const ANIM_REGISTRY = {
   //  (whale-race-boat.js: WELLE_TREFFER_MS). Ohne Flaeche (Region fehlt im DOM) flutet sie das Feld der Ziele.
   // ═══════════════════════════════════════════════════════════════════
   tidal_wave: (() => {
-    const SCHAUM = ppHex('#ffffff'), SCHAUM2 = ppHex('#e4f6ff'), HELL = ppHex('#a8e2ff'), MITTEL = ppHex('#4fb1ee');
-    const BLAU = ppHex('#2a76cc'), TIEF = ppHex('#1b4a9c'), KONTUR = ppHex('#0f2152');
+    const SCHAUM = ppHex('#ffffff'), SCHAUM2 = ppHex('#e5f5fa'), HELL = ppHex('#b4dff8'), MITTEL = ppHex('#399edf');
+    const BLAU = ppHex('#4e77ca'), TIEF = ppHex('#2f539d'), KONTUR = ppHex('#14285a');
     const SWEEP = 1250, HALTEN_BIS = 1750, ENDE = 2300, RAND = 40;
     const FACE = 6, ABKLING = 20, SPLASH_T = 700, G = 170;
     const glatt = (u) => { const x = Math.min(1, Math.max(0, u)); return x * x * (3 - 2 * x); };
@@ -28839,7 +28839,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -42, top: -18,
             width: 84, height: 36, borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(60,0,0,0.85) 0%, rgba(20,0,0,0.7) 50%, rgba(0,0,0,0) 90%)',
+            background: 'radial-gradient(ellipse, rgba(58,0,0,0.85) 0%, rgba(8,6,12,0.7) 50%, rgba(0,0,0,0) 90%)',
             filter: 'blur(2px)',
             opacity: 0,
             animation: 'hellFoxHalo 760ms ease-out forwards',
@@ -28854,7 +28854,7 @@ const ANIM_REGISTRY = {
               top: 0,
               fontSize: 32 * f.scale,
               lineHeight: '32px',
-              filter: 'brightness(0.35) drop-shadow(0 0 6px rgba(120,0,0,0.95)) drop-shadow(0 0 14px rgba(180,0,0,0.5))',
+              filter: 'brightness(0.35) drop-shadow(0 0 6px rgba(120,0,0,0.95)) drop-shadow(0 0 14px rgba(190,14,14,0.5))',
               '--hffRise': f.riseY + 'px',
               opacity: 0,
               animation: `hellFoxFlame ${f.dur}ms ease-out ${f.delay}ms forwards`,
@@ -28866,8 +28866,8 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: 0, top: 0,
               width: s.size + 'px', height: s.size + 'px',
               borderRadius: '50%',
-              background: 'radial-gradient(circle, #ff3030 0%, #c00000 60%, transparent 100%)',
-              boxShadow: '0 0 8px #c00000aa',
+              background: 'radial-gradient(circle, #ef2929 0%, #c80000 60%, transparent 100%)',
+              boxShadow: '0 0 8px #c80000aa',
               '--hfsDx': s.dx + 'px',
               '--hfsDy': s.dy + 'px',
               opacity: 0,
@@ -28925,7 +28925,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -20, top: -28,
             fontSize: 38, lineHeight: '32px',
-            filter: 'drop-shadow(0 0 4px rgba(40,20,10,0.8))',
+            filter: 'drop-shadow(0 0 4px rgba(39,24,12,0.8))',
             transformOrigin: '60% 90%',
             animation: 'dogBiteTopFang 360ms cubic-bezier(0.4, 0, 0.85, 1) forwards',
           }}>🦷</div>
@@ -28935,7 +28935,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -2, top: 4,
             fontSize: 38, lineHeight: '32px',
-            filter: 'drop-shadow(0 0 4px rgba(40,20,10,0.8))',
+            filter: 'drop-shadow(0 0 4px rgba(39,24,12,0.8))',
             transform: 'scaleY(-1)',
             transformOrigin: '40% 10%',
             animation: 'dogBiteBottomFang 360ms cubic-bezier(0.4, 0, 0.85, 1) forwards',
@@ -28944,7 +28944,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -22, top: -12,
             width: 44, height: 32, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,235,200,0.85) 0%, rgba(255,200,140,0.35) 50%, transparent 80%)',
+            background: 'radial-gradient(circle, rgba(247,224,181,0.85) 0%, rgba(224,192,133,0.35) 50%, transparent 80%)',
             opacity: 0,
             animation: 'dogBiteImpact 280ms ease-out 320ms forwards',
           }} />
@@ -28954,7 +28954,7 @@ const ANIM_REGISTRY = {
             <div key={'dbs' + i} style={{
               position: 'absolute', left: -1, top: -1,
               width: s.len + 'px', height: 2,
-              background: 'linear-gradient(90deg, rgba(70,40,20,0.95), rgba(70,40,20,0))',
+              background: 'linear-gradient(90deg, rgba(74,42,16,0.95), rgba(74,42,16,0))',
               transform: `rotate(${s.rot}deg)`,
               transformOrigin: '0 50%',
               opacity: 0,
@@ -28967,8 +28967,8 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: 0, top: 0,
               width: d.size + 'px', height: d.size + 'px',
               borderRadius: '50%',
-              background: 'radial-gradient(circle, #f5f1d8 0%, #cfc7a0 70%, transparent 100%)',
-              boxShadow: '0 0 4px rgba(220,210,170,0.7)',
+              background: 'radial-gradient(circle, #fff8e8 0%, #ccb799 70%, transparent 100%)',
+              boxShadow: '0 0 4px rgba(247,224,181,0.7)',
               opacity: 0,
               '--dbDx': d.dx + 'px',
               '--dbDy': d.dy + 'px',
@@ -29044,19 +29044,19 @@ const ANIM_REGISTRY = {
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           <div className="anim-flame-flash" style={{
             width: 130, height: 130, marginLeft: -65, marginTop: -65,
-            background: 'radial-gradient(circle, rgba(60,10,90,.85) 0%, rgba(80,30,140,.5) 35%, rgba(20,0,40,.25) 60%, transparent 80%)',
+            background: 'radial-gradient(circle, rgba(64,26,102,.85) 0%, rgba(88,35,140,.5) 35%, rgba(25,6,45,.25) 60%, transparent 80%)',
           }} />
           <div className="anim-flame-flash" style={{
             width: 80, height: 80, marginLeft: -40, marginTop: -40,
             animationDelay: '180ms',
-            background: 'radial-gradient(circle, rgba(140,60,200,.5) 0%, rgba(60,20,120,.3) 50%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(149,68,213,.5) 0%, rgba(71,17,126,.3) 50%, transparent 70%)',
           }} />
           {motes.map((m, i) => (
             <div key={'sbm'+i} style={{
               position: 'absolute', left: m.xOff, top: m.startY,
               width: m.size, height: m.size, borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(180,100,255,.95), rgba(80,20,150,.4))',
-              boxShadow: '0 0 10px rgba(160,60,255,.7), 0 0 18px rgba(80,20,140,.4)',
+              background: 'radial-gradient(circle, rgba(184,102,255,.95), rgba(80,0,140,.4))',
+              boxShadow: '0 0 10px rgba(160,64,255,.7), 0 0 18px rgba(80,0,140,.4)',
               opacity: 0,
               animation: `holySparkleRise ${m.dur}ms ease-out ${m.delay}ms forwards`,
             }} />
@@ -29065,9 +29065,9 @@ const ANIM_REGISTRY = {
             <div key={'sbr'+i} style={{
               position: 'absolute', left: 0, top: 0,
               fontSize: r.size, opacity: 0,
-              color: '#cf9bff',
+              color: '#c98aff',
               transform: `rotate(${r.rot}deg)`,
-              textShadow: '0 0 8px rgba(180,80,255,.85), 0 0 16px rgba(80,20,140,.55)',
+              textShadow: '0 0 8px rgba(169,82,255,.85), 0 0 16px rgba(80,0,140,.55)',
               animation: `musicNoteFloat ${r.dur}ms ease-out ${r.delay}ms forwards`,
               '--endX': r.endX + 'px', '--endY': r.endY + 'px',
               '--noteOpacity': 0.95,
@@ -29114,7 +29114,7 @@ const ANIM_REGISTRY = {
         return {
           dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
           size: 2 + Math.random() * (4 + t * 4),
-          color: ['#ff3300','#ff7700','#ffbb00','#ff1100','#ffaa00','#ffe680'][Math.floor(Math.random() * 6)],
+          color: ['#ff491a','#ff7d00','#ffb91a','#ff1a1a','#f9ac20','#fbe181'][Math.floor(Math.random() * 6)],
           delay: 240 + Math.random() * 200,
           dur: 320 + Math.random() * 280,
         };
@@ -29140,21 +29140,21 @@ const ANIM_REGISTRY = {
           <div className="anim-flame-flash" style={{
             width: flashSize, height: flashSize,
             marginLeft: -flashSize / 2, marginTop: -flashSize / 2,
-            background: 'radial-gradient(circle, rgba(255,140,30,.85) 0%, rgba(255,60,0,.55) 35%, rgba(160,20,0,.25) 65%, transparent 80%)',
+            background: 'radial-gradient(circle, rgba(255,139,26,.85) 0%, rgba(255,73,26,.55) 35%, rgba(143,0,0,.25) 65%, transparent 80%)',
           }} />
           {/* Inner flash (delayed) */}
           <div className="anim-flame-flash" style={{
             width: innerFlashSize, height: innerFlashSize,
             marginLeft: -innerFlashSize / 2, marginTop: -innerFlashSize / 2,
             animationDelay: '120ms',
-            background: 'radial-gradient(circle, rgba(255,220,120,.9) 0%, rgba(255,120,0,.5) 50%, transparent 80%)',
+            background: 'radial-gradient(circle, rgba(251,225,129,.9) 0%, rgba(255,125,0,.5) 50%, transparent 80%)',
           }} />
           {/* White-hot core (max tier only) */}
           {showWhiteCore && (
             <div className="anim-flame-flash" style={{
               width: 50, height: 50, marginLeft: -25, marginTop: -25,
               animationDelay: '60ms', animationDuration: '500ms',
-              background: 'radial-gradient(circle, rgba(255,255,240,1) 0%, rgba(255,200,100,.7) 40%, transparent 70%)',
+              background: 'radial-gradient(circle, rgba(255,248,232,1) 0%, rgba(251,200,106,.7) 40%, transparent 70%)',
             }} />
           )}
           {/* Flame shards radiating outward */}
@@ -29176,8 +29176,8 @@ const ANIM_REGISTRY = {
             <div key={'sp'+idx} style={{
               position: 'absolute', left: p.xOff, top: p.startY,
               width: p.size, height: p.size, borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(255,200,80,.95), rgba(220,60,0,.5))',
-              boxShadow: '0 0 12px rgba(255,140,30,.85), 0 0 22px rgba(180,40,0,.5)',
+              background: 'radial-gradient(circle, rgba(255,208,102,.95), rgba(204,43,0,.5))',
+              boxShadow: '0 0 12px rgba(255,139,26,.85), 0 0 22px rgba(182,38,0,.5)',
               opacity: 0,
               animation: `holySparkleRise ${p.dur}ms ease-out ${p.delay}ms forwards`,
             }} />
@@ -29188,7 +29188,7 @@ const ANIM_REGISTRY = {
               width: flashSize * 1.15, height: flashSize * 1.15,
               marginLeft: -flashSize * 1.15 / 2, marginTop: -flashSize * 1.15 / 2,
               animationDelay: '420ms', animationDuration: '520ms',
-              background: 'radial-gradient(circle, rgba(255,80,0,.7) 0%, rgba(180,30,0,.4) 45%, transparent 75%)',
+              background: 'radial-gradient(circle, rgba(255,73,26,.7) 0%, rgba(182,38,0,.4) 45%, transparent 75%)',
             }} />
           )}
           {/* Shockwave ring (intensity 6+) */}
@@ -29196,8 +29196,8 @@ const ANIM_REGISTRY = {
             <div style={{
               position: 'absolute', left: 0, top: 0,
               width: 0, height: 0, borderRadius: '50%',
-              border: '4px solid rgba(255,160,40,.85)',
-              boxShadow: '0 0 28px rgba(255,140,40,.7)',
+              border: '4px solid rgba(255,154,26,.85)',
+              boxShadow: '0 0 28px rgba(255,139,26,.7)',
               animation: `soulShardShockwave 700ms ease-out 80ms forwards`,
             }} />
           )}
@@ -29237,7 +29237,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -cw * 0.55, top: -ch * 0.55,
             width: cw * 1.1, height: ch * 1.1, borderRadius: 12,
-            background: 'radial-gradient(ellipse at center, rgba(140,210,255,0.55) 0%, rgba(80,170,240,0.35) 50%, rgba(40,130,220,0) 90%)',
+            background: 'radial-gradient(ellipse at center, rgba(119,200,238,0.55) 0%, rgba(102,182,255,0.35) 50%, rgba(78,119,202,0) 90%)',
             filter: 'blur(5px)',
             opacity: 0,
             animation: 'coldStrikeAura 950ms ease-out forwards',
@@ -29247,8 +29247,8 @@ const ANIM_REGISTRY = {
             position: 'absolute', left: 0, top: 0,
             width: 8, height: 8, marginLeft: -4, marginTop: -4,
             borderRadius: '50%',
-            border: '3px solid rgba(180,230,255,.85)',
-            boxShadow: '0 0 14px rgba(120,200,255,.7)',
+            border: '3px solid rgba(180,223,248,.85)',
+            boxShadow: '0 0 14px rgba(104,198,253,.7)',
             opacity: 0,
             animation: 'coldStrikeRing 800ms ease-out forwards',
           }} />
@@ -29258,8 +29258,8 @@ const ANIM_REGISTRY = {
             return (
               <div key={'csf'+i} style={{
                 position: 'absolute', left: sx, top: sy,
-                fontSize: f.size, color: '#dff2ff',
-                filter: 'drop-shadow(0 0 5px rgba(120,200,255,.85))',
+                fontSize: f.size, color: '#e5edfa',
+                filter: 'drop-shadow(0 0 5px rgba(104,198,253,.85))',
                 opacity: 0,
                 animation: `coldStrikeFlake ${f.dur}ms ease-out ${f.delay}ms forwards`,
                 '--csdx': f.drift + 'px',
@@ -29311,7 +29311,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -cw * 0.55, top: -ch * 0.55,
             width: cw * 1.1, height: ch * 1.1, borderRadius: 12,
-            background: 'radial-gradient(ellipse at center, rgba(255,180,60,0.6) 0%, rgba(255,130,30,0.4) 50%, rgba(220,90,20,0) 90%)',
+            background: 'radial-gradient(ellipse at center, rgba(249,172,32,0.6) 0%, rgba(255,139,26,0.4) 50%, rgba(207,95,0,0) 90%)',
             filter: 'blur(5px)',
             opacity: 0,
             animation: 'empoweredStrikeAura 950ms ease-out forwards',
@@ -29321,8 +29321,8 @@ const ANIM_REGISTRY = {
             position: 'absolute', left: 0, top: 0,
             width: 8, height: 8, marginLeft: -4, marginTop: -4,
             borderRadius: '50%',
-            border: '3px solid rgba(255,200,90,.9)',
-            boxShadow: '0 0 14px rgba(255,160,40,.8)',
+            border: '3px solid rgba(255,208,102,.9)',
+            boxShadow: '0 0 14px rgba(255,154,26,.8)',
             opacity: 0,
             animation: 'empoweredStrikeRing 800ms ease-out forwards',
           }} />
@@ -29330,7 +29330,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: 0, top: 0,
             fontSize: 30, marginLeft: -15, marginTop: -18,
-            filter: 'drop-shadow(0 0 8px rgba(255,180,60,.95))',
+            filter: 'drop-shadow(0 0 8px rgba(249,172,32,.95))',
             opacity: 0,
             animation: 'empoweredStrikeFist 700ms ease-out 120ms forwards',
           }}>💪</div>
@@ -29340,8 +29340,8 @@ const ANIM_REGISTRY = {
             return (
               <div key={'esp'+i} style={{
                 position: 'absolute', left: sx, top: sy,
-                fontSize: s.size, color: '#ffd07a',
-                filter: 'drop-shadow(0 0 5px rgba(255,140,40,.9))',
+                fontSize: s.size, color: '#fbc86a',
+                filter: 'drop-shadow(0 0 5px rgba(255,139,26,.9))',
                 opacity: 0,
                 animation: `empoweredStrikeSpark ${s.dur}ms ease-out ${s.delay}ms forwards`,
                 '--esdx': s.drift + 'px',
@@ -29405,7 +29405,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -cw * 0.55, top: -ch * 0.55,
             width: cw * 1.1, height: ch * 1.1, borderRadius: 8,
-            background: 'radial-gradient(ellipse at center, rgba(75,75,80,0.55) 0%, rgba(55,55,60,0.35) 55%, rgba(40,40,45,0.0) 100%)',
+            background: 'radial-gradient(ellipse at center, rgba(83,83,83,0.55) 0%, rgba(50,50,50,0.35) 55%, rgba(34,34,34,0.0) 100%)',
             filter: 'blur(6px)',
             opacity: 0,
             animation: 'smokeVialHaze 1100ms ease-out forwards',
@@ -29417,7 +29417,7 @@ const ANIM_REGISTRY = {
               width: p.size, height: p.size,
               marginLeft: -p.size / 2, marginTop: -p.size / 2,
               borderRadius: '50%',
-              background: `radial-gradient(circle, rgba(${p.shade},${p.shade},${p.shade + 5},0.85) 0%, rgba(${p.shade - 15},${p.shade - 15},${p.shade - 10},0.55) 50%, rgba(30,30,35,0) 78%)`,
+              background: `radial-gradient(circle, rgba(${p.shade},${p.shade},${p.shade + 5},0.85) 0%, rgba(${p.shade - 15},${p.shade - 15},${p.shade - 10},0.55) 50%, rgba(34,34,34,0) 78%)`,
               filter: 'blur(2px)',
               opacity: 0,
               transform: 'scale(0.5)',
@@ -29464,10 +29464,10 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -len / 2, top: -3,
             width: len + 'px', height: 6 + 'px',
-            background: 'linear-gradient(to right, transparent 0%, rgba(40,200,90,0.95) 20%, rgba(80,255,120,1) 50%, rgba(40,200,90,0.95) 80%, transparent 100%)',
+            background: 'linear-gradient(to right, transparent 0%, rgba(0,204,80,0.95) 20%, rgba(102,255,113,1) 50%, rgba(0,204,80,0.95) 80%, transparent 100%)',
             transform: 'rotate(45deg)',
             transformOrigin: '50% 50%',
-            boxShadow: '0 0 14px rgba(40,200,90,0.85), 0 0 28px rgba(20,140,60,0.6)',
+            boxShadow: '0 0 14px rgba(0,204,80,0.85), 0 0 28px rgba(22,121,39,0.6)',
             opacity: 0,
             animation: 'silence-cut-blade 480ms ease-out forwards',
           }} />
@@ -29477,7 +29477,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -len / 2, top: -1,
             width: len + 'px', height: 2 + 'px',
-            background: 'linear-gradient(to right, transparent 0%, rgba(180,255,200,1) 50%, transparent 100%)',
+            background: 'linear-gradient(to right, transparent 0%, rgba(179,249,184,1) 50%, transparent 100%)',
             transform: 'rotate(45deg)',
             transformOrigin: '50% 50%',
             opacity: 0,
@@ -29488,7 +29488,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             width: 70, height: 70, left: -35, top: -35,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(40,200,90,0.5) 0%, rgba(20,100,50,0.3) 40%, transparent 75%)',
+            background: 'radial-gradient(circle, rgba(0,204,80,0.5) 0%, rgba(41,102,63,0.3) 40%, transparent 75%)',
             opacity: 0,
             animation: 'silence-cut-puff 700ms ease-out 80ms forwards',
           }} />
@@ -29532,10 +29532,10 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -len / 2, top: -3,
             width: len + 'px', height: 6 + 'px',
-            background: 'linear-gradient(to right, transparent 0%, rgba(220,40,40,0.95) 20%, rgba(255,80,80,1) 50%, rgba(220,40,40,0.95) 80%, transparent 100%)',
+            background: 'linear-gradient(to right, transparent 0%, rgba(230,62,51,0.95) 20%, rgba(254,81,84,1) 50%, rgba(230,62,51,0.95) 80%, transparent 100%)',
             transform: 'rotate(45deg)',
             transformOrigin: '50% 50%',
-            boxShadow: '0 0 14px rgba(220,40,40,0.85), 0 0 28px rgba(140,20,20,0.6)',
+            boxShadow: '0 0 14px rgba(230,62,51,0.85), 0 0 28px rgba(139,13,13,0.6)',
             opacity: 0,
             animation: 'red-cut-blade 480ms ease-out forwards',
           }} />
@@ -29544,7 +29544,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -len / 2, top: -1,
             width: len + 'px', height: 2 + 'px',
-            background: 'linear-gradient(to right, transparent 0%, rgba(255,200,200,1) 50%, transparent 100%)',
+            background: 'linear-gradient(to right, transparent 0%, rgba(240,191,188,1) 50%, transparent 100%)',
             transform: 'rotate(45deg)',
             transformOrigin: '50% 50%',
             opacity: 0,
@@ -29555,7 +29555,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             width: 70, height: 70, left: -35, top: -35,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(220,40,40,0.5) 0%, rgba(120,20,20,0.3) 40%, transparent 75%)',
+            background: 'radial-gradient(circle, rgba(230,62,51,0.5) 0%, rgba(120,0,20,0.3) 40%, transparent 75%)',
             opacity: 0,
             animation: 'red-cut-puff 700ms ease-out 80ms forwards',
           }} />
@@ -29607,7 +29607,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', width: 30, height: 30, left: -15, top: -15,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,220,0.9) 0%, rgba(255,200,120,0.5) 50%, transparent 80%)',
+            background: 'radial-gradient(circle, rgba(255,251,210,0.9) 0%, rgba(251,200,106,0.5) 50%, transparent 80%)',
             opacity: 0,
             animation: 'arrow-impact-core 380ms ease-out forwards',
           }} />
@@ -29617,8 +29617,8 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: -s.size / 2, top: -s.size / 2,
               width: s.size + 'px', height: s.size + 'px',
               borderRadius: '50%',
-              background: '#fffbe0',
-              boxShadow: '0 0 6px #ffe080, 0 0 12px rgba(255,220,140,0.7)',
+              background: '#fff8e8',
+              boxShadow: '0 0 6px #fbe181, 0 0 12px rgba(251,225,129,0.7)',
               opacity: 0,
               animation: `arrow-impact-sparkle 600ms ease-out ${s.delay}ms forwards`,
               '--aix': Math.cos(s.angle) * s.dist + 'px',
@@ -29632,8 +29632,8 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: -b.size / 2, top: -b.size / 2,
               width: b.size + 'px', height: b.size + 'px',
               borderRadius: '50%',
-              background: 'radial-gradient(circle, #c41a1a 0%, #7a0000 80%)',
-              boxShadow: '0 0 4px rgba(180,0,0,0.7)',
+              background: 'radial-gradient(circle, #c0141c 0%, #780000 80%)',
+              boxShadow: '0 0 4px rgba(190,14,14,0.7)',
               opacity: 0,
               animation: `arrow-impact-blood 720ms cubic-bezier(.2,.5,.4,1) ${b.delay}ms forwards`,
               '--bdx': Math.cos(b.angle) * b.dist + 'px',
@@ -29695,7 +29695,7 @@ function IceEncaseEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 3 + Math.random() * 6,
-      color: ['#aaddff','#88ccff','#cceeFF','#fff','#ddeeff'][Math.floor(Math.random() * 5)],
+      color: ['#b3d8f9','#7bbeea','#bddcef','#fff','#e5edfa'][Math.floor(Math.random() * 5)],
       delay: 350 + Math.random() * 100,
       dur: 300 + Math.random() * 200,
     };
@@ -29792,7 +29792,7 @@ function ZielMarkenEbene({ marken, blitze, myIdx }) {
       <svg className="ziel-pfad" width="100%" height="100%">
         <defs>
           <marker id="zielPfadSpitze" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(255,90,80,.75)" />
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(254,81,84,.75)" />
           </marker>
         </defs>
         {segmente.map(sg => (
@@ -29892,7 +29892,7 @@ function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, sha
   const isMimic = !attachedHero && !shapeshiftBase && !isNest && !!mimicCreature;
   const isShift = !!shapeshiftBase;
   const badgeIcon = isShift ? '🎭' : isMimic ? '🎭' : isNest ? '🪺' : '📎';
-  const badgeColor = isShift ? '#9bd8ff' : isMimic ? '#cf9bff' : isNest ? '#9ad19a' : '#ffd700';
+  const badgeColor = isShift ? '#b3d8f9' : isMimic ? '#c98aff' : isNest ? '#92d3a9' : '#ffd61a';
   // Beim Shapeshifter nennt das Abzeichen die EIGENE Karte — die
   // kopierte sieht man ja bereits. Bei den anderen umgekehrt.
   const badgeShortName = (overlay || '').split(',')[0]
@@ -30036,7 +30036,7 @@ function AbilityStack({ cards }) {
 }
 
 // Card name picker prompt component (for Luck, etc.) — must be a proper component to preserve state across re-renders
-const CARD_NAME_TYPE_COLORS = { Hero:'#aa44ff', 'Ascended Hero':'#7722cc', Ability:'#4488ff', Artifact:'#ddaa22', Creature:'#44bb44', Attack:'#ff4444', Spell:'#ff4444', Potion:'#8B4513' };
+const CARD_NAME_TYPE_COLORS = { Hero:'#a040ff', 'Ascended Hero':'#7a2bd0', Ability:'#4580f6', Artifact:'#c79e05', Creature:'#20ac37', Attack:'#f03232', Spell:'#f03232', Potion:'#7d3911' };
 // Dropdown variant of the generic Option Picker prompt. Used when a prompt
 // has many scalar choices (Siphem spending 1..N counters) and the usual
 // stack of wide buttons would eat too much vertical space.
@@ -30082,7 +30082,7 @@ function SharedZoneInstanceList({ instances, onPick, canActivateFor, onActivate 
         const maxHp = inst.maxHp != null && inst.maxHp > 0 ? inst.maxHp : Math.max(hp, 1);
         const pct = Math.max(0, Math.min(100, Math.round((hp / maxHp) * 100)));
         // Rot, sobald es knapp wird — dieselbe Ampel wie auf dem Brett.
-        const barColor = pct <= 25 ? '#e05252' : pct <= 60 ? '#e0b152' : '#52c471';
+        const barColor = pct <= 25 ? '#e94e53' : pct <= 60 ? '#d1a148' : '#4bcd7c';
         const activatable = typeof canActivateFor === 'function' && canActivateFor(inst);
         const clickable = !!onPick || activatable;
         const handleClick = () => {
@@ -30096,8 +30096,8 @@ function SharedZoneInstanceList({ instances, onPick, canActivateFor, onActivate 
             style={{
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '8px 10px', borderRadius: 6,
-              border: '1px solid ' + (activatable ? 'var(--accent, #ffd166)' : 'var(--border, rgba(255,255,255,.18))'),
-              background: activatable ? 'rgba(255,209,102,.10)' : 'rgba(255,255,255,.04)',
+              border: '1px solid ' + (activatable ? 'var(--accent, #ffd066)' : 'var(--border, rgba(255,255,255,.18))'),
+              background: activatable ? 'rgba(255,208,102,.10)' : 'rgba(255,255,255,.04)',
               cursor: clickable ? 'pointer' : 'default',
             }}>
             <div style={{
@@ -30144,8 +30144,8 @@ function SharedZoneInstanceList({ instances, onPick, canActivateFor, onActivate 
                 {activatable && (
                   <span style={{
                     fontSize: 10, padding: '1px 6px', borderRadius: 8, fontWeight: 700,
-                    background: 'rgba(255,209,102,.22)',
-                    border: '1px solid var(--accent, #ffd166)',
+                    background: 'rgba(255,208,102,.22)',
+                    border: '1px solid var(--accent, #ffd066)',
                   }}>⚡ Click to use effect</span>
                 )}
               </div>
@@ -30327,7 +30327,7 @@ function IdentityPileCard({ traegerCard, identityCard, nutzbar = false, onActiva
       {!hovered && (
         <div style={{
           position: 'absolute', top: 2, left: 2,
-          background: 'rgba(0,0,0,.65)', color: '#cf9bff',
+          background: 'rgba(0,0,0,.65)', color: '#c98aff',
           fontSize: 10, padding: '1px 4px', borderRadius: 3,
           pointerEvents: 'none', zIndex: 5,
         }} title={`Currently: ${identityCard.name}`}>
@@ -30458,12 +30458,12 @@ function PileSearchModal({ title, cards, onClose, preserveOrder = false, ownerLe
                       <div style={{
                         position: 'absolute', top: 2, left: 2,
                         background: 'rgba(0,0,0,.85)',
-                        color: stamp > 0 ? '#c4a8ff' : '#fff',
+                        color: stamp > 0 ? '#d6b3f9' : '#fff',
                         padding: '2px 6px', borderRadius: 4,
                         fontSize: 11, fontWeight: 700,
-                        border: '1px solid ' + (stamp > 0 ? '#a288ff' : 'rgba(255,255,255,0.3)'),
+                        border: '1px solid ' + (stamp > 0 ? '#b278ed' : 'rgba(255,255,255,0.3)'),
                         pointerEvents: 'none', zIndex: 5,
-                        boxShadow: stamp > 0 ? '0 0 6px rgba(162,136,255,.6)' : 'none',
+                        boxShadow: stamp > 0 ? '0 0 6px rgba(178,120,237,.6)' : 'none',
                       }}>Lv {effectiveLevel}{stamp > 0 ? ` (+${stamp})` : ''}</div>
                     )}
                   </div>
@@ -30588,8 +30588,8 @@ function CardReorderPrompt({ ep, onRespond }) {
                       width: 104, height: 146, borderRadius: 6, pointerEvents: 'none', boxSizing: 'border-box',
                       border: '2px dashed var(--accent)', display: 'flex', flexDirection: 'column', alignItems: 'center',
                       justifyContent: 'center', gap: 8, textAlign: 'center', padding: 6, fontSize: 12, fontWeight: 800,
-                      color: 'var(--accent)', background: 'rgba(120,220,255,.07)',
-                      boxShadow: ziel ? '0 0 0 3px var(--accent), 0 0 16px rgba(120,220,255,.8)' : 'none',
+                      color: 'var(--accent)', background: 'rgba(127,223,255,.07)',
+                      boxShadow: ziel ? '0 0 0 3px var(--accent), 0 0 16px rgba(127,223,255,.8)' : 'none',
                     }}>
                       <div style={{ fontSize: 22 }}>⇅</div>
                       <div>{ep.splitLabel || 'Cards after this marker go to the BOTTOM'}</div>
@@ -30600,12 +30600,12 @@ function CardReorderPrompt({ ep, onRespond }) {
                   <>
                     <div style={{
                       minWidth: 26, textAlign: 'center', padding: '2px 8px', borderRadius: 10, fontSize: 13, fontWeight: 800,
-                      background: pos === 0 ? 'var(--accent)' : 'rgba(255,255,255,.12)', color: pos === 0 ? '#001018' : 'var(--text)',
+                      background: pos === 0 ? 'var(--accent)' : 'rgba(255,255,255,.12)', color: pos === 0 ? '#08060c' : 'var(--text)',
                       border: '1px solid rgba(255,255,255,.25)',
                     }}>{markerPos >= 0 ? (inUnten ? '⬇ ' : '⬆ ') + gruppenNr : gruppenNr}</div>
                     <div style={{
                       width: 104, height: 146, borderRadius: 6, overflow: 'hidden', pointerEvents: 'none',
-                      boxShadow: ziel ? '0 0 0 3px var(--accent), 0 0 16px rgba(120,220,255,.8)' : '0 2px 8px rgba(0,0,0,.5)',
+                      boxShadow: ziel ? '0 0 0 3px var(--accent), 0 0 16px rgba(127,223,255,.8)' : '0 2px 8px rgba(0,0,0,.5)',
                       opacity: inUnten ? 0.8 : 1,
                     }}>
                       {card ? <CardMini card={card} style={{ width: '100%', height: '100%' }} />
@@ -30852,7 +30852,7 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
         <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12, flexShrink: 0 }}>
           {ep.description}
           {maxBudget != null && !ep.hideCostUI && (
-            <span style={{ marginLeft: 8, color: totalCost > maxBudget * 0.8 ? '#ffaa33' : 'var(--accent)', fontWeight: 600 }}>
+            <span style={{ marginLeft: 8, color: totalCost > maxBudget * 0.8 ? '#f9ac20' : 'var(--accent)', fontWeight: 600 }}>
               ({ep.budgetLabel || 'Cost'}: {totalCost}/{maxBudget})
             </span>
           )}
@@ -30861,13 +30861,13 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
           {maxBudget == null && ep.exactBudget != null && !ep.hideCostUI && (
             <span style={{
               marginLeft: 8, fontWeight: 800, fontSize: 13,
-              color: totalCost === ep.exactBudget ? 'var(--success)' : (totalCost > ep.exactBudget ? '#ff4d4d' : 'var(--accent)'),
+              color: totalCost === ep.exactBudget ? 'var(--success)' : (totalCost > ep.exactBudget ? '#fe5154' : 'var(--accent)'),
             }}>
               ({ep.budgetLabel || 'Cost'}: {totalCost}/{ep.exactBudget})
             </span>
           )}
           {uniqueNamesPicked && (
-            <span style={{ marginLeft: 8, color: meetsUniqueGate ? 'var(--success)' : '#ffaa33', fontWeight: 600 }}>
+            <span style={{ marginLeft: 8, color: meetsUniqueGate ? 'var(--success)' : '#f9ac20', fontWeight: 600 }}>
               ({ep.uniqueGateLabel || 'Unique'}: {uniqueNamesPicked.size}/{requiredUniqueCount})
             </span>
           )}
@@ -30945,9 +30945,9 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
               // to remember the pile order.
               const pileSide = entry.pileSide;
               const pileBadge = pileSide === 'own'
-                ? { text: 'Yours', color: '#7dff90', bg: 'rgba(20,80,30,0.85)' }
+                ? { text: 'Yours', color: '#75f091', bg: 'rgba(47,78,29,0.85)' }
                 : pileSide === 'opp'
-                  ? { text: "Opp's", color: '#ff9090', bg: 'rgba(80,20,30,0.85)' }
+                  ? { text: "Opp's", color: '#ec7f79', bg: 'rgba(75,16,33,0.85)' }
                   : null;
               return (
                 <div key={entry.name + '-' + i} style={{ position: 'relative' }}>
@@ -30959,7 +30959,7 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
                     }} />
                   {isSel && <div style={{ position: 'absolute', top: 3, right: 3, background: 'var(--accent)', color: '#000', fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 3, zIndex: 5 }}>✓</div>}
                   {pileBadge && <div style={{ position: 'absolute', top: 3, left: 3, background: pileBadge.bg, color: pileBadge.color, fontSize: 9, fontWeight: 800, padding: '1px 5px', borderRadius: 3, zIndex: 5, letterSpacing: '0.5px', textShadow: '0 0 2px rgba(0,0,0,0.9)' }}>{pileBadge.text}</div>}
-                  {_budgetCap != null && !ep.hideCostUI && <div style={{ position: 'absolute', bottom: 3, left: 3, background: 'rgba(0,0,0,.7)', color: '#ffd700', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, zIndex: 5 }}>{entryCost}G</div>}
+                  {_budgetCap != null && !ep.hideCostUI && <div style={{ position: 'absolute', bottom: 3, left: 3, background: 'rgba(0,0,0,.7)', color: '#ffd61a', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, zIndex: 5 }}>{entryCost}G</div>}
                 </div>
               );
             })}
@@ -31010,18 +31010,18 @@ function StatusSelectPrompt({ ep, onRespond }) {
   }, [localSelected, onRespond]);
 
   return (
-    <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#33dd55', minWidth: 260 }}>
-      <div className="orbit-font" style={{ fontSize: 13, color: '#33dd55', marginBottom: 4 }}>{ep.title}</div>
+    <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#3ddc57', minWidth: 260 }}>
+      <div className="orbit-font" style={{ fontSize: 13, color: '#3ddc57', marginBottom: 4 }}>{ep.title}</div>
       <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
         {(ep.statuses || []).map(s => (
           <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 8px', borderRadius: 4,
-            background: localSelected.includes(s.key) ? 'rgba(50,220,80,.15)' : 'rgba(255,255,255,.03)',
-            border: localSelected.includes(s.key) ? '1px solid rgba(50,220,80,.5)' : '1px solid rgba(255,255,255,.08)',
+            background: localSelected.includes(s.key) ? 'rgba(61,220,87,.15)' : 'rgba(255,255,255,.03)',
+            border: localSelected.includes(s.key) ? '1px solid rgba(61,220,87,.5)' : '1px solid rgba(255,255,255,.08)',
           }} onClick={() => toggleStatus(s.key)}>
             <span style={{ fontSize: 16 }}>{s.icon}</span>
-            <span style={{ fontSize: 12, color: localSelected.includes(s.key) ? '#88ffaa' : 'var(--text2)' }}>{s.label}{s.stacks > 1 ? ` (×${s.stacks})` : ''}</span>
-            <span style={{ marginLeft: 'auto', fontSize: 10, color: localSelected.includes(s.key) ? '#33dd55' : 'var(--text2)', opacity: .6 }}>
+            <span style={{ fontSize: 12, color: localSelected.includes(s.key) ? '#75f091' : 'var(--text2)' }}>{s.label}{s.stacks > 1 ? ` (×${s.stacks})` : ''}</span>
+            <span style={{ marginLeft: 'auto', fontSize: 10, color: localSelected.includes(s.key) ? '#3ddc57' : 'var(--text2)', opacity: .6 }}>
               {localSelected.includes(s.key) ? '✓' : '○'}
             </span>
           </div>
@@ -31067,10 +31067,10 @@ function playSideDeckAppearOverlay(targetEl) {
         100% { opacity: 0; transform: translateX(220%) skewX(-25deg); }
       }
       @keyframes sdaCardGlow {
-        0%   { box-shadow: 0 0 0 0 rgba(255,235,140,0); filter: brightness(1); }
-        25%  { box-shadow: 0 0 28px 6px rgba(255,225,140,0.95), 0 0 48px 14px rgba(220,180,255,0.7); filter: brightness(1.3); }
-        70%  { box-shadow: 0 0 22px 4px rgba(255,225,140,0.7); filter: brightness(1.1); }
-        100% { box-shadow: 0 0 0 0 rgba(255,225,140,0); filter: brightness(1); }
+        0%   { box-shadow: 0 0 0 0 rgba(255,241,150,0); filter: brightness(1); }
+        25%  { box-shadow: 0 0 28px 6px rgba(251,225,129,0.95), 0 0 48px 14px rgba(214,179,249,0.7); filter: brightness(1.3); }
+        70%  { box-shadow: 0 0 22px 4px rgba(251,225,129,0.7); filter: brightness(1.1); }
+        100% { box-shadow: 0 0 0 0 rgba(251,225,129,0); filter: brightness(1); }
       }
       @keyframes sdaSparkle {
         0%   { opacity: 0; transform: translate(0,0) scale(0.3) rotate(0deg); }
@@ -31099,7 +31099,7 @@ function playSideDeckAppearOverlay(targetEl) {
   shine.style.cssText = `
     position: absolute; top: -20%; left: 0;
     width: 50%; height: 140%;
-    background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(255,250,220,0.85) 45%, rgba(255,255,255,0.95) 50%, rgba(255,235,180,0.85) 55%, rgba(255,255,255,0) 100%);
+    background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(255,251,210,0.85) 45%, rgba(255,255,255,0.95) 50%, rgba(249,236,179,0.85) 55%, rgba(255,255,255,0) 100%);
     mix-blend-mode: screen;
     animation: sdaShineSweep 900ms ease-out 100ms both;
   `;
@@ -31110,7 +31110,7 @@ function playSideDeckAppearOverlay(targetEl) {
   const cx = rect.width / 2;
   const cy = rect.height / 2;
   const particles = ['✦', '✧', '✨', '⋆', '·', '★'];
-  const colors    = ['#fff5dc', '#ffd84a', '#e8c8ff', '#fff2c8', '#ffffff', '#c8a8ff'];
+  const colors    = ['#fff8e8', '#fad54a', '#d6bbf1', '#fffbd2', '#ffffff', '#d6b3f9'];
   for (let i = 0; i < 18; i++) {
     const sparkle = document.createElement('div');
     const angle = Math.random() * Math.PI * 2;
@@ -31125,7 +31125,7 @@ function playSideDeckAppearOverlay(targetEl) {
     sparkle.style.cssText = `
       position: absolute; left: ${cx}px; top: ${cy}px;
       font-size: ${size}px; color: ${color};
-      text-shadow: 0 0 6px ${color}, 0 0 12px rgba(255,220,140,0.8);
+      text-shadow: 0 0 6px ${color}, 0 0 12px rgba(251,225,129,0.8);
       opacity: 0; transform: translate(0,0) scale(0.3) rotate(0deg);
       --sdaDx: ${dx}px; --sdaDy: ${dy}px;
       animation: sdaSparkle ${dur}ms ease-out ${delay}ms both;
@@ -31242,7 +31242,7 @@ function StRanking({ res, players, myIdx }) {
       {rows.map(r => (
         <div key={r.i} className={'st-rank-row' + (r.i === myIdx ? ' st-rank-me' : '')}>
           <span className="st-rank-place">{r.place}.</span>
-          <span className="st-rank-dot" style={{ background: r.p.color || '#888' }} />
+          <span className="st-rank-dot" style={{ background: r.p.color || '#7f7f7f' }} />
           <span className="st-rank-name">{r.p.username}</span>
           <span className="st-rank-sc">{r.sc} SC</span>
         </div>
@@ -31289,7 +31289,7 @@ function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloCh
   useEffect(() => {
     if (fertig && anzahlFrei > 0 && window.playSFX) window.playSFX('ascension', { dedupe: 300 });
   }, [fertig, anzahlFrei]);
-  const farbe = spectator ? '#ffd700' : (won ? '#ffd700' : '#ff5577');
+  const farbe = spectator ? '#ffd61a' : (won ? '#ffd61a' : '#ec2d62');
   // ★ v1263 (Al 21.9.): „Player-Namen und Avatare UEBER dem Background,
   // genau wie die Sprechblasen." Die echten Cluster sitzen in den
   // Handzeilen (Ebenen 400 / 10000) und koennen ihre Stapelkontexte nicht
@@ -31609,7 +31609,7 @@ const ChatPanel = React.memo(function ChatPanel({ roomId, participants: particip
             {participants.spectators.map(s => (
               <div key={s.username} className="player-list-entry" onClick={() => s.username !== myUsername && setChatView('private:' + s.username)}>
                 {s.avatar && <img className="player-list-avatar" src={s.avatar} alt="" />}
-                <span className="player-list-name" style={{ color: '#888' }}>{s.username}{s.username === myUsername ? ' (you)' : ''}</span>
+                <span className="player-list-name" style={{ color: '#7f7f7f' }}>{s.username}{s.username === myUsername ? ' (you)' : ''}</span>
                 <span className="player-list-badge">SPECTATOR</span>
               </div>
             ))}
@@ -31620,7 +31620,7 @@ const ChatPanel = React.memo(function ChatPanel({ roomId, participants: particip
               <div key={msg.id} className={'chat-msg' + (msg.isSpectator ? ' spectator-msg' : '')}>
                 {msg.avatar && <img className="chat-msg-avatar" src={msg.avatar} alt="" />}
                 <span className="chat-msg-name"
-                  style={{ color: msg.isSpectator ? '#888' : (msg.color || '#fff') }}
+                  style={{ color: msg.isSpectator ? '#7f7f7f' : (msg.color || '#fff') }}
                   onClick={() => (msg.from || msg.username) !== myUsername && setChatView('private:' + (msg.from || msg.username))}
                 >{msg.from || msg.username}</span>
                 <span className="chat-msg-text">: {msg.text}</span>
@@ -31677,7 +31677,7 @@ function ppSendePromptAntwort(gameState, response) {
 // aus (`FINALE_AUSBLENDEN_MS`) und verlaesst das Tutorial.
 const FINALE_FEUERWERK_MS = 8500;
 const FINALE_AUSBLENDEN_MS = 3200;
-const FINALE_FARBEN = ['#ffd700', '#ff3366', '#33ff88', '#44aaff', '#ff8800', '#cc44ff', '#00f0ff', '#ffffff'];
+const FINALE_FARBEN = ['#ffd61a', '#fc1c5f', '#4ceb70', '#1ca9fd', '#ff8b1a', '#a952ff', '#1aedff', '#ffffff'];
 function TutorialFinaleFeuerwerk() {
   const salven = useMemo(() => {
     const anzahlSalven = 17;
@@ -34770,7 +34770,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const tailLeft = Math.max(14, anchor.x - bubbleLeft);
     return (
       <div style={{ position: 'fixed', left: bubbleLeft, top: isUp ? anchor.bottom + 12 : anchor.top - 12, transform: isUp ? 'none' : 'translateY(-100%)', zIndex: z, pointerEvents: 'none', maxWidth }}>
-        <div style={{ position: 'relative', background: '#15151f', border: '2px solid ' + color, borderRadius: 10, padding: '8px 14px', color: '#fff', fontSize: 15, fontWeight: 600, textAlign: 'center', lineHeight: 1.3, boxShadow: '0 0 16px ' + color + '66', wordBreak: 'normal', overflowWrap: 'break-word', animation: fading ? 'result-fade-out .7s ease-in forwards' : 'result-fade-in .5s ease-out' }}>
+        <div style={{ position: 'relative', background: '#12101f', border: '2px solid ' + color, borderRadius: 10, padding: '8px 14px', color: '#fff', fontSize: 15, fontWeight: 600, textAlign: 'center', lineHeight: 1.3, boxShadow: '0 0 16px ' + color + '66', wordBreak: 'normal', overflowWrap: 'break-word', animation: fading ? 'result-fade-out .7s ease-in forwards' : 'result-fade-in .5s ease-out' }}>
           <TypewriterText key={tkey} text={msg} bounce={bounce} />
           <div style={{ position: 'absolute', left: tailLeft, transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent', ...(isUp ? { top: -10, borderBottom: '10px solid ' + color } : { bottom: -10, borderTop: '10px solid ' + color }) }} />
         </div>
@@ -34832,7 +34832,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // row only has z 2, so it otherwise hides behind the veil.
   const endGlow = (won) => 'drop-shadow(0 0 10px ' + (won ? 'var(--success)' : 'var(--danger)') + ')';
   // Mid-Game-Bark: solange die Sprechblase steht, leuchtet das Portrait
-  // des Sprechers im Bark-Bernstein (#ffcc44 = Blasenrand). End-Game-
+  // des Sprechers im Bark-Bernstein (#fad54a = Blasenrand). End-Game-
   // Glow hat Vorrang, weil showEndBubbles die Bark-Blase ohnehin
   // ausblendet (siehe Render: !showEndBubbles && cpuBark …).
   // Als Playtest-Befund: beim Greeting (Spielbeginn) leuchtete nichts —
@@ -34848,7 +34848,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // zusätzlich zu isMyTurn.
   const oppBarking = !showEndBubbles && cpuBark && cpuBark.owner === oppIdx;
   const meBarking = !showEndBubbles && cpuBark && cpuBark.owner !== oppIdx;
-  const barkFilter = 'drop-shadow(0 0 10px #ffcc44)';
+  const barkFilter = 'drop-shadow(0 0 10px #fad54a)';
   const oppAvatarHighlight = oppBubbleMsg ? { zIndex: 1100, filter: endGlow(endOppWon) }
     : (oppBarking ? { zIndex: 9650, filter: barkFilter } : undefined);
   const meAvatarHighlight = meBubbleMsg ? { filter: endGlow(endMeWon) }
@@ -37867,7 +37867,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const surrenderMatchZwischen = (
     <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 12 }}>
       {!confirmSurrenderMatch ? (
-        <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: '#ff2222', color: '#ff2222' }}
+        <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: '#ff1a1a', color: '#ff1a1a' }}
           onClick={() => setConfirmSurrenderMatch(true)}>🏳️ Surrender Match</button>
       ) : (<>
         <span style={{ fontSize: 11, color: 'var(--danger)', alignSelf: 'center' }}>Give up the whole match?</span>
@@ -38614,7 +38614,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const dur = duration || 1400;
       setTetherAnims(prev => [...prev, {
         id, dur, faeden, ziel,
-        color: color || '#b56cff', glow: glow || 'rgba(90,20,160,0.85)',
+        color: color || '#b866ff', glow: glow || 'rgba(80,0,140,0.85)',
       }]);
       setTimeout(() => setTetherAnims(prev => prev.filter(a => a.id !== id)), dur + 60);
     };
@@ -38727,7 +38727,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         punkte = stuetz.join(' ');
       }
       setBeamAnims(prev => [...prev, {
-        id, color: color || '#ff2222',
+        id, color: color || '#ff1a1a',
         glow: glow || null,
         thickness: typeof thickness === 'number' && thickness > 0 ? thickness : 1,
         duration: dur,
@@ -38819,7 +38819,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const _wa = window.ppFxWeltAnker ? window.ppFxWeltAnker(destEl) : { welt: false, dx: 0, dy: 0 };
       const _ws = (!_wa.welt && window.ppFxWeltAnker) ? window.ppFxWeltAnker(sourceEl) : _wa;
       const _w = _wa.welt ? _wa : _ws;
-      fly.style.cssText = `position:fixed;left:${sr.left + _w.dx}px;top:${sr.top + _w.dy}px;width:${sr.width}px;height:${sr.height}px;z-index:10150;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 20px rgba(255,200,80,.6);transition:transform 600ms cubic-bezier(.22,.8,.3,1),opacity 600ms ease-out;`;
+      fly.style.cssText = `position:fixed;left:${sr.left + _w.dx}px;top:${sr.top + _w.dy}px;width:${sr.width}px;height:${sr.height}px;z-index:10150;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 20px rgba(255,208,102,.6);transition:transform 600ms cubic-bezier(.22,.8,.3,1),opacity 600ms ease-out;`;
       (_w.welt && window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(fly);
       // Next frame: kick off the transform so the transition plays.
       requestAnimationFrame(() => {
@@ -38942,7 +38942,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const _wa = window.ppFxWeltAnker ? window.ppFxWeltAnker(destEl) : { welt: false, dx: 0, dy: 0 };
       const _ws = (!_wa.welt && window.ppFxWeltAnker) ? window.ppFxWeltAnker(sourceEl) : _wa;
       const _w = _wa.welt ? _wa : _ws;
-      fly.style.cssText = `position:fixed;left:${sr.left + _w.dx}px;top:${sr.top + _w.dy}px;width:${sr.width}px;height:${sr.height}px;z-index:10150;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 24px rgba(255,180,80,.7);transition:transform 600ms cubic-bezier(.22,.8,.3,1),opacity 600ms ease-out;`;
+      fly.style.cssText = `position:fixed;left:${sr.left + _w.dx}px;top:${sr.top + _w.dy}px;width:${sr.width}px;height:${sr.height}px;z-index:10150;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 24px rgba(244,174,100,.7);transition:transform 600ms cubic-bezier(.22,.8,.3,1),opacity 600ms ease-out;`;
       (_w.welt && window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(fly);
       requestAnimationFrame(() => {
         fly.style.transform = `translate(${dx}px, ${dy}px) scale(${dr.width / sr.width})`;
@@ -39156,7 +39156,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         left:${start.x}px; top:${start.y}px; width:46px; height:64px;
         transform:translate(-50%,-50%) rotateY(90deg);
         border-radius:8px; overflow:hidden; opacity:0;
-        box-shadow:0 0 26px rgba(120,220,255,.75), 0 6px 20px rgba(0,0,0,.55);
+        box-shadow:0 0 26px rgba(127,223,255,.75), 0 6px 20px rgba(0,0,0,.55);
         transition:left 780ms cubic-bezier(.25,.7,.35,1), top 780ms cubic-bezier(.25,.7,.35,1),
                    width 780ms cubic-bezier(.25,.7,.35,1), height 780ms cubic-bezier(.25,.7,.35,1),
                    transform 780ms cubic-bezier(.25,.7,.35,1), opacity 220ms linear;
@@ -39308,8 +39308,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const dist = 20 + Math.random() * 40;
         spark.style.cssText = `
           position:fixed; left:${cx}px; top:${cy}px; width:${4+Math.random()*4}px; height:${4+Math.random()*4}px;
-          border-radius:50%; background:rgba(160,80,255,0.9); pointer-events:none; z-index:9999;
-          box-shadow: 0 0 6px rgba(180,100,255,0.8), 0 0 12px rgba(140,60,220,0.4);
+          border-radius:50%; background:rgba(169,82,255,0.9); pointer-events:none; z-index:9999;
+          box-shadow: 0 0 6px rgba(184,102,255,0.8), 0 0 12px rgba(144,58,230,0.4);
           animation: nomuSparkle 0.7s ease-out ${i*30}ms forwards;
           --np-x: ${Math.cos(angle*Math.PI/180)*dist}px;
           --np-y: ${Math.sin(angle*Math.PI/180)*dist - 30}px;
@@ -39367,7 +39367,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => burst.remove(), 2200);
 
       // Phase 2: spiraling particles rising from the hero
-      const colors = ['#ff44aa','#aa44ff','#4488ff','#44ff88','#ffdd44','#ff4444','#ffffff'];
+      const colors = ['#fb1ea9','#a040ff','#4580f6','#4ceb70','#ffe23d','#f03232','#ffffff'];
       for (let i = 0; i < 40; i++) {
         const p = document.createElement('div');
         const c = colors[i % colors.length];
@@ -39389,7 +39389,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
 
       // Phase 3: firework bursts at staggered heights
-      const fireworkColors = ['#ff44aa','#aa44ff','#ffdd44','#44ff88','#4488ff'];
+      const fireworkColors = ['#fb1ea9','#a040ff','#ffe23d','#4ceb70','#4580f6'];
       for (let f = 0; f < 5; f++) {
         const fx = cx + (Math.random() - 0.5) * r.width * 2;
         const fy = cy - 40 - Math.random() * 120;
@@ -39417,8 +39417,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const ring = document.createElement('div');
       ring.style.cssText = `
         position:fixed;left:${cx}px;top:${cy}px;width:0;height:0;
-        border:3px solid rgba(255,220,100,.9);border-radius:50%;pointer-events:none;z-index:10002;
-        transform:translate(-50%,-50%);box-shadow:0 0 20px rgba(255,200,50,.6),inset 0 0 20px rgba(255,200,50,.3);
+        border:3px solid rgba(255,217,102,.9);border-radius:50%;pointer-events:none;z-index:10002;
+        transform:translate(-50%,-50%);box-shadow:0 0 20px rgba(255,198,28,.6),inset 0 0 20px rgba(255,198,28,.3);
         animation:ascensionRing 1.2s ease-out 200ms forwards;
       `;
       document.body.appendChild(ring);
@@ -39540,7 +39540,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       glow.style.cssText = `
         position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;
         border-radius:8px;z-index:9999;pointer-events:none;
-        background:radial-gradient(ellipse at center, rgba(255,215,0,.8) 0%, rgba(50,200,50,.4) 40%, transparent 70%);
+        background:radial-gradient(ellipse at center, rgba(255,214,26,.8) 0%, rgba(61,220,87,.4) 40%, transparent 70%);
         animation:ascensionBurstAnim 1.8s ease-out forwards;
       `;
       document.body.appendChild(glow);
@@ -39566,9 +39566,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const thread = document.createElement('div');
       thread.style.cssText = `
         position:fixed;left:${sx}px;top:${sy}px;width:0;height:2px;
-        background:linear-gradient(90deg, rgba(180,180,180,.9), rgba(220,220,220,.6));
+        background:linear-gradient(90deg, rgba(185,185,185,.9), rgba(230,230,230,.6));
         transform-origin:0 50%;transform:rotate(${angle}deg);
-        pointer-events:none;z-index:10000;box-shadow:0 0 4px rgba(200,200,200,.5);
+        pointer-events:none;z-index:10000;box-shadow:0 0 4px rgba(185,185,185,.5);
         animation:spiderThread .4s ease-out forwards;--thread-len:${dist}px;
       `;
       document.body.appendChild(thread);
@@ -39619,8 +39619,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         tendril.style.cssText = `
           position:fixed;left:${cx + sx}px;top:${cy + sy}px;
           width:3px;height:3px;border-radius:50%;
-          background:radial-gradient(circle,#9b30ff,#4b0082);
-          box-shadow:0 0 6px #9b30ff,0 0 12px #4b0082;
+          background:radial-gradient(circle,#a040ff,#50008c);
+          box-shadow:0 0 6px #a040ff,0 0 12px #50008c;
           pointer-events:none;z-index:10000;opacity:0;
           animation:darkTendril .7s ease-in ${i * 40}ms forwards;
           --dt-x:${-sx}px;--dt-y:${-sy}px;
@@ -39633,7 +39633,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       pulse.style.cssText = `
         position:fixed;left:${cx - 30}px;top:${cy - 30}px;
         width:60px;height:60px;border-radius:50%;
-        border:2px solid #9b30ff;
+        border:2px solid #a040ff;
         pointer-events:none;z-index:10000;opacity:0;
         animation:darkControlPulse .6s ease-out .5s forwards;
       `;
@@ -39668,7 +39668,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       schleier.style.cssText = `
         position:fixed;left:${r.left - 8}px;top:${r.top - 8}px;
         width:${r.width + 16}px;height:${r.height + 16}px;border-radius:10px;
-        background:radial-gradient(circle at 50% 60%, rgba(70,0,110,.55), rgba(10,0,20,.8));
+        background:radial-gradient(circle at 50% 60%, rgba(71,17,126,.55), rgba(18,16,31,.8));
         pointer-events:none;z-index:9998;opacity:0;
         animation:darkRitualShade 1.15s ease-in-out forwards;
       `;
@@ -39679,8 +39679,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       kreis.style.cssText = `
         position:fixed;left:${cx - 70}px;top:${cy - 70}px;
         width:140px;height:140px;border-radius:50%;
-        border:2px dashed #b04dff;
-        box-shadow:0 0 14px #7a00cc, inset 0 0 18px rgba(122,0,204,.6);
+        border:2px dashed #a952ff;
+        box-shadow:0 0 14px #6e00cc, inset 0 0 18px rgba(110,0,204,.6);
         pointer-events:none;z-index:10000;opacity:0;
         animation:darkRitualRing 1.05s cubic-bezier(.3,.7,.3,1) forwards;
       `;
@@ -39696,7 +39696,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           position:fixed;left:${fx - 7}px;top:${fy - 20}px;
           width:14px;height:40px;
           border-radius:50% 50% 45% 45% / 65% 65% 35% 35%;
-          background:linear-gradient(180deg, rgba(200,120,255,.9) 0%, rgba(110,20,190,.85) 40%, rgba(30,0,50,.9) 100%);
+          background:linear-gradient(180deg, rgba(186,116,255,.9) 0%, rgba(102,24,180,.85) 40%, rgba(26,10,58,.9) 100%);
           filter:blur(1.5px);
           pointer-events:none;z-index:10001;opacity:0;
           animation:darkRitualFlame ${(0.55 + Math.random() * 0.35).toFixed(2)}s ease-out ${(i * 70)}ms forwards;
@@ -39712,8 +39712,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         g.textContent = glyphen[i % glyphen.length];
         g.style.cssText = `
           position:fixed;left:${gx - 9}px;top:${cy + 8}px;
-          font-size:18px;color:#d9a6ff;
-          text-shadow:0 0 8px #8a2be2, 0 0 16px #4b0082;
+          font-size:18px;color:#d6b3f9;
+          text-shadow:0 0 8px #903ae6, 0 0 16px #50008c;
           pointer-events:none;z-index:10002;opacity:0;
           animation:darkRitualGlyph ${(0.7 + Math.random() * 0.3).toFixed(2)}s ease-out ${(120 + i * 130)}ms forwards;
         `;
@@ -39725,7 +39725,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       sog.style.cssText = `
         position:fixed;left:${cx - 26}px;top:${cy - 40}px;
         width:52px;height:80px;border-radius:50%;
-        background:linear-gradient(180deg, transparent 0%, rgba(90,0,150,.0) 30%, rgba(90,0,150,.55) 70%, rgba(20,0,35,.9) 100%);
+        background:linear-gradient(180deg, transparent 0%, rgba(80,0,140,.0) 30%, rgba(80,0,140,.55) 70%, rgba(23,11,40,.9) 100%);
         filter:blur(3px);
         pointer-events:none;z-index:10001;opacity:0;
         animation:darkRitualPull .5s ease-in .62s forwards;
@@ -39793,7 +39793,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         l.setAttribute('x1', x1); l.setAttribute('y1', y1);
         l.setAttribute('x2', x2); l.setAttribute('y2', y2);
-        l.setAttribute('stroke', '#e8dcc0');
+        l.setAttribute('stroke', '#ebdcc1');
         l.setAttribute('stroke-width', w || 1.6);
         l.setAttribute('stroke-linecap', 'round');
         l.setAttribute('opacity', '.92');
@@ -39807,7 +39807,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       const rand = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       rand.setAttribute('cx', '44'); rand.setAttribute('cy', '44'); rand.setAttribute('r', '43');
-      rand.setAttribute('fill', 'none'); rand.setAttribute('stroke', '#c8b48a');
+      rand.setAttribute('fill', 'none'); rand.setAttribute('stroke', '#ccb799');
       rand.setAttribute('stroke-width', '3'); rand.setAttribute('opacity', '.95');
       maschen.appendChild(rand);
       // Knoten an den Kreuzungspunkten.
@@ -39815,7 +39815,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         for (let j = 1; j < 5; j++) {
           const k = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
           k.setAttribute('cx', (i / 5) * 88); k.setAttribute('cy', (j / 5) * 88);
-          k.setAttribute('r', '1.8'); k.setAttribute('fill', '#f2e8cf'); k.setAttribute('opacity', '.8');
+          k.setAttribute('r', '1.8'); k.setAttribute('fill', '#ebdcc1'); k.setAttribute('opacity', '.8');
           maschen.appendChild(k);
         }
       }
@@ -39831,7 +39831,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         p.style.cssText = `
           position:fixed;left:${vx}px;top:${vy}px;
           width:3px;height:3px;border-radius:50%;
-          background:#e8dcc0;box-shadow:0 0 4px rgba(232,220,192,.9);
+          background:#ebdcc1;box-shadow:0 0 4px rgba(235,220,193,.9);
           pointer-events:none;z-index:10000;opacity:0;
           animation:huntingStruggle ${Math.round(_fang * 0.7)}ms ease-out ${Math.round(_fang * 0.25) + i * 24}ms forwards;
           --hs-x:${Math.cos(a) * d}px;--hs-y:${Math.sin(a) * d}px;
@@ -39848,7 +39848,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         position:fixed;left:${vx}px;top:${vy}px;
         width:${laenge}px;height:2px;transform-origin:0 50%;
         transform:rotate(${winkel}deg);
-        background:repeating-linear-gradient(90deg,#e8dcc0 0 6px,transparent 6px 11px);
+        background:repeating-linear-gradient(90deg,#ebdcc1 0 6px,transparent 6px 11px);
         pointer-events:none;z-index:9999;opacity:0;
         animation:huntingLine ${_fang + _flug}ms ease-in-out forwards;
       `;
@@ -39888,7 +39888,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         width:${Math.max(r.width, r.height) * 1.1}px;height:${Math.max(r.width, r.height) * 1.1}px;
         margin-left:${-Math.max(r.width, r.height) * .55}px;margin-top:${-Math.max(r.width, r.height) * .55}px;
         border-radius:50%;pointer-events:none;z-index:10050;
-        border:3px solid #d9b45a;box-shadow:0 0 18px rgba(217,180,90,.85), inset 0 0 14px rgba(217,180,90,.5);
+        border:3px solid #d1a148;box-shadow:0 0 18px rgba(209,161,72,.85), inset 0 0 14px rgba(209,161,72,.5);
         animation:heroReactionRing 720ms ease-out forwards;
       `;
       document.body.appendChild(ring);
@@ -39912,11 +39912,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const slash = document.createElement('div');
       slash.style.cssText = `
         position:fixed;left:${cx - 50}px;top:${cy - 4}px;width:100px;height:8px;
-        background:linear-gradient(90deg,transparent,#ff6600,#ffcc00,#ff6600,transparent);
+        background:linear-gradient(90deg,transparent,#f87420,#ffd61a,#f87420,transparent);
         border-radius:4px;pointer-events:none;z-index:10000;opacity:0;
         transform:rotate(-30deg);
         animation:fierySlash .35s ease-out forwards;
-        box-shadow:0 0 16px #ff6600,0 0 30px #ff4400;
+        box-shadow:0 0 16px #f87420,0 0 30px #ff491a;
       `;
       document.body.appendChild(slash);
       // Sparks
@@ -39968,18 +39968,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         animation:punchStrike .35s ease-out forwards;
       ` + (metal ? `
         filter: grayscale(1) brightness(1.5) contrast(1.35)
-                drop-shadow(0 0 6px rgba(220,235,255,.95))
-                drop-shadow(0 0 14px rgba(150,190,230,.7));
+                drop-shadow(0 0 6px rgba(229,237,250,.95))
+                drop-shadow(0 0 14px rgba(123,190,234,.7));
       ` : '');
       document.body.appendChild(fist);
       // Impact ring
       const ring = document.createElement('div');
       ring.style.cssText = `
         position:fixed;left:${cx - 20}px;top:${cy - 20}px;width:40px;height:40px;
-        border-radius:50%;border:3px solid #ffcc00;
+        border-radius:50%;border:3px solid #ffd61a;
         pointer-events:none;z-index:10000;opacity:0;
         animation:punchRing .4s ease-out .1s forwards;
-        box-shadow:0 0 10px #ffcc00;
+        box-shadow:0 0 10px #ffd61a;
       `;
       document.body.appendChild(ring);
       // Impact lines
@@ -39990,7 +39990,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         line.style.cssText = `
           position:fixed;left:${cx}px;top:${cy}px;
           width:${len}px;height:3px;border-radius:2px;
-          background:#ffcc00;pointer-events:none;z-index:10000;opacity:0;
+          background:#ffd61a;pointer-events:none;z-index:10000;opacity:0;
           transform-origin:0 50%;transform:rotate(${angle}rad);
           animation:punchLine .3s ease-out .05s forwards;
         `;
@@ -40048,7 +40048,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         `left:${r.left + r.width / 2 - gm.b / 2}px`, `top:${r.top + r.height / 2 - gm.h / 2}px`,
         `width:${gm.b}px`, `height:${gm.h}px`, 'z-index:10210', 'pointer-events:none',
         'border-radius:4px', 'overflow:hidden',
-        'box-shadow:0 0 14px rgba(255,150,60,0.8),0 0 5px rgba(255,90,30,0.6)',
+        'box-shadow:0 0 14px rgba(255,155,58,0.8),0 0 5px rgba(255,73,26,0.6)',
         `--pfUp:${up}px`,
         `animation:pusherFling ${dur}ms cubic-bezier(.34,.02,.5,1) forwards`,
       ].join(';');
@@ -40059,8 +40059,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         img.draggable = false;
         card.appendChild(img);
       } else {
-        card.style.background = 'linear-gradient(135deg,#3a1a0a,#5a2a0a)';
-        card.innerHTML = `<div style="color:#ffb070;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardName}</div>`;
+        card.style.background = 'linear-gradient(135deg,#311402,#5a341a)';
+        card.innerHTML = `<div style="color:#f4ae64;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardName}</div>`;
       }
       document.body.appendChild(card);
       setTimeout(() => {
@@ -40080,7 +40080,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const r = el.getBoundingClientRect();
       const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
       const stone = document.createElement('div');
-      stone.style.cssText = `position:fixed;left:${cx-35}px;top:${cy-35}px;width:70px;height:70px;border-radius:8px;background:rgba(140,140,140,.6);pointer-events:none;z-index:10000;opacity:0;animation:petrifyFlash .8s ease-out forwards;border:2px solid rgba(180,180,180,.5);`;
+      stone.style.cssText = `position:fixed;left:${cx-35}px;top:${cy-35}px;width:70px;height:70px;border-radius:8px;background:rgba(146,146,146,.6);pointer-events:none;z-index:10000;opacity:0;animation:petrifyFlash .8s ease-out forwards;border:2px solid rgba(185,185,185,.5);`;
       document.body.appendChild(stone);
       setTimeout(() => stone.remove(), 900);
     };
@@ -40091,7 +40091,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       overlay.style.cssText = 'position:fixed;inset:0;z-index:20000;pointer-events:none;overflow:hidden;';
       // Animals: Tiger, Dragon, Turtle, Phoenix
       const animals = ['🐅', '🐉', '🐢', '🐦‍🔥'];
-      const animalColors = ['#ffaa00', '#00ccff', '#00cc66', '#ff4444'];
+      const animalColors = ['#f9ac20', '#1ac6ff', '#00cc50', '#f03232'];
       const animalAnims = ['cardinalAnimalRight', 'cardinalAnimalDown', 'cardinalAnimalLeft', 'cardinalAnimalUp'];
       // Center burst with 4 animals spiraling outward
       for (let a = 0; a < 4; a++) {
@@ -40113,7 +40113,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       // Title text
       const title = document.createElement('div');
-      title.style.cssText = 'position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);font-size:28px;font-weight:900;color:#ffd700;text-shadow:0 0 30px #ffd700,0 0 60px #ff8800;opacity:0;animation:cardinalTitle 3s 0.3s ease-out forwards;white-space:nowrap;font-family:var(--font-orbit),sans-serif;';
+      title.style.cssText = 'position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);font-size:28px;font-weight:900;color:#ffd61a;text-shadow:0 0 30px #ffd61a,0 0 60px #ff8b1a;opacity:0;animation:cardinalTitle 3s 0.3s ease-out forwards;white-space:nowrap;font-family:var(--font-orbit),sans-serif;';
       title.textContent = '⭐ CARDINAL BEASTS ASSEMBLED ⭐';
       overlay.appendChild(title);
       document.body.appendChild(overlay);
@@ -40147,10 +40147,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const h = 5 + Math.random() * 4;
         const delay = b * 40;
         bolt.style.cssText = `position:fixed;left:${sx}px;top:${sy-h/2+yOff}px;width:0;height:${h}px;`
-          + `background:linear-gradient(90deg,transparent,#ffee55,#ffffff,#ffee55,transparent);`
+          + `background:linear-gradient(90deg,transparent,#ffe23d,#ffffff,#ffe23d,transparent);`
           + `border-radius:${h/2}px;transform-origin:0 50%;transform:rotate(${angle + (Math.random()-0.5)*4}deg);`
           + `pointer-events:none;z-index:10000;`
-          + `box-shadow:0 0 14px #ffcc00,0 0 30px #ffaa00,0 0 50px rgba(255,200,0,.4);`
+          + `box-shadow:0 0 14px #ffd61a,0 0 30px #f9ac20,0 0 50px rgba(255,198,28,.4);`
           + `animation:lightningBolt .35s ${delay}ms ease-out forwards;--bolt-len:${dist}px;`;
         document.body.appendChild(bolt);
         setTimeout(() => bolt.remove(), 450 + delay);
@@ -40158,7 +40158,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Impact flash on target
       const flash = document.createElement('div');
       flash.style.cssText = `position:fixed;left:${tx-20}px;top:${ty-20}px;width:40px;height:40px;border-radius:50%;`
-        + `background:radial-gradient(circle,rgba(255,255,200,.9),rgba(255,220,50,.5),transparent);`
+        + `background:radial-gradient(circle,rgba(248,248,189,.9),rgba(255,226,61,.5),transparent);`
         + `pointer-events:none;z-index:10001;animation:petrifyFlash .4s 100ms ease-out forwards;`;
       document.body.appendChild(flash);
       setTimeout(() => flash.remove(), 550);
@@ -40209,10 +40209,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           `top:${cy - boltH}px`,
           `width:${boltW}px`,
           `height:${boltH}px`,
-          `background:linear-gradient(180deg,transparent 0%,#ff3333 30%,#ff8888 60%,#ffffff 80%,transparent 100%)`,
+          `background:linear-gradient(180deg,transparent 0%,#ef2929 30%,#ec7f79 60%,#ffffff 80%,transparent 100%)`,
           `border-radius:${boltW}px`,
           `transform-origin:50% 0%`,
-          `box-shadow:0 0 10px #ff2222,0 0 25px #cc0000,0 0 50px rgba(200,0,0,.4)`,
+          `box-shadow:0 0 10px #ff1a1a,0 0 25px #c80000,0 0 50px rgba(200,0,0,.4)`,
           `pointer-events:none`,
           `z-index:10000`,
           `animation:redBoltFall .5s ${delay}ms ease-out forwards`,
@@ -40229,7 +40229,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           `width:28px`,
           `height:28px`,
           `border-radius:50%`,
-          `background:radial-gradient(circle,rgba(255,180,180,.9),rgba(200,0,0,.5),transparent)`,
+          `background:radial-gradient(circle,rgba(249,179,179,.9),rgba(200,0,0,.5),transparent)`,
           `pointer-events:none`,
           `z-index:10001`,
           `animation:redImpact .4s ${delay + 150}ms ease-out forwards`,
@@ -40254,16 +40254,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         style.id = 'area-descend-kf';
         style.textContent = `
           @keyframes areaCardFall {
-            0%   { transform: translate(-50%, -720px) rotateZ(-14deg) scale(1.45); opacity: 0; filter: brightness(2.2) drop-shadow(0 0 24px rgba(255,220,120,.8)); }
+            0%   { transform: translate(-50%, -720px) rotateZ(-14deg) scale(1.45); opacity: 0; filter: brightness(2.2) drop-shadow(0 0 24px rgba(251,225,129,.8)); }
             20%  { opacity: 1; }
-            75%  { transform: translate(-50%, 0) rotateZ(4deg) scale(1.35); filter: brightness(1.9) drop-shadow(0 0 28px rgba(255,240,160,.9)); }
-            82%  { transform: translate(-50%, 12px) rotateZ(-2deg) scale(1.18); filter: brightness(1.4) drop-shadow(0 0 18px rgba(255,220,120,.6)); }
+            75%  { transform: translate(-50%, 0) rotateZ(4deg) scale(1.35); filter: brightness(1.9) drop-shadow(0 0 28px rgba(255,241,150,.9)); }
+            82%  { transform: translate(-50%, 12px) rotateZ(-2deg) scale(1.18); filter: brightness(1.4) drop-shadow(0 0 18px rgba(251,225,129,.6)); }
             90%  { transform: translate(-50%, -4px) rotateZ(1deg) scale(1.22); filter: brightness(1.3); }
             100% { transform: translate(-50%, 0) rotateZ(0deg) scale(1); opacity: 1; filter: brightness(1); }
           }
           @keyframes areaPileFly {
-            0%   { transform: translate(calc(-50% + var(--fdx)), var(--fdy)) rotateZ(-10deg) scale(var(--fsc)); opacity: 1; filter: brightness(1.3) drop-shadow(0 0 10px rgba(255,200,100,.6)); }
-            70%  { transform: translate(-50%, 0) rotateZ(3deg) scale(1.3); filter: brightness(1.8) drop-shadow(0 0 26px rgba(255,240,160,.9)); }
+            0%   { transform: translate(calc(-50% + var(--fdx)), var(--fdy)) rotateZ(-10deg) scale(var(--fsc)); opacity: 1; filter: brightness(1.3) drop-shadow(0 0 10px rgba(251,200,106,.6)); }
+            70%  { transform: translate(-50%, 0) rotateZ(3deg) scale(1.3); filter: brightness(1.8) drop-shadow(0 0 26px rgba(255,241,150,.9)); }
             85%  { transform: translate(-50%, 6px) rotateZ(-1deg) scale(1.12); filter: brightness(1.3); }
             100% { transform: translate(-50%, 0) rotateZ(0deg) scale(1); opacity: 1; filter: brightness(1); }
           }
@@ -40283,9 +40283,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             100% { opacity: 0; transform: translate(calc(-50% + var(--adx)), calc(-50% + var(--ady))) scale(1.4); }
           }
           @keyframes areaBgFlash {
-            0%   { background: radial-gradient(ellipse at center, rgba(255,240,160,0) 0%, transparent 60%); }
-            30%  { background: radial-gradient(ellipse at center, rgba(255,240,160,.55) 0%, rgba(255,180,60,.25) 30%, transparent 70%); }
-            100% { background: radial-gradient(ellipse at center, rgba(255,240,160,0) 0%, transparent 60%); }
+            0%   { background: radial-gradient(ellipse at center, rgba(255,241,150,0) 0%, transparent 60%); }
+            30%  { background: radial-gradient(ellipse at center, rgba(255,241,150,.55) 0%, rgba(249,172,32,.25) 30%, transparent 70%); }
+            100% { background: radial-gradient(ellipse at center, rgba(255,241,150,0) 0%, transparent 60%); }
           }
         `;
         document.head.appendChild(style);
@@ -40327,13 +40327,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (imgUrl) {
         const img = document.createElement('img');
         img.src = imgUrl;
-        img.style.cssText = `width:100%;height:100%;object-fit:cover;border-radius:6px;box-shadow:0 0 28px rgba(255,200,80,.9),0 0 60px rgba(255,180,40,.5);border:2px solid rgba(255,220,120,.95);`;
+        img.style.cssText = `width:100%;height:100%;object-fit:cover;border-radius:6px;box-shadow:0 0 28px rgba(255,208,102,.9),0 0 60px rgba(249,172,32,.5);border:2px solid rgba(251,225,129,.95);`;
         img.draggable = false;
         cardEl.appendChild(img);
       } else {
-        cardEl.style.background = 'linear-gradient(135deg,#ffe58a,#d48c1a)';
+        cardEl.style.background = 'linear-gradient(135deg,#fbe181,#c68206)';
         cardEl.style.borderRadius = '6px';
-        cardEl.style.boxShadow = '0 0 28px rgba(255,200,80,.9)';
+        cardEl.style.boxShadow = '0 0 28px rgba(255,208,102,.9)';
       }
       document.body.appendChild(cardEl);
       setTimeout(() => cardEl.remove(), 1300);
@@ -40345,8 +40345,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         ring.style.cssText = [
           `position:fixed`, `left:${cx}px`, `top:${cy}px`,
           `width:${tr.width * 1.2}px`, `height:${tr.width * 1.2}px`,
-          `border:4px solid rgba(255,230,120,.95)`, `border-radius:50%`,
-          `box-shadow:0 0 40px rgba(255,220,120,.8), inset 0 0 30px rgba(255,200,80,.4)`,
+          `border:4px solid rgba(255,228,105,.95)`, `border-radius:50%`,
+          `box-shadow:0 0 40px rgba(251,225,129,.8), inset 0 0 30px rgba(255,208,102,.4)`,
           `pointer-events:none`, `z-index:10005`,
           `animation:areaImpactRing .9s ease-out forwards`,
         ].join(';');
@@ -40357,7 +40357,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         flash.style.cssText = [
           `position:fixed`, `left:${cx}px`, `top:${cy}px`,
           `width:${tr.width * 1.6}px`, `height:${tr.width * 1.6}px`,
-          `background:radial-gradient(circle, rgba(255,255,220,.95) 0%, rgba(255,200,80,.55) 35%, transparent 75%)`,
+          `background:radial-gradient(circle, rgba(255,251,210,.95) 0%, rgba(255,208,102,.55) 35%, transparent 75%)`,
           `border-radius:50%`,
           `pointer-events:none`, `z-index:10004`,
           `animation:areaImpactFlash .7s ease-out forwards`,
@@ -40378,7 +40378,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             `width:${size}px`, `height:${size}px`,
             `border-radius:50%`,
             `background:rgba(${200 + Math.random() * 55},${160 + Math.random() * 70},${60 + Math.random() * 80},.9)`,
-            `box-shadow:0 0 10px rgba(255,200,100,.5)`,
+            `box-shadow:0 0 10px rgba(251,200,106,.5)`,
             `pointer-events:none`, `z-index:10006`,
             `--adx:${dx}px`, `--ady:${dy}px`,
             `animation:areaDustParticle .7s ease-out forwards`,
@@ -40512,10 +40512,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const ax = zx, ay = Math.max(8, zy - 300);                  // Aufhaengepunkt der Schnur (Rutenspitze)
       const L0 = 190;                                             // Schnurlaenge beim Pendeln
       const mk = (css) => { const e = document.createElement('div'); e.style.cssText = 'position:fixed;pointer-events:none;' + css; document.body.appendChild(e); return e; };
-      const rute = mk(`left:${ax - 3}px;top:${ay - 12}px;width:6px;height:6px;border-radius:50%;background:#c9a24a;box-shadow:0 0 8px #e8c870;z-index:10020;`);
-      const schnur = mk(`left:0;top:0;width:2px;height:10px;background:linear-gradient(to bottom,#f4ecd0,#bfae80);box-shadow:0 0 4px rgba(255,240,200,.7);transform-origin:50% 0;z-index:10018;`);
-      const haken = mk(`left:0;top:0;width:12px;height:12px;border:3px solid #d8d0b0;border-top-color:transparent;border-radius:50%;z-index:10022;box-shadow:0 0 6px rgba(255,255,230,.7);`);
-      const karte = mk(`left:0;top:0;width:${cardW}px;height:${cardH}px;border-radius:5px;z-index:10019;box-shadow:0 6px 18px rgba(0,0,0,.55),0 0 14px rgba(120,200,255,.7);border:2px solid rgba(190,230,255,.9);overflow:hidden;background:linear-gradient(135deg,#7ac4e8,#2c6c94);`);
+      const rute = mk(`left:${ax - 3}px;top:${ay - 12}px;width:6px;height:6px;border-radius:50%;background:#d1a148;box-shadow:0 0 8px #fbe181;z-index:10020;`);
+      const schnur = mk(`left:0;top:0;width:2px;height:10px;background:linear-gradient(to bottom,#ebdcc1,#ccb799);box-shadow:0 0 4px rgba(255,251,210,.7);transform-origin:50% 0;z-index:10018;`);
+      const haken = mk(`left:0;top:0;width:12px;height:12px;border:3px solid #ebdcc1;border-top-color:transparent;border-radius:50%;z-index:10022;box-shadow:0 0 6px rgba(255,248,232,.7);`);
+      const karte = mk(`left:0;top:0;width:${cardW}px;height:${cardH}px;border-radius:5px;z-index:10019;box-shadow:0 6px 18px rgba(0,0,0,.55),0 0 14px rgba(104,198,253,.7);border:2px solid rgba(180,223,248,.9);overflow:hidden;background:linear-gradient(135deg,#77c8ee,#405f8c);`);
       karte.className = 'card-flight';
       if (imgUrl) { const im = document.createElement('img'); im.src = imgUrl; im.draggable = false; im.style.cssText = 'width:100%;height:100%;object-fit:cover;'; karte.appendChild(im); }
       const sfx = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
@@ -40657,8 +40657,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       charge.style.cssText = [
         `position:fixed`, `left:${sx - 36}px`, `top:${sy - 36}px`,
         `width:72px`, `height:72px`, `border-radius:50%`,
-        `background:radial-gradient(circle, rgba(255,60,60,1) 0%, rgba(180,0,10,0.95) 40%, rgba(70,0,0,0.75) 70%, transparent 100%)`,
-        `box-shadow:0 0 40px rgba(220,20,30,0.95), 0 0 80px rgba(160,0,20,0.7)`,
+        `background:radial-gradient(circle, rgba(240,50,50,1) 0%, rgba(190,14,14,0.95) 40%, rgba(82,10,12,0.75) 70%, transparent 100%)`,
+        `box-shadow:0 0 40px rgba(239,41,41,0.95), 0 0 80px rgba(181,23,28,0.7)`,
         `pointer-events:none`, `z-index:10015`, `opacity:0`,
         `animation:eraserBeamCharge 500ms ease-out forwards`,
       ].join(';');
@@ -40673,7 +40673,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           `position:fixed`, `left:${sx}px`, `top:${sy}px`,
           `width:${len}px`, `height:28px`,
           `transform-origin:0 50%`, `transform:rotate(${angle}deg)`,
-          `background:linear-gradient(180deg, transparent 0%, rgba(180,10,20,0.65) 40%, rgba(255,60,60,0.85) 50%, rgba(180,10,20,0.65) 60%, transparent 100%)`,
+          `background:linear-gradient(180deg, transparent 0%, rgba(181,23,28,0.65) 40%, rgba(240,50,50,0.85) 50%, rgba(181,23,28,0.65) 60%, transparent 100%)`,
           `filter:blur(6px)`,
           `pointer-events:none`, `z-index:10011`, `opacity:0`,
           `animation:eraserBeamOuter 1000ms ease-out forwards`,
@@ -40699,9 +40699,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           `position:absolute`, `left:0`, `top:0`,
           `width:100%`, `height:100%`,
           `transform-origin:0 50%`,
-          `background:linear-gradient(180deg, transparent 0%, rgba(220,30,40,0.95) 30%, rgba(255,255,255,0.95) 45%, rgba(255,220,220,0.95) 55%, rgba(220,30,40,0.95) 70%, transparent 100%)`,
+          `background:linear-gradient(180deg, transparent 0%, rgba(233,47,56,0.95) 30%, rgba(255,255,255,0.95) 45%, rgba(250,229,235,0.95) 55%, rgba(233,47,56,0.95) 70%, transparent 100%)`,
           `border-radius:6px`,
-          `box-shadow:0 0 20px rgba(255,40,40,0.95), 0 0 40px rgba(180,0,20,0.8)`,
+          `box-shadow:0 0 20px rgba(255,26,26,0.95), 0 0 40px rgba(192,20,28,0.8)`,
           `opacity:0`,
           `animation:eraserBeamCore 1000ms ease-out forwards`,
         ].join(';');
@@ -40718,8 +40718,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           bolt.style.cssText = [
             `position:absolute`, `left:${pos * 100}%`, `top:50%`,
             `width:${boltLen}px`, `height:3px`,
-            `background:linear-gradient(90deg, transparent 0%, rgba(255,240,180,0.95) 20%, rgba(255,255,255,1) 50%, rgba(255,240,180,0.95) 80%, transparent 100%)`,
-            `box-shadow:0 0 10px rgba(255,220,140,0.95), 0 0 20px rgba(255,180,60,0.7)`,
+            `background:linear-gradient(90deg, transparent 0%, rgba(249,236,179,0.95) 20%, rgba(255,255,255,1) 50%, rgba(249,236,179,0.95) 80%, transparent 100%)`,
+            `box-shadow:0 0 10px rgba(251,225,129,0.95), 0 0 20px rgba(249,172,32,0.7)`,
             `opacity:0`, `transform-origin:center`,
             `--ebbRot:${rot}deg`,
             `animation:eraserBeamBolt ${550 + Math.random() * 300}ms ease-out ${delay}ms forwards`,
@@ -40733,8 +40733,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         impact.style.cssText = [
           `position:fixed`, `left:${tx}px`, `top:${ty}px`,
           `width:120px`, `height:120px`, `border-radius:50%`,
-          `background:radial-gradient(circle, rgba(255,240,220,0.95) 0%, rgba(255,60,60,0.9) 25%, rgba(150,0,10,0.75) 55%, rgba(50,0,5,0.4) 85%, transparent 100%)`,
-          `box-shadow:0 0 60px rgba(220,30,40,0.9), 0 0 120px rgba(140,0,20,0.55)`,
+          `background:radial-gradient(circle, rgba(255,248,232,0.95) 0%, rgba(240,50,50,0.9) 25%, rgba(143,0,0,0.75) 55%, rgba(58,0,0,0.4) 85%, transparent 100%)`,
+          `box-shadow:0 0 60px rgba(233,47,56,0.9), 0 0 120px rgba(140,0,20,0.55)`,
           `pointer-events:none`, `z-index:10014`, `opacity:0`,
           `animation:eraserBeamImpact 900ms ease-out forwards`,
         ].join(';');
@@ -40749,8 +40749,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           ember.style.cssText = [
             `position:fixed`, `left:${tx}px`, `top:${ty}px`,
             `width:${size}px`, `height:${size}px`, `border-radius:50%`,
-            `background:radial-gradient(circle, #ffeeaa 0%, #ff4422 50%, #800800 100%)`,
-            `box-shadow:0 0 10px rgba(255,80,40,0.9)`,
+            `background:radial-gradient(circle, #f9ecb3 0%, #ff491a 50%, #780000 100%)`,
+            `box-shadow:0 0 10px rgba(255,73,26,0.9)`,
             `pointer-events:none`, `z-index:10013`, `opacity:0`,
             `--ebeDx:${Math.cos(ang) * dist}px`, `--ebeDy:${Math.sin(ang) * dist - 20}px`,
             `animation:eraserBeamEmber ${700 + Math.random() * 300}ms ease-out ${100 + Math.random() * 200}ms forwards`,
@@ -40811,9 +40811,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       bg.style.cssText = [
         `position:fixed`, `inset:0`, `pointer-events:none`, `z-index:9993`,
         `background:`
-          + `radial-gradient(circle at 50% 50%, rgba(60,180,120,0.35) 0%, transparent 60%),`
-          + `radial-gradient(circle at 30% 30%, rgba(255,220,120,0.28) 0%, transparent 55%),`
-          + `radial-gradient(circle at 70% 70%, rgba(120,220,200,0.28) 0%, transparent 55%)`,
+          + `radial-gradient(circle at 50% 50%, rgba(91,189,126,0.35) 0%, transparent 60%),`
+          + `radial-gradient(circle at 30% 30%, rgba(251,225,129,0.28) 0%, transparent 55%),`
+          + `radial-gradient(circle at 70% 70%, rgba(124,233,220,0.28) 0%, transparent 55%)`,
         `background-size:200% 200%`,
         `animation:cooldinBgSweep 1600ms ease-in-out forwards`,
       ].join(';');
@@ -40826,8 +40826,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         ring.style.cssText = [
           `position:fixed`, `left:${cx}px`, `top:${cy}px`,
           `width:200px`, `height:200px`, `border-radius:50%`,
-          `border:3px solid rgba(120,255,180,0.85)`,
-          `box-shadow:0 0 30px rgba(100,240,160,0.8), inset 0 0 25px rgba(80,200,140,0.5)`,
+          `border:3px solid rgba(104,253,193,0.85)`,
+          `box-shadow:0 0 30px rgba(117,240,145,0.8), inset 0 0 25px rgba(91,189,126,0.5)`,
           `pointer-events:none`, `z-index:9994`, `opacity:0`,
           `animation:cooldinRipple 1400ms ease-out ${i * 220}ms forwards`,
         ].join(';');
@@ -40844,9 +40844,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         pillar.style.cssText = [
           `position:fixed`, `left:${px}px`, `top:${r.bottom}px`,
           `width:26px`, `height:${h}px`,
-          `background:linear-gradient(180deg, rgba(160,100,50,0) 0%, rgba(140,85,40,0.85) 40%, rgba(90,55,20,0.95) 100%)`,
-          `border-top:3px solid rgba(200,160,100,0.95)`,
-          `box-shadow:0 0 14px rgba(100,220,150,0.75)`,
+          `background:linear-gradient(180deg, rgba(157,97,47,0) 0%, rgba(157,97,47,0.85) 40%, rgba(90,60,20,0.95) 100%)`,
+          `border-top:3px solid rgba(178,148,102,0.95)`,
+          `box-shadow:0 0 14px rgba(75,205,124,0.75)`,
           `transform-origin:50% 100%`,
           `pointer-events:none`, `z-index:9995`, `opacity:0`,
           `animation:cooldinPillar 1100ms cubic-bezier(0.4, 1.6, 0.55, 1) ${i * 60}ms forwards`,
@@ -40866,8 +40866,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         glyph.style.cssText = [
           `position:fixed`, `left:${gx}px`, `top:${gy}px`,
           `font-size:${28 + Math.random() * 22}px`,
-          `color:rgba(255,240,170,0.95)`,
-          `text-shadow:0 0 14px rgba(120,255,160,0.95), 0 0 24px rgba(255,220,100,0.7)`,
+          `color:rgba(247,247,173,0.95)`,
+          `text-shadow:0 0 14px rgba(102,255,162,0.95), 0 0 24px rgba(255,217,102,0.7)`,
           `pointer-events:none`, `z-index:9996`, `opacity:0`,
           `animation:cooldinGlyph ${900 + Math.random() * 400}ms ease-out ${i * 70}ms forwards`,
         ].join(';');
@@ -40900,7 +40900,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
           @keyframes bgClockFadeOut {
             0%   { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: brightness(1); }
-            40%  { opacity: 1; transform: translate(-50%, -50%) scale(1.12); filter: brightness(1.8) drop-shadow(0 0 40px #ffcc33); }
+            40%  { opacity: 1; transform: translate(-50%, -50%) scale(1.12); filter: brightness(1.8) drop-shadow(0 0 40px #f8ca21); }
             100% { opacity: 0; transform: translate(-50%, -50%) scale(0.7); filter: brightness(1); }
           }
           @keyframes bgHourTick {
@@ -40933,7 +40933,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       // Dimmer behind the clock
       const dimmer = document.createElement('div');
-      dimmer.style.cssText = 'position:fixed;inset:0;background:radial-gradient(ellipse at center,rgba(20,10,0,.45),rgba(0,0,0,.15) 60%,transparent 90%);pointer-events:none;z-index:10020;opacity:0;animation:bgClockFadeIn 0.6s ease-out forwards,bgClockFadeOut 0.6s ease-in 1.6s forwards;';
+      dimmer.style.cssText = 'position:fixed;inset:0;background:radial-gradient(ellipse at center,rgba(31,15,4,.45),rgba(0,0,0,.15) 60%,transparent 90%);pointer-events:none;z-index:10020;opacity:0;animation:bgClockFadeIn 0.6s ease-out forwards,bgClockFadeOut 0.6s ease-in 1.6s forwards;';
       document.body.appendChild(dimmer);
       setTimeout(() => dimmer.remove(), 2300);
 
@@ -40947,7 +40947,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       ].join(';');
       // Clock face
       const face = document.createElement('div');
-      face.style.cssText = `position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fffaea 0%,#f2d98a 35%,#b58a2a 75%,#6b4a10 100%);border:8px solid #3a2a0d;box-shadow:0 0 60px rgba(255,200,80,.6),0 0 120px rgba(255,170,40,.3),inset 0 0 24px rgba(120,80,20,.7);`;
+      face.style.cssText = `position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff8e8 0%,#fbe181 35%,#a87c00 75%,#72541d 100%);border:8px solid #332300;box-shadow:0 0 60px rgba(255,208,102,.6),0 0 120px rgba(249,172,32,.3),inset 0 0 24px rgba(114,84,29,.7);`;
       clock.appendChild(face);
       // Numerals (12 roman-ish positions)
       const nums = ['XII','I','II','III','IV','V','VI','VII','VIII','IX','X','XI'];
@@ -40959,20 +40959,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const ny = size / 2 + Math.sin(rad) * rr;
         const n = document.createElement('div');
         n.textContent = nums[i];
-        n.style.cssText = `position:absolute;left:${nx}px;top:${ny}px;transform:translate(-50%,-50%);color:#2a1a05;font-family:'Cinzel',Georgia,serif;font-weight:900;font-size:${Math.round(size*0.08)}px;text-shadow:0 1px 0 rgba(255,240,180,.7);`;
+        n.style.cssText = `position:absolute;left:${nx}px;top:${ny}px;transform:translate(-50%,-50%);color:#27180c;font-family:'Cinzel',Georgia,serif;font-weight:900;font-size:${Math.round(size*0.08)}px;text-shadow:0 1px 0 rgba(249,236,179,.7);`;
         clock.appendChild(n);
       }
       // Center pin
       const pin = document.createElement('div');
-      pin.style.cssText = `position:absolute;left:50%;top:50%;width:${size*0.06}px;height:${size*0.06}px;border-radius:50%;background:radial-gradient(circle,#ffcc44,#8a5a10);transform:translate(-50%,-50%);box-shadow:0 0 8px rgba(255,200,80,.7);z-index:3;`;
+      pin.style.cssText = `position:absolute;left:50%;top:50%;width:${size*0.06}px;height:${size*0.06}px;border-radius:50%;background:radial-gradient(circle,#fad54a,#8b5b04);transform:translate(-50%,-50%);box-shadow:0 0 8px rgba(255,208,102,.7);z-index:3;`;
       clock.appendChild(pin);
       // Hour hand (11:55 → 12:00)
       const hour = document.createElement('div');
-      hour.style.cssText = `position:absolute;left:50%;top:50%;width:${size*0.045}px;height:${size*0.26}px;background:linear-gradient(180deg,#1a0f05 0%,#3a2a0d 100%);border-radius:${size*0.03}px;transform-origin:50% 100%;transform:translate(-50%,-100%) rotate(-30deg);animation:bgHourTick 1s steps(5,end) forwards;box-shadow:0 0 6px rgba(0,0,0,.6);z-index:2;`;
+      hour.style.cssText = `position:absolute;left:50%;top:50%;width:${size*0.045}px;height:${size*0.26}px;background:linear-gradient(180deg,#1f0f04 0%,#332300 100%);border-radius:${size*0.03}px;transform-origin:50% 100%;transform:translate(-50%,-100%) rotate(-30deg);animation:bgHourTick 1s steps(5,end) forwards;box-shadow:0 0 6px rgba(0,0,0,.6);z-index:2;`;
       clock.appendChild(hour);
       // Minute hand
       const minute = document.createElement('div');
-      minute.style.cssText = `position:absolute;left:50%;top:50%;width:${size*0.03}px;height:${size*0.38}px;background:linear-gradient(180deg,#2a1a05 0%,#6b4a10 100%);border-radius:${size*0.02}px;transform-origin:50% 100%;transform:translate(-50%,-100%) rotate(-30deg);animation:bgMinuteTick 1s steps(5,end) forwards;box-shadow:0 0 6px rgba(0,0,0,.6);z-index:2;`;
+      minute.style.cssText = `position:absolute;left:50%;top:50%;width:${size*0.03}px;height:${size*0.38}px;background:linear-gradient(180deg,#27180c 0%,#72541d 100%);border-radius:${size*0.02}px;transform-origin:50% 100%;transform:translate(-50%,-100%) rotate(-30deg);animation:bgMinuteTick 1s steps(5,end) forwards;box-shadow:0 0 6px rgba(0,0,0,.6);z-index:2;`;
       clock.appendChild(minute);
       document.body.appendChild(clock);
       setTimeout(() => clock.remove(), 2300);
@@ -40984,7 +40984,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           `position:fixed`, `left:${cx}px`, `top:${cy}px`,
           `width:${size*0.6}px`, `height:${size*0.6}px`,
           `border-radius:50%`,
-          `background:radial-gradient(circle,rgba(255,240,160,.95),rgba(255,190,60,.4),transparent 75%)`,
+          `background:radial-gradient(circle,rgba(255,241,150,.95),rgba(255,185,26,.4),transparent 75%)`,
           `pointer-events:none`, `z-index:10022`,
           `animation:bgBell 0.55s ease-out forwards`,
         ].join(';');
@@ -41039,7 +41039,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         'width:60px', 'height:60px',
         'font-size:56px', 'line-height:60px', 'text-align:center',
         'pointer-events:none', 'z-index:10002',
-        'filter:drop-shadow(0 8px 16px rgba(80,40,0,0.8))',
+        'filter:drop-shadow(0 8px 16px rgba(74,42,16,0.8))',
         'animation:boulderDrop 0.55s ease-in forwards',
       ].join(';');
       document.body.appendChild(boulder);
@@ -41051,7 +41051,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           'position:fixed',
           `left:${cx - 20}px`, `top:${cy - 20}px`,
           'width:40px', 'height:40px', 'border-radius:50%',
-          'background:radial-gradient(circle,rgba(160,100,40,.9),rgba(100,60,20,.5),transparent)',
+          'background:radial-gradient(circle,rgba(157,97,47,.9),rgba(110,68,33,.5),transparent)',
           'pointer-events:none', 'z-index:10001',
           'animation:boulderCrash 0.5s ease-out forwards',
         ].join(';');
@@ -41115,7 +41115,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const size  = 10 + Math.random() * 14;
         const delay = Math.random() * 200;
         const dur   = 500 + Math.random() * 400;
-        const col   = Math.random() > 0.5 ? '#cc44ff' : '#8822dd';
+        const col   = Math.random() > 0.5 ? '#a952ff' : '#903ae6';
         p.textContent = symbols[Math.floor(Math.random() * symbols.length)];
         p.style.cssText = [
           'position:fixed',
@@ -41180,7 +41180,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           `left:${startX - 10}px`, `top:${startY - 10}px`,
           'font-size:20px', 'line-height:1', 'pointer-events:none',
           'z-index:10250',
-          'filter:drop-shadow(0 0 6px rgba(255,220,100,.85)) drop-shadow(0 0 10px rgba(255,160,40,.6))',
+          'filter:drop-shadow(0 0 6px rgba(255,217,102,.85)) drop-shadow(0 0 10px rgba(255,154,26,.6))',
           `--gsDx:${endX - startX}px`, `--gsDy:${endY - startY}px`,
           `--gsMx:${jitterX}px`, `--gsMy:${jitterY}px`,
           `animation:goldStealCoin ${dur}ms cubic-bezier(0.4, 0.1, 0.2, 1) ${delay}ms forwards`,
@@ -41215,8 +41215,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // Ein Bogen nach oben, damit die Paeckchen nicht schnurgerade
         // ueber das Brett rutschen.
         bogen: -(60 + Math.random() * 90),
-        farbe: ['#e5484d', '#3fa96a', '#3b82f6', '#f0b429', '#a855f7', '#ec4899'][i % 6],
-        band: ['#ffe9b0', '#fff', '#ffd6e7'][i % 3],
+        farbe: ['#e94e53', '#2ca058', '#4580f6', '#ffb91a', '#a952ff', '#ea2f80'][i % 6],
+        band: ['#f9ecb3', '#fff', '#fae5eb'][i % 3],
         groesse: 16 + Math.random() * 12,
         delay: i * (dauer * 0.055),
         dur: dauer * 0.8,
@@ -41244,7 +41244,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       flash.style.cssText = `
         position:fixed;left:${cx - 90}px;top:${cy - 90}px;
         width:180px;height:180px;border-radius:50%;
-        background:radial-gradient(circle,rgba(255,80,80,.55) 0%,rgba(180,30,30,.3) 45%,transparent 75%);
+        background:radial-gradient(circle,rgba(254,81,84,.55) 0%,rgba(181,23,28,.3) 45%,transparent 75%);
         pointer-events:none;z-index:9999;opacity:0;
         animation:jumpscareFlash .6s ease-out forwards;
       `;
@@ -41258,7 +41258,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       box.style.cssText = `
         position:fixed;left:${cx - 28}px;top:${cy - 10}px;font-size:56px;
         pointer-events:none;z-index:10000;
-        filter:drop-shadow(0 0 6px rgba(255,60,60,.8));
+        filter:drop-shadow(0 0 6px rgba(240,50,50,.8));
         animation:jumpscareBoxShake .55s ease-in-out forwards;
       `;
       document.body.appendChild(box);
@@ -41269,7 +41269,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         spring.style.cssText = `
           position:fixed;left:${cx - 32}px;top:${cy - 14}px;font-size:64px;
           pointer-events:none;z-index:10001;opacity:0;
-          filter:drop-shadow(0 0 8px rgba(255,80,80,.9));
+          filter:drop-shadow(0 0 8px rgba(254,81,84,.9));
           animation:jumpscareSpring .7s ease-out forwards;
         `;
         document.body.appendChild(spring);
@@ -41282,7 +41282,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           star.style.cssText = `
             position:fixed;left:${cx}px;top:${cy - 20}px;font-size:22px;
             pointer-events:none;z-index:10001;opacity:0;
-            filter:drop-shadow(0 0 4px rgba(255,220,80,.9));
+            filter:drop-shadow(0 0 4px rgba(250,213,74,.9));
             animation:jumpscareStars .7s ease-out ${i * 35}ms forwards;
             --js-x:${Math.cos(angle) * dist}px;--js-y:${Math.sin(angle) * dist - 15}px;
           `;
@@ -41304,11 +41304,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const bubble = document.createElement('div');
       bubble.style.cssText = `
         position:fixed;left:${cx - 35}px;top:${cy - 35}px;width:70px;height:70px;
-        border-radius:50%;border:3px solid rgba(100,180,255,.6);
-        background:radial-gradient(circle at 30% 30%, rgba(180,220,255,.3), rgba(100,160,255,.1));
+        border-radius:50%;border:3px solid rgba(102,182,255,.6);
+        background:radial-gradient(circle at 30% 30%, rgba(179,216,249,.3), rgba(109,155,248,.1));
         pointer-events:none;z-index:10000;opacity:0;
         animation:magicBubble 1s ease-out forwards;
-        box-shadow:0 0 20px rgba(100,180,255,.4), inset 0 0 15px rgba(150,200,255,.2);
+        box-shadow:0 0 20px rgba(102,182,255,.4), inset 0 0 15px rgba(123,190,234,.2);
       `;
       document.body.appendChild(bubble);
       // Shine highlight
@@ -41355,7 +41355,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       glow.style.cssText = `
         position:fixed;left:${cx - 40}px;top:${cy - 40}px;width:80px;height:80px;
         border-radius:50%;pointer-events:none;z-index:9999;opacity:0;
-        background:radial-gradient(circle, rgba(255,120,0,.4), transparent 70%);
+        background:radial-gradient(circle, rgba(255,125,0,.4), transparent 70%);
         animation:fireshieldGlow .8s ease-out forwards;
       `;
       document.body.appendChild(glow);
@@ -41435,8 +41435,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             100% { opacity: 0; transform: translate(var(--bsDx), var(--bsDy)) scale(0.9); }
           }
           @keyframes bodySwapGhostHalo {
-            0%, 100% { box-shadow: 0 0 18px rgba(180, 220, 255, 0.55), 0 0 38px rgba(120, 180, 255, 0.35); }
-            50%      { box-shadow: 0 0 30px rgba(220, 240, 255, 0.85), 0 0 60px rgba(160, 200, 255, 0.5);  }
+            0%, 100% { box-shadow: 0 0 18px rgba(179,216,249,0.55), 0 0 38px rgba(102,182,255,0.35); }
+            50%      { box-shadow: 0 0 30px rgba(229,237,250,0.85), 0 0 60px rgba(180,207,248,0.5);  }
           }
         `;
         document.head.appendChild(style);
@@ -41458,8 +41458,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           'border-radius:10px',
           'overflow:hidden',
           // Soft cyan-white halo around the soul portrait.
-          'box-shadow:0 0 18px rgba(180,220,255,0.65), 0 0 38px rgba(120,180,255,0.4)',
-          'border:1.5px solid rgba(220,240,255,0.7)',
+          'box-shadow:0 0 18px rgba(179,216,249,0.65), 0 0 38px rgba(102,182,255,0.4)',
+          'border:1.5px solid rgba(229,237,250,0.7)',
           'pointer-events:none', 'z-index:10080',
           'opacity:0',
           `--bsDx:${dx}px`, `--bsDy:${dy}px`,
@@ -41484,14 +41484,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const tint = document.createElement('div');
           tint.style.cssText = [
             'position:absolute', 'inset:0',
-            'background:linear-gradient(180deg, rgba(180,220,255,0.45) 0%, rgba(140,190,240,0.35) 60%, rgba(110,170,230,0.40) 100%)',
+            'background:linear-gradient(180deg, rgba(179,216,249,0.45) 0%, rgba(123,190,234,0.35) 60%, rgba(102,182,255,0.40) 100%)',
             'mix-blend-mode:screen',
           ].join(';');
           ghost.appendChild(tint);
         } else {
           // Fallback for cards without a registered image — labelled
           // soul ribbon so the swap still reads correctly.
-          ghost.style.cssText += ';background:linear-gradient(180deg, rgba(220,240,255,0.55) 0%, rgba(150,200,255,0.45) 100%);display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;font-size:11px;font-weight:700;color:#fff;text-shadow:0 0 4px rgba(60,100,160,0.9)';
+          ghost.style.cssText += ';background:linear-gradient(180deg, rgba(229,237,250,0.55) 0%, rgba(123,190,234,0.45) 100%);display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;font-size:11px;font-weight:700;color:#fff;text-shadow:0 0 4px rgba(64,95,140,0.9)';
           ghost.textContent = (heroName || '').split(',')[0].slice(0, 14);
         }
         document.body.appendChild(ghost);
@@ -41533,7 +41533,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       overlay.style.cssText = [
         'position:fixed', 'left:0', 'top:0',
         'width:100vw', 'height:100vh',
-        'background:radial-gradient(ellipse at 50% 50%, rgba(140,0,0,0.55) 0%, rgba(80,0,0,0.45) 55%, rgba(30,0,0,0.55) 100%)',
+        'background:radial-gradient(ellipse at 50% 50%, rgba(143,0,0,0.55) 0%, rgba(82,10,12,0.45) 55%, rgba(39,13,12,0.55) 100%)',
         'mix-blend-mode:multiply',
         'pointer-events:none', 'z-index:9998',
         'opacity:0',
@@ -41547,9 +41547,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         'left:50%', 'top:50%',
         'width:60px', 'height:60px',
         'transform:translate(-50%, -50%)',
-        'border:6px solid rgba(255,40,40,0.9)',
+        'border:6px solid rgba(255,26,26,0.9)',
         'border-radius:50%',
-        'box-shadow:0 0 60px rgba(255,40,40,0.7), inset 0 0 30px rgba(255,40,40,0.5)',
+        'box-shadow:0 0 60px rgba(255,26,26,0.7), inset 0 0 30px rgba(255,26,26,0.5)',
         'pointer-events:none', 'z-index:9999',
         'opacity:0',
         `animation:forbiddenZoneFade ${dur}ms ease-out forwards`,
@@ -41591,7 +41591,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       onBeamAnimation({
         sourceOwner: fromOwner, sourceHeroIdx: fromHeroIdx,
         targetOwner: toOwner, targetHeroIdx: toHeroIdx,
-        color: '#7fd4ff', duration: 900, thickness: 4, bolt: true, glow: true,
+        color: '#77c8ee', duration: 900, thickness: 4, bolt: true, glow: true,
       });
     };
     socket.on('tempeste_redirect_strike', onTempesteRedirectStrike);
@@ -42386,7 +42386,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const totalButterflies = Math.min(120, tgtPositions.length * 30);
       const perTarget = Math.floor(totalButterflies / tgtPositions.length);
       const butterflyChars = ['🦋'];
-      const colors = ['#ffd700','#ffec80','#fff4cc','#f0c040','#ffe066'];
+      const colors = ['#ffd61a','#fbe181','#fffbd2','#fad54a','#ffe469'];
 
       for (let ti = 0; ti < tgtPositions.length; ti++) {
         const tgt = tgtPositions[ti];
@@ -42409,7 +42409,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           bf.textContent = butterflyChars[0];
           bf.style.cssText = `
             position:fixed; left:${srcX}px; top:${srcY}px; z-index:10200; pointer-events:none;
-            font-size:${size}px; filter:drop-shadow(0 0 4px ${color}) drop-shadow(0 0 8px rgba(255,215,0,0.5));
+            font-size:${size}px; filter:drop-shadow(0 0 4px ${color}) drop-shadow(0 0 8px rgba(255,214,26,0.5));
             --bfDx:${dx + (-15 + Math.random()*30)}px; --bfDy:${dy + (-15 + Math.random()*30)}px;
             --bfWobble1:${wobble1}px; --bfWobble2:${wobble2}px;
             --bfSpin1:${spin1}deg; --bfSpin2:${spin2}deg; --bfSpin3:${spin3}deg; --bfSpin4:${spin4}deg;
@@ -42426,7 +42426,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           burst.style.cssText = `
             position:fixed; left:${tgt.x - 40}px; top:${tgt.y - 40}px; width:80px; height:80px;
             z-index:10201; pointer-events:none; border-radius:50%;
-            background: radial-gradient(circle, rgba(255,215,0,0.9) 0%, rgba(255,236,128,0.5) 40%, transparent 70%);
+            background: radial-gradient(circle, rgba(255,214,26,0.9) 0%, rgba(251,225,129,0.5) 40%, transparent 70%);
             animation: butterflyBurst 500ms ease-out forwards;
           `;
           document.body.appendChild(burst);
@@ -42469,7 +42469,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       flash.style.cssText = `
         position:fixed; left:${cx - 50}px; top:${cy - 50}px; width:100px; height:100px;
         z-index:10201; pointer-events:none; border-radius:50%;
-        background: radial-gradient(circle, rgba(255,200,50,0.95) 0%, rgba(255,170,0,0.5) 40%, transparent 70%);
+        background: radial-gradient(circle, rgba(255,198,28,0.95) 0%, rgba(249,172,32,0.5) 40%, transparent 70%);
         animation: smugCoinFlash 600ms ease-out forwards;
       `;
       document.body.appendChild(flash);
@@ -42495,7 +42495,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           position:fixed; left:${cx + xOff - size/2}px; top:${cy - size/2}px;
           width:${size}px; height:${size}px; z-index:10200; pointer-events:none;
           object-fit:contain;
-          filter: drop-shadow(0 0 3px rgba(255,200,50,0.8)) drop-shadow(0 0 6px rgba(255,170,0,0.4));
+          filter: drop-shadow(0 0 3px rgba(255,198,28,0.8)) drop-shadow(0 0 6px rgba(249,172,32,0.4));
           --scStartY:${startY}px; --scMidY:${midY}px; --scEndY:${endY}px;
           --scRot1:${rot1}deg; --scRot2:${rot2}deg; --scRot3:${rot3}deg;
           animation: smugCoinFall ${dur}ms ease-in ${delay}ms forwards;
@@ -42545,7 +42545,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const flash = document.createElement('div');
       flash.style.cssText = `
         position:absolute; top:0; left:0; width:100%; height:100%;
-        background: rgba(100,150,255,0.15);
+        background: rgba(109,155,248,0.15);
         animation: rainFlash 2s ease-out forwards;
       `;
       overlay.appendChild(flash);
@@ -42564,7 +42564,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         drop.style.cssText = `
           position:absolute; left:${x}%; top:-20px;
           width:${width}px; height:${height}px;
-          background: linear-gradient(to bottom, rgba(140,180,255,0), rgba(140,180,255,${opacity}), rgba(180,210,255,${opacity * 0.5}));
+          background: linear-gradient(to bottom, rgba(102,182,255,0), rgba(140,180,255,${opacity}), rgba(180,210,255,${opacity * 0.5}));
           border-radius: 0 0 2px 2px;
           animation: rainDrop ${dur}s linear ${delay}s infinite;
           transform: rotate(-5deg);
@@ -42625,7 +42625,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const veil = document.createElement('div');
       veil.style.cssText = `
         position:absolute; inset:0;
-        background: linear-gradient(180deg, rgba(200,235,255,.5) 0%, rgba(150,205,245,.32) 45%, rgba(120,180,230,.42) 100%);
+        background: linear-gradient(180deg, rgba(189,220,239,.5) 0%, rgba(123,190,234,.32) 45%, rgba(123,190,234,.42) 100%);
         animation: iceageVeil 2600ms ease-out forwards;
       `;
       overlay.appendChild(veil);
@@ -42634,7 +42634,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       frost.style.cssText = `
         position:absolute; inset:0;
         background:
-          radial-gradient(ellipse at 50% 50%, transparent 38%, rgba(225,245,255,.75) 82%),
+          radial-gradient(ellipse at 50% 50%, transparent 38%, rgba(229,245,250,.75) 82%),
           repeating-linear-gradient(115deg, rgba(255,255,255,.16) 0 3px, transparent 3px 9px);
         animation: iceageFrost 2600ms ease-out forwards;
       `;
@@ -42642,7 +42642,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Kaelteblitz
       const flash = document.createElement('div');
       flash.style.cssText = `
-        position:absolute; inset:0; background: rgba(235,250,255,.95);
+        position:absolute; inset:0; background: rgba(229,245,250,.95);
         animation: iceageFlash 2600ms ease-out forwards;
       `;
       overlay.appendChild(flash);
@@ -42715,7 +42715,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Schleier + Reif von den Raendern
       const veil = document.createElement('div');
       veil.style.cssText = `position:absolute;inset:0;--o:${0.25 + stufe * 0.14};`
-        + `background:radial-gradient(ellipse at 50% 50%, rgba(170,215,245,.35) 0%, rgba(200,235,255,.55) 60%, rgba(235,250,255,.85) 100%);`
+        + `background:radial-gradient(ellipse at 50% 50%, rgba(179,216,249,.35) 0%, rgba(189,220,239,.55) 60%, rgba(229,245,250,.85) 100%);`
         + `animation:yukiVeil ${dauer}ms ease-out forwards;`;
       box.appendChild(veil);
       // Schneestreifen: Wind von links, flacher und schneller je Stufe
@@ -42737,7 +42737,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       for (let i = 0; i < 20 + stufe * 18; i++) {
         const s = 2 + Math.random() * 4;
         const f = document.createElement('div');
-        f.style.cssText = `position:absolute;left:${Math.random() * 100 - 10}%;top:${Math.random() * 100}%;width:${s}px;height:${s}px;border-radius:50%;background:rgba(255,255,255,.95);box-shadow:0 0 4px rgba(210,240,255,.9);`
+        f.style.cssText = `position:absolute;left:${Math.random() * 100 - 10}%;top:${Math.random() * 100}%;width:${s}px;height:${s}px;border-radius:50%;background:rgba(255,255,255,.95);box-shadow:0 0 4px rgba(229,245,250,.9);`
           + `--dx:${Math.round(w * (0.35 + stufe * 0.15) * (0.6 + Math.random()))}px;--dy:${Math.round((Math.random() - 0.3) * h * 0.5)}px;`
           + `animation:yukiFlake ${1.1 - stufe * 0.12 + Math.random() * 0.5}s ease-in ${Math.random() * dauer * 0.55 / 1000}s 2;opacity:0;`;
         box.appendChild(f);
@@ -42746,13 +42746,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       for (let i = 0; i < (stufe - 1) * 2; i++) {
         const g = document.createElement('div');
         g.style.cssText = `position:absolute;left:0;top:${8 + Math.random() * 78}%;width:60%;height:${10 + Math.random() * 18}%;`
-          + `background:linear-gradient(90deg, rgba(255,255,255,0), rgba(235,248,255,.55), rgba(255,255,255,0));filter:blur(6px);--o:${0.45 + stufe * 0.1};`
+          + `background:linear-gradient(90deg, rgba(255,255,255,0), rgba(229,245,250,.55), rgba(255,255,255,0));filter:blur(6px);--o:${0.45 + stufe * 0.1};`
           + `animation:yukiGust ${900 - stufe * 90}ms ease-in-out ${Math.round(150 + Math.random() * dauer * 0.55)}ms 1 both;`;
         box.appendChild(g);
       }
       if (stufe >= 4) {
         const flash = document.createElement('div');
-        flash.style.cssText = `position:absolute;inset:0;background:rgba(240,252,255,.95);animation:yukiFlash ${dauer}ms ease-out forwards;`;
+        flash.style.cssText = `position:absolute;inset:0;background:rgba(229,245,250,.95);animation:yukiFlash ${dauer}ms ease-out forwards;`;
         box.appendChild(flash);
       }
       document.body.appendChild(box);
@@ -42795,9 +42795,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             35% { transform: scale(0.95); }
             50% { transform: scale(1.5); }
             60% { transform: scale(1.0); }
-            75% { transform: scale(1.8); filter: brightness(1.5) drop-shadow(0 0 30px rgba(255,50,80,0.9)); }
+            75% { transform: scale(1.8); filter: brightness(1.5) drop-shadow(0 0 30px rgba(254,81,84,0.9)); }
             85% { transform: scale(1.6); }
-            95% { transform: scale(2.2); filter: brightness(2) drop-shadow(0 0 60px rgba(255,50,80,1)); }
+            95% { transform: scale(2.2); filter: brightness(2) drop-shadow(0 0 60px rgba(254,81,84,1)); }
             100% { transform: scale(6); opacity: 0; filter: brightness(3) drop-shadow(0 0 100px white); }
           }
           @keyframes moeFlash {
@@ -42842,7 +42842,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       heart.style.cssText = `
         font-size:180px; line-height:1;
         animation: moePulse 2.8s ease-in-out forwards;
-        filter: drop-shadow(0 0 30px rgba(255,50,80,0.8));
+        filter: drop-shadow(0 0 30px rgba(254,81,84,0.8));
       `;
       heartWrap.appendChild(heart);
       container.appendChild(heartWrap);
@@ -42853,7 +42853,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const flash = document.createElement('div');
         flash.style.cssText = `
           position:absolute; top:0; left:0; width:100%; height:100%;
-          background: radial-gradient(circle at 50% 50%, rgba(255,200,220,0.9) 0%, rgba(255,100,150,0.4) 30%, transparent 60%);
+          background: radial-gradient(circle at 50% 50%, rgba(243,186,211,0.9) 0%, rgba(254,103,148,0.4) 30%, transparent 60%);
           animation: moeFlash 800ms ease-out forwards;
         `;
         container.appendChild(flash);
@@ -42881,7 +42881,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
 
         // Glitter sparkles
-        const glitterColors = ['#ff69b4','#ffd700','#ff1493','#ff6eb4','#fff','#ffc0cb','#ff85a2','#ffb7d5','#87ceeb','#dda0dd'];
+        const glitterColors = ['#fc69c6','#ffd61a','#fb1ea9','#f174ab','#fff','#f8b4c8','#e58092','#f8b4c8','#77c8ee','#d6b3f9'];
         for (let i = 0; i < 80; i++) {
           const g = document.createElement('div');
           const angle = Math.random() * 360;
@@ -42906,7 +42906,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
 
         // Confetti ribbons
-        const confettiColors = ['#ff1493','#ff69b4','#ffd700','#ff4500','#ff6eb4','#87ceeb','#dda0dd','#98fb98','#ffc0cb'];
+        const confettiColors = ['#fb1ea9','#fc69c6','#ffd61a','#ff491a','#f174ab','#77c8ee','#d6b3f9','#75f091','#f8b4c8'];
         for (let i = 0; i < 50; i++) {
           const c = document.createElement('div');
           const x = Math.random() * window.innerWidth;
@@ -43000,7 +43000,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const vignette = document.createElement('div');
       vignette.style.cssText = `
         position:absolute; inset:0; opacity:0;
-        background: radial-gradient(ellipse at center, transparent 30%, rgba(80,40,150,0.35) 70%, rgba(40,20,90,0.65) 100%);
+        background: radial-gradient(ellipse at center, transparent 30%, rgba(88,35,140,0.35) 70%, rgba(46,10,81,0.65) 100%);
         animation: divineMagicVignette 2200ms ease-out both;
       `;
       overlay.appendChild(vignette);
@@ -43012,8 +43012,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         ring.style.cssText = `
           position:absolute; top:50%; left:50%;
           width:${size}px; height:${size}px; border-radius:50%;
-          border: 3px solid rgba(200,170,255,0.85);
-          box-shadow: 0 0 32px rgba(180,140,255,0.8), inset 0 0 24px rgba(220,190,255,0.5);
+          border: 3px solid rgba(214,179,249,0.85);
+          box-shadow: 0 0 32px rgba(201,138,255,0.8), inset 0 0 24px rgba(214,179,249,0.5);
           opacity:0; transform: translate(-50%, -50%) scale(0);
           animation: divineMagicShockwave ${1200 + i * 200}ms ease-out ${i * 120}ms both;
         `;
@@ -43025,7 +43025,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       halo.style.cssText = `
         position:absolute; top:50%; left:50%;
         width:480px; height:480px; border-radius:50%;
-        background: radial-gradient(circle, rgba(255,245,220,0.95) 0%, rgba(220,190,255,0.7) 30%, rgba(170,130,240,0.4) 60%, transparent 90%);
+        background: radial-gradient(circle, rgba(255,248,232,0.95) 0%, rgba(214,179,249,0.7) 30%, rgba(178,120,237,0.4) 60%, transparent 90%);
         filter: blur(2px);
         mix-blend-mode: screen;
         opacity:0; transform: translate(-50%, -50%) scale(0.2);
@@ -43041,8 +43041,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       glyph.style.cssText = `
         position:absolute; top:50%; left:50%;
         font-size: 320px; line-height: 1;
-        color: rgba(255,250,230,0.95);
-        text-shadow: 0 0 40px rgba(220,190,255,1), 0 0 80px rgba(180,140,255,0.85), 0 0 120px rgba(140,90,220,0.6);
+        color: rgba(255,248,232,0.95);
+        text-shadow: 0 0 40px rgba(214,179,249,1), 0 0 80px rgba(201,138,255,0.85), 0 0 120px rgba(161,89,233,0.6);
         opacity:0; transform: translate(-50%, -50%) rotate(0deg) scale(0.4);
         animation: divineMagicGlyph 1400ms ease-out 100ms both;
       `;
@@ -43061,8 +43061,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           position:absolute; top:50%; left:50%;
           margin-left:${x}px; margin-top:${y}px;
           font-size: 36px;
-          color: rgba(240,220,255,1);
-          text-shadow: 0 0 12px rgba(200,170,255,1), 0 0 24px rgba(160,110,230,0.8);
+          color: rgba(241,229,250,1);
+          text-shadow: 0 0 12px rgba(214,179,249,1), 0 0 24px rgba(178,120,237,0.8);
           opacity:0; transform: translate(-50%, -50%) scale(0.3);
           animation: divineMagicRune 1800ms ease-in-out ${300 + i * 60}ms both;
         `;
@@ -43079,8 +43079,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         streak.style.cssText = `
           position:absolute; top:100%; left:${xPct}%;
           width: 4px; height: 60vh;
-          background: linear-gradient(to top, rgba(200,170,255,0) 0%, rgba(220,190,255,0.85) 30%, rgba(255,240,220,0.95) 70%, rgba(255,255,255,0) 100%);
-          box-shadow: 0 0 12px rgba(200,170,255,0.9);
+          background: linear-gradient(to top, rgba(214,179,249,0) 0%, rgba(214,179,249,0.85) 30%, rgba(255,248,232,0.95) 70%, rgba(255,255,255,0) 100%);
+          box-shadow: 0 0 12px rgba(214,179,249,0.9);
           transform-origin: 50% 100%;
           opacity:0; transform: translate(-50%, -50%) rotate(${rot}deg) translateY(0) scaleY(0);
           --dmgRot: ${rot}deg;
@@ -43101,13 +43101,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const size = 12 + Math.random() * 22;
         const dur = 900 + Math.random() * 700;
         const delay = Math.random() * 500;
-        const hue = ['#fff5dc','#e8d8ff','#c8b0ff','#f5e8b8','#d8c0ff','#fff'][Math.floor(Math.random() * 6)];
+        const hue = ['#fff8e8','#d9c0ec','#d6b3f9','#f9ecb3','#d6bbf1','#fff'][Math.floor(Math.random() * 6)];
         sparkle.textContent = particles[Math.floor(Math.random() * particles.length)];
         sparkle.style.cssText = `
           position:absolute; top:50%; left:50%;
           font-size:${size}px;
           color:${hue};
-          text-shadow: 0 0 8px ${hue}, 0 0 16px rgba(180,140,255,0.7);
+          text-shadow: 0 0 8px ${hue}, 0 0 16px rgba(201,138,255,0.7);
           opacity:0; transform: translate(0,0) scale(0.3) rotate(0deg);
           --dmgDx:${dx}px; --dmgDy:${dy}px;
           animation: divineMagicSparkle ${dur}ms ease-out ${delay}ms both;
@@ -43184,7 +43184,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const vignette = document.createElement('div');
       vignette.style.cssText = `
         position:absolute; inset:0; opacity:0;
-        background: radial-gradient(ellipse at center, transparent 30%, rgba(40,80,160,0.35) 70%, rgba(20,40,90,0.65) 100%);
+        background: radial-gradient(ellipse at center, transparent 30%, rgba(47,83,157,0.35) 70%, rgba(20,40,90,0.65) 100%);
         animation: dtVignette 2200ms ease-out both;
       `;
       overlay.appendChild(vignette);
@@ -43196,8 +43196,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         ring.style.cssText = `
           position:absolute; top:50%; left:50%;
           width:${size}px; height:${size}px; border-radius:50%;
-          border: 3px solid rgba(140,210,255,0.85);
-          box-shadow: 0 0 32px rgba(120,200,255,0.85), inset 0 0 24px rgba(180,230,255,0.5);
+          border: 3px solid rgba(119,200,238,0.85);
+          box-shadow: 0 0 32px rgba(104,198,253,0.85), inset 0 0 24px rgba(180,223,248,0.5);
           opacity:0; transform: translate(-50%, -50%) scale(0.5);
           animation: dtRingExpand ${1300 + i * 180}ms ease-out ${i * 120}ms both;
         `;
@@ -43217,7 +43217,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         width:${clockSize}px; height:${clockSize}px;
         opacity:0; transform: translate(-50%, -50%) scale(0.4);
         animation: dtFaceFadeIn 1900ms ease-out 100ms both;
-        filter: drop-shadow(0 0 20px rgba(140,210,255,0.85)) drop-shadow(0 0 40px rgba(180,230,255,0.5));
+        filter: drop-shadow(0 0 20px rgba(119,200,238,0.85)) drop-shadow(0 0 40px rgba(180,223,248,0.5));
       `;
       const svg = document.createElementNS(clockSvgNS, 'svg');
       svg.setAttribute('viewBox', `0 0 ${clockSize} ${clockSize}`);
@@ -43227,16 +43227,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const rim = document.createElementNS(clockSvgNS, 'circle');
       rim.setAttribute('cx', cx); rim.setAttribute('cy', cy);
       rim.setAttribute('r', clockSize * 0.46);
-      rim.setAttribute('fill', 'rgba(220,240,255,0.92)');
-      rim.setAttribute('stroke', 'rgba(80,140,210,0.9)');
+      rim.setAttribute('fill', 'rgba(229,237,250,0.92)');
+      rim.setAttribute('stroke', 'rgba(78,130,203,0.9)');
       rim.setAttribute('stroke-width', '8');
       svg.appendChild(rim);
       // Inner face
       const face = document.createElementNS(clockSvgNS, 'circle');
       face.setAttribute('cx', cx); face.setAttribute('cy', cy);
       face.setAttribute('r', clockSize * 0.43);
-      face.setAttribute('fill', 'rgba(245,250,255,0.95)');
-      face.setAttribute('stroke', 'rgba(120,180,230,0.6)');
+      face.setAttribute('fill', 'rgba(255,255,255,0.95)');
+      face.setAttribute('stroke', 'rgba(123,190,234,0.6)');
       face.setAttribute('stroke-width', '2');
       svg.appendChild(face);
       // Tick marks (12)
@@ -43252,7 +43252,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const tick = document.createElementNS(clockSvgNS, 'line');
         tick.setAttribute('x1', x1); tick.setAttribute('y1', y1);
         tick.setAttribute('x2', x2); tick.setAttribute('y2', y2);
-        tick.setAttribute('stroke', 'rgba(40,80,140,0.95)');
+        tick.setAttribute('stroke', 'rgba(43,69,126,0.95)');
         tick.setAttribute('stroke-width', isHour ? '5' : '2');
         tick.setAttribute('stroke-linecap', 'round');
         svg.appendChild(tick);
@@ -43267,7 +43267,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         t.setAttribute('x', n.x); t.setAttribute('y', n.y);
         t.setAttribute('text-anchor', 'middle');
         t.setAttribute('dominant-baseline', 'middle');
-        t.setAttribute('fill', 'rgba(40,80,140,0.95)');
+        t.setAttribute('fill', 'rgba(43,69,126,0.95)');
         t.setAttribute('font-family', 'serif');
         t.setAttribute('font-weight', 'bold');
         t.setAttribute('font-size', '28');
@@ -43292,13 +43292,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       };
       svg.appendChild(makeHand(clockSize * 0.28, 8, 'rgba(20,40,90,0.95)', 'dtHourBack',   1900));
       svg.appendChild(makeHand(clockSize * 0.36, 6, 'rgba(20,40,90,0.95)', 'dtMinuteBack', 1900));
-      svg.appendChild(makeHand(clockSize * 0.40, 3, 'rgba(180,40,40,0.95)', 'dtSecondBack', 1900));
+      svg.appendChild(makeHand(clockSize * 0.40, 3, 'rgba(178,26,41,0.95)', 'dtSecondBack', 1900));
       // Center pin
       const pin = document.createElementNS(clockSvgNS, 'circle');
       pin.setAttribute('cx', cx); pin.setAttribute('cy', cy);
       pin.setAttribute('r', 8);
       pin.setAttribute('fill', 'rgba(20,40,90,0.95)');
-      pin.setAttribute('stroke', 'rgba(180,220,255,0.9)');
+      pin.setAttribute('stroke', 'rgba(179,216,249,0.9)');
       pin.setAttribute('stroke-width', '2');
       svg.appendChild(pin);
       clockWrap.appendChild(svg);
@@ -43320,8 +43320,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         sparkle.style.cssText = `
           position:absolute; top:50%; left:50%;
           font-size:${size}px;
-          color: rgba(220,240,255,0.95);
-          text-shadow: 0 0 8px rgba(140,210,255,0.95), 0 0 16px rgba(120,200,255,0.7);
+          color: rgba(229,237,250,0.95);
+          text-shadow: 0 0 8px rgba(119,200,238,0.95), 0 0 16px rgba(104,198,253,0.7);
           opacity:0; transform: translate(0,0) scale(0.4) rotate(0deg);
           --dtfDx:${dx}px; --dtfDy:${dy}px;
           animation: dtFragment ${dur}ms ease-out ${delay}ms both;
@@ -43377,7 +43377,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           position:fixed; left:${srcX - gm.b / 2}px; top:${srcY - gm.h / 2}px;
           width:${gm.b}px; height:${gm.h}px; z-index:${10200 + (cardNames.length - i)}; pointer-events:none;
           border-radius:4px; overflow:hidden;
-          box-shadow: 0 0 12px rgba(100,255,150,0.7), 0 0 4px rgba(50,200,100,0.5);
+          box-shadow: 0 0 12px rgba(102,255,162,0.7), 0 0 4px rgba(75,205,124,0.5);
           --dtdDx:${dx}px; --dtdDy:${dy}px;
           animation: discardToDeck 700ms ease-in-out ${delay}ms forwards;
           opacity: 0;
@@ -43390,9 +43390,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           card.appendChild(img);
           card.style.opacity = '1';
         } else {
-          card.style.background = 'linear-gradient(135deg, #2a5a3a, #1a3a2a)';
+          card.style.background = 'linear-gradient(135deg, #29663f, #1a4128)';
           card.style.opacity = '1';
-          card.innerHTML = `<div style="color:#8f8;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardNames[i]}</div>`;
+          card.innerHTML = `<div style="color:#75f091;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardNames[i]}</div>`;
         }
         document.body.appendChild(card);
         setTimeout(() => card.remove(), delay + 800);
@@ -44056,11 +44056,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       //     fade-out.
       let glow;
       if (isWindstorm) {
-        glow = 'box-shadow:0 0 18px rgba(180,230,255,0.95),0 0 6px rgba(120,180,230,0.7)';
+        glow = 'box-shadow:0 0 18px rgba(180,223,248,0.95),0 0 6px rgba(123,190,234,0.7)';
       } else if (isToHand || isToSupport) {
-        glow = 'box-shadow:0 0 14px rgba(100,220,255,0.85),0 0 4px rgba(60,170,230,0.55)';
+        glow = 'box-shadow:0 0 14px rgba(102,217,255,0.85),0 0 4px rgba(57,158,223,0.55)';
       } else {
-        glow = 'box-shadow:0 0 12px rgba(180,80,255,0.7),0 0 4px rgba(120,40,200,0.5)';
+        glow = 'box-shadow:0 0 12px rgba(169,82,255,0.7),0 0 4px rgba(122,43,208,0.5)';
       }
       // Animation + duration:
       //   • windstorm runs 1200ms (longer, so the chaos reads).
@@ -44215,9 +44215,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         inhalt.appendChild(img);
         card.style.opacity = '1';
       } else {
-        inhalt.style.background = 'linear-gradient(135deg,#2a1a4a,#1a0a3a)';
+        inhalt.style.background = 'linear-gradient(135deg,#1a0a3a,#1a0a3a)';
         card.style.opacity = '1';
-        inhalt.innerHTML = `<div style="color:#c8a;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardName}</div>`;
+        inhalt.innerHTML = `<div style="color:#f8b4df;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardName}</div>`;
       }
       // ★★ ALS BEFUND 18.8. (vierte Runde): „Creatures jenseits der
       // ersten flashen unsichtbar, bis sie sich bewegen."
@@ -44242,9 +44242,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // und eine Spur aus Sternchen, die an der jeweils aktuellen Position
       // der Karte entsteht und zurueckbleibt. Nur `transform`/`opacity`.
       if (flightStyle === 'glitzer') {
-        card.style.boxShadow = '0 0 16px rgba(255,236,150,.95), 0 0 34px rgba(255,210,90,.55)';
+        card.style.boxShadow = '0 0 16px rgba(255,241,150,.95), 0 0 34px rgba(255,217,102,.55)';
         card.style.overflow = 'visible';
-        const FARBEN = ['#fff8d6', '#ffe27a', '#ffffff', '#ffd14a', '#fff2b0'];
+        const FARBEN = ['#fffbd2', '#fbe181', '#ffffff', '#fad54a', '#f9ecb3'];
         const funkelZahl = ppFxN(14);
         for (let i = 0; i < funkelZahl; i++) {
           const f = document.createElement('i');
@@ -44296,7 +44296,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Glutpixel zurueck. Kein weicher Schein — ein harter Pixelrahmen.
       if (flightStyle === 'flammen') {
         card.style.overflow = 'visible';
-        card.style.boxShadow = '0 0 0 2px #ffd23a, 0 0 0 4px #ff7a14, 0 0 0 6px #b8200e';
+        card.style.boxShadow = '0 0 0 2px #f8ca21, 0 0 0 4px #ff7d00, 0 0 0 6px #be0e0e';
         const zungen = ppFxN(14);
         const PX = 3;                                   // Bildschirmpixel je Sprite-Pixel
         for (let i = 0; i < zungen; i++) {
@@ -44320,7 +44320,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           ].join(';');
           card.appendChild(z);
         }
-        const FARBEN = ['#ffd23a', '#ff9a1a', '#ff5a10', '#fff3a8', '#b8200e'];
+        const FARBEN = ['#f8ca21', '#ff9a1a', '#ff491a', '#f7f7ad', '#be0e0e'];
         let takt = 0;
         const spurStart = (laneDelay || 0);
         const spurEnde = spurStart + Math.round(durationMs * 0.9);
@@ -45096,7 +45096,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const bild = window.cardImageUrl ? window.cardImageUrl(d.cardName) : null;
         el.innerHTML = (bild
           ? `<img src="${bild}" draggable="false" style="width:100%;height:100%;object-fit:cover;border-radius:6px;display:block" />`
-          : `<div style="width:100%;height:100%;border-radius:6px;background:#3a2a1a"></div>`)
+          : `<div style="width:100%;height:100%;border-radius:6px;background:#3a2412"></div>`)
           + '<span class="chaorc-wurf-russ"></span>';
         (wA.welt && window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(el);
 
@@ -45643,10 +45643,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             100% { opacity: 0; transform: translateX(220%) skewX(-25deg); }
           }
           @keyframes sdaCardGlow {
-            0%   { box-shadow: 0 0 0 0 rgba(255,235,140,0); filter: brightness(1); }
-            25%  { box-shadow: 0 0 28px 6px rgba(255,225,140,0.95), 0 0 48px 14px rgba(220,180,255,0.7); filter: brightness(1.3); }
-            70%  { box-shadow: 0 0 22px 4px rgba(255,225,140,0.7); filter: brightness(1.1); }
-            100% { box-shadow: 0 0 0 0 rgba(255,225,140,0); filter: brightness(1); }
+            0%   { box-shadow: 0 0 0 0 rgba(255,241,150,0); filter: brightness(1); }
+            25%  { box-shadow: 0 0 28px 6px rgba(251,225,129,0.95), 0 0 48px 14px rgba(214,179,249,0.7); filter: brightness(1.3); }
+            70%  { box-shadow: 0 0 22px 4px rgba(251,225,129,0.7); filter: brightness(1.1); }
+            100% { box-shadow: 0 0 0 0 rgba(251,225,129,0); filter: brightness(1); }
           }
           @keyframes sdaSparkle {
             0%   { opacity: 0; transform: translate(0,0) scale(0.3) rotate(0deg); }
@@ -45763,7 +45763,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           `left:${srcX - gm.b / 2}px`, `top:${srcY - gm.h / 2}px`,
           `width:${gm.b}px`, `height:${gm.h}px`, `z-index:${10200 + (cardNames.length - i)}`, 'pointer-events:none',
           'border-radius:4px', 'overflow:hidden',
-          'box-shadow:0 0 12px rgba(180,80,255,0.7),0 0 4px rgba(120,40,200,0.5)',
+          'box-shadow:0 0 12px rgba(169,82,255,0.7),0 0 4px rgba(122,43,208,0.5)',
           `--dtdsDx:${dx}px`, `--dtdsDy:${dy}px`,
           `animation:${animName} ${totalMs}ms ease-in-out ${delay}ms forwards`,
           'opacity:0',
@@ -45776,9 +45776,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           card.appendChild(img);
           card.style.opacity = '1';
         } else {
-          card.style.background = 'linear-gradient(135deg,#2a1a4a,#1a0a3a)';
+          card.style.background = 'linear-gradient(135deg,#1a0a3a,#1a0a3a)';
           card.style.opacity    = '1';
-          card.innerHTML = `<div style="color:#c8a;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardNames[i]}</div>`;
+          card.innerHTML = `<div style="color:#f8b4df;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardNames[i]}</div>`;
         }
         document.body.appendChild(card);
         setTimeout(() => card.remove(), delay + totalMs + 100);
@@ -45848,7 +45848,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // Subtle red-purple glow to differentiate from the deck→
           // discard purple flight — makes "going to deleted" feel
           // distinct from "going to discard" at a glance.
-          'box-shadow:0 0 12px rgba(255,80,140,0.7),0 0 4px rgba(140,40,80,0.5)',
+          'box-shadow:0 0 12px rgba(254,103,148,0.7),0 0 4px rgba(174,38,76,0.5)',
           `--dtdsDx:${dx}px`, `--dtdsDy:${dy}px`,
           `animation:deckToDiscard ${travelMs}ms ease-in-out ${delay}ms forwards`,
           'opacity:0',
@@ -45861,9 +45861,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           card.appendChild(img);
           card.style.opacity = '1';
         } else {
-          card.style.background = 'linear-gradient(135deg,#3a1a2a,#2a0a1a)';
+          card.style.background = 'linear-gradient(135deg,#270d0c,#2a0404)';
           card.style.opacity = '1';
-          card.innerHTML = `<div style="color:#fcc;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardNames[i]}</div>`;
+          card.innerHTML = `<div style="color:#f0bfbc;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardNames[i]}</div>`;
         }
         document.body.appendChild(card);
         setTimeout(() => card.remove(), delay + travelMs + 150);
@@ -45930,7 +45930,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           'border-radius:4px', 'overflow:hidden',
           // Green-cyan glow — "rescued from oblivion" read, distinct
           // from the red-purple flight when cards are deleted.
-          'box-shadow:0 0 12px rgba(80,255,180,0.75),0 0 4px rgba(40,140,100,0.55)',
+          'box-shadow:0 0 12px rgba(102,255,162,0.75),0 0 4px rgba(59,145,89,0.55)',
           `--dtdsDx:${dx}px`, `--dtdsDy:${dy}px`,
           `animation:deckToDiscard ${travelMs}ms ease-in-out ${delay}ms forwards`,
           'opacity:0',
@@ -45943,9 +45943,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           card.appendChild(img);
           card.style.opacity = '1';
         } else {
-          card.style.background = 'linear-gradient(135deg,#1a3a2a,#0a2a1a)';
+          card.style.background = 'linear-gradient(135deg,#1a4128,#0f2412)';
           card.style.opacity = '1';
-          card.innerHTML = `<div style="color:#cfc;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardNames[i]}</div>`;
+          card.innerHTML = `<div style="color:#b3f9cf;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardNames[i]}</div>`;
         }
         document.body.appendChild(card);
         setTimeout(() => card.remove(), delay + travelMs + 150);
@@ -46004,7 +46004,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           `left:${srcX - gm.b / 2}px`, `top:${srcY - gm.h / 2}px`,
           `width:${gm.b}px`, `height:${gm.h}px`, `z-index:${10200 + (count - i)}`, 'pointer-events:none',
           'border-radius:4px', 'overflow:hidden',
-          'box-shadow:0 0 12px rgba(255,200,50,0.8),0 0 4px rgba(200,150,0,0.6)',
+          'box-shadow:0 0 12px rgba(255,198,28,0.8),0 0 4px rgba(199,158,5,0.6)',
           `--dtaDx:${dx}px`, `--dtaDy:${dy}px`,
           `animation:deckToAbility 600ms ease-in-out ${delay}ms forwards`,
           'opacity:0',
@@ -46014,9 +46014,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           img.src = imgUrl; img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
           img.draggable = false; card.appendChild(img); card.style.opacity = '1';
         } else {
-          card.style.background = 'linear-gradient(135deg,#3a2a0a,#2a1a00)';
+          card.style.background = 'linear-gradient(135deg,#332300,#27180c)';
           card.style.opacity = '1';
-          card.innerHTML = `<div style="color:#ffa;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardName}</div>`;
+          card.innerHTML = `<div style="color:#f7f7ad;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardName}</div>`;
         }
         document.body.appendChild(card);
         setTimeout(() => card.remove(), delay + 700);
@@ -46094,7 +46094,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       `;
       const glove = document.createElement('div');
       glove.textContent = '🥊';
-      glove.style.cssText = `font-size:80px; line-height:1; transform:rotate(90deg); filter:drop-shadow(0 0 10px rgba(255,50,0,0.6));`;
+      glove.style.cssText = `font-size:80px; line-height:1; transform:rotate(90deg); filter:drop-shadow(0 0 10px rgba(255,73,26,0.6));`;
       gloveWrap.appendChild(glove);
       document.body.appendChild(gloveWrap);
       setTimeout(() => gloveWrap.remove(), 800);
@@ -46106,8 +46106,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         pow.textContent = 'POW!';
         pow.style.cssText = `
           position:fixed; left:${cx - 50}px; top:${cy - 60}px;
-          font-size:48px; font-weight:900; color:#ff3300; z-index:10301;
-          pointer-events:none; text-shadow: 3px 3px 0 #ffcc00, -2px -2px 0 #ff6600;
+          font-size:48px; font-weight:900; color:#ff491a; z-index:10301;
+          pointer-events:none; text-shadow: 3px 3px 0 #ffd61a, -2px -2px 0 #f87420;
           font-family: 'Comic Sans MS', cursive, sans-serif;
           animation: punchImpact 500ms ease-out forwards;
         `;
@@ -46115,7 +46115,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         setTimeout(() => pow.remove(), 600);
 
         // Impact starburst
-        const burstColors = ['#ff3300','#ffcc00','#ff6600','#fff','#ff9900'];
+        const burstColors = ['#ff491a','#ffd61a','#f87420','#fff','#ff9a1a'];
         const stars = ['⭐','💥','✦','★','⚡'];
         for (let i = 0; i < 15; i++) {
           const s = document.createElement('div');
@@ -46163,7 +46163,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         document.head.appendChild(style);
       }
 
-      const colors = ['#ffd700','#ffec80','#fff4cc','#f0c040','#ffe066','#fff'];
+      const colors = ['#ffd61a','#fbe181','#fffbd2','#fad54a','#ffe469','#fff'];
       const perTarget = 25;
 
       for (const t of targets) {
@@ -46194,7 +46194,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             position:fixed; left:${srcX}px; top:${srcY}px;
             width:${size}px; height:${size}px; border-radius:50%;
             background:${color}; z-index:10200; pointer-events:none;
-            box-shadow: 0 0 ${size + 2}px ${color}, 0 0 ${size * 2}px rgba(255,215,0,0.3);
+            box-shadow: 0 0 ${size + 2}px ${color}, 0 0 ${size * 2}px rgba(255,214,26,0.3);
             --tcDx:${dx}px; --tcDy:${dy}px; --tcMidX:${midX}px; --tcMidY:${midY}px;
             animation: tearsSparkle ${dur}ms ease-in ${delay}ms forwards;
             opacity:0;
@@ -46227,8 +46227,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         stealIndices.forEach(idx => {
           const el = document.querySelector(`.game-hand-opp [data-hand-idx="${idx}"]`);
           if (el) {
-            el.style.outline = '3px solid rgba(255,150,50,.95)';
-            el.style.filter = 'brightness(1.4) drop-shadow(0 0 10px rgba(255,150,50,.7))';
+            el.style.outline = '3px solid rgba(255,155,58,.95)';
+            el.style.filter = 'brightness(1.4) drop-shadow(0 0 10px rgba(255,155,58,.7))';
           }
         });
       }
@@ -46302,7 +46302,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
           const flyEl = document.createElement('div');
           flyEl.className = 'card-flight'; // exempt from no-animations kill rule
-          flyEl.style.cssText = `position:fixed;left:${sr.left}px;top:${sr.top}px;width:${sr.width}px;height:${sr.height}px;z-index:10200;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 15px rgba(255,150,50,.8);animation:handStealFly ${dur}ms ease-in-out ${i * 100}ms forwards;--steal-dx:${dx}px;--steal-dy:${dy}px;`;
+          flyEl.style.cssText = `position:fixed;left:${sr.left}px;top:${sr.top}px;width:${sr.width}px;height:${sr.height}px;z-index:10200;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 15px rgba(255,155,58,.8);animation:handStealFly ${dur}ms ease-in-out ${i * 100}ms forwards;--steal-dx:${dx}px;--steal-dy:${dy}px;`;
           const imgUrl = name ? window.cardImageUrl(name) : null;
           if (imgUrl) {
             const img = document.createElement('img');
@@ -46532,7 +46532,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         'transform-origin:center center',
         'opacity:0',
         'animation:ddgManifest 2500ms ease-in-out forwards',
-        'filter:drop-shadow(0 0 40px rgba(255,40,60,0.85))',
+        'filter:drop-shadow(0 0 40px rgba(240,50,50,0.85))',
       ].join(';');
       document.body.appendChild(img);
       setTimeout(() => img.remove(), 2700);
@@ -46562,7 +46562,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         'transform-origin:center center',
         'opacity:0',
         'animation:yolomungandrManifest 2500ms ease-in-out forwards',
-        'filter:drop-shadow(0 0 40px rgba(120,210,255,0.85))',
+        'filter:drop-shadow(0 0 40px rgba(119,200,238,0.85))',
       ].join(';');
       document.body.appendChild(img);
       setTimeout(() => img.remove(), 2700);
@@ -47737,7 +47737,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   const emitPing = useCallback((info) => {
     if (!info || !gameState.roomId || isSpectator) return;
-    socket.emit('ping_card', { roomId: gameState.roomId, ping: info, color: user.color || '#00f0ff' });
+    socket.emit('ping_card', { roomId: gameState.roomId, ping: info, color: user.color || '#1aedff' });
   }, [gameState.roomId, user.color, isSpectator]);
 
   // Tab key + contextmenu (right-click) → ping hovered card
@@ -48686,7 +48686,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <div style={{ marginTop: 20, marginBottom: 20, textAlign: 'center' }}>
           {entries.map(e => (
             <div key={e.name} style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: '#ffd700', fontWeight: 700, fontSize: 15 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: '#ffd61a', fontWeight: 700, fontSize: 15 }}>
                 <span>{e.name}:</span>
                 <span>{e.total}</span>
                 <img src="/data/sc.png" style={{ width: 18, height: 18, imageRendering: 'pixelated' }} />
@@ -48695,9 +48695,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {(e.rewards || []).map(r => (
                   <div key={r.id} style={{ fontSize: 12, color: 'var(--text2)' }}>
-                    <span style={{ color: '#ffd700', fontWeight: 600 }}>{r.title}</span>
+                    <span style={{ color: '#ffd61a', fontWeight: 600 }}>{r.title}</span>
                     {' — '}{r.description}{' '}
-                    <span style={{ color: '#ffd700' }}>+{r.amount}</span>
+                    <span style={{ color: '#ffd61a' }}>+{r.amount}</span>
                   </div>
                 ))}
               </div>
@@ -48709,7 +48709,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (!scEarned.total || scEarned.total <= 0) return null;
     return (
       <div style={{ marginTop: 20, marginBottom: 20, textAlign: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#ffd700', fontWeight: 700, fontSize: 18, textShadow: '0 0 12px rgba(255,215,0,.5)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#ffd61a', fontWeight: 700, fontSize: 18, textShadow: '0 0 12px rgba(255,214,26,.5)' }}>
           <span>{scEarned.total}</span>
           <img src="/data/sc.png" style={{ width: 24, height: 24, imageRendering: 'pixelated' }} />
           <span>earned!</span>
@@ -48717,9 +48717,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {(scEarned.rewards || []).map(r => (
             <div key={r.id} style={{ fontSize: 13, color: 'var(--text2)' }}>
-              <span style={{ color: '#ffd700', fontWeight: 700 }}>{r.title}</span>
+              <span style={{ color: '#ffd61a', fontWeight: 700 }}>{r.title}</span>
               {' — '}{r.description}{' '}
-              <span style={{ color: '#ffd700', fontWeight: 700 }}>+{r.amount}</span>
+              <span style={{ color: '#ffd61a', fontWeight: 700 }}>+{r.amount}</span>
             </div>
           ))}
         </div>
@@ -48770,36 +48770,36 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const pName = (name, color) => <span className="log-player-name" style={{ color: color || '#fff' }}>{name}</span>;
     const logCardColor = (name) => {
       const card = CARDS_BY_NAME[name];
-      if (!card) return '#ffcc44';
-      const m = { Artifact:'#ffd700', Potion:'#a0724a', Ability:'#4488ff', Spell:'#ff4444', Attack:'#ff4444', Creature:'#44cc66', Hero:'#bb66ff', 'Ascended Hero':'#bb66ff', Token:'#999' };
-      return m[card.cardType] || '#ffcc44';
+      if (!card) return '#fad54a';
+      const m = { Artifact:'#ffd61a', Potion:'#886c44', Ability:'#4580f6', Spell:'#f03232', Attack:'#f03232', Creature:'#4bcd7c', Hero:'#b866ff', 'Ascended Hero':'#b866ff', Token:'#929292' };
+      return m[card.cardType] || '#fad54a';
     };
     const cName = (name) => <span className="log-card-name" style={{ color: logCardColor(name) }}>{name}</span>;
     const p0 = gameState.players[0], p1 = gameState.players[1];
     const getPlayer = (username) => {
       if (username === p0.username) return { name: p0.username, color: p0.color };
       if (username === p1.username) return { name: p1.username, color: p1.color };
-      return { name: username || '?', color: '#aaa' };
+      return { name: username || '?', color: '#a8a8a8' };
     };
     const playerByName = (n) => getPlayer(n);
     const t = entry.type;
     // ── Diagnose-Einträge des Zugablaufs (8.8.) ──
     if (t === 'hook_timeout') {
-      return <span style={{ color: '#ff9944' }}>⏱ Effect of {cName(entry.card)} timed out ({entry.hook})</span>;
+      return <span style={{ color: '#ff9b3a' }}>⏱ Effect of {cName(entry.card)} timed out ({entry.hook})</span>;
     }
     // Sicherheitsgrenze des Zuges erreicht: bis zum Zugende loest keine Karte
     // mehr aus. Ohne diese Zeile blieb ein Trigger einfach aus, ohne Hinweis.
     if (t === 'hooks_killed') {
-      return <span style={{ color: '#ff9944' }}>⚠ Safety limit reached in turn {entry.turn}: card effects are switched off for the rest of this turn</span>;
+      return <span style={{ color: '#ff9b3a' }}>⚠ Safety limit reached in turn {entry.turn}: card effects are switched off for the rest of this turn</span>;
     }
     if (t === 'stale_end_phase_dropped') {
-      return <span style={{ color: '#ff9944' }}>⏱ Late End Phase from turn {entry.enteredOnTurn} discarded</span>;
+      return <span style={{ color: '#ff9b3a' }}>⏱ Late End Phase from turn {entry.enteredOnTurn} discarded</span>;
     }
     if (t === 'switch_turn_reentry_blocked') {
-      return <span style={{ color: '#ff9944' }}>⏱ Duplicate turn change blocked</span>;
+      return <span style={{ color: '#ff9b3a' }}>⏱ Duplicate turn change blocked</span>;
     }
     if (t === 'turn_start_irregular') {
-      return <span style={{ color: '#ff5555' }}>⚠ Turn started out of {entry.fromPhase} — previous turn did not end normally</span>;
+      return <span style={{ color: '#fe5154' }}>⚠ Turn started out of {entry.fromPhase} — previous turn did not end normally</span>;
     }
     if (t === 'thebinxan_declared') {
       return <>{pName(getPlayer(entry.player).name, getPlayer(entry.player).color)} declares <b>{entry.declaration}</b></>;
@@ -48809,17 +48809,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
     const statusColor = (s) => {
       const sl = (s||'').toLowerCase();
-      if (sl === 'burned' || sl === 'burn') return '#ff8833';
-      if (sl === 'frozen' || sl === 'freeze') return '#88ddff';
-      if (sl === 'stunned' || sl === 'stun') return '#ffdd44';
-      if (sl === 'negated' || sl === 'negate') return '#ccaa22';
-      if (sl === 'poisoned' || sl === 'poison') return '#bb66ff';
-      if (sl === 'petrified' || sl === 'petrify') return '#999';
-      if (sl === 'shielded' || sl === 'shield') return '#44ddff';
-      if (sl === 'charmed' || sl === 'charme') return '#ff66aa';
-      if (sl === 'submerged' || sl === 'submerge') return '#4488cc';
-      if (sl === 'immune' || sl === 'immunity') return '#66ffaa';
-      return '#aa88ff';
+      if (sl === 'burned' || sl === 'burn') return '#f87420';
+      if (sl === 'frozen' || sl === 'freeze') return '#7fdfff';
+      if (sl === 'stunned' || sl === 'stun') return '#ffe23d';
+      if (sl === 'negated' || sl === 'negate') return '#c79e05';
+      if (sl === 'poisoned' || sl === 'poison') return '#b866ff';
+      if (sl === 'petrified' || sl === 'petrify') return '#929292';
+      if (sl === 'shielded' || sl === 'shield') return '#08d3ef';
+      if (sl === 'charmed' || sl === 'charme') return '#f174ab';
+      if (sl === 'submerged' || sl === 'submerge') return '#4e82cb';
+      if (sl === 'immune' || sl === 'immunity') return '#66ffa2';
+      return '#b278ed';
     };
     /** Capitalize first letter of a status/buff name */
     const capStatus = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
@@ -48994,10 +48994,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'soul_transmigration_fizzle') { const p = playerByName(entry.player); return <span className="log-info">{cName('Soul Transmigration Ritual')} fizzled — {pName(p.name, p.color)}'s chosen Hero could not be revived.</span>; }
       if (t === 'hero_defeat_deleted') { const p = playerByName(entry.player); return <span className="log-hero-defeated">🕯️ {entry.hero} was defeated — {cName(entry.by)} deletes it and its cards, except Creatures.</span>; }
       if (t === 'hero_deleted') { const p = playerByName(entry.player); return <span className="log-hero-defeated">🗑️ {pName(p.name, p.color)}'s {entry.hero} was deleted by {cName(entry.by)}.</span>; }
-      if (t === 'gold_gain') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} gained <span className="log-amount" style={{color:'#ffcc44'}}>+{entry.amount}</span> Gold.</span>; }
-      if (t === 'gold_steal') { const p = playerByName(entry.player); const q = playerByName(entry.from); return <span className="log-status">🪙 {cName(entry.by)} — {pName(p.name, p.color)} steals <span className="log-amount" style={{color:'#ffcc44'}}>{entry.amount}</span> Gold from {pName(q.name, q.color)}.</span>; }
+      if (t === 'gold_gain') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} gained <span className="log-amount" style={{color:'#fad54a'}}>+{entry.amount}</span> Gold.</span>; }
+      if (t === 'gold_steal') { const p = playerByName(entry.player); const q = playerByName(entry.from); return <span className="log-status">🪙 {cName(entry.by)} — {pName(p.name, p.color)} steals <span className="log-amount" style={{color:'#fad54a'}}>{entry.amount}</span> Gold from {pName(q.name, q.color)}.</span>; }
       if (t === 'gold_steal_fizzle') { return <span className="log-info">🪙 {cName(entry.by)} — there is no Gold to steal{entry.reason === 'first-turn protection' ? ' (first-turn protection)' : ''}.</span>; }
-      if (t === 'gold_spend') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} spent <span className="log-amount" style={{color:'#cc8844'}}>{entry.amount}</span> Gold.</span>; }
+      if (t === 'gold_spend') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} spent <span className="log-amount" style={{color:'#ca874e'}}>{entry.amount}</span> Gold.</span>; }
       if (t === 'forced_discard') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} discarded {cName(entry.card)}.</span>; }
       // `forced_delete` is what `actionPromptForceDiscard` logs in
       // deleteMode (Wheels' Draw-4 cost since it moved onto the
@@ -49021,10 +49021,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // v846: `amount` ist der TATSAECHLICH angekommene Schaden (Tempeste,
       // Cloud Pillow, Negationen). 0 wird als „took no … damage" gezeigt.
       if (t === 'burn_damage') { return entry.amount > 0
-        ? <span className="log-damage">{entry.target} took <span className="log-amount" style={{color:'#ff8833'}}>{entry.amount}</span> {styledStatus('burn')} damage!</span>
+        ? <span className="log-damage">{entry.target} took <span className="log-amount" style={{color:'#f87420'}}>{entry.amount}</span> {styledStatus('burn')} damage!</span>
         : <span className="log-damage">{entry.target} took no {styledStatus('burn')} damage.</span>; }
       if (t === 'poison_damage') { return entry.amount > 0
-        ? <span className="log-damage">{entry.target} took <span className="log-amount" style={{color:'#bb66ff'}}>{entry.amount}</span> {styledStatus('poison')} damage!</span>
+        ? <span className="log-damage">{entry.target} took <span className="log-amount" style={{color:'#b866ff'}}>{entry.amount}</span> {styledStatus('poison')} damage!</span>
         : <span className="log-damage">{entry.target} took no {styledStatus('poison')} damage.</span>; }
       if (t === 'level_change') { return <span className="log-info">{cName(entry.card)} is now Lv{entry.newLevel}.</span>; }
       if (t === 'deck_out') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)} decked out!</span>; }
@@ -49324,7 +49324,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'zsos_ssar_cost') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {entry.hero} inflicted Poison on {entry.target} (Serpent's Cost).</span>; }
       if (t === 'zsos_ssar_boost') { return <span className="log-damage">{entry.hero}'s damage boosted by <span className="log-amount">+{entry.bonus}</span> ({entry.poisonedCount} poisoned target{entry.poisonedCount !== 1 ? 's' : ''})!</span>; }
       if (t === 'peszet_plague') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {entry.hero} poisoned {entry.target} ({cName(entry.trigger)} summoned).</span>; }
-      if (t === 'logan_invest') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)}'s {cName(entry.hero)} invested <span className="log-amount" style={{color:'#ffcc44'}}>{entry.paid}</span> Gold — now at <span className="log-amount">{entry.counters}</span> Invest Counter{entry.counters !== 1 ? 's' : ''}.</span>; }
+      if (t === 'logan_invest') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)}'s {cName(entry.hero)} invested <span className="log-amount" style={{color:'#fad54a'}}>{entry.paid}</span> Gold — now at <span className="log-amount">{entry.counters}</span> Invest Counter{entry.counters !== 1 ? 's' : ''}.</span>; }
       // ★★ v1141 („Forbidden Curse of Aging"): die Karte protokollierte
       // ihre Entscheidung, aber NIEMAND zeichnete sie — fuer Al war
       // unsichtbar, ob die Zusatz-Aktion greift oder nicht. Ein Log
@@ -49332,7 +49332,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'curse_of_aging_attached') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)} aged {cName(entry.hero)} — its HP cannot be healed and its other statuses are frozen.</span>; }
       if (t === 'curse_of_aging_no_free_action') { const p = playerByName(entry.player); return <span className="log-info">{cName('Forbidden Curse of Aging')} cost {pName(p.name, p.color)} an Action — the chosen target has no {cName('Charme')} and has already taken damage this game.</span>; }
       if (t === 'status_select_auto') { const p = playerByName(entry.player); return <span className="log-info">Only one status could be removed from {cName(entry.target)} — {cName(entry.status)} was chosen automatically.</span>; }
-      if (t === 'logan_payout_gold') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)}'s {cName(entry.hero)} cashed in <span className="log-amount">{entry.counters}</span> Invest Counter{entry.counters !== 1 ? 's' : ''} for <span className="log-amount" style={{color:'#ffcc44'}}>+{entry.gold}</span> Gold!</span>; }
+      if (t === 'logan_payout_gold') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)}'s {cName(entry.hero)} cashed in <span className="log-amount">{entry.counters}</span> Invest Counter{entry.counters !== 1 ? 's' : ''} for <span className="log-amount" style={{color:'#fad54a'}}>+{entry.gold}</span> Gold!</span>; }
       if (t === 'logan_payout_damage') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s {cName(entry.hero)} cashed in <span className="log-amount">{entry.counters}</span> Invest Counter{entry.counters !== 1 ? 's' : ''} — <span className="log-amount">{entry.damage}</span> damage to {entry.target}!</span>; }
             if (t === 'kent_overdraft') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s {cName(entry.hero)} went into debt — Gold is now <span className="log-amount">{entry.gold}</span>. No more Actions this turn.</span>; }
       if (t === 'debt_o_tron_fees') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)} played {cName('Debt-O-Tron Damage Fees')} on credit — <span className="log-amount">{entry.cost}</span> Gold charged, leaving <span className="log-amount">{entry.gold}</span>.</span>; }
@@ -49360,12 +49360,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'shared_blood_tanks_share') { const p = playerByName(entry.player); return <span className="log-damage">{cName('Shared Blood Tanks')} shared the bleeding — <span className="log-amount">{entry.targets}</span> other Bleeding target{entry.targets === 1 ? '' : 's'} of {pName(p.name, p.color)} bled too.</span>; }
       if (t === 'hat_of_madness_gift') { const p = playerByName(entry.player); return <span className="log-status">{cName('Hat of Madness')} made {pName(p.name, p.color)} hand {cName(entry.card)} to {entry.opponent}.</span>; }
       if (t === 'skullmael_greatsword_summon') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {entry.hero} summoned {cName(entry.creature)} from the discard pile with {cName("Skullmael's Greatsword")}.</span>; }
-      if (t === 'golden_skull_blast') { const p = playerByName(entry.player); return <span className="log-damage">{cName('Golden Exploding Skull')} burst — <span className="log-amount">{entry.damage}</span> damage to <span className="log-amount">{entry.targets}</span> of {pName(p.name, p.color)}'s own target{entry.targets === 1 ? '' : 's'}, <span className="log-amount" style={{color:'#ffcc44'}}>+{entry.gold}</span> Gold.</span>; }
-      if (t === 'quisto_boost') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s {entry.hero} paid <span className="log-amount" style={{color:'#ffcc44'}}>{entry.paid}</span> Gold — this Attack deals <span className="log-amount">+{entry.bonus}</span> damage.</span>; }
-      if (t === 'quisto_bounty') { const p = playerByName(entry.player); return <span className="log-info">{cName('Don Quisto, the Gold Seeker')} collected the bounty on <span className="log-amount">{entry.targets}</span> target{entry.targets === 1 ? '' : 's'} — <span className="log-amount" style={{color:'#ffcc44'}}>+{entry.gold}</span> Gold for {pName(p.name, p.color)}.</span>; }
+      if (t === 'golden_skull_blast') { const p = playerByName(entry.player); return <span className="log-damage">{cName('Golden Exploding Skull')} burst — <span className="log-amount">{entry.damage}</span> damage to <span className="log-amount">{entry.targets}</span> of {pName(p.name, p.color)}'s own target{entry.targets === 1 ? '' : 's'}, <span className="log-amount" style={{color:'#fad54a'}}>+{entry.gold}</span> Gold.</span>; }
+      if (t === 'quisto_boost') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s {entry.hero} paid <span className="log-amount" style={{color:'#fad54a'}}>{entry.paid}</span> Gold — this Attack deals <span className="log-amount">+{entry.bonus}</span> damage.</span>; }
+      if (t === 'quisto_bounty') { const p = playerByName(entry.player); return <span className="log-info">{cName('Don Quisto, the Gold Seeker')} collected the bounty on <span className="log-amount">{entry.targets}</span> target{entry.targets === 1 ? '' : 's'} — <span className="log-amount" style={{color:'#fad54a'}}>+{entry.gold}</span> Gold for {pName(p.name, p.color)}.</span>; }
       if (t === 'teocuilatl_offering') { const p = playerByName(entry.player); return entry.kind === 'hero'
-        ? <span className="log-status">{pName(p.name, p.color)} offered {entry.hero} to the Gods — <span className="log-amount" style={{color:'#ffcc44'}}>+{entry.gold}</span> Gold, turn ends.</span>
-        : <span className="log-info">{pName(p.name, p.color)} offered a Creature to the Gods — <span className="log-amount" style={{color:'#ffcc44'}}>+{entry.gold}</span> Gold.</span>; }
+        ? <span className="log-status">{pName(p.name, p.color)} offered {entry.hero} to the Gods — <span className="log-amount" style={{color:'#fad54a'}}>+{entry.gold}</span> Gold, turn ends.</span>
+        : <span className="log-info">{pName(p.name, p.color)} offered a Creature to the Gods — <span className="log-amount" style={{color:'#fad54a'}}>+{entry.gold}</span> Gold.</span>; }
       if (t === 'boulder_placed') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)} dropped {cName('Boulder in a Bottle')} onto {entry.opponent}'s {entry.hero} — it blocks every free Support Zone there.</span>; }
       if (t === 'boulder_zones_claimed') { const p = playerByName(entry.player); return <span className="log-info">{cName('Boulder in a Bottle')} fills the free Support Zones of {pName(p.name, p.color)}'s Hero.</span>; }
       if (t === 'pseudonia_devour') { const p = playerByName(entry.player); return <span className="log-heal">{pName(p.name, p.color)}'s Pseudonia devoured the effects of <b>{entry.from}</b> ({entry.count}/{entry.max}).</span>; }   {/* v1275 */}
@@ -49968,7 +49968,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || pickHeroDropIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || pickHeroDropTarget || attachPickEligibleHero || isCsppHeroTarget || spellPickEntry) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isValidHeroTarget && accentGreenTargetIds.has(heroTargetId) ? ' potion-target-accent-green' : '') + (isIneligibleHeroTarget ? ' potion-target-ineligible' : '') + (isRedMarkedHeroTarget ? ' potion-target-marked-red' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (zielMarkeLeuchtet ? ' prompt-marked' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + ((isHeroEffectActive || klickHeilungOffen) ? ' zone-hero-effect-active' : '') + (stReadyGlow && !stBonus ? ' st-actor-ready' : '') + (stBonus && !stActing ? ' st-actor-bonus' : '') + (stActing ? ' st-actor-acting' : '') + (stExhausted && !stBonus && !stActing && hero?.hp > 0 ? ' st-actor-exhausted' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '') + (isZonePickHero ? ' zone-pick-target' : '') + ((allianzHover && allianzHover.some(a => a.owner === (isOpp ? oppIdx : myIdx) && a.heroIdx === i)) ? ' zone-alliance-linked' : '')}
                 data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
                 onClick={onHeroClick}
-                style={zsMerge('hero', { ...((isCsppHeroTarget || isHeroEffectActive || isValidHeroTarget || isChainPickValid || attachPickEligibleHero || isZonePickHero || spellPickEntry) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#ff69b4' } : undefined) })}>
+                style={zsMerge('hero', { ...((isCsppHeroTarget || isHeroEffectActive || isValidHeroTarget || isChainPickValid || attachPickEligibleHero || isZonePickHero || spellPickEntry) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#fc69c6' } : undefined) })}>
                 {isChainPickSelected && <div className="chain-pick-number">{chainPickStep + 1}</div>}
                 {/* v718: dauerhaft uebernommener Held. Der pulsende
                     Rahmen allein sagt nur „hier stimmt etwas nicht" —
@@ -50003,7 +50003,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                             <div key={oi} className={'ascension-orb' + (orb.collected ? ' ascension-orb-collected' : '')}
                               style={{
                                 left: cx + '%', top: cy + '%',
-                                background: orb.collected ? orb.color : 'rgba(60,60,60,.7)',
+                                background: orb.collected ? orb.color : 'rgba(50,50,50,.7)',
                                 boxShadow: orb.collected ? `0 0 8px ${orb.color}, 0 0 16px ${orb.color}55` : 'none',
                               }}
                             />
@@ -50242,14 +50242,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       height: 'calc(18px * var(--board-scale))',
                       padding: '0 calc(3px * var(--board-scale))',
                       borderRadius: 'calc(9px * var(--board-scale))',
-                      background: 'radial-gradient(circle at 30% 30%, #ff8a7a, #7a0e0e)',
-                      color: '#ffecec',
+                      background: 'radial-gradient(circle at 30% 30%, #ec7f79, #780000)',
+                      color: '#fae5eb',
                       fontFamily: 'Pixel Intv, monospace',
                       fontSize: 'calc(10px * var(--board-scale))',
                       fontWeight: 'bold', lineHeight: 1,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      boxShadow: '0 0 calc(5px * var(--board-scale)) #ff5a4a, inset 0 0 calc(2px * var(--board-scale)) #ffd0c8',
-                      border: 'calc(1.5px * var(--board-scale)) solid #2a0505',
+                      boxShadow: '0 0 calc(5px * var(--board-scale)) #fe5154, inset 0 0 calc(2px * var(--board-scale)) #f0bfbc',
+                      border: 'calc(1.5px * var(--board-scale)) solid #2a0404',
                       zIndex: 6, pointerEvents: 'auto', cursor: 'default',
                     }}
                     onMouseEnter={e => showGameTooltip(e, `${hero.name.split(',')[0]} cannot perform Actions this turn: a target you control was defeated since the end of your last turn.`)}
@@ -50273,15 +50273,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       height: 'calc(18px * var(--board-scale))',
                       padding: '0 calc(3px * var(--board-scale))',
                       borderRadius: 'calc(9px * var(--board-scale))',
-                      background: 'radial-gradient(circle at 30% 30%, #7cd8ff, #0b4a8a)',
-                      color: '#e8faff',
+                      background: 'radial-gradient(circle at 30% 30%, #7fdfff, #2b457e)',
+                      color: '#e5f5fa',
                       fontFamily: 'Pixel Intv, monospace',
                       fontSize: 'calc(9px * var(--board-scale))',
                       fontWeight: 'bold', lineHeight: 1,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       gap: 'calc(1px * var(--board-scale))',
-                      boxShadow: '0 0 calc(5px * var(--board-scale)) #38c0ff, inset 0 0 calc(2px * var(--board-scale)) #b8ecff',
-                      border: 'calc(1.5px * var(--board-scale)) solid #061528',
+                      boxShadow: '0 0 calc(5px * var(--board-scale)) #1ac6ff, inset 0 0 calc(2px * var(--board-scale)) #b3e8f9',
+                      border: 'calc(1.5px * var(--board-scale)) solid #12101f',
                       zIndex: 6, pointerEvents: 'auto', cursor: 'default',
                     }}
                     onMouseEnter={e => showGameTooltip(e, `Deepsea Counters: ${hero.deepseaCounters}`)}
@@ -50300,15 +50300,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       height: 'calc(18px * var(--board-scale))',
                       padding: '0 calc(3px * var(--board-scale))',
                       borderRadius: 'calc(9px * var(--board-scale))',
-                      background: 'radial-gradient(circle at 30% 30%, #ffe9a8, #8a5a0b)',
-                      color: '#fff7e0',
+                      background: 'radial-gradient(circle at 30% 30%, #f9ecb3, #8b5b04)',
+                      color: '#fff8e8',
                       fontFamily: 'Pixel Intv, monospace',
                       fontSize: 'calc(9px * var(--board-scale))',
                       fontWeight: 'bold', lineHeight: 1,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       gap: 'calc(1px * var(--board-scale))',
-                      boxShadow: '0 0 calc(5px * var(--board-scale)) #ffcb45, inset 0 0 calc(2px * var(--board-scale)) #ffeec2',
-                      border: 'calc(1.5px * var(--board-scale)) solid #2a1505',
+                      boxShadow: '0 0 calc(5px * var(--board-scale)) #fad54a, inset 0 0 calc(2px * var(--board-scale)) #f7e0b5',
+                      border: 'calc(1.5px * var(--board-scale)) solid #27180c',
                       zIndex: 6, pointerEvents: 'auto', cursor: 'default',
                     }}
                     onMouseEnter={e => showGameTooltip(e, `Time Counters: ${hero._timeCounters}. At the end of each of your turns Carris gains 1; at 3 or more, you lose the game.`)}
@@ -50327,15 +50327,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       height: 'calc(18px * var(--board-scale))',
                       padding: '0 calc(3px * var(--board-scale))',
                       borderRadius: 'calc(9px * var(--board-scale))',
-                      background: 'radial-gradient(circle at 30% 30%, #fff1b0, #b58900)',
-                      color: '#fffbe6',
+                      background: 'radial-gradient(circle at 30% 30%, #f9ecb3, #a87c00)',
+                      color: '#fff8e8',
                       fontFamily: 'Pixel Intv, monospace',
                       fontSize: 'calc(9px * var(--board-scale))',
                       fontWeight: 'bold', lineHeight: 1,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       gap: 'calc(1px * var(--board-scale))',
-                      boxShadow: '0 0 calc(6px * var(--board-scale)) #ffd34d, inset 0 0 calc(2px * var(--board-scale)) #fff3bf',
-                      border: 'calc(1.5px * var(--board-scale)) solid #4a3300',
+                      boxShadow: '0 0 calc(6px * var(--board-scale)) #fad54a, inset 0 0 calc(2px * var(--board-scale)) #f9ecb3',
+                      border: 'calc(1.5px * var(--board-scale)) solid #5a3c14',
                       zIndex: 6, pointerEvents: 'auto', cursor: 'default',
                     }}
                     onMouseEnter={e => showGameTooltip(e, `Divinity Counters: ${hero._divinityCounters}. At the end of your turn, Pharaoh sacrifices a target you control, removes 1 counter and you draw 2 cards.`)}
@@ -50370,11 +50370,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       position: 'absolute', right: '6%', top: '6%',
                       display: 'flex', alignItems: 'center', gap: 2,
                       padding: '2px 5px', borderRadius: 8,
-                      background: 'rgba(20,60,40,0.85)',
-                      border: '1px solid #6fe3a0', color: '#b8ffd9',
+                      background: 'rgba(26,65,40,0.85)',
+                      border: '1px solid #68fdc1', color: '#b3f9cf',
                       fontSize: '0.72em', fontWeight: 'bold',
                       pointerEvents: 'auto', zIndex: 6,
-                      textShadow: '0 0 4px #2fbf7a',
+                      textShadow: '0 0 4px #4bcd7c',
                     }}
                   >
                     <PxIcon z="🧬" />{hero._evolutionCounters}
@@ -50394,11 +50394,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       position: 'absolute', right: '6%', top: '6%',
                       display: 'flex', alignItems: 'center', gap: 2,
                       padding: '2px 5px', borderRadius: 8,
-                      background: 'rgba(60,50,10,0.85)',
-                      border: '1px solid #ffd76f', color: '#fff3c4',
+                      background: 'rgba(51,35,0,0.85)',
+                      border: '1px solid #ffd066', color: '#fffbd2',
                       fontSize: '0.72em', fontWeight: 'bold',
                       pointerEvents: 'auto', zIndex: 6,
-                      textShadow: '0 0 4px #d9a520',
+                      textShadow: '0 0 4px #c79e05',
                     }}
                   >
                     <PxIcon z="🪙" />{hero._investCounters}
@@ -50415,12 +50415,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       padding: '2px 5px',
                       fontFamily: "'Pixel Intv', 'Press Start 2P', monospace",
                       fontSize: 'calc(10px * var(--board-scale))',
-                      color: '#ffe9ff',
-                      background: 'linear-gradient(135deg, rgba(102,68,204,0.92), rgba(42,13,102,0.92))',
-                      border: '1px solid #aa66ff',
+                      color: '#f1e5fa',
+                      background: 'linear-gradient(135deg, rgba(112,45,179,0.92), rgba(64,26,102,0.92))',
+                      border: '1px solid #b866ff',
                       borderRadius: 4,
                       textShadow: '0 0 3px #000, 1px 1px 0 #000',
-                      boxShadow: '0 0 6px rgba(170,100,255,0.55)',
+                      boxShadow: '0 0 6px rgba(184,102,255,0.55)',
                       zIndex: 5, pointerEvents: 'auto',
                     }}
                   >
@@ -50579,14 +50579,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       style={{
                         position: 'absolute',
                         top: 2, left: 2,
-                        background: 'linear-gradient(135deg, #6a3a8a 0%, #4a2a6a 100%)',
+                        background: 'linear-gradient(135deg, #663597 0%, #401a66 100%)',
                         color: '#fff',
                         fontFamily: 'Orbit, monospace',
                         fontSize: 11,
                         padding: '1px 6px',
                         borderRadius: 4,
-                        border: '1px solid #b06ad0',
-                        boxShadow: '0 0 6px rgba(176,106,208,.6)',
+                        border: '1px solid #b278ed',
+                        boxShadow: '0 0 6px rgba(178,120,237,.6)',
                         pointerEvents: 'auto',
                         cursor: 'default',
                         zIndex: 5,
@@ -51517,7 +51517,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         + ' | Zaehler= ' + (cc2 ? Object.keys(cc2).join(',') : 'KEINE')
                         + ' | Abfrage= ' + (gameState.effectPrompt
                             ? (gameState.effectPrompt.title || gameState.effectPrompt.type) : 'nein'),
-                        'color:#fff;background:#b3261e;font-weight:bold;padding:2px 6px');
+                        'color:#fff;background:#b5171c;font-weight:bold;padding:2px 6px');
                       return;
                     }
                     console.log('[ZONE]', key, '| Zustand=', JSON.stringify(cards),
@@ -51576,15 +51576,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         <div style={{
                           position: 'absolute', inset: 0,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: 'radial-gradient(ellipse at center, rgba(60,0,0,.55) 0%, rgba(20,0,0,.7) 80%)',
-                          border: '2px dashed rgba(220, 40, 40, .55)',
+                          background: 'radial-gradient(ellipse at center, rgba(58,0,0,.55) 0%, rgba(8,6,12,.7) 80%)',
+                          border: '2px dashed rgba(230,62,51,.55)',
                           borderRadius: 6,
                           pointerEvents: 'none',
                         }}>
                           <span style={{
                             fontSize: 64, lineHeight: 1, fontWeight: 900,
-                            color: '#ff3333',
-                            textShadow: '0 0 8px rgba(255,30,30,.95), 0 0 16px rgba(255,30,30,.6)',
+                            color: '#ef2929',
+                            textShadow: '0 0 8px rgba(255,26,26,.95), 0 0 16px rgba(255,26,26,.6)',
                             opacity: 0.9,
                           }}>✕</span>
                         </div>
@@ -51652,10 +51652,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     // einer versteinerten Kreatur sichtbar bleibt.
                     const _fremdBoden = cc?.crossSideControlled != null;
                     const _fremdRing = _fremdBoden ? {
-                      outline: `3px solid ${cc.crossSideControlled === myIdx ? (me.color || '#4ad9ff') : (opp.color || '#ff7a4a')}`,
+                      outline: `3px solid ${cc.crossSideControlled === myIdx ? (me.color || '#66d9ff') : (opp.color || '#e37435')}`,
                       outlineOffset: '-2px',
                       borderRadius: 7,
-                      boxShadow: `0 0 12px 3px ${cc.crossSideControlled === myIdx ? (me.color || '#4ad9ff') : (opp.color || '#ff7a4a')}`,
+                      boxShadow: `0 0 12px 3px ${cc.crossSideControlled === myIdx ? (me.color || '#66d9ff') : (opp.color || '#e37435')}`,
                       animation: 'pp-crossside-pulse 1.8s ease-in-out infinite',
                     } : null;
                     const creatureStyle = (cc?._petrified || cc?._baihuPetrify) ? { filter: 'saturate(0) brightness(0.7) contrast(1.1)', transition: 'filter 0.5s' }
@@ -51690,7 +51690,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                           <div className="head-counter-badge"
                             onMouseEnter={e => showGameTooltip(e, `Balance Counters: ${cc.balance}. Charm of Balance lets you draw this many cards once per turn.`)}
                             onMouseLeave={hideGameTooltip}
-                            style={{ background: 'linear-gradient(135deg, #f6d36b, #b07a14)', borderColor: '#7a4f08', color: '#3a2200' }}
+                            style={{ background: 'linear-gradient(135deg, #ffd066, #a87c00)', borderColor: '#8b5b04', color: '#332300' }}
                           >
                             <span className="head-counter-icon">⚖️</span>
                             <span className="head-counter-num">×{cc.balance}</span>
@@ -51869,8 +51869,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                             // Liste. Das Abzeichen ist nur noch Anzeige, sonst
                             // waere es ein zweiter, unnoetiger Trefferbereich.
                             pointerEvents: 'none',
-                            background: 'linear-gradient(135deg, #8fd0ff, #2a6ea8)',
-                            borderColor: '#1b4a72', color: '#06243a',
+                            background: 'linear-gradient(135deg, #7bbeea, #405f8c)',
+                            borderColor: '#2d4362', color: '#00213f',
                           }}
                         >
                           <span className="head-counter-icon">🧬</span>
@@ -51905,9 +51905,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       return (
                         <div className="creature-level"
                           style={letheBonus > 0 ? {
-                            color: '#c4a8ff',
-                            textShadow: '0 0 6px rgba(162,136,255,.8)',
-                            borderColor: '#a288ff',
+                            color: '#d6b3f9',
+                            textShadow: '0 0 6px rgba(178,120,237,.8)',
+                            borderColor: '#b278ed',
                           } : undefined}>
                           Lv{total}{letheBonus > 0 ? ` (+${letheBonus})` : ''}
                         </div>
@@ -51926,7 +51926,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       <div className="head-counter-badge head-counter-badge--raised"
                         onMouseEnter={e => showGameTooltip(e, `Demon Counters: ${cc.demonCounter}. Horned Demon's strike deals 50 damage per Demon Counter.`)}
                         onMouseLeave={hideGameTooltip}
-                        style={{ background: 'linear-gradient(135deg, #6a1b9a, #b71c1c)', borderColor: '#3a0a12' }}
+                        style={{ background: 'linear-gradient(135deg, #702db3, #b5171c)', borderColor: '#3a0000' }}
                       >
                         <span className="head-counter-icon">😈</span>
                         <span className="head-counter-num">×{cc.demonCounter}</span>
@@ -51936,7 +51936,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       <div className="head-counter-badge"
                         onMouseEnter={e => showGameTooltip(e, `Bomb Counters: ${cc.bombCounters}. While Time Bomblebee has Bomb Counters, it cannot take damage or be defeated. At the start of the opponent's turn, all Bomb Counters are removed and 150 damage is dealt to a chosen Creature.`)}
                         onMouseLeave={hideGameTooltip}
-                        style={{ background: 'linear-gradient(135deg, #ffaa22, #ff5500)', borderColor: '#882200' }}
+                        style={{ background: 'linear-gradient(135deg, #f9ac20, #ff491a)', borderColor: '#7a1900' }}
                       >
                         <span className="head-counter-icon">💣</span>
                         <span className="head-counter-num">×{cc.bombCounters}</span>
@@ -51946,7 +51946,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       <div className="head-counter-badge"
                         onMouseEnter={e => showGameTooltip(e, `Change Counters: ${cc.changeCounter}. Cosmic Depths counters used by Analyzer, Gatherer, Argos and friends.`)}
                         onMouseLeave={hideGameTooltip}
-                        style={{ background: 'linear-gradient(135deg, #6644cc, #2a0d66)', borderColor: '#aa66ff', color: '#ffe9ff' }}
+                        style={{ background: 'linear-gradient(135deg, #702db3, #401a66)', borderColor: '#b866ff', color: '#f1e5fa' }}
                       >
                         <span className="head-counter-icon"><PxIcon z="🌌" /></span>
                         <span className="head-counter-num">×{cc.changeCounter}</span>
@@ -51956,7 +51956,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       <div className="head-counter-badge"
                         onMouseEnter={e => showGameTooltip(e, `Balance Counters: ${cc.balance}. Charm of Balance lets you draw this many cards once per turn.`)}
                         onMouseLeave={hideGameTooltip}
-                        style={{ background: 'linear-gradient(135deg, #f6d36b, #b07a14)', borderColor: '#7a4f08', color: '#3a2200' }}
+                        style={{ background: 'linear-gradient(135deg, #ffd066, #a87c00)', borderColor: '#8b5b04', color: '#332300' }}
                       >
                         <span className="head-counter-icon">⚖️</span>
                         <span className="head-counter-num">×{cc.balance}</span>
@@ -51970,7 +51970,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       <div className="head-counter-badge"
                         onMouseEnter={e => showGameTooltip(e, 'Shielded: any damage this Creature would take is negated until the start of its controller\u2019s next turn. Damage that cannot be negated still gets through.')}
                         onMouseLeave={hideGameTooltip}
-                        style={{ background: 'linear-gradient(135deg, #ffe08f, #b8860b)', borderColor: '#6b4c00', color: '#3a2a00' }}
+                        style={{ background: 'linear-gradient(135deg, #fbe181, #a87c00)', borderColor: '#72541d', color: '#332300' }}
                       >
                         <span className="head-counter-icon">🛡️</span>
                       </div>
@@ -51979,7 +51979,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       <div className="head-counter-badge"
                         onMouseEnter={e => showGameTooltip(e, `Bomb Counters: ${cc.bunnyBombCounter}. Bunny Bombs deals ${cc.bunnyBombCounter * 20} damage to every target on the board when it is defeated.`)}
                         onMouseLeave={hideGameTooltip}
-                        style={{ background: 'linear-gradient(135deg, #ff8a4c, #a32b00)', borderColor: '#5c1800', color: '#fff3e0' }}
+                        style={{ background: 'linear-gradient(135deg, #e37435, #b62600)', borderColor: '#6a1c14', color: '#fff8e8' }}
                       >
                         <span className="head-counter-icon">🧨</span>
                         <span className="head-counter-num">×{cc.bunnyBombCounter}</span>
@@ -51998,8 +51998,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                           onMouseLeave={hideGameTooltip}
                           style={{
                             left: 'auto', bottom: 'auto', right: 1, top: 2,
-                            background: 'linear-gradient(135deg, #ffd966, #c08820)',
-                            borderColor: '#7a5510', color: '#3a2200',
+                            background: 'linear-gradient(135deg, #ffd966, #a87c00)',
+                            borderColor: '#72541d', color: '#332300',
                           }}
                         >
                           <span className="head-counter-icon">🪙</span>
@@ -52067,7 +52067,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   };
 
   return (
-    <div className="screen-full no-crt ui-noscale" style={{ background: '#0c0c14' }}>
+    <div className="screen-full no-crt ui-noscale" style={{ background: '#08060c' }}>
       {/* ★ v1258 (Als Vorgabe 19.9.): Die Kampf-Kopfzeile ist WEG — sie
           und die Gegnerhand-Zeile sind zu EINER Zeile verschmolzen.
           Der Surrender-/Exit-Knopf (doppelt so gross wie vorher) und der
@@ -52087,9 +52087,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         {/* Mid-game CPU bark (hidden once the end-game bubbles take over).
             z 9650 keeps the opening greeting ABOVE the start-of-game dim +
             first-choice panel (z 9600) instead of being occluded by them. */}
-        {!showEndBubbles && cpuBark && renderBubbleAt(cpuBark.text, '#ffcc44', cpuBark.dir, cpuBark.anchor, cpuBark.id, 9650, cpuBark.fading, !!opp?.barkBounce)}
+        {!showEndBubbles && cpuBark && renderBubbleAt(cpuBark.text, '#fad54a', cpuBark.dir, cpuBark.anchor, cpuBark.id, 9650, cpuBark.fading, !!opp?.barkBounce)}
         {/* Opponent hand */}
-        <div className="game-hand game-hand-opp" style={{ '--hand-accent': opp.color || '#ff5577' }}>
+        <div className="game-hand game-hand-opp" style={{ '--hand-accent': opp.color || '#ec2d62' }}>
           {/* ★ v1258 — DER LINKE CLUSTER DER VERSCHMOLZENEN ZEILE.
               Aufgabe und Avatar stehen nebeneinander; der Knopf traegt
               das doppelte Mass der alten Kopfzeile (8/16 statt 4/12,
@@ -52102,7 +52102,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {/* Porträt im verzierten Pixelrahmen in der Farbe des Spielers
                 (`.pp-portraet`, style.css). Im Tutorial: Monia Bot bzw.
                 Antonia mit eigenem Bild und eigener Farbe. */}
-            <span className="pp-portraet" style={{ '--portraet': opp.color || '#ff5577' }}>
+            <span className="pp-portraet" style={{ '--portraet': opp.color || '#ec2d62' }}>
               {/* `result ? '' : …` statt `!result && …`: der &&-Ausdruck liefert bei gesetztem Ergebnis das BOOLEAN false, und `'…-big' + false` haengt woertlich "false" an den Klassennamen. Aus `game-hand-avatar-crop` wurde `game-hand-avatar-cropfalse` — der quadratische Rahmen fiel weg und der HeroArtCrop lief auf seine volle 135px-Breite aus, der Avatar wurde also im End-Screen ploetzlich breiter. */}
               <HandPortraet
                 src={tutorialGegner ? tutorialGegner.avatar : opp.avatar}
@@ -52326,31 +52326,31 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           {/* ── Generic Player Debuff Warnings (top of battlefield) ── */}
           {(() => {
             const debuffs = [];
-            if (me.actionLocked) debuffs.push({ key: 'action-me', icon: '⛔', text: 'You cannot perform any more Actions this turn! (Placing Creatures still works.)', color: '#ff4466' });
-            if (opp.actionLocked) debuffs.push({ key: 'action-opp', icon: '⛔', text: `${opp.username} cannot perform any more Actions this turn!`, color: '#cc3355' });
-            if (me.summonLocked) debuffs.push({ key: 'summon-me', text: 'You cannot summon any more Creatures this turn!', color: '#ff6644' });
-            if (opp.summonLocked) debuffs.push({ key: 'summon-opp', text: `${opp.username} cannot summon any more Creatures this turn!`, color: '#cc8800' });
-            if (me.damageLocked) debuffs.push({ key: 'damage-me', icon: '🔥', text: 'You cannot deal any more damage to your opponent this turn!', color: '#ff4444' });
-            if (opp.damageLocked) debuffs.push({ key: 'damage-opp', icon: '🛡️', text: `${opp.username} cannot deal any more damage to your targets this turn!`, color: '#ff8844' });
-            if (me.oppHandLocked) debuffs.push({ key: 'opphand-me', icon: '🫲', text: 'You cannot interact with your opponent\'s hand for the rest of this turn!', color: '#aa44ff' });
-            if (opp.oppHandLocked) debuffs.push({ key: 'opphand-opp', icon: '🫲', text: `${opp.username} cannot interact with your hand for the rest of this turn!`, color: '#8833cc' });
-            if (me.potionLocked) debuffs.push({ key: 'potion-me', icon: '🧪', text: 'You cannot play any more Potions this turn!', color: '#aa44ff' });
-            if (opp.potionLocked) debuffs.push({ key: 'potion-opp', icon: '🧪', text: `${opp.username} cannot play any more Potions this turn!`, color: '#8844cc' });
-            if (me.supportSpellLocked) debuffs.push({ key: 'support-me', icon: '💚', text: 'You cannot use another Support Spell this turn.', color: '#ff4444' });
-            if (opp.supportSpellLocked) debuffs.push({ key: 'support-opp', icon: '💚', text: `Your opponent cannot use another Support Spell this turn.`, color: '#ff8844' });
-            if (me.itemLocked) debuffs.push({ key: 'item-me', icon: '🔨', text: 'You must delete 1 card from your hand to use an Artifact!', color: '#ff6633' });
-            if (opp.itemLocked) debuffs.push({ key: 'item-opp', icon: '🔨', text: `${opp.username} must delete 1 card from their hand to use an Artifact!`, color: '#cc5522' });
+            if (me.actionLocked) debuffs.push({ key: 'action-me', icon: '⛔', text: 'You cannot perform any more Actions this turn! (Placing Creatures still works.)', color: '#ec2d62' });
+            if (opp.actionLocked) debuffs.push({ key: 'action-opp', icon: '⛔', text: `${opp.username} cannot perform any more Actions this turn!`, color: '#ae264c' });
+            if (me.summonLocked) debuffs.push({ key: 'summon-me', text: 'You cannot summon any more Creatures this turn!', color: '#e63e33' });
+            if (opp.summonLocked) debuffs.push({ key: 'summon-opp', text: `${opp.username} cannot summon any more Creatures this turn!`, color: '#c68206' });
+            if (me.damageLocked) debuffs.push({ key: 'damage-me', icon: '🔥', text: 'You cannot deal any more damage to your opponent this turn!', color: '#f03232' });
+            if (opp.damageLocked) debuffs.push({ key: 'damage-opp', icon: '🛡️', text: `${opp.username} cannot deal any more damage to your targets this turn!`, color: '#e37435' });
+            if (me.oppHandLocked) debuffs.push({ key: 'opphand-me', icon: '🫲', text: 'You cannot interact with your opponent\'s hand for the rest of this turn!', color: '#a040ff' });
+            if (opp.oppHandLocked) debuffs.push({ key: 'opphand-opp', icon: '🫲', text: `${opp.username} cannot interact with your hand for the rest of this turn!`, color: '#9544d5' });
+            if (me.potionLocked) debuffs.push({ key: 'potion-me', icon: '🧪', text: 'You cannot play any more Potions this turn!', color: '#a040ff' });
+            if (opp.potionLocked) debuffs.push({ key: 'potion-opp', icon: '🧪', text: `${opp.username} cannot play any more Potions this turn!`, color: '#9544d5' });
+            if (me.supportSpellLocked) debuffs.push({ key: 'support-me', icon: '💚', text: 'You cannot use another Support Spell this turn.', color: '#f03232' });
+            if (opp.supportSpellLocked) debuffs.push({ key: 'support-opp', icon: '💚', text: `Your opponent cannot use another Support Spell this turn.`, color: '#e37435' });
+            if (me.itemLocked) debuffs.push({ key: 'item-me', icon: '🔨', text: 'You must delete 1 card from your hand to use an Artifact!', color: '#f87420' });
+            if (opp.itemLocked) debuffs.push({ key: 'item-opp', icon: '🔨', text: `${opp.username} must delete 1 card from their hand to use an Artifact!`, color: '#e37435' });
             // Boomerang's "no Artifacts for the rest of this turn"
             // lockout. Distinct icon (🪃) from the 🔨 itemLocked
             // badge — different mechanic, different message.
-            if (me.artifactLocked) debuffs.push({ key: 'artifact-me', icon: '🪃', text: 'You cannot use any more Artifacts this turn!', color: '#ff8855' });
-            if (opp.artifactLocked) debuffs.push({ key: 'artifact-opp', icon: '🪃', text: `${opp.username} cannot use any more Artifacts this turn!`, color: '#cc6644' });
-            if (me.forsaken) debuffs.push({ key: 'forsaken-me', icon: '🏴‍☠️', text: 'All cards that would go to your discard pile are deleted for the rest of the turn.', color: '#8888aa' });
-            if (opp.forsaken) debuffs.push({ key: 'forsaken-opp', icon: '🏴‍☠️', text: `All cards that would go to ${opp.username}'s discard pile are deleted for the rest of the turn.`, color: '#6666aa' });
-            if (me.handLocked) debuffs.push({ key: 'hand-me', icon: '🔒', text: 'You cannot draw or search any more cards this turn!', color: '#ff6644' });
-            if (opp.handLocked) debuffs.push({ key: 'hand-opp', icon: '🔒', text: `${opp.username} cannot draw or search any more cards this turn!`, color: '#cc8800' });
-            if (me.drawLocked && !me.handLocked) debuffs.push({ key: 'draw-me', icon: '💎', text: 'You cannot draw any more cards this turn (searches still work)!', color: '#ff6644' });
-            if (opp.drawLocked && !opp.handLocked) debuffs.push({ key: 'draw-opp', icon: '💎', text: `${opp.username} cannot draw any more cards this turn (searches still work)!`, color: '#cc8800' });
+            if (me.artifactLocked) debuffs.push({ key: 'artifact-me', icon: '🪃', text: 'You cannot use any more Artifacts this turn!', color: '#ff8566' });
+            if (opp.artifactLocked) debuffs.push({ key: 'artifact-opp', icon: '🪃', text: `${opp.username} cannot use any more Artifacts this turn!`, color: '#b06746' });
+            if (me.forsaken) debuffs.push({ key: 'forsaken-me', icon: '🏴‍☠️', text: 'All cards that would go to your discard pile are deleted for the rest of the turn.', color: '#7e7d9b' });
+            if (opp.forsaken) debuffs.push({ key: 'forsaken-opp', icon: '🏴‍☠️', text: `All cards that would go to ${opp.username}'s discard pile are deleted for the rest of the turn.`, color: '#8066b2' });
+            if (me.handLocked) debuffs.push({ key: 'hand-me', icon: '🔒', text: 'You cannot draw or search any more cards this turn!', color: '#e63e33' });
+            if (opp.handLocked) debuffs.push({ key: 'hand-opp', icon: '🔒', text: `${opp.username} cannot draw or search any more cards this turn!`, color: '#c68206' });
+            if (me.drawLocked && !me.handLocked) debuffs.push({ key: 'draw-me', icon: '💎', text: 'You cannot draw any more cards this turn (searches still work)!', color: '#e63e33' });
+            if (opp.drawLocked && !opp.handLocked) debuffs.push({ key: 'draw-opp', icon: '💎', text: `${opp.username} cannot draw any more cards this turn (searches still work)!`, color: '#c68206' });
             // v1068: Gegenstueck zum Zieh-Lock — Suchen gesperrt, Ziehen frei.
             // Der Zusatz nennt ausdruecklich, ob der Ablagestapel mitgesperrt
             // ist, weil das der einzige Unterschied der starken Stufe ist.
@@ -52366,30 +52366,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (me.abilityActivationBlocked) {
               debuffs.push({ key: 'abil-me', icon: '⛔',
                 text: 'You cannot activate any Ability effects while "The Thing in the Ship" is on the board!',
-                color: '#ff6644' });
+                color: '#e63e33' });
               debuffs.push({ key: 'abil-opp', icon: '⛔',
                 text: `${opp.username} cannot activate any Ability effects either — the lock hits both players!`,
-                color: '#cc8800' });
+                color: '#c68206' });
             }
-            if (me.searchLocked && !me.handLocked) debuffs.push({ key: 'search-me', icon: '🔒', text: `You cannot search or add cards to your hand this turn${me.searchLockedIncludesDiscard ? ', not even from your discard pile' : ' (your discard pile still works)'} — but you can still draw!`, color: '#ff6644' });
-            if (opp.searchLocked && !opp.handLocked) debuffs.push({ key: 'search-opp', icon: '🔒', text: `${opp.username} cannot search or add cards to their hand this turn${opp.searchLockedIncludesDiscard ? ', not even from their discard pile' : ''} (they can still draw)!`, color: '#cc8800' });
+            if (me.searchLocked && !me.handLocked) debuffs.push({ key: 'search-me', icon: '🔒', text: `You cannot search or add cards to your hand this turn${me.searchLockedIncludesDiscard ? ', not even from your discard pile' : ' (your discard pile still works)'} — but you can still draw!`, color: '#e63e33' });
+            if (opp.searchLocked && !opp.handLocked) debuffs.push({ key: 'search-opp', icon: '🔒', text: `${opp.username} cannot search or add cards to their hand this turn${opp.searchLockedIncludesDiscard ? ', not even from their discard pile' : ''} (they can still draw)!`, color: '#c68206' });
             // v828: Hand-Spielsperre (Knight of Kings [W]) — zwei Modi.
-            if (me.handPlayLock === 'all') debuffs.push({ key: 'handplay-me', icon: '♞', text: 'You cannot play any more cards from your hand this turn!', color: '#ff6644' });
-            if (me.handPlayLock === 'of-kings') debuffs.push({ key: 'handplay-me', icon: '♞', text: 'You cannot play any more cards from your hand this turn — except "of Kings" cards (Board of Kings)!', color: '#ffaa44' });
-            if (opp.handPlayLock === 'all') debuffs.push({ key: 'handplay-opp', icon: '♞', text: `${opp.username} cannot play any more cards from their hand this turn!`, color: '#cc8800' });
-            if (opp.handPlayLock === 'of-kings') debuffs.push({ key: 'handplay-opp', icon: '♞', text: `${opp.username} cannot play any more cards from their hand this turn — except "of Kings" cards!`, color: '#cc8800' });
+            if (me.handPlayLock === 'all') debuffs.push({ key: 'handplay-me', icon: '♞', text: 'You cannot play any more cards from your hand this turn!', color: '#e63e33' });
+            if (me.handPlayLock === 'of-kings') debuffs.push({ key: 'handplay-me', icon: '♞', text: 'You cannot play any more cards from your hand this turn — except "of Kings" cards (Board of Kings)!', color: '#ff9b3a' });
+            if (opp.handPlayLock === 'all') debuffs.push({ key: 'handplay-opp', icon: '♞', text: `${opp.username} cannot play any more cards from their hand this turn!`, color: '#c68206' });
+            if (opp.handPlayLock === 'of-kings') debuffs.push({ key: 'handplay-opp', icon: '♞', text: `${opp.username} cannot play any more cards from their hand this turn — except "of Kings" cards!`, color: '#c68206' });
             if (me.flashbanged) debuffs.push({ key: 'flashbanged-me', icon: '⚪', text: 'Flashbanged — your turn will end after your first Action!', color: '#ffffff' });
-            if (opp.flashbanged) debuffs.push({ key: 'flashbanged-opp', icon: '⚪', text: `Flashbanged — ${opp.username}'s turn will end after their first Action!`, color: '#dddddd' });
+            if (opp.flashbanged) debuffs.push({ key: 'flashbanged-opp', icon: '⚪', text: `Flashbanged — ${opp.username}'s turn will end after their first Action!`, color: '#e6e6e6' });
             // Giga Steroids — owner-wide second-Action grant for
             // effect activations. Set on resolve, cleared on consume
             // / fizzle / expire by Giga Steroids' hooks.
-            if (me.onSteroids) debuffs.push({ key: 'steroids-me', icon: '💪', text: 'On Steroids — You can use a second Action for an active effect this Action Phase!', color: '#ff66dd' });
-            if (opp.onSteroids) debuffs.push({ key: 'steroids-opp', icon: '💪', text: `On Steroids — Your opponent can use a second Action for an active effect this Action Phase!`, color: '#cc44aa' });
+            if (me.onSteroids) debuffs.push({ key: 'steroids-me', icon: '💪', text: 'On Steroids — You can use a second Action for an active effect this Action Phase!', color: '#fa6bed' });
+            if (opp.onSteroids) debuffs.push({ key: 'steroids-opp', icon: '💪', text: `On Steroids — Your opponent can use a second Action for an active effect this Action Phase!`, color: '#fc69c6' });
             // ★ v1004: „Mission of the Light Brigade" — die offenen
             // Ladungen stehen in derselben Leiste. Sie sind Segen und
             // Fluch zugleich: zwei Zusatzaktionen, aber KEINE anderen.
-            if (me.missionActions > 0) debuffs.push({ key: 'mission-me', icon: '🎺', text: `Light Brigade — ${me.missionActions} additional Action${me.missionActions === 1 ? '' : 's'} left (no other additional Actions this turn).`, color: '#ffcc44' });
-            if (opp.missionActions > 0) debuffs.push({ key: 'mission-opp', icon: '🎺', text: `${opp.username} has ${opp.missionActions} Light Brigade Action${opp.missionActions === 1 ? '' : 's'} left.`, color: '#ccaa33' });
+            if (me.missionActions > 0) debuffs.push({ key: 'mission-me', icon: '🎺', text: `Light Brigade — ${me.missionActions} additional Action${me.missionActions === 1 ? '' : 's'} left (no other additional Actions this turn).`, color: '#fad54a' });
+            if (opp.missionActions > 0) debuffs.push({ key: 'mission-opp', icon: '🎺', text: `${opp.username} has ${opp.missionActions} Light Brigade Action${opp.missionActions === 1 ? '' : 's'} left.`, color: '#c79e05' });
             if (debuffs.length === 0) return null;
             return (
               <div className="phase-debuffs">
@@ -52424,7 +52424,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // Skill Test: gs.turn zählt 2 je Round — angezeigt wird die Round (stInfo.round).
                 const zaehlerWert = stInfo ? (stInfo.round || 1) : gameState.turn;
                 const amZug = activePlayer === myIdx ? me : opp;
-                const farbe = amZug.color || (activePlayer === myIdx ? '#00f0ff' : '#ff5577');
+                const farbe = amZug.color || (activePlayer === myIdx ? '#1aedff' : '#ec2d62');
                 return (
                   <div key={stInfo ? zaehlerWert + ':' + activePlayer : gameState.turn} className="board-round-counter" style={{ '--runde-farbe': farbe }}>
                     {/* v1473 (Als Vorgabe 28.9.): gezaehlt wird jeder Zug beider
@@ -52523,7 +52523,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           {/* ★ 10.10.: KEIN `isolation: isolate` mehr — die Isolation sitzt jetzt an `.board-plane-clip` (style.css), damit die
               Sprite-Huelle (letztes Kind) im Kontext der Phasenspalte steht und ueber ihr liegt. */}
           <div className="board-center" ref={boardCenterRef} style={{ position: 'relative' }}>
-            {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#ffcc00', textShadow: '0 0 10px rgba(255,200,0,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
+            {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#ffd61a', textShadow: '0 0 10px rgba(255,198,28,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
             {/* ── Pseudo-3D ground plane ─────────────────────────────────
                 ONE wrapper around both player sides + the area zones +
                 the mid row, tilted as a single continuous plane via CSS
@@ -52556,7 +52556,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   return (
                     <div key={k} className={'st-mini' + (tot ? ' st-mini-out' : '') + (amZug ? ' st-mini-turn' : '')}
                       data-st-seat={k}>
-                      <div className="st-mini-head" style={{ borderColor: pl.color || '#888' }}
+                      <div className="st-mini-head" style={{ borderColor: pl.color || '#7f7f7f' }}
                         onClick={() => setStFocusPin(k)} title="Click to bring this player to the front">
                         <span className="st-mini-name">{pl.username}</span>
                         <span className="st-mini-stats" title="Total hero HP · Gold">
@@ -53111,12 +53111,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </div>
 
         {/* My hand (bottom player) — drag to reorder for players, face-down for spectators */}
-        <div className="game-hand game-hand-me" ref={isSpectator ? undefined : handRef} style={{ '--hand-accent': me.color || '#00f0ff' }}>
+        <div className="game-hand game-hand-me" ref={isSpectator ? undefined : handRef} style={{ '--hand-accent': me.color || '#1aedff' }}>
           <HandAmbiance color={me.color} />
           <div className="game-hand-info" ref={speechMeRef} style={meAvatarHighlight}>
             {/* Porträt im verzierten Pixelrahmen in der Farbe des Spielers
                 (`.pp-portraet`, style.css). */}
-            <span className="pp-portraet" style={{ '--portraet': me.color || '#00f0ff' }}>
+            <span className="pp-portraet" style={{ '--portraet': me.color || '#1aedff' }}>
               <HandPortraet src={me.avatar} heroName={portraetHeld(me)}
                 zustand={result ? '' : ((isMyTurn || meBarking) ? ' avatar-active' : ' avatar-inactive')} />
               <span className="pp-portraet-zier" aria-hidden="true" />
@@ -53347,13 +53347,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // zeigt die aktuellen Werte, der Tooltip die gedruckten — und sagt, woher die Abweichung kommt.
                 const handNotes = [];
                 if (handEffectiveLevel != null) {
-                  const lvFarbe = handEffectiveLevel > (handCardData?.level ?? 0) ? '#ff5555' : '#4ade80';
+                  const lvFarbe = handEffectiveLevel > (handCardData?.level ?? 0) ? '#fe5154' : '#75f091';
                   handNotes.push({ color: lvFarbe, text: `Level ${handEffectiveLevel} in your hand (printed ${handCardData?.level}).` });
                   if (handLevelIsHeroFiltered) handNotes.push({ color: lvFarbe, text: `Reduced level only applies when ${me.heroes?.[handLevelHostHeroIdx]?.name || 'the corresponding Hero'} plays this card.` });
-                  if (manaCrystalBoost) handNotes.push({ color: '#ff5555', text: 'Mana Absorbing Crystal in your hand: Spells read +1 level.' });
+                  if (manaCrystalBoost) handNotes.push({ color: '#fe5154', text: 'Mana Absorbing Crystal in your hand: Spells read +1 level.' });
                 }
                 if (handEffectiveCost != null) {
-                  const kFarbe = handEffectiveCost > handCardData.cost ? '#ff5555' : '#4ade80';
+                  const kFarbe = handEffectiveCost > handCardData.cost ? '#fe5154' : '#75f091';
                   const teile = [];
                   if (handBaseCostAfterCrystal !== handCardData.cost) teile.push(`Rusting Crystal doubles the cost (base ${handCardData.cost} → ${handBaseCostAfterCrystal})`);
                   if (handCostReduction > 0) teile.push(`Reduced by ${handCostReduction} this turn`);
@@ -53361,7 +53361,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 }
                 else if (handKostenVariabel && handCostReduction > 0) {
                   // variable Kosten mit Rabatt: nicht auf die Karte druckbar (s. o.), aber im Tooltip genannt
-                  handNotes.push({ color: '#4ade80', text: `Cost reduced by ${handCostReduction} this turn (printed ${window.cardCostText(handCardData)}).` });
+                  handNotes.push({ color: '#75f091', text: `Cost reduced by ${handCostReduction} this turn (printed ${window.cardCostText(handCardData)}).` });
                 }
                 return (
                   <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-card-name={item.card} data-card-type={CARDS_BY_NAME[item.card]?.cardType || ''} data-touch-drag="1"
@@ -53828,25 +53828,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                    style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.55))', overflow: 'visible' }}>
                 {/* Tail (long horsehair from the rear) */}
                 <path d="M 12 46 Q 0 50 -2 64 Q 4 58 8 60 Q 4 68 10 70 Q 6 76 14 74"
-                      fill="none" stroke="#3a2008" strokeWidth="2.5" strokeLinecap="round" />
+                      fill="none" stroke="#3a2412" strokeWidth="2.5" strokeLinecap="round" />
                 {/* Body (oval — slimmer than before, leaving room for the long neck) */}
-                <ellipse cx="48" cy="48" rx="38" ry="17" fill="#6b3f1a" />
+                <ellipse cx="48" cy="48" rx="38" ry="17" fill="#6e4421" />
                 <ellipse cx="48" cy="48" rx="38" ry="17" fill="none"
-                         stroke="#3a2008" strokeWidth="1.5" />
+                         stroke="#3a2412" strokeWidth="1.5" />
                 {/* Wood-grain stripes across the body */}
                 <line x1="14" y1="44" x2="84" y2="44" stroke="#4a2a10" strokeWidth="1" />
                 <line x1="12" y1="50" x2="86" y2="50" stroke="#4a2a10" strokeWidth="1" />
                 <line x1="14" y1="55" x2="84" y2="55" stroke="#4a2a10" strokeWidth="1" />
                 {/* Plank bolts */}
-                <circle cx="24" cy="48" r="1.3" fill="#2a1808" />
-                <circle cx="40" cy="48" r="1.3" fill="#2a1808" />
-                <circle cx="56" cy="48" r="1.3" fill="#2a1808" />
-                <circle cx="72" cy="48" r="1.3" fill="#2a1808" />
+                <circle cx="24" cy="48" r="1.3" fill="#27180c" />
+                <circle cx="40" cy="48" r="1.3" fill="#27180c" />
+                <circle cx="56" cy="48" r="1.3" fill="#27180c" />
+                <circle cx="72" cy="48" r="1.3" fill="#27180c" />
                 {/* Long arched neck — sweeps up from the front of the
                     body to the base of the head. Thicker at the
                     shoulder, tapering as it rises. */}
                 <path d="M 78 38 Q 85 22 100 14 L 110 22 Q 100 30 88 50 Z"
-                      fill="#6b3f1a" stroke="#3a2008" strokeWidth="1.3" />
+                      fill="#6e4421" stroke="#3a2412" strokeWidth="1.3" />
                 {/* Neck wood-grain stripe (follows the curve) */}
                 <path d="M 82 40 Q 90 26 102 18" fill="none" stroke="#4a2a10" strokeWidth="1" />
                 {/* Spiky wooden mane along the top of the neck */}
@@ -53854,30 +53854,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       fill="#4a2a10" />
                 {/* Head — elongated muzzle, attached to the top of the neck */}
                 <path d="M 100 10 Q 120 8 124 18 Q 126 28 116 32 L 105 30 Q 99 22 102 12 Z"
-                      fill="#6b3f1a" stroke="#3a2008" strokeWidth="1.3" />
+                      fill="#6e4421" stroke="#3a2412" strokeWidth="1.3" />
                 {/* Head wood-grain accent */}
                 <line x1="105" y1="22" x2="120" y2="20" stroke="#4a2a10" strokeWidth="0.8" />
                 {/* Ears (two angled triangles) */}
-                <path d="M 106 10 L 108 2 L 111 11 Z" fill="#5a341a" stroke="#3a2008" strokeWidth="0.6" />
-                <path d="M 100 12 L 102 4 L 105 13 Z" fill="#4a2a10" stroke="#3a2008" strokeWidth="0.6" />
+                <path d="M 106 10 L 108 2 L 111 11 Z" fill="#5a341a" stroke="#3a2412" strokeWidth="0.6" />
+                <path d="M 100 12 L 102 4 L 105 13 Z" fill="#4a2a10" stroke="#3a2412" strokeWidth="0.6" />
                 {/* Eye — ominous orange glow */}
-                <circle cx="116" cy="20" r="2.2" fill="#ff8800" />
-                <circle cx="116" cy="20" r="1" fill="#2a1808" />
+                <circle cx="116" cy="20" r="2.2" fill="#ff8b1a" />
+                <circle cx="116" cy="20" r="1" fill="#27180c" />
                 {/* Nostril + mouth crease at the snout */}
-                <ellipse cx="121" cy="25" rx="1.6" ry="1" fill="#2a1808" />
-                <line x1="116" y1="29" x2="122" y2="29" stroke="#2a1808" strokeWidth="0.9" />
+                <ellipse cx="121" cy="25" rx="1.6" ry="1" fill="#27180c" />
+                <line x1="116" y1="29" x2="122" y2="29" stroke="#27180c" strokeWidth="0.9" />
                 {/* Legs (squared wooden posts) */}
-                <rect x="18" y="63" width="9" height="22" fill="#5a341a" stroke="#3a2008" strokeWidth="1" />
-                <rect x="34" y="63" width="9" height="22" fill="#5a341a" stroke="#3a2008" strokeWidth="1" />
-                <rect x="56" y="63" width="9" height="22" fill="#5a341a" stroke="#3a2008" strokeWidth="1" />
-                <rect x="72" y="63" width="9" height="22" fill="#5a341a" stroke="#3a2008" strokeWidth="1" />
+                <rect x="18" y="63" width="9" height="22" fill="#5a341a" stroke="#3a2412" strokeWidth="1" />
+                <rect x="34" y="63" width="9" height="22" fill="#5a341a" stroke="#3a2412" strokeWidth="1" />
+                <rect x="56" y="63" width="9" height="22" fill="#5a341a" stroke="#3a2412" strokeWidth="1" />
+                <rect x="72" y="63" width="9" height="22" fill="#5a341a" stroke="#3a2412" strokeWidth="1" />
                 {/* Wheels (Trojan-cart style) */}
-                <circle cx="24" cy="86" r="7" fill="#3a1f08" stroke="#1f0f04" strokeWidth="1.5" />
-                <circle cx="24" cy="86" r="2.5" fill="#6b3f1a" />
+                <circle cx="24" cy="86" r="7" fill="#3a2412" stroke="#1f0f04" strokeWidth="1.5" />
+                <circle cx="24" cy="86" r="2.5" fill="#6e4421" />
                 <line x1="24" y1="79" x2="24" y2="93" stroke="#1f0f04" strokeWidth="1" />
                 <line x1="17" y1="86" x2="31" y2="86" stroke="#1f0f04" strokeWidth="1" />
-                <circle cx="76" cy="86" r="7" fill="#3a1f08" stroke="#1f0f04" strokeWidth="1.5" />
-                <circle cx="76" cy="86" r="2.5" fill="#6b3f1a" />
+                <circle cx="76" cy="86" r="7" fill="#3a2412" stroke="#1f0f04" strokeWidth="1.5" />
+                <circle cx="76" cy="86" r="2.5" fill="#6e4421" />
                 <line x1="76" y1="79" x2="76" y2="93" stroke="#1f0f04" strokeWidth="1" />
                 <line x1="69" y1="86" x2="83" y2="86" stroke="#1f0f04" strokeWidth="1" />
               </svg>
@@ -54020,22 +54020,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                  Rotation zum Ziel kommt vom Wrapper. */
               <svg className="projectile-arrow-shaft" viewBox="0 0 140 10"
                    width="120" height="9" xmlns="http://www.w3.org/2000/svg">
-                <rect x="0" y="4" width="112" height="2" fill="#b98a4a" />
-                <rect x="0" y="4" width="112" height="2" fill="none" stroke="#3a2410" strokeWidth="0.5" />
+                <rect x="0" y="4" width="112" height="2" fill="#ca874e" />
+                <rect x="0" y="4" width="112" height="2" fill="none" stroke="#3a2412" strokeWidth="0.5" />
                 <polygon points="110,5 118,2.4 140,5 118,7.6" fill="#e6e6e6" />
                 <polygon points="110,5 118,2.4 140,5 118,7.6" fill="none" stroke="#222" strokeWidth="0.5" />
-                <rect x="108" y="3.3" width="4" height="3.4" fill="#8a8a8a" />
+                <rect x="108" y="3.3" width="4" height="3.4" fill="#929292" />
               </svg>
             ) : p.projectileShape === 'arrow' ? (
               <svg className="projectile-arrow-shaft" viewBox="0 0 100 22"
                    width="78" height="18" xmlns="http://www.w3.org/2000/svg">
                 {/* Filled fletching at the tail (the ⪼ end). */}
-                <polygon points="0,4 14,11 0,18" fill="#8a8a8a" />
+                <polygon points="0,4 14,11 0,18" fill="#929292" />
                 <polygon points="9,4 23,11 9,18" fill="#a8a8a8" />
                 {/* Solid shaft. */}
-                <rect x="22" y="9" width="58" height="4" fill="#c8c8c8" />
+                <rect x="22" y="9" width="58" height="4" fill="#b9b9b9" />
                 {/* Arrowhead (the ➢ tip). */}
-                <polygon points="78,2 100,11 78,20" fill="#e8e8e8" />
+                <polygon points="78,2 100,11 78,20" fill="#e6e6e6" />
                 {/* Outline strokes for board-background contrast. */}
                 <polygon points="0,4 14,11 0,18" fill="none" stroke="#222" strokeWidth="0.6" />
                 <polygon points="9,4 23,11 9,18" fill="none" stroke="#222" strokeWidth="0.6" />
@@ -54103,12 +54103,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <div className="camera-flash-overlay">
           <div className="camera-flash-icon">
             <svg viewBox="0 0 100 100" width="120" height="120">
-              <rect x="20" y="30" width="60" height="45" rx="8" fill="#ff69b4" stroke="#fff" strokeWidth="2"/>
+              <rect x="20" y="30" width="60" height="45" rx="8" fill="#fc69c6" stroke="#fff" strokeWidth="2"/>
               <circle cx="50" cy="52" r="14" fill="#222" stroke="#fff" strokeWidth="2"/>
-              <circle cx="50" cy="52" r="8" fill="#4af"/>
-              <rect x="38" y="24" width="24" height="10" rx="3" fill="#ff69b4" stroke="#fff" strokeWidth="1.5"/>
-              <ellipse cx="28" cy="22" rx="10" ry="16" fill="none" stroke="#ff69b4" strokeWidth="2" transform="rotate(-30 28 22)"/>
-              <ellipse cx="72" cy="22" rx="10" ry="16" fill="none" stroke="#ff69b4" strokeWidth="2" transform="rotate(30 72 22)"/>
+              <circle cx="50" cy="52" r="8" fill="#1ca9fd"/>
+              <rect x="38" y="24" width="24" height="10" rx="3" fill="#fc69c6" stroke="#fff" strokeWidth="1.5"/>
+              <ellipse cx="28" cy="22" rx="10" ry="16" fill="none" stroke="#fc69c6" strokeWidth="2" transform="rotate(-30 28 22)"/>
+              <ellipse cx="72" cy="22" rx="10" ry="16" fill="none" stroke="#fc69c6" strokeWidth="2" transform="rotate(30 72 22)"/>
             </svg>
           </div>
         </div>
@@ -54132,7 +54132,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const el = document.querySelector(`[data-support-owner="${ownerLabel}"][data-support-hero="${hi}"][data-support-slot="${sl}"] .additional-action-icon`);
         if (!el) return null;
         const r = el.getBoundingClientRect();
-        return <div className="immune-tooltip" style={{ position: 'fixed', left: r.right + 8, top: r.top - 4, borderColor: 'rgba(255,200,0,.4)', color: '#ffdd88' }}>Provides an additional Action.</div>;
+        return <div className="immune-tooltip" style={{ position: 'fixed', left: r.right + 8, top: r.top - 4, borderColor: 'rgba(255,198,28,.4)', color: '#fbe181' }}>Provides an additional Action.</div>;
       })()}
 
       {/* Deck-top tooltip — anchored to the LEFT of the deck pile so the
@@ -54171,7 +54171,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {imgUrl && (
               <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
                 <img src={imgUrl} style={{ width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
-                  border: foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : 'none' }} />
+                  border: foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,214,26,.5)' : 'none' }} />
                 {/* ★ v1203: Dieses Vorschaubild rechnete `isFoil` aus und
                     zeichnete die Schicht dann NIE — dritte Stelle derselben
                     Bauart. Jetzt haengt auch sie an CardFoil. */}
@@ -54181,7 +54181,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <div style={{ padding: '10px 12px' }}>
               <div style={{ fontWeight: 700, fontSize: 18, color: typeColor(card.cardType), marginBottom: 5 }}>{card.name}</div>
               {hoverIdentity && traeger && (
-                <div style={{ fontSize: 13, color: '#cf9bff', marginBottom: 5 }}>
+                <div style={{ fontSize: 13, color: '#c98aff', marginBottom: 5 }}>
                   🎭 {traeger.name}, until end of turn
                 </div>
               )}
@@ -54191,10 +54191,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               {card.effect && <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.5 }}>{card.effect}</div>}
               <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 8, display: 'flex', gap: 12 }}>
                 {card.hp != null && <span style={{ color: '#ff6666' }}>♥ HP {card.hp}</span>}
-                {card.atk != null && <span style={{ color: '#ffaa44' }}>⚔ ATK {card.atk}</span>}
-                {card.cost != null && <span style={{ color: '#44aaff' }}>◆ Cost {window.cardCostText(card)}</span>}
+                {card.atk != null && <span style={{ color: '#ff9b3a' }}>⚔ ATK {card.atk}</span>}
+                {card.cost != null && <span style={{ color: '#1ca9fd' }}>◆ Cost {window.cardCostText(card)}</span>}
                 {shownLevel != null && (
-                  <span style={hoverStamp > 0 ? { color: '#c4a8ff', fontWeight: 700 } : undefined}>
+                  <span style={hoverStamp > 0 ? { color: '#d6b3f9', fontWeight: 700 } : undefined}>
                     Lv {shownLevel}{hoverStamp > 0 ? ` (+${hoverStamp})` : ''}
                   </span>
                 )}
@@ -54406,9 +54406,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               onMouseEnter={() => card && setBoardTooltip(card)} onMouseLeave={() => setBoardTooltip(null)}
               style={{
                 width: 64, height: 90, borderRadius: 4, overflow: 'hidden', cursor: sideDeckDone ? 'default' : 'pointer',
-                border: isSelected ? '2px solid #ffaa00' : (isSwapTarget && (pool !== 'hero' || isValidHeroTarget) || isValidSideForHero) ? '2px solid rgba(100,255,100,.6)' : '2px solid transparent',
+                border: isSelected ? '2px solid #f9ac20' : (isSwapTarget && (pool !== 'hero' || isValidHeroTarget) || isValidSideForHero) ? '2px solid rgba(102,255,113,.6)' : '2px solid transparent',
                 opacity: sideDeckDone ? 0.5 : 1,
-                boxShadow: isSelected ? '0 0 12px rgba(255,170,0,.6)' : undefined,
+                boxShadow: isSelected ? '0 0 12px rgba(249,172,32,.6)' : undefined,
                 transition: 'border .15s, box-shadow .15s',
                 flexShrink: 0,
               }}>
@@ -54434,10 +54434,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
                 padding: 6, borderRadius: 6, cursor: h?.hero && !sideDeckDone ? 'pointer' : 'default',
-                border: isSelected ? '2px solid #ffaa00' : isSwapTarget ? '2px solid rgba(100,255,100,.6)' : '2px solid var(--bg4)',
+                border: isSelected ? '2px solid #f9ac20' : isSwapTarget ? '2px solid rgba(102,255,113,.6)' : '2px solid var(--bg4)',
                 background: 'var(--bg2)', minWidth: 90,
                 opacity: sideDeckDone ? 0.5 : 1,
-                boxShadow: isSelected ? '0 0 12px rgba(255,170,0,.6)' : undefined,
+                boxShadow: isSelected ? '0 0 12px rgba(249,172,32,.6)' : undefined,
               }}>
               <div style={{ width: 72, height: 100, borderRadius: 4, overflow: 'hidden' }}>
                 {card ? (
@@ -54447,9 +54447,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 )}
               </div>
               <div style={{ fontSize: 9, color: 'var(--text2)', textAlign: 'center' }}>
-                {h?.ability1 && <span style={{ color: '#88ccff' }}>{h.ability1}</span>}
+                {h?.ability1 && <span style={{ color: '#7bbeea' }}>{h.ability1}</span>}
                 {h?.ability1 && h?.ability2 && ' / '}
-                {h?.ability2 && <span style={{ color: '#88ccff' }}>{h.ability2}</span>}
+                {h?.ability2 && <span style={{ color: '#7bbeea' }}>{h.ability2}</span>}
               </div>
             </div>
           );
@@ -54470,8 +54470,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {oppDone && <span style={{ fontSize: 18, color: '#44ff44' }} title="Opponent is done">✅</span>}
-                  <span style={{ fontSize: 11, color: oppDone ? '#44ff44' : 'var(--text2)' }}>
+                  {oppDone && <span style={{ fontSize: 18, color: '#1aff73' }} title="Opponent is done">✅</span>}
+                  <span style={{ fontSize: 11, color: oppDone ? '#1aff73' : 'var(--text2)' }}>
                     {oppDone ? 'Opponent ready' : 'Opponent siding...'}
                   </span>
                 </div>
@@ -54481,7 +54481,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 Click a card to select it, then click a card in the Side Deck (or vice versa) to swap them. Heroes can only be swapped with Side Deck Heroes.
               </div>
               {sideDeckNotice && (
-                <div style={{ fontSize: 12, color: '#ffb347', marginBottom: 10, padding: '6px 10px', borderRadius: 6, background: 'rgba(255,170,0,.1)', border: '1px solid rgba(255,170,0,.35)' }}>
+                <div style={{ fontSize: 12, color: '#f9ac20', marginBottom: 10, padding: '6px 10px', borderRadius: 6, background: 'rgba(249,172,32,.1)', border: '1px solid rgba(249,172,32,.35)' }}>
                   ⚠ {sideDeckNotice}
                 </div>
               )}
@@ -54512,8 +54512,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
               {/* Side Deck */}
               <div style={sectionStyle}>
-                <div style={{ ...labelStyle, color: '#ffaa00' }}>SIDE DECK ({sideCards.length})</div>
-                <div style={{ ...cardRowStyle, borderColor: 'rgba(255,170,0,.3)' }}>
+                <div style={{ ...labelStyle, color: '#f9ac20' }}>SIDE DECK ({sideCards.length})</div>
+                <div style={{ ...cardRowStyle, borderColor: 'rgba(249,172,32,.3)' }}>
                   {sideCards.length === 0 ? <div style={{ color: 'var(--text2)', fontSize: 11, padding: 8 }}>No side deck cards</div> : sideCards.map((c, i) => renderCard(c, 'side', i))}
                 </div>
               </div>
@@ -54560,7 +54560,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // und die Textbox nimmt waehrenddessen keine Klicks/Tasten an.
         <div className="modal-overlay modal-overlay-ueber-textbox" onClick={() => setShowSurrender(false)}>
           <div className="modal animate-in" onClick={e => e.stopPropagation()} style={{ maxWidth: 380, textAlign: 'center' }}>
-            <div className="pixel-font" style={{ fontSize: 14, color: isPuzzleMode ? '#ff8800' : 'var(--danger)', marginBottom: 16 }}>
+            <div className="pixel-font" style={{ fontSize: 14, color: isPuzzleMode ? '#ff8b1a' : 'var(--danger)', marginBottom: 16 }}>
               {isPuzzleMode ? (gameState.isTutorial ? 'TUTORIAL' : 'PUZZLE') : 'SURRENDER?'}
             </div>
             <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20 }}>
@@ -54582,7 +54582,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   setShowSurrender(false);
                   socket.emit('surrender_game', { roomId: gameState.roomId });
                 }}>Surrender Game</button>
-                <button className="btn" style={{ padding: '10px 28px', fontSize: 13, width: 220, borderColor: '#ff2222', color: '#ff2222' }} onClick={() => {
+                <button className="btn" style={{ padding: '10px 28px', fontSize: 13, width: 220, borderColor: '#ff1a1a', color: '#ff1a1a' }} onClick={() => {
                   setShowSurrender(false);
                   socket.emit('surrender_match', { roomId: gameState.roomId });
                 }}>Surrender Match</button>
@@ -55007,7 +55007,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       opacity: waehlbar ? 1 : 0.42,
                       filter: waehlbar ? 'none' : 'grayscale(0.75)',
                       borderRadius: 6,
-                      boxShadow: entry.highlight ? '0 0 0 2px var(--accent), 0 0 12px rgba(120,220,255,.65)' : 'none',
+                      boxShadow: entry.highlight ? '0 0 0 2px var(--accent), 0 0 12px rgba(127,223,255,.65)' : 'none',
                     }}>
                       <CardMini card={displayCard}
                         onClick={waehlbar
@@ -55018,12 +55018,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         <div style={{
                           position: 'absolute', top: 2, left: 2,
                           background: 'rgba(0,0,0,.85)',
-                          color: stamp > 0 ? '#c4a8ff' : '#fff',
+                          color: stamp > 0 ? '#d6b3f9' : '#fff',
                           padding: '2px 6px', borderRadius: 4,
                           fontSize: 11, fontWeight: 700,
-                          border: '1px solid ' + (stamp > 0 ? '#a288ff' : 'rgba(255,255,255,0.3)'),
+                          border: '1px solid ' + (stamp > 0 ? '#b278ed' : 'rgba(255,255,255,0.3)'),
                           pointerEvents: 'none', zIndex: 5,
-                          boxShadow: stamp > 0 ? '0 0 6px rgba(162,136,255,.6)' : 'none',
+                          boxShadow: stamp > 0 ? '0 0 6px rgba(178,120,237,.6)' : 'none',
                         }}>Lv {effLvl}{stamp > 0 ? ` (+${stamp})` : ''}</div>
                       )}
                       {entry.count != null && (
@@ -55035,13 +55035,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                           // the player can read it at a glance without
                           // squinting at the corner of the card art.
                           position: 'absolute', top: 4, right: 4,
-                          background: 'linear-gradient(135deg, #ffd84a 0%, #ff9a1f 100%)',
-                          color: '#1a0c00',
+                          background: 'linear-gradient(135deg, #fad54a 0%, #ff9a1a 100%)',
+                          color: '#1f0f04',
                           fontSize: 22, fontWeight: 900, lineHeight: 1,
                           padding: '4px 9px',
                           borderRadius: 8, pointerEvents: 'none', zIndex: 5,
                           border: '2px solid #fff',
-                          boxShadow: '0 0 10px rgba(255,200,80,0.95), 0 2px 4px rgba(0,0,0,0.65)',
+                          boxShadow: '0 0 10px rgba(255,208,102,0.95), 0 2px 4px rgba(0,0,0,0.65)',
                           textShadow: '0 1px 0 rgba(255,255,255,0.45)',
                           letterSpacing: 0.5,
                         } : {
@@ -55073,13 +55073,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         // Client, die Karte schickt deshalb nur die
                         // Seite.
                         background: entry.labelSide === 'me' ? (me.color || 'var(--player-color)')
-                          : entry.labelSide === 'opp' ? (opp.color || '#ff7a4a')
-                          : entry.label ? 'rgba(120,120,140,.85)'
-                          : entry.source === 'hand' ? 'rgba(80,200,120,.85)'
-                          : entry.source === 'discard' ? 'rgba(180,80,200,.85)'
-                          : entry.source === 'stack' ? 'rgba(120,220,255,.9)'
-                          : entry.source === 'outside' ? 'rgba(230,190,90,.9)'
-                          : 'rgba(80,140,220,.85)',
+                          : entry.labelSide === 'opp' ? (opp.color || '#e37435')
+                          : entry.label ? 'rgba(126,125,155,.85)'
+                          : entry.source === 'hand' ? 'rgba(75,205,124,.85)'
+                          : entry.source === 'discard' ? 'rgba(126,65,186,.85)'
+                          : entry.source === 'stack' ? 'rgba(127,223,255,.9)'
+                          : entry.source === 'outside' ? 'rgba(251,200,106,.9)'
+                          : 'rgba(78,130,203,.85)',
                       }}>
                         {entry.label ? entry.label
                           : entry.source === 'hand' ? 'HAND'
@@ -55143,12 +55143,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const canConfirm = surprisePickSelected.length >= minN
           && surprisePickSelected.length <= cap;
         return (
-          <DraggablePanel zielwahl className="first-choice-panel animate-in" style={{ borderColor: '#b04ba0' }}>
-            <div className="orbit-font" style={{ fontSize: 13, color: '#d36cc0', marginBottom: 8 }}>{ep.title || 'Sacrifice Surprises'}</div>
+          <DraggablePanel zielwahl className="first-choice-panel animate-in" style={{ borderColor: '#fc69c6' }}>
+            <div className="orbit-font" style={{ fontSize: 13, color: '#fc69c6', marginBottom: 8 }}>{ep.title || 'Sacrifice Surprises'}</div>
             <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>{ep.description}</div>
             <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .8, marginBottom: 8 }}>
               Click highlighted Surprise{cap > 1 ? 's' : ''} on the board to toggle selection.
-              <span style={{ display: 'block', marginTop: 4, color: '#d36cc0' }}>
+              <span style={{ display: 'block', marginTop: 4, color: '#fc69c6' }}>
                 Selected: {surprisePickSelected.length} / {cap}
               </span>
             </div>
@@ -55159,7 +55159,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 marginTop: 4, padding: '6px 16px', fontSize: 11,
                 opacity: canConfirm ? 1 : 0.4,
                 cursor: canConfirm ? 'pointer' : 'not-allowed',
-                background: canConfirm ? '#7a2a6a' : undefined,
+                background: canConfirm ? '#5a023a' : undefined,
                 color: canConfirm ? '#fff' : undefined,
                 marginRight: 8,
               }}
@@ -55179,8 +55179,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* ── Effect Prompt: Chain Target Pick (Chain Lightning / Qinglong / Bottled Lightning) ── */}
       {isMyEffectPrompt && ep.type === 'chainTargetPick' && (
-        <DraggablePanel zielwahl className="first-choice-panel animate-in" style={{ borderColor: '#ffcc00' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: '#ffcc00', marginBottom: 8 }}>⚡ {ep.title || 'Chain Lightning'}</div>
+        <DraggablePanel zielwahl className="first-choice-panel animate-in" style={{ borderColor: '#ffd61a' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#ffd61a', marginBottom: 8 }}>⚡ {ep.title || 'Chain Lightning'}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>
             {chainPickSelected.length < chainPickMaxTargets && chainPickValidIds.size > 0
               ? `Click target #${chainPickSelected.length + 1} (${chainPickDamages[chainPickSelected.length]} dmg).`
@@ -55189,7 +55189,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           {chainPickSelected.length > 0 && (
             <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 8 }}>
               {chainPickSelected.map((t, i) => (
-                <span key={String(t.id)} style={{ display: 'block', color: '#ffcc00' }}>#{i+1} {String(t.cardName || '?')} → {chainPickDamages[i] || 0} dmg</span>
+                <span key={String(t.id)} style={{ display: 'block', color: '#ffd61a' }}>#{i+1} {String(t.cardName || '?')} → {chainPickDamages[i] || 0} dmg</span>
               ))}
             </div>
           )}
@@ -55208,8 +55208,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* ── Effect Prompt: Slippery Skates Move ── */}
       {isMyEffectPrompt && ep.type === 'skatesMove' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#00ccff' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: '#00ccff', marginBottom: 8 }}>⛸️ Slippery Skates</div>
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#1ac6ff' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#1ac6ff', marginBottom: 8 }}>⛸️ Slippery Skates</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>
             {skatesSelected != null
               ? 'Now click a highlighted zone to move the Creature there.'
@@ -55223,8 +55223,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* ── Effect Prompt: Slippery Pengu Ability Move ── */}
       {isMyEffectPrompt && ep.type === 'pengueAbilityMove' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#7fd0ff' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: '#7fd0ff', marginBottom: 8 }}>🐧 Slippery Pengu</div>
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#77c8ee' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#77c8ee', marginBottom: 8 }}>🐧 Slippery Pengu</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>
             {ep.description || 'Move an Ability from one of your Heroes to an adjacent Hero.'}
           </div>
@@ -55246,8 +55246,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* ── Effect Prompt: Slippery Start-Phase Sub-Mode ── */}
       {isMyEffectPrompt && ep.type === 'slipperyMove' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#7fd0ff' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: '#7fd0ff', marginBottom: 8 }}>❄️ Slippery Movement</div>
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#77c8ee' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#77c8ee', marginBottom: 8 }}>❄️ Slippery Movement</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>
             {ep.description || 'You may move your Slippery Creatures around!'}
           </div>
@@ -55269,8 +55269,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* ── Effect Prompt: Guard Change movement ── */}
       {isMyEffectPrompt && ep.type === 'guardChangeMove' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#9ad27f' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: '#9ad27f', marginBottom: 8 }}>🛡️ {ep.title || 'Guard Change'}</div>
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#80bf59' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#80bf59', marginBottom: 8 }}>🛡️ {ep.title || 'Guard Change'}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>
             {ep.description || 'Reposition your Creatures.'}
           </div>
@@ -55304,9 +55304,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           klicken muss (Als Vorgaben 28.8.). */}
       {isMyEffectPrompt && ep.type === 'heroAction' && !gameState.potionTargeting && (
         <DraggablePanel className={'first-choice-panel animate-in' + (ep.panelPlacement === 'oppSide' ? ' panel-opp-side' : '')}
-          style={{ borderColor: '#8b6b4a', display: 'flex', gap: 16, alignItems: 'stretch' }}>
+          style={{ borderColor: '#886c44', display: 'flex', gap: 16, alignItems: 'stretch' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: '#cc9966', marginBottom: 4 }}>{ep.title}</div>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#c7855b', marginBottom: 4 }}>{ep.title}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
           <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7, marginBottom: 12 }}>{(() => {
             // Der Hinweis nannte bisher nur den Zieh-Weg — Abilities
@@ -55351,8 +55351,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* ── Effect Prompt: Pick a Hand Card (Deepsea Castle, etc.) ── */}
       {isMyEffectPrompt && ep.type === 'pickHandCard' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(200,100,255,.6)' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: '#c864ff', marginBottom: 4 }}>{ep.title || 'Pick a Card'}</div>
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(184,102,255,.6)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#b866ff', marginBottom: 4 }}>{ep.title || 'Pick a Card'}</div>
           {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>}
           <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7, marginBottom: 12 }}>{ep.instruction || 'Click a highlighted card in your hand.'}</div>
           {ep.cancellable !== false && <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
@@ -55365,8 +55365,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           normal spielbar (nur Artefakte mit festem Preis sind hell);
           Cancel klickt serverseitig den Helden erneut = entschaerfen. ── */}
       {!isSpectator && !result && !isMyEffectPrompt && !gameState.potionTargeting && me?.freeArtifactArmed && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(255,210,77,.6)' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: '#ffd24d', marginBottom: 4 }}>💰 {me.heroes?.[me.freeArtifactArmed.heroIdx]?.name || 'Free Artifact'}</div>
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(250,213,74,.6)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#fad54a', marginBottom: 4 }}>💰 {me.heroes?.[me.freeArtifactArmed.heroIdx]?.name || 'Free Artifact'}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>Play an Artifact with a set Cost from your hand without paying its Cost.</div>
           <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7, marginBottom: 12 }}>Click a highlighted Artifact in your hand.</div>
           <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
@@ -55379,8 +55379,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           face-up + clickable; the cancel button bows out (after one
           pick, the cancel label switches to "Done" via server). ── */}
       {isMyEffectPrompt && ep.type === 'pickFromOppHand' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(255,200,80,.6)' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: '#ffc850', marginBottom: 4 }}>{ep.title || 'Pick a Card'}</div>
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(255,208,102,.6)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#ffd066', marginBottom: 4 }}>{ep.title || 'Pick a Card'}</div>
           {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>}
           {ep.instruction && <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7, marginBottom: 12 }}>{ep.instruction}</div>}
           {ep.cancellable !== false && <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
@@ -55469,8 +55469,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* ── Ability Activation Confirmation ── */}
       {pendingAbilityActivation && !result && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#ffcc33' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: '#ffcc33', marginBottom: 8 }}>⚡ Activate Ability</div>
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#f8ca21' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#f8ca21', marginBottom: 8 }}>⚡ Activate Ability</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>Activate {pendingAbilityActivation.abilityName} (Lv.{pendingAbilityActivation.level})?</div>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
             <button className="btn btn-success" style={{ padding: '8px 20px', fontSize: 12 }}
@@ -55555,7 +55555,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 }}>
                 🐾 Summon
               </button>
-              <button className="btn" style={{ padding: '8px 16px', fontSize: 12, borderColor: '#ffc84a', color: '#ffc84a', textAlign: 'left' }}
+              <button className="btn" style={{ padding: '8px 16px', fontSize: 12, borderColor: '#fad54a', color: '#fad54a', textAlign: 'left' }}
                 onClick={() => {
                   const { cardName: cn, handIndex: hi, fromCreation: fc } = p;
                   setSummonOrRevealPick(null);
@@ -55605,7 +55605,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
             onClick={() => respondToPrompt({ cancelled: true })}>{ep.cancelLabel || 'Cancel (Esc)'}</button>
           {ep.altLabel && (
-            <button className="btn" style={{ padding: '6px 16px', fontSize: 11, marginLeft: 8, borderColor: '#F27525', color: '#F27525' }}
+            <button className="btn" style={{ padding: '6px 16px', fontSize: 11, marginLeft: 8, borderColor: '#f87420', color: '#f87420' }}
               onClick={() => respondToPrompt({ alt: true })}>{ep.altLabel}</button>
           )}
         </DraggablePanel>
@@ -55624,14 +55624,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           ? `${baseLabel} ${handPickSelected.size}`
           : baseLabel;
         return (
-          <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(200,100,255,.85)' }}>
-            <div className="orbit-font" style={{ fontSize: 13, color: '#cc66ff', marginBottom: 4 }}>{ep.title || 'Select Cards'}</div>
+          <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(184,102,255,.85)' }}>
+            <div className="orbit-font" style={{ fontSize: 13, color: '#b866ff', marginBottom: 4 }}>{ep.title || 'Select Cards'}</div>
             <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
-            <div style={{ fontSize: 11, color: '#cc66ff', opacity: .8, marginBottom: 8 }}>
+            <div style={{ fontSize: 11, color: '#b866ff', opacity: .8, marginBottom: 8 }}>
               Selected: {handPickSelected.size}/{ep.maxSelect || 3} (min {minSel})
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-              <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: canConfirm ? '#cc66ff' : '#555', color: canConfirm ? '#cc66ff' : '#555' }}
+              <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: canConfirm ? '#b866ff' : '#535353', color: canConfirm ? '#b866ff' : '#535353' }}
                 disabled={!canConfirm}
                 onClick={() => {
                   const selected = [...handPickSelected].map(idx => ({ handIndex: idx, cardName: me.hand[idx] }));
@@ -55656,14 +55656,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // the existing `cancellable !== false` effectPrompt handler).
         const cancellable = ep.cancellable === true;
         return (
-          <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(255,150,50,.85)' }}>
-            <div className="orbit-font" style={{ fontSize: 13, color: '#ff9933', marginBottom: 4 }}>{ep.title || 'Steal Cards'}</div>
+          <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(255,155,58,.85)' }}>
+            <div className="orbit-font" style={{ fontSize: 13, color: '#ff9b3a', marginBottom: 4 }}>{ep.title || 'Steal Cards'}</div>
             <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description || `Click ${maxSel} face-down cards from your opponent's hand.`}</div>
-            <div style={{ fontSize: 11, color: '#ff9933', opacity: .8, marginBottom: 8 }}>
+            <div style={{ fontSize: 11, color: '#ff9b3a', opacity: .8, marginBottom: 8 }}>
               Selected: {blindPickSelected.size}/{maxSel}
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-              <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: canConfirm ? '#ff9933' : '#555', color: canConfirm ? '#ff9933' : '#555' }}
+              <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: canConfirm ? '#ff9b3a' : '#535353', color: canConfirm ? '#ff9b3a' : '#535353' }}
                 disabled={!canConfirm}
                 onClick={() => {
                   respondToPrompt({ selectedIndices: [...blindPickSelected] });
@@ -55679,10 +55679,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* ── Ability Attach Prompt (Training, etc.) ── */}
       {isMyEffectPrompt && ep.type === 'abilityAttach' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(100,220,150,.85)' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: '#7fffaa', marginBottom: 4 }}>✦ {ep.title || 'Attach Ability'}</div>
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(75,205,124,.85)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#66ffa2', marginBottom: 4 }}>✦ {ep.title || 'Attach Ability'}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
-          <div style={{ fontSize: 11, color: '#7fffaa', opacity: .8, marginBottom: 12 }}>Drag a highlighted Ability from your hand onto the Hero.</div>
+          <div style={{ fontSize: 11, color: '#66ffa2', opacity: .8, marginBottom: 12 }}>Drag a highlighted Ability from your hand onto the Hero.</div>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
             {ep.canFinish && (
               <button className="btn btn-success" style={{ padding: '6px 16px', fontSize: 11 }}
@@ -55703,16 +55703,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
            hero / zone handlers, which emit effect_prompt_response when
            the pick source is 'effectPrompt'. */}
       {isMyEffectPrompt && ep.type === 'abilityAttachTarget' && (
-        <DraggablePanel zielwahl className="first-choice-panel animate-in attach-pick-panel" style={{ borderColor: '#7fffaa' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: '#7fffaa', marginBottom: 4, textShadow: '0 0 8px rgba(120,255,170,.6)' }}>✦ {ep.title || 'Attach Ability'}</div>
+        <DraggablePanel zielwahl className="first-choice-panel animate-in attach-pick-panel" style={{ borderColor: '#66ffa2' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#66ffa2', marginBottom: 4, textShadow: '0 0 8px rgba(102,255,162,.6)' }}>✦ {ep.title || 'Attach Ability'}</div>
           {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>}
           {ep.cardName && (
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-              <BoardCard cardName={ep.cardName} style={{ width: 110, height: 154, borderRadius: 6, boxShadow: '0 0 18px rgba(120,255,170,.55)' }} />
+              <BoardCard cardName={ep.cardName} style={{ width: 110, height: 154, borderRadius: 6, boxShadow: '0 0 18px rgba(102,255,162,.55)' }} />
             </div>
           )}
           <div style={{
-            fontSize: 12, color: '#baffcf', marginBottom: 12, textAlign: 'center',
+            fontSize: 12, color: '#b3f9cf', marginBottom: 12, textAlign: 'center',
             fontWeight: 600, letterSpacing: 0.3,
           }}>
             👉 Click a highlighted Hero or Ability Zone
@@ -55795,7 +55795,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <DraggablePanel zielwahl className="first-choice-panel" style={{ borderColor: 'var(--danger)', animation: 'fadeIn .2s ease-out', display: 'flex', gap: 16, alignItems: 'stretch' }}>
           <TriggerCardSlot name={pt.config?.triggerCardName} />
           <div className="panel-zielwahl-spalte" data-zielwahl-mitte="" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div className="pixel-font" style={{ fontSize: 12, color: pt.config?.goldSelect ? '#ffd700' : pt.config?.greenSelect ? '#33dd55' : 'var(--danger)', marginBottom: 8 }}>{pt.potionName}</div>
+          <div className="pixel-font" style={{ fontSize: 12, color: pt.config?.goldSelect ? '#ffd61a' : pt.config?.greenSelect ? '#3ddc57' : 'var(--danger)', marginBottom: 8 }}>{pt.potionName}</div>
           <div className="panel-zielwahl-text" style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{pt.config?.description || 'Select targets'}</div>
           {pt.config?.maxTotal > 0 && pt.validTargets?.length > 0 && (() => {
             // For Pollution-capped prompts (Sun Beam etc.), the effective cap
@@ -55931,7 +55931,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <div className="pixel-font" style={{
               fontSize: 28, marginBottom: 12,
               color: isSpectator ? 'var(--accent)' : (iWon ? 'var(--success)' : 'var(--danger)'),
-              textShadow: isSpectator ? '0 0 30px rgba(0,240,255,.3)' : (iWon ? '0 0 30px rgba(51,255,136,.4)' : '0 0 30px rgba(255,51,102,.4)'),
+              textShadow: isSpectator ? '0 0 30px rgba(26,237,255,.3)' : (iWon ? '0 0 30px rgba(76,235,112,.4)' : '0 0 30px rgba(252,28,95,.4)'),
             }}>
               {isSpectator ? `${result.winnerName} wins the round!` : (iWon ? 'ROUND WIN!' : 'ROUND LOSS')}
             </div>
@@ -55952,7 +55952,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               <div key={i} className="firework-particle" style={{
                 '--fw-x': (Math.random() * 200 - 100) + 'px',
                 '--fw-y': (Math.random() * -200 - 40) + 'px',
-                '--fw-color': ['#ffd700','#ff3366','#33ff88','#44aaff','#ff8800','#cc44ff'][i % 6],
+                '--fw-color': ['#ffd61a','#fc1c5f','#4ceb70','#1ca9fd','#ff8b1a','#a952ff'][i % 6],
                 '--fw-delay': (Math.random() * 2) + 's',
                 '--fw-dur': (1 + Math.random()) + 's',
                 left: (20 + Math.random() * 60) + '%',
@@ -55963,8 +55963,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <div className="animate-in" style={{ textAlign: 'center', position: 'relative', zIndex: 2 }}>
             <div className="pixel-font" style={{
               fontSize: 40, marginBottom: 8,
-              color: isSpectator ? '#ffd700' : (iWon ? '#ffd700' : 'var(--danger)'),
-              textShadow: isSpectator ? '0 0 40px rgba(255,215,0,.6)' : (iWon ? '0 0 40px rgba(255,215,0,.6)' : '0 0 40px rgba(255,51,102,.5)'),
+              color: isSpectator ? '#ffd61a' : (iWon ? '#ffd61a' : 'var(--danger)'),
+              textShadow: isSpectator ? '0 0 40px rgba(255,214,26,.6)' : (iWon ? '0 0 40px rgba(255,214,26,.6)' : '0 0 40px rgba(252,28,95,.5)'),
             }}>
               {isSpectator ? `🏆 ${result.winnerName} WINS! 🏆` : (iWon ? '🏆 SET VICTORY! 🏆' : 'SET DEFEAT')}
             </div>
@@ -56058,10 +56058,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               <>
                 <div className="pixel-font" style={{
                   fontSize: finalTutorialCleared ? 56 : 42,
-                  marginBottom: 12, color: '#ffd700',
+                  marginBottom: 12, color: '#ffd61a',
                   textShadow: finalTutorialCleared
-                    ? '0 0 60px rgba(255,215,0,.85), 0 0 100px rgba(255,215,0,.45)'
-                    : '0 0 40px rgba(255,215,0,.6)'
+                    ? '0 0 60px rgba(255,214,26,.85), 0 0 100px rgba(255,214,26,.45)'
+                    : '0 0 40px rgba(255,214,26,.6)'
                 }}>
                   {finalTutorialCleared
                     ? '🎉 TUTORIAL CLEARED! 🎉'
@@ -56075,7 +56075,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               </>
             ) : (
               <>
-                <div className="pixel-font" style={{ fontSize: 36, marginBottom: 12, color: 'var(--danger)', textShadow: '0 0 30px rgba(255,51,102,.5)' }}>
+                <div className="pixel-font" style={{ fontSize: 36, marginBottom: 12, color: 'var(--danger)', textShadow: '0 0 30px rgba(252,28,95,.5)' }}>
                   {result.isTutorial ? 'STAGE FAILED' : 'PUZZLE FAILED'}
                 </div>
                 <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 24 }}>
@@ -56086,7 +56086,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               </>
             )}
             {result.puzzleResult === 'success' ? (
-              <button className="btn" style={{ padding: '12px 32px', fontSize: 14, borderColor: '#ffd700', color: '#ffd700' }} onClick={handleResultLeave}>
+              <button className="btn" style={{ padding: '12px 32px', fontSize: 14, borderColor: '#ffd61a', color: '#ffd61a' }} onClick={handleResultLeave}>
                 {finalTutorialCleared ? '→ CONTINUE' : result.isTutorial ? '← RETURN TO TUTORIAL' : '← RETURN TO PUZZLE'}
               </button>
             ) : (
