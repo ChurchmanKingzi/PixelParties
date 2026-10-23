@@ -14826,7 +14826,7 @@ class GameEngine {
       card: cardInstance, leavingCard: cardInstance,
       fromZone, fromHeroIdx,
       fromZoneSlot: cardInstance.zoneSlot ?? -1,
-      fromOwner: cardInstance.owner,
+      fromOwner: fromZone === ZONES.SUPPORT ? this.physicalSide(cardInstance) : cardInstance.owner,   // W66d: Brettseite des Platzes (Plant Golem: Brett des Gegners)
       toZone,
       // v1363: die Quelle der Bewegung (fuer `entferntVon`, siehe runHooks).
       source: opts.deathSource || opts.source || null,
@@ -14981,8 +14981,11 @@ class GameEngine {
     // v1490 (Surprising Opportunity: „add them to YOUR hand"): `opts.toPlayer` schickt eine Brettkarte in die Hand eines
     // ANDEREN Spielers als ihres Besitzers. Gleicher Weg wie die Heimkehr — Besitzer und Kontrolleur wechseln, die Hand
     // ist die des Empfaengers; der urspruengliche Besitzer wird unten als Herkunft vermerkt (Ablage-Pile, Steal-Regel).
+    // W66d (Al 23.10.2026: Racket Arrow / Chasing the Legend → Hand des URSPRUENGLICHEN Owners, auch beim Plant Golem): der Vergleich gilt dem KONTROLLEUR
+    // (dem Standardziel eines Bounces), nicht `inst.owner` — beim Plant Golem ist `owner` = Beschwoerer, der Kontrolleur aber der Gegner; ein `toPlayer` = Besitzer
+    // wurde sonst als „kein Sonderziel" gelesen und der Golem landete in der Hand des Kontrolleurs.
     const _zuFremderHand = (fromZone === ZONES.SUPPORT && toZone === ZONES.HAND && Number.isInteger(opts.toPlayer)
-      && opts.toPlayer !== cardInstance.owner) ? opts.toPlayer : null;
+      && opts.toPlayer !== (cardInstance.controller ?? cardInstance.owner)) ? opts.toPlayer : null;
     const _herkunftVorWechsel = cardInstance.originalOwner ?? cardInstance.owner;
     // W64c (Al 23.10.2026: „Bounce geht an den aktuellen Kontrolleur"): Brett → HAND geht in die Hand des KONTROLLEURS (auch gestohlen/uebernommen);
     // die Herkunft bleibt (Platzmarke unten), spaeteres Abwerfen/Loeschen/Spielen/Mischen geht in die Stapel des Besitzers. Brett → Ablage/Loeschstapel/Deck
@@ -15000,9 +15003,10 @@ class GameEngine {
     if (fromZone === ZONES.SUPPORT && toZone === ZONES.HAND) {
       const owner = _heimkehr ?? cardInstance.owner;
       const handForOwner = this.gs.players[owner]?.hand || [];
+      const _brettSeite = this.physicalSide(cardInstance);   // W66d: Plant Golem liegt auf dem Brett des Gegners (`controller`), `owner` ist der Beschwoerer
       this._broadcastEvent('play_pile_transfer', {
         owner, cardName: cardInstance.name, from: 'support', to: 'hand',
-        ...(_heimkehr != null && _heimkehr !== cardInstance.owner ? { fromOwner: cardInstance.owner, toOwner: _heimkehr } : {}),
+        ...(_brettSeite !== owner ? { fromOwner: _brettSeite, toOwner: owner } : {}),
         fromHeroIdx: cardInstance.heroIdx, fromSlotIdx: cardInstance.zoneSlot,
         toHandIdx: handForOwner.length,
       });
@@ -15036,7 +15040,7 @@ class GameEngine {
       const cd = this._getCardDB()[cardInstance.name];
       if (cd && hasCardType(cd, 'Creature')) {
         this._broadcastEvent('creature_zone_move', {
-          owner: cardInstance.owner,
+          owner: this.physicalSide(cardInstance),   // W66d: BRETTSEITE des Platzes (Plant Golem: nicht der Beschwoerer)
           heroIdx: cardInstance.heroIdx,
           zoneSlot: cardInstance.zoneSlot,
         });

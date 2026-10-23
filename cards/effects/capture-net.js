@@ -171,7 +171,7 @@ module.exports = {
 
     // ── Animation phase 1: the net plummets onto the Creature ──
     engine._broadcastEvent('play_zone_animation', {
-      type: 'capture_net', owner: inst.owner,
+      type: 'capture_net', owner: engine.physicalSide(inst),   // W66d: Brettseite der Zone (Plant Golem: nicht der Beschwoerer)
       heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
       duration: 1900,
     });

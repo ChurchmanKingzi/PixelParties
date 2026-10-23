@@ -291,8 +291,10 @@ async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) 
   // uebernommenen Helden beschworene Kreatur steht physisch auf
   // `inst.owner`, gehoert aber ihrem Beschwoerer (`crossSideControlled`)
   // — die Hand ist seine, das Brett bleibt `seite`. Ohne Marke wie bisher.
-  const seite = inst.owner;
-  // W64c (Al 23.10.2026: „Bounce geht an den AKTUELLEN KONTROLLEUR"): eine Kreatur, die vom Brett auf die Hand zurückgeht, landet in der HAND ihres
+  // W66d: Brettseite über `physicalSide` (Plant Golem: `owner` = Beschwörer, liegt aber auf dem Brett des Gegners = `controller`; `inst.owner` zeigte hier auf
+  // das falsche Brett → der Name blieb als Geister-Eintrag in der Support Zone des Gegners stehen).
+  const seite = engine.physicalSide(inst);
+  // W64c (Al 23.10.2026: „Bounce geht an den AKTUELLEN KONTROLLEUR“): eine Kreatur, die vom Brett auf die Hand zurückgeht, landet in der HAND ihres
   // Kontrolleurs (`kontrolleurVon`) — auch eine gestohlene/übernommene (Charme, Hunting, Dark Gear, Diplomacy …). Die HERKUNFT bleibt: die Karte trägt
   // weiter ihren permanenten Besitzer (Platzmarke, unten `originalOwner`), ihr späterer Austritt aus der Hand (Abwerfen, Löschen, Spielen, Mischen,
   // Mulligan) geht in die STAPEL des Besitzers. `opts.toPlayer` bleibt für Texte mit ausdrücklichem Empfänger („… to YOUR hand" an einen anderen Spieler).
