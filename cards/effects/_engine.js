@@ -1476,6 +1476,8 @@ class GameEngine {
       gs: gsSnap,
       _deferredSurprisesSnap: deferredSnap,
       cardInstances: instSnaps,
+      // Laenge der Nach-Ketten-Warteschlange: was danach eingereiht wird, gehoert zur Simulation (siehe restore).
+      postChainLen: (this._postChainActions || []).length,
       eventId: this.eventId,
       chain: _clone(this.chain),
       chainDepth: this.chainDepth,
@@ -1652,6 +1654,13 @@ class GameEngine {
       delete this.gs._deferredSurprises;
     }
     // Rebuild cardInstances as real CardInstance objects so methods work.
+    // Nach-Ketten-Aktionen (Gate to the Armory: Zug beenden; Master's Plan, Silence, Lunar Eclipse: Ersatzaktion) sind
+    // Closures und stecken nicht im Schnappschuss. Reihte ein Rollout eine ein, blieb sie nach dem Zurueckspulen in der
+    // LIVE-Warteschlange und lief beim naechsten Entleeren im echten Spiel - mit Wirkung auf den falschen Zug.
+    if (Array.isArray(this._postChainActions) && Number.isInteger(snap.postChainLen)
+        && this._postChainActions.length > snap.postChainLen) {
+      this._postChainActions.length = snap.postChainLen;
+    }
     this.cardInstances = snap.cardInstances.map(data => {
       const inst = new CardInstance(data.name, data.owner, data.zone, data.heroIdx ?? -1, data.zoneSlot ?? -1);
       for (const key of Object.keys(data)) {
@@ -24295,6 +24304,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const inst = this._trackCard(cardName, playerIdx, 'hand', heroIdx, -1);
     if (wirkerSeite !== playerIdx) inst.heroOwner = wirkerSeite;   // Als Vorgabe 29.9.
     const _cancelVorher = this.gs._spellCancelled;
+    const _zugendeVorher = this.gs._spellEndsTurn;   // Zugende-Reiter: nur einen NEU gesetzten Stand selbst einloesen/raeumen
     this.gs._spellCancelled = false;
     // ★ v1316 (Als Befund 23.9., Yukana): die Wisdom-Kosten werden jetzt
     // wie im regulaeren Zauber-Weg ERST NACH der Aufloesung bezahlt (unten).
@@ -24461,6 +24471,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         pool.splice(_retIdx, 0, cardName);
       }
       delete this.gs._spellKeepInstance;   // W63b: ein abgebrochener Guss hält keine Instanz fest
+      if (!_zugendeVorher) delete this.gs._spellEndsTurn;   // abgebrochen = nie aufgeloest: kein Zugende (der Reiter bliebe sonst fuer die naechste Aktion stehen)
       this._untrackCard(inst.id);
       this.gussAuftrittBeenden(_auftritt, { abgebrochen: true });   // v1338/v1339
       delete this.gs._pendingPlayLog;
@@ -24572,6 +24583,22 @@ this._deathWatch = (this._deathWatchStack || []).length
     // zaehlte die Aktion doppelt (`_actionsPlayedThisTurn`).
     if (opts.alsZusatzaktion && !this.gs.result) {
       await this.meldeGussAlsAktion(playerIdx, heroIdx, cardName, wirkerSeite !== playerIdx ? { heroOwner: wirkerSeite } : {});
+    }
+    // ── Immediately end your turn afterwards: auch beim Sofort-Guss ──
+    // Lesson in the Arts, Tanuki Escape, Great Offensive, Spontaneous
+    // Reappearance ... setzen `gs._spellEndsTurn`; eingeloest wurde der Reiter
+    // bisher nur von doPlaySpell & Co. Ein Guss ueber diese Bruecke (Zusatz-
+    // aktion, Master's Plan, Silence-Bonus-Spell ...) liess ihn stehen - die
+    // naechste beliebige Aktion beendete dann einen fremden Zug. Laeuft der
+    // Guss INNERHALB einer anderen Aufloesung (Tiefe > 0), loest der aeussere
+    // Weg den Reiter ein (advanceToPhase weist dort ohnehin ab).
+    if (!_zugendeVorher && this.gs._spellEndsTurn && (this.gs._spellResolutionDepth || 0) === 0) {
+      const grundmechanik = this.gs._spellEndsTurn === 'baseMechanic';
+      delete this.gs._spellEndsTurn;
+      const cur = this.gs.currentPhase;
+      if (!this.gs.result && (cur === 2 || cur === 3 || cur === 4)) {
+        await this.advanceToPhase(playerIdx, 5, grundmechanik ? { baseMechanic: true } : undefined);
+      }
     }
     return { cancelled: false };
   }
@@ -25092,6 +25119,19 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     delete this.gs._preventPhaseAdvance;
+
+    // ── Einmal-Marker „Zug beenden / Aktion nachtragen" räumen ──
+    // `gs._spellEndsTurn` und `gs._pendingActionBurn` sind Reiter, die ein
+    // Zauber/eine Ability setzt und die NUR der Server-Pfad der setzenden
+    // Aktion einlöst (doPlaySpell, doActivateAbility, doActivateFreeAbility,
+    // doUseArtifactEffect). Blieb einer stehen (Aktion auf einem Weg ohne
+    // Einlöser, Abbruch nach dem Setzen), löste ihn die NÄCHSTE beliebige
+    // Aktion irgendeines Spielers ein — bei `_spellEndsTurn` also ein
+    // fremdes Zugende (Bugreport: Zug endete direkt nach Pillage). Ein
+    // Reiter gilt höchstens für den Zug, in dem er entstand.
+    delete this.gs._spellEndsTurn;
+    delete this.gs._pendingActionBurn;
+    delete this.gs._spreadingRumorFumbled;   // gleicher Reiter-Vertrag (nur doPlaySpell loest ihn ein)
 
     // ── Revert charmed heroes (Charme Lv3) ──
     for (const ps of this.gs.players) {
