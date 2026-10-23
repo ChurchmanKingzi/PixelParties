@@ -12,6 +12,12 @@
 //
 //  The deck-search reveals to the opponent and
 //  shuffles afterwards (standard tutor etiquette).
+//
+//  ★ W63d (Al, 22.10.2026): BEIDE Auswahlen (Ausrüstung aus dem Deck, Träger/Zone) sind abbrechbar und werden
+//  VOR dem Reaktionsfenster getroffen (`payArtifactCost`, Vertrag wie bei Hive's Crown & Co.): der Gegner sieht die
+//  Karte erst, wenn nichts mehr abgebrochen werden kann (zentraler Auftritts-Puffer der Engine, CARD_API
+//  „Auftritt streamen — erst nach dem Commit"). Abbruch an irgendeiner Stelle = Karte bleibt auf der Hand, nichts
+//  gesehen, nichts bezahlt. Wird das Artefakt danach negiert, bleibt das Deck unberührt.
 // ═══════════════════════════════════════════
 
 const { getCardDB: _getCardDB } = require('./_card-db');
@@ -79,6 +85,37 @@ function hasHeroWithFreeZone(ps) {
   return false;
 }
 
+/**
+ * Beide abbrechbaren Wahlen des Backpacks: (1) die Ausrüstung aus dem Deck, (2) Träger und Zone.
+ * Rückgabe `{ equipName, heroIdx, slot, seite }` oder `null` bei Abbruch / ungültiger Wahl.
+ * ★ v1268: Trägerregeln und Zonenwahl kommen aus `_equip-shared.js` (wie bei Riffel und der Weapon Collecting Wight).
+ */
+async function waehleAusruestungUndPlatz(engine, pi) {
+  const gs = engine.gs;
+  const ps = gs.players[pi];
+  if (!ps) return null;
+  const gallery = buildEligibleGallery(gs, pi, engine);
+  if (gallery.length === 0) return null;
+  const picked = await engine.promptGeneric(pi, {
+    type: 'cardGallery',
+    cards: gallery,
+    title: CARD_NAME,
+    description: `Choose an equippable Artifact (Cost ≤ ${MAX_EQUIP_COST}) from your deck.`,
+    cancellable: true,
+  });
+  if (!picked || picked.cancelled || !picked.cardName) return null;
+  const equipName = picked.cardName;
+  if (!isEquipByData(equipName)) return null;
+  if (ps.mainDeck.indexOf(equipName) < 0) return null;
+  const platz = await waehleAusruestPlatz(engine, pi, equipName, {
+    title: `${CARD_NAME} — Equip ${equipName}`,
+    description: `Select a Support Zone to equip ${equipName} to. The chosen Hero cannot perform an Action this turn.`,
+    confirmLabel: '🎒 Equip!',
+  });
+  if (!platz) return null;
+  return { equipName, heroIdx: platz.heroIdx, slot: platz.slot, seite: platz.seite ?? pi };
+}
+
 module.exports = {
   isTargetingArtifact: true,
   activeIn: ['hand'],
@@ -105,40 +142,32 @@ module.exports = {
 
   animationType: 'none',
 
-  resolve: async (engine, pi /*, selectedIds, validTargets */) => {
+  // ★ W63d: die Wahlen (Ausrüstung aus dem Deck → Träger/Zone) VOR dem Reaktionsfenster. `false` = abgebrochen: Karte bleibt auf der Hand, nichts bezahlt, nichts gezeigt.
+  payArtifactCost: async (engine, pi) => {
+    const wahl = await waehleAusruestungUndPlatz(engine, pi);
+    return wahl ? { wahl } : false;
+  },
+
+  resolve: async (engine, pi, selectedIds, validTargets, kosten) => {
     const gs = engine.gs;
     const ps = gs.players[pi];
     if (!ps) return { aborted: true };
 
-    // ── Step 1: pick equip from deck ──
-    const gallery = buildEligibleGallery(gs, pi, engine);
-    if (gallery.length === 0) return { aborted: true };
-
-    const picked = await engine.promptGeneric(pi, {
-      type: 'cardGallery',
-      cards: gallery,
-      title: CARD_NAME,
-      description: `Choose an equippable Artifact (Cost ≤ ${MAX_EQUIP_COST}) from your deck.`,
-      cancellable: true,
-    });
-    if (!picked || picked.cancelled || !picked.cardName) return { aborted: true };
-
-    const equipName = picked.cardName;
-    if (!isEquipByData(equipName)) return { aborted: true };
-    const deckIdx = ps.mainDeck.indexOf(equipName);
-    if (deckIdx < 0) return { aborted: true };
-
-    // ── Step 2: pick destination Hero / Support Zone ──
-    // ★ v1268: Traegerregeln und Wahl kommen aus `_equip-shared.js` —
-    // derselben Stelle wie bei Riffel und der Weapon Collecting Wight.
-    // Inhaltlich wie bisher (lebendig, nicht Frozen, freie Zone,
-    // `canEquipCardToHero`), NEU: auch nicht Charmed — wie im Handweg.
-    const platz = await waehleAusruestPlatz(engine, pi, equipName, {
-      title: `${CARD_NAME} — Equip ${equipName}`,
-      description: `Select a Support Zone to equip ${equipName} to. The chosen Hero cannot perform an Action this turn.`,
-      confirmLabel: '🎒 Equip!',
-    });
-    if (!platz) return { aborted: true };
+    // ── Step 1+2: Ausrüstung aus dem Deck und Träger/Zone — normalerweise schon VOR dem Reaktionsfenster gewählt (`payArtifactCost`).
+    // Hat sich der Zustand inzwischen verschoben (Zone belegt, Karte nicht mehr im Deck) oder kam der Aufruf ohne Vorab-Wahl
+    // (Gratis-Spiel durch Sky Archeologist u. ä.), wird hier (erneut) gefragt.
+    let wahl = kosten && kosten.wahl;
+    if (wahl) {
+      const _zs = gs.players[wahl.seite];
+      const _frei = _zs && (((_zs.supportZones[wahl.heroIdx] || [])[wahl.slot] || []).length === 0);
+      const _imDeck = ps.mainDeck.indexOf(wahl.equipName) >= 0;
+      const _traeger = ausruestTraegerMitSeite(engine, pi, wahl.equipName).some(t => t.heroIdx === wahl.heroIdx && t.seite === wahl.seite);
+      if (!_frei || !_imDeck || !_traeger) wahl = null;
+    }
+    if (!wahl) wahl = await waehleAusruestungUndPlatz(engine, pi);
+    if (!wahl) return { aborted: true };
+    const equipName = wahl.equipName;
+    const platz = { heroIdx: wahl.heroIdx, slot: wahl.slot, seite: wahl.seite };
     const destHeroIdx = platz.heroIdx;
     const destSlot = platz.slot;
     // Als Vorgabe 29.9.: Brettseite eines uebernommenen Helden; die Karte

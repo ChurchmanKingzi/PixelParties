@@ -2781,8 +2781,27 @@ function mainDeckSizeOk(main, side) {
  * Abfrage-Zustand fuer einen Empfaenger. Private Abfragen (Typ `cardReorder`: Scavenging Crane sortiert die obersten Karten
  * des EIGENEN Decks) schicken ihre Karten NUR an den Besitzer — Gegner und Zuschauer sehen sie nicht.
  */
-function effectPromptFuer(ep, empfaengerIdx) {
+/**
+ * ★ W63d (Al, 22.10.2026: „Eine Karte streamed ihren Auftritt IMMER erst, nachdem es keine Cancel-Option mehr gibt"): die Zielwahl eines Spielers
+ * (`gs.potionTargeting`) ist für Gegner und Zuschauer eine leere Hülle — der Kartenname (`potionName`), die Ziel-Liste und die Beschriftungen
+ * hätten sonst schon VOR dem Commit verraten, welche Karte gespielt wird (ein Abbruch verriete verdeckte Information). Dem Client genügt
+ * „jemand wählt gerade" (`ownerIdx`); der Besitzer bekommt alles wie bisher.
+ */
+function potionTargetingFuer(pt, empfaengerIdx) {
+  if (!pt) return null;
+  if (pt.ownerIdx === empfaengerIdx) return pt;
+  return { ownerIdx: pt.ownerIdx, isEffectPrompt: !!pt.isEffectPrompt, hidden: true, config: {}, validTargets: [] };
+}
+
+function effectPromptFuer(ep, empfaengerIdx, gs) {
   if (!ep || ep.ownerIdx === empfaengerIdx) return ep || null;
+  // W63d: Frage eines Spielers, dessen Karte noch auf ihren Auftritt wartet (Auswahl noch abbrechbar): Titel, Beschreibung, Karten, Bild — nichts davon darf zum Gegner.
+  // Auch jede ABBRECHBARE Frage (`cancellable`) bekommt der Gegner nur als Hülle: bei Karten, die ihren Auftritt selbst steuern (`deferBroadcast`), gibt es keine Vormerkung, die Frage ist aber ebenso
+  // noch nicht verbindlich — und dem Client des Gegners genügen Typ und Wartetext (`opponentTitle`/`opponentSubtitle`/`showOpponentWaiting`, die Karten ausdrücklich für ihn setzen).
+  if ((gs && gs._pendingCardReveal && gs._pendingCardReveal.ownerIdx === ep.ownerIdx) || ep.cancellable === true) {
+    return { type: ep.type, ownerIdx: ep.ownerIdx, promptId: ep.promptId, title: '', description: '', message: '', cards: [], options: [], hidden: true,
+             opponentTitle: ep.opponentTitle, opponentSubtitle: ep.opponentSubtitle, showOpponentWaiting: ep.showOpponentWaiting };
+  }
   if (ep.type === 'cardReorder') return { ...ep, cards: [], description: '' };
   // ★ 11.10. (Create Secret Room, „an keiner Stelle revealed"): eine Abfrage mit `_privat: true` zeigt ihren Inhalt (Kartengalerie, gezeigte Karte, Beschriftungen) nur ihrem
   // Besitzer; Gegner und Zuschauer sehen eine leere Hülle (Typ und Titel genügen dem Client für „Opponent is deciding …").
@@ -5303,7 +5322,8 @@ function sendGameState(room, playerIdx, extra) {
         return !!(scr && (scr.playableFromCoolnessStack || scr.summonableFromCoolnessStack));
       })(),
       oncePerGameUsed: ps._oncePerGameUsed ? [...ps._oncePerGameUsed] : [],
-      resolvingCard: ps._resolvingCard || null,
+      // W63d: welche Karte der ANDERE Spieler gerade aufloest, ist verdeckte Information (der Auftritt kommt erst nach dem Commit): nur "es loest etwas auf" (Wahrheitswert genuegt dem Client).
+      resolvingCard: (pi === playerIdx || !ps._resolvingCard) ? (ps._resolvingCard || null) : { hidden: true },
       deckSkins: ps.deckSkins || {},
       poisonDmgPerStack: room.engine ? room.engine.getPoisonDamagePerStack(pi) : 30,
     })),
@@ -5468,10 +5488,10 @@ function sendGameState(room, playerIdx, extra) {
     mulliganPending: gs.mulliganPending || false,
     handReturnToDeck: gs.handReturnToDeck || false,
     handReturnToOppCards: gs.handReturnToOppCards || [],
-    potionTargeting: gs.potionTargeting || null,
+    potionTargeting: potionTargetingFuer(gs.potionTargeting, playerIdx),   // W63d: der Gegner erfaehrt nicht, WELCHE Karte zielt
     // v1150: Zielmarken (#1, #2 …) — siehe `engine.setzeZielMarke`.
     zielMarken: gs.zielMarken || [],
-    effectPrompt: effectPromptFuer(gs.effectPrompt, playerIdx),
+    effectPrompt: effectPromptFuer(gs.effectPrompt, playerIdx, gs),
     surprisePending: gs.surprisePending || false,
     heroEffectPending: gs.heroEffectPending || null,
     creatureCounters: room.engine ? (() => {
@@ -5952,6 +5972,8 @@ function sendGameStateErzwungen(room, playerIdx) {
 function sendToSpectators(room, event, data) {
   if (room.engine?._fastMode) return;
   if (!room.spectators) return;
+  // ★ W63d: Auftritts-Puffer — Zuschauer sehen die Karte erst nach dem Commit (wie der Gegner; s. engine._auftrittHaelt).
+  if (room.gameState?._pendingCardReveal && room.engine?._auftrittHaelt(-1, event, data, 'zuschauer')) return;
   for (const spec of room.spectators) {
     if (spec.socketId) io.to(spec.socketId).emit(event, data);
   }
@@ -6115,7 +6137,7 @@ function sendSpectatorGameState(room) {
         return !!(scr && (scr.playableFromCoolnessStack || scr.summonableFromCoolnessStack));
       })(),
       oncePerGameUsed: ps._oncePerGameUsed ? [...ps._oncePerGameUsed] : [],
-      resolvingCard: ps._resolvingCard || null,
+      resolvingCard: ps._resolvingCard ? { hidden: true } : null,   // W63d: Zuschauer sehen die aufloesende Karte erst mit dem Auftritt
       deckSkins: ps.deckSkins || {},
       poisonDmgPerStack: room.engine ? room.engine.getPoisonDamagePerStack(spi) : 30,
       // Fields that sendGameState includes per-player but spectators don't interact with
@@ -6192,14 +6214,8 @@ function sendSpectatorGameState(room) {
     handReturnToDeck: gs.handReturnToDeck || false,
     handReturnToOppCards: gs.handReturnToOppCards || [],
     zielMarken: gs.zielMarken || [],   // v1150
-    potionTargeting: gs.potionTargeting ? {
-      potionName: gs.potionTargeting.potionName,
-      ownerIdx: gs.potionTargeting.ownerIdx,
-      cardType: gs.potionTargeting.cardType,
-      config: gs.potionTargeting.config,
-      validTargets: gs.potionTargeting.validTargets,
-    } : null,
-    effectPrompt: effectPromptFuer(gs.effectPrompt, -1),
+    potionTargeting: potionTargetingFuer(gs.potionTargeting, -1),   // W63d
+    effectPrompt: effectPromptFuer(gs.effectPrompt, -1, gs),
     surprisePending: gs.surprisePending || false,
     heroEffectPending: gs.heroEffectPending || null,
     creatureCounters: room.engine ? (() => {
@@ -7145,8 +7161,10 @@ function broadcastHandToBoard(room, ownerIdx, payload, forceOwnerAnim = false) {
   if (room.engine?._fastMode) return;
   if (!room?.gameState) return;
   const oppIdx = opponentOfGs(room.gameState, ownerIdx);
-  emitToOpponentsGs(room.gameState, io, ownerIdx, 'hand_to_board_fly', { ownerIdx, ...payload });
-  sendToSpectators(room, 'hand_to_board_fly', { ownerIdx, ...payload });
+  // ★ W63d: eine VERDECKT gelegte Karte (Surprise, Bakhm-Zone …) verraet ihren Namen nicht — der Client zeichnet sie ohnehin als Rueckseite (`faceDown`), also gehoert der Name gar nicht erst auf die Leitung.
+  const fremdPayload = payload.faceDown ? (({ cardName: _verdeckt, ...rest }) => rest)(payload) : payload;
+  emitToOpponentsGs(room.gameState, io, ownerIdx, 'hand_to_board_fly', { ownerIdx, ...fremdPayload });
+  sendToSpectators(room, 'hand_to_board_fly', { ownerIdx, ...fremdPayload });
   // Normally the owner sees their own drag animation, so we don't echo
   // the fly back to them. For click-placed plays there's no drag —
   // `forceOwnerAnim` opts the owner in (the client's `onHandToBoard`
@@ -8329,6 +8347,10 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // attaches to heroIdx's hero card — we don't know the exact slot yet
     // (card scripts pick it inside onPlay), so we target the hero card
     // itself and let the client route to a visually sensible destination.
+    // ★ W63d (Al, 22.10.2026): der Auftritt (Bild, Protokollzeile, Flug) wird SCHON JETZT vorgemerkt — Kostenwahl (`payActivationCost`), Reaktionsfenster und Zielwahl kommen danach,
+    // und alles davon ist noch abbrechbar. Der Auftritts-Puffer der Engine hält zurück, was an Gegner/Zuschauer gehen würde, bis die Karte committed ist.
+    if (gs._pendingCardReveal) room.engine._firePendingCardReveal();   // eine noch offene Vormerkung der AUSLOESENDEN Karte (Kreatur-Effekt, der einen Zauber wirkt) ist längst committed
+    gs._pendingCardReveal = { cardName, ownerIdx: pi };
     if ((cardData.subtype || '').toLowerCase() === 'attachment') {
       broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'hero', heroIdx });
     }
@@ -8431,9 +8453,8 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     gs._spellExcludeTargets = [];
     gs._spellCancelled = _kostenAbbruch;   // Z7c
 
-    if (!chainResult.chainFormed) {
-      gs._pendingCardReveal = { cardName, ownerIdx: pi };
-    }
+    // (W63d: vorgemerkt wird oben, vor der Kostenwahl. Ist inzwischen etwas dazwischengekommen, das die Vormerkung verbraucht hat — z. B. das Reaktionsfenster des Gegners —,
+    //  bleibt es dabei: der Auftritt ist dann längst gezeigt.)
 
     if (attachmentZoneSlot != null && attachmentZoneSlot >= 0) gs._attachmentZoneSlot = attachmentZoneSlot;
     // ★ 28.8.: EMPFAENGER getrennt vom Wirker. Bei einer Anlege-Karte
@@ -10113,6 +10134,10 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   let _heroCostFinalized = false;
 
   try {
+    // ★ W63d (Al, 22.10.2026): auch die Beschwörung hat abbrechbare Stellen (Tribut-/Opferwahl, `beforeSummon`-Fragen) VOR dem Landen. Der Auftritt (Flug, Beschwörungsschein, Protokollzeile)
+    // wird als STUMME Vormerkung (`stumm`: kein `card_reveal`, nur der Puffer) gehalten und beim Landen freigegeben; jeder Abbruchzweig löscht sie samt Puffer.
+    if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
+    gs._pendingCardReveal = { cardName, ownerIdx: pi, stumm: true };
     // ★ W4b (Al, Welle 4): Tribut-/Opferkosten der Beschwörung („… to play this card") werden VOR dem Reaktionsfenster
     // bezahlt (`paySummonCost` der Kreatur, Engine `_payCreatureSummonCost`); wird die Beschwörung danach komplett
     // negiert (Off Duty …), bleiben die Opfer tot. Bricht der Spieler die Kostenwahl ab (`false`), ist nichts bezahlt:
@@ -10127,6 +10152,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       if (actionCounterIncrementedHere) ps._actionsPlayedThisPhase = Math.max(0, (ps._actionsPlayedThisPhase || 0) - 1);
       if (bonusMainActionsConsumedHere) ps._bonusMainActions = 1;
       room.engine.log('creature_fizzle', { card: cardName, reason: 'summon_cost_cancelled' });
+      delete gs._pendingCardReveal;   // W63d: Abbruch — der Gegner hat nichts gesehen (die Protokollzeile oben war noch im Puffer)
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
@@ -10147,11 +10173,13 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       if (actionCounterIncrementedHere) ps._actionsPlayedThisPhase = Math.max(0, (ps._actionsPlayedThisPhase || 0) - 1);
       if (bonusMainActionsConsumedHere) ps._bonusMainActions = 1;
       room.engine.log('creature_fizzle', { card: cardName, reason: 'summon_effect_negated_keep_in_hand' });
+      delete gs._pendingCardReveal;   // W63d (die Karte bleibt auf der Hand)
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
 
     if (chainResult.negated) {
+      if (gs._pendingCardReveal) room.engine._firePendingCardReveal();   // W63d: eine negierte Beschwörung war gespielt (die Karte geht öffentlich in die Ablage)
       room.engine._verwerfeSummonKosten();   // W4b: die Kosten bleiben bezahlt, der Merker für die Landung entfällt
       // Negated by a Reaction — the creature never actually summoned,
       // refund the Hero pre-action cost (Saint Nicolas keeps the
@@ -10232,6 +10260,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
         ps._bonusMainActions = 1;
       }
       room.engine.log('creature_fizzle', { card: cardName, reason: 'beforeSummon_cancelled' });
+      delete gs._pendingCardReveal;   // W63d
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
@@ -10267,6 +10296,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     let inst = null;
     if (placementConsumed) {
       commitHandRemoval();
+      if (gs._pendingCardReveal) room.engine._firePendingCardReveal();   // W63d: committed
     } else {
       commitHandRemoval();
       // ★ Brettseite = Heldenbesitzer, KONTROLLE = Beschwoerer (v1198).
@@ -10308,11 +10338,13 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
           ps._bonusMainActions = 1;
         }
         room.engine.log('creature_fizzle', { card: cardName, reason: 'zone_occupied' });
+        delete gs._pendingCardReveal;   // W63d
         for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
         return true;
       }
       actualZoneSlot = placeResult.actualSlot;
       inst = placeResult.inst;
+      if (gs._pendingCardReveal) room.engine._firePendingCardReveal();   // W63d: die Kreatur liegt — ab hier gibt es keinen Abbruch mehr; Flug/Schein/Protokoll gehen jetzt an den Gegner
       // Propagate foreign-origin tag from the hand-tracked instance
       // onto the placed-on-board instance, so when the Creature dies
       // the engine's death-path (which already routes via
@@ -10332,9 +10364,10 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
         cardName, handIndex, zoneType: 'support', heroIdx, slotIdx: actualZoneSlot,
         destOwner: heroOwner,
       });
-      for (let i = 0; i < gs.players.length; i++) {
-        const sid = gs.players[i]?.socketId;
-        if (sid && !room.engine?._inMctsSim) io.to(sid).emit('summon_effect', { owner: heroOwner, heroIdx, zoneSlot: actualZoneSlot, cardName });
+      {   // W63d: der Besitzer sofort, die Gegner über den zentralen Weg (Auftritts-Puffer)
+        const _ownSid = gs.players[pi]?.socketId;
+        if (_ownSid && !room.engine?._inMctsSim) io.to(_ownSid).emit('summon_effect', { owner: heroOwner, heroIdx, zoneSlot: actualZoneSlot, cardName });
+        if (!room.engine?._inMctsSim) emitToOpponentsGs(gs, io, pi, 'summon_effect', { owner: heroOwner, heroIdx, zoneSlot: actualZoneSlot, cardName });
       }
       sendToSpectators(room, 'summon_effect', { owner: heroOwner, heroIdx, zoneSlot: actualZoneSlot, cardName });
     }
@@ -10459,6 +10492,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   } catch (err) {
     console.error('[Engine] doPlayCreature error:', err.message);
   } finally {
+    if (gs._pendingCardReveal && gs._pendingCardReveal.stumm && gs._pendingCardReveal.cardName === cardName) delete gs._pendingCardReveal;   // W63d: Sicherheitsnetz (unerwarteter Ausgang)
     // Safety net: if neither commit nor refund ran (unexpected exit),
     // refund so a marked Potion isn't stranded with stale escrow.
     if (!_heroCostFinalized) {
@@ -10648,6 +10682,10 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     );
     if (!inst) return false;
 
+    // ★ W63d: der Auftritt wird VOR Reaktionsfenster und Handler vorgemerkt (die Aktivierung kann in ihren Fragen noch abbrechen); die Aktivierungs-Animation
+    // (`ability_activated`) und alle Protokollzeilen halten sich im Auftritts-Puffer, bis die Fähigkeit committed ist. Das Reaktionsfenster des Gegners committet.
+    if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
+    gs._pendingCardReveal = { cardName: abilityName, ownerIdx: pi };
     // v353: Auftritt auch fuer Abilities MIT Aktionskosten. Bisher hatte
     // nur `doActivateFreeAbility` einen — dass eine Trade-Aktivierung die
     // Karte zeigt und eine Leadership-Aktivierung nicht, war eine
@@ -10668,6 +10706,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
       : await room.engine._checkSurpriseOnAbilityActivation(pi, heroIdx, zoneIdx, abilityName, heroOwner);   // Styx 28.9.: Brettseite
 
     if (chainResult.negated || abilitySurprise?.negateEffect) {
+      if (gs._pendingCardReveal) room.engine._firePendingCardReveal();   // W63d: gefeuert und gekontert = gespielt
       room.engine.announceActiveEffect();   // gefeuert und gekontert
       room.engine.clearEffectAnnounce();
       // ★ Z7b: ganz negiert = nie aufgelöst → die Rundensperre (oben vorab gestempelt) wird frei.
@@ -10686,13 +10725,13 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     const origController = inst.controller;
     const origOwner = inst.owner;
     const origHeroIdx = inst.heroIdx;
-    for (let i = 0; i < gs.players.length; i++) {
-      const sid = gs.players[i]?.socketId;
-      if (sid && !room.engine?._inMctsSim) io.to(sid).emit('ability_activated', { owner: heroOwner, heroIdx, zoneIdx, abilityName });
+    {   // W63d: der Besitzer sofort, die Gegner über den zentralen Weg (Auftritts-Puffer hält die Animation bis zum Commit)
+      const _ownSid = gs.players[pi]?.socketId;
+      if (_ownSid && !room.engine?._inMctsSim) io.to(_ownSid).emit('ability_activated', { owner: heroOwner, heroIdx, zoneIdx, abilityName });
+      if (!room.engine?._inMctsSim) emitToOpponentsGs(gs, io, pi, 'ability_activated', { owner: heroOwner, heroIdx, zoneIdx, abilityName });
     }
     sendToSpectators(room, 'ability_activated', { owner: heroOwner, heroIdx, zoneIdx, abilityName });
 
-    gs._pendingCardReveal = { cardName: abilityName, ownerIdx: pi };
     if (charmedOwner != null) {
       inst.controller = pi; inst.owner = pi; inst.heroOwner = charmedOwner;
     } else if (borrowedFromOwner != null) {
@@ -11158,17 +11197,23 @@ async function doActivatePermanent(room, pi, { permId, ownerIdx }) {
 
   try {
     const oi = opponentOfGs(gs, pi);
-    emitToOpponentsGs(gs, io, pi, 'card_reveal', { cardName: perm.name });
-    sendToSpectators(room, 'card_reveal', { cardName: perm.name });
-    room.engine.log('permanent_activated', { card: perm.name, player: gs.players[pi].username });
+    // ★ W63d: Auftritt + Protokollzeile erst nach dem Commit (die Aktivierung kann in ihren Fragen noch abbrechen).
+    gs._pendingCardReveal = { cardName: perm.name, ownerIdx: pi };
+    room.engine._setPendingPlayLog('permanent_activated', { card: perm.name, player: gs.players[pi].username });
+    room.engine.maybeFireCpuRevealEarly();
     // v353: Auftritt — ein Permanent liegt am Brett, also `'board'`.
     room.engine.armEffectAnnounce(perm.name, pi, 'board');
     const _ret = await script.onActivatePermanent(room.engine, pi, permOwner, perm);
-    if (_ret !== false) room.engine.announceActiveEffect();
+    if (_ret !== false) {
+      room.engine.announceActiveEffect();
+      if (gs._pendingCardReveal) room.engine._firePendingCardReveal(); else room.engine._firePendingPlayLog();
+    }
   } catch (err) {
     console.error('[doActivatePermanent]', err.message);
   } finally {
     room.engine.clearEffectAnnounce();
+    delete gs._pendingCardReveal;   // abgebrochen / Fehler: nichts nachliefern (bei Erfolg schon gefeuert)
+    delete gs._pendingPlayLog;
   }
   for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
@@ -11204,13 +11249,21 @@ async function doActivateDiscardEffect(room, pi, { instId }) {
   const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
   if (typeof script?.onDiscardEffect !== 'function') return false;
 
-  room.engine.log('discard_effect_activated', {
+  // ★ W63d: die Protokollzeile „Effekt aus der Ablage aktiviert" erst, wenn die Aktivierung nicht mehr abbrechbar ist (bricht der Spieler in der Frage ab, gibt `onDiscardEffect` `false` zurück —
+  // dann darf der Gegner weder die Zeile noch Animationen davor gesehen haben). Stumme Vormerkung: kein `card_reveal` (die Karte liegt ohnehin offen in der Ablage).
+  if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
+  gs._pendingCardReveal = { cardName: eintrag.displayName, ownerIdx: pi, stumm: true };
+  room.engine._setPendingPlayLog('discard_effect_activated', {
     player: gs.players[pi]?.username, card: eintrag.displayName,
   });
+  room.engine.maybeFireCpuRevealEarly();
   try {
-    await script.onDiscardEffect(room.engine, pi, inst);
+    const _ret = await script.onDiscardEffect(room.engine, pi, inst);
+    if (_ret !== false) { if (gs._pendingCardReveal) room.engine._firePendingCardReveal(); else room.engine._firePendingPlayLog(); }
   } catch (err) {
     console.error('[doActivateDiscardEffect]', err.stack || err.message);
+  } finally {
+    delete gs._pendingCardReveal; delete gs._pendingPlayLog;   // abgebrochen/Fehler: nichts nachliefern (bei Erfolg schon gefeuert)
   }
   for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
@@ -11399,8 +11452,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
         (_pt.validTargets || []).filter(t => t?.ineligible).map(t => t.id));
       if (selectedIds.some(id => _unwaehlbar.has(id))) {
         room.engine.log?.('targeting_blocked', {
-          reason: 'ineligible_target_submitted',
-          source: _pt.potionName || null,
+          reason: 'ineligible_target_submitted',   // W63d: KEIN Kartenname (`source`) — die Zeile geht an Gegner/Zuschauer, die Karte ist noch nicht committed
           ids: selectedIds.filter(id => _unwaehlbar.has(id)),
         });
         return false;   // Abfrage bleibt offen, die Antwort zaehlt nicht
@@ -11419,8 +11471,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
       const _grund = room.engine.zielAuswahlRegelverstoss(_pt.validTargets, room.engine.pickerRegelKonfig(_pt), selectedIds);
       if (_grund) {
         room.engine.log?.('targeting_blocked', {
-          reason: 'selection_invalid:' + _grund,
-          source: _pt.potionName || null,
+          reason: 'selection_invalid:' + _grund,   // W63d: KEIN Kartenname (`source`) — s. o.
           count: _n, maxTotal: _c.maxTotal ?? null, minRequired: _min,
         });
         return false;
@@ -11500,17 +11551,12 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   // `aborted`/`cancelled`-Zweigen unten wieder verworfen und feuert nur
   // bei einer Prompt-Antwort mit nicht-leerer Auswahl.
   const oi = opponentOfGs(gs, pi);
-  if (script.deferReveal || script.deferBroadcast) {
-    gs._pendingCardReveal = { cardName: potionName, ownerIdx: pi };
-    room.engine._setPendingPlayLog('card_played', {
-      player: ps.username, card: potionName, cardType, cost: goldCost || 0,
-    });
-  } else {
-    room.engine.log('card_played', { player: ps.username, card: potionName, cardType, cost: goldCost || 0 });
-    emitToOpponentsGs(gs, io, pi, 'card_reveal', { cardName: potionName });
-    sendToSpectators(room, 'card_reveal', { cardName: potionName });
-    await room.engine._delay(100);
-  }
+  // ★ W63d (Al, 22.10.2026, Treasure Hunter's Backpack): der Auftritt kommt IMMER erst nach dem Commit — für JEDE Ziel-Karte, nicht nur für `deferReveal`/`deferBroadcast`.
+  // Bis dahin hält der Auftritts-Puffer der Engine alles zurück, was an Gegner/Zuschauer gehen würde (Bild, Protokollzeile, Flug, Animation); ein Abbruch löscht ihn mit.
+  gs._pendingCardReveal = { cardName: potionName, ownerIdx: pi };
+  room.engine._setPendingPlayLog('card_played', {
+    player: ps.username, card: potionName, cardType, cost: goldCost || 0,
+  });
 
   // ★ Welle 12 (Q92, F01-24, Al): Item-Lock-Kosten erst NACH dem Commit (Abbruch/„aborted" kostet nichts), bei Zieh-Artefakten VOR dem Ziehen —
   // hier nur vormerken; `engine.itemLockFordern` (Hand-Primitive / nach dem Auflösen / nach Negation) fordert sie ein.
@@ -11530,10 +11576,10 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   // animation fires.
   const animationType = script.animationType || 'explosion';
   const broadcastPotionAnim = (animationType !== 'none') ? () => {
-    for (let i = 0; i < gs.players.length; i++) {
-      const sid = gs.players[i]?.socketId;
-      if (sid && !room.engine?._inMctsSim) io.to(sid).emit('potion_resolved', { destroyedIds: selectedIds, animationType });
-    }
+    // W63d: der Besitzer sofort, Gegner/Zuschauer über die zentralen Wege (Auftritts-Puffer)
+    const ownSid = gs.players[pi]?.socketId;
+    if (ownSid && !room.engine?._inMctsSim) io.to(ownSid).emit('potion_resolved', { destroyedIds: selectedIds, animationType });
+    if (!room.engine?._inMctsSim) emitToOpponentsGs(gs, io, pi, 'potion_resolved', { destroyedIds: selectedIds, animationType });
     sendToSpectators(room, 'potion_resolved', { destroyedIds: selectedIds, animationType });
   } : null;
 
@@ -11674,7 +11720,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   // `resolveEffectPrompt` / `resolveGenericPrompt` already drain the
   // stash on first commit, so this is a no-op when an inner prompt
   // ran.
-  if ((script.deferReveal || script.deferBroadcast) && gs._pendingCardReveal) {
+  if (gs._pendingCardReveal) {   // W63d: für jede Ziel-Karte (früher nur `deferReveal`/`deferBroadcast`)
     room.engine._firePendingCardReveal();
   }
 
@@ -12164,13 +12210,12 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
 
   try {
     const oi = opponentOfGs(gs, pi);
-    if (!script.deferBroadcast) {
-      emitToOpponentsGs(gs, io, pi, 'card_reveal', { cardName });
-      sendToSpectators(room, 'card_reveal', { cardName });
-      await room.engine._delay(100);
-    }
+    // ★ W63d: der Auftritt wird nur VORGEMERKT (Auftritts-Puffer der Engine) — Trank-Fragen (Galerie, Zone, Ziel) sind abbrechbar, und der Gegner darf die Karte erst nach dem Commit sehen.
+    // `deferBroadcast`-Tränke zeigen sich wie bisher selbst (an ihrer eigenen Zusagestelle).
+    if (!script.deferBroadcast) gs._pendingCardReveal = { cardName, ownerIdx: pi };
 
     room.engine._setPendingPlayLog('card_played', { player: ps.username, card: cardName, cardType: 'Potion', cost: 0 });
+    room.engine.maybeFireCpuRevealEarly();   // Live-CPU: wie bei Zaubern/Artefakten sofort zeigen (nichts zu verbergen)
 
     let chainResult;
     try {
@@ -12196,11 +12241,13 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
     if (room.engine.nimmOpferFizzle() && chainResult.resolveResult) delete chainResult.resolveResult.cancelled;   // v1313
     if (chainResult.resolveResult?.cancelled) {
       ps._resolvingCard = null;
+      delete gs._pendingCardReveal;   // W63d: Abbruch = der Gegner hat nichts gesehen (Auftritts-Puffer verfällt mit)
       delete gs._pendingPlayLog;
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
-    room.engine._firePendingPlayLog();
+    if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
+    else room.engine._firePendingPlayLog();
 
     const currentIdx = getResolvingHandIndex(ps);
     ps._resolvingCard = null;
@@ -16003,9 +16050,8 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    const oi = opponentOfGs(room.gameState, pi);
-    emitToOpponentsGs(room.gameState, io, pi, 'opponent_pending_placement', { owner: pi, heroIdx, zoneSlot, cardName });
-    sendToSpectators(room, 'opponent_pending_placement', { owner: pi, heroIdx, zoneSlot, cardName });
+    // ★ W63d (Al, 22.10.2026): die Vorschau „diese Creature soll hierhin" (Wahl des Zusatzaktions-Gebers) ist noch ABBRECHBAR — der Gegner darf die Karte da nicht sehen
+    // (ein Abbruch verriete verdeckte Information). Keine Weitergabe mehr; der Auftritt kommt mit dem Spielen (`play_creature` → Auftritts-Puffer). Alter Aufruf bleibt gueltig, tut nichts.
   });
   socket.on('pending_placement_clear', ({ roomId }) => {
     if (!currentUser) return;
@@ -22082,4 +22128,4 @@ initDatabase().then(async () => {
 });
 
 // Für die Headless-Simulation des Skill-Test-Modus (skilltest/sim-bridge.js; PP_ST_SIM=1).
-module.exports = { skillTestHandlers: { doPlaySpell, doPlayCreature, doPlayArtifact, doUseArtifactEffect, doPlaySurprise, doActivateCreatureEffect, doActivateHeroEffect, doActivateEquipEffect, doUsePotion, doConfirmPotion, doPlayAbility, doActivateAbility, doActivateFreeAbility, setupGameState, effectPromptFuer } };
+module.exports = { skillTestHandlers: { doPlaySpell, doPlayCreature, doPlayArtifact, doUseArtifactEffect, doPlaySurprise, doActivateCreatureEffect, doActivateHeroEffect, doActivateEquipEffect, doUsePotion, doConfirmPotion, doPlayAbility, doActivateAbility, doActivateFreeAbility, setupGameState, effectPromptFuer, sendGameState, sendSpectatorGameState } };

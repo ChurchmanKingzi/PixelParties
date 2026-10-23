@@ -110,11 +110,8 @@ module.exports = {
         return;
       }
 
-      // Stream the card image to the opponent NOW — without this,
-      // doPlaySpell's `_firePendingCardReveal` only runs AFTER the
-      // name-picker + iterative discard finishes, leaving the
-      // opponent staring at a mystery cast for the entire prompt.
-      if (gs._pendingCardReveal) engine._firePendingCardReveal();
+      // ★ W63d: KEIN Früh-Auftritt vor dem Namens-Dialog — er ist abbrechbar, und der Gegner darf die Karte erst nach dem Commit sehen
+      // (zentraler Auftritts-Puffer; der Auftritt kommt mit der ersten sichtbaren Wirkung nach der Namenswahl).
 
       const cardDB = engine._getCardDB();
       const allNames = Object.keys(cardDB).filter(n => {
