@@ -46474,6 +46474,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // hätte sie größer starten lassen als die Karte darunter.
           sourceRects.push(el ? (window.handFanCardBox?.(el) || el.getBoundingClientRect()) : null);
         });
+        // Eine volle Hand schiebt ihre Plätze zusammen: der Kasten einer Karte ist dann schmaler als die Karte selbst (in der Gegnerhand schneidet er sie sogar ab). Die Flugkarte
+        // bekommt deshalb die volle Größe — gemessen am LETZTEN Platz der Hand, der nie zusammengeschoben wird.
+        const quellLetzter = document.querySelector(`.game-hand-${fromLabel} .game-hand-cards > :last-child`);
+        const volleGroesse = quellLetzter && (window.handFanCardBox?.(quellLetzter) || quellLetzter.getBoundingClientRect());
+        if (volleGroesse && volleGroesse.width > 0) {
+          sourceRects.forEach((r, k) => { if (r) sourceRects[k] = { left: r.left, top: r.top, width: volleGroesse.width, height: volleGroesse.height }; });
+        }
 
         // Zielplätze: die Karten werden in Reihenfolge ABSTEIGENDER Quellplätze ans Ende der Zielhand gehängt (Engine: `actionStealFromHand`), landen also an
         // `destCount + (Anzahl − 1 − k)`. Gerechnet wird gegen die Endgröße der Hand, nicht „rechts neben die letzte Karte".

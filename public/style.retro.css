@@ -5236,7 +5236,9 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * { cursor: url("/cursor
   15%, 75% { filter: hue-rotate(155deg) saturate(1.4) brightness(1.05); }
   100% { filter: none; }
 }
-.blind-pick-active { overflow: visible !important; }
+/* `.blind-pick-active` (Handreihe während einer Kartenwahl) darf die Reihe NICHT auf `overflow: visible` stellen: ein Flex-Element mit sichtbarem Überlauf hat als Mindestbreite seinen
+   Inhalt, die Reihe sprengte bei voller Hand ihre Zone und die zusammengeschobenen Karten fächerten sich in voller Breite auf. Das Polster der Reihe (`--fan-pad-x`, oben
+   0,8 Kartenhöhen) fasst Rahmen und Hub der markierten Karten ohnehin. */
 .blind-pick-eligible { outline: 2px dashed #7d3911; outline-offset: 2px; cursor: pointer !important; animation: blindPickPulse 1.2s steps(24, end) infinite; }
 /* ★ v1241: `.hand-steal-highlight-active` hat der Handreihe früher Luft
    nach oben verschafft (`overflow: visible !important; padding-top`),
