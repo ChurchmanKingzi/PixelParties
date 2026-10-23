@@ -14310,19 +14310,29 @@ class GameEngine {
    */
   zugBesitzer(n) { return ZugFristen.zugBesitzer(this, n); }
   istEchterZug(n) { return ZugFristen.istEchterZug(this, n); }
+  /**
+   * ★ W69a (Al, 23.10.2026: „Nein, sie sollen nur 'echte' eigene Züge zählen!" / „Und auch das soll 'echte' eigene Züge zählen!") — ORDNUNGS- und FOLGE-ZÄHLER
+   * rechnen mit echten Zügen (nie mit `turn − 2`, `turn % 2` o. ä.): „your Nth turn", „2 consecutive turns", „every other turn". Alles in `_zug-fristen.js`.
+   *   echteEigeneZuegeBis(pi, turn = gs.turn, ab = 1)     Zahl der echten Züge von pi in ab..turn (der laufende echte Zug zählt mit)
+   *   echterEigenerZugIndex(pi, turn = gs.turn, ab = 1)   der wievielte echte eigene Zug `turn` ist (null: kein echter Zug von pi)
+   *   echterEigenerZugNr(pi, k, ab = 1)                   Zugnummer des k-ten echten eigenen Zuges („before the end of your third turn": gs.turn ≤ Nr)
+   *   vorigerEchterEigenerZug(pi, turn = gs.turn)         Nummer des letzten echten Zuges von pi vor `turn` (null: keiner)
+   *   istFolgezug(pi, letzteNr, turn = gs.turn)           kein echter Zug von pi zwischen letzteNr und turn (Sperre „not in 2 consecutive turns" greift)
+   */
+  echteEigeneZuegeBis(pi, turn, ab) { return ZugFristen.echteEigeneZuegeBis(this, pi, turn, ab); }
+  echterEigenerZugIndex(pi, turn, ab) { return ZugFristen.echterEigenerZugIndex(this, pi, turn, ab); }
+  echterEigenerZugNr(pi, k, ab) { return ZugFristen.echterEigenerZugNr(this, pi, k, ab); }
+  vorigerEchterEigenerZug(pi, turn) { return ZugFristen.vorigerEchterEigenerZug(this, pi, turn); }
+  istFolgezug(pi, letzteNr, turn) { return ZugFristen.istFolgezug(this, pi, letzteNr, turn); }
 
   /**
    * ★ v1340 — Welcher Wert von `gs.turn` ist der k-te EIGENE Zug von pi?
-   * Zuege wechseln strikt ab (auch ein uebersprungener Zug zaehlt, Zhu),
-   * der Startspieler hat die ungeraden Nummern. („before the end of your
-   * third turn" ⇔ gs.turn ≤ zugIndexVon(pi, 3), Cheat Chair.)
+   * Zuege wechseln strikt ab, der Startspieler hat die ungeraden Nummern.
+   * („before the end of your third turn" ⇔ gs.turn ≤ zugIndexVon(pi, 3), Cheat Chair.)
+   * ★ W69a (Al, 23.10.2026): ein uebersprungener Zug (Zhu, Hand of Death) zaehlt NICHT mit — „dritter Zug" ist der dritte tatsaechlich gespielte
+   * eigene Zug (`echterEigenerZugNr`). Neue Karten rufen gleich `echterEigenerZugNr`.
    */
-  zugIndexVon(pi, k) {
-    const t = this.gs.turn || 1;
-    const aktiv = this.gs.activePlayer;
-    const starter = (t % 2 === 1) ? aktiv : (this.opponentOf(aktiv));
-    return starter === pi ? 2 * k - 1 : 2 * k;
-  }
+  zugIndexVon(pi, k) { return this.echterEigenerZugNr(pi, k); }
 
   /**
    * ★ v1490 — HAND-FENSTER „ein Held (deiner ODER der des Gegners) wird besiegt — VOR dem Aufraeumen".
@@ -26706,6 +26716,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           delete cpuPs._skipNextTurn;
           this.gs.activePlayer = this._cpuPlayerIdx;
           this.gs.turn++;
+          (this.gs._uebersprungeneZuege || (this.gs._uebersprungeneZuege = [])).push({ turn: this.gs.turn, player: this._cpuPlayerIdx });   // W69a: auch im Puzzle zaehlt der Zug nicht als echter Zug
           this.log('turn_skipped', {
             player: cpuPs.username, by: 'Guardian Beast Zhu',
             turn: this.gs.turn, in: 'puzzle',
@@ -28189,6 +28200,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       fromPlayer: oppIdx, toPlayer: pi,
       indices: validated, cardNames, count: validated.length,
       duration: flightMs, highlightMs,
+      // Karten, die in der Hand des Diebs BLEIBEN: ohne die gerade aufgelöste Karte (sie liegt bis zum Ende der Auflösung noch in der Hand, verlässt sie aber vor dem Eintreffen der
+      // gestohlenen) — daran rechnet der Client die Landeplätze der Flugkarten.
+      toBaseCount: this._handIndizesOhneAufloesende(ps).length,
     });
     const perCardStagger = Math.max(0, (validated.length - 1) * 100);
     // The client's phase-3 cleanup (clears `stealHiddenMe/Opp`,

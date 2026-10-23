@@ -1,0 +1,25 @@
+# Fix-Welle 69 (W69a) – „Nur ECHTE Züge zählen" bei Ordnungs- und Folge-Zählern
+
+Umgesetzt vom Agenten **W69a** (Zweig `wave69/W69a`) auf Entscheidungen von Al vom 23.10.2026 (die zwei letzten Rückfragen aus W68a): (a) **Ordnungszähler** „your Nth turn" (Cheat Chair, Willy …): „Nein, sie sollen nur 'echte' eigene Züge zählen!" (b) **„2 consecutive turns" / „every other turn"** (Thicket, Jump in the River, Blade of the Frostbringer, Hammer Throw …): „Und auch das soll 'echte' eigene Züge zählen!" Details, Audit-Tabelle, Verträge: `cards/effects/CARD_API.md`, Abschnitt „Welle 69 / W69a"; Repro `docs/niche-tests/repro/W69/a-01` (Exit 0 = korrekt). Kartentexte (`data/cards.json`), `repro-status.json` und Index unverändert.
+
+| Auftrag | Ergebnis |
+|---|---|
+| **Zentrale API** (`cards/effects/_zug-fristen.js`, Engine-Wrapper gleichen Namens) | `echteEigeneZuegeBis(pi, turn, ab)` · `echterEigenerZugIndex(pi, turn, ab)` · `echterEigenerZugNr(pi, k, ab)` · `vorigerEchterEigenerZug(pi, turn)` · `istFolgezug(pi, letzteNr, turn)`. Übersprungene Zugnummern stehen in `gs._uebersprungeneZuege` (jetzt auch beim Skip im Puzzle); der nächste eigene Zug eines Spielers mit ausstehender Skip-Marke gilt schon als ausgefallen. Ohne Skip identisch zur alten Rechnung. `engine.zugIndexVon` ist ein Alias. |
+| **a) Ordnungszähler** | **Cheat Chair**: „dritter Zug" = dritter tatsächlich gespielter eigener Zug. **Willy**: „first turn" = erster echter eigener Zug (wurde der nominell erste Zug des zweiten Spielers übersprungen, ging der Effekt vorher ganz verloren); Handlimit-Freiheit bis zum Beginn des zweiten echten Zuges. |
+| **b) Folge-Sperren / Takte** | **Thicket**, **Jump in the River** (Züge des Zugspielers), **Blade of the Frostbringer** (Kreatur; Held lief schon über die Engine-Auftau-Immunität), **Hammer Throw** (echte Züge des Betroffenen, Ordnungszahl `_hammerLockZug`): ein übersprungener Zug hebt die Sperre nicht auf und verschiebt den Takt nicht. Zusätzlich die Restdauer-Rechnung in **Petrifying Potion** (heute toter Pfad). Butterfly Cloud, Barker, „last turn"-Karten (Frost Breaker, Heragas, Ralzish, Lethe, Rewrite History) und die Zähler „at the end of each …" waren schon ereignisgebunden (im Repro abgesichert). |
+| **Erstrunden-Schutz** | **nicht geändert**: Spielregel („first turn of the game"), der erste Spielzug kann nie übersprungen werden; der Schutz endet am Ende von Zug 1, ein Skip von Zug 2 ändert nichts (Repro Kategorie 8). Night, the Herald of Chess / First Contact / Vengeful Attack / YOU'RE ALIVE?! haben noch kein Skript — die Hilfen stehen für sie bereit, der Wächter kennt die Namen. |
+| **Wächter** | `scripts/check-zugfristen.js` erweitert: Hilfen exportiert und verdrahtet, die sieben Folge-/Ordnungs-Karten rufen ihre Hilfe, neue Kartentexte mit „Nth turn"/„consecutive"/„every other turn" müssen eingetragen werden, keine eigene `gs.turn`-Folge-Arithmetik (Differenz, `% 2`, `/ 2`, `zugIndexVon(`) in Kartenskripten und `-shared`-Bausteinen. |
+
+## Geänderte Dateien (Kern)
+`cards/effects/_zug-fristen.js` (neue Hilfen), `cards/effects/_engine.js` (Wrapper, `zugIndexVon` als Alias, Puzzle-Skip vermerkt), Kartenskripte `cheat-chair.js`, `willy-the-valiant-leprechaun.js`, `thicket.js`, `jump-in-the-river.js`, `blade-of-the-frostbringer.js`, `hammer-throw.js`, `petrifying-potion.js`, `scripts/check-zugfristen.js`, `docs/niche-tests/lib/skip.js` (neu: `zeitleiste`), Repro `docs/niche-tests/repro/W69/a-01-nur-echte-zuege-ordnungs-und-folgezaehler.js`.
+
+## Rückfragen an Al (Ja/Nein) – siehe CARD_API „Welle 69 / W69a", Abschnitt 5
+a. **Hammer Throw:** „every other turn" zählt jetzt in den echten Zügen des **Betroffenen** (so war schon die Erklärung im Skript gemeint). Soll stattdessen der **Werfer** zählen? (Ohne Skip identisch.)
+b. **Willy:** Ist der nominell erste Zug übersprungen, löst jetzt der erste ECHTE eigene Zug „draw 5 or gain 30" aus. Passt das — oder soll der Effekt bei einem übersprungenen ersten Zug verfallen?
+
+## Ergebnis der Gesamtläufe
+* **Repro `W69/a-01`**: 198 Prüfungen grün; auf dem Ausgangsstand (3a9104ae) 48 von 166 prüfbaren rot (Kategorie 0, die neuen Hilfen, stürzt dort ab), alle Gegenproben ohne Skip und die ereignisgebundenen Karten grün.
+* **Gesamtlauf** (`runall`, alle 1363 Repros inkl. `W69/a-01`; Zeitlimit je Datei 300 s): 1363 × „tritt NICHT auf" (= korrekt), 0 Fehler, 0 Zeitüberschreitungen.
+* `scripts/check-*.js`: alle grün außer `check-scope.js` (72 Altstellen, identisch zum Ausgangsstand); `check-zugfristen.js` grün (erweitert). `node --test test/*.test.js`: 10/10 grün.
+* E2E (`NODE_PATH=/tmp/claude-0/sio/node_modules:/opt/node-tools/node_modules`): `draw-cards` und `sacrifice` je 1/1 grün; `cards` 3/3 grün; `artifacts` 4/5 grün (ein Lauf rot: „Cool Presents: erscheint in den freien Aktionen des Bots → 0" – Zufallshand/Zufallsheld des Skill-Test-Bretts, Fehlerklasse wie in W68a bekannt und ohne Zugbezug; Ausgangsstand 4/4 grün in vier Läufen).
+* Ergebnisdatei: `status-after69a.json` im Scratchpad (nicht eingecheckt).

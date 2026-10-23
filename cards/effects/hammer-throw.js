@@ -13,6 +13,10 @@
 //  A player can only be affected every other
 //  turn. Not applied on Turn 1 (the card text
 //  no longer mentions it).
+//  ★ W69a (Al, 23.10.2026): „every other turn" rechnet in den
+//  TATSAECHLICH gespielten Zuegen des Betroffenen (`_hammerLockZug`,
+//  `engine.echteEigeneZuegeBis`) — ein uebersprungener Zug verschiebt den
+//  Takt nicht.
 //
 //  Animation: spinning hammer projectile →
 //  impact slash on target.
@@ -151,14 +155,21 @@ module.exports = {
           // freie eigene Runde hat, müssen zwischen zwei Anwendungen
           // mindestens 4 gezählt werden (Wurf in Zug 3 sperrt Zug 4,
           // nächster erlaubter Wurf in Zug 7 sperrt Zug 8).
-          const last = oppPs._hammerLockTurn;
-          if (last != null && (gs.turn - last) < 4) {
+          //
+          // ★ W69a (Al, 23.10.2026: „… 'every other turn' rechnet in echten eigenen Zuegen"): gezaehlt werden die TATSAECHLICH gespielten
+          // Zuege des Betroffenen. `_hammerLockZug` = Ordnungszahl seines echten Zuges, den die letzte Sperre getroffen hat (der naechste echte
+          // Zug nach dem Wurf); eine neue Sperre ist erst fuer den uebernaechsten echten Zug erlaubt. Ein uebersprungener Zug des Betroffenen
+          // (die Sperre liegt dann weiter bis zu seinem naechsten echten Zug) oder des Werfers verschiebt den Takt nicht. Ohne Skip wie zuvor.
+          const zugNr = engine.echteEigeneZuegeBis(oppIdx, gs.turn) + 1;
+          const last = oppPs._hammerLockZug;
+          if (last != null && (zugNr - last) < 2) {
             engine.log('item_lock_blocked', {
               player: oppPs.username, by: 'Hammer Throw',
-              reason: 'every-other-turn', lastAppliedTurn: last,
+              reason: 'every-other-turn', lastAppliedTurn: oppPs._hammerLockTurn,
             });
           } else {
             oppPs._hammerLockTurn = gs.turn;
+            oppPs._hammerLockZug = zugNr;
             oppPs.itemLocked = true;
             engine.log('item_locked', {
               player: oppPs.username, by: 'Hammer Throw',
