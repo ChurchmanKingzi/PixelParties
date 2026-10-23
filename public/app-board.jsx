@@ -46489,10 +46489,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       } else {
         stealIndices.forEach(idx => {
           const el = document.querySelector(`.game-hand-opp [data-hand-idx="${idx}"]`);
-          if (el) {
-            el.style.outline = '3px solid rgba(255,155,58,.95)';
-            el.style.filter = 'brightness(1.4) drop-shadow(0 0 10px rgba(255,155,58,.7))';
-          }
+          if (el) el.classList.add('blind-pick-selected');   // dieselbe Markierung wie bei der Wahl (volle Kartenbreite, harter Rahmen)
         });
       }
 
@@ -46514,7 +46511,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           stealExpectedOppCountRef.current = count > 0 ? document.querySelectorAll('.game-hand-opp .game-hand-cards .hand-card').length : -1;
           stealIndices.forEach(idx => {
             const el = document.querySelector(`.game-hand-opp [data-hand-idx="${idx}"]`);
-            if (el) { el.style.outline = ''; el.style.filter = ''; }
+            if (el) el.classList.remove('blind-pick-selected');
           });
         }
 
@@ -46530,6 +46527,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // hätte sie größer starten lassen als die Karte darunter.
           sourceRects.push(el ? (window.handFanCardBox?.(el) || el.getBoundingClientRect()) : null);
         });
+        // Eine volle Hand schiebt ihre Plätze zusammen: der Kasten einer Karte ist dann schmaler als die Karte selbst (in der Gegnerhand schneidet er sie sogar ab). Die Flugkarte
+        // bekommt deshalb die volle Größe — gemessen am LETZTEN Platz der Hand, der nie zusammengeschoben wird.
+        const quellLetzter = document.querySelector(`.game-hand-${fromLabel} .game-hand-cards > :last-child`);
+        const volleGroesse = quellLetzter && (window.handFanCardBox?.(quellLetzter) || quellLetzter.getBoundingClientRect());
+        if (volleGroesse && volleGroesse.width > 0) {
+          sourceRects.forEach((r, k) => { if (r) sourceRects[k] = { left: r.left, top: r.top, width: volleGroesse.width, height: volleGroesse.height }; });
+        }
 
         // Zielplätze: die Karten werden in Reihenfolge ABSTEIGENDER Quellplätze ans Ende der Zielhand gehängt (Engine: `actionStealFromHand`), landen also an
         // `destCount + (Anzahl − 1 − k)`. Gerechnet wird gegen die Endgröße der Hand, nicht „rechts neben die letzte Karte".

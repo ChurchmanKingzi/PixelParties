@@ -28202,7 +28202,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const cardNames = validated.map(idx => oppPs.hand[idx]).filter(Boolean);
 
     const flightMs = 800;
-    const highlightMs = validated.length > 1 ? 700 : 250;
+    const highlightMs = Number.isFinite(opts.highlightMs) ? opts.highlightMs : (validated.length > 1 ? 450 : 250);
     this._broadcastEvent('play_hand_steal', {
       fromPlayer: oppIdx, toPlayer: pi,
       indices: validated, cardNames, count: validated.length,
