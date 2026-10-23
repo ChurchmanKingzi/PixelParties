@@ -43460,7 +43460,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Generic pile-to-pile flying card animation. Used for moves the
     // automatic hand → pile detector can't see — specifically
     // discard → deleted (Mass Multiplication's consumed source card).
-    const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, finalHandSize, flightStyle, faceDown, sfx, landSfx }) => {
+    const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, finalHandSize, zielLayout, flightStyle, faceDown, sfx, landSfx }) => {
       // ★ v1122 (Al 15.9.: „fuer die 4 Karten, die vom Discard ins Deck
       // fliegen, fehlt jeweils ein Woosh-Sound-Effect (wie beim Ziehen
       // von Karten)"). Ein Flug konnte bisher keinen Klang mitbringen —
@@ -43641,7 +43641,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             const specific =
               document.querySelector(`${base} .hand-slot[data-hand-idx="${extras.handIdx}"]`) ||
               document.querySelector(`${base} [data-hand-idx="${extras.handIdx}"]`);
-            if (specific) return specific;
+            // `zielLayout` (Live Show): mehrere Karten fliegen nacheinander in dieselbe Hand, jede Landung verschiebt die zentrierte Reihe. Der Aufrufer nennt
+            // deshalb die ENDGRÖSSE, und auch ein schon vorhandener Platz wird gegen das Endlayout gerechnet statt gegen die Momentaufnahme.
+            if (specific && !(extras.zielLayout && extras.finalHandSize)) return specific;
             // Slot doesn't exist yet — the broadcast fires before the
             // state mutation, so the new slot won't render until the
             // next sync. Project a synthetic rect for where the new
@@ -43665,6 +43667,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // Handplatz ohnehin unverändert den seinen).
               const lastRect = window.handFanCardBox?.(slots[slots.length - 1])
                 || slots[slots.length - 1].getBoundingClientRect();
+              const firstRect = window.handFanCardBox?.(slots[0]) || slots[0].getBoundingClientRect();
               const cardW = lastRect.width;
               const oldCount = slots.length;
               // v891 (Als Befund zu Shooting Star): Der Boden `oldCount + 1`
@@ -43680,11 +43683,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const finalCount = extras.finalHandSize
                 ? Math.max(extras.finalHandSize, extras.handIdx + 1)
                 : Math.max(extras.handIdx + 1, oldCount + 1);
-              // Old hand spans [C - oldCount*cardW/2, C + oldCount*cardW/2];
-              // the old last slot's right edge gives the centre C. The
-              // final slot `handIdx` then sits at the centred offset.
-              const C = (lastRect.left + lastRect.width) - (oldCount * cardW) / 2;
-              const projLeft = C - (finalCount * cardW) / 2 + extras.handIdx * cardW;
+              // Die Reihe ist zentriert: ihre Mitte liegt zwischen linker Kante des ersten und rechter Kante des letzten Platzes. Der Abstand von Platz zu Platz ist
+              // die Flex-Basis, solange die Hand hineinpasst — ab dann schrumpfen die Plätze gleichmäßig (`.game-hand-cards .hand-slot`, `min-width`), der letzte behält
+              // die volle Kartenbreite. Mit fester Kartenbreite als Abstand landete jede Karte einer vollen Hand weit rechts außerhalb der Reihe.
+              const C = (firstRect.left + lastRect.left + lastRect.width) / 2;
+              const reihe = slots[0].parentElement;
+              const cs0 = window.getComputedStyle(slots[0]);
+              // CSS-Maße sind Layout-Einheiten, die Rechtecke Bildschirmeinheiten (`zoom`): der Faktor gleicht beides an.
+              const faktor = reihe && reihe.offsetWidth ? reihe.getBoundingClientRect().width / reihe.offsetWidth : 1;
+              const basis = parseFloat(cs0.flexBasis) * faktor;
+              const minW = (parseFloat(cs0.minWidth) || 0) * faktor;
+              const jetztSchritt = oldCount > 1 ? (lastRect.left - firstRect.left) / (oldCount - 1) : cardW;
+              const grundSchritt = basis > 0 ? basis : Math.max(jetztSchritt, cardW * 0.906);
+              let schritt = grundSchritt;
+              if (reihe && finalCount > 1) {
+                const rcs = window.getComputedStyle(reihe);
+                const innen = (reihe.clientWidth - (parseFloat(rcs.paddingLeft) || 0) - (parseFloat(rcs.paddingRight) || 0)) * faktor;
+                if (innen > cardW) schritt = Math.min(grundSchritt, Math.max(minW, (innen - cardW) / (finalCount - 1)));
+              }
+              const spanne = (finalCount - 1) * schritt + cardW;
+              const projLeft = C - spanne / 2 + extras.handIdx * schritt;
               const projected = {
                 left:  projLeft,
                 top:   lastRect.top,
@@ -43737,7 +43755,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
       }
       const srcEl = elementFor(from, srcIsMe, { heroIdx: fromHeroIdx, slotIdx: fromSlotIdx, handIdx: fromHandIdx, permId: fromPermId });
-      const tgtEl = elementFor(to,   tgtIsMe, { handIdx: toHandIdx, finalHandSize, heroIdx: toHeroIdx, slotIdx: toSlotIdx });
+      const tgtEl = elementFor(to,   tgtIsMe, { handIdx: toHandIdx, finalHandSize, zielLayout, heroIdx: toHeroIdx, slotIdx: toSlotIdx });
       if (!srcEl || !tgtEl) return;
 
       // Hide the landing hand slot until the flying card arrives so both
@@ -52290,6 +52308,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     + (isPermaRevealed ? ' hand-card-perma-revealed' : '')
                     + (isTreacherousClickable ? ' hand-card-treacherous-click' : '')
                     + (isSelected ? ' blind-pick-selected' : '')
+                    + (isBlindPick && gameState.effectPrompt.highlightStyle === 'strong' ? ' blind-pick-stark' : '')
                     + (isBlindPick && !isSelected && !isFull ? ' blind-pick-eligible' : '')
                     + (isFull ? ' hand-card-dimmed' : '')
                     + (pickEligible ? ' blind-pick-eligible' : '')
@@ -53459,7 +53478,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 }
                 return (
                   <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-card-name={item.card} data-card-type={CARDS_BY_NAME[item.card]?.cardType || ''} data-touch-drag="1"
-                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardUrgent ? ' hand-pick-eligible-urgent' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + ((spellHeroPick && item.origIdx !== spellHeroPick.handIndex) ? ' hand-card-dimmed' : '') + ((crossSidePlayPick && item.origIdx !== crossSidePlayPick.handIndex) ? ' hand-card-dimmed' : '') + (isZonePickHandHighlight ? ' hand-pick-eligible-urgent' : '') + (isZonePickHandQueued ? ' hand-pick-eligible' : '') + (isZonePickHandDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTargetSelected ? ' hand-pick-selected' : (isPotionHandTarget ? ' hand-pick-eligible' : '')) + (isStNicolasEscrowed ? ' hand-card-st-nicolas-escrowed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '') + (istFrischErschienen(item.origIdx) ? ' hand-card-materializing' : '')}
+                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPick && gameState.effectPrompt.highlightStyle === 'strong' ? ' hand-pick-stark' + (!isHandPickEligible ? ' hand-card-dimmed' : '') : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardUrgent ? ' hand-pick-eligible-urgent' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + ((spellHeroPick && item.origIdx !== spellHeroPick.handIndex) ? ' hand-card-dimmed' : '') + ((crossSidePlayPick && item.origIdx !== crossSidePlayPick.handIndex) ? ' hand-card-dimmed' : '') + (isZonePickHandHighlight ? ' hand-pick-eligible-urgent' : '') + (isZonePickHandQueued ? ' hand-pick-eligible' : '') + (isZonePickHandDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTargetSelected ? ' hand-pick-selected' : (isPotionHandTarget ? ' hand-pick-eligible' : '')) + (isStNicolasEscrowed ? ' hand-card-st-nicolas-escrowed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '') + (istFrischErschienen(item.origIdx) ? ' hand-card-materializing' : '')}
                     style={{
                       // ★ v1233: Der Faecher haengt am PLATZ, nicht an
                       // der Karte — siehe „HANDFAECHER" in style.css.
