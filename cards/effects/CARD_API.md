@@ -23713,3 +23713,70 @@ Befunde von Al (Spieldesigner), „wahrscheinlich größere Bug-Klassen": (1) Ei
 3. Surprise Party: spielbar nur mit freier Zone (der Name steht erst nach dem Aufdecken fest); ein geteilter Platz ist nur Rückfall — okay?
 4. Sollen BEWEGUNGEN (Guard Change, Slippery Skates/Ice, Memory Blast, Jumper-Spider-Transfer) die Teilung nutzen dürfen (Slime in die Zone eines anderen Slimes ziehen)? **Derzeit nein.**
 5. Reincarnation (Kreatur-Modus braucht 3 freie Zonen: 2 für die Pollution Tokens + 1): mit Alice-Teilung nur 2 freie + die geteilte Zone? **Derzeit unverändert.**
+
+## Welle 63 / W63c — Besitzer-Regel für gestohlene, geschenkte und übernommene Karten (Charme Lv 2 & alle Verwandten)
+
+Befund von Al (Spieldesigner): „Karten, die via Charme Lv 2 gestohlen werden, landen beim Abwerfen/Deleten und vermutlich auch beim Mischen ins Deck in den Piles ihres **Diebes** statt beim ursprünglichen Besitzer." Die Regel selbst steht seit Welle 5 (W3, Al 14.10.2026: „Karten landen *immer* im Deck/Discard/Deleted Pile ihres **permanenten Besitzers**, durch alles."): Ablage, Löschstapel, Deck, Potion Deck und Hand-Rückgabe gehören dem BESITZER, egal wer die Karte hält oder kontrolliert; nur ein Kartentext mit „YOUR …" ändert das (dann `opts.toPlayer`, die Karte bleibt aber Eigentum des Besitzers). Gerade dort ist **der Dieb-Weg** (Hand eines anderen Spielers) lückenhaft gewesen.
+
+### 1) Ursache — die Herkunft hing nur an EINEM Teil der Wege
+Handkarten sind Namen (Strings). Die Herkunft einer fremden Karte steckt (a) in der **Platzmarke** `ps._handOriginals[handIdx] = { o: Besitzer, n: Name }` (handindiziertes Feld, wandert mit Splices/Umsortieren), (b) in `inst.originalOwner` der Hand-Instanz. Nur wer **taggt** (`engine._tagHandCardOrigin`, Charme, Infiltration, Key, Magic Lamp …) schreibt (a). Gefunden (alle rot auf dem alten Stand, Repros `W63/c-01…c-07`):
+
+| Lücke | Wirkung |
+|---|---|
+| `actionStealFromHand` (Thieving Strike, Loot the Leftovers, Gather Intel, Live Show) und `actionTransferCardToOppHand` (Cool Presents, Live Show, Hat of Madness, Santa Klaus, Chatty Town Guard, Crystal Well, Saint Nicolas) nahmen die Instanz mit, setzten aber **keine Platzmarke** | Abwerfen, Löschen, Spell/Potion/Artefakt spielen, Mischen, Mulligan, Handlimit: **alles** beim Halter (Dieb/Beschenkten) |
+| Charme Lv 2 nahm „Besitzer = der Gegner" an | Karte, die schon vorher gestohlen war (Gegenrichtung, Diebstahl, Geschenk), bekam den falschen Besitzer — hin und zurück endete sie beim Dieb |
+| Hand → **Brett** (Ausrüstung, Ability, Surprise, Area, Anhängsel; Free-Side-Equip; Skript-Beschwörungen wie Army of the Cute): nur Creature/Spell/Artefakt trugen die Herkunft auf die Brettinstanz | Zerstört/geopfert → Ablage des Diebs; dazu eine **Geister-Handinstanz** der fremden Karte (Namens-Notnagel könnte später eine eigene Kopie umleiten) |
+| ~15 **Hand-Reaktionsfenster** der Engine (`_offerPostTargetHandReaction` & Geschwister) und die Reaktionskette | gestohlene Reaktionskarte wanderte nach dem Spielen in die Ablage des Reagierenden |
+| ~20 Skripte entnehmen per `takeFromPileSync(…, 'hand', …)` und schreiben **direkt** `ps.discardPile/deletedPile.push` (Bottled Flame/Lightning, Jump in the River, Dive Down, Unwanted Audience, Anti Magic Enchantment, Love Shot, Nieht, Bomblebee Cluster, Pollution Piranha, Taio, Crusader, Cybug-Treibstoff, Criminal Monkee, Learning, Cooldin, Sofort-Guss `_castSpellImmediately` …) | Ablage/Löschstapel des Halters |
+| Bounce einer gestohlenen/übernommenen Kreatur (`returnSupportCreatureToHand`, `actionMoveCard` Brett → Hand) | Hand des **Kontrolleurs** statt des Besitzers; die Herkunft ging verloren |
+| Nur `inst.originalOwner` gesetzt, keine Platzmarke (Letter of Misinformations, Magic Lamp, Birthday Present …) | Einzelsatz der Entnahme las „eigene Karte" |
+| `reorder_hand` ohne gültige Permutation strich **alle** handindizierten Marken | Sortieren/Mischen der Hand an einem Wettlauf mit einem Diebstahl verlor die Herkunft |
+| Coolness Stack | gestohlene Karte aus dem Stapel → Ablage/Löschstapel des Halters |
+
+### 2) Mechanik (zentral, ohne 200 Skripte anzufassen)
+* **Platzmarke an JEDEM Eintritt:** `engine._setHandSlotOrigin(halter, name, besitzer, idx)` (nur die Marke, keine Instanz) — `actionStealFromHand`, `actionTransferCardToOppHand`, Charme, `actionMoveCard` (Brett → fremde Hand), Coolness Stack. Die Herkunft kommt aus der Marke des GEBER-Platzes bzw. der Hand-Instanz an diesem Platz (`engine._handOriginAt(ps, idx)`): eine Karte, die zu ihrem Besitzer zurückkehrt, ist wieder eine normale Handkarte.
+* **Instanz-Fallback:** `_handOriginAt` und der Splice-Abfang der Hand lesen ohne Marke `inst.originalOwner` der Hand-Instanz dieses Platzes (Rang je Name, wie `_findHandInstanceAt`). Damit reicht es weiter, wenn ein altes Skript nur die Instanz stempelt.
+* **Fremd-Abgangsbuch** `ps._fremdAbgang = [{ name, owner, turn }]` (Halter): jede FREMDE Karte, die die Hand verlässt, wird im Splice-Abfang gebucht (der Einzelsatz `_handOriginsRemoved` der letzten Entnahme wird von jedem weiteren Splice überschrieben — Reaktionen im Kettenfenster). Verbraucht wird sie, sobald die Karte ihren Weg gefunden hat: `_consumeHandCardOrigin` / `handKartenBesitzerPs` / `_handCardPileOwner` NACH dem Splice (Stapel) oder das Brett-Netz. Zugwechsel verwirft Reste. Ein Aufruf VOR dem Splice (Platz bekannt) merkt sich nur „nicht buchen" (`_fremdSkip`).
+* **Brett-Netz in `_trackCard`** (Zonen support/ability/surprise/area/hero → `_stempelFremdHerkunft`): erscheint eine Karte gleichen Namens auf dem Brett, während das Buch eine fremde Karte dieses Namens kennt (oder die aufzulösende Handkarte `_resolvingCard` fremd ist — Karten, die sich VOR dem Splice selbst aufs Brett legen), trägt die Instanz `originalOwner = Besitzer`, die fremde Geister-Handinstanz wird abgeräumt. Die Herkunft ist **gesperrt** (Zugriffsfunktion ohne Wirkung beim Schreiben): die ~25 Stellen, die beim Anlegen/Beschwören auf fremder Brettseite pauschal `inst.originalOwner = <Spieler>` setzen, können den Besitzer einer gestohlenen Karte nicht mehr mit dem Dieb überschreiben (`markiereSeitenfremd` respektiert die Marke ebenfalls).
+* **Stapel:** `engine.handKartenBesitzerPs(ps, name)` (NACH `takeFromPileSync(…,'hand',…)`) — jetzt auch mit überschriebenem Einzelsatz (Buch); `engine.handZugangRueckgabe(ps, name, opts)` für „unverrichteter Dinge zurück auf die Hand" (Herkunft bleibt); `engine._pileOwnerFlug(halter, name, idx)` für `fromOwner/toOwner` des Fluges VOR dem Splice.
+* **Bounce/Heimkehr:** Brett → Hand/Ablage/Löschstapel einer Karte mit `originalOwner ≠ owner` geht zum BESITZER (`actionMoveCard`-`_heimkehr`, `returnSupportCreatureToHand`); Texte mit „YOUR hand" bleiben bei `opts.toPlayer` (Karte danach gekennzeichnet).
+* **Hand-Reaktionsfenster und Reaktionskette** (30 Stellen) legen über `handKartenBesitzerPs` ab; `doPlaySpell` stempelt die Spell-Instanz (Area/Anhängsel bleiben Eigentum des Besitzers); `placeAttachment` übernimmt `ctx.card.originalOwner`; Sofort-Guss (`_castSpellImmediately`) legt Spell/Anhängsel/Area in den Stapel bzw. auf das Brett des Besitzers.
+* **Umsortieren ohne Permutation** (`reorder_hand`): `engine.herkunftNachNamenVerteilen` verteilt die Marken nach Namen statt sie zu streichen.
+
+### 3) Verträge für künftige Karten
+* Karte in eine FREMDE Hand legen → `engine.handZugang(…, { originalOwner })` oder `engine._tagHandCardOrigin(halter, name, besitzer)`; den Weg der Hand-Instanz geht `actionStealFromHand`/`actionTransferCardToOppHand` schon.
+* Handkarte per Skript entnehmen und ablegen/löschen/ins Deck → `engine.handKartenBesitzerPs(ps, name)` statt `ps`; zurücklegen → `handZugangRueckgabe`; Flug → `…this._pileOwnerFlug(...)`. Aufs Brett legen reicht `_trackCard`/`safePlaceInSupport` (Netz) — nie `inst.originalOwner = <Spieler>` für eine Karte, die aus der HAND kam, ohne den Besitzer zu fragen (`_herkunftGestempelt`).
+* Pile-bezogene Zähler („Karten in deiner Ablage", Core/Gun): „deine" = der KONTROLLEUR (Welle 28/W28a, W58) — unverändert; es geht nur darum, in WESSEN Stapel eine Karte LIEGT.
+
+### 4) Audit-Tabelle
+| Weg | Eintritt | Austritt | Ergebnis vorher → nachher |
+|---|---|---|---|
+| **Charme Lv 2** | Hand → Hand (Platzmarke + Instanz) | Abwerfen, Zwangsabwurf, Mehrfach-/Animiert-Abwurf, Handlimit, Löschen (deleteMode/Item Lock), Spell/Potion/Artefakt spielen, Zurückmischen, Mulligan | schon richtig (M01-16) → richtig (`c-01`) |
+| Charme Lv 2 | – | Ausrüstung, Free-Side-Equip, Ability, Surprise, Area, Anhängsel zerstören; Kreatur stirbt/zerstört | Dieb → Besitzer (`c-02`) |
+| Charme Lv 2 | – | Bounce der gestohlenen Kreatur | Hand des Diebs → Hand des Besitzers (`c-02`) |
+| Charme Lv 2 | – | als Reaktion aus der Hand gespielt (Bamboo Shield, Spectral Armor …) | Dieb → Besitzer (`c-06`) |
+| Charme Lv 2 | – | Skript-Wege (Army of the Cute, Bottled Flame, Sofort-Guss, Reaktions-Beschwörung …) | Dieb → Besitzer (`c-05`) |
+| Charme Lv 2 in beide Richtungen | gestohlene Karte wird zurückgeklaut | alle | Besitzer = Geber angenommen → Marke des Geber-Platzes (`c-03`) |
+| Thieving Strike, Loot the Leftovers, Gather Intel, Live Show (Griff) | `actionStealFromHand` | alle (siehe oben) | **alles Dieb** → Besitzer (`c-04`) |
+| Cool Presents, Live Show, Hat of Madness, Santa Klaus, Chatty Town Guard, Crystal Well, Saint Nicolas (Geschenk) | `actionTransferCardToOppHand` | alle | **alles Beschenkter** → Besitzer (`c-04`) |
+| Infiltration, Enigma, Hunting 1, Key, Sid, Krates, Spice Mortar, Gold Trap, Magic Lamp, Birthday Present, Sculpture Theft, Winged Skeleton, Noble Mummy Guards, Divine Gift of Time, Sparkfly, Jenny (bereits getaggt) | Platzmarke | Hand-Austritte schon richtig; Brett, Reaktionsfenster, Skripte, Bounce wie oben | → alle richtig |
+| Letter of Misinformations, Magic Lamp, Birthday Present (nur `inst.originalOwner`) | Instanz | Hand-Austritte | Einzelsatz „eigene Karte" → Instanz-Fallback (`c-07`) |
+| Very Special Prisoner, Sacrifice to Divinity, Peter Röll …: Ability aus Hand/Deck | `_trackCard` ability | Zerstören/Opfern | Netz + Sperre (`c-02`, Ability) |
+| Kontrollwechsel Kreatur (Hunting 2/3, Dark Gear, Chilly Wizard, `actionTransferCreature`, Styx/Seitenwechsel, Hunting) | `owner` wechselt, `originalOwner` bleibt | Tod, Zerstören, Opfer (Suspicious Monster) | Ablage schon richtig; Suspicious Monster → Besitzer; Bounce Hand des Kontrolleurs → **Besitzer** |
+| Charme Lv 3 (übernommener Held), Golden Apple, Love Shot, Styx | Held steht in der Spalte des Besitzers | Ausrüstung/Anhängsel des Helden gehören ihrem Besitzer; vom Kontrolleur über den Helden gespielte Karten gehören dem Kontrolleur; gestohlene Handkarte über den Helden gespielt: Besitzer | Kreatur über geliehenen Helden: Dieb → Besitzer (`c-05` seitenfremd) |
+| Coolness Stack (Hand → Stapel → Ablage/Löschstapel/Hand) | `actionPushHandCardToCoolnessStack` | `actionPopCoolnessStackTo` | Halter → Besitzer |
+| `reorder_hand` ohne Permutation | Marken `_handOriginals` | alle | Marken gestrichen → nach Namen verteilt (`c-03` e) |
+| Handlimit/Handgröße | – | – | gestohlene Karte zählt für die Hand des Diebs (`c-03` b), Ablage des Besitzers |
+| Nicht untersucht (kein Skript im Repo): Secret Entrance, I Found You!, Skulltop Castle, Treasure Theft, Control Monitors, The Root of all Presents | – | – | `data/cards.json` kennt die Karten, `cards/effects/` hat keine Skripte |
+
+### 5) Rulings-Abgleich
+* „you control" = aktuelle Kontrolle, Karten gehören dem Besitzer (Welle 28/W28a, Welle 31): **unverändert.** Core/Gun zählen die Ablage des Kontrolleurs (W58) — betrifft die Frage, WESSEN Ablage „deine" ist, nicht in welchen Stapel eine Karte fällt.
+* Gestohlene Karten zählen für Handgröße/Handlimit des Diebs und handbasierte Zähler (sie liegen in seiner Hand).
+
+### 6) Tests
+`docs/niche-tests/repro/W63/c-01 … c-07` (alle Exit 0 = korrekt; `c-02 … c-07` auf dem alten Stand rot). Gemeinsame Hilfen: `docs/niche-tests/lib/besitzer.js`.
+
+### 7) Rückfragen an Al (Ja/Nein)
+1. **Bounce einer gestohlenen/übernommenen Kreatur** („return to hand", ohne „YOUR hand" im Text): Hand des **Besitzers**, nicht des Kontrolleurs (bisher: Kontrolleur). Gilt jetzt auch für Karten mit `originalOwner ≠ owner` (Hunting, Dark Gear, Charme-Diebstahl) — ja/nein?
+2. **Coolness Stack**: die Karte liegt im Stapel des Halters (Stapel gehört dem Wowhalla-Besitzer), verlässt sie ihn per Ablage/Löschen, geht sie in den Stapel des Besitzers; kommt sie auf die Hand, bleibt sie Eigentum des Besitzers — ja/nein?
+3. **Core/Gun an übernommenem Helden:** zählen weiter die Ablage des Kontrolleurs (Ruling W58/W28a) — oder die des Besitzers der Ausrüstung?
