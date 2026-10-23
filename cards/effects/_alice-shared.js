@@ -180,6 +180,36 @@ function shareableSupportZones(engine, pi, cardName, opts = {}) {
 }
 
 /**
+ * ★ W63a (Al, 22.10.2026: „es sollte immer gelten: erst die geteilte Zone, sofern Alices Effekt aktiv ist, DANN die erste leere"):
+ * stellt in einer Zonenliste die GETEILTEN Eintraege (`shared: true`) VOR die freien — stabil, sonst unveraendert. Wer eine Zone selbst
+ * bestimmt (kein Spielerentscheid), nimmt danach `[0]`; bei einer Spielerwahl ist die geteilte Zone die Standardvorauswahl.
+ * @param {Array<{shared?: boolean}>} zones
+ */
+function geteiltZuerst(zones) {
+  if (!Array.isArray(zones) || !zones.some(z => z && z.shared)) return zones;
+  return [...zones.filter(z => z.shared), ...zones.filter(z => !z.shared)];
+}
+
+/**
+ * ★ W63a (Al, 22.10.2026: „das sollte allgemein fuer alle Beschwoerungs-/Platzierungs-Effekte gelten"): ergaenzt die FREIEN Zonen eines Skripts, das
+ * seine Zonenliste selbst baut (eigene Filter: Held-Zustand, Sperren, `canSummon`), um die GETEILTEN Zonen der Alice-Teilung — und stellt sie VORN.
+ * Die geteilten Zonen kommen aus der zentralen Frage `engine.beschwoerZonenFuer(pi, cardName, opts)`; `filter(z)` kann sie zusaetzlich einschraenken
+ * (z. B. `isCreatureSummonable` je Held). Gleiche Form wie die freien Eintraege: `{ owner, heroIdx, slotIdx, label, shared: true, stackDepth }`.
+ * Ohne Alice-Teilung (oder ohne gleichnamige Creature) bleibt `frei` unveraendert.
+ * @param {object} engine · @param {number} pi Beschwoerer · @param {string} cardName
+ * @param {Array} frei die freien Zonen des Skripts
+ * @param {object} [opts] wie `getFreeSupportZones` (Standard: `nachKontrolle: true`, `livingHeroesOnly: true`)
+ * @param {(z: object) => boolean} [filter]
+ */
+function mitGeteilten(engine, pi, cardName, frei, opts = {}, filter = null) {
+  if (!cardName) return frei;
+  const geteilt = engine.beschwoerZonenFuer(pi, cardName, { nachKontrolle: true, livingHeroesOnly: true, ...opts })
+    .filter(z => z.shared && (!filter || filter(z)))
+    .map(z => ({ owner: z.owner ?? pi, heroIdx: z.heroIdx, slotIdx: z.slotIdx, label: z.label, shared: true, stackDepth: z.stackDepth }));
+  return geteilt.length ? [...geteilt, ...frei] : frei;
+}
+
+/**
  * Beschreibt eine Instanz fuer die Auswahl-Abfrage. Genau die Angaben,
  * die Al verlangt hat: aktuelle und maximale HP, Counter, Status.
  * Reine Lesefunktion — kein Zustand wird angefasst.
@@ -224,8 +254,23 @@ function describeInstance(engine, inst) {
   };
 }
 
+/**
+ * ★ W63a — erster Platz auf EINEM bestimmten Helden (Brettseite `feld`, auch ein seitenfremd kontrollierter Held), ohne Held-/Kontrollfilter der
+ * Zonenlisten: erst (Alice-Teilung des Beschwoerers `sharer`) die Zone einer GLEICHNAMIGEN Creature, DANN die erste leere. -1 = kein Platz.
+ */
+function ersterPlatzAufHeld(engine, feld, heroIdx, cardName, sharer = feld) {
+  const zonen = engine.gs.players[feld]?.supportZones?.[heroIdx] || [];
+  if (cardName) for (let si = 0; si < 3; si++) {
+    if ((zonen[si] || []).length > 0 && canShareInto(engine, sharer, heroIdx, si, cardName, feld)) return si;
+  }
+  const anzahl = Math.max(3, zonen.length);
+  for (let si = 0; si < anzahl; si++) if (!zonen[si] || zonen[si].length === 0) return si;
+  return -1;
+}
+
 module.exports = {
   ALICE_NAME,
+  ersterPlatzAufHeld,
   sharingActive,
   armSharing,
   stackAt,
@@ -233,5 +278,7 @@ module.exports = {
   isStacked,
   canShareInto,
   shareableSupportZones,
+  geteiltZuerst,
+  mitGeteilten,
   describeInstance,
 };

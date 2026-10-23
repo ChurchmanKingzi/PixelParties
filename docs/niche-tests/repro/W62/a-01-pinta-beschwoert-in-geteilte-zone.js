@@ -103,12 +103,12 @@ const potion = (t, seat) => t.gs.players[seat].potionDeck.slice();
       R.check('nichts beschworen, Zone A unverändert', JSON.stringify(zone(t, seat, 0)) === JSON.stringify([SLIME, BIG]) && t.lg('pinta_summon').length === 0, { r, z: zone(t, seat, 0) });
       R.check('keine Engine-Fehler', t.errors.length === 0, t.errors); }
 
-    R.section(S + 'freie Zone UND geteilte Zone: Pinta nimmt wie bisher die ERSTE FREIE Zone (keine Zonenwahl) — freie Zone C hinter dem Stapel A');
+    R.section(S + 'freie Zone UND geteilte Zone: W63a (Al: „erst die geteilte Zone, DANN die erste leere") — Pinta nimmt die GETEILTE Zone A (keine Zonenwahl), die freie Zone C bleibt leer');
     { const t = await brett(seat, [[SLIME, SLIME], [BIG], []]);
       const r = await t.activateHero(seat, 0);
-      R.check('der neue Slime steht in der freien Zone C, der Stapel A bleibt bei 2', zone(t, seat, 2).join() === SLIME && zone(t, seat, 0).length === 2 && r === true, [0, 1, 2].map(z => zone(t, seat, z)));
+      R.check('der neue Slime steht im Stapel A (×3), die freie Zone C bleibt leer', zone(t, seat, 0).length === 3 && zone(t, seat, 2).length === 0 && r === true, [0, 1, 2].map(z => zone(t, seat, z)));
       R.check('keine Zonenwahl gestellt', t.prompts.filter(p => p.d.type === 'zonePick').length === 0, t.prompts.map(p => p.d.type));
-      R.check('Aufdecken flog auf Zone C (Slot 2)', t.evs('mill_center_reveal').some(e => e.dest === 'support' && e.destSlotIdx === 2), t.evs('mill_center_reveal'));
+      R.check('Aufdecken flog auf Zone A (Slot 0)', t.evs('mill_center_reveal').some(e => e.dest === 'support' && e.destSlotIdx === 0), t.evs('mill_center_reveal'));
       R.check('keine Engine-Fehler', t.errors.length === 0, t.errors); }
 
     R.section(S + 'zwei geteilte Zonen (A = 2 Slimes, B = 1 Slime), keine freie: die erste geteilte Zone nimmt ihn');
@@ -118,10 +118,10 @@ const potion = (t, seat) => t.gs.players[seat].potionDeck.slice();
       R.check('keine Zonenwahl', t.prompts.filter(p => p.d.type === 'zonePick').length === 0, t.prompts.map(p => p.d.type));
       R.check('keine Engine-Fehler', t.errors.length === 0, t.errors); }
 
-    R.section(S + 'Hilfsfrage `engine.beschwoerZonenFuer`: frei vor geteilt, Gegenproben, Held-Filter');
+    R.section(S + 'Hilfsfrage `engine.beschwoerZonenFuer`: geteilt vor frei (W63a), Gegenproben, Held-Filter');
     { const t = await brett(seat, [[SLIME, SLIME], [], [BIG]]);
       const z = t.engine.beschwoerZonenFuer(seat, SLIME, { heroIdx: 0 });
-      R.check('Reihenfolge: freie Zone B, dann geteilte Zone A', JSON.stringify(z.map(e => [e.slotIdx, !!e.shared])) === JSON.stringify([[1, false], [0, true]]), z);
+      R.check('Reihenfolge (W63a): geteilte Zone A VOR der freien Zone B', JSON.stringify(z.map(e => [e.slotIdx, !!e.shared])) === JSON.stringify([[0, true], [1, false]]), z);
       R.check('andere Karte: nur die freie Zone', JSON.stringify(t.engine.beschwoerZonenFuer(seat, CRE, { heroIdx: 0 }).map(e => e.slotIdx)) === '[1]', t.engine.beschwoerZonenFuer(seat, CRE, { heroIdx: 0 }));
       R.check('Held ohne Zonen-Treffer (Held 1) liefert dessen drei freien Zonen, keine geteilte', t.engine.beschwoerZonenFuer(seat, SLIME, { heroIdx: 1 }).length === 3 && t.engine.beschwoerZonenFuer(seat, SLIME, { heroIdx: 1 }).every(e => !e.shared), t.engine.beschwoerZonenFuer(seat, SLIME, { heroIdx: 1 }));
       R.check('der Gegner (ohne Alice) bekommt keine geteilte Zone auf Pintas Seite', t.engine.beschwoerZonenFuer(1 - seat, SLIME, {}).every(e => !e.shared), null);

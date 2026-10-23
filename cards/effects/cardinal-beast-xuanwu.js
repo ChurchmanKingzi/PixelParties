@@ -98,7 +98,7 @@ module.exports = {
     // rule. This is a placement that skips `beforeSummon`, so cards
     // like King Trex re-apply their strict per-Hero archetype rule
     // (no Gigantisaur-occupied Hero when auto-sacrifice can't run).
-    const freeZones = [];
+    let freeZones = [];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
@@ -113,6 +113,7 @@ module.exports = {
     for (const z of engine.beschwoerZonenFuer(pi, chosenName, { livingHeroesOnly: true })) {
       if (z.shared && engine.isCreatureSummonable(chosenName, pi, z.heroIdx, { _bypassBeforeSummon: true })) freeZones.push({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, shared: true, label: z.label });
     }
+    freeZones = require('./_alice-shared').geteiltZuerst(freeZones);   // W63a (Al, 22.10.2026): erst die geteilte Zone, DANN die erste leere
     if (freeZones.length === 0) return false;
 
     let destHeroIdx, destSlot;

@@ -73,12 +73,13 @@ function _userHasFreeSupportSlot(ps, heroIdx) {
  */
 function _userSlotFor(engine, ps, pi, hs, heroIdx, name) {
   const sup = ps?.supportZones?.[heroIdx] || [];
-  const frei = sup.findIndex(sl => (sl || []).length === 0);
-  if (frei >= 0) return frei;
-  if (!name) return -1;
-  const { canShareInto } = require('./_alice-shared');
-  for (let s = 0; s < 3; s++) if (canShareInto(engine, pi, heroIdx, s, name, hs)) return s;
-  return -1;
+  // W63a (Al, 22.10.2026: „erst die geteilte Zone, sofern Alices Effekt aktiv ist, DANN die erste leere"): die Zone bestimmt der Zauber selbst —
+  // zuerst die geteilte Zone einer gleichnamigen Creature, sonst die erste freie.
+  if (name) {
+    const { canShareInto } = require('./_alice-shared');
+    for (let s = 0; s < 3; s++) if (canShareInto(engine, pi, heroIdx, s, name, hs)) return s;
+  }
+  return sup.findIndex(sl => (sl || []).length === 0);
 }
 function _userHasSlotFor(engine, ps, pi, hs, heroIdx, namen) {
   return _userHasFreeSupportSlot(ps, heroIdx) || namen.some(n => _userSlotFor(engine, ps, pi, hs, heroIdx, n) >= 0);

@@ -83,8 +83,9 @@ function alleParaseeds(engine) {
 }
 
 /** Freie Zonen aller Helden auf dem Brett, ausser denen des Wirts. */
-function umzugsZiele(engine, ausserHost) {
+function umzugsZiele(engine, ausserHost, inst = null) {
   const ziele = [];
+  const { canShareInto } = require('./_alice-shared');
   for (let pi = 0; pi < (engine.gs.players || []).length; pi++) {
     const ps = engine.gs.players[pi];
     for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
@@ -97,6 +98,18 @@ function umzugsZiele(engine, ausserHost) {
           owner: pi, heroIdx: hi, slotIdx: si,
           label: `${engine.gs.players[pi]?.username || 'P' + pi} — ${hero.name}`,
         });
+      }
+      // ★ W63a (Al, 22.10.2026: „Solange der Effekt aktiv ist, kann eine Creature in eine geteilte Zone bewegt werden"): mit Alice-Teilung des Zielspielers
+      // (bei der Landung wird er Kontrolleur) auch die Zone einer GLEICHNAMIGEN Paraseed — geteilte Zonen stehen vorn.
+      if (inst) {
+        for (let si = 0; si < 3; si++) {
+          if (!canShareInto(engine, pi, hi, si, inst.name, pi)) continue;
+          const tiefe = (ps.supportZones[hi][si] || []).length;
+          ziele.unshift({
+            owner: pi, heroIdx: hi, slotIdx: si, shared: true, stackDepth: tiefe,
+            label: `${engine.gs.players[pi]?.username || 'P' + pi} — ${hero.name} (×${tiefe})`,
+          });
+        }
       }
     }
   }
@@ -111,7 +124,7 @@ function kannPflanzen(engine, pi) {
 
 function kannUmziehen(engine) {
   return alleParaseeds(engine)
-    .some(inst => umzugsZiele(engine, { owner: inst.owner, heroIdx: inst.heroIdx }).length > 0);
+    .some(inst => umzugsZiele(engine, { owner: inst.owner, heroIdx: inst.heroIdx }, inst).length > 0);
 }
 
 // ─── Die beiden Modi ─────────────────────────────────────────────
@@ -176,7 +189,7 @@ async function umziehen(engine, pi) {
   for (;;) {
     const beweglich = alleParaseeds(engine).filter(inst =>
       !schonBewegt.has(inst.id)
-      && umzugsZiele(engine, { owner: inst.owner, heroIdx: inst.heroIdx }).length > 0);
+      && umzugsZiele(engine, { owner: inst.owner, heroIdx: inst.heroIdx }, inst).length > 0);
     if (beweglich.length === 0) break;
 
     // ── Schritt 1: EINE Paraseed anklicken ────────────────────────
@@ -211,7 +224,7 @@ async function umziehen(engine, pi) {
     const vonOwner = inst.owner;
     const vonHero = inst.heroIdx;
     const wirt = engine.gs.players[vonOwner]?.heroes?.[vonHero]?.name || '—';
-    const zonen = umzugsZiele(engine, { owner: vonOwner, heroIdx: vonHero });
+    const zonen = umzugsZiele(engine, { owner: vonOwner, heroIdx: vonHero }, inst);   // W63a: + geteilte Zone (Alice)
     if (zonen.length === 0) break;
 
     const ziel = zonen.length === 1 ? zonen[0]

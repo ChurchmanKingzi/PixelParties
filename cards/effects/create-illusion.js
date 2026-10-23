@@ -142,7 +142,7 @@ module.exports = {
       // Trex re-apply their strict per-Hero archetype rule — no
       // Gigantisaur-occupied Hero when the auto-sacrifice can't run.
 
-      const freeZones = [];
+      let freeZones = [];
       // W16g (S01-15): „a free Support Zone of THE USER“ — nur die Zonen des wirkenden Helden (wie Create Secret Room:
       // „the user's Surprise Zone“). Bei einem geliehenen Wirker (andere Brettseite) bleibt es bei den eigenen Helden.
       const nurNutzer = (ctx.cardHeroOwner ?? pi) === pi && Number.isInteger(heroIdx) && heroIdx >= 0;
@@ -157,7 +157,7 @@ module.exports = {
           }
         }
       }
-      // ★ W62a: + (Alice-Teilung) die Zone einer GLEICHNAMIGEN Creature, freie Zonen zuerst. Spielbar bleibt der Zauber nur mit freier
+      // ★ W62a: + (Alice-Teilung) die Zone einer GLEICHNAMIGEN Creature (W63a: geteilte Zone zuerst, dann die freien). Spielbar bleibt der Zauber nur mit freier
       // Zone (`canPlayWithHero`/`spellPlayCondition`: die Creature steht erst nach der Deck-Wahl fest).
       for (const z of engine.beschwoerZonenFuer(pi, chosenName, { livingHeroesOnly: true })) {
         if (!z.shared) continue;
@@ -166,6 +166,7 @@ module.exports = {
         freeZones.push({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, shared: true, label: z.label });
       }
 
+      freeZones = require('./_alice-shared').geteiltZuerst(freeZones);   // W63a (Al, 22.10.2026): erst die geteilte Zone, DANN die erste leere
       if (freeZones.length === 0) {
         gs._spellCancelled = true;
         return;

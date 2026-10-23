@@ -78,7 +78,7 @@ module.exports = {
             }
           }
         }
-        // ★ W62a: mit Alice-Teilung ist auch die Zone einer GLEICHNAMIGEN Creature ein Ziel (Slime in einen Slime-Stapel); freie zuerst.
+        // ★ W62a: mit Alice-Teilung ist auch die Zone einer GLEICHNAMIGEN Creature ein Ziel (Slime in einen Slime-Stapel); W63a (Al): geteilte Zone zuerst.
         if (forCardName) {
           const { canShareInto } = require('./_alice-shared');
           for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
@@ -91,7 +91,7 @@ module.exports = {
             }
           }
         }
-        return zones;
+        return require('./_alice-shared').geteiltZuerst(zones);   // W63a (Al, 22.10.2026): erst die geteilte Zone, DANN die erste leere
       };
 
       // Fizzle if no free zones anywhere (sentinel — name-agnostic; W62a: oder eine geteilte Zone fuer eine der Handkarten)

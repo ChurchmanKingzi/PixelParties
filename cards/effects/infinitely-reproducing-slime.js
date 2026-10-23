@@ -150,7 +150,7 @@ module.exports = {
       if (zones.length > 1) {
         const zonePick = await engine.promptGeneric(pi, {
           type: 'zonePick',
-          zones: zones.map(z => ({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, owner: z.owner, ownerIdx: z.owner })),   // Kontrolle statt Seite (Styx 28.9.)
+          zones: zones.map(z => ({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, owner: z.owner, ownerIdx: z.owner, ...(z.shared ? { shared: true, stackDepth: z.stackDepth, label: z.label } : {}) })),   // Kontrolle statt Seite (Styx 28.9.); W63a: geteilte Zonen stehen vorn und tragen `shared`
           title: CARD_NAME,
           description: 'Choose a free Support Zone for the new Slime.',
           cancellable: true,

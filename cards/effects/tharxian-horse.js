@@ -100,17 +100,17 @@ function eligibleDestinations(engine, pi, creatureName) {
         || hero.statuses?.bound) continue;   // Welle 12 (Al): Negated sperrt „summon" nicht; die harte Form (Abilities negiert) begrenzt ueber `heroMeetsLevelReq` auf Stufe 0
     if (!engine.heroMeetsLevelReq(physOwner, hi, cd, { pileSide: 'discard' })) continue;
     if (!engine.isCreatureSummonable(creatureName, physOwner, hi)) continue;
-    const sup = engine.gs.players[physOwner].supportZones?.[hi] || [];
-    for (let si = 0; si < 3; si++) {
-      if (((sup[si] || []).length === 0)) {
-        out.push({
-          owner: physOwner, heroIdx: hi, slotIdx: si,
-          label: `${hero.name} — Slot ${si + 1}`,
-        });
-      }
+    // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): freie Zonen UND — mit
+    // Alice-Teilung des Beschwoerers — die Zone einer GLEICHNAMIGEN Creature (`engine.beschwoerZonenFuer`).
+    for (const zz of engine.beschwoerZonenFuer(pi, creatureName, { seite: physOwner, heroIdx: hi, nurBasis: true, namedHeroesOnly: true })) {
+      out.push({
+        owner: physOwner, heroIdx: hi, slotIdx: zz.slotIdx,
+        label: `${hero.name} — Slot ${zz.slotIdx + 1}${zz.shared ? ` (×${zz.stackDepth})` : ''}`,
+        ...(zz.shared ? { shared: true, stackDepth: zz.stackDepth } : {}),
+      });
     }
   }
-  return out;
+  return require('./_alice-shared').geteiltZuerst(out);
 }
 
 /** Build the discard-revive gallery, filtered to summonable Creatures. */

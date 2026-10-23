@@ -104,7 +104,7 @@ module.exports = {
       let dest = zonen[0];
       if (zonen.length > 1) {
         const zp = await ctx.promptZonePick(
-          zonen.map(z => ({ owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx, ownerIdx: z.owner })),
+          zonen.map(z => ({ owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx, ownerIdx: z.owner, ...(z.shared ? { shared: true, stackDepth: z.stackDepth, label: z.label } : {}) })),   // W63a: geteilte Zone (Alice) vorn, mit Kennzeichen
           { title: CARD_NAME, description: `Choose a free Support Zone for ${cardName}.`, cancellable: true, previewCardName: cardName },
         );
         if (!zp || zp.cancelled || typeof zp.heroIdx !== 'number' || typeof zp.slotIdx !== 'number') return;

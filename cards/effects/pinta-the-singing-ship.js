@@ -48,11 +48,11 @@
 //     Student" (Alice-Teilung des Kontrolleurs: auch bei gefallener/negierter Alice, `_alice-shared.sharingActive`) ist auch eine
 //     BELEGTE Zone ein Landeplatz, in der schon nur Kreaturen GLEICHEN Namens liegen — die aufgedeckte Creature stapelt sich dazu,
 //     wie beim Hand-Weg. Die Zonenfrage ist EINE zentrale (`eligibleSummonZones` → `canShareInto`, dieselbe Auslegung wie
-//     `engine.beschwoerZonenFuer`): freie Zonen zuerst (der Hand-Weg legt in einen leeren Platz, wenn der Spieler keinen anderen
-//     wählt; Pinta wählt nie), dahinter die geteilten. Ohne Alice-Teilung oder ohne gleichnamige Kreatur bleibt es bei „keine Zone →
+//     `engine.beschwoerZonenFuer`): ★ W63a (Al, 22.10.2026: „erst die geteilte Zone, DANN die erste leere"): GETEILTE Zonen zuerst, dahinter
+//     die freien — wählt der Spieler selbst (Hand-Weg), bleiben beide wählbar; Pinta wählt nie und nimmt die erste Zone der Liste. Ohne Alice-Teilung oder ohne gleichnamige Kreatur bleibt es bei „keine Zone →
 //     nicht beschwörbar". Die Opfer-Zonen unten gelten nur, wenn WEDER eine freie NOCH eine geteilte Zone da ist.
 //
-//     PLATZ: KEINE Zonenwahl — Pinta nimmt die ERSTE freie Zone (sonst die erste geteilte). Einzige
+//     PLATZ: KEINE Zonenwahl — Pinta nimmt die ERSTE geteilte Zone (W63a; Alice-Teilung), sonst die erste freie. Einzige
 //     Ausnahme: sind alle Zonen Pintas belegt und verlangt die aufgedeckte
 //     Creature Opfer (Blue-Ice Dragon), waehlt der Spieler NACH dem
 //     Aufdecken die Zone, in die sie soll — die Creature, die dort steht,

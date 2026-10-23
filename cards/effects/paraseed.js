@@ -155,7 +155,7 @@ module.exports = {
       const toeter = killerHeroOf(engine, ctx.source);
       if (!toeter) return;                                  // Artifact/Potion/Status
 
-      const slot = freeSlotOnHero(engine, toeter.owner, toeter.heroIdx);
+      const slot = freeSlotOnHero(engine, toeter.owner, toeter.heroIdx, tot.name);   // W63a: auch die Zone einer GLEICHNAMIGEN Paraseed (Alice-Teilung des Toeters), geteilte zuerst
       if (slot < 0) return;                                 // keine freie Zone → Ablage
 
       const inst = engine.cardInstances.find(c => c.id === tot.instId);

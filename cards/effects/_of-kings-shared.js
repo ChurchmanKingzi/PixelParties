@@ -233,10 +233,13 @@ function freeZonesOfHero(engine, pi, heroIdx, cardName = null, sharer = pi) {
   const out = [];
   // v1349: versiegelte Plaetze (Madame Guillotine) zaehlen als belegt.
   for (let z = 0; z < 3; z++) if (!engine.supportSlotBelegt(pi, heroIdx, z)) out.push(z);
-  // ★ W62a: mit `cardName` zaehlt — bei Alice-Teilung des Beschwoerers `sharer` — auch die Zone einer GLEICHNAMIGEN Creature (frei zuerst).
+  // ★ W62a: mit `cardName` zaehlt — bei Alice-Teilung des Beschwoerers `sharer` — auch die Zone einer GLEICHNAMIGEN Creature.
+  // ★ W63a (Al, 22.10.2026: „erst die geteilte Zone, DANN die erste leere"): die geteilten Zonen stehen VOR den freien.
   if (cardName) {
     const { canShareInto } = require('./_alice-shared');
-    for (let z = 0; z < 3; z++) if (!out.includes(z) && canShareInto(engine, sharer, heroIdx, z, cardName, pi)) out.push(z);
+    const geteilt = [];
+    for (let z = 0; z < 3; z++) if (!out.includes(z) && canShareInto(engine, sharer, heroIdx, z, cardName, pi)) geteilt.push(z);
+    return [...geteilt, ...out];
   }
   return out;
 }
@@ -345,7 +348,23 @@ function summonZonesFor(engine, pi, cd, opts = {}) {
       out.push(seite !== pi ? { heroIdx: hi, slotIdx: z, owner: seite } : { heroIdx: hi, slotIdx: z });
     }
   }
-  return out;
+  return geteiltVorn(engine, pi, out, cd?.name, seite);
+}
+
+/**
+ * ★ W63a (Al, 22.10.2026: „erst die geteilte Zone, sofern Alices Effekt aktiv ist, DANN die erste leere"): stellt in einer Zonenliste
+ * `[{ heroIdx, slotIdx, owner? }]` die GETEILTEN Zonen (belegt, nur gleichnamige Creatures, `canShareInto` fuer `pi`) nach vorn und markiert
+ * sie mit `shared: true`; sonst bleibt die Reihenfolge. `seite` = Brettseite, wenn der Eintrag kein `owner` traegt.
+ */
+function geteiltVorn(engine, pi, zones, cardName, seite = pi) {
+  if (!cardName || !zones.length) return zones;
+  const { canShareInto } = require('./_alice-shared');
+  const markiert = zones.map(z => {
+    const feld = z.owner ?? seite;
+    const belegt = (engine.gs.players[feld]?.supportZones?.[z.heroIdx]?.[z.slotIdx] || []).length > 0;
+    return belegt && canShareInto(engine, pi, z.heroIdx, z.slotIdx, cardName, feld) ? { ...z, shared: true } : z;
+  });
+  return markiert.some(z => z.shared) ? [...markiert.filter(z => z.shared), ...markiert.filter(z => !z.shared)] : markiert;
 }
 
 async function pickZone(engine, pi, zones, title, description) {
@@ -417,6 +436,6 @@ module.exports = {
   protectorAffectable, coveredByBoardOfKings,
   reduceLevelByOfKingsFactory, summonedThisTurn,
   freeZonesOfHero, freeZonesAll, collectHandAndDeck, takeFromPile, returnToPile,
-  pickFromHandOrDeck, placeFromHandOrDeck, summonFromHandOrDeck, summonZonesFor, pickZone,
+  pickFromHandOrDeck, placeFromHandOrDeck, summonFromHandOrDeck, summonZonesFor, geteiltVorn, pickZone,
   mainActionSlotFree, ofKingsCpuAnswer,
 };

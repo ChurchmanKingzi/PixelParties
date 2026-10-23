@@ -144,7 +144,7 @@ module.exports = {
     // ★ W22a (Al, 20.10.2026, „Hero you control": „Nur der aktuelle Kontrolleur, inklusive eines temporaeren Kontrolleurs"): die Zonen der Helden, die `pi`
     // KONTROLLIERT (`heroesControlledBy`): ein abgegebener eigener Held (dauerhaft oder temporaer) wird dem Besitzer nicht angeboten, ein uebernommener Held der
     // Gegenspalte seinem Kontrolleur (Zone traegt `owner` = Brettseite; die Illusion steht dann seitenfremd, kontrolliert von `pi`).
-    const freeZones = [];
+    let freeZones = [];
     for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
       if (!h?.name) continue;
       if (!engine.isCreatureSummonable(chosenName, physOwner, hi, { _bypassBeforeSummon: true })) continue;
@@ -158,12 +158,13 @@ module.exports = {
         }
       }
     }
-    // ★ W62a: + (Alice-Teilung) die Zone einer GLEICHNAMIGEN Creature, freie Zonen zuerst (`beschwoerZonenFuer`).
+    // ★ W62a: + (Alice-Teilung) die Zone einer GLEICHNAMIGEN Creature (W63a: geteilte Zone zuerst, dann die freien; `beschwoerZonenFuer`).
     for (const z of engine.beschwoerZonenFuer(pi, chosenName, { nachKontrolle: true })) {
       if (!z.shared) continue;
       if (!engine.isCreatureSummonable(chosenName, z.owner, z.heroIdx, { _bypassBeforeSummon: true })) continue;
       freeZones.push({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, owner: z.owner, shared: true, label: z.label });
     }
+    freeZones = require('./_alice-shared').geteiltZuerst(freeZones);   // W63a (Al, 22.10.2026): erst die geteilte Zone, DANN die erste leere
     if (freeZones.length === 0) return { aborted: true };
 
     let destHeroIdx, destSlot, destSeite = pi;

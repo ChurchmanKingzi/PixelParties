@@ -53,14 +53,14 @@ function getFreeZones(ps, heroIdx, owner) {
 
 /**
  * ★ W62a: freie Zonen des Helden PLUS — mit Alice-Teilung des Kontrolleurs `pi` — die Zonen, in denen schon nur GLEICHNAMIGE
- * Kreaturen liegen (`engine.beschwoerZonenFuer`, Kontrolle statt Seite). Freie zuerst.
+ * Kreaturen liegen (`engine.beschwoerZonenFuer`, Kontrolle statt Seite). W63a (Al): GETEILTE zuerst, dann die freien.
  */
 function getZonesFor(engine, pi, ps, heroIdx, owner, cardName) {
   const frei = getFreeZones(ps, heroIdx, owner);
   if (!cardName || !ps.heroes?.[heroIdx]?.name || ps.heroes[heroIdx].hp <= 0) return frei;
   const geteilt = engine.beschwoerZonenFuer(pi, cardName, { seite: owner, heroIdx, livingHeroesOnly: true })
     .filter(z => z.shared).map(z => ({ owner, heroIdx, slotIdx: z.slotIdx, shared: true, label: z.label }));
-  return [...frei, ...geteilt];
+  return [...geteilt, ...frei];   // W63a (Al, 22.10.2026): erst die geteilte Zone, DANN die erste leere
 }
 
 /**

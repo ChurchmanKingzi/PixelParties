@@ -79,10 +79,12 @@ module.exports = {
       for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
         if (!hero?.name || hero.hp <= 0) continue;
         // Free zone check.
-        const zones = gs.players[physOwner]?.supportZones?.[hi] || [];
+        // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte): freie Zone ODER — mit Alice-Teilung des Beschwoerers — die Zone einer
+        // GLEICHNAMIGEN Loyal-Creature (`engine.beschwoerZonenFuer`, je Handkarte); geteilte zuerst.
         let freeSlot = -1;
-        for (let z = 0; z < 3; z++) {
-          if ((zones[z] || []).length === 0) { freeSlot = z; break; }
+        for (const l of handLoyals) {
+          const z0 = engine.ersteBeschwoerZone(pi, l.name, { seite: physOwner, heroIdx: hi, nurBasis: true, namedHeroesOnly: true });
+          if (z0) { freeSlot = z0.slotIdx; break; }
         }
         if (freeSlot < 0) continue;
         // Use any-Loyal level-req shortcut: every Loyal is Lv1 with
@@ -144,17 +146,16 @@ module.exports = {
       for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
         if (!hero?.name || hero.hp <= 0) continue;
         if (!canHeroSummon(engine, pi, hi, cd, { alsAktion: true, physOwner })) continue;   // Z6 (A06-26)
-        const zones = gs.players[physOwner]?.supportZones?.[hi] || [];
-        for (let z = 0; z < 3; z++) {
-          if ((zones[z] || []).length === 0) {
-            dests.push({
-              id: `equip-${physOwner}-${hi}-${z}`,
-              type: 'equip', owner: physOwner, heroIdx: hi, slotIdx: z,
-              cardName: '',
-            });
-          }
+        for (const zz of engine.beschwoerZonenFuer(pi, pickedLoyal, { seite: physOwner, heroIdx: hi, nurBasis: true, namedHeroesOnly: true })) {   // W63a: frei oder geteilt (Alice)
+          dests.push({
+            id: `equip-${physOwner}-${hi}-${zz.slotIdx}`,
+            type: 'equip', owner: physOwner, heroIdx: hi, slotIdx: zz.slotIdx,
+            cardName: '',
+            ...(zz.shared ? { shared: true } : {}),
+          });
         }
       }
+      dests.splice(0, dests.length, ...require('./_alice-shared').geteiltZuerst(dests));   // W63a (Al): erst die geteilte Zone, DANN die erste leere
       if (dests.length === 0) { refundHopt(); return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true }); }   // W11/R4: wirkt nicht → Blob stumm
 
       let destHero, destSlot, destOwner = dests[0].owner;

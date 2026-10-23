@@ -51,7 +51,7 @@ function getFreeSupportZonesForHero(ps, heroIdx) {
 
 /**
  * ★ W62a: freie Zonen des Helden PLUS — mit Alice-Teilung des Nutzers — die Zonen, in denen schon nur GLEICHNAMIGE Kreaturen
- * liegen („Creatures with identical names … share 1 Support Zone"). Freie zuerst. Ohne `name` nur die freien.
+ * liegen („Creatures with identical names … share 1 Support Zone"). W63a (Al): GETEILTE zuerst, dann die freien. Ohne `name` nur die freien.
  */
 function zonenFuerHeld(engine, ps, pi, heroIdx, name) {
   const frei = getFreeSupportZonesForHero(ps, heroIdx);
@@ -63,7 +63,7 @@ function zonenFuerHeld(engine, ps, pi, heroIdx, name) {
     const h = ps.heroes[heroIdx];
     geteilt.push({ heroIdx, slotIdx: si, shared: true, label: `${h.name}${h.hp <= 0 ? ' (KO)' : ''} — Slot ${si + 1} (×${(ps.supportZones[heroIdx][si] || []).length})` });
   }
-  return [...frei, ...geteilt];
+  return [...geteilt, ...frei];   // W63a (Al, 22.10.2026): erst die geteilte Zone, DANN die erste leere
 }
 
 module.exports = {

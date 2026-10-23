@@ -100,11 +100,16 @@ module.exports = {
       if (!_isSummonerHero(engine, pi, z.heroIdx)) s += 1;
       return s;
     };
-    let bestZone = destZones[0];
+    // ★ W63a (Al, 22.10.2026: „erst die geteilte Zone, DANN die erste leere"): gibt es eine geteilte Zone (Alice, `nurSlots` = die Kreaturen, die dort
+    // hineinpassen), nimmt die CPU zuerst eine von ihnen; die Hero-Wertung entscheidet nur noch unter gleichwertigen Zonen.
+    const geteilteZonen = destZones.filter(z => z.shared && (z.nurSlots || []).some(sl => creatures.some(c => c.zoneSlot === sl)));
+    const zonenPool = geteilteZonen.length ? geteilteZonen : destZones.filter(z => !z.shared);
+    if (zonenPool.length === 0) return null;
+    let bestZone = zonenPool[0];
     let bestScore = scoreZone(bestZone);
-    for (let i = 1; i < destZones.length; i++) {
-      const sc = scoreZone(destZones[i]);
-      if (sc > bestScore) { bestScore = sc; bestZone = destZones[i]; }
+    for (let i = 1; i < zonenPool.length; i++) {
+      const sc = scoreZone(zonenPool[i]);
+      if (sc > bestScore) { bestScore = sc; bestZone = zonenPool[i]; }
     }
 
     // Pick a creature to move. If the equipped hero is a strong summoner
@@ -112,9 +117,10 @@ module.exports = {
     // creature; otherwise prefer the highest-HP / strongest creature so
     // the destination receives the more valuable piece.
     const cardDB = engine._getCardDB();
-    let bestCreature = creatures[0];
+    const erlaubteKreaturen = bestZone.shared ? creatures.filter(c => (bestZone.nurSlots || []).includes(c.zoneSlot)) : creatures;   // W63a: in eine geteilte Zone passen nur gleichnamige
+    let bestCreature = erlaubteKreaturen[0];
     let bestCreatureScore = -Infinity;
-    for (const c of creatures) {
+    for (const c of erlaubteKreaturen) {
       const cd = engine.getEffectiveCardData(c.inst) || cardDB[c.name];   // wirksame Daten (Als Sweep 9.10.)
       const lvl = cd?.level || 0;
       const hp = cd?.hp || 0;
@@ -220,8 +226,8 @@ module.exports = {
     const hasCreature = _getCreaturesOnHero(ps, heroIdx, engine, _kontrolleur(ctx)).length > 0;
     if (!hasCreature) return false;
 
-    // Check for 1+ adjacent heroes with free zones
-    return _getAdjacentFreeZones(ps, heroIdx).length > 0;
+    // Check for 1+ adjacent heroes with free zones (W63a: oder, mit Alice-Teilung, einer geteilten Zone fuer eine der Kreaturen)
+    return _getAdjacentFreeZones(ps, heroIdx, engine, _getCreaturesOnHero(ps, heroIdx, engine, _kontrolleur(ctx))).length > 0;
   },
 
   async onEquipEffect(ctx) {
@@ -242,7 +248,7 @@ module.exports = {
 
     const creatures = _getCreaturesOnHero(ps, heroIdx, engine, kontrolleur);
     if (creatures.length === 0) return false;
-    const freeZones = _getAdjacentFreeZones(ps, heroIdx);
+    const freeZones = _getAdjacentFreeZones(ps, heroIdx, engine, creatures);   // W63a: + geteilte Zonen (Alice)
     if (freeZones.length === 0) return false;
 
     // Single combined prompt — client handles two-step click flow.
@@ -254,7 +260,7 @@ module.exports = {
       boardOwner: pi,
       heroIdx,
       creatures: creatures.map(c => ({ zoneSlot: c.zoneSlot, name: c.name })),
-      destZones: freeZones.map(z => ({ heroIdx: z.heroIdx, slotIdx: z.slotIdx })),
+      destZones: freeZones.map(z => ({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, ...(z.shared ? { shared: true, nurSlots: z.nurSlots, stackDepth: z.stackDepth } : {}) })),   // W63a: geteilte Zone (Alice) nur fuer gleichnamige Kreaturen (`nurSlots`)
       cancellable: true,
     });
 
@@ -273,8 +279,9 @@ module.exports = {
     if (!inst) return false;
     if (!creatures.some(c => c.inst === inst)) return false;   // nur angebotene Kreaturen
 
-    // Verify destination is still free
-    if (((ps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0) return false;
+    // Verify destination is still free (W63a: oder von einer GLEICHNAMIGEN Creature belegt und per Alice-Teilung geteilt)
+    if (((ps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0
+        && !require('./_alice-shared').canShareInto(engine, kontrolleur, destHeroIdx, destSlot, inst.name, pi)) return false;
 
     // Fire the card reveal now
     if (savedReveal) {
@@ -390,7 +397,7 @@ function _getCreaturesOnHero(ps, heroIdx, engine, kontrolleur = null) {
  * Get free Support Zones on adjacent heroes.
  * Adjacency: hero 0↔1, hero 1↔2 (hero 0 and 2 are NOT adjacent).
  */
-function _getAdjacentFreeZones(ps, heroIdx) {
+function _getAdjacentFreeZones(ps, heroIdx, engine = null, creatures = null) {
   const adjacent = [];
   if (heroIdx > 0) adjacent.push(heroIdx - 1);
   if (heroIdx < 2) adjacent.push(heroIdx + 1);
@@ -401,12 +408,18 @@ function _getAdjacentFreeZones(ps, heroIdx) {
   // Hero. Matches the rule applied across the Slippery / Dark Gear
   // / Skeleton tutor families.
   const result = [];
+  const geteilt = [];
   for (const hi of adjacent) {
     for (let zi = 0; zi < 3; zi++) {
       if (((ps.supportZones[hi] || [])[zi] || []).length === 0) {
         result.push({ heroIdx: hi, slotIdx: zi });
+      } else if (engine && creatures) {
+        // ★ W63a (Al, 22.10.2026: „Solange der Effekt aktiv ist, kann eine Creature in eine geteilte Zone bewegt werden"): mit Alice-Teilung ist die Zone einer
+        // GLEICHNAMIGEN Creature ein Ziel — aber nur fuer die gleichnamigen Kreaturen (`nurSlots` = deren Zonen-Slots am ausgeruesteten Helden).
+        const nurSlots = creatures.filter(c => require('./_slippery-shared').teilbarZiel(engine, c.inst, hi, zi)).map(c => c.zoneSlot);
+        if (nurSlots.length) geteilt.push({ heroIdx: hi, slotIdx: zi, shared: true, nurSlots, stackDepth: ps.supportZones[hi][zi].length });
       }
     }
   }
-  return result;
+  return geteilt.length ? [...geteilt, ...result] : result;   // Al: erst die geteilte Zone, DANN die erste leere
 }

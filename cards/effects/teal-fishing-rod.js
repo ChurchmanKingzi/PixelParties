@@ -61,7 +61,10 @@ function zonenFuer(engine, pi, cardName) {
       out.push({ owner: physOwner, heroIdx: hi, slotIdx: si, label: `${h.name} — Slot ${si + 1}` });
     }
   }
-  return out;
+  // W63a (Al, 22.10.2026): mit Alice-Teilung zaehlt auch die Zone einer GLEICHNAMIGEN Creature als „free" — geteilte Zone zuerst, dann die erste leere.
+  return require('./_alice-shared').mitGeteilten(engine, pi, cardName, out, { source: CARD_NAME },
+    z => !engine.isSupportZoneLocked(z.owner, z.heroIdx, { source: CARD_NAME, cardName, via: 'place' })
+      && (!cardName || engine.isCreatureSummonable(cardName, z.owner, z.heroIdx, { _bypassBeforeSummon: true })));
 }
 
 module.exports = {

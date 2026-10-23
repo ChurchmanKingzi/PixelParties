@@ -204,7 +204,7 @@ module.exports = {
       if (!cd) return { cancelled: true };
 
       // Step 2: Pick a support zone on an eligible hero
-      const freeZones = [];
+      let freeZones = [];
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         if (!canHeroSummon(engine, ps, pi, hi, cd, creatureSource)) continue;
         if (!engine.isCreatureSummonable(creatureName, pi, hi, { _bypassBeforeSummon: true })) continue;
@@ -224,6 +224,7 @@ module.exports = {
         }
       }
 
+      freeZones = require('./_alice-shared').geteiltZuerst(freeZones);   // W63a (Al, 22.10.2026): erst die geteilte Zone, DANN die erste leere
       if (freeZones.length === 0) return { cancelled: true };
 
       const zone = await engine.promptGeneric(pi, {

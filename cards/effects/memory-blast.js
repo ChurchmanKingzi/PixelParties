@@ -137,14 +137,11 @@ module.exports = {
 
       if (warMeine) {
         // Erste freie Zone auf meiner Seite suchen.
+        // ★ W63a (Al, 22.10.2026: „Solange der Effekt aktiv ist, kann eine Creature in eine geteilte Zone bewegt werden"; „erst die geteilte Zone, DANN die erste leere"):
+        // mit Alice-Teilung des Zaubernden ist auch die Zone einer GLEICHNAMIGEN Creature ein Ziel und kommt zuerst (`engine.ersteBeschwoerZone`).
         let ziel = null;
-        for (let hi = 0; hi < (ps.heroes || []).length && !ziel; hi++) {
-          const hero = ps.heroes[hi];
-          if (!hero?.name || hero.hp <= 0) continue;
-          for (let zi = 0; zi < 3; zi++) {
-            if (((ps.supportZones?.[hi] || [])[zi] || []).length === 0) { ziel = { hi, zi }; break; }
-          }
-        }
+        const z0 = engine.ersteBeschwoerZone(pi, inst.name, { livingHeroesOnly: true, nurBasis: true });
+        if (z0) ziel = { hi: z0.heroIdx, zi: z0.slotIdx };
         if (!ziel) {
           // Kein Platz — dann passiert schlicht nichts. „instead" laesst
           // keinen Rueckfall auf Schaden zu.
