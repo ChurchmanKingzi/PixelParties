@@ -25091,6 +25091,18 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     delete this.gs._preventPhaseAdvance;
 
+    // ── Einmal-Marker „Zug beenden / Aktion nachtragen" räumen ──
+    // `gs._spellEndsTurn` und `gs._pendingActionBurn` sind Reiter, die ein
+    // Zauber/eine Ability setzt und die NUR der Server-Pfad der setzenden
+    // Aktion einlöst (doPlaySpell, doActivateAbility, doActivateFreeAbility,
+    // doUseArtifactEffect). Blieb einer stehen (Aktion auf einem Weg ohne
+    // Einlöser, Abbruch nach dem Setzen), löste ihn die NÄCHSTE beliebige
+    // Aktion irgendeines Spielers ein — bei `_spellEndsTurn` also ein
+    // fremdes Zugende (Bugreport: Zug endete direkt nach Pillage). Ein
+    // Reiter gilt höchstens für den Zug, in dem er entstand.
+    delete this.gs._spellEndsTurn;
+    delete this.gs._pendingActionBurn;
+
     // ── Revert charmed heroes (Charme Lv3) ──
     for (const ps of this.gs.players) {
       if (!ps) continue;

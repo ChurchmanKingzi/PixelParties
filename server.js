@@ -4694,6 +4694,21 @@ function sendGameState(room, playerIdx, extra) {
       const terrorPi = gs._terrorForceEndTurn;
       const terrorSrc = gs._terrorForceEndSource || { owner: terrorPi };
 
+      // ── Zwangsende gilt nur dem aktiven Spieler ─────────────────────
+      // `runPhase(5)` beendet IMMER den laufenden Zug — egal, wem die
+      // Marke gehoert. Steht sie fuer den NICHT aktiven Spieler (Rest aus
+      // dem Zug davor, gesetzt in einer Reaktion/Kette), wuerde sie
+      // sonst den Zug des Gegners abschneiden. Verwaiste Marke raeumen.
+      if (terrorPi !== gs.activePlayer) {
+        delete gs._terrorForceEndTurn;
+        delete gs._terrorForceEndSource;
+        room.engine.log('turn_end_marker_dropped', {
+          player: gs.players[terrorPi]?.username || null,
+          active: gs.players[gs.activePlayer]?.username || null,
+          source: terrorSrc.name || null,
+        });
+      } else
+
       // ── ZUG-ENDE-RIEGEL (v436) ────────────────────────────────────
       // Dieser Pfad laeuft NICHT ueber `advanceToPhase` — er ruft
       // `runPhase(5)` direkt. Der Riegel dort greift hier also nicht,
