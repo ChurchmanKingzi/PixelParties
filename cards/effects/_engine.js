@@ -16587,6 +16587,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         _fremd ? { ...(opts.hookExtras || {}), heldSeite: playerIdx } : opts.hookExtras, zoneSlot);
       if (!ok) return null;
     }
+    this._auftrittSchrittNachKosten('summonCreatureWithHooks');   // ★ W65a: Kosten sind bezahlt, ab hier kein Abbruch mehr -> Auftritt vor der Landung
 
     const result = this.summonCreature(cardName, playerIdx, heroIdx, zoneSlot, { ...opts, skipLog: opts.skipLog });
     if (!result) return null;
@@ -21448,15 +21449,25 @@ this._deathWatch = (this._deathWatchStack || []).length
       const orphan = this.cardInstances.find(c => c.owner === pi && c.zone === pile && c.name === name);
       if (orphan) this._untrackCard(orphan.id);
     }
-    if (pile === 'deck' && opts.shuffle) this.shuffleDeck(pi, 'main');
-    if (pile === 'potionDeck' && opts.shuffle) this.shuffleDeck(pi, 'potion');   // v1361
+    if (pile === 'deck' && opts.shuffle) this._shuffleKostenVorlauf(pi, 'main', opts._kostenVorlauf);
+    if (pile === 'potionDeck' && opts.shuffle) this._shuffleKostenVorlauf(pi, 'potion', opts._kostenVorlauf);   // v1361
     // `opts.geheim`: verdeckte Zuege (Create Secret Room) schreiben den Kartennamen NICHT ins Log, das an beide Spieler geht.
     this.log('pile_take', { player: ps.username, pile, ...(opts.geheim ? {} : { card: name }), by: opts.source || null });
     return { name, idx };
   }
 
+  /**
+   * ★ W65a: Mischen im Kosten-Vorlauf einer Beschwoerung (Entnahme VOR der abbrechbaren Opfer-/Tribut-Wahl, Rueckgabe NACH einem Abbruch). `shuffleDeck` ist ein Schritt-Primitiv
+   * (W64b: Auftritt kommt vor dem Mischen) — hier waere das der Commit VOR der letzten Abbruchstelle; das Mischen ist reine Buchfuehrung und committet nicht.
+   */
+  _shuffleKostenVorlauf(pi, deckType, vorlauf) {
+    if (!vorlauf) return this.shuffleDeck(pi, deckType);
+    this._auftrittSchrittAus = (this._auftrittSchrittAus || 0) + 1;
+    try { return this.shuffleDeck(pi, deckType); } finally { this._auftrittSchrittAus--; }
+  }
+
   /** Rueckgabe nach geplatztem Komposit — Gegenstueck zu `takeFromPile`. */
-  returnToPile(pi, pile, name, idx = null) {
+  returnToPile(pi, pile, name, idx = null, opts = {}) {
     pi = this._resolvePi(pi);
     const ps = this.gs.players[pi];
     const arr = this._pileArray(ps, pile);
@@ -21465,7 +21476,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // kein Mischen). Ohne Index: ans Ende, Deck wird gemischt.
     if (idx != null && idx >= 0 && idx <= arr.length) { arr.splice(idx, 0, name); return true; }
     arr.push(name);
-    if (pile === 'deck') this.shuffleDeck(pi, 'main');
+    if (pile === 'deck') this._shuffleKostenVorlauf(pi, 'main', opts._kostenVorlauf);
     return true;
   }
 
@@ -21520,6 +21531,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.returnToPile(pi, pile, taken.name, (pile === 'hand' || pile === 'potionDeck') ? taken.idx : null); this.sync(); return null;
     }
     kernOpts._sperrenGeprueft = true; kernOpts._kostenGezahlt = true;
+    this._auftrittSchrittNachKosten('summonFromPile');   // ★ W65a (siehe summonFromDiscard)
     // `opts.flug: false`: der Aufrufer hat den Flug schon selbst gezeigt (z. B. Aufdecken ueber die Mitte des
     // Feldes, `mill_center_reveal` mit `dest: 'support'`) — kein zweiter Flug von der Quelle.
     if (opts.flug !== false) this._pileFlight(pi, taken.name, pile, 'support', flight);
@@ -37262,7 +37274,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   /** Baustein 3: gescheitert — zurueck ins Deck (gemischt). */
   deckRueckgabe(ab) {
     if (!ab) return;
-    this.returnToPile(ab.pi, 'deck', ab.name);
+    this.returnToPile(ab.pi, 'deck', ab.name, null, { _kostenVorlauf: true });   // W65a: ein Abbruch (Rueckgabe) darf den Auftritt nicht committen
     this.sync();
   }
 
@@ -37279,7 +37291,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // gehoert `pi` (`controller`).
     const feld = opts.heldSeite ?? pi;
     const kontrolle = feld !== pi ? { controller: pi } : {};
-    const ab = await this.deckEntnahme(pi, what, { source: opts.source, shuffle: opts.shuffle !== false });
+    const ab = await this.deckEntnahme(pi, what, { source: opts.source, shuffle: opts.shuffle !== false, _kostenVorlauf: mode !== 'place' });   // W65a: Mischen committet den Auftritt nicht (Kosten-Wahl kann noch abbrechen)
     if (!ab) return null;
     // ★ W64a: Kosten (beforeSummon) VOR Vor-Animation und Flug (siehe `_beschwoerungKostenVorAuftritt`); nur die Beschwoerung (nicht das Platzieren) hat Kosten.
     const kernOpts = mode === 'place' ? null : {
@@ -37289,6 +37301,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!(await this._beschwoerungKostenVorAuftritt(ab.name, feld, heroIdx, slotIdx, kernOpts))) { this.deckRueckgabe(ab); return null; }
       kernOpts._sperrenGeprueft = true; kernOpts._kostenGezahlt = true;
     }
+    this._auftrittSchrittNachKosten('summonFromDeck');   // ★ W65a (siehe summonFromDiscard)
     if (typeof opts.nachKostenAnim === 'function') await opts.nachKostenAnim(ab);
     if (opts.vorAnim?.type) {
       this._broadcastEvent('play_zone_animation', { type: opts.vorAnim.type, owner: feld, heroIdx, zoneSlot: slotIdx });
@@ -37436,6 +37449,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!(await this._beschwoerungKostenVorAuftritt(ab.name, feld, heroIdx, slotIdx, kernOpts))) { this.ablageRueckgabe(ab); return null; }
       kernOpts._sperrenGeprueft = true; kernOpts._kostenGezahlt = true;
     }
+    this._auftrittSchrittNachKosten('summonFromDiscard');   // ★ W65a: Auftritt erst HIER (nach der letzten abbrechbaren Kostenfrage), nicht schon beim Aufruf
     // `nachKostenAnim`: die eigene Auftritts-Animation der Karte (Forceful Revival: Ramm-Anlauf) — laeuft erst NACH dem letzten abbrechbaren Prompt.
     if (typeof opts.nachKostenAnim === 'function') await opts.nachKostenAnim(ab);
     if (opts.vorAnim?.type) {
@@ -54621,7 +54635,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (pend._turn == null) pend._turn = this.gs.turn;
     else if (pend._turn !== this.gs.turn) { this._firePendingCardReveal(); return this.gs._pendingCardReveal || null; }
     const hold = AUFTRITT_HALTE_EREIGNISSE.has(event);
-    if (hold || this.gs._holdCardReveal || this._auftrittFrageOffen(pend.ownerIdx)) return pend;
+    if (hold || this.gs._holdCardReveal || this._auftrittSchrittAus > 0 || this._auftrittFrageOffen(pend.ownerIdx)) return pend;   // W65a: `_auftrittSchrittAus` = Buchfuehrung im Kosten-Vorlauf (Mischen): Ereignis wartet im Puffer
     this._firePendingCardReveal();                 // erste sichtbare Wirkung: committed
     return this.gs._pendingCardReveal || null;     // (nur noch offen, wenn die Karte den Auftritt ausdrücklich hält)
   }
@@ -54682,9 +54696,19 @@ this._deathWatch = (this._deathWatchStack || []).length
     const pend = this.gs && this.gs._pendingCardReveal;
     if (!pend || this._inMctsSim || this._fastMode || this._auftrittFlush) return false;
     if (this.gs._holdCardReveal) return false;
+    if (this._auftrittSchrittAus > 0) return false;   // W65a: Buchfuehrung im Kosten-Vorlauf einer Beschwoerung (Mischen) ist kein Effektschritt
     if (this._auftrittFrageOffen(pend.ownerIdx)) return false;   // der Besitzer kann noch abbrechen (und ein Primitiv läuft nur nebenher)
     this._firePendingCardReveal();
     return true;
+  }
+
+  /**
+   * ★ W65a: Auftritt für die Beschwörungs-Primitive (`summonFromDiscard`/`-Deck`/`-Pile`, `summonCreatureWithHooks`) — ihr Effektschritt beginnt NACH dem Kosten-Vorlauf
+   * (`_beschwoerungKostenVorAuftritt` / `beforeSummon`: abbrechbare Opfer-/Tribut-Wahl der Karte), nicht schon beim Aufruf. Die Hülle am Dateiende lässt diese Namen
+   * deshalb aus (`AUFTRITT_SCHRITT_NACH_KOSTEN`); sie rufen diese Methode an der Stelle, an der die Kosten bezahlt und alle Abbruchstellen vorbei sind.
+   */
+  _auftrittSchrittNachKosten(grund) {
+    if (this.gs && this.gs._pendingCardReveal) this._auftrittSchritt(grund);
   }
 
   /**
@@ -55925,7 +55949,9 @@ this._deathWatch = (this._deathWatchStack || []).length
 // Dazu die wichtigsten Primitive, die nicht `action…` heißen (Status, Beschwörung aus der Ablage, Flächen, Mischen …). Eine Zusatzzeile hier kostet nichts; fehlt eines, greift der Rückfall
 // (erstes sichtbares Ereignis / erste Protokollzeile / Zustandspuffer) — der Sweep `W64/b-0x` zeigt, ob eine Karte davor etwas preisgibt.
 const AUFTRITT_SCHRITT_PRIMITIVE = new Set(['addHeroStatus', 'removeHeroStatus', 'applyCreatureStatus', 'cleanseHeroStatuses', 'cleanseCreatureStatuses', 'increaseMaxHp', 'dealDamageToTargets',
-  'summonCreatureWithHooks', 'summonFromDiscard', 'placeArea', 'shuffleDeck', 'addCardFromDiscardToHand', 'grantAdditionalAction', 'performImmediateAction', 'performImmediateActionAnyHero', 'sendBoardCardToDiscard']);
+  'placeArea', 'shuffleDeck', 'addCardFromDiscardToHand', 'grantAdditionalAction', 'performImmediateAction', 'performImmediateActionAnyHero', 'sendBoardCardToDiscard']);
+// ★ W65a: `summonFromDiscard` und `summonCreatureWithHooks` stehen NICHT mehr hier — sie fragen zuerst die (abbrechbaren) Beschwörungskosten der Karte und rufen
+// `_auftrittSchrittNachKosten` erst dahinter (Hülle am Aufruf hätte den Auftritt VOR der Kostenfrage gezeigt; Forceful Revival × 500 Piranhas & Co.).
 for (const _name of Object.getOwnPropertyNames(GameEngine.prototype)) {
   const _orig = GameEngine.prototype[_name];
   if (!(/^action[A-Z]/.test(_name) || AUFTRITT_SCHRITT_PRIMITIVE.has(_name)) || typeof _orig !== 'function') continue;
