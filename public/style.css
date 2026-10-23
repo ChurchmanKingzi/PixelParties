@@ -4456,8 +4456,6 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 
 /* Activatable ability zone glow */
 .zone-ability-activatable {
-  border-color: rgba(250,213,74,1) !important;
-  box-shadow: 0 0 22px rgba(250,213,74,1), 0 0 44px rgba(249,172,32,.75), 0 0 70px rgba(249,172,32,.35), inset 0 0 18px rgba(250,213,74,.45) !important;
   animation: abilityPulse 0.7s ease-in-out infinite !important;
   position: relative;
   z-index: 1;
@@ -4483,8 +4481,6 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 
 /* Free-activatable ability zone glow (Main Phase, no action cost) */
 .zone-ability-free-activatable {
-  border-color: rgba(104,253,193,1) !important;
-  box-shadow: 0 0 22px rgba(104,253,193,1), 0 0 44px rgba(75,205,124,.75), 0 0 70px rgba(75,205,124,.35), inset 0 0 18px rgba(104,253,193,.45) !important;
   animation: freeAbilityPulse 0.7s ease-in-out infinite !important;
   position: relative;
   z-index: 1;
@@ -4507,8 +4503,6 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 
 /* Active creature effect glow */
 .zone-creature-activatable {
-  border-color: rgba(255,208,102,1) !important;
-  box-shadow: 0 0 22px rgba(255,208,102,1), 0 0 44px rgba(255,139,26,.75), 0 0 70px rgba(255,139,26,.35), inset 0 0 18px rgba(255,208,102,.45) !important;
   animation: creatureEffectPulse 0.7s ease-in-out infinite !important;
   position: relative;
   z-index: 1;
@@ -4545,8 +4539,6 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 
 /* Active equip effect (Slippery Skates, etc.) */
 .zone-equip-activatable {
-  border-color: rgba(107,233,250,1) !important;
-  box-shadow: 0 0 22px rgba(107,233,250,1), 0 0 44px rgba(7,174,197,.75), 0 0 70px rgba(7,174,197,.35), inset 0 0 18px rgba(107,233,250,.45) !important;
   animation: equipEffectPulse 0.7s ease-in-out infinite !important;
   position: relative;
   z-index: 1;
@@ -4645,8 +4637,6 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 
 /* Active hero effect glow (e.g. Alice, the Puppeteer Girl) */
 .zone-hero-effect-active {
-  border-color: rgba(254,116,118,1) !important;
-  box-shadow: 0 0 22px rgba(254,116,118,1), 0 0 44px rgba(239,41,41,.75), 0 0 70px rgba(239,41,41,.35), inset 0 0 18px rgba(254,116,118,.45) !important;
   animation: heroEffectPulse 0.7s ease-in-out infinite !important;
   position: relative;
   z-index: 1;
@@ -6743,8 +6733,6 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   50% { box-shadow: 0 0 20px rgba(250,213,74,.35), inset 0 0 12px rgba(250,213,74,.15); }
 }
 .zone-permanent-activatable {
-  border-color: rgba(250,213,74,.9) !important;
-  box-shadow: 0 0 16px rgba(250,213,74,.8), 0 0 32px rgba(255,185,26,.4), inset 0 0 12px rgba(250,213,74,.3) !important;
   animation: permanentActivatablePulse 1s ease-in-out infinite !important;
 }
 .zone-permanent-activatable::after {
@@ -26540,4 +26528,48 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .board-permanent-slot.zone-permanent-activatable {
   overflow: visible;
   z-index: 3;
+}
+
+/* ═══ PIXEL-GLÜHEN der aktivierbaren Zonen (Vorschlag, Al 23.10.: „Das Glühen ist ein guter Punkt") ═══
+   Statt weicher Scheine (Blur-Schatten, Alpha-Verläufe, gleitendes Pulsieren): drei harte Farbringe um die Zone, innen ein harter Rand, außen ein
+   Dither-Ring (2×2-Schachbrett), und das Pulsieren ist ein Umschalten zwischen zwei Ring-Sätzen (`steps(1)`, Blinken). Das Bereit-Zeichen (⚔ ⚡ …) hat eine
+   1-px-Kontur statt Leuchten und hüpft in ganzen Pixeln ohne Drehen und Skalieren. Farbfamilien je Zone über --gl-1 (hell) / --gl-2 / --gl-3 (dunkel). */
+.zone-ability-activatable, .zone-permanent-activatable, .board-permanent-slot.zone-permanent-activatable { --gl-1: #f7f7ad; --gl-2: #fad54a; --gl-3: #f29a3e; }
+.zone-ability-free-activatable { --gl-1: #b1ff1a; --gl-2: #4ceb70; --gl-3: #167927; }
+.zone-creature-activatable { --gl-1: #fff196; --gl-2: #ff8b1a; --gl-3: #aa5300; }
+.zone-equip-activatable { --gl-1: #bddcef; --gl-2: #6be9fa; --gl-3: #07aec5; }
+.zone-hero-effect-active { --gl-1: #f9b3b3; --gl-2: #fe5154; --gl-3: #e92f38; }
+.zone-ability-activatable, .zone-ability-free-activatable, .zone-creature-activatable, .zone-equip-activatable, .zone-hero-effect-active, .zone-permanent-activatable {
+  /* kein `!important` auf Rand und Schatten: sonst überstimmen sie die Schlüsselbilder (Eigenschaften mit !important schlagen Animationen) und es pulsiert nichts;
+     Animationswerte schlagen normale Regeln ohnehin, nur `.zone-ability-exhausted` & Co. (mit !important) setzen sich weiter durch */
+  border-color: var(--gl-2);
+  box-shadow: 0 0 0 2px var(--gl-3), 0 0 0 4px #08060c, inset 0 0 0 2px var(--gl-3);
+  animation: ppZonePuls 0.7s steps(1, end) infinite !important;
+}
+@keyframes ppZonePuls {
+  0%   { box-shadow: 0 0 0 2px var(--gl-3), 0 0 0 4px #08060c, inset 0 0 0 2px var(--gl-3); border-color: var(--gl-2); }
+  50%  { box-shadow: 0 0 0 2px var(--gl-2), 0 0 0 4px var(--gl-3), 0 0 0 6px #08060c, inset 0 0 0 2px var(--gl-2), inset 0 0 0 4px var(--gl-3); border-color: var(--gl-1); }
+}
+/* Dither-Ring um die Zone: wechselt mit dem Pulsieren die Breite */
+.zone-ability-activatable::before, .zone-ability-free-activatable::before, .zone-creature-activatable::before, .zone-equip-activatable::before,
+.zone-hero-effect-active::before, .zone-permanent-activatable::before {
+  content: ''; position: absolute; inset: -10px; padding: 4px; pointer-events: none; z-index: -1;
+  background: repeating-conic-gradient(var(--gl-3) 0% 25%, transparent 0% 50%) 0 0 / 4px 4px;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: ppZoneDither 0.7s steps(1, end) infinite;
+}
+@keyframes ppZoneDither { 0% { inset: -10px; padding: 4px; } 50% { inset: -14px; padding: 8px; } }
+/* Bereit-Zeichen: Pixelkontur statt Leuchten, Hüpfen in ganzen Pixeln */
+.zone-ability-activatable::after, .zone-ability-free-activatable::after, .zone-creature-activatable::after, .zone-equip-activatable::after,
+.zone-hero-effect-active::after, .zone-permanent-activatable::after, .zone-friendship-bonus::after,
+.zone-creature-activatable.zone-artifact-creature::after {
+  filter: drop-shadow(2px 0 0 #08060c) drop-shadow(-2px 0 0 #08060c) drop-shadow(0 2px 0 #08060c) drop-shadow(0 -2px 0 #08060c);
+  animation: ppZeichenHopp 0.6s steps(1, end) infinite;
+}
+@keyframes ppZeichenHopp { 0% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) {
+  .zone-ability-activatable, .zone-ability-free-activatable, .zone-creature-activatable, .zone-equip-activatable, .zone-hero-effect-active, .zone-permanent-activatable { animation: none !important; }
+  .zone-ability-activatable::before, .zone-ability-free-activatable::before, .zone-creature-activatable::before, .zone-equip-activatable::before, .zone-hero-effect-active::before, .zone-permanent-activatable::before,
+  .zone-ability-activatable::after, .zone-ability-free-activatable::after, .zone-creature-activatable::after, .zone-equip-activatable::after, .zone-hero-effect-active::after, .zone-permanent-activatable::after, .zone-friendship-bonus::after { animation: none; }
 }
