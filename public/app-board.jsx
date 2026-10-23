@@ -6973,6 +6973,150 @@ function GoldSparkleEffect({ x, y }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  PIXELART-BILDER AN EINEM PUNKT (23.10., Shimmering Dragonegg, Liquid Luck) — Vorlage: das jeweilige Kartenbild
+//
+//  Hülle für Zonen-/Permanent-Animationen, die nur um den Mittelpunkt einer Karte laufen (`x`/`y` Mitte, `w`/`h` Kartenmass; so ruft `playAnimation` sie
+//  auf, auch im Welt-Feld): ein Canvas, ein Rasterpixel = 3 Bildschirmpixel (`image-rendering: pixelated`), feste Paletten, Bayer-Dithering statt Alpha,
+//  ~30 Bilder/s, KEIN Filter, KEIN Schein; die Wurzel trägt `data-pp-px="aus"` (die Grafik IST schon Pixelart).
+//    ppPunktBild(malen, ende, breite, hoehe, vorbereiten?) → Komponente
+//      malen(g, t, sz, teile): Pinsel `g` wie bei `ppSalve` (put/block); `sz` { gw, gh, cx, cy, hw, hh } in RASTERkoordinaten (cx/cy = Kartenmitte, hw/hh = halbe Karte)
+// ═══════════════════════════════════════════════════════════════════
+function ppPunktBild(malen, ende, breite, hoehe, vorbereiten) {
+  const S = 3, TAKT = 33;
+  return function PunktBildEffekt({ x, y, w, h }) {
+    const cvs = useRef(null);
+    const sz = useMemo(() => {
+      const gw = Math.ceil(breite / S), gh = Math.ceil(hoehe / S);
+      return { gw, gh, cx: gw / 2, cy: gh / 2, hw: ((w || 64) / S) / 2, hh: ((h || 90) / S) / 2 };
+    }, []);
+    const teile = useMemo(() => (vorbereiten ? vorbereiten(sz) : null), []);
+    useEffect(() => {
+      const el = cvs.current;
+      if (!el || window._playAnimations === false) return undefined;
+      const ctx = el.getContext('2d');
+      const img = ctx.createImageData(sz.gw, sz.gh);
+      const buf = img.data, gw = sz.gw, gh = sz.gh;
+      const put = (px, py, c, a = 1) => {
+        const X = Math.round(px), Y = Math.round(py);
+        if (X < 0 || Y < 0 || X >= gw || Y >= gh || a <= 0) return;
+        if (a < 1 && ppBayer(X, Y) >= a) return;
+        const i = (Y * gw + X) * 4;
+        buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
+      };
+      const g = { put, block(px, py, bw, bh, c, a = 1) { for (let j = 0; j < bh; j++) for (let i = 0; i < bw; i++) put(px + i, py + j, c, a); } };
+      const t0 = performance.now();
+      let raf = 0, letzte = -1;
+      const schritt = (jetzt) => {
+        const t = jetzt - t0;
+        const fr = Math.floor(t / TAKT);
+        if (fr !== letzte) { letzte = fr; buf.fill(0); malen(g, t, sz, teile); ctx.putImageData(img, 0, 0); }
+        if (t < ende) raf = requestAnimationFrame(schritt);
+        else { buf.fill(0); ctx.putImageData(img, 0, 0); }
+      };
+      raf = requestAnimationFrame(schritt);
+      return () => cancelAnimationFrame(raf);
+    }, []);
+    return (
+      <div aria-hidden="true" data-pp-px="aus"
+        style={{ position: 'fixed', left: x - (sz.gw * S) / 2, top: y - (sz.gh * S) / 2, pointerEvents: 'none', zIndex: 10100 }}>
+        <canvas ref={cvs} width={sz.gw} height={sz.gh}
+          style={{ width: sz.gw * S, height: sz.gh * S, imageRendering: 'pixelated', display: 'block' }} />
+      </div>
+    );
+  };
+}
+
+/** Kreuzfunkel wie auf dem Kartenbild des Eis: weisser Kern (2×2), Arme in drei Stufen (hellgelb → gelb → orange), ab Armlänge 3 vier Eck-Pixel. */
+function ppKreuzfunkel(g, x, y, arm, pal, a) {
+  if (arm <= 0) return;
+  const cx = Math.round(x), cy = Math.round(y);
+  g.block(cx, cy, 2, 2, pal[0], a);
+  for (let i = 1; i <= arm; i++) {
+    const c = i === 1 ? pal[1] : i < arm ? pal[2] : pal[3];
+    g.put(cx - i, cy, c, a); g.put(cx + 1 + i, cy, c, a); g.put(cx, cy - i, c, a); g.put(cx + 1, cy - i, c, a);
+    g.put(cx - i, cy + 1, c, a); g.put(cx + 1 + i, cy + 1, c, a); g.put(cx, cy + 1 + i, c, a); g.put(cx + 1, cy + 1 + i, c, a);
+  }
+  if (arm >= 3) { g.put(cx - 1, cy - 1, pal[1], a); g.put(cx + 2, cy - 1, pal[1], a); g.put(cx - 1, cy + 2, pal[1], a); g.put(cx + 2, cy + 2, pal[1], a); }
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  Shimmering Dragonegg: Goldglanz (`dragonegg_shimmer`) — PIXELART; Vorlage: das Kartenbild (goldenes Ei, Kreuzfunkel in Weiss/Gelb/Orange)
+//
+//  Rund um die Karte blitzen acht Kreuzfunkel auf (versetzt, je ~450 ms: Arm 1→4→1 in ganzen Pixeln), dazu zwei im Ei selbst; kleine goldene
+//  Flecken (2×2 mit hellem Punkt) steigen auf. Ab ~800 ms dithert alles weg, bei 1100 ms ist es fort. Feste Palette, kein Leuchten.
+// ═════════════════════════════════════════════════════════════════
+const DragoneggShimmerEffect = (() => {
+  const PAL = ['#ffffff', '#fff1a0', '#ffd23a', '#f08a1e', '#c4561a'].map(ppHex);
+  const ENDE = 1100, FADE_AB = 780;
+  const ARM = [1, 2, 3, 4, 4, 3, 2, 1];
+  const vorbereiten = (sz) => ({
+    sterne: Array.from({ length: 10 }, (_, i) => {
+      const innen = i >= 8, w = Math.random() * Math.PI * 2;
+      return { x: Math.cos(w) * sz.hw * (innen ? 0.25 : 1.0), y: Math.sin(w) * sz.hh * (innen ? 0.3 : 0.92), start: Math.random() * 420, leben: 420 + Math.random() * 120 };
+    }),
+    flecken: Array.from({ length: ppFxN(10) }, () => ({ x: (Math.random() - 0.5) * sz.hw * 1.6, y: (Math.random() - 0.2) * sz.hh * 1.2, v: 14 + Math.random() * 22, start: Math.random() * 500, leben: 380 + Math.random() * 220 })),
+  });
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    for (const f of teile.flecken) {
+      const k = (t - f.start) / f.leben;
+      if (k < 0 || k > 1) continue;
+      const px = Math.round(sz.cx + f.x), py = Math.round(sz.cy + f.y - f.v * (t - f.start) / 1000);
+      g.block(px, py, 2, 2, PAL[2], aus); g.put(px, py, PAL[1], aus); g.put(px + 1, py + 1, PAL[3], aus);
+    }
+    for (const st of teile.sterne) {
+      const k = (t - st.start) / st.leben;
+      if (k < 0 || k >= 1) continue;
+      ppKreuzfunkel(g, sz.cx + st.x, sz.cy + st.y, ARM[Math.floor(k * ARM.length)], PAL, aus);
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 260, 300, vorbereiten);
+})();
+
+// ═════════════════════════════════════════════════════════════════
+//  Liquid Luck: Regenbogen (`liquid_rainbow`) — PIXELART; Vorlage: das Kartenbild (Regenbogen, Goldtopf, Kobold)
+//
+//  Über der Karte wächst von links nach rechts ein Regenbogen in sieben Bändern (rot, orange, gelb, grün, blau, indigo, violett; je 3 Rasterpixel, in
+//  ganzen Pixelschritten, ~12 Stufen in 480 ms). An seinem rechten Fuss (dem Goldtopf) blitzen goldene Kreuzfunkel, Goldmünzen (3×3 mit hellem Punkt)
+//  fallen von seinem Scheitel herab. Ab ~1150 ms dithert alles weg, bei 1500 ms ist es fort. Feste Palette, kein Leuchten.
+// ═════════════════════════════════════════════════════════════════
+const LiquidRainbowEffect = (() => {
+  const BAND = ['#e8412e', '#f58a1f', '#f5d02a', '#46b83c', '#2f8be0', '#3f45b8', '#8a3fb8'].map(ppHex);
+  const GOLD = ['#ffffff', '#fff1a0', '#ffd23a', '#f08a1e', '#c4561a'].map(ppHex);
+  const ENDE = 1500, FADE_AB = 1150, WACHS = 480, DICKE = 3;
+  const ARM = [1, 2, 3, 3, 2, 1];
+  const vorbereiten = () => ({
+    muenzen: Array.from({ length: 7 }, () => ({ u: 0.15 + Math.random() * 0.7, start: 520 + Math.random() * 380, fall: 520 + Math.random() * 260 })),
+  });
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const R = Math.round(sz.hw * 1.3), cx = Math.round(sz.cx), cy = Math.round(sz.cy + sz.hh * 0.45);
+    const stufe = Math.min(12, Math.floor(t / (WACHS / 12)) + 1) / 12;               // ganze Stufen statt stufenlosem Wachsen
+    const bis = cx - R + Math.round(stufe * 2 * R);
+    for (let y = cy - R; y <= cy; y++) for (let x = cx - R; x <= bis; x++) {
+      const r = Math.hypot(x - cx + 0.5, y - cy + 0.5), b = Math.floor((R - r) / DICKE);
+      if (b < 0 || b > 6) continue;
+      g.put(x, y, BAND[b], aus);
+    }
+    if (t > WACHS) {                                                                  // Goldtopf-Ende: Kreuzfunkel am rechten Fuss
+      const k = (t - WACHS) / 560;
+      if (k < 1) ppKreuzfunkel(g, cx + R - 4, cy - 2, ARM[Math.floor(k * ARM.length)], GOLD, aus);
+      const k2 = (t - WACHS - 180) / 520;
+      if (k2 > 0 && k2 < 1) ppKreuzfunkel(g, cx - R + 4, cy - 3, ARM[Math.floor(k2 * ARM.length)], GOLD, aus);
+    }
+    for (const m of teile.muenzen) {
+      const k = (t - m.start) / m.fall;
+      if (k < 0 || k > 1) continue;
+      const px = Math.round(cx - R * 0.7 + m.u * R * 1.4), py = Math.round(cy - R + DICKE * 3 + k * k * (sz.hh * 1.5 + R));
+      g.block(px, py, 3, 3, GOLD[2], aus); g.put(px, py, GOLD[1], aus); g.put(px + 2, py + 2, GOLD[3], aus); g.put(px + 1, py + 1, GOLD[3], aus);
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 300, 280, vorbereiten);
+})();
+
 // Spider summon flourish — fires when a Spider Creature is summoned
 // from hand via the Spider archetype's surprise-cost path (Box /
 // Brain / Crimson Skull / Diamond). Renders a curtain of cobweb
@@ -17230,6 +17374,8 @@ const ANIM_REGISTRY = {
   wind: WindEffect,
   shadow_summon: ShadowSummonEffect,
   gold_sparkle: GoldSparkleEffect,
+  dragonegg_shimmer: DragoneggShimmerEffect,
+  liquid_rainbow: LiquidRainbowEffect,
   // ── Circles of Hell (Animationen) ──────────────────────────────────
   // Farben aus den Pixelart-Hintergruenden der Kreise (Flammen #F8F5B5 … #550A04).
   // ★ The Sixth Circle: Hoellen-Charme — blutrote Siegelringe, aufsteigende Schlieren, dunkler Blitz.
@@ -41412,7 +41558,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // leise `ability_activate`; die Zonen-Klangtabelle (holy_revival →
       // `revive`) galt nur fuer Zonen-Animationen. Jetzt derselbe Klang
       // wie in der Zone, der leise Auftakt bleibt als Fallback.
-      if (window.playSFX) window.playSFX(type === 'holy_revival' ? 'revive' : 'ability_activate', { category: 'effect' });
+      if (type === 'liquid_rainbow' && window.playSFXForZoneAnim) window.playSFXForZoneAnim(type, {});   // 23.10.: eigener Klang (ZONE_ANIM_SFX)
+      else if (window.playSFX) window.playSFX(type === 'holy_revival' ? 'revive' : 'ability_activate', { category: 'effect' });
       const ownerLabel = ownerLbl(owner, myIdx);
       const el = document.querySelector(`[data-perm-id="${permId}"][data-perm-owner="${ownerLabel}"]`);
       if (el) playAnimation(type || 'holy_revival', el, { duration: 1200 });

@@ -3426,6 +3426,17 @@ const ZONE_ANIM_SFX = {
   field_standard_rally:    { name: 'buff' },
   // Silent — redundant with a log or purely decorative
   gold_sparkle:            null,
+  // Shimmering Dragonegg (23.10.): Kreuzfunkel blitzen um das goldene Ei — helle Pings, versetzt; Liquid Luck: der Regenbogen wächst (Buff-Klang), Goldmünzen klingeln.
+  dragonegg_shimmer: [
+    { name: 'ping', opts: { rate: 1.5, volume: 0.5, category: null, dedupe: 0 } },
+    { name: 'ping', opts: { rate: 1.9, volume: 0.4, delay: 170, category: null, dedupe: 0 } },
+    { name: 'ping', opts: { rate: 2.2, volume: 0.3, delay: 330, category: null, dedupe: 0 } },
+  ],
+  liquid_rainbow: [
+    { name: 'buff', opts: { rate: 1.2, volume: 0.7 } },
+    { name: 'ping', opts: { rate: 1.7, volume: 0.5, delay: 520, category: null, dedupe: 0 } },
+    { name: 'ping', opts: { rate: 2.1, volume: 0.4, delay: 700, category: null, dedupe: 0 } },
+  ],
   // Circles of Hell: Hoellen-Charme (Sixth), Lavafontaene (Seventh), Flammenmeer der Gegnerseite (Fifth), Goldrausch (Fourth).
   hell_charm: [
     { name: 'elem_dark', opts: { rate: 0.65, volume: 1.0 } },

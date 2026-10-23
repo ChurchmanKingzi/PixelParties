@@ -42,6 +42,16 @@ const H = require('../../lib/h.js');
       R.check(`${V}: Reaction ${rx} wird vom Gegner ausgespielt …`, ausgespielt, { discard: t.pile(1, 'discardPile'), hand: t.pile(1, 'hand') });
       if (ausgespielt) R.check(`${V}: … und löst genau einmal aus (${s.soll})`, s.gain() === s.soll, { gain: s.gain(), errors: t.errors.slice(0, 2) });
     }
+    {   // Divine Gift of the Guardian spielt sich selbst (kein Reaktionsfenster-Flug mit Hook): trotzdem genau ein Auslöser
+      const DG = 'Divine Gift of the Guardian';
+      const s = await szene(variante, DG, { hand1: [DG], prep: async (t) => { t.grantFor(1, 0, DG); t.put(1, 0, 0, H.INERT.creature); } });
+      const { t } = s;
+      t.targetFn = (v) => [v.find(x => x.type === 'equip' && x.owner === 1 && x.heroIdx === 0).id];
+      await t.play(0, 'Fireball', { hero: 0 });
+      const ausgespielt = t.pile(1, 'discardPile').includes(DG);
+      R.check(`${V}: Reaction ${DG} wird vom Gegner ausgespielt …`, ausgespielt, { discard: t.pile(1, 'discardPile'), hand: t.pile(1, 'hand') });
+      if (ausgespielt) R.check(`${V}: … und löst genau einmal aus (${s.soll})`, s.gain() === s.soll, { gain: s.gain(), errors: t.errors.slice(0, 2) });
+    }
     {   // Surprise verdeckt setzen: kein Auslöser
       const s = await szene(variante, 'Gold Trap', { hand1: ['Gold Trap'] });
       const { t } = s;

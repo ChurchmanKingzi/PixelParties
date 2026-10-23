@@ -113,7 +113,7 @@ async function trigger(ctx, gespielt, spieler) {
   if (baseCardName(gespielt) !== baseCardName(ziel)) return;
   const engine = ctx._engine;
   engine.log('liquid_luck_trigger', { player: engine.gs.players[pi]?.username, card: ziel });
-  engine._broadcastEvent('play_permanent_animation', { owner: pi, permId: inst.counters.permId, type: 'gold_sparkle' });
+  engine._broadcastEvent('play_permanent_animation', { owner: pi, permId: inst.counters.permId, type: 'liquid_rainbow' });
   await sucheBeliebigeKarte(engine, pi);
   engine.sync();
 }
@@ -123,7 +123,8 @@ module.exports = {
   activeIn: ['permanent'],
 
   // Wie Luck / Elixir of Immortality: der Nutzen liegt in der Zukunft und ist für die Zugbewertung der CPU unsichtbar.
-  cpuMeta: { alwaysCommit: true },
+  // `alwaysCommit` als Funktion: nur spielen, solange das Deck etwas zum Suchen hergibt (sonst verpufft der Trank beim Auslösen).
+  cpuMeta: { alwaysCommit: (engine, cpuIdx) => (engine.gs.players[cpuIdx]?.mainDeck || []).length > 0 },
 
   resolve: async (engine, pi) => {
     const gs = engine.gs;
@@ -157,7 +158,7 @@ module.exports = {
     engine.log('permanent_placed', { card: CARD_NAME, player: ps.username });
     engine.sync();
     await engine._delay(60);
-    engine._broadcastEvent('play_permanent_animation', { owner: pi, permId, type: 'gold_sparkle' });
+    engine._broadcastEvent('play_permanent_animation', { owner: pi, permId, type: 'liquid_rainbow' });
     await engine._delay(240);
     return { placed: true };
   },

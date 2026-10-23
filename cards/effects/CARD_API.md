@@ -24021,6 +24021,14 @@ Gemeint sind **alle** Spells, auch eigene (Heal auf den eigenen Dragon heilt nic
 * **Suche:** Pflicht, nicht abbrechbar (Muster Crushing Defeat), offen aufgedeckt, danach gemischt (`searchDeckForNamedCard`); Such-/Hand-Sperre und leeres Deck überspringen nur den Such-Schritt (Bauform ④ des Such-Templates).
 * **★ Engine-Nachtrag `server.js` (`doUsePotion`):** ein Trank, der sich offen hinlegt (`resolveResult.placed`), meldete bisher KEIN `afterPotionUsed` — Beobachter (Luck, Liquid Luck, Trainings-Recorder, SC-Tracking) sahen ihn nie (galt schon für Elixir of Immortality). Der Zweig feuert den Hook jetzt mit `placed: true`; Saint Nicolas, Biomancy und Lizbeth steigen bei `ctx.placed` still aus.
 
+### Kartenbilder, Animationen, CPU, Feed (23.10.2026)
+* **Set/Skilltest (Al):** `setID` aller drei Karten = `PP MBS`; skilltest-legal sind die beiden Creatures, Liquid Luck nicht.
+* **Kunst:** `data/card-art/native/{Black_Thorn_Dragon,Shimmering_Dragonegg,Liquid_Luck}.png` (76×50, aus den gelieferten 610×400-Bildern im 8-px-Raster zurückgerechnet, Zellenmedian) + Einträge in `data/card-art/index.json`, Atlas neu gepackt (`scripts/build-card-art.py`).
+* **Neue Pixelart-Animationen** (`public/app-board.jsx`, Hülle `ppPunktBild`: Canvas um den Kartenmittelpunkt, 3-px-Raster, Bayer-Dithering, ~30 Bilder/s, feste Palette; Klänge in `ZONE_ANIM_SFX`):
+  `dragonegg_shimmer` (Kreuzfunkel in Weiß/Gelb/Orange wie auf dem Ei-Bild; läuft beim Gold-Tod des Eis und als `spellVisual`-Einschlag) und `liquid_rainbow` (Regenbogen in sieben Bändern, Goldfunkel am Topf-Ende, fallende Münzen; als Permanent-Animation beim Ausspielen und beim Auslösen von Liquid Luck). Black-Thorns Effekt nutzt weiter `black_flame_strike` (schwarze Flamme passt zum Kartenbild).
+* **CPU:** der Namens-Wähler (`_cpu.js`, `cardNamePicker`) kennt jetzt Stufen: Muster aus dem Log (aktivierte Surprises/Reactions zählen als Plays) → sichere Plays aus Hand/Deck → verdeckte Surprise des Gegners → Reaction/Surprise aus Hand/Deck. Liquid Luck spielt die CPU nur bei nicht leerem Deck (`cpuMeta.alwaysCommit` als Funktion). Test `NK-neue-karten/06`.
+* **Discord-Feed:** neue Karten postet MoniaBot als eigene Nachricht je Karte, nur das Bild mit der Tagline `**New card beep-boop:**`, in den Kanal `774670375303905291` (Standard in `bot/config.js`).
+
 ### Antworten von Al (23.10.2026) auf die vier offenen Fragen
 1. Reaction-/Surprise-Namen deklarierbar: **ja, auch bei Luck**; bei Surprises zählt die Aktivierung. → umgesetzt (s. o., Test `NK-neue-karten/05`).
 2. Wiederbelebung: **Creature vom Discard zählt, Held nicht** (Luck und Liquid Luck). → umgesetzt (`05`).

@@ -35,6 +35,7 @@ async function goldEffekt(ctx) {
   const engine = ctx._engine;
   if (!starbInEigenerRunde(engine, death, ctx.card)) return;
   const pi = death.controller ?? ctx.card.controller ?? ctx.card.owner ?? death.owner;
+  engine._broadcastEvent('play_zone_animation', { type: 'dragonegg_shimmer', owner: ctx.card.owner, heroIdx: ctx.card.heroIdx, zoneSlot: ctx.card.zoneSlot });
   engine._broadcastEvent('play_gold_coins', { owner: pi });
   await engine.actionGainGold(pi, GOLD);
   engine.log('dragonegg_gold', { player: engine.gs.players[pi]?.username, card: CARD_NAME, gold: GOLD });
@@ -44,7 +45,7 @@ async function goldEffekt(ctx) {
 module.exports = {
   // Entkoppelte Bilder (v1182): laufen auch, wenn die Karte negiert wird.
   spellVisual: {
-    impact: { type: 'gold_sparkle' }, impactMs: 260,
+    impact: { type: 'dragonegg_shimmer' }, impactMs: 260,
   },
 
   activeIn: ['support'],

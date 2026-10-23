@@ -8236,17 +8236,22 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   // peek at opp.hand / mainDeck / potionDeck and weight by likelihood. Log
   // of last turn's plays adds a pattern bonus for cards opp already cast.
   if (type === 'cardNamePicker') {
-    // User-spec'd Luck heuristic:
+    // User-spec'd Luck heuristic (Luck, Liquid Luck):
     //   1. If opp has played a particular card every / close-to-every
     //      turn so far → name that (the strongest predictor of "they'll
-    //      play it again next turn").
+    //      play it again next turn"). Activated Surprises and Reactions
+    //      count as plays (Al 23.10.), so they can win this step too.
     //   2. Else → random card in opp's hand (any one card — pure
     //      probabilistic guess at their next play).
     //   3. Else (hand empty / no playable hand cards) → random card
     //      from their main deck.
-    // All picks are filtered to "playable" cards (excluding Heroes /
-    // Ascended Heroes / Tokens, which can't be cast from hand and so
-    // can't trigger Luck).
+    //   4. Else → a Surprise the opp has face-down right now (it only
+    //      counts once it is ACTIVATED, so it ranks below a sure play).
+    //   5. Else → a Reaction/Surprise from opp's hand or deck.
+    // Steps 1-3 are filtered to cards that are played on the opp's own
+    // turn (excluding Heroes / Ascended Heroes / Tokens, which can't be
+    // cast from hand, and Reactions/Surprises, which only fire when
+    // the opp's own conditions are met).
     const allowed = promptData.cardNames;
     if (!Array.isArray(allowed) || allowed.length === 0) return null;
     const oppIdx = cpuIdx === 0 ? 1 : 0;
@@ -8261,19 +8266,19 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     // so skip Area-subtype cards entirely while opp's area zone is
     // occupied.
     const oppHasArea = ((engine.gs.areaZones?.[oppIdx]) || []).length > 0;
-    const isPlayable = (name) => {
+    const isPlayable = (name, mitReaktion = false) => {
       if (!allowedSet.has(name)) return false;
       const cd = cardDB[name];
       if (!cd) return false;
       const t = cd.cardType;
       if (t === 'Hero' || t === 'Ascended Hero' || t === 'Token') return false;
-      // Reaction and Surprise subtypes don't get "played on opp's own
-      // turn" — Reactions fire in chain windows, Surprises trigger
-      // from face-down zones — so declaring them is almost always a
-      // wasted Luck. Defense-in-depth: Luck's onFreeActivate also
-      // filters these out of the prompt's `cardNames` list.
+      // Reactions fire in chain windows and Surprises from face-down
+      // zones: they only count when the opp's own conditions are met, so
+      // steps 1-3 skip them (sure plays first); `mitReaktion` lets the
+      // pattern step (they were actually activated before) and the
+      // fallback steps take them.
       const sub = (cd.subtype || '').toLowerCase();
-      if (sub === 'reaction' || sub === 'surprise') return false;
+      if (!mitReaktion && (sub === 'reaction' || sub === 'surprise')) return false;
       // Areas are blocked from being cast while another Area occupies
       // the caster's area zone. If opp already has one in play, the
       // named Area can't be played next turn either.
@@ -8296,14 +8301,15 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     // Attacks), `creature_summoned` (Creatures), and `card_played`
     // (Potions + Artifacts). All three trigger Luck's hooks, so all
     // three count toward "what does opp tend to play".
-    const PLAY_TYPES = new Set(['spell_played', 'creature_summoned', 'card_played']);
+    // `surprise_activated` / `reaction_activated`: activated Surprises and Reactions count as plays too.
+    const PLAY_TYPES = new Set(['spell_played', 'creature_summoned', 'card_played', 'surprise_activated', 'reaction_activated']);
     for (const e of log) {
       if (e.turn == null) continue;
       if (e.player !== oppName) continue;
       oppTurnsSeen.add(e.turn);
       if (!e.card) continue;
       if (!PLAY_TYPES.has(e.type)) continue;
-      if (!isPlayable(e.card)) continue;
+      if (!isPlayable(e.card, true)) continue;
       let s = turnsByCard.get(e.card);
       if (!s) { s = new Set(); turnsByCard.set(e.card, s); }
       s.add(e.turn);
@@ -8321,22 +8327,33 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     }
 
     // ── 2. Random card from opp's hand ───────────────────────────────
-    const handCandidates = (opp.hand || []).filter(isPlayable);
+    const handCandidates = (opp.hand || []).filter(n => isPlayable(n));
     if (handCandidates.length > 0) {
       return { cardName: randomOf(handCandidates) };
     }
 
     // ── 3. Random card from opp's main deck ──────────────────────────
-    const deckCandidates = (opp.mainDeck || []).filter(isPlayable);
+    const deckCandidates = (opp.mainDeck || []).filter(n => isPlayable(n));
     if (deckCandidates.length > 0) {
       return { cardName: randomOf(deckCandidates) };
     }
+
+    // ── 4. A Surprise face-down on opp's side right now ──────────────
+    const verdeckt = [];
+    for (const zone of (opp.surpriseZones || [])) for (const n of (Array.isArray(zone) ? zone : [zone])) if (typeof n === 'string' && isPlayable(n, true)) verdeckt.push(n);
+    if (verdeckt.length > 0) return { cardName: randomOf(verdeckt) };
+
+    // ── 5. A Reaction/Surprise from opp's hand, then deck ────────────
+    const reaktionen = (opp.hand || []).filter(n => isPlayable(n, true));
+    if (reaktionen.length > 0) return { cardName: randomOf(reaktionen) };
+    const reaktionenDeck = (opp.mainDeck || []).filter(n => isPlayable(n, true));
+    if (reaktionenDeck.length > 0) return { cardName: randomOf(reaktionenDeck) };
 
     // ── Final fallback — declare ANY playable allowed name so Luck
     //    fires (free activation, no downside). Only reached when opp
     //    has no playable hand AND no playable deck (extremely rare —
     //    all-Hero / all-Token state).
-    const fallback = allowed.find(isPlayable);
+    const fallback = allowed.find(n => isPlayable(n, true));
     return fallback ? { cardName: fallback } : null;
   }
   if (type === 'zonePick') {
@@ -14417,4 +14434,4 @@ async function measureAreaValues(engine, helpers, cpuIdx) {
 // Gold-Bedarfsrechnung, die an zwei Stellen gepflegt wird, laeuft
 // garantiert auseinander. Rein additiv, kein Aufrufer geaendert.
 module.exports = { CPU_META_HELPERS, runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, mctsValueGoldVsDraw, mctsPickFromOptions, rolloutRestOfTurn, seedExploreAttempts, computeGoldDemand, mctsOpponentGoldEconomy,
-  _test: { heroCheatBonusByName, heroEffectGateCheatBonus, candidateCheatBonus, heuristicCandidateCmp, ACTION_CHEAT_BONUS, pickCreatureZoneSlot, listEligibleHeroesForActionCard } };
+  _test: { cpuGenericChoice, heroCheatBonusByName, heroEffectGateCheatBonus, candidateCheatBonus, heuristicCandidateCmp, ACTION_CHEAT_BONUS, pickCreatureZoneSlot, listEligibleHeroesForActionCard } };

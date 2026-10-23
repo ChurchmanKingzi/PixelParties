@@ -67,7 +67,7 @@ const config = {
   channels: {
     welcome: env('WELCOME_CHANNEL_ID'),          // leer: Systemkanal des Servers
     modlog: env('MODLOG_CHANNEL_ID'),
-    newCards: env('NEW_CARDS_CHANNEL_ID'),
+    newCards: env('NEW_CARDS_CHANNEL_ID', '774670375303905291'),   // neue Karten als Bilder (ohne .env-Eintrag gilt dieser)
     patchnotes: env('PATCHNOTES_CHANNEL_ID'),
     leaderboard: env('LEADERBOARD_CHANNEL_ID'),
     cardOfDay: env('CARD_OF_DAY_CHANNEL_ID'),
