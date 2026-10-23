@@ -9,7 +9,7 @@ const check = (name, cond, info) => { if (cond) console.log('  ✓', name); else
 (async () => {
   const oL = console.log, oE = console.error;
   console.log = () => {}; console.error = () => {};
-  const out = await runGame({ seats: 3, setupOnly: true, noProfileSeats: [0, 1, 2], seed: 62 });
+  const out = await runGame({ seats: 3, setupOnly: true, noProfileSeats: [0, 1, 2], seed: 69 });
   console.log = oL; console.error = oE;
   const { room, gs, engine } = out;
   const pool = room.skillTest.pool;
