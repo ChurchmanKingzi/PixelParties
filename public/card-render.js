@@ -31,7 +31,7 @@
   const OVER_GREEN = 'rgb(76,235,112)', OVER_RED = 'rgb(255,72,72)', OVER_OUTLINE = 'rgb(8,6,12)';   // aktuelle Werte: verringert / erhoeht, Kontur
   let TEXT_MASK = false;                      // waehrend `textLayer` gesetzt: aller Text weiss (Maske), siehe `draw(…, textOnly)`
   const INK_TRAIL_U = 200;                    // Vorschub minus Tintenbreite: 1 Schrift-Pixel Abstand hinter jedem Zeichen
-  const OPT = { boldU: 50, statusOutline: 0.5, dy: 0, dx: 0, slack: 0, trail: false, step: 0.05, hextra: 0, forcePt: 0, bsteps: 7, silverRim: true, nl: 'space', symDx: 0, symDy: 0, symMode: 'rule', hardOutlines: true };
+  const OPT = { nameOutline: !/[?&]namenkontur=0/.test(typeof location !== 'undefined' ? location.search : ''), boldU: 50, statusOutline: 0.5, dy: 0, dx: 0, slack: 0, trail: false, step: 0.05, hextra: 0, forcePt: 0, bsteps: 7, silverRim: true, nl: 'space', symDx: 0, symDy: 0, symMode: 'rule', hardOutlines: true };
 
   // ── Schrift: Umrisse und Vorschubbreiten aus cardgen/glyphs.json ──
   // Pixel Intv besteht nur aus Rechtecken, hat kein Kerning und Breiten in Vielfachen von 200 Einheiten.
@@ -499,6 +499,19 @@
   }
 
   // ═════════════ Farben je Karte ═════════════
+  /** TEST (Al, 23.10.): Kontur der Kartennamen in einem dunkleren Ton der jeweiligen Karte — aus der Namensplatte des Rahmens abgetastet
+   *  (mittlerer Farbwert eines Streifens am Rand der Platte, wo selten Schrift steht), auf 38 % Helligkeit abgedunkelt. Schalter: `OPT.nameOutline`
+   *  (Standard an; `?namenkontur=0` in der Adresse schaltet aus). */
+  function nameOutlineColor(ctx, sup) {
+    try {
+      const x0 = sup ? 56 : 108, ys = [62, 70, 78, 86, 94];
+      const px = ys.map(y => Array.from(ctx.getImageData(x0, y, 1, 1).data));
+      const hell = c => c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11;
+      px.sort((a, b) => hell(a) - hell(b));
+      const m = px[Math.floor(px.length / 2)];
+      return 'rgb(' + [0, 1, 2].map(i => Math.round(m[i] * 0.38)).join(',') + ')';
+    } catch (e) { return null; }
+  }
   function nameColor(s) {
     const t = s.type, r = s.rarity;
     if (t === 'boss') return C.boss;
@@ -685,6 +698,7 @@
     if (!textOnly) drawLine(ctx, spec.name, {
       left: sup ? 48 : 103, top: 48, width: sup ? 654 : 544, height: 55, size: 50, min: 48,
       align: 'center', color: spec.nameGold ? goldFill(ctx, 48, 55) : nameColor(spec),
+      outline: OPT.nameOutline && !isArti2(t) ? nameOutlineColor(ctx, sup) : null,   // Artifacts: dunkle Schrift auf heller Platte — dort keine dunkle Kontur
     });
 
     // 4) Faehigkeiten-Felder der Helden
