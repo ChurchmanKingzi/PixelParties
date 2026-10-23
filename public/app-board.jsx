@@ -33226,6 +33226,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     });
   }, [_meineHandGroesse, _gegnerHandGroesse]);
   const prevOppHandCountRef = useRef(opp.handCount || 0);
+  const oppHandShrinkRef = useRef(null);   // 23.10.: wann und auf welche Größe die Gegnerhand zuletzt geschrumpft ist (Handflug-Verdeckung, s. onPileTransfer)
   if (roomJustChanged) prevOppHandCountRef.current = opp.handCount || 0;
   // ★ v816 (Als Befund 6.9.): `useLayoutEffect` statt `useEffect`. Der
   // neue Zustand (Hand +1) wurde EINEN Frame lang gemalt, bevor der
@@ -33353,6 +33354,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
     // Clear stale steal-hidden indices when opp hand state changes (sync arrived)
     if (newCount !== prevCount && stealHiddenOpp.size > 0) setStealHiddenOpp(new Set());
+    if (newCount < prevCount) oppHandShrinkRef.current = { to: newCount, at: Date.now() };
     prevOppHandCountRef.current = newCount;
   }, [opp.handCount]);
 
@@ -43856,7 +43858,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const handHideKey = srcIsMe
           ? `${srcOwner}-${fromHandIdx}#${_handJetzt}@${cardName || ''}`
           : `${srcOwner}-${fromHandIdx}#${_handJetzt}`;
-        setBounceReturnHidden(prev => { const n = new Set(prev); n.add(handHideKey); return n; });
+        // ★ 23.10. (Great Vanguard Demon, Als Befund: „der Demon wird während der Animation unsichtbar"): die GEGNERHAND hat keine Namen im Schlüssel, er trägt nur Platz und
+        // Handgröße. Kommt der Zustand VOR dem Flug an (Reaction-Beschwörung aus der Hand: die Karte ist schon aus dem Zustand), hat die Hand beim Abflug schon die neue Größe, der
+        // Schlüssel passt auf den nachgerückten Nachbarn — und der blieb 4 s verdeckt. Liegt auf dem Platz eine AUFGEDECKTE Karte mit anderem Namen als die fliegende, ist die fliegende
+        // schon weg: nichts zu verdecken.
+        const _platzKarte = srcIsMe ? null : (spielerLiveRef.current?.[srcOwner]?.revealedHandCards || []).find(r => r.index === fromHandIdx);
+        // Für verdeckte Nachbarn (keine Namen): ist die Hand eben erst auf genau die Größe geschrumpft, die der Schlüssel trägt, kam der Zustand vor dem Flug.
+        const _shrink = srcIsMe ? null : oppHandShrinkRef.current;
+        const _schonWeg = !!(_platzKarte && cardName && _platzKarte.name !== cardName)
+          || !!(_shrink && _shrink.to === _handJetzt && Date.now() - _shrink.at < 500);
+        if (!_schonWeg) setBounceReturnHidden(prev => { const n = new Set(prev); n.add(handHideKey); return n; });
         // ★★ v1221 (Als Befund 18.9. zu „Dive Down\": die Karte erscheint
         // nach ihrem Flug kurz wieder in der Hand).
         //
