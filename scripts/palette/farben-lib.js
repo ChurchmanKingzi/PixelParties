@@ -52,6 +52,6 @@ function oberflaechenDateien() {
   return out.filter(f => !AUSGENOMMEN.some(re => re.test(f)));
 }
 // Das Kartenbild gehoert dem Kartengestalter: Renderer, Rahmen, Symbole, Kunst sowie die Spielfeld-Szenen/-Kunst und Hilfsdateien ohne Oberflaechenfarben
-const AUSGENOMMEN = [/public\/palette\.js$/, /public\/card-render\.js$/, /public\/card-image-shim\.js$/, /public\/skilltest-art\.js$/, /public\/dist\//, /public\/sw\.js$/, /public\/cardgen\//, /public\/campaign\//];
+const AUSGENOMMEN = [/public\/palette\.js$/, /public\/card-render\.js$/, /public\/card-image-shim\.js$/, /public\/skilltest-art\.js$/, /public\/dist\//, /public\/sw\.js$/, /public\/cardgen\//, /public\/campaign\//, /public\/retro-core\.js$/, /public\/.*\.retro\.css$/];
 
 module.exports = { ROOT, NAMEN, RE_HEX, RE_RGB, RE_HSL, hexZuRgb, rgbZuHex, hslZuRgb, rgbZuLab, dE, oberflaechenDateien, AUSGENOMMEN };

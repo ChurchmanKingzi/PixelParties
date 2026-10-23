@@ -80,16 +80,31 @@
   // Instanz — also faengt ein Proxy um `el.style` jede Zuweisung (und `setProperty` / `cssText`) ab.
   try {
     const proxies = new WeakMap();
+    // Retro-Modus (public/retro-core.js, nur mit ?retro=1): Inline-Stile laufen durch denselben Umwandler wie style.css — harte Schatten, Farbbaender,
+    // Dithering statt Alpha, steps() statt weicher Uebergaenge, Retro-Palette.
+    const RC = window.PP_RETRO && window.PPRetroCore;
+    const kebab = (k) => k.replace(/^webkit/i, '-webkit').replace(/[A-Z]/g, (m) => '-' + m.toLowerCase());
+    function retroSchreiben(t, name, v, pr) {
+      const r = RC.deklaration(name, v, { hatHintergrund: !!t.backgroundImage && t.backgroundImage !== 'none' });
+      t.setProperty(name, r.wert, pr || '');
+      for (const [ep, ev] of r.extra) t.setProperty(ep, ev, pr || '');
+    }
     const huelle = (decl) => {
       let px = proxies.get(decl);
       if (px) return px;
       px = new Proxy(decl, {
         get(t, k) {
-          if (k === 'setProperty') return (n, v, pr) => t.setProperty(n, snapWert(v), pr);
+          if (k === 'setProperty') return (n, v, pr) => (RC && typeof v === 'string' && v ? retroSchreiben(t, n, v, pr) : t.setProperty(n, snapWert(v), pr));
           const v = Reflect.get(t, k, t);
           return typeof v === 'function' ? v.bind(t) : v;
         },
-        set(t, k, v) { t[k] = (k === 'cssText') ? ppSnapCss(v) : snapWert(v); return true; },
+        set(t, k, v) {
+          if (RC && typeof v === 'string') {
+            if (k === 'cssText') { t.cssText = RC.deklarationen(v); return true; }
+            if (v && typeof k === 'string' && k in t && typeof t[k] === 'string' && k !== 'cssFloat') { retroSchreiben(t, kebab(k), v, ''); return true; }
+          }
+          t[k] = (k === 'cssText') ? ppSnapCss(v) : snapWert(v); return true;
+        },
       });
       proxies.set(decl, px);
       return px;
@@ -100,7 +115,19 @@
     }
   } catch (e) { console.warn('[palette] Stile nicht eingehaengt:', e && e.message); }
   // ── Canvas ──
-  try {
+  if (window.PP_RETRO && window.PPRetroCore) try {
+    const RC = window.PPRetroCore, c2d = CanvasRenderingContext2D.prototype;
+    const snapA = (v) => (typeof v === 'string' && FARBTEXT.test(v) ? RC.snapAlpha(v) : v);
+    for (const name of ['fillStyle', 'strokeStyle']) {
+      const d = Object.getOwnPropertyDescriptor(c2d, name);
+      if (d && d.set) Object.defineProperty(c2d, name, { configurable: true, enumerable: d.enumerable, get: d.get, set(v) { d.set.call(this, snapA(v)); } });
+    }
+    const sb = Object.getOwnPropertyDescriptor(c2d, 'shadowBlur');
+    if (sb && sb.set) Object.defineProperty(c2d, 'shadowBlur', { configurable: true, enumerable: sb.enumerable, get: sb.get, set() { sb.set.call(this, 0); } });
+    const acs0 = CanvasGradient.prototype.addColorStop;
+    CanvasGradient.prototype.addColorStop = function (o, c) { return acs0.call(this, o, snapA(c)); };
+  } catch (e) { console.warn('[retro] Canvas nicht eingehaengt:', e && e.message); }
+  else try {
     const c2d = CanvasRenderingContext2D.prototype;
     for (const name of ['fillStyle', 'strokeStyle', 'shadowColor']) {
       const d = Object.getOwnPropertyDescriptor(c2d, name);

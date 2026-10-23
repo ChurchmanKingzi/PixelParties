@@ -244,7 +244,7 @@ function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
 //  served from /data/animated_screen/layers2/. Purely cosmetic; sits behind
 //  the auth panel and is pointer-events:none.
 // ═══════════════════════════════════════════
-const ANIM_LAYERS_DIR = '/data/animated_screen/layers2/';
+const ANIM_LAYERS_DIR = window.PP_RETRO ? '/data/animated_screen/layers2-retro/' : '/data/animated_screen/layers2/';
 
 // ── ZUSCHNITT DER KULISSEN-EBENEN (v1265, Al 22.9.: „der Login-Screen
 // ruckelt") ─────────────────────────────────────────────────────────────

@@ -74,8 +74,23 @@
   }
   </script>
 
-  <link rel="stylesheet" href="/style.css">
-  <link rel="stylesheet" href="/style-skilltest.css">
+  <!-- Retro-Modus (Vorschau): ?retro=1 schaltet ein, ?retro=0 aus (wird gemerkt). Laedt die umgewandelten Stylesheets (scripts/retro/build-css.js) und den
+       Umwandlungs-Kern fuer Inline-Stile. Muss synchron VOR den Stylesheets laufen. -->
+  <script>
+    (function () {
+      var an = false;
+      try {
+        var q = /[?&]retro=(\w+)/.exec(location.search);
+        if (q) localStorage.setItem('pp-retro', (q[1] === '0' || q[1] === 'aus') ? '0' : '1');
+        an = localStorage.getItem('pp-retro') === '1';
+      } catch (e) { /* ohne Speicher: normaler Modus */ }
+      window.PP_RETRO = an;
+      if (an) document.documentElement.setAttribute('data-retro', '1');
+      var s = an ? '.retro' : '';
+      document.write('<link rel="stylesheet" href="/style' + s + '.css"><link rel="stylesheet" href="/style-skilltest' + s + '.css">');
+      if (an) document.write('<script src="/retro-core.js"><\/script>');
+    })();
+  </script>
 
   <!-- Instant branded splash, shown until React mounts. Styles are
        inlined so it renders before style.css and never flashes. React
