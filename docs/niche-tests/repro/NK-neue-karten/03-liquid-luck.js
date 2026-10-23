@@ -23,6 +23,9 @@ const H = require('../../lib/h.js');
   {
     const t = await szene('Fireball');
     const reveals = [];
+    const emits = [];   // was wirklich an die Sockets geht (Sitz 0 = „S0", Sitz 1 = „S1")
+    t.gs.players[0].socketId = 'S0'; t.gs.players[1].socketId = 'S1';
+    t.engine.io = { to: sid => ({ emit: (ev, data) => { if (ev === 'card_reveal') emits.push({ sid, data }); } }) };
     const urspr = t.engine._broadcastEvent.bind(t.engine);
     t.engine._broadcastEvent = (ev, data, opts) => { if (ev === 'card_reveal' && data.cardName === 'Fireball') reveals.push({ data, toPlayers: opts && opts.toPlayers }); return urspr(ev, data, opts); };
     const r = await gespielt(t);
@@ -32,7 +35,7 @@ const H = require('../../lib/h.js');
     R.check('Trank nicht mehr in der Hand', !ps.hand.includes(LL), ps.hand);
     R.check('… der Trank selbst liegt wie jede Normal Potion im Gelöscht-Stapel (genau 1×), nicht in der Ablage', ps.deletedPile.filter(n => n === LL).length === 1 && !ps.discardPile.includes(LL), { del: ps.deletedPile, disc: ps.discardPile });
     R.check('Marker trägt Ziel und Spieler', (() => { const i = marker(t, 0)[0]; return i && i.counters.liquidLuckZiel === 'Fireball' && i.counters.liquidLuckSpieler === 0; })(), marker(t, 0)[0]?.counters);
-    R.check('das Bild der deklarierten Karte wird an den Gegner gestreamt (card_reveal nur an Sitz 1, einmal)', reveals.length === 1 && reveals[0].data.cardName === 'Fireball' && JSON.stringify(reveals[0].toPlayers) === '[1]', reveals);
+    R.check('das Bild der deklarierten Karte wird gestreamt (card_reveal, einmal, an beide Sitze inkl. Gegner)', reveals.length === 1 && reveals[0].data.cardName === 'Fireball' && !reveals[0].toPlayers && emits.some(e => e.sid === 'S1' && e.data.cardName === 'Fireball') && emits.some(e => e.sid === 'S0' && e.data.cardName === 'Fireball'), { reveals, emits });
     R.check('Log liquid_luck_declare', t.lg('liquid_luck_declare').length === 1 && t.lg('liquid_luck_declare')[0].card === 'Fireball', t.lg('liquid_luck_declare'));
     const pn = t.prompts.find(p => p.d.type === 'cardNamePicker')?.d;
     R.check('Wähler bietet Kartennamen an (auch Reactions und Surprises, Al 23.10.), aber keine Tokens', pn && pn.cardNames.includes('Fireball') && pn.cardNames.includes('Gold Trap') && pn.cardNames.includes('Anti-Magnet') && !pn.cardNames.some(n => H.DB[n].cardType === 'Token'), pn && pn.cardNames.length);
