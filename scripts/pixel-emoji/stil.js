@@ -82,9 +82,11 @@ function stilisiere(g0, opt = {}) {
     if (!v) return 0;
     let s = 0, n = 0;
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const yy = y + dy, xx = x + dx; const vv = (yy < 0 || yy >= H || xx < 0 || xx >= W) ? 0 : h[yy][xx]; const w = (dx === 0 && dy === 0) ? 2 : 1; s += vv * w; n += w; }
-    return Math.min(s / n, 2.4);                                   // Kuppel flacht ab ~2 Zellen Randabstand ab: nur der Rand wird schattiert
+    return Math.min(s / n, 4.2);                                   // Obergrenze; die Flaeche selbst kappt unten auf 2,4 (flach) bzw. 4,2 (gross und rund)
   }));
   const hAt = (x, y) => (y < 0 || y >= H || x < 0 || x >= W) ? 0 : hs[y][x];
+  // ungeglaettete Hoehe fuer grosse runde Flaechen (siehe `kuppel` unten)
+  const hRoh = (x, y) => (y < 0 || y >= H || x < 0 || x >= W) ? 0 : (h[y][x] >= INF ? 0 : h[y][x]);
   // Licht von oben links
   const L = [-0.62, -0.62, 0.48]; const ln = Math.hypot(...L); L[0] /= ln; L[1] /= ln; L[2] /= ln;
   const flach = L[2];
@@ -108,8 +110,15 @@ function stilisiere(g0, opt = {}) {
     const tHell = ton(rgb2hex(r.licht)), tMitte = ton(rgb2hex(r.mitte)), tDunkel = ton(rgb2hex(r.schatten)), tGlanz = ton(rgb2hex(r.glanz));
     let besterGlanz = null;
     const wert = new Map();                                          // Zelle → Neigung zum Licht
+    // Rechteckigkeit: Anteil der Zellen am Umschlagrechteck. Rechtecke (Tasten, Karten) bleiben flach mit Fase; grosse runde Flaechen (Kugeln, Monde) wolben sich.
+    const xs = a.zellen.map(c => c[0]), ys = a.zellen.map(c => c[1]);
+    const bw = Math.max(...xs) - Math.min(...xs) + 1, bh = Math.max(...ys) - Math.min(...ys) + 1;
+    const fuell = a.zellen.length / (bw * bh);
+    const kuppel = a.zellen.length >= 60 && fuell < 0.86 ? 4.2 : 2.4;
+    const hh = (x, y) => Math.min(hAt(x, y), kuppel);
+    const hh2 = kuppel > 2.4 ? ((x, y) => Math.min(hRoh(x, y), kuppel)) : hh;
     for (const [x, y] of a.zellen) {
-      const gx = (hAt(x + 1, y) - hAt(x - 1, y)) / 2, gy = (hAt(x, y + 1) - hAt(x, y - 1)) / 2;
+      const gx = (hh2(x + 1, y) - hh2(x - 1, y)) / 2, gy = (hh2(x, y + 1) - hh2(x, y - 1)) / 2;
       const k = 1.0; const n = [-gx, -gy, k]; const nl = Math.hypot(...n);
       wert.set(x + ',' + y, (n[0] * L[0] + n[1] * L[1] + n[2] * L[2]) / nl - flach);
     }
@@ -122,7 +131,7 @@ function stilisiere(g0, opt = {}) {
       const w = wert.get(x + ',' + y);
       let t = tonVon(w);
       // Dithering NUR an der Grenze zweier Toene (Schachbrett), und nur auf grossen Flaechen
-      if (gross && !dunkel) {
+      if (gross && !dunkel && kuppel > 2.4 && hAt(x, y) >= 2.0) {          // nur auf gewoelbten (grossen, runden) Flaechen
         const naeher = Math.min(Math.abs(w - TH), Math.abs(w + TH));
         if (naeher < 0.07 && ((x + y) & 1) === 0) t = Math.max(0, Math.min(2, w > 0 ? (t === 2 ? 1 : (t === 1 ? 2 : 1)) : (t === 0 ? 1 : (t === 1 ? 0 : 1))));
       }

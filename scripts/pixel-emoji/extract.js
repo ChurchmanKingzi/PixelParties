@@ -152,10 +152,10 @@ function imBrowser(zeichen) {
     await page.waitForFunction(() => typeof PP_PX_SPRITES !== 'undefined' && typeof PP_PX_ICONS !== 'undefined', null, { timeout: 30000 });
     const { ergebnis, protokoll } = await page.evaluate(`(${imBrowser.toString()})(${JSON.stringify(zeichen)})`);
     // Zeichen mit und ohne Variantenselektor teilen sich EIN Glyph (gleicher Codepunkt): Farbfassung vor Einfarbfassung.
-    // Handzeichner-Stil (stil.js): FORM aus dem System-Emoji, Schattierung/Licht/Dithering wie beim handgezeichneten Sprite. Standard: nur Zeichen, die frueher
-    // ein handgezeichnetes Sprite hatten; PE_STIL=alle wendet ihn auf alle Farb-Emojis an, PE_STIL=aus schaltet ihn ab.
+    // Handzeichner-Stil (stil.js): FORM aus dem System-Emoji, Schattierung/Licht/Dithering wie beim handgezeichneten Sprite. Standard: ALLE Farb-Emojis;
+    // PE_STIL=sprites beschraenkt ihn auf Zeichen, die frueher ein handgezeichnetes Sprite hatten, PE_STIL=aus schaltet ihn ab.
     const { stilisiere } = require('./stil');
-    const modus = process.env.PE_STIL || 'sprites';
+    const modus = process.env.PE_STIL || 'alle';
     for (const [z, g] of Object.entries(ergebnis)) {
       if (!g.mono && g.pal && g.pal.Z && modus !== 'aus' && (g.stil || modus === 'alle')) Object.assign(g, stilisiere(g));
       delete g.stil;
