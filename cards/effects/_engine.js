@@ -11315,6 +11315,10 @@ class GameEngine {
     // can find the right hand-card DOM source. After the splice, the
     // card is gone and indices shift.
     const sourceHandIndex = sourceLabel === 'hand' ? handIdx : -1;
+    // W64c (Al 23.10.2026: Karten gehen IMMER in die Stapel ihres permanenten Besitzers): der angelegte Held ist die Karte des Spielers, der ihn anlegt
+    // (bei einer gestohlenen Handkarte: ihres Besitzers) - NICHT zwingend die des Kreatur-Besitzers (uebernommene Kreatur, eigene Karte darunter).
+    // Beim Abgang der Traeger-Kreatur folgt der Held in den Stapel DIESES Besitzers (`counters.attachedHeroOwner`).
+    const _heldBesitzer = (sourceLabel === 'hand' ? this._handOriginAt(ps, handIdx) : null) ?? playerIdx;
 
     if (sourceLabel === 'hand') {
       ps.hand.splice(handIdx, 1);
@@ -11330,6 +11334,7 @@ class GameEngine {
 
     if (!creatureInst.counters) creatureInst.counters = {};
     creatureInst.counters.attachedHero = heroName;
+    creatureInst.counters.attachedHeroOwner = _heldBesitzer;   // W64c
 
     // ── Visual flight: source → host Creature ──────────────────────
     // A custom `attach_hero_fly` event renders for BOTH the owner and
@@ -14853,14 +14858,19 @@ class GameEngine {
     const _zuFremderHand = (fromZone === ZONES.SUPPORT && toZone === ZONES.HAND && Number.isInteger(opts.toPlayer)
       && opts.toPlayer !== cardInstance.owner) ? opts.toPlayer : null;
     const _herkunftVorWechsel = cardInstance.originalOwner ?? cardInstance.owner;
+    // W64c (Al 23.10.2026: „Bounce geht an den aktuellen Kontrolleur"): Brett → HAND geht in die Hand des KONTROLLEURS (auch gestohlen/uebernommen);
+    // die Herkunft bleibt (Platzmarke unten), spaeteres Abwerfen/Loeschen/Spielen/Mischen geht in die Stapel des Besitzers. Brett → Ablage/Loeschstapel/Deck
+    // einer gestohlenen/uebernommenen Karte geht dagegen zum BESITZER (W63c, Al: „IMMER in die Stapel des permanenten Besitzers").
+    const _kontrolleur = cardInstance.controller ?? cardInstance.owner;
     const _heimkehr = _zuFremderHand != null ? _zuFremderHand
-      : (fromZone === ZONES.SUPPORT && toZone !== ZONES.SUPPORT
-        && (cardInstance.counters?.crossSideControlled != null
-          // W63c (Besitzer-Regel W3: „Hand-Rueckgaben gehen in die Hand des Besitzers"): auch eine gestohlene/uebernommene Karte
-          // (Charme Lv 2, Hunting, Dark Gear …) geht zum BESITZER zurueck, nicht in die Hand/Ablage des Kontrolleurs.
-          || ((toZone === ZONES.HAND || toZone === ZONES.DISCARD || toZone === ZONES.DELETED || toZone === ZONES.DECK)
-            && Number.isInteger(cardInstance.originalOwner) && cardInstance.originalOwner !== cardInstance.owner)))
-        ? (cardInstance.originalOwner ?? cardInstance.controller ?? cardInstance.owner) : null;
+      : (fromZone === ZONES.SUPPORT && toZone === ZONES.HAND)
+        ? ((_kontrolleur !== cardInstance.owner || cardInstance.counters?.crossSideControlled != null) ? _kontrolleur : null)
+        : ((fromZone === ZONES.SUPPORT && toZone !== ZONES.SUPPORT
+          && (cardInstance.counters?.crossSideControlled != null
+            // W63c (Besitzer-Regel W3): auch eine gestohlene/uebernommene Karte (Charme Lv 2, Hunting, Dark Gear …) geht zum BESITZER zurueck.
+            || ((toZone === ZONES.DISCARD || toZone === ZONES.DELETED || toZone === ZONES.DECK)
+              && Number.isInteger(cardInstance.originalOwner) && cardInstance.originalOwner !== cardInstance.owner)))
+          ? (cardInstance.originalOwner ?? cardInstance.controller ?? cardInstance.owner) : null);
     if (fromZone === ZONES.SUPPORT && toZone === ZONES.HAND) {
       const owner = _heimkehr ?? cardInstance.owner;
       const handForOwner = this.gs.players[owner]?.hand || [];
@@ -29938,9 +29948,12 @@ this._deathWatch = (this._deathWatchStack || []).length
         const i = zone[inst.zoneSlot].indexOf(inst.name);
         if (i >= 0) zone[inst.zoneSlot].splice(i, 1);
       }
-      ps.mainDeck.push(inst.name);
-      this.shuffleDeck(entry.owner);
-      await this.noteShuffledBack(entry.owner, 1, entry.quelle || 'Staff of Illusions');
+      // W64c: Deck des permanenten BESITZERS der Karte (eine gestohlene Handkarte, die der Dieb per Staff/Create Illusion beschwor, gehoert nicht in sein Deck)
+      const _deckBesitzer = this.kartenBesitzerVon(inst);
+      const _deckIdx = gs.players[_deckBesitzer] ? _deckBesitzer : entry.owner;
+      gs.players[_deckIdx].mainDeck.push(inst.name);
+      this.shuffleDeck(_deckIdx);
+      await this.noteShuffledBack(_deckIdx, 1, entry.quelle || 'Staff of Illusions');
       this._untrackCard(inst.id);
       this.log('staff_illusion_return', { player: ps.username, creature: inst.name });
       this.sync();
@@ -43314,15 +43327,18 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
       await this._delay(650);
     }
+    // W64c: eine negierte HANDkarte (Quelle 'hand'/'handGone') kommt in die Stapel ihres permanenten Besitzers (gestohlen/geschenkt), sonst Stapel des Platzierers.
+    const pilePs = (source === 'hand' || source === 'handGone') ? this.handKartenBesitzerPs(ps, cardName) : ps;
+    const pileIdx = this.gs.players.indexOf(pilePs);
     if (nachDeck) {
-      if (!ps.mainDeck) ps.mainDeck = [];
-      ps.mainDeck.push(cardName);
-      this.shuffleDeck(playerIdx);
-      this.log('negated_to_deck', { card: cardName, player: ps.username, placement: true });
+      if (!pilePs.mainDeck) pilePs.mainDeck = [];
+      pilePs.mainDeck.push(cardName);
+      this.shuffleDeck(pileIdx >= 0 ? pileIdx : playerIdx);
+      this.log('negated_to_deck', { card: cardName, player: pilePs.username, placement: true });
     } else {
       const pile = nachGeloescht ? 'deletedPile' : 'discardPile';
-      if (!ps[pile]) ps[pile] = [];
-      ps[pile].push(cardName);
+      if (!pilePs[pile]) pilePs[pile] = [];
+      pilePs[pile].push(cardName);
       this.log('placement_negated', { card: cardName, player: ps.username, to: pile });
     }
     this.sync();
@@ -43409,6 +43425,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this._delay(650);
       return;
     }
+    // W64c (Al 23.10.2026: Karten gehen IMMER in die Stapel ihres permanenten Besitzers): eine negierte HANDkarte, die dem Halter nicht gehoert (Charme, Diebstahl,
+    // Geschenk), kommt in Deck/Ablage/Loeschstapel ihres BESITZERS. Ruft ein Weg schon mit dem Stapelbesitzer auf, bleibt es dabei (kein Buchungseintrag mehr).
+    const pilePs = (!opts.fromZone || opts.fromZone === 'hand') ? this.handKartenBesitzerPs(ps, cardName) : ps;
+    const pileIdx = this.gs.players.indexOf(pilePs);
     // ★ v1017 („Off Duty"): zurueck INS DECK statt auf einen Stapel.
     // Der Flug geht sichtbar zum Deckstapel, danach wird gemischt —
     // sonst laege die Karte obenauf und waere sofort wieder da.
@@ -43419,9 +43439,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         ...(_fhiDeck != null ? { fromHandIdx: _fhiDeck } : {}),
       });
       await this._delay(650);
-      if (!ps.mainDeck) ps.mainDeck = [];
-      ps.mainDeck.push(cardName);
-      this.shuffleDeck(ownerIdx);
+      if (!pilePs.mainDeck) pilePs.mainDeck = [];
+      pilePs.mainDeck.push(cardName);
+      this.shuffleDeck(pileIdx >= 0 ? pileIdx : ownerIdx);
       this.log('negated_to_deck', { card: cardName, player: ps.username });
       this.sync();
       return;
@@ -43466,14 +43486,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       // als Startpunkt zu finden.
       if (vonZone !== 'hand') this.sync();
       await this._delay(650);
-      if (!ps[pile]) ps[pile] = [];
-      ps[pile].push(cardName);
+      if (!pilePs[pile]) pilePs[pile] = [];
+      pilePs[pile].push(cardName);
       this.sync();
       return;
     }
     // Normal discard negation — unchanged, immediate, no flight.
-    if (!ps[pile]) ps[pile] = [];
-    ps[pile].push(cardName);
+    if (!pilePs[pile]) pilePs[pile] = [];
+    pilePs[pile].push(cardName);
   }
 
   /**
@@ -52578,10 +52598,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // name into the discard.
     const attachedHero = e.inst.counters?.attachedHero;
     if (attachedHero && creatureDiscardPs) {
-      creatureDiscardPs.discardPile.push(attachedHero);
+      // W64c: Ablage des Besitzers der HELDEN-Karte (`attachedHeroOwner`), sonst der Kreatur-Besitzer wie bisher
+      const _heldPs = this.gs.players[e.inst.counters?.attachedHeroOwner] || creatureDiscardPs;
+      _heldPs.discardPile.push(attachedHero);
       this.log('attached_hero_discarded', {
         hero: attachedHero, creature: e.inst.name,
-        player: creatureDiscardPs.username,
+        player: _heldPs.username,
       });
     }
     // `_onlyCard: e.inst` — onCardLeaveZone fires ONLY the leaving

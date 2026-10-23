@@ -175,7 +175,7 @@ module.exports = {
     engine.takeFromPileSync(ps, 'hand', handIdx);
 
     if (engine.supportSlotBelegt(pi, bouncedHeroIdx, bouncedSlotIdx)) {   // v1360
-      engine.handZugangSync(ps, newName, { von: 'brett', source: CARD_NAME, ohneInstanz: true });
+      engine.handZugangRueckgabe(ps, newName, { von: 'brett', source: CARD_NAME, ohneInstanz: true });   // W64c: unverrichtet zurück — Herkunft einer gestohlenen Handkarte bleibt
       await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });
       return null;
     }

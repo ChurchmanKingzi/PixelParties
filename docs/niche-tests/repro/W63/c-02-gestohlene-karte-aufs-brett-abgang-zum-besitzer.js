@@ -2,6 +2,7 @@
 // W63c-02 · Gestohlene Handkarte (Charme Lv 2) kommt aufs BRETT und verlässt es wieder — Ablage/Hand gehören dem BESITZER.
 // Eintritt: Karte wird gespielt/ausgerüstet/beschworen/angelegt/gesetzt (Equip, Creature, Ability, Surprise, Area, Attachment, Free-Side-Equip).
 // Austritt: zerstört (actionDestroyCard), Kreatur stirbt durch Schaden, Kreatur wird auf die Hand zurückgegeben (Bounce).
+// W64c (Al 23.10.2026): der Bounce geht in die Hand des aktuellen KONTROLLEURS (Herkunft bleibt) - die W63c-Annahme "Hand des Besitzers" ist zurückgenommen.
 // Regel (CARD_API „Besitzer-Regel (W3)"): Ablage/Löschstapel/Deck/Hand-Rückgabe = Stapel des permanenten Besitzers, nicht des Kontrolleurs/Diebs.
 // Alter Stand: Equip, Ability, Surprise, Area, Attachment und der Bounce landeten bei Dieb (`originalOwner` = Dieb, weil nur Creature/Spell/Artefakt
 // die Herkunft der Handkarte auf die Brettinstanz übertrugen); dazu blieb eine Geister-Instanz der gestohlenen Karte in Zone `hand`.
@@ -46,9 +47,10 @@ const { H } = B;
       const inst = t.engine.cardInstances.find(c => c.name === 'ZZ Dummy' && c.zone === 'support');
       await t.run(() => returnSupportCreatureToHand(t.engine, inst, 'Test', {}));
       const o = B.ort(t, 'ZZ Dummy');
-      R.check(`Kreatur zurück auf die Hand (Dieb ${dieb}): Hand des BESITZERS`, B.anzahl(t, t.besitzer, 'hand', 'ZZ Dummy') === 1 && B.anzahl(t, dieb, 'hand', 'ZZ Dummy') === 0, o);
+      // W64c (Al 23.10.2026, ersetzt die W63c-Annahme „Hand des Besitzers"): Bounce geht in die Hand des aktuellen KONTROLLEURS (= Dieb); die Herkunft bleibt
+      R.check(`Kreatur zurück auf die Hand (Dieb ${dieb}): Hand des KONTROLLEURS (Dieb), Herkunft = Besitzer`, B.anzahl(t, dieb, 'hand', 'ZZ Dummy') === 1 && B.anzahl(t, t.besitzer, 'hand', 'ZZ Dummy') === 0 && Object.values(t.gs.players[dieb]._handOriginals || {}).some(x => x && x.n === 'ZZ Dummy' && x.o === t.besitzer), o);
       // …und von dort abgeworfen: Ablage des Besitzers
-      await t.run(() => t.engine.actionDiscardHandCard(t.besitzer, 'ZZ Dummy', t.pile(t.besitzer, 'hand').indexOf('ZZ Dummy'), {}));
+      await t.run(() => t.engine.actionDiscardHandCard(dieb, 'ZZ Dummy', t.pile(dieb, 'hand').indexOf('ZZ Dummy'), {}));
       B.erwarteStapel(R, t, `Kreatur zurück auf die Hand, abgeworfen (Dieb ${dieb})`, 'ZZ Dummy', t.besitzer, 'discardPile');
     }
     // Gegenprobe: eigene Karte desselben Namens → Stapel des Halters

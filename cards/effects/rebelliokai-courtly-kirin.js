@@ -205,8 +205,7 @@ module.exports = {
     // Defensive cleanup helper — if anything below fails, push Kirin
     // to discard so the cardName isn't permanently lost from any pile.
     const fallbackDiscard = () => {
-      if (!ps.discardPile) ps.discardPile = [];
-      ps.discardPile.push(CARD_NAME);
+      engine.handKartenBesitzerPs(ps, CARD_NAME).discardPile.push(CARD_NAME);   // W64c: Ablage des permanenten Besitzers (gestohlene Handkarte)
     };
 
     const eligible = _eligibleCostCards(engine, pi);

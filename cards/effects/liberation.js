@@ -194,7 +194,7 @@ async function bergen(engine, pi, ctx) {
   // `_spellPlacedOnBoard` abgeklemmt (Bauform aus forbidden-zone.js),
   // das Untracking uebernimmt die Karte deshalb selbst.
   gs._spellPlacedOnBoard = true;
-  ps.deletedPile.push(CARD_NAME);
+  engine.handKartenBesitzerPs(ps, CARD_NAME).deletedPile.push(CARD_NAME);   // W64c: Loeschstapel des permanenten Besitzers (gestohlene Handkarte)
   if (ctx?.card?.id) engine._untrackCard(ctx.card.id);
   engine.sync();
   return true;
