@@ -8090,6 +8090,26 @@ class GameEngine {
     return (Array.isArray(stack) && stack.length > 0) ? stack[stack.length - 1] : null;
   }
 
+  /**
+   * Top of the resolving-PLAY stack: wie `_currentResolvingSpellName()`, aber auch für ATTACK-Karten (die Anti Magic nicht sperrt und deshalb
+   * nicht auf dem Spell-Stapel liegen). Für Zuhörer, die „diese Karte wird gerade gespielt" von „diese Karte betritt eine Zone" trennen müssen
+   * (Luck: ein Area-/Attachment-Angriff erzeugt Zonen-Eintritt UND `afterSpellResolved` — gezählt wird einmal).
+   */
+  _currentResolvingPlayName() {
+    const stack = this.gs?._resolvingPlayStack;
+    return (Array.isArray(stack) && stack.length > 0) ? stack[stack.length - 1] : null;
+  }
+
+  _pushResolvingPlay(cardName) {
+    if (!this.gs._resolvingPlayStack) this.gs._resolvingPlayStack = [];
+    this.gs._resolvingPlayStack.push(cardName);
+  }
+
+  _popResolvingPlay() {
+    const stack = this.gs._resolvingPlayStack;
+    if (Array.isArray(stack) && stack.length > 0) stack.pop();
+  }
+
   /** Push a Spell name onto the resolving-Spell stack. Paired with
    *  `_popResolvingSpell()` in the caller's finally block. The
    *  push/pop pattern lives at the canonical resolution entry points
@@ -24320,6 +24340,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if ((this.gs._spellResolutionDepth || 0) === 0) { delete this.gs._spellNegatedByEffect; delete this.gs._negationWhole; this._visLog = []; }
     this.gs._spellResolutionDepth = (this.gs._spellResolutionDepth || 0) + 1;
     if (cardData.cardType === 'Spell') this._pushResolvingSpell(cardName);
+    if (cardData.cardType === 'Spell' || cardData.cardType === 'Attack') this._pushResolvingPlay(cardName);
     // ★ v1303 (Als Vorgabe 23.9.): der Auftritt der schenkenden Karte
     // (Junshi) kommt in dem Moment, in dem der Spell ANFAENGT aufzuloesen
     // — nach Wahl und Wisdom-Kosten, vor seinem Effekt. Vorher lief er
@@ -24423,6 +24444,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       else delete this.gs._spellPlacedOnBoard;
       this.gs._spellResolutionDepth = Math.max(0, (this.gs._spellResolutionDepth || 1) - 1);
       if (cardData.cardType === 'Spell') this._popResolvingSpell();
+      if (cardData.cardType === 'Spell' || cardData.cardType === 'Attack') this._popResolvingPlay();
     }
     // ★ v1003: Nachtraeglich verbrauchte Aktion — dieselbe Marke, die
     // `doPlaySpell` nach seiner Aufloesung abarbeitet. Hier steht sie,
@@ -41020,7 +41042,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // misclassify.
     const _surpriseCardData = this._getCardDB()[cardName];
     const _surpriseIsSpell = _surpriseCardData?.cardType === 'Spell';
-    if (_surpriseIsSpell) this._pushResolvingSpell(cardName);
+    if (_surpriseIsSpell) { this._pushResolvingSpell(cardName); this._pushResolvingPlay(cardName); }
     let _steuerInst = null, _steuerVorher;   // 29.9.: Ausloeser als controller (s.u.)
     try {
     const ps = this.gs.players[playerIdx];
@@ -41577,7 +41599,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       this._surpriseResolutionDepth = Math.max(0, (this._surpriseResolutionDepth || 1) - 1);
       if (this._surpriseResolutionDepth === 0) this._inSurpriseResolution = false;
       this._activeSurpriseHeroes?.delete(heroKey);
-      if (_surpriseIsSpell) this._popResolvingSpell();
+      if (_surpriseIsSpell) { this._popResolvingSpell(); this._popResolvingPlay(); }
       // 29.9.: liegt die Instanz noch in der Surprise Zone (staysFaceUp),
       // bestimmt wieder `effektiveSeiten` den Kontrolleur.
       if (_steuerInst && _steuerInst.zone === ZONES.SURPRISE && _steuerInst.controller !== _steuerVorher) {
