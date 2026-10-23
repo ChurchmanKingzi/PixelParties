@@ -34,7 +34,7 @@
 const { useState, useEffect, useRef, useCallback, useContext } = React;
 
 const PPF_OPEN_EVENT = 'pp:player-profile-open';
-const PPF_MEDAL_COLORS = { 1: '#ffd61a', 2: '#d2d2db', 3: '#ff9b3a' };
+const PPF_MEDAL_COLORS = { 1: '#fad54a', 2: '#d2d2db', 3: '#ff9b3a' };
 
 function ppfSfx(name, opts) {
   if (window.playSFX) window.playSFX(name, opts);
@@ -219,7 +219,7 @@ function PpfStats({ p }) {
         <span className="menu-stat-label">⚔ ELO</span>
         <span className="menu-stat-value">{p.elo}</span>
       </div>
-      <div className="badge menu-stat-badge menu-stat-badge--sc pp-eckzier ppf-badge" style={{ color: '#ffd61a' }}>
+      <div className="badge menu-stat-badge menu-stat-badge--sc pp-eckzier ppf-badge" style={{ color: '#fad54a' }}>
         <span className="menu-stat-coin-wrap">
           <img src="/data/sc.png" className="menu-stat-coin ppf-coin" alt="" />
           {Glitzer && <Glitzer />}
