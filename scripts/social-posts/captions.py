@@ -291,6 +291,32 @@ HEROES = {
 }
 
 
+# TikTok-Beschreibungen (kürzer als bei Instagram: Aufhänger, Fähigkeit in einem Satz, Adresse als Text, 5 Hashtags). Link auf TikTok:
+# auf einem Privatkonto erst ab 1.000 Followern klickbar, deshalb steht die Adresse im Text. Fähigkeiten folgen dem Kartentext.
+TIKTOK_TAGS = '#tcg #cardgame #pixelart #indiegame #freetoplay'
+TIKTOK = {
+    "Cool Rescuer Monia": ("Meet Monia, the face of Pixel Parties 💙🚀",
+                           "Once per turn: discard 1 card and negate an effect on ALL Creatures."),
+    "Bomb Berserker Bartas": ("One spell. Two targets. 💥",
+                              "Hit exactly one target with a lower-level Destruction Magic Spell and you may pick a second target for it."),
+    "Nao, the Barrier Priestess": ("What if healing had no limit? ✨",
+                                   "Nao's healing can go beyond a Hero's max HP, while the max itself stays unchanged."),
+    "Zsos'Ssar, the Serpent Warlord": ("Poison your own team to hit harder. 🐍",
+                                       "+40 damage for every poisoned target on the board. The catch: each Decay spell makes you poison one of your own Heroes first."),
+    "Beato, the Butterfly Witch": ("Any level 1 Spell. Any level 1 Creature. 🦋",
+                                   "Use all 5 Spell Schools and Beato ascends into the Eternal Butterfly."),
+    "Bakhm, the Desert Digger": ("Traps in the sand. 💀",
+                                 "His Support Zones double as Surprise Zones, and every activated Surprise lets you deal 100 damage to a target."),
+    "Cute Annoyance Mini": ("Discard a card, find a cute friend. 🐾",
+                            "Once per turn, discard 1 card to search your deck for a \"Cute\" Creature. Discard 1 more and Mini summons it as an extra Action."),
+}
+
+
+def tiktok(name):
+    hook, body = TIKTOK[name]
+    return f"{hook}\n{body}\nFree online pixel TCG → pixelpartiestcg.com\n{TIKTOK_TAGS}"
+
+
 def slugify(n):
     return re.sub(r'^-+|-+$', '', re.sub(r'[^a-z0-9]+', '-', n.lower()))
 
@@ -339,6 +365,8 @@ def main():
         lines += ['> ' + ln if ln else '>' for ln in cap.split('\n')]
         lines += ['', f'**Alt-Text**: {alt}', '', '---', '']
         (OUT / f"{r['slug']}.txt").write_text(f"{cap}\n\n--- Alt-Text ---\n{alt}\n", encoding='utf-8')
+        if r['name'] in TIKTOK:
+            (OUT / f"{r['slug']}-tiktok.txt").write_text(tiktok(r['name']) + '\n', encoding='utf-8')
     (HERE / 'captions.md').write_text('\n'.join(lines), encoding='utf-8')
     print(len(rows), 'Captions geschrieben')
 
