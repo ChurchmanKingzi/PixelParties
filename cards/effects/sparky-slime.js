@@ -61,7 +61,7 @@ module.exports = {
         await engine.addHeroStatus(target.owner, target.heroIdx, 'negated', {
           appliedBy: ctx.cardOwner,
           animationType: 'electric_strike',
-          ...(eigeneSpalte ? { permanent: true, expiresAtTurn: engine.gs.turn + 2, expiresForPlayer: ctx.cardOwner } : {}),
+          ...(eigeneSpalte ? { permanent: true, expiresAtTurn: engine.gs.turn + 2, expiresForPlayer: ctx.cardOwner, fristBeginn: true } : {}),
         });
       } else if (target.type === 'equip') {
         const inst = target.cardInstance || engine.cardInstances.find(c => c.owner === target.owner && c.zone === 'support' && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx);
@@ -74,7 +74,7 @@ module.exports = {
           // endet zu Beginn des naechsten eigenen Zuges; „counts as a negative status effect" → heilbar.
           if (engine.canApplyCreatureStatus(inst, 'negated', { name: 'Sparky Slime', owner: ctx.cardOwner })) {
             await engine.actionNegateCreature(inst, 'Sparky Slime', {
-              expiresAtTurn: engine.gs.turn + 2, expiresForPlayer: ctx.cardOwner,
+              expiresAtTurn: engine.gs.turn + 2, expiresForPlayer: ctx.cardOwner, fristBeginn: true,   // W68a
               buffKey: 'sparky_slime_negated', cleansable: true,
             });
           }

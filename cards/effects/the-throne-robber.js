@@ -323,9 +323,8 @@ module.exports = {
     if (heldInst) {
       heldInst.counters = heldInst.counters || {};
       heldInst.counters._identityExpiresTurn = gs.turn + 1;
-      // W67a (Al): ein ÜBERSPRUNGENER Gegnerzug (Guardian Beast Zhu, Hand of Death) zählt nicht als „your opponent's next turn" — der Abstieg wartet auf das
-      // Ende des nächsten tatsächlich gespielten Gegnerzuges (`engine._expireBorrowedIdentities`, `uebersprungen`).
-      heldInst.counters._identitySkipAufschub = true;
+      // W67a/W68a (Al): ein ÜBERSPRUNGENER Gegnerzug (Guardian Beast Zhu, Hand of Death) zählt nicht als „your opponent's next turn" — der Abstieg wartet auf das
+      // Ende des nächsten tatsächlich gespielten Gegnerzuges (der Skip schiebt `_identityExpiresTurn` um 2 weiter: `_zug-fristen.js`).
       // Als Vorgabe 29.9.: die Form stammt vom Kontrolleur — beim Abstieg
       // geht sie in SEINE Ablage, auch wenn die Uebernahme dann vorbei ist.
       if (feld !== pi) heldInst.counters._identityFormOwner = pi;

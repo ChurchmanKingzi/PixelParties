@@ -375,6 +375,7 @@ module.exports = {
       await engine.actionNegateCreature(inst, 'Necromancy', {
         expiresAtTurn: gs.turn + 2,
         expiresForPlayer: pi,
+        fristBeginn: true,   // W68a: „until the beginning of your next turn"
         selfInflicted: true,
       });
     }

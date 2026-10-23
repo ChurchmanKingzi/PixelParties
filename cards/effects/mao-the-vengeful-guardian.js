@@ -220,6 +220,7 @@ module.exports = {
       gwSourceOwner: pi,   // W17b: eigene Kosten – Golden Wings schützt nur gegen den Gegner
       expiresAtTurn: gs.activePlayer === pi ? gs.turn + 2 : gs.turn + 1,
       expiresForPlayer: pi,
+      fristBeginn: true,   // W68a: „until the beginning of your next turn"
       buffKey: 'mao_negated',
       removeAnim: 'negate_release',
     });

@@ -198,6 +198,7 @@ module.exports = {
       await engine.actionNegateCreature(inst, CARD_NAME, {
         expiresAtTurn: gs.turn + 2,
         expiresForPlayer: pi,
+        fristBeginn: true,   // W68a: „until the beginning of your next turn"
         selfInflicted: true,
       });
 

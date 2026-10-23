@@ -140,6 +140,7 @@ module.exports = {
     await engine.actionNegateCreature(inst, CARD_NAME, {
       expiresAtTurn:    gs.activePlayer === pi ? gs.turn + 2 : gs.turn + 1,
       expiresForPlayer: pi,
+      fristBeginn:      true,   // W68a: „until the start of your next turn"
       buffKey:          'omikron_negated',
       selfInflicted:    true,
     });

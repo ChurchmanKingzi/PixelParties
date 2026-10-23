@@ -179,6 +179,7 @@ module.exports = {
       // `gs.turn` zaehlt pro Spielerwechsel: naechste eigene Runde = +2.
       expiresAtTurn: engine.gs.activePlayer === pi ? engine.gs.turn + 2 : engine.gs.turn + 1,
       expiresForPlayer: pi,
+      fristBeginn: true,   // W68a: „until the beginning of your next turn"
       clearCountersOnExpire: ['negated', 'negated_placement'],
       source: CARD_NAME,
     });

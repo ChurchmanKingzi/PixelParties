@@ -20,6 +20,7 @@ const { isSeat, opponentOfGs, opponentsOfGs, playerCountGs } = require('./_opp')
 const { gainedNames, heroScriptsOf, heroScriptOf, eigenesHeldenSkript } = require('./_gained-effects-shared');
 const { charges: ladungenLesen } = require('./_charges');
 const ScTracking = require('./_sc-tracking');   // v1381
+const ZugFristen = require('./_zug-fristen');   // W68a: „nur echte Züge zählen"
 // ★ W63d: Ereignisse, die den Beginn einer Aktion ANKÜNDIGEN, aber noch keine sichtbare Wirkung sind: sie lösen den Commit des Auftritts nicht aus (nur Protokoll + Flug/Aktivierungsschein).
 const AUFTRITT_HALTE_EREIGNISSE = new Set(['action_log', 'hand_to_board_fly', 'ability_activated', 'potion_resolved']);   // `potion_resolved`: der Server sendet es beim START der Auflösung — also VOR den abbrechbaren Fragen der Karte
 
@@ -14272,6 +14273,14 @@ class GameEngine {
    * `_rxHandkarteEinsetzen` wie in den uebrigen Hand-Fenstern.
    */
   /**
+   * ★ W68a (Al, 23.10.2026: „nur 'echte' Züge zählen") — Besitzer der Zugnummer `n` (strenger Wechsel ab dem laufenden Zug).
+   * Ein übersprungener Zug (Zhu, Hand-of-Death-Rider) behält seine Nummer und seinen Besitzer, ist aber kein Zug: `istEchterZug(n)` ist dort falsch.
+   * Alles Weitere (Verschieben der Zugnummern-Fristen beim Skip): `_zug-fristen.js`.
+   */
+  zugBesitzer(n) { return ZugFristen.zugBesitzer(this, n); }
+  istEchterZug(n) { return ZugFristen.istEchterZug(this, n); }
+
+  /**
    * ★ v1340 — Welcher Wert von `gs.turn` ist der k-te EIGENE Zug von pi?
    * Zuege wechseln strikt ab (auch ein uebersprungener Zug zaehlt, Zhu),
    * der Startspieler hat die ungeraden Nummern. („before the end of your
@@ -15492,7 +15501,6 @@ this._deathWatch = (this._deathWatchStack || []).length
         delete traeger.counters._effectOverride;
         delete traeger.counters._cardDataOverride;
         delete traeger.counters._identityExpiresTurn;
-        delete traeger.counters._identitySkipAufschub;   // W67a
         delete traeger.counters._identityCleanupCard;
         delete traeger.counters._identityAnchorInst;
       }
@@ -19978,7 +19986,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     let expired = false;
 
     // ★ W25b (N2-05): Divine Gift of the Guardian endet zum Beginn des naechsten eigenen Zuges, VOR dem Statusschaden.
-    if (filterEarly !== false && this._guardianShieldAblauf(activePlayer)) expired = true;
+    // W68a: ein übersprungener Zug hat keinen Beginn — „until the beginning of your next turn" läuft bis zum nächsten echten Zugbeginn.
+    if (filterEarly !== false && !opts.uebersprungen && this._guardianShieldAblauf(activePlayer)) expired = true;
 
     // Hero buffs
     for (let pi = 0; pi < this.playerCount(); pi++) {
@@ -20057,6 +20066,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           inst.counters.buffs.cc_immune_post = {
             expiresAtTurn: currentTurn + 1,
             expiresForPlayer: ctrl,
+            fristBeginn: true,   // W68a: „at the start of the bearer's controller's next turn" — ein übersprungener Zug beendet die Immunität nicht
             clearCountersOnExpire: ['cc_immune'],
             source: 'cc_immune',
           };
@@ -20250,6 +20260,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     inst.counters.buffs[buffKey] = {
       expiresAtTurn: opts.expiresAtTurn,
       expiresForPlayer: opts.expiresForPlayer,
+      ...(opts.fristBeginn ? { fristBeginn: true } : {}),   // W68a: „until the beginning of your next turn" (siehe _zug-fristen.js)
       clearCountersOnExpire: [
         statusKey,
         ...(opts.cleansable ? [statusKey + 'Cleansable'] : []),
@@ -26459,10 +26470,11 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   async _switchTurnInner(opts = {}) {
-    // ★ W67a (Al, 23.10.2026: „der Gegner-Zug wird ja komplett übersprungen, also ist da effektiv kein Zug, in dem das aktivieren könnte. Erst nach dem
-    // 'echten' nächsten Gegner-Zug."): `opts.uebersprungen` = dies ist das FORMALE Ende eines übersprungenen Zuges (Guardian Beast Zhu, Hand of Death). Ein
-    // übersprungener Zug zählt nicht als „your opponent's next turn": Zugende-Aufträge der Form „At the end of your opponent's next turn, …" (Hand of Death,
-    // Throne Robber, Create Illusion, Staff of Illusions) feuern dort NICHT, sondern am Ende des nächsten tatsächlich gespielten Gegnerzuges.
+    // ★ W67a/W68a (Al, 23.10.2026: „Korrekt, nur 'echte' Züge." — Fristen, Zähler, Aufträge und Zugende-Auslöser): `opts.uebersprungen` = dies ist der FORMALE
+    // Durchlauf eines übersprungenen Zuges (Guardian Beast Zhu, Hand of Death). Ein übersprungener Zug hat kein Ende: ON_TURN_END, Zugende-Aufträge
+    // (Hand of Death, Illusionen), das Zugende-Surprise-Fenster, der Ablauf von Zusatzaktionen/Zugende-Löschungen/geliehenen Identitäten und das Abräumen
+    // von `itemLocked` bleiben aus — alles feuert/läuft erst am Ende des nächsten tatsächlich gespielten Zuges. Zugnummern-Fristen hat der Skip-Eingang
+    // schon weitergeschoben (`fristenNachSkip`, `_zug-fristen.js`). Zug-Übergabe, Spielende-Prüfungen und die Aufräum-Netze unten laufen weiter.
     const _uebersprungen = !!opts.uebersprungen;
     // Für die Unregelmässigkeits-Diagnose in startTurn: aus welcher
     // Phase heraus wechseln wir? Regulär ist das END.
@@ -26524,7 +26536,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!_liveTurnEnd || this._turnEndHooksDoneForTurn !== this.gs.turn) {
       if (_liveTurnEnd) this._turnEndHooksDoneForTurn = this.gs.turn;
       try {
-        await this.runHooks(HOOKS.ON_TURN_END, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
+        if (!_uebersprungen) await this.runHooks(HOOKS.ON_TURN_END, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });   // W68a: ein übersprungener Zug hat kein Ende
       } catch (err) {
         console.error('[Engine] ⚠️  ON_TURN_END abgebrochen — Zugübergabe läuft trotzdem weiter:', err.message);
         this.log('turn_end_hooks_aborted', {
@@ -26537,7 +26549,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // ein abgebrochener ON_TURN_END (Hook-Obergrenze, Kartenfehler eines anderen Zugende-Lauschers) darf sie nicht verschlucken; sie hängen an
       // `ps._handOfDeathArmed`, nicht an einer Karteninstanz (Ablage, Hand, Fantasy Buddy Token …). Welle 14 (Q171) hatte den Nachhol-Weg, W66a macht ihn zum einzigen.
       try {
-        if (!_uebersprungen) await loadCardEffect('Hand of Death')?.nachholenOhneKarte?.(this);   // W67a: ein übersprungener Gegnerzug ist kein „next turn"
+        if (!_uebersprungen) await loadCardEffect('Hand of Death')?.nachholenOhneKarte?.(this);   // W67a/W68a: ein übersprungener Zug ist kein „next turn"
       } catch (err) {
         console.error('[Engine] ⚠️  Spielergebundene Zugende-Aufträge abgebrochen — Zugübergabe läuft trotzdem weiter:', err.message);
         this.log('turn_end_player_effects_aborted', { turn: this.gs.turn, reason: String(err.message || '').slice(0, 240) });
@@ -26580,7 +26592,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // to abort the end-of-turn pipeline, but the contract is preserved
     // for future Surprises).
     try {
-      await this._checkSurpriseOnTurnEnd(this.gs.activePlayer);
+      if (!_uebersprungen) await this._checkSurpriseOnTurnEnd(this.gs.activePlayer);   // W68a: kein Zugende, kein Zugende-Fenster (Spider Silk Bridge …)
     } catch (err) {
       // Gleiche Begruendung wie oben: das Fenster darf ausfallen, die
       // Uebergabe nicht.
@@ -26597,8 +26609,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     // leak; any future 'this turn' grant gets the same guarantee by
     // setting the flag. Types WITHOUT the flag keep their existing
     // self-managed lifetimes (legendary sword, second-action tiers).
-    this._expireTurnEndAdditionalActions();
-    await this._zugendeLoeschungenAusfuehren();   // v1307 (Crum)
+    if (!_uebersprungen) {   // W68a: Zusatzaktionen/Zugende-Löschungen („At the end of its owner's next turn …") warten auf das Ende eines echten Zuges
+      this._expireTurnEndAdditionalActions();
+      await this._zugendeLoeschungenAusfuehren();   // v1307 (Crum)
+    }
 
     // Geliehene Identitaeten fallen ab (Future Tech Copy Device).
     // Aus demselben Grund hier und nicht in einem Karten-Hook: der
@@ -26606,7 +26620,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // zufaellig selbst ein `onTurnEnd` mitbringt. Darf ausfallen, ohne
     // die Uebergabe mitzureissen.
     try {
-      await this._expireBorrowedIdentities({ uebersprungen: _uebersprungen });
+      if (!_uebersprungen) await this._expireBorrowedIdentities();   // W68a: die Fristen der Identitäten hat der Skip weitergeschoben
     } catch (err) {
       console.error('[Engine] ⚠️  Identitaets-Ablauf abgebrochen:', err.message);
     }
@@ -26704,9 +26718,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Clear itemLocked for the player whose turn is ending
     // (it lasts from when it's applied until after the afflicted player's own turn)
     const endingPs = this.gs.players[this.gs.activePlayer];
-    if (endingPs) endingPs.itemLocked = false;
+    if (endingPs && !_uebersprungen) endingPs.itemLocked = false;   // W68a: eine Sperre „bis nach dem eigenen Zug" überlebt einen übersprungenen Zug
     // Clear first-turn full protection after the starting player's turn ends
-    if (this.gs.firstTurnProtectedPlayer != null) {
+    if (this.gs.firstTurnProtectedPlayer != null && !_uebersprungen) {
       delete this.gs.firstTurnProtectedPlayer;
     }
     // Skill Test: hier endet nur die Zugende-Abwicklung; Spielerwechsel macht der Round-Treiber.
@@ -26737,13 +26751,19 @@ this._deathWatch = (this._deathWatchStack || []).length
         });
         this.sync();
         await this._delay(1700);
-        // ★ Z2 (A07-02): Fristen, die auf den ZUGBEGINN des uebersprungenen Spielers fallen („this turn" des Gegners:
+        // ★ W68a (Al, 23.10.2026: „nur 'echte' Züge beenden/bringen Zähler vorwärts"): der übersprungene Zug beendet keine Frist, die einen Zug dieses
+        // Spielers zählt („until the end of your opponent's next turn", „until the beginning of your next turn", „for N turns" …) — diese Zugnummern-Fristen
+        // rücken um 2 weiter (`fristenNachSkip`). Der Zug wird als übersprungen vermerkt (`istEchterZug`).
+        const _skipSpieler = this.gs.activePlayer, _skipZug = this.gs.turn;
+        (this.gs._uebersprungeneZuege || (this.gs._uebersprungeneZuege = [])).push({ turn: _skipZug, player: _skipSpieler });
+        if (!this.gs.result) ZugFristen.fristenNachSkip(this, _skipSpieler, _skipZug);
+        // ★ Z2 (A07-02): Fristen, die auf den ZUGBEGINN des uebersprungenen Spielers fallen, aber einen schon BEENDETEN Zug zaehlen („this turn" des Gegners:
         // Niu, Cloudy …), sind mit dem Ueberspringen faellig — `startTurn()` laeuft fuer diesen Zug nie, und die Frist
         // (`expiresAtTurn === gs.turn`) traefe spaeter keinen Zug mehr: der Buff stuende auf unbestimmte Zeit.
         // Kein Statusschaden (Zhu: der Zug findet nicht statt), nur der Buff-Ablauf.
         if (!this.gs.result) {
-          await this._processBuffExpiry({ beforeStatusDamage: true });
-          await this._processBuffExpiry({ beforeStatusDamage: false });
+          await this._processBuffExpiry({ beforeStatusDamage: true, uebersprungen: true });
+          await this._processBuffExpiry({ beforeStatusDamage: false, uebersprungen: true });
         }
         // Advance straight to End Phase, then switchTurn back. The
         // standard switchTurn handles the start-of-turn ticks for
@@ -33846,21 +33866,16 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
   }
 
-  async _expireBorrowedIdentities(opts = {}) {
+  async _expireBorrowedIdentities() {
     const turn = this.gs.turn;
     // ★ NICHT auf `_effectOverride` einschraenken (v582): Future Tech
     // Prototypes leiht sich nur den NAMEN, nicht den Effekt, und setzt
     // deshalb kein Override — sie waere hier durchgerutscht und ihr
     // Alias haette den Zug ueberlebt. Der Ablaufstempel ALLEIN ist das
     // Kriterium; er ist genau dafuer da.
-    let betroffen = this.cardInstances.filter(c =>
+    // W68a: ein übersprungener Zug ruft das hier nicht auf; seine Fristen hat `fristenNachSkip` schon weitergeschoben.
+    const betroffen = this.cardInstances.filter(c =>
       c?.counters?._identityExpiresTurn === turn);
-    // ★ W67a: formales Ende eines ÜBERSPRUNGENEN Zuges — Identitäten mit `_identitySkipAufschub` („At the end of your opponent's next turn, Descend": Throne
-    // Robber) laufen dort nicht ab; die Frist rückt auf den nächsten tatsächlichen Zug desselben Spielers (zwei Zugnummern weiter: der Gegenzug dazwischen).
-    if (opts.uebersprungen) {
-      for (const c of betroffen) if (c.counters._identitySkipAufschub) c.counters._identityExpiresTurn = turn + 2;
-      betroffen = betroffen.filter(c => !c.counters._identitySkipAufschub);
-    }
     for (const inst of betroffen) {
       // ★ 28.8.: Normalerweise ist die Ruecknahme das Skript der
       // Traegerkarte selbst. Eine Karte, die ihre Identitaet durch
@@ -33887,7 +33902,6 @@ this._deathWatch = (this._deathWatchStack || []).length
       delete inst.counters._effectOverride;
       delete inst.counters._cardDataOverride;
       delete inst.counters._identityExpiresTurn;
-      delete inst.counters._identitySkipAufschub;
       delete inst.counters._identityCleanupCard;
       delete inst.counters.treatAsEquip;
     }
@@ -43217,10 +43231,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
         if (!this._pendingSurpriseReactionCleanup) this._pendingSurpriseReactionCleanup = [];
         // Als Vorgabe 29.9.: `pi` = Brettseite der Zone, `ablage` = Kartenbesitzer.
-        this._pendingSurpriseReactionCleanup.push({
+        // W68a (Al, 23.10.2026, Rückfrage 4: „Ja, sollen sie."): `link` (unten gesetzt) verbindet den Aufräum-Eintrag mit seinem Kettenglied — wird die Karte
+        // dort zu Inyas Fantasy Buddy, legt das Kettenende sie NICHT zusätzlich in die Ablage.
+        const _aufraeumEintrag = {
           pi: sSeite, heroIdx: sHeroIdx, cardName: chosenName, instId: sInst?.id,
           ablage: sInst?.originalOwner ?? sSeite,
-        });
+        };
+        this._pendingSurpriseReactionCleanup.push(_aufraeumEintrag);
 
         const engine = this;
         const reactionOwner = pi;
@@ -43234,6 +43251,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           casterOwner: sSeite, heroOwner: sSeite,
           goldCost: 0, wisdomCost: sWisdom,
           isInitialCard: false, negated: false, chainClosed: false,
+          fromSurprise: true, ablageBesitzer: _aufraeumEintrag.ablage,   // W68a: Kettenglied einer aus der Surprise Zone aktivierten Karte (Lunar Eclipse)
           resolve: script.resolve
             ? async (ch, idx) => {
                 if (sWisdom > 0) {
@@ -43246,6 +43264,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             : null,
           script,
         };
+        _aufraeumEintrag.link = link;
         chain.push(link);
         if (chain.length >= 2) this._broadcastChainUpdate(chain);
         await this.runHooks('onReactionActivated', {
@@ -43635,8 +43654,13 @@ this._deathWatch = (this._deathWatchStack || []).length
               _kettenBuddy = this.neuesBuddyTicket('kette', {
                 // Ablage nur, wenn das Glied keine Karte des Bretts ist (Helden-/Kreatur-Glieder), sich nicht selbst abräumt (`skipPostResolveDiscard`),
                 // nicht gelöscht wird und sich nicht selbst aufs Brett gelegt hat.
-                ablageErwartet: () => !link.fromHero && !link.fromCreature && !loadCardEffect(link.cardName)?.skipPostResolveDiscard
-                  && !loadCardEffect(link.cardName)?.deleteOnUse && !this.gs._spellPlacedOnBoard && !this.gs._spellReturnToHand,
+                // W68a (Al, Rückfrage 4: „Ja, sollen sie."): ein Glied aus der Surprise Zone (Lunar Eclipse) räumt sich nicht selbst ab, sondern geht am
+                // KETTENENDE in die Ablage (`_pendingSurpriseReactionCleanup`) — auch das ist „würde in die Ablage gehen"; der Token ersetzt diese Ablage.
+                ablageErwartet: () => link.fromSurprise
+                  ? (!loadCardEffect(link.cardName)?.deleteOnUse && !this.gs._spellPlacedOnBoard && !this.gs._spellReturnToHand)
+                  : (!link.fromHero && !link.fromCreature && !loadCardEffect(link.cardName)?.skipPostResolveDiscard
+                    && !loadCardEffect(link.cardName)?.deleteOnUse && !this.gs._spellPlacedOnBoard && !this.gs._spellReturnToHand),
+                kartenBesitzer: link.fromSurprise ? link.ablageBesitzer : undefined,
               });
               await this.runHooks('afterSpellResolved', {
                 heroOwner: link.heroOwner ?? link.owner,   // Styx 28.9.: Reihe, in die `heroIdx` zeigt
@@ -43649,6 +43673,7 @@ this._deathWatch = (this._deathWatchStack || []).length
                 _buddy: _kettenBuddy,   // W67a
                 _skipReactionCheck: true,
               });
+              if (link.fromSurprise && _kettenBuddy?.token) link._buddyToken = _kettenBuddy.token;   // W68a: das Kettenende legt diese Karte nicht zusätzlich ab
             } catch (err) {
               console.error('[Engine] afterSpellResolved (chain) error:', err.message);
             }
@@ -43740,6 +43765,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (szi >= 0) sZone.splice(szi, 1);
         if (ent.instId != null) this._untrackCard(ent.instId);
         // Als Vorgabe 29.9.: Ablage beim Kartenbesitzer, Zone auf der Brettseite.
+        if (ent.link?._buddyToken) {   // W68a: Inyas Fantasy Buddy hat die Ablage ersetzt — genau EINE Platzierung
+          this.log('surprise_reaction_became_buddy', { card: ent.cardName, owner: ent.ablage ?? ent.pi });
+          this.sync();
+          continue;
+        }
         const ablagePs = this.gs.players[ent.ablage ?? ent.pi] || ps;
         if (!ablagePs.discardPile) ablagePs.discardPile = [];
         ablagePs.discardPile.push(ent.cardName);
@@ -51103,8 +51133,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (hero.statuses.immune) await this.removeHeroStatus(ap, hi, 'immune', { natuerlichesEnde: true });
         // Untargetable expires at the start of the caster's next turn
         if (hero.statuses.untargetable) {
-          delete hero.statuses.untargetable;
-          this.log('status_removed', { target: hero.name, status: 'untargetable' });
+          // W68a: Perfect Disguise („during their next turn") — war der Gegnerzug dazwischen ein übersprungener, hält der Schutz noch einen echten Gegnerzug.
+          if (hero.statuses.untargetable.gegnerZug && !this.istEchterZug(this.gs.turn - 1)) {
+            // bleibt: der gezählte Gegnerzug hat nicht stattgefunden
+          } else {
+            delete hero.statuses.untargetable;
+            this.log('status_removed', { target: hero.name, status: 'untargetable' });
+          }
         }
       }
       // Creature soft-untargetable (Perfect Disguise) — mirror of the
@@ -51117,8 +51152,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (inst.owner !== ap) continue;
         if (inst.zone !== 'support') continue;
         if (!inst.counters?.softUntargetable_by_opponent) continue;
+        if (inst.counters.softUntargetable_gegnerZug && !this.istEchterZug(this.gs.turn - 1)) continue;   // W68a (s. oben): der gezählte Gegnerzug hat nicht stattgefunden
         delete inst.counters.softUntargetable_by_opponent;
         delete inst.counters.softUntargetable_by_opponent_pi;
+        delete inst.counters.softUntargetable_gegnerZug;
         this.log('counter_removed', { target: inst.name, counter: 'softUntargetable_by_opponent' });
       }
       // Harte Unwaehlbarkeit (Thicket, v724): „bis zum Beginn deines

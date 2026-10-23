@@ -56,6 +56,7 @@ module.exports = {
       inst.counters.forcesTargeting = true;
       inst.counters.forcesTargeting_pi = oppIdx;
       inst.counters.forcesTargeting_untilTurn = (gs.turn || 0) + 1;
+      inst.counters.forcesTargeting_fristBeginn = true;   // W68a: „until your next turn" — endet zu BEGINN des nächsten eigenen Zuges (ein übersprungener Zug beendet ihn nicht)
       // Mirror as a buff entry so BuffColumn renders the standard 🎯
       // taunt icon (no bespoke overlay needed).
       if (!inst.counters.buffs) inst.counters.buffs = {};

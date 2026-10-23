@@ -71,12 +71,12 @@ module.exports = {
         if (!th?.name || th.hp <= 0) return;
         await engine.addHeroStatus(target.owner, target.heroIdx, 'negated', {
           appliedBy: pi, source: CARD_NAME,
-          expiresAtTurn: gs.turn + 2, expiresForPlayer: pi,
+          expiresAtTurn: gs.turn + 2, expiresForPlayer: pi, fristBeginn: true,   // W68a: „until the beginning of your next turn" (ein übersprungener Zug beendet sie nicht)
           effectOnly: true,   // W4a (Al): Text sagt nur "effects are negated" -> leichte Form, Abilities laufen weiter
         });
       } else if (target.cardInstance) {
         await engine.actionNegateCreature(target.cardInstance, CARD_NAME, {
-          expiresAtTurn: gs.turn + 2, expiresForPlayer: pi,
+          expiresAtTurn: gs.turn + 2, expiresForPlayer: pi, fristBeginn: true,
           buffKey: 'locke_negated', removeAnim: 'status_remove',
           cleansable: true,   // „This counts as a negative status effect."
         });

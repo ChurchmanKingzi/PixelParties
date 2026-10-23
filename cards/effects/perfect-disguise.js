@@ -174,7 +174,8 @@ module.exports = {
       // specifically" detail isn't needed here because hero
       // untargetable already filters opponent-side picks only (own-
       // side picks bypass via the `if (owner === pi) continue` skip).
-      hero.statuses.untargetable = true;
+      // W68a: „during their next turn" — zählt den nächsten ECHTEN Gegnerzug (`gegnerZug`; ein Skip des Gegners verlängert den Schutz, s. `_zug-fristen.js`).
+      hero.statuses.untargetable = { gegnerZug: true };
       engine.log('perfect_disguise', {
         player: ps.username, target: hero.name, type: 'hero',
       });
@@ -191,6 +192,7 @@ module.exports = {
       if (!inst.counters) inst.counters = {};
       inst.counters.softUntargetable_by_opponent = 1;
       inst.counters.softUntargetable_by_opponent_pi = oi;
+      inst.counters.softUntargetable_gegnerZug = true;   // W68a (s. oben)
       engine.log('perfect_disguise', {
         player: ps.username, target: inst.name, type: 'creature',
       });

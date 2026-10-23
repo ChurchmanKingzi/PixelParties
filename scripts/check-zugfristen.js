@@ -1,0 +1,104 @@
+#!/usr/bin/env node
+// ════════════════════════════════════════════════════════════════
+//  WÄCHTER: ZUGNUMMERN-FRISTEN UND „NUR ECHTE ZÜGE ZÄHLEN"  (W68a)
+//
+//  Anlass (Al, 23.10.2026): Ein ÜBERSPRUNGENER Zug (Guardian Beast Zhu, Hand of Death) ist kein Zug — er beendet keine Frist, bringt keinen
+//  Zähler vorwärts und löst keine Zugende-Auslöser aus. Technisch: der Skip lässt die Zugnummer verstreichen; Fristen, die als ZUGNUMMER abgelegt
+//  sind (`expiresAtTurn`/`expiresForPlayer`, `_identityExpiresTurn`, `untilTurn` …), schiebt `fristenNachSkip` (cards/effects/_zug-fristen.js) um
+//  zwei Zugnummern weiter — aber NUR, wenn die Frist weiß, welchen Zug sie zählt:
+//     • Standard: Frist endet am ENDE des Zuges `expiresAtTurn − 1` („until the end of …", „for N turns", „this turn");
+//     • `fristBeginn: true`: Frist endet zu BEGINN des Zuges `expiresAtTurn` („until the beginning/start of your next turn").
+//
+//  Dieses Skript hält zwei Dinge fest:
+//   1. Jedes Kartenskript mit einer Zugnummern-Frist (`expiresAtTurn:` …) steht in der GEPRÜFTEN Liste unten (= CARD_API „Welle 68 / W68a",
+//      Audit-Tabelle). Eine neue Datei meldet sich hier: sie muss gegen den Kartentext geprüft und eingetragen werden.
+//   2. Lautet der Kartentext „until the beginning/start of your next turn" (oder „until your next turn"), muss das Skript `fristBeginn` setzen.
+//
+//  Aufruf:  node scripts/check-zugfristen.js        Rückgabe 0 = sauber, 1 = Befund.
+// ════════════════════════════════════════════════════════════════
+const fs = require('fs');
+const path = require('path');
+
+const WURZEL = path.join(__dirname, '..');
+const EFFEKTE = path.join(WURZEL, 'cards', 'effects');
+const KARTEN = JSON.parse(fs.readFileSync(path.join(WURZEL, 'data', 'cards.json'), 'utf8'));
+const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const NACH_SLUG = new Map(KARTEN.map(k => [slug(k.name), k]));
+
+// Geprüfte Skripte mit Zugnummern-Frist (Audit CARD_API „Welle 68 / W68a"). Neue Datei ⇒ Kartentext lesen, Frist als ENDE/BEGINN einordnen, hier eintragen.
+const GEPRUEFT = new Set([
+  // „this turn" / „for the rest of the turn" (gezählt wird der laufende, echte Zug — nie von einem Skip betroffen)
+  'cloud-in-a-bottle', 'dark-gear', 'diplomacy', 'dirty-smuggler', 'elixir-of-cold', 'ghuanjun-the-undead-martial-artist', 'golden-wings', 'greatmaw-shark',
+  'guardian-beast-niu', 'jump-in-the-river', 'soul-shard-ka', 'the-cosmic-depths', 'the-master-s-key', 'unwanted-audience',
+  // ENDE eines fremden/eigenen nächsten Zuges
+  'anti-magic-zone', 'disruption-ray', 'forbidden-zone', 'medusa-s-curse', 'null-the-mage-slayer', 'null-zone', 'pink-sky', 'rool-the-troll-guard',
+  'skeleton-death-knight', 'smoke-vial',
+  // BEGINN des nächsten eigenen Zuges (setzen `fristBeginn: true`)
+  'cloud-pillow', 'howling-in-the-night', 'infinitely-reproducing-slime', 'locke-the-unseen-saboteur', 'loyal-shepherd', 'mao-the-vengeful-guardian',
+  'necromancy', 'omikron-the-faceless-illusionist', 'sparky-slime', 'string-of-fine', 'unsettling-opportunist-vullary',
+  // Zusatzaktionen „this turn" (`expiresAtTurnEnd`, ohne Zugnummer) und eigene Speicher mit Handler in `fristenNachSkip`
+  'calm-diatribe', 'cute-crown', 'deepsea-primordium', 'mission-of-the-light-brigade', 'weapon-unleashing', 'guardian-beast-gou',
+]);
+
+// Eigene Zugnummern-Speicher (nicht `expiresAtTurn`): Datei → Stichwort im Skript → Handler-Stichwort in `fristenNachSkip`.
+const SPEICHER = [
+  { datei: 'moe-shield.js', stichwort: 'drawLockedUntilTurn', handler: 'drawLockedUntilTurn' },
+  { datei: 'stealthy-pursuit.js', stichwort: 'untilTurn', handler: '_targetBlockers' },
+  { datei: 'resilient-monkee.js', stichwort: '_monkeeShieldUntilTurn', handler: '_monkeeShieldUntilTurn' },
+  { datei: 'barrier-of-undying.js', stichwort: 'markiereBrettLoeschung', handler: '_zugendeLoeschungen' },
+  { datei: 'perilous-journey.js', stichwort: '_handAscensionGrants', handler: '_handAscensionGrants' },
+  { datei: 'hardy-slime.js', stichwort: 'forcesTargeting_untilTurn', handler: 'forcesTargeting_untilTurn' },
+  { datei: 'deepsea-horror-clown.js', stichwort: 'forcesTargeting_untilTurn', handler: 'forcesTargeting_untilTurn' },
+  { datei: 'the-throne-robber.js', stichwort: '_identityExpiresTurn', handler: '_identityExpiresTurn' },
+  { datei: 'open-invitation.js', stichwort: '_identityExpiresTurn', handler: '_identityExpiresTurn' },
+  { datei: 'the-shapeshifter.js', stichwort: '_identityExpiresTurn', handler: '_identityExpiresTurn' },
+  { datei: 'perfect-disguise.js', stichwort: 'gegnerZug', handler: 'gegnerZug' },
+];
+// Beginn-Fristen mit eigenem Speicher (Stempel + `activePlayer`-Prüfung), die ohne `fristBeginn` auskommen.
+const EIGENER_BEGINN = new Set(['guardian-beast-gou']);
+// Begründete Zugnummern-Rechnungen ohne eigenen Fristnamen.
+const AUSNAHMEN = [{ datei: 'the-shapeshifter.js', muster: /return gs\.turn \+ 1;/ }];
+
+let fehler = 0;
+const melde = (m) => { fehler++; console.log('✗ ' + m); };
+
+// 1) Dateien mit `expiresAtTurn` (außer Engine-Hilfsdateien)
+for (const f of fs.readdirSync(EFFEKTE)) {
+  if (!f.endsWith('.js') || f.startsWith('_')) continue;
+  const quelle = fs.readFileSync(path.join(EFFEKTE, f), 'utf8');
+  const code = quelle.split('\n').filter(z => !/^\s*(\/\/|\*|\/\*)/.test(z)).join('\n');
+  if (!/expiresAtTurn\s*[:=]|expiresAtTurn,/.test(code)) continue;
+  const name = f.replace(/\.js$/, '');
+  if (!GEPRUEFT.has(name)) melde(`${f}: Zugnummern-Frist (expiresAtTurn) in einem nicht geprüften Skript — Kartentext lesen, ENDE oder BEGINN einordnen (fristBeginn), in scripts/check-zugfristen.js eintragen und in CARD_API „Welle 68 / W68a" aufnehmen`);
+  const karte = NACH_SLUG.get(name);
+  if (karte && /until the (beginning|start) of your next turn|until your next turn|start of your next turn/i.test(karte.effect || '') && !/fristBeginn/.test(code) && !EIGENER_BEGINN.has(name)) {
+    melde(`${f}: Kartentext „${(karte.effect.match(/until[^.]*next turn/i) || [''])[0]}" — das Skript muss \`fristBeginn: true\` setzen (Frist endet zu BEGINN des nächsten eigenen Zuges)`);
+  }
+}
+
+// 2) Eigene Speicher haben einen Handler
+const fristen = fs.readFileSync(path.join(EFFEKTE, '_zug-fristen.js'), 'utf8');
+for (const { datei, stichwort, handler } of SPEICHER) {
+  const p = path.join(EFFEKTE, datei);
+  if (!fs.existsSync(p)) { melde(`${datei}: Datei fehlt (Speicher-Liste veraltet)`); continue; }
+  if (!fs.readFileSync(p, 'utf8').includes(stichwort)) melde(`${datei}: Stichwort ${stichwort} nicht mehr gefunden (Speicher-Liste veraltet)`);
+  if (!fristen.includes(handler)) melde(`${datei}: Speicher ${stichwort} hat keinen Handler in cards/effects/_zug-fristen.js (fristenNachSkip)`);
+}
+
+// 3) Neue Speicher mit `gs.turn + N` in einem unbekannten Namen
+const BEKANNT = /expiresAtTurn|UntilTurn|untilTurn|_identityExpiresTurn|markiereBrettLoeschung|_handAscensionGrants|grantOnTurn|teleportalUntil|_teleportalUntil|deleteTurn|expiresTurn|expiryTurn|negatedUntilTurn|armedTurn|_hammerLockTurn|thicketTurn|_frostbringerTurn|_slimeSpawnedTurn|_willyFirstTurn|bisZug|amZug|faelligIn|meineNaechste|meinNaechster|expiresAtTurnEnd/;
+for (const f of fs.readdirSync(EFFEKTE)) {
+  if (!f.endsWith('.js') || f.startsWith('_')) continue;
+  const zeilen = fs.readFileSync(path.join(EFFEKTE, f), 'utf8').split('\n');
+  zeilen.forEach((z, i) => {
+    if (/^\s*(\/\/|\*|\/\*)/.test(z)) return;
+    if (!/(gs|engine\.gs|state)\.turn\s*\+\s*[1-9]|\bturn\s*\+\s*[2-9]/.test(z)) return;
+    if (BEKANNT.test(z)) return;
+    if (/log\(|console\./.test(z)) return;
+    if (AUSNAHMEN.some(a => a.datei === f && a.muster.test(z))) return;
+    melde(`${f}:${i + 1}: Zugnummern-Rechnung \`${z.trim().slice(0, 110)}\` ohne bekannten Fristnamen — eine neue Zugnummern-Frist braucht einen Handler in _zug-fristen.js (und einen Eintrag hier)`);
+  });
+}
+
+if (fehler) { console.log(`\n${fehler} Befund(e).`); process.exit(1); }
+console.log('check-zugfristen: sauber');
