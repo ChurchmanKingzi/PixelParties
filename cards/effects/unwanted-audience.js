@@ -78,7 +78,7 @@ async function sleepCreature(engine, inst, ownerPi) {
   // Monias Schild („… all Creatures") steht für diesen Effekt schon (angenommenes Angebot bei einer früheren Kreatur): kein weiteres Fenster, die Kreatur schläft nicht ein.
   // (W58a: die Einmal-pro-Zug-Sperre ist weg; Monias Hook prüft den Schild selbst — die Prüfung hier spart nur das Fenster.)
   if (engine.moniaSchildBlockt(inst, { name: CARD_NAME }, inst.controller ?? inst.owner)) return;
-  const fensterCtx = { creature: inst, effectType: 'status', source: { name: CARD_NAME, owner: ownerPi }, cancelled: false, _skipReactionCheck: true };
+  const fensterCtx = { creature: inst, effectType: 'status', statusName: 'negated', source: { name: CARD_NAME, owner: ownerPi }, cancelled: false, _skipReactionCheck: true };
   await engine.runHooks('beforeCreatureAffected', fensterCtx);
   if (fensterCtx.cancelled) return;
   // ★ W14b (Q152, Al: „NUR aktive Effekte, passive Komponenten bleiben unberührt!"): kein `negated` mehr (das legte die GANZE Kreatur still,

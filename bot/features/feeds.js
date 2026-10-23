@@ -14,7 +14,7 @@ const path = require('path');
 const { execFile } = require('child_process');
 const { AttachmentBuilder } = require('discord.js');
 const renderer = require('../lib/card-renderer');
-const { findBugfixes, readNotes, normName } = require('../lib/bugfix');
+const { findBugfixes, readNotes, readSkips, applySkips, normName } = require('../lib/bugfix');
 
 const MAX_CARDS_POSTED = 40;
 const NEW_CARD_TAGLINE = '**New card beep-boop:**';
@@ -183,6 +183,9 @@ module.exports = function register(ctx) {
     try { found = await findBugfixes({ git, last, head, cards: renderer.allCards(), maxShared: config.bugfixMaxShared, balanced: new Set([...balanced, ...neu]) }); }
     catch { await db.kvSet('bugfix_last', head); return; }                          // alter Stand unbekannt (force-push) → neu ansetzen
     const notes = await readNotes({ git, last, head });                             // `Bugfix-Note: <Karte oder _baustein> | <was schieflief>`
+    // `Bugfix-Skip: <Karte oder _baustein>`: reine Anpassung an eine NEUE Karte, kein Fehler → nicht im Bugfix-Kanal (hat Vorrang vor einer Note)
+    const skips = await readSkips({ git, last, head });
+    found = applySkips(found, skips);
     await db.kvSet('bugfix_last', head);
 
     const byNorm = new Map(renderer.allCards().map(c => [normName(c.name), c]));
@@ -204,7 +207,7 @@ module.exports = function register(ctx) {
     // ausgenommen war (die Beschreibung ist die ausdrückliche Aussage „das war ein Bugfix“)
     for (const [key, text] of notes) {
       const c = byNorm.get(key);
-      if (!c || neu.has(c.name)) continue;       // neue, noch nicht live gegangene Karte: keine Bugfix-Meldung
+      if (!c || neu.has(c.name) || skips.has(key)) continue;       // neue, noch nicht live gegangene Karte bzw. `Bugfix-Skip`: keine Bugfix-Meldung
       const it = items.get(c.name) || { card: c, note: '' };
       it.detail = [noteOfCard(c), it.detail && it.detail !== text ? it.detail : ''].filter(Boolean).join(' ');
       items.set(c.name, it);

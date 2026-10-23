@@ -148,7 +148,7 @@ module.exports = {
       if (inst) {
         // W16c (A05-20): Schutzkarten (Winged Skeleton: "chosen by an opponent's card") lesen `beforeCreatureAffected` (wie Grunge Harpyformer).
         const hookCtx = {
-          creature: inst, effectType: 'status',
+          creature: inst, effectType: 'status', statusName: 'negated',
           source: { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx },
           cancelled: false, _skipReactionCheck: true,
         };

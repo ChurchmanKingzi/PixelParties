@@ -11,6 +11,7 @@
 //  Gezielte BALANCING-Änderungen (Eintrag der Karte in cards.json hat sich geändert, z. B. der Effekttext) sind kein Bugfix: Diese Karten werden
 //  übergeben (`balanced`) und hier ausgelassen — sie gehören in die Patchnotes.
 //  Die genaue Fehlerbeschreibung stammt aus Commit-Zeilen der Form `Bugfix-Note: <Kartenname oder _baustein> | <Beschreibung>` (siehe readNotes).
+//  Reine Anpassungen an eine NEUE Karte (kein Fehler) melden Commit-Zeilen `Bugfix-Skip: <Kartenname oder _baustein>` ab (siehe readSkips/applySkips).
 // ═══════════════════════════════════════════════════════════════════
 const path = require('path');
 
@@ -85,6 +86,36 @@ async function readNotes({ git, last, head }) {
   return out;
 }
 
+const SKIP_RE = /^\s*(?:[*-]\s+)?Bugfix-Skip:[ \t]*([^|\n]+?)[ \t]*(?:\|.*)?$/gim;
+
+/**
+ * Ausnahmen aus den Commit-Nachrichten zwischen zwei Ständen: Zeilen `Bugfix-Skip: <Kartenname oder _baustein> [| Grund]`. Sie sagen „diese Änderung am Skript ist KEIN Bugfix",
+ * z. B. wenn eine bestehende Karte nur an eine NEUE Karte angepasst wurde (Wechselwirkung, neuer Engine-Vertrag) oder die neue Karte selbst nachgebessert wird. Der Bot meldet
+ * das Ziel dann nicht im Bugfix-Kanal. Eine Ausnahme hat Vorrang vor einer `Bugfix-Note` desselben Ziels im selben Bereich (so lässt sich eine zu Unrecht geschriebene Note
+ * in einem späteren Commit zurücknehmen).
+ * @returns {Promise<Set<string>>}  normalisierte Ziele
+ */
+async function readSkips({ git, last, head }) {
+  const out = new Set();
+  let log = '';
+  try { log = await git('log', '--format=%B%x1e', `${last}..${head}`); } catch { return out; }
+  for (const m of log.matchAll(SKIP_RE)) { const key = normName(m[1]); if (key) out.add(key); }
+  return out;
+}
+
+/** Lässt die Ziele aus `skips` (Karten und Bausteine) aus einem `findBugfixes`-Ergebnis weg; Karten, die über einen Baustein betroffen wären, ebenfalls. */
+function applySkips(found, skips) {
+  if (!skips || !skips.size) return found;
+  const keep = c => !skips.has(normName(c.name));
+  return {
+    direct: found.direct.filter(d => keep(d.card)),
+    shared: found.shared.filter(sh => !skips.has(normName(sh.module))).map(sh => {
+      const cards = sh.cards.filter(keep);
+      return { ...sh, cards, count: cards.length };
+    }),
+  };
+}
+
 /**
  * @param {object} o
  * @param {(...args:string[]) => Promise<string>} o.git   führt git im Repo aus
@@ -131,4 +162,4 @@ async function findBugfixes({ git, last, head, cards, maxShared = 12, balanced =
   return { direct, shared };
 }
 
-module.exports = { findBugfixes, readNotes, normName, fingerprint, parseNameStatus, parseRequires, closure, nameToFile };
+module.exports = { findBugfixes, readNotes, readSkips, applySkips, normName, fingerprint, parseNameStatus, parseRequires, closure, nameToFile };
