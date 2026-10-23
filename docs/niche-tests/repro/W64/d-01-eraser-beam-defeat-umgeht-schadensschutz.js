@@ -1,5 +1,7 @@
 'use strict';
-// W64d-01 · „Defeat" ist ein Kill via EFFEKT, nicht via Schaden: Eraser Beam umgeht SCHADENS-Schutz, EFFEKT-Schutz wirkt weiter
+// W64d-01 · (W66a: ZURÜCKGENOMMEN) Eraser Beam läuft wieder als 999999 Schaden durch die Schadens-Pipeline: SCHADENS-Schutz UND EFFEKT-Schutz halten ihn ab.
+//   Dateiname bleibt (Verlauf); der Inhalt ist auf den Stand VOR W64a zurückgestellt. Neu seit W66a: Resistance fängt das Helden-„defeat" ab (Al: „JEDE Form von defeat").
+//   Die ursprüngliche W64a-Auslegung („defeat umgeht Schadensimmunität", Al 23.10.) beruhte auf einer Verwechslung — Al meinte Hand of Death (siehe W66/a-01 … a-04).
 //
 // Kartentext Eraser Beam: „This must be the only Spell you play this turn. Place 3 Pollution Tokens into your free Support Zones to use this Spell. Choose a target
 //   your opponent controls and defeat it. This Spell can never hit more than 1 target. You can only play 1 "Eraser Beam" per game."
@@ -34,7 +36,7 @@ async function lauf(seat, fall) {
   return { t, r, opp, seat, h0, inst, tot, kontrolle };
 }
 
-// Schadens-Schutz: Eraser Beam gilt als Kill via Effekt → das Ziel stirbt (alt: überlebte)
+// Schadens-Schutz: Eraser Beam läuft als Schaden → der Schutz hält ihn ab, das Ziel überlebt (W66a: wie vor W64a)
 const schaden = {
   'Inya mit lebendem Fantasy Buddy („takes no damage")': { held: IN, prep: (t, opp) => { t.put(opp, 0, 1, 'Fireball', { counters: { _fantasyBuddyToken: true, currentHp: 10, maxHp: 10, _cardDataOverride: { ...H.DB['Fireball'], name: 'Fantasy Buddy Token', cardType: 'Creature/Token', subtype: 'Token', hp: 10 } } }); },
     kontrolle: async (t, opp, seat) => { const n0 = t.hp(opp, 0); await t.run(() => t.engine.actionDealDamage({ name: 'X', owner: seat, heroIdx: 0, heroOwner: seat }, t.hero(opp, 0), 50, 'physical')); return t.hp(opp, 0) === n0; } },
@@ -62,8 +64,11 @@ const effekt = {
   'Cardinal-Beast-Kreatur (unaffected by all cards and effects)': { kreatur: H.INERT.creature, counters: { _cardinalImmune: 1 } },
   'Time Bomblebee mit Bomb Counters (_damageDestroyImmune)': { kreatur: H.INERT.creature, counters: { _damageDestroyImmune: 1 } },
 };
-// Neu geschützt durch einen EFFEKT-Schutz, der vorher nicht griff (Resistance: „blocks every non-damage effect", Welle 14 Ruling für „defeat"-Effekte)
-const resist = { 'Resistance (blockt Nicht-Schaden-Effekte, Welle 14)': { prep: (t, opp) => { t.setAbilities(opp, 0, [['Resistance'], [], []]); } } };
+// W66a: Resistance (Al 23.10.: „sollte JEDE Form von defeat abdecken") fängt das Helden-„defeat" von Eraser Beam ab — Lv1 die erste Karte des Zuges, Lv3 alles außer Schaden
+const resist = {
+  'Resistance Lv1 (erste Karte des Zuges)': { prep: (t, opp) => { t.setAbilities(opp, 0, [['Resistance'], [], []]); } },
+  'Resistance Lv3 (alles außer Schaden)': { prep: (t, opp) => { t.setAbilities(opp, 0, [['Resistance', 'Resistance', 'Resistance'], [], []]); } },
+};
 
 (async () => {
   const R = H.runner();
@@ -77,7 +82,7 @@ const resist = { 'Resistance (blockt Nicht-Schaden-Effekte, Welle 14)': { prep: 
     for (const [name, f] of Object.entries(schaden)) {
       const s = await lauf(seat, f);
       R.check(`[S${seat}] Schadens-Schutz „${name}": die Schadens-Probe ist wirklich geschützt (Kontrolle)`, s.kontrolle === true, s.kontrolle);
-      R.check(`[S${seat}] Schadens-Schutz „${name}": „defeat" ist ein Kill via Effekt → das Ziel wird besiegt`, s.r === true && s.tot, { r: s.r, hp: s.h0.hp, inst: s.inst && s.inst.zone });
+      R.check(`[S${seat}] Schadens-Schutz „${name}": Eraser Beam läuft als Schaden → das Ziel überlebt, Eraser Beam ist verbraucht`, s.r === true && !s.tot && s.t.gs.players[seat]._oncePerGameUsed.has('eraserBeam'), { r: s.r, hp: s.h0.hp, inst: s.inst && s.inst.zone });
       R.check(`[S${seat}] Schadens-Schutz „${name}": keine Engine-Fehler, Zustand sauber`, s.t.errors.length === 0 && s.t.audit().length === 0, { errors: s.t.errors, audit: s.t.audit() });
     }
     for (const [name, f] of Object.entries(effekt)) {
