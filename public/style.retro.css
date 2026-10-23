@@ -3070,6 +3070,15 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 .damage-number { position: fixed; z-index: 10200; font-family: 'Pixel Intv', 'Press Start 2P', monospace; font-size: 20px; color: #e92f38; text-shadow: 1px 1px 0 #55011a, 2px 2px 0 #000000; pointer-events: none; animation: damageFloat 1.6s steps(24, end) forwards; }
 .damage-number.heal-number { color: #4ceb70; text-shadow: 1px 1px 0 #1a4128, 2px 2px 0 #000000; }
 
+/* Steam Dwarfs: gruene "+10" ueber der Kreatur (Pixelart: harte Kontur aus
+   Schattenringen, ganzzahlige Schritte im Bildtakt, kein Skalieren/Blur). */
+@keyframes steamHpFloat {
+  0%   { opacity: 1; transform: translate(-50%, 0); }
+  80%  { opacity: 1; transform: translate(-50%, -40px); }
+  100% { opacity: 0; transform: translate(-50%, -44px); }
+}
+.steam-hp-number { position: fixed; z-index: 10200; font-family: 'Pixel Intv', 'Press Start 2P', monospace; font-size: 20px; color: #4ceb70; text-shadow: 1px 1px 0 #1a4128, -1px -1px 0 #1a4128; pointer-events: none; animation: steamHpFloat 1.2s steps(18, end) forwards; }
+
 /* Red flash overlay when a hero or creature takes damage. Uses an
    absolutely positioned ::after so we don't perturb the existing
    board-zone background, border, or any inner card layout. */
@@ -13617,6 +13626,15 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   100% { background-position: 0% 0; }
 }
 @media (prefers-reduced-motion: reduce) { .game-gold-icon::after { animation: none; } }
+
+/* ═══ Zeichen und Abzeichen dürfen den Rand der Zone überragen (Al, 23.10.) ═══
+   `.board-zone { overflow: hidden }` schnitt die Bereit-Zeichen (⚡ ⚔ ⚙ ✦ 💚 ⚖: `::after` bei top/right −8…−10 px, dazu springend und bis 1,35-fach) und die
+   Status-/Buff-Abzeichen an der Zonenkante ab — beim Auf- und Abspringen endete das Zeichen sichtbar an einer geraden Linie. Zonen, die so etwas tragen, zeigen
+   jetzt alles; sie liegen eine Stufe höher, damit der Überstand nicht unter der Nachbarzone verschwindet. Vorbild: `.board-zone-aura`. */
+.board-zone:is(.zone-ability-activatable, .zone-ability-free-activatable, .zone-creature-activatable, .zone-equip-activatable,
+               .zone-hero-effect-active, .zone-friendship-bonus, .zone-permanent-activatable),
+.board-zone:has(> .status-badges-row), .board-zone:has(> .buff-column),
+.board-permanent-slot.zone-permanent-activatable { overflow: visible; z-index: 3; }
 
 
 /* ── RETRO-ZUSATZ (scripts/retro/retro-extra.css) ── */

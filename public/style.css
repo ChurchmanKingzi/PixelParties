@@ -26505,3 +26505,15 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   100% { background-position: 0% 0; }
 }
 @media (prefers-reduced-motion: reduce) { .game-gold-icon::after { animation: none; } }
+
+/* ═══ Zeichen und Abzeichen dürfen den Rand der Zone überragen (Al, 23.10.) ═══
+   `.board-zone { overflow: hidden }` schnitt die Bereit-Zeichen (⚡ ⚔ ⚙ ✦ 💚 ⚖: `::after` bei top/right −8…−10 px, dazu springend und bis 1,35-fach) und die
+   Status-/Buff-Abzeichen an der Zonenkante ab — beim Auf- und Abspringen endete das Zeichen sichtbar an einer geraden Linie. Zonen, die so etwas tragen, zeigen
+   jetzt alles; sie liegen eine Stufe höher, damit der Überstand nicht unter der Nachbarzone verschwindet. Vorbild: `.board-zone-aura`. */
+.board-zone:is(.zone-ability-activatable, .zone-ability-free-activatable, .zone-creature-activatable, .zone-equip-activatable,
+               .zone-hero-effect-active, .zone-friendship-bonus, .zone-permanent-activatable),
+.board-zone:has(> .status-badges-row), .board-zone:has(> .buff-column),
+.board-permanent-slot.zone-permanent-activatable {
+  overflow: visible;
+  z-index: 3;
+}
