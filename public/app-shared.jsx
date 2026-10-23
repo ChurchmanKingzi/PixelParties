@@ -4020,9 +4020,11 @@ if (typeof document !== 'undefined') {
     // Up hin und her zu klicken, macht noch kein Geraeusch"). Reiter sind
     // `<div>`s ohne Rolle und fielen deshalb durch — dasselbe gilt fuer
     // jeden kuenftigen Reiter, nicht nur fuer die beiden im Login.
-    const btn = e.target.closest('button, [role="button"], .tab');
+    // `[role="switch"]`: die Schalter im Profil (`ProfilSchalter`) sind <div>s mit dieser Rolle und waren stumm. Gesperrte Schalter klingen als Fehler.
+    const btn = e.target.closest('button, [role="button"], [role="switch"], .tab');
     if (!btn) return;
     if (btn.closest('.volume-control, .volume-slider-popup')) return;
+    if (btn.getAttribute('role') === 'switch' && btn.getAttribute('aria-disabled') === 'true') { playSFX('ui_error', { dedupe: 250 }); return; }
     // Don't double-fire on buttons that have data-sfx="none".
     if (btn.dataset && btn.dataset.sfx === 'none') return;
     // Cancel-style buttons get ui_cancel instead of ui_click.
