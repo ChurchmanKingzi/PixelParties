@@ -13723,6 +13723,17 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 }
 @media (prefers-reduced-motion: reduce) { .skin-holo-rim u { animation: none; background-image: none; } }
 
+/* ═══ Name, Stufe und Kosten der Super-/Diamond-Rares tragen die Schraffur des Bildes (Al, 23.10.) ═══
+   Dieselbe Schicht wie `.skin-holo-hatch` auf der Kunst: dünne Schrägstriche (118°, gleiche Breiten in cqw) mit wanderndem Pastell-Regenbogen
+   (gleiche Farben, gleiche 14 s, gleiche Phase → läuft im Gleichtakt mit dem Bild). Sie liegt in `.skin-holo-name`, ist also auf Name,
+   Stufenzahl, Artifact-Kosten und Stempel zugeschnitten; der Regeltext (`.skin-holo-text`) bekommt sie nicht. */
+.skin-holo-name .sh-ht { position: absolute; inset: 0; overflow: hidden; opacity: .6; -webkit-mask-image: repeating-linear-gradient(118deg, #000000 0, #000000 .24cqw, transparent .34cqw, transparent .78cqw); mask-image: repeating-linear-gradient(118deg, #000000 0, #000000 .24cqw, transparent .34cqw, transparent .78cqw); }
+.skin-holo-name .sh-ht i { position: absolute; top: 0; bottom: 0; left: 0; width: 300%; background: linear-gradient(112deg, #f174ab 0% 0%, #f9b3b3 0% 4.8%, #e0c085 4.8% 12%, #fff196 12% 17.8%, #f7f7ad 17.8% 25%, #6be9fa 25% 32.2%, #bddcef 32.2% 34%, #66b6ff 34% 38.8%, #d6bbf1 38.8% 53.2%, #f174ab 53.2% 58%, #f9b3b3 58% 62.8%, #e0c085 62.8% 70.5%, #fff196 70.5% 76.6%, #f7f7ad 76.6% 83%, #6be9fa 83% 90.2%, #bddcef 90.2% 92%, #66b6ff 92% 96.8%, #d6bbf1 96.8% 100%); animation: skinHoloHatch 14s steps(24, end) infinite; animation-delay: var(--sh-phase, 0s); will-change: transform; }
+.skin-holo-name.skin-holo-text .sh-ht { display: none; }
+@container (max-width: 299px) { .skin-holo-name .sh-ht i { animation: none; will-change: auto; } }
+@media (pointer: coarse) { .skin-holo-name .sh-ht i { animation: none; will-change: auto; } }
+@media (pointer: coarse) and (max-height: 600px) { .skin-holo-name .sh-ht { display: none; } }
+
 
 /* ── RETRO-ZUSATZ (scripts/retro/retro-extra.css) ── */
 /* ════════════════════════════════════════════════════════════════════════════

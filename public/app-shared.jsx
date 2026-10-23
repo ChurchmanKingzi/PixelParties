@@ -5878,7 +5878,7 @@ function FoilName({ card, tone, fkey }) {
   return (
     <>
       <div ref={ref} className={'skin-holo skin-holo-nur-name foil-name-' + tone} data-foil-key={fkey} style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
-        {daten && breit && <div className="skin-holo-name"><i className="sh-rb" /><i className="sh-gl" /></div>}
+        {daten && breit && <div className="skin-holo-name"><i className="sh-rb" /><div className="sh-ht"><i /></div><i className="sh-gl" /></div>}
       </div>
       {textAn && (
         <div ref={refT} className={'skin-holo skin-holo-nur-name foil-name-' + tone} data-foil-key={fkey + '|text'} style={datenT ? { ...datenT.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
