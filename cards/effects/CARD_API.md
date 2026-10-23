@@ -405,8 +405,8 @@ ERSTEN Klick"). Vorbild: Ultimate Weapon Experiment (Galerie → Held).
 Dasselbe gilt für ALLES Sichtbare vor dem Zusagepunkt: kein Flug, keine
 Animation, kein Klang (v1122, Brainstorming).
 
-> **★ Seit W63d (22.10.2026) setzt die Engine das ZENTRAL durch** — siehe den Abschnitt „AUFTRITT STREAMEN — ERST NACH DEM COMMIT" direkt darunter. `deferReveal`/`deferBroadcast`
-> und das Muster mit `_holdCardReveal` bleiben gültig, sind aber für den Regelfall nicht mehr nötig; eine bestätigte Antwort allein committet NICHT mehr.
+> **★ Seit W63d (22.10.2026) setzt die Engine das ZENTRAL durch, seit W64b (23.10.2026) mit dem Auftritt VOR dem ersten Effektschritt** — siehe den Abschnitt „AUFTRITT STREAMEN — ERST NACH DEM COMMIT, VOR DEM ERSTEN EFFEKT" direkt darunter. `deferReveal`
+> und das Muster mit `_holdCardReveal` bleiben gültig, sind aber für den Regelfall nicht mehr nötig (`deferBroadcast` ist ohne Wirkung); eine bestätigte Antwort allein committet NICHT.
 
 **4. Nicht wählbare Ziele werden ausgegraut, nicht verschwiegen**
 (Als Regel 21.8., für die zentrale Zielwahl nachgezogen in v1294):
@@ -447,11 +447,18 @@ wird gewählt und sofort gewirkt: Taio, Zi, Archibald, Learning, Rubin, Call for
 **Prüfung im Repro (Pflicht):** Abbruch an jeder Stufe → `_spellCancelled`
 bzw. `false`, Karte in der Hand, KEIN `card_reveal`, keine Animation.
 
-## ★ AUFTRITT STREAMEN — ERST NACH DEM COMMIT (Als Regel Al, 22.10.2026 — MANDATORY, zentral durchgesetzt)
+## ★ AUFTRITT STREAMEN — ERST NACH DEM COMMIT, VOR DEM ERSTEN EFFEKT (Als Regeln Al, 22.10. + 23.10.2026 — MANDATORY, zentral durchgesetzt)
 
-> Al (Treasure Hunter's Backpack): „Eine Karte streamed ihren Auftritt IMMER erst, nachdem es keine Cancel-Option mehr gibt, also nachdem sie für ihren Einsatz komplett committed wurde
+> Al (22.10., Treasure Hunter's Backpack): „Eine Karte streamed ihren Auftritt IMMER erst, nachdem es keine Cancel-Option mehr gibt, also nachdem sie für ihren Einsatz komplett committed wurde
 > (alle Auswahlen/Zielwahlen/Kostenwahlen abgeschlossen, keine Abbruchmöglichkeit mehr). Solange der Spieler noch abbrechen kann, darf der Gegner die Karte nicht sehen — sonst verrät ein
 > Abbruch verdeckte Information (Karteninhalt/Kartenwahl)."
+>
+> Al (23.10., Staff of Uncontrollable Destruction): „Auftritte sollten allgemein VOR BEGINN der Effekte gestreamed werden (aber nach dem Confirm), nicht erst an deren Ende. […] Das ist verwirrend,
+> weil der Gegner nicht sofort weiß, *was für einen Effekt* er gerade mitansieht. Die Reihenfolge soll also sein: Aktiviere eine Karte, wähle ggf. ihre Ziele, bestätige ggf., dass sie feuern soll,
+> DANN streame den Auftritt, dann feuere den Effekt durch."
+
+**Die Regel in einem Satz: Der Auftritt kommt NACH der letzten Abbruchstelle und VOR dem ersten Effektschritt.** Gibt es keine Abbruchstelle (Draw, Buff, Sperre, Staff …), kommt er sofort beim Start der
+Auflösung, vor dem ersten Zustandswechsel, Ereignis und Protokolleintrag des Effekts.
 
 ### Was „Auftritt" ist und wer ihn sieht
 **Alles**, was an Gegner und Zuschauer geht und die Karte verrät: das Bild (`card_reveal`), die Protokollzeile (`card_played`, `spell_played`, `creature_fizzle`, `sacrifice_cancelled` … — jede
@@ -459,43 +466,73 @@ bzw. `false`, Karte in der Hand, KEIN `card_reveal`, keine Animation.
 der Beschwörungsschein (`summon_effect`) und der **Zustand** (`game_state`: `potionTargeting.potionName`, `resolvingCard`, Titel/Galerie einer `effectPrompt`). Der Besitzer sieht natürlich alles sofort;
 der Gegner sieht vor dem Commit nur „Opponent is choosing …" (Typ der Frage, `opponentTitle` falls die Karte ihn ausdrücklich setzt) — **keinen** Kartennamen, kein Bild, keinen Kartentext.
 **Commit** = die letzte Stelle, an der ein Abbruch die Karte noch zurückgibt (Karte bleibt auf der Hand / im Deck, nichts bezahlt, Rundensperre frei) ist überschritten.
+**Effektschritt** = alles, was nach dem Commit den Spielzustand verändert oder dem Gegner etwas zeigt (Schaden, Ziehen, Abwerfen, Status, Anlegen, Gold, Sperre setzen …).
 
 ### Wie die Engine es zentral durchsetzt (kein Kartencode nötig)
 1. Jeder Spielweg merkt den Auftritt VOR der ersten abbrechbaren Stelle vor: `gs._pendingCardReveal = { cardName, ownerIdx }` (Zauber/Attack ab Spielbeginn, Ziel-Artefakt/Trank mit „Bestätigen", Artefakt/Trank
-   ohne Ziel, Ability-/Helden-/Kreatur-/Ausrüstungs-/Area-/Permanent-Aktivierung; Kreatur-Beschwörung und Ablage-Effekt als **stumme** Vormerkung `stumm: true` = kein `card_reveal`, nur der Puffer).
-2. Solange die Vormerkung offen ist, hält der **Auftritts-Puffer** (`pending.outbox`) alles zurück, was an Gegner/Zuschauer ginge — durch die vier Engpässe `engine._broadcastEvent` (inkl. `log` → `action_log`),
-   `_opp.emitToOpponentsGs`, `server.sendToSpectators` und den Zustandsversand (`potionTargetingFuer`, `effectPromptFuer`, `resolvingCard`). Wer direkt `io.to(sid).emit(…)` ruft, **umgeht den Puffer** — nicht tun.
-3. **Commit** (Puffer wird ausgeliefert, dann `card_reveal` + Protokollzeile) bei der ersten dieser Gelegenheiten:
+   ohne Ziel — **jetzt auch mit dem alten Flag `deferBroadcast`, das keine Wirkung mehr hat** —, Ability-/Helden-/Kreatur-/Ausrüstungs-/Area-/Permanent-Aktivierung; Kreatur-Beschwörung und Ablage-Effekt als
+   **stumme** Vormerkung `stumm: true` = kein `card_reveal`, nur der Puffer).
+2. Solange die Vormerkung offen ist, hält der **Auftritts-Puffer** (`pending.outbox`) alles zurück, was an Gegner/Zuschauer ginge — durch die Engpässe `engine._broadcastEvent` (inkl. `log` → `action_log`),
+   `_opp.emitToOpponentsGs`, `server.sendToSpectators` und den Zustandsversand. Wer direkt `io.to(sid).emit(…)` ruft, **umgeht den Puffer** — nicht tun.
+   * **Zustandspuffer (W64b):** hat der Besitzer KEINE Frage offen, geht überhaupt kein `game_state` an Gegner/Zuschauer (`engine._auftrittZustandHalten` → `'halten'`, Server `sendGameState`/`sendSpectatorGameState`).
+     Hat er eine (abbrechbare) Frage offen, bekommen sie den Zustand **von VOR der Karte** und nur die maskierte Hülle der Frage (`'huelle'`) — auch eine Karte, die vor ihrer abbrechbaren Frage schon still etwas
+     verändert hat (Magic Ruby: Stun, dann „Karte behalten?"), verrät sich so nicht. Ausnahmen: der Besitzer selbst, Resync (`sendGameStateErzwungen`), `extra`-Sendungen (Reconnect), liegengebliebene Vormerkung eines früheren Zugs.
+3. **Commit** bei der ersten dieser Gelegenheiten. Ausgeliefert wird in dieser Reihenfolge: `card_reveal` → Zeile der Karte (`card_played`/`spell_played` …) → was der Puffer zurückgehalten hat (Ankündigungen, erste
+   Effektzeilen) → der Zustand.
+   * ein **Engine-Effektschritt (W64b)**: jeder `engine.action…` (Hülle am Dateiende von `_engine.js`, ~60 Primitive) und die Primitive aus `AUFTRITT_SCHRITT_PRIMITIVE` (`addHeroStatus`, `applyCreatureStatus`,
+     `placeArea`, `summonFromDiscard`, `shuffleDeck`, `dealDamageToTargets` …) — VOR dem Schritt, während der Besitzer keine Frage offen hat;
+   * eine **Pflichtfrage an den Besitzer (W64b)** (`promptGeneric` ohne `cancellable: true`, `promptEffectTarget` mit `cancellable: false`) — hinter ihr gibt es keinen Rückweg mehr;
    * die erste **sichtbare Wirkung** (jedes Ereignis außer den Ankündigungs-Ereignissen `action_log`, `hand_to_board_fly`, `ability_activated`, `potion_resolved`), während der Besitzer **keine Frage offen** hat;
    * eine **Frage an den anderen Spieler** (Reaktionsfenster, „Gegner wählt zuerst", Suche zeigen) — er muss wissen, worauf er antwortet; der Besitzer hat die Karte da verbindlich gespielt;
    * das **Ende der Auflösung** (Server) bzw. ein **Phasenwechsel** (Sicherheitsnetz);
-   * ein ausdrücklicher **`engine.commitAppearance()`** der Karte (= `_firePendingCardReveal`);
+   * ein ausdrückliches **`engine.commitAppearance()`** der Karte (= `_firePendingCardReveal`);
    * die CPU zeigt sofort (`maybeFireCpuRevealEarly`, nichts zu verbergen).
+   **Kein Commit:** eine bloße Protokollzeile (`engine.log`), `engine.sync()`, eine Pause (`engine._delay` — die Spielwege warten nach der Auflösung, BEVOR sie über Abbruch oder Erfolg entscheiden), eine
+   abbrechbare Frage des Besitzers (auch nach ihrer bestätigten Antwort).
 4. **Abbruch**: der Spielweg löscht `gs._pendingCardReveal` (`delete`) — der Puffer verfällt mit. Kein Ereignis, keine Zeile, kein Name im Zustand; die Rückerstattung bleibt wie bisher (Karte auf der Hand, Aktion zurück …).
-5. **Eine bestätigte Antwort allein ist KEIN Commit** (mehrstufige Wahl Galerie → Held → Zone: erst die letzte Stufe schließt den Abbruch aus). `gs._holdCardReveal = true` hält den Commit weiterhin bis zur
-   ausdrücklichen Freigabe zurück (Muster Ultimate Weapon Experiment).
+   Direkt danach schickt der Spielweg `sendGameState` an alle (die Abbruchzweige der Spielwege tun das; ein neuer Abbruchzweig MUSS es tun) — der Gegner bekommt dann wieder den echten Zustand ohne Frage-Hülle.
+5. **Eine bestätigte Antwort allein ist KEIN Commit** (mehrstufige Wahl Galerie → Held → Zone: erst die letzte Stufe schließt den Abbruch aus). Die Engine erkennt „die letzte Stufe" daran, dass danach etwas
+   GESCHIEHT (Effektschritt, Pflichtfrage, Ereignis) — nicht daran, dass die Antwort kam. `gs._holdCardReveal = true` hält den Commit weiterhin bis zur ausdrücklichen Freigabe zurück (Muster Ultimate Weapon Experiment).
 
 ### Pflichten für neue Karten — wo `commit` zu markieren ist
-* **Regelfall: nichts tun.** Fragen (`promptGeneric`/`promptEffectTarget`/`promptDamageTarget` …) mit `cancellable: true` VOR der ersten Wirkung genügen; der Auftritt kommt von selbst mit der ersten sichtbaren Wirkung.
-* **Kein Früh-Auftritt vor einer abbrechbaren Frage.** `if (gs._pendingCardReveal) engine._firePendingCardReveal()` am Anfang des `onPlay` ist VERBOTEN, wenn danach noch eine abbrechbare Frage kommt
-  (Accusation und Spreading Rumor taten es, „damit der Gegner nicht auf einen Mystery-Cast starrt" — das war der Fehler). Explizit committen nur HINTER der letzten abbrechbaren Stelle: `engine.commitAppearance()`
-  (Vorbilder: Mischief Militia - SnowItAll, Psychic Scout, Slippery Skates — sie stellen die Vormerkung bis zur Zonenwahl zurück und committen dann).
+* **Regelfall: nichts tun.** Fragen (`promptGeneric`/`promptEffectTarget`/`promptDamageTarget` …) mit `cancellable: true` VOR der ersten Wirkung genügen; Wirkungen über die Engine-Primitive (`engine.action…`, Status, Beschwören …)
+  committen den Auftritt selbst, bevor sie wirken. Eine Karte ohne abbrechbare Frage zeigt sich also vor ihrem ersten Effektschritt, eine mit abbrechbaren Fragen nach der letzten beantworteten — ohne Zutun.
+* **Stille Effekte (direkter Zugriff auf `gs`/`ps`, nur `engine.log` + `sync()`):** auch sie sind sicher — der Zustandspuffer hält den neuen Zustand zurück, der Commit am Ende der Auflösung liefert Auftritt → Zeilen → Zustand.
+  Soll der Auftritt trotzdem VOR einer langen stillen Strecke kommen (Pause, Animation eigener Bauart), setze ausdrücklich `engine.commitAppearance()` an den Anfang der Wirkung — **aber erst HINTER der letzten abbrechbaren Frage**.
+* **Kein Früh-Auftritt vor einer abbrechbaren Frage.** `if (gs._pendingCardReveal) engine._firePendingCardReveal()` / `engine.commitAppearance()` am Anfang des `onPlay`/`resolve` ist VERBOTEN, wenn danach noch eine abbrechbare Frage
+  kommt (Accusation, Spreading Rumor, Staff of Illusions taten es). Explizit committen nur HINTER der letzten abbrechbaren Stelle (Vorbilder: Monster/Planet in a Bottle, Magic Lamp, Horn in a Bottle, Mischief Militia - SnowItAll,
+  Psychic Scout, Slippery Skates).
+* **Kein eigenes `card_reveal` der eigenen Karte** (`engine.io.to(oppSid).emit('card_reveal', …)` / `_broadcastEvent('card_reveal', { cardName: <diese Karte> })`): es zeigt die Karte doppelt (zentral + eigen), umgeht den Puffer und
+  erreicht oft die Zuschauer nicht. Stattdessen `engine.commitAppearance()`. (Reveals ANDERER Karten — gezogene, gesuchte, gewählte — bleiben wie sie sind.) `deferBroadcast: true` ist ohne Wirkung und wird nicht mehr gesetzt.
 * **Wahlen, die VOR dem Reaktionsfenster stehen müssen** (der Gegner darf die Karte negieren; die Wahl darf dann nichts berührt haben und nicht mehr zurückgenommen werden): in den Vorab-Haken
   `payArtifactCost` / `payActivationCost` / `paySummonCost` (liefern `false` bei Abbruch, sonst Daten für `resolve(…, kosten)`). Vorbild: **Treasure Hunter's Backpack** (Artefakt-Galerie + Träger/Zone → `{ wahl }`;
   `resolve` prüft sie erneut und fragt nur bei verschobenem Zustand/ohne Vorab-Wahl noch einmal). Danach öffnet sich das Reaktionsfenster; die Frage an den Gegner committet den Auftritt.
 * **Eigene Sendungen an den Gegner** nur über `engine._broadcastEvent`, `emitToOpponentsGs` (`cards/effects/_opp.js`) und `sendToSpectators` — nie `engine.io.to(oppSid).emit(…)` (umgeht den Puffer).
   Sendest du bewusst VOR der Auflösung etwas, das keine Wirkung ist (Ankündigung), gehört der Ereignisname in `AUFTRITT_HALTE_EREIGNISSE` (`_engine.js`).
+* **Abbruchantwort des Skripts:** ein Skript, das über `doUseArtifactEffect`/`doUsePotion` (ohne Zielsitzung) läuft, meldet den Abbruch mit `{ cancelled: true }` — `{ aborted: true }` kennt nur der Zielsitzungs-Weg
+  (`doConfirmPotion`), im anderen gilt die Karte sonst als gespielt (Staff of Illusions verbrauchte sich beim Abbruch der Galerie).
 * **Der Server schickt `animationType` (Ziel-Artefakt/Trank) beim Start der Auflösung** (`potion_resolved`) — er ist ein Ankündigungs-Ereignis und wird bis zum Commit gehalten; die Karte braucht nichts zu tun.
 * **Protokollzeilen mit dem Kartennamen im Abbruchzweig** (`creature_fizzle`, `sacrifice_cancelled`, `targeting_blocked` mit `source`) sind harmlos, WENN die Vormerkung noch offen ist (der Puffer verwirft sie) —
   schreibe sie aber nie NACH dem `delete gs._pendingCardReveal`, und nie mit dem Kartennamen in Zeilen, die vor jeder Vormerkung entstehen (Server-Sitzungsebene).
 * **Fragen, die zuerst der GEGNER beantwortet** (Bottled Flame, Overflowing Chalice, Duel): der Auftritt kommt vor seiner Frage — das ist Absicht (die Karte ist dann verbindlich gespielt). Spätere „abbrechbare"
   Fragen des Spielers (Abwurf annehmen?) geben die Karte nicht mehr zurück und sind keine Abbruchstellen im Sinne dieser Regel.
+* **Kreaturen:** der Auftritt einer Kreatur ist die Landung (Flug + `summon_effect`). Beschwörungskosten (Opfer, Schaden, Bleed) laufen davor — Entscheidung offen (Rückfrage an Al, W64b).
 * **Verdeckt gelegte Karten** (Surprise face-down) verraten ihren Namen auch nicht auf der Leitung: `broadcastHandToBoard` lässt `cardName` bei `faceDown: true` weg.
 
-### Prüfung im Repro (Pflicht für jede Karte mit abbrechbarer Frage)
+### Prüfliste für neue Karten (W64b)
+1. Jede Frage, nach der der Spieler die Karte noch zurückbekommt, ist `cancellable: true` (bzw. liefert in `payXCost` `false`) — und steht VOR dem ersten Effektschritt.
+2. Hinter der letzten abbrechbaren Frage passiert etwas über die Engine-Primitive (oder `engine.commitAppearance()` steht dort). Kein Früh-Commit davor, kein eigenes `card_reveal` der eigenen Karte.
+3. Kein Abbruch mehr NACH einem Effektschritt (kein „Zustand ändern, dann abbrechbar fragen, dann zurückrollen"): der Auftritt wäre schon draußen. Muss ein Schritt vor einer abbrechbaren Frage laufen
+   (Kosten mit Rückerstattung), setze `gs._holdCardReveal = true` bis hinter die Frage und gib frei (`delete` + `commitAppearance()`; `finally`!).
+4. Skript im Nicht-Zielweg meldet Abbruch mit `{ cancelled: true }`.
+5. Repro mit der Leitungs-Harness: `W.durchlauf` + `W.pruefeDurchlauf(R, label, d, { seat, nEcht })` auf BEIDEN Sitzen — prüft „nichts vor der letzten echten Abbruchstelle", „Abbruch → nichts" UND „Auftritt vor dem ersten
+   Effekt-Ereignis/-Zeile/Zustandswechsel" für Gegner und Zuschauer. Die Sweeps `W63/d-07` (Abbruch) und `W64/b-05` (Reihenfolge) laufen über alle Handkarten und fangen neue Verstöße.
+
+### Prüfung im Repro (Pflicht für jede Karte mit abbrechbarer Frage oder stillem Effekt)
 `docs/niche-tests/lib/wire.js` (Leitungs-Harness, MENSCH-Modus, echte `do*`-Handler): zeichnet jede Nachricht an Gegner-Sitz und Zuschauer auf, verschränkt mit den Fragen an den Spieler.
 `W.durchlauf(mk, seat, name, o)` + `W.pruefeDurchlauf(R, label, d, o)`: ein Durchlauf und je ein Abbruch ab JEDER abbrechbaren Stelle — „nichts vor der letzten echten Abbruchstelle, danach der Auftritt; Abbruch → nichts
-(Ereignis, Zeile, Zustand), Karte noch auf der Hand". Der Sweep `docs/niche-tests/repro/W63/d-07-…` spielt ALLE Handkarten mit möglicher Abbruchfrage durch und ist der Wächter gegen neue Verstöße.
+(Ereignis, Zeile, Zustand), Karte noch auf der Hand"; seit W64b zusätzlich „der Auftritt kommt je Empfänger vor dem ersten Effekt-Ereignis, der ersten Effekt-Protokollzeile und dem ersten Zustandswechsel" (`r.pro`, Option
+`ohneEffektOrdnung` für Kreaturen mit Beschwörungskosten). Der Sweep `docs/niche-tests/repro/W63/d-07-…` spielt ALLE Handkarten mit möglicher Abbruchfrage durch und ist der Wächter gegen neue Verstöße.
 
 ## ★ JEDE **NEUE** ANIMATION BRAUCHT EINEN KLANG (Als Regel 19.8.)
 
@@ -23989,3 +24026,74 @@ Kreatur-Modus: spielbar mit 3 freien Zonen ODER (Alice aktiv + geteilte Zone fü
 | `W63/a-05-bewegen-memory-blast-jumper-spider-puppet-kein-on-summon.js` | Memory Blast, Jumper Spider, Puppet, Paraseed Greenhouse | 46 |
 | `W63/a-06-reincarnation-geteilte-zone-statt-dritter-freier.js` | Reincarnation Kreatur-Modus, Mensch + CPU | 118 |
 Angepasst: `W62/a-01`, `W62/a-04` (Reihenfolge geteilt vor frei).
+
+## Welle 64 / W64b — Auftritt VOR dem ersten Effektschritt · Zustandspuffer · Audit aller Spielwege
+
+Rückfrage an Al zu W63d („Auftritt kommt jetzt mit der ersten sichtbaren Wirkung statt mit der Zielbestätigung; Karten, die danach nur still den Zustand ändern, zeigen sich erst am Ende der Auflösung — in Ordnung?"), Antwort: **„Nein, Auftritte sollten allgemein VOR BEGINN der Effekte gestreamed werden (aber nach dem Confirm), nicht erst an deren Ende. Z. B. Staff of Uncontrollable Destruction … Die Reihenfolge soll also sein: Aktiviere eine Karte, wähle ggf. ihre Ziele, bestätige ggf., dass sie feuern soll, DANN streame den Auftritt, dann feuere den Effekt durch."** Vertragsabsatz (überarbeitet): Abschnitt „★ AUFTRITT STREAMEN — ERST NACH DEM COMMIT, VOR DEM ERSTEN EFFEKT" oben, mit Prüfliste für neue Karten. Repros: `docs/niche-tests/repro/W64/b-01` … `b-06` (alle auf dem Stand vor W64b rot), Harness `docs/niche-tests/lib/wire.js` (`W.pruefeDurchlauf` prüft jetzt auch die Reihenfolge). Sammelübersicht: `docs/niche-tests/FIXES-WELLE-64b.md`.
+
+### 1) Ursache
+Der Auftritts-Puffer aus W63d committete erst bei der **ersten sichtbaren Wirkung** (Ereignis außer `action_log`/`hand_to_board_fly`/`ability_activated`/`potion_resolved`), einer Frage an den anderen Spieler, dem Ende der Auflösung oder `commitAppearance()`. Was dazwischen still geschah, kam VOR dem Auftritt zum Gegner:
+* der **Zustand** (`game_state` nach `sync()`): Handgröße, Ablage, Gold, Status/Buffs, Sperren, ein frisch angelegter Anhang (bei 157 von 813 Handkarten mit Auftritt stand die Änderung schon im Zustand des Gegners, bevor `card_reveal` kam);
+* die ersten **Protokollzeilen** des Effekts (`engine.log` → `action_log`) — sie standen im Protokoll des Gegners VOR der Zeile „X played" der Karte (Reihenfolge der Auslieferung: Puffer zuerst, Auftritt danach);
+* **Sonderfälle:** 13 Artefakte/Tränke mit `deferBroadcast: true` hatten gar keine Vormerkung und zeigten sich selbst — nur dem Gegner (nicht den Zuschauern), teils nur per Protokollzeile am Ende (Alchemic Journal, Boomerang, Shard of Chaos), Staff of Illusions sogar VOR seiner abbrechbaren Galerie; Chain Lightning und Pillage zeigten sich doppelt.
+
+### 2) Lösung (zentral, ohne Pflegeaufwand für neue Karten)
+Verworfene Alternativen: *Commit am Start von `onPlay` + Opt-out für Karten mit abbrechbaren Fragen* (jede der 188 Karten mit abbrechbarer Frage müsste den Opt-out tragen; vergisst ihn eine neue Karte, verrät ein Abbruch sie — genau der W63d-Fehler); *„nach der Antwort kurz warten, ob eine weitere abbrechbare Frage kommt" (Mikrotask/Tick)* (zeitabhängig, und eine Karte, die vollständig in Mikrotasks durchläuft — Staff —, wäre erst nach ihrem ganzen Effekt „sicher"). Gewählt: **Der Effekt beginnt, sobald er etwas tut — und was er bis dahin still tut, bleibt unsichtbar.**
+* **Schritt-Erkennung** (`engine._auftrittSchritt`): VOR jedem `engine.action…` (Hülle am Dateiende von `_engine.js`, ~60 Primitive) und den Primitiven `AUFTRITT_SCHRITT_PRIMITIVE` (`addHeroStatus`, `removeHeroStatus`, `applyCreatureStatus`, `cleanse…`, `increaseMaxHp`, `dealDamageToTargets`, `summonCreatureWithHooks`, `summonFromDiscard`, `placeArea`, `shuffleDeck`, `addCardFromDiscardToHand`, `grantAdditionalAction`, `performImmediateAction…`, `sendBoardCardToDiscard`) sowie vor jeder **Pflichtfrage an den Besitzer** (`promptGeneric` ohne `cancellable: true`, `promptEffectTarget` mit `cancellable: false`) wird die Vormerkung committet — sofern der Besitzer keine Frage offen hat. Eine abbrechbare Frage (auch ihre bestätigte Antwort) committet nicht; der Auftritt kommt also nach der LETZTEN beantworteten abbrechbaren Frage, sobald der Effekt etwas tut — ohne dass die Karte „die letzte Frage" kennen muss. Karten ohne abbrechbare Frage zeigen sich damit vor ihrem ersten Schritt.
+* **Zustandspuffer** (`engine._auftrittZustandHalten`, Server `sendGameState`/`sendSpectatorGameState`): solange die Vormerkung offen ist, geht kein `game_state` an Gegner/Zuschauer, wenn der Besitzer keine Frage offen hat (`'halten'`); mit offener Frage bekommen sie den Zustand von VOR der Karte und nur die maskierte Hülle der Frage (`'huelle'`, aus dem Dedupe-Cache). Dadurch kann auch ein stiller Effekt ohne Primitive (direkter Zugriff auf `ps`/`gs`, `sync()`) den Gegner nie VOR dem Auftritt etwas sehen lassen. Der Commit liefert den echten Zustand sofort nach.
+* **Auslieferungsreihenfolge** (`_firePendingCardReveal`): `card_reveal` → Zeile der Karte → Zurückgehaltenes (Ankündigungen, erste Effektzeilen) → Zustand (vorher: Puffer → reveal → Zeile).
+* **Keine** Auslöser: `engine.log`, `sync()`, `_delay` (die Spielwege rufen `_delay(100)` NACH der Auflösung, bevor sie zwischen Abbruch und Erfolg unterscheiden — ein Commit dort hätte Abbrüche verraten; in der ersten Fassung war das ein Fehler, Staff of Illusions zeigte es).
+* **Reaktionsfenster / Fragen an den Gegner** (Tool Freezer, Counter-Spells, Bottled Flame …): unverändert — der Auftritt kommt VOR seiner Frage. Zuschauer: derselbe Puffer, derselbe Zustandspuffer.
+* **`deferBroadcast`** ist ohne Wirkung (Server merkt jede Karte vor); 13 Skripte umgestellt (s. u.). `_TEMPLATE.js` aktualisiert.
+* **Nicht geändert:** CPU (`maybeFireCpuRevealEarly` zeigt sofort), MCTS/`_fastMode`, Client (`public/`), Kartentexte (`data/cards.json`). Reconnect/Resync (`sendGameStateErzwungen`, `extra`) wird nie gehalten.
+
+### 3) Harness (`docs/niche-tests/lib/wire.js`)
+`W.spiele` sendet vor dem Zug den Ausgangszustand an Gegner/Zuschauer (`host.sendGameStateErzwungen` — neu exportiert) und `analyse` liefert je Empfänger `pro[sid] = { R, wechsel, ereignis, effektLog, ersterEffekt, vorEffekt }`: `R` = erster Auftritt, `wechsel` = erster Zustand mit anderem Brett/Hand/Stapel/Gold/Status, `ereignis` = erstes Nicht-Ankündigungs-Ereignis, `effektLog` = erste Effekt-Protokollzeile. `W.pruefeDurchlauf` prüft `vorEffekt` für Gegner und Zuschauer (Option `ohneEffektOrdnung` für Kreaturen mit Beschwörungskosten).
+
+### 4) Audit-Tabelle — wann wird der Auftritt gesendet?
+Methode: (1) Quelltext-Durchgang aller Spielwege; (2) Sweep über alle 1184 spielbaren Handkarten (Standardszene; 853 dort spielbar — 331 brauchen eine Sonderlage: Reaktionen, Surprises, Bedingungen — davon 813 mit sichtbarem Auftritt, 40 verdeckt gelegt) und alle 254 Aktivierungs-Kandidaten (Held 50, Area 7, Kreatur 167, Ausrüstung 11, freie Ability 18, Aktions-Ability 1; 128 in der Standardszene aktivierbar) mit der Leitungs-Harness (Abbruch ab jeder abbrechbaren Stelle; Zeitleiste je Gegner und Zuschauer). Gemessen wird pro Karte: kommt der Auftritt vor dem ersten Effekt-Ereignis, der ersten Effektzeile und dem ersten Zustandswechsel?
+
+| Weg / Karte | Zeitpunkt VORHER | NACHHER |
+|---|---|---|
+| **Handkarten gesamt** (813 mit Auftritt) | 171 Karten mit Effekt vor dem Auftritt (157 Zustandswechsel, 12 Effektzeile, 2 nur beim Zuschauer) | **0** (außer 10 Kreaturen mit Beschwörungskosten, s. u.) |
+| Zauber/Attack **ohne** abbrechbare Frage, stiller Effekt (Haste, Divine Gift of Coolness, Calm Diatribe, Brilliant Idea …) | Ende der Auflösung bzw. erste sichtbare Wirkung; Buff/Ziehen/Sperre schon im Zustand des Gegners | vor dem ersten Effektschritt (Auftritt → Zeile → Effektzeilen → Zustand) |
+| **Anhänge** (Curse, Berserk, Anti Magic, Overheal Shock, Decisive Defeat … — 22 Attachment-Karten) | der Anhang stand im Zustand des Gegners (Brett!) vor `card_reveal`; Flug/Zeile davor | Auftritt vor dem Anlegen; Flug (`hand_to_board_fly`) danach |
+| Zauber/Attack **mit** abbrechbaren Fragen (im Ausgangszustand betroffen: 74 Zauber, 24 Attacken — mit und ohne Fragen) | nach der letzten Antwort + erste sichtbare Wirkung; dazwischen Zustand/Effektzeilen | nach der letzten Antwort, vor dem ersten Schritt (Regel (b) aus W63d bleibt: eine bestätigte Antwort allein committet nicht) |
+| Artefakte/Tränke ohne Ziel (29 Artefakte, 9 Tränke: Staff of the Teleporter, The Sacred Jewel, Wheels, Supply Chain, Potion of Greed, Poison Vial, Experimental Potion, Mana Absorbing Crystal, Distracting Crystal, Weakening Crystal …) | Ende der Auflösung; Zustand + Effektzeile davor | vor dem ersten Schritt |
+| Ziel-Artefakte/-Tränke (`doConfirmPotion`: Acid Vial, Blood-Soaked Coin, Cool Repair, Magic Ruby/Sapphire, Backpack, Book of Doom …) | erste sichtbare Wirkung (Ruby: Stun schon im Zustand, dann „Karte behalten?") | vor dem ersten Schritt; Zustand der Frage = Zustand von vor der Karte |
+| **Staff of Uncontrollable Destruction** | Auftritt mit dem ersten Abwurf-Glimmen (= erste sichtbare Wirkung); in der stillen Lage (nur der Stab auf der Hand, Zieh-Sperre) erst am Ende, NACH dem Zustand | vor dem ersten Abwurf bzw., still, vor Sperren/Zeile/Zustand — Gegner und Zuschauer, beide Sitze |
+| `deferBroadcast`-Karten (13) | eigener `engine.io…emit('card_reveal')` nur an den Gegner (nicht Zuschauer) an der Zusagestelle; Alchemic Journal, Boomerang, Shard of Chaos nur die Protokollzeile am Ende; **Staff of Illusions VOR der abbrechbaren Galerie** (und der Abbruch verbrauchte die Karte); Chain Lightning, Pillage doppelt | zentral, einmal, auch für Zuschauer: Zusagestelle = `engine.commitAppearance()` (Monster/Planet in a Bottle, Magic Lamp, Birthday Present, Elixir of Immortality, Horn in a Bottle, Hive's Crown, Staff of Illusions) oder nichts (Alchemic Journal, Boomerang, Shard of Chaos, The Yeeting); Chain Lightning/Pillage ohne Doppel |
+| Heldeneffekte (Cecilia, Omikron, Logan, Enigma …) | Zustand/Effektzeile vor dem Auftritt | vor dem ersten Schritt |
+| Area-Effekte (Smuggler's Pier, Deepsea Castle …) | dito | dito |
+| Kreatur-Effekte (Doctor Fester, Elven Leader, Gigantisaur Raptoren, Inconspicuous Lawn Gnome, Informant, Populated Island Turtle, Skeleton Mage, Treasure Skeleton …) | dito | dito |
+| Freie/Aktions-Abilities (Alchemy, Leadership, Luck, Premonition, Adventurousness) | dito | dito |
+| **Aktivierungen gesamt** (128 aktivierbar) | 19 mit Effekt vor dem Auftritt (12 Zustand, 7 Effektzeile) | **0** |
+| Steam Dwarf Engineer (Kreatur-Effekt) | Dampfstoß-Animation VOR der abbrechbaren Galerie (Abbruch verriet die Aktivierung) | Animation nach der Wahl |
+| Kreaturen mit Beschwörungskosten (Archer/Warrior/Guardian of Teocuilatl, Blue-Ice Dragon, Foresta, The Egg of God, Steam Dwarf Dragon Pilot, 500 Piranhas, Doctor Fester, Empty Armor) | Opfer-/Schadens-/Bleed-Kosten laufen vor der Landung (Flug + `summon_effect` = Auftritt) | **unverändert** — Rückfrage an Al |
+| Zusatzaktions-Güsse (`_castSpellImmediately`), Hand-Reaktionen, Surprise-Aktivierung, Kettenglieder | Puffer/Commit wie W63d | zentraler Puffer, gleiche neue Auslöser; Hand-Reaktionen (Commit = Aktivierung bestätigt) unverändert |
+| Abbruchverhalten aller 188 Handkarten mit abbrechbarer Frage und aller 128 aktivierbaren Aktivierungen | — | identisch zu vorher (nichts gesehen); einzige Änderungen: Staff of Illusions (Abbruch jetzt wirklich ohne Folgen), Steam Dwarf Engineer (s. o.) |
+| Rest (pre-existing, nicht angefasst) | Forceful Revival (W63d), Guardian Beast Hu (5 Karten werden VOR der abbrechbaren Aktionswahl gelöscht und bei Abbruch zurückgelegt — der Gegner sah die Karte), Monster Nest (geschachtelte abbrechbare Beschwörungskosten der gezogenen Kreatur) | unverändert |
+
+### 5) Skriptänderungen (Bugfix-Notes)
+`deferBroadcast` entfernt / `commitAppearance()` statt eigenem `card_reveal`: Alchemic Journal, Birthday Present, Boomerang, Elixir of Immortality, Hive's Crown, Horn in a Bottle, Magic Lamp, Monster in a Bottle, Planet in a Bottle, Shard of Chaos, Staff of Illusions (+ Abbruch meldet `{ cancelled: true }`), The Yeeting; Doppel-Auftritt entfernt: Chain Lightning, Pillage; Steam Dwarf Engineer (Animation nach der Wahl).
+
+### 6) Verträge für künftige Karten (Kurzfassung — Details im Vertragsabsatz)
+* Abbrechbare Fragen mit `cancellable: true`, Wirkung über die Engine-Primitive → nichts weiter tun. Eigener Commit nur HINTER der letzten abbrechbaren Stelle (`engine.commitAppearance()`); kein eigenes `card_reveal` der eigenen Karte; kein `deferBroadcast`.
+* Kein Effektschritt vor einer abbrechbaren Frage; Skript ohne Zielsitzung meldet Abbruch mit `{ cancelled: true }`.
+* Repro: `W.durchlauf` + `W.pruefeDurchlauf` (beide Sitze); `W63/d-07` (Abbruch) und `W64/b-05` (Reihenfolge) müssen grün bleiben.
+
+### 7) Rückfragen an Al (Ja/Nein)
+1. **Kreaturen mit Beschwörungskosten** (Opfer, Schaden, Bleed): der Auftritt der Kreatur ist ihre Landung; die Kosten laufen davor (Opfer-Animation, Schaden), der Gegner sieht also erst „etwas wird geopfert", dann die Kreatur einfliegen. Soll der Flug der Kreatur VOR dem Zahlen der Kosten kommen — ja/nein?
+2. **Guardian Beast Hu / Monster Nest** (Kosten bezahlt, dann noch eine abbrechbare Stufe mit Rückerstattung): der Gegner sieht die Karte vor dem Abbruch. Eigener Folgeauftrag (Kosten erst nach der letzten Stufe bezahlen) — ja/nein?
+3. **Stille Effekte ohne Engine-Primitive** (direkter Zugriff auf den Zustand): zeigen sich — wie der neue Zustand — erst am Ende der Auflösung, in einem Zug (Auftritt → Zeilen → Zustand). Reicht das, oder soll jede Karte ausdrücklich zu Beginn committen — ja/nein?
+
+### Tests W64b
+| Datei | Inhalt | Prüfungen |
+|---|---|---|
+| `W64/b-01-staff-of-uncontrollable-destruction-auftritt-vor-dem-effekt.js` | Staff (beide Sitze; normal und still [nur der Stab + Zieh-Sperre]): Auftritt vor Abwurf/Zeile/Zustand für Gegner und Zuschauer | 70 |
+| `W64/b-02-stille-karten-auftritt-vor-dem-ersten-effekt.js` | 15 stille Karten (Buff, Sperre, Gold, Ziehen, Anhang, Trank) × Durchlauf + Abbruch | 247 |
+| `W64/b-03-auftritts-puffer-ausloeser-und-zustandspuffer.js` | Auslöser (Primitiv, Status, Pflichtfrage, Gegnerfrage, Ereignis, `commitAppearance`), Nicht-Auslöser (Zeile, `sync`, Pause, abbrechbare Frage), Zustand von vor der Karte + Hülle, Reihenfolge, Abbruch, Resync, liegengebliebene Vormerkung, beitretender Zuschauer | 60 |
+| `W64/b-04-aktivierungen-auftritt-vor-dem-ersten-effekt.js` | 20 Aktivierungen (Held, Area, Kreatur, freie/Aktions-Ability) | 309 |
+| `W64/b-05-alle-handkarten-sweep-auftritt-vor-dem-ersten-effekt.js` | Sweep über alle Handkarten (Reihenfolge, Gegner + Zuschauer) | 3 |
+| `W64/b-06-karten-mit-eigenem-auftritt-zentral-statt-deferbroadcast.js` | 11 Ex-`deferBroadcast`-Karten: genau ein Auftritt, vor dem Effekt, Abbruch → nichts; Staff of Illusions behält die Karte | 186 |
+Angepasst: `W63/d-04` (Kreaturen: `ohneEffektOrdnung`); Harness `wire.js`, `server.js` exportiert `sendGameStateErzwungen`.
