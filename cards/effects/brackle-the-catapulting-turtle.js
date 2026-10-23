@@ -265,6 +265,9 @@ module.exports = {
         // Das Opfer wird erst nach dem Schaden abgelegt, steht aber nicht
         // mehr zur Wahl (sonst Selbstbeschuss + doppelte Ablage, H01-heroes-17).
         condition: (t) => t.cardInstance?.id !== creatureInst.id,
+        // Das Opfer bleibt auf dem Brett sichtbar, aber gesperrt und ROT markiert — kein Fehlklick auf die eigene Opfer-Kreatur.
+        dimUnmetCondition: true,
+        markUnmetRed: true,
       }));
       if (target || negiert) break;     // Have both a sacrifice AND a target (or a negated hit) — proceed.
       // Target prompt cancelled → loop back to sacrifice picker.

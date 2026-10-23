@@ -9718,6 +9718,41 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   opacity: 0.65;
   pointer-events: none;
 }
+/* Gesperrt UND rot markiert (`t.markRed`, Config `markUnmetRed` — Brackle): das designierte Opfer. Bleibt unwaehlbar, wird aber nicht ausgegraut,
+   sondern pulsiert rot mit einem ✖ — es soll als „das wird geopfert" lesbar sein, nicht wie ein beliebiges verbotenes Ziel. */
+.potion-target-ineligible.potion-target-marked-red {
+  filter: none;
+  opacity: 1;
+  position: relative;
+  z-index: 4;
+  border-color: #ff3b30 !important;
+  box-shadow:
+    0 0 0 2px rgba(255,235,235,.9),
+    0 0 0 5px rgba(255,50,50,.95),
+    0 0 26px rgba(255,60,60,1),
+    0 0 52px rgba(220,0,0,.65),
+    inset 0 0 16px rgba(255,60,60,.45) !important;
+  animation: sacrificeMarkPulse 1.1s ease-in-out infinite !important;
+}
+.potion-target-ineligible.potion-target-marked-red::after {
+  content: '✖';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  font-weight: 700;
+  color: rgba(255,255,255,.95);
+  text-shadow: 0 0 10px rgba(255,0,0,1), 0 2px 4px rgba(0,0,0,.9);
+  background: rgba(180,0,0,.3);
+  pointer-events: none;
+  z-index: 6;
+}
+@keyframes sacrificeMarkPulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(255,235,235,.9), 0 0 0 5px rgba(255,50,50,.95), 0 0 26px rgba(255,60,60,1), 0 0 52px rgba(220,0,0,.65), inset 0 0 16px rgba(255,60,60,.45); }
+  50%      { box-shadow: 0 0 0 2px rgba(255,245,245,1), 0 0 0 6px rgba(255,80,80,1), 0 0 38px rgba(255,90,90,1), 0 0 74px rgba(240,20,20,.8), inset 0 0 24px rgba(255,80,80,.65); }
+}
 /* ★★ v1143b — Ziel-Akzent gruen (`t.accent === 'green'`): ein waehlbares
    Ziel mit Sonderwirkung, z.B. „Forbidden Curse of Aging" als
    Zusatz-Aktion. Liegt UEBER `.potion-target-valid`; gewaehlt gewinnt

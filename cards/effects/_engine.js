@@ -5147,6 +5147,8 @@ class GameEngine {
         // sie gibt, aber nicht waehlen kann (Petrifier: „except the user").
         // Ohne die Flagge bleibt es beim Weglassen. CPU, Auto-Wahl und
         // Antwortpruefung ueberspringen `ineligible` ohnehin.
+        // `config.markUnmetRed` (Brackle): die ausgegrauten Ziele tragen `markRed` und werden
+        // im Client ROT hervorgehoben — das designierte Opfer soll nicht wie ein beliebiges Ziel aussehen.
         const addHeroes = (playerIdx) => {
           const ps2 = gs.players[playerIdx];
           for (let hi = 0; hi < (ps2.heroes || []).length; hi++) {
@@ -5160,7 +5162,7 @@ class GameEngine {
             const t = { id: `hero-${playerIdx}-${hi}`, type: 'hero', owner: playerIdx, heroIdx: hi, cardName: hero.name };
             if (config.condition && !config.condition(t, engine)) {
               if (!config.dimUnmetCondition) continue;
-              t.ineligible = true;   // ausgegraut statt weg (s. dimUnmetCondition)
+              t.ineligible = true; if (config.markUnmetRed) t.markRed = true;   // ausgegraut statt weg (s. dimUnmetCondition); `markUnmetRed` zeichnet sie zusaetzlich ROT
             }
             targets.push(t);
           }
@@ -5191,7 +5193,7 @@ class GameEngine {
               const t = { id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx, heroIdx: hi, slotIdx: si, cardName: creatureName, cardInstance: inst };
               if (config.condition && !config.condition(t, engine)) {
               if (!config.dimUnmetCondition) continue;
-              t.ineligible = true;   // ausgegraut statt weg (s. dimUnmetCondition)
+              t.ineligible = true; if (config.markUnmetRed) t.markRed = true;   // ausgegraut statt weg (s. dimUnmetCondition); `markUnmetRed` zeichnet sie zusaetzlich ROT
             }
               targets.push(t);
             }
@@ -5210,7 +5212,7 @@ class GameEngine {
               const t = { id: `hero-${oppIdx}-${hi}`, type: 'hero', owner: oppIdx, heroIdx: hi, cardName: h.name };
               if (config.condition && !config.condition(t, engine)) {
               if (!config.dimUnmetCondition) continue;
-              t.ineligible = true;   // ausgegraut statt weg (s. dimUnmetCondition)
+              t.ineligible = true; if (config.markUnmetRed) t.markRed = true;   // ausgegraut statt weg (s. dimUnmetCondition); `markUnmetRed` zeichnet sie zusaetzlich ROT
             }
               if (!targets.some(x => x.id === t.id)) targets.push(t);
             }
