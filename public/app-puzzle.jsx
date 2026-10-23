@@ -5515,7 +5515,7 @@ function PuzzleCreator() {
             <button className="pz-lv-btn" data-pz-lv="down" onClick={() => setzeLv(istOpp, idx, aktuell - 1, kc.level)}>-</button>
             <span className={'pz-lv-wert' + (gesetzt ? (aktuell < kc.level ? ' pz-lv-tiefer' : ' pz-lv-hoeher') : '')} data-pz-lv="wert">Lv {aktuell}</span>
             <button className="pz-lv-btn" data-pz-lv="up" onClick={() => setzeLv(istOpp, idx, aktuell + 1, kc.level)}>+</button>
-            {gesetzt && <button className="pz-lv-reset" data-pz-lv="reset" onClick={() => setzeLv(istOpp, idx, null, kc.level)}>RESET ({kc.level})</button>}
+            <button className="pz-lv-reset" data-pz-lv="reset" disabled={!gesetzt} onClick={() => setzeLv(istOpp, idx, null, kc.level)}>RESET ({kc.level})</button>
           </div>
         );
       })()}
