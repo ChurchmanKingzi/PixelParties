@@ -13,7 +13,8 @@ Wer ein **neues** Emoji in Text, Titel, Beschriftung oder Kartenskript einbaut, 
     node scripts/pixel-emoji/pruefen.js       # Gegenprobe: nichts fehlt
 
 * `extract.js` braucht Playwright und startet den Server auf Port 3992 (React-UMD per `PE_REACT_DIR` oder aus dem Netz).
-* Handgezeichnetes hat Vorrang: Sprites in `PP_PX_ICONS`/`PP_PX_ZEICHEN` (`public/app-shared.jsx`) werden uebernommen; eigene Raster koennen in
+* **Stil (`stil.js`):** Die Form kommt aus dem System-Emoji, die Schattierung aus einer Beleuchtungsrechnung (Licht oben links: Lichtkante, Schatten unten rechts, Glanzpunkt, Dithering nur an den Tonuebergaengen, getoente Kontur) — wie bei den frueheren handgezeichneten Sprites. Angewendet auf alle Zeichen, die frueher ein farbiges Sprite hatten; `PE_STIL=alle` wendet ihn auf alle Farb-Emojis an, `PE_STIL=aus` schaltet ihn ab.
+* Einfarbige Sprites in `PP_PX_ICONS`/`PP_PX_ZEICHEN` bleiben bestehen; ausserdem: Sprites in `PP_PX_ICONS`/`PP_PX_ZEICHEN` (`public/app-shared.jsx`) werden uebernommen; eigene Raster koennen in
   `handarbeit.json` (Schluessel = Zeichen, Wert = `{ "pal": {"A":"#rrggbb"}, "z": ["..A..", …] }` bzw. `{ "mono": true, "z": [...] }`) stehen und ersetzen die Automatik.
 * Einfarbige Symbole folgen der Textfarbe (`color`); Farb-Emojis haben feste Farben.
 * Aufbau: COLRv0/CPAL (Chrome, Edge, Firefox) plus OpenType-SVG (Safari); ohne Farbschrift-Unterstuetzung erscheint eine einfarbige Silhouette.
