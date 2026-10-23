@@ -2,23 +2,22 @@
 """Held-Thema „Cute Princess Mary“ → public/music/bgm_mary.ogg                          Titel: „Sovereign Skies“
 
 Mary ist eine Prinzessin mit Phönixflügeln, die elegant und mächtig über ein weites Reich im Himmel regiert
-(Card Art: goldene Flammenflügel vor rosa-orangem Himmel, Krone, weißes Kleid). Der Track soll majestätisch klingen —
-edel, weit, strahlend, nie hektisch — und bleibt trotzdem ein Kampf-Track (federnder Streicher-Puls, Pauke, Trommel).
+(Card Art: goldene Flammenflügel vor rosa-orangem Himmel, Krone, weißes Kleid). Majestätisch — aber ein echter
+Kampf-Track: schnell, treibend, dramatisch. Version 2 (v1 war zu langsam und friedlich).
 
-  • D-Dur, 126 BPM, 4/4. Orchester statt Rock/Blech: Solo-Violine + Flöte tragen das Thema, Harfe läuft in Phönix-Arpeggien
-    (aufsteigende Skalenläufe), Streicher-Ostinato (Achtel) gibt den Puls, Kontrabass, Pauke, Chor (Aahs/Oohs), Horn nur als
-    weiche Stütze, Glockenspiel funkelt, Pfeifenorgel im Finale.
-  • Thema: weite Intervalle (Sprung zur Quinte, lange Töne, Abstieg in Stufen) — „würdevoll schreitend“. Zweiter Teil
-    (Bridge) schwingt sich in lange Bögen nach oben. Die Schluss-Themen stehen einen Ganzton höher (E-Dur: Sonnenaufgang).
-  • Interlude: nur Harfe, Flöte und Chor — der Blick über das Reich — dann bricht das Orchester wieder los.
-Form (56 Takte ≈ 1:47): Intro 4 · Thema 8 · Thema 8 (voll) · Bridge 8 · Thema E 8 · Interlude 8 · Thema E 8 (Finale) · Outro 4
-Ausklang E → A → A → A (Dominante) führt zurück in die D-Dur-Intro.
+  • D-Moll, 156 BPM, 4/4. Orchester-Action: rasende Streicher-16tel als Motor, Pauken- und Tom-Galopp, scharfe Snare auf 2/4,
+    Hörner und Chor tragen das Thema mit der Solo-Violine; Harfe/Flöte nur noch als Glanz. Der Himmelsglanz kommt über
+    Majestät und Höhe, nicht über Ruhe.
+  • Thema: markant, rhythmisch (Repetition + Sprung zur Quinte, Aufstieg zur hohen Oktave) — Fanfare statt Schreiten.
+    Bridge: lange, hohe Bögen über Bb–F–C–Dm. Der „Phönix steigt auf“-Moment: Schluss-Themen einen Ganzton höher (E-Moll)
+    und am Ende Picardische Terz (E-Dur) → A (Dominante) → zurück zur D-Moll-Intro.
+Form (64 Takte ≈ 1:38): Intro 4 · Charge 8 · Thema 8 · Thema voll 8 · Bridge 8 · Thema +2 8 · Break 8 · Finale 8 · Outro 4
 """
 import os, sys, random
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lib import *
 
-BPM, BARS = 126, 56
+BPM, BARS = 156, 64
 song = Song(BPM, BARS)
 rng = random.Random(1812)
 
@@ -42,7 +41,7 @@ def pn(s):
         a, i = (1 if s[1] == '#' else -1), 2
     return 12 * (int(s[i:]) + 1) + NAMES[s[0]] + a
 
-CH = {'D': (2, 'M'), 'A': (9, 'M'), 'Bm': (11, 'm'), 'G': (7, 'M'), 'E': (4, 'M'), 'F#m': (6, 'm'), 'Em': (4, 'm')}
+CH = {'Dm': (2, 'm'), 'Bb': (10, 'M'), 'F': (5, 'M'), 'C': (0, 'M'), 'Gm': (7, 'm'), 'A': (9, 'M'), 'E': (4, 'M'), 'Em': (4, 'm')}
 QUAL = {'M': (0, 4, 7), 'm': (0, 3, 7)}
 
 def tones(ch, oct_, shift=0):
@@ -60,57 +59,66 @@ def mel(inst, bar0, bars, shift=0, vel=92, octave=0, legato=.97):
                 song.add(inst, t, dur * legato, pn(name) + shift + 12 * octave, hv(vel))
             t += dur
 
-# ═══ Material (D-Dur) ═════════════════════════════════════════════════════════════════════════════
+# ═══ Material (D-Moll) ═════════════════════════════════════════════════════════════════════════════
 THEME = [
-    [('D5', 1), ('F#5', 1), ('A5', 2)],
-    [('A5', 1.5), ('F#5', .5), ('E5', 2)],
-    [('D5', 1), ('F#5', 1), ('B5', 2)],
-    [('B5', 1.5), ('A5', .5), ('G5', 2)],
-    [('F#5', 1), ('A5', 1), ('D6', 2)],
-    [('C#6', 1.5), ('B5', .5), ('A5', 2)],
-    [('G5', 1), ('B5', 1), ('A5', 1), ('G5', 1)],
+    [('D5', .5), ('D5', .5), ('A5', 1), ('G5', .5), ('F5', .5), ('E5', 1)],
+    [('D5', .5), ('D5', .5), ('F5', 1), ('E5', .5), ('D5', .5), ('Bb4', 1)],
+    [('C5', .5), ('C5', .5), ('A5', 1), ('G5', .5), ('F5', .5), ('C5', 1)],
+    [('E5', 1.5), ('G5', .5), ('C6', 2)],
+    [('D5', .5), ('D5', .5), ('A5', 1), ('D6', 1.5), ('C6', .5)],
+    [('Bb5', 1.5), ('A5', .5), ('G5', 1), ('F5', 1)],
+    [('G5', 1), ('Bb5', 1), ('D6', 2)],
 ]
-THEME_END_OPEN = [('F#5', 2), ('E5', 1), (None, 1)]          # 8 über A
-THEME_END_CLOSED = [('D5', 4)]                                # 8 über D
-THEME_CH_OPEN = ['D', 'A', 'Bm', 'G', 'D', 'A', 'G', 'A']
-THEME_CH_CLOSED = ['D', 'A', 'Bm', 'G', 'D', 'A', 'G', 'D']
+THEME_END_OPEN = [('C#6', 1.5), ('E6', .5), ('A5', 2)]          # 8 über A (Dominante, Leitton)
+THEME_END_CLOSED = [('D6', .5), ('A5', .5), ('F5', .5), ('D5', .5), ('D5', 2)]   # 8 über Dm
+THEME_CH_OPEN = ['Dm', 'Bb', 'F', 'C', 'Dm', 'Bb', 'Gm', 'A']
+THEME_CH_CLOSED = ['Dm', 'Bb', 'F', 'C', 'Dm', 'Bb', 'Gm', 'Dm']
+
+# Charge: Hörner-Motiv über dem Streichermotor, noch ohne vollständiges Thema
+CHARGE_CH = ['Dm', 'Dm', 'Bb', 'C', 'Dm', 'Dm', 'Bb', 'A']
+CHARGE = [
+    [('D5', .5), ('D5', .5), ('F5', 1), ('E5', .5), ('D5', .5), ('A4', 1)],
+    [('D5', .5), ('D5', .5), ('F5', 1), ('E5', .5), ('D5', .5), ('A4', 1)],
+    [('D5', .5), ('D5', .5), ('F5', 1), ('D5', .5), ('Bb4', .5), ('F4', 1)],
+    [('E5', .5), ('E5', .5), ('G5', 1), ('E5', .5), ('C5', .5), ('G4', 1)],
+    [('D5', .5), ('D5', .5), ('F5', 1), ('E5', .5), ('D5', .5), ('A4', 1)],
+    [('D5', .5), ('D5', .5), ('A5', 1), ('G5', .5), ('F5', .5), ('E5', 1)],
+    [('D5', .5), ('D5', .5), ('F5', 1), ('D5', .5), ('Bb4', .5), ('F4', 1)],
+    [('E5', .5), ('E5', .5), ('A5', 1), ('G5', .5), ('E5', .5), ('C#5', 1)],
+]
 
 BRIDGE = [
-    [('D6', 2), ('B5', 2)],
-    [('B5', 1), ('D6', 1), ('G6', 2)],
-    [('F#6', 2), ('D6', 2)],
-    [('E6', 3), ('C#6', 1)],
-    [('D6', 1), ('F#6', 1), ('A6', 2)],
-    [('G6', 1.5), ('F#6', .5), ('E6', 2)],
+    [('D6', 2), ('F6', 2)],
+    [('C6', 1), ('F6', 1), ('A6', 2)],
+    [('G6', 2), ('E6', 2)],
+    [('F6', 3), ('D6', 1)],
+    [('D6', 1), ('F6', 1), ('Bb6', 2)],
+    [('A6', 1.5), ('G6', .5), ('F6', 2)],
+    [('E6', 1), ('A6', 1), ('G6', 1), ('E6', 1)],
     [('C#6', 1), ('E6', 1), ('A6', 2)],
-    [('A6', 3), (None, 1)],
 ]
-BRIDGE_CH = ['Bm', 'G', 'D', 'A', 'Bm', 'G', 'A', 'A']
+BRIDGE_CH = ['Bb', 'F', 'C', 'Dm', 'Bb', 'F', 'A', 'A']
 
-# Interlude (Harfe/Flöte/Chor): ruhiger Blick über das Reich
-INTER = [
-    [('F#5', 2), ('A5', 2)],
-    [('E5', 2), ('G5', 2)],
-    [('D5', 2), ('F#5', 2)],
-    [('E5', 3), ('C#5', 1)],
-    [('D5', 2), ('F#5', 2)],
-    [('G5', 2), ('B5', 2)],
-    [('A5', 2), ('E5', 2)],
-    [('E5', 3), (None, 1)],
+# Break (8): Dichte nimmt ab, Spannung baut sich auf (Pauke + Streicher + Chor), kein Schlagzeug bis zum Wirbel
+BREAK = [
+    [('A5', 4)], [('A5', 2), ('G5', 2)], [('F5', 4)], [('F5', 2), ('G5', 2)],
+    [('G5', 2), ('Bb5', 2)], [('D6', 4)], [('C#6', 2), ('E6', 2)], [('A5', 3), (None, 1)],
 ]
-INTER_CH = ['D', 'A', 'Bm', 'A', 'G', 'D', 'A', 'A']
+BREAK_CH = ['Dm', 'Dm', 'Bb', 'Bb', 'Gm', 'Gm', 'A', 'A']
 
 # ═══ Begleit-Bausteine ═══════════════════════════════════════════════════════════════════════════
 def spans(chords):
     return [(k, 0, 4, c) for k, c in enumerate(chords)]
 
-def ostinato(bar0, chords, shift=0, vel=70, dur=0.42):
-    """Springende Streicher-Achtel: Grundton – Quinte – Oktave – Quinte."""
+def ostinato(bar0, chords, shift=0, vel=70, dur=0.2, eighth=False):
+    """Treibende Streicher-Sechzehntel (spiccato): Grundton – Grundton – Quinte – Grundton | Grundton – Quinte – Oktave – Quinte."""
     for k, off, _, ch in spans(chords):
         T = tones(ch, 3, shift)
-        pat = (T[0], T[2], T[0] + 12, T[2])
-        for i in range(8):
-            song.add('ostinato', song.bar(bar0 + k) + i * 0.5, dur, pat[i % 4], hv(vel + (8 if i % 2 == 0 else 0)))
+        pat = (T[0], T[0], T[2], T[0], T[0], T[2], T[0] + 12, T[2])
+        steps = 8 if eighth else 16
+        for i in range(steps):
+            t = song.bar(bar0 + k) + i * (0.5 if eighth else 0.25)
+            song.add('ostinato', t, dur * (2 if eighth else 1), pat[i % 8], hv(vel + (14 if i % 4 == 0 else (6 if i % 2 == 0 else 0))))
 
 def pad(bar0, chords, shift=0, vel=58, inst='pad'):
     for k, off, _, ch in spans(chords):
@@ -131,35 +139,38 @@ def harp_arp(bar0, chords, shift=0, vel=70, rise=False):
                 song.add('harp', song.bar(bar0 + k) + 3.0 + i * 0.1667, 0.5, m, hv(vel + 4 + 2 * i))
 
 def bass(bar0, chords, shift=0, vel=96):
+    """Kontrabass in pumpenden Achteln, Oktavsprung auf 3&."""
     for k, off, _, ch in spans(chords):
         r = tones(ch, 1, shift)[0] + 12
         if r > 50: r -= 12
-        song.add('bass', song.bar(bar0 + k), 1.9, r, vel)
-        song.add('bass', song.bar(bar0 + k) + 2, 1.9, r + 7 if k % 2 == 0 else r, vel - 8)
+        for i in range(8):
+            song.add('bass', song.bar(bar0 + k) + i * 0.5, 0.42, r + (12 if i == 5 else 0), hv(vel + (8 if i % 2 == 0 else -6)))
 
 def timp(bar0, chords, shift=0, vel=96):
+    """Pauken-Galopp: 1 · 1& · 2& · 3 · 3& · 4&."""
     for k, off, _, ch in spans(chords):
         r = tones(ch, 2, shift)[0] + 12
         if r > 55: r -= 12
-        song.add('timp', song.bar(bar0 + k), 0.9, r, vel)
-        song.add('timp', song.bar(bar0 + k) + 2, 0.9, r, vel - 14)
-        song.add('timp', song.bar(bar0 + k) + 3.5, 0.4, r, vel - 30)
+        for beat, v in ((0, 0), (0.5, -26), (1.5, -16), (2, -4), (2.5, -26), (3.5, -16)):
+            song.add('timp', song.bar(bar0 + k) + beat, 0.4, r, hv(vel + v))
 
 def timp_roll(beat, dur, note, v0=40, v1=110):
     n = int(dur * 4)
     for i in range(n):
         song.add('timp', beat + i * 0.25, 0.3, note, int(v0 + (v1 - v0) * i / max(1, n - 1)))
 
-def drums(bar0, nbars, level=1.0, crash=True):
-    """Zurückhaltender Marsch: Kick auf 1/3, kleine Trommel auf 2/4, Crash am Abschnittsanfang; keine Hi-Hat."""
+def drums(bar0, nbars, level=1.0, crash=True, fills=True):
+    """Orchester-Action-Beat: Kick auf 1, 2&, 3; Snare auf 2 und 4; Hi-Hat-Achtel; Tom-Fill alle 4 Takte."""
     for k in range(nbars):
         t = song.bar(bar0 + k)
-        song.dr(t, KICK, int(78 * level), 0.2); song.dr(t + 2, KICK, int(72 * level), 0.2)
-        song.dr(t + 1, SNARE, int(72 * level), 0.15); song.dr(t + 3, SNARE, int(76 * level), 0.15)
-        if k % 2 == 1:
-            song.dr(t + 3.5, SNARE, int(58 * level), 0.1)
+        song.dr(t, KICK, int(104 * level), 0.2); song.dr(t + 1.5, KICK, int(88 * level), 0.2); song.dr(t + 2, KICK, int(100 * level), 0.2)
+        song.dr(t + 1, SNARE, int(104 * level), 0.15); song.dr(t + 3, SNARE, int(108 * level), 0.15)
+        for i in range(8): song.dr(t + i * 0.5, HAT, int((98 if i % 2 == 0 else 84) * level), 0.08)
         if k == 0 and crash:
-            song.dr(t, CRASH, int(96 * level), 1.6)
+            song.dr(t, CRASH, int(108 * level), 1.6)
+        if fills and k % 4 == 3:
+            for j, tom in enumerate((TOM_H, TOM_H, TOM_M, TOM_L)):
+                song.dr(t + 2.5 + j * 0.375, tom, int((92 + 6 * j) * level), 0.12)
 
 def snare_roll(bar0, start, end, v0=44, v1=116):
     t0 = song.bar(bar0) + start
@@ -192,102 +203,110 @@ def organ(bar0, chords, shift=0, vel=50):
         for m in (T[0] - 12, T[0], T[2], T[0] + 12):
             song.add('organ', song.bar(bar0 + k), 3.95, m, vel)
 
-def theme(base, chords, end, shift=0, vel=96, full=False, closed=False):
+def theme(base, chords, end, shift=0, vel=96, full=False):
     mel('violin', base, THEME, shift=shift, vel=vel); mel('violin', base + 7, [end], shift=shift, vel=vel)
-    mel('flute', base, THEME, shift=shift, vel=76, octave=1); mel('flute', base + 7, [end], shift=shift, vel=76, octave=1)
+    mel('flute', base, THEME, shift=shift, vel=70, octave=1); mel('flute', base + 7, [end], shift=shift, vel=70, octave=1)
+    mel('horn', base, THEME, shift=shift, vel=78 if full else 64, octave=-1); mel('horn', base + 7, [end], shift=shift, vel=78 if full else 64, octave=-1)
     if full:
-        mel('choir', base, THEME, shift=shift, vel=72, octave=-1); mel('choir', base + 7, [end], shift=shift, vel=72, octave=-1)
-        mel('horn', base, THEME, shift=shift, vel=64, octave=-1); mel('horn', base + 7, [end], shift=shift, vel=64, octave=-1)
-        organ(base, chords, shift=shift, vel=48)
-        timp(base, chords, shift=shift, vel=98)
-        drums(base, 8, level=1.1)
-    else:
-        horn_pad(base, chords, shift=shift, vel=52)
-        timp(base, chords, shift=shift, vel=84)
-        drums(base, 8, level=0.8)
-    ostinato(base, chords, shift=shift, vel=68 + (8 if full else 0))
-    pad(base, chords, shift=shift, vel=54)
-    harp_arp(base, chords, shift=shift, vel=64, rise=True)
-    bass(base, chords, shift=shift, vel=96)
-    glock(base, chords, shift=shift)
+        mel('choir', base, THEME, shift=shift, vel=74, octave=-1); mel('choir', base + 7, [end], shift=shift, vel=74, octave=-1)
+        organ(base, chords, shift=shift, vel=46)
+    timp(base, chords, shift=shift, vel=100 if full else 90)
+    drums(base, 8, level=1.1 if full else 1.0)
+    ostinato(base, chords, shift=shift, vel=72 + (8 if full else 0))
+    pad(base, chords, shift=shift, vel=50)
+    bass(base, chords, shift=shift, vel=98)
+    glock(base, chords, shift=shift, vel=50)
+    if full: harp_arp(base, chords, shift=shift, vel=54)
 
 # ═══ Arrangement ══════════════════════════════════════════════════════════════════════════════════
 b = 0
-# ── Intro (4): Harfen-Glissando, Flöte, Pauken-Wirbel, Streicher schwellen an ───────────────────────────
-INTRO_CH = ['D', 'D', 'G', 'A']
-harp_arp(b, INTRO_CH, vel=66, rise=True)
-pad(b, INTRO_CH, vel=48)
-choir_pad(b + 2, INTRO_CH[2:], vel=48)
-mel('flute', b, [[('A5', 2), ('F#5', 1), ('D5', 1)], [('A5', 3), (None, 1)], [('B5', 2), ('G5', 2)], [('E5', 3), (None, 1)]], vel=72)
-timp_roll(song.bar(b + 2), 4.0, pn('D3'), 36, 96)
-timp_roll(song.bar(b + 3) + 2, 2.0, pn('A2'), 50, 112)
-bass(b + 2, INTRO_CH[2:], vel=84)
-song.dr(song.bar(b), CRASH, 90, 1.6)
-snare_roll(b + 3, 2, 4, 50, 118)
+# ── Intro (4): Pauken-Wirbel, Streicher-Motor setzt ein, Hörner-Stoß ─────────────────────────────────
+INTRO_CH = ['Dm', 'Dm', 'Bb', 'A']
+ostinato(b, INTRO_CH, vel=60)
+bass(b + 2, INTRO_CH[2:], vel=92)
+timp_roll(song.bar(b), 8.0, pn('D3'), 40, 108)
+for m in (pn('D4'), pn('A4'), pn('D5')): song.add('horn', song.bar(b + 2), 3.9, m, 84)
+choir_pad(b + 2, INTRO_CH[2:], vel=56)
+mel('flute', b, [[(None, 4)], [(None, 4)], [('D6', 2), ('A5', 2)], [('E6', 3), (None, 1)]], vel=72)
+song.dr(song.bar(b), CRASH, 100, 1.6); song.dr(song.bar(b + 2), CRASH, 96, 1.6)
+snare_roll(b + 3, 0, 4, 56, 124)
 b += 4
 
-# ── Thema 1 (8): leicht ─────────────────────────────────────────────────────────────────────────────
+# ── Charge (8): Hörner-Motiv, Motor, Bass, Pauke — Aufmarsch ────────────────────────────────────────
+mel('horn', b, CHARGE, vel=86)
+mel('violin', b + 4, CHARGE[4:], vel=76, octave=1)
+ostinato(b, CHARGE_CH, vel=74)
+bass(b, CHARGE_CH, vel=98)
+timp(b, CHARGE_CH, vel=96)
+drums(b, 8, level=1.0)
+pad(b, CHARGE_CH, vel=46)
+b += 8
+
+# ── Thema 1 (8) ──────────────────────────────────────────────────────────────────────────────────────
 theme(b, THEME_CH_OPEN, THEME_END_OPEN)
 b += 8
 
-# ── Thema 2 (8): voll — Chor trägt, Orgel, Horn, Pauke ─────────────────────────────────────────────────
-theme(b, THEME_CH_CLOSED, THEME_END_CLOSED, vel=100, full=True)
+# ── Thema 2 (8): voll — Chor, Orgel, Harfe ───────────────────────────────────────────────────────────
+theme(b, THEME_CH_CLOSED, THEME_END_CLOSED, vel=102, full=True)
 b += 8
 
-# ── Bridge (8): lange Bögen nach oben, Chor, Streicher voran ───────────────────────────────────────────
-mel('violin', b, BRIDGE, vel=100)
-mel('flute', b, BRIDGE, vel=70, octave=0)
+# ── Bridge (8): lange hohe Bögen, Chor, Motor läuft weiter ───────────────────────────────────────────
+mel('violin', b, BRIDGE, vel=102)
+mel('flute', b, BRIDGE, vel=66)
 mel('choir', b, BRIDGE, vel=66, octave=-1)
-ostinato(b, BRIDGE_CH, vel=64)
-pad(b, BRIDGE_CH, vel=60)
-harp_arp(b, BRIDGE_CH, vel=64, rise=True)
-horn_pad(b, BRIDGE_CH, vel=58)
-timp(b, BRIDGE_CH, vel=88)
+mel('horn', b, BRIDGE, vel=66, octave=-1)
+ostinato(b, BRIDGE_CH, vel=72)
+pad(b, BRIDGE_CH, vel=56)
 bass(b, BRIDGE_CH, vel=96)
+timp(b, BRIDGE_CH, vel=94)
+drums(b, 8, level=1.0)
 glock(b, BRIDGE_CH, vel=54)
-drums(b, 8, level=0.9, crash=True)
-snare_roll(b + 7, 1, 4, 50, 122)
-timp_roll(song.bar(b + 7) + 2, 2.0, pn('A2'), 50, 114)
+harp_arp(b, BRIDGE_CH, vel=58, rise=True)
+snare_roll(b + 7, 1, 4, 56, 126)
+timp_roll(song.bar(b + 7) + 2, 2.0, pn('A2'), 50, 118)
 b += 8
 
-# ── Thema 3 (8): E-Dur — Rückung um einen Ganzton, Sonnenaufgang ─────────────────────────────────────────
-theme(b, THEME_CH_OPEN, THEME_END_OPEN, shift=2, vel=102, full=True)
+# ── Thema 3 (8): +2 (E-Moll) — der Phönix steigt auf ─────────────────────────────────────────────────
+theme(b, THEME_CH_OPEN, THEME_END_OPEN, shift=2, vel=104, full=True)
 b += 8
 
-# ── Interlude (8): Harfe, Flöte, Chor — der Blick über das Reich (leise, ohne Schlagwerk) ──────────────────
-mel('flute', b, INTER, vel=76, octave=0)
-mel('violin', b + 4, INTER[4:], vel=70)
-choir_pad(b, INTER_CH, vel=58)
-harp_arp(b, INTER_CH, vel=68)
-pad(b, INTER_CH, vel=46)
-bass(b, INTER_CH, vel=78)
-glock(b, INTER_CH, vel=60)
+# ── Break (8): Spannung — Streicher-Achtel, Pauke, Chor, kein Schlagzeug, dann Wirbel ─────────────────
+mel('violin', b, BREAK, vel=84)
+mel('choir', b, BREAK, vel=64, octave=-1)
+mel('flute', b, BREAK, vel=60, octave=1)
+ostinato(b, BREAK_CH, vel=58, eighth=True)
+pad(b, BREAK_CH, vel=56)
+bass(b, BREAK_CH, vel=88)
 for k in range(8):
-    song.dr(song.bar(b + k), KICK, 56, 0.2)
-timp_roll(song.bar(b + 7) + 0, 4.0, pn('A2'), 36, 100)
-snare_roll(b + 7, 2, 4, 40, 120)
+    r = tones(BREAK_CH[k], 2)[0] + 12
+    if r > 55: r -= 12
+    song.add('timp', song.bar(b + k), 1.8, r, 64 + k * 5)
+    song.add('timp', song.bar(b + k) + 2, 1.8, r, 56 + k * 5)
+harp_arp(b, BREAK_CH, vel=52)
+timp_roll(song.bar(b + 6), 8.0, pn('A2'), 40, 120)
+snare_roll(b + 6, 0, 8, 40, 124)
 b += 8
 
-# ── Thema 4 (8): Finale in E-Dur, alles — Ganzschluss ──────────────────────────────────────────────────
-theme(b, THEME_CH_CLOSED, THEME_END_CLOSED, shift=2, vel=106, full=True)
+# ── Finale (8): E-Moll, alles — Ganzschluss ───────────────────────────────────────────────────────────
+theme(b, THEME_CH_CLOSED, THEME_END_CLOSED, shift=2, vel=108, full=True)
 b += 8
 
-# ── Outro (4): E → A → A → A (Dominante zur D-Dur-Intro), Harfenlauf, Pauken-Wirbel ───────────────────────
+# ── Outro (4): E-Dur (Picardische Terz) → A → A → A (Dominante zur D-Moll-Intro) ───────────────────────
 OUT_CH = ['E', 'A', 'A', 'A']
-mel('violin', b, [[('G#5', 1), ('B5', 1), ('E6', 2)], [('E6', 2), ('C#6', 1), ('A5', 1)], [('A5', 3), (None, 1)], [(None, 4)]], vel=98)
-choir_pad(b, OUT_CH[:3], vel=66)
-horn_pad(b, OUT_CH[:3], vel=62)
-harp_arp(b, OUT_CH, vel=66)
+mel('violin', b, [[('G#5', 1), ('B5', 1), ('E6', 2)], [('E6', 2), ('C#6', 1), ('A5', 1)], [('A5', 3), (None, 1)], [(None, 4)]], vel=100)
+choir_pad(b, OUT_CH[:3], vel=68)
+horn_pad(b, OUT_CH[:3], vel=66)
+ostinato(b, OUT_CH, vel=70)
 pad(b, OUT_CH, vel=58)
 bass(b, OUT_CH[:3], vel=96)
-timp(b, OUT_CH[:2], vel=96)
-drums(b, 2, level=1.0)
-timp_roll(song.bar(b + 2), 6.0, pn('A2'), 50, 118)
-snare_roll(b + 3, 0, 4, 46, 124)
+timp(b, OUT_CH[:2], vel=98)
+drums(b, 2, level=1.05, fills=False)
+timp_roll(song.bar(b + 2), 6.0, pn('A2'), 50, 120)
+snare_roll(b + 3, 0, 4, 46, 126)
 song.dr(song.bar(b + 3) + 3.5, CRASH, 84, 0.6)
 b += 4
 assert b == BARS, (b, BARS)
 
 if os.environ.get('MARY_NORENDER') != '1':
     sf2, out = cli_paths('bgm_mary.ogg')
-    song.render(sf2, out, target_rms=0.25, saturate=False, compress=True, air_cut=0.25)
+    song.render(sf2, out, target_rms=0.27, saturate=False, compress=True, air_cut=0.2)
