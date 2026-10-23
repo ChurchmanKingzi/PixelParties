@@ -28200,6 +28200,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       fromPlayer: oppIdx, toPlayer: pi,
       indices: validated, cardNames, count: validated.length,
       duration: flightMs, highlightMs,
+      // Karten, die in der Hand des Diebs BLEIBEN: ohne die gerade aufgelöste Karte (sie liegt bis zum Ende der Auflösung noch in der Hand, verlässt sie aber vor dem Eintreffen der
+      // gestohlenen) — daran rechnet der Client die Landeplätze der Flugkarten.
+      toBaseCount: this._handIndizesOhneAufloesende(ps).length,
     });
     const perCardStagger = Math.max(0, (validated.length - 1) * 100);
     // The client's phase-3 cleanup (clears `stealHiddenMe/Opp`,

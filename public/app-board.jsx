@@ -31844,6 +31844,57 @@ function TutorialFinaleFeuerwerk() {
   );
 }
 
+/**
+ * Wo wird der Handplatz `handIdx` stehen, wenn die Hand `finalHandSize` Karten hat? Rechnet gegen die Karten, die JETZT im DOM stehen (Zustand und DOM laufen um einen Takt
+ * auseinander; `finalHandSize` fehlt → eine Karte mehr als jetzt). Liefert ein Rechteck oder `null`, wenn die Hand leer ist.
+ * Gemeinsame Stelle für `play_pile_transfer` (elementFor) und den Hand-Diebstahl (`play_hand_steal`).
+ */
+function handPlatzProjektion(isMe, handIdx, finalHandSize) {
+  const base = isMe ? '.game-hand-me' : '.game-hand-opp';
+  // Eigene Hand: die PLÄTZE zählen (die Karte darin trägt keinen eigenen Platz); Gegnerhand: die Karten selbst.
+  let slots = document.querySelectorAll(`${base} .game-hand-cards > .hand-slot`);
+  if (slots.length === 0) slots = document.querySelectorAll(`${base} .game-hand-cards > [data-hand-idx]`);
+  if (slots.length === 0) return null;
+  // ★ v1233: über `handFanCardBox` messen, nicht roh. In der Gegnerhand trägt die Karte den Fächerwinkel selbst, ihr Hüllkasten ist also breiter als die Karte.
+  const lastRect = window.handFanCardBox?.(slots[slots.length - 1]) || slots[slots.length - 1].getBoundingClientRect();
+  const firstRect = window.handFanCardBox?.(slots[0]) || slots[0].getBoundingClientRect();
+  const cardW = lastRect.width;
+  const oldCount = slots.length;
+  // v891 (Als Befund zu Shooting Star): Der Boden `oldCount + 1` stimmt nur, wenn die Hand durch den Flug WÄCHST. Nennt der Aufrufer eine Endgröße ausdrücklich, gilt SIE.
+  const finalCount = finalHandSize
+    ? Math.max(finalHandSize, handIdx + 1)
+    : Math.max(handIdx + 1, oldCount + 1);
+  // Die Reihe ist zentriert: ihre Mitte liegt zwischen linker Kante des ersten und rechter Kante des letzten Platzes. Der Abstand von Platz zu Platz ist die Flex-Basis,
+  // solange die Hand hineinpasst — ab dann schrumpfen die Plätze gleichmäßig (`.game-hand-cards .hand-slot`, `min-width`), der letzte behält die volle Kartenbreite.
+  const C = (firstRect.left + lastRect.left + lastRect.width) / 2;
+  const reihe = slots[0].parentElement;
+  const cs0 = window.getComputedStyle(slots[0]);
+  // CSS-Maße sind Layout-Einheiten, die Rechtecke Bildschirmeinheiten (`zoom`): der Faktor gleicht beides an.
+  const faktor = reihe && reihe.offsetWidth ? reihe.getBoundingClientRect().width / reihe.offsetWidth : 1;
+  const basis = parseFloat(cs0.flexBasis) * faktor;
+  const minW = (parseFloat(cs0.minWidth) || 0) * faktor;
+  const jetztSchritt = oldCount > 1 ? (lastRect.left - firstRect.left) / (oldCount - 1) : cardW;
+  const grundSchritt = basis > 0 ? basis : Math.max(jetztSchritt, cardW * 0.906);
+  let schritt = grundSchritt;
+  if (reihe && finalCount > 1) {
+    const rcs = window.getComputedStyle(reihe);
+    const innen = (reihe.clientWidth - (parseFloat(rcs.paddingLeft) || 0) - (parseFloat(rcs.paddingRight) || 0)) * faktor;
+    if (innen > cardW) schritt = Math.min(grundSchritt, Math.max(minW, (innen - cardW) / (finalCount - 1)));
+  }
+  const spanne = (finalCount - 1) * schritt + cardW;
+  const projLeft = C - spanne / 2 + handIdx * schritt;
+  // Der Fächerbogen hebt/senkt jeden Platz (`handFanGeometry`, in Kartenhöhen): die Höhe des letzten Platzes plus der Unterschied zwischen seinem Bogenstand und dem des Ziels.
+  let projTop = lastRect.top;
+  if (window.handFanGeometry) {
+    const seite = isMe ? 'me' : 'opp';
+    projTop += (window.handFanGeometry(handIdx, finalCount, { seite }).lift - window.handFanGeometry(oldCount - 1, oldCount, { seite }).lift) * lastRect.height;
+  }
+  return {
+    left: projLeft, top: projTop, width: cardW, height: lastRect.height,
+    right: projLeft + cardW, bottom: projTop + lastRect.height,
+  };
+}
+
 function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck, setSelectedDeck, cubeMatchInfo }) {
   useHoverDurchSchleier();   // v1270: Tooltips durch den Dialog-Schleier
   const { user, setUser, notify, setBgmMode } = useContext(AppContext);
@@ -43729,62 +43780,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // each lands half a card-width off. `finalHandSize`
             // carries that; it falls back to oldCount+1, which
             // reproduces the exact single-add projection.
-            const slots = document.querySelectorAll(`${base} .hand-slot, ${base} [data-hand-idx]`);
-            if (slots.length > 0) {
-              // ★ v1233: über `handFanCardBox` messen, nicht roh. In der
-              // Gegnerhand trägt die Karte den Fächerwinkel selbst, ihr
-              // Hüllkasten ist also breiter als die Karte — und genau
-              // diese Breite dient hier als ABSTAND von Platz zu Platz.
-              // Der Helfer gibt den echten Kasten zurück (und beim
-              // Handplatz ohnehin unverändert den seinen).
-              const lastRect = window.handFanCardBox?.(slots[slots.length - 1])
-                || slots[slots.length - 1].getBoundingClientRect();
-              const firstRect = window.handFanCardBox?.(slots[0]) || slots[0].getBoundingClientRect();
-              const cardW = lastRect.width;
-              const oldCount = slots.length;
-              // v891 (Als Befund zu Shooting Star): Der Boden `oldCount + 1`
-              // stimmt nur, wenn die Hand durch den Flug WAECHST. Spielt
-              // der Spieler eine Karte, die ihrerseits etwas auf die Hand
-              // holt, liegt die spielende Karte beim Flug noch (ausgegraut)
-              // in der Hand und verlaesst sie gleich danach — die Hand ist
-              // hinterher also genauso gross wie vorher. Der Boden zwang
-              // trotzdem einen Extraplatz, die zentrierte Reihe rutschte um
-              // eine halbe Karte, und das Blatt landete daneben.
-              // Nennt der Aufrufer eine Endgroesse ausdruecklich, gilt SIE;
-              // der alte Boden bleibt der Rueckfall, wenn keine kommt.
-              const finalCount = extras.finalHandSize
-                ? Math.max(extras.finalHandSize, extras.handIdx + 1)
-                : Math.max(extras.handIdx + 1, oldCount + 1);
-              // Die Reihe ist zentriert: ihre Mitte liegt zwischen linker Kante des ersten und rechter Kante des letzten Platzes. Der Abstand von Platz zu Platz ist
-              // die Flex-Basis, solange die Hand hineinpasst — ab dann schrumpfen die Plätze gleichmäßig (`.game-hand-cards .hand-slot`, `min-width`), der letzte behält
-              // die volle Kartenbreite. Mit fester Kartenbreite als Abstand landete jede Karte einer vollen Hand weit rechts außerhalb der Reihe.
-              const C = (firstRect.left + lastRect.left + lastRect.width) / 2;
-              const reihe = slots[0].parentElement;
-              const cs0 = window.getComputedStyle(slots[0]);
-              // CSS-Maße sind Layout-Einheiten, die Rechtecke Bildschirmeinheiten (`zoom`): der Faktor gleicht beides an.
-              const faktor = reihe && reihe.offsetWidth ? reihe.getBoundingClientRect().width / reihe.offsetWidth : 1;
-              const basis = parseFloat(cs0.flexBasis) * faktor;
-              const minW = (parseFloat(cs0.minWidth) || 0) * faktor;
-              const jetztSchritt = oldCount > 1 ? (lastRect.left - firstRect.left) / (oldCount - 1) : cardW;
-              const grundSchritt = basis > 0 ? basis : Math.max(jetztSchritt, cardW * 0.906);
-              let schritt = grundSchritt;
-              if (reihe && finalCount > 1) {
-                const rcs = window.getComputedStyle(reihe);
-                const innen = (reihe.clientWidth - (parseFloat(rcs.paddingLeft) || 0) - (parseFloat(rcs.paddingRight) || 0)) * faktor;
-                if (innen > cardW) schritt = Math.min(grundSchritt, Math.max(minW, (innen - cardW) / (finalCount - 1)));
-              }
-              const spanne = (finalCount - 1) * schritt + cardW;
-              const projLeft = C - spanne / 2 + extras.handIdx * schritt;
-              const projected = {
-                left:  projLeft,
-                top:   lastRect.top,
-                width: cardW,
-                height: lastRect.height,
-                right: projLeft + cardW,
-                bottom: lastRect.bottom,
-              };
-              return { getBoundingClientRect: () => projected };
-            }
+            const projected = handPlatzProjektion(isMe, extras.handIdx, extras.finalHandSize);
+            if (projected) return { getBoundingClientRect: () => projected };
           }
           return document.querySelector(base);
         }
@@ -46370,7 +46367,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     };
     socket.on('tears_of_creation_animation', onTearsOfCreation);
-    const onHandSteal = ({ fromPlayer, toPlayer, indices, cardNames, count, duration, highlightMs: hlMs }) => {
+    const onHandSteal = ({ fromPlayer, toPlayer, indices, cardNames, count, duration, highlightMs: hlMs, toBaseCount }) => {
       if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_hand_steal');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
       stealInProgressRef.current = true;
       const iAmVictim = fromPlayer === myIdx;
@@ -46433,34 +46430,34 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           sourceRects.push(el ? (window.handFanCardBox?.(el) || el.getBoundingClientRect()) : null);
         });
 
-        // Find target position: just right of last visible card in destination hand
-        const toHandCards = document.querySelectorAll(`.game-hand-${toLabel} .game-hand-cards > *`);
-        const lastCard = toHandCards.length > 0 ? toHandCards[toHandCards.length - 1] : null;
-        // ★ v1233: echter Kartenkasten statt Hüllkasten — in der
-        // Gegnerhand dreht die Karte selbst (siehe `handFanCardBox`).
-        const lastRect = lastCard
-          ? (window.handFanCardBox?.(lastCard) || lastCard.getBoundingClientRect())
-          : null;
-        const toHandEl = document.querySelector(`.game-hand-${toLabel} .game-hand-cards`);
+        // Zielplätze: die Karten werden in Reihenfolge ABSTEIGENDER Quellplätze ans Ende der Zielhand gehängt (Engine: `actionStealFromHand`), landen also an
+        // `destCount + (Anzahl − 1 − k)`. Gerechnet wird gegen die Endgröße der Hand, nicht „rechts neben die letzte Karte".
+        const destIsMe = toLabel === 'me';
+        const destBase = `.game-hand-${toLabel} .game-hand-cards`;
+        const destCount = document.querySelectorAll(`${destBase} > .hand-slot, ${destBase} > .hand-card`).length;
+        // `toBaseCount` (Engine): so viele Karten bleiben in der Zielhand, wenn die gerade aufgelöste Karte sie verlassen hat (sie steht bis dahin noch in der Hand).
+        const basisAnzahl = Number.isInteger(toBaseCount) ? toBaseCount : destCount;
+        const endGroesse = basisAnzahl + stealIndices.length;
+        const toHandEl = document.querySelector(destBase);
         const toRect = toHandEl?.getBoundingClientRect();
-        const cardW = lastRect?.width || 64;
+        const cardW0 = sourceRects.find(Boolean)?.width || 64;
         // ★ LEERE ZIELHAND (Als Befund 12.9.) ─────────────────────────
-        // Ohne Karten klappt `.game-hand-cards` auf Breite 0 zusammen
-        // und sitzt dann direkt neben dem Deckstapel — die gestohlene
-        // Karte flog sichtbar INS DECK des Gegners. Fallback ist
-        // deshalb die ganze Handreihe, mittig angeflogen.
+        // Ohne Karten klappt `.game-hand-cards` auf Breite 0 zusammen und sitzt dann direkt neben dem Deckstapel — die gestohlene Karte flog sichtbar INS DECK des
+        // Gegners. Fallback ist deshalb die ganze Handreihe, mittig angeflogen.
         const toRowRect = document.querySelector(`.game-hand-${toLabel}`)?.getBoundingClientRect();
-        const zielBasis = (toRect && toRect.width > cardW * 0.5) ? toRect : (toRowRect || toRect);
+        const zielBasis = (toRect && toRect.width > cardW0 * 0.5) ? toRect : (toRowRect || toRect);
 
+        const flyEls = [];
         stealIndices.forEach((idx, i) => {
           const sr = sourceRects[i];
           if (!sr) return;
           const name = names[i] || '';
-          const targetX = lastRect
-            ? ((lastRect.left + lastRect.width) + i * (cardW * 0.6))
-            : (zielBasis ? (zielBasis.left + zielBasis.width / 2 - cardW / 2 + i * (cardW * 0.6)) : sr.left);
-          const targetY = lastRect
-            ? lastRect.top
+          const ziel = destCount > 0 ? handPlatzProjektion(destIsMe, basisAnzahl + (stealIndices.length - 1 - i), endGroesse) : null;
+          const targetX = ziel
+            ? ziel.left
+            : (zielBasis ? (zielBasis.left + zielBasis.width / 2 - cardW0 / 2 + i * (cardW0 * 0.6)) : sr.left);
+          const targetY = ziel
+            ? ziel.top
             : (zielBasis ? (zielBasis.top + Math.max(0, (zielBasis.height - sr.height) / 2)) : sr.top);
           const dx = targetX - sr.left;
           const dy = targetY - sr.top;
@@ -46485,20 +46482,34 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             flyEl.textContent = name;
           }
           document.body.appendChild(flyEl);
-          // All clones share the SAME removal time (`batchEndMs`) so
-          // the batch disappears in lockstep with the server's state
-          // sync. The previous per-clone 2200ms padding kept clones
-          // alive long after the real cards landed, so when the
-          // triggering card (Thieving Strike etc.) was discarded and
-          // the real cards slid left, the stale clones lingered at
-          // the old "end of hand" rects — a visible ghost duplicate.
-          setTimeout(() => flyEl.remove(), batchEndMs);
+          // Jede Karte hat ihren eigenen Flug-Klang (wie ein Zug), zum Abflug dieser Karte.
+          if (window.playSFX) setTimeout(() => window.playSFX('draw', { dedupe: 60 }), i * 100 + 40);
+          flyEls.push(flyEl);
         });
+        // Die Klone bleiben stehen, bis die Karten WIRKLICH in der Zielhand erscheinen (der Zustand kommt gut 150 ms nach dem Ende des Flugs) — sonst sind sie in der Zwischenzeit
+        // einfach weg. Zeigt die Zielhand mehr Karten (oder ist die Frist um), werden Klone und Quellverdeckung zusammen aufgehoben.
+        // Angekommen heißt: der Zustand ist da — die QUELLHAND ist um die gestohlenen Karten kürzer (die Zielhand zu zählen trügt, solange die aufgelöste Karte noch darin liegt).
+        const srcBase = `.game-hand-${fromLabel} .game-hand-cards`;
+        const zaehleQuelle = () => document.querySelectorAll(`${srcBase} > .hand-slot, ${srcBase} > .hand-card`).length;
+        const quelleVorher = zaehleQuelle();
+        let aufgeraeumt = false;
+        const aufraeumen = () => {
+          if (aufgeraeumt) return;
+          aufgeraeumt = true;
+          flyEls.forEach(el => el.remove());
+          setStealHiddenMe(new Set());
+          setStealHiddenOpp(new Set());
+        };
+        const fruehestens = Date.now() + batchEndMs;
+        const spaetestens = Date.now() + batchEndMs + 1200;
+        const warte = setInterval(() => {
+          const jetzt = Date.now();
+          if (jetzt >= spaetestens || (jetzt >= fruehestens && zaehleQuelle() <= quelleVorher - stealIndices.length)) { clearInterval(warte); aufraeumen(); }
+        }, 30);
 
         // Phase 3: Clear hidden states right as the clones dissolve.
         setTimeout(() => {
-          setStealHiddenMe(new Set());
-          setStealHiddenOpp(new Set());
+          // (Die Quellverdeckung hebt `aufraeumen` oben auf, sobald die Karten in der Zielhand stehen — die Verdeckung gilt nur, solange die Hand ihre Größe hat.)
           // Bin ich der DIEB, landen die Karten in MEINER Hand — dort den
           // Zieh-Anim ueberspringen. Bin ich das OPFER, landen sie in der
           // GEGNERHAND: derselbe Gedanke, nur die andere Seite. Ohne den
@@ -52395,6 +52406,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   }}
                   onClick={isBlindPick ? () => {
                     if (blindGesperrt) return;
+                    // Auswahl und Abwahl klingen wie jede andere Kartenwahl (`pickEligible` weiter unten).
+                    if (window.playSFX) window.playSFX('ui_click');
                     // Compute the NEXT selection set outside the
                     // setState updater. React may double-invoke state
                     // updaters (StrictMode dev, batching), so the
