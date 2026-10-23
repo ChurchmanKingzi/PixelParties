@@ -3378,14 +3378,14 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   transform: translateY(-50%);
   display: flex;
   align-items: center;
-  gap: calc(12px * var(--board-scale));
+  gap: calc(32px * var(--board-scale));   /* Platz zwischen Knöpfen und Gold */
   z-index: 3;
 }
 .game-hand-topright-spalte {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: calc(8px * var(--board-scale));
+  align-items: center;
+  gap: calc(10px * var(--board-scale));
 }
 /* Dasselbe fuer die Goldanzeige: im Cluster steht sie in der Spalte,
    nicht mehr am rechten Rand der Zeile. */
@@ -6868,7 +6868,13 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
    Platz. Die Goldzahlen (GoldGainNumber) messen `[data-gold-player]`
    und folgen von selbst. */
 /* v1270 (Al 22.9.: „etwas kleiner"): 46/40 → 40/34, beide Seiten. */
-.game-gold-icon { font-size: calc(40px * var(--board-scale)); }
+.game-gold-icon {
+  /* Dein 12×12-Sprite (public/gold-muenze.png), 3-fach; als Hintergrundbild statt Zeichen, damit zwischen den Pixeln keine Nähte schimmern. */
+  display: inline-block; flex-shrink: 0;
+  width: calc(36px * var(--board-scale)); height: calc(36px * var(--board-scale));
+  background: url('/gold-muenze.png') center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+}
 .game-gold-value {
   font-size: calc(34px * var(--board-scale));
   font-weight: 800;
@@ -6939,7 +6945,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   transform: translateY(-50%);
   display: flex;
   align-items: center;
-  gap: calc(18px * var(--board-scale));
+  gap: calc(32px * var(--board-scale));   /* Platz zwischen Knöpfen und Gold */
   z-index: 10002;
 }
 .hand-rechts > .hand-actions,
@@ -16945,7 +16951,7 @@ body:has(.textbox-overlay) .tooltip {
   /* v1260: Gold am Telefon ebenfalls groesser (war 18/16) — die
      rechte Spalte der 70-px-Zeile traegt Regler + Gold, mehr als 26/24
      passt dort nicht. */
-  .game-hand-opp .game-gold-icon { font-size: 26px !important; }
+  .game-hand-opp .game-gold-icon { width: 24px !important; height: 24px !important; }
   .game-hand-opp .game-gold-value { font-size: 24px !important; }
 
   /* Compact player hand. The container is small (54px) but the cards
@@ -26394,3 +26400,74 @@ input[type="checkbox"]:checked::after {
 input[type="radio"]:checked::after { content: ''; position: absolute; left: 4px; top: 4px; width: 8px; height: 8px; background: #000000; }
 input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: .4; cursor: not-allowed; }
 input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outline: 2px solid #ffffff; outline-offset: 2px; }
+
+
+/* ═══ GOLD-ZAHLEN: Goldfarben, Kontur, Schiller (Al 23.10.) ═══════════════════════════════════════════════════════
+   Eine Zahl in drei Bändern der Münzenfarben (hell / Gold / Orange / Dunkelorange), getrennt durch je eine Dither-Reihe, mit Pixelkontur in Rotbraun
+   und schwarzem Sockel. Der Schiller ist ein schmales helles Band, das in Stufen über die Zahl läuft und dann ruht.
+   Gilt für: die Goldanzeige im Duell, die fliegenden Gold-Zahlen und die Gold-Zahl im Puzzle-Editor (`.pp-gold-zahl`).
+   Zustände ändern nur die Farbvariablen (Schulden rot, Absturz rot, Erholung grün). Textschatten bleibt aus: bei durchsichtiger Füllung würde er
+   durch die Buchstaben schimmern. */
+.pp-gold-zahl, .game-gold-value, .gold-gain-number {
+  --g-hell: #f7f7ad; --g-1: #fad54a; --g-2: #f29a3e; --g-3: #ee6428; --g-kontur: #b62600;
+  color: var(--g-1);
+  background:
+    linear-gradient(105deg, transparent 0 40%, #ffffff 40% 50%, transparent 50% 100%) 100% 0 / 300% 100% no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.55'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.55'/%3E%3C/svg%3E") 0 30% / 4px 2px repeat-x,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23000000' fill-opacity='0.35'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23000000' fill-opacity='0.35'/%3E%3C/svg%3E") 0 76% / 4px 2px repeat-x,
+    linear-gradient(180deg, var(--g-hell) 0 28%, var(--g-1) 28% 52%, var(--g-2) 52% 76%, var(--g-3) 76%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+  filter:
+    drop-shadow(2px 0 0 var(--g-kontur)) drop-shadow(-2px 0 0 var(--g-kontur))
+    drop-shadow(0 2px 0 var(--g-kontur)) drop-shadow(0 -2px 0 var(--g-kontur))
+    drop-shadow(0 4px 0 #000000);
+  animation: ppGoldSchiller 3.6s steps(18) infinite;
+}
+@keyframes ppGoldSchiller {
+  0%   { background-position: 100% 0, 0 30%, 0 76%, 0 0; }
+  32%  { background-position: 0% 0, 0 30%, 0 76%, 0 0; }
+  100% { background-position: 0% 0, 0 30%, 0 76%, 0 0; }
+}
+.pp-gold-zahl.gold-negative, .game-gold-value.gold-negative, .game-gold-value.gold-crashing, .game-gold-value.gold-crashing.gold-negative {
+  --g-hell: #f9b3b3; --g-1: #fe5154; --g-2: #e92f38; --g-3: #8c0014; --g-kontur: #55011a;
+  text-shadow: none;
+}
+.game-gold-value.gold-recovering, .game-gold-value.gold-recovering.gold-negative {
+  --g-hell: #b1ff1a; --g-1: #4ceb70; --g-2: #167927; --g-3: #1a4128; --g-kontur: #1a4128;
+  text-shadow: none;
+}
+.gold-loss-number {
+  --g-hell: #f9b3b3; --g-1: #fe5154; --g-2: #e92f38; --g-3: #8c0014; --g-kontur: #55011a;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.55'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.55'/%3E%3C/svg%3E") 0 30% / 4px 2px repeat-x,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23000000' fill-opacity='0.35'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23000000' fill-opacity='0.35'/%3E%3C/svg%3E") 0 76% / 4px 2px repeat-x,
+    linear-gradient(180deg, var(--g-hell) 0 28%, var(--g-1) 28% 52%, var(--g-2) 52% 76%, var(--g-3) 76%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; text-shadow: none;
+  filter: drop-shadow(2px 0 0 var(--g-kontur)) drop-shadow(-2px 0 0 var(--g-kontur)) drop-shadow(0 2px 0 var(--g-kontur)) drop-shadow(0 -2px 0 var(--g-kontur)) drop-shadow(0 4px 0 #000000);
+}
+/* Fliegende Zahlen: Schiller läuft zusätzlich zur Flugbahn */
+.gold-gain-number { animation: goldFloat 1.6s ease-out forwards, ppGoldSchiller 1.2s steps(12) infinite; }
+.gold-gain-number.gold-gain-down { animation: goldFloatDown 1.6s ease-out forwards, ppGoldSchiller 1.2s steps(12) infinite; }
+@media (prefers-reduced-motion: reduce) { .pp-gold-zahl, .game-gold-value, .gold-gain-number { animation: none; } }
+
+/* ── Puzzle-Editor: Gold-Feld über die volle Breite, ohne Goldsack; Debuff-Knopf höher ── */
+.pz-hand-extras { width: 128px; gap: 8px; padding: 6px 7px; }
+.pz-gold-feld { position: relative; display: block; width: 100%; }
+.pz-gold-feld input {
+  display: block; width: 100%; box-sizing: border-box;
+  padding: 10px 6px; font-size: 26px; font-weight: 800; text-align: center;
+  color: transparent; caret-color: #fad54a;
+  border: 3px solid #f29a3e; background: #12101f;
+  box-shadow: inset 2px 2px 0 #000000, inset -2px -2px 0 #3e3e51;
+}
+.pz-gold-feld input:focus { border-color: #fad54a; outline: none; }
+.pz-gold-zahl {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display), sans-serif; font-size: 26px; font-weight: 800; line-height: 1;
+  pointer-events: none;
+}
+
+.pz-gold-feld > .pz-gold-zahl { font-size: 26px; flex-shrink: 1; }
+@media (max-height: 600px) { .pz-gold-feld > .pz-gold-zahl, .pz-gold-feld input { font-size: 18px; } }

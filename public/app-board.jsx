@@ -41220,11 +41220,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const jitterX = (Math.random() - 0.5) * 44;
         const jitterY = -30 - Math.random() * 35;
         const dur = 700 + Math.random() * 200;
-        coin.textContent = '🪙';
         coin.style.cssText = [
           'position:fixed',
-          `left:${startX - 10}px`, `top:${startY - 10}px`,
-          'font-size:20px', 'line-height:1', 'pointer-events:none',
+          `left:${startX - 12}px`, `top:${startY - 12}px`,
+          'width:24px', 'height:24px', "background:url('/gold-muenze.png') center/100% 100% no-repeat", 'image-rendering:pixelated', 'pointer-events:none',
           'z-index:10250',
           '',
           `--gsDx:${endX - startX}px`, `--gsDy:${endY - startY}px`,
@@ -52348,6 +52347,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               Shuffle neben dem eigenen Gold (`.hand-rechts`). Neben dem
               Avatar machte ein langes „SURRENDER" den Cluster zu breit. */}
           <div className="game-hand-topright">
+            {/* Linke Spalte: Lautstärke ÜBER dem Aufgabe-/Exit-Knopf; rechts daneben das Gold, mittig in der Zeile (wie auf der eigenen Seite) */}
+            <div className="game-hand-topright-spalte">
+            <VolumeControl />
             {isSpectator ? (
               <button className="btn btn-danger game-hand-quit" onClick={handleLeave}>
                 👁 ✕ LEAVE
@@ -52367,13 +52369,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {result ? '✕ LEAVE' : gameState.isPuzzle ? '✕ EXIT' : '⚑ SURRENDER'}
               </button>
             )}
-            <div className="game-hand-topright-spalte">
-              <VolumeControl />
+            </div>
               <div className="game-gold-display">
-                <span className="game-gold-icon">🪙</span>
+                <span className="game-gold-icon"></span>
                 <span className={'game-gold-value orbit-font' + (goldCrash ? (goldCrashTone === 'recover' ? ' gold-recovering' : ' gold-crashing') : '') + (goldIsNegative(goldCrash ? goldCrash[oppIdx] : opp.gold) ? ' gold-negative' : '')} data-gold-player={oppIdx}>{formatGold(goldCrash ? goldCrash[oppIdx] : opp.gold)}</span>
               </div>
-            </div>
           </div>
         </div>
         {/* Board */}
@@ -53532,7 +53532,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               </div>
             )}
             <div className="game-gold-display">
-              <span className="game-gold-icon">🪙</span>
+              <span className="game-gold-icon"></span>
               <span className={'game-gold-value orbit-font' + (goldCrash ? (goldCrashTone === 'recover' ? ' gold-recovering' : ' gold-crashing') : '') + (goldIsNegative(goldCrash ? goldCrash[myIdx] : me.gold) ? ' gold-negative' : '')} data-gold-player={myIdx}>{formatGold(goldCrash ? goldCrash[myIdx] : me.gold)}</span>
             </div>
           </div>
