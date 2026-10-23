@@ -36,8 +36,11 @@
 //  Worked example: P0 casts on turn 5.
 //    • Turn 5 end (P0): active = caster → skipped. Flag still armed.
 //    • Turn 6 end (P1): turn 6 > 5, active ≠ caster → fires.
-//  Ist der gegnerische Zug übersprungen (Guardian Beast Zhu), endet er
-//  trotzdem formal (`_switchTurnInner`) → der Effekt feuert dort.
+//  ★ W67a (Al, 23.10.2026): ein ÜBERSPRUNGENER Gegnerzug (Guardian Beast Zhu,
+//  „skip your next turn") zählt NICHT als „your opponent's next turn" — er
+//  endet zwar formal (`_switchTurnInner({ uebersprungen: true })`), aber dort
+//  ruft die Engine `nachholenOhneKarte` NICHT; der Auftrag bleibt liegen und
+//  feuert am Ende des nächsten tatsächlich gespielten Gegnerzuges.
 //
 //  ── Schutzschichten (★ W66a, Al: „Resistance … JEDE Form von defeat") ──
 //  Der Kill läuft über `engine.actionDefeat(..., { wirkungsSchutz: true })`:

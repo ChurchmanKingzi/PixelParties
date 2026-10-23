@@ -8709,6 +8709,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // an. Der Zauber liegt hier noch in der Hand — er ist vom Abwurf
     // ausgenommen (`eligibleIndices`).
     let _wisdomBezahlt = false;
+    let _buddyTicket = null;   // W67a: Inyas Fantasy Buddy (gesetzt vor `afterSpellResolved`)
     if (wisdomDiscardCost > 0 && !_gefizzelt) {
       const _rIdx = getResolvingHandIndex(ps);
       const _pool = fromCreation ? ps.hand.map((_, i) => i) : ps.hand.map((_, i) => i).filter(i => i !== _rIdx);
@@ -8740,6 +8741,11 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         if (!ps._spellsResolvedThisGame) ps._spellsResolvedThisGame = [];
         if (!ps._spellsResolvedThisGame.includes(cardName)) ps._spellsResolvedThisGame.push(cardName);
       }
+      // W67a: Ticket für Inyas Fantasy Buddy (Hand-Spiel): würde die Karte nach dem Auflösen in die Ablage gehen? Nicht, wenn sie sich selbst aufs Brett gelegt hat
+      // (Area/Attachment/Permanent, `_spellPlacedOnBoard`), auf die Hand zurückkehrt oder gelöscht wird.
+      _buddyTicket = room.engine.neuesBuddyTicket('hand', {
+        ablageErwartet: () => !gs._spellPlacedOnBoard && !gs._spellReturnToHand && !script?.deleteOnUse,
+      });
       await room.engine.runHooks('afterSpellResolved', {
         // v778: `heroOwner` = in WESSEN Heldenreihe `heroIdx` zeigt.
         // Ohne das Feld war der Hook bei einem bezauberten Helden
@@ -8757,7 +8763,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         // normally-cast Support Magic Spell from the same Hero no longer
         // pays the draw bonus.
         viaAdditionalProvider: additionalConsumed ? consumedInst : null,
-        _inyaBuddyWeg: true,   // W66a: dieser Weg räumt `_spellPlacedOnBoard`/`_spellBecameToken` selbst ab (Inyas Fantasy Buddy ist hier möglich)
+        _buddy: _buddyTicket,   // W67a: Inyas Fantasy Buddy (ersetzt die Ablage; siehe unten)
         _skipReactionCheck: true,
       });
     }
@@ -8808,7 +8814,8 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // (`aufloesenderSpellInDieAblage`, Shooting Star), ist auch seine
     // Herkunft schon verbraucht — nicht ein zweites Mal ziehen.
     const spellPileOwner = resolveHi >= 0 ? room.engine._consumeHandCardOrigin(pi, cardName, fromCreation ? undefined : resolveHi) : pi;
-    if (resolveHi >= 0 && !gs._spellPlacedOnBoard && !gs._spellReturnToHand) {
+    const _buddyToken = _buddyTicket?.token || null;   // W67a: Inya hat die Karte als Fantasy Buddy aufs Brett gestellt — statt Ablage, nie beides
+    if (resolveHi >= 0 && !gs._spellPlacedOnBoard && !gs._spellReturnToHand && !_buddyToken) {
       room.engine._broadcastEvent('play_pile_transfer', {
         fromOwner: pi, toOwner: spellPileOwner, cardName,
         from: fromCreation ? 'creation' : 'hand',
@@ -8817,11 +8824,11 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       });
     }
     if (resolveHi >= 0) { (fromCreation ? ps.creationZone : ps.hand).splice(resolveHi, 1); room.engine.notePlayedFromHand(pi); }
-    if (gs._spellPlacedOnBoard) {
+    if (gs._spellPlacedOnBoard || _buddyToken) {
       delete gs._spellPlacedOnBoard;
-      // W63b: macht ein Hook aus dem Zauber eine NEUE Brettkarte (Inyas Fantasy Buddy Token, `_spellBecameToken`), räumt die
+      // W63b/W67a: macht ein Hook aus dem Zauber eine NEUE Brettkarte (Inyas Fantasy Buddy Token, `_buddyTicket.token`), räumt die
       // Engine die gespielte Hand-Instanz ab bzw. behält sie als Wirkungsträger (`_spellKeepInstance`) — siehe dort.
-      if (gs._spellBecameToken) { delete gs._spellBecameToken; room.engine.zauberInstanzNachBrettzug(inst); }
+      if (_buddyToken) room.engine.zauberInstanzNachBrettzug(inst);
     } else if (gs._spellReturnToHand) {
       // Rocket Fist etc. — the resolved Spell/Attack returns to its
       // caster's hand instead of going to the discard pile. Origin

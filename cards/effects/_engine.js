@@ -15442,6 +15442,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         delete traeger.counters._effectOverride;
         delete traeger.counters._cardDataOverride;
         delete traeger.counters._identityExpiresTurn;
+        delete traeger.counters._identitySkipAufschub;   // W67a
         delete traeger.counters._identityCleanupCard;
         delete traeger.counters._identityAnchorInst;
       }
@@ -18077,6 +18078,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hps = this.gs.players[pi];
     const vorSplice = Number.isInteger(handIdx) && hps?.hand?.[handIdx] === cardName;   // Karte liegt noch an ihrem Platz
     const besitzer = this._consumeHandCardOriginKern(pi, cardName, handIdx);
+    this._letzteHandHerkunft = { pi, cardName, besitzer };   // W67a: in wessen Stapel die Karte gerade gelegt wurde (Hand-Reaktion × Inyas Buddy: `reaktionsBuddyTicket`)
     if (besitzer !== pi) {
       // W63c: Fremd-Abgangsbuch — die Karte hat ihren Stapel gefunden. Vor dem Splice: der Splice darf sie nicht mehr buchen.
       if (vorSplice) {
@@ -24533,6 +24535,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Abbruch in der Zielwahl verraet nichts), bei der CPU sofort (sie
     // hat nichts zu verbergen, und der Auftritt soll der Wirkung vorangehen).
     let _placedVorher = false, _aufsBrett = false;   // v1364
+    let _buddyTicket = null;   // W67a: Inyas Fantasy Buddy (gesetzt vor `afterSpellResolved`)
     let _ganzNegiert = false;   // Z7b
     const _auftritt = this.gussAuftrittBeginnen(cardName, playerIdx);   // v1339: gemeinsamer Helfer
     // Als Vorgabe 29.9.: Wirker-Seite fuer Stufenabfragen (wie doPlaySpell).
@@ -24584,6 +24587,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         for (const t of (this.gs._spellDamageLog || [])) {
           if (!seenIds.has(t.id)) { seenIds.add(t.id); uniqueTargets.push(t); }
         }
+        // W67a: Ticket für Inyas Fantasy Buddy (Sofort-Guss): Ablage nur, wenn sich die Karte nicht selbst aufs Brett legt / zurück auf die Hand geht / gelöscht wird.
+        _buddyTicket = this.neuesBuddyTicket('sofort', {
+          ablageErwartet: () => !this.gs._spellPlacedOnBoard && !this.gs._spellReturnToHand && !loadCardEffect(cardName)?.deleteOnUse,
+        });
         await this.runHooks('afterSpellResolved', {
           // v778: siehe Zwillingsstelle in server.js — wessen Heldenreihe
           // `heroIdx` meint. Der Sofort-Guss laeuft ueber den Helden des
@@ -24596,7 +24603,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // ★ W16b (A01-pollution-24): Herkunft des Gusses — nur ein Zauber aus der HAND zählt für „plays a Spell from their hand"
           // (Acid Rain). Circle-Replays (Wegwerf-Pool aus dem Gelöscht-Stapel), Deck-/Ablage-Güsse sind keine Handzauber.
           spellFromHand: fromZone === 'hand' && pool === ps.hand,
-          _inyaBuddyWeg: true,   // W66a: dieser Weg räumt `_spellPlacedOnBoard`/`_spellBecameToken` selbst ab (`zauberInstanzNachBrettzug`)
+          _buddy: _buddyTicket,   // W67a
           _skipReactionCheck: true,
         });
       }
@@ -24616,7 +24623,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (_aeussererLog === undefined) delete this.gs._spellDamageLog;
       else this.gs._spellDamageLog = _aeussererLog;
       // v1364: eigener Brett-Stempel auswerten, aeusseren wiederherstellen.
-      _aufsBrett = !!this.gs._spellPlacedOnBoard;
+      _aufsBrett = !!this.gs._spellPlacedOnBoard || !!_buddyTicket?.token;   // W67a: Inyas Token ersetzt die Ablage (Karte liegt als Buddy auf dem Brett)
       if (_placedVorher) this.gs._spellPlacedOnBoard = true;
       else delete this.gs._spellPlacedOnBoard;
       this.gs._spellResolutionDepth = Math.max(0, (this.gs._spellResolutionDepth || 1) - 1);
@@ -24746,7 +24753,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `gs.areaZones` haelt den Namen, aber kein Hook der Area laeuft mehr (The Circles of Hell).
     // W63b: bleibt die gespielte Hand-Instanz übrig, wird sie abgeräumt — ODER als Wirkungsträger in die Ablage umgezont, wenn der Zauber
     // seine fortwirkende Wirkung an sie gehängt hat (`_spellKeepInstance`, auch beim Sofort-Guss; Inyas Token ersetzt die Karte, nicht den Träger).
-    delete this.gs._spellBecameToken;
     if (!(_aufsBrett && inst.zone && inst.zone !== 'hand')) this.zauberInstanzNachBrettzug(inst);
     // v1338: ohne Abfrage aufgeloest → jetzt zeigen (idempotent).
     this.gussAuftrittBeenden(_auftritt);
@@ -26325,7 +26331,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
   }
 
-  async _switchTurnInner() {
+  async _switchTurnInner(opts = {}) {
+    // ★ W67a (Al, 23.10.2026: „der Gegner-Zug wird ja komplett übersprungen, also ist da effektiv kein Zug, in dem das aktivieren könnte. Erst nach dem
+    // 'echten' nächsten Gegner-Zug."): `opts.uebersprungen` = dies ist das FORMALE Ende eines übersprungenen Zuges (Guardian Beast Zhu, Hand of Death). Ein
+    // übersprungener Zug zählt nicht als „your opponent's next turn": Zugende-Aufträge der Form „At the end of your opponent's next turn, …" (Hand of Death,
+    // Throne Robber, Create Illusion, Staff of Illusions) feuern dort NICHT, sondern am Ende des nächsten tatsächlich gespielten Gegnerzuges.
+    const _uebersprungen = !!opts.uebersprungen;
     // Für die Unregelmässigkeits-Diagnose in startTurn: aus welcher
     // Phase heraus wechseln wir? Regulär ist das END.
     this._lastPhaseBeforeTurnStart = this.gs.currentPhase;
@@ -26399,7 +26410,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // ein abgebrochener ON_TURN_END (Hook-Obergrenze, Kartenfehler eines anderen Zugende-Lauschers) darf sie nicht verschlucken; sie hängen an
       // `ps._handOfDeathArmed`, nicht an einer Karteninstanz (Ablage, Hand, Fantasy Buddy Token …). Welle 14 (Q171) hatte den Nachhol-Weg, W66a macht ihn zum einzigen.
       try {
-        await loadCardEffect('Hand of Death')?.nachholenOhneKarte?.(this);
+        if (!_uebersprungen) await loadCardEffect('Hand of Death')?.nachholenOhneKarte?.(this);   // W67a: ein übersprungener Gegnerzug ist kein „next turn"
       } catch (err) {
         console.error('[Engine] ⚠️  Spielergebundene Zugende-Aufträge abgebrochen — Zugübergabe läuft trotzdem weiter:', err.message);
         this.log('turn_end_player_effects_aborted', { turn: this.gs.turn, reason: String(err.message || '').slice(0, 240) });
@@ -26427,7 +26438,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // of Illusions — lag keine Staff-Instanz in einer lauschenden Zone,
     // blieb eine Create-Illusion-Kreatur fuer immer liegen (Als Befund).
     try {
-      await this._illusionenZurueck();
+      if (!_uebersprungen) await this._illusionenZurueck();   // W67a: „At the end of your opponent's next turn" — nicht am übersprungenen Zug
     } catch (err) {
       console.error('[Engine] Rueckkehr der Illusionen:', err.message);
     }
@@ -26468,7 +26479,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // zufaellig selbst ein `onTurnEnd` mitbringt. Darf ausfallen, ohne
     // die Uebergabe mitzureissen.
     try {
-      await this._expireBorrowedIdentities();
+      await this._expireBorrowedIdentities({ uebersprungen: _uebersprungen });
     } catch (err) {
       console.error('[Engine] ⚠️  Identitaets-Ablauf abgebrochen:', err.message);
     }
@@ -26612,7 +26623,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // the OTHER player on the recursive call.
         if (!this.gs.result) {
           this.gs.currentPhase = 5; // End phase
-          await this._switchTurnInner();   // Rumpf: laeuft im selben Riegel
+          await this._switchTurnInner({ uebersprungen: true });   // Rumpf: laeuft im selben Riegel (W67a: formales Ende eines übersprungenen Zuges)
           return;
         }
       }
@@ -33658,15 +33669,21 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
   }
 
-  async _expireBorrowedIdentities() {
+  async _expireBorrowedIdentities(opts = {}) {
     const turn = this.gs.turn;
     // ★ NICHT auf `_effectOverride` einschraenken (v582): Future Tech
     // Prototypes leiht sich nur den NAMEN, nicht den Effekt, und setzt
     // deshalb kein Override — sie waere hier durchgerutscht und ihr
     // Alias haette den Zug ueberlebt. Der Ablaufstempel ALLEIN ist das
     // Kriterium; er ist genau dafuer da.
-    const betroffen = this.cardInstances.filter(c =>
+    let betroffen = this.cardInstances.filter(c =>
       c?.counters?._identityExpiresTurn === turn);
+    // ★ W67a: formales Ende eines ÜBERSPRUNGENEN Zuges — Identitäten mit `_identitySkipAufschub` („At the end of your opponent's next turn, Descend": Throne
+    // Robber) laufen dort nicht ab; die Frist rückt auf den nächsten tatsächlichen Zug desselben Spielers (zwei Zugnummern weiter: der Gegenzug dazwischen).
+    if (opts.uebersprungen) {
+      for (const c of betroffen) if (c.counters._identitySkipAufschub) c.counters._identityExpiresTurn = turn + 2;
+      betroffen = betroffen.filter(c => !c.counters._identitySkipAufschub);
+    }
     for (const inst of betroffen) {
       // ★ 28.8.: Normalerweise ist die Ruecknahme das Skript der
       // Traegerkarte selbst. Eine Karte, die ihre Identitaet durch
@@ -33693,6 +33710,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       delete inst.counters._effectOverride;
       delete inst.counters._cardDataOverride;
       delete inst.counters._identityExpiresTurn;
+      delete inst.counters._identitySkipAufschub;
       delete inst.counters._identityCleanupCard;
       delete inst.counters.treatAsEquip;
     }
@@ -36936,10 +36954,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._inCreaturePreDefeatReaction = false;
       }
       // v1157: Handlung des Wirkers melden (Santa, „performs an Action")
-      await this._rxAufgeloest(ps, cardName, rxCast.casterIdx, { heroOwner: rxCast.casterSeite });
+      const _buddyErsetzt = await this._rxAufgeloest(ps, cardName, rxCast.casterIdx, { spaetAblegen: true, heroOwner: rxCast.casterSeite });
 
       // Same routing as the other hand-reaction windows.
-      if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
+      if (_buddyErsetzt) { /* W67a: Inyas Fantasy Buddy ersetzt die Ablage */ }
+      else if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
         this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
       } else {
         this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
@@ -37885,6 +37904,7 @@ this._deathWatch = (this._deathWatchStack || []).length
               casterIdx: reactorIdx,
               damageTargets: [],
               isSecondCast: false,
+              _buddy: this.reaktionsBuddyTicket(reactorIdx, cardName, script),   // W67a: Inyas Fantasy Buddy ersetzt die Ablage (Karte liegt hier schon darin)
               _skipReactionCheck: true,
             });
           } catch (err) {
@@ -38080,6 +38100,7 @@ this._deathWatch = (this._deathWatchStack || []).length
               heroIdx: typeof _rxWirker === 'number' ? _rxWirker : -1, casterIdx: ownerIdx,
               damageTargets: [],
               isSecondCast: false,
+              _buddy: this.reaktionsBuddyTicket(ownerIdx, cardName, script),   // W67a
               _skipReactionCheck: true,
             });
           } catch (err) {
@@ -38446,9 +38467,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._inPostSummonReaction = false;
       }
       // v1157: Handlung des Wirkers melden (Santa, „performs an Action")
-      await this._rxAufgeloest(ps, cardName, castingHeroIdx, { heroOwner: castingSeite });
+      const _buddyErsetzt = await this._rxAufgeloest(ps, cardName, castingHeroIdx, { spaetAblegen: true, heroOwner: castingSeite });
 
-      if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
+      if (_buddyErsetzt) { /* W67a */ }
+      else if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
         this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
       } else {
         this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
@@ -38834,11 +38856,12 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._inCdMovementReaction = false;
       }
       // v1157: Handlung des Wirkers melden (Santa, „performs an Action")
-      await this._rxAufgeloest(ps, cardName, castingHeroIdx, { heroOwner: castingSeite });
+      const _buddyErsetzt = await this._rxAufgeloest(ps, cardName, castingHeroIdx, { spaetAblegen: true, heroOwner: castingSeite });
 
       // Routing — Cosmic Malfunction's text says "Delete this card",
       // so it goes to deletedPile. Scripts opt in via deleteOnUse.
-      if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
+      if (_buddyErsetzt) { /* W67a */ }
+      else if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
         this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
       } else {
         this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
@@ -38960,10 +38983,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._inOppActionPhaseReaction = false;
       }
       // v1157: Handlung des Wirkers melden (Santa, „performs an Action")
-      await this._rxAufgeloest(ps, cardName, castingHeroIdx, { heroOwner: castingSeite });
+      const _buddyErsetzt = await this._rxAufgeloest(ps, cardName, castingHeroIdx, { spaetAblegen: true, heroOwner: castingSeite });
 
       // Routing matches the resource-phase reaction handler.
-      if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
+      if (_buddyErsetzt) { /* W67a */ }
+      else if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
         this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
       } else {
         this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
@@ -40300,6 +40324,7 @@ this._deathWatch = (this._deathWatchStack || []).length
               casterIdx: pi,
               damageTargets: [],
               isSecondCast: false,
+              _buddy: this.reaktionsBuddyTicket(pi, cardName, script),   // W67a
               _skipReactionCheck: true,
             });
           } catch (err) {
@@ -40522,6 +40547,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Spell-type ascension reactions so hero passives like Zsos'Ssar
       // (Decay-Spell Poison cost), Beato's orb collector, etc., still
       // trigger on this cast. Artifacts don't fire spell hooks.
+      const _aszBuddy = this.reaktionsBuddyTicket(pi, cardName, script, { inDerAblage: false });   // W67a: diese Karte wird erst NACH dem Hook abgelegt
       if (!isArtifact && (cardData?.cardType === 'Spell' || cardData?.cardType === 'Attack') && castingHeroIdx >= 0) {   // v1154: auch Attacks
         try {
           await this.runHooks('afterSpellResolved', {
@@ -40529,6 +40555,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             spellName: cardName, spellCardData: cardData,
             heroIdx: castingHeroIdx, casterIdx: pi,
             damageTargets: [], isSecondCast: false,
+            _buddy: _aszBuddy,
             _skipReactionCheck: true,
           });
         } catch (err) {
@@ -40539,7 +40566,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this._rxAufgeloest(ps, cardName, castingHeroIdx, { spellHook: false, heroOwner: castingSeite });
 
       // Discard the spent card
-      this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);   // W63c: Ablage des permanenten Besitzers (gestohlene Handkarte)
+      const _aszPs = this.handKartenBesitzerPs(ps, cardName);   // W63c: Ablage des permanenten Besitzers (gestohlene Handkarte)
+      if (!_aszBuddy.token) _aszPs.discardPile.push(cardName);   // W67a: Inyas Fantasy Buddy ersetzt die Ablage
       this.sync();
       // (Wisdom discard was paid earlier — see comment above.)
 
@@ -40618,12 +40646,16 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (typ === 'Spell') this.thaliaNotiereSupportZauber(pi, cardName);   // W49a (Thalia): gewirkte Support-Reaktion zaehlt als Kopie des Zugs
     // Als Vorgabe 29.9.: `opts.heroOwner` = Brettseite des Wirkers (geliehener Held).
     const heroOwner = Number.isInteger(opts.heroOwner) ? opts.heroOwner : pi;
+    // W67a: Inyas Fantasy Buddy. `opts.spaetAblegen`: das Fenster legt die Karte erst NACH diesem Aufruf ab — dann liegt sie noch nirgends, und der Aufrufer
+    // lässt das Ablegen aus, wenn der Rückgabewert `true` ist (Token statt Ablage).
+    const _buddy = this.reaktionsBuddyTicket(pi, cardName, loadCardEffect(cardName), { inDerAblage: !opts.spaetAblegen });
     try {
       if (opts.spellHook !== false && (typ === 'Spell' || typ === 'Attack')) {
         await this.runHooks('afterSpellResolved', {
           heroOwner, spellName: cardName, spellCardData: cd,
           heroIdx: casterIdx, casterIdx: pi,
           damageTargets: [], isSecondCast: false, isReaction: true,
+          _buddy: _buddy,
           _skipReactionCheck: true,
         });
       }
@@ -40635,6 +40667,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     } catch (err) {
       console.error(`[Engine] Reaktions-Abschluss ${cardName}:`, err.message);
     }
+    return !!_buddy.token;
   }
 
   /**
@@ -41596,9 +41629,18 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Creature-type surprises (Bakhm flips, Jumpscare, etc.) are not
     // spells and naturally skip this.
     const cardDataForDelay = this._getCardDB()[cardName];
+    // ★ W67a (Al: Inya macht JEDEN Spell-Subtyp zum Token, sofern die Karte nach dem Effekt nicht auf dem Board bleibt): Inyas Fantasy Buddy ersetzt die
+    // Ablage dieser Surprise (Skull Carpet Bombing am eigenen Zugende, Hand-Surprises …). Die Karte bleibt NICHT liegen, wenn sie offen auf dem Brett bleibt
+    // (Spider Silk Bridge, Glass Wall: `staysFaceUpOnActivation`/`stayFaceUp`) oder aus der Ablage gelöscht wird (Cute Spider) — dann kein Buddy.
+    const _surpriseBuddy = this.neuesBuddyTicket('surprise', {
+      kartenBesitzer: isSeat(this, inst?.originalOwner) ? inst.originalOwner : playerIdx,
+      ablageErwartet: () => !fromDiscard && !isBakhmSlot && !script?.staysFaceUpOnActivation && !result?.stayFaceUp && !script?.deleteOnUse
+        && !hasCardType(cardDataForDelay, 'Creature'),
+    });
     if (!surpriseNegated && (cardDataForDelay?.cardType === 'Spell' || cardDataForDelay?.cardType === 'Attack')) {   // v1154
       try {
         await this.runHooks('afterSpellResolved', {
+          _buddy: _surpriseBuddy,
           heroOwner: playerIdx,   // Styx 28.9.: Reihe, in die `heroIdx` zeigt
           spellName: cardName,
           spellCardData: cardDataForDelay,
@@ -41862,15 +41904,19 @@ this._deathWatch = (this._deathWatchStack || []).length
       // flight (see Creature branch above).
       // Als Vorgabe 29.9.: Ablage beim KARTENBESITZER (`originalOwner`).
       const _ablage = (isSeat(this, inst?.originalOwner)) ? inst.originalOwner : playerIdx;
-      if (!fromDeck) {
-        this._broadcastEvent('play_pile_transfer', {
-          owner: playerIdx, cardName,
-          fromOwner: playerIdx, toOwner: _ablage,
-          from: 'surprise', to: 'discard',
-          fromHeroIdx: hostHeroIdx,
-        });
+      if (_surpriseBuddy.token) {
+        // W67a: Inyas Fantasy Buddy ersetzt die Ablage — weder Flug noch Ablageeintrag, nur die Surprise-Instanz räumt ab (der Token ist eine eigene Instanz).
+      } else {
+        if (!fromDeck) {
+          this._broadcastEvent('play_pile_transfer', {
+            owner: playerIdx, cardName,
+            fromOwner: playerIdx, toOwner: _ablage,
+            from: 'surprise', to: 'discard',
+            fromHeroIdx: hostHeroIdx,
+          });
+        }
+        this.gs.players[_ablage].discardPile.push(cardName);
       }
-      this.gs.players[_ablage].discardPile.push(cardName);
       if (inst) this._untrackCard(inst.id);
     }
     } // end if/else isBakhmSlot
@@ -43363,10 +43409,17 @@ this._deathWatch = (this._deathWatchStack || []).length
         // plays. Initial cards already got their own afterSpellResolved
         // firing through their normal play path. Artifacts and cards
         // without a valid casting hero are skipped.
+        let _kettenBuddy = null;   // W67a: Inyas Fantasy Buddy für dieses Kettenglied
         if (!link.isInitialCard && (link.cardType === 'Spell' || link.cardType === 'Attack') && link.casterHeroIdx >= 0) {   // v1154
           const linkCardData = this._getCardDB()[link.cardName];
           if (linkCardData) {
             try {
+              _kettenBuddy = this.neuesBuddyTicket('kette', {
+                // Ablage nur, wenn das Glied keine Karte des Bretts ist (Helden-/Kreatur-Glieder), sich nicht selbst abräumt (`skipPostResolveDiscard`),
+                // nicht gelöscht wird und sich nicht selbst aufs Brett gelegt hat.
+                ablageErwartet: () => !link.fromHero && !link.fromCreature && !loadCardEffect(link.cardName)?.skipPostResolveDiscard
+                  && !loadCardEffect(link.cardName)?.deleteOnUse && !this.gs._spellPlacedOnBoard && !this.gs._spellReturnToHand,
+              });
               await this.runHooks('afterSpellResolved', {
                 heroOwner: link.heroOwner ?? link.owner,   // Styx 28.9.: Reihe, in die `heroIdx` zeigt
                 spellName: link.cardName,
@@ -43375,7 +43428,7 @@ this._deathWatch = (this._deathWatchStack || []).length
                 casterIdx: link.owner,
                 damageTargets: [],
                 isSecondCast: false,
-                _inyaBuddyWeg: true,   // W66a: das Kettenglied wertet `_spellPlacedOnBoard` unten selbst aus
+                _buddy: _kettenBuddy,   // W67a
                 _skipReactionCheck: true,
               });
             } catch (err) {
@@ -43408,9 +43461,8 @@ this._deathWatch = (this._deathWatchStack || []).length
           // suppresses the post-resolve discard for initial spell
           // casts in doPlaySpell. Per-link consumption: clear after
           // the check so the next link is unaffected.
-          const spellPlaced = this.gs._spellPlacedOnBoard === true;
-          if (spellPlaced) delete this.gs._spellPlacedOnBoard;
-          delete this.gs._spellBecameToken;   // W63b: Inyas Token-Marke gilt nur für den Weg der Karte selbst
+          const spellPlaced = this.gs._spellPlacedOnBoard === true || !!_kettenBuddy?.token;   // W67a: Inyas Token ersetzt die Ablage
+          if (this.gs._spellPlacedOnBoard) delete this.gs._spellPlacedOnBoard;
           if (!linkScript?.skipPostResolveDiscard && !spellPlaced) {
             await this._delay(250);
             const ps = this.gs.players[link.owner];
@@ -45138,6 +45190,51 @@ this._deathWatch = (this._deathWatchStack || []).length
    * als Wirkungsträger in `discard`, genau wie nach einer normalen Auflösung — unabhängig davon, ob der Token überlebt oder stirbt.
    * Das Flag wird in jedem Fall verbraucht (sonst hielte der NÄCHSTE Zauber seine Instanz grundlos fest).
    */
+  /**
+   * ★ W67a (Al, 23.10.2026: „Sofern es der Zug des Inya-Spielers ist, soll JEDER Subtyp von Spell zu einem Token werden können, sofern er nach seinem Effekt
+   * nicht auf dem Board bleiben würde"): der EINE Vertrag zwischen einem Auflösungsweg und Card Game Player Inya.
+   *
+   * Statt Marken im Spielstand (`gs._spellPlacedOnBoard` + `gs._spellBecameToken`, die in Wegen ohne Auswertung stehenblieben und den NÄCHSTEN Zauber
+   * verschluckten, W66a) trägt jeder Weg, der einen Spell-Kartenabschluss meldet (`afterSpellResolved`), ein Ticket im Hook-Kontext (`_buddy`):
+   *   • `ablageErwartet()` – wäre die Karte nach dem Auflösen in der Ablage? (false: Area/Attachment/Permanent/Glass Wall/Delete/zurück auf die Hand)
+   *   • `kannNehmen()` / `nimm()` – liegt die Karte schon in der Ablage (Hand-Reaktionen), nimmt `nimm()` sie dort heraus, BEVOR der Token erscheint.
+   *   • `token` – Inya trägt die Token-Instanz ein. Der Weg liest sie nach dem Hook und legt die Karte dann NICHT zusätzlich ab (genau EINE Platzierung).
+   * Das Ticket lebt nur für diesen Aufruf – nichts bleibt stehen, nichts kann den nächsten Zauber treffen.
+   */
+  neuesBuddyTicket(weg, opt = {}) {
+    return {
+      weg, token: null,
+      ablageErwartet: opt.ablageErwartet || (() => true),
+      kannNehmen: opt.kannNehmen || (() => true),
+      nimm: opt.nimm || (() => true),
+      kartenBesitzer: opt.kartenBesitzer,
+    };
+  }
+
+  /**
+   * ★ W67a: Ticket für eine HAND-REAKTION (die Karte wurde beim Aktivieren schon in die Ablage ihres permanenten Besitzers gelegt, `inDerAblage: true`)
+   * bzw. für ein Fenster, das die Karte erst NACH dem Hook ablegt (Ascension-Reaktion, `inDerAblage: false`).
+   */
+  reaktionsBuddyTicket(pi, cardName, script, opt = {}) {
+    const inDerAblage = opt.inDerAblage !== false;
+    const h = this._letzteHandHerkunft;
+    const besitzer = (h && h.pi === pi && h.cardName === cardName && Number.isInteger(h.besitzer)) ? h.besitzer : pi;
+    const pileVon = () => this.gs.players[besitzer]?.discardPile;
+    return this.neuesBuddyTicket('reaktion', {
+      kartenBesitzer: besitzer,
+      ablageErwartet: () => !script?.deleteOnUse && !script?.skipPostResolveDiscard,
+      kannNehmen: () => !inDerAblage || (pileVon() || []).lastIndexOf(cardName) >= 0,
+      nimm: () => {
+        if (!inDerAblage) return true;
+        const arr = pileVon();
+        const idx = arr ? arr.lastIndexOf(cardName) : -1;
+        if (idx < 0) return false;
+        this._takeFromPileCore(besitzer, this.gs.players[besitzer], arr, 'discard', idx, cardName, { source: 'Card Game Player Inya' });
+        return true;
+      },
+    });
+  }
+
   zauberInstanzNachBrettzug(inst) {
     const behalten = !!this.gs._spellKeepInstance;
     delete this.gs._spellKeepInstance;
