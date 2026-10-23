@@ -336,7 +336,7 @@ module.exports = attachSteamEngine({
      * On discard of 1+ cards from hand, deal 100 damage to any target.
      * Up to 3 uses per turn per instance (tracked on inst.counters).
      * Does NOT conflict with the shared STEAM ENGINE passive: that
-     * one has its own HOPT key (_steamEngineTurn), while this one
+     * one has its own HOPT key (_steamEngineTurn, legacy rule), while this one
      * nutzt den gemeinsamen Rundenzaehler (Schluessel `dragonPilot`).
      */
     onDiscard: async (ctx) => {
@@ -432,4 +432,4 @@ module.exports = attachSteamEngine({
       engine.sync();
     },
   },
-});
+}, { legacy: true });   // Dragon Pilot ist von der neuen +10-je-Karte-Regel ausgenommen
