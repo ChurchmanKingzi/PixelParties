@@ -140,6 +140,7 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
   });
   engine.takeFromPileSync(ps, 'hand', handIndex);
   const inst = engine._trackCard(cardName, pi, 'hand', heroIdx, -1);
+  { const _hk = fromDeck ? pi : engine._consumeHandCardOrigin(pi, cardName); if (_hk !== pi) inst.originalOwner = _hk; }   // W63c: gestohlene Handkarte — die Area gehoert ihrem Besitzer
   // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang — sonst taucht die
   // abgeflogene Karte nach dem Flug wieder in der Hand auf (Als
   // Befund 18.9. zu „Dive Down").
@@ -177,7 +178,7 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
     || inst.zone === 'area'
     || (gs.areaZones?.[pi] || []).includes(cardName);
   if (!placedOnBoard) {
-    ps.discardPile.push(cardName);
+    (engine.gs.players[engine.kartenBesitzerVon(inst)] || ps).discardPile.push(cardName);   // W63c: Ablage des permanenten Besitzers
     engine._untrackCard(inst.id);
     engine.log('cooldin_area_fizzle', { player: ps.username, card: cardName });
   }

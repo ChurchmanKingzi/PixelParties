@@ -176,6 +176,7 @@ module.exports = {
       await engine._delay(AME_FLUG_MS);
 
       engine.takeFromPileSync(ps, 'hand', handIdx);
+      const _ablagePs = engine.handKartenBesitzerPs(ps, 'Anti Magic Enchantment');   // W63c: Ablage des permanenten Besitzers (gestohlene Handkarte)
       // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
       // Startplatz der abfliegenden Karte nur, solange die Hand noch so
       // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
@@ -203,7 +204,7 @@ module.exports = {
       if (!entering.counters.buffs) entering.counters.buffs = {};
       entering.counters.buffs.anti_magic_enchanted = { source: 'Anti Magic Enchantment' };
 
-      ps.discardPile.push('Anti Magic Enchantment');
+      _ablagePs.discardPile.push('Anti Magic Enchantment');
       inst.zone = 'discard';
 
       engine.log('anti_magic_enchantment_applied', {

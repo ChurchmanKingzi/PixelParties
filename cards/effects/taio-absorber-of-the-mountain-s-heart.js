@@ -358,7 +358,7 @@ async function _castAsAdditionalAction(engine, pi, heroIdx, picked, feld = pi) {
       engine.takeFromPileSync(ps, 'hand', idx);
     }
   }
-  ps.discardPile.push(cardName);
+  (fromDeck ? ps : engine.handKartenBesitzerPs(ps, cardName)).discardPile.push(cardName);   // W63c: Ablage des permanenten Besitzers (gestohlene Handkarte)
   // ★ v1323 (Tester-Befund 23.9.): Wisdom NACH dem Guss — der Zauber
   // liegt dann schon in der Ablage (kein Selbst-Abwurf), und ein Abbruch
   // kostet nichts.

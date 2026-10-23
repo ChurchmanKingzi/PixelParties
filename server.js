@@ -7722,7 +7722,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
           }
           const result = room.engine.safePlaceInSupport(cardName, placementOwner, heroIdx, finalSlot);
           if (!result) {
-            ps.discardPile.push(cardName);
+            room.engine.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);   // W63c: Ablage des permanenten Besitzers (gestohlene Handkarte)
             room.engine.log('equip_fizzle', { card: cardName, reason: 'zone_occupied_by_chain' });
             return true;
           }
@@ -7975,7 +7975,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
             },
           );
           if (!placed) {
-            ps.discardPile.push(cardName);
+            room.engine.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);   // W63c: Ablage des permanenten Besitzers (gestohlene Handkarte)
             room.engine.log('artifact_creature_fizzle', { card: cardName, reason: 'no_free_zone_or_canceled' });
             return true;
           }
@@ -7983,7 +7983,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
           // playing player so the corpse routes to THEIR discard
           // pile per the engine's standard discard-routing rule —
           // Powder Keg conceptually belongs to whoever fired it.
-          if (_isCrossSideArtifact && placed.inst) {
+          if (_isCrossSideArtifact && placed.inst && !placed.inst._herkunftGestempelt) {   // W63c: gestohlene Handkarte behaelt ihren Besitzer
             placed.inst.originalOwner = pi;
           }
           return true;
@@ -8324,6 +8324,8 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     delete gs._spellFreeAction;
     const inst = room.engine._trackCard(cardName, pi, 'hand', heroIdx, -1);
     if (charmedOwner != null) inst.heroOwner = charmedOwner;
+    // W63c: gestohlene Handkarte — die Spell-Instanz traegt den BESITZER (Area/Attachment bleiben Eigentum des Besitzers, Ablage dort).
+    if (!fromCreation && Number.isInteger(handIndex)) { const _hk = room.engine._handCardPileOwner(pi, cardName, handIndex); if (_hk !== pi) inst.originalOwner = _hk; }
 
     // Hand-to-board fly animation for Attachment-subtype Spells. The card
     // attaches to heroIdx's hero card — we don't know the exact slot yet
@@ -15413,10 +15415,14 @@ io.on('connection', (socket) => {
       }
       return out;
     };
+    // W63c: Die HERKUNFT gestohlener Karten (`_handOriginals`) darf nie still verloren gehen — ohne gueltige Permutation (veralteter Client,
+    // Wettlauf mit einem Diebstahl) verteilt sie sich stattdessen NACH NAMEN auf die Plaetze der neuen Reihenfolge, statt gestrichen zu werden
+    // (sonst landete die Karte beim Abwerfen/Loeschen/Mischen in den Stapeln des Diebs).
+    const alteHerkunft = ps._handOriginals;
     if (room.engine?._handIndexedFields) {
       for (const [fieldName] of room.engine._handIndexedFields) {
         if (ps[fieldName] != null) {
-          ps[fieldName] = remapValueMap(ps[fieldName]);
+          ps[fieldName] = (fieldName === '_handOriginals' && !validMap) ? room.engine.herkunftNachNamenVerteilen(alteHerkunft, current, hand) : remapValueMap(ps[fieldName]);
         }
       }
     }

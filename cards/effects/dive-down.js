@@ -241,11 +241,13 @@ module.exports = {
         // noch existiert (CARD_API „FLUG-ZIELFELDER\").
         const handIdx = ps.hand.indexOf(CARD_NAME);
         if (handIdx < 0) break;
+        const _besitzer = engine._handCardPileOwner(pi, CARD_NAME, handIdx);   // W63c: Loeschstapel des permanenten Besitzers
         engine._broadcastEvent('play_pile_transfer', {
           owner: pi, cardName: CARD_NAME,
           from: 'hand', to: 'deleted',
           fromHandIdx: handIdx, asPlay: 'sole',
           sfx: 'discard',
+          ...(_besitzer !== pi ? { fromOwner: pi, toOwner: _besitzer } : {}),
         });
         engine.takeFromPileSync(ps, 'hand', handIdx);
         const inst = engine.cardInstances.find(c =>
@@ -286,7 +288,7 @@ module.exports = {
           },
         });
 
-        ps.deletedPile.push(CARD_NAME);
+        engine.handKartenBesitzerPs(ps, CARD_NAME).deletedPile.push(CARD_NAME);   // W63c
         if (kette?.negated) {
           engine.log('dive_down_negated', { player: ps.username, hero: hero.name });
         } else if (kette?.fizzled) {

@@ -295,8 +295,9 @@ async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) 
   // W5a (Al 14.10.2026): `opts.toPlayer` = Karten mit „… to YOUR hand" (Dark Deepsea God Tribut, Moonlight Butterfly „add this
   // Creature you control back to your hand"): eine geliehene Kreatur geht dann auf die Hand des KONTROLLEURS (und bleibt Eigentum
   // ihres Besitzers — Ablage/Deck spaeter dort, siehe `_tagHandCardOrigin` unten). Sonst wie bisher: Hand des Besitzers.
+  // W63c: der BESITZER (`originalOwner`) — auch fuer gestohlene/uebernommene Karten (Charme Lv 2, Hunting …), deren `owner` der Dieb ist.
   const ownerIdx = Number.isInteger(opts.toPlayer) ? opts.toPlayer
-    : (inst.counters?.crossSideControlled ?? inst.owner); // Hand-return ALWAYS goes to original owner.
+    : (engine.kartenBesitzerVon(inst) ?? inst.counters?.crossSideControlled ?? inst.owner); // Hand-return ALWAYS goes to original owner.
   const ps = gs.players[ownerIdx];
   if (!ps) return { returned: false };
   const bps = gs.players[seite] || ps;

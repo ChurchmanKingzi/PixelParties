@@ -251,7 +251,7 @@ module.exports = {
         inst.heroIdx = -1;
         inst.zoneSlot = -1;
       }
-      ps.discardPile.push(CARD_NAME);
+      engine.handKartenBesitzerPs(ps, CARD_NAME).discardPile.push(CARD_NAME);   // W63c: Ablage des permanenten Besitzers
 
       if (chainResult.negated) {
         engine.log('unwanted_audience_negated', { player: ps.username });

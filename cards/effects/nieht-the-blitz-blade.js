@@ -238,7 +238,7 @@ module.exports = {
       delete gs._forcedDamageTarget;
 
       engine._untrackCard(bonusInst.id);
-      ps.discardPile.push(bonusName);
+      engine.handKartenBesitzerPs(ps, bonusName).discardPile.push(bonusName);   // W63c: Ablage des permanenten Besitzers
 
       engine.log('nieht_blitz_extra_attack', {
         player: ps.username, hero: hero.name,

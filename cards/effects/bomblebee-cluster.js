@@ -174,7 +174,7 @@ module.exports = {
       if (!summonRes) {
         // Fizzle (zone occupied / beforeSummon refused) — discard the
         // ripped card so we don't lose it silently.
-        ps.discardPile.push(chosenName);
+        engine.handKartenBesitzerPs(ps, chosenName).discardPile.push(chosenName);   // W63c: Ablage des permanenten Besitzers
         engine.log('bomblebee_cluster_fizzle', {
           player: ps.username, card: chosenName,
         });

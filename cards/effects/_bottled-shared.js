@@ -106,7 +106,8 @@ async function runDiscardChain(engine, potionOwner, potionName) {
 
     if (handIndex >= 0 && handIndex < hand.length && hand[handIndex] === cardName) {
       engine.takeFromPileSync(currentPlayer, 'hand', handIndex);   // v1394: Stapel-Schicht
-      ps.discardPile.push(cardName);
+      const _ablagePs = engine.handKartenBesitzerPs(ps, cardName);   // W63c: Ablage des permanenten Besitzers (gestohlene Handkarte)
+      _ablagePs.discardPile.push(cardName);
       const inst = engine.findCards({ owner: currentPlayer, zone: 'hand', name: cardName })[0];
       if (inst) {
         inst.zone = 'discard';
