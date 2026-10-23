@@ -28153,6 +28153,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         title: opts.title || 'Steal Cards',
         description: opts.description || defaultDesc,
         maxSelect: effectiveCount,
+        // 23.10. (Secret Entrance, „up to 1/2/3"): Untergrenze der blinden Wahl; ohne Angabe müssen es genau `maxSelect` sein (Loot the Leftovers).
+        ...(Number.isInteger(opts.minSelect) ? { minSelect: Math.min(opts.minSelect, effectiveCount) } : {}),
         confirmLabel: opts.confirmLabel || '🫳 Steal!',
         oppHandCount: (oppPs.hand || []).length,
         blockedIndices: oppGesperrt,
