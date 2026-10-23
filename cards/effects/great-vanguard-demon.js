@@ -84,7 +84,7 @@ async function senkeStufe(ctx, gespielt, spieler) {
   for (let idx = 0; idx < ps.hand.length; idx++) {
     if (ps.hand[idx] !== CARD_NAME) continue;
     ps._handLevelOffsetsTransient[idx] = (ps._handLevelOffsetsTransient[idx] || 0) - 1;
-    engine._broadcastEvent('play_hand_card_animation', { owner: pi, handIdx: idx, animType: 'level_down', count: 1, duration: 900 });
+    engine._broadcastEvent('play_hand_card_animation', { owner: pi, handIdx: idx, cardName: CARD_NAME, animType: 'hand_level_down', count: 1, duration: 800 });
     engine.log('hand_level_reduced', { player: ps.username, card: CARD_NAME, by: gespielt, offset: ps._handLevelOffsetsTransient[idx] });
     n++;
   }

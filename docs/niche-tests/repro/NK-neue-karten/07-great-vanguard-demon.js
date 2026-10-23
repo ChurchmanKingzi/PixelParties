@@ -67,6 +67,8 @@ const H = require('../../lib/h.js');
   {
     const t = await fenster('Test Flight', [1, 0, ['Magic Arts', 'Magic Arts']]);
     const i = t.gs.players[1].hand.indexOf(GV);
+    const anim = t.events.filter(e => e.ev === 'play_hand_card_animation');
+    R.check('Animation: genau eine, Pixelart-Typ hand_level_down, am Kartennamen verankert (nicht am Engine-Index), Index = Platz der Karte', anim.length === 1 && anim[0].data.animType === 'hand_level_down' && anim[0].data.cardName === GV && anim[0].data.handIdx === i && anim[0].data.owner === 1, anim.map(a => a.data));
     R.check('Reaction-SPELL (Test Flight) vom Besitzer gespielt: Stufe 8', t.pile(1, 'discardPile').includes('Test Flight') && stufe(t, 1, i) === 8, { discard: t.pile(1, 'discardPile'), level: stufe(t, 1, i) });
     R.check('… genau einmal gezählt, Karte weiter aufgedeckt, keine Engine-Fehler', t.gs.players[1]._handLevelOffsetsTransient?.[i] === -1 && !!t.gs.players[1]._permanentlyRevealedHandIndices?.[i] && t.errors.length === 0, { off: t.gs.players[1]._handLevelOffsetsTransient, e: t.errors });
   }
