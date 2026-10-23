@@ -12,7 +12,7 @@
 
 module.exports = {
   isTargetingArtifact: true,
-  deferBroadcast: true,
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral (Auftritts-Puffer) VOR dem ersten Effektschritt, nach der letzten abbrechbaren Wahl.
 
   // ── CPU prompt routing (fast heuristic, NO nested MCTS) ───────────
   // Previous implementation routed both prompts through nested MCTS

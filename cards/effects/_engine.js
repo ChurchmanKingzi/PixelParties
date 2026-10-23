@@ -31500,6 +31500,8 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // ★ W63d: Zielwahl des ANDEREN Spielers (nicht des Kartenbesitzers) = der Auftritt ist committed (s. `promptGeneric`).
     if (this.gs._pendingCardReveal && playerIdx !== this.gs._pendingCardReveal.ownerIdx && !this._inMctsSim && !this._fastMode) this._firePendingCardReveal();
+    // ★ W64b: Pflicht-Zielwahl (`cancellable: false`) des Besitzers = der Effekt hat begonnen → Auftritt VOR der Frage (s. `promptGeneric`).
+    else if (this.gs._pendingCardReveal && playerIdx === this.gs._pendingCardReveal.ownerIdx && config.cancellable === false) this._auftrittSchritt('promptEffectTarget');
     if (this.isCpuPlayer(playerIdx) || this._inMctsSim || this._fastMode) {
       await this._delay(50);
       const cpuPicked = await this._getCpuTargetResponse(_waehlbar, config, playerIdx);
@@ -31996,7 +31998,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const pending = this.gs._pendingCardReveal;
     if (!pending) return;
     delete this.gs._pendingCardReveal;
-    this._auftrittAusliefern(pending);   // W63d: was bis zum Commit zurückgehalten wurde (chronologisch VOR dem Auftritt selbst)
+    // W64b: ZUERST der Auftritt (Bild + Zeile „… played"), DANN was der Puffer bis zum Commit zurückgehalten hat (Ankündigungen und die ersten Protokollzeilen des Effekts):
+    // sonst stünde eine Effektzeile („… discards 3 cards") vor der Zeile der Karte, die sie auslöst (Al: „der Gegner weiß nicht sofort, welchen Effekt er gerade mitansieht").
     if (!pending.stumm) {   // W63d: eine stumme Vormerkung (Beschwörung: Flug/Schein zeigen die Karte) liefert nur den Puffer aus
       require('./_opp').emitToOpponentsGs(this.gs, this.io, pending.ownerIdx, 'card_reveal', { cardName: pending.cardName });
       if (this.room?.spectators) {
@@ -32007,6 +32010,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     // Fire any pending play log at the same time as the card reveal
     this._firePendingPlayLog();
+    this._auftrittAusliefern(pending);
+    // W64b: der Zustand, den der Puffer an Gegner/Zuschauer zurückgehalten hat, kommt NACH dem Auftritt (Bild → Zustand), nie davor.
+    if (pending.zustandGehalten && !this._inMctsSim && !this._fastMode && !this._aborted) {
+      for (let i = 0; i < this.playerCount(); i++) if (i !== pending.ownerIdx) this.sendGameState?.(this.room, i);
+      this.sendSpectatorGameState?.(this.room);
+    }
   }
 
   /**
@@ -33849,6 +33858,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ★ W63d: eine Frage an den ANDEREN Spieler als den, dessen Karte noch auf ihren Auftritt wartet (Reaktionsfenster, „Suche zeigen", Gegnerwahl …):
     // er muss wissen, worauf er antwortet — und der Besitzer hat die Karte da längst verbindlich gespielt. Commit.
     if (this.gs._pendingCardReveal && playerIdx !== this.gs._pendingCardReveal.ownerIdx && !this._inMctsSim && !this._fastMode) this._firePendingCardReveal();
+    // ★ W64b: eine PFLICHTFRAGE an den Besitzer (ohne Abbruchknopf) gehört schon zum Effekt — hinter ihr gibt es keinen Rückweg mehr: der Auftritt kommt VOR der Frage.
+    else if (this.gs._pendingCardReveal && playerIdx === this.gs._pendingCardReveal.ownerIdx && !promptData?.cancellable) this._auftrittSchritt('promptGeneric');
     // CPU auto-response: resolve immediately without socket round-trip.
     // ALSO auto-resolve for non-CPU players during MCTS rollouts — the
     // socket is nulled out in fast mode, so the Promise path below would
@@ -54578,10 +54589,14 @@ this._deathWatch = (this._deathWatchStack || []).length
   //  (`emitToOpponentsGs`, `sendToSpectators`). Der Besitzer bekommt alles wie bisher sofort.
   //
   //  COMMIT (der Puffer wird geleert, der Auftritt gezeigt) — zentral, ohne dass die Karte etwas tun muss:
-  //    • die erste SICHTBARE Wirkung (jedes Ereignis außer den Hold-Ereignissen `action_log` / `hand_to_board_fly`), während der Besitzer KEINE Frage offen hat;
+  //    • die erste SICHTBARE Wirkung (jedes Ereignis außer den Hold-Ereignissen `action_log` / `hand_to_board_fly` / `ability_activated` / `potion_resolved`), während der Besitzer KEINE Frage offen hat;
   //    • eine Frage an den ANDEREN Spieler (Reaktionsfenster, Suche-zeigen …) — er muss wissen, worauf er antwortet;
   //    • das Ende der Auflösung (Server: `_firePendingCardReveal` nach dem Guss) und jeder ausdrückliche Aufruf `engine.commitAppearance()`;
-  //    • die CPU (nichts zu verbergen): `maybeFireCpuRevealEarly`.
+  //    • die CPU (nichts zu verbergen): `maybeFireCpuRevealEarly`;
+  //    • ★ W64b: jeder ENGINE-EFFEKTSCHRITT (`_auftrittSchritt`: `engine.action…` + `AUFTRITT_SCHRITT_PRIMITIVE`, Hülle am Dateiende) und jede PFLICHTFRAGE an den Besitzer (`promptGeneric`/`promptEffectTarget` ohne `cancellable`)
+  //      — der Auftritt steht VOR dem ersten Effektschritt, auch wenn der Effekt nur still den Zustand ändert.
+  //  ★ W64b — ZUSTANDSPUFFER: solange die Vormerkung offen ist und der Besitzer keine Frage offen hat, geht KEIN `game_state` an Gegner/Zuschauer (`_auftrittZustandHalten`, Server `sendGameState`/`sendSpectatorGameState`);
+  //  mit offener abbrechbarer Frage bekommen sie den Zustand von VOR der Karte + die Hülle der Frage. Der Commit liefert zuerst card_reveal + Zeile der Karte, dann das Zurückgehaltene, dann den Zustand.
   //  ABBRUCH: der Spielweg löscht `gs._pendingCardReveal` — mit ihm der Puffer. Nichts war zu sehen, nichts wird nachgeliefert.
   //  Eine bestätigte Antwort allein ist KEIN Commit (mehrstufige Auswahl: Galerie → Held → Zone; erst die letzte Stufe schließt die Abbruchmöglichkeit).
   //  `gs._holdCardReveal = true` hält den Auftritt weiterhin zurück, bis die Karte ihn selbst freigibt (ältere Muster bleiben gültig).
@@ -54646,6 +54661,45 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /** Ausdrücklicher Commit-Punkt für Karten mit eigenen Abfragen: „ab hier gibt es keinen Abbruch mehr" (= `_firePendingCardReveal`). */
   commitAppearance() { this._firePendingCardReveal(); }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  //  ★ W64b — AUFTRITT VOR DEM ERSTEN EFFEKTSCHRITT (Al, 23.10.2026: „Auftritte sollten allgemein VOR BEGINN der Effekte gestreamed werden (aber nach dem Confirm) …
+  //  Aktiviere eine Karte, wähle ggf. ihre Ziele, bestätige ggf., dass sie feuern soll, DANN streame den Auftritt, dann feuere den Effekt durch.")
+  //
+  //  Die Karte weiß nicht, ob nach einer bestätigten Antwort noch ein Abbruch kommt — die Engine erkennt den Beginn des Effekts daran, dass etwas GESCHIEHT:
+  //    • ein Engine-Effektschritt (`engine.action…`, alle Zustandsprimitive der Karten) — `_auftrittSchritt` sitzt VOR jedem `action…` (Hülle am Dateiende);
+  //    • eine PFLICHTFRAGE an den Besitzer (`cancellable` nicht gesetzt/false): ab hier kann er nicht mehr zurück (`promptGeneric`/`promptEffectTarget`);
+  //    • (wie bisher) das erste sichtbare Ereignis, eine Frage an den anderen Spieler, das Ende der Auflösung, `commitAppearance()`.
+  //  Zusätzlich HÄLT der Puffer den ZUSTAND (`game_state`) an Gegner/Zuschauer zurück, solange der Besitzer keine Frage offen hat (`_auftrittZustandHalten`): so kann auch eine Karte, die nur still
+  //  den Zustand ändert (direkter Zugriff, `sync()`), den Gegner nie VOR ihrem Auftritt etwas sehen lassen; mit dem Commit wird der Zustand sofort nachgeliefert.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Beginn eines Effektschritts: hat der Besitzer keine Frage mehr offen (= keine Abbruchmöglichkeit), wird der Auftritt jetzt gezeigt — VOR dem Schritt.
+   * `grund` (Name des Primitivs) dient nur der Diagnose beim Debuggen.
+   */
+  _auftrittSchritt(grund) {
+    const pend = this.gs && this.gs._pendingCardReveal;
+    if (!pend || this._inMctsSim || this._fastMode || this._auftrittFlush) return false;
+    if (this.gs._holdCardReveal) return false;
+    if (this._auftrittFrageOffen(pend.ownerIdx)) return false;   // der Besitzer kann noch abbrechen (und ein Primitiv läuft nur nebenher)
+    this._firePendingCardReveal();
+    return true;
+  }
+
+  /**
+   * Wie soll `game_state` für diesen Empfänger (Spielerindex, -1 = Zuschauer) jetzt behandelt werden? `false` = normal senden; `'halten'` = gar nichts senden (Vormerkung offen, der Besitzer hat
+   * KEINE Frage offen); `'huelle'` = den Zustand von vor der Karte senden, nur mit der (maskierten) Frage des Besitzers (Frage offen). Der Commit liefert den echten Zustand nach (`_firePendingCardReveal`).
+   */
+  _auftrittZustandHalten(empfaengerIdx) {
+    const pend = this.gs && this.gs._pendingCardReveal;
+    if (!pend || this._inMctsSim || this._fastMode || this._auftrittFlush) return false;
+    if (empfaengerIdx === pend.ownerIdx) return false;
+    if (pend._turn == null) pend._turn = this.gs.turn;
+    else if (pend._turn !== this.gs.turn) { this._firePendingCardReveal(); return false; }   // liegengebliebene Vormerkung: nie Zustände verschlucken
+    pend.zustandGehalten = true;
+    return this._auftrittFrageOffen(pend.ownerIdx) ? 'huelle' : 'halten';   // 'huelle': nur die Hülle der Frage ist neu, der Rest bleibt der Zustand von vor der Karte
+  }
 
   // ─── LOGGING ──────────────────────────────
 
@@ -55864,6 +55918,21 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     return false;
   }
+}
+
+// ★ W64b: jeder Engine-Effektschritt (`engine.action…`) zeigt zuerst den Auftritt der gerade aufgelösten Karte (`_auftrittSchritt`) — Al: „Auftritt VOR BEGINN der Effekte".
+// Eine einzige Hülle statt Eingriffen in ~60 Primitive; ohne offene Vormerkung kostet sie einen Eigenschaftszugriff.
+// Dazu die wichtigsten Primitive, die nicht `action…` heißen (Status, Beschwörung aus der Ablage, Flächen, Mischen …). Eine Zusatzzeile hier kostet nichts; fehlt eines, greift der Rückfall
+// (erstes sichtbares Ereignis / erste Protokollzeile / Zustandspuffer) — der Sweep `W64/b-0x` zeigt, ob eine Karte davor etwas preisgibt.
+const AUFTRITT_SCHRITT_PRIMITIVE = new Set(['addHeroStatus', 'removeHeroStatus', 'applyCreatureStatus', 'cleanseHeroStatuses', 'cleanseCreatureStatuses', 'increaseMaxHp', 'dealDamageToTargets',
+  'summonCreatureWithHooks', 'summonFromDiscard', 'placeArea', 'shuffleDeck', 'addCardFromDiscardToHand', 'grantAdditionalAction', 'performImmediateAction', 'performImmediateActionAnyHero', 'sendBoardCardToDiscard']);
+for (const _name of Object.getOwnPropertyNames(GameEngine.prototype)) {
+  const _orig = GameEngine.prototype[_name];
+  if (!(/^action[A-Z]/.test(_name) || AUFTRITT_SCHRITT_PRIMITIVE.has(_name)) || typeof _orig !== 'function') continue;
+  GameEngine.prototype[_name] = { [_name](...args) {
+    if (this.gs && this.gs._pendingCardReveal) this._auftrittSchritt(_name);
+    return _orig.apply(this, args);
+  } }[_name];
 }
 
 module.exports = { GameEngine, CardInstance, SPEED, STATUS_EFFECTS, getNegativeStatuses };

@@ -96,7 +96,7 @@ module.exports = {
   // Defer the card reveal until AFTER the player has picked an Area,
   // matching Monster in a Bottle. The opponent sees "Planet in a Bottle"
   // and the chosen Area in the same beat.
-  deferBroadcast: true,
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral; `commitAppearance()` unten = nach allen Wahlen.
 
   canActivate(gs, pi, engine) {
     const ps = gs.players[pi];
@@ -143,12 +143,9 @@ module.exports = {
     if (!chosenEntry) return { cancelled: true };
     const chosenSource = chosenEntry.source;
 
-    // ── Step 2: All decisions made — reveal the potion card to opponent NOW ──
+    // ── Step 2: All decisions made — reveal the potion card to opponent NOW (W64b: zentral, auch für Zuschauer) ──
     const oi = engine.opponentOf(pi);
-    const oppSid = gs.players[oi]?.socketId;
-    if (oppSid && engine.io) {
-      engine.io.to(oppSid).emit('card_reveal', { cardName: 'Planet in a Bottle' });
-    }
+    engine.commitAppearance();
     await engine._delay(100);
 
     // ── Step 3: Remove the chosen Area from its source pile ──

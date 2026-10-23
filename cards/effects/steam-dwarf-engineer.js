@@ -91,13 +91,6 @@ module.exports = attachSteamEngine({
       .map(([name, count]) => ({ name, source: 'deck', count }));
     if (galleryCards.length === 0) return false;
 
-    // Preview puff
-    engine._broadcastEvent('play_zone_animation', {
-      type: 'steam_puff',
-      owner: inst.owner, heroIdx, zoneSlot,
-    });
-    await engine._delay(200);
-
     const result = await engine.promptGeneric(pi, {
       type: 'cardGallery',
       cards: galleryCards,
@@ -107,6 +100,13 @@ module.exports = attachSteamEngine({
       cancellable: true,
     });
     if (!result || result.cancelled || !result.cardName) return false;
+
+    // Puff (W64b: erst NACH der Wahl — als Vorschau vor der abbrechbaren Galerie sah der Gegner die Aktivierung auch bei Abbruch)
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'steam_puff',
+      owner: inst.owner, heroIdx, zoneSlot,
+    });
+    await engine._delay(200);
 
     // Verify still in deck (the player's own prompt may have shown
     // stale data in edge cases — mill, other effects).

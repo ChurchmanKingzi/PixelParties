@@ -119,7 +119,7 @@ module.exports = {
   // des Loaders wuerde sonst unter Knight of Kings [B] die ganze Karte sperren.
   blockedByPileLock: false,
   isPotion: true,
-  deferBroadcast: true, // Broadcast after creature+zone selected, not before
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral; `commitAppearance()` unten = nach Kreatur + Zone.
 
   canActivate(gs, pi, engine) {
     const ps = gs.players[pi];
@@ -236,12 +236,8 @@ module.exports = {
       });
       if (!zone) continue; // Back → re-pick creature
 
-      // All decisions finalized — broadcast card to opponent NOW
-      const oi = engine.opponentOf(pi);
-      const oppSid = gs.players[oi]?.socketId;
-      if (oppSid && engine.io) {
-        engine.io.to(oppSid).emit('card_reveal', { cardName: 'Monster in a Bottle' });
-      }
+      // All decisions finalized — stream the card NOW (W64b: zentral über den Auftritts-Puffer, auch für Zuschauer)
+      engine.commitAppearance();
       await engine._delay(100);
 
       // Execute: remove from source, place into support zone

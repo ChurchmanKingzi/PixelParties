@@ -4657,6 +4657,10 @@ function sendGameState(room, playerIdx, extra) {
   // Kette war also noch minutenlang am Aufloesen und hat in dieser
   // Zeit weiter Spielzustaende verschickt.
   if (room.engine?._aborted) return;
+  // ★ W64b: Auftritts-Puffer — solange die Karte des aktiven Spielers noch nicht gezeigt ist (und er keine Frage offen hat), sieht der Gegner keinen neuen Zustand;
+  // der Commit liefert ihn nach dem Auftritt (engine._firePendingCardReveal). Resync (`sendGameStateErzwungen`) ist ausgenommen.
+  const _auftrittHalt = (_zustandErzwungen || extra) ? false : room.engine?._auftrittZustandHalten?.(playerIdx);   // false | 'halten' | 'huelle'
+  if (_auftrittHalt === 'halten') return;
   // ★ v1263 (Tester-Report 21.9.: „when i click play online after
   // finishing a match, it puts me back in the match, but at the very
   // start again"). Wer nach dem Ergebnis den Raum verlaesst, bleibt mit
@@ -4733,7 +4737,7 @@ function sendGameState(room, playerIdx, extra) {
       }
     }
   }
-  const state = {
+  let state = {
     myIndex: playerIdx, roomId: room.id,
     players: gs.players.map((ps, pi) => ({
       username: ps.username, color: ps.color, avatar: bildRef(ps.avatar), cardback: bildRef(ps.cardback) || null, board: bildRef(ps.board) || null,   // v1374
@@ -5949,6 +5953,17 @@ function sendGameState(room, playerIdx, extra) {
   //  • `stateSeq` zaehlt nur noch tatsaechlich gesendete Zustaende.
   //  • Abschalten: PP_STATE_DEDUPE=0.
   let sig = null;
+  // ★ W64b: Frage des Besitzers offen, Karte noch nicht gezeigt → der Gegner sieht den Zustand von VOR der Karte, nur die Hülle der Frage ist neu
+  // (eine Karte, die vor einer abbrechbaren Frage schon etwas verändert hat, verriete sich sonst im Zustand).
+  if (_auftrittHalt === 'huelle') {
+    const vorher = _zustandsCache.get(p);
+    if (vorher && vorher.socketId === p.socketId && vorher.sig) {
+      try {
+        const basis = JSON.parse(vorher.sig);
+        state = { ...basis, effectPrompt: state.effectPrompt, potionTargeting: state.potionTargeting };
+      } catch { /* kein Einfrieren möglich: aktueller Zustand */ }
+    }
+  }
   if (STATE_DEDUPE) {
     sig = JSON.stringify(state);
     const vorher = _zustandsCache.get(p);
@@ -5963,10 +5978,12 @@ function sendGameState(room, playerIdx, extra) {
 const STATE_DEDUPE = process.env.PP_STATE_DEDUPE !== '0';
 const _zustandsCache = new WeakMap();
 /** Wie `sendGameState`, schickt aber IMMER — fuer Resync (Client soll sicher den Serverstand sehen). */
+let _zustandErzwungen = false;
 function sendGameStateErzwungen(room, playerIdx) {
   const p = room.players && room.players[playerIdx];
   if (p) _zustandsCache.delete(p);
-  sendGameState(room, playerIdx);
+  _zustandErzwungen = true;
+  try { sendGameState(room, playerIdx); } finally { _zustandErzwungen = false; }
 }
 
 function sendToSpectators(room, event, data) {
@@ -5985,6 +6002,10 @@ function sendSpectatorGameState(room) {
   if (!room.spectators || room.spectators.length === 0) return;
   const gs = room.gameState;
   if (!gs) return;
+  const _auftrittHalt = room.engine?._auftrittZustandHalten?.(-1);   // W64b: wie beim Gegner — der Zustand folgt dem Auftritt (false | 'halten' | 'huelle')
+  // Ein Zuschauer, der mitten in einer offenen Vormerkung beitritt, hat noch GAR keinen Zustand: er bekommt den aktuellen (nur an ihn), statt eines leeren Bildschirms bis zum Commit.
+  const _neueZuschauer = _auftrittHalt ? room.spectators.filter(sp => sp.socketId && !sp._zustandDa) : null;
+  if (_auftrittHalt === 'halten' && !_neueZuschauer.length) return;
 
   // Determine who is choosing first (for awaiting first choice overlay)
   let choosingPlayerName = null;
@@ -5993,7 +6014,7 @@ function sendSpectatorGameState(room) {
     if (loserPs) choosingPlayerName = loserPs.username;
   }
 
-  const state = {
+  let state = {
     isSpectator: true,
     myIndex: 0, // Player 0 at bottom, Player 1 at top (host = bottom)
     roomId: room.id,
@@ -6330,8 +6351,12 @@ function sendSpectatorGameState(room) {
     },
   };
 
-  for (const spec of room.spectators) {
-    if (spec.socketId) io.to(spec.socketId).emit('game_state', state);
+  if (_auftrittHalt === 'huelle' && room._zuschauerSig) {   // W64b: Zustand von vor der Karte, nur die Hülle der Frage ist neu (s. sendGameState)
+    try { state = { ...JSON.parse(room._zuschauerSig), effectPrompt: state.effectPrompt, potionTargeting: state.potionTargeting }; } catch { /* aktueller Zustand */ }
+  }
+  if (_auftrittHalt !== 'halten') room._zuschauerSig = JSON.stringify(state);   // (die Basis für „Zustand von vor der Karte" bleibt der letzte regulär gesendete)
+  for (const spec of (_auftrittHalt === 'halten' ? _neueZuschauer : room.spectators)) {
+    if (spec.socketId) { io.to(spec.socketId).emit('game_state', state); spec._zustandDa = true; }
   }
 }
 
@@ -12216,8 +12241,8 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
   try {
     const oi = opponentOfGs(gs, pi);
     // ★ W63d: der Auftritt wird nur VORGEMERKT (Auftritts-Puffer der Engine) — Trank-Fragen (Galerie, Zone, Ziel) sind abbrechbar, und der Gegner darf die Karte erst nach dem Commit sehen.
-    // `deferBroadcast`-Tränke zeigen sich wie bisher selbst (an ihrer eigenen Zusagestelle).
-    if (!script.deferBroadcast) gs._pendingCardReveal = { cardName, ownerIdx: pi };
+    // W64b: auch Karten mit dem alten Flag `deferBroadcast` werden vorgemerkt (das Flag ist ohne Wirkung; die Skripte markieren ihre Zusagestelle mit `engine.commitAppearance()`).
+    gs._pendingCardReveal = { cardName, ownerIdx: pi };
 
     room.engine._setPendingPlayLog('card_played', { player: ps.username, card: cardName, cardType: 'Potion', cost: 0 });
     room.engine.maybeFireCpuRevealEarly();   // Live-CPU: wie bei Zaubern/Artefakten sofort zeigen (nichts zu verbergen)
@@ -12521,9 +12546,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
   // aufdecken (`_pendingCardReveal` unten), aufloesen, in die Ablage.
 
   try {
-    if (!script.deferBroadcast) {
-      gs._pendingCardReveal = { cardName, ownerIdx: pi };
-    }
+    gs._pendingCardReveal = { cardName, ownerIdx: pi };   // W64b: `deferBroadcast` ist ohne Wirkung — jede Karte wird vorgemerkt (Skripte markieren ihre Zusagestelle mit `engine.commitAppearance()`)
     room.engine._setPendingPlayLog('card_played', { player: ps.username, card: cardName, cardType: 'Artifact', cost: cost || 0 });
 
     // Live CPU: stream the Artifact before its effect resolves
@@ -22137,4 +22160,4 @@ initDatabase().then(async () => {
 });
 
 // Für die Headless-Simulation des Skill-Test-Modus (skilltest/sim-bridge.js; PP_ST_SIM=1).
-module.exports = { skillTestHandlers: { doPlaySpell, doPlayCreature, doPlayArtifact, doUseArtifactEffect, doPlaySurprise, doActivateCreatureEffect, doActivateHeroEffect, doActivateEquipEffect, doUsePotion, doConfirmPotion, doPlayAbility, doActivateAbility, doActivateFreeAbility, setupGameState, effectPromptFuer, sendGameState, sendSpectatorGameState } };
+module.exports = { skillTestHandlers: { doPlaySpell, doPlayCreature, doPlayArtifact, doUseArtifactEffect, doPlaySurprise, doActivateCreatureEffect, doActivateHeroEffect, doActivateEquipEffect, doUsePotion, doConfirmPotion, doPlayAbility, doActivateAbility, doActivateFreeAbility, setupGameState, effectPromptFuer, sendGameState, sendGameStateErzwungen, sendSpectatorGameState } };

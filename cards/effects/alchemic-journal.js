@@ -11,7 +11,7 @@ const { baseCardName } = require('./_hooks');
 
 module.exports = {
   isTargetingArtifact: true,
-  deferBroadcast: true,
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral (Auftritts-Puffer) VOR dem ersten Effektschritt, nach der letzten abbrechbaren Wahl.
   // Both modes (draw + search) move a Potion from deck to hand —
   // hand-locked controllers can't do either. Blocks the artifact
   // entirely while the lock is active.
