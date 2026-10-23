@@ -131,7 +131,7 @@ def main():
     ur = ', '.join(teile)
     bloecke = ['/* PIXEL-EMOJI:BEGIN — erzeugt von scripts/pixel-emoji/build_font.py, nicht von Hand aendern */']
     for fam in FAMILIEN:
-        bloecke.append("@font-face { font-family: '%s'; src: url('/fonts/pp-pixel-emoji.woff2') format('woff2'); unicode-range: %s; font-display: swap; }" % (fam, ur))
+        bloecke.append("@font-face { font-family: '%s'; src: url('/fonts/pp-pixel-emoji.woff2') format('woff2'); unicode-range: %s; font-display: block; }" % (fam, ur))
     # Bedienelemente ohne eigene Schrift (Browser-Standard Arial) bekommen die Pixel-Zeichen vorangestellt; `:where` = Spezifitaet 0, jede Klasse darf weiter ueberschreiben.
     bloecke.append("/* Bedienelemente ohne eigene Schrift: Emoji trotzdem als Pixelart */")
     bloecke.append(":where(button, input, select, textarea, option) { font-family: 'PP Pixel Emoji', Arial, sans-serif; }")
