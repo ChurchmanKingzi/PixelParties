@@ -10,6 +10,7 @@ node docs/niche-tests/repro/NK-neue-karten/04-batterien.js      # Dauerfeuer + K
 node docs/niche-tests/repro/NK-neue-karten/05-luck-reaction-surprise-revive.js   # Luck + Liquid Luck: Reactions, Surprise-Aktivierung, Wiederbelebung
 node docs/niche-tests/repro/NK-neue-karten/07-great-vanguard-demon.js   # Great Vanguard Demon: Aufdecken, Stufensenkung, Counter, Schaden
 node docs/niche-tests/repro/NK-neue-karten/06-cpu-luck.js       # CPU-Wähler und CPU-Entscheidung für Luck / Liquid Luck
+node docs/niche-tests/repro/NK-neue-karten/08-puzzle-handstufe.js   # Puzzle-Creator: Stufe je Handkopie (Engine-Seite der Setzung)
 ```
 
 Exit 1 bei einem ✗. Voraussetzung: `npm ci` (die Engine braucht `uuid`).
@@ -23,3 +24,4 @@ Exit 1 bei einem ✗. Voraussetzung: `npm ci` (die Engine braucht `uuid`).
 | `05` | Luck und Liquid Luck (Entscheidung Al 23.10.): Reaction-/Surprise-Namen im Wähler, Reactions (Test Flight, Martyry, Anti-Magnet, Divine Gift of the Guardian) zählen genau einmal, Surprise nur bei Aktivierung (Spell- und Creature-Surprise), Wiederbelebung einer Creature zählt, eines Helden nicht |
 | `06` | CPU-Heuristik: Wähler-Stufen (sicherer Play vor Reaction/Surprise, Muster aus aktivierten Surprises, verdeckte Surprise des Gegners, Fallbacks), Liquid Luck nur bei gefülltem Deck, CPU-Durchlauf mit installierter Heuristik |
 | `07` | Great Vanguard Demon: Aufdecken auf jedem Weg, Stufensenkung je eigener Reaction (Spell, Attack, Creature; nicht Artefakt/gegnerische/normale), mehrere Kopien, Zurücksetzen auf 9 (Abwerfen, Löschen, Deck, Ausspielen), Untergrenze 0, Spielbarkeit nach Stufe, Demon Counter auf alle eigenen Creatures (Kontrolle), Horned Demon profitiert, 50 × Counter auf dem Brett, einmal pro Zug |
+| `08` | Puzzle-Creator, Stufe je Handkopie (Linksklick auf eine Handkarte mit Level): absolute Setzung `counters.levelSet` auf dem Weg des Puzzle-Starts — gesenkt (spielbar mit niedrigerer Schulstufe, gedruckte Kopie nicht), erhöht, Stufe 0, Wirkung neben Handsenkungen (Basis + Senkung, nie unter 0), gleichnamige Kopien getrennt, Gegnerhand. Editor, Export und Anzeige im Browser geprüft (siehe `cards/effects/CARD_API.md`, Abschnitt „Puzzle-Creator: Stufe je Handkopie“) |

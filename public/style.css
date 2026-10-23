@@ -15383,6 +15383,28 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   pointer-events: auto;
 }
 
+/* ── Puzzle Creator: Stufe einer Handkarte (23.10.) — harte Pixelrahmen, nur Variablen der Palette ── */
+.pz-lv-pop {
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 4px;
+  background: var(--bg2);
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 2px var(--bg);
+  font-size: 9px; font-weight: 700; white-space: nowrap;
+  pointer-events: auto;
+}
+.pz-lv-btn, .pz-lv-reset {
+  background: var(--bg3); color: var(--text);
+  border: 2px solid var(--accent);
+  font: inherit; line-height: 1; cursor: pointer;
+}
+.pz-lv-btn { width: 18px; height: 18px; padding: 0; }
+.pz-lv-reset { padding: 2px 5px; color: var(--text2); border-color: var(--text2); }
+.pz-lv-btn:hover, .pz-lv-reset:hover { background: var(--accent); color: var(--bg); }
+.pz-lv-wert { min-width: 34px; text-align: center; color: var(--text); }
+.pz-lv-tiefer { color: var(--success); }
+.pz-lv-hoeher { color: var(--danger); }
+
 /* ── Puzzle Creator: mobile touch fixes ── */
 @media (pointer: coarse) {
   .pz-search-card,

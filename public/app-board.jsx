@@ -35446,7 +35446,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Forager, …) so the highlight agrees with `heroMeetsLevelReq`. Only
     // meaningful for the own player — the charmed-summon path calls this
     // with `me` too, so the opponent's side does not need its own delta.
-    const rawLevel = card.level || 0;
+    let rawLevel = card.level || 0;
+    // 23.10.: absolut gesetzte Stufe einer Handkopie (Puzzle-Creator, Inconspicuous Lawn Gnome): „darf IRGENDEINE Kopie", also die niedrigste Basis unter den Kopien.
+    if (playerData === me && card.name && me.handLevelSet && Object.keys(me.handLevelSet).length) {
+      let beste = null;
+      (me.hand || []).forEach((n, i) => {
+        if (n !== card.name) return;
+        const v = me.handLevelSet[i] ?? card.level ?? 0;
+        if (beste == null || v < beste) beste = v;
+      });
+      if (beste != null) rawLevel = beste;
+    }
     const reduction = (playerData === me ? (gameState.cardLevelReductions || {})[card.name] : 0) || 0;
     let level = Math.max(0, rawLevel - reduction);
     // Per-instance hand-card level offsets (Rocky Slime + Sparkfly
@@ -53386,9 +53396,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // "Lv-1". Level requirements never go below 0 in this
                 // game (any Hero can satisfy a Lv0 cast) so the badge
                 // should track that semantic.
-                const handEffectiveLevel = (handLevelOffset !== 0 || manaCrystalBoost !== 0)
+                // 23.10.: absolut gesetzte Stufe dieser Kopie (Puzzle-Creator, Inconspicuous Lawn Gnome) ist die Basis, auf der die Senkungen weiterwirken.
+                const handLevelGesetzt = (me.handLevelSet || {})[item.origIdx];
+                const handEffectiveLevel = (handLevelOffset !== 0 || manaCrystalBoost !== 0 || handLevelGesetzt != null)
                   && handCardData?.level != null
-                  ? Math.max(0, handCardData.level + handLevelOffset + manaCrystalBoost)
+                  ? Math.max(0, (handLevelGesetzt ?? handCardData.level) + handLevelOffset + manaCrystalBoost)
                   : null;
                 const handLevelHostHeroIdx = (me.handLevelOffsetHeroFilter || {})[item.origIdx];
                 const handLevelIsHeroFiltered = handLevelHostHeroIdx != null;
