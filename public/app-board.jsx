@@ -35208,6 +35208,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     return -1;
   };
 
+  // W64a (Al, 23.10.2026: „Der Spieler darf auch auf eine freie Zone klicken und so den Alice-Effekt quasi 'verschwenden', indem er trotzdem seine Creatures verteilt."):
+  // der Slot-Picker des Klickwegs bietet ALLE Zonen an, in die die Karte darf — die geteilten Zonen (gleichnamige Creature, Alice) VORN, danach ALLE freien Zonen des Helden
+  // (nicht nur die erste). Es wird nichts erzwungen: die Wahl einer freien Zone ist trotz verfuegbarer geteilter Zone gueltig (der Server setzt genau die geklickte Zone).
+  const allSummonSlots = (playerData, heroIdx, cardName) => {
+    const out = [];
+    const supZones = playerData.supportZones[heroIdx] || [[], [], []];
+    if (cardName) for (let z = 0; z < 3; z++) if (canShareSupportSlot(playerData, heroIdx, z, cardName)) out.push({ slotIdx: z, shared: true });
+    for (let s = 0; s < supZones.length; s++) if (!supZones[s] || supZones[s].length === 0) out.push({ slotIdx: s, shared: false });
+    return out;
+  };
+
   // W63a (Al, 22.10.2026: „erst die geteilte Zone, DANN die erste leere"): Standard-Platz fuer AUTOMATISCHE Beschwoerungen (Heldenaktion ohne Auswahl): solange
   // Alices Effekt greift, die Zone einer gleichnamigen Creature, sonst die erste freie Zone. Der Spieler-Klickweg oeffnet weiter den Slot-Picker (beide waehlbar).
   const findAutoSummonSlot = (playerData, heroIdx, cardName) => {
@@ -36890,10 +36901,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const normalTargets = [];
               for (let hi = 0; hi < (me.heroes || []).length; hi++) {
                 if (!canHeroNormalSummon(me, hi, card)) continue;
-                const slot = findFreeSupportSlot(me, hi);
-                if (slot < 0) continue;
-                normalTargets.push({ heroIdx: hi, slotIdx: slot });
+                // W64a: geteilte Zonen (Alice) vorn, danach ALLE freien Zonen des Helden.
+                for (const sl of allSummonSlots(me, hi, cardName)) normalTargets.push({ heroIdx: hi, slotIdx: sl.slotIdx, ...(sl.shared ? { shared: true } : {}) });
               }
+              normalTargets.sort((a, b) => (b.shared ? 1 : 0) - (a.shared ? 1 : 0));
               // Styx 28.9.: auch ueber geliehene Helden der Gegenspalte.
               for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
                 const g = opp.heroes[hi];
@@ -36922,15 +36933,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const shareTargets = [];
               for (let hi = 0; hi < (me.heroes || []).length; hi++) {
                 if (!canHeroNormalSummon(me, hi, card)) continue;
-                const sz = findShareableSupportSlot(me, hi, cardName);
-                if (sz >= 0) shareTargets.push({ heroIdx: hi, slotIdx: sz });
+                for (const sl of allSummonSlots(me, hi, cardName)) if (sl.shared) shareTargets.push({ heroIdx: hi, slotIdx: sl.slotIdx, shared: true });
               }
               if (shareTargets.length > 0) {
+                // W64a: ALLE freien Zonen bleiben waehlbar (nicht nur die erste je Held) — die geteilte Zone steht vorn, aber nichts wird erzwungen.
                 const freeTargets = [];
                 for (let hi = 0; hi < (me.heroes || []).length; hi++) {
                   if (!canHeroNormalSummon(me, hi, card)) continue;
-                  const fz = findFreeSupportSlot(me, hi);
-                  if (fz >= 0) freeTargets.push({ heroIdx: hi, slotIdx: fz });
+                  for (const sl of allSummonSlots(me, hi, cardName)) if (!sl.shared) freeTargets.push({ heroIdx: hi, slotIdx: sl.slotIdx });
                 }
                 setPendingBouncePick({
                   cardName, handIndex: idx, fromCreation, card,

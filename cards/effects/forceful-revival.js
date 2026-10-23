@@ -179,23 +179,29 @@ module.exports = {
       // sie ERSCHEINT mit dem Aufprall.
       const freiSlot = _userSlotFor(engine, hps, pi, hs, heroIdx, chosenName);   // Als Befund 29.9.: Brettseite des Nutzers; W62a: erste freie, sonst geteilte Zone (Alice)
       if (freiSlot < 0) { gs._spellCancelled = true; return; }
-      engine._broadcastEvent('play_ram_animation', {
-        sourceOwner: hs, sourceHeroIdx: heroIdx,   // Als Befund 29.9.: Brettseite des Nutzers
-        targetOwner: hs, targetHeroIdx: heroIdx, targetZoneSlot: freiSlot,
-        cardName: userHero.name, duration: 1600,
-      });
-      // Aufprall bei 12 % des Anlaufs (≈190 ms); Zonen-Animationen haben
-      // 100 ms Einhaengeverzug — also 90 ms vorher senden.
-      await engine._delay(90);
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'gewaltsame_erweckung', owner: hs, heroIdx, zoneSlot: freiSlot, duration: 900,   // Als Befund 29.9.: Brettseite des Nutzers
-      });
-      await engine._delay(100);
+      // ★ W64a (Orchestrator/Al, 23.10.2026: „Auftritt erst nach dem Commit"): hat die wiederbelebte Karte eine abbrechbare Beschwoerungsfrage
+      // (Opfer-/Tribut-Wahl: Archer, Warrior/Guardian of Teocuilatl, 500 Piranhas …), laeuft der Anlauf erst NACH dieser Frage — `summonFromDiscard`
+      // fragt zuerst und ruft dann `nachKostenAnim`. Bricht der Spieler ab, hat der Gegner nichts gesehen (die Karte liegt wieder in der Ablage).
+      const rammen = async () => {
+        engine._broadcastEvent('play_ram_animation', {
+          sourceOwner: hs, sourceHeroIdx: heroIdx,   // Als Befund 29.9.: Brettseite des Nutzers
+          targetOwner: hs, targetHeroIdx: heroIdx, targetZoneSlot: freiSlot,
+          cardName: userHero.name, duration: 1600,
+        });
+        // Aufprall bei 12 % des Anlaufs (≈190 ms); Zonen-Animationen haben
+        // 100 ms Einhaengeverzug — also 90 ms vorher senden.
+        await engine._delay(90);
+        engine._broadcastEvent('play_zone_animation', {
+          type: 'gewaltsame_erweckung', owner: hs, heroIdx, zoneSlot: freiSlot, duration: 900,   // Als Befund 29.9.: Brettseite des Nutzers
+        });
+        await engine._delay(100);
+      };
 
       const summonRes = await engine.summonFromDiscard(pi, pi, dpIdx, heroIdx, freiSlot, {
         source: CARD_NAME, flug: false, heldSeite: hs,   // Als Befund 29.9.: Brettseite des Nutzers
         summonOpts: { playSummonAnim: false },   // die Landung zeigt die eigene Animation
         hookExtras: { _isForcefulRevival: true },
+        nachKostenAnim: rammen,
       });
       if (!summonRes?.inst) {
         gs._spellCancelled = true;
