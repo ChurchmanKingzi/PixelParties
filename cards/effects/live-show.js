@@ -211,10 +211,10 @@ module.exports = {
       let gegeben = 0;
       if (gewaehlt.length > 0 && !(await engine.checkHandInteractionReaction(oi, 'insert',
             { byPi: pi, count: gewaehlt.length, sourceName: CARD_NAME }))) {
-        // Jede Karte fliegt an IHREN neuen Platz am Ende der Gegnerhand: der Flug rechnet gegen die Endgröße, nicht gegen die Hand im Moment des Abflugs.
-        const endgroesse = (ops.hand || []).length + gewaehlt.length;
+        // Jede Karte fliegt an IHREN neuen Platz am Ende der Gegnerhand, und die Hand rückt erst beim EINTREFFEN dieser Karte zusammen: Ziel = Platz in einer Hand, die bis dahin genau
+        // diese Karte mehr hat (`finalHandSize` = Platz + 1), die früheren Karten sind dann schon gelandet.
         for (const idx of [...gewaehlt].sort((a, b) => b - a)) {
-          if (await engine.actionTransferCardToOppHand(pi, idx, { source: CARD_NAME, windowChecked: true, finalHandSize: endgroesse })) gegeben++;
+          if (await engine.actionTransferCardToOppHand(pi, idx, { source: CARD_NAME, windowChecked: true, finalHandSize: (ops.hand || []).length + 1 })) gegeben++;
           if (gegeben < gewaehlt.length) await engine._delay(GEBEN_ABSTAND_MS);
         }
       }

@@ -3182,10 +3182,12 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 .game-hand-opp .game-hand-cards { padding: var(--fan-pad-unten) var(--fan-pad-x) calc(var(--hand-card-h) * 0.8 + 20px); margin-top: calc(var(--fan-pad-unten) * -1 - var(--hand-senkung)); margin-bottom: calc(var(--hand-card-h) * -0.8 - 20px); }
 /* Hand cards compress (overlap) when there are too many */
 .game-hand-cards .hand-slot { flex: 0 1 calc(var(--fan-pitch, 58px) * var(--board-scale)); min-width: calc(var(--hand-card-w) * var(--hand-min-anteil)); }
-.game-hand-cards .hand-slot:last-child { flex: 0 0 var(--hand-card-w); }
+.game-hand-cards .hand-slot:last-child,
+.game-hand-cards .hand-slot.hand-letzter { flex: 0 0 var(--hand-card-w); }
 /* Opponent face-down cards also compress */
 .game-hand-cards > .board-card.hand-card { flex-shrink: 1; min-width: calc(var(--hand-card-w) * var(--hand-min-anteil)); }
-.game-hand-cards > .board-card.hand-card:last-child { flex-shrink: 0; }
+.game-hand-cards > .board-card.hand-card:last-child,
+.game-hand-cards > .board-card.hand-card.hand-letzter { flex-shrink: 0; }
 .game-board { flex: 1; display: flex; min-height: 0; overflow: hidden; position: relative; }
 
 /* ═══ Global pixel cursor (menus + battle) ═══

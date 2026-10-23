@@ -28224,7 +28224,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // animation. +250 ms gives a 50 ms margin past phase-3 fire.
     await this._delay(highlightMs + flightMs + perCardStagger + 250);
 
-    const stolen = [];
+    // Erst aus der Gegnerhand nehmen (von hinten nach vorn, die Plätze bleiben stabil), dann in der Reihenfolge der QUELLPLÄTZE an die eigene Hand hängen: die Karten behalten ihre
+    // Reihenfolge (die linkste gewählte Gegnerkarte liegt links unter den genommenen) — der Client lässt die Flugkarten genau so landen.
+    const entnommen = [];
     for (const idx of [...validated].sort((a, b) => b - a)) {
       const cardName = oppPs.hand[idx];
       if (!cardName) continue;
@@ -28234,6 +28236,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         || this.cardInstances.find(c => c.owner === oppIdx && c.zone === ZONES.HAND && c.name === cardName) || null;
       const herkunft = this._handOriginAt(oppPs, idx) ?? (instVor && Number.isInteger(instVor.originalOwner) ? instVor.originalOwner : oppIdx);
       oppPs.hand.splice(idx, 1);
+      entnommen.unshift({ cardName, instVor, herkunft });
+    }
+    const stolen = [];
+    for (const { cardName, instVor, herkunft } of entnommen) {
       const neuerPlatz = ps.hand.length;
       ps.hand.push(cardName);
       // Instanz mitziehen — sonst bleibt die Karte für findCards beim

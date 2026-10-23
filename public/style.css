@@ -6355,7 +6355,8 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
      darf, steht als EIN Wert in `--hand-min-anteil`. */
   min-width: calc(var(--hand-card-w) * var(--hand-min-anteil));
 }
-.game-hand-cards .hand-slot:last-child {
+.game-hand-cards .hand-slot:last-child,
+.game-hand-cards .hand-slot.hand-letzter {
   /* Last card never compressed — always fully visible.
      ★ v1241: und zwar in KARTENbreite, nicht in Platzbreite. Die
      Karten ragen beim Zusammenschieben über ihren Platz hinaus; nur
@@ -6370,7 +6371,8 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   flex-shrink: 1;
   min-width: calc(var(--hand-card-w) * var(--hand-min-anteil));
 }
-.game-hand-cards > .board-card.hand-card:last-child {
+.game-hand-cards > .board-card.hand-card:last-child,
+.game-hand-cards > .board-card.hand-card.hand-letzter {
   flex-shrink: 0;
 }
 .game-board {
