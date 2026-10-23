@@ -310,7 +310,9 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
   // W19a (Al, 19.10.2026): die oberste Karte eines Coolness Stacks ist ein gültiges Ziel („any card on the board that is not a Hero").
   if (targetInst.zone === 'coolnessStack') return await _stackSpitzeAufHand(engine, pi, targetInst, sourceName);
 
-  const owner    = targetInst.owner;
+  // W66d: Brettseite einer Support-Karte = wo ihre Zone liegt (`physicalSide`), nicht `inst.owner` — Plant Golem (Besitzer = Beschwoerer, liegt beim Gegner) und
+  // eine an den Angreifer angelegte Crimson Web blieben sonst als Geister-Name in ihrer Zone stehen (die Zone der FALSCHEN Seite wurde geleert).
+  const owner    = targetInst.zone === 'support' ? _brettSeite(engine, targetInst) : targetInst.owner;
   const heroIdx  = targetInst.heroIdx;
   const zoneSlot = targetInst.zoneSlot;
   const zone     = targetInst.zone;
