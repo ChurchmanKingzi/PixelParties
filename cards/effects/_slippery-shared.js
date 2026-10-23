@@ -71,10 +71,30 @@ function destinationsFor(engine, pi, inst) {
           heroIdx: hi, slotIdx: zi,
           label: `${heroLabel} — Slot ${zi + 1}`,
         });
+      } else if (teilbarZiel(engine, inst, hi, zi)) {
+        // ★ W63a (Al, 22.10.2026: „Solange der Effekt aktiv ist, kann eine Creature in eine geteilte Zone bewegt werden"): mit Alice-Teilung des Kontrolleurs
+        // ist auch die Zone einer GLEICHNAMIGEN Creature ein Ziel (die Creatures teilen sich dann die Zone).
+        const tiefe = (zones[zi] || []).length;
+        out.push({
+          heroIdx: hi, slotIdx: zi, shared: true, stackDepth: tiefe,
+          label: `${heroLabel} — Slot ${zi + 1} (×${tiefe})`,
+        });
       }
     }
   }
-  return out;
+  // Geteilte Zonen zuerst (Al: erst die geteilte Zone, DANN die erste leere) — die Standardvorauswahl.
+  return out.some(z => z.shared) ? [...out.filter(z => z.shared), ...out.filter(z => !z.shared)] : out;
+}
+
+/**
+ * ★ W63a: darf `inst` in die BELEGTE Zone (Held `hi`, Slot `zi`) der Brettseite der Kreatur ziehen, weil dort nur GLEICHNAMIGE Creatures liegen und ihr Kontrolleur
+ * die Alice-Teilung hat (`_alice-shared.canShareInto`)? Bewegung triggert nie On-Summon (`_isMove`), die Instanz wird nur umgehaengt.
+ */
+function teilbarZiel(engine, inst, hi, zi) {
+  if (!inst?.name) return false;
+  const seite = engine.physicalSide ? engine.physicalSide(inst) : (inst.owner ?? 0);
+  const ktrl = engine.kontrolleurVon ? engine.kontrolleurVon(inst) : (inst.controller ?? inst.owner);
+  return require('./_alice-shared').canShareInto(engine, ktrl, hi, zi, inst.name, seite);
 }
 
 /**
@@ -104,7 +124,7 @@ async function moveSlipperyCreature(engine, pi, inst, destHeroIdx, destSlot, opt
   const srcArr = (ps.supportZones?.[srcHeroIdx] || [])[srcSlot] || [];
   const srcIdx = srcArr.indexOf(inst.name);
   if (srcIdx < 0) return false;
-  if (((ps.supportZones?.[destHeroIdx] || [])[destSlot] || []).length > 0) return false;
+  if (((ps.supportZones?.[destHeroIdx] || [])[destSlot] || []).length > 0 && !teilbarZiel(engine, inst, destHeroIdx, destSlot)) return false;   // W63a: belegt nur ok, wenn geteilt (Alice)
 
   // Suppress the diff-detector's spurious damage-floater on the
   // source slot as the Creature leaves it.
@@ -446,6 +466,7 @@ module.exports = {
   ARCHETYPE,
   adjacentHeroIndices,
   destinationsFor,
+  teilbarZiel,
   moveSlipperyCreature,
   onSlipperyTurnStart,
   slipperyOnMoveGate,

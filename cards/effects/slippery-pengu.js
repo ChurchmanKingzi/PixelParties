@@ -46,6 +46,7 @@ const {
   slipperyOnMoveGate,
   moveSlipperyCreature,
   adjacentHeroIndices,
+  teilbarZiel,
 } = require('./_slippery-shared');
 
 const CARD_NAME = 'Slippery Pengu';
@@ -90,7 +91,7 @@ function eligiblePartnerCreatures(engine, pi, excludeInstId) {
  * excluded per the card's "adjacent undefeated Heroes" wording. Returns
  * `{ owner, heroIdx, slotIdx, label }` entries for the zone-pick prompt.
  */
-function adjacentFreeUndefeatedZones(engine, pi, fromHeroIdx) {
+function adjacentFreeUndefeatedZones(engine, pi, fromHeroIdx, inst = null) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
   const out = [];
@@ -105,10 +106,17 @@ function adjacentFreeUndefeatedZones(engine, pi, fromHeroIdx) {
           heroIdx: hi, slotIdx: zi,
           label: `${hero.name} — Slot ${zi + 1}`,
         });
+      } else if (inst && teilbarZiel(engine, inst, hi, zi)) {
+        // ★ W63a (Al, 22.10.2026: „Solange der Effekt aktiv ist, kann eine Creature in eine geteilte Zone bewegt werden"): auch die Zone einer GLEICHNAMIGEN
+        // Creature (Alice-Teilung des Kontrolleurs) ist ein Ziel; geteilte Zonen stehen vorn.
+        out.push({
+          owner: pi, heroIdx: hi, slotIdx: zi, shared: true, stackDepth: zones[zi].length,
+          label: `${hero.name} — Slot ${zi + 1} (×${zones[zi].length})`,
+        });
       }
     }
   }
-  return out;
+  return out.some(z => z.shared) ? [...out.filter(z => z.shared), ...out.filter(z => !z.shared)] : out;
 }
 
 module.exports = {
@@ -163,7 +171,7 @@ module.exports = {
         // for an opp CPU's zonePick response. The relative VALUE between
         // partners (Whoolmoth's 120 dmg etc.) dominates the destination
         // choice, so this proxy preserves the ranking we care about.
-        const dests = adjacentFreeUndefeatedZones(eng, cpuIdx, liveInst.heroIdx);
+        const dests = adjacentFreeUndefeatedZones(eng, cpuIdx, liveInst.heroIdx, liveInst);   // W63a: + geteilte Zone (Alice)
         if (dests.length === 0) return false;
         const dest = dests[0];
         const ok = await moveSlipperyCreature(
@@ -199,7 +207,7 @@ module.exports = {
       const candidates = eligiblePartnerCreatures(engine, pi, pengueInst.id)
         .map(t => ({
           target: t,
-          dests: adjacentFreeUndefeatedZones(engine, pi, t.heroIdx),
+          dests: adjacentFreeUndefeatedZones(engine, pi, t.heroIdx, t.cardInstance),
         }))
         .filter(c => c.dests.length > 0);
       if (candidates.length === 0) return;
@@ -229,7 +237,7 @@ module.exports = {
       const liveInst = chosen.target.cardInstance;
       if (!liveInst || liveInst.zone !== 'support'
           || (liveInst.controller ?? liveInst.owner) !== pi) return;
-      const liveDests = adjacentFreeUndefeatedZones(engine, pi, liveInst.heroIdx);
+      const liveDests = adjacentFreeUndefeatedZones(engine, pi, liveInst.heroIdx, liveInst);
       if (liveDests.length === 0) return;
 
       // Opponent picks the destination zone. The zone-pick prompt is

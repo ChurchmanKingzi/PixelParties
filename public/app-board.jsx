@@ -35208,6 +35208,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     return -1;
   };
 
+  // W63a (Al, 22.10.2026: „erst die geteilte Zone, DANN die erste leere"): Standard-Platz fuer AUTOMATISCHE Beschwoerungen (Heldenaktion ohne Auswahl): solange
+  // Alices Effekt greift, die Zone einer gleichnamigen Creature, sonst die erste freie Zone. Der Spieler-Klickweg oeffnet weiter den Slot-Picker (beide waehlbar).
+  const findAutoSummonSlot = (playerData, heroIdx, cardName) => {
+    const sz = cardName ? findShareableSupportSlot(playerData, heroIdx, cardName) : -1;
+    return sz >= 0 ? sz : findFreeSupportSlot(playerData, heroIdx);
+  };
+
   // Eligible summoners for a `playOnAnyHeroSide` Creature — own Heroes
   // that can validly act as the summon's "validation surface": in the
   // playable map (own side), alive, non-CC, skill-unlocked, AND with at
@@ -36779,7 +36786,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (isHeroAction) {
               const lockedHi = heroActionPrompt.heroIdx;
               if (lockedHi !== undefined) {
-                const lockedSlot = findFreeSupportSlot(me, lockedHi);
+                const lockedSlot = findAutoSummonSlot(me, lockedHi, cardName);
                 if (lockedSlot >= 0) {
                   ppSendePromptAntwort(gameState, { cardName, handIndex: idx, fromCreation, heroIdx: lockedHi, zoneSlot: lockedSlot });
                 }
@@ -36798,7 +36805,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 for (const hi of allowedHeroIdxs) {
                   const h = me.heroes[hi];
                   if (!h?.name || h.hp <= 0) continue;
-                  const slot = findFreeSupportSlot(me, hi);
+                  const slot = findAutoSummonSlot(me, hi, cardName);
                   if (slot < 0) continue;
                   eligible.push({ idx: hi, name: h.name, zoneSlot: slot });
                 }
@@ -48125,6 +48132,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
     if (skatesSelected != null) {
       for (const z of (ep.destZones || [])) {
+        // W63a (Al, 22.10.2026): eine geteilte Zone (Alice) nimmt nur gleichnamige Kreaturen auf — `nurSlots` nennt deren Zonen-Slots.
+        if (Array.isArray(z.nurSlots) && !z.nurSlots.includes(skatesSelected)) continue;
         skatesDestSet.add(`${skatesSeite}-${z.heroIdx}-${z.slotIdx}`);
       }
     }

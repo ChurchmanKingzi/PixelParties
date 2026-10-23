@@ -60,7 +60,12 @@
 //     dem Rest zurueck ins Deck — abgelegt wird sie NICHT.
 //     KEIN Fall von „if possible" ist dagegen eine volle Support Zone:
 //     ohne freie Zone ist Surprise Party gar nicht erst aktivierbar
-//     (siehe `spellPlayCondition` / `canPlayWithHero`).
+//     (siehe `spellPlayCondition` / `canPlayWithHero`) — AUSSER mit
+//     Alice-Teilung (W63a, Al 22.10.2026): liegt eine legale Creature im
+//     Deck, deren Namen der Nutzer schon in einer Zone hat, ist die Karte
+//     IMMER spielbar (die Creature passt in die geteilte Zone). Wird eine
+//     andere Creature aufgedeckt, die nicht passt, geht sie wie bisher
+//     zurueck ins Deck.
 //  3) Liegt ihr Level ueber der Support-Magic-Stufe des Wirkers, zieht
 //     der GEGNER 2 Karten je Stufe Unterschied. Nur nach oben.
 //  4) Alle uebrigen aufgedeckten Karten zurueck ins Deck, dann mischen.
@@ -76,6 +81,30 @@ const MAX_AUFGEDECKT = 5;   // „If you reveal 5 cards before you reveal an app
 const REVEAL_MS = 900;      // Laufzeit einer Aufdeckung (Deck → Mitte → Ziel)
 const PRO_STUFE = 2;
 
+/**
+ * ★ W63a (Al, 22.10.2026: „Solange Alices Effekt aktiv ist und der Spieler mindestens eine Creature im Deck hat, die ein legales Target für Surprise Party ist UND von
+ * der der Nutzer schon eine Kopie in seinen Zonen hat, soll sie IMMER spielbar sein — weil es ja theoretisch immer möglich ist, diese zu finden"):
+ * gibt es im Deck eine Creature, die (a) ein LEGALES Ziel ist (Creature, Level <= 3, nicht „nur unter Voraussetzung beschwoerbar": Foresta, Plant Golem,
+ * Elusive Hind, Ifrit …, und die eigenen Bedingungen der Karte erfuellt), und (b) von der der Spieler schon eine GLEICHNAMIGE Creature in einer Zone hat, in die sie
+ * dank Alice-Teilung des Spielers hineinpasst? Mit `heroIdx` nur Zonen DIESES Helden (der Nutzer), sonst jeder eigene Held.
+ */
+function teilbaresZielImDeck(engine, pi, heroIdx = null) {
+  const ps = engine.gs.players[pi];
+  if (!ps || !require('./_alice-shared').sharingActive(engine.gs, pi)) return false;
+  const cardDB = engine._getCardDB();
+  const gesehen = new Set();
+  for (const name of (ps.mainDeck || [])) {
+    if (gesehen.has(name)) continue;
+    gesehen.add(name);
+    const cd = cardDB[name];
+    if (!cd || !hasCardType(cd, 'Creature') || typeof cd.level !== 'number' || cd.level > MAX_LEVEL) continue;
+    if (nurUnterBedingungBeschwoerbar(cd, name)) continue;
+    const geteilt = engine.beschwoerZonenFuer(pi, name, heroIdx == null ? {} : { heroIdx }).filter(z => z.shared);
+    if (geteilt.some(z => engine.isCreatureSummonable(name, pi, z.heroIdx))) return true;
+  }
+  return false;
+}
+
 module.exports = {
   activeIn: ['hand'],
 
@@ -84,17 +113,18 @@ module.exports = {
    * Ohne freie Zone ist die Karte nicht aktivierbar (Als Klarstellung
    * 11.9.) — sie waere ein reiner Deckdurchlauf ohne Wirkung.
    * Der Zonensammler laeuft OHNE Helden-Filter: es wird platziert.
+   * ★ W63a (Al): ... ODER, mit Alice-Teilung, eine im Deck liegende legale Creature, deren Namen der Spieler schon in seinen Zonen hat (`teilbaresZielImDeck`).
    */
   spellPlayCondition(gs, playerIdx, engine) {
     if ((gs.players[playerIdx]?.mainDeck || []).length === 0) return false;
     if (!engine) return true;
-    return engine.getFreeSupportZones(playerIdx).length > 0;
+    return engine.getFreeSupportZones(playerIdx).length > 0 || teilbaresZielImDeck(engine, playerIdx);
   },
 
-  /** „the user" — DIESER Held braucht die freie Zone, kein anderer. */
+  /** „the user" — DIESER Held braucht die freie Zone, kein anderer (W63a: oder eine geteilte Zone fuer eine Deck-Creature). */
   canPlayWithHero(gs, playerIdx, heroIdx, cardData, engine) {
     if (!engine) return true;
-    return engine.getFreeSupportZones(playerIdx).some(z => z.heroIdx === heroIdx);
+    return engine.getFreeSupportZones(playerIdx).some(z => z.heroIdx === heroIdx) || teilbaresZielImDeck(engine, playerIdx, heroIdx);
   },
 
   hooks: {
@@ -181,8 +211,9 @@ module.exports = {
       // ist der Kanal dafuer — es fragt genau das `canSummon` der Karte
       // und sonst nichts, also keine Beschwoerungsvoraussetzungen, die
       // beim Platzieren ohnehin nicht gelten.
-      // W62a: freie Zonen zuerst, danach (Alice-Teilung) die Zone einer GLEICHNAMIGEN Creature — `beschwoerZonenFuer`.
-      // Spielbar bleibt die Karte nur mit freier Zone (`spellPlayCondition`): der Name der Creature steht erst nach dem Aufdecken fest.
+      // W62a/W63a: freie Zonen UND (Alice-Teilung) die Zone einer GLEICHNAMIGEN Creature — `beschwoerZonenFuer`, geteilte Zone zuerst (Al: „erst die geteilte Zone,
+      // DANN die erste leere"). Der Name der Creature steht erst nach dem Aufdecken fest; spielbar ist die Karte mit freier Zone ODER mit einer teilbaren
+      // Deck-Creature (`spellPlayCondition`).
       const zonen = engine.beschwoerZonenFuer(pi, gefunden, { heroIdx });
       let platziert = false;
       let bedingungOffen = false;

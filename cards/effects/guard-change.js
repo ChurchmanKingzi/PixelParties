@@ -108,7 +108,13 @@ function destsFor(engine, pi, inst) {
     if (z.slotIdx >= 3) continue;                           // Insel-Zonen bleiben wie bisher draußen
     out.push({ owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx });
   }
-  return out;
+  // ★ W63a (Al, 22.10.2026: „Solange der Effekt aktiv ist, kann eine Creature in eine geteilte Zone bewegt werden"): mit Alice-Teilung des Kontrolleurs auch die
+  // Zone einer GLEICHNAMIGEN Creature eines ANDEREN Helden (`engine.beschwoerZonenFuer`, nach Kontrolle) — die Creatures teilen sich die Zone. Geteilte Zonen
+  // stehen vorn (Al: erst die geteilte Zone, DANN die erste leere).
+  const geteilt = engine.beschwoerZonenFuer(pi, inst.name, { nachKontrolle: true })
+    .filter(z => z.shared && z.slotIdx < 3 && !(aSeite === z.owner && z.heroIdx === inst.heroIdx))
+    .map(z => ({ owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx, shared: true }));
+  return geteilt.length ? [...geteilt, ...out] : out;
 }
 
 /**
@@ -127,12 +133,25 @@ function collectMovable(engine, pi, movedIds) {
     const swaps = !heldKontrolliert(engine, pi, aSeite, inst.heroIdx) ? [] : creatures
       .filter(o => o.id !== inst.id
         && !(engine.physicalSide(o) === aSeite && o.heroIdx === inst.heroIdx)
-        && heldKontrolliert(engine, pi, engine.physicalSide(o), o.heroIdx))
+        && heldKontrolliert(engine, pi, engine.physicalSide(o), o.heroIdx)
+        && tauschOhneMischung(engine, inst, o))   // W63a: ein Tausch mischt nie verschiedene Namen in einer geteilten Zone
       .map(o => o.id);
     if (dests.length === 0 && swaps.length === 0) continue;
     list.push({ inst, dests, swaps });
   }
   return list;
+}
+
+/**
+ * ★ W63a: Beim TAUSCH zweier Kreaturen darf in keiner Zone eine Mischung verschiedener Namen entstehen. Liegt eine der beiden in einem Alice-Stapel
+ * (Zone mit mehreren Kreaturen), bliebe dort nach dem Heraustauschen ein Namensgleiches zurueck — die ungleichnamige Tauschpartnerin koennte nicht
+ * dazu. Getauscht wird also nur, wenn beide allein in ihrer Zone liegen oder beide denselben Namen tragen.
+ */
+function tauschOhneMischung(engine, a, b) {
+  if (a.name === b.name) return true;
+  const { stackAt } = require('./_alice-shared');
+  const tiefe = (x) => stackAt(engine, engine.kontrolleurVon(x), x.heroIdx, x.zoneSlot, engine.physicalSide(x)).length;   // nur Kreaturen (keine Anhaengsel)
+  return tiefe(a) <= 1 && tiefe(b) <= 1;
 }
 
 /** W18b: `inst` steht jetzt in einer Zone der Brettseite `neueSeite`. Der Kontrolleur bleibt; `owner` = Brettseite, die Seitenfremd-Marke
@@ -156,7 +175,8 @@ async function moveCreature(engine, pi, inst, destOwner, destHeroIdx, destSlot) 
   const sArr = (ps.supportZones?.[sH] || [])[sS] || [];
   const sIdx = sArr.indexOf(inst.name);
   if (sIdx < 0) return false;
-  if (((dps.supportZones?.[destHeroIdx] || [])[destSlot] || []).length > 0) return false;
+  if (((dps.supportZones?.[destHeroIdx] || [])[destSlot] || []).length > 0
+      && !require('./_alice-shared').canShareInto(engine, engine.kontrolleurVon(inst), destHeroIdx, destSlot, inst.name, destOwner)) return false;   // W63a: belegt nur ok, wenn geteilt (Alice)
 
   engine._broadcastEvent('creature_zone_move', { owner: aSeite, heroIdx: sH, zoneSlot: sS });
   sArr.splice(sIdx, 1);
@@ -284,7 +304,7 @@ async function runGuardChangeMode(engine, pi) {
         owner: engine.physicalSide(e.inst),   // W18b: Brettseite (gestohlene Kreaturen stehen beim Gegner)
         heroIdx: e.inst.heroIdx,
         zoneSlot: e.inst.zoneSlot,
-        dests: e.dests.map(d => ({ owner: d.owner, heroIdx: d.heroIdx, slotIdx: d.slotIdx })),
+        dests: e.dests.map(d => ({ owner: d.owner, heroIdx: d.heroIdx, slotIdx: d.slotIdx, ...(d.shared ? { shared: true } : {}) })),
         swaps: e.swaps,
       })),
       doneLabel: movedIds.size > 0 ? '✓ Done' : '✕ Cancel',
