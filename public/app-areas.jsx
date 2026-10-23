@@ -127,7 +127,7 @@ function AreaBackgrounds({ areaZones, myIdx, oppIdx, spielstand }) {
               stroke="rgba(0,0,0,0.55)" strokeWidth="0.9" strokeLinejoin="round" vectorEffect="non-scaling-stroke"
               style={{ filter: 'blur(1.2px)' }} />
             <polyline points={seam.map(p => `${p.x},${p.y}`).join(' ')} fill="none"
-              stroke="rgba(255,240,220,0.35)" strokeWidth="0.25" strokeLinejoin="round"
+              stroke="rgba(255,248,232,0.35)" strokeWidth="0.25" strokeLinejoin="round"
               strokeDasharray="1.2 0.7 0.4 0.9" vectorEffect="non-scaling-stroke" />
           </svg>,
         );
@@ -215,7 +215,7 @@ function PixelScene({ artH, bg, className, children }) {
            faellt um --fall. Farben ueber --tropfen / --tropfen-dunkel. */
         .pp-px-tropfen {
           position: absolute; width: var(--px); height: calc(2 * var(--px)); transform-origin: top;
-          background: var(--tropfen, #a41e14); box-shadow: 0 calc(-1 * var(--px)) 0 var(--tropfen-dunkel, #5a0909);
+          background: var(--tropfen, #8f0000); box-shadow: 0 calc(-1 * var(--px)) 0 var(--tropfen-dunkel, #5b0102);
         }
         @keyframes ppPxTropfen {
           0%   { transform: translateY(0) scaleY(.5); opacity: 0; }
@@ -368,7 +368,7 @@ const BloodRockOverlay = React.memo(function BloodRockOverlay() {
   })), []);
   const wand = BR_KEEP_W;
   return (
-    <PixelScene artH={100} bg="#140606" className="blood-rock-overlay">
+    <PixelScene artH={100} bg="#08060c" className="blood-rock-overlay">
       <PixelBand src={BR + 'tile.png'} />
       <div className="pp-pixel-layer br-strom" style={ppMaske(BR + 'mask-tile.png', true)} />
       {batsFern.map((b, i) => (
@@ -407,7 +407,7 @@ const BloodRockOverlay = React.memo(function BloodRockOverlay() {
       {tropfen.map((d, i) => (
         <i key={'d' + i} className="pp-area-dyn pp-px-tropfen" style={{
           left: d.left, top: ppArt(d.y0), '--fall': ppArt(d.y1 - d.y0),
-          '--tropfen': '#8a120d', '--tropfen-dunkel': '#3d0506',
+          '--tropfen': '#8b0d0d', '--tropfen-dunkel': '#3a0000',
           animation: `ppPxTropfen ${d.dur.toFixed(2)}s ease-in ${d.delay.toFixed(2)}s infinite`,
         }} />
       ))}
@@ -601,7 +601,7 @@ const PangaiaOverlay = React.memo(function PangaiaOverlay() {
   const kraeusel = useMemo(() => PGN_SEE.slice(0, ppFxN(PGN_SEE.length)).map(([x, y]) => ({ x, y, dur: 4 + Math.random() * 4, delay: -Math.random() * 8 })), []);
   const mitte = { left: `calc(50% - ${PGN_W / 2} * var(--px))`, width: ppArt(PGN_W), right: 'auto' };
   return (
-    <PixelScene artH={100} bg="#123a96" className="pangaia-overlay">
+    <PixelScene artH={100} bg="#02398c" className="pangaia-overlay">
       <PixelBand src={PGN + 'sea.png'} />
       <PixelPiece src={PGN + 'island.png'} w={PGN_W} />
       <div className="pp-pixel-layer pgn-glitzer" />
@@ -776,7 +776,7 @@ const BoardOfKingsOverlay = React.memo(function BoardOfKingsOverlay() {
     x: i ? 68 : -71, dur: 70 + Math.random() * 30, delay: -Math.random() * 80, ab: i === 1,
   })), []);
   return (
-    <PixelScene artH={100} bg="#1c3a18" className="board-of-kings-overlay">
+    <PixelScene artH={100} bg="#18300a" className="board-of-kings-overlay">
       <PixelBand src={BOK + 'hedge.png'} />
       <PixelBand src={BOK + 'blossoms.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.7s steps(1) infinite' }} />
       <PixelPiece src={BOK + 'board.png'} w={BOK_W} />
@@ -870,8 +870,8 @@ const BoardOfKingsOverlay = React.memo(function BoardOfKingsOverlay() {
           70% { transform: translate(calc(7 * var(--px)), calc(1 * var(--px))); } 85% { transform: translate(calc(2 * var(--px)), calc(4 * var(--px))); }
         }
         .bok-biene-ort { position: absolute; width: var(--px); height: var(--px); }
-        .bok-biene { position: absolute; width: calc(2 * var(--px)); height: var(--px); background: linear-gradient(90deg, #1e1406 50%, #f0c23a 50%); }
-        @keyframes bokFluegel { 0% { box-shadow: 0 calc(-1 * var(--px)) 0 rgba(230, 236, 245, .8); } 50% { box-shadow: var(--px) calc(-1 * var(--px)) 0 rgba(230, 236, 245, .55); } }
+        .bok-biene { position: absolute; width: calc(2 * var(--px)); height: var(--px); background: linear-gradient(90deg, #1f0f04 50%, #fad54a 50%); }
+        @keyframes bokFluegel { 0% { box-shadow: 0 calc(-1 * var(--px)) 0 rgba(229,237,250,.8); } 50% { box-shadow: var(--px) calc(-1 * var(--px)) 0 rgba(229,237,250,.55); } }
         @keyframes bokSummA {
           0%, 100% { transform: translate(0, 0); } 12.5% { transform: translate(calc(3 * var(--px)), calc(-2 * var(--px))); }
           25% { transform: translate(calc(5 * var(--px)), 0); } 37.5% { transform: translate(calc(3 * var(--px)), calc(2 * var(--px))); }
@@ -996,7 +996,7 @@ const SharedBloodTanksOverlay = React.memo(function SharedBloodTanksOverlay() {
   })), []);
   const dampf = useMemo(() => ppZufall(ppFxN(3), (i) => ({ dur: 3.2, delay: -i * 1.07 })), []);
   return (
-    <PixelScene artH={100} bg="#120d0d" className="shared-blood-tanks-overlay">
+    <PixelScene artH={100} bg="#141414" className="shared-blood-tanks-overlay">
       <PixelBand src={SBT + 'tile.png'} />
       {/* Blut in den Tanks: Maske = Glasinneres, darin hebt/senkt sich die Blutebene */}
       <div className="pp-pixel-layer" style={{ position: 'absolute', inset: 0, ...ppMaske(SBT + 'mask-tank.png', true) }}>
@@ -1040,7 +1040,7 @@ const SharedBloodTanksOverlay = React.memo(function SharedBloodTanksOverlay() {
         <React.Fragment key={'d' + i}>
           <i className="pp-area-dyn pp-px-tropfen" style={{
             left: ppArtX(d.x, 0), top: ppArt(d.y0), '--fall': ppArt(d.y1 - d.y0),
-            '--tropfen': '#9a1614', '--tropfen-dunkel': '#4a0607',
+            '--tropfen': '#8b0d0d', '--tropfen-dunkel': '#520a0c',
             animation: `ppPxTropfen ${d.dur}s ease-in ${d.delay.toFixed(2)}s infinite`,
           }} />
           <i className="pp-area-dyn sbt-kraeusel" style={{
@@ -1060,8 +1060,8 @@ const SharedBloodTanksOverlay = React.memo(function SharedBloodTanksOverlay() {
       <style>{`
         .sbt-spiegel { position: absolute; inset: 0; animation: sbtSpiegel ${SBT_LEVEL_S}s steps(1) infinite; }
         @keyframes sbtSpiegel { ${SBT_SPIEGEL_KF} }
-        .sbt-blase { position: absolute; width: var(--px); height: var(--px); background: #d0564a; opacity: 0; }
-        .sbt-blase.gross { box-shadow: var(--px) 0 0 #a8302a, 0 var(--px) 0 #a8302a, var(--px) var(--px) 0 #7c1a18; background: #e27a6c; }
+        .sbt-blase { position: absolute; width: var(--px); height: var(--px); background: #e94e53; opacity: 0; }
+        .sbt-blase.gross { box-shadow: var(--px) 0 0 #9d342f, 0 var(--px) 0 #9d342f, var(--px) var(--px) 0 #780014; background: #ec7f79; }
         @keyframes sbtBlase {
           0% { transform: translate(0, 0); opacity: 0; }
           8% { opacity: .9; }
@@ -1245,7 +1245,7 @@ const AcidRainOverlay = React.memo(function AcidRainOverlay() {
     dur: 0.3 + Math.random() * 0.12,
   })), []);
   return (
-    <PixelScene artH={100} bg="#1e0e12" className="acid-rain-overlay">
+    <PixelScene artH={100} bg="#1f0f04" className="acid-rain-overlay">
       <div className="pp-pixel-layer ar-wolken" />
       <div className="pp-area-dyn ar-himmelblitz" />
       <i className="pp-area-dyn ar-blitz" style={{ left: ppArtX(-74, 0), top: 0, animation: 'arBlitz 13s steps(1) -4s infinite, arBlitzForm 13s steps(1) -4s infinite' }} />
@@ -1303,7 +1303,7 @@ const AcidRainOverlay = React.memo(function AcidRainOverlay() {
         @keyframes arWolken { from { background-position: 50% 0; } to { background-position: calc(50% - 128 * var(--px)) 0; } }
         /* Blitze zucken hinter den Zinnen: der Himmelsstreifen hellt auf, die Zinnen stehen als Scherenschnitt davor */
         .ar-himmelblitz {
-          position: absolute; left: 0; right: 0; top: 0; height: calc(12 * var(--px)); background: #9c3a34; opacity: 0;
+          position: absolute; left: 0; right: 0; top: 0; height: calc(12 * var(--px)); background: #9d342f; opacity: 0;
           animation: arBlitzLicht 13s steps(1) -4s infinite;
         }
         .ar-blitz {
@@ -1316,7 +1316,7 @@ const AcidRainOverlay = React.memo(function AcidRainOverlay() {
         @keyframes arBlitzForm { 0%, 94% { background-position: 0 0; } 94.2%, 100% { background-position: 100% 0; } }
         @keyframes arBlitzFern { 0%, 95% { opacity: 0; } 95.6% { opacity: .75; } 96.4%, 100% { opacity: 0; } }
         .ar-blitzlicht {
-          position: absolute; inset: 0; background: #ff6a54; mix-blend-mode: soft-light; opacity: 0;
+          position: absolute; inset: 0; background: #ff6666; mix-blend-mode: soft-light; opacity: 0;
           animation: arBlitzLicht 13s steps(1) -4s infinite;
         }
         @keyframes arBlitzLicht {
@@ -1346,7 +1346,7 @@ const AcidRainOverlay = React.memo(function AcidRainOverlay() {
         }
         .ar-schein {
           position: absolute; width: calc(14 * var(--px)); height: calc(14 * var(--px)); border-radius: 50%;
-          background: radial-gradient(circle, rgba(255,190,90,.34) 0%, rgba(255,150,60,.14) 45%, rgba(255,150,60,0) 70%);
+          background: radial-gradient(circle, rgba(251,200,106,.34) 0%, rgba(255,155,58,.14) 45%, rgba(255,155,58,0) 70%);
           animation: arSchein 1.7s steps(1) infinite;
         }
         @keyframes arSchein { 0% { opacity: .85; } 18% { opacity: 1; } 31% { opacity: .7; } 52% { opacity: .95; } 71% { opacity: .78; } 86% { opacity: 1; } }
@@ -1464,7 +1464,7 @@ const CottageOverlay = React.memo(function CottageOverlay() {
   }), []);
   const rauch = useMemo(() => ppZufall(ppFxN(4), (i) => ({ delay: -i * 1.6 })), []);
   return (
-    <PixelScene artH={100} bg="#2e3c24" className="cottage-overlay">
+    <PixelScene artH={100} bg="#1a4128" className="cottage-overlay">
       <PixelBand src={COT + 'far.png'} />
       <PixelBand src={COT + 'tile.png'} />
       <PixelBand src={COT + 'shafts.png'} className="cot-strahlen" />
@@ -1516,8 +1516,8 @@ const CottageOverlay = React.memo(function CottageOverlay() {
         }
         @keyframes cotRauchZug { from { transform: translate(0, 0); } to { transform: translate(calc(-26 * var(--px)), calc(-7 * var(--px))); } }
         .cot-gluehw {
-          position: absolute; width: var(--px); height: var(--px); background: #f4ff9a; opacity: 0;
-          box-shadow: 0 0 calc(2 * var(--px)) calc(.5 * var(--px)) rgba(220, 255, 120, .55);
+          position: absolute; width: var(--px); height: var(--px); background: #fff196; opacity: 0;
+          box-shadow: 0 0 calc(2 * var(--px)) calc(.5 * var(--px)) rgba(203,255,102,.55);
         }
         @keyframes cotGlueh { 0%, 45% { opacity: 0; } 50% { opacity: .6; } 56%, 74% { opacity: 1; } 80% { opacity: .5; } 85%, 100% { opacity: 0; } }
         @keyframes cotSchweb { from { translate: 0 0; } to { translate: calc(4 * var(--px)) calc(-3 * var(--px)); } }
@@ -1641,7 +1641,7 @@ const CrystalWellOverlay = React.memo(function CrystalWellOverlay() {
     y: 30 + Math.random() * 50, dur: 24 + Math.random() * 12, delay: -Math.random() * 30, rtl: i % 2 === 1, bob: 2 + Math.random() * 2,
   })), []);
   return (
-    <PixelScene artH={100} bg="#1664e8" className="crystal-well-overlay">
+    <PixelScene artH={100} bg="#3866f0" className="crystal-well-overlay">
       <PixelBand src={CWL + 'tile.png'} />
       <PixelBand src={CWL + 'glow.png'} className="cwl-atmen" />
       <PixelBand src={CWL + 'sway-b.png'} className="cwl-wiegen b" style={{ backgroundSize: 'auto 300%' }} />
@@ -1695,17 +1695,17 @@ const CrystalWellOverlay = React.memo(function CrystalWellOverlay() {
           20% { background-position: 66.667% 0; } 30% { background-position: 100% 0; } 40%, 100% { opacity: 0; }
         }
         .cwl-funke {
-          position: absolute; width: var(--px); height: var(--px); background: #e8fcff; opacity: 0;
-          box-shadow: 0 var(--px) 0 rgba(120, 210, 255, .55);
+          position: absolute; width: var(--px); height: var(--px); background: #e5f5fa; opacity: 0;
+          box-shadow: 0 var(--px) 0 rgba(119,200,238,.55);
         }
         @keyframes cwlSteigen {
           0% { transform: translateY(0); opacity: 0; } 10% { opacity: 1; } 70% { opacity: .8; }
           100% { transform: translateY(calc(-26 * var(--px))); opacity: 0; }
         }
         .cwl-gluehwurm {
-          position: absolute; width: var(--px); height: var(--px); background: #f2ffff; opacity: 0;
-          box-shadow: var(--px) 0 0 rgba(140, 225, 255, .45), calc(-1 * var(--px)) 0 0 rgba(140, 225, 255, .45),
-                      0 var(--px) 0 rgba(140, 225, 255, .45), 0 calc(-1 * var(--px)) 0 rgba(140, 225, 255, .45);
+          position: absolute; width: var(--px); height: var(--px); background: #e5f5fa; opacity: 0;
+          box-shadow: var(--px) 0 0 rgba(127,223,255,.45), calc(-1 * var(--px)) 0 0 rgba(127,223,255,.45),
+                      0 var(--px) 0 rgba(127,223,255,.45), 0 calc(-1 * var(--px)) 0 rgba(127,223,255,.45);
         }
         @keyframes cwlSchwebenA {
           0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: 1; }
@@ -1736,7 +1736,7 @@ const CrystalWellOverlay = React.memo(function CrystalWellOverlay() {
 //  Karte: dunkelgraue, FARBLOSE Meeresoberfläche. Als Vorgabe (5.8.):
 //  dunkelgrau, entsättigt, bedrohlich, mit Seegang — die Karten dürfen
 //  nicht verschleiert werden. Farblos bleibt farblos: alles in Grautönen
-//  (nur der leichte Kaltstich des alten #323335).
+//  (nur der leichte Kaltstich des alten #323232).
 //
 //  Überarbeitung v1441 (Al 25.9.: „deine haben ein anderes Level"): mehr
 //  Tiefe und Leben im Wasser. Leichte Perspektive (fern oben: kleinere
@@ -1787,7 +1787,7 @@ const DarkOceanOverlay = React.memo(function DarkOceanOverlay() {
     y: 25 + Math.random() * 55, dur: 26 + Math.random() * 12, delay: -Math.random() * 40, rtl: i === 0,
   })), []);
   return (
-    <PixelScene artH={100} bg="#303134" className="dark-ocean-overlay">
+    <PixelScene artH={100} bg="#323232" className="dark-ocean-overlay">
       <PixelBand src={DOC + 'tile.png'} />
       <div className="pp-area-dyn doc-tier-bahn"><i className="doc-tier" /></div>
       {fische.map((f, i) => (
@@ -1877,7 +1877,7 @@ const DarkOceanOverlay = React.memo(function DarkOceanOverlay() {
         @keyframes docWippen { 0% { translate: 0 0; } 50% { translate: 0 var(--px); } }
         .doc-blitz {
           position: absolute; inset: 0; opacity: 0;
-          background: linear-gradient(180deg, rgba(205,207,214,.2) 0%, rgba(205,207,214,.07) 45%, rgba(205,207,214,0) 80%);
+          background: linear-gradient(180deg, rgba(210,210,219,.2) 0%, rgba(210,210,219,.07) 45%, rgba(210,210,219,0) 80%);
           animation: docBlitz 23s steps(1) infinite;
         }
         @keyframes docBlitz { 0%, 88% { opacity: 0; } 88.4% { opacity: .8; } 88.9% { opacity: .15; } 89.6% { opacity: .55; } 90.3%, 100% { opacity: 0; } }
@@ -1959,7 +1959,7 @@ const DeepseaCastleOverlay = React.memo(function DeepseaCastleOverlay() {
     dur: 3 + Math.random() * 3, delay: -Math.random() * 6,
   })), []);
   return (
-    <PixelScene artH={100} bg="#bdb4e1" className="deepsea-castle-overlay">
+    <PixelScene artH={100} bg="#d9c0ec" className="deepsea-castle-overlay">
       <PixelBand src={DSC + 'back.png'} />
       <div className="pp-area-dyn pp-quer" style={ppQuer(14, 120, -50, true)}><i className="dsc-wal" /></div>
       <div className="pp-area-dyn pp-quer" style={ppQuer(40, 52, -12, false)}><i className="dsc-schwarm" /></div>
@@ -2039,11 +2039,11 @@ const DeepseaCastleOverlay = React.memo(function DeepseaCastleOverlay() {
           100% { transform: translate(0, calc(-12 * var(--px))); }
         }
         .dsc-krabbe { display: block; width: calc(9 * var(--px)); height: calc(6 * var(--px)); background: url(${DSC}crab.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 .34s steps(1) infinite; }
-        .dsc-schnee { position: absolute; top: 0; width: var(--px); height: var(--px); background: #efe6ff; opacity: .55; }
+        .dsc-schnee { position: absolute; top: 0; width: var(--px); height: var(--px); background: #f1e5fa; opacity: .55; }
         .dsc-schnee.hell { opacity: .85; }
         @keyframes dscSinken { from { transform: translate(0, 0); } 50% { transform: translate(calc(3 * var(--px)), calc(50 * var(--px))); } to { transform: translate(0, calc(100 * var(--px))); } }
-        .dsc-blase { position: absolute; top: calc(96 * var(--px)); width: var(--px); height: var(--px); background: #f4eeff; opacity: 0; }
-        .dsc-blase.gross { width: calc(2 * var(--px)); height: calc(2 * var(--px)); background: transparent; box-shadow: inset 0 0 0 var(--px) #f4eeff; }
+        .dsc-blase { position: absolute; top: calc(96 * var(--px)); width: var(--px); height: var(--px); background: #f1e5fa; opacity: 0; }
+        .dsc-blase.gross { width: calc(2 * var(--px)); height: calc(2 * var(--px)); background: transparent; box-shadow: inset 0 0 0 var(--px) #f1e5fa; }
         @keyframes dscSteigen {
           0% { transform: translate(0, 0); opacity: 0; } 8% { opacity: .9; }
           50% { transform: translate(calc(2 * var(--px)), calc(-48 * var(--px))); }
@@ -2141,7 +2141,7 @@ const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], s
     );
   };
   return (
-    <PixelScene artH={100} bg="#1a0409" className="doom-clock-overlay">
+    <PixelScene artH={100} bg="#1f0f04" className="doom-clock-overlay">
       <PixelBand src={DCL + 'sky.png'} />
       {blitze.map((b, i) => (
         <React.Fragment key={'b' + i}>
@@ -2187,7 +2187,7 @@ const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], s
         .dc-puls {
           position: absolute; left: calc(50% - 60 * var(--px)); top: calc(${DC_MITTE_Y} * var(--px) - 60 * var(--px));
           width: calc(120 * var(--px)); height: calc(120 * var(--px)); border-radius: 50%;
-          background: radial-gradient(circle, rgba(255,40,20,.55) 0%, rgba(200,10,10,.25) 40%, rgba(120,0,0,0) 70%);
+          background: radial-gradient(circle, rgba(255,26,26,.55) 0%, rgba(200,0,0,.25) 40%, rgba(120,0,0,0) 70%);
           animation: dcPuls 3s ease-in-out infinite;
         }
         @keyframes dcPuls {
@@ -2210,21 +2210,21 @@ const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], s
         .dc-kappe { position: absolute; width: calc(7 * var(--px)); height: calc(7 * var(--px)); background: url(${DCL}cap.png) 0 0 / 100% 100% no-repeat; }
         .dc-glut {
           position: absolute; width: calc(8 * var(--px)); height: calc(8 * var(--px));
-          background: radial-gradient(circle, rgba(255,40,40,.6) 0%, rgba(255,40,40,0) 70%);
+          background: radial-gradient(circle, rgba(255,26,26,.6) 0%, rgba(255,26,26,0) 70%);
           animation: dcGlut 2.8s ease-in-out infinite alternate;
         }
         @keyframes dcGlut { from { opacity: .25; } to { opacity: 1; } }
         .dc-blitz { position: absolute; width: calc(11 * var(--px)); height: calc(30 * var(--px)); background: url(${DCL}bolt.png) 0 0 / 300% 100% no-repeat; opacity: 0; }
         .dc-blitzschein {
           position: absolute; width: calc(40 * var(--px)); height: calc(40 * var(--px)); opacity: 0;
-          background: radial-gradient(circle, rgba(255,120,80,.35) 0%, rgba(255,60,40,.12) 45%, rgba(255,40,20,0) 70%);
+          background: radial-gradient(circle, rgba(255,133,102,.35) 0%, rgba(239,41,41,.12) 45%, rgba(255,26,26,0) 70%);
         }
         @keyframes dcBlitz { 0%, 90% { opacity: 0; } 91% { opacity: 1; } 92% { opacity: .15; } 93.5% { opacity: 1; } 96%, 100% { opacity: 0; } }
         .dc-rad { position: absolute; width: calc(9 * var(--px)); height: calc(9 * var(--px)); background: url(${DCL}gear-s.png) 0 0 / 300% 100% no-repeat; }
         .dc-rad.gross { width: calc(13 * var(--px)); height: calc(13 * var(--px)); background-image: url(${DCL}gear.png); }
         .dc-kraehe { display: block; width: calc(7 * var(--px)); height: calc(4 * var(--px)); background: url(${DCL}crow.png) 0 0 / 200% 100% no-repeat; }
-        .dc-asche { position: absolute; top: calc(98 * var(--px)); width: var(--px); height: var(--px); background: #3a0a0a; opacity: 0; }
-        .dc-asche.glut { background: #ff5a2a; }
+        .dc-asche { position: absolute; top: calc(98 * var(--px)); width: var(--px); height: var(--px); background: #3a0000; opacity: 0; }
+        .dc-asche.glut { background: #ff491a; }
         @keyframes dcAsche { 0% { transform: translate(0,0); opacity: 0; } 15% { opacity: .9; } 100% { transform: translate(calc(4 * var(--px)), calc(-64 * var(--px))); opacity: 0; } }
       `}</style>
     </PixelScene>
@@ -2297,7 +2297,7 @@ const GraveyardOfLimitedPowerOverlay = React.memo(function GraveyardOfLimitedPow
   })), []);
   const motten = useMemo(() => ppZufall(ppFxN(2), (i) => ({ dur: 1.6 + i * .5, delay: -Math.random() * 2, rev: i % 2 === 1 })), []);
   return (
-    <PixelScene artH={100} bg="#322e2f" className="graveyard-overlay">
+    <PixelScene artH={100} bg="#323232" className="graveyard-overlay">
       <PixelBand src={GYD + 'tile.png'} />
       <PixelBand src={GYD + 'glow-a.png'} className="gyd-schein" />
       <PixelBand src={GYD + 'glow-b.png'} className="gyd-schein b" />
@@ -2350,7 +2350,7 @@ const GraveyardOfLimitedPowerOverlay = React.memo(function GraveyardOfLimitedPow
           animation: gydLaterne 1.15s steps(1) infinite;
         }
         @keyframes gydLaterne { 0% { background-position: 0 0; } 30% { background-position: 50% 0; } 42% { background-position: 0 0; } 70% { background-position: 100% 0; } 84% { background-position: 50% 0; } }
-        .gyd-motte { position: absolute; width: var(--px); height: var(--px); background: #d8cdb8; }
+        .gyd-motte { position: absolute; width: var(--px); height: var(--px); background: #e2d8cb; }
         @keyframes gydMotte {
           0% { transform: translate(calc(4 * var(--px)), calc(-2 * var(--px))); }
           12% { transform: translate(calc(5 * var(--px)), calc(1 * var(--px))); }
@@ -2388,13 +2388,13 @@ const GraveyardOfLimitedPowerOverlay = React.memo(function GraveyardOfLimitedPow
           80% { transform: translate(var(--px), calc(-19 * var(--px))); }
           100% { transform: translate(0, calc(-24 * var(--px))); opacity: 0; }
         }
-        .gyd-funke { position: absolute; width: var(--px); height: var(--px); background: #ff5060; opacity: 0; }
+        .gyd-funke { position: absolute; width: var(--px); height: var(--px); background: #fe5154; opacity: 0; }
         @keyframes gydFunke {
           0% { transform: translate(0, 0); opacity: 0; } 20% { opacity: .9; } 50% { opacity: .4; } 70% { opacity: .8; }
           100% { transform: translate(var(--dx), calc(-10 * var(--px))); opacity: 0; }
         }
-        .gyd-blatt { position: absolute; width: calc(2 * var(--px)); height: var(--px); background: #5a2620; box-shadow: var(--px) 0 0 #7c3a26; opacity: 0; }
-        .gyd-blatt.rot { background: #6a2c22; box-shadow: var(--px) 0 0 #3c1a17; }
+        .gyd-blatt { position: absolute; width: calc(2 * var(--px)); height: var(--px); background: #68332a; box-shadow: var(--px) 0 0 #8e503a; opacity: 0; }
+        .gyd-blatt.rot { background: #68332a; box-shadow: var(--px) 0 0 #311402; }
         @keyframes gydFallen {
           0% { transform: translate(0, 0); opacity: 0; } 2% { opacity: 1; }
           10% { transform: translate(calc(2 * var(--px)), calc(6 * var(--px))); }
@@ -2520,11 +2520,11 @@ const ParaseedGreenhouseOverlay = React.memo(function ParaseedGreenhouseOverlay(
   })), []);
   const sporen = useMemo(() => ppZufall(ppFxN(14), () => ({
     x: Math.random() * 100, y: 66 + Math.round(Math.random() * 8), dur: 7 + Math.random() * 6, delay: -Math.random() * 12,
-    farbe: Math.random() < .5 ? '#c9ff2f' : '#ff6ad5',
+    farbe: Math.random() < .5 ? '#b1ff1a' : '#fc69c6',
   })), []);
   const B = PSG_BLUME;
   return (
-    <PixelScene artH={100} bg="#7c807a" className="paraseed-greenhouse-overlay">
+    <PixelScene artH={100} bg="#7f7f7f" className="paraseed-greenhouse-overlay">
       <PixelBand src={PSG + 'tile.png'} />
       <PixelBand src={PSG + 'tile-glow.png'} className="psg-pochen" />
       <PixelBand src={PSG + 'shafts.png'} className="psg-strahlen" />
@@ -2542,7 +2542,7 @@ const ParaseedGreenhouseOverlay = React.memo(function ParaseedGreenhouseOverlay(
       {duesen.map((d, i) => (
         <i key={'d' + i} className="pp-area-dyn pp-px-tropfen" style={{
           left: ppArtX(d.x, 0), top: ppArt(18), '--fall': ppArt(42),
-          '--tropfen': '#c4d0cc', '--tropfen-dunkel': '#7e8a86',
+          '--tropfen': '#d2d2db', '--tropfen-dunkel': '#7f7f7f',
           animation: `ppPxTropfen ${d.dur.toFixed(2)}s ease-in ${d.delay.toFixed(2)}s infinite`,
         }} />
       ))}
@@ -2560,12 +2560,12 @@ const ParaseedGreenhouseOverlay = React.memo(function ParaseedGreenhouseOverlay(
       <PixelPiece src={PSG + 'pod-glow.png'} w={PSG_POD_W} className="psg-samen" />
       <i className="pp-area-dyn pp-px-tropfen" style={{
         left: ppArtX(-1, 0), top: ppArt(56), '--fall': ppArt(18),
-        '--tropfen': '#b6f25a', '--tropfen-dunkel': '#5c8a1c',
+        '--tropfen': '#cbff66', '--tropfen-dunkel': '#5b9438',
         animation: 'ppPxTropfen 4.6s ease-in -1.2s infinite',
       }} />
       <i className="pp-area-dyn pp-px-tropfen" style={{
         left: ppArtX(1, 0), top: ppArt(51), '--fall': ppArt(22),
-        '--tropfen': '#b6f25a', '--tropfen-dunkel': '#5c8a1c',
+        '--tropfen': '#cbff66', '--tropfen-dunkel': '#5b9438',
         animation: 'ppPxTropfen 6.1s ease-in -3.9s infinite',
       }} />
       <div className="pp-pixel-layer psg-dunst b" style={{ top: ppArt(64) }} />
@@ -2768,7 +2768,7 @@ const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
     rtl: i === 1, figur: i, dur: 42 + Math.random() * 18, delay: -Math.random() * 50 - i * 20,
   })), []);
   return (
-    <PixelScene artH={100} bg="#3a3531" className="rioting-village-overlay">
+    <PixelScene artH={100} bg="#323232" className="rioting-village-overlay">
       <PixelBand src={RVG + 'sky.png'} />
       <PixelBand src={RVG + 'sky-glow.png'} className="rvg-fern" />
       <PixelBand src={RVG + 'haze.png'} className="pp-area-dyn rvg-dunst" />
@@ -2863,7 +2863,7 @@ const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
         .rvg-haufen { position: absolute; background-size: 100% 100%; background-repeat: no-repeat; }
         .rvg-bodenschein {
           position: absolute; border-radius: 50%;
-          background: radial-gradient(ellipse, rgba(255,140,40,.42) 0%, rgba(255,90,20,.16) 45%, rgba(255,90,20,0) 70%);
+          background: radial-gradient(ellipse, rgba(255,139,26,.42) 0%, rgba(255,73,26,.16) 45%, rgba(255,73,26,0) 70%);
           animation: rvgSchein 1.1s steps(1) infinite;
         }
         .rvg-puff { position: absolute; width: calc(9 * var(--px)); height: calc(8 * var(--px)); background: url(${RVG}puff.png) 0 0 / 400% 100% no-repeat; opacity: 0; }
@@ -2882,14 +2882,14 @@ const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
         }
         .rvg-augenglut {
           position: absolute; width: calc(19 * var(--px)); height: calc(13 * var(--px));
-          background: radial-gradient(ellipse, rgba(255,30,20,.5) 0%, rgba(255,30,20,0) 70%);
+          background: radial-gradient(ellipse, rgba(255,26,26,.5) 0%, rgba(255,26,26,0) 70%);
           animation: rvgAugenglut 2.4s ease-in-out infinite alternate;
         }
         @keyframes rvgAugenglut { from { opacity: .45; } to { opacity: 1; } }
-        .rvg-funke { position: absolute; width: var(--px); height: var(--px); background: #f47a1c; opacity: 0; }
-        .rvg-funke.hell { background: #ffd060; }
+        .rvg-funke { position: absolute; width: var(--px); height: var(--px); background: #f87420; opacity: 0; }
+        .rvg-funke.hell { background: #ffd066; }
         @keyframes rvgFunke { 0% { transform: translate(0,0); opacity: 0; } 8% { opacity: 1; } 70% { opacity: 1; } 100% { transform: translate(calc(-5 * var(--px)), calc(-26 * var(--px))); opacity: 0; } }
-        .rvg-asche { position: absolute; width: var(--px); height: var(--px); background: #7a716b; opacity: 0; }
+        .rvg-asche { position: absolute; width: var(--px); height: var(--px); background: #686868; opacity: 0; }
         @keyframes rvgAsche { 0% { transform: translate(0,0); opacity: 0; } 10% { opacity: .7; } 85% { opacity: .6; } 100% { transform: translate(calc(-18 * var(--px)), calc(60 * var(--px))); opacity: 0; } }
       `}</style>
     </PixelScene>
@@ -2975,7 +2975,7 @@ const SlipperyIceOverlay = React.memo(function SlipperyIceOverlay() {
     x: Math.random() * 100, y: 3 + Math.random() * 54, dur: 1.8 + Math.random() * 2, delay: -Math.random() * 4,
   })), []);
   return (
-    <PixelScene artH={100} bg="#d2d1f7" className="slippery-ice-overlay">
+    <PixelScene artH={100} bg="#b4cff8" className="slippery-ice-overlay">
       <PixelBand src={SLI + 'water.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.1s steps(1) infinite' }} />
       {schollen.map((s, i) => (
         <i key={'s' + i} className="pp-area-dyn sli-scholle" style={{
@@ -3128,7 +3128,7 @@ const SmugglersPierOverlay = React.memo(function SmugglersPierOverlay() {
     x, y, dur: 3 + Math.random() * 4, delay: -Math.random() * 7,
   })), []);
   return (
-    <PixelScene artH={100} bg="#1646cc" className="smugglers-pier-overlay">
+    <PixelScene artH={100} bg="#0351c9" className="smugglers-pier-overlay">
       <PixelBand src={SMP + 'water.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.4s steps(1) infinite' }} />
       {fische.map((f, i) => (
         <div key={'f' + i} className="pp-area-dyn pp-quer" style={ppQuer(f.y, f.dur, f.delay, f.rtl)}>
@@ -3278,7 +3278,7 @@ const SpatialCreviceOverlay = React.memo(function SpatialCreviceOverlay() {
     y: 16 + Math.random() * 22, dur: 11 + Math.random() * 6, delay: -Math.random() * 16, rtl: i % 2 === 1,
   })), []);
   return (
-    <PixelScene artH={100} bg="#0c2144" className="spatial-crevice-overlay">
+    <PixelScene artH={100} bg="#00213f" className="spatial-crevice-overlay">
       <PixelBand src={SC + 'tile.png'} />
       <PixelBand src={SC + 'rays.png'} className="sc-strahlen" />
       <PixelBand src={SC + 'shimmer.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.7s steps(1) infinite' }} />
@@ -3350,14 +3350,14 @@ const SpatialCreviceOverlay = React.memo(function SpatialCreviceOverlay() {
         }
         @keyframes scFlugLtr { from { transform: translateX(calc(40 * var(--px))); } to { transform: translateX(calc(130 * var(--px))); } }
         @keyframes scFlugRtl { from { transform: translateX(calc(130 * var(--px))); } to { transform: translateX(calc(40 * var(--px))); } }
-        .sc-glut { position: absolute; width: var(--px); height: var(--px); background: #ffc050; opacity: 0; }
+        .sc-glut { position: absolute; width: var(--px); height: var(--px); background: #ffd066; opacity: 0; }
         @keyframes scGlut {
-          0% { transform: translate(0, 0); opacity: 0; background: #ffd060; }
+          0% { transform: translate(0, 0); opacity: 0; background: #ffd066; }
           6% { opacity: 1; }
-          35% { background: #f58a2c; }
-          65% { background: #b8321a; opacity: .95; }
-          85% { background: #5a1a2a; opacity: .7; }
-          100% { transform: translate(var(--dx), var(--dy)); background: #1c2a4a; opacity: 0; }
+          35% { background: #ff9b3a; }
+          65% { background: #b5171c; opacity: .95; }
+          85% { background: #4b1021; opacity: .7; }
+          100% { transform: translate(var(--dx), var(--dy)); background: #00213f; opacity: 0; }
         }
         .sc-fisch {
           display: block; width: calc(9 * var(--px)); height: calc(6 * var(--px));
@@ -3368,10 +3368,10 @@ const SpatialCreviceOverlay = React.memo(function SpatialCreviceOverlay() {
           background: url(${SC}jelly.png) 0 0 / 200% 100% no-repeat;
           animation: ppSprite2 1.6s steps(1) infinite, ppBob 3.2s ease-in-out infinite alternate;
         }
-        .sc-schnee { position: absolute; top: 0; width: var(--px); height: var(--px); background: #9fb8e0; opacity: .55; }
+        .sc-schnee { position: absolute; top: 0; width: var(--px); height: var(--px); background: #89abdc; opacity: .55; }
         @keyframes scSinken { from { transform: translate(0, 0); } 50% { transform: translate(calc(3 * var(--px)), calc(50 * var(--px))); } to { transform: translate(0, calc(100 * var(--px))); } }
-        .sc-blase { position: absolute; top: calc(96 * var(--px)); width: var(--px); height: var(--px); background: #b8d0f4; opacity: 0; }
-        .sc-blase.gross { width: calc(2 * var(--px)); height: calc(2 * var(--px)); background: transparent; box-shadow: inset 0 0 0 var(--px) #b8d0f4; }
+        .sc-blase { position: absolute; top: calc(96 * var(--px)); width: var(--px); height: var(--px); background: #b4cff8; opacity: 0; }
+        .sc-blase.gross { width: calc(2 * var(--px)); height: calc(2 * var(--px)); background: transparent; box-shadow: inset 0 0 0 var(--px) #b4cff8; }
         @keyframes scSteigen {
           0% { transform: translate(0, 0); opacity: 0; } 8% { opacity: .8; }
           50% { transform: translate(calc(2 * var(--px)), calc(-48 * var(--px))); }
@@ -3455,7 +3455,7 @@ const SpiderHiveOverlay = React.memo(function SpiderHiveOverlay() {
     return { x: x + Math.round((Math.random() - .5) * 6), y0, fall: Math.min(10, y1 - y0), dur: 5 + Math.random() * 5, delay: -Math.random() * 10 };
   }), []);
   return (
-    <PixelScene artH={100} bg="#7b5428" className="spider-hive-overlay">
+    <PixelScene artH={100} bg="#72541d" className="spider-hive-overlay">
       <PixelBand src={SH + 'tile.png'} />
       <PixelBand src={SH + 'tile-glow.png'} className="sh-glimmen" />
       <PixelBand src={SH + 'vines.png'} style={{ backgroundSize: 'auto 200%', animation: 'ppBand2 2.8s steps(1) infinite' }} />
@@ -3513,7 +3513,7 @@ const SpiderHiveOverlay = React.memo(function SpiderHiveOverlay() {
           65% { background-position: 50% 0; } 66%, 86% { background-position: 0 0; } 87% { background-position: 50% 0; }
           88% { background-position: 100% 0; } 89% { background-position: 50% 0; } 90%, 100% { background-position: 0 0; }
         }
-        .sh-lid { position: absolute; width: calc(3 * var(--px)); height: var(--px); background: #080403; opacity: 0; }
+        .sh-lid { position: absolute; width: calc(3 * var(--px)); height: var(--px); background: #000000; opacity: 0; }
         @keyframes shBlinzeln { 0%, 90% { opacity: 0; } 91%, 93% { opacity: 1; } 94%, 100% { opacity: 0; } }
         @keyframes shWeg { 0%, 45% { opacity: 0; } 46%, 55% { opacity: 1; } 56%, 58% { opacity: 0; } 59%, 90% { opacity: 1; } 91%, 100% { opacity: 0; } }
         .sh-spinne { position: absolute; width: calc(13 * var(--px)); height: calc(7 * var(--px)); background: url(${SH}spider.png) 0 0 / 200% 100% no-repeat; }
@@ -3522,7 +3522,7 @@ const SpiderHiveOverlay = React.memo(function SpiderHiveOverlay() {
         .sh-seiler { position: absolute; top: 0; width: calc(7 * var(--px)); height: calc(7 * var(--px)); background: url(${SH}hang.png) 0 0 / 200% 100% no-repeat; }
         .sh-seiler::before {
           content: ''; position: absolute; left: calc(3 * var(--px)); bottom: calc(100% - var(--px)); width: var(--px); height: calc(110 * var(--px));
-          background: rgba(236, 228, 214, .55);
+          background: rgba(226,216,203,.55);
         }
         @keyframes shAbseilen {
           0% { translate: 0 calc(-10 * var(--px)); } 30%, 62% { translate: 0 var(--tief); } 100% { translate: 0 calc(-10 * var(--px)); }
@@ -3533,7 +3533,7 @@ const SpiderHiveOverlay = React.memo(function SpiderHiveOverlay() {
           78% { background-position: 50% 0; } 81% { background-position: 100% 0; } 84%, 92% { background-position: 0 0; }
           93% { background-position: 100% 0; } 96%, 100% { background-position: 0 0; }
         }
-        .sh-staub { position: absolute; width: var(--px); height: var(--px); background: #c09452; opacity: 0; }
+        .sh-staub { position: absolute; width: var(--px); height: var(--px); background: #ca874e; opacity: 0; }
         @keyframes shRieseln {
           0% { translate: 0 0; opacity: 0; } 1% { opacity: .9; }
           24% { translate: 0 var(--fall); opacity: .9; }
@@ -3621,7 +3621,7 @@ const StinkyStablesOverlay = React.memo(function StinkyStablesOverlay() {
     y: 16 + Math.random() * 16, dur: 9 + Math.random() * 6, delay: -Math.random() * 15, rtl: i % 2 === 1,
   })), []);
   return (
-    <PixelScene artH={100} bg="#1a110a" className="stinky-stables-overlay">
+    <PixelScene artH={100} bg="#1f0f04" className="stinky-stables-overlay">
       <PixelBand src={SS + 'tile.png'} />
       <PixelPiece src={SS + 'heap.png'} w={SS_W} />
       <i className="ss-huhn" style={{ left: ppArtX(24, SS_W), top: ppArt(84) }} />
@@ -3706,15 +3706,15 @@ const StinkyStablesOverlay = React.memo(function StinkyStablesOverlay() {
           100% { transform: translateY(calc(-18 * var(--px))); opacity: 0; }
         }
         @keyframes ssMiefBild { 0% { background-position: 0 0; } 30% { background-position: 50% 0; } 62%, 100% { background-position: 100% 0; } }
-        .ss-staub { position: absolute; width: var(--px); height: var(--px); background: #f4dd9c; opacity: 0; }
+        .ss-staub { position: absolute; width: var(--px); height: var(--px); background: #f9ecb3; opacity: 0; }
         @keyframes ssRieseln {
           0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: .75; }
           50% { opacity: .4; } 60% { opacity: .8; } 90% { opacity: .5; }
           100% { transform: translate(calc(-23 * var(--px)), calc(56 * var(--px))); opacity: 0; }
         }
         .ss-fliege-ort { position: absolute; width: var(--px); height: var(--px); }
-        .ss-fliege { position: absolute; width: var(--px); height: var(--px); background: #120b06; }
-        @keyframes ssSurr { 0% { box-shadow: 0 calc(-1 * var(--px)) 0 rgba(215, 225, 235, .75); } 50% { box-shadow: var(--px) 0 0 rgba(215, 225, 235, .5); } }
+        .ss-fliege { position: absolute; width: var(--px); height: var(--px); background: #141414; }
+        @keyframes ssSurr { 0% { box-shadow: 0 calc(-1 * var(--px)) 0 rgba(229,237,250,.75); } 50% { box-shadow: var(--px) 0 0 rgba(229,237,250,.5); } }
         @keyframes ssFlugA {
           0% { transform: translate(0, 0); } 12.5% { transform: translate(calc(3 * var(--px)), calc(-2 * var(--px))); }
           25% { transform: translate(calc(5 * var(--px)), 0); } 37.5% { transform: translate(calc(3 * var(--px)), calc(2 * var(--px))); }
@@ -3812,7 +3812,7 @@ const FloatingIslandOverlay = React.memo(function FloatingIslandOverlay() {
     x: [60, 58, 61, 63][i], y: [10, 30, 46, 70][i], dur: 2 + Math.random() * 2, delay: -Math.random() * 4,
   })), []);
   return (
-    <PixelScene artH={100} bg="#1a5dd7" className="floating-island-overlay">
+    <PixelScene artH={100} bg="#0351c9" className="floating-island-overlay">
       <PixelBand src={FI + 'sky.png'} />
       <PixelBand src={FI + 'clouds-back.png'} className="fi-wolken-hinten" />
       {FI_INSELN.map((s, i) => (
@@ -3872,14 +3872,14 @@ const FloatingIslandOverlay = React.memo(function FloatingIslandOverlay() {
           60% { translate: 0 calc(-1 * var(--px)); } 82% { translate: 0 0; } 100% { translate: 0 0; }
         }
         .fi-insel { position: absolute; background-size: 100% 100%; background-repeat: no-repeat; }
-        .fi-kruemel, .fi-tropfen { position: absolute; width: var(--px); height: var(--px); background: #5a3a1e; opacity: 0; }
-        .fi-tropfen { background: #bcd9ff; }
+        .fi-kruemel, .fi-tropfen { position: absolute; width: var(--px); height: var(--px); background: #5a341a; opacity: 0; }
+        .fi-tropfen { background: #b4cff8; }
         @keyframes fiRieseln {
           0% { transform: translateY(0); opacity: 0; } 5% { opacity: 1; }
           80% { opacity: 1; } 100% { transform: translateY(var(--fall)); opacity: 0; }
         }
         .fi-nebel { position: absolute; width: calc(24 * var(--px)); height: calc(10 * var(--px)); background: url(${FI}mist.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 .9s steps(1) infinite; }
-        .fi-gischt { position: absolute; width: calc(3 * var(--px)); height: calc(2 * var(--px)); background: #e3edfb; opacity: 0; box-shadow: var(--px) calc(-1 * var(--px)) 0 #f4f8fe; }
+        .fi-gischt { position: absolute; width: calc(3 * var(--px)); height: calc(2 * var(--px)); background: #e5edfa; opacity: 0; box-shadow: var(--px) calc(-1 * var(--px)) 0 #ffffff; }
         @keyframes fiGischt {
           0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: .85; }
           100% { transform: translate(calc(-4 * var(--px)), calc(-14 * var(--px))); opacity: 0; }
@@ -3969,7 +3969,7 @@ const TempleOfSacrificeOverlay = React.memo(function TempleOfSacrificeOverlay() 
     y: 6 + Math.random() * 14, dur: 34 + Math.random() * 12, delay: -Math.random() * 30, rtl: Math.random() < .5,
   })), []);
   return (
-    <PixelScene artH={100} bg="#10251b" className="temple-of-sacrifice-overlay">
+    <PixelScene artH={100} bg="#0f2412" className="temple-of-sacrifice-overlay">
       <PixelBand src={TS + 'tile.png'} />
       <PixelBand src={TS + 'sway.png'} className="ts-wiegen" style={{ backgroundSize: 'auto 300%' }} />
       <PixelPiece src={TS + 'temple.png'} w={TS_W} />
@@ -4034,7 +4034,7 @@ const TempleOfSacrificeOverlay = React.memo(function TempleOfSacrificeOverlay() 
           60% { opacity: .5; }
           100% { transform: translate(calc(-6 * var(--px)), calc(-28 * var(--px))); opacity: 0; }
         }
-        .ts-funke { position: absolute; width: var(--px); height: var(--px); background: #ffb040; opacity: 0; }
+        .ts-funke { position: absolute; width: var(--px); height: var(--px); background: #f9ac20; opacity: 0; }
         @keyframes tsFunke { 0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: 1; } 100% { transform: translate(calc(-2 * var(--px)), calc(-14 * var(--px))); opacity: 0; } }
         .ts-ara {
           position: absolute; width: calc(9 * var(--px)); height: calc(14 * var(--px));
@@ -4061,8 +4061,8 @@ const TempleOfSacrificeOverlay = React.memo(function TempleOfSacrificeOverlay() 
           100% { transform: translateX(calc(-20 * var(--px))); }
         }
         .ts-gluehwurm {
-          position: absolute; width: var(--px); height: var(--px); background: #f4ff9a; opacity: 0;
-          box-shadow: 0 0 calc(2 * var(--px)) calc(.6 * var(--px)) rgba(210, 255, 90, .45);
+          position: absolute; width: var(--px); height: var(--px); background: #fff196; opacity: 0;
+          box-shadow: 0 0 calc(2 * var(--px)) calc(.6 * var(--px)) rgba(203,255,102,.45);
         }
         @keyframes tsGluehen {
           0% { transform: translate(0, 0); opacity: 0; } 20% { opacity: .9; } 40% { opacity: .25; }
@@ -4133,7 +4133,7 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
   })), []);
   const ratte = useMemo(() => ({ dur: 9 + Math.random() * 4, delay: -Math.random() * 30, rtl: Math.random() < .5 }), []);
   return (
-    <PixelScene artH={100} bg="#2a2422" className="bonegrinder-overlay">
+    <PixelScene artH={100} bg="#222222" className="bonegrinder-overlay">
       <PixelBand src={BGR + 'tile.png'} />
       <PixelBand src={BGR + 'tile-glow.png'} className="bg-schein" />
       <PixelBand src={BGR + 'chains.png'} className="bg-ketten" style={{ backgroundSize: 'auto 300%' }} />
@@ -4182,7 +4182,7 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
         @keyframes bgPendel { 0% { background-position: 50% 0%; } 25% { background-position: 50% 50%; } 50% { background-position: 50% 0%; } 75% { background-position: 50% 100%; } }
         .bg-glut {
           position: absolute; width: calc(18 * var(--px)); height: calc(18 * var(--px));
-          background: radial-gradient(circle, rgba(255,170,70,.30) 0%, rgba(255,120,40,.12) 45%, rgba(255,120,40,0) 70%);
+          background: radial-gradient(circle, rgba(255,155,58,.30) 0%, rgba(248,116,32,.12) 45%, rgba(248,116,32,0) 70%);
         }
         @keyframes bgGlut { 0% { opacity: .8; } 22% { opacity: 1; } 40% { opacity: .65; } 63% { opacity: .95; } 81% { opacity: .75; } }
         .bg-flamme {
@@ -4209,7 +4209,7 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
           animation: bgRieseln .5s steps(8) infinite;
         }
         @keyframes bgRieseln { from { background-position: 0 0; } to { background-position: 0 calc(8 * var(--px)); } }
-        .bg-wolke { position: absolute; width: var(--px); height: var(--px); background: #d9d3c5; opacity: 0; }
+        .bg-wolke { position: absolute; width: var(--px); height: var(--px); background: #e2d8cb; opacity: 0; }
         @keyframes bgStauben {
           0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: .8; }
           100% { transform: translate(var(--dx), calc(-7 * var(--px))); opacity: 0; }
@@ -4248,7 +4248,7 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
           background: url(${BGR}rat.png) 0 0 / 200% 100% no-repeat;
           animation: ppSprite2 .18s steps(1) infinite;
         }
-        .bg-staub { position: absolute; width: var(--px); height: var(--px); background: #cfc3a8; opacity: 0; }
+        .bg-staub { position: absolute; width: var(--px); height: var(--px); background: #c5b7a0; opacity: 0; }
         @keyframes bgSchweben {
           0% { transform: translate(0, 0); opacity: 0; } 20% { opacity: .45; } 80% { opacity: .45; }
           100% { transform: translate(calc(6 * var(--px)), calc(-10 * var(--px))); opacity: 0; }
@@ -4318,7 +4318,7 @@ const CosmicDepthsOverlay = React.memo(function CosmicDepthsOverlay() {
     return { dx: Math.cos(a) * d, dy: Math.sin(a) * d * 1.3, dur: 2.2 + Math.random() * 2.2, delay: -Math.random() * 4.4 };
   }), []);
   return (
-    <PixelScene artH={100} bg="#01021f" className="cosmic-depths-overlay">
+    <PixelScene artH={100} bg="#12101f" className="cosmic-depths-overlay">
       <PixelBand src={CD + 'tile.png'} />
       <PixelBand src={CD + 'twinkle.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 3.6s steps(1) infinite' }} />
       <div className="pp-pixel-layer cd-nebel" />
@@ -4401,11 +4401,11 @@ const CosmicDepthsOverlay = React.memo(function CosmicDepthsOverlay() {
           animation: cdRiss 2.8s steps(1) infinite;
         }
         @keyframes cdRiss { 0% { background-position: 0 0; } 25% { background-position: 50% 0; } 50% { background-position: 100% 0; } 75% { background-position: 50% 0; } }
-        .cd-funke { position: absolute; width: var(--px); height: var(--px); background: #ff5a4a; opacity: 0; }
+        .cd-funke { position: absolute; width: var(--px); height: var(--px); background: #fe5154; opacity: 0; }
         @keyframes cdSog {
           0% { transform: translate(var(--dx), var(--dy)); opacity: 0; }
           20% { opacity: .9; }
-          85% { opacity: .9; background: #ff2a6a; }
+          85% { opacity: .9; background: #fc1c5f; }
           100% { transform: translate(0, 0); opacity: 0; }
         }
         .cd-schnuppe {
@@ -4537,7 +4537,7 @@ const FirstCircleOfHellOverlay = React.memo(function FirstCircleOfHellOverlay() 
     );
   };
   return (
-    <PixelScene artH={100} bg="#4f4e4b" className="first-circle-overlay">
+    <PixelScene artH={100} bg="#535353" className="first-circle-overlay">
       <PixelBand src={FC + 'tile.png'} />
       {ferne.map((f, i) => (
         <div key={'f' + i} className="pp-area-dyn fc-fern" style={{
@@ -4617,9 +4617,9 @@ const FirstCircleOfHellOverlay = React.memo(function FirstCircleOfHellOverlay() 
           26.9% { opacity: 1; transform: translateY(0); }
           27%, 100% { opacity: 0; transform: translateY(0); }
         }
-        .fc-asche { position: absolute; left: 0; width: var(--px); height: var(--px); background: #9a978f; opacity: .6; }
-        .fc-asche.dunkel { background: #4a4946; }
-        .fc-asche.gross { width: calc(2 * var(--px)); background: #a8a59d; }
+        .fc-asche { position: absolute; left: 0; width: var(--px); height: var(--px); background: #929292; opacity: .6; }
+        .fc-asche.dunkel { background: #535353; }
+        .fc-asche.gross { width: calc(2 * var(--px)); background: #a8a8a8; }
         @keyframes fcAsche {
           0% { transform: translate(calc(-10 * var(--px)), 0); }
           25% { transform: translate(calc(25cqw), calc(3 * var(--px))); }
@@ -4720,7 +4720,7 @@ const BigGwenOverlay = React.memo(function BigGwenOverlay() {
     }} />
   );
   return (
-    <PixelScene artH={100} bg="#120f30" className="big-gwen-overlay">
+    <PixelScene artH={100} bg="#170b28" className="big-gwen-overlay">
       <PixelBand src={GW + 'sky.png'} />
       <i className="gw-mond" style={{ left: ppArtX(GW_MOND_X - 8.5, 0), top: ppArt(3) }} />
       <PixelBand src={GW + 'smog.png'} className="gw-smog" />
@@ -4787,8 +4787,8 @@ const BigGwenOverlay = React.memo(function BigGwenOverlay() {
         /* Blumen wiegen: gerade – rechts – gerade – links */
         @keyframes gwWiegen { 0% { background-position: 50% 0%; } 25% { background-position: 50% 50%; } 50% { background-position: 50% 0%; } 75% { background-position: 50% 100%; } }
         .gw-gluehwurm {
-          position: absolute; width: var(--px); height: var(--px); background: #e4f47a; opacity: 0;
-          box-shadow: 0 0 calc(2 * var(--px)) calc(.5 * var(--px)) rgba(210, 240, 110, .45);
+          position: absolute; width: var(--px); height: var(--px); background: #f0f075; opacity: 0;
+          box-shadow: 0 0 calc(2 * var(--px)) calc(.5 * var(--px)) rgba(240,240,117,.45);
         }
         @keyframes gwSchwirren {
           0%, 100% { transform: translate(0, 0); } 25% { transform: translate(calc(4 * var(--px)), calc(-3 * var(--px))); }
@@ -4802,7 +4802,7 @@ const BigGwenOverlay = React.memo(function BigGwenOverlay() {
           background-repeat: no-repeat; background-size: calc(${60 * GW_ZEIGER} * var(--px)) 100%;
         }
         @keyframes gwZeiger { from { background-position: 0 0; } to { background-position: calc(${-60 * GW_ZEIGER} * var(--px)) 0; } }
-        .gw-achse { position: absolute; width: var(--px); height: var(--px); background: #e8b83a; }
+        .gw-achse { position: absolute; width: var(--px); height: var(--px); background: #c79e05; }
         .gw-rauch { position: absolute; width: calc(6 * var(--px)); height: calc(5 * var(--px)); background: url(${GW}smoke.png) 0 0 / 100% 100% no-repeat; opacity: 0; }
         .gw-rauch.gross { width: calc(9 * var(--px)); height: calc(7 * var(--px)); background-image: url(${GW}smoke-big.png); }
         @keyframes gwRauch {
@@ -4890,7 +4890,7 @@ const WarCouncilOverlay = React.memo(function WarCouncilOverlay() {
     y: 44 + Math.random() * 36, dur: 9 + Math.random() * 7, delay: -Math.random() * 16, bob: 2 + Math.random() * 3,
   })), []);
   return (
-    <PixelScene artH={100} bg="#4a66a2" className="war-council-overlay">
+    <PixelScene artH={100} bg="#405f8c" className="war-council-overlay">
       <PixelBand src={WC + 'sky.png'} />
       {wolken.map((w, i) => (
         <div key={'w' + i} className="pp-area-dyn pp-quer" style={ppQuer(w.y, w.dur.toFixed(1), w.delay.toFixed(1), false)}>
@@ -4939,7 +4939,7 @@ const WarCouncilOverlay = React.memo(function WarCouncilOverlay() {
           background: url(${WC}fire.png) 0 0 / 400% 100% no-repeat;
         }
         @keyframes wcFeuer { from { background-position: 0 0; } to { background-position: calc(-36 * var(--px)) 0; } }
-        .wc-funke { position: absolute; width: var(--px); height: var(--px); background: #ffb040; opacity: 0; }
+        .wc-funke { position: absolute; width: var(--px); height: var(--px); background: #f9ac20; opacity: 0; }
         @keyframes wcFunke {
           0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: 1; }
           60% { transform: translate(calc(5 * var(--px)), calc(-9 * var(--px))); }
@@ -4947,7 +4947,7 @@ const WarCouncilOverlay = React.memo(function WarCouncilOverlay() {
         }
         .wc-rauch {
           position: absolute; width: calc(4 * var(--px)); height: calc(3 * var(--px)); opacity: 0;
-          background: rgba(96, 90, 112, .55); box-shadow: inset calc(-1 * var(--px)) calc(1 * var(--px)) 0 rgba(60, 54, 74, .5);
+          background: rgba(89,96,110,.55); box-shadow: inset calc(-1 * var(--px)) calc(1 * var(--px)) 0 rgba(62,62,81,.5);
         }
         @keyframes wcRauch {
           0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: .75; }
@@ -5038,7 +5038,7 @@ const WowhallaOverlay = React.memo(function WowhallaOverlay() {
     }} />
   );
   return (
-    <PixelScene artH={100} bg="#8fd6dc" className="wowhalla-overlay">
+    <PixelScene artH={100} bg="#91e6e6" className="wowhalla-overlay">
       <PixelBand src={WH + 'tile.png'} />
       <PixelBand src={WH + 'clouds.png'} className="wh-wolken" />
       <div className="pp-pixel-layer pp-area-dyn wh-schnee fern" />
@@ -5127,7 +5127,7 @@ const SecondCircleOfHellOverlay = React.memo(function SecondCircleOfHellOverlay(
     f: (i + k) % 2, dx: ((i + k) % 3 - 1) * 2,
   }))), [frauen]);
   return (
-    <PixelScene artH={100} bg="#1e0a2c" className="second-circle-overlay">
+    <PixelScene artH={100} bg="#19062d" className="second-circle-overlay">
       <PixelBand src={LC + 'tile.png'} className="lc-wand" style={{ backgroundSize: 'auto 200%', backgroundPosition: '0 0' }} />
       <div className="lc-volk">
         {frauen.map((f, i) => (
@@ -5222,7 +5222,7 @@ const ThirdCircleOfHellOverlay = React.memo(function ThirdCircleOfHellOverlay() 
     return out;
   }, []);
   return (
-    <PixelScene artH={100} bg="#4a0a0a" className="third-circle-overlay">
+    <PixelScene artH={100} bg="#520a0c" className="third-circle-overlay">
       <PixelBand src={TCI + 'tile.png'} className="tc-wand" style={{ backgroundSize: 'auto 200%', backgroundPosition: '0 0' }} />
       <div className="tc-volk">
         {fresser.map((f, i) => (
@@ -5299,7 +5299,7 @@ const FourthCircleOfHellOverlay = React.memo(function FourthCircleOfHellOverlay(
     return { x: (i * 53 + 7) % 380, y: i < 15 ? 3 + (i * 29) % 40 : 52 + (i * 17) % 38, dur, delay: -((i * 1.1) % dur) };
   }), []);
   return (
-    <PixelScene artH={100} bg="#0a0000" className="fourth-circle-overlay">
+    <PixelScene artH={100} bg="#000000" className="fourth-circle-overlay">
       <PixelBand src={FCI + 'back.png'} style={{ backgroundPosition: '0 0' }} />
       <div className="pp-area-dyn fc4-glut" />
       <div className="fc4-volk">
@@ -5334,7 +5334,7 @@ const FourthCircleOfHellOverlay = React.memo(function FourthCircleOfHellOverlay(
         .fc4-volk { position: absolute; inset: 0; }
         .fc4-glut {
           position: absolute; inset: 0; opacity: .85;
-          background: linear-gradient(to top, rgba(255,196,64,.30), rgba(255,140,30,.12) 38%, rgba(255,120,20,0) 62%);
+          background: linear-gradient(to top, rgba(255,185,26,.30), rgba(255,139,26,.12) 38%, rgba(255,125,0,0) 62%);
           animation: fc4Puls 6s ease-in-out infinite alternate;
         }
         @keyframes fc4Puls { from { opacity: .55; } to { opacity: 1; } }
@@ -5415,7 +5415,7 @@ const FifthCircleOfHellOverlay = React.memo(function FifthCircleOfHellOverlay() 
     return { x: ((i * 29) % FI_BREITE), k: i % 3, dur, delay: -((i * 1.9) % dur), drift: 8 + (i % 4) * 4 };
   }), []);
   return (
-    <PixelScene artH={100} bg="#140806" className="fifth-circle-overlay">
+    <PixelScene artH={100} bg="#08060c" className="fifth-circle-overlay">
       <PixelBand src={FII + 'back.png'} style={{ backgroundPosition: '0 0' }} />
       <div className="fi-volk">
         {fontaenen.map((f, i) => (
@@ -5462,7 +5462,7 @@ const FifthCircleOfHellOverlay = React.memo(function FifthCircleOfHellOverlay() 
         @keyframes fiFontB { ${[0,1,2,3,4,5,6,7].map(b => `${(b * 12.5)}% { background-position-x: ${(b * 100 / 7).toFixed(3)}%; }`).join(' ')} }
         /* Schein der Fontaenen: warmes Pulsieren */
         .fi-glut { position: absolute; top: calc(10 * var(--px)); width: calc(60 * var(--px)); height: calc(80 * var(--px)); opacity: .5;
-          background: radial-gradient(ellipse at 50% 62%, rgba(255,160,50,.34), rgba(255,100,20,.14) 45%, rgba(255,80,10,0) 70%); }
+          background: radial-gradient(ellipse at 50% 62%, rgba(255,155,58,.34), rgba(248,116,32,.14) 45%, rgba(255,73,26,0) 70%); }
         @keyframes fiGlut { from { opacity: .35; } to { opacity: .8; } }
         .fi-held { position: absolute; top: calc(42 * var(--px)); width: calc(26 * var(--px)); height: calc(36 * var(--px)); background: url(${FII}hero.png) 0 0 / ${FI_BILDER * 100}% 200% no-repeat; }
         @keyframes fiHeld { ${FI_KEYFRAMES} }
@@ -5517,7 +5517,7 @@ const SixthCircleOfHellOverlay = React.memo(function SixthCircleOfHellOverlay() 
   }), []);
   const himmel = useMemo(() => Array.from({ length: 12 }, (_, k) => k - 6), []);
   return (
-    <PixelScene artH={100} bg="#140000" className="sixth-circle-overlay">
+    <PixelScene artH={100} bg="#08060c" className="sixth-circle-overlay">
       <PixelBand src={SXX + 'back.png'} style={{ backgroundPosition: '50% 0' }} />
       <PixelPiece src={SXX + 'panorama.png'} w={SX_PAN} />
       <div className="sx-volk">
@@ -5554,7 +5554,7 @@ const SixthCircleOfHellOverlay = React.memo(function SixthCircleOfHellOverlay() 
         .sx-feuer { position: absolute; width: calc(12 * var(--px)); height: calc(18 * var(--px)); background: url(${SXX}grave-fire.png) 0 0 / 800% 100% no-repeat; }
         @keyframes sxFeuer { ${sxReihe(8)} }
         .sx-glut { position: absolute; width: calc(24 * var(--px)); height: calc(34 * var(--px)); opacity: .5;
-          background: radial-gradient(ellipse at 50% 60%, rgba(255,150,40,.32), rgba(255,90,20,.12) 50%, rgba(255,80,10,0) 72%); }
+          background: radial-gradient(ellipse at 50% 60%, rgba(255,154,26,.32), rgba(255,73,26,.12) 50%, rgba(255,73,26,0) 72%); }
         @keyframes sxGlut { from { opacity: .3; } to { opacity: .8; } }
         .sx-gott { position: absolute; top: calc(31 * var(--px)); width: calc(46 * var(--px)); height: calc(48 * var(--px)); background: url(${SXX}god.png) 0 0 / ${12 * 100}% 100% no-repeat; }
         @keyframes sxGott { ${sxFolge(SX_GOTT, 12)} }
@@ -5608,7 +5608,7 @@ const SeventhCircleOfHellOverlay = React.memo(function SeventhCircleOfHellOverla
     return { x: -230 + ((i * 59 + 7) % 460), y0: SV_LAVA + 6 + (i % 4) * 4, dur, k: i % 3, delay: -((i * 0.79) % dur), drift: ((i % 5) - 2) * 3 };
   }), []);
   return (
-    <PixelScene artH={100} bg="#200000" className="seventh-circle-overlay">
+    <PixelScene artH={100} bg="#270d0c" className="seventh-circle-overlay">
       <PixelBand src={SVX + 'back.png'} style={{ backgroundPosition: '50% 0' }} />
       <PixelPiece src={SVX + 'statue.png'} w={SV_PAN} />
       <div className="sv-volk">
@@ -5645,7 +5645,7 @@ const SeventhCircleOfHellOverlay = React.memo(function SeventhCircleOfHellOverla
         .sv-augen { position: absolute; top: calc(31 * var(--px)); width: calc(30 * var(--px)); height: calc(5 * var(--px)); background: url(${SVX}eyes.png) 0 0 / 400% 100% no-repeat; }
         @keyframes svAugen { ${sxReihe(4)} }
         .sv-augenglut { position: absolute; top: calc(20 * var(--px)); width: calc(42 * var(--px)); height: calc(28 * var(--px)); opacity: .5;
-          background: radial-gradient(ellipse at 50% 50%, rgba(255,40,20,.30), rgba(255,20,10,.1) 50%, rgba(255,0,0,0) 72%); }
+          background: radial-gradient(ellipse at 50% 50%, rgba(255,26,26,.30), rgba(255,26,26,.1) 50%, rgba(255,26,26,0) 72%); }
         @keyframes svGlut { from { opacity: .3; } to { opacity: .85; } }
         .sv-blut { position: absolute; top: calc(36 * var(--px)); width: calc(7 * var(--px)); height: calc(42 * var(--px)); background: url(${SVX}blood.png) 0 0 / 400% 100% no-repeat; }
         @keyframes svBlut { ${sxReihe(4)} }
@@ -5691,7 +5691,7 @@ const EighthCircleOfHellOverlay = React.memo(function EighthCircleOfHellOverlay(
     return { x: (links ? -126 + ((i * 13) % 34) : 82 + ((i * 11) % 40)), y0: 84 - (i % 4) * 8, dur, k: i % 3, delay: -((i * 0.83) % dur), drift: ((i % 5) - 2) * 3 };
   }), []);
   return (
-    <PixelScene artH={100} bg="#200000" className="eighth-circle-overlay">
+    <PixelScene artH={100} bg="#270d0c" className="eighth-circle-overlay">
       <PixelBand src={EIX + 'back.png'} style={{ backgroundPosition: '50% 0' }} />
       <PixelPiece src={EIX + 'ground.png'} w={EG_PAN} />
       <div className="eg-volk">
@@ -5714,7 +5714,7 @@ const EighthCircleOfHellOverlay = React.memo(function EighthCircleOfHellOverlay(
         .eg-portal { position: absolute; top: 0; width: calc(72 * var(--px)); height: calc(80 * var(--px)); background: url(${EIX}portal.png) 0 0 / 2400% 100% no-repeat; }
         @keyframes egPortal { ${sxReihe(24)} }
         .eg-glut { position: absolute; top: calc(-20 * var(--px)); width: calc(112 * var(--px)); height: calc(120 * var(--px)); opacity: .5;
-          background: radial-gradient(ellipse at 50% 50%, rgba(150,60,220,.30), rgba(110,30,190,.12) 50%, rgba(80,0,160,0) 72%); }
+          background: radial-gradient(ellipse at 50% 50%, rgba(144,58,230,.30), rgba(102,24,180,.12) 50%, rgba(102,24,180,0) 72%); }
         @keyframes egGlut { from { opacity: .3; } to { opacity: .9; } }
         .eg-fluss { position: absolute; top: 0; height: calc(100 * var(--px)); background-size: 2400% 100%; background-repeat: no-repeat; }
         .eg-fluss.a { width: calc(36 * var(--px)); background-image: url(${EIX}flow-a.png); }

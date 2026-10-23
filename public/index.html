@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Pixel Parties TCG</title>
   <meta name="description" content="Assemble your party of Heroes, shape their Abilities and powers - and eliminate the competition! Pixel Parties is a free online multiplayer trading card game.">
-  <meta name="theme-color" content="#0a0a12">
+  <meta name="theme-color" content="#08060c">
 
   <!-- Icons / PWA -->
   <link rel="icon" type="image/png" href="/favicon.png">
@@ -44,7 +44,7 @@
   <link rel="preload" href="/data/Pixel%20Intv.otf" as="font" type="font/otf" crossorigin>
   <!-- Pixel-Emoji-Schrift: schon beim Seitenaufruf holen UND (Skript unten) fuer die Spiel-Schriften laden, damit das erste Emoji nicht
        einen Moment als weiches System-Emoji aufblitzt, bevor die Pixel-Fassung da ist (siehe scripts/pixel-emoji/README.md). -->
-  <link rel="preload" href="/fonts/pp-pixel-emoji.woff2?v=96ff763dc9" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/pp-pixel-emoji.woff2?v=baf71c3ca9" as="font" type="font/woff2" crossorigin>
 
   <!-- Strukturierte Daten. Sagt Google, WAS diese Seite ist, statt es
        aus einem Ladebildschirm erraten zu lassen. Die Basis-URL wird
@@ -74,8 +74,23 @@
   }
   </script>
 
-  <link rel="stylesheet" href="/style.css">
-  <link rel="stylesheet" href="/style-skilltest.css">
+  <!-- Retro-Modus (Vorschau): ?retro=1 schaltet ein, ?retro=0 aus (wird gemerkt). Laedt die umgewandelten Stylesheets (scripts/retro/build-css.js) und den
+       Umwandlungs-Kern fuer Inline-Stile. Muss synchron VOR den Stylesheets laufen. -->
+  <script>
+    (function () {
+      var an = false;
+      try {
+        var q = /[?&]retro=(\w+)/.exec(location.search);
+        if (q) localStorage.setItem('pp-retro', (q[1] === '0' || q[1] === 'aus') ? '0' : '1');
+        an = localStorage.getItem('pp-retro') === '1';
+      } catch (e) { /* ohne Speicher: normaler Modus */ }
+      window.PP_RETRO = an;
+      if (an) document.documentElement.setAttribute('data-retro', '1');
+      var s = an ? '.retro' : '';
+      document.write('<link rel="stylesheet" href="/style' + s + '.css"><link rel="stylesheet" href="/style-skilltest' + s + '.css">');
+      if (an) document.write('<script src="/retro-core.js"><\/script>');
+    })();
+  </script>
 
   <!-- Instant branded splash, shown until React mounts. Styles are
        inlined so it renders before style.css and never flashes. React
@@ -87,29 +102,29 @@
     #boot-splash {
       position: fixed; inset: 0; z-index: 9999;
       display: flex; align-items: center; justify-content: center;
-      background-image: url('/title.png'), linear-gradient(135deg, #0a0a12 0%, #1a0a2e 50%, #0a1a1e 100%);
+      background-image: url('/title.png'), linear-gradient(135deg, #08060c 0%, #19062d 50%, #141414 100%);
       background-size: 100% 100%, auto;
       background-position: center center, center center;
       background-repeat: no-repeat, no-repeat;
-      background-color: #050510;
+      background-color: #08060c;
       font-family: 'Segoe UI', system-ui, sans-serif;
     }
     #boot-splash .bs-panel {
       display: flex; flex-direction: column; align-items: center; gap: 18px;
       padding: 28px 44px;
-      background: rgba(10, 10, 20, .82);
+      background: rgba(8,6,12,.82);
       backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-      border: 1px solid rgba(170, 136, 255, .35); border-radius: 12px;
-      box-shadow: 0 0 40px rgba(0, 0, 0, .75), 0 0 60px rgba(170, 136, 255, .15);
+      border: 1px solid rgba(178,120,237,.35); border-radius: 12px;
+      box-shadow: 0 0 40px rgba(0, 0, 0, .75), 0 0 60px rgba(178,120,237,.15);
     }
     #boot-splash .bs-title {
       font-size: 24px; font-weight: 800; letter-spacing: 6px;
-      text-transform: uppercase; color: #00f0ff; text-shadow: 0 0 24px rgba(0,240,255,.55);
+      text-transform: uppercase; color: #1aedff; text-shadow: 0 0 24px rgba(26,237,255,.55);
     }
-    #boot-splash .bs-sub { font-size: 12px; letter-spacing: 4px; color: #8888aa; }
+    #boot-splash .bs-sub { font-size: 12px; letter-spacing: 4px; color: #7e7d9b; }
     #boot-splash .bs-ring {
       width: 38px; height: 38px; border-radius: 50%;
-      border: 3px solid rgba(0,240,255,.18); border-top-color: #00f0ff;
+      border: 3px solid rgba(26,237,255,.18); border-top-color: #1aedff;
       animation: bs-spin .8s linear infinite;
     }
     @keyframes bs-spin { to { transform: rotate(360deg); } }
@@ -127,6 +142,8 @@
   </script>
 
   <!-- React runtime (deferred so the splash paints first). -->
+  <!-- Spiel-Palette (256 Farben): rastet Farben, die erst zur Laufzeit entstehen, auf die Palette ein (scripts/palette). Synchron, vor allem anderen. -->
+  <script src="/palette.js"></script>
   <script defer src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script defer src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script defer src="/socket.io/socket.io.js"></script>
