@@ -67,6 +67,8 @@ const H = require('../../lib/h.js');
   {
     const t = await fenster('Test Flight', [1, 0, ['Magic Arts', 'Magic Arts']]);
     const i = t.gs.players[1].hand.indexOf(GV);
+    const anim = t.events.filter(e => e.ev === 'play_hand_card_animation');
+    R.check('Animation: genau eine, Pixelart-Typ hand_level_down, am Kartennamen verankert (nicht am Engine-Index), Index = Platz der Karte', anim.length === 1 && anim[0].data.animType === 'hand_level_down' && anim[0].data.cardName === GV && anim[0].data.handIdx === i && anim[0].data.owner === 1, anim.map(a => a.data));
     R.check('Reaction-SPELL (Test Flight) vom Besitzer gespielt: Stufe 8', t.pile(1, 'discardPile').includes('Test Flight') && stufe(t, 1, i) === 8, { discard: t.pile(1, 'discardPile'), level: stufe(t, 1, i) });
     R.check('… genau einmal gezählt, Karte weiter aufgedeckt, keine Engine-Fehler', t.gs.players[1]._handLevelOffsetsTransient?.[i] === -1 && !!t.gs.players[1]._permanentlyRevealedHandIndices?.[i] && t.errors.length === 0, { off: t.gs.players[1]._handLevelOffsetsTransient, e: t.errors });
   }
@@ -75,6 +77,22 @@ const H = require('../../lib/h.js');
     const t = await fenster('Challenge', [1, 1, ['Fighting']]);
     const i = t.gs.players[1].hand.indexOf(GV);
     R.check('Reaction-ATTACK (Challenge) gespielt: Stufe 8', t.pile(1, 'discardPile').includes('Challenge') && stufe(t, 1, i) === 8, { discard: t.pile(1, 'discardPile'), level: stufe(t, 1, i), hand: t.pile(1, 'hand') });
+  }
+  {
+    // Der GEGNER sieht die gesenkte Stufe: der Zustand für Sitz 0 trägt bei der aufgedeckten Handkarte von Sitz 1 `handLevel` (Client malt `?lv=`)
+    const gesendet = [];
+    require('socket.io').Server.prototype.to = function (sid) { return { emit: (ev, data) => { if (ev === 'game_state') gesendet.push({ sid, data }); } }; };
+    const t = await fenster('Test Flight', [1, 0, ['Magic Arts', 'Magic Arts']]);
+    t.room.players.forEach((pl, k) => { pl.socketId = 'S' + k; });
+    t.host.sendGameState(t.room, 0);
+    const z = gesendet.filter(g => g.sid === 'S0').pop();
+    const rev = z && z.data.players && z.data.players[1] && z.data.players[1].revealedHandCards;
+    R.check('Gegner-Zustand: aufgedeckte Karte mit handLevel 8 (gedruckt 9)', Array.isArray(rev) && rev.some(e => e.name === GV && e.handLevel === 8), rev);
+    t.gs.players[1]._handLevelOffsetsTransient = {};
+    gesendet.length = 0; t.host.sendGameStateErzwungen(t.room, 0);
+    const z2 = gesendet.filter(g => g.sid === 'S0').pop();
+    const rev2 = z2 && z2.data.players[1].revealedHandCards;
+    R.check('ohne Senkung: kein handLevel am Eintrag (Karte unverändert)', Array.isArray(rev2) && rev2.some(e => e.name === GV && e.handLevel === undefined), rev2);
   }
   {
     // Reaction CREATURE (Doomed Town Guard: Beschwörung, wenn eine eigene Creature durch eine gegnerische Karte besiegt wird)

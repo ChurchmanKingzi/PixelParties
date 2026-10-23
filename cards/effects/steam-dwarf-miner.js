@@ -3,9 +3,9 @@
 //  Creature (Summoning Magic Lv1, archetype
 //  "Steam Dwarfs") — 50 HP.
 //
-//  ① STEAM ENGINE passive (shared): once per
-//    turn, when you discard 1+ cards, gain +50
-//    current & max HP.
+//  ① STEAM ENGINE passive (shared): whenever you
+//    discard 1+ cards, gain +10 current & max HP
+//    per discarded card.
 //  ② At the end of each of your turns, draw 1
 //    card for every 100 max HP this Creature has.
 // ═══════════════════════════════════════════

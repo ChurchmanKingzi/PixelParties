@@ -581,7 +581,7 @@ const PP_PX_ABZEICHEN_SPRITES = {
     '.KLKKLLBBBKKDK..', '.KKLLKKBKKBDKK..', 'KLLLK.KBK.KDDDK.', '.KKLKKBBBKKDKK..',
     '...KKBKBKDKK....', '.....KKDKK......', '.......K........', '................',
   ] },
-  blitz: { pal: { K: '#311402', O: '#ff8b1a', Y: '#ffd61a', W: '#f8f8bd' }, z: [
+  blitz: { pal: { K: '#311402', O: '#ff8b1a', Y: '#fad54a', W: '#f8f8bd' }, z: [
     '.........KKKKKK.', '........KWYYYOK.', '.......KWYYYOK..', '......KWYYYOK...',
     '.....KWYYYOK....', '....KWYYYOK.....', '...KWYYYYYKKKK..', '..KWYYYYYYYYYOK.',
     '..KKKOOOWYYYOK..', '.......KWYYOK...', '......KWYYOK....', '.....KWYYOK.....',
@@ -2727,6 +2727,7 @@ const ZONE_ANIM_SFX = {
   battery_charge:          { name: 'elem_lightning', opts: { rate: 1.5, volume: 0.45 } },
   modifier_sparkle:        { name: 'buff', opts: { rate: 1.25, volume: 0.5 } },
   level_down:              { name: 'debuff', opts: { rate: 0.9, volume: 0.7 } },   // Looming Threat: Stufe sinkt
+  hand_level_down:         { name: 'debuff', opts: { rate: 1.0, volume: 0.6 } },   // Great Vanguard Demon: Stufe sinkt (Pixelart, die Karte bleibt sichtbar)
   loom_swell:              { name: 'elem_dark', opts: { rate: 0.6, volume: 0.9 } },   // Looming Threat: Karte schwillt an
   // Gangster Angel — Schusssalve (`gunshot_barrage`). `projectile` ist
   // der vorhandene Geschossklang; schneller abgespielt wird daraus ein
@@ -5347,7 +5348,7 @@ function trimOverLimitCopies(deck) {
 
 function typeColor(ct) {
   const m = { Hero:'#a040ff', 'Ascended Hero':'#702db3', Creature:'#3ddc57', Spell:'#f03232',
-    Attack:'#f03232', Artifact:'#ffd61a', Potion:'#9d612f', Ability:'#1ca9fd', Token:'#7f7f7f' };
+    Attack:'#f03232', Artifact:'#fad54a', Potion:'#9d612f', Ability:'#1ca9fd', Token:'#7f7f7f' };
   return m[ct] || '#7f7f7f';
 }
 
@@ -5395,7 +5396,7 @@ const BAND_GRADIENTS = [
   'linear-gradient(to right, transparent 0%, rgba(255,255,255,.04) 10%, rgba(248,116,32,.35) 25%, rgba(251,30,169,.4) 40%, rgba(255,198,28,.35) 55%, rgba(254,81,84,.3) 70%, rgba(255,255,255,.04) 85%, transparent 100%)',
   'linear-gradient(to right, transparent 0%, rgba(255,255,255,.05) 12%, rgba(26,198,255,.35) 25%, rgba(104,253,193,.35) 40%, rgba(169,82,255,.3) 55%, rgba(102,182,255,.3) 70%, rgba(255,255,255,.05) 85%, transparent 100%)',
   'linear-gradient(to right, transparent 0%, transparent 20%, rgba(255,255,255,.5) 45%, rgba(255,255,255,.65) 50%, rgba(255,255,255,.5) 55%, transparent 80%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, rgba(251,200,106,.05) 10%, rgba(255,214,26,.35) 25%, rgba(249,172,32,.4) 40%, rgba(254,255,102,.3) 55%, rgba(255,198,28,.25) 70%, rgba(251,200,106,.05) 85%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(251,200,106,.05) 10%, rgba(250,213,74,.35) 25%, rgba(249,172,32,.4) 40%, rgba(254,255,102,.3) 55%, rgba(255,198,28,.25) 70%, rgba(251,200,106,.05) 85%, transparent 100%)',
   'linear-gradient(to right, transparent 0%, rgba(184,102,255,.05) 10%, rgba(160,64,255,.3) 25%, rgba(248,33,227,.35) 40%, rgba(117,31,249,.3) 55%, rgba(184,102,255,.25) 70%, rgba(184,102,255,.05) 85%, transparent 100%)',
 ];
 
@@ -7232,7 +7233,7 @@ function CardSideTooltip({ card, imgUrl, inGallery }) {
   const foilType = card.foil;
   const bonus = ascensionBonusText(card);
   const effectText = ttEffectText(card.effect, bonus);
-  const ttBorderColor = foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,214,26,.5)' : '1px solid var(--bg4)';
+  const ttBorderColor = foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)' : foilType === 'secret_rare' ? '2px solid rgba(250,213,74,.5)' : '1px solid var(--bg4)';
   // v1298: der grosse Tooltip zeigt IMMER die volle Foil-Schicht, auch
   // wenn er aus einer Kleinansicht (PileGrid) heraus aufgeht.
   return (
@@ -8262,7 +8263,7 @@ window.cardCostText = cardCostText;
 // Namen UND die Typzeile.
 const TT_HP_COLOR = '#75f091';
 const TT_ATK_COLOR = '#fe5154';
-const TT_COST_COLOR = '#ffd61a';
+const TT_COST_COLOR = '#fad54a';
 const TT_ASCENDED_COLOR = '#c98aff';
 function tooltipTypeColor(cardType) {
   return cardType === 'Ascended Hero' ? TT_ASCENDED_COLOR : typeColor(cardType);
@@ -8707,7 +8708,7 @@ function CardTooltipContent({ card, children, imageUrl }) {
           <TooltipCardImage card={card} src={imgUrl} hp={bildHp} stufe={stufe} style={{
             width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
             border: foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)'
-                 : foilType === 'secret_rare' ? '2px solid rgba(255,214,26,.5)' : 'none'
+                 : foilType === 'secret_rare' ? '2px solid rgba(250,213,74,.5)' : 'none'
           }} />
           <CardFoil card={card} skin={skinOfUrl(imgUrl)} />
         </div>
@@ -10296,7 +10297,7 @@ const TUTORIAL_SCRIPTS = {
       { text: 'Heya!\nWelcome back!' },
       { text: "So far, we've looked at different ways for your Heroes to deal damage or summon Creatures to do that for you." },
       // ── Highlight: Book of Doom und Lifeforce Howitzer ──
-      { text: 'However, there are also other ways.\n{#ffd61a:**Artifacts**} are cards that you play by spending **Gold**...',
+      { text: 'However, there are also other ways.\n{#fad54a:**Artifacts**} are cards that you play by spending **Gold**...',
         highlights: [BOOK, HOWITZER] },
       // ── Antonia tritt rechts auf, die Musik wechselt, alle Highlights aus ──
       AJ("**GOLDS???**\nWhere's de Gold?\nI wants itttt!", { enterRight: true }),
@@ -10444,7 +10445,7 @@ const TUTORIAL_SCRIPTS = {
     outro: [
       A("Daaaat's it, dat's a good lil' minion!"),
       A("Alrighty - as promised, ya're now my *official* minion!"),
-      A("Dat means ya're now **allowed** to use my Golds in games, earn **delicious, delicious** {#ffd61a:**Smug Coins**} with games, and bring 'em to me in my {#ffd61a:**Shop**}!"),
+      A("Dat means ya're now **allowed** to use my Golds in games, earn **delicious, delicious** {#fad54a:**Smug Coins**} with games, and bring 'em to me in my {#fad54a:**Shop**}!"),
       A("And don't worry about de Golds - it aaaaaall finds its way back to the GRRRRREAT Antonia again anyway, khehehehehe!"),
     ],
     };

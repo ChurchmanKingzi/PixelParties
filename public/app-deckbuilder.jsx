@@ -727,7 +727,7 @@ function DeckBuilder() {
     const items = [
       isCover
         ? { label: 'Remove as cover card', icon: '✕', color: 'var(--danger)', action: () => setCoverCard('') }
-        : { label: 'Make this the cover card', icon: '⭐', color: '#ffd61a', action: () => setCoverCard(cardName) },
+        : { label: 'Make this the cover card', icon: '⭐', color: '#fad54a', action: () => setCoverCard(cardName) },
     ];
     if (hasSkins) {
       const availOpts = ownedSkins ? SKINS_DB[cardName].filter(s => ownedSkins.has(s)) : SKINS_DB[cardName].filter(s => !window.UNLOCKABLE_SKINS.has(s));
@@ -753,7 +753,7 @@ function DeckBuilder() {
       return;
     }
     if (card.cardType === 'Hero') {
-      items.push({ label: 'Add to Heroes', icon: '👑', color: '#ffd61a', disabled: !canAddCard(currentDeck, cardName, 'hero'), action: () => addCardTo(cardName, 'hero') });
+      items.push({ label: 'Add to Heroes', icon: '👑', color: '#fad54a', disabled: !canAddCard(currentDeck, cardName, 'hero'), action: () => addCardTo(cardName, 'hero') });
       // Heroes are also legal in the Main Deck (Goff-style attach
       // mechanic) up to 4 copies. Always offer the option; canAddCard
       // disables it when the cap or 60-card limit is hit.
@@ -1522,7 +1522,7 @@ function DeckBuilder() {
                   const v = isDeckLegal(d); const hasChanges = unsaved[d.id];
                   return (
                     <div key={d.id} role="button" className={'deck-list-item' + (i === activeIdx && !isSampleMode ? ' active' : '')} onClick={() => { setActiveIdx(i); setSampleActive(-1); setDeckDropdownOpen(false); }}>
-                      {d.isDefault && <span style={{ color: '#ffd61a', fontSize: 10 }}>★</span>}
+                      {d.isDefault && <span style={{ color: '#fad54a', fontSize: 10 }}>★</span>}
                       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}{hasChanges ? ' *' : ''}</span>
                       <span style={{ fontSize: 8, color: v.legal ? 'var(--success)' : 'var(--danger)' }}>{v.legal ? '✓' : '✗'}</span>
                     </div>
@@ -1557,7 +1557,7 @@ function DeckBuilder() {
                   return (
                     <>
                       <div style={{ padding: '6px 8px 4px', display: 'flex', alignItems: 'center', gap: 6, borderTop: '1px solid var(--bg4)', marginTop: 4 }}>
-                        <span style={{ fontSize: 9, color: '#ffd61a', fontWeight: 700, flex: 1 }}>🏆 DRAFTED DECKS</span>
+                        <span style={{ fontSize: 9, color: '#fad54a', fontWeight: 700, flex: 1 }}>🏆 DRAFTED DECKS</span>
                       </div>
                       {draftedEntries.map(({ d, i }) => {
                         const hasChanges = unsaved[d.id];
@@ -1569,7 +1569,7 @@ function DeckBuilder() {
                           <div key={d.id} role="button" title={tip}
                             className={'deck-list-item' + (i === activeIdx && !isSampleMode ? ' active' : '')}
                             onClick={() => { setActiveIdx(i); setSampleActive(-1); setDeckDropdownOpen(false); }}>
-                            <span style={{ color: '#ffd61a', fontSize: 10 }}>🏆</span>
+                            <span style={{ color: '#fad54a', fontSize: 10 }}>🏆</span>
                             <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}{hasChanges ? ' *' : ''}</span>
                           </div>
                         );
@@ -1655,7 +1655,7 @@ function DeckBuilder() {
                       const menuItems = [
                         isCover
                           ? { label: 'Remove as cover card', icon: '✕', color: 'var(--danger)', action: () => setCoverCard('') }
-                          : { label: 'Make this the cover card', icon: '⭐', color: '#ffd61a', action: () => setCoverCard(item.card) },
+                          : { label: 'Make this the cover card', icon: '⭐', color: '#fad54a', action: () => setCoverCard(item.card) },
                       ];
                       if (hasSkins) {
                         const availOpts = ownedSkins ? SKINS_DB[item.card].filter(s => ownedSkins.has(s)) : SKINS_DB[item.card].filter(s => !window.UNLOCKABLE_SKINS.has(s));

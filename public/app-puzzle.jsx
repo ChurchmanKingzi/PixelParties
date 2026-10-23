@@ -227,8 +227,8 @@ function DebuffSelector({ side, selected, onChange, isOpen, onToggle, onClose, k
         className="pz-debuff-btn"
         onClick={onToggle}
         style={{
-          padding: kompakt ? '3px 2px' : '6px 10px',
-          fontSize: kompakt ? 10 : 11, fontWeight: 700,
+          padding: kompakt ? '9px 4px' : '6px 10px',
+          fontSize: kompakt ? 14 : 11, fontWeight: 700,
           background: isOpen ? `rgba(${isOpp ? '255,136,68' : '136,204,255'},.18)` : 'rgba(0,0,0,.25)',
           border: `1px solid ${accent}55`,
           color: accent,
@@ -303,7 +303,6 @@ function HandNebenspalte({ si, seite, gold, onGold, ...debuffProps }) {
   return (
     <div className="pz-hand-extras">
       <label className="pz-gold-feld" title="Starting Gold (−999 … 999)">
-        <span aria-hidden="true">💰</span>
         {/* Negatives Gold ist seit dem Debt-O-Tron-Archetyp ein
             gueltiger Zustand und muss auch im Puzzle einstellbar sein
             (Als Vorgabe 16.8.). Untergrenze −999, Obergrenze 999, und
@@ -315,7 +314,9 @@ function HandNebenspalte({ si, seite, gold, onGold, ...debuffProps }) {
         <input className="input" type="number" min="-999" max="999"
           value={gold ?? 0}
           onChange={(e) => onGold(Math.min(999, Math.max(-999, parseInt(e.target.value) || 0)))}
-          style={{ color: (gold ?? 0) < 0 ? '#fe5154' : undefined }} />
+          style={{ caretColor: '#fad54a' }} />
+        {/* Die Zahl selbst zeichnet dieses Element in Gold (Verlauf, Kontur, Schiller) — das Feld darunter nimmt nur die Eingabe an */}
+        <span className={'pz-gold-zahl pp-gold-zahl' + ((gold ?? 0) < 0 ? ' gold-negative' : '')} aria-hidden="true">{gold ?? 0}</span>
       </label>
       <DebuffSelector side={seite} kompakt {...debuffProps} />
     </div>
@@ -3969,12 +3970,12 @@ function PuzzleCreator() {
                     // einen Ablegeplatz vortaeuschen, den es nicht gibt.
                     <div key={pm.id} title={pm.name} data-pz-perm={si + '-' + i}
                       onContextMenu={(e) => { e.preventDefault(); if (window.playSFX) window.playSFX('discard', { dedupe: 60 }); removeCard(si, 'permanent', 0, i); }}>
-                      <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(255,214,26,.5)', background: 'rgba(255,214,26,.08)', cursor: 'pointer' }}>
+                      <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(250,213,74,.5)', background: 'rgba(250,213,74,.08)', cursor: 'pointer' }}>
                         <BoardCard cardName={pm.name} />
                       </div>
                     </div>
                   ))}
-                  <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderStyle: 'dashed', borderColor: 'rgba(255,214,26,.3)' }}
+                  <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderStyle: 'dashed', borderColor: 'rgba(250,213,74,.3)' }}
                     onDragOver={(e) => { e.preventDefault(); if (dragCardName) setDragOverZone('perm-' + si); }}
                     onDragLeave={() => setDragOverZone(null)}
                     onDrop={(e) => { e.preventDefault(); setDragOverZone(null); if (dragCardName != null) { if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot); placePermanent(dragCardName, si); entferneAusHandquelle(dragHandSource, dragHandIdx); setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); dragEntityData.current = null; } }}>

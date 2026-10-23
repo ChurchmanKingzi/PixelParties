@@ -1151,7 +1151,7 @@ function CubeDraftFinalStandings({ lobby, tournament, leaveRoom }) {
     delay: (Math.random() * 3).toFixed(2),
     dur: (3.2 + Math.random() * 2.6).toFixed(2),
     size: 6 + Math.round(Math.random() * 7),
-    color: ['#ffd61a', '#fe6794', '#1aedff', '#66ff71', '#c98aff', '#ffffff'][i % 6],
+    color: ['#fad54a', '#fe6794', '#1aedff', '#66ff71', '#c98aff', '#ffffff'][i % 6],
     rot: Math.round(Math.random() * 360),
   })), []);
   useEffect(() => {
@@ -1183,10 +1183,10 @@ function CubeDraftFinalStandings({ lobby, tournament, leaveRoom }) {
     );
   };
   return (
-    <div className="screen-full" style={{ background: 'radial-gradient(ellipse at 50% 30%, rgba(255,214,26,.16) 0%, var(--bg) 70%)', position: 'relative', overflow: 'hidden' }}>
+    <div className="screen-full" style={{ background: 'radial-gradient(ellipse at 50% 30%, rgba(250,213,74,.16) 0%, var(--bg) 70%)', position: 'relative', overflow: 'hidden' }}>
       <div className="top-bar">
         <button className="btn" onClick={leaveRoom}>← LEAVE</button>
-        <h2 className="orbit-font" style={{ fontSize: 14, color: '#ffd61a' }}>🏆 TOURNAMENT COMPLETE</h2>
+        <h2 className="orbit-font" style={{ fontSize: 14, color: '#fad54a' }}>🏆 TOURNAMENT COMPLETE</h2>
         <VolumeControl />
       </div>
       {stage >= 4 && (
@@ -1205,7 +1205,7 @@ function CubeDraftFinalStandings({ lobby, tournament, leaveRoom }) {
         )}
         <div className="podium-stage">
           {step(2, '2', 104, '#d2d2db', '🥈')}
-          {step(1, '1', 148, '#ffd61a', '🥇')}
+          {step(1, '1', 148, '#fad54a', '🥇')}
           {step(3, '3', 72, '#be680e', '🥉')}
         </div>
         <div className="panel" style={{ width: '100%', maxWidth: 720, padding: 20, marginTop: 22, opacity: stage >= 4 ? 1 : 0, transform: stage >= 4 ? 'none' : 'translateY(16px)', transition: 'opacity .6s, transform .6s' }}>
@@ -1216,11 +1216,11 @@ function CubeDraftFinalStandings({ lobby, tournament, leaveRoom }) {
             <div key={s.seat} style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '10px 12px',
-              background: i === 0 ? 'rgba(255,214,26,.08)' : (i === 1 ? 'rgba(168,168,168,.08)' : (i === 2 ? 'rgba(190,104,14,.08)' : 'transparent')),
-              borderLeft: '4px solid ' + (i === 0 ? '#ffd61a' : i === 1 ? '#a8a8a8' : i === 2 ? '#be680e' : 'var(--bg4)'),
+              background: i === 0 ? 'rgba(250,213,74,.08)' : (i === 1 ? 'rgba(168,168,168,.08)' : (i === 2 ? 'rgba(190,104,14,.08)' : 'transparent')),
+              borderLeft: '4px solid ' + (i === 0 ? '#fad54a' : i === 1 ? '#a8a8a8' : i === 2 ? '#be680e' : 'var(--bg4)'),
               marginBottom: 4, borderRadius: 4,
             }}>
-              <div style={{ fontSize: 24, width: 40, textAlign: 'center', fontWeight: 800, color: i === 0 ? '#ffd61a' : i === 1 ? '#d2d2db' : i === 2 ? '#be680e' : 'var(--text2)' }}>
+              <div style={{ fontSize: 24, width: 40, textAlign: 'center', fontWeight: 800, color: i === 0 ? '#fad54a' : i === 1 ? '#d2d2db' : i === 2 ? '#be680e' : 'var(--text2)' }}>
                 #{s.placement}
               </div>
               <div style={{ flex: 1 }}>
