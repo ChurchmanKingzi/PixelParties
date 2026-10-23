@@ -8697,6 +8697,61 @@ const MindControlHexEffect = (() => {
   return ppPunktBild(malen, ENDE + 40, 200, 260, vorbereiten);
 })();
 
+// ═════════════════════════════════════════════════════════════════
+//  Spy in the Enemy's Camp: Spähauge (`spy_mark`) — PIXELART, Hülle `ppPunktBild`; läuft auf der markierten Kreatur
+//
+//  Ein Auge senkt sich in vier ganzen Schritten über die Karte, öffnet sich, blinzelt einmal und lässt die Iris nach links und rechts wandern; Sucherecken (Fadenkreuz-Winkel)
+//  schnappen um die Karte zu. Ab ~1000 ms dithert alles weg, bei 1300 ms ist es fort. Feste Palette, kein Leuchten, Karte bleibt lesbar (nur Augenfläche und Winkel).
+// ═════════════════════════════════════════════════════════════════
+const SpyMarkEffect = (() => {
+  const KONTUR = ppHex('#1a1a2e'), WEISS = ppHex('#ffffff'), LIDER = ppHex('#d2d2db');
+  const IRIS = ['#77c8ee', '#4e82cb', '#0351c9'].map(ppHex), SUCHER = ['#ffffff', '#77c8ee'].map(ppHex);
+  const ENDE = 1300, FADE_AB = 1000, BLINZELN = [560, 700];
+  const malen = (g, t, sz) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
+    // Sucherecken: schnappen von aussen heran (4 Schritte), blinken zweimal (steps)
+    const ein = Math.min(4, Math.floor(t / 60)), ecke = Math.round(sz.hw * 1.05 + (4 - ein) * 3), eckeH = Math.round(sz.hh * 1.02 + (4 - ein) * 3), arm = 5;
+    if (t > 40 && !(t > 760 && t < 860)) {
+      for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        const ex = cx + sx * ecke, ey = cy + sy * eckeH;
+        for (let i = 0; i < arm; i++) {
+          g.put(ex - sx * i, ey, SUCHER[0], aus); g.put(ex, ey - sy * i, SUCHER[0], aus);
+          g.put(ex - sx * i, ey - sy, SUCHER[1], aus); g.put(ex - sx, ey - sy * i, SUCHER[1], aus);
+        }
+      }
+    }
+    // Auge: fällt in vier Schritten von oben auf die Kartenmitte
+    const fall = Math.min(4, Math.floor(t / 70)), ey0 = Math.round(cy - sz.hh * 0.9 + fall * (sz.hh * 0.9) / 4);
+    if (t < 60) return;
+    const zu = t > BLINZELN[0] && t < BLINZELN[1];
+    const W = 5, H = zu ? 0 : 3;
+    for (let x = -W; x <= W; x++) {
+      const hh = zu ? 0 : Math.round(H * Math.sqrt(Math.max(0, 1 - (x / (W + 0.6)) ** 2)) + 0.4);
+      for (let y = -hh - 1; y <= hh + 1; y++) {
+        const rand = Math.abs(y) > hh;
+        if (zu && y !== 0) continue;
+        g.put(cx + x * 2, ey0 + y * 2, rand ? KONTUR : (Math.abs(y) === hh ? LIDER : WEISS), aus);
+        g.put(cx + x * 2 + 1, ey0 + y * 2, rand ? KONTUR : (Math.abs(y) === hh ? LIDER : WEISS), aus);
+        g.put(cx + x * 2, ey0 + y * 2 + 1, rand ? KONTUR : (Math.abs(y) === hh ? LIDER : WEISS), aus);
+        g.put(cx + x * 2 + 1, ey0 + y * 2 + 1, rand ? KONTUR : (Math.abs(y) === hh ? LIDER : WEISS), aus);
+      }
+    }
+    if (!zu && t > 280) {                                                              // Iris wandert links – Mitte – rechts – Mitte
+      const gang = [0, -2, -2, 0, 2, 2, 0][Math.min(6, Math.floor(Math.max(0, t - 280) / 110))];
+      const ix = cx + gang * 2;
+      for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) {
+        const r2 = x * x + y * y; if (r2 > 5) continue;
+        g.block(ix + x * 2, ey0 + y * 2, 2, 2, r2 > 3 ? IRIS[2] : IRIS[1], aus);
+      }
+      g.block(ix - 1, ey0 - 1, 4, 4, KONTUR, aus);   // Pupille 4×4, mittig in der Iris
+      g.put(ix - 2, ey0 - 2, WEISS, aus); g.put(ix - 1, ey0 - 2, WEISS, aus);                                                                                       // Glanzpunkt
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 200, 260);
+})();
+
 // ═══════════════════════════════════════════════════════════════════
 //  Glass Wall (12.10.) — PIXELART, Held-Animation (`glass_wall_up`, `glass_wall_shatter`; Ursprung = die Heldenzone, `x`/`y` Mitte, `w`/`h` Kartengrösse)
 //
@@ -17470,6 +17525,7 @@ const ANIM_REGISTRY = {
   liquid_rainbow: LiquidRainbowEffect,
   hand_level_down: HandLevelDownEffect,
   mind_control_hex: MindControlHexEffect,
+  spy_mark: SpyMarkEffect,
   // ── Circles of Hell (Animationen) ──────────────────────────────────
   // Farben aus den Pixelart-Hintergruenden der Kreise (Flammen #f8f8bd … #520a0c).
   // ★ The Sixth Circle: Hoellen-Charme — blutrote Siegelringe, aufsteigende Schlieren, dunkler Blitz.

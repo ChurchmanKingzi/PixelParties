@@ -8,6 +8,7 @@ node docs/niche-tests/repro/NK2-neue-karten/02-mine-mine-mine.js
 node docs/niche-tests/repro/NK2-neue-karten/03-see-through-the-ruse.js
 node docs/niche-tests/repro/NK2-neue-karten/03b-see-through-the-ruse-sicht.js   # Zustandsversand (wire.js)
 node docs/niche-tests/repro/NK2-neue-karten/04-mind-control.js
+node docs/niche-tests/repro/NK2-neue-karten/05-spy-in-the-enemys-camp.js
 ```
 
 | Datei | Inhalt |
@@ -17,3 +18,4 @@ node docs/niche-tests/repro/NK2-neue-karten/04-mind-control.js
 | `03` | See through the Ruse: Handfalle (negiert Flooding / Pure Advantage Camel, abgelehnt, kein Wirker, eigene Aktivierung, Hand-Spielsperre, mehrere Kopien, Ruse im Kettenfenster negiert, CPU) und proaktives Aufdecken (alle verdeckten Gegner-Surprises, Bakhm-Creature, eigene/offene unberührt, keine Aktion, Phase bleibt, aufgedeckte Surprise bleibt aktivierbar, nicht spielbar ohne Ziel) |
 | `03b` | See through the Ruse: Zustandsversand an Wirker und Besitzer (`?` → Name, `surpriseKnown`, `surpriseFaceDown`) |
 | `04` | Mind Control: Grundfall (Anlegen, dauerhafte Kontrolle, Status, Besitzer), Spielbedingung (2 eigene besiegt, Gegner dauerhaft > 1 unbesiegt, Charme zählt nicht, Erstrunden-Schutz, Boris, keine freie Zone), Heilen/Cleanse gibt Kontrolle zurück, jeder andere Austritt (Zerstörung, Heldentod), Obergrenze > 2 Helden (Wiederbelebung, Charme-Held; kein Rekursions-Loop beim Abräumen), Schutz (Resistance, Flooding, Black-Thorn Dragon), zwei Kopien, Puzzle-Aufbau, CPU |
+| `05` | Spy in the Enemy's Camp: Reaktion auf die Beschwörung (Marke, Ablage, Besitz bleibt), Benutzen in meinem Zug (Cavalry trifft den Gegner, Chatty Town Guard gibt MEINE Handkarte, Kontrolle springt zurück, Rundensperre, der Besitzer benutzt weiter), nicht angeboten (eigene Beschwörung, ohne aktiven Effekt, abgelehnt, ohne Decay Magic, im Gegnerzug, Action Phase), Marke ist kein Status (Heilen, Frost), Marke endet (Tod, Hand), negierte Beschwörung (Baustein), Aktionskosten (Spawn Mother), CPU spielt und benutzt |
