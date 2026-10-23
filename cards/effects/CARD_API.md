@@ -24669,3 +24669,64 @@ die Zone zeigt die zuletzt gelegte Karte (`cards[cards.length-1]`) mit den Zähl
 * Alle 1339 Repros (inkl. der 14 neuen W66-Dateien, beide Sitze): „tritt NICHT auf" 1339/1339 (vorher 1325 grün).
 * `node scripts/check-*.js`: grün, außer `check-scope.js` (Ausgangsbefund: 63 Stellen, unverändert). `node --test test/*.test.js`: 7/7.
 * E2E: cards, draw-cards, sacrifice, artifacts, prompts, target-informed, second-action, ui-shared-zone-summon: grün. Client unverändert (`public/`), kein Build nötig.
+## Welle 67 / W67a — Inya: JEDER Spell-Subtyp im eigenen Zug wird Token (Ticket statt Marken) · Hand of Death & Co.: ein übersprungener Gegnerzug zählt nicht als „next turn" · Explosive Drone: Ist-Zustand abgesichert
+
+Entscheidungen von Al (Spieldesigner, 23.10.2026). Repros `docs/niche-tests/repro/W67/a-01 … a-03` (Exit 0 = korrekt), Übersicht `docs/niche-tests/FIXES-WELLE-67a.md`. Kartentexte (`data/cards.json`), `repro-status.json` und Index unverändert.
+
+### 1) Card Game Player Inya — Rückfrage 2 aus W66a: „Nein." (Beschränkung aufgehoben)
+Al: „Sofern es der Zug des Inya-Spielers ist, soll JEDER Subtyp von Spell zu einem Token werden können, sofern er nach seinem Effekt nicht auf dem Board bleiben würde (also sind Areas und Attachments fast immer ausgenommen und manche anderen Nischen-Fälle, bei denen Spells auf dem Board bleiben, auch, etwa Glass Wall)."
+
+**Bedingung (alle vier):** (1) Inya ist die Nutzerin des Spells (Heldenindex/Seite stimmen), (2) `gs.activePlayer === Kontrolleur`, (3) die Karte würde nach dem Auflösen in die ABLAGE gehen (`ticket.ablageErwartet()`), (4) freie Support Zone (Alice-Teilung: die Zone eines gleichnamigen Buddys zählt). Dazu die Rückfrage „Buddy beschwören?" (abgelehnt = Ablage).
+
+**Wege (alle mit Ticket):**
+| Weg | Stelle | `ablageErwartet` ist falsch bei … |
+|---|---|---|
+| Handspiel | `server.js` `doPlaySpell` | Area/Attachment/Permanent (`gs._spellPlacedOnBoard`), `_spellReturnToHand`, `deleteOnUse` |
+| Sofort-Guss | `engine._castSpellImmediately` | dasselbe |
+| Kettenglied (Reaktion in der Kette) | `_resolveReactionChain` | `fromHero`/`fromCreature`, `skipPostResolveDiscard`, `deleteOnUse`, Selbstplatzierung |
+| aktivierte Surprise (Skull Carpet Bombing am eigenen Zugende, Toxic Trap …) | `engine._activateSurprise` | `staysFaceUpOnActivation`/`stayFaceUp` (Glass Wall, Spider Silk Bridge: bleibt offen liegen), `fromDiscard` (Cute Spider: wird gelöscht), Bakhm-Slot, Kreatur-Surprise |
+| Hand-Reaktion im Schadens-/Ziel-/Beschwörungsfenster (Spectral Armor …) | `after-damage`, `after-creature-damage`, `post-target`, `_rxAufgeloest` (alle Hand-Reaktionsfenster) | `deleteOnUse`, `skipPostResolveDiscard` |
+| Ascension-Reaktion | `ascensionReaction` | dito |
+
+**Das Duplikat-/Geister-Problem (W66a-Fund bei Skull Carpet Bombing) ist an der Wurzel gelöst:** Bisher setzte Inya zwei Marken im Spielstand (`gs._spellPlacedOnBoard` + `gs._spellBecameToken`), die nur drei Wege auswerteten; in jedem anderen blieben sie stehen (Karte doppelt: Token UND Ablage; der NÄCHSTE Zauber verschluckt). Jetzt trägt jeder Weg ein **Ticket** im Hook-Kontext (`ctx._buddy`, `engine.neuesBuddyTicket(weg, { ablageErwartet, kannNehmen, nimm, kartenBesitzer })`); es lebt nur für diesen einen `afterSpellResolved`-Aufruf. Inya trägt den Token in `ticket.token` ein, der Weg liest ihn nach dem Hook und legt die Karte dann NICHT ab. Inya setzt **keine** Marken im Spielstand mehr (`_spellBecameToken` entfällt; `_spellPlacedOnBoard` bedeutet wieder nur „Karte hat sich selbst aufs Brett gelegt"). Ohne Ticket (Skripte, die `afterSpellResolved` für Effekte ohne Karte melden) tut Inya nichts.
+* **Genau EINE Platzierung:** liegt die Karte schon in der Ablage (Hand-Reaktionen legen sie beim Aktivieren dort hinein, VOR der Wirkung), nimmt Inya sie mit `ticket.nimm()` (`engine.reaktionsBuddyTicket`: letzte Kopie aus der Ablage des permanenten Besitzers, `_letzteHandHerkunft`) heraus, nachdem Zone und Frage bestätigt sind. Fenster, die die Karte erst NACH dem Hook ablegen (Ascension-Reaktion; Creature-Pre-Defeat-, Post-Summon-, CD-Movement-, Opp-Action-Phase-Reaktion via `_rxAufgeloest(…, { spaetAblegen: true })`), lassen das Ablegen aus, wenn ein Token entstand (Rückgabewert/`ticket.token`).
+* **Surprise/Reaktion wird nach der Auflösung zum Token, nicht beim Setzen:** das Ticket entsteht erst nach `onSurpriseActivate`; die Surprise-Instanz wird abgeräumt (der Token ist eine eigene Instanz), weder Flug noch Ablageeintrag.
+* **Wirkung an der Ablage-Instanz bleibt:** Hand-Reaktionen mit `activeIn: ['hand','discard']` (Spectral Armor, Sculpture Guards, Unwanted Audience) halbieren/schützen wie ohne Buddy (Repro `a-01` Post-Target-Fall: 50 Schaden).
+* **Besitzer-Regel (W64a):** `ticket.kartenBesitzer` (Surprise: `originalOwner`, Hand-Reaktion: Besitzer der Ablage) setzt `inst.originalOwner` des Buddys; der Tod des Buddys legt die Karte in die Ablage des Besitzers.
+
+**Verträge:** (a) Neue Wege, die einen Spell-Kartenabschluss (`afterSpellResolved` für eine echte Karte) melden, übergeben `_buddy: engine.neuesBuddyTicket(…)` und werten `ticket.token` aus (Karte nicht ablegen, ggf. Hand-Instanz über `zauberInstanzNachBrettzug`). (b) `ablageErwartet` beantwortet der Weg, nicht Inya. (c) `_inyaBuddyWeg` (W66a) ist entfernt.
+
+**Nicht angefasst / bewusst ohne Buddy:** die Surprise-Reaktionen im Kettenfenster (Lunar Eclipse & Co., `_pendingSurpriseReactionCleanup`) melden `afterSpellResolved` nie — sie bleiben bis zum Kettenende offen und gehen dann in die Ablage (keine Inya-Wirkung, wie bisher). Attacks sind keine Spells (Karten­text: „uses a Spell").
+
+**Repros:** `W67/a-01` (78 Prüfungen, beide Sitze; auf dem Stand b4b43f1c 13 rot): Handspiel/abgelehnt/kein Platz/Gegnerzug, Sofort-Guss, Kettenglied (Silence), Surprise eigener Zug (Toxic Trap, Skull Carpet Bombing am Zugende, abgelehnt) vs. Gegnerzug, Glass Wall (offen: kein Buddy; „Discard it": Buddy), Hand-Reaktion Spectral Armor (eigener Zug angenommen/abgelehnt, Gegnerzug), Post-Target-Reaktion, Folgezauber nach jedem Weg, Sweep über 155 spielbare Spells (Buddy ⇔ die Karte wäre in der Ablage gelandet: 94 Buddy, 61 bleiben auf dem Board/gelöscht/zurück auf die Hand, darunter alle Areas, Attachments, Teleportal, Forbidden Zone, Divine Gift of …). `W66/a-05` ist auf die neue Regel umgestellt (Skull Carpet Bombing wird zum Buddy, genau einmal). `W63/b-01 … b-04`, `W66/a-03` (Fingerabdruck-Äquivalenz) unverändert grün.
+
+### 2) Ein ÜBERSPRUNGENER Gegnerzug zählt nicht als „your opponent's next turn" — Rückfrage 3 aus W66a: „Bitte ändern."
+Al: „der Gegner-Zug wird ja komplett übersprungen, also ist da effektiv kein Zug, in dem das aktivieren könnte. Erst nach dem 'echten' nächsten Gegner-Zug."
+
+**Wie die Engine einen Skip modelliert:** Guardian Beast Zhu (und der Rider von Hand of Death) setzen `ps._skipNextTurn`. `_switchTurnInner` zählt `gs.turn` hoch, erkennt die Marke, spielt die Schlaf-Animation, löst die Fristen des Buffs auf (`_processBuffExpiry`) und ruft sich **rekursiv** für den übersprungenen Spieler auf — dessen ON_TURN_END, `nachholenOhneKarte`, `_illusionenZurueck`, `_expireBorrowedIdentities` liefen dabei wie bei einem echten Zugende. Das ist die „formale" Beendigung; nur `startTurn` läuft nie.
+
+**Umsetzung:** `_switchTurnInner(opts)` bekommt `opts.uebersprungen` (nur der rekursive Aufruf setzt es). Im formalen Ende eines übersprungenen Zuges laufen die Aufträge der Form „At the end of your opponent's next turn, …" **nicht**; sie bleiben liegen und feuern am Ende des nächsten tatsächlich gespielten Gegnerzuges. Alle anderen ON_TURN_END-Hooks, Statusfristen, Buff-Abläufe laufen unverändert weiter (nur die oben genannten Aufträge sind zugstellend).
+
+| Karte | Text | übersprungener Zug zählte vorher | nachher | Mechanismus |
+|---|---|---|---|---|
+| **Hand of Death** | „At the end of your opponent's next turn … defeat it" | ja (feuerte am formalen Ende) | **nein** (Marke bleibt, feuert nach dem echten Gegnerzug) | `nachholenOhneKarte` wird im Skip-Ende nicht gerufen |
+| **???, the Throne Robber** | „At the end of your opponent's next turn, Descend this Hero" | ja (`_identityExpiresTurn = turn+1` traf den übersprungenen Zug) | **nein** (Frist rückt um 2 Zugnummern auf den nächsten echten Gegnerzug) | `_identitySkipAufschub` + `_expireBorrowedIdentities({ uebersprungen })` |
+| **Create Illusion** | „At the end of your opponent's next turn, shuffle the Creature … back" | ja | **nein** | `_illusionenZurueck` im Skip-Ende ausgelassen |
+| **Staff of Illusions** | „At the end of your opponent's next turn, shuffle the Creature back" | ja | **nein** | dieselbe Funktion `_illusionenZurueck` |
+| Atta, Speaker of Desires / Zwei, the Lucky Thief | „At the end of your opponent's next turn, …" | – | – | keine Skripte vorhanden (Held ohne Effekt-Skript) → nichts zu ändern |
+| Open Invitation | „At the end of **your** next turn, shuffle the Ascended Hero back" | ja | **unverändert** (eigener Zug, Text lautet nicht „opponent's") | Rückfrage 1 |
+| Anti Magic Zone, Frost Rune, Skeleton Death Knight, Pink Sky, Null Zone (u. a. „until the end of …/your opponent's next turn") | Dauer („until"), kein Auftrag | Frist läuft über das formale Ende | **unverändert** (Dauer ≠ „At the end of …, do X"; im Zweifel nicht ändern) | Rückfrage 2 |
+| Moonlight Butterfly, Fun-Fun Circus Clown, ???, the Shapeshifter | „At the end of your opponent's turn" (KEIN „next") | ja | **unverändert** | Rückfrage 3 |
+
+„Skip-Turn der Eigenen" (Hand-of-Death-Rider: der Wirker überspringt seinen nächsten Zug): die Regel gilt für jeden übersprungenen Zug, egal wessen — eine Marke des Gegners (Fenster „Ende von A's nächstem Zug") feuert nicht am formalen Ende von A's übersprungenem Zug 7, sondern am Ende von A's nächstem echten Zug (`W67/a-02`, Fall 3). Das Puzzle-Skip (`isPuzzle`, kein Zugende-Lauf) war nie betroffen.
+
+**Repros:** `W67/a-02` (42 Prüfungen, beide Sitze; auf b4b43f1c 20 rot): Zhu-Skip (1 und 2 hintereinander), Kontrolle ohne Skip, Skip des eigenen Zuges, Nutzer-Bedingung am ECHTEN Zugende, Throne Robber (Skip/Kontrolle), Create Illusion (Skip/Kontrolle). `W66/a-02` Fall H auf die neue Regel umgestellt (142 Prüfungen grün).
+
+### 3) Explosive Drone — Teil C zurückgenommen (Ist-Zustand abgesichert)
+Al hatte kurz gemeint, „defeated by an opponent's card or effect" schließe Schadenstode aus, und das **zurückgenommen: die Phrase schließt Schaden ein.** Keine Änderung an `explosive-drone.js`, keine neue Todesursachen-Klassifikation in der Engine. `W67/a-03` (42 Prüfungen, beide Sitze, auf altem und neuem Stand grün) schreibt den Ist-Zustand fest: Auslöser (Hand; eigene Kreatur UND eigener Held) und Detonation feuern bei Tod durch Attack-/Spell-/Creature-Schaden des Gegners und bei Zerstören/„defeat" (`actionDestroyCard`, `actionDefeatHero`, `actionDefeat` mit Hand-of-Death-Quelle); sie feuern NICHT bei eigener Opferung, Rückstoß (eigene Quelle) und Statusschaden ohne Verursacher.
+
+### 4) Rückfragen an Al (Ja/Nein)
+1. **Eigener übersprungener Zug:** „At the end of **your** next turn" (Open Invitation: Ascended Hero zurück ins Deck; ähnlich Expedition/Ghostly Warning) — wenn der EIGENE nächste Zug übersprungen wird (Hand-of-Death-Rider), soll das Ende erst am nächsten echten eigenen Zug feuern? (Heute: am formalen Ende des übersprungenen Zuges; Text lautet nicht „opponent's", daher nicht geändert.)
+2. **Dauer-Effekte** („until the end of your opponent's next turn": Anti Magic Zone, Frost Rune, Skeleton Death Knight, Pink Sky, Null Zone …): soll ein übersprungener Gegnerzug sie ebenfalls NICHT beenden (Frist läuft bis zum Ende des echten Gegnerzuges)? Heute läuft die Frist am formalen Ende des übersprungenen Zuges aus.
+3. **„At the end of your opponent's turn"** (ohne „next": Moonlight Butterfly, Fun-Fun Circus Clown, ???, the Shapeshifter): ein übersprungener Zug hat kein Ende — soll ihr Auslöser dort ausbleiben? (Heute: feuern am formalen Ende.)
+4. **Inya × Kettenfenster-Surprises** (Lunar Eclipse & Co.): sie melden kein `afterSpellResolved` und gehen am Kettenende in die Ablage. Sollen sie ebenfalls Buddys werden können?

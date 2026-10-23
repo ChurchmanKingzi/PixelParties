@@ -9,29 +9,31 @@
 //    free Support Zones as a "Fantasy Buddy
 //    Token" with 10 HP.
 //
-//    Eligibility filter:
-//     • Spell must NOT have placed itself on the
-//       board during its own onPlay (Areas /
-//       Attachments set `gs._spellPlacedOnBoard
-//       = true` — we skip those).
-//     • Trigger only fires on the controller's
-//       turn — `gs.activePlayer === cardOwner`.
-//       Naturally excludes Reactions / Surprises
-//       Inya casts during the OPPONENT's turn.
-//     • Inya needs at least one free base Support
-//       Zone slot.
+//    Eligibility (★ W67a, Al 23.10.2026: JEDER Spell-Subtyp —
+//    Normal, Surprise, Reaction, Counter … — sofern es der Zug des
+//    Inya-Spielers ist):
+//     • Inya is the user of the Spell (Handspiel, Sofort-Guss,
+//       Kettenglied, aktivierte Surprise, Hand-Reaktion).
+//     • `gs.activePlayer === cardOwner` (eigener Zug).
+//     • Die Karte würde nach dem Auflösen in die ABLAGE gehen
+//       (`ticket.ablageErwartet()`): Areas, Attachments, Permanents
+//       (Teleportal), Glass Wall / offen liegende Surprises,
+//       „Delete this card" und „zurück auf die Hand" sind ausgenommen.
+//     • Inya needs at least one free base Support Zone slot
+//       (Alice: Zone eines gleichnamigen Buddys zählt).
 //
 //    Implementation: place a fresh Token inst in
 //    Inya's free Support Zone via
 //    `engine.safePlaceInSupport`, override its
 //    card data + HP via `_cardDataOverride`, and
 //    flag it with `_fantasyBuddyToken` so the
-//    damage-shield count finds it. Then set
-//    `gs._spellPlacedOnBoard = true` to suppress
-//    the standard post-resolve discard (works
-//    both for initial casts in doPlaySpell AND
-//    for reaction-chain casts via the matching
-//    flag check in `_resolveReactionChain`).
+//    damage-shield count finds it. Der Auflösungsweg
+//    reicht im Hook-Kontext ein TICKET (`_buddy`, siehe
+//    `engine.neuesBuddyTicket`): Inya trägt den Token
+//    dort ein (`ticket.token`), nimmt die Karte ggf. aus
+//    der Ablage (`ticket.nimm()`, Hand-Reaktionen), und der
+//    Weg legt sie danach NICHT zusätzlich ab — genau EINE
+//    Platzierung, keine Marken im Spielstand.
 //
 //    Same Token-creation pattern Biomancy Token
 //    uses — keeps the spell's card image while
@@ -112,10 +114,12 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
 
-      // ★ W66a: nur die Wege, die den Token abräumen/auswerten (Handspiel `doPlaySpell`, Sofort-Guss, Kettenglied) — NICHT die Surprise-Aktivierung
-      // (Skull Carpet Bombing am eigenen Zugende) und die Hand-Reaktionen aus Schadensfenstern: dort wanderte die Karte in die Ablage UND als Buddy aufs Brett
-      // (Duplikat), und `_spellPlacedOnBoard`/`_spellBecameToken` blieben stehen und verschluckten den nächsten Zauber.
-      if (!ctx._inyaBuddyWeg) return;
+      // ★ W67a (Al, 23.10.2026: „JEDER Subtyp von Spell" — Normal, Surprise, Reaction, Counter …, sofern es der Zug des Inya-Spielers ist und die Karte nach ihrem
+      // Effekt nicht auf dem Board bleibt): jeder Weg, der einen Spell-Kartenabschluss meldet, trägt ein Ticket (`engine.neuesBuddyTicket`). Ohne Ticket
+      // (Skripte, die `afterSpellResolved` für Effekte melden, die keine Karte ablegen) gibt es nichts zu ersetzen. W66a hatte Inya auf drei Wege beschränkt,
+      // weil die Marken im Spielstand (`_spellPlacedOnBoard`/`_spellBecameToken`) in den übrigen stehenblieben; das Ticket lebt nur für diesen Aufruf.
+      const ticket = ctx._buddy;
+      if (!ticket || ticket.token) return;
 
       // Caster must be THIS Inya.
       if (ctx.casterIdx !== ctx.cardOwner) return;
@@ -130,13 +134,9 @@ module.exports = {
       // Defensive: only Spell-type cards. afterSpellResolved fires
       // only for Spells in practice but check the field on hookCtx.
       if (ctx.spellCardData?.cardType !== 'Spell') return;
-      // Spell already self-placed somewhere on the board (Area /
-      // Attachment) → not eligible. The flag was set during the
-      // spell's onPlay; we read it BEFORE setting our own
-      // suppress-discard flag below.
-      if (gs._spellPlacedOnBoard) return;
-      // W63b: ein Zauber, der die Hand nicht in die Ablage verlässt (kehrt auf die Hand zurück), wird kein Buddy.
-      if (gs._spellReturnToHand) return;
+      // Die Karte würde nach dem Auflösen NICHT in die Ablage gehen (Area/Attachment/Permanent legen sich selbst aufs Brett, Glass Wall bleibt offen liegen,
+      // „Delete this card", zurück auf die Hand): nicht berechtigt. Jeder Weg beantwortet das für sich (`ticket.ablageErwartet`).
+      if (!ticket.ablageErwartet()) return;
 
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
@@ -168,6 +168,8 @@ module.exports = {
         gerrymanderEligible: true,
       });
       if (!engine._confirmSaidYes(confirmed)) return;   // W63b: `{ confirmed: false }` ist ein wahrheitsfähiges Objekt (Rückgabeform-Falle v672)
+      // W67a: während der Frage kann sich der Zustand geändert haben (Karte nicht mehr da, Zone belegt) — alles neu prüfen, ehe etwas verändert wird.
+      if (!ticket.ablageErwartet() || !ticket.kannNehmen()) return;
 
       // safePlaceInSupport finds the first free base zone and creates
       // a fresh tracked inst. Same primitive Biomancy Token uses for
@@ -179,11 +181,14 @@ module.exports = {
       if (!placeResult) return; // Race: zone filled mid-prompt.
 
       const { inst, actualSlot } = placeResult;
+      // W67a: liegt die Karte schon in der Ablage (Hand-Reaktion), kommt sie dort heraus — der Token ERSETZT die Ablage, er kommt nicht dazu.
+      ticket.nimm();
 
       // W64a (Al, 23.10.2026: „der Spell wandert in den Discard Pile"; Besitzer-Regel: Karten gehen IMMER in die Stapel ihres permanenten Besitzers):
       // gehört der gespielte Zauber einem anderen als dem Wirker (gestohlen/geschenkt), gehört die Karte unter dem Buddy weiter ihrem Besitzer.
       const _gespielt = engine.findCards({ owner: pi, zone: 'hand', name: spellName })[0];
-      if (Number.isInteger(_gespielt?.originalOwner) && _gespielt.originalOwner !== inst.originalOwner) inst.originalOwner = _gespielt.originalOwner;
+      const _besitzer = Number.isInteger(ticket.kartenBesitzer) ? ticket.kartenBesitzer : _gespielt?.originalOwner;
+      if (Number.isInteger(_besitzer) && _besitzer !== inst.originalOwner) inst.originalOwner = _besitzer;
 
       // Mark + override card data so the engine + UI treat this as a
       // Creature/Token. The card image stays as the original spell.
@@ -205,13 +210,10 @@ module.exports = {
         effect: 'Fantasy Buddy Token. While its controller has at least 1 of these Tokens, Card Game Player Inya takes no damage.',
       };
 
-      // Suppress the standard post-resolve discard. Honored by
-      // doPlaySpell (initial casts) AND _resolveReactionChain
-      // (chain links — see the matching flag-check block there).
-      gs._spellPlacedOnBoard = true;
-      // W63b: die gespielte Instanz ist NICHT der Token (eigene Instanz) — der Server räumt sie ab bzw. behält sie als Wirkungsträger
+      // W67a: Ticket eintragen. Der Auflösungsweg liest es nach dem Hook und legt die Karte dann NICHT zusätzlich ab (keine Marken im Spielstand).
+      // Die gespielte Instanz ist NICHT der Token (eigene Instanz) — der Weg räumt sie ab bzw. behält sie als Wirkungsträger
       // (`_spellKeepInstance`: Anti Magic Zone, Calm Diatribe, Mission, Weapon Unleashing), `engine.zauberInstanzNachBrettzug`.
-      gs._spellBecameToken = true;
+      ticket.token = inst;
 
       // Sparkle on the Buddy's slot.
       engine._broadcastEvent('play_zone_animation', {

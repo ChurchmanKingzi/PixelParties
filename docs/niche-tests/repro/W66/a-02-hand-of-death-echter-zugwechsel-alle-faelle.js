@@ -220,9 +220,10 @@ const lebt = (inst) => inst.zone === 'support';
     // ───────────────────────── (H) Skip-Turn-Effekte ─────────────────────────
     R.section(`── ${S} H · Zug des Gegners wird übersprungen / Zugnummern ──`);
     {
+      // ★ W67a (Al, 23.10.2026: „der Gegner-Zug wird ja komplett übersprungen, also ist da effektiv kein Zug … Erst nach dem 'echten' nächsten Gegner-Zug."): ein übersprungener Gegnerzug (Zhu)
+      // zählt NICHT als „your opponent's next turn" — die Marke bleibt liegen und feuert am Ende des nächsten TATSÄCHLICH gespielten Gegnerzuges (Ausführlich: W67/a-02).
       const x = await ablauf({ seat, nachCast: async (t) => { t.gs.players[t.opp]._skipNextTurn = true; }, keinGegnerEnde: true });
-      // Der Gegnerzug wird übersprungen (Zhu): sein formales Zugende läuft sofort und löst die Marke aus.
-      R.check(`${S} der nächste Gegnerzug ist übersprungen: sein (formales) Zugende löst die Marke aus — sie bleibt nicht stehen`, !x.armedDanach && x.hodFragen.length === 1 && x.skip, { fr: x.hodFragen, turn: x.t.gs.turn });
+      R.check(`${S} der nächste Gegnerzug ist übersprungen: Hand of Death feuert NICHT an seinem formalen Zugende — die Marke bleibt liegen`, x.armedDanach && x.hodFragen.length === 0 && !x.skip, { fr: x.hodFragen, turn: x.t.gs.turn });
     }
     {   // Zugnummer verschoben (+2): die Marke feuert am ersten Gegnerzugende danach (Fenster ist „turn > armedOnTurn")
       const x = await ablauf({ seat, nachCast: async (t) => { t.gs.turn += 2; } });
