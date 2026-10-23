@@ -911,6 +911,8 @@ app.get('/sitemap.xml', (req, res) => {
 // gut wie nie aendern, und dort waeren 730 bedingte Anfragen je
 // Seitenaufruf der teurere Weg. Wer Kartenkunst tauscht, muss also bis
 // zu 7 Tage einplanen — oder den Dateinamen aendern.
+// Pixel-Emoji-Schrift: der Dateiname traegt einen Inhalts-Hash (`?v=…`, scripts/pixel-emoji/build_font.py) — ein Jahr cachen, ohne Rueckfrage.
+app.use('/fonts', express.static(path.join(__dirname, 'public', 'fonts'), { maxAge: '365d', immutable: true }));
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: 0, etag: true }));
 app.use('/data', express.static(path.join(__dirname, 'data')));
 // Card art (~730 immutable-ish PNGs). A long cache lifetime means a full

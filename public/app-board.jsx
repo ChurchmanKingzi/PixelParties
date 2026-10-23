@@ -27821,6 +27821,115 @@ const ANIM_REGISTRY = {
     return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
   })(),
   // ═════════════════════════════════════════════════════════════════
+  //  Kidnapping (23.10.) — PIXELART, Brett-Animation: ein Jutesack fällt auf die Kreatur (`targets: [{ owner, heroIdx, zoneSlot }]`, Ursprung = der wirkende Held)
+  //
+  //  Der Sack (Jute mit Webmuster, Flicken, Strick am Hals) fällt von oben auf die Karte, staucht sich beim Aufprall (Staubwolke an den Rändern), wird zugebunden (der Hals
+  //  zieht sich zusammen, Strickenden baumeln), zappelt (die Kreatur drückt abwechselnd links und rechts Beulen hinein, kleine Stossstriche) und löst sich zuletzt gedithert
+  //  auf (Funken) — in dem Moment fliegt die Kreatur von ihrer Zone auf die Hand (kidnapping.js, ab ~1150 ms).
+  // ═════════════════════════════════════════════════════════════════
+  kidnap_sack: (() => {
+    const JUTE = ['#f0d79a', '#cfa35c', '#946c34', '#5e4119'].map(ppHex);          // hell, Mitte, dunkel, Kontur
+    const STRICK = ['#efe2b4', '#b08f55'].map(ppHex);
+    const FLICKEN = ['#c9605a', '#8c3a36'].map(ppHex);
+    const STAUB = ['#f4ead0', '#d3bf94'].map(ppHex);
+    const FUNKEN = ['#ffffff', '#ffd1ec', '#b9f0ff'].map(ppHex);
+    const ENDE = 1350, FALL_BIS = 380, STAUCH_BIS = 560, BINDEN_BIS = 760, ZAPPELN_BIS = 1100, AUS_AB = 1100;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = () => ({
+      staub: Array.from({ length: ppFxN(16) }, () => ({ seite: Math.random() < 0.5 ? -1 : 1, v: 10 + Math.random() * 20, vy: 3 + Math.random() * 9, gross: Math.random() < 0.3 ? 2 : 1, helle: Math.random() < 0.5 })),
+      funken: Array.from({ length: ppFxN(20) }, () => ({ w: Math.random() * Math.PI * 2, v: 14 + Math.random() * 30, leben: 220 + Math.random() * 120, farbe: Math.floor(Math.random() * FUNKEN.length) })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const z = sz.ziele[0];
+      if (!z) return;
+      const SW = Math.max(24, Math.round(z.w * 1.15)), SH = Math.max(30, Math.round(z.h * 1.45));
+      const cx = Math.round(z.x), unten = Math.round(z.y + z.h / 2) + 2;
+      // Fall: beschleunigt von oberhalb der Karte
+      const fallHoehe = SH + Math.round(z.h * 0.55) + 6;
+      let dy = 0, stauch = 0;
+      if (t < FALL_BIS) { const k = t / FALL_BIS; dy = -Math.round(fallHoehe * (1 - k * k)); }
+      else if (t < STAUCH_BIS) { const k = (t - FALL_BIS) / (STAUCH_BIS - FALL_BIS); stauch = Math.sin(k * Math.PI); }
+      const binden = klemme((t - STAUCH_BIS) / (BINDEN_BIS - STAUCH_BIS), 0, 1);          // 0 = locker, 1 = zugezogen
+      const zappeln = t >= BINDEN_BIS && t < ZAPPELN_BIS ? (t - BINDEN_BIS) / (ZAPPELN_BIS - BINDEN_BIS) : -1;
+      const ruck = zappeln >= 0 ? Math.sin(zappeln * Math.PI * 7) : 0;                   // -1 … 1, wechselt die Seite
+      const aus = t > AUS_AB ? klemme(1 - (t - AUS_AB) / (ENDE - AUS_AB), 0, 1) : 1;
+      // Sackmasse (gestaucht: niedriger und breiter)
+      const hoehe = Math.round(SH * (1 - 0.12 * stauch));
+      const breite = SW * (1 + 0.1 * stauch);
+      const ox = Math.round(ruck * 1.6);
+      const oben = unten - hoehe + dy;
+      const tie = Math.round(hoehe * 0.17);
+      const haelfte = (r) => {
+        if (r < tie) { const u = (tie - r) / tie; return Math.max(2, breite * (0.15 - 0.04 * binden + 0.1 * u)); }           // ausgefranster Hals über dem Strick
+        const u = (r - tie) / Math.max(1, hoehe - 1 - tie);
+        let hw = (breite / 2) * (0.3 + 0.7 * Math.pow(Math.sin(Math.min(1, u * 1.12) * Math.PI / 2), 0.78));
+        if (u > 0.86) hw *= Math.sqrt(Math.max(0, 1 - Math.pow((u - 0.86) / 0.14, 2) * 0.6));
+        return hw;
+      };
+      // Beule der zappelnden Kreatur: nur auf der Seite, auf die sie gerade drückt
+      const beule = (r) => {
+        if (zappeln < 0 || r < tie) return 0;
+        const u = (r - tie) / Math.max(1, hoehe - 1 - tie);
+        return u > 0.25 && u < 0.78 ? Math.abs(ruck) * 2.4 * Math.sin(((u - 0.25) / 0.53) * Math.PI) : 0;
+      };
+      if (aus > 0) {
+        // linke/rechte Beule getrennt: die Seite, auf die die Kreatur drückt, wölbt sich
+        for (let r = 0; r < hoehe; r++) {
+          const hw = haelfte(r), bu = beule(r);
+          const x0 = Math.round(cx + ox - hw - (ruck < 0 ? bu : 0)), x1 = Math.round(cx + ox + hw + (ruck > 0 ? bu : 0));
+          const al = klemme(aus * 1.35 - 0.35 * (r / hoehe), 0, 1);
+          for (let x = x0; x <= x1; x++) {
+            const f = (x - x0) / Math.max(1, x1 - x0);
+            let c = f < 0.2 ? JUTE[0] : f < 0.55 ? JUTE[1] : JUTE[2];
+            if (f >= 0.5 && f < 0.7 && ((x + r) & 1)) c = JUTE[1];                                      // Dither-Übergang Mitte → dunkel
+            if (x === x0 || x === x1 || r === hoehe - 1 || r === 0) c = JUTE[3];                          // Kontur
+            else if (((x + r) % 3) === 0 && r > tie) g.put(x, oben + r, JUTE[3], 0.35 * al);               // Webmuster
+            if (r === 0 && x !== x0 && x !== x1 && ((x + r) & 1)) continue;                              // ausgefranster Rand oben
+            g.put(x, oben + r, c, al);
+          }
+        }
+        // Flicken mit Stichen
+        const fx = Math.round(cx + ox + breite * 0.1), fy = oben + Math.round(hoehe * 0.58);
+        for (let j = 0; j < 6; j++) for (let i = 0; i < 6; i++) g.put(fx + i, fy + j, (i === 0 || j === 0 || i === 5 || j === 5) ? FLICKEN[1] : FLICKEN[0], aus);
+        for (const [i, j] of [[1, 0], [3, 0], [0, 2], [5, 2], [2, 5], [4, 5]]) g.put(fx + i, fy + j, STRICK[0], aus);
+        // Strick am Hals + Knoten + Enden
+        const sy = oben + tie, sw = Math.max(3, Math.round(haelfte(tie)));
+        for (let x = -sw; x <= sw; x++) { g.put(cx + ox + x, sy, STRICK[0], aus); g.put(cx + ox + x, sy + 1, STRICK[1], aus); }
+        g.block(cx + ox - 1, sy - 1, 3, 4, STRICK[1], aus); g.put(cx + ox, sy, STRICK[0], aus);
+        const wippe = Math.round(Math.sin(t / 90) * 1);
+        for (let k = 1; k <= 5; k++) { g.put(cx + ox - 1 - Math.round(k * 0.7) + wippe, sy + 2 + k, STRICK[1], aus); g.put(cx + ox + 1 + Math.round(k * 0.5) - wippe, sy + 2 + k, STRICK[0], aus); }
+      }
+      // Staub beim Aufprall
+      if (t >= FALL_BIS && t < FALL_BIS + 320) {
+        const al = (t - FALL_BIS) / 1000;
+        for (const s of teile.staub) {
+          const k = (t - FALL_BIS) / 320, x = cx + s.seite * (SW * 0.4 + s.v * al), y = unten - 1 - s.vy * al;
+          const col = s.helle ? STAUB[0] : STAUB[1];
+          g.put(x, y, col, (1 - k));
+          if (s.gross > 1) { g.put(x + 1, y, col, (1 - k) * 0.8); g.put(x, y - 1, col, (1 - k) * 0.8); }
+        }
+      }
+      // Stossstriche beim Zappeln
+      if (zappeln >= 0 && Math.abs(ruck) > 0.55) {
+        const seite = ruck > 0 ? 1 : -1, bx = cx + ox + seite * (Math.round(SW / 2) + 3), by = oben + Math.round(hoehe * 0.5);
+        for (let k = 0; k < 3; k++) for (let m = 0; m < 3; m++) g.put(bx + seite * m, by - 4 + k * 4 - m, JUTE[0], 0.9);
+      }
+      // Funken beim Auflösen
+      if (t >= AUS_AB) {
+        const al = t - AUS_AB, mx = cx + ox, my = oben + Math.round(hoehe * 0.5);
+        for (const s of teile.funken) {
+          if (al > s.leben) continue;
+          const k = al / s.leben, sek = al / 1000;
+          const x = mx + Math.cos(s.w) * s.v * sek * 2.2, y = my + Math.sin(s.w) * s.v * sek * 2.2 - 6 * sek;
+          const col = FUNKEN[s.farbe];
+          g.put(x, y, col, 1 - k);
+          if (k < 0.5) { g.put(x + 1, y, col, (1 - k) * 0.7); g.put(x - 1, y, col, (1 - k) * 0.7); g.put(x, y + 1, col, (1 - k) * 0.7); g.put(x, y - 1, col, (1 - k) * 0.7); }
+        }
+      }
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 90 });
+  })(),
+  // ═════════════════════════════════════════════════════════════════
   //  Gather Intel (12.10.) — PIXELART, Brett-Animation: eine Lupe gleitet vom Wirker über die HAND des Gegners (`targets: [{ owner, hand: true }]`, Ursprung = der wirkende Held)
   //
   //  Die Lupe (Messingring mit blauem, gedithertem Glas, Griff, weisser Glanzpunkt) fliegt auf einem Bogen zum linken Rand der Kartenreihe, tastet sie dann in einer
@@ -48639,6 +48748,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'duel_result') { const p = playerByName(entry.player); return <span className="log-status">⚔️ {cName('Duel')} ends {entry.rounds > 0 ? `after ${entry.rounds} round${entry.rounds === 1 ? '' : 's'}` : 'at once'}: {entry.result === 'draw' ? <>both Heroes are defeated — a draw! {pName(p.name, p.color)} wins the game.</> : entry.result === 'win' ? <>{cName(entry.heroB || 'Hero')} is defeated.</> : entry.result === 'lose' ? <>{cName(entry.heroA || 'Hero')} is defeated.</> : <>neither Hero is defeated.</>}</span>; }
       if (t === 'gather_intel_look') { const p = playerByName(entry.player); return <span className="log-status">🔍 {pName(p.name, p.color)} looks at {entry.opponent}'s hand with {cName('Gather Intel')}.</span>; }
       if (t === 'gather_intel_result') { const p = playerByName(entry.player); return <span className="log-status">🔍 {entry.opponent} {entry.choice === 'give' ? (entry.moved > 0 ? <>adds the chosen card to {pName(p.name, p.color)}'s hand</> : <>cannot hand over the chosen card</>) : <>lets {pName(p.name, p.color)} draw 2 cards</>}.</span>; }
+      if (t === 'kidnapping') { const p = playerByName(entry.player); return <span className="log-status">🎒 {pName(p.name, p.color)} kidnaps {cName(entry.creature)} from {entry.opponent} with {cName('Kidnapping')}.</span>; }
+      if (t === 'kidnapping_blocked') { const p = playerByName(entry.player); return <span className="log-status">🎒 {cName('Kidnapping')}: {cName(entry.creature)} cannot be taken by {pName(p.name, p.color)}.</span>; }
+      if (t === 'kidnapping_fizzle') { const p = playerByName(entry.player); return <span className="log-status">🎒 {cName('Kidnapping')}: {pName(p.name, p.color)} no longer finds {cName(entry.creature)}.</span>; }
       if (t === 'gather_intel_lock') { const p = playerByName(entry.player); return <span className="log-status">🔒 {pName(p.name, p.color)} cannot perform other Actions for the rest of the turn ({cName('Gather Intel')}).</span>; }
       if (t === 'hero_control_returned') return <span className="log-status">↩ {entry.target} returns to {entry.controller}'s control{entry.by ? <> ({cName(entry.by)})</> : null}.</span>;
       if (t === 'secret_spell_book') { const p = playerByName(entry.player); const g = entry.taken || []; const h = entry.heroes || []; const liste = (arr) => arr.map((c, i) => <React.Fragment key={i}>{i > 0 ? ', ' : ''}{cName(c)}</React.Fragment>); return <span className="log-status">📖 {pName(p.name, p.color)}'s {cName('Secret Spell Book')} {(g.length + h.length) > 0 ? <>took permanent control of {liste([...h, ...g])}{(entry.placed || []).length > 0 ? <> (placed: {(entry.placed || []).length})</> : null}</> : <>drew {entry.drew || 1} card{(entry.drew || 1) === 1 ? '' : 's'} instead</>}.</span>; }
