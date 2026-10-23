@@ -150,17 +150,27 @@ module.exports = {
       dest = treffer;
     }
 
+    // ★ W65a: die Beschwoerungskosten der gewaehlten Kreatur (Opfer-/Tribut-Wahl, abbrechbar) kommen VOR dem Auftritt — solange der Spieler sie
+    // abbrechen kann, sieht der Gegner nichts (kein Banner, keine Zeile); HOPT bleibt bei einem Abbruch frei. Erst danach der Auftritt, dann die Landung.
     if (savedReveal) engine.gs._pendingCardReveal = savedReveal;
     if (savedPlayLog) engine.gs._pendingPlayLog = savedPlayLog;
-    engine._firePendingCardReveal();
 
     const handIdx = ps.hand.indexOf(chosenName);
     if (handIdx < 0) return false;
     engine.takeFromPileSync(ps, 'hand', handIdx);
-    const res = await engine.summonCreatureWithHooks(chosenName, dest.owner, dest.heroIdx, dest.slotIdx, {
+    const kernOpts = {
       source: CARD_NAME,
       ...(feld !== pi ? { controller: pi } : {}),   // Kontrolle statt Seite (Styx 28.9.)
-    });
+    };
+    if (!(await engine._beschwoerungKostenVorAuftritt(chosenName, dest.owner, dest.heroIdx, dest.slotIdx, kernOpts))) {
+      delete engine.gs._pendingCardReveal; delete engine.gs._pendingPlayLog;
+      engine.returnToPile(ps, 'hand', chosenName, handIdx);   // Kosten abgebrochen / Sperre: Karte zurueck
+      engine.sync();
+      return false;
+    }
+    kernOpts._sperrenGeprueft = true; kernOpts._kostenGezahlt = true;
+    engine._firePendingCardReveal();
+    const res = await engine.summonCreatureWithHooks(chosenName, dest.owner, dest.heroIdx, dest.slotIdx, kernOpts);
     if (!res?.inst) {
       engine.returnToPile(ps, 'hand', chosenName, handIdx);   // Beschwoerung abgelehnt: Karte zurueck
       return false;
