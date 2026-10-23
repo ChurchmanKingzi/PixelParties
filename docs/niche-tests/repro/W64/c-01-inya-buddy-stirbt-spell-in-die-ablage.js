@@ -89,4 +89,4 @@ const n = (arr, name) => arr.filter(x => x === name).length;
     R.check(`[S${seat}] Gegenprobe Biomancy Token (${potion.name}): die Potion darunter wird weiter GELÖSCHT (nicht abgelegt)`, n(bps.deletedPile, potion.name) === 1 && n(bps.discardPile, potion.name) === 0, { abl: bps.discardPile, del: bps.deletedPile });
   }
   R.finish();
-})().catch(e => { console.error(e); process.exit(2); });
+})().catch(e => { process.stderr.write(String(e && e.stack || e) + '\n'); process.exit(2); });

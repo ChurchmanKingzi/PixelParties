@@ -84,10 +84,16 @@ const resist = { 'Resistance (blockt Nicht-Schaden-Effekte, Welle 14)': { prep: 
       const s = await lauf(seat, f);
       R.check(`[S${seat}] Effekt-Schutz „${name}": das Ziel überlebt, Eraser Beam ist verbraucht`, s.r === true && !s.tot && s.t.gs.players[seat]._oncePerGameUsed.has('eraserBeam'), { r: s.r, hp: s.h0.hp, inst: s.inst && s.inst.zone });
     }
+    // „Besiegt durch einen Spell" bleibt sichtbar: der Gegner kann auf die besiegte Kreatur mit Corpse Explosion reagieren (Fenster „Kreatur besiegt", auch ohne Schaden — W24a/W25a)
+    {
+      const opp2 = 1 - seat;
+      const c = await lauf(seat, { kreatur: H.INERT.creature, prep: (t, o) => { t.setHand(o, ['Corpse Explosion']); t.grantFor(o, 0, 'Corpse Explosion'); } });
+      R.check(`[S${seat}] Corpse Explosion des Gegners antwortet auf die von Eraser Beam besiegte Kreatur (Kill via Effekt zählt als „besiegt durch einen Spell"): 50 Schaden an die Helden des Wirkers`, c.tot && c.t.hp(seat, 0) === 750 && c.t.gs.players[opp2].discardPile.includes('Corpse Explosion'), { tot: c.tot, hp: c.t.hp(seat, 0), abl: c.t.gs.players[opp2].discardPile });
+    }
     for (const [name, f] of Object.entries(resist)) {
       const s = await lauf(seat, f);
       R.check(`[S${seat}] Effekt-Schutz „${name}": der Held überlebt`, s.r === true && !s.tot, { r: s.r, hp: s.h0.hp });
     }
   }
   R.finish();
-})().catch(e => { console.error(e); process.exit(2); });
+})().catch(e => { process.stderr.write(String(e && e.stack || e) + '\n'); process.exit(2); });

@@ -23989,3 +23989,107 @@ Kreatur-Modus: spielbar mit 3 freien Zonen ODER (Alice aktiv + geteilte Zone fü
 | `W63/a-05-bewegen-memory-blast-jumper-spider-puppet-kein-on-summon.js` | Memory Blast, Jumper Spider, Puppet, Paraseed Greenhouse | 46 |
 | `W63/a-06-reincarnation-geteilte-zone-statt-dritter-freier.js` | Reincarnation Kreatur-Modus, Mensch + CPU | 118 |
 Angepasst: `W62/a-01`, `W62/a-04` (Reihenfolge geteilt vor frei).
+
+## Welle 64 / W64a — Alice-Folgeregeln (Creature-Tokens teilen · Klick-Beschwörung · „gleiche Zone"-Ersetzungen) · Forceful Revival: Kosten VOR dem Auftritt · Inya: Buddy-Spell in die ABLAGE · „defeat" = Kill via EFFEKT (Eraser Beam)
+
+Antworten von Al (Spieldesigner, 23.10.2026) auf die Rückfragen aus Welle 63, umgesetzt in `wave64/W64a`. Repros: `docs/niche-tests/repro/W64/a-01 … a-05` (Alice), `b-01` (Forceful Revival / Pile-Wege), `c-01` (Inya), `d-01` (defeat); Übersicht `docs/niche-tests/FIXES-WELLE-64a.md`. Kartentexte (`data/cards.json`) unverändert.
+
+### 1) Alice (A) — Antworten und Umsetzung
+| Frage | Antwort Al | Umsetzung / Ergebnis |
+|---|---|---|
+| **A1 Army of the Cute:** zweite gleichnamige Kopie auf die erste stapeln? | „Sofern der Alice-Effekt aktiv ist, ja." | Ist-Zustand (W63a) war schon so; per Repro bestätigt (`a-01`, 14 Prüfungen, beide Sitze, auf dem alten Stand grün): mit Alice kommen beide Kopien in EINE Zone (×2; liegt schon eine Kopie, ×3 — die geteilte Zone steht vor der leeren), ohne Alice eine Kopie je freier Zone. |
+| **A2 Elixir of Immortality:** ursprüngliche Zone hat Vorrang? | „Ja." | Ist-Zustand schon so; per Repro bestätigt (`a-02`, 12 Prüfungen, auf dem alten Stand grün): alte Zone (auch ein Alice-Stapel: die Wiederbelebung stapelt sich zurück) → fällt sie weg: geteilte Zone vor freier Zone; ohne Alice: alte, sonst erste freie. |
+| **A3 Tokens mit Untertyp „Creature"** | „Ja, sollen sie!" | Siehe 2). |
+| **A4 Klick-Beschwörung** | „Der Spieler darf auch auf eine freie Zone klicken und so den Alice-Effekt quasi ‚verschwenden'." | Siehe 3). |
+| **A5 „Gleiche Zone"-Ersetzungen** | „Creatures in einer geteilten Zone sind für diese Effekte schlicht keine legalen Ziele." | Siehe 4). |
+
+### 2) A3 — Creature-Tokens teilen Zonen (kein „Token-Ausnahme"-Code gefunden)
+* **Befund:** Die zentrale Zonenfrage kannte keine Token-Ausnahme: `stackAt`/`canShareInto` nehmen alles, was `hasCardType(…, 'Creature')` ist — das schließt Tokens mit Untertyp `Creature` (Leprochaun/Mummy/Invader) und Creature/Token-Overrides (Biomancy-Token, Fantasy Buddy) ein (`a-03`, Prüfungen 1–5 je Token schon auf dem alten Stand grün). Die „Ausnahme" steckte in den **Vorab-Prüfungen der Token-Quellen**, die nur LEERE Zonen zählten: Biomancy (`freeSupportSlots`), Kyli, Lizbeth-Biomancy-Kopie, Inya (`hasFree`), Invader from the Cosmic Depths / Analyzer (`allFreeSupportSlotsBothSides`). Bei vollem Brett konnte sich der zweite Token deshalb nie auf den ersten stapeln.
+* **Umsetzung:** `_biomancy-shared.teilbareSlots(engine, pi, feld, heroIdx, tokenName)` / `tokenZonePossible(…)` (frei ODER geteilt, Kontrolle des Beschwörers `pi`, Brettseite `feld`) für Biomancy, Kyli (Zahl der Wahlkarten wächst mit der geteilten Zone, Platzierung je Karte neu geprüft), Lizbeth, Inya; `_cosmic-shared.geteilteSlotsBeiderSeiten(engine, 'Invader Token')` für beide Invader-Quellen (Zonen-Liste: geteilte vorn, Zonenwahl mit `shared`/`stackDepth`; die Zahl möglicher Tokens ist bei einer geteilten Zone nicht durch die Zonenzahl begrenzt). Die Platzierung selbst lief schon über `safePlaceInSupport` (geteilt zuerst).
+* **Nicht geändert (Begründung):** Tokens werden nie UMGEHÄNGT (W52a/W53a); **Mummy Token** („no Mummy Tokens yet" – höchstens einer je Held, die Frage stellt sich nie); **Leprochaun Token** (Disease Fairy Leprochaun hat kein Skript); **Boulder in a Bottle** (belegt alle freien Zonen — kein Stapel); Pollution Token/Puppets (keine Creatures). **Namensbezug:** Biomancy Token = Potion-Name, Fantasy Buddy = Zauber-Name (Bild); „identical names" vergleicht den Instanznamen — zwei Buddys teilen nur, wenn sie aus DEMSELBEN Zauber stammen (Rückfrage 1).
+* **Anzeige:** `supportStacks` (Server) und das Stapel-Abzeichen (`app-board.jsx`) hängen an `stackAt` und der Zonenliste, nicht am Kartentyp — Token-Stapel zählen und öffnen die Instanzliste wie Kreatur-Stapel; die Client-Prüfung `canShareSupportSlot` betrifft nur Handkarten (Tokens werden nie gespielt).
+
+### 3) A4 — Klick-Beschwörung: die freie Zone bleibt wählbar
+* **Server:** `doPlayCreature` setzt die GEKLICKTE Zone — leer = normale Beschwörung dorthin (die Kopie liegt NICHT im Stapel), belegt-gleichnamig = Stapel. Bestätigt (`a-04`, beide Sitze, mit/ohne Alice). Automatische Wege (`safePlaceInSupport` ohne Wunschplatz, CPU, Heldenaktions-Auto-Emit `findAutoSummonSlot`) bleiben „geteilt zuerst".
+* **Client (`app-board.jsx`):** der Slot-Picker (`pendingBouncePick`) bot nur die ERSTE geteilte und die ERSTE freie Zone je Held an. Jetzt `allSummonSlots(playerData, heroIdx, cardName)`: ALLE geteilten Zonen vorn, danach ALLE freien Zonen (auch Inselzonen) — im Deepsea-Zweig (Bounce-Ziele) ebenfalls. Es wird nichts erzwungen.
+
+### 4) A5 — „Gleiche Zone"-Ersetzungen: Stapel-Creatures sind kein legales Ziel
+Regel: eine Creature in einer Zone mit ≥ 2 Karten ist für Effekte, die sie entfernen/opfern/ersetzen, damit das Ergebnis in DIESELBE Zone kommt, kein Ziel (nicht wählbar, nicht anbietbar, nicht als Kosten); Zone mit GENAU einer Karte: legal (W17/W19/W20, `engine.zoneFreiNachKostenzahlung(side, hi, slot, inst)`). Mehr-Opfer-Beschwörungen (Blue-Ice, Foresta, Steam Dwarf Dragon Pilot, Egg of God, Dark Deepsea God, Pinta) behalten die W19/W20-Regel „Zone, die durch die Opfer VOLLSTÄNDIG leer wird" (`zoneLeerbarDurchOpfer`).
+* **`actionPlaceCreature` überschrieb** eine belegte, nicht teilbare Zone (`supportZones[h][s] = [name]`) und ließ die Bewohner als **Geisterinstanzen** zurück. Jetzt verweigert sie die Platzierung (`placement_blocked`, `reason: 'zone_occupied'`, Rückgabe `null`, nichts entnommen), wenn in der Zone noch LEBENDE getrackte Karten liegen (`engine.zoneMitLebendenBelegt`) und die Karte nicht teilen darf; reine Namensreste im Array zählen nicht. Über die ganze Suite (1299 Repros, Spur im Überschreib-Zweig) gab es genau EINEN Treffer — eine Testszene (`W10/a-r3`), die selbst den Geist erzeugte (angepasst).
+* **Audit (jede Karte „… in its place / same Support Zone", Quelle: Kartentexte + Skripte):**
+
+| Karte(n) | Mechanismus | Stapel-Creature … | Ergebnis |
+|---|---|---|---|
+| Garius, Kasperov [B], Rook of Kings [W], Hive's Crown, Loyal Rottweiler, Steam Dwarf Engineer, Creepy Villager, Suspicious Monster, Divine Gift of the Deepsea, Deepsea Encounter | `zoneFreiNachKostenzahlung` in Zielliste/Kosten | nicht wählbar | schon korrekt (W17–W20); Proben `a-05` (Garius, Kasperov [B], Rottweiler, Suspicious Monster) |
+| Shapeshift, Deepsea Castle, Deepsea-Bounce-Place (Bats, Horror Clown, Jack O' Lantern, Monstrosity, Mummy, Pirate, Poltergeister, Primordium, Reaper, Siren, Skeleton, Stein, Succubus, Werewolf, Witch, Zombie) | `ownSupportCreatures(… zoneLeerNachRueckgabe)`, `bouncePlacementTargets`, `_deepsea-shared` | nicht wählbar | schon korrekt |
+| The Egg of God, Blue-Ice Dragon, Foresta, Steam Dwarf Dragon Pilot, Dark Deepsea God, Pinta, Teocuilatl-Trio, Pollution Piranha, Gigantisaur King Trex | Opfer-/Rückgabe-Beschwörung, Zone nach Kostenzahlung | Zone muss VOLLSTÄNDIG leer werden | schon korrekt (W19/W20) |
+| **500 Piranhas in a Monster Suit** | Opfer = gegnerische Kreatur, Piranhas in ihre Zone | Stapel-Opfer war wählbar; danach sprang die Karte in eine Ersatzzone (gegen den Text) | **behoben:** `_validVictims` nimmt nur Zonen mit genau einer Karte (`a-05`) |
+| **Life-Searcher from the Cosmic Depths** | mischt sich ins Deck, Nachfolger in dieselbe Zone | im Stapel aktivierbar: Kosten bezahlt, dann Fizzle | **behoben:** nicht aktivierbar (`canActivateCreatureEffect`/`onCreatureEffect`, `a-05`) |
+| Loyal Bone Dog, Extra Life (Trial of Coolness), Cute Phoenix (`_wiederbelebungNachTod`) | Wiederbelebung in dieselbe Zone | Zone „belegt" durch gleichnamige Stapel-Kameraden → Fizzle, Kosten (Bone Dog aus der Hand) verloren | **behoben:** die wiederbelebte Kreatur teilt die Zone mit ihren Namensvettern (Stapel wieder ×2; `a-05` Bone Dog; Rückfrage 2) |
+| Chaorc Corpse Cannibal, Elven Rider, Green Dragoneer, Loyal Shepherd, Undurdle, Cute Bird, Grave Worm, Rewrite History, Pawn Chain, Call of the Deepsea, Zombified Assault | Auslöser nach dem Tod, „muss in dieselbe Zone" | Zone bleibt belegt → Auslöser feuert nicht | schon korrekt (jede prüft „Zone leer", sonst Fizzle bzw. nicht angeboten) |
+| Kasperov [W], Castling, Bishop of Kings [W] | Beschwören in FREIE Zonen (nicht dieselbe Zone) | – | nicht betroffen (nutzen `_of-kings-shared.freeZonesOfHero`, geteilt vor frei) |
+| Unholy Combination, Off with His Head!, Explosion Toss, Infallible Oracle Pythia, Man-Eater Birds, Tail Slap, Ultimate Destroyer Punch | – | – | kein Skript im Repo |
+
+### 5) B — Forceful Revival und die Pile-Wege: Kosten VOR dem Auftritt
+* **Ursache:** `summonFromDiscard` zeigte Vor-Animation und Flug und fragte erst DANACH die Beschwörungskosten der Karte (`beforeSummon`: Opfer-/Tribut-Wahl, abbrechbar) — bei Forceful Revival kam der Ramm-Anlauf (`play_ram_animation`, Script-Animation vor dem Aufruf) sogar noch früher. Die Animation ist die „erste sichtbare Wirkung" und committet den Auftritt (W63d-Puffer) — ein Abbruch der Opferwahl hatte dem Gegner die Karte schon gezeigt.
+* **Umsetzung (EIN Baustein):** `engine._beschwoerungKostenVorAuftritt(cardName, feld, heroIdx, slotIdx, kernOpts)` = Sperren (`_summonSperrenOk`, aus `_summonCreatureWithHooksKern` herausgelöst) + `beforeSummon`. `summonFromDiscard` (mode `summon`), `summonFromDeck` (mode `summon`) und `summonFromPile` (Hand, Potion Deck) rufen ihn VOR Vor-Animation, Flug und Landung; das Ergebnis geht mit `_sperrenGeprueft`/`_kostenGezahlt` an `summonCreatureWithHooks` (kein zweites Fragen). Abbruch = Karte zurück an ihren Platz, nichts gezeigt. Neue Option `opts.nachKostenAnim` (`summonFromDiscard`/`-Deck`): eine Karten-Animation, die erst NACH dem letzten abbrechbaren Prompt läuft — Forceful Revival legt Ramm-Anlauf + `gewaltsame_erweckung` dort hinein. Die Karte bietet solche Kreaturen weiter an (kein Ausschluss).
+* **Andere `summonFrom*`-Wege:** Deck, Hand, Potion Deck hatten dieselbe Lücke (Flug vor der Kostenfrage) → im selben Baustein behoben; `mode: 'place'`/`'revive'` fragen keine Kosten (unverändert). Skripte mit eigener Animation vor dem Aufruf: Raise the Minions, Rewrite History, Undurdle (alle `place`, keine Kosten) — kein Befund; **Skullmael's Greatsword** zeigt `undead_revival` + `showTriggeredEffect` vor `summonFromPile(discard)` (Kostenfrage danach möglich) — als getriggerter Effekt mit geclaimter HOPT bewusst verbindlich, nicht geändert (Rückfrage 4).
+* Repro: `W64/b-01` (Forceful Revival × Archer/Warrior/Guardian of Teocuilatl/500 Piranhas, beide Sitze; summonFromPile Deck/Ablage/Hand/Potion Deck; auf dem alten Stand 24 ✗); `W63/d-07` ohne Ausnahme grün (alt: „Forceful Revival (Abbruch an Stelle 1)").
+
+### 6) C — Inya: Stirbt der Fantasy Buddy, geht der Spell in die ABLAGE
+Al: „Auf der Karte steht nirgends, dass er gelöscht würde." Neu: `engine.tokenStapelZiel(inst)` (`'discard'` für `counters._fantasyBuddyToken`, sonst `'deleted'`), `tokenAbgang(inst, { geloescht })`: Schaden, Zerstören, Opfer, Rückgabe (auch „zurück auf die Hand"), Insel-Aufräumen → Ablage des permanenten Besitzers; nur ein ausdrückliches „delete" löscht (`actionMoveCard(…, 'deleted')`, Ghazma/Selbstlöschen). Biomancy-/Boulder-Token: unverändert Gelöscht-Stapel. Gestohlene/geschenkte Zauber: der Buddy trägt `originalOwner` des Zaubers → Ablage des echten Besitzers (W63c). Die Instanz wird beim Abgang entmarkt und abgemeldet (die Karte liegt als Name im Stapel wie jeder abgelegte Zauber); Flüge (`actionDestroyCard`, `_tokenStapelFlug`, Schadens-Tod) zielen auf die Ablage. Ablage-Zähler (Guardian Beast Hu, Core/Gun …) sehen die Karte. `c-01` (72 Prüfungen; alt 40 ✗); `W63/b-02` angepasst (Ablage statt „nicht in der Ablage").
+
+### 7) D — „defeat" ist ein Kill via EFFEKT, nicht via Schaden
+Al: „‚Defeat' umgeht Schadensimmunität, das ist ein Kill via Effekt statt via Schaden." Klassifikation (Schadens-Schutz greift NICHT, Effekt-Schutz greift WEITER):
+
+| Schicht | Klasse | bei „defeat" |
+|---|---|---|
+| „takes no damage" (Inya + Buddy), Carris, `damage_proof` (Storm Piano, Cheat Chair), Schadensreduktion/-schilde (Aquatic Shield, Strong Shield …), `beforeDamage`-Multiplikatoren (Cloudy), Interference, Flame-Avalanche-Sperre, Immortal/`capAtHPMinus1`/`lethalProtection`, Egg of God („damage negated"), Resilient Monkee, Sparkfly Attendant (Schaden), Guardian-Schutz | SCHADEN | greift nicht |
+| Erstrunden-Schutz, Resistance (`beforeHeroEffect`), Effekt-Immunität (Escape Device, Castling …), Spell-Schild (Energy Aura), „would be defeated"-Reaktionen (Escape, Paraseed Zombie, Barrier of Undying …), Gate Shield, Board-Wächter (Puppets), Monia-Schutz (`BEFORE_CREATURE_AFFECTED`), `_cardinalImmune`/`_damageDestroyImmune`/`_stealImmortal`, `kreaturGegnerEffektImmun` | EFFEKT | greift weiter (`actionDefeatHero`/`actionDestroyCard` hatten sie schon) |
+| Zielschutz „or HIT" (Dive Down, Jetpack, Stealth, Alluring Light), Anti Magic Enchantment, Anti Magic (`magic_immune`), Charme Lv 3 (`charmed`), Quellen-Immunität (Damus), Versteinert, Submerged | EFFEKT (nur in der Schadens-Pipeline, nicht in `actionDefeatHero`) | `actionDefeatHero(…, { wirkungsSchutz })` / `_heldWirkungsSchutz` — opt-in für Kill-Effekte, die vorher als Schaden liefen |
+
+* **Baustein:** `engine.actionDefeat(source, target, opts)` — Held → `actionDefeatHero`, Kreatur → `actionDestroyCard` (`fireCreatureDeath`); `opts.wirkungsSchutz: true` + `damageType` schaltet für Helden die dritte Zeile zu. Es gab schon die beiden Wege (`actionDefeatHero`, `actionDestroyCard`); der Dispatcher ist die Stelle für „defeat target" ohne Wissen um den Zieltyp.
+* **Eraser Beam** lief als 999999 Schaden (Held `dealDamage`, Kreatur `processCreatureDamageBatch`, `destruction_spell`) durch alle Schadensschichten — Inyas Buddy, Immortal, Carris, Storm Piano, Egg of God, Resilient Monkee hielten ihn ab. Jetzt `actionDefeat`; der ZEITPUNKT (sofort in `onPlay`) ist unverändert. Neu geschützt, weil Nicht-Schaden-Effekt: **Resistance** (W14-Ruling für „defeat"-Effekte; Rückfrage 3). `d-01` (66 Prüfungen, beide Sitze; alt 16 ✗).
+* **Audit der Bug-Klasse** (Kartentext „defeat" als Effekt; Quelle `data/cards.json` + Skripte; vorher/nachher = „greift Schadensschutz?"):
+
+| Karte | Text („defeat …") | Pfad | Schadensschutz vorher → nachher |
+|---|---|---|---|
+| **Eraser Beam** | „Choose a target your opponent controls and defeat it." | vorher Schaden 999999 → **`actionDefeat`** | **ja → nein** |
+| Hand of Death | „choose any target and defeat it" | `actionDefeatHero` / `actionDestroyCard` | nein → nein |
+| Decapitating Strike | „Defeat that target." | `actionDefeatHero` / `actionDestroyCard` | nein → nein |
+| Kohta, Master of Super-Killing | „choose any target on the board and defeat it" | `actionDefeatHero` (Typ attack) / `actionDestroyCard` | nein → nein |
+| Midnight Assault | „… and defeat it" | `unaufhaltsam` (Hero/Destroy) | nein → nein |
+| Goldify, Burned Contract, Trial of Dominance, Troop Annihilation, Point-Blank Annihilation, Rolling Boulder, Afflicted Vermin, Deepsea Reaper/Siren, Slippery Narw, Spirit of the Super-Killing Knife, Burning Fuse, Censpartan War Counselor, Crusader's Cutlass, Giant Exploding Skull, Aquatic Arrows, 500 Piranhas, Sentient Bomb Golems | „defeat (all) …" | `actionDestroyCard` | nein → nein |
+| Plant Golem, The Creepy Clown of Heaven | „defeat this Creature" (freiwillig) | `actionDestroyCard` | nein → nein |
+| Hel, Bonded Companions (4), Gobbo, Divine Gift of Sacrifice, Pharaoh, Teocuilatl, Last Resort, Foresta, Lunatic Golem | „defeat this Hero" / Opfer / HP-Kosten / Golem-Stufe | `actionDefeatHero` (`isSacrifice`/`eigenerAbgang`/`hpKosten`) | nein → nein (Selbstopfer umgehen bewusst jeden Schutz) |
+| Off with His Head!, Ultimate Destroyer Punch, Explosion Toss, Infallible Oracle Pythia, Man-Eater Birds, Tail Slap | „defeat …" | kein Skript im Repo | – |
+| Heragas („deal damage equal to its max HP … treated as an Attack"), Pusher, Rocket Fist, Shattering Strike, Skeleton Reaper, Crusader's Cutlass (Schaden-Teil) | „deal damage … if this damage defeats …" | Schaden (Kartentext nennt „damage") | bleibt Schaden |
+
+* Im Audit fand sich **kein weiterer** Kill-Effekt über die Schadens-Pipeline. Offen (Rückfrage 5): die übrigen Hero-Defeats (Hand of Death, Decapitating Strike, Kohta, Lunatic Golem, Midnight Assault [ohne `unaufhaltsam`]) prüfen die dritte Zeile (Zielschutz, Submerged, Charmed, Anti Magic, AME, Petrified) bisher NICHT — ein Submerged-Held stirbt z. B. an Hand of Death; bei Eraser Beam greifen sie wie bisher.
+
+### 8) Verträge für künftige Karten
+* Beschwört/platziert ein Weg aus einem Stapel: `summonFromDiscard/-Deck/-Pile` — nie eigene Flüge/Animationen VOR der Kostenfrage; eigene Animation → `opts.nachKostenAnim`. Neue Pile-Wege rufen `engine._beschwoerungKostenVorAuftritt` vor jeder sichtbaren Wirkung.
+* „… in the same Support Zone": die Zielliste prüft `engine.zoneFreiNachKostenzahlung(side, hi, slot, inst)` (genau eine Karte); der Platzierer überschreibt nie (`actionPlaceCreature` verweigert belegte Zonen); die Wiederbelebung nach dem Tod stapelt sich in eine geteilte Zone (`_wiederbelebungNachTod`).
+* Token-Quellen fragen „frei ODER geteilt" (`tokenZonePossible` / `engine.beschwoerZonenFuer`), nie nur `freeSupportSlots`.
+* Kartentext „defeat" (nicht „deal damage") → `engine.actionDefeat` (Kill via Effekt); der Typ „damage" bleibt Schaden. Ein Token mit echter Karte darunter: `engine.tokenStapelZiel(inst)` entscheidet Ablage/Gelöscht-Stapel (`tokenAbgang(inst, { geloescht })`).
+
+### 9) Tests W64a
+| Datei | Inhalt | Prüfungen | alter Stand |
+|---|---|---|---|
+| `W64/a-01-army-of-the-cute-zweite-kopie-stapelt-mit-alice.js` | A1, beide Sitze, mit/ohne Alice | 14 | grün (Bestätigung) |
+| `W64/a-02-elixir-of-immortality-alte-zone-vorrang-dann-geteilt-dann-frei.js` | A2, Reihenfolge der Landezone | 12 | grün (Bestätigung) |
+| `W64/a-03-creature-tokens-teilen-zonen-bei-aktiver-alice.js` | A3: Leprochaun/Mummy/Invader/Biomancy/Buddy (zentral, Stapel-Anzeige), Analyzer, Biomancy, Kyli, Inya | 66 | 8 ✗ |
+| `W64/a-04-klick-beschwoerung-freie-zone-trotz-geteilter-zone-waehlbar.js` | A4: Server + Client-Quelltext | 14 | 1 ✗ (Client) |
+| `W64/a-05-gleiche-zone-ersetzen-geteilte-zone-kein-legales-ziel.js` | A5: Place-Guard, Garius, Kasperov [B], Rottweiler, Suspicious Monster, 500 Piranhas, Life-Searcher, Bone Dog | 52 | 14 ✗ |
+| `W64/b-01-forceful-revival-kosten-vor-dem-auftritt.js` | B: Forceful Revival × 4 Kreaturen + summonFromPile Deck/Ablage/Hand/Potion Deck | 146 | 24 ✗ |
+| `W64/c-01-inya-buddy-stirbt-spell-in-die-ablage.js` | C | 72 | 40 ✗ |
+| `W64/d-01-eraser-beam-defeat-umgeht-schadensschutz.js` | D (inkl. Corpse-Explosion-Parität) | 66 | 16 ✗ |
+| `scripts/skilltest-e2e/ui-slot-picker-alice.js` (Playwright, `NODE_PATH=/tmp/claude-0/sio/node_modules:/opt/node-tools/node_modules`) | A4 im echten Client: Klick auf die Handkarte → Picker markiert geteilte UND alle freien Zonen; Klick auf eine FREIE Zone setzt genau sie (Zone 0 bleibt ×1), Klick auf die geteilte Zone stapelt (×2) | 6 | 4 ✗ (alter Client: nur die erste freie Zone) |
+Angepasst: `W63/b-02` (Buddy-Tod → Ablage), `W63/d-07` (Ausnahme Forceful Revival gestrichen), `W10/a-r3` (Testszene erzeugte einen Geist).
+
+### 10) Rückfragen an Al (Ja/Nein)
+1. **Zwei Fantasy Buddys verschiedener Zauber** (Token-Name beide „Fantasy Buddy Token", Bild der jeweilige Zauber): teilen sie eine Zone? Derzeit **nein** — „identical names" vergleicht den Zaubernamen (Instanzname), zwei Buddys desselben Zaubers teilen.
+2. **Wiederbelebung in eine Alice-Zone** (Loyal Bone Dog, Trial of Coolness, Cute Phoenix): die wiederbelebte Kreatur stapelt sich zu ihren gleichnamigen Kameraden zurück (vorher: Fizzle nach bezahlten Kosten) — so gewollt?
+3. **Resistance** blockt jetzt Eraser Beams Helden-Defeat („defeat" = Nicht-Schaden-Effekt, W14-Ruling) — ja?
+4. **Skullmael's Greatsword / getriggerte Effekte:** Animation (`undead_revival`) und `showTriggeredEffect` laufen vor der Kostenfrage der aus der Ablage beschworenen Karte (HOPT ist geclaimt, Abbruch nach der Frage = Effekt verpufft) — in Ordnung, oder soll auch hier die Kostenfrage vor der Animation stehen?
+5. **Wirkungs-Schutz für alle Hero-Defeats:** Hand of Death, Decapitating Strike, Kohta, Lunatic Golem, Midnight Assault (ohne `unaufhaltsam`) sollen — wie jetzt Eraser Beam — an Zielschutz („cannot be chosen or hit"), Submerged, Charmed, Anti Magic/AME, Versteinerung scheitern? Derzeit **nein** (nur Resistance, Effekt-Immunität, Spell-Schild, Erstrunden-Schutz, „would be defeated"-Reaktionen).

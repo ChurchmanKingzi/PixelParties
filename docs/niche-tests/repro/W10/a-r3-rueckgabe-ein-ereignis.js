@@ -45,7 +45,10 @@ const H = require('../../lib/h.js');
   // (2) Blood Moon zählt weiter je Kreatur (Text: „Whenever a Creature is returned …“)
   {
     const t = await H.fresh({ heroes: [['Tushu, the Knowledge Keeper', 'Rick, the Trigger Happy Undertaker', 'Zwei, the Lucky Thief'], ['Atta, Speaker of Desires', 'Hulijing, the Foxdemon', 'George, the Mad Tyrant King']], hand: [['Dark Deepsea God'], []], deck: [Array(10).fill(H.INERT.creature)] });
-    const a = t.put(0, 0, 0, 'Deepsea Werewolf'), b = t.put(0, 0, 1, 'Deepsea Siren'), c = t.put(0, 0, 2, 'Deepsea Witch');
+    // W64a: Blood Moon steht in einer EIGENEN Zone des Helden (früher wurde die Zone der Werwölfin überschrieben und ihre Instanz blieb als Geist stehen;
+    // `actionPlaceCreature` überschreibt belegte Zonen nicht mehr).
+    // Drei Tribute geben es auf EINEM Helden nicht mehr her (drei Zonen, eine davon Blood Moon): zwei Tribute am Held + einer am Nachbarn — Blood Moon zählt nur Rückgaben DIESES Helden.
+    const a = t.put(0, 1, 0, 'Deepsea Werewolf'), b = t.put(0, 0, 1, 'Deepsea Siren'), c = t.put(0, 0, 2, 'Deepsea Witch');
     a.turnPlayed = b.turnPlayed = c.turnPlayed = 1;
     t.put(0, 0, 0, 'Blood Moon under the Sea');
     t.script.push({ match: d => d.type === 'zonePick', answer: (d) => ({ heroIdx: d.zones[0].heroIdx, slotIdx: d.zones[0].slotIdx, owner: d.zones[0].owner }) });
@@ -54,10 +57,10 @@ const H = require('../../lib/h.js');
       return valid.filter(v => v.type === 'equip' && v.owner === 0 && [a, b, c].some(x => x.heroIdx === v.heroIdx && x.zoneSlot === v.slotIdx)).map(v => v.id);
     };
     const hp0 = t.hp(1, 0);
-    const r = await t.play(0, 'Dark Deepsea God', { hero: 0, slot: 0, noGrant: true });
+    const r = await t.play(0, 'Dark Deepsea God', { hero: 0, slot: 1, noGrant: true });
     R.note('(2) gespielt', { r, hp: t.hp(1, 0), errors: t.errors.length });
     // DDG selbst macht 150 auf den Gegner; Blood Moon je Kreatur 50 → 3x50 = 150 zusätzlich
-    R.check('(2) Blood Moon löst je Kreatur aus (3 x 50)', hp0 - t.hp(1, 0) === 150 + 3 * 50, hp0 - t.hp(1, 0));
+    R.check('(2) Blood Moon löst je Kreatur dieses Helden aus (2 x 50 für Siren + Witch; Werewolf liegt am Nachbarn)', hp0 - t.hp(1, 0) === 150 + 2 * 50, hp0 - t.hp(1, 0));
     R.check('(2) keine Engine-Fehler', t.errors.length === 0, t.errors);
   }
   R.finish();

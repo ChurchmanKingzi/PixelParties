@@ -13,6 +13,7 @@ const { biomancyTokenCounters } = require('../../../../cards/effects/_biomancy-s
 const TOK = { 'Leprochaun Token': 'Leprochaun Token', 'Mummy Token': 'Mummy Token', 'Invader Token': 'Invader Token' };
 const POTION = 'Elixir of Quickness', SPELL = 'Fireball', IN = 'Card Game Player Inya', KYLI = 'Kyli, the Deceptive Sapling';
 
+const seite_ = (s) => s;
 const buddyZaehler = (name) => ({ _fantasyBuddyToken: true, currentHp: 10, maxHp: 10, _cardDataOverride: { ...H.DB[name], name: 'Fantasy Buddy Token', cardType: 'Creature/Token', subtype: 'Token', hp: 10 } });
 
 (async () => {
@@ -34,6 +35,11 @@ const buddyZaehler = (name) => ({ _fantasyBuddyToken: true, currentHp: 10, maxHp
           R.check(`[S${seat}] ${label} + Alice: die Zone des gleichnamigen Tokens ist eine geteilte Zone (vorn)`, geteilt.length === 1 && zonen[0].shared && zonen[0].heroIdx === 0 && zonen[0].slotIdx === 0, zonen);
           R.check(`[S${seat}] ${label} + Alice: canShareInto = ja, andere Namen = nein`, canShareInto(e, seat, 0, 0, name) && !canShareInto(e, seat, 0, 0, 'Pollution Token'), null);
           const r = e.safePlaceInSupport(name, seat, 0, -1);
+          // Anzeige/Zähler (Server `buildSupportStacks` → Client-Abzeichen): beide Kopien zählen als Creature-Stapel, HP/Status je Kopie sind endlich
+          if (r && mk) mk(t);   // die neue Instanz bekommt denselben Token-Override wie die erste
+          const stapelInsts = stackAt(e, seite_(seat), 0, 0);
+          const beschr = stapelInsts.map(i => require('../../../../cards/effects/_alice-shared.js').describeInstance(e, i));
+          R.check(`[S${seat}] ${label} + Alice: Stapel-Anzeige — zwei Creature-Instanzen im Stapel (Abzeichen ×2), HP je Kopie endlich`, !!r && stapelInsts.length === 2 && beschr.every(b => Number.isFinite(b.hp) && Number.isFinite(b.maxHp)), beschr.map(b => [b.name, b.hp, b.maxHp]));
           R.check(`[S${seat}] ${label} + Alice: die zweite Kopie wird in dieselbe Zone gelegt (Stapel ×2, 2 Instanzen, kein Geist)`, !!r && r.actualSlot === 0 && zoneA(t, seat).length === 2 && instIn(t, seat, 0, 0, name) === 2 && t.audit().filter(m => !/hält \d Karten|\d Instanzen/.test(m)).length === 0 && (mk ? true : stackAt(e, seat, 0, 0).length === 2), { r: !!r, zone: zoneA(t, seat) });
         } else {
           R.check(`[S${seat}] ${label} ohne Alice: keine geteilte Zone, nichts wird gestapelt`, geteilt.length === 0 && !canShareInto(e, seat, 0, 0, name) && e.safePlaceInSupport(name, seat, 0, -1) === null, zonen);
@@ -104,4 +110,4 @@ const buddyZaehler = (name) => ({ _fantasyBuddyToken: true, currentHp: 10, maxHp
     }
   }
   R.finish();
-})().catch(e => { console.error(e); process.exit(2); });
+})().catch(e => { process.stderr.write(String(e && e.stack || e) + '\n'); process.exit(2); });

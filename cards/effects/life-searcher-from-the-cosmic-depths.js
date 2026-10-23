@@ -168,6 +168,10 @@ module.exports = {
     // Gate: ≥3 Change Counters across cards we control.
     if (totalChangeCountersOnSide(engine, pi) < 3) return false;
 
+    // ★ W64a (Al, 23.10.2026): „… into the same Support Zone this Creature occupied" — liegt die Life-Searcher in einer geteilten Zone (Alice-Stapel),
+    // wäre die Zone nach dem Zurückmischen nicht frei: sie ist für diesen Effekt kein legales Ziel (nicht aktivierbar, nichts bezahlt).
+    if (!engine.zoneFreiNachKostenzahlung(engine.physicalSide(inst), inst.heroIdx, inst.zoneSlot, inst)) return false;
+
     // Engine HOPT (creature-effect:${id}) handles the once-per-turn
     // gate naturally. No script-level HOPT needed.
 
@@ -202,6 +206,7 @@ module.exports = {
     if (!sps) return false;
 
     if (totalChangeCountersOnSide(engine, pi) < 3) return false;
+    if (!engine.zoneFreiNachKostenzahlung(seite, inst.heroIdx, inst.zoneSlot, inst)) return false;   // W64a: Alice-Stapel kein Ziel (s. canActivateCreatureEffect)
 
     const cardDB = engine._getCardDB();
     const myLvl = cardDB[CARD_NAME]?.level ?? 3;

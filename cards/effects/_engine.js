@@ -16422,24 +16422,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     });
   }
 
-  async _summonCreatureWithHooksKern(cardName, playerIdx, heroIdx, zoneSlot = -1, opts = {}) {
-    // ★ FLUG VON DER HAND (v933, Als Befund 12.9.) ────────────────────
-    // Der regulaere Spielweg sendet den Flug im Server; der HOOK-Weg
-    // (Reaktions-Kreaturen: Explosive Drone, Doomed Town Guard, Chaorc
-    // Rider Warg, Rebelliokai Courtly Kirin) tat es bei keiner einzigen
-    // Karte — die Kreatur erschien ohne Bewegung in der Zone. Der
-    // Aufrufer nimmt die Karte VOR dem Beschwoeren aus der Hand und
-    // uebergibt den Platz als `opts.fromHandIdx`; nur dann fliegt sie.
-    if (opts.fromHandIdx != null && opts.fromHandIdx >= 0) {
-      this._broadcastEvent('play_pile_transfer', {
-        owner: opts.controller ?? playerIdx, cardName,
-        from: 'hand', to: 'support',
-        fromHandIdx: opts.fromHandIdx,
-        toHeroIdx: heroIdx, toSlotIdx: zoneSlot,
-        // Hand = Beschwoerer, Ziel = Feldseite (Styx 28.9.).
-        ...(opts.controller != null && opts.controller !== playerIdx ? { toOwner: playerIdx } : {}),
-      });
-    }
+  /**
+   * ★ W64a — die Sperren, die JEDE Beschwoerung vor der Kostenzahlung prueft (Zonensperre, Hand-only, Beschwoerungssperre, Cross-Side, Artifact Creature, Zonenrecht).
+   * Aus `_summonCreatureWithHooksKern` herausgeloest, damit die Pile-Wege (`summonFromDiscard/-Deck/-Pile`) sie VOR der Kostenfrage und VOR jeder sichtbaren Animation
+   * pruefen koennen („Auftritt erst nach dem Commit", Welle 63d/64a): scheitert eine Sperre, ist nichts bezahlt und nichts gezeigt. Reine Pruefung (loggt wie bisher).
+   * @returns {boolean} true = keine Sperre
+   */
+  _summonSperrenOk(cardName, playerIdx, heroIdx, opts = {}) {
     // v704 (Puppets): gesperrte Support Zones (Tri Fecta / Tri Ad) — nur
     // der Held selbst und Puppet-Tokens duerfen hinein (Skript-Vertrag
     // `supportZonesLocked`).
@@ -16453,11 +16442,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         && !(opts.fromHandIdx != null && opts.fromHandIdx >= 0)
         && !opts._fromHand) {
       this.log('summon_blocked', { card: cardName, reason: 'hand_only' });
-      return null;
+      return false;
     }
     if (this.isSupportZoneLocked(playerIdx, heroIdx, { source: opts.source, cardName, via: 'summon' })) {
       this.log('summon_blocked', { card: cardName, reason: 'support_zones_locked', heroIdx });
-      return null;
+      return false;
     }
     // ── BESCHWOERUNGSSPERRE AUCH FUER EFFEKT-BESCHWOERUNGEN (Z6, A01-27) ──
     // `ps.summonLocked` sperrt laut CARD_API „Hand-, Effekt-Beschwoerungen UND Platzierungen" - die Platzierung
@@ -16469,13 +16458,13 @@ this._deathWatch = (this._deathWatchStack || []).length
       const _sps = this.gs.players[opts.controller ?? playerIdx];
       if (_sps?.summonLocked) {
         this.log('summon_blocked', { card: cardName, reason: 'summonLocked', heroIdx });
-        return null;
+        return false;
       }
       if (_sps?.summonLockExceptGreatmaw) {
         const { isGreatmawCreature } = require('./_greatmaw-shared');
         if (!isGreatmawCreature(cardName, this)) {
           this.log('summon_blocked', { card: cardName, reason: 'summonLockExceptGreatmaw', heroIdx });
-          return null;
+          return false;
         }
       }
     }
@@ -16498,7 +16487,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const _beschwoerer = opts.controller ?? playerIdx;
       if (_beschwoerer === playerIdx && !this.zonenRechtAmHeld(_beschwoerer, playerIdx, heroIdx, { beschwoeren: !opts.isPlacement })) {
         this.log('summon_blocked', { card: cardName, reason: 'hero_not_controlled', heroIdx });
-        return null;
+        return false;
       }
     }
     if (!opts.crossSidePlacement) {
@@ -16509,7 +16498,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           player: this.gs.players[playerIdx]?.username,
           source: opts.source || null,
         });
-        return null;
+        return false;
       }
     }
 
@@ -16538,9 +16527,33 @@ this._deathWatch = (this._deathWatchStack || []).length
           player: this.gs.players[playerIdx]?.username,
           source: opts.source || null,
         });
-        return null;
+        return false;
       }
     }
+
+    return true;
+  }
+
+  async _summonCreatureWithHooksKern(cardName, playerIdx, heroIdx, zoneSlot = -1, opts = {}) {
+    // ★ FLUG VON DER HAND (v933, Als Befund 12.9.) ────────────────────
+    // Der regulaere Spielweg sendet den Flug im Server; der HOOK-Weg
+    // (Reaktions-Kreaturen: Explosive Drone, Doomed Town Guard, Chaorc
+    // Rider Warg, Rebelliokai Courtly Kirin) tat es bei keiner einzigen
+    // Karte — die Kreatur erschien ohne Bewegung in der Zone. Der
+    // Aufrufer nimmt die Karte VOR dem Beschwoeren aus der Hand und
+    // uebergibt den Platz als `opts.fromHandIdx`; nur dann fliegt sie.
+    if (opts.fromHandIdx != null && opts.fromHandIdx >= 0) {
+      this._broadcastEvent('play_pile_transfer', {
+        owner: opts.controller ?? playerIdx, cardName,
+        from: 'hand', to: 'support',
+        fromHandIdx: opts.fromHandIdx,
+        toHeroIdx: heroIdx, toSlotIdx: zoneSlot,
+        // Hand = Beschwoerer, Ziel = Feldseite (Styx 28.9.).
+        ...(opts.controller != null && opts.controller !== playerIdx ? { toOwner: playerIdx } : {}),
+      });
+    }
+    // ★ W64a: die Sperren stehen in `_summonSperrenOk`; die Pile-Wege pruefen sie schon VOR der Kostenfrage (`_sperrenGeprueft`).
+    if (!opts._sperrenGeprueft && !this._summonSperrenOk(cardName, playerIdx, heroIdx, opts)) return null;
 
     // Pre-placement gate: if the card defines a `beforeSummon(ctx)` async
     // hook (sacrifice costs etc.) and the summon path isn't opted out via
@@ -16556,7 +16569,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // restrictions, NOT host-side normal-summoning gates. Only sources
     // that explicitly own the cost (e.g. Steam Dwarf Engineer's "its own
     // life is the cost") opt out via `skipBeforeSummon: true`.
-    if (!opts.skipBeforeSummon) {
+    if (!opts.skipBeforeSummon && !opts._kostenGezahlt) {   // W64a: `_kostenGezahlt` — die Pile-Wege haben `beforeSummon` schon VOR ihrer Animation gefragt
       // Styx 28.9.: auf eine fremde Feldseite beschworen (`controller`) —
       // der Beschwoerer zahlt, der Held steht auf `playerIdx` (Feldseite).
       const _fremd = opts.controller != null && opts.controller !== playerIdx;
@@ -16905,6 +16918,16 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ids = this.zoneInsassen(side, heroIdx, zoneSlot).map(c => c.id);
     if (ids.length !== slot.length) return false;
     return this.canSatisfySacrifice(pi, { ...spec, requiredInstIds: ids }, selfId);
+  }
+  /**
+   * ★ W64a: Liegt in dieser Zone (physische Seite `side`) noch mindestens eine LEBENDE, getrackte Karte? (Eintrag im Zonen-Array UND eine Support-Instanz gleichen Namens,
+   * die nicht schon als gestorben gilt.) Reine Namensreste im Array (Platzhalter, nachgezogene Tauschzonen) zählen nicht.
+   */
+  zoneMitLebendenBelegt(side, heroIdx, zoneSlot) {
+    const arr = this.gs?.players?.[side]?.supportZones?.[heroIdx]?.[zoneSlot];
+    if (!Array.isArray(arr) || arr.length === 0) return false;
+    return this.cardInstances.some(c => c.zone === ZONES.SUPPORT && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
+      && this.physicalSide(c) === side && arr.includes(c.name) && !c._deathResolved);
   }
   /** W17a: Teilt sich diese Zone mehrere Karten (Alice-Stapel)? Nur der Stapel-Fall (>= 2 Eintraege); fehlt das Zonen-Array, gilt sie nicht als geteilt. */
   _zoneGeteilt(side, heroIdx, zoneSlot) {
@@ -21476,15 +21499,21 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!taken) return null;
     const flight = { toHeroIdx: heroIdx, toSlotIdx: slotIdx, ...(feld !== pi ? { toOwner: feld } : {}) };
     if (pile === 'hand') flight.fromHandIdx = taken.idx;
-    // `opts.flug: false`: der Aufrufer hat den Flug schon selbst gezeigt (z. B. Aufdecken ueber die Mitte des
-    // Feldes, `mill_center_reveal` mit `dest: 'support'`) — kein zweiter Flug von der Quelle.
-    if (opts.flug !== false) this._pileFlight(pi, taken.name, pile, 'support', flight);
-    const summon = await this.summonCreatureWithHooks(taken.name, feld, heroIdx, slotIdx, {
+    const kernOpts = {
       source: opts.source || 'summonFromPile', hookExtras: { _summonedFromPile: pile, ...(opts.hookExtras || {}) },
       alsZusatzaktion: !!opts.alsZusatzaktion,   // v1349
       ...(opts.summonOpts || {}),
       ...(feld !== pi ? { controller: pi } : {}),
-    });
+    };
+    // ★ W64a: Kosten (beforeSummon) VOR dem sichtbaren Flug; abgebrochen → Karte zurueck an ihren Platz, nichts gezeigt.
+    if (!(await this._beschwoerungKostenVorAuftritt(taken.name, feld, heroIdx, slotIdx, kernOpts))) {
+      this.returnToPile(pi, pile, taken.name, (pile === 'hand' || pile === 'potionDeck') ? taken.idx : null); this.sync(); return null;
+    }
+    kernOpts._sperrenGeprueft = true; kernOpts._kostenGezahlt = true;
+    // `opts.flug: false`: der Aufrufer hat den Flug schon selbst gezeigt (z. B. Aufdecken ueber die Mitte des
+    // Feldes, `mill_center_reveal` mit `dest: 'support'`) — kein zweiter Flug von der Quelle.
+    if (opts.flug !== false) this._pileFlight(pi, taken.name, pile, 'support', flight);
+    const summon = await this.summonCreatureWithHooks(taken.name, feld, heroIdx, slotIdx, kernOpts);
     // Hand und Potion Deck sind geordnete Stapel ohne Mischen: scheitert die Beschwoerung, liegt die
     // Karte wieder an IHREM Platz (das Potion Deck behaelt seine Reihenfolge, die oberste Karte bleibt oben).
     if (!summon?.inst) { this.returnToPile(pi, pile, taken.name, (pile === 'hand' || pile === 'potionDeck') ? taken.idx : null); this.sync(); return null; }
@@ -29028,6 +29057,17 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.log('placement_blocked', { card: cardName, reason: 'support_zones_locked', heroIdx });
       return null;
     }
+    // ★ W64a (Al, 23.10.2026: „Creatures in einer geteilten Zone sind für diese Effekte schlicht keine legalen Ziele … sonst bleiben Geisterinstanzen"):
+    // eine Zone, in der noch lebende Karten liegen, wird NIE überschrieben. Früher setzte der Eintrag unten `supportZones[h][s] = [cardName]` und ließ die
+    // bisherigen Bewohner als Geisterinstanzen zurück (Kasperov [B], Rook [W], Loyal Rottweiler-Typ, wenn ihre Zielzone ein Alice-Stapel war). Teilbare Zonen
+    // (gleichnamige Kreatur, Alice) stapeln weiter; ein Aufrufer, der eine Zone wirklich leeren will, räumt die Bewohner vorher selbst ab.
+    if (slotIdx >= 0 && this.zoneMitLebendenBelegt(feld, heroIdx, slotIdx)) {
+      const { canShareInto: _kannTeilen } = require('./_alice-shared');
+      if (!_kannTeilen(this, playerIdx, heroIdx, slotIdx, cardName, feld)) {
+        this.log('placement_blocked', { card: cardName, by: opts.sourceName || 'Placement', reason: 'zone_occupied', heroIdx, zoneSlot: slotIdx });
+        return null;
+      }
+    }
 
     // ── ARTIFACT-CREATURE-RIEGEL (Als Ruling 17.8.) ──────────────────
     // Dieselbe Sperre wie in `summonCreatureWithHooks`. Sie MUSS hier
@@ -29861,7 +29901,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     // DENSELBEN Platz. Hat ein Todes-Listener ihn inzwischen gefuellt
     // (Call of the Deepsea, Grave Worm, Loyal Shepherd …), fizzelt sie
     // sichtbar — die Karte bleibt in der Ablage, kein Ausweichplatz.
-    if (reviveAfterDeath && this.supportSlotBelegt(reviveAfterDeath.owner, reviveAfterDeath.heroIdx, reviveAfterDeath.zoneSlot)) {
+    // ★ W64a: die Kreatur kehrt in IHRE Zone zurueck — liegen dort noch gleichnamige Kreaturen (Alice-Stapel, „identical names share 1 Support Zone"),
+    // ist die Zone fuer sie nicht belegt, sondern geteilt: die Wiederbelebung stapelt sich (statt zu fizzeln, nachdem Bone Dog & Co. bezahlt sind).
+    const _wbTeilt = !!reviveAfterDeath && this.supportSlotBelegt(reviveAfterDeath.owner, reviveAfterDeath.heroIdx, reviveAfterDeath.zoneSlot)
+      && require('./_alice-shared').canShareInto(this, reviveAfterDeath.owner, reviveAfterDeath.heroIdx, reviveAfterDeath.zoneSlot, reviveAfterDeath.name);
+    if (reviveAfterDeath && !_wbTeilt && this.supportSlotBelegt(reviveAfterDeath.owner, reviveAfterDeath.heroIdx, reviveAfterDeath.zoneSlot)) {
       this.log('creature_revive_fizzle', { target: reviveAfterDeath.name, by: reviveAfterDeath.by || null, reason: 'zone_taken' });
       await this.zeigeFizzle(reviveAfterDeath.by || reviveAfterDeath.name, { playerIdx: reviveAfterDeath.owner, grund: 'zone_taken' });
       return false;
@@ -37213,6 +37257,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     const kontrolle = feld !== pi ? { controller: pi } : {};
     const ab = await this.deckEntnahme(pi, what, { source: opts.source, shuffle: opts.shuffle !== false });
     if (!ab) return null;
+    // ★ W64a: Kosten (beforeSummon) VOR Vor-Animation und Flug (siehe `_beschwoerungKostenVorAuftritt`); nur die Beschwoerung (nicht das Platzieren) hat Kosten.
+    const kernOpts = mode === 'place' ? null : {
+      source: opts.source || 'summonFromDeck', ...(opts.summonOpts || {}), ...kontrolle, hookExtras: this.deckHookExtras(opts.hookExtras || {}),
+    };
+    if (kernOpts) {
+      if (!(await this._beschwoerungKostenVorAuftritt(ab.name, feld, heroIdx, slotIdx, kernOpts))) { this.deckRueckgabe(ab); return null; }
+      kernOpts._sperrenGeprueft = true; kernOpts._kostenGezahlt = true;
+    }
+    if (typeof opts.nachKostenAnim === 'function') await opts.nachKostenAnim(ab);
     if (opts.vorAnim?.type) {
       this._broadcastEvent('play_zone_animation', { type: opts.vorAnim.type, owner: feld, heroIdx, zoneSlot: slotIdx });
       await this._delay(opts.vorAnim.ms ?? 700);
@@ -37230,12 +37283,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         ...(feld !== pi ? { heldSeite: feld } : {}),
       });
     } else {
-      res = await this.summonCreatureWithHooks(ab.name, feld, heroIdx, slotIdx, {
-        source: opts.source || 'summonFromDeck',
-        ...(opts.summonOpts || {}),
-        ...kontrolle,
-        hookExtras: this.deckHookExtras(opts.hookExtras || {}),
-      });
+      res = await this.summonCreatureWithHooks(ab.name, feld, heroIdx, slotIdx, kernOpts);
     }
     if (!res?.inst) { this.deckRueckgabe(ab); return null; }
     this.deckLandung(res.inst, ab);
@@ -37307,6 +37355,21 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ W64a (Al/Orchestrator, 23.10.2026: „Auftritt erst nach dem Commit", Welle 63d): die Pile-Wege (`summonFromDiscard` / `-Deck` / `-Pile`) zeigten ihren Auftritt
+   * (Vor-Animation, Flug Stapel → Zone) VOR der Beschwoerungsfrage der Karte (`beforeSummon`: Opfer-/Tribut-Wahl, Archer, Warrior/Guardian of Teocuilatl,
+   * 500 Piranhas, Dark Deepsea God …, abbrechbar). Brach der Spieler ab, hatte der Gegner die Karte schon fliegen sehen. Jetzt fragen die Pile-Wege ZUERST
+   * (Sperren, dann Kosten) und zeigen ERST danach. Liefert `false`, wenn gesperrt oder abgebrochen (dann ist nichts bezahlt und nichts gezeigt).
+   * `kernOpts` = die Optionen des spaeteren `summonCreatureWithHooks`-Aufrufs; der Aufrufer reicht sie danach mit `_sperrenGeprueft` / `_kostenGezahlt` weiter.
+   */
+  async _beschwoerungKostenVorAuftritt(cardName, feld, heroIdx, slotIdx, kernOpts = {}) {
+    if (!this._summonSperrenOk(cardName, feld, heroIdx, kernOpts)) return false;
+    if (kernOpts.skipBeforeSummon) return true;
+    const _fremd = kernOpts.controller != null && kernOpts.controller !== feld;
+    return !!(await this._runBeforeSummon(cardName, _fremd ? kernOpts.controller : feld, heroIdx,
+      _fremd ? { ...(kernOpts.hookExtras || {}), heldSeite: feld } : kernOpts.hookExtras, slotIdx));
+  }
+
+  /**
    * Der EINE Aufruf: Creature aus einer Ablage aufs Feld.
    *
    * @param {number} pi         wer beschwoert (bekommt die Kreatur)
@@ -37341,6 +37404,16 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     const ab = await this.ablageEntnahme(pi, pileOwner, what, opts);
     if (!ab) return null;
+    // ★ W64a: Kosten (Opfer-/Tribut-Wahl der Karte) VOR jeder sichtbaren Animation; abgebrochen/gesperrt → nichts gezeigt, Karte zurueck in die Ablage.
+    const kernOpts = mode === 'revive'
+      ? { skipHooks: true, skipBeforeSummon: true, playSummonAnim: false, skipLog: true, source: opts.source || 'revive', ...kontrolle }
+      : { source: opts.source || 'summonFromDiscard', ...(opts.summonOpts || {}), ...kontrolle, hookExtras: this.ablageHookExtras(opts.hookExtras || {}) };
+    if (mode !== 'revive') {
+      if (!(await this._beschwoerungKostenVorAuftritt(ab.name, feld, heroIdx, slotIdx, kernOpts))) { this.ablageRueckgabe(ab); return null; }
+      kernOpts._sperrenGeprueft = true; kernOpts._kostenGezahlt = true;
+    }
+    // `nachKostenAnim`: die eigene Auftritts-Animation der Karte (Forceful Revival: Ramm-Anlauf) — laeuft erst NACH dem letzten abbrechbaren Prompt.
+    if (typeof opts.nachKostenAnim === 'function') await opts.nachKostenAnim(ab);
     if (opts.vorAnim?.type) {
       this._broadcastEvent('play_zone_animation', { type: opts.vorAnim.type, owner: feld, heroIdx, zoneSlot: slotIdx });
       await this._delay(opts.vorAnim.ms ?? 700);
@@ -37353,17 +37426,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
       if (typeof opts.flug === 'number' && opts.flug > 0) { this.sync(); await this._delay(opts.flug); }
     }
-    const res = mode === 'revive'
-      ? await this.summonCreatureWithHooks(ab.name, feld, heroIdx, slotIdx, {
-          skipHooks: true, skipBeforeSummon: true, playSummonAnim: false, skipLog: true,
-          source: opts.source || 'revive', ...kontrolle,
-        })
-      : await this.summonCreatureWithHooks(ab.name, feld, heroIdx, slotIdx, {
-          source: opts.source || 'summonFromDiscard',
-          ...(opts.summonOpts || {}),
-          ...kontrolle,
-          hookExtras: this.ablageHookExtras(opts.hookExtras || {}),
-        });
+    const res = await this.summonCreatureWithHooks(ab.name, feld, heroIdx, slotIdx, kernOpts);
     if (!res?.inst) { this.ablageRueckgabe(ab); return null; }
     this.ablageLandung(res.inst, ab, mode);
     if (mode === 'revive') {
