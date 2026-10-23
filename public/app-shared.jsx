@@ -2915,6 +2915,16 @@ const ZONE_ANIM_SFX = {
     { name: 'ping',   opts: { rate: 3.1, volume: 0.25, delay: 900, category: null, dedupe: 0 } },
     { name: 'reveal', opts: { rate: 1.3, volume: 0.45, delay: 1000, category: null, dedupe: 0 } },
   ],
+  // Kidnapping (23.10.) — der Sack faellt (Zieh-Ton, 0 ms), klatscht auf die Karte (tiefer Platzierungston, ~380 ms), der Strick zieht sich zu (Zieh-Ton hoch, ~560 ms), zwei dumpfe Stoesse
+  // beim Zappeln (~800 / ~940 ms), der Sack loest sich auf (Aufdeck-Ton, ~1120 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  kidnap_sack: [
+    { name: 'draw',          opts: { rate: 0.7, volume: 0.4 } },
+    { name: 'placement',     opts: { rate: 0.5, volume: 0.55, delay: 380, category: null, dedupe: 0 } },
+    { name: 'draw',          opts: { rate: 1.5, volume: 0.35, delay: 560, category: null, dedupe: 0 } },
+    { name: 'heavy_impact',  opts: { rate: 1.5, volume: 0.25, delay: 800, category: null, dedupe: 0 } },
+    { name: 'heavy_impact',  opts: { rate: 1.3, volume: 0.25, delay: 940, category: null, dedupe: 0 } },
+    { name: 'reveal',        opts: { rate: 1.6, volume: 0.4,  delay: 1120, category: null, dedupe: 0 } },
+  ],
   // Gather Intel (12.10.) — die Lupe huscht los (Zieh-Ton, 0 ms), tastet die Hand ab (leise Pings im Takt der Funkelkreuze, ~460 / ~620 / ~780 ms), der Blick sitzt (Aufdeck-Ton,
   // ~1000 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   intel_peek: [
