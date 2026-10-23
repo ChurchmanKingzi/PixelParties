@@ -115,6 +115,8 @@ function attachSteamEngine(mod) {
   // Force the shared-engine cards to have activeIn 'support' so the
   // hook doesn't fire while the creature is in hand/discard/etc.
   if (!mod.activeIn) mod.activeIn = ['support'];
+  // Mehrfach-Abwurf: nach JEDER abgeworfenen Karte sofort +10, nicht gebuendelt am Ende (Engine: `_abwurfHookVormerken`).
+  mod.discardSofort = true;
   const existing = mod.hooks.onDiscard;
   mod.hooks.onDiscard = async (ctx) => {
     if (existing) {

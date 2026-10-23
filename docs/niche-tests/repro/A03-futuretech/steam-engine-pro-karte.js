@@ -19,6 +19,18 @@ const H = require('../../lib/h.js');
   R.check('je Karte eine grüne „+10“ über dem Diver (4 Stück)', zahlen.length === 4 && zahlen.every(e => e.data.amount === 10 && e.data.zoneSlot === d.zoneSlot), { n: zahlen.length });
   R.check('Abwurf des Gegners zählt nicht', (gegner.counters?.maxHp ?? 50) === 50, { max: gegner.counters?.maxHp });
   R.check('Dragon Pilot: kein HP-Gewinn', (pilot.counters?.maxHp ?? 150) === 150, { max: pilot.counters.maxHp });
+  // Reihenfolge bei Mehrfach-Abwurf in einer Klammer: Abwurf, +10, Abwurf, +10 ... (nicht erst alle Abwuerfe, dann alle +10)
+  {
+    const u = await H.fresh({ hand: [['Fireball', 'Fireball', 'Fireball'], []] });
+    const dd = u.put(0, 0, 1, 'Steam Dwarf Diver'); dd.turnPlayed = 1;
+    const von = u.events.length;
+    await u.run(() => u.engine.withDiscardBatch(0, { source: 'Test' }, async () => {
+      for (let k = 0; k < 3; k++) await u.engine.actionDiscardHandCard(0, 'Fireball', 0, { source: 'Test' });
+    }));
+    const folge = u.events.slice(von).filter(e => e.ev === 'play_pile_transfer' || e.ev === 'play_steam_hp').map(e => e.ev === 'play_steam_hp' ? 'HP' : 'Abwurf').join(',');
+    R.check('Klammer: abwechselnd Abwurf,HP,Abwurf,HP,Abwurf,HP', folge === 'Abwurf,HP,Abwurf,HP,Abwurf,HP', folge);
+    R.check('Klammer: genau 3 x +10 (kein Doppelzaehlen beim Ausleeren)', dd.counters.maxHp === 80, dd.counters.maxHp);
+  }
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })().catch(e => { console.error(e); process.exit(2); });
