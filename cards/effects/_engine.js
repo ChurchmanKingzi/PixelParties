@@ -3426,6 +3426,9 @@ class GameEngine {
       const hookFn = c.getHook(hookName);
       if (!hookFn) return false;
       if (!c.isActiveIn(c.zone)) return false;
+      // Abwurf-Klammer: Skripte mit `discardSofort` (Steam Dwarfs) antworten auf JEDE Karte sofort ('nur'),
+      // alle anderen gebuendelt nach der Klammer ('ohne') - siehe `_abwurfHookVormerken`.
+      if (hookCtx._sofortModus && (hookCtx._sofortModus === 'nur') !== !!loadCardEffect(c.name)?.discardSofort) return false;
       // Dead heroes and their abilities/supports don't fire hooks
       // Frozen/Stunned heroes' hero and ability effects are negated (but creature effects still work)
       // Negated heroes' hero + ability effects are silenced, but support/creature effects still work
@@ -15692,8 +15695,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (_umgeleitet && inst && inst.zone === ZONES.DISCARD && this.cardInstances.includes(inst)) this._untrackCard(inst.id);
     };
     if ((this.gs._batchDiscardDepth || 0) > 0) {
-      if (!this.gs._batchDiscardPendingHooks) this.gs._batchDiscardPendingHooks = [];
-      this.gs._batchDiscardPendingHooks.push({ hookName: HOOKS.ON_DISCARD, ctx: discardCtx });
+      await this._abwurfHookVormerken(HOOKS.ON_DISCARD, discardCtx);
       if (_umgeleitet) this.gs._batchDiscardPendingHooks.push({ fn: _waiseAbraeumen });
     } else {
       await this.runHooks(HOOKS.ON_DISCARD, discardCtx);
@@ -18331,6 +18333,21 @@ this._deathWatch = (this._deathWatchStack || []).length
     return this._abwurfVorgangsSeq;
   }
 
+  /**
+   * Innerhalb einer Abwurf-Klammer werden die `onDiscard`-Hooks bis zum Ende der Klammer aufgeschoben (alle Karten landen erst
+   * im Stapel, dann reagieren Glass of Marbles & Co.). Skripte mit `discardSofort` (Steam Dwarfs: +10 HP je Karte) sollen dagegen
+   * abwechselnd laufen - nach JEDEM einzelnen Abwurf sofort, dann erst die naechste Karte. Diese Stelle feuert sie sofort
+   * (`_sofortModus: 'nur'`) und merkt den Hook fuer alle uebrigen Zuhoerer vor (`'ohne'`, damit niemand doppelt reagiert).
+   */
+  async _abwurfHookVormerken(hookName, ctx) {
+    if (hookName === HOOKS.ON_DISCARD) {
+      await this.runHooks(hookName, { ...ctx, _sofortModus: 'nur' });
+      ctx = { ...ctx, _sofortModus: 'ohne' };
+    }
+    if (!this.gs._batchDiscardPendingHooks) this.gs._batchDiscardPendingHooks = [];
+    this.gs._batchDiscardPendingHooks.push({ hookName, ctx });
+  }
+
   async withDiscardBatch(playerIdx, opts, fn) {
     if (typeof opts === 'function') { fn = opts; opts = {}; }
     if (!opts) opts = {};
@@ -18716,35 +18733,31 @@ this._deathWatch = (this._deathWatchStack || []).length
           // die Instanz blieb aber beim Halter stehen.
           const _io = resolvedInst.originalOwner;
           if (_io != null && _io !== playerIdx && this.gs.players[_io]) resolvedInst.owner = _io;
-          if (!this.gs._batchDiscardPendingHooks) this.gs._batchDiscardPendingHooks = [];
-          this.gs._batchDiscardPendingHooks.push({
-            hookName,
-            ctx: {
-              playerIdx, card: resolvedInst,
-              cardName: resolvedCardName,
-              discardedCardName: resolvedCardName,
-              // Discarded card's instance id — same role as in
-              // `actionDiscardHandCard`'s hook. Listeners with
-              // `activeIn: ['hand', 'discard', 'deleted']` (Skull
-              // Necklace, etc.) need it to identify "I am the
-              // just-discarded inst" vs "I'm a sibling copy that was
-              // already sitting in the destination pile".
-              discardedInstId: resolvedInst.id,
-              // Forwards the calling effect's source tag (Mary
-              // Crestmas, Spreading Rumor, etc.) so listeners can key
-              // off who triggered the discard.
-              source: opts.source || null,
-              // v327: `selfInflicted` markiert einen Abwurf, den eine
-              // EIGENE Karte ihrem Besitzer als Kosten auferlegt (Monia,
-              // Inventing, …). Der Marker existierte schon, wurde aber
-              // nicht in den Hook gereicht — Zuhörer wie Skull Necklace
-              // mussten deshalb über `gs.activePlayer` raten und lagen
-              // im Gegnerzug systematisch falsch.
-              selfInflicted: !!opts.selfInflicted,
-              sourceOwner: this._deriveEffectOwner(opts, playerIdx),
-              _fromHand: true, _skipReactionCheck: true,
-              ...(this.gs._batchDiscardOp != null ? { discardOp: this.gs._batchDiscardOp } : {}),   // W16b (A03-futuretech-07)
-            },
+          await this._abwurfHookVormerken(hookName, {
+            playerIdx, card: resolvedInst,
+            cardName: resolvedCardName,
+            discardedCardName: resolvedCardName,
+            // Discarded card's instance id — same role as in
+            // `actionDiscardHandCard`'s hook. Listeners with
+            // `activeIn: ['hand', 'discard', 'deleted']` (Skull
+            // Necklace, etc.) need it to identify "I am the
+            // just-discarded inst" vs "I'm a sibling copy that was
+            // already sitting in the destination pile".
+            discardedInstId: resolvedInst.id,
+            // Forwards the calling effect's source tag (Mary
+            // Crestmas, Spreading Rumor, etc.) so listeners can key
+            // off who triggered the discard.
+            source: opts.source || null,
+            // v327: `selfInflicted` markiert einen Abwurf, den eine
+            // EIGENE Karte ihrem Besitzer als Kosten auferlegt (Monia,
+            // Inventing, …). Der Marker existierte schon, wurde aber
+            // nicht in den Hook gereicht — Zuhörer wie Skull Necklace
+            // mussten deshalb über `gs.activePlayer` raten und lagen
+            // im Gegnerzug systematisch falsch.
+            selfInflicted: !!opts.selfInflicted,
+            sourceOwner: this._deriveEffectOwner(opts, playerIdx),
+            _fromHand: true, _skipReactionCheck: true,
+            ...(this.gs._batchDiscardOp != null ? { discardOp: this.gs._batchDiscardOp } : {}),   // W16b (A03-futuretech-07)
           });
         }
         this.sync();
