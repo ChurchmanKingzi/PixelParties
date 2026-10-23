@@ -58,6 +58,12 @@ if len(kern) > KERN_MAX: kern = kern[:KERN_MAX]
 KERN = [tuple(k) for k, w in kern]
 for c in [(0, 0, 0), (255, 255, 255)]:
     if c not in KERN and not any(np.linalg.norm(rgb2lab(c) - rgb2lab(k)) < 3 for k in KERN): KERN.append(c)
+# Vom Spielgestalter festgelegte Farben (data/palette-fest.json): kommen GENAU SO in die Palette (Zentralfarben), nie gerastet — z. B. die Farben der Gold-Muenze.
+fest_pfad = os.path.join(WURZEL, 'data/palette-fest.json')
+if os.path.exists(fest_pfad):
+    for eintrag in json.load(open(fest_pfad, encoding='utf-8'))['farben']:
+        c = tuple(hex2rgb(eintrag['hex']))
+        if c not in KERN: KERN.append(c)
 print('Zentralfarben:', len(KERN))
 
 # ── 2. Oberflaechenfarben (Gewichte) ────────────────────────────────────────────────────────────

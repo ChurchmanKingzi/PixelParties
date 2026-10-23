@@ -3724,7 +3724,7 @@ function ShadowSummonEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 2 + Math.random() * 4,
-      color: ['#7e41ba','#58238c','#663597','#1a0a3a','#7e41ba'][Math.floor(Math.random() * 5)],
+      color: ['#7e41ba','#58238c','#58238c','#1a0a3a','#7e41ba'][Math.floor(Math.random() * 5)],
       delay: 300 + Math.random() * 200,
       dur: 300 + Math.random() * 300,
     };
@@ -4808,7 +4808,7 @@ const ANIM_REGISTRY = {
         return {
           dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed - 20,
           size: 4 + Math.random() * 8,
-          color: ['#751ff9','#6618b4','#9544d5','#50008c','#663597','#a952ff','#1a0a3a'][Math.floor(Math.random() * 7)],
+          color: ['#751ff9','#6618b4','#9544d5','#50008c','#58238c','#a952ff','#1a0a3a'][Math.floor(Math.random() * 7)],
           delay: Math.random() * 400,
           dur: 400 + Math.random() * 400,
         };
@@ -8087,7 +8087,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
             {/* ── Generic Player Debuff Warnings ── */}
             {(() => {
               const debuffs = [];
-              if (me.summonLocked) debuffs.push({ key: 'summon-me', text: 'You cannot summon any more Creatures this turn!', color: '#e63e33' });
+              if (me.summonLocked) debuffs.push({ key: 'summon-me', text: 'You cannot summon any more Creatures this turn!', color: '#e92f38' });
               if (opp.summonLocked) debuffs.push({ key: 'summon-opp', text: `${opp.username} cannot summon any more Creatures this turn!`, color: '#c68206' });
               if (me.damageLocked) debuffs.push({ key: 'damage-me', icon: '🔥', text: 'You cannot deal any more damage to your opponent this turn!', color: '#f03232' });
               if (opp.damageLocked) debuffs.push({ key: 'damage-opp', icon: '🛡️', text: `${opp.username} cannot deal damage to your targets this turn!`, color: '#e37435' });

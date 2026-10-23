@@ -1,6 +1,6 @@
 {
  "beschreibung": "Reduzierte Retro-Oberflaechenpalette (Teilmenge von palette.json) \u2014 erzeugt von scripts/retro/build_palette.py",
- "groesse": 49,
+ "groesse": 54,
  "familien": {
   "tinte": [
    "#000000",
@@ -51,7 +51,7 @@
   ],
   "orange": [
    "#7d3911",
-   "#aa5300",
+   "#bd440f",
    "#ff8b1a"
   ],
   "gold": [
@@ -60,6 +60,13 @@
    "#f9ac20",
    "#ffd61a",
    "#fff196"
+  ],
+  "muenze": [
+   "#b62600",
+   "#ee6428",
+   "#f29a3e",
+   "#fad54a",
+   "#f7f7ad"
   ],
   "gruen": [
    "#1a4128",
@@ -109,13 +116,18 @@
   "#fe5154",
   "#f9b3b3",
   "#7d3911",
-  "#aa5300",
+  "#bd440f",
   "#ff8b1a",
   "#72541d",
   "#a87c00",
   "#f9ac20",
   "#ffd61a",
   "#fff196",
+  "#b62600",
+  "#ee6428",
+  "#f29a3e",
+  "#fad54a",
+  "#f7f7ad",
   "#1a4128",
   "#167927",
   "#4ceb70",

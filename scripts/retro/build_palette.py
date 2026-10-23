@@ -15,6 +15,7 @@ FAMILIEN = {
   'rot':     ['#4a0010', '#8a0a1c', '#e0202c', '#ff5c5c', '#ffb0a8'],
   'orange':  ['#6a3410', '#c0561a', '#ff8b1a'],
   'gold':    ['#5a4000', '#a87000', '#f9ac20', '#ffd61a', '#fff0a0'],
+  'muenze':  ['#b62600', '#ee6428', '#f29a3e', '#fad54a', '#f7f7ad'],      # die exakten Gold-Farben (data/palette-fest.json)
   'gruen':   ['#0f3a1a', '#1f7a3a', '#4ceb70', '#b1ff1a'],
   'braun':   ['#3a2210', '#7a4a20', '#b8885a', '#e0c498'],
 }
