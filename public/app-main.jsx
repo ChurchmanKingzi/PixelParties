@@ -264,12 +264,12 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
           Pack {draft.round + 1}/{draft.totalRounds} · Pick {cubeDraftOverallPick(draft)}/{draft.totalPicks}
         </span>
         {draft.timerDisabled ? (
-          <span className="badge" style={{ background: 'rgba(26,237,255,.08)', color: 'var(--text2)', fontSize: 12, padding: '5px 14px', fontWeight: 600 }}>
+          <span className="badge" style={{ background: 'rgba(102,182,255,.08)', color: 'var(--text2)', fontSize: 12, padding: '5px 14px', fontWeight: 600 }}>
             ⏱ Untimed
           </span>
         ) : (
           <span className="badge" style={{
-            background: timerWarn ? 'rgba(254,81,84,.18)' : 'rgba(26,237,255,.10)',
+            background: timerWarn ? 'rgba(254,81,84,.18)' : 'rgba(102,182,255,.10)',
             color: timerWarn ? '#ff6666' : 'var(--accent)',
             fontSize: 13, padding: '5px 14px', fontWeight: 700,
             animation: timerWarn ? 'pulse 1s infinite' : undefined,
@@ -334,7 +334,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
             <React.Fragment key={r.seatIdx}>
               <div style={{
                 padding: '8px 10px',
-                background: r.isMe ? 'rgba(26,237,255,.10)' : 'transparent',
+                background: r.isMe ? 'rgba(102,182,255,.10)' : 'transparent',
                 borderLeft: r.isMe ? '3px solid var(--accent)' : '3px solid transparent',
                 marginBottom: 2,
                 display: 'flex', alignItems: 'center', gap: 6,
@@ -801,7 +801,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
         </div>
       )}
       {buildTimerMsLeft == null && build.buildTimerTotalMs === 0 && (
-        <div style={{ background: 'rgba(26,237,255,.06)', borderBottom: '1px solid var(--bg4)', padding: '4px 16px', fontSize: 11, textAlign: 'center', color: 'var(--text2)' }}>
+        <div style={{ background: 'rgba(102,182,255,.06)', borderBottom: '1px solid var(--bg4)', padding: '4px 16px', fontSize: 11, textAlign: 'center', color: 'var(--text2)' }}>
           ⏱ Deck building timer is off — the tournament starts once everyone is ready.
         </div>
       )}
@@ -811,7 +811,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
         const warn = buildTimerMsLeft <= 60_000;
         return (
           <div style={{
-            background: warn ? 'rgba(254,81,84,.16)' : 'rgba(26,237,255,.10)',
+            background: warn ? 'rgba(254,81,84,.16)' : 'rgba(102,182,255,.10)',
             borderBottom: '1px solid ' + (warn ? '#ff6666' : 'var(--accent)'),
             padding: '6px 16px', fontSize: 12, textAlign: 'center',
             color: warn ? '#ec7f79' : 'var(--accent)',
@@ -1013,7 +1013,7 @@ function CubeDraftTournamentScreen({ lobby, tournament, gameState, leaveRoom, no
           Bo{tournament.currentRoundIdx === Math.log2(tournament.bracketSize) - 1 ? tournament.finaleBo : tournament.prelimsBo}
         </span>
         <div style={{ flex: 1 }} />
-        <span className="badge" style={{ background: tournament.flow === 'simultaneous' ? 'rgba(26,237,255,.10)' : 'rgba(249,172,32,.10)', color: tournament.flow === 'simultaneous' ? 'var(--accent)' : '#f9ac20' }}>
+        <span className="badge" style={{ background: tournament.flow === 'simultaneous' ? 'rgba(102,182,255,.10)' : 'rgba(249,172,32,.10)', color: tournament.flow === 'simultaneous' ? 'var(--accent)' : '#f9ac20' }}>
           {tournament.flow === 'simultaneous' ? 'SIMULTANEOUS' : 'CONSECUTIVE'}
         </span>
         <VolumeControl />
@@ -1104,7 +1104,7 @@ function CubeDraftMatchCard({ match, mySeat, currentRound }) {
   const slot = (label, seat, name, isWinner) => (
     <div style={{
       padding: '6px 10px',
-      background: isWinner ? 'rgba(76,235,112,.10)' : (seat === mySeat ? 'rgba(26,237,255,.08)' : 'transparent'),
+      background: isWinner ? 'rgba(76,235,112,.10)' : (seat === mySeat ? 'rgba(102,182,255,.08)' : 'transparent'),
       borderLeft: '3px solid ' + (isWinner ? 'var(--success)' : (seat === mySeat ? 'var(--accent)' : 'var(--bg4)')),
       fontSize: 12,
       color: isWinner ? 'var(--success)' : (seat === mySeat ? 'var(--accent)' : 'var(--text)'),
@@ -1662,7 +1662,7 @@ function PlayScreen() {
           <span className="badge" style={{ background: 'rgba(179,216,249,.14)', color: '#b3d8f9' }}>
             {lobby.cubeDraft.cubeName}
           </span>
-          <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(249,172,32,.12)' : 'rgba(26,237,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
+          <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(249,172,32,.12)' : 'rgba(102,182,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
             {lobby.type.toUpperCase()}
           </span>
           <VolumeControl />
@@ -1692,7 +1692,7 @@ function PlayScreen() {
                     borderStyle: occupied ? 'solid' : 'dashed',
                     borderRadius: 8,
                     padding: '12px 8px',
-                    background: occupied ? 'rgba(26,237,255,.04)' : 'transparent',
+                    background: occupied ? 'rgba(102,182,255,.04)' : 'transparent',
                     textAlign: 'center',
                     opacity: occupied ? 1 : .5,
                     cursor: promotable ? 'pointer' : 'default',
@@ -1796,7 +1796,7 @@ function PlayScreen() {
             {isHost ? 'CLOSE ROOM' : 'LEAVE'}
           </button>
           <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>GAME LOBBY</h2>
-          <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(249,172,32,.12)' : 'rgba(26,237,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
+          <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(249,172,32,.12)' : 'rgba(102,182,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
             {lobby.type.toUpperCase()}
           </span>
           <VolumeControl />
@@ -1947,7 +1947,7 @@ function PlayScreen() {
                       {isDraft && <span className="badge" style={{ background: 'rgba(179,216,249,.14)', color: '#b3d8f9', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(179,216,249,.3)', letterSpacing: 1 }}>CUBE DRAFT</span>}
                       {r.skillTest && <span className="badge" style={{ background: 'rgba(255,208,102,.14)', color: '#ffd066', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(255,208,102,.3)', letterSpacing: 1 }}>🎯 SKILL TEST</span>}
                       {!isDraft && !r.skillTest && r.format > 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.1)', color: '#fff', fontSize: 12, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(255,255,255,.2)', letterSpacing: 1 }}>Bo{r.format}</span>}
-                      <span className="badge" style={{ background: r.type === 'ranked' ? 'rgba(249,172,32,.18)' : 'rgba(26,237,255,.15)', color: r.type === 'ranked' ? '#ffb91a' : '#1aedff', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: r.type === 'ranked' ? '1px solid rgba(249,172,32,.35)' : '1px solid rgba(26,237,255,.3)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                      <span className="badge" style={{ background: r.type === 'ranked' ? 'rgba(249,172,32,.18)' : 'rgba(102,182,255,.15)', color: r.type === 'ranked' ? '#ffb91a' : '#1aedff', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: r.type === 'ranked' ? '1px solid rgba(249,172,32,.35)' : '1px solid rgba(102,182,255,.3)', textTransform: 'uppercase', letterSpacing: 1 }}>
                         {r.type}
                       </span>
                       {!isDraft && !r.skillTest && r.format <= 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.06)', color: 'var(--text2)', fontSize: 11, padding: '3px 10px' }}>Bo1</span>}
@@ -2014,7 +2014,7 @@ function PlayScreen() {
                 tier === 'gold'   ? '#fad54a' :
                 tier === 'silver' ? '#d2d2db' :
                 tier === 'bronze' ? '#be680e' :
-                p.color || '#1aedff';
+                p.color || '#66b6ff';
               const crown = tier === 'gold' ? '👑' : tier === 'silver' ? '🥈' : tier === 'bronze' ? '🥉' : null;
               return (
                 // v1289: Klick/Enter oeffnet das Spielerprofil (app-player-profile.jsx).
@@ -3194,7 +3194,7 @@ function App() {
   // Expose the player's chosen colour as a global CSS variable so every
   // screen/submenu (titles, etc.) can theme off it via var(--player-color).
   useEffect(() => {
-    const col = (user && user.color) || '#1aedff';
+    const col = (user && user.color) || '#66b6ff';
     document.documentElement.style.setProperty('--player-color', col);
     // Recolour the hover/clickable cursor to a shining tone of this colour.
     applyPixelHoverCursor(col);
@@ -3277,7 +3277,7 @@ function App() {
 
   // Sync accent color to user's profile color
   useEffect(() => {
-    document.documentElement.style.setProperty('--accent', user && user.color ? user.color : '#1aedff');
+    document.documentElement.style.setProperty('--accent', user && user.color ? user.color : '#66b6ff');
   }, [user?.color]);
 
   // ── App-wide tooltip wheel-scroll redirect ──

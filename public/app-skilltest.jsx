@@ -56,8 +56,8 @@ function SkillTestLobby({ lobby, user, leaveRoom, playerJoined, setPlayerJoined 
       <div className="top-bar">
         <button className="btn btn-danger" onClick={leaveRoom}>{isHost ? 'CLOSE ROOM' : 'LEAVE'}</button>
         <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🎯 SKILL TEST LOBBY</h2>
-        <span className="badge" style={{ background: 'rgba(26,237,255,.12)', color: 'var(--accent)' }}>2–8 PLAYERS</span>
-        <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(249,172,32,.12)' : 'rgba(26,237,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
+        <span className="badge" style={{ background: 'rgba(102,182,255,.12)', color: 'var(--accent)' }}>2–8 PLAYERS</span>
+        <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(249,172,32,.12)' : 'rgba(102,182,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
           {(lobby.type || 'unranked').toUpperCase()}
         </span>
         <a className="btn" href="/skilltest-learning.html" target="_blank" rel="noopener" style={{ textDecoration: 'none', fontSize: 12 }}

@@ -176,7 +176,7 @@
       const a = flach[i], b = flach[i + 1];
       if (b.p - a.p < 1e-6) continue;     // harter Stopp: das Band endet, das nächste beginnt
       const d = farbDist(a.f, b.f);
-      const n = Math.max(1, Math.min(6, Math.round(d / 14)));
+      const n = Math.max(1, Math.min(10, Math.round(d / 9)));
       if (n === 1) { add(interp(a.f, b.f, 0.5), a.p, b.p); continue; }
       for (let k = 0; k < n; k++) {
         const t = (k + 0.5) / n;            // Bandmitte
@@ -245,7 +245,7 @@
       if (!p) { eintraege.push({ str: recolor(item.trim()) }); continue; }
       const a = p.f.a;
       if (p.blur === 0) {      // schon hart: nur deckend färben
-        eintraege.push({ str: `${p.inset ? 'inset ' : ''}${px(p.x)} ${px(p.y)} 0 ${px(p.spread)} ${schattenFarbe(p.f)}` });
+        eintraege.push({ str: `${p.inset ? 'inset ' : ''}${px(p.x)} ${px(p.y)} 0 ${px(p.x === 0 && p.y === 0 && p.spread === 1 ? 2 : p.spread)} ${schattenFarbe(p.f)}` });
         continue;
       }
       if (a < 0.2) continue;                                            // zarter Dunst: fällt weg
@@ -350,6 +350,7 @@
     if (p === 'box-shadow' || (p.startsWith('--') && /schatten|shadow|glow|schein/.test(p))) return { wert: boxSchatten(v), extra };
     if (p === 'text-shadow') return { wert: textSchatten(v), extra };
     if (p === 'filter' || p === '-webkit-filter') return { wert: filterWert(v), extra };
+    if (/^(border(-(top|right|bottom|left))?(-width)?|outline(-width)?)$/.test(p)) v = v.replace(/(^|\s)1px(?=\s|$)/g, '$12px');      // keine Haarlinien: Rahmen sind mindestens 2 px (Pixelraster)
     if (p === 'transition' || p === 'animation') return { wert: bewegung(p, v), extra };
     if (p === 'transition-timing-function' || p === 'animation-timing-function') return { wert: bewegungTiming(v), extra };
     if (p === 'background' || p === 'background-image') {

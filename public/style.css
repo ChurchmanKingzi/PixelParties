@@ -29,7 +29,7 @@
   --bg2: #12101f;
   --bg3: #1a1a2e;
   --bg4: #291f3d;
-  --accent: #1aedff;
+  --accent: #66b6ff;
   --accent2: #fb1ea9;
   --accent3: #b1ff1a;
   --accent4: #f9ac20;
@@ -212,8 +212,8 @@ body {
 /* ===== ANIMATIONS ===== */
 @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.6; } }
 @keyframes glow {
-  0%,100% { box-shadow: 0 0 5px var(--accent), 0 0 10px rgba(26,237,255,.25); }
-  50% { box-shadow: 0 0 15px var(--accent), 0 0 30px rgba(26,237,255,.4); }
+  0%,100% { box-shadow: 0 0 5px var(--accent), 0 0 10px rgba(102,182,255,.25); }
+  50% { box-shadow: 0 0 15px var(--accent), 0 0 30px rgba(102,182,255,.4); }
 }
 @keyframes slideIn { from { transform: translateY(20px); opacity:0; } to { transform: translateY(0); opacity:1; } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -236,7 +236,7 @@ body {
   font-weight: 600;
   padding: 10px 20px;
   border: 2px solid var(--accent);
-  background: rgba(26,237,255,.08);
+  background: rgba(102,182,255,.08);
   color: var(--accent);
   cursor: pointer;
   text-transform: uppercase;
@@ -244,7 +244,7 @@ body {
   transition: all .2s;
   font-size: 13px;
 }
-.btn:hover { background: rgba(26,237,255,.18); box-shadow: 0 0 15px rgba(26,237,255,.25); }
+.btn:hover { background: rgba(102,182,255,.18); box-shadow: 0 0 15px rgba(102,182,255,.25); }
 .btn:active { transform: scale(.97) translateY(1px); }
 .btn:disabled { opacity: .3; cursor: not-allowed; }
 
@@ -369,7 +369,7 @@ body {
   outline: none;
   width: 100%;
 }
-.input:focus { border-color: var(--accent); box-shadow: 0 0 5px rgba(26,237,255,.2); }
+.input:focus { border-color: var(--accent); box-shadow: 0 0 5px rgba(102,182,255,.2); }
 
 .select {
   background: var(--bg);
@@ -444,7 +444,7 @@ select optgroup {
   background: var(--bg);
   flex-shrink: 0;
 }
-.card-slot:hover { border-color: var(--accent); background: rgba(26,237,255,.04); }
+.card-slot:hover { border-color: var(--accent); background: rgba(102,182,255,.04); }
 
 .card-mini {
   width: var(--card-w);
@@ -723,7 +723,7 @@ select optgroup {
   background: linear-gradient(135deg,
     rgba(255,155,58,.1) 0%, rgba(251,30,169,.09) 15%,
     rgba(109,155,248,.12) 30%, rgba(177,255,26,.09) 45%,
-    rgba(251,30,169,.1) 60%, rgba(26,237,255,.09) 75%,
+    rgba(251,30,169,.1) 60%, rgba(102,182,255,.09) 75%,
     rgba(255,198,28,.1) 90%);
 }
 .foil-iridescent-diamond::before {
@@ -1535,7 +1535,7 @@ select optgroup {
    Stylesheet-Regel (`.board-zone:hover` & Co.) uebertrumpft hat.
    Ohne `data-pz-glow`: cyanfarbener Schein (Brettzonen, Stapel). */
 [data-pz-ziel-an]:not([data-pz-glow="hand"]) {
-  box-shadow: 0 0 14px rgba(26,237,255,.5) !important;
+  box-shadow: 0 0 14px rgba(102,182,255,.5) !important;
 }
 [data-pz-zone][data-pz-ziel-an] { z-index: 5 !important; }
 [data-pz-ziel-an][data-pz-glow="blau"]       { box-shadow: 0 0 14px rgba(119,200,238,.7) !important; }
@@ -1846,7 +1846,7 @@ select optgroup {
   outline: none;
   width: 100%;
 }
-.db-filter-input:focus { border-color: var(--accent); box-shadow: 0 0 5px rgba(26,237,255,.2); }
+.db-filter-input:focus { border-color: var(--accent); box-shadow: 0 0 5px rgba(102,182,255,.2); }
 .db-filter-select {
   background: var(--bg);
   border: 1px solid var(--bg4);
@@ -1885,7 +1885,7 @@ select optgroup {
   align-items: center;
   gap: 8px;
 }
-.ctx-menu-item:hover { background: rgba(26,237,255,.12); }
+.ctx-menu-item:hover { background: rgba(102,182,255,.12); }
 .ctx-menu-item.disabled { opacity: .3; cursor: not-allowed; }
 .ctx-menu-item.disabled:hover { background: none; }
 
@@ -2487,7 +2487,7 @@ select optgroup {
 }
 .pp-logo-img {
   display: block;
-  filter: drop-shadow(0 6px 0 rgba(0,0,0,.45)) drop-shadow(0 0 18px color-mix(in srgb, var(--player-color, #1aedff) 45%, transparent));
+  filter: drop-shadow(0 6px 0 rgba(0,0,0,.45)) drop-shadow(0 0 18px color-mix(in srgb, var(--player-color, #66b6ff) 45%, transparent));
   /* 2 Bildschirmpixel je Rasterpixel (61 Rasterzeilen) — ganzzahlig,
      damit die Bloecke gleich breit bleiben. */
   height: 122px;
@@ -2506,7 +2506,7 @@ select optgroup {
   inset: 0;
   pointer-events: none;
   mix-blend-mode: multiply;
-  background: var(--player-color, #1aedff);
+  background: var(--player-color, #66b6ff);
   -webkit-mask: url(/data/logo-tint-mask.png) center / 100% 100% no-repeat;
   mask: url(/data/logo-tint-mask.png) center / 100% 100% no-repeat;
 }
@@ -2516,7 +2516,7 @@ select optgroup {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: color-mix(in srgb, var(--player-color, #1aedff) 45%, #ffffff);
+  background: color-mix(in srgb, var(--player-color, #66b6ff) 45%, #ffffff);
   -webkit-mask: url(/data/logo-licht-mask.png) center / 100% 100% no-repeat;
   mask: url(/data/logo-licht-mask.png) center / 100% 100% no-repeat;
 }
@@ -2557,10 +2557,10 @@ select optgroup {
   position: absolute;
   width: var(--p-size, 4px);
   height: var(--p-size, 4px);
-  background: var(--p-color, var(--player-color, #1aedff));
+  background: var(--p-color, var(--player-color, #66b6ff));
   box-shadow:
-    0 0 8px var(--p-color, var(--player-color, #1aedff)),
-    0 0 16px var(--p-color, var(--player-color, #1aedff));
+    0 0 8px var(--p-color, var(--player-color, #66b6ff)),
+    0 0 16px var(--p-color, var(--player-color, #66b6ff));
   image-rendering: pixelated;
   opacity: 0;
   transform: translate(0, 0) scale(.6);
@@ -2610,10 +2610,10 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   position: absolute;
   width: var(--p-size, 4px);
   height: var(--p-size, 4px);
-  background: var(--p-color, var(--player-color, #1aedff));
+  background: var(--p-color, var(--player-color, #66b6ff));
   box-shadow:
-    0 0 8px var(--p-color, var(--player-color, #1aedff)),
-    0 0 16px var(--p-color, var(--player-color, #1aedff));
+    0 0 8px var(--p-color, var(--player-color, #66b6ff)),
+    0 0 16px var(--p-color, var(--player-color, #66b6ff));
   image-rendering: pixelated;
   opacity: 0;
   transform: translate(0, 0) scale(.6);
@@ -2650,7 +2650,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 .deck-list-item:hover { background: rgba(255,255,255,.03); }
 .deck-list-item.active {
   border-left-color: var(--accent);
-  background: rgba(26,237,255,.06);
+  background: rgba(102,182,255,.06);
 }
 .deck-list-item.deck-list-sample {
   opacity: .45;
@@ -2660,7 +2660,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 .deck-list-item.deck-list-sample.active {
   opacity: .8;
   border-left-color: var(--accent3);
-  background: rgba(26,237,255,.04);
+  background: rgba(102,182,255,.04);
 }
 
 /* ===== ROOM CARD ===== */
@@ -2787,8 +2787,8 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 
 /* ===== PROFILE CARD ===== */
 @keyframes profileGlow {
-  0%, 100% { box-shadow: 0 0 30px var(--rank-glow, rgba(26,237,255,.2)), 0 2px 40px rgba(0,0,0,.6); }
-  50% { box-shadow: 0 0 50px var(--rank-glow, rgba(26,237,255,.3)), 0 2px 40px rgba(0,0,0,.6); }
+  0%, 100% { box-shadow: 0 0 30px var(--rank-glow, rgba(102,182,255,.2)), 0 2px 40px rgba(0,0,0,.6); }
+  50% { box-shadow: 0 0 50px var(--rank-glow, rgba(102,182,255,.3)), 0 2px 40px rgba(0,0,0,.6); }
 }
 @keyframes avatarPulse {
   0%, 100% { box-shadow: 0 0 20px var(--rank-glow), 0 0 40px var(--rank-glow), inset 0 0 15px var(--rank-glow); }
@@ -2983,7 +2983,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   resize: none;
   line-height: 1.4;
 }
-.profile-bio-input:focus { border-color: var(--accent); box-shadow: 0 0 5px rgba(26,237,255,.2); }
+.profile-bio-input:focus { border-color: var(--accent); box-shadow: 0 0 5px rgba(102,182,255,.2); }
 .profile-bio-input::placeholder { color: var(--text2); font-style: italic; }
 
 .profile-elo-bar {
@@ -3048,7 +3048,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 }
 .profile-cardback-clickable:hover {
   border-color: var(--accent);
-  box-shadow: 0 0 16px rgba(26,237,255,.2);
+  box-shadow: 0 0 16px rgba(102,182,255,.2);
 }
 .profile-cardback-hover-overlay {
   position: absolute;
@@ -3086,12 +3086,12 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 }
 .profile-cb-gallery-item:hover {
   border-color: var(--accent);
-  background: rgba(26,237,255,.04);
+  background: rgba(102,182,255,.04);
 }
 .profile-cb-gallery-item.active {
   border-color: var(--accent);
-  background: rgba(26,237,255,.08);
-  box-shadow: 0 0 12px rgba(26,237,255,.2);
+  background: rgba(102,182,255,.08);
+  box-shadow: 0 0 12px rgba(102,182,255,.2);
 }
 .profile-cb-gallery-card {
   width: 90px;
@@ -3193,7 +3193,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 }
 .profile-deck-tile:hover .profile-deck-tile-card {
   border-color: var(--accent);
-  box-shadow: 0 4px 16px rgba(0,0,0,.5), 0 0 10px rgba(26,237,255,.15);
+  box-shadow: 0 4px 16px rgba(0,0,0,.5), 0 0 10px rgba(102,182,255,.15);
 }
 .profile-deck-tile-star {
   position: absolute;
@@ -3436,7 +3436,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   flex-shrink: 0;
   border: 2px dashed var(--accent);
   border-radius: 4px;
-  background: rgba(26,237,255,.06);
+  background: rgba(102,182,255,.06);
 }
 /* Card draw animation — floating card slides diagonally from deck to hand */
 .draw-anim-card {
@@ -3652,7 +3652,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 .game-hand-avatar-tutorial {
   object-fit: contain !important;
   image-rendering: pixelated;
-  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--pf, #1aedff) 35%, #170b28) 0%, #08060c 72%);
+  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--pf, #66b6ff) 35%, #170b28) 0%, #08060c 72%);
 }
 .game-hand-avatar-big {
   /* ★ v1234: feste 88 px statt `--hand-min-h * 0.86`. Das war bis
@@ -5956,7 +5956,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   z-index: 10080;
   background: var(--bg2);
   border: 2px solid var(--accent);
-  box-shadow: 0 8px 40px rgba(0,0,0,.7), 0 0 20px rgba(26,237,255,.15);
+  box-shadow: 0 8px 40px rgba(0,0,0,.7), 0 0 20px rgba(102,182,255,.15);
   padding: 12px 24px;
   text-align: center;
   /* Als Kosmetik-Ruling: ohne Breitenbegrenzung wächst dieses fixed
@@ -6578,7 +6578,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   pointer-events: none;
   background:
     radial-gradient(120% 150% at 50% 100%,
-      color-mix(in srgb, var(--amb-me, #1aedff) 42%, transparent) 0%, transparent 68%);
+      color-mix(in srgb, var(--amb-me, #66b6ff) 42%, transparent) 0%, transparent 68%);
   mix-blend-mode: screen;
   opacity: .55;
   animation: hand-bloom-pulse 6s ease-in-out infinite;
@@ -6600,8 +6600,8 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   position: absolute;
   width: var(--p-size, 3px);
   height: var(--p-size, 3px);
-  background: var(--p-color, var(--amb-me, #1aedff));
-  box-shadow: 0 0 6px var(--p-color, var(--amb-me, #1aedff));
+  background: var(--p-color, var(--amb-me, #66b6ff));
+  box-shadow: 0 0 6px var(--p-color, var(--amb-me, #66b6ff));
   image-rendering: pixelated;
   opacity: 0;
   transform: translate(0, 0) scale(.6);
@@ -6836,13 +6836,13 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   position: relative;
   z-index: 1;
   color: #fff;
-  background: rgba(26,237,255,.18);
+  background: rgba(102,182,255,.18);
   border: 1px solid rgb(26,237,255);
   animation: phase-hinweis-puls 1.4s ease-in-out infinite;
 }
 @keyframes phase-hinweis-puls {
-  0%, 100% { transform: scale(1); box-shadow: 0 0 10px rgba(26,237,255,.6), 0 0 20px rgba(26,237,255,.25); }
-  50%      { transform: scale(1.08); box-shadow: 0 0 18px rgba(26,237,255,.85), 0 0 32px rgba(26,237,255,.4); }
+  0%, 100% { transform: scale(1); box-shadow: 0 0 10px rgba(102,182,255,.6), 0 0 20px rgba(102,182,255,.25); }
+  50%      { transform: scale(1.08); box-shadow: 0 0 18px rgba(102,182,255,.85), 0 0 32px rgba(102,182,255,.4); }
 }
 .board-phase-item.clickable:hover {
   color: #fff;
@@ -8183,7 +8183,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   letter-spacing: 2px;
   text-indent: 2px;      /* gleicht den Buchstabenabstand hinter dem letzten Zeichen aus: sonst sitzt der Titel optisch zu weit links */
   text-transform: uppercase;
-  text-shadow: 0 0 8px rgba(26,237,255,.4);
+  text-shadow: 0 0 8px rgba(102,182,255,.4);
 }
 .reaction-chain-cards {
   display: flex;
@@ -13327,8 +13327,8 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   pointer-events: none;
 }
 @keyframes shop-unowned-glow {
-  0%, 100% { box-shadow: 0 0 6px rgba(26,237,255,.25), 0 0 14px rgba(169,82,255,.12); }
-  50%      { box-shadow: 0 0 18px rgba(26,237,255,.6), 0 0 32px rgba(251,30,169,.38); }
+  0%, 100% { box-shadow: 0 0 6px rgba(102,182,255,.25), 0 0 14px rgba(169,82,255,.12); }
+  50%      { box-shadow: 0 0 18px rgba(102,182,255,.6), 0 0 32px rgba(251,30,169,.38); }
 }
 /* Hover: shimmer the gradient border + quicken the glow pulse. */
 .shop-item:not(.shop-owned):not(.structure-deck-default):not(.shop-selected):hover {
@@ -14111,8 +14111,8 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 
 /* ===== TURN INDICATOR ON AVATARS ===== */
 .avatar-active {
-  box-shadow: 0 0 10px rgba(26,237,255,.6), 0 0 20px rgba(26,237,255,.3), 0 0 4px rgba(26,237,255,.8) inset;
-  border: 2px solid rgba(26,237,255,.7) !important;
+  box-shadow: 0 0 10px rgba(102,182,255,.6), 0 0 20px rgba(102,182,255,.3), 0 0 4px rgba(102,182,255,.8) inset;
+  border: 2px solid rgba(102,182,255,.7) !important;
   animation: avatar-pulse 1.5s ease-in-out infinite;
 }
 .avatar-inactive {
@@ -14120,8 +14120,8 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   border: 2px solid transparent !important;
 }
 @keyframes avatar-pulse {
-  0%, 100% { box-shadow: 0 0 10px rgba(26,237,255,.6), 0 0 20px rgba(26,237,255,.3); }
-  50% { box-shadow: 0 0 14px rgba(26,237,255,.8), 0 0 28px rgba(26,237,255,.4); }
+  0%, 100% { box-shadow: 0 0 10px rgba(102,182,255,.6), 0 0 20px rgba(102,182,255,.3); }
+  50% { box-shadow: 0 0 14px rgba(102,182,255,.8), 0 0 28px rgba(102,182,255,.4); }
 }
 
 /* ===== CARD PING FLASH ===== */
@@ -14196,7 +14196,7 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 .rules-nav-item.active {
   color: var(--accent);
   border-left-color: var(--accent);
-  background: rgba(26,237,255,.05);
+  background: rgba(102,182,255,.05);
 }
 
 /* ── Content ── */
@@ -14216,7 +14216,7 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   margin-bottom: 18px;
   padding-bottom: 10px;
   border-bottom: 2px solid var(--bg4);
-  text-shadow: 0 0 20px rgba(26,237,255,.25);
+  text-shadow: 0 0 20px rgba(102,182,255,.25);
 }
 
 .rules-sub-title {
@@ -14357,7 +14357,7 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   height: 52px;
   object-fit: contain;
   image-rendering: pixelated;
-  filter: drop-shadow(0 0 6px rgba(26,237,255,.3));
+  filter: drop-shadow(0 0 6px rgba(102,182,255,.3));
 }
 .rules-icon-label {
   font-size: 11px;
@@ -14446,7 +14446,7 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   line-height: 1.6;
 }
 .rules-restriction-item.rules-phase-action {
-  background: rgba(26,237,255,.04);
+  background: rgba(102,182,255,.04);
   border-left-color: var(--accent);
 }
 
@@ -15143,7 +15143,7 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   flex-shrink: 0;
   border: 2px dashed var(--accent);
   border-radius: 4px;
-  background: rgba(26,237,255,.06);
+  background: rgba(102,182,255,.06);
 }
 
 .pz-hand-creation {
@@ -15339,7 +15339,7 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 /* ── Puzzle Creator: mobile tap-to-select highlight ── */
 .pz-hand-card-selected > .pz-hand-card-inner {
   border-color: var(--accent) !important;
-  box-shadow: 0 0 12px rgba(26,237,255,.7), inset 0 0 8px rgba(26,237,255,.2);
+  box-shadow: 0 0 12px rgba(102,182,255,.7), inset 0 0 8px rgba(102,182,255,.2);
 }
 
 /* ── Puzzle Creator: remove popup ── */
@@ -15384,7 +15384,7 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   pointer-events: none;
   border: 2px solid var(--accent);
   border-radius: 4px;
-  box-shadow: 0 0 20px rgba(26,237,255,.5);
+  box-shadow: 0 0 20px rgba(102,182,255,.5);
   background: var(--bg3);
   overflow: hidden;
   opacity: .85;
@@ -15909,7 +15909,7 @@ body:has(.textbox-overlay) .tooltip {
 .textbox-highlight {
   z-index: 90001;
   border-radius: 6px;
-  box-shadow: 0 0 16px rgba(26,237,255,.6), 0 0 30px rgba(26,237,255,.25);
+  box-shadow: 0 0 16px rgba(102,182,255,.6), 0 0 30px rgba(102,182,255,.25);
   animation: textbox-hl-glow 1.5s ease-in-out infinite;
   overflow: hidden;
 }
@@ -15942,9 +15942,9 @@ body:has(.textbox-overlay) .tooltip {
 }
 .textbox-highlight-clone .board-phase-item[data-tb-an] {
   color: #fff;
-  background: rgba(26,237,255,.2);
+  background: rgba(102,182,255,.2);
   border: 1px solid rgb(26,237,255) !important;
-  box-shadow: 0 0 10px rgba(26,237,255,.6) !important;
+  box-shadow: 0 0 10px rgba(102,182,255,.6) !important;
 }
 /* Der Klon steht ausserhalb seines Kontexts — Groessenregeln wie die
    der Handkarten (`.game-hand … > .board-card`) greifen dort nicht.
@@ -15971,8 +15971,8 @@ body:has(.textbox-overlay) .tooltip {
   outline-offset: -1px;
 }
 @keyframes textbox-hl-glow {
-  0%, 100% { box-shadow: 0 0 16px rgba(26,237,255,.6), 0 0 30px rgba(26,237,255,.25); }
-  50%      { box-shadow: 0 0 24px rgba(26,237,255,.8), 0 0 40px rgba(26,237,255,.4); }
+  0%, 100% { box-shadow: 0 0 16px rgba(102,182,255,.6), 0 0 30px rgba(102,182,255,.25); }
+  50%      { box-shadow: 0 0 24px rgba(102,182,255,.8), 0 0 40px rgba(102,182,255,.4); }
 }
 /* Jedes Highlight pulsiert leicht (TextBox setzt `.textbox-highlight-pulse`):
    ein paar Prozent Groesse und ein atmender Schein — beides aus dem
@@ -16266,11 +16266,11 @@ body:has(.textbox-overlay) .tooltip {
 .ornate-frame {
   position: relative;
   /* 4px to match the chunky corner ornaments' arm thickness (--bt). */
-  border: 4px solid var(--player-color, #1aedff);
+  border: 4px solid var(--player-color, #66b6ff);
   box-shadow:
     inset 0 0 0 1px rgba(0, 0, 0, .45),
-    inset 0 0 26px color-mix(in srgb, var(--player-color, #1aedff) 16%, transparent),
-    0 0 30px color-mix(in srgb, var(--player-color, #1aedff) 30%, transparent),
+    inset 0 0 26px color-mix(in srgb, var(--player-color, #66b6ff) 16%, transparent),
+    0 0 30px color-mix(in srgb, var(--player-color, #66b6ff) 30%, transparent),
     0 12px 46px rgba(0, 0, 0, .55);
 }
 /* Inset accent line, following the rounded corners. */
@@ -16279,7 +16279,7 @@ body:has(.textbox-overlay) .tooltip {
   position: absolute;
   inset: 5px;
   z-index: -1;
-  border: 1px solid color-mix(in srgb, var(--player-color, #1aedff) 45%, transparent);
+  border: 1px solid color-mix(in srgb, var(--player-color, #66b6ff) 45%, transparent);
   border-radius: 13px;
   pointer-events: none;
 }
@@ -16318,7 +16318,7 @@ body:has(.textbox-overlay) .tooltip {
      Maske auf einer Farbflaeche, damit die Farbe weiter aus
      `--eck-farbe` kommt. Die Dicke ist damit fest ein Viertel der
      Armlaenge — genau das Verhaeltnis der grossen Kaesten (16/4). */
-  --bk: var(--eck-farbe, var(--player-color, #1aedff));
+  --bk: var(--eck-farbe, var(--player-color, #66b6ff));
   --bl: var(--eck-arm, 16px);   /* Armlaenge; Dicke = Armlaenge / 4 */
   background: var(--bk);
   -webkit-mask:
@@ -16478,7 +16478,7 @@ body:has(.textbox-overlay) .tooltip {
   font-size: 15px;
   border: 1px solid transparent;   /* keep height stable vs. medal rows */
 }
-.menu-lb-row.is-me { background: rgba(26,237,255,.12); outline: 1px solid rgba(26,237,255,.3); }
+.menu-lb-row.is-me { background: rgba(102,182,255,.12); outline: 1px solid rgba(102,182,255,.3); }
 /* Top-3 podium: gold / silver / bronze tinted backdrop + border. */
 .menu-lb-row.rank-1 {
   background: rgba(255,214,26,.16);
@@ -16515,7 +16515,7 @@ body:has(.textbox-overlay) .tooltip {
   flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: 13px 6px; border-radius: 0;
   background: rgba(255, 255, 255, .04);
-  border: 1px solid var(--player-color, #1aedff);
+  border: 1px solid var(--player-color, #66b6ff);
 }
 .menu-record-cell b { font-size: 28px; font-weight: 800; line-height: 1; }
 .menu-record-cell span { font-size: 10.5px; letter-spacing: .6px; color: var(--text2); }
@@ -16531,21 +16531,21 @@ body:has(.textbox-overlay) .tooltip {
   display: flex; align-items: center; gap: 13px; width: 100%;
   padding: 10px 12px; border-radius: 0; cursor: pointer; text-align: left;
   background: rgba(255, 255, 255, .04);
-  border: 1px solid var(--player-color, #1aedff);
+  border: 1px solid var(--player-color, #66b6ff);
   transition: background .15s, border-color .15s;
   /* <button> doesn't inherit the page font — set the pixel UI font explicitly
      so the deck rows match the rest of the menu. */
   font-family: var(--font-display), sans-serif;
 }
-.menu-deck-card:hover { background: rgba(26,237,255,.1); border-color: var(--player-color, #1aedff); }
+.menu-deck-card:hover { background: rgba(102,182,255,.1); border-color: var(--player-color, #66b6ff); }
 .menu-deck-card.is-active {
-  background: rgba(26,237,255,.14);
-  border-color: var(--player-color, #1aedff);
+  background: rgba(102,182,255,.14);
+  border-color: var(--player-color, #66b6ff);
   cursor: url("/cursor-arrow.png?v=4") 2 2, default;
 }
 /* The standalone "Active Deck" card up top is clickable (→ deck builder). */
 .menu-deck-card.is-editable { cursor: pointer; }
-.menu-deck-card.is-editable:hover { background: rgba(26,237,255,.2); }
+.menu-deck-card.is-editable:hover { background: rgba(102,182,255,.2); }
 .menu-deck-card.is-busy { opacity: .55; cursor: progress; }
 /* Illegal decks can't be set active — dim them and signal not-allowed,
    but keep them clickable so the click can explain why. */
@@ -16747,9 +16747,9 @@ body:has(.textbox-overlay) .tooltip {
   position: relative;
   /* Every main-menu button tracks the player's chosen colour (text, border
      and icon), the way Play Online always has. */
-  color: var(--player-color, #1aedff);
-  border-color: var(--player-color, #1aedff);
-  background: color-mix(in srgb, var(--player-color, #1aedff) 8%, transparent);
+  color: var(--player-color, #66b6ff);
+  border-color: var(--player-color, #66b6ff);
+  background: color-mix(in srgb, var(--player-color, #66b6ff) 8%, transparent);
 }
 /* Labels are centered on the button. */
 .menu-nav-label {
@@ -17911,8 +17911,8 @@ body:has(.textbox-overlay) .tooltip {
   height: calc(var(--hand-min-h) * 0.78);
   background: linear-gradient(to bottom,
     transparent 0%,
-    color-mix(in srgb, var(--hand-accent, #1aedff) 60%, transparent) 16%,
-    color-mix(in srgb, var(--hand-accent, #1aedff) 60%, transparent) 84%,
+    color-mix(in srgb, var(--hand-accent, #66b6ff) 60%, transparent) 16%,
+    color-mix(in srgb, var(--hand-accent, #66b6ff) 60%, transparent) 84%,
     transparent 100%);
   pointer-events: none;
   /* Als Vorgabe 2.10.: Handkarten liegen ÜBER den Trennlinien (Fächerebene ≥ 1). */
@@ -18160,8 +18160,8 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
    slim 4-direction 1px ring (thinner than the full 8-direction outline). */
 .auth-panel-content .auth-subtitle {
   text-shadow:
-    1px 0 0 var(--player-color, #1aedff), -1px 0 0 var(--player-color, #1aedff),
-    0 1px 0 var(--player-color, #1aedff), 0 -1px 0 var(--player-color, #1aedff);
+    1px 0 0 var(--player-color, #66b6ff), -1px 0 0 var(--player-color, #66b6ff),
+    0 1px 0 var(--player-color, #66b6ff), 0 -1px 0 var(--player-color, #66b6ff);
 }
 /* Keep the link hover glow, but preserve the readable outline underneath it. */
 .auth-panel-content .auth-link:hover { text-shadow: var(--pixel-outline), 0 0 8px var(--accent); }
@@ -18343,7 +18343,7 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 
 /* Main-menu nav buttons */
 .menu-buttons .btn {
-  background: color-mix(in srgb, var(--player-color, #1aedff) 8%, var(--menu-surface)) !important;
+  background: color-mix(in srgb, var(--player-color, #66b6ff) 8%, var(--menu-surface)) !important;
 }
 
 /* Deck cards (Active Deck + Your Decks), incl. hover / state tints */
@@ -18593,7 +18593,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   position: absolute; z-index: 15; background: transparent;
   border: 1px dashed transparent; border-radius: 4px; cursor: pointer; padding: 0;
 }
-.cmp-hotspot:hover { border-color: var(--accent); background: rgba(26,237,255,.10); }
+.cmp-hotspot:hover { border-color: var(--accent); background: rgba(102,182,255,.10); }
 .cmp-hotspot-show { border-color: rgba(248,33,227,.7); background: rgba(248,33,227,.10); }
 .cmp-hotspot-label {
   position: absolute; left: 50%; top: -18px; transform: translateX(-50%);
@@ -18622,11 +18622,11 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   font-family: 'Pixel Intv', monospace; text-align: center;
   background: linear-gradient(180deg, rgba(18,16,31,.92), rgba(8,6,12,.92));
   border: 2px solid var(--accent); border-radius: 8px; padding: 6px 14px 7px;
-  box-shadow: 0 0 18px rgba(26,237,255,.22), inset 0 0 12px rgba(0,0,0,.6);
+  box-shadow: 0 0 18px rgba(102,182,255,.22), inset 0 0 12px rgba(0,0,0,.6);
   min-width: 104px;
 }
 .cmp-clock-day  { font-size: 9px;  color: var(--text2); letter-spacing: 2px; }
-.cmp-clock-time { font-size: 22px; color: var(--accent); line-height: 1.15; text-shadow: 0 0 12px rgba(26,237,255,.5); }
+.cmp-clock-time { font-size: 22px; color: var(--accent); line-height: 1.15; text-shadow: 0 0 12px rgba(102,182,255,.5); }
 .cmp-clock-part { font-size: 9px;  color: var(--text2); letter-spacing: 1px; }
 .cmp-clock-bump { animation: cmp-clock-bump .7s ease; }
 @keyframes cmp-clock-bump {
@@ -18665,9 +18665,9 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   font-family: 'Pixel Intv', monospace; font-size: 12px; letter-spacing: 2px; color: var(--text);
   background: linear-gradient(180deg, rgba(26,26,46,.95), rgba(8,6,12,.95));
   border: 2px solid var(--accent); border-radius: 8px; padding: 9px 16px; cursor: pointer;
-  box-shadow: 0 0 16px rgba(26,237,255,.2);
+  box-shadow: 0 0 16px rgba(102,182,255,.2);
 }
-.cmp-places-toggle:hover { background: rgba(26,237,255,.16); }
+.cmp-places-toggle:hover { background: rgba(102,182,255,.16); }
 .cmp-places-list {
   display: flex; flex-direction: column; gap: 4px; max-height: calc(56dvh / var(--ui-scale, 1)); overflow-y: auto;
   background: rgba(8,6,12,.94); border: 2px solid var(--accent); border-radius: 8px; padding: 8px; min-width: 260px;
@@ -18677,7 +18677,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   background: rgba(255,255,255,.04); border: 1px solid transparent; border-left: 3px solid var(--accent);
   border-radius: 4px; padding: 7px 10px; cursor: pointer; text-align: left; width: 100%;
 }
-.cmp-place:hover:not(.is-disabled) { background: rgba(26,237,255,.14); border-color: var(--accent); }
+.cmp-place:hover:not(.is-disabled) { background: rgba(102,182,255,.14); border-color: var(--accent); }
 .cmp-place-name { font-family: 'Pixel Intv', monospace; font-size: 12px; color: var(--text); }
 .cmp-place-meta { font-size: 10px; color: var(--text2); }
 .cmp-place.is-here { border-left-color: #ffd61a; }
@@ -18702,7 +18702,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   position: relative; flex: 1 1 auto; max-width: 1100px; min-height: 132px;
   background: linear-gradient(180deg, rgba(18,16,31,.96), rgba(8,6,12,.97));
   border: 3px solid var(--accent); border-radius: 10px; padding: 20px 22px 18px;
-  box-shadow: 0 0 30px rgba(26,237,255,.18), inset 0 0 24px rgba(0,0,0,.7);
+  box-shadow: 0 0 30px rgba(102,182,255,.18), inset 0 0 24px rgba(0,0,0,.7);
 }
 .cmp-speaker {
   position: absolute; top: -15px; left: 20px;
@@ -18732,7 +18732,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   border: 2px solid var(--accent); border-left-width: 6px; border-radius: 8px;
   padding: 14px 18px; cursor: pointer; transition: transform .1s, background .15s;
 }
-.cmp-choice:hover { background: rgba(26,237,255,.16); transform: translateX(6px); }
+.cmp-choice:hover { background: rgba(102,182,255,.16); transform: translateX(6px); }
 .cmp-choice-hint { display: block; font-size: 12px; color: var(--text2); margin-top: 3px; }
 .cmp-choice-time { position: absolute; right: 14px; top: 14px; font-size: 11px; color: #ffd61a; }
 
@@ -18808,7 +18808,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   flex: 1 1 auto; min-width: 0; font-weight: 700;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.cmp-card-row:hover:not(.is-out) { background: rgba(26,237,255,.15); }
+.cmp-card-row:hover:not(.is-out) { background: rgba(102,182,255,.15); }
 /* "0/x" bleibt überfahrbar, damit der Tooltip auch dort erscheint —
    nur klicken tut nichts (siehe Kommentar in addCard). */
 .cmp-card-row.is-out { opacity: .42; cursor: url("/cursor-arrow.png?v=4") 2 2, default; border-left-color: var(--text2); }
@@ -18892,11 +18892,11 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 }
 .cmp-duel-core img {
   image-rendering: pixelated; image-rendering: crisp-edges;
-  filter: drop-shadow(0 0 26px rgba(26,237,255,.55));
+  filter: drop-shadow(0 0 26px rgba(102,182,255,.55));
 }
 .cmp-duel-word {
   font-family: 'Pixel Intv', monospace; font-size: 46px; letter-spacing: 14px;
-  color: #fff; text-shadow: 0 0 26px rgba(26,237,255,.85), 0 4px 0 #000;
+  color: #fff; text-shadow: 0 0 26px rgba(102,182,255,.85), 0 4px 0 #000;
   margin-top: 10px;
 }
 .cmp-duel-name {
@@ -19068,10 +19068,10 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   background: linear-gradient(180deg, rgba(26,26,46,.95), rgba(8,6,12,.95));
   border: 2px solid var(--accent); border-left-width: 7px; border-radius: 9px;
   padding: 15px 18px; cursor: pointer;
-  box-shadow: 0 0 16px rgba(26,237,255,.18);
+  box-shadow: 0 0 16px rgba(102,182,255,.18);
   transition: background .15s, transform .1s;
 }
-.cmp-action:hover { background: rgba(26,237,255,.18); transform: translateX(5px); }
+.cmp-action:hover { background: rgba(102,182,255,.18); transform: translateX(5px); }
 
 /* ── Deck-Editor: Vorschauspalte, rote Zähler, fliegende Karten ──── */
 .cmp-deck-editor { width: min(1320px, 96vw); }
@@ -19095,7 +19095,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 }
 .cmp-flight img {
   width: 100%; border-radius: 4px; display: block;
-  box-shadow: 0 0 18px rgba(26,237,255,.55), 0 4px 10px rgba(0,0,0,.7);
+  box-shadow: 0 0 18px rgba(102,182,255,.55), 0 4px 10px rgba(0,0,0,.7);
 }
 @keyframes cmp-flight {
   0%   { transform: translate(-50%, -50%) scale(.85) rotate(-6deg); opacity: 0; }
@@ -19564,19 +19564,19 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
    Ablage-Dialog. Der Rahmen sagt „hier ist etwas moeglich", das
    Abzeichen sagt was. */
 .pile-card-activatable {
-  outline: 2px solid var(--accent, #1aedff);
+  outline: 2px solid var(--accent, #66b6ff);
   outline-offset: -2px;
   border-radius: 6px;
   animation: pileUsablePulse 1.4s ease-in-out infinite;
 }
 @keyframes pileUsablePulse {
-  0%, 100% { box-shadow: 0 0 6px rgba(26,237,255,.45); }
-  50%      { box-shadow: 0 0 16px rgba(26,237,255,.85); }
+  0%, 100% { box-shadow: 0 0 6px rgba(102,182,255,.45); }
+  50%      { box-shadow: 0 0 16px rgba(102,182,255,.85); }
 }
 .pile-card-activatable-badge {
   position: absolute; bottom: 2px; right: 2px;
   background: rgba(0, 0, 0, .78);
-  color: var(--accent, #1aedff);
+  color: var(--accent, #66b6ff);
   font-size: 9px; letter-spacing: .5px;
   padding: 1px 4px; border-radius: 3px;
   pointer-events: none; z-index: 6;
@@ -19586,7 +19586,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
    Derselbe Cyan-Puls wie bei aktivierbarer Ausruestung — der Spieler
    soll den Stapel aufklappen, ohne es jede Runde blind zu versuchen. */
 .zone-discard-usable {
-  outline: 2px solid var(--accent, #1aedff);
+  outline: 2px solid var(--accent, #66b6ff);
   outline-offset: -2px;
   animation: pileUsablePulse 1.4s ease-in-out infinite;
 }
@@ -21830,7 +21830,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 
 /* Lotse: pulsierender Schein aussen um den Wirt. Fester Schatten, es
    pulsiert nur seine Deckkraft (Compositor statt Neuzeichnen). */
-.pp-lotse { --lotse-farbe: #fb1ea9; position: relative; }
+.pp-lotse { --lotse-farbe: #ffd61a; position: relative; }
 .pp-lotse-schein {
   position: absolute;
   inset: 0;
@@ -22191,7 +22191,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 .ppf-trigger { cursor: pointer; transition: filter .12s, transform .12s; }
 .ppf-trigger:hover { filter: brightness(1.22); }
 .ppf-trigger:active { transform: translateY(1px); }
-.ppf-trigger:focus-visible { outline: 2px solid var(--player-color, #1aedff); outline-offset: 1px; }
+.ppf-trigger:focus-visible { outline: 2px solid var(--player-color, #66b6ff); outline-offset: 1px; }
 
 .ppf-veil {
   position: fixed; inset: 0; z-index: 9000;
@@ -23189,7 +23189,7 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 /* Zierfarbe der grossen Rahmen: im Menue die Spielerfarbe, im Login das
    Violett des Login-Kastens (dort gibt es noch keinen Spieler). */
 .main-menu-screen,
-.pp-menuekasten { --zier: var(--player-color, #1aedff); }
+.pp-menuekasten { --zier: var(--player-color, #66b6ff); }
 .auth-screen .auth-panel { --zier: var(--auth-rahmen, #a36afb); }
 
 /* ── Kaesten (Knopfstreifen, Seitenkaesten, Login-Kasten) ──────────── */
@@ -23291,7 +23291,7 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
   background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.07'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.07'/%3E%3C/svg%3E"),
     linear-gradient(180deg,
-      color-mix(in srgb, var(--player-color, #1aedff) 13%, transparent) 0%,
+      color-mix(in srgb, var(--player-color, #66b6ff) 13%, transparent) 0%,
       transparent 32%,
       transparent 70%,
       rgba(0, 0, 0, .32) 100%) !important;
@@ -23305,7 +23305,7 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
   display: flex;
   align-items: center;
   gap: 11px;
-  color: var(--player-color, #1aedff);
+  color: var(--player-color, #66b6ff);
   text-shadow: 2px 2px 0 #000;
   border-bottom: none;
   padding-bottom: 12px;
@@ -23319,9 +23319,9 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
   height: 3px;
   background:
     linear-gradient(90deg,
-      var(--player-color, #1aedff) 0 12px,
+      var(--player-color, #66b6ff) 0 12px,
       transparent 12px 18px,
-      color-mix(in srgb, var(--player-color, #1aedff) 60%, transparent) 18px,
+      color-mix(in srgb, var(--player-color, #66b6ff) 60%, transparent) 18px,
       transparent 100%);
 }
 .menu-side-title-icon {
@@ -23353,7 +23353,7 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 .auth-screen .auth-corner .volume-btn,
 .discord-btn,
 .main-menu-screen .menu-logout-frage .btn {
-  --knopf: var(--player-color, #1aedff);
+  --knopf: var(--player-color, #66b6ff);
   --knopf-tiefe: 5px;
   --knopf-licht: color-mix(in srgb, var(--knopf) 55%, #fff);
   --kf-oben: color-mix(in srgb, var(--knopf) 30%, var(--menu-surface));
@@ -23466,8 +23466,8 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 .auth-screen .auth-corner .menu-logout-btn:hover:not(:disabled) { --knopf-tiefe: 6px; transform: translateY(-2px); }
 /* Farben im Login (dort gibt es keine Spielerfarbe). */
 .auth-screen .auth-rumpf .btn-big,
-.auth-screen .auth-corner .menu-logout-btn { --knopf: var(--accent, #1aedff); }
-.auth-screen .auth-gast .auth-gast-btn { --knopf: var(--lotse-farbe, #fb1ea9); }
+.auth-screen .auth-corner .menu-logout-btn { --knopf: var(--accent, #66b6ff); }
+.auth-screen .auth-gast .auth-gast-btn { --knopf: var(--lotse-farbe, #ffd61a); }
 
 /* Pfeil rechts, der beim Ueberfahren hineingleitet und wippt. (Die
    Knoepfe tragen bewusst KEINE Icons.) */
@@ -23611,7 +23611,7 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 /* Bilanz: je Zelle eine Farbkappe oben (Sieg gruen, Niederlage rot,
    Quote Spielerfarbe), Schattenfuss unten, Zahl mit Pixelschatten. */
 .main-menu-screen .menu-record-cell {
-  --zelle: var(--player-color, #1aedff);
+  --zelle: var(--player-color, #66b6ff);
   border: 2px solid color-mix(in srgb, var(--zelle) 45%, transparent);
   border-top: 4px solid var(--zelle);
   background: linear-gradient(180deg,
@@ -23627,45 +23627,45 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 /* Deck-Kacheln: Spielerfarbe statt des festen Cyan-Tons beim Ueberfahren;
    das aktive Deck traegt einen dicken Farbbalken links. */
 .main-menu-screen .menu-deck-card {
-  border: 2px solid color-mix(in srgb, var(--player-color, #1aedff) 40%, transparent);
+  border: 2px solid color-mix(in srgb, var(--player-color, #66b6ff) 40%, transparent);
   box-shadow: 0 0 0 2px var(--pp-kontur), inset 0 2px 0 rgba(255, 255, 255, .05), inset 0 -3px 0 rgba(0, 0, 0, .35);
   transition: transform .12s ease, border-color .12s ease, background .12s ease;
 }
 .main-menu-screen .menu-deck-card:hover {
-  border-color: var(--player-color, #1aedff);
-  background: color-mix(in srgb, var(--player-color, #1aedff) 12%, var(--menu-surface)) !important;
+  border-color: var(--player-color, #66b6ff);
+  background: color-mix(in srgb, var(--player-color, #66b6ff) 12%, var(--menu-surface)) !important;
   transform: translateX(3px);
 }
 .main-menu-screen .menu-deck-card.is-active {
-  border-color: var(--player-color, #1aedff);
+  border-color: var(--player-color, #66b6ff);
   background: linear-gradient(90deg,
-    color-mix(in srgb, var(--player-color, #1aedff) 22%, var(--menu-surface)) 0%,
-    color-mix(in srgb, var(--player-color, #1aedff) 8%, var(--menu-surface)) 100%) !important;
-  box-shadow: 0 0 0 2px var(--pp-kontur), inset 6px 0 0 var(--player-color, #1aedff), inset 0 -3px 0 rgba(0, 0, 0, .35);
+    color-mix(in srgb, var(--player-color, #66b6ff) 22%, var(--menu-surface)) 0%,
+    color-mix(in srgb, var(--player-color, #66b6ff) 8%, var(--menu-surface)) 100%) !important;
+  box-shadow: 0 0 0 2px var(--pp-kontur), inset 6px 0 0 var(--player-color, #66b6ff), inset 0 -3px 0 rgba(0, 0, 0, .35);
   transform: none;
 }
 .main-menu-screen .menu-deck-card.is-editable:hover {
   background: linear-gradient(90deg,
-    color-mix(in srgb, var(--player-color, #1aedff) 32%, var(--menu-surface)) 0%,
-    color-mix(in srgb, var(--player-color, #1aedff) 12%, var(--menu-surface)) 100%) !important;
-  box-shadow: 0 0 0 2px var(--pp-kontur), inset 6px 0 0 var(--player-color, #1aedff), 0 0 18px color-mix(in srgb, var(--player-color, #1aedff) 35%, transparent);
+    color-mix(in srgb, var(--player-color, #66b6ff) 32%, var(--menu-surface)) 0%,
+    color-mix(in srgb, var(--player-color, #66b6ff) 12%, var(--menu-surface)) 100%) !important;
+  box-shadow: 0 0 0 2px var(--pp-kontur), inset 6px 0 0 var(--player-color, #66b6ff), 0 0 18px color-mix(in srgb, var(--player-color, #66b6ff) 35%, transparent);
 }
 .main-menu-screen .menu-deck-card.is-illegal:hover {
   border-color: rgba(252,28,95,.5);
   background: color-mix(in srgb, var(--danger) 10%, var(--menu-surface)) !important;
   transform: none;
 }
-.main-menu-screen .menu-deck-flag { text-shadow: 1px 1px 0 #000; color: var(--player-color, #1aedff); }
+.main-menu-screen .menu-deck-flag { text-shadow: 1px 1px 0 #000; color: var(--player-color, #66b6ff); }
 
 /* Bestenliste: Zeile hebt sich beim Ueberfahren (sie oeffnet das Profil). */
 .main-menu-screen .menu-lb-row { transition: transform .12s ease, border-color .12s ease; }
 .main-menu-screen .menu-lb-row:hover {
   transform: translateX(3px);
-  border-color: color-mix(in srgb, var(--player-color, #1aedff) 60%, transparent);
+  border-color: color-mix(in srgb, var(--player-color, #66b6ff) 60%, transparent);
 }
 .main-menu-screen .menu-lb-row.is-me {
-  background: color-mix(in srgb, var(--player-color, #1aedff) 14%, var(--menu-surface)) !important;
-  outline-color: color-mix(in srgb, var(--player-color, #1aedff) 45%, transparent);
+  background: color-mix(in srgb, var(--player-color, #66b6ff) 14%, var(--menu-surface)) !important;
+  outline-color: color-mix(in srgb, var(--player-color, #66b6ff) 45%, transparent);
 }
 
 /* ── Telefon quer: Pfeil aus (zwei schmale Knopfspalten) ──────────────── */
@@ -23900,6 +23900,9 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
   animation: google-rahmen-puls 2.4s ease-in-out infinite;
 }
 .google-pixelrahmen:empty { display: none; }
+/* Google zeichnet den Knopf inzwischen als normales DOM (nicht mehr im iframe) und erbt `line-height: 0` von oben — die Textzeile ist dann 0 px hoch und
+   wird vom overflow:hidden des Beschriftungs-Elements weggeschnitten (Knopf ohne Text). Mit eigener Zeilenhöhe steht „Sign in with Google" wieder da. */
+.google-pixelrahmen [role="button"] { line-height: 20px; }
 .google-pixelrahmen::after,
 .google-btn--prominent::after {
   content: '';
@@ -24036,8 +24039,8 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 }
 /* Nicht gekauft: Regenbogenrahmen, der Puls laeuft mit Kontur und Schatten. */
 @keyframes shop-unowned-glow {
-  0%, 100% { box-shadow: 0 0 0 5px var(--pp-kontur), 6px 7px 0 3px rgba(0, 0, 0, .4), 0 0 8px rgba(26,237,255,.25), 0 0 14px rgba(169,82,255,.12); }
-  50%      { box-shadow: 0 0 0 5px var(--pp-kontur), 6px 7px 0 3px rgba(0, 0, 0, .4), 0 0 20px rgba(26,237,255,.55), 0 0 32px rgba(251,30,169,.35); }
+  0%, 100% { box-shadow: 0 0 0 5px var(--pp-kontur), 6px 7px 0 3px rgba(0, 0, 0, .4), 0 0 8px rgba(102,182,255,.25), 0 0 14px rgba(169,82,255,.12); }
+  50%      { box-shadow: 0 0 0 5px var(--pp-kontur), 6px 7px 0 3px rgba(0, 0, 0, .4), 0 0 20px rgba(102,182,255,.55), 0 0 32px rgba(251,30,169,.35); }
 }
 @keyframes structure-deck-equipped-pulse {
   0%, 100% { box-shadow: 0 0 0 2px var(--pp-kontur), 6px 7px 0 rgba(0,0,0,.4), 0 0 16px rgba(76,235,112,.6); }
@@ -24136,7 +24139,7 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
    ein Zierkeil oben und unten in der aufgehellten Farbe. Am Zug pulsiert
    ein Schein in der Spielerfarbe (Deckkraft, nicht box-shadow). */
 .pp-portraet {
-  --pf: var(--portraet, var(--player-color, #1aedff));
+  --pf: var(--portraet, var(--player-color, #66b6ff));
   position: relative;
   display: inline-flex;
   flex-shrink: 0;
@@ -25230,8 +25233,8 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 /* Der Puls der Zustaende traegt die Ringe mit (die alten Bilder setzten
    `box-shadow` komplett und haetten sie geloescht). */
 @keyframes shop-unowned-glow {
-  0%, 100% { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #2b0b47, 0 0 0 6px var(--pp-kontur), inset 0 0 0 1px var(--pp-kontur), 8px 9px 0 rgba(0, 0, 0, .45), 0 0 10px rgba(26,237,255,.25), 0 0 18px rgba(169,82,255,.14); }
-  50%      { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #663597, 0 0 0 6px var(--pp-kontur), inset 0 0 0 1px var(--pp-kontur), 8px 9px 0 rgba(0, 0, 0, .45), 0 0 22px rgba(26,237,255,.55), 0 0 36px rgba(251,30,169,.35); }
+  0%, 100% { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #2b0b47, 0 0 0 6px var(--pp-kontur), inset 0 0 0 1px var(--pp-kontur), 8px 9px 0 rgba(0, 0, 0, .45), 0 0 10px rgba(102,182,255,.25), 0 0 18px rgba(169,82,255,.14); }
+  50%      { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #663597, 0 0 0 6px var(--pp-kontur), inset 0 0 0 1px var(--pp-kontur), 8px 9px 0 rgba(0, 0, 0, .45), 0 0 22px rgba(102,182,255,.55), 0 0 36px rgba(251,30,169,.35); }
 }
 @keyframes structure-deck-equipped-pulse {
   0%, 100% { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #3b9159, 0 0 0 6px var(--pp-kontur), inset 0 0 0 1px var(--pp-kontur), 8px 9px 0 rgba(0, 0, 0, .45), 0 0 16px rgba(76,235,112,.55); }
@@ -25685,7 +25688,7 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
    ═══════════════════════════════════════════════════════════════ */
 .menu-side-tabs {
   display: flex; gap: 4px; margin: 0 0 13px;
-  border-bottom: 3px solid color-mix(in srgb, var(--player-color, #1aedff) 55%, transparent);
+  border-bottom: 3px solid color-mix(in srgb, var(--player-color, #66b6ff) 55%, transparent);
 }
 .menu-side-tab {
   flex: 1; min-width: 0;
@@ -25698,9 +25701,9 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
 }
 .menu-side-tab:hover { color: var(--text); background: rgba(255, 255, 255, .07); }
 .menu-side-tab.active {
-  color: var(--player-color, #1aedff);
-  background: color-mix(in srgb, var(--player-color, #1aedff) 14%, transparent);
-  border-color: color-mix(in srgb, var(--player-color, #1aedff) 55%, transparent);
+  color: var(--player-color, #66b6ff);
+  background: color-mix(in srgb, var(--player-color, #66b6ff) 14%, transparent);
+  border-color: color-mix(in srgb, var(--player-color, #66b6ff) 55%, transparent);
 }
 .menu-side-tab .menu-side-title-icon { width: 18px; height: 18px; }
 .menu-side-tab-count { font-size: 12px; color: var(--text2); }
@@ -25734,7 +25737,7 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
 }
 .social-row:hover, .social-row:focus-visible {
   transform: translateX(2px); outline: none;
-  border-color: color-mix(in srgb, var(--player-color, #1aedff) 55%, transparent);
+  border-color: color-mix(in srgb, var(--player-color, #66b6ff) 55%, transparent);
 }
 .social-row.has-news { border-color: rgba(250,213,74,.55); background: rgba(250,213,74,.08); }
 .social-name { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -25774,7 +25777,7 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
   padding: 6px 10px; font-size: 14px; line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere;
   border: 1px solid rgba(255, 255, 255, .1); background: rgba(255, 255, 255, .07);
 }
-.social-msg.mine .social-msg-bubble { background: color-mix(in srgb, var(--player-color, #1aedff) 22%, #08060c); border-color: color-mix(in srgb, var(--player-color, #1aedff) 50%, transparent); }
+.social-msg.mine .social-msg-bubble { background: color-mix(in srgb, var(--player-color, #66b6ff) 22%, #08060c); border-color: color-mix(in srgb, var(--player-color, #66b6ff) 50%, transparent); }
 .social-msg-time { font-size: 10px; color: var(--text2); margin-top: 2px; }
 .social-challenge {
   align-self: stretch; padding: 8px 10px; text-align: center;
@@ -25814,7 +25817,7 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
 
 /* Raum-Einladungen: Zeilenmenü in der Liste (Besitzer) und Hinweis beim Empfänger */
 .social-row-wrap { display: flex; flex-direction: column; }
-.social-row-wrap.is-open > .social-row { border-color: color-mix(in srgb, var(--player-color, #1aedff) 55%, transparent); }
+.social-row-wrap.is-open > .social-row { border-color: color-mix(in srgb, var(--player-color, #66b6ff) 55%, transparent); }
 .social-row-menu {
   display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 8px 8px; margin-top: 1px;
   background: rgba(0, 0, 0, .35); border: 1px solid rgba(255, 255, 255, .06); border-top: none;
@@ -26275,25 +26278,25 @@ body.pp-dialog-offen .skin-holo:not(.modal-overlay .skin-holo):not(.card-tooltip
      behalten die allgemeine Pixel-Scrollbar (s. „Scrollbars" oben).
    ═══════════════════════════════════════════════════════════════════ */
 .main-menu-screen .menu-deck-card.is-active {
-  border: 3px solid var(--player-color, #1aedff);
+  border: 3px solid var(--player-color, #66b6ff);
   background:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.05'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.05'/%3E%3C/svg%3E") 0 0 / 4px 4px,
     linear-gradient(90deg,
-      color-mix(in srgb, var(--player-color, #1aedff) 40%, var(--menu-surface)) 0%,
-      color-mix(in srgb, var(--player-color, #1aedff) 17%, var(--menu-surface)) 100%) !important;
+      color-mix(in srgb, var(--player-color, #66b6ff) 40%, var(--menu-surface)) 0%,
+      color-mix(in srgb, var(--player-color, #66b6ff) 17%, var(--menu-surface)) 100%) !important;
   box-shadow:
     0 0 0 2px var(--pp-kontur),
-    inset 9px 0 0 var(--player-color, #1aedff),
+    inset 9px 0 0 var(--player-color, #66b6ff),
     inset 0 -3px 0 rgba(0, 0, 0, .35),
-    0 0 20px color-mix(in srgb, var(--player-color, #1aedff) 50%, transparent);
+    0 0 20px color-mix(in srgb, var(--player-color, #66b6ff) 50%, transparent);
 }
 .main-menu-screen .menu-deck-card.is-active .menu-deck-name {
   color: #fff;
-  text-shadow: 2px 2px 0 #000, 0 0 12px color-mix(in srgb, var(--player-color, #1aedff) 65%, transparent);
+  text-shadow: 2px 2px 0 #000, 0 0 12px color-mix(in srgb, var(--player-color, #66b6ff) 65%, transparent);
 }
 .main-menu-screen .menu-deck-card.is-active .menu-deck-flag {
   padding: 2px 5px;
-  background: var(--player-color, #1aedff);
+  background: var(--player-color, #66b6ff);
   color: #08060c;
   text-shadow: none;
   box-shadow: 0 0 0 2px var(--pp-kontur), inset 2px 2px 0 rgba(255, 255, 255, .45), inset -2px -2px 0 rgba(0, 0, 0, .3);
@@ -26302,12 +26305,12 @@ body.pp-dialog-offen .skin-holo:not(.modal-overlay .skin-holo):not(.card-tooltip
   background:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.06'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.06'/%3E%3C/svg%3E") 0 0 / 4px 4px,
     linear-gradient(90deg,
-      color-mix(in srgb, var(--player-color, #1aedff) 50%, var(--menu-surface)) 0%,
-      color-mix(in srgb, var(--player-color, #1aedff) 24%, var(--menu-surface)) 100%) !important;
+      color-mix(in srgb, var(--player-color, #66b6ff) 50%, var(--menu-surface)) 0%,
+      color-mix(in srgb, var(--player-color, #66b6ff) 24%, var(--menu-surface)) 100%) !important;
   box-shadow:
     0 0 0 2px var(--pp-kontur),
-    inset 9px 0 0 var(--player-color, #1aedff),
-    0 0 26px color-mix(in srgb, var(--player-color, #1aedff) 60%, transparent);
+    inset 9px 0 0 var(--player-color, #66b6ff),
+    0 0 26px color-mix(in srgb, var(--player-color, #66b6ff) 60%, transparent);
 }
 
 @supports selector(::-webkit-scrollbar) {
@@ -26335,3 +26338,58 @@ body.pp-dialog-offen .skin-holo:not(.modal-overlay .skin-holo):not(.card-tooltip
 @supports not selector(::-webkit-scrollbar) {
   .menu-side-scroll { scrollbar-width: auto; scrollbar-color: color-mix(in srgb, var(--player-color, var(--accent)) 82%, #fff) #08060c; }
 }
+
+
+/* ═══ PIXEL-SCHALTER UND -HÄKCHEN (Al, 23.10.: „Toggle-Buttons haben noch keinen Pixelart-Look") ═══
+   Schalter (`PixelSchalter`, Profil): zwei ineinandergelegte, an den Ecken eingekerbte Blöcke (außen Kontur, innen Bahn), ein eckiger Knopf mit
+   Kantenlicht, der in drei Schritten umspringt, und ON/OFF in Pixelschrift. Häkchenfelder (`input[type=checkbox]`) und Radioknöpfe bekommen
+   denselben Kerb-Block statt der Systemdarstellung; das Häkchen ist ein kleines Pixel-Sprite aus zwei Rechtecken. Nur harte Kanten, keine Rundung. */
+.pp-schalter {
+  --kerb: polygon(2px 0, calc(100% - 2px) 0, calc(100% - 2px) 2px, 100% 2px, 100% calc(100% - 2px), calc(100% - 2px) calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 2px calc(100% - 2px), 0 calc(100% - 2px), 0 2px, 2px 2px);
+  position: relative; display: inline-block; flex-shrink: 0;
+  width: 56px; height: 28px;
+  background: var(--pp-kontur);
+  clip-path: var(--kerb);
+}
+.pp-schalter-bahn {
+  position: absolute; inset: 2px; display: block;
+  background: var(--bg4);
+  clip-path: polygon(2px 0, calc(100% - 2px) 0, calc(100% - 2px) 2px, 100% 2px, 100% calc(100% - 2px), calc(100% - 2px) calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 2px calc(100% - 2px), 0 calc(100% - 2px), 0 2px, 2px 2px);
+}
+.pp-schalter-an .pp-schalter-bahn { background: var(--accent); }
+.pp-schalter-text {
+  position: absolute; top: 0; bottom: 0; right: 0; width: 28px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display), sans-serif; font-size: 9px; letter-spacing: 1px;
+  color: var(--text2);
+}
+.pp-schalter-an .pp-schalter-text { right: auto; left: 0; color: #000000; }
+.pp-schalter-knopf {
+  position: absolute; top: 0; left: 0; width: 24px; height: 24px;
+  background: #e5edfa;
+  box-shadow: inset 2px 2px 0 #ffffff, inset -2px -2px 0 #9aa3b6;
+  transition: left .1s steps(3, end);
+}
+.pp-schalter-an .pp-schalter-knopf { left: 28px; }
+.profile-schalter:hover .pp-schalter { background: var(--text2); }
+.profile-schalter-aus .pp-schalter-knopf { box-shadow: inset 2px 2px 0 #d2d2db, inset -2px -2px 0 #7e7d9b; }
+
+input[type="checkbox"], input[type="radio"] {
+  -webkit-appearance: none; appearance: none;
+  position: relative; flex-shrink: 0; vertical-align: middle;
+  width: 16px; height: 16px; margin: 0 4px 0 0; padding: 0;
+  background: var(--bg4);
+  box-shadow: 0 0 0 2px var(--pp-kontur), inset 2px 2px 0 #000000;
+  border-radius: 0;
+  cursor: pointer;
+}
+input[type="checkbox"]:checked, input[type="radio"]:checked { background: var(--accent); box-shadow: 0 0 0 2px var(--pp-kontur), inset -2px -2px 0 #000000, inset 2px 2px 0 #ffffff; }
+input[type="checkbox"]:checked::after {
+  content: ''; position: absolute; left: 3px; top: 3px; width: 2px; height: 2px;
+  background: #000000;
+  box-shadow: 2px 2px 0 #000000, 4px 0 0 #000000, 6px -2px 0 #000000, 8px -4px 0 #000000, 2px 0 0 #000000;
+  transform: translate(0, 2px);
+}
+input[type="radio"]:checked::after { content: ''; position: absolute; left: 4px; top: 4px; width: 8px; height: 8px; background: #000000; }
+input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: .4; cursor: not-allowed; }
+input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outline: 2px solid #ffffff; outline-offset: 2px; }

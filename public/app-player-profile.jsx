@@ -133,7 +133,7 @@ function PlayerProfilePopup({ seed, onClose }) {
   useEffect(() => { closeBtnRef.current && closeBtnRef.current.focus({ preventScroll: true }); }, []);
 
   const p = profile || {};
-  const color = p.color || seed.color || '#1aedff';
+  const color = p.color || seed.color || '#66b6ff';
   const rank = p.rank != null ? p.rank : seed.rank;
   const decks = p.topDecks || [];
   const deck = decks[Math.min(deckIdx, Math.max(0, decks.length - 1))] || null;
