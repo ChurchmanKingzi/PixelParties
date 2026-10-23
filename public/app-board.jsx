@@ -27959,6 +27959,212 @@ const ANIM_REGISTRY = {
     return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
   })(),
   // ═══════════════════════════════════════════════════════════════════
+  //  Trap Sabotage (23.10.) — PIXELART, Brett-Animation auf der gewaehlten verdeckten Surprise (Surprise Zone oder Bakhm-Slot; `targets`)
+  //
+  //  Ein Feuerball fliegt vom Wirker auf die Karte (0–300 ms), Flammenzungen schlagen an ihrer Unterkante hoch (rot-orange-gelb, weisse Kerne), die Karte verkohlt
+  //  von unten nach oben (Bayer-Muster aus Schwarz und Aschgrau, Glutkante an der Brandfront), bis sie bei ~1030 ms ganz verkohlt ist. Dann legt der Zauber sie ab
+  //  (trap-sabotage.js, `BRAND_MS`): die Kohle zerfaellt kruemelnd, Flammen ersterben, Asche und Funken steigen auf, ein paar Rauchwolken ziehen nach oben.
+  // ═══════════════════════════════════════════════════════════════════
+  trap_burn: (() => {
+    const FEUER = ['#ffffff', '#f7f7ad', '#fad54a', '#f29a3e', '#e94e53', '#b21a29'].map(ppHex);
+    const KOHLE = ['#7f7f7f', '#535353', '#323232', '#141414'].map(ppHex);
+    const WEISS = ppHex('#ffffff');
+    const ENDE = 1800, ANFLUG = 300, BRAND_AB = 300, VERKOHLT = 1000, ZERFALL_AB = 1030, FEUER_AUS = 1060;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = (sz) => ({
+      zungen: sz.ziele.map(z => Array.from({ length: Math.max(6, Math.floor(z.w / 2)) }, () => ({
+        h: 0.55 + Math.random() * 0.85, ph: Math.random() * Math.PI * 2, tempo: 45 + Math.random() * 40,
+      }))),
+      funken: sz.ziele.map(() => Array.from({ length: ppFxN(22) }, () => ({
+        fx: Math.random(), fy: 0.35 + Math.random() * 0.65, v: 16 + Math.random() * 34, sw: Math.random() * Math.PI * 2, gross: Math.random() < 0.3 ? 2 : 1,
+        start: Math.random() * 640, leben: 420 + Math.random() * 380, farbe: Math.floor(Math.random() * 4),
+      }))),
+      asche: sz.ziele.map(() => Array.from({ length: ppFxN(26) }, () => ({
+        fx: Math.random(), fy: Math.random(), v: 8 + Math.random() * 20, sw: Math.random() * Math.PI * 2, gross: Math.random() < 0.35 ? 2 : 1,
+        start: Math.random() * 220, leben: 480 + Math.random() * 420, farbe: Math.floor(Math.random() * 3),
+      }))),
+      rauch: sz.ziele.map(() => Array.from({ length: 5 }, () => ({ fx: 0.15 + Math.random() * 0.7, start: 20 + Math.random() * 260, leben: 520 + Math.random() * 280, r: 2.5 + Math.random() * 2.5, sw: Math.random() * Math.PI * 2 }))),
+    });
+    const malen = (g, t, sz, teile) => {
+      sz.ziele.forEach((z, zi) => {
+        const CX = Math.round(z.x), CY = Math.round(z.y);
+        const hw = Math.floor(z.w / 2), hh = Math.floor(z.h / 2);
+        const links = CX - hw, oben = CY - hh, unten = CY + hh;
+        // ── Feuerball vom Wirker auf die Karte ──
+        if (t < ANFLUG) {
+          const k = t / ANFLUG, e = k * k;
+          const bx = sz.O.x + (z.x - sz.O.x) * e, by = sz.O.y + (z.y - sz.O.y) * e;
+          for (let n = 4; n >= 1; n--) {
+            const ke = Math.max(0, k - n * 0.05), ee = ke * ke;
+            const tx = sz.O.x + (z.x - sz.O.x) * ee, ty = sz.O.y + (z.y - sz.O.y) * ee;
+            g.disc(tx, ty, 3 - n * 0.55, FEUER[3 + (n & 1)], 0.9 - n * 0.15);
+          }
+          g.disc(bx, by, 3.4, FEUER[4]);
+          g.disc(bx, by, 2.4, FEUER[3]);
+          g.disc(bx, by, 1.4, FEUER[1]);
+          g.put(bx, by, WEISS);
+        }
+        // ── Brandfront und Verkohlung ──
+        const brand = klemme((t - BRAND_AB) / (VERKOHLT - BRAND_AB), 0, 1);
+        const front = unten - brand * (2 * hh + 2);                       // y-Koordinate der Brandfront (steigt von unten nach oben)
+        const zerfall = t >= ZERFALL_AB ? klemme((t - ZERFALL_AB) / 380, 0, 1) : 0;
+        if (t >= BRAND_AB) {
+          for (let y = oben; y <= unten; y++) for (let x = links; x <= CX + hw; x++) {
+            if (y < front) continue;                                       // noch nicht verbrannt
+            const b = ppBayer(x, y);
+            if (zerfall > 0 && b < zerfall) continue;                       // kruemelt weg
+            const tiefe = klemme((y - front) / 7, 0, 1);                    // frische Kante: glutrot, weiter unten kohlschwarz
+            let c;
+            if (y - front < 1.5) c = FEUER[(Math.floor(t / 70) + x) & 1 ? 3 : 4];
+            else if (y - front < 3.5) c = b < 0.5 ? FEUER[5] : KOHLE[3];
+            else c = b < 0.3 + 0.4 * tiefe ? KOHLE[3] : (b < 0.8 ? KOHLE[2] : KOHLE[1]);
+            g.put(x, y, c);
+          }
+        }
+        // ── Flammenzungen an der Unterkante bis zur Brandfront und darueber hinaus ──
+        const flamme = t < FEUER_AUS ? klemme((t - BRAND_AB) / 220, 0, 1) : 1 - klemme((t - FEUER_AUS) / 340, 0, 1);
+        if (flamme > 0) {
+          const zungen = teile.zungen[zi];
+          zungen.forEach((zg, i) => {
+            const spaltenX = links + Math.floor((i / zungen.length) * (2 * hw + 1));
+            const breite = Math.max(2, Math.ceil((2 * hw + 1) / zungen.length));
+            const hoehe = Math.max(0, (6 + 9 * zg.h) * flamme * (0.82 + 0.18 * Math.sin(t / zg.tempo + zg.ph)));
+            const fussY = Math.round(front);                                // der Fuss der Flammen sitzt auf der Brandfront und steigt mit ihr
+            for (let k = 0; k < hoehe; k++) {
+              const rel = k / Math.max(1, hoehe);
+              const c = rel < 0.2 ? FEUER[0] : rel < 0.42 ? FEUER[1] : rel < 0.62 ? FEUER[2] : rel < 0.8 ? FEUER[3] : FEUER[4];
+              const a = rel > 0.84 ? 0.55 : 1;
+              for (let b = 0; b < breite; b++) g.put(spaltenX + b, fussY - k, c, a);
+            }
+          });
+        }
+        // ── Funken ──
+        for (const s of teile.funken[zi]) {
+          const al = t - BRAND_AB - s.start;
+          if (al < 0 || al > s.leben) continue;
+          const k = al / s.leben, sek = al / 1000;
+          const x = links + s.fx * 2 * hw + Math.sin(sek * 7 + s.sw) * 2.2, y = oben + s.fy * 2 * hh - s.v * sek;
+          g.block(x, y, s.gross, s.gross, FEUER[s.farbe + 1], 1 - k * k);
+        }
+        // ── Asche und Rauch (nach dem Ablegen) ──
+        if (t >= ZERFALL_AB) {
+          for (const s of teile.asche[zi]) {
+            const al = t - ZERFALL_AB - s.start;
+            if (al < 0 || al > s.leben) continue;
+            const k = al / s.leben, sek = al / 1000;
+            const x = links + s.fx * 2 * hw + Math.sin(sek * 5 + s.sw) * 3, y = oben + s.fy * 2 * hh - s.v * sek + 14 * sek * sek;
+            g.block(x, y, s.gross, s.gross, KOHLE[s.farbe], 1 - k * k);
+          }
+          for (const r of teile.rauch[zi]) {
+            const al = t - ZERFALL_AB - r.start;
+            if (al < 0 || al > r.leben) continue;
+            const k = al / r.leben, sek = al / 1000;
+            const x = links + r.fx * 2 * hw + Math.sin(sek * 4 + r.sw) * 3, y = CY - 4 - 22 * sek * 1.4;
+            g.disc(x, y, r.r * (0.7 + 0.6 * k), KOHLE[k < 0.5 ? 1 : 0], 0.34 * (1 - k));
+          }
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 60 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Voodoo Curse (23.10.) — PIXELART, Brett-Animation auf ZWEI Zielen (`targets`: Held oder Kreatur-Zone, je ein Eintrag)
+  //
+  //  Auf beide Ziele faellt eine Nadel (rot-violetter Kopf, helle Spitze) und bleibt stecken; ein gepunkteter violetter Faden spannt sich zwischen ihnen, an dem zwei
+  //  Kugeln in entgegengesetzter Richtung wandern (rot: die Lebenspunkte des einen, gruen: die des anderen) und einander in der Mitte kreuzen. Bei der Ankunft
+  //  zuckt ein Ring ueber jedem Ziel, kantige Funken sprengen nach aussen, die Nadeln zerfallen. Der Zauber tauscht die Werte, wenn die Kugeln ankommen (`TAUSCH_MS`).
+  // ═══════════════════════════════════════════════════════════════════
+  voodoo_swap: (() => {
+    const VIO = ['#f1e5fa', '#d6b3f9', '#a159e9', '#702db3'].map(ppHex);
+    const ROT = ['#f7f7ad', '#e94e53', '#b21a29'].map(ppHex);
+    const GRUEN = ['#f7f7ad', '#80bf59', '#167927'].map(ppHex);
+    const WEISS = ppHex('#ffffff');
+    const ENDE = 1500, NADEL = 380, FADEN_AB = 300, WANDER_AB = 460, ANKUNFT = 1020, FADE_AB = 1180;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = (sz) => ({
+      funken: sz.ziele.map(() => Array.from({ length: ppFxN(14) }, () => ({ w: Math.random() * Math.PI * 2, v: 18 + Math.random() * 38, leben: 320 + Math.random() * 260, farbe: Math.floor(Math.random() * 4) }))),
+    });
+    const malen = (g, t, sz, teile) => {
+      const zs = sz.ziele;
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      // ── Nadeln ──
+      zs.forEach((z) => {
+        const CX = Math.round(z.x), CY = Math.round(z.y);
+        const k = klemme(t / NADEL, 0, 1);
+        const fall = (1 - k * k) * 16;                         // faellt von oben, wird schneller
+        const spitzeY = CY - 2 - Math.round(fall);
+        const zerfall = t > ANKUNFT ? klemme((t - ANKUNFT) / 260, 0, 1) : 0;
+        for (let j = 0; j < 9; j++) {
+          const dm = zerfall;
+          if (dm > 0 && ppBayer(CX, spitzeY - j) < dm) continue;
+          g.put(CX, spitzeY - j, j === 0 ? WEISS : VIO[1], aus);
+          g.put(CX + 1, spitzeY - j, VIO[3], aus * 0.9);
+        }
+        for (let b = -1; b <= 1; b++) for (let h = 0; h < 3; h++) {                  // Kopf
+          if (zerfall > 0 && ppBayer(CX + b, spitzeY - 9 - h) < zerfall) continue;
+          g.put(CX + b, spitzeY - 9 - h, h === 0 ? ROT[0] : (b === 1 ? ROT[2] : ROT[1]), aus);
+        }
+        if (t >= NADEL - 40 && t < NADEL + 260) {                                    // Einschlagring
+          const a = (t - (NADEL - 40)) / 300;
+          g.ring(CX, CY, 3 + a * 12, 2 + a * 8, VIO[2], (1 - a) * aus);
+        }
+      });
+      if (zs.length < 2) return;
+      const A = zs[0], B = zs[1];
+      const ax = A.x, ay = A.y, bx = B.x, by = B.y;
+      const dist = Math.hypot(bx - ax, by - ay) || 1;
+      // ── Faden: wachsend, gepunktet, marschiert ──
+      if (t >= FADEN_AB) {
+        const wachs = klemme((t - FADEN_AB) / 260, 0, 1);
+        const n = Math.floor(dist * wachs);
+        const marsch = Math.floor(t / 45);
+        for (let d = 0; d < n; d += 1) {
+          if (((d + marsch) % 4) > 1) continue;
+          const f = d / dist;
+          const x = ax + (bx - ax) * f, y = ay + (by - ay) * f - Math.sin(f * Math.PI) * 4;
+          g.put(x, y, ((d + marsch) & 1) ? VIO[1] : VIO[2], aus);
+          g.put(x, y + 1, VIO[3], aus * 0.85);
+        }
+      }
+      // ── Kugeln, die einander kreuzen ──
+      if (t >= WANDER_AB && t < ANKUNFT + 40) {
+        const k = klemme((t - WANDER_AB) / (ANKUNFT - WANDER_AB), 0, 1);
+        const e = k * k * (3 - 2 * k);
+        const punkt = (f) => ({ x: ax + (bx - ax) * f, y: ay + (by - ay) * f - Math.sin(f * Math.PI) * 4 });
+        for (let n = 5; n >= 0; n--) {                          // Schweif
+          const ke = klemme(e - n * 0.035, 0, 1);
+          const pa = punkt(ke), pb = punkt(1 - ke);
+          const r = Math.max(0.8, 3.4 - n * 0.5), a = (1 - n * 0.16) * aus;
+          g.disc(pa.x, pa.y, r, n < 2 ? ROT[1] : ROT[2], a);
+          g.disc(pb.x, pb.y, r, n < 2 ? GRUEN[1] : GRUEN[2], a);
+        }
+        const pa = punkt(e), pb = punkt(1 - e);
+        g.disc(pa.x, pa.y, 4, ROT[2], aus); g.disc(pa.x, pa.y, 3.2, ROT[1], aus); g.disc(pa.x, pa.y, 1.8, ROT[0], aus); g.put(pa.x, pa.y, WEISS, aus);
+        g.disc(pb.x, pb.y, 4, GRUEN[2], aus); g.disc(pb.x, pb.y, 3.2, GRUEN[1], aus); g.disc(pb.x, pb.y, 1.8, GRUEN[0], aus); g.put(pb.x, pb.y, WEISS, aus);
+      }
+      // ── Ankunft: Ring und Funken ──
+      if (t >= ANKUNFT) {
+        const al = t - ANKUNFT;
+        zs.forEach((z, zi) => {
+          const CX = Math.round(z.x), CY = Math.round(z.y);
+          if (al < 220) {
+            const f = 1 - al / 220;
+            g.ring(CX, CY, z.w / 2 * 0.5 + al / 8, z.h / 2 * 0.5 + al / 8, zi === 0 ? GRUEN[1] : ROT[1], f * aus);
+            g.disc(CX, CY, 3 * f + 1, WEISS, f * aus);
+          }
+          for (const s of teile.funken[zi]) {
+            if (al > s.leben) continue;
+            const k = al / s.leben, sek = al / 1000;
+            const x = CX + Math.cos(s.w) * s.v * sek * 1.1, y = CY + Math.sin(s.w) * s.v * sek * 0.9 + 0.5 * 40 * sek * sek;
+            g.block(x, y, 1 + (s.farbe === 0 ? 1 : 0), 1 + (s.farbe === 0 ? 1 : 0), s.farbe === 0 ? WEISS : s.farbe === 1 ? VIO[1] : s.farbe === 2 ? ROT[1] : GRUEN[1], (1 - k * k) * aus);
+          }
+        });
+      }
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 30 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
   //  Amazing Finding (11.10.) — PIXELART, Brett-Animation auf dem DECK des Spielers (`originDeck`, Ziel `{ deck: true }`)
   //
   //  Ein weisses Fragezeichen (violette Kontur) steigt ueber dem Deck auf und pulsiert, bei ~520 ms platzt es in einen achtstrahligen Funkelstern; rosa und
@@ -48996,6 +49202,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'looting') { const p = playerByName(entry.player); return <span className="log-status">🎒 {pName(p.name, p.color)}'s {cName('Looting')}: {entry.hero} equipped {cName(entry.card)} from {entry.from}'s discard pile.</span>; }
       if (t === 'live_show_look') { const p = playerByName(entry.player); return <span className="log-status">🎭 {pName(p.name, p.color)} looks at {entry.opponent}'s hand with {cName('Live Show')}.</span>; }
       if (t === 'live_show_result') { const p = playerByName(entry.player); return <span className="log-status">🎭 {pName(p.name, p.color)}'s {cName('Live Show')}: gave {entry.gave} card{entry.gave === 1 ? '' : 's'} to {entry.opponent}{entry.took > 0 ? ` and took ${entry.took} back` : ''}.</span>; }
+      if (t === 'transmission') { const p = playerByName(entry.player); return <span className="log-status">📡 {pName(p.name, p.color)}'s {cName('Transmission')} sent {cName(entry.card)} from their discard pile to {entry.opponent}'s hand.</span>; }
+      if (t === 'transmission_negated') { const p = playerByName(entry.player); return <span className="log-status">📡 {pName(p.name, p.color)}'s {cName('Transmission')} was negated.</span>; }
+      if (t === 'transmission_fizzle') { const p = playerByName(entry.player); return <span className="log-status">📡 {pName(p.name, p.color)}'s {cName('Transmission')} had no effect.</span>; }
+      if (t === 'trap_sabotage') { const p = playerByName(entry.player); return <span className="log-status">🔥 {pName(p.name, p.color)}'s {cName('Trap Sabotage')} burned {cName(entry.card)}{entry.discarded ? '' : ' (it stayed in place)'}{entry.fromHand + entry.fromDeck > 0 ? `; ${entry.opponent} sends ${entry.fromHand + entry.fromDeck} cop${entry.fromHand + entry.fromDeck === 1 ? 'y' : 'ies'} to the discard pile${entry.fromHand > 0 && entry.fromDeck > 0 ? ` (${entry.fromHand} from hand, ${entry.fromDeck} from deck)` : entry.fromHand > 0 ? ' from their hand' : ' from their deck'}` : ''}.</span>; }
+      if (t === 'trap_sabotage_peek') { const p = playerByName(entry.player); return <span className="log-status">🔥 {pName(p.name, p.color)}'s {cName('Trap Sabotage')} looked at a face-down card of {entry.hero || 'a Hero'} that is no Surprise.</span>; }
+      if (t === 'trap_sabotage_fizzle') { const p = playerByName(entry.player); return <span className="log-status">🔥 {pName(p.name, p.color)}'s {cName('Trap Sabotage')} found its target gone.</span>; }
+      if (t === 'treasure_theft') { const p = playerByName(entry.player); return <span className="log-status">🪙 {pName(p.name, p.color)}'s {cName('Treasure Theft')}: {entry.toHero} took {cName(entry.card)} from {entry.fromHero}.</span>; }
+      if (t === 'treasure_theft_blocked') { const p = playerByName(entry.player); return <span className="log-status">🪙 {pName(p.name, p.color)}'s {cName('Treasure Theft')} could not move {cName(entry.card)}.</span>; }
+      if (t === 'treasure_theft_fizzle') { const p = playerByName(entry.player); return <span className="log-status">🪙 {pName(p.name, p.color)}'s {cName('Treasure Theft')} found its target gone.</span>; }
+      if (t === 'voodoo_curse') { const p = playerByName(entry.player); return <span className="log-status">🪆 {pName(p.name, p.color)}'s {cName('Voodoo Curse')}: {cName(entry.a)} and {cName(entry.b)} swapped HP — {entry.a} now {entry.aHp}, {entry.b} now {entry.bHp}{entry.aAtk != null ? `; Attack: ${entry.a} ${entry.aAtk}, ${entry.b} ${entry.bAtk}` : ''}.</span>; }
+      if (t === 'voodoo_curse_blocked') { const p = playerByName(entry.player); return <span className="log-status">🪆 {pName(p.name, p.color)}'s {cName('Voodoo Curse')} between {cName(entry.a)} and {cName(entry.b)} had no effect (a target is unaffected).</span>; }
+      if (t === 'voodoo_curse_fizzle') { const p = playerByName(entry.player); return <span className="log-status">🪆 {pName(p.name, p.color)}'s {cName('Voodoo Curse')} found a target gone.</span>; }
       // Secret Spell Book (secret-spell-book.js)
       if (t === 'duel_choose') { const p = playerByName(entry.player); return <span className="log-status">⚔️ {pName(p.name, p.color)} chooses {cName(entry.hero)} for the {cName('Duel')}.</span>; }
       if (t === 'duel_round') { const pa = playerByName(entry.a.player), pb = playerByName(entry.b.player); return <span className="log-status">⚔️ {cName('Duel')} — round {entry.round}: {cName(entry.a.hero || 'Hero')} ({pName(pa.name, pa.color)}) deals {entry.a.damage}, {cName(entry.b.hero || 'Hero')} ({pName(pb.name, pb.color)}) deals {entry.b.damage}. HP left: {entry.a.hp} / {entry.b.hp}.</span>; }

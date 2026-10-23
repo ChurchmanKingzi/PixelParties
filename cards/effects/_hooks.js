@@ -403,6 +403,10 @@ const STATUS_EFFECTS = {
   // routes ALL attached copies to their original owners' discard piles
   // when the status is cleansed (its `onStatusRemoved` hook).
   berserked: { negative: true, cleansable: true, label: 'Berserked', icon: '😡', immuneKey: 'berserk_immune' },
+  // `ordered` (23.10., „The Master's Orders"): der Held steht unter dem Befehl des Anhaengers — der darf in seinen Zuegen mit ihm handeln, als gehoerte er ihm (zeitweise Uebernahme am
+  // Zugbeginn, siehe the-master-s-orders.js). Der Status ist der Schalter und die Heilbarkeit der Karte („treated as a negative status effect"): geheilt (Juice, Beer, Cure …) faellt jede
+  // Orders-Kopie am Helden in die Ablage ihres Besitzers.
+  ordered: { negative: true, cleansable: true, label: 'Under Orders', icon: '📜', immuneKey: 'orders_immune' },
   // `cursed` — applied by Curse Attachment Spell. The bearer's
   // Attack stat is suppressed to 0 while attached: the engine's
   // `actionGrantAtk` / `actionRevokeAtk` / `grantTempHeroAtk` /
