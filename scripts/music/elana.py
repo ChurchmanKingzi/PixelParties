@@ -6,7 +6,7 @@ Hand mischen und eins mehr ziehen). Der Track soll wie ein echter Song klingen, 
 Power-Pop-Punk-Rock mit Strophe, Pre-Chorus, Hymnen-Refrain mit Mitgröl-Chor, Bridge, Gitarrensolo und
 Schluss-Refrain eine Stufe höher — und natürlich loopend.
 
-  • G-Dur, 156 BPM, 4/4. Gitarren: Palm-Mute-Achtel in der Strophe, offene Powerchords im Refrain; ein Lead-Gitarren-Riff
+  • G-Dur, 156 BPM, 4/4. (Version 2: E-Dur, 168 BPM, Gitarren/Bass statt Chor/Streicher) Gitarren: Palm-Mute-Achtel in der Strophe, offene Powerchords im Refrain; ein Lead-Gitarren-Riff
     eröffnet und hält das Stück zusammen; Clean-Gitarre als Gegenpol (Bridge, Strophe 2); Bass pumpt Achtel.
   • Refrain mit rockiger Mixolydisch-Wendung (G – F – C – G | G – F – C – D): das ♭VII (F) gibt den „Rebel“-Biss. Die
     Hook-Melodie sitzt im Lead (Gitarre, dazu die Solo-Voice-Stimme leise) und wird vom Chor (Aahs, Gang-„Hey!“,
@@ -20,27 +20,30 @@ import os, sys, math, random
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lib import *
 
-BPM, BARS = 156, 80
+BPM, BARS = 168, 80
+KEY = -3          # Grundton E statt G: offene E-Saite, Standard-Rockgitarren-Tonart (Finale in F#)
 song = Song(BPM, BARS)
 rng = random.Random(1977)
 
-song.inst('lead', 'rockgtr', vol=96, pan=64)       # Lead-Gitarre (Riff, Hook, Solo)
-song.inst('gtrL', 'rockgtr', vol=86, pan=20)
-song.inst('gtrR', 'rockgtr', vol=84, pan=108)
+song.inst('lead', 'rockgtr', vol=104, pan=64)       # Lead-Gitarre (Riff, Hook, Solo)
+song.inst('gtrL', 'rockgtr', vol=100, pan=18)
+song.inst('gtrR', 'rockgtr', vol=98, pan=110)
 song.inst('clean', 'cleangtr', vol=80, pan=92)
-song.inst('bass', 'bass', vol=102, pan=60)
+song.inst('bass', 'bass2', vol=102, pan=60)
 song.inst('organ', 'rockorgan', vol=60, pan=46)
-song.inst('choir', 'choir', vol=78, pan=64)         # Mitgröl-Chor (Aahs, Gang-„Hey!“)
-song.inst('oohs', 'oohs', vol=70, pan=74)
+song.inst('lead2', 'rockgtr', vol=80, pan=30)       # zweite Lead-Gitarre (Twin-Guitar-Oktave)
+song.inst('acou', 'guitar', vol=84, pan=100)        # Schlaggitarre (Western-Gitarre)
+song.inst('choir', 'choir', vol=44, pan=64)         # Mitgröl-Chor (Aahs, Gang-„Hey!“)
+song.inst('oohs', 'oohs', vol=36, pan=74)
 song.inst('vox', 'solovoice', vol=70, pan=58)       # Solo-Voice leise als „Gesang“ unter der Gitarre
-song.inst('strings', 'slowstr', vol=70, pan=40)
+song.inst('strings', 'slowstr', vol=40, pan=40)
 
 NAMES = {'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11}
 def pn(s):
     a, i = 0, 1
     if s[1] in '#b':
         a, i = (1 if s[1] == '#' else -1), 2
-    return 12 * (int(s[i:]) + 1) + NAMES[s[0]] + a
+    return 12 * (int(s[i:]) + 1) + NAMES[s[0]] + a + KEY
 
 CH = {'G': (7, 'M'), 'F': (5, 'M'), 'C': (0, 'M'), 'D': (2, 'M'), 'D7': (2, '7'), 'Em': (4, 'm'),
       'Am': (9, 'm'), 'E': (4, 'M')}
@@ -48,7 +51,7 @@ QUAL = {'M': (0, 4, 7), 'm': (0, 3, 7), '7': (0, 4, 7, 10)}
 
 def tones(ch, oct_, shift=0):
     root, q = CH[ch]
-    r = (root + shift) % 12 + 12 * (oct_ + 1)
+    r = (root + shift + KEY) % 12 + 12 * (oct_ + 1)
     return [r + i for i in QUAL[q]]
 
 def hv(v): return v + rng.randint(-3, 3)
@@ -207,6 +210,15 @@ def bass_half(bar0, chords, shift=0, vel=84):
         if r > 50: r -= 12
         song.add('bass', song.bar(bar0 + k) + off, dur - 0.1, r, vel)
 
+def acou_strum(bar0, chords, shift=0, vel=84):
+    """Achtel-Schlag der Akustikgitarre (Ab-Auf-Muster) unter dem Refrain."""
+    for k, off, dur, ch in spans(chords):
+        T = tones(ch, 3, shift)
+        for i in range(int(dur * 2)):
+            if i % 4 in (0, 1, 3) or True:
+                for j, m in enumerate((T[0], T[1] + (0), T[2], T[0] + 12)):
+                    song.add('acou', song.bar(bar0 + k) + off + i * 0.5 + j * 0.012, 0.45, m, hv(vel + (10 if i % 2 == 0 else -6)))
+
 def organ(bar0, chords, shift=0, vel=48):
     for k, off, dur, ch in spans(chords):
         T = tones(ch, 3, shift)
@@ -302,7 +314,7 @@ b += 8
 mel('lead', b, PRE, vel=90); mel('vox', b, PRE, vel=50)
 chug(b, PRE_CH, vel=74)
 bass8(b, PRE_CH, vel=98)
-choir_pad(b + 2, PRE_CH[2:], vel=54)
+
 drums(b, 4, 'pre')
 roll(b + 3, 2.5, 4, 70, 126)
 b += 4
@@ -311,12 +323,10 @@ b += 4
 def chorus(base, ch_list, end, shift=0, vel=96, big=False, style='chorus'):
     mel('lead', base, HOOK, shift=shift, vel=vel); mel('lead', base + 7, [end], shift=shift, vel=vel)
     mel('vox', base, HOOK, shift=shift, vel=54); mel('vox', base + 7, [end], shift=shift, vel=54)
-    mel('choir', base, HOOK, shift=shift, vel=60 + (8 if big else 0), octave=-1, vib=False)
-    mel('choir', base + 7, [end], shift=shift, vel=60 + (8 if big else 0), octave=-1, vib=False)
+    mel('lead2', base, HOOK, shift=shift, vel=84, octave=-1, vib=False); mel('lead2', base + 7, [end], shift=shift, vel=84, octave=-1, vib=False)
+    acou_strum(base, ch_list, shift=shift)
     strum(base, ch_list, shift=shift, vel=90 + (6 if big else 0))
     bass8(base, ch_list, shift=shift, vel=100, gallop=(style == 'gallop'))
-    organ(base, ch_list, shift=shift, vel=48 + (6 if big else 0))
-    if big: strings(base, ch_list, shift=shift, vel=50)
     for k in (3, 7):                                                  # Antwort-Chor nach den langen Tönen
         oh_oh_oh(base, k, 2.5, ch_list[k] if k != 7 or ch_list[7] != ch_list[0] else ch_list[7], shift=shift, vel=84 + (8 if big else 0))
     for k in (0, 4):
@@ -331,7 +341,7 @@ mel('lead', b, VERSE, vel=88); mel('vox', b, VERSE, vel=52)
 chug(b, VERSE_CH, vel=70)
 arps(b, VERSE_CH, vel=52)
 bass8(b, VERSE_CH, vel=96)
-organ(b, VERSE_CH, vel=40)
+acou_strum(b, VERSE_CH, vel=70)
 drums(b, 8, 'verse')
 b += 8
 
@@ -339,7 +349,7 @@ b += 8
 mel('lead', b, PRE, vel=94); mel('vox', b, PRE, vel=54)
 chug(b, PRE_CH, vel=78)
 bass8(b, PRE_CH, vel=100)
-choir_pad(b, PRE_CH, vel=58)
+
 drums(b, 4, 'pre')
 roll(b + 3, 2.5, 4, 70, 127)
 b += 4
@@ -352,8 +362,7 @@ b += 8
 mel('clean', b, BRIDGE, vel=80, octave=0, vib=False)
 mel('vox', b, BRIDGE, vel=62)
 arps(b, BRIDGE_CH, vel=48, oct_=3)
-strings(b, BRIDGE_CH, vel=60)
-choir_pad(b + 4, BRIDGE_CH[4:], vel=52)
+acou_strum(b, BRIDGE_CH, vel=60)
 bass_half(b, BRIDGE_CH, vel=84)
 drums(b, 8, 'half', fill_every=0)
 roll(b + 7, 2, 4, 50, 124)
@@ -365,7 +374,7 @@ for k in (1, 3, 5, 7):
     bend_up('lead', song.bar(b + k), semis=2.0, rise=0.2)
 strum(b, SOLO_CH, vel=88)
 bass8(b, SOLO_CH, vel=100)
-organ(b, SOLO_CH, vel=46)
+acou_strum(b, SOLO_CH, vel=70)
 drums(b, 8, 'chorus')
 b += 8
 
@@ -383,8 +392,7 @@ CH['A'] = (9, 'M')
 mel('lead', b, [[('E5', 1.5), ('C#5', .5), ('E5', 2)], [('D5', 1.5), ('B4', .5), ('D5', 2)], [('A4', 1), ('D5', 1), ('F#5', 2)], [('A5', .5), ('F#5', .5), ('D5', 1), (None, 2)]], vel=94)
 strum(b, OUT_CH, vel=92, hits=((0, 1.8), (2, 1.8)))
 bass8(b, OUT_CH, vel=96)
-choir_pad(b, OUT_CH, vel=62)
-organ(b, OUT_CH, vel=50)
+acou_strum(b, OUT_CH, vel=78)
 drums(b, 3, 'half', crash=True, fill_every=0)
 for k in (3,):
     roll(b + k, 0, 4, 50, 126)
