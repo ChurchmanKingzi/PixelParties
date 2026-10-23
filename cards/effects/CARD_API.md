@@ -25225,3 +25225,40 @@ Text: „You can only use this Spell while 2 of your Heroes are defeated and you
 * **Puzzle** (kein `onPlay`): `puzzleAnheften` (aus `createPuzzleGame`, `server.js`) legt die Kontrolle an; Besitzer der Karte = Spieler der ANDEREN Seite des Wirts. Im Puzzle-Aufbau gilt die Obergrenze: ein Spieler mit > 2 lebenden Helden verliert die Karte sofort.
 * **Bild**: `mind_control_hex` (Pixelart, `ppPunktBild` in `app-board.jsx`; Hypnose-Spirale in fünf Violetttönen, Bayer-Dither, Kreuzfunkel an den Ecken; Klang `elem_dark` in `ZONE_ANIM_SFX`), auch als `spellVisual` bei Negation. CPU: nimmt den Helden mit dem höchsten Wert (HP, ATK, Fähigkeiten).
 * Tests: `docs/niche-tests/repro/NK2-neue-karten/04-mind-control.js`.
+
+## ★ 23.10. — Fünf neue Karten: The Master's Orders, Transmission, Trap Sabotage, Treasure Theft, Voodoo Curse
+Ausführliche Rulings stehen jeweils im Kopf des Skripts (`cards/effects/<slug>.js`); hier nur die Verträge, die andere Karten betreffen.
+
+### The Master's Orders (Spell, Attachment, Decay Magic Lv1)
+Text: „Attach this card to a Hero your opponent controls. While this card is attached to a Hero, your opponent may perform Actions with it as if they controlled it, but they cannot make it choose itself as a target for an Attack or Spell. This is treated as a negative status effect.“
+* **„Your opponent“ = der ANHÄNGER** (Spieler, der die Karte gespielt hat, `inst.originalOwner`), also der Gegner des Kontrolleurs des Helden. Der Besitzer des Helden behält ihn für seine eigenen Züge.
+* **Status**: echter Status `ordered` („Under Orders“, negativ, heilbar; Registry `_hooks.js`, Abzeichen in `app-shared.jsx`). Cure/Beer/Juice … → `onStatusRemoved` (`_viaCleanse`) wirft ALLE Kopien am Helden in die Ablage ihres Besitzers. Ohne Status passiert nichts (immun, geheilt).
+* **Kontrolle**: in jedem Zug des Anhängers (`onTurnStart`, bei Anlegen im eigenen Zug sofort) übernimmt er den Helden zeitweise (`_charm-shared.temporaereKontrolle`, Marken `charmedBy`/`charmedFromOwner`/`charmedHeroIdx`, Status `charmed` mit `ohneSchutz` und `quelle`), Rechte „beschwören + ausrüsten“. Die Rückgabe ist generisch (`startTurn`). Während der Übernahme zählt der Held überall als Held des Anhängers (`heroSideOf`): „you control“ trifft ihn, „all targets your opponent controls“ nicht.
+* **Selbstwahl-Sperre** über `blocksTargetingAnywhere(gs, engine, info, inst)` (Alliance-Muster): der übernommene Held kann sich mit Attack/Spell nicht selbst wählen (auch kein Support-Spell); Abilities, Heldeneffekte und Creature-Effekte sind nicht erfasst.
+* Unspielbar im Erste-Runden-Schutz des Wirts (`blockedByFirstTurnProtection`). CPU: stärkster Gegnerheld (HP + 3·ATK).
+
+### Transmission (Spell, Support Magic Lv1)
+Text: „Choose any card from your discard pile and add it to your opponent's hand. This counts as an additional Action.“
+* `inherentAction: true`. Galerie der eigenen Ablage (abbrechbar), dann Fenster „Hand-Interaktion / insert“ (Ambush the Scout), `takeFromPile` (Stapelsperren), Flug `play_pile_transfer` Ablage → Gegnerhand, `handZugang(oi, name, { originalOwner: pi })` — die Karte bleibt Eigentum des Wirkers.
+* Unspielbar bei leerer Ablage, Ablage-Sperre, Hand-Sperre/Erste-Runden-Schutz des Gegners, Spreading Rumor/Slow. CPU spielt sie nie von sich aus (`cpuSkipProactive`).
+
+### Trap Sabotage (Spell, Destruction Magic Lv1)
+Text: „Choose a face-down Surprise your opponent controls and send it to the discard pile. Your opponent must send all copies of that Surprise from their hand and deck to their discard pile. If the user has at least Destruction Magic 1, this counts as an additional Action.“
+* **Ziele**: verdeckte echte Surprises (`engine._getAllSurpriseEntries`, nach Kontrolle) und verdeckte Surprise-Creatures in Bakhm-Support-Zonen; offene, festgesetzte und Cardinal-Beast-Karten nicht. Verdeckte Nicht-Surprises (Create Secret Room) werden dem Wirker einmal gezeigt (`deckSearchReveal`), bleiben verdeckt und sind kein Ziel. Namen verdeckter Ziele sieht der Wähler nicht.
+* **Ablegen**: Surprise Zone `actionDestroyCard`, Bakhm-Slot `sendBoardCardToDiscard`; Besitzer der Ablage = ursprünglicher Besitzer. **Kopien**: gleicher BASISNAME aus Hand (`actionDiscardHandCard`, ein Fenster „Hand-Interaktion / discard“, Boris darf verzichten) und Deck (`takeFromPile`, eine gesammelte Animation). Der Satz hängt nicht am Erfolg des Ablegens.
+* `inherentAction` als Funktion (`effectiveSchoolLevelForCaster` ≥ 1). Bild `trap_burn` (Pixelart: Feuerball, Flammen, Verkohlen von unten nach oben, Asche; `ANIM_REGISTRY` in `app-board.jsx`, Klänge in `ZONE_ANIM_SFX`). CPU wählt zufällig.
+
+### Treasure Theft (Spell, Decay Magic Lv0)
+Text: „Choose an Artifact equipped to a Hero your opponent controls and equip it to the user. If the user has at least Decay Magic 1, this counts as an additional Action.“
+* **Ziele**: Artefakt-Ausrüstung eines vom Gegner KONTROLLIERTEN Helden, die der Nutzer tragen kann (`_equip-shared`: `istUmhaengbaresEquip`, `darfAn`, `umhaengFreieZonen`) — Crusader's-/Idej-Artefakte, „höchstens eins“-Regeln und Race Boats beachtet. Ohne freie Support Zone oder tragbares Ziel kann der Held die Karte nicht wirken (`canPlayWithHero`).
+* **Umhängen** über `engine.actionTransferAttachment`: keine Kosten, keine Einmal-Wirkung beim Anlegen (`_isMove`), Equip-Fenster der Surprises mit dem Nutzer als Ausrüstendem; die Karte gehört weiter ihrem Besitzer.
+* `inherentAction` als Funktion (Decay Magic ≥ 1 des Nutzers). CPU: teuerstes Artefakt.
+
+### Voodoo Curse (Spell, Decay Magic Lv2, Secret Rare)
+Text: „Choose 2 targets that are controlled by the same player and swap their current and max HP, including all bonuses from Attachments, equipped Artifacts and Abilities. Then, if both targets have an Attack stat, swap those as well.“
+* **Ziele**: lebende Helden und aufgedeckte Kreaturen, nach Kontrolle; beide vom SELBEN Spieler. Zwei abbrechbare Schritte, Rest ausgegraut.
+* **Tausch** PAARWEISE (A bekommt max UND aktuelle HP von B und umgekehrt), als Gesamtsumme inkl. Boni; die Boni bleiben bei ihren Karten (spätere Toughness-Verluste ziehen vom getauschten Wert ab, max HP nie unter 1). ATK nur, wenn beide einen Attack stat haben (heute nur Helden), über `_applyHeroAtkDelta`.
+* **Schutz**: Helden `heroNonDamageEffectBlocked(…, 'max_hp')`, Kreaturen `isOmniImmune`; ist EIN Ziel geschützt, verpufft der ganze Tausch.
+* Bild `voodoo_swap` (Pixelart: Nadeln, Faden, zwei Kugeln kreuzen sich; Werte wandern bei `TAUSCH_MS`). CPU tauscht nur Gegnerpaare, bei denen der stärkere Angreifer die niedrigeren HP bekommt.
+* Logs: `transmission`, `trap_sabotage(_peek/_fizzle)`, `treasure_theft(_blocked/_fizzle)`, `voodoo_curse(_blocked/_fizzle)`, `masters_orders_(attached/control/noop/cleansed)` — Client-Texte im Log-Schalter von `app-board.jsx`.
+* Tests: nur lokal (Scratchpad), nicht im Repo.
