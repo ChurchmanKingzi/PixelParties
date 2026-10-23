@@ -84,13 +84,9 @@ module.exports = {
       // trigger off a Spell's resolution.
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
-      // Need a free Support Zone on Klaus.
-      const supZones = fs.supportZones?.[heroIdx] || [[], [], []];
-      let freeSlot = -1;
-      for (let z = 0; z < 3; z++) {
-        if ((supZones[z] || []).length === 0) { freeSlot = z; break; }
-      }
-      if (freeSlot < 0) return;
+      // Need a free Support Zone on Klaus — W63a (Al, 22.10.2026): oder, mit Alice-Teilung, die Zone einer GLEICHNAMIGEN Creature (je Karte unten geprueft;
+      // geteilte Zone zuerst, dann die erste leere: `engine.beschwoerZonenFuer`).
+      const zonenFuer = (name) => engine.beschwoerZonenFuer(pi, name, { seite: feld, heroIdx, nurBasis: true, namedHeroesOnly: true });
 
       // Eligible Creatures: in hand, type Creature, level < spell level.
       const cardDB = engine._getCardDB();
@@ -107,6 +103,7 @@ module.exports = {
         // Effective level (Whoolmoth-style reducers, per-slot offsets).
         const lvl = engine.effectiveCardLevel(cd, pi, { handIdx: i });
         if (lvl >= spellLevel) continue;
+        if (zonenFuer(cn).length === 0) continue;   // W63a: frei oder (Alice) geteilt
         eligible.push(cn);
       }
       if (eligible.length === 0) return;
@@ -124,11 +121,7 @@ module.exports = {
       // Re-verify hand presence — async prompt could have shifted state.
       if ((ps.hand || []).indexOf(chosenName) < 0) return;
       // Re-verify free slot.
-      const supZones2 = fs.supportZones?.[heroIdx] || [[], [], []];
-      let slotNow = -1;
-      for (let z = 0; z < 3; z++) {
-        if ((supZones2[z] || []).length === 0) { slotNow = z; break; }
-      }
+      const slotNow = zonenFuer(chosenName)[0]?.slotIdx ?? -1;   // W63a: geteilte Zone (Alice) zuerst, dann die erste freie
       if (slotNow < 0) return;
 
       // PLACE — bypasses summon level / school requirement. The helper

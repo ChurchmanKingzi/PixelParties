@@ -199,16 +199,17 @@ module.exports = {
       // Styx 28.9.: geliehene Helden der Gegenspalte — Ermaessigungen aus
       // der Hand von `pi` (fuer eigene Helden identisch zu vorher).
       if (cd && !engine.heroMeetsLevelReq(physOwner, hi, cd, { levelSourcePi: pi })) continue;
-      const sup = engine.gs.players[physOwner]?.supportZones?.[hi] || [[], [], []];
-      for (let z = 0; z < 3; z++) {
-        if ((sup[z] || []).length === 0) {
-          hostZones.push({
-            owner: physOwner, heroIdx: hi, slotIdx: z,
-            label: `${h.name} — Support ${z + 1}`,
-          });
-        }
+      // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): freie Zonen UND — mit
+      // Alice-Teilung — die Zone eines gleichnamigen Candlestick Squire (`engine.beschwoerZonenFuer`).
+      for (const zz of engine.beschwoerZonenFuer(pi, CARD_NAME, { seite: physOwner, heroIdx: hi, nurBasis: true, namedHeroesOnly: true })) {
+        hostZones.push({
+          owner: physOwner, heroIdx: hi, slotIdx: zz.slotIdx,
+          label: `${h.name} — Support ${zz.slotIdx + 1}${zz.shared ? ` (×${zz.stackDepth})` : ''}`,
+          ...(zz.shared ? { shared: true, stackDepth: zz.stackDepth } : {}),
+        });
       }
     }
+    hostZones.splice(0, hostZones.length, ...require('./_alice-shared').geteiltZuerst(hostZones));
     if (hostZones.length === 0) return false; // no valid host
 
     // Styx 28.9.: geliehene Helden der Gegenspalte — physische Seite des

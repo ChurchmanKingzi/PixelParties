@@ -58,13 +58,19 @@ function _isFromMolinda(source, ctx) {
  * `[]` if she's KO'd or her column has no empty slots —
  * matches dark-gear.js' getFreeZones, scoped to one hero.
  */
-function _molindaFreeZones(engine, ctx) {
+function _molindaFreeZones(engine, ctx, name = null) {
   // Styx 28.9.: Zonen auf Molindas Brettseite.
   const ps = engine.gs.players[ctx.cardHeroOwner ?? ctx.cardOwner];
   if (!ps) return [];
   const heroIdx = ctx.cardHeroIdx;
   const hero = ctx.attachedHero ?? ps.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return [];
+  // ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): mit `name` zaehlt auch die Zone
+  // einer GLEICHNAMIGEN Creature (Alice-Teilung des Kontrolleurs) — `engine.beschwoerZonenFuer`, geteilte Zonen vorn.
+  if (name) {
+    return engine.beschwoerZonenFuer(ctx.cardOwner, name, { seite: ctx.cardHeroOwner ?? ctx.cardOwner, heroIdx, namedHeroesOnly: true })
+      .map(z => ({ heroIdx, slotIdx: z.slotIdx, label: z.label, ...(z.shared ? { shared: true, stackDepth: z.stackDepth } : {}) }));
+  }
   const slots = ps.supportZones?.[heroIdx] || [];
   const zones = [];
   for (let si = 0; si < slots.length; si++) {
@@ -256,7 +262,7 @@ module.exports = {
         if (engine._guardianSchutzFuer(inst)) continue;   // W25b (N2-05): Spieler-Marke massgeblich
         if (inst.counters?._stealImmortal) continue;
 
-        const freeZones = _molindaFreeZones(engine, ctx);
+        const freeZones = _molindaFreeZones(engine, ctx, inst.name);   // W63a: + Zone einer gleichnamigen Creature (Alice), geteilte zuerst
         if (freeZones.length === 0) break; // No room — bail on remaining hits.
 
         const confirmed = await ctx.promptConfirmEffect({

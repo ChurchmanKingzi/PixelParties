@@ -104,7 +104,16 @@ function _enumerateFreeOwnSlots(engine, pi) {
  */
 function _enumerateHostSlotsForCreature(engine, pi, cd) {
   const slots = _enumerateFreeOwnSlots(engine, pi);
-  return slots.filter(s => _heroCanHostCreature(engine, s.owner, s.heroIdx, cd, pi));
+  // ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): mit Alice-Teilung des Beschwoerers
+  // zaehlt auch die Zone einer GLEICHNAMIGEN Mischief-Militia-Creature — geteilte Zonen vorn (`_alice-shared.mitGeteilten`).
+  return require('./_alice-shared').mitGeteilten(engine, pi, cd.name,
+    slots.filter(s => _heroCanHostCreature(engine, s.owner, s.heroIdx, cd, pi)), {},
+    z => _heroCanHostCreature(engine, z.owner, z.heroIdx, cd, pi));
+}
+
+/** W63a: gibt es fuer `cd` mindestens eine GETEILTE Zone (Alice) bei einem Helden, der sie beschwoeren darf? */
+function _hatGeteilteZone(engine, pi, cd) {
+  return _enumerateHostSlotsForCreature(engine, pi, cd).some(z => z.shared);
 }
 
 /**
@@ -128,6 +137,8 @@ function _buildHandCopies(engine, pi, slots) {
         eligibleSlotIdxs.push(s);
       }
     }
+    // W63a: eine GETEILTE Zone (Alice) braucht keinen freien Platz — ein privater Zusatzknoten je Kopie im Matching (Index ab `slots.length`).
+    if (_hatGeteilteZone(engine, pi, cd)) eligibleSlotIdxs.push(slots.length + copies.length);
     if (eligibleSlotIdxs.length === 0) continue; // un-summonable copy — drop
     copies.push({ name, cd, handIdx, eligibleSlotIdxs });
   }
@@ -202,7 +213,7 @@ module.exports = {
     if (ps._mischiefInvasionUsedTurn === gs.turn) return false;
     if (countFrozenTargets(engine) < 1) return false;
     const slots = _enumerateFreeOwnSlots(engine, pi);
-    if (slots.length === 0) return false;
+    // W63a: auch ohne freie Zone spielbar, wenn eine Kopie in eine geteilte Zone (Alice) passt (`_buildHandCopies` prueft beides)
     // At least one MM Creature in hand must be summonable somewhere.
     return _buildHandCopies(engine, pi, slots).length > 0;
   },
@@ -221,12 +232,8 @@ module.exports = {
       }
 
       const slots = _enumerateFreeOwnSlots(engine, pi);
-      if (slots.length === 0) {
-        engine.gs._spellCancelled = true;
-        return;
-      }
 
-      const copies = _buildHandCopies(engine, pi, slots);
+      const copies = _buildHandCopies(engine, pi, slots);   // W63a: ohne freie Zone nur Kopien mit geteilter Zone (Alice)
       if (copies.length === 0) {
         engine.gs._spellCancelled = true;
         return;
@@ -235,7 +242,7 @@ module.exports = {
       // ── Max matching across ALL summonable copies in hand. ──
       // The picker's cap is the matching size — bigger picks would
       // necessarily leave some Creature un-summonable.
-      const fullMatch = _maxMatching(copies, slots.length);
+      const fullMatch = _maxMatching(copies, slots.length + copies.length);   // W63a: + je ein privater Knoten fuer geteilte Zonen
       const cap = Math.min(frozenCount, fullMatch.count);
       if (cap < 1) {
         engine.gs._spellCancelled = true;
@@ -376,7 +383,8 @@ module.exports = {
           const zones = hosts.map(h => ({
             owner: h.owner,   // Kontrolle statt Seite (Styx 28.9.)
             heroIdx: h.heroIdx, slotIdx: h.slotIdx,
-            label: `${engine.gs.players[h.owner]?.heroes?.[h.heroIdx]?.name || 'Hero ' + (h.heroIdx + 1)} — Support ${h.slotIdx + 1}`,
+            label: `${engine.gs.players[h.owner]?.heroes?.[h.heroIdx]?.name || 'Hero ' + (h.heroIdx + 1)} — Support ${h.slotIdx + 1}${h.shared ? ` (×${h.stackDepth})` : ''}`,
+            ...(h.shared ? { shared: true, stackDepth: h.stackDepth } : {}),   // W63a: geteilte Zone (Alice) vorn, mit Kennzeichen
           }));
           const zp = await engine.promptGeneric(pi, {
             type: 'zonePick',

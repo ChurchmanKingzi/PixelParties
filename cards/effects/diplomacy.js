@@ -50,7 +50,7 @@ function getMaxCreatureLevel(level) {
  * doesn't care which specific Hero hosts the stolen Creature
  * (Creatures are independent of their Hero).
  */
-function getFreeZones(ps) {
+function getFreeZones(ps, engine = null, pi = null, name = null) {
   const zones = [];
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
@@ -63,6 +63,11 @@ function getFreeZones(ps) {
         zones.push({ heroIdx: hi, slotIdx: si, label: `${heroLabel} — Slot ${si + 1}` });
       }
     }
+  }
+  // ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): mit Alice-Teilung des Spielers
+  // zaehlt auch die Zone einer GLEICHNAMIGEN Creature als „free" fuer die uebernommene Kreatur (`name`) — geteilte zuerst.
+  if (engine && name) {
+    return require('./_alice-shared').mitGeteilten(engine, pi, name, zones, { nachKontrolle: false, livingHeroesOnly: false, nurBasis: true });
   }
   return zones;
 }
@@ -132,10 +137,12 @@ module.exports = {
     if ((ps.gold || 0) < cost) return false;
     if (cost > 0 && engine.goldSpendBlocked(pi)) return false;   // G1 (A09-11): Goldsperre - "Spend N Gold"
 
-    if (getFreeZones(ps).length === 0) return false;
-
     const maxLv = getMaxCreatureLevel(level);
-    return getEligibleCreatures(engine, pi, maxLv).length > 0;
+    const ziele = getEligibleCreatures(engine, pi, maxLv);
+    if (ziele.length === 0) return false;
+    if (getFreeZones(ps).length > 0) return true;
+    // W63a: keine freie Zone — mit Alice-Teilung reicht die Zone einer GLEICHNAMIGEN Creature fuer ein Ziel
+    return ziele.some(t => getFreeZones(ps, engine, pi, t.cardName).length > 0);
   },
 
   /**
@@ -158,9 +165,9 @@ module.exports = {
     const eligible = getEligibleCreatures(engine, pi, maxLv);
     if (eligible.length === 0) return false;
 
-    // Check free zones
+    // Check free zones (W63a: oder, mit Alice-Teilung, eine geteilte — je Ziel unten)
     const freeZones = getFreeZones(ps);
-    if (freeZones.length === 0) return false;
+    if (freeZones.length === 0 && !eligible.some(t => getFreeZones(ps, engine, pi, t.cardName).length > 0)) return false;
 
     // Step 1: Select an opponent's creature
     const selectedIds = await ctx.promptTarget(eligible, {
@@ -178,7 +185,7 @@ module.exports = {
     if (!target) return false;
 
     // Step 2: Select a free support zone
-    const currentFreeZones = getFreeZones(ps);
+    const currentFreeZones = getFreeZones(ps, engine, pi, target.cardName);   // W63a: + Zone einer gleichnamigen Creature (Alice), geteilte zuerst
     if (currentFreeZones.length === 0) return false;
 
     let chosenZone;

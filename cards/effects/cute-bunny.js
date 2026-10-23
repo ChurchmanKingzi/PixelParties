@@ -65,8 +65,8 @@ function getHostHeroes(engine, pi) {
   for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp <= 0) continue;
     if (!require('./_summon-eligibility').heroAgiert(h)) continue;   // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer (nicht Frozen/Stunned/Webbed/Bound/Negated) — `heroAgiert`.
-    const supZones = engine.gs.players[physOwner]?.supportZones?.[hi] || [];
-    if (!supZones.some(slot => (slot || []).length === 0)) continue;
+    // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte): freie Zone ODER — mit Alice-Teilung — die Zone eines gleichnamigen Cute Bunny.
+    if (!engine.hatBeschwoerZone(pi, CARD_NAME, { seite: physOwner, heroIdx: hi, nurBasis: true, namedHeroesOnly: true })) continue;
     if (!engine.heroMeetsLevelReq(physOwner, hi, cd)) continue;
     out.push({ owner: physOwner, heroIdx: hi });
   }
@@ -132,16 +132,15 @@ module.exports = {
       if (!confirmed) return;
 
       // Pick destination zone
-      const zones = [];
+      let zones = [];
       for (const { owner, heroIdx: hi } of hosts) {   // Kontrolle statt Seite (Styx 28.9.)
         const hps = engine.gs.players[owner];
-        const sup = hps?.supportZones?.[hi] || [];
-        for (let s = 0; s < 3; s++) {
-          if ((sup[s] || []).length === 0) {
-            zones.push({ owner, heroIdx: hi, slotIdx: s, label: `${hps.heroes[hi].name} — Support ${s + 1}` });
-          }
+        // W63a: freie Zonen UND (Alice-Teilung) die Zone eines gleichnamigen Cute Bunny — `engine.beschwoerZonenFuer`
+        for (const zz of engine.beschwoerZonenFuer(pi, CARD_NAME, { seite: owner, heroIdx: hi, nurBasis: true, namedHeroesOnly: true })) {
+          zones.push({ owner, heroIdx: hi, slotIdx: zz.slotIdx, label: `${hps.heroes[hi].name} — Support ${zz.slotIdx + 1}${zz.shared ? ` (×${zz.stackDepth})` : ''}`, ...(zz.shared ? { shared: true, stackDepth: zz.stackDepth } : {}) });
         }
       }
+      zones = require('./_alice-shared').geteiltZuerst(zones);   // W63a (Al): erst die geteilte Zone, DANN die erste leere
       if (zones.length === 0) return;
 
       let chosen;

@@ -98,7 +98,9 @@ function isHostable(engine, pi, heroIdx, cardData, physOwner = pi) {
   const s = hero.statuses || {};
   // Welle 12 (Al): ein bloss Effekt-negierter Held beschwoert normal; harte Form (Abilities negiert) -> nur Stufe 0 ueber `heroMeetsLevelReq`.
   if (s.frozen || s.stunned || s.bound) return false;
-  if (firstFreeSlot(ps, heroIdx) < 0) return false;
+  // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Platzierungs-Effekte): eine freie ODER — mit Alice-Teilung des Beschwoerers — die Zone einer
+  // GLEICHNAMIGEN Creature (`engine.beschwoerZonenFuer`).
+  if (firstFreeSlot(ps, heroIdx) < 0 && !(cardData.name && engine.hatBeschwoerZone(pi, cardData.name, { seite: physOwner, heroIdx, nurBasis: true, namedHeroesOnly: true }))) return false;
   if (!engine.heroMeetsLevelReq(physOwner, heroIdx, cardData)) return false;
   // „summon": die kartenseitigen Beschwoerungstore (`canSummon`: Gigantisaurier,
   // Guardian Beasts …) gelten auch hier (A07-04).
@@ -111,6 +113,12 @@ function isHostable(engine, pi, heroIdx, cardData, physOwner = pi) {
 function anyHostHero(engine, pi, cardData) {
   return engine.heroesControlledBy(pi)
     .some(e => isHostable(engine, pi, e.heroIdx, cardData, e.physOwner));
+}
+
+/** W63a: ist der Platz frei oder — mit Alice-Teilung des Beschwoerers `pi` — von einer GLEICHNAMIGEN Creature belegt? */
+function platzOk(engine, pi, seite, heroIdx, slot, name) {
+  const belegt = (engine.gs.players[seite].supportZones?.[heroIdx]?.[slot] || []).length !== 0;
+  return !belegt || require('./_alice-shared').canShareInto(engine, pi, heroIdx, slot, name, seite);
 }
 
 /** Effective-Lv-0 Creature names in `source` (hand / mainDeck), deduped. */
@@ -151,17 +159,16 @@ function countCopies(arr, cardName) {
  * adds friction to the chained 3-card hand path.
  */
 async function pickHostSlot(engine, pi, cardName, cardData) {
-  const zones = [];
+  let zones = [];
   // Kontrolle statt Seite (Styx 28.9.): alle Helden, die `pi` kontrolliert.
   for (const { physOwner, heroIdx: hi } of engine.heroesControlledBy(pi)) {
     if (!isHostable(engine, pi, hi, cardData, physOwner)) continue;
-    const supZones = engine.gs.players[physOwner].supportZones?.[hi] || [];
-    for (let z = 0; z < 3; z++) {
-      if ((supZones[z] || []).length === 0) {
-        zones.push({ owner: physOwner, heroIdx: hi, slotIdx: z });
-      }
+    // W63a: `engine.beschwoerZonenFuer` — freie Zonen UND (Alice-Teilung) die Zone einer GLEICHNAMIGEN Creature; danach geteilte Zonen zuerst.
+    for (const z of engine.beschwoerZonenFuer(pi, cardName, { seite: physOwner, heroIdx: hi, nurBasis: true })) {
+      zones.push({ owner: physOwner, heroIdx: hi, slotIdx: z.slotIdx, ...(z.shared ? { shared: true, stackDepth: z.stackDepth, label: z.label } : {}) });
     }
   }
+  zones = require('./_alice-shared').geteiltZuerst(zones);
   if (zones.length === 0) return null;
   if (zones.length === 1) {
     return { owner: zones[0].owner, heroIdx: zones[0].heroIdx, slotIdx: zones[0].slotIdx };
@@ -216,7 +223,7 @@ async function runStellinEffect(ctx) {
   if (handEligible.length > 0 && deckEligible.length > 0
       && anyHostable(handEligible) && anyHostable(deckEligible)) {
     const freeSlotsTotal = totalFreeSlotsOnSide(engine, pi);
-    const handCap = Math.min(MAX_FROM_HAND, handEligible.length, freeSlotsTotal);
+    const handCap = Math.min(MAX_FROM_HAND, handEligible.length, require('./_alice-shared').sharingActive(gs, pi) ? MAX_FROM_HAND : freeSlotsTotal);   // W63a: mit Alice-Teilung begrenzt die Zahl freier Zonen nicht
     const optRes = await engine.promptGeneric(pi, {
       type: 'optionPicker',
       title: CARD_NAME,
@@ -238,7 +245,7 @@ async function runStellinEffect(ctx) {
 
   if (source === 'hand') {
     const freeSlotsTotal = totalFreeSlotsOnSide(engine, pi);
-    const handCap = Math.min(MAX_FROM_HAND, handEligible.length, freeSlotsTotal);
+    const handCap = Math.min(MAX_FROM_HAND, handEligible.length, require('./_alice-shared').sharingActive(gs, pi) ? MAX_FROM_HAND : freeSlotsTotal);   // W63a: mit Alice-Teilung begrenzt die Zahl freier Zonen nicht
     const gallery = handEligible.map(cn => ({ name: cn, source: 'hand' }));
     const picked = await engine.promptGeneric(pi, {
       type: 'cardGalleryMulti',
@@ -272,14 +279,13 @@ async function runStellinEffect(ctx) {
       const { owner: seite, heroIdx, slotIdx: slot } = dest;
       // Race: the picked slot could have been filled between prompt
       // close and action — re-verify before committing.
-      const supZones = gs.players[seite].supportZones?.[heroIdx] || [];
-      if ((supZones[slot] || []).length !== 0) continue;
+      if (!platzOk(engine, pi, seite, heroIdx, slot, cardName)) continue;   // W63a: frei oder (Alice) geteilt
       // Beschwoerungskosten der Kreatur (`beforeSummon`: Opfer, Tribut …) zahlen —
       // `actionPlaceCreature` fuehrt sie nicht aus (A07-04).
       if (!(await engine._runBeforeSummon(cardName, pi, heroIdx,
         seite !== pi ? { heldSeite: seite } : {}, slot))) continue;
       if ((ps.hand || []).indexOf(cardName) < 0) continue;
-      if ((gs.players[seite].supportZones?.[heroIdx]?.[slot] || []).length !== 0) continue;   // Kosten koennen den Platz belegt haben
+      if (!platzOk(engine, pi, seite, heroIdx, slot, cardName)) continue;   // Kosten koennen den Platz belegt haben (W63a: frei oder geteilt)
       const res = await engine.actionPlaceCreature(cardName, pi, heroIdx, slot, {
         heldSeite: seite,   // Kontrolle statt Seite (Styx 28.9.)
         source: 'hand',
@@ -326,8 +332,7 @@ async function runStellinEffect(ctx) {
 
   // Race: slot could have been filled between prompt and now (engine
   // has been doing other work during the prompt's network round-trip).
-  const supZones = gs.players[seite].supportZones?.[heroIdx] || [];
-  if ((supZones[slot] || []).length !== 0) {
+  if (!platzOk(engine, pi, seite, heroIdx, slot, chosenName)) {   // W63a: frei oder (Alice) geteilt
     engine.returnToPile(ps, 'deck', chosenName);   // v1393 (mischt)
     return false;
   }

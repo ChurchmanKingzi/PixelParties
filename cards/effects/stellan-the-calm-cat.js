@@ -70,6 +70,14 @@ function freeStellanSlots(ps, heroIdx) {
 }
 
 /**
+ * ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): Stellans Zonen fuer `name` —
+ * freie, und mit Alice-Teilung des Kontrolleurs die Zone einer GLEICHNAMIGEN Creature (geteilte zuerst). `engine.beschwoerZonenFuer`.
+ */
+function zonenFuer(engine, pi, feld, heroIdx, name) {
+  return engine.beschwoerZonenFuer(pi, name, { seite: feld, heroIdx, nurBasis: true, namedHeroesOnly: true });
+}
+
+/**
  * Deduplicated list of Level-0 Creature card names in `source` (hand or
  * mainDeck), where "Level 0" is the EFFECTIVE level after board-wide
  * reductions — not just the raw `level` field on the card. A Lv1 Elven
@@ -125,16 +133,17 @@ async function runStellanEffect(ctx) {
   // consume the trigger (refund on cancel only, not on no-legal-target).
   if (ps.summonLocked) return false;
   const freeSlots = freeStellanSlots(fs, heroIdx);
-  if (freeSlots.length === 0) return false;
-
-  const handEligible = levelZeroCreatureNames(engine, pi, ps.hand);
-  const deckEligible = levelZeroCreatureNames(engine, pi, ps.mainDeck);
+  const teilt = require('./_alice-shared').sharingActive(gs, pi);   // W63a: Alice-Teilung — die Zahl freier Zonen begrenzt dann nicht mehr
+  // W63a: nur Namen, fuer die Stellan eine Zone hat (frei oder geteilt)
+  const handEligible = levelZeroCreatureNames(engine, pi, ps.hand).filter(cn => zonenFuer(engine, pi, feld, heroIdx, cn).length > 0);
+  const deckEligible = levelZeroCreatureNames(engine, pi, ps.mainDeck).filter(cn => zonenFuer(engine, pi, feld, heroIdx, cn).length > 0);
+  if (freeSlots.length === 0 && !teilt) return false;
   if (handEligible.length === 0 && deckEligible.length === 0) return false;
 
   // ── Source pick (hand / deck / cancel) ──
   let source;
   if (handEligible.length > 0 && deckEligible.length > 0) {
-    const handCap = Math.min(MAX_FROM_HAND, freeSlots.length, handEligible.length);
+    const handCap = Math.min(MAX_FROM_HAND, teilt ? MAX_FROM_HAND : freeSlots.length, handEligible.length);
     const optRes = await engine.promptGeneric(pi, {
       type: 'optionPicker',
       title: CARD_NAME,
@@ -155,7 +164,7 @@ async function runStellanEffect(ctx) {
   }
 
   if (source === 'hand') {
-    const handCap = Math.min(MAX_FROM_HAND, freeSlots.length, handEligible.length);
+    const handCap = Math.min(MAX_FROM_HAND, teilt ? MAX_FROM_HAND : freeSlots.length, handEligible.length);
     const gallery = handEligible.map(cn => ({ name: cn, source: 'hand' }));
     const picked = await engine.promptGeneric(pi, {
       type: 'cardGalleryMulti',
@@ -175,15 +184,17 @@ async function runStellanEffect(ctx) {
     // Re-snapshot the free slot list — nothing has mutated state between the
     // earlier read and here (prompts are pure), but we want the freshest
     // view in case a future hook interleaves something.
-    const slots = freeStellanSlots(fs, heroIdx);
     let placed = 0;
-    for (let i = 0; i < chosen.length && i < slots.length; i++) {
+    for (let i = 0; i < chosen.length; i++) {
       const cardName = chosen[i];
       // Re-verify the card is still in hand — a prior placement's onPlay
       // could have moved cards around, which would invalidate our
       // pre-computed list.
       if ((ps.hand || []).indexOf(cardName) < 0) continue;
-      const res = await engine.actionPlaceCreature(cardName, pi, heroIdx, slots[i], {
+      // W63a: Zone je Karte, frisch gefragt — geteilte Zone (Alice) zuerst, dann die erste freie (eine eben belegte Zone faellt weg).
+      const zielZone = zonenFuer(engine, pi, feld, heroIdx, cardName)[0];
+      if (!zielZone) continue;
+      const res = await engine.actionPlaceCreature(cardName, pi, heroIdx, zielZone.slotIdx, {
         source: 'hand',
         sourceName: CARD_NAME,
         countAsSummon: false,
@@ -214,7 +225,7 @@ async function runStellanEffect(ctx) {
   const _taken_deckIdx = await engine.deckEntnahme(ps,  chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
   if (!_taken_deckIdx) return false;
 
-  const slot = freeStellanSlots(fs, heroIdx)[0];
+  const slot = zonenFuer(engine, pi, feld, heroIdx, chosenName)[0]?.slotIdx;   // W63a: geteilte Zone (Alice) zuerst, dann die erste freie
   if (slot == null) {
     // Race: all slots filled between the free-slot check and here. Refund
     // the deck card so we don't silently eat it.

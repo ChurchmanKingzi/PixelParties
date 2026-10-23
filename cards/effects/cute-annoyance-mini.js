@@ -82,12 +82,11 @@ function eligibleSummonSlots(engine, pi, miniHeroIdx, creatureCd, feld = pi) {
   // Mini herself must still meet the level req for the chosen
   // creature (the summon is "with this Hero", so Mini is the host).
   if (!engine.heroMeetsLevelReq(feld, miniHeroIdx, creatureCd)) return [];
-  const zones = fs.supportZones?.[miniHeroIdx] || [[], [], []];
+  // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): Minis freie Zonen UND — mit
+  // Alice-Teilung des Beschwoerers — die Zone einer GLEICHNAMIGEN Creature (`engine.beschwoerZonenFuer`).
   const out = [];
-  for (let z = 0; z < 3; z++) {
-    if ((zones[z] || []).length === 0) {
-      out.push({ heroIdx: miniHeroIdx, slotIdx: z, ...(feld !== pi ? { owner: feld } : {}) });
-    }
+  for (const zz of engine.beschwoerZonenFuer(pi, creatureCd.name, { seite: feld, heroIdx: miniHeroIdx, nurBasis: true, namedHeroesOnly: true })) {
+    out.push({ heroIdx: miniHeroIdx, slotIdx: zz.slotIdx, ...(feld !== pi ? { owner: feld } : {}), ...(zz.shared ? { shared: true, stackDepth: zz.stackDepth } : {}) });
   }
   return out;
 }
@@ -276,7 +275,8 @@ module.exports = {
       const zones = hostSlots.map(h => ({
         heroIdx: h.heroIdx, slotIdx: h.slotIdx,
         ...(h.owner != null ? { owner: h.owner } : {}),   // Kontrolle statt Seite (Styx 28.9.)
-        label: `Support ${h.slotIdx + 1}`,
+        label: `Support ${h.slotIdx + 1}${h.shared ? ` (×${h.stackDepth})` : ''}`,
+        ...(h.shared ? { shared: true, stackDepth: h.stackDepth } : {}),   // W63a: geteilte Zone (Alice) vorn, mit Kennzeichen
       }));
       const zp = await engine.promptGeneric(pi, {
         type: 'zonePick',

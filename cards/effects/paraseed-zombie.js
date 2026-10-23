@@ -82,8 +82,9 @@ module.exports = {
     if (seite !== ownerIdx && !engine.kontrollRechte(seite, heroIdx).beschwoeren) return false;
 
     // „and if you do\": ohne Paraseed und ohne freie Zone kein Effekt.
-    if (!findeParaseed(engine, ownerIdx)) return false;
-    if (freeSlotOnHero(engine, seite, heroIdx) < 0) return false;
+    const _fundPruef = findeParaseed(engine, ownerIdx);
+    if (!_fundPruef) return false;
+    if (freeSlotOnHero(engine, seite, heroIdx, _fundPruef.name, ownerIdx) < 0) return false;   // W63a: frei oder (Alice-Teilung) die Zone einer gleichnamigen Paraseed
     return true;
   },
 
@@ -91,7 +92,7 @@ module.exports = {
     const ps = engine.gs.players[ownerIdx];
     const fund = findeParaseed(engine, ownerIdx);
     const seite = engine._findHeroOwner(target);    // W20c: Brettseite des Nutzers (uebernommener Held der Gegenspalte moeglich)
-    const slot = freeSlotOnHero(engine, seite, heroIdx);
+    const slot = fund ? freeSlotOnHero(engine, seite, heroIdx, fund.name, ownerIdx) : -1;   // W63a: geteilte Zone (Alice) zuerst, dann die erste freie
     if (!fund || slot < 0) return null;             // Bedingung war erfuellt, Brett hat sich gedreht
 
     if (fund.from === 'deck') {

@@ -54,6 +54,14 @@ function freeHostSlot(ps, heroIdx) {
   return -1;
 }
 
+/**
+ * ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-/Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"):
+ * Vullarys Zonen fuer `name` — freie Zonen des Helden und, mit Alice-Teilung, die Zone einer GLEICHNAMIGEN Creature (geteilte zuerst).
+ */
+function zonenFuer(engine, pi, heroIdx, name) {
+  return engine.beschwoerZonenFuer(pi, name, { heroIdx, nurBasis: true, namedHeroesOnly: true });
+}
+
 function levelMaxNCreatureNames(engine, pi, hand, maxLevel, heroIdx = -1) {
   const cardDB = engine._getCardDB();
   const seen = new Set();
@@ -70,6 +78,7 @@ function levelMaxNCreatureNames(engine, pi, hand, maxLevel, heroIdx = -1) {
     // „regardless of its level" — nur das LEVEL entfaellt; die kartenseitigen
     // Beschwoerungstore (`canSummon`: Gigantisaurier, Guardian Beasts …) gelten (A07-04).
     if (heroIdx >= 0 && !engine.isCreatureSummonable(cn, pi, heroIdx)) continue;
+    if (heroIdx >= 0 && zonenFuer(engine, pi, heroIdx, cn).length === 0) continue;   // W63a: frei oder (Alice) geteilt
     out.push(cn);
   }
   return out;
@@ -96,7 +105,6 @@ module.exports = {
 
     // Mode B: Mary attached — summon Lv≤3 Creature with bypass.
     if (ps.summonLocked) return false;
-    if (freeHostSlot(ps, ctx.cardHeroIdx) < 0) return false;
     return levelMaxNCreatureNames(engine, ctx.cardOwner, ps.hand, 3, ctx.cardHeroIdx).length > 0;
   },
 
@@ -124,9 +132,6 @@ module.exports = {
     const eligible = levelMaxNCreatureNames(engine, pi, ps.hand, 3, heroIdx);
     if (eligible.length === 0) return false;
 
-    const slot = freeHostSlot(ps, heroIdx);
-    if (slot < 0) return false;
-
     const picked = await engine.promptGeneric(pi, {
       type: 'cardGallery',
       cards: eligible.map(cn => ({ name: cn, source: 'hand' })),
@@ -139,14 +144,14 @@ module.exports = {
     const chosenName = picked.cardName;
     if ((ps.hand || []).indexOf(chosenName) < 0) return false;
     // Re-verify free slot — async prompt could have shifted state.
-    const slotNow = freeHostSlot(ps, heroIdx);
+    const slotNow = zonenFuer(engine, pi, heroIdx, chosenName)[0]?.slotIdx ?? -1;   // W63a: geteilte Zone (Alice) zuerst, dann die erste freie
     if (slotNow < 0) return false;
 
     // Beschwoerungskosten der Kreatur (`beforeSummon`: Opfer, Tribut …) zahlen —
     // `actionPlaceCreature` fuehrt sie nicht aus (A07-04).
     if (!(await engine._runBeforeSummon(chosenName, pi, heroIdx, {}, slotNow))) return false;
     if ((ps.hand || []).indexOf(chosenName) < 0) return false;
-    if ((ps.supportZones?.[heroIdx]?.[slotNow] || []).length > 0) return false;   // Kosten koennen den Platz belegt haben
+    if ((ps.supportZones?.[heroIdx]?.[slotNow] || []).length > 0 && !require('./_alice-shared').canShareInto(engine, pi, heroIdx, slotNow, chosenName)) return false;   // Kosten koennen den Platz belegt haben (W63a: ausser geteilt)
 
     // Place — `actionPlaceCreature` bypasses level/school via the
     // placement code path. Welle 10 (Q47): die Platzierung zaehlt als

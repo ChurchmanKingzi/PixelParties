@@ -125,8 +125,11 @@ module.exports = {
         .filter(n => { const cd = engine._getCardDB()[n]; return !cd || engine.heroMeetsLevelReq(feld, hostHeroIdx, cd, { levelSourcePi: pi }); });
       if (candidates.length === 0) break;
 
-      const slot = findFreeSupportSlot(fps, hostHeroIdx);
-      if (slot < 0) {
+      // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): die Zone je Bomblebee —
+      // frei oder, mit Alice-Teilung, die Zone einer GLEICHNAMIGEN Bomblebee (geteilte zuerst; `engine.ersteBeschwoerZone`).
+      const zoneFuer = (n) => engine.ersteBeschwoerZone(pi, n, { seite: feld, heroIdx: hostHeroIdx, nurBasis: true, namedHeroesOnly: true });
+      for (let ci = candidates.length - 1; ci >= 0; ci--) if (!zoneFuer(candidates[ci])) candidates.splice(ci, 1);
+      if (candidates.length === 0) {
         engine.log('bomblebee_cluster_no_slot', {
           player: ps.username, hero: host.name, summoned,
         });
@@ -150,6 +153,7 @@ module.exports = {
       const chosenName = result.cardName;
       const handIdx = ps.hand.indexOf(chosenName);
       if (handIdx < 0) break;
+      const slot = zoneFuer(chosenName).slotIdx;
 
       // Remove from hand, then summon via summonCreatureWithHooks so the
       // chosen Bomblebee gets its onPlay / onCardEnterZone hooks. The

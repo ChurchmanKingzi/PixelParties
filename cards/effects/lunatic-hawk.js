@@ -127,7 +127,9 @@ function freeZonesFor(engine, pi, creatureName) {
       if ((zonen[zi] || []).length === 0) out.push({ owner: physOwner, heroIdx: hi, slotIdx: zi });
     }
   }
-  return out;
+  // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte): auch die Zone einer GLEICHNAMIGEN Creature (Alice-Teilung) — geteilte zuerst.
+  return require('./_alice-shared').mitGeteilten(engine, pi, creatureName, out, {},
+    z => engine.isCreatureSummonable(creatureName, z.owner, z.heroIdx, { _bypassBeforeSummon: true }));
 }
 
 module.exports = {

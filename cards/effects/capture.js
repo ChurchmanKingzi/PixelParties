@@ -57,8 +57,16 @@ function maxLevelFuer(engine, hs, heroIdx) {
   return Math.max(1, Math.min(stufe, MAX_STUFE));
 }
 
-/** Freie Support Zones DES Helden: [{ heroIdx, slotIdx, label }]. */
-function freieZonen(gs, hs, heroIdx) {
+/**
+ * Freie Support Zones DES Helden: [{ heroIdx, slotIdx, label }].
+ * ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): mit `engine`/`pi`/`name` zaehlt
+ * auch die Zone einer GLEICHNAMIGEN Creature des Nutzers (Alice-Teilung des Kontrolleurs `pi`) — die uebernommene Kreatur teilt sich die Zone; geteilte zuerst.
+ */
+function freieZonen(gs, hs, heroIdx, engine = null, pi = null, name = null) {
+  if (engine && name) {
+    return engine.beschwoerZonenFuer(pi, name, { seite: hs, heroIdx, nurBasis: true, namedHeroesOnly: true })
+      .map(z => ({ heroIdx, slotIdx: z.slotIdx, label: z.label, ...(z.shared ? { shared: true, stackDepth: z.stackDepth } : {}) }));
+  }
   const hero = gs.players[hs]?.heroes?.[heroIdx];
   const out = [];
   for (let si = 0; si < 3; si++) {
@@ -107,9 +115,12 @@ function heldTauglich(engine, pi, heroIdx) {
   const hs = engine.heldSeiteFuer(pi, heroIdx);
   const hero = gs.players[hs]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
-  if (freieZonen(gs, hs, heroIdx).length === 0) return false;
   const mitSchutz = !heldHatAuge(engine, hs, heroIdx);
-  return ziele(engine, pi, maxLevelFuer(engine, hs, heroIdx), mitSchutz).length > 0;
+  const zs = ziele(engine, pi, maxLevelFuer(engine, hs, heroIdx), mitSchutz);
+  if (zs.length === 0) return false;
+  if (freieZonen(gs, hs, heroIdx).length > 0) return true;
+  // W63a: keine freie Zone — mit Alice-Teilung reicht die Zone einer GLEICHNAMIGEN Creature fuer ein Ziel
+  return zs.some(t => freieZonen(gs, hs, heroIdx, engine, pi, t.name).length > 0);
 }
 
 module.exports = {
@@ -153,7 +164,7 @@ module.exports = {
       if (!ps || !userHero?.name || userHero.hp <= 0) { gs._spellCancelled = true; return; }
 
       const maxLv = maxLevelFuer(engine, hs, heroIdx);
-      if (freieZonen(gs, hs, heroIdx).length === 0) { gs._spellCancelled = true; return; }
+      if (freieZonen(gs, hs, heroIdx).length === 0 && !require('./_alice-shared').sharingActive(gs, pi)) { gs._spellCancelled = true; return; }   // W63a: mit Alice-Teilung entscheidet erst das Ziel
 
       // ── Ziel: eine Kreatur eines Gegners, Stufe ≤ Fighting-Stufe ──
       const target = await ctx.promptDamageTarget({
@@ -178,7 +189,7 @@ module.exports = {
       if (!inst || !istZiel(engine, pi, inst, maxLv, false)) { gs._spellCancelled = true; return; }
 
       // ── Platz: eine freie Zone DES NUTZERS ──
-      const frei = freieZonen(gs, hs, heroIdx);
+      const frei = freieZonen(gs, hs, heroIdx, engine, pi, inst.name);   // W63a: + Zone einer gleichnamigen Creature (Alice), geteilte zuerst
       if (frei.length === 0) { gs._spellCancelled = true; return; }
       let zone = frei[0];
       if (frei.length > 1) {
@@ -210,7 +221,8 @@ module.exports = {
 
       // Während der Animation kann eine Kette die Lage geändert haben.
       if (inst.zone !== 'support' || (inst.controller ?? inst.owner) !== vorher
-          || ((gs.players[hs]?.supportZones?.[zone.heroIdx]?.[zone.slotIdx]) || []).length > 0) {
+          || (((gs.players[hs]?.supportZones?.[zone.heroIdx]?.[zone.slotIdx]) || []).length > 0
+              && !require('./_alice-shared').canShareInto(engine, pi, zone.heroIdx, zone.slotIdx, name, hs))) {   // W63a: belegt nur ok, wenn geteilt (Alice)
         engine.log('capture_fizzle', { player: ps.username, creature: name });
         engine.sync();
         return;

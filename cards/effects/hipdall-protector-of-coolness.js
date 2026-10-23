@@ -154,18 +154,18 @@ async function summonFromStack(engine, pi, cardName) {
     // BESCHWOREN — der Held braucht die Stufe (Wildur Lv1: Summoning Magic 1).
     // (Glorious Rebirth „Place that Creature" bleibt ohne Stufe.)
     if (cd && !engine.heroMeetsLevelReq(pi, hi, cd)) continue;
-    const slots = ps.supportZones?.[hi] || [];
+    // ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): freie Zonen UND — mit Alice-Teilung —
+    // die Zone einer GLEICHNAMIGEN Creature (`engine.beschwoerZonenFuer`); der Helden-Klick nimmt die erste Zone der Liste, also die geteilte.
     let leftmostFree = -1;
-    for (let si = 0; si < slots.length; si++) {
-      if (!slots[si] || slots[si].length === 0) {
-        if (leftmostFree < 0) leftmostFree = si;
-        targets.push({
-          id: `equip-${pi}-${hi}-${si}`,
-          type: 'equip',
-          owner: pi, heroIdx: hi, slotIdx: si,
-          cardName: '',
-        });
-      }
+    for (const zz of engine.beschwoerZonenFuer(pi, cardName, { heroIdx: hi, namedHeroesOnly: true })) {
+      if (leftmostFree < 0) leftmostFree = zz.slotIdx;
+      targets.push({
+        id: `equip-${pi}-${hi}-${zz.slotIdx}`,
+        type: 'equip',
+        owner: pi, heroIdx: hi, slotIdx: zz.slotIdx,
+        cardName: '',
+        ...(zz.shared ? { shared: true } : {}),
+      });
     }
     if (leftmostFree >= 0) {
       targets.push({

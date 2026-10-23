@@ -77,7 +77,9 @@ function tributeViable(engine, pi, calaHi, c, feld = pi) {
   // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden — ein
   // Tribut macht nur dann Platz, wenn er in Calamitusks Spalte steht.
   return firstFreeSupportSlot(engine, feld, calaHi) >= 0
-    || (c.inst.heroIdx === calaHi && (c.inst.owner ?? pi) === feld);
+    || (c.inst.heroIdx === calaHi && (c.inst.owner ?? pi) === feld)
+    // W63a (Al): oder, mit Alice-Teilung, die Zone einer GLEICHNAMIGEN Creature fuer eine der Ersatzkreaturen
+    || replacements(engine, pi, calaHi, c.cardName, feld).some(o => firstFreeSupportSlot(engine, feld, calaHi, o.name, pi) >= 0);
 }
 
 module.exports = {
@@ -116,10 +118,9 @@ module.exports = {
         const sacName = picked?.[0]?.cardName;
         // The tribute is gone — recompute the (now-free) slot in
         // Calamitusk's column.
-        const slot = firstFreeSupportSlot(engine, feld, calaHi);
-        if (slot < 0) { engine.sync(); return; }
-
-        const opts = replacements(engine, pi, calaHi, sacName, feld);
+        // W63a: nur Ersatzkreaturen mit Zone (frei oder — Alice-Teilung — geteilt)
+        const opts = replacements(engine, pi, calaHi, sacName, feld)
+          .filter(o => firstFreeSupportSlot(engine, feld, calaHi, o.name, pi) >= 0);
         if (opts.length === 0) { engine.sync(); return; }
 
         let chosen = opts[0];
@@ -135,6 +136,8 @@ module.exports = {
           chosen = opts.find(o => o.name === res?.cardName) || opts[0];
         }
 
+        const slot = firstFreeSupportSlot(engine, feld, calaHi, chosen.name, pi);   // W63a: geteilte Zone (Alice) zuerst, dann die erste leere
+        if (slot < 0) { engine.sync(); return; }
         const pile = chosen.source === 'deck' ? ps.mainDeck : ps.hand;
         const idx = pile.indexOf(chosen.name);
         if (idx < 0) { engine.sync(); return; }

@@ -209,17 +209,18 @@ module.exports = {
       if (cd && !(physOwner === pi
         ? engine.heroMeetsLevelReq(pi, hi, cd)
         : engine.heroMeetsLevelReq(physOwner, hi, cd, { levelSourcePi: pi }))) continue;
-      const sup = engine.gs.players[physOwner]?.supportZones?.[hi] || [[], [], []];
-      for (let z = 0; z < 3; z++) {
-        if ((sup[z] || []).length === 0) {
-          hostZones.push({
-            heroIdx: hi, slotIdx: z,
-            ...(physOwner !== pi ? { owner: physOwner } : {}),
-            label: `${h.name} — Support ${z + 1}`,
-          });
-        }
+      // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): freie Zonen UND — mit
+      // Alice-Teilung — die Zone einer GLEICHNAMIGEN Waitress (`engine.beschwoerZonenFuer`).
+      for (const zz of engine.beschwoerZonenFuer(pi, CARD_NAME, { seite: physOwner, heroIdx: hi, nurBasis: true, namedHeroesOnly: true })) {
+        hostZones.push({
+          heroIdx: hi, slotIdx: zz.slotIdx,
+          ...(physOwner !== pi ? { owner: physOwner } : {}),
+          label: `${h.name} — Support ${zz.slotIdx + 1}${zz.shared ? ` (×${zz.stackDepth})` : ''}`,
+          ...(zz.shared ? { shared: true, stackDepth: zz.stackDepth } : {}),
+        });
       }
     }
+    hostZones.splice(0, hostZones.length, ...require('./_alice-shared').geteiltZuerst(hostZones));
     if (hostZones.length === 0) return false; // no valid host
     const seiteVon = (z) => z.owner ?? pi;
 

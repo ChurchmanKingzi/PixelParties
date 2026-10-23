@@ -101,12 +101,10 @@ module.exports = {
       if (gs._mausoleumAngebot === stempel) return;
 
       // Freie Plaetze des gefallenen Helden.
-      const zonen = [];
-      for (let z = 0; z < 3; z++) {
-        if (engine.supportSlotBelegt(seite, heroIdx, z)) continue;
-        if (engine.isSupportZoneLocked(seite, heroIdx, { source: CARD_NAME, cardName: CARD_NAME, via: 'place' })) continue;
-        zonen.push({ heroIdx, slotIdx: z, label: `${gefallen.name} — Slot ${z + 1}`, owner: seite });
-      }
+      // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): `engine.beschwoerZonenFuer` —
+      // freie Plaetze des gefallenen Helden und, mit Alice-Teilung, die Zone eines weiteren Mausoleum Worm; geteilte zuerst.
+      const zonen = engine.beschwoerZonenFuer(pi, CARD_NAME, { seite, heroIdx, nurBasis: true, namedHeroesOnly: true, source: CARD_NAME })
+        .map(z => ({ heroIdx, slotIdx: z.slotIdx, label: z.label, owner: seite, ...(z.shared ? { shared: true, stackDepth: z.stackDepth } : {}) }));
       if (zonen.length === 0) return;
       gs._mausoleumAngebot = stempel;
 

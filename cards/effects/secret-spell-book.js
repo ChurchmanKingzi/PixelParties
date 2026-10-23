@@ -116,7 +116,10 @@ function zonenFuerKreatur(engine, pi, inst) {
       out.push({ owner: physOwner, heroIdx, slotIdx: si, label: `${hero.hp <= 0 ? hero.name + ' (KO)' : hero.name} — ${si >= 3 ? 'Island ' + (si - 2) : 'Slot ' + (si + 1)}` });
     }
   }
-  return out;
+  // ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): mit Alice-Teilung des Spielers
+  // zaehlt auch die Zone einer GLEICHNAMIGEN Creature als „free" fuer die uebernommene Kreatur — geteilte zuerst.
+  return require('./_alice-shared').mitGeteilten(engine, pi, inst.name, out, { nachKontrolle: true, livingHeroesOnly: false, nurBasis: true },
+    z => !engine.isSupportZoneLocked(z.owner, z.heroIdx, { cardName: inst.name, via: 'move' }));
 }
 
 /** Freie Basis-Zonen für Ausrüstung bzw. Anhängsel: nur eigene Helden der eigenen Seite, mit den Regeln der Kartenart. */
@@ -192,7 +195,8 @@ async function uebernimm(engine, pi, inst, ergebnis) {
     let ok = false;
     // frisch prüfen: zwischen Abfrage und Umzug kann der Platz weg sein
     if (art === 'creature') {
-      if (!engine.supportSlotBelegt(auswahl.owner, auswahl.heroIdx, auswahl.slotIdx)) {
+      if (!engine.supportSlotBelegt(auswahl.owner, auswahl.heroIdx, auswahl.slotIdx)
+          || (auswahl.shared && require('./_alice-shared').canShareInto(engine, pi, auswahl.heroIdx, auswahl.slotIdx, name, auswahl.owner))) {   // W63a: belegt nur ok, wenn geteilt (Alice)
         const r = await engine.actionTransferCreature(inst, auswahl.owner, auswahl.heroIdx, auswahl.slotIdx, { sourceName: CARD_NAME, sourceOwner: pi, controller: pi });
         ok = !!r?.success;
       }
