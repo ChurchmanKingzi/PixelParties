@@ -20,6 +20,8 @@ const { isSeat, opponentOfGs, opponentsOfGs, playerCountGs } = require('./_opp')
 const { gainedNames, heroScriptsOf, heroScriptOf, eigenesHeldenSkript } = require('./_gained-effects-shared');
 const { charges: ladungenLesen } = require('./_charges');
 const ScTracking = require('./_sc-tracking');   // v1381
+// ★ W63d: Ereignisse, die den Beginn einer Aktion ANKÜNDIGEN, aber noch keine sichtbare Wirkung sind: sie lösen den Commit des Auftritts nicht aus (nur Protokoll + Flug/Aktivierungsschein).
+const AUFTRITT_HALTE_EREIGNISSE = new Set(['action_log', 'hand_to_board_fly', 'ability_activated', 'potion_resolved']);   // `potion_resolved`: der Server sendet es beim START der Auflösung — also VOR den abbrechbaren Fragen der Karte
 
 // Aufstiegs-Erlasse (Perilous Journey): `true` weitete das Fenster zum
 // Testen auf „ab sofort" aus (31.8., zurueckgebaut am selben Tag).
@@ -578,6 +580,9 @@ class GameEngine {
     this.onGameOver = onGameOverFn || null;
     this.sendSpectatorGameState = sendSpectatorGameStateFn || null;
     this.gs = room.gameState;
+    // ★ W63d: der Auftritts-Puffer (`_auftrittHaelt`) muss auch Sendungen erreichen, die nicht durch die Engine laufen
+    // (`_opp.emitToOpponentsGs`, `sendToSpectators` in server.js). Rückverweis am Spielzustand — nicht aufzählbar, damit kein JSON-/Klon-Pfad ihn mitnimmt.
+    if (this.gs && typeof this.gs === 'object') Object.defineProperty(this.gs, '_engineRef', { value: this, enumerable: false, writable: true, configurable: true });
 
     // Card instance tracking
     this.cardInstances = []; // All tracked CardInstance objects
@@ -25847,6 +25852,8 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   async advanceToPhase(playerIdx, targetPhase, opts = {}) {
     if (playerIdx !== this.gs.activePlayer) return false;
+    // ★ W63d: ein Phasenwechsel macht jede noch offene Vormerkung verbindlich sichtbar (Sicherheitsnetz: ein vergessener Auftritt darf nie Sendungen über Phasen hinweg zurückhalten).
+    if (this.gs._pendingCardReveal && !this.gs._holdCardReveal && !this._inMctsSim) this._firePendingCardReveal();
 
     // ── ZUG-ENDE-RIEGEL (v429) ────────────────────────────────────────
     // Jeder NICHT-manuelle Sprung auf die End Phase ist per Definition
@@ -31314,6 +31321,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _waehlbar = validTargets.filter(t => !t.ineligible);
     if (_waehlbar.length === 0 && validTargets.some(t => t.ineligible)) return [];
 
+    // ★ W63d: Zielwahl des ANDEREN Spielers (nicht des Kartenbesitzers) = der Auftritt ist committed (s. `promptGeneric`).
+    if (this.gs._pendingCardReveal && playerIdx !== this.gs._pendingCardReveal.ownerIdx && !this._inMctsSim && !this._fastMode) this._firePendingCardReveal();
     if (this.isCpuPlayer(playerIdx) || this._inMctsSim || this._fastMode) {
       await this._delay(50);
       const cpuPicked = await this._getCpuTargetResponse(_waehlbar, config, playerIdx);
@@ -31810,10 +31819,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     const pending = this.gs._pendingCardReveal;
     if (!pending) return;
     delete this.gs._pendingCardReveal;
-    require('./_opp').emitToOpponentsGs(this.gs, this.io, pending.ownerIdx, 'card_reveal', { cardName: pending.cardName });
-    if (this.room?.spectators) {
-      for (const spec of this.room.spectators) {
-        if (spec.socketId) this.io.to(spec.socketId).emit('card_reveal', { cardName: pending.cardName });
+    this._auftrittAusliefern(pending);   // W63d: was bis zum Commit zurückgehalten wurde (chronologisch VOR dem Auftritt selbst)
+    if (!pending.stumm) {   // W63d: eine stumme Vormerkung (Beschwörung: Flug/Schein zeigen die Karte) liefert nur den Puffer aus
+      require('./_opp').emitToOpponentsGs(this.gs, this.io, pending.ownerIdx, 'card_reveal', { cardName: pending.cardName });
+      if (this.room?.spectators) {
+        for (const spec of this.room.spectators) {
+          if (spec.socketId) this.io.to(spec.socketId).emit('card_reveal', { cardName: pending.cardName });
+        }
       }
     }
     // Fire any pending play log at the same time as the card reveal
@@ -32303,7 +32315,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       resolve(null);
       return true;
     }
-    if (selectedIds && selectedIds.length > 0) this._firePendingCardReveal();
+    // W63d: eine bestätigte Antwort ist KEIN Commit mehr (mehrstufige Auswahl) — der Auftritt kommt mit der ersten sichtbaren Wirkung (`_auftrittEntscheide`) bzw. am Ende der Auflösung.
     resolve(selectedIds || []);
     return true;
   }
@@ -33657,6 +33669,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       promptData = redirect.rewrittenData;
     }
 
+    // ★ W63d: eine Frage an den ANDEREN Spieler als den, dessen Karte noch auf ihren Auftritt wartet (Reaktionsfenster, „Suche zeigen", Gegnerwahl …):
+    // er muss wissen, worauf er antwortet — und der Besitzer hat die Karte da längst verbindlich gespielt. Commit.
+    if (this.gs._pendingCardReveal && playerIdx !== this.gs._pendingCardReveal.ownerIdx && !this._inMctsSim && !this._fastMode) this._firePendingCardReveal();
     // CPU auto-response: resolve immediately without socket round-trip.
     // ALSO auto-resolve for non-CPU players during MCTS rollouts — the
     // socket is nulled out in fast mode, so the Promise path below would
@@ -33909,7 +33924,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (response?.cancelled) {
       resolve(null);
     } else {
-      this._firePendingCardReveal();
+      // W63d: s. `resolveEffectPrompt` — die Antwort allein committet nicht.
       resolve(response);
     }
     this.sync();
@@ -54300,8 +54315,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Zuschauer bekommen weiterhin alles: sie sind unbeteiligt und
     // sollen das Spiel vollstaendig sehen.
     const onlyPlayers = Array.isArray(opts?.toPlayers) ? opts.toPlayers : null;
+    // ★ W63d — AUFTRITTS-PUFFER: Solange die Karte des aktiven Spielers noch nicht committed ist (`gs._pendingCardReveal`),
+    // gehen Ereignisse NUR an ihn; Gegner und Zuschauer bekommen sie erst mit dem Auftritt (oder nie, wenn abgebrochen wird).
+    const _puffer = this._auftrittEntscheide(event);
     for (let i = 0; i < this.playerCount(); i++) {
       if (onlyPlayers && !onlyPlayers.includes(i)) continue;
+      if (_puffer && i !== _puffer.ownerIdx) { (_puffer.outbox || (_puffer.outbox = [])).push({ seat: i, event, data: outData }); continue; }
       const sid = this.gs.players[i]?.socketId;
       if (sid) this.io.to(sid).emit(event, outData);
     }
@@ -54310,11 +54329,89 @@ this._deathWatch = (this._deathWatchStack || []).length
     // doppelt (Beispiel: der eigene card_reveal des Aktivierenden
     // die Gegner-Seite schickt denselben Reveal bereits an sie mit).
     if (opts?.toSpectators !== false && this.room?.spectators) {
-      for (const spec of this.room.spectators) {
+      if (_puffer) (_puffer.outbox || (_puffer.outbox = [])).push({ spec: true, event, data: outData });
+      else for (const spec of this.room.spectators) {
         if (spec.socketId) this.io.to(spec.socketId).emit(event, outData);
       }
     }
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  ★ W63d — AUFTRITT ERST NACH DEM COMMIT (Al, 22.10.2026: „Eine Karte streamed ihren Auftritt IMMER erst, nachdem es keine Cancel-Option mehr gibt")
+  //
+  //  Der Spielweg merkt den Auftritt vor (`gs._pendingCardReveal`). Solange er offen ist, hält dieser Puffer ALLES zurück, was an Gegner und Zuschauer
+  //  gehen würde — Ereignisse (`_broadcastEvent`), Protokollzeilen (`log` → `action_log`) und die direkten Sendungen der Spielwege
+  //  (`emitToOpponentsGs`, `sendToSpectators`). Der Besitzer bekommt alles wie bisher sofort.
+  //
+  //  COMMIT (der Puffer wird geleert, der Auftritt gezeigt) — zentral, ohne dass die Karte etwas tun muss:
+  //    • die erste SICHTBARE Wirkung (jedes Ereignis außer den Hold-Ereignissen `action_log` / `hand_to_board_fly`), während der Besitzer KEINE Frage offen hat;
+  //    • eine Frage an den ANDEREN Spieler (Reaktionsfenster, Suche-zeigen …) — er muss wissen, worauf er antwortet;
+  //    • das Ende der Auflösung (Server: `_firePendingCardReveal` nach dem Guss) und jeder ausdrückliche Aufruf `engine.commitAppearance()`;
+  //    • die CPU (nichts zu verbergen): `maybeFireCpuRevealEarly`.
+  //  ABBRUCH: der Spielweg löscht `gs._pendingCardReveal` — mit ihm der Puffer. Nichts war zu sehen, nichts wird nachgeliefert.
+  //  Eine bestätigte Antwort allein ist KEIN Commit (mehrstufige Auswahl: Galerie → Held → Zone; erst die letzte Stufe schließt die Abbruchmöglichkeit).
+  //  `gs._holdCardReveal = true` hält den Auftritt weiterhin zurück, bis die Karte ihn selbst freigibt (ältere Muster bleiben gültig).
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /** Hat der Besitzer gerade eine Frage offen (Prompt, Zielwahl)? Dann kann er noch abbrechen. */
+  _auftrittFrageOffen(ownerIdx) {
+    const gs = this.gs;
+    return (gs.effectPrompt && gs.effectPrompt.ownerIdx === ownerIdx && !!this._pendingGenericPrompt)
+      || (gs.potionTargeting && gs.potionTargeting.ownerIdx === ownerIdx && !!this._pendingPrompt)
+      || false;
+  }
+
+  /**
+   * Entscheidung für EINE Sendung an Gegner/Zuschauer: `null` = jetzt senden, sonst das offene Auftritts-Objekt (= zurückhalten, in seinen `outbox`).
+   * Kann dabei den Auftritt committen (erste sichtbare Wirkung ohne offene Frage), dann kommt `null` zurück.
+   */
+  _auftrittEntscheide(event) {
+    const pend = this.gs._pendingCardReveal;
+    if (!pend || this._inMctsSim || this._fastMode || this._auftrittFlush) return null;
+    // Liegengebliebener Auftritt aus einem früheren Zug (Fehlerfall): lieber nachliefern als Sendungen verschlucken.
+    if (pend._turn == null) pend._turn = this.gs.turn;
+    else if (pend._turn !== this.gs.turn) { this._firePendingCardReveal(); return this.gs._pendingCardReveal || null; }
+    const hold = AUFTRITT_HALTE_EREIGNISSE.has(event);
+    if (hold || this.gs._holdCardReveal || this._auftrittFrageOffen(pend.ownerIdx)) return pend;
+    this._firePendingCardReveal();                 // erste sichtbare Wirkung: committed
+    return this.gs._pendingCardReveal || null;     // (nur noch offen, wenn die Karte den Auftritt ausdrücklich hält)
+  }
+
+  /**
+   * Direkte Sendung eines Spielwegs (server.js / `_opp.js`) an die Gegner (`ziel: 'gegner'`, Besitzer `actorIdx`) bzw. Zuschauer. `true` = zurückgehalten.
+   * Sendungen der ANDEREN Seite (Reaktion, Gegner-Aktion) werden nie angehalten.
+   */
+  _auftrittHaelt(actorIdx, event, payload, ziel) {
+    const pend = this.gs._pendingCardReveal;
+    if (!pend) return false;
+    if (ziel === 'gegner' && actorIdx !== pend.ownerIdx) return false;
+    const box = this._auftrittEntscheide(event);
+    if (!box) return false;
+    (box.outbox || (box.outbox = [])).push({ direkt: ziel, actorIdx, event, data: payload });
+    return true;
+  }
+
+  /** Liefert den Puffer eines gerade committeten Auftritts aus (in der Reihenfolge, in der die Sendungen entstanden sind). */
+  _auftrittAusliefern(pend) {
+    const box = pend && pend.outbox;
+    if (!box || !box.length) return;
+    this._auftrittFlush = true;
+    try {
+      const { emitToOpponentsGs } = require('./_opp');
+      for (const e of box) {
+        if (e.direkt === 'gegner') { emitToOpponentsGs(this.gs, this.io, e.actorIdx, e.event, e.data); continue; }
+        if (e.direkt === 'zuschauer' || e.spec) {
+          for (const spec of (this.room?.spectators || [])) if (spec.socketId) this.io.to(spec.socketId).emit(e.event, e.data);
+          continue;
+        }
+        const sid = this.gs.players[e.seat]?.socketId;
+        if (sid) this.io.to(sid).emit(e.event, e.data);
+      }
+    } finally { this._auftrittFlush = false; }
+  }
+
+  /** Ausdrücklicher Commit-Punkt für Karten mit eigenen Abfragen: „ab hier gibt es keinen Abbruch mehr" (= `_firePendingCardReveal`). */
+  commitAppearance() { this._firePendingCardReveal(); }
 
   // ─── LOGGING ──────────────────────────────
 
