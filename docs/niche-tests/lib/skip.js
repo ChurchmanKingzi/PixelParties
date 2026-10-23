@@ -89,4 +89,34 @@ const SZENARIEN = [
   ['Gegnerzug 1 UND eigener Zug 2 übersprungen', [1, 2]],
 ];
 
-module.exports = { lauf, vormarken, soll, pruefe, SZENARIEN, H };
+// ── W69a · Zeitleiste mit Handlung an jedem echten Zug (Ordnungs-/Folge-Zähler) ─────────────────────────────────────────────────────────────
+/**
+ * Zug T0 (= der laufende) gehört dem Spieler `A` (= gs.activePlayer beim Aufruf), Zug T0+i gehört B (i ungerade) bzw. A (i gerade). `skip`: Indizes i,
+ * deren Zug übersprungen wird. `nach(t, { i, turn, aktiv, echt })` wird zu Beginn jedes TATSÄCHLICH gespielten Zuges aufgerufen (zuerst für T0 selbst,
+ * i = 0) — dort probiert die Karte ihre Handlung (Thicket spielen, Hammer Throw werfen …). Die Zugwechsel laufen über den echten Engine-Weg.
+ * Gibt { echteA, echteB, T0, A, B, skip } zurück: Indizes der tatsächlich gespielten Züge (0 gehört A) bis `schritte` (inklusive).
+ */
+async function zeitleiste(t, o = {}) {
+  const A = t.gs.activePlayer, B = 1 - A, T0 = t.gs.turn;
+  const skip = new Set(o.skip || []);
+  const schritte = o.schritte ?? 8;
+  const eigner = (i) => (i % 2 === 1 ? B : A);
+  const echteA = [], echteB = [];
+  const rec = (i) => { (i % 2 === 1 ? echteB : echteA).push(i); };
+  if (o.nach) await o.nach(t, { i: 0, turn: t.gs.turn, aktiv: A, echt: true });
+  rec(0);
+  let i = 0;
+  for (let k = 0; k < schritte; k++) {
+    let j = i + 1;
+    while (skip.has(j)) { t.gs.players[eigner(j)]._skipNextTurn = true; j++; }
+    const vorher = t.gs.turn;
+    await t.endTurn();
+    if (t.gs.result || t.gs.turn === vorher) break;
+    i = t.gs.turn - T0;
+    rec(i);
+    if (o.nach) await o.nach(t, { i, turn: t.gs.turn, aktiv: t.gs.activePlayer, echt: true });
+  }
+  return { echteA, echteB, T0, A, B, skip: [...skip] };
+}
+
+module.exports = { lauf, vormarken, soll, pruefe, zeitleiste, SZENARIEN, H };

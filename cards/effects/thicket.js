@@ -24,19 +24,24 @@
 //    START-Durchgang des WIRKERS (Engine, neben der Perfect-Disguise-
 //    Aufraeumung). Der ganze Gegnerzug liegt dazwischen.
 //  • „not on 2 consecutive turns\": der Zeitstempel `counters.thicketTurn`
-//    haelt fest, wann die Kreatur zuletzt im Dickicht stand. `gs.turn`
-//    zaehlt HALBE Zuege, mein naechster Zug ist also +2. Gesperrt ist
-//    damit alles mit `gs.turn - thicketTurn <= 2`; ab +4 geht es
-//    wieder — dann liegt ein eigener Zug ohne Thicket dazwischen.
+//    haelt fest, wann die Kreatur zuletzt im Dickicht stand. Gesperrt ist
+//    der FOLGEZUG: liegt zwischen dem letzten Mal und jetzt kein
+//    tatsaechlich gespielter eigener Zug des Wirkers
+//    (`engine.istFolgezug(pi, thicketTurn)`), geht es nicht; ein eigener
+//    Zug ohne Thicket dazwischen gibt die Kreatur wieder frei.
+//    ★ W69a (Al, 23.10.2026: „… soll 'echte' eigene Züge zählen!"): ein
+//    UEBERSPRUNGENER eigener Zug (Zhu, Hand of Death) hebt die Sperre
+//    nicht auf — er ist kein Zug. Ohne Skip ist das die alte Rechnung
+//    (`gs.turn - thicketTurn <= 2`).
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Thicket';
 
 /** Darf diese Instanz JETZT ins Dickicht? (Sperre fuer Folgezuege) */
-function darfInsDickicht(engine, inst) {
+function darfInsDickicht(engine, inst, pi) {
   const letzte = inst?.counters?.thicketTurn;
   if (letzte == null) return true;
-  return (engine.gs.turn - letzte) > 2;
+  return !engine.istFolgezug(pi ?? engine.gs.activePlayer, letzte);   // W69a: nur echte eigene Zuege zaehlen
 }
 
 module.exports = {
@@ -78,7 +83,7 @@ module.exports = {
       const cd = eng.getEffectiveCardData(inst) || eng._getCardDB()[inst.name];
       if (!cd || !eng.isChoosableAsCreature(inst, cd)) continue;
       // „not on 2 consecutive turns\"
-      if (!darfInsDickicht(eng, inst)) continue;
+      if (!darfInsDickicht(eng, inst, pi)) continue;
       targets.push({
         id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
         type: 'equip',
@@ -119,7 +124,7 @@ module.exports = {
       && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
     ) || target.cardInstance;
     if (!inst || inst.zone !== 'support') return false;
-    if (!darfInsDickicht(engine, inst)) return false;
+    if (!darfInsDickicht(engine, inst, pi)) return false;
 
     if (!inst.counters) inst.counters = {};
     inst.counters.untargetable_all = 1;

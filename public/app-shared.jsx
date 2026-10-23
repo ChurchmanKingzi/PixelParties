@@ -2728,6 +2728,7 @@ const ZONE_ANIM_SFX = {
   modifier_sparkle:        { name: 'buff', opts: { rate: 1.25, volume: 0.5 } },
   level_down:              { name: 'debuff', opts: { rate: 0.9, volume: 0.7 } },   // Looming Threat: Stufe sinkt
   hand_level_down:         { name: 'debuff', opts: { rate: 1.0, volume: 0.6 } },   // Great Vanguard Demon: Stufe sinkt (Pixelart, die Karte bleibt sichtbar)
+  mind_control_hex:        { name: 'elem_dark', opts: { rate: 0.8, volume: 0.6 } },   // Mind Control: Hypnose-Spirale über dem übernommenen Helden (Pixelart)
   loom_swell:              { name: 'elem_dark', opts: { rate: 0.6, volume: 0.9 } },   // Looming Threat: Karte schwillt an
   // Gangster Angel — Schusssalve (`gunshot_barrage`). `projectile` ist
   // der vorhandene Geschossklang; schneller abgespielt wird daraus ein
@@ -2850,6 +2851,12 @@ const ZONE_ANIM_SFX = {
     { name: 'ping',       opts: { rate: 1.9,  volume: 0.3,  delay: 760,  category: null, dedupe: 0 } },
     { name: 'reveal',     opts: { rate: 1.1,  volume: 0.5,  delay: 1020, category: null, dedupe: 0 } },
     { name: 'ping',       opts: { rate: 2.4,  volume: 0.4,  delay: 1070, category: null, dedupe: 0 } },
+  ],
+  // See through the Ruse (23.10.) — das Auge oeffnet sich (Aufdeck-Ton, 0 ms), die Abtastzeile faehrt ueber die Karte (leises Surren), beim Schliessen ein Ping (~800 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  ruse_peek: [
+    { name: 'reveal', opts: { rate: 1.3, volume: 0.5 } },
+    { name: 'ping',   opts: { rate: 1.6, volume: 0.3, delay: 300, category: null, dedupe: 0 } },
+    { name: 'ping',   opts: { rate: 2.4, volume: 0.35, delay: 800, category: null, dedupe: 0 } },
   ],
   // Amazing Finding (11.10.) — das Fragezeichen funkelt auf (hoher Ping, 0 ms), platzt bei ~520 ms zum Stern (Aufdeck-Ton + Ping). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   finding_glint: [
@@ -5951,7 +5958,7 @@ function FoilRim({ rim, fkey }) {
   const phase = usePhase(fkey);
   return (
     <div ref={ref} className={'skin-holo skin-holo-nur-rahmen foil-rim-' + rim.tone} data-foil-key={fkey} style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
-      {daten && breit && <div className="skin-holo-rim"><i /></div>}
+      {daten && breit && <div className="skin-holo-rim"><i /><u /></div>}
     </div>
   );
 }
@@ -7965,6 +7972,14 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
       key: 'soul_transmitted', icon: '🕯️',
       tooltip: 'Soul Transmitted: The next time this Hero is defeated, it is deleted together with '
         + 'all cards in its Ability and Support Zones, except Creatures. Cannot be removed.',
+    });
+  }
+  // 23.10. („Mind Control"): der Wirtsheld gehört dem Besitzer der Karte, solange sie angelegt ist.
+  if (s.mind_controlled) {
+    badges.push({
+      key: 'mind_controlled', icon: '🧠',
+      tooltip: 'Mind Controlled: Another player has permanent control of this Hero while Mind Control remains attached to it. '
+        + 'Counts as a negative status effect — curing it discards the card and returns control.',
     });
   }
   if (s.aged) {

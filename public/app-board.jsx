@@ -2994,6 +2994,7 @@ const HERO_TOENUNGEN = [
   // Zeichenschritt).
   { status: 'cursed',       puls: [150, 40, 225], min: 0.06, max: 0.55 },
   { status: 'charmed',      puls: [255, 85, 190], min: 0.06, max: 0.5 },
+  { status: 'mind_controlled', puls: [118, 92, 255], min: 0.06, max: 0.5 },     // 23.10. Mind Control: blau-violett pulsierend
 ];
 
 // kleiner fester Zufall je Figur und Effekt
@@ -8651,6 +8652,49 @@ const HandLevelDownEffect = (() => {
     }
   };
   return ppPunktBild(malen, ENDE + 40, 150, 210, vorbereiten);
+})();
+
+// ═════════════════════════════════════════════════════════════════
+//  Mind Control: Hypnose-Spirale (`mind_control_hex`) — PIXELART, Hülle `ppPunktBild`; läuft über dem übernommenen Helden
+//
+//  Eine Spirale in fünf Violett-Tönen (Bänder, die in ganzen Schritten — ~10 Bilder/s — gegen den Uhrzeigersinn weiterdrehen) legt sich über die Karte: sie dithert
+//  ein (0 → 260 ms), dreht sich ~900 ms und dithert ab ~1150 ms wieder weg (fort bei 1500 ms). Ein heller Ring weitet sich einmal von der Mitte aus, vier Kreuzfunkel
+//  blitzen an den Ecken. Die Karte darunter bleibt lesbar (Spirale nur als Gitter-Dither über einem Teil der Pixel). Feste Palette, kein Leuchten.
+// ═════════════════════════════════════════════════════════════════
+const MindControlHexEffect = (() => {
+  const PAL = ['#f1e5fa', '#d6b3f9', '#ba74ff', '#7a2bd0', '#401a66'].map(ppHex);
+  const ENDE = 1500, EIN = 260, FADE_AB = 1150, DREH_MS = 100;
+  const ARM = [1, 2, 3, 2, 1];
+  const vorbereiten = (sz) => ({
+    ecken: [[-1, -1, 80], [1, -1, 240], [1, 1, 400], [-1, 1, 560]].map(([sx, sy, start]) => ({ x: sx * sz.hw * 0.95, y: sy * sz.hh * 0.9, start })),
+  });
+  const malen = (g, t, sz, teile) => {
+    const ein = Math.min(1, t / EIN), aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    const a = Math.min(ein, aus) * 0.75;                                                // höchstens drei Viertel der Pixel → Karte bleibt lesbar
+    if (a <= 0) return;
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
+    const RX = Math.round(sz.hw * 1.05), RY = Math.round(sz.hh * 1.05);
+    const schritt = Math.floor(t / DREH_MS);                                            // ganze Drehschritte
+    for (let y = -RY; y <= RY; y++) for (let x = -RX; x <= RX; x++) {
+      const nx = x / RX, ny = y / RY, r = Math.hypot(nx, ny);
+      if (r > 1) continue;
+      const w = Math.atan2(ny, nx) / (Math.PI * 2) + 0.5;
+      const v = ((w * 3 + r * 2.2 - schritt / 8) % 1 + 1) % 1;                          // drei Spiralarme
+      if (v > 0.5) continue;
+      const band = Math.min(4, Math.floor(r * 4.2));
+      g.put(cx + x, cy + y, PAL[4 - band > 3 ? 3 : 4 - band], a);
+    }
+    if (t > 120 && t < 720) {                                                           // heller Ring, einmal von innen nach aussen
+      const k = (t - 120) / 600, R = Math.round(k * Math.max(RX, RY) * 1.1);
+      for (let i = 0; i < 64; i++) { const w = i / 64 * Math.PI * 2; g.put(cx + Math.cos(w) * R * (RX / Math.max(RX, RY)), cy + Math.sin(w) * R * (RY / Math.max(RX, RY)), PAL[0], (1 - k) * 0.9 * aus); }
+    }
+    for (const e of teile.ecken) {
+      const k = (t - e.start) / 420;
+      if (k < 0 || k >= 1) continue;
+      ppKreuzfunkel(g, cx + e.x, cy + e.y, ARM[Math.floor(k * ARM.length)], [PAL[0], PAL[1], PAL[2], PAL[3]], aus);
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 200, 260, vorbereiten);
 })();
 
 // ═══════════════════════════════════════════════════════════════════
@@ -17425,6 +17469,7 @@ const ANIM_REGISTRY = {
   dragonegg_shimmer: DragoneggShimmerEffect,
   liquid_rainbow: LiquidRainbowEffect,
   hand_level_down: HandLevelDownEffect,
+  mind_control_hex: MindControlHexEffect,
   // ── Circles of Hell (Animationen) ──────────────────────────────────
   // Farben aus den Pixelart-Hintergruenden der Kreise (Flammen #f8f8bd … #520a0c).
   // ★ The Sixth Circle: Hoellen-Charme — blutrote Siegelringe, aufsteigende Schlieren, dunkler Blitz.
@@ -28164,6 +28209,77 @@ const ANIM_REGISTRY = {
     };
     return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 30 });
   })(),
+  //  See through the Ruse (23.10.) — PIXELART, Brett-Animation auf JEDER aufgedeckten Surprise (`targets`: Surprise Zone oder Support Zone)
+  //
+  //  Ein Auge oeffnet sich ueber der Zone (weisser Augapfel, goldene Iris, dunkle Pupille, rote Lider mit Wimpern), die Iris tastet von links nach rechts; zugleich
+  //  faehrt eine weisse Abtastzeile mit goldenem Schweif von oben nach unten ueber die verdeckte Karte (rotes Dither-Glas, das sie hinter sich lichtet). Zum Schluss
+  //  schliesst sich das Auge, ein Kreuzfunkel bleibt. Die Karten selbst bleiben verdeckt liegen — nur der Zustandsversand zeigt sie nun dem Wirker.
+  // ═══════════════════════════════════════════════════════════════════
+  ruse_peek: (() => {
+    const ROT = ['#f0bfbc', '#e94e53', '#b21a29', '#710122'].map(ppHex);
+    const GOLD = ['#f7f7ad', '#fad54a', '#f29a3e'].map(ppHex);
+    const WEISS = ppHex('#ffffff');
+    const ENDE = 1100, AUF = 220, ZU = 800, FADE_AB = 960;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const AUGE_B = 7;                                   // halbe Breite des Auges (Rasterpixel)
+    const malen = (g, t, sz) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      sz.ziele.forEach((z, zi) => {
+        const CX = Math.round(z.x), CY = Math.round(z.y);
+        const hw = Math.floor(z.w / 2), hh = Math.floor(z.h / 2);
+        // Lidoeffnung: 0 → 1 (oeffnen), 1 → 0 (schliessen)
+        const off = t < AUF ? klemme(t / AUF, 0, 1) : (t > ZU ? klemme(1 - (t - ZU) / 140, 0, 1) : 1);
+        // ── Abtastzeile mit rotem Dither-Glas dahinter ──
+        const T0 = 260, T1 = 760;
+        if (t > T0 && t < ZU + 60) {
+          const k = klemme((t - T0) / (T1 - T0), 0, 1);
+          const zeile = -hh + Math.round(k * 2 * hh);
+          for (let y = -hh; y <= hh; y++) for (let x = -hw; x <= hw; x++) {
+            if (y > zeile && ppBayer(CX + x, CY + y) < 0.28) g.put(CX + x, CY + y, ROT[1], 0.9);
+          }
+          if (k < 1) {
+            for (let x = -hw; x <= hw; x++) {
+              g.put(CX + x, CY + zeile, WEISS, aus);
+              g.put(CX + x, CY + zeile - 1, GOLD[0], aus * 0.85);
+              g.put(CX + x, CY + zeile - 2, GOLD[1], aus * 0.55);
+              g.put(CX + x, CY + zeile - 3, GOLD[2], aus * 0.3);
+            }
+          }
+        }
+        // ── das Auge ──
+        if (off > 0) {
+          const hoehe = 3.4 * off;
+          const irisX = Math.round(Math.sin(klemme((t - 240) / 520, 0, 1) * Math.PI * 2 - Math.PI / 2) * 3.2);
+          for (let x = -AUGE_B; x <= AUGE_B; x++) {
+            const f = Math.sqrt(Math.max(0, 1 - (x * x) / ((AUGE_B + 0.5) * (AUGE_B + 0.5))));
+            const h = Math.round(hoehe * f);
+            if (h <= 0) { g.put(CX + x, CY, ROT[3], aus); continue; }
+            for (let y = -h; y <= h; y++) g.put(CX + x, CY + y, WEISS, aus);
+            g.put(CX + x, CY - h - 1, ROT[2], aus);
+            g.put(CX + x, CY + h + 1, ROT[2], aus);
+            if (Math.abs(x) % 3 === 0 && off > 0.8) g.put(CX + x, CY - h - 2, ROT[3], aus);         // Wimpern
+          }
+          const ir = off > 0.5 ? 2 : 1;
+          for (let j = -ir; j <= ir; j++) for (let i = -ir; i <= ir; i++) {
+            if (i * i + j * j <= ir * ir + 1) g.put(CX + irisX + i, CY + j, GOLD[1], aus);
+          }
+          g.put(CX + irisX, CY, ROT[3], aus);
+          g.put(CX + irisX - 1, CY - 1, WEISS, aus);
+        }
+        // ── Kreuzfunkel beim Schliessen ──
+        if (t > ZU - 40 && t < ZU + 240) {
+          const k = (t - (ZU - 40)) / 280, arm = Math.max(1, Math.round((1 - Math.abs(k - 0.4) / 0.6) * 5));
+          for (let i = 1; i <= arm; i++) {
+            g.put(CX + AUGE_B + 3 + i, CY, i === arm ? GOLD[2] : GOLD[0], aus); g.put(CX + AUGE_B + 3 - i, CY, i === arm ? GOLD[2] : GOLD[0], aus);
+            g.put(CX + AUGE_B + 3, CY - i, i === arm ? GOLD[2] : GOLD[0], aus); g.put(CX + AUGE_B + 3, CY + i, i === arm ? GOLD[2] : GOLD[0], aus);
+          }
+          g.put(CX + AUGE_B + 3, CY, WEISS, aus);
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, null, { extra: 24 });
+  })(),
   // ═══════════════════════════════════════════════════════════════════
   //  Amazing Finding (11.10.) — PIXELART, Brett-Animation auf dem DECK des Spielers (`originDeck`, Ziel `{ deck: true }`)
   //
@@ -31976,6 +32092,57 @@ function TutorialFinaleFeuerwerk() {
       ))}
     </div>
   );
+}
+
+/**
+ * Wo wird der Handplatz `handIdx` stehen, wenn die Hand `finalHandSize` Karten hat? Rechnet gegen die Karten, die JETZT im DOM stehen (Zustand und DOM laufen um einen Takt
+ * auseinander; `finalHandSize` fehlt → eine Karte mehr als jetzt). Liefert ein Rechteck oder `null`, wenn die Hand leer ist.
+ * Gemeinsame Stelle für `play_pile_transfer` (elementFor) und den Hand-Diebstahl (`play_hand_steal`).
+ */
+function handPlatzProjektion(isMe, handIdx, finalHandSize) {
+  const base = isMe ? '.game-hand-me' : '.game-hand-opp';
+  // Eigene Hand: die PLÄTZE zählen (die Karte darin trägt keinen eigenen Platz); Gegnerhand: die Karten selbst.
+  let slots = document.querySelectorAll(`${base} .game-hand-cards > .hand-slot`);
+  if (slots.length === 0) slots = document.querySelectorAll(`${base} .game-hand-cards > [data-hand-idx]`);
+  if (slots.length === 0) return null;
+  // ★ v1233: über `handFanCardBox` messen, nicht roh. In der Gegnerhand trägt die Karte den Fächerwinkel selbst, ihr Hüllkasten ist also breiter als die Karte.
+  const lastRect = window.handFanCardBox?.(slots[slots.length - 1]) || slots[slots.length - 1].getBoundingClientRect();
+  const firstRect = window.handFanCardBox?.(slots[0]) || slots[0].getBoundingClientRect();
+  const cardW = lastRect.width;
+  const oldCount = slots.length;
+  // v891 (Als Befund zu Shooting Star): Der Boden `oldCount + 1` stimmt nur, wenn die Hand durch den Flug WÄCHST. Nennt der Aufrufer eine Endgröße ausdrücklich, gilt SIE.
+  const finalCount = finalHandSize
+    ? Math.max(finalHandSize, handIdx + 1)
+    : Math.max(handIdx + 1, oldCount + 1);
+  // Die Reihe ist zentriert: ihre Mitte liegt zwischen linker Kante des ersten und rechter Kante des letzten Platzes. Der Abstand von Platz zu Platz ist die Flex-Basis,
+  // solange die Hand hineinpasst — ab dann schrumpfen die Plätze gleichmäßig (`.game-hand-cards .hand-slot`, `min-width`), der letzte behält die volle Kartenbreite.
+  const C = (firstRect.left + lastRect.left + lastRect.width) / 2;
+  const reihe = slots[0].parentElement;
+  const cs0 = window.getComputedStyle(slots[0]);
+  // CSS-Maße sind Layout-Einheiten, die Rechtecke Bildschirmeinheiten (`zoom`): der Faktor gleicht beides an.
+  const faktor = reihe && reihe.offsetWidth ? reihe.getBoundingClientRect().width / reihe.offsetWidth : 1;
+  const basis = parseFloat(cs0.flexBasis) * faktor;
+  const minW = (parseFloat(cs0.minWidth) || 0) * faktor;
+  const jetztSchritt = oldCount > 1 ? (lastRect.left - firstRect.left) / (oldCount - 1) : cardW;
+  const grundSchritt = basis > 0 ? basis : Math.max(jetztSchritt, cardW * 0.906);
+  let schritt = grundSchritt;
+  if (reihe && finalCount > 1) {
+    const rcs = window.getComputedStyle(reihe);
+    const innen = (reihe.clientWidth - (parseFloat(rcs.paddingLeft) || 0) - (parseFloat(rcs.paddingRight) || 0)) * faktor;
+    if (innen > cardW) schritt = Math.min(grundSchritt, Math.max(minW, (innen - cardW) / (finalCount - 1)));
+  }
+  const spanne = (finalCount - 1) * schritt + cardW;
+  const projLeft = C - spanne / 2 + handIdx * schritt;
+  // Der Fächerbogen hebt/senkt jeden Platz (`handFanGeometry`, in Kartenhöhen): die Höhe des letzten Platzes plus der Unterschied zwischen seinem Bogenstand und dem des Ziels.
+  let projTop = lastRect.top;
+  if (window.handFanGeometry) {
+    const seite = isMe ? 'me' : 'opp';
+    projTop += (window.handFanGeometry(handIdx, finalCount, { seite }).lift - window.handFanGeometry(oldCount - 1, oldCount, { seite }).lift) * lastRect.height;
+  }
+  return {
+    left: projLeft, top: projTop, width: cardW, height: lastRect.height,
+    right: projLeft + cardW, bottom: projTop + lastRect.height,
+  };
 }
 
 function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck, setSelectedDeck, cubeMatchInfo }) {
@@ -43863,62 +44030,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // each lands half a card-width off. `finalHandSize`
             // carries that; it falls back to oldCount+1, which
             // reproduces the exact single-add projection.
-            const slots = document.querySelectorAll(`${base} .hand-slot, ${base} [data-hand-idx]`);
-            if (slots.length > 0) {
-              // ★ v1233: über `handFanCardBox` messen, nicht roh. In der
-              // Gegnerhand trägt die Karte den Fächerwinkel selbst, ihr
-              // Hüllkasten ist also breiter als die Karte — und genau
-              // diese Breite dient hier als ABSTAND von Platz zu Platz.
-              // Der Helfer gibt den echten Kasten zurück (und beim
-              // Handplatz ohnehin unverändert den seinen).
-              const lastRect = window.handFanCardBox?.(slots[slots.length - 1])
-                || slots[slots.length - 1].getBoundingClientRect();
-              const firstRect = window.handFanCardBox?.(slots[0]) || slots[0].getBoundingClientRect();
-              const cardW = lastRect.width;
-              const oldCount = slots.length;
-              // v891 (Als Befund zu Shooting Star): Der Boden `oldCount + 1`
-              // stimmt nur, wenn die Hand durch den Flug WAECHST. Spielt
-              // der Spieler eine Karte, die ihrerseits etwas auf die Hand
-              // holt, liegt die spielende Karte beim Flug noch (ausgegraut)
-              // in der Hand und verlaesst sie gleich danach — die Hand ist
-              // hinterher also genauso gross wie vorher. Der Boden zwang
-              // trotzdem einen Extraplatz, die zentrierte Reihe rutschte um
-              // eine halbe Karte, und das Blatt landete daneben.
-              // Nennt der Aufrufer eine Endgroesse ausdruecklich, gilt SIE;
-              // der alte Boden bleibt der Rueckfall, wenn keine kommt.
-              const finalCount = extras.finalHandSize
-                ? Math.max(extras.finalHandSize, extras.handIdx + 1)
-                : Math.max(extras.handIdx + 1, oldCount + 1);
-              // Die Reihe ist zentriert: ihre Mitte liegt zwischen linker Kante des ersten und rechter Kante des letzten Platzes. Der Abstand von Platz zu Platz ist
-              // die Flex-Basis, solange die Hand hineinpasst — ab dann schrumpfen die Plätze gleichmäßig (`.game-hand-cards .hand-slot`, `min-width`), der letzte behält
-              // die volle Kartenbreite. Mit fester Kartenbreite als Abstand landete jede Karte einer vollen Hand weit rechts außerhalb der Reihe.
-              const C = (firstRect.left + lastRect.left + lastRect.width) / 2;
-              const reihe = slots[0].parentElement;
-              const cs0 = window.getComputedStyle(slots[0]);
-              // CSS-Maße sind Layout-Einheiten, die Rechtecke Bildschirmeinheiten (`zoom`): der Faktor gleicht beides an.
-              const faktor = reihe && reihe.offsetWidth ? reihe.getBoundingClientRect().width / reihe.offsetWidth : 1;
-              const basis = parseFloat(cs0.flexBasis) * faktor;
-              const minW = (parseFloat(cs0.minWidth) || 0) * faktor;
-              const jetztSchritt = oldCount > 1 ? (lastRect.left - firstRect.left) / (oldCount - 1) : cardW;
-              const grundSchritt = basis > 0 ? basis : Math.max(jetztSchritt, cardW * 0.906);
-              let schritt = grundSchritt;
-              if (reihe && finalCount > 1) {
-                const rcs = window.getComputedStyle(reihe);
-                const innen = (reihe.clientWidth - (parseFloat(rcs.paddingLeft) || 0) - (parseFloat(rcs.paddingRight) || 0)) * faktor;
-                if (innen > cardW) schritt = Math.min(grundSchritt, Math.max(minW, (innen - cardW) / (finalCount - 1)));
-              }
-              const spanne = (finalCount - 1) * schritt + cardW;
-              const projLeft = C - spanne / 2 + extras.handIdx * schritt;
-              const projected = {
-                left:  projLeft,
-                top:   lastRect.top,
-                width: cardW,
-                height: lastRect.height,
-                right: projLeft + cardW,
-                bottom: lastRect.bottom,
-              };
-              return { getBoundingClientRect: () => projected };
-            }
+            const projected = handPlatzProjektion(isMe, extras.handIdx, extras.finalHandSize);
+            if (projected) return { getBoundingClientRect: () => projected };
           }
           return document.querySelector(base);
         }
@@ -46504,7 +46617,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     };
     socket.on('tears_of_creation_animation', onTearsOfCreation);
-    const onHandSteal = ({ fromPlayer, toPlayer, indices, cardNames, count, duration, highlightMs: hlMs }) => {
+    const onHandSteal = ({ fromPlayer, toPlayer, indices, cardNames, count, duration, highlightMs: hlMs, toBaseCount }) => {
       if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_hand_steal');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
       stealInProgressRef.current = true;
       const iAmVictim = fromPlayer === myIdx;
@@ -46566,35 +46679,42 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // hätte sie größer starten lassen als die Karte darunter.
           sourceRects.push(el ? (window.handFanCardBox?.(el) || el.getBoundingClientRect()) : null);
         });
+        // Eine volle Hand schiebt ihre Plätze zusammen: der Kasten einer Karte ist dann schmaler als die Karte selbst (in der Gegnerhand schneidet er sie sogar ab). Die Flugkarte
+        // bekommt deshalb die volle Größe — gemessen am LETZTEN Platz der Hand, der nie zusammengeschoben wird.
+        const quellLetzter = document.querySelector(`.game-hand-${fromLabel} .game-hand-cards > :last-child`);
+        const volleGroesse = quellLetzter && (window.handFanCardBox?.(quellLetzter) || quellLetzter.getBoundingClientRect());
+        if (volleGroesse && volleGroesse.width > 0) {
+          sourceRects.forEach((r, k) => { if (r) sourceRects[k] = { left: r.left, top: r.top, width: volleGroesse.width, height: volleGroesse.height }; });
+        }
 
-        // Find target position: just right of last visible card in destination hand
-        const toHandCards = document.querySelectorAll(`.game-hand-${toLabel} .game-hand-cards > *`);
-        const lastCard = toHandCards.length > 0 ? toHandCards[toHandCards.length - 1] : null;
-        // ★ v1233: echter Kartenkasten statt Hüllkasten — in der
-        // Gegnerhand dreht die Karte selbst (siehe `handFanCardBox`).
-        const lastRect = lastCard
-          ? (window.handFanCardBox?.(lastCard) || lastCard.getBoundingClientRect())
-          : null;
-        const toHandEl = document.querySelector(`.game-hand-${toLabel} .game-hand-cards`);
+        // Zielplätze: die Karten werden in Reihenfolge ABSTEIGENDER Quellplätze ans Ende der Zielhand gehängt (Engine: `actionStealFromHand`), landen also an
+        // `destCount + (Anzahl − 1 − k)`. Gerechnet wird gegen die Endgröße der Hand, nicht „rechts neben die letzte Karte".
+        const destIsMe = toLabel === 'me';
+        const destBase = `.game-hand-${toLabel} .game-hand-cards`;
+        const destCount = document.querySelectorAll(`${destBase} > .hand-slot, ${destBase} > .hand-card`).length;
+        // `toBaseCount` (Engine): so viele Karten bleiben in der Zielhand, wenn die gerade aufgelöste Karte sie verlassen hat (sie steht bis dahin noch in der Hand).
+        const basisAnzahl = Number.isInteger(toBaseCount) ? toBaseCount : destCount;
+        const endGroesse = basisAnzahl + stealIndices.length;
+        const toHandEl = document.querySelector(destBase);
         const toRect = toHandEl?.getBoundingClientRect();
-        const cardW = lastRect?.width || 64;
+        const cardW0 = sourceRects.find(Boolean)?.width || 64;
         // ★ LEERE ZIELHAND (Als Befund 12.9.) ─────────────────────────
-        // Ohne Karten klappt `.game-hand-cards` auf Breite 0 zusammen
-        // und sitzt dann direkt neben dem Deckstapel — die gestohlene
-        // Karte flog sichtbar INS DECK des Gegners. Fallback ist
-        // deshalb die ganze Handreihe, mittig angeflogen.
+        // Ohne Karten klappt `.game-hand-cards` auf Breite 0 zusammen und sitzt dann direkt neben dem Deckstapel — die gestohlene Karte flog sichtbar INS DECK des
+        // Gegners. Fallback ist deshalb die ganze Handreihe, mittig angeflogen.
         const toRowRect = document.querySelector(`.game-hand-${toLabel}`)?.getBoundingClientRect();
-        const zielBasis = (toRect && toRect.width > cardW * 0.5) ? toRect : (toRowRect || toRect);
+        const zielBasis = (toRect && toRect.width > cardW0 * 0.5) ? toRect : (toRowRect || toRect);
 
+        const flyEls = [];
         stealIndices.forEach((idx, i) => {
           const sr = sourceRects[i];
           if (!sr) return;
           const name = names[i] || '';
-          const targetX = lastRect
-            ? ((lastRect.left + lastRect.width) + i * (cardW * 0.6))
-            : (zielBasis ? (zielBasis.left + zielBasis.width / 2 - cardW / 2 + i * (cardW * 0.6)) : sr.left);
-          const targetY = lastRect
-            ? lastRect.top
+          const ziel = destCount > 0 ? handPlatzProjektion(destIsMe, basisAnzahl + (stealIndices.length - 1 - i), endGroesse) : null;
+          const targetX = ziel
+            ? ziel.left
+            : (zielBasis ? (zielBasis.left + zielBasis.width / 2 - cardW0 / 2 + i * (cardW0 * 0.6)) : sr.left);
+          const targetY = ziel
+            ? ziel.top
             : (zielBasis ? (zielBasis.top + Math.max(0, (zielBasis.height - sr.height) / 2)) : sr.top);
           const dx = targetX - sr.left;
           const dy = targetY - sr.top;
@@ -46619,20 +46739,34 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             flyEl.textContent = name;
           }
           document.body.appendChild(flyEl);
-          // All clones share the SAME removal time (`batchEndMs`) so
-          // the batch disappears in lockstep with the server's state
-          // sync. The previous per-clone 2200ms padding kept clones
-          // alive long after the real cards landed, so when the
-          // triggering card (Thieving Strike etc.) was discarded and
-          // the real cards slid left, the stale clones lingered at
-          // the old "end of hand" rects — a visible ghost duplicate.
-          setTimeout(() => flyEl.remove(), batchEndMs);
+          // Jede Karte hat ihren eigenen Flug-Klang (wie ein Zug), zum Abflug dieser Karte.
+          if (window.playSFX) setTimeout(() => window.playSFX('draw', { dedupe: 60 }), i * 100 + 40);
+          flyEls.push(flyEl);
         });
+        // Die Klone bleiben stehen, bis die Karten WIRKLICH in der Zielhand erscheinen (der Zustand kommt gut 150 ms nach dem Ende des Flugs) — sonst sind sie in der Zwischenzeit
+        // einfach weg. Zeigt die Zielhand mehr Karten (oder ist die Frist um), werden Klone und Quellverdeckung zusammen aufgehoben.
+        // Angekommen heißt: der Zustand ist da — die QUELLHAND ist um die gestohlenen Karten kürzer (die Zielhand zu zählen trügt, solange die aufgelöste Karte noch darin liegt).
+        const srcBase = `.game-hand-${fromLabel} .game-hand-cards`;
+        const zaehleQuelle = () => document.querySelectorAll(`${srcBase} > .hand-slot, ${srcBase} > .hand-card`).length;
+        const quelleVorher = zaehleQuelle();
+        let aufgeraeumt = false;
+        const aufraeumen = () => {
+          if (aufgeraeumt) return;
+          aufgeraeumt = true;
+          flyEls.forEach(el => el.remove());
+          setStealHiddenMe(new Set());
+          setStealHiddenOpp(new Set());
+        };
+        const fruehestens = Date.now() + batchEndMs;
+        const spaetestens = Date.now() + batchEndMs + 1200;
+        const warte = setInterval(() => {
+          const jetzt = Date.now();
+          if (jetzt >= spaetestens || (jetzt >= fruehestens && zaehleQuelle() <= quelleVorher - stealIndices.length)) { clearInterval(warte); aufraeumen(); }
+        }, 30);
 
         // Phase 3: Clear hidden states right as the clones dissolve.
         setTimeout(() => {
-          setStealHiddenMe(new Set());
-          setStealHiddenOpp(new Set());
+          // (Die Quellverdeckung hebt `aufraeumen` oben auf, sobald die Karten in der Zielhand stehen — die Verdeckung gilt nur, solange die Hand ihre Größe hat.)
           // Bin ich der DIEB, landen die Karten in MEINER Hand — dort den
           // Zieh-Anim ueberspringen. Bin ich das OPFER, landen sie in der
           // GEGNERHAND: derselbe Gedanke, nur die andere Seite. Ohne den
@@ -52541,6 +52675,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   }}
                   onClick={isBlindPick ? () => {
                     if (blindGesperrt) return;
+                    // Auswahl und Abwahl klingen wie jede andere Kartenwahl (`pickEligible` weiter unten).
+                    if (window.playSFX) window.playSFX('ui_click');
                     // Compute the NEXT selection set outside the
                     // setState updater. React may double-invoke state
                     // updaters (StrictMode dev, batching), so the

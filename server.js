@@ -16959,6 +16959,11 @@ io.on('connection', (socket) => {
           hero: hero.name, buff: buffName, by: inst.name,
         });
       }
+      // 23.10. (Mind Control): Anhängsel mit dauerhafter Wirkung über den Status hinaus (Heldenkontrolle) legen sie im Puzzle-Aufbau selbst an.
+      if (typeof scr?.puzzleAnheften === 'function') {
+        try { await scr.puzzleAnheften(room.engine, inst); }
+        catch (err) { console.error('[Puzzle] puzzleAnheften ' + inst.name + ' threw:', err.message); }
+      }
     }
 
     // ── Apply player-state starting debuffs ──

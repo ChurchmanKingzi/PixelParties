@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ════════════════════════════════════════════════════════════════
-//  WÄCHTER: ZUGNUMMERN-FRISTEN UND „NUR ECHTE ZÜGE ZÄHLEN"  (W68a)
+//  WÄCHTER: ZUGNUMMERN-FRISTEN UND „NUR ECHTE ZÜGE ZÄHLEN"  (W68a; Ordnungs-/Folge-Zähler W69a)
 //
 //  Anlass (Al, 23.10.2026): Ein ÜBERSPRUNGENER Zug (Guardian Beast Zhu, Hand of Death) ist kein Zug — er beendet keine Frist, bringt keinen
 //  Zähler vorwärts und löst keine Zugende-Auslöser aus. Technisch: der Skip lässt die Zugnummer verstreichen; Fristen, die als ZUGNUMMER abgelegt
@@ -97,6 +97,66 @@ for (const f of fs.readdirSync(EFFEKTE)) {
     if (/log\(|console\./.test(z)) return;
     if (AUSNAHMEN.some(a => a.datei === f && a.muster.test(z))) return;
     melde(`${f}:${i + 1}: Zugnummern-Rechnung \`${z.trim().slice(0, 110)}\` ohne bekannten Fristnamen — eine neue Zugnummern-Frist braucht einen Handler in _zug-fristen.js (und einen Eintrag hier)`);
+  });
+}
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+//  W69a — ORDNUNGS- UND FOLGE-ZÄHLER („your Nth turn", „2 consecutive turns", „every other turn") rechnen nie selbst mit Zugnummern
+//  Al, 23.10.2026: übersprungene Züge zählen dort nicht mit. Die Hilfen stehen in `_zug-fristen.js` (`echteEigeneZuegeBis`, `echterEigenerZugIndex`,
+//  `echterEigenerZugNr`, `vorigerEchterEigenerZug`, `istFolgezug`; Engine-Wrapper gleichen Namens).
+// ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+// 4) Die Hilfen existieren, und jede Karte mit Ordnungs-/Folge-Zähler ruft sie (statt `turn − N`, `turn % 2` …).
+for (const h of ['echteEigeneZuegeBis', 'echterEigenerZugIndex', 'echterEigenerZugNr', 'vorigerEchterEigenerZug', 'istFolgezug']) {
+  if (!new RegExp('module\\.exports[\\s\\S]*' + h).test(fristen)) melde(`_zug-fristen.js: Hilfe ${h} fehlt im Export`);
+  if (!new RegExp('\\b' + h + '\\s*\\(').test(fs.readFileSync(path.join(EFFEKTE, '_engine.js'), 'utf8'))) melde(`_engine.js: Wrapper ${h}(…) fehlt`);
+}
+const FOLGE_KARTEN = [
+  { datei: 'thicket.js', hilfe: 'istFolgezug', text: '2 consecutive turns' },
+  { datei: 'jump-in-the-river.js', hilfe: 'istFolgezug', text: '2 consecutive turns' },
+  { datei: 'blade-of-the-frostbringer.js', hilfe: 'echteEigeneZuegeBis', text: '2 consecutive turns' },
+  { datei: 'hammer-throw.js', hilfe: 'echteEigeneZuegeBis', text: 'every other turn' },
+  { datei: 'cheat-chair.js', hilfe: 'echterEigenerZugNr', text: 'third turn' },
+  { datei: 'willy-the-valiant-leprechaun.js', hilfe: 'echterEigenerZugIndex', text: 'first turn' },
+  { datei: 'petrifying-potion.js', hilfe: 'echteEigeneZuegeBis', text: 'Restdauer aus Zugnummern' },
+];
+for (const { datei, hilfe, text } of FOLGE_KARTEN) {
+  const p = path.join(EFFEKTE, datei);
+  if (!fs.existsSync(p)) { melde(`${datei}: Datei fehlt (Folge-Karten-Liste veraltet)`); continue; }
+  const code = fs.readFileSync(p, 'utf8').split('\n').filter(z => !/^\s*(\/\/|\*|\/\*)/.test(z)).join('\n');
+  if (!new RegExp('\\b' + hilfe + '\\b').test(code)) melde(`${datei}: „${text}" muss ${hilfe} aufrufen (nur echte Züge zählen) — keine eigene Zugnummern-Rechnung`);
+}
+// Der Kartentext hat eine Ordnungs-/Folge-Klausel? Dann steht die Karte oben in FOLGE_KARTEN (neue Karte ⇒ prüfen, Hilfe einbauen, eintragen).
+const FOLGE_TEXT = /\b(first|second|third|fourth|fifth) turn\b|\bconsecutive turns?\b|\bevery other turn\b|\bturns? in a row\b/i;
+const FOLGE_BEKANNT = new Set([...FOLGE_KARTEN.map(k => k.datei.replace(/\.js$/, '')), 'butterfly-cloud', 'barker-the-monster-tamer', 'first-contact', 'night-the-herald-of-chess']);
+for (const k of KARTEN) {
+  const m = (k.effect || '').match(FOLGE_TEXT);
+  if (!m) continue;
+  if (/\bboth players\b|\bat the end of your first turn\b/.test('')) continue;
+  const name = slug(k.name);
+  if (!FOLGE_BEKANNT.has(name)) melde(`Karte „${k.name}": Kartentext „${m[0]}" — Ordnungs-/Folge-Klausel; mit den Hilfen aus _zug-fristen.js umsetzen und in FOLGE_KARTEN/FOLGE_BEKANNT eintragen`);
+}
+
+// 5) Keine eigene Folge-Arithmetik mit `gs.turn` in Kartenskripten (Differenz, Parität, Halbieren). Begründete Altstellen stehen in FOLGE_AUSNAHMEN.
+const FOLGE_AUSNAHMEN = [
+  { datei: 'petrifying-potion.js', muster: /echteEigeneZuegeBis\(/ },                 // `gs.turn - 1` = Obergrenze für die Hilfe, keine Differenz
+  { datei: 'magic-lamp.js', muster: /gs\.turn \|\| 1\) <= 1/ },                         // Spielregel: nicht im allerersten Zug des Spiels
+  { datei: 'hammer-throw.js', muster: /gs\.turn \|\| 1\) > 1/ },                       // Spielregel: nicht im allerersten Zug des Spiels
+  { datei: 'thicket.js', muster: /gs\.turn \|\| 0\) < 3/ },                            // CPU-Anstoß (Zug ≥ 3), keine Spielregel
+  { datei: 'perfect-disguise.js', muster: /gs\.turn \|\| 0\) < 5/ },                   // CPU-Anstoß
+  { datei: 'moe-shield.js', muster: /./ }, { datei: 'barrier-of-undying.js', muster: /./ },   // Zugnummern-Fristen (Abschnitt 3, Handler in fristenNachSkip)
+];
+const FOLGE_ARITH = /(gs|engine\.gs|state|ctx\.gameState)\.turn\s*(\|\|\s*\d+\)?\s*)?[-%]\s*[\w(.]|\bturn\s*%\s*2|[Tt]urn\s*\)?\s*\/\s*2\b|Math\.(floor|ceil)\([^)]*[Tt]urn[^)]*\/\s*2|zugIndexVon\(/;
+for (const f of fs.readdirSync(EFFEKTE)) {
+  if (!f.endsWith('.js') || f.startsWith('_') && !/-shared\.js$/.test(f)) continue;
+  if (/^_(cpu|train|decision|deck-profile|ability-worth|area-removal)/.test(f)) continue;   // CPU-/Lern-Heuristiken rechnen mit Zugnummern, ohne Spielregel
+  const zeilen = fs.readFileSync(path.join(EFFEKTE, f), 'utf8').split('\n');
+  zeilen.forEach((z, i) => {
+    if (/^\s*(\/\/|\*|\/\*)/.test(z) || /log\(|console\./.test(z)) return;
+    const code = z.replace(/\/\/.*$/, '');
+    if (!FOLGE_ARITH.test(code)) return;
+    if (FOLGE_AUSNAHMEN.some(a => a.datei === f && a.muster.test(code))) return;
+    melde(`${f}:${i + 1}: Folge-/Ordnungs-Arithmetik mit Zugnummern \`${code.trim().slice(0, 110)}\` — nur echte Züge zählen: engine.echteEigeneZuegeBis / echterEigenerZugIndex / echterEigenerZugNr / vorigerEchterEigenerZug / istFolgezug verwenden (oder begründete Ausnahme in scripts/check-zugfristen.js)`);
   });
 }
 

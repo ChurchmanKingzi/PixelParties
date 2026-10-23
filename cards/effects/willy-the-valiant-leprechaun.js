@@ -3,6 +3,9 @@
 //  Hero — At the end of your first turn, choose:
 //  Draw 5 cards OR Gain 30 Gold.
 //  No hand size limit until the start of your second turn (W16f: bis einschliesslich der Gegnerrunde dazwischen).
+//  ★ W69a (Al, 23.10.2026: „Nein, sie sollen nur 'echte' eigene Züge zählen!"): „first"/„second turn" sind der erste/zweite TATSAECHLICH gespielte
+//  eigene Zug (`engine.echterEigenerZugIndex` / `echteEigeneZuegeBis`); `_willyFirstTurn` ist nur die Zugnummer, ab der gezaehlt wird (der
+//  nominell erste Zug). Wird der nominell erste Zug uebersprungen (Hand-of-Death-Rider im ersten Zug des Startspielers), ist der naechste echte Zug der erste.
 // ═══════════════════════════════════════════
 
 // Als Ruling 17.8. ("Tuscan Aristocrat"): eine Gold-OPTION faellt weg,
@@ -36,7 +39,8 @@ module.exports = {
   bypassHandLimit(engine, pi, hero) {
     const first = hero?._willyFirstTurn;
     if (first == null) return false;
-    return (engine.gs.turn || 1) <= first + Math.max(1, (engine.gs.players || []).length - 1);
+    if ((engine.gs.turn || 1) < first) return true;   // vor dem nominell ersten Zug (Aufbau)
+    return engine.echteEigeneZuegeBis(pi, engine.gs.turn || 1, first) < 2;   // bis zum BEGINN des zweiten echten eigenen Zuges
   },
 
   hooks: {
@@ -74,7 +78,7 @@ module.exports = {
       const hero = ctx.attachedHero;
       if (!hero || hero._willyEffectUsed) return;
       if (gs.activePlayer !== pi) return; // Only on owner's turn
-      if ((gs.turn || 1) !== hero._willyFirstTurn) return; // Only first turn
+      if (engine.echterEigenerZugIndex(pi, gs.turn || 1, hero._willyFirstTurn) !== 1) return; // Only first (real) turn
 
       // Must be alive and not incapacitated
       if (hero.hp <= 0) return;
