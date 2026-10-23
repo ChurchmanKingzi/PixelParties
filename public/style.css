@@ -20839,41 +20839,72 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
                     scale(.5) rotate(var(--gg-rot)); }
 }
 
-/* ── Regler: groesserer Griff (v1138, Al: „vor allem auf Mobile") ── */
+/* ── Regler in Pixelart (v1138 groesserer Griff, Als Vorgabe 23.10.: „Jede Animation und jedes Highlight ist Pixelart") ──────────────────────────
+   Wie der Lautstaerke-Regler (`.volume-slider`), nur groesser (Mobile): versenkte Schiene mit hartem Rahmen, die FUELLUNG ist eine harte Stufe bis zum Griff
+   (`--p` = Anteil 0–1, setzt `OptionPickerSlider`; kein Verlauf), dazu ein 8-px-Strichraster als Skala; der Griff ist ein eckiger Block mit Lichtkante,
+   drei Griffrillen und hartem Versatzschatten. Beim Ziehen springt nur die Farbe (kein stufenloses Skalieren). */
 .effect-slider input[type=range] {
-  height: 34px;
+  --p: 1;
+  --griff: 26px;
+  height: 36px;
   -webkit-appearance: none; appearance: none;
   background: transparent;
+  cursor: pointer;
 }
 .effect-slider input[type=range]::-webkit-slider-runnable-track {
-  height: 10px; border-radius: 5px;
-  background: linear-gradient(90deg, var(--accent), rgba(255,255,255,.18));
+  height: 12px; border-radius: 0;
+  border: 3px solid var(--pp-kontur);
+  background:
+    repeating-linear-gradient(90deg, rgba(0,0,0,.28) 0 2px, transparent 2px 8px),
+    linear-gradient(90deg,
+      var(--accent) 0 calc(var(--griff) / 2 + (100% - var(--griff)) * var(--p)),
+      #07060e calc(var(--griff) / 2 + (100% - var(--griff)) * var(--p)) 100%);
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, .55), 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 .effect-slider input[type=range]::-moz-range-track {
-  height: 10px; border-radius: 5px;
-  background: linear-gradient(90deg, var(--accent), rgba(255,255,255,.18));
+  height: 6px; border-radius: 0;
+  border: 3px solid var(--pp-kontur);
+  background:
+    repeating-linear-gradient(90deg, rgba(0,0,0,.28) 0 2px, transparent 2px 8px),
+    linear-gradient(90deg,
+      var(--accent) 0 calc(var(--griff) / 2 + (100% - var(--griff)) * var(--p)),
+      #07060e calc(var(--griff) / 2 + (100% - var(--griff)) * var(--p)) 100%);
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, .55), 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
 }
-/* ★ Der Griff: 30px statt der Browser-Standardgröße (~12px). Auf einem
-   Telefon ist alles unter ~24px kaum zu treffen. */
 .effect-slider input[type=range]::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none;
-  width: 30px; height: 30px; margin-top: -10px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 32%, #fff 0%, var(--accent) 55%, #7a2f12 100%);
-  border: 2px solid rgba(255,255,255,.8);
-  box-shadow: 0 2px 8px rgba(0,0,0,.5);
+  width: var(--griff); height: 34px; margin-top: -11px;
+  border-radius: 0;
+  border: 3px solid var(--pp-kontur);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 4px, rgba(0,0,0,.35) 4px 6px, transparent 6px 8px) center / 100% 40% no-repeat,
+    var(--accent);
+  box-shadow: inset 3px 3px 0 rgba(255, 255, 255, .6), inset -3px -3px 0 rgba(0, 0, 0, .4), 3px 3px 0 rgba(0, 0, 0, .55);
   cursor: grab;
 }
 .effect-slider input[type=range]::-moz-range-thumb {
-  width: 30px; height: 30px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 32%, #fff 0%, var(--accent) 55%, #7a2f12 100%);
-  border: 2px solid rgba(255,255,255,.8);
-  box-shadow: 0 2px 8px rgba(0,0,0,.5);
+  width: calc(var(--griff) - 6px); height: 28px;
+  border-radius: 0;
+  border: 3px solid var(--pp-kontur);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 4px, rgba(0,0,0,.35) 4px 6px, transparent 6px 8px) center / 100% 40% no-repeat,
+    var(--accent);
+  box-shadow: inset 3px 3px 0 rgba(255, 255, 255, .6), inset -3px -3px 0 rgba(0, 0, 0, .4), 3px 3px 0 rgba(0, 0, 0, .55);
   cursor: grab;
 }
-.effect-slider input[type=range]:active::-webkit-slider-thumb { cursor: grabbing; transform: scale(1.12); }
-.effect-slider input[type=range]:active::-moz-range-thumb { cursor: grabbing; transform: scale(1.12); }
+.effect-slider input[type=range]:active::-webkit-slider-thumb { cursor: grabbing; background-color: color-mix(in srgb, var(--accent) 70%, #fff); }
+.effect-slider input[type=range]:active::-moz-range-thumb { cursor: grabbing; background-color: color-mix(in srgb, var(--accent) 70%, #fff); }
+/* Zahlenfeld neben dem Regler: eckig, harter Rahmen + dunkle Kontur, Innenkante oben/links dunkel (versenkt). */
+.effect-slider-zahl {
+  width: 78px; padding: 6px 8px; font-size: 13px; text-align: right;
+  background: #07060e; color: var(--accent);
+  border: 3px solid var(--accent); border-radius: 0; outline: none;
+  box-shadow: 0 0 0 2px var(--pp-kontur), inset 2px 2px 0 rgba(0, 0, 0, .6);
+  -moz-appearance: textfield; appearance: textfield;
+}
+.effect-slider-zahl::-webkit-outer-spin-button,
+.effect-slider-zahl::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.effect-slider-zahl:focus { border-color: #fff; }
 
 
 /* ════════════════════════════════════════════════════════════════

@@ -29930,17 +29930,13 @@ function OptionPickerSlider({ ep, respondToPrompt }) {
         <input
           type="range" min={min} max={max} step={schritt} value={wert}
           onChange={e => setWert(klemmen(e.target.value))}
-          style={{ flex: 1, accentColor: 'var(--accent)' }}
+          style={{ flex: 1, '--p': max > min ? (wert - min) / (max - min) : 1 }}
         />
         <input
+          className="effect-slider-zahl"
           type="number" min={min} max={max} step={schritt} value={wert}
           onChange={e => setWert(e.target.value === '' ? min : klemmen(e.target.value))}
           onBlur={e => setWert(klemmen(e.target.value))}
-          style={{
-            width: 78, padding: '6px 8px', fontSize: 13, textAlign: 'right',
-            background: 'var(--bg2)', color: 'var(--accent)',
-            border: '1px solid var(--accent)', borderRadius: 6,
-          }}
         />
         {einheit && <span style={{ fontSize: 12, color: 'var(--text2)' }}>{einheit}</span>}
       </div>
