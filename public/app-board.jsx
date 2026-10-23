@@ -1249,33 +1249,90 @@ function BirthdayPresentReveal({ state, interactive, onPick }) {
   );
 }
 
-// Brackle catapult — single five-phase flying card. THREE chained CSS
-// animations (load → fire → discard-fly) with `forwards` fills cover
-// the visible flow. The implicit gaps between animations are the
-// HOLD (creature parked on Brackle) and IMPACT (creature parked at
-// target while the explosion plays) phases — no extra animations
-// needed since `forwards` fill keeps the card visibly pinned in
-// place across each gap.
+// Brackle catapult — single five-phase flying card, PIXELART (Als Vorgabe 23.10.: „Jede Animation und jedes Highlight soll Pixelart sein!").
+// Statt weich interpolierter CSS-Animationen (Rotation, Skalierung, Weichzeichner-Schatten) treibt ein Bildtakt (~30 Bilder/s, wie die übrigen
+// Pixelart-Animationen) die Karte: Position in GANZEN 2-px-Schritten, keine Drehung, Grösse nur in ganzzahligen Stufen, harter Versatzschatten,
+// `image-rendering: pixelated`. Beim Abschuss bleiben eckige Pixelfunken (feste Palette, kein Alpha) hinter der Karte zurück. Die Phasen sind die
+// des Servers: Laden (Slot → Brackle) → Halten (Karte zittert auf Brackle) → Abschuss (Brackle → Ziel) → Einschlag (Karte sitzt am Ziel, zittert,
+// während die Explosion läuft) → Ablage (Ziel → Ablagestapel, schrumpft in Stufen).
+const BRACKLE_TAKT_MS = 33;
+const BRACKLE_FUNKEN = ['#fff3a8', '#ffd23a', '#ff7a14', '#ffffff'];
 function BrackleCatapultCard({ sx, sy, mx, my, ex, ey, dx, dy, cardName, loadMs, holdMs, fireMs, impactMs, discardMs }) {
   const card = CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name) : null;
-  // Each chained animation's `animation-delay` is the cumulative
-  // start-time across previous phases. CSS doesn't compute these
-  // for us, so we precompute and pass each as a variable.
-  const fireDelay    = (loadMs || 0) + (holdMs || 0);
-  const discardDelay = fireDelay + (fireMs || 0) + (impactMs || 0);
+  const wurzel = useRef(null);
+  useEffect(() => {
+    const el = wurzel.current;
+    if (!el) return;
+    const L = loadMs || 0, Hh = holdMs || 0, F = fireMs || 0, I = impactMs || 0, D = discardMs || 0;
+    const T1 = L, T2 = L + Hh, T3 = T2 + F, T4 = T3 + I, T5 = T4 + D;
+    const CW = 64, CH = 90;
+    const klemme = (v) => Math.max(0, Math.min(1, v));
+    const raus = (v) => 2 * Math.round(v / 2);                         // ganze 2-px-Schritte: die Karte rastet auf dem Pixelraster ein
+    const sanftAus = (k) => 1 - Math.pow(1 - k, 3);                    // Laden: schwungvoll anfahren, weich ankommen
+    const hartEin = (k) => Math.pow(k, 2.2);                           // Abschuss: beschleunigt hart, kein Nachschwingen
+    const sanft = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
+    const funken = [];
+    let letzterTakt = -1, raf = 0;
+    const t0 = performance.now();
+    const setze = (x, y, b, h) => {
+      el.style.left = raus(x + (CW - b) / 2) + 'px';
+      el.style.top = raus(y + (CH - h) / 2) + 'px';
+      el.style.width = b + 'px'; el.style.height = h + 'px';
+    };
+    const funke = (x, y) => {
+      const f = document.createElement('i');
+      const g = Math.random() < 0.5 ? 4 : 6;
+      f.style.cssText = [
+        'position:fixed', 'display:block', 'pointer-events:none', 'z-index:10099', 'border-radius:0',
+        `left:${raus(x + CW / 2 + (Math.random() - 0.5) * 40)}px`, `top:${raus(y + CH / 2 + (Math.random() - 0.5) * 60)}px`,
+        `width:${g}px`, `height:${g}px`, `background:${BRACKLE_FUNKEN[Math.floor(Math.random() * BRACKLE_FUNKEN.length)]}`,
+      ].join(';');
+      f.setAttribute('data-pp-px', 'aus');
+      document.body.appendChild(f);
+      const eintrag = { f, ende: performance.now() + 160 + Math.random() * 140 };
+      funken.push(eintrag);
+    };
+    const bild = () => {
+      const t = performance.now() - t0;
+      const takt = Math.floor(t / BRACKLE_TAKT_MS);
+      if (takt !== letzterTakt) {
+        letzterTakt = takt;
+        const tq = takt * BRACKLE_TAKT_MS;
+        const wackel = (takt % 2 === 0) ? 2 : -2;
+        if (tq < T1) {
+          const k = sanftAus(klemme(tq / (L || 1)));
+          setze(sx + (mx - sx) * k, sy + (my - sy) * k, CW, CH);
+        } else if (tq < T2) {
+          setze(mx + wackel, my, CW, CH);                              // Aufladen: zittert auf Brackle
+        } else if (tq < T3) {
+          const k = hartEin(klemme((tq - T2) / (F || 1)));
+          const x = mx + (ex - mx) * k, y = my + (ey - my) * k;
+          setze(x, y, CW, CH);
+          funke(x, y); funke(x, y);
+        } else if (tq < T4) {
+          setze(ex + wackel, ey + (takt % 3 === 0 ? 2 : 0), CW, CH);  // Einschlag: Treffer-Zittern
+        } else if (tq < T5) {
+          const k = sanft(klemme((tq - T4) / (D || 1)));
+          const stufe = Math.min(3, Math.floor(k * 4));                // 100 % → 85 % → 70 % → 55 %: ganzzahlige Pixelgrössen, kein weiches Skalieren
+          const m = [1, 0.85, 0.7, 0.55][stufe];
+          setze(ex + (dx - ex) * k, ey + (dy - ey) * k, 2 * Math.round(CW * m / 2), 2 * Math.round(CH * m / 2));
+        } else {
+          el.style.visibility = 'hidden';
+        }
+      }
+      const jetzt = performance.now();
+      for (let i = funken.length - 1; i >= 0; i--) {
+        if (jetzt >= funken[i].ende) { funken[i].f.remove(); funken.splice(i, 1); }
+      }
+      raf = requestAnimationFrame(bild);
+    };
+    setze(sx, sy, CW, CH);
+    raf = requestAnimationFrame(bild);
+    return () => { cancelAnimationFrame(raf); for (const e of funken) e.f.remove(); };
+  }, []);
   return (
-    <div className="brackle-catapult-card" style={{
-      '--sx': sx + 'px', '--sy': sy + 'px',
-      '--mx': mx + 'px', '--my': my + 'px',
-      '--ex': ex + 'px', '--ey': ey + 'px',
-      '--dx': dx + 'px', '--dy': dy + 'px',
-      '--load-ms':     loadMs    + 'ms',
-      '--fire-ms':     fireMs    + 'ms',
-      '--discard-ms':  discardMs + 'ms',
-      '--fire-delay':    fireDelay    + 'ms',
-      '--discard-delay': discardDelay + 'ms',
-    }}>
+    <div ref={wurzel} className="brackle-catapult-card" data-pp-px="aus" style={{ left: sx + 'px', top: sy + 'px' }}>
       {imgUrl ? <img src={imgUrl} draggable={false} alt="" />
         : <div style={{ width: '100%', height: '100%', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--text)', padding: 4, textAlign: 'center' }}>{cardName}</div>}
     </div>
