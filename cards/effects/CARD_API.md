@@ -23713,3 +23713,54 @@ Befunde von Al (Spieldesigner), „wahrscheinlich größere Bug-Klassen": (1) Ei
 3. Surprise Party: spielbar nur mit freier Zone (der Name steht erst nach dem Aufdecken fest); ein geteilter Platz ist nur Rückfall — okay?
 4. Sollen BEWEGUNGEN (Guard Change, Slippery Skates/Ice, Memory Blast, Jumper-Spider-Transfer) die Teilung nutzen dürfen (Slime in die Zone eines anderen Slimes ziehen)? **Derzeit nein.**
 5. Reincarnation (Kreatur-Modus braucht 3 freie Zonen: 2 für die Pollution Tokens + 1): mit Alice-Teilung nur 2 freie + die geteilte Zone? **Derzeit unverändert.**
+
+
+## Welle 63 / W63a — Alice-Teilung: erst die geteilte Zone, DANN die erste leere · „free Support Zone" für ALLE Wege · Surprise Party · Bewegen · Reincarnation
+
+Als Antworten auf die fünf Rückfragen aus Welle 62 (alle fünf mit **Ja**), umgesetzt in `wave63/W63a`. Repros: `docs/niche-tests/repro/W63/a-01` … `a-06` (beide Sitze, Exit 0 = korrekt; alle auf dem Stand vor W63a rot), gemeinsamer Szenenbau `docs/niche-tests/lib/alice-brett.js` (`brett(seat, opts)`). Sammelübersicht: `docs/niche-tests/FIXES-WELLE-63.md`.
+
+### 1) Reihenfolge (Frage 2): geteilte Zone ZUERST, dann die erste leere
+* **Regel:** solange Alices Teilung des Beschwörers aktiv ist (`_alice-shared.sharingActive`, auch bei gefallener/negierter/abgegangener Alice), steht in JEDER Zonenliste die Zone einer gleichnamigen Creature VOR den leeren Zonen. Wo der Spieler wählt (Hand-Beschwörung, Zonenwahl-Prompts, Slot-Picker des Klickwegs) bleiben beide wählbar, nur die Vorauswahl (erster Eintrag, Heldenkürzel im Client) ist die geteilte Zone. Wo die Karte/CPU selbst wählt (Pinta, Slimes, Surprise-Party-Platzierung, Auto-Place, CPU) gilt `[0]` = die geteilte Zone.
+* **Zentral (`_engine.js`):** `getFreeSupportZones(…, { shareableFor, sharer })` (beide Zweige, mit/ohne `nachKontrolle`) und `engine.beschwoerZonenFuer` liefern geteilte Zonen vorn; neu `engine.ersteBeschwoerZone(pi, name, opts)` (= `beschwoerZonenFuer(...)[0] || null`) für „die Karte wählt selbst"; `safePlaceInSupport` (Auto-Platz und Verlagerung) sucht erst geteilt, dann frei. `_summon-eligibility.eligibleSummonZones` gibt `[...geteilt, ...frei]` zurück (Pinta und alle „summon … as an additional Action"-Effekte). `_cpu.js`: `pickCreatureZoneSlot` (geteilt vor frei vor Bounce), Kandidatenaufzählung, generische `zonePick`-Heuristik und MCTS-Alternativen bevorzugen `shared`.
+* **Neue Helfer (`_alice-shared.js`):** `geteiltZuerst(zones)` (stabile Teilung, geteilte vorn) und `mitGeteilten(engine, pi, cardName, frei, opts, filter)` — für Karten mit EIGENER Liste freier Zonen: ergänzt die geteilten Zonen der Alice-Teilung und stellt sie voran (Standard `nachKontrolle: true, livingHeroesOnly: true`; für Brettseiten-Listen `{ nachKontrolle: false, livingHeroesOnly: false, nurBasis: true }`). Weitere: `_of-kings-shared.geteiltVorn`, `_chaorcs-shared.firstFreeSupportSlot(engine, pi, heroIdx, name, sharer)`, `_paraseed-shared.freeSlotOnHero(engine, physOwner, heroIdx, name, sharer)`, `_slippery-shared.teilbarZiel(engine, inst, hi, zi)`.
+* **Bestehende Rulings der Hand-Wege bleiben:** „Zone nach Kostenzahlung" (W17/W19/W20), Opfer-Zonen, Ersetz-Karten (gleicher Platz) — unverändert.
+
+### 2) „free Support Zone" im Kartentext (Frage 1): ALLE Wege (Audit mit Szenario je Karte, `a-02`)
+Systematisch gesucht: jede Schleife über leere Zonen, jedes `getFreeSupportZones`, jedes `supportZones[h][s] = [name]`, jeder Übernahme-/Takeover-Weg. Mit Szenario in `a-02` (Stapel gleichnamiger Kreaturen in Zone A, sonst volles Brett; Varianten „voll", „gemischt" [freie Zone bleibt leer], Gegenprobe ohne Alice) geprüft: Old Couple, Elixir of Immortality, Zombified Assault, Doomed Town Guard, Enhanced Guard Dog, Explosive Drone, Green Dragoneer, Golden Ladybug, Ladder to the Sky, Arrival from the Cosmic Depths, Kasperov [W], Bishop of Kings [W], Glorious Rebirth, Living Illusion, Teal Fishing Rod, The Master's Key, The Root of all Evil, Thep, Stellan, Sentient Bomb Golems, Mausoleum Worm, Elven Druid, Psychic Scout, Capture, Dark Gear. Zusätzlich auf Code-Ebene umgestellt (gleiche Primitive, Ladetest; ohne eigenes Szenario): Stellin, Unsettling Opportunist Vullary, Klaus, Paraseed, Paraseed Zombie, Calamitusk, Bomblebee Cluster, Loyal Pinpom, Orthos, Soul Shard Khet/Ka, Rebelliokai Terror Tengu, Cute Annoyance Mini, Cute Bunny/Dog/Hydra, Skullmael's Greatsword, Lunatic Hawk, Tharxian Horse, Waitress, Candlestick Squire, Mischief Invasion (zusätzliche Treffer-Knoten für geteilte Zonen), Hipdall, Cute Angel Molinda, Spirit of the Heart Bow, Hunting, Diplomacy, Liberation, Secret Spell Book.
+| Gruppe | Ergebnis |
+|---|---|
+| Beschwören/Platzieren mit eigener Zonenschleife | umgestellt auf `beschwoerZonenFuer`/`mitGeteilten`/`ersteBeschwoerZone` (siehe Liste oben) |
+| Übernahmen (permanente Kontrolle → „free Support Zone") | Capture, Dark Gear, Diplomacy, Hunting, Liberation, Secret Spell Book, Cute Angel Molinda, Spirit of the Heart Bow: Zielzonenliste mit geteilten Zonen vorn (Kontrolle des Übernehmers) |
+| Nicht betroffen (Begründung) | Cute Familiar, Cats of the Pharaoh, Lone Survivor, Ethan, Gigantisaur Raptoren (1 pro Held), The Cosmic Depths (eigene Level-Regel), Barker; Ersetz-in-gleicher-Zone-Karten (500 Piranhas, Call of the Deepsea, Cannibal, Cute Bird, Creepy Villager, Deepsea Encounter, Divine Gift, Garius, Grave Worm, Hive's Crown, Loyal Rottweiler/Shepherd, Shapeshift, Steam Dwarf, Suspicious Monster, Egg of God, Undurdle, Rewrite History, Pawn Chain); Paraseed Greenhouse im Pflanz-Modus („Hero without Paraseed"); Tokens (Pollution Token ist keine Kreatur) ; ohne Platzierung: Betrayal, Serket, YOU'RE ALIVE?!, Marianne, Leafagami Snake |
+| Offen | Tokens mit Untertyp „Creature" (Leprochaun-/Mummy-/Invader-/Biomancy-/Inya-/Kyli-Token) teilen noch nicht — Rückfrage an Al |
+
+### 3) Surprise Party (Frage 3)
+* **Spielbar** (`spellPlayCondition` und `canPlayWithHero`): freie Zone (wie bisher) ODER (Alices Effekt aktiv UND im Deck liegt eine Creature, die ein **legales Ziel** der Karte ist — Level ≤ 3, nicht „nur unter Voraussetzung beschwörbar" [Plant Golem, Elusive Hind, Ifrit, Foresta …], eigene Bedingungen erfüllt — UND von der der Nutzer schon eine Kopie in den Zonen hat). Helfer `teilbaresZielImDeck(engine, pi, heroIdx = null)`.
+* **Auflösung:** die aufgedeckte Creature geht in `beschwoerZonenFuer(pi, name, { heroIdx })[0]` — die geteilte Zone vorn, nicht nur als Rückfall. Passt die erste legale Creature nicht (keine Zone), wird sie wie bisher zurückgemischt, der Effekt endet, der Zug endet. Repro `a-03` (76).
+
+### 4) Bewegen in geteilte Zonen (Frage 4)
+* Erlaubt, solange die Teilung des Bewegenden (Kontrolleur) aktiv ist: **Guard Change** (Ziele inkl. `shared`, Tausch ohne Mischung), **Slippery Ice/Skates/Pengu/Auto-Slide** (`destinationsFor` mit `shared`/`stackDepth`; Skates-Prompt trägt `nurSlots` — der Client filtert das Hervorheben), **Memory Blast** (Rückholung: `ersteBeschwoerZone`), **Jumper Spider**-Transfer, **Paraseed Greenhouse** (Umzug). Quell-Zone verliert die Karte; das Stapelabzeichen im Client (W62a) zählt weiter.
+* **`_isMove`:** Bewegen löst nie On-Summon aus (geprüft für Jumper Spider und Greenhouse). Puppets („Cannot be moved to a different Support Zone") bleiben unbeweglich (`actionMoveCard` blockiert; sie sind Tokens und teilen nicht).
+* **Vertrag:** `actionMoveCard`/`actionTransferCreature` prüfen die Belegung NICHT (`_addCardToState` pusht) — der Aufrufer wählt das Ziel (Zonenlisten wie oben, `canShareInto` bei Eigenlisten). Repros `a-04` (46) und `a-05` (46).
+
+### 5) Reincarnation (Frage 5)
+Kreatur-Modus: spielbar mit 3 freien Zonen ODER (Alice aktiv + geteilte Zone für DIESE Kreatur) mit 2 freien Zonen für die Pollution Tokens + der geteilten Zone. `getCreatureZones(engine, gs, pi, bezahlt, name)` nutzt `beschwoerZonenFuer` (geteilte Zone braucht keine dritte freie Zone, steht vorn); Spielbarkeit und Galerie prüfen je Karte; Platzierung (Mensch: Zonenwahl mit beiden Optionen; CPU: erste = geteilt) und Token-Bezahlung (die 2 verbleibenden freien Zonen) passen zusammen. Repro `a-06` (118, Mensch und CPU).
+
+### 6) Client (`public/app-board.jsx`)
+* Skates-Zielhervorhebung filtert `z.nurSlots`; `findAutoSummonSlot(playerData, heroIdx, cardName)` (geteilt vor frei) für die Auto-Emits der Heldenaktions-Beschwörung (Guardian Beast Hu & Co.); der Klickweg öffnete bei teilbarer Zone ohnehin schon den Slot-Picker mit den geteilten Zielen vorn.
+* Bundles: `node scripts/build.js --force` und `node scripts/check-bundles.js` laufen sauber.
+
+### 7) Beobachtungen / Rückfragen (Ja/Nein) — siehe `docs/niche-tests/FIXES-WELLE-63.md`
+* `actionPlaceCreature` überschreibt eine belegte, NICHT teilbare Zone (`supportZones[h][s] = [name]`): bei „gleiche Zone"-Ersetzungen aus einem Stapel (Kasperov [B], Rook [W], Loyal Rottweiler-Typ) können Geisterinstanzen bleiben. Nicht angefasst (kein Teil der Aufgabe) — Folgeauftrag möglich.
+* Offene Auslegungen: Army of the Cute — zweite gleichnamige Kopie stapelt auf die erste; Elixir of Immortality — die ursprüngliche Zone der Kreatur hat Vorrang (Kartenregel), dahinter geteilt vor frei; Klick-Beschwörung mit mehreren Helden lässt dem Spieler die Wahl.
+
+### Tests W63a
+| Datei | Inhalt | Prüfungen |
+|---|---|---|
+| `W63/a-01-reihenfolge-erst-geteilte-zone-dann-erste-leere.js` | Hilfsfragen und Pinta/Slimes/Surprise-Party-Platzierung/CPU: geteilt zuerst, beide Optionen wählbar | 66 |
+| `W63/a-02-free-support-zone-alle-platzierungswege-teilen.js` | 25 Karten × beide Sitze × voll/gemischt/Gegenprobe (`FILTER=<Name>`) | 498 |
+| `W63/a-03-surprise-party-spielbar-mit-teilbarer-deck-creature.js` | Spielbarkeit/Auflösung, Gegenproben, unpassende Ziele | 76 |
+| `W63/a-04-bewegen-in-geteilte-zone-guard-change-slippery.js` | Guard Change, Slippery Ice/Skates (+ ohne Alice) | 46 |
+| `W63/a-05-bewegen-memory-blast-jumper-spider-puppet-kein-on-summon.js` | Memory Blast, Jumper Spider, Puppet, Paraseed Greenhouse | 46 |
+| `W63/a-06-reincarnation-geteilte-zone-statt-dritter-freier.js` | Reincarnation Kreatur-Modus, Mensch + CPU | 118 |
+Angepasst: `W62/a-01`, `W62/a-04` (Reihenfolge geteilt vor frei).
