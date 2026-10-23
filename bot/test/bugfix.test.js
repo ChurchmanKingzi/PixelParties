@@ -226,6 +226,36 @@ test('Balancing-Änderung (cards.json) ist kein Bugfix; Bugfix-Note beschreibt d
   } finally { r.clean(); config.repoRoot = path.resolve(__dirname, '..', '..'); }
 });
 
+test('Neue, noch nicht live gegangene Karte: kein Bugfix, auch nicht mit Bugfix-Note (Troubleshooting vor dem Livegang)', async () => {
+  const r = makeRepo();
+  try {
+    const mk = (ohneFireball) => JSON.stringify(ohneFireball ? real.filter(c => c.name !== 'Fireball') : real);
+    r.write('data/cards.json', mk(true));
+    r.head = r.commit('cards.json ohne Fireball');
+    config.repoRoot = r.dir; config.channels.bugfixes = 'BF'; config.bugfixMaxShared = 12;
+    const { ctx, client } = await setup();
+    const sent = [];
+    const g = guild();
+    g.channels.cache.set('BF', { isTextBased: () => true, send: async p => { sent.push(p); } });
+    client.guilds.cache.set('G1', g);
+    await ctx._feeds.pollBugfixes();                          // merkt den Stand (Fireball ist noch nicht in cards.json)
+    assert.equal(sent.length, 0);
+
+    // Fireball kommt NEU dazu (Eintrag + Skript), wird nachgebessert und mit Note beschrieben; Acid Rain ist ein echter Bugfix
+    r.write('data/cards.json', mk(false));
+    r.write(r.E('fireball'), "module.exports = { effect: 'v1' };\n");
+    r.commit('Neue Karte Fireball');
+    r.write(r.E('fireball'), "module.exports = { effect: 'v2' };\n");
+    r.write(r.E('acid-rain'), "module.exports = { effect: 'fix' };\n");
+    r.commit('Troubleshooting\n\nBugfix-Note: Fireball | Damage was dealt twice.\nBugfix-Note: Acid Rain | Damage was dealt once too often.');
+    await ctx._feeds.pollBugfixes();
+    assert.equal(sent.length, 1);
+    assert.match(sent[0].content, /Bug fixes\*\* — 1 card\n/);
+    assert.match(sent[0].content, /\*\*Acid Rain\*\*\n {2}↳ Damage was dealt once too often\./);
+    assert.ok(!/Fireball/.test(sent[0].content), 'neue Karte erscheint nicht im Bugfix-Feed');
+  } finally { r.clean(); config.repoRoot = path.resolve(__dirname, '..', '..'); }
+});
+
 test('readNotes: Zeilenformat, Aufzählungszeichen, Kürzung, mehrere Zeilen pro Ziel; findBugfixes lässt balancierte Karten aus', async () => {
   const r = makeRepo();
   try {

@@ -168,13 +168,19 @@ module.exports = function register(ctx) {
     await ctx.cardsReload();                                                        // aktuelle Karten (cards.json) für die Zuordnung
     await renderer.init();
     // Balancing-Änderungen (cards.json-Eintrag der Karte geändert) sind kein Bugfix → gehören in die Patchnotes
+    // Karten, die seit dem letzten gemeldeten Stand ERST NEU in cards.json stehen, sind noch nicht live: Wer sie umsetzt und danach nachbessert (Troubleshooting vor dem Livegang),
+    // erzeugt keine Bugfix-Meldung — auch nicht über eine `Bugfix-Note`-Zeile. Der Neue-Karten-Feed zeigt sie.
     let balanced = new Set();
+    let neu = new Set();
     try {
       const read = async ref => JSON.parse(await git('show', `${ref}:data/cards.json`));
-      balanced = new Set(diffCards(await read(last), await read(head)).map(c => c.name));
+      const [alt, jetzt] = [await read(last), await read(head)];
+      balanced = new Set(diffCards(alt, jetzt).map(c => c.name));
+      const vorher = new Set(alt.map(c => c.name));
+      neu = new Set(jetzt.filter(c => !vorher.has(c.name)).map(c => c.name));
     } catch { /* cards.json nicht lesbar: dann keine Ausnahmen */ }
     let found;
-    try { found = await findBugfixes({ git, last, head, cards: renderer.allCards(), maxShared: config.bugfixMaxShared, balanced }); }
+    try { found = await findBugfixes({ git, last, head, cards: renderer.allCards(), maxShared: config.bugfixMaxShared, balanced: new Set([...balanced, ...neu]) }); }
     catch { await db.kvSet('bugfix_last', head); return; }                          // alter Stand unbekannt (force-push) → neu ansetzen
     const notes = await readNotes({ git, last, head });                             // `Bugfix-Note: <Karte oder _baustein> | <was schieflief>`
     await db.kvSet('bugfix_last', head);
@@ -198,7 +204,7 @@ module.exports = function register(ctx) {
     // ausgenommen war (die Beschreibung ist die ausdrückliche Aussage „das war ein Bugfix“)
     for (const [key, text] of notes) {
       const c = byNorm.get(key);
-      if (!c) continue;
+      if (!c || neu.has(c.name)) continue;       // neue, noch nicht live gegangene Karte: keine Bugfix-Meldung
       const it = items.get(c.name) || { card: c, note: '' };
       it.detail = [noteOfCard(c), it.detail && it.detail !== text ? it.detail : ''].filter(Boolean).join(' ');
       items.set(c.name, it);
