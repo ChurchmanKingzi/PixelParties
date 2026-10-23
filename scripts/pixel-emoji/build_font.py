@@ -117,6 +117,21 @@ def main():
             buchst = sorted({c for r in zeilen for c in r if c in g['pal']})
             ebenen = [(c, g['pal'][c]) for c in buchst]
         alle_r = []; layer_namen = []; svg_rects = []
+        # ★ Untergrund-Ebene (nur Chrome/Opera, COLR): ein Pixel-Sprite wird in nicht ganzzahliger Groesse gezeichnet, an den Nahtstellen
+        #   benachbarter Rechtecke schimmert dann der Hintergrund durch (dunkle „Umrandung" um innere Pixel, Gold-Muenze im Duell). Die
+        #   gesamte Silhouette liegt deshalb einmal in der haeufigsten Farbe UNTER allen Ebenen — Nahtstellen zeigen dann diese Farbe.
+        if not g.get('mono'):
+            zaehl = {}
+            for r in zeilen:
+                for ch in r:
+                    if ch in g['pal']: zaehl[ch] = zaehl.get(ch, 0) + 1
+            if zaehl:
+                haupt = max(zaehl, key=lambda ch: zaehl[ch])
+                sil = [''.join('#' if ch in g['pal'] else '.' for ch in r) for r in zeilen]
+                rs0 = [fu(*r) for r in rechtecke(sil, '#')]
+                ln0 = '%s.b' % name
+                gl[ln0] = rechteck_glyph(rs0); metriken[ln0] = (breite, 0); order.append(ln0)
+                layer_namen.append((ln0, palette(g['pal'][haupt])))
         for i, (c, farbe) in enumerate(ebenen):
             rs = [fu(*r) for r in rechtecke(zeilen, c)]
             if not rs: continue
@@ -153,7 +168,12 @@ def main():
     fb.setupGlyphOrder(order)
     fb.setupCharacterMap(cmap)
     fb.setupGlyf(gl)
-    fb.setupHorizontalMetrics({n: (metriken[n][0], 0) for n in order})
+    # ★ lsb = linke Kante des Glyphen. Mit lsb 0 verschiebt FreeType (Chrome/Opera) JEDE Ebene eines Farbzeichens so, dass ihre linke Kante bei x = 0 liegt —
+    #   Fuellungen und Kontur rutschen gegeneinander (Muenze/Herz/Schild sahen „kaputt" aus, mit Geisterkontur). Deshalb die echte Kante eintragen.
+    def _lsb(n):
+        co = getattr(gl[n], 'coordinates', None)
+        return min(x for x, _ in co) if co and len(co) else 0
+    fb.setupHorizontalMetrics({n: (metriken[n][0], _lsb(n)) for n in order})
     fb.setupHorizontalHeader(ascent=ASC, descent=DESC, lineGap=0)
     fb.setupNameTable({'familyName': FAMILIE, 'styleName': 'Regular', 'uniqueFontIdentifier': FAMILIE + ' 1.0', 'fullName': FAMILIE, 'psName': 'PPPixelEmoji-Regular', 'version': 'Version 1.0'})
     fb.setupOS2(sTypoAscender=ASC, sTypoDescender=DESC, usWinAscent=ASC, usWinDescent=-DESC, sTypoLineGap=0, fsType=0)

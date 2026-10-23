@@ -188,7 +188,7 @@ function canAddCard(deck, cardName, section) {
 
 function typeColor(ct) {
   const m = { Hero:'#a040ff', 'Ascended Hero':'#702db3', Creature:'#3ddc57', Spell:'#f03232',
-    Attack:'#f03232', Artifact:'#ffd61a', Potion:'#9d612f', Ability:'#1ca9fd', Token:'#7f7f7f' };
+    Attack:'#f03232', Artifact:'#fad54a', Potion:'#9d612f', Ability:'#1ca9fd', Token:'#7f7f7f' };
   return m[ct] || '#7f7f7f';
 }
 
@@ -239,7 +239,7 @@ const BAND_GRADIENTS = [
   'linear-gradient(to right, transparent 0%, rgba(255,255,255,.04) 10%, rgba(248,116,32,.35) 25%, rgba(251,30,169,.4) 40%, rgba(255,198,28,.35) 55%, rgba(254,81,84,.3) 70%, rgba(255,255,255,.04) 85%, transparent 100%)',
   'linear-gradient(to right, transparent 0%, rgba(255,255,255,.05) 12%, rgba(26,198,255,.35) 25%, rgba(104,253,193,.35) 40%, rgba(169,82,255,.3) 55%, rgba(102,182,255,.3) 70%, rgba(255,255,255,.05) 85%, transparent 100%)',
   'linear-gradient(to right, transparent 0%, transparent 20%, rgba(255,255,255,.5) 45%, rgba(255,255,255,.65) 50%, rgba(255,255,255,.5) 55%, transparent 80%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, rgba(251,200,106,.05) 10%, rgba(255,214,26,.35) 25%, rgba(249,172,32,.4) 40%, rgba(254,255,102,.3) 55%, rgba(255,198,28,.25) 70%, rgba(251,200,106,.05) 85%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(251,200,106,.05) 10%, rgba(250,213,74,.35) 25%, rgba(249,172,32,.4) 40%, rgba(254,255,102,.3) 55%, rgba(255,198,28,.25) 70%, rgba(251,200,106,.05) 85%, transparent 100%)',
   'linear-gradient(to right, transparent 0%, rgba(184,102,255,.05) 10%, rgba(160,64,255,.3) 25%, rgba(248,33,227,.35) 40%, rgba(117,31,249,.3) 55%, rgba(184,102,255,.25) 70%, rgba(184,102,255,.05) 85%, transparent 100%)',
 ];
 
@@ -367,7 +367,7 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
     setTT(false);
   };
   const onDragEnd = () => { activeDragData = null; };
-  const ttBorderColor = foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,214,26,.5)' : '1px solid var(--bg4)';
+  const ttBorderColor = foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)' : foilType === 'secret_rare' ? '2px solid rgba(250,213,74,.5)' : '1px solid var(--bg4)';
   return (
     <>
       <div className={'card-mini ' + typeClass(card.cardType) + (dimmed ? ' dimmed' : '') + (foilClass ? ' ' + foilClass : '') + (isCover ? ' card-mini-cover' : '')}
@@ -528,13 +528,13 @@ function MainMenu() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: 280 }} className="animate-in">
         <button className="btn btn-big" onClick={() => setScreen('play')} style={{ fontSize: 16 }}>⚔ PLAY</button>
         <button className="btn btn-big btn-accent2" onClick={() => setScreen('deckbuilder')} style={{ fontSize: 16 }}>✦ EDIT DECK</button>
-        <button className="btn btn-big" onClick={() => setScreen('shop')} style={{ fontSize: 16, borderColor: '#ffd61a', color: '#ffd61a', background: 'rgba(255,214,26,.08)' }}>✦ SHOP</button>
+        <button className="btn btn-big" onClick={() => setScreen('shop')} style={{ fontSize: 16, borderColor: '#fad54a', color: '#fad54a', background: 'rgba(250,213,74,.08)' }}>✦ SHOP</button>
         <button className="btn btn-big btn-success" onClick={() => setScreen('profile')} style={{ fontSize: 16 }}>♛ VIEW PROFILE</button>
       </div>
       <div style={{ marginTop: 30, display: 'flex', alignItems: 'center', gap: 12 }}>
         <span style={{ color: user.color || 'var(--accent)', fontWeight: 700 }} className="orbit-font">{user.username}</span>
         <span className="badge" style={{ background: 'rgba(177,255,26,.12)', color: 'var(--accent3)' }}>ELO {user.elo}</span>
-        <span className="badge" style={{ background: 'rgba(255,214,26,.12)', color: '#ffd61a', display: 'flex', alignItems: 'center', gap: 4 }}>
+        <span className="badge" style={{ background: 'rgba(250,213,74,.12)', color: '#fad54a', display: 'flex', alignItems: 'center', gap: 4 }}>
           <img src="/data/sc.png" style={{ width: 14, height: 14, imageRendering: 'pixelated' }} /> {user.sc || 0}
         </span>
         <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={logout}>LOGOUT</button>
@@ -550,7 +550,7 @@ function MainMenu() {
 const RANK_TIERS = [
   { name: 'BRONZE',       min: 0,    color: '#be680e', glow: 'rgba(190,104,14,.5)',  icon: '⬡' },
   { name: 'SILVER',       min: 1200, color: '#b9b9b9', glow: 'rgba(185,185,185,.5)', icon: '⬡' },
-  { name: 'GOLD',         min: 1400, color: '#ffd61a', glow: 'rgba(255,214,26,.5)',    icon: '⬡' },
+  { name: 'GOLD',         min: 1400, color: '#fad54a', glow: 'rgba(250,213,74,.5)',    icon: '⬡' },
   { name: 'PLATINUM',     min: 1600, color: '#b6eff7', glow: 'rgba(182,239,247,.5)', icon: '◈' },
   { name: 'DIAMOND',      min: 1800, color: '#b6eff7', glow: 'rgba(182,239,247,.6)', icon: '◆' },
   { name: 'MASTER',       min: 2000, color: '#fb1ea9', glow: 'rgba(251,30,169,.5)',   icon: '✦' },
@@ -828,7 +828,7 @@ function ProfileScreen() {
                     <img src="/data/sc.png" style={{ width: 96, height: 96, imageRendering: 'pixelated' }} />
                   </div>
                 </div>
-                <span className="orbit-font" style={{ fontSize: 20, fontWeight: 700, color: '#ffd61a' }}>{user.sc || 0}</span>
+                <span className="orbit-font" style={{ fontSize: 20, fontWeight: 700, color: '#fad54a' }}>{user.sc || 0}</span>
                 <span style={{ fontSize: 11, color: 'var(--text2)' }}>SC</span>
               </div>
             </div>
@@ -1223,7 +1223,7 @@ function PurchaseCelebration({ cx, cy, onDone }) {
     const ox = cx ?? canvas.width / 2;
     const oy = cy ?? canvas.height / 2;
     const particles = [];
-    const colors = ['#ffd61a', '#f9ac20', '#f7f7ad', '#fb1ea9', '#1aedff', '#b1ff1a', '#f87420', '#ffffff'];
+    const colors = ['#fad54a', '#f9ac20', '#f7f7ad', '#fb1ea9', '#1aedff', '#b1ff1a', '#f87420', '#ffffff'];
     const shapes = ['star', 'circle', 'diamond', 'spark'];
     // Burst from item position
     for (let i = 0; i < 120; i++) {
@@ -1246,7 +1246,7 @@ function PurchaseCelebration({ cx, cy, onDone }) {
       particles.push({
         x: ox + Math.cos(angle) * dist, y: oy + Math.sin(angle) * dist,
         vx: Math.cos(angle) * 1.5, vy: Math.sin(angle) * 1.5,
-        size: 2 + Math.random() * 4, color: '#ffd61a',
+        size: 2 + Math.random() * 4, color: '#fad54a',
         shape: 'spark', life: 1, decay: 0.015 + Math.random() * 0.01,
         rotation: 0, rotSpeed: 0, gravity: 0,
       });
@@ -1530,16 +1530,16 @@ function ShopScreen() {
             </div>
             {randomReveal.label && <div className="shop-reveal-label">{randomReveal.label}</div>}
             {randomReveal.subtitle && <div className="shop-reveal-subtitle">{randomReveal.subtitle}</div>}
-            <button className="btn" style={{ marginTop: 16, padding: '8px 32px', fontSize: 13, borderColor: '#ffd61a', color: '#ffd61a' }}
+            <button className="btn" style={{ marginTop: 16, padding: '8px 32px', fontSize: 13, borderColor: '#fad54a', color: '#fad54a' }}
               onClick={() => setRandomReveal(null)}>NICE!</button>
           </div>
         </div>
       )}
       <div className="top-bar">
         <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setScreen('menu')}>← BACK</button>
-        <h2 className="orbit-font" style={{ fontSize: 16, color: '#ffd61a' }}>SHOP</h2>
+        <h2 className="orbit-font" style={{ fontSize: 16, color: '#fad54a' }}>SHOP</h2>
         <div style={{ flex: 1 }} />
-        <div className="badge" style={{ background: 'rgba(255,214,26,.12)', color: '#ffd61a', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+        <div className="badge" style={{ background: 'rgba(250,213,74,.12)', color: '#fad54a', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
           <img src="/data/sc.png" style={{ width: 16, height: 16, imageRendering: 'pixelated' }} /> {user.sc || 0} SC
         </div>
       </div>
@@ -2154,7 +2154,7 @@ function DeckBuilder() {
     const items = [
       isCover
         ? { label: 'Remove as cover card', icon: '✕', color: 'var(--danger)', action: () => setCoverCard('') }
-        : { label: 'Make this the cover card', icon: '⭐', color: '#ffd61a', action: () => setCoverCard(cardName) },
+        : { label: 'Make this the cover card', icon: '⭐', color: '#fad54a', action: () => setCoverCard(cardName) },
     ];
     if (hasSkins) {
       const availOpts = ownedSkins ? SKINS_DB[cardName].filter(s => ownedSkins.has(s)) : SKINS_DB[cardName];
@@ -2171,7 +2171,7 @@ function DeckBuilder() {
     if (!card || !currentDeck) return;
     const items = [];
     if (card.cardType === 'Hero') {
-      items.push({ label: 'Add to Heroes', icon: '👑', color: '#ffd61a', disabled: !canAddCard(currentDeck, cardName, 'hero'), action: () => addCardTo(cardName, 'hero') });
+      items.push({ label: 'Add to Heroes', icon: '👑', color: '#fad54a', disabled: !canAddCard(currentDeck, cardName, 'hero'), action: () => addCardTo(cardName, 'hero') });
     } else if (card.cardType === 'Potion') {
       items.push({ label: 'Add to Potion Deck', icon: '🧪', color: '#66ffa2', disabled: !canAddCard(currentDeck, cardName, 'potion'), action: () => addCardTo(cardName, 'potion') });
     } else {
@@ -2626,7 +2626,7 @@ function DeckBuilder() {
               const v = isDeckLegal(d); const hasChanges = unsaved[d.id];
               return (
                 <div key={d.id} className={'deck-list-item' + (i === activeIdx && !isSampleMode ? ' active' : '')} onClick={() => { setActiveIdx(i); setSampleActive(-1); }}>
-                  {d.isDefault && <span style={{ color: '#ffd61a', fontSize: 10 }}>★</span>}
+                  {d.isDefault && <span style={{ color: '#fad54a', fontSize: 10 }}>★</span>}
                   <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}{hasChanges ? ' *' : ''}</span>
                   <span style={{ fontSize: 8, color: v.legal ? 'var(--success)' : 'var(--danger)' }}>{v.legal ? '✓' : '✗'}</span>
                 </div>
@@ -2953,7 +2953,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
           {imgUrl && (
             <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
               <img src={imgUrl} style={{ width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
-                border: foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,214,26,.5)' : 'none' }} />
+                border: foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)' : foilType === 'secret_rare' ? '2px solid rgba(250,213,74,.5)' : 'none' }} />
               {isFoil && foilMeta.current && <FoilOverlay bands={foilBands} shimmerOffset={foilMeta.current.shimmerOffset} sparkleDelays={foilMeta.current.sparkleDelays} foilType={foilType} />}
             </div>
           )}
@@ -3310,7 +3310,7 @@ function CardRevealEntry({ cardName, onDone }) {
         <div className="card-reveal-card">
           {imgUrl ? (
             <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6,
-              border: foilType === 'diamond_rare' ? '3px solid rgba(104,198,253,.7)' : foilType === 'secret_rare' ? '3px solid rgba(255,214,26,.6)' : '2px solid var(--bg4)' }} draggable={false} />
+              border: foilType === 'diamond_rare' ? '3px solid rgba(104,198,253,.7)' : foilType === 'secret_rare' ? '3px solid rgba(250,213,74,.6)' : '2px solid var(--bg4)' }} draggable={false} />
           ) : (
             <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               background: 'var(--bg3)', borderRadius: 6, border: '2px solid var(--bg4)', padding: 16, textAlign: 'center' }}>
@@ -3325,7 +3325,7 @@ function CardRevealEntry({ cardName, onDone }) {
           {imgUrl && (
             <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
               <img src={imgUrl} style={{ width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
-                border: foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,214,26,.5)' : 'none' }} />
+                border: foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)' : foilType === 'secret_rare' ? '2px solid rgba(250,213,74,.5)' : 'none' }} />
             </div>
           )}
           <div style={{ padding: '10px 12px' }}>
@@ -3356,7 +3356,7 @@ function ExplosionEffect({ x, y }) {
       dx: Math.cos(angle) * speed,
       dy: Math.sin(angle) * speed,
       size: 3 + Math.random() * 8,
-      color: ['#ff491a','#ff8b1a','#ffd61a','#ff1a1a','#f9ac20','#fff'][Math.floor(Math.random() * 6)],
+      color: ['#ff491a','#ff8b1a','#fad54a','#ff1a1a','#f9ac20','#fff'][Math.floor(Math.random() * 6)],
       delay: Math.random() * 80,
       dur: 350 + Math.random() * 400,
     };
@@ -3459,7 +3459,7 @@ function ElectricStrikeEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 2 + Math.random() * 5,
-      color: ['#ffe23d','#fff','#ffd61a','#f7f7ad','#ffd61a'][Math.floor(Math.random() * 5)],
+      color: ['#ffe23d','#fff','#fad54a','#f7f7ad','#fad54a'][Math.floor(Math.random() * 5)],
       delay: 250 + Math.random() * 150,
       dur: 250 + Math.random() * 250,
     };
@@ -3529,7 +3529,7 @@ function FlameStrikeEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 2 + Math.random() * 5,
-      color: ['#ff491a','#ff8b1a','#ffd61a','#ff1a1a','#f9ac20'][Math.floor(Math.random() * 5)],
+      color: ['#ff491a','#ff8b1a','#fad54a','#ff1a1a','#f9ac20'][Math.floor(Math.random() * 5)],
       delay: 300 + Math.random() * 150,
       dur: 300 + Math.random() * 250,
     };
@@ -3724,7 +3724,7 @@ function ShadowSummonEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 2 + Math.random() * 4,
-      color: ['#7e41ba','#58238c','#663597','#1a0a3a','#7e41ba'][Math.floor(Math.random() * 5)],
+      color: ['#7e41ba','#58238c','#58238c','#1a0a3a','#7e41ba'][Math.floor(Math.random() * 5)],
       delay: 300 + Math.random() * 200,
       dur: 300 + Math.random() * 300,
     };
@@ -3756,7 +3756,7 @@ function GoldSparkleEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 3 + Math.random() * 5,
-      color: ['#ffd61a','#ffd61a','#ffe23d','#fff','#f9ac20'][Math.floor(Math.random() * 5)],
+      color: ['#fad54a','#fad54a','#ffe23d','#fff','#f9ac20'][Math.floor(Math.random() * 5)],
       delay: Math.random() * 150,
       dur: 400 + Math.random() * 400,
     };
@@ -3781,7 +3781,7 @@ function BeerBubblesEffect({ x, y }) {
     size: 4 + Math.random() * 8,
     delay: Math.random() * 300,
     dur: 500 + Math.random() * 500,
-    color: ['#ffd61a','#f8ca21','#fff8e8','#fbe181','#fff'][Math.floor(Math.random() * 5)],
+    color: ['#fad54a','#f8ca21','#fff8e8','#fbe181','#fff'][Math.floor(Math.random() * 5)],
     wobble: -8 + Math.random() * 16,
   })), []);
   return (
@@ -4261,11 +4261,11 @@ const ANIM_REGISTRY = {
         delay: 200 + Math.random() * 600,
         dur: 500 + Math.random() * 500,
         size: 4 + Math.random() * 8,
-        color: ['#fff8e8','#ffd61a','#fff','#fbe181','#f8f8bd'][Math.floor(Math.random() * 5)],
+        color: ['#fff8e8','#fad54a','#fff','#fbe181','#f8f8bd'][Math.floor(Math.random() * 5)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ width: 160, height: 160, marginLeft: -80, marginTop: -80, background: 'radial-gradient(circle, rgba(255,248,232,.9) 0%, rgba(255,214,26,.4) 35%, rgba(248,248,189,.1) 60%, transparent 80%)', animationDuration: '800ms' }} />
+          <div className="anim-flame-flash" style={{ width: 160, height: 160, marginLeft: -80, marginTop: -80, background: 'radial-gradient(circle, rgba(255,248,232,.9) 0%, rgba(250,213,74,.4) 35%, rgba(248,248,189,.1) 60%, transparent 80%)', animationDuration: '800ms' }} />
           <div className="anim-flame-flash" style={{ width: 100, height: 100, marginLeft: -50, marginTop: -50, background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(249,236,179,.5) 40%, transparent 70%)', animationDelay: '200ms', animationDuration: '600ms' }} />
           {rays.map((r, i) => (
             <div key={'hr'+i} style={{
@@ -4275,7 +4275,7 @@ const ANIM_REGISTRY = {
             }}>
               <div style={{
                 width: r.width, height: r.len, marginLeft: -r.width/2,
-                background: 'linear-gradient(to top, rgba(255,214,26,.8), rgba(255,248,232,.3) 70%, transparent)',
+                background: 'linear-gradient(to top, rgba(250,213,74,.8), rgba(255,248,232,.3) 70%, transparent)',
                 borderRadius: r.width,
                 transformOrigin: 'center bottom',
                 animation: `holyRayGrow ${r.dur}ms ease-out ${r.delay}ms forwards`,
@@ -4367,7 +4367,7 @@ const ANIM_REGISTRY = {
         return {
           dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
           size: 4 + Math.random() * 8,
-          color: ['#ff1a1a','#ff491a','#ff8b1a','#ffd61a','#f9ac20','#ff1a1a','#f87420'][Math.floor(Math.random() * 7)],
+          color: ['#ff1a1a','#ff491a','#ff8b1a','#fad54a','#f9ac20','#ff1a1a','#f87420'][Math.floor(Math.random() * 7)],
           delay: Math.random() * 300,
           dur: 500 + Math.random() * 400,
         };
@@ -4696,16 +4696,16 @@ const ANIM_REGISTRY = {
         delay: 200 + Math.random() * 600,
         dur: 500 + Math.random() * 500,
         size: 3 + Math.random() * 7,
-        color: ['#ffd61a','#fbe181','#fffbd2','#ffb91a','#ffe469'][Math.floor(Math.random() * 5)],
+        color: ['#fad54a','#fbe181','#fffbd2','#ffb91a','#ffe469'][Math.floor(Math.random() * 5)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ width: 150, height: 150, marginLeft: -75, marginTop: -75, background: 'radial-gradient(circle, rgba(255,214,26,.85) 0%, rgba(255,185,26,.4) 35%, rgba(255,241,150,.1) 60%, transparent 80%)', animationDuration: '900ms' }} />
-          <div className="anim-flame-flash" style={{ width: 90, height: 90, marginLeft: -45, marginTop: -45, background: 'radial-gradient(circle, rgba(255,251,210,.95) 0%, rgba(255,214,26,.5) 40%, transparent 70%)', animationDelay: '250ms', animationDuration: '700ms' }} />
+          <div className="anim-flame-flash" style={{ width: 150, height: 150, marginLeft: -75, marginTop: -75, background: 'radial-gradient(circle, rgba(250,213,74,.85) 0%, rgba(255,185,26,.4) 35%, rgba(255,241,150,.1) 60%, transparent 80%)', animationDuration: '900ms' }} />
+          <div className="anim-flame-flash" style={{ width: 90, height: 90, marginLeft: -45, marginTop: -45, background: 'radial-gradient(circle, rgba(255,251,210,.95) 0%, rgba(250,213,74,.5) 40%, transparent 70%)', animationDelay: '250ms', animationDuration: '700ms' }} />
           {ankhs.map((a, i) => (
             <div key={'ak'+i} style={{
               position: 'absolute', left: a.xOff, top: a.startY,
-              fontSize: a.size, color: '#ffd61a',
+              fontSize: a.size, color: '#fad54a',
               filter: 'drop-shadow(0 0 6px rgba(255,198,28,.9))',
               transform: `rotate(${a.rot}deg)`,
               animation: `ankhFloat ${a.dur}ms ease-out ${a.delay}ms forwards`,
@@ -4808,7 +4808,7 @@ const ANIM_REGISTRY = {
         return {
           dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed - 20,
           size: 4 + Math.random() * 8,
-          color: ['#751ff9','#6618b4','#9544d5','#50008c','#663597','#a952ff','#1a0a3a'][Math.floor(Math.random() * 7)],
+          color: ['#751ff9','#6618b4','#9544d5','#50008c','#58238c','#a952ff','#1a0a3a'][Math.floor(Math.random() * 7)],
           delay: Math.random() * 400,
           dur: 400 + Math.random() * 400,
         };
@@ -4867,7 +4867,7 @@ const ANIM_REGISTRY = {
           dx: Math.cos(angle) * speed - speed / 2,
           dy: -Math.abs(Math.sin(angle) * speed),
           size: 2 + Math.random() * 4,
-          color: ['#ffd61a','#ff8b1a','#f9ac20','#ffe469','#fff'][Math.floor(Math.random() * 5)],
+          color: ['#fad54a','#ff8b1a','#f9ac20','#ffe469','#fff'][Math.floor(Math.random() * 5)],
           delay: 480 + Math.random() * 60,
           dur: 300 + Math.random() * 200,
         };
@@ -4879,7 +4879,7 @@ const ANIM_REGISTRY = {
           dx: Math.cos(angle) * speed - speed / 2,
           dy: -Math.abs(Math.sin(angle) * speed),
           size: 2 + Math.random() * 4,
-          color: ['#ffd61a','#ff8b1a','#f9ac20','#ffe469','#fff'][Math.floor(Math.random() * 5)],
+          color: ['#fad54a','#ff8b1a','#f9ac20','#ffe469','#fff'][Math.floor(Math.random() * 5)],
           delay: 1080 + Math.random() * 60,
           dur: 300 + Math.random() * 200,
         };
@@ -4973,7 +4973,7 @@ const ANIM_REGISTRY = {
         delay: 1000 + Math.random() * 400,
         dur: 500 + Math.random() * 400,
         size: 3 + Math.random() * 5,
-        color: ['#ffe23d','#fff','#ffd61a','#fbe181','#ffffff'][Math.floor(Math.random() * 5)],
+        color: ['#ffe23d','#fff','#fad54a','#fbe181','#ffffff'][Math.floor(Math.random() * 5)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
@@ -5567,7 +5567,7 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
                     filter: isSel ? 'brightness(1.2)' : (dimmed ? 'brightness(0.4) saturate(0.3)' : 'none'),
                   }} />
                 {isSel && <div style={{ position: 'absolute', top: 3, right: 3, background: 'var(--accent)', color: '#000', fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 3, zIndex: 5 }}>✓</div>}
-                {maxBudget != null && <div style={{ position: 'absolute', bottom: 3, left: 3, background: 'rgba(0,0,0,.7)', color: '#ffd61a', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, zIndex: 5 }}>{entryCost}G</div>}
+                {maxBudget != null && <div style={{ position: 'absolute', bottom: 3, left: 3, background: 'rgba(0,0,0,.7)', color: '#fad54a', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, zIndex: 5 }}>{entryCost}G</div>}
               </div>
             );
           })}
@@ -7648,7 +7648,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
         <div style={{ marginTop: 20, marginBottom: 20, textAlign: 'center' }}>
           {entries.map(e => (
             <div key={e.name} style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: '#ffd61a', fontWeight: 700, fontSize: 15 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: '#fad54a', fontWeight: 700, fontSize: 15 }}>
                 <span>{e.name}:</span>
                 <span>{e.total}</span>
                 <img src="/data/sc.png" style={{ width: 18, height: 18, imageRendering: 'pixelated' }} />
@@ -7657,9 +7657,9 @@ function GameBoard({ gameState, lobby, onLeave }) {
               <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {(e.rewards || []).map(r => (
                   <div key={r.id} style={{ fontSize: 12, color: 'var(--text2)' }}>
-                    <span style={{ color: '#ffd61a', fontWeight: 600 }}>{r.title}</span>
+                    <span style={{ color: '#fad54a', fontWeight: 600 }}>{r.title}</span>
                     {' — '}{r.description}{' '}
-                    <span style={{ color: '#ffd61a' }}>+{r.amount}</span>
+                    <span style={{ color: '#fad54a' }}>+{r.amount}</span>
                   </div>
                 ))}
               </div>
@@ -7671,7 +7671,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
     if (!scEarned.total || scEarned.total <= 0) return null;
     return (
       <div style={{ marginTop: 20, marginBottom: 20, textAlign: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#ffd61a', fontWeight: 700, fontSize: 18, textShadow: '0 0 12px rgba(255,214,26,.5)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#fad54a', fontWeight: 700, fontSize: 18, textShadow: '0 0 12px rgba(250,213,74,.5)' }}>
           <span>{scEarned.total}</span>
           <img src="/data/sc.png" style={{ width: 24, height: 24, imageRendering: 'pixelated' }} />
           <span>earned!</span>
@@ -7679,9 +7679,9 @@ function GameBoard({ gameState, lobby, onLeave }) {
         <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {(scEarned.rewards || []).map(r => (
             <div key={r.id} style={{ fontSize: 13, color: 'var(--text2)' }}>
-              <span style={{ color: '#ffd61a', fontWeight: 700 }}>{r.title}</span>
+              <span style={{ color: '#fad54a', fontWeight: 700 }}>{r.title}</span>
               {' — '}{r.description}{' '}
-              <span style={{ color: '#ffd61a', fontWeight: 700 }}>+{r.amount}</span>
+              <span style={{ color: '#fad54a', fontWeight: 700 }}>+{r.amount}</span>
             </div>
           ))}
         </div>
@@ -8087,7 +8087,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
             {/* ── Generic Player Debuff Warnings ── */}
             {(() => {
               const debuffs = [];
-              if (me.summonLocked) debuffs.push({ key: 'summon-me', text: 'You cannot summon any more Creatures this turn!', color: '#e63e33' });
+              if (me.summonLocked) debuffs.push({ key: 'summon-me', text: 'You cannot summon any more Creatures this turn!', color: '#e92f38' });
               if (opp.summonLocked) debuffs.push({ key: 'summon-opp', text: `${opp.username} cannot summon any more Creatures this turn!`, color: '#c68206' });
               if (me.damageLocked) debuffs.push({ key: 'damage-me', icon: '🔥', text: 'You cannot deal any more damage to your opponent this turn!', color: '#f03232' });
               if (opp.damageLocked) debuffs.push({ key: 'damage-opp', icon: '🛡️', text: `${opp.username} cannot deal damage to your targets this turn!`, color: '#e37435' });
@@ -8099,7 +8099,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                 </div>
               ));
             })()}
-            {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#ffd61a', textShadow: '0 0 10px rgba(255,198,28,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
+            {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#fad54a', textShadow: '0 0 10px rgba(255,198,28,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
             <div className="board-player-side board-side-opp">{renderPlayerSide(opp, true)}</div>
             <div className="board-area-zones-center">
               <BoardZone type="area" cards={gameState.areaZones?.[myIdx] || []} label="Area" style={{...myBoardZone('area'), left: areaPositions[0]}} />
@@ -8477,7 +8477,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
             {imgUrl && (
               <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
                 <img src={imgUrl} style={{ width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
-                  border: foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,214,26,.5)' : 'none' }} />
+                  border: foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)' : foilType === 'secret_rare' ? '2px solid rgba(250,213,74,.5)' : 'none' }} />
               </div>
             )}
             <div style={{ padding: '10px 12px' }}>
@@ -9008,7 +9008,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
               <div key={i} className="firework-particle" style={{
                 '--fw-x': (Math.random() * 200 - 100) + 'px',
                 '--fw-y': (Math.random() * -200 - 40) + 'px',
-                '--fw-color': ['#ffd61a','#fc1c5f','#4ceb70','#1ca9fd','#ff8b1a','#a952ff'][i % 6],
+                '--fw-color': ['#fad54a','#fc1c5f','#4ceb70','#1ca9fd','#ff8b1a','#a952ff'][i % 6],
                 '--fw-delay': (Math.random() * 2) + 's',
                 '--fw-dur': (1 + Math.random()) + 's',
                 left: (20 + Math.random() * 60) + '%',
@@ -9019,8 +9019,8 @@ function GameBoard({ gameState, lobby, onLeave }) {
           <div className="animate-in" style={{ textAlign: 'center', position: 'relative', zIndex: 2 }}>
             <div className="pixel-font" style={{
               fontSize: 40, marginBottom: 8,
-              color: isSpectator ? '#ffd61a' : (iWon ? '#ffd61a' : 'var(--danger)'),
-              textShadow: isSpectator ? '0 0 40px rgba(255,214,26,.6)' : (iWon ? '0 0 40px rgba(255,214,26,.6)' : '0 0 40px rgba(252,28,95,.5)'),
+              color: isSpectator ? '#fad54a' : (iWon ? '#fad54a' : 'var(--danger)'),
+              textShadow: isSpectator ? '0 0 40px rgba(250,213,74,.6)' : (iWon ? '0 0 40px rgba(250,213,74,.6)' : '0 0 40px rgba(252,28,95,.5)'),
             }}>
               {isSpectator ? `🏆 ${result.winnerName} WINS! 🏆` : (iWon ? '🏆 SET VICTORY! 🏆' : 'SET DEFEAT')}
             </div>
@@ -9070,8 +9070,8 @@ function GameBoard({ gameState, lobby, onLeave }) {
           <div className="animate-in" style={{ textAlign: 'center' }}>
             <div className="pixel-font" style={{
               fontSize: 36, marginBottom: 16,
-              color: isSpectator ? '#ffd61a' : (iWon ? 'var(--success)' : 'var(--danger)'),
-              textShadow: isSpectator ? '0 0 40px rgba(255,214,26,.5)' : (iWon ? '0 0 40px rgba(76,235,112,.5)' : '0 0 40px rgba(252,28,95,.5)'),
+              color: isSpectator ? '#fad54a' : (iWon ? 'var(--success)' : 'var(--danger)'),
+              textShadow: isSpectator ? '0 0 40px rgba(250,213,74,.5)' : (iWon ? '0 0 40px rgba(76,235,112,.5)' : '0 0 40px rgba(252,28,95,.5)'),
             }}>
               {isSpectator ? `🏆 ${result.winnerName} WINS!` : (iWon ? 'YOU WIN!' : 'YOU LOSE')}
             </div>

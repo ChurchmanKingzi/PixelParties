@@ -123,7 +123,7 @@ module.exports = {
     } else if (target.cardInstance) {
       const inst = target.cardInstance;
       const hookCtx = {
-        creature: inst, effectType: 'status',
+        creature: inst, effectType: 'status', statusName: 'burned',
         source: { name: CARD_NAME, owner: pi, heroIdx },
         cancelled: false, _skipReactionCheck: true,
       };

@@ -4263,6 +4263,10 @@
 "id": "Teal_Fishing_Rod",
 "kind": "a"
 },
+"Tearing Mountain": {
+"id": "Tearing_Mountain",
+"kind": "a"
+},
 "Tears of Creation": {
 "id": "Tears_of_Creation",
 "kind": "a"
@@ -5305,6 +5309,10 @@
 },
 "Liquid Luck": {
 "id": "Liquid_Luck",
+"kind": "a"
+},
+"Great Vanguard Demon": {
+"id": "Great_Vanguard_Demon",
 "kind": "a"
 }
 }

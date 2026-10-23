@@ -831,7 +831,7 @@ function AuthScreen() {
                       <path fill="#4580f6" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/>
                       <path fill="#2ca058" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/>
                       <path fill="#ffc61c" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.05l3.01-2.33z"/>
-                      <path fill="#e63e33" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.47.89 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/>
+                      <path fill="#e92f38" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.47.89 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/>
                     </svg>
                     {/* Wortgleich mit dem Knopf, den Google zeichnet — sonst
                         stehen im Desktop-Gehaeuse und im Browser zwei
@@ -1452,7 +1452,7 @@ function LogoParticles() {
  * Die Form (Pixel-Kreuz) und der Takt stehen in style.css
  * (`.pp-sc-glitzer-teil`).
  */
-const SC_GLITZER_FARBEN = ['#f7f7ad', '#ffd61a', '#ffe469', '#ffffff'];
+const SC_GLITZER_FARBEN = ['#f7f7ad', '#fad54a', '#ffe469', '#ffffff'];
 // v1289: auch die SC-Plakette im Spielerprofil-Popup glitzert.
 window.ScGlitzer = ScGlitzer;
 function ScGlitzer() {
@@ -2031,7 +2031,7 @@ function MainMenu() {
           <span className="badge menu-stat-badge pp-eckzier" style={{ background: 'color-mix(in srgb, var(--player-color, #66b6ff) 14%, var(--menu-surface))', color: 'var(--player-color, #66b6ff)' }}>
             <span className="menu-stat-label">⚔ ELO</span><span className="menu-stat-value">{user.elo}</span>
           </span>
-          <span className="badge menu-stat-badge menu-stat-badge--sc pp-eckzier" style={{ background: 'color-mix(in srgb, #ffd61a 12%, var(--menu-surface))', color: '#ffd61a' }}>
+          <span className="badge menu-stat-badge menu-stat-badge--sc pp-eckzier" style={{ background: 'color-mix(in srgb, #fad54a 12%, var(--menu-surface))', color: '#fad54a' }}>
             <span className="menu-stat-coin-wrap"><img src="/data/sc.png" className="menu-stat-coin" /><ScGlitzer /></span><span className="menu-stat-label">SC</span><span className="menu-stat-value">{user.sc || 0}</span>
           </span>
         </div>
@@ -2278,7 +2278,7 @@ function MainMenu() {
 const RANK_TIERS = [
   { name: 'BRONZE',       min: 0,    color: '#be680e', glow: 'rgba(190,104,14,.5)',  icon: '⬡' },
   { name: 'SILVER',       min: 1200, color: '#b9b9b9', glow: 'rgba(185,185,185,.5)', icon: '⬡' },
-  { name: 'GOLD',         min: 1400, color: '#ffd61a', glow: 'rgba(255,214,26,.5)',    icon: '⬡' },
+  { name: 'GOLD',         min: 1400, color: '#fad54a', glow: 'rgba(250,213,74,.5)',    icon: '⬡' },
   { name: 'PLATINUM',     min: 1600, color: '#b6eff7', glow: 'rgba(182,239,247,.5)', icon: '◈' },
   { name: 'DIAMOND',      min: 1800, color: '#b6eff7', glow: 'rgba(182,239,247,.6)', icon: '◆' },
   { name: 'MASTER',       min: 2000, color: '#fb1ea9', glow: 'rgba(251,30,169,.5)',   icon: '✦' },
@@ -3088,7 +3088,7 @@ function ProfileScreen() {
                     <img src="/data/sc.png" style={{ width: 96, height: 96, imageRendering: 'pixelated' }} />
                   </div>
                 </div>
-                <span className="orbit-font" style={{ fontSize: 20, fontWeight: 700, color: '#ffd61a' }}>{user.sc || 0}</span>
+                <span className="orbit-font" style={{ fontSize: 20, fontWeight: 700, color: '#fad54a' }}>{user.sc || 0}</span>
               </div>
             </div>
 
@@ -3619,7 +3619,7 @@ function PurchaseCelebration({ cx, cy, onDone }) {
     const ox = cx ?? canvas.width / 2;
     const oy = cy ?? canvas.height / 2;
     const particles = [];
-    const colors = ['#ffd61a', '#f9ac20', '#f7f7ad', '#fb1ea9', '#1aedff', '#b1ff1a', '#f87420', '#ffffff'];
+    const colors = ['#fad54a', '#f9ac20', '#f7f7ad', '#fb1ea9', '#1aedff', '#b1ff1a', '#f87420', '#ffffff'];
     const shapes = ['star', 'circle', 'diamond', 'spark'];
     // Burst from item position
     for (let i = 0; i < 120; i++) {
@@ -3642,7 +3642,7 @@ function PurchaseCelebration({ cx, cy, onDone }) {
       particles.push({
         x: ox + Math.cos(angle) * dist, y: oy + Math.sin(angle) * dist,
         vx: Math.cos(angle) * 1.5, vy: Math.sin(angle) * 1.5,
-        size: 2 + Math.random() * 4, color: '#ffd61a',
+        size: 2 + Math.random() * 4, color: '#fad54a',
         shape: 'spark', life: 1, decay: 0.015 + Math.random() * 0.01,
         rotation: 0, rotSpeed: 0, gravity: 0,
       });
@@ -4262,7 +4262,7 @@ function ShopScreen() {
                 <span className="shop-item-zier" aria-hidden="true" />
                 <img src={coverUrl} alt={d.name} draggable={false}
                   style={{ width: '100%', height: 148, objectFit: 'cover', objectPosition: 'center top', borderRadius: 4, opacity: d.owned ? 1 : 0.5 }} />
-                <div style={{ fontSize: 11, textAlign: 'center', padding: '6px 4px 2px', color: isCurrentDefault ? '#4ceb70' : (d.owned ? '#ffd61a' : 'var(--text2)'), fontWeight: 600 }}>
+                <div style={{ fontSize: 11, textAlign: 'center', padding: '6px 4px 2px', color: isCurrentDefault ? '#4ceb70' : (d.owned ? '#fad54a' : 'var(--text2)'), fontWeight: 600 }}>
                   {d.name}
                 </div>
                 {d.owned ? (
@@ -4270,14 +4270,14 @@ function ShopScreen() {
                     <div className="shop-price" style={{ borderColor: '#4ceb70', color: '#4ceb70' }}>DEFAULT</div>
                   ) : (
                     <button className="btn" onClick={(e) => { e.stopPropagation(); pickStructureAsDefault(d.id); }}
-                      style={{ padding: '4px 10px', fontSize: 11, marginTop: 4, borderColor: '#ffd61a', color: '#ffd61a' }}>
+                      style={{ padding: '4px 10px', fontSize: 11, marginTop: 4, borderColor: '#fad54a', color: '#fad54a' }}>
                       SELECT
                     </button>
                   )
                 ) : (
                   <button className="btn" disabled={buying || !canAfford}
                     onClick={(e) => buyStructureDeck(d.structureId, e)}
-                    style={{ padding: '4px 10px', fontSize: 11, marginTop: 4, borderColor: '#ffd61a', color: canAfford ? '#ffd61a' : 'var(--text2)' }}>
+                    style={{ padding: '4px 10px', fontSize: 11, marginTop: 4, borderColor: '#fad54a', color: canAfford ? '#fad54a' : 'var(--text2)' }}>
                     🔒 {price ?? '?'} <CoinIcon size={13} />
                   </button>
                 )}
@@ -4335,7 +4335,7 @@ function ShopScreen() {
             </div>
             {randomReveal.label && <div className="shop-reveal-label">{randomReveal.label}</div>}
             {randomReveal.subtitle && <div className="shop-reveal-subtitle">{randomReveal.subtitle}</div>}
-            <button className="btn" style={{ marginTop: 16, padding: '8px 32px', fontSize: 13, borderColor: '#ffd61a', color: '#ffd61a' }}
+            <button className="btn" style={{ marginTop: 16, padding: '8px 32px', fontSize: 13, borderColor: '#fad54a', color: '#fad54a' }}
               onClick={() => setRandomReveal(null)}>NICE!</button>
           </div>
         </div>
@@ -4344,7 +4344,7 @@ function ShopScreen() {
         <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>SHOP</h2>
         <div style={{ flex: 1 }} />
-        <div className="badge" style={{ background: 'rgba(255,214,26,.12)', color: '#ffd61a', display: 'flex', alignItems: 'center', gap: 6, fontSize: 18, padding: '6px 14px' }}>
+        <div className="badge" style={{ background: 'rgba(250,213,74,.12)', color: '#fad54a', display: 'flex', alignItems: 'center', gap: 6, fontSize: 18, padding: '6px 14px' }}>
           <img src="/data/sc.png" style={{ width: 22, height: 22, imageRendering: 'pixelated' }} /> {user.sc || 0}
         </div>
         <VolumeControl />
@@ -4644,7 +4644,7 @@ function RulesScreen({ onBack }) {
           <div className="rules-divider" />
 
           {/* ── ARTIFACTS ── */}
-          <SectionTitle id="artifacts"><span style={{ color: '#ffd61a' }}>Artifacts</span></SectionTitle>
+          <SectionTitle id="artifacts"><span style={{ color: '#fad54a' }}>Artifacts</span></SectionTitle>
           <div className="rules-card-row">
             <Img src="artifact.png" alt="Artifact card example" className="rules-card-img" />
             <div className="rules-text-block">

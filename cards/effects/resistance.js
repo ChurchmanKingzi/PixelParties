@@ -112,6 +112,9 @@ module.exports = {
 
       const statusName = ctx.statusName;
       if (!statusName) return;
+      // ★ 23.10. (Tearing Mountain: „any effects that would prevent targets from being Burned are negated"): der Engine-Pfad meldet, dass jeder Schutz vor
+      // diesem Status aufgehoben ist — Resistance fängt ihn dann nicht ab (und verbraucht keine Ladung).
+      if (ctx.schutzAufgehoben) return;
 
       // ── SCHUTZ-STATUS DER ENGINE NIE ABFANGEN (v328, Als Report) ────
       // `shielded` ist der Anfangsschutz aus der Turn-1-Regel: die Engine

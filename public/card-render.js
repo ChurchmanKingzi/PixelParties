@@ -31,7 +31,7 @@
   const OVER_GREEN = 'rgb(76,235,112)', OVER_RED = 'rgb(255,72,72)', OVER_OUTLINE = 'rgb(8,6,12)';   // aktuelle Werte: verringert / erhoeht, Kontur
   let TEXT_MASK = false;                      // waehrend `textLayer` gesetzt: aller Text weiss (Maske), siehe `draw(…, textOnly)`
   const INK_TRAIL_U = 200;                    // Vorschub minus Tintenbreite: 1 Schrift-Pixel Abstand hinter jedem Zeichen
-  const OPT = { boldU: 50, statusOutline: 0.5, dy: 0, dx: 0, slack: 0, trail: false, step: 0.05, hextra: 0, forcePt: 0, bsteps: 7, silverRim: true, nl: 'space', symDx: 0, symDy: 0, symMode: 'rule', hardOutlines: true };
+  const OPT = { nameOutline: !/[?&]namenkontur=0/.test(typeof location !== 'undefined' ? location.search : ''), boldU: 50, statusOutline: 0.5, dy: 0, dx: 0, slack: 0, trail: false, step: 0.05, hextra: 0, forcePt: 0, bsteps: 7, silverRim: true, nl: 'space', symDx: 0, symDy: 0, symMode: 'rule', hardOutlines: true };
 
   // ── Schrift: Umrisse und Vorschubbreiten aus cardgen/glyphs.json ──
   // Pixel Intv besteht nur aus Rechtecken, hat kein Kerning und Breiten in Vielfachen von 200 Einheiten.
@@ -226,7 +226,7 @@
   // ── Farben (Style-Skript des Templates) ──
   const C = {
     white: 'rgb(255,255,255)', boss: 'rgb(200,0,0)', bossText: 'rgb(240,50,50)', token: 'rgb(50,50,50)',
-    sapphire: 'rgb(8,211,239)', diamond: 'rgb(145,230,230)', diamondLight: 'rgb(178,238,238)', diamondMuted: 'rgb(116,184,184)', diamondDark: 'rgb(102,161,161)', artifact: 'rgb(182,38,0)', sup: 'rgb(255,221,0)',
+    sapphire: 'rgb(8,211,239)', diamond: 'rgb(145,230,230)', diamondLight: 'rgb(178,238,238)', diamondMuted: 'rgb(116,184,184)', diamondDark: 'rgb(102,161,161)', artifact: 'rgb(182,38,0)', sup: 'rgb(250,213,74)',
     supArti: 'rgb(255,125,0)', rare: 'rgb(173,97,0)',
   };
 
@@ -480,7 +480,7 @@
       };
       // `outline`: dunkle Kontur um die Zahl (8 Richtungen, 0,7 Schrift-Pixel) — hebt farbige Werte (gruen/rot) auf jedem Rahmen ab
       if (o.outline && !TEXT_MASK) {
-        const d = Math.max(2, Math.round(pt * PT * 200 / UPM * 0.7));
+        const d = Math.max(2, Math.round(pt * PT * 200 / UPM * 0.7 * (o.outlineFactor || 1)));
         ctx.fillStyle = o.outline;
         for (const [ox, oy] of [[-d, 0], [d, 0], [0, -d], [0, d], [-d, -d], [d, -d], [-d, d], [d, d]]) paint(ox, oy);
         ctx.fillStyle = TEXT_MASK ? '#fff' : o.color;
@@ -490,6 +490,14 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
 
+  /** Münzen-Gold in vier harten Bändern (hell / Gold / Orange / Dunkelorange), Kanten ohne Übergang — dieselben Farben wie die Goldzahlen im Duell. */
+  function muenzGoldFill(ctx, top, height) {
+    // Verlauf über die Tintenhöhe der Schrift (Oberkante der Großbuchstaben bis Unterkante), nicht über die ganze Zeile
+    const g = ctx.createLinearGradient(0, top + height * 0.14, 0, top + height * 0.86);
+    const stufen = [[0, '#f7f7ad'], [0.3, '#fad54a'], [0.62, '#f29a3e']];
+    stufen.forEach(([p, c], i) => { g.addColorStop(p, c); g.addColorStop(i + 1 < stufen.length ? stufen[i + 1][0] - 0.001 : 1, c); });
+    return g;
+  }
   // Goldener Verlauf fuer Skin-Namen (oben hell, unten tief; harte Kante in der Mitte wie bei gebuerstetem Gold)
   function goldFill(ctx, top, height) {
     const g = ctx.createLinearGradient(0, top + height * 0.12, 0, top + height * 0.88);
@@ -499,6 +507,19 @@
   }
 
   // ═════════════ Farben je Karte ═════════════
+  /** TEST (Al, 23.10.): Kontur der Kartennamen in einem dunkleren Ton der jeweiligen Karte — aus der Namensplatte des Rahmens abgetastet
+   *  (mittlerer Farbwert eines Streifens am Rand der Platte, wo selten Schrift steht), auf 60 % Helligkeit abgedunkelt. Schalter: `OPT.nameOutline`
+   *  (Standard an; `?namenkontur=0` in der Adresse schaltet aus). */
+  function nameOutlineColor(ctx, sup) {
+    try {
+      const x0 = sup ? 56 : 108, ys = [62, 70, 78, 86, 94];
+      const px = ys.map(y => Array.from(ctx.getImageData(x0, y, 1, 1).data));
+      const hell = c => c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11;
+      px.sort((a, b) => hell(a) - hell(b));
+      const m = px[Math.floor(px.length / 2)];
+      return 'rgb(' + [0, 1, 2].map(i => Math.round(m[i] * 0.6)).join(',') + ')';
+    } catch (e) { return null; }
+  }
   function nameColor(s) {
     const t = s.type, r = s.rarity;
     if (t === 'boss') return C.boss;
@@ -682,9 +703,12 @@
 
     // 3) Namenszeile (z 2) — Superhelden: breiter
     const sup = isSuperhero(t);
+    // Super Rares (außer Artifacts): Name in den Münzen-Goldtönen (data/palette-fest.json), in vier harten Bändern wie die Goldzahlen, Kontur in Münzen-Rotbraun
+    const supGold = spec.rarity === 'super rare' && !isArti2(t) && !isSuperhero(t) && t !== 'boss' && !isToken(t);
     if (!textOnly) drawLine(ctx, spec.name, {
       left: sup ? 48 : 103, top: 48, width: sup ? 654 : 544, height: 55, size: 50, min: 48,
-      align: 'center', color: spec.nameGold ? goldFill(ctx, 48, 55) : nameColor(spec),
+      align: 'center', color: spec.nameGold ? goldFill(ctx, 48, 55) : supGold ? muenzGoldFill(ctx, 48, 55) : nameColor(spec),
+      outline: OPT.nameOutline && !isArti2(t) ? (supGold ? 'rgb(182,38,0)' : nameOutlineColor(ctx, sup)) : null, outlineFactor: 0.5,   // Artifacts: dunkle Schrift auf heller Platte — dort keine dunkle Kontur
     });
 
     // 4) Faehigkeiten-Felder der Helden

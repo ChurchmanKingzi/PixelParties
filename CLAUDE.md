@@ -23,6 +23,10 @@ Bugfix-Note: _alice-shared | Summons no longer stay on the board after their own
   und erscheint nur in den Patchnotes – auch wenn dabei das Skript angepasst wurde. Wurde dabei zusätzlich ein echter Fehler behoben
   (z. B. Skript passte nicht zum Kartentext), schreibe eine `Bugfix-Note` für diese Karte; dann erscheint sie auch im Bugfix-Kanal.
 * Ohne `Bugfix-Note` erscheint die Karte trotzdem (erkannt am geänderten Skript), nur ohne Erklärung.
+* **Reine Anpassung an eine NEUE Karte ist kein Bugfix:** Wird ein bestehendes Skript (oder ein gemeinsamer Baustein, auch `_engine`) nur geändert, damit es zu einer neuen Karte passt (neuer Engine-Vertrag, Wechselwirkung, Zielfilter für die neue Karte), schreibe pro betroffener Karte/Baustein eine Zeile
+  `Bugfix-Skip: <Kartenname oder _baustein>` (optional `| Grund`) in die Commit-Nachricht – **keine** `Bugfix-Note`. Der Bot meldet das Ziel dann nicht im Bugfix-Kanal. Dasselbe gilt für Nachbesserungen an einer neuen Karte, die für Spieler noch nicht
+  freigegeben ist, auch wenn sie schon in `data/cards.json` steht. Ein `Bugfix-Skip` hat Vorrang vor einer `Bugfix-Note` desselben Ziels im selben Bot-Zeitraum (so nimmt man eine zu Unrecht geschriebene Note in einem späteren Commit zurück) –
+  also nicht für eine Karte schreiben, an der im selben Zeitraum auch ein echter Fehler behoben wurde.
 
 ## Grafik-Regel: Jede Animation und jedes Highlight ist Pixelart
 
@@ -40,3 +44,4 @@ Das Spiel hat eine feste Palette (`data/palette.json`, 8 Bit = höchstens 256 Fa
 * Jede **neue Farbe** in CSS/JSX/HTML (`#rrggbb`, `rgb()`, `hsl()` …) muss eine Palettenfarbe sein. `node scripts/palette/anwenden.js` setzt alle Farb-Literale auf die nächste Palettenfarbe (Lab-Abstand, Alpha bleibt); `npm test` schlägt fehl (`test/palette.test.js`), solange eine fremde Farbe im Quelltext steht. Am einfachsten: gleich eine Farbe aus `data/palette.json` nehmen.
 * Farben, die erst **zur Laufzeit** entstehen (Spielerfarbe, Zufallspartikel, `hsl(${hue})`, Farben aus Kartenskripten), rastet `public/palette.js` ein (Stile, Canvas, SVG-Attribute). Die **Spielerfarbe** wird beim Speichern serverseitig auf die nächste Palettenfarbe gesetzt (`palette.js` im Wurzelverzeichnis, `snapHex`) und im Farbfeld des Profils live eingerastet.
 * Die Palette selbst ändert man nur bewusst: `python3 scripts/palette/build_palette.py` (Gewichte der Oberfläche: `data/palette-ui-gewichte.json`), danach `node scripts/palette/anwenden.js` und `python3 scripts/pixel-emoji/build_font.py` (die Emoji-Schrift nutzt dieselben 256 Farben).
+* **Feste Farben des Spielgestalters** stehen in `data/palette-fest.json` (z. B. die Farben der Gold-Münze). Sie kommen **exakt** in die Palette (`build_palette.py`, nie auf Nachbarfarben gerastet) und werden dort, wofür sie gedacht sind, unverändert verwendet — Gold im Spiel (Münze, Goldzahl, Gold-Zahlen im Duell) nutzt genau diese fünf Farben. Gibt der Gestalter ein Icon oder Farben vor, werden sie dort eingetragen und das Icon pixelgenau übernommen (die 🪙-Münze der Emoji-Schrift ist sein 12×12-Sprite).

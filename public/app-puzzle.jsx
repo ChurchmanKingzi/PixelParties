@@ -227,8 +227,8 @@ function DebuffSelector({ side, selected, onChange, isOpen, onToggle, onClose, k
         className="pz-debuff-btn"
         onClick={onToggle}
         style={{
-          padding: kompakt ? '3px 2px' : '6px 10px',
-          fontSize: kompakt ? 10 : 11, fontWeight: 700,
+          padding: kompakt ? '9px 4px' : '6px 10px',
+          fontSize: kompakt ? 14 : 11, fontWeight: 700,
           background: isOpen ? `rgba(${isOpp ? '255,136,68' : '136,204,255'},.18)` : 'rgba(0,0,0,.25)',
           border: `1px solid ${accent}55`,
           color: accent,
@@ -303,7 +303,6 @@ function HandNebenspalte({ si, seite, gold, onGold, ...debuffProps }) {
   return (
     <div className="pz-hand-extras">
       <label className="pz-gold-feld" title="Starting Gold (−999 … 999)">
-        <span aria-hidden="true">💰</span>
         {/* Negatives Gold ist seit dem Debt-O-Tron-Archetyp ein
             gueltiger Zustand und muss auch im Puzzle einstellbar sein
             (Als Vorgabe 16.8.). Untergrenze −999, Obergrenze 999, und
@@ -315,7 +314,9 @@ function HandNebenspalte({ si, seite, gold, onGold, ...debuffProps }) {
         <input className="input" type="number" min="-999" max="999"
           value={gold ?? 0}
           onChange={(e) => onGold(Math.min(999, Math.max(-999, parseInt(e.target.value) || 0)))}
-          style={{ color: (gold ?? 0) < 0 ? '#fe5154' : undefined }} />
+          style={{ caretColor: '#fad54a' }} />
+        {/* Die Zahl selbst zeichnet dieses Element in Gold (Verlauf, Kontur, Schiller) — das Feld darunter nimmt nur die Eingabe an */}
+        <span className={'pz-gold-zahl pp-gold-zahl' + ((gold ?? 0) < 0 ? ' gold-negative' : '')} aria-hidden="true">{gold ?? 0}</span>
       </label>
       <DebuffSelector side={seite} kompakt {...debuffProps} />
     </div>
@@ -362,6 +363,26 @@ function puppetsInPlay(players) {
 const VENA_NAME = 'Vena, the Bounty Huntress';
 function venaAufSeite(player) {
   return (player?.heroes || []).some(h => h?.name === VENA_NAME);
+}
+
+// 23.10. — Stufen je Handkopie (`handLv` / `oppHandLv`, s. PuzzleCreator): Listen parallel zur Hand, null/fehlend = gedruckte Stufe.
+const LV_MAX = 99;
+function lvEntfernen(lv, idx) { return lv.filter((_, i) => i !== idx); }
+function lvEinfuegen(lv, idx) { if (lv.length <= idx) return lv; const n = [...lv]; n.splice(idx, 0, null); return n; }
+function lvUmsortieren(lv, von, nach, laenge) {
+  const voll = Array.from({ length: laenge }, (_, i) => lv[i] ?? null);
+  return window.handMove(voll, von, nach);
+}
+/** Kartenbild einer Handkopie: mit gewählter Stufe malt der Renderer sie wie in der echten Hand (`?lv=`, grün gesenkt / rot erhöht). */
+function cardImageMitStufe(name, lv) {
+  const url = cardImageUrl(name);
+  const c = window.CARDS_BY_NAME?.[name];
+  return url && Number.isInteger(lv) && c && c.level != null && lv !== c.level ? url + '?lv=' + lv : url;
+}
+/** Für Export/Start: nur setzen, wenn mindestens eine Kopie eine eigene Stufe trägt; sonst fehlt das Feld (ältere Puzzles bleiben bytegleich). */
+function lvFuerDaten(lv, hand) {
+  if (!lv.some((v, i) => v != null && i < hand.length)) return undefined;
+  return hand.map((_, i) => (Number.isInteger(lv[i]) ? lv[i] : null));
 }
 
 // ★★ v1143 — Gate des Schalters „Has taken damage this game". Karten,
@@ -522,6 +543,12 @@ function PuzzleCreator() {
   const [doomCounters, setDoomCounters] = useState(saved?.doomCounters || [0, 0]);
   const [hand, setHand] = useState(saved?.hand || []);
   const [oppHand, setOppHand] = useState(saved?.oppHand || []);
+  // 23.10. (Al): Level je HANDKOPIE von Hand anpassen (Linksklick auf eine Karte mit Level). Parallel zu `hand` / `oppHand`: `handLv[i]` ist die
+  // gewählte Stufe der Karte `hand[i]` oder null/fehlend = gedruckte Stufe. Die Liste darf kürzer sein als die Hand (angehängte Karten haben keinen
+  // Eintrag); Entfernen, Umsortieren und Einfügen halten sie über `lvEntfernen` / `lvUmsortieren` / `lvEinfuegen` im Takt. Beim Start gesetzt als
+  // `counters.levelSet` der Handinstanz (`createPuzzleGame`, dieselbe absolute Setzung wie beim Inconspicuous Lawn Gnome).
+  const [handLv, setHandLv] = useState(saved?.handLv || []);
+  const [oppHandLv, setOppHandLv] = useState(saved?.oppHandLv || []);
   const [puzzleName, setPuzzleName] = useState(saved?.puzzleName || '');
   // Per-player starting debuff lists. Each entry is a key from
   // PLAYER_DEBUFF_REGISTRY below; the server applies them at puzzle
@@ -1134,8 +1161,8 @@ function PuzzleCreator() {
 
   // ── Auto-save state to localStorage on every change ──
   useEffect(() => {
-    try { localStorage.setItem('pz-creator-state', JSON.stringify({ players, areaZones, doomCounters, hand, oppHand, puzzleName, meDebuffs, oppDebuffs })); } catch (_) {}
-  }, [players, areaZones, doomCounters, hand, oppHand, puzzleName, meDebuffs, oppDebuffs]);
+    try { localStorage.setItem('pz-creator-state', JSON.stringify({ players, areaZones, doomCounters, hand, oppHand, handLv, oppHandLv, puzzleName, meDebuffs, oppDebuffs })); } catch (_) {}
+  }, [players, areaZones, doomCounters, hand, oppHand, handLv, oppHandLv, puzzleName, meDebuffs, oppDebuffs]);
 
   const puzzleIgnoreRef = useRef(false); // true after leaving — blocks inflight game_state updates
 
@@ -1215,6 +1242,8 @@ function PuzzleCreator() {
     setDoomCounters([0, 0]);
     setHand([]);
     setOppHand([]);
+    setHandLv([]);
+    setOppHandLv([]);
     setMeDebuffs([]);
     setOppDebuffs([]);
     setValidated(false);
@@ -1757,9 +1786,19 @@ function PuzzleCreator() {
   // user-facing actions AND as part of drag-to-place flows where they'd
   // double up with placement/discard. Call sites play the sound instead.
   const addToHand = useCallback((card) => { setHand(prev => [...prev, card.name]); invalidate(); }, [invalidate]);
-  const removeFromHand = useCallback((idx) => { setHand(prev => prev.filter((_, i) => i !== idx)); invalidate(); }, [invalidate]);
+  const removeFromHand = useCallback((idx) => { setHand(prev => prev.filter((_, i) => i !== idx)); setHandLv(prev => lvEntfernen(prev, idx)); invalidate(); }, [invalidate]);
   const addToOppHand = useCallback((card) => { setOppHand(prev => [...prev, card.name]); invalidate(); }, [invalidate]);
-  const removeFromOppHand = useCallback((idx) => { setOppHand(prev => prev.filter((_, i) => i !== idx)); invalidate(); }, [invalidate]);
+  const removeFromOppHand = useCallback((idx) => { setOppHand(prev => prev.filter((_, i) => i !== idx)); setOppHandLv(prev => lvEntfernen(prev, idx)); invalidate(); }, [invalidate]);
+  /** Stufe der Handkopie `idx` setzen (`wert` = gedruckte Stufe oder null → zurück auf die gedruckte). */
+  const setzeLv = useCallback((istOpp, idx, wert, gedruckt) => {
+    const neu = (wert == null || wert === gedruckt) ? null : Math.max(0, Math.min(LV_MAX, wert));
+    (istOpp ? setOppHandLv : setHandLv)(prev => {
+      const n = Array.from({ length: Math.max(prev.length, idx + 1) }, (_, i) => prev[i] ?? null);
+      n[idx] = neu;
+      return n;
+    });
+    invalidate();
+  }, [invalidate]);
   // ★ v1427 (Als Befund 25.9.: Karten aus der Creation Zone liessen sich
   // per Ziehen nicht wegbewegen). Jede Ablage raeumte ihre Quelle mit
   // „oppHand → Gegnerhand, SONST eigene Hand" — ein Zug aus Crestinas
@@ -2514,12 +2553,12 @@ function PuzzleCreator() {
     // wie im Duell.
     const misch = (arr) => window.handMove(arr, vonIdx, nachIdx);
     // Vier Haelften: eigene Hand/Vorrat und dieselben beim Gegner.
-    if (zone === 'hand') setHand(prev => misch(prev));
-    else if (zone === 'oppHand') setOppHand(prev => misch(prev));
+    if (zone === 'hand') { setHand(prev => misch(prev)); setHandLv(prev => lvUmsortieren(prev, vonIdx, nachIdx, hand.length)); }
+    else if (zone === 'oppHand') { setOppHand(prev => misch(prev)); setOppHandLv(prev => lvUmsortieren(prev, vonIdx, nachIdx, oppHand.length)); }
     else if (zone === 'oppCreation') updatePlayer(1, pp => { pp.creationZone = misch(pp.creationZone || []); return pp; });
     else updatePlayer(0, pp => { pp.creationZone = misch(pp.creationZone || []); return pp; });
     invalidate();
-  }, [updatePlayer, invalidate]);
+  }, [updatePlayer, invalidate, hand.length, oppHand.length]);
 
   const handleHandDrop = useCallback((e) => {
     e.preventDefault();
@@ -2533,6 +2572,7 @@ function PuzzleCreator() {
       removeFromCreation(dragHandIdx);
       const ziel = tropfIndex(e.clientX, '[data-pz-hand="hand"]');
       setHand(prev => { const n = [...prev]; n.splice(ziel, 0, name); return n; });
+      setHandLv(prev => lvEinfuegen(prev, ziel));
       if (window.playSFX) window.playSFX('draw');
       setDragCardName(null); setDragHandIdx(null); setDragSource(null);
       setDragHandSource(null); setDragOverZone(null); setDropGap(null); setZiehLaeuft(false);
@@ -2683,6 +2723,7 @@ function PuzzleCreator() {
       });
       const ziel = tropfIndex(e.clientX, '[data-pz-hand="oppHand"]');
       setOppHand(prev => { const n = [...prev]; n.splice(ziel, 0, name); return n; });
+      setOppHandLv(prev => lvEinfuegen(prev, ziel));
       if (window.playSFX) window.playSFX('draw');
       setDragCardName(null); setDragHandIdx(null); setDragSource(null);
       setDragHandSource(null); setDragOverZone(null); setDropGap(null); setZiehLaeuft(false);
@@ -3338,14 +3379,14 @@ function PuzzleCreator() {
     }
     // Send puzzle to server — starts a real battle against a CPU opponent
     puzzleIgnoreRef.current = false;
-    socket.emit('start_puzzle', { players, areaZones, doomCounters, hand, oppHand, playerDebuffs: [meDebuffs, oppDebuffs] });
-  }, [players, areaZones, doomCounters, hand, oppHand, meDebuffs, oppDebuffs, notify]);
+    socket.emit('start_puzzle', { players, areaZones, doomCounters, hand, oppHand, handLevels: lvFuerDaten(handLv, hand), oppHandLevels: lvFuerDaten(oppHandLv, oppHand), playerDebuffs: [meDebuffs, oppDebuffs] });
+  }, [players, areaZones, doomCounters, hand, oppHand, handLv, oppHandLv, meDebuffs, oppDebuffs, notify]);
 
   const handleExport = useCallback(() => {
     if (!validated) return;
-    const data = { players, areaZones, doomCounters, hand, oppHand, playerDebuffs: [meDebuffs, oppDebuffs], version: 1 };
+    const data = { players, areaZones, doomCounters, hand, oppHand, handLevels: lvFuerDaten(handLv, hand), oppHandLevels: lvFuerDaten(oppHandLv, oppHand), playerDebuffs: [meDebuffs, oppDebuffs], version: 1 };
     socket.emit('export_puzzle', data);
-  }, [validated, players, areaZones, hand, oppHand, meDebuffs, oppDebuffs]);
+  }, [validated, players, areaZones, hand, oppHand, handLv, oppHandLv, meDebuffs, oppDebuffs]);
 
   // Listen for encrypted puzzle from server
   useEffect(() => {
@@ -3969,12 +4010,12 @@ function PuzzleCreator() {
                     // einen Ablegeplatz vortaeuschen, den es nicht gibt.
                     <div key={pm.id} title={pm.name} data-pz-perm={si + '-' + i}
                       onContextMenu={(e) => { e.preventDefault(); if (window.playSFX) window.playSFX('discard', { dedupe: 60 }); removeCard(si, 'permanent', 0, i); }}>
-                      <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(255,214,26,.5)', background: 'rgba(255,214,26,.08)', cursor: 'pointer' }}>
+                      <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(250,213,74,.5)', background: 'rgba(250,213,74,.08)', cursor: 'pointer' }}>
                         <BoardCard cardName={pm.name} />
                       </div>
                     </div>
                   ))}
-                  <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderStyle: 'dashed', borderColor: 'rgba(255,214,26,.3)' }}
+                  <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderStyle: 'dashed', borderColor: 'rgba(250,213,74,.3)' }}
                     onDragOver={(e) => { e.preventDefault(); if (dragCardName) setDragOverZone('perm-' + si); }}
                     onDragLeave={() => setDragOverZone(null)}
                     onDrop={(e) => { e.preventDefault(); setDragOverZone(null); if (dragCardName != null) { if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot); placePermanent(dragCardName, si); entferneAusHandquelle(dragHandSource, dragHandIdx); setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); dragEntityData.current = null; } }}>
@@ -4402,7 +4443,7 @@ function PuzzleCreator() {
             <div className="pz-hand-cards" data-pz-hand="oppHand" data-pz-ziel="oppHand hand:oppHand" data-pz-glow="hand"
               style={{ '--hand-max-lift': window.handFanMaxLift?.(oppHand.length, { seite: 'opp' }) ?? 0 }}>
               {oppHand.map((cardName, i) => {
-                const img = cardImageUrl(cardName);
+                const img = cardImageMitStufe(cardName, oppHandLv[i]);
                 // Gespiegelt zur eigenen Hand (Als Befund 28.8.).
                 const gapPosOh = dropGap?.zone === 'oppHand'
                   ? (dragHandIdx != null && dropGap.idx >= dragHandIdx ? dropGap.idx + 1 : dropGap.idx)
@@ -4697,7 +4738,7 @@ function PuzzleCreator() {
         <div className="pz-hand-cards" data-pz-hand="hand" data-pz-ziel="hand hand:hand" data-pz-glow="hand"
           style={{ '--hand-max-lift': window.handFanMaxLift?.(hand.length) ?? 0 }}>
           {hand.map((cardName, i) => {
-            const img = cardImageUrl(cardName);
+            const img = cardImageMitStufe(cardName, handLv[i]);
             // Zieh-Luecke VOR diesem Platz, wenn der Zeiger hier steht.
             // ★ Der Index kommt OHNE die gezogene Karte; hier steht sie
             // aber noch drin. Deshalb `+1` ab dem Ursprung — dieselbe
@@ -5454,6 +5495,30 @@ function PuzzleCreator() {
           setMobileSelected(null);
         }}>✕ Remove</div>
       )}
+      {/* ── Stufe der gewählten Handkarte (23.10., Al): Linksklick wählt die Karte, und hat sie ein Level, erscheint hier die Stufenwahl. */}
+      {mobileSelected && removePopupPos && (mobileSelected.handSource === 'hand' || mobileSelected.handSource === 'oppHand') && (() => {
+        const kc = getCard(mobileSelected.cardName);
+        if (!kc || kc.level == null) return null;
+        const istOpp = mobileSelected.handSource === 'oppHand';
+        const idx = mobileSelected.handIdx;
+        const lvListe = istOpp ? oppHandLv : handLv;
+        const gesetzt = Number.isInteger(lvListe[idx]);
+        const aktuell = gesetzt ? lvListe[idx] : kc.level;
+        return (
+          <div className="pz-lv-pop" data-pz-lv-pop style={{
+            position: 'fixed',
+            left: removePopupPos.left,
+            top: removePopupPos.top,
+            transform: istOpp ? 'translate(-50%, 28px)' : 'translate(-50%, calc(-100% - 28px))',
+            zIndex: 999999,
+          }} onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+            <button className="pz-lv-btn" data-pz-lv="down" onClick={() => setzeLv(istOpp, idx, aktuell - 1, kc.level)}>-</button>
+            <span className={'pz-lv-wert' + (gesetzt ? (aktuell < kc.level ? ' pz-lv-tiefer' : ' pz-lv-hoeher') : '')} data-pz-lv="wert">Lv {aktuell}</span>
+            <button className="pz-lv-btn" data-pz-lv="up" onClick={() => setzeLv(istOpp, idx, aktuell + 1, kc.level)}>+</button>
+            <button className="pz-lv-reset" data-pz-lv="reset" disabled={!gesetzt} onClick={() => setzeLv(istOpp, idx, null, kc.level)}>RESET ({kc.level})</button>
+          </div>
+        );
+      })()}
     </div>
   );
 }

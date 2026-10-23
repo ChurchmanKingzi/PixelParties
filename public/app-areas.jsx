@@ -76,6 +76,7 @@ const AREA_OVERLAYS = {
   // opaque-Area, und die Crevice liegt in aller Regel zuerst. Als
   // 'partial' laege die deckende Szene dagegen OBEN auf allem.
   'Spatial Crevice':              { tier: 'opaque',      C: () => <SpatialCreviceOverlay /> },   // v1440: Kartenstil
+  'Tearing Mountain':             { tier: 'opaque',      C: () => <TearingMountainOverlay /> },   // 23.10.: Lavaberg mit Wasserfall und Lavafluss
 };
 
 /** Faserige Diagonale: Punkte von links oben nach rechts unten, leicht gezackt. */
@@ -5728,6 +5729,120 @@ const EighthCircleOfHellOverlay = React.memo(function EighthCircleOfHellOverlay(
         @keyframes egFunke {
           0% { opacity: 0; transform: translate(0, 0); } 10% { opacity: 1; }
           80% { opacity: .8; } 100% { opacity: 0; transform: translate(var(--dx), calc(-50 * var(--px))); }
+        }
+      `}</style>
+    </PixelScene>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  TEARING MOUNTAIN — Lavaberg mit Wasserfall und Lavafluss (23.10., Al)
+//
+//  Nach dem Kartenmotiv (ein Lava-Wasserfall zwischen dunklen Felswänden, darunter
+//  ein Lavabecken) und dem Auftrag: „einen Berg mit einem Lava-Wasserfall und
+//  Lava-Fluss". Ein kantiger, rissiger Vulkanberg trägt im Krater einen Lavasee;
+//  eine Rinne läuft zur Kante, stürzt als Wasserfall durch eine Basaltschlucht
+//  (dazu vier Rinnsale) und sammelt sich in einem breiten Lavafluss, der quer
+//  durch die Szene zieht. Davor eine Basaltebene mit glühenden Rissen, Tümpeln
+//  und Felsbrocken; dahinter rote Gipfel, ein ferner Vulkan und Glutwolken.
+//  Licht IMMER oben rechts; Lava und Fels in den Farben des Kartenbilds (Al 23.10.: „dieselben Lava-Farben wie das Card Art“) — Hellgelb, Gelb,
+//  Orange; Fels in Braun; alles Palettenfarben.
+//
+//  Ebenen (Kunsthöhe 100; per Generator gemalt, der nicht im Projekt liegt):
+//  land.png — Kachel 128 (Himmel, Gipfel, Ufer, Fluss, Ebene); mountain.png —
+//  Versatzstück 160 (Berg samt Wasserfall; sein Fuß liegt genau auf der
+//  Flussoberkante); mask-river.png (Kachel) / mask-fall.png (Versatzstück) —
+//  Schablonen für die bewegte Lava; flow-river.png (16×16, fließt nach rechts) /
+//  flow-fall.png (16×16, fließt nach unten); glow-land.png / glow-mountain.png —
+//  zwei Flackerbilder des Lichtscheins auf dem Fels (Raster, kein Verlauf);
+//  splash.png (3 Bilder 30×14, Gischt am Fuß des Falls); bubble.png (3 Bilder
+//  3×3, Lavablasen); smoke.png (4 Bilder 11×11, Rauchfahne vom Krater).
+//
+//  Animiert: Lava strömt (Fall senkrecht, Fluss waagerecht), der Glutschein auf
+//  dem Fels flackert, Gischt spritzt am Fall, Blasen steigen im Fluss auf und
+//  platzen, Funken steigen aus Fluss und Krater, Rauch zieht vom Krater ab.
+//  ALLE Animationen teilen die Periode 12 s (0,8/2,4/3/4/6/12 s) → nahtlose Schleife.
+// ═══════════════════════════════════════════════════════════════════
+const TMT = '/areas/tearing-mountain/';
+const TMT_W = 160;                       // Berg-Versatzstück
+const TMT_FLUSS_Y = 56;                  // erste Zeile der Fließkachel (der Fluss liegt in den Zeilen 56–71)
+const TMT_FALL_FUSS = 65;                // Gischt-Bild (30 breit) so, dass seine Mitte auf der Fallachse (x 80) sitzt
+// Blasen im Fluss: [x (Kunstpixel neben der Mitte), y, Takt s]
+const TMT_BLASEN = [[-92, 62], [-61, 66], [-33, 61], [-14, 67], [22, 63], [49, 66], [71, 61], [96, 65], [118, 63], [-118, 65]];
+
+/** Kleiner, fester Zufall (mulberry32) — gleiche Szene bei jedem Zeichnen, damit die 12-s-Schleife stimmt. */
+function tmtZufall(seed) {
+  let a = seed >>> 0;
+  return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+
+const TearingMountainOverlay = React.memo(function TearingMountainOverlay() {
+  const funken = useMemo(() => {
+    const r = tmtZufall(2310);
+    const aus = ppZufall(ppFxN(18), (i) => {
+      const krater = i % 6 === 5;
+      return {
+        x: krater ? Math.round(-6 + r() * 12) : Math.round(-120 + r() * 240),
+        y: krater ? 7 : Math.round(57 + r() * 12),
+        steig: krater ? Math.round(14 + r() * 8) : Math.round(26 + r() * 22),
+        dx: Math.round(2 + r() * 9),
+        dur: [4, 6, 12][i % 3], delay: -Math.round(r() * 24) / 2,
+      };
+    });
+    return aus;
+  }, []);
+  const blasen = useMemo(() => TMT_BLASEN.slice(0, ppFxN(TMT_BLASEN.length)).map(([x, y], i) => ({ x, y, dur: [4, 6, 3][i % 3], delay: -((i * 7) % 12) / 2 })), []);
+  const rauch = useMemo(() => ppZufall(ppFxN(3), (i) => ({ delay: -i * 4, dy: i % 2 })), []);
+  const mitte = { left: `calc(50% - ${TMT_W / 2} * var(--px))`, width: ppArt(TMT_W), right: 'auto' };
+  return (
+    <PixelScene artH={100} bg="#1f0f04" className="tearing-mountain-overlay">
+      <PixelBand src={TMT + 'land.png'} />
+      <PixelPiece src={TMT + 'mountain.png'} w={TMT_W} />
+      <div className="pp-pixel-layer tmt-fluss" style={{ position: 'absolute', inset: 0, ...ppMaske(TMT + 'mask-river.png', true) }} />
+      <PixelBand src={TMT + 'glow-land.png'} className="pp-area-dyn" style={{ backgroundSize: 'auto 200%', animation: 'ppBand2 3s steps(1) infinite' }} />
+      <div className="pp-pixel-layer tmt-fall" style={{ ...mitte, ...ppMaske(TMT + 'mask-fall.png', false) }} />
+      <PixelPiece src={TMT + 'glow-mountain.png'} w={TMT_W} className="pp-area-dyn" style={{ backgroundSize: '100% 200%', animation: 'ppBand2 3s steps(1) infinite' }} />
+      <i className="pp-area-dyn tmt-gischt" style={{ left: ppArtX(TMT_FALL_FUSS, TMT_W), top: ppArt(48) }} />
+      {blasen.map((b, i) => (
+        <i key={'b' + i} className="pp-area-dyn tmt-blase" style={{ left: ppArtX(b.x - 1, 0), top: ppArt(b.y - 1), animation: `tmtBlubb ${b.dur}s steps(1) ${b.delay}s infinite` }} />
+      ))}
+      {rauch.map((r, i) => (
+        <i key={'r' + i} className="pp-area-dyn tmt-rauch" style={{ left: ppArtX(80 - 6, 0), top: ppArt(-2 + r.dy), animation: `tmtRauch 12s steps(34) ${r.delay}s infinite, tmtRauchBild 12s steps(1) ${r.delay}s infinite` }} />
+      ))}
+      {funken.map((f, i) => (
+        <i key={'f' + i} className="pp-area-dyn tmt-funke" style={{
+          left: ppArtX(f.x, 0), top: ppArt(f.y), '--dx': ppArt(f.dx), '--steig': ppArt(-f.steig),
+          animation: `tmtSteig ${f.dur}s steps(${f.steig}) ${f.delay}s infinite, tmtFarbe ${f.dur}s steps(1) ${f.delay}s infinite`,
+        }} />
+      ))}
+      <div className="pp-rand-dim" />
+      <style>{`
+        /* Lavafluss: Kachel 16×16, Zeile 56 der Szene, nur waagerecht gescrollt (16 Schritte in 2,4 s) */
+        .tmt-fluss {
+          background: url(${TMT}flow-river.png) 0 calc(${TMT_FLUSS_Y} * var(--px)) / calc(16 * var(--px)) calc(16 * var(--px)) repeat-x;
+          animation: tmtFluss 2.4s steps(16) infinite;
+        }
+        @keyframes tmtFluss { from { background-position: 0 calc(${TMT_FLUSS_Y} * var(--px)); } to { background-position: calc(16 * var(--px)) calc(${TMT_FLUSS_Y} * var(--px)); } }
+        /* Wasserfall und Rinne: Kachel 16×16, senkrecht gescrollt (16 Schritte in 0,8 s) */
+        .tmt-fall {
+          position: absolute; top: 0; bottom: 0;
+          background: url(${TMT}flow-fall.png) 0 0 / calc(16 * var(--px)) calc(16 * var(--px)) repeat;
+          animation: tmtFall .8s steps(16) infinite;
+        }
+        @keyframes tmtFall { from { background-position: 0 0; } to { background-position: 0 calc(16 * var(--px)); } }
+        .tmt-gischt { position: absolute; width: calc(30 * var(--px)); height: calc(14 * var(--px)); background: url(${TMT}splash.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 .6s steps(1) infinite; }
+        .tmt-blase { position: absolute; width: calc(3 * var(--px)); height: calc(3 * var(--px)); background: url(${TMT}bubble.png) 0 0 / 300% 100% no-repeat; opacity: 0; }
+        @keyframes tmtBlubb { 0%, 70% { opacity: 0; background-position: 0 0; } 72% { opacity: 1; background-position: 0 0; } 80% { background-position: 50% 0; } 88% { background-position: 100% 0; } 94%, 100% { opacity: 0; background-position: 100% 0; } }
+        /* Rauchfahne: vom Krater nach rechts über den Himmel (Wind), vier Bilder (wächst, löst sich auf) */
+        .tmt-rauch { position: absolute; width: calc(11 * var(--px)); height: calc(11 * var(--px)); background: url(${TMT}smoke.png) 0 0 / 400% 100% no-repeat; }
+        @keyframes tmtRauch { from { transform: translate(0, 0); } to { transform: translate(calc(46 * var(--px)), calc(-4 * var(--px))); } }
+        @keyframes tmtRauchBild { 0% { background-position: 0 0; } 20% { background-position: 33.33% 0; } 55% { background-position: 66.67% 0; } 82% { background-position: 100% 0; } }
+        /* Funken: ein Kunstpixel, steigt in ganzen Pixeln auf und kühlt in harten Stufen ab (Lavafarben des Kartenmotivs: Hellgelb → Orange) */
+        .tmt-funke { position: absolute; width: var(--px); height: var(--px); opacity: 0; background: #fff196; }
+        @keyframes tmtSteig { from { transform: translate(0, 0); } to { transform: translate(var(--dx), var(--steig)); } }
+        @keyframes tmtFarbe {
+          0% { opacity: 0; background: #fff196; } 3% { opacity: 1; background: #fff196; } 22% { background: #ffd066; } 45% { background: #ff9b3a; }
+          68% { background: #f87420; } 88% { background: #e37435; } 97%, 100% { opacity: 0; background: #e37435; }
         }
       `}</style>
     </PixelScene>

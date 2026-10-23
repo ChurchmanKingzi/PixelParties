@@ -3481,7 +3481,7 @@
     "startingAbility2": "Terror",
     "spellSchool1": "",
     "spellSchool2": "",
-    "foil": null
+    "foil": "secret_rare"
   },
   {
     "name": "Charm of Balance",
@@ -10582,7 +10582,7 @@
     "hp": 200,
     "atk": null,
     "cost": null,
-    "effect": "Reveal this card while it is in your hand. Whenever you play a Reaction Attack or Spell, reduce this card's level in your hand by 1. When you summon this Creature, place a Demon Counter on all Creatures you control. You may once per turn choose a target and deal damage equal to 50 times the combined number of Demon Counters on all cards on the board to it.",
+    "effect": "Reveal this card while it is in your hand. Whenever you play a Reaction Attack, Spell or Creature, reduce this card's level in your hand by 1. When you summon this Creature, place a Demon Counter on all Creatures you control. You may once per turn choose a target and deal damage equal to 50 times the combined number of Demon Counters on all cards on the board to it.",
     "archetype": "",
     "setID": "PP MSHW",
     "banned": "",
@@ -12815,7 +12815,7 @@
     "startingAbility2": "Magic Arts",
     "spellSchool1": "",
     "spellSchool2": "",
-    "foil": null
+    "foil": "secret_rare"
   },
   {
     "name": "Johanna, Crusader of Light",
@@ -21798,7 +21798,7 @@
     "hp": 50,
     "atk": null,
     "cost": null,
-    "effect": "Once per turn, when you discard 1 or more cards, this Creature's current and max HP are increased by 50. You may once per turn set the current and max HP of another Creature you control equal to this Creature's max HP.",
+    "effect": "Whenever you discard 1 or more cards, this Creature's current and max HP are increased by 10 times the number of cards discarded. You may once per turn set the current and max HP of another Creature you control equal to this Creature's max HP.",
     "archetype": "Steam Dwarfs",
     "setID": "PP MSRU",
     "banned": "",
@@ -21817,7 +21817,7 @@
     "hp": 50,
     "atk": null,
     "cost": null,
-    "effect": "Once per turn, when you discard 1 or more cards, this Creature's current and max HP are increased by 50. You may once per turn reduce this Creature's current and max HP by 100 to search your deck for a card, reveal it and add it to your hand.",
+    "effect": "Whenever you discard 1 or more cards, this Creature's current and max HP are increased by 10 times the number of cards discarded. You may once per turn reduce this Creature's current and max HP by 100 to search your deck for a card, reveal it and add it to your hand.",
     "archetype": "Steam Dwarfs",
     "setID": "PP MBS1",
     "banned": "",
@@ -21855,7 +21855,7 @@
     "hp": 50,
     "atk": null,
     "cost": null,
-    "effect": "Once per turn, when you discard 1 or more cards, this Creature's current and max HP are increased by 50. You may once per turn sacrifice this Creature you control that was not summoned this turn to place any Creature from your deck whose max HP is less than or equal to this Creature's current HP into its Support Zone. If that Creature would require additional sacrifices, negate those sacrifices.",
+    "effect": "Whenever you discard 1 or more cards, this Creature's current and max HP are increased by 10 times the number of cards discarded. You may once per turn sacrifice this Creature you control that was not summoned this turn to place any Creature from your deck whose max HP is less than or equal to this Creature's current HP into its Support Zone. If that Creature would require additional sacrifices, negate those sacrifices.",
     "archetype": "Steam Dwarfs",
     "setID": "PP MS1",
     "banned": "",
@@ -21874,7 +21874,7 @@
     "hp": 50,
     "atk": null,
     "cost": null,
-    "effect": "Once per turn, when you discard 1 or more cards, this Creature's current and max HP are increased by 50. You may once per turn choose a target and deal damage equal to this Creature's current HP to it. This damage cannot exceed 200.",
+    "effect": "Whenever you discard 1 or more cards, this Creature's current and max HP are increased by 10 times the number of cards discarded. You may once per turn choose a target and deal damage equal to this Creature's current HP to it. This damage cannot exceed 200.",
     "archetype": "Steam Dwarfs",
     "setID": "PP MBS1",
     "banned": "",
@@ -21893,7 +21893,7 @@
     "hp": 50,
     "atk": null,
     "cost": null,
-    "effect": "Once per turn, when you discard 1 or more cards, this Creature's current and max HP are increased by 50. At the end of each of your turns, draw 1 card for every 100 max HP this Creature has.",
+    "effect": "Whenever you discard 1 or more cards, this Creature's current and max HP are increased by 10 times the number of cards discarded. At the end of each of your turns, draw 1 card for every 100 max HP this Creature has.",
     "archetype": "Steam Dwarfs",
     "setID": "PP MBS1",
     "banned": "",
@@ -23137,7 +23137,7 @@
     "startingAbility2": "Wisdom",
     "spellSchool1": "",
     "spellSchool2": "",
-    "foil": null
+    "foil": "secret_rare"
   },
   {
     "name": "The Bonegrinder",
@@ -26424,7 +26424,7 @@
     "startingAbility2": "",
     "spellSchool1": "Summoning Magic",
     "spellSchool2": "",
-    "foil": null
+    "foil": "secret_rare"
   },
   {
     "name": "Cardinal Beast Qinglong",
@@ -26443,7 +26443,7 @@
     "startingAbility2": "",
     "spellSchool1": "Summoning Magic",
     "spellSchool2": "",
-    "foil": null
+    "foil": "secret_rare"
   },
   {
     "name": "Cardinal Beast Xuanwu",
@@ -26462,7 +26462,7 @@
     "startingAbility2": "",
     "spellSchool1": "Summoning Magic",
     "spellSchool2": "",
-    "foil": null
+    "foil": "secret_rare"
   },
   {
     "name": "Cardinal Beast Zhuque",
@@ -26481,7 +26481,7 @@
     "startingAbility2": "",
     "spellSchool1": "Summoning Magic",
     "spellSchool2": "",
-    "foil": null
+    "foil": "secret_rare"
   },
   {
     "name": "Xiong, the Bamboo Guardian",
@@ -26899,7 +26899,7 @@
     "startingAbility2": "Divinity",
     "spellSchool1": "",
     "spellSchool2": "",
-    "foil": null
+    "foil": "secret_rare"
   },
   {
     "name": "Flaming Dragonegg",

@@ -209,7 +209,9 @@ module.exports = {
 
       // Target is a hero (has statuses)
       if (target.hp !== undefined && target.statuses) {
-        if (target.statuses.burned || target.statuses.burn_immune || target.statuses.immune) return;
+        // 23.10. Tearing Mountain: kein Schutz (`burn_immune`, `immune` …) verhindert Burn.
+        if (target.statuses.burned) return;
+        if (!engine.statusSchutzAufgehoben?.('burned', target) && (target.statuses.burn_immune || target.statuses.immune)) return;
 
         // Find which player/hero this target belongs to
         for (let tpi = 0; tpi < engine.playerCount(); tpi++) {

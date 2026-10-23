@@ -695,7 +695,7 @@ function HealNumber({ amount, ownerLabel, heroIdx }) {
 // broadcast by `play_heal_zero` (Skeleton Healer / Heal targeting a
 // full-HP creature, etc.); positive creature heals are not surfaced as
 // floating numbers (matching prior behavior — only damage was).
-function CreatureHealNumber({ amount, ownerLabel, heroIdx, zoneSlot }) {
+function CreatureHealNumber({ amount, ownerLabel, heroIdx, zoneSlot, pixel }) {
   const [pos, setPos] = useState(null);
   useEffect(() => {
     const el = document.querySelector(`[data-support-zone="1"][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
@@ -710,8 +710,9 @@ function CreatureHealNumber({ amount, ownerLabel, heroIdx, zoneSlot }) {
 
   if (!pos) return null;
   const label = amount > 0 ? `+${amount}` : '0';
+  // `pixel` = gruene Pixel-Zahl der Steam Dwarfs (Steam Engine, +10 HP je Karte).
   return (
-    <div className="damage-number heal-number" style={{ left: pos.x, top: pos.y }}>
+    <div className={pixel ? 'steam-hp-number' : 'damage-number heal-number'} style={{ left: pos.x, top: pos.y }}>
       {label}
     </div>
   );
@@ -3699,7 +3700,7 @@ function CardRevealEntry({ cardName, onDone, fizzled }) {
         {fizzled && <div className="card-reveal-fizzle-label orbit-font">FIZZLED</div>}
         {imgUrl ? (
           <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6,
-            border: foilType === 'diamond_rare' ? '3px solid rgba(104,198,253,.7)' : foilType === 'secret_rare' ? '3px solid rgba(255,214,26,.6)' : '2px solid var(--bg4)' }} draggable={false} />
+            border: foilType === 'diamond_rare' ? '3px solid rgba(104,198,253,.7)' : foilType === 'secret_rare' ? '3px solid rgba(250,213,74,.6)' : '2px solid var(--bg4)' }} draggable={false} />
         ) : (
           <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             background: 'var(--bg3)', borderRadius: 6, border: '2px solid var(--bg4)', padding: 16, textAlign: 'center' }}>
@@ -3724,7 +3725,7 @@ function ExplosionEffect({ x, y, opacity }) {
       dx: Math.cos(angle) * speed,
       dy: Math.sin(angle) * speed,
       size: 4 + Math.random() * 9,
-      color: ['#ff491a','#ff8b1a','#ffd61a','#ff1a1a','#f9ac20','#fff','#fbe181'][Math.floor(Math.random() * 7)],
+      color: ['#ff491a','#ff8b1a','#fad54a','#ff1a1a','#f9ac20','#fff','#fbe181'][Math.floor(Math.random() * 7)],
       delay: Math.random() * 80,
       dur: 380 + Math.random() * 420,
     };
@@ -4032,7 +4033,7 @@ function ElectricStrikeEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 2 + Math.random() * 5,
-      color: ['#ffe23d','#fff','#ffd61a','#f7f7ad','#ffd61a'][Math.floor(Math.random() * 5)],
+      color: ['#ffe23d','#fff','#fad54a','#f7f7ad','#fad54a'][Math.floor(Math.random() * 5)],
       delay: 250 + Math.random() * 150,
       dur: 250 + Math.random() * 250,
     };
@@ -5701,7 +5702,7 @@ function FlameStrikeEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 2 + Math.random() * 5,
-      color: ['#ff491a','#ff8b1a','#ffd61a','#ff1a1a','#f9ac20'][Math.floor(Math.random() * 5)],
+      color: ['#ff491a','#ff8b1a','#fad54a','#ff1a1a','#f9ac20'][Math.floor(Math.random() * 5)],
       delay: 300 + Math.random() * 150,
       dur: 300 + Math.random() * 250,
     };
@@ -6885,7 +6886,7 @@ function ShadowSummonEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 2 + Math.random() * 4,
-      color: ['#7e41ba','#58238c','#663597','#1a0a3a','#7e41ba'][Math.floor(Math.random() * 5)],
+      color: ['#7e41ba','#58238c','#58238c','#1a0a3a','#7e41ba'][Math.floor(Math.random() * 5)],
       delay: 300 + Math.random() * 200,
       dur: 300 + Math.random() * 300,
     };
@@ -6955,7 +6956,7 @@ function GoldSparkleEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 3 + Math.random() * 5,
-      color: ['#ffd61a','#ffd61a','#ffe23d','#fff','#f9ac20'][Math.floor(Math.random() * 5)],
+      color: ['#fad54a','#fad54a','#f7f7ad','#ffffff','#f29a3e'][Math.floor(Math.random() * 5)],
       delay: Math.random() * 150,
       dur: 400 + Math.random() * 400,
     };
@@ -7140,7 +7141,7 @@ function BeerBubblesEffect({ x, y }) {
     size: 4 + Math.random() * 8,
     delay: Math.random() * 300,
     dur: 500 + Math.random() * 500,
-    color: ['#ffd61a','#f8ca21','#fff8e8','#fbe181','#fff'][Math.floor(Math.random() * 5)],
+    color: ['#fad54a','#f8ca21','#fff8e8','#fbe181','#fff'][Math.floor(Math.random() * 5)],
     wobble: -8 + Math.random() * 16,
   })), []);
   return (
@@ -7410,7 +7411,7 @@ function BomblebeeBlastEffect({ x, y }) {
       dx: Math.cos(angle) * speed,
       dy: Math.sin(angle) * speed,
       size: 3 + Math.random() * 7,
-      color: ['#ffd61a', '#f9ac20', '#ff8b1a', '#222', '#000', '#f7f7ad'][Math.floor(Math.random() * 6)],
+      color: ['#fad54a', '#f9ac20', '#ff8b1a', '#222', '#000', '#f7f7ad'][Math.floor(Math.random() * 6)],
       delay: Math.random() * 60,
       dur: 380 + Math.random() * 320,
     };
@@ -7650,7 +7651,7 @@ function BomblebeeDetonateEffect({ x, y }) {
       dx: Math.cos(angle) * speed,
       dy: Math.sin(angle) * speed,
       size: 4 + Math.random() * 9,
-      color: ['#fff', '#fffbd2', '#f9ac20', '#ff491a', '#ffd61a', '#7a1900'][Math.floor(Math.random() * 6)],
+      color: ['#fff', '#fffbd2', '#f9ac20', '#ff491a', '#fad54a', '#7a1900'][Math.floor(Math.random() * 6)],
       delay: Math.random() * 120,
       dur: 500 + Math.random() * 500,
     };
@@ -8015,7 +8016,7 @@ function NiuPowerUpEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed - 8,
       size: 4 + Math.random() * 6,
-      color: ['#ffd61a','#fff196','#fad54a','#fff','#f9ac20'][Math.floor(Math.random() * 5)],
+      color: ['#fad54a','#fff196','#fad54a','#fff','#f9ac20'][Math.floor(Math.random() * 5)],
       delay: Math.random() * 200,
       dur: 400 + Math.random() * 350,
     };
@@ -8573,8 +8574,8 @@ const DragoneggShimmerEffect = (() => {
 //  fallen von seinem Scheitel herab. Ab ~1150 ms dithert alles weg, bei 1500 ms ist es fort. Feste Palette, kein Leuchten.
 // ═════════════════════════════════════════════════════════════════
 const LiquidRainbowEffect = (() => {
-  const BAND = ['#e63e33', '#ff8b1a', '#f8ca21', '#20ac37', '#4e82cb', '#0351c9', '#7e41ba'].map(ppHex);
-  const GOLD = ['#ffffff', '#fff196', '#f8ca21', '#ff8b1a', '#cf5f00'].map(ppHex);
+  const BAND = ['#e92f38', '#ff8b1a', '#f8ca21', '#20ac37', '#4e82cb', '#0351c9', '#7e41ba'].map(ppHex);
+  const GOLD = ['#ffffff', '#f7f7ad', '#fad54a', '#f29a3e', '#ee6428'].map(ppHex);
   const ENDE = 1500, FADE_AB = 1150, WACHS = 480, DICKE = 3;
   const ARM = [1, 2, 3, 3, 2, 1];
   const vorbereiten = () => ({
@@ -8605,6 +8606,51 @@ const LiquidRainbowEffect = (() => {
     }
   };
   return ppPunktBild(malen, ENDE + 40, 300, 280, vorbereiten);
+})();
+
+// ═════════════════════════════════════════════════════════════════
+//  Handkarte verliert eine Stufe (`hand_level_down`, Great Vanguard Demon) — PIXELART, Hülle `ppPunktBild`
+//
+//  Läuft über der Handkarte, ohne sie anzufassen (kein Anschwellen, kein Abdunkeln, kein Verdecken — die Karte bleibt die ganze Zeit sichtbar und lesbar): fünf
+//  Pfeilspitzen sinken in ganzen Pixelschritten über sie, ein „-1" aus Pixelziffern (heller Kern, dunkler Rand) steigt auf und gleitet nach unten. Bei ~550 ms
+//  dithert alles weg, bei 800 ms ist es fort. Feste Palette, kein Leuchten. (Das ältere `level_down` von Looming Threat dunkelt die Karte ab und vergrößert sie.)
+// ═════════════════════════════════════════════════════════════════
+const HandLevelDownEffect = (() => {
+  const PAL = ['#f1e5fa', '#d6b3f9', '#ba74ff', '#7a2bd0', '#401a66'].map(ppHex);
+  const ENDE = 800, FADE_AB = 520;
+  // Pixelziffern 3×5: „-" und „1"
+  const GLYPHEN = { '-': ['000', '000', '111', '000', '000'], '1': ['010', '110', '010', '010', '111'] };
+  const text = (g, str, x0, y0, farbe, a, rand) => {
+    let x = x0;
+    for (const ch of str) {
+      const bm = GLYPHEN[ch];
+      for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) if (bm[j][i] === '1') {
+        if (rand) for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) g.put(x + i * 2 + dx, y0 + j * 2 + dy, rand, a);
+      }
+      for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) if (bm[j][i] === '1') g.block(x + i * 2, y0 + j * 2, 2, 2, farbe, a);
+      x += 8;
+    }
+  };
+  const vorbereiten = () => ({ pfeile: Array.from({ length: 5 }, (_, i) => ({ dx: (i - 2) * 11 + Math.round((Math.random() - 0.5) * 2), start: i * 55 + Math.round(Math.random() * 30) })) });
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    for (const p of teile.pfeile) {
+      const k = (t - p.start) / 520;
+      if (k < 0 || k > 1) continue;
+      const y = Math.round(sz.cy - sz.hh * 0.9 + k * sz.hh * 1.5), x = Math.round(sz.cx + p.dx);
+      for (let r = 0; r < 4; r++) {                       // Pfeilspitze nach unten: 7, 5, 3, 1 Pixel breit
+        const b = 7 - r * 2, col = r === 0 ? PAL[1] : r < 3 ? PAL[2] : PAL[3];
+        g.block(x - Math.floor(b / 2), y + r, b, 1, col, aus);
+        g.put(x - Math.floor(b / 2) - 1, y + r, PAL[4], aus); g.put(x + Math.floor(b / 2) + 1, y + r, PAL[4], aus);
+      }
+    }
+    if (t > 120) {
+      const k = Math.min(1, (t - 120) / 600), y = Math.round(sz.cy - 8 + k * 14);
+      text(g, '-1', Math.round(sz.cx - 8), y, PAL[0], aus, PAL[4]);
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 150, 210, vorbereiten);
 })();
 
 // ═══════════════════════════════════════════════════════════════════
@@ -8796,8 +8842,8 @@ function ppGlasWand(modus) {
 //  nach ~560 ms aus der Ablage herüber (Flug der Engine).
 // ═══════════════════════════════════════════════════════════════════
 function ppBeute() {
-  const SACK = { '#': ppHex('#27180c'), b: ppHex('#9d612f'), l: ppHex('#ca874e'), d: ppHex('#5a341a'), g: ppHex('#fad54a'), s: ppHex('#cc8e00') };
-  const MUENZE = ['#ffffff', '#fff196', '#fad54a', '#cc8e00'].map(ppHex);
+  const SACK = { '#': ppHex('#27180c'), b: ppHex('#9d612f'), l: ppHex('#ca874e'), d: ppHex('#5a341a'), g: ppHex('#fad54a'), s: ppHex('#c68206') };
+  const MUENZE = ['#ffffff', '#fff196', '#fad54a', '#c68206'].map(ppHex);
   const FORM = [
     '....##..##....',
     '.....#bb#.....',
@@ -13207,7 +13253,7 @@ const ANIM_REGISTRY = {
             clipPath: zacken,
             background: 'linear-gradient(90deg, transparent 0%, rgba(226,216,203,.25) 8%,'
               + ' rgba(255,255,255,.95) 38%, rgba(255,255,255,1) 50%,'
-              + ' rgba(230,62,51,.9) 62%, rgba(120,0,20,.55) 86%, transparent 100%)',
+              + ' rgba(233,47,56,.9) 62%, rgba(120,0,20,.55) 86%, transparent 100%)',
             transform: 'translateX(-120%) scaleY(.5)',
             animation: 'superKillCut 260ms cubic-bezier(.05,.9,.2,1) forwards',
             opacity: 0,
@@ -15126,7 +15172,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -80, top: -80, width: 160, height: 160,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,248,232,.9) 0%, rgba(255,198,28,.55) 35%, rgba(230,62,51,.35) 65%, transparent 85%)',
+            background: 'radial-gradient(circle, rgba(255,248,232,.9) 0%, rgba(255,198,28,.55) 35%, rgba(233,47,56,.35) 65%, transparent 85%)',
             boxShadow: '0 0 45px rgba(255,217,102,.9), 0 0 90px rgba(255,73,26,.55)',
             animation: 'criticalShockwave 480ms ease-out forwards',
             opacity: 0,
@@ -15419,7 +15465,7 @@ const ANIM_REGISTRY = {
     return function RainOfSporesRainEffect({ x, y, w, h }) {
       const W = Math.max(w || window.innerWidth, 480);
       const H = Math.max(h || window.innerHeight, 320);
-      const palette = ['#ffe469', '#ffd61a', '#fbe181', '#ffb91a', '#f7f7ad'];
+      const palette = ['#ffe469', '#fad54a', '#fbe181', '#ffb91a', '#f7f7ad'];
       const spores = useMemo(() => Array.from({ length: ppFxN(200) }, () => ({
         xStart: Math.random() * W - W / 2,
         yStart: -H / 2 - 40,
@@ -16038,7 +16084,7 @@ const ANIM_REGISTRY = {
           {/* Violet haze flash */}
           <div className="anim-flame-flash" style={{
             width: 140, height: 140, marginLeft: -70, marginTop: -70,
-            background: 'radial-gradient(circle, rgba(201,138,255,.55) 0%, rgba(102,53,151,.3) 45%, transparent 75%)',
+            background: 'radial-gradient(circle, rgba(201,138,255,.55) 0%, rgba(88,35,140,.3) 45%, transparent 75%)',
             animationDuration: '900ms',
           }} />
           {/* Main ghost */}
@@ -16156,7 +16202,7 @@ const ANIM_REGISTRY = {
         rise: 70 + Math.random() * 160,
         sway: (Math.random() - 0.5) * 50,
         size: 16 + Math.random() * 18,
-        color: ['#ffd61a', '#f9ecb3', '#ffffff', '#f9ac20', '#f9ecb3'][Math.floor(Math.random() * 5)],
+        color: ['#fad54a', '#f9ecb3', '#ffffff', '#f9ac20', '#f9ecb3'][Math.floor(Math.random() * 5)],
         delay: 100 + i * 55 + Math.random() * 60,
         dur: 900 + Math.random() * 600,
       })), []);
@@ -16229,11 +16275,11 @@ const ANIM_REGISTRY = {
         delay: 200 + Math.random() * 600,
         dur: 500 + Math.random() * 500,
         size: 4 + Math.random() * 8,
-        color: ['#fff8e8','#ffd61a','#fff','#fbe181','#f8f8bd'][Math.floor(Math.random() * 5)],
+        color: ['#fff8e8','#fad54a','#fff','#fbe181','#f8f8bd'][Math.floor(Math.random() * 5)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ width: 160, height: 160, marginLeft: -80, marginTop: -80, background: 'radial-gradient(circle, rgba(255,248,232,.9) 0%, rgba(255,214,26,.4) 35%, rgba(248,248,189,.1) 60%, transparent 80%)', animationDuration: '800ms' }} />
+          <div className="anim-flame-flash" style={{ width: 160, height: 160, marginLeft: -80, marginTop: -80, background: 'radial-gradient(circle, rgba(255,248,232,.9) 0%, rgba(250,213,74,.4) 35%, rgba(248,248,189,.1) 60%, transparent 80%)', animationDuration: '800ms' }} />
           <div className="anim-flame-flash" style={{ width: 100, height: 100, marginLeft: -50, marginTop: -50, background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(249,236,179,.5) 40%, transparent 70%)', animationDelay: '200ms', animationDuration: '600ms' }} />
           {rays.map((r, i) => (
             <div key={'hr'+i} style={{
@@ -16243,7 +16289,7 @@ const ANIM_REGISTRY = {
             }}>
               <div style={{
                 width: r.width, height: r.len, marginLeft: -r.width/2,
-                background: 'linear-gradient(to top, rgba(255,214,26,.8), rgba(255,248,232,.3) 70%, transparent)',
+                background: 'linear-gradient(to top, rgba(250,213,74,.8), rgba(255,248,232,.3) 70%, transparent)',
                 borderRadius: r.width,
                 transformOrigin: 'center bottom',
                 animation: `holyRayGrow ${r.dur}ms ease-out ${r.delay}ms forwards`,
@@ -17378,6 +17424,7 @@ const ANIM_REGISTRY = {
   gold_sparkle: GoldSparkleEffect,
   dragonegg_shimmer: DragoneggShimmerEffect,
   liquid_rainbow: LiquidRainbowEffect,
+  hand_level_down: HandLevelDownEffect,
   // ── Circles of Hell (Animationen) ──────────────────────────────────
   // Farben aus den Pixelart-Hintergruenden der Kreise (Flammen #f8f8bd … #520a0c).
   // ★ The Sixth Circle: Hoellen-Charme — blutrote Siegelringe, aufsteigende Schlieren, dunkler Blitz.
@@ -19046,16 +19093,16 @@ const ANIM_REGISTRY = {
         delay: 200 + Math.random() * 600,
         dur: 500 + Math.random() * 500,
         size: 3 + Math.random() * 7,
-        color: ['#ffd61a','#fbe181','#fffbd2','#ffb91a','#ffe469'][Math.floor(Math.random() * 5)],
+        color: ['#fad54a','#fbe181','#fffbd2','#ffb91a','#ffe469'][Math.floor(Math.random() * 5)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ width: 150, height: 150, marginLeft: -75, marginTop: -75, background: 'radial-gradient(circle, rgba(255,214,26,.85) 0%, rgba(255,185,26,.4) 35%, rgba(255,241,150,.1) 60%, transparent 80%)', animationDuration: '900ms' }} />
-          <div className="anim-flame-flash" style={{ width: 90, height: 90, marginLeft: -45, marginTop: -45, background: 'radial-gradient(circle, rgba(255,251,210,.95) 0%, rgba(255,214,26,.5) 40%, transparent 70%)', animationDelay: '250ms', animationDuration: '700ms' }} />
+          <div className="anim-flame-flash" style={{ width: 150, height: 150, marginLeft: -75, marginTop: -75, background: 'radial-gradient(circle, rgba(250,213,74,.85) 0%, rgba(255,185,26,.4) 35%, rgba(255,241,150,.1) 60%, transparent 80%)', animationDuration: '900ms' }} />
+          <div className="anim-flame-flash" style={{ width: 90, height: 90, marginLeft: -45, marginTop: -45, background: 'radial-gradient(circle, rgba(255,251,210,.95) 0%, rgba(250,213,74,.5) 40%, transparent 70%)', animationDelay: '250ms', animationDuration: '700ms' }} />
           {ankhs.map((a, i) => (
             <div key={'ak'+i} style={{
               position: 'absolute', left: a.xOff, top: a.startY,
-              fontSize: a.size, color: '#ffd61a',
+              fontSize: a.size, color: '#fad54a',
               filter: 'drop-shadow(0 0 6px rgba(255,198,28,.9))',
               transform: `rotate(${a.rot}deg)`,
               animation: `ankhFloat ${a.dur}ms ease-out ${a.delay}ms forwards`,
@@ -19158,7 +19205,7 @@ const ANIM_REGISTRY = {
         return {
           dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed - 20,
           size: 4 + Math.random() * 8,
-          color: ['#751ff9','#6618b4','#9544d5','#50008c','#663597','#a952ff','#1a0a3a'][Math.floor(Math.random() * 7)],
+          color: ['#751ff9','#6618b4','#9544d5','#50008c','#58238c','#a952ff','#1a0a3a'][Math.floor(Math.random() * 7)],
           delay: Math.random() * 400,
           dur: 400 + Math.random() * 400,
         };
@@ -19217,7 +19264,7 @@ const ANIM_REGISTRY = {
           dx: Math.cos(angle) * speed - speed / 2,
           dy: -Math.abs(Math.sin(angle) * speed),
           size: 2 + Math.random() * 4,
-          color: ['#ffd61a','#ff8b1a','#f9ac20','#ffe469','#fff'][Math.floor(Math.random() * 5)],
+          color: ['#fad54a','#ff8b1a','#f9ac20','#ffe469','#fff'][Math.floor(Math.random() * 5)],
           delay: 480 + Math.random() * 60,
           dur: 300 + Math.random() * 200,
         };
@@ -19229,7 +19276,7 @@ const ANIM_REGISTRY = {
           dx: Math.cos(angle) * speed - speed / 2,
           dy: -Math.abs(Math.sin(angle) * speed),
           size: 2 + Math.random() * 4,
-          color: ['#ffd61a','#ff8b1a','#f9ac20','#ffe469','#fff'][Math.floor(Math.random() * 5)],
+          color: ['#fad54a','#ff8b1a','#f9ac20','#ffe469','#fff'][Math.floor(Math.random() * 5)],
           delay: 1080 + Math.random() * 60,
           dur: 300 + Math.random() * 200,
         };
@@ -19406,7 +19453,7 @@ const ANIM_REGISTRY = {
         delay: 1000 + Math.random() * 400,
         dur: 500 + Math.random() * 400,
         size: 3 + Math.random() * 5,
-        color: ['#ffe23d','#fff','#ffd61a','#fbe181','#ffffff'][Math.floor(Math.random() * 5)],
+        color: ['#ffe23d','#fff','#fad54a','#fbe181','#ffffff'][Math.floor(Math.random() * 5)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
@@ -19671,7 +19718,7 @@ const ANIM_REGISTRY = {
   // Heilung, rot für Vergeltung); Fallback ist neutrales Gold.
   equip_flash: (() => {
     return function EquipFlashEffect({ x, y, w, h, color }) {
-      const c = color || '#ffd61a';
+      const c = color || '#fad54a';
       const bw = Math.max(60, w || 80), bh = Math.max(80, h || 110);
       return (
         <div style={{ position: 'fixed', left: x - bw / 2, top: y - bh / 2, width: bw, height: bh,
@@ -19812,7 +19859,7 @@ const ANIM_REGISTRY = {
           {[0, 0.15, 0.3].map((d, i) => (
             <div key={`r${i}`} style={{
               position: 'absolute', left: -45, top: -45, width: 90, height: 90,
-              border: '3px solid rgba(255,214,26,.9)',
+              border: '3px solid rgba(250,213,74,.9)',
               borderRadius: '50%',
               boxShadow: '0 0 22px rgba(255,198,28,.95), inset 0 0 14px rgba(255,228,105,.7)',
               opacity: 0,
@@ -19840,8 +19887,8 @@ const ANIM_REGISTRY = {
               left: 0, top: 0,
               width: p.size, height: p.size,
               borderRadius: '50%',
-              background: 'radial-gradient(circle, #f8f8bd, #ffd61a, #c68206)',
-              boxShadow: '0 0 8px #ffd61a, 0 0 16px #f9ac20',
+              background: 'radial-gradient(circle, #f8f8bd, #fad54a, #c68206)',
+              boxShadow: '0 0 8px #fad54a, 0 0 16px #f9ac20',
               opacity: 0,
               animation: `ssjSpark ${p.dur}s ease-out ${p.delay}s forwards`,
               '--ssj-tx': `${Math.cos(p.angle) * p.dist}px`,
@@ -19953,7 +20000,7 @@ const ANIM_REGISTRY = {
         delay: Math.random() * 120,
         dur: 500 + Math.random() * 600,
         wobble: -20 + Math.random() * 40,
-        color: ['#c80000','#ef2929','#ef2929','#c80000','#be0e0e','#e63e33','#ff1a1a','#c80000'][Math.floor(Math.random() * 8)],
+        color: ['#c80000','#ef2929','#ef2929','#c80000','#be0e0e','#e92f38','#ff1a1a','#c80000'][Math.floor(Math.random() * 8)],
       })), []);
       const splats = useMemo(() => Array.from({ length: ppFxN(6) }, () => ({
         xOff: -25 + Math.random() * 50,
@@ -21930,7 +21977,7 @@ const ANIM_REGISTRY = {
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100, transform: 'translate(-50%, -50%)' }}>
           <div style={{
             fontSize: 64,
-            filter: 'drop-shadow(0 0 16px rgba(255,214,26,.9)) drop-shadow(0 0 32px rgba(255,185,26,.6))',
+            filter: 'drop-shadow(0 0 16px rgba(250,213,74,.9)) drop-shadow(0 0 32px rgba(255,185,26,.6))',
             animation: 'goldenScaleGrow 800ms ease-out forwards',
           }}>⚖️</div>
           <style>{`
@@ -22346,7 +22393,7 @@ const ANIM_REGISTRY = {
           size: 3 + Math.random() * 5,
           delay: 480 + Math.random() * 300,
           dur: 500 + Math.random() * 300,
-          color: ['#ffd61a','#fbe181','#fffbd2','#ffb91a','#ffe469'][Math.floor(Math.random() * 5)],
+          color: ['#fad54a','#fbe181','#fffbd2','#ffb91a','#ffe469'][Math.floor(Math.random() * 5)],
         };
       }), []);
       return (
@@ -22356,7 +22403,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -cw / 2, top: -ch / 2,
             width: cw, height: ch, borderRadius: 4,
-            background: 'radial-gradient(circle at center, rgba(255,214,26,0.85) 0%, rgba(255,185,26,0.6) 50%, rgba(249,172,32,0.3) 85%, transparent 100%)',
+            background: 'radial-gradient(circle at center, rgba(250,213,74,0.85) 0%, rgba(255,185,26,0.6) 50%, rgba(249,172,32,0.3) 85%, transparent 100%)',
             boxShadow: '0 0 18px rgba(255,198,28,0.7), inset 0 0 22px rgba(255,228,105,0.7)',
             mixBlendMode: 'color-dodge',
             opacity: 0,
@@ -22366,7 +22413,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -60, top: -60,
             width: 120, height: 120, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,251,210,0.95) 0%, rgba(255,214,26,0.6) 40%, transparent 75%)',
+            background: 'radial-gradient(circle, rgba(255,251,210,0.95) 0%, rgba(250,213,74,0.6) 40%, transparent 75%)',
             opacity: 0,
             animation: 'goldifyBurst 400ms ease-out 450ms forwards',
           }} />
@@ -22577,7 +22624,7 @@ const ANIM_REGISTRY = {
               position: 'absolute', left: -f.size / 2, top: -f.size / 2,
               width: f.size, height: f.size * 0.42,
               borderRadius: '60% 8% 60% 8%',
-              background: 'linear-gradient(120deg, #fffbd2 0%, #ffd966 42%, #cc8e00 100%)',
+              background: 'linear-gradient(120deg, #fffbd2 0%, #ffd966 42%, #c68206 100%)',
               boxShadow: '0 0 8px rgba(255,208,102,.9)',
               opacity: 0,
               '--gfX': f.dx + 'px',
@@ -23707,11 +23754,11 @@ const ANIM_REGISTRY = {
         delay: 200 + Math.random() * 600,
         dur: 500 + Math.random() * 500,
         size: 3 + Math.random() * 7,
-        color: ['#ffd61a','#fbe181','#fffbd2','#ffffff','#ffe469'][Math.floor(Math.random() * 5)],
+        color: ['#fad54a','#fbe181','#fffbd2','#ffffff','#ffe469'][Math.floor(Math.random() * 5)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ width: 150, height: 150, marginLeft: -75, marginTop: -75, background: 'radial-gradient(circle, rgba(255,251,210,.9) 0%, rgba(255,214,26,.45) 35%, rgba(249,236,179,.15) 60%, transparent 80%)', animationDuration: '900ms' }} />
+          <div className="anim-flame-flash" style={{ width: 150, height: 150, marginLeft: -75, marginTop: -75, background: 'radial-gradient(circle, rgba(255,251,210,.9) 0%, rgba(250,213,74,.45) 35%, rgba(249,236,179,.15) 60%, transparent 80%)', animationDuration: '900ms' }} />
           <div className="anim-flame-flash" style={{ width: 90, height: 90, marginLeft: -45, marginTop: -45, background: 'radial-gradient(circle, rgba(255,255,255,.98) 0%, rgba(255,228,105,.55) 40%, transparent 70%)', animationDelay: '250ms', animationDuration: '700ms' }} />
           {angels.map((a, i) => (
             <div key={'agl'+i} style={{
@@ -23843,7 +23890,7 @@ const ANIM_REGISTRY = {
           size: 3 + Math.random() * 5,
           delay: 250 + Math.random() * 600,
           dur: 600 + Math.random() * 400,
-          color: ['#ffd61a','#fffbd2','#fbe181','#ffffff'][Math.floor(Math.random() * 4)],
+          color: ['#fad54a','#fffbd2','#fbe181','#ffffff'][Math.floor(Math.random() * 4)],
         };
       }), []);
       return (
@@ -23866,7 +23913,7 @@ const ANIM_REGISTRY = {
             fontSize: Math.max(cw, ch) * 0.55,
             transformOrigin: 'right center',
             filter: 'drop-shadow(0 0 10px rgba(250,213,74,0.9)) drop-shadow(0 0 18px rgba(255,241,150,0.55)) hue-rotate(30deg) saturate(1.4) brightness(1.2)',
-            color: '#ffd61a',
+            color: '#fad54a',
             opacity: 0,
             animation: 'goldenWingLeft 1100ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards',
           }}>
@@ -23879,7 +23926,7 @@ const ANIM_REGISTRY = {
             fontSize: Math.max(cw, ch) * 0.55,
             transformOrigin: 'left center',
             filter: 'drop-shadow(0 0 10px rgba(250,213,74,0.9)) drop-shadow(0 0 18px rgba(255,241,150,0.55)) hue-rotate(30deg) saturate(1.4) brightness(1.2)',
-            color: '#ffd61a',
+            color: '#fad54a',
             opacity: 0,
             animation: 'goldenWingRight 1100ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards',
           }}>🕊️</div>
@@ -24206,7 +24253,7 @@ const ANIM_REGISTRY = {
             <div key={'pbs' + i} style={{
               position: 'absolute', left: 0, top: 0,
               width: s.size, height: s.size, borderRadius: '50% 55% 40% 60% / 60% 40% 60% 40%',
-              background: 'radial-gradient(circle at 35% 30%, #e63e33, #780014 70%)',
+              background: 'radial-gradient(circle at 35% 30%, #e92f38, #780014 70%)',
               boxShadow: '0 0 6px rgba(181,23,28,0.7)',
               opacity: 0,
               animation: `pbSplat ${s.dur}ms ease-out ${s.delay}ms forwards`,
@@ -24267,7 +24314,7 @@ const ANIM_REGISTRY = {
         size:    4 + Math.random() * 7,
         delay:   Math.random() * 600,
         dur:     500 + Math.random() * 500,
-        color:   ['#ff1a1a','#ff491a','#ff8b1a','#f9ac20','#ffd61a'][Math.floor(Math.random() * 5)],
+        color:   ['#ff1a1a','#ff491a','#ff8b1a','#f9ac20','#fad54a'][Math.floor(Math.random() * 5)],
       })), [cw, ch]);
       // Ground plume — wide hot glow at the base.
       return (
@@ -24355,7 +24402,7 @@ const ANIM_REGISTRY = {
         return {
           dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
           size: 5 + Math.random() * 9,
-          color: ['#ff1a1a','#ff491a','#ff8b1a','#ffd61a','#f9ac20','#ff1a1a'][Math.floor(Math.random() * 6)],
+          color: ['#ff1a1a','#ff491a','#ff8b1a','#fad54a','#f9ac20','#ff1a1a'][Math.floor(Math.random() * 6)],
           delay: 1300 + Math.random() * 200,
           dur: 600 + Math.random() * 500,
         };
@@ -24792,7 +24839,7 @@ const ANIM_REGISTRY = {
           size: 4 + Math.random() * 8,
           delay: FLUG + Math.random() * 110,
           dur: 380 + Math.random() * 260,
-          color: ['#8f0000', '#c0141c', '#780000', '#e63e33', '#8f0000'][Math.floor(Math.random() * 5)],
+          color: ['#8f0000', '#c0141c', '#780000', '#e92f38', '#8f0000'][Math.floor(Math.random() * 5)],
         };
       }), [vonLinks]);
       const flecken = useMemo(() => Array.from({ length: ppFxN(8) }, () => ({
@@ -24955,7 +25002,7 @@ const ANIM_REGISTRY = {
       '.....k...',
     ];
     const SPITZE = [5, 22];
-    const BLUT = ['#e63e33', '#b5171c', '#8b0d0d', '#780014'].map(hex);
+    const BLUT = ['#e92f38', '#b5171c', '#8b0d0d', '#780014'].map(hex);
     const FUNKEN = ['#ffffff', '#f9ecb3', '#fbc86a', '#e37435', '#e37435'].map(hex);
     const RESTE = ['#e2d8cb', '#f9b3b3', '#ff6666', '#e73b41'].map(hex);
     const STREIFEN = hex('#bddcef');
@@ -26063,10 +26110,10 @@ const ANIM_REGISTRY = {
   //  weg. Feste Palette, KEINE Unschärfe, KEIN Leuchten; die Wurzel trägt `data-pp-px="aus"`.
   // ═════════════════════════════════════════════════════════════════
   sky_shaman_chant: (() => {
-    const FED_ROT = ['#8c0014', '#b5171c', '#e63e33'].map(ppHex);
+    const FED_ROT = ['#8c0014', '#b5171c', '#e92f38'].map(ppHex);
     const WEISS = ['#ffffff', '#e2d8cb', '#c5b7a0'].map(ppHex);
     const TUERKIS = ['#e5fae7', '#3adfcb', '#66a1a1', '#29663f'].map(ppHex);
-    const GOLD = ['#f8f8bd', '#fad54a', '#cc8e00'].map(ppHex);
+    const GOLD = ['#f7f7ad', '#fad54a', '#f29a3e'].map(ppHex);
     const ENDE = 1300, FADE_AB = 950, STRAHL_AB = 600, FUNKEN_AB = 780;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const vorbereiten = (sz) => {
@@ -26169,7 +26216,7 @@ const ANIM_REGISTRY = {
     const HOLZ = ['#ca874e', '#9d612f', '#5a341a'].map(ppHex);
     const EISEN = ['#e5f5fa', '#b9b9b9', '#808898', '#59606e', '#282834'].map(ppHex);
     const STEIN = ['#d2d2db', '#9aa3b6', '#7e7d9b', '#3e3e51'].map(ppHex);
-    const GOLD = ['#ffffff', '#f7f7ad', '#fad54a', '#cc8e00'].map(ppHex);
+    const GOLD = ['#f7f7ad', '#fad54a', '#f29a3e', '#ee6428'].map(ppHex);
     const KARTE = ['#2f539d', '#14285a', '#fad54a', '#f7f7ad'].map(ppHex);
     const ENDE = 1200, FADE_AB = 900, SCHLAG1 = 280, SCHLAG2 = 600;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -26267,7 +26314,7 @@ const ANIM_REGISTRY = {
   //  KEINE Unschärfe, KEIN Leuchten; die Wurzel trägt `data-pp-px="aus"`.
   // ═════════════════════════════════════════════════════════════════
   slave_chains: (() => {
-    const GOLD = ['#f9ecb3', '#fad54a', '#cc8e00', '#9d612f', '#5a341a'].map(ppHex);
+    const GOLD = ['#ffffff', '#f7f7ad', '#fad54a', '#f29a3e', '#ee6428'].map(ppHex);
     const EISEN = ['#ffffff', '#b9b9b9', '#808898', '#3e3e51'].map(ppHex);
     const ENDE = 1200, FADE_AB = 800, KLIRR = 520;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -26334,8 +26381,8 @@ const ANIM_REGISTRY = {
   // ═════════════════════════════════════════════════════════════════
   front_soldier_block: (() => {
     const STAHL = ['#ffffff', '#d2d2db', '#9aa3b6', '#808898', '#3e3e51', '#282834'].map(ppHex);
-    const MESSING = ['#f7f7ad', '#fad54a', '#cc8e00', '#9d612f'].map(ppHex);
-    const FUNKEN = ['#ffffff', '#f7f7ad', '#fad54a', '#cc8e00'].map(ppHex);
+    const MESSING = ['#f7f7ad', '#fad54a', '#c68206', '#9d612f'].map(ppHex);
+    const FUNKEN = ['#ffffff', '#f7f7ad', '#fad54a', '#c68206'].map(ppHex);
     const STAUB = ['#c5b7a0', '#929292', '#7f7f7f'].map(ppHex);
     const ENDE = 1060, FADE_AB = 700, AUFPRALL = 280;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -26430,10 +26477,10 @@ const ANIM_REGISTRY = {
   // ═════════════════════════════════════════════════════════════════
   mimic_chomp: (() => {
     const HOLZ = ['#6e4421', '#4a2a10', '#311402'].map(ppHex);
-    const MESSING = ['#f7f7ad', '#fad54a', '#cc8e00', '#9d612f'].map(ppHex);
+    const MESSING = ['#f7f7ad', '#fad54a', '#c68206', '#9d612f'].map(ppHex);
     const ZAHN = ['#ffffff', '#e2d8cb', '#c5b7a0'].map(ppHex);
     const RACHEN = ['#8c0014', '#520a0c', '#2a0404'].map(ppHex);
-    const MUENZE = ['#f8f8bd', '#fad54a', '#cc8e00', '#9d612f'].map(ppHex);
+    const MUENZE = ['#f8f8bd', '#fad54a', '#c68206', '#9d612f'].map(ppHex);
     const ENDE = 1100, FADE_AB = 800, BISS1 = 260, BISS2 = 560;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     // Schliessgrad 0 (offen, Kiefer an den Kartenkanten) … 1 (zu, Kiefer treffen sich in der Mitte)
@@ -27044,7 +27091,7 @@ const ANIM_REGISTRY = {
   //  schon Pixelart. Massstab folgt der Zielzone (`w`/`h`).
   // ═══════════════════════════════════════════════════════════════════
   triumphant_return: (() => {
-    const GOLD = ['#ffffff', '#f8f8bd', '#fbe181', '#ffc61c', '#f9ac20', '#ad6100'].map(ppHex);
+    const GOLD = ['#ffffff', '#f7f7ad', '#fad54a', '#f29a3e', '#ee6428', '#b62600'].map(ppHex);
     const KONF = ['#fe5154', '#f8ca21', '#6d9bf8', '#ffffff', '#4ceb70'].map(ppHex);
     const S = 3, TAKT = 33, ENDE = 1300, EIN = 120, FADE_AB = 1000;
     const PADX = 40, PAD_OBEN = 92, PAD_UNTEN = 16;
@@ -27713,7 +27760,7 @@ const ANIM_REGISTRY = {
   //  Sternchen stieben auseinander und zwei kleine rosa Herzen steigen auf.
   // ═══════════════════════════════════════════════════════════════════
   crown_flutter: (() => {
-    const GOLD = ['#f8f8bd', '#fad54a', '#cc8e00', '#ad6100'].map(ppHex);
+    const GOLD = ['#f7f7ad', '#fad54a', '#f29a3e', '#ee6428'].map(ppHex);
     const FEDER = ['#ffffff', '#e5edfa', '#a5b0c0', '#7e7d9b'].map(ppHex);
     const ROSA = ['#f3bad3', '#fc69c6', '#c80480'].map(ppHex);
     const WEISS = ppHex('#ffffff');
@@ -27857,7 +27904,7 @@ const ANIM_REGISTRY = {
   // ═══════════════════════════════════════════════════════════════════
   breakthrough_shatter: (() => {
     const ROT = ['#f0bfbc', '#e94e53', '#b21a29', '#710122'].map(ppHex);
-    const GOLD = ['#f7f7ad', '#fad54a', '#cc8e00'].map(ppHex);
+    const GOLD = ['#f7f7ad', '#fad54a', '#f29a3e'].map(ppHex);
     const WEISS = ppHex('#ffffff');
     const ENDE = 1100, BRUCH = 460, FADE_AB = 860;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -28145,7 +28192,7 @@ const ANIM_REGISTRY = {
   // ═════════════════════════════════════════════════════════════════
   live_show_spot: (() => {
     const ROT = ['#fe7476', '#a60f39', '#55011a'].map(ppHex);
-    const GOLD = ['#f9ecb3', '#ffd066', '#a87c00'].map(ppHex);
+    const GOLD = ['#f7f7ad', '#fad54a', '#f29a3e'].map(ppHex);
     const LICHT = ['#ffffff', '#fff196'].map(ppHex);
     const KONFETTI = ['#f174ab', '#66d9ff', '#ffe469', '#75f091', '#c98aff'].map(ppHex);
     const ENDE = 1300, AUF_AB = 260, AUF_BIS = 780, LICHT_AB = 360, AUS_AB = 1060;
@@ -28236,7 +28283,7 @@ const ANIM_REGISTRY = {
   //  Plus-Zeichen (Heilung) in goldenem Licht auf und ein Ring weitet sich um die Karte. Zuletzt blendet alles aus. Gespielt, bevor die HP umgebucht werden (inheritance-ceremony.js).
   // ═════════════════════════════════════════════════════════════════
   inheritance_flow: (() => {
-    const GOLD = ['#ffffff', '#fff196', '#fad54a', '#cc8e00'].map(ppHex);
+    const GOLD = ['#f7f7ad', '#fad54a', '#f29a3e', '#ee6428'].map(ppHex);
     const ENDE = 1000, FLUG = 520, ABSTAND = 35, AUS_AB = 760;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const glatt = (u) => { const q = klemme(u, 0, 1); return q * q * (3 - 2 * q); };
@@ -28429,7 +28476,7 @@ const ANIM_REGISTRY = {
     const STEIN = ['#9aa3b6', '#808898', '#808898', '#59606e'].map(ppHex);
     const FUGE = ppHex('#282834'), KANTE = ppHex('#d2d2db');
     const RAUM = ['#141414', '#27180c', '#3a2412'].map(ppHex);
-    const GOLD = ['#f9ecb3', '#ffd966', '#cc8e00', '#a87c00'].map(ppHex);
+    const GOLD = ['#f7f7ad', '#fad54a', '#f29a3e', '#ee6428'].map(ppHex);
     const ENDE = 1000, AUF = 380, ZU_AB = 640, ZU_BIS = 940;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const glatt = (u) => { const x = klemme(u, 0, 1); return x * x * (3 - 2 * x); };
@@ -28496,9 +28543,9 @@ const ANIM_REGISTRY = {
   //  `data-pp-px="aus"`: die Grafik IST schon Pixelart.
   // ═══════════════════════════════════════════════════════════════════
   masterpiece_paint: (() => {
-    const GOLD = ['#f9ecb3', '#ffd966', '#cc8e00', '#a87c00'].map(ppHex);
+    const GOLD = ['#f7f7ad', '#fad54a', '#f29a3e', '#ee6428'].map(ppHex);
     const LEINWAND = ['#ebdcc1', '#ebdcc1'].map(ppHex);
-    const FARBEN = ['#e63e33', '#ff9b3a', '#fad54a', '#80bf59', '#4e82cb', '#7e41ba', '#f8b4df'].map(ppHex);
+    const FARBEN = ['#e92f38', '#ff9b3a', '#fad54a', '#80bf59', '#4e82cb', '#7e41ba', '#f8b4df'].map(ppHex);
     const HOLZ = ['#9d612f', '#5a341a'].map(ppHex);
     const WEISS = ppHex('#ffffff');
     const ENDE = 1100, RAHMEN = 140, MAL_AB = 150, STRICH = 70, STRICH_DAUER = 150, GLANZ_AB = 640, FADE_AB = 880;
@@ -28587,7 +28634,7 @@ const ANIM_REGISTRY = {
     const PAPIER = ['#ffffff', '#e2d8cb', '#c5b7a0'].map(ppHex);
     const LEDER = ['#9d612f', '#6e4421', '#4a2a10'].map(ppHex);
     const VIO = ['#d9c0ec', '#ba74ff', '#702db3'].map(ppHex);
-    const GOLD = ['#f9ecb3', '#ffd966', '#cc8e00'].map(ppHex);
+    const GOLD = ['#f7f7ad', '#fad54a', '#f29a3e'].map(ppHex);
     const ENDE = 1100, FLUG = 520, AUFSCHLAG = 560, FADE_AB = 860;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const glatt = (u) => { const x = klemme(u, 0, 1); return x * x * (3 - 2 * x); };
@@ -29532,10 +29579,10 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             left: -len / 2, top: -3,
             width: len + 'px', height: 6 + 'px',
-            background: 'linear-gradient(to right, transparent 0%, rgba(230,62,51,0.95) 20%, rgba(254,81,84,1) 50%, rgba(230,62,51,0.95) 80%, transparent 100%)',
+            background: 'linear-gradient(to right, transparent 0%, rgba(233,47,56,0.95) 20%, rgba(254,81,84,1) 50%, rgba(233,47,56,0.95) 80%, transparent 100%)',
             transform: 'rotate(45deg)',
             transformOrigin: '50% 50%',
-            boxShadow: '0 0 14px rgba(230,62,51,0.85), 0 0 28px rgba(139,13,13,0.6)',
+            boxShadow: '0 0 14px rgba(233,47,56,0.85), 0 0 28px rgba(139,13,13,0.6)',
             opacity: 0,
             animation: 'red-cut-blade 480ms ease-out forwards',
           }} />
@@ -29555,7 +29602,7 @@ const ANIM_REGISTRY = {
             position: 'absolute',
             width: 70, height: 70, left: -35, top: -35,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(230,62,51,0.5) 0%, rgba(120,0,20,0.3) 40%, transparent 75%)',
+            background: 'radial-gradient(circle, rgba(233,47,56,0.5) 0%, rgba(120,0,20,0.3) 40%, transparent 75%)',
             opacity: 0,
             animation: 'red-cut-puff 700ms ease-out 80ms forwards',
           }} />
@@ -29892,7 +29939,7 @@ function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, sha
   const isMimic = !attachedHero && !shapeshiftBase && !isNest && !!mimicCreature;
   const isShift = !!shapeshiftBase;
   const badgeIcon = isShift ? '🎭' : isMimic ? '🎭' : isNest ? '🪺' : '📎';
-  const badgeColor = isShift ? '#b3d8f9' : isMimic ? '#c98aff' : isNest ? '#92d3a9' : '#ffd61a';
+  const badgeColor = isShift ? '#b3d8f9' : isMimic ? '#c98aff' : isNest ? '#92d3a9' : '#fad54a';
   // Beim Shapeshifter nennt das Abzeichen die EIGENE Karte — die
   // kopierte sieht man ja bereits. Bei den anderen umgekehrt.
   const badgeShortName = (overlay || '').split(',')[0]
@@ -30959,7 +31006,7 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
                     }} />
                   {isSel && <div style={{ position: 'absolute', top: 3, right: 3, background: 'var(--accent)', color: '#000', fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 3, zIndex: 5 }}>✓</div>}
                   {pileBadge && <div style={{ position: 'absolute', top: 3, left: 3, background: pileBadge.bg, color: pileBadge.color, fontSize: 9, fontWeight: 800, padding: '1px 5px', borderRadius: 3, zIndex: 5, letterSpacing: '0.5px', textShadow: '0 0 2px rgba(0,0,0,0.9)' }}>{pileBadge.text}</div>}
-                  {_budgetCap != null && !ep.hideCostUI && <div style={{ position: 'absolute', bottom: 3, left: 3, background: 'rgba(0,0,0,.7)', color: '#ffd61a', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, zIndex: 5 }}>{entryCost}G</div>}
+                  {_budgetCap != null && !ep.hideCostUI && <div style={{ position: 'absolute', bottom: 3, left: 3, background: 'rgba(0,0,0,.7)', color: '#fad54a', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, zIndex: 5 }}>{entryCost}G</div>}
                 </div>
               );
             })}
@@ -31289,7 +31336,7 @@ function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloCh
   useEffect(() => {
     if (fertig && anzahlFrei > 0 && window.playSFX) window.playSFX('ascension', { dedupe: 300 });
   }, [fertig, anzahlFrei]);
-  const farbe = spectator ? '#ffd61a' : (won ? '#ffd61a' : '#ec2d62');
+  const farbe = spectator ? '#fad54a' : (won ? '#fad54a' : '#ec2d62');
   // ★ v1263 (Al 21.9.): „Player-Namen und Avatare UEBER dem Background,
   // genau wie die Sprechblasen." Die echten Cluster sitzen in den
   // Handzeilen (Ebenen 400 / 10000) und koennen ihre Stapelkontexte nicht
@@ -31677,7 +31724,7 @@ function ppSendePromptAntwort(gameState, response) {
 // aus (`FINALE_AUSBLENDEN_MS`) und verlaesst das Tutorial.
 const FINALE_FEUERWERK_MS = 8500;
 const FINALE_AUSBLENDEN_MS = 3200;
-const FINALE_FARBEN = ['#ffd61a', '#fc1c5f', '#4ceb70', '#1ca9fd', '#ff8b1a', '#a952ff', '#1aedff', '#ffffff'];
+const FINALE_FARBEN = ['#fad54a', '#fc1c5f', '#4ceb70', '#1ca9fd', '#ff8b1a', '#a952ff', '#1aedff', '#ffffff'];
 function TutorialFinaleFeuerwerk() {
   const salven = useMemo(() => {
     const anzahlSalven = 17;
@@ -33179,6 +33226,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     });
   }, [_meineHandGroesse, _gegnerHandGroesse]);
   const prevOppHandCountRef = useRef(opp.handCount || 0);
+  const oppHandShrinkRef = useRef(null);   // 23.10.: wann und auf welche Größe die Gegnerhand zuletzt geschrumpft ist (Handflug-Verdeckung, s. onPileTransfer)
   if (roomJustChanged) prevOppHandCountRef.current = opp.handCount || 0;
   // ★ v816 (Als Befund 6.9.): `useLayoutEffect` statt `useEffect`. Der
   // neue Zustand (Hand +1) wurde EINEN Frame lang gemalt, bevor der
@@ -33306,6 +33354,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
     // Clear stale steal-hidden indices when opp hand state changes (sync arrived)
     if (newCount !== prevCount && stealHiddenOpp.size > 0) setStealHiddenOpp(new Set());
+    if (newCount < prevCount) oppHandShrinkRef.current = { to: newCount, at: Date.now() };
     prevOppHandCountRef.current = newCount;
   }, [opp.handCount]);
 
@@ -35397,7 +35446,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Forager, …) so the highlight agrees with `heroMeetsLevelReq`. Only
     // meaningful for the own player — the charmed-summon path calls this
     // with `me` too, so the opponent's side does not need its own delta.
-    const rawLevel = card.level || 0;
+    let rawLevel = card.level || 0;
+    // 23.10.: absolut gesetzte Stufe einer Handkopie (Puzzle-Creator, Inconspicuous Lawn Gnome): „darf IRGENDEINE Kopie", also die niedrigste Basis unter den Kopien.
+    if (playerData === me && card.name && me.handLevelSet && Object.keys(me.handLevelSet).length) {
+      let beste = null;
+      (me.hand || []).forEach((n, i) => {
+        if (n !== card.name) return;
+        const v = me.handLevelSet[i] ?? card.level ?? 0;
+        if (beste == null || v < beste) beste = v;
+      });
+      if (beste != null) rawLevel = beste;
+    }
     const reduction = (playerData === me ? (gameState.cardLevelReductions || {})[card.name] : 0) || 0;
     let level = Math.max(0, rawLevel - reduction);
     // Per-instance hand-card level offsets (Rocky Slime + Sparkfly
@@ -39540,7 +39599,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       glow.style.cssText = `
         position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;
         border-radius:8px;z-index:9999;pointer-events:none;
-        background:radial-gradient(ellipse at center, rgba(255,214,26,.8) 0%, rgba(61,220,87,.4) 40%, transparent 70%);
+        background:radial-gradient(ellipse at center, rgba(250,213,74,.8) 0%, rgba(61,220,87,.4) 40%, transparent 70%);
         animation:ascensionBurstAnim 1.8s ease-out forwards;
       `;
       document.body.appendChild(glow);
@@ -39912,7 +39971,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const slash = document.createElement('div');
       slash.style.cssText = `
         position:fixed;left:${cx - 50}px;top:${cy - 4}px;width:100px;height:8px;
-        background:linear-gradient(90deg,transparent,#f87420,#ffd61a,#f87420,transparent);
+        background:linear-gradient(90deg,transparent,#f87420,#fad54a,#f87420,transparent);
         border-radius:4px;pointer-events:none;z-index:10000;opacity:0;
         transform:rotate(-30deg);
         animation:fierySlash .35s ease-out forwards;
@@ -39976,10 +40035,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const ring = document.createElement('div');
       ring.style.cssText = `
         position:fixed;left:${cx - 20}px;top:${cy - 20}px;width:40px;height:40px;
-        border-radius:50%;border:3px solid #ffd61a;
+        border-radius:50%;border:3px solid #fad54a;
         pointer-events:none;z-index:10000;opacity:0;
         animation:punchRing .4s ease-out .1s forwards;
-        box-shadow:0 0 10px #ffd61a;
+        box-shadow:0 0 10px #fad54a;
       `;
       document.body.appendChild(ring);
       // Impact lines
@@ -39990,7 +40049,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         line.style.cssText = `
           position:fixed;left:${cx}px;top:${cy}px;
           width:${len}px;height:3px;border-radius:2px;
-          background:#ffd61a;pointer-events:none;z-index:10000;opacity:0;
+          background:#fad54a;pointer-events:none;z-index:10000;opacity:0;
           transform-origin:0 50%;transform:rotate(${angle}rad);
           animation:punchLine .3s ease-out .05s forwards;
         `;
@@ -40113,7 +40172,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       // Title text
       const title = document.createElement('div');
-      title.style.cssText = 'position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);font-size:28px;font-weight:900;color:#ffd61a;text-shadow:0 0 30px #ffd61a,0 0 60px #ff8b1a;opacity:0;animation:cardinalTitle 3s 0.3s ease-out forwards;white-space:nowrap;font-family:var(--font-orbit),sans-serif;';
+      title.style.cssText = 'position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);font-size:28px;font-weight:900;color:#fad54a;text-shadow:0 0 30px #fad54a,0 0 60px #ff8b1a;opacity:0;animation:cardinalTitle 3s 0.3s ease-out forwards;white-space:nowrap;font-family:var(--font-orbit),sans-serif;';
       title.textContent = '⭐ CARDINAL BEASTS ASSEMBLED ⭐';
       overlay.appendChild(title);
       document.body.appendChild(overlay);
@@ -40150,7 +40209,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           + `background:linear-gradient(90deg,transparent,#ffe23d,#ffffff,#ffe23d,transparent);`
           + `border-radius:${h/2}px;transform-origin:0 50%;transform:rotate(${angle + (Math.random()-0.5)*4}deg);`
           + `pointer-events:none;z-index:10000;`
-          + `box-shadow:0 0 14px #ffd61a,0 0 30px #f9ac20,0 0 50px rgba(255,198,28,.4);`
+          + `box-shadow:0 0 14px #fad54a,0 0 30px #f9ac20,0 0 50px rgba(255,198,28,.4);`
           + `animation:lightningBolt .35s ${delay}ms ease-out forwards;--bolt-len:${dist}px;`;
         document.body.appendChild(bolt);
         setTimeout(() => bolt.remove(), 450 + delay);
@@ -41174,13 +41233,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const jitterX = (Math.random() - 0.5) * 44;
         const jitterY = -30 - Math.random() * 35;
         const dur = 700 + Math.random() * 200;
-        coin.textContent = '🪙';
         coin.style.cssText = [
           'position:fixed',
-          `left:${startX - 10}px`, `top:${startY - 10}px`,
-          'font-size:20px', 'line-height:1', 'pointer-events:none',
+          `left:${startX - 12}px`, `top:${startY - 12}px`,
+          'width:24px', 'height:24px', "background:url('/gold-muenze.png') center/100% 100% no-repeat", 'image-rendering:pixelated', 'pointer-events:none',
           'z-index:10250',
-          'filter:drop-shadow(0 0 6px rgba(255,217,102,.85)) drop-shadow(0 0 10px rgba(255,154,26,.6))',
+          '',
           `--gsDx:${endX - startX}px`, `--gsDy:${endY - startY}px`,
           `--gsMx:${jitterX}px`, `--gsMy:${jitterY}px`,
           `animation:goldStealCoin ${dur}ms cubic-bezier(0.4, 0.1, 0.2, 1) ${delay}ms forwards`,
@@ -42386,7 +42444,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const totalButterflies = Math.min(120, tgtPositions.length * 30);
       const perTarget = Math.floor(totalButterflies / tgtPositions.length);
       const butterflyChars = ['🦋'];
-      const colors = ['#ffd61a','#fbe181','#fffbd2','#fad54a','#ffe469'];
+      const colors = ['#fad54a','#fbe181','#fffbd2','#fad54a','#ffe469'];
 
       for (let ti = 0; ti < tgtPositions.length; ti++) {
         const tgt = tgtPositions[ti];
@@ -42409,7 +42467,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           bf.textContent = butterflyChars[0];
           bf.style.cssText = `
             position:fixed; left:${srcX}px; top:${srcY}px; z-index:10200; pointer-events:none;
-            font-size:${size}px; filter:drop-shadow(0 0 4px ${color}) drop-shadow(0 0 8px rgba(255,214,26,0.5));
+            font-size:${size}px; filter:drop-shadow(0 0 4px ${color}) drop-shadow(0 0 8px rgba(250,213,74,0.5));
             --bfDx:${dx + (-15 + Math.random()*30)}px; --bfDy:${dy + (-15 + Math.random()*30)}px;
             --bfWobble1:${wobble1}px; --bfWobble2:${wobble2}px;
             --bfSpin1:${spin1}deg; --bfSpin2:${spin2}deg; --bfSpin3:${spin3}deg; --bfSpin4:${spin4}deg;
@@ -42426,7 +42484,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           burst.style.cssText = `
             position:fixed; left:${tgt.x - 40}px; top:${tgt.y - 40}px; width:80px; height:80px;
             z-index:10201; pointer-events:none; border-radius:50%;
-            background: radial-gradient(circle, rgba(255,214,26,0.9) 0%, rgba(251,225,129,0.5) 40%, transparent 70%);
+            background: radial-gradient(circle, rgba(250,213,74,0.9) 0%, rgba(251,225,129,0.5) 40%, transparent 70%);
             animation: butterflyBurst 500ms ease-out forwards;
           `;
           document.body.appendChild(burst);
@@ -42881,7 +42939,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
 
         // Glitter sparkles
-        const glitterColors = ['#fc69c6','#ffd61a','#fb1ea9','#f174ab','#fff','#f8b4c8','#e58092','#f8b4c8','#77c8ee','#d6b3f9'];
+        const glitterColors = ['#fc69c6','#fad54a','#fb1ea9','#f174ab','#fff','#f8b4c8','#e58092','#f8b4c8','#77c8ee','#d6b3f9'];
         for (let i = 0; i < 80; i++) {
           const g = document.createElement('div');
           const angle = Math.random() * 360;
@@ -42906,7 +42964,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
 
         // Confetti ribbons
-        const confettiColors = ['#fb1ea9','#fc69c6','#ffd61a','#ff491a','#f174ab','#77c8ee','#d6b3f9','#75f091','#f8b4c8'];
+        const confettiColors = ['#fb1ea9','#fc69c6','#fad54a','#ff491a','#f174ab','#77c8ee','#d6b3f9','#75f091','#f8b4c8'];
         for (let i = 0; i < 50; i++) {
           const c = document.createElement('div');
           const x = Math.random() * window.innerWidth;
@@ -43810,7 +43868,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const handHideKey = srcIsMe
           ? `${srcOwner}-${fromHandIdx}#${_handJetzt}@${cardName || ''}`
           : `${srcOwner}-${fromHandIdx}#${_handJetzt}`;
-        setBounceReturnHidden(prev => { const n = new Set(prev); n.add(handHideKey); return n; });
+        // ★ 23.10. (Great Vanguard Demon, Als Befund: „der Demon wird während der Animation unsichtbar"): die GEGNERHAND hat keine Namen im Schlüssel, er trägt nur Platz und
+        // Handgröße. Kommt der Zustand VOR dem Flug an (Reaction-Beschwörung aus der Hand: die Karte ist schon aus dem Zustand), hat die Hand beim Abflug schon die neue Größe, der
+        // Schlüssel passt auf den nachgerückten Nachbarn — und der blieb 4 s verdeckt. Liegt auf dem Platz eine AUFGEDECKTE Karte mit anderem Namen als die fliegende, ist die fliegende
+        // schon weg: nichts zu verdecken.
+        const _platzKarte = srcIsMe ? null : (spielerLiveRef.current?.[srcOwner]?.revealedHandCards || []).find(r => r.index === fromHandIdx);
+        // Für verdeckte Nachbarn (keine Namen): ist die Hand eben erst auf genau die Größe geschrumpft, die der Schlüssel trägt, kam der Zustand vor dem Flug.
+        const _shrink = srcIsMe ? null : oppHandShrinkRef.current;
+        const _schonWeg = !!(_platzKarte && cardName && _platzKarte.name !== cardName)
+          || !!(_shrink && _shrink.to === _handJetzt && Date.now() - _shrink.at < 500);
+        if (!_schonWeg) setBounceReturnHidden(prev => { const n = new Set(prev); n.add(handHideKey); return n; });
         // ★★ v1221 (Als Befund 18.9. zu „Dive Down\": die Karte erscheint
         // nach ihrem Flug kurz wieder in der Hand).
         //
@@ -44890,10 +44957,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // spielt die Animation ueber dem echten Handslot. `count` reicht
     // die Partikelmenge durch (Battery/Magic Modifier skalieren damit
     // ihre Staerke).
-    const onHandCardAnim = ({ owner, handIdx, animType, count, duration }) => {
+    const onHandCardAnim = ({ owner, handIdx, animType, count, duration, cardName }) => {
       const isMe = owner === myIdx;
       const base = isMe ? '.game-hand-me' : '.game-hand-opp';
-      const el = document.querySelector(`${base} .hand-slot[data-hand-idx="${handIdx}"]`)
+      // 23.10.: mit `cardName` sucht der Client den Slot über den KARTENNAMEN (der Index der Engine kann dem Stand der Handanzeige voraus sein — eine Reaction
+      // verlässt die Hand, während die Animation schon läuft); gleicher Index bevorzugt, sonst die erste Kopie.
+      let byName = null;
+      if (cardName) {
+        const kopien = [...document.querySelectorAll(`${base} .hand-slot[data-card-name="${CSS.escape(cardName)}"]`)];
+        byName = kopien.find(k => k.getAttribute('data-hand-idx') === String(handIdx)) || kopien[0] || null;
+      }
+      const el = byName
+        || document.querySelector(`${base} .hand-slot[data-hand-idx="${handIdx}"]`)
         || document.querySelector(`${base} [data-hand-idx="${handIdx}"]`)
         || document.querySelector(base);
       if (!el) return;
@@ -46107,7 +46182,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         pow.style.cssText = `
           position:fixed; left:${cx - 50}px; top:${cy - 60}px;
           font-size:48px; font-weight:900; color:#ff491a; z-index:10301;
-          pointer-events:none; text-shadow: 3px 3px 0 #ffd61a, -2px -2px 0 #f87420;
+          pointer-events:none; text-shadow: 3px 3px 0 #fad54a, -2px -2px 0 #f87420;
           font-family: 'Comic Sans MS', cursive, sans-serif;
           animation: punchImpact 500ms ease-out forwards;
         `;
@@ -46115,7 +46190,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         setTimeout(() => pow.remove(), 600);
 
         // Impact starburst
-        const burstColors = ['#ff491a','#ffd61a','#f87420','#fff','#ff9a1a'];
+        const burstColors = ['#ff491a','#fad54a','#f87420','#fff','#ff9a1a'];
         const stars = ['⭐','💥','✦','★','⚡'];
         for (let i = 0; i < 15; i++) {
           const s = document.createElement('div');
@@ -46163,7 +46238,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         document.head.appendChild(style);
       }
 
-      const colors = ['#ffd61a','#fbe181','#fffbd2','#fad54a','#ffe469','#fff'];
+      const colors = ['#fad54a','#fbe181','#fffbd2','#fad54a','#ffe469','#fff'];
       const perTarget = 25;
 
       for (const t of targets) {
@@ -46194,7 +46269,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             position:fixed; left:${srcX}px; top:${srcY}px;
             width:${size}px; height:${size}px; border-radius:50%;
             background:${color}; z-index:10200; pointer-events:none;
-            box-shadow: 0 0 ${size + 2}px ${color}, 0 0 ${size * 2}px rgba(255,214,26,0.3);
+            box-shadow: 0 0 ${size + 2}px ${color}, 0 0 ${size * 2}px rgba(250,213,74,0.3);
             --tcDx:${dx}px; --tcDy:${dy}px; --tcMidX:${midX}px; --tcMidY:${midY}px;
             animation: tearsSparkle ${dur}ms ease-in ${delay}ms forwards;
             opacity:0;
@@ -46446,6 +46521,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     };
     socket.on('play_heal_zero', onHealZero);
+    // Steam Dwarfs (Steam Engine): jede +10 HP poppt als gruene Pixel-Zahl
+    // ueber der Kreatur auf. Der Diff-Detektor zeigt positive Kreatur-HP
+    // nicht an, deshalb meldet der Server den Gewinn ausdruecklich.
+    const onSteamHp = ({ owner, heroIdx, zoneSlot, amount }) => {
+      const id = Date.now() + Math.random();
+      const entry = { id, amount, ownerLabel: ownerLbl(owner, myIdx), heroIdx, zoneSlot, pixel: true };
+      setCreatureHealNumbers(prev => [...prev, entry]);
+      setTimeout(() => setCreatureHealNumbers(prev => prev.filter(e => e.id !== id)), 1800);
+    };
+    socket.on('play_steam_hp', onSteamHp);
     // Server-driven 0-damage feedback. Fired from the engine when a
     // damage hit is fully absorbed by a buff multiplier (Damage Immune,
     // Petrified) — the diff-based damage-number detector wouldn't see
@@ -46817,6 +46902,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('play_skull_burst', onSkullBurst);
       socket.off('play_heal_beam', onHealBeam);
       socket.off('play_heal_zero', onHealZero);
+      socket.off('play_steam_hp', onSteamHp);
       socket.off('play_damage_zero', onDamageZero);
       socket.off('ziel_marke_blitz', onZielMarkeBlitz);
       socket.off('play_guardian_angel', onGuardianAngel);
@@ -48686,7 +48772,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <div style={{ marginTop: 20, marginBottom: 20, textAlign: 'center' }}>
           {entries.map(e => (
             <div key={e.name} style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: '#ffd61a', fontWeight: 700, fontSize: 15 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: '#fad54a', fontWeight: 700, fontSize: 15 }}>
                 <span>{e.name}:</span>
                 <span>{e.total}</span>
                 <img src="/data/sc.png" style={{ width: 18, height: 18, imageRendering: 'pixelated' }} />
@@ -48695,9 +48781,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {(e.rewards || []).map(r => (
                   <div key={r.id} style={{ fontSize: 12, color: 'var(--text2)' }}>
-                    <span style={{ color: '#ffd61a', fontWeight: 600 }}>{r.title}</span>
+                    <span style={{ color: '#fad54a', fontWeight: 600 }}>{r.title}</span>
                     {' — '}{r.description}{' '}
-                    <span style={{ color: '#ffd61a' }}>+{r.amount}</span>
+                    <span style={{ color: '#fad54a' }}>+{r.amount}</span>
                   </div>
                 ))}
               </div>
@@ -48709,7 +48795,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (!scEarned.total || scEarned.total <= 0) return null;
     return (
       <div style={{ marginTop: 20, marginBottom: 20, textAlign: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#ffd61a', fontWeight: 700, fontSize: 18, textShadow: '0 0 12px rgba(255,214,26,.5)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#fad54a', fontWeight: 700, fontSize: 18, textShadow: '0 0 12px rgba(250,213,74,.5)' }}>
           <span>{scEarned.total}</span>
           <img src="/data/sc.png" style={{ width: 24, height: 24, imageRendering: 'pixelated' }} />
           <span>earned!</span>
@@ -48717,9 +48803,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {(scEarned.rewards || []).map(r => (
             <div key={r.id} style={{ fontSize: 13, color: 'var(--text2)' }}>
-              <span style={{ color: '#ffd61a', fontWeight: 700 }}>{r.title}</span>
+              <span style={{ color: '#fad54a', fontWeight: 700 }}>{r.title}</span>
               {' — '}{r.description}{' '}
-              <span style={{ color: '#ffd61a', fontWeight: 700 }}>+{r.amount}</span>
+              <span style={{ color: '#fad54a', fontWeight: 700 }}>+{r.amount}</span>
             </div>
           ))}
         </div>
@@ -48771,7 +48857,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const logCardColor = (name) => {
       const card = CARDS_BY_NAME[name];
       if (!card) return '#fad54a';
-      const m = { Artifact:'#ffd61a', Potion:'#886c44', Ability:'#4580f6', Spell:'#f03232', Attack:'#f03232', Creature:'#4bcd7c', Hero:'#b866ff', 'Ascended Hero':'#b866ff', Token:'#929292' };
+      const m = { Artifact:'#fad54a', Potion:'#886c44', Ability:'#4580f6', Spell:'#f03232', Attack:'#f03232', Creature:'#4bcd7c', Hero:'#b866ff', 'Ascended Hero':'#b866ff', Token:'#929292' };
       return m[card.cardType] || '#fad54a';
     };
     const cName = (name) => <span className="log-card-name" style={{ color: logCardColor(name) }}>{name}</span>;
@@ -48901,6 +48987,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'kidnapping') { const p = playerByName(entry.player); return <span className="log-status">🎒 {pName(p.name, p.color)} kidnaps {cName(entry.creature)} from {entry.opponent} with {cName('Kidnapping')}.</span>; }
       if (t === 'kidnapping_blocked') { const p = playerByName(entry.player); return <span className="log-status">🎒 {cName('Kidnapping')}: {cName(entry.creature)} cannot be taken by {pName(p.name, p.color)}.</span>; }
       if (t === 'kidnapping_fizzle') { const p = playerByName(entry.player); return <span className="log-status">🎒 {cName('Kidnapping')}: {pName(p.name, p.color)} no longer finds {cName(entry.creature)}.</span>; }
+      if (t === 'tearing_mountain_burn') { const p = playerByName(entry.player); return <span className="log-status">🔥 {cName('Tearing Mountain')}: {pName(p.name, p.color)} must set {cName(entry.target)} aflame — it is Burned for the rest of the game.</span>; }
       if (t === 'gather_intel_lock') { const p = playerByName(entry.player); return <span className="log-status">🔒 {pName(p.name, p.color)} cannot perform other Actions for the rest of the turn ({cName('Gather Intel')}).</span>; }
       if (t === 'hero_control_returned') return <span className="log-status">↩ {entry.target} returns to {entry.controller}'s control{entry.by ? <> ({cName(entry.by)})</> : null}.</span>;
       if (t === 'secret_spell_book') { const p = playerByName(entry.player); const g = entry.taken || []; const h = entry.heroes || []; const liste = (arr) => arr.map((c, i) => <React.Fragment key={i}>{i > 0 ? ', ' : ''}{cName(c)}</React.Fragment>); return <span className="log-status">📖 {pName(p.name, p.color)}'s {cName('Secret Spell Book')} {(g.length + h.length) > 0 ? <>took permanent control of {liste([...h, ...g])}{(entry.placed || []).length > 0 ? <> (placed: {(entry.placed || []).length})</> : null}</> : <>drew {entry.drew || 1} card{(entry.drew || 1) === 1 ? '' : 's'} instead</>}.</span>; }
@@ -50579,7 +50666,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       style={{
                         position: 'absolute',
                         top: 2, left: 2,
-                        background: 'linear-gradient(135deg, #663597 0%, #401a66 100%)',
+                        background: 'linear-gradient(135deg, #58238c 0%, #401a66 100%)',
                         color: '#fff',
                         fontFamily: 'Orbit, monospace',
                         fontSize: 11,
@@ -51577,7 +51664,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                           position: 'absolute', inset: 0,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           background: 'radial-gradient(ellipse at center, rgba(58,0,0,.55) 0%, rgba(8,6,12,.7) 80%)',
-                          border: '2px dashed rgba(230,62,51,.55)',
+                          border: '2px dashed rgba(233,47,56,.55)',
                           borderRadius: 6,
                           pointerEvents: 'none',
                         }}>
@@ -52251,8 +52338,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     socket.emit('trigger_treacherous_crystal', { roomId: gameState.roomId });
                   } : undefined))}>
                   {revealEntry ? (
-                    <img src={cardImageUrl(revealEntry.name)} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} draggable={false}
-                      onMouseEnter={() => { const c = CARDS_BY_NAME[revealEntry.name]; if (c) setBoardTooltip(c); }}
+                    <img src={cardImageUrl(revealEntry.name) + (revealEntry.handLevel != null ? '?lv=' + revealEntry.handLevel : '')} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} draggable={false}
+                      onMouseEnter={() => {
+                        const c = CARDS_BY_NAME[revealEntry.name];
+                        // 23.10.: eine aufgedeckte Gegnerkarte mit gesenkter Stufe (Great Vanguard Demon) zeigt sie auf der Karte (`?lv=`, wie die eigene Hand) und im Tooltip
+                        if (c) setBoardTooltip(revealEntry.handLevel != null ? { ...c, _handNotes: [{ color: '#75f091', text: `Level ${revealEntry.handLevel} in their hand (printed ${c.level}).` }] } : c);
+                      }}
                       onMouseLeave={() => setBoardTooltip(null)} />
                   ) : (
                     <img src={opp.cardback || "/cardback.png"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
@@ -52293,6 +52384,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               Shuffle neben dem eigenen Gold (`.hand-rechts`). Neben dem
               Avatar machte ein langes „SURRENDER" den Cluster zu breit. */}
           <div className="game-hand-topright">
+            {/* Linke Spalte: Lautstärke ÜBER dem Aufgabe-/Exit-Knopf; rechts daneben das Gold, mittig in der Zeile (wie auf der eigenen Seite) */}
+            <div className="game-hand-topright-spalte">
+            <VolumeControl />
             {isSpectator ? (
               <button className="btn btn-danger game-hand-quit" onClick={handleLeave}>
                 👁 ✕ LEAVE
@@ -52312,13 +52406,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {result ? '✕ LEAVE' : gameState.isPuzzle ? '✕ EXIT' : '⚑ SURRENDER'}
               </button>
             )}
-            <div className="game-hand-topright-spalte">
-              <VolumeControl />
+            </div>
               <div className="game-gold-display">
-                <span className="game-gold-icon">🪙</span>
+                <span className="game-gold-icon"></span>
                 <span className={'game-gold-value orbit-font' + (goldCrash ? (goldCrashTone === 'recover' ? ' gold-recovering' : ' gold-crashing') : '') + (goldIsNegative(goldCrash ? goldCrash[oppIdx] : opp.gold) ? ' gold-negative' : '')} data-gold-player={oppIdx}>{formatGold(goldCrash ? goldCrash[oppIdx] : opp.gold)}</span>
               </div>
-            </div>
           </div>
         </div>
         {/* Board */}
@@ -52328,7 +52420,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             const debuffs = [];
             if (me.actionLocked) debuffs.push({ key: 'action-me', icon: '⛔', text: 'You cannot perform any more Actions this turn! (Placing Creatures still works.)', color: '#ec2d62' });
             if (opp.actionLocked) debuffs.push({ key: 'action-opp', icon: '⛔', text: `${opp.username} cannot perform any more Actions this turn!`, color: '#ae264c' });
-            if (me.summonLocked) debuffs.push({ key: 'summon-me', text: 'You cannot summon any more Creatures this turn!', color: '#e63e33' });
+            if (me.summonLocked) debuffs.push({ key: 'summon-me', text: 'You cannot summon any more Creatures this turn!', color: '#e92f38' });
             if (opp.summonLocked) debuffs.push({ key: 'summon-opp', text: `${opp.username} cannot summon any more Creatures this turn!`, color: '#c68206' });
             if (me.damageLocked) debuffs.push({ key: 'damage-me', icon: '🔥', text: 'You cannot deal any more damage to your opponent this turn!', color: '#f03232' });
             if (opp.damageLocked) debuffs.push({ key: 'damage-opp', icon: '🛡️', text: `${opp.username} cannot deal any more damage to your targets this turn!`, color: '#e37435' });
@@ -52347,9 +52439,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (opp.artifactLocked) debuffs.push({ key: 'artifact-opp', icon: '🪃', text: `${opp.username} cannot use any more Artifacts this turn!`, color: '#b06746' });
             if (me.forsaken) debuffs.push({ key: 'forsaken-me', icon: '🏴‍☠️', text: 'All cards that would go to your discard pile are deleted for the rest of the turn.', color: '#7e7d9b' });
             if (opp.forsaken) debuffs.push({ key: 'forsaken-opp', icon: '🏴‍☠️', text: `All cards that would go to ${opp.username}'s discard pile are deleted for the rest of the turn.`, color: '#8066b2' });
-            if (me.handLocked) debuffs.push({ key: 'hand-me', icon: '🔒', text: 'You cannot draw or search any more cards this turn!', color: '#e63e33' });
+            if (me.handLocked) debuffs.push({ key: 'hand-me', icon: '🔒', text: 'You cannot draw or search any more cards this turn!', color: '#e92f38' });
             if (opp.handLocked) debuffs.push({ key: 'hand-opp', icon: '🔒', text: `${opp.username} cannot draw or search any more cards this turn!`, color: '#c68206' });
-            if (me.drawLocked && !me.handLocked) debuffs.push({ key: 'draw-me', icon: '💎', text: 'You cannot draw any more cards this turn (searches still work)!', color: '#e63e33' });
+            if (me.drawLocked && !me.handLocked) debuffs.push({ key: 'draw-me', icon: '💎', text: 'You cannot draw any more cards this turn (searches still work)!', color: '#e92f38' });
             if (opp.drawLocked && !opp.handLocked) debuffs.push({ key: 'draw-opp', icon: '💎', text: `${opp.username} cannot draw any more cards this turn (searches still work)!`, color: '#c68206' });
             // v1068: Gegenstueck zum Zieh-Lock — Suchen gesperrt, Ziehen frei.
             // Der Zusatz nennt ausdruecklich, ob der Ablagestapel mitgesperrt
@@ -52366,15 +52458,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (me.abilityActivationBlocked) {
               debuffs.push({ key: 'abil-me', icon: '⛔',
                 text: 'You cannot activate any Ability effects while "The Thing in the Ship" is on the board!',
-                color: '#e63e33' });
+                color: '#e92f38' });
               debuffs.push({ key: 'abil-opp', icon: '⛔',
                 text: `${opp.username} cannot activate any Ability effects either — the lock hits both players!`,
                 color: '#c68206' });
             }
-            if (me.searchLocked && !me.handLocked) debuffs.push({ key: 'search-me', icon: '🔒', text: `You cannot search or add cards to your hand this turn${me.searchLockedIncludesDiscard ? ', not even from your discard pile' : ' (your discard pile still works)'} — but you can still draw!`, color: '#e63e33' });
+            if (me.searchLocked && !me.handLocked) debuffs.push({ key: 'search-me', icon: '🔒', text: `You cannot search or add cards to your hand this turn${me.searchLockedIncludesDiscard ? ', not even from your discard pile' : ' (your discard pile still works)'} — but you can still draw!`, color: '#e92f38' });
             if (opp.searchLocked && !opp.handLocked) debuffs.push({ key: 'search-opp', icon: '🔒', text: `${opp.username} cannot search or add cards to their hand this turn${opp.searchLockedIncludesDiscard ? ', not even from their discard pile' : ''} (they can still draw)!`, color: '#c68206' });
             // v828: Hand-Spielsperre (Knight of Kings [W]) — zwei Modi.
-            if (me.handPlayLock === 'all') debuffs.push({ key: 'handplay-me', icon: '♞', text: 'You cannot play any more cards from your hand this turn!', color: '#e63e33' });
+            if (me.handPlayLock === 'all') debuffs.push({ key: 'handplay-me', icon: '♞', text: 'You cannot play any more cards from your hand this turn!', color: '#e92f38' });
             if (me.handPlayLock === 'of-kings') debuffs.push({ key: 'handplay-me', icon: '♞', text: 'You cannot play any more cards from your hand this turn — except "of Kings" cards (Board of Kings)!', color: '#ff9b3a' });
             if (opp.handPlayLock === 'all') debuffs.push({ key: 'handplay-opp', icon: '♞', text: `${opp.username} cannot play any more cards from their hand this turn!`, color: '#c68206' });
             if (opp.handPlayLock === 'of-kings') debuffs.push({ key: 'handplay-opp', icon: '♞', text: `${opp.username} cannot play any more cards from their hand this turn — except "of Kings" cards!`, color: '#c68206' });
@@ -52523,7 +52615,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           {/* ★ 10.10.: KEIN `isolation: isolate` mehr — die Isolation sitzt jetzt an `.board-plane-clip` (style.css), damit die
               Sprite-Huelle (letztes Kind) im Kontext der Phasenspalte steht und ueber ihr liegt. */}
           <div className="board-center" ref={boardCenterRef} style={{ position: 'relative' }}>
-            {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#ffd61a', textShadow: '0 0 10px rgba(255,198,28,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
+            {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#fad54a', textShadow: '0 0 10px rgba(255,198,28,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
             {/* ── Pseudo-3D ground plane ─────────────────────────────────
                 ONE wrapper around both player sides + the area zones +
                 the mid row, tilted as a single continuous plane via CSS
@@ -53304,9 +53396,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // "Lv-1". Level requirements never go below 0 in this
                 // game (any Hero can satisfy a Lv0 cast) so the badge
                 // should track that semantic.
-                const handEffectiveLevel = (handLevelOffset !== 0 || manaCrystalBoost !== 0)
+                // 23.10.: absolut gesetzte Stufe dieser Kopie (Puzzle-Creator, Inconspicuous Lawn Gnome) ist die Basis, auf der die Senkungen weiterwirken.
+                const handLevelGesetzt = (me.handLevelSet || {})[item.origIdx];
+                const handEffectiveLevel = (handLevelOffset !== 0 || manaCrystalBoost !== 0 || handLevelGesetzt != null)
                   && handCardData?.level != null
-                  ? Math.max(0, handCardData.level + handLevelOffset + manaCrystalBoost)
+                  ? Math.max(0, (handLevelGesetzt ?? handCardData.level) + handLevelOffset + manaCrystalBoost)
                   : null;
                 const handLevelHostHeroIdx = (me.handLevelOffsetHeroFilter || {})[item.origIdx];
                 const handLevelIsHeroFiltered = handLevelHostHeroIdx != null;
@@ -53477,7 +53571,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               </div>
             )}
             <div className="game-gold-display">
-              <span className="game-gold-icon">🪙</span>
+              <span className="game-gold-icon"></span>
               <span className={'game-gold-value orbit-font' + (goldCrash ? (goldCrashTone === 'recover' ? ' gold-recovering' : ' gold-crashing') : '') + (goldIsNegative(goldCrash ? goldCrash[myIdx] : me.gold) ? ' gold-negative' : '')} data-gold-player={myIdx}>{formatGold(goldCrash ? goldCrash[myIdx] : me.gold)}</span>
             </div>
           </div>
@@ -53613,7 +53707,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <CreatureDamageNumber key={d.id} amount={d.amount} ownerLabel={d.ownerLabel} heroIdx={d.heroIdx} zoneSlot={d.zoneSlot} />
       ))}
       {creatureHealNumbers.map(d => (
-        <CreatureHealNumber key={d.id} amount={d.amount} ownerLabel={d.ownerLabel} heroIdx={d.heroIdx} zoneSlot={d.zoneSlot} />
+        <CreatureHealNumber key={d.id} amount={d.amount} ownerLabel={d.ownerLabel} heroIdx={d.heroIdx} zoneSlot={d.zoneSlot} pixel={d.pixel} />
       ))}
       </div>
 
@@ -54171,7 +54265,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {imgUrl && (
               <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
                 <img src={imgUrl} style={{ width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
-                  border: foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,214,26,.5)' : 'none' }} />
+                  border: foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)' : foilType === 'secret_rare' ? '2px solid rgba(250,213,74,.5)' : 'none' }} />
                 {/* ★ v1203: Dieses Vorschaubild rechnete `isFoil` aus und
                     zeichnete die Schicht dann NIE — dritte Stelle derselben
                     Bauart. Jetzt haengt auch sie an CardFoil. */}
@@ -55179,8 +55273,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* ── Effect Prompt: Chain Target Pick (Chain Lightning / Qinglong / Bottled Lightning) ── */}
       {isMyEffectPrompt && ep.type === 'chainTargetPick' && (
-        <DraggablePanel zielwahl className="first-choice-panel animate-in" style={{ borderColor: '#ffd61a' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: '#ffd61a', marginBottom: 8 }}>⚡ {ep.title || 'Chain Lightning'}</div>
+        <DraggablePanel zielwahl className="first-choice-panel animate-in" style={{ borderColor: '#fad54a' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#fad54a', marginBottom: 8 }}>⚡ {ep.title || 'Chain Lightning'}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>
             {chainPickSelected.length < chainPickMaxTargets && chainPickValidIds.size > 0
               ? `Click target #${chainPickSelected.length + 1} (${chainPickDamages[chainPickSelected.length]} dmg).`
@@ -55189,7 +55283,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           {chainPickSelected.length > 0 && (
             <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 8 }}>
               {chainPickSelected.map((t, i) => (
-                <span key={String(t.id)} style={{ display: 'block', color: '#ffd61a' }}>#{i+1} {String(t.cardName || '?')} → {chainPickDamages[i] || 0} dmg</span>
+                <span key={String(t.id)} style={{ display: 'block', color: '#fad54a' }}>#{i+1} {String(t.cardName || '?')} → {chainPickDamages[i] || 0} dmg</span>
               ))}
             </div>
           )}
@@ -55795,7 +55889,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <DraggablePanel zielwahl className="first-choice-panel" style={{ borderColor: 'var(--danger)', animation: 'fadeIn .2s ease-out', display: 'flex', gap: 16, alignItems: 'stretch' }}>
           <TriggerCardSlot name={pt.config?.triggerCardName} />
           <div className="panel-zielwahl-spalte" data-zielwahl-mitte="" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div className="pixel-font" style={{ fontSize: 12, color: pt.config?.goldSelect ? '#ffd61a' : pt.config?.greenSelect ? '#3ddc57' : 'var(--danger)', marginBottom: 8 }}>{pt.potionName}</div>
+          <div className="pixel-font" style={{ fontSize: 12, color: pt.config?.goldSelect ? '#fad54a' : pt.config?.greenSelect ? '#3ddc57' : 'var(--danger)', marginBottom: 8 }}>{pt.potionName}</div>
           <div className="panel-zielwahl-text" style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{pt.config?.description || 'Select targets'}</div>
           {pt.config?.maxTotal > 0 && pt.validTargets?.length > 0 && (() => {
             // For Pollution-capped prompts (Sun Beam etc.), the effective cap
@@ -55952,7 +56046,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               <div key={i} className="firework-particle" style={{
                 '--fw-x': (Math.random() * 200 - 100) + 'px',
                 '--fw-y': (Math.random() * -200 - 40) + 'px',
-                '--fw-color': ['#ffd61a','#fc1c5f','#4ceb70','#1ca9fd','#ff8b1a','#a952ff'][i % 6],
+                '--fw-color': ['#fad54a','#fc1c5f','#4ceb70','#1ca9fd','#ff8b1a','#a952ff'][i % 6],
                 '--fw-delay': (Math.random() * 2) + 's',
                 '--fw-dur': (1 + Math.random()) + 's',
                 left: (20 + Math.random() * 60) + '%',
@@ -55963,8 +56057,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <div className="animate-in" style={{ textAlign: 'center', position: 'relative', zIndex: 2 }}>
             <div className="pixel-font" style={{
               fontSize: 40, marginBottom: 8,
-              color: isSpectator ? '#ffd61a' : (iWon ? '#ffd61a' : 'var(--danger)'),
-              textShadow: isSpectator ? '0 0 40px rgba(255,214,26,.6)' : (iWon ? '0 0 40px rgba(255,214,26,.6)' : '0 0 40px rgba(252,28,95,.5)'),
+              color: isSpectator ? '#fad54a' : (iWon ? '#fad54a' : 'var(--danger)'),
+              textShadow: isSpectator ? '0 0 40px rgba(250,213,74,.6)' : (iWon ? '0 0 40px rgba(250,213,74,.6)' : '0 0 40px rgba(252,28,95,.5)'),
             }}>
               {isSpectator ? `🏆 ${result.winnerName} WINS! 🏆` : (iWon ? '🏆 SET VICTORY! 🏆' : 'SET DEFEAT')}
             </div>
@@ -56058,10 +56152,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               <>
                 <div className="pixel-font" style={{
                   fontSize: finalTutorialCleared ? 56 : 42,
-                  marginBottom: 12, color: '#ffd61a',
+                  marginBottom: 12, color: '#fad54a',
                   textShadow: finalTutorialCleared
-                    ? '0 0 60px rgba(255,214,26,.85), 0 0 100px rgba(255,214,26,.45)'
-                    : '0 0 40px rgba(255,214,26,.6)'
+                    ? '0 0 60px rgba(250,213,74,.85), 0 0 100px rgba(250,213,74,.45)'
+                    : '0 0 40px rgba(250,213,74,.6)'
                 }}>
                   {finalTutorialCleared
                     ? '🎉 TUTORIAL CLEARED! 🎉'
@@ -56086,7 +56180,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               </>
             )}
             {result.puzzleResult === 'success' ? (
-              <button className="btn" style={{ padding: '12px 32px', fontSize: 14, borderColor: '#ffd61a', color: '#ffd61a' }} onClick={handleResultLeave}>
+              <button className="btn" style={{ padding: '12px 32px', fontSize: 14, borderColor: '#fad54a', color: '#fad54a' }} onClick={handleResultLeave}>
                 {finalTutorialCleared ? '→ CONTINUE' : result.isTutorial ? '← RETURN TO TUTORIAL' : '← RETURN TO PUZZLE'}
               </button>
             ) : (
