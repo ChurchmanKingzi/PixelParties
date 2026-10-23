@@ -5,7 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { findBugfixes, readNotes, fingerprint, parseNameStatus, parseRequires } = require('../lib/bugfix');
+const { findBugfixes, readNotes, readSkips, applySkips, fingerprint, parseNameStatus, parseRequires } = require('../lib/bugfix');
 const { guild, setup, config } = require('./helpers');
 
 const real = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'data', 'cards.json'), 'utf8'));
@@ -254,6 +254,61 @@ test('Neue, noch nicht live gegangene Karte: kein Bugfix, auch nicht mit Bugfix-
     assert.match(sent[0].content, /\*\*Acid Rain\*\*\n {2}↳ Damage was dealt once too often\./);
     assert.ok(!/Fireball/.test(sent[0].content), 'neue Karte erscheint nicht im Bugfix-Feed');
   } finally { r.clean(); config.repoRoot = path.resolve(__dirname, '..', '..'); }
+});
+
+test('Bugfix-Skip: reine Anpassung an eine neue Karte erscheint nicht im Bugfix-Kanal (Vorrang vor Bugfix-Note, auch für Bausteine)', async () => {
+  const r = makeRepo();
+  try {
+    r.write('data/cards.json', JSON.stringify(real));
+    r.head = r.commit('cards.json');
+    config.repoRoot = r.dir; config.channels.bugfixes = 'BF'; config.bugfixMaxShared = 12;
+    const { ctx, client } = await setup();
+    const sent = [];
+    const g = guild();
+    g.channels.cache.set('BF', { isTextBased: () => true, send: async p => { sent.push(p); } });
+    client.guilds.cache.set('G1', g);
+    await ctx._feeds.pollBugfixes();                          // merkt den Stand
+    assert.equal(sent.length, 0);
+
+    // Fireball nur an eine neue Karte angepasst (Skip), Acid Rain echter Fix; ein schmaler und ein breiter Baustein ebenfalls angepasst (Skip)
+    r.write(r.E('fireball'), "module.exports = { effect: 'angepasst' };\n");
+    r.write(r.E('acid-rain'), "module.exports = { effect: 'fix' };\n");
+    r.write(r.E('_alice-shared'), "exports.x = 'z';\n"); r.write(r.E('_big-shared'), "exports.big = 'z';\n");
+    r.commit('Neue Karte\n\nBugfix-Note: Fireball | Eine zu Unrecht geschriebene Beschreibung.\nBugfix-Note: Acid Rain | Damage was dealt once too often.');
+    r.write('server.js', '// angepasst\n');
+    r.commit('Anpassung\n\nBugfix-Skip: Fireball | nur an die neue Karte angepasst\n- Bugfix-Skip: _alice-shared\nBugfix-Skip: _big-shared');
+    await ctx._feeds.pollBugfixes();
+    assert.equal(sent.length, 1, 'nur eine Nachricht (Karten); der breite Baustein ist abgemeldet');
+    assert.match(sent[0].content, /Bug fixes\*\* — 1 card\n/);
+    assert.match(sent[0].content, /\*\*Acid Rain\*\*\n {2}↳ Damage was dealt once too often\./);
+    assert.ok(!/Fireball/.test(sent[0].content), 'Fireball (Skip) erscheint nicht — auch nicht mit der Note');
+    assert.ok(!/Alice/.test(sent[0].content), 'über den abgemeldeten Baustein betroffene Karten erscheinen nicht');
+  } finally { r.clean(); config.repoRoot = path.resolve(__dirname, '..', '..'); }
+});
+
+test('readSkips/applySkips: Zeilenformat mit und ohne Grund, Aufzählungszeichen; Karten und Bausteine werden entfernt', async () => {
+  const r = makeRepo();
+  try {
+    const from = r.head;
+    r.write(r.E('fireball'), "module.exports = { effect: 'b' };\n");
+    r.commit('Eins\n\nBugfix-Skip: Fireball | nur angepasst\n- Bugfix-Skip: acid rain\nBugfix-Skip:   \nBugfix-Skip: _alice-shared');
+    const head = r.sync('rev-parse', 'HEAD').trim();
+    const sk = await readSkips({ git: r.git, last: from, head });
+    assert.deepEqual([...sk].sort(), ['acidrain', 'alicesshared'.replace('alicesshared', 'aliceshared'), 'fireball'].sort());
+    assert.deepEqual(await readSkips({ git: r.git, last: 'deadbeef', head }), new Set(), 'unbekannter Stand → keine Ausnahmen, kein Absturz');
+
+    const found = {
+      direct: [{ card: { name: 'Fireball' }, file: 'fireball' }, { card: { name: 'Deadly Poison' }, file: 'deadly-poison' }],
+      shared: [{ module: '_alice-shared', cards: [{ name: 'Alice' }], count: 1, broad: false },
+        { module: '_outer-shared', cards: [{ name: 'Acid Rain' }, { name: 'Chain Lightning' }], count: 2, broad: false }],
+    };
+    const out = applySkips(found, sk);
+    assert.deepEqual(out.direct.map(d => d.card.name), ['Deadly Poison']);
+    assert.deepEqual(out.shared.map(x => x.module), ['_outer-shared'], 'abgemeldeter Baustein fällt weg');
+    assert.deepEqual(out.shared[0].cards.map(c => c.name), ['Chain Lightning'], 'abgemeldete Karte fällt aus den Baustein-Karten');
+    assert.equal(out.shared[0].count, 1);
+    assert.equal(applySkips(found, new Set()), found, 'ohne Ausnahmen unverändert');
+  } finally { r.clean(); }
 });
 
 test('readNotes: Zeilenformat, Aufzählungszeichen, Kürzung, mehrere Zeilen pro Ziel; findBugfixes lässt balancierte Karten aus', async () => {
