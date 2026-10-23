@@ -127,7 +127,7 @@ module.exports = {
 
       // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): die Zone je Bomblebee —
       // frei oder, mit Alice-Teilung, die Zone einer GLEICHNAMIGEN Bomblebee (geteilte zuerst; `engine.ersteBeschwoerZone`).
-      const zoneFuer = (n) => engine.ersteBeschwoerZone(pi, n, { seite: feld, heroIdx: hostHeroIdx, nurBasis: true, namedHeroesOnly: true });
+      const zoneFuer = (n) => { const si = require('./_alice-shared').ersterPlatzAufHeld(engine, feld, hostHeroIdx, n, pi); return si < 0 ? null : { slotIdx: si }; };
       for (let ci = candidates.length - 1; ci >= 0; ci--) if (!zoneFuer(candidates[ci])) candidates.splice(ci, 1);
       if (candidates.length === 0) {
         engine.log('bomblebee_cluster_no_slot', {

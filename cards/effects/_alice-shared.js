@@ -254,8 +254,23 @@ function describeInstance(engine, inst) {
   };
 }
 
+/**
+ * ★ W63a — erster Platz auf EINEM bestimmten Helden (Brettseite `feld`, auch ein seitenfremd kontrollierter Held), ohne Held-/Kontrollfilter der
+ * Zonenlisten: erst (Alice-Teilung des Beschwoerers `sharer`) die Zone einer GLEICHNAMIGEN Creature, DANN die erste leere. -1 = kein Platz.
+ */
+function ersterPlatzAufHeld(engine, feld, heroIdx, cardName, sharer = feld) {
+  const zonen = engine.gs.players[feld]?.supportZones?.[heroIdx] || [];
+  if (cardName) for (let si = 0; si < 3; si++) {
+    if ((zonen[si] || []).length > 0 && canShareInto(engine, sharer, heroIdx, si, cardName, feld)) return si;
+  }
+  const anzahl = Math.max(3, zonen.length);
+  for (let si = 0; si < anzahl; si++) if (!zonen[si] || zonen[si].length === 0) return si;
+  return -1;
+}
+
 module.exports = {
   ALICE_NAME,
+  ersterPlatzAufHeld,
   sharingActive,
   armSharing,
   stackAt,

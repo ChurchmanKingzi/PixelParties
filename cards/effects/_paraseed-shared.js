@@ -187,11 +187,10 @@ function killerHeroOf(engine, source) {
  * Alice-Teilung des Kontrolleurs des Helden (`sharer`, Standard: `heroSideOf`) — auch die Zone einer GLEICHNAMIGEN Creature, und sie kommt zuerst.
  */
 function freeSlotOnHero(engine, physOwner, heroIdx, name = null, sharer = null) {
-  if (name && engine.beschwoerZonenFuer) {
+  if (name) {
     const hero = engine.gs.players[physOwner]?.heroes?.[heroIdx];
     const wer = sharer ?? (hero?.name ? engine.heroSideOf(physOwner, hero) : physOwner);
-    const z = engine.beschwoerZonenFuer(wer, name, { seite: physOwner, heroIdx, namedHeroesOnly: true, nachKontrolle: false })[0];
-    return z ? z.slotIdx : -1;
+    return require('./_alice-shared').ersterPlatzAufHeld(engine, physOwner, heroIdx, name, wer);
   }
   const slots = engine.gs.players[physOwner]?.supportZones?.[heroIdx] || [];
   const anzahl = Math.max(3, slots.length);

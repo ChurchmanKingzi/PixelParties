@@ -29293,8 +29293,12 @@ this._deathWatch = (this._deathWatchStack || []).length
   beschwoerZonenFuer(playerIdx, cardName, opts = {}) {
     const { heroIdx = null, seite = null, ...rest } = opts;
     const feld = seite ?? playerIdx;
-    const alle = this.getFreeSupportZones(feld, { ...rest, shareableFor: cardName || undefined, sharer: playerIdx });
-    const nachHeld = heroIdx == null ? alle : alle.filter(z => z.heroIdx === heroIdx && (z.owner ?? feld) === feld);
+    // ★ W63a: `seite` ≠ Beschwoerer = ein Held der GEGENspalte, den `playerIdx` kontrolliert (uebernommen/geliehen): das Zonenrecht des Spaltenbesitzers
+    // (W21a, „dauerhaft abgegebener Held") gilt hier nicht — der Aufrufer nennt den Helden ausdruecklich (`heroIdx`), wie bisher ohne Kontrollpruefung
+    // (Drill Sergeant, gestohlen: Wirtsheld der Gegenseite, Q74); geteilt wird nur, wenn der Beschwoerer den Helden kontrolliert (`sharer`).
+    const fremd = feld !== playerIdx;
+    const alle = this.getFreeSupportZones(feld, { ...rest, ...(fremd ? { _nachKontrolle: true } : {}), shareableFor: cardName || undefined, sharer: playerIdx });
+    let nachHeld = heroIdx == null ? alle : alle.filter(z => z.heroIdx === heroIdx && (z.owner ?? feld) === feld);
     // ★ W63a (Al): GETEILTE Zonen vor den freien — wer die Zone selbst bestimmt (Pinta, Slimes, CPU …), nimmt zuerst die geteilte Zone, dann die erste leere.
     return nachHeld.some(z => z.shared) ? [...nachHeld.filter(z => z.shared), ...nachHeld.filter(z => !z.shared)] : nachHeld;
   }
