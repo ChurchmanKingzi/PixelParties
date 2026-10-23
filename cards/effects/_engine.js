@@ -28201,6 +28201,8 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const cardNames = validated.map(idx => oppPs.hand[idx]).filter(Boolean);
 
+    await this._stehlenderSpellFruehAblegen(pi, opts.sourceName);
+
     const flightMs = 800;
     const highlightMs = Number.isFinite(opts.highlightMs) ? opts.highlightMs : (validated.length > 1 ? 450 : 250);
     this._broadcastEvent('play_hand_steal', {
@@ -44899,6 +44901,23 @@ this._deathWatch = (this._deathWatchStack || []).length
     this._trackCard(weg.name, ziel, 'discard');
     this.sync();
     return { idx, name: weg.name };
+  }
+
+  /**
+   * Hand-Diebstahl eines Zaubers, der sich dabei verbraucht (Secret Entrance, Gather Intel, Loot the Leftovers …): die auflösende Karte liegt bis zum Ende der Auflösung noch in der Hand
+   * und würde genau beim Eintreffen der gestohlenen Karten ausgetauscht — das verschiebt deren Landeplätze. Deshalb geht sie VOR dem Flug in die Ablage (`aufloesenderSpellInDieAblage`),
+   * die Hand richtet sich ohne sie aus. Nur für den Zauber, der selbst stiehlt (`sourceName`), der aus der Hand kommt und in die Ablage geht (nicht `deleteOnUse`).
+   * @returns {Promise<boolean>} true, wenn die Karte die Hand verlassen hat
+   */
+  async _stehlenderSpellFruehAblegen(pi, sourceName) {
+    const ps = this.gs.players[pi];
+    const rc = ps?._resolvingCard;
+    if (!rc || rc.fromCreation || !sourceName || rc.name !== sourceName) return false;
+    const cd = this._getCardDB()[rc.name];
+    if (!cd || cd.cardType !== 'Spell' || loadCardEffect(rc.name)?.deleteOnUse) return false;
+    const weg = await this.aufloesenderSpellInDieAblage(pi);
+    if (weg) await this._delay(150);       // der Client richtet die Hand neu aus, bevor die Landeplätze der gestohlenen Karten gemessen werden
+    return !!weg;
   }
 
   /**
