@@ -23989,3 +23989,38 @@ Kreatur-Modus: spielbar mit 3 freien Zonen ODER (Alice aktiv + geteilte Zone fü
 | `W63/a-05-bewegen-memory-blast-jumper-spider-puppet-kein-on-summon.js` | Memory Blast, Jumper Spider, Puppet, Paraseed Greenhouse | 46 |
 | `W63/a-06-reincarnation-geteilte-zone-statt-dritter-freier.js` | Reincarnation Kreatur-Modus, Mensch + CPU | 118 |
 Angepasst: `W62/a-01`, `W62/a-04` (Reihenfolge geteilt vor frei).
+
+## Neue Karten 23.10.2026 — Black-Thorn Dragon · Shimmering Dragonegg · Liquid Luck · Vertrag „unaffected by all Spells"
+
+Drei Karten mit je einer Neuerung (Tests: `docs/niche-tests/repro/NK-neue-karten/`, `01`–`04`; alle Dateien einzeln mit `node …` lauffähig).
+
+### Shimmering Dragonegg (Creature, Lv 0, 1 HP, Drago)
+„If you control no Creatures, summoning this counts as an additional Action. When this Creature is defeated during your turn, you gain 8 Gold."
+Drittes Ei der Familie: Satz 1 (`eiInherentAction`) und das Ruling 22.9. („during your turn" = die Runde des **Kontrolleurs** über `starbInEigenerRunde`, auch bei Tod durch eine gegnerische Reaktion; gestohlene Eier zahlen dem Dieb) kommen unverändert aus `_dragonegg-shared.js` (bewusst nicht angefasst — Änderungen dort ließen Icy/Flaming im Bugfix-Feed erscheinen). Die Wirkung steht im Kartenskript: **Pflicht** (kein „may", keine Rückfrage), Gewinn über `actionGainGold` ohne `_isResourceGain` — also ein Effekt-Gewinn, den Gold Trap, Golden Vermin, Royal Treasury, Goldsperren (`goldLocked`, Tuscan Aristocrat) wie jeden anderen sehen. Ein negiertes/gefrorenes Ei zahlt nichts (derselbe Hook-Filter wie bei Icy/Flaming).
+
+### Black-Thorn Dragon (Creature, Lv 3, 250 HP, Drago)
+* **Kosten, zwei Wege** (`makeSacrificeSpec(engine, route)`): (a) GENAU 1 „Drago"-Kreatur, die nicht in diesem Zug beschworen wurde, ODER (b) GENAU 2 „Drago"-Kreaturen — „nicht in diesem Zug" steht im Text nur hinter (a), bei (b) dürfen beide frisch sein. Stehen beide Wege offen, fragt eine `optionPicker`-Wahl (abbrechbar, Abbruch = nichts bezahlt); steht nur einer offen, entfällt die Frage. Die CPU wählt über `cpuResponse` den billigeren Weg (a). Bauform sonst wie Foresta/Blue-Ice (`paySummonCost` vor dem Reaktionsfenster, Wurf auf belegte Plätze mit den Insassen als Pflicht-Opfern — ein Platz ist ein Ziel, wenn EINER der beiden Wege ihn leeren kann). Kein Haste, keine Zusatzaktion. Aktiv-Effekt: 200 Schaden auf ein beliebiges Ziel (Held/Kreatur, jede Seite, auch der Dragon selbst), Standard-HOPT.
+* **Vertrag `unaffectedBySpells` / `heroUnaffectedBySpells`** (Skript-Flaggen, Engine-Helfer in `_engine.js`):
+
+| Baustein | Aufgabe |
+|---|---|
+| `engine.quelleIstSpell(quelle, opts)` | EINE Auslegung „ist das ein Spell?": Kartentyp `Spell` (auch Areas, Anhänge, Surprise-Spells — nach cardType, W45a) oder `treatedAsSpell` (Alice, W32a). Attacks sind keine Spells. Name aus Quelle/`opts.source`/`opts.sourceName`; ohne Namen gilt der gerade auflösende Spell (`_currentResolvingSpellName`, Konvention der Heldenwege) |
+| `engine.kreaturSpellImmun(inst, quelle, opts)` | Flagge `unaffectedBySpells` an der Kreatur. Ruht bei Negierung/Frost/Betäubung (`isCardPassiveDormant`, W7a). `opts.piercing` (Ida) geht durch. Gelesen in `kreaturGegnerEffektImmun` (Schaden, Zerstörung, Bewegung zwischen Zonen, Buffs, Negierung, Diebstahl, Status — dieselben Stellen wie Golden Wings) und zusätzlich in `actionHealCreature`, `increaseMaxHp` (Kreatur), `canApplyCreatureStatus` und der Support→Support-Bewegung in `actionMoveCard` |
+| `engine.heroHasSpellImmunity(heroOwner, heroIdx)` | Flagge `heroUnaffectedBySpells` an einer wirksamen Karte in einer Support Zone dieses Helden („the corresponding Hero" = Held der Zone, Als Ruling 2.10.). Gelesen in `heroSpellWardBlocks` — damit auf allen fünf Wegen von Anti Magic/Energy Aura (Schaden, Heilung, Buff, Status, Niederlage) — und in `heroNonDamageEffectBlocked` (Max-HP, Entfernen, Abwurf, Kontrolle …) |
+
+Gemeint sind **alle** Spells, auch eigene (Heal auf den eigenen Dragon heilt nicht); keine Stufenschranke. Die Ziele bleiben wählbar — „unaffected" heißt: die Wirkung bleibt aus, Bilder laufen. **Eigene Opferkosten** des Kontrolleurs („Sacrifice a Creature you control to play this card") sind kein Zugriff des Spells (wie bei Golden Wings und `ctx.isSacrifice`); ein vom Gegner per Spell erzwungenes Opfer oder eine Zerstörung wirkt nicht. Der Tod selbst (`fireCreatureDeath` + `_equipGrund: 'destroyed'`) wird nicht ein zweites Mal gesperrt. **Piercing-Nachtrag:** Idas Hook stempelt `canBeNegated = false` erst in der Hook-Runde des Kreaturen-Schadensstapels, die Markierung der Immunitäten läuft davor — `_processCreatureDamageBatchKern` bewertet Piercing-Einträge bei Spell-immunen Kreaturen deshalb nach der Hook-Runde neu.
+**Nicht erfasst (bewusst):** das bloße Anlegen eines Spell-Anhangs (nur seine Wirkungen sind blockiert: Schaden, Heilung, Status — Decisive Defeat legt sich am Dragon-Helden gar nicht erst an), Sperren, die ein Spell am SPIELER (nicht am Helden) setzt (Siege, Goldsperre).
+
+### Liquid Luck (Potion)
+„Declare a card name. Whenever your opponent plays a card of that name until the beginning of your next turn, search your deck for any card, reveal it and add it to your hand."
+* **Wo der Effekt lebt:** der Trank legt sich offen vor den Spieler (`ps.permanents` + Instanz in der Zone `permanent`, `resolve` meldet `{ placed: true }`; Bauform Elixir of Immortality). Der Eintrag trägt `declared` (Tooltip im Client, `public/app-board.jsx`) — die Deklaration ist öffentlich. Ablauf: `onTurnStart` des Deklarierenden löscht ihn (Bauform Luck), der Trank geht in den Gelöscht-Stapel seines BESITZERS (`liquidLuckBesitzer`, fremde Tränke aus Magic Lamp & Co.).
+* **Beobachter:** `_card-played-shared.js` (`kartenSpielBeobachter`) bündelt die vier Ereignisse „Karte gespielt" mit Lucks Entdoppelungen (Spell/Attack, Zonen-Eintritt, Trank, Normal-Artefakt). **Luck trägt noch eine eigene Kopie derselben Hooks** (`luck.js`) — wer eine ändert, prüft die andere oder zieht Luck auf den Baustein um. Wie bei Luck zählt der rohe Zonen-Eintritt, also auch eine Wiederbelebung durch einen Effekt („plays" im weiten Sinn, Luck-Konvention).
+* **Wähler:** dieselbe Namensliste wie Luck (ohne Token, Reaction, Surprise); ungültige Antworten und Abbruch = nichts passiert, der Trank bleibt auf der Hand.
+* **Suche:** Pflicht, nicht abbrechbar (Muster Crushing Defeat), offen aufgedeckt, danach gemischt (`searchDeckForNamedCard`); Such-/Hand-Sperre und leeres Deck überspringen nur den Such-Schritt (Bauform ④ des Such-Templates).
+* **★ Engine-Nachtrag `server.js` (`doUsePotion`):** ein Trank, der sich offen hinlegt (`resolveResult.placed`), meldete bisher KEIN `afterPotionUsed` — Beobachter (Luck, Liquid Luck, Trainings-Recorder, SC-Tracking) sahen ihn nie (galt schon für Elixir of Immortality). Der Zweig feuert den Hook jetzt mit `placed: true`; Saint Nicolas, Biomancy und Lizbeth steigen bei `ctx.placed` still aus.
+
+### Offene Fragen an Al (alle mit einem Wort beantwortbar)
+1. Liquid Luck: Reaction-/Surprise-Namen fehlen im Wähler (wie bei Luck). Sollen sie deklarierbar sein?
+2. Liquid Luck zählt eine Wiederbelebung/Platzierung per Effekt als „plays" (wie Luck). Nur echtes Ausspielen?
+3. Black-Thorn Dragon: soll er auch von EIGENEN heilenden/stärkenden Spells unberührt sein (jetzt: ja, „all Spells")?
+4. Black-Thorn Dragon: soll das Verschieben innerhalb der Support Zones durch Spells (Guard Change, Slippery Ice) gesperrt sein (jetzt: ja)?

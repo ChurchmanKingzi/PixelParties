@@ -48577,6 +48577,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'willy_gold') { const p = playerByName(entry.player); return <span>💰 {pName(p.name, p.color)}'s Willy granted {entry.amount} Gold!</span>; }
       if (t === 'luck_declare') { const p = playerByName(entry.player); return <span>🍀 {pName(p.name, p.color)} declared {cName(entry.card)} with Luck (Lv{entry.level})!</span>; }
       if (t === 'luck_trigger') { const p = playerByName(entry.player); return <span>🌈 {pName(p.name, p.color)}'s Luck triggered on {cName(entry.card)}! Drew {entry.drawn} cards.</span>; }
+      if (t === 'liquid_luck_declare') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} declared {cName(entry.card)} with {cName('Liquid Luck')}!</span>; }
+      if (t === 'liquid_luck_trigger') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {cName('Liquid Luck')} triggered on {cName(entry.card)}!</span>; }
       if (t === 'alleria_surprise_draw') { const p = playerByName(entry.player); return <span>🕸️ {pName(p.name, p.color)}'s Alleria drew 1 card from Surprise activation!</span>; }
       if (t === 'trapping_set') { const p = playerByName(entry.player); return <span>🪤 {pName(p.name, p.color)}'s {entry.hero} set {cName(entry.card)} via Trapping!</span>; }
       if (t === 'controlled_attack') { const p = playerByName(entry.player); return <span>🔮 {pName(p.name, p.color)} took control of {entry.target}'s abilities!</span>; }
@@ -52578,6 +52580,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       className={'board-permanent-slot' + (isValidPermTarget ? ' potion-target-valid' : '') + (isSelectedPermTarget ? ' potion-target-selected' : '') + (isActivatable ? ' zone-permanent-activatable' : '')}
                       data-perm-id={perm.id} data-perm-owner="opp"
                       onClick={handlePermClick}
+                      onMouseEnter={perm.declared ? (e => showGameTooltip(e, `Declared: ${perm.declared}`)) : undefined}
+                      onMouseLeave={perm.declared ? hideGameTooltip : undefined}
                       style={{
                         ...((isValidPermTarget || isActivatable) ? { cursor: 'pointer' } : {}),
                         // v1284: verdeckt, solange die Enthuellung noch fliegt.
@@ -52655,6 +52659,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       className={'board-permanent-slot' + (isValidPermTarget ? ' potion-target-valid' : '') + (isSelectedPermTarget ? ' potion-target-selected' : '') + (isActivatable ? ' zone-permanent-activatable' : '')}
                       data-perm-id={perm.id} data-perm-owner="me"
                       onClick={handlePermClick}
+                      onMouseEnter={perm.declared ? (e => showGameTooltip(e, `Declared: ${perm.declared}`)) : undefined}
+                      onMouseLeave={perm.declared ? hideGameTooltip : undefined}
                       style={{
                         ...((isValidPermTarget || isActivatable) ? { cursor: 'pointer' } : {}),
                         // v1284: verdeckt, solange die Enthuellung noch fliegt.
