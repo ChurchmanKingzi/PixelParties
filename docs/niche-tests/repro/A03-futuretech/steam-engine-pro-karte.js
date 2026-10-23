@@ -15,6 +15,8 @@ const H = require('../../lib/h.js');
   R.check('3 Karten → +30 aktuelle HP', d.counters.currentHp === hp0 + 30, { aktuell: d.counters.currentHp });
   await t.run(() => t.engine.actionPromptForceDiscard(0, 1, { source: 'Test', selfInflicted: true }));
   R.check('zweiter Abwurf im selben Zug: weitere +10 (kein Zuglimit)', d.counters.maxHp === hp0 + 40, { max: d.counters.maxHp });
+  const zahlen = t.events.filter(e => e.ev === 'play_steam_hp');
+  R.check('je Karte eine grüne „+10“ über dem Diver (4 Stück)', zahlen.length === 4 && zahlen.every(e => e.data.amount === 10 && e.data.zoneSlot === d.zoneSlot), { n: zahlen.length });
   R.check('Abwurf des Gegners zählt nicht', (gegner.counters?.maxHp ?? 50) === 50, { max: gegner.counters?.maxHp });
   R.check('Dragon Pilot: kein HP-Gewinn', (pilot.counters?.maxHp ?? 150) === 150, { max: pilot.counters.maxHp });
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
