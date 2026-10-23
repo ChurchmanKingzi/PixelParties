@@ -85,7 +85,7 @@ module.exports = {
   // geschützten Spieler unspielbar (`engine.ersterZugGeschuetzt`, Sperr-Stutzen `_cardBlockedBySearchLock`).
   blockedByFirstTurnProtection: true,
   blockedByHandLock: true,
-  deferBroadcast: true,
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral (`commitAppearance()` unten).
 
   canActivate(gs, pi) {
     const ps = gs.players[pi];
@@ -107,18 +107,9 @@ module.exports = {
     engine.sync();
 
     // ── Step 2: reveal the Birthday Present artifact itself to opp ───────
-    // `deferBroadcast: true` suppressed the engine's auto-reveal. Emit
-    // manually so opp sees "Birthday Present is being played" before the
+    // W64b: zentral über den Auftritts-Puffer (Gegner UND Zuschauer): opp sees "Birthday Present is being played" before the
     // 3-card slide-in animation kicks off.
-    const oppSid = oppPs.socketId;
-    if (oppSid && engine.io) {
-      engine.io.to(oppSid).emit('card_reveal', { cardName: CARD_NAME });
-    }
-    if (engine.room?.spectators) {
-      for (const spec of engine.room.spectators) {
-        if (spec.socketId) engine.io.to(spec.socketId).emit('card_reveal', { cardName: CARD_NAME });
-      }
-    }
+    engine.commitAppearance();
     await engine._delay(400);
 
     // ── Step 3: broadcast Phase 1/2/3 — slide-in + flip + hold ───────────

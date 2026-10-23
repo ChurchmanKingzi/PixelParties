@@ -10,7 +10,7 @@ module.exports = {
   blockedByHandLock: true,
   blockedBySearchLock: true,   // Z6 (M02-19): Deck-Suche ist der ganze Ertrag (Gruppe A, Al 14.9.) - unter der Such-Sperre unspielbar
   isPotion: true,
-  deferBroadcast: true, // Broadcast after selections, not before
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral; `commitAppearance()` unten = nach den Wahlen.
 
   canActivate(gs, pi) {
     // Not usable on the very first turn of the game
@@ -84,11 +84,8 @@ module.exports = {
       return { cancelled: true };
     }
 
-    // Broadcast card to opponent NOW (after player decisions finalized)
-    const oppSid = oppPs.socketId;
-    if (oppSid && engine.io) {
-      engine.io.to(oppSid).emit('card_reveal', { cardName: 'Magic Lamp' });
-    }
+    // Stream the card NOW (after player decisions finalized; W64b: zentral, auch für Zuschauer)
+    engine.commitAppearance();
     await engine._delay(100);
 
     // Step 2: Opponent picks 1 of the 3

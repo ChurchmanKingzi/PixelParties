@@ -25,7 +25,7 @@ function normalizeType(cardType) {
 }
 
 module.exports = {
-  deferBroadcast: true,
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral (Auftritts-Puffer) VOR dem ersten Effektschritt, nach der letzten abbrechbaren Wahl.
   deleteOnUse: true,
 
   canActivate(gs, pi, engine) {

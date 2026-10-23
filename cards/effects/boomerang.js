@@ -74,7 +74,7 @@ function artifactsInOwnDiscard(ps) {
 
 module.exports = {
   isTargetingArtifact: true,
-  deferBroadcast: true,
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral (Auftritts-Puffer) VOR dem ersten Effektschritt, nach der letzten abbrechbaren Wahl.
 
   /**
    * Activatable iff the player's discard pile contains at least one
