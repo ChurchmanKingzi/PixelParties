@@ -227,8 +227,8 @@ function DebuffSelector({ side, selected, onChange, isOpen, onToggle, onClose, k
         className="pz-debuff-btn"
         onClick={onToggle}
         style={{
-          padding: kompakt ? '3px 2px' : '6px 10px',
-          fontSize: kompakt ? 10 : 11, fontWeight: 700,
+          padding: kompakt ? '9px 4px' : '6px 10px',
+          fontSize: kompakt ? 14 : 11, fontWeight: 700,
           background: isOpen ? `rgba(${isOpp ? '255,136,68' : '136,204,255'},.18)` : 'rgba(0,0,0,.25)',
           border: `1px solid ${accent}55`,
           color: accent,
@@ -303,7 +303,6 @@ function HandNebenspalte({ si, seite, gold, onGold, ...debuffProps }) {
   return (
     <div className="pz-hand-extras">
       <label className="pz-gold-feld" title="Starting Gold (−999 … 999)">
-        <span aria-hidden="true">💰</span>
         {/* Negatives Gold ist seit dem Debt-O-Tron-Archetyp ein
             gueltiger Zustand und muss auch im Puzzle einstellbar sein
             (Als Vorgabe 16.8.). Untergrenze −999, Obergrenze 999, und
@@ -315,7 +314,9 @@ function HandNebenspalte({ si, seite, gold, onGold, ...debuffProps }) {
         <input className="input" type="number" min="-999" max="999"
           value={gold ?? 0}
           onChange={(e) => onGold(Math.min(999, Math.max(-999, parseInt(e.target.value) || 0)))}
-          style={{ color: (gold ?? 0) < 0 ? '#fe5154' : undefined }} />
+          style={{ caretColor: '#fad54a' }} />
+        {/* Die Zahl selbst zeichnet dieses Element in Gold (Verlauf, Kontur, Schiller) — das Feld darunter nimmt nur die Eingabe an */}
+        <span className={'pz-gold-zahl pp-gold-zahl' + ((gold ?? 0) < 0 ? ' gold-negative' : '')} aria-hidden="true">{gold ?? 0}</span>
       </label>
       <DebuffSelector side={seite} kompakt {...debuffProps} />
     </div>
