@@ -43527,7 +43527,12 @@ this._deathWatch = (this._deathWatchStack || []).length
    * so the player can't actually act on it.
    */
   queuePostChainAction(fn) {
-    if (typeof fn === 'function') this._postChainActions.push(fn);
+    if (typeof fn !== 'function') return;
+    // In einem CPU-Rollout (`_inMctsSim`) eingereiht = gehoert zur Simulation. Der Rollout spielt auch den Zug des
+    // MENSCHEN nach (z. B. Gate to the Armory: Closure `advanceToPhase(pi, 5)`); im echten Spiel darf sie nie laufen
+    // (`_runPostChainActions` verwirft markierte Eintraege). `restore()` kappt zusaetzlich die Warteschlange.
+    if (this._inMctsSim) fn._ausSimulation = true;
+    this._postChainActions.push(fn);
   }
 
   /** Drain the post-chain action queue (sequentially). Snapshots +
@@ -43557,7 +43562,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // NOT re-looped here — that's picked up at the next legitimate
       // drain point (next play socket `.finally` / CPU dispatcher).
       // An unbounded `while` risked an infinite re-queue hang.
-      const batch = this._postChainActions;
+      const batch = this._inMctsSim
+        ? this._postChainActions
+        : this._postChainActions.filter(fn => !fn._ausSimulation);   // Rollout-Reste nie im echten Spiel ausfuehren
       this._postChainActions = [];
       for (const fn of batch) {
         try { await fn(); }
