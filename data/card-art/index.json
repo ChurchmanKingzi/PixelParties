@@ -4403,6 +4403,10 @@
 "id": "The_Masters_Key",
 "kind": "a"
 },
+"The Master's Orders": {
+"id": "The_Masters_Orders",
+"kind": "a"
+},
 "The Master's Plan": {
 "id": "The_Masters_Plan",
 "kind": "a"
@@ -4579,6 +4583,14 @@
 "id": "Transdimensional_Stab",
 "kind": "b"
 },
+"Transmission": {
+"id": "Transmission",
+"kind": "a"
+},
+"Trap Sabotage": {
+"id": "Trap_Sabotage",
+"kind": "a"
+},
 "Trapping": {
 "id": "Trapping",
 "kind": "a"
@@ -4605,6 +4617,10 @@
 },
 "Treasure Skeleton": {
 "id": "Treasure_Skeleton",
+"kind": "a"
+},
+"Treasure Theft": {
+"id": "Treasure_Theft",
 "kind": "a"
 },
 "Tri Ad, the Puppet Mistress": {
@@ -4737,6 +4753,10 @@
 },
 "Voice in your Head": {
 "id": "Voice_in_your_Head",
+"kind": "a"
+},
+"Voodoo Curse": {
+"id": "Voodoo_Curse",
 "kind": "a"
 },
 "Waflav, the Metamorphing Monstrosity": {
