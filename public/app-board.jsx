@@ -2994,6 +2994,7 @@ const HERO_TOENUNGEN = [
   // Zeichenschritt).
   { status: 'cursed',       puls: [150, 40, 225], min: 0.06, max: 0.55 },
   { status: 'charmed',      puls: [255, 85, 190], min: 0.06, max: 0.5 },
+  { status: 'mind_controlled', puls: [118, 92, 255], min: 0.06, max: 0.5 },     // 23.10. Mind Control: blau-violett pulsierend
 ];
 
 // kleiner fester Zufall je Figur und Effekt
@@ -8651,6 +8652,49 @@ const HandLevelDownEffect = (() => {
     }
   };
   return ppPunktBild(malen, ENDE + 40, 150, 210, vorbereiten);
+})();
+
+// ═════════════════════════════════════════════════════════════════
+//  Mind Control: Hypnose-Spirale (`mind_control_hex`) — PIXELART, Hülle `ppPunktBild`; läuft über dem übernommenen Helden
+//
+//  Eine Spirale in fünf Violett-Tönen (Bänder, die in ganzen Schritten — ~10 Bilder/s — gegen den Uhrzeigersinn weiterdrehen) legt sich über die Karte: sie dithert
+//  ein (0 → 260 ms), dreht sich ~900 ms und dithert ab ~1150 ms wieder weg (fort bei 1500 ms). Ein heller Ring weitet sich einmal von der Mitte aus, vier Kreuzfunkel
+//  blitzen an den Ecken. Die Karte darunter bleibt lesbar (Spirale nur als Gitter-Dither über einem Teil der Pixel). Feste Palette, kein Leuchten.
+// ═════════════════════════════════════════════════════════════════
+const MindControlHexEffect = (() => {
+  const PAL = ['#f1e5fa', '#d6b3f9', '#ba74ff', '#7a2bd0', '#401a66'].map(ppHex);
+  const ENDE = 1500, EIN = 260, FADE_AB = 1150, DREH_MS = 100;
+  const ARM = [1, 2, 3, 2, 1];
+  const vorbereiten = (sz) => ({
+    ecken: [[-1, -1, 80], [1, -1, 240], [1, 1, 400], [-1, 1, 560]].map(([sx, sy, start]) => ({ x: sx * sz.hw * 0.95, y: sy * sz.hh * 0.9, start })),
+  });
+  const malen = (g, t, sz, teile) => {
+    const ein = Math.min(1, t / EIN), aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    const a = Math.min(ein, aus) * 0.75;                                                // höchstens drei Viertel der Pixel → Karte bleibt lesbar
+    if (a <= 0) return;
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
+    const RX = Math.round(sz.hw * 1.05), RY = Math.round(sz.hh * 1.05);
+    const schritt = Math.floor(t / DREH_MS);                                            // ganze Drehschritte
+    for (let y = -RY; y <= RY; y++) for (let x = -RX; x <= RX; x++) {
+      const nx = x / RX, ny = y / RY, r = Math.hypot(nx, ny);
+      if (r > 1) continue;
+      const w = Math.atan2(ny, nx) / (Math.PI * 2) + 0.5;
+      const v = ((w * 3 + r * 2.2 - schritt / 8) % 1 + 1) % 1;                          // drei Spiralarme
+      if (v > 0.5) continue;
+      const band = Math.min(4, Math.floor(r * 4.2));
+      g.put(cx + x, cy + y, PAL[4 - band > 3 ? 3 : 4 - band], a);
+    }
+    if (t > 120 && t < 720) {                                                           // heller Ring, einmal von innen nach aussen
+      const k = (t - 120) / 600, R = Math.round(k * Math.max(RX, RY) * 1.1);
+      for (let i = 0; i < 64; i++) { const w = i / 64 * Math.PI * 2; g.put(cx + Math.cos(w) * R * (RX / Math.max(RX, RY)), cy + Math.sin(w) * R * (RY / Math.max(RX, RY)), PAL[0], (1 - k) * 0.9 * aus); }
+    }
+    for (const e of teile.ecken) {
+      const k = (t - e.start) / 420;
+      if (k < 0 || k >= 1) continue;
+      ppKreuzfunkel(g, cx + e.x, cy + e.y, ARM[Math.floor(k * ARM.length)], [PAL[0], PAL[1], PAL[2], PAL[3]], aus);
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 200, 260, vorbereiten);
 })();
 
 // ═══════════════════════════════════════════════════════════════════
@@ -17425,6 +17469,7 @@ const ANIM_REGISTRY = {
   dragonegg_shimmer: DragoneggShimmerEffect,
   liquid_rainbow: LiquidRainbowEffect,
   hand_level_down: HandLevelDownEffect,
+  mind_control_hex: MindControlHexEffect,
   // ── Circles of Hell (Animationen) ──────────────────────────────────
   // Farben aus den Pixelart-Hintergruenden der Kreise (Flammen #f8f8bd … #520a0c).
   // ★ The Sixth Circle: Hoellen-Charme — blutrote Siegelringe, aufsteigende Schlieren, dunkler Blitz.

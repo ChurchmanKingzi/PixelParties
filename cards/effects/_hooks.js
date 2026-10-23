@@ -421,6 +421,10 @@ const STATUS_EFFECTS = {
   // ihres urspruenglichen Besitzers. Die Sperre der uebrigen Status
   // nimmt ihn selbst aus („its OTHER status effects").
   aged:      { negative: true, cleansable: true, label: 'Aged',      icon: '⏳', immuneKey: 'aged_immune' },
+  // `mind_controlled` (23.10.) — angelegt von „Mind Control" und AUSSCHLIESSLICH an diese Karte gebunden (`attachmentStatus`): „This is treated as a negative status effect."
+  // Der Status ist der Griff für Heilen/Übertragen: wird er entfernt (Cure, Beer, Juice …), fällt die Karte in die Ablage ihres Besitzers und mit ihr die dauerhafte Kontrolle über den
+  // Wirtshelden (`cards/effects/mind-control.js`, `onCardLeaveZone`). Heilbar wie Cursed.
+  mind_controlled: { negative: true, cleansable: true, label: 'Mind Controlled', icon: '🧠', immuneKey: 'mind_control_immune' },
   // `soul_transmitted` (v1330, „Soul Transmigration Ritual"): Debuff am
   // wiederbelebten Helden. NICHT ENTFERNBAR (`unremovable` — gilt fuer
   // jede Entfernung, auch fuer Eintraege ohne `unhealable`, etwa aus dem
