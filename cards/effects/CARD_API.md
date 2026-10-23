@@ -363,6 +363,9 @@ for w in scripts/check-*.js; do node $w || echo "ROT: $w"; done
    auch allein? Fliegt die Karte? Öffnet sich die Galerie mit Inhalt?
    Greift der Schutz auch gegen Flächenschaden?
 5. Ist die Karte fertig, liegt sie im ZIP — mit `data/cards.json`.
+6. **Auftritt erst nach dem Commit (W63d, MANDATORY):** hat die Karte eine abbrechbare Frage (`cancellable: true`, Kosten-/Zielwahl, Galerie, Zone), zeigt sie sich dem Gegner/Zuschauer erst HINTER der letzten
+   solchen Stelle. Kein `_firePendingCardReveal()` davor; Wahlen, die vor einem Konter stehen müssen, in `payArtifactCost`/`payActivationCost`/`paySummonCost`; keine direkten `io.to(…).emit`-Sendungen an den Gegner.
+7. Repro mit `lib/wire.js`: `W.durchlauf` + `W.pruefeDurchlauf` (Durchlauf + Abbruch an jeder abbrechbaren Stelle, Sitz 0 und 1) — und `repro/W63/d-07` bleibt grün.
 
 ## ★ ZIELENDE KARTEN SIND IMMER ABBRECHBAR — UND ZEIGEN SICH ERST BEIM AUFLÖSEN (Als Regel 23.9. — MANDATORY)
 
@@ -402,6 +405,9 @@ ERSTEN Klick"). Vorbild: Ultimate Weapon Experiment (Galerie → Held).
 Dasselbe gilt für ALLES Sichtbare vor dem Zusagepunkt: kein Flug, keine
 Animation, kein Klang (v1122, Brainstorming).
 
+> **★ Seit W63d (22.10.2026) setzt die Engine das ZENTRAL durch** — siehe den Abschnitt „AUFTRITT STREAMEN — ERST NACH DEM COMMIT" direkt darunter. `deferReveal`/`deferBroadcast`
+> und das Muster mit `_holdCardReveal` bleiben gültig, sind aber für den Regelfall nicht mehr nötig; eine bestätigte Antwort allein committet NICHT mehr.
+
 **4. Nicht wählbare Ziele werden ausgegraut, nicht verschwiegen**
 (Als Regel 21.8., für die zentrale Zielwahl nachgezogen in v1294):
 `t.ineligible = true` statt aus der Liste nehmen. Der Server lässt
@@ -440,6 +446,56 @@ wird gewählt und sofort gewirkt: Taio, Zi, Archibald, Learning, Rubin, Call for
 
 **Prüfung im Repro (Pflicht):** Abbruch an jeder Stufe → `_spellCancelled`
 bzw. `false`, Karte in der Hand, KEIN `card_reveal`, keine Animation.
+
+## ★ AUFTRITT STREAMEN — ERST NACH DEM COMMIT (Als Regel Al, 22.10.2026 — MANDATORY, zentral durchgesetzt)
+
+> Al (Treasure Hunter's Backpack): „Eine Karte streamed ihren Auftritt IMMER erst, nachdem es keine Cancel-Option mehr gibt, also nachdem sie für ihren Einsatz komplett committed wurde
+> (alle Auswahlen/Zielwahlen/Kostenwahlen abgeschlossen, keine Abbruchmöglichkeit mehr). Solange der Spieler noch abbrechen kann, darf der Gegner die Karte nicht sehen — sonst verrät ein
+> Abbruch verdeckte Information (Karteninhalt/Kartenwahl)."
+
+### Was „Auftritt" ist und wer ihn sieht
+**Alles**, was an Gegner und Zuschauer geht und die Karte verrät: das Bild (`card_reveal`), die Protokollzeile (`card_played`, `spell_played`, `creature_fizzle`, `sacrifice_cancelled` … — jede
+`engine.log`-Zeile geht als `action_log` an alle), der Flug (`hand_to_board_fly`, `play_pile_transfer`), die Aktivierungs-/Auflösungs-Animation (`ability_activated`, `potion_resolved`, `play_zone_animation` …),
+der Beschwörungsschein (`summon_effect`) und der **Zustand** (`game_state`: `potionTargeting.potionName`, `resolvingCard`, Titel/Galerie einer `effectPrompt`). Der Besitzer sieht natürlich alles sofort;
+der Gegner sieht vor dem Commit nur „Opponent is choosing …" (Typ der Frage, `opponentTitle` falls die Karte ihn ausdrücklich setzt) — **keinen** Kartennamen, kein Bild, keinen Kartentext.
+**Commit** = die letzte Stelle, an der ein Abbruch die Karte noch zurückgibt (Karte bleibt auf der Hand / im Deck, nichts bezahlt, Rundensperre frei) ist überschritten.
+
+### Wie die Engine es zentral durchsetzt (kein Kartencode nötig)
+1. Jeder Spielweg merkt den Auftritt VOR der ersten abbrechbaren Stelle vor: `gs._pendingCardReveal = { cardName, ownerIdx }` (Zauber/Attack ab Spielbeginn, Ziel-Artefakt/Trank mit „Bestätigen", Artefakt/Trank
+   ohne Ziel, Ability-/Helden-/Kreatur-/Ausrüstungs-/Area-/Permanent-Aktivierung; Kreatur-Beschwörung und Ablage-Effekt als **stumme** Vormerkung `stumm: true` = kein `card_reveal`, nur der Puffer).
+2. Solange die Vormerkung offen ist, hält der **Auftritts-Puffer** (`pending.outbox`) alles zurück, was an Gegner/Zuschauer ginge — durch die vier Engpässe `engine._broadcastEvent` (inkl. `log` → `action_log`),
+   `_opp.emitToOpponentsGs`, `server.sendToSpectators` und den Zustandsversand (`potionTargetingFuer`, `effectPromptFuer`, `resolvingCard`). Wer direkt `io.to(sid).emit(…)` ruft, **umgeht den Puffer** — nicht tun.
+3. **Commit** (Puffer wird ausgeliefert, dann `card_reveal` + Protokollzeile) bei der ersten dieser Gelegenheiten:
+   * die erste **sichtbare Wirkung** (jedes Ereignis außer den Ankündigungs-Ereignissen `action_log`, `hand_to_board_fly`, `ability_activated`, `potion_resolved`), während der Besitzer **keine Frage offen** hat;
+   * eine **Frage an den anderen Spieler** (Reaktionsfenster, „Gegner wählt zuerst", Suche zeigen) — er muss wissen, worauf er antwortet; der Besitzer hat die Karte da verbindlich gespielt;
+   * das **Ende der Auflösung** (Server) bzw. ein **Phasenwechsel** (Sicherheitsnetz);
+   * ein ausdrücklicher **`engine.commitAppearance()`** der Karte (= `_firePendingCardReveal`);
+   * die CPU zeigt sofort (`maybeFireCpuRevealEarly`, nichts zu verbergen).
+4. **Abbruch**: der Spielweg löscht `gs._pendingCardReveal` (`delete`) — der Puffer verfällt mit. Kein Ereignis, keine Zeile, kein Name im Zustand; die Rückerstattung bleibt wie bisher (Karte auf der Hand, Aktion zurück …).
+5. **Eine bestätigte Antwort allein ist KEIN Commit** (mehrstufige Wahl Galerie → Held → Zone: erst die letzte Stufe schließt den Abbruch aus). `gs._holdCardReveal = true` hält den Commit weiterhin bis zur
+   ausdrücklichen Freigabe zurück (Muster Ultimate Weapon Experiment).
+
+### Pflichten für neue Karten — wo `commit` zu markieren ist
+* **Regelfall: nichts tun.** Fragen (`promptGeneric`/`promptEffectTarget`/`promptDamageTarget` …) mit `cancellable: true` VOR der ersten Wirkung genügen; der Auftritt kommt von selbst mit der ersten sichtbaren Wirkung.
+* **Kein Früh-Auftritt vor einer abbrechbaren Frage.** `if (gs._pendingCardReveal) engine._firePendingCardReveal()` am Anfang des `onPlay` ist VERBOTEN, wenn danach noch eine abbrechbare Frage kommt
+  (Accusation und Spreading Rumor taten es, „damit der Gegner nicht auf einen Mystery-Cast starrt" — das war der Fehler). Explizit committen nur HINTER der letzten abbrechbaren Stelle: `engine.commitAppearance()`
+  (Vorbilder: Mischief Militia - SnowItAll, Psychic Scout, Slippery Skates — sie stellen die Vormerkung bis zur Zonenwahl zurück und committen dann).
+* **Wahlen, die VOR dem Reaktionsfenster stehen müssen** (der Gegner darf die Karte negieren; die Wahl darf dann nichts berührt haben und nicht mehr zurückgenommen werden): in den Vorab-Haken
+  `payArtifactCost` / `payActivationCost` / `paySummonCost` (liefern `false` bei Abbruch, sonst Daten für `resolve(…, kosten)`). Vorbild: **Treasure Hunter's Backpack** (Artefakt-Galerie + Träger/Zone → `{ wahl }`;
+  `resolve` prüft sie erneut und fragt nur bei verschobenem Zustand/ohne Vorab-Wahl noch einmal). Danach öffnet sich das Reaktionsfenster; die Frage an den Gegner committet den Auftritt.
+* **Eigene Sendungen an den Gegner** nur über `engine._broadcastEvent`, `emitToOpponentsGs` (`cards/effects/_opp.js`) und `sendToSpectators` — nie `engine.io.to(oppSid).emit(…)` (umgeht den Puffer).
+  Sendest du bewusst VOR der Auflösung etwas, das keine Wirkung ist (Ankündigung), gehört der Ereignisname in `AUFTRITT_HALTE_EREIGNISSE` (`_engine.js`).
+* **Der Server schickt `animationType` (Ziel-Artefakt/Trank) beim Start der Auflösung** (`potion_resolved`) — er ist ein Ankündigungs-Ereignis und wird bis zum Commit gehalten; die Karte braucht nichts zu tun.
+* **Protokollzeilen mit dem Kartennamen im Abbruchzweig** (`creature_fizzle`, `sacrifice_cancelled`, `targeting_blocked` mit `source`) sind harmlos, WENN die Vormerkung noch offen ist (der Puffer verwirft sie) —
+  schreibe sie aber nie NACH dem `delete gs._pendingCardReveal`, und nie mit dem Kartennamen in Zeilen, die vor jeder Vormerkung entstehen (Server-Sitzungsebene).
+* **Fragen, die zuerst der GEGNER beantwortet** (Bottled Flame, Overflowing Chalice, Duel): der Auftritt kommt vor seiner Frage — das ist Absicht (die Karte ist dann verbindlich gespielt). Spätere „abbrechbare"
+  Fragen des Spielers (Abwurf annehmen?) geben die Karte nicht mehr zurück und sind keine Abbruchstellen im Sinne dieser Regel.
+* **Verdeckt gelegte Karten** (Surprise face-down) verraten ihren Namen auch nicht auf der Leitung: `broadcastHandToBoard` lässt `cardName` bei `faceDown: true` weg.
+
+### Prüfung im Repro (Pflicht für jede Karte mit abbrechbarer Frage)
+`docs/niche-tests/lib/wire.js` (Leitungs-Harness, MENSCH-Modus, echte `do*`-Handler): zeichnet jede Nachricht an Gegner-Sitz und Zuschauer auf, verschränkt mit den Fragen an den Spieler.
+`W.durchlauf(mk, seat, name, o)` + `W.pruefeDurchlauf(R, label, d, o)`: ein Durchlauf und je ein Abbruch ab JEDER abbrechbaren Stelle — „nichts vor der letzten echten Abbruchstelle, danach der Auftritt; Abbruch → nichts
+(Ereignis, Zeile, Zustand), Karte noch auf der Hand". Der Sweep `docs/niche-tests/repro/W63/d-07-…` spielt ALLE Handkarten mit möglicher Abbruchfrage durch und ist der Wächter gegen neue Verstöße.
 
 ## ★ JEDE **NEUE** ANIMATION BRAUCHT EINEN KLANG (Als Regel 19.8.)
 
@@ -23713,3 +23769,61 @@ Befunde von Al (Spieldesigner), „wahrscheinlich größere Bug-Klassen": (1) Ei
 3. Surprise Party: spielbar nur mit freier Zone (der Name steht erst nach dem Aufdecken fest); ein geteilter Platz ist nur Rückfall — okay?
 4. Sollen BEWEGUNGEN (Guard Change, Slippery Skates/Ice, Memory Blast, Jumper-Spider-Transfer) die Teilung nutzen dürfen (Slime in die Zone eines anderen Slimes ziehen)? **Derzeit nein.**
 5. Reincarnation (Kreatur-Modus braucht 3 freie Zonen: 2 für die Pollution Tokens + 1): mit Alice-Teilung nur 2 freie + die geteilte Zone? **Derzeit unverändert.**
+
+
+## Welle 63 / W63d — Auftritt erst nach dem Commit · zentraler Auftritts-Puffer · Audit aller Spielwege
+
+Befund von Al (Spieldesigner): „**Treasure Hunter's Backpack streamed sein Bild bereits an den Gegner, bevor die Karte committed ist.**" Regel (Vertragsabsatz: Abschnitt „★ AUFTRITT STREAMEN — ERST NACH DEM COMMIT" oben, Prüfliste Punkt 6/7):
+Eine Karte streamed ihren Auftritt IMMER erst, nachdem es keine Cancel-Option mehr gibt. Repros: `docs/niche-tests/repro/W63/d-01` … `d-08` (alle auf dem Stand vor W63d rot), Harness `docs/niche-tests/lib/wire.js`. Sammelübersicht: `docs/niche-tests/FIXES-WELLE-63d.md`.
+
+### 1) Ursache (Backpack)
+* Das Backpack ist ein Ziel-Artefakt (`isTargetingArtifact`, `getValidTargets: () => []`) ohne `deferReveal`. `doConfirmPotion` sendete bei Nicht-`deferReveal`-Karten **sofort** `card_reveal` + die Protokollzeile `card_played` — mit dem „Unpack!"-Klick, noch VOR der Artefakt-Galerie (abbrechbar) und der Träger-/Zonenwahl (abbrechbar). Abbruch → der Gegner hatte die Karte gesehen, sie lag aber auf der Hand; die danach erneut geöffnete Zielwahl sendete den Auftritt ein zweites Mal.
+* Ereignisprotokoll VORHER (Sitz 0 spielt, Gegner = S1, Zuschauer = SPEC): `prompt(Unpack) → answer → action_log(card_played) → S1/SPEC card_reveal → prompt(Galerie, abbrechbar) → answer → prompt(Zone, abbrechbar) → answer → … Animationen`. NACHHER: `prompt(Unpack) → prompt(Galerie) → prompt(Zone) → [erst jetzt: Puffer-Auslieferung] pile_take-Log → card_reveal → card_played-Log → Animationen` (bzw. VOR der Frage an den Gegner, wenn der ein Reaktionsfenster hat).
+* **Klasse**, nicht Einzelfall: (a) jede Ziel-Karte ohne `deferReveal`/`deferBroadcast`; (b) bei mehrstufiger Wahl löste die ERSTE bestätigte Antwort den Auftritt aus (`resolveEffectPrompt`/`resolveGenericPrompt` riefen `_firePendingCardReveal`); (c) Ankündigungs-Ereignisse und Protokollzeilen, die vor jeder Vormerkung liefen (`hand_to_board_fly` bei Attachments, `ability_activated`, `potion_resolved` beim Start der Auflösung, `creature_fizzle`/`sacrifice_cancelled` mit Kartennamen); (d) der **Zustand**: `game_state` an den Gegner enthielt `potionTargeting.potionName`/`config.description`, `players[i].resolvingCard.name` und Titel/Galerie jeder `effectPrompt` — für JEDE Zielwahl; (e) die Vorschau-Geisterkarte der Zusatzaktions-Wahl (`pending_placement`); (f) Früh-Auftritte in Karten vor einer abbrechbaren Frage (Accusation, Spreading Rumor).
+
+### 2) Lösung (zentral, wenige Nebenwirkungen)
+* **Auftritts-Puffer** in der Engine (`_auftrittEntscheide`, `_auftrittHaelt`, `_auftrittAusliefern`, `commitAppearance`): siehe Vertragsabsatz. Er sitzt an den vier Engpässen, durch die alles zum Gegner/Zuschauer läuft; Karten brauchen im Regelfall NICHTS zu tun. Die CPU (`maybeFireCpuRevealEarly`) zeigt weiter sofort; MCTS/`_fastMode` unberührt.
+* **Nebenwirkung, bewusst:** der Auftritt kommt bei Zielwahl-Karten nicht mehr mit der Zielbestätigung, sondern mit der **ersten sichtbaren Wirkung** (Schadens-Animation …) — also praktisch im selben Augenblick, aber nicht mehr vor einer weiteren abbrechbaren Stufe. Eine Karte, die nach der letzten Wahl nur still den Zustand ändert, zeigt sich am Ende ihrer Auflösung.
+* **Backpack:** Artefakt- und Träger-/Zonenwahl in `payArtifactCost` (vor dem Reaktionsfenster); Abbruch an irgendeiner der drei Stellen = Karte bleibt auf der Hand, nichts bezahlt, nichts gesehen; negiert der Gegner (Tool Freezer), bleibt das Deck unberührt. (Früher ging ein Abbruch in der Galerie zurück in die „Unpack!"-Zielwahl und sendete den Auftritt erneut.)
+* **Zustand:** `potionTargetingFuer` (Gegner/Zuschauer: nur `ownerIdx`), `players[i].resolvingCard` für den anderen Spieler nur `{ hidden: true }`, `effectPromptFuer(…, gs)`: Frage eines Spielers mit offener Vormerkung oder jede `cancellable`-Frage erreicht den Gegner nur als Hülle (Typ, `opponentTitle`/`opponentSubtitle`/`showOpponentWaiting`). Der Client braucht dafür keine Änderung (er las bei fremden Fragen nur Typ und Wahrheitswerte; der Wartetext „… for X" fällt auf „… a target" zurück).
+* **Kleines Zubehör:** `broadcastHandToBoard` lässt bei `faceDown: true` den Kartennamen weg (verdeckte Surprise verriet sich auf der Leitung); `targeting_blocked`-Protokollzeilen der Server-Sitzungsebene ohne `source`; `pending_placement` wird nicht mehr an den Gegner weitergereicht (`opponent_targeting` mit reinen Ziel-IDs bleibt); `skillTestHandlers` exportiert `sendGameState`/`sendSpectatorGameState` (für die Harness).
+
+### 3) Audit-Tabelle — wann wird der Auftritt gesendet?
+Methode: (1) Quelltext-Durchgang aller Server-Spielwege (`doPlay*`, `doUse*`, `doActivate*`, `doConfirmPotion`) und Engine-Wege; (2) Sweep über ALLE 1184 spielbaren Handkarten und 297 Aktivierungen mit der Leitungs-Harness (Abbruch ab jeder abbrechbaren Stelle): VORHER 27 Karten mit Ereignis-Leck und 148 mit Zustands-Leck (121 nur Zustand) von 705 Karten mit möglicher Abbruchfrage, 10 Aktivierungen mit Ereignis-Leck — NACHHER 1 Karte (Forceful Revival, s. u.) und 0 Aktivierungen.
+
+| Weg / Karte | Streaming-Zeitpunkt VORHER | NACHHER | Abbrechbare Fragen davor |
+|---|---|---|---|
+| `doPlaySpell` (Spell/Attack aus der Hand, auch Attachment/Area/Reaction) | `spell_played`+`card_reveal` bei der ERSTEN bestätigten Antwort (mehrstufig: nach Stufe 1); Attachments: `hand_to_board_fly` mit Kartenname sofort beim Ablegen; `payActivationCost`-Abbruch schrieb `sacrifice_cancelled` mit Namen | Vormerkung ganz am Anfang (vor Flug, Kostenwahl, Reaktionsfenster); Commit mit erster sichtbarer Wirkung / Frage an den Gegner / Ende der Auflösung | Kostenwahl, Heldenwahl, Zielwahl(en), Galerie/Namen/Zone (Alluring Light, Capture, Golem Smash, Gate to the Armory, Create Illusion, Shapeshift ×3, Anti Magic & Co., Sacrifice to Divinity) |
+| `doPlayCreature` (Hand → Support Zone) | Flug/`summon_effect`/Log beim Landen (ok); Abbruchzweige (Opfer-/Tribut-Wahl, `beforeSummon`, Zone) schrieben `creature_fizzle`/`sacrifice_cancelled` MIT Kartennamen an den Gegner | stumme Vormerkung ab Beginn (`stumm`: kein `card_reveal`), Commit beim Landen; `summon_effect` über den zentralen Weg | Opfer-/Tribut-Wahl (`paySummonCost`), `beforeSummon`-Fragen (Archer/Warrior/Guardian of Teocuilatl, 500 Piranhas, Doctor Fester, Knight of Kings [W], The Egg of God …) |
+| `doPlayArtifact` (Ausrüstung) | Drop = Commit: Flug + `card_reveal` + Log sofort | unverändert (Platz mit dem Drop gewählt) | keine |
+| `doUseArtifactEffect` (Artefakt ohne Ziel) | Vormerkung (außer `deferBroadcast`), Auftritt bei erster Antwort; `payArtifactCost` vor dem Fenster | Vormerkung + Puffer, Commit wie oben | Kosten (`payArtifactCost`), Fragen in `resolve` (Difficulty Lever, Cool Repair, The Eye of Ren, Mysterious Core, Magic Cobalt/Ruby …) |
+| `doUsePotion` → Zielsitzung → `doConfirmPotion` (Ziel-Artefakt/-Trank) | **sofort mit „Bestätigen"** (nur `deferReveal`/`deferBroadcast` hielten zurück); `potion_resolved` beim Start der Auflösung; Zustand mit `potionName` | Vormerkung IMMER; `potion_resolved` als Ankündigung gehalten; Zustand maskiert | Zielsitzung (Bestätigen), Galerie/Held/Zone in `resolve` (**Treasure Hunter's Backpack ×3**, Blood-Soaked Coin: Schadenshöhe nach der Explosion, Sword in a Bottle, Ladder to the Sky: Opferwahl) |
+| `doUsePotion` (Trank ohne Ziel) | `card_reveal` sofort + 100 ms (außer `deferBroadcast`) | Vormerkung + Puffer | Fragen in `resolve` (Overflowing Chalice/Bottled Flame: Gegner zuerst, danach nichts mehr rückgängig) |
+| `deferBroadcast`-Karten (Magic Lamp, Monster/Planet/Horn in a Bottle, Alchemic Journal, Boomerang, The Yeeting, Birthday Present, Hive's Crown, Shard of Chaos, Staff of Illusions, Elixir of Immortality) | zeigen sich selbst (`engine.io.to(oppSid).emit`) an ihrer Zusagestelle; Zustand verriet den Namen (Titel der Frage) | Zustand maskiert (jede abbrechbare Frage ist für den Gegner eine Hülle); eigener Auftritt unverändert | je Karte eigene Auswahlen |
+| `doPlayAbility` / `doPlaySurprise` | Drop = Commit; verdeckt: `hand_to_board_fly` trug den Kartennamen | Name bei `faceDown` weggelassen | keine |
+| `doActivateAbility` (Ability mit Aktionskosten) | `ability_activated` an alle VOR dem Handler, Vormerkung erst nach der Kette | Vormerkung vor Kette, Animation gehalten | Fragen in `onActivate` (HOPT-Rückgabe bei Abbruch) |
+| `doActivateFreeAbility` | Vormerkung vor Handler, Auftritt bei erster Antwort | Commit wie oben; `ability_activated` erst nach Commit | Diplomacy, Necromancy, Occultism (zweistufig) |
+| Heldeneffekt (`resolveHeroEffectActivation`), Kreatur-Effekt, Ausrüstungs-Effekt, Area-Effekt | Auftritt bei erster Antwort (mehrstufig: zu früh), Einzelfrage: vor der Frage | Puffer + Commit wie oben | Brackle, Garius, Lolek, Teocuilatl (Held); Crystal Well, Deepsea Castle, Slippery Ice (Area) |
+| `doActivatePermanent` | `card_reveal` + `permanent_activated` sofort | Vormerkung; bei Abbruch (`false`) nichts | Fragen in `onActivatePermanent` |
+| `doActivateDiscardEffect` (Future Tech Prototypes, Mountain Boars) | Log `discard_effect_activated` sofort, auch bei Abbruch | stumme Vormerkung + Log erst bei Erfolg | Fragen in `onDiscardEffect` |
+| Zusatzaktions-Güsse (`_castSpellImmediately`, `gussAuftritt…`) | erste bestätigte Antwort | Puffer; `gussAuftrittBeenden` committet am Ende | Taio, Archibald, Learning, Difficulty Lever … (Zielwahl des gewirkten Spells) |
+| Hand-Reaktionen, Surprise-Aktivierung, Kettenglieder | Karte bezahlt + abgelegt, dann `card_reveal` | unverändert (Commit = Aktivierung bestätigt) | Wahl des Wirkers vor der Bezahlung (kein Auftritt davor) |
+| Hand-aktivierte Effekte (Luna Kiai, Mana Absorbing Crystal, Stormkissed Waflav, Inconspicuous Lawn Gnome) | zeigen sich selbst nach der Zielwahl | unverändert | Zielwahl |
+| Client → Server: `pending_placement` | Geisterkarte (Name!) beim Gegner, während der Spieler den Zusatzaktions-Geber wählt (abbrechbar) | wird nicht weitergegeben | Geber-Wahl |
+| Client → Server: `targeting_update` → `opponent_targeting` | Ziel-IDs der gerade markierten Ziele beim Gegner | unverändert (nur IDs, kein Kartenbezug) | Zielwahl |
+| Drag-Start / Hover einer Handkarte | nichts auf der Leitung (kein Socket-Ereignis vor dem Ablegen) | unverändert | — |
+| Spectator-Strom | dieselben Sendungen wie der Gegner (Ereignisse, Zustand) | derselbe Puffer / dieselbe Maskierung (`sendToSpectators`, `sendSpectatorGameState`) | — |
+| Accusation, Spreading Rumor | `_firePendingCardReveal()` am Anfang des `onPlay`, VOR dem abbrechbaren Namens-Dialog | Früh-Auftritt entfernt (Skriptänderung) | Namenswahl |
+| Forceful Revival (**Rest, nicht behoben**) | Ramm-/Zonen-Animation (`play_ram_animation`) VOR der Beschwörung der wiederbelebten Karte; hat sie eine abbrechbare Opfer-/Tribut-Wahl (Archer/Warrior/Guardian of Teocuilatl, 500 Piranhas …), wird der ganze Zauber danach abgebrochen | unverändert — `summonFromDiscard` fragt die Beschwörungskosten NACH der Vor-Animation | Opferwahl der wiederbelebten Karte |
+
+### 4) Verträge für künftige Karten (Kurzfassung — Details im Vertragsabsatz)
+* Abbrechbare Frage → Auftritt kommt von selbst nach dem Commit. Kein Früh-`_firePendingCardReveal()` davor; ausdrücklich nur `engine.commitAppearance()` HINTER der letzten abbrechbaren Stelle.
+* Wahl vor einem möglichen Konter → `payArtifactCost` / `payActivationCost` / `paySummonCost` (Vorbild Backpack).
+* Nie direkt `io.to(…).emit` an den Gegner; Ankündigungs-Ereignisse in `AUFTRITT_HALTE_EREIGNISSE`.
+* Repro: `W.durchlauf` + `W.pruefeDurchlauf` (Sitz 0 und 1); `d-07` (Sweep) muss grün bleiben.
+
+### 5) Rückfragen an Al (Ja/Nein)
+1. **Geisterkarte der Zusatzaktions-Wahl** (`pending_placement`): der Gegner sah bisher die Creature halbtransparent im Zielplatz, während du den Geber wähltest. Nach der Regel darf er das nicht — jetzt entfernt. Lieber eine **verdeckte** Geisterkarte (Rückseite) statt gar nichts? (Client-Änderung)
+2. **Auftritt-Zeitpunkt bei Zielwahl-Karten** ist jetzt „erste sichtbare Wirkung" statt „Zielbestätigung" (praktisch gleich). Eine Karte, die nach der letzten Wahl nur still den Zustand ändert, zeigt sich erst am Ende der Auflösung. In Ordnung?
+3. **Forceful Revival** × wiederbelebte Karte mit abbrechbarer Opfer-/Tribut-Wahl: die Animation läuft vor dieser Wahl. Soll die Karte solche Kreaturen gar nicht erst anbieten (wie „Zone belegt"), oder soll die Kostenwahl VOR der Animation stehen?
+4. **Bottled Flame/Lightning, Overflowing Chalice, Duel** (der Gegner antwortet zuerst): der Gegner sieht die Karte vor seiner Frage — gewollt (die Karte ist dann verbindlich gespielt). Richtig so?
