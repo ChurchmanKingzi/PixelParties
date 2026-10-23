@@ -145,14 +145,15 @@ async function waehleAusruestPlatz(engine, pi, cardName, cfg = {}) {
 }
 
 /**
- * `cardName` aus `stapel` ('deck' | 'discard' | 'deleted') nehmen und in
+ * `cardName` aus `stapel` ('deck' | 'discard' | 'deleted' | 'hand') nehmen und in
  * die freie Zone `slot` von Held `heroIdx` legen. Liefert die neue
  * Instanz oder `null`, wenn nichts geschah (Zone inzwischen belegt,
  * Traeger nicht mehr legal, Karte weg, Stapel gesperrt).
  *
  * opts: `source` (Kartenname fuer Log/Sperren), `flug` (Standard an),
  *       `flugMs` (Wartezeit bis zur Landung, Standard 520 wie Riffel),
- *       `stapelBesitzer` (wessen Stapel; Standard `pi` — Looting nimmt auch aus der gegnerischen Ablage).
+ *       `stapelBesitzer` (wessen Stapel; Standard `pi` — Looting nimmt auch aus der gegnerischen Ablage),
+ *       `handIdx` (nur Stapel 'hand': der Handplatz der Karte; Mine! Mine! Mine!).
  */
 async function ruesteAusStapelAus(engine, pi, stapel, cardName, heroIdx, slot, opts = {}) {
   const ps = engine.gs.players[pi];
@@ -171,17 +172,39 @@ async function ruesteAusStapelAus(engine, pi, stapel, cardName, heroIdx, slot, o
   // ★ W16a (Al, Frage 3: „Ja!"): ein von Resistance abgefangener Effekt verbraucht den Einmal-Einsatz (Riffel, Weapon Collecting Wight …) — der Aufrufer liest `opts.blockiert`
   // (gesetzt NUR bei der Resistance-Abwehr, nicht bei den übrigen Fehlschlägen = `null` ohne Marke) und meldet den Einsatz als gewirkt.
   if (await engine.heroNonDamageEffectBlocked(seite, heroIdx, 'equip', { sourceOwner: pi, source: opts.source })) { opts.blockiert = true; return null; }
-  const genommen = await engine.takeFromPile(engine.gs.players[stapelBesitzer], stapel, cardName,
+  // 23.10. (Mine! Mine! Mine!): Stapel `'hand'` — die Karte kommt von einem Handplatz (`opts.handIdx`, sonst die erste Kopie). Die Handinstanz wird mit dem Platz
+  // verabschiedet; die Herkunft (gestohlene Karte: der Gegner) wandert als `originalOwner` auf die Brettinstanz, damit Ablage/Löschen später beim Besitzer landen.
+  const vonHand = stapel === 'hand';
+  let handIdx = null, handInstVor = null, herkunft = null;
+  if (vonHand) {
+    const hand = engine.gs.players[stapelBesitzer].hand || [];
+    handIdx = Number.isInteger(opts.handIdx) ? opts.handIdx : hand.indexOf(cardName);
+    if (handIdx < 0 || hand[handIdx] !== cardName) return null;
+    handInstVor = engine._findHandInstanceAt(stapelBesitzer, handIdx);
+    herkunft = engine._handOriginAt(engine.gs.players[stapelBesitzer], handIdx)
+      ?? (handInstVor && Number.isInteger(handInstVor.originalOwner) ? handInstVor.originalOwner : stapelBesitzer);
+  }
+  // Flug VOR der Zustandsänderung (Hand → Zone), damit der Client den Handplatz abfängt (Muster Kidnapping/Gold Trap).
+  const flug = opts.flug !== false;
+  if (flug && vonHand) {
+    engine._broadcastEvent('play_pile_transfer', {
+      owner: stapelBesitzer, toOwner: seite, cardName,
+      from: 'hand', to: 'support', fromHandIdx: handIdx,
+      toHeroIdx: heroIdx, toSlotIdx: slot,
+    });
+  }
+  const genommen = await engine.takeFromPile(engine.gs.players[stapelBesitzer], stapel, vonHand ? handIdx : cardName,
     { source: opts.source, ...(stapelBesitzer !== pi ? { sourceOwner: pi } : {}) });
   if (!genommen) return null;
+  if (handInstVor) engine._untrackCard(handInstVor.id);
 
   if (!zps.supportZones[heroIdx]) zps.supportZones[heroIdx] = [[], [], []];
   zps.supportZones[heroIdx][slot] = [cardName];
   const inst = engine._trackCard(cardName, seite, 'support', heroIdx, slot);
-  if (stapelBesitzer !== seite) inst.originalOwner = stapelBesitzer;
+  if (vonHand) { if (herkunft != null && herkunft !== seite) inst.originalOwner = herkunft; }
+  else if (stapelBesitzer !== seite) inst.originalOwner = stapelBesitzer;
 
-  const flug = opts.flug !== false;
-  if (flug) {
+  if (flug && !vonHand) {
     // Sichtbarer Weg Stapel → Zone (Als Regel: jede Bewegung zwischen
     // Stapeln wird animiert). Der Client versteckt das Ziel waehrend
     // des Flugs.
