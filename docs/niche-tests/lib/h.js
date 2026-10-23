@@ -386,7 +386,7 @@ function attachHelpers(t) {
     } catch (e) { if (t.runaway) return { runaway: true, threw: e }; t.errors.push('[THROW] ' + (e && e.stack || e).toString().split('\n').slice(0, 4).join(' | ')); return { threw: e }; }
     finally { clearTimeout(timer); }
   };
-  t.activateCreature = (seat, hi, slot, o) => t.run(() => host.doActivateCreatureEffect(room, seat, { heroIdx: hi, zoneSlot: slot }), o);
+  t.activateCreature = (seat, hi, slot, o) => t.run(() => host.doActivateCreatureEffect(room, seat, { heroIdx: hi, zoneSlot: slot, charmedOwner: o && o.charmedOwner }), o);   // `o.charmedOwner`: Kreatur auf der Gegenseite (geliehen / Spy in the Enemy's Camp)
   t.activateHero = (seat, hi, o = {}) => { gs.activePlayer = seat; t.phase(o.phase ?? PHASES.MAIN1); return t.run(() => host.doActivateHeroEffect(room, seat, { heroIdx: hi, chosenEffectName: o.effect }), o); };
   t.activateEquip = (seat, hi, slot, o = {}) => { gs.activePlayer = seat; t.phase(o.phase ?? PHASES.MAIN1); return t.run(() => host.doActivateEquipEffect(room, seat, { heroIdx: hi, zoneSlot: slot }), o); };
   t.activateAbility = (seat, hi, zoneIdx, o = {}) => { gs.activePlayer = seat; t.phase(o.phase ?? PHASES.MAIN1); return t.run(() => host.doActivateAbility(room, seat, { heroIdx: hi, zoneIdx }), o); };

@@ -20,6 +20,7 @@ const { isSeat, opponentOfGs, opponentsOfGs, playerCountGs } = require('./_opp')
 const { gainedNames, heroScriptsOf, heroScriptOf, eigenesHeldenSkript } = require('./_gained-effects-shared');
 const { charges: ladungenLesen } = require('./_charges');
 const ScTracking = require('./_sc-tracking');   // v1381
+const SpyShared = require('./_spy-shared');   // Spy in the Enemy's Camp: Spionage-Marke an der Kreatur
 const ZugFristen = require('./_zug-fristen');   // W68a: „nur echte Züge zählen"
 // ★ W63d: Ereignisse, die den Beginn einer Aktion ANKÜNDIGEN, aber noch keine sichtbare Wirkung sind: sie lösen den Commit des Auftritts nicht aus (nur Protokoll + Flug/Aktivierungsschein).
 const AUFTRITT_HALTE_EREIGNISSE = new Set(['action_log', 'hand_to_board_fly', 'ability_activated', 'potion_resolved']);   // `potion_resolved`: der Server sendet es beim START der Auflösung — also VOR den abbrechbaren Fragen der Karte
@@ -3226,6 +3227,12 @@ class GameEngine {
         try { this.log('hooks_killed', { turn: this.gs?.turn, hook: hookName, fired: this._hooksFiredThisTurn }); } catch { /* Protokoll ist Beiwerk */ }
       }
       return;
+    }
+
+    // Spy in the Enemy's Camp: die Kreatur, auf deren Beschwörung der Spion reagiert hat, bekommt ihre Marke, BEVOR irgendein Zuhörer sie sieht.
+    if (hookName === 'onCardEnterZone' && this.gs?._spyVormerkungen && hookCtx.enteringCard && hookCtx.toZone === 'support') {
+      SpyShared.spyLandung(this, hookCtx.enteringCard,
+        hookCtx._summonedByPlayer != null ? hookCtx._summonedByPlayer : (hookCtx.enteringCard.controller ?? hookCtx.enteringCard.owner));
     }
 
     // Central sacrifice bookkeeping. EVERY path that fires
@@ -28210,8 +28217,10 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const cardNames = validated.map(idx => oppPs.hand[idx]).filter(Boolean);
 
+    await this._stehlenderSpellFruehAblegen(pi, opts.sourceName);
+
     const flightMs = 800;
-    const highlightMs = validated.length > 1 ? 700 : 250;
+    const highlightMs = Number.isFinite(opts.highlightMs) ? opts.highlightMs : (validated.length > 1 ? 450 : 250);
     this._broadcastEvent('play_hand_steal', {
       fromPlayer: oppIdx, toPlayer: pi,
       indices: validated, cardNames, count: validated.length,
@@ -28231,7 +28240,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // animation. +250 ms gives a 50 ms margin past phase-3 fire.
     await this._delay(highlightMs + flightMs + perCardStagger + 250);
 
-    const stolen = [];
+    // Erst aus der Gegnerhand nehmen (von hinten nach vorn, die Plätze bleiben stabil), dann in der Reihenfolge der QUELLPLÄTZE an die eigene Hand hängen: die Karten behalten ihre
+    // Reihenfolge (die linkste gewählte Gegnerkarte liegt links unter den genommenen) — der Client lässt die Flugkarten genau so landen.
+    const entnommen = [];
     for (const idx of [...validated].sort((a, b) => b - a)) {
       const cardName = oppPs.hand[idx];
       if (!cardName) continue;
@@ -28241,6 +28252,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         || this.cardInstances.find(c => c.owner === oppIdx && c.zone === ZONES.HAND && c.name === cardName) || null;
       const herkunft = this._handOriginAt(oppPs, idx) ?? (instVor && Number.isInteger(instVor.originalOwner) ? instVor.originalOwner : oppIdx);
       oppPs.hand.splice(idx, 1);
+      entnommen.unshift({ cardName, instVor, herkunft });
+    }
+    const stolen = [];
+    for (const { cardName, instVor, herkunft } of entnommen) {
       const neuerPlatz = ps.hand.length;
       ps.hand.push(cardName);
       // Instanz mitziehen — sonst bleibt die Karte für findCards beim
@@ -42414,6 +42429,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         await this._flushSurpriseDrawChecks();
       }
     }
+    SpyShared.spyKetteBeendet(this, initialLink, !!result.negated);   // Spy in the Enemy's Camp: negierte Beschwörung → keine Marke
     // Post-chain deferred actions (Lunar Eclipse / The Master's Plan
     // replacement Action) are NOT drained here: this still runs nested
     // inside the play handler (which holds _spellResolutionDepth /
@@ -44907,6 +44923,23 @@ this._deathWatch = (this._deathWatchStack || []).length
     this._trackCard(weg.name, ziel, 'discard');
     this.sync();
     return { idx, name: weg.name };
+  }
+
+  /**
+   * Hand-Diebstahl eines Zaubers, der sich dabei verbraucht (Secret Entrance, Gather Intel, Loot the Leftovers …): die auflösende Karte liegt bis zum Ende der Auflösung noch in der Hand
+   * und würde genau beim Eintreffen der gestohlenen Karten ausgetauscht — das verschiebt deren Landeplätze. Deshalb geht sie VOR dem Flug in die Ablage (`aufloesenderSpellInDieAblage`),
+   * die Hand richtet sich ohne sie aus. Nur für den Zauber, der selbst stiehlt (`sourceName`), der aus der Hand kommt und in die Ablage geht (nicht `deleteOnUse`).
+   * @returns {Promise<boolean>} true, wenn die Karte die Hand verlassen hat
+   */
+  async _stehlenderSpellFruehAblegen(pi, sourceName) {
+    const ps = this.gs.players[pi];
+    const rc = ps?._resolvingCard;
+    if (!rc || rc.fromCreation || !sourceName || rc.name !== sourceName) return false;
+    const cd = this._getCardDB()[rc.name];
+    if (!cd || cd.cardType !== 'Spell' || loadCardEffect(rc.name)?.deleteOnUse) return false;
+    const weg = await this.aufloesenderSpellInDieAblage(pi);
+    if (weg) await this._delay(150);       // der Client richtet die Hand neu aus, bevor die Landeplätze der gestohlenen Karten gemessen werden
+    return !!weg;
   }
 
   /**
@@ -47727,7 +47760,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         // W33a (Al, 22.10.2026): jede Kreatur auf der GEGENSEITE, die ich KONTROLLIERE — gestohlen (`stolenBy`, Controller = Dieb) UND seitenfremd beschworen
         // (`markiereSeitenfremd`: Brettseite = Gegner, Controller = ich); vorher nur die gestohlenen (`inst.owner === oi && stolenBy`).
         if (this.physicalSide(inst) !== oi) continue;
-        if (this.kontrolleurVon(inst) !== playerIdx) continue;
+        // Spy in the Enemy's Camp: eine Kreatur des Gegners mit meiner Spionage-Marke darf ich in MEINEM Zug benutzen, „as if I control it" (Kontrolle nur für die Dauer des Effekts).
+        const _spyZugriff = this.kontrolleurVon(inst) !== playerIdx && inst.stolenBy == null && SpyShared.spyHat(inst, playerIdx);
+        if (this.kontrolleurVon(inst) !== playerIdx && !_spyZugriff) continue;
         if (inst.faceDown) continue;
         // (Der frühere Ausschluss „Host-Held von uns verzaubert" entfällt: der Charme-Scan der Gegenseite ist seit v1197 weg, die Kreatur ginge sonst ganz verloren.)
         const hero = oppPs.heroes?.[inst.heroIdx];
@@ -47755,20 +47790,26 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (isActionCost) {
           if (actionsBlockedCr) continue;
           if (!isActionPhase && !hasAdditionalForActionCost) continue;
+          if (_spyZugriff && this.anyPlayerActorHero(playerIdx) == null) continue;   // die Aktion zahlt ein EIGENER Held
         } else {
           if (!isMainPhase) continue;
         }
 
-        const hasSummoningSickness = inst.turnPlayed === (this.gs.turn || 0) && !this.gs.skillTest;
+        const hasSummoningSickness = inst.turnPlayed === (this.gs.turn || 0) && !this.gs.skillTest && !_spyZugriff;   // (die Kreatur ist nicht meine: kein Beschwörungs-Schlaf, wie bei `activatableByAnyPlayer`)
         const hoptKey = `creature-effect:${inst.id}`;
         const exhausted = this.gs.hoptUsed?.[hoptKey] === this.gs.turn;
         let canActivate = !exhausted && !hasSummoningSickness;
-        if (canActivate) canActivate = this.creatureEffectScriptAllows(inst);
+        if (canActivate) {
+          // Spy: das Karten-Gate (`canActivateCreatureEffect`) liest „you / your hand" — aus MEINER Sicht, also die Kontrolle für die Prüfung leihen.
+          const _undo = _spyZugriff ? this._leiheKontrolle(inst, playerIdx) : null;
+          try { canActivate = this.creatureEffectScriptAllows(inst); } finally { if (_undo) _undo(); }
+        }
 
         result.push({
           owner: oi, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
           cardName: inst.name, canActivate, exhausted,
           instId: inst.id,
+          ...(_spyZugriff ? { spy: true } : {}),
           // `charmedOwner` is how the client's render loop distinguishes
           // "this activation lives on the opponent's side but belongs
           // to me" — same field the charmed-hero scan uses, so the

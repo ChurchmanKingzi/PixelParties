@@ -6355,7 +6355,8 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
      darf, steht als EIN Wert in `--hand-min-anteil`. */
   min-width: calc(var(--hand-card-w) * var(--hand-min-anteil));
 }
-.game-hand-cards .hand-slot:last-child {
+.game-hand-cards .hand-slot:last-child,
+.game-hand-cards .hand-slot.hand-letzter {
   /* Last card never compressed — always fully visible.
      ★ v1241: und zwar in KARTENbreite, nicht in Platzbreite. Die
      Karten ragen beim Zusammenschieben über ihren Platz hinaus; nur
@@ -6370,7 +6371,8 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   flex-shrink: 1;
   min-width: calc(var(--hand-card-w) * var(--hand-min-anteil));
 }
-.game-hand-cards > .board-card.hand-card:last-child {
+.game-hand-cards > .board-card.hand-card:last-child,
+.game-hand-cards > .board-card.hand-card.hand-letzter {
   flex-shrink: 0;
 }
 .game-board {
@@ -10527,6 +10529,38 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 }
 .hand-pick-stark.hand-pick-selected { transform: translateY(-12px); }
 .board-card.blind-pick-stark.blind-pick-selected { transform: translateY(-12px); }
+/* Gegnerhand: eine volle Hand schiebt ihre Karten zusammen — der Kasten ist dann schmaler als die Karte und schneidet sie ab (`overflow: hidden`). Eine GEWÄHLTE Karte zeigt sich für die
+   Dauer der Markierung in voller Breite: das Bild wird so breit wie eine Karte, der Rahmen sitzt am Bild statt am schmalen Kasten (der Platz im Layout bleibt, nichts rückt). */
+.game-hand-opp .board-card.hand-card.blind-pick-selected {
+  overflow: visible !important;
+  outline: none !important;
+  box-shadow: none !important;
+  filter: none;
+}
+.game-hand-opp .board-card.hand-card.blind-pick-selected > img {
+  width: var(--hand-card-w) !important;   /* das Bild trägt `width: 100%` inline */
+  max-width: none !important;
+  height: 100% !important;
+  object-fit: cover;
+  outline: 4px solid #fad54a;
+  outline-offset: 0;
+  box-shadow: 0 0 0 7px #c68206;
+  filter: brightness(1.2);
+}
+/* Dasselbe für die Hover-Markierung: die gehoverte Gegnerkarte einer vollen Hand zeigt sich als GANZE Karte (Bild in Kartenbreite, Rahmen am Bild), nicht als schmaler Ausschnitt. */
+.game-hand-opp:not([data-pp-dragging]) .board-card.hand-card:hover {
+  overflow: visible !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+.game-hand-opp:not([data-pp-dragging]) .board-card.hand-card:hover > img {
+  width: var(--hand-card-w) !important;
+  max-width: none !important;
+  height: 100% !important;
+  object-fit: cover;
+  outline: 3px solid var(--player-color);
+  outline-offset: 0;
+}
 @keyframes pickStarkBlink {
   0%, 49%  { outline-color: #ba74ff; }
   50%, 100% { outline-color: #f1e5fa; }
@@ -10611,9 +10645,9 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   }
   100% { filter: none; }
 }
-.blind-pick-active {
-  overflow: visible !important;
-}
+/* `.blind-pick-active` (Handreihe während einer Kartenwahl) darf die Reihe NICHT auf `overflow: visible` stellen: ein Flex-Element mit sichtbarem Überlauf hat als Mindestbreite seinen
+   Inhalt, die Reihe sprengte bei voller Hand ihre Zone und die zusammengeschobenen Karten fächerten sich in voller Breite auf. Das Polster der Reihe (`--fan-pad-x`, oben
+   0,8 Kartenhöhen) fasst Rahmen und Hub der markierten Karten ohnehin. */
 .blind-pick-eligible {
   outline: 2px dashed rgba(255,155,58,.6);
   outline-offset: 2px;
@@ -26640,3 +26674,23 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   75% { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 75 105' shape-rendering='crispEdges' fill='%23ffffff'%3E%3Crect x='47' y='0' width='1' height='1'/%3E%3Crect x='63' y='104' width='1' height='1'/%3E%3Crect x='0' y='93' width='1' height='1'/%3E%3Crect x='74' y='88' width='1' height='1'/%3E%3Crect x='33' y='0' width='1' height='1'/%3E%3Crect x='31' y='0' width='1' height='1'/%3E%3Crect x='0' y='9' width='1' height='1'/%3E%3Crect x='74' y='79' width='1' height='1'/%3E%3Crect x='74' y='43' width='1' height='1'/%3E%3Crect x='74' y='96' width='1' height='1'/%3E%3Crect x='0' y='79' width='1' height='1'/%3E%3Crect x='70' y='104' width='1' height='1'/%3E%3Crect x='0' y='48' width='1' height='1'/%3E%3Crect x='74' y='90' width='1' height='1'/%3E%3Crect x='0' y='28' width='1' height='1'/%3E%3Crect x='11' y='0' width='1' height='1'/%3E%3Crect x='0' y='87' width='1' height='1'/%3E%3Crect x='0' y='32' width='1' height='1'/%3E%3Crect x='11' y='104' width='1' height='1'/%3E%3Crect x='74' y='60' width='1' height='1'/%3E%3Crect x='59' y='0' width='1' height='1'/%3E%3Crect x='0' y='103' width='1' height='1'/%3E%3Crect x='30' y='0' width='1' height='1'/%3E%3Crect x='36' y='104' width='1' height='1'/%3E%3Crect x='72' y='104' width='1' height='1'/%3E%3Crect x='66' y='0' width='1' height='1'/%3E%3Crect x='51' y='104' width='1' height='1'/%3E%3Crect x='0' y='54' width='1' height='1'/%3E%3Crect x='0' y='51' width='1' height='1'/%3E%3Crect x='74' y='2' width='1' height='1'/%3E%3Crect x='41' y='0' width='1' height='1'/%3E%3Crect x='10' y='104' width='1' height='1'/%3E%3Crect x='0' y='80' width='1' height='1'/%3E%3Crect x='0' y='56' width='1' height='1'/%3E%3C/svg%3E"); }
 }
 @media (prefers-reduced-motion: reduce) { .skin-holo-rim u { animation: none; background-image: none; } }
+
+/* ═══ Name, Stufe und Kosten der Super-/Diamond-Rares tragen die Schraffur des Bildes (Al, 23.10.) ═══
+   Dieselbe Schicht wie `.skin-holo-hatch` auf der Kunst: dünne Schrägstriche (118°, gleiche Breiten in cqw) mit wanderndem Pastell-Regenbogen
+   (gleiche Farben, gleiche 14 s, gleiche Phase → läuft im Gleichtakt mit dem Bild). Sie liegt in `.skin-holo-name`, ist also auf Name,
+   Stufenzahl, Artifact-Kosten und Stempel zugeschnitten; der Regeltext (`.skin-holo-text`) bekommt sie nicht. */
+.skin-holo-name .sh-ht {
+  position: absolute; inset: 0; overflow: hidden; opacity: .6;
+  -webkit-mask-image: repeating-linear-gradient(118deg, #000 0, #000 .24cqw, transparent .34cqw, transparent .78cqw);
+  mask-image: repeating-linear-gradient(118deg, #000 0, #000 .24cqw, transparent .34cqw, transparent .78cqw);
+}
+.skin-holo-name .sh-ht i {
+  position: absolute; top: 0; bottom: 0; left: 0; width: 300%;
+  background: linear-gradient(112deg, #e58092 0%, #e0c085 8%, #fff196 16%, #92d3a9 25%, #77c8ee 34%, #b38ed7 42%, #b38ed7 50%, #e58092 58%, #e0c085 66%, #fff196 75%, #92d3a9 83%, #77c8ee 92%, #b38ed7 100%);
+  animation: skinHoloHatch 14s linear infinite; animation-delay: var(--sh-phase, 0s);
+  will-change: transform;
+}
+.skin-holo-name.skin-holo-text .sh-ht { display: none; }
+@container (max-width: 299px) { .skin-holo-name .sh-ht i { animation: none; will-change: auto; } }
+@media (pointer: coarse) { .skin-holo-name .sh-ht i { animation: none; will-change: auto; } }
+@media (pointer: coarse) and (max-height: 600px) { .skin-holo-name .sh-ht { display: none; } }

@@ -2728,6 +2728,12 @@ const ZONE_ANIM_SFX = {
   modifier_sparkle:        { name: 'buff', opts: { rate: 1.25, volume: 0.5 } },
   level_down:              { name: 'debuff', opts: { rate: 0.9, volume: 0.7 } },   // Looming Threat: Stufe sinkt
   hand_level_down:         { name: 'debuff', opts: { rate: 1.0, volume: 0.6 } },   // Great Vanguard Demon: Stufe sinkt (Pixelart, die Karte bleibt sichtbar)
+  mind_control_hex:        { name: 'elem_dark', opts: { rate: 0.8, volume: 0.6 } },   // Mind Control: Hypnose-Spirale über dem übernommenen Helden (Pixelart)
+  // Spy in the Enemy's Camp (23.10.) — das Auge öffnet sich (Aufdeck-Ton, 0 ms), beim Blinzeln ein Ping (~560 ms). Nur der erste Teil übernimmt die Sammelkategorie 'effect'.
+  spy_mark: [
+    { name: 'reveal', opts: { rate: 1.4, volume: 0.45 } },
+    { name: 'ping',   opts: { rate: 2.0, volume: 0.3, delay: 560, category: null, dedupe: 0 } },
+  ],
   loom_swell:              { name: 'elem_dark', opts: { rate: 0.6, volume: 0.9 } },   // Looming Threat: Karte schwillt an
   // Gangster Angel — Schusssalve (`gunshot_barrage`). `projectile` ist
   // der vorhandene Geschossklang; schneller abgespielt wird daraus ein
@@ -5872,7 +5878,7 @@ function FoilName({ card, tone, fkey }) {
   return (
     <>
       <div ref={ref} className={'skin-holo skin-holo-nur-name foil-name-' + tone} data-foil-key={fkey} style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
-        {daten && breit && <div className="skin-holo-name"><i className="sh-rb" /><i className="sh-gl" /></div>}
+        {daten && breit && <div className="skin-holo-name"><i className="sh-rb" /><div className="sh-ht"><i /></div><i className="sh-gl" /></div>}
       </div>
       {textAn && (
         <div ref={refT} className={'skin-holo skin-holo-nur-name foil-name-' + tone} data-foil-key={fkey + '|text'} style={datenT ? { ...datenT.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
@@ -7945,6 +7951,22 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
       key: 'soul_transmitted', icon: '🕯️',
       tooltip: 'Soul Transmitted: The next time this Hero is defeated, it is deleted together with '
         + 'all cards in its Ability and Support Zones, except Creatures. Cannot be removed.',
+    });
+  }
+  // 23.10. („Spy in the Enemy's Camp"): Marke an der Kreatur — KEIN Status (Heilen entfernt sie nicht); sie gilt, bis die Kreatur das Brett verlässt.
+  if (c._spyMask) {
+    badges.push({
+      key: 'spy_marked', icon: '👁️',
+      tooltip: "Spied on (Spy in the Enemy's Camp): the player who spied may activate this Creature's active effect during their own turn as if they controlled it. "
+        + 'This is not a status effect and cannot be healed. It lasts until the Creature leaves the board.',
+    });
+  }
+  // 23.10. („Mind Control"): der Wirtsheld gehört dem Besitzer der Karte, solange sie angelegt ist.
+  if (s.mind_controlled) {
+    badges.push({
+      key: 'mind_controlled', icon: '🧠',
+      tooltip: 'Mind Controlled: Another player has permanent control of this Hero while Mind Control remains attached to it. '
+        + 'Counts as a negative status effect — curing it discards the card and returns control.',
     });
   }
   if (s.aged) {

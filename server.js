@@ -55,6 +55,7 @@ const crypto = require('crypto');
 const zlib = require('zlib');
 const { GameEngine } = require('./cards/effects/_engine');
 const { loadCardEffect, hasCardEffect } = require('./cards/effects/_loader');
+const { spyHat } = require('./cards/effects/_spy-shared');   // Spy in the Enemy's Camp
 // ★ v1186: „This Hero gains the effects of X" — dieselbe Aufloesung wie
 // in der Engine, ohne Engine-Referenz (siehe _gained-effects-shared).
 const { heroScriptOf, eigenesHeldenSkript } = require('./cards/effects/_gained-effects-shared');   // v1286
@@ -9228,15 +9229,20 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   // seite, gehoert dem Gegner und ist nicht geliehen, darf aber trotzdem von
   // `pi` ausgeloest werden. Ohne Kontrollwechsel; die Aktion bezahlt ein
   // EIGENER Held (`actHero`), nicht der Wirt der fremden Kreatur.
-  const anyPlayer = charmedOwner != null && charmedOwner !== pi
+  // ★ „SPY IN THE ENEMY'S CAMP": eine Kreatur des Gegners mit MEINER Spionage-Marke darf ich in meinem Zug aktivieren, „as if you control it". Sie bleibt beim Gegner (Brettseite wie
+  // Kontrolle); nur für die Dauer dieser Aktivierung gilt sie als meine (`_leiheKontrolle`, unten). Die Aktion (falls der Effekt eine kostet) zahlt ein EIGENER Held — wie bei `anyPlayer`.
+  const _spyZugriff = charmedOwner != null && charmedOwner !== pi && inst.stolenBy == null
+    && (inst.controller ?? inst.owner) !== pi && spyHat(inst, pi);
+  const anyPlayer = _spyZugriff || (charmedOwner != null && charmedOwner !== pi
     && !!loadCardEffect(inst.counters?._effectOverride || creatureName)?.activatableByAnyPlayer
-    && inst.stolenBy !== pi && (inst.controller ?? inst.owner) !== pi;
+    && inst.stolenBy !== pi && (inst.controller ?? inst.owner) !== pi);
   // W33a (Al, 22.10.2026: „Nur der aktuelle Kontrolleur einer Creature kann ihren Effekt aktivieren!"): EIN Tor für alle Wege (Eigen-Brett, gestohlen, seitenfremd beschworen):
   // aktivieren darf nur, wer die Kreatur gerade kontrolliert (`controller ?? owner`) – der Besitzer einer gestohlenen Kreatur und der Brettinhaber einer seitenfremd beschworenen
   // nicht. Ausnahme bleibt der Kartentext „either player may spend an Action" (`anyPlayer`, The Creepy Clown of Heaven).
   if (!anyPlayer && (inst.controller ?? inst.owner) !== pi) return false;
   const actHero = anyPlayer ? room.engine.anyPlayerActorHero(pi) : heroIdx;
-  if (anyPlayer && actHero == null) return false;
+  if (anyPlayer && actHero == null
+      && !(_spyZugriff && !loadCardEffect(inst.counters?._effectOverride || creatureName)?.creatureActionCost)) return false;   // Spy: ein freier Effekt braucht keinen Akteur
   const actHeroOwner = anyPlayer ? pi : (charmedOwner ?? pi);
   // CC-locked creatures cannot fire their own effects — mirrors the
   // engine-side filter in getActivatableCreatures and the hook gate in
@@ -9378,8 +9384,12 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   room.engine.noteActivationOutcome(hoptKey, false);
 
   if (script.canActivateCreatureEffect) {
-    const checkCtx = room.engine._createContext(inst, { event: 'canCreatureEffectCheck' });
-    if (!script.canActivateCreatureEffect(checkCtx)) return false;
+    // Spy in the Enemy's Camp: das Gate liest „you / your hand" aus MEINER Sicht — die Kontrolle für die Prüfung leihen.
+    const _undoGate = _spyZugriff ? room.engine._leiheKontrolle(inst, pi) : null;
+    let _gateOk;
+    try { _gateOk = script.canActivateCreatureEffect(room.engine._createContext(inst, { event: 'canCreatureEffectCheck' })); }
+    finally { if (_undoGate) _undoGate(); }
+    if (!_gateOk) return false;
   }
 
   // `actionCost` discriminator on the log entry — true iff this
@@ -9397,7 +9407,10 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   // below for the Gerrymander veto path).
   room.engine._lastPromptGerryDeclined = false;
 
+  let _spyUndo = null;
   try {
+    // Spy in the Enemy's Camp: Kontrolle für die Dauer des Effekts auf mich stellen (dieselben Felder wie `actionStealCreature`, ohne `onTakeControl` und ohne Immunitätsprüfung).
+    if (_spyZugriff) _spyUndo = room.engine._leiheKontrolle(inst, pi);
     const isStolenByPi = inst.stolenBy === pi && inst.controller === pi;
     const charmedHeroCreature = charmedOwner != null && !isStolenByPi && !anyPlayer;
 
@@ -9616,6 +9629,8 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     await room.engine._executeDeferredSurprises();
   } catch (err) {
     console.error('[Engine] doActivateCreatureEffect error:', err.message, '\n' + String(err.stack || '').split('\n').slice(1, 4).join('\n'));
+  } finally {
+    if (_spyUndo) { try { _spyUndo(); delete inst.heroOwner; } catch { /* Rückgabe darf nie werfen */ } room.engine.sync(); }
   }
   for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
@@ -16959,6 +16974,11 @@ io.on('connection', (socket) => {
           hero: hero.name, buff: buffName, by: inst.name,
         });
       }
+      // 23.10. (Mind Control): Anhängsel mit dauerhafter Wirkung über den Status hinaus (Heldenkontrolle) legen sie im Puzzle-Aufbau selbst an.
+      if (typeof scr?.puzzleAnheften === 'function') {
+        try { await scr.puzzleAnheften(room.engine, inst); }
+        catch (err) { console.error('[Puzzle] puzzleAnheften ' + inst.name + ' threw:', err.message); }
+      }
     }
 
     // ── Apply player-state starting debuffs ──
@@ -17074,6 +17094,8 @@ io.on('connection', (socket) => {
             // of 🚫 Negated; the functional negation comes from the
             // standard `negated` counter set above.
             if (cs._dkSilenced) inst.counters._dkSilenced = 1;
+            // Spy in the Enemy's Camp: Spionage-Marke (Bitmaske der Sitze, die die Kreatur in ihrem Zug benutzen dürfen) — dieselbe Zahl wie im Spiel.
+            if (Number.isInteger(cs._spyMask) && cs._spyMask > 0) inst.counters._spyMask = cs._spyMask;
             if (cs.poisoned) { inst.counters.poisoned = 1; inst.counters.poisonStacks = cs.poisoned.stacks || 1; }
             // Alliance (v871): die im Editor gesetzte Verbindung. Zwei
             // nackte Zahlen — genau die Zaehler, die das Kartenskript
