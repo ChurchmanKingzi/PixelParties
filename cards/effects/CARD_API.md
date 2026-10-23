@@ -23742,6 +23742,7 @@ Handkarten sind Namen (Strings). Die Herkunft einer fremden Karte steckt (a) in 
 * **Bounce/Heimkehr:** Brett → Hand/Ablage/Löschstapel einer Karte mit `originalOwner ≠ owner` geht zum BESITZER (`actionMoveCard`-`_heimkehr`, `returnSupportCreatureToHand`); Texte mit „YOUR hand" bleiben bei `opts.toPlayer` (Karte danach gekennzeichnet).
 * **Hand-Reaktionsfenster und Reaktionskette** (30 Stellen) legen über `handKartenBesitzerPs` ab; `doPlaySpell` stempelt die Spell-Instanz (Area/Anhängsel bleiben Eigentum des Besitzers); `placeAttachment` übernimmt `ctx.card.originalOwner`; Sofort-Guss (`_castSpellImmediately`) legt Spell/Anhängsel/Area in den Stapel bzw. auf das Brett des Besitzers.
 * **Umsortieren ohne Permutation** (`reorder_hand`): `engine.herkunftNachNamenVerteilen` verteilt die Marken nach Namen statt sie zu streichen.
+* **Weitere Stapel-Wege:** `deleteFromPile(pi, 'hand', …)` und das Löschen des ganzen Coolness Stacks (`actionDeleteCoolnessStack`) legen in den Löschstapel des Besitzers; `actionPopCoolnessStackTo` (Ablage/Löschstapel/Hand) ebenso.
 
 ### 3) Verträge für künftige Karten
 * Karte in eine FREMDE Hand legen → `engine.handZugang(…, { originalOwner })` oder `engine._tagHandCardOrigin(halter, name, besitzer)`; den Weg der Hand-Instanz geht `actionStealFromHand`/`actionTransferCardToOppHand` schon.
@@ -23774,7 +23775,7 @@ Handkarten sind Namen (Strings). Die Herkunft einer fremden Karte steckt (a) in 
 * Gestohlene Karten zählen für Handgröße/Handlimit des Diebs und handbasierte Zähler (sie liegen in seiner Hand).
 
 ### 6) Tests
-`docs/niche-tests/repro/W63/c-01 … c-07` (alle Exit 0 = korrekt; `c-02 … c-07` auf dem alten Stand rot). Gemeinsame Hilfen: `docs/niche-tests/lib/besitzer.js`.
+`docs/niche-tests/repro/W63/c-01 … c-07` (alle Exit 0 = korrekt; `c-02 … c-07` auf dem alten Stand rot: 38/6/40/40/8/34 ✗; `c-01` ist der Wächter für die schon richtigen Grundwege). Gemeinsame Hilfen: `docs/niche-tests/lib/besitzer.js`.
 
 ### 7) Rückfragen an Al (Ja/Nein)
 1. **Bounce einer gestohlenen/übernommenen Kreatur** („return to hand", ohne „YOUR hand" im Text): Hand des **Besitzers**, nicht des Kontrolleurs (bisher: Kontrolleur). Gilt jetzt auch für Karten mit `originalOwner ≠ owner` (Hunting, Dark Gear, Charme-Diebstahl) — ja/nein?

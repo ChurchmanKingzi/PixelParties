@@ -21473,9 +21473,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.sync();
       return true;
     }
-    if (!ps.deletedPile) ps.deletedPile = [];
-    ps.deletedPile.push(taken.name);
-    this._trackCard(taken.name, pi, ZONES.DELETED);
+    // W63c: eine gestohlene HANDkarte wird in den Loeschstapel ihres BESITZERS gelegt (Deck/Ablage-Karten gehoeren ohnehin dem Stapelbesitzer)
+    const _loeschPs = (pile === 'hand') ? this.handKartenBesitzerPs(pi, taken.name) : ps;
+    const _loeschIdx = this.gs.players.indexOf(_loeschPs);
+    if (!_loeschPs.deletedPile) _loeschPs.deletedPile = [];
+    _loeschPs.deletedPile.push(taken.name);
+    this._trackCard(taken.name, _loeschIdx >= 0 ? _loeschIdx : pi, ZONES.DELETED);
     this._pileFlight(pi, taken.name, pile, 'deleted');
     this.log('card_deleted', { player: ps.username, card: taken.name, from: pile, by: opts.source || null });
     this.sync();
@@ -53627,7 +53630,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (gerettet) {
         this.log('delete_rescued', { player: ps.username, card: cardName, from: 'coolnessStack', source: opts.source || null });
       } else {
-        ps.deletedPile.push(cardName);
+        (this.gs.players[this.kartenBesitzerVon(inst)] || ps).deletedPile.push(cardName);   // W63c: Loeschstapel des permanenten Besitzers
         if (inst) inst.zone = ZONES.DELETED;
       }
       movedInsts.push({ inst, cardName, gerettet });

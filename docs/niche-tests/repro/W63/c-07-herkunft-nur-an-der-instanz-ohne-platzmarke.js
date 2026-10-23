@@ -48,5 +48,23 @@ const { H } = B;
       R.check(`Gegenprobe fremde Kopie (Halter ${halter}) → Ablage des Besitzers`, B.anzahl(t, 1 - halter, 'discardPile', 'Fireball') === 1, B.ort(t, 'Fireball'));
     }
   }
+  // Echter Weg: Karte aus der FREMDEN Ablage auf die Hand (Herbithorn Demon, Xiong, Boomerang …; `addCardFromDiscardToHand` stempelt nur die Instanz)
+  for (const halter of [0, 1]) {
+    R.section(`── Ablage des Gegners → Hand von Sitz ${halter} ──`);
+    for (const [name, stapel, fn] of [
+      ['Abwerfen', 'discardPile', (t) => t.run(() => t.engine.actionDiscardHandCard(t.dieb, 'Fireball', t.pile(t.dieb, 'hand').indexOf('Fireball'), {}))],
+      ['Spell spielen', 'discardPile', async (t) => { t.targetFn = v => [v.find(x => x.type === 'hero' && x.owner === t.besitzer && x.heroIdx === 0).id]; await t.play(t.dieb, 'Fireball', { hero: 0 }); }],
+      ['Zurückmischen', 'mainDeck', (t) => t.run(() => t.engine.actionShuffleBackToDeck(t.dieb, ['Fireball'], 'Test'))],
+    ]) {
+      const hand = [[], []]; hand[halter] = ['ZZ Filler'];
+      const discard = [[], []]; discard[1 - halter] = ['Fireball'];
+      const t = await H.fresh({ hand, discard, deck: [Array(10).fill('ZZ Trinket'), Array(10).fill('ZZ Trinket')] });
+      t.dieb = halter; t.besitzer = 1 - halter;
+      const r = await t.run(() => t.engine.addCardFromDiscardToHand(halter, 'Fireball', 1 - halter, { source: 'Test' }));
+      R.check(`Ablage → Hand (Halter ${halter}): Karte geholt`, !!r && B.anzahl(t, halter, 'hand', 'Fireball') === 1, B.ort(t, 'Fireball'));
+      await fn(t);
+      B.erwarteStapel(R, t, `Ablage → Hand / ${name} (Halter ${halter})`, 'Fireball', 1 - halter, stapel);
+    }
+  }
   R.finish();
 })();

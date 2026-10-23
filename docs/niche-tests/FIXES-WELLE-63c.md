@@ -35,7 +35,7 @@ Geändert: `cards/effects/_engine.js`, `server.js` (`doPlaySpell`, Equip/Artefak
 | `W63/c-04-diebstahl-und-geschenk-wege-bleiben-eigentum-des-besitzers.js` | `actionStealFromHand`/`actionTransferCardToOppHand` × 7 Austritte × beide Sitze, hin und zurück, zweimal klauen, gleichnamige Kopien, Cool Presents, Thieving Strike | 134 | 40 ✗ |
 | `W63/c-05-skript-wege-hand-zu-brett-und-stapel-zentrale-herkunft.js` | `takeFromPileSync` + `safePlaceInSupport`/`summonCreatureWithHooks` (auch seitenfremd), Stapel trotz Zwischen-Splices, `handZugangRueckgabe`, Army of the Cute, Bottled Flame, Sofort-Guss (Spell, Anhängsel) | 80 | 40 ✗ |
 | `W63/c-06-gestohlene-reaktionskarte-aus-der-hand-zum-besitzer.js` | Bamboo Shield, Spectral Armor aus gestohlener Hand als Reaktion | 16 | 8 ✗ |
-| `W63/c-07-herkunft-nur-an-der-instanz-ohne-platzmarke.js` | Herkunft nur an `inst.originalOwner` (Letter, Magic Lamp, Birthday Present) × 7 Austritte + Brett + Gegenproben | 52 | 24 ✗ |
+| `W63/c-07-herkunft-nur-an-der-instanz-ohne-platzmarke.js` | Herkunft nur an `inst.originalOwner` (Letter, Magic Lamp, Birthday Present) × 7 Austritte + Brett + Gegenproben; echter Weg `addCardFromDiscardToHand` (Karte aus der Ablage des Gegners auf die Hand: Herbithorn Demon & Co.) | 76 | 34 ✗ |
 
 * `Bugfix-Note` (in den Commit-Nachrichten): Charme, Thieving Strike, Loot the Leftovers, Cool Presents, Live Show, Hat of Madness, Santa Klaus sowie die Bausteine `_engine`, `_attachment-shared`, `_deepsea-shared` und die geänderten Skripte (siehe oben).
 
