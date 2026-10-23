@@ -112,6 +112,11 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
 
+      // ★ W66a: nur die Wege, die den Token abräumen/auswerten (Handspiel `doPlaySpell`, Sofort-Guss, Kettenglied) — NICHT die Surprise-Aktivierung
+      // (Skull Carpet Bombing am eigenen Zugende) und die Hand-Reaktionen aus Schadensfenstern: dort wanderte die Karte in die Ablage UND als Buddy aufs Brett
+      // (Duplikat), und `_spellPlacedOnBoard`/`_spellBecameToken` blieben stehen und verschluckten den nächsten Zauber.
+      if (!ctx._inyaBuddyWeg) return;
+
       // Caster must be THIS Inya.
       if (ctx.casterIdx !== ctx.cardOwner) return;
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;

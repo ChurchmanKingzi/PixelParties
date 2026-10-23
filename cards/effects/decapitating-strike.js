@@ -83,10 +83,12 @@ module.exports = {
     // ★ Signatur ist `(source, target, opts)` — die QUELLE steht vorn.
     // Mit dem Ziel als erstem Argument lief der Aufruf still ins Leere
     // (der Held blieb stehen); der Testfall hat es gefangen.
-    await engine.actionDefeatHero(
+    // W66a (Al, 23.10.2026: Effekt-Schutz gegen JEDE Form von „defeat"): `engine.actionDefeat` mit `wirkungsSchutz` — Zielschutz, Anti Magic, Charmed,
+    // Submerged, Versteinerung, Quellen-Immunität zusätzlich zu Resistance/Spell-Schild/„would be defeated"-Reaktionen. Schadens-Schutz gilt nicht (kein Schaden).
+    await engine.actionDefeat(
       { name: CARD_NAME, owner: pi, controller: pi },
       target,
-      { sourceOwner: pi, reason: CARD_NAME },
+      { sourceOwner: pi, reason: CARD_NAME, damageType: 'attack', wirkungsSchutz: true },
     );
     engine.log('decapitating_strike', {
       player: engine.gs.players[pi]?.username,

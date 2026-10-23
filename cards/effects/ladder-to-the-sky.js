@@ -187,8 +187,8 @@ async function zahleOpfer(engine, pi) {
 }
 
 module.exports = {
-  // Tracked in the discard pile so the delayed onTurnStart fires.
-  activeIn: ['discard'],
+  // ★ W66a: KEIN Ablage-Träger mehr. Der verzögerte Teil ("At the beginning of your next turn …") hängt am SPIELER (`ps._ladderPending`), nicht an der Artefakt-Instanz in der Ablage —
+  // verließ die Karte die Ablage vor dem nächsten Zug (Meditation, Magic Sapphire …), ging die Suche verloren. Die Engine ruft `nachholen` nach den Zugbeginn-Hooks (Bug-Klasse, Hand-of-Death-Audit).
 
   // Playable only while a Creature not summoned this turn has an eligible
   // deck replacement (Gold is gated by the handler).
@@ -228,36 +228,30 @@ module.exports = {
       return;
     }
 
-    // ── Keep this card tracked in the discard pile to fire its delayed
-    //    next-turn effect. The server pushes the name to discard + splices
-    //    the hand entry; we only re-zone the instance + arm it. ──
-    const inst = engine.findCards({ owner: pi, zone: 'hand', name: CARD_NAME })[0];
-    if (inst) {
-      inst.zone = 'discard'; inst.heroIdx = -1; inst.zoneSlot = -1;
-      inst.counters = inst.counters || {};
-      inst.counters._ladderLevel = sacLevel;
-      inst.counters._ladderArmedTurn = gs.turn;
-    }
+    // ── W66a: den verzögerten Auftrag am SPIELER merken (die Karte geht ganz normal in die Ablage; ihre Instanz ist für die Wirkung unwichtig). ──
+    if (!Array.isArray(ps._ladderPending)) ps._ladderPending = [];
+    ps._ladderPending.push({ level: sacLevel, armedTurn: gs.turn });
     engine.sync();
   },
 
-  hooks: {
-    onTurnStart: async (ctx) => {
-      if (ctx.cardZone !== 'discard') return;
-      const inst = ctx.card;
-      const armed = inst.counters?._ladderArmedTurn;
-      if (armed == null) return;
-      const engine = ctx._engine;
-      const gs = engine.gs;
-      const pi = ctx.cardOwner;
-      // Start of the CONTROLLER's NEXT turn (a later turn than armed).
-      if (gs.activePlayer !== pi) return;
-      if (gs.turn <= armed) return;
-
-      delete inst.counters._ladderArmedTurn; // one-shot
-      const sacLevel = inst.counters?._ladderLevel ?? 0;
-      await doLadderSearch(engine, pi, sacLevel);
-      engine._untrackCard(inst.id); // spent — the name stays in discard
-    },
+  /**
+   * Von der Engine nach den Zugbeginn-Hooks gerufen: jeder fällige Auftrag des AKTIVEN Spielers (Beginn SEINES nächsten Zuges, also ein späterer Zug als der des Spielens)
+   * läuft genau einmal — unabhängig davon, wo die Karte liegt (Ablage, Hand, Deck, gelöscht).
+   */
+  async nachholen(engine) {
+    const gs = engine.gs;
+    for (let pi = 0; pi < engine.playerCount(); pi++) {
+      const ps = gs.players[pi];
+      if (!ps || !Array.isArray(ps._ladderPending) || ps._ladderPending.length === 0) continue;
+      if (gs.activePlayer !== pi) continue;
+      const faellig = ps._ladderPending.filter(a => gs.turn > a.armedTurn);
+      if (faellig.length === 0) continue;
+      ps._ladderPending = ps._ladderPending.filter(a => !(gs.turn > a.armedTurn));      // zuerst verbrauchen (kein Doppelfeuer)
+      if (ps._ladderPending.length === 0) delete ps._ladderPending;
+      for (const a of faellig) {
+        if (gs.result) return;
+        await doLadderSearch(engine, pi, a.level ?? 0);
+      }
+    }
   },
 };

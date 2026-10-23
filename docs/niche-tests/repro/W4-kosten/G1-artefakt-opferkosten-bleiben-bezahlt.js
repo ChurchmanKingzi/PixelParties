@@ -15,7 +15,7 @@ const FALLE = [
     bezahlt: (t) => auf(t, 'Sparkfly Worker') === 0, wirkung: (t) => auf(t, 'Sparkfly Queen') === 1 },
   { name: 'Ladder to the Sky', deck: ['Afflicted Pests', 'Afflicted Pests', D, D, D, D],
     bau: (t) => { t.put(0, 0, 0, D); alt(t); },
-    bezahlt: (t) => auf(t, D) === 0, wirkung: (t) => t.inst(c => c.name === 'Ladder to the Sky' && c.zone === 'discard' && c.counters?._ladderArmedTurn != null).length === 1 },
+    bezahlt: (t) => auf(t, D) === 0, wirkung: (t) => (t.gs.players[0]._ladderPending || []).length === 1 },   // W66a: der Auftrag liegt am Spieler (`ps._ladderPending`), nicht an einer Ablage-Instanz
   { name: 'Remote Detonator', bau: (t) => { t.put(0, 0, 0, 'Sentient Bomb Golems'); t.put(0, 0, 1, 'Sentient Bomb Golems'); },
     bezahlt: (t) => auf(t, 'Sentient Bomb Golems') === 0 && t.pile(0, 'deletedPile').filter(n => n === 'Sentient Bomb Golems').length === 2, wirkung: (t) => t.hp(1, 0) === 400 },
 ];

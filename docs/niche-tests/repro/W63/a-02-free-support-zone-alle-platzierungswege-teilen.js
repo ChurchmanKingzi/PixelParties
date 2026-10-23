@@ -107,7 +107,8 @@ fall({ name: 'Ladder to the Sky (Deck-Suche in die Zone der Opfer-Kopie)', x: 'C
     t.script.push({ match: d => d.type === 'cardGalleryMulti' || d.type === 'sacrificePick' || /sacrifice/i.test(d.title || ''), answer: () => undefined });
     await t.play(s, 'Ladder to the Sky', { noGrant: true });
     t.gs.turn += 2;
-    return t.turnStart(s);
+    await t.turnStart(s);
+    return t.run(() => t.engine._spielerAuftraegeZugbeginn());   // W66a: der Ladder-Auftrag gehört dem Spieler (kein Ablage-Hook mehr) — die Engine löst ihn nach den Zugbeginn-Hooks aus
   } });
 
 

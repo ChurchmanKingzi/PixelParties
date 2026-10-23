@@ -306,28 +306,36 @@ module.exports = {
     engine.sync();
   },
 
+  // ★ W66a (Bug-Klasse „verzögerte Wirkung hängt an einer Karteninstanz statt am Spielstand", Hand-of-Death-Audit): der Auftrag steht im Spielstand (`gs._teleportPending`), der
+  // Auslöser war aber nur die Potion-Instanz im Löschstapel (`_ensurePileListeners`). Verlässt die Potion den Löschstapel (Aurora Borealis, Guardian Beast Yang, Ghazma …),
+  // kam der Held NIE zurück (und `ps._teleportedAway` hielt die Niederlage auf). Die Engine ruft deshalb zusätzlich `rueckkehrNachholen` direkt nach dem frühen Zugbeginn-Hook;
+  // beide Wege verbrauchen den Auftrag (kein Doppelfeuer).
+  rueckkehrNachholen: (engine) => rueckkehrAusfuehren(engine),
+
   hooks: {
     // Rueckkehr ganz am Anfang des Zuges dessen, der die Potion spielte.
-    onTurnStartEarly: async (ctx) => {
-      const engine = ctx._engine;
-      const gs = engine.gs;
-      const offen = gs._teleportPending;
-      if (!Array.isArray(offen) || offen.length === 0) return;
-      const dran = gs.activePlayer;
-
-      const bleiben = [];
-      for (const auftrag of offen) {
-        if (auftrag.rueckkehrBei !== dran || auftrag.gesetztInZug === gs.turn) {
-          bleiben.push(auftrag);
-          continue;
-        }
-        await zurueckstellen(engine, auftrag);
-      }
-      gs._teleportPending = bleiben;
-      if (bleiben.length === 0) delete gs._teleportPending;
-    },
+    onTurnStartEarly: async (ctx) => rueckkehrAusfuehren(ctx._engine),
   },
 };
+
+/** Alle fälligen Aufträge zurückstellen (Auftrag wird verbraucht — idempotent). */
+async function rueckkehrAusfuehren(engine) {
+  const gs = engine.gs;
+  const offen = gs._teleportPending;
+  if (!Array.isArray(offen) || offen.length === 0) return;
+  const dran = gs.activePlayer;
+
+  const bleiben = [];
+  const faellig = [];
+  for (const auftrag of offen) {
+    if (auftrag.rueckkehrBei !== dran || auftrag.gesetztInZug === gs.turn) bleiben.push(auftrag);
+    else faellig.push(auftrag);
+  }
+  if (faellig.length === 0) return;
+  gs._teleportPending = bleiben;               // zuerst verbrauchen: ein zweiter Aufruf (Engine-Netz) findet nichts mehr
+  if (bleiben.length === 0) delete gs._teleportPending;
+  for (const auftrag of faellig) await zurueckstellen(engine, auftrag);
+}
 
 /**
  * Alles an seinen Platz — OHNE Eintritts- oder Spiel-Hooks. Genau das

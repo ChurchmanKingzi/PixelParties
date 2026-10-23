@@ -154,7 +154,9 @@ module.exports = {
         // damage" reaction prompts, and every form of damage protection
         // (incl. Golem's own tier-4 host-damage negation) is bypassed
         // by construction. "instead of damaging it" — to the letter.
-        await engine.actionDefeatHero(source, hero, { reason: CARD_NAME });
+        // W66a (Al, 23.10.2026: Effekt-Schutz gegen JEDE Form von „defeat"): Resistance, Zielschutz, Anti Magic, Charmed, Submerged, Versteinerung … gelten
+        // (`wirkungsSchutz`, Typ `creature`); SCHADENS-Schutz (Schadensimmunität, Stufe-4-Negation) gilt nicht, es ist kein Schaden.
+        await engine.actionDefeat(source, hero, { reason: CARD_NAME, damageType: 'creature', wirkungsSchutz: true });
       } else {
         await ctx.dealDamage(hero, dmg, 'creature');
       }

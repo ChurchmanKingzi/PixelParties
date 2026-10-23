@@ -8757,6 +8757,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         // normally-cast Support Magic Spell from the same Hero no longer
         // pays the draw bonus.
         viaAdditionalProvider: additionalConsumed ? consumedInst : null,
+        _inyaBuddyWeg: true,   // W66a: dieser Weg räumt `_spellPlacedOnBoard`/`_spellBecameToken` selbst ab (Inyas Fantasy Buddy ist hier möglich)
         _skipReactionCheck: true,
       });
     }
