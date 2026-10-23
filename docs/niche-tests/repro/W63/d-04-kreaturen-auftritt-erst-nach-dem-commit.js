@@ -21,7 +21,8 @@ const KARTEN = [
       R.section(label);
       const mk = () => W.reicheSzene({ seat, karten: [karte] });
       const d = await W.durchlauf(mk, seat, karte, { seat, hero: 0, maxCancel: 4 });
-      W.pruefeDurchlauf(R, label, d, { seat, nCanc });
+      // W64b: Kreaturen zahlen ihre Beschwörungskosten (Opfer, Bleed) VOR dem Landen; der Auftritt der Kreatur ist die Landung — die Kosten zählen nicht als Effekt (`ohneEffektOrdnung`).
+      W.pruefeDurchlauf(R, label, d, { seat, nCanc, ohneEffektOrdnung: true });
     }
   }
   R.finish();
