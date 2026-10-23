@@ -18992,6 +18992,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Check if this is a negative status
     const statusDef = STATUS_EFFECTS[statusName];
     const isNegative = statusDef?.negative === true;
+    const schutzAus = this.statusSchutzAufgehoben(statusName, target);   // 23.10.: Tearing Mountain — jeder Schutz vor diesem Status ist aufgehoben (die Erste-Runden-Regel bleibt)
 
     // Per-status default animation when the source card didn't pass an
     // explicit `opts.animationType`. Mirrors the client's status-diff
@@ -19038,7 +19039,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       // Charmed heroes are immune to negative statuses — bei „Golden
       // Apple" nur gegenueber den Karten des Kontrolleurs (v1196).
-      if (this._charmBlocksFrom(target, opts.appliedBy ?? opts.sourceOwner)) {
+      if (!schutzAus && this._charmBlocksFrom(target, opts.appliedBy ?? opts.sourceOwner)) {
         this.log('status_blocked', { target: this._heroLabel(target), status: statusName, reason: 'charmed' });
         playBlockedAnim();
         return false;
@@ -19050,7 +19051,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // valid (Heroes can be CHOSEN as targets — same pattern as first-
       // turn-protection); the status simply doesn't land.
       // Johanna herself is NOT covered by her own protection.
-      if (target?.hp !== undefined) {
+      if (!schutzAus && target?.hp !== undefined) {
         const ownerIdx = this._findHeroOwner(target);
         if (ownerIdx >= 0) {
           const ownerPs = this.gs.players[ownerIdx];
@@ -19081,14 +19082,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
 
       // Immune status blocks all negative statuses
-      if (target.statuses?.immune) {
+      if (!schutzAus && target.statuses?.immune) {
         this.log('status_blocked', { target: target.name || this._heroLabel(target), status: statusName, reason: 'immune' });
         playBlockedAnim();
         return false;
       }
 
       // Specific immunity (burn_immune, freeze_immune, etc.)
-      if (statusDef?.immuneKey && target.statuses?.[statusDef.immuneKey]) {
+      if (!schutzAus && statusDef?.immuneKey && target.statuses?.[statusDef.immuneKey]) {
         this.log('status_blocked', { target: target.name || this._heroLabel(target), status: statusName, reason: statusDef.immuneKey });
         playBlockedAnim();
         return false;
@@ -19116,7 +19117,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // die halbe Engine blind (Luna Pele und die Mischief-Militia-Karten
     // lesen deshalb seit jeher beide). Rein additiv: kein bestehender
     // Leser ändert sein Verhalten, wer eines liest, sieht jetzt alles.
-    await this.runHooks(HOOKS.ON_STATUS_APPLIED, { target, status: statusName, statusName, opts, wasAlreadyActive: !!_vorher });
+    await this.runHooks(HOOKS.ON_STATUS_APPLIED, { target, status: statusName, statusName, opts, wasAlreadyActive: !!_vorher, schutzAufgehoben: schutzAus });
     return true;
   }
 
@@ -19518,8 +19519,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     const sourceObj = typeof opts.source === 'string'
       ? { name: opts.source }
       : (opts.source || (opts.sourceCard || undefined));
+    const schutzAus = this.statusSchutzAufgehoben(statusName, inst);   // 23.10.: Tearing Mountain — jeder Schutz vor diesem Status ist aufgehoben
     // v704 (Puppets, Vinny): Effekt-Waechter fuer Status-Anwendung.
-    if (inst.zone === ZONES.SUPPORT && !opts._skipBoardGuard) {
+    if (!schutzAus && inst.zone === ZONES.SUPPORT && !opts._skipBoardGuard) {
       const guardSrc = sourceObj && typeof (sourceObj.owner ?? sourceObj.controller) === 'number'
         ? sourceObj
         : (typeof opts.sourceOwner === 'number' ? { ...(sourceObj || {}), owner: opts.sourceOwner } : null);
@@ -19536,7 +19538,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // and destroys. canApplyCreatureStatus already reads the shield flag
     // — we just need to surface the trigger here so the gate offers a
     // prompt instead of silently letting the status land.
-    if (!opts.ignoreGateShield && inst.zone === ZONES.SUPPORT) {
+    if (!schutzAus && !opts.ignoreGateShield && inst.zone === ZONES.SUPPORT) {
       await this._triggerGateCheck(inst.controller ?? inst.owner, sourceObj?.name || null, this._gateQuelleVon(sourceObj, opts));   // v1377
     }
     const canApply = this.canApplyCreatureStatus(inst, statusName, sourceObj, { gwSourceOwner: opts.sourceOwner });   // W17b: Golden Wings braucht den Besitzer der Quelle
@@ -19558,7 +19560,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // öffnet das Schutzfenster `beforeCreatureAffected` wie Gift (`actionApplyCreaturePoison`), Heilung, Zerstörung und Bewegung
     // (Warrior of Teocuilatl, Cool Rescuer Monia, Elusive Hind, Winged Skeleton lauschen darauf). Nur bei einer Quelle (Karte/Effekt);
     // Aufrufer, die das Fenster schon selbst geöffnet haben, setzen `_skipAffectedWindow`.
-    if (!opts._skipAffectedWindow && inst.zone === ZONES.SUPPORT && !inst.faceDown
+    if (!schutzAus && !opts._skipAffectedWindow && inst.zone === ZONES.SUPPORT && !inst.faceDown
         && (sourceObj || typeof opts.sourceOwner === 'number')) {
       const _fenster = {
         creature: inst, effectType: 'status',
@@ -19574,7 +19576,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // W16d (A08-13): Status-Umleitungs-Surprise (Cactus Creature) gilt für „a target you control" – auch für Kreaturen.
     // Nur negative Status, nicht bei „negate its effects" (keinStatus), nicht innerhalb einer Surprise-Auflösung.
-    if (STATUS_EFFECTS[statusName]?.negative && !opts.keinStatus && !opts._fromSurpriseRedirect
+    if (!schutzAus && STATUS_EFFECTS[statusName]?.negative && !opts.keinStatus && !opts._fromSurpriseRedirect
         && !this._inSurpriseResolution && !this._inMctsSim && inst.zone === ZONES.SUPPORT && !inst.faceDown) {
       const redirect = await this._checkSurpriseOnCreatureStatus(inst, statusName, opts);
       if (redirect) {
@@ -19678,6 +19680,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           _onCreature: true,
           opts,
           wasAlreadyActive: !!already,   // Welle 10 (Q55): Flamebathed zaehlt nur den initialen Burn
+          schutzAufgehoben: schutzAus,   // 23.10.: Abfänger lassen den Status stehen
           _skipReactionCheck: !!opts?._skipReactionCheck || !!stapel,
         });
       } catch (err) {
@@ -20817,6 +20820,8 @@ this._deathWatch = (this._deathWatchStack || []).length
   canApplyCreatureStatus(inst, statusName, source, opts = {}) {
     if (!inst) return false;
     if (inst.faceDown) return false; // Face-down surprises cannot receive statuses
+    // 23.10. (Tearing Mountain): kein Schutz — weder Immunität noch Wächter noch Schild — verhindert diesen Status.
+    if (this.statusSchutzAufgehoben(statusName, inst)) return true;
     if (!opts.ignoreGateShield && inst.zone === 'support' && this._isGateShielded(inst.controller ?? inst.owner, this._gateQuelleVon(source, opts))) return false; // Defending the Gate
     // Generic absolute-immunity gate: omni-immune creatures (Cardinal
     // Beasts, Golden Wings, future creatures opting in via
@@ -22007,6 +22012,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   canTargetForStatus(inst, statusName, opts = {}) {
     if (!inst) return false;
     if (inst.faceDown) return false;
+    if (this.statusSchutzAufgehoben(statusName, inst)) return true;   // 23.10.: Tearing Mountain
     if (!opts.ignoreGateShield && inst.zone === 'support' && this._isGateShielded(inst.controller ?? inst.owner)) return false;
     // Same canonical-immuneKey lookup as `canApplyCreatureStatus`.
     const statusDef = STATUS_EFFECTS[statusName];
@@ -30789,6 +30795,32 @@ this._deathWatch = (this._deathWatchStack || []).length
    * a generic `reason` for the heal-blocked / poison-remove-blocked
    * log entries so engine code never hardcodes a card name.
    */
+  /**
+   * ★ 23.10. (Tearing Mountain, Vorgabe Al): „While this Area remains in play, any effects that would prevent targets from being Burned are negated."
+   *
+   * Eine Karte im Spiel (heute: eine Area in einer Area-Zone) trägt im Skript `negatesStatusPrevention: ['burned']` — dann gilt für diese Status: JEDER Schutz
+   * davor ist aufgehoben. Das heißt: Statusschutz (Divine Gift of Coolness, Johanna, Light Ball, Immunitäts-Anhängsel, `burn_immune`), Effekt-Immunität
+   * (Charme, `grantEffectImmunity`, Anti Magic, Anti Magic Enchantment, Spell-Immunität, Omni-Immunität, Golden Wings …), Abfänger (Resistance), Wächter (Defending the
+   * Gate, Board Guard, `beforeCreatureAffected`) und Umlenkungen (Cactus Creature) greifen beim SETZEN des Status nicht. Bewusst NICHT aufgehoben: die Erste-Runden-Regel
+   * (`shielded` ist eine Spielregel, kein Effekt) und alles, was den SCHADEN betrifft (Tick, Reduktionen, Negierungen: Tempeste, Chuck …).
+   * `ziel` (Held ODER Kreatur-Instanz) ist ausgenommen, wenn es „unaffected by Areas" ist (Diver Helmet).
+   */
+  statusSchutzAufgehoben(statusName, ziel = null) {
+    const gs = this.gs;
+    if (!statusName || !gs?.areaZones) return false;
+    let aktiv = false;
+    for (const zone of gs.areaZones) {
+      for (const name of (zone || [])) {
+        const liste = loadCardEffect(name)?.negatesStatusPrevention;
+        if (Array.isArray(liste) && liste.includes(statusName)) { aktiv = true; break; }
+      }
+      if (aktiv) break;
+    }
+    if (!aktiv) return false;
+    if (ziel && this._isDiverHelmetProtectedTarget(ziel)) return false;
+    return true;
+  }
+
   _poisonHealLockedBy() {
     const gs = this.gs;
     if (!gs?.areaZones) return null;
@@ -50338,6 +50370,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   heroBlocksStatusNow(playerIdx, heroIdx, statusName, opts = {}) {
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
     if (!hero?.name) return true;
+    if (this.statusSchutzAufgehoben(statusName, hero)) return false;   // 23.10.: Tearing Mountain — kein Schutz verhindert diesen Status
     const statusDef = STATUS_EFFECTS[statusName];
     // W31a (Al, 22.10.2026: „temporäre Heroes sind mögliche Ziele, auch wenn der Schaden verpufft"): `opts.ohneCharme` laesst den Charme-Schutz (ein temporaer
     // uebernommener Held, dessen Wirkung nur verpufft) ausser Acht — fuer Kostenkarten (Sickly Cheese), bei denen nur ECHTE Immunitaet ein Ziel ineligible macht.
@@ -50358,11 +50391,12 @@ this._deathWatch = (this._deathWatchStack || []).length
   async addHeroStatus(playerIdx, heroIdx, statusName, opts = {}) {
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
     if (!hero || !hero.name) return;
+    const schutzAus = this.statusSchutzAufgehoben(statusName, hero);   // 23.10.: Tearing Mountain — jeder Schutz vor diesem Status ist aufgehoben
     // ★ Effekt-Immunitaet: derselbe Riegel wie im Schadenspfad, damit
     // „ALLE Effekte" wirklich alle sind und nicht nur der Schaden.
     // BEWUSST ohne `opts.source`-Vorbedingung: die meisten Statuswege
     // reichen ihre Quelle gar nicht mit (Divine Gift of Fire).
-    if (this.hasEffectImmunity(playerIdx, heroIdx, opts.source)) {
+    if (!schutzAus && this.hasEffectImmunity(playerIdx, heroIdx, opts.source)) {
       this.log('effect_immunity', { hero: hero.name, status: statusName });
       return;
     }
@@ -50375,7 +50409,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // betrifft „Charme" Lv3 genauso. Die Quelle kommt aus
     // `opts.appliedBy` — dieselbe Angabe, die der Statuseintrag
     // ohnehin als `sourceOwner` mitfuehrt.
-    if (STATUS_EFFECTS[statusName]?.negative
+    if (!schutzAus && STATUS_EFFECTS[statusName]?.negative
         && this._charmBlocksFrom(hero, opts.appliedBy ?? opts.sourceOwner)) {
       this.log('status_blocked', {
         target: this._heroLabel(hero), status: statusName, reason: 'charmed',
@@ -50390,7 +50424,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ★ W16b (A01-pollution-31, Text „… make the Hero unaffected by a Spell that hits it"): ein Status-Zauber (Cold Coffin, Medusa's Curse,
     // Null Zone) „trifft" den Helden auch ohne Schaden — das AME-Angebot lief bisher nur lazy aus `actionDealDamage`. Jetzt fragt auch das
     // Setzen eines NEGATIVEN Status durch einen Zauber (lazy, je Zauber und Held einmal gemerkt, `_maybePromptAntiMagicEnchantment`).
-    if (STATUS_EFFECTS[statusName]?.negative && !this._isAmeShieldedHero(playerIdx, heroIdx)) {
+    if (!schutzAus && STATUS_EFFECTS[statusName]?.negative && !this._isAmeShieldedHero(playerIdx, heroIdx)) {
       const _ameQuelle = (typeof opts.source === 'string' && opts.source) || this._currentResolvingSpellName();
       if (_ameQuelle) await this._maybePromptAntiMagicEnchantment(hero, { name: _ameQuelle });
     }
@@ -50398,14 +50432,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Anti Magic Enchantment shield: the current spell already "hit" this
     // hero visually, but the enchantment owner spent a charge to nullify
     // the spell's effects — so downstream status applications are skipped.
-    if (this._isAmeShieldedHero(playerIdx, heroIdx)) {
+    if (!schutzAus && this._isAmeShieldedHero(playerIdx, heroIdx)) {
       this.log('ame_status_blocked', { target: hero.name, status: statusName });
       return;
     }
 
     // Check for status-redirect surprises (Cactus Creature) — only for negative statuses
     const statusDef = STATUS_EFFECTS[statusName];
-    if (statusDef?.negative && !opts._fromSurpriseRedirect && !this._inSurpriseResolution) {
+    if (!schutzAus && statusDef?.negative && !opts._fromSurpriseRedirect && !this._inSurpriseResolution) {
       const redirect = await this._checkSurpriseOnStatus(playerIdx, heroIdx, statusName, opts);
       if (redirect) {
         if (redirect.type === 'hero') {
@@ -50469,7 +50503,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // path) was already added; THIS gate catches the hero-specific
     // path (`addHeroStatus`) which most Spells / Artifacts use to
     // freeze / stun / negate Heroes (Snow Cannon, etc.).
-    if (statusDef?.negative) {
+    if (!schutzAus && statusDef?.negative) {
       if (this._johannaSchuetzt(hero)) {   // Styx 28.9.: nach Kontrolle
         this.log('status_blocked', { target: hero.name, status: statusName, reason: 'johanna_protected' });
         playBlockedAnim();
@@ -50496,7 +50530,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     // Submerged (Jump in the River) — Regel zentral in `isSubmergedProtected`.
-    if (hero.buffs?.submerged) {
+    if (!schutzAus && hero.buffs?.submerged) {
       if (this.isSubmergedProtected(playerIdx, hero, { festesZiel: opts.festesZiel })) {
         this.log('status_blocked', { target: hero.name, status: statusName, reason: 'submerged' });
         playBlockedAnim();
@@ -50515,7 +50549,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const CC_STATUSES = ['frozen', 'stunned', 'negated', 'bound'];
 
     // Universal negative status immunity (Divine Gift of Coolness, etc.)
-    if (statusDef?.negative && hero.buffs?.negative_status_immune) {
+    if (!schutzAus && statusDef?.negative && hero.buffs?.negative_status_immune) {
       this.log('status_blocked', { target: hero.name, status: statusName, reason: 'negative_status_immune' });
       playBlockedAnim();
       return;
@@ -50528,7 +50562,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     // Per-status immunity (e.g. poison_immune blocks poisoned, freeze_immune blocks frozen)
-    if (statusDef?.immuneKey && hero.statuses[statusDef.immuneKey]) {
+    if (!schutzAus && statusDef?.immuneKey && hero.statuses[statusDef.immuneKey]) {
       this.log('status_blocked', { target: hero.name, status: statusName, reason: statusDef.immuneKey });
       playBlockedAnim();
       return;
@@ -50548,14 +50582,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     {
       const spellSrc = (typeof opts.source === 'string' && opts.source)
         || this._currentResolvingSpellName();
-      if (this._isHeroSpellProtected(hero, spellSrc)) {
+      if (!schutzAus && this._isHeroSpellProtected(hero, spellSrc)) {
         this.log('status_blocked', { target: hero.name, status: statusName, reason: 'magic_immune', source: spellSrc });
         playBlockedAnim();
         this._playAntiMagicBlockedAnim(hero);
         return;
       }
       // v1053: Spell-Schild („Energy Aura").
-      if (this.heroSpellWardBlocks(hero, spellSrc)) {
+      if (!schutzAus && this.heroSpellWardBlocks(hero, spellSrc)) {
         this.log('status_blocked', { target: hero.name, status: statusName, reason: 'spell_ward', source: spellSrc });
         playBlockedAnim();
         return;
@@ -50621,6 +50655,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       animationType: opts.animationType || _DEFAULT_STATUS_ANIM_HERO[statusName] || null,
       opts,
       wasAlreadyActive: _warAktiv,
+      schutzAufgehoben: schutzAus,   // 23.10.: Abfänger (Resistance …) lassen den Status stehen
       _skipReactionCheck: opts._skipReactionCheck || !!stapel,
     });
     this.sync();

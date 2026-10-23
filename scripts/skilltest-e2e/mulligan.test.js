@@ -22,7 +22,7 @@ const prompt = (title, extra = {}) => Object.assign({ type: 'handPick', title, d
 
   const oL = console.log, oE = console.error;
   console.log = () => {}; console.error = () => {};
-  const out = await runGame({ seats: 3, setupOnly: true, noProfileSeats: [0, 1, 2], seed: 61 });
+  const out = await runGame({ seats: 3, setupOnly: true, noProfileSeats: [0, 1, 2], seed: 62 });
   console.log = oL; console.error = oE;
   const { room, gs, engine, st, host } = out;
   const cards = engine._getCardDB();
@@ -122,7 +122,7 @@ const prompt = (title, extra = {}) => Object.assign({ type: 'handPick', title, d
 
   console.log('Ablauf im Spiel (Bot mit Horn in a Bottle und drei toten Karten)');
   console.log = () => {}; console.error = () => {};
-  const g = await runGame({ seats: 3, setupOnly: true, noProfileSeats: [0, 1, 2], seed: 61, mullMode: { 0: 'weak' }, record: true,
+  const g = await runGame({ seats: 3, setupOnly: true, noProfileSeats: [0, 1, 2], seed: 62, mullMode: { 0: 'weak' }, record: true,
     mutatePrep: (prep) => { prep.players[0].hand = [...dead, 'Horn in a Bottle']; } });      // die Hand gehört dem Test: sonst zieht eine andere Karte dazwischen
   console.log = oL; console.error = oE;
   const gp = g.gs.players[0], pool = g.room.skillTest.pool;
@@ -149,7 +149,7 @@ const prompt = (title, extra = {}) => Object.assign({ type: 'handPick', title, d
 
   console.log('Ablauf im Spiel (Bot mit Leadership Lv3 auf dem Brett)');
   console.log = () => {}; console.error = () => {};
-  const g2 = await runGame({ seats: 3, setupOnly: true, noProfileSeats: [0, 1, 2], seed: 61, mullMode: { 0: 'weak' }, record: true,
+  const g2 = await runGame({ seats: 3, setupOnly: true, noProfileSeats: [0, 1, 2], seed: 62, mullMode: { 0: 'weak' }, record: true,
     mutatePrep: (prep) => { prep.players[0].hand = [...dead]; prep.players[0].abilityZones[0][0] = { n: 'Leadership', s: 0, c: true }; } });
   console.log = oL; console.error = oE;
   const g2p = g2.gs.players[0];
