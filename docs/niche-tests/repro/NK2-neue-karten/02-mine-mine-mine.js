@@ -44,6 +44,16 @@ const H = require('../../lib/h.js');
     R.check('keine Engine-Fehler, Audit sauber', t.errors.length === 0 && t.audit().length === 0, { e: t.errors, a: t.audit() });
   }
 
+  R.section('A2 · Flug Zone → Hand: Haltezeit über das Ende der fliegenden Kopie hinaus (Al: Kopie und echte Karte waren kurz beide sichtbar)');
+  {
+    const t = await frisch();
+    const delays = [];
+    const orig = t.engine._delay;
+    t.engine._delay = async (ms) => { delays.push(ms); return orig(ms); };
+    await spiele(t);
+    R.check('nach dem Wegnehmen wartet die Karte mindestens 900 ms (Flug 700 + Entfernen der Kopie 100 + Puffer), BEVOR sie die Hand verlässt', delays.some(ms => ms >= 900), delays);
+  }
+
   R.section('B · Charme 1+: Zusatzaktion, optionales Anlegen ohne Kosten');
   for (const lvl of [1, 2, 3]) {
     const t = await frisch(); charme(t, lvl);
