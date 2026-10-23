@@ -76,7 +76,26 @@ def main():
     gl['.notdef'] = TTGlyphPen(None).glyph(); metriken['.notdef'] = (UPEM, 0)
     farben = []            # CPAL-Palette (RGBA 0..1)
     farb_index = {}
+    # Spiel-Palette (256 Farben, scripts/palette): jede Glyphenfarbe rastet auf die naechste Palettenfarbe ein
+    import math
+    pal_hex = [f['hex'] for f in json.load(io.open(os.path.join(WURZEL, 'data', 'palette.json'), encoding='utf-8'))['farben']]
+    def _lab(c):
+        def lin(v): v /= 255; return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+        r, g, b = (lin(x) for x in c)
+        x = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047; y = 0.2126 * r + 0.7152 * g + 0.0722 * b; z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883
+        f = lambda t: t ** (1 / 3) if t > 0.008856 else 7.787 * t + 16 / 116
+        x, y, z = f(x), f(y), f(z)
+        return (116 * y - 16, 500 * (x - y), 200 * (y - z))
+    pal_lab = [_lab([int(h[i:i + 2], 16) for i in (1, 3, 5)]) for h in pal_hex]
+    snap_cache = {}
+    def snap(hexfarbe):
+        if os.environ.get('PE_OHNE_PALETTE'): return hexfarbe     # nur zum Vergleichen
+        if hexfarbe not in snap_cache:
+            l = _lab([int(hexfarbe[i:i + 2], 16) for i in (1, 3, 5)])
+            snap_cache[hexfarbe] = min(zip(pal_hex, pal_lab), key=lambda p: (l[0] - p[1][0]) ** 2 + (l[1] - p[1][1]) ** 2 + (l[2] - p[1][2]) ** 2)[0]
+        return snap_cache[hexfarbe]
     def palette(hexfarbe):
+        hexfarbe = snap(hexfarbe)
         if hexfarbe not in farb_index:
             farb_index[hexfarbe] = len(farben)
             h = hexfarbe.lstrip('#'); farben.append((int(h[0:2], 16) / 255, int(h[2:4], 16) / 255, int(h[4:6], 16) / 255, 1.0))

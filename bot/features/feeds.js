@@ -2,7 +2,7 @@
 // ═══════════════════════════════════════════════════════════════════
 //  Feeds
 //   • Neue Karten: ändert sich data/cards.json (z. B. nach einem Deploy), postet der Bot die neuen
-//     Karten als Bilder in NEW_CARDS_CHANNEL_ID.
+//     Karten in NEW_CARDS_CHANNEL_ID — je Karte eine Nachricht mit dem Kartenbild und der Tagline „**New card beep-boop:**“.
 //   • Patchnotes: Karten, deren Eintrag in data/cards.json sich seit dem letzten Stand VERÄNDERT hat (Text, Werte, Kosten …),
 //     als Bilder in PATCHNOTES_CHANNEL_ID — keine Commit-Texte. Ganz neue Karten gehören in den Neue-Karten-Feed.
 //   • Bugfixes: inhaltliche Änderungen an bestehenden Karten-Skripten (cards/effects/*.js) und gemeinsamen Bausteinen für Wechselwirkungen
@@ -17,6 +17,7 @@ const renderer = require('../lib/card-renderer');
 const { findBugfixes, readNotes, normName } = require('../lib/bugfix');
 
 const MAX_CARDS_POSTED = 40;
+const NEW_CARD_TAGLINE = '**New card beep-boop:**';
 const PER_MESSAGE = 10;
 
 module.exports = function register(ctx) {
@@ -59,6 +60,17 @@ module.exports = function register(ctx) {
   }
 
   // ── Neue Karten ──
+  /** Je neue Karte EINE Nachricht: nur das Kartenbild mit der Tagline (kein Namens-Aufzählungspunkt). Mehr als MAX_CARDS_POSTED: der Rest als Namensliste. */
+  async function postNewCards(ch, cards) {
+    const shown = cards.slice(0, MAX_CARDS_POSTED);
+    for (const c of shown) {
+      const buf = await ctx.cardPng(c.name);
+      if (!buf) continue;
+      await ch.send({ content: NEW_CARD_TAGLINE, files: [new AttachmentBuilder(buf, { name: c.name.replace(/[^a-z0-9]+/gi, '_').slice(0, 60) + '.png' })], allowedMentions: { parse: [] } });
+    }
+    if (cards.length > shown.length) await ch.send({ content: `${NEW_CARD_TAGLINE} …and ${cards.length - shown.length} more: ${cards.slice(shown.length).map(c => c.name).join(', ')}`.slice(0, 1900), allowedMentions: { parse: [] } });
+  }
+
   async function pollCards() {
     let stat;
     try { stat = fs.statSync(cardsFile); } catch { return; }
@@ -78,7 +90,7 @@ module.exports = function register(ctx) {
     if (!fresh.length) return;
 
     const ch = await channel(config.channels.newCards);
-    if (ch) await postCards(ch, `✨ **New cards!**${fresh.length === 1 ? '' : ` (${fresh.length})`}`, fresh.map(c => ({ card: c })));
+    if (ch) await postNewCards(ch, fresh);
     await db.kvSet('known_cards', [...new Set([...known, ...fresh.map(c => c.name)])]);
     console.log('[feeds] neue Karten:', fresh.length);
   }
@@ -156,13 +168,19 @@ module.exports = function register(ctx) {
     await ctx.cardsReload();                                                        // aktuelle Karten (cards.json) für die Zuordnung
     await renderer.init();
     // Balancing-Änderungen (cards.json-Eintrag der Karte geändert) sind kein Bugfix → gehören in die Patchnotes
+    // Karten, die seit dem letzten gemeldeten Stand ERST NEU in cards.json stehen, sind noch nicht live: Wer sie umsetzt und danach nachbessert (Troubleshooting vor dem Livegang),
+    // erzeugt keine Bugfix-Meldung — auch nicht über eine `Bugfix-Note`-Zeile. Der Neue-Karten-Feed zeigt sie.
     let balanced = new Set();
+    let neu = new Set();
     try {
       const read = async ref => JSON.parse(await git('show', `${ref}:data/cards.json`));
-      balanced = new Set(diffCards(await read(last), await read(head)).map(c => c.name));
+      const [alt, jetzt] = [await read(last), await read(head)];
+      balanced = new Set(diffCards(alt, jetzt).map(c => c.name));
+      const vorher = new Set(alt.map(c => c.name));
+      neu = new Set(jetzt.filter(c => !vorher.has(c.name)).map(c => c.name));
     } catch { /* cards.json nicht lesbar: dann keine Ausnahmen */ }
     let found;
-    try { found = await findBugfixes({ git, last, head, cards: renderer.allCards(), maxShared: config.bugfixMaxShared, balanced }); }
+    try { found = await findBugfixes({ git, last, head, cards: renderer.allCards(), maxShared: config.bugfixMaxShared, balanced: new Set([...balanced, ...neu]) }); }
     catch { await db.kvSet('bugfix_last', head); return; }                          // alter Stand unbekannt (force-push) → neu ansetzen
     const notes = await readNotes({ git, last, head });                             // `Bugfix-Note: <Karte oder _baustein> | <was schieflief>`
     await db.kvSet('bugfix_last', head);
@@ -186,7 +204,7 @@ module.exports = function register(ctx) {
     // ausgenommen war (die Beschreibung ist die ausdrückliche Aussage „das war ein Bugfix“)
     for (const [key, text] of notes) {
       const c = byNorm.get(key);
-      if (!c) continue;
+      if (!c || neu.has(c.name)) continue;       // neue, noch nicht live gegangene Karte: keine Bugfix-Meldung
       const it = items.get(c.name) || { card: c, note: '' };
       it.detail = [noteOfCard(c), it.detail && it.detail !== text ? it.detail : ''].filter(Boolean).join(' ');
       items.set(c.name, it);

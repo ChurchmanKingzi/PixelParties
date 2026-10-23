@@ -369,6 +369,36 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
     }
   }
 
+  // ★ 23.10. (Kidnapping, Als Befund: „die gestohlene Creature fliegt zweimal auf die Hand“): Flug und Floater-Sperre gehen VOR jeder Zustandsänderung raus
+  // (Muster `gold-trap.js`). `handZugangSync` und die Leave-Hooks pushen den Zustand (`sync`) — kam der Zustand „Hand gewachsen, Kreatur vom Brett weg“ im Client VOR dem
+  // `play_pile_transfer`, lief dessen automatischer Hand-Diff-Melder (zusätzlicher Zieh-Flug) los, bevor die Unterdrückung gesetzt war (Wettlauf, nur manchmal sichtbar), und
+  // das Verschwinden der Kreatur las der Schadens-Melder als tödlichen Treffer (Schadenszahl am alten Platz): `creature_zone_move` sperrt das. Folgt der Zustand dem Event,
+  // fängt der Client die Quelle noch am echten Platz ab und blendet sie für den Flug aus.
+  const istTokenKarte = !!engine.isTokenCard?.(targetInst);
+  const handPlatz = ps.hand.length;                       // der Platz, den die Karte auf der Hand einnimmt
+  const zoneBekannt = ['support', 'ability', 'permanent', 'area', 'surprise'].includes(zone);   // sonst bricht es unten ohne Wirkung ab
+  if (zone === 'support') engine._broadcastEvent('creature_zone_move', { owner, heroIdx, zoneSlot });
+  if (zoneBekannt && !istTokenKarte) {
+    const fromPile = (zone === 'support' || zone === 'ability' || zone === 'surprise')
+      ? zone
+      : (zone === 'permanent' ? 'permanent' : 'area');
+    engine._broadcastEvent('play_pile_transfer', {
+      fromOwner: owner,
+      toOwner: pi,
+      cardName,
+      from: fromPile,
+      to: 'hand',
+      fromHeroIdx: heroIdx,
+      fromSlotIdx: zoneSlot,
+      // `play_pile_transfer`'s permanent-zone selector keys on `permId`
+      // (Mass Multiplication / Deepsea swaps both pass it). Read it off
+      // the original instance's counter — falls back gracefully to the
+      // instance's id, which the handler accepts as a permId match.
+      fromPermId: targetInst.counters?.permId || targetInst.id,
+      toHandIdx: handPlatz,
+    });
+  }
+
   // Remove from its source zone.
   if (zone === 'support') {
     if (ownerPs.supportZones?.[heroIdx]) {
@@ -429,31 +459,7 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
   // W3 (Al 14.10.2026): die Karte bleibt Eigentum ihres PERMANENTEN Besitzers (nicht der Brettseite, auf der sie gerade liegt).
   newInst.originalOwner = engine.kartenBesitzerVon(targetInst);
 
-  // Authoritative flight animation — start at the EXACT board slot the
-  // card was sitting in (not the receiver's deck/hand). The
-  // `play_pile_transfer` handler suppresses the auto hand-grew detector
-  // for this arrival, so this is the sole visual for the move.
-  // `fromOwner` (board side) and `toOwner` (receiver) are different —
-  // the cross-player path the handler supports.
-  const newHandIdx = ps.hand.length - 1;
-  const fromPile = (zone === 'support' || zone === 'ability' || zone === 'surprise')
-    ? zone
-    : (zone === 'permanent' ? 'permanent' : 'area');
-  engine._broadcastEvent('play_pile_transfer', {
-    fromOwner: owner,
-    toOwner: pi,
-    cardName,
-    from: fromPile,
-    to: 'hand',
-    fromHeroIdx: heroIdx,
-    fromSlotIdx: zoneSlot,
-    // `play_pile_transfer`'s permanent-zone selector keys on `permId`
-    // (Mass Multiplication / Deepsea swaps both pass it). Read it off
-    // the original instance's counter — falls back gracefully to the
-    // instance's id, which the handler accepts as a permId match.
-    fromPermId: targetInst.counters?.permId || targetInst.id,
-    toHandIdx: newHandIdx,
-  });
+  // (Der Flug ist oben schon rausgegangen — VOR dem Zustand, s. dort.)
   engine.log('sparkfly_steal', {
     by: sourceName,
     player: ps.username,

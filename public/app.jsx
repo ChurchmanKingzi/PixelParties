@@ -187,9 +187,9 @@ function canAddCard(deck, cardName, section) {
 }
 
 function typeColor(ct) {
-  const m = { Hero:'#aa44ff', 'Ascended Hero':'#6622aa', Creature:'#44dd44', Spell:'#ff4444',
-    Attack:'#ff4444', Artifact:'#ffd700', Potion:'#a0703c', Ability:'#44aaff', Token:'#888' };
-  return m[ct] || '#888';
+  const m = { Hero:'#a040ff', 'Ascended Hero':'#702db3', Creature:'#3ddc57', Spell:'#f03232',
+    Attack:'#f03232', Artifact:'#ffd61a', Potion:'#9d612f', Ability:'#1ca9fd', Token:'#7f7f7f' };
+  return m[ct] || '#7f7f7f';
 }
 
 function typeClass(ct) {
@@ -235,42 +235,42 @@ let _pendingGameState = null; // buffered game state for reconnection
 
 // Shine band gradient palettes
 const BAND_GRADIENTS = [
-  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.06) 8%, rgba(255,80,200,.4) 18%, rgba(80,160,255,.5) 28%, rgba(255,255,60,.4) 38%, rgba(60,255,160,.5) 48%, rgba(200,80,255,.45) 58%, rgba(255,160,60,.35) 68%, rgba(255,255,255,.06) 82%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.04) 10%, rgba(255,120,60,.35) 25%, rgba(255,60,180,.4) 40%, rgba(255,200,60,.35) 55%, rgba(255,80,80,.3) 70%, rgba(255,255,255,.04) 85%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.05) 12%, rgba(60,200,255,.35) 25%, rgba(60,255,200,.35) 40%, rgba(160,80,255,.3) 55%, rgba(80,180,255,.3) 70%, rgba(255,255,255,.05) 85%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.06) 8%, rgba(252,105,198,.4) 18%, rgba(109,155,248,.5) 28%, rgba(255,235,26,.4) 38%, rgba(102,255,162,.5) 48%, rgba(169,82,255,.45) 58%, rgba(255,155,58,.35) 68%, rgba(255,255,255,.06) 82%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.04) 10%, rgba(248,116,32,.35) 25%, rgba(251,30,169,.4) 40%, rgba(255,198,28,.35) 55%, rgba(254,81,84,.3) 70%, rgba(255,255,255,.04) 85%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.05) 12%, rgba(26,198,255,.35) 25%, rgba(104,253,193,.35) 40%, rgba(169,82,255,.3) 55%, rgba(102,182,255,.3) 70%, rgba(255,255,255,.05) 85%, transparent 100%)',
   'linear-gradient(to right, transparent 0%, transparent 20%, rgba(255,255,255,.5) 45%, rgba(255,255,255,.65) 50%, rgba(255,255,255,.5) 55%, transparent 80%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, rgba(255,200,100,.05) 10%, rgba(255,215,0,.35) 25%, rgba(255,180,60,.4) 40%, rgba(255,255,100,.3) 55%, rgba(255,200,60,.25) 70%, rgba(255,200,100,.05) 85%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, rgba(200,100,255,.05) 10%, rgba(160,60,255,.3) 25%, rgba(255,60,255,.35) 40%, rgba(100,60,255,.3) 55%, rgba(180,100,255,.25) 70%, rgba(200,100,255,.05) 85%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(251,200,106,.05) 10%, rgba(255,214,26,.35) 25%, rgba(249,172,32,.4) 40%, rgba(254,255,102,.3) 55%, rgba(255,198,28,.25) 70%, rgba(251,200,106,.05) 85%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(184,102,255,.05) 10%, rgba(160,64,255,.3) 25%, rgba(248,33,227,.35) 40%, rgba(117,31,249,.3) 55%, rgba(184,102,255,.25) 70%, rgba(184,102,255,.05) 85%, transparent 100%)',
 ];
 
 // Sparkle positions — secret rare (warm)
 const SPARKLE_POSITIONS = [
-  { x: 15, y: 20, color: '#ffe080', dur: 2.2, delay: 0 },
-  { x: 75, y: 12, color: '#80d0ff', dur: 2.5, delay: 0.4 },
-  { x: 45, y: 65, color: '#ff80d0', dur: 2.0, delay: 0.9 },
-  { x: 85, y: 50, color: '#80ffb0', dur: 2.7, delay: 1.3 },
-  { x: 25, y: 80, color: '#d080ff', dur: 2.3, delay: 1.7 },
+  { x: 15, y: 20, color: '#fbe181', dur: 2.2, delay: 0 },
+  { x: 75, y: 12, color: '#77c8ee', dur: 2.5, delay: 0.4 },
+  { x: 45, y: 65, color: '#fc69c6', dur: 2.0, delay: 0.9 },
+  { x: 85, y: 50, color: '#66ffa2', dur: 2.7, delay: 1.3 },
+  { x: 25, y: 80, color: '#c98aff', dur: 2.3, delay: 1.7 },
   { x: 60, y: 35, color: '#ffffff', dur: 1.9, delay: 0.6 },
-  { x: 10, y: 50, color: '#ffb060', dur: 2.6, delay: 2.0 },
-  { x: 90, y: 85, color: '#60d0ff', dur: 2.1, delay: 1.1 },
-  { x: 50, y: 10, color: '#ff60a0', dur: 2.4, delay: 0.2 },
-  { x: 35, y: 90, color: '#a0ff60', dur: 2.8, delay: 1.5 },
+  { x: 10, y: 50, color: '#f4ae64', dur: 2.6, delay: 2.0 },
+  { x: 90, y: 85, color: '#66d9ff', dur: 2.1, delay: 1.1 },
+  { x: 50, y: 10, color: '#fe6794', dur: 2.4, delay: 0.2 },
+  { x: 35, y: 90, color: '#cbff66', dur: 2.8, delay: 1.5 },
   { x: 70, y: 70, color: '#ffffff', dur: 2.0, delay: 0.8 },
-  { x: 20, y: 40, color: '#ffe0a0', dur: 2.3, delay: 1.9 },
+  { x: 20, y: 40, color: '#f9ecb3', dur: 2.3, delay: 1.9 },
 ];
 
 // Sparkle positions — diamond rare: white + teal sparkles, no bands
 const DIAMOND_SPARKLE_POSITIONS = [
   { x: 15, y: 10, color: '#ffffff', dur: 1.5, delay: 0.0 },
-  { x: 80, y: 8,  color: '#70e8d0', dur: 1.7, delay: 0.4 },
+  { x: 80, y: 8,  color: '#7ce9dc', dur: 1.7, delay: 0.4 },
   { x: 45, y: 28, color: '#ffffff', dur: 1.4, delay: 0.9 },
-  { x: 8,  y: 45, color: '#80f0e0', dur: 1.6, delay: 0.2 },
+  { x: 8,  y: 45, color: '#7ce9dc', dur: 1.6, delay: 0.2 },
   { x: 70, y: 42, color: '#ffffff', dur: 1.3, delay: 1.1 },
-  { x: 35, y: 55, color: '#90f0e8', dur: 1.8, delay: 0.6 },
+  { x: 35, y: 55, color: '#7ce9dc', dur: 1.8, delay: 0.6 },
   { x: 88, y: 58, color: '#ffffff', dur: 1.5, delay: 1.4 },
-  { x: 20, y: 75, color: '#70e0d0', dur: 1.4, delay: 0.3 },
+  { x: 20, y: 75, color: '#7ce9dc', dur: 1.4, delay: 0.3 },
   { x: 60, y: 72, color: '#ffffff', dur: 1.7, delay: 1.0 },
-  { x: 50, y: 90, color: '#80eed8', dur: 1.6, delay: 0.7 },
+  { x: 50, y: 90, color: '#7ce9dc', dur: 1.6, delay: 0.7 },
 ];
 
 // Hook: spawns random shine bands at random intervals
@@ -367,7 +367,7 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
     setTT(false);
   };
   const onDragEnd = () => { activeDragData = null; };
-  const ttBorderColor = foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : '1px solid var(--bg4)';
+  const ttBorderColor = foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,214,26,.5)' : '1px solid var(--bg4)';
   return (
     <>
       <div className={'card-mini ' + typeClass(card.cardType) + (dimmed ? ' dimmed' : '') + (foilClass ? ' ' + foilClass : '') + (isCover ? ' card-mini-cover' : '')}
@@ -394,8 +394,8 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
             <div className="card-stats">
               {card.level != null && <span>Lv{card.level}</span>}
               {card.hp != null && <span style={{ color: '#ff6666' }}>♥{card.hp}</span>}
-              {card.atk != null && <span style={{ color: '#ffaa44' }}>⚔{card.atk}</span>}
-              {card.cost != null && <span style={{ color: '#44aaff' }}>◆{card.cost}</span>}
+              {card.atk != null && <span style={{ color: '#ff9b3a' }}>⚔{card.atk}</span>}
+              {card.cost != null && <span style={{ color: '#1ca9fd' }}>◆{card.cost}</span>}
             </div>
           </>
         )}
@@ -528,13 +528,13 @@ function MainMenu() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: 280 }} className="animate-in">
         <button className="btn btn-big" onClick={() => setScreen('play')} style={{ fontSize: 16 }}>⚔ PLAY</button>
         <button className="btn btn-big btn-accent2" onClick={() => setScreen('deckbuilder')} style={{ fontSize: 16 }}>✦ EDIT DECK</button>
-        <button className="btn btn-big" onClick={() => setScreen('shop')} style={{ fontSize: 16, borderColor: '#ffd700', color: '#ffd700', background: 'rgba(255,215,0,.08)' }}>✦ SHOP</button>
+        <button className="btn btn-big" onClick={() => setScreen('shop')} style={{ fontSize: 16, borderColor: '#ffd61a', color: '#ffd61a', background: 'rgba(255,214,26,.08)' }}>✦ SHOP</button>
         <button className="btn btn-big btn-success" onClick={() => setScreen('profile')} style={{ fontSize: 16 }}>♛ VIEW PROFILE</button>
       </div>
       <div style={{ marginTop: 30, display: 'flex', alignItems: 'center', gap: 12 }}>
         <span style={{ color: user.color || 'var(--accent)', fontWeight: 700 }} className="orbit-font">{user.username}</span>
-        <span className="badge" style={{ background: 'rgba(170,255,0,.12)', color: 'var(--accent3)' }}>ELO {user.elo}</span>
-        <span className="badge" style={{ background: 'rgba(255,215,0,.12)', color: '#ffd700', display: 'flex', alignItems: 'center', gap: 4 }}>
+        <span className="badge" style={{ background: 'rgba(177,255,26,.12)', color: 'var(--accent3)' }}>ELO {user.elo}</span>
+        <span className="badge" style={{ background: 'rgba(255,214,26,.12)', color: '#ffd61a', display: 'flex', alignItems: 'center', gap: 4 }}>
           <img src="/data/sc.png" style={{ width: 14, height: 14, imageRendering: 'pixelated' }} /> {user.sc || 0}
         </span>
         <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={logout}>LOGOUT</button>
@@ -548,13 +548,13 @@ function MainMenu() {
 // ═══════════════════════════════════════════
 
 const RANK_TIERS = [
-  { name: 'BRONZE',       min: 0,    color: '#cd7f32', glow: 'rgba(205,127,50,.5)',  icon: '⬡' },
-  { name: 'SILVER',       min: 1200, color: '#c0c0c0', glow: 'rgba(192,192,192,.5)', icon: '⬡' },
-  { name: 'GOLD',         min: 1400, color: '#ffd700', glow: 'rgba(255,215,0,.5)',    icon: '⬡' },
-  { name: 'PLATINUM',     min: 1600, color: '#a8e8f0', glow: 'rgba(168,232,240,.5)', icon: '◈' },
-  { name: 'DIAMOND',      min: 1800, color: '#b9f2ff', glow: 'rgba(185,242,255,.6)', icon: '◆' },
-  { name: 'MASTER',       min: 2000, color: '#ff44cc', glow: 'rgba(255,68,204,.5)',   icon: '✦' },
-  { name: 'GRANDMASTER',  min: 2200, color: '#ff8800', glow: 'rgba(255,136,0,.6)',    icon: '♛' },
+  { name: 'BRONZE',       min: 0,    color: '#be680e', glow: 'rgba(190,104,14,.5)',  icon: '⬡' },
+  { name: 'SILVER',       min: 1200, color: '#b9b9b9', glow: 'rgba(185,185,185,.5)', icon: '⬡' },
+  { name: 'GOLD',         min: 1400, color: '#ffd61a', glow: 'rgba(255,214,26,.5)',    icon: '⬡' },
+  { name: 'PLATINUM',     min: 1600, color: '#b6eff7', glow: 'rgba(182,239,247,.5)', icon: '◈' },
+  { name: 'DIAMOND',      min: 1800, color: '#b6eff7', glow: 'rgba(182,239,247,.6)', icon: '◆' },
+  { name: 'MASTER',       min: 2000, color: '#fb1ea9', glow: 'rgba(251,30,169,.5)',   icon: '✦' },
+  { name: 'GRANDMASTER',  min: 2200, color: '#ff8b1a', glow: 'rgba(255,139,26,.6)',    icon: '♛' },
 ];
 
 function getRank(elo) {
@@ -566,7 +566,7 @@ function getRank(elo) {
 
 function ProfileScreen() {
   const { user, setUser, setScreen, notify } = useContext(AppContext);
-  const [color, setColor] = useState(user.color || '#00f0ff');
+  const [color, setColor] = useState(user.color || '#66b6ff');
   const [avatar, setAvatar] = useState(user.avatar);
   const [cardback, setCardback] = useState(user.cardback);
   const [bio, setBio] = useState(user.bio || '');
@@ -598,7 +598,7 @@ function ProfileScreen() {
   const [topHeroes, setTopHeroes] = useState([]);
 
   // Dirty tracking — compare against original user values
-  const isDirty = color !== (user.color || '#00f0ff')
+  const isDirty = color !== (user.color || '#66b6ff')
     || avatar !== user.avatar
     || cardback !== user.cardback
     || bio !== (user.bio || '');
@@ -723,7 +723,7 @@ function ProfileScreen() {
     setShowAvatarGallery(false);
     try {
       const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
-        color: user.color || '#00f0ff', avatar: newAvatar, cardback: user.cardback, bio: user.bio || ''
+        color: user.color || '#66b6ff', avatar: newAvatar, cardback: user.cardback, bio: user.bio || ''
       })});
       setUser(data.user);
     } catch (e) { notify(e.message, 'error'); }
@@ -734,7 +734,7 @@ function ProfileScreen() {
     setShowSleeveGallery(false);
     try {
       const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
-        color: user.color || '#00f0ff', avatar: user.avatar, cardback: newSleeve, bio: user.bio || ''
+        color: user.color || '#66b6ff', avatar: user.avatar, cardback: newSleeve, bio: user.bio || ''
       })});
       setUser(data.user);
     } catch (e) { notify(e.message, 'error'); }
@@ -745,7 +745,7 @@ function ProfileScreen() {
     setShowBoardGallery(false);
     try {
       const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
-        color: user.color || '#00f0ff', avatar: user.avatar, cardback: user.cardback, bio: user.bio || '', board: newBoard
+        color: user.color || '#66b6ff', avatar: user.avatar, cardback: user.cardback, bio: user.bio || '', board: newBoard
       })});
       setUser(data.user);
     } catch (e) { notify(e.message, 'error'); }
@@ -774,7 +774,7 @@ function ProfileScreen() {
   const displayCardback = cardback || '/cardback.png';
 
   return (
-    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #12101f 40%, #0a0a12 100%)' }}>
+    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #08060c 0%, #12101f 40%, #08060c 100%)' }}>
       <div className="top-bar">
         <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 16, color: 'var(--accent)' }}>PLAYER PROFILE</h2>
@@ -828,7 +828,7 @@ function ProfileScreen() {
                     <img src="/data/sc.png" style={{ width: 96, height: 96, imageRendering: 'pixelated' }} />
                   </div>
                 </div>
-                <span className="orbit-font" style={{ fontSize: 20, fontWeight: 700, color: '#ffd700' }}>{user.sc || 0}</span>
+                <span className="orbit-font" style={{ fontSize: 20, fontWeight: 700, color: '#ffd61a' }}>{user.sc || 0}</span>
                 <span style={{ fontSize: 11, color: 'var(--text2)' }}>SC</span>
               </div>
             </div>
@@ -920,7 +920,7 @@ function ProfileScreen() {
                 <div style={{ paddingTop: 14, paddingBottom: 14, borderBottom: '1px solid var(--bg4)' }}>
                   <div className="profile-section-label">NAME COLOR</div>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                    <input type="color" value={color} onChange={e => setColor(e.target.value)}
+                    <input type="color" value={window.ppSnap ? window.ppSnap(color) : color} onChange={e => setColor(window.ppSnap ? window.ppSnap(e.target.value) : e.target.value)}
                       style={{ width: 44, height: 34, border: '1px solid var(--bg4)', cursor: 'pointer', background: 'none', padding: 0 }} />
                     <span style={{ color, fontWeight: 700, fontSize: 18 }}>{user.username}</span>
                     <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 4 }}>Preview</span>
@@ -1223,7 +1223,7 @@ function PurchaseCelebration({ cx, cy, onDone }) {
     const ox = cx ?? canvas.width / 2;
     const oy = cy ?? canvas.height / 2;
     const particles = [];
-    const colors = ['#ffd700', '#ffaa00', '#fff8b0', '#ff00aa', '#00f0ff', '#aaff00', '#ff6600', '#ffffff'];
+    const colors = ['#ffd61a', '#f9ac20', '#f7f7ad', '#fb1ea9', '#1aedff', '#b1ff1a', '#f87420', '#ffffff'];
     const shapes = ['star', 'circle', 'diamond', 'spark'];
     // Burst from item position
     for (let i = 0; i < 120; i++) {
@@ -1246,7 +1246,7 @@ function PurchaseCelebration({ cx, cy, onDone }) {
       particles.push({
         x: ox + Math.cos(angle) * dist, y: oy + Math.sin(angle) * dist,
         vx: Math.cos(angle) * 1.5, vy: Math.sin(angle) * 1.5,
-        size: 2 + Math.random() * 4, color: '#ffd700',
+        size: 2 + Math.random() * 4, color: '#ffd61a',
         shape: 'spark', life: 1, decay: 0.015 + Math.random() * 0.01,
         rotation: 0, rotSpeed: 0, gravity: 0,
       });
@@ -1519,7 +1519,7 @@ function ShopScreen() {
   ];
 
   return (
-    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #12101f 40%, #0a0a12 100%)' }}>
+    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #08060c 0%, #12101f 40%, #08060c 100%)' }}>
       {celebration && <PurchaseCelebration cx={celebration.cx} cy={celebration.cy} onDone={() => setCelebration(null)} />}
       {randomReveal && (
         <div className="modal-overlay" style={{ zIndex: 90000 }} onClick={() => setRandomReveal(null)}>
@@ -1530,16 +1530,16 @@ function ShopScreen() {
             </div>
             {randomReveal.label && <div className="shop-reveal-label">{randomReveal.label}</div>}
             {randomReveal.subtitle && <div className="shop-reveal-subtitle">{randomReveal.subtitle}</div>}
-            <button className="btn" style={{ marginTop: 16, padding: '8px 32px', fontSize: 13, borderColor: '#ffd700', color: '#ffd700' }}
+            <button className="btn" style={{ marginTop: 16, padding: '8px 32px', fontSize: 13, borderColor: '#ffd61a', color: '#ffd61a' }}
               onClick={() => setRandomReveal(null)}>NICE!</button>
           </div>
         </div>
       )}
       <div className="top-bar">
         <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setScreen('menu')}>← BACK</button>
-        <h2 className="orbit-font" style={{ fontSize: 16, color: '#ffd700' }}>SHOP</h2>
+        <h2 className="orbit-font" style={{ fontSize: 16, color: '#ffd61a' }}>SHOP</h2>
         <div style={{ flex: 1 }} />
-        <div className="badge" style={{ background: 'rgba(255,215,0,.12)', color: '#ffd700', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+        <div className="badge" style={{ background: 'rgba(255,214,26,.12)', color: '#ffd61a', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
           <img src="/data/sc.png" style={{ width: 16, height: 16, imageRendering: 'pixelated' }} /> {user.sc || 0} SC
         </div>
       </div>
@@ -2154,7 +2154,7 @@ function DeckBuilder() {
     const items = [
       isCover
         ? { label: 'Remove as cover card', icon: '✕', color: 'var(--danger)', action: () => setCoverCard('') }
-        : { label: 'Make this the cover card', icon: '⭐', color: '#ffd700', action: () => setCoverCard(cardName) },
+        : { label: 'Make this the cover card', icon: '⭐', color: '#ffd61a', action: () => setCoverCard(cardName) },
     ];
     if (hasSkins) {
       const availOpts = ownedSkins ? SKINS_DB[cardName].filter(s => ownedSkins.has(s)) : SKINS_DB[cardName];
@@ -2171,13 +2171,13 @@ function DeckBuilder() {
     if (!card || !currentDeck) return;
     const items = [];
     if (card.cardType === 'Hero') {
-      items.push({ label: 'Add to Heroes', icon: '👑', color: '#ffd700', disabled: !canAddCard(currentDeck, cardName, 'hero'), action: () => addCardTo(cardName, 'hero') });
+      items.push({ label: 'Add to Heroes', icon: '👑', color: '#ffd61a', disabled: !canAddCard(currentDeck, cardName, 'hero'), action: () => addCardTo(cardName, 'hero') });
     } else if (card.cardType === 'Potion') {
-      items.push({ label: 'Add to Potion Deck', icon: '🧪', color: '#44ffaa', disabled: !canAddCard(currentDeck, cardName, 'potion'), action: () => addCardTo(cardName, 'potion') });
+      items.push({ label: 'Add to Potion Deck', icon: '🧪', color: '#66ffa2', disabled: !canAddCard(currentDeck, cardName, 'potion'), action: () => addCardTo(cardName, 'potion') });
     } else {
-      items.push({ label: 'Add to Main Deck', icon: '📋', color: '#44aaff', disabled: !canAddCard(currentDeck, cardName, 'main'), action: () => addCardTo(cardName, 'main') });
+      items.push({ label: 'Add to Main Deck', icon: '📋', color: '#1ca9fd', disabled: !canAddCard(currentDeck, cardName, 'main'), action: () => addCardTo(cardName, 'main') });
     }
-    items.push({ label: 'Add to Side Deck', icon: '📦', color: '#888', disabled: !canAddCard(currentDeck, cardName, 'side'), action: () => addCardTo(cardName, 'side') });
+    items.push({ label: 'Add to Side Deck', icon: '📦', color: '#7f7f7f', disabled: !canAddCard(currentDeck, cardName, 'side'), action: () => addCardTo(cardName, 'side') });
     setCtxMenu({ x: e.clientX, y: e.clientY, items });
   }, [currentDeck, addCardTo]);
 
@@ -2626,7 +2626,7 @@ function DeckBuilder() {
               const v = isDeckLegal(d); const hasChanges = unsaved[d.id];
               return (
                 <div key={d.id} className={'deck-list-item' + (i === activeIdx && !isSampleMode ? ' active' : '')} onClick={() => { setActiveIdx(i); setSampleActive(-1); }}>
-                  {d.isDefault && <span style={{ color: '#ffd700', fontSize: 10 }}>★</span>}
+                  {d.isDefault && <span style={{ color: '#ffd61a', fontSize: 10 }}>★</span>}
                   <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}{hasChanges ? ' *' : ''}</span>
                   <span style={{ fontSize: 8, color: v.legal ? 'var(--success)' : 'var(--danger)' }}>{v.legal ? '✓' : '✗'}</span>
                 </div>
@@ -2676,7 +2676,7 @@ function DeckBuilder() {
             )}
             <div style={{ flex: 1 }} />
             {!validation.legal && <div style={{ fontSize: 9, color: 'var(--danger)', maxWidth: 300, textAlign: 'right' }}>{validation.reasons.join(' · ')}</div>}
-            {validation.legal && <span className="badge" style={{ background: 'rgba(51,255,136,.12)', color: 'var(--success)' }}>LEGAL</span>}
+            {validation.legal && <span className="badge" style={{ background: 'rgba(76,235,112,.12)', color: 'var(--success)' }}>LEGAL</span>}
           </div>
 
           {/* Scrollable deck body */}
@@ -2688,7 +2688,7 @@ function DeckBuilder() {
               const slot = dt && dt.section === 'hero' ? dt.idx : null;
               handleDrop('hero', { ...d, targetSlot: slot }, mx, my);
             }} onDragPos={onGalleryDragPos} className="deck-section">
-              <SecHeader sec="heroes" color="#bb77ff" icon="👑" label="HEROES" count={heroes.filter(h=>h&&h.hero).length} max={3} />
+              <SecHeader sec="heroes" color="#ba74ff" icon="👑" label="HEROES" count={heroes.filter(h=>h&&h.hero).length} max={3} />
               <div className="deck-section-body" data-deck-section="hero" style={{ display: 'flex', flexWrap: 'nowrap', justifyContent: 'space-evenly', gap: 40, padding: 12 }}>
                 {heroes.map((h, i) => {
                   const isDropTarget = (() => {
@@ -2723,7 +2723,7 @@ function DeckBuilder() {
                           if (abCard) return <CardMini key={ai} card={abCard} onClick={() => {}} style={{ width: 'var(--card-w)', height: 'var(--card-h)', aspectRatio: 'unset' }} />;
                           return (
                             <div key={ai} className="ability-slot" style={{ width: 'var(--card-w)', height: 'var(--card-h)', aspectRatio: 'unset', fontSize: 10, padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              {ab ? <span style={{ color: '#ffff44' }}>{ab}</span> : <span style={{ color: 'var(--text2)' }}>Ability {ai + 1}</span>}
+                              {ab ? <span style={{ color: '#ffeb1a' }}>{ab}</span> : <span style={{ color: 'var(--text2)' }}>Ability {ai + 1}</span>}
                             </div>
                           );
                         })}
@@ -2737,7 +2737,7 @@ function DeckBuilder() {
 
             {/* ── MAIN DECK ── */}
             <DropSection sectionId="main" onDrop={(d, mx, my) => handleDrop('main', d, mx, my)} onDragPos={onGalleryDragPos} className="deck-section">
-              <SecHeader sec="main" color="#44aaff" icon="📋" label="MAIN DECK" count={(currentDeck?.mainDeck||[]).length} max={60}
+              <SecHeader sec="main" color="#1ca9fd" icon="📋" label="MAIN DECK" count={(currentDeck?.mainDeck||[]).length} max={60}
                 extra={<><TipBtn tip="Shuffle" className="btn" style={{ padding:'2px 6px', fontSize:8 }} onClick={shuffleMain}>🔀</TipBtn><TipBtn tip="Sort" className="btn" style={{ padding:'2px 6px', fontSize:8 }} onClick={() => sortSec('main')}>↕</TipBtn></>} />
               <div className="deck-section-body" data-deck-section="main">
                 {buildDeckDisplay('main', currentDeck?.mainDeck || []).map((item, idx) => {
@@ -2755,7 +2755,7 @@ function DeckBuilder() {
 
             {/* ── POTION DECK ── */}
             <DropSection sectionId="potion" onDrop={(d, mx, my) => handleDrop('potion', d, mx, my)} onDragPos={onGalleryDragPos} className="deck-section">
-              <SecHeader sec="potion" color="#c8a060" icon="🧪" label="POTION DECK" count={(currentDeck?.potionDeck||[]).length} max={15} note="(0 or 5–15)"
+              <SecHeader sec="potion" color="#b29466" icon="🧪" label="POTION DECK" count={(currentDeck?.potionDeck||[]).length} max={15} note="(0 or 5–15)"
                 extra={<TipBtn tip="Sort" className="btn" style={{ padding:'2px 6px', fontSize:8 }} onClick={() => sortSec('potion')}>↕</TipBtn>} />
               <div className="deck-section-body" data-deck-section="potion">
                 {buildDeckDisplay('potion', currentDeck?.potionDeck || []).map((item, idx) => {
@@ -2773,7 +2773,7 @@ function DeckBuilder() {
 
             {/* ── SIDE DECK ── */}
             <DropSection sectionId="side" onDrop={(d, mx, my) => handleDrop('side', d, mx, my)} onDragPos={onGalleryDragPos} className="deck-section">
-              <SecHeader sec="side" color="#888" icon="📦" label="SIDE DECK" count={(currentDeck?.sideDeck||[]).length} max={15}
+              <SecHeader sec="side" color="#7f7f7f" icon="📦" label="SIDE DECK" count={(currentDeck?.sideDeck||[]).length} max={15}
                 extra={<TipBtn tip="Sort" className="btn" style={{ padding:'2px 6px', fontSize:8 }} onClick={() => sortSec('side')}>↕</TipBtn>} />
               <div className="deck-section-body" data-deck-section="side">
                 {buildDeckDisplay('side', currentDeck?.sideDeck || []).map((item, idx) => {
@@ -2953,7 +2953,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
           {imgUrl && (
             <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
               <img src={imgUrl} style={{ width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
-                border: foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : 'none' }} />
+                border: foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,214,26,.5)' : 'none' }} />
               {isFoil && foilMeta.current && <FoilOverlay bands={foilBands} shimmerOffset={foilMeta.current.shimmerOffset} sparkleDelays={foilMeta.current.sparkleDelays} foilType={foilType} />}
             </div>
           )}
@@ -2965,8 +2965,8 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
             {card.effect && <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.5 }}>{card.effect}</div>}
             <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 8, display: 'flex', gap: 12 }}>
               {card.hp != null && <span style={{ color: '#ff6666' }}>♥ HP {card.hp}</span>}
-              {card.atk != null && <span style={{ color: '#ffaa44' }}>⚔ ATK {card.atk}</span>}
-              {card.cost != null && <span style={{ color: '#44aaff' }}>◆ Cost {card.cost}</span>}
+              {card.atk != null && <span style={{ color: '#ff9b3a' }}>⚔ ATK {card.atk}</span>}
+              {card.cost != null && <span style={{ color: '#1ca9fd' }}>◆ Cost {card.cost}</span>}
               {card.level != null && <span>Lv{card.level}</span>}
             </div>
           </div>
@@ -3310,7 +3310,7 @@ function CardRevealEntry({ cardName, onDone }) {
         <div className="card-reveal-card">
           {imgUrl ? (
             <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6,
-              border: foilType === 'diamond_rare' ? '3px solid rgba(120,200,255,.7)' : foilType === 'secret_rare' ? '3px solid rgba(255,215,0,.6)' : '2px solid var(--bg4)' }} draggable={false} />
+              border: foilType === 'diamond_rare' ? '3px solid rgba(104,198,253,.7)' : foilType === 'secret_rare' ? '3px solid rgba(255,214,26,.6)' : '2px solid var(--bg4)' }} draggable={false} />
           ) : (
             <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               background: 'var(--bg3)', borderRadius: 6, border: '2px solid var(--bg4)', padding: 16, textAlign: 'center' }}>
@@ -3325,7 +3325,7 @@ function CardRevealEntry({ cardName, onDone }) {
           {imgUrl && (
             <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
               <img src={imgUrl} style={{ width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
-                border: foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : 'none' }} />
+                border: foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,214,26,.5)' : 'none' }} />
             </div>
           )}
           <div style={{ padding: '10px 12px' }}>
@@ -3336,8 +3336,8 @@ function CardRevealEntry({ cardName, onDone }) {
             {card.effect && <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.5 }}>{card.effect}</div>}
             <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 8, display: 'flex', gap: 12 }}>
               {card.hp != null && <span style={{ color: '#ff6666' }}>♥ HP {card.hp}</span>}
-              {card.atk != null && <span style={{ color: '#ffaa44' }}>⚔ ATK {card.atk}</span>}
-              {card.cost != null && <span style={{ color: '#44aaff' }}>◆ Cost {card.cost}</span>}
+              {card.atk != null && <span style={{ color: '#ff9b3a' }}>⚔ ATK {card.atk}</span>}
+              {card.cost != null && <span style={{ color: '#1ca9fd' }}>◆ Cost {card.cost}</span>}
               {card.level != null && <span>Lv{card.level}</span>}
             </div>
           </div>
@@ -3356,7 +3356,7 @@ function ExplosionEffect({ x, y }) {
       dx: Math.cos(angle) * speed,
       dy: Math.sin(angle) * speed,
       size: 3 + Math.random() * 8,
-      color: ['#ff4400','#ff8800','#ffcc00','#ff2200','#ffaa00','#fff'][Math.floor(Math.random() * 6)],
+      color: ['#ff491a','#ff8b1a','#ffd61a','#ff1a1a','#f9ac20','#fff'][Math.floor(Math.random() * 6)],
       delay: Math.random() * 80,
       dur: 350 + Math.random() * 400,
     };
@@ -3389,7 +3389,7 @@ function FreezeEffect({ x, y, w, h }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 3 + Math.random() * 7,
-      color: ['#aaddff','#88ccff','#cceeFF','#ffffff','#66bbff'][Math.floor(Math.random() * 5)],
+      color: ['#b3d8f9','#7bbeea','#bddcef','#ffffff','#66b6ff'][Math.floor(Math.random() * 5)],
       delay: 400 + Math.random() * 200,
       dur: 400 + Math.random() * 300,
     };
@@ -3424,7 +3424,7 @@ function ThawEffect({ x, y }) {
     size: 3 + Math.random() * 5,
     delay: Math.random() * 300,
     dur: 500 + Math.random() * 400,
-    color: ['#aaddff','#88ccff','#cceeFF','#ddf4ff'][Math.floor(Math.random() * 4)],
+    color: ['#b3d8f9','#7bbeea','#bddcef','#e5f5fa'][Math.floor(Math.random() * 4)],
   })), []);
   return (
     <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
@@ -3459,7 +3459,7 @@ function ElectricStrikeEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 2 + Math.random() * 5,
-      color: ['#ffe033','#fff','#ffcc00','#ffffaa','#ffd700'][Math.floor(Math.random() * 5)],
+      color: ['#ffe23d','#fff','#ffd61a','#f7f7ad','#ffd61a'][Math.floor(Math.random() * 5)],
       delay: 250 + Math.random() * 150,
       dur: 250 + Math.random() * 250,
     };
@@ -3529,7 +3529,7 @@ function FlameStrikeEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 2 + Math.random() * 5,
-      color: ['#ff4400','#ff8800','#ffcc00','#ff2200','#ffaa00'][Math.floor(Math.random() * 5)],
+      color: ['#ff491a','#ff8b1a','#ffd61a','#ff1a1a','#f9ac20'][Math.floor(Math.random() * 5)],
       delay: 300 + Math.random() * 150,
       dur: 300 + Math.random() * 250,
     };
@@ -3724,7 +3724,7 @@ function ShadowSummonEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 2 + Math.random() * 4,
-      color: ['#6633aa','#442288','#553399','#221144','#7744bb'][Math.floor(Math.random() * 5)],
+      color: ['#7e41ba','#58238c','#663597','#1a0a3a','#7e41ba'][Math.floor(Math.random() * 5)],
       delay: 300 + Math.random() * 200,
       dur: 300 + Math.random() * 300,
     };
@@ -3756,7 +3756,7 @@ function GoldSparkleEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 3 + Math.random() * 5,
-      color: ['#ffd700','#ffcc00','#ffee55','#fff','#ffaa00'][Math.floor(Math.random() * 5)],
+      color: ['#ffd61a','#ffd61a','#ffe23d','#fff','#f9ac20'][Math.floor(Math.random() * 5)],
       delay: Math.random() * 150,
       dur: 400 + Math.random() * 400,
     };
@@ -3781,7 +3781,7 @@ function BeerBubblesEffect({ x, y }) {
     size: 4 + Math.random() * 8,
     delay: Math.random() * 300,
     dur: 500 + Math.random() * 500,
-    color: ['#ffd700','#ffcc33','#fff8dc','#ffe680','#fff'][Math.floor(Math.random() * 5)],
+    color: ['#ffd61a','#f8ca21','#fff8e8','#fbe181','#fff'][Math.floor(Math.random() * 5)],
     wobble: -8 + Math.random() * 16,
   })), []);
   return (
@@ -3803,7 +3803,7 @@ function CreatureDeathEffect({ x, y }) {
     dx: -20 + Math.random() * 40,
     dy: -(40 + Math.random() * 60),
     size: 4 + Math.random() * 6,
-    color: ['#ffffff','#aaccff','#88aaff','#ccddff','#ddeeff'][Math.floor(Math.random() * 5)],
+    color: ['#ffffff','#b4cff8','#6d9bf8','#b3d8f9','#e5edfa'][Math.floor(Math.random() * 5)],
     delay: Math.random() * 200,
     dur: 600 + Math.random() * 500,
   })), []);
@@ -3814,7 +3814,7 @@ function CreatureDeathEffect({ x, y }) {
       dx: Math.cos(angle) * speed,
       dy: Math.sin(angle) * speed,
       size: 2 + Math.random() * 4,
-      color: ['#ff4444','#ff6666','#ffaaaa','#ff8888','#cc3333'][Math.floor(Math.random() * 5)],
+      color: ['#f03232','#ff6666','#f9b3b3','#ec7f79','#b5171c'][Math.floor(Math.random() * 5)],
       delay: 50 + Math.random() * 150,
       dur: 400 + Math.random() * 400,
     };
@@ -3857,7 +3857,7 @@ const ANIM_REGISTRY = {
         delay: i * 18 + Math.random() * 60,
         dur: 320 + Math.random() * 180,
         size: 4 + Math.random() * 6,
-        color: ['#cc1100', '#ff2200', '#dd3300', '#aa0000', '#ee4400', '#b81022'][Math.floor(Math.random() * 6)],
+        color: ['#c80000', '#ff1a1a', '#cc2b00', '#be0e0e', '#ff491a', '#b5171c'][Math.floor(Math.random() * 6)],
       })), [cw]);
       const splats = useMemo(() => Array.from({ length: 9 }, () => ({
         x: -cw * 0.4 + Math.random() * cw * 0.8,
@@ -3897,8 +3897,8 @@ const ANIM_REGISTRY = {
               left: s.x + 'px', top: s.y + 'px',
               width: (s.rx * 2) + 'px', height: (s.ry * 2) + 'px',
               borderRadius: '50%',
-              background: 'radial-gradient(ellipse, #ee2200 0%, #aa0500 50%, #440000 90%)',
-              boxShadow: '0 0 7px rgba(220, 30, 0, 0.85), inset 0 -2px 3px rgba(0,0,0,0.5)',
+              background: 'radial-gradient(ellipse, #ff1a1a 0%, #be0e0e 50%, #520a0c 90%)',
+              boxShadow: '0 0 7px rgba(200,0,0,0.85), inset 0 -2px 3px rgba(0,0,0,0.5)',
               opacity: 0,
               animation: `boiling-oil-splat ${s.dur}ms ease-out ${s.delay}ms forwards`,
             }} />
@@ -3909,7 +3909,7 @@ const ANIM_REGISTRY = {
               left: st.x + 'px', top: st.y + 'px',
               width: st.size + 'px', height: (st.size * 1.4) + 'px',
               borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(255,210,190,0.7) 0%, rgba(255,160,110,0.35) 65%, transparent 100%)',
+              background: 'radial-gradient(circle, rgba(240,191,188,0.7) 0%, rgba(244,174,100,0.35) 65%, transparent 100%)',
               opacity: 0,
               animation: `boiling-oil-steam ${st.dur}ms ease-out ${st.delay}ms forwards`,
             }} />
@@ -3958,7 +3958,7 @@ const ANIM_REGISTRY = {
           dx: Math.cos(angle) * speed,
           dy: Math.sin(angle) * speed,
           size: 3 + Math.random() * 4,
-          color: ['#ff2200', '#ff8800', '#ffaa00', '#ffcc33', '#ffe066'][Math.floor(Math.random() * 5)],
+          color: ['#ff1a1a', '#ff8b1a', '#f9ac20', '#f8ca21', '#ffe469'][Math.floor(Math.random() * 5)],
           delay: 230 + Math.random() * 220,
           dur: 500 + Math.random() * 320,
         };
@@ -3972,7 +3972,7 @@ const ANIM_REGISTRY = {
             width: cw * 0.84 + 'px',
             height: ch * 0.32 + 'px',
             borderRadius: '50%',
-            background: 'radial-gradient(ellipse, #fff8aa 0%, #ffaa22 30%, #ff4400aa 60%, transparent 85%)',
+            background: 'radial-gradient(ellipse, #f7f7ad 0%, #f9ac20 30%, #ff491aaa 60%, transparent 85%)',
             opacity: 0,
             animation: 'flame-pillar-base 380ms ease-out forwards',
             filter: 'blur(2px)',
@@ -3983,7 +3983,7 @@ const ANIM_REGISTRY = {
               left: p.startX + 'px',
               top: ch * 0.45 + 'px',
               fontSize: p.size + 'px',
-              filter: 'drop-shadow(0 0 4px #ff6600)',
+              filter: 'drop-shadow(0 0 4px #f87420)',
               opacity: 0,
               animation: `flame-pillar-rise ${p.dur}ms cubic-bezier(0.3, 0.7, 0.3, 1) ${p.delay}ms forwards`,
               '--fpdy': (-p.rise) + 'px',
@@ -4043,8 +4043,8 @@ const ANIM_REGISTRY = {
           size: 6 + Math.random() * 8,
           delay: i * 12 + Math.random() * 60,
           dur: 380 + Math.random() * 220,
-          color: ['#5a189a', '#7b2cbf', '#9d4edd', '#c77dff',
-                  '#b338ff', '#e0aaff', '#ff5cd6', '#a855f7'][Math.floor(Math.random() * 8)],
+          color: ['#50008c', '#702db3', '#9544d5', '#ba74ff',
+                  '#a040ff', '#d6b3f9', '#fa6bed', '#a952ff'][Math.floor(Math.random() * 8)],
         };
       }), []);
       const splats = useMemo(() => Array.from({ length: 7 }, () => ({
@@ -4070,7 +4070,7 @@ const ANIM_REGISTRY = {
             left: -cw * 0.45 + 'px', top: -ch * 0.35 + 'px',
             width: cw * 0.9 + 'px', height: ch * 0.7 + 'px',
             borderRadius: '50%',
-            background: 'radial-gradient(ellipse, #f0c4ff 0%, #c77dff 25%, #7b2cbf99 55%, transparent 80%)',
+            background: 'radial-gradient(ellipse, #d6bbf1 0%, #ba74ff 25%, #702db399 55%, transparent 80%)',
             opacity: 0,
             animation: 'hydra-goo-flash 360ms ease-out forwards',
             filter: 'blur(2px)',
@@ -4081,8 +4081,8 @@ const ANIM_REGISTRY = {
               left: s.x + 'px', top: s.y + 'px',
               width: (s.rx * 2) + 'px', height: (s.ry * 2) + 'px',
               borderRadius: '50%',
-              background: 'radial-gradient(ellipse, #b338ff 0%, #7b2cbf 50%, #4a0e75 90%)',
-              boxShadow: '0 0 8px rgba(155, 60, 230, 0.85), inset 0 -2px 4px rgba(0,0,0,0.4)',
+              background: 'radial-gradient(ellipse, #a040ff 0%, #702db3 50%, #47117e 90%)',
+              boxShadow: '0 0 8px rgba(144,58,230,0.85), inset 0 -2px 4px rgba(0,0,0,0.4)',
               transform: `rotate(${s.rot}deg)`,
               opacity: 0,
               animation: `hydra-goo-splat ${s.dur}ms ease-out ${s.delay}ms forwards`,
@@ -4107,8 +4107,8 @@ const ANIM_REGISTRY = {
               left: b.x + 'px', top: b.y + 'px',
               width: b.size + 'px', height: b.size + 'px',
               borderRadius: '50%',
-              background: 'radial-gradient(circle, #ffffff 0%, #e0aaff 60%, #c77dff 100%)',
-              boxShadow: '0 0 4px rgba(255, 200, 255, 0.9)',
+              background: 'radial-gradient(circle, #ffffff 0%, #d6b3f9 60%, #ba74ff 100%)',
+              boxShadow: '0 0 4px rgba(248,180,223,0.9)',
               opacity: 0,
               animation: `hydra-goo-bubble ${b.dur}ms ease-out ${b.delay}ms forwards`,
             }} />
@@ -4230,9 +4230,9 @@ const ANIM_REGISTRY = {
             <div key={'bb'+i} style={{
               position: 'absolute', left: b.xOff, top: b.startY,
               width: b.size, height: b.size, borderRadius: '50%',
-              background: 'radial-gradient(circle at 35% 35%, rgba(100,160,220,.6), rgba(20,50,100,.3))',
-              border: '1px solid rgba(80,140,200,.4)',
-              boxShadow: `inset 0 -2px 4px rgba(10,30,60,.3), 0 0 ${b.size/2}px rgba(40,80,140,.3)`,
+              background: 'radial-gradient(circle at 35% 35%, rgba(57,158,223,.6), rgba(20,40,90,.3))',
+              border: '1px solid rgba(57,158,223,.4)',
+              boxShadow: `inset 0 -2px 4px rgba(0,33,63,.3), 0 0 ${b.size/2}px rgba(43,69,126,.3)`,
               animation: `bubbleRise ${b.dur}ms ease-out ${b.delay}ms forwards`,
               opacity: 0,
               '--endY': b.endY + 'px',
@@ -4261,12 +4261,12 @@ const ANIM_REGISTRY = {
         delay: 200 + Math.random() * 600,
         dur: 500 + Math.random() * 500,
         size: 4 + Math.random() * 8,
-        color: ['#fffbe6','#ffd700','#fff','#ffe082','#fff9c4'][Math.floor(Math.random() * 5)],
+        color: ['#fff8e8','#ffd61a','#fff','#fbe181','#f8f8bd'][Math.floor(Math.random() * 5)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ width: 160, height: 160, marginLeft: -80, marginTop: -80, background: 'radial-gradient(circle, rgba(255,255,240,.9) 0%, rgba(255,215,0,.4) 35%, rgba(255,255,200,.1) 60%, transparent 80%)', animationDuration: '800ms' }} />
-          <div className="anim-flame-flash" style={{ width: 100, height: 100, marginLeft: -50, marginTop: -50, background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,240,180,.5) 40%, transparent 70%)', animationDelay: '200ms', animationDuration: '600ms' }} />
+          <div className="anim-flame-flash" style={{ width: 160, height: 160, marginLeft: -80, marginTop: -80, background: 'radial-gradient(circle, rgba(255,248,232,.9) 0%, rgba(255,214,26,.4) 35%, rgba(248,248,189,.1) 60%, transparent 80%)', animationDuration: '800ms' }} />
+          <div className="anim-flame-flash" style={{ width: 100, height: 100, marginLeft: -50, marginTop: -50, background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(249,236,179,.5) 40%, transparent 70%)', animationDelay: '200ms', animationDuration: '600ms' }} />
           {rays.map((r, i) => (
             <div key={'hr'+i} style={{
               position: 'absolute', left: 0, top: 0,
@@ -4275,7 +4275,7 @@ const ANIM_REGISTRY = {
             }}>
               <div style={{
                 width: r.width, height: r.len, marginLeft: -r.width/2,
-                background: 'linear-gradient(to top, rgba(255,215,0,.8), rgba(255,255,240,.3) 70%, transparent)',
+                background: 'linear-gradient(to top, rgba(255,214,26,.8), rgba(255,248,232,.3) 70%, transparent)',
                 borderRadius: r.width,
                 transformOrigin: 'center bottom',
                 animation: `holyRayGrow ${r.dur}ms ease-out ${r.delay}ms forwards`,
@@ -4313,11 +4313,11 @@ const ANIM_REGISTRY = {
         delay: 250 + Math.random() * 500,
         dur: 300 + Math.random() * 200,
         size: 3 + Math.random() * 5,
-        color: ['#ffcc44','#ff8800','#ffaa22','#ddaa00','#ffe066'][Math.floor(Math.random() * 5)],
+        color: ['#fad54a','#ff8b1a','#f9ac20','#c79e05','#ffe469'][Math.floor(Math.random() * 5)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ width: 80, height: 80, marginLeft: -40, marginTop: -40, background: 'radial-gradient(circle, rgba(255,200,50,.5) 0%, rgba(255,150,0,.2) 50%, transparent 80%)', animationDelay: '300ms' }} />
+          <div className="anim-flame-flash" style={{ width: 80, height: 80, marginLeft: -40, marginTop: -40, background: 'radial-gradient(circle, rgba(255,198,28,.5) 0%, rgba(255,154,26,.2) 50%, transparent 80%)', animationDelay: '300ms' }} />
           {arrows.map((a, i) => (
             <div key={'ar'+i} style={{
               position: 'absolute', left: a.xOff, top: a.startY,
@@ -4326,13 +4326,13 @@ const ANIM_REGISTRY = {
             }}>
               <div style={{
                 width: 2, height: a.len,
-                background: 'linear-gradient(to bottom, transparent 0%, #ffdd66 20%, #ffaa22 80%, #ff8800 100%)',
+                background: 'linear-gradient(to bottom, transparent 0%, #ffd966 20%, #f9ac20 80%, #ff8b1a 100%)',
                 borderRadius: '0 0 1px 1px',
-                boxShadow: '0 0 4px rgba(255,200,50,.6)',
+                boxShadow: '0 0 4px rgba(255,198,28,.6)',
                 transform: `rotate(${a.rot}deg)`,
                 transformOrigin: 'center top',
               }}>
-                <div style={{ position: 'absolute', bottom: -4, left: -3, width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: '6px solid #ff8800' }} />
+                <div style={{ position: 'absolute', bottom: -4, left: -3, width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: '6px solid #ff8b1a' }} />
               </div>
             </div>
           ))}
@@ -4367,15 +4367,15 @@ const ANIM_REGISTRY = {
         return {
           dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
           size: 4 + Math.random() * 8,
-          color: ['#ff2200','#ff4400','#ff8800','#ffcc00','#ffaa00','#ff0000','#ff6600'][Math.floor(Math.random() * 7)],
+          color: ['#ff1a1a','#ff491a','#ff8b1a','#ffd61a','#f9ac20','#ff1a1a','#f87420'][Math.floor(Math.random() * 7)],
           delay: Math.random() * 300,
           dur: 500 + Math.random() * 400,
         };
       }), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ width: 200, height: 200, marginLeft: -100, marginTop: -100, background: 'radial-gradient(circle, rgba(255,100,0,.9) 0%, rgba(255,60,0,.6) 30%, rgba(255,0,0,.2) 60%, transparent 80%)' }} />
-          <div className="anim-flame-flash" style={{ width: 140, height: 140, marginLeft: -70, marginTop: -70, animationDelay: '100ms', background: 'radial-gradient(circle, rgba(255,255,200,.8) 0%, rgba(255,180,0,.4) 40%, transparent 70%)' }} />
+          <div className="anim-flame-flash" style={{ width: 200, height: 200, marginLeft: -100, marginTop: -100, background: 'radial-gradient(circle, rgba(248,116,32,.9) 0%, rgba(255,73,26,.6) 30%, rgba(255,26,26,.2) 60%, transparent 80%)' }} />
+          <div className="anim-flame-flash" style={{ width: 140, height: 140, marginLeft: -70, marginTop: -70, animationDelay: '100ms', background: 'radial-gradient(circle, rgba(248,248,189,.8) 0%, rgba(255,185,26,.4) 40%, transparent 70%)' }} />
           {flames.map((f, i) => (
             <div key={'fa'+i} className="anim-flame-shard" style={{
               '--startX': f.startX + 'px', '--startY': f.startY + 'px', '--size': f.size + 'px',
@@ -4404,12 +4404,12 @@ const ANIM_REGISTRY = {
         size: 4 + Math.random() * 8,
         delay: Math.random() * 300,
         dur: 500 + Math.random() * 500,
-        color: ['#ff8c00','#ffa033','#ffcc66','#ff6600','#ffe0b0'][Math.floor(Math.random() * 5)],
+        color: ['#ff8b1a','#ff9b3a','#ffd066','#f87420','#f7e0b5'][Math.floor(Math.random() * 5)],
         wobble: -8 + Math.random() * 16,
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(255,140,0,.8) 0%, rgba(255,100,0,.3) 40%, transparent 70%)' }} />
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(255,139,26,.8) 0%, rgba(248,116,32,.3) 40%, transparent 70%)' }} />
           {bubbles.map((b, i) => (
             <div key={'jb'+i} className="anim-beer-bubble" style={{
               '--xOff': b.xOff + 'px', '--size': b.size + 'px', '--wobble': b.wobble + 'px',
@@ -4427,12 +4427,12 @@ const ANIM_REGISTRY = {
         size: 4 + Math.random() * 7,
         delay: Math.random() * 250,
         dur: 400 + Math.random() * 400,
-        color: ['#9933cc','#7722aa','#bb55ee','#6611aa','#dd88ff'][Math.floor(Math.random() * 5)],
+        color: ['#9544d5','#702db3','#b866ff','#6618b4','#c98aff'][Math.floor(Math.random() * 5)],
         wobble: -8 + Math.random() * 16,
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(130,0,180,.8) 0%, rgba(100,0,160,.3) 40%, transparent 70%)' }} />
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(102,24,180,.8) 0%, rgba(102,24,180,.3) 40%, transparent 70%)' }} />
           {bubbles.map((b, i) => (
             <div key={'pt'+i} className="anim-beer-bubble" style={{
               '--xOff': b.xOff + 'px', '--size': b.size + 'px', '--wobble': b.wobble + 'px',
@@ -4451,7 +4451,7 @@ const ANIM_REGISTRY = {
         delay: Math.random() * 200,
         dur: 500 + Math.random() * 500,
         wobble: -10 + Math.random() * 20,
-        color: ['#7722bb','#9933dd','#6611aa','#aa44ee','#551199'][Math.floor(Math.random() * 5)],
+        color: ['#6618b4','#903ae6','#6618b4','#a952ff','#50008c'][Math.floor(Math.random() * 5)],
       })), []);
       const skulls = useMemo(() => Array.from({ length: 5 }, () => ({
         xOff: -20 + Math.random() * 40,
@@ -4460,7 +4460,7 @@ const ANIM_REGISTRY = {
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(100,0,160,.9) 0%, rgba(80,0,140,.4) 40%, transparent 70%)' }} />
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(102,24,180,.9) 0%, rgba(80,0,140,.4) 40%, transparent 70%)' }} />
           {ooze.map((o, i) => (
             <div key={'po'+i} className="anim-beer-bubble" style={{
               '--xOff': o.xOff + 'px', '--size': o.size + 'px', '--wobble': o.wobble + 'px',
@@ -4470,7 +4470,7 @@ const ANIM_REGISTRY = {
           {skulls.map((s, i) => (
             <div key={'ps'+i} className="anim-beer-bubble" style={{
               '--xOff': s.xOff + 'px', '--size': '14px', '--wobble': '0px',
-              '--color': 'rgba(150,50,200,.6)', animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+              '--color': 'rgba(149,68,213,.6)', animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
               fontSize: 14, opacity: 0,
             }}>💀</div>
           ))}
@@ -4486,12 +4486,12 @@ const ANIM_REGISTRY = {
         delay: Math.random() * 300,
         dur: 500 + Math.random() * 500,
         char: ['🍃','~','≈','☁','·','🍃'][Math.floor(Math.random() * 6)],
-        color: ['#88cc66','#aaddaa','#66aa44','#ccddbb','#bbeeaa'][Math.floor(Math.random() * 5)],
+        color: ['#80bf59','#92d3a9','#80bf59','#ebdcc1','#b3f9b8'][Math.floor(Math.random() * 5)],
         wobble: -8 + Math.random() * 16,
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(100,180,80,.7) 0%, rgba(80,150,60,.3) 40%, transparent 70%)' }} />
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(128,191,89,.7) 0%, rgba(91,148,56,.3) 40%, transparent 70%)' }} />
           {particles.map((p, i) => (
             <div key={'ts'+i} className="anim-beer-bubble" style={{
               '--xOff': p.xOff + 'px', '--size': p.size + 'px', '--wobble': p.wobble + 'px',
@@ -4511,12 +4511,12 @@ const ANIM_REGISTRY = {
         delay: Math.random() * 300,
         dur: 500 + Math.random() * 500,
         char: ['☕','~','≈','☁','·','♨'][Math.floor(Math.random() * 6)],
-        color: ['#3a2a1a','#5c3d1e','#2a1a0a','#8b6b4a','#4a3020'][Math.floor(Math.random() * 5)],
+        color: ['#3a2412','#5a3c14','#27180c','#886c44','#3a2412'][Math.floor(Math.random() * 5)],
         wobble: -8 + Math.random() * 16,
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(60,40,20,.8) 0%, rgba(40,25,10,.4) 40%, transparent 70%)' }} />
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(58,36,18,.8) 0%, rgba(39,24,12,.4) 40%, transparent 70%)' }} />
           {particles.map((p, i) => (
             <div key={'cs'+i} className="anim-beer-bubble" style={{
               '--xOff': p.xOff + 'px', '--size': p.size + 'px', '--wobble': p.wobble + 'px',
@@ -4542,7 +4542,7 @@ const ANIM_REGISTRY = {
           dx: Math.cos(angle) * speed,
           dy: -Math.abs(Math.sin(angle) * speed) - 5,
           size: 2 + Math.random() * 4,
-          color: ['#ccc','#fff','#aaa','#ff8','#ffa'][Math.floor(Math.random() * 5)],
+          color: ['#d2d2db','#fff','#a8a8a8','#f0f075','#f7f7ad'][Math.floor(Math.random() * 5)],
           delay: 320 + Math.random() * 80,
           dur: 250 + Math.random() * 200,
         };
@@ -4634,7 +4634,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -20, top: -14,
             fontSize: 40, color: '#fff',
-            filter: 'drop-shadow(0 0 10px rgba(220,240,255,.8))',
+            filter: 'drop-shadow(0 0 10px rgba(229,237,250,.8))',
             animation: 'cloudFormCenter 400ms ease-out 600ms forwards',
             opacity: 0,
           }}>☁️</div>
@@ -4660,7 +4660,7 @@ const ANIM_REGISTRY = {
           <div style={{
             position: 'absolute', left: -20, top: -14,
             fontSize: 40, color: '#fff',
-            filter: 'drop-shadow(0 0 10px rgba(220,240,255,.8))',
+            filter: 'drop-shadow(0 0 10px rgba(229,237,250,.8))',
             animation: 'cloudDisperseCenter 350ms ease-in forwards',
             opacity: 1,
           }}>☁️</div>
@@ -4696,17 +4696,17 @@ const ANIM_REGISTRY = {
         delay: 200 + Math.random() * 600,
         dur: 500 + Math.random() * 500,
         size: 3 + Math.random() * 7,
-        color: ['#ffd700','#ffec80','#fff5cc','#ffb300','#ffe066'][Math.floor(Math.random() * 5)],
+        color: ['#ffd61a','#fbe181','#fffbd2','#ffb91a','#ffe469'][Math.floor(Math.random() * 5)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ width: 150, height: 150, marginLeft: -75, marginTop: -75, background: 'radial-gradient(circle, rgba(255,215,0,.85) 0%, rgba(255,180,0,.4) 35%, rgba(255,240,150,.1) 60%, transparent 80%)', animationDuration: '900ms' }} />
-          <div className="anim-flame-flash" style={{ width: 90, height: 90, marginLeft: -45, marginTop: -45, background: 'radial-gradient(circle, rgba(255,255,220,.95) 0%, rgba(255,215,0,.5) 40%, transparent 70%)', animationDelay: '250ms', animationDuration: '700ms' }} />
+          <div className="anim-flame-flash" style={{ width: 150, height: 150, marginLeft: -75, marginTop: -75, background: 'radial-gradient(circle, rgba(255,214,26,.85) 0%, rgba(255,185,26,.4) 35%, rgba(255,241,150,.1) 60%, transparent 80%)', animationDuration: '900ms' }} />
+          <div className="anim-flame-flash" style={{ width: 90, height: 90, marginLeft: -45, marginTop: -45, background: 'radial-gradient(circle, rgba(255,251,210,.95) 0%, rgba(255,214,26,.5) 40%, transparent 70%)', animationDelay: '250ms', animationDuration: '700ms' }} />
           {ankhs.map((a, i) => (
             <div key={'ak'+i} style={{
               position: 'absolute', left: a.xOff, top: a.startY,
-              fontSize: a.size, color: '#ffd700',
-              filter: 'drop-shadow(0 0 6px rgba(255,200,0,.9))',
+              fontSize: a.size, color: '#ffd61a',
+              filter: 'drop-shadow(0 0 6px rgba(255,198,28,.9))',
               transform: `rotate(${a.rot}deg)`,
               animation: `ankhFloat ${a.dur}ms ease-out ${a.delay}ms forwards`,
               opacity: 0,
@@ -4754,11 +4754,11 @@ const ANIM_REGISTRY = {
         delay: 100 + Math.random() * 500,
         dur: 500 + Math.random() * 400,
         size: 3 + Math.random() * 5,
-        color: ['#ff66aa','#ffaa44','#66ccff','#ffdd55','#cc88ff','#44ffaa'][Math.floor(Math.random() * 6)],
+        color: ['#f174ab','#ff9b3a','#68c6fd','#fad54a','#c98aff','#66ffa2'][Math.floor(Math.random() * 6)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ width: 100, height: 100, marginLeft: -50, marginTop: -50, background: 'radial-gradient(circle, rgba(255,100,200,.4) 0%, rgba(200,100,255,.2) 40%, transparent 70%)' }} />
+          <div className="anim-flame-flash" style={{ width: 100, height: 100, marginLeft: -50, marginTop: -50, background: 'radial-gradient(circle, rgba(252,105,198,.4) 0%, rgba(184,102,255,.2) 40%, transparent 70%)' }} />
           {notes.map((n, i) => (
             <div key={'mn'+i} style={{
               position: 'absolute', left: n.startX, top: n.startY,
@@ -4768,7 +4768,7 @@ const ANIM_REGISTRY = {
               '--endX': n.endX + 'px', '--endY': n.endY + 'px',
               '--noteOpacity': n.opacity,
               filter: `hue-rotate(${Math.random() * 360}deg)`,
-              textShadow: '0 0 8px rgba(255,150,255,.6)',
+              textShadow: '0 0 8px rgba(201,138,255,.6)',
             }}>{n.char}</div>
           ))}
           {sparkles.map((s, i) => (
@@ -4808,7 +4808,7 @@ const ANIM_REGISTRY = {
         return {
           dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed - 20,
           size: 4 + Math.random() * 8,
-          color: ['#8b00ff','#6a0dad','#9932cc','#4b0082','#7b2d8e','#cc44ff','#220033'][Math.floor(Math.random() * 7)],
+          color: ['#751ff9','#6618b4','#9544d5','#50008c','#663597','#a952ff','#1a0a3a'][Math.floor(Math.random() * 7)],
           delay: Math.random() * 400,
           dur: 400 + Math.random() * 400,
         };
@@ -4824,8 +4824,8 @@ const ANIM_REGISTRY = {
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ width: 120, height: 120, marginLeft: -60, marginTop: -60, background: 'radial-gradient(circle, rgba(100,0,180,.7) 0%, rgba(60,0,120,.4) 40%, transparent 70%)' }} />
-          <div className="anim-flame-flash" style={{ width: 80, height: 80, marginLeft: -40, marginTop: -40, animationDelay: '100ms', background: 'radial-gradient(circle, rgba(180,50,255,.5) 0%, rgba(100,0,200,.2) 50%, transparent 70%)' }} />
+          <div className="anim-flame-flash" style={{ width: 120, height: 120, marginLeft: -60, marginTop: -60, background: 'radial-gradient(circle, rgba(102,24,180,.7) 0%, rgba(71,17,126,.4) 40%, transparent 70%)' }} />
+          <div className="anim-flame-flash" style={{ width: 80, height: 80, marginLeft: -40, marginTop: -40, animationDelay: '100ms', background: 'radial-gradient(circle, rgba(160,64,255,.5) 0%, rgba(110,0,204,.2) 50%, transparent 70%)' }} />
           {skulls.map((s, i) => (
             <div key={'ns'+i} style={{
               position: 'absolute', left: s.startX, top: s.startY,
@@ -4834,7 +4834,7 @@ const ANIM_REGISTRY = {
               animation: `musicNoteFloat ${s.dur}ms ease-out ${s.delay}ms forwards`,
               '--endX': s.endX + 'px', '--endY': s.endY + 'px',
               '--noteOpacity': 0.85,
-              textShadow: '0 0 12px rgba(130,0,220,.8), 0 0 24px rgba(80,0,160,.4)',
+              textShadow: '0 0 12px rgba(110,0,204,.8), 0 0 24px rgba(102,24,180,.4)',
             }}>{s.char}</div>
           ))}
           {particles.map((p, i) => (
@@ -4847,8 +4847,8 @@ const ANIM_REGISTRY = {
             <div key={'nw'+i} style={{
               position: 'absolute', left: w.xOff, top: w.startY,
               width: w.size, height: w.size, borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(150,50,255,.6), rgba(80,0,150,.2))',
-              boxShadow: '0 0 8px rgba(130,0,220,.5)',
+              background: 'radial-gradient(circle, rgba(160,64,255,.6), rgba(80,0,140,.2))',
+              boxShadow: '0 0 8px rgba(110,0,204,.5)',
               animation: `holySparkleRise ${w.dur}ms ease-out ${w.delay}ms forwards`,
               opacity: 0,
             }} />
@@ -4867,7 +4867,7 @@ const ANIM_REGISTRY = {
           dx: Math.cos(angle) * speed - speed / 2,
           dy: -Math.abs(Math.sin(angle) * speed),
           size: 2 + Math.random() * 4,
-          color: ['#ffcc00','#ff8800','#ffaa33','#ffe066','#fff'][Math.floor(Math.random() * 5)],
+          color: ['#ffd61a','#ff8b1a','#f9ac20','#ffe469','#fff'][Math.floor(Math.random() * 5)],
           delay: 480 + Math.random() * 60,
           dur: 300 + Math.random() * 200,
         };
@@ -4879,14 +4879,14 @@ const ANIM_REGISTRY = {
           dx: Math.cos(angle) * speed - speed / 2,
           dy: -Math.abs(Math.sin(angle) * speed),
           size: 2 + Math.random() * 4,
-          color: ['#ffcc00','#ff8800','#ffaa33','#ffe066','#fff'][Math.floor(Math.random() * 5)],
+          color: ['#ffd61a','#ff8b1a','#f9ac20','#ffe469','#fff'][Math.floor(Math.random() * 5)],
           delay: 1080 + Math.random() * 60,
           dur: 300 + Math.random() * 200,
         };
       }), []);
       const weightStyle = {
         width: 10, height: 36,
-        background: 'linear-gradient(to right, #999, #555)',
+        background: 'linear-gradient(to right, #929292, #535353)',
         borderRadius: 3,
         boxShadow: '0 2px 6px rgba(0,0,0,.5), inset 0 1px 2px rgba(255,255,255,.3)',
       };
@@ -4900,7 +4900,7 @@ const ANIM_REGISTRY = {
             <div style={weightStyle} />
             <div style={{
               width: 50, height: 8,
-              background: 'linear-gradient(to bottom, #bbb, #888, #bbb)',
+              background: 'linear-gradient(to bottom, #b9b9b9, #7f7f7f, #b9b9b9)',
               boxShadow: 'inset 0 0 4px rgba(0,0,0,.3)',
             }} />
             <div style={weightStyle} />
@@ -4933,7 +4933,7 @@ const ANIM_REGISTRY = {
           size: 4 + Math.random() * 8,
           delay: Math.random() * 200,
           dur: 500 + Math.random() * 400,
-          color: ['#4488cc','#66aaee','#3377bb','#88ccff','#aaddff','#2266aa'][Math.floor(Math.random() * 6)],
+          color: ['#4e82cb','#66b6ff','#4e82cb','#7bbeea','#b3d8f9','#2f539d'][Math.floor(Math.random() * 6)],
         };
       }), []);
       const ripples = useMemo(() => Array.from({ length: 3 }, (_, i) => ({
@@ -4943,12 +4943,12 @@ const ANIM_REGISTRY = {
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ width: 120, height: 60, marginLeft: -60, marginTop: -10, background: 'radial-gradient(ellipse, rgba(60,140,220,.7) 0%, rgba(40,100,180,.3) 50%, transparent 80%)' }} />
+          <div className="anim-flame-flash" style={{ width: 120, height: 60, marginLeft: -60, marginTop: -10, background: 'radial-gradient(ellipse, rgba(78,130,203,.7) 0%, rgba(47,83,157,.3) 50%, transparent 80%)' }} />
           {ripples.map((r, i) => (
             <div key={'wr'+i} style={{
               position: 'absolute', left: -r.size/2, top: -8,
               width: r.size, height: r.size * 0.35, borderRadius: '50%',
-              border: '2px solid rgba(100,180,255,.5)',
+              border: '2px solid rgba(102,182,255,.5)',
               animation: `waterRipple ${r.dur}ms ease-out ${r.delay}ms forwards`,
               opacity: 0,
             }} />
@@ -4973,7 +4973,7 @@ const ANIM_REGISTRY = {
         delay: 1000 + Math.random() * 400,
         dur: 500 + Math.random() * 400,
         size: 3 + Math.random() * 5,
-        color: ['#ffdd44','#fff','#ffcc00','#ffe088','#ffffff'][Math.floor(Math.random() * 5)],
+        color: ['#ffe23d','#fff','#ffd61a','#fbe181','#ffffff'][Math.floor(Math.random() * 5)],
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
@@ -5012,7 +5012,7 @@ const ANIM_REGISTRY = {
           size: 5 + Math.random() * 9,
           delay: 460 + Math.random() * 160,
           dur: 460 + Math.random() * 320,
-          color: ['#2a1808', '#4a2c12', '#7a4f24', '#c08440', '#ffd070', '#fff5b0'][Math.floor(Math.random() * 6)],
+          color: ['#27180c', '#4a2a10', '#6e4421', '#ca874e', '#fbc86a', '#f7f7ad'][Math.floor(Math.random() * 6)],
         };
       }), []);
       const debrisChunks = useMemo(() => Array.from({ length: 10 }, () => {
@@ -5045,48 +5045,48 @@ const ANIM_REGISTRY = {
             fontSize: 96, lineHeight: '56px',
             transform: 'rotate(-90deg)',
             transformOrigin: '50% 50%',
-            filter: 'drop-shadow(0 0 10px rgba(0,0,0,0.85)) drop-shadow(0 0 4px rgba(120,80,30,0.7))',
+            filter: 'drop-shadow(0 0 10px rgba(0,0,0,0.85)) drop-shadow(0 0 4px rgba(114,84,29,0.7))',
             animation: 'clubBashHorizontalSlam 460ms cubic-bezier(0.4, 0, 0.9, 1) forwards',
           }}>🏏</div>
           <div style={{
             position: 'absolute', left: -90, top: -18,
             width: 180, height: 180, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,220,1) 0%, rgba(255,210,100,0.8) 30%, rgba(220,120,40,0.45) 60%, rgba(120,60,20,0.15) 80%, transparent 95%)',
+            background: 'radial-gradient(circle, rgba(255,251,210,1) 0%, rgba(255,208,102,0.8) 30%, rgba(227,116,53,0.45) 60%, rgba(125,57,17,0.15) 80%, transparent 95%)',
             opacity: 0,
             animation: 'clubBashHardFlash 520ms ease-out 440ms forwards',
           }} />
           <div style={{
             position: 'absolute', left: -42, top: -8,
             width: 84, height: 84, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,240,160,0.8) 50%, transparent 80%)',
+            background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,241,150,0.8) 50%, transparent 80%)',
             opacity: 0,
             animation: 'clubBashCore 360ms ease-out 460ms forwards',
           }} />
           <div style={{
             position: 'absolute', left: -38, top: -8,
             width: 76, height: 76, borderRadius: '50%',
-            border: '5px solid rgba(140, 80, 30, 0.9)',
+            border: '5px solid rgba(157,97,47,0.9)',
             opacity: 0,
             animation: 'clubBashShockwave 720ms ease-out 460ms forwards',
           }} />
           <div style={{
             position: 'absolute', left: -32, top: -6,
             width: 64, height: 64, borderRadius: '50%',
-            border: '4px solid rgba(255, 210, 90, 0.9)',
+            border: '4px solid rgba(255,217,102,0.9)',
             opacity: 0,
             animation: 'clubBashShockwave 580ms ease-out 480ms forwards',
           }} />
           <div style={{
             position: 'absolute', left: -24, top: -4,
             width: 48, height: 48, borderRadius: '50%',
-            border: '3px solid rgba(255, 250, 220, 0.95)',
+            border: '3px solid rgba(255,251,210,0.95)',
             opacity: 0,
             animation: 'clubBashShockwave 440ms ease-out 500ms forwards',
           }} />
           <div style={{
             position: 'absolute', left: -38, top: -22,
             fontSize: 76, lineHeight: '52px',
-            filter: 'drop-shadow(0 0 10px rgba(255,180,40,0.85)) drop-shadow(0 0 4px rgba(255,255,200,0.6))',
+            filter: 'drop-shadow(0 0 10px rgba(249,172,32,0.85)) drop-shadow(0 0 4px rgba(248,248,189,0.6))',
             opacity: 0,
             animation: 'clubBashImpactGlyph 720ms ease-out 460ms forwards',
           }}>💥</div>
@@ -5119,7 +5119,7 @@ const ANIM_REGISTRY = {
             <div key={'cbd' + i} style={{
               position: 'absolute', left: d.xOff + 'px', top: d.startY + 'px',
               width: d.size + 'px', height: d.size + 'px', borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(190,150,100,0.75) 0%, rgba(140,100,60,0.45) 55%, transparent 90%)',
+              background: 'radial-gradient(circle, rgba(178,148,102,0.75) 0%, rgba(136,108,68,0.45) 55%, transparent 90%)',
               opacity: 0,
               '--cbRiseY': d.riseY + 'px',
               animation: `clubBashDust ${d.dur}ms ease-out ${d.delay}ms forwards`,
@@ -5197,7 +5197,7 @@ const ANIM_REGISTRY = {
           <div style={{
             fontSize: 52,
             marginLeft: -26, marginTop: -26,
-            filter: 'drop-shadow(0 0 8px rgba(255,180,200,0.7))',
+            filter: 'drop-shadow(0 0 8px rgba(248,180,200,0.7))',
             animation: 'weirdDollGrow 700ms ease-out forwards',
           }}>🪆</div>
           <style>{`
@@ -5249,19 +5249,19 @@ const ANIM_REGISTRY = {
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           <div className="anim-flame-flash" style={{
             width: 130, height: 130, marginLeft: -65, marginTop: -65,
-            background: 'radial-gradient(circle, rgba(60,10,90,.85) 0%, rgba(80,30,140,.5) 35%, rgba(20,0,40,.25) 60%, transparent 80%)',
+            background: 'radial-gradient(circle, rgba(64,26,102,.85) 0%, rgba(88,35,140,.5) 35%, rgba(25,6,45,.25) 60%, transparent 80%)',
           }} />
           <div className="anim-flame-flash" style={{
             width: 80, height: 80, marginLeft: -40, marginTop: -40,
             animationDelay: '180ms',
-            background: 'radial-gradient(circle, rgba(140,60,200,.5) 0%, rgba(60,20,120,.3) 50%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(149,68,213,.5) 0%, rgba(71,17,126,.3) 50%, transparent 70%)',
           }} />
           {motes.map((m, i) => (
             <div key={'sbm'+i} style={{
               position: 'absolute', left: m.xOff, top: m.startY,
               width: m.size, height: m.size, borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(180,100,255,.95), rgba(80,20,150,.4))',
-              boxShadow: '0 0 10px rgba(160,60,255,.7), 0 0 18px rgba(80,20,140,.4)',
+              background: 'radial-gradient(circle, rgba(184,102,255,.95), rgba(80,0,140,.4))',
+              boxShadow: '0 0 10px rgba(160,64,255,.7), 0 0 18px rgba(80,0,140,.4)',
               opacity: 0,
               animation: `holySparkleRise ${m.dur}ms ease-out ${m.delay}ms forwards`,
             }} />
@@ -5270,9 +5270,9 @@ const ANIM_REGISTRY = {
             <div key={'sbr'+i} style={{
               position: 'absolute', left: 0, top: 0,
               fontSize: r.size, opacity: 0,
-              color: '#cf9bff',
+              color: '#c98aff',
               transform: `rotate(${r.rot}deg)`,
-              textShadow: '0 0 8px rgba(180,80,255,.85), 0 0 16px rgba(80,20,140,.55)',
+              textShadow: '0 0 8px rgba(169,82,255,.85), 0 0 16px rgba(80,0,140,.55)',
               animation: `musicNoteFloat ${r.dur}ms ease-out ${r.delay}ms forwards`,
               '--endX': r.endX + 'px', '--endY': r.endY + 'px',
               '--noteOpacity': 0.95,
@@ -5315,7 +5315,7 @@ const ANIM_REGISTRY = {
         return {
           dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
           size: 2 + Math.random() * (4 + t * 4),
-          color: ['#ff3300','#ff7700','#ffbb00','#ff1100','#ffaa00','#ffe680'][Math.floor(Math.random() * 6)],
+          color: ['#ff491a','#ff7d00','#ffb91a','#ff1a1a','#f9ac20','#fbe181'][Math.floor(Math.random() * 6)],
           delay: 240 + Math.random() * 200,
           dur: 320 + Math.random() * 280,
         };
@@ -5336,19 +5336,19 @@ const ANIM_REGISTRY = {
           <div className="anim-flame-flash" style={{
             width: flashSize, height: flashSize,
             marginLeft: -flashSize / 2, marginTop: -flashSize / 2,
-            background: 'radial-gradient(circle, rgba(255,140,30,.85) 0%, rgba(255,60,0,.55) 35%, rgba(160,20,0,.25) 65%, transparent 80%)',
+            background: 'radial-gradient(circle, rgba(255,139,26,.85) 0%, rgba(255,73,26,.55) 35%, rgba(143,0,0,.25) 65%, transparent 80%)',
           }} />
           <div className="anim-flame-flash" style={{
             width: innerFlashSize, height: innerFlashSize,
             marginLeft: -innerFlashSize / 2, marginTop: -innerFlashSize / 2,
             animationDelay: '120ms',
-            background: 'radial-gradient(circle, rgba(255,220,120,.9) 0%, rgba(255,120,0,.5) 50%, transparent 80%)',
+            background: 'radial-gradient(circle, rgba(251,225,129,.9) 0%, rgba(255,125,0,.5) 50%, transparent 80%)',
           }} />
           {showWhiteCore && (
             <div className="anim-flame-flash" style={{
               width: 50, height: 50, marginLeft: -25, marginTop: -25,
               animationDelay: '60ms', animationDuration: '500ms',
-              background: 'radial-gradient(circle, rgba(255,255,240,1) 0%, rgba(255,200,100,.7) 40%, transparent 70%)',
+              background: 'radial-gradient(circle, rgba(255,248,232,1) 0%, rgba(251,200,106,.7) 40%, transparent 70%)',
             }} />
           )}
           {flames.map((f, idx) => (
@@ -5367,8 +5367,8 @@ const ANIM_REGISTRY = {
             <div key={'sp'+idx} style={{
               position: 'absolute', left: p.xOff, top: p.startY,
               width: p.size, height: p.size, borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(255,200,80,.95), rgba(220,60,0,.5))',
-              boxShadow: '0 0 12px rgba(255,140,30,.85), 0 0 22px rgba(180,40,0,.5)',
+              background: 'radial-gradient(circle, rgba(255,208,102,.95), rgba(204,43,0,.5))',
+              boxShadow: '0 0 12px rgba(255,139,26,.85), 0 0 22px rgba(182,38,0,.5)',
               opacity: 0,
               animation: `holySparkleRise ${p.dur}ms ease-out ${p.delay}ms forwards`,
             }} />
@@ -5378,15 +5378,15 @@ const ANIM_REGISTRY = {
               width: flashSize * 1.15, height: flashSize * 1.15,
               marginLeft: -flashSize * 1.15 / 2, marginTop: -flashSize * 1.15 / 2,
               animationDelay: '420ms', animationDuration: '520ms',
-              background: 'radial-gradient(circle, rgba(255,80,0,.7) 0%, rgba(180,30,0,.4) 45%, transparent 75%)',
+              background: 'radial-gradient(circle, rgba(255,73,26,.7) 0%, rgba(182,38,0,.4) 45%, transparent 75%)',
             }} />
           )}
           {showShockwave && (
             <div style={{
               position: 'absolute', left: 0, top: 0,
               width: 0, height: 0, borderRadius: '50%',
-              border: '4px solid rgba(255,160,40,.85)',
-              boxShadow: '0 0 28px rgba(255,140,40,.7)',
+              border: '4px solid rgba(255,154,26,.85)',
+              boxShadow: '0 0 28px rgba(255,139,26,.7)',
               animation: `soulShardShockwave 700ms ease-out 80ms forwards`,
             }} />
           )}
@@ -5424,7 +5424,7 @@ function IceEncaseEffect({ x, y }) {
     return {
       dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
       size: 3 + Math.random() * 6,
-      color: ['#aaddff','#88ccff','#cceeFF','#fff','#ddeeff'][Math.floor(Math.random() * 5)],
+      color: ['#b3d8f9','#7bbeea','#bddcef','#fff','#e5edfa'][Math.floor(Math.random() * 5)],
       delay: 350 + Math.random() * 100,
       dur: 300 + Math.random() * 200,
     };
@@ -5537,7 +5537,7 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
         <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>
           {ep.description}
           {maxBudget != null && (
-            <span style={{ marginLeft: 8, color: totalCost > maxBudget * 0.8 ? '#ffaa33' : 'var(--accent)', fontWeight: 600 }}>
+            <span style={{ marginLeft: 8, color: totalCost > maxBudget * 0.8 ? '#f9ac20' : 'var(--accent)', fontWeight: 600 }}>
               (Cost: {totalCost}/{maxBudget})
             </span>
           )}
@@ -5567,7 +5567,7 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
                     filter: isSel ? 'brightness(1.2)' : (dimmed ? 'brightness(0.4) saturate(0.3)' : 'none'),
                   }} />
                 {isSel && <div style={{ position: 'absolute', top: 3, right: 3, background: 'var(--accent)', color: '#000', fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 3, zIndex: 5 }}>✓</div>}
-                {maxBudget != null && <div style={{ position: 'absolute', bottom: 3, left: 3, background: 'rgba(0,0,0,.7)', color: '#ffd700', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, zIndex: 5 }}>{entryCost}G</div>}
+                {maxBudget != null && <div style={{ position: 'absolute', bottom: 3, left: 3, background: 'rgba(0,0,0,.7)', color: '#ffd61a', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, zIndex: 5 }}>{entryCost}G</div>}
               </div>
             );
           })}
@@ -5590,18 +5590,18 @@ function StatusSelectPrompt({ ep, onRespond }) {
     setLocalSelected(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
   };
   return (
-    <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#33dd55', minWidth: 260 }}>
-      <div className="orbit-font" style={{ fontSize: 13, color: '#33dd55', marginBottom: 4 }}>{ep.title}</div>
+    <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#3ddc57', minWidth: 260 }}>
+      <div className="orbit-font" style={{ fontSize: 13, color: '#3ddc57', marginBottom: 4 }}>{ep.title}</div>
       <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
         {(ep.statuses || []).map(s => (
           <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 8px', borderRadius: 4,
-            background: localSelected.includes(s.key) ? 'rgba(50,220,80,.15)' : 'rgba(255,255,255,.03)',
-            border: localSelected.includes(s.key) ? '1px solid rgba(50,220,80,.5)' : '1px solid rgba(255,255,255,.08)',
+            background: localSelected.includes(s.key) ? 'rgba(61,220,87,.15)' : 'rgba(255,255,255,.03)',
+            border: localSelected.includes(s.key) ? '1px solid rgba(61,220,87,.5)' : '1px solid rgba(255,255,255,.08)',
           }} onClick={() => toggleStatus(s.key)}>
             <span style={{ fontSize: 16 }}>{s.icon}</span>
-            <span style={{ fontSize: 12, color: localSelected.includes(s.key) ? '#88ffaa' : 'var(--text2)' }}>{s.label}{s.stacks > 1 ? ` (×${s.stacks})` : ''}</span>
-            <span style={{ marginLeft: 'auto', fontSize: 10, color: localSelected.includes(s.key) ? '#33dd55' : 'var(--text2)', opacity: .6 }}>
+            <span style={{ fontSize: 12, color: localSelected.includes(s.key) ? '#75f091' : 'var(--text2)' }}>{s.label}{s.stacks > 1 ? ` (×${s.stacks})` : ''}</span>
+            <span style={{ marginLeft: 'auto', fontSize: 10, color: localSelected.includes(s.key) ? '#3ddc57' : 'var(--text2)', opacity: .6 }}>
               {localSelected.includes(s.key) ? '✓' : '○'}
             </span>
           </div>
@@ -7075,7 +7075,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
       const id = Date.now() + Math.random();
       const dur = duration || 1500;
       setBeamAnims(prev => [...prev, {
-        id, color: color || '#ff2222',
+        id, color: color || '#ff1a1a',
         x1: sr.left + sr.width / 2, y1: sr.top + sr.height / 2,
         x2: tr.left + tr.width / 2, y2: tr.top + tr.height / 2,
       }]);
@@ -7648,7 +7648,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
         <div style={{ marginTop: 20, marginBottom: 20, textAlign: 'center' }}>
           {entries.map(e => (
             <div key={e.name} style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: '#ffd700', fontWeight: 700, fontSize: 15 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: '#ffd61a', fontWeight: 700, fontSize: 15 }}>
                 <span>{e.name}:</span>
                 <span>{e.total}</span>
                 <img src="/data/sc.png" style={{ width: 18, height: 18, imageRendering: 'pixelated' }} />
@@ -7657,9 +7657,9 @@ function GameBoard({ gameState, lobby, onLeave }) {
               <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {(e.rewards || []).map(r => (
                   <div key={r.id} style={{ fontSize: 12, color: 'var(--text2)' }}>
-                    <span style={{ color: '#ffd700', fontWeight: 600 }}>{r.title}</span>
+                    <span style={{ color: '#ffd61a', fontWeight: 600 }}>{r.title}</span>
                     {' — '}{r.description}{' '}
-                    <span style={{ color: '#ffd700' }}>+{r.amount}</span>
+                    <span style={{ color: '#ffd61a' }}>+{r.amount}</span>
                   </div>
                 ))}
               </div>
@@ -7671,7 +7671,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
     if (!scEarned.total || scEarned.total <= 0) return null;
     return (
       <div style={{ marginTop: 20, marginBottom: 20, textAlign: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#ffd700', fontWeight: 700, fontSize: 18, textShadow: '0 0 12px rgba(255,215,0,.5)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#ffd61a', fontWeight: 700, fontSize: 18, textShadow: '0 0 12px rgba(255,214,26,.5)' }}>
           <span>{scEarned.total}</span>
           <img src="/data/sc.png" style={{ width: 24, height: 24, imageRendering: 'pixelated' }} />
           <span>earned!</span>
@@ -7679,9 +7679,9 @@ function GameBoard({ gameState, lobby, onLeave }) {
         <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {(scEarned.rewards || []).map(r => (
             <div key={r.id} style={{ fontSize: 13, color: 'var(--text2)' }}>
-              <span style={{ color: '#ffd700', fontWeight: 700 }}>{r.title}</span>
+              <span style={{ color: '#ffd61a', fontWeight: 700 }}>{r.title}</span>
               {' — '}{r.description}{' '}
-              <span style={{ color: '#ffd700', fontWeight: 700 }}>+{r.amount}</span>
+              <span style={{ color: '#ffd61a', fontWeight: 700 }}>+{r.amount}</span>
             </div>
           ))}
         </div>
@@ -8028,7 +8028,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
   };
 
   return (
-    <div className="screen-full" style={{ background: '#0c0c14' }}>
+    <div className="screen-full" style={{ background: '#08060c' }}>
       <div className="top-bar" style={{ justifyContent: 'space-between' }}>
         {isSpectator ? (
           <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={handleLeave}>
@@ -8042,7 +8042,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
         <h2 className="orbit-font" style={{ fontSize: 14, color: isSpectator ? 'var(--text2)' : 'var(--accent)' }}>
           {isSpectator ? '👁 SPECTATING' : 'PIXEL PARTIES'}
         </h2>
-        <span className="badge" style={{ background: lobby?.type === 'ranked' ? 'rgba(255,170,0,.12)' : 'rgba(0,240,255,.12)', color: lobby?.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
+        <span className="badge" style={{ background: lobby?.type === 'ranked' ? 'rgba(249,172,32,.12)' : 'rgba(102,182,255,.12)', color: lobby?.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
           {lobby?.type?.toUpperCase() || 'GAME'}
         </span>
       </div>
@@ -8087,19 +8087,19 @@ function GameBoard({ gameState, lobby, onLeave }) {
             {/* ── Generic Player Debuff Warnings ── */}
             {(() => {
               const debuffs = [];
-              if (me.summonLocked) debuffs.push({ key: 'summon-me', text: 'You cannot summon any more Creatures this turn!', color: '#ff6644' });
-              if (opp.summonLocked) debuffs.push({ key: 'summon-opp', text: `${opp.username} cannot summon any more Creatures this turn!`, color: '#cc8800' });
-              if (me.damageLocked) debuffs.push({ key: 'damage-me', icon: '🔥', text: 'You cannot deal any more damage to your opponent this turn!', color: '#ff4444' });
-              if (opp.damageLocked) debuffs.push({ key: 'damage-opp', icon: '🛡️', text: `${opp.username} cannot deal damage to your targets this turn!`, color: '#ff8844' });
-              if (me.potionLocked) debuffs.push({ key: 'potion-me', icon: '🧪', text: 'You cannot play any more Potions this turn!', color: '#aa44ff' });
-              if (opp.potionLocked) debuffs.push({ key: 'potion-opp', icon: '🧪', text: `${opp.username} cannot play any more Potions this turn!`, color: '#8844cc' });
+              if (me.summonLocked) debuffs.push({ key: 'summon-me', text: 'You cannot summon any more Creatures this turn!', color: '#e63e33' });
+              if (opp.summonLocked) debuffs.push({ key: 'summon-opp', text: `${opp.username} cannot summon any more Creatures this turn!`, color: '#c68206' });
+              if (me.damageLocked) debuffs.push({ key: 'damage-me', icon: '🔥', text: 'You cannot deal any more damage to your opponent this turn!', color: '#f03232' });
+              if (opp.damageLocked) debuffs.push({ key: 'damage-opp', icon: '🛡️', text: `${opp.username} cannot deal damage to your targets this turn!`, color: '#e37435' });
+              if (me.potionLocked) debuffs.push({ key: 'potion-me', icon: '🧪', text: 'You cannot play any more Potions this turn!', color: '#a040ff' });
+              if (opp.potionLocked) debuffs.push({ key: 'potion-opp', icon: '🧪', text: `${opp.username} cannot play any more Potions this turn!`, color: '#9544d5' });
               return debuffs.map(d => (
                 <div key={d.key} className="summon-lock-warning" style={{ color: d.color }}>
                   {d.icon ? d.icon + ' ' : ''}{d.text}
                 </div>
               ));
             })()}
-            {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#ffcc00', textShadow: '0 0 10px rgba(255,200,0,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
+            {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#ffd61a', textShadow: '0 0 10px rgba(255,198,28,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
             <div className="board-player-side board-side-opp">{renderPlayerSide(opp, true)}</div>
             <div className="board-area-zones-center">
               <BoardZone type="area" cards={gameState.areaZones?.[myIdx] || []} label="Area" style={{...myBoardZone('area'), left: areaPositions[0]}} />
@@ -8373,10 +8373,10 @@ function GameBoard({ gameState, lobby, onLeave }) {
             {p.projectileShape === 'arrow' ? (
               <svg className="projectile-arrow-shaft" viewBox="0 0 100 22"
                    width="78" height="18" xmlns="http://www.w3.org/2000/svg">
-                <polygon points="0,4 14,11 0,18" fill="#8a8a8a" />
+                <polygon points="0,4 14,11 0,18" fill="#929292" />
                 <polygon points="9,4 23,11 9,18" fill="#a8a8a8" />
-                <rect x="22" y="9" width="58" height="4" fill="#c8c8c8" />
-                <polygon points="78,2 100,11 78,20" fill="#e8e8e8" />
+                <rect x="22" y="9" width="58" height="4" fill="#b9b9b9" />
+                <polygon points="78,2 100,11 78,20" fill="#e6e6e6" />
                 <polygon points="0,4 14,11 0,18" fill="none" stroke="#222" strokeWidth="0.6" />
                 <polygon points="9,4 23,11 9,18" fill="none" stroke="#222" strokeWidth="0.6" />
                 <rect x="22" y="9" width="58" height="4" fill="none" stroke="#222" strokeWidth="0.6" />
@@ -8434,12 +8434,12 @@ function GameBoard({ gameState, lobby, onLeave }) {
         <div className="camera-flash-overlay">
           <div className="camera-flash-icon">
             <svg viewBox="0 0 100 100" width="120" height="120">
-              <rect x="20" y="30" width="60" height="45" rx="8" fill="#ff69b4" stroke="#fff" strokeWidth="2"/>
+              <rect x="20" y="30" width="60" height="45" rx="8" fill="#fc69c6" stroke="#fff" strokeWidth="2"/>
               <circle cx="50" cy="52" r="14" fill="#222" stroke="#fff" strokeWidth="2"/>
-              <circle cx="50" cy="52" r="8" fill="#4af"/>
-              <rect x="38" y="24" width="24" height="10" rx="3" fill="#ff69b4" stroke="#fff" strokeWidth="1.5"/>
-              <ellipse cx="28" cy="22" rx="10" ry="16" fill="none" stroke="#ff69b4" strokeWidth="2" transform="rotate(-30 28 22)"/>
-              <ellipse cx="72" cy="22" rx="10" ry="16" fill="none" stroke="#ff69b4" strokeWidth="2" transform="rotate(30 72 22)"/>
+              <circle cx="50" cy="52" r="8" fill="#1ca9fd"/>
+              <rect x="38" y="24" width="24" height="10" rx="3" fill="#fc69c6" stroke="#fff" strokeWidth="1.5"/>
+              <ellipse cx="28" cy="22" rx="10" ry="16" fill="none" stroke="#fc69c6" strokeWidth="2" transform="rotate(-30 28 22)"/>
+              <ellipse cx="72" cy="22" rx="10" ry="16" fill="none" stroke="#fc69c6" strokeWidth="2" transform="rotate(30 72 22)"/>
             </svg>
           </div>
         </div>
@@ -8463,7 +8463,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
         const el = document.querySelector(`[data-support-owner="${ownerLabel}"][data-support-hero="${hi}"][data-support-slot="${sl}"] .additional-action-icon`);
         if (!el) return null;
         const r = el.getBoundingClientRect();
-        return <div className="immune-tooltip" style={{ position: 'fixed', left: r.right + 8, top: r.top - 4, borderColor: 'rgba(255,200,0,.4)', color: '#ffdd88' }}>Provides an additional Action.</div>;
+        return <div className="immune-tooltip" style={{ position: 'fixed', left: r.right + 8, top: r.top - 4, borderColor: 'rgba(255,198,28,.4)', color: '#fbe181' }}>Provides an additional Action.</div>;
       })()}
 
       {/* Pile hover tooltip (rendered at top level to escape overflow clipping) */}
@@ -8477,7 +8477,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
             {imgUrl && (
               <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
                 <img src={imgUrl} style={{ width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
-                  border: foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : 'none' }} />
+                  border: foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,214,26,.5)' : 'none' }} />
               </div>
             )}
             <div style={{ padding: '10px 12px' }}>
@@ -8488,8 +8488,8 @@ function GameBoard({ gameState, lobby, onLeave }) {
               {card.effect && <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.5 }}>{card.effect}</div>}
               <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 8, display: 'flex', gap: 12 }}>
                 {card.hp != null && <span style={{ color: '#ff6666' }}>♥ HP {card.hp}</span>}
-                {card.atk != null && <span style={{ color: '#ffaa44' }}>⚔ ATK {card.atk}</span>}
-                {card.cost != null && <span style={{ color: '#44aaff' }}>◆ Cost {card.cost}</span>}
+                {card.atk != null && <span style={{ color: '#ff9b3a' }}>⚔ ATK {card.atk}</span>}
+                {card.cost != null && <span style={{ color: '#1ca9fd' }}>◆ Cost {card.cost}</span>}
                 {card.level != null && <span>Lv{card.level}</span>}
               </div>
             </div>
@@ -8592,12 +8592,12 @@ function GameBoard({ gameState, lobby, onLeave }) {
                           <div style={{
                             position: 'absolute', top: 2, left: 2,
                             background: 'rgba(0,0,0,.85)',
-                            color: stamp > 0 ? '#c4a8ff' : '#fff',
+                            color: stamp > 0 ? '#d6b3f9' : '#fff',
                             padding: '2px 6px', borderRadius: 4,
                             fontSize: 11, fontWeight: 700,
-                            border: '1px solid ' + (stamp > 0 ? '#a288ff' : 'rgba(255,255,255,0.3)'),
+                            border: '1px solid ' + (stamp > 0 ? '#b278ed' : 'rgba(255,255,255,0.3)'),
                             pointerEvents: 'none', zIndex: 5,
-                            boxShadow: stamp > 0 ? '0 0 6px rgba(162,136,255,.6)' : 'none',
+                            boxShadow: stamp > 0 ? '0 0 6px rgba(178,120,237,.6)' : 'none',
                           }}>Lv {effectiveLevel}{stamp > 0 ? ` (+${stamp})` : ''}</div>
                         )}
                       </div>
@@ -8714,7 +8714,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                         }}>×{entry.count}</div>
                       )}
                       <div className="gallery-source-badge" style={{
-                        background: entry.source === 'hand' ? 'rgba(80,200,120,.85)' : entry.source === 'discard' ? 'rgba(180,80,200,.85)' : 'rgba(80,140,220,.85)',
+                        background: entry.source === 'hand' ? 'rgba(75,205,124,.85)' : entry.source === 'discard' ? 'rgba(126,65,186,.85)' : 'rgba(78,130,203,.85)',
                       }}>
                         {entry.source === 'hand' ? 'HAND' : entry.source === 'discard' ? 'DISCARD' : 'DECK'}
                       </div>
@@ -8752,8 +8752,8 @@ function GameBoard({ gameState, lobby, onLeave }) {
 
       {/* ── Effect Prompt: Hero Action (Coffee) ── */}
       {isMyEffectPrompt && ep.type === 'heroAction' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#8b6b4a' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: '#cc9966', marginBottom: 4 }}>☕ {ep.title}</div>
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#886c44' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#c7855b', marginBottom: 4 }}>☕ {ep.title}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
           <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7, marginBottom: 12 }}>Drag a highlighted card onto {ep.heroName}'s zones to play it.</div>
           <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
@@ -8794,8 +8794,8 @@ function GameBoard({ gameState, lobby, onLeave }) {
 
       {/* ── Ability Activation Confirmation ── */}
       {pendingAbilityActivation && !result && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#ffcc33' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: '#ffcc33', marginBottom: 8 }}>⚡ Activate Ability</div>
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#f8ca21' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#f8ca21', marginBottom: 8 }}>⚡ Activate Ability</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>Activate {pendingAbilityActivation.abilityName} (Lv.{pendingAbilityActivation.level})?</div>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
             <button className="btn btn-success" style={{ padding: '8px 20px', fontSize: 12 }}
@@ -8836,10 +8836,10 @@ function GameBoard({ gameState, lobby, onLeave }) {
 
       {/* ── Ability Attach Prompt (Training, etc.) ── */}
       {isMyEffectPrompt && ep.type === 'abilityAttach' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(100,220,150,.85)' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: '#7fffaa', marginBottom: 4 }}>✦ {ep.title || 'Attach Ability'}</div>
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(75,205,124,.85)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#66ffa2', marginBottom: 4 }}>✦ {ep.title || 'Attach Ability'}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
-          <div style={{ fontSize: 11, color: '#7fffaa', opacity: .8, marginBottom: 12 }}>Drag a highlighted Ability from your hand onto the Hero.</div>
+          <div style={{ fontSize: 11, color: '#66ffa2', opacity: .8, marginBottom: 12 }}>Drag a highlighted Ability from your hand onto the Hero.</div>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
             {ep.canFinish && (
               <button className="btn btn-success" style={{ padding: '6px 16px', fontSize: 11 }}
@@ -8913,7 +8913,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
       {/* Potion/Artifact targeting panel */}
       {!isSpectator && isTargeting && pt && !gameState.effectPrompt && (
         <DraggablePanel className="first-choice-panel" style={{ borderColor: 'var(--danger)', animation: 'fadeIn .2s ease-out' }}>
-          <div className="pixel-font" style={{ fontSize: 12, color: pt.config?.greenSelect ? '#33dd55' : 'var(--danger)', marginBottom: 8 }}>{pt.potionName}</div>
+          <div className="pixel-font" style={{ fontSize: 12, color: pt.config?.greenSelect ? '#3ddc57' : 'var(--danger)', marginBottom: 8 }}>{pt.potionName}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{pt.config?.description || 'Select targets'}</div>
           {pt.config?.maxTotal > 0 && pt.validTargets?.length > 0 && (
             <div style={{ fontSize: 11, color: 'var(--accent)', marginBottom: 10, fontWeight: 600 }}>
@@ -8987,7 +8987,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
             <div className="pixel-font" style={{
               fontSize: 28, marginBottom: 12,
               color: isSpectator ? 'var(--accent)' : (iWon ? 'var(--success)' : 'var(--danger)'),
-              textShadow: isSpectator ? '0 0 30px rgba(0,240,255,.3)' : (iWon ? '0 0 30px rgba(51,255,136,.4)' : '0 0 30px rgba(255,51,102,.4)'),
+              textShadow: isSpectator ? '0 0 30px rgba(102,182,255,.3)' : (iWon ? '0 0 30px rgba(76,235,112,.4)' : '0 0 30px rgba(252,28,95,.4)'),
             }}>
               {isSpectator ? `${result.winnerName} wins the round!` : (iWon ? 'ROUND WIN!' : 'ROUND LOSS')}
             </div>
@@ -9008,7 +9008,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
               <div key={i} className="firework-particle" style={{
                 '--fw-x': (Math.random() * 200 - 100) + 'px',
                 '--fw-y': (Math.random() * -200 - 40) + 'px',
-                '--fw-color': ['#ffd700','#ff3366','#33ff88','#44aaff','#ff8800','#cc44ff'][i % 6],
+                '--fw-color': ['#ffd61a','#fc1c5f','#4ceb70','#1ca9fd','#ff8b1a','#a952ff'][i % 6],
                 '--fw-delay': (Math.random() * 2) + 's',
                 '--fw-dur': (1 + Math.random()) + 's',
                 left: (20 + Math.random() * 60) + '%',
@@ -9019,8 +9019,8 @@ function GameBoard({ gameState, lobby, onLeave }) {
           <div className="animate-in" style={{ textAlign: 'center', position: 'relative', zIndex: 2 }}>
             <div className="pixel-font" style={{
               fontSize: 40, marginBottom: 8,
-              color: isSpectator ? '#ffd700' : (iWon ? '#ffd700' : 'var(--danger)'),
-              textShadow: isSpectator ? '0 0 40px rgba(255,215,0,.6)' : (iWon ? '0 0 40px rgba(255,215,0,.6)' : '0 0 40px rgba(255,51,102,.5)'),
+              color: isSpectator ? '#ffd61a' : (iWon ? '#ffd61a' : 'var(--danger)'),
+              textShadow: isSpectator ? '0 0 40px rgba(255,214,26,.6)' : (iWon ? '0 0 40px rgba(255,214,26,.6)' : '0 0 40px rgba(252,28,95,.5)'),
             }}>
               {isSpectator ? `🏆 ${result.winnerName} WINS! 🏆` : (iWon ? '🏆 SET VICTORY! 🏆' : 'SET DEFEAT')}
             </div>
@@ -9070,8 +9070,8 @@ function GameBoard({ gameState, lobby, onLeave }) {
           <div className="animate-in" style={{ textAlign: 'center' }}>
             <div className="pixel-font" style={{
               fontSize: 36, marginBottom: 16,
-              color: isSpectator ? '#ffd700' : (iWon ? 'var(--success)' : 'var(--danger)'),
-              textShadow: isSpectator ? '0 0 40px rgba(255,215,0,.5)' : (iWon ? '0 0 40px rgba(51,255,136,.5)' : '0 0 40px rgba(255,51,102,.5)'),
+              color: isSpectator ? '#ffd61a' : (iWon ? 'var(--success)' : 'var(--danger)'),
+              textShadow: isSpectator ? '0 0 40px rgba(255,214,26,.5)' : (iWon ? '0 0 40px rgba(76,235,112,.5)' : '0 0 40px rgba(252,28,95,.5)'),
             }}>
               {isSpectator ? `🏆 ${result.winnerName} WINS!` : (iWon ? 'YOU WIN!' : 'YOU LOSE')}
             </div>
@@ -9268,7 +9268,7 @@ function PlayScreen() {
             {isHost ? 'CLOSE ROOM' : 'LEAVE'}
           </button>
           <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>GAME LOBBY</h2>
-          <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(255,170,0,.12)' : 'rgba(0,240,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
+          <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(249,172,32,.12)' : 'rgba(102,182,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
             {lobby.type.toUpperCase()}
           </span>
         </div>
@@ -9380,7 +9380,7 @@ function PlayScreen() {
                   <span style={{ fontWeight: 700 }}>{r.host}</span>
                   <div style={{ display: 'flex', gap: 4 }}>
                     {r.format > 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.08)', color: 'var(--text2)' }}>Bo{r.format}</span>}
-                    <span className="badge" style={{ background: r.type === 'ranked' ? 'rgba(255,170,0,.12)' : 'rgba(0,240,255,.12)', color: r.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
+                    <span className="badge" style={{ background: r.type === 'ranked' ? 'rgba(249,172,32,.12)' : 'rgba(102,182,255,.12)', color: r.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
                       {r.type}
                     </span>
                   </div>
@@ -9406,7 +9406,7 @@ function PlayScreen() {
                   <span style={{ fontWeight: 700 }}>{r.players.join(' vs ')}</span>
                   <div style={{ display: 'flex', gap: 4 }}>
                     {r.format > 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.08)', color: 'var(--text2)' }}>Bo{r.format}</span>}
-                    <span className="badge" style={{ background: 'rgba(255,0,170,.12)', color: 'var(--accent2)' }}>LIVE</span>
+                    <span className="badge" style={{ background: 'rgba(251,30,169,.12)', color: 'var(--accent2)' }}>LIVE</span>
                   </div>
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2 }}>
@@ -9594,7 +9594,7 @@ function App() {
 
   // Sync accent color to user's profile color
   useEffect(() => {
-    document.documentElement.style.setProperty('--accent', user && user.color ? user.color : '#00f0ff');
+    document.documentElement.style.setProperty('--accent', user && user.color ? user.color : '#66b6ff');
   }, [user?.color]);
 
   // Escape key → return to main menu from any sub-screen (except play — handled by PlayScreen/GameBoard)

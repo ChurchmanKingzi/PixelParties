@@ -34,9 +34,9 @@ function StUnknownTile() {
   return (
     <span className="st-unknown" aria-label="Unknown CPU" title="CPU — shows its middle hero once the battle starts">
       <svg viewBox="0 0 14 16" shapeRendering="crispEdges" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-        <rect x="0" y="0" width="14" height="16" fill="#050507" />
-        {rects.map(([x, y]) => <rect key={'s' + x + ',' + y} x={x + 2} y={y + 2} width="1" height="1" fill="#2b2650" />)}
-        {rects.map(([x, y]) => <rect key={'f' + x + ',' + y} x={x + 1} y={y + 1} width="1" height="1" fill={y < 6 ? '#9d90f2' : '#7d70d6'} />)}
+        <rect x="0" y="0" width="14" height="16" fill="#000000" />
+        {rects.map(([x, y]) => <rect key={'s' + x + ',' + y} x={x + 2} y={y + 2} width="1" height="1" fill="#14285a" />)}
+        {rects.map(([x, y]) => <rect key={'f' + x + ',' + y} x={x + 1} y={y + 1} width="1" height="1" fill={y < 6 ? '#ac87de' : '#8066b2'} />)}
       </svg>
     </span>
   );
@@ -56,8 +56,8 @@ function SkillTestLobby({ lobby, user, leaveRoom, playerJoined, setPlayerJoined 
       <div className="top-bar">
         <button className="btn btn-danger" onClick={leaveRoom}>{isHost ? 'CLOSE ROOM' : 'LEAVE'}</button>
         <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🎯 SKILL TEST LOBBY</h2>
-        <span className="badge" style={{ background: 'rgba(0,240,255,.12)', color: 'var(--accent)' }}>2–8 PLAYERS</span>
-        <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(255,170,0,.12)' : 'rgba(0,240,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
+        <span className="badge" style={{ background: 'rgba(102,182,255,.12)', color: 'var(--accent)' }}>2–8 PLAYERS</span>
+        <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(249,172,32,.12)' : 'rgba(102,182,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
           {(lobby.type || 'unranked').toUpperCase()}
         </span>
         <a className="btn" href="/skilltest-learning.html" target="_blank" rel="noopener" style={{ textDecoration: 'none', fontSize: 12 }}
@@ -100,7 +100,7 @@ function SkillTestLobby({ lobby, user, leaveRoom, playerJoined, setPlayerJoined 
             <div>🛠 Preparation timer: <strong style={{ color: 'var(--text)' }}>{cfg.prepTimerDisabled ? 'Off' : `${cfg.prepTimerSec}s`}</strong></div>
             <div>⏱ Turn timer: <strong style={{ color: 'var(--text)' }}>{cfg.turnTimerDisabled ? 'Off' : `${cfg.turnTimerSec}s`}</strong></div>
             {lobby.type === 'ranked' && (
-              <div style={{ gridColumn: '1 / -1', color: '#ffbb33' }}>
+              <div style={{ gridColumn: '1 / -1', color: '#ffb91a' }}>
                 🏆 Ranked — placement among the human players changes your Ranked Elo (needs at least 2 humans; CPUs don't count).
               </div>
             )}
@@ -168,7 +168,7 @@ function SkillTestCreateOptions({ opts, setOpts, ranked }) {
         takes turns acting with one Hero or Creature at a time. No deck needed.
       </div>
       {ranked && (
-        <div style={{ fontSize: 11, color: '#ffbb33', lineHeight: 1.5, padding: '6px 8px', border: '1px solid rgba(255,170,0,.35)', borderRadius: 4, background: 'rgba(255,170,0,.06)' }}>
+        <div style={{ fontSize: 11, color: '#ffb91a', lineHeight: 1.5, padding: '6px 8px', border: '1px solid rgba(249,172,32,.35)', borderRadius: 4, background: 'rgba(249,172,32,.06)' }}>
           Ranked: your placement among the human players changes your normal Ranked Elo
           (1st +24 … last −24). CPUs don't count, and without at least 2 human players
           nothing is rated. Dropping out of a running game and not coming back costs −24.
@@ -183,7 +183,7 @@ function SkillTestCreateOptions({ opts, setOpts, ranked }) {
               <input className="input" type="number" min={0} max={hi} step={5} value={opts[key]}
                 title={`0 = timer off, otherwise ${lo}–${hi} seconds`}
                 onChange={e => set(key, e.target.value === '' ? '' : Math.max(0, Math.min(hi, parseInt(e.target.value, 10) || 0)))} />
-              <div style={{ fontSize: 10, marginTop: 3, color: off ? '#ffc850' : 'var(--text2)' }}>{off ? 'Timer off' : `0 = timer off (min. ${lo})`}</div>
+              <div style={{ fontSize: 10, marginTop: 3, color: off ? '#ffd066' : 'var(--text2)' }}>{off ? 'Timer off' : `0 = timer off (min. ${lo})`}</div>
             </div>
           );
         })}

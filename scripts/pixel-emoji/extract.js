@@ -134,7 +134,10 @@ function imBrowser(zeichen, opt) {
         let fern = px[0], fd = 0; for (const p of px) { const dd = dist(p, farbe); if (dd > fd) { fd = dd; fern = p; } }
         if (fd > 70) {
           const mind = px.filter(p => dist(p, fern) < dist(p, farbe));
-          if (mind.length >= px.length * 0.22 && mind.length <= px.length * 0.7) farbe = [0, 1, 2].map(ch => mind.reduce((s, p) => s + p[ch], 0) / mind.length);
+          const mm = [0, 1, 2].map(ch => mind.reduce((s, p) => s + p[ch], 0) / mind.length);
+          const lum = (c) => 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+          // nur DUNKLES Merkmal auf hellerem Grund (Augen, Mund, Linien): helle Gegenpixel wuerden die Flaechen zerpfluecken
+          if (mind.length >= px.length * 0.22 && mind.length <= px.length * 0.6 && lum(mm) < lum(farbe) - 55) farbe = mm;
         }
       }
       zellen.push({ cx, cy, dk, farbe });
@@ -155,7 +158,7 @@ function imBrowser(zeichen, opt) {
         if (c.dk < 0.45) continue;
         let sum = [0, 0, 0], n = 0;
         for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const nb = gitter.get((c.cx + dx) + ',' + (c.cy + dy)); if (nb && nb.dk >= 0.45) { sum = sum.map((v, i) => v + nb.farbe[i]); n++; } }
-        neuF.set(c, n >= 3 ? c.farbe.map((v, i) => Math.max(0, Math.min(255, v + 0.35 * (v - sum[i] / n)))) : c.farbe);
+        neuF.set(c, n >= 3 ? c.farbe.map((v, i) => Math.max(0, Math.min(255, v + (opt.schaerfe != null ? opt.schaerfe : 0) * (v - sum[i] / n)))) : c.farbe);
       }
       for (const [c, f] of neuF) c.farbe = f;
     }

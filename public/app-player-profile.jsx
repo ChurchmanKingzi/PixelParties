@@ -34,7 +34,7 @@
 const { useState, useEffect, useRef, useCallback, useContext } = React;
 
 const PPF_OPEN_EVENT = 'pp:player-profile-open';
-const PPF_MEDAL_COLORS = { 1: '#ffd700', 2: '#d8dce6', 3: '#e0903c' };
+const PPF_MEDAL_COLORS = { 1: '#ffd61a', 2: '#d2d2db', 3: '#ff9b3a' };
 
 function ppfSfx(name, opts) {
   if (window.playSFX) window.playSFX(name, opts);
@@ -133,7 +133,7 @@ function PlayerProfilePopup({ seed, onClose }) {
   useEffect(() => { closeBtnRef.current && closeBtnRef.current.focus({ preventScroll: true }); }, []);
 
   const p = profile || {};
-  const color = p.color || seed.color || '#00f0ff';
+  const color = p.color || seed.color || '#66b6ff';
   const rank = p.rank != null ? p.rank : seed.rank;
   const decks = p.topDecks || [];
   const deck = decks[Math.min(deckIdx, Math.max(0, decks.length - 1))] || null;
@@ -219,7 +219,7 @@ function PpfStats({ p }) {
         <span className="menu-stat-label">⚔ ELO</span>
         <span className="menu-stat-value">{p.elo}</span>
       </div>
-      <div className="badge menu-stat-badge menu-stat-badge--sc pp-eckzier ppf-badge" style={{ color: '#ffd700' }}>
+      <div className="badge menu-stat-badge menu-stat-badge--sc pp-eckzier ppf-badge" style={{ color: '#ffd61a' }}>
         <span className="menu-stat-coin-wrap">
           <img src="/data/sc.png" className="menu-stat-coin ppf-coin" alt="" />
           {Glitzer && <Glitzer />}

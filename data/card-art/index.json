@@ -5294,5 +5294,17 @@
 "skin/Layn Summoner of Weapons": {
 "id": "Layn_Summoner_of_Weapons",
 "kind": "a"
+},
+"Black-Thorn Dragon": {
+"id": "Black_Thorn_Dragon",
+"kind": "a"
+},
+"Shimmering Dragonegg": {
+"id": "Shimmering_Dragonegg",
+"kind": "a"
+},
+"Liquid Luck": {
+"id": "Liquid_Luck",
+"kind": "a"
 }
 }

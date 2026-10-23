@@ -29,7 +29,7 @@ function ppZustandVeraltet(state) {
   if (state.stateSeq < _ppLetzteSeq.n) {
     if (window.PP_ZONE_WATCH) {
       console.log('%c[ZUSTAND] veraltet verworfen: #' + state.stateSeq
-        + ' (aktuell #' + _ppLetzteSeq.n + ')', 'color:#fff;background:#7a5c00;padding:2px 6px');
+        + ' (aktuell #' + _ppLetzteSeq.n + ')', 'color:#fff;background:#8b5b04;padding:2px 6px');
     }
     return true;
   }
@@ -493,44 +493,44 @@ function ppPxSchattenUrl() {
 // Farbig: eigene Palette. Einfarbig (`mono`): '#' voll, '+' halb — die
 // Farbe kommt aus `color` des Elements (wie bei der Glyphe vorher).
 const PP_PX_SPRITES = {
-  flamme: { pal: { W: '#fff6c8', Y: '#ffd23e', O: '#ff8a1e', R: '#e03a12', D: '#9c1e0a' }, z: [
+  flamme: { pal: { W: '#fffbd2', Y: '#fad54a', O: '#ff8b1a', R: '#cc2b00', D: '#8f0000' }, z: [
     '....R....', '...ROR...', '...ROR..R', '..ROYOR.R', '..ROYYORR', '.ROYWYYOR',
     '.ROYWWYOR', 'ROYYWWYOR', 'ROYWWWYOR', 'DROYYYORD', '.DRROORD.'] },
-  schaedel: { pal: { W: '#f4f1e6', G: '#bdb6a2', K: '#1a1414' }, z: [
+  schaedel: { pal: { W: '#fff8e8', G: '#c5b7a0', K: '#141414' }, z: [
     '..WWWWW..', '.WWWWWWW.', 'WWWWWWWWG', 'WKKWWWKKG', 'WKKWWWKKG', 'WWWWKWWWG',
     '.WWWWWWG.', '..WKWKWG.', '..WGWGWG.'] },
-  knall: { pal: { W: '#ffffff', Y: '#ffe36b', O: '#ff8a1e', R: '#e03a12' }, z: [
+  knall: { pal: { W: '#ffffff', Y: '#ffe469', O: '#ff8b1a', R: '#cc2b00' }, z: [
     'R...R...R', '.R.RYR.R.', '..RYOYR..', '.RYOWOYR.', 'RYOWWWOYR', '.RYOWOYR.',
     '..RYOYR..', '.R.RYR.R.', 'R...R...R'] },
-  herz: { pal: { R: '#e8324a', D: '#a01a30', P: '#ff9aa8' }, z: [
+  herz: { pal: { R: '#e73b41', D: '#a60f39', P: '#e58092' }, z: [
     '.RR...RR.', 'RPPR.RRRR', 'RPRRRRRRD', 'RRRRRRRRD', '.RRRRRRD.', '..RRRRD..',
     '...RRD...', '....D....'] },
-  blatt: { pal: { G: '#5fbf3a', D: '#2e7d22', L: '#a8e070' }, z: [
+  blatt: { pal: { G: '#20ac37', D: '#167927', L: '#80bf59' }, z: [
     '......DG', '....DGGG', '..DGLGGG', '.DGLGGGD', 'DGLGGGD.', 'DGGGGD..', '.DGDD...', 'D.......'] },
-  spinne: { pal: { K: '#1a1016', R: '#c0283c' }, z: [
+  spinne: { pal: { K: '#08060c', R: '#b21a29' }, z: [
     'K.K...K.K', '.K.KKK.K.', '..KKKKK..', 'KKKRKRKKK', '..KKKKK..', '.K.KKK.K.', 'K.K...K.K'] },
-  knochen: { pal: { W: '#f4f1e6', G: '#bdb6a2' }, z: [
+  knochen: { pal: { W: '#fff8e8', G: '#c5b7a0' }, z: [
     'WW.....WW', 'WWWWWWWWG', '.WWWWWWG.', 'WWWWWWWWG', 'GG.....GG'] },
-  wolke: { pal: { W: '#ffffff', G: '#cfd8e6', S: '#9aa8bc' }, z: [
+  wolke: { pal: { W: '#ffffff', G: '#d2d2db', S: '#9aa3b6' }, z: [
     '...WWW....', '.WWWWWWW..', 'WWWWWWWWWW', 'WWWWWWWWWG', 'GWWWWWWWGS', '.GGSGGSGS.'] },
-  geist: { pal: { W: '#f4f6ff', G: '#b8c0d8', K: '#1a1a2a' }, z: [
+  geist: { pal: { W: '#e5edfa', G: '#a5b0c0', K: '#1a1a2e' }, z: [
     '..WWWW..', '.WWWWWW.', 'WWKWWKWW', 'WWKWWKWW', 'WWWWWWWG', 'WWWKKWWG', 'WWWWWWWG', 'WWWWWWGG', 'W.WW.WG.'] },
-  blitz: { pal: { W: '#ffffff', Y: '#ffe36b', O: '#f0a000' }, z: [
+  blitz: { pal: { W: '#ffffff', Y: '#ffe469', O: '#f9ac20' }, z: [
     '....YY.', '...YY..', '..YYW..', '.YYW...', 'YYYYYYO', '..YWYO.', '..YYO..', '.YYO...', '.YO....', 'YO.....', 'O......'] },
   blitz_mono: { mono: true, z: [
     '....##.', '...##..', '..##+..', '.##+...', '#######', '..#+#..', '..##...', '.##....', '.#.....', '##.....', '#......'] },
-  flamme_schwarz: { pal: { W: '#8a3ab0', Y: '#5a1a7a', O: '#34104a', R: '#180424', D: '#000000' }, z: [
+  flamme_schwarz: { pal: { W: '#7e41ba', Y: '#58238c', O: '#2b0b47', R: '#170b28', D: '#000000' }, z: [
     '....R....', '...ROR...', '...ROR..R', '..ROYOR.R', '..ROYYORR', '.ROYWYYOR',
     '.ROYWWYOR', 'ROYYWWYOR', 'ROYWWWYOR', 'DROYYYORD', '.DRROORD.'] },
-  herz_gruen: { pal: { R: '#3fbf5a', D: '#1f7a34', P: '#a8f0b4' }, z: [
+  herz_gruen: { pal: { R: '#20ac37', D: '#167927', P: '#b3f9b8' }, z: [
     '.RR...RR.', 'RPPR.RRRR', 'RPRRRRRRD', 'RRRRRRRRD', '.RRRRRRD.', '..RRRRD..',
     '...RRD...', '....D....'] },
-  herz_rosa: { pal: { R: '#ff6fa8', D: '#c83a78', P: '#ffd0e4' }, z: [
+  herz_rosa: { pal: { R: '#f174ab', D: '#ea2f80', P: '#f3bad3' }, z: [
     '.RR...RR.', 'RPPR.RRRR', 'RPRRRRRRD', 'RRRRRRRRD', '.RRRRRRD.', '..RRRRD..',
     '...RRD...', '....D....'] },
-  wut: { pal: { R: '#e8243a', D: '#9a1020' }, z: [
+  wut: { pal: { R: '#e92f38', D: '#8c0014' }, z: [
     '.RR...RR.', 'RRD...DRR', 'RD.....DR', '.........', '.........', 'RD.....DR', 'RRD...DRR', '.RR...RR.'] },
-  tropfen: { pal: { W: '#e8f6ff', B: '#4aa8ff', D: '#1f5fb8' }, z: [
+  tropfen: { pal: { W: '#e5f5fa', B: '#1ca9fd', D: '#2f539d' }, z: [
     '...B...', '...B...', '..BBB..', '.BWBBB.', 'BWBBBBD', 'BBBBBBD', '.BBBBD.', '..DDD..'] },
   kreuz: { mono: true, z: ['..###..', '..#+#..', '###+###', '#++++##', '###+###', '..#+#..', '..###..'] },
   funke4: { mono: true, z: ['...#...', '...#...', '..###..', '#######', '..###..', '...#...', '...#...'] },
@@ -563,127 +563,127 @@ const PP_PX_ZEICHEN = {
 // fuer die farbigen Plaketten. Eigener Namensraum `ab_…` in PP_PX_SPRITES,
 // damit die Animations-Sprites gleichen Namens unberuehrt bleiben.
 const PP_PX_ABZEICHEN_SPRITES = {
-  flamme: { pal: { K: '#3a0a04', D: '#b8200c', R: '#e8461a', O: '#ff8a1e', Y: '#ffd23e', W: '#fff6c8' }, z: [
+  flamme: { pal: { K: '#3a0000', D: '#b62600', R: '#cc2b00', O: '#ff8b1a', Y: '#fad54a', W: '#fffbd2' }, z: [
     '.......K........', '......KRK.......', '......KRK....K..', '.....KROK...KRK.',
     '.....KROOK..KRK.', '....KROYOK.KROK.', '...KRROYYOKKROK.', '..KRROYYYOORROK.',
     '..KROOYWWYOOROK.', '.KRROYWWWYYOORK.', '.KROYYWWWWYYORK.', '.KROYWWWWWWYORK.',
     '.KDROYWWWWYYORK.', '..KDROYYYYOORDK.', '...KDDRRRRRDDK..', '....KKKKKKKKK...',
   ] },
-  schild: { pal: { K: '#141a2a', S: '#c8ccd8', G: '#8a90a0', B: '#4a7ad0', L: '#8ab4ff', D: '#2a4a90', W: '#ffffff' }, z: [
+  schild: { pal: { K: '#1a1a2e', S: '#d2d2db', G: '#808898', B: '#4e77ca', L: '#66b6ff', D: '#2f539d', W: '#ffffff' }, z: [
     '................', '.KKKKKKKKKKKKKK.', '.KSSSSSSSSSSSGK.', '.KSLLLBBBBBBBGK.',
     '.KSLWLBBBBBBDGK.', '.KSLLBBBBBBBDGK.', '.KSLBBBBBBBBDGK.', '.KSBBBBBBBBBDGK.',
     '.KSBBBBBBBBBDGK.', '..KSBBBBBBBDGK..', '..KSBBBBBBBDGK..', '...KSBBBBBDGK...',
     '....KSBBBDGK....', '.....KSBDGK.....', '......KGGK......', '.......KK.......',
   ] },
-  eis: { pal: { K: '#0c1a3a', D: '#3a6cc0', B: '#78b4f0', L: '#c4ecff', W: '#ffffff' }, z: [
+  eis: { pal: { K: '#00213f', D: '#4e77ca', B: '#66b6ff', L: '#b3e8f9', W: '#ffffff' }, z: [
     '.......K........', '.....KKWKK......', '...KKWKWKLKK....', '.KKWKKWLLKKLKK..',
     'KWWWK.KLK.KBBBK.', '.KKWWKKLKKBBKK..', '.KWKKLLLLBKKBK..', '..K..KLWBK..K...',
     '.KLKKLLBBBKKDK..', '.KKLLKKBKKBDKK..', 'KLLLK.KBK.KDDDK.', '.KKLKKBBBKKDKK..',
     '...KKBKBKDKK....', '.....KKDKK......', '.......K........', '................',
   ] },
-  blitz: { pal: { K: '#3a1a04', O: '#f08a10', Y: '#ffdc2a', W: '#fff8c0' }, z: [
+  blitz: { pal: { K: '#311402', O: '#ff8b1a', Y: '#ffd61a', W: '#f8f8bd' }, z: [
     '.........KKKKKK.', '........KWYYYOK.', '.......KWYYYOK..', '......KWYYYOK...',
     '.....KWYYYOK....', '....KWYYYOK.....', '...KWYYYYYKKKK..', '..KWYYYYYYYYYOK.',
     '..KKKOOOWYYYOK..', '.......KWYYOK...', '......KWYYOK....', '.....KWYYOK.....',
     '....KWYOOK......', '...KWYOK........', '..KYOK..........', '..KKK...........',
   ] },
-  moai: { pal: { K: '#16161a', W: '#e0dcd4', L: '#b4b0a8', M: '#88847c', D: '#5c5852', E: '#383632' }, z: [
+  moai: { pal: { K: '#141414', W: '#e2d8cb', L: '#a8a8a8', M: '#7f7f7f', D: '#535353', E: '#323232' }, z: [
     '...KKKKKKKKKK...', '..KLLLLLLLLLMK..', '..KLWLLLLLLMMK..', '..KLLLLLLLLMDK..',
     '.KLLLLLLLLLLMDK.', '.KEEEEELLEEEEDK.', 'KMKMMMMLLDMMMKDK', 'KMKMMMMLLDMMMKDK',
     'KMKMMMMLLDMMMKDK', 'KMKMMMLLLLDMMKDK', 'KMKMMMLDDDDMMKDK', '.KKMMMMMMMMMDKK.',
     '..KMEEEEEEEEDK..', '..KMMMMMMMMMDK..', '..KKMMMMMMMDDK..', '...KKKKKKKKKK...',
   ] },
-  verbot: { pal: { K: '#3a0606', R: '#e42424', L: '#ff6a5a', D: '#a40c10', W: '#ffd8d0' }, z: [
+  verbot: { pal: { K: '#3a0000', R: '#ef2929', L: '#ff6666', D: '#b5171c', W: '#f0bfbc' }, z: [
     '....KKLLLKK.....', '..KKLLLLRRRKK...', '.KLLLLLRRRRRRK..', '.KLWLKKKKKRRRK..',
     'KLLLLLK...KRRRK.', 'KLLKLLRK...KRRK.', 'LLLKKRRRK..KRRDK', 'LLRK.KRRRK.KRDDK',
     'LRRK..KRRRKKDDDK', 'KRRK...KRDDKDDK.', 'KRRRK...KDDDDDK.', '.KRRRKKKKKDDDK..',
     '.KRRRRRRDDDDDK..', '..KKRRRDDDDKK...', '....KKDDDKK.....', '......KKK.......',
   ] },
-  fels: { pal: { K: '#18181c', W: '#f2f2f4', L: '#c4c4ca', M: '#94949c', D: '#686870', E: '#46464e' }, z: [
+  fels: { pal: { K: '#141414', W: '#e6e6e6', L: '#b9b9b9', M: '#929292', D: '#686868', E: '#535353' }, z: [
     '................', '................', '.....KKKKKKK....', '...KKLLLLLLLKK..',
     '..KLWWLLLLLLLMK.', '.KLWLLLLLLLLMMDK', '.KLLLLLLLLLLMMDK', 'KMMLLLLLLLLMMDDK',
     'KMMMMMLLLLMMDDDK', 'KMMMMMMMLMDDDDDK', 'KMMMMMMMMDDDDDEK', 'KMMMMMMMMDDDDDEK',
     'KDMMMMMMMDDDDEEK', '.KDDMMMMMDDDEEK.', '..KKEEEEEEEEKK..', '....KKKKKKKK....',
   ] },
-  blut: { pal: { K: '#2a0408', R: '#d8182a', L: '#ff5a64', D: '#8c0c1c', W: '#ffe0e0' }, z: [
+  blut: { pal: { K: '#2a0404', R: '#e92f38', L: '#ff6666', D: '#8c0014', W: '#fae5eb' }, z: [
     '.......K........', '......KLK.......', '......KLK.......', '......KLK.......',
     '.....KLLRK......', '....KLLRRRK.....', '...KLLRRRRRK....', '..KLLLRRRRRRK...',
     '..KLLWRRRRRDK...', '.KLLWWRRRRRDDK..', '.KLLWRRRRRDDDK..', '..KRRRRRRDDDK...',
     '..KRRRRRRDDDK...', '...KDDDDDDDK....', '....KDDDDDK.....', '.....KKKKK......',
   ] },
-  schaedel_gift: { pal: { K: '#0e1e0c', W: '#eaffe2', B: '#b4dca0', S: '#6e9e5c' }, z: [
+  schaedel_gift: { pal: { K: '#0a1a04', W: '#e5fae7', B: '#92d3a9', S: '#3b9159' }, z: [
     '..KK........KK..', '.KWBKKKKKKKKWBK.', 'KWBKWWBBBBBBKBBK', 'KBKWWBBBBBBBSKSK',
     '.KKWBBBBBBBBSKK.', '..KBKKKBBKKKSK..', '..KBKKKBBKKKSK..', '..KBBBBKKBBBSK..',
     '...KSBBBBBBSK...', '....KBKBKBSK....', '...KKKKKKKKKK...', '.KKWBSK..KBBBKK.',
     'KWWBSK....KBBWBK', 'KBBSK......KWBSK', '.KBSK......KBSK.', '..KK........KK..',
   ] },
-  schaedel: { pal: { K: '#1c1410', W: '#ffffff', B: '#ece4d2', S: '#b0a488' }, z: [
+  schaedel: { pal: { K: '#1f0f04', W: '#ffffff', B: '#e2d8cb', S: '#c5b7a0' }, z: [
     '................', '....KKKKKKKK....', '...KWWBBBBBBK...', '..KWWBBBBBBBBK..',
     '.KWBBBBBBBBBBSK.', '.KWBBBBBBBBBBSK.', '.KBKKKBBBBKKKSK.', '.KBKKKKBBKKKKSK.',
     '.KBKKKKBBKKKKSK.', '.KBBKKBBBBKKBSK.', '..KBBBBKKBBBSK..', '...KSBBKKBBSK...',
     '...KBKBKBKBSK...', '...KBKBKBKBSK...', '....KSSSSSSK....', '.....KKKKKK.....',
   ] },
-  mund_zu: { pal: { K: '#3a1c04', L: '#ffe46a', Y: '#ffc42a', O: '#e08810', W: '#fff8d0', S: '#dcdce4', G: '#8a8a96' }, z: [
+  mund_zu: { pal: { K: '#311402', L: '#ffe469', Y: '#ffc61c', O: '#c68206', W: '#fffbd2', S: '#d2d2db', G: '#808898' }, z: [
     '....KKKLKKK.....', '...KLLLLLLLK....', '..KLWWYYYYYYK...', '.KLLLYYYYYYYYK..',
     'KLLLYKYYYYKYYOK.', 'KLLYYKYYYYKYYOK.', 'KLYYYYYYYYYYYOK.', 'LLYYYYYYYYYYYOOK',
     'KLYKKKKKKKKKKOK.', 'KLYKSGSGSGSGSKK.', 'KLYKKKKKKKKKKSK.', '.KYYYYYYYYOOKK..',
     '..KYYYYYYOOOK...', '...KOOOOOOOK....', '....KKKOKKK.....', '.......K........',
   ] },
-  stumm: { pal: { K: '#141420', W: '#ffffff', L: '#d4d4e0', M: '#9a9aae', D: '#606078', R: '#e82222', P: '#ff7a6a', Q: '#a00c10' }, z: [
+  stumm: { pal: { K: '#12101f', W: '#ffffff', L: '#d2d2db', M: '#9aa3b6', D: '#59606e', R: '#ef2929', P: '#ff8566', Q: '#8f0000' }, z: [
     '.......K........', '......KLK.......', '.....KLLK.......', '....KLLLK.......',
     '.KKKLLLLKKK..KK.', 'KWWLLLLLKPPKKRRK', 'KWLLLLLLKKPRRRK.', 'KLLLLLLMK.KRRK..',
     'KLLLLLMMK.KRRK..', 'KLLLLMMMKKRRRQK.', 'KMMMMMMMKRRKKQQK', '.KKKMMMDKKK..KK.',
     '....KMDDK.......', '.....KDDK.......', '......KDK.......', '.......K........',
   ] },
-  glocke_aus: { pal: { K: '#2a1604', Y: '#ffc42a', L: '#ffe680', O: '#d8860e', D: '#8e5006', R: '#e82020', W: '#fffbe0' }, z: [
+  glocke_aus: { pal: { K: '#27180c', Y: '#ffc61c', L: '#fbe181', O: '#c68206', D: '#8b5b04', R: '#ef2929', W: '#fff8e8' }, z: [
     'KKK...KKKK......', 'KRRK.KYYYYK.....', '.KRRKYWYYYYK....', '..KRRKYYYYYOK...',
     '...KRRKYYYYOK...', '..KLKRRKYYYOOK..', '..KLLKRRKYYOOK..', '..KLLYKRRKYOOK..',
     '..KLLYYKRRKOOK..', '.KLLLYYYKRRKOOK.', 'KLLLLYYYYKRRKOOK', 'KOOOOOOOOOKRRKDK',
     '.KKKKKOOOOKKRRK.', '......KOOK..KRRK', '.......KK....KRK', '.............KKK',
   ] },
-  schreck: { pal: { K: '#2a1606', L: '#ffe46a', Y: '#ffc42a', O: '#e08810', W: '#ffffff', C: '#5aa8f0', N: '#2a64c0', D: '#6a1a10' }, z: [
+  schreck: { pal: { K: '#27180c', L: '#ffe469', Y: '#ffc61c', O: '#c68206', W: '#ffffff', C: '#66b6ff', N: '#4e77ca', D: '#6a1c14' }, z: [
     '.....KKKKKK.....', '...KKCCCCCCKK...', '..KCWCCCCCCCNK..', '.KCCCCCCCCCCCNK.',
     '.KCCCCCCCCCCNNK.', 'KYYYWWYYYYWWYYOK', 'KYYWKKWYYWKKWYOK', 'KYYYWWYYYYWWYYOK',
     'KYYYYYYKKYYYYYOK', 'KKKYYYKDDKYYYKKK', 'KLYKYKDDDDKYKLOK', 'KLYKYKDDDDKYKLOK',
     'KLYKYKDDDDKYKLOK', 'KLYKYYKDDKYYKLOK', 'KLOKKYYKKYYOKLOK', '.KKK.KKKKKK.KKK.',
   ] },
-  wut_gesicht: { pal: { K: '#2a0404', L: '#ff7a5a', R: '#e8342a', D: '#a8141a' }, z: [
+  wut_gesicht: { pal: { K: '#2a0404', L: '#ff8566', R: '#f03232', D: '#b5171c' }, z: [
     '....KKKLKKK.....', '...KLLLLLLLK....', '..KLLLRRRRRRK...', '.KLKKRRRRRRKKK..',
     'KLLLKKKRRKKKRDK.', 'KLLRRRKRRKRRRDK.', 'KLRRRKKRRKKRRDK.', 'LLRRRKKRRKKRRDDK',
     'KLRRRRRRRRRRRDK.', 'KLRRRRRRRRRRDDK.', 'KLRRRKKKKKKDDDK.', '.KRRKKRRRRKKDK..',
     '..KRRRRRRDDDK...', '...KDDDDDDDK....', '....KKKDKKK.....', '.......K........',
   ] },
-  nazar: { pal: { K: '#070a1e', D: '#0e1e70', B: '#1e40b4', L: '#4a7ae8', W: '#ffffff', S: '#c4d4e8', C: '#60c4f4' }, z: [
+  nazar: { pal: { K: '#12101f', D: '#02398c', B: '#0351c9', L: '#4580f6', W: '#ffffff', S: '#bddcef', C: '#68c6fd' }, z: [
     '....KKLLBKK.....', '..KKLLLBBBBKK...', '.KLLWLBBBBBBBK..', '.KLWLWWWWWBBBK..',
     'KLLLWWCCCWWBBBK.', 'KLLWWCCCCCWWBBK.', 'LLBWCCWKKCCWBBDK', 'LBBWCCKKKCCSBDDK',
     'BBBWCCKKKCCSDDDK', 'KBBWWCCCCCSSDDK.', 'KBBBWWCCCSSDDDK.', '.KBBBWWSSSDDDK..',
     '.KBBBBBBDDDDDK..', '..KKBBBDDDDKK...', '....KKDDDKK.....', '......KKK.......',
   ] },
-  kerze: { pal: { K: '#1e1410', W: '#ffffff', C: '#e4ded2', S: '#aea493', Y: '#ffe04a', O: '#ff8a1e' }, z: [
+  kerze: { pal: { K: '#1f0f04', W: '#ffffff', C: '#e2d8cb', S: '#c5b7a0', Y: '#ffe23d', O: '#ff8b1a' }, z: [
     '.......K........', '......KOK.......', '......KOOK......', '.....KOYYOK.....',
     '.....KOYWOK.....', '.....KOYYOK.....', '....KKKKKKKK....', '...KWWWWCCCSK...',
     '...KWWCCCCCSK...', '...KWCCCCCSSK...', '...KWCCCCCSSK...', '...KWCCCCCSSK...',
     '...KWCCCCCSSK...', '...KWCCCCCSSK...', '...KSSSSSSSSK...', '....KKKKKKKK....',
   ] },
-  sanduhr: { pal: { K: '#1e1008', H: '#d08a4a', B: '#8a4e22', G: '#cfe8f4', W: '#ffffff', S: '#f4c64c', O: '#c8861e' }, z: [
+  sanduhr: { pal: { K: '#1f0f04', H: '#ca874e', B: '#9d612f', G: '#bddcef', W: '#ffffff', S: '#ffd066', O: '#c68206' }, z: [
     'KKKKKKKKKKKKKKKK', 'KHHHHHHHHHHHHHHK', 'KBBBBBBBBBBBBBBK', 'KHK.KGGGGGGK.KBK',
     'KHK.KWGGGGGK.KBK', 'KHK.KSSSSSOK.KBK', 'KHK..KSSSOK..KBK', 'KHK...KSOK...KBK',
     'KHK...KGSK...KBK', 'KHK..KGGSGK..KBK', 'KHK.KGGGSGGK.KBK', 'KHK.KGGSSSGK.KBK',
     'KHK.KSSSSSOK.KBK', 'KHHHHHHHHHHHHHHK', 'KBBBBBBBBBBBBBBK', 'KKKKKKKKKKKKKKKK',
   ] },
-  kette: { pal: { K: '#14161e', W: '#ffffff', L: '#dde2ec', M: '#aab2c2', S: '#7a8292', D: '#4c5464' }, z: [
+  kette: { pal: { K: '#12101f', W: '#ffffff', L: '#e5edfa', M: '#a5b0c0', S: '#808898', D: '#59606e' }, z: [
     '...........KK...', '.........KKWLK..', '........KWMSSSK.', '.......KWMDKKSDK',
     '......KWMDK.KMDK', '......KMDK.KLSK.', '....KKWSK.KLSDK.', '...KWKLSSKLSDK..',
     '..KWMDKKSDKDK...', '.KWMDK.KMDKK....', '.KMDK.KLSK......', 'KWSK.KLSDK......',
     'KLSKKLSDK.......', '.KSSMSDK........', '..KDDKK.........', '...KK...........',
   ] },
-  auge: { pal: { K: '#141018', W: '#ffffff', E: '#dcdce8', G: '#a0a0b8', B: '#3a8ae0', D: '#1e4ea0', L: '#8ac8ff' }, z: [
+  auge: { pal: { K: '#08060c', W: '#ffffff', E: '#d2d2db', G: '#9aa3b6', B: '#4e82cb', D: '#2f539d', L: '#68c6fd' }, z: [
     '................', '................', '................', '.....KKKKKK.....',
     '...KKWDDDDEKK...', '..KWWDLLBBDEEK..', '.KWWDLWKKBBDEEK.', 'KWWWDBKKKKBDEEEK',
     'KEWWDBKKKKBDEGGK', '.KEEDBBKKBDDGGK.', '..KEEDBBDDDGGK..', '...KKEDDDDGKK...',
     '.....KKKKKK.....', '................', '................', '................',
   ] },
-  nebel: { pal: { K: '#1c2230', W: '#ffffff', L: '#dde3ec', M: '#b0bac8', S: '#7e8898' }, z: [
+  nebel: { pal: { K: '#282834', W: '#ffffff', L: '#e5edfa', M: '#a5b0c0', S: '#808898' }, z: [
     '........KK......', '...K..KKWWKK....', '..KWKKWWMMWWKK..', '.KWMWWMMKKMMWMK.',
     '..KKMMKK..KKMK..', '....KK..KK..K...', '.KKK..KKLLKK..K.', 'KLLLKKLLMMLLKKMK',
     '.KMMLLMMKKMMLLK.', '..KKMMKK..KKMMK.', '....KK..KK..KK..', '......KKLLKK....',
@@ -695,241 +695,241 @@ const PP_PX_ABZEICHEN_SPRITES = {
     '..###++.........', '..##............', '..##............', '..##............',
     '..##............', '..##............', '..##............', '.####...........',
   ] },
-  blasen: { pal: { K: '#0c2238', W: '#ffffff', L: '#bfeaff', B: '#6cc4f0', D: '#2e7fbf' }, z: [
+  blasen: { pal: { K: '#00213f', W: '#ffffff', L: '#b3e8f9', B: '#77c8ee', D: '#4e82cb' }, z: [
     '..KKK...........', '.KWLBK....KKKK..', '.KLBDK...KLLBBK.', '.KBDDK..KLWLBBBK',
     '..KKK...KWLBBBDK', '........KLBBBBDK', '...KKKK.KBBBBDDK', '.KKLLBBKKKBDDDK.',
     '.KLWLBBBK.KKKK..', 'KLWBBBBBDK......', 'KLBBBBBBDK......', 'KBBBBBBBDK..KK..',
     'KBBBBBBDDK.KWBK.', '.KBBBBDDK..KBDK.', '.KKDDDDKK...KK..', '...KKKK.........',
   ] },
-  zweig: { pal: { K: '#0e2410', D: '#1f6b2a', G: '#3fa044', L: '#8ad85a', H: '#d8ffb0' }, z: [
+  zweig: { pal: { K: '#0f2412', D: '#167927', G: '#2ca058', L: '#80bf59', H: '#b3f9b8' }, z: [
     '......KKK...KKKK', '.....KHLGK.KHLGK', '.....KLLGKKHLGDK', '...K.KLLGDKLGDK.',
     '..KLKKGGGDKDDK..', '.KLLGKKGDDKKK...', '.KLLGDKDDKHLLKK.', '.KLLGDKKKLLLLGGK',
     '..KGGDKGDKGGGGDK', '..KGGDKKKKKDDDDK', '...KDKHLLLKKKKK.', '....KKLLLLGK....',
     '...KGKGGGGGDK...', '...KDKKDDDDDK...', '..KGDK.KKKKK....', '..KKK...........',
   ] },
-  geist: { pal: { K: '#1a1428', W: '#ffffff', L: '#e4e4f2', S: '#b4b4cc', D: '#8484a4' }, z: [
+  geist: { pal: { K: '#1a1a2e', W: '#ffffff', L: '#e5edfa', S: '#a5b0c0', D: '#7e7d9b' }, z: [
     '.....KKKKKK.....', '...KKWWWWLLKK...', '..KWWWWWWWWLSK..', '.KWWWWWWWWWWLSK.',
     '.KWWWWWWWWWWLSK.', '.KWWWKKWWKKWLSK.', '.KWWWKKWWKKWLSK.', 'KLWWWKKWWKKWLSSK',
     'KSWWWWWWWWWLLSDK', '.KLWWWWKKWWLSSK.', '.KLWWWWKKWLLSSK.', '.KLWWWWWLLLSSDK.',
     '.KSLLLLLLSSSDDK.', '.KSSDKKSDKKSDDK.', '..KKK..KK..KKK..', '................',
   ] },
-  welle: { pal: { K: '#061a30', D: '#1a5ab0', B: '#2a8ae0', L: '#6ac4ff', F: '#cfeeff', W: '#ffffff' }, z: [
+  welle: { pal: { K: '#1a1a2e', D: '#2f539d', B: '#4e82cb', L: '#68c6fd', F: '#bddcef', W: '#ffffff' }, z: [
     '................', '.......KKKK.....', '.....KKWWWWKK...', '....KWWFFFLBBK..',
     '...KWFLBBBBBBDK.', '...KWLBDKKKDBBDK', '..KWLBDK...KBBDK', '..KWBDK....KBBDK',
     '..KWBDK.KK.KBBDK', '..KFBBKKWFKKBBDK', '.KKFBBBWFKKKBBDK', 'KFWWFWBBBBBBBBDK',
     'KLBBBBBBBBBBBBDK', 'KDBBBBBBBBBBBDDK', '.KDDDDDDDDDDDDK.', '..KKKKKKKKKKKK..',
   ] },
-  herz: { pal: { K: '#3a0a18', D: '#b01848', R: '#f0386a', L: '#ff90b0', W: '#ffffff', Y: '#ffe070' }, z: [
+  herz: { pal: { K: '#4b1021', D: '#ae264c', R: '#ec2d62', L: '#e58092', W: '#ffffff', Y: '#ffd966' }, z: [
     '................', '.............K..', '............KYK.', '...........KYWYK',
     '..KKK...KKK.KYK.', '.KLLLK.KLLRK.K..', 'KLWLRRKRRRRDK...', 'KLWRRRRRRRRDK...',
     'KLRRRRRRRRRDK...', 'KRRRRRRRRRDDK...', '.KRRRRRRRRDK.K..', '..KRRRRRRDK.KYK.',
     '...KRRRRDK.KYWYK', '....KRRDK...KYK.', '.....KDK.....K..', '......K.........',
   ] },
-  herz_rosa: { pal: { K: '#3a0a24', D: '#c0287a', P: '#ff5aa8', L: '#ffa8d4', W: '#ffffff', A: '#ffd05a', B: '#b07a1a' }, z: [
+  herz_rosa: { pal: { K: '#4b1021', D: '#c80480', P: '#fc69c6', L: '#f8b4df', W: '#ffffff', A: '#ffd966', B: '#a87c00' }, z: [
     '...........KKKKK', '...........KAAAK', '....KKK...KKKABK', '...KLLLK.KLLAKBK',
     '..KLWLPPKPPAKDK.', '..KLWPPPPPAKPDK.', '..KLPPPPPAKPPDK.', '..KPPPPPAKPPDDK.',
     '...KPPPAKPPPDK..', '....KPAKPPPDK...', '....KAKPPPDK....', '...KAKKPPDK.....',
     '.KLAK..KDK......', 'KLALK...K.......', 'KALK............', '.KK.............',
   ] },
-  note: { pal: { K: '#1a0a2a', D: '#5a2a9a', V: '#9050e0', L: '#c8a0ff', W: '#ffffff' }, z: [
+  note: { pal: { K: '#170b28', D: '#58238c', V: '#a159e9', L: '#ac87de', W: '#ffffff' }, z: [
     '.............KK.', '..........KKKLLK', '.......KKKLLLVVK', '.....KKLLLVVVVDK',
     '....KLLVVVDDDVDK', '....KVVDDDKKKVDK', '....KVDKKK..KVDK', '....KVDK....KVDK',
     '....KVDK..KKKVDK', '....KVDK.KLWVVDK', '..KKKVDKKLVVVVDK', '.KLWVVDKKVVVDDDK',
     'KLVVVVDK.KDDDDK.', 'KVVVDDDK..KKKK..', '.KDDDDK.........', '..KKKK..........',
   ] },
-  glanz: { pal: { K: '#3a2404', D: '#c07a10', Y: '#ffc21e', L: '#ffe680', W: '#ffffff' }, z: [
+  glanz: { pal: { K: '#332300', D: '#c68206', Y: '#ffc61c', L: '#fbe181', W: '#ffffff' }, z: [
     '............K...', '...........KYK..', '..........KKLKK.', '......K..KLLWYDK',
     '.....KLK..KKDKK.', '.....KLK...KDK..', '....KLLYK...K...', '...KKLLYKK......',
     '.KKLLLWYYDKK....', 'KLLLLWWYYYDDK...', '.KKYYYYDDDKKK...', '...KKYYDKK.KYK..',
     '....KYDDK.KYWDK.', '.....KDK...KDK..', '.....KDK....K...', '......K.........',
   ] },
-  falter: { pal: { K: '#0a1428', D: '#1a4ab0', B: '#3a8af0', L: '#8ad0ff', W: '#ffffff', G: '#7a6a90', H: '#3a2a50' }, z: [
+  falter: { pal: { K: '#1a1a2e', D: '#0351c9', B: '#6d9bf8', L: '#7bbeea', W: '#ffffff', G: '#7e7d9b', H: '#291f3d' }, z: [
     '................', '..KK.H....H.KK..', '.KDDKKHKKHKKDDK.', 'KDWBDDKGHKDDBWDK',
     'KDBLLBBGHBBLLBDK', 'KWBLBBBGHBBBLBWK', '.KDBBBBGHBBBBDK.', '..KDBBDGHDBBDK..',
     '...KDDDGHDDDK...', '..KDBBDGHDBBDK..', '.KDLBBDGHDBBLDK.', '.KWBBBDGHDBBBWK.',
     '.KDBBDKGHKDBBDK.', '..KDWDKGHKDWDK..', '...KKK.KK.KKK...', '................',
   ] },
-  hut: { pal: { K: '#08080e', E: '#a8a8c8', M: '#565670', D: '#2c2c3c', W: '#e4e4f4', Y: '#ffc81e', O: '#b07a10' }, z: [
+  hut: { pal: { K: '#08060c', E: '#9ba3ca', M: '#59606e', D: '#282834', W: '#e5edfa', Y: '#ffc61c', O: '#a87c00' }, z: [
     '................', '.......KK.......', '.....KKEEKK.....', '...KKEEMMEEKK...',
     '.KKEEMMWYMMEEKK.', 'KEEMMMMYOYYYYYEK', '.KKDMMMMMMMMDYK.', '...KKDMMMMDKKYK.',
     '...KKKKDDKKKKYK.', '...KMMDDDDDDKYK.', '...KMDDDDDDDKYYK', '...KEEEEEEEEKYOK',
     '....KKKKKKKKKOOK', '.............KK.', '................', '................',
   ] },
-  wolke: { pal: { K: '#1a2030', W: '#ffffff', G: '#d4dae6', S: '#9aa6ba' }, z: [
+  wolke: { pal: { K: '#1a1a2e', W: '#ffffff', G: '#d2d2db', S: '#9aa3b6' }, z: [
     '................', '................', '................', '.....KKK........',
     '....KWWWK.KK....', '...KWWWWWKWWK...', '..KWWWWWWWWWGK..', '.KKWWWWWWWWWWGK.',
     'KWWKWWWWWWWWGGK.', 'KWWWWWWWWWWWWGGK', 'KWWWWWWWWWWWGGSK', 'KGWWWGGWWWWGGGSK',
     '.KGGGGGGGGGGGSK.', '..KSSSSSSSSSSK..', '...KKKKKKKKKK...', '................',
   ] },
-  zahnrad: { pal: { K: '#1a1a24', W: '#ffffff', L: '#dce0e8', M: '#a4aab6', D: '#666c7a' }, z: [
+  zahnrad: { pal: { K: '#12101f', W: '#ffffff', L: '#e6e6e6', M: '#a5b0c0', D: '#59606e' }, z: [
     '......KKKK......', '..KK..KLLK..KK..', '.KLLKKLLLMKKMDK.', '.KLWLLLLLMMMMDK.',
     '..KLLLLMMMMMDK..', '..KLLMKKKKMMDK..', 'KKKLLK....KMDKKK', 'KLLLLK....KMMMDK',
     'KLLMMK....KMDDDK', 'KKKMMK....KDDKKK', '..KMMMKKKKDDDK..', '..KMMMMMMDDDDK..',
     '.KMMMMMMDDDDDDK.', '.KMDKKMDDDKKDDK.', '..KK..KDDK..KK..', '......KKKK......',
   ] },
-  taube: { pal: { K: '#1a1c2a', W: '#ffffff', L: '#e2e6ee', G: '#a8b0c2', Y: '#f0a020', O: '#7ac040', N: '#3a7a22' }, z: [
+  taube: { pal: { K: '#1a1a2e', W: '#ffffff', L: '#e5edfa', G: '#a5b0c0', Y: '#f9ac20', O: '#80bf59', N: '#167927' }, z: [
     '.............KK.', '...........KKWLK', '.........KKWWLGK', '........KWWLLLGK',
     '..KKK..KWWLLLGK.', '.KWWWK.KWLLLGGK.', 'KWWKWLKWLLLGGK..', 'YKWWLLKWLLGGK...',
     'YYKWLLLKLGGKKK..', '.KKWLLLLKKKLLLKK', '.N.KWLLLLLLLLLGK', 'NON.KGLLLLLLGGK.',
     '.ONO.KKGGGGGKGGK', '..N...KKKKKK.KKK', '................', '................',
   ] },
-  katze: { pal: { K: '#2a1408', L: '#ffc070', O: '#f08a2a', D: '#b8561a', P: '#ff8aa0', W: '#ffffff', G: '#58c040' }, z: [
+  katze: { pal: { K: '#27180c', L: '#f4ae64', O: '#ff9b3a', D: '#aa5300', P: '#e58092', W: '#ffffff', G: '#20ac37' }, z: [
     '.KK..........KK.', '.KLK........KOK.', '.KLPK......KPDK.', '.KLPPKKKKKKPPDK.',
     'KLLOOODOODOOOODK', 'KLOOOOODDOOOOODK', 'KLOOOOOOOOOOOODK', 'KLOGKOOOOOOKGODK',
     'KOOGKOOOOOOKGODK', 'KOOOOOOPPOOOOODK', 'KWWOOOOKKOOOOWWK', 'KOOWWOKOOKOWWODK',
     '.KOOOOOOOOOOODK.', '..KDOOOOOOOODK..', '...KKDDDDDDKK...', '.....KKKKKK.....',
   ] },
-  schloss: { pal: { K: '#20140a', Y: '#ffd23e', G: '#e8a020', B: '#a8640c', S: '#dde0e8', M: '#8a90a0', W: '#ffffff' }, z: [
+  schloss: { pal: { K: '#1f0f04', Y: '#fad54a', G: '#f9ac20', B: '#ad6100', S: '#e6e6e6', M: '#808898', W: '#ffffff' }, z: [
     '....KKKKKKKK....', '...KSWSSSSSMK...', '..KSSKKKKKKSMK..', '..KSSK....KSMK..',
     '..KSSK....KSMK..', '..KSMK....KSMK..', '.KKKKKKKKKKKKKK.', '.KYYYYYYYYYYYGK.',
     '.KYWYYYYYYYYGBK.', '.KYYYYYKKYYYGBK.', '.KYYYYKKKKGGGBK.', '.KYYYYYKKGGGGBK.',
     '.KGYYYYKKGGGGBK.', '.KGGGGGGGGGGBBK.', '.KBBBBBBBBBBBBK.', '.KKKKKKKKKKKKKK.',
   ] },
-  sonnenbrille: { pal: { K: '#2a1a08', Y: '#ffd23e', L: '#fff08a', O: '#e89a20', B: '#5a6a8a', W: '#ffffff' }, z: [
+  sonnenbrille: { pal: { K: '#27180c', Y: '#fad54a', L: '#fff196', O: '#f9ac20', B: '#405f8c', W: '#ffffff' }, z: [
     '.....KKKKKK.....', '...KKLLYYYYKK...', '..KLWLYYYYYYOK..', '.KLLYYYYYYYYYOK.',
     '.KLYYYYYYYYYYOK.', 'KKKKKKKKKKKKKKKK', 'KKBBKKKYYKBBKKKK', 'KKBKKKKYYKBKKKKK',
     'KYKKKKYYYYKKKKOK', 'KYYYYYYYYYYYYYOK', 'KYYKYYYYYYYYKYOK', '.KYYKWWWWWWKYOK.',
     '.KOYYKKKKKKYYOK.', '..KOYYYYYYYYOK..', '...KKOOOOOOKK...', '.....KKKKKK.....',
   ] },
-  fluegel: { pal: { K: '#3a2204', W: '#ffffff', L: '#fff0a0', Y: '#ffd23e', G: '#e8a020', B: '#a8640c' }, z: [
+  fluegel: { pal: { K: '#332300', W: '#ffffff', L: '#fff196', Y: '#fad54a', G: '#f9ac20', B: '#ad6100' }, z: [
     '..........KKKK..', '.......KKKLLLLKK', '.....KKLLLYYYYK.', '....KLWYYYYGGK..',
     '...KLYYYGGKKKKK.', '..KLYYGKKKLLYYYK', '..KLYGKLLYYYGGK.', '.KLYGKLYYGGKKK..',
     '.KLYGKYYGKKKKKK.', '.KLYKLYGKLYYYYGK', 'KLYGKYGKLYYGGKK.', 'KLYGKYGKYGGKK...',
     'KLYYKGKYGKK.....', 'KLYYGKKGKK......', '.KGGGBBK........', '..KKKKK.........',
   ] },
-  zielscheibe: { pal: { K: '#200a0a', R: '#e82828', L: '#ff6a5a', D: '#a01414', W: '#ffffff', G: '#d0ccd8', A: '#7a4a1a', F: '#ffd23e' }, z: [
+  zielscheibe: { pal: { K: '#270d0c', R: '#ef2929', L: '#ff6666', D: '#8f0000', W: '#ffffff', G: '#d2d2db', A: '#6e4421', F: '#fad54a' }, z: [
     '......KKKK..KFK.', '....KKLRRRKKFFFK', '..KKLRRWWRRRAKKK', '..KRRWWWWWWAKK..',
     '.KLRWWWRRWAKRRK.', '.KRWWRRRRAKWWRK.', 'KLRWWRRWAKRWWRDK', 'KRWWRRWRRWRRGGDK',
     'KRWWRRWRRWRRGGDK', 'KRRWWRRWWRRGGDDK', '.KRWWRRRRRRGGDK.', '.KRRWWWRRGGGDDK.',
     '..KRRWWGGGGDDK..', '..KKRRRGGDDDKK..', '....KKDDDDKK....', '......KKKK......',
   ] },
-  bueffel: { pal: { K: '#101014', G: '#6a6e7a', L: '#9aa0ac', D: '#3e4048', H: '#e8dcc0', N: '#a8987a', W: '#ffffff' }, z: [
+  bueffel: { pal: { K: '#141414', G: '#59606e', L: '#9aa3b6', D: '#3e3e51', H: '#ebdcc1', N: '#a89370', W: '#ffffff' }, z: [
     'K..............K', 'KK............KK', 'KHK..........KNK', 'KHHK........KNNK',
     '.KHHKK....KKNNK.', '..KHHHKKKKHNNK..', '...KKHHHHNNKK...', 'KKKKLGGGGGGGDKKK',
     'KLGKLGGGGGGGDKDK', '.KKKLWGGGGWGDKK.', '...KLKGGGGKGDK..', '...KLGGGGGGDK...',
     '...KLLLLLLLGK...', '...KLKLLLLKGK...', '...KGLLLLLGDK...', '....KKKKKKKK....',
   ] },
-  hund: { pal: { K: '#2a1408', D: '#6a3e16', B: '#b87838', L: '#e0a868', C: '#f6dcb0', T: '#ff6a88', W: '#ffffff' }, z: [
+  hund: { pal: { K: '#27180c', D: '#6e4421', B: '#ca874e', L: '#f4ae64', C: '#f7e0b5', T: '#fe6794', W: '#ffffff' }, z: [
     '....KKKKKKKK....', '..KKLLLLBBBBKK..', '.KDKLWLBBBBBKDK.', 'KDDKLLLBBBBBKDDK',
     'KDDKLLBBBBBBKDDK', 'KDDKLWKBBWKBKDDK', 'KDDKLKKBBKKBKDDK', 'KDDKBBBBBBBBKDDK',
     'KDDKBCCKKCCBKDDK', 'KDDKCCKKKKCCKDDK', '.KDKCCCKKCCCKDK.', '.KKKCCKCCKCCKKK.',
     '...KCCKTTKCCK...', '....KCKTTKCK....', '.....KKTTKK.....', '......KKKK......',
   ] },
-  neumond: { pal: { K: '#0a0a14', M: '#5a5a74', D: '#3a3a4c', S: '#24242e', C: '#f0e6b0', Y: '#c8b870' }, z: [
+  neumond: { pal: { K: '#08060c', M: '#59606e', D: '#3e3e51', S: '#282834', C: '#f9ecb3', Y: '#e0c085' }, z: [
     '......KKKK......', '....KKMMDCKK....', '..KKMMMDDDDCKK..', '..KMMMDDDDDDCK..',
     '.KMMMSSDDDDDCCK.', '.KMMSSMDDSDDDCK.', 'KMMDDMDDDDMDDCCK', 'KMDDDDDDDDDDDCCK',
     'KDDDDDDDDDDDSCCK', 'KDDDDDDDSSDSSCCK', '.KDDDDDSSMSSSCK.', '.KDDDDDDMSSSCCK.',
     '..KDDDDDSSSSCK..', '..KKDDDSSSSCKK..', '....KKSSSCKK....', '......KKKK......',
   ] },
-  arm: { pal: { K: '#3a1a08', Y: '#ffc83a', L: '#ffe48a', O: '#e0902a', W: '#ffffff' }, z: [
+  arm: { pal: { K: '#311402', Y: '#ffc61c', L: '#fbe181', O: '#c68206', W: '#ffffff' }, z: [
     '.....KKKKKK.....', '....KLLLLYYKK...', '...KLWLLYYYYOK..', '...KKKKKKYYYOK..',
     '...KLLYYKYYYOOK.', '...KKKKKKYYYYOK.', '....KLYYKYYYYOK.', '.....KKKKLYYYOK.',
     '..KKKK..KLYYYOK.', '.KLLLLK.KLYYOOK.', 'KLLWLYYKKLYYOOK.', 'KLYYYYYYKYYYOOK.',
     'KYYYYYYYYYYYOOK.', 'KOYYYYYYYYYOOK..', 'KOOOOOOOOOOOK...', '.KKKKKKKKKKKK...',
   ] },
-  geodreieck: { pal: { K: '#2a1a0a', Y: '#ffe07a', G: '#f0b830', B: '#b87a18', T: '#6a4210', W: '#ffffff' }, z: [
+  geodreieck: { pal: { K: '#27180c', Y: '#fbe181', G: '#ffb91a', B: '#c68206', T: '#6e4421', W: '#ffffff' }, z: [
     'KK..............', 'KWK.............', 'KYYK............', 'KTYYK...........',
     'KYYYYK..........', 'KTYKYYK.........', 'KYYKKYYK........', 'KTYK.KYYK.......',
     'KYYK..KYYK......', 'KTYK...KYYK.....', 'KYYK....KYYK....', 'KTYKKKKKKKYYK...',
     'KYYGGGGGGGGGGK..', 'KGGTGTGTGTGTGGK.', 'KBBBBBBBBBBBBBBK', 'KKKKKKKKKKKKKKKK',
   ] },
-  feder: { pal: { K: '#2a1808', L: '#fff4dc', Y: '#e8c890', B: '#b8844c', D: '#7a5228', Q: '#fffaf0' }, z: [
+  feder: { pal: { K: '#27180c', L: '#fff8e8', Y: '#e0c085', B: '#ca874e', D: '#6e4421', Q: '#fff8e8' }, z: [
     '............KKK.', '..........KKLLK.', '.........KLLLYK.', '........KLLLQBK.',
     '........KLLQYBK.', '......KLLYQYBK..', '.....KLLYQYBBK..', '....KLLYQYBK....',
     '...KLYYQYBBDK...', '...KLYQYBBDK....', '..KYYQBBDDK.....', '..KYQBDDKK......',
     '.KKQKKKK........', '.KQK............', 'KQK.............', 'KK..............',
   ] },
-  kaefer: { pal: { K: '#0a1a10', G: '#34b04a', L: '#8ae86a', D: '#16663a', T: '#2aa8b0', H: '#2e4a3a', W: '#ffffff' }, z: [
+  kaefer: { pal: { K: '#0a1a04', G: '#20ac37', L: '#4ceb70', D: '#29663f', T: '#07aec5', H: '#1a4128', W: '#ffffff' }, z: [
     '..K..........K..', '...K........K...', '....K.KKKK.K....', '.....KHWHHK.....',
     '.K..KKKKKKKK..K.', '..KKKLLGGGDKKK..', '...KKKKKKKKKK...', '...KLWLKKGGDK...',
     '...KLLGKKLGDK...', '.KKKLGGKKGGDKKK.', 'K..KGGTKKGTDK..K', '...KGTGKKTGDK...',
     '..KKGGGKKGDDKK..', '.K..KGGKKDDK..K.', 'K....KDKKDK....K', '......KKKK......',
   ] },
-  raute_blau: { pal: { K: '#0a1430', B: '#3a8ae8', L: '#8ac8ff', D: '#1a4aa8', C: '#d0ecff', W: '#ffffff' }, z: [
+  raute_blau: { pal: { K: '#170b28', B: '#6d9bf8', L: '#68c6fd', D: '#02398c', C: '#bddcef', W: '#ffffff' }, z: [
     '.......KK.......', '......KLBK......', '.....KLLBBK.....', '....KLLCCBBK....',
     '...KLLCCCCBBK...', '..KLLLLCCBBBBK..', '.KLLCLLLBBBCBBK.', 'KLLCCCLWWBCCCBBK',
     'KBBCCCBWWDCCCDDK', '.KBBCBBBDDDCDDK.', '..KBBBBCCDDDDK..', '...KBBCCCCDDK...',
     '....KBBCCDDK....', '.....KBBDDK.....', '......KBDK......', '.......KK.......',
   ] },
-  radioaktiv: { pal: { K: '#1a1408', Y: '#ffd23e', L: '#fff08a', O: '#e89a20', W: '#ffffff' }, z: [
+  radioaktiv: { pal: { K: '#1f0f04', Y: '#fad54a', L: '#fff196', O: '#f9ac20', W: '#ffffff' }, z: [
     '......KKKK......', '....KKLYYYKK....', '..KKLWYYYYYYKK..', '..KLLYYYYYYYYK..',
     '.KLLKKYYYYKKYYK.', '.KLKKKKYYKKKKYK.', 'KLYKKKKYYKKKKYYK', 'KYKKKKYKKYKKKKYK',
     'KYYYYYYKKYYYYYOK', 'KYYYYYYYYYYYYOOK', '.KYYYYYKKYYYOOK.', '.KYYYYKKKKYOOOK.',
     '..KYYKKKKKKOOK..', '..KKYYYKKYOOKK..', '....KKYYOOKK....', '......KKKK......',
   ] },
-  buch: { pal: { K: '#0e1430', B: '#2f6ae0', D: '#1c3a90', L: '#7eacff', G: '#ffd040', O: '#b8800c', P: '#f6f2e4', Q: '#b8b0a0' }, z: [
+  buch: { pal: { K: '#170b28', B: '#4580f6', D: '#02398c', L: '#6d9bf8', G: '#fad54a', O: '#a87c00', P: '#fff8e8', Q: '#c5b7a0' }, z: [
     '.KKKKKKKKKKKKK..', 'KBDLLLLLLLLLLK..', 'KBDLBBBBBBBBBKK.', 'KBDLBBBBBBBBBKPK',
     'KBDLBKKKKKKKBKPK', 'KBDLBKGGGGGKBKPK', 'KBDLBKGOOOGKBKPK', 'KBDLBKGGGGOKBKPK',
     'KBDLBKKKKKKKBKPK', 'KBDLBBBBBBBBBKPK', 'KBDBBBBBBBBBBKPK', 'KBDBBBBBBBBBBKPK',
     'KBDBBBBBBBBBDKPK', 'KBDDDDDDDDDDDKQK', 'KKPPPPPPPPPPPPQK', '.KKKKKKKKKKKKKK.',
   ] },
-  halt: { pal: { K: '#2a0606', R: '#e02828', L: '#ff6a5a', D: '#a01010', W: '#ffffff', G: '#d0d0dc' }, z: [
+  halt: { pal: { K: '#2a0404', R: '#f03232', L: '#ff6666', D: '#8f0000', W: '#ffffff', G: '#d2d2db' }, z: [
     '.....KKKKKK.....', '...KKLLLRRRKK...', '..KLLRRRRRRRRK..', '.KLLRRRRRRRRRDK.',
     '.KLRRRRRRRRRRDK.', 'KLRRRRRRRRRRRRDK', 'KLRWWWWWWWWWWRDK', 'KRRWWWWWWWWWWRDK',
     'KRRWWWWWWWWWWRDK', 'KRRGGGGGGGGGGRDK', 'KRRRRRRRRRRRRDDK', '.KRRRRRRRRRRRDK.',
     '.KRRRRRRRRRRDDK.', '..KDRRRRRRRDDK..', '...KKDDDDDDKK...', '.....KKKKKK.....',
   ] },
-  klee: { pal: { K: '#0c2410', L: '#8ee86a', G: '#46b83a', D: '#1f7a2a', S: '#3a9a30' }, z: [
+  klee: { pal: { K: '#0f2412', L: '#75f091', G: '#20ac37', D: '#167927', S: '#20ac37' }, z: [
     '.....KK.KK......', '....KLLKLLK.....', '...KLGGLGGDK....', '..KKLGGGGGDKK...',
     '.KLLKLGGGDKLLK..', 'KLGGLKLGDKLGGDK.', 'KLGGGGKDKGGGGDK.', '.KLGGGDDDGGGDK..',
     'KLGGGGKDKSGGGDK.', 'KLGGDKLGDKSGGDK.', '.KLDKLGGGDKSDK..', '..KKLGGGGGDKSK..',
     '...KLGGGGGDKSK..', '....KLDKLDKKSK..', '.....KK.KK..KSK.', '.............K..',
   ] },
-  ninja: { pal: { K: '#0a0a14', N: '#262636', H: '#4a4a64', S: '#f2c490', T: '#c88a5a', R: '#e02828', D: '#8a1010', W: '#ffffff' }, z: [
+  ninja: { pal: { K: '#08060c', N: '#282834', H: '#3e3e51', S: '#e0c085', T: '#c7855b', R: '#f03232', D: '#8b0d0d', W: '#ffffff' }, z: [
     '...KKKKKK.......', '.KKHHHHNNKK.....', '.KHHHNNNNNK.....', 'KHHNNNNNNNNK.KK.',
     'KRRRRRRRRRRRKRRK', 'KRRRRRRRRRRRRRDK', 'KDDDDDDDDDDRRKK.', 'KNSSSSSSSSNKRDK.',
     'KNSWKSSWKSNKKRDK', 'KNSKKSSKKSNK.KDK', 'KNTTTTTTTTNK..KK', 'KHNNNNNNNNNK....',
     'KHNNNNNNNNNK....', '.KNNNNNNNNK.....', '.KKNNNNNNKK.....', '...KKKKKK.......',
   ] },
-  haende: { pal: { K: '#1a1010', B: '#3a6ee0', N: '#1e3a8a', R: '#e03030', D: '#8a1414', S: '#f6c48a', T: '#c88450', L: '#ffe4bc' }, z: [
+  haende: { pal: { K: '#141414', B: '#4580f6', N: '#02398c', R: '#e63e33', D: '#8b0d0d', S: '#e0c085', T: '#ca874e', L: '#f7e0b5' }, z: [
     '................', '................', '.....KKK........', '....KLLSK.KKKKKK',
     'KKKKLSSSKKLLLRRK', 'KBBBSSSKLLSSSRRK', 'KBBBSSKSSSSSTRRK', 'KBBBSKKKKKKSTRRK',
     'KNNNKLLLLLTKTDDK', 'KNNNKSSSSSTKTDDK', 'KNNNKKKKKKKSTKKK', 'KKKKKLLLLLTTK...',
     '....KSSSSSTK....', '....KKKKKKK.....', '................', '................',
   ] },
-  klavier: { pal: { K: '#0c0c14', N: '#2a2a3a', H: '#55556e', W: '#ffffff', S: '#c4c8d6', G: '#8a90a4' }, z: [
+  klavier: { pal: { K: '#08060c', N: '#282834', H: '#59606e', W: '#ffffff', S: '#d2d2db', G: '#808898' }, z: [
     '................', 'KKKKKKKKKKKKKKKK', 'KHHHHHHHHHHHHHNK', 'KHNNNNNNNNNNNNNK',
     'KKKKKKKKKKKKKKKK', 'KWKWKWSWKWKWKWSK', 'KWKWKWSWKWKWKWSK', 'KWKWKWSWKWKWKWSK',
     'KWKWKWSWKWKWKWSK', 'KWKWKWSWKWKWKWSK', 'KWSWSWSWSWSWSWSK', 'KWSWSWSWSWSWSWSK',
     'KWSWSWSWSWSWSWSK', 'KGSGSGSGSGSGSGSK', 'KKKKKKKKKKKKKKKK', '................',
   ] },
-  stuhl: { pal: { K: '#2a1408', L: '#eaa866', M: '#c07a3a', D: '#8a4a1e' }, z: [
+  stuhl: { pal: { K: '#27180c', L: '#f4ae64', M: '#ca874e', D: '#7d3911' }, z: [
     '.......KKKKKKK..', '......KLLLLLLMK.', '......KMMMMMMDK.', '......KKKKKKKKK.',
     '......KLK...KMK.', '......KLKKKKKMK.', '......KLLLLLLMK.', '......KMMMMMMDK.',
     '....KKKKKKKKKMK.', '...KLLLLLLLLLKK.', '..KLMMMMMMMMLDK.', '.KLMMMMMMMMMDDK.',
     '.KDDDDDDDDDDDKK.', '.KMKKKKKKKKKMKDK', '.KMK.....KMK.KDK', '.KKK.....KKK..K.',
   ] },
-  zombie: { pal: { K: '#102010', L: '#a8e070', G: '#6cb840', D: '#3a7a28', H: '#5a2a3a', J: '#8a4050', W: '#f0f0d0' }, z: [
+  zombie: { pal: { K: '#0f2412', L: '#80bf59', G: '#80bf59', D: '#167927', H: '#4b1021', J: '#784437', W: '#fffbd2' }, z: [
     '...K.KK.K.KK....', '..KHKHHKHKHHKK..', '.KHJJHHHJJHHHHK.', '.KHJHHHHHHHHHHK.',
     'KHHGGHHHGGHHGHHK', 'KHGLLGGGGGGGGDHK', 'KGLLLGGGGGGGGGDK', 'KGLDDDGGGDDDGGDK',
     'KGLDKDGGGDKDGGDK', 'KGGDDDGGGDDDGGDK', 'KGGGGGGGGGGGGGDK', 'KGGGGKKKGGGGGDDK',
     '.KGGKWKWKKKGGDK.', '.KDGGGGGGGKKDDK.', '..KKDDDDDDDDKK..', '....KKKKKKKK....',
   ] },
-  ankh: { pal: { K: '#3a2404', L: '#fff080', G: '#ffc830', O: '#c0800c', W: '#ffffff' }, z: [
+  ankh: { pal: { K: '#332300', L: '#f0f075', G: '#ffc61c', O: '#c68206', W: '#ffffff' }, z: [
     '.....KKKKKK.....', '....KLLLLGGK....', '...KLLKKKKGOK...', '...KLGK..KGOK...',
     '...KLGK..KGOK...', '...KLGK..KGOK...', '...KLGK..KGOK...', '....KLGKKGOK....',
     '.KKKKLGGGGOKKKK.', 'KLLLLLLGGGGGGGOK', 'KGGGGGGGGGGGOOOK', '.KKKKKLGGOKKKKK.',
     '.....KLGGOK.....', '.....KLGGOK.....', '....KLLGGOOK....', '....KKKKKKKK....',
   ] },
-  zahn: { pal: { K: '#1a2030', W: '#ffffff', L: '#eef2fa', M: '#c0cadb', D: '#8490a8' }, z: [
+  zahn: { pal: { K: '#1a1a2e', W: '#ffffff', L: '#e5edfa', M: '#d2d2db', D: '#808898' }, z: [
     '..KKKKK..KKKKK..', '.KWWWWWKKWWWWMK.', 'KWWLLLLLLLLLLMMK', 'KWLLLLLLLLLLLMDK',
     'KWLLLLLLLLLLLMDK', 'KLLLLLLLLLLLMMDK', 'KLLLLLLLLLLLMMDK', 'KLLLLLLLLLLMMMDK',
     '.KLLLLLLLLLMMDK.', '.KLLLLLLLLMMMDK.', '.KLLLMKKKKMMMDK.', '.KLLMK....KMDDK.',
     '.KLLMK....KMDK..', '..KLMK....KMDK..', '..KLK......KDK..', '...K.......KK...',
   ] },
-  dna: { pal: { K: '#12102a', Q: '#ff9ad8', P: '#e8409c', C: '#8ad0ff', B: '#2a7ae8', Y: '#ffd040', G: '#50d070' }, z: [
+  dna: { pal: { K: '#170b28', Q: '#f8b4df', P: '#c80480', C: '#7bbeea', B: '#4580f6', Y: '#fad54a', G: '#4bcd7c' }, z: [
     'KQPKKKKKKKKKCBK.', '.KQPYYYGGGGCBK..', '..KQPKKKKKCBK...', '...KKQPKCBKK....',
     '....KKCQPKK.....', '..KKCBKKKQPKK...', '.KCBYYYGGGGQPK..', '.KCBK.....KQPK..',
     '.KCBK.....KQPK..', '.KCBYYYGGGGQPK..', '..KKCBKKKQPKK...', '....KKCBPKK.....',
     '...KKQPKCBKK....', '..KQPKKKKKCBK...', '.KQPYYYGGGGCBK..', 'KQPKKKKKKKKKCBK.',
   ] },
-  muenze: { pal: { K: '#3a2404', W: '#ffffff', L: '#ffe680', Y: '#ffc21e', O: '#c07a0a' }, z: [
+  muenze: { pal: { K: '#332300', W: '#ffffff', L: '#fbe181', Y: '#ffc61c', O: '#c68206' }, z: [
     '....KKKKKKKK....', '...KLLLLLLLYK...', '..KLWLOOOOYYYK..', '.KLLOOYYYYYYYYK.',
     'KLLOYYYYYYYYYYYK', 'KLLOYYYLYYYYYYOK', 'KLOYYYLLLYYYYLOK', 'KLOYLLLLLLLYYLOK',
     'KLOYYLLLLLOOYLOK', 'KLOYYLLOLLOYYLOK', 'KLYYYLOOYLOYLOOK', 'KYYYYYOYYYOYLOOK',
     '.KYYYYYYYYLLOOK.', '..KYYYLLLLOOOK..', '...KYOOOOOOOK...', '....KKKKKKKK....',
   ] },
-  galaxie: { pal: { K: '#08061a', N: '#1c1648', M: '#2a2266', V: '#8a4ad8', L: '#d0a0ff', P: '#ffd8ff', W: '#ffffff' }, z: [
+  galaxie: { pal: { K: '#12101f', N: '#1a0a3a', M: '#401a66', V: '#9544d5', L: '#ac87de', P: '#d9c0ec', W: '#ffffff' }, z: [
     '....KKKMMKKK....', '...KMMNNNNMMK...', '..KMNNNNNNWNMK..', '.KMNLLLVVVVVNMK.',
     'KMNLLLVNNNNNNNMK', 'KMVLLVNNNNNWNNMK', 'KNVLLNPPPPLVNNNK', 'MNVLLPPWWPPLVNNM',
     'MNNVLPPWWPPLLVNM', 'KNNNVLPPPPNLLVNK', 'KMNWNNNNNNVLLVMK', 'KMNNNNNNNVLLLNMK',
@@ -1174,12 +1174,12 @@ const PP_PX_KLASSEN = {
   // Einzelregeln, wo ein entfernter Filter mehr tat als weichzeichnen.
   extra: [
     // Black Flame: `brightness(0)` faerbte auch die Glyphen schwarz.
-    '.anim-black-flame-shard{color:#3a0a52;}',
+    '.anim-black-flame-shard{color:#2e0a51;}',
   ],
   // Umrisse aus `border` + weichem Schein → Pixelring (eigener Verlauf).
   ersatz: [
-    { sel: '.anim-shield-bubble-rim', breite: 110, verlauf: 'radial-gradient(ellipse, transparent 64%, rgba(255,255,255,.95) 66%, rgba(255,255,255,.95) 69%, rgba(200,230,255,.5) 71%, transparent 73%)' },
-    { sel: '.torchure-ring', breite: 72, verlauf: 'radial-gradient(circle, transparent 58%, rgba(120,220,90,.55) 61%, #be5aff 63%, #be5aff 67%, rgba(160,60,230,.5) 69%, transparent 71%)' },
+    { sel: '.anim-shield-bubble-rim', breite: 110, verlauf: 'radial-gradient(ellipse, transparent 64%, rgba(255,255,255,.95) 66%, rgba(255,255,255,.95) 69%, rgba(189,220,239,.5) 71%, transparent 73%)' },
+    { sel: '.torchure-ring', breite: 72, verlauf: 'radial-gradient(circle, transparent 58%, rgba(61,220,87,.55) 61%, #b866ff 63%, #b866ff 67%, rgba(144,58,230,.5) 69%, transparent 71%)' },
   ],
   // Paket 3 (v1448): runde Abzeichen → Pixel-Plakette. `klassen` ist die
   // Klassenliste fuer die Probe (Flaeche und Rand werden aus style.css
@@ -1198,8 +1198,8 @@ const PP_PX_KLASSEN = {
   // 1-Pixel-Umriss in der Scheinfarbe.
   abzeichenExtra: [
     '.status-immune-icon{filter:drop-shadow(1px 1px 0 rgba(0,0,0,.8));}',
-    '.status-immune-icon.status-shielded-icon{filter:drop-shadow(1px 0 0 #ffd84a) drop-shadow(-1px 0 0 #ffd84a) drop-shadow(0 1px 0 #ffd84a) drop-shadow(0 -1px 0 #ffd84a) drop-shadow(1px 1px 0 rgba(0,0,0,.8))!important;}',
-    '.status-immune-icon.vena-bounty-badge{box-shadow:none;filter:drop-shadow(1px 0 0 #ff5060) drop-shadow(-1px 0 0 #ff5060) drop-shadow(0 1px 0 #ff5060) drop-shadow(0 -1px 0 #ff5060);}',
+    '.status-immune-icon.status-shielded-icon{filter:drop-shadow(1px 0 0 #fad54a) drop-shadow(-1px 0 0 #fad54a) drop-shadow(0 1px 0 #fad54a) drop-shadow(0 -1px 0 #fad54a) drop-shadow(1px 1px 0 rgba(0,0,0,.8))!important;}',
+    '.status-immune-icon.vena-bounty-badge{box-shadow:none;filter:drop-shadow(1px 0 0 #fe5154) drop-shadow(-1px 0 0 #fe5154) drop-shadow(0 1px 0 #fe5154) drop-shadow(0 -1px 0 #fe5154);}',
     '.mummified-icon{filter:drop-shadow(1px 1px 0 rgba(0,0,0,.8))!important;}',
     // Buff-Puls: statt weichem Schein ein gestufter Helligkeitswechsel.
     '.buff-icon{animation:ppPxBuffPuls 2s steps(2,jump-none) infinite;}',
@@ -3436,6 +3436,17 @@ const ZONE_ANIM_SFX = {
   field_standard_rally:    { name: 'buff' },
   // Silent — redundant with a log or purely decorative
   gold_sparkle:            null,
+  // Shimmering Dragonegg (23.10.): Kreuzfunkel blitzen um das goldene Ei — helle Pings, versetzt; Liquid Luck: der Regenbogen wächst (Buff-Klang), Goldmünzen klingeln.
+  dragonegg_shimmer: [
+    { name: 'ping', opts: { rate: 1.5, volume: 0.5, category: null, dedupe: 0 } },
+    { name: 'ping', opts: { rate: 1.9, volume: 0.4, delay: 170, category: null, dedupe: 0 } },
+    { name: 'ping', opts: { rate: 2.2, volume: 0.3, delay: 330, category: null, dedupe: 0 } },
+  ],
+  liquid_rainbow: [
+    { name: 'buff', opts: { rate: 1.2, volume: 0.7 } },
+    { name: 'ping', opts: { rate: 1.7, volume: 0.5, delay: 520, category: null, dedupe: 0 } },
+    { name: 'ping', opts: { rate: 2.1, volume: 0.4, delay: 700, category: null, dedupe: 0 } },
+  ],
   // Circles of Hell: Hoellen-Charme (Sixth), Lavafontaene (Seventh), Flammenmeer der Gegnerseite (Fifth), Goldrausch (Fourth).
   hell_charm: [
     { name: 'elem_dark', opts: { rate: 0.65, volume: 1.0 } },
@@ -4298,7 +4309,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && wi
 
 // Handle session superseded by another tab
 socket.on('superseded', ({ reason }) => {
-  document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#1a1a2e;color:#fff;font-family:sans-serif;text-align:center;padding:20px"><div><h2 style="color:#ff6644">⚠️ Session Taken Over</h2><p style="color:#aaa;max-width:400px">${reason || 'This session was opened in another tab.'}</p><button onclick="location.reload()" style="margin-top:16px;padding:10px 24px;background:#4488ff;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:16px">Reload</button></div></div>`;
+  document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#1a1a2e;color:#fff;font-family:sans-serif;text-align:center;padding:20px"><div><h2 style="color:#e63e33">⚠️ Session Taken Over</h2><p style="color:#a8a8a8;max-width:400px">${reason || 'This session was opened in another tab.'}</p><button onclick="location.reload()" style="margin-top:16px;padding:10px 24px;background:#4580f6;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:16px">Reload</button></div></div>`;
 });
 
 // ===== CARD DB =====
@@ -5333,9 +5344,9 @@ function trimOverLimitCopies(deck) {
 }
 
 function typeColor(ct) {
-  const m = { Hero:'#aa44ff', 'Ascended Hero':'#6622aa', Creature:'#44dd44', Spell:'#ff4444',
-    Attack:'#ff4444', Artifact:'#ffd700', Potion:'#a0703c', Ability:'#44aaff', Token:'#888' };
-  return m[ct] || '#888';
+  const m = { Hero:'#a040ff', 'Ascended Hero':'#702db3', Creature:'#3ddc57', Spell:'#f03232',
+    Attack:'#f03232', Artifact:'#ffd61a', Potion:'#9d612f', Ability:'#1ca9fd', Token:'#7f7f7f' };
+  return m[ct] || '#7f7f7f';
 }
 
 function typeClass(ct) {
@@ -5378,12 +5389,12 @@ window.activeDragData = null; // shared drag tracker (cross-file)
 
 // Shine band gradient palettes
 const BAND_GRADIENTS = [
-  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.06) 8%, rgba(255,80,200,.4) 18%, rgba(80,160,255,.5) 28%, rgba(255,255,60,.4) 38%, rgba(60,255,160,.5) 48%, rgba(200,80,255,.45) 58%, rgba(255,160,60,.35) 68%, rgba(255,255,255,.06) 82%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.04) 10%, rgba(255,120,60,.35) 25%, rgba(255,60,180,.4) 40%, rgba(255,200,60,.35) 55%, rgba(255,80,80,.3) 70%, rgba(255,255,255,.04) 85%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.05) 12%, rgba(60,200,255,.35) 25%, rgba(60,255,200,.35) 40%, rgba(160,80,255,.3) 55%, rgba(80,180,255,.3) 70%, rgba(255,255,255,.05) 85%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.06) 8%, rgba(252,105,198,.4) 18%, rgba(109,155,248,.5) 28%, rgba(255,235,26,.4) 38%, rgba(102,255,162,.5) 48%, rgba(169,82,255,.45) 58%, rgba(255,155,58,.35) 68%, rgba(255,255,255,.06) 82%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.04) 10%, rgba(248,116,32,.35) 25%, rgba(251,30,169,.4) 40%, rgba(255,198,28,.35) 55%, rgba(254,81,84,.3) 70%, rgba(255,255,255,.04) 85%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.05) 12%, rgba(26,198,255,.35) 25%, rgba(104,253,193,.35) 40%, rgba(169,82,255,.3) 55%, rgba(102,182,255,.3) 70%, rgba(255,255,255,.05) 85%, transparent 100%)',
   'linear-gradient(to right, transparent 0%, transparent 20%, rgba(255,255,255,.5) 45%, rgba(255,255,255,.65) 50%, rgba(255,255,255,.5) 55%, transparent 80%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, rgba(255,200,100,.05) 10%, rgba(255,215,0,.35) 25%, rgba(255,180,60,.4) 40%, rgba(255,255,100,.3) 55%, rgba(255,200,60,.25) 70%, rgba(255,200,100,.05) 85%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, rgba(200,100,255,.05) 10%, rgba(160,60,255,.3) 25%, rgba(255,60,255,.35) 40%, rgba(100,60,255,.3) 55%, rgba(180,100,255,.25) 70%, rgba(200,100,255,.05) 85%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(251,200,106,.05) 10%, rgba(255,214,26,.35) 25%, rgba(249,172,32,.4) 40%, rgba(254,255,102,.3) 55%, rgba(255,198,28,.25) 70%, rgba(251,200,106,.05) 85%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(184,102,255,.05) 10%, rgba(160,64,255,.3) 25%, rgba(248,33,227,.35) 40%, rgba(117,31,249,.3) 55%, rgba(184,102,255,.25) 70%, rgba(184,102,255,.05) 85%, transparent 100%)',
 ];
 
 // ★ v1205 — Bandpalette der Diamond Rares (Als Vorgabe 18.9.:
@@ -5391,9 +5402,9 @@ const BAND_GRADIENTS = [
 // der Secret Rare: Diamond bleibt in Tuerkis/Aqua/Tiefblau mit weissem
 // Glanz, sonst sind die beiden Seltenheiten nicht auseinanderzuhalten.
 const DIAMOND_BAND_GRADIENTS = [
-  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.05) 10%, rgba(64,224,208,.42) 26%, rgba(150,255,245,.5) 40%, rgba(60,190,230,.42) 56%, rgba(40,150,225,.3) 72%, rgba(255,255,255,.05) 86%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, transparent 22%, rgba(200,255,250,.5) 44%, rgba(255,255,255,.7) 50%, rgba(200,255,250,.5) 56%, transparent 78%, transparent 100%)',
-  'linear-gradient(to right, transparent 0%, rgba(120,235,245,.06) 12%, rgba(45,175,205,.36) 28%, rgba(120,250,235,.44) 44%, rgba(80,200,255,.36) 60%, rgba(140,245,230,.26) 74%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.05) 10%, rgba(58,223,203,.42) 26%, rgba(124,233,220,.5) 40%, rgba(119,200,238,.42) 56%, rgba(57,158,223,.3) 72%, rgba(255,255,255,.05) 86%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, transparent 22%, rgba(178,238,238,.5) 44%, rgba(255,255,255,.7) 50%, rgba(178,238,238,.5) 56%, transparent 78%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(107,233,250,.06) 12%, rgba(7,174,197,.36) 28%, rgba(124,233,220,.44) 44%, rgba(104,198,253,.36) 60%, rgba(124,233,220,.26) 74%, transparent 100%)',
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -5484,33 +5495,33 @@ if (typeof CSSAnimation !== 'undefined' && typeof document.getAnimations === 'fu
 
 // Sparkle positions — secret rare (warm)
 const SPARKLE_POSITIONS = [
-  { x: 15, y: 20, color: '#ffe080', dur: 2.2, delay: 0 },
-  { x: 75, y: 12, color: '#80d0ff', dur: 2.5, delay: 0.4 },
-  { x: 45, y: 65, color: '#ff80d0', dur: 2.0, delay: 0.9 },
-  { x: 85, y: 50, color: '#80ffb0', dur: 2.7, delay: 1.3 },
-  { x: 25, y: 80, color: '#d080ff', dur: 2.3, delay: 1.7 },
+  { x: 15, y: 20, color: '#fbe181', dur: 2.2, delay: 0 },
+  { x: 75, y: 12, color: '#77c8ee', dur: 2.5, delay: 0.4 },
+  { x: 45, y: 65, color: '#fc69c6', dur: 2.0, delay: 0.9 },
+  { x: 85, y: 50, color: '#66ffa2', dur: 2.7, delay: 1.3 },
+  { x: 25, y: 80, color: '#c98aff', dur: 2.3, delay: 1.7 },
   { x: 60, y: 35, color: '#ffffff', dur: 1.9, delay: 0.6 },
-  { x: 10, y: 50, color: '#ffb060', dur: 2.6, delay: 2.0 },
-  { x: 90, y: 85, color: '#60d0ff', dur: 2.1, delay: 1.1 },
-  { x: 50, y: 10, color: '#ff60a0', dur: 2.4, delay: 0.2 },
-  { x: 35, y: 90, color: '#a0ff60', dur: 2.8, delay: 1.5 },
+  { x: 10, y: 50, color: '#f4ae64', dur: 2.6, delay: 2.0 },
+  { x: 90, y: 85, color: '#66d9ff', dur: 2.1, delay: 1.1 },
+  { x: 50, y: 10, color: '#fe6794', dur: 2.4, delay: 0.2 },
+  { x: 35, y: 90, color: '#cbff66', dur: 2.8, delay: 1.5 },
   { x: 70, y: 70, color: '#ffffff', dur: 2.0, delay: 0.8 },
-  { x: 20, y: 40, color: '#ffe0a0', dur: 2.3, delay: 1.9 },
+  { x: 20, y: 40, color: '#f9ecb3', dur: 2.3, delay: 1.9 },
 ];
 
 // Sparkle positions — diamond rare. ★ v1205: durchgehend tuerkis-blau,
 // weisse Glanzpunkte nur noch als Akzent dazwischen.
 const DIAMOND_SPARKLE_POSITIONS = [
   { x: 15, y: 10, color: '#ffffff', dur: 1.5, delay: 0.0 },
-  { x: 80, y: 8,  color: '#40e0d0', dur: 1.7, delay: 0.4 },
-  { x: 45, y: 28, color: '#8ff8ea', dur: 1.4, delay: 0.9 },
-  { x: 8,  y: 45, color: '#5ad7e8', dur: 1.6, delay: 0.2 },
+  { x: 80, y: 8,  color: '#3adfcb', dur: 1.7, delay: 0.4 },
+  { x: 45, y: 28, color: '#7ce9dc', dur: 1.4, delay: 0.9 },
+  { x: 8,  y: 45, color: '#6be9fa', dur: 1.6, delay: 0.2 },
   { x: 70, y: 42, color: '#ffffff', dur: 1.3, delay: 1.1 },
-  { x: 35, y: 55, color: '#48c8f0', dur: 1.8, delay: 0.6 },
-  { x: 88, y: 58, color: '#a8fff2', dur: 1.5, delay: 1.4 },
-  { x: 20, y: 75, color: '#40e0d0', dur: 1.4, delay: 0.3 },
+  { x: 35, y: 55, color: '#66d9ff', dur: 1.8, delay: 0.6 },
+  { x: 88, y: 58, color: '#7ce9dc', dur: 1.5, delay: 1.4 },
+  { x: 20, y: 75, color: '#3adfcb', dur: 1.4, delay: 0.3 },
   { x: 60, y: 72, color: '#ffffff', dur: 1.7, delay: 1.0 },
-  { x: 50, y: 90, color: '#6ae8dc', dur: 1.6, delay: 0.7 },
+  { x: 50, y: 90, color: '#7ce9dc', dur: 1.6, delay: 0.7 },
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -5577,7 +5588,7 @@ function makeFoilMotes(isDiamond, rnd = Math.random) {
   return Array.from({ length: FOIL_MOTE_COUNT }, (_, i) => ({
     x: 5 + rnd() * 90,
     y: 30 + rnd() * 65,                      // starten unten
-    color: isDiamond ? (i % 2 ? '#8ff3e4' : '#7fd8f5') : (i % 2 ? '#ffe6a8' : '#ffd0f0'),
+    color: isDiamond ? (i % 2 ? '#7ce9dc' : '#7fdfff') : (i % 2 ? '#f9ecb3' : '#f3bad3'),
     size: 1.5 + rnd() * 1.5,
     dur: 4.5 + rnd() * 4.5,
     delay: -rnd() * 9,
@@ -6158,7 +6169,7 @@ const PIXEL_ICONS = {
   ],
 };
 // '-' = Hauptfarbe gedimmt (inaktive Lautsprecher-Wellen).
-const PIXEL_ICON_FARBEN = { '#': 'currentColor', '+': '#ffffff', 'o': '#0b0712', '-': 'currentColor' };
+const PIXEL_ICON_FARBEN = { '#': 'currentColor', '+': '#ffffff', 'o': '#08060c', '-': 'currentColor' };
 const PIXEL_ICON_DECKUNG = { '-': 0.28 };
 const PIXEL_ICON_PFADE = {};
 function pixelIconPfade(rows) {
@@ -6370,7 +6381,7 @@ function spawnZoneLandFx(el, opts) {
   // Lite-Modus in style.css.
   const sparsam = window.matchMedia
     && window.matchMedia('(pointer: coarse) and (max-height: 600px)').matches;
-  const farbe = opts.color || '#ffd77a';
+  const farbe = opts.color || '#fbe181';
   // Grosse Zonen bekommen etwas mehr Funken als kleine, damit der
   // Einschlag auf einer 64-px-Karte nicht zur Konfettikanone wird.
   const n = Math.round((sparsam ? 5 : 10) * Math.min(1.5, Math.max(.7, r.width / 70)));
@@ -7027,7 +7038,7 @@ function spawnZoneLandFxBatch(liste) {
  */
 function zoneLandStyle(cardName) {
   const c = cardName ? window.CARDS_BY_NAME[cardName] : null;
-  if (!c) return { color: '#ffd77a', variant: null };
+  if (!c) return { color: '#fbe181', variant: null };
   const t = c.cardType || '';
   const istKreatur = t.includes('Creature') || (t === 'Token' && c.hp != null);
   return { color: typeColor(t), variant: istKreatur ? 'summon' : null };
@@ -7188,8 +7199,8 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
             <div className="card-stats">
               {card.level != null && <span>Lv{card.level}</span>}
               {card.hp != null && <span style={{ color: '#ff6666' }}>♥{card.hp}</span>}
-              {card.atk != null && <span style={{ color: '#ffaa44' }}>⚔{card.atk}</span>}
-              {card.cost != null && <span style={{ color: '#44aaff' }}>◆{cardCostText(card)}</span>}
+              {card.atk != null && <span style={{ color: '#ff9b3a' }}>⚔{card.atk}</span>}
+              {card.cost != null && <span style={{ color: '#1ca9fd' }}>◆{cardCostText(card)}</span>}
             </div>
           </>
         )}
@@ -7219,7 +7230,7 @@ function CardSideTooltip({ card, imgUrl, inGallery }) {
   const foilType = card.foil;
   const bonus = ascensionBonusText(card);
   const effectText = ttEffectText(card.effect, bonus);
-  const ttBorderColor = foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : '1px solid var(--bg4)';
+  const ttBorderColor = foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,214,26,.5)' : '1px solid var(--bg4)';
   // v1298: der grosse Tooltip zeigt IMMER die volle Foil-Schicht, auch
   // wenn er aus einer Kleinansicht (PileGrid) heraus aufgeht.
   return (
@@ -8243,14 +8254,14 @@ window.cardCostText = cardCostText;
 // HP gruen, ATK rot, Kosten (Artifacts) golden. Helle Toene, weil der
 // Tooltip auf dunklem Grund (`--bg2`) steht. Der Kartentyp traegt die
 // Farbe seiner Kartenart (`typeColor`) — AUSSER dem Ascended Hero: dessen
-// `typeColor` (#6622aa) ist fuer Karten-Rahmen gedacht und auf dem
+// `typeColor` (#702db3) ist fuer Karten-Rahmen gedacht und auf dem
 // dunklen Tooltip kaum zu lesen. Er bekommt ein helleres Violett, das sich
-// zugleich vom Lila des normalen Helden (#aa44ff) abhebt. Gilt fuer den
+// zugleich vom Lila des normalen Helden (#a040ff) abhebt. Gilt fuer den
 // Namen UND die Typzeile.
-const TT_HP_COLOR = '#4ade80';
-const TT_ATK_COLOR = '#ff5555';
-const TT_COST_COLOR = '#ffd700';
-const TT_ASCENDED_COLOR = '#c88dff';
+const TT_HP_COLOR = '#75f091';
+const TT_ATK_COLOR = '#fe5154';
+const TT_COST_COLOR = '#ffd61a';
+const TT_ASCENDED_COLOR = '#c98aff';
 function tooltipTypeColor(cardType) {
   return cardType === 'Ascended Hero' ? TT_ASCENDED_COLOR : typeColor(cardType);
 }
@@ -8261,17 +8272,17 @@ function tooltipTypeColor(cardType) {
 // Kartennamen in Anfuehrungszeichen hervorgehoben) und die Zusatzfelder (Orbs, geerbte Effekte). Alles im Pixel-Stil der
 // Karten und Menuefenster (CSS: „KARTEN-TOOLTIP IM PIXEL-STIL" in style.css). Beide Tooltips (Spielbrett und Menues/Galerie)
 // bauen sich aus denselben Stuecken, damit sie nicht auseinanderlaufen.
-const TT_QUOTE_COLOR = '#9ecbff';
-const TT_GOLD_NOTE = '#ffcc44';
-const TT_NEUTRAL = '#8a8aa8';
+const TT_QUOTE_COLOR = '#b4cff8';
+const TT_GOLD_NOTE = '#fad54a';
+const TT_NEUTRAL = '#7e7d9b';
 const TT_SCHOOL_COLORS = {   // wie die Orbs von Beato (cards/effects/beato-the-butterfly-witch.js)
-  'Destruction Magic': '#ff4444', 'Decay Magic': '#aa44ff', 'Magic Arts': '#4488ff',
-  'Support Magic': '#ffdd44', 'Summoning Magic': '#44ff88',
+  'Destruction Magic': '#f03232', 'Decay Magic': '#a040ff', 'Magic Arts': '#4580f6',
+  'Support Magic': '#ffe23d', 'Summoning Magic': '#4ceb70',
 };
 
 /** "#rgb" / "#rrggbb" -> [r, g, b] */
 function ttRgb(hex) {
-  let h = String(hex || '#888888').replace('#', '');
+  let h = String(hex || '#7f7f7f').replace('#', '');
   if (h.length === 3) h = h.split('').map(c => c + c).join('');
   const n = parseInt(h, 16) || 0;
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
@@ -8289,7 +8300,7 @@ function ttFrame(color) {
   const key = String(color);
   let url = _ttFrames.get(key);
   if (url) return url;
-  const K = '#05040a', lit = ttMix(key, '#ffffff', .45), mid = key, dark = ttMix(key, '#000000', .5);
+  const K = '#08060c', lit = ttMix(key, '#ffffff', .45), mid = key, dark = ttMix(key, '#000000', .5);
   const r = (x, y, c) => `<rect x='${x}' y='${y}' width='1' height='1' fill='${c}'/>`;
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='5' height='5' shape-rendering='crispEdges'>` + [
     r(1, 0, K), r(0, 1, K), r(1, 1, lit),                 // oben links (Ecke abgeschnitten)
@@ -8329,7 +8340,7 @@ function TTHeader({ card, name, level, levelBonus }) {
         <TTChip color={color}>{card.cardType}</TTChip>
         {card.subtype && <TTChip>{card.subtype}</TTChip>}
         {card.archetype && <TTChip>{card.archetype}</TTChip>}
-        {level != null && <TTChip color={levelBonus > 0 ? '#c4a8ff' : undefined}>Lv {level}{levelBonus > 0 ? ` (+${levelBonus})` : ''}</TTChip>}
+        {level != null && <TTChip color={levelBonus > 0 ? '#d6b3f9' : undefined}>Lv {level}{levelBonus > 0 ? ` (+${levelBonus})` : ''}</TTChip>}
         {schools.map(sc => <TTChip key={sc} color={TT_SCHOOL_COLORS[sc]}>{sc}</TTChip>)}
       </div>
     </div>
@@ -8391,7 +8402,7 @@ function TTCallout({ color, title, children }) {
 // und Farben kommen aus dem Kartenrenderer (`CardRender.STATUS_TERMS` / `statusMatches`), damit Bild und Tooltip nie auseinanderlaufen.
 // NUR im Effekttext, nie in Namen: Kartennamen im Text stehen in Anfuehrungszeichen und bleiben unberuehrt.
 // Darunter steht fuer jeden erwaehnten Status ein Remindertext (`TTStatusReminders`).
-const TT_STATUS_BOX = '#a3a9bd';
+const TT_STATUS_BOX = '#9aa3b6';
 // Die Remindertexte sind die Definitionen aus den Regeln des Spiels (`RulesScreen`, Abschnitt „Status Effects“ in app-screens.jsx), Wort
 // fuer Wort — `scripts/check-status-terms.js` haelt sie gleich. Negate hat dort keinen eigenen Eintrag; der Text steht nur hier.
 const TT_STATUS_REMINDER = {
@@ -8693,8 +8704,8 @@ function CardTooltipContent({ card, children, imageUrl }) {
         <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
           <TooltipCardImage card={card} src={imgUrl} hp={bildHp} stufe={stufe} style={{
             width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
-            border: foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)'
-                 : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : 'none'
+            border: foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)'
+                 : foilType === 'secret_rare' ? '2px solid rgba(255,214,26,.5)' : 'none'
           }} />
           <CardFoil card={card} skin={skinOfUrl(imgUrl)} />
         </div>
@@ -9091,11 +9102,11 @@ function tutorialStartsWithAntonia(num) {
 // Wie `_antoniaPresent` ein sequenzuebergreifender Zustand
 // mit Mini-Abo, weil Textbox (app-shared) und Brett (app-board) ihn
 // getrennt lesen und schreiben.
-// Beide tragen die Gegnerfarbe (`NICHT_MENSCH_FARBE` im Server, #ff4444):
+// Beide tragen die Gegnerfarbe (`NICHT_MENSCH_FARBE` im Server, #f03232):
 // die Textbox soll in der Farbe der Gegnerseite stehen, nicht in Cyan.
 const TUTORIAL_GEGNER = {
-  monia:   { key: 'monia',   name: 'Monia Bot', avatar: '/MoniaBot.png', color: '#ff4444' },
-  antonia: { key: 'antonia', name: 'Antonia',   avatar: ANTONIA_PORTRAIT, color: '#ff4444' },
+  monia:   { key: 'monia',   name: 'Monia Bot', avatar: '/MoniaBot.png', color: '#f03232' },
+  antonia: { key: 'antonia', name: 'Antonia',   avatar: ANTONIA_PORTRAIT, color: '#f03232' },
 };
 const MONIA_PORTRAIT = '/MoniaBot.png';
 
@@ -9500,7 +9511,7 @@ function TextBox() {
       if (window._currentTutorialNum) setTutorialGegner('antonia');
       // Monias Portraetrahmen fliegt aus dem Bild (nach oben links).
       const wurf = frame.cloneNode(true);
-      wurf.style.setProperty('--tb-seite', getComputedStyle(frame).getPropertyValue('--tb-seite') || '#ff4444');
+      wurf.style.setProperty('--tb-seite', getComputedStyle(frame).getPropertyValue('--tb-seite') || '#f03232');
       fest(wurf, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px', margin: '0' });
       wurf.animate([
         { transform: 'translate(0,0) rotate(0deg) scale(1)', opacity: 1 },
@@ -9509,7 +9520,7 @@ function TextBox() {
       // Blitz am Einschlagpunkt
       const blitz = document.createElement('div');
       fest(blitz, { left: (mx - 90) + 'px', top: (my - 90) + 'px', width: '180px', height: '180px', borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,210,120,.7) 35%, rgba(255,120,60,0) 70%)' });
+        background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(251,200,106,.7) 35%, rgba(248,116,32,0) 70%)' });
       blitz.animate([{ transform: 'scale(.2)', opacity: 1 }, { transform: 'scale(1.7)', opacity: 0 }], { duration: 380, easing: 'ease-out', fill: 'forwards' });
       // Die Box wackelt.
       if (box) box.animate([
@@ -9964,7 +9975,7 @@ function atkWowStart(heldSelektor) {
   wurzel.appendChild(zahl);
   document.body.appendChild(wurzel);
   const wertEl = zahl.querySelector('.atk-wow-wert');
-  const FARBEN = ['#ffd34d', '#ff9a00', '#ff5a1f', '#ffffff', '#ffe9a0'];
+  const FARBEN = ['#fad54a', '#ff9a1a', '#ff491a', '#ffffff', '#f9ecb3'];
   const ring = (verzoegerung, groesse) => {
     const e = document.createElement('div');
     e.className = 'atk-wow-ring';
@@ -10060,7 +10071,7 @@ const TUTORIAL_SCRIPTS = {
         highlights: [
           '.game-hand-me [data-card-name="Magic Hammer"]',
         ] },
-      { text: 'And see your Ida? She has {#88ccee:**Destruction Magic**}, so she CAN use **Destruction Spells** like Magic Hammer - but her Ability is only at level 2. She only has 2 copies of it attached to her.',
+      { text: 'And see your Ida? She has {#77c8ee:**Destruction Magic**}, so she CAN use **Destruction Spells** like Magic Hammer - but her Ability is only at level 2. She only has 2 copies of it attached to her.',
         highlights: [
           '.game-hand-me [data-card-name="Magic Hammer"]',
           '[data-ability-owner="me"][data-card-name="Destruction Magic"]',
@@ -10131,7 +10142,7 @@ const TUTORIAL_SCRIPTS = {
   3: (() => {
     // Antonia (rechts): als „Jetpack Raccoon" gefuehrt, bis sie sich in
     // Tutorial 5 vorstellt; ALLE ihre Texte wackeln (`shakeText`).
-    const A = (text, extra) => ({ text, side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true, ...extra });
+    const A = (text, extra) => ({ text, side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#f03232', shakeText: true, ...extra });
     // Monia im Epilog: ausgebremst, daher Silber statt Rot.
     const M = (text) => ({ text, speakerName: 'Monia Bot', nameColor: 'silver' });
     return {
@@ -10217,7 +10228,7 @@ const TUTORIAL_SCRIPTS = {
       // ── Highlight: Reiza ──
       { text: 'Your Hero {purple:**Reiza**} applies {purple:**Poison**} and {yellow:**Stun**} to whatever she hits.',
         highlights: [REIZA] },
-      { text: "Stun, as well as {#88ddff:**Freeze**}, prevents a target from taking Actions and negates its effects and Abilities. You can use it to control your opponent's options.",
+      { text: "Stun, as well as {#7fdfff:**Freeze**}, prevents a target from taking Actions and negates its effects and Abilities. You can use it to control your opponent's options.",
         highlights: [REIZA] },
       { text: 'And Poison is 30 bonus damage every turn - dealt at the **start of the poisoned player\'s turn**.',
         highlights: [REIZA] },
@@ -10250,7 +10261,7 @@ const TUTORIAL_SCRIPTS = {
     ],
     outro: [
       { text: 'Perfect, beep-boop!' },
-      { text: 'You can use {yellow:**Stun**}, {#88ddff:**Freeze**} and other inhibiting status effects to slow your opponent down, while {purple:**Poison**} and {orange:**Burn**} whittle them down!' },
+      { text: 'You can use {yellow:**Stun**}, {#7fdfff:**Freeze**} and other inhibiting status effects to slow your opponent down, while {purple:**Poison**} and {orange:**Burn**} whittle them down!' },
       { text: 'With one caveat:\nAfter an inhibiting status effect runs out on a target, it becomes **immune** to further non-damaging status effects for 1 turn!' },
       { text: 'You have to time your status effects properly if you want to truly control the flow of the battle!' },
       { text: 'You got that?\nNice!' },
@@ -10269,10 +10280,10 @@ const TUTORIAL_SCRIPTS = {
     const ALLE_KARTEN = ['.zone-has-card', '.game-hand-me [data-card-name]'];
     // Antonia (rechts), alle Texte wackeln. Bis zu ihrer Vorstellung heisst
     // sie „Jetpack Raccoon", danach „Antonia".
-    const A = (text, extra) => ({ text, side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true, ...extra });
+    const A = (text, extra) => ({ text, side: 'right', speakerName: 'Antonia', nameColor: '#f03232', shakeText: true, ...extra });
     const AJ = (text, extra) => A(text, { speakerName: 'Jetpack Raccoon', ...extra });
     // Antonia im Epilog: LINKS, an Monias Stelle, nachdem sie sie umgerannt hat.
-    const AL = (text, extra) => ({ text, portrait: ANTONIA_PORTRAIT, speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true, ...extra });
+    const AL = (text, extra) => ({ text, portrait: ANTONIA_PORTRAIT, speakerName: 'Antonia', nameColor: '#f03232', shakeText: true, ...extra });
     return {
     opts: { rightSpeaker: '/Antonia.png', rightSpeakerName: 'Antonia' },
     // Kein `nurActionPhase`: das Raetsel handelt vom Gold-Einkommen — das
@@ -10283,7 +10294,7 @@ const TUTORIAL_SCRIPTS = {
       { text: 'Heya!\nWelcome back!' },
       { text: "So far, we've looked at different ways for your Heroes to deal damage or summon Creatures to do that for you." },
       // ── Highlight: Book of Doom und Lifeforce Howitzer ──
-      { text: 'However, there are also other ways.\n{#ffd700:**Artifacts**} are cards that you play by spending **Gold**...',
+      { text: 'However, there are also other ways.\n{#ffd61a:**Artifacts**} are cards that you play by spending **Gold**...',
         highlights: [BOOK, HOWITZER] },
       // ── Antonia tritt rechts auf, die Musik wechselt, alle Highlights aus ──
       AJ("**GOLDS???**\nWhere's de Gold?\nI wants itttt!", { enterRight: true }),
@@ -10323,7 +10334,7 @@ const TUTORIAL_SCRIPTS = {
         { highlights: [BOOK, HOWITZER, ALCHEMY] }),
       // ── Tipp (Tester: das Raetsel verlangt drei Abilities, die man noch nie brauchte) ──
       // ── Highlight: Alchemy, Adventurousness UND beide Main Phases in der Phasenleiste ──
-      A("Want a lil' hint...? Khehehe! Some {#4488ff:**Abilities**} can be activated during da **Main Phase** or even da **Action Phase**!",
+      A("Want a lil' hint...? Khehehe! Some {#4580f6:**Abilities**} can be activated during da **Main Phase** or even da **Action Phase**!",
         { highlights: [
           ALCHEMY, ADVENTUROUSNESS,
           { selector: '.board-phase-tracker', an: ['[data-phase-name="Main Phase 1"]', '[data-phase-name="Main Phase 2"]'] },
@@ -10349,7 +10360,7 @@ const TUTORIAL_SCRIPTS = {
       { text: 'So!\nYou did it! Great job, beep-boop!' },
       { text: 'As you can see, **Gold** can be an excellent way to apply damage, along with many other things! It can even be worth inflicting your own Hero with Poison to get access to more of it.' },
       // ── Highlight: Alchemy ──
-      { text: 'And **Alchemy** and the {#a0703c:**Potions**} it provides can be incredibly valuable cards as well!',
+      { text: 'And **Alchemy** and the {#9d612f:**Potions**} it provides can be incredibly valuable cards as well!',
         highlights: [ALCHEMY] },
       { text: "I feel like you're really starting to get a hang of things!\nNext time-",
         highlights: [ALCHEMY] },
@@ -10368,7 +10379,7 @@ const TUTORIAL_SCRIPTS = {
     // Antonia ist die einzige Sprecherin und steht durchgehend LINKS — kein
     // Auftritt, kein Abgang, kein Monia Bot. Name und Farbe stehen an jeder
     // Seite (der Namenslauf liest sie von den Seiten), alle Texte wackeln.
-    const A = (text, extra) => ({ text, speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true, ...extra });
+    const A = (text, extra) => ({ text, speakerName: 'Antonia', nameColor: '#f03232', shakeText: true, ...extra });
     // Ab „Now - look-see ..." bis zum Ende der Einleitung: Deepsea Castle.
     const AC = (text) => A(text, { highlights: [CASTLE] });
     return {
@@ -10409,7 +10420,7 @@ const TUTORIAL_SCRIPTS = {
     const BEATO = '[data-hero-zone][data-hero-owner="me"][data-hero-name^="Beato"]';
     const DECK = '[data-my-deck="1"]';
     // Antonia steht wieder allein links, durchgehend. Alle Texte wackeln.
-    const A = (text, extra) => ({ text, speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true, ...extra });
+    const A = (text, extra) => ({ text, speakerName: 'Antonia', nameColor: '#f03232', shakeText: true, ...extra });
     return {
     opts: { speaker: '/Antonia.png', speakerName: 'Antonia' },
     // Letztes Tutorial: nach dem Epilog Feuerwerk und langsames Ausblenden
@@ -10431,7 +10442,7 @@ const TUTORIAL_SCRIPTS = {
     outro: [
       A("Daaaat's it, dat's a good lil' minion!"),
       A("Alrighty - as promised, ya're now my *official* minion!"),
-      A("Dat means ya're now **allowed** to use my Golds in games, earn **delicious, delicious** {#ffd700:**Smug Coins**} with games, and bring 'em to me in my {#ffd700:**Shop**}!"),
+      A("Dat means ya're now **allowed** to use my Golds in games, earn **delicious, delicious** {#ffd61a:**Smug Coins**} with games, and bring 'em to me in my {#ffd61a:**Shop**}!"),
       A("And don't worry about de Golds - it aaaaaall finds its way back to the GRRRRREAT Antonia again anyway, khehehehehe!"),
     ],
     };

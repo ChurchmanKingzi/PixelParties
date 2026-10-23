@@ -228,8 +228,9 @@ Nur im Minigames-Kanal (fest eingestellt auf `1561796630762623036`; andere Kanä
 * Einstellbar in `bot/.env` (alles optional): `PIXLE_MAX_GUESSES=10` (je Spiel), `PIXLE_REWARD=30`, `PIXLE_PENALTY=3`.
 
 ### Feeds und Gemeinschaft
-* **Neue Karten:** Ändert sich `data/cards.json` (z. B. durch ein Deploy), postet der Bot die neuen Karten als Bilder
-  in `NEW_CARDS_CHANNEL_ID`. Der allererste Lauf merkt sich nur den Bestand.
+* **Neue Karten:** Ändert sich `data/cards.json` (z. B. durch ein Deploy), postet der Bot jede neue Karte (mit Kartenbild) als eigene Nachricht — nur das Bild
+  mit der Tagline `**New card beep-boop:**` — in den Kanal für neue Karten (Standard `774670375303905291`, überschreibbar mit `NEW_CARDS_CHANNEL_ID`).
+  Der allererste Lauf merkt sich nur den Bestand. Eine neue Karte erscheint erst, wenn ihr Kartenbild vorhanden ist (`data/card-art/index.json`).
 * **Patchnotes:** Karten, deren Eintrag in `data/cards.json` sich seit dem letzten Stand **verändert** hat (Text, HP, ATK, Kosten, Level …), werden als **Bilder**
   in `PATCHNOTES_CHANNEL_ID` gepostet, mit dem Hinweis, was sich geändert hat („changed: effect text, HP“). Commit-Texte erscheinen nicht. Ganz neue Karten
   kommen nicht hierher, sondern in den Feed für neue Karten; rein interne Felder (`skilltestLegal`, `setID`) lösen nichts aus.
