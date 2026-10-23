@@ -41,6 +41,8 @@ Geändert: `cards/effects/_engine.js`, `server.js` (`doPlaySpell`, Equip/Artefak
 
 ## Rückfragen an Al
 
+> **W64c (23.10.2026):** alle drei beantwortet — 1. Bounce → Hand des aktuellen **Kontrolleurs** (Herkunft bleibt; W63c-Annahme zurückgenommen), 2. Coolness Stack: ja, 3. Core/Gun: Ablage des Kontrolleurs (Ist-Zustand). Siehe `FIXES-WELLE-64c.md`.
+
 1. **Bounce einer gestohlenen/übernommenen Kreatur** (Text ohne „YOUR hand"): Hand des **Besitzers** (neu) statt des Kontrolleurs — ja/nein?
 2. **Coolness Stack**: Stapel gehört dem Halter, Ablage/Löschen/Hand-Rückgabe gehören dem Besitzer der Karte — ja/nein?
 3. **Core/Gun an übernommenem Helden**: weiter die Ablage des Kontrolleurs (Ruling W58/W28a) — ja/nein?

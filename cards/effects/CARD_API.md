@@ -8,6 +8,55 @@ available on the `ctx` object inside hooks.
 
 ---
 
+## ★★★ KARTEN GEHEN IMMER IN DIE STAPEL IHRES PERMANENTEN BESITZERS — OHNE AUSNAHMEN (Al, 23.10.2026 — MANDATORY, zentral + Wächter)
+
+> Al: „Karten gehen **IMMER** in die Stapel (Decks, Potion-Deck, Discard, Deleted-Pile) ihres **permanenten Besitzers**. IMMER. Da gibt es keine Ausnahmen."
+> (Vorläufer: W3/Welle 5 14.10., W63c 22.10. — ab jetzt als verbindlicher Vertrag, keine Rückfragen mehr nötig.)
+
+**Die Regel.** Jede Karte hat genau einen permanenten Besitzer: den Spieler, dessen Deck sie zu Spielbeginn war (oder dessen Karte sie entsteht). Eigentum wandert NIE —
+nicht durch Diebstahl (Charme Lv 2, Thieving Strike, Loot the Leftovers …), Geschenk (Cool Presents …), Kontrollwechsel (Hunting, Dark Gear, Diplomacy, Capture, Chilly Wizard …),
+Übernahme eines Helden (Charme Lv 3, Paraseed), seitenfremde Beschwörung (Styx), Gegner-Zugriff („send a card from your opponent's hand/board to the discard pile") oder Unterkarten (angelegter Held, Spell unter dem Buddy).
+Verlässt eine Karte das Spiel bzw. die Hand/das Brett Richtung **Ablage, Löschstapel, Deck (zurückmischen, Deckboden/-spitze) oder Potion Deck**, landet sie im Stapel des BESITZERS. Das gilt auch für Texte,
+die „your discard pile / your deck" sagen: gemeint ist der Stapel des Besitzers der Karte.
+
+**Zwei Dinge, die NICHT dazugehören (nicht verwechseln).**
+* *Wo die Karte gerade LIEGT* (Hand, Brett) ist Sache von Kontrolle und Kartentext: eine gestohlene Karte liegt in der Hand des Diebs, eine übernommene Kreatur steht beim Kontrolleur, und ein **Bounce** (Brett → Hand) geht in die
+  Hand des aktuellen **Kontrolleurs** (Al 23.10.) — die Herkunftsmarke (`_handOriginals` / `originalOwner`) bleibt dabei erhalten, sodass der spätere Austritt aus der Hand wieder zum Besitzer geht. Texte mit ausdrücklichem
+  „(original) owner's hand" (Racket Arrow, Chasing the Legend) nennen die Hand des Besitzers (`toPlayer: engine.kartenBesitzerVon(inst)`).
+* *Zähler und Bedingungen* („Karten in deiner Ablage", Core/Gun) beziehen sich auf den KONTROLLEUR — es geht nur darum, in WESSEN Stapel eine Karte LIEGT (Core/Gun: Ruling W58/W28a, von Al bestätigt: „gezählt wird die Ablage des Spielers, der den ausgerüsteten Helden aktuell kontrolliert").
+
+**Helfer (benutzen, nicht nachbauen).**
+| Situation | Helfer |
+|---|---|
+| Handkarte per Skript entnommen (`takeFromPileSync(…,'hand',…)`) und abgelegt/gelöscht/ins Deck gelegt | `engine.handKartenBesitzerPs(ps, name)` → `.discardPile/.deletedPile/.mainDeck.push(name)` (verbraucht die Herkunft; Aufruf NACH dem Splice) |
+| Handkarte unverrichtet zurück auf die Hand | `engine.handZugangRueckgabe(ps, name, opts)` (statt `handZugangSync`) |
+| Flug (`play_pile_transfer`) einer Handkarte VOR dem Splice | `engine._pileOwnerFlug(ps, name, handIdx)` (`fromOwner/toOwner`) |
+| Brettkarte (Kreatur, Ausrüstung, Anhängsel, Ability, Surprise, Area) in einen Stapel | `engine.gs.players[engine.kartenBesitzerVon(inst)]` (`originalOwner ?? owner`), nie `inst.owner`/`controller`/`ps` des Wirkers; Tokens: `engine.tokenAbgang(inst)` (kein Stapel) |
+| Karte aus der FREMDEN Ablage/Hand/dem Deck auf die eigene Hand | `engine.addCardFromDiscardToHand`, `actionStealFromHand`, `handZugang(…, { originalOwner })`, `_tagHandCardOrigin(halter, name, besitzer)` — die Karte trägt danach die Herkunft |
+| Brett → Hand (Bounce) | `returnSupportCreatureToHand` / `actionMoveCard(inst, 'hand', …)`: Hand des Kontrolleurs, Herkunft bleibt; Eigenbau: `handZugangSync(ps, name, { originalOwner: besitzer })`, wenn `besitzer !== ps` |
+| Unterkarte (angelegter Held unter Goff & Co.) | `counters.attachedHeroOwner` (setzt `actionAttachHeroToCreature`); beim Abgang der Träger-Kreatur folgt der Held in die Ablage DIESES Besitzers |
+| negierte Handkarte / negierte Platzierung | `routeNegatedInitialCard` / `_negatedPlacementRoute` (routen zentral zum Besitzer — nicht selbst pushen) |
+
+**Verbotene Muster** (jedes davon ist ein Verstoß, wenn die Karte jemandem anderen gehören KANN):
+* `ps.discardPile.push(CARD_NAME)` / `ps.deletedPile.push(CARD_NAME)` / `ps.mainDeck.push(CARD_NAME)` auf den Wirker/Halter für eine Karte, die aus der HAND kam (Selbst-Ablage nach `skipPostResolveDiscard`, `_spellPlacedOnBoard`, Fizzle-/Fallback-Ablage!) → `engine.handKartenBesitzerPs(ps, CARD_NAME).…`
+* `gs.players[inst.owner].discardPile.push(…)` / `…[inst.controller]…` / `…[sourceOwner]…` für eine Brettkarte → `kartenBesitzerVon(inst)`
+* `ps.mainDeck.push(inst.name)` für eine Kreatur auf dem Brett („shuffle that Creature back into your deck", Staff/Create Illusion) → Deck des Besitzers
+* eine fremde Karte per `hand.push(name)` ohne Herkunft auf die Hand legen (→ `handZugang…({ originalOwner })` / `_tagHandCardOrigin`)
+* `inst.originalOwner = <Spieler>` für eine Karte, die aus der HAND kam, ohne den Besitzer zu fragen (die Herkunft ist gesperrt — Überschreiben wirkungslos, aber ein Zeichen für ein falsches Modell)
+* Stapel einer Karte nach dem NAMEN raten („wem gehört ‚Fireball'?") — bei gleichnamigen Karten verschiedener Besitzer zählt die Herkunft des Platzes/der Instanz
+
+**Prüfliste für neue Karten** (vor dem Commit):
+1. Legt mein Skript irgendwo Karten in Ablage/Löschstapel/Deck/Potion Deck? → Grep `discardPile|deletedPile|mainDeck|potionDeck` + `push|unshift|splice` in der Datei: jede Stelle braucht den Besitzer-Helfer aus der Tabelle (Ausnahme: Karten, die aus DEM EIGENEN Stapel desselben Spielers kommen, z. B. Mill/Deck → Ablage desselben Decks).
+2. Kann die Karte (oder das, was sie bewegt) aus einer fremden Hand/einem fremden Stapel/Brett stammen? → Herkunft prüfen/mitgeben.
+3. Karte per Skript auf das Brett: `safePlaceInSupport`/`summonCreatureWithHooks` (Netz stempelt die Herkunft) — nie selbst `originalOwner` des Spielers setzen.
+4. Gegner-Zugriff („send … from your opponent's hand/board to the discard pile"): `actionDiscardHandCard(opp, …)` / `sendBoardCardToDiscard(inst)` benutzen — die lösen den Besitzer auf.
+5. Repro: Karte als gestohlene Handkarte (`actionStealFromHand`) spielen/abwerfen UND als übernommene Kreatur (`actionTransferCreature`) sterben/bouncen lassen, mit dem Besitzer-Wächter: `PP_OWNER_GUARD=strict node dein-repro.js` (`docs/niche-tests/lib/besitzer.js` → `waechter(t)`; Details: Abschnitt „Welle 64 / W64c").
+
+**Durchsetzung.** Zentral: Platzmarken + Fremd-Abgangsbuch + Brett-Netz (W63c), negierte Karten, Bounce, Unterkarten (W64c). Prüfung: der generische Besitzer-Wächter (`PP_OWNER_GUARD=1`, nicht standardmäßig an) instrumentiert die vier Stapel jedes Sitzes
+und meldet jede Karte in einem Stapel eines Nicht-Besitzers; die Sweeps `docs/niche-tests/repro/W64/c-02` (gestohlene Handkarte, alle Karten) und `c-05` (Gegner-/Übernahme-Zugriffe, alle Karten) laufen ihn über die ganze Kartenmenge.
+
+---
+
 ## ★★★ DIE STILLEN FEHLSCHLÄGE — LESEN, BEVOR DU EINE KARTE BAUST
 
 > Zusammengetragen am 18.9.2026 beim Bau von „Tempeluna, the Convergence
@@ -23817,6 +23866,8 @@ Methode: (a) Quellenaudit aller 387 Spell-Skripte (Flags `_spellKeepInstance`, `
 3. Stirbt ein Buddy, landet die Spell-Karte darunter im **Gelöscht-Stapel** (W5a „Unterkarte"): gewollt, oder soll der Buddy rückstandslos verschwinden (Karte nie in einem Stapel)? Derzeit **Gelöscht-Stapel**.
 ## Welle 63 / W63c — Besitzer-Regel für gestohlene, geschenkte und übernommene Karten (Charme Lv 2 & alle Verwandten)
 
+> **W64c (Al 23.10.2026) ändert zwei Punkte dieses Abschnitts:** (1) „Bounce einer gestohlenen/übernommenen Kreatur → Hand des BESITZERS" ist **zurückgenommen** — ein Bounce (Brett → Hand) geht in die Hand des aktuellen KONTROLLEURS, die Herkunft bleibt (Rückfrage 1 unten: entschieden). Die Stapel-Regel (Ablage/Löschstapel/Deck/Potion Deck → Besitzer) bleibt unverändert und gilt jetzt als Vertrag ohne Ausnahmen (Abschnitt ganz oben, Details in „Welle 64 / W64c"). (2) Rückfragen 2 (Coolness Stack) und 3 (Core/Gun) sind **bestätigt** (Core/Gun: Ablage des aktuellen Kontrolleurs, Ist-Zustand).
+
 Befund von Al (Spieldesigner): „Karten, die via Charme Lv 2 gestohlen werden, landen beim Abwerfen/Deleten und vermutlich auch beim Mischen ins Deck in den Piles ihres **Diebes** statt beim ursprünglichen Besitzer." Die Regel selbst steht seit Welle 5 (W3, Al 14.10.2026: „Karten landen *immer* im Deck/Discard/Deleted Pile ihres **permanenten Besitzers**, durch alles."): Ablage, Löschstapel, Deck, Potion Deck und Hand-Rückgabe gehören dem BESITZER, egal wer die Karte hält oder kontrolliert; nur ein Kartentext mit „YOUR …" ändert das (dann `opts.toPlayer`, die Karte bleibt aber Eigentum des Besitzers). Gerade dort ist **der Dieb-Weg** (Hand eines anderen Spielers) lückenhaft gewesen.
 
 ### 1) Ursache — die Herkunft hing nur an EINEM Teil der Wege
@@ -23989,3 +24040,94 @@ Kreatur-Modus: spielbar mit 3 freien Zonen ODER (Alice aktiv + geteilte Zone fü
 | `W63/a-05-bewegen-memory-blast-jumper-spider-puppet-kein-on-summon.js` | Memory Blast, Jumper Spider, Puppet, Paraseed Greenhouse | 46 |
 | `W63/a-06-reincarnation-geteilte-zone-statt-dritter-freier.js` | Reincarnation Kreatur-Modus, Mensch + CPU | 118 |
 Angepasst: `W62/a-01`, `W62/a-04` (Reihenfolge geteilt vor frei).
+
+## Welle 64 / W64c — „Karten gehen IMMER in die Stapel ihres permanenten Besitzers" (Vertrag, Wächter, Sweep) · Bounce → Kontrolleur · Unterkarten · Diplomacy = Dark Gear
+
+Vertragsabsatz: ganz oben in dieser Datei („★★★ KARTEN GEHEN IMMER IN DIE STAPEL IHRES PERMANENTEN BESITZERS — OHNE AUSNAHMEN"; Helfer-Tabelle, verbotene Muster, Prüfliste für neue Karten). Repros `docs/niche-tests/repro/W64/c-02 … c-08`, Wächter `docs/niche-tests/lib/besitzer.js`. Sammelübersicht: `docs/niche-tests/FIXES-WELLE-64c.md`.
+
+### 1) Entscheidungen von Al (23.10.2026)
+1. **Allgemeine Regel, „IMMER, ohne Ausnahmen":** Karten gehen immer in die Stapel (Decks, Potion Deck, Ablage, Löschstapel) ihres permanenten Besitzers (Charme, Hunting, Diebstahl, Kontrollwechsel eingeschlossen). Kein Nachfragen mehr — so im Vertragsabsatz festgehalten.
+2. **Bounce geht an den AKTUELLEN KONTROLLEUR** (Brett → Hand: return to hand, Bounce, Deepsea-Tausch, `returnSupportCreatureToHand`, `actionMoveCard` Brett → Hand) — auch bei `originalOwner ≠ owner` (Hunting 2/3, Dark Gear, Diplomacy, Charme-Diebstahl). **Das nimmt „Bounce → Hand des Besitzers" aus W63c zurück** (dortige Rückfrage 1: entschieden). Die HERKUNFT bleibt: Platzmarke `_handOriginals`/`originalOwner` — Abwerfen, Löschen, Spielen, Mischen, Mulligan danach → Stapel des Besitzers.
+3. **Selbst-Bounce-Kreaturen** (Winged Skeleton, Moonlight Butterfly …) lösen nur der aktuelle Kontrolleur aus (W33a) — geprüft (Abschnitt 4).
+4. **Dark Deepsea God / Deepsea-Modul:** Opfer/Kosten = Kreaturen, die der Spieler AKTUELL KONTROLLIERT (nicht Besitz) — geprüft (Abschnitt 5).
+5. **Core/Gun:** „Gezählt wird die Ablage des Spielers, der aktuell den ausgerüsteten Helden kontrolliert" = Ist-Zustand (Ruling W58/W28a) — nur als entschieden dokumentiert, keine Änderung. **Coolness Stack:** verlässt eine Karte den Stack per Ablage/Löschen → Stapel des permanenten Besitzers; kommt sie auf die Hand, bleibt sie Eigentum des Besitzers — per Repro bestätigt (`c-08`, 84 Prüfungen).
+
+### 2) Der generische Besitzer-Wächter (`docs/niche-tests/lib/besitzer.js` → `waechter(t)`)
+* **Zuschalten:** `PP_OWNER_GUARD=1 node <repro>.js` (nicht standardmäßig an; `H.fresh` installiert ihn dann in jedem Szenenaufbau) · `PP_OWNER_GUARD=strict` → Exit 1 bei einem echten Verstoß · `PP_OWNER_GUARD_OUT=<datei>` hängt Verstöße als JSON-Zeilen an (Sammellauf). Im Test: `const w = B.waechter(t); … w.echte()` (Liste der Verstöße).
+* **Instrumentierung:** alle vier Stapel (`discardPile`, `deletedPile`, `mainDeck`, `potionDeck`) jedes Sitzes — Zugriffs-Wächter am Spieler + Überlagerung von `push/unshift/splice` am Array (kompatibel mit den Engine-Überlagerungen für Löschstapel/Root of all Evil; wird bei jedem Zugriff erneuert); Neuzuweisung `ps.discardPile = […]` wird per Multimengen-Vergleich geprüft.
+* **Besitzer-Buchführung** (`ledger[sitz][name]` = Exemplare, die dem Sitz GEHÖREN): Startbestand aus dem Aufbau, fortgeschrieben über die Aufbauhelfer der Harness (`t.put/putSurprise/putArea/setHand/addHand/setDeck/setDiscard/setAbilities/setHero/grantFor`) und direkte Schreibzugriffe der Test-Datei. Diebstahl, Geschenk, Kontrollwechsel ändern die Buchführung NICHT — Eigentum wandert nie. **Verstoß** = nach dem Ende der Aktion (`t.run`) / am Prozessende liegen in den Stapeln von Sitz P mehr Exemplare von N, als P besitzt, UND alle Exemplare von N im Spiel sind verbucht (sonst haben Effekt/Test Karten aus dem Nichts erzeugt → „unbekannt", keine Aussage) UND ein anderer Sitz besitzt N. Jeder Verstoß trägt den Aufrufweg (Skript-/Engine-Funktionen, Zeile) und Belege (`originalOwner`, `_handOriginals`, `_fremdAbgang`) **zum Zeitpunkt des Schreibens**.
+* **Klasse „test-aufbau"** (kein Befund): eine Instanz/Marke trägt als Besitzer den Sitz des Stapels, die Buchführung weiß es aber nicht — künstlicher Aufbau (`t.put` mit nachträglich gesetztem `originalOwner`). Klasse **„echt"** = echter Verstoß.
+* **Suite-Lauf** (alle 1299 Repros mit `PP_OWNER_GUARD=1`): 3 Treffer, **alle „test-aufbau"**: `W19/b-1` (Gold Trap, Test setzt `originalOwner = 1`), `A02-deepsea/03` (Analyzer from the Cosmic Depths) und `M01/08` (Boulder in a Bottle) — jeweils setzt der Test den Besitzer per Hand; die Engine folgt der Metadatenregel korrekt. Keine echten Verstöße in den vorhandenen Repros (W63c hat die dort geprüften Wege schon geschlossen).
+* **Sweeps** (decken die Karten ab, die kein Repro einzeln hatte): `W64/c-02` — jede Karte (Spell/Attack/Creature/Artifact/Potion/Ability) als GESTOHLENE Handkarte vom Dieb gespielt (reiche Szene, menschliche Antworten) bzw. abgeworfen, danach alle Brettinstanzen zerstört; `W64/c-05` — jede Karte spielt gegen eine Szene mit Gegnerhand/-brett/-decks/-ablage/-Potion-Deck (jeder Name nur bei EINEM Spieler) und einer dauerhaft übernommenen Gegnerkreatur, 3 Zielwahl-Politiken, danach 2× `endTurn`. Standard = Karten mit direkten Stapel-Schreibzugriffen im Skript (~25 s / ~10 s); `VOLL=1` (+ `ART=Spell|Attack|Creature|Artifact|Potion|Ability`) = ALLE Karten (~10 Min). **Grenze:** Reaktionen und Karten mit Spielbedingung bleiben bei `t.play` auf der Hand (c-02 meldet die Abdeckung: „x Läufe haben die Karte wirklich aufgelöst, y blieben auf der Hand"); deren Ablage läuft über die zentrale Kette (30 Stellen, W63c) bzw. wurde statisch durchgesehen (`skipPostResolveDiscard`-Karten, siehe Tabelle).
+
+### 3) Verstoß-Tabelle (Weg/Karte | Verstoß | Behebung)
+Methode: (a) Sweep/Wächter (dynamisch), (b) statische Durchsicht ALLER Stapel-Schreibstellen (`discardPile|deletedPile|mainDeck|potionDeck` + `push|unshift|splice`: ~300 in `_engine.js` [91], `server.js` [46], `_cpu.js` [2, nur Bewertungsproben], Karten-Skripten [~165]); Quellen: Sweep = „S", statisch = „St", Probe = „P".
+
+| Weg / Karte | Verstoß (vorher) | Behebung | Quelle |
+|---|---|---|---|
+| **Forbidden Zone**, **Liberation** (gestohlene Handkarte gespielt; `_spellPlacedOnBoard`-Muster) | Spell → **Löschstapel des Diebs** (`ps.deletedPile.push(CARD_NAME)`) | `engine.handKartenBesitzerPs(ps, CARD_NAME).deletedPile.push(…)`; Repro `c-02` | S (Spell-Sweep, 4 Treffer: 2 Karten × 2 Sitze) |
+| **Magic Topaz** (Reaktion, „keep in hand" abgelehnt), **Rebelliokai Courtly Kirin** (Fallback-Ablage), **Front Soldier** (Fallback-Ablage) | `skipPostResolveDiscard`-Karten legen sich selbst in die Ablage des Halters | `handKartenBesitzerPs(ps, CARD_NAME).discardPile` | St (`skipPostResolveDiscard`: Topaz, Kirin, Front Soldier, Lunar Eclipse [Surprise, ok], Magic Gems über Engine) |
+| **Negierte Handkarte** (`routeNegatedInitialCard`: Ablage / Löschstapel [Lunar Eclipse] / zurück ins Deck [Off Duty]) | Server ruft mit dem Halter (`pi`): negierte gestohlene Karte → Stapel des Halters (Ablage, Löschstapel, Deck) | zentral: bei Quelle Hand `handKartenBesitzerPs` (Stapelbesitzer-Aufrufe bleiben unberührt); Repro `c-07` (26 ✗ vorher) | St |
+| **Negierte Platzierung** aus der Hand (`_negatedPlacementRoute`) | wie oben | zentral: Quelle `hand`/`handGone` → Besitzer | St |
+| **Staff of Illusions / Create Illusion** (`_illusionenZurueck`, „shuffle … back into your deck") | vom Dieb aus der gestohlenen Hand beschworene Kreatur → Deck des Diebs | Deck des Besitzers (`kartenBesitzerVon(inst)`); Repro `c-07` | St |
+| **Unterkarte: angelegter Held** (Goff + Gon, Clausss, Smug…, Dream Lander: `actionAttachHeroToCreature`) | Held folgt IMMER dem Besitzer der Träger-Kreatur: übernommene Kreatur + eigener Held → Ablage des Gegners; gestohlene Held-Handkarte → Ablage des Diebs | `counters.attachedHeroOwner` (Besitzer der Heldenkarte, aus Handherkunft); Abgang (Tod, `heldFolgtAbgang`) → dessen Ablage; Repro `c-06` (16 ✗ vorher) | St + P |
+| **Rain of Death** (Abilities löschen) | Löschstapel der Brettseite (`players[inst.owner]`) | Löschstapel von `kartenBesitzerVon(inst)` | St |
+| **Quetzahuitl** (Held-Zonen löschen, Ability- und Support-Zonen eigener Helden) | alle Karten der Zonen → Löschstapel des Nutzers (übernommene Kreatur / fremdes Equip gehört ihm nicht) | je Karte `kartenBesitzerVon(inst)` | St |
+| **Crimson Web** (Gefangen-Effekt endet) | Ablage `players[inst.owner]` (Leger/Dieb) | `kartenBesitzerVon(inst)` | St |
+| **Deepsea-Tausch** (`tryBouncePlace`/`payBouncePlace`/`atomicSwap`: Deepsea Jack O' Lantern, Poltergeister, Skeleton, Stein, Monstrosity, Infected Squirrel, Shapeshift) | übernommene Kreatur kommt in die Hand des Kontrolleurs OHNE Herkunft → später in SEINER Ablage (und: sie „wurde" seine Karte) | `handZugangSync(…, { originalOwner })`; Repro `c-04` | P (Wächter-Probe) |
+| **Deepsea Encounter** (Ersatz-Kreatur unverrichtet zurück auf die Hand) | gestohlene Handkarte verliert ihre Herkunft | `handZugangRueckgabe` | St |
+| **Bounce** (`returnSupportCreatureToHand`, `actionMoveCard` Brett → Hand) | W63c: Hand des Besitzers (jetzt entschieden anders) | Hand des **Kontrolleurs**, Herkunft bleibt (Platzmarke); Texte mit „owner's hand" (Racket Arrow, Chasing the Legend) → `toPlayer: Besitzer` | Entscheidung (Al) |
+| **Winged Skeleton** (`bounceSkeletonToHand`) | Hand über `targetInst.owner` (Brettseite), Herkunft nur an der Hand-Instanz | Brettseite `physicalSide`, Hand `kontrolleurVon`, Herkunft per Platzmarke | St |
+| *Nicht (mehr) Verstoß, geprüft:* Hunting 1 / Sas'Za / Fun-Fun Circus Director (Todes-Anspruch → Hand des Anspruchstellers, `_tagHandCardOrigin`), Sculpture Theft / Capture Net / Gold Trap / Surprising Opportunity / Spawn Mother (Hand des Nutzers mit Herkunft), Mass Routing / Missing People / Dive Bomblebee / Divine Gift of Forgetting (Deck des Besitzers), Suspicious Monster / Occultism / Fire Bomb / Strong Ox Headbutt / Detection / Silent Water Mizune / Spider Silk Bridge / Afflicted Pests / Initiation Ritual / Guardian Angel / `_nest-shared` / `_multizone-shared` / `_teocuilatl-shared` (`originalOwner`), Mill/Deck → Ablage desselben Decks (Kit, Chaos Magic/Diamond, Heart of Cards, Third Circle …) | – | – | St |
+| *Künstliche Aufbauten (keine Verstöße)* | `W19/b-1` Gold Trap, `A02-deepsea/03` Analyzer, `M01/08` Boulder in a Bottle: der Test setzt `originalOwner` selbst | markiert „test-aufbau" | Suite-Lauf |
+| Sweeps ohne Befund (nach den Fixes) | c-02 (gestohlene Handkarte) alle 6 Kartenarten; c-05 (Gegner-/Übernahme-Zugriffe) alle 6 Kartenarten | – | S |
+
+### 4) Bounce-Fälle (Kreatur Brett → Hand), vorher/nachher bei einer gestohlenen/übernommenen Kreatur (`originalOwner ≠ owner`)
+„Text sagt ‚your hand'" = der Kartentext nennt die eigene Hand; Kontrolleur K, Besitzer B.
+
+| Karte / Pfad | Kartentext (Auszug) | „your hand"? | vorher (W63c) | nachher (W64c) |
+|---|---|---|---|---|
+| Racket Arrow (`returnSupportCreatureToHand`) | „Choose a Creature your opponent controls and return it to its **original owner's hand**." | nein (owner) | Hand B | Hand B (Text wörtlich; `toPlayer` B) |
+| Chasing the Legend (`actionMoveCard`) | „Add that Creature to its **owner's hand** before the damage is applied." | nein (owner) | Hand B | Hand B (Ruling 29.8.; `toPlayer` B) |
+| Bounce Trap | „That Creature is returned to its **owner's hand**." | nein | – | **kein Skript** vorhanden (Karte in `cards.json`) |
+| Deepsea Encounter | „Add the Creature back to **your hand** …" (Reaktion) | ja | Hand B | Hand K, Herkunft B |
+| Deepsea Monstrosity (2. Effekt) | „Add it back to **your hand**." | ja | Hand B | Hand K, Herkunft B |
+| Divine Gift of the Deepsea | „Choose any Creature **you control** and add it to **your hand**." | ja | Hand B | Hand K, Herkunft B |
+| Dark Deepsea God (Kosten) | „… returning 2 or more Creatures … from your side of the board to **your hand**" | ja | Hand K (`toPlayer`), Herkunft B | unverändert |
+| Moonlight Butterfly | „add this Creature **you control** back to **your hand**" | ja | Hand K (`toPlayer`), Herkunft B | unverändert |
+| The Spawn Mother | „add this Creature you control to **your hand**" | ja | Hand K (`toPlayer`) | unverändert |
+| Winged Skeleton | „return that Creature back to **your hand**" (Reaktion) | ja | Hand der Brettseite (= K bei Übernahme), Herkunft an der Hand-Instanz | Hand K, Herkunft per Platzmarke (auch seitenfremd) |
+| Deepsea Jack O' Lantern / Poltergeister / Skeleton / Stein, Deepsea Monstrosity (Kosten), Infected Squirrel (Kosten) | „add a ‚Deepsea' Creature … from one of **your** Heroes' Support Zones to **your hand**" | ja | Hand K, **ohne Herkunft** (Fehler) | Hand K, Herkunft B |
+| Shapeshift (`atomicSwap`) | „Choose a Creature in one of your Heroes' Support Zones and add it to **your hand**." | ja | Hand K, ohne Herkunft | Hand K, Herkunft B |
+| Sculpture Theft, Capture Net, Gold Trap, Surprising Opportunity | „add it/them to **your hand**" (beliebige Kreatur / Kreatur des fallenden Helden) | ja | Hand des Nutzers, Herkunft B | unverändert |
+| Hunting 1, Sas'Za, Fun-Fun Circus Director | „add it to **your hand** instead of sending it to the discard pile" (Todes-Anspruch) | ja | Hand des Anspruchstellers, Herkunft B | unverändert |
+| Creepy Villager | „Control of this Creature cannot change." | – | nicht übernehmbar | – |
+| Wendy, the Shy Girl | „add this Creature you control back to your hand" | ja | **kein Skript** | – |
+| `actionMoveCard` Brett → Hand (allgemein) / `returnSupportCreatureToHand` (allgemein) | – | – | Hand B | **Hand K, Herkunft B** |
+| Mass Routing, Homecoming (Stapel!) | „back into their original owners' decks" / „original owner's deck" | – | Deck B | Deck B (Stapel-Regel) |
+
+Dive Down und Jump in the River sind KEINE Bounce-Karten (Spell/Attack: „unaffected"/„cannot be chosen"; sie landen/löschen sich aus der Hand → Stapel des Besitzers, W63c). **Plant Golem** (Ruling 29.8.: „Chasing/Bounce bringen ihn zurück auf die Hand des Besitzers"): ein Bounce außerhalb der „owner's hand"-Texte geht jetzt in die Hand des Kontrolleurs (= des Gegners des Spielers) — siehe Rückfrage 2.
+
+### 5) Selbst-Bounce und Deepsea-Kosten: Kontrolleur, nicht Besitzer (Repro `c-04`, beide Sitze)
+* **Moonlight Butterfly:** Ende des Zuges des Kontrolleurs → niemand gefragt; Ende des Zuges des Besitzers (= „des Gegners" des Kontrolleurs) → der KONTROLLEUR wird gefragt (`cardOwner` = effektiver Kontrolleur), nie der Besitzer. Winged Skeleton: reagiert nur auf Effekte des Gegners des Kontrolleurs gegen eine Kreatur, die der Kontrolleur kontrolliert. Creepy Villager: nicht übernehmbar. Wendy: kein Skript. Infected Squirrel / Deepsea-Tauscher: `getBounceableDeepseaCreatures` = `controller === pi` (der Besitzer einer übernommenen Deepsea-Kreatur darf sie nicht abgeben, der Kontrolleur schon) — **kein Abweichung gefunden**, nur die fehlende Herkunft (Tabelle oben).
+* **Dark Deepsea God:** `getSacrificableCreatures` zählt Kreaturen mit `controller === Spieler`: eine per Dark Gear/Diplomacy übernommene ist ein legales Opfer, eine vom Gegner übernommene eigene nicht; beide Tribute landen in der Hand des Spielers, die übernommene mit Herkunft (Abwerfen → Ablage des Besitzers). Ist-Zustand war schon richtig, jetzt per Repro gesichert.
+
+### 6) Diplomacy = Dark Gear (Primitive identisch)
+`diplomacy.js` und `dark-gear.js` rufen beide `engine.actionTransferCreature(inst, pi, destHi, destSi, { sourceName, sourceOwner: pi })` und danach `actionNegateCreature(inst, <Karte>, { expiresAtTurn: turn + 1, expiresForPlayer: Gegner, selfInflicted: true, unpreventable: true })`. `originalOwner` bleibt unverändert, `controller`/`owner` wechseln. Unterschiede: nur die Kosten (Diplomacy: Gold 20/10/5 je Stufe 1/2/3 mit Stufenobergrenze und freier Aktion der Ability; Dark Gear: Artefakt, `Stufe × 5` Gold, nur ohne ursprünglich gegnerische Kreaturen unter eigener Kontrolle) und die Zielzonen-Liste (beide: freie Zonen mit geteilten Alice-Zonen vorn, W63a). W63c hatte Diplomacy NICHT einzeln geprüft (Audit-Zeile „Kontrollwechsel Kreatur" nennt Dark Gear, nicht Diplomacy; die Primitive deckt es ab). Repro `c-03` ergänzt: Diplomacy UND Dark Gear über den echten Spielweg, beide Sitze, 7 Abgänge je (Schaden-Tod, Zerstören, Löschstapel, Rückgabe auf die Hand [Hand des Kontrolleurs, Herkunft bleibt] + Abwerfen/Zwangsabwurf, Mass Routing) — alle Stapel des Besitzers, 126 Prüfungen, auf dem Stand vor W64c bis auf den Bounce-Teil bereits grün.
+
+### 7) Tests
+| Datei | Inhalt | Prüfungen | alter Stand |
+|---|---|---|---|
+| `W64/c-02-diebstahl-sweep-alle-karten-…` | Sweep: jede Karte als gestohlene Handkarte gespielt/abgeworfen/zerstört, Wächter | 2 (+ Abdeckungsnotiz) | 2 Karten rot (Forbidden Zone, Liberation) |
+| `W64/c-03-diplomacy-und-dark-gear-…` | Diplomacy + Dark Gear × 2 Sitze × 7 Abgänge + Gegenprobe | 126 | bis auf Bounce grün |
+| `W64/c-04-bounce-geht-an-den-kontrolleur-herkunft-bleibt` | Bounce-Wege, Deepsea-Tausch, Moonlight Butterfly, Winged Skeleton, Dark Deepsea God, Deepsea-Kosten | 114 | 20 ✗ |
+| `W64/c-05-gegner-und-uebernahme-sweep-…` | Sweep: Gegner-/Übernahme-Zugriffe aller Karten, 3 Politiken | 2 (+ Notiz) | grün (Grenze: Szenen-Abdeckung) |
+| `W64/c-06-angelegter-held-unterkarte-…` | Unterkarte Held (Goff + Gon), 3 Varianten × 2 Abgänge × 2 Sitze | 36 | 16 ✗ |
+| `W64/c-07-negierte-und-zurueckgemischte-…` | negierte Handkarten (Ablage/Löschstapel/Deck), negierte Platzierung, Staff of Illusions, Gegenprobe | 52 | 26 ✗ |
+| `W64/c-08-coolness-stack-…` | Coolness Stack: Ablage/Löschen/Stack löschen/zur Hand → Abwerfen, Gegenprobe | 84 | W63c-Basis 16 ✗ |
+Angepasst: `W63/c-02` (Bounce einer gestohlenen Kreatur: Hand des Kontrolleurs, Herkunft bleibt, danach Abwerfen → Ablage des Besitzers).
+
+### 8) Rückfragen an Al (Ja/Nein)
+1. **Racket Arrow / Chasing the Legend** (Text: „(original) owner's hand"): weiter wörtlich die Hand des **Besitzers** (so umgesetzt), obwohl ein allgemeiner Bounce an den Kontrolleur geht — ja/nein? (Bounce Trap hat denselben Text, aber noch kein Skript.)
+2. **Plant Golem** (Ruling 29.8.: Bounce → Hand des Besitzers): mit „Bounce → Kontrolleur" landet der Golem nach einem Bounce in der Hand des Gegners (der ihn gegen den Besitzer spielen kann; abgeworfen geht er in die Ablage des Besitzers). Ausnahme „Plant Golem → Hand des Besitzers" gewollt — ja/nein?
+3. **Reaktionskarten aus fremder Hand** werden vom Sweep nicht aufgelöst (Bedingungen): die zentrale Kette (30 Stellen) ist geprüft; reicht das, oder soll ein Reaktions-Szenenbauer pro Reaktionskarte (80 Karten) her — ja/nein?
