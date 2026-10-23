@@ -10772,6 +10772,8 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   /* Die Pixel-Schrift lässt hinter jeder Ziffer eine Lücke (~0,05 em): ohne Ausgleich sitzt die Zahl optisch zu weit links. */
   padding-left: .1em;
   z-index: 5;
+  /* Die Zahl darf den Hover/Tooltip der Ability darunter nicht abfangen (wie die Spell-School-Marker bei Beato). */
+  pointer-events: none;
 }
 .board-card-text {
   width: 100%; height: 100%;
