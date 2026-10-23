@@ -68,6 +68,8 @@ HERO_TITLES = {
     'mary': ('Cute Princess Mary', 'Sovereign Skies'),
     'key': ('Key, the Cursed Thief', 'Wrong Place, Wrong Curse'),
     'alex': ('Alex, Trainer of Heroes', 'Retired, Not Done'),
+    # Alice: Alice, the Puppeteer Girl und Alice, the Transfer Student teilen sich den Slug 'alice' (Namensregel).
+    'alice': ('Alice, the Puppeteer Girl', "The Dolls' Tea Party"),
 }
 
 # Skill Test (bis zu 8 Spieler, zufällige Layouts): fünf gleichwertige Kampfmusiken `bgm_skilltest1…5.ogg`,
