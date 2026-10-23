@@ -19,8 +19,11 @@
 //    Spieler dauerhaft kontrolliert (`info.letzterHeld`).
 //  • „by an opponent's card or effect" — Verursacher ist der Gegner.
 //  • „before the end of your third turn" — gs.turn ≤ Nummer des dritten
-//    EIGENEN Zuges (`engine.zugIndexVon(pi, 3)`): im eigenen dritten
+//    EIGENEN Zuges (`engine.echterEigenerZugNr(pi, 3)`): im eigenen dritten
 //    Zug noch ja, im Gegnerzug danach nicht mehr.
+//    ★ W69a (Al, 23.10.2026: „Nein, sie sollen nur 'echte' eigene Züge
+//    zählen!"): ein übersprungener eigener Zug (Zhu, Hand of Death) zählt
+//    NICHT mit — der „dritte Zug" ist der dritte tatsächlich gespielte.
 //
 //  ── WIRKUNG ───────────────────────────────────────────────────────
 //  • Wiederbelebung mit vollen HP (`actionReviveHero`, max HP) — mit der
@@ -55,7 +58,7 @@ module.exports = {
     const held = info.hero || gs.players[pi]?.heroes?.[info.heroIdx];
     if (!engine.canReviveHero(held, { heilt: true })) return false;
     if (info.sourceOwner == null || info.sourceOwner === pi) return false;
-    return (gs.turn || 1) <= engine.zugIndexVon(pi, LETZTER_ZUG);
+    return (gs.turn || 1) <= engine.echterEigenerZugNr(pi, LETZTER_ZUG);   // W69a: nur echte eigene Züge zählen
   },
 
   async heroDefeatedResolve(engine, pi, info) {

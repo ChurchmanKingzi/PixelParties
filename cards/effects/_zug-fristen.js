@@ -115,4 +115,103 @@ function fristenNachSkip(engine, S, Ts) {
   return n;
 }
 
-module.exports = { zugBesitzer, istEchterZug, fristenNachSkip };
+// ═══════════════════════════════════════════════════════════════════════════
+//  W69a — „NUR ECHTE ZÜGE ZÄHLEN" auch bei ORDNUNGS- und FOLGE-ZÄHLERN  (Al, 23.10.2026)
+//
+//  a) Ordnungszähler „your Nth turn" (Cheat Chair „before the end of your third turn", Willy „your first/second turn"): „Nein, sie sollen nur 'echte'
+//     eigene Züge zählen!" — der dritte Zug ist der dritte TATSÄCHLICH gespielte eigene Zug.
+//  b) „2 consecutive turns" / „every other turn" (Thicket, Jump in the River, Blade of the Frostbringer, Hammer Throw): „Und auch das soll 'echte'
+//     eigene Züge zählen!" — ein übersprungener Zug hebt die Sperre nicht auf und verschiebt den Takt nicht.
+//
+//  Ein Zähler/eine Sperre rechnet NIE selbst mit Zugnummern („turn − 2", „turn % 2", „zugIndexVon"), sondern fragt diese Hilfen (alle für Zwei-Spieler-Partien;
+//  strenger Wechsel, der Startspieler hat die ungeraden Nummern — wie `zugBesitzer`). Übersprungene Zugnummern stehen in `gs._uebersprungeneZuege`; zusätzlich
+//  gilt der NÄCHSTE eigene Zug eines Spielers mit ausstehender Skip-Marke (`_skipNextTurn`) schon jetzt als ausgefallen (Cheat Chair im Zug davor).
+//  Skill Test und Partien mit mehr als zwei Sitzen: Rückfall auf die alte Rechnung ohne Skip-Wissen (dort gibt es keinen Skip).
+//
+//    echteEigeneZuegeBis(pi, turn = gs.turn, ab = 1)   Anzahl der echten Züge von pi mit Nummer ab..turn (der laufende, echte Zug zählt mit)
+//    echterEigenerZugIndex(pi, turn = gs.turn, ab = 1) „Der wievielte echte eigene Zug ist `turn`?" (1 = der erste); null, wenn `turn` kein echter Zug von pi ist
+//    echterEigenerZugNr(pi, k, ab = 1)                 Zugnummer des k-ten echten eigenen Zuges von pi (für „before the end of your k-th turn": gs.turn ≤ Nr)
+//    vorigerEchterEigenerZug(pi, turn = gs.turn)       Nummer des letzten echten Zuges von pi VOR `turn` (null, wenn es keinen gab)
+//    istFolgezug(pi, letzteNr, turn = gs.turn)         „Folgezug": zwischen `letzteNr` (Zugnummer der letzten Verwendung) und `turn` liegt KEIN echter Zug von pi.
+//                                                      Zählende Spieler `pi` ist der, dessen Züge die Karte meint (Thicket: der Wirker; Jump in the River/Blade:
+//                                                      der Zugspieler; Hammer Throw: der Betroffene).
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Zwei-Spieler-Partie mit strengem Wechsel? (Skill Test zählt Runden, nicht Spielerzüge.) */
+function zweiSpieler(engine) {
+  const gs = engine.gs;
+  return !!gs && !gs.skillTest && engine.playerCount() === 2;
+}
+
+/** Fällt der Zug `n` aus (übersprungen oder ausstehend übersprungen)? Gilt nur für Zugnummern ≥ 1. */
+function zugFaelltAus(engine, n) {
+  const gs = engine.gs;
+  if (!istEchterZug(engine, n)) return true;
+  if (n > gs.turn) {
+    // Ausstehende Skip-Marke: trifft den ersten Zug des Besitzers nach dem laufenden.
+    const o = zugBesitzer(engine, n);
+    if (gs.players[o]?._skipNextTurn) {
+      const erster = zugBesitzer(engine, gs.turn + 1) === o ? gs.turn + 1 : gs.turn + 2;
+      return n === erster;
+    }
+  }
+  return false;
+}
+
+/** Aufsteigende Liste der echten Zugnummern von `pi` im Bereich ab..bis (strenger Wechsel). */
+function echteZuegeVon(engine, pi, bis, ab = 1) {
+  const l = [];
+  const start = Math.max(1, ab);
+  // erste Nummer ≥ start, die pi gehört
+  let n = start;
+  if (zugBesitzer(engine, n) !== pi) n++;
+  for (; n <= bis; n += 2) if (!zugFaelltAus(engine, n)) l.push(n);
+  return l;
+}
+
+function echteEigeneZuegeBis(engine, pi, turn, ab = 1) {
+  const t = turn ?? engine.gs.turn ?? 1;
+  if (!zweiSpieler(engine)) return Math.floor((t - ab) / Math.max(1, engine.playerCount())) + 1;
+  return echteZuegeVon(engine, pi, t, ab).length;
+}
+
+function echterEigenerZugIndex(engine, pi, turn, ab = 1) {
+  const t = turn ?? engine.gs.turn ?? 1;
+  if (!zweiSpieler(engine)) return Math.floor((t - ab) / Math.max(1, engine.playerCount())) + 1;
+  if (t < ab || zugBesitzer(engine, t) !== pi || zugFaelltAus(engine, t)) return null;
+  return echteZuegeVon(engine, pi, t, ab).length;
+}
+
+function echterEigenerZugNr(engine, pi, k, ab = 1) {
+  if (!zweiSpieler(engine)) {   // alte Rechnung (ohne Skip-Wissen)
+    const gs = engine.gs, t = gs.turn || 1;
+    const starter = (t % 2 === 1) ? gs.activePlayer : engine.opponentOf(gs.activePlayer);
+    return starter === pi ? 2 * k - 1 : 2 * k;
+  }
+  let n = Math.max(1, ab);
+  if (zugBesitzer(engine, n) !== pi) n++;
+  for (let gefunden = 0; n < 100000; n += 2) {
+    if (zugFaelltAus(engine, n)) continue;
+    if (++gefunden >= k) return n;
+  }
+  return Infinity;
+}
+
+function vorigerEchterEigenerZug(engine, pi, turn) {
+  const t = turn ?? engine.gs.turn ?? 1;
+  if (!zweiSpieler(engine)) return engine.letzterEigenerZug(pi);
+  const l = echteZuegeVon(engine, pi, t - 1);
+  return l.length ? l[l.length - 1] : null;
+}
+
+function istFolgezug(engine, pi, letzteNr, turn) {
+  if (letzteNr == null || !Number.isFinite(letzteNr)) return false;
+  const t = turn ?? engine.gs.turn ?? 1;
+  const vor = vorigerEchterEigenerZug(engine, pi, t);
+  return letzteNr >= (vor ?? 0);
+}
+
+module.exports = {
+  zugBesitzer, istEchterZug, fristenNachSkip,
+  zugFaelltAus, echteEigeneZuegeBis, echterEigenerZugIndex, echterEigenerZugNr, vorigerEchterEigenerZug, istFolgezug,
+};
