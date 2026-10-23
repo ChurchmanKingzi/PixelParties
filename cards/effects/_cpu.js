@@ -7230,10 +7230,17 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
     // then rank by eval delta, take top N for multi-select.
     const pool = [...ownTargets, ...enemyTargets].filter(t => !isTargetImmune(engine, t));
     if (pool.length > 0) {
+      // Maßstab „nichts passiert": `evaluateState` liegt in der Größenordnung von Tausend, ein Treffer ändert sie um Zehner. Ein
+      // eigenes Ziel zählt nur, wenn der Treffer die Stellung gegenüber diesem Ausgangswert VERBESSERT (Soul Shard in der Ablage
+      // …) — sonst wählte die CPU „das kleinste Übel" aus lauter Eigentreffern, sobald kein Gegner angreifbar war.
+      let baseline = null;
+      try { baseline = engine._cpuEvaluateState(cpuIdx); } catch { /* ohne Ausgangswert: alte Regel */ }
+      const ownIds = new Set(ownTargets.map(t => t.id));
       const scored = [];
       for (const t of pool) {
         const s = simulateDamageTargetScore(engine, t, damageAmount, cpuIdx);
         if (s == null) continue;
+        if (baseline != null && ownIds.has(t.id) && !(s > baseline)) continue;
         scored.push({ t, s });
       }
       if (scored.length > 0) {
@@ -7244,14 +7251,16 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
         // isn't perfectly predictable when scores tie.
         if (cap > 1) return scored.slice(0, cap).map(x => x.t.id);
         const top = scored[0].s;
-        const eps = Math.max(1, Math.abs(top) * 0.03);
+        // Gleichstand = nah beieinander im VERBESSERUNGS-Maß (Abstand zum Ausgangswert), nicht im Betrag der Bewertung: 3 % von ~2500
+        // (≈ 75) war größer als der ganze Unterschied zwischen einem Treffer auf den Gegner und einem auf die eigene Kreatur.
+        const eps = Math.max(1, Math.abs(baseline != null ? top - baseline : top) * 0.03);
         const tied = scored.filter(x => x.s >= top - eps).map(x => x.t);
         return [randomOf(tied).id];
       }
     }
-    // Pool was empty (everything immune) — fall through to enemy/ally
-    // logic below; the enemy branch will return [] for cancellable
-    // prompts, decline-friendly.
+    // Nichts Brauchbares im Pool (alles immun oder kein Eigentreffer lohnt) — weiter zur Gegner-/Verbündeten-Logik unten; eigene
+    // Ziele sind dort keine Option, solange es Gegnerziele gibt (wie im `else if`-Zweig darunter).
+    if (enemyTargets.length > 0) ownTargets.length = 0;
   } else if (isDamageCard && ownTargets.length > 0 && enemyTargets.length > 0
              && !config.allowOwnSide) {
     // Default: strip own targets so the existing enemy-only picker
@@ -7349,6 +7358,14 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
     // If it's not cancellable, fall through so we still pick SOMETHING.
     const allEnemyImmune = enemyTargets.every(t => isTargetImmune(engine, t));
     if (allEnemyImmune && config.cancellable !== false) return [];
+  }
+
+  // Eine abbrechbare ATTACK ohne jedes gegnerische Ziel (alles geschützt/ausgegraut) wird abgebrochen — der Verbündeten-Zweig unten
+  // würde sonst einen eigenen Helden oder eine eigene Kreatur angreifen (Quick Attack & Co.).
+  if (cd?.cardType === 'Attack' && enemyTargets.length === 0 && ownTargets.length > 0
+      && config.cancellable === true && !config.allowOwnSide
+      && config.side !== 'my' && config.side !== 'own') {
+    return [];
   }
 
   // Ally-only fallthrough (e.g. cards whose side is 'own' but don't look

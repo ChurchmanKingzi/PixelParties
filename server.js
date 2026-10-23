@@ -8341,12 +8341,14 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   // is the resolving card; `cardType === 'Spell'` catches Normal,
   // Reaction, Surprise, Attachment, Area subtypes.
   if (cardData.cardType === 'Spell') room.engine._pushResolvingSpell(cardName);
+  if (cardData.cardType === 'Spell' || cardData.cardType === 'Attack') room.engine._pushResolvingPlay(cardName);
   let _spellDepthReleased = false;
   const _releaseSpellDepth = () => {
     if (_spellDepthReleased) return;
     _spellDepthReleased = true;
     gs._spellResolutionDepth = Math.max(0, (gs._spellResolutionDepth || 1) - 1);
     if (cardData.cardType === 'Spell') room.engine._popResolvingSpell();
+    if (cardData.cardType === 'Spell' || cardData.cardType === 'Attack') room.engine._popResolvingPlay();
   };
 
   try {
@@ -11850,6 +11852,15 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     // Card stays in hand — still counts as a played-from-hand card
     // so per-turn play counters track it.
     room.engine.notePlayedFromHand(pi);
+    // Gespielt ist gespielt: Luck & Co. hängen am Aktivieren der Karte, nicht an ihrem Weg in die Ablage — das Behalten per Abwurf
+    // (Magic Ruby/Amethyst/Cobalt) feuert `afterArtifactUsed` deshalb genauso wie der Zweig oben.
+    try {
+      await room.engine.runHooks('afterArtifactUsed', {
+        artifactName: potionName, playerIdx: pi, _skipReactionCheck: true,
+      });
+    } catch (err) {
+      console.error('[Engine] afterArtifactUsed hook error:', err.message);
+    }
   } else {
     if (!chainResult.negated && cardType === 'Potion') checkPotionLock(ps, gs, pi);
   }

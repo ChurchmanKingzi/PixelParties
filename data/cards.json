@@ -14801,7 +14801,7 @@
     "hp": null,
     "atk": null,
     "cost": 10,
-    "effect": "Choose a Hero your opponent controls and Stun it for 1 turn. \nYou may discard a card from your hand to keep this card in your hand instead of putting it into your discard pile after playing it.\nYou can only play 1 \"Magic Ruby\" per turn.",
+    "effect": "Choose a Hero your opponent controls and Stun it for 1 turn. \nYou may discard a card from your hand to keep this card in your hand instead of putting it into your discard pile after playing it. You can only play 1 \"Magic Ruby\" per turn.",
     "archetype": "",
     "setID": "PP SET01",
     "banned": "",
