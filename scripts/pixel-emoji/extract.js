@@ -1,7 +1,7 @@
 'use strict';
 // Erzeugt die Pixel-Raster aller Emojis/Symbole des Spiels (→ glyphen.json), Eingabe: zeichen.json (siehe scan.js).
 //   node scripts/pixel-emoji/extract.js
-// Quelle je Zeichen: 1) ein handgezeichnetes Sprite des Spiels (PP_PX_ICONS / PP_PX_ZEICHEN → PP_PX_SPRITES in app-shared.jsx), sonst
+// Quelle je Zeichen: 1) ein EINFARBIGES handgezeichnetes Sprite des Spiels (farbige Sprites ersetzt die Automatik, siehe unten) (PP_PX_ICONS / PP_PX_ZEICHEN → PP_PX_SPRITES in app-shared.jsx), sonst
 // 2) das System-Emoji (Chromium, Noto Color Emoji), per Flaechenmittel auf ein 16x16-Raster verkleinert, auf wenige Farben reduziert
 // (Median-Cut), mit dunkler Kontur. Reine Text-Symbole (✓ ★ → …) werden einfarbig (folgen der Textfarbe) im 14x14-Raster abgelegt.
 // Handarbeit hat Vorrang: Eintraege in `handarbeit.json` (gleiche Form wie ein Sprite) ersetzen die Automatik.
@@ -74,14 +74,18 @@ function imBrowser(zeichen) {
   const protokoll = { sprite: [], farbe: [], mono: [], leer: [] };
   for (const z of zeichen) {
     const sp = spriteFuer(z);
-    if (sp) {
+    const alsSprite = () => {
       ergebnis[z] = sp.mono ? { mono: true, z: sp.z.map(r => r.replace(/\+/g, '#').replace(/[^#]/g, '.')) } : { pal: sp.pal, z: sp.z.slice() };
-      protokoll.sprite.push(z); continue;
-    }
+      protokoll.sprite.push(z);
+    };
+    // Einfarbige Sprites (✦ ★ ♪ …) bleiben. Farbige Sprites ersetzt die AUTOMATISCHE Rasterung des System-Emojis (Als Entscheidung 23.10.: sieht besser aus) —
+    // ausser das Zeichen hat gar kein Farb-Emoji (dann ist das Sprite die einzige bunte Fassung).
+    if (sp && sp.mono) { alsSprite(); continue; }
     const roh = rendern(z);
     const d = roh.data;
-    if (gleich(d, tofu) || !bbox(d)) { protokoll.leer.push(z); continue; }
+    if (gleich(d, tofu) || !bbox(d)) { if (sp) alsSprite(); else protokoll.leer.push(z); continue; }
     const bunt = hatFarbe(d) || /️/.test(z) || /^\p{Emoji_Presentation}/u.test(z);
+    if (sp && !bunt) { alsSprite(); continue; }
     const bb = bbox(d);
     const N = bunt ? NF : NS, rand = bunt ? 1 : 0, inn = N - 2 * rand;
     // Abbildung Bild-px → Zellen: Farb-Emojis passen in den Innenbereich (volle Groesse), Symbole bleiben im natuerlichen Massstab zur Schrift

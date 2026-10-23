@@ -8602,7 +8602,18 @@ function ascensionBonusText(card) {
 // Hovern nicht neu zeichnet.
 const _ttHpKarten = new Map();   // "Name|Skin|HP" -> blob:-URL (LRU, klein)
 const TT_HP_KARTEN_MAX = 24;
-function TooltipCardImage({ card, src, hp, stufe, style }) {
+function TooltipCardImage(props) {
+  // Ability auf dem Brett (nur Stufe, ohne HP-Aufdruck): dieselbe Variante `?stufe=N` wie das Bild auf dem Brett — der Bild-Shim hat sie
+  // dort schon gezeichnet (und die anderen Stufen vorgewaermt), der Tooltip zeigt sie also SOFORT. Vorher kam zuerst die Karte ohne
+  // Hervorhebung und erst nach einer eigenen Zeichnung die richtige Stufe (Als Befund 23.10.). Eigene Komponente je Fall, damit die Hooks
+  // der HP-Fassung nie bedingt aufgerufen werden.
+  const { src, hp, stufe, style } = props;
+  if (stufe != null && hp == null && typeof src === 'string' && src) {
+    return <img src={src + (src.includes('?') ? '&' : '?') + 'stufe=' + stufe} style={style} />;
+  }
+  return <TooltipCardImageHp {...props} />;
+}
+function TooltipCardImageHp({ card, src, hp, stufe, style }) {
   const skin = skinOfUrl(src);
   // `hp`: aktuelle max. HP; `stufe`: aktuelle Stufe einer Ability auf dem Brett (ihre Box ist hervorgehoben, die anderen grau)
   const key = (hp != null || stufe != null) ? `${card.name}|${skin || ''}|${hp ?? ''}|${stufe ?? ''}` : null;
