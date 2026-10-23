@@ -81,6 +81,14 @@ async function fireSteamEngine(ctx) {
     zoneSlot: inst.zoneSlot,
   });
 
+  // Gruene "+10" ueber der Kreatur (Client: `play_steam_hp`).
+  engine._broadcastEvent('play_steam_hp', {
+    owner: inst.owner,
+    heroIdx: inst.heroIdx,
+    zoneSlot: inst.zoneSlot,
+    amount: STEAM_ENGINE_GAIN_PER_CARD,
+  });
+
   engine.log('steam_engine_fired', {
     card: inst.name,
     player: gs.players[inst.owner]?.username,

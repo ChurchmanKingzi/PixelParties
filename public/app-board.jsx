@@ -695,7 +695,7 @@ function HealNumber({ amount, ownerLabel, heroIdx }) {
 // broadcast by `play_heal_zero` (Skeleton Healer / Heal targeting a
 // full-HP creature, etc.); positive creature heals are not surfaced as
 // floating numbers (matching prior behavior — only damage was).
-function CreatureHealNumber({ amount, ownerLabel, heroIdx, zoneSlot }) {
+function CreatureHealNumber({ amount, ownerLabel, heroIdx, zoneSlot, pixel }) {
   const [pos, setPos] = useState(null);
   useEffect(() => {
     const el = document.querySelector(`[data-support-zone="1"][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
@@ -710,8 +710,9 @@ function CreatureHealNumber({ amount, ownerLabel, heroIdx, zoneSlot }) {
 
   if (!pos) return null;
   const label = amount > 0 ? `+${amount}` : '0';
+  // `pixel` = gruene Pixel-Zahl der Steam Dwarfs (Steam Engine, +10 HP je Karte).
   return (
-    <div className="damage-number heal-number" style={{ left: pos.x, top: pos.y }}>
+    <div className={pixel ? 'steam-hp-number' : 'damage-number heal-number'} style={{ left: pos.x, top: pos.y }}>
       {label}
     </div>
   );
@@ -46499,6 +46500,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     };
     socket.on('play_heal_zero', onHealZero);
+    // Steam Dwarfs (Steam Engine): jede +10 HP poppt als gruene Pixel-Zahl
+    // ueber der Kreatur auf. Der Diff-Detektor zeigt positive Kreatur-HP
+    // nicht an, deshalb meldet der Server den Gewinn ausdruecklich.
+    const onSteamHp = ({ owner, heroIdx, zoneSlot, amount }) => {
+      const id = Date.now() + Math.random();
+      const entry = { id, amount, ownerLabel: ownerLbl(owner, myIdx), heroIdx, zoneSlot, pixel: true };
+      setCreatureHealNumbers(prev => [...prev, entry]);
+      setTimeout(() => setCreatureHealNumbers(prev => prev.filter(e => e.id !== id)), 1800);
+    };
+    socket.on('play_steam_hp', onSteamHp);
     // Server-driven 0-damage feedback. Fired from the engine when a
     // damage hit is fully absorbed by a buff multiplier (Damage Immune,
     // Petrified) — the diff-based damage-number detector wouldn't see
@@ -46870,6 +46881,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('play_skull_burst', onSkullBurst);
       socket.off('play_heal_beam', onHealBeam);
       socket.off('play_heal_zero', onHealZero);
+      socket.off('play_steam_hp', onSteamHp);
       socket.off('play_damage_zero', onDamageZero);
       socket.off('ziel_marke_blitz', onZielMarkeBlitz);
       socket.off('play_guardian_angel', onGuardianAngel);
@@ -53672,7 +53684,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <CreatureDamageNumber key={d.id} amount={d.amount} ownerLabel={d.ownerLabel} heroIdx={d.heroIdx} zoneSlot={d.zoneSlot} />
       ))}
       {creatureHealNumbers.map(d => (
-        <CreatureHealNumber key={d.id} amount={d.amount} ownerLabel={d.ownerLabel} heroIdx={d.heroIdx} zoneSlot={d.zoneSlot} />
+        <CreatureHealNumber key={d.id} amount={d.amount} ownerLabel={d.ownerLabel} heroIdx={d.heroIdx} zoneSlot={d.zoneSlot} pixel={d.pixel} />
       ))}
       </div>
 

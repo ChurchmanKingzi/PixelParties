@@ -6017,6 +6017,24 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   text-shadow: 0 0 8px rgba(61,220,87,.7), 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
 }
 
+/* Steam Dwarfs: gruene "+10" ueber der Kreatur (Pixelart: harte Kontur aus
+   Schattenringen, ganzzahlige Schritte im Bildtakt, kein Skalieren/Blur). */
+@keyframes steamHpFloat {
+  0%   { opacity: 1; transform: translate(-50%, 0); }
+  80%  { opacity: 1; transform: translate(-50%, -40px); }
+  100% { opacity: 0; transform: translate(-50%, -44px); }
+}
+.steam-hp-number {
+  position: fixed;
+  z-index: 10200;
+  font-family: 'Pixel Intv', 'Press Start 2P', monospace;
+  font-size: 20px;
+  color: #4ceb70;
+  text-shadow: 1px 1px 0 #1a4128, -1px -1px 0 #1a4128, 1px -1px 0 #1a4128, -1px 1px 0 #1a4128, 2px 2px 0 #000000;
+  pointer-events: none;
+  animation: steamHpFloat 1.2s steps(18, end) forwards;
+}
+
 /* Red flash overlay when a hero or creature takes damage. Uses an
    absolutely positioned ::after so we don't perturb the existing
    board-zone background, border, or any inner card layout. */
