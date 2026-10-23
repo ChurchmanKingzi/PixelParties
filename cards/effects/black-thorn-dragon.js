@@ -19,7 +19,12 @@ const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 //   (b) GENAU 2 „Drago"-Kreaturen — hier gilt die Einschränkung „nicht in
 //       diesem Zug beschworen" NICHT (sie steht im Text nur hinter der ersten
 //       Möglichkeit; zwei frisch beschworene Drachen dürfen also zusammen den
-//       Preis zahlen).
+//       Preis zahlen) — und auch NICHT „you control" (Al 23.10.): hier dürfen
+//       ausdrücklich auch GEGNERISCHE Drago-Kreaturen geopfert werden, in jeder
+//       Mischung (2 eigene, 1+1, 2 gegnerische). Engine: Spec-Schalter
+//       `auchGegner` (`_collectSacrificeCandidates`); eine fremde Kreatur mit
+//       Schutz gegen fremde Zugriffe (Golden Wings, Oppo-Immunität …) ist kein
+//       Kandidat, sonst gälte der Preis als bezahlt, ohne bezahlt zu sein.
 //  Was „Drago" heißt, legt `_drago-shared.js` fest (Teilstring im Namen:
 //  auch „Dragonegg", „Dragoneer", „Dragsparov, the King of Dragons" und
 //  Black-Thorn Dragon selbst).
@@ -95,9 +100,11 @@ function makeSacrificeSpec(engine, route) {
     minCount: 2,
     maxCount: 2,
     filter: (c) => isDragoName(c?.cardName),
+    // Der Text sagt hier NICHT „you control" (Al 23.10.): auch gegnerische Drago-Kreaturen zählen (jede Mischung).
+    auchGegner: true,
     showFilteredAsIneligible: true,
     title: CARD_NAME,
-    description: `Sacrifice 2 "${DRAGO}" Creatures you control.`,
+    description: `Sacrifice 2 "${DRAGO}" Creatures (yours or your opponent's).`,
     confirmLabel: '🐉 Sacrifice!',
     confirmClass: 'btn-danger',
     cancellable: true,
@@ -164,7 +171,7 @@ async function waehleWeg(ctx, wege) {
     showCard: CARD_NAME,
     options: [
       { id: ROUTE_ONE, label: `Sacrifice 1 "${DRAGO}" Creature (not summoned this turn)` },
-      { id: ROUTE_TWO, label: `Sacrifice 2 "${DRAGO}" Creatures` },
+      { id: ROUTE_TWO, label: `Sacrifice 2 "${DRAGO}" Creatures (also your opponent's)` },
     ],
     cancellable: true,
     gerrymanderEligible: true,

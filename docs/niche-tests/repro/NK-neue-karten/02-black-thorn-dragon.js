@@ -134,6 +134,64 @@ const H = require('../../lib/h.js');
     R.check('zwei Shimmering Dragoneggs als Tribut (Weg b): 2 × 8 Gold als Todeseffekt in eigener Runde', x.r === true && x.t.gs.players[0].gold === 66, { r: x.r, gold: x.t.gs.players[0].gold });
   }
 
+  R.section('A3 · Zwei-Opfer-Weg: auch GEGNERISCHE Drago-Kreaturen (Al 23.10.), in jeder Mischung');
+  {
+    // Je ein eigenes und ein gegnerisches Drago (der gemeldete Fall): Weg b wird angeboten, Weg a nur für das eigene
+    const x = await summon(t => { alt(t.put(0, 0, 0, EGG)); alt(t.put(1, 0, 0, 'Flaming Dragonegg')); }, {
+      choose: 'two',
+      pick: (valid) => valid.filter(v => v.type === 'equip' && !v.ineligible).map(v => v.id),
+    });
+    R.check('je ein eigenes und ein gegnerisches Drago: beide Wege stehen offen (Weg-Frage mit zwei Optionen)', route(x.t).length === 1 && route(x.t)[0].d.options.map(o => o.id).join() === 'one,two', route(x.t).map(p => p.d.options));
+    R.check('Weg b: eigenes UND gegnerisches Drago geopfert, Dragon steht', x.r === true && x.t.zone(0, 0, 2) === BT && !x.t.zone(0, 0, 0) && !x.t.zone(1, 0, 0), { r: x.r, own: x.t.zone(0, 0, 0), opp: x.t.zone(1, 0, 0) });
+    R.check('das gegnerische Ei liegt in der Ablage SEINES Besitzers (Sitz 1), das eigene in meiner', x.t.pile(1, 'discardPile').includes('Flaming Dragonegg') && x.t.pile(0, 'discardPile').includes(EGG) && !x.t.pile(0, 'discardPile').includes('Flaming Dragonegg'), { p0: x.t.pile(0, 'discardPile'), p1: x.t.pile(1, 'discardPile') });
+    R.check('keine Engine-Fehler / Zustand sauber', x.t.errors.length === 0 && x.t.audit().length === 0, { e: x.t.errors, a: x.t.audit() });
+  }
+  {
+    // Weg a (Pflicht „you control"): gegnerische Kreaturen sind dort NICHT wählbar
+    const x = await summon(t => { alt(t.put(0, 0, 0, EGG)); alt(t.put(1, 0, 0, 'Flaming Dragonegg')); }, {
+      choose: 'one', pick: (valid) => valid.filter(v => v.type === 'equip' && !v.ineligible).map(v => v.id).slice(0, 1),
+    });
+    const sac = x.t.targets.find(tg => tg.config && /Sacrifice 1/i.test(tg.config.description || ''));
+    R.check('Weg a: in der Opferwahl steht nur das eigene Ei', x.r === true && sac && !sac.valid.some(v => v.owner === 1), sac && sac.valid.map(v => v.owner + ':' + v.cardName));
+    R.check('Weg a: das gegnerische Ei bleibt unberührt', x.t.zone(1, 0, 0) === 'Flaming Dragonegg', x.t.zone(1, 0, 0));
+  }
+  {
+    // zwei gegnerische Drago, keine eigenen: Weg b spielbar, Weg a nicht (keine Weg-Frage)
+    const x = await summon(t => { frisch(t.put(1, 0, 0, EGG)); frisch(t.put(1, 1, 0, 'Flaming Dragonegg')); }, {
+      pick: (valid) => valid.filter(v => v.type === 'equip' && !v.ineligible).map(v => v.id),
+    });
+    R.check('zwei gegnerische Drago (auch frisch beschworen), kein eigenes: spielbar ohne Weg-Frage', x.r === true && x.t.zone(0, 0, 2) === BT && route(x.t).length === 0, { r: x.r, route: route(x.t).length });
+    R.check('beide gegnerischen Eier geopfert (Ablage des Gegners)', x.t.pile(1, 'discardPile').includes(EGG) && x.t.pile(1, 'discardPile').includes('Flaming Dragonegg'), x.t.pile(1, 'discardPile'));
+  }
+  {
+    // Sacrifice-Hooks der gegnerischen Kreatur: sein Todeseffekt (Shimmering Dragonegg zahlt in der Runde des KONTROLLEURS) — der Gegner ist nicht am Zug → kein Gold
+    const x = await summon(t => { alt(t.put(0, 0, 0, EGG)); alt(t.put(1, 0, 0, 'Shimmering Dragonegg')); t.setGold(0, 50); t.setGold(1, 50); }, {
+      choose: 'two', pick: (valid) => valid.filter(v => v.type === 'equip' && !v.ineligible).map(v => v.id),
+    });
+    R.check('gegnerisches Shimmering Dragonegg als Opfer in MEINER Runde: kein Gold (Todeseffekt zählt nur in der Runde seines Kontrolleurs)', x.r === true && x.t.gs.players[1].gold === 50 && x.t.gs.players[0].gold === 50, { g0: x.t.gs.players[0].gold, g1: x.t.gs.players[1].gold });
+  }
+  {
+    // Nur EIN Drago insgesamt (eigenes alt) + ein gegnerisches Nicht-Drago: Weg a trägt, Weg b nicht
+    const x = await summon(t => { alt(t.put(0, 0, 0, EGG)); t.put(1, 0, 0, H.INERT.creature); });
+    R.check('gegnerische Nicht-Drago-Kreatur ändert nichts: Weg a, ohne Frage', x.r === true && route(x.t).length === 0 && x.t.zone(1, 0, 0) === H.INERT.creature, { r: x.r });
+  }
+  {
+    // Geschützte gegnerische Kreatur (Golden Wings: unaffected by the opponent) ist KEIN Kandidat — sonst zählte der Preis als bezahlt, ohne dass sie stirbt
+    const x = await summon(t => { alt(t.put(0, 0, 0, EGG)); const g = t.put(1, 0, 0, 'Flaming Dragonegg'); g.counters._gwImmune = true; return { g }; });
+    R.check('gegnerisches Drago mit Golden-Wings-Schutz zählt NICHT: nur Weg a (ohne Weg-Frage), geschützte Kreatur unberührt', x.r === true && route(x.t).length === 0 && x.t.zone(1, 0, 0) === 'Flaming Dragonegg', { r: x.r, route: route(x.t).length });
+    const y = await summon(t => { frisch(t.put(1, 0, 0, EGG)); const g = t.put(1, 1, 0, 'Flaming Dragonegg'); g.counters._gwImmune = true; frisch(g); });
+    R.check('ein geschütztes + ein ungeschütztes gegnerisches Drago: Weg b nicht bezahlbar → nicht spielbar', y.r === false && !y.t.find(BT, 'support') && y.t.zone(1, 0, 0) === EGG, { r: y.r });
+  }
+  {
+    // Wurf auf belegten Platz bleibt eigen: die Pflicht-Opfer der Zielzone sind die eigenen Insassen; der zweite Tribut darf gegnerisch sein
+    const x = await summon(t => { alt(t.put(0, 0, 0, EGG)); alt(t.put(0, 0, 1, 'Flaming Dragonegg')); alt(t.put(0, 0, 2, 'Dragolfin')); alt(t.put(1, 0, 0, 'Red Dragoneer')); }, {
+      choose: 'two',
+      pick: (valid) => valid.filter(v => v.type === 'equip' && !v.ineligible && v.owner === 1).map(v => v.id),
+    });
+    R.check('Wurf auf den belegten Platz: der Insasse (Dragolfin, Pflicht-Opfer) UND das gegnerische Red Dragoneer sind geopfert, der Dragon steht dort, die anderen Eier bleiben', x.r === true && x.t.zone(0, 0, 2) === BT && x.t.pile(0, 'discardPile').includes('Dragolfin') && x.t.pile(1, 'discardPile').includes('Red Dragoneer') && !x.t.zone(1, 0, 0) && x.t.zone(0, 0, 0) === EGG && x.t.zone(0, 0, 1) === 'Flaming Dragonegg', { r: x.r, z2: x.t.zone(0, 0, 2), p0: x.t.pile(0, 'discardPile'), p1: x.t.pile(1, 'discardPile') });
+    R.check('… keine Engine-Fehler', x.t.errors.length === 0, x.t.errors);
+  }
+
   // Wurf auf belegten Platz (volle Spalte)
   R.section('A2 · Wurf auf einen belegten Platz (volle Spalte, W19a)');
   {

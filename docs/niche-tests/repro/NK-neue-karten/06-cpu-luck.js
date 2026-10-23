@@ -52,9 +52,9 @@ const { loadCardEffect } = H;
     const t = await H.fresh({ hand: [['Liquid Luck'], ['Fireball', 'Heal']], deck: [['Fireball', 'Heal', 'Fireball', 'Heal'], ['Fireball', 'Heal']], gold: 100 });
     cpu.installCpuBrain(t.engine);
     await t.play(0, 'Liquid Luck');
-    const perm = t.gs.players[0].permanents.find(p => p.name === 'Liquid Luck');
-    R.check('CPU hat den Trank gespielt und einen Namen deklariert', !!perm && !!perm.declared, perm);
-    R.check('der deklarierte Name ist eine Karte aus der Gegnerhand (Fireball/Heal)', perm && ['Fireball', 'Heal'].includes(perm.declared), perm && perm.declared);
+    const marker = t.engine.cardInstances.find(c => c.name === 'Liquid Luck' && c.zone === 'deleted' && c.owner === 0);
+    R.check('CPU hat den Trank gespielt und einen Namen deklariert', !!marker && !!marker.counters.liquidLuckZiel, marker && marker.counters);
+    R.check('der deklarierte Name ist eine Karte aus der Gegnerhand (Fireball/Heal)', marker && ['Fireball', 'Heal'].includes(marker.counters.liquidLuckZiel), marker && marker.counters.liquidLuckZiel);
     R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   }
   R.finish();
