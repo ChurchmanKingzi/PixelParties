@@ -153,7 +153,12 @@ def main():
     fb.setupGlyphOrder(order)
     fb.setupCharacterMap(cmap)
     fb.setupGlyf(gl)
-    fb.setupHorizontalMetrics({n: (metriken[n][0], 0) for n in order})
+    # ★ lsb = linke Kante des Glyphen. Mit lsb 0 verschiebt FreeType (Chrome/Opera) JEDE Ebene eines Farbzeichens so, dass ihre linke Kante bei x = 0 liegt —
+    #   Fuellungen und Kontur rutschen gegeneinander (Muenze/Herz/Schild sahen „kaputt" aus, mit Geisterkontur). Deshalb die echte Kante eintragen.
+    def _lsb(n):
+        co = getattr(gl[n], 'coordinates', None)
+        return min(x for x, _ in co) if co and len(co) else 0
+    fb.setupHorizontalMetrics({n: (metriken[n][0], _lsb(n)) for n in order})
     fb.setupHorizontalHeader(ascent=ASC, descent=DESC, lineGap=0)
     fb.setupNameTable({'familyName': FAMILIE, 'styleName': 'Regular', 'uniqueFontIdentifier': FAMILIE + ' 1.0', 'fullName': FAMILIE, 'psName': 'PPPixelEmoji-Regular', 'version': 'Version 1.0'})
     fb.setupOS2(sTypoAscender=ASC, sTypoDescender=DESC, usWinAscent=ASC, usWinDescent=-DESC, sTypoLineGap=0, fsType=0)
