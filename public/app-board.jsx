@@ -8607,6 +8607,51 @@ const LiquidRainbowEffect = (() => {
   return ppPunktBild(malen, ENDE + 40, 300, 280, vorbereiten);
 })();
 
+// ═════════════════════════════════════════════════════════════════
+//  Handkarte verliert eine Stufe (`hand_level_down`, Great Vanguard Demon) — PIXELART, Hülle `ppPunktBild`
+//
+//  Läuft über der Handkarte, ohne sie anzufassen (kein Anschwellen, kein Abdunkeln, kein Verdecken — die Karte bleibt die ganze Zeit sichtbar und lesbar): fünf
+//  Pfeilspitzen sinken in ganzen Pixelschritten über sie, ein „-1" aus Pixelziffern (heller Kern, dunkler Rand) steigt auf und gleitet nach unten. Bei ~550 ms
+//  dithert alles weg, bei 800 ms ist es fort. Feste Palette, kein Leuchten. (Das ältere `level_down` von Looming Threat dunkelt die Karte ab und vergrößert sie.)
+// ═════════════════════════════════════════════════════════════════
+const HandLevelDownEffect = (() => {
+  const PAL = ['#f1e5fa', '#d6b3f9', '#ba74ff', '#7a2bd0', '#401a66'].map(ppHex);
+  const ENDE = 800, FADE_AB = 520;
+  // Pixelziffern 3×5: „-" und „1"
+  const GLYPHEN = { '-': ['000', '000', '111', '000', '000'], '1': ['010', '110', '010', '010', '111'] };
+  const text = (g, str, x0, y0, farbe, a, rand) => {
+    let x = x0;
+    for (const ch of str) {
+      const bm = GLYPHEN[ch];
+      for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) if (bm[j][i] === '1') {
+        if (rand) for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) g.put(x + i * 2 + dx, y0 + j * 2 + dy, rand, a);
+      }
+      for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) if (bm[j][i] === '1') g.block(x + i * 2, y0 + j * 2, 2, 2, farbe, a);
+      x += 8;
+    }
+  };
+  const vorbereiten = () => ({ pfeile: Array.from({ length: 5 }, (_, i) => ({ dx: (i - 2) * 11 + Math.round((Math.random() - 0.5) * 2), start: i * 55 + Math.round(Math.random() * 30) })) });
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    for (const p of teile.pfeile) {
+      const k = (t - p.start) / 520;
+      if (k < 0 || k > 1) continue;
+      const y = Math.round(sz.cy - sz.hh * 0.9 + k * sz.hh * 1.5), x = Math.round(sz.cx + p.dx);
+      for (let r = 0; r < 4; r++) {                       // Pfeilspitze nach unten: 7, 5, 3, 1 Pixel breit
+        const b = 7 - r * 2, col = r === 0 ? PAL[1] : r < 3 ? PAL[2] : PAL[3];
+        g.block(x - Math.floor(b / 2), y + r, b, 1, col, aus);
+        g.put(x - Math.floor(b / 2) - 1, y + r, PAL[4], aus); g.put(x + Math.floor(b / 2) + 1, y + r, PAL[4], aus);
+      }
+    }
+    if (t > 120) {
+      const k = Math.min(1, (t - 120) / 600), y = Math.round(sz.cy - 8 + k * 14);
+      text(g, '-1', Math.round(sz.cx - 8), y, PAL[0], aus, PAL[4]);
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 150, 210, vorbereiten);
+})();
+
 // ═══════════════════════════════════════════════════════════════════
 //  Glass Wall (12.10.) — PIXELART, Held-Animation (`glass_wall_up`, `glass_wall_shatter`; Ursprung = die Heldenzone, `x`/`y` Mitte, `w`/`h` Kartengrösse)
 //
@@ -17378,6 +17423,7 @@ const ANIM_REGISTRY = {
   gold_sparkle: GoldSparkleEffect,
   dragonegg_shimmer: DragoneggShimmerEffect,
   liquid_rainbow: LiquidRainbowEffect,
+  hand_level_down: HandLevelDownEffect,
   // ── Circles of Hell (Animationen) ──────────────────────────────────
   // Farben aus den Pixelart-Hintergruenden der Kreise (Flammen #f8f8bd … #520a0c).
   // ★ The Sixth Circle: Hoellen-Charme — blutrote Siegelringe, aufsteigende Schlieren, dunkler Blitz.
@@ -44890,10 +44936,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // spielt die Animation ueber dem echten Handslot. `count` reicht
     // die Partikelmenge durch (Battery/Magic Modifier skalieren damit
     // ihre Staerke).
-    const onHandCardAnim = ({ owner, handIdx, animType, count, duration }) => {
+    const onHandCardAnim = ({ owner, handIdx, animType, count, duration, cardName }) => {
       const isMe = owner === myIdx;
       const base = isMe ? '.game-hand-me' : '.game-hand-opp';
-      const el = document.querySelector(`${base} .hand-slot[data-hand-idx="${handIdx}"]`)
+      // 23.10.: mit `cardName` sucht der Client den Slot über den KARTENNAMEN (der Index der Engine kann dem Stand der Handanzeige voraus sein — eine Reaction
+      // verlässt die Hand, während die Animation schon läuft); gleicher Index bevorzugt, sonst die erste Kopie.
+      let byName = null;
+      if (cardName) {
+        const kopien = [...document.querySelectorAll(`${base} .hand-slot[data-card-name="${CSS.escape(cardName)}"]`)];
+        byName = kopien.find(k => k.getAttribute('data-hand-idx') === String(handIdx)) || kopien[0] || null;
+      }
+      const el = byName
+        || document.querySelector(`${base} .hand-slot[data-hand-idx="${handIdx}"]`)
         || document.querySelector(`${base} [data-hand-idx="${handIdx}"]`)
         || document.querySelector(base);
       if (!el) return;
