@@ -1282,6 +1282,14 @@ async function initDatabase() {
   await social.init();
   await botApi.ensureSchema(db);   // users.discord_id (MoniaBot)
 
+  // Spiel-Palette (256 Farben): gespeicherte Spielerfarben auf die naechste Palettenfarbe setzen (einmalig je Farbe; idempotent)
+  try {
+    const farben = await db.all('SELECT id, color FROM users WHERE color IS NOT NULL');
+    let geaendert = 0;
+    for (const u of farben) { const neu = snapHex(u.color); if (neu && neu !== u.color) { await db.run('UPDATE users SET color = ? WHERE id = ?', [neu, u.id]); geaendert++; } }
+    if (geaendert) console.log('[Palette] ' + geaendert + ' Spielerfarben auf die Palette gesetzt.');
+  } catch (err) { console.error('[Palette] Spielerfarben:', err.message); }
+
   // Puzzle completions table
   await db.execute(`CREATE TABLE IF NOT EXISTS puzzle_completions (
     user_id TEXT NOT NULL,
@@ -1322,6 +1330,7 @@ function getRandomDefaultAvatar() {
  *  cyan in lobby lists / chat / hero accents — this hand-tuned palette
  *  spreads new signups across distinguishable hues that all read
  *  cleanly on the dark UI. The user can still recolour from Profile. */
+const { snapHex } = require('./palette');
 const DEFAULT_PLAYER_COLORS = [
   '#00f0ff', // cyan (legacy default — keep in the pool)
   '#ff5060', // crimson
@@ -1337,7 +1346,7 @@ const DEFAULT_PLAYER_COLORS = [
   '#66ddcc', // teal
 ];
 function getRandomDefaultColor() {
-  return DEFAULT_PLAYER_COLORS[Math.floor(Math.random() * DEFAULT_PLAYER_COLORS.length)];
+  return snapHex(DEFAULT_PLAYER_COLORS[Math.floor(Math.random() * DEFAULT_PLAYER_COLORS.length)]);   // Spiel-Palette (256 Farben)
 }
 // Simple token-based auth using cookies
 const sessions = new Map(); // token -> { userId, username }
@@ -2134,7 +2143,7 @@ app.put('/api/profile', authMiddleware, async (req, res) => {
   const sets = [];
   const vals = [];
   if (b.username !== undefined)   { sets.push('username = ?');     vals.push(newUsername); }
-  if (b.color !== undefined)      { sets.push('color = ?');       vals.push(b.color || '#00f0ff'); }
+  if (b.color !== undefined)      { sets.push('color = ?');       vals.push(snapHex(b.color || '#00f0ff')); }
   if (b.avatar !== undefined)     { sets.push('avatar = ?');      vals.push(b.avatar || null); }
   if (b.cardback !== undefined)   { sets.push('cardback = ?');    vals.push(b.cardback || null); }
   if (b.bio !== undefined)        { sets.push('bio = ?');         vals.push((b.bio || '').slice(0, 200)); }
@@ -2362,7 +2371,7 @@ app.post('/api/profile/import', authMiddleware, express.text({ limit: '20mb' }),
 
   // Restore user fields
   await db.run('UPDATE users SET elo = ?, color = ?, bio = ?, wins = ?, losses = ?, cardback = ? WHERE id = ?',
-    [data.elo || 1000, data.color || '#00f0ff', (data.bio || '').slice(0, 200), data.wins || 0, data.losses || 0, data.cardback || null, req.user.userId]);
+    [data.elo || 1000, snapHex(data.color || '#00f0ff'), (data.bio || '').slice(0, 200), data.wins || 0, data.losses || 0, data.cardback || null, req.user.userId]);
 
   // Restore avatar (may be data URL or old-format base64 object)
   if (data.avatar) {

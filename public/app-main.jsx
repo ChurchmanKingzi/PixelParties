@@ -147,7 +147,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
     return () => clearInterval(t);
   }, [draft?.suspended, draft?.myPicked, draft?.round, draft?.pickInRound]);
 
-  // Hooks muessen VOR den fruehen Returns stehen (sonst React #310, sobald
+  // Hooks muessen VOR den fruehen Returns stehen (sonst React #311402, sobald
   // `draft` von null auf gesetzt wechselt).
   const startedAt = useRef(Date.now());
   useEffect(() => { startedAt.current = Date.now(); }, [draft?.round, draft?.pickInRound, draft?.suspended]);
@@ -195,7 +195,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
         <div className="top-bar">
           <button className="btn btn-danger" onClick={leaveRoom}>LEAVE</button>
           <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 CUBE DRAFT — SPECTATING</h2>
-          <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff' }}>Pack {draft.round + 1}/{draft.totalRounds} · Pick {cubeDraftOverallPick(draft)}/{draft.totalPicks}</span>
+          <span className="badge" style={{ background: 'rgba(179,216,249,.14)', color: '#b3d8f9' }}>Pack {draft.round + 1}/{draft.totalRounds} · Pick {cubeDraftOverallPick(draft)}/{draft.totalPicks}</span>
           <VolumeControl />
         </div>
         <div className="screen-center" style={{ flexDirection: 'column', gap: 16 }}>
@@ -260,16 +260,16 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
         <button className="btn btn-danger" onClick={leaveRoom}>LEAVE</button>
         <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 CUBE DRAFT</h2>
         <div style={{ flex: 1 }} />
-        <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff', fontSize: 13, padding: '5px 14px', fontWeight: 700 }}>
+        <span className="badge" style={{ background: 'rgba(179,216,249,.14)', color: '#b3d8f9', fontSize: 13, padding: '5px 14px', fontWeight: 700 }}>
           Pack {draft.round + 1}/{draft.totalRounds} · Pick {cubeDraftOverallPick(draft)}/{draft.totalPicks}
         </span>
         {draft.timerDisabled ? (
-          <span className="badge" style={{ background: 'rgba(0,240,255,.08)', color: 'var(--text2)', fontSize: 12, padding: '5px 14px', fontWeight: 600 }}>
+          <span className="badge" style={{ background: 'rgba(26,237,255,.08)', color: 'var(--text2)', fontSize: 12, padding: '5px 14px', fontWeight: 600 }}>
             ⏱ Untimed
           </span>
         ) : (
           <span className="badge" style={{
-            background: timerWarn ? 'rgba(255,80,80,.18)' : 'rgba(0,240,255,.10)',
+            background: timerWarn ? 'rgba(254,81,84,.18)' : 'rgba(26,237,255,.10)',
             color: timerWarn ? '#ff6666' : 'var(--accent)',
             fontSize: 13, padding: '5px 14px', fontWeight: 700,
             animation: timerWarn ? 'pulse 1s infinite' : undefined,
@@ -294,7 +294,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
         // Fallback: any seat that's the kick target.
         const kickTarget = draft.voteKick?.targetSeat;
         return (
-          <div style={{ background: 'rgba(255,170,0,.15)', border: '1px solid #ffaa33', padding: '8px 16px', textAlign: 'center', color: '#ffcc44', fontWeight: 600 }}>
+          <div style={{ background: 'rgba(249,172,32,.15)', border: '1px solid #f9ac20', padding: '8px 16px', textAlign: 'center', color: '#fad54a', fontWeight: 600 }}>
             ⏸ Draft suspended — {draft.suspendReason || 'a player has disconnected'}.
             {draft.voteKick ? (
               <>
@@ -334,7 +334,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
             <React.Fragment key={r.seatIdx}>
               <div style={{
                 padding: '8px 10px',
-                background: r.isMe ? 'rgba(0,240,255,.10)' : 'transparent',
+                background: r.isMe ? 'rgba(26,237,255,.10)' : 'transparent',
                 borderLeft: r.isMe ? '3px solid var(--accent)' : '3px solid transparent',
                 marginBottom: 2,
                 display: 'flex', alignItems: 'center', gap: 6,
@@ -779,7 +779,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
       <div className="top-bar">
         <button className="btn btn-danger" onClick={leaveRoom}>LEAVE</button>
         <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 BUILD YOUR DECK</h2>
-        <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff' }}>{build.cubeName}</span>
+        <span className="badge" style={{ background: 'rgba(179,216,249,.14)', color: '#b3d8f9' }}>{build.cubeName}</span>
         <input className="input" placeholder="Deck name…" value={deckName} onChange={e => setDeckName(e.target.value)}
           style={{ width: 240, fontSize: 12, padding: '4px 8px' }} />
         <div style={{ flex: 1 }} />
@@ -796,12 +796,12 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
       </div>
 
       {build.assignedHero && (
-        <div style={{ background: 'rgba(255,170,0,.12)', borderBottom: '1px solid #ffaa33', padding: '6px 16px', fontSize: 11, textAlign: 'center', color: '#ffcc44' }}>
+        <div style={{ background: 'rgba(249,172,32,.12)', borderBottom: '1px solid #f9ac20', padding: '6px 16px', fontSize: 11, textAlign: 'center', color: '#fad54a' }}>
           🎲 You drafted no Heroes. The system assigned <strong>{build.assignedHero}</strong> to you.
         </div>
       )}
       {buildTimerMsLeft == null && build.buildTimerTotalMs === 0 && (
-        <div style={{ background: 'rgba(0,240,255,.06)', borderBottom: '1px solid var(--bg4)', padding: '4px 16px', fontSize: 11, textAlign: 'center', color: 'var(--text2)' }}>
+        <div style={{ background: 'rgba(26,237,255,.06)', borderBottom: '1px solid var(--bg4)', padding: '4px 16px', fontSize: 11, textAlign: 'center', color: 'var(--text2)' }}>
           ⏱ Deck building timer is off — the tournament starts once everyone is ready.
         </div>
       )}
@@ -811,10 +811,10 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
         const warn = buildTimerMsLeft <= 60_000;
         return (
           <div style={{
-            background: warn ? 'rgba(255,80,80,.16)' : 'rgba(0,240,255,.10)',
+            background: warn ? 'rgba(254,81,84,.16)' : 'rgba(26,237,255,.10)',
             borderBottom: '1px solid ' + (warn ? '#ff6666' : 'var(--accent)'),
             padding: '6px 16px', fontSize: 12, textAlign: 'center',
-            color: warn ? '#ff8888' : 'var(--accent)',
+            color: warn ? '#ec7f79' : 'var(--accent)',
             fontWeight: 700, letterSpacing: 1,
             animation: warn ? 'pulse 1s infinite' : undefined,
           }}>
@@ -937,14 +937,14 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
                     <CardMini card={cardDB[name]} onClick={() => {}} style={{ width: '100%', height: '100%', filter: dimmed ? 'grayscale(.8) brightness(.6)' : 'none' }} />
                     {isNonStartingHero(name) && (
                       <div style={{
-                        position: 'absolute', top: 2, left: 2, background: 'rgba(255,170,0,.9)', color: '#2a1a00',
+                        position: 'absolute', top: 2, left: 2, background: 'rgba(249,172,32,.9)', color: '#27180c',
                         borderRadius: 4, padding: '1px 5px', fontSize: 8, fontWeight: 800, lineHeight: 1.2, pointerEvents: 'none',
                       }} title="Cannot be a Starting Hero — play it in the Main Deck">MAIN ONLY</div>
                     )}
                     <div style={{
                       position: 'absolute', bottom: 2, right: 2,
-                      background: free ? 'rgba(154,216,255,.85)' : 'rgba(0,0,0,.85)',
-                      color: free ? '#001a33' : '#fff',
+                      background: free ? 'rgba(179,216,249,.85)' : 'rgba(0,0,0,.85)',
+                      color: free ? '#00213f' : '#fff',
                       borderRadius: 4, padding: '1px 5px',
                       fontSize: 10, fontWeight: 700, lineHeight: 1.2,
                       pointerEvents: 'none',
@@ -1005,7 +1005,7 @@ function CubeDraftTournamentScreen({ lobby, tournament, gameState, leaveRoom, no
       <div className="top-bar">
         <button className="btn btn-danger" onClick={leaveRoom}>LEAVE</button>
         <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 CUBE TOURNAMENT</h2>
-        <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff' }}>{tournament.cubeName}</span>
+        <span className="badge" style={{ background: 'rgba(179,216,249,.14)', color: '#b3d8f9' }}>{tournament.cubeName}</span>
         <span className="badge" style={{ background: 'rgba(255,255,255,.06)', color: 'var(--text)' }}>
           Round {tournament.currentRoundIdx + 1}/{Math.log2(tournament.bracketSize)}
         </span>
@@ -1013,7 +1013,7 @@ function CubeDraftTournamentScreen({ lobby, tournament, gameState, leaveRoom, no
           Bo{tournament.currentRoundIdx === Math.log2(tournament.bracketSize) - 1 ? tournament.finaleBo : tournament.prelimsBo}
         </span>
         <div style={{ flex: 1 }} />
-        <span className="badge" style={{ background: tournament.flow === 'simultaneous' ? 'rgba(0,240,255,.10)' : 'rgba(255,170,0,.10)', color: tournament.flow === 'simultaneous' ? 'var(--accent)' : '#ffaa33' }}>
+        <span className="badge" style={{ background: tournament.flow === 'simultaneous' ? 'rgba(26,237,255,.10)' : 'rgba(249,172,32,.10)', color: tournament.flow === 'simultaneous' ? 'var(--accent)' : '#f9ac20' }}>
           {tournament.flow === 'simultaneous' ? 'SIMULTANEOUS' : 'CONSECUTIVE'}
         </span>
         <VolumeControl />
@@ -1104,7 +1104,7 @@ function CubeDraftMatchCard({ match, mySeat, currentRound }) {
   const slot = (label, seat, name, isWinner) => (
     <div style={{
       padding: '6px 10px',
-      background: isWinner ? 'rgba(51,255,136,.10)' : (seat === mySeat ? 'rgba(0,240,255,.08)' : 'transparent'),
+      background: isWinner ? 'rgba(76,235,112,.10)' : (seat === mySeat ? 'rgba(26,237,255,.08)' : 'transparent'),
       borderLeft: '3px solid ' + (isWinner ? 'var(--success)' : (seat === mySeat ? 'var(--accent)' : 'var(--bg4)')),
       fontSize: 12,
       color: isWinner ? 'var(--success)' : (seat === mySeat ? 'var(--accent)' : 'var(--text)'),
@@ -1122,7 +1122,7 @@ function CubeDraftMatchCard({ match, mySeat, currentRound }) {
       position: 'relative',
     }}>
       {match.thirdPlace && (
-        <div className="orbit-font" style={{ padding: '3px 10px', fontSize: 9, fontWeight: 700, letterSpacing: 1, color: '#cd8b4a', background: 'rgba(205,139,74,.12)' }}>🥉 3RD PLACE</div>
+        <div className="orbit-font" style={{ padding: '3px 10px', fontSize: 9, fontWeight: 700, letterSpacing: 1, color: '#ca874e', background: 'rgba(202,135,78,.12)' }}>🥉 3RD PLACE</div>
       )}
       {live && (
         <div style={{ position: 'absolute', top: 4, right: 6, fontSize: 9, color: 'var(--accent3)', fontWeight: 700, animation: 'pulse 1.2s infinite' }}>
@@ -1151,7 +1151,7 @@ function CubeDraftFinalStandings({ lobby, tournament, leaveRoom }) {
     delay: (Math.random() * 3).toFixed(2),
     dur: (3.2 + Math.random() * 2.6).toFixed(2),
     size: 6 + Math.round(Math.random() * 7),
-    color: ['#ffd700', '#ff6b9d', '#00f0ff', '#9aff6b', '#c58bff', '#ffffff'][i % 6],
+    color: ['#ffd61a', '#fe6794', '#1aedff', '#66ff71', '#c98aff', '#ffffff'][i % 6],
     rot: Math.round(Math.random() * 360),
   })), []);
   useEffect(() => {
@@ -1183,10 +1183,10 @@ function CubeDraftFinalStandings({ lobby, tournament, leaveRoom }) {
     );
   };
   return (
-    <div className="screen-full" style={{ background: 'radial-gradient(ellipse at 50% 30%, rgba(255,215,0,.16) 0%, var(--bg) 70%)', position: 'relative', overflow: 'hidden' }}>
+    <div className="screen-full" style={{ background: 'radial-gradient(ellipse at 50% 30%, rgba(255,214,26,.16) 0%, var(--bg) 70%)', position: 'relative', overflow: 'hidden' }}>
       <div className="top-bar">
         <button className="btn" onClick={leaveRoom}>← LEAVE</button>
-        <h2 className="orbit-font" style={{ fontSize: 14, color: '#ffd700' }}>🏆 TOURNAMENT COMPLETE</h2>
+        <h2 className="orbit-font" style={{ fontSize: 14, color: '#ffd61a' }}>🏆 TOURNAMENT COMPLETE</h2>
         <VolumeControl />
       </div>
       {stage >= 4 && (
@@ -1204,9 +1204,9 @@ function CubeDraftFinalStandings({ lobby, tournament, leaveRoom }) {
           </div>
         )}
         <div className="podium-stage">
-          {step(2, '2', 104, '#cfd4dc', '🥈')}
-          {step(1, '1', 148, '#ffd700', '🥇')}
-          {step(3, '3', 72, '#cd7f32', '🥉')}
+          {step(2, '2', 104, '#d2d2db', '🥈')}
+          {step(1, '1', 148, '#ffd61a', '🥇')}
+          {step(3, '3', 72, '#be680e', '🥉')}
         </div>
         <div className="panel" style={{ width: '100%', maxWidth: 720, padding: 20, marginTop: 22, opacity: stage >= 4 ? 1 : 0, transform: stage >= 4 ? 'none' : 'translateY(16px)', transition: 'opacity .6s, transform .6s' }}>
           <div className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', marginBottom: 16, textAlign: 'center', fontWeight: 700, letterSpacing: 1 }}>
@@ -1216,11 +1216,11 @@ function CubeDraftFinalStandings({ lobby, tournament, leaveRoom }) {
             <div key={s.seat} style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '10px 12px',
-              background: i === 0 ? 'rgba(255,215,0,.08)' : (i === 1 ? 'rgba(170,170,170,.08)' : (i === 2 ? 'rgba(205,127,50,.08)' : 'transparent')),
-              borderLeft: '4px solid ' + (i === 0 ? '#ffd700' : i === 1 ? '#aaaaaa' : i === 2 ? '#cd7f32' : 'var(--bg4)'),
+              background: i === 0 ? 'rgba(255,214,26,.08)' : (i === 1 ? 'rgba(168,168,168,.08)' : (i === 2 ? 'rgba(190,104,14,.08)' : 'transparent')),
+              borderLeft: '4px solid ' + (i === 0 ? '#ffd61a' : i === 1 ? '#a8a8a8' : i === 2 ? '#be680e' : 'var(--bg4)'),
               marginBottom: 4, borderRadius: 4,
             }}>
-              <div style={{ fontSize: 24, width: 40, textAlign: 'center', fontWeight: 800, color: i === 0 ? '#ffd700' : i === 1 ? '#cccccc' : i === 2 ? '#cd7f32' : 'var(--text2)' }}>
+              <div style={{ fontSize: 24, width: 40, textAlign: 'center', fontWeight: 800, color: i === 0 ? '#ffd61a' : i === 1 ? '#d2d2db' : i === 2 ? '#be680e' : 'var(--text2)' }}>
                 #{s.placement}
               </div>
               <div style={{ flex: 1 }}>
@@ -1659,10 +1659,10 @@ function PlayScreen() {
             {isHost ? 'CLOSE ROOM' : 'LEAVE'}
           </button>
           <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 CUBE DRAFT LOBBY</h2>
-          <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff' }}>
+          <span className="badge" style={{ background: 'rgba(179,216,249,.14)', color: '#b3d8f9' }}>
             {lobby.cubeDraft.cubeName}
           </span>
-          <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(255,170,0,.12)' : 'rgba(0,240,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
+          <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(249,172,32,.12)' : 'rgba(26,237,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
             {lobby.type.toUpperCase()}
           </span>
           <VolumeControl />
@@ -1692,7 +1692,7 @@ function PlayScreen() {
                     borderStyle: occupied ? 'solid' : 'dashed',
                     borderRadius: 8,
                     padding: '12px 8px',
-                    background: occupied ? 'rgba(0,240,255,.04)' : 'transparent',
+                    background: occupied ? 'rgba(26,237,255,.04)' : 'transparent',
                     textAlign: 'center',
                     opacity: occupied ? 1 : .5,
                     cursor: promotable ? 'pointer' : 'default',
@@ -1796,7 +1796,7 @@ function PlayScreen() {
             {isHost ? 'CLOSE ROOM' : 'LEAVE'}
           </button>
           <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>GAME LOBBY</h2>
-          <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(255,170,0,.12)' : 'rgba(0,240,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
+          <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(249,172,32,.12)' : 'rgba(26,237,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
             {lobby.type.toUpperCase()}
           </span>
           <VolumeControl />
@@ -1940,14 +1940,14 @@ function PlayScreen() {
                 <div key={r.id} className="room-card" onClick={() => joinRoom(r, false)}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontWeight: 700 }}>
-                      {isDraft && <span style={{ color: '#9ad8ff', marginRight: 4 }}>🧊</span>}
+                      {isDraft && <span style={{ color: '#b3d8f9', marginRight: 4 }}>🧊</span>}
                       {r.host}
                     </span>
                     <div style={{ display: 'flex', gap: 6 }}>
-                      {isDraft && <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(154,216,255,.3)', letterSpacing: 1 }}>CUBE DRAFT</span>}
-                      {r.skillTest && <span className="badge" style={{ background: 'rgba(255,200,80,.14)', color: '#ffc850', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(255,200,80,.3)', letterSpacing: 1 }}>🎯 SKILL TEST</span>}
+                      {isDraft && <span className="badge" style={{ background: 'rgba(179,216,249,.14)', color: '#b3d8f9', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(179,216,249,.3)', letterSpacing: 1 }}>CUBE DRAFT</span>}
+                      {r.skillTest && <span className="badge" style={{ background: 'rgba(255,208,102,.14)', color: '#ffd066', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(255,208,102,.3)', letterSpacing: 1 }}>🎯 SKILL TEST</span>}
                       {!isDraft && !r.skillTest && r.format > 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.1)', color: '#fff', fontSize: 12, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(255,255,255,.2)', letterSpacing: 1 }}>Bo{r.format}</span>}
-                      <span className="badge" style={{ background: r.type === 'ranked' ? 'rgba(255,170,0,.18)' : 'rgba(0,240,255,.15)', color: r.type === 'ranked' ? '#ffbb33' : '#00f0ff', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: r.type === 'ranked' ? '1px solid rgba(255,170,0,.35)' : '1px solid rgba(0,240,255,.3)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                      <span className="badge" style={{ background: r.type === 'ranked' ? 'rgba(249,172,32,.18)' : 'rgba(26,237,255,.15)', color: r.type === 'ranked' ? '#ffb91a' : '#1aedff', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: r.type === 'ranked' ? '1px solid rgba(249,172,32,.35)' : '1px solid rgba(26,237,255,.3)', textTransform: 'uppercase', letterSpacing: 1 }}>
                         {r.type}
                       </span>
                       {!isDraft && !r.skillTest && r.format <= 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.06)', color: 'var(--text2)', fontSize: 11, padding: '3px 10px' }}>Bo1</span>}
@@ -1955,7 +1955,7 @@ function PlayScreen() {
                   </div>
                   <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2 }}>
                     {r.hasPlayerPw ? '🔒 Password' : '🔓 Open'} · {r.playerCount}/{cap} players
-                    {isDraft && r.cubeDraft && <span style={{ marginLeft: 8 }}>· Cube: <span style={{ color: '#9ad8ff' }}>{r.cubeDraft.cubeName}</span> · Bo{r.cubeDraft.prelimsBo} prelims / Bo{r.cubeDraft.finaleBo} finale</span>}
+                    {isDraft && r.cubeDraft && <span style={{ marginLeft: 8 }}>· Cube: <span style={{ color: '#b3d8f9' }}>{r.cubeDraft.cubeName}</span> · Bo{r.cubeDraft.prelimsBo} prelims / Bo{r.cubeDraft.finaleBo} finale</span>}
                   </div>
                 </div>
               );
@@ -1977,7 +1977,7 @@ function PlayScreen() {
                   <div style={{ display: 'flex', gap: 6 }}>
                     {r.format > 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.1)', color: '#fff', fontSize: 12, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(255,255,255,.2)', letterSpacing: 1 }}>Bo{r.format}</span>}
                     {r.format <= 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.06)', color: 'var(--text2)', fontSize: 11, padding: '3px 10px' }}>Bo1</span>}
-                    <span className="badge" style={{ background: 'rgba(255,0,170,.12)', color: 'var(--accent2)' }}>LIVE</span>
+                    <span className="badge" style={{ background: 'rgba(251,30,169,.12)', color: 'var(--accent2)' }}>LIVE</span>
                   </div>
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2 }}>
@@ -2011,10 +2011,10 @@ function PlayScreen() {
               // personal even outside the medal tier.
               const tier = p.rank === 1 ? 'gold' : p.rank === 2 ? 'silver' : p.rank === 3 ? 'bronze' : null;
               const nameColor =
-                tier === 'gold'   ? '#ffd24a' :
-                tier === 'silver' ? '#d8d8e6' :
-                tier === 'bronze' ? '#cd7f32' :
-                p.color || '#00f0ff';
+                tier === 'gold'   ? '#fad54a' :
+                tier === 'silver' ? '#d2d2db' :
+                tier === 'bronze' ? '#be680e' :
+                p.color || '#1aedff';
               const crown = tier === 'gold' ? '👑' : tier === 'silver' ? '🥈' : tier === 'bronze' ? '🥉' : null;
               return (
                 // v1289: Klick/Enter oeffnet das Spielerprofil (app-player-profile.jsx).
@@ -2083,7 +2083,7 @@ function PlayScreen() {
                   <div>
                     <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>Cube</div>
                     {legalCubes.length === 0 ? (
-                      <div style={{ fontSize: 11, color: 'var(--danger)', padding: '6px 8px', border: '1px solid var(--danger)', borderRadius: 4, background: 'rgba(255,80,80,.06)' }}>
+                      <div style={{ fontSize: 11, color: 'var(--danger)', padding: '6px 8px', border: '1px solid var(--danger)', borderRadius: 4, background: 'rgba(254,81,84,.06)' }}>
                         You have no legal Cube (exactly 512 cards). Build one in the Deck Editor before hosting a draft.
                       </div>
                     ) : (
@@ -2769,12 +2769,12 @@ class GameErrorBoundary extends React.Component {
     const e = this.state.err;
     const text = `${e?.message || e}\n\n${e?.stack || ''}\n\nKomponenten-Stack:${this.state.info?.componentStack || ''}`;
     return (
-      <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(10,10,16,.96)',
-        color: '#ffd7d7', padding: '24px', overflow: 'auto', fontFamily: 'monospace', fontSize: 13 }}>
-        <div style={{ fontSize: 18, marginBottom: 10, color: '#ff8080' }}>
+      <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(8,6,12,.96)',
+        color: '#fae5eb', padding: '24px', overflow: 'auto', fontFamily: 'monospace', fontSize: 13 }}>
+        <div style={{ fontSize: 18, marginBottom: 10, color: '#fe7476' }}>
           Das Spielfeld ist auf einen Fehler gelaufen.
         </div>
-        <div style={{ marginBottom: 14, color: '#ccc', fontFamily: 'inherit' }}>
+        <div style={{ marginBottom: 14, color: '#d2d2db', fontFamily: 'inherit' }}>
           Die Partie läuft auf dem Server weiter — Neuladen bringt dich zurück hinein.
           Bitte den Text unten mitschicken.
         </div>
@@ -3024,7 +3024,7 @@ function OpponentUnlockPopup() {
       style={{
         position: 'fixed', inset: 0, zIndex: 100000,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'radial-gradient(circle at 50% 45%, rgba(40,28,5,.55), rgba(5,3,12,.9))',
+        background: 'radial-gradient(circle at 50% 45%, rgba(39,24,12,.55), rgba(8,6,12,.9))',
         backdropFilter: 'blur(3px)',
         animation: 'ppUnlockFade .3s ease both',
       }}
@@ -3038,12 +3038,12 @@ function OpponentUnlockPopup() {
         }
         @keyframes ppUnlockSpin { to { transform: rotate(360deg); } }
         @keyframes ppUnlockGlow {
-          0%,100% { box-shadow: 0 0 28px rgba(255,200,60,.55), 0 0 70px rgba(255,160,20,.35), inset 0 0 24px rgba(255,200,60,.18); }
-          50% { box-shadow: 0 0 44px rgba(255,225,120,.85), 0 0 110px rgba(255,170,30,.55), inset 0 0 34px rgba(255,210,90,.3); }
+          0%,100% { box-shadow: 0 0 28px rgba(255,198,28,.55), 0 0 70px rgba(255,154,26,.35), inset 0 0 24px rgba(255,198,28,.18); }
+          50% { box-shadow: 0 0 44px rgba(251,225,129,.85), 0 0 110px rgba(249,172,32,.55), inset 0 0 34px rgba(255,217,102,.3); }
         }
         @keyframes ppUnlockTitle {
-          0%,100% { text-shadow: 0 0 10px rgba(255,210,90,.8), 0 0 22px rgba(255,160,20,.5); }
-          50% { text-shadow: 0 0 18px rgba(255,235,150,1), 0 0 40px rgba(255,180,40,.8); }
+          0%,100% { text-shadow: 0 0 10px rgba(255,217,102,.8), 0 0 22px rgba(255,154,26,.5); }
+          50% { text-shadow: 0 0 18px rgba(255,241,150,1), 0 0 40px rgba(249,172,32,.8); }
         }
       `}</style>
 
@@ -3052,7 +3052,7 @@ function OpponentUnlockPopup() {
            onClick={e => e.stopPropagation()}>
         <div style={{
           position: 'absolute', width: 620, height: 620, borderRadius: '50%',
-          background: 'conic-gradient(from 0deg, rgba(255,200,60,0) 0deg, rgba(255,210,90,.32) 60deg, rgba(255,200,60,0) 120deg, rgba(255,210,90,.32) 180deg, rgba(255,200,60,0) 240deg, rgba(255,210,90,.32) 300deg, rgba(255,200,60,0) 360deg)',
+          background: 'conic-gradient(from 0deg, rgba(255,198,28,0) 0deg, rgba(255,217,102,.32) 60deg, rgba(255,198,28,0) 120deg, rgba(255,217,102,.32) 180deg, rgba(255,198,28,0) 240deg, rgba(255,217,102,.32) 300deg, rgba(255,198,28,0) 360deg)',
           filter: 'blur(6px)', animation: 'ppUnlockSpin 14s linear infinite', pointerEvents: 'none',
         }} />
 
@@ -3063,41 +3063,41 @@ function OpponentUnlockPopup() {
           padding: '34px 36px 30px',
           textAlign: 'center',
           borderRadius: 18,
-          border: '3px solid #ffcf52',
-          outline: '1px solid rgba(255,225,140,.6)',
+          border: '3px solid #fad54a',
+          outline: '1px solid rgba(251,225,129,.6)',
           outlineOffset: 6,
-          background: 'linear-gradient(160deg, #241a36 0%, #15101f 55%, #1d1330 100%)',
+          background: 'linear-gradient(160deg, #291f3d 0%, #12101f 55%, #170b28 100%)',
           animation: 'ppUnlockPop .5s cubic-bezier(.18,.9,.3,1.2) both, ppUnlockGlow 2.6s ease-in-out infinite',
         }}>
           {/* Ornamental corner flourishes */}
           {[['top','left'],['top','right'],['bottom','left'],['bottom','right']].map(([v,h]) => (
             <div key={v+h} style={{
-              position: 'absolute', [v]: 6, [h]: 10, color: '#ffd76a',
-              fontSize: 20, lineHeight: 1, textShadow: '0 0 8px rgba(255,180,40,.8)', pointerEvents: 'none',
+              position: 'absolute', [v]: 6, [h]: 10, color: '#ffd966',
+              fontSize: 20, lineHeight: 1, textShadow: '0 0 8px rgba(249,172,32,.8)', pointerEvents: 'none',
             }}>✦</div>
           ))}
 
           <div className="orbit-font" style={{
-            fontSize: 15, fontWeight: 800, letterSpacing: 3, color: '#ffd76a',
+            fontSize: 15, fontWeight: 800, letterSpacing: 3, color: '#ffd966',
             marginBottom: 18, animation: 'ppUnlockTitle 2.2s ease-in-out infinite',
           }}>{current.kind === 'skin' ? '✦ NEW SKIN UNLOCKED ✦' : '✦ NEW OPPONENT UNLOCKED ✦'}</div>
 
           {/* Hero portrait in a gold frame */}
           <div style={{
             display: 'inline-block', padding: 4, borderRadius: 10,
-            border: '2px solid #ffcf52', background: '#0a0a12',
-            boxShadow: '0 0 18px rgba(255,190,50,.5)', marginBottom: 18,
+            border: '2px solid #fad54a', background: '#08060c',
+            boxShadow: '0 0 18px rgba(255,185,26,.5)', marginBottom: 18,
           }}>
             {heroArt
               ? <HeroArtCrop heroName={current.kind === 'skin' ? current.heroName : current.middleHero} skinName={current.kind === 'skin' ? current.skinName : null} width={300} />
-              : <div style={{ width: 300, height: 200, background: '#1a1a28' }} />}
+              : <div style={{ width: 300, height: 200, background: '#1a1a2e' }} />}
           </div>
 
           <div style={{ fontSize: 16, color: 'var(--text)', lineHeight: 1.5, marginBottom: 22 }}>
             You unlocked{' '}
             <span className="orbit-font" style={{
-              color: '#ffe08a', fontWeight: 800, fontSize: 20,
-              textShadow: '0 0 12px rgba(255,190,50,.7)',
+              color: '#fbe181', fontWeight: 800, fontSize: 20,
+              textShadow: '0 0 12px rgba(255,185,26,.7)',
             }}>{current.kind === 'skin' ? current.skinName : (current.middleHero || current.name)}</span>{' '}
             {current.kind === 'skin' ? <>as a new skin for <b>{current.heroName}</b>!</> : 'as a new opponent!'}
           </div>
@@ -3107,13 +3107,13 @@ function OpponentUnlockPopup() {
             className="orbit-font"
             style={{
               padding: '10px 34px', fontSize: 14, fontWeight: 800, letterSpacing: 2,
-              color: '#3a2600', cursor: 'pointer', borderRadius: 8, border: 'none',
-              background: 'linear-gradient(180deg, #ffe27a 0%, #ffc23a 60%, #f0a51c 100%)',
-              boxShadow: '0 0 16px rgba(255,190,50,.7), 0 3px 0 #b9791a',
+              color: '#332300', cursor: 'pointer', borderRadius: 8, border: 'none',
+              background: 'linear-gradient(180deg, #fbe181 0%, #ffb91a 60%, #f9ac20 100%)',
+              boxShadow: '0 0 16px rgba(255,185,26,.7), 0 3px 0 #c68206',
               transition: 'transform .12s ease, box-shadow .12s ease',
             }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 0 26px rgba(255,210,90,.9), 0 5px 0 #b9791a'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 0 16px rgba(255,190,50,.7), 0 3px 0 #b9791a'; }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 0 26px rgba(255,217,102,.9), 0 5px 0 #c68206'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 0 16px rgba(255,185,26,.7), 0 3px 0 #c68206'; }}
           >CONTINUE</button>
         </div>
       </div>
@@ -3194,7 +3194,7 @@ function App() {
   // Expose the player's chosen colour as a global CSS variable so every
   // screen/submenu (titles, etc.) can theme off it via var(--player-color).
   useEffect(() => {
-    const col = (user && user.color) || '#00f0ff';
+    const col = (user && user.color) || '#1aedff';
     document.documentElement.style.setProperty('--player-color', col);
     // Recolour the hover/clickable cursor to a shining tone of this colour.
     applyPixelHoverCursor(col);
@@ -3277,7 +3277,7 @@ function App() {
 
   // Sync accent color to user's profile color
   useEffect(() => {
-    document.documentElement.style.setProperty('--accent', user && user.color ? user.color : '#00f0ff');
+    document.documentElement.style.setProperty('--accent', user && user.color ? user.color : '#1aedff');
   }, [user?.color]);
 
   // ── App-wide tooltip wheel-scroll redirect ──
