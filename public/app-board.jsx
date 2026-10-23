@@ -46359,12 +46359,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       for (const anim of newAnims) {
         setTimeout(() => {
           setDiscardAnims(prev => [...prev, (anim.t0 == null ? { ...anim, t0: ppJetzt() } : anim)]);
-          // v337 (Als Befund): der Flug in den Deleted Pile war stumm —
-          // Trade schickte fuenf Karten lautlos weg. Derselbe Klang wie
-          // beim Abwurf, je Karte und im Takt ihres Fluges; ein eigener
-          // Delete-Klang existiert nicht. Gilt fuer JEDEN Sender von
-          // `deck_to_deleted`, also auch Nerdy Cheese.
-          if (window.playSFX) window.playSFX('discard', { dedupe: 40 });
+          // KEIN Klang hier. v337 hatte an dieser Stelle je Karte einen
+          // Abwurf-Klang gesetzt (Trade war stumm); seit v1261 klingt aber
+          // schon das WACHSTUM des Loeschstapels (je Karte beim Landen,
+          // die Engine bucht sie im Takt ihres Fluges ein). Beides zusammen
+          // spielte Trade mit 5 Karten als 7-8 Klaenge ab. Der Landeklang
+          // deckt JEDEN Sender von `deck_to_deleted` ab (auch Nerdy Cheese).
           setTimeout(() => setDiscardAnims(prev => prev.filter(a => a.id !== anim.id)), 500);
         }, anim.delay);
       }
