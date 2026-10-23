@@ -4,7 +4,7 @@
 // Kartentext Alice, the Transfer Student: „Creatures with identical names in the Support Zones of a Hero you control share 1 Support Zone. This effect persists even when this
 //   Hero is defeated and cannot be negated."
 // Geprüft wird:
-//  1. `engine.beschwoerZonenFuer` / `hatBeschwoerZone` / `eligibleSummonZones`: freie Zonen vor geteilten, `shared`/`stackDepth`, nur gleichnamige Stapel, Held-Zustand
+//  1. `engine.beschwoerZonenFuer` / `hatBeschwoerZone` / `eligibleSummonZones`: GETEILTE Zonen vor freien (W63a, Al 22.10.2026: erst die geteilte, dann die erste leere), `shared`/`stackDepth`, nur gleichnamige Stapel, Held-Zustand
 //     (Frozen/gefallen), `geteilt: false`, `nurBasis`, übernommener Held der Gegenspalte (Kontrolle statt Seite), Alice beim Gegner.
 //  2. `sofortAusHandBeschwoeren` (Albrecht, Ellie, Golden Ladybug …): die Zonenwahl bietet die geteilte Zone an, die Kreatur landet im Stapel.
 //  3. `_canHeroActivateSurprise` für Kreatur-Surprises (Jumper Spider): gilt auf vollem Brett mit gleichnamiger Zone als aktivierbar.
@@ -40,12 +40,12 @@ const slots = (zs) => zs.filter(z => z.heroIdx === 0).map(z => z.slotIdx + (z.sh
   for (const seat of [0, 1]) {
     const S = `Sitz ${seat}: `;
 
-    R.section(S + '1 · `beschwoerZonenFuer` / `eligibleSummonZones`: frei vor geteilt, nur gleichnamige Stapel');
+    R.section(S + '1 · `beschwoerZonenFuer` / `eligibleSummonZones`: geteilt vor frei (W63a), nur gleichnamige Stapel');
     { const t = await brett(seat, [[SLIME, SLIME], [], [BIG]], { fuellen: true });
       const bz = t.engine.beschwoerZonenFuer(seat, SLIME, { heroIdx: 0 });
-      R.check('beschwoerZonenFuer: Slot 1 frei, dann Slot 0 geteilt (×2)', JSON.stringify(bz.map(z => [z.slotIdx, !!z.shared, z.stackDepth || 0])) === JSON.stringify([[1, false, 0], [0, true, 2]]), bz);
+      R.check('beschwoerZonenFuer: Slot 0 geteilt (×2) VOR Slot 1 frei (W63a)', JSON.stringify(bz.map(z => [z.slotIdx, !!z.shared, z.stackDepth || 0])) === JSON.stringify([[0, true, 2], [1, false, 0]]), bz);
       const ez = eligibleSummonZones(t.engine, seite(t, seat), SLIME, { alsAktion: false });
-      R.check('eligibleSummonZones (Held 0): Slot 1 frei, Slot 0 geteilt', JSON.stringify(slots(ez)) === JSON.stringify(['1', '0s']), ez);
+      R.check('eligibleSummonZones (Held 0): Slot 0 geteilt VOR Slot 1 frei (W63a)', JSON.stringify(slots(ez)) === JSON.stringify(['0s', '1']), ez);
       R.check('eligibleSummonZones `geteilt: false` → nur die freie Zone', JSON.stringify(slots(eligibleSummonZones(t.engine, seat, SLIME, { alsAktion: false, geteilt: false }))) === '["1"]', null);
       R.check('hatBeschwoerZone: Slime ja, andere Karte nur die freie Zone, BIG-Stapel-Name nicht über Slime', t.engine.hatBeschwoerZone(seat, SLIME, { heroIdx: 0 }) && JSON.stringify(slots(t.engine.beschwoerZonenFuer(seat, CRE, { heroIdx: 0 }))) === '["1"]', null);
       R.check('nurBasis: nur Basisplätze 0-2', t.engine.beschwoerZonenFuer(seat, SLIME, { heroIdx: 0, nurBasis: true }).every(z => z.slotIdx < 3), null);
@@ -122,7 +122,7 @@ const slots = (zs) => zs.filter(z => z.heroIdx === 0).map(z => z.slotIdx + (z.sh
       R.check('GEGENPROBE ohne Alice: Held 0 ist kein Kandidat, keine Zone (−1)', !cpu.listEligibleHeroesForActionCard(t2.engine, seat, cd).some(e => e.hi === 0) && cpu.pickCreatureZoneSlot(t2.engine, seat, 0, SLIME) === -1, null);
       const t3 = await brett(seat, [[SLIME, SLIME], [], [BIG]], { fuellen: true });
       t3.grantFor(seat, 0, SLIME);
-      R.check('freie Zone UND geteilte Zone: die CPU bevorzugt die freie (Slot 1)', cpu.pickCreatureZoneSlot(t3.engine, seat, 0, SLIME) === 1, cpu.pickCreatureZoneSlot(t3.engine, seat, 0, SLIME)); }
+      R.check('freie Zone UND geteilte Zone: die CPU bevorzugt die geteilte (Slot 0; W63a)', cpu.pickCreatureZoneSlot(t3.engine, seat, 0, SLIME) === 0, cpu.pickCreatureZoneSlot(t3.engine, seat, 0, SLIME)); }
 
     R.section(S + '5 · `engine.zoneEintragen`: stapelt bei Alice, überschreibt nie');
     { const t = await brett(seat, [[SLIME, SLIME], [], [BIG]], { fuellen: true });

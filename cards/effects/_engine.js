@@ -4271,8 +4271,8 @@ class GameEngine {
        * Returns { inst, actualSlot } or null (no free zones — caller handles fizzle).
        * Does NOT fire onPlay/onCardEnterZone — caller must do that.
        */
-      safePlaceInSupport(cardName, playerIdx, heroIdx, zoneSlot) {
-        return engine.safePlaceInSupport(cardName, playerIdx, heroIdx, zoneSlot);
+      safePlaceInSupport(cardName, playerIdx, heroIdx, zoneSlot, opts) {
+        return engine.safePlaceInSupport(cardName, playerIdx, heroIdx, zoneSlot, opts);   // W63a: `opts` (z. B. `controller`) durchreichen
       },
       /**
        * Centralized creature summoning — guarantees summoning sickness, tracking, and counting.
@@ -15816,18 +15816,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ★★ v1349: versiegelte Plaetze (Madame Guillotine) zaehlen als belegt.
     const _frei = (z) => !this.supportSlotBelegt(playerIdx, heroIdx, z);
     if (actualSlot < 0) {
+      // ★ W63a (Al, 22.10.2026: „erst die geteilte Zone, sofern Alices Effekt aktiv ist, DANN die erste leere"): bestimmt die Engine den Platz
+      // selbst (kein Wunschplatz), kommt eine Zone mit GLEICHNAMIGER Creature (Alice-Teilung) vor der ersten leeren.
       for (let z = 0; z < 3; z++) {
-        if (_frei(z)) {
-          actualSlot = z;
-          break;
-        }
+        if (!_frei(z) && mayShare(z)) { actualSlot = z; break; }
       }
-      // Kein freier Platz — mit Alice darf die Karte trotzdem zu einer
-      // Namensgleichen dazu. Erst NACH dem Freien suchen: ein leerer
-      // Platz bleibt die natuerlichere Wahl.
       if (actualSlot < 0) {
         for (let z = 0; z < 3; z++) {
-          if (mayShare(z)) { actualSlot = z; break; }
+          if (_frei(z)) {
+            actualSlot = z;
+            break;
+          }
         }
       }
       if (actualSlot < 0) {
@@ -15847,15 +15846,16 @@ this._deathWatch = (this._deathWatchStack || []).length
       } else {
       // Find another free base zone (0–2) on the same hero
       actualSlot = -1;
+      // ★ W63a (Al): auch beim Ausweichen zuerst die geteilte Zone, dann die erste leere.
       for (let z = 0; z < 3; z++) {
-        if (z !== zoneSlot && _frei(z)) {
-          actualSlot = z;
-          break;
-        }
+        if (z !== zoneSlot && !_frei(z) && mayShare(z)) { actualSlot = z; shareHere = true; break; }
       }
       if (actualSlot < 0) {
         for (let z = 0; z < 3; z++) {
-          if (z !== zoneSlot && mayShare(z)) { actualSlot = z; shareHere = true; break; }
+          if (z !== zoneSlot && _frei(z)) {
+            actualSlot = z;
+            break;
+          }
         }
       }
       if (actualSlot < 0) {
@@ -29199,8 +29199,9 @@ this._deathWatch = (this._deathWatchStack || []).length
           out.push({ ...z, owner: seite });
         }
       }
-      // ★ W62a: freie Zonen vor geteilten (ueber alle Seiten hinweg), Reihenfolge sonst unveraendert.
-      return out.some(z => z.shared) ? [...out.filter(z => !z.shared), ...out.filter(z => z.shared)] : out;
+      // ★ W63a (Al, 22.10.2026: „erst die geteilte Zone, sofern Alices Effekt aktiv ist, DANN die erste leere"): geteilte Zonen vor freien (ueber alle
+      // Seiten hinweg), Reihenfolge sonst unveraendert.
+      return out.some(z => z.shared) ? [...out.filter(z => z.shared), ...out.filter(z => !z.shared)] : out;
     }
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
@@ -29261,6 +29262,8 @@ this._deathWatch = (this._deathWatchStack || []).length
           zones.push({ heroIdx: hi, slotIdx: si, label: `${heroLabel} — Slot ${si + 1} (×${tiefe})`, isIsland: false, shared: true, stackDepth: tiefe });
         }
       }
+      // ★ W63a (Al, 22.10.2026): geteilte Zonen VOR den freien — „erst die geteilte Zone, DANN die erste leere" (Reihenfolge sonst unveraendert).
+      if (zones.some(z => z.shared)) return [...zones.filter(z => z.shared), ...zones.filter(z => !z.shared)];
     }
     return zones;
   }
@@ -29272,6 +29275,9 @@ this._deathWatch = (this._deathWatchStack || []).length
    * oder negierter Alice) — Zonen, in denen schon nur GLEICHNAMIGE Kreaturen liegen („Creatures with identical names in the
    * Support Zones of a Hero you control share 1 Support Zone"). Freie Zonen stehen vorn (ein leerer Platz bleibt die
    * natuerlichere Wahl; dieselbe Reihenfolge wie `safePlaceInSupport`), die geteilten dahinter (`shared: true`, `stackDepth`).
+   * ★ W63a (Al, 22.10.2026: „erst die geteilte Zone, sofern Alices Effekt aktiv ist, DANN die erste leere"): die Reihenfolge ist UMGEKEHRT —
+   * geteilte Zonen stehen VORN, die freien dahinter. Bestimmt der Effekt die Zone selbst (kein Spielerentscheid), gilt `[0]`; waehlt der
+   * Spieler, stehen beide zur Wahl (die Standardvorauswahl ist dann die geteilte Zone).
    * Das ist dieselbe Auslegung wie der Hand-Weg (`validateActionPlay`/`doPlayCreature` + `canShareInto`) — jeder Beschwoerer,
    * der nach „freien Zonen" fragt, ruft diese Funktion (oder `eligibleSummonZones`, die darauf aufbaut) statt eine eigene
    * Zonenschleife zu bauen.
@@ -29289,7 +29295,16 @@ this._deathWatch = (this._deathWatchStack || []).length
     const feld = seite ?? playerIdx;
     const alle = this.getFreeSupportZones(feld, { ...rest, shareableFor: cardName || undefined, sharer: playerIdx });
     const nachHeld = heroIdx == null ? alle : alle.filter(z => z.heroIdx === heroIdx && (z.owner ?? feld) === feld);
-    return nachHeld.some(z => z.shared) ? [...nachHeld.filter(z => !z.shared), ...nachHeld.filter(z => z.shared)] : nachHeld;
+    // ★ W63a (Al): GETEILTE Zonen vor den freien — wer die Zone selbst bestimmt (Pinta, Slimes, CPU …), nimmt zuerst die geteilte Zone, dann die erste leere.
+    return nachHeld.some(z => z.shared) ? [...nachHeld.filter(z => z.shared), ...nachHeld.filter(z => !z.shared)] : nachHeld;
+  }
+
+  /**
+   * ★ W63a — die Zone, die ein Effekt nimmt, der den Platz SELBST bestimmt (kein Spielerentscheid): `beschwoerZonenFuer(...)[0]` — mit Alice-Teilung des
+   * Beschwoerers zuerst eine geteilte Zone (gleichnamige Creature), sonst die erste leere. `null`, wenn es keine gibt.
+   */
+  ersteBeschwoerZone(playerIdx, cardName, opts = {}) {
+    return this.beschwoerZonenFuer(playerIdx, cardName, opts)[0] || null;
   }
 
   /** `true`, wenn `beschwoerZonenFuer` mindestens eine Zone fuer `cardName` liefert. */

@@ -66,16 +66,18 @@ function freeSlots(ps, heroIdx) {
 }
 
 /**
- * ★ W62a: Plaetze fuer `name` am Held — freie Basisplaetze zuerst, dahinter (Alice-Teilung des Kontrolleurs `pi`) die Plaetze,
+ * ★ W62a: Plaetze fuer `name` am Held — (W63a: Alice-Teilung des Kontrolleurs `pi` ZUERST) die Plaetze,
  * auf denen schon nur GLEICHNAMIGE Kreaturen liegen (`canShareInto`). Eine Kopie, die kurz vorher in diesem Zauber gelegt wurde, zaehlt mit.
  */
 function slotsFor(engine, ps, pi, hs, heroIdx, name) {
   const out = freeSlots(ps, heroIdx);
   const { canShareInto } = require('./_alice-shared');
+  // ★ W63a (Al, 22.10.2026: „erst die geteilte Zone, DANN die erste leere"): geteilte Plaetze VOR den freien.
+  const geteilt = [];
   for (let s = 0; s < 3; s++) {
-    if (!out.includes(s) && canShareInto(engine, pi, heroIdx, s, name, hs)) out.push(s);
+    if (!out.includes(s) && canShareInto(engine, pi, heroIdx, s, name, hs)) geteilt.push(s);
   }
-  return out;
+  return [...geteilt, ...out];
 }
 
 /** Every Cute-Creature copy in hand then discard → gallery entries.

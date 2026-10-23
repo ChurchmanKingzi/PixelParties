@@ -118,7 +118,7 @@ function eligibleOwnSlotsFor(engine, pi, cd) {
   // W62a: + Zone einer GLEICHNAMIGEN Creature (Alice-Teilung) — `beschwoerZonenFuer`.
   return engine.beschwoerZonenFuer(pi, cd.name, { nachKontrolle: true })
     .filter(z => canHeroSummonCd(engine, z.owner, z.heroIdx, cd))
-    .map(z => ({ owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx }));
+    .map(z => ({ owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx, ...(z.shared ? { shared: true, stackDepth: z.stackDepth } : {}) }));   // W63a: geteilte Zone (Alice) vorn
 }
 
 /**
@@ -385,7 +385,8 @@ module.exports = {
       const ownZones = ownSlots.map(s => ({
         owner: s.owner,   // Kontrolle statt Seite (Styx 28.9.)
         heroIdx: s.heroIdx, slotIdx: s.slotIdx,
-        label: `${gs.players[s.owner]?.heroes?.[s.heroIdx]?.name || 'Hero'} — Slot ${s.slotIdx + 1}`,
+        label: `${gs.players[s.owner]?.heroes?.[s.heroIdx]?.name || 'Hero'} — Slot ${s.slotIdx + 1}${s.shared ? ` (×${s.stackDepth})` : ''}`,
+        ...(s.shared ? { shared: true, stackDepth: s.stackDepth } : {}),   // W63a: geteilte Zone (Alice) vorn, mit Kennzeichen
       }));
       const ownPick = await promptCtx.promptZonePick(ownZones, {
         title: CARD_NAME,

@@ -84,13 +84,14 @@ module.exports = {
             zones.push({ heroIdx, slotIdx: s, label: `${hero.name} — Support ${s + 1}`, ...(feld !== pi ? { owner: feld } : {}) });
           }
         }
-        // ★ W62a: mit Alice-Teilung ist auch die Zone einer GLEICHNAMIGEN Creature ein Ziel (frei zuerst); `beschwoerZonenFuer` kennt die Kontrolle.
+        // ★ W62a: mit Alice-Teilung ist auch die Zone einer GLEICHNAMIGEN Creature ein Ziel; `beschwoerZonenFuer` kennt die Kontrolle.
+        // ★ W63a (Al, 22.10.2026): erst die geteilte Zone, DANN die erste leere.
         if (forCardName) {
           for (const z of engine.beschwoerZonenFuer(pi, forCardName, { seite: feld, heroIdx, namedHeroesOnly: true })) {
             if (z.shared) zones.push({ heroIdx, slotIdx: z.slotIdx, label: z.label, shared: true, ...(feld !== pi ? { owner: feld } : {}) });
           }
         }
-        return zones;
+        return require('./_alice-shared').geteiltZuerst(zones);
       };
 
       // Fizzle if no free zones on this hero (W62a: oder eine geteilte Zone fuer eine der Karten)

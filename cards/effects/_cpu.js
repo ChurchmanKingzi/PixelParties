@@ -1005,7 +1005,9 @@ async function runActionPhase(engine, helpers) {
         const zones = ps2.supportZones?.[heroIdx] || [[], [], []];
         // W62a: freie Zonen UND (Alice-Teilung) Zonen gleichnamiger Creatures — `beschwoerZonenFuer` (nur Basisplaetze, wie bisher)
         const _geteilteZ = new Set(engine.beschwoerZonenFuer(cpuIdx, cardName, { heroIdx, nurBasis: true }).filter(zz => zz.shared).map(zz => zz.slotIdx));
-        for (let z = 0; z < zones.length; z++) {
+        // W63a (Al, 22.10.2026: „erst die geteilte Zone, DANN die erste leere"): geteilte Zonen stehen in der Kandidatenliste VOR den freien (Gleichstand → geteilt).
+        const _zonenReihe = [...Array(zones.length).keys()].sort((a, b) => (_geteilteZ.has(b) ? 1 : 0) - (_geteilteZ.has(a) ? 1 : 0));
+        for (const z of _zonenReihe) {
           if ((zones[z] || []).length !== 0 && !_geteilteZ.has(z)) continue;
           candidates.push({
             cardName, handIdx, heroIdx, zoneSlot: z, fromCreation: ausVorrat,
@@ -4842,13 +4844,14 @@ function pickCreatureZoneSlot(engine, pi, heroIdx, cardName) {
   // Ohne laufenden Motor gilt weiter: freier Slot schlägt Bounce (der
   // reguläre Summon liefert denselben on-play-Trigger und behält den
   // Insassen auf dem Board).
+  // W62a/W63a: Alice-Teilung — die Zone einer gleichnamigen Creature kostet nichts (Al, 22.10.2026: „erst die geteilte Zone, DANN die erste leere"),
+  // also VOR dem freien Slot und erst recht vor dem Bounce.
+  const geteilt = engine.beschwoerZonenFuer(pi, cardName, { heroIdx, nurBasis: true }).filter(z => z.shared);
+  if (geteilt.length) { swapDiag(engine, 'pick:shared-slot'); return geteilt[0].slotIdx; }
   if (free.length) {
     swapDiag(engine, 'pick:free-slot');
     return free[Math.floor(Math.random() * free.length)];
   }
-  // W62a: Alice-Teilung — die Zone einer gleichnamigen Creature kostet nichts, ein Bounce schon.
-  const geteilt = engine.beschwoerZonenFuer(pi, cardName, { heroIdx, nurBasis: true }).filter(z => z.shared);
-  if (geteilt.length) { swapDiag(engine, 'pick:shared-slot'); return geteilt[0].slotIdx; }
   const last = pickBouncePlacementSlot(engine, pi, heroIdx, cardName);
   swapDiag(engine, last >= 0 ? 'pick:bounce-fallback' : 'pick:none');
   return last;
@@ -6264,6 +6267,8 @@ function mctsEnumerateGenericAlternatives(engine, promptData, cpuIdxForBias) {
         });
       }
     } catch { /* ignore — keep original ordering */ }
+    // W63a (Al): geteilte Zonen (Alice) zuerst erkunden, dann die freien (stabil).
+    if (zones.some(z => z.shared)) zones = [...zones.filter(z => z.shared), ...zones.filter(z => !z.shared)];
     return zones.map(z => ({
       value: { heroIdx: z.heroIdx, slotIdx: z.slotIdx, ...(z.owner != null ? { owner: z.owner } : {}) },
       label: `zone=h${z.heroIdx}s${z.slotIdx}`,
@@ -8335,6 +8340,9 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
         if (oppPool.length > 0) pool = oppPool;
       }
     } catch { /* ignore — fall through to uniform pick */ }
+    // W63a (Al, 22.10.2026: „erst die geteilte Zone, sofern Alices Effekt aktiv ist, DANN die erste leere"): die CPU nimmt eine geteilte Zone vor den freien.
+    const poolGeteilt = pool.filter(zz => zz.shared);
+    if (poolGeteilt.length > 0) pool = poolGeteilt;
     const z = pool[Math.floor(Math.random() * pool.length)];
     return { heroIdx: z.heroIdx, slotIdx: z.slotIdx, ...(z.owner != null ? { owner: z.owner } : {}) };
   }

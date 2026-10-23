@@ -109,7 +109,8 @@ function eligibleSummonZones(engine, pi, cardName, opts = {}) {
     : (ps.heroes || []).map((hero, heroIdx) => ({ physOwner: pi, heroIdx, hero }));
   // ★ W62a (Al: „Pintas Effekt erkennt Zonen mit bereits liegenden gleichnamigen Creatures nicht"): mit „Alice, the Transfer Student"
   // (Alice-Teilung des Beschwoerers) ist auch eine BELEGTE Zone ein Landeplatz, in der schon nur Kreaturen GLEICHEN Namens liegen —
-  // wie beim Hand-Weg (`validateActionPlay` + `canShareInto`). Freie Zonen stehen vorn, die geteilten (`shared: true`) dahinter;
+  // wie beim Hand-Weg (`validateActionPlay` + `canShareInto`). ★ W63a (Al, 22.10.2026: „erst die geteilte Zone, sofern Alices Effekt aktiv ist,
+  // DANN die erste leere"): die geteilten Zonen (`shared: true`) stehen VORN, die freien dahinter (wer `[0]` nimmt, nimmt die geteilte);
   // `opts.geteilt === false` schaltet das ab (Aufrufer, die ausdruecklich einen LEEREN Platz brauchen).
   const { canShareInto } = require('./_alice-shared');
   const geteilt = [];
@@ -135,7 +136,7 @@ function eligibleSummonZones(engine, pi, cardName, opts = {}) {
       }
     }
   }
-  return geteilt.length ? [...out, ...geteilt] : out;
+  return geteilt.length ? [...geteilt, ...out] : out;
 }
 
 /**

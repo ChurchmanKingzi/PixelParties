@@ -118,7 +118,7 @@ module.exports = {
     let dest = zones[0];
     if (zones.length > 1) {
       const zonePick = await ctx.promptZonePick(
-        zones.map(z => ({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, ownerIdx: seite, owner: seite })),
+        zones.map(z => ({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, ownerIdx: seite, owner: seite, ...(z.shared ? { shared: true, stackDepth: z.stackDepth, label: z.label } : {}) })),   // W63a: geteilte Zone (Alice) vorn, mit Kennzeichen
         {
           title: CARD_NAME,
           description: `Choose a free Support Zone for ${cardName}.`,
