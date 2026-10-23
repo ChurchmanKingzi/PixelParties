@@ -38,8 +38,6 @@ const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 //  summonCreatureWithHooks (see engineer file).
 // ═══════════════════════════════════════════
 
-const { attachSteamEngine } = require('./_steam-dwarf-shared');
-
 const CARD_NAME = 'Steam Dwarf Dragon Pilot';
 const DISCHARGE_DAMAGE = 100;
 const DISCHARGES_PER_TURN = 3;
@@ -187,7 +185,9 @@ async function zahleOpfer(ctx, allFullDrop, req = null) {
   return !!(await engine.resolveSacrificeCost(ctx, spec));
 }
 
-module.exports = attachSteamEngine({
+module.exports = {
+  // Hooks nur aktiv, solange der Pilot auf dem Brett (Support-Zone) liegt.
+  activeIn: ['support'],
   // Ladungsanzeige oben rechts (Als Vorgabe 16.8.): nur LESEN,
   // niemals den Zaehler anfassen — laeuft bei jedem Zustandsversand.
   chargesPerTurn: 3,
@@ -335,9 +335,9 @@ module.exports = attachSteamEngine({
     /**
      * On discard of 1+ cards from hand, deal 100 damage to any target.
      * Up to 3 uses per turn per instance (tracked on inst.counters).
-     * Does NOT conflict with the shared STEAM ENGINE passive: that
-     * one has its own HOPT key (_steamEngineTurn, legacy rule), while this one
-     * nutzt den gemeinsamen Rundenzaehler (Schluessel `dragonPilot`).
+     * Nutzt den gemeinsamen Rundenzaehler (Schluessel `dragonPilot`).
+     * Der Dragon Pilot hat KEINE Steam-Engine-Passive (HP-Gewinn) - der
+     * Kartentext nennt keine.
      */
     onDiscard: async (ctx) => {
       const engine = ctx._engine;
@@ -432,4 +432,4 @@ module.exports = attachSteamEngine({
       engine.sync();
     },
   },
-}, { legacy: true });   // Dragon Pilot ist von der neuen +10-je-Karte-Regel ausgenommen
+};

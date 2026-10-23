@@ -1,6 +1,6 @@
 'use strict';
 // Steam Dwarfs (außer Dragon Pilot): „Whenever you discard 1 or more cards, this Creature's current and max HP are increased by 10 times the number of cards discarded.“
-// Erwartung: je abgeworfener Karte +10 aktuelle & max HP, ohne Begrenzung pro Zug; Dragon Pilot behält die alte Regel (Text nennt sie nicht, Skript unverändert).
+// Erwartung: je abgeworfener Karte +10 aktuelle & max HP, ohne Begrenzung pro Zug; Dragon Pilot bekommt keinen HP-Gewinn (Text nennt keinen).
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
@@ -16,7 +16,7 @@ const H = require('../../lib/h.js');
   await t.run(() => t.engine.actionPromptForceDiscard(0, 1, { source: 'Test', selfInflicted: true }));
   R.check('zweiter Abwurf im selben Zug: weitere +10 (kein Zuglimit)', d.counters.maxHp === hp0 + 40, { max: d.counters.maxHp });
   R.check('Abwurf des Gegners zählt nicht', (gegner.counters?.maxHp ?? 50) === 50, { max: gegner.counters?.maxHp });
-  R.check('Dragon Pilot: alte Regel (+50 einmal pro Zug)', pilot.counters.maxHp === 200, { max: pilot.counters.maxHp });
+  R.check('Dragon Pilot: kein HP-Gewinn', (pilot.counters?.maxHp ?? 150) === 150, { max: pilot.counters.maxHp });
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })().catch(e => { console.error(e); process.exit(2); });

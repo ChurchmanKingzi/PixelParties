@@ -11,8 +11,6 @@
 //    - STEAM_ENGINE_GAIN_PER_CARD : the +HP per discarded card
 //    - attachSteamEngine(mod) : mixin that merges the
 //        onDiscard hook into a card script
-//        (`{ legacy: true }` = the old once-per-turn +50,
-//        kept for Dragon Pilot, which the new rule excludes)
 //    - decreaseCreatureMaxHp(engine, inst, amount) :
 //        creature-side counterpart to engine.decreaseMaxHp
 //        (used by Steam Dwarf Diver)
@@ -24,7 +22,6 @@
 // ═══════════════════════════════════════════
 
 const STEAM_ENGINE_GAIN_PER_CARD = 10;
-const STEAM_ENGINE_GAIN_LEGACY = 50;
 const ARCHETYPE = 'Steam Dwarfs';
 
 /**
@@ -97,65 +94,6 @@ async function fireSteamEngine(ctx) {
 }
 
 /**
- * Old rule, kept unchanged for Steam Dwarf Dragon Pilot only (the new
- * per-card rule explicitly excludes it): once per turn and instance,
- * +50 current & max HP when the controller discards 1+ cards.
- * The HOPT guard collapses a multi-card discard into a single gain.
- */
-async function fireSteamEngineLegacy(ctx) {
-  const engine = ctx._engine;
-  const gs = engine.gs;
-  const inst = ctx.card;
-
-  // Jeder Aufruf wird gezaehlt — auch die, die gleich wieder aussteigen.
-  // Erst der Vergleich „aufgerufen" gegen „gefeuert" zeigt, ob die Kette
-  // lang ist oder ob nur oft vergeblich gefragt wird.
-  steamZaehl(engine, 'aufgerufen');
-
-  if (!inst || inst.zone !== 'support') { steamZaehl(engine, 'raus_zone'); return; }
-  if (ctx.playerIdx !== ctx.cardOwner) { steamZaehl(engine, 'raus_fremd'); return; }        // only my discards
-  // Als Ruling (Kreaturen-Audit): kein Hero-Bezug im Steam-Engine-Text
-  // → nur der Zustand der Kreatur selbst gated (kanonisch via
-  // isCardEffectActive statt des alten attachedHero-Gates; deckt jetzt
-  // auch frozen/stunned/faceDown der Kreatur).
-  if (!engine.isCardEffectActive(inst)) { steamZaehl(engine, 'raus_inaktiv'); return; }
-
-  // Hard once-per-turn per creature instance
-  if (!inst.counters) inst.counters = {};
-  const turn = gs.turn || 0;
-  if (inst.counters._steamEngineTurn === turn) { steamZaehl(engine, 'raus_hopt'); return; }
-  inst.counters._steamEngineTurn = turn;
-  steamZaehl(engine, 'gefeuert');
-
-  // Apply the engine — engine.increaseMaxHp handles the creature path
-  // (bumps both counters.maxHp and counters.currentHp by the amount).
-  engine.increaseMaxHp(inst, STEAM_ENGINE_GAIN_LEGACY);
-  steamMax(engine, 'maxHp_hoechster', inst.counters?.maxHp || 0);
-
-  // Steam puff animation on the creature's zone
-  engine._broadcastEvent('play_zone_animation', {
-    type: 'steam_puff',
-    owner: inst.owner,
-    heroIdx: inst.heroIdx,
-    zoneSlot: inst.zoneSlot,
-  });
-
-  engine.log('steam_engine_fired', {
-    card: inst.name,
-    player: gs.players[inst.owner]?.username,
-    gain: STEAM_ENGINE_GAIN_LEGACY,
-    newMax: inst.counters.maxHp,
-  });
-
-  engine.sync();
-  // Diese 150 ms liegen INNERHALB eines Hooks und fallen je Steam Dwarf
-  // auf dem Brett einmal an. Mitgezaehlt, damit im Bericht steht, wie
-  // viel Wartezeit die Abwurfketten allein hier erzeugen.
-  steamZaehl(engine, 'delay_ms', 150);
-  await engine._delay(150);
-}
-
-/**
  * Mixin helper: merges the shared steam-engine onDiscard trigger into
  * a card module's hooks object. Preserves any existing onDiscard the
  * card may already define (calls the card's handler FIRST, then ours).
@@ -164,8 +102,7 @@ async function fireSteamEngineLegacy(ctx) {
  *   const mod = module.exports = { ...card definition... };
  *   attachSteamEngine(mod);
  */
-function attachSteamEngine(mod, { legacy = false } = {}) {
-  const fire = legacy ? fireSteamEngineLegacy : fireSteamEngine;
+function attachSteamEngine(mod) {
   if (!mod.hooks) mod.hooks = {};
   // Force the shared-engine cards to have activeIn 'support' so the
   // hook doesn't fire while the creature is in hand/discard/etc.
@@ -177,8 +114,8 @@ function attachSteamEngine(mod, { legacy = false } = {}) {
         console.error('[SteamEngine] existing onDiscard threw:', err.message);
       }
     }
-    try { await fire(ctx); } catch (err) {
-      console.error('[SteamEngine] fire threw:', err.message);
+    try { await fireSteamEngine(ctx); } catch (err) {
+      console.error('[SteamEngine] fireSteamEngine threw:', err.message);
     }
   };
   return mod;
