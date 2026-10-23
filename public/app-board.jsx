@@ -27959,6 +27959,78 @@ const ANIM_REGISTRY = {
     return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
   })(),
   // ═══════════════════════════════════════════════════════════════════
+  //  See through the Ruse (23.10.) — PIXELART, Brett-Animation auf JEDER aufgedeckten Surprise (`targets`: Surprise Zone oder Support Zone)
+  //
+  //  Ein Auge oeffnet sich ueber der Zone (weisser Augapfel, goldene Iris, dunkle Pupille, rote Lider mit Wimpern), die Iris tastet von links nach rechts; zugleich
+  //  faehrt eine weisse Abtastzeile mit goldenem Schweif von oben nach unten ueber die verdeckte Karte (rotes Dither-Glas, das sie hinter sich lichtet). Zum Schluss
+  //  schliesst sich das Auge, ein Kreuzfunkel bleibt. Die Karten selbst bleiben verdeckt liegen — nur der Zustandsversand zeigt sie nun dem Wirker.
+  // ═══════════════════════════════════════════════════════════════════
+  ruse_peek: (() => {
+    const ROT = ['#f0bfbc', '#e94e53', '#b21a29', '#710122'].map(ppHex);
+    const GOLD = ['#f7f7ad', '#fad54a', '#f29a3e'].map(ppHex);
+    const WEISS = ppHex('#ffffff');
+    const ENDE = 1100, AUF = 220, ZU = 800, FADE_AB = 960;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const AUGE_B = 7;                                   // halbe Breite des Auges (Rasterpixel)
+    const malen = (g, t, sz) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      sz.ziele.forEach((z, zi) => {
+        const CX = Math.round(z.x), CY = Math.round(z.y);
+        const hw = Math.floor(z.w / 2), hh = Math.floor(z.h / 2);
+        // Lidoeffnung: 0 → 1 (oeffnen), 1 → 0 (schliessen)
+        const off = t < AUF ? klemme(t / AUF, 0, 1) : (t > ZU ? klemme(1 - (t - ZU) / 140, 0, 1) : 1);
+        // ── Abtastzeile mit rotem Dither-Glas dahinter ──
+        const T0 = 260, T1 = 760;
+        if (t > T0 && t < ZU + 60) {
+          const k = klemme((t - T0) / (T1 - T0), 0, 1);
+          const zeile = -hh + Math.round(k * 2 * hh);
+          for (let y = -hh; y <= hh; y++) for (let x = -hw; x <= hw; x++) {
+            if (y > zeile && ppBayer(CX + x, CY + y) < 0.28) g.put(CX + x, CY + y, ROT[1], 0.9);
+          }
+          if (k < 1) {
+            for (let x = -hw; x <= hw; x++) {
+              g.put(CX + x, CY + zeile, WEISS, aus);
+              g.put(CX + x, CY + zeile - 1, GOLD[0], aus * 0.85);
+              g.put(CX + x, CY + zeile - 2, GOLD[1], aus * 0.55);
+              g.put(CX + x, CY + zeile - 3, GOLD[2], aus * 0.3);
+            }
+          }
+        }
+        // ── das Auge ──
+        if (off > 0) {
+          const hoehe = 3.4 * off;
+          const irisX = Math.round(Math.sin(klemme((t - 240) / 520, 0, 1) * Math.PI * 2 - Math.PI / 2) * 3.2);
+          for (let x = -AUGE_B; x <= AUGE_B; x++) {
+            const f = Math.sqrt(Math.max(0, 1 - (x * x) / ((AUGE_B + 0.5) * (AUGE_B + 0.5))));
+            const h = Math.round(hoehe * f);
+            if (h <= 0) { g.put(CX + x, CY, ROT[3], aus); continue; }
+            for (let y = -h; y <= h; y++) g.put(CX + x, CY + y, WEISS, aus);
+            g.put(CX + x, CY - h - 1, ROT[2], aus);
+            g.put(CX + x, CY + h + 1, ROT[2], aus);
+            if (Math.abs(x) % 3 === 0 && off > 0.8) g.put(CX + x, CY - h - 2, ROT[3], aus);         // Wimpern
+          }
+          const ir = off > 0.5 ? 2 : 1;
+          for (let j = -ir; j <= ir; j++) for (let i = -ir; i <= ir; i++) {
+            if (i * i + j * j <= ir * ir + 1) g.put(CX + irisX + i, CY + j, GOLD[1], aus);
+          }
+          g.put(CX + irisX, CY, ROT[3], aus);
+          g.put(CX + irisX - 1, CY - 1, WEISS, aus);
+        }
+        // ── Kreuzfunkel beim Schliessen ──
+        if (t > ZU - 40 && t < ZU + 240) {
+          const k = (t - (ZU - 40)) / 280, arm = Math.max(1, Math.round((1 - Math.abs(k - 0.4) / 0.6) * 5));
+          for (let i = 1; i <= arm; i++) {
+            g.put(CX + AUGE_B + 3 + i, CY, i === arm ? GOLD[2] : GOLD[0], aus); g.put(CX + AUGE_B + 3 - i, CY, i === arm ? GOLD[2] : GOLD[0], aus);
+            g.put(CX + AUGE_B + 3, CY - i, i === arm ? GOLD[2] : GOLD[0], aus); g.put(CX + AUGE_B + 3, CY + i, i === arm ? GOLD[2] : GOLD[0], aus);
+          }
+          g.put(CX + AUGE_B + 3, CY, WEISS, aus);
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, null, { extra: 24 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
   //  Amazing Finding (11.10.) — PIXELART, Brett-Animation auf dem DECK des Spielers (`originDeck`, Ziel `{ deck: true }`)
   //
   //  Ein weisses Fragezeichen (violette Kontur) steigt ueber dem Deck auf und pulsiert, bei ~520 ms platzt es in einen achtstrahligen Funkelstern; rosa und

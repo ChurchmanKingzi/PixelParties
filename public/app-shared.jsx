@@ -2831,6 +2831,12 @@ const ZONE_ANIM_SFX = {
     { name: 'creature_destroyed', opts: { rate: 1.6, volume: 0.5,  delay: 500, category: null, dedupe: 0 } },
     { name: 'ping',               opts: { rate: 2.4, volume: 0.35, delay: 560, category: null, dedupe: 0 } },
   ],
+  // See through the Ruse (23.10.) — das Auge oeffnet sich (Aufdeck-Ton, 0 ms), die Abtastzeile faehrt ueber die Karte (leises Surren), beim Schliessen ein Ping (~800 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  ruse_peek: [
+    { name: 'reveal', opts: { rate: 1.3, volume: 0.5 } },
+    { name: 'ping',   opts: { rate: 1.6, volume: 0.3, delay: 300, category: null, dedupe: 0 } },
+    { name: 'ping',   opts: { rate: 2.4, volume: 0.35, delay: 800, category: null, dedupe: 0 } },
+  ],
   // Amazing Finding (11.10.) — das Fragezeichen funkelt auf (hoher Ping, 0 ms), platzt bei ~520 ms zum Stern (Aufdeck-Ton + Ping). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   finding_glint: [
     { name: 'ping',   opts: { rate: 1.7, volume: 0.4 } },
