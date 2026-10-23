@@ -11,6 +11,7 @@ Umgesetzt vom Agenten **W63a** (Zweig `wave63/W63a`) als Antwort auf Als **fünf
 | **5 · Reincarnation** | Kreatur-Modus: 3 freie Zonen ODER 2 freie + geteilte Zone der Kreatur; Spielbarkeit, Zonenwahl (Mensch/CPU), Platzierung und Token-Bezahlung stimmen überein. |
 
 * **Nicht angefasst:** Kartentexte in `data/cards.json`; `repro-status.json`/Index; `server.js`. Bundles: `node scripts/build.js --force` und `node scripts/check-bundles.js` laufen sauber (`public/dist/` ist nicht versioniert). `scripts/check-*.js`: alle grün außer `check-scope.js` (51 Altstellen, wie im Ausgangsstand).
+* **Gesamtlauf** (`runall`, alle 1280 Repros inkl. der 6 neuen): 1280 × „tritt NICHT auf" (= korrekt). Der erste Lauf zeigte zwei Rückschritte (W20/c-1 Paraseed Zombie, W21/a-4 Bomblebee Cluster: Helden der Gegenspalte); behoben in `beschwoerZonenFuer` (`seite` ≠ Beschwörer) und `_alice-shared.ersterPlatzAufHeld`.
 * **Bugfix-Notes** stehen in den drei Commit-Nachrichten (je Karte/Baustein eine Zeile).
 
 ## Tests
