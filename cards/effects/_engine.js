@@ -21248,6 +21248,17 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   creatureAuraInfo(inst) {
     if (!inst || inst.zone !== ZONES.SUPPORT) return null;
+    // ★ 23.10.: Re-Entrancy-Schutz. „Ist `inst` gegen die Aura-Quelle immun?" (`kreaturGegnerEffektImmun` → `kreaturSpellImmun`, z. B. Black-Thorn Dragon:
+    // „unaffected by all Spells") fragt über `isCardPassiveDormant` → `isCreatureEffectSuppressed` ihrerseits, ob `inst` stummgeschaltet ist — und das fragt wieder
+    // nach der Aura (Endlosschleife, „Maximum call stack size exceeded" in `play_spell`). Die innere Frage gilt dem Zustand OHNE die Aura, die gerade geprüft wird.
+    const laeuft = this._auraInfoLaeuft || (this._auraInfoLaeuft = {});
+    if (laeuft[inst.id]) return null;
+    laeuft[inst.id] = true;
+    try { return this._creatureAuraInfoPruefen(inst); }
+    finally { delete laeuft[inst.id]; }
+  }
+
+  _creatureAuraInfoPruefen(inst) {
     const gs = this.gs;
     const cd = this.getEffectiveCardData(inst) || this._getCardDB()[inst.name];
     if (!this.isChoosableAsCreature(inst, cd)) return null;
