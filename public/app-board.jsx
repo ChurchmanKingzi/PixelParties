@@ -50920,7 +50920,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const isSelectedHeroTarget = selectedSet.has(heroTargetId);
           const isFrozen = hero?.statuses?.frozen;
           const isStunned = (hero?.statuses?.stunned || hero?.statuses?.webbed);
-          // 24.10. Stoneskin: trägt der Held die Karte, sieht er versteinert aus (Sprite bleibt animiert) — ohne Betäubung, nur Optik.
+          // 24.10. Stoneskin: trägt der Held die Karte, wird NUR sein animierter Sprite versteinert (Karte bleibt unverändert; Sprite läuft weiter) — keine Betäubung, nur Optik.
           const hatSteinhaut = (p.supportZones?.[i] || []).some(z => (z || []).includes('Stoneskin'));
           const isImmune = hero?.statuses?.immune;
           const isNegated = hero?.statuses?.negated;
@@ -51217,7 +51217,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         // denselben Anblick — ohne den gemeinsamen Namen
                         // haette jede weitere Versteinerungs-Karte ihren
                         // eigenen Zweig gebraucht.
-                        ...((isStunned?._petrified || isStunned?._baihuPetrify || hatSteinhaut) ? { filter: 'saturate(0) brightness(0.7) contrast(1.1)' } : null),
+                        ...((isStunned?._petrified || isStunned?._baihuPetrify) ? { filter: 'saturate(0) brightness(0.7) contrast(1.1)' } : null),
                         ...(isInvisible ? { opacity: 0.4 } : null),
                         transition: 'opacity 0.4s ease, filter 0.5s ease',
                       },
@@ -51320,7 +51320,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   && <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>}
                 {/* ★ 26.9.: Crimson Web — statt der Betaeubungsblitze das rote Netz. */}
                 {hero?.name && !figurDa && <CrimsonWebOverlay aktiv={!!hero.statuses?.webbed} />}
-                {hero?.name && !figurDa && (isStunned?._petrified || isStunned?._baihuPetrify || hatSteinhaut) && <div className="baihu-petrify-overlay" />}
+                {hero?.name && !figurDa && (isStunned?._petrified || isStunned?._baihuPetrify) && <div className="baihu-petrify-overlay" />}
                 {hero?.name && !figurDa && isNegated && !isNegated._byWeakeningCrystal && <NegatedOverlay />}
                 {hero?.name && !figurDa && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
                 {hero?.name && !figurDa && isBleeding && <BleedingOverlay ticking={bleedTickingHeroes.includes(`${pi}-${i}`)} />}
