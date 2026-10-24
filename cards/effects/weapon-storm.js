@@ -2,9 +2,10 @@
 //  CARD EFFECT: "Weapon Storm"
 //  Attack (Normal, Lv2, Fighting)
 //
-//  „Send any number of Artifacts equipped and Abilities attached to
-//   the user to the discard pile. Then, choose a target and deal
-//   damage equal to 40/50/60 times the number of cards sent to it."
+//  „Choose any number of Artifacts equipped and Abilities attached to
+//   the user and send them to the discard pile. Then, choose a target
+//   and deal damage equal to 40/50/60 times the number of cards chosen
+//   to it."
 //
 //  Als Ruling (6.9.): das Fighting-Level des Nutzers NACH dem Senden
 //  bestimmt den Schaden je Karte — Lv1 40, Lv2 50, Lv3+ 60. Wer sein

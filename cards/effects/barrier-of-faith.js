@@ -3,9 +3,9 @@
 //  Spell (Reaction, Lv1, Support Magic)
 //
 //  „Play this card immediately when a Hero you control would be
-//   affected by a card or effect. Send 3/2/1 Abilities from that Hero
-//   to the discard pile to negate any effects that card or effect
-//   would have on the Hero, including damage."
+//   affected by a card or effect. Choose 3/2/1 Abilities from that Hero
+//   and send them to the discard pile to negate any effects that card
+//   or effect would have on the Hero, including damage."
 //
 //  Bauform (Schwester von Future Tech Escape Device)
 //  ────────────────────────────────────────────────
