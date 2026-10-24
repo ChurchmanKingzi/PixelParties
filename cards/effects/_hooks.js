@@ -422,6 +422,10 @@ const STATUS_EFFECTS = {
   // `shrunk` (24.10., „Shrink"): Schaden, den der Held mit Attacks macht, wird 1; Schaden, den er von Attacks erleidet, wird verdoppelt (Haken in shrink.js). Der Kartentext sagt ausdruecklich „This is treated
   // as a negative status effect" — negativ und heilbar: geheilt (Juice, Beer, Cure …) faellt Shrink in die Ablage seines Besitzers (`anhaengselStatusHooks`, `heilenWirftAb`).
   shrunk: { negative: true, cleansable: true, label: 'Shrunk', icon: '🤏', immuneKey: 'shrink_immune' },
+  // `pranked` (24.10., „Nasty Prank"): der Held darf einzelne Attacks/Spells NAMENTLICH nicht mehr ausführen. Ein Statuseintrag je Held; `names` = { [Kartenname]: { expiresAtTurn, expiresForPlayer,
+  // permanent, by } } — jeder Name läuft für sich ab (bis zum Ende des nächsten Zuges des Gegners bzw. für den Rest des Spiels, wenn der Nutzer Magic Arts ≥ 1 hat). Sperren: `engine.heroPranked(hero, name)`
+  // in `validateActionPlay`, den Hand-Grau-Schleifen und im Reaktions-/Surprise-Gate. Negativ und heilbar („This counts as a negative status effect"): geheilt fallen alle Namen weg.
+  pranked: { negative: true, cleansable: true, label: 'Pranked', icon: '🤡', immuneKey: 'prank_immune' },
   // `cursed` — applied by Curse Attachment Spell. The bearer's
   // Attack stat is suppressed to 0 while attached: the engine's
   // `actionGrantAtk` / `actionRevokeAtk` / `grantTempHeroAtk` /
@@ -526,6 +530,8 @@ const BUFF_EFFECTS = {
   // Elixir of Strength — primed +150 unstoppable damage on the Hero's
   // next single-target Attack. Persists across turns until consumed.
   empowered_strike: { label: 'Empowered Strike', icon: '💪', tooltip: "The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 150 and cannot be reduced or negated." },
+  // Unreasonable Anger (24.10.): jeder Schaden, den der Held an EINEM einzelnen Ziel verursacht, +100 — bis zum Ende des nächsten Zuges des Wirkers (Engine `_applyAngerBonusIfApplicable`).
+  unreasonable_anger: { label: 'Unreasonable Anger', icon: '💢', tooltip: 'Any damage this Hero deals to single targets is increased by 100.' },
   // String of Fine — target takes 0 damage from any source for the
   // duration of the buff. `damageMultiplier: 0` is read by the
   // engine's standard buff-multiplier pass on hero & creature damage,

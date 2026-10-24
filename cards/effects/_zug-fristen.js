@@ -65,6 +65,8 @@ function fristenNachSkip(engine, S, Ts) {
       if (!hero) continue;
       for (const b of Object.values(hero.buffs || {})) stempel(b);
       for (const s of Object.values(hero.statuses || {})) { stempel(s); if (s && typeof s === 'object') stempel(s._fremd); }
+      // Nasty Prank (24.10.): jeder gesperrte Name trägt seine eigene Frist (`statuses.pranked.names[Name]`, ENDE des nächsten gegnerischen Zuges).
+      for (const e of Object.values(hero.statuses?.pranked?.names || {})) stempel(e);
       for (const g of (hero._tempAtkGrants || [])) stempel(g);
       // Perfect Disguise: „cannot be chosen by your opponent during their next turn" (Ablauf ereignisgebunden zu Beginn des nächsten eigenen Zuges des Wirkers,
       // `processStatusExpiry('START')`: dort bleibt der Schutz, wenn der Gegnerzug davor übersprungen war). Wird der EIGENE Zug übersprungen, läuft dieser Beginn
