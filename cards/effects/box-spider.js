@@ -59,6 +59,7 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) return;
       // Surprise Zone must be empty.
       if ((hps.surpriseZones?.[heroIdx] || []).length > 0) return;
+      if (engine.surprisesLockedFor(owner)) return;   // Arcane Eyes (Welle 72): der Gegner kontrolliert wirksame Augen — keine Surprise setzen
       // Box Spider must still be alive on the board.
       const cardDB = engine._getCardDB();
       const hp = inst.counters?.currentHp ?? cardDB[CARD_NAME]?.hp ?? 0;

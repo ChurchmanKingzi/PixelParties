@@ -4910,6 +4910,8 @@ function sendGameState(room, playerIdx, extra) {
         if (room.type === 'singleplayer' && DEBUG_REVEAL_NPC_HAND) {
           return ps.hand.map((name, index) => ({ index, name }));
         }
+        // Arcane Eyes (Welle 72): „must play with their hand revealed" — die GANZE Hand liegt offen vor dem Kontrolleur der Augen.
+        if (room.engine?.handsRevealedTo(playerIdx, pi)) return ps.hand.map((name, index) => ({ index, name }));
         // Puzzle mode reveals the CPU opponent's full hand to the
         // player — solving puzzles requires perfect information about
         // what the opponent can react with. Mark mechanically-revealed
@@ -8581,6 +8583,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     if (!_gefizzelt && !_kostenAbbruch) {
       const _wirkerHook = gs._wirkerSeite;
       gs._wirkerSeite = { pi, heroIdx, heroOwner };
+      gs._klonAufnahme = { pi, heroIdx, heroOwner, name: cardName, eintraege: [] };   // Clone (Welle 72): die Zielwahlen dieses Wurfs merken (Engine: `_zielwahlAbschliessen`)
       try {
         await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
       } finally {
@@ -8645,6 +8648,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       room.engine._untrackCard(inst.id);
       delete gs._spellDamageLog;
       delete gs._spellExcludeTargets;
+      delete gs._klonAufnahme;
       delete gs._spellCancelled;
       room.engine.endeEffektImmunitaeten?.();   // Z2 (A03-02): Abbruch beendet auch die Aufloesung
       // A09-01: Pfeile, die auf den abgebrochenen Angriff gekettet wurden, nicht scharf zuruecklassen
@@ -8847,6 +8851,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
 
     delete gs._spellDamageLog;
     delete gs._spellExcludeTargets;
+    delete gs._klonAufnahme;
     delete gs._bartasSecondCast;
     delete gs._spellNegatedByEffect;
     delete gs._negationWhole;
@@ -12020,6 +12025,7 @@ async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlo
 
   const script = loadCardEffect(cardName);
   if (!script?.isSurprise) return false;
+  if (room.engine.surprisesLockedFor(pi)) return false;   // Arcane Eyes (Welle 72): der Gegner kontrolliert wirksame Augen — Surprises setzen ist gesperrt
 
   const cardData = getCardDB()[cardName];
   if (!cardData || (cardData.subtype || '').toLowerCase() !== 'surprise') return false;

@@ -159,6 +159,10 @@
 "id": "Aquatic_Spear",
 "kind": "a"
 },
+"Arcane Eyes": {
+"id": "Arcane_Eyes",
+"kind": "a"
+},
 "Arcane Lamp": {
 "id": "Arcane_Lamp",
 "kind": "a"
@@ -709,6 +713,10 @@
 },
 "Cloak of Edge": {
 "id": "Cloak_of_Edge",
+"kind": "a"
+},
+"Clone": {
+"id": "Clone",
 "kind": "a"
 },
 "Cloud Pillow": {
@@ -2191,6 +2199,10 @@
 "id": "Hives_Crown",
 "kind": "a"
 },
+"Hockey Genie": {
+"id": "Hockey_Genie",
+"kind": "a"
+},
 "Hole in the Sky": {
 "id": "Hole_in_the_Sky",
 "kind": "a"
@@ -3483,6 +3495,10 @@
 "id": "Refreshing_Night",
 "kind": "a"
 },
+"Regeneration": {
+"id": "Regeneration",
+"kind": "a"
+},
 "Reincarnation": {
 "id": "Reincarnation",
 "kind": "a"
@@ -3729,6 +3745,10 @@
 },
 "Shooting Star": {
 "id": "Shooting_Star",
+"kind": "a"
+},
+"Shrink": {
+"id": "Shrink",
 "kind": "a"
 },
 "Shu'Chaku, the Blood Moon Projection": {

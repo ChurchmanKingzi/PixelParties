@@ -67,6 +67,7 @@ module.exports = {
 
     const onlyCreatures = !hasSurpriseZone && hasBakhmSlot;
 
+    if (engine.surprisesLockedFor(activator)) return false;   // Arcane Eyes (Welle 72): der Gegner kontrolliert wirksame Augen — keine Surprise setzen
     // Build deduplicated gallery of eligible Surprises
     const seen = new Set();
     const galleryCards = [];

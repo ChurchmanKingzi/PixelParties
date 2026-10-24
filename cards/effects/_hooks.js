@@ -411,6 +411,9 @@ const STATUS_EFFECTS = {
   // `heroKannZaubern`), bekommt aber +100 ATK (gebucht ueber die Karteninstanz, `actionSetAtkGrant`). Der Kartentext sagt ausdruecklich „This is treated as a negative status effect" — negativ und heilbar:
   // geheilt (Juice, Beer, Cure …) faellt Polymorph in die Ablage seines Besitzers (`anhaengselStatusHooks`, `heilenWirftAb`) und der ATK-Bonus verschwindet mit.
   polymorphed: { negative: true, cleansable: true, label: 'Polymorphed', icon: '🐱', immuneKey: 'polymorph_immune' },
+  // `shrunk` (24.10., „Shrink"): Schaden, den der Held mit Attacks macht, wird 1; Schaden, den er von Attacks erleidet, wird verdoppelt (Haken in shrink.js). Der Kartentext sagt ausdruecklich „This is treated
+  // as a negative status effect" — negativ und heilbar: geheilt (Juice, Beer, Cure …) faellt Shrink in die Ablage seines Besitzers (`anhaengselStatusHooks`, `heilenWirftAb`).
+  shrunk: { negative: true, cleansable: true, label: 'Shrunk', icon: '🤏', immuneKey: 'shrink_immune' },
   // `cursed` — applied by Curse Attachment Spell. The bearer's
   // Attack stat is suppressed to 0 while attached: the engine's
   // `actionGrantAtk` / `actionRevokeAtk` / `grantTempHeroAtk` /
