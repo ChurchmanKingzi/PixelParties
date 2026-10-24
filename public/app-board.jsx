@@ -9562,6 +9562,251 @@ function ppBeute() {
   };
 }
 
+// ═════════════════════════════════════════════════════════════════
+//  Welle 73 — fünf Pixelart-Animationen (Vorlagen: die Kartenbilder 11–15)
+// ═════════════════════════════════════════════════════════════════
+
+/**
+ * Wie `ppPunktBild`, aber für Flüge ZWISCHEN zwei Brettpunkten (`targetPoints` = [Start, Ziel] in Bildschirmkoordinaten, vom Brett-Zweig von `onZoneAnim` aufgelöst):
+ * ein Canvas um beide Punkte (3 Bildschirmpixel je Rasterpixel, Bayer-Dithering statt Alpha, ~30 Bilder/s). `malen(g, t, geo, teile)`: `geo` = { gw, gh, a: {x, y, hw, hh}, b: {…} } in RASTERkoordinaten.
+ */
+function ppPunktFlug(malen, ende, vorbereiten) {
+  const S = 3, TAKT = 33, RAND = 60;
+  return function PunktFlugEffekt({ targetPoints }) {
+    const cvs = useRef(null);
+    const geo = useMemo(() => {
+      const p = (targetPoints || []).slice(0, 2);
+      if (p.length < 2) return null;
+      const l = Math.min(p[0].x, p[1].x) - RAND, o = Math.min(p[0].y, p[1].y) - RAND;
+      const r = Math.max(p[0].x, p[1].x) + RAND, u = Math.max(p[0].y, p[1].y) + RAND;
+      const raster = (q) => ({ x: (q.x - l) / S, y: (q.y - o) / S, hw: ((q.w || 64) / S) / 2, hh: ((q.h || 90) / S) / 2 });
+      return { left: l, top: o, gw: Math.ceil((r - l) / S), gh: Math.ceil((u - o) / S), a: raster(p[0]), b: raster(p[1]) };
+    }, []);
+    const teile = useMemo(() => (geo && vorbereiten ? vorbereiten(geo) : null), []);
+    useEffect(() => {
+      const el = cvs.current;
+      if (!el || !geo || window._playAnimations === false) return undefined;
+      const ctx = el.getContext('2d');
+      const img = ctx.createImageData(geo.gw, geo.gh);
+      const buf = img.data, gw = geo.gw, gh = geo.gh;
+      const put = (px, py, c, a = 1) => {
+        const X = Math.round(px), Y = Math.round(py);
+        if (X < 0 || Y < 0 || X >= gw || Y >= gh || a <= 0) return;
+        if (a < 1 && ppBayer(X, Y) >= a) return;
+        const i = (Y * gw + X) * 4;
+        buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
+      };
+      const g = { put, block(px, py, bw, bh, c, a = 1) { for (let j = 0; j < bh; j++) for (let i = 0; i < bw; i++) put(px + i, py + j, c, a); } };
+      const t0 = performance.now();
+      let raf = 0, letzte = -1;
+      const schritt = (jetzt) => {
+        const t = jetzt - t0;
+        const fr = Math.floor(t / TAKT);
+        if (fr !== letzte) { letzte = fr; buf.fill(0); malen(g, t, geo, teile); ctx.putImageData(img, 0, 0); }
+        if (t < ende) raf = requestAnimationFrame(schritt);
+        else { buf.fill(0); ctx.putImageData(img, 0, 0); }
+      };
+      raf = requestAnimationFrame(schritt);
+      return () => cancelAnimationFrame(raf);
+    }, []);
+    if (!geo) return null;
+    return (
+      <div aria-hidden="true" data-pp-px="aus" style={{ position: 'fixed', left: geo.left, top: geo.top, pointerEvents: 'none', zIndex: 10100 }}>
+        <canvas ref={cvs} width={geo.gw} height={geo.gh} style={{ width: geo.gw * S, height: geo.gh * S, imageRendering: 'pixelated', display: 'block' }} />
+      </div>
+    );
+  };
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  Ankhota, the Burier: Sandwirbel (`ankhota_sandstorm`) — PIXELART; Vorlage: das Kartenbild (Sandwellen, die Karte in Sand und Beige)
+//
+//  Ein Wirbel aus Sandkörnern (2×2, vorne heller mit Rand, hinten dunkler und kleiner) steigt in einem Trichter um den Helden auf: unten eng, oben weit, jedes Korn auf einer flachen
+//  Ellipse, mit zwei Schweifpunkten. Am Fuß liegt ein gepunkteter Staubring. In den letzten 300 ms dithert der Wirbel weg (bei ~1100 ms fort). Feste Palette, kein Leuchten.
+// ═════════════════════════════════════════════════════════════════
+const AnkhotaSandstormEffect = (() => {
+  const PAL = ['#fffbd2', '#e0c085', '#e0c085', '#ca874e', '#72541d'].map(ppHex);   // Glanz, Hell, Sand, Schatten, Rand
+  const ENDE = 1100, FADE_AB = 800;
+  const vorbereiten = () => ({
+    koerner: Array.from({ length: ppFxN(54) }, (_, i) => ({
+      w0: Math.random() * Math.PI * 2, h0: Math.random(), tempo: 3.4 + Math.random() * 2.4, gross: i % 3 === 0, start: Math.random() * 280,
+    })),
+  });
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
+    // Staubring am Fuß (gepunktet, in zwei Stufen größer werdend)
+    if (t < 760) {
+      const stufe = Math.min(2, Math.floor(t / 220));
+      const rx = Math.round(sz.hw * (0.7 + 0.28 * stufe)), ry = Math.max(2, Math.round(sz.hh * 0.14 * (1 + stufe * 0.4))), fy = cy + Math.round(sz.hh * 0.86);
+      for (let i = 0; i < 30; i++) {
+        const w = (i / 30) * Math.PI * 2;
+        g.put(cx + Math.cos(w) * rx, fy + Math.sin(w) * ry, i % 2 ? PAL[2] : PAL[3], aus * (t > 520 ? 0.5 : 1));
+      }
+    }
+    for (const k of teile.koerner) {
+      const tt = t - k.start;
+      if (tt < 0) continue;
+      const aufbau = Math.min(1, tt / 220);
+      const hf = (k.h0 + tt / 1500) % 1;                                         // 0 unten … 1 oben
+      const R = (sz.hw * (0.3 + 0.75 * hf)) * aufbau + 1;
+      const w = k.w0 + (tt / 1000) * k.tempo;
+      const y0 = cy + sz.hh * 0.9 - hf * sz.hh * 1.85;
+      const x = cx + Math.cos(w) * R, y = y0 + Math.sin(w) * R * 0.24;
+      const vorne = Math.sin(w) > 0;
+      const a = aus * (hf > 0.86 ? 0.5 : 1);
+      for (let s = 2; s >= 1; s--) {                                              // Schweif (zwei Punkte zurück auf der Bahn)
+        const w2 = w - s * 0.24;
+        g.put(cx + Math.cos(w2) * R, y0 + Math.sin(w2) * R * 0.24 + s, PAL[3], a * (s === 1 ? 0.6 : 0.3));
+      }
+      if (vorne && k.gross) { g.block(Math.round(x) - 1, Math.round(y) - 1, 4, 4, PAL[4], a); g.block(Math.round(x), Math.round(y), 2, 2, PAL[1], a); g.put(x, y, PAL[0], a); }
+      else if (vorne) g.block(Math.round(x), Math.round(y), 2, 2, PAL[2], a);
+      else g.put(x, y, PAL[3], a);
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 300, 340, vorbereiten);
+})();
+
+// ═════════════════════════════════════════════════════════════════
+//  Shroomasaur: Pilzregen (`shroomasaur_spores`) — PIXELART; Vorlage: das Kartenbild (der blaue Dino, bunte Blüten im Moos)
+//
+//  Viele kleine bunte Pilze (5×5: dunkler Rand, Kappe in Rot/Blau/Gelb/Lila/Grün/Orange/Rosa mit weißem Fleck, heller Stiel) schießen rund um die Karte aus dem Boden: sie wachsen in drei
+//  Stufen (Stiel, halbe Kappe, ganze Kappe), halten kurz, schaukeln um ein Pixel und dithern ab ~900 ms weg (bei ~1200 ms fort). Dazwischen steigen einzelne bunte Sporenpunkte auf.
+//  Feste Palette, kein Leuchten.
+// ═════════════════════════════════════════════════════════════════
+const ShroomasaurSporesEffect = (() => {
+  const KAPPEN = ['#e92f38', '#4e82cb', '#f8ca21', '#7e41ba', '#3ddc57', '#ff8b1a', '#fc69c6'].map(ppHex);
+  const RAND = ppHex('#291f3d'), WEISS = ppHex('#ffffff'), STIEL = ppHex('#ebdcc1');
+  const ENDE = 1200, FADE_AB = 900;
+  const GANZ = ['..ddd..', '.dcccd.', 'dcxccxd', 'dccxccd', 'ddddddd', '..dsd..', '..dsd..'];
+  const HALB = ['.......', '.......', '..ddd..', '.dcccd.', 'ddddddd', '..dsd..', '..dsd..'];
+  const STAMM = ['.......', '.......', '.......', '.......', '.......', '..dsd..', '..dsd..'];
+  const vorbereiten = (sz) => ({
+    pilze: Array.from({ length: ppFxN(22) }, (_, i) => {
+      const w = Math.random() * Math.PI * 2, r = 0.55 + Math.random() * 0.75;
+      return { x: Math.cos(w) * sz.hw * r, y: Math.sin(w) * sz.hh * r * 0.9 + sz.hh * 0.1, farbe: i % KAPPEN.length, start: Math.random() * 380, halt: 440 + Math.random() * 120 };
+    }),
+    sporen: Array.from({ length: ppFxN(16) }, (_, i) => ({ x: (Math.random() - 0.5) * sz.hw * 2, y: sz.hh * (0.1 + Math.random() * 0.8), v: 14 + Math.random() * 20, start: Math.random() * 600, farbe: i % KAPPEN.length })),
+  });
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    for (const p of teile.pilze) {
+      const tt = t - p.start;
+      if (tt < 0) continue;
+      const bild = tt < 90 ? STAMM : tt < 180 ? HALB : GANZ;
+      ppSprite(g, sz.cx + p.x, sz.cy + p.y, bild, { d: RAND, c: KAPPEN[p.farbe], x: WEISS, s: STIEL }, aus * (tt > p.halt + 160 ? 0.5 : 1));
+    }
+    for (const s of teile.sporen) {
+      const tt = t - s.start;
+      if (tt < 0 || tt > 700) continue;
+      g.block(sz.cx + s.x + Math.sin(tt / 140 + s.x) * 2, sz.cy + s.y - (tt / 1000) * s.v * 1.6, 2, 2, KAPPEN[s.farbe], aus * (tt > 520 ? 0.5 : 1));
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 300, 340, vorbereiten);
+})();
+
+// ═════════════════════════════════════════════════════════════════
+//  Leafagami Snake: Laubwirbel (`leafagami_leaves`) — PIXELART; Vorlage: das Kartenbild (Schlange aus gefaltetem Laub in Grün, Rot, Orange)
+//
+//  Bunte Blätter (4×4: Rand, Fläche in Rot/Orange/Gelb/Grün/Lime, hellere Ader) wirbeln in einer aufsteigenden Spirale um die geschützte Karte; die Blätter drehen sich in ganzen Schritten
+//  (vier Stellungen, alle 100 ms). Zwei Kreuzfunkel in Grün blitzen auf. Ab ~800 ms dithert alles weg (bei ~1100 ms fort). Feste Palette, kein Leuchten.
+// ═════════════════════════════════════════════════════════════════
+const LeafagamiLeavesEffect = (() => {
+  const FARBEN = ['#e92f38', '#ff8b1a', '#f8ca21', '#3ddc57', '#87cc00'].map(ppHex);
+  const RAND = ppHex('#2f4e1d'), ADER = ppHex('#fffbd2'), GRUEN = ['#ffffff', '#b3f9b8', '#3ddc57', '#20ac37'].map(ppHex);
+  const ENDE = 1100, FADE_AB = 800;
+  const STELLUNG = [
+    ['..dd..', '.dccd.', 'dcvccd', 'dccvcd', '.dccd.', '..dd..'],
+    ['..dd..', '.dccd.', 'dccvcd', 'dcvccd', '.dccd.', '..dd..'],
+    ['.dd...', 'dccdd.', 'dcvccd', '.dccvd', '..dccd', '...dd.'],
+    ['...dd.', '.ddccd', 'dccvcd', 'dvccd.', 'dccd..', '.dd...'],
+  ];
+  const vorbereiten = () => ({
+    blaetter: Array.from({ length: ppFxN(22) }, (_, i) => ({ w0: Math.random() * Math.PI * 2, h0: Math.random(), tempo: 3 + Math.random() * 2, farbe: i % FARBEN.length, start: Math.random() * 300, dreh: Math.floor(Math.random() * 4) })),
+  });
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
+    const hw = Math.max(10, sz.hw), hh = Math.max(10, sz.hh);
+    for (const b of teile.blaetter) {
+      const tt = t - b.start;
+      if (tt < 0) continue;
+      const hf = (b.h0 + tt / 1300) % 1;
+      const R = hw * (0.55 + 0.7 * Math.sin(hf * Math.PI)) + 3;
+      const w = b.w0 + (tt / 1000) * b.tempo;
+      const x = cx + Math.cos(w) * R, y = cy + hh * 0.8 - hf * hh * 1.7 + Math.sin(w) * R * 0.3;
+      const bild = STELLUNG[(b.dreh + Math.floor(tt / 100)) % 4];
+      ppSprite(g, x, y, bild, { d: RAND, c: FARBEN[b.farbe], v: ADER }, aus * (Math.sin(w) > 0 ? 1 : 0.6));
+    }
+    if (t > 100 && t < 560 && Math.floor(t / 110) % 2 === 0) {
+      ppKreuzfunkel(g, cx - hw * 0.6, cy - hh * 0.3, 2, GRUEN, aus);
+      ppKreuzfunkel(g, cx + hw * 0.6, cy + hh * 0.2, 2, GRUEN, aus);
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 240, 240, vorbereiten);
+})();
+
+// ═════════════════════════════════════════════════════════════════
+//  Fruit Bat, Nosferapple: Vampirbiss (`bat_bite_drain`, Brett-Zweig mit `targets` = [Opfer, Fledermaus]) — PIXELART; Vorlage: das Kartenbild (rosa Fledermaus-Apfel)
+//
+//  Am Opfer schließen sich zwei weiße Fangzähne (5×9, Rand, heller Kern) in Pixelschritten von oben und unten (0–320 ms), der Biss spritzt rote Tropfen nach allen Seiten (320 ms). Dann
+//  fliegt ein Strom aus Blutstropfen (2×3 mit hellem Punkt, dunkler Rand) in einem Bogen vom Opfer zur Fledermaus (360–1050 ms, versetzt, in ganzen Pixelschritten, mit Dither-Schweif).
+//  Bei der Ankunft blitzt ein rotes Kreuzfunkel. Ab ~1100 ms fort. Feste Palette, kein Leuchten.
+// ═════════════════════════════════════════════════════════════════
+const BatBiteDrainEffect = (() => {
+  const ROT = ['#ffffff', '#ec7f79', '#e92f38', '#b21a29', '#3a0000'].map(ppHex);   // Glanz, hell, Blut, dunkel, Rand
+  const ZAHN = ['#ffffff', '#f1e5fa', '#d2d2db', '#291f3d'].map(ppHex);              // Glanz, Zahn, Schatten, Rand
+  const ENDE = 1150;
+  const vorbereiten = () => ({
+    tropfen: Array.from({ length: ppFxN(18) }, (_, i) => ({ start: 380 + i * 34 + Math.random() * 30, dauer: 520 + Math.random() * 120, bogen: (Math.random() - 0.5) * 18 - 14, versatz: (Math.random() - 0.5) * 6 })),
+    spritzer: Array.from({ length: 9 }, (_, i) => ({ w: (i / 9) * Math.PI * 2 + Math.random() * 0.5, v: 18 + Math.random() * 22 })),
+  });
+  const zahn = (g, x, y, nachUnten, a) => {
+    // 5 breit, 9 hoch: Wurzel oben (nachUnten) bzw. unten, Spitze zeigt zur Mitte
+    for (let j = 0; j < 9; j++) {
+      const b = Math.max(1, Math.round(5 - j * 0.5));                                   // Breite nimmt zur Spitze ab
+      const yy = nachUnten ? y + j : y - j;
+      for (let i = -Math.floor(b / 2) - 1; i <= Math.floor(b / 2) + 1; i++) {
+        const rand = Math.abs(i) > Math.floor(b / 2);
+        g.put(x + i, yy, rand ? ZAHN[3] : (i < 0 ? ZAHN[2] : j < 6 && i === 0 ? ZAHN[0] : ZAHN[1]), a);
+      }
+    }
+  };
+  const malen = (g, t, geo, teile) => {
+    const A = geo.a, B = geo.b;
+    const aus = t > ENDE - 150 ? Math.max(0, 1 - (t - (ENDE - 150)) / 150) : 1;
+    if (aus <= 0) return;
+    const ax = Math.round(A.x), ay = Math.round(A.y);
+    if (t < 560) {                                                                      // die Fangzähne
+      const f = Math.min(1, t / 320), abstand = Math.round((1 - f) * 16) + 1;
+      const halt = t > 320 ? Math.round(Math.sin((t - 320) / 40) * 1) : 0;
+      for (const dx of [-5, 5]) { zahn(g, ax + dx, ay - abstand - 9 + halt, true, aus * (t > 460 ? 0.5 : 1)); zahn(g, ax + dx, ay + abstand + 9 - halt, false, aus * (t > 460 ? 0.5 : 1)); }
+    }
+    if (t >= 320 && t < 700) {                                                           // Spritzer
+      for (const s of teile.spritzer) {
+        const tt = (t - 320) / 1000;
+        const x = ax + Math.cos(s.w) * s.v * tt * 1.8, y = ay + Math.sin(s.w) * s.v * tt * 1.8 + tt * tt * 60;
+        g.block(Math.round(x), Math.round(y), 2, 2, ROT[2], aus * (t > 560 ? 0.5 : 1));
+      }
+    }
+    for (const d of teile.tropfen) {                                                    // Blutstrom Opfer → Fledermaus
+      const f = (t - d.start) / d.dauer;
+      if (f < 0 || f > 1) continue;
+      const e = f * f * (3 - 2 * f);
+      const qx = (A.x + B.x) / 2 + d.bogen, qy = Math.min(A.y, B.y) - 8 + d.versatz;
+      const pos = (u) => ({ x: (1 - u) * (1 - u) * A.x + 2 * (1 - u) * u * qx + u * u * B.x + d.versatz, y: (1 - u) * (1 - u) * A.y + 2 * (1 - u) * u * qy + u * u * B.y });
+      for (let s = 3; s >= 1; s--) { const q = pos(Math.max(0, e - s * 0.05)); g.put(q.x, q.y, ROT[3], aus * (0.5 - s * 0.1)); }
+      const p = pos(e), X = Math.round(p.x), Y = Math.round(p.y);
+      g.block(X - 1, Y - 1, 4, 5, ROT[4], aus); g.block(X, Y, 2, 3, ROT[2], aus); g.put(X, Y, ROT[1], aus);
+    }
+    if (t > 800 && t < 1080) ppKreuzfunkel(g, B.x - 1, B.y - 1, Math.min(4, Math.floor((t - 800) / 70) + 1), [ROT[0], ROT[1], ROT[2], ROT[3]], aus);
+  };
+  return ppPunktFlug(malen, ENDE + 40, vorbereiten);
+})();
+
 const ANIM_REGISTRY = {
   // ── Kernschlag ueber dem ganzen Brett (Doomsday Bomb, v580) ───────
   // [Als Vorgabe 22.8.: „Eine zentrale, gewaltige Explosion in der
@@ -18035,6 +18280,10 @@ const ANIM_REGISTRY = {
   spell_shackle_chains: SpellShackleChainsEffect,
   shrink_squeeze: ShrinkSqueezeEffect,
   regeneration_bloom: RegenerationBloomEffect,
+  ankhota_sandstorm: AnkhotaSandstormEffect,
+  shroomasaur_spores: ShroomasaurSporesEffect,
+  leafagami_leaves: LeafagamiLeavesEffect,
+  bat_bite_drain: BatBiteDrainEffect,
   arcane_eyes_open: ArcaneEyesOpenEffect,
   hockey_wish: HockeyWishEffect,
   liquid_rainbow: LiquidRainbowEffect,
@@ -53511,6 +53760,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                             };
                           }
                         }
+                        // Shroomasaur (W73): der Zusatzname gilt nur in dem Zug, in dem er vergeben wurde — der Tooltip zeigt ihn grün neben dem echten Namen.
+                        if (cc?._zusatzName && cc._zusatzNameZug === gameState.turn) {
+                          tooltipOverride = { ...(tooltipOverride || baseCard || {}), extraName: cc._zusatzName };
+                        }
                         // Goff/Gon-style attached Hero: swap to the
                         // Hero's card on hover (Performance-pattern).
                         // The badge in the corner tells the player an
@@ -53719,6 +53972,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         style={{ background: 'linear-gradient(135deg, #fbe181, #a87c00)', borderColor: '#72541d', color: '#332300' }}
                       >
                         <span className="head-counter-icon">🛡️</span>
+                      </div>
+                    ) : null}
+                    {cc?._zusatzName && cc._zusatzNameZug === gameState.turn ? (
+                      <div style={{ position: 'absolute', left: 0, right: 0, top: 2, textAlign: 'center', pointerEvents: 'none', zIndex: 6 }}>
+                        <span style={{ display: 'inline-block', maxWidth: '94%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '1px 3px', fontFamily: "'Pixel Intv', 'Press Start 2P', monospace", fontSize: 'calc(8px * var(--board-scale))', lineHeight: 1.1, color: '#b3f9b8', background: '#29663f', border: '1px solid #3ddc57', textShadow: '1px 1px 0 #000' }}>{cc._zusatzName}</span>
                       </div>
                     ) : null}
                     {cc?.bunnyBombCounter > 0 ? (
