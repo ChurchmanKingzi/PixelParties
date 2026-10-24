@@ -26715,3 +26715,20 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 @container (max-width: 299px) { .skin-holo-name .sh-ht i { animation: none; will-change: auto; } }
 @media (pointer: coarse) { .skin-holo-name .sh-ht i { animation: none; will-change: auto; } }
 @media (pointer: coarse) and (max-height: 600px) { .skin-holo-name .sh-ht { display: none; } }
+
+/* ═══ Markierungen der Handkarten sitzen auf der KARTE, nicht am Platz (Al, 24.10.) ═══
+   `.hand-slot` wird nicht geneigt — nur die Karte darin (`--hand-tilt`, Fächer). Ein Rahmen oder Schein am Platz (Ability anlegen: `.hand-card-attach-eligible`; Pflicht-Auswahl:
+   `.hand-pick-eligible-urgent`) stand deshalb als gerades Rechteck neben der gekippten Karte. Jetzt zeichnet die Karte selbst den Rahmen und kippt mit; statt
+   weichem Schein ein harter Ring und Blinken in ganzen Stufen (Pixelart). */
+.hand-card-attach-eligible { border: none !important; box-shadow: none !important; }
+.hand-card-attach-eligible > .board-card,
+.hand-pick-eligible-urgent > .board-card {
+  outline: 3px solid #4ceb70 !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px #08060c, 0 0 0 5px #167927 !important;
+  animation: ppHandPickBlink .8s steps(1, end) infinite;
+}
+.hand-pick-eligible-urgent { animation: none; }
+.hand-pick-eligible-urgent .board-card { box-shadow: 0 0 0 2px #08060c, 0 0 0 5px #167927 !important; }
+@keyframes ppHandPickBlink { 0%, 49% { outline-color: #4ceb70; } 50%, 100% { outline-color: #b1ff1a; } }
+@media (prefers-reduced-motion: reduce) { .hand-card-attach-eligible > .board-card, .hand-pick-eligible-urgent > .board-card { animation: none; } }
