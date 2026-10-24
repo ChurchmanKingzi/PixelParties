@@ -19,6 +19,11 @@ const { findBugfixes, readNotes, readSkips, applySkips, normName } = require('..
 const MAX_CARDS_POSTED = 40;
 const NEW_CARD_TAGLINE = '**New card beep-boop:**';
 const PER_MESSAGE = 10;
+// Einmal-Zurücksetzung (siehe pollCards): Mind Control, Mine! Mine! Mine!, Secret Entrance, See through the Ruse, Spy in the Enemy's Camp.
+const WELLE_ZURUECK = {
+  key: 'reset_welle_2026_10_24',
+  karten: ['Mind Control', 'Mine! Mine! Mine!', 'Secret Entrance', 'See through the Ruse', "Spy in the Enemy's Camp"],
+};
 
 module.exports = function register(ctx) {
   const { client, config, db } = ctx;
@@ -117,7 +122,15 @@ module.exports = function register(ctx) {
     lastMtime = stat.mtimeMs;
 
     await ctx.cardsReload();                       // neue Karten + neue Kunst einlesen
-    const known = await db.kvGet('known_cards');
+    let known = await db.kvGet('known_cards');
+    // Einmaliges Zurücksetzen (Test des Feeds nach dem Deploy, 24.10.): die Karten der Nachtwelle gelten wieder als „noch nicht gezeigt“ und erscheinen beim nächsten Lauf.
+    // Läuft je Schlüssel genau einmal (der Schlüssel liegt in der Datenbank); danach ist dieser Block wirkungslos und kann gelöscht werden.
+    if (known && !(await db.kvGet(WELLE_ZURUECK.key))) {
+      known = known.filter(n => !WELLE_ZURUECK.karten.includes(n));
+      await db.kvSet('known_cards', known);
+      await db.kvSet(WELLE_ZURUECK.key, new Date().toISOString());
+      console.log('[feeds] Karten der Welle als „noch nicht gezeigt“ zurückgesetzt:', WELLE_ZURUECK.karten.length);
+    }
     const withArt = renderer.allCards().filter(c => renderer.canRender(c.name));
     if (!known) {                                  // erster Lauf: nur merken
       await db.kvSet('known_cards', withArt.map(c => c.name));
