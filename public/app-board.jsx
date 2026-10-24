@@ -8920,49 +8920,6 @@ const ShrinkSqueezeEffect = (() => {
 })();
 
 // ═════════════════════════════════════════════════════════════════
-//  Clone: Echo (`clone_echo`) — PIXELART; Vorlage: das Kartenbild (der durchscheinende Zwilling neben dem Helden, Lavendel/Hellblau)
-//
-//  Ein Abbild in Kartengröße löst sich in ganzen Pixelschritten vom Helden und schiebt sich nach rechts (0–300 ms), flimmert (zwei Bilder im Takt, Zeilen abwechselnd gedithert wie ein
-//  Abtastbild), hält kurz und dithert dann weg (bei ~700 ms fort). Eine Punktlinie verbindet beide, kleine Funken steigen auf. Feste Palette, kein Leuchten.
-// ═════════════════════════════════════════════════════════════════
-const CloneEchoEffect = (() => {
-  const PAL = ['#ffffff', '#d9c0ec', '#6d9bf8', '#0351c9', '#02398c'].map(ppHex);   // Glanz, Hell, Lavendel, Mittel, Rand
-  const ENDE = 700, FADE_AB = 480;
-  const vorbereiten = (sz) => ({
-    funken: Array.from({ length: ppFxN(8) }, () => ({ x: (Math.random() - 0.5) * sz.hw * 2.6, y: (Math.random() - 0.2) * sz.hh * 1.4, v: 12 + Math.random() * 20, start: 120 + Math.random() * 300, leben: 240 + Math.random() * 160 })),
-  });
-  const echo = (g, cx, cy, hw, hh, t, a) => {
-    const flimmer = Math.floor(t / 66) % 2;
-    for (let y = -hh; y <= hh; y++) {
-      const zeile = (y + hh + flimmer) % 2 === 0;
-      for (let x = -hw; x <= hw; x++) {
-        const rand = x === -hw || x === hw || y === -hh || y === hh;
-        if (rand) g.put(cx + x, cy + y, PAL[2], a);
-        else if (zeile) g.put(cx + x, cy + y, PAL[1], a * 0.28);
-        else g.put(cx + x, cy + y, PAL[3], a * 0.16);
-      }
-    }
-    for (let x = -hw + 2; x < hw - 1; x += 2) g.put(cx + x, cy - hh + 1, PAL[0], a);              // helle Oberkante (Glanz)
-  };
-  const malen = (g, t, sz, teile) => {
-    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
-    if (aus <= 0) return;
-    const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
-    const stufe = Math.min(5, Math.floor(t / 60));                    // ganze Schritte
-    const dx = Math.round(sz.hw * 2.1 * stufe / 5);
-    if (stufe > 0) for (let x = 0; x < dx; x += 3) g.put(cx + x, cy, PAL[2], aus);   // Punktlinie zwischen Held und Echo
-    echo(g, cx + dx, cy, Math.round(sz.hw * 0.96), Math.round(sz.hh * 0.96), t, aus * (stufe < 2 ? 0.6 : 1));
-    for (const f of teile.funken) {
-      const k = (t - f.start) / f.leben;
-      if (k < 0 || k > 1) continue;
-      const px = cx + dx + f.x * 0.4, py = cy + f.y - f.v * (t - f.start) / 1000;
-      g.put(px, py, PAL[0], aus); g.put(px + 1, py, PAL[2], aus); g.put(px, py + 1, PAL[2], aus);
-    }
-  };
-  return ppPunktBild(malen, ENDE + 40, 420, 340, vorbereiten);
-})();
-
-// ═════════════════════════════════════════════════════════════════
 //  Arcane Eyes: Augen öffnen sich (`arcane_eyes_open`) — PIXELART; Vorlage: das Kartenbild (zwei violette Augen in einer goldenen Backsteinwand)
 //
 //  Zwei Augen (17×11, weißer Augapfel mit grauem Schatten, violette Iris, dunkle Pupille mit Glanzpunkt, dunkler Rand) liegen als Lidstrich über der Zone und öffnen sich in vier ganzen
@@ -18078,7 +18035,6 @@ const ANIM_REGISTRY = {
   spell_shackle_chains: SpellShackleChainsEffect,
   shrink_squeeze: ShrinkSqueezeEffect,
   regeneration_bloom: RegenerationBloomEffect,
-  clone_echo: CloneEchoEffect,
   arcane_eyes_open: ArcaneEyesOpenEffect,
   hockey_wish: HockeyWishEffect,
   liquid_rainbow: LiquidRainbowEffect,
@@ -53465,6 +53421,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                           ><PxIcon z="🔒" />{cc.preserve > 1 ? <span className="puppet-counter-num">×{cc.preserve}</span> : null}</div>
                         ) : null}
                         {cc ? <BuffColumn buffs={cc.buffs} statuses={cc} cardName={cards[cards.length-1]} /> : null}
+                        {/* Regeneration (Spell-Anhängsel): Stufe, als die sie läuft (60/120/180 HP je Zug) */}
+                        {cards[cards.length - 1] === 'Regeneration' && cc?.regenerationLevel > 0 ? (
+                      <div className="head-counter-badge"
+                        onMouseEnter={e => showGameTooltip(e, `Regeneration Lv ${cc.regenerationLevel}: Heals the Hero for ${60 * cc.regenerationLevel} HP at the start of its owner's turns.`)}
+                        onMouseLeave={hideGameTooltip}
+                        style={{ background: '#20ac37', borderColor: '#29663f', color: '#ffffff' }}
+                      >
+                        <span className="head-counter-icon"><PxIcon z="🌱" /></span>
+                        <span className="head-counter-num">Lv {cc.regenerationLevel}</span>
+                      </div>
+                    ) : null}
                         {cc?.balance > 0 ? (
                           <div className="head-counter-badge"
                             onMouseEnter={e => showGameTooltip(e, `Balance Counters: ${cc.balance}. Charm of Balance lets you draw this many cards once per turn.`)}

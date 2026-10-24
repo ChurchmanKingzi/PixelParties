@@ -17274,6 +17274,12 @@ io.on('connection', (socket) => {
             // Multiple Anti Magics on the same Hero correctly keep the
             // HIGHEST level — `actionAddBuff` overwrites, so we iterate
             // sup zones with a max-by-level pass after stamping.
+            // Regeneration (Welle 72) — im Puzzle-Editor gesetzt: als welches Level der Zauber behandelt wird (1/2/3 → 60/120/180 HP je Zugbeginn).
+            // Landet auf `inst.counters.regenerationLevel` (der Wert, den der Zugbeginn-Heilhaken liest); das Brett zeigt ihn als „Lv N"-Abzeichen.
+            if (inst.name === 'Regeneration' && typeof cs.regenerationLevel === 'number'
+                && cs.regenerationLevel >= 1 && cs.regenerationLevel <= 3) {
+              inst.counters.regenerationLevel = cs.regenerationLevel;
+            }
             if (inst.name === 'Anti Magic'
                 && typeof cs.antiMagicLevel === 'number'
                 && cs.antiMagicLevel >= 1 && cs.antiMagicLevel <= 3) {

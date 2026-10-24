@@ -76,6 +76,7 @@ const PZ_BG_KEY = 'pz-creator-backgrounds';
 // Waechst die Liste, waechst sie genau hier.
 const PZ_ATTACHMENT_MIT_WERTEN = new Set([
   'Anti Magic',        // Stufe 1-3 (editAntiMagicLevel)
+  'Regeneration',      // Stufe 1-3 (editRegenerationLevel): als welches Level der Zauber behandelt wird (60/120/180 HP)
 ]);
 
 // ★ v1212: Ziehquelle → Kartenreihe, die sich neigt. Modulweit, nicht
@@ -338,6 +339,8 @@ const PUZZLE_COUNTER_BADGES = [
   // Fun-Fun Circus: Applause Counter auf beliebigen Creatures.
   { key: 'applause',          icon: '👏', label: 'Applause Counters' },
   { key: 'bunnyBombCounter',  icon: '🧨', label: 'Bomb Counters' },
+  // Regeneration (Welle 72): die Stufe, als die der Zauber behandelt wird — als „Lv N" statt „×N".
+  { key: 'regenerationLevel', icon: '🌱', label: 'Regeneration Level', stufe: true },
   // Demon Counter (v601) — Horned Demon, Baaliel; spaeter Great Vanguard Demon.
   { key: 'demonCounter',      icon: '😈', label: 'Demon Counters' },
   // Puppets (v707): Luck (Lucky Puppet Laki) / Preserve (Preserving Puppet Vinny).
@@ -449,7 +452,7 @@ function CounterBadges({ source, defs }) {
           title={`${d.label}: ${source[d.key]}`}
           style={{ position: 'static' }}>
           <span className="head-counter-icon">{d.icon}</span>
-          {!d.boolean && <span className="head-counter-num">×{source[d.key]}</span>}
+          {!d.boolean && <span className="head-counter-num">{d.stufe ? 'Lv ' : '×'}{source[d.key]}</span>}
         </div>
       ))}
       {/* v708 (Puppets): Luck/Preserve nebeneinander in EINER Zeile. */}
@@ -2872,6 +2875,10 @@ function PuzzleCreator() {
   // and target-filter both use the authored level. Null when the open
   // editor target isn't an Anti Magic.
   const [editAntiMagicLevel, setEditAntiMagicLevel] = useState(null);
+  // For Regeneration: the Support Magic level (1/2/3) the Spell is treated as — it heals 60/120/180 HP at the start of each of its owner's turns. Stored under
+  // `_creatureStatuses[hi-slot].regenerationLevel` and applied server-side as `inst.counters.regenerationLevel` (the value the card's turn-start heal reads).
+  // Null when the open editor target isn't a Regeneration.
+  const [editRegenerationLevel, setEditRegenerationLevel] = useState(null);
   // Cards whose puzzle starting state can include Change Counters.
   // Hardcoded here because the script-side `cpuMeta.counterConsumer`
   // flag isn't reachable from the client; mirrors the convention used
@@ -2955,6 +2962,7 @@ function PuzzleCreator() {
     setEditDemonCounter(null);
     setEditSparkflyGifts(null);
     setEditAntiMagicLevel(null);
+    setEditRegenerationLevel(null);
     if (zt === 'hero') {
       const h = p.heroes[hi]; if (!h) return;
       klangBeimOeffnen();
@@ -3121,6 +3129,10 @@ function PuzzleCreator() {
       // section stays hidden.
       setEditAntiMagicLevel(c?.name === 'Anti Magic'
         ? Math.max(1, Math.min(3, cs.antiMagicLevel || 1))
+        : null);
+      // Regeneration: hydrate the level (1/2/3), default 1 (the level an unedited card heals as).
+      setEditRegenerationLevel(c?.name === 'Regeneration'
+        ? Math.max(1, Math.min(3, cs.regenerationLevel || 1))
         : null);
     }
   }, [players, getCard, hand, oppHand]);
@@ -3336,11 +3348,16 @@ function PuzzleCreator() {
       if (c?.name === 'Anti Magic' && editAntiMagicLevel != null) {
         merged.antiMagicLevel = Math.max(1, Math.min(3, editAntiMagicLevel));
       }
+      // Regeneration: persist the level the Spell is treated as (read by its turn-start heal via `counters.regenerationLevel`).
+      delete merged.regenerationLevel;
+      if (c?.name === 'Regeneration' && editRegenerationLevel != null) {
+        merged.regenerationLevel = Math.max(1, Math.min(3, editRegenerationLevel));
+      }
       p._creatureStatuses[hi + '-' + slot] = merged;
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editSkin, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editDiamondLoss, editJeGetroffen, editBountyMark, editBalanceCounter, editApplause, editBunnyBombCounter, editDemonCounter, editSparkflyGifts, editAntiMagicLevel, updatePlayer, getCard, statusScopePasst]);
+  }, [editTarget, editSkin, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editDiamondLoss, editJeGetroffen, editBountyMark, editBalanceCounter, editApplause, editBunnyBombCounter, editDemonCounter, editSparkflyGifts, editAntiMagicLevel, editRegenerationLevel, updatePlayer, getCard, statusScopePasst]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -5152,6 +5169,28 @@ function PuzzleCreator() {
                         onClick={() => setEditAntiMagicLevel(lv)}>
                         Level {lv}
                         <div style={{ fontSize: 10, opacity: 0.8, marginTop: 2 }}>Immune to ≤ Lv{lv} Spells</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {/* Regeneration Level picker — visible only when the edit target is a Regeneration Spell. Stamps `regenerationLevel` into `_creatureStatuses[hi-slot]`,
+                which the puzzle loader applies as `inst.counters.regenerationLevel`; the card then shows a "Lv N" badge and heals 60/120/180 HP per turn start. */}
+            {!isBiomancyTokenEdit && editTarget.zt === 'support' && _editCard?.name === 'Regeneration' && editRegenerationLevel != null && (
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                  🌱 Regeneration Level
+                </span>
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  {[1, 2, 3].map(lv => {
+                    const active = editRegenerationLevel === lv;
+                    return (
+                      <button key={lv} className={'btn ' + (active ? 'btn-success' : '')}
+                        style={{ flex: 1, padding: '10px 0', fontSize: 12, borderColor: active ? '#4ceb70' : 'var(--bg4)' }}
+                        onClick={() => setEditRegenerationLevel(lv)}>
+                        Level {lv}
+                        <div style={{ fontSize: 10, opacity: 0.8, marginTop: 2 }}>Heals {60 * lv} HP / turn</div>
                       </button>
                     );
                   })}
