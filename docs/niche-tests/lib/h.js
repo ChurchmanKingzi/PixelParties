@@ -44,7 +44,7 @@ const PHASES = { START: 0, RESOURCE: 1, MAIN1: 2, ACTION: 3, MAIN2: 4, END: 5 };
 /** Heroes ohne implementierte Fähigkeit – neutrale Platzhalter, damit Hero-Passive nichts verfälschen. */
 const BLANK_HEROES = ['Tushu, the Knowledge Keeper', 'Rick, the Trigger Happy Undertaker', 'Zwei, the Lucky Thief'];
 /** Zweites neutrales Trio (für Tests mit 3+ Sitzen). */
-const BLANK_HEROES_B = ['Fern, the Ship Slave', 'Hulijing, the Foxdemon', 'George, the Mad Tyrant King'];
+const BLANK_HEROES_B = ['Cuberto, Supreme Lord of Edges', 'Hulijing, the Foxdemon', 'George, the Mad Tyrant King'];
 
 /**
  * Inerte Testkarten (ohne Skript, kein Kartentext) – werden zur Laufzeit in die Karten-DB eingeschoben (die DB ist ein

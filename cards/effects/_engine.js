@@ -3459,6 +3459,13 @@ class GameEngine {
     const listeners = this.cardInstances.filter(c => {
       // If _onlyCard is set, only that specific card fires this hook
       if (hookCtx._onlyCard && c.id !== hookCtx._onlyCard.id) return false;
+      // ★ Darion (Equip-Stapel): die Equip-Skripte erkennen „ICH verlasse die Zone" an Held + Platz der abgehenden Karte (eine Karte je Platz war bisher Gesetz). Liegen mehrere
+      // Equips im selben Platz, haelt jedes die Karte des NACHBARN fuer sich selbst und nimmt seine Boni zurueck. Darum hoert beim Abgang eines Equips nur dieses Equip selbst zu —
+      // die Stapelnachbarn nicht.
+      if (hookName === HOOKS.ON_CARD_LEAVE_ZONE && hookCtx.leavingCard && c.id !== hookCtx.leavingCard.id
+          && hookCtx.fromZone === 'support' && c.zone === ZONES.SUPPORT
+          && c.heroIdx === hookCtx.fromHeroIdx && c.zoneSlot === hookCtx.fromZoneSlot
+          && this.istEquipArtifact(c) && this.istEquipArtifact(hookCtx.leavingCard)) return false;
       const hookFn = c.getHook(hookName);
       if (!hookFn) return false;
       // ★ ABILITY IN EINER SUPPORT ZONE (Xal, Xalibur; 24.10.): ein Ability-Skript (`activeIn: ['ability']`) wirkt dort wie in einer echten
@@ -9919,7 +9926,11 @@ class GameEngine {
                 // W52a: dieser Weg nimmt die Ausruestung OHNE `onCardLeaveZone` aus der Zone (Smug Coin) — der Equip-Verlust wird trotzdem gemeldet (`onEquipLost`).
                 await this.fireEquipLost(inst, { reason: 'deleted', toZone: ZONES.DELETED, fromOwner: this.physicalSide(inst), fromHeroIdx: heroIdx, fromZoneSlot: inst.zoneSlot, source: inst.name });
                 if (ps.supportZones[heroIdx]?.[inst.zoneSlot]) {
-                  ps.supportZones[heroIdx][inst.zoneSlot] = [];
+                  // Nur DIESE Karte nehmen (Darion: die anderen Equips des Stapels bleiben liegen).
+                  const _zeile = ps.supportZones[heroIdx][inst.zoneSlot];
+                  const _ix = _zeile.indexOf(inst.name);
+                  if (_ix >= 0 && _zeile.length > 1) _zeile.splice(_ix, 1);
+                  else ps.supportZones[heroIdx][inst.zoneSlot] = [];
                 }
                 const ownerPs = this.gs.players[inst.originalOwner ?? targetOwner];
                 if (ownerPs) ownerPs.deletedPile.push(inst.name);
