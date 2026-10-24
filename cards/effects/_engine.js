@@ -3866,7 +3866,7 @@ class GameEngine {
     // Ausnahme `onCreatureSummoned` (Ruling 3.10.): eine NEUE Beschwoerung
     // mitten in einer laufenden Kette oeffnet trotzdem ihr eigenes
     // On-Summon-Fenster.
-    if ((!this._inReactionCheck || hookName === 'onCreatureSummoned')
+    if ((!this._inReactionCheck || hookName === 'onCreatureSummoned' || hookName === 'onHandAddByDiscard' || hookCtx._verschachtelt)
         && !hookCtx._skipReactionCheck && !hookCtx._isReaction) {
       await this._checkReactionCards(hookName, hookCtx);
     }
@@ -22256,6 +22256,22 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * „Karten aus Deck/Ablage auf die Hand — bezahlt mit dem Abwurf derselben Anzahl Handkarten" (Cute Dog, Lunatic Cycle - New Moon,
+   * Life-Searcher, Inventing …). Die Tutor-Karte ruft das EINMAL, wenn alle Karten auf der Hand liegen. Feuert nur, wenn die Zahl
+   * der Karten gleich der Zahl der Abwuerfe ist (Kartentext Control Monitors: „by discarding the same number of cards").
+   * Reaktionsfenster: Control Monitors. Danach prueft der Aufrufer, welche der Karten noch auf der Hand sind (`handHat`).
+   * @returns {Promise<boolean>} true = ein Fenster wurde angeboten
+   */
+  async meldeHandZugangDurchAbwurf(pi, { names, discarded, source } = {}) {
+    pi = this._resolvePi(pi);
+    if (this._inMctsSim || this._fastMode) return false;
+    const liste = (names || []).filter(Boolean);
+    if (!liste.length || !(discarded > 0) || discarded !== liste.length) return false;
+    await this.runHooks('onHandAddByDiscard', { playerIdx: pi, cardNames: liste, discarded, sourceName: source || null });
+    return true;
+  }
+
+  /**
    * Karte aus Deck/Ablage LOESCHEN. Getrackte Ablage-Instanzen wandern
    * ueber `actionMoveCard` (Zonen-Hooks bleiben erhalten), sonst
    * Entnahme + Geloescht-Stapel + Flug.
@@ -35092,7 +35108,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Innerhalb einer MCTS-Simulation und innerhalb eines laufenden
     // Reaktions-Checks kein weiteres Fenster öffnen — sonst
     // rekursiert die Kette.
-    if (this._inMctsSim || this._inReactionCheck) return false;
+    // `opts.verschachtelt` (Control Monitors): die Hand-Interaktion geschieht MITTEN in einer aufloesenden Reaktionskette — dort darf
+    // Ambush the Scout trotzdem antworten (eigenes verschachteltes Fenster, wie das On-Summon-Fenster).
+    if (this._inMctsSim || (this._inReactionCheck && !opts.verschachtelt)) return false;
     // AUSFALLSICHER: ohne ausdrueckliches `byPi` kein Fenster. Frueher
     // wurde hier der Gegner geraten — das haette bei jedem Selbst-
     // Abwurf (Kosten!) faelschlich ein Fenster geoeffnet, sobald der
@@ -35109,6 +35127,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       count: opts.count ?? 1,
       sourceName: opts.sourceName || null,
       cancelled: false,
+      ...(opts.verschachtelt ? { _verschachtelt: true } : {}),
     };
     // Reaktionen erreichen `resolve(engine, pi, …)` OHNE chainCtx —
     // der sechste Parameter dort ist der Kettenindex. Das offene
@@ -42830,6 +42849,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     onCardActivation: 'A card was activated',
     onReactionActivated: 'A reaction was activated',
     onTakeControl: 'A target was taken control of',
+    onHandAddByDiscard: 'Cards were added to a hand from a deck or discard pile by discarding the same number of cards',
   };
 
   /** Hooks that should NOT trigger reaction checks */

@@ -70,6 +70,10 @@ const HOOKS = {
   // Feuert NUR, wenn ein FREMDER Effekt die Hand anfasst — eigene Kosten
   // (byPi === targetPi) oeffnen kein Fenster.
   ON_HAND_INTERACTION: 'onHandInteraction',
+  // Feuert, NACHDEM ein Spieler per Effekt N Karten aus Deck/Ablage auf die Hand genommen hat UND dafuer genau N Handkarten abgeworfen
+  // hat (Cute Dog, Lunatic Cycle - New Moon, Life-Searcher, Inventing …). Genau EIN Aufruf je Effekt (nicht je Karte).
+  // Kontext: { playerIdx (der Hinzufuegende), cardNames[], discarded, sourceName }. Reaktionsfenster (Control Monitors).
+  ON_HAND_ADD_BY_DISCARD: 'onHandAddByDiscard',
   // Feuert, NACHDEM ein Doom Counter auf eine Doom Clock gelegt wurde.
   // Kontext: { clock, byPi, count, sourceName }. Zuhoerer sind Archer
   // of Teocuilatl (Schaden) und Swift Eagle Warrior (Karte ziehen).
