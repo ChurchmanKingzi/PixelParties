@@ -35943,6 +35943,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
 
     const isSurprise = (card.subtype || '').toLowerCase() === 'surprise';
+    if (isSurprise && me.surprisesLocked) return true;   // Arcane Eyes (Welle 72): der Gegner kontrolliert wirksame Augen — keine Surprise setzbar → in der Hand ausgegraut
     if (currentPhase === 2 || currentPhase === 4) {
       // Surprise cards: playable if any hero has an empty surprise zone
       if (isSurprise) {

@@ -4818,6 +4818,8 @@ function sendGameState(room, playerIdx, extra) {
       spellImmuneHeroes: room.engine
         ? (ps.heroes || []).map((h, hi) => !!(h?.name && room.engine.heroHasSpellImmunity(pi, hi)))
         : [],
+      // Arcane Eyes (Welle 72): der Gegner kontrolliert wirksame Augen — dieser Spieler kann keine Surprises setzen/aktivieren (der Client graut sie in der Hand aus). Abgeleitet, nie gespeichert.
+      surprisesLocked: room.engine ? !!room.engine.surprisesLockedFor(pi) : false,
       // Als Vorgabe 29.9.: eine verdeckte Surprise sieht ihr KARTENBESITZER
       // (`originalOwner`) — auch auf der Gegenseite (gesetzt am geliehenen
       // Helden, Trapping); die Brettseite sieht fremde verdeckte Karten nicht.
@@ -6108,6 +6110,7 @@ function sendSpectatorGameState(room) {
       // v1349: verwahrte/versiegelte Zonen (Madame Guillotine) — rotes Kreuz, Anlegen gesperrt.
       verwahrteZonen: require('./cards/effects/_ability-verwahrung-shared').zonenFuerAnzeige(gs, spi),
       spellImmuneHeroes: room.engine ? (ps.heroes || []).map((h, hi) => !!(h?.name && room.engine.heroHasSpellImmunity(spi, hi))) : [],   // 24.10.: s. oben
+      surprisesLocked: room.engine ? !!room.engine.surprisesLockedFor(spi) : false,   // Arcane Eyes (Welle 72), s. oben
       surpriseZones: ps.surpriseZones.map((sz, hi) => (sz || []).map(cn => {
         const inst = room.engine?.cardInstances.find(c => c.owner === spi && c.zone === 'surprise' && c.heroIdx === hi && c.name === cn);
         if (inst && !inst.faceDown) return cn;

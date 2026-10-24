@@ -110,6 +110,9 @@ const zusatz = (t, seat) => !!eyes.inherentAction(t.gs, seat, 0, t.engine);
     const rev1 = s1 && (s1.players || s1.gameState?.players || [])[0]?.revealedHandCards;
     R.check('Sitz 0 (Augen) sieht die ganze Hand von Sitz 1 offen', Array.isArray(rev0) && rev0.length === 3 && rev0.map(c => c.name).sort().join() === ['Fireball', 'Icebolt', 'ZZ Filler'].sort().join(), rev0);
     R.check('Sitz 1 sieht die Hand von Sitz 0 NICHT offen', !rev1 || rev1.length === 0, rev1);
+    const sp1 = s1 && (s1.players || s1.gameState?.players || [])[1], sp0 = s0 && (s0.players || s0.gameState?.players || [])[0];
+    R.check('Zustand an Sitz 1 meldet `surprisesLocked` (der Client graut Surprises in der Hand aus)', sp1 && sp1.surprisesLocked === true, sp1 && sp1.surprisesLocked);
+    R.check('Zustand an Sitz 0 (Augen): nicht gesperrt', sp0 && sp0.surprisesLocked === false, sp0 && sp0.surprisesLocked);
   }
 
   R.section('D · Ruhen der Augen');

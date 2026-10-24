@@ -5147,6 +5147,14 @@ class GameEngine {
             if (gs._spellDamageLog && !config._skipDamageLog) {
               gs._spellDamageLog.push({ ...forced });
             }
+            // ★ Clone (Welle 72): auch ein ERZWUNGENES Ziel (Niehts Bonusangriff) gehoert zur Aufzeichnung des Wurfs — sonst gaebe es fuer diese Attack keine Kopie.
+            {
+              const ra = gs._klonAufnahme;
+              if (ra && !gs._klonWiedergabe && pi === ra.pi) {
+                const fid = forced.id || (forced.type === 'hero' ? `hero-${forced.owner}-${forced.heroIdx}` : `equip-${forced.owner}-${forced.heroIdx}-${forced.slotIdx}`);
+                ra.eintraege.push({ title: config.title || cardInstance.name, ids: [fid] });
+              }
+            }
             return forced;
           }
           // else: fall through to normal prompt path
