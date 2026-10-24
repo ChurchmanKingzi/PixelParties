@@ -100,6 +100,7 @@ const HOOKS = {
   // ── Combat ──
   ON_ATTACK_DECLARE: 'onAttackDeclare',
   BEFORE_DAMAGE:     'beforeDamage',
+  BEFORE_TRUE_DAMAGE: 'beforeTrueDamage',   // W73b: nur ERHÖHUNGEN (`modifyAmount(+n)`) vor True Damage (Cheering Rabbit) — Senkungen/Negation gibt es hier nicht
   AFTER_DAMAGE:      'afterDamage',
   ON_HERO_KO:        'onHeroKO',
   ON_HERO_REVIVE:    'onHeroRevive',

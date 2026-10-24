@@ -43,11 +43,24 @@ function abilityCardCount(abilities) {
   return abilities.reduce((n, a) => n + (a.level || 1), 0);
 }
 
+/** W73d (Leafagami Snake): wie viele Kopien dieses Ability-Eintrags wurden in dieser Schleife schon (geschützt) „abgeworfen"? */
+function geschuetzteKopien(engine, a) {
+  const set = engine._laubGeschuetzt;
+  if (!set || !set.size) return 0;
+  let n = 0;
+  for (const c of engine.cardInstances || []) {
+    if (set.has(c.id) && c.owner === a.owner && c.heroIdx === a.heroIdx && c.zoneSlot === a.slotIdx && c.zone === ZONES.ABILITY) n++;
+  }
+  return n;
+}
+
 function targetsFor(engine, pi, heroIdx, kinds) {
   const { abilities, equips } = sendables(engine, pi, heroIdx);
   const out = [];
   if (kinds.includes('ability')) {
     for (const a of abilities) {
+      if (a.zoneKind !== 'support' && geschuetzteKopien(engine, a) >= (a.level || 1)) continue;   // alle Kopien dieses Platzes schon „abgeworfen" (geschützt)
+      if (a.zoneKind === 'support' && a.cardInstance && engine._laubGeschuetzt && engine._laubGeschuetzt.has(a.cardInstance.id)) continue;
       out.push({
         id: a.id, type: a.type, owner: a.owner, heroIdx: a.heroIdx, slotIdx: a.slotIdx,
         cardName: a.cardName, cardInstance: a.cardInstance || undefined,
@@ -82,6 +95,14 @@ function targetsFor(engine, pi, heroIdx, kinds) {
  * @returns {{sent, abilitiesSent, equipsSent, aborted}}
  */
 async function sendCardsLoop(engine, pi, heroIdx, opts) {
+  // W73d: Schutz-Menge für die Dauer der Schleife (Leafagami Snake lässt Abilities liegen — dieselbe Karte darf nicht mehrfach „bezahlen")
+  const laubVorher = engine._laubGeschuetzt;
+  engine._laubGeschuetzt = new Set();
+  try { return await sendCardsLoopKern(engine, pi, heroIdx, opts); }
+  finally { engine._laubGeschuetzt = laubVorher; }
+}
+
+async function sendCardsLoopKern(engine, pi, heroIdx, opts) {
   const kinds = opts.kinds || ['ability', 'equip'];
   const min = Math.max(0, opts.min || 0);
   const max = opts.max == null ? Infinity : opts.max;

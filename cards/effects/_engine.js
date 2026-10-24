@@ -421,7 +421,7 @@ function _applyForcesTargetingFilter(engine, targets, casterPi, quelle) {
 // Hooks, die Schaden BERECHNEN (Reduktion, Umleitung, Negation). Helden,
 // deren Tod im laufenden Schlag nur vorgemerkt ist, wirken hier noch mit
 // (siehe `heldTodAufgeschoben`).
-const SCHADENSBERECHNUNGS_HOOKS = new Set([HOOKS.BEFORE_DAMAGE, HOOKS.BEFORE_CREATURE_DAMAGE_BATCH]);
+const SCHADENSBERECHNUNGS_HOOKS = new Set([HOOKS.BEFORE_DAMAGE, HOOKS.BEFORE_CREATURE_DAMAGE_BATCH, HOOKS.BEFORE_TRUE_DAMAGE]);
 
 // ═══════════════════════════════════════════
 //  CARD INSTANCE
@@ -10142,6 +10142,16 @@ class GameEngine {
       // der Kartentext nimmt „damage that could normally not be reduced
       // or negated" nicht mehr aus.)
 
+      // ★ W73b (Cheering Rabbit): „X additional damage" ERHÖHT auch True Damage („cannot be reduced or negated" schützt nur vor Senkungen). Die Hooks dürfen nur ERHÖHEN.
+      {
+        const bq = this._klonSicht(source);
+        const hookCtx = { source: bq, target, amount, type, sourceHeroIdx: bq?.heroIdx ?? -1, trueDamage: true, cannotBeReduced: true, cannotBeNegated: true };
+        hookCtx._kBase = amount; hookCtx._kMul = 1; hookCtx._kFlat = 0;
+        await this.runHooks(HOOKS.BEFORE_TRUE_DAMAGE, hookCtx);
+        const proj = this._projectedAmount(hookCtx);
+        if (proj !== undefined && proj > amount) amount = proj;
+      }
+
       const hpBefore = target.hp;
       target.hp = Math.max(0, target.hp - amount);
       const dealt = hpBefore - target.hp;
@@ -13620,6 +13630,48 @@ class GameEngine {
     return hero.charmedBy != null || hero.controlledBy != null;
   }
 
+  /**
+   * ★ W73d (Leafagami Snake): „When Abilities would be removed from Heroes you control, don't remove them and draw a card for each affected Ability instead."
+   * `laubSchlangeFuer(seite, heroIdx)`: die aktive Schlange (Skript-Flag `protectsAbilitiesFromRemoval`: Support Zone, offen, nicht stummgeschaltet) des KONTROLLEURS dieses Helden — oder `null`.
+   * `abilityEntfernungVerhindert(inst, toZone, opts)`: EINE Stelle für jeden Weg, auf dem eine Ability-Karte (Ability Zone, oder in einer Support Zone, wo sie als Ability zählt) den Helden
+   * verlassen würde (Ablage, Gelöscht, Hand, Deck …; Umzug zwischen Ability-/Support-Zonen ist keine Entfernung): sie BLEIBT liegen, der Kontrolleur zieht 1 Karte, Laub-Wirbel um die Karte.
+   * Aufgerufen von `sendBoardCardToDiscard` (Kosten-Wege: Barrier of Faith, Weapon Storm, Weapon Unleashing …: die Abwurf-Meldung bleibt TRUE, der Preis gilt als bezahlt), `_actionMoveCardKern`
+   * und `_actionDestroyCardKern` (Rückgabe: nichts bewegt). `_laubGeschuetzt` (Menge von Instanz-Ids, nur während `sendCardsLoop`) verhindert, dass dieselbe Karte in einer Schleife mehrfach „abgeworfen" wird.
+   */
+  laubSchlangeFuer(seite, heroIdx) {
+    const hero = this.gs.players[seite]?.heroes?.[heroIdx];
+    if (!hero?.name) return null;
+    const pi = this.heroSideOf(seite, hero);
+    for (const c of this.cardInstances || []) {
+      if (c.zone !== ZONES.SUPPORT || c.faceDown || (c.controller ?? c.owner) !== pi) continue;
+      if (!loadCardEffect(c.name)?.protectsAbilitiesFromRemoval) continue;
+      if (this.isCardPassiveDormant(c)) continue;
+      return c;
+    }
+    return null;
+  }
+
+  async abilityEntfernungVerhindert(inst, toZone, opts = {}) {
+    if (!inst || this._fastMode) return false;
+    if (toZone === ZONES.ABILITY || toZone === ZONES.SUPPORT) return false;
+    const istAbility = inst.zone === ZONES.ABILITY
+      || (inst.zone === ZONES.SUPPORT && !inst.faceDown && (this.countsAsAbilityInZone(inst.name, inst) || hasCardType(this._getCardDB()[inst.name] || {}, 'Ability')));
+    if (!istAbility) return false;
+    const seite = inst.zone === ZONES.ABILITY ? inst.owner : this.physicalSide(inst);
+    const schlange = this.laubSchlangeFuer(seite, inst.heroIdx);
+    if (!schlange) return false;
+    const pi = schlange.controller ?? schlange.owner;
+    if (this._laubGeschuetzt) this._laubGeschuetzt.add(inst.id);
+    this._broadcastEvent('play_zone_animation', inst.zone === ZONES.ABILITY
+      ? { type: 'leafagami_leaves', zoneType: 'ability', owner: seite, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot }
+      : { type: 'leafagami_leaves', owner: seite, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot });
+    this.log('leafagami_protect', { player: this.gs.players[pi]?.username, ability: inst.name, hero: this.gs.players[seite]?.heroes?.[inst.heroIdx]?.name || null });
+    await this._delay(260);
+    await this.actionDrawCards(pi, 1, { source: schlange });
+    this.sync();
+    return true;
+  }
+
   /** Ist diese Karte durch den Schutz oben unberuehrbar? */
   abilityZoneGeschuetzt(inst) {
     if (!inst || inst.zone !== ZONES.ABILITY) return false;
@@ -13680,6 +13732,7 @@ class GameEngine {
       this.log('ability_protected_by_control', { card: targetCard.name, by: source?.name || null });
       return;
     }
+    if (await this.abilityEntfernungVerhindert(targetCard, ZONES.DISCARD, opts)) return;   // W73d: Leafagami Snake
     // ★ v1293 — `opts.unaufhaltsam`: „ignores any effect that would …
     // prevent the target from being defeated" (Midnight Assault). Ueber-
     // springt JEDEN Schutz-/Rettungsweg unten (Unzerstoerbarkeit,
@@ -14050,6 +14103,37 @@ class GameEngine {
   }
 
   /**
+   * ★ W73a (Ankhota, the Burier): „Whenever one or more Creatures are deleted …" — jede Kreatur-KARTE, die in IRGENDEINEN Gelöscht-Stapel gelangt (vom Brett, aus der Hand, Ablage, Deck),
+   * zählt. Mehrere Löschungen innerhalb einer Auflösung (Flächenschaden, Mill, …) werden zu EINEM Schritt gebündelt (`_loeschZaehler`); die Meldung läuft nach der Kette
+   * (`queuePostChainAction`) bei jedem dann aktiven Skript mit `onCreaturesDeleted(engine, inst, anzahl)` (Kontrolle/Brettseite regelt das Skript).
+   * Nicht in Bewertungsproben (`_fastMode`/`_inMctsSim`).
+   */
+  _kreaturenGeloeschtMelden(items) {
+    if (this._fastMode || this._inMctsSim || !items?.length) return;
+    const db = this._getCardDB();
+    let n = 0;
+    for (const name of items) { const cd = db[name]; if (cd && hasCardType(cd, 'Creature')) n++; }
+    if (!n) return;
+    const leser = (this.cardInstances || []).some(c => c.zone === ZONES.SUPPORT && !c.faceDown && typeof loadCardEffect(c.name)?.onCreaturesDeleted === 'function');
+    if (!leser) return;
+    this._loeschZaehler = (this._loeschZaehler || 0) + n;
+    if (this._loeschZaehlerAngemeldet) return;
+    this._loeschZaehlerAngemeldet = true;
+    this.queuePostChainAction(async () => {
+      const anzahl = this._loeschZaehler || 0;
+      this._loeschZaehler = 0; this._loeschZaehlerAngemeldet = false;
+      if (!anzahl) return;
+      for (const inst of (this.cardInstances || []).slice()) {
+        if (inst.zone !== ZONES.SUPPORT || inst.faceDown || this.isCardPassiveDormant(inst)) continue;
+        const sk = loadCardEffect(inst.name);
+        if (typeof sk?.onCreaturesDeleted !== 'function') continue;
+        try { await sk.onCreaturesDeleted(this, inst, anzahl); }
+        catch (err) { console.error(`[onCreaturesDeleted] ${inst.name}:`, err.message); }
+      }
+    });
+  }
+
+  /**
    * ★ „WENN DIESE KARTE GELOESCHT WIRD" — EINE Stelle (Circles of Hell). Jede Karte, die in den
    * Geloescht-Stapel von `pi` gelangt (egal ueber welchen der vielen Loeschwege — alle laufen
    * ueber `push`/`unshift` dieses Stapels), wird gemeldet. Hat ihr Skript `onDeletedFromAnywhere`
@@ -14059,6 +14143,7 @@ class GameEngine {
    */
   _geloeschtMeldung(pi, items) {
     if (this._geloeschtStumm > 0 || !items?.length) return;
+    this._kreaturenGeloeschtMelden(items);   // W73a (Ankhota): „Whenever one or more Creatures are deleted"
     for (const name of items) {
       let script = null;
       try { script = loadCardEffect(name); } catch { script = null; }
@@ -14905,6 +14990,7 @@ class GameEngine {
       this.log('ability_protected_by_control', { card: cardInstance.name, by: opts.source?.name || opts.sourceName || null });
       return;
     }
+    if (cardInstance.zone !== toZone && await this.abilityEntfernungVerhindert(cardInstance, toZone, opts)) return;   // W73d: Leafagami Snake
     // v1293: `opts.unaufhaltsam` kommt nur aus `actionDestroyCard`
     // (Midnight Assault) — dieselben Schutzmarken wie dort gelten nicht.
     const _u = !!opts.unaufhaltsam;
@@ -15115,6 +15201,16 @@ class GameEngine {
       toSlot    = -1;
     } else if (cardInstance._swagdriRouteToDelete && toZone !== ZONES.SUPPORT) {
       delete cardInstance._swagdriRouteToDelete;   // zurück auf die Hand/ins Deck: die Klausel endet (ein erneutes Ausspielen von der Hand ist normal)
+    }
+    // ★ W73a (Ankhota, the Burier): „Delete all Creatures that are moved from the board to anywhere else." Die Marke setzt Ankhotas `onCardLeaveZone`;
+    // JEDES Ziel außerhalb des Bretts (Hand, Deck, Ablage, …) wird zu Gelöscht — auch ein von `_returnToHand` umgeleiteter Weg (die Löschung kommt danach).
+    if (cardInstance._ankhotaLoescht) {
+      delete cardInstance._ankhotaLoescht;
+      if (fromZone === ZONES.SUPPORT && toZone !== ZONES.SUPPORT && toZone !== ZONES.DELETED) {
+        toZone    = ZONES.DELETED;
+        toHeroIdx = -1;
+        toSlot    = -1;
+      }
     }
     // M01-08: Tokens (Biomancy Token, Boulder in a Bottle, Mummy Token …) werden
     // beim Verlassen des Bretts gelöscht — wie im Schadenspfad
@@ -17248,6 +17344,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   async _runBeforeSummon(cardName, playerIdx, heroIdx, hookExtras = {}, reservedSlot = -1) {
     const script = loadCardEffect(cardName);
+    if (this.zusatzNameSperrt(playerIdx, cardName)) return false;   // W73c: ein Zusatzname (Shroomasaur) belegt das „only 1"
     if (!script?.beforeSummon) return true;
     // W4b: Kosten schon vor dem Reaktionsfenster bezahlt (`payActivationCost` der Kreatur) → `ctx._summonKosten`.
     const _bezahlt = this._takePaidSummonCost(cardName, playerIdx);
@@ -17387,6 +17484,11 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   isCreatureSummonable(cardName, playerIdx, heroIdx = -1, ctxExtras = {}) {
     const script = loadCardEffect(cardName);
+    {
+      const _h = heroIdx >= 0 ? this.gs.players[playerIdx]?.heroes?.[heroIdx] : null;
+      const _b = ctxExtras.beschwoerer ?? (_h?.name ? this.heroSideOf(playerIdx, _h) : playerIdx);
+      if (this.zusatzNameSperrt(_b, cardName)) return false;   // W73c: ein Zusatzname (Shroomasaur) belegt das „only 1"
+    }
     if (!script?.canSummon) return true;
     try {
       // ★ Styx 28.9.: `playerIdx` ist die Seite des Zielhelden. Wird dieser
@@ -42886,6 +42988,11 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @param {'attack'|'spell'} art
    * @param {{ pi:number, heroIdx:number, heroOwner?:number, name?:string, karte?:boolean }} q  `pi` = Kontrolleur/Spieler, `heroOwner` = Brettseite des Helden
    */
+  /** W73b: wie viele Attacks/Spells hat dieser Held DIESEN Zug schon benutzt (gezählt nach der Auflösung, `zaehleAlsArt`)? Während der Auflösung der ersten Karte also 0. */
+  heldWuerfeDiesenZug(hero) {
+    return (hero && hero._wuerfeZug === this.gs.turn) ? (hero._wuerfeZahl || 0) : 0;
+  }
+
   async zaehleAlsArt(art, { pi, heroIdx, heroOwner, name, karte, schule, surprise }) {   // W47a: `schule` = Zauberschule einer aktivierten Spell-Surprise (Log für Fire Bolts)
     const gs = this.gs;
     const ps = gs?.players?.[pi];
@@ -42897,6 +43004,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (art === 'attack' && karte && gs._attackVorgezaehlt && gs._attackVorgezaehlt.pi === pi && gs._attackVorgezaehlt.heroIdx === heroIdx && gs._attackVorgezaehlt.name === name) {
       delete gs._attackVorgezaehlt;
       return;
+    }
+    // W73b (Cheering Rabbit): Zähler „Attacks UND Spells, die dieser Held diesen Zug benutzt hat" (`heldWuerfeDiesenZug`) — Stempel mit dem Zug statt Rücksetzen.
+    if (hero) {
+      hero._wuerfeZahl = (hero._wuerfeZug === gs.turn ? (hero._wuerfeZahl || 0) : 0) + 1;
+      hero._wuerfeZug = gs.turn;
     }
     if (art === 'attack') {
       ps.attacksPlayedThisTurn = (ps.attacksPlayedThisTurn || 0) + 1;
@@ -45124,6 +45236,29 @@ this._deathWatch = (this._deathWatchStack || []).length
    * einer Creature und liegt schon eine eigene offene Kopie auf dem Brett?
    * Speist das Ausgrauen der Handkopien (server.js, cardGateBlockedCards).
    */
+  /**
+   * ★ W73c (Shroomasaur): „give this Creature the name of any other card IN ADDITION to its own name for the rest of the turn." Der Zusatzname hängt an der Instanz
+   * (`counters._zusatzName` + Stempel `_zusatzNameZug`) und gilt nur in dem Zug, in dem er vergeben wurde. `zusatzNameVon` liefert ihn (oder `null`), `instHatName` fragt „trägt diese Karte
+   * den Namen?" (eigener ODER Zusatzname). Engine-Stellen, die Kartennamen auf dem Brett vergleichen und für die Zusatznamen zählen: „You can only control 1 X"
+   * (`nurEinerSchonKontrolliert`, `zusatzNameSperrt`, `kontrolliert` aus `_double-shared`).
+   */
+  zusatzNameVon(inst) {
+    const c = inst?.counters;
+    return (c && c._zusatzName && c._zusatzNameZug === this.gs.turn) ? c._zusatzName : null;
+  }
+
+  instHatName(inst, name) {
+    return !!inst && (inst.name === name || this.zusatzNameVon(inst) === name);
+  }
+
+  /** Sperrt ein Zusatzname „You can only control 1 X" für eine neue Beschwörung/Platzierung von `cardName` durch `pi`? */
+  zusatzNameSperrt(pi, cardName, ausser = null) {
+    const cd = this._getCardDB()[cardName];
+    if (!cd || cd.cardType !== 'Creature' || !(cd.effect || '').includes(`You can only control 1 "${cardName}"`)) return false;
+    return this.cardInstances.some(c => c !== ausser && c.zone === ZONES.SUPPORT && !c.faceDown && (c.controller ?? c.owner) === pi
+      && c.name !== cardName && this.zusatzNameVon(c) === cardName);
+  }
+
   nurEinerSchonKontrolliert(pi, cardName) {
     const cd = this._getCardDB()[cardName];
     if (!cd || cd.cardType !== 'Creature') return false;
@@ -45131,7 +45266,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // (Glorious Rebirth …) und das Ausgrauen der Handkopien - der erste Eintritt dieses Zuges zaehlt (`playLimitKey`, `_eintrittsLimitErreicht`).
     if (this._eintrittsLimitErreicht(cardName, pi)) return true;
     if (!(cd.effect || '').includes(`You can only control 1 "${cardName}"`)) return false;
-    return this.cardInstances.some(c => c.name === cardName && c.zone === 'support' && !c.faceDown
+    return this.cardInstances.some(c => this.instHatName(c, cardName) && c.zone === 'support' && !c.faceDown
       && (c.controller ?? c.owner) === pi);
   }
 
@@ -46358,6 +46493,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this.kreaturGegnerEffektImmun(inst, opts.source, opts)) return false;   // W17b: Golden Wings – nur gegnerische Quelle; ohne Quelle geschützt
     const ownerIdx = inst.owner;
     if (!this.gs.players[ownerIdx]) return false;
+    // W73d (Leafagami Snake): die Ability bleibt liegen, der Kontrolleur zieht — der Abwurf gilt für den Aufrufer (Kosten!) trotzdem als erfolgt.
+    if (await this.abilityEntfernungVerhindert(inst, ZONES.DISCARD, opts)) return true;
     if (zone === ZONES.SUPPORT) {
       // ★★ v1143b: ein Cross-Side-Anhaengsel („Forbidden Curse of Aging"
       // am gegnerischen Helden) landet in der Ablage seines
@@ -46433,7 +46570,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const name = slot[slot.length - 1];
     const inst = this.cardInstances.find(c =>
       c.zone === ZONES.ABILITY && c.owner === ownerIdx
-      && c.heroIdx === eintrag.heroIdx && c.zoneSlot === eintrag.slotIdx && c.name === name);
+      && c.heroIdx === eintrag.heroIdx && c.zoneSlot === eintrag.slotIdx && c.name === name
+      && !(this._laubGeschuetzt && this._laubGeschuetzt.has(c.id)));   // W73d: schon (geschützt) „abgeworfene" Kopien nicht noch einmal
     if (inst) return this.sendBoardCardToDiscard(inst, opts);
     // Ohne Instanz (sollte nicht vorkommen — jede Kopie wird beim
     // Anlegen getrackt): Namensweg wie frueher, damit der Effekt nicht
