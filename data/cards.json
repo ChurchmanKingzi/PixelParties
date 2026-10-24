@@ -27071,5 +27071,24 @@
     "spellSchool1": "",
     "spellSchool2": "",
     "foil": "secret_rare"
+  },
+  {
+    "name": "Robird",
+    "cardType": "Artifact",
+    "subtype": "Creature",
+    "level": null,
+    "hp": 120,
+    "atk": null,
+    "cost": 20,
+    "effect": "No effect!",
+    "archetype": "",
+    "setID": "PP SET01",
+    "banned": "",
+    "skilltestLegal": false,
+    "spellSchool1": "",
+    "spellSchool2": "",
+    "startingAbility1": "",
+    "startingAbility2": "",
+    "foil": null
   }
 ]
