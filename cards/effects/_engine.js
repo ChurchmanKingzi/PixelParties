@@ -28135,6 +28135,51 @@ this._deathWatch = (this._deathWatchStack || []).length
     return (orig != null && orig !== holderIdx) ? orig : holderIdx;
   }
 
+  /**
+   * ★ W70a (Secret Entrance): die blinde Wahl von `actionStealFromHand` als eigener Schritt — OHNE `action`-Präfix, also ohne die Auftritts-Hülle:
+   * die (abbrechbare) Wahl committet den Auftritt nicht. Eine Karte, deren Wahl abbrechbar sein soll (`cancellable: true`), fragt sie ZUERST hier und
+   * übergibt das Ergebnis danach als `preselectedIndices` an `actionStealFromHand` (das dann Ambush-Fenster, Flug, Besitzerwechsel und Hooks erledigt;
+   * Kosten/Limits/Terror-Zähler/Auftritt kommen erst dort, also nach dem Commit). Gleiche Optionen wie `actionStealFromHand` (`count`, `minSelect`,
+   * `title`, `description`, `confirmLabel`, `cancellable`). Rückgabe `{ cancelled: true }` oder `{ indices }` (aufsteigende physische Handplätze der Gegnerhand).
+   */
+  async blindHandWahl(pi, opts = {}) {
+    const gs = this.gs;
+    const oppPs = gs.players[this.opponentOf(pi)];
+    if (!oppPs) return { cancelled: true };
+    // Die aufgeloeste Karte des Gegners bleibt bis zum Ende seiner Aufloesung in `oppPs.hand`, ist aber nicht stehlbar: die Indizes bleiben die
+    // physischen Handplaetze (die Anzeige zeigt sie ausgegraut mit), `blockedIndices` nennt dem Client den gesperrten Platz.
+    const oppStehlbar = this._handIndizesOhneAufloesende(oppPs);
+    const oppGesperrt = (oppPs.hand || []).map((_, i) => i).filter(i => !oppStehlbar.includes(i));
+    const effectiveCount = Math.min(Math.max(1, opts.count || 1), oppStehlbar.length);
+    if (effectiveCount <= 0) return { cancelled: true };
+    const defaultDesc = `Pick ${effectiveCount} card${effectiveCount > 1 ? 's' : ''} from ${oppPs.username}'s hand to steal.`;
+    const prompt = await this.promptGeneric(pi, {
+      type: 'blindHandPick',
+      title: opts.title || 'Steal Cards',
+      description: opts.description || defaultDesc,
+      maxSelect: effectiveCount,
+      // 23.10. (Secret Entrance, „up to 1/2/3"): Untergrenze der blinden Wahl; ohne Angabe müssen es genau `maxSelect` sein (Loot the Leftovers).
+      ...(Number.isInteger(opts.minSelect) ? { minSelect: Math.min(opts.minSelect, effectiveCount) } : {}),
+      confirmLabel: opts.confirmLabel || '🫳 Steal!',
+      oppHandCount: (oppPs.hand || []).length,
+      blockedIndices: oppGesperrt,
+      cancellable: !!opts.cancellable,
+      autoConfirm: effectiveCount === 1,
+    });
+    if (!prompt || prompt.cancelled) return { cancelled: true };
+    const raw = Array.isArray(prompt.selectedIndices) ? prompt.selectedIndices : [];
+    const gueltig = raw.filter(i => Number.isInteger(i) && i >= 0 && i < oppPs.hand.length);
+    // ★ Z4: die aufloesende Karte ist nicht stehlbar. Hat der Spieler blind genau sie erwischt, wird mit zufaelligen anderen
+    // Handkarten aufgefuellt („choose random cards", Loot the Leftovers) — nicht mit einer Niete bestraft.
+    const aus = gueltig.filter(i => oppStehlbar.includes(i));
+    if (aus.length < Math.min(effectiveCount, gueltig.length)) {
+      const rest = oppStehlbar.filter(i => !aus.includes(i));
+      while (aus.length < effectiveCount && rest.length > 0) aus.push(rest.splice(Math.floor(Math.random() * rest.length), 1)[0]);
+    }
+    const indices = [...new Set(aus)].slice(0, effectiveCount).sort((a, b) => a - b);
+    return indices.length ? { indices } : { cancelled: true };
+  }
+
   async actionStealFromHand(pi, opts = {}) {
     const gs = this.gs;
     const ps = gs.players[pi];
@@ -28152,10 +28197,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // ★ Z4 (R02-07): Eine Karte, die der Gegner GERADE SPIELT (Reaktionsfenster mitten in seiner Aufloesung), liegt bis zum
     // Ende der Aufloesung noch in `oppPs.hand`, ist aber keine Handkarte mehr — sie ist nicht stehlbar und zaehlt nicht mit.
-    // Die Indizes bleiben die physischen Handplaetze (die Anzeige zeigt die Karte ausgegraut mit; `oppHandCount`/`indices`
-    // bleiben deshalb unveraendert), nur `blockedIndices` nennt dem Client den gesperrten Platz.
     const oppStehlbar = this._handIndizesOhneAufloesende(oppPs);
-    const oppGesperrt = (oppPs.hand || []).map((_, i) => i).filter(i => !oppStehlbar.includes(i));
     const oppHandLen = oppStehlbar.length;
     if (oppHandLen === 0) return { stolen: [], cancelled: false, fizzled: true };
 
@@ -28167,48 +28209,22 @@ this._deathWatch = (this._deathWatchStack || []).length
       return { stolen: [], cancelled: false, fizzled: true, negated: true };
     }
 
-    const requested = Math.max(1, opts.count || 1);
-    const effectiveCount = Math.min(requested, oppHandLen);
-    const cancellable = !!opts.cancellable;
-    const defaultDesc = `Pick ${effectiveCount} card${effectiveCount > 1 ? 's' : ''} from ${oppPs.username}'s hand to steal.`;
+    const effectiveCount = Math.min(Math.max(1, opts.count || 1), oppHandLen);
 
     // `opts.preselectedIndices`: die Karten stehen schon fest (Gather Intel: der Spieler hat sie beim Ansehen der Hand gewaehlt, der Gegner
-    // entscheidet nur noch, ob sie wandern) — dann entfaellt die blinde Wahl, alles andere (Erstrunden-Schutz, Ambush-Fenster, Flug,
-    // Besitzwechsel, Hooks) bleibt dieselbe Strecke.
-    const prompt = Array.isArray(opts.preselectedIndices)
-      ? { selectedIndices: opts.preselectedIndices }
-      : await this.promptGeneric(pi, {
-        type: 'blindHandPick',
-        title: opts.title || 'Steal Cards',
-        description: opts.description || defaultDesc,
-        maxSelect: effectiveCount,
-        // 23.10. (Secret Entrance, „up to 1/2/3"): Untergrenze der blinden Wahl; ohne Angabe müssen es genau `maxSelect` sein (Loot the Leftovers).
-        ...(Number.isInteger(opts.minSelect) ? { minSelect: Math.min(opts.minSelect, effectiveCount) } : {}),
-        confirmLabel: opts.confirmLabel || '🫳 Steal!',
-        oppHandCount: (oppPs.hand || []).length,
-        blockedIndices: oppGesperrt,
-        cancellable,
-        autoConfirm: effectiveCount === 1,
-      });
-
-    if (!prompt || prompt.cancelled) {
-      return { stolen: [], cancelled: true, fizzled: false };
+    // entscheidet nur noch, ob sie wandern; Secret Entrance: die abbrechbare blinde Wahl lief VORHER über `blindHandWahl`) — dann entfaellt die
+    // blinde Wahl, alles andere (Erstrunden-Schutz, Ambush-Fenster, Flug, Besitzwechsel, Hooks) bleibt dieselbe Strecke.
+    let validated;
+    if (Array.isArray(opts.preselectedIndices)) {
+      // Vorab festgelegte Karten werden nur gestrichen (die aufloesende Karte ist nicht stehlbar), nie aufgefuellt.
+      validated = [...new Set(opts.preselectedIndices.filter(i => Number.isInteger(i) && i >= 0 && i < oppPs.hand.length && oppStehlbar.includes(i)))]
+        .slice(0, effectiveCount).sort((a, b) => a - b);
+      if (validated.length === 0) return { stolen: [], cancelled: true, fizzled: false };
+    } else {
+      const wahl = await this.blindHandWahl(pi, opts);
+      if (!wahl || wahl.cancelled || !wahl.indices?.length) return { stolen: [], cancelled: true, fizzled: false };
+      validated = wahl.indices;
     }
-
-    const raw = Array.isArray(prompt.selectedIndices) ? prompt.selectedIndices : [];
-    const gueltig = raw.filter(i => Number.isInteger(i) && i >= 0 && i < oppPs.hand.length);
-    // ★ Z4: die aufloesende Karte ist nicht stehlbar. Hat der Spieler blind genau sie erwischt, wird mit zufaelligen anderen
-    // Handkarten aufgefuellt („choose random cards", Loot the Leftovers) — nicht mit einer Niete bestraft. Vorab festgelegte
-    // Karten (`preselectedIndices`) werden nur gestrichen.
-    let aus = gueltig.filter(i => oppStehlbar.includes(i));
-    if (!Array.isArray(opts.preselectedIndices) && aus.length < Math.min(effectiveCount, gueltig.length)) {
-      const rest = oppStehlbar.filter(i => !aus.includes(i));
-      while (aus.length < effectiveCount && rest.length > 0) aus.push(rest.splice(Math.floor(Math.random() * rest.length), 1)[0]);
-    }
-    const validated = [...new Set(aus)]
-      .slice(0, effectiveCount)
-      .sort((a, b) => a - b);
-    if (validated.length === 0) return { stolen: [], cancelled: true, fizzled: false };
 
     const cardNames = validated.map(idx => oppPs.hand[idx]).filter(Boolean);
 

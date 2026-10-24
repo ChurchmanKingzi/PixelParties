@@ -12,7 +12,8 @@
 //
 //  ── „CHOOSE … RANDOM CARDS … ADD THEM TO YOUR HAND" ─────────────────────
 //  Wie Loot the Leftovers: der Spieler wählt BLIND Plätze der verdeckten Gegnerhand (`blindHandPick`), nicht abbrechbar nach dem Bestätigen — die Auswahl selbst ist abbrechbar
-//  (dann bleibt die Karte auf der Hand). „up to": mindestens eine, höchstens N Karten (`minSelect: 1`). Das Nehmen läuft ganz über die kanonische Hand-Diebstahl-Strecke
+//  (dann bleibt die Karte auf der Hand). W70a (Auftritt/Kosten erst nach dem Commit): die abbrechbare Wahl läuft über `engine.blindHandWahl` (OHNE die Auftritts-Hülle der
+//  `action…`-Primitive), erst danach `actionStealFromHand` mit `preselectedIndices` — vorher zeigte schon der Aufruf die Karte und setzte den Terror-Zähler. „up to": mindestens eine, höchstens N Karten (`minSelect: 1`). Das Nehmen läuft ganz über die kanonische Hand-Diebstahl-Strecke
 //  `engine.actionStealFromHand`: Erstrunden-Schutz, Reaktionsfenster `onHandInteraction` Kategorie `steal` (Ambush the Scout), Flug `play_hand_steal`, Besitzerwechsel
 //  (`originalOwner` bleibt beim Gegner: Ablage/Löschen/Deck gehen dorthin), Hook `onCardTakenFromOpponent` (Lilly). Eine gerade aufgelöste Gegnerkarte ist nicht stehlbar.
 //
@@ -99,15 +100,23 @@ module.exports = {
       if (!wirkbar(engine, pi, oi)) { gs._spellCancelled = true; return; }
 
       const n = anzahlFuer(engine, pi, ctx.cardHeroIdx);
-      const res = await engine.actionStealFromHand(pi, {
+      // 1. Die ABBRECHBARE blinde Wahl zuerst und OHNE Auftritt: `actionStealFromHand` ist ein Effektschritt (Hülle) und würde die Karte schon beim Aufruf zeigen
+      //    (und den Terror-Zähler setzen). `blindHandWahl` ist dieselbe Wahl ohne Hülle — ein Abbruch hinterlässt nichts, der Gegner sieht nur „Opponent is stealing …".
+      const wahl = await engine.blindHandWahl(pi, {
         count: n,
         minSelect: 1,                                   // „up to": mindestens eine Karte
         title: CARD_NAME,
         description: `Choose up to ${n} random card${n > 1 ? 's' : ''} from your opponent's hand. They are added to your hand.`,
-        sourceName: CARD_NAME,
         cancellable: true,
       });
-      if (res?.cancelled) { gs._spellCancelled = true; return; }     // Abbruch in der Wahl: die Karte bleibt auf der Hand
+      if (wahl.cancelled) { gs._spellCancelled = true; return; }      // Abbruch in der Wahl: die Karte bleibt auf der Hand
+      // 2. Hinter der letzten Abbruchstelle: der Diebstahl (Hülle committet den Auftritt VOR dem ersten Effektschritt; Ambush-Fenster, Flug, Besitzerwechsel, Hooks).
+      const res = await engine.actionStealFromHand(pi, {
+        count: n,
+        preselectedIndices: wahl.indices,
+        title: CARD_NAME,
+        sourceName: CARD_NAME,
+      });
       engine.log(res?.stolen?.length ? 'secret_entrance' : 'secret_entrance_fizzle', {
         player: ps.username, opponent: gs.players[oi]?.username, count: res?.stolen?.length || 0,
       });
