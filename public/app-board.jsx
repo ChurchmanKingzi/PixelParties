@@ -27998,6 +27998,339 @@ const ANIM_REGISTRY = {
     return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
   })(),
   // ═══════════════════════════════════════════════════════════════════
+  //  Time Distortion (24.10.) — PIXELART, Zonen-Animation auf dem Wirker (Held)
+  //
+  //  Ein Zifferblatt (Ring, zwölf Striche) erscheint um den Helden; der Zeiger rast mehrfach im Kreis, ein zweiter Ring läuft rückwärts, Dither-Wellen verzerren die Luft. Bei ~650 ms
+  //  bricht das Zifferblatt in Funken auf; dann beginnt das Aufdecken der Deckkarten (time-distortion.js, `UHR_VOR_MS`).
+  // ═══════════════════════════════════════════════════════════════════
+  time_distortion: (() => {
+    const BLAU = ['#b3e8f9', '#66d9ff', '#4e77ca', '#02398c'].map(ppHex);
+    const GOLD = ['#f7f7ad', '#fad54a', '#f29a3e'].map(ppHex);
+    const WEISS = ppHex('#ffffff');
+    const ENDE = 900, AUFBRUCH = 650, FADE_AB = 760;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = (sz) => ({
+      funken: sz.ziele.map(() => Array.from({ length: ppFxN(16) }, (_, i) => ({ w: (i / 16) * Math.PI * 2 + Math.random() * 0.3, v: 14 + Math.random() * 30, leben: 200 + Math.random() * 120 }))),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      sz.ziele.forEach((z, zi) => {
+        const CX = Math.round(z.x), CY = Math.round(z.y);
+        const R = Math.max(14, Math.round(Math.min(z.w, z.h) * 0.62));
+        if (t < AUFBRUCH) {
+          const k = klemme(t / 160, 0, 1);
+          const r = R * k;
+          g.ring(CX, CY, r, r, BLAU[1], aus);
+          g.ring(CX, CY, r - 1, r - 1, BLAU[2], aus * 0.9);
+          g.ring(CX, CY, r * 0.55, r * 0.55, BLAU[2], aus * 0.7);
+          // zwölf Striche
+          for (let i = 0; i < 12; i++) {
+            const w = (i / 12) * Math.PI * 2 - Math.PI / 2, c = Math.cos(w), s = Math.sin(w), lang = i % 3 === 0;
+            for (let d = 0; d < (lang ? 4 : 2); d++) g.put(CX + c * (r - 2 - d), CY + s * (r - 2 - d), lang ? WEISS : BLAU[0], aus);
+          }
+          // Zeiger: rast (zwei Umdrehungen in 650 ms), Gegenzeiger langsamer rückwärts
+          const w1 = (t / AUFBRUCH) * Math.PI * 2 * 2 - Math.PI / 2, w2 = -(t / AUFBRUCH) * Math.PI * 2 * 0.5 - Math.PI / 2;
+          for (let d = 1; d < r - 3; d++) { g.put(CX + Math.cos(w1) * d, CY + Math.sin(w1) * d, d > r * 0.6 ? WEISS : GOLD[1], aus); }
+          for (let d = 1; d < r * 0.55; d++) { g.put(CX + Math.cos(w2) * d, CY + Math.sin(w2) * d, GOLD[2], aus); }
+          g.disc(CX, CY, 2, GOLD[0], aus);
+          // Dither-Wellen verzerren die Luft
+          for (let n = 0; n < 2; n++) {
+            const rr = ((t / 7 + n * 22) % 44) + 4, a = (1 - rr / 48) * 0.5;
+            for (let i = 0; i < 28; i++) { const w = (i / 28) * Math.PI * 2; if (ppBayer(i, n) < a) g.put(CX + Math.cos(w) * rr, CY + Math.sin(w) * rr * 0.8, BLAU[0], aus); }
+          }
+        } else {
+          const al = t - AUFBRUCH;
+          if (al < 120) {
+            const f = 1 - al / 120;
+            g.ring(CX, CY, R + al / 3, R + al / 3, WEISS, f * aus);
+            g.disc(CX, CY, 4 * f + 1, WEISS, f * aus);
+          }
+          for (const fu of teile.funken[zi]) {
+            if (al > fu.leben) continue;
+            const kk = al / fu.leben, sek = al / 1000;
+            g.put(CX + Math.cos(fu.w) * (R * 0.9 + fu.v * sek), CY + Math.sin(fu.w) * (R * 0.9 + fu.v * sek), kk < 0.5 ? BLAU[0] : GOLD[1], (1 - kk) * aus);
+          }
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Redirecting Aura (24.10.) — PIXELART, Zonen-Animation vom getroffenen Helden (Ursprung) zum neuen Ziel
+  //
+  //  Ein Ring aus Funken wirbelt um den Helden, die Treffer-Wolke wird eingesogen; dann fliegt ein Pixel-Komet (weisser Kern, hellblauer Schweif, violette Funken) in einem Bogen zum neuen Ziel
+  //  und schlaegt dort mit einem Ring ein. Beim Anlegen (Ursprung = Ziel, `selbst`) kreist nur der Wirbel einmal um den Wirt. Der Zauber loest den umgeleiteten Effekt nach `FLUG_WARTE_MS` auf.
+  // ═══════════════════════════════════════════════════════════════════
+  redirect_aura: (() => {
+    const BLAU = ['#b3e8f9', '#66d9ff', '#4e77ca', '#02398c'].map(ppHex);
+    const VIOLETT = ['#d9c0ec', '#c98aff', '#9544d5', '#58238c'].map(ppHex);
+    const WEISS = ppHex('#ffffff');
+    const ENDE = 1000, ABFLUG = 260, EINSCHLAG = 700, FADE_AB = 840;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = (sz) => ({
+      funken: sz.ziele.map(() => Array.from({ length: 10 }, () => ({ ab: ABFLUG + Math.random() * 380, w: Math.random() * Math.PI * 2, v: 8 + Math.random() * 20, leben: 260 + Math.random() * 200 }))),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const OX = sz.O.x, OY = sz.O.y;
+      sz.ziele.forEach((z, zi) => {
+        // ── Wirbel um den Ursprung: Ring + kreisende Funken, wird eingesogen ──
+        if (t < ABFLUG + 200) {
+          const k = klemme(t / (ABFLUG + 200), 0, 1);
+          const r = 16 - 8 * k;
+          g.ring(OX, OY, r, r * 1.15, VIOLETT[2], klemme(t / 60, 0, 1) * aus);
+          g.ring(OX, OY, r - 1, (r - 1) * 1.15, BLAU[1], klemme(t / 60, 0, 1) * aus * 0.8);
+          for (let i = 0; i < 8; i++) {
+            const w = (i / 8) * Math.PI * 2 + t / 90;
+            g.put(OX + Math.cos(w) * r, OY + Math.sin(w) * r * 1.15, i % 2 ? WEISS : BLAU[0], aus);
+          }
+        }
+        if (z.selbst) return;
+        // ── Komet: Bogen vom Ursprung zum Ziel ──
+        if (t >= ABFLUG && t < EINSCHLAG + 60) {
+          const k = klemme((t - ABFLUG) / (EINSCHLAG - ABFLUG), 0, 1), e = k * k * (3 - 2 * k);
+          const bogen = (px, py, kk) => {
+            const nx = -z.dy, ny = z.dx, hub = Math.sin(kk * Math.PI) * Math.min(14, z.len * 0.25);
+            return [OX + z.dx * z.len * kk + nx * hub, OY + z.dy * z.len * kk + ny * hub];
+          };
+          for (let n = 5; n >= 0; n--) {
+            const kk = klemme(e - n * 0.035, 0, 1), [px, py] = bogen(0, 0, kk);
+            const col = n === 0 ? WEISS : n < 3 ? BLAU[0] : n < 5 ? BLAU[1] : BLAU[2];
+            g.block(px - (n === 0 ? 1 : 0), py - (n === 0 ? 1 : 0), n === 0 ? 3 : 2, n === 0 ? 3 : 2, col, aus * (1 - n * 0.12));
+            if (n % 2 === 0) g.put(px + (n % 4 ? 2 : -2), py + 1, VIOLETT[1], aus * 0.8);
+          }
+        }
+        // ── Einschlag ──
+        if (t >= EINSCHLAG - 20) {
+          const al = t - (EINSCHLAG - 20), tx = OX + z.dx * z.len, ty = OY + z.dy * z.len;
+          if (al < 200) {
+            const f = 1 - al / 200;
+            g.ring(tx, ty, 3 + al / 9, 3 + al / 9, WEISS, f * aus);
+            g.ring(tx, ty, 5 + al / 6, 5 + al / 6, BLAU[1], f * aus * 0.8);
+            g.disc(tx, ty, 3 * f + 1, WEISS, f * aus);
+          }
+          for (const fu of teile.funken[zi]) {
+            const a2 = t - fu.ab; if (a2 < 0 || a2 > fu.leben) continue;
+            const kk = a2 / fu.leben, sek = a2 / 1000;
+            g.put(tx + Math.cos(fu.w) * fu.v * sek, ty + Math.sin(fu.w) * fu.v * sek + 40 * sek * sek, kk < 0.5 ? BLAU[0] : BLAU[2], (1 - kk) * aus);
+          }
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Exorcism (24.10.) — PIXELART, Zonen-Animation auf dem Ziel (Held oder Kreatur)
+  //
+  //  Eine Lichtsäule (Dither-Rand, weisser Kern, goldene Kante) fällt von oben auf das Ziel, dunkle Schwaden steigen aus ihm auf und lösen sich im Licht auf; bei ~560 ms schlägt ein
+  //  weisser Ring aus, goldene Funken steigen. Der Zauber schickt die Anhängsel bei `LICHT_VOR_MS` (exorcism.js) in die Ablage.
+  // ═══════════════════════════════════════════════════════════════════
+  exorcism_light: (() => {
+    const GOLD = ['#f7f7ad', '#fad54a', '#f29a3e'].map(ppHex);
+    const VIOLETT = ['#d9c0ec', '#c98aff', '#9544d5', '#58238c'].map(ppHex);
+    const WEISS = ppHex('#ffffff');
+    const ENDE = 1200, BLITZ = 560, FADE_AB = 900;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = (sz) => ({
+      schwaden: sz.ziele.map(() => Array.from({ length: ppFxN(14) }, () => ({
+        x: (Math.random() - 0.5) * 18, ab: Math.random() * 260, steig: 14 + Math.random() * 20, r: 2 + Math.floor(Math.random() * 3), farbe: Math.floor(Math.random() * 3),
+      }))),
+      funken: sz.ziele.map(() => Array.from({ length: ppFxN(16) }, () => ({
+        x: (Math.random() - 0.5) * 22, ab: BLITZ - 40 + Math.random() * 200, steig: 12 + Math.random() * 30, leben: 360 + Math.random() * 240,
+      }))),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      sz.ziele.forEach((z, zi) => {
+        const CX = Math.round(z.x), CY = Math.round(z.y);
+        const hw = Math.floor(z.w / 2), hh = Math.floor(z.h / 2);
+        const oben = CY - hh - 26;
+        // ── Lichtsäule: wächst von oben nach unten, wird breiter ──
+        const wachs = klemme(t / 300, 0, 1);
+        const breite = Math.max(3, Math.round(hw * 0.7 * (0.5 + 0.5 * klemme(t / BLITZ, 0, 1))));
+        const unten = oben + (CY + hh - oben) * wachs;
+        for (let y = Math.round(oben); y <= unten; y++) {
+          for (let x = -breite; x <= breite; x++) {
+            const rand = Math.abs(x) / breite;
+            const dm = 1 - rand;                              // Kern dicht, Rand gedithert
+            if (rand > 0.55 && ppBayer(CX + x, y) >= dm * 1.6) continue;
+            const col = rand < 0.3 ? WEISS : rand < 0.7 ? GOLD[0] : GOLD[1];
+            g.put(CX + x, y, col, (rand < 0.3 ? 0.9 : 0.7) * aus);
+          }
+        }
+        // ── dunkle Schwaden steigen auf und lösen sich im Licht auf ──
+        for (const sw of teile.schwaden[zi]) {
+          const al = t - sw.ab; if (al < 0) continue;
+          const k = klemme(al / 760, 0, 1);
+          const x = CX + sw.x * (1 + k * 0.4), y = CY + hh * 0.4 - sw.steig * k * 2.2;
+          const col = sw.farbe === 0 ? VIOLETT[3] : sw.farbe === 1 ? VIOLETT[2] : VIOLETT[1];
+          g.disc(x, y, sw.r * (1 - k * 0.6), col, (1 - k * k) * aus);
+        }
+        // ── Blitz und Funken ──
+        if (t >= BLITZ && t < BLITZ + 200) {
+          const f = 1 - (t - BLITZ) / 200;
+          g.ring(CX, CY, hw * 0.5 + (t - BLITZ) / 3, hh * 0.5 + (t - BLITZ) / 3, WEISS, f * aus);
+          g.disc(CX, CY, 4 * f + 2, WEISS, f * aus);
+        }
+        for (const fu of teile.funken[zi]) {
+          const al = t - fu.ab; if (al < 0 || al > fu.leben) continue;
+          const k = al / fu.leben, y = CY + hh * 0.3 - fu.steig * k * 1.6;
+          const col = k < 0.5 ? WEISS : GOLD[1];
+          g.put(CX + fu.x, y, col, (1 - k) * aus);
+          if (k < 0.5) { g.put(CX + fu.x + 1, y, GOLD[0], (1 - k) * aus); g.put(CX + fu.x, y - 1, GOLD[0], (1 - k) * aus); }
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Polymorph (24.10.) — PIXELART, Zonen-Animation auf dem Wirt (Held)
+  //
+  //  Ein Zauberring spannt sich um den Helden, Pixel-Rauchwolken quellen aus der Mitte und verdecken ihn (Verwandlung bei ~520 ms: weisser Blitz), danach driften die Wolken nach oben
+  //  und lichten sich; Sterne in Rosa/Gelb funkeln. Der Zauber legt den Status bei `POOF_VOR_MS` (polymorph.js) an.
+  // ═══════════════════════════════════════════════════════════════════
+  polymorph_poof: (() => {
+    const VIOLETT = ['#d9c0ec', '#c98aff', '#9544d5', '#58238c'].map(ppHex);
+    const ROSA = ['#f3bad3', '#fc69c6', '#c80480'].map(ppHex);
+    const GOLD = ['#f7f7ad', '#fad54a', '#f29a3e'].map(ppHex);
+    const WEISS = ppHex('#ffffff');
+    const ENDE = 1000, VERWANDLUNG = 520, FADE_AB = 760;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = (sz) => ({
+      wolken: sz.ziele.map(() => Array.from({ length: ppFxN(16) }, () => ({
+        w: Math.random() * Math.PI * 2, v: 6 + Math.random() * 16, r: 3 + Math.floor(Math.random() * 4),
+        farbe: Math.floor(Math.random() * 4), ab: Math.random() * 160, hoch: 4 + Math.random() * 14,
+      }))),
+      sterne: sz.ziele.map(() => Array.from({ length: ppFxN(14) }, () => ({
+        w: Math.random() * Math.PI * 2, v: 14 + Math.random() * 30, ab: 300 + Math.random() * 380, leben: 360 + Math.random() * 240,
+        farbe: Math.floor(Math.random() * 3),
+      }))),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      sz.ziele.forEach((z, zi) => {
+        const CX = Math.round(z.x), CY = Math.round(z.y);
+        const hw = Math.floor(z.w / 2), hh = Math.floor(z.h / 2);
+        // ── Zauberring: spannt sich zusammen, dreht sich in Funken ──
+        if (t < VERWANDLUNG) {
+          const k = klemme(t / VERWANDLUNG, 0, 1), e = k * k;
+          const rx = (hw + 8) - 9 * e, ry = (hh + 8) - 9 * e;
+          g.ring(CX, CY, rx, ry, VIOLETT[2], klemme(t / 80, 0, 1) * aus);
+          g.ring(CX, CY, rx - 1, ry - 1, ROSA[1], klemme(t / 80, 0, 1) * aus);
+          for (let i = 0; i < 8; i++) {
+            const w = (i / 8) * Math.PI * 2 + t / 140;
+            g.put(CX + Math.cos(w) * rx, CY + Math.sin(w) * ry, i % 2 ? WEISS : GOLD[1], aus);
+          }
+        }
+        // ── Verwandlungsblitz ──
+        if (t >= VERWANDLUNG && t < VERWANDLUNG + 150) {
+          const f = 1 - (t - VERWANDLUNG) / 150;
+          g.ring(CX, CY, hw * 0.5 + (t - VERWANDLUNG) / 3, hh * 0.5 + (t - VERWANDLUNG) / 3, WEISS, f * aus);
+          g.disc(CX, CY, 5 * f + 2, WEISS, f * aus);
+        }
+        // ── Rauchwolken: quellen aus der Mitte, driften dann nach oben ──
+        for (const c of teile.wolken[zi]) {
+          const al = t - c.ab; if (al < 0) continue;
+          const k = klemme(al / (ENDE - c.ab), 0, 1);
+          const aus1 = klemme(al / VERWANDLUNG, 0, 1), x = CX + Math.cos(c.w) * c.v * 0.9 * aus1, y = CY + Math.sin(c.w) * c.v * 0.7 * aus1 - c.hoch * k;
+          const col = c.farbe === 0 ? VIOLETT[0] : c.farbe === 1 ? ROSA[0] : c.farbe === 2 ? VIOLETT[1] : ROSA[1];
+          const rad = c.r * (k < 0.6 ? 0.5 + k : 1.1 - (k - 0.6));
+          g.disc(x, y + 1, rad, VIOLETT[3], 0.55 * (1 - k) * aus);
+          g.disc(x, y, rad, col, (1 - k * k * 0.8) * aus);
+        }
+        // ── Sterne ──
+        for (const st of teile.sterne[zi]) {
+          const al = t - st.ab; if (al < 0 || al > st.leben) continue;
+          const k = al / st.leben, sek = al / 1000, x = CX + Math.cos(st.w) * st.v * sek, y = CY + Math.sin(st.w) * st.v * sek - 10 * sek;
+          const col = st.farbe === 0 ? WEISS : st.farbe === 1 ? GOLD[0] : ROSA[1];
+          g.put(x, y, col, (1 - k) * aus);
+          if (k < 0.6) { g.put(x + 1, y, col, (1 - k) * aus); g.put(x - 1, y, col, (1 - k) * aus); g.put(x, y + 1, col, (1 - k) * aus); g.put(x, y - 1, col, (1 - k) * aus); }
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Overheat (24.10.) — PIXELART, Zonen-Animation auf dem gewaehlten Artefakt (Support Zone des Traegers)
+  //
+  //  Das Artefakt heizt sich auf: ein gedithertes Gold/Rot-Glimmen legt sich ueber die Karte, der Rand glueht von Orange zu Weissgelb, Hitzeflimmern steigt in
+  //  Pixelpunkten auf, glueende Risse laufen aus der Mitte. Bei ~500 ms platzt es (Druckring, weisser Blitz) und glimmende Splitter fliegen mit Schwerkraft
+  //  nach aussen. Der Zauber schickt die Karte bei `PLATZEN_MS` (overheat.js) in die Ablage.
+  // ═══════════════════════════════════════════════════════════════════
+  overheat: (() => {
+    const ROT = ['#f0bfbc', '#e94e53', '#b21a29', '#710122'].map(ppHex);
+    const GOLD = ['#f7f7ad', '#fad54a', '#f29a3e'].map(ppHex);
+    const WEISS = ppHex('#ffffff');
+    const ENDE = 1200, PLATZEN = 500, FADE_AB = 960;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = (sz) => ({
+      flimmer: sz.ziele.map(() => Array.from({ length: 7 }, (_, i) => ({ dx: (i - 3) * 3 + Math.round((Math.random() - 0.5) * 2), phase: Math.random() * 14, wiegen: Math.random() * 6 }))),
+      risse: sz.ziele.map(() => Array.from({ length: 6 }, (_, i) => ({ w: (i / 6) * Math.PI * 2 + (Math.random() - 0.5) * 0.6, len: 9 + Math.random() * 10, sch: Math.random() * 6 }))),
+      splitter: sz.ziele.map(() => Array.from({ length: ppFxN(26) }, () => ({
+        w: Math.random() * Math.PI * 2, v: 18 + Math.random() * 56, gross: Math.random() < 0.35 ? 2 : 1,
+        farbe: Math.floor(Math.random() * 3), hoch: 14 + Math.random() * 36, leben: 420 + Math.random() * 360,
+      }))),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      sz.ziele.forEach((z, zi) => {
+        const CX = Math.round(z.x), CY = Math.round(z.y);
+        const hw = Math.floor(z.w / 2), hh = Math.floor(z.h / 2);
+        if (t < PLATZEN) {
+          const k = klemme(t / PLATZEN, 0, 1), e = k * k;
+          // ── Gluehen: Dither-Muster Gold/Rot, wird dichter ──
+          const dm = 0.08 + 0.55 * e;
+          for (let y = -hh; y <= hh; y++) for (let x = -hw; x <= hw; x++) {
+            if (ppBayer(CX + x, CY + y) < dm) g.put(CX + x, CY + y, ((x + y) & 1) ? GOLD[2] : ROT[1], 0.9);
+          }
+          g.ring(CX, CY, hw, hh, k > 0.65 ? GOLD[0] : GOLD[2], klemme(t / 60, 0, 1));
+          g.ring(CX, CY, hw + 1, hh + 1, ROT[2], klemme(t / 60, 0, 1) * 0.8);
+          // ── Risse glimmen ──
+          for (const r of teile.risse[zi]) {
+            const laenge = r.len * klemme((k - 0.15) / 0.85, 0, 1);
+            for (let d = 1; d <= laenge; d++) {
+              const w = r.w + Math.sin(d * 0.9 + r.sch) * 0.22;
+              const x = CX + Math.cos(w) * d, y = CY + Math.sin(w) * d * 1.1;
+              g.put(x + 1, y + 1, ROT[3], 0.85);
+              g.put(x, y, d > laenge - 2 ? WEISS : GOLD[1]);
+            }
+          }
+          // ── Hitzeflimmern steigt in Punkten auf ──
+          for (const f of teile.flimmer[zi]) {
+            for (let n = 0; n < 2; n++) {
+              const h = ((t * 0.045 + f.phase + n * 7) % 16);
+              const x = CX + f.dx + Math.round(Math.sin((t / 120) + f.wiegen + n) * 1.6), y = CY - hh - 1 - h;
+              g.put(x, y, h < 8 ? GOLD[1] : ROT[0], (1 - h / 16) * Math.min(1, k * 2));
+            }
+          }
+        } else {
+          const al = t - PLATZEN;
+          // ── Platzen: Blitz, Druckring ──
+          if (al < 190) {
+            const f = 1 - al / 190;
+            g.ring(CX, CY, hw * 0.6 + al / 4, hh * 0.6 + al / 4, WEISS, f * aus);
+            g.ring(CX, CY, hw * 0.6 + al / 3, hh * 0.6 + al / 3, GOLD[1], f * aus * 0.8);
+            g.disc(CX, CY, 4 * f + 2, WEISS, f * aus);
+          }
+          // ── Splitter: weissgelb → gold → rot → dunkelrot ──
+          for (const s of teile.splitter[zi]) {
+            if (al > s.leben) continue;
+            const k = al / s.leben, sek = al / 1000;
+            const x = CX + Math.cos(s.w) * s.v * sek * 1.15, y = CY + Math.sin(s.w) * s.v * sek * 0.9 - s.hoch * sek + 0.5 * 130 * sek * sek;
+            const col = k < 0.2 ? GOLD[0] : k < 0.5 ? (s.farbe === 0 ? GOLD[1] : GOLD[2]) : k < 0.8 ? ROT[1] : ROT[3];
+            g.block(x, y, s.gross, s.gross, col, (1 - k * k) * aus);
+          }
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
   //  Breakthrough (11.10.) — PIXELART, Brett-Animation auf der gewaehlten Surprise (Surprise Zone oder Support Zone; `targets`)
   //
   //  Rote Risslinien laufen aus der Mitte ueber die Zone (dunkler Schatten, weisse Spitze), ein rotes Dither-Glas legt sich darueber; bei ~460 ms birst die
@@ -49668,6 +50001,48 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'frost_breaker') {
         const p = playerByName(entry.player);
         return <span className="log-status">🔥 {cName('Frost Breaker')} — {pName(p.name, p.color)}'s flames break the ice of {entry.target}{entry.healed ? ', healing it from its Freeze,' : ''} for <span className="log-amount">{entry.damage}</span> damage{entry.additional ? ' (an additional Action)' : ''}.</span>;
+      }
+      if (t === 'time_distortion') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">⏳ {cName('Time Distortion')} — {pName(p.name, p.color)} {entry.cast ? <>performs {cName(entry.cast)} as an additional Action and shuffles the other revealed cards back</> : (entry.revealed || []).length ? <>shuffles the revealed cards back</> : <>has no cards to reveal</>}.</span>;
+      }
+      if (t === 'time_distortion_fizzle') {
+        const p = playerByName(entry.player);
+        return <span className="log-info">⏳ {cName('Time Distortion')} — no level 3 or lower Spell among the revealed cards can be performed: it fizzles.</span>;
+      }
+      if (t === 'time_distortion_cast_fizzled') {
+        return <span className="log-info">⏳ {cName('Time Distortion')} — {cName(entry.card)} can no longer be performed and fizzles.</span>;
+      }
+      if (t === 'redirecting_aura') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">↪️ {cName('Redirecting Aura')} — {pName(p.name, p.color)} redirects {entry.source ? <>{cName(entry.source)}</> : 'the hit'} from {entry.from} to {entry.to}.</span>;
+      }
+      if (t === 'redirecting_aura_attached') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">↪️ {cName('Redirecting Aura')} — {pName(p.name, p.color)} attaches it to {entry.hero}.</span>;
+      }
+      if (t === 'exorcism') {
+        const p = playerByName(entry.player);
+        const teile = [];
+        if ((entry.removed || []).length) teile.push(<>sends {(entry.removed || []).map((n, i) => <React.Fragment key={i}>{i ? ', ' : ''}{cName(n)}</React.Fragment>)} to the discard pile</>);
+        if ((entry.statuses || []).length) teile.push(<>removes {(entry.statuses || []).join(', ')}</>);
+        return <span className="log-status">✨ {cName('Exorcism')} — {pName(p.name, p.color)} exorcises {entry.target}{teile.length ? <>: {teile.reduce((acc, x, i) => i ? [...acc, ' and ', x] : [x], [])}</> : <> (nothing removed)</>}{entry.unstoppable ? ' — it could not be stopped' : ''}.</span>;
+      }
+      if (t === 'exorcism_blocked') {
+        const p = playerByName(entry.player);
+        return <span className="log-info">✨ {cName('Exorcism')} — {pName(p.name, p.color)}'s spell has no effect on {entry.target}.</span>;
+      }
+      if (t === 'polymorph_attached') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🐰 {cName('Polymorph')} — {pName(p.name, p.color)} transforms {entry.hero}{entry.applied ? <>: it can no longer use Spells, but gains <span className="log-amount">100</span> ATK</> : <> (no effect)</>}.</span>;
+      }
+      if (t === 'polymorph_noop') {
+        const p = playerByName(entry.player);
+        return <span className="log-info">🐰 {cName('Polymorph')} — {entry.hero} is immune: {pName(p.name, p.color)}'s spell has no effect.</span>;
+      }
+      if (t === 'overheat') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🔥 {cName('Overheat')} — {pName(p.name, p.color)}'s spell {entry.discarded ? <>sends {cName(entry.artifact)} to the discard pile</> : <>fails to remove {cName(entry.artifact)}</>}{entry.negated ? <> (the hit on {entry.hero} was negated)</> : entry.damaged ? <> and {entry.damaged} takes <span className="log-amount">{entry.damage}</span> damage</> : null}.</span>;
       }
       if (t === 'frost_breaker_no_free_action') {
         const p = playerByName(entry.player);

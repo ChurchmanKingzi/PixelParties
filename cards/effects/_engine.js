@@ -22827,7 +22827,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // client grays the spell out when no non-silenced hero can
         // cast it, and so a silenced hero stops being highlighted as
         // a drag-drop / selection-menu target for Spells.
-        if (cd.cardType === 'Spell' && (hero.statuses?.magic_silenced || hero.statuses?.frightened)) {   // v879
+        if (cd.cardType === 'Spell' && (hero.statuses?.magic_silenced || hero.statuses?.frightened || hero.statuses?.polymorphed)) {   // v879; 24.10. Polymorph
           const s = loadCardEffect(cd.name);
           let ok = false;
           if (typeof s?.canPlayDespiteStatuses === 'function') {
@@ -23074,7 +23074,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // Nulled (Null Zone) blocks Spells here just like for own heroes.
           if (cd.cardType === 'Spell' && hero.statuses?.nulled) continue;
           // Magic-Silenced (Anti Magic Zone) blocks Spells.
-          if (cd.cardType === 'Spell' && (hero.statuses?.magic_silenced || hero.statuses?.frightened)) continue;   // v879
+          if (cd.cardType === 'Spell' && (hero.statuses?.magic_silenced || hero.statuses?.frightened || hero.statuses?.polymorphed)) continue;   // v879; 24.10. Polymorph
           // Berserked blocks Spells AND Creature summons, and caps Attacks at 2/turn.
           if ((cd.cardType === 'Spell' || cd.cardType === 'Creature') && hero.statuses?.berserked) continue;
           if (cd.cardType === 'Attack' && hero.statuses?.berserked && (hero._attacksThisTurn || 0) >= 2) continue;
@@ -23671,7 +23671,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // effects, and Artifacts are all still legal — only the Spell
     // card-type is blocked. Same `canPlayDespiteStatuses` opt-out as
     // the Nulled gate above.
-    if ((hero.statuses?.magic_silenced || hero.statuses?.frightened) && cardData.cardType === 'Spell') {   // v879
+    if ((hero.statuses?.magic_silenced || hero.statuses?.frightened || hero.statuses?.polymorphed) && cardData.cardType === 'Spell') {   // v879; 24.10. Polymorph
       const cardScript = loadCardEffect(cardData.name);
       let bypass = false;
       if (typeof cardScript?.canPlayDespiteStatuses === 'function') {
@@ -41419,7 +41419,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `canPlayDespiteStatuses` ausdruecklich davon ausnehmen.
     // W16g (R01-11): auch `nulled` (Null Zone) und `berserked` (Berserk) sperren Spells wie in `validateActionPlay`.
     if (cardData.cardType === 'Spell'
-        && (hero.statuses?.magic_silenced || hero.statuses?.frightened || hero.statuses?.nulled || hero.statuses?.berserked)) {
+        && (hero.statuses?.magic_silenced || hero.statuses?.frightened || hero.statuses?.nulled || hero.statuses?.berserked || hero.statuses?.polymorphed)) {
       const script = loadCardEffect(cardName);
       let bypass = false;
       if (typeof script?.canPlayDespiteStatuses === 'function') {
@@ -48756,7 +48756,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!this.canHeroPerformAction(seite, heroIdx, { ohneStatus: true })) return false;
     if (this.kontrollRechte(seite, heroIdx).zauber === false) return false;
     const st = hero.statuses || {};
-    if (st.nulled || st.magic_silenced || st.frightened || st.berserked) return false;
+    if (st.nulled || st.magic_silenced || st.frightened || st.berserked || st.polymorphed) return false;
     if (this._isHeroBlinded(seite, heroIdx)) return false;
     const p = Number.isInteger(pi) ? pi : seite;
     const ps = this.gs.players[p];
