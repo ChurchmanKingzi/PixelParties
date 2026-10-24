@@ -53,7 +53,7 @@
 //  jeden Weg (auch Clown-Aura, die kein Status ist).
 // ═══════════════════════════════════════════
 
-const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
+const { anyName, hatName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const {
   isGigantisaurCreature,
 } = require('./_gigantisaurs-shared');
@@ -71,8 +71,8 @@ const CARD_NAME = 'Gigantisaur King Trex';
 function _trexSacrificeCandidates(engine, pi, selfId) {
   const cs = engine.getSacrificableCreatures(pi);
   return cs.filter(c =>
-    isGigantisaurCreature(c.cardName, engine)
-    && c.cardName !== CARD_NAME
+    anyName(c.inst || { name: c.cardName }, (n) => isGigantisaurCreature(n, engine))
+    && !hatName(c.inst || { name: c.cardName }, CARD_NAME)
     && (!selfId || c.inst.id !== selfId)
   );
 }
@@ -381,8 +381,8 @@ module.exports = {
       minCount: 1,
       maxCount: 1,
       // Re-narrow inside resolveSacrificeCost — defense in depth.
-      filter: (c) => isGigantisaurCreature(c.cardName, engine)
-        && c.cardName !== CARD_NAME
+      filter: (c) => anyName(c.inst || { name: c.cardName }, (n) => isGigantisaurCreature(n, engine))
+        && !hatName(c.inst || { name: c.cardName }, CARD_NAME)
         && (!selfId || c.inst.id !== selfId),
       title: `${CARD_NAME} — Tribute`,
       description: 'Sacrifice 1 of your Gigantisaur Creatures (other than Gigantisaur King Trex) to summon Gigantisaur King Trex.',

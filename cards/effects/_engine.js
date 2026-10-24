@@ -26084,7 +26084,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     this._hookHeapDeltaByCard = Object.create(null);
 
     // ── W73c (Shroomasaur): Zusatznamen gelten „for the rest of the turn" — mit dem Zugwechsel sind sie fort.
-    for (const _c of this.cardInstances) { if (_c.counters && _c.counters._zusatzName) { delete _c.counters._zusatzName; delete _c.counters._zusatzNameZug; } }
+    {
+      const _verfallen = [];
+      for (const _c of this.cardInstances) { if (_c.counters && _c.counters._zusatzName) { _verfallen.push([_c, _c.counters._zusatzName]); delete _c.counters._zusatzName; delete _c.counters._zusatzNameZug; } }
+      // Wer seine Buchung am Bestand einer Namensfamilie fuehrt (Censpartan-Schirm, Cykyran-Base-ATK), bucht neu.
+      for (const [_c, _alt] of _verfallen) await this.runHooks(HOOKS.ON_NAME_CHANGED, { inst: _c, name: null, oldName: _alt, _skipReactionCheck: true });
+    }
 
     // ── Einmal-Schadensschilde verfallen (v697): „until the start of
     // your next turn" — zu Beginn des Zuges ihres BESITZERS, VOR den
@@ -42687,7 +42692,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /** Hooks that should NOT trigger reaction checks */
   static REACTION_SKIP_HOOKS = new Set([
-    'onPlay', 'onCardEnterZone', 'onEquipGained', 'onEquipLost', 'onFormChanged', 'onPhaseStart', 'onGameStart', 'onBeforeHandDraw',
+    'onPlay', 'onCardEnterZone', 'onEquipGained', 'onEquipLost', 'onFormChanged', 'onNameChanged', 'onPhaseStart', 'onGameStart', 'onBeforeHandDraw',
     'onChainStart', 'onChainResolve', 'onEffectNegated', 'onNegationDealt', 'onResourceDrawReplace',
     'beforeDamage', 'afterDamage', 'beforeLevelChange',
     'onResourceSpend', 'onReactionActivated', 'onCardActivation',

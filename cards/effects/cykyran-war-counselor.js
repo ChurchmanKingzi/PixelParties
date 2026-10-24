@@ -256,6 +256,7 @@ module.exports = {
   onRevive: (ctx) => resyncFromCtx(ctx),
 
   hooks: {
+    onNameChanged: (ctx) => resyncFromCtx(ctx),   // W73c: Shroomasaur bekommt/verliert einen Zusatznamen - der Bestand der Ratgeber ändert sich
     // Bedingung UND Grundwert koennen sich bei jedem dieser Ereignisse
     // aendern — kein Filter auf die gespielte Karte, gerade FREMDE
     // Beschwoerungen und Tode veraendern ja die Ratgeberzahl.

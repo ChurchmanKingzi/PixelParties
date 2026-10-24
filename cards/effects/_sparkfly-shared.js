@@ -1,4 +1,5 @@
 const { areaTargetId, coolnessSpitzeZiel } = require('./_targeting-shared');
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt
 // ═══════════════════════════════════════════
 //  Shared Sparkfly archetype helpers.
 //
@@ -52,7 +53,7 @@ function findSacrificeCandidates(engine, playerIdx) {
   const out = [];
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
-    if (!isNonQueenSparkfly(inst.name)) continue;
+    if (!anyName(inst, isNonQueenSparkfly)) continue;
     if ((inst.controller ?? inst.owner) !== playerIdx) continue;
     out.push(inst);
   }
