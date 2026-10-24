@@ -13,7 +13,8 @@
 //  The dead Hero's original zone is orphaned:
 //  - Hero slot cleared (name, HP, stats removed)
 //  - All cards in its Ability Zones → DELETED (W16e, Text "deleting");
-//    Ability-type cards in its Support Zones → discard
+//    Ability-type cards in its Support Zones (Xal, Xalibur) → ALSO DELETED
+//    (24.10.2026, Al: "Alle Abilities des Helden werden gelöscht, egal aus welcher Zone")
 //  - Creatures/other cards stay
 //
 //  Revival cannot target heroes with empty slots.
@@ -223,13 +224,18 @@ module.exports = {
         const inst = engine.cardInstances.find(c =>
           c.owner === pi && c.zone === 'support' && c.heroIdx === deadHeroIdx && c.zoneSlot === zi && c.name === cardName
         );
-        const irSupDiscardPs = gs.players[inst?.originalOwner ?? pi];
-        if (irSupDiscardPs) irSupDiscardPs.discardPile.push(cardName);
+        // 24.10.: eine Ability in einer Support Zone ist eine Ability wie jede andere — „deleting all cards in its Ability Zones" gilt für sie genauso:
+        // in den Gelöscht-Stapel des Kartenbesitzers, nicht in die Ablage.
+        const irSupDeletePs = gs.players[inst?.originalOwner ?? pi];
+        if (irSupDeletePs) {
+          if (!irSupDeletePs.deletedPile) irSupDeletePs.deletedPile = [];
+          irSupDeletePs.deletedPile.push(cardName);
+        }
         if (inst) {
           await engine.runHooks('onCardLeaveZone', { _onlyCard: inst, card: inst, fromZone: 'support', fromHeroIdx: deadHeroIdx, _skipReactionCheck: true });
           engine._untrackCard(inst.id);
         }
-        engine.log('discard', { card: cardName, by: 'Initiation Ritual', reason: 'zone_orphaned' });
+        engine.log('card_deleted', { card: cardName, by: 'Initiation Ritual', from: 'support', reason: 'zone_orphaned' });
       }
     }
 

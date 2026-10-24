@@ -155,6 +155,15 @@ function usageFactor(engine, params, holderPi, A) {
 }
 
 // ── Brett lesen ────────────────────────────────────────────────────
+/** 24.10.: ALLE Stapel eines Helden — die echten Zonen und die Stapel in den Support Zonen (Xal, Xalibur), soweit der Held sie aufnimmt. */
+function stapelDesHelden(engine, owner, hi) {
+  const ps = engine.gs?.players?.[owner];
+  const real = (ps?.abilityZones?.[hi] || []).map(s => s || []);
+  let support = [];
+  try { support = engine.heroSupportAbilityStacks?.(owner, hi) || []; } catch { support = []; }
+  return [...real, ...support];
+}
+
 /**
  * Ability-Stufen je Name über die LEBENDEN Helden von `holderPi`.
  * `zonesBy` ersetzt die Zonen einzelner Helden (Was-wäre-wenn).
@@ -167,7 +176,7 @@ function levelsByAbility(engine, holderPi, zonesBy = null) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const h = ps.heroes[hi];
     if (!h?.name || (h.hp || 0) <= 0) continue;
-    const zones = (zonesBy && zonesBy[hi]) || ps.abilityZones?.[hi] || [];
+    const zones = (zonesBy && zonesBy[hi]) || stapelDesHelden(engine, holderPi, hi);
     const proHeld = Object.create(null);
     for (const slot of zones) {
       if (!slot || !slot.length) continue;
@@ -213,7 +222,7 @@ function castableValue(engine, pi, viewPi, zonesBy, params) {
   const kann = (cd) => {
     const raw = cd.level || 0;
     for (const { h, hi } of heroes) {
-      const zones = (zonesBy && zonesBy[hi]) || ps.abilityZones?.[hi] || [];
+      const zones = (zonesBy && zonesBy[hi]) || stapelDesHelden(engine, pi, hi);
       try { if (engine._testLevelReqForZones(pi, hi, cd, h, raw, zones)) return true; } catch { /* weiter */ }
     }
     return false;
@@ -249,12 +258,17 @@ function swapGain(engine, viewPi, a, b, opts = {}) {
   const gs = engine.gs;
   const pa = gs.players[a.owner], pb = gs.players[b.owner];
   if (!pa || !pb) return null;
-  const za = pa.abilityZones?.[a.heroIdx] || [[], [], []];
-  const zb = pb.abilityZones?.[b.heroIdx] || [[], [], []];
+  // 24.10.: echte Zonen UND Support-Stapel; ein Held ohne Erlaubnis für Abilities in Support Zonen behält die angekommenen Support-Stapel NICHT.
+  const realA = (pa.abilityZones?.[a.heroIdx] || [[], [], []]).map(x => x || []);
+  const realB = (pb.abilityZones?.[b.heroIdx] || [[], [], []]).map(x => x || []);
+  const supA = engine.heroSupportAbilityStacks?.(a.owner, a.heroIdx) || [];
+  const supB = engine.heroSupportAbilityStacks?.(b.owner, b.heroIdx) || [];
+  const nimmtA = !!engine.heroAcceptsAbilitiesInSupport?.(a.owner, a.heroIdx);
+  const nimmtB = !!engine.heroAcceptsAbilitiesInSupport?.(b.owner, b.heroIdx);
   // Was-wäre-wenn je Besitzer (beide Helden können demselben Spieler gehören).
   const nach = [{}, {}];
-  nach[a.owner][a.heroIdx] = zb;
-  nach[b.owner][b.heroIdx] = za;
+  nach[a.owner][a.heroIdx] = [...realB, ...(nimmtA ? supB : [])];
+  nach[b.owner][b.heroIdx] = [...realA, ...(nimmtB ? supA : [])];
   const opp = engine.opponentOf(viewPi);
   const zonenFuer = (pi) => (Object.keys(nach[pi]).length ? nach[pi] : null);
 
@@ -275,7 +289,7 @@ function swapGain(engine, viewPi, a, b, opts = {}) {
   if (userIn && typeof engine._testLevelReqForZones === 'function') {
     const ps = gs.players[viewPi];
     const hero = ps.heroes?.[ch];
-    const zones = nach[viewPi][ch] || ps.abilityZones?.[ch] || [];
+    const zones = nach[viewPi][ch] || stapelDesHelden(engine, viewPi, ch);
     const db = engine._getCardDB();
     for (const n of (ps.hand || [])) {
       const cd = db[n];
@@ -315,6 +329,7 @@ function rankSwaps(engine, viewPi, opts = {}) {
   const out = [];
   for (let i = 0; i < heroes.length; i++) {
     for (let j = i + 1; j < heroes.length; j++) {
+      if (opts.okPair && !opts.okPair(heroes[i], heroes[j])) continue;   // 24.10.: Support Zones müssen die Support-Zone-Abilities tragen
       const r = swapGain(engine, viewPi, heroes[i], heroes[j], { ...opts, params });
       if (r) out.push({ a: heroes[i], b: heroes[j], gain: r.gain, parts: r.parts });
     }

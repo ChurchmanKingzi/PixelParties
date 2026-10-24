@@ -72,8 +72,9 @@ module.exports = {
     for (let hi = 0; hi < (cpuPs.heroes || []).length; hi++) {
       const h = cpuPs.heroes[hi];
       if (!h?.name || h.hp <= 0) continue;
-      const zones = cpuPs.abilityZones?.[hi] || [];
-      for (const slot of zones) {
+      // 24.10.: auch die Stapel in Support Zonen (Xal, Xalibur).
+      for (const e of engine.abilityStapelListe(cpuIdx, hi)) {
+        const slot = e.namen;
         if (!slot?.length) continue;
         const abName = slot[0];
         const prev = ownLevels.get(abName) || 0;
@@ -87,10 +88,12 @@ module.exports = {
       // Borrow level == opp slot length. The target id encodes
       // `ability-{owner}-{heroIdx}-{slotIdx}` — re-read the slot
       // off the live state instead of trusting a stale level.
-      const m = (t.id || '').match(/^ability-(\d+)-(\d+)-(\d+)$/);
+      const m = (t.id || '').match(/^(ability|equip)-(\d+)-(\d+)-(\d+)$/);
       if (!m) return true;
-      const oi = +m[1], hi = +m[2], zi = +m[3];
-      const opSlot = engine.gs.players[oi]?.abilityZones?.[hi]?.[zi] || [];
+      const oi = +m[2], hi = +m[3], zi = +m[4];
+      const opSlot = (m[1] === 'equip'
+        ? engine.gs.players[oi]?.supportZones?.[hi]?.[zi]   // 24.10.: Ability in der Support Zone des Gegners (Xal)
+        : engine.gs.players[oi]?.abilityZones?.[hi]?.[zi]) || [];
       const borrowLv = opSlot.length;
       const ownLv = ownLevels.get(cardName) || 0;
       // Borrow only when it strictly upgrades the CPU's access to
@@ -110,10 +113,12 @@ module.exports = {
     // first-found.
     let best = null, bestSwing = -Infinity;
     for (const t of viable) {
-      const m = (t.id || '').match(/^ability-(\d+)-(\d+)-(\d+)$/);
+      const m = (t.id || '').match(/^(ability|equip)-(\d+)-(\d+)-(\d+)$/);
       if (!m) continue;
-      const oi = +m[1], hi = +m[2], zi = +m[3];
-      const opSlot = engine.gs.players[oi]?.abilityZones?.[hi]?.[zi] || [];
+      const oi = +m[2], hi = +m[3], zi = +m[4];
+      const opSlot = (m[1] === 'equip'
+        ? engine.gs.players[oi]?.supportZones?.[hi]?.[zi]
+        : engine.gs.players[oi]?.abilityZones?.[hi]?.[zi]) || [];
       const borrowLv = opSlot.length;
       const ownLv = ownLevels.get(t.cardName) || 0;
       const swing = borrowLv - ownLv;
@@ -224,8 +229,11 @@ function _getOpponentActivatableAbilities(gs, pi, engine, host = null) {
   for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
     const h = ops.heroes[hi];
     if (!h?.name || h.hp <= 0) continue;
-    for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
-      const slot = (ops.abilityZones[hi] || [])[zi] || [];
+    // 24.10.: auch die Stapel in den Support Zonen des Gegners (Xal, Xalibur) — „as if they were Ability Zones".
+    for (const _e of engine._aktivierungsStapel(oi, hi)) {
+      const zi = _e.zi;
+      const slot = _e.slot || [];
+      const inSupport = _e.zoneKind === 'support';
       if (slot.length === 0) continue;
       const abName = slot[0];
       const script = loadCardEffect(abName);
@@ -279,7 +287,7 @@ function _getOpponentActivatableAbilities(gs, pi, engine, host = null) {
         } catch { erlaubt = true; }
         if (!erlaubt) continue;
       }
-      results.push({ abName, abLevel: slot.length, ownerHeroIdx: hi, zoneIdx: zi, heroName: h.name, script, isFree });
+      results.push({ abName, abLevel: slot.length, ownerHeroIdx: hi, zoneIdx: zi, heroName: h.name, script, isFree, ...(inSupport ? { inSupportZone: true } : {}) });
     }
   }
   return results;
@@ -312,15 +320,18 @@ async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops, feld = pi) {
   // `resolved === false` and clears them as part of its standard
   // free-activate rollback (HOPT released, no animation, no opponent
   // reveal).
+  // 24.10.: Abilities in Support Zonen (Xal, Xalibur) tragen wie Cloak of Edge die Zonenart `equip` — der Client hebt sie dann in der Support Zone hervor.
+  const imSupport = (ab) => !!(ab.fromSupport || ab.inSupportZone);
+  const targetId = (ab) => imSupport(ab)
+    ? `equip-${oi}-${ab.ownerHeroIdx}-${ab.zoneIdx}`
+    : `ability-${oi}-${ab.ownerHeroIdx}-${ab.zoneIdx}`;
   const targets = abilities.map(ab => ({
-    id: ab.fromSupport
-      ? `equip-${oi}-${ab.ownerHeroIdx}-${ab.zoneIdx}`
-      : `ability-${oi}-${ab.ownerHeroIdx}-${ab.zoneIdx}`,
+    id: targetId(ab),
     // `type` MUSS der ZONE folgen, nicht dem Regeltyp — der Client
     // hebt Ability-Slots und Support-Slots ueber verschiedene Wege
     // hervor. Mit `type: 'ability'` fand der Picker die Cloak in der
     // Support-Zone nicht (Als Befund 5.8.).
-    type: ab.fromSupport ? 'equip' : 'ability',
+    type: imSupport(ab) ? 'equip' : 'ability',
     owner: oi,
     heroIdx: ab.ownerHeroIdx,
     slotIdx: ab.zoneIdx,
@@ -358,12 +369,7 @@ async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops, feld = pi) {
   }
 
   if (!selectedIds || selectedIds.length === 0) return false;
-  const targetId = selectedIds[0];
-  const selectedAb = abilities.find(ab =>
-    (ab.fromSupport
-      ? `equip-${oi}-${ab.ownerHeroIdx}-${ab.zoneIdx}`
-      : `ability-${oi}-${ab.ownerHeroIdx}-${ab.zoneIdx}`) === targetId
-  );
+  const selectedAb = abilities.find(ab => targetId(ab) === selectedIds[0]);
   if (!selectedAb) return false;
 
   const script = selectedAb.script;
