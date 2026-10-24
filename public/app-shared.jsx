@@ -941,6 +941,12 @@ const PP_PX_ABZEICHEN_SPRITES = {
     '################', '..++########++..', '....+######+....', '.....+####+.....',
     '......####......', '......+##+......', '.......##.......', '.......##.......',
   ] },
+  drachenkopf: { pal: { K: '#08060c', N: '#282834', H: '#3e3e51', G: '#59606e', S: '#d2d2db', R: '#f03232', D: '#8b0d0d', W: '#ffffff' }, z: [
+    '..........K..K..', '.........KSK.KSK', '........KSK..KSK', '.....KKKKSKKKKK.',
+    '...KKHHHNNKKNNK.', '..KHHGHNNNNNNNNK', '.KHHNNNNNNNNNNNK', 'KHNNKRRKNNNNNNNK',
+    'KNNNKRWKNNNNNNK.', 'KNNNNNNNNNNNNK..', 'KNKNNNNNNNNNNK..', 'KSKSKNNNNNNNK...',
+    'KDSDSKNNNNNNK...', '.KKKKKKKKNNK....', '...........KK...', '................',
+  ] },
 };
 
 // Emoji → Abzeichen-Sprite. Vorrang vor PP_PX_ZEICHEN (PxIcon).
@@ -958,6 +964,8 @@ const PP_PX_ICONS = {
   '☢': 'ab_radioaktiv', '📘': 'ab_buch', '⛔': 'ab_halt', '🍀': 'ab_klee', '🥷': 'ab_ninja', '🤝': 'ab_haende',
   '🎹': 'ab_klavier', '🪑': 'ab_stuhl', '🧟': 'ab_zombie', '☥': 'ab_ankh', '🦷': 'ab_zahn', '🧬': 'ab_dna',
   '🪙': 'ab_muenze', '🌌': 'ab_galaxie', '✦': 'ab_funke',
+  // Eigenes Zeichen (Privatbereich, keine Unicode-Entsprechung): schwarzer Drachenkopf (Black-Thorn Dragon, Zauber-Immunität). Dasselbe Raster steht in scripts/pixel-emoji/handarbeit.json.
+  '\uE900': 'ab_drachenkopf',
 };
 for (const [n, s] of Object.entries(PP_PX_ABZEICHEN_SPRITES)) PP_PX_SPRITES['ab_' + n] = s;
 // Die Animationen (Pixelierer, PxZeichen) bekommen die neuen Zeichen mit,
@@ -8183,6 +8191,8 @@ function BuffColumn({ buffs, cardName, statuses }) {
   // v1364: Butterfly Clouds Schutz — ein Buff, keine Status.
   // Truthy statt `=== true`: der Puzzle-Start normalisiert `true` zu
   // `{ appliedTurn: 0 }` (Als Befund v1365: Badge fehlte zu Puzzle-Beginn).
+  // 24.10.: „unaffected by all Spells" (Black-Thorn Dragon: Kreatur UND zugehöriger Held) — vom Server abgeleitet (`_spellImmune`), kein Zähler/Status
+  if (st._spellImmune) statusBuffs.push(['spell_immune', { icon: '\uE900', tooltip: 'Unaffected by all Spells: Spells have no effect on this target — damage, healing, status effects, buffs and more. It can still be targeted, and Attacks and Creature effects work normally.' }]);
   if (st.untargetable) statusBuffs.push(['untargetable', { icon: '🦋', tooltip: 'Untargetable: Your opponent can\'t choose this Hero with Attacks, Spells or Creature effects while you control other Heroes that can be chosen. Wears off at the start of its owner\'s turn.' }]);
   if ((!buffs || Object.keys(buffs).length === 0) && statusBuffs.length === 0) return null;
   buffs = buffs || {};
