@@ -1,5 +1,5 @@
 const { areaTargetId, coolnessSpitzeZiel } = require('./_targeting-shared');
-const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt
+const { anyName, hatName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt
 // ═══════════════════════════════════════════
 //  Shared Sparkfly archetype helpers.
 //
@@ -36,7 +36,7 @@ function isNonQueenSparkfly(name) {
 function findControlledQueen(engine, playerIdx) {
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
-    if (inst.name !== QUEEN_NAME) continue;
+    if (!hatName(inst, QUEEN_NAME)) continue;   // Shroomasaur: Zusatzname „Sparkfly Queen" zählt (Worker: „while you control a Sparkfly Queen")
     if ((inst.controller ?? inst.owner) !== playerIdx) continue;
     return inst;
   }

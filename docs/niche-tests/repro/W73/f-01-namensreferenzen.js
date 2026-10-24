@@ -18,6 +18,7 @@ const cards = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../../../da
 const byName = Object.fromEntries(cards.map(c => [c.name, c]));
 const creatures = cards.filter(c => /Creature/.test(c.cardType) && !c.banned);
 const SHROOM = 'Shroomasaur';
+const VOLL = process.env.SWEEP_VOLL === '1';   // Standard: ein Vertreter je Familie, Gegenseite nur bei Karten, die sie meinen (ca. 2 Minuten); SWEEP_VOLL=1: zwei Vertreter, beide Seiten
 const nurFilter = process.env.ONLY ? new RegExp(process.env.ONLY, 'i') : null;
 const stumm = process.env.QUIET === '1';
 
@@ -36,7 +37,7 @@ function paare() {
       hits = hits.filter(k => k.name !== SHROOM && k.name !== c.name);
       if (!hits.length) continue;
       // Vertreter: exakte Kreatur, sonst bis zu 2 der Familie (erste und mittlere)
-      const reps = hits.length <= 2 ? hits : [hits[0], hits[Math.floor(hits.length / 2)]];
+      const reps = hits.length <= 2 ? hits : (VOLL ? [hits[0], hits[Math.floor(hits.length / 2)]] : [hits[Math.floor(hits.length / 3)]]);
       if (!out.has(c.name)) out.set(c.name, new Set());
       for (const r of reps) { out.get(c.name).add(r.name); FAMILIE.set(c.name + '|' + r.name, q); }
     }
@@ -90,6 +91,7 @@ async function welt(R, N, welt_, modus, seiteN, opt = {}) {
   if (welt_ === 'A') trager = t.put(seatN, 0, slotN, N);
   else trager = t.put(seatN, 0, slotN, SHROOM);
   trager.turnPlayed = 0;
+  if (welt_ !== 'A') trager._shroomGezogen = true;   // Shroomasaurs EIGENES Ziehen beim Verlassen des Bretts ist nicht Gegenstand dieses Tests
   if (opt.begleiter) {
     const q = FAMILIE.get(R + '|' + N);
     const k = q && creatures.find(c => c.name.includes(q) && c.name !== N && c.name !== R && c.name !== SHROOM && !/Ascended/.test(c.cardType));
@@ -183,6 +185,7 @@ async function niederlage(w, R) {
   const nachZ = zustand(t);
   out['besiegt.zustand'] = Object.keys(nachZ).filter(k => nachZ[k] !== vorZ[k]).map(k => `${k}:${vorZ[k]}→${nachZ[k]}`).join(', ');
   out['besiegt.prompts'] = [...new Set(t.prompts.map(p => (p.d && (p.d.title || p.d.type)) || '?'))].sort().join('|');
+  out['besiegt.tot'] = !t.engine.cardInstances.includes(trager);
   out['besiegt.traeger'] = traegerZustand(trager);
   out['besiegt.fehler'] = out['besiegt.fehler'] || (t.errors.length ? t.errors.join(' || ').slice(0, 160) : '');
   return out;
@@ -223,8 +226,9 @@ async function fluss(w, R, art) {
   return out;
 }
 
-function diff(a, b) {   // Schlüssel, in denen a und b verschieden sind
-  const ks = new Set([...Object.keys(a), ...Object.keys(b)]);
+const RAUSCHEN_TRAEGER = /^(besiegt|schaden|weg|spielen|aktiv|aktiv-letzte)\.traeger$/;   // Zähler der echten Karte (z. B. _jeGetroffen) unterscheiden sich von denen des Shroomasaur – nur start./feind. zählen
+function diff(a, b, filter = () => true) {   // Schlüssel, in denen a und b verschieden sind
+  const ks = new Set([...Object.keys(a), ...Object.keys(b)].filter(k => !RAUSCHEN_TRAEGER.test(k) && filter(k)));
   const d = {};
   for (const k of ks) { const x = JSON.stringify(a[k]), y = JSON.stringify(b[k]); if (x !== y) d[k] = [a[k], b[k]]; }
   return d;
@@ -260,9 +264,23 @@ async function messen(R, N, modus, seite, begleiter = 0) {
 
 // ── 3) Erwartete Befunde (Identität statt Referenz bzw. Eigeneffekt der echten Karte) ────────────────────────
 // Schlüssel: `R|N` → Begründung. Wird hier begründet, damit der Sweep als Regressionswächter taugt.
-const ERWARTET_NUR_A = {
-  // wird nach der ersten Auswertung von Hand gefüllt (siehe Notizen im Lauf)
-};
+// Erwartete Abweichungen A↔B: die echte Karte N bringt EIGENE Wirkung mit, die der Zusatzname nicht gibt (der Zusatzname gibt nur den NAMEN).
+// Format: [Referenzkarte (Regex), N (Regex), Schlüssel (Regex), Begründung]
+const ERWARTET = [
+  [/Bloom|Paraseed (Control|Greenhouse|Zombie)/, /Paraseed/, /^besiegt\./, 'Paraseeds eigener Todes-Effekt (wandert in die Support Zone des Angreifers); Blooms Bezug auf Paraseed prüft f-02'],
+  [/Burning Fuse|Bomblebee Cluster/, /Bomblebee/, /^(spielen|feind)\./, 'die echte Bomblebee feuert ihre eigene Wirkung; die Fuse-Voraussetzung selbst prüft f-02'],
+  [/Cute Bird/, /Cute Phoenix/, /^besiegt\./, 'Cute Phoenix fragt nach dem eigenen Wiederbeleben'],
+  [/Elven (Archer|Druid)/, /Elven Forager/, /^(stufe|spielbar)/, 'Elven Forager senkt selbst die Stufen (Identität)'],
+  [/Gangster Angel/, /Angler Angel/, /^aktiv/, 'Angler Angel verursacht eigenen Schaden'],
+  [/Skeleton Bard/, /Skeleton Mage|Burning Skeleton|Skeleton Archer/, /^aktiv/, 'Bard lässt eine Kreatur mit Einmal-pro-Zug-Effekt diesen noch einmal nutzen; der Shroomasaur hat seinen eigenen (Name vergeben) – gewollt'],
+  [/Tanuki Escape/, /Timid Tanuki/, /^besiegt\./, 'Timid Tanuki zieht/wirft eigene Karten'],
+  [/Non-Fungible Monkee/, /Cheeky Monkee/, /^(besiegt|weg)\./, 'Cheeky Monkee zahlt die 4 Gold für ihren eigenen Schaden'],
+  [/./, /Cute Cat/, /^besiegt\./, 'Cute Cat zieht beim Fallen selbst Karten'],
+  [/Gorinthian/, /Cykyran/, /./, 'Cykyran verdoppelt selbst die Base ATK (Identität)'],
+  [/Loyal/, /Loyal Hountriever/, /^spielen\./, 'Hountriever zieht beim Beschwören selbst'],
+  [/Fun-Fun Circus (Director|Clown)/, /Strongman/, /^feind\./, 'Strongman legt selbst Applause Counter, wenn ein Ziel fällt'],
+];
+const erwartet = (R, N, key) => ERWARTET.some(([r, n, k]) => r.test(R) && n.test(N) && k.test(key));
 
 (async () => {
   const R = H.runner();
@@ -276,15 +294,19 @@ const ERWARTET_NUR_A = {
       for (const modus of MODI) {
         for (const [seite, begleiter] of [['eigen', 0], ['gegner', 0], ['eigen', 1]]) {
           let e;
+          if (seite === 'gegner' && !VOLL && !/opponent|either player|both players|on the board/i.test(byName[rName].effect || '')) continue;   // Gegenseite nur, wo der Text sie meint
           if (begleiter && !/at least|different|3 /.test(byName[rName].effect || '')) continue;   // Begleiter nur, wo der Text eine Mindestzahl verlangt
           try { e = await messen(rName, N, modus, seite, begleiter); } catch (x) { fehler.push(`${rName}|${N}|${modus}|${seite}: Aufbau warf ${String(x.message).slice(0, 100)}`); continue; }
           if (!e) continue;
           n++;
           if (process.env.FULL) for (const w of ['A', 'B', 'C']) REAL_LOG(`${rName} ⇐ ${N} [${modus}/${seite}${begleiter ? '+B' : ''}] ${w}: ${JSON.stringify(Object.fromEntries(Object.entries(e[w]).filter(([k]) => new RegExp(process.env.FULL).test(k)))).slice(0, 700)}`);
-          const dA = diff(e.C, e.A), dB = diff(e.C, e.B);
+          // Niederlagen-Vergleich nur, wo die echte Karte N überhaupt fiel (Cardinal Beasts, Paraseed … sind gegen 99999 Schaden gefeit)
+          const gefallen = e.A['besiegt.tot'] === true;
+          const filt = (k) => gefallen || !k.startsWith('besiegt.');
+          const dA = diff(e.C, e.A, filt), dB = diff(e.C, e.B, filt);
           const kA = Object.keys(dA), kB = Object.keys(dB);
-          const fehlt = kA.filter(k => !(k in dB) || JSON.stringify(dB[k]) !== JSON.stringify(dA[k]));
-          const zuviel = kB.filter(k => !(k in dA));
+          const fehlt = kA.filter(k => (!(k in dB) || JSON.stringify(dB[k]) !== JSON.stringify(dA[k])) && !erwartet(rName, N, k));
+          const zuviel = kB.filter(k => !(k in dA) && !erwartet(rName, N, k));
           const tag = `${rName} ⇐ ${N} [${modus}/${seite}${begleiter ? '+B' : ''}]`;
           if (process.env.DUMP) (global.__dump = global.__dump || []).push({ tag, dA, dB });
           if (process.env.DEBUG) REAL_LOG(`${tag}: dA=${JSON.stringify(Object.fromEntries(kA.map(k => [k, dA[k]]))).slice(0, 300)} dB=${kB.join(',')}`);

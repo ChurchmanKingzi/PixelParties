@@ -54,6 +54,7 @@ const {
   buildAllBoardTargets,
 } = require('./_guardian-beasts-shared');
 const { ablageLoeschKostenMoeglich } = require('./_guardian-beasts-shared');   // v1398
+const { hatName } = require('./_alias-name');
 
 const CARD_NAME = 'Guardian Beast Gou';
 const BUFF_NAME = 'gou_protected';
@@ -113,7 +114,7 @@ function buildProtectableTargets(engine) {
   // off-limits. ALL other on-board targets (yours or opp's, hero or
   // creature) are eligible per the text "the same number of targets
   // on the board".
-  return buildAllBoardTargets(engine).filter(t => t.cardName !== CARD_NAME);
+  return buildAllBoardTargets(engine).filter(t => !(t.cardInstance ? hatName(t.cardInstance, CARD_NAME) : t.cardName === CARD_NAME));   // Shroomasaur mit dem Namen Gou ist ebenfalls ausgenommen
 }
 
 /**
@@ -150,6 +151,7 @@ function isStillProtected(engine, target) {
 }
 
 module.exports = {
+  buildProtectableTargets,   // W73f: für den Namensreferenz-Test
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
