@@ -178,5 +178,59 @@ const picker = (t) => t.prompts.filter(p => p.d && p.d.type === 'cardNamePicker'
     }
   }
 
+  R.section('F · auch Namensfamilien und Archetypen sehen den Zusatznamen (of Kings, Spider, Loyal, Gigantisaur)');
+  {
+    const ok = await H.fresh({ hand: [[], []], deckSize: 12 });
+    const kings = require('../../../../cards/effects/_of-kings-shared.js');
+    const spider = require('../../../../cards/effects/_spider-shared.js');
+    const loyal = require('../../../../cards/effects/_loyal-shared.js');
+    const fam = async (alias, check) => {
+      const t = await H.fresh({ hand: [[], []], deckSize: 12 });
+      const s = t.put(0, 0, 0, CARD); s.turnPlayed = 0;
+      const vorher = check(t);
+      await nennen(t, 0, 0, 0, alias);
+      return { t, s, vorher, nachher: check(t) };
+    };
+    {
+      const r = await fam('Knight of Kings [B]', (t) => ({ ritter: kings.controlsNamed(t.engine, 0, 'Knight of Kings'), anzahl: kings.ofKingsCreatures(t.engine, 0).length }));
+      R.check('of Kings: ohne Zusatznamen kein Knight, mit „Knight of Kings [B]" kontrolliert man einen', !r.vorher.ritter && r.nachher.ritter && r.vorher.anzahl === 0 && r.nachher.anzahl === 1, [r.vorher, r.nachher]);
+      const t2 = r.t;
+      await t2.endTurn();
+      R.check('… und nach dem Zugwechsel nicht mehr', !kings.controlsNamed(t2.engine, 0, 'Knight of Kings') && kings.ofKingsCreatures(t2.engine, 0).length === 0);
+    }
+    {
+      const r = await fam('Baby Spider', (t) => spider.countSpiderCreaturesControlled(t.engine, 0));
+      R.check('Spider: mit dem Namen einer Spider zählt sie als Spider-Kreatur (0 → 1)', r.vorher === 0 && r.nachher === 1, [r.vorher, r.nachher]);
+    }
+    {
+      const r = await fam('Loyal Beagle', (t) => loyal.countLoyalCreatures(t.engine, 0));
+      R.check('Loyal: Zusatzname „Loyal Beagle" → 1 Loyal-Kreatur (Archetyp Loyals)', r.vorher === 0 && r.nachher === 1, [r.vorher, r.nachher]);
+    }
+    {
+      // Gigantisaur: „A Hero can only have 1 Gigantisaur Creature in its Support Zones" — die Zone des Helden ist mit dem Zusatznamen belegt
+      const t = await H.fresh({ hand: [[], []], deckSize: 12 });
+      const s = t.put(0, 0, 0, CARD); s.turnPlayed = 0;
+      R.check('vorher: Gigantisaur Spinor ist bei Held 0 beschwörbar', t.engine.isCreatureSummonable('Gigantisaur Spinor', 0, 0) === true);
+      await nennen(t, 0, 0, 0, 'Gigantisaur Triceras');
+      R.check('mit dem Namen einer Gigantisaur: kein weiterer Gigantisaur bei diesem Helden', t.engine.isCreatureSummonable('Gigantisaur Spinor', 0, 0) === false);
+      R.check('… bei einem anderen Helden schon', t.engine.isCreatureSummonable('Gigantisaur Spinor', 0, 1) === true);
+      R.check('wirksame Kartendaten tragen den Archetyp der Zusatzkarte, die eigenen Werte bleiben', t.engine.getEffectiveCardData(s).archetype === 'Gigantisaurs' && t.engine.getEffectiveCardData(s).hp === 90 && t.engine.getEffectiveCardData(s).name === CARD, t.engine.getEffectiveCardData(s));
+    }
+    {
+      // Ereignis: Loyal Terrier — „whenever a Loyal Creature you control, except Loyal Terrier, is defeated" gilt für die benannte Shroomasaur
+      const t = await H.fresh({ hand: [[], []], deckSize: 12 });
+      t.put(0, 0, 1, 'Loyal Terrier').turnPlayed = 0;
+      const s = t.put(0, 0, 0, CARD); s.turnPlayed = 0;
+      await nennen(t, 0, 0, 0, 'Loyal Beagle');
+      let angeboten = 0;
+      t.targetFn = (valid, cfg) => { if (cfg && /Terrier/.test(cfg.title || '')) angeboten++; return valid.length ? [valid[0].id] : []; };
+      const hpVor = t.hp(1, 0) + t.hp(1, 1) + t.hp(1, 2);
+      await t.run(() => t.engine.actionDestroyCard({ name: 'Gegner', owner: 1 }, s));
+      t.targetFn = null;
+      const hpNach = t.hp(1, 0) + t.hp(1, 1) + t.hp(1, 2);
+      R.check('Loyal Terrier reagiert auf den Tod der als Loyal benannten Shroomasaur (50 Schaden)', hpVor - hpNach === 50, [hpVor - hpNach, angeboten]);
+    }
+  }
+
   R.finish();
 })().catch(e => { process.stderr.write('THROW ' + (e && e.stack || e) + '\n'); process.exit(2); });

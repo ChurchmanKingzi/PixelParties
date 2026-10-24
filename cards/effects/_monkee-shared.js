@@ -26,6 +26,7 @@
 //  nicht zwingend genau 4.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { hasCardType } = require('./_hooks');
 
 const MONKEE = 'Monkee';
@@ -38,7 +39,7 @@ function isMonkeeName(cardName) {
 
 /** "Monkee"-Karte UND Kreatur? (Non-Fungible Monkee ist ein Artefakt.) */
 function isMonkeeCreature(engine, inst) {
-  if (!inst || !isMonkeeName(inst.name)) return false;
+  if (!inst || !anyName(inst, (n) => isMonkeeName(n))) return false;
   const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];
   return !!cd && hasCardType(cd, 'Creature');
 }

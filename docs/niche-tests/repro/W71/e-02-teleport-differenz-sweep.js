@@ -78,7 +78,7 @@ const liegtAmBrett = (t, name) => !!t.find(name, 'support') && (t.gs.players[0].
         z2 = Z.zustand(s2.gs, s2.engine);
       } catch (e) { ergebnis = { skip: `${art} ${name}: Szene 2 warf ${e.message}` }; continue; }
       const d = Z.zustandDiff({ ...heldenPfade(z1), ...SUPPORT_INST(z1) }, { ...heldenPfade(z2), ...SUPPORT_INST(z2) })
-        .filter(l => !/turnPlayed|_gameStart|\.id:|heroesActedThisTurn|appliedByInst|appliedByHero|\.counters: "\{leer\}" → ∅|\.counters: ∅ → "\{leer\}"|heroIdx|heroOwner|heroesAttackedThisTurn|_attacksThisTurn|_taioAtkGrantedBy/.test(l));   // Wirker-Buchführung/Instanz-Ids: kein Heldenzustand
+        .filter(l => !/turnPlayed|_gameStart|\.id:|heroesActedThisTurn|appliedByInst|appliedByHero|\.counters: "\{leer\}" → ∅|\.counters: ∅ → "\{leer\}"|heroIdx|heroOwner|heroesAttackedThisTurn|_attacksThisTurn|_wuerfeZahl|_wuerfeZug|_taioAtkGrantedBy/.test(l));   // Wirker-Buchführung/Instanz-Ids: kein Heldenzustand
       const fehler = [...s1.errors, ...s2.errors];
       ergebnis = { gelegt: true, modus, d, fehler, art, name };
       break;

@@ -27,6 +27,7 @@
 //  also pruefe ich den Namen.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { hasCardType } = require('./_hooks');
 
 const WC = 'War Counselor';
@@ -53,7 +54,7 @@ function controlledWarCounselors(engine, pi) {
   return (engine.cardInstances || []).filter((inst) => {
     if (!inst || inst.zone !== 'support' || inst.faceDown) return false;
     if ((inst.controller ?? inst.owner) !== pi) return false;
-    if (!isWarCounselorName(inst.name)) return false;
+    if (!anyName(inst, (n) => isWarCounselorName(n))) return false;
     const cd = engine.getEffectiveCardData?.(inst) || engine._getCardDB()[inst.name];
     return !!cd && hasCardType(cd, 'Creature');
   });

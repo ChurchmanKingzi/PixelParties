@@ -27,6 +27,7 @@
 //  Creatures hand to `engine.resolveSacrificeCost`.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { hasCardType } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
 
@@ -66,7 +67,7 @@ function controlsNonRemoraGreatmaw(engine, pi, excludeInstId = null) {
     if (inst.faceDown) continue;
     if (excludeInstId != null && inst.id === excludeInstId) continue;
     if (inst.name === REMORA_NAME) continue;
-    if (!isGreatmawCreature(inst.name, engine)) continue;
+    if (!anyName(inst, (n) => isGreatmawCreature(n, engine))) continue;
     return true;
   }
   return false;
@@ -130,7 +131,7 @@ async function negateFreshTributes(engine, pi, picked) {
     const inst = t?.cardInstance;
     if (!inst) continue;
     if (inst.turnPlayed !== gs.turn) continue;             // only fresh tributes
-    if (isGreatmawCreature(inst.name, engine)) continue;   // Greatmaw excepted
+    if (anyName(inst, (n) => isGreatmawCreature(n, engine))) continue;   // Greatmaw excepted
     const script = loadCardEffect(inst.name);
     if (script?.selfSacrificeableForGreatmaw) continue;    // not "sacrificed this way"
     try {

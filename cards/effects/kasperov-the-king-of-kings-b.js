@@ -16,6 +16,7 @@
 //  dann Platzieren aus Hand ODER Deck (regardless of level, auch zu
 //  toten/Frozen/Stunned/Negated Helden — Als Ruling 6.9., Frage 14).
 // ═══════════════════════════════════════════
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const {
   PAWN, isOfKingsCreatureData, ofKingsCreatures, summonedThisTurn,
   collectHandAndDeck, pickFromHandOrDeck, placeFromHandOrDeck, ofKingsCpuAnswer,
@@ -26,7 +27,7 @@ const CARD_NAME = 'Kasperov, the King of Kings [B]';
 // W20b (Al, 20.10.2026: Opfer-Zonen-Regel gilt für jede Opfer-Beschwörung): der Ersatz kommt in die Zone des Pawns - nur Zonen, die das EINE Opfer leert (kein Alice-Stapel).
 const zoneLeer = (engine, i) => engine.zoneFreiNachKostenzahlung(engine.physicalSide(i), i.heroIdx, i.zoneSlot, i);
 function eligiblePawns(engine, pi) {
-  return ofKingsCreatures(engine, pi).filter(i => i.name.startsWith(PAWN) && !summonedThisTurn(engine, i) && zoneLeer(engine, i));
+  return ofKingsCreatures(engine, pi).filter(i => anyName(i, (n) => n.startsWith(PAWN)) && !summonedThisTurn(engine, i) && zoneLeer(engine, i));
 }
 
 module.exports = {

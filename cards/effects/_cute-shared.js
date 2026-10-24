@@ -19,6 +19,7 @@
 //  Cute archetype starts with capital "Cute".
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { hasCardType } = require('./_hooks');
 
 const CUTE_RE = /\bCute\b/;
@@ -36,7 +37,7 @@ function hasCuteInName(cardName) {
 
 /** Kartendaten einer „Cute" Creature (Name enthaelt das Wort „Cute"; ohne Wings-Kontext). */
 function isCuteCreatureCard(cd) {
-  return !!cd && hasCardType(cd, 'Creature') && hasCuteInName(cd.name);
+  return !!cd && hasCardType(cd, 'Creature') && anyName(cd, (n) => hasCuteInName(n));
 }
 
 // ── Dynamic "Cute" membership via "Cute Wings" ─────────────────────
@@ -85,7 +86,7 @@ function isCuteCreatureInst(engine, inst) {
   if (!engine || !inst) return false;
   const cd = engine._getCardDB?.()[inst.name];
   if (!cd || !hasCardType(cd, 'Creature')) return false;
-  if (hasCuteInName(cd.name || inst.name)) return true; // Name zaehlt (Al, Welle 9, Q24)
+  if (hasCuteInName(cd.name || inst.name) || anyName(inst, (n) => hasCuteInName(n))) return true; // Name zaehlt (Al, Welle 9, Q24); W73c: auch ein Zusatzname (Shroomasaur)
   if (inst.zone === 'support' && inst.heroIdx != null && inst.heroIdx >= 0
       && heroHasCuteWings(engine, inst.owner, inst.heroIdx)) return true;
   return false;
