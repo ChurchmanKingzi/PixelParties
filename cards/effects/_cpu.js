@@ -1839,6 +1839,7 @@ async function activateHeroEffects(engine, helpers) {
     pickCsHero = null;
     pickCsEvoBefore = null;
     pickCsHeroIdx = -1;
+    let pickHc = null;      // Held-als-Kreatur-Kanal (Form 9): die Entscheidung des gewaehlten Helden
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
@@ -1935,6 +1936,19 @@ async function activateHeroEffects(engine, helpers) {
           }
         } catch { available = false; }
       }
+      // ── Held-als-Kreatur-Kanal (Form 9, Hulijing; Karten-Vertrag `cpuMeta.heroCreature`) ──
+      // EINE Entscheidung je Held und Phase: verwandeln — und in WELCHE Kreatur — oder nicht. Sie kommt VOR dem Gate:
+      // gelernte Regel / Exploration (`mode: 'force'`) committen ohne Gate, ein Startwert (`mode: 'gate'`) prueft das Gate.
+      // Ohne Karten-Vertrag oder ohne Pool bleibt alles beim Alten.
+      let hcDec = null;
+      if (available && script?.cpuMeta?.heroCreature) {
+        hcDec = deckProfile.heroCreatureDecision(engine, cpuIdx, hi);
+        if (!hcDec || hcDec.none) {
+          swapDiag(engine, hcDec ? 'herocreature:nein' : 'herocreature:kein-pool');
+          available = false;
+          hcDec = null;
+        }
+      }
       // Also check equipped hero-effect providers (e.g. Mummy Token, treatAsEquip heroes).
       const hasEquippedEffect = engine.cardInstances.some(ci => {
         if (ci.owner !== cpuIdx || ci.zone !== 'support' || ci.heroIdx !== hi) return false;
@@ -1955,6 +1969,7 @@ async function activateHeroEffects(engine, helpers) {
       });
       if (available || hasEquippedEffect) {
         pickIdx = hi;
+        if (available && hcDec) pickHc = hcDec;
         if (available && csTags && csTags.length > 0) {
           pickCsTags = csTags;
           pickCsHero = hero.name;
@@ -1974,9 +1989,24 @@ async function activateHeroEffects(engine, helpers) {
     // Ifrit): kein Wert-Gate und keine Recon — die Entscheidung steht, es
     // gibt keinen Zielplan zu optimieren.
     const forceHero = (await cpuForcePlayHero(engine, cpuIdx, ps.heroes[pickIdx], pickIdx)) > 0;
-    const committed = await mctsGatedActivation(engine, helpers, `hero-effect h${pickIdx}`,
-      () => helpers.doActivateHeroEffect(helpers.room, cpuIdx, { heroIdx: pickIdx }),
-      forceHero ? { alwaysCommit: true, commitWithoutRecon: true } : {});
+    // Held-als-Kreatur: die vorgemerkte Wahl beantwortet die Galerie des Skripts (`cpuResponse`). Steht die Entscheidung fest
+    // (`mode: 'force'`), gibt es keinen Zielplan zu optimieren — ohne Gate und ohne Recon committen.
+    if (pickHc) engine._heroCreaturePick = { pi: cpuIdx, heroIdx: pickIdx, name: pickHc.name, pile: pickHc.pile, handIdx: pickHc.handIdx, turn: gs.turn };
+    let committed;
+    try {
+      committed = await mctsGatedActivation(engine, helpers, `hero-effect h${pickIdx}`,
+        () => helpers.doActivateHeroEffect(helpers.room, cpuIdx, { heroIdx: pickIdx }),
+        (forceHero || (pickHc && pickHc.mode === 'force')) ? { alwaysCommit: true, commitWithoutRecon: true } : {});
+    } finally {
+      if (pickHc) delete engine._heroCreaturePick;
+    }
+    if (pickHc) {
+      // Das TATSAECHLICHE Ergebnis in die aufgezeichnete Zeile (das Gate kann den Vorschlag verworfen haben); danach darf die
+      // aufliegende Kreatur SOFORT ihren aktiven Effekt benutzen (`activateCreatureEffects` kennt die Ueberlagerung).
+      const placed = deckProfile.heroCreatureOutcome(engine, cpuIdx, pickIdx, pickHc);
+      swapDiag(engine, placed ? 'herocreature:verwandelt' : 'herocreature:gate-nein');
+      if (committed && ps.heroes?.[pickIdx]?.heldKreatur) await activateCreatureEffects(engine, helpers);
+    }
     // Vorher wurde `JSON.stringify(gs.hoptUsed)` vor/nach verglichen —
     // ein Helden-Effekt mit MEHREREN Nutzungen pro Runde (Kassaran, 3×)
     // lässt die Sperre offen und sah damit aus wie "nicht gefeuert".
@@ -2435,6 +2465,17 @@ async function activateCreatureEffects(engine, helpers) {
         const key = `spy|${e.cardName}|${e.instId}`;
         if (tried.has(key)) continue;
         pick = { heroIdx: e.heroIdx, zoneSlot: e.zoneSlot, cardName: e.cardName, instId: e.instId, key, charmedOwner: e.charmedOwner };
+        break;
+      }
+    }
+    // Held als Kreatur (Hulijing): die AUFLIEGENDE Kreatur eines eigenen Helden (Zone `heroOverlay`, `zoneSlot` -1) darf sofort ihren
+    // aktiven Effekt benutzen — derselbe Sammler wie beim Menschen (`_hero-creature-shared.aktivierbareEintraege`).
+    if (!pick) {
+      for (const e of (require('./_hero-creature-shared').aktivierbareEintraege(engine, cpuIdx) || [])) {
+        if (!e.canActivate || e.owner !== cpuIdx || e.charmedOwner != null) continue;
+        const key = `heldKreatur|${e.cardName}|${e.heroIdx}|${e.instId}`;
+        if (tried.has(key)) continue;
+        pick = { heroIdx: e.heroIdx, zoneSlot: -1, cardName: e.cardName, instId: e.instId, key };
         break;
       }
     }
@@ -14444,4 +14485,4 @@ async function measureAreaValues(engine, helpers, cpuIdx) {
 // Gold-Bedarfsrechnung, die an zwei Stellen gepflegt wird, laeuft
 // garantiert auseinander. Rein additiv, kein Aufrufer geaendert.
 module.exports = { CPU_META_HELPERS, runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, mctsValueGoldVsDraw, mctsPickFromOptions, rolloutRestOfTurn, seedExploreAttempts, computeGoldDemand, mctsOpponentGoldEconomy,
-  _test: { activateCreatureEffects, cpuGenericChoice, heroCheatBonusByName, heroEffectGateCheatBonus, candidateCheatBonus, heuristicCandidateCmp, ACTION_CHEAT_BONUS, pickCreatureZoneSlot, listEligibleHeroesForActionCard } };
+  _test: { activateCreatureEffects, activateHeroEffects, cpuGenericChoice, heroCheatBonusByName, heroEffectGateCheatBonus, candidateCheatBonus, heuristicCandidateCmp, ACTION_CHEAT_BONUS, pickCreatureZoneSlot, listEligibleHeroesForActionCard } };

@@ -38,8 +38,13 @@
 //  `play_zone_animation` `hero_creature_on` (Pixelart, ANIM_REGISTRY: violettes Fuchsfeuer wirbelt um die Heldin, ein Rauchring verhüllt die Verwandlung) beim Auflegen, `hero_creature_off`
 //  (Rauch, Funken) beim Löschen am Zugende. Klänge in ZONE_ANIM_SFX; Logs `hero_creature_placed`, `hero_creature_deleted`, `hero_creature_defeated`, `hero_creature_move_fizzle` (die Infrastruktur schreibt sie).
 //
-//  ── CPU ─────────────────────────────────────────────────────────────────
-//  Die CPU benutzt den Effekt NICHT (sie kann die aufgelegte Kreatur nicht gezielt einsetzen; das Auflegen aus dem Deck kostet die Karte): alle Abfragen werden abgelehnt.
+//  ── CPU (Lernkanal „Held als Kreatur", Form 9) ─────────────────────────
+//  Die CPU benutzt den Effekt über einen EIGENEN LERNKANAL (Karten-Vertrag `cpuMeta.heroCreature`, `_deck-profile.js` `heroCreatureDecision`, Trainer FORM 9 in
+//  `scripts/decision-channels.js`, Vokabular `_hero-creature-learn-shared.js`; Doku TRAINING.md): je Held, Zug und Phase EINE Entscheidung „verwandeln — und in WELCHE Kreatur
+//  aus Hand oder Deck?" gegen „nicht", gelernt aus den Spielausgängen (Identität der Kreatur, Herkunft, Wirkung, Stufe, HP-Verhältnis, Brett, Stand). Die Entscheidung kommt
+//  VOR dem Gate: `cpuResponse` beantwortet die Galerie mit der vorgemerkten Wahl (`engine._heroCreaturePick`), nie mit einer eigenen. Datensammlung: Exploration (`PP_HULI_EXPLORE`).
+//  OHNE Training gilt ein Startwert: nur DECK-Karten mit sofortigem Nutzen (Einsatz-Effekt oder freier aktiver Effekt), vom Gate geprüft; die Hand bleibt unangetastet.
+//  Die CPU nutzt den aktiven Effekt der aufliegenden Kreatur sofort (`activateCreatureEffects` kennt die Überlagerung).
 // ═══════════════════════════════════════════
 
 const HC = require('./_hero-creature-shared');
@@ -104,9 +109,29 @@ module.exports = {
     return true;
   },
 
-  /** CPU: nutzt den Effekt nicht (lehnt jede Abfrage ab). */
+  /**
+   * CPU-Lernkanal (Form 9): der Pool der Kandidaten, aus dem `heroCreatureDecision` wählt. Dieselbe Menge wie die Galerie
+   * von `onHeroEffect` (Stufe KLEINER als die Magic-Arts-Stufe), dazu die Riegel von `canActivateHeroEffect`.
+   */
+  cpuMeta: {
+    heroCreature: {
+      pool(engine, pi, heroIdx) {
+        const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
+        if (!hero?.name || hero.hp <= 0 || hero.heldKreatur) return [];
+        if (engine._isHeroEffectSilenced(pi, heroIdx)) return [];
+        return HC.kandidaten(engine, pi, pi, heroIdx, HC.schulStufe(engine, SCHULE, pi, heroIdx));
+      },
+    },
+  },
+
+  /** CPU: die Galerie wird mit der VORGEMERKTEN Wahl des Lernkanals beantwortet (`engine._heroCreaturePick`), sonst abgelehnt. */
   cpuResponse(engine, kind, payload) {
     if (kind !== 'generic' || !payload || payload.title !== CARD_NAME) return undefined;
+    const pick = engine._heroCreaturePick;
+    if (pick && pick.turn === engine.gs?.turn && Array.isArray(payload.cards)
+        && payload.cards.some(c => c && c.name === pick.name && c.source === pick.pile)) {
+      return { cardName: pick.name, source: pick.pile };
+    }
     return { cancelled: true };
   },
 

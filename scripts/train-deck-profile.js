@@ -3593,6 +3593,7 @@ function main() {
       setOfferRules: advModel.decisionChannels.setOfferRules,
       poolFeatureRules: advModel.decisionChannels.poolFeatureRules,
       areaRemovalRules: advModel.decisionChannels.areaRemovalRules,
+      heroCreatureRules: advModel.decisionChannels.heroCreatureRules,
       abilityWorthRules: advModel.decisionChannels.abilityWorthRules,
     } : {}),
     // Gelernte Tutor-/Such-Präferenzen (Quelle→Karte).
