@@ -22,12 +22,13 @@
 //     Sonst (kein Angebot möglich, abgelehnt, Zahlung nicht erbracht, Karte nicht in einer eigenen Zone): die Karte wird besiegt und ALLE Ziele des Halters (seine Helden UND
 //     Kreaturen) erleiden 50 + 50 × Counter Schaden. Bild: große Pixelart-Explosion (`hot_potato_blast`).
 // ═══════════════════════════════════════════
-const { hasCardType } = require('./_hooks');
+const { hasCardType, PHASES } = require('./_hooks');
 
 const CARD_NAME = 'Hot Skull Potato';
 const KEY = 'skullCounter';
 const GRUND = 50, JE_COUNTER = 50;
 const BLAST_MS = 1500;
+const FLUG_MS = 850;   // Dauer des Wurfs in die andere Zone (`hot_potato_throw`)
 
 /** Freie Zonen bei Helden, die der GEGNER von `holder` kontrolliert. */
 function freieGegnerZonen(engine, holder) {
@@ -65,6 +66,13 @@ async function weiterreichen(engine, inst, holder, ziel) {
   const altSlot = alt?.supportZones?.[inst.heroIdx]?.[inst.zoneSlot];
   if (altSlot) { const i = altSlot.indexOf(CARD_NAME); if (i >= 0) altSlot.splice(i, 1); }
   const to = gs.players[oppIdx];
+  // Flug (Pixelart `hot_potato_throw` + Klang): die Karte verlässt die alte Zone sofort und liegt während des Flugs in keiner; erst bei der Landung steht sie in der neuen.
+  engine._broadcastEvent('play_zone_animation', {
+    type: 'hot_potato_throw', zoneType: 'board', duration: FLUG_MS + 330,
+    targets: [{ owner: altSeite, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot }, { owner: oppIdx, heroIdx: ziel.heroIdx, zoneSlot: ziel.slotIdx }],
+  });
+  engine.sync();
+  await engine._delay(FLUG_MS);
   if (!to.supportZones[ziel.heroIdx]) to.supportZones[ziel.heroIdx] = [[], [], []];
   to.supportZones[ziel.heroIdx][ziel.slotIdx] = [CARD_NAME];
   inst.heroIdx = ziel.heroIdx;
@@ -173,47 +181,59 @@ module.exports = {
       engine.sync();
     },
 
-    /** Zugende des Halters: bezahlen und weiterreichen — oder besiegen und Schaden an alle seine Ziele. */
-    onTurnEnd: async (ctx) => {
-      const engine = ctx._engine;
-      const gs = engine.gs;
-      const inst = ctx.card;
-      if (!inst || inst.zone !== 'support' || inst.faceDown) return;
-      const holder = inst.controller ?? inst.owner;
-      if (gs.activePlayer !== holder) return;
-      if (inst.counters._kartoffelZug === gs.turn) return;
-      inst.counters._kartoffelZug = gs.turn;
-      const ps = gs.players[holder];
-      const n = inst.counters[KEY] || 1;
-      const zonen = freieGegnerZonen(engine, holder);
-
-      let weitergegeben = false;
-      if (inEigenerZone(engine, inst, holder) && zonen.length > 0 && (ps.hand || []).length >= n) {
-        const ja = await engine.promptGeneric(holder, {
-          type: 'confirm', title: CARD_NAME, showCard: CARD_NAME,
-          _kartoffel: { zaehler: n, hand: (ps.hand || []).length },
-          message: `Discard ${n} card${n === 1 ? '' : 's'} to pass ${CARD_NAME} to your opponent? Otherwise it explodes: ${GRUND + JE_COUNTER * n} damage to all your targets.`,
-          confirmLabel: `🥔 Pass it (${n})`, cancelLabel: '💥 Let it blow', cancellable: true,
-        });
-        if (engine._confirmSaidYes(ja)) {
-          const vor = (ps.hand || []).length;
-          await engine.actionPromptForceDiscard(holder, n, { costFor: CARD_NAME, costKind: 'disrupt', title: `${CARD_NAME} — Discard ${n}`, source: CARD_NAME, selfInflicted: true, skipSourceGlow: true });
-          if (vor - (ps.hand || []).length >= n) {
-            let ziel = zonen[0];
-            if (zonen.length > 1) {
-              const wahl = await engine.promptGeneric(holder, {
-                type: 'zonePick', title: CARD_NAME, description: `Choose a free Support Zone of a Hero your opponent controls for the ${CARD_NAME}.`,
-                zones: zonen.map(z => ({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, owner: z.ownerIdx })), cancellable: false,
-              });
-              ziel = (wahl && zonen.find(z => z.heroIdx === wahl.heroIdx && z.slotIdx === wahl.slotIdx)) || zonen[0];
-            }
-            schildAb(inst);
-            try { await weiterreichen(engine, inst, holder, ziel); } finally { schildAuf(inst); }
-            weitergegeben = true;
-          }
-        }
-      }
-      if (!weitergegeben && inst.zone === 'support') await explodieren(engine, inst, holder);
+    /**
+     * Zugende des Halters: bezahlen und weiterreichen — oder besiegen und Schaden an alle seine Ziele.
+     * Läuft schon in der END-Phase (`onPhaseEnd`), also VOR dem Abwurf auf die Handgröße (`enforceHandLimit` kommt danach): die Zahlung zählt Handkarten, und die Karten, die dafür
+     * abgeworfen werden, müssen nicht mehr für das Handlimit herhalten. `onTurnEnd` bleibt als Rückfall für Zugenden ohne END-Phase (Merker `_kartoffelZug` verhindert ein zweites Mal).
+     */
+    onPhaseEnd: async (ctx) => {
+      if (ctx.phaseIndex !== PHASES.END) return;
+      await zugEnde(ctx);
     },
+
+    onTurnEnd: async (ctx) => zugEnde(ctx),
   },
 };
+
+/** Zugende-Wirkung (Zahlen und Weiterreichen, sonst Explosion). */
+async function zugEnde(ctx) {
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  const inst = ctx.card;
+  if (!inst || inst.zone !== 'support' || inst.faceDown) return;
+  const holder = inst.controller ?? inst.owner;
+  if (gs.activePlayer !== holder) return;
+  if (inst.counters._kartoffelZug === gs.turn) return;
+  inst.counters._kartoffelZug = gs.turn;
+  const ps = gs.players[holder];
+  const n = inst.counters[KEY] || 1;
+  const zonen = freieGegnerZonen(engine, holder);
+
+  let weitergegeben = false;
+  if (inEigenerZone(engine, inst, holder) && zonen.length > 0 && (ps.hand || []).length >= n) {
+    const ja = await engine.promptGeneric(holder, {
+      type: 'confirm', title: CARD_NAME, showCard: CARD_NAME,
+      _kartoffel: { zaehler: n, hand: (ps.hand || []).length },
+      message: `Discard ${n} card${n === 1 ? '' : 's'} to pass ${CARD_NAME} to your opponent? Otherwise it explodes: ${GRUND + JE_COUNTER * n} damage to all your targets.`,
+      confirmLabel: `🥔 Pass it (${n})`, cancelLabel: '💥 Let it blow', cancellable: true,
+    });
+    if (engine._confirmSaidYes(ja)) {
+      const vor = (ps.hand || []).length;
+      await engine.actionPromptForceDiscard(holder, n, { costFor: CARD_NAME, costKind: 'disrupt', title: `${CARD_NAME} — Discard ${n}`, source: CARD_NAME, selfInflicted: true, skipSourceGlow: true });
+      if (vor - (ps.hand || []).length >= n) {
+        let ziel = zonen[0];
+        if (zonen.length > 1) {
+          const wahl = await engine.promptGeneric(holder, {
+            type: 'zonePick', title: CARD_NAME, description: `Choose a free Support Zone of a Hero your opponent controls for the ${CARD_NAME}.`,
+            zones: zonen.map(z => ({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, owner: z.ownerIdx })), cancellable: false,
+          });
+          ziel = (wahl && zonen.find(z => z.heroIdx === wahl.heroIdx && z.slotIdx === wahl.slotIdx)) || zonen[0];
+        }
+        schildAb(inst);
+        try { await weiterreichen(engine, inst, holder, ziel); } finally { schildAuf(inst); }
+        weitergegeben = true;
+      }
+    }
+  }
+  if (!weitergegeben && inst.zone === 'support') await explodieren(engine, inst, holder);
+}
