@@ -14,7 +14,7 @@ src/cute-princess-mary.png).
   sie etwas ab.
 * Glut: von den Flügelspitzen lösen sich beim Abschlag kleine Funken.
 * Körper (`body_layer`): die Haare wehen (die Außenkante der Strähnen am Kopf wird zeilenweise verschoben, die langen Locken unter den
-  Schulterpolstern sind dieselbe Strähne und schwingen mit derselben, nur verzögerten Welle mit), die Arme schwingen seitwärts (gestreckt statt abgelöst, die Hand bleibt am Arm), der Saum
+  Schulterpolstern sind dieselbe Strähne und schwingen mit derselben, nur verzögerten Welle mit), die Arme schwingen als Einheiten seitwärts (Ärmel samt Hand um die Schulter, ohne dass die Hand wächst), der Saum
   des Kleides schwingt, und das Feuer am Kleid flackert (Farben wandern auf der Leiter Rot → Orange → Gelb nach oben). Der Kopf selbst
   bleibt starr (kein Dehnen und Stauchen).
 * Krone: ein Lichtband wandert einmal pro Schleife über die Krone; danach blitzen Glitzersterne über den Zacken auf.
@@ -138,15 +138,27 @@ def body_layer(i):
             out[y, lo:hi + 1] = 0
             seg = warp_row(BODY[y], a, b, d, side)
             out[y, lo:hi + 1] = np.where(seg[lo:hi + 1, 3:4] > 0, seg[lo:hi + 1], out[y, lo:hi + 1])
-    # 2) Arme schwingen seitwärts: der ganze Arm samt Hand (Zeilen 41–43 zwischen Mantel und Handkante) wird nach außen gestreckt bzw. wieder
-    #    eingezogen, die Mantelkante bleibt stehen. So bleibt die Hand immer am Arm; es entsteht kein Spalt.
-    o = max(-1, int(round(2.6 * math.sin(ph - 1.6))))                  # > 0: nach außen
-    for y in range(41, 44):
-        for side in (-1, 1):
-            a, b = (29, 32) if side < 0 else (MIRROR - 32, MIRROR - 29)
-            lo, hi = (a - 4, b) if side < 0 else (a, b + 4)
-            seg = warp_row(out[y].copy(), a, b, o, side)
-            out[y, lo:hi + 1] = seg[lo:hi + 1]
+    # 2) Arme schwingen seitwärts, jeder Arm als Einheit (Ärmel samt Hand, Zeilen 40–47 zwischen Außenkante und Kleid) um die Schulter: die
+    #    oberen Zeilen bewegen sich kaum, der Ärmelsaum unten am weitesten (Scherung ≈ Drehung). Die Hand wird dabei nicht größer, sondern
+    #    wandert mit; der Spalt zum Kleid wird mit der Innenkante des Arms gefüllt.
+    o = max(-1, int(round(3.0 * math.sin(ph - 1.6))))                  # > 0: nach außen
+    for side in (-1, 1):
+        xa, xb = (29, 36) if side < 0 else (MIRROR - 36, MIRROR - 29)
+        inner = xb if side < 0 else xa
+        for y in range(40, 48):
+            dx = int(round(o * (y - 38) / 9.0))
+            if not dx:
+                continue
+            arm = {x: out[y, x].copy() for x in range(xa, xb + 1)}
+            for x in range(xa, xb + 1):
+                out[y, x] = 0
+            for x, c in arm.items():
+                if c[3]:
+                    out[y, x + side * dx] = c
+            for k in range(max(0, dx)):                                   # Spalt zwischen Arm und Kleid füllen
+                gx = inner + side * k
+                if not out[y, gx, 3]:
+                    out[y, gx] = arm[inner]
     # 3) Saum schwingt
     for y in range(48, 56):
         dx = int(round(math.sin(ph - 2.2 - 0.3 * (y - 47)) * (y - 47) / 7.0 * 1.2))
