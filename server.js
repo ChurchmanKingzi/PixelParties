@@ -17106,7 +17106,7 @@ io.on('connection', (socket) => {
             // standard `negated` counter set above.
             if (cs._dkSilenced) inst.counters._dkSilenced = 1;
             // Spy in the Enemy's Camp: Spionage-Marke (Bitmaske der Sitze, die die Kreatur in ihrem Zug benutzen dürfen) — dieselbe Zahl wie im Spiel.
-            // `true` (Puzzle-Editor-Schalter „Spied On"): das Bit der ANDEREN Seite; eine Zahl gilt als fertige Bitmaske.
+            // `true` (Puzzle-Editor-Schalter „Spying"): das Bit der ANDEREN Seite; eine Zahl gilt als fertige Bitmaske.
             if (cs._spyMask === true) inst.counters._spyMask = 1 << (pi === 0 ? 1 : 0);
             else if (Number.isInteger(cs._spyMask) && cs._spyMask > 0) inst.counters._spyMask = cs._spyMask;
             if (cs.poisoned) { inst.counters.poisoned = 1; inst.counters.poisonStacks = cs.poisoned.stacks || 1; }
