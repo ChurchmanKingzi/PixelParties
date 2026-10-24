@@ -90,7 +90,7 @@ function collectRemovableAbilities(engine, playerIdx) {
 
     for (const inst of engine.cardInstances) {
       if (inst.owner !== physOwner) continue;
-      if (inst.zone !== 'ability') continue;
+      if (!engine.istWirksameAbility(inst)) continue;   // 24.10.: echte Ability Zone ODER Support Zone (Xal)
       if (inst.heroIdx !== hi) continue;
 
       const limit = startingCounts[inst.name] || 0;
@@ -185,7 +185,7 @@ module.exports = {
         engine._broadcastEvent('play_pile_transfer', {
           owner: inst.owner,
           cardName: inst.name,
-          from: 'ability',
+          from: inst.zone === 'support' ? 'support' : 'ability',
           to: 'deck',
           fromHeroIdx: inst.heroIdx,
           fromSlotIdx: inst.zoneSlot,
@@ -207,7 +207,7 @@ module.exports = {
 
         // Splice from ability zone, push name to mainDeck, untrack —
         // immediately, so the slot empties as the flight begins.
-        const slotArr = gs.players[inst.owner]?.abilityZones?.[inst.heroIdx]?.[inst.zoneSlot];
+        const slotArr = (inst.zone === 'support' ? gs.players[inst.owner]?.supportZones : gs.players[inst.owner]?.abilityZones)?.[inst.heroIdx]?.[inst.zoneSlot];
         if (Array.isArray(slotArr)) {
           const idx = slotArr.indexOf(inst.name);
           if (idx >= 0) slotArr.splice(idx, 1);

@@ -94,6 +94,8 @@ module.exports = {
           }
         }
       }
+      // Karten, die der Schlange wegen liegen geblieben sind, gelten nicht mehr als Ability: ihre Wirkung (Fighting-ATK …) geht zurück.
+      await engine.syncSupportAbilities(pi, heroIdx, weg.id);
       engine.sync();
     },
   },

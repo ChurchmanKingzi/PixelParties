@@ -97,7 +97,7 @@ function collectRemovableAbilities(engine, playerIdx) {
     // abilities the hero actually started with, removing later stacks.
     for (const inst of engine.cardInstances) {
       if (inst.owner !== playerIdx) continue;
-      if (inst.zone !== 'ability') continue;
+      if (!engine.istWirksameAbility(inst)) continue;   // 24.10.: echte Ability Zone ODER Support Zone (Xal)
       if (inst.heroIdx !== hi) continue;
 
       const limit = startingCounts[inst.name] || 0;
@@ -157,7 +157,7 @@ module.exports = {
         engine._broadcastEvent('play_zone_animation', {
           type: 'rain_of_death', owner: inst.owner,
           heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
-          zoneType: 'ability',
+          ...(inst.zone === 'support' ? {} : { zoneType: 'ability' }),
         });
       }
       await engine._delay(1400);
@@ -191,7 +191,7 @@ module.exports = {
       const deleteAbility = (inst) => {
         const ps = gs.players[inst.owner];
         if (!ps) return;
-        const slotArr = ps.abilityZones?.[inst.heroIdx]?.[inst.zoneSlot];
+        const slotArr = (inst.zone === 'support' ? ps.supportZones : ps.abilityZones)?.[inst.heroIdx]?.[inst.zoneSlot];
         if (Array.isArray(slotArr)) {
           const nameIdx = slotArr.indexOf(inst.name);
           if (nameIdx >= 0) slotArr.splice(nameIdx, 1);

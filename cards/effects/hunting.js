@@ -108,7 +108,7 @@ module.exports = {
       const stapel = engine.cardInstances.filter(c =>
         (feld === pi ? (c.controller ?? c.owner) === pi : c.owner === feld)   // Styx 28.9.
         && c.heroIdx === hi
-        && c.zone === 'ability'
+        && engine.istWirksameAbility(c)   // 24.10.: auch in einer Support Zone (Xal)
         && c.name === CARD_NAME
         && !c.faceDown);
       if (stapel.length === 0) return;
