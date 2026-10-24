@@ -31,5 +31,23 @@ const trapAngebot = (t) => t.prompts.filter(p => p.d && p.d.type === 'confirm' &
     R.check('Falle noch auf der Hand', t.pile(0, 'hand').includes(TRAP), t.pile(0, 'hand'));
     R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   }
+  R.section('C · Torchure: Gift auf den eigenen Helden ist der Kostenpunkt → keine Falle; Gegenprobe Heal (echte Wahl) → Falle');
+  {
+    const t = await H.fresh({ hand: [[TRAP, 'ZZ Filler'], ['Torchure']], gold: [50, 100] });
+    t.setAbilities(0, 0, [['Decay Magic', 'Decay Magic'], [], []]);
+    const hp0 = t.hp(1, 0);
+    t.targetFn = (valid) => { const h = valid.find(v => v.type === 'hero' && v.owner === 1 && v.heroIdx === 0); return h ? [h.id] : undefined; };
+    await t.play(1, 'Torchure', {});
+    R.check('Torchure: Falle nicht angeboten', trapAngebot(t) === 0, t.prompts.map(p => p.d && (p.d.title || p.d.type)));
+    R.check('Torchure: Held vergiftet, kein Fallenschaden', !!t.gs.players[1].heroes[0].statuses?.poisoned && t.hp(1, 0) >= hp0 - 100, [hp0, t.hp(1, 0)]);
+    R.check('Falle noch auf der Hand', t.pile(0, 'hand').includes(TRAP), t.pile(0, 'hand'));
+  }
+  {
+    const t = await H.fresh({ hand: [[TRAP, 'ZZ Filler'], ['Heal']], gold: [50, 100] });
+    t.setAbilities(0, 0, [['Decay Magic', 'Decay Magic'], [], []]);
+    t.targetFn = (valid) => { const h = valid.find(v => v.type === 'hero' && v.owner === 1 && v.heroIdx === 0); return h ? [h.id] : undefined; };
+    await t.play(1, 'Heal', {});
+    R.check('Heal (echte Heldenwahl): Falle weiterhin angeboten', trapAngebot(t) === 1, t.prompts.map(p => p.d && (p.d.title || p.d.type)));
+  }
   R.finish();
 })().catch(e => { process.stderr.write('THROW ' + (e && e.stack || e) + '\n'); process.exit(2); });

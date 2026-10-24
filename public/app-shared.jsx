@@ -3654,6 +3654,13 @@ const ZONE_ANIM_SFX = {
     { name: 'ping',         opts: { rate: 2.6, volume: 0.25, delay: 760, category: null, dedupe: 0 } },
     { name: 'ping',         opts: { rate: 2.0, volume: 0.2, delay: 900, category: null, dedupe: 0 } },
   ],
+  // Hot Skull Potato: Wurf in die andere Zone — Zischen und Pfeifen im Flug, dumpfer Aufprall.
+  hot_potato_throw: [
+    { name: 'debuff',       opts: { rate: 1.9, volume: 0.3 } },
+    { name: 'elem_wind',    opts: { rate: 1.7, volume: 0.35, delay: 60, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.3, volume: 0.35, delay: 800, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.4, volume: 0.2, delay: 850, category: null, dedupe: 0 } },
+  ],
   leafagami_leaves: [
     { name: 'elem_wind',  opts: { rate: 1.4, volume: 0.35 } },
     { name: 'ping',       opts: { rate: 2.2, volume: 0.25, delay: 140, category: null, dedupe: 0 } },

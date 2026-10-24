@@ -9990,11 +9990,23 @@ const FleshSwarmEffect = (() => {
 // ═════════════════════════════════════════════════════════════════
 const HotPotatoBlastEffect = (() => {
   const WEISS = ppHex('#ffffff'), GELB = ppHex('#f8ca21'), ORANGE = ppHex('#ff8b1a'), ROT = ppHex('#e92f38'), DUNKELROT = ppHex('#b21a29');
-  const RAUCH = ppHex('#3e3e51'), RAUCH2 = ppHex('#291f3d'), KNOCHEN = ppHex('#ebdcc1'), RAND = ppHex('#291f3d');
+  const RAUCH = ppHex('#3e3e51'), RAUCH2 = ppHex('#291f3d'), RAUCH_HELL = ppHex('#808898'), KNOCHEN = ppHex('#ebdcc1'), KNOCHEN_DUNKEL = ppHex('#a89370'), RAND = ppHex('#291f3d');
+  const RAMPE = [RAUCH2, DUNKELROT, ROT, ORANGE, GELB, WEISS];          // Hitze: kalt/dunkel → weißglühend; Übergänge werden mit Bayer-Raster gedithert
   const ENDE = 1500, FADE_AB = 1050;
   const scheibe = (g, cx, cy, r, farbe, a) => {
     const r2 = r * r, R = Math.ceil(r);
     for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) if (dx * dx + dy * dy <= r2) g.put(cx + dx, cy + dy, farbe, a);
+  };
+  // Rauchballen mit Licht von links oben: Hell- und Schattenseite gehen über Dithering ineinander über, dunkler Rand
+  const rauchBall = (g, cx, cy, r, hell, dunkel, a) => {
+    const r2 = r * r, R = Math.ceil(r);
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+      const d = dx * dx + dy * dy;
+      if (d > r2) continue;
+      if (d > (r - 1.4) * (r - 1.4)) { g.put(cx + dx, cy + dy, RAND, a); continue; }
+      const licht = ((-dx * 0.6 - dy * 0.8) / Math.max(1, r)) * 0.5 + 0.5;
+      g.put(cx + dx, cy + dy, licht + (ppBayer(cx + dx, cy + dy) - 0.5) * 0.7 > 0.5 ? hell : dunkel, a);
+    }
   };
   const ring = (g, cx, cy, r, breite, farbe, a) => {
     const lo = (r - breite) * (r - breite), hi = r * r, R = Math.ceil(r);
@@ -10010,40 +10022,65 @@ const HotPotatoBlastEffect = (() => {
     const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
     if (aus <= 0) return;
     const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
-    // Rauch (hinten)
+    // Brandfleck am Boden: gedithertes dunkles Oval, bleibt bis zum Ende
+    if (t > 90) {
+      const rx = Math.min(54, 14 + (t - 90) / 6), ry = rx * 0.28;
+      for (let dy = -Math.ceil(ry); dy <= Math.ceil(ry); dy++) for (let dx = -Math.ceil(rx); dx <= Math.ceil(rx); dx++) {
+        const q = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry);
+        if (q <= 1) g.put(cx + dx, cy + 34 + dy, RAUCH2, aus * (q > 0.6 ? 0.35 : 0.7));
+      }
+    }
+    // Rauch (hinten): Ballen mit Hell-/Schattenseite, im Lauf der Zeit heller und weiter oben
     for (const s of teile.rauch) {
       const tt = t - s.start;
       if (tt < 0) continue;
       const r = s.r * Math.min(1, tt / 260) * (1 + tt / 1400);
-      scheibe(g, Math.round(cx + s.x), Math.round(cy + s.y - (tt / 1000) * s.v), r, tt > 500 ? RAUCH : RAUCH2, aus * 0.5);
+      rauchBall(g, Math.round(cx + s.x), Math.round(cy + s.y - (tt / 1000) * s.v), r, tt > 500 ? RAUCH_HELL : RAUCH, tt > 500 ? RAUCH : RAUCH2, aus * 0.85);
     }
-    // Feuerball: ein Mittelkörper und neun Lappen (unregelmäßige Wolke), vier Farbschichten von außen nach innen
-    if (t < 980) {
+    // Feuerball: ein Mittelkörper und neun Lappen; je Pixel eine Hitze (nahe am Zentrum eines Lappens = heiß, Licht von links oben),
+    // die über die Rampe Weiß→Gelb→Orange→Rot→Dunkelrot mit Bayer-Dithering läuft; dunkler Rand, nach dem Höhepunkt kühlt alles zur Rauchfarbe ab
+    if (t < 1000) {
       const u = Math.min(1, t / 640), R = 48 * (1 - (1 - u) * (1 - u));
-      const abkling = t > 640 ? Math.max(0, 1 - (t - 640) / 340) : 1;
-      if (R > 0 && abkling > 0) {
-        const SCHICHTEN = [[DUNKELROT, 1.0], [ROT, 0.78], [ORANGE, 0.56], [GELB, 0.34]];
-        for (const [farbe, m] of SCHICHTEN) {
-          scheibe(g, cx, cy, R * 0.72 * m, farbe, abkling * aus);
-          for (const l of teile.lappen) scheibe(g, Math.round(cx + Math.cos(l.w) * R * l.d * m), Math.round(cy + Math.sin(l.w) * R * l.d * m * 0.9), R * l.s * m, farbe, abkling * aus);
+      const kuehl = t > 640 ? (t - 640) / 360 : 0;
+      if (R > 0 && kuehl < 1) {
+        const blobs = [{ x: cx, y: cy, r: R * 0.72 }];
+        for (const l of teile.lappen) blobs.push({ x: cx + Math.cos(l.w) * R * l.d, y: cy + Math.sin(l.w) * R * l.d * 0.9, r: R * l.s });
+        const x0 = Math.floor(cx - R * 1.3), x1 = Math.ceil(cx + R * 1.3), y0 = Math.floor(cy - R * 1.2), y1 = Math.ceil(cy + R * 1.2);
+        for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+          let heiss = -1, summe = 0, lichtSumme = 0;
+          for (const b of blobs) {
+            const dx = x - b.x, dy = y - b.y, d = Math.sqrt(dx * dx + dy * dy);
+            if (d > b.r) continue;
+            const f = 1 - d / b.r;
+            summe += f * f;                                                             // Überlagerung: die Lappen verschmelzen zu EINEM Feuerball (kein Punktemuster)
+            lichtSumme += ((-dx * 0.6 - dy * 0.8) / Math.max(1, b.r)) * f;               // −… (Schattenseite) … +… (Lichtseite)
+            if (f > heiss) heiss = f;
+          }
+          if (heiss < 0) continue;
+          heiss = Math.min(1, heiss * 0.5 + summe * 0.42) + Math.max(-0.2, Math.min(0.2, lichtSumme * 0.12));
+          if (heiss < 0.07) { g.put(x, y, RAND, aus); continue; }                       // harter dunkler Rand
+          const h = heiss * 1.15 - kuehl * 0.95 + (t < 220 ? (1 - t / 220) * 0.4 : 0);   // Anfangsblitz heizt, Abkühlen dunkelt
+          const idx = Math.floor(Math.max(0, Math.min(1, h)) * (RAMPE.length - 1) + (ppBayer(x, y) - 0.5) * 0.95 + 0.5);
+          g.put(x, y, RAMPE[Math.max(0, Math.min(RAMPE.length - 1, idx))], aus);
         }
-        if (t < 520) scheibe(g, cx, cy, R * 0.16, WEISS, aus);
       }
     }
-    // Blitzkern am Anfang
-    if (t < 160) scheibe(g, cx, cy, 6 + t / 12, WEISS, aus);
-    // Druckring
+    // Blitzkern am Anfang (mit gedithertem Hof)
+    if (t < 180) { const r = 6 + t / 12; scheibe(g, cx, cy, r + 3, GELB, aus * 0.5); scheibe(g, cx, cy, r, WEISS, aus); }
+    // Druckring: zwei Ringe (hell/gelb), Innenseite gedithert
     if (t > 120 && t < 760) {
-      const u = (t - 120) / 640;
-      ring(g, cx, cy, 14 + 56 * u, 2, u < 0.5 ? WEISS : GELB, aus * (u > 0.6 ? 0.5 : 1));
+      const u = (t - 120) / 640, r = 14 + 56 * u, a = aus * (u > 0.6 ? 0.5 : 1);
+      ring(g, cx, cy, r, 3, u < 0.5 ? WEISS : GELB, a);
+      ring(g, cx, cy, r - 3, 2, u < 0.5 ? GELB : ORANGE, a * 0.5);
     }
-    // Splitter und Funken
+    // Splitter (zweifarbig schattiert) und Funken
     for (const p of teile.splitter) {
       const tt = (t - p.start) / 1000;
       if (tt < 0 || tt > 0.95) continue;
-      const x = cx + Math.cos(p.w) * p.v * tt * 2.2, y = cy + Math.sin(p.w) * p.v * tt * 1.6 + p.grav * tt * tt * 3;
-      g.block(x, y, 2, 2, p.hell ? KNOCHEN : RAND, aus);
-      g.put(x - 1, y - 1, RAND, aus * 0.7);
+      const x = Math.round(cx + Math.cos(p.w) * p.v * tt * 2.2), y = Math.round(cy + Math.sin(p.w) * p.v * tt * 1.6 + p.grav * tt * tt * 3);
+      g.block(x - 1, y - 1, 4, 4, RAND, aus);
+      g.block(x, y, 2, 2, p.hell ? KNOCHEN : KNOCHEN_DUNKEL, aus);
+      g.put(x, y, p.hell ? WEISS : KNOCHEN, aus);
     }
     for (const f of teile.funken) {
       const tt = (t - f.start) / 1000;
@@ -10152,6 +10189,97 @@ const BatBiteDrainEffect = (() => {
     if (t > 800 && t < 1080) ppKreuzfunkel(g, B.x - 1, B.y - 1, Math.min(4, Math.floor((t - 800) / 70) + 1), [ROT[0], ROT[1], ROT[2], ROT[3]], aus);
   };
   return ppPunktFlug(malen, ENDE + 40, vorbereiten);
+})();
+
+// ═════════════════════════════════════════════════════════════════
+//  Hot Skull Potato: Sprung in eine andere Zone (`hot_potato_throw`, Brett-Zweig mit `targets` = [von (mit `cardName`), nach]) — PIXELART; die KARTE selbst springt
+//
+//  Das Kartenbild löst sich aus der alten Zone und hüpft in einem Bogen in die neue (0–820 ms): Position in ganzen 2-px-Schritten im Bildtakt (~30 Bilder/s), keine Drehung, die Größe
+//  wächst im Scheitel nur in ganzzahligen Stufen (je +8 px, wie beim Brackle-Katapult), harter Rahmen aus gestapelten Ringen statt Weichzeichner, am Boden ein harter Schattenstreifen.
+//  Aus der Lunte (oben links) und vom Boden stieben eckige Funken in fester Palette; bei der Landung (820 ms) wackelt die Karte zwei Takte und ein Staubring aus Pixeln blitzt am Boden auf.
+//  Die Engine nimmt die Karte beim Start aus der alten Zone und setzt sie bei der Landung in die neue.
+// ═════════════════════════════════════════════════════════════════
+const HotPotatoThrowEffect = (() => {
+  const TAKT = 33, FLUG = 820, ENDE = 1110;
+  const FUNKEN = ['#ffffff', '#f8ca21', '#ff8b1a', '#e92f38'], RAND = '#291f3d', STAUB = '#808898';
+  return function HotPotatoThrowEffekt({ targetPoints }) {
+    const wurzel = useRef(null), schatten = useRef(null);
+    const geo = useMemo(() => {
+      const p = (targetPoints || []).slice(0, 2);
+      return p.length < 2 ? null : { a: p[0], b: p[1] };
+    }, []);
+    useEffect(() => {
+      const el = wurzel.current, sh = schatten.current;
+      if (!el || !geo || window._playAnimations === false) return undefined;
+      const A = geo.a, B = geo.b;
+      const CW = 2 * Math.round((A.w || 64) / 2), CH = 2 * Math.round((A.h || 90) / 2);
+      const raus = (v) => 2 * Math.round(v / 2);
+      const dist = Math.hypot(B.x - A.x, B.y - A.y);
+      const hoehe = 24 + dist * 0.22;                                    // Scheitelhöhe des Sprungs
+      const ease = (f) => f * f * (3 - 2 * f);
+      const teile = [];
+      let letzter = -1, raf = 0;
+      const t0 = performance.now();
+      const stueck = (x, y, g, farbe, dauer) => {
+        const f = document.createElement('i');
+        f.style.cssText = `position:fixed;display:block;pointer-events:none;z-index:10101;border-radius:0;left:${raus(x)}px;top:${raus(y)}px;width:${g}px;height:${g}px;background:${farbe}`;
+        f.setAttribute('data-pp-px', 'aus');
+        document.body.appendChild(f);
+        teile.push({ f, ende: performance.now() + dauer });
+      };
+      const setze = (cx, cy, stufe) => {
+        const b = CW + stufe * 8, h = CH + stufe * 8;
+        el.style.width = b + 'px'; el.style.height = h + 'px';
+        el.style.left = raus(cx - b / 2) + 'px'; el.style.top = raus(cy - h / 2) + 'px';
+      };
+      const bild = () => {
+        const t = performance.now() - t0, takt = Math.floor(t / TAKT);
+        if (takt !== letzter) {
+          letzter = takt;
+          const tq = takt * TAKT;
+          if (tq < FLUG) {
+            const f = ease(Math.min(1, tq / FLUG));
+            const x = A.x + (B.x - A.x) * f, yBoden = A.y + (B.y - A.y) * f;
+            const sprung = Math.sin(Math.PI * f) * hoehe;
+            const stufe = sprung > hoehe * 0.85 ? 2 : sprung > hoehe * 0.45 ? 1 : 0;   // ganzzahlige Größenstufen im Scheitel
+            setze(x, yBoden - sprung, stufe);
+            sh.style.display = 'block';
+            const sb = CW - Math.round(sprung / 6) * 2;
+            sh.style.width = Math.max(16, sb) + 'px'; sh.style.height = '8px';
+            sh.style.left = raus(x - Math.max(16, sb) / 2) + 'px'; sh.style.top = raus(yBoden + CH / 2 - 4) + 'px';
+            const cy = yBoden - sprung;
+            stueck(x - CW / 2 + 6 + (Math.random() - 0.5) * 8, cy - CH / 2 - 2 + (Math.random() - 0.5) * 6, Math.random() < 0.5 ? 4 : 6, FUNKEN[1 + Math.floor(Math.random() * 3)], 160 + Math.random() * 160);   // Lunte
+            if (takt % 2 === 0) stueck(x + (Math.random() - 0.5) * CW, cy + (Math.random() - 0.5) * CH, 4, STAUB, 200 + Math.random() * 120);                                                              // Rauch
+          } else if (tq < ENDE) {
+            sh.style.display = 'none';
+            const wackel = (takt % 2 === 0) ? 2 : -2;
+            setze(B.x + (tq < FLUG + 130 ? wackel : 0), B.y + (tq < FLUG + 130 ? (takt % 3 === 0 ? 2 : 0) : 0), 0);
+            if (tq < FLUG + TAKT + 1) for (let i = 0; i < 14; i++) {                         // Staubring
+              const w = (i / 14) * Math.PI * 2, r = 0.5 * CW;
+              stueck(B.x + Math.cos(w) * r, B.y + CH / 2 - 6 + Math.sin(w) * 8, 4, i % 3 === 0 ? FUNKEN[0] : STAUB, 240 + Math.random() * 120);
+            }
+            if (tq > ENDE - 80) el.style.visibility = 'hidden';
+          } else { el.style.visibility = 'hidden'; }
+        }
+        const jetzt = performance.now();
+        for (let i = teile.length - 1; i >= 0; i--) if (jetzt >= teile[i].ende) { teile[i].f.remove(); teile.splice(i, 1); }
+        if (t < ENDE + 400) raf = requestAnimationFrame(bild);
+      };
+      setze(A.x, A.y, 0);
+      raf = requestAnimationFrame(bild);
+      return () => { cancelAnimationFrame(raf); for (const e of teile) e.f.remove(); };
+    }, []);
+    if (!geo) return null;
+    const bildUrl = geo.a.cardName ? cardImageUrl(geo.a.cardName) : null;
+    return (
+      <>
+        <div ref={schatten} aria-hidden="true" data-pp-px="aus" style={{ position: 'fixed', display: 'none', pointerEvents: 'none', zIndex: 10098, background: RAND }} />
+        <div ref={wurzel} aria-hidden="true" data-pp-px="aus" style={{ position: 'fixed', pointerEvents: 'none', zIndex: 10100, boxShadow: `0 0 0 2px ${RAND}, 0 0 0 4px #f8ca21`, overflow: 'hidden', background: RAND }}>
+          {bildUrl ? <img src={bildUrl} draggable={false} alt="" style={{ width: '100%', height: '100%', display: 'block', imageRendering: 'pixelated', objectFit: 'cover' }} /> : null}
+        </div>
+      </>
+    );
+  };
 })();
 
 const ANIM_REGISTRY = {
@@ -18633,6 +18761,7 @@ const ANIM_REGISTRY = {
   hot_potato_blast: HotPotatoBlastEffect,
   leafagami_leaves: LeafagamiLeavesEffect,
   bat_bite_drain: BatBiteDrainEffect,
+  hot_potato_throw: HotPotatoThrowEffect,
   arcane_eyes_open: ArcaneEyesOpenEffect,
   hockey_wish: HockeyWishEffect,
   pinaxolotl_bubbles: PinaxolotlBubblesEffect,

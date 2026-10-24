@@ -84,7 +84,8 @@ module.exports = {
   // ── ② Wahl im Effekt (Zielfenster) ──────────────────────────────
   isPostTargetReaction: true,
 
-  postTargetCondition(gs, pi, engine, targetedHeroes, sourceCard /*, opts */) {
+  postTargetCondition(gs, pi, engine, targetedHeroes, sourceCard, opts) {
+    if (opts?.heroChoiceIsCost) return false;   // die Heldenwahl ist nur der Kostenpunkt (Torchure), nicht das Ziel des Effekts
     const srcOwner = sourceCard?.controller ?? sourceCard?.owner ?? -1;
     if (srcOwner < 0 || srcOwner === pi) return false;
     const helden = (targetedHeroes || []).filter(t => t && t.type === 'hero');

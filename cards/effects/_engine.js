@@ -5797,6 +5797,7 @@ class GameEngine {
             [selected], reactionSource, {
               damageType: config.damageType,
               dealsDamage: config.dealsDamage === false ? false : true,
+              heroChoiceIsCost: config.heroChoiceIsCost === true,
             },
           );
 
@@ -6338,7 +6339,7 @@ class GameEngine {
             (!!config.damageType && config.damageType !== 'status' && config.damageType !== 'none')
           );
           const ptResult = await engine._checkPostTargetHandReactions(
-            result, cardInstance, { damageType: config.damageType, dealsDamage: _ptDealsDamage },
+            result, cardInstance, { damageType: config.damageType, dealsDamage: _ptDealsDamage, heroChoiceIsCost: config.heroChoiceIsCost === true },
           );
           if (ptResult?.effectNegated) {
             gs._spellNegatedByEffect = true;
@@ -32694,6 +32695,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           const pt = await this._checkPostTargetHandReactions(helden.concat(kreaturen), quelle, {
             damageType: config.damageType,
             dealsDamage: config.dealsDamage === true,
+            heroChoiceIsCost: config.heroChoiceIsCost === true,
             ausZielwahl: true,
           });
           if (pt?.effectNegated) {
@@ -40968,7 +40970,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // damage tag so reactions can detect Hero-effect damage that
         // is "treated as a Spell" (Alice the Puppeteer Girl, …).
         if (script.postTargetCondition &&
-            !script.postTargetCondition(this.gs, pi, this, targetedHeroes, sourceCard, { damageType, dealsDamage })) continue;
+            !script.postTargetCondition(this.gs, pi, this, targetedHeroes, sourceCard, { damageType, dealsDamage, heroChoiceIsCost: opts.heroChoiceIsCost === true })) continue;
 
         // Spell/Attack reactions: at least 1 hero must be able to cast it
         // Artifacts: skip hero check (only need gold). `spellInHand: true`
@@ -41225,7 +41227,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             const rxInst = this.cardInstances.find(c =>
               c.zone === 'support' && c.heroIdx === hi && c.name === cardName
               && this.physicalSide(c) === seite) || null;
-            const rxOpts = { damageType, dealsDamage, inst: rxInst, heroIdx: hi, heroOwner: seite };
+            const rxOpts = { damageType, dealsDamage, heroChoiceIsCost: opts.heroChoiceIsCost === true, inst: rxInst, heroIdx: hi, heroOwner: seite };
             if (script.postTargetCondition
                 && !script.postTargetCondition(this.gs, pi, this, targetedHeroes, sourceCard, rxOpts)) continue;
 
