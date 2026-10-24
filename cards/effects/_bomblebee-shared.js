@@ -29,6 +29,8 @@
 //      stamped this turn.
 // ═══════════════════════════════════════════
 
+const { hatNameIn } = require('./_alias-name');
+
 const BOMBLEBEE_NAMES = new Set([
   'Bomblebee',
   'Carpet Bomblebee',
@@ -120,7 +122,7 @@ function findOwnBomblebees(engine, pi, opts = {}) {
     if (inst.faceDown) continue;
     const owner = inst.controller ?? inst.owner;
     if (owner !== pi) continue;
-    if (!BOMBLEBEE_NAMES.has(inst.name)) continue;
+    if (!hatNameIn(inst, BOMBLEBEE_NAMES)) continue;   // Shroomasaur: Zusatzname zählt
     // Skip negated/nulled/frozen/stunned Bomblebees — same gate the
     // engine's hook filter applies; defensive when called from Burning
     // Fuse which doesn't go through runHooks.
@@ -153,7 +155,7 @@ function findOwnBomblebees(engine, pi, opts = {}) {
  */
 async function triggerBomblebeeAsIfDeath(engine, inst, opts = {}) {
   if (!inst || inst.zone !== 'support') return false;
-  if (!BOMBLEBEE_NAMES.has(inst.name)) return false;
+  if (!hatNameIn(inst, BOMBLEBEE_NAMES)) return false;   // Zusatzname: zählt als Biene, bringt aber keine Wirkung mit (Skript der echten Karte)
   const { loadCardEffect } = require('./_loader');
   const script = loadCardEffect(inst.name);
   if (!script?.runOpponentDeathPayload) return false;

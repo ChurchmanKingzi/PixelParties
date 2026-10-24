@@ -224,6 +224,9 @@ const HOOKS = {
   //        gedruckten Wert + fortbestehende Buchungen NEU aufgebaut — alles, was am alten Grundwert hing (Cykyran: Base-ATK x2), ist weg und muss neu gebucht werden) }
   ON_FORM_CHANGED: 'onFormChanged',
 
+  // ── W73c: Zusatzname (Shroomasaur) ──
+  ON_NAME_CHANGED: 'onNameChanged',  // Fires when a creature gains or loses an additional name (Shroomasaur; the engine drops it at the start of the next turn). Zustandsmeldung, kein Reaktionsfenster. Karten, die ihre Wirkung am Bestand einer Namensfamilie BUCHEN (Censpartan: Schirm, Cykyran: Base-ATK x2), buchen hier neu. Context: { inst, name (neuer Zusatzname oder null), oldName }
+
   // ── Control changes ──
   ON_TAKE_CONTROL: 'onTakeControl',  // Fires when a player gains control of an opponent's target (Hero or Creature). Covers permanent transfers (Dark Gear, Diplomacy), temporary creature steals (Aligning Goals, Treacherous Crystal, Deepsea Succubus), Charme Lv3 hero steals, and Controlled Attack's hero-control mark. Context: { controllerPi, originalOwnerPi, targetType: 'hero'|'creature', targetName, targetInst?, targetHero?, heroIdx, kind: 'steal'|'transfer'|'charm'|'controlled' }
 

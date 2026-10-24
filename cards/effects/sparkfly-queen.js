@@ -222,7 +222,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     for (const inst of engine.cardInstances) {
       if (inst.zone !== 'support') continue;
-      if (inst.name !== QUEEN_NAME) continue;
+      if (!hatName(inst, QUEEN_NAME)) continue;   // Shroomasaur: Zusatzname zählt
       if ((inst.controller ?? inst.owner) !== pi) continue;
       return false; // already controlling one
     }
