@@ -3573,13 +3573,6 @@ const ZONE_ANIM_SFX = {
     { name: 'debuff',     opts: { rate: 1.3, volume: 0.6, delay: 560, category: null, dedupe: 0 } },
     { name: 'heavy_impact', opts: { rate: 1.6, volume: 0.4, delay: 580, category: null, dedupe: 0 } },
   ],
-  // Clone (24.10.): das Echo löst sich vom Helden — hoher Zauberton (0 ms), flimmerndes Surren, am Ende ein heller Ping beim Einrasten (~300 ms).
-  clone_echo: [
-    { name: 'spell_cast', opts: { rate: 1.6, volume: 0.45 } },
-    { name: 'ping',       opts: { rate: 2.4, volume: 0.3, delay: 120, category: null, dedupe: 0 } },
-    { name: 'ping',       opts: { rate: 1.9, volume: 0.3, delay: 260, category: null, dedupe: 0 } },
-    { name: 'buff',       opts: { rate: 1.5, volume: 0.35, delay: 300, category: null, dedupe: 0 } },
-  ],
   // Arcane Eyes (24.10.): die Augen öffnen sich (leises Knarren, 0 ms), der Strahl streicht über die Zone (~620 ms, Wind + Ping), ein kurzes Schimmern zum Schluss.
   arcane_eyes_open: [
     { name: 'buff',       opts: { rate: 0.7, volume: 0.5 } },

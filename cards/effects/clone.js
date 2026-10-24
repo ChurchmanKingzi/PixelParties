@@ -32,7 +32,7 @@
 //  Die Kopie ist KEIN Gebrauch einer Karte durch den Helden: keine Zähler (gespielte Attacks/Spells), kein `afterSpellResolved`, keine Aktion, keine Ablage — die Instanz verschwindet danach.
 //
 //  ── Bild und Klang ──────────────────────────────────────────────────────
-//  `play_zone_animation` `clone_echo` (Pixelart): das Abbild des Helden flimmert neben ihm auf. Auftritt der Karte (`showTriggeredEffect`) und Glühen am Klon beim Auslösen.
+//  Keine eigene Zonen-Animation (das Echo-Abbild am Helden ist entfallen, Al 24.10.): nur der Auftritt der Karte (`showTriggeredEffect`) und das Glühen am Klon beim Auslösen — danach die Kopie selbst.
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -42,7 +42,7 @@ const { companionHeldGefallen, companionGlow } = require('./_bonded-companions-s
 
 const CARD_NAME = 'Clone';
 const HOPT_KEY = 'clone-copy';
-const ANIM_MS = 700;
+const ANIM_MS = 250;
 // gs-Marken, die eine Kopie verändern darf und die der äußere Wurf danach unverändert wiederfinden muss
 const dbg = (m) => { if (process.env.CLONE_DEBUG) process.stderr.write('[clone] ' + m + '\n'); };
 // „Performs a copy of the Spell" schließt Kosten UND Einschränkungen ein (Al, 24.10.): jede Karte mit einem Limit je Zug/Partie oder einer „must be the only/first …"-Bedingung ist nicht klonbar.
@@ -141,7 +141,6 @@ module.exports = {
       engine.log('clone_copy', { player: gs.players[pi]?.username, card: name, hero: hero.name });
       await engine.showTriggeredEffect(CARD_NAME, { source: inst });
       companionGlow(engine, inst);
-      engine._broadcastEvent('play_zone_animation', { type: 'clone_echo', owner: feld, heroIdx: inst.heroIdx, zoneSlot: -1 });
       await engine._delay(ANIM_MS);
 
       // ── die Kopie: Zustand des äußeren Wurfs sichern, wirken, zurückstellen ──
