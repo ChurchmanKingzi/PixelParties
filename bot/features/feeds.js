@@ -30,7 +30,28 @@ module.exports = function register(ctx) {
     const guild = client.guilds.cache.get(config.guildId);
     if (!guild) return null;
     const ch = guild.channels.cache.get(id) || await guild.channels.fetch(id).catch(() => null);
-    return ch && ch.isTextBased() ? ch : null;
+    return ch && (ch.isTextBased() || (typeof ch.isThreadOnly === 'function' && ch.isThreadOnly())) ? ch : null;
+  }
+
+  // Warnungen an das Moderationsprotokoll — je gleicher Text nur einmal je Bot-Lauf, sonst käme alle paar Minuten dieselbe Meldung.
+  const gemeldet = new Set();
+  async function warnen(titel, text) {
+    console.error(`[feeds] ${titel}: ${text}`);
+    const key = titel + '|' + text;
+    if (gemeldet.has(key)) return;
+    gemeldet.add(key);
+    try {
+      const guild = client.guilds.cache.get(config.guildId);
+      if (guild) await ctx.modlog(guild, { title: '⚠️ ' + titel, description: text.slice(0, 1800), color: 0xe67e22 });
+    } catch { /* die Warnung darf den Feed nie stören */ }
+  }
+
+  /** Eine Nachricht in einen Text- bzw. Ankündigungskanal — oder, bei einem Forum-Kanal, als neuer Beitrag. */
+  function senden(ch, name, payload) {
+    if (typeof ch.isThreadOnly === 'function' && ch.isThreadOnly()) {
+      return ch.threads.create({ name: String(name).slice(0, 90) || 'New card', message: payload });
+    }
+    return ch.send(payload);
   }
 
   /**
@@ -60,21 +81,39 @@ module.exports = function register(ctx) {
   }
 
   // ── Neue Karten ──
-  /** Je neue Karte EINE Nachricht: nur das Kartenbild mit der Tagline (kein Namens-Aufzählungspunkt). Mehr als MAX_CARDS_POSTED: der Rest als Namensliste. */
+  /**
+   * Je neue Karte EINE Nachricht: nur das Kartenbild mit der Tagline (kein Namens-Aufzählungspunkt). Mehr als MAX_CARDS_POSTED: der Rest als Namensliste.
+   * Gibt die Namen zurück, die WIRKLICH gepostet sind — nur die gelten danach als bekannt; scheitert das Senden (fehlende Rechte …), bricht es ab und meldet den Fehler,
+   * die übrigen Karten bleiben für den nächsten Lauf offen.
+   * @returns {{posted:string[], error:Error|null}}
+   */
   async function postNewCards(ch, cards) {
     const shown = cards.slice(0, MAX_CARDS_POSTED);
+    const posted = [];
     for (const c of shown) {
       const buf = await ctx.cardPng(c.name);
-      if (!buf) continue;
-      await ch.send({ content: NEW_CARD_TAGLINE, files: [new AttachmentBuilder(buf, { name: c.name.replace(/[^a-z0-9]+/gi, '_').slice(0, 60) + '.png' })], allowedMentions: { parse: [] } });
+      if (!buf) { console.error('[feeds] Kein Kartenbild für', c.name); continue; }          // bleibt offen (nicht als bekannt vermerkt)
+      try {
+        await senden(ch, c.name, { content: NEW_CARD_TAGLINE, files: [new AttachmentBuilder(buf, { name: c.name.replace(/[^a-z0-9]+/gi, '_').slice(0, 60) + '.png' })], allowedMentions: { parse: [] } });
+      } catch (error) { return { posted, error }; }
+      posted.push(c.name);
     }
-    if (cards.length > shown.length) await ch.send({ content: `${NEW_CARD_TAGLINE} …and ${cards.length - shown.length} more: ${cards.slice(shown.length).map(c => c.name).join(', ')}`.slice(0, 1900), allowedMentions: { parse: [] } });
+    if (cards.length > shown.length) {
+      const rest = cards.slice(shown.length);
+      try {
+        await senden(ch, 'More new cards', { content: `${NEW_CARD_TAGLINE} …and ${rest.length} more: ${rest.map(c => c.name).join(', ')}`.slice(0, 1900), allowedMentions: { parse: [] } });
+        posted.push(...rest.map(c => c.name));
+      } catch (error) { return { posted, error }; }
+    }
+    return { posted, error: null };
   }
 
-  async function pollCards() {
+  let neueKartenOffen = false;                     // es gibt Karten, die noch nicht gepostet werden konnten → nächster Lauf versucht es erneut, auch ohne Dateiänderung
+
+  async function pollCards(force = false) {
     let stat;
     try { stat = fs.statSync(cardsFile); } catch { return; }
-    if (stat.mtimeMs === lastMtime) return;
+    if (!force && stat.mtimeMs === lastMtime && !neueKartenOffen) return;
     lastMtime = stat.mtimeMs;
 
     await ctx.cardsReload();                       // neue Karten + neue Kunst einlesen
@@ -87,13 +126,43 @@ module.exports = function register(ctx) {
     }
     const knownSet = new Set(known);
     const fresh = withArt.filter(c => !knownSet.has(c.name));
-    if (!fresh.length) return;
+    if (!fresh.length) { neueKartenOffen = false; return; }
 
+    // Ohne erreichbaren Kanal NICHTS als bekannt vermerken (früher gingen die Karten dann stillschweigend verloren) — warnen und später erneut versuchen.
     const ch = await channel(config.channels.newCards);
-    if (ch) await postNewCards(ch, fresh);
-    await db.kvSet('known_cards', [...new Set([...known, ...fresh.map(c => c.name)])]);
-    console.log('[feeds] neue Karten:', fresh.length);
+    if (!ch) {
+      neueKartenOffen = true;
+      await warnen('New-cards feed: channel not reachable', `${fresh.length} new card${fresh.length === 1 ? '' : 's'} are waiting (${fresh.slice(0, 5).map(c => c.name).join(', ')}${fresh.length > 5 ? ', …' : ''}), but channel \`${config.channels.newCards}\` can't be found or isn't a text/announcement/forum channel the bot can see. Check the channel ID (NEW_CARDS_CHANNEL_ID) and the bot's permissions there (View Channel, Send Messages, Attach Files). I'll keep retrying.`);
+      return;
+    }
+    const { posted, error } = await postNewCards(ch, fresh);
+    if (posted.length) await db.kvSet('known_cards', [...new Set([...known, ...posted])]);
+    neueKartenOffen = posted.length < fresh.length;
+    if (error) await warnen('New-cards feed: posting failed', `${error.message} — ${fresh.length - posted.length} card${fresh.length - posted.length === 1 ? '' : 's'} still waiting (channel \`${config.channels.newCards}\`). The bot needs View Channel, Send Messages and Attach Files there. I'll keep retrying.`);
+    console.log('[feeds] neue Karten:', posted.length, 'gepostet,', fresh.length - posted.length, 'offen');
   }
+
+  // `!announce Karte; Karte; …` — Karten von Hand in den Neue-Karten-Kanal stellen (z. B. wenn welche verpasst wurden). Namen mit `;` trennen (Kartennamen enthalten Kommas).
+  ctx.command('announce', { staff: true, help: '`!announce <card>; <card>; …` — post cards to the new-cards channel again (separate names with `;`)' }, async (msg, args, rest) => {
+    const names = String(rest || '').split(/[;\n]+/).map(x => x.trim()).filter(Boolean);
+    if (!names.length) return msg.reply({ content: 'Usage: `!announce <card>; <card>; …`', allowedMentions: { parse: [] } });
+    await renderer.init();
+    const byLower = new Map(renderer.allCards().map(c => [c.name.toLowerCase(), c]));
+    const { searchCards } = require('../lib/card-search');
+    const cards = [], unknown = [];
+    for (const n of names) {
+      const c = byLower.get(n.toLowerCase()) || searchCards(renderer.allCards(), n)[0]?.card;
+      if (c && renderer.canRender(c.name)) cards.push(c); else unknown.push(n);
+    }
+    const ch = await channel(config.channels.newCards);
+    if (!ch) return msg.reply({ content: `The new-cards channel \`${config.channels.newCards}\` can't be reached.`, allowedMentions: { parse: [] } });
+    const { posted, error } = await postNewCards(ch, cards);
+    if (posted.length) { const known = (await db.kvGet('known_cards')) || []; await db.kvSet('known_cards', [...new Set([...known, ...posted])]); }
+    const lines = [`Posted ${posted.length} card${posted.length === 1 ? '' : 's'}.`];
+    if (unknown.length) lines.push('Not found / no image: ' + unknown.join(', '));
+    if (error) lines.push('Stopped: ' + error.message);
+    return msg.reply({ content: lines.join('\n').slice(0, 1900), allowedMentions: { parse: [] } });
+  });
 
   // ── Patchnotes ──
   const git = (...args) => new Promise((resolve, reject) =>
@@ -142,11 +211,15 @@ module.exports = function register(ctx) {
       const read = async ref => JSON.parse(await git('show', `${ref}:data/cards.json`));
       changed = diffCards(await read(last), await read(head));
     } catch { await db.kvSet('patch_last', head); return; }                         // alter Stand unbekannt (force-push) → neu ansetzen
-    await db.kvSet('patch_last', head);
-    if (!changed.length) return;
+    if (!changed.length) { await db.kvSet('patch_last', head); return; }
 
     const ch = await channel(config.channels.patchnotes);
-    if (!ch) return;
+    if (!ch) {                                                                        // Kanal nicht erreichbar: Stand NICHT weiterschieben, später erneut versuchen
+      if (config.channels.patchnotes) await warnen('Patch notes: channel not reachable', `${changed.length} changed card${changed.length === 1 ? '' : 's'} are waiting, but channel \`${config.channels.patchnotes}\` can't be reached. Check PATCHNOTES_CHANNEL_ID and the bot's permissions there. I'll keep retrying.`);
+      else await db.kvSet('patch_last', head);                                        // gar nicht eingerichtet: nichts aufstauen
+      return;
+    }
+    await db.kvSet('patch_last', head);
     await ctx.cardsReload();                                                        // die Bilder müssen den NEUEN Kartentext zeigen
     await renderer.init();
     const byName = new Map(renderer.allCards().map(c => [c.name, c]));
@@ -186,7 +259,6 @@ module.exports = function register(ctx) {
     // `Bugfix-Skip: <Karte oder _baustein>`: reine Anpassung an eine NEUE Karte, kein Fehler → nicht im Bugfix-Kanal (hat Vorrang vor einer Note)
     const skips = await readSkips({ git, last, head });
     found = applySkips(found, skips);
-    await db.kvSet('bugfix_last', head);
 
     const byNorm = new Map(renderer.allCards().map(c => [normName(c.name), c]));
     const noteOfCard = c => notes.get(normName(c.name));
@@ -214,10 +286,15 @@ module.exports = function register(ctx) {
     }
     const list = [...items.values()].sort((a, b) => Boolean(b.detail) - Boolean(a.detail));   // Karten mit Fehlerbeschreibung zuerst, damit sie unter dem Bilderlimit (MAX_CARDS_POSTED) nicht untergehen
     const broad = found.shared.filter(x => x.broad);
-    if (!list.length && !broad.length) return;
+    if (!list.length && !broad.length) { await db.kvSet('bugfix_last', head); return; }
 
     const ch = await channel(config.channels.bugfixes);
-    if (!ch) return;
+    if (!ch) {                                                                      // Kanal nicht erreichbar: Stand NICHT weiterschieben, später erneut versuchen
+      if (config.channels.bugfixes) await warnen('Bug fixes: channel not reachable', `${list.length} fixed card${list.length === 1 ? '' : 's'} are waiting, but channel \`${config.channels.bugfixes}\` can't be reached. Check BUGFIXES_CHANNEL_ID and the bot's permissions there. I'll keep retrying.`);
+      else await db.kvSet('bugfix_last', head);
+      return;
+    }
+    await db.kvSet('bugfix_last', head);
     if (list.length) await postCards(ch, `🛠️ **Bug fixes** — ${list.length} card${list.length === 1 ? '' : 's'}`, list);
     if (broad.length) {
       const lines = broad.map(x => `• \`${x.module}\` (${x.count} cards)${notes.get(normName(x.module)) ? ' — ' + notes.get(normName(x.module)) : ''}`);
