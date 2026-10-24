@@ -1896,8 +1896,33 @@ function PuzzleCreator() {
     return Math.max(1, Math.min(3, n || 1));
   }, []);
 
+  // ★ Darion, the Blood-Crazy Groundskeeper: „All Artifacts equipped to this Hero share 1 Support Zone." Der Editor kennt keine Kartenskripte — die Heldennamen
+  // stehen hier (Spiegel von `equipsShareZone` im Heldenskript; `EQUIP_STAPEL_HELDEN` ergaenzen, wenn ein weiterer Held das kann).
+  const EQUIP_STAPEL_HELDEN = ['Darion, the Blood-Crazy Groundskeeper'];
+  const istEquipName = useCallback((n) => {
+    const c = getCard(n);
+    return !!c && c.cardType === 'Artifact' && (c.subtype || '').toLowerCase() === 'equipment';
+  }, [getCard]);
+  /** Der Platz (0–2) des Equip-Stapels dieses Helden, sonst -1 — nur, wenn der Held seine Equips teilt. */
+  const equipStapelPlatz = useCallback((p, hi) => {
+    const held = p?.heroes?.[hi];
+    if (!held || !EQUIP_STAPEL_HELDEN.includes(held.name || held)) return -1;
+    const zonen = p.supportZones?.[hi] || [];
+    for (let z = 0; z < 3; z++) { if ((zonen[z] || []).length > 0 && istEquipName(zonen[z][0])) return z; }
+    return -1;
+  }, [istEquipName]);
+
   const placeSupport = useCallback((cardName, si, hi, slot) => {
     if (window.playSFX) window.playSFX('placement');
+    // ★ Darion: ein weiteres Equip STAPELT sich auf den Equip-Stapel des Helden — egal, auf welche seiner Zonen es fiel (wie im Spiel, wo der Server
+    // es Pflicht in den Stapel legt); beliebig viele. Das ERSTE Equip legt wie gewohnt in die gewaehlte Zone und eroeffnet den Stapel.
+    if (istEquipName(cardName)) {
+      const st = equipStapelPlatz(players[si], hi);
+      if (st >= 0) {
+        updatePlayer(si, (p) => { p.supportZones[hi][st].push(cardName); return p; });
+        return;
+      }
+    }
     const zone = players[si].supportZones[hi][slot];
     // v768: Abilities in einer Support Zone (Xal) STAPELN wie in einer
     // echten Ability-Zone — gleicher Name, hoechstens 3. Ohne diesen
@@ -1969,7 +1994,7 @@ function PuzzleCreator() {
       }
       return p;
     });
-  }, [players, updatePlayer, getCard, getHeroBiomancyLevel]);
+  }, [players, updatePlayer, getCard, getHeroBiomancyLevel, istEquipName, equipStapelPlatz]);
 
   const placeSurprise = useCallback((cardName, si, hi) => {
     if (!players[si].heroes[hi]) { notify('Place a Hero first!', 'error'); return; }
@@ -2022,6 +2047,9 @@ function PuzzleCreator() {
     if (zt === 'hero') updatePlayer(si, (p) => { p.heroes[hi] = null; p.abilityZones[hi] = [[], [], []]; p.supportZones[hi] = [[], [], []]; p.surpriseZones[hi] = []; if (p.islandZoneCount) p.islandZoneCount[hi] = 0; return p; });
     else if (zt === 'ability') updatePlayer(si, (p) => { p.abilityZones[hi][slot] = []; return p; });
     else if (zt === 'support') updatePlayer(si, (p) => {
+      // ★ Darion: aus einem Equip-Stapel faellt nur die OBERSTE Karte, der Rest bleibt liegen.
+      const zoneAlt = p.supportZones[hi][slot] || [];
+      if (zoneAlt.length > 1 && zoneAlt.every(istEquipName)) { p.supportZones[hi][slot] = zoneAlt.slice(0, -1); return p; }
       const removedCard = p.supportZones[hi][slot][0];
       p.supportZones[hi][slot] = [];
       // Clear creature metadata
@@ -2047,7 +2075,7 @@ function PuzzleCreator() {
     // Area, nicht die ganze Zone.
     else if (zt === 'area') updateArea(si, (prev) => prev.filter((_, i) => i !== slot));
     else if (zt === 'permanent') updatePlayer(si, (p) => { p.permanents.splice(slot, 1); return p; });
-  }, [updatePlayer, updateArea]);
+  }, [updatePlayer, updateArea, istEquipName]);
 
   /**
    * Nimmt dieser Held Abilities in seine Support Zones? (v768)
@@ -4135,7 +4163,7 @@ function PuzzleCreator() {
                 const cards = allSlots[slot] || [];
                 const c = cards.length > 0 ? getCard(cards[0]) : null;
                 return (
-                  <div key={slot} className={'board-zone board-zone-support' + (item.isIsland ? ' board-zone-island' : '')}
+                  <div key={slot} className={'board-zone board-zone-support' + (item.isIsland ? ' board-zone-island' : '') + ((cards.length >= 2 && cards.every(n => { const ec = getCard(n); return !!ec && ec.cardType === 'Artifact' && (ec.subtype || '').toLowerCase() === 'equipment'; })) ? ' board-zone-equipstack' : '')}
                     style={{ ...zs('support'), ...hl('support', si, hi, slot) }}
                     data-support-zone="1" data-support-owner={isOpp ? 'opp' : 'me'}
                     {...zh('support', si, hi, slot)}>
@@ -4154,6 +4182,10 @@ function PuzzleCreator() {
                             {cards.length > 1 && <div className="board-card-label">{cards.length}</div>}
                           </div>
                         );
+                      }
+                      // ★ Darion: mehrere Ausruestungen in einem Platz — gestapelt wie im Spiel (`EquipStack`, ohne Obergrenze).
+                      if (cards.length >= 2 && cards.every(n => { const ec = getCard(n); return !!ec && ec.cardType === 'Artifact' && (ec.subtype || '').toLowerCase() === 'equipment'; })) {
+                        return <EquipStack cards={cards} />;
                       }
                       const cs = p._creatureStatuses?.[hi + '-' + slot] || {};
                       // Biomancy Tokens render their HP bar from the stored
