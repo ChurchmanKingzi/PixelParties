@@ -1216,7 +1216,7 @@
   "name": "Mary",
   "title": "Cute Princess",
   "music": "bgm_theme_cute.ogg",
-  "px": 8,
+  "px": 10,
   "particles": [
    [
     "ember",
@@ -1251,6 +1251,8 @@
     "gold",
     8
    ]
-  ]
+  ],
+  "feet": 330,
+  "logoFront": true
  }
 }
