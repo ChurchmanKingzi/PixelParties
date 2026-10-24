@@ -50265,11 +50265,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       if (t === 'polymorph_attached') {
         const p = playerByName(entry.player);
-        return <span className="log-status">🐰 {cName('Polymorph')} — {pName(p.name, p.color)} transforms {entry.hero}{entry.applied ? <>: it can no longer use Spells, but gains <span className="log-amount">100</span> ATK</> : <> (no effect)</>}.</span>;
+        return <span className="log-status">🐱 {cName('Polymorph')} — {pName(p.name, p.color)} transforms {entry.hero}{entry.applied ? <>: it can no longer use Spells, but gains <span className="log-amount">100</span> ATK</> : <> (no effect)</>}.</span>;
       }
       if (t === 'polymorph_noop') {
         const p = playerByName(entry.player);
-        return <span className="log-info">🐰 {cName('Polymorph')} — {entry.hero} is immune: {pName(p.name, p.color)}'s spell has no effect.</span>;
+        return <span className="log-info">🐱 {cName('Polymorph')} — {entry.hero} is immune: {pName(p.name, p.color)}'s spell has no effect.</span>;
       }
       if (t === 'overheat') {
         const p = playerByName(entry.player);

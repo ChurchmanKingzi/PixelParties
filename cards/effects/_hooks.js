@@ -410,7 +410,7 @@ const STATUS_EFFECTS = {
   // `polymorphed` (24.10., „Polymorph"): der Held kann keine Spells wirken (dieselben Sperr-Stellen wie `magic_silenced`/`frightened`: `validateActionPlay`, Hand-Grau, Reaktions-/Surprise-Wirker,
   // `heroKannZaubern`), bekommt aber +100 ATK (gebucht ueber die Karteninstanz, `actionSetAtkGrant`). Der Kartentext sagt ausdruecklich „This is treated as a negative status effect" — negativ und heilbar:
   // geheilt (Juice, Beer, Cure …) faellt Polymorph in die Ablage seines Besitzers (`anhaengselStatusHooks`, `heilenWirftAb`) und der ATK-Bonus verschwindet mit.
-  polymorphed: { negative: true, cleansable: true, label: 'Polymorphed', icon: '🐰', immuneKey: 'polymorph_immune' },
+  polymorphed: { negative: true, cleansable: true, label: 'Polymorphed', icon: '🐱', immuneKey: 'polymorph_immune' },
   // `cursed` — applied by Curse Attachment Spell. The bearer's
   // Attack stat is suppressed to 0 while attached: the engine's
   // `actionGrantAtk` / `actionRevokeAtk` / `grantTempHeroAtk` /
