@@ -3939,7 +3939,8 @@ function PuzzleCreator() {
                 data-hero-zone="1" data-hero-idx={hi} data-hero-owner={isOpp ? 'opp' : 'me'}
                 {...zh('hero', si, hi, 0)}>
                 {hero ? <>
-                  <BoardCard cardName={(hero.heldKreatur?.name && CARDS_BY_NAME[hero.heldKreatur.name]) ? hero.heldKreatur.name : hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" skins={hero.skin ? { [hero.name]: hero.skin } : undefined} />
+                  <BoardCard cardName={(hero.heldKreatur?.name && CARDS_BY_NAME[hero.heldKreatur.name]) ? hero.heldKreatur.name : hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" skins={hero.skin ? { [hero.name]: hero.skin } : undefined}
+                    {...((hero.heldKreatur?.name && CARDS_BY_NAME[hero.heldKreatur.name] && CARDS_BY_NAME[hero.name]) ? { tooltipDarunter: { ...CARDS_BY_NAME[hero.name], _liveHp: hero.hp, _liveMaxHp: hero.maxHp, _liveAtk: hero.atk }, tooltipDarunterTitel: 'Also treated as a Hero' } : null)} />
                   {hero.heldKreatur?.name && CARDS_BY_NAME[hero.heldKreatur.name] && (
                     <div className="attached-hero-badge" data-pz-held-badge="1"
                       title={`${hero.name} is treated as ${hero.heldKreatur.name} until the end of the turn`}

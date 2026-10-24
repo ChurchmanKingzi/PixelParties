@@ -22,8 +22,8 @@
 //       Hulijing („lower than this Hero's Magic Arts level"; Stufe 0 / harte Negation der Abilities ⇒ nichts wählbar). Magic Arts 1 ⇒ nur Lv-0-Kreaturen, 2 ⇒ bis Lv 1, 3 ⇒ bis Lv 2.
 //       Es gelten die Riegel des Platzierens (`actionPlaceCreature`): keine Artifact Creatures, nichts „nur über den eigenen Effekt", keine Beschwörungssperre, die Spiel-Limits
 //       („You can only play/control 1") und das `canSummon` der Karte selbst. Ohne wählbare Karte ist der Effekt nicht aktivierbar. Hulijing trägt höchstens EINE Kreatur.
-//    ② Gibt es Kandidaten in Hand UND Deck, fragt eine Auswahl „Hand / Deck"; dann wählt eine Galerie die Karte. Abbruch kostet nichts (das „may" entscheidet sich hier; die
-//       Einmal-pro-Zug-Sperre bleibt frei). Die Deckwahl mischt das Deck (Karte aus dem Deck genommen).
+//    ② Eine Galerie für beide Quellen: jeder Eintrag trägt sein Herkunfts-Abzeichen (HAND / DECK, wie bei Barker, the Monster Tamer); gleichnamige Karten aus Hand und Deck sind zwei
+//       Einträge. Abbruch kostet nichts (das „may" entscheidet sich hier; die Einmal-pro-Zug-Sperre bleibt frei). Die Deckwahl mischt das Deck (Karte aus dem Deck genommen).
 //    ③ Platzieren: Flug zur Heldenzone, die Karte liegt auf Hulijing; sie zählt als Beschwörung (Einsatz-Hook „When you play/summon this Creature" läuft, Beschwörungszähler,
 //       Eintritts-Limit). Sie darf SOFORT ihren aktiven Effekt benutzen (Hulijing selbst war nicht beschwörungsmüde).
 //
@@ -70,40 +70,24 @@ module.exports = {
     const alle = HC.kandidaten(engine, pi, seite, heroIdx, stufe);
     if (alle.length === 0) return false;
 
-    // ② Quelle wählen, wenn beide möglich sind.
-    const hand = alle.filter(k => k.pile === 'hand');
-    const deck = alle.filter(k => k.pile === 'deck');
-    let pile = hand.length && deck.length ? null : (hand.length ? 'hand' : 'deck');
-    if (!pile) {
-      const w = await engine.promptGeneric(pi, {
-        type: 'optionPicker',
-        title: CARD_NAME,
-        description: `Place a Creature with a level lower than ${stufe} (this Hero's Magic Arts level) on top of ${hero.name}.`,
-        options: [
-          { id: 'hand', label: `From your hand (${hand.length})` },
-          { id: 'deck', label: `From your deck (${deck.length})` },
-        ],
-        cancellable: true,
-      });
-      if (!w || w.cancelled || !w.optionId) return false;
-      pile = w.optionId === 'deck' ? 'deck' : 'hand';
-    }
-    const liste = pile === 'hand' ? hand : deck;
-    if (liste.length === 0) return false;
-
-    // Karte wählen.
-    const galerie = liste.map(k => ({ name: k.name, source: pile, ...(pile === 'hand' ? { handIdx: k.handIdx } : {}) }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+    // ② EIN gemeinsamer Picker für Hand UND Deck: jeder Eintrag trägt sein Herkunfts-Abzeichen (HAND / DECK, wie bei Barker, the Monster Tamer). Gleichnamige Karten aus beiden
+    //    Quellen stehen als zwei Einträge da; die Antwort nennt `cardName` + `source`. Erst die Hand, dann das Deck, je alphabetisch.
+    const sortiert = alle.slice().sort((a, b) => (a.pile === b.pile ? 0 : a.pile === 'hand' ? -1 : 1) || a.name.localeCompare(b.name));
+    const galerie = sortiert.map(k => ({ name: k.name, source: k.pile, ...(k.pile === 'hand' ? { handIdx: k.handIdx } : {}) }));
     const wahl = await engine.promptGeneric(pi, {
       type: 'cardGallery',
       cards: galerie,
       title: CARD_NAME,
-      description: `Choose a Creature (level lower than ${stufe}) to place on top of ${hero.name} until the end of the turn.`,
+      description: `Choose a Creature (level lower than ${stufe}) from your hand or deck to place on top of ${hero.name} until the end of the turn.`,
       confirmLabel: '🦊 Transform!',
       confirmClass: 'btn-success',
       cancellable: true,
     });
-    if (!wahl || wahl.cancelled || !wahl.cardName || !liste.some(k => k.name === wahl.cardName)) return false;
+    if (!wahl || wahl.cancelled || !wahl.cardName) return false;
+    // Herkunft: die Antwort nennt sie; fehlt sie (Automat), gilt die erste passende Karte (Hand vor Deck).
+    const treffer = sortiert.find(k => k.name === wahl.cardName && (!wahl.source || k.pile === wahl.source));
+    if (!treffer) return false;
+    const pile = treffer.pile;
 
     // ③ Auflegen.
     engine._broadcastEvent('play_zone_animation', { type: 'hero_creature_on', owner: seite, heroIdx, zoneSlot: -1, duration: ON_MS });

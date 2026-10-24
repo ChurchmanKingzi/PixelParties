@@ -26363,6 +26363,9 @@ body.pp-dialog-offen .skin-holo:not(.modal-overlay .skin-holo):not(.card-tooltip
 .tt-token-name { font-size: 16px; font-weight: 700; text-shadow: 1px 1px 0 #000; }
 .tt-token-bild { display: block; width: 62%; aspect-ratio: 750 / 1050; object-fit: cover; margin: 0 auto 10px; box-shadow: 0 0 0 2px var(--pp-kontur, #08060c), 0 3px 0 rgba(0, 0, 0, .5); }
 .tt-token .tt-stat { margin-bottom: 9px; }
+/* Zweite Karte unter dem Tooltip (verwandelte Hulijing: oben die Kreatur, darunter der Held; `TTZweiteKarte`). */
+.tt-zweite { padding: 9px 11px 11px; margin-top: 4px; }
+.tt-zweite-inhalt > div:first-child { width: 62% !important; margin: 0 auto 10px; }
 .tt-callout-titel { font-size: 12px; font-weight: 700; letter-spacing: .5px; margin-bottom: 4px; text-shadow: 1px 1px 0 #000; }
 .tt-textbox { padding: 9px 11px 10px; }
 /* Nummernmarke der Faehigkeitsstufen */

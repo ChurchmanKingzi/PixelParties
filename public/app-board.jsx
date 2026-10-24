@@ -297,7 +297,7 @@ function applyCrystalCostMods(me, cardName, baseCost) {
   return baseCost * 2;
 }
 
-function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, orbs, effectiveLevel, stampBonus, showLevelBadge, handLevel, handCost, handNotes, abilityLevel, children }) {
+function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, tooltipDarunter, tooltipDarunterTitel, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, orbs, effectiveLevel, stampBonus, showLevelBadge, handLevel, handCost, handNotes, abilityLevel, children }) {
   const card = faceDown ? null : CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name, skins) : null;
   // Auf dem Brett liegen die LIVE-Werte (HP, bei Helden auch ATK) ueber der Karte —
@@ -341,7 +341,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   // Gewählter Skin gilt auch im Hover-Tooltip (CardTooltipContent liest `_skinUrl`).
   const tooltipBase0 = tooltipCardOverride || tooltipCardData;
   const tooltipBase = (tooltipBase0 && !faceDown && skins && skins[cardName] && imgUrl) ? { ...tooltipBase0, _skinUrl: imgUrl } : tooltipBase0;
-  const tooltipTarget = (() => {
+  const tooltipTarget0 = (() => {
     if (!tooltipBase) return null;
     const hasLiveAbilities = Array.isArray(abilities) && abilities.length > 0;
     const hasLiveOrbs = Array.isArray(orbs) && orbs.length > 0;
@@ -380,6 +380,9 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
       _abilityLevel: abilityLevel != null ? abilityLevel : tooltipBase._abilityLevel,
     };
   })();
+
+  // Zweite Karte unter dem Tooltip (verwandelte Hulijing: oben die Kreatur, darunter der Held — `tooltipDarunter` = Kartendaten samt Live-Werten).
+  const tooltipTarget = (tooltipTarget0 && tooltipDarunter) ? { ...tooltipTarget0, _darunterKarte: tooltipDarunter, _darunterTitel: tooltipDarunterTitel } : tooltipTarget0;
 
   // Foil support — Bänder, Schimmer und Funken kommen komplett aus
   // `CardFoil` (app-shared, v1203). Hier bleibt nur die Randklasse, die
@@ -31809,11 +31812,19 @@ function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, sha
     : isNest ? `Placed on top of: ${overlay} — at the end of your turn this Creature is removed and deleted`
     : isHeld ? `${overlay} is treated as ${creatureName} until the end of the turn (hover for ${overlay}) — then the Creature is deleted`
     : `Attached: ${overlay}`;
+  // Verwandelte Hulijing: der Tooltip zeigt oben die Kreatur und darunter den Tooltip des Helden (mit den gemeinsamen Live-Werten).
+  const heldKarte = isHeld ? CARDS_BY_NAME[heldHero] : null;
+  const darunter = heldKarte ? {
+    ...heldKarte, _liveHp: boardCardProps.hp, _liveMaxHp: boardCardProps.maxHp, _liveAtk: boardCardProps.atk,
+    ...(boardCardProps.copiedHeroes && boardCardProps.copiedHeroes.length ? { _copiedHeroes: boardCardProps.copiedHeroes } : null),
+    ...(boardCardProps.inheritedEffects && boardCardProps.inheritedEffects.length ? { _inheritedEffects: boardCardProps.inheritedEffects } : null),
+  } : null;
   return (
     <div className="attachable-creature-wrap" ref={wrapRef}
       style={{ position: 'relative', width: '100%', height: '100%' }}
       {...hoverProps}>
-      <BoardCard {...boardCardProps} cardName={showName} />
+      <BoardCard {...boardCardProps} cardName={showName}
+        {...(darunter ? { tooltipDarunter: darunter, tooltipDarunterTitel: 'Also treated as a Hero' } : null)} />
       {!hovered && overlay && (
         <div className="attached-hero-badge"
           title={badgeTitle}
