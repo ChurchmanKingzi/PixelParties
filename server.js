@@ -9232,7 +9232,10 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   // (Die Pruefung folgt unten, nach `anyPlayer` — die Aktivierung durch
   // den Nicht-Besitzer braucht keinen Helden auf der fremden Seite.)
 
-  const slot = (ps.supportZones[heroIdx] || [])[zoneSlot] || [];
+  // ★ HELD ALS KREATUR (Hulijing, 24.10.): `zoneSlot === -1` meint die auf dem Helden liegende Kreatur (`_hero-creature-shared.js`) — sie hat keinen Zonenplatz.
+  const _heldUeber = (zoneSlot === -1) ? require('./cards/effects/_hero-creature-shared').ueberlagerung(room.engine, heroOwner, heroIdx) : null;
+  if (zoneSlot === -1 && (!_heldUeber || !(hero?.hp > 0) || hero?.heldKreatur?._tot)) return false;   // keine aufliegende Kreatur, oder sie ist als Kreatur besiegt (bleibt nur bis zum Zugende liegen)
+  const slot = _heldUeber ? [_heldUeber.name] : ((ps.supportZones[heroIdx] || [])[zoneSlot] || []);
   if (slot.length === 0) return false;
   const creatureName = slot[0];
 
@@ -9243,7 +9246,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   // nicht irgendeine fremde Instanz aktiviert.
   // Z1: `heroOwner` ist die BRETTSEITE des Platzes - nicht "Besitzer ODER Kontrolleur" (sonst trifft eine von
   // `heroOwner` gestohlene Fremdkreatur gleicher (Held, Slot)-Koordinate).
-  const slotInsts = room.engine.cardInstances.filter(c =>
+  const slotInsts = _heldUeber ? [_heldUeber] : room.engine.cardInstances.filter(c =>
     room.engine.physicalSide(c) === heroOwner && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
   );
   const inst = instId != null
@@ -12179,6 +12182,8 @@ async function doPlaySurpriseFremd(room, pi, { cardName, handIndex, heroIdx, fro
  */
 function normalizeValidTargets(validTargets, casterPi, engine, config, cardName) {
   if (!Array.isArray(validTargets)) return validTargets;
+  // ★ HELD ALS KREATUR (Hulijing): selbst gebaute Listen bieten die aufliegende Kreatur nicht an (s. `entferneFremdeUeberlagerungen`).
+  require('./cards/effects/_hero-creature-shared').entferneFremdeUeberlagerungen(validTargets);
   // ★ Styx (28.9., Als Befund: Snow Cannon bot einen uebernommenen Helden
   // an). Karten, die ihre Ziele selbst sammeln, lesen die PHYSISCHE
   // Gegnerseite — ein Held, den der Spieler gerade kontrolliert, steht
@@ -16798,6 +16803,11 @@ io.on('connection', (socket) => {
         if (typeof h._diamondSelfLoss === 'number' && h._diamondSelfLoss > 0) {
           out._diamondSelfLoss = h._diamondSelfLoss;
         }
+        // Hulijing, the Foxdemon (Welle 4): die aufliegende Kreatur („Hero treated as a Creature"). Der Editor speichert `heldKreatur: { name }`; die Überlagerung entsteht erst NACH
+        // `engine.init()` (`anlegenOhneEinsatz`), hier wandert nur der Name in ein Übergangsfeld.
+        if (h.name === 'Hulijing, the Foxdemon' && h.heldKreatur && typeof h.heldKreatur.name === 'string' && (out.hp ?? 0) > 0) {
+          out._heldKreaturName = h.heldKreatur.name;
+        }
         // ★★ v1143 („Forbidden Curse of Aging"): „has not taken any damage
         // yet this game". Im Puzzle hat nie ein Schaden stattgefunden, der
         // Merker `_jeGetroffen` fehlte also JEDEM Helden — auch einem mit
@@ -16944,6 +16954,15 @@ io.on('connection', (socket) => {
     const VOR_SPIELBEGINN = new Set(['support', 'surprise', 'area', 'permanent']);
     for (const inst of room.engine.cardInstances) {
       if (VOR_SPIELBEGINN.has(inst.zone)) inst.turnPlayed = 0;
+    }
+    // ★ Hulijing (Welle 4): im Editor gesetzte aufliegende Kreaturen als Überlagerung anlegen (ohne Einsatz-Effekt) und das Übergangsfeld entfernen.
+    for (let pi = 0; pi < (gs.players || []).length; pi++) {
+      (gs.players[pi]?.heroes || []).forEach((hero, hi) => {
+        if (!hero || !hero._heldKreaturName) return;
+        const name = hero._heldKreaturName;
+        delete hero._heldKreaturName;
+        require('./cards/effects/_hero-creature-shared').anlegenOhneEinsatz(room.engine, pi, hi, name);
+      });
     }
 
     // ── STUFEN JE HANDKOPIE (23.10., Al: Puzzle-Creator, Linksklick auf eine Handkarte) ──

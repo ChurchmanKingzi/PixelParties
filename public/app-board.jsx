@@ -297,7 +297,7 @@ function applyCrystalCostMods(me, cardName, baseCost) {
   return baseCost * 2;
 }
 
-function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, orbs, effectiveLevel, stampBonus, showLevelBadge, handLevel, handCost, handNotes, abilityLevel, children }) {
+function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, tooltipDarunter, tooltipDarunterTitel, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, orbs, effectiveLevel, stampBonus, showLevelBadge, handLevel, handCost, handNotes, abilityLevel, children }) {
   const card = faceDown ? null : CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name, skins) : null;
   // Auf dem Brett liegen die LIVE-Werte (HP, bei Helden auch ATK) ueber der Karte —
@@ -341,7 +341,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   // Gewählter Skin gilt auch im Hover-Tooltip (CardTooltipContent liest `_skinUrl`).
   const tooltipBase0 = tooltipCardOverride || tooltipCardData;
   const tooltipBase = (tooltipBase0 && !faceDown && skins && skins[cardName] && imgUrl) ? { ...tooltipBase0, _skinUrl: imgUrl } : tooltipBase0;
-  const tooltipTarget = (() => {
+  const tooltipTarget0 = (() => {
     if (!tooltipBase) return null;
     const hasLiveAbilities = Array.isArray(abilities) && abilities.length > 0;
     const hasLiveOrbs = Array.isArray(orbs) && orbs.length > 0;
@@ -381,6 +381,9 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
     };
   })();
 
+  // Zweite Karte unter dem Tooltip (verwandelte Hulijing: oben die Kreatur, darunter der Held — `tooltipDarunter` = Kartendaten samt Live-Werten).
+  const tooltipTarget = (tooltipTarget0 && tooltipDarunter) ? { ...tooltipTarget0, _darunterKarte: tooltipDarunter, _darunterTitel: tooltipDarunterTitel } : tooltipTarget0;
+
   // Foil support — Bänder, Schimmer und Funken kommen komplett aus
   // `CardFoil` (app-shared, v1203). Hier bleibt nur die Randklasse, die
   // am Kartenrahmen selbst haengt.
@@ -401,7 +404,10 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
           setBoardTooltip(tooltipTarget);
         }, window.LONG_PRESS_MS || 400);
       }}>
-      <CardFoil card={card} skin={window.skinOfUrl ? window.skinOfUrl(imgUrl) : null} />
+      <CardFoil card={card} skin={window.skinOfUrl ? window.skinOfUrl(imgUrl) : null}
+        werte={(ohneGedruckt.length || handLevel != null || handCost != null) ? {
+          noHp: ohneGedruckt.includes('hp') || undefined, noAtk: ohneGedruckt.includes('atk') || undefined,
+          lv: handLevel != null ? handLevel : undefined, kost: handCost != null ? handCost : undefined } : null} />
       {faceDown ? (
         <img src="/cardback.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
       ) : imgUrl ? (
@@ -9019,6 +9025,233 @@ const HockeyWishEffect = (() => {
     }
   };
   return ppPunktBild(malen, ENDE + 40, 300, 300);
+})();
+
+// ═══════════════════════════════════════════════════════════════════
+//  Welle 4 (24.10.) — Pinaxolotl, Motharch Squire, Arnold: kleine Pixelart-Bilder über einer Zone (`ppPunktBild`, feste Paletten, Dither statt Alpha, kein Leuchten)
+// ═══════════════════════════════════════════════════════════════════
+/** Pixelkreis-Umriss (Mittelpunktverfahren, ganze Pixel) mit Radius r. */
+function ppKreisUmriss(g, cx, cy, r, c, a) {
+  const R = Math.max(1, Math.round(r));
+  for (let i = 0; i <= Math.ceil(R * 0.7071); i++) {
+    const j = Math.round(Math.sqrt(Math.max(0, R * R - i * i)));
+    for (const [x, y] of [[i, j], [j, i]]) {
+      g.put(cx + x, cy + y, c, a); g.put(cx - x, cy + y, c, a); g.put(cx + x, cy - y, c, a); g.put(cx - x, cy - y, c, a);
+    }
+  }
+}
+
+//  Pinaxolotl: Blasen (`pinaxolotl_bubbles`) — Vorlage: der Axolotl im Wasser. Hellblaue Blasen (Umriss mit weißem Glanzpunkt) steigen mit leichtem Wackeln über der Zone auf und
+//  zerplatzen oben in vier Funken; ~700 ms.
+const PinaxolotlBubblesEffect = (() => {
+  const PAL = ['#ffffff', '#b3d8f9', '#4e82cb', '#f7f7ad'].map(ppHex);
+  const ENDE = 800, N = 9;
+  const vorbereiten = (sz) => Array.from({ length: N }, (_, i) => ({
+    x: (Math.random() - 0.5) * sz.hw * 1.6, start: i * 45 + Math.random() * 40, tempo: 0.032 + Math.random() * 0.02, r: 2 + Math.floor(Math.random() * 3),
+    wack: Math.random() * 6.28, pop: 380 + Math.random() * 220,
+  }));
+  const malen = (g, t, sz, teile) => {
+    const aus = t > ENDE - 160 ? Math.max(0, 1 - (t - (ENDE - 160)) / 160) : 1;
+    if (aus <= 0) return;
+    for (const b of teile) {
+      const a2 = t - b.start; if (a2 < 0) continue;
+      const x = Math.round(sz.cx + b.x + Math.sin(a2 / 120 + b.wack) * 2), y = Math.round(sz.cy + sz.hh * 0.5 - a2 * b.tempo * 3);
+      if (a2 < b.pop) {
+        ppKreisUmriss(g, x, y, b.r, a2 > b.pop - 120 ? PAL[0] : PAL[1], aus);
+        g.put(x - 1, y - 1, PAL[0], aus);
+        if (b.r >= 3) g.put(x + 1, y + 1, PAL[2], aus);
+      } else if (a2 < b.pop + 140) {
+        const k = (a2 - b.pop) / 140, d = 2 + k * 5;                  // vier Funken fliegen auseinander
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) g.put(x + dx * d, y + dy * d, k < 0.5 ? PAL[0] : PAL[3], aus * (1 - k));
+      }
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 300, 300, vorbereiten);
+})();
+
+//  Motharch Squire: Mottenstaub (`moth_dust`) — Vorlage: die Motte. Goldene Staubkörner rieseln von oben über die Kreatur, wiegen sich hin und her und funkeln (Blinken in ganzen
+//  Pixelschritten); ~800 ms.
+const MothDustEffect = (() => {
+  const PAL = ['#fff196', '#fad54a', '#f29a3e', '#aa5300'].map(ppHex);
+  const ENDE = 900, N = 34;
+  const vorbereiten = (sz) => Array.from({ length: ppFxN(N) }, () => ({
+    x: (Math.random() - 0.5) * sz.hw * 2.1, y0: -sz.hh * 1.1 - Math.random() * 14, v: 0.02 + Math.random() * 0.03, ph: Math.random() * 6.28, start: Math.random() * 360, c: Math.floor(Math.random() * 3),
+  }));
+  const malen = (g, t, sz, teile) => {
+    const aus = t > ENDE - 220 ? Math.max(0, 1 - (t - (ENDE - 220)) / 220) : 1;
+    if (aus <= 0) return;
+    for (const k of teile) {
+      const a2 = t - k.start; if (a2 < 0) continue;
+      const x = Math.round(sz.cx + k.x + Math.sin(a2 / 150 + k.ph) * 3), y = Math.round(sz.cy + k.y0 + a2 * k.v * 3);
+      if (y > sz.cy + sz.hh) continue;
+      const blink = Math.floor(a2 / 66 + k.ph * 3) % 4 === 0;
+      g.put(x, y, blink ? PAL[0] : PAL[k.c], aus);
+      if (blink) { g.put(x + 1, y, PAL[1], aus); g.put(x - 1, y, PAL[1], aus); g.put(x, y + 1, PAL[1], aus); g.put(x, y - 1, PAL[1], aus); }
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 300, 340, vorbereiten);
+})();
+
+//  Lamenting Knight: heilende Tränen (`lament_tears`, Quelle → Ziel; `lament_rain` = nur der Regen an einem Punkt, für die entkoppelten Bilder einer negierten Karte) — Vorlage: der
+//  weinende Ritter. Am Ritter quellen zwei Tränen und rinnen die Wange hinab; dann fliegen große Tränen (mit zwei Begleittropfen) im Bogen zum Helden und regnen über ihm nieder. Jeder
+//  Tropfen spritzt am Boden auseinander, grüne Heilkreuze steigen auf. Pixelart: feste Paletten, Dither statt Alpha, Bewegung in ganzen Pixeln im Bildtakt; ~1700 ms (Einschlag ~940 ms).
+const TRAENE_PAL = { o: ppHex('#2f539d'), b: ppHex('#4e82cb'), l: ppHex('#b3d8f9'), w: ppHex('#ffffff') };
+const TRAENE_GROSS = ['..o..', '.obo.', '.obo.', 'obbbo', 'obwbo', 'obbbo', '.ooo.'];
+const TRAENE_KLEIN = ['.o.', 'owo', 'obo', '.o.'];
+const HEIL_GRUEN = ['#b3f9cf', '#75f091', '#4ceb70', '#00cc50'].map(ppHex);
+/** Ein grünes Heilkreuz (5×5) mit hellem Kern. */
+function ppHeilKreuz(g, x, y, a) {
+  g.block(x - 1, y, 3, 1, HEIL_GRUEN[2], a); g.block(x, y - 1, 1, 3, HEIL_GRUEN[2], a);
+  g.put(x, y, HEIL_GRUEN[0], a);
+  g.put(x - 2, y, HEIL_GRUEN[3], a); g.put(x + 2, y, HEIL_GRUEN[3], a); g.put(x, y - 2, HEIL_GRUEN[3], a); g.put(x, y + 2, HEIL_GRUEN[3], a);
+}
+/** Tränenregen über (cx, cy): `al` = ms seit Beginn, `a` = Deckkraft. Die Tropfen fallen aus der Höhe, kleine Wellen und vier Spritzer am „Boden", grüne Kreuze steigen auf. Nur put/block. */
+function ppTraenenRegen(g, cx, cy, al, a) {
+  const N = 14, FALL = 380, SPRITZ = 240;
+  for (let i = 0; i < N; i++) {
+    const a2 = al - ((i * 47) % 360); if (a2 < 0 || a2 > FALL + SPRITZ) continue;
+    const x = Math.round(cx + ((i * 37) % 23) - 11), boden = Math.round(cy + 6 + ((i * 5) % 5) - 2);
+    if (a2 < FALL) {
+      const y = Math.round((boden - 34) + 34 * Math.pow(a2 / FALL, 1.6));
+      ppSprite(g, x, y, i % 3 === 0 ? TRAENE_GROSS : TRAENE_KLEIN, TRAENE_PAL, a);
+    } else {
+      const k = (a2 - FALL) / SPRITZ, r = 1 + Math.round(k * 4), f = (1 - k) * a;
+      g.put(x - r, boden, TRAENE_PAL.l, f); g.put(x + r, boden, TRAENE_PAL.l, f); g.put(x - r + 1, boden + 1, TRAENE_PAL.b, f); g.put(x + r - 1, boden + 1, TRAENE_PAL.b, f);
+      for (const [dx, dy] of [[-1, -1], [1, -1], [-2, 0], [2, 0]]) g.put(x + dx * (1 + k * 4), boden - 1 + dy * k * 5 + k * k * 5, k < 0.5 ? TRAENE_PAL.w : TRAENE_PAL.l, f);
+    }
+  }
+  for (let j = 0; j < 3; j++) {
+    const a3 = al - (140 + j * 170); if (a3 < 0 || a3 > 560) continue;
+    const k = a3 / 560;
+    ppHeilKreuz(g, Math.round(cx + (j - 1) * 9), Math.round(cy + 4 - k * 22), (1 - k) * a);
+  }
+}
+const LamentRainEffect = ppPunktBild((g, t, sz) => {
+  const aus = t > 920 ? Math.max(0, 1 - (t - 920) / 260) : 1;
+  if (aus > 0) ppTraenenRegen(g, sz.cx, sz.cy, t, aus);
+}, 1200, 300, 330);
+const LamentTearsEffect = ppProjektil({
+  ende: 1700, abflug: 480, einschlag: 940, fadeAb: 1500, bogen: 20, extra: 120,
+  schweif: [TRAENE_PAL.l, TRAENE_PAL.b, TRAENE_PAL.o], schweifLaenge: 6, schweifSchritt: 0.03,
+  funkenFarben: [TRAENE_PAL.w, TRAENE_PAL.l, TRAENE_PAL.b], funken: 10,
+  // Der Ritter weint: zwei Tränen quellen oben an der Karte, rinnen die Wange hinab und tropfen ab.
+  laden: (g, ox, oy, c) => {
+    for (let i = 0; i < 2; i++) {
+      const a2 = c.t - i * 110; if (a2 < 0) continue;
+      const x = Math.round(ox + (i ? 4 : -4)), y0 = Math.round(oy - 7), rinn = Math.min(1, a2 / 420), y = Math.round(y0 + rinn * rinn * 15);
+      for (let yy = y0 + 2; yy < y - 2; yy += 2) g.put(x, yy, TRAENE_PAL.l, c.aus * 0.7);
+      ppSprite(g, x, y, TRAENE_KLEIN, TRAENE_PAL, c.aus * (a2 > 480 ? Math.max(0, 1 - (a2 - 480) / 140) : 1));
+    }
+  },
+  kopf: (g, x, y, c) => {
+    const nx = -c.dy, ny = c.dx;
+    ppSprite(g, x, y, TRAENE_GROSS, TRAENE_PAL, c.aus);
+    ppSprite(g, x - c.dx * 6 + nx * 4, y - c.dy * 6 + ny * 4 - 1, TRAENE_KLEIN, TRAENE_PAL, c.aus);
+    ppSprite(g, x - c.dx * 9 - nx * 4, y - c.dy * 9 - ny * 4 - 2, TRAENE_KLEIN, TRAENE_PAL, c.aus);
+  },
+  treffer: (g, tx, ty, c) => ppTraenenRegen(g, tx, ty, c.al, c.aus),
+});
+
+//  Arnold: Muskelspiel (`arnold_flex`) — Vorlage: der rosa Axolotl-Muskelprotz. Rosa Pixel-Kreuze (HP) und Aufwärtspfeile (ATK) steigen rund um den Helden auf, ein rosa Ring
+//  (zwei Pixelstufen) blitzt auf; ~1000 ms.
+const ArnoldFlexEffect = (() => {
+  const PAL = ['#ffffff', '#f8b4df', '#fc69c6', '#c80480', '#710122'].map(ppHex);
+  const ENDE = 1000;
+  const vorbereiten = (sz) => Array.from({ length: 8 }, (_, i) => ({
+    x: (i % 2 ? 1 : -1) * (sz.hw * 0.35 + Math.random() * sz.hw * 0.65), start: i * 70 + Math.random() * 50, tempo: 0.018 + Math.random() * 0.012, pfeil: i % 2 === 1,
+  }));
+  const kreuz = (g, x, y, a) => {
+    g.block(x - 1, y, 3, 1, PAL[1], a); g.block(x, y - 1, 1, 3, PAL[1], a); g.put(x, y, PAL[0], a);
+    g.put(x - 2, y, PAL[3], a); g.put(x + 2, y, PAL[3], a); g.put(x, y - 2, PAL[3], a); g.put(x, y + 2, PAL[3], a);
+  };
+  const pfeil = (g, x, y, a) => {
+    g.put(x, y - 3, PAL[0], a); g.block(x - 1, y - 2, 3, 1, PAL[1], a); g.block(x - 2, y - 1, 5, 1, PAL[1], a);
+    g.block(x, y, 1, 3, PAL[2], a); g.put(x - 1, y, PAL[3], a); g.put(x + 1, y, PAL[3], a);
+  };
+  const malen = (g, t, sz, teile) => {
+    const aus = t > ENDE - 220 ? Math.max(0, 1 - (t - (ENDE - 220)) / 220) : 1;
+    if (aus <= 0) return;
+    // Ring (Pixelstufen)
+    if (t < 380) {
+      const f = 1 - t / 380, r = 6 + t / 9;
+      ppKreisUmriss(g, Math.round(sz.cx), Math.round(sz.cy), r, PAL[2], f * aus);
+      ppKreisUmriss(g, Math.round(sz.cx), Math.round(sz.cy), r - 1, PAL[1], f * aus * 0.8);
+    }
+    for (const k of teile) {
+      const a2 = t - k.start; if (a2 < 0 || a2 > 760) continue;
+      const kk = a2 / 760, y = Math.round(sz.cy + sz.hh * 0.45 - a2 * k.tempo * 3.2), x = Math.round(sz.cx + k.x);
+      const f = (1 - kk) * aus;
+      if (k.pfeil) pfeil(g, x, y, f); else kreuz(g, x, y, f);
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 320, 340, vorbereiten);
+})();
+
+//  Hulijing: Verwandlung (`hero_creature_on`) — Vorlage: das Fuchsfeuer der Fuchsdämonin. Violette Fuchsflammen (kleine Pixelflammen, flackern im Bildtakt) kreisen als Ring um die Heldin und
+//  ziehen sich in die Mitte zusammen, ein gedithertet Rauchring weitet sich, zum Schluss blitzt ein weißes Pixelkreuz; ~1000 ms. `hero_creature_off` (Löschen am Zugende) ist das Gegenstück:
+//  grauer Rauch steigt in Pixelblöcken auf, violette Funken fliegen in acht Richtungen auseinander; ~900 ms.
+const HERO_FUCHS_PAL = ['#ffffff', '#d6b3f9', '#b278ed', '#702db3', '#2e0a51', '#b9b9b9', '#929292', '#535353'].map(ppHex);
+/** Eine Fuchsflamme (Fuß bei x,y; wächst nach oben; `bild` 0/1 lässt die Spitze flackern). */
+function ppFuchsFlamme(g, x, y, a, bild, gross) {
+  const P = HERO_FUCHS_PAL;
+  g.block(x - 1, y - 1, 3, 2, P[3], a);
+  g.block(x - 1, y - 3, 3, 2, P[2], a);
+  g.block(x, y - 4, 1, 1, P[1], a);
+  g.put(x + (bild ? 1 : -1), y - 5, P[2], a);
+  g.put(x, y - 5, P[1], a);
+  if (gross) { g.put(x, y - 6, P[0], a); g.put(x + (bild ? -1 : 1), y - 6, P[1], a); g.put(x - 2, y - 2, P[4], a); g.put(x + 2, y - 2, P[4], a); }
+}
+const HeroCreatureOnEffect = (() => {
+  const ENDE = 1100, N = 10;
+  const malen = (g, t, sz) => {
+    const aus = t > ENDE - 200 ? Math.max(0, 1 - (t - (ENDE - 200)) / 200) : 1;
+    if (aus <= 0) return;
+    const P = HERO_FUCHS_PAL, bild = Math.floor(t / 66) % 2;
+    const rad = sz.hw * (1.05 - Math.min(1, t / 760) * 0.8);                     // der Ring zieht sich zusammen
+    const flammen = [];
+    for (let i = 0; i < N; i++) {
+      const w = (i / N) * 6.2832 + t / 260;
+      flammen.push({ x: Math.round(sz.cx + Math.cos(w) * rad), y: Math.round(sz.cy + sz.hh * 0.3 + Math.sin(w) * rad * 0.42), z: Math.sin(w) });
+    }
+    flammen.sort((a, b) => a.z - b.z);                                           // hinten zuerst
+    for (const f of flammen) ppFuchsFlamme(g, f.x, f.y, aus, bild, f.z > 0.2);
+    if (t >= 260 && t < 860) {                                                   // Rauchring (Dither, drei Pixelstufen)
+      const k = (t - 260) / 600, r = 6 + Math.floor(k * sz.hw * 1.1);
+      for (let d = 0; d < 3; d++) ppKreisUmriss(g, Math.round(sz.cx), Math.round(sz.cy), r - d, P[5 + d], (1 - k) * aus * (d === 0 ? 0.9 : 0.6));
+    }
+    if (t >= 640 && t < 960) {                                                   // Verwandlungs-Blitz
+      const k = (t - 640) / 320;
+      ppKreuzfunkel(g, Math.round(sz.cx) - 1, Math.round(sz.cy) - 1, Math.min(6, 2 + Math.floor(k * 6)), [P[0], P[1], P[2], P[3]], aus);
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 320, 340);
+})();
+
+const HeroCreatureOffEffect = (() => {
+  const ENDE = 900;
+  const vorbereiten = (sz) => Array.from({ length: ppFxN(14) }, (_, i) => ({
+    x: (Math.random() - 0.5) * sz.hw * 1.5, start: Math.random() * 260, tempo: 0.02 + Math.random() * 0.025, b: 2 + Math.floor(Math.random() * 2), c: 5 + (i % 3), ph: Math.random() * 6.28,
+  }));
+  const RICHTUNGEN = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]];
+  const malen = (g, t, sz, teile) => {
+    const aus = t > ENDE - 220 ? Math.max(0, 1 - (t - (ENDE - 220)) / 220) : 1;
+    if (aus <= 0) return;
+    const P = HERO_FUCHS_PAL;
+    for (const r of teile) {                                                     // Rauch steigt in Pixelblöcken auf und dithert weg
+      const a2 = t - r.start; if (a2 < 0 || a2 > 620) continue;
+      const kk = a2 / 620, x = Math.round(sz.cx + r.x + Math.sin(a2 / 130 + r.ph) * 2), y = Math.round(sz.cy + sz.hh * 0.45 - a2 * r.tempo * 3.4);
+      g.block(x, y, r.b + Math.floor(kk * 2), r.b + Math.floor(kk * 2), P[r.c], (1 - kk) * aus * 0.9);
+    }
+    if (t < 520) {                                                               // Funken fliegen in acht Richtungen
+      const k = t / 520, d = 3 + Math.floor(k * sz.hw * 0.9);
+      for (const [dx, dy] of RICHTUNGEN) {
+        const x = Math.round(sz.cx + dx * d), y = Math.round(sz.cy + dy * d * 0.8);
+        g.put(x, y, k < 0.5 ? P[1] : P[2], (1 - k) * aus);
+        g.put(x - dx, y - dy, P[3], (1 - k) * aus);
+      }
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 320, 340, vorbereiten);
 })();
 
 // ═════════════════════════════════════════════════════════════════
@@ -18402,6 +18635,13 @@ const ANIM_REGISTRY = {
   bat_bite_drain: BatBiteDrainEffect,
   arcane_eyes_open: ArcaneEyesOpenEffect,
   hockey_wish: HockeyWishEffect,
+  pinaxolotl_bubbles: PinaxolotlBubblesEffect,
+  lament_tears: LamentTearsEffect,
+  lament_rain: LamentRainEffect,
+  hero_creature_on: HeroCreatureOnEffect,
+  hero_creature_off: HeroCreatureOffEffect,
+  moth_dust: MothDustEffect,
+  arnold_flex: ArnoldFlexEffect,
   liquid_rainbow: LiquidRainbowEffect,
   hand_level_down: HandLevelDownEffect,
   mind_control_hex: MindControlHexEffect,
@@ -31721,11 +31961,13 @@ function GameAnimationRenderer({ type, x, y, w, h, _gemountet, prewarm, ...rest 
 //     sich sonst verkehrt herum.
 // When not hovered, shows the Creature's own art with the appropriate
 // corner badge.
+//   • `heldHero` — „Hulijing, the Foxdemon": der Held trägt eine aufgelegte Kreatur („Hero treated as a Creature"). Richtung wie bei `nestedUnder`
+//     — ungehovert steht die KREATUR da (das ist der Spielzustand), beim Hovern kommt der Held zum Vorschein (🦊); am Zugende wird die Kreatur gelöscht.
 //   • `nestedUnder` — „Monster Nest": auf der verdeckten Karte liegt
 //     eine andere Kreatur. Richtung wie bei `attachedHero` — ungehovert
 //     steht die OBENLIEGENDE Kreatur da (das ist der Spielzustand),
 //     beim Hovern kommt die verdeckte Karte zum Vorschein (🪺).
-function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, shapeshiftBase, nestedUnder, ...boardCardProps }) {
+function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, shapeshiftBase, nestedUnder, heldHero, ...boardCardProps }) {
   // `useStickyHoverFlag` statt eines nackten useState: der Hover TAUSCHT
   // hier das Kartenbild, der Knoten unter dem Zeiger wird also mitten in
   // der Bewegung ersetzt — genau die Lage, in der ein mouseleave
@@ -31734,13 +31976,14 @@ function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, sha
   // wirklich noch drueber ist.
   const wrapRef = useRef(null);
   const [hovered, hoverProps] = useStickyHoverFlag(wrapRef);
-  const overlay = attachedHero || mimicCreature || shapeshiftBase || nestedUnder;
+  const overlay = attachedHero || mimicCreature || shapeshiftBase || nestedUnder || heldHero;
   const showName = hovered ? overlay : creatureName;
-  const isNest = !attachedHero && !shapeshiftBase && !mimicCreature && !!nestedUnder;
-  const isMimic = !attachedHero && !shapeshiftBase && !isNest && !!mimicCreature;
+  const isHeld = !attachedHero && !shapeshiftBase && !mimicCreature && !nestedUnder && !!heldHero;
+  const isNest = !attachedHero && !shapeshiftBase && !mimicCreature && !isHeld && !!nestedUnder;
+  const isMimic = !attachedHero && !shapeshiftBase && !isNest && !isHeld && !!mimicCreature;
   const isShift = !!shapeshiftBase;
-  const badgeIcon = isShift ? '🎭' : isMimic ? '🎭' : isNest ? '🪺' : '📎';
-  const badgeColor = isShift ? '#b3d8f9' : isMimic ? '#c98aff' : isNest ? '#92d3a9' : '#fad54a';
+  const badgeIcon = isShift ? '🎭' : isMimic ? '🎭' : isNest ? '🪺' : isHeld ? '🦊' : '📎';
+  const badgeColor = isShift ? '#b3d8f9' : isMimic ? '#c98aff' : isNest ? '#92d3a9' : isHeld ? '#f4ae64' : '#fad54a';
   // Beim Shapeshifter nennt das Abzeichen die EIGENE Karte — die
   // kopierte sieht man ja bereits. Bei den anderen umgekehrt.
   const badgeShortName = (overlay || '').split(',')[0]
@@ -31748,12 +31991,21 @@ function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, sha
   const badgeTitle = isShift ? `Shapeshifted: ${creatureName} (hover for ${overlay})`
     : isMimic ? `Mimicking: ${overlay}`
     : isNest ? `Placed on top of: ${overlay} — at the end of your turn this Creature is removed and deleted`
+    : isHeld ? `${overlay} is treated as ${creatureName} until the end of the turn (hover for ${overlay}) — then the Creature is deleted`
     : `Attached: ${overlay}`;
+  // Verwandelte Hulijing: der Tooltip zeigt oben die Kreatur und darunter den Tooltip des Helden (mit den gemeinsamen Live-Werten).
+  const heldKarte = isHeld ? CARDS_BY_NAME[heldHero] : null;
+  const darunter = heldKarte ? {
+    ...heldKarte, _liveHp: boardCardProps.hp, _liveMaxHp: boardCardProps.maxHp, _liveAtk: boardCardProps.atk,
+    ...(boardCardProps.copiedHeroes && boardCardProps.copiedHeroes.length ? { _copiedHeroes: boardCardProps.copiedHeroes } : null),
+    ...(boardCardProps.inheritedEffects && boardCardProps.inheritedEffects.length ? { _inheritedEffects: boardCardProps.inheritedEffects } : null),
+  } : null;
   return (
     <div className="attachable-creature-wrap" ref={wrapRef}
       style={{ position: 'relative', width: '100%', height: '100%' }}
       {...hoverProps}>
-      <BoardCard {...boardCardProps} cardName={showName} />
+      <BoardCard {...boardCardProps} cardName={showName}
+        {...(darunter ? { tooltipDarunter: darunter, tooltipDarunterTitel: 'Also treated as a Hero' } : null)} />
       {!hovered && overlay && (
         <div className="attached-hero-badge"
           title={badgeTitle}
@@ -48837,21 +49089,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
   }, []);
 
-  // ── Verworfene Aktion: der Server hat eine Aktion ohne jede Wirkung
-  // abgebrochen (ungueltige Lage, Sperre, Zug vorbei …) und uns den aktuellen
-  // Zustand geschickt. Hier nur der Hinweis dazu — hoechstens alle 3 s, damit
-  // wiederholtes Tippen die Anzeige nicht zumuellt.
-  useEffect(() => {
-    let zuletzt = 0;
-    const onActionRejected = () => {
-      const jetzt = Date.now();
-      if (jetzt - zuletzt < 3000) return;
-      zuletzt = jetzt;
-      if (notify) notify('That action isn\'t possible right now.', 'error');
-    };
-    socket.on('action_rejected', onActionRejected);
-    return () => { socket.off('action_rejected', onActionRejected); };
-  }, [notify]);
+  // ── Verworfene Aktion (`action_rejected`): der Server hat eine Aktion ohne jede Wirkung abgebrochen und uns den aktuellen Zustand geschickt. Der Spieler wird damit NICHT behelligt
+  // (24.10.: kein Hinweis „That action isn't possible right now", kein Fehlerton) — scheitert im Hintergrund still etwas, gleicht der neue Zustand die Anzeige ab.
 
   // ── Action Log socket listener (Chat: v1374 in `ChatPanel`) ──
   useEffect(() => {
@@ -51155,6 +51394,47 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const p = playerByName(entry.player);
         return <span className="log-status">💥 {cName('Buttap')} — {pName(p.name, p.color)} reveals {cName(entry.revealed)}{entry.toHand ? <> and adds it to their hand.</> : <>{entry.target ? <>: {entry.damage} damage to {entry.target}, then it is shuffled back.</> : <>: no damage, then it is shuffled back.</>}</>}</span>;
       }
+      if (t === 'pinaxolotl') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🔍 {cName('Pinaxolotl')} — {pName(p.name, p.color)} searches their deck and adds {cName(entry.card)} to their hand.</span>;
+      }
+      if (t === 'pinaxolotl_summon') {
+        const p = playerByName(entry.player);
+        return <span className="log-info">✨ {cName('Pinaxolotl')} — {pName(p.name, p.color)} {entry.summoned ? <>immediately summons {cName(entry.card)} as an additional Action.</> : <>cannot summon {cName(entry.card)} right now.</>}</span>;
+      }
+      if (t === 'motharch_squire_recycle') {
+        const p = playerByName(entry.player);
+        const karten = Array.isArray(entry.cards) ? entry.cards : [];
+        return <span className="log-status">🔄 {cName('Motharch Squire')} — {pName(p.name, p.color)} shuffles {karten.map((k, i) => <React.Fragment key={i}>{i > 0 ? ' and ' : ''}{cName(k)}</React.Fragment>)} back into their deck.</span>;
+      }
+      if (t === 'motharch_squire_search') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🔍 {cName('Motharch Squire')} — {pName(p.name, p.color)} searches their deck and adds {cName(entry.card)} to their hand.</span>;
+      }
+      if (t === 'arnold') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">✨ {cName('Arnold, the Maximum Lotl')} — {entry.ability} is attached: {entry.hero} gains <span className="log-amount">{entry.hp || 40}</span> HP (current and max) and <span className="log-amount">{entry.atk}</span> Attack.</span>;
+      }
+      if (t === 'hero_creature_placed') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🦊 {cName(entry.hero)} — {pName(p.name, p.color)} places {cName(entry.creature)} (from {entry.from === 'deck' ? 'the deck' : 'the hand'}) on top of {entry.hero}: until the end of the turn it is treated as that Creature as well as a Hero.</span>;
+      }
+      if (t === 'hero_creature_max_hp') {
+        return <span className="log-info">🦊 {cName(entry.hero)}{entry.zurueck ? ' — max HP back to ' : ' — max HP becomes '}<span className="log-amount">{entry.to}</span>{entry.zurueck ? '.' : <> (that of {cName(entry.creature)}; current HP unchanged).</>}</span>;
+      }
+      if (t === 'hero_creature_deleted') {
+        return <span className="log-info">💨 {cName(entry.creature)} is deleted from {entry.hero} at the end of the turn.</span>;
+      }
+      if (t === 'hero_creature_defeated') {
+        return <span className="log-status">☠ {entry.hero} is defeated as {cName(entry.creature)}: the Creature stays on the Hero until the end of the turn, then it is deleted.</span>;
+      }
+      if (t === 'hero_creature_move_fizzle') {
+        return <span className="log-info">💨 {cName(entry.creature)} cannot be moved away from the Hero it lies on.</span>;
+      }
+      if (t === 'lamenting_knight') {
+        const p = playerByName(entry.player);
+        return <span className="log-heal">✨ {cName('Lamenting Knight')} — {pName(p.name, p.color)} heals {entry.target} for <span className="log-amount">{entry.amount}</span> HP (half its max HP).</span>;
+      }
       if (t === 'frost_breaker_no_free_action') {
         const p = playerByName(entry.player);
         return <span className="log-info">🔥 {cName('Frost Breaker')} — the target was not Frozen during {pName(p.name, p.color)}'s last turn: this costs an Action.</span>;
@@ -51872,6 +52152,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             ? (gameState.effectPrompt.activatableHeroEffects || []).find(e => e.heroIdx === i && (isOpp ? e.charmedOwner === oppIdx : !e.charmedOwner))
             : null;
           const isHeroEffectActive = (!!heroEffectEntry || !!heroActionEffectEntry) && !klickPfadOffen;   // Klick-Pfad einer Handkarte: kein Heldeneffekt (s. klickPfadOffen)
+          // ★ HELD ALS KREATUR (Hulijing): der aktive Effekt der aufliegenden Kreatur (`zoneSlot: -1`) — ein Klick auf die Heldenzone benutzt ihn.
+          const heldKreaturEntry = hero?.heldKreatur
+            ? (gameState.activatableCreatures || []).find(c => c.heldKreatur && c.heroIdx === i && ((!isOpp && !c.charmedOwner) || (isOpp && c.charmedOwner === pi)))
+            : null;
+          const isHeldKreaturActivatable = heldKreaturEntry?.canActivate === true && !klickPfadOffen && !isEffectLocked;
           // Skill Test: bereit (noch nicht erschöpft) / erschöpft — gilt für alle Spieler (Vorschau der Round).
           const stOwner = isOpp ? oppIdx : myIdx;
           const stExhausted = !!(gameState.skillTest && gameState.skillTest.exhaustedHeroes && gameState.skillTest.exhaustedHeroes[stOwner + ':' + i]);
@@ -51914,7 +52199,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // Ohne Sheet fuer den Skin faellt es auf den Basis-Helden zurueck.
           const _figurSkin = figurBasisName ? p?.deckSkins?.[figurBasisName] : null;
           const figurName = (_figurSkin && HeroIdleAnims.hatAnimation(_figurSkin)) ? _figurSkin : figurBasisName;
-          const figurDa = !!(heldenFigurenZeigen && hero?.name && !isDead && !isRamming && HeroIdleAnims.hatAnimation(figurName));
+          // ★ Held als Kreatur (Hulijing): liegt eine Kreatur auf dem Helden, zeigt das Brett deren Karte — die Heldenfigur steht dann nicht darüber.
+          const figurDa = !!(heldenFigurenZeigen && hero?.name && !isDead && !isRamming && !hero.heldKreatur && HeroIdleAnims.hatAnimation(figurName));
           // Aufstiegs-Morph dieses Helden (s. HeroIdleSprite): alte und neue Figur stehen zugleich da.
           const aufstiegHier = !!(ascMorph && ascMorph.ownerLabel === ownerLabel && ascMorph.heroIdx === i);
           // Chain target pick
@@ -52038,6 +52324,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   socket.emit('st_attack', { roomId: gameState.roomId, heroIdx: i });
                 }
               }
+            : (isHeldKreaturActivatable && !isValidHeroTarget && !heroActionEffectEntry)
+            ? () => socket.emit('activate_creature_effect', { roomId: gameState.roomId, heroIdx: i, zoneSlot: -1, charmedOwner: heldKreaturEntry?.charmedOwner })
             : (isHeroEffectActive && (!isEffectLocked || heroActionEffectEntry) && !isValidHeroTarget)
             ? (heroActionEffectEntry
                 // Zusatzaktion: die Antwort geht an den offenen Prompt,
@@ -52065,10 +52353,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <div key={'lpad-'+s} className="board-zone-spacer" />
               ))}
               <div className="board-zone-spacer" />
-              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || pickHeroDropIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || pickHeroDropTarget || attachPickEligibleHero || isCsppHeroTarget || spellPickEntry) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isValidHeroTarget && accentGreenTargetIds.has(heroTargetId) ? ' potion-target-accent-green' : '') + (isIneligibleHeroTarget ? ' potion-target-ineligible' : '') + (isRedMarkedHeroTarget ? ' potion-target-marked-red' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (zielMarkeLeuchtet ? ' prompt-marked' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + ((isHeroEffectActive || klickHeilungOffen) ? ' zone-hero-effect-active' : '') + (stReadyGlow && !stBonus ? ' st-actor-ready' : '') + (stBonus && !stActing ? ' st-actor-bonus' : '') + (stActing ? ' st-actor-acting' : '') + (stExhausted && !stBonus && !stActing && hero?.hp > 0 ? ' st-actor-exhausted' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '') + (isZonePickHero ? ' zone-pick-target' : '') + ((allianzHover && allianzHover.some(a => a.owner === (isOpp ? oppIdx : myIdx) && a.heroIdx === i)) ? ' zone-alliance-linked' : '')}
+              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || pickHeroDropIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || pickHeroDropTarget || attachPickEligibleHero || isCsppHeroTarget || spellPickEntry) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isValidHeroTarget && accentGreenTargetIds.has(heroTargetId) ? ' potion-target-accent-green' : '') + (isIneligibleHeroTarget ? ' potion-target-ineligible' : '') + (isRedMarkedHeroTarget ? ' potion-target-marked-red' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (zielMarkeLeuchtet ? ' prompt-marked' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + ((isHeroEffectActive || klickHeilungOffen) ? ' zone-hero-effect-active' : '') + (isHeldKreaturActivatable ? ' zone-creature-activatable' : '') + (stReadyGlow && !stBonus ? ' st-actor-ready' : '') + (stBonus && !stActing ? ' st-actor-bonus' : '') + (stActing ? ' st-actor-acting' : '') + (stExhausted && !stBonus && !stActing && hero?.hp > 0 ? ' st-actor-exhausted' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '') + (isZonePickHero ? ' zone-pick-target' : '') + ((allianzHover && allianzHover.some(a => a.owner === (isOpp ? oppIdx : myIdx) && a.heroIdx === i)) ? ' zone-alliance-linked' : '')}
                 data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
                 onClick={onHeroClick}
-                style={zsMerge('hero', { ...((isCsppHeroTarget || isHeroEffectActive || isValidHeroTarget || isChainPickValid || attachPickEligibleHero || isZonePickHero || spellPickEntry) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#fc69c6' } : undefined) })}>
+                style={zsMerge('hero', { ...((isCsppHeroTarget || isHeroEffectActive || isHeldKreaturActivatable || isValidHeroTarget || isChainPickValid || attachPickEligibleHero || isZonePickHero || spellPickEntry) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#fc69c6' } : undefined) })}>
                 {isChainPickSelected && <div className="chain-pick-number">{chainPickStep + 1}</div>}
                 {/* v718: dauerhaft uebernommener Held. Der pulsende
                     Rahmen allein sagt nur „hier stimmt etwas nicht" —
@@ -52138,6 +52426,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     // `useStickyHoverFlag` steckt in der Komponente und
                     // faengt den verlorenen mouseleave ab, der beim
                     // Bildtausch unter dem Zeiger entsteht.
+                    // ★ HELD ALS KREATUR (Hulijing, 24.10.): liegt eine Kreatur auf dem Helden, zeigt das Brett SIE (HP/ATK bleiben die des Helden),
+                    // beim Hovern kommt der Held zum Vorschein — dieselbe Richtung wie bei „Monster Nest" (`nestedUnder`).
+                    if (hero.heldKreatur && CARDS_BY_NAME[hero.heldKreatur.name]) {
+                      return <AttachableCreatureCard
+                        creatureName={hero.heldKreatur.name}
+                        heldHero={hero.name}
+                        {...heroCardProps} />;
+                    }
                     if (hero._shapeshiftBase && CARDS_BY_NAME[hero._shapeshiftBase]) {
                       return <AttachableCreatureCard
                         creatureName={hero.name}
@@ -52180,7 +52476,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     Gelähmt (Frozen/Stunned/Webbed) → Frame steht still;
                     versteinert → zusätzlich Steinoptik. Name wie auf der
                     Karte (vorgezogene Gestalt, Shapeshifter-Kopie). */}
-                {heldenFigurenZeigen && hero?.name && !isDead && !isRamming && (() => {
+                {heldenFigurenZeigen && hero?.name && !isDead && !isRamming && !hero.heldKreatur && (() => {
                   const skinFuer = (n) => { const sk = n ? p?.deckSkins?.[n] : null; return (sk && HeroIdleAnims.hatAnimation(sk)) ? sk : n; };
                   const basis = (
                   <HeroIdleSprite

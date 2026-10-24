@@ -2888,6 +2888,47 @@ const ZONE_ANIM_SFX = {
     { name: 'heavy_impact', opts: { rate: 0.9, volume: 0.55, delay: 600, category: null, dedupe: 0 } },
     { name: 'debuff',       opts: { rate: 0.7, volume: 0.6,  delay: 640, category: null, dedupe: 0 } },
   ],
+  // Welle 4 (24.10.) — Pinaxolotl: Blasen steigen (Wasser, 0 ms) und zerplatzen (Ping, ~400 ms). Nur der erste Teil übernimmt die Sammelkategorie 'effect'.
+  pinaxolotl_bubbles: [
+    { name: 'elem_water', opts: { rate: 1.6, volume: 0.4 } },
+    { name: 'ping',       opts: { rate: 2.2, volume: 0.25, delay: 380, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.8, volume: 0.2,  delay: 520, category: null, dedupe: 0 } },
+  ],
+  // Lamenting Knight: heilende Tränen — Tränen quellen (Wasser, 0 ms) und tropfen (Pings), fliegen (~470 ms), der Regen setzt ein, Heilklang beim Einschlag (~940 ms) mit nachtropfenden Pings.
+  // Nur der erste Teil übernimmt die Sammelkategorie 'effect'. `lament_rain` (nur der Regen, entkoppeltes Bild einer negierten Karte) tropft und heilt leise.
+  lament_tears: [
+    { name: 'elem_water', opts: { rate: 1.9, volume: 0.35 } },
+    { name: 'ping',       opts: { rate: 2.4, volume: 0.2,  delay: 300,  category: null, dedupe: 0 } },
+    { name: 'elem_water', opts: { rate: 1.3, volume: 0.4,  delay: 470,  category: null, dedupe: 0 } },
+    { name: 'heal',       opts: { rate: 1.15, volume: 0.6, delay: 940,  category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.6, volume: 0.18, delay: 1060, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 3.0, volume: 0.15, delay: 1200, category: null, dedupe: 0 } },
+  ],
+  lament_rain: [
+    { name: 'elem_water', opts: { rate: 1.5, volume: 0.35 } },
+    { name: 'heal',       opts: { rate: 1.15, volume: 0.45, delay: 120, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.6, volume: 0.18, delay: 420, category: null, dedupe: 0 } },
+  ],
+  // Motharch Squire: goldener Mottenstaub rieselt (weicher Zauberklang, 0 ms), Funkeln (~300 ms).
+  moth_dust: [
+    { name: 'buff', opts: { rate: 1.5, volume: 0.45 } },
+    { name: 'ping', opts: { rate: 2.6, volume: 0.22, delay: 300, category: null, dedupe: 0 } },
+  ],
+  // Hulijing (Held als Kreatur): Verwandlung — dunkler Zauberklang, Wind (Fuchsfeuer, ~150 ms), Ping beim Blitz (~650 ms); Löschen am Zugende — kurzes Verpuffen.
+  hero_creature_on: [
+    { name: 'elem_dark', opts: { rate: 1.1, volume: 0.45 } },
+    { name: 'elem_wind', opts: { rate: 1.3, volume: 0.3, delay: 150, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 1.8, volume: 0.3, delay: 650, category: null, dedupe: 0 } },
+  ],
+  hero_creature_off: [
+    { name: 'elem_wind', opts: { rate: 1.6, volume: 0.35 } },
+    { name: 'ping',      opts: { rate: 1.2, volume: 0.2, delay: 120, category: null, dedupe: 0 } },
+  ],
+  // Arnold: Muskelspiel — Stärkung (0 ms), heller Heilklang (~120 ms) für die zusätzlichen HP.
+  arnold_flex: [
+    { name: 'buff', opts: { rate: 0.9, volume: 0.7 } },
+    { name: 'heal', opts: { rate: 1.4, volume: 0.35, delay: 120, category: null, dedupe: 0 } },
+  ],
   // Zira Racer (24.10.) — der AUFPRALL des Rammens klingt nach seiner Wucht (`wucht` 1..3 = Level der abgeworfenen Karte): ein kurzer Schlag und Ping bei Lv1, ab Lv2 dazu der harte Treffer,
   // bei Lv3 zusätzlich tiefes Poltern der Brocken. Das Anrasen selbst vertont `attack_ram` (Ramm-Animation). Delays > 0 laufen mit dem Einbau der Animation (= Berührung); nur der erste
   // Teil übernimmt die Sammelkategorie 'effect'.
@@ -6035,19 +6076,23 @@ window.SkinHolo = SkinHolo;
  * Skin-Karten (`.skin-holo-name`), ohne Bild-Foil; in Grossansichten (>= 240 px) zusaetzlich als zweite Schicht der Glanz
  * auf allem uebrigen Text (`.skin-holo-text`). In Kleinansichten entfaellt sie — dort ist der Name nicht lesbar.
  */
-function FoilName({ card, tone, fkey }) {
+function FoilName({ card, tone, fkey, werte }) {
   const [ref, breit] = useEffektHuelle(ppEffektMin());
-  const [daten, setDaten] = useState(() => (card && window.CardRender && window.CardRender.nameCached(card)) || null);
+  // `werte`: Zahlen, die statt der gedruckten aufs Kartenbild kommen ({ hp, lv, kost, noHp, noAtk }) — die Maske des Glanzes bekommt dieselben,
+  // sonst glänzt die Schraffur auf dem gedruckten Wert statt auf dem sichtbaren.
+  const wk = werte ? JSON.stringify(werte) : '';
+  const [daten, setDaten] = useState(() => (card && window.CardRender && window.CardRender.nameCached(card, werte)) || null);
   useEffect(() => {
     let lebt = true;
     if (!card || !breit) return undefined;
-    const fertig = window.CardRender.nameCached(card);
+    const fertig = window.CardRender.nameCached(card, werte);
     if (fertig) { setDaten(fertig); return undefined; }
+    setDaten(null);
     window.CardImageShim.boot()
-      .then(() => window.CardRender.nameShimmerFor(card))
+      .then(() => window.CardRender.nameShimmerFor(card, werte))
       .then(d => { if (lebt) setDaten(d || null); });
     return () => { lebt = false; };
-  }, [card?.name, breit]);
+  }, [card?.name, breit, wk]);
   fkey = fkey || 'card:' + (card?.name || '');
   const phase = usePhase(fkey);
   // Auch der ÜBRIGE Text der Karte (Fähigkeitsfelder, Werte, Regeltext) bekommt den Glanz (Als Vorgabe 12.10.). Eigene Hülle mit
@@ -6139,7 +6184,7 @@ function FoilRim({ rim, fkey }) {
   );
 }
 
-function CardFoil({ card, foilType, skin }) {
+function CardFoil({ card, foilType, skin, werte }) {
   const type = foilType || card?.foil || null;
   const isFoil = type === 'secret_rare' || type === 'diamond_rare';
   const klein = useContext(FoilKleinContext);
@@ -6196,7 +6241,7 @@ function CardFoil({ card, foilType, skin }) {
         <FoilOverlay foilType={type} bands={meta.bands} motes={meta.motes}
           sparkles={meta.sparkles} shimmerOffset={meta.shimmerOffset} klein={klein} fkey={fkey} />
       )}
-      {foilSchicht && !klein && skinHoloAktiv() && <FoilName card={card} tone={type === 'diamond_rare' ? 'diamond' : 'gold'} fkey={fkey} />}
+      {foilSchicht && !klein && skinHoloAktiv() && <FoilName card={card} tone={type === 'diamond_rare' ? 'diamond' : 'gold'} fkey={fkey} werte={werte} />}
       {holoSkin && <SkinHolo skin={skin} fkey={fkey} />}
       {schraffur && <FoilHatch card={card} fkey={fkey} />}
       {rahmen && <FoilRim rim={rahmen} fkey={fkey} />}
@@ -8767,6 +8812,20 @@ function TTTokenBox({ token }) {
     </TTBox>
   );
 }
+/**
+ * Zweite Karte unter dem Tooltip der ersten (`card._darunterKarte`): der Tooltip der Karte, die zugleich gilt — z. B. Hulijing, the Foxdemon als Held, solange sie eine Kreatur ist
+ * („Hero treated as a Creature"). Oben steht die Kreatur (was das Brett zeigt), darunter der volle Tooltip des Helden mit seinen Live-Werten. Die zweite Karte hat keine eigene zweite.
+ */
+function TTZweiteKarte({ card, titel }) {
+  const color = tooltipTypeColor(card.cardType);
+  return (
+    <TTBox color={color} className="tt-zweite">
+      {titel && <div className="tt-token-kopf"><span className="tt-token-marke">{titel}</span></div>}
+      <div className="tt-zweite-inhalt"><CardTooltipContent card={{ ...card, _darunterKarte: null }} /></div>
+    </TTBox>
+  );
+}
+
 /** Rubrik am Ende des Tooltips: je genanntem Token ein Kasten; ohne Token nichts. */
 function TTTokenSektion({ card }) {
   const tokens = ttRelatedTokens(card);
@@ -8962,7 +9021,7 @@ function CardTooltipContent({ card, children, imageUrl }) {
             border: foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)'
                  : foilType === 'secret_rare' ? '2px solid rgba(250,213,74,.5)' : 'none'
           }} />
-          <CardFoil card={card} skin={skinOfUrl(imgUrl)} />
+          <CardFoil card={card} skin={skinOfUrl(imgUrl)} werte={bildHp != null ? { hp: bildHp } : null} />
         </div>
       )}
       <div>
@@ -9022,6 +9081,8 @@ function CardTooltipContent({ card, children, imageUrl }) {
           {children}
           {/* Genannte Tokens (Bild + Effekt) ganz unten — in jedem Menue und Modus (Als Vorgabe 20.10.) */}
           <TTTokenSektion card={card} />
+          {/* Zweite Karte, die zugleich gilt (verwandelte Hulijing: oben die Kreatur, darunter der Held) */}
+          {card._darunterKarte && <TTZweiteKarte card={card._darunterKarte} titel={card._darunterTitel} />}
         </div>
       </div>
     </>

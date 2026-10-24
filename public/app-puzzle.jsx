@@ -2356,6 +2356,9 @@ function PuzzleCreator() {
             p.heroes[hi].hp = entityData.data.hp;
             p.heroes[hi].maxHp = entityData.data.maxHp;
             p.heroes[hi].atk = entityData.data.atk;
+            // Hulijing: die aufliegende Kreatur zieht mit dem Helden um (und bleibt nicht am Platz zurück).
+            if (entityData.data.heldKreatur && entityData.data.hp > 0) p.heroes[hi].heldKreatur = { name: entityData.data.heldKreatur.name };
+            else delete p.heroes[hi].heldKreatur;
             if (entityData.data.hp <= 0) {
               p.heroes[hi].statuses = {};
               p.heroes[hi].buffs = undefined;
@@ -2829,6 +2832,9 @@ function PuzzleCreator() {
   // ueberhaupt nicht testen — dieselbe Begruendung wie bei Waflavs
   // Evolution Counters. Null fuer alle anderen Helden.
   const [editCeciliaDefeated, setEditCeciliaDefeated] = useState(null);
+  // Hulijing, the Foxdemon (Welle 4): die Kreatur, die gerade AUF ihr liegt („Hero treated as a Creature", `hero.heldKreatur = { name }`). Der Server legt sie beim Puzzle-Start auf
+  // (ohne Einsatz-Effekt, ohne Beschwörung) — sie gilt bis zum Zugende und wird dann gelöscht. '' = keine; null für alle anderen Helden.
+  const [editHeldKreatur, setEditHeldKreatur] = useState(null);
   // Diamond, the Keeper of Peace: HP, die sie durch ihren eigenen Effekt
   // verloren hat (`hero._diamondSelfLoss`) — Aufstiegsbedingung von
   // „Diamond, the Bulwark of Peace" (150). Null fuer andere Helden.
@@ -2954,6 +2960,7 @@ function PuzzleCreator() {
     setEditEvolutionCounter(null);
     setEditInvestCounter(null);
     setEditCeciliaDefeated(null);
+    setEditHeldKreatur(null);
     setEditDiamondLoss(null);
     setEditJeGetroffen(null);
     setEditBalanceCounter(null);
@@ -2998,6 +3005,7 @@ function PuzzleCreator() {
       setEditCeciliaDefeated(h.name === 'Cecilia, the Harrowing Crusader'
         ? !!h._ceciliaDefeatedOnce
         : null);
+      setEditHeldKreatur(h.name === 'Hulijing, the Foxdemon' ? (h.heldKreatur?.name || '') : null);
       setEditDiamondLoss(h.name === 'Diamond, the Keeper of Peace'
         ? (h._diamondSelfLoss || 0)
         : null);
@@ -3182,6 +3190,11 @@ function PuzzleCreator() {
         }
         // Logan: Invest Counters. Gleiche Speicherform, damit Server
         // und Client sie ohne Sonderfall durchreichen.
+        // Hulijing: aufliegende Kreatur — nur auf einem lebenden Helden (ein gefallener trägt keine).
+        if (editHeldKreatur != null) {
+          if (editHeldKreatur && p.heroes[hi].hp > 0) p.heroes[hi].heldKreatur = { name: editHeldKreatur };
+          else delete p.heroes[hi].heldKreatur;
+        }
         if (editCeciliaDefeated != null && editCeciliaDefeated) {
           p.heroes[hi]._ceciliaDefeatedOnce = true;
         } else if (editCeciliaDefeated != null) {
@@ -3357,7 +3370,7 @@ function PuzzleCreator() {
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editSkin, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editDiamondLoss, editJeGetroffen, editBountyMark, editBalanceCounter, editApplause, editBunnyBombCounter, editDemonCounter, editSparkflyGifts, editAntiMagicLevel, editRegenerationLevel, updatePlayer, getCard, statusScopePasst]);
+  }, [editTarget, editSkin, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editHeldKreatur, editDiamondLoss, editJeGetroffen, editBountyMark, editBalanceCounter, editApplause, editBunnyBombCounter, editDemonCounter, editSparkflyGifts, editAntiMagicLevel, editRegenerationLevel, updatePlayer, getCard, statusScopePasst]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -3369,7 +3382,7 @@ function PuzzleCreator() {
       setEditHp('0');
       setEditStatuses({});
       setEditBuffs({});
-      updatePlayer(si, (p) => { if (p.heroes[hi]) { p.heroes[hi].hp = 0; p.heroes[hi].statuses = {}; p.heroes[hi].buffs = undefined; } return p; });
+      updatePlayer(si, (p) => { if (p.heroes[hi]) { p.heroes[hi].hp = 0; p.heroes[hi].statuses = {}; p.heroes[hi].buffs = undefined; delete p.heroes[hi].heldKreatur; } return p; });
     } else {
       // Revive: set HP to maxHp
       const full = String(h.maxHp || 0);
@@ -3926,7 +3939,15 @@ function PuzzleCreator() {
                 data-hero-zone="1" data-hero-idx={hi} data-hero-owner={isOpp ? 'opp' : 'me'}
                 {...zh('hero', si, hi, 0)}>
                 {hero ? <>
-                  <BoardCard cardName={hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" skins={hero.skin ? { [hero.name]: hero.skin } : undefined} />
+                  <BoardCard cardName={(hero.heldKreatur?.name && CARDS_BY_NAME[hero.heldKreatur.name]) ? hero.heldKreatur.name : hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" skins={hero.skin ? { [hero.name]: hero.skin } : undefined}
+                    {...((hero.heldKreatur?.name && CARDS_BY_NAME[hero.heldKreatur.name] && CARDS_BY_NAME[hero.name]) ? { tooltipDarunter: { ...CARDS_BY_NAME[hero.name], _liveHp: hero.hp, _liveMaxHp: hero.maxHp, _liveAtk: hero.atk }, tooltipDarunterTitel: 'Also treated as a Hero' } : null)} />
+                  {hero.heldKreatur?.name && CARDS_BY_NAME[hero.heldKreatur.name] && (
+                    <div className="attached-hero-badge" data-pz-held-badge="1"
+                      title={`${hero.name} is treated as ${hero.heldKreatur.name} until the end of the turn`}
+                      style={{ position: 'absolute', top: 2, left: 2, background: 'rgba(0,0,0,.65)', color: '#f4ae64', fontSize: 10, padding: '1px 4px', borderRadius: 3, pointerEvents: 'none', zIndex: 5 }}>
+                      🦊 {(hero.name || '').split(',')[0]}
+                    </div>
+                  )}
                   {hero.statuses?.frozen && <FrozenOverlay />}
                   {(hero.statuses?.stunned || hero.statuses?.webbed) && <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>}
                   {hero.statuses?.negated && <NegatedOverlay />}
@@ -5227,6 +5248,26 @@ function PuzzleCreator() {
                 </div>
               </div>
             )}
+            {editHeldKreatur != null && (() => {
+              const kreaturen = Object.values(CARDS_BY_NAME).filter(c => c && c.cardType === 'Creature')
+                .sort((a, b) => (Number(a.level) || 0) - (Number(b.level) || 0) || a.name.localeCompare(b.name));
+              return (
+                <div style={{ marginBottom: 14 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                    🦊 Creature on this Hero
+                  </span>
+                  <select value={editHeldKreatur} onChange={(e) => setEditHeldKreatur(e.target.value)}
+                    data-pz-held-kreatur="1"
+                    style={{ display: 'block', width: '100%', marginTop: 6, fontSize: 12, padding: '4px 6px', background: 'var(--bg2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4 }}>
+                    <option value="">— none —</option>
+                    {kreaturen.map(c => <option key={c.name} value={c.name}>{`Lv ${c.level ?? 0} · ${c.name}`}</option>)}
+                  </select>
+                  <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 4 }}>
+                    "Hulijing, the Foxdemon" is treated as this Creature for the rest of the turn (HP unchanged, still a Hero) and the card is deleted at the end of the turn. It is placed without its "when you play" effect.
+                  </div>
+                </div>
+              );
+            })()}
             {editCeciliaDefeated != null && (
               <div style={{ marginBottom: 14 }}>
                 <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>

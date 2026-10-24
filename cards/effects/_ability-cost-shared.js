@@ -60,7 +60,13 @@ function targetsFor(engine, pi, heroIdx, kinds) {
   if (kinds.includes('ability')) {
     for (const a of abilities) {
       if (a.zoneKind !== 'support' && geschuetzteKopien(engine, a) >= (a.level || 1)) continue;   // alle Kopien dieses Platzes schon „abgeworfen" (geschützt)
-      if (a.zoneKind === 'support' && a.cardInstance && engine._laubGeschuetzt && engine._laubGeschuetzt.has(a.cardInstance.id)) continue;
+      // Support-STAPEL (Xal, Xalibur): je Karte eine Instanz, im Eintrag nur durch EINE vertreten — erst ausblenden, wenn ALLE Kopien des Stapels geschützt sind
+      // (sonst bezahlt ein Stapel der Höhe 2 nur einmal, und die Kosten bleiben unvollständig). Eine einzelne Karte (Cloak of Edge) ist der Sonderfall Höhe 1.
+      if (a.zoneKind === 'support' && a.cardInstance && engine._laubGeschuetzt && engine._laubGeschuetzt.size) {
+        const v = a.cardInstance;
+        const kopien = (engine.cardInstances || []).filter(c => c.zone === ZONES.SUPPORT && c.owner === v.owner && c.heroIdx === v.heroIdx && c.zoneSlot === v.zoneSlot && c.name === v.name);
+        if (kopien.length > 0 && kopien.every(c => engine._laubGeschuetzt.has(c.id))) continue;
+      }
       out.push({
         id: a.id, type: a.type, owner: a.owner, heroIdx: a.heroIdx, slotIdx: a.slotIdx,
         cardName: a.cardName, cardInstance: a.cardInstance || undefined,

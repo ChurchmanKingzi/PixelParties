@@ -920,6 +920,22 @@
     return meta;
   }
 
+  /** Abweichende Werte, die statt der gedruckten aufs Bild kommen (HP im Tooltip, Stufe/Kosten in der Hand, weggelassene Zahlen auf dem Brett).
+   *  Gemeinsam fuer das Kartenbild (`renderCard`) und die Namensmaske des Foils (`nameLayer`) — sonst glänzt die Schraffur auf dem gedruckten Wert. */
+  function applyOverrides(spec, card, o) {
+    if (o.hp != null) spec.hp = o.hp;
+    if (o.noHp) spec.noHp = true;
+    if (o.stufe >= 1 && o.stufe <= 3) spec.stufe = o.stufe;
+    if (o.noAtk) spec.noAtk = true;
+    // aktuelle Stufe / Kosten (Hand): gruen, wenn niedriger als gedruckt, rot, wenn hoeher; gleich -> unveraendert gedruckt
+    if (o.lv != null && card.level != null && o.lv !== card.level) { spec.lvOver = o.lv; spec.lvColor = o.lv < card.level ? OVER_GREEN : OVER_RED; }
+    // Variable Kosten („4X"): das X bleibt dran (aus 4X wird 8X); ein reines „X" hat keine Zahl, die man ersetzen koennte.
+    if (o.kost != null && card.cost != null && o.kost !== card.cost && (!card.costLabel || /^\d/.test(card.costLabel))) {
+      spec.costOver = o.kost + (card.costLabel ? String(card.costLabel).replace(/^\d+/, '') : '');
+      spec.costColor = o.kost < card.cost ? OVER_GREEN : OVER_RED;
+    }
+  }
+
   /**
    * Komplette Karte als Canvas.
    * @param {object} card  Karte aus cards.json
@@ -941,17 +957,7 @@
     const m = Object.assign({}, meta.cards[card.name]);
     if (skin) { if (skin.r) m.r = skin.r; if (skin.f) m.f = skin.f; }
     const spec = specFromCard(card, m, skin ? { name: skin.name || o.skin } : null);
-    if (o.hp != null) spec.hp = o.hp;
-    if (o.noHp) spec.noHp = true;
-    if (o.stufe >= 1 && o.stufe <= 3) spec.stufe = o.stufe;
-    if (o.noAtk) spec.noAtk = true;
-    // aktuelle Stufe / Kosten (Hand): gruen, wenn niedriger als gedruckt, rot, wenn hoeher; gleich -> unveraendert gedruckt
-    if (o.lv != null && card.level != null && o.lv !== card.level) { spec.lvOver = o.lv; spec.lvColor = o.lv < card.level ? OVER_GREEN : OVER_RED; }
-    // Variable Kosten („4X"): das X bleibt dran (aus 4X wird 8X); ein reines „X" hat keine Zahl, die man ersetzen koennte.
-    if (o.kost != null && card.cost != null && o.kost !== card.cost && (!card.costLabel || /^\d/.test(card.costLabel))) {
-      spec.costOver = o.kost + (card.costLabel ? String(card.costLabel).replace(/^\d+/, '') : '');
-      spec.costColor = o.kost < card.cost ? OVER_GREEN : OVER_RED;
-    }
+    applyOverrides(spec, card, o);
     // Skin-Holo: der Name steht golden auf der Karte (siehe unten, HOLO-TEXTUR); die schillernden Schichten
     // darueber zeichnet das Spiel als eigene DOM-Lage (SkinHolo in app-shared.jsx).
     if (skin && holoOn(skin)) spec.nameGold = true;
@@ -1162,8 +1168,9 @@
   }
 
   /** Nur der Namensumriss einer Karte (Super Rare / Diamond Rare tragen den Namensglanz ebenfalls). */
-  function nameLayer(card) {
+  function nameLayer(card, o) {
     const spec = specFromCard(card, meta.cards[card.name], null);
+    if (o) applyOverrides(spec, card, o);
     return { type: spec.type, nameStrip: NAME_STRIP, nameMask: nameMaskCanvas(spec, holoGeometry(spec.type)) };
   }
 
@@ -1243,7 +1250,18 @@
     return val;
   }
   function holoCached(skin) { return holoDone.get(skin) || null; }
-  function nameCached(card) { return nameDone.get(card.name) || null; }
+  /** Anhang des Schluessels fuer Karten mit abweichenden Werten (`|h=630|l=2|k=3|o=hp,atk`); leer ohne Abweichung. */
+  function nameVariant(card, o) {
+    if (!o) return '';
+    const t = [];
+    if (o.hp != null && o.hp !== card.hp) t.push('h=' + o.hp);
+    if (o.lv != null && card.level != null && o.lv !== card.level) t.push('l=' + o.lv);
+    if (o.kost != null && card.cost != null && o.kost !== card.cost) t.push('k=' + o.kost);
+    if (o.noHp) t.push('oh');
+    if (o.noAtk) t.push('oa');
+    return t.length ? '|' + t.join('|') : '';
+  }
+  function nameCached(card, o) { return nameDone.get(card.name + nameVariant(card, o)) || null; }
   function holoFor(card, skin) {
     if (!HOLO.on || !card || !skin) return Promise.resolve(null);
     const hit = holoDone.get(skin);
@@ -1378,28 +1396,28 @@
   function rimCached(rk) { return (rk && rimDone.get(rk.kind)) || null; }
 
   /** Namensglanz fuer Karten mit Foil (Super Rare / Diamond Rare): Umriss der Buchstaben + Lage. */
-  function nameShimmerFor(card) {
+  function nameShimmerFor(card, o) {
     if (!HOLO.on || !card) return Promise.resolve(null);
-    const hit = nameDone.get(card.name);
+    const sfx = nameVariant(card, o), nk = card.name + sfx;
+    const hit = nameDone.get(nk);
     if (hit) return Promise.resolve(hit);
-    const key = 'n:' + card.name;
+    const key = 'n:' + nk;
     if (holoWait.has(key)) return holoWait.get(key);
     const job = holoChain.then(async () => {
       await new Promise(r => setTimeout(r, 0));
-      const ck = 'n:' + card.name;
-      let rec = await cacheGet(ck);
+      let rec = await cacheGet(key);
       if (!(rec && rec.name instanceof Blob && rec.strip)) {
-        const L = nameLayer(card), name = await toBlob(L.nameMask);
+        const L = nameLayer(card, o), name = await toBlob(L.nameMask);
         if (!name) return null;
         rec = { name, strip: L.nameStrip };
-        cachePut(ck, rec, name.size);
+        cachePut(key, rec, name.size);
       }
       const url = urlOf(rec.name), strip = rec.strip;
-      return lru(nameDone, card.name, {
+      return lru(nameDone, nk, {
         vars: { '--sh-ny': pc(strip.y, H), '--sh-nh': pc(strip.h, H), '--sh-name': 'url(' + url + ')' },
         urls: [url],
       }, NAME_MAX);
-    }).catch(err => { console.warn('[card-render] Namensglanz', card.name, err && err.message); return null; })
+    }).catch(err => { console.warn('[card-render] Namensglanz', nk, err && err.message); return null; })
       .finally(() => holoWait.delete(key));
     holoChain = job.catch(() => {});
     holoWait.set(key, job);
