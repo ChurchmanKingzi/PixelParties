@@ -5,12 +5,12 @@
 //
 //  ── MODELL ──────────────────────────────────────────────────────────
 //  Der Held bleibt ein Held (eigene HP, Abilities, Statuswerte, Heldeneffekt, Zonen). Zusätzlich LIEGT eine Kreaturenkarte „auf" ihm:
-//    • Instanz in `zone: 'support'` (wie jede Kreatur — Skripte, die `ctx.card.zone !== 'support'` als „Karte liegt noch am Brett" prüfen, funktionieren so
-//      unverändert), aber OHNE Zonenplatz: `zoneSlot` = -1, `heroIdx` = Wirt, `heroOwner` = Brettseite des Wirts, Marke `counters._heldKreatur = { seite, heroIdx }`
-//      (`istUeberlagerung(inst)`). Ihr Platz steht in KEINEM `supportZones`-Array: alle Schleifen über die Zonen-Arrays (Brettdarstellung, Platz-Zähler, Zonen-
-//      Aufräumen) sehen sie nicht; Schleifen über `cardInstances` („alle Kreaturen, die ich kontrolliere") sehen sie — „treated as a Creature". Die Hooks des
-//      Skripts (Einsatz, Tod, Zugende, Passive, aktiver Effekt …) laufen mit `cardHeroIdx` = Wirt, `cardHeroOwner` = Brettseite, `card.zoneSlot` = -1
-//      (Animationen fallen damit auf die Heldenzone zurück).
+//    • Instanz in der EIGENEN Zone `'heroOverlay'` (`ZONES.HERO_OVERLAY`), `zoneSlot` = -1, `heroIdx` = Wirt, `heroOwner` = Brettseite des Wirts, Marke `counters._heldKreatur = { seite,
+//      heroIdx }` (`istUeberlagerung(inst)`). Bewusst NICHT `zone: 'support'`: die vielen Schleifen über `cardInstances` mit `zone === 'support'` (Zielwahlen, Opfer, Rückgaben,
+//      Kontrollwechsel …) sehen sie nicht — die Kreatur kann nirgendwohin bewegt werden und soll darum nie als Ziel eines wegbewegenden Effekts dastehen. Als Kreatur eingebunden ist sie nur
+//      an den Stellen, die dieser Baustein ausdrücklich bedient (zentrale Zielsammler, Flächenschläge, Tod, aktiver Effekt). Die Hooks ihres Skripts laufen wie in einer Support Zone
+//      (`isActiveIn`: heroOverlay gilt als support) mit `cardHeroIdx` = Wirt, `cardHeroOwner` = Brettseite, `card.zoneSlot` = -1; ihr Skript sieht `ctx.card.zone === 'support'`
+//      (`skriptSicht`, damit Riegel wie `ctx.card.zone !== 'support'` stimmen).
 //    • Am Helden: `hero.heldKreatur = { instId, name, turn, _tot? }` — das ist, was der Client zeichnet und was alle Leser abfragen (`istHeldKreatur`).
 //  HP: UNVERÄNDERT. Die Kreatur hat keinen eigenen Lebenspunktestand: Schaden an der Instanz wird auf den Helden gebucht (derselbe Weg wie bei geteilten HP,
 //  `_reroutePooledCreatureDamage`).
@@ -32,9 +32,22 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
-const { hasCardType, isArtifactCreature, isSummonablePileCreature } = require('./_hooks');
+const { hasCardType, isArtifactCreature, isSummonablePileCreature, baseCardName } = require('./_hooks');
 
-const ZONE = 'support';
+const ZONE = 'heroOverlay';
+
+/**
+ * Die SICHT der Kartenskripte auf ihre Überlagerung: dieselbe Instanz, nur mit `zone === 'support'`. Skripte prüfen oft `ctx.card.zone !== 'support'` als „die Karte liegt noch am Brett"
+ * (z. B. nach einer Animationspause) — für die eigene Überlagerung muss das stimmen, während fremde Schleifen über `cardInstances` sie (Zone `heroOverlay`) nicht sehen. Schreibzugriffe
+ * gehen an die echte Instanz; die Sicht ist je Instanz gespeichert (stabile Identität). Gebaut in `engine._createContext` (`ctx.card`).
+ */
+function skriptSicht(inst) {
+  if (!inst || !inst.counters?._heldKreatur) return inst;
+  if (inst._skriptSicht) return inst._skriptSicht;
+  const sicht = new Proxy(inst, { get: (ziel, k) => (k === 'zone' ? 'support' : Reflect.get(ziel, k, ziel)) });
+  Object.defineProperty(inst, '_skriptSicht', { value: sicht, enumerable: false, configurable: true, writable: true });
+  return sicht;
+}
 
 /** Ist diese Instanz die auf einem Helden liegende Kreatur („Held als Kreatur")? */
 function istUeberlagerung(inst) {
@@ -171,6 +184,37 @@ function kandidaten(engine, pi, seite, heroIdx, maxExklusiv) {
   return out;
 }
 
+/** Die Überlagerungs-Instanz anlegen und am Helden vermerken (ohne Einsatz-Hook, ohne Zähler, ohne Flug). */
+function erzeugen(engine, pi, seite, heroIdx, name, turn) {
+  const hero = engine.gs.players[seite]?.heroes?.[heroIdx];
+  const inst = engine._trackCard(name, pi, ZONE, heroIdx, -1);
+  inst.controller = pi;
+  inst.heroOwner = seite;
+  inst.turnPlayed = turn;
+  inst.counters = inst.counters || {};
+  inst.counters._heldKreatur = { seite, heroIdx };
+  inst.counters._hasHaste = true;
+  // HP-Anzeige für Leser, die `counters.currentHp` lesen: Spiegel der Heldenwerte zum Zeitpunkt des Auflegens (Schaden wird ohnehin auf den Helden gebucht).
+  inst.counters.maxHp = hero.maxHp || hero.hp;
+  inst.counters.currentHp = hero.hp;
+  hero.heldKreatur = { instId: inst.id, name, turn };
+  return inst;
+}
+
+/**
+ * Puzzle-Start (Editor-Feld „Creature on this Hero"): die Kreatur liegt schon auf dem Helden, ohne dass sie je ausgespielt wurde — kein Einsatz-Hook, kein Beschwörungszähler,
+ * kein Eintritts-Limit, kein Flug. Sie gehört dem Spieler der Brettseite (der Held ist nicht übernommen) und darf sofort ihren aktiven Effekt nutzen; am Zugende wird sie gelöscht.
+ * @returns {object|null} die Überlagerung oder null (Karte unbekannt / keine Kreatur / Held fehlt oder gefallen / schon belegt)
+ */
+function anlegenOhneEinsatz(engine, seite, heroIdx, name) {
+  const gs = engine.gs;
+  const hero = gs.players[seite]?.heroes?.[heroIdx];
+  const cd = engine._getCardDB()[name];
+  if (!hero?.name || !(hero.hp > 0) || !cd || !hasCardType(cd, 'Creature') || isArtifactCreature(cd)) return null;
+  if (hero.heldKreatur && hero.heldKreatur.instId) return null;
+  return erzeugen(engine, seite, seite, heroIdx, name, 0);
+}
+
 /**
  * Die Karte `name` aus `pile` ('hand' | 'deck') auf den Helden legen. Zählt als Platzierung (= Beschwörung im Sinne der Zähler): Flug zur Heldenzone, Einsatz-Hook
  * (`onPlay`, „When you summon this Creature"), Beschwörungszähler, Eintritts-Limit. Die Karte darf sofort ihren aktiven Effekt benutzen („Haste": der Held selbst
@@ -188,26 +232,14 @@ async function platzieren(engine, pi, seite, heroIdx, name, pile, opts = {}) {
   engine._pileFlight(pi, taken.name, pile, 'hero', {
     toHeroIdx: heroIdx, ...(seite !== pi ? { toOwner: seite } : {}), ...(pile === 'hand' ? { fromHandIdx: taken.idx } : {}),
   });
-  const inst = engine._trackCard(taken.name, pi, ZONE, heroIdx, -1);
-  inst.controller = pi;
-  inst.heroOwner = seite;
-  inst.turnPlayed = gs.turn || 0;
-  inst.counters = inst.counters || {};
-  inst.counters._heldKreatur = { seite, heroIdx };
-  inst.counters._hasHaste = true;
-  const cd = engine._getCardDB()[taken.name];
-  // HP-Anzeige für Leser, die `counters.currentHp` lesen: Spiegel der Heldenwerte zum Zeitpunkt des Auflegens (Schaden wird ohnehin auf den Helden gebucht).
-  inst.counters.maxHp = hero.maxHp || hero.hp;
-  inst.counters.currentHp = hero.hp;
-  void cd;
-  hero.heldKreatur = { instId: inst.id, name: taken.name, turn: gs.turn || 0 };
+  const inst = erzeugen(engine, pi, seite, heroIdx, taken.name, gs.turn || 0);
   engine._stempelEintrittsLimit(taken.name, pi);
   engine.zaehleBeschwoerung(pi);
   engine.log('hero_creature_placed', { player: ps.username, hero: hero.name, creature: taken.name, from: pile });
   engine.sync();
   // Einsatz-Hook der Kreatur selbst („When you play/summon this Creature") — wie jede Platzierung (`actionPlaceCreature`).
   await engine.runHooks('onPlay', {
-    _onlyCard: inst, playedCard: inst, cardName: taken.name, zone: 'support', heroIdx, zoneSlot: -1,
+    _onlyCard: inst, playedCard: skriptSicht(inst), cardName: taken.name, zone: 'support', heroIdx, zoneSlot: -1,
     _isPlacement: true, _summonedFromPile: pile, _skipReactionCheck: true,
   });
   engine.sync();
@@ -311,11 +343,44 @@ async function bewegungAbfangen(engine, inst, toZone, opts = {}) {
 }
 
 /**
- * Ziel-Einträge der Überlagerungen für eine Wahl, die NUR Kreaturen zulässt (Aufruf aus dem Ziel-Sammler der Engine). `seiteFilter(inst)` entscheidet nach der
- * Kontrolle der Überlagerung („my"/„enemy"/„any").
+ * Karten, deren Wahl (über die zentralen Ziel-Sammler `promptDamageTarget` / `promptMultiTarget`) eine gewählte Kreatur aus ihrer Zone WEGBEWEGT — auf die Hand, ins Deck oder
+ * unter fremde Kontrolle in eine andere Zone. Die aufliegende Kreatur des Helden kann nirgendwohin bewegt werden: solche Wahlen bieten den Helden gar nicht erst an (er soll
+ * nicht wählbar sein und dann ins Leere laufen). Neue Karten dieser Art tragen sich hier ein oder setzen `movesTarget: true` im Wahl-Config. Karten, die ihre Kreaturenliste selbst
+ * über die Support Zones bauen (Capture Net, Kidnapping, Dark Gear, Diplomacy, Tengu Windstorm …), bieten die aufliegende Kreatur ohnehin nie an.
  */
-function zielEintraege(engine, brettSeite, seiteFilter) {
+const WEGBEWEGENDE_WAHL = new Set(['Capture', 'Missing People', 'Racket Arrow']);
+
+/** Darf die aufliegende Kreatur in dieser Wahl überhaupt angeboten werden? (false bei Wahlen, die das Ziel wegbewegen) */
+function alsKreaturWaehlbar(engine, config, quellName) {
+  if (config && config.movesTarget) return false;
+  const quellen = [quellName, engine?._currentEffectSource?.cardName];
+  for (const q of quellen) if (q && WEGBEWEGENDE_WAHL.has(baseCardName(q))) return false;
+  return true;
+}
+
+/**
+ * Zielwahlen, die eine Karte über ihre EIGENE Liste baut (nicht über die zentralen Sammler `promptDamageTarget` / `promptMultiTarget`), bieten die aufliegende Kreatur nicht an: ein
+ * Eintrag mit der Überlagerung als `cardInstance`, den `zielEintraege` nicht selbst erzeugt hat (`alsKreatur`), fliegt hier heraus (in place). Grund: viele solcher Listen laufen
+ * über `cardInstances` (Zone support) und gehören Karten, die ihr Ziel WEGBEWEGEN (Hand, Deck, andere Zone, Kontrolle) — die Kreatur kann aber nirgendwohin. Aufgerufen aus
+ * `engine.promptEffectTarget` (alle Effekt-Wahlen) und `normalizeValidTargets` (server.js, Zielwahl-Karten mit `getValidTargets`).
+ */
+function entferneFremdeUeberlagerungen(liste) {
+  if (!Array.isArray(liste)) return liste;
+  for (let i = liste.length - 1; i >= 0; i--) {
+    const t = liste[i];
+    const inst = t?.cardInstance || t?._cardInstance;
+    if (inst?.counters?._heldKreatur && !t.alsKreatur) liste.splice(i, 1);
+  }
+  return liste;
+}
+
+/**
+ * Ziel-Einträge der Überlagerungen für eine Wahl, die NUR Kreaturen zulässt (Aufruf aus dem Ziel-Sammler der Engine). `seiteFilter(inst)` entscheidet nach der
+ * Kontrolle der Überlagerung („my"/„enemy"/„any"). Wahlen, die das Ziel wegbewegen (`alsKreaturWaehlbar`), erhalten gar keinen Eintrag.
+ */
+function zielEintraege(engine, brettSeite, seiteFilter, config, quellName) {
   const out = [];
+  if (!alsKreaturWaehlbar(engine, config, quellName)) return out;
   const ps = engine.gs.players[brettSeite];
   if (!ps) return out;
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
@@ -331,6 +396,6 @@ function zielEintraege(engine, brettSeite, seiteFilter) {
 }
 
 module.exports = {
-  ZONE, istUeberlagerung, spiegeln, ueberlagerung, istHeldKreatur, wirtVon, aktivierbareEintraege, ablehnungsgrund, schulStufe, kandidaten,
-  platzieren, entfernen, zugendeAufraeumen, heldStirbt, bewegungAbfangen, zielEintraege,
+  ZONE, skriptSicht, istUeberlagerung, spiegeln, ueberlagerung, istHeldKreatur, wirtVon, aktivierbareEintraege, ablehnungsgrund, schulStufe, kandidaten,
+  platzieren, anlegenOhneEinsatz, entfernen, zugendeAufraeumen, heldStirbt, bewegungAbfangen, zielEintraege, alsKreaturWaehlbar, WEGBEWEGENDE_WAHL, entferneFremdeUeberlagerungen,
 };

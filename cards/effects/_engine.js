@@ -473,7 +473,8 @@ class CardInstance {
     const script = override ? loadCardEffect(override) : this.loadScript();
     if (!script) return false;
     if (!script.activeIn) return true; // No restriction = always active
-    const z = zone || this.zone;
+    // ★ HELD ALS KREATUR (Hulijing, 24.10.): die Überlagerung eines Helden (`heroOverlay`) feuert die Hooks ihrer Kreatur wie in einer Support Zone.
+    const z = ((zone || this.zone) === ZONES.HERO_OVERLAY) ? ZONES.SUPPORT : (zone || this.zone);
     // ★ ANGELEGTE HELDEN (Als Bugmeldung 28.8.) ─────────────────────
     // Ein Held, der als Ausruestung an einem anderen Helden liegt
     // (Initiation Ritual, `treatAsEquip`), steht in einer SUPPORT
@@ -4152,12 +4153,12 @@ class GameEngine {
       set amount(v) { hookCtx.amount = v; hookCtx._flat = 0; hookCtx._mul = 1; },   // absolut (wie setAmount): zaehlt NICHT als Senkung fuer den Kettenbetrag (W50a)
 
       // ── Card-specific info (always refers to the card whose hook is firing) ──
-      card: cardInstance,
+      card: cardInstance.counters?._heldKreatur ? require('./_hero-creature-shared').skriptSicht(cardInstance) : cardInstance,   // Held als Kreatur: das Skript sieht `zone === 'support'`
       cardName: cardInstance.name,
       cardOwner: effectiveOwner,
       cardOriginalOwner: cardInstance.owner, // Always the original owner (for flag keys, etc.)
       cardController: effectiveController,
-      cardZone: cardInstance.zone,
+      cardZone: cardInstance.counters?._heldKreatur ? ZONES.SUPPORT : cardInstance.zone,
       cardHeroIdx: cardInstance.heroIdx,
       cardHeroOwner: effectiveHeroOwner,
       attachedHero: cardInstance.heroIdx >= 0
@@ -5298,7 +5299,7 @@ class GameEngine {
           }
           // ★ HELD ALS KREATUR (Hulijing): eine Wahl NUR für Kreaturen bietet auch einen Helden mit aufliegender Kreatur an (mit Helden zusammen steht er ohnehin als Held da).
           if (!types.includes('hero')) {
-            for (const t of require('./_hero-creature-shared').zielEintraege(engine, playerIdx, (_i) => engine.kreaturPasstZurSeite(_i, side, pi))) {
+            for (const t of require('./_hero-creature-shared').zielEintraege(engine, playerIdx, (_i) => engine.kreaturPasstZurSeite(_i, side, pi), config, ctx.cardName)) {
               if (config.condition && !config.condition(t, engine)) {
                 if (!config.dimUnmetCondition) continue;
                 t.ineligible = true;
@@ -5911,7 +5912,7 @@ class GameEngine {
           }
           // ★ HELD ALS KREATUR (Hulijing): eine Wahl NUR für Kreaturen bietet auch einen Helden mit aufliegender Kreatur an (mit Helden zusammen steht er ohnehin als Held da).
           if (!types.includes('hero')) {
-            for (const t of require('./_hero-creature-shared').zielEintraege(engine, playerIdx, (_i) => engine.kreaturPasstZurSeite(_i, side, pi))) {
+            for (const t of require('./_hero-creature-shared').zielEintraege(engine, playerIdx, (_i) => engine.kreaturPasstZurSeite(_i, side, pi), config, ctx.cardName)) {
               if (config.condition && !config.condition(t, engine)) {
                 if (!config.dimUnmetCondition) continue;
                 t.ineligible = true;
@@ -17551,6 +17552,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @returns {{ success: boolean }}
    */
   async actionTransferCreature(inst, toPlayerIdx, destHeroIdx, destSlotIdx, opts = {}) {
+    // ★ HELD ALS KREATUR (Hulijing): die aufliegende Kreatur wechselt nie den Platz oder die Kontrolle (Sicherung; die Wahllisten bieten sie schon nicht an).
+    if (inst?.counters?._heldKreatur) return { success: false, heldKreatur: true };
     const gs = this.gs;
     const fromPlayerIdx = inst.controller ?? inst.owner;
     const fromPs = gs.players[fromPlayerIdx];
@@ -21612,7 +21615,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Held als Kreatur (Hulijing): „it is still treated as a Hero" — ist der Wirt stumm (Frozen / Stunned / Webbed / Negated), ruhen auch die Effekte der Karte.
     if (inst.counters?._heldKreatur) {
       const m = inst.counters._heldKreatur;
-      return this._isHeroEffectSilenced(m.seite, m.heroIdx);
+      if (this._isHeroEffectSilenced(m.seite, m.heroIdx)) return true;
+      // …und die Kreatur selbst kann gefroren/betäubt/negiert sein (Instant Cryo Stasis & Co.): dann gelten die Kreaturen-Prüfungen unten wie für jede Kreatur.
     }
     const c = inst.counters || {};
     // ★ v1280: `ignoriereFrozen` — NUR fuer die Wirksamkeitspruefung des
@@ -29603,6 +29607,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   actionStealCreature(stealerPi, inst, opts = {}) {
     if (!inst || inst.zone !== 'support') return false;
+    if (inst.counters?._heldKreatur) return false;   // ★ HELD ALS KREATUR (Hulijing): nicht stehlbar (Sicherung)
     // Styx 28.9.: bestohlen wird der KONTROLLEUR. Eine ueber einen
     // geliehenen Helden beschworene Kreatur steht beim Gegner (`owner`),
     // gehoert aber ihrem Beschwoerer — der Brettbesitzer darf sie stehlen,
@@ -32037,6 +32042,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // auslaeuft statt auf eine Antwort zu warten, die nie kommt.
     if (this._aborted) return null;
     if (!validTargets || validTargets.length === 0) return [];
+    // ★ HELD ALS KREATUR (Hulijing): selbst gebaute Listen bieten die aufliegende Kreatur nicht an (sie kann nirgendwohin bewegt werden; die zentralen Sammler setzen sie bewusst selbst dazu).
+    require('./_hero-creature-shared').entferneFremdeUeberlagerungen(validTargets);
+    if (validTargets.length === 0) return [];
 
     // Z1 (A03-26, A08-30, A01-34, H04-10 …): Ziel-IDs/`owner` der Support-Kreaturen auf die
     // BRETTSEITE normieren — fuer MENSCH UND CPU. Karten, die ihre Liste selbst bauen, schreiben
@@ -46551,15 +46559,15 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async sendBoardCardToDiscard(inst, opts = {}) {
     if (!inst) return false;
-    const zone = inst.zone;
-    if (zone !== ZONES.SUPPORT && zone !== ZONES.ABILITY) return false;
-    if (inst.counters?.immovable || inst.counters?._cardinalImmune) return false;
-    if (this.kreaturGegnerEffektImmun(inst, opts.source, opts)) return false;   // W17b: Golden Wings – nur gegnerische Quelle; ohne Quelle geschützt
     // ★ HELD ALS KREATUR (Hulijing): „abwerfen/zerstören" der aufliegenden Kreatur besiegt den HELDEN; die Karte bleibt bis zum Zugende liegen — also kein Flug in die Ablage.
     if (inst.counters?._heldKreatur) {
       await require('./_hero-creature-shared').bewegungAbfangen(this, inst, ZONES.DISCARD, { source: opts.source, sourceName: opts.sourceName });
       return false;
     }
+    const zone = inst.zone;
+    if (zone !== ZONES.SUPPORT && zone !== ZONES.ABILITY) return false;
+    if (inst.counters?.immovable || inst.counters?._cardinalImmune) return false;
+    if (this.kreaturGegnerEffektImmun(inst, opts.source, opts)) return false;   // W17b: Golden Wings – nur gegnerische Quelle; ohne Quelle geschützt
     const ownerIdx = inst.owner;
     if (!this.gs.players[ownerIdx]) return false;
     // W73d (Leafagami Snake): die Ability bleibt liegen, der Kontrolleur zieht — der Abwurf gilt für den Aufrufer (Kosten!) trotzdem als erfolgt.
@@ -52075,10 +52083,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Z1 (S01-09): „Seite" = KONTROLLE (wie bei den Helden, v718) — nicht „Besitzer ODER
         // Kontrolleur": eine geliehene Kreatur zaehlte sonst zu BEIDEN Seiten (doppelt bei
         // `side: 'both'`, getroffen von „all targets your opponent controls" des Kontrolleurs).
-        if ((nachBrett ? this.physicalSide(inst) : this.kontrolleurVon(inst)) !== tpi || inst.zone !== 'support') continue;
+        // ★ Held als Kreatur (Hulijing): die aufgelegte Kreatur (Zone `heroOverlay`) zählt für „alle Kreaturen"-Schläge — nur wenn der Schlag KEINE Helden trifft (sonst wäre der Wirt doppelt dran).
+        const _ueberl = inst.counters?._heldKreatur && inst.zone === ZONES.HERO_OVERLAY;
+        if ((nachBrett ? this.physicalSide(inst) : this.kontrolleurVon(inst)) !== tpi || (inst.zone !== 'support' && !_ueberl)) continue;
         if (inst.faceDown) continue; // Face-down surprises are immune to AOE
-        // ★ Held als Kreatur (Hulijing): die aufgelegte Kreatur zählt für „alle Kreaturen"-Schläge — nur wenn der Schlag KEINE Helden trifft (sonst wäre der Wirt doppelt dran).
-        if (inst.counters?._heldKreatur) {
+        if (_ueberl) {
           const _w = this.gs.players[inst.counters._heldKreatur.seite]?.heroes?.[inst.heroIdx];
           if (types.includes('hero') || !_w?.name || _w.hp <= 0) continue;
           require('./_hero-creature-shared').spiegeln(this, inst);   // die Karte hat keine eigenen HP: Spiegel nachziehen

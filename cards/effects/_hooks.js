@@ -259,6 +259,9 @@ const ZONES = {
   DISCARD:  'discard',
   DELETED:  'deleted',
   HERO:     'hero',
+  // ★ Held als Kreatur (Hulijing): die auf einem Helden liegende Kreatur — eigene Zone, damit KEINE fremde Schleife über `cardInstances` (`zone === 'support'`) sie als Kreatur in einer
+  // Support Zone sieht (Zielwahlen, Opfer, Rückgaben, Kontrollwechsel …). Eingebunden wird sie bewusst und ausdrücklich (`_hero-creature-shared.js`).
+  HERO_OVERLAY: 'heroOverlay',
   PERMANENT:'permanent',
   // Coolness Stack — face-up player-owned pile created by Wowhalla.
   // Cards on the Stack can be searched, played from the top, or moved
