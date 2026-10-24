@@ -53673,6 +53673,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         <span className="head-counter-icon">🛡️</span>
                       </div>
                     ) : null}
+                    {cards[cards.length - 1] === 'Regeneration' && cc?.regenerationLevel > 0 ? (
+                      <div className="head-counter-badge"
+                        onMouseEnter={e => showGameTooltip(e, `Regeneration Lv${cc.regenerationLevel}: heals the Hero this Spell is attached to for ${60 * cc.regenerationLevel} HP at the start of each of its owner's turns.`)}
+                        onMouseLeave={hideGameTooltip}
+                        style={{ background: '#20ac37', borderColor: '#29663f', color: '#ffffff' }}
+                      >
+                        <span className="head-counter-icon"><PxIcon z="🌱" /></span>
+                        <span className="head-counter-num">Lv{cc.regenerationLevel}</span>
+                      </div>
+                    ) : null}
                     {cc?.bunnyBombCounter > 0 ? (
                       <div className="head-counter-badge"
                         onMouseEnter={e => showGameTooltip(e, `Bomb Counters: ${cc.bunnyBombCounter}. Bunny Bombs deals ${cc.bunnyBombCounter * 20} damage to every target on the board when it is defeated.`)}
