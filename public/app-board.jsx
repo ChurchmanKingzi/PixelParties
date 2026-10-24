@@ -53343,7 +53343,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         {/* Regeneration (Spell-Anhängsel): Stufe, als die sie läuft (60/120/180 HP je Zug) */}
                         {cards[cards.length - 1] === 'Regeneration' && cc?.regenerationLevel > 0 ? (
                       <div className="head-counter-badge"
-                        onMouseEnter={e => showGameTooltip(e, `Regeneration Lv${cc.regenerationLevel}: heals the Hero this Spell is attached to for ${60 * cc.regenerationLevel} HP at the start of each of its owner's turns.`)}
+                        onMouseEnter={e => showGameTooltip(e, `Regeneration Lv${cc.regenerationLevel}: Heals the Hero for ${60 * cc.regenerationLevel} HP at the start of its owner's turns.`)}
                         onMouseLeave={hideGameTooltip}
                         style={{ background: '#20ac37', borderColor: '#29663f', color: '#ffffff' }}
                       >
