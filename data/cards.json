@@ -27080,7 +27080,7 @@
     "hp": 120,
     "atk": null,
     "cost": 20,
-    "effect": "No effect!",
+    "effect": "",
     "archetype": "",
     "setID": "PP SET01",
     "banned": "",
