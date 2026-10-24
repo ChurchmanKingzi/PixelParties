@@ -80,5 +80,11 @@ module.exports = {
     },
   },
 
-  // CPU: das Angebot (Galerie) nimmt die Engine-Politik; Ja/Nein gibt es nicht.
+  // CPU: die Galerie (abbrechbar → die Engine-Politik lehnte sonst ab): das teuerste angebotene Equip nehmen (halber Preis = der groesste Rabatt).
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic' || promptData?.type !== 'cardGallery' || promptData.title !== CARD_NAME) return undefined;
+    const db = engine._getCardDB();
+    const liste = (promptData.cards || []).slice().sort((a, b) => (db[b.name]?.cost || 0) - (db[a.name]?.cost || 0));
+    return liste.length ? { cardName: liste[0].name, source: liste[0].source } : undefined;
+  },
 };
