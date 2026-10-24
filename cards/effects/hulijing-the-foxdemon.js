@@ -17,6 +17,7 @@
 //
 //  ── AKTIVIERUNG ─────────────────────────────────────────────────────────
 //  Freier Heldeneffekt (kein „spend your Action" im Text), hart einmal pro Zug (Engine-HOPT). `heroEffect: true` + `onHeroEffect`.
+//  NICHT aktivierbar, solange Hulijing stumm ist (Frozen, Stunned, Webbed, Negated — `engine._isHeroEffectSilenced`; mit „Chilly Dog" gilt Frozen wie überall nicht als Sperre).
 //    ① Wählbar: Kreaturen aus der HAND (wirksame Handstufe, Handstufen-Effekte zählen) und aus dem DECK (aufgedruckte Stufe) mit Stufe KLEINER als die Magic-Arts-Stufe von
 //       Hulijing („lower than this Hero's Magic Arts level"; Stufe 0 / harte Negation der Abilities ⇒ nichts wählbar). Magic Arts 1 ⇒ nur Lv-0-Kreaturen, 2 ⇒ bis Lv 1, 3 ⇒ bis Lv 2.
 //       Es gelten die Riegel des Platzierens (`actionPlaceCreature`): keine Artifact Creatures, nichts „nur über den eigenen Effekt", keine Beschwörungssperre, die Spiel-Limits
@@ -51,6 +52,7 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     const hero = engine.gs.players[seite]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0 || hero.heldKreatur) return false;
+    if (engine._isHeroEffectSilenced(seite, heroIdx)) return false;      // gelähmt/negiert (Frozen, Stunned, Webbed, Negated): sie verwandelt sich nicht
     const stufe = HC.schulStufe(engine, SCHULE, seite, heroIdx);
     return HC.kandidaten(engine, ctx.cardOwner, seite, heroIdx, stufe).length > 0;
   },
@@ -62,6 +64,7 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     const hero = engine.gs.players[seite]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0 || hero.heldKreatur) return false;
+    if (engine._isHeroEffectSilenced(seite, heroIdx)) return false;
 
     const stufe = HC.schulStufe(engine, SCHULE, seite, heroIdx);
     const alle = HC.kandidaten(engine, pi, seite, heroIdx, stufe);
