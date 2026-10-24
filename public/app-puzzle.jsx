@@ -343,6 +343,8 @@ const PUZZLE_COUNTER_BADGES = [
   { key: 'regenerationLevel', icon: '🌱', label: 'Regeneration Level', stufe: true },
   // Demon Counter (v601) — Horned Demon, Baaliel; spaeter Great Vanguard Demon.
   { key: 'demonCounter',      icon: '😈', label: 'Demon Counters' },
+  // Hot Skull Potato (Welle 74): Skull Counter, 100 Schaden je Zähler beim Zünden.
+  { key: 'skullCounter',      icon: '💀', label: 'Skull Counters' },
   // Puppets (v707): Luck (Lucky Puppet Laki) / Preserve (Preserving Puppet Vinny).
   { key: 'luck',              icon: '🍀', label: 'Luck Counters', row: 'puppet' },
   { key: 'preserve',          icon: '🔒', label: 'Preserve Counters', row: 'puppet' },
@@ -2863,6 +2865,7 @@ function PuzzleCreator() {
   const [editBunnyBombCounter, setEditBunnyBombCounter] = useState(null);
   // Demon Counter (v601): null = Abschnitt verborgen (keine Demon-Counter-Karte).
   const [editDemonCounter, setEditDemonCounter] = useState(null);
+  const [editSkullCounter, setEditSkullCounter] = useState(null);   // Hot Skull Potato
   // Puppets (v707): null = Editor ausgeblendet, sonst true/false.
   const [editLuckCounter, setEditLuckCounter] = useState(null);
   const [editPreserveCounter, setEditPreserveCounter] = useState(null);
@@ -2967,6 +2970,7 @@ function PuzzleCreator() {
     setEditApplause(null);
     setEditBunnyBombCounter(null);
     setEditDemonCounter(null);
+    setEditSkullCounter(null);
     setEditSparkflyGifts(null);
     setEditAntiMagicLevel(null);
     setEditRegenerationLevel(null);
@@ -3111,6 +3115,7 @@ function PuzzleCreator() {
       setEditApplause(String(c?.cardType || '').split('/').some(t => t.trim() === 'Creature') && funFunImPuzzle(players, hand, oppHand, getCard) ? (cs.applause || 0) : null);
       // Bunny Bombs: Bomb Counter aus dem gespeicherten Zustand holen.
       setEditDemonCounter(cardUsesDemonCounters(c) ? (cs.demonCounter || 0) : null);
+      setEditSkullCounter(c?.name === 'Hot Skull Potato' ? (cs.skullCounter || 0) : null);
       // Puppets (v707): Luck/Preserve auf Creatures und Tokens.
       {
         const isCrOrToken = !!c && (String(c.cardType || '').includes('Creature') || c.cardType === 'Token');
@@ -3333,6 +3338,8 @@ function PuzzleCreator() {
         merged.bunnyBombCounter = editBunnyBombCounter;
       }
       // Demon Counter (v601): Server legt sie auf `inst.counters.demonCounter`.
+      delete merged.skullCounter;
+      if (editSkullCounter != null && editSkullCounter > 0) merged.skullCounter = editSkullCounter;
       delete merged.demonCounter;
       if (editDemonCounter != null && editDemonCounter > 0) {
         merged.demonCounter = editDemonCounter;
@@ -3370,7 +3377,7 @@ function PuzzleCreator() {
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editSkin, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editHeldKreatur, editDiamondLoss, editJeGetroffen, editBountyMark, editBalanceCounter, editApplause, editBunnyBombCounter, editDemonCounter, editSparkflyGifts, editAntiMagicLevel, editRegenerationLevel, updatePlayer, getCard, statusScopePasst]);
+  }, [editTarget, editSkin, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editHeldKreatur, editDiamondLoss, editJeGetroffen, editBountyMark, editBalanceCounter, editApplause, editBunnyBombCounter, editDemonCounter, editSkullCounter, editSparkflyGifts, editAntiMagicLevel, editRegenerationLevel, updatePlayer, getCard, statusScopePasst]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -5066,6 +5073,7 @@ function PuzzleCreator() {
         feld('applause', '👏', 'Applause', editApplause, setEditApplause, '#fad54a', 'Applause Counters on this Creature at the start of the puzzle.');
         feld('bomb', '💣', 'Bomb', editBunnyBombCounter, setEditBunnyBombCounter, '#e37435', `Bunny Bombs: explodes for ${(editBunnyBombCounter || 0) * 20} damage to every target on the board when defeated (20 per Bomb Counter).`);
         feld('demon', '😈', 'Demon', editDemonCounter, setEditDemonCounter, '#c98aff', `Horned Demon's strike deals ${(editDemonCounter || 0) * 50} damage (50 per Demon Counter).`);
+        feld('skull', '💀', 'Skull', editSkullCounter, setEditSkullCounter, '#b9b9b9', `Hot Skull Potato: when it explodes it deals ${50 + (editSkullCounter || 0) * 50} damage (50 + 50 per Skull Counter).`);
         if (!isBiomancyTokenEdit && editTarget.zt === 'support' && _editCard?.name === 'Cute Hydra') {
           feld('head', '🐲', 'Heads', editHeadCounter, setEditHeadCounter, '#f7e0b5', "Head Counters: cap the number of different targets Hydra's once-per-turn strike can hit.");
         }
