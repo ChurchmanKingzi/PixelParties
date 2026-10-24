@@ -2837,6 +2837,26 @@ const ZONE_ANIM_SFX = {
     { name: 'creature_destroyed', opts: { rate: 1.6, volume: 0.5,  delay: 500, category: null, dedupe: 0 } },
     { name: 'ping',               opts: { rate: 2.4, volume: 0.35, delay: 560, category: null, dedupe: 0 } },
   ],
+  // Trap Sabotage (23.10.) — der Feuerball faucht heran (0 ms), die Flammen schlagen hoch (~300 ms), die Kohle bricht (~1130 ms: Schlag, Splittern), Asche weht davon (Wind). Nur der erste
+  // Teil uebernimmt die Sammelkategorie 'effect'.
+  trap_burn: [
+    { name: 'elem_fire',          opts: { rate: 1.3,  volume: 0.55 } },
+    { name: 'elem_fire',          opts: { rate: 0.8,  volume: 0.8,  delay: 300,  category: null, dedupe: 0 } },
+    { name: 'elem_fire',          opts: { rate: 0.7,  volume: 0.6,  delay: 760,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact',       opts: { rate: 1.1,  volume: 0.5,  delay: 1130, category: null, dedupe: 0 } },
+    { name: 'creature_destroyed', opts: { rate: 1.3,  volume: 0.45, delay: 1150, category: null, dedupe: 0 } },
+    { name: 'elem_wind',          opts: { rate: 1.6,  volume: 0.35, delay: 1200, category: null, dedupe: 0 } },
+  ],
+  // Voodoo Curse (23.10.) — die Nadeln stechen zu (Zauberton + dumpfer Fluch, 0 / ~340 ms), die Kugeln wandern (Ping, ~480 ms), bei der Ankunft klingt es zweimal hell (~1020 / ~1070 ms).
+  // Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  voodoo_swap: [
+    { name: 'spell_cast', opts: { rate: 0.9,  volume: 0.45 } },
+    { name: 'debuff',     opts: { rate: 0.8,  volume: 0.5,  delay: 340,  category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 1.5,  volume: 0.3,  delay: 500,  category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 1.9,  volume: 0.3,  delay: 760,  category: null, dedupe: 0 } },
+    { name: 'reveal',     opts: { rate: 1.1,  volume: 0.5,  delay: 1020, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.4,  volume: 0.4,  delay: 1070, category: null, dedupe: 0 } },
+  ],
   // See through the Ruse (23.10.) — das Auge oeffnet sich (Aufdeck-Ton, 0 ms), die Abtastzeile faehrt ueber die Karte (leises Surren), beim Schliessen ein Ping (~800 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   ruse_peek: [
     { name: 'reveal', opts: { rate: 1.3, volume: 0.5 } },
@@ -7935,6 +7955,12 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
     badges.push({
       key: 'berserked', icon: '😡',
       tooltip: 'Berserked: Cannot cast Spells or summon Creatures. Gets one free additional Attack per turn, but never more than 2 Attacks per turn total.',
+    });
+  }
+  if (s.ordered) {
+    badges.push({
+      key: 'ordered', icon: '📜',
+      tooltip: "Under Orders (The Master's Orders): Your opponent may perform Actions with this Hero as if they controlled it, but they cannot make it choose itself as a target for an Attack or Spell.",
     });
   }
   if (s.cursed) {
