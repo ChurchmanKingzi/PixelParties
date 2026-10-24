@@ -9225,7 +9225,10 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   // (Die Pruefung folgt unten, nach `anyPlayer` — die Aktivierung durch
   // den Nicht-Besitzer braucht keinen Helden auf der fremden Seite.)
 
-  const slot = (ps.supportZones[heroIdx] || [])[zoneSlot] || [];
+  // ★ HELD ALS KREATUR (Hulijing, 24.10.): `zoneSlot === -1` meint die auf dem Helden liegende Kreatur (`_hero-creature-shared.js`) — sie hat keinen Zonenplatz.
+  const _heldUeber = (zoneSlot === -1) ? require('./cards/effects/_hero-creature-shared').ueberlagerung(room.engine, heroOwner, heroIdx) : null;
+  if (zoneSlot === -1 && (!_heldUeber || !(hero?.hp > 0) || hero?.heldKreatur?._tot)) return false;   // keine aufliegende Kreatur, oder sie ist als Kreatur besiegt (bleibt nur bis zum Zugende liegen)
+  const slot = _heldUeber ? [_heldUeber.name] : ((ps.supportZones[heroIdx] || [])[zoneSlot] || []);
   if (slot.length === 0) return false;
   const creatureName = slot[0];
 
@@ -9236,7 +9239,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   // nicht irgendeine fremde Instanz aktiviert.
   // Z1: `heroOwner` ist die BRETTSEITE des Platzes - nicht "Besitzer ODER Kontrolleur" (sonst trifft eine von
   // `heroOwner` gestohlene Fremdkreatur gleicher (Held, Slot)-Koordinate).
-  const slotInsts = room.engine.cardInstances.filter(c =>
+  const slotInsts = _heldUeber ? [_heldUeber] : room.engine.cardInstances.filter(c =>
     room.engine.physicalSide(c) === heroOwner && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
   );
   const inst = instId != null
