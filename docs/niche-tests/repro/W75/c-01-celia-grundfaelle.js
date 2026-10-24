@@ -1,4 +1,8 @@
-const H = require('../lib/h.js');
+'use strict';
+// W75 · Celia, the Class Clown — Negation + sofortige Zusatzaktion, Level reicht, einmal pro Zug, Status, Erstrundenschutz, nur 1 Celia, inherente Aktion, Mehrspieler.
+// Kartentext: „You may once per turn, during your opponent's turn, when your opponent activates a Spell, increase that Spell's level by 1. If that Spell's level is then too high for its user to use, negate it and send it to the discard pile. If this was your opponent's Action, they may immediately perform an additional Action. You can only control 1 "Celia, the Class Clown"."
+// Erwartet: laut Kartentext und Kopfkommentar der Skripte. Aufruf: node docs/niche-tests/repro/W75/c-01-celia-grundfaelle.js   (Exit 0 = korrekt)
+const H = require('../../lib/h.js');
 const F = H.INERT.filler, CELIA = 'Celia, the Class Clown';
 const tgt = (owner, hi) => (valid) => [valid.find(v => v.type === 'hero' && v.owner === owner && v.heroIdx === hi).id];
 async function scene(o = {}) {

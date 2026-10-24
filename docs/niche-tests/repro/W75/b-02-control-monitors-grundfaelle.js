@@ -1,4 +1,8 @@
-const H = require('../lib/h.js');
+'use strict';
+// W75 · Control Monitors — Grundfaelle: Wahl „alle anderen loeschen", keine anderen Karten, eigener Tutor, Held ohne Schule/gefroren, abgelehnt, Duplikate, 3 Sitze.
+// Kartentext: „Play this card immediately when your opponent adds 1 or more cards from their deck or discard pile to their hand by discarding the same number of cards from your hand. Delete the cards your opponent added. Your opponent may delete all other cards in their hand instead."
+// Erwartet: laut Kartentext und Kopfkommentar der Skripte. Aufruf: node docs/niche-tests/repro/W75/b-02-control-monitors-grundfaelle.js   (Exit 0 = korrekt)
+const H = require('../../lib/h.js');
 const F = H.INERT.filler;
 const HM = 'Lunatic Cycle - Half Moon', NM = 'Lunatic Cycle - New Moon';
 async function scene(o = {}) {

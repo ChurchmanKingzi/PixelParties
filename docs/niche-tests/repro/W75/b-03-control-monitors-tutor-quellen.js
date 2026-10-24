@@ -1,4 +1,8 @@
-const H = require('../lib/h.js');
+'use strict';
+// W75 · Control Monitors — Tutor-Quellen: Cute Dog (2/2, 1/1), Inventing Lv3.
+// Kartentext: „Play this card immediately when your opponent adds 1 or more cards from their deck or discard pile to their hand by discarding the same number of cards from your hand. Delete the cards your opponent added. Your opponent may delete all other cards in their hand instead."
+// Erwartet: laut Kartentext und Kopfkommentar der Skripte. Aufruf: node docs/niche-tests/repro/W75/b-03-control-monitors-tutor-quellen.js   (Exit 0 = korrekt)
+const H = require('../../lib/h.js');
 const F = H.INERT.filler;
 (async () => {
   const R = H.runner();

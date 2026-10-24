@@ -1,4 +1,8 @@
-const H = require('../lib/h.js');
+'use strict';
+// W75 · Celia, the Class Clown — Wisdom-Zusatzkosten, Level-0-Zauber.
+// Kartentext: „You may once per turn, during your opponent's turn, when your opponent activates a Spell, increase that Spell's level by 1. If that Spell's level is then too high for its user to use, negate it and send it to the discard pile. If this was your opponent's Action, they may immediately perform an additional Action. You can only control 1 "Celia, the Class Clown"."
+// Erwartet: laut Kartentext und Kopfkommentar der Skripte. Aufruf: node docs/niche-tests/repro/W75/c-02-celia-wisdom-und-level.js   (Exit 0 = korrekt)
+const H = require('../../lib/h.js');
 const CELIA = 'Celia, the Class Clown';
 (async () => {
   const R = H.runner();

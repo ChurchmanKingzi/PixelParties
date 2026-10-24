@@ -1,4 +1,8 @@
-const H = require('../lib/h.js');
+'use strict';
+// W75 · Atta, Speaker of Desires — Aufdecken → Loeschen → verzoegertes Wirken; Zauber von Atta werden geloescht statt abgelegt; genau 1 brauchbarer Normal Spell; Ability-Quellen; einmal pro Zug; Deck-Zone; Atta tot; Celia.
+// Kartentext: „Once per turn, when you reveal exactly 1 Normal Spell from your deck or hand that this Hero can use, except by the effect of an Ability, you may delete that Spell. At the end of your opponent's next turn, if this Hero is not defeated and that Spell is still deleted, this Hero immediately uses it as an additional Action, regardless of its level and in spite of any negative status effects. Spells this Hero uses that would be sent to the discard pile are deleted instead."
+// Erwartet: laut Kartentext und Kopfkommentar der Skripte. Aufruf: node docs/niche-tests/repro/W75/e-01-atta-grundfaelle-und-auswahl.js   (Exit 0 = korrekt)
+const H = require('../../lib/h.js');
 const F = H.INERT.filler, ATTA = 'Atta, Speaker of Desires';
 const tgt = (owner) => (valid) => [valid.find(v => v.type === 'hero' && v.owner === owner && v.heroIdx === 0).id];
 async function scene(o = {}) {

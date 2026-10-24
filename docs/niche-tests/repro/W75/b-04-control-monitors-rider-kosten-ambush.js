@@ -1,4 +1,8 @@
-const H = require('../lib/h.js');
+'use strict';
+// W75 · Control Monitors — Cute Annoyance Mini (Rider entfaellt), Lunatic-Kostensenkung entfaellt, Ambush the Scout negiert das Loeschen.
+// Kartentext: „Play this card immediately when your opponent adds 1 or more cards from their deck or discard pile to their hand by discarding the same number of cards from your hand. Delete the cards your opponent added. Your opponent may delete all other cards in their hand instead."
+// Erwartet: laut Kartentext und Kopfkommentar der Skripte. Aufruf: node docs/niche-tests/repro/W75/b-04-control-monitors-rider-kosten-ambush.js   (Exit 0 = korrekt)
+const H = require('../../lib/h.js');
 const F = H.INERT.filler;
 const HM = 'Lunatic Cycle - Half Moon', NM = 'Lunatic Cycle - New Moon';
 (async () => {

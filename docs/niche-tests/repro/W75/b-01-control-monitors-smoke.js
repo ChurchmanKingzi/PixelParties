@@ -1,4 +1,8 @@
-const H = require('../lib/h.js');
+'use strict';
+// W75 · Control Monitors — Smoke: Lunatic Cycle - New Moon (Abwurf 1, Suche 1) → Monitors loescht die hinzugefuegte Karte.
+// Kartentext: „Play this card immediately when your opponent adds 1 or more cards from their deck or discard pile to their hand by discarding the same number of cards from your hand. Delete the cards your opponent added. Your opponent may delete all other cards in their hand instead."
+// Erwartet: laut Kartentext und Kopfkommentar der Skripte. Aufruf: node docs/niche-tests/repro/W75/b-01-control-monitors-smoke.js   (Exit 0 = korrekt)
+const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
   const t = await H.fresh({ active: 1, hand: [['Control Monitors'], [H.INERT.filler, 'Fireball']], deck: [[], ['Lunatic Cycle - Half Moon', H.INERT.filler, H.INERT.filler, H.INERT.filler]] });
