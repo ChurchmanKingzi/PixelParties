@@ -5,7 +5,7 @@
 //  Play this card immediately when the user would take any damage.
 //  Choose any number of Artifacts equipped and Abilities attached to
 //  the user and send them to the discard pile. The user heals for
-//  80 HP times the number of cards sent. This Spell's level is
+//  80 HP times the number of cards you chose. This Spell's level is
 //  reduced by the number of Abilities you send with this effect.
 //
 //  ── Als Rulings (6.9.) ────────────────────────────────────────────
