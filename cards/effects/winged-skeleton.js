@@ -30,6 +30,7 @@
 //  get their own activation per the default Creature HOPT semantics.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { isSkeletonCreature } = require('./_skeleton-shared');
 
 const CARD_NAME = 'Winged Skeleton';
@@ -135,7 +136,7 @@ module.exports = {
       if (sourceOwner === myController) return;
       const targetController = targetInst.controller ?? targetInst.owner;
       if (targetController !== myController) return;
-      if (!isSkeletonCreature(targetInst.name, engine)) return;
+      if (!anyName(targetInst, (n) => isSkeletonCreature(n, engine))) return;
 
       const verb = (ctx.effectType === 'destroy') ? 'targeted'
                  : (ctx.effectType === 'move')    ? 'is moving'
@@ -177,7 +178,7 @@ module.exports = {
       if (sourceOwner === myController) return;
       const targetController = targetInst.controller ?? targetInst.owner;
       if (targetController !== myController) return;
-      if (!isSkeletonCreature(targetInst.name, engine)) return;
+      if (!anyName(targetInst, (n) => isSkeletonCreature(n, engine))) return;
 
       const accepted = await offerNegation(ctx, targetInst, entry.source?.name, `targeted (${entry.amount} dmg)`);
       if (accepted) {

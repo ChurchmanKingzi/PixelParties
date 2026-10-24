@@ -41,6 +41,7 @@
 //  haelt den Spieler danach in der Action Phase.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { hasCardType } = require('./_hooks');
 const {
   countDistinctLunaticCycle,
@@ -283,7 +284,7 @@ module.exports = {
       if (!cd) return;
 
       // ── Tier 5: ein Lunatic Cycle hebt die Zahl mitten im Zug auf 5 ──
-      if (n >= 5 && isLunaticCycle(entering.name)) await tier5Grant(ctx);
+      if (n >= 5 && anyName(entering, (n) => isLunaticCycle(n))) await tier5Grant(ctx);
 
       // (Tier 2+ — das Ziehen beim Ausruesten — liegt seit W52a im Hook `onEquipGained` unten.)
 

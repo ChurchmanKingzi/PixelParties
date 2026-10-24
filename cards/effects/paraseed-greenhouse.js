@@ -33,6 +33,7 @@
 //    „Defending the Gate\" mitbringt.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const {
   isParaseedCreature, heroHasParaseed, syncParaseedPoison,
 } = require('./_paraseed-shared');
@@ -75,7 +76,7 @@ function alleParaseeds(engine) {
   const out = [];
   for (const inst of (engine.cardInstances || [])) {
     if (inst.zone !== 'support') continue;
-    if (!isParaseedCreature(inst.name, engine)) continue;
+    if (!anyName(inst, (n) => isParaseedCreature(n, engine))) continue;
     if (isAreaImmuneInst(engine, inst)) continue;
     out.push(inst);
   }

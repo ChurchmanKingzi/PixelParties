@@ -15,6 +15,7 @@
 //  Auftritt beim Ja (v818-Grundregel). Die Todes-Zone ist beim Hook
 //  bereits frei und steht mit zur Wahl.
 // ═══════════════════════════════════════════
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const {
   PAWN, isOfKingsName, collectHandAndDeck, pickFromHandOrDeck, summonFromHandOrDeck,
@@ -45,7 +46,7 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) return;
       if (engine._isHeroEffectSilenced?.(feld, hi)) return;
       const death = ctx.creature;
-      if (!death || !isOfKingsName(death.name)) return;
+      if (!death || !anyName(death, (n) => isOfKingsName(n))) return;
       if ((death.controller ?? death.owner) !== pi) return;
       if (gs.hoptUsed?.[key(pi, hi)] === gs.turn) return;
 

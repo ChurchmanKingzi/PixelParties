@@ -33,6 +33,7 @@
 //     ✓ Red Dragoneer, Green Dragoneer
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { hasCardType } = require('./_hooks');
 
 const DRAGO = 'Drago';
@@ -57,7 +58,7 @@ function isDragoCreatureName(engine, cardName) {
 function isControlledDragoCreature(engine, inst, pi) {
   if (!inst || inst.zone !== 'support' || inst.faceDown) return false;
   if ((inst.controller ?? inst.owner) !== pi) return false;
-  if (!isDragoName(inst.name)) return false;
+  if (!anyName(inst, (n) => isDragoName(n))) return false;
   const cd = engine.getEffectiveCardData?.(inst) || engine._getCardDB()[inst.name];
   return !!cd && hasCardType(cd, 'Creature');
 }

@@ -19,6 +19,7 @@
 //  seit v818 auch fuer den Haupt-Slot).
 //  Loeschen aus der Ablage: Stapel-Schicht `engine.deleteFromPile` (v820).
 // ═══════════════════════════════════════════
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { PAWN, isOfKingsName, ofKingsCreatures, ofKingsCpuAnswer } = require('./_of-kings-shared');
 const { drawWouldBeBlocked } = require('./_draw-block-shared');
 
@@ -27,7 +28,7 @@ const key = (pi) => `pawn-sacrifice:${pi}`;
 const isPawnName = (n) => typeof n === 'string' && n.startsWith(PAWN);
 
 function pawnsOnBoard(engine, pi) {
-  return ofKingsCreatures(engine, pi).filter(i => isPawnName(i.name));
+  return ofKingsCreatures(engine, pi).filter(i => anyName(i, (n) => isPawnName(n)));
 }
 function pawnsInDiscard(engine, pi) {
   const ps = engine.gs.players[pi];
@@ -114,7 +115,7 @@ module.exports = {
       if (mode === 'sacrifice') {
         const paid = await engine.resolveSacrificeCost(ctx, {
           minCount: 1, maxCount: 1, noHandSubstitute: true,
-          filter: c => isPawnName(c.inst?.name),
+          filter: c => anyName(c.inst, (n) => isPawnName(n)),
           title: CARD_NAME, description: 'Sacrifice a "Pawn of Kings" to draw 3 cards.',
           confirmLabel: '♟ Sacrifice!',
         });

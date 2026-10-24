@@ -1,4 +1,5 @@
 'use strict';
+const { anyName, zusatz } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════════════════════════════
 //  GETEILT: der „of Kings"-Archetyp (Schach) — v818
@@ -56,11 +57,11 @@ function isOfKingsName(name) {
 /** Karte, deren NAME oder EFFEKTTEXT „of Kings" enthaelt (Knight [W]). */
 function mentionsOfKings(cd) {
   if (!cd) return false;
-  return isOfKingsName(cd.name) || String(cd.effect || '').includes(OF_KINGS);
+  return anyName(cd, (n) => isOfKingsName(n)) || String(cd.effect || '').includes(OF_KINGS);
 }
 
 function isOfKingsCreatureData(cd) {
-  return !!cd && hasCardType(cd, 'Creature') && isOfKingsName(cd.name);
+  return !!cd && hasCardType(cd, 'Creature') && anyName(cd, (n) => isOfKingsName(n));
 }
 
 function boardOfKingsOnBoard(engine) {
@@ -92,7 +93,7 @@ function controlledCreatures(engine, pi) {
 }
 
 function ofKingsCreatures(engine, pi) {
-  return controlledCreatures(engine, pi).filter(i => isOfKingsName(i.name));
+  return controlledCreatures(engine, pi).filter(i => anyName(i, (n) => isOfKingsName(n)));
 }
 
 /**
@@ -103,6 +104,9 @@ function ofKingsCreatures(engine, pi) {
 function instCountsAsName(engine, inst, baseName) {
   if (!inst?.name) return false;
   if (inst.name.includes(baseName)) return true;
+  // W73c (Shroomasaur): ein ZUSATZNAME zählt als Name (die Queen-Sonderregel ist die WIRKUNG der Queen — der Zusatzname gibt sie nicht).
+  const zn = zusatz(inst);
+  if (zn && zn.includes(baseName)) return true;
   if (!inst.name.startsWith(QUEEN)) return false;
   if (![KNIGHT, BISHOP, ROOK].includes(baseName)) return false;
   if (inst.zone !== 'support') return false;

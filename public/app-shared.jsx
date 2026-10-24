@@ -3610,6 +3610,30 @@ const ZONE_ANIM_SFX = {
     { name: 'debuff',     opts: { rate: 1.3, volume: 0.6, delay: 560, category: null, dedupe: 0 } },
     { name: 'heavy_impact', opts: { rate: 1.6, volume: 0.4, delay: 580, category: null, dedupe: 0 } },
   ],
+  // Welle 73 (24.10.): Ankhota (Sandwirbel steigt auf: Wind, dumpfer Ton, Funkeln), Shroomasaur (Pilze poppen auf: Ploppen in Staffeln), Leafagami (Laubrauschen), Fruit Bat (Biss, Saugen, Ankunft).
+  ankhota_sandstorm: [
+    { name: 'elem_wind',  opts: { rate: 0.9, volume: 0.45 } },
+    { name: 'buff',       opts: { rate: 0.7, volume: 0.45, delay: 380, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 1.6, volume: 0.3, delay: 640, category: null, dedupe: 0 } },
+  ],
+  shroomasaur_spores: [
+    { name: 'buff',       opts: { rate: 1.5, volume: 0.4 } },
+    { name: 'ping',       opts: { rate: 2.0, volume: 0.25, delay: 110, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.4, volume: 0.25, delay: 230, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 1.8, volume: 0.25, delay: 340, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.6, volume: 0.2, delay: 470, category: null, dedupe: 0 } },
+  ],
+  leafagami_leaves: [
+    { name: 'elem_wind',  opts: { rate: 1.4, volume: 0.35 } },
+    { name: 'ping',       opts: { rate: 2.2, volume: 0.25, delay: 140, category: null, dedupe: 0 } },
+    { name: 'buff',       opts: { rate: 1.6, volume: 0.3, delay: 300, category: null, dedupe: 0 } },
+  ],
+  bat_bite_drain: [
+    { name: 'slash',      opts: { rate: 1.9, volume: 0.45 } },
+    { name: 'debuff',     opts: { rate: 1.0, volume: 0.5, delay: 300, category: null, dedupe: 0 } },
+    { name: 'heal',       opts: { rate: 1.3, volume: 0.45, delay: 760, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 1.4, volume: 0.3, delay: 880, category: null, dedupe: 0 } },
+  ],
   // Arcane Eyes (24.10.): die Augen öffnen sich (leises Knarren, 0 ms), der Strahl streicht über die Zone (~620 ms, Wind + Ping), ein kurzes Schimmern zum Schluss.
   arcane_eyes_open: [
     { name: 'buff',       opts: { rate: 0.7, volume: 0.5 } },
@@ -8576,7 +8600,7 @@ function TTHeader({ card, name, level, levelBonus }) {
   const schools = card.cardType !== 'Creature' ? [card.spellSchool1, card.spellSchool2].filter(Boolean) : [];
   return (
     <div className="tt-kopf" style={{ '--zier': color }}>
-      <div className="tt-name" style={{ color }}>{name}</div>
+      <div className="tt-name" style={{ color }}>{name}{card.extraName ? <span style={{ color: '#3ddc57' }}> / {card.extraName}</span> : null}</div>
       <div className="tt-chips">
         <TTChip color={color}>{card.cardType}</TTChip>
         {card.subtype && <TTChip>{card.subtype}</TTChip>}

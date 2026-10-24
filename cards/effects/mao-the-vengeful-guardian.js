@@ -26,6 +26,7 @@
 //  duplicate it.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const {
   promptAndDeleteFromBothDiscards,
   isGuardianBeastCreature,
@@ -44,7 +45,7 @@ function isRefirable(engine, pi, inst) {
   if (inst.controller !== pi) return false;
   if (inst.zone !== 'support') return false;
   if (inst.faceDown) return false;
-  if (!isGuardianBeastCreature(inst.name)) return false;
+  if (!anyName(inst, (n) => isGuardianBeastCreature(n))) return false;
   if (inst.turnPlayed !== turn) return false;
   if (inst.counters?.negated || inst.counters?.nulled) return false;
   const script = inst.loadScript ? inst.loadScript() : null;

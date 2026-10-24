@@ -34,6 +34,7 @@
 //  sie kommentarlos.
 // ═══════════════════════════════════════════
 
+const { hatName, hatNameIn, namenIn } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt
 const { IFRIT, ARMAGEDDON, ifritsOf, sourceSide } = require('./_apocalypse-shared');
 const { hatEffekt, istHeldenTraeger } = require('./_gained-effects-shared');
 
@@ -61,7 +62,7 @@ module.exports = {
    * faellt der Schutz.
    */
   protectsCreatureFromDamage(engine, inst, source, pi, heroIdx) {
-    if (inst?.name !== IFRIT) return false;
+    if (!hatName(inst, IFRIT)) return false;   // Zusatzname (Shroomasaur) zählt
     // Kontrolle statt Seite (Styx 28.9.): `pi` ist die physische Seite des
     // Helden; „you" ist sein KONTROLLEUR (ohne Uebernahme dasselbe).
     pi = engine.heroSideOf(pi, engine.gs.players[pi]?.heroes?.[heroIdx]);
