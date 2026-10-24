@@ -142,7 +142,7 @@ module.exports = {
         ...hostOpts(engine),
         ignoreDropHints: true,
         description: 'Attach Polymorph to a Hero. That Hero cannot use any Spells, but its Attack stat is increased by 100.',
-        confirmLabel: '🐰 Attach!', confirmClass: 'btn-danger', skipEnterHook: true,
+        confirmLabel: '🐱 Attach!', confirmClass: 'btn-danger', skipEnterHook: true,
       });
       if (!res) return;
       const { host, inst } = res;

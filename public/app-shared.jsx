@@ -8032,7 +8032,7 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
   }
   if (s.polymorphed) {
     badges.push({
-      key: 'polymorphed', icon: '🐰',
+      key: 'polymorphed', icon: '🐱',
       tooltip: 'Polymorphed (Polymorph): Cannot use any Spells, but its Attack stat is increased by 100.',
     });
   }
