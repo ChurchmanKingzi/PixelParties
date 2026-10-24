@@ -9,6 +9,7 @@
 //  BOTH players' sides (designer-confirmed).
 // ═══════════════════════════════════════════
 
+const { hatName, hatNameIn, namenIn } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt
 const LUNATIC_CYCLE_NAMES = [
   'Lunatic Cycle - New Moon',
   'Lunatic Cycle - Crescent Moon',
@@ -39,7 +40,7 @@ function countDistinctLunaticCycle(engine) {
   const seen = new Set();
   for (const inst of (engine.cardInstances || [])) {
     if (!inst || inst.zone !== 'support' || inst.faceDown) continue;
-    if (LUNATIC_CYCLE_SET.has(inst.name)) seen.add(inst.name);
+    for (const n of namenIn(inst, LUNATIC_CYCLE_SET)) seen.add(n);
     if (seen.size === LUNATIC_CYCLE_NAMES.length) break;
   }
   return seen.size;
@@ -53,7 +54,7 @@ function countDistinctLunaticCycle(engine) {
 function lunaticCycleCountByName(engine, name) {
   let n = 0;
   for (const inst of (engine.cardInstances || [])) {
-    if (inst && inst.zone === 'support' && !inst.faceDown && inst.name === name) n++;
+    if (inst && inst.zone === 'support' && !inst.faceDown && hatName(inst, name)) n++;
   }
   return n;
 }
