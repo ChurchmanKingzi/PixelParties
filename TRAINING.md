@@ -542,6 +542,54 @@ seine eigenen Abilities fast immer). (3) γ, r0, ρ, die Fit-Skalen und die
 (4) Eine Ability, die keine Schule ist und passiv wirkt (Toughness, Wealth,
 Resistance), hat keine zählbare Nutzung und läuft über `base` allein.
 
+## Held als Kreatur: Hulijing-Lernkanal (Form 9, 24.10.2026)
+
+Anlass: „Die CPU soll Hulijing benutzen – mit einem eigenen Lernkanal." Hulijing, the Foxdemon legt eine Kreatur aus **Hand oder Deck**
+auf sich; die Karte ist bis Zugende eine Kreatur (Einsatz-Effekt, sofort nutzbarer aktiver Effekt, Todes-Effekt) und wird am Ende
+**gelöscht**. Ob und **welche** Kreatur sich lohnt, hängt an der Lage – ein freier Einsatz-Effekt aus dem Deck ist fast geschenkt, dieselbe
+Karte von der Hand kostet einen Zug. Eine feste Rangfolge gibt es nicht, deshalb wird gelernt statt verdrahtet.
+
+**Eine Entscheidung je Held, Zug und Phase:** „verwandeln – und in WELCHE Kreatur (Hand/Deck)?" gegen „nicht".
+
+| Tag | Bedeutung |
+|---|---|
+| `src:hand` / `src:deck` | Herkunft – Hand kostet einen Spielzug, Deck fast nichts |
+| `fx:summon · active · action · death · none` | was die Kreatur in dieser Runde tut (aus dem Skript abgeleitet, nicht aus dem Kartentext) |
+| `lv:0/1/2/3+` | Stufe |
+| `mx:over` / `mx:fit`, `hpr:tiny…full` | liegen die aktuellen HP des Helden über den HP der Kreatur? (Overheal) / Größenverhältnis |
+| `bd:*` / `bo:*` | Kreaturen auf dem eigenen / gegnerischen Brett |
+| `ma:*`, `pool:*`, `mix:hand|deck|both` | Magic-Arts-Stufe, Größe und Zusammensetzung des Pools |
+| `Name` (Identität) | diese Kreatur soll (nicht) aufgelegt werden – das Profil gehört einem Deck, dort lernbar |
+
+Dazu die Zustands-Tags der anderen Formen (`st:*`).
+
+**Drei Teile, ein gemeinsames Vokabular** (`cards/effects/_hero-creature-learn-shared.js` – Trainer und Laufzeit leiten die Tags aus DERSELBEN Funktion ab):
+
+- **Recorder** (`_decision-log.js`, Art `heroCreature`): eine Zeile je Held/Zug/Phase mit dem rohen Kontext `hc` (HP, Magic Arts, Brett, der ganze Pool samt Merkmalen) VOR der Antwort. Die Zeile nennt am Ende die **tatsächlich** aufgelegte Kreatur (`w`, Herkunft `wp`): das Gate kann einen Vorschlag verwerfen.
+- **Trainer** (`scripts/decision-channels.js`, FORM 9): Einheit ist das Paar (Entscheidung × angebotene Kreatur), Kontrast „diese Kreatur aufgelegt" gegen „nichts aufgelegt" (Zeilen, in denen eine **andere** Kreatur gewählt wurde, zählen für diese nicht). Gelernt wird je Held `ident`, `base`, `tags` (additiv, nie gekreuzt; Welch-Gate mit Cluster-nach-Spiel-Korrektur; Tags brauchen |Δ| ≥ 3,5). Ausgabe: `profile.heroCreatureRules = { <Held>: { ident, base, tags } }`.
+- **Laufzeit** (`_deck-profile.js`, `heroCreatureDecision`): Vorrang **Exploration** (nur Datensammlung) > **gelernte Regel** (Wert ≥ +3 aufwerten, ≤ −3 verwerfen, confidence-skaliert) > **Startwert**.
+
+**Startwert ohne Training:** nur **Deck**-Karten mit sofortigem Nutzen (Einsatz-Effekt oder freier aktiver Effekt; aktiver Effekt vor Einsatz-Effekt, dann höhere Stufe, dann Name – deterministisch). Die Hand bleibt unangetastet. Der Vorschlag läuft durch das Gate (`mctsGatedActivation`, `mode: 'gate'`) und wird dort gegen das Auslassen geprüft; Regel und Exploration (`mode: 'force'`) committen **ohne** Gate und Recon.
+
+**CPU-Anbindung** (`activateHeroEffects` in `_cpu.js`): Die Entscheidung fällt **vor** dem Gate. Die Wahl wird als `engine._heroCreaturePick` vorgemerkt und beantwortet die Galerie des Skripts (`cpuResponse` der Hulijing) – nie eine eigene Wahl. Nach dem Auflegen darf die Kreatur **sofort** ihren aktiven Effekt benutzen (`activateCreatureEffects` kennt die Überlagerung der Zone `heroOverlay`). Bei „nicht verwandeln" gilt der Held als nicht aktivierbar.
+
+**Exploration (Datensammlung `PP_TRAIN=1`, nur der gepinnte Spieler, nie im Rollout):** mit `PP_HULI_EXPLORE` (Default 0,5; mit vorhandener Regel `PP_RULE_EXPLORE`, Default 0,15) wird gleichmäßig aus „nicht" und allen Pool-Kreaturen gezogen; einmal je Held und Phase gewürfelt (Cache), sonst wüchse die Chance auf ein „Ja" mit der Zahl der Durchläufe. Ohne diesen Arm sähe der Trainer nur Nullen.
+
+**Schwelle (gemessen, nicht geschätzt):** Je Held werden rund 45 Tags und alle Namen verglichen; bei so vielen Vergleichen lässt das Standard-`tMin` 2,5 in der Negativkontrolle (Ausgang reiner Zufall) Scheinregeln durch. Synthetik, 1200 Spiele je Lauf (30 Wiederholungen Negativkontrolle / 10 mit Signal):
+
+| `PP_HC_T_MIN` | Fehlalarme (Negativkontrolle) | Signal voll gefunden |
+|---|---|---|
+| 2,5 | 7/30 | 9/10 |
+| **3,0 (Standard)** | **1/30** | **6/10** |
+| 3,3 | 1/30 | 4/10 |
+| 4,0 | 0/30 | 2/10 |
+
+**Neue Karte „Held als Kreatur":** `cpuMeta.heroCreature = { pool(engine, pi, heroIdx) → [{ name, pile: 'hand'|'deck', handIdx?, level }] }` und im `cpuResponse` die Galerie mit `engine._heroCreaturePick` beantworten – Recorder, Exploration, Regel und Startwert greifen von selbst.
+
+**Prüfung:** Vokabular-Unit-Tests, Entscheidungs-Tests (Regel, Exploration, Startwert, Gate), CPU-Ende-zu-Ende (verwandelt aus der Hand, Max-HP der Kreatur, Sofort-Heilung durch den Lamenting Knight, Cache, kein Rest-Pick), Synthetik mit eingebautem Signal (Herkunft Deck +, Hand −, Lamenting Knight +; neutrale Kreatur ohne Regel) und Negativkontrolle.
+
+**Stand:** Kein Beispiel-Deck enthält Hulijing – es gibt noch kein Profil und nichts zu trainieren, bis ein Hulijing-Deck existiert. Bis dahin gilt der Startwert (Deck-Karten mit Nutzen, Gate-geprüft).
+
 ## Deck-Telemetrie: PP_DECK_MONITOR=1
 
 Env-gated Ressourcen-Log am Ende jedes CPU-Zugs (in _cpu.js vor dem

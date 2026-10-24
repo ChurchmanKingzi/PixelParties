@@ -2900,6 +2900,133 @@ function areaStandingValue(engine, pi) {
   } catch { return 0; }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  FORM 9 — HELD ALS KREATUR (Hulijing, the Foxdemon; 24.10.2026)
+//
+//  „Die CPU soll Hulijing benutzen — mit einem eigenen Lernkanal."
+//
+//  Eine Entscheidung je Held, Zug und Phase: „verwandeln — und in WELCHE Kreatur aus Hand oder Deck?" gegen „nicht".
+//  Vokabular (Tags) im gemeinsamen Modul `_hero-creature-learn-shared.js`; Trainer: FORM 9 in `scripts/decision-channels.js`.
+//
+//    heroCreatureDecision(engine, pi, heroIdx)
+//      → null                         kein Pool / kein Karten-Vertrag (der Held ist nicht aktivierbar)
+//      → { none: true, mode }          nicht verwandeln
+//      → { name, pile, handIdx, mode } diese Kreatur auflegen
+//      mode 'force' = die Entscheidung steht (gelernte Regel oder Exploration): ohne Gate committen.
+//      mode 'gate'  = Vorschlag (Startwert ohne Training, `heuristik`): das Gate der CPU prüft ihn gegen das Auslassen.
+//    Vorrang: Exploration (nur Datensammlung) > gelernte Regel (≥ +3 aufwerten, ≤ −3 verwerfen) > Startwert.
+//
+//  Karten-Vertrag (Hero-Skript): `cpuMeta.heroCreature = { pool(engine, pi, heroIdx) → [{ name, pile, handIdx?, level }] }`.
+//  Ohne Training gilt der Startwert: nur Deck-Karten mit sofortigem Nutzen, vom Gate geprüft — die Hand bleibt unangetastet.
+//  Aufgezeichnet wird über das Entscheidungs-Protokoll (`_decision-log.js`, Art `heroCreature`, roher Kontext `hc`).
+// ═══════════════════════════════════════════════════════════════════
+
+/** Punktwert, den das Profil dem Auflegen der Kreatur `k` gibt (roh, ohne Confidence). */
+function heroCreatureScore(rules, roh, k, stTags) {
+  let s = (rules.ident?.[k.n] || 0) + (rules.base || 0);
+  const tg = rules.tags;
+  if (tg) {
+    const shared = require('./_hero-creature-learn-shared');
+    for (const t of shared.alleTags(roh, k).concat(stTags || [])) s += tg[t] || 0;
+  }
+  return s;
+}
+
+/** Die Zeile EINMAL je (Held, Phase, Zug) ins Entscheidungs-Protokoll schreiben (No-op ohne Aufzeichnung). */
+function noteHeroCreature(engine, pi, heroName, key, roh, dec) {
+  try {
+    if (engine._inMctsSim) return;
+    if (!engine._heroCreatureRows) engine._heroCreatureRows = {};
+    if (engine._heroCreatureRows[key]) return;
+    const id = require('./_decision-log').notiere(engine, pi, {
+      art: 'heroCreature', karte: heroName, optionen: roh.pl.map(k => k.n),
+      gewaehlt: dec.none ? null : dec.name,
+      zusatz: { hc: roh, wp: dec.none ? null : (dec.pile === 'deck' ? 'd' : 'h'), ...(dec.explored ? { ex: 1 } : {}) },
+    });
+    if (id) engine._heroCreatureRows[key] = id;
+  } catch { /* Aufzeichnung darf nie stören */ }
+}
+
+function heroCreatureDecision(engine, pi, heroIdx) {
+  try {
+    const hero = engine.gs?.players?.[pi]?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return null;
+    const { loadCardEffect } = require('./_loader');
+    const vertrag = loadCardEffect(hero.name)?.cpuMeta?.heroCreature;
+    if (!vertrag || typeof vertrag.pool !== 'function') return null;
+    const pool = vertrag.pool(engine, pi, heroIdx) || [];
+    if (!pool.length) return null;
+    const live = !engine._inMctsSim;
+    const key = `${pi}:${heroIdx}:${engine.gs?.turn || 0}:${engine.gs?.currentPhase}`;
+    // Live: eine Entscheidung je Held und Phase. Mehrere Durchläufe von `activateHeroEffects` würfeln die Exploration sonst
+    // mehrfach — die Wahrscheinlichkeit, irgendwann ein 》Ja《 zu ziehen, wüchse mit der Zahl der Durchläufe.
+    const cache = live ? (engine._heroCreatureCache = engine._heroCreatureCache || {}) : null;
+    if (cache && cache[key]) {
+      const c = cache[key];
+      if (c.none || pool.some(p => p.name === c.name && p.pile === c.pile)) return c;
+      delete cache[key];
+    }
+    const shared = require('./_hero-creature-learn-shared');
+    const roh = shared.rohKontext(engine, pi, heroIdx, pool);
+    const heroName = hero.baseName || hero.name;
+    const prof = profileFor(engine, pi);
+    const rules = prof?.heroCreatureRules?.[heroName] || null;
+
+    let dec = null;
+    // ── Exploration: nur Datensammlung, nur der gepinnte Spieler, nie im Rollout ──
+    // Ohne sie gäbe es keinen 》verwandelt《-Arm: die CPU benutzte Hulijing nie, der Trainer sähe nur Nullen.
+    const sammeln = isCollecting() && live && (engine._decisionPinned == null || engine._decisionPinned === pi);
+    if (sammeln) {
+      const eps = rules
+        ? parseFloat(process.env.PP_RULE_EXPLORE || '0.15')
+        : parseFloat(process.env.PP_HULI_EXPLORE || '0.5');
+      if (Math.random() < eps) {
+        const optionen = [null, ...pool.slice(0, roh.pl.length)];
+        const w = optionen[Math.floor(Math.random() * optionen.length)];
+        dec = w ? { name: w.name, pile: w.pile, handIdx: w.handIdx, mode: 'force', explored: true }
+          : { none: true, mode: 'force', explored: true };
+      }
+    }
+    // ── gelernte Regel ──
+    if (!dec && rules) {
+      const st = decisionStateTags(engine, pi);
+      const conf = confidence(prof);
+      let best = null, bestS = -Infinity;
+      for (let i = 0; i < roh.pl.length; i++) {
+        const sc = heroCreatureScore(rules, roh, roh.pl[i], st) * conf;
+        if (sc > bestS) { bestS = sc; best = pool[i]; }
+      }
+      if (best && bestS >= 3) dec = { name: best.name, pile: best.pile, handIdx: best.handIdx, mode: 'force', score: bestS };
+      else if (best && bestS <= -3) dec = { none: true, mode: 'force', score: bestS };
+    }
+    // ── Startwert (ohne Training / ohne Urteil): ein Vorschlag fürs Gate, oder nichts ──
+    if (!dec) {
+      const h = shared.heuristik(roh);
+      const p = h ? pool.find(c => c.name === h.n && c.pile === 'deck') : null;
+      dec = p ? { name: p.name, pile: p.pile, handIdx: p.handIdx, mode: 'gate', heuristic: true }
+        : { none: true, mode: 'gate', heuristic: true };
+    }
+    dec.key = key;
+    if (cache) { cache[key] = dec; noteHeroCreature(engine, pi, heroName, key, roh, dec); }
+    return dec;
+  } catch { return null; }
+}
+
+/** Nach der Aktivierung: das TATSÄCHLICHE Ergebnis in die Zeile eintragen (das Gate kann den Vorschlag verworfen haben). */
+function heroCreatureOutcome(engine, pi, heroIdx, dec) {
+  try {
+    if (!dec || engine._inMctsSim) return null;
+    const hero = engine.gs?.players?.[pi]?.heroes?.[heroIdx];
+    const placed = hero?.heldKreatur?.name || null;
+    const id = engine._heroCreatureRows?.[dec.key];
+    if (id && Array.isArray(engine._decisionLog)) {
+      const z = engine._decisionLog.find(x => x.i === id);
+      if (z) { z.w = placed; z.f = placed ? 1 : 0; z.wp = placed ? (dec.pile === 'deck' ? 'd' : 'h') : null; }
+    }
+    return placed;
+  } catch { return null; }
+}
+
 /**
  * FORM 3 — ORDINAL (》wie viel《). Liefert den Index der Option, die der
  * gelernten Zielstufe am naechsten kommt, oder null.
@@ -3549,6 +3676,8 @@ module.exports = {
   noteAbilityCostChoice,
   areaRemovalChoice,
   areaStandingValue,
+  heroCreatureDecision,
+  heroCreatureOutcome,
   isCollecting,
   profileConfidence: confidence,
   __getProfile: profileFor,
