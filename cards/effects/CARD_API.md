@@ -6369,6 +6369,17 @@ Beim Loeschen eines Helden (`deleteHero`) teilt eine Ability in einer
 Support Zone das Schicksal der Abilities: sie wird GELOESCHT, nicht
 abgelegt.
 
+### Prüfung 24.10.2026: Xal / Xalibur / geerbter Xal-Effekt × Leafagami Snake
+
+Szenario-Tests (Scratchpad) für alle DREI Quellen — Xal selbst, Xalibur am Helden, GEWONNENER Xal-Effekt (`grantHeroEffect`; `heroScriptOf` verschmilzt das Flag):
+
+* **Funktioniert:** Ablegen aus der Hand (`doPlayAbility`, `supportSlot`), Stapeln, Stufe (`effectiveSchoolLevelForCaster`, `heroMeetsLevelReq`), Aktivieren, und der Schutz der **Leafagami Snake** auf JEDEM Entfernungsweg (`actionMoveCard` → Ablage / Gelöscht / Hand / Deck, `actionDestroyCard`, `sendBoardCardToDiscard`): die Karte bleibt liegen, der Kontrolleur zieht je Ability-Karte 1 (Stapel der Höhe 2 = zwei Züge). Xalibur geht vom Brett: ohne Schlange wandern alle Abilities der Support Zonen in die Ablage; mit Schlange bleiben sie liegen (und ziehen), zählen aber nicht mehr als Ability (Stufe 0, bis ein neues Xalibur kommt); bleibt eine zweite Quelle (der Held IST Xal, gewonnener Effekt, zweites Xalibur), bleibt alles wie es ist.
+* **Behoben (24.10.):** die Kosten-Schleife (`sendCardsLoop`: Barrier of Faith, Weapon Storm, Memory Wipe …) bezahlte mit Schlange einen Support-STAPEL (Höhe ≥ 2) nur EINMAL — der Eintrag trägt nur eine Instanz und wurde nach deren Schutz ganz ausgeblendet (Kosten 3 mit Fighting ×2 + Training: nur 2 bezahlt, 2 Züge). Jetzt zählen die geschützten Kopien je Stapel (`targetsFor`, `discardAbilityTopCopy` nimmt die nächste ungeschützte Kopie) — wie bei echten Ability-Zonen.
+* **Behoben (24.10.):** Hulijings Stufen-Grenze (`_hero-creature-shared.schulStufe`) zählt Support-Stapel mit (vorher `heroSchoolLevel`, das nur echte Zonen kennt).
+* **BEKANNTE LÜCKE (nicht behoben):** Abilities in Support Zonen lösen ihre PASSIVEN / Anlege-Hooks nicht aus — `doPlayAbility` feuert im Support-Zweig weder `onPlay` noch `onCardEnterZone`, und Skripte mit `activeIn: ['ability']` sind in einer Support Zone nicht aktiv. Betroffen sind 13 Abilities mit Hooks: Biomancy, Cannibalism, Creativity, Fighting (ATK), Friendship, Hunting, Learning, Luck, Performance, Resistance, Smugness, Toughness (HP), Wealth. Fighting in Xals Support Zone gibt 0 ATK. Stufe/Aktivierung (Action-Cost- und freie Abilities) laufen dagegen über die Stapel-Helfer und funktionieren.
+* **Hinweis Fast-Mode:** `abilityEntfernungVerhindert` kehrt im Fast-Mode sofort zurück — die Schlange schützt in headless Simulationen (Selbstspiel/Training, Rollouts der CPU) nicht. Live-Partien laufen nie im Fast-Mode.
+* **Hinweise:** Rain of Death (`inst.zone !== 'ability'`) und Noble Mummy Guards (`slot.pop()` an `abilityZones`) sehen Abilities in Support Zonen nicht; Noble Mummy Guards umgeht außerdem die Schlange.
+
 ## Einen Helden RESTLOS loeschen — `deleteHero` (v762)
 
 `await engine.deleteHero(pi, heroIdx, sourceName)` nimmt einen Helden

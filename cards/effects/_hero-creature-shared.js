@@ -143,9 +143,15 @@ function ablehnungsgrund(engine, pi, seite, heroIdx, name) {
   return null;
 }
 
-/** Magic-Arts-Stufe (oder eine andere Schule) des Wirts — 0 bei harter Negation der Abilities. */
+/**
+ * Magic-Arts-Stufe (oder eine andere Schule) des Wirts — 0 bei harter Negation der Abilities. Abilities in SUPPORT Zonen (Xal, Xalibur, geerbter Xal-Effekt) zählen mit:
+ * sie gelten „as if Ability Zones" (`heroSchoolLevel` kennt nur die echten Zonen; ohne diesen Zusatz zählte Magic Arts in einer Support Zone für „lower than this Hero's
+ * Magic Arts level" nicht).
+ */
 function schulStufe(engine, school, seite, heroIdx) {
-  return engine.heroSchoolLevel(school, seite, heroIdx);
+  if (engine.heroAbilityLevelsBlanked(seite, heroIdx)) return 0;
+  const ps = engine.gs.players[seite];
+  return engine.countAbilitiesForSchool(school, [...(ps?.abilityZones?.[heroIdx] || []), ...engine.heroSupportAbilityStacks(seite, heroIdx)]);
 }
 
 /**
