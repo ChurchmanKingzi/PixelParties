@@ -7791,6 +7791,18 @@ function GameTooltip() {
   );
 }
 
+// ── EFFEKTTEXT-SUCHE (Deckbau, Puzzle-Creator, Kartensammlung) ─────────────
+// 24.10. (Al): „Play this card" sucht nicht mehr den exakten Text, sondern Karten, deren Effekt JEDES der Wörter („play", „this", „card") enthält — nicht unbedingt zusammen
+// und nicht in dieser Reihenfolge. Groß-/Kleinschreibung egal, Teilwörter zählen („damage" findet „damages"). Leere Eingabe = alles.
+function effektTextPasst(card, suche) {
+  const woerter = String(suche == null ? '' : suche).toLowerCase().split(/\s+/).filter(Boolean);
+  if (woerter.length === 0) return true;
+  const text = card && typeof card.effect === 'string' ? card.effect.toLowerCase() : '';
+  if (!text) return false;
+  return woerter.every(w => text.includes(w));
+}
+window.effektTextPasst = effektTextPasst;
+
 // ★★ v1166 — DOPPELSCHULEN-FILTER (Al 17.9.)
 //
 // „Double only" zeigt ausschliesslich Attacks, Spells und Creatures mit
