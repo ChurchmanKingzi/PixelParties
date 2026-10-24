@@ -276,7 +276,7 @@ HEROES = {
     "Cute Princess Mary": (
         "Only cute Creatures. Any level. 👑",
         "Cute Princess Mary can summon \"Cute\" Creatures regardless of their levels. The catch: she can't summon any other Creatures. Pure cuteness, no exceptions.",
-        "flaming embers, floating golden crowns, hearts and golden sparkles",
+        "rising flames, embers, floating golden crowns, hearts and golden sparkles",
         "#Princess #Cute"),
     "Zsos'Ssar, the Serpent Warlord": (
         "Poison your own team to hit harder. 🐍",

@@ -46,7 +46,7 @@ Datei: `cute-princess-mary.mp4`
 >
 > #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Princess #Cute
 
-**Alt-Text**: Animated pixel art trading card of Cute Princess Mary, with flaming embers, floating golden crowns, hearts and golden sparkles around the hero.
+**Alt-Text**: Animated pixel art trading card of Cute Princess Mary, with rising flames, embers, floating golden crowns, hearts and golden sparkles around the hero.
 
 ---
 

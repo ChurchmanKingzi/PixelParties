@@ -1225,6 +1225,15 @@
    ],
    [
     "glyph",
+    "fire",
+    16,
+    {
+     "g": "flame",
+     "move": "rise"
+    }
+   ],
+   [
+    "glyph",
     "gold",
     5,
     {
