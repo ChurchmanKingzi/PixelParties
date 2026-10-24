@@ -3483,6 +3483,15 @@ const ZONE_ANIM_SFX = {
     { name: 'ping', opts: { rate: 1.9, volume: 0.4, delay: 170, category: null, dedupe: 0 } },
     { name: 'ping', opts: { rate: 2.2, volume: 0.3, delay: 330, category: null, dedupe: 0 } },
   ],
+  // Spell Shackle (24.10.): blaue Ketten legen sich klirrend um den Helden — Kettenklirren (Glied für Glied), dunkles Brummen, beim Zuziehen ein Schlag.
+  spell_shackle_chains: [
+    { name: 'chain_add', opts: { rate: 0.8, volume: 0.9 } },
+    { name: 'chain_add', opts: { rate: 1.0, volume: 0.7, delay: 150, category: null, dedupe: 0 } },
+    { name: 'chain_add', opts: { rate: 1.2, volume: 0.6, delay: 300, category: null, dedupe: 0 } },
+    { name: 'elem_dark', opts: { rate: 0.7, volume: 0.6, delay: 80, category: null, dedupe: 0 } },
+    { name: 'debuff',    opts: { rate: 0.9, volume: 0.8, delay: 560, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.3, volume: 0.5, delay: 600, category: null, dedupe: 0 } },
+  ],
   liquid_rainbow: [
     { name: 'buff', opts: { rate: 1.2, volume: 0.7 } },
     { name: 'ping', opts: { rate: 1.7, volume: 0.5, delay: 520, category: null, dedupe: 0 } },
