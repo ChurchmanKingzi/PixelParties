@@ -16,6 +16,8 @@
 //  perform an additional Action afterwards.
 // ═══════════════════════════════════════════
 
+const { stufeErhoehen } = require('./_level-bump-shared');
+
 module.exports = {
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
@@ -53,74 +55,13 @@ module.exports = {
     const gs = engine.gs;
     const targetIndex = myIndex - 1;
     if (targetIndex < 0) return;
-    const targetLink = chain[targetIndex];
-    if (!targetLink) return;
 
+    // Stufe +1 prüfen / Wisdom-Zusatz zahlen / ggf. negieren — gemeinsamer Baustein mit Celia, the Class Clown.
+    const { status, link: targetLink } = await stufeErhoehen(engine, chain, targetIndex, { logPrefix: 'shamanic_curse' });
+    if (status !== 'negated') return;
     const oppIdx = targetLink.owner;
-    const oppPs = gs.players[oppIdx];
     const castingHi = targetLink.heroIdx ?? -1;
-    // W16g (R02-22): bei einem geliehenen Wirker (Charme …) liegt der Held auf der Brettseite `casterOwner`, nicht beim
-    // Kontrolleur `owner`; Hand/Abwurf bleiben beim Kontrolleur (`oppIdx`).
-    const heroSeite = targetLink.casterOwner ?? oppIdx;
-    const castingHero = gs.players[heroSeite]?.heroes?.[castingHi];
     const spellName = targetLink.cardName;
-    const spellCd = engine._getCardDB()[spellName];
-
-    if (!oppPs || !castingHero || !spellCd) {
-      engine.log('shamanic_curse_abort', { reason: 'caster-or-spell-missing' });
-      return;
-    }
-
-    // Determine the new required Wisdom cost when the spell's effective
-    // level goes up by 1. Temporarily patch the caster's levelOverrideCards
-    // so engine.getWisdomDiscardCost sees the bumped level.
-    if (!castingHero.levelOverrideCards) castingHero.levelOverrideCards = {};
-    const hadOverride = Object.prototype.hasOwnProperty.call(castingHero.levelOverrideCards, spellName);
-    const prevOverride = hadOverride ? castingHero.levelOverrideCards[spellName] : undefined;
-    const currentLevel = prevOverride != null ? prevOverride : (spellCd.level || 0);
-    castingHero.levelOverrideCards[spellName] = currentLevel + 1;
-
-    const newCost = engine.getWisdomDiscardCost(heroSeite, castingHi, spellCd);
-
-    // Restore override exactly as it was
-    if (!hadOverride) delete castingHero.levelOverrideCards[spellName];
-    else castingHero.levelOverrideCards[spellName] = prevOverride;
-    // W5b-B9 (Al, Welle 5): der erhöhte Level kostet bei Wisdom-Helden den Zusatz-Abwurf TATSÄCHLICH. Die ursprünglichen
-    // Wisdom-Kosten zahlt `doPlaySpell` erst nach der Auflösung (Kosten vorab berechnet, `oldCost`); hier kommt nur die Differenz dazu.
-    const oldCost = Math.max(0, engine.getWisdomDiscardCost(heroSeite, castingHi, spellCd));
-
-    // newCost: -1 means uncoverable (no Wisdom path exists), otherwise the
-    // required extra discards. Spell survives iff the caster CAN cover it
-    // AND has enough hand cards to pay (Gesamtkosten; B9: die Differenz zum Ursprungsgebot wird unten wirklich abgeworfen).
-    const coverable = newCost >= 0;
-    // ★ Z4 (R02-15): der gerade gewirkte Zauber liegt noch in `oppPs.hand`, ist aber keine bezahlbare Handkarte.
-    const affordable = coverable && engine._handIndizesOhneAufloesende(oppPs).length >= newCost;
-
-    engine._broadcastEvent('play_zone_animation', {
-      type: 'plague_smoke', owner: heroSeite,
-      heroIdx: castingHi >= 0 ? castingHi : 0, zoneSlot: -1,
-    });
-    await engine._delay(500);
-
-    if (affordable) {
-      // Still legal – aber der Zusatz-Level kostet bei Wisdom-Helden die Differenz an Handkarten (Abwurf wie die Wisdom-Kosten;
-      // die auflösende Karte ist ausgenommen). Gesamtkosten (alt + Zusatz) sind oben als bezahlbar geprüft.
-      const extra = Math.max(0, newCost - oldCost);
-      if (extra > 0) {
-        await engine.actionPromptForceDiscard(oppIdx, extra, {
-          title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
-        });
-      }
-      engine.log('shamanic_curse_survived', {
-        player: gs.players[pi]?.username,
-        spell: spellName, newCost, extraDiscarded: extra,
-      });
-      engine.sync();
-      return;
-    }
-
-    // Uncoverable → negate the Spell.
-    engine.negateChainLink(chain, targetIndex);
 
     // „If it does, your opponent may immediately perform an ADDITIONAL
     // Action afterwards" (Text 3.10.) — unabhaengig davon, ob der Zauber
