@@ -28240,21 +28240,17 @@ this._deathWatch = (this._deathWatchStack || []).length
       // gestohlenen) — daran rechnet der Client die Landeplätze der Flugkarten.
       toBaseCount: this._handIndizesOhneAufloesende(ps).length,
     });
-    const perCardStagger = Math.max(0, (validated.length - 1) * 100);
-    // The client's phase-3 cleanup (clears `stealHiddenMe/Opp`,
-    // sets `stealSkipDrawRef`, clears `stealInProgressRef`) fires
-    // at `highlightMs + (flightMs + perCardStagger + 100) + 100`.
-    // The previous +120 ms buffer was 80 ms SHORT — the state
-    // sync arrived on the client before phase 3 had run, so the
-    // diff handler saw `stealInProgressRef === true`, skipped the
-    // deck-draw branch, and any chained Lilly draw never got its
-    // animation. +250 ms gives a 50 ms margin past phase-3 fire.
-    await this._delay(highlightMs + flightMs + perCardStagger + 250);
-
-    // Erst aus der Gegnerhand nehmen (von hinten nach vorn, die Plätze bleiben stabil), dann in der Reihenfolge der QUELLPLÄTZE an die eigene Hand hängen: die Karten behalten ihre
-    // Reihenfolge (die linkste gewählte Gegnerkarte liegt links unter den genommenen) — der Client lässt die Flugkarten genau so landen.
-    const entnommen = [];
-    for (const idx of [...validated].sort((a, b) => b - a)) {
+    // Die Karten wandern EINZELN, jede im Moment ihrer Landung beim Client (Abflug nach `highlightMs`, 100 ms Versatz je Karte, `flightMs` Flug): je Karte ein Zustand, die Hände
+    // rücken je Karte, nicht alle am Ende. Aufsteigend nach Quellplatz — die Karten behalten ihre Reihenfolge (die linkste gewählte Gegnerkarte liegt links unter den genommenen);
+    // nach `bisher` genommenen Karten sitzt der ursprüngliche Platz `j` auf `j − bisher`.
+    const sortiert = [...validated].sort((a, b) => a - b);
+    const tStart = Date.now();
+    const stolen = [];
+    let bisher = 0;
+    for (let k = 0; k < sortiert.length; k++) {
+      const warte = highlightMs + k * 100 + flightMs + 40 - (Date.now() - tStart);
+      if (warte > 0) await this._delay(warte);
+      const idx = sortiert[k] - bisher;
       const cardName = oppPs.hand[idx];
       if (!cardName) continue;
       // W63c: Herkunft VOR dem Splice festhalten (Marke dieses Platzes, sonst die Instanz an dieser Position): die gestohlene Karte
@@ -28263,10 +28259,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         || this.cardInstances.find(c => c.owner === oppIdx && c.zone === ZONES.HAND && c.name === cardName) || null;
       const herkunft = this._handOriginAt(oppPs, idx) ?? (instVor && Number.isInteger(instVor.originalOwner) ? instVor.originalOwner : oppIdx);
       oppPs.hand.splice(idx, 1);
-      entnommen.unshift({ cardName, instVor, herkunft });
-    }
-    const stolen = [];
-    for (const { cardName, instVor, herkunft } of entnommen) {
+      bisher++;
       const neuerPlatz = ps.hand.length;
       ps.hand.push(cardName);
       // Instanz mitziehen — sonst bleibt die Karte für findCards beim
@@ -28283,6 +28276,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       inst.originalOwner = herkunft;
       this._setHandSlotOrigin(pi, cardName, herkunft, neuerPlatz);
       stolen.push(cardName);
+      this.sync();
     }
 
     if (stolen.length > 0) {
