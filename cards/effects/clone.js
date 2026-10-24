@@ -42,6 +42,13 @@ const HOPT_KEY = 'clone-copy';
 const ANIM_MS = 700;
 // gs-Marken, die eine Kopie verändern darf und die der äußere Wurf danach unverändert wiederfinden muss
 const dbg = (m) => { if (process.env.CLONE_DEBUG) process.stderr.write('[clone] ' + m + '\n'); };
+// „Performs a copy of the Spell" schließt Kosten UND Einschränkungen ein (Al, 24.10.): jede Karte mit einem Limit je Zug/Partie oder einer „must be the only/first …"-Bedingung ist nicht klonbar.
+const NICHT_KLONBAR = [
+  /can only (?:play|use|activate) (?:1|one)\b[^.]*\bper (?:turn|game)/i,   // „You can only play 1 "X" per turn" / „Each Hero can only use 1 "X" per turn"
+  /\bonce per (?:turn|game)\b/i,
+  /\bper game\b/i,
+  /must be the (?:only|first)\b/i,                                         // „This must be the only Attack you play this turn" (Knife Throw, Eraser Beam, Off with His Head! …)
+];
 const GS_MARKEN = ['_spellCancelled', '_spellNegatedByEffect', '_negationWhole', '_spellPlacedOnBoard', '_spellReturnToHand', '_spellFreeAction', '_spellForcesActionConsume',
   '_spellDamageLog', '_spellExcludeTargets', '_immediateActionContext', '_surpriseCheckedHeroes', '_deferredRecoil'];
 
@@ -104,15 +111,12 @@ module.exports = {
       const name = ctx.spellName;
       const script = loadCardEffect(name);
       if (!script?.hooks?.onPlay) { dbg('kein onPlay'); return; }
-      if (script.oncePerGame || script.oncePerGameKey) { dbg('once per game'); return; }          // ein zweites Wirken gibt das Limit nicht her
+      if (script.oncePerGame || script.oncePerGameKey || NICHT_KLONBAR.some(r => r.test(cd.effect || ''))) { dbg('Limit/Einschränkung der Karte'); return; }   // ein zweites Wirken gibt das Limit nicht her
       const eintraege = rec.eintraege.map(e => ({ title: e.title, ids: e.ids.filter(id => zielSteht(engine, id)) }));
       if (rec.eintraege.length > 0 && !eintraege.some(e => e.ids.length > 0)) { dbg('Ziele weg'); return; }   // keines der Ziele steht noch → „same target(s)" gibt es nicht mehr
-      // Die Spielbarkeit der Karte (`spellPlayCondition`: „1 pro Zug", Voraussetzungen des SPIELENS) gilt nur, wo die Kopie Kosten zahlen muss (Muster Magic Mirror) — sonst prüft der Effekt seine
-      // Voraussetzungen und Sperren beim Wirken selbst, und die Kopie wird nicht „gespielt".
-      if (typeof script.payActivationCost === 'function' && script.payActivationCost.length <= 1) {
-        try { if (script.spellPlayCondition && !script.spellPlayCondition(gs, pi, engine)) { dbg('spellPlayCondition false'); return; } }
-        catch (err) { console.error('[Clone] spellPlayCondition', name, err.message); return; }
-      }
+      // Einschränkungen der Karte gelten für die Kopie (Al, 24.10.): die Voraussetzungen des SPIELENS (`spellPlayCondition`) müssen jetzt noch erfüllt sein.
+      try { if (script.spellPlayCondition && !script.spellPlayCondition(gs, pi, engine)) { dbg('spellPlayCondition false'); return; } }
+      catch (err) { console.error('[Clone] spellPlayCondition', name, err.message); return; }
 
       // ── „may": der Spieler entscheidet ──
       const ja = await ctx.promptConfirmEffect({

@@ -62,38 +62,53 @@ async function wirken(t, seat, hi, karte, ziele) {
     R.check('Shrink ohne Karte am Brett hat keine Wirkung (Hooks hängen an der Karte)', t.hp(1, 0) <= 600, t.hp(1, 0));
   }
 
-  R.section('C · Kosten der Karte und Rundensperren');
+  R.section('C · Kosten und Einschränkungen der Karte (Al: „performs a copy of the Spell" — Kosten UND Einschränkungen)');
   {
-    // Meditation „nur 1 pro Zug": die Kopie wirkt nicht noch einmal (Sperre der Karte selbst)
+    // „You can only play 1 "Meditation" per turn": jeder once-per-turn-Spell ist NICHT klonbar
     const t = await H.fresh({ hand: [['Meditation'], []], discard: [['Fireball', 'Icebolt'], []] });
     klon(t); t.grantFor(0, 0, 'Meditation');
     t.setHand(0, ['Meditation']);
     t.script.push({ match: (d) => d.type === 'optionPicker', answer: { optionId: 'hand' } });
     const r = await t.play(0, 'Meditation', { hero: 0 });
     R.check('Meditation gespielt', r === true, r);
-    R.check('Meditation nahm höchstens 2 Spells (die Kopie wiederholt die gesperrte Karte nicht)', t.pile(0, 'hand').filter(n => n === 'Fireball' || n === 'Icebolt').length <= 2 && t.errors.length === 0, [t.pile(0, 'hand'), t.errors]);
+    R.check('Meditation (1 pro Zug): keine Kopie angeboten', confirms(t).length === 0, confirms(t).length);
     R.check('Karte nur einmal im Löschstapel', t.pile(0, 'deletedPile').filter(n => n === 'Meditation').length === 1, t.pile(0, 'deletedPile'));
   }
-  {
-    // Knife Throw: Kosten „Artefakt ablegen" — mit EINEM Artefakt kann die Kopie die Kosten nicht zahlen → keine Kopie, Limit bleibt frei
-    const t = await H.fresh({ hand: [['Knife Throw'], []] });
-    klon(t); t.grantFor(0, 0, 'Knife Throw'); setAtk(t, 0, 0, 100);
-    t.put(0, 0, 1, 'Diver Helmet');
-    const r = await wirken(t, 0, 0, 'Knife Throw', [`hero-1-0`]);
-    R.check('Knife Throw gespielt (Diver Helmet als Kosten)', r === true && t.pile(0, 'discardPile').includes('Diver Helmet'), [r, t.pile(0, 'discardPile')]);
-    R.check('Original: 2 × 100 = 200', t.hp(1, 0) === 600, t.hp(1, 0));
-    R.check('Kopie nicht zahlbar: nur das Original wirkt, kein Fehler', t.errors.length === 0, t.errors);
-    R.check('das Limit „1 pro Zug" blieb frei', t.gs.hoptUsed?.[`clone-copy:0`] !== t.gs.turn, t.gs.hoptUsed);
+  for (const [karte, grund] of [['Hand of Death', '1 pro Zug'], ['Pyroblast', '1 pro Zug'], ['Gigantisaur Stomp', 'je Held 1 pro Zug']]) {
+    const t = await H.fresh({ hand: [[karte], []] });
+    klon(t); t.grantFor(0, 0, karte);
+    t.setHand(0, [karte]);
+    await t.play(0, karte, { hero: 0 });
+    R.check(`${karte} (${grund}): keine Kopie angeboten`, confirms(t).length === 0, confirms(t).length);
   }
   {
-    // mit ZWEI Artefakten zahlt die Kopie das zweite
+    // „This must be the only Attack you play this turn": die Kopie wäre eine zweite Attack
     const t = await H.fresh({ hand: [['Knife Throw'], []] });
     klon(t); t.grantFor(0, 0, 'Knife Throw'); setAtk(t, 0, 0, 100);
     t.put(0, 0, 1, 'Diver Helmet'); t.put(0, 0, 2, 'Diver Helmet');
-    await wirken(t, 0, 0, 'Knife Throw', [`hero-1-0`]);
-    R.check('zwei Artefakte: Original und Kopie je 200 → 400', t.hp(1, 0) === 400, t.hp(1, 0));
-    R.check('beide Helme in der Ablage', t.pile(0, 'discardPile').filter(n => n === 'Diver Helmet').length === 2, t.pile(0, 'discardPile'));
-    R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
+    const r = await wirken(t, 0, 0, 'Knife Throw', [`hero-1-0`]);
+    R.check('Knife Throw gespielt', r === true, r);
+    R.check('„must be the only Attack": keine Kopie angeboten', confirms(t).length === 0, confirms(t).length);
+  }
+  {
+    // Kosten: Kirin Firebreath „Delete 1 Courtly Kirin from your discard pile to play this card" — die Kopie braucht eine ZWEITE Kirin
+    const kirin = 'Rebelliokai Courtly Kirin';
+    const zahl = async (kirins) => {
+      const t = await H.fresh({ hand: [['Kirin Firebreath'], []], discard: [Array(kirins).fill(kirin).concat(['Rebelliokai Camouflaged Kappa']), []] });
+      klon(t); t.grantFor(0, 0, 'Kirin Firebreath');
+      t.setHand(0, ['Kirin Firebreath']);
+      t.targetFn = (valid) => [valid.find(v => isHero(v, 1, 0)).id];
+      const r = await t.play(0, 'Kirin Firebreath', { hero: 0 });
+      t.targetFn = null;
+      return { t, r, loch: t.pile(0, 'deletedPile').filter(n => n === kirin).length, dmg: 800 - t.hp(1, 0) };
+    };
+    const eine = await zahl(1), zwei = await zahl(2);
+    R.check('Kirin Firebreath mit EINER Kirin gespielt (Kosten gezahlt)', eine.r === true && eine.loch === 1, [eine.r, eine.loch]);
+    R.check('mit einer Kirin: die Kopie kann die Kosten nicht zahlen → nur das Original', eine.t.errors.length === 0 && eine.dmg > 0, [eine.dmg, eine.t.errors]);
+    R.check('mit EINER Kirin bleibt das Limit „1 pro Zug" frei', eine.t.gs.hoptUsed?.['clone-copy:0'] !== eine.t.gs.turn);
+    R.check('mit ZWEI Kirin: die Kopie zahlt die zweite (beide gelöscht)', zwei.r === true && zwei.loch === 2, [zwei.r, zwei.loch]);
+    R.check('mit ZWEI Kirin: doppelter Schaden (Original + Kopie)', zwei.dmg === eine.dmg * 2 || zwei.dmg > eine.dmg, [eine.dmg, zwei.dmg]);
+    R.check('keine Engine-Fehler', zwei.t.errors.length === 0, zwei.t.errors);
   }
 
   R.section('D · Teleport und Umhängen');
