@@ -1,6 +1,6 @@
 # Captions für alle Reels (Entwürfe, Englisch)
 
-52 Heroes mit eigenem Musikstück (Monia, die erste, eingeschlossen). Je Reel liegt dieselbe Caption als Textdatei neben dem Video (`scripts/social-posts/out/reels/<slug>.txt`), zum direkten Einfügen. Erzeugt von `captions.py`; dort lassen sich die Texte ändern.
+53 Heroes mit Musikstück (Monia mit eigenem Stück, Mary mit dem Theme ihres Archetyps „Cute“). Je Reel liegt dieselbe Caption als Textdatei neben dem Video (`scripts/social-posts/out/reels/<slug>.txt`), zum direkten Einfügen. Erzeugt von `captions.py`; dort lassen sich die Texte ändern.
 
 Hinweise:
 
@@ -28,6 +28,25 @@ Datei: `cool-rescuer-monia.mp4`
 > #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Heroine #Jetpack
 
 **Alt-Text**: Animated pixel art trading card of Cool Rescuer Monia, a blue-haired girl flying on a flaming jetpack, with drifting white clouds, floating hearts, glints and falling jet sparks around her.
+
+---
+
+## Cute Princess Mary
+
+Datei: `cute-princess-mary.mp4`
+
+**Caption**
+
+> Only cute Creatures. Any level. 👑
+>
+> Cute Princess Mary can summon "Cute" Creatures regardless of their levels. The catch: she can't summon any other Creatures. Pure cuteness, no exceptions.
+>
+> Assemble your party of Heroes, then annihilate your opponent's! Pixel Parties is a free online TCG with almost 200 animated pixel Heroes.
+> 👉 pixelpartiestcg.com (link in bio)
+>
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Princess #Cute
+
+**Alt-Text**: Animated pixel art trading card of Cute Princess Mary, with flaming embers, floating golden crowns, hearts and golden sparkles around the hero.
 
 ---
 

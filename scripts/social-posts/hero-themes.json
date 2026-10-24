@@ -1211,5 +1211,37 @@
    ]
   },
   "accent": "#5aa8ff"
+ },
+ "Cute Princess Mary": {
+  "name": "Mary",
+  "title": "Cute Princess",
+  "music": "bgm_theme_cute.ogg",
+  "px": 8,
+  "particles": [
+   [
+    "ember",
+    "fire",
+    14
+   ],
+   [
+    "glyph",
+    "gold",
+    5,
+    {
+     "g": "crown",
+     "move": "float"
+    }
+   ],
+   [
+    "heart",
+    "heal",
+    10
+   ],
+   [
+    "spark",
+    "gold",
+    8
+   ]
+  ]
  }
 }

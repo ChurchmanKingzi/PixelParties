@@ -273,6 +273,11 @@ HEROES = {
         "Once per turn, Victorica removes a Pollution Token from your side of the board that was not placed there this turn.",
         "golden motes, floating crowns and red gems",
         "#Empress #Royalty"),
+    "Cute Princess Mary": (
+        "Only cute Creatures. Any level. 👑",
+        "Cute Princess Mary can summon \"Cute\" Creatures regardless of their levels. The catch: she can't summon any other Creatures. Pure cuteness, no exceptions.",
+        "flaming embers, floating golden crowns, hearts and golden sparkles",
+        "#Princess #Cute"),
     "Zsos'Ssar, the Serpent Warlord": (
         "Poison your own team to hit harder. 🐍",
         "Zsos'Ssar deals +40 extra damage for every poisoned target on the board. The catch: every Decay spell he casts forces you to poison one of your own Heroes first. Risky? Absolutely.",
@@ -301,6 +306,8 @@ TIKTOK = {
                               "Hit exactly one target with a lower-level Destruction Magic Spell and you may pick a second target for it."),
     "Nao, the Barrier Priestess": ("What if healing had no limit? ✨",
                                    "Nao's healing can go beyond a Hero's max HP, while the max itself stays unchanged."),
+    "Cute Princess Mary": ("Only cute Creatures. Any level. 👑",
+                           "Mary summons \"Cute\" Creatures regardless of their levels. The catch: no other Creatures, ever."),
     "Zsos'Ssar, the Serpent Warlord": ("Poison your own team to hit harder. 🐍",
                                        "+40 damage for every poisoned target on the board. The catch: each Decay spell makes you poison one of your own Heroes first."),
     "Beato, the Butterfly Witch": ("Any level 1 Spell. Any level 1 Creature. 🦋",
@@ -342,7 +349,7 @@ def main():
     lines = [
         '# Captions für alle Reels (Entwürfe, Englisch)',
         '',
-        f'{len(rows)} Heroes mit eigenem Musikstück (Monia, die erste, eingeschlossen). Je Reel liegt dieselbe Caption als Textdatei neben dem Video '
+        f'{len(rows)} Heroes mit Musikstück (Monia mit eigenem Stück, Mary mit dem Theme ihres Archetyps „Cute“). Je Reel liegt dieselbe Caption als Textdatei neben dem Video '
         '(`scripts/social-posts/out/reels/<slug>.txt`), zum direkten Einfügen. Erzeugt von `captions.py`; dort lassen sich die Texte ändern.',
         '',
         'Hinweise:',
@@ -357,9 +364,10 @@ def main():
         '',
     ]
     OUT.mkdir(parents=True, exist_ok=True)
-    others = [r for r in rows if r['name'] != 'Cool Rescuer Monia']
+    special = {'Cool Rescuer Monia': 0, 'Cute Princess Mary': 1}                  # feste Aufruf-Variante, damit sich die Texte der übrigen Heroes nicht verschieben
+    others = [r for r in rows if r['name'] not in special]
     for r in rows:
-        i = others.index(r) if r in others else 0
+        i = others.index(r) if r in others else special[r['name']]
         cap, alt = build(r['name'], i)
         lines += [f"## {r['name']}", '', f"Datei: `{r['slug']}.mp4`", '', '**Caption**', '']
         lines += ['> ' + ln if ln else '>' for ln in cap.split('\n')]
