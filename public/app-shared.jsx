@@ -3646,20 +3646,21 @@ const ZONE_ANIM_SFX = {
     { name: 'slash',      opts: { rate: 1.8, volume: 0.3, delay: 880, category: null, dedupe: 0 } },
     { name: 'slash',      opts: { rate: 2.3, volume: 0.3, delay: 1060, category: null, dedupe: 0 } },
   ],
-  // Hot Skull Potato: Zischen, dann der große Knall (tiefer Schlag + Wind + Knistern).
+  // Hot Skull Potato: der Knall sitzt auf dem Blitz (Animationsstart, `delay: 1` = animationsrelativ, +Mount-Vorlauf), danach Druckwelle, Knistern und Splitter.
   hot_potato_blast: [
-    { name: 'debuff',       opts: { rate: 1.8, volume: 0.3 } },
-    { name: 'heavy_impact', opts: { rate: 0.7, volume: 0.6, delay: 520, category: null, dedupe: 0 } },
-    { name: 'elem_wind',    opts: { rate: 0.8, volume: 0.45, delay: 560, category: null, dedupe: 0 } },
-    { name: 'ping',         opts: { rate: 2.6, volume: 0.25, delay: 760, category: null, dedupe: 0 } },
-    { name: 'ping',         opts: { rate: 2.0, volume: 0.2, delay: 900, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.7, volume: 0.65, delay: 1, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.1, volume: 0.4, delay: 1, category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 0.8, volume: 0.45, delay: 60, category: null, dedupe: 0 } },
+    { name: 'debuff',       opts: { rate: 1.6, volume: 0.3, delay: 220, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.6, volume: 0.25, delay: 320, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.0, volume: 0.2, delay: 460, category: null, dedupe: 0 } },
   ],
   // Hot Skull Potato: Wurf in die andere Zone — Zischen und Pfeifen im Flug, dumpfer Aufprall.
   hot_potato_throw: [
     { name: 'debuff',       opts: { rate: 1.9, volume: 0.3 } },
     { name: 'elem_wind',    opts: { rate: 1.7, volume: 0.35, delay: 60, category: null, dedupe: 0 } },
-    { name: 'heavy_impact', opts: { rate: 1.3, volume: 0.35, delay: 800, category: null, dedupe: 0 } },
-    { name: 'ping',         opts: { rate: 2.4, volume: 0.2, delay: 850, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.3, volume: 0.35, delay: 730, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.4, volume: 0.2, delay: 780, category: null, dedupe: 0 } },
   ],
   leafagami_leaves: [
     { name: 'elem_wind',  opts: { rate: 1.4, volume: 0.35 } },
