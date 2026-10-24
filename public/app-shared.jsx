@@ -7986,8 +7986,8 @@ window.ppStatusHover = ppStatusHover;
 /** Tooltip-Text des Poison-Abzeichens. Auch die Stapelzahl auf der Karte
  *  (`PoisonedOverlay` in app-board) zeigt genau diesen Text beim Hover. */
 function poisonTooltipText(stacks, perStack, isUnhealable, deadly) {
-  // „Deadly Poison": das Gift HEILT statt zu schaden, bis der Held voll geheilt ist (danach schadet es wieder wie jedes Gift); zählt weiter als negativer Status.
-  if (deadly) return `${isUnhealable ? 'Unhealable ' : ''}Poisoned ("Deadly Poison"): Heals ${perStack * stacks} HP instead of dealing damage at the start of each of its owner's turns, until the Hero is fully healed. Still counts as a negative status effect.${isUnhealable ? ' Cannot be removed.' : ''}`;
+  // „Deadly Poison": das Gift HEILT statt zu schaden, bis das Gift entfernt wird; zählt weiter als negativer Status.
+  if (deadly) return `${isUnhealable ? 'Unhealable ' : ''}Poisoned ("Deadly Poison"): Heals ${perStack * stacks} HP instead of dealing damage at the start of each of its owner's turns, until the Poison is removed. Still counts as a negative status effect.${isUnhealable ? ' Cannot be removed.' : ''}`;
   return `${isUnhealable ? 'Unhealable ' : ''}Poisoned: Takes ${perStack * stacks} damage at the start of each of its owner's turns.${isUnhealable ? ' Cannot be removed.' : ''}`;
 }
 window.poisonTooltipText = poisonTooltipText;

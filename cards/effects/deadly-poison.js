@@ -1,19 +1,18 @@
 'use strict';
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "\"Deadly Poison\""  (W75e)
-//  Spell (Normal, Lv1, Magic Arts + Support Magic)
+//  Spell (Normal, Lv1, Magic Arts + Support Magic, inherent additional Action)
 //
-//  „Choose a Poisoned Hero. The Poison heals that Hero instead of dealing damage to it until it is healed. It still counts as a negative status effect."
+//  „Choose a Poisoned Hero. The Poison heals that Hero instead of dealing damage to it until it is healed. It still counts as a negative status effect. This counts as an additional Action."
 //
 //  ── AUSLEGUNG ───────────────────────────────────────────────────────────
+//  • „This counts as an additional Action": `inherentAction: true` — die Karte kostet keine Aktion (Main Phase: spielbar, Action Phase: verbraucht die Aktion nicht).
 //  • „a Poisoned Hero": jeder lebende Held, Freund oder Feind, der vergiftet ist (Status `poisoned`). Ohne Giftopfer ist die Karte nicht spielbar (`spellPlayCondition`).
-//  • Die Marke `deadly` am Giftstatus (`hero.statuses.poisoned.deadly`) kippt den Tick (Engine `processPoisonDamage`): statt Schaden gibt es zu Zugbeginn des Besitzers
-//    Heilung in Höhe des Gift-Ticks (Stapel × Schaden je Stapel, wie beim Schaden verändert durch Gift-Hooks).
-//  • „until it is healed": bis der HELD voll geheilt ist (aktuelle HP = Max-HP). Der Tick, der ihn auf die Max-HP bringt, ist der letzte Heil-Tick — danach fällt die Marke, und das
-//    Gift schadet wieder wie jedes andere („Deadly" in Anführungszeichen). Ist der Held beim Tick schon voll, gilt er als geheilt: gewöhnlicher Schadens-Tick.
-//    (Entscheidung zu einem mehrdeutigen Text: „it" = der Held; als Rückfrage vermerkt.)
-//  • „It still counts as a negative status effect": der Status ist nach wie vor `poisoned` (negativ, heilbar, zählt für „Poisoned"-Karten, wird von Cleanse/Juice/Cure entfernt —
-//    mit dem Status verschwindet die Marke). Weitere Gift-Stapel erhöhen den Heilbetrag, die Marke bleibt.
+//  • Die Marke `deadly` am Giftstatus (`hero.statuses.poisoned.deadly`) kippt den Tick (Engine `processPoisonDamage`): statt Schaden gibt es zu Zugbeginn des Besitzers Heilung in Höhe des
+//    Gift-Ticks (Stapel × Schaden je Stapel, wie beim Schaden verändert durch Gift-Hooks), nie über die Max-HP.
+//  • „until it is healed": „it" = das GIFT (Al, 24.10.): die Marke gilt, bis das Gift entfernt wird (Beer, Cure, Juice … — mit dem Status verschwindet die Marke, neues Gift schadet wieder
+//    normal). Weitere Stapel erhöhen nur den Heilbetrag; die Marke bleibt. Ein voller Held bekommt bei einem Tick weder Heilung noch Schaden.
+//  • „It still counts as a negative status effect": der Status ist nach wie vor `poisoned` (negativ, heilbar, zählt für „Poisoned"-Karten).
 //  • Spell-Schutz: ein Held mit Anti Magic (ausreichende Stufe) / Effekt-Immunität bleibt unverändert.
 //
 //  ── Bild und Klang ─────────────────────────────────────────────────────
@@ -25,6 +24,7 @@ const CARD_NAME = '"Deadly Poison"';
 const ANIM_MS = 1500;
 
 module.exports = {
+  inherentAction: true,   // „This counts as an additional Action."
   spellVisual: { impact: { type: 'deadly_poison_heal' }, impactMs: 400 },
   requiresTarget: true,
 

@@ -26,7 +26,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Choose a Poisoned Hero. The Poison heals that Hero instead of dealing damage to it until it is healed. It still counts as a negative status effect.",
+    "effect": "Choose a Poisoned Hero. The Poison heals that Hero instead of dealing damage to it until it is healed. It still counts as a negative status effect. This counts as an additional Action.",
     "archetype": "",
     "setID": "PP ART",
     "banned": "",

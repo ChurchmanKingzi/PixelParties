@@ -54918,23 +54918,21 @@ this._deathWatch = (this._deathWatchStack || []).length
       const hero = ps.heroes[heroIdx];
       if (!hero || hero.hp <= 0) continue;
       const damage = await this.calculatePoisonDamage(ap, stacks);
-      // ★ 24.10. „Deadly Poison": das Gift HEILT, bis der Held voll geheilt ist (danach schadet es wieder wie jedes Gift). Ein Held, der schon voll ist, wenn der Tick kommt, gilt als geheilt:
-      // die Marke fällt, es ist ein gewöhnlicher Schadens-Tick. Der Status bleibt in jedem Fall (negativ, heilbar, zählt als Gift).
+      // ★ 24.10. „Deadly Poison": solange der Giftstatus die Marke `deadly` trägt, HEILT der Tick statt zu schaden (nie über die Max-HP). Weitere Stapel erhöhen nur den Heilbetrag; wird das Gift entfernt
+      // (Beer, Cure …), geht die Marke mit ihm, und neues Gift schadet wieder normal.
       if (hero.statuses.poisoned.deadly) {
-        if (hero.hp >= hero.maxHp) {
-          delete hero.statuses.poisoned.deadly;
-          this.log('deadly_poison_spent', { target: heroName, owner });
-        } else {
+        if (hero.hp < hero.maxHp) {
           this._broadcastEvent('play_zone_animation', { type: 'deadly_poison_heal', owner: ap, heroIdx, zoneSlot: -1, duration: 1500 });
           await this._delay(520);
           const vorher = hero.hp;
-          await this.actionHealHero({ name: 'Poison', owner: hero.statuses.poisoned.deadly?.by ?? ap }, hero, damage);
+          await this.actionHealHero({ name: 'Poison', owner: hero.statuses.poisoned?.deadly?.by ?? ap }, hero, damage);
           this.log('poison_heal', { target: heroName, amount: hero.hp - vorher, nominal: damage, stacks, owner });
-          if (hero.hp >= hero.maxHp && hero.statuses?.poisoned) { delete hero.statuses.poisoned.deadly; this.log('deadly_poison_spent', { target: heroName, owner }); }
           this.sync();
           await this._delay(200);
-          continue;
+        } else {
+          this.log('poison_heal', { target: heroName, amount: 0, nominal: damage, stacks, owner });   // voll: nichts zu heilen, aber auch kein Schaden
         }
+        continue;
       }
       this._broadcastEvent('play_zone_animation', { type: 'poison_tick', owner: ap, heroIdx, zoneSlot: -1 });
       await this._delay(300);
