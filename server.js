@@ -17270,6 +17270,10 @@ io.on('connection', (socket) => {
             if (typeof cs.demonCounter === 'number' && cs.demonCounter > 0) {
               inst.counters.demonCounter = cs.demonCounter;
             }
+            // Hot Skull Potato (Welle 74): Skull Counter aus dem Puzzle-Editor.
+            if (typeof cs.skullCounter === 'number' && cs.skullCounter > 0) {
+              inst.counters.skullCounter = cs.skullCounter;
+            }
             if (typeof cs.bunnyBombCounter === 'number' && cs.bunnyBombCounter > 0) {
               inst.counters.bunnyBombCounter = cs.bunnyBombCounter;
             }
