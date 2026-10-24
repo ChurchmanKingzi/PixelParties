@@ -8307,6 +8307,8 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   }
 
   const heroOwner = charmedOwner != null ? charmedOwner : pi;
+  // ★ Atta: „Spells this Hero uses that would be sent to the discard pile are deleted instead" — beim Wirken festgestellt (der Held kann waehrend der Aufloesung fallen).
+  const _attaLoescht = cardData.cardType === 'Spell' && room.engine.spellGoesToDeletedInstead(heroOwner, heroIdx);
   // ★ W15b (C2): Wisdom-Kosten der konkreten Handkarte (Rabatt „nur die eine Kopie"); geliehener Held/Vorrat: namensweit.
   // ★ W16a (Al, Frage 6): auch beim geliehenen/gecharmten Helden zählt die konkrete Handkopie des Kontrolleurs `pi` (Hand und Rabatt des Kontrolleurs, nicht des Helden-Besitzers).
   const wisdomDiscardCost = room.engine.getWisdomDiscardCost(heroOwner, heroIdx, cardData, !fromCreation ? handIndex : undefined, heroOwner !== pi ? pi : undefined);
@@ -8574,6 +8576,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       const discardOwner = room.engine._consumeHandCardOrigin(pi, cardName);
       // `hi` = the pre-splice hand slot; the client hasn't synced the
       // splice yet, so the slot still renders → flight starts there.
+      if (_attaLoescht) chainResult.negatedToDeleted = true;   // Atta: der negierte Zauber waere in die Ablage gegangen → gelöscht
       await room.engine.routeNegatedInitialCard(discardOwner, cardName, chainResult, hi);
       room.engine._untrackCard(inst.id);
       // ★ v1323 (Tester-Befund 23.9.): die AKTIVIERUNG wurde negiert (The
@@ -8861,7 +8864,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       // W67a: Ticket für Inyas Fantasy Buddy (Hand-Spiel): würde die Karte nach dem Auflösen in die Ablage gehen? Nicht, wenn sie sich selbst aufs Brett gelegt hat
       // (Area/Attachment/Permanent, `_spellPlacedOnBoard`), auf die Hand zurückkehrt oder gelöscht wird.
       _buddyTicket = room.engine.neuesBuddyTicket('hand', {
-        ablageErwartet: () => !gs._spellPlacedOnBoard && !gs._spellReturnToHand && !script?.deleteOnUse,
+        ablageErwartet: () => !gs._spellPlacedOnBoard && !gs._spellReturnToHand && !script?.deleteOnUse && !_attaLoescht,
       });
       await room.engine.runHooks('afterSpellResolved', {
         // v778: `heroOwner` = in WESSEN Heldenreihe `heroIdx` zeigt.
@@ -8937,7 +8940,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       room.engine._broadcastEvent('play_pile_transfer', {
         fromOwner: pi, toOwner: spellPileOwner, cardName,
         from: fromCreation ? 'creation' : 'hand',
-        to: (script && script.deleteOnUse) ? 'deleted' : 'discard',
+        to: ((script && script.deleteOnUse) || _attaLoescht) ? 'deleted' : 'discard',
         fromHandIdx: resolveHi,
       });
     }
@@ -8961,7 +8964,8 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         // Fremde Herkunft (gestohlen, Magic Lamp) → Ablage des
         // URSPRUENGLICHEN Besitzers. Oben vor dem Flug ermittelt, damit
         // Flug und Landung denselben Stapel meinen.
-        gs.players[spellPileOwner].discardPile.push(cardName);
+        if (_attaLoescht) gs.players[spellPileOwner].deletedPile.push(cardName);   // Atta: gelöscht statt abgelegt
+        else gs.players[spellPileOwner].discardPile.push(cardName);
       }
       // ★ INSTANZ IN DER ABLAGE WEITERLEBEN LASSEN (v808, Als Befund 6.9.).
       // Ein Spell, dessen Wirkung an seiner INSTANZ haengt (Weapon

@@ -25073,6 +25073,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hero = this.gs.players[wirkerSeite]?.heroes?.[heroIdx];
     const cardData = this._getCardDB()[cardName];
     if (!ps || !hero || !cardData) return { cancelled: true };
+    // Atta: Spells, die dieser Held wirkt und die in die Ablage gingen, werden stattdessen geloescht — beim Wirken festgestellt.
+    const _attaLoescht = cardData.cardType === 'Spell' && this.spellGoesToDeletedInstead(wirkerSeite, heroIdx);
     // W36a: ein unter Silence-Sperre zugelassener Guss (Bonus-Spell) verbraucht den Bonus — der Stand VOR dem Guss zaehlt (Silence kann im Guss selbst keinen neuen Bonus gewaehren, `_skipReactionCheck`).
     const _silenceBonusVorher = ps._spellLockTurn === this.gs.turn && ps._silenceBonusSpell === this.gs.turn;
     // ★ Z7 (S01-11, H04-05/-17): EINMAL PRO SPIEL gilt für JEDEN Sofort-Guss (Zi, Saya, Call for
@@ -25220,7 +25222,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
         // W67a: Ticket für Inyas Fantasy Buddy (Sofort-Guss): Ablage nur, wenn sich die Karte nicht selbst aufs Brett legt / zurück auf die Hand geht / gelöscht wird.
         _buddyTicket = this.neuesBuddyTicket('sofort', {
-          ablageErwartet: () => !this.gs._spellPlacedOnBoard && !this.gs._spellReturnToHand && !loadCardEffect(cardName)?.deleteOnUse,
+          ablageErwartet: () => !this.gs._spellPlacedOnBoard && !this.gs._spellReturnToHand && !loadCardEffect(cardName)?.deleteOnUse && !_attaLoescht,
         });
         await this.runHooks('afterSpellResolved', {
           // v778: siehe Zwillingsstelle in server.js — wessen Heldenreihe
@@ -25357,21 +25359,22 @@ this._deathWatch = (this._deathWatchStack || []).length
         // `opts.ablageFlugVon`: woher der Flug in die Ablage startet, wenn die
         // Karte nicht wirklich aus dem Deck kam (Chaos-Diamond: aus der
         // Brettmitte, nachdem sie aus der Ablage geholt wurde).
-        owner: playerIdx, cardName, from: opts.ablageFlugVon || 'deck', to: 'discard',
+        owner: playerIdx, cardName, from: opts.ablageFlugVon || 'deck', to: _attaLoescht ? 'deleted' : 'discard',
       });
-      ps.discardPile.push(cardName);
+      if (_attaLoescht) ps.deletedPile.push(cardName); else ps.discardPile.push(cardName);
     } else {
       const _endIdx = pool.indexOf(cardName);
       if (_endIdx >= 0) {
         // W63c: gestohlene Handkarte (Sofort-Guss: Hu, Coffee, Learning …) → Ablage des permanenten Besitzers; Herkunft VOR dem Splice
         const _ablageBesitzer = (pool === ps.hand) ? this._consumeHandCardOrigin(playerIdx, cardName, _endIdx) : playerIdx;
         this._broadcastEvent('play_pile_transfer', {
-          owner: playerIdx, cardName, from: 'hand', to: 'discard',
+          owner: playerIdx, cardName, from: 'hand', to: _attaLoescht ? 'deleted' : 'discard',
           fromHandIdx: _endIdx,
           ...(_ablageBesitzer !== playerIdx ? { fromOwner: playerIdx, toOwner: _ablageBesitzer } : {}),
         });
         pool.splice(_endIdx, 1);
-        (this.gs.players[_ablageBesitzer] || ps).discardPile.push(cardName);
+        if (_attaLoescht) (this.gs.players[_ablageBesitzer] || ps).deletedPile.push(cardName);
+        else (this.gs.players[_ablageBesitzer] || ps).discardPile.push(cardName);
         // ★ v1323 (Tester-Befund 23.9., Yukana): SOFORT synchronisieren —
         // sonst blieb der Handplatz bis zum naechsten Zustand (Wisdom-
         // Abfrage …) als sichtbare Luecke stehen, statt dass die Hand
@@ -34598,6 +34601,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Sofort mit "abgebrochen" zurueck, damit die alte Kette schnell
     // auslaeuft statt auf eine Antwort zu warten, die nie kommt.
     if (this._aborted) return null;
+    this._beobachtePrompt(playerIdx, promptData);   // Atta: jedes Zeigen gesuchter Karten ist ein Aufdecken
 
     // ★ v1404 (Al 25.9.): Jede Surprise-Aktivierungsfrage zeigt das Bild
     // der Surprise klein LINKS neben dem Dialog (Vorbild: Abfragen, die
@@ -44259,7 +44263,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             // ★ v1327: `deleteOnUse` („Delete this card") gilt auch hier —
             // dieselbe Regel wie in allen Hand-Reaktionsfenstern, die die
             // Karte beim Aktivieren loeschen, egal was danach geschieht.
-            const toDeleted = !!link._negatedToDeleted || !!loadCardEffect(link.cardName)?.deleteOnUse;
+            const toDeleted = !!link._negatedToDeleted || !!loadCardEffect(link.cardName)?.deleteOnUse || this._kettenSpellGeloeschtStattAblage(link);
             const pile = toDeleted ? 'deletedPile' : 'discardPile';
             // 2. Flug DORTHIN. Feld `owner:` wie in
             //    routeNegatedInitialCard, das nachweislich funktioniert.
@@ -44338,7 +44342,7 @@ this._deathWatch = (this._deathWatchStack || []).length
                 ablageErwartet: () => link.fromSurprise
                   ? (!loadCardEffect(link.cardName)?.deleteOnUse && !this.gs._spellPlacedOnBoard && !this.gs._spellReturnToHand)
                   : (!link.fromHero && !link.fromCreature && !loadCardEffect(link.cardName)?.skipPostResolveDiscard
-                    && !loadCardEffect(link.cardName)?.deleteOnUse && !this.gs._spellPlacedOnBoard && !this.gs._spellReturnToHand),
+                    && !loadCardEffect(link.cardName)?.deleteOnUse && !this._kettenSpellGeloeschtStattAblage(link) && !this.gs._spellPlacedOnBoard && !this.gs._spellReturnToHand),
                 kartenBesitzer: link.fromSurprise ? link.ablageBesitzer : undefined,
               });
               await this.runHooks('afterSpellResolved', {
@@ -44391,7 +44395,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             // ★ v1327: „Delete this card" (`deleteOnUse`) — bisher kannte
             // nur jedes HAND-Reaktionsfenster das Feld, die Kette legte
             // solche Karten stumm in die Ablage.
-            const zumLoeschen = !!linkScript?.deleteOnUse;
+            const zumLoeschen = !!linkScript?.deleteOnUse || this._kettenSpellGeloeschtStattAblage(link);
             if (ps) {
               // v858: `fromHandIdx` kommt aus dem Link (Platz beim
               // Aktivieren) — der Client startet den Flug damit am
@@ -45389,6 +45393,85 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ AUFDECKEN (Atta, Speaker of Desires): „when you reveal exactly 1 Normal Spell from your deck or hand, except by the effect of an Ability …".
+   * Es gibt kein zentrales Aufdeck-Ereignis — die Engine kennt vier Wege: das Fenster „Gegner sieht die gesuchte Karte" (`deckSearchReveal`, ca. 40 Karten,
+   * ueber `_beobachtePrompt`), das Zeigen einer Handkarte (`revealToOpponent`), das Aufdecken der obersten Deckkarte (`_deck-top-shared`) und
+   * `revealSearchedCards`. Jeder meldet hier. Gesammelt wird je WIRKUNG (Quelle) und am Ende der Wirkung (Nach-Ketten-Aktion) ausgewertet —
+   * wie die Tutor-Strichliste (`noteDeckTutor`): ob noch eine Karte folgt, weiss man erst dann. Auswertung: Hook `onCardsRevealed`
+   * { playerIdx, cardNames, zone ('hand'|'deck': wo die Karten jetzt liegen), sourceName } — EIN Aufruf je Spieler und Quelle.
+   * Aufdecken durch den Effekt einer ABILITY zaehlt nicht (Quelle ist eine Ability-Karte) — Atta nimmt es ausdruecklich aus.
+   */
+  meldeAufgedeckt(pi, names, opts = {}) {
+    if (this._inMctsSim || this._fastMode) return;
+    const liste = (names || []).filter(Boolean);
+    if (!liste.length || !this.gs?.players?.[pi]) return;
+    const quelle = opts.source || null;
+    const basis = quelle ? String(quelle).replace(/\s+Lv\s*\d.*$/i, '') : null;
+    const qcd = basis ? this._getCardDB()[basis] : null;
+    if (qcd && qcd.cardType === 'Ability') return;   // „except by the effect of an Ability"
+    if (!this._aufgedeckt) this._aufgedeckt = [];
+    this._aufgedeckt.push({ pi, names: liste, zone: opts.zone || 'hand', source: quelle });
+    if (!this._aufgedecktGeplant) {
+      this._aufgedecktGeplant = true;
+      this.queuePostChainAction(() => this._wertAufgedecktAus());
+    }
+  }
+
+  /** Das Fenster „Gegner sieht die gesuchten Karten" (`deckSearchReveal`) IST ein Aufdecken des Suchenden (aus Deck oder Ablage auf die Hand). */
+  _beobachtePrompt(opponentPi, d) {
+    if (!d || d.type !== 'deckSearchReveal') return;
+    if (/discard|deleted/i.test(String(d.sourceLabel || ''))) return;   // aus Ablage/Geloescht-Stapel: nicht „from your deck or hand"
+    const gs = this.gs;
+    let searcher = gs?.players ? gs.players.findIndex(p => p && p.username === d.searcherName) : -1;
+    if (searcher < 0) searcher = this.opponentOf(opponentPi);
+    this.meldeAufgedeckt(searcher, d.cardNames || [d.cardName], { zone: 'hand', source: d.title || null });
+  }
+
+  async _wertAufgedecktAus() {
+    this._aufgedecktGeplant = false;
+    const batch = this._aufgedeckt || [];
+    this._aufgedeckt = [];
+    if (!batch.length) return;
+    const gruppen = new Map();
+    for (const b of batch) {
+      const k = `${b.pi}|${b.source || ''}`;
+      if (!gruppen.has(k)) gruppen.set(k, { pi: b.pi, source: b.source, namen: [], zone: b.zone });
+      const g = gruppen.get(k);
+      g.namen.push(...b.names);
+    }
+    for (const g of gruppen.values()) {
+      if (this.gs?.result) return;
+      try {
+        await this.runHooks('onCardsRevealed', { playerIdx: g.pi, cardNames: g.namen, zone: g.zone, sourceName: g.source, _skipReactionCheck: true });
+      } catch (err) { console.error('[Engine] onCardsRevealed:', err.message); }
+    }
+  }
+
+  /** Atta als Wirker eines REAKTIONS-Zaubers (Kettenglied, nicht initial): derselbe Ersatz „gelöscht statt Ablage". */
+  _kettenSpellGeloeschtStattAblage(link) {
+    if (!link || link.cardType !== 'Spell' || link.isInitialCard) return false;
+    const seite = link.casterOwner ?? link.owner;
+    const hi = link.casterHeroIdx ?? link.heroIdx;
+    if (hi == null || hi < 0) return false;
+    return this.spellGoesToDeletedInstead(seite, hi);
+  }
+
+  /**
+   * „Spells this Hero uses that would be sent to the discard pile are deleted instead" (Atta): wird ein Zauber, den DIESER Held wirkt, in die Ablage
+   * gehen, kommt er stattdessen in den Geloescht-Stapel. Hero-Skript-Flag `deletesOwnSpellsInsteadOfDiscard`; es gilt nur, solange der Held lebt und sein
+   * Effekt nicht stumm ist (Frozen/Stunned/Negated). `heroSeite` = Brettseite des Wirkers.
+   */
+  spellGoesToDeletedInstead(heroSeite, heroIdx) {
+    const hero = this.gs?.players?.[heroSeite]?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return false;
+    let sc = null;
+    try { sc = this.heroScript(heroSeite, heroIdx); } catch { return false; }
+    if (!sc?.deletesOwnSpellsInsteadOfDiscard) return false;
+    try { if (this._isHeroEffectSilenced(heroSeite, heroIdx)) return false; } catch { /* im Zweifel gilt es */ }
+    return true;
+  }
+
+  /**
    * ★ v1307 — EINE HANDKARTE DEM GEGNER ZEIGEN („reveal it").
    * Dasselbe Bild wie der Reveal gespielter Karten, nur fuer den Gegner
    * und die Zuschauer; dazu Logzeile und das Kartengedaechtnis der CPU.
@@ -45403,6 +45486,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     this._broadcastEvent('hand_card_present', { ownerIdx: pi, handIdx, cardName });
     if (typeof this.noteKnownCard === 'function') this.noteKnownCard(oi, cardName, 'hand');
     this.log('hand_card_revealed', { player: this.gs.players[pi]?.username, card: cardName, by: opts.source || null });
+    this.meldeAufgedeckt(pi, [cardName], { zone: 'hand', source: opts.source || null });   // Atta
   }
 
   /**

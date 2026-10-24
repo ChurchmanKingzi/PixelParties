@@ -74,6 +74,10 @@ const HOOKS = {
   // hat (Cute Dog, Lunatic Cycle - New Moon, Life-Searcher, Inventing …). Genau EIN Aufruf je Effekt (nicht je Karte).
   // Kontext: { playerIdx (der Hinzufuegende), cardNames[], discarded, sourceName }. Reaktionsfenster (Control Monitors).
   ON_HAND_ADD_BY_DISCARD: 'onHandAddByDiscard',
+  // Ein Spieler hat Karten aus Hand/Deck AUFGEDECKT (Suchergebnis, gezeigte Handkarte, oberste Deckkarte) — NICHT durch den Effekt einer Ability.
+  // Gesammelt je Wirkung, EIN Aufruf am Ende der Wirkung (Nach-Ketten-Aktion). Kontext: { playerIdx, cardNames[], zone ('hand'|'deck'), sourceName }.
+  // Zuhoerer: Atta, Speaker of Desires. Siehe `engine.meldeAufgedeckt`.
+  ON_CARDS_REVEALED: 'onCardsRevealed',
   // Feuert, NACHDEM ein Doom Counter auf eine Doom Clock gelegt wurde.
   // Kontext: { clock, byPi, count, sourceName }. Zuhoerer sind Archer
   // of Teocuilatl (Schaden) und Swift Eagle Warrior (Karte ziehen).
