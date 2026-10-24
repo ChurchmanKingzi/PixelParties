@@ -59,6 +59,8 @@ module.exports = {
   // unterscheiden kann; das manuelle Flag gewinnt im Loader.
   blockedBySearchLock: true,
   isTargetingArtifact: true,
+  // Die Heldenwahl ist hier nur der KOSTENPUNKT ("… to it" vor der Suche); der Effekt selbst wählt keinen Helden → Flesh-Eating Swarm Trap & Co. dürfen nicht darauf reagieren.
+  heroChoiceIsCost: true,
   // Tutors a Decay Magic Spell into hand — blocked while hand-locked.
   blockedByHandLock: true,
 

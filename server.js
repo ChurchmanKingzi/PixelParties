@@ -11760,7 +11760,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
       // W74b (Flesh-Eating Swarm Trap): waehlt der Trank genau EINEN Helden (und sonst nichts), ist das der gewaehlte Held.
       chosenHero: (() => {
         const ids = Array.isArray(selectedIds) ? selectedIds : [];
-        if (ids.length !== 1) return null;
+        if (script.heroChoiceIsCost || ids.length !== 1) return null;   // Angry/Sickly Cheese: der Held ist nur der Kostenpunkt, nicht das Ziel des Effekts
         const t = (validTargets || []).find(v => v && v.id === ids[0]);
         return (t && t.type === 'hero' && Number.isInteger(t.heroIdx)) ? { owner: t.owner, heroIdx: t.heroIdx } : null;
       })(),
