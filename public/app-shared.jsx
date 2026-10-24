@@ -7591,7 +7591,9 @@ function GameTooltip() {
     // Gleichstand entscheidet der Stapelkontext, also mal so, mal so.
     // Jetzt eindeutig darueber, aber weiterhin unter den Animationen
     // (ab 10150) und dem Entfernen-Knopf des Editors.
-    <div className="game-tooltip" ref={boxRef} style={{ position: 'fixed', width: 'max-content', left: pos.x, top: pos.y, transform, zIndex: 10020, pointerEvents: 'none' }}>
+    // 24.10.: über die Variable — solange ein Dialog-Schleier offen ist (Puzzle-Editor: „Edit Creature Stats", im Kampf die Wahl-Dialoge, Schleier bei 10085), steigt der Tooltip knapp
+    // darüber (`--pz-tooltip-z: 10086`, style.css); sonst lag er UNTER dem Dialog, in dem er gerade aufgerufen wurde.
+    <div className="game-tooltip" ref={boxRef} style={{ position: 'fixed', width: 'max-content', left: pos.x, top: pos.y, transform, zIndex: 'var(--pz-tooltip-z, 10020)', pointerEvents: 'none' }}>
       {tip.text}
     </div>
   );
