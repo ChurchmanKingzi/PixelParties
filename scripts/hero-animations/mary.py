@@ -13,9 +13,10 @@ src/cute-princess-mary.png).
 * Fliegen: beim Abschlag wird Mary nach oben gedrückt, beim Aufschlag sinkt
   sie etwas ab.
 * Glut: von den Flügelspitzen lösen sich beim Abschlag kleine Funken.
-* Körper (`body_layer`): die Haare wehen (Strähnen am Kopf werden zeilenweise gedehnt bzw. gestaucht, die langen Locken schwingen am
-  weitesten), der Kopf wippt mit leichter Verzögerung gegen den Rumpf, die Hände flattern, der Saum des Kleides schwingt, und das
-  Feuer am Kleid flackert (Farben wandern auf der Leiter Rot → Orange → Gelb nach oben).
+* Körper (`body_layer`): die Haare wehen (die Außenkante der Strähnen am Kopf wird zeilenweise verschoben, die langen Locken unter den
+  Schulterpolstern sind dieselbe Strähne und schwingen mit derselben, nur verzögerten Welle mit), die Arme schwingen seitwärts, der Saum
+  des Kleides schwingt, und das Feuer am Kleid flackert (Farben wandern auf der Leiter Rot → Orange → Gelb nach oben). Der Kopf selbst
+  bleibt starr (kein Dehnen und Stauchen).
 * Krone: ein Lichtband wandert einmal pro Schleife über die Krone; danach blitzen Glitzersterne über den Zacken auf.
 """
 import math
@@ -103,9 +104,11 @@ SPARKS = [(42, 18, 18), (35, 18, 24), (39, 19, 29)]   # Glitzersterne über den 
 
 
 def hair_shift(y, i):
-    """Seitlicher Versatz der äußeren Kante der Strähnen in Zeile y (Wind von links, Welle läuft nach unten)."""
-    amp = 0.35 + 0.17 * (y - 26) if y < 34 else 2.1
-    return int(round(amp * math.sin(2 * math.pi * (i % N) / N - 0.38 * (y - 26))))
+    """Seitlicher Versatz der Außenkante der Haare in Zeile y (Wind von links). Die Welle läuft von oben nach unten durch die ganze
+    Strähne, auch durch die langen Locken unter den Schulterpolstern: dieselbe Formel, nur Zeile für Zeile verzögert, damit sie sich
+    wie die Fortsetzung des Haars am Kopf bewegen und nicht wie ein eigenes Teil."""
+    amp = 0.35 + 0.15 * (y - 26)
+    return int(round(amp * math.sin(2 * math.pi * (i % N) / N - 0.14 * (y - 26))))
 
 
 def warp_row(row, xa, xb, d, side):
@@ -113,10 +116,10 @@ def warp_row(row, xa, xb, d, side):
     Die Pixel werden gedehnt bzw. gestaucht, es entstehen weder Lücken noch neue Farben."""
     src = row[xa:xb + 1].copy()
     n_src = xb - xa + 1
-    n_out = max(2, n_src + d)
+    n_out = max(1, n_src + d)
     out = np.zeros_like(row)
     for j in range(n_out):
-        c = src[int(round(j * (n_src - 1) / (n_out - 1)))]
+        c = src[int(round(j * (n_src - 1) / max(1, n_out - 1)))]
         x = xb - n_out + 1 + j if side < 0 else xa + j
         out[x] = c
     return out
@@ -135,47 +138,49 @@ def body_layer(i):
             out[y, lo:hi + 1] = 0
             seg = warp_row(BODY[y], a, b, d, side)
             out[y, lo:hi + 1] = np.where(seg[lo:hi + 1, 3:4] > 0, seg[lo:hi + 1], out[y, lo:hi + 1])
-    # 2) Kopf wippt (leicht verzögert gegen den Rumpf); die Kinn-Zeile bleibt als Hals darunter stehen
-    dy_h = int(round(0.8 * math.sin(ph - 3.2)))
-    head = out[HEAD0:HEAD1 + 1].copy()
-    out[HEAD0:HEAD1] = 0
-    for y in range(head.shape[0]):
-        for x in range(SW):
-            if head[y, x, 3]:
-                out[HEAD0 + y + dy_h, x] = head[y, x]
-    # 3) Hände flattern
-    dy_a = int(round(1.0 * math.sin(ph - 1.6)))
-    if dy_a:
-        for xs in (range(29, 33), range(45, 49)):
-            hand = {(x, y): out[y, x].copy() for y in range(41, 44) for x in xs if out[y, x, 3] and tuple(out[y, x, :3]) in HAND}
-            for (x, y) in hand:
-                out[y, x] = 0
-            for (x, y), c in hand.items():
-                out[y + dy_a, x] = c
-    # 4) Saum schwingt
+    # 2) Arme schwingen seitwärts: die Hände wandern nach außen und zurück (dazu leicht auf und ab); der Spalt zum Mantel wird mit Arm gefüllt
+    o = max(-1, int(round(2.0 * math.sin(ph - 1.6))))                  # > 0: nach außen
+    dy_a = int(round(0.7 * math.sin(ph - 1.6 + math.pi / 2)))
+    for side in (-1, 1):
+        xs = range(29, 33) if side < 0 else range(45, 49)
+        hand = {(x, y): out[y, x].copy() for y in range(41, 44) for x in xs if out[y, x, 3] and tuple(out[y, x, :3]) in HAND}
+        if not hand:
+            continue
+        inner = max(x for x, _ in hand) if side < 0 else min(x for x, _ in hand)
+        for (x, y) in hand:
+            out[y, x] = 0
+        for (x, y), c in hand.items():
+            out[y + dy_a, x + side * o] = c
+        for y in range(41, 44):
+            for k in range(max(0, o)):
+                gx = inner - side * k
+                if not out[y + dy_a, gx, 3]:
+                    out[y + dy_a, gx] = (*(HAND_SKIN if y == 42 else HAND_LINE), 255)
+    # 3) Saum schwingt
     for y in range(48, 56):
         dx = int(round(math.sin(ph - 2.2 - 0.3 * (y - 47)) * (y - 47) / 7.0 * 1.2))
         if dx:
             out[y, 27:51] = np.roll(out[y, 27:51], dx, axis=0)
-    # 5) Feuer am Kleid flackert (Farben wandern auf der Leiter)
+    # 4) Feuer am Kleid flackert (Farben wandern auf der Leiter)
     for y in range(34, 57):
         for x in range(SW):
             if out[y, x, 3] and tuple(out[y, x, :3]) in FLAME_LADDER:
                 s = int(round(1.0 * math.sin(ph * 1.0 + 0.7 * x + 0.5 * y)))
                 if s:
                     out[y, x, :3] = step(FLAME_LADDER, tuple(out[y, x, :3]), s)
-    # 6) Lichtband über die Krone
+    # 5) Lichtband über die Krone
     x0, x1, y0, y1 = CROWN
     for y in range(y0 - 1, y1 + 1):
         for x in range(x0, x1 + 1):
-            if out[y + dy_h, x, 3] and tuple(out[y + dy_h, x, :3]) in CROWN_LADDER:
+            if out[y, x, 3] and tuple(out[y, x, :3]) in CROWN_LADDER:
                 lv = sweep_level(x, y, i, N, speed=1.25, slope=0.8, offset=29.0)
                 if lv:
-                    out[y + dy_h, x, :3] = step(CROWN_LADDER, tuple(out[y + dy_h, x, :3]), lv + 1)
-    return out, dy_h
+                    out[y, x, :3] = step(CROWN_LADDER, tuple(out[y, x, :3]), lv + 1)
+    return out
 
 
-HAND = {(0x59, 0x20, 0x0c), (0xf0, 0xca, 0x9e)}                  # Handfarben (Umriss, Haut)
+HAND_LINE, HAND_SKIN = (0x59, 0x20, 0x0c), (0xf0, 0xca, 0x9e)
+HAND = {HAND_LINE, HAND_SKIN}                                   # Handfarben (Umriss, Haut)
 
 
 EMBER = [(255, 236, 170), (255, 190, 80), (240, 120, 40), (190, 60, 30)]
@@ -192,7 +197,7 @@ def frame(i):
                 if c is not None:
                     out[y, x] = c
     # Körper (Haare, Kopf, Hände, Saum, Feuer, Krone: siehe body_layer)
-    body, dy_h = body_layer(i)
+    body = body_layer(i)
     for y in range(SH):
         for x in range(SW):
             if body[y, x, 3]:
@@ -217,7 +222,7 @@ def frame(i):
         if 0 <= xx < W and 0 <= yy < H and out[yy, xx, 3] == 0:
             out[yy, xx] = (*EMBER[min(3, t // 2)], 255 - t * 22)
     # Glitzersterne über der Krone (folgen dem Körper)
-    draw_sparkles(out, i, N, [(x + PL, y + PT + oy + dy_h, st) for x, y, st in SPARKS], rgb('ffef93'), rgb('ffd900'))
+    draw_sparkles(out, i, N, [(x + PL, y + PT + oy, st) for x, y, st in SPARKS], rgb('ffef93'), rgb('ffd900'))
     return out
 
 
