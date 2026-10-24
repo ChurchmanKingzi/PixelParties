@@ -31959,6 +31959,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // aber nie durchgereicht, und der Picker liess zwei Kopien
           // derselben Karte zu (Als Befund 5.9.).
           uniqueBy: config.uniqueBy,
+          sameBy: config.sameBy,   // Gegenstück zu `uniqueBy`: alle gewählten Ziele teilen den Wert dieses Felds (Voodoo Curse: `kontrolleur`)
           maxBudget: config.maxBudget,
           // ── `selectCount` / `minSelect` ALS ALIAS (Als Report 16.8.) ──
           // Es gibt zwei Prompt-Familien mit UNTERSCHIEDLICHEN Feldnamen:
@@ -32047,6 +32048,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       const werte = sel.map(t => t[c.uniqueBy]);
       if (new Set(werte).size !== werte.length) return 'unique_by';
     }
+    // `sameBy` (Voodoo Curse: „2 targets that are controlled by the same player"): alle Ziele der Auswahl stimmen in diesem Feld überein — Gegenstück zu `uniqueBy`.
+    if (c.sameBy && new Set(sel.map(t => t[c.sameBy])).size > 1) return 'same_by';
     if (c.maxBudget != null && sel.reduce((n, t) => n + (t.budgetCost ?? 0), 0) > c.maxBudget) return 'max_budget';
     if (c.maxNonOwnSupport !== undefined && sel.filter(t => !t.ownSupport).length > c.maxNonOwnSupport) return 'max_non_own_support';
     return null;
@@ -32158,7 +32161,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   async _zielwahlAbschliessen(playerIdx, validTargets, config, picked) {
     // ★ W7b (S01-22, Al 14.10./15.10.: der Server prueft Antworten nach; „die CPU-Regeln sollen denen fuer Spieler entsprechen“):
     // Jede Antwort - Mensch, CPU, Skript-`cpuResponse`, `targetFn` - unterliegt denselben Picker-Regeln wie ein Klick im Client
-    // (`korrigiereZielAuswahl`): Duplikate, unwaehlbare Ziele, `maxTotal`, `exclusiveTypes`, `maxPerType`, `uniqueBy`, `maxBudget`,
+    // (`korrigiereZielAuswahl`): Duplikate, unwaehlbare Ziele, `maxTotal`, `exclusiveTypes`, `maxPerType`, `uniqueBy`, `sameBy`, `maxBudget`,
     // `maxNonOwnSupport` (Obergrenzen: gekappt, die zuerst genannten gelten) sowie `minRequired`, `minSumMaxHp`, `minSumLevel`,
     // Pflichttribut (Untergrenzen: aus den waehlbaren Zielen in Listenreihenfolge aufgefuellt; geht das nicht auf, gilt eine
     // abbrechbare Wahl als Abbruch). Gueltige Antworten bleiben unveraendert; Abbruch (`null`) und `[]` auch. Der Mensch-Weg
