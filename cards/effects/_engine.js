@@ -3888,7 +3888,7 @@ class GameEngine {
       // route benefits to the borrower's controller. Skipped if the
       // script opts out (`disableLizbethMirror: true`). The mirror flag
       // prevents recursion via _isLizbethMirror.
-      if (!hookCtx._isLizbethMirror && card.zone === 'ability' && card.heroIdx >= 0) {
+      if (!hookCtx._isLizbethMirror && (card.zone === 'ability' || this.supportAbilityLebt(card)) && card.heroIdx >= 0) {
         await this._fireLizbethMirrorIfApplicable(card, hookFn, hookName, hookCtx);
       }
 
@@ -31958,7 +31958,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const FLIGHT_MS = 600;
     const LAND_AT_MS = Math.round(FLIGHT_MS * 0.8);
     const placedInsts = [];
-    const placeOne = async (name, slotIdx, source) => {
+    const placeOne = async (name, ort, source) => {
+      const slotIdx = ort.slot;
       let handInst = null;
       let handIdx = -1;
       if (source === 'deck') {
@@ -31972,6 +31973,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Flug endet.
       this._broadcastEvent('deck_to_ability_animation', {
         owner: pi, heroIdx, slotIdx, cardName: name, count: 1, source,
+        ...(ort.art === 'support' ? { zoneKind: 'support' } : {}),
         ...(heroOwner !== pi ? { destOwner: heroOwner } : {}),
       });
       await this._delay(LAND_AT_MS);
@@ -31988,10 +31990,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (handInst) this._untrackCard(handInst.id);
         ps.hand.splice(handIdx, 1);
       }
-      if (!abZones[slotIdx]) abZones[slotIdx] = [];
-      abZones[slotIdx].push(name);
-      const inst = this._trackCard(name, heroOwner, 'ability', heroIdx, slotIdx);
-      placedInsts.push({ inst, name, slotIdx, source });
+      // 24.10.: echte Ability Zone ODER Support Zone (Xal, Xalibur) — `abilityOrtBelegen` legt Namen und Instanz an.
+      const inst = this.abilityOrtBelegen(heroOwner, heroIdx, name, ort);
+      placedInsts.push({ inst, name, slotIdx, source, ort });
       this.sync();
       await this._delay(FLIGHT_MS - LAND_AT_MS);
       return true;
@@ -31999,10 +32000,17 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // ★★ v1349: Zonenwahl und Obergrenze zentral (`abilityZielZone` —
     // zaehlt verwahrte Kopien mit, Madame Guillotine).
-    const nochPlatz = (name, slotIdx) => this.abilityZielZone(heroOwner, heroIdx, name) === slotIdx;
+    // 24.10.: `abilityZielOrt` kennt auch die Support Zonen von Xal / Xalibur und erzwingt EINEN Stapel je Ability ueber beide Zonenarten.
+    // Ein GELIEHENER Held auf der Gegenspalte (`heroOwner !== pi`) bekommt wie bei `doPlayAbilityFremd` nur echte Zonen.
+    const zielOrt = (name) => {
+      if (heroOwner === pi) return this.abilityZielOrt(heroOwner, heroIdx, name);
+      const z = this.abilityZielZone(heroOwner, heroIdx, name);
+      return z >= 0 ? { art: 'ability', slot: z } : null;
+    };
+    const nochPlatz = (name, ort) => { const o = zielOrt(name); return !!o && o.art === ort.art && o.slot === ort.slot; };
     for (const name of abilityChoices) {
-      const slotIdx = this.abilityZielZone(heroOwner, heroIdx, name);
-      if (slotIdx < 0) continue;
+      const ort = zielOrt(name);
+      if (!ort) continue;
       if (!ps.mainDeck.includes(name) && !ps.hand.includes(name)) continue;
       // v670 (Al 30.8.): der Bonus ist OPTIONAL — je Ability ein Ja/Nein
       // („Add Resistance to Monia?"). Die CPU bejaht immer
@@ -32019,11 +32027,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         this.log('ascension_bonus_declined', { player: ps.username, hero: heroName, ability: name });
         continue;
       }
-      while (nochPlatz(name, slotIdx)) {
-        if (!(await placeOne(name, slotIdx, 'deck'))) break;
+      while (nochPlatz(name, ort)) {
+        if (!(await placeOne(name, ort, 'deck'))) break;
       }
-      while (nochPlatz(name, slotIdx)) {
-        if (!(await placeOne(name, slotIdx, 'hand'))) break;
+      while (nochPlatz(name, ort)) {
+        if (!(await placeOne(name, ort, 'hand'))) break;
       }
     }
 
@@ -32031,6 +32039,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     this.shuffleDeck(pi);
 
+    // Echte Zone wie Support Zone: nur `onPlay` (die Anlege-Boni) — eine Support-Ability wirkt, solange der Held sie aufnimmt (`runHooks` → `supportAbilityLebt`).
     for (const { inst, name, slotIdx } of placedInsts) {
       await this.runHooks('onPlay', {
         _onlyCard: inst, playedCard: inst,
@@ -32045,8 +32054,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Log per (slot, name) — players care about the total per ability,
     // not the deck-vs-hand split.
     const logGroups = new Map();
-    for (const { name, slotIdx } of placedInsts) {
-      const key = `${slotIdx}-${name}`;
+    for (const { name, slotIdx, ort } of placedInsts) {
+      const key = `${ort.art}${slotIdx}-${name}`;
       if (!logGroups.has(key)) logGroups.set(key, { name, count: 0 });
       logGroups.get(key).count++;
     }
@@ -36303,7 +36312,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    *   `{ negateEffect: true }` laesst den Aufrufer die Aktivierung
    *   genauso abbrechen wie eine Negation aus der Kette.
    */
-  async _checkSurpriseOnAbilityActivation(activatorIdx, heroIdx, zoneIdx, abilityName, heroOwner = activatorIdx) {
+  async _checkSurpriseOnAbilityActivation(activatorIdx, heroIdx, zoneIdx, abilityName, heroOwner = activatorIdx, zoneKind = 'ability') {
     if (this._surpriseNestingBlocked()) return null;
     const opponentIdx = this.opponentOf(activatorIdx);
     // Styx 28.9.: `heroOwner` = Brettseite des Helden (uebernommen: Gegenseite);
@@ -36313,7 +36322,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Stufe = Stapelhoehe im Slot, dieselbe Rechnung wie in
       // `getAbilityTargets`. Surprises, die auf die Stufe schauen,
       // muessen sie nicht selbst herleiten.
-      level: (this.gs.players[heroOwner]?.abilityZones?.[heroIdx]?.[zoneIdx] || []).length,
+      level: ((zoneKind === 'support' ? this.gs.players[heroOwner]?.supportZones : this.gs.players[heroOwner]?.abilityZones)?.[heroIdx]?.[zoneIdx] || []).length,
     };
     const activatorName = this.gs.players[activatorIdx]?.username || 'Opponent';
     const heroName = this.gs.players[heroOwner]?.heroes?.[heroIdx]?.name || 'a Hero';
@@ -47515,8 +47524,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         // the charmed Hero.
         if (!this.canHeroPerformAction(playerIdx, hi)) continue;
 
-        for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
-          const slot = (ops.abilityZones[hi] || [])[zi] || [];
+        for (const _e of this._aktivierungsStapel(oi, hi)) {
+          const zi = _e.zi, slot = _e.slot;
           if (slot.length === 0) continue;
           const abilityName = slot[0];
           const script = loadCardEffect(abilityName);
@@ -47533,7 +47542,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
           if (script.canActivateAction && !script.canActivateAction(this.gs, playerIdx, hi, slot.length, this)) continue;
 
-          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, charmedOwner: oi });
+          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, charmedOwner: oi, ...(_e.zoneKind === 'support' ? { zoneKind: 'support' } : {}) });
         }
       }
     }
@@ -47555,8 +47564,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (this.areActionsBlocked(playerIdx)) continue;
         if (this.isHeroSkillLocked(oi, hi)) continue;
 
-        for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
-          const slot = (ops.abilityZones[hi] || [])[zi] || [];
+        for (const _e of this._aktivierungsStapel(oi, hi)) {
+          const zi = _e.zi, slot = _e.slot;
           if (slot.length === 0) continue;
           const abilityName = slot[0];
           const script = loadCardEffect(abilityName);
@@ -47572,7 +47581,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
           if (script.canActivateAction && !script.canActivateAction(this.gs, playerIdx, hi, slot.length, this)) continue;
 
-          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, charmedOwner: oi });
+          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, charmedOwner: oi, ...(_e.zoneKind === 'support' ? { zoneKind: 'support' } : {}) });
         }
       }
     }
@@ -47607,8 +47616,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
         if (!borrowed) continue;
 
-        for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
-          const slot = (ops.abilityZones[hi] || [])[zi] || [];
+        for (const _e of this._aktivierungsStapel(oi, hi)) {
+          const zi = _e.zi, slot = _e.slot;
           if (slot.length === 0) continue;
           const abilityName = slot[0];
           const script = loadCardEffect(abilityName);
@@ -47624,12 +47633,23 @@ this._deathWatch = (this._deathWatchStack || []).length
 
           if (script.canActivateAction && !script.canActivateAction(this.gs, playerIdx, hi, slot.length, this)) continue;
 
-          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, borrowedFromOwner: oi });
+          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, borrowedFromOwner: oi, ...(_e.zoneKind === 'support' ? { zoneKind: 'support' } : {}) });
         }
       }
     }
 
     return result;
+  }
+
+  /**
+   * 24.10.: die Ability-Stapel eines Helden (Brettseite `seite`) fuer die Aktivierungslisten FREMDER Helden (Charme Lv3, Kontrolle, Lizbeth/Smugbeth):
+   * echte Ability Zonen IMMER, Support-Stapel nur, wenn der Held Abilities in Support Zonen nimmt (Xal, Xalibur). `[{ slot: Namen, zi: Slotindex, zoneKind }]`.
+   */
+  _aktivierungsStapel(seite, heroIdx) {
+    const ps = this.gs.players[seite];
+    const out = ((ps?.abilityZones?.[heroIdx]) || []).map((slot, zi) => ({ slot: slot || [], zi, zoneKind: 'ability' }));
+    for (const e of this.abilityStapelListe(seite, heroIdx)) if (e.art === 'support') out.push({ slot: e.namen, zi: e.slot, zoneKind: 'support' });
+    return out;
   }
 
   /** Cheap pre-check used by `getActivatableAbilities`: does `playerIdx`
@@ -49144,8 +49164,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Check script's canFreeActivate condition
         if (canActivate && script.canFreeActivate) {
           try {
+            // 24.10.: Abilities in Support Zonen (Xal, Xalibur) sind Instanzen mit zone 'support'.
             const inst = this.cardInstances.find(c =>
-              c.owner === playerIdx && c.zone === 'ability' && c.heroIdx === hi && c.zoneSlot === zi
+              c.owner === playerIdx && c.zone === (_eintrag.zoneKind === 'support' ? 'support' : 'ability') && c.heroIdx === hi && c.zoneSlot === zi
             );
             if (inst) {
               const ctx = this._createContext(inst, { event: 'canFreeActivateCheck' });
@@ -49174,8 +49195,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         if ((hero.statuses?.stunned || hero.statuses?.webbed)) continue;
         if (hero.statuses?.frozen && !chillyDogFreeAbilLift) continue;
 
-        for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
-          const slot = (ops.abilityZones[hi] || [])[zi] || [];
+        for (const _e of this._aktivierungsStapel(oi, hi)) {
+          const zi = _e.zi, slot = _e.slot;
           if (slot.length === 0) continue;
           const abilityName = slot[0];
           const script = loadCardEffect(abilityName);
@@ -49194,7 +49215,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (canActivate && script.canFreeActivate) {
             try {
               const inst = this.cardInstances.find(c =>
-                c.owner === oi && c.zone === 'ability' && c.heroIdx === hi && c.zoneSlot === zi
+                c.owner === oi && c.zone === (_e.zoneKind === 'support' ? 'support' : 'ability') && c.heroIdx === hi && c.zoneSlot === zi
               );
               if (inst) {
                 const ctx = this._createContext(inst, { event: 'canFreeActivateCheck' });
@@ -49203,7 +49224,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             } catch { canActivate = false; }
           }
 
-          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, canActivate, exhausted, charmedOwner: oi });
+          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, canActivate, exhausted, charmedOwner: oi, ...(_e.zoneKind === 'support' ? { zoneKind: 'support' } : {}) });
         }
       }
     }
@@ -49218,8 +49239,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         if ((hero.statuses?.stunned || hero.statuses?.webbed)) continue;
         if (hero.statuses?.frozen && !chillyDogFreeAbilLift) continue;
 
-        for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
-          const slot = (ops.abilityZones[hi] || [])[zi] || [];
+        for (const _e of this._aktivierungsStapel(oi, hi)) {
+          const zi = _e.zi, slot = _e.slot;
           if (slot.length === 0) continue;
           const abilityName = slot[0];
           const script = loadCardEffect(abilityName);
@@ -49238,7 +49259,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (canActivate && script.canFreeActivate) {
             try {
               const inst = this.cardInstances.find(c =>
-                c.owner === oi && c.zone === 'ability' && c.heroIdx === hi && c.zoneSlot === zi
+                c.owner === oi && c.zone === (_e.zoneKind === 'support' ? 'support' : 'ability') && c.heroIdx === hi && c.zoneSlot === zi
               );
               if (inst) {
                 const ctx = this._createContext(inst, { event: 'canFreeActivateCheck' });
@@ -49247,7 +49268,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             } catch { canActivate = false; }
           }
 
-          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, canActivate, exhausted, charmedOwner: oi });
+          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, canActivate, exhausted, charmedOwner: oi, ...(_e.zoneKind === 'support' ? { zoneKind: 'support' } : {}) });
         }
       }
     }
@@ -49278,8 +49299,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
         if (!borrowed) continue;
 
-        for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
-          const slot = (ops.abilityZones[hi] || [])[zi] || [];
+        for (const _e of this._aktivierungsStapel(oi, hi)) {
+          const zi = _e.zi, slot = _e.slot;
           if (slot.length === 0) continue;
           const abilityName = slot[0];
           const script = loadCardEffect(abilityName);
@@ -49316,7 +49337,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (canActivate && script.canFreeActivate) {
             try {
               const inst = this.cardInstances.find(c =>
-                c.owner === oi && c.zone === 'ability' && c.heroIdx === hi && c.zoneSlot === zi
+                c.owner === oi && c.zone === (_e.zoneKind === 'support' ? 'support' : 'ability') && c.heroIdx === hi && c.zoneSlot === zi
               );
               if (inst) {
                 // Build ctx with borrower-side cardOwner so per-hero
@@ -49334,6 +49355,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length,
             canActivate, exhausted, handLockBlocked,
             borrowedFromOwner: oi,
+            ...(_e.zoneKind === 'support' ? { zoneKind: 'support' } : {}),
           });
         }
       }
@@ -49973,6 +49995,48 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
   }
 
+  /**
+   * Alle ABILITIES in den Support Zonen dieses Helden in die Ablage schicken (Xalibur geht, Teleport / Compulsory Body Swap bringen einen Helden um
+   * seine Erlaubnis). Laeuft ueber `actionMoveCard` — die Leafagami Snake schuetzt auch hier (die Karte bleibt liegen, der Kontrolleur zieht).
+   * `opts.nurSlots`: nur diese Support-Slots (Set/Array von Slot-Indizes); `opts.excludeId`: die abgehende Erlaubnis-Quelle zaehlt nicht mehr mit.
+   * Danach gleicht `syncSupportAbilities` die uebrig gebliebenen (geschuetzten) Karten ab: ohne Erlaubnis schlafen sie.
+   */
+  async sendeSupportAbilitiesInAblage(seite, heroIdx, sourceName, opts = {}) {
+    const ps = this.gs.players[seite];
+    if (!ps) return;
+    const nur = opts.nurSlots ? new Set(opts.nurSlots) : null;
+    const cardDB = this._getCardDB();
+    const zonen = ps.supportZones?.[heroIdx] || [];
+    // Hat der Held die Erlaubnis SCHON verloren (Teleport / Compulsory Body Swap: die Abilities sind gerade erst bei ihm angekommen), feuert der Abgang der
+    // Karten keine Hooks mehr (`supportAbilityLebt` ist falsch) — ihre Wirkung (Fighting-ATK, Toughness-HP …) bliebe am Helden. Deshalb zuerst abgleichen:
+    // `syncSupportAbilities` nimmt die Wirkung zurück. (Beim Abgang von Xalibur zählt die Quelle noch mit: dort feuern die Hooks selbst, kein Vorab-Abgleich.)
+    if (!this.heroAcceptsAbilitiesInSupport(seite, heroIdx)) await this.syncSupportAbilities(seite, heroIdx, opts.excludeId ?? null);
+    for (let zi = 0; zi < zonen.length; zi++) {
+      if (nur && !nur.has(zi)) continue;
+      for (const kartenName of [...(zonen[zi] || [])]) {
+        const cd = cardDB[kartenName];
+        if (!cd || !hasCardType(cd, 'Ability')) continue;
+        this._broadcastEvent('play_pile_transfer', {
+          owner: seite, cardName: kartenName,
+          from: 'support', to: 'discard',
+          fromHeroIdx: heroIdx, fromSlotIdx: zi,
+        });
+        const inst = (this.cardInstances || []).find(c =>
+          c.zone === 'support' && c.owner === seite
+          && c.heroIdx === heroIdx && c.zoneSlot === zi && c.name === kartenName);
+        if (inst) {
+          await this.actionMoveCard(inst, 'discard', -1, -1, { sourceName });
+        } else {
+          const idx = (zonen[zi] || []).indexOf(kartenName);
+          if (idx >= 0) zonen[zi].splice(idx, 1);
+          ps.discardPile.push(kartenName);
+        }
+      }
+    }
+    await this.syncSupportAbilities(seite, heroIdx, opts.excludeId ?? null);
+    this.sync();
+  }
+
   _getCandidateAbilityZoneSets(playerIdx, heroIdx, trotzNegierung = false) {
     const ps = this.gs.players[playerIdx];
     // S1 (C05-10): Abilities negiert (Stowaway) — weder eigene noch geliehene noch Geraete-Zonen zaehlen.
@@ -49989,7 +50053,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const sets = [own];
     const sources = this._getAbilityBorrowSources(playerIdx, heroIdx, 'passive');
     for (const src of sources) {
-      const oppZones = this.gs.players[src.playerIdx]?.abilityZones?.[src.heroIdx] || [];
+      // 24.10.: auch die Stapel in den Support Zonen des Gegners (Xal, Xalibur) werden geliehen — „as if they were Ability Zones".
+      const oppZones = [
+        ...(this.gs.players[src.playerIdx]?.abilityZones?.[src.heroIdx] || []),
+        ...this.heroSupportAbilityStacks(src.playerIdx, src.heroIdx),
+      ];
       const filteredOpp = oppZones.filter(slot => {
         if (!slot || slot.length === 0) return false;
         const script = loadCardEffect(slot[0]);
@@ -50054,7 +50122,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * shares with the activator's own copies of the ability because it's
    * keyed on `(abilityName, activatingPi)`, not on the source slot.
    */
-  _getAbilityBorrowerForOppSlot(activatingPi, sourcePi, sourceHeroIdx, sourceZoneIdx) {
+  _getAbilityBorrowerForOppSlot(activatingPi, sourcePi, sourceHeroIdx, sourceZoneIdx, sourceZoneKind = 'ability') {
     if (sourcePi === activatingPi) return null; // not a borrow
     // Styx 28.9.: Leiher = Helden, die der Aktivierende kontrolliert;
     // `borrowerOwner` = deren Brettseite (geliehene Lizbeth → Gegenseite).
@@ -50065,7 +50133,10 @@ this._deathWatch = (this._deathWatchStack || []).length
           // Confirm the slot itself exists and is non-empty — the
           // activation path will fail anyway, but bailing here gives
           // a cleaner false return to the click handler.
-          const opSlot = this.gs.players[sourcePi]?.abilityZones?.[sourceHeroIdx]?.[sourceZoneIdx];
+          // 24.10.: die geliehene Ability kann in einer SUPPORT Zone des Gegners liegen (Xal, Xalibur) — dann muss sie dort wirklich als Ability liegen und lebendig sein.
+          const opSlot = sourceZoneKind === 'support'
+            ? this._aktivierungsStapel(sourcePi, sourceHeroIdx).find(e => e.zoneKind === 'support' && e.zi === sourceZoneIdx)?.slot
+            : this.gs.players[sourcePi]?.abilityZones?.[sourceHeroIdx]?.[sourceZoneIdx];
           if (opSlot && opSlot.length > 0) return { borrowerHeroIdx: hi, borrowerOwner: physOwner };
         }
       }

@@ -9760,7 +9760,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
   let borrowerHeroIdx = null, borrowerOwner = pi;
   if (borrowedFromOwner != null) {
     if (charmedOwner != null) return false;
-    const borrow = room.engine._getAbilityBorrowerForOppSlot(pi, borrowedFromOwner, heroIdx, zoneIdx);
+    const borrow = room.engine._getAbilityBorrowerForOppSlot(pi, borrowedFromOwner, heroIdx, zoneIdx, zoneKind);
     if (!borrow) return false;
     borrowerHeroIdx = borrow.borrowerHeroIdx;
     borrowerOwner = borrow.borrowerOwner ?? pi;   // Styx 28.9.: Seite des Leihers
@@ -9823,8 +9823,9 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
   // Vorbelegung "nicht gefeuert" — der Erfolgspfad setzt um.
   room.engine.noteActivationOutcome(hoptKey, false);
 
+  // 24.10.: eine Ability in einer SUPPORT Zone (Xal, Xalibur) ist eine Instanz mit zone 'support' (vorher fand diese Suche sie nie).
   const inst = room.engine.cardInstances.find(c =>
-    c.owner === heroOwner && c.zone === 'ability' && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
+    c.owner === heroOwner && c.zone === (zoneKind === 'support' ? 'support' : 'ability') && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
   );
   if (!inst) return false;
 
@@ -9875,7 +9876,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
     // freie Ability schluepft.
     const abilitySurprise = chainResult.negated
       ? null
-      : await room.engine._checkSurpriseOnAbilityActivation(pi, heroIdx, zoneIdx, abilityName, heroOwner);   // Styx 28.9.: Brettseite
+      : await room.engine._checkSurpriseOnAbilityActivation(pi, heroIdx, zoneIdx, abilityName, heroOwner, zoneKind);   // Styx 28.9.: Brettseite
 
     if (chainResult.negated || abilitySurprise?.negateEffect) {
       // Gefeuert und gekontert — der Auftritt gehoert trotzdem dazu,
@@ -10663,7 +10664,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
   let borrowerHeroIdx = null, borrowerOwner = pi;
   if (borrowedFromOwner != null) {
     if (charmedOwner != null) return false; // charm + borrow combo not supported
-    const borrow = room.engine._getAbilityBorrowerForOppSlot(pi, borrowedFromOwner, heroIdx, zoneIdx);
+    const borrow = room.engine._getAbilityBorrowerForOppSlot(pi, borrowedFromOwner, heroIdx, zoneIdx, zoneKind);
     if (!borrow) return false;
     borrowerHeroIdx = borrow.borrowerHeroIdx;
     borrowerOwner = borrow.borrowerOwner ?? pi;   // Styx 28.9.: Seite des Leihers
@@ -10821,8 +10822,9 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
   let _heroCostFinalized = false;
 
   try {
+    // 24.10.: auch Abilities in Support Zonen (Xal, Xalibur) — Instanz mit zone 'support'.
     const inst = room.engine.cardInstances.find(c =>
-      c.owner === heroOwner && c.zone === 'ability' && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
+      c.owner === heroOwner && c.zone === (zoneKind === 'support' ? 'support' : 'ability') && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
     );
     if (!inst) return false;
 
@@ -10847,7 +10849,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     // Ausgang wie eine Negation aus der Kette.
     const abilitySurprise = chainResult.negated
       ? null
-      : await room.engine._checkSurpriseOnAbilityActivation(pi, heroIdx, zoneIdx, abilityName, heroOwner);   // Styx 28.9.: Brettseite
+      : await room.engine._checkSurpriseOnAbilityActivation(pi, heroIdx, zoneIdx, abilityName, heroOwner, zoneKind);   // Styx 28.9.: Brettseite
 
     if (chainResult.negated || abilitySurprise?.negateEffect) {
       if (gs._pendingCardReveal) room.engine._firePendingCardReveal();   // W63d: gefeuert und gekontert = gespielt
@@ -10871,10 +10873,10 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     const origHeroIdx = inst.heroIdx;
     {   // W63d: der Besitzer sofort, die Gegner über den zentralen Weg (Auftritts-Puffer hält die Animation bis zum Commit)
       const _ownSid = gs.players[pi]?.socketId;
-      if (_ownSid && !room.engine?._inMctsSim) io.to(_ownSid).emit('ability_activated', { owner: heroOwner, heroIdx, zoneIdx, abilityName });
-      if (!room.engine?._inMctsSim) emitToOpponentsGs(gs, io, pi, 'ability_activated', { owner: heroOwner, heroIdx, zoneIdx, abilityName });
+      if (_ownSid && !room.engine?._inMctsSim) io.to(_ownSid).emit('ability_activated', { owner: heroOwner, heroIdx, zoneIdx, zoneKind, abilityName });
+      if (!room.engine?._inMctsSim) emitToOpponentsGs(gs, io, pi, 'ability_activated', { owner: heroOwner, heroIdx, zoneIdx, zoneKind, abilityName });
     }
-    sendToSpectators(room, 'ability_activated', { owner: heroOwner, heroIdx, zoneIdx, abilityName });
+    sendToSpectators(room, 'ability_activated', { owner: heroOwner, heroIdx, zoneIdx, zoneKind, abilityName });
 
     if (charmedOwner != null) {
       inst.controller = pi; inst.owner = pi; inst.heroOwner = charmedOwner;

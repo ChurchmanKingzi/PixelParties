@@ -48652,7 +48652,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('deleted_to_discard_animation', onDeletedToDiscard);
 
-    const onDeckToAbility = ({ owner, heroIdx, slotIdx, cardName, count, source, destOwner }) => {
+    const onDeckToAbility = ({ owner, heroIdx, slotIdx, cardName, count, source, destOwner, zoneKind }) => {
       const ownerLabel = ownerLbl(owner, myIdx);
       // 29.9.: Ziel-Zone eines geliehenen Helden liegt auf der anderen Seite.
       const zielLabel = ownerLbl((destOwner ?? owner), myIdx);
@@ -48665,7 +48665,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       } else {
         srcSel = ownerLabel === 'me' ? '[data-my-deck]' : '[data-opp-deck]';
       }
-      const abSel   = `[data-ability-zone][data-ability-owner="${zielLabel}"][data-ability-hero="${heroIdx}"][data-ability-slot="${slotIdx}"]`;
+      // 24.10.: Xal / Xalibur — die Ability fliegt in eine Support Zone.
+      const abSel   = zoneKind === 'support'
+        ? `[data-support-zone][data-support-owner="${zielLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${slotIdx}"]`
+        : `[data-ability-zone][data-ability-owner="${zielLabel}"][data-ability-hero="${heroIdx}"][data-ability-slot="${slotIdx}"]`;
       const srcEl   = document.querySelector(srcSel);
       const tgtEl   = document.querySelector(abSel);
       if (!srcEl || !tgtEl || !count) return;
@@ -53563,9 +53566,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // (`charmedOwner === pi`) and Lizbeth/Smugbeth borrow
                 // (`borrowedFromOwner === pi`). Both highlight the slot
                 // and enable the click handler.
+                // 24.10.: Einträge einer SUPPORT Zone (`zoneKind: 'support'`, Xal / Xalibur) gehören nicht zur gleichnummerierten Ability Zone.
                 const activatableEntry = cards.length > 0 && (
-                  (!isOpp && (gameState.activatableAbilities || []).find(a => a.heroIdx === i && a.zoneIdx === z && !a.charmedOwner && !a.borrowedFromOwner)) ||
-                  (isOpp && (gameState.activatableAbilities || []).find(a => a.heroIdx === i && a.zoneIdx === z && (a.charmedOwner === pi || a.borrowedFromOwner === pi)))
+                  (!isOpp && (gameState.activatableAbilities || []).find(a => a.zoneKind !== 'support' && a.heroIdx === i && a.zoneIdx === z && !a.charmedOwner && !a.borrowedFromOwner)) ||
+                  (isOpp && (gameState.activatableAbilities || []).find(a => a.zoneKind !== 'support' && a.heroIdx === i && a.zoneIdx === z && (a.charmedOwner === pi || a.borrowedFromOwner === pi)))
                 );
                 const isActivatable = !!activatableEntry;
                 // Check if this ability is free-activatable (no action cost, Main Phase).
@@ -53573,8 +53577,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // borrowedFromOwner), charm/control (`charmedOwner === pi`),
                 // and Lizbeth/Smugbeth borrow (`borrowedFromOwner === pi`).
                 const freeAbilityEntry = cards.length > 0 && (
-                  (!isOpp && (gameState.freeActivatableAbilities || []).find(a => a.heroIdx === i && a.zoneIdx === z && !a.charmedOwner && !a.borrowedFromOwner)) ||
-                  (isOpp && (gameState.freeActivatableAbilities || []).find(a => a.heroIdx === i && a.zoneIdx === z && (a.charmedOwner === pi || a.borrowedFromOwner === pi)))
+                  (!isOpp && (gameState.freeActivatableAbilities || []).find(a => a.zoneKind !== 'support' && a.heroIdx === i && a.zoneIdx === z && !a.charmedOwner && !a.borrowedFromOwner)) ||
+                  (isOpp && (gameState.freeActivatableAbilities || []).find(a => a.zoneKind !== 'support' && a.heroIdx === i && a.zoneIdx === z && (a.charmedOwner === pi || a.borrowedFromOwner === pi)))
                 );
                 const isFreeActivatable = freeAbilityEntry?.canActivate === true;
                 const isFreeExhausted = freeAbilityEntry && !freeAbilityEntry.canActivate;
@@ -53888,15 +53892,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // es aufheben kann. Stunned/Webbed sind eindeutig.
               const isFrozenOrStunnedSup = !!heldHier
                 && (heldHier.statuses?.stunned || heldHier.statuses?.webbed);
-              const supportAbilityEntry = (!isOpp && !klickPfadOffen)
+              // 24.10.: auch die Support-Zonen-Abilities eines GEGNERHELDEN, den ich kontrolliere (Charme Lv3 …, `charmedOwner`) oder von dem ich leihe
+              // (Lizbeth / Smugbeth, `borrowedFromOwner`) — gleiche Matcher wie bei den Ability Zonen.
+              const _supGehoert = (a) => !isOpp
+                ? (!a.charmedOwner && !a.borrowedFromOwner)
+                : (a.charmedOwner === pi || a.borrowedFromOwner === pi);
+              const supportAbilityEntry = !klickPfadOffen
                 ? ((gameState.activatableAbilities || []).find(a =>
-                      a.zoneKind === 'support' && a.heroIdx === i && a.zoneIdx === z)
+                      a.zoneKind === 'support' && a.heroIdx === i && a.zoneIdx === z && _supGehoert(a))
                    || (gameState.freeActivatableAbilities || []).find(a =>
-                      a.zoneKind === 'support' && a.heroIdx === i && a.zoneIdx === z && a.canActivate !== false))
+                      a.zoneKind === 'support' && a.heroIdx === i && a.zoneIdx === z && a.canActivate !== false && _supGehoert(a)))
                 : null;
               const supportAbilityFrei = !!supportAbilityEntry
                 && (gameState.freeActivatableAbilities || []).some(a =>
-                     a.zoneKind === 'support' && a.heroIdx === i && a.zoneIdx === z);
+                     a.zoneKind === 'support' && a.heroIdx === i && a.zoneIdx === z && _supGehoert(a));
               // Surprise-subtype creatures skip the invalid-zone dimming
               // entirely (we only want the orange surprise highlight on
               // eligible zones — the other zones should stay neutral, not
@@ -54278,6 +54287,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       heroIdx: supportAbilityEntry.heroIdx,
                       zoneIdx: supportAbilityEntry.zoneIdx,
                       zoneKind: 'support',
+                      charmedOwner: supportAbilityEntry.charmedOwner,
+                      borrowedFromOwner: supportAbilityEntry.borrowedFromOwner,
                     });
                   } : isCsppEmptySlot ? () => {
                     // Click-pick destination chosen → route through the
