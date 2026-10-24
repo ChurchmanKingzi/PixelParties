@@ -3662,6 +3662,46 @@ const ZONE_ANIM_SFX = {
     { name: 'heavy_impact', opts: { rate: 1.3, volume: 0.35, delay: 730, category: null, dedupe: 0 } },
     { name: 'ping',         opts: { rate: 2.4, volume: 0.2, delay: 780, category: null, dedupe: 0 } },
   ],
+  // Welle 75 (24.10.): Unreasonable Anger — zischender Dampf, Pfiff, Zornader pocht.
+  unreasonable_steam: [
+    { name: 'elem_wind',    opts: { rate: 2.4, volume: 0.3, delay: 1, category: null, dedupe: 0 } },
+    { name: 'buff',         opts: { rate: 0.7, volume: 0.3, delay: 160, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 1.6, volume: 0.22, delay: 220, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.1, volume: 0.22, delay: 520, category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 2.0, volume: 0.25, delay: 560, category: null, dedupe: 0 } },
+  ],
+  // Nasty Prank — der Eimer saust herab, scheppert auf dem Kopf, das Wasser platscht.
+  prank_bucket: [
+    { name: 'elem_wind',    opts: { rate: 1.6, volume: 0.25, delay: 1, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.6, volume: 0.5, delay: 690, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 0.9, volume: 0.35, delay: 700, category: null, dedupe: 0 } },
+    { name: 'elem_water',   opts: { rate: 1.0, volume: 0.5, delay: 780, category: null, dedupe: 0 } },
+    { name: 'elem_water',   opts: { rate: 1.35, volume: 0.35, delay: 980, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 1.2, volume: 0.25, delay: 1180, category: null, dedupe: 0 } },
+  ],
+  // Reverse Trap — der 1-Tonnen-Klotz pfeift herab und schlägt dumpf auf.
+  reverse_trap_ton: [
+    { name: 'elem_wind',    opts: { rate: 0.6, volume: 0.4, delay: 1, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.5, volume: 0.85, delay: 610, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 0.6, volume: 0.3, delay: 615, category: null, dedupe: 0 } },
+    { name: 'negate',       opts: { rate: 1.0, volume: 0.3, delay: 700, category: null, dedupe: 0 } },
+  ],
+  // Explosion Toss — dieselbe große Explosion wie die Kartoffel: der Knall sitzt auf dem Blitz.
+  explosion_toss_blast: [
+    { name: 'heavy_impact', opts: { rate: 0.7, volume: 0.65, delay: 1, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.1, volume: 0.4, delay: 1, category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 0.8, volume: 0.45, delay: 60, category: null, dedupe: 0 } },
+    { name: 'debuff',       opts: { rate: 1.6, volume: 0.3, delay: 220, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.6, volume: 0.25, delay: 320, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.0, volume: 0.2, delay: 460, category: null, dedupe: 0 } },
+  ],
+  // „Deadly Poison" — Giftschwaden blubbern, dann kippt es in sanfte Heilung.
+  deadly_poison_heal: [
+    { name: 'poison',       opts: { rate: 1.0, volume: 0.4, delay: 1, category: null, dedupe: 0 } },
+    { name: 'elem_dark',    opts: { rate: 1.2, volume: 0.25, delay: 120, category: null, dedupe: 0 } },
+    { name: 'heal',         opts: { rate: 1.1, volume: 0.45, delay: 620, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.4, volume: 0.2, delay: 950, category: null, dedupe: 0 } },
+  ],
   leafagami_leaves: [
     { name: 'elem_wind',  opts: { rate: 1.4, volume: 0.35 } },
     { name: 'ping',       opts: { rate: 2.2, volume: 0.25, delay: 140, category: null, dedupe: 0 } },
@@ -7945,7 +7985,9 @@ window.ppStatusHover = ppStatusHover;
 
 /** Tooltip-Text des Poison-Abzeichens. Auch die Stapelzahl auf der Karte
  *  (`PoisonedOverlay` in app-board) zeigt genau diesen Text beim Hover. */
-function poisonTooltipText(stacks, perStack, isUnhealable) {
+function poisonTooltipText(stacks, perStack, isUnhealable, deadly) {
+  // „Deadly Poison": das Gift HEILT statt zu schaden, bis der Held voll geheilt ist (danach schadet es wieder wie jedes Gift); zählt weiter als negativer Status.
+  if (deadly) return `${isUnhealable ? 'Unhealable ' : ''}Poisoned ("Deadly Poison"): Heals ${perStack * stacks} HP instead of dealing damage at the start of each of its owner's turns, until the Hero is fully healed. Still counts as a negative status effect.${isUnhealable ? ' Cannot be removed.' : ''}`;
   return `${isUnhealable ? 'Unhealable ' : ''}Poisoned: Takes ${perStack * stacks} damage at the start of each of its owner's turns.${isUnhealable ? ' Cannot be removed.' : ''}`;
 }
 window.poisonTooltipText = poisonTooltipText;
@@ -8075,7 +8117,7 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
     const stacks = s.poisoned?.stacks || c.poisonStacks || c.poisoned || 1;
     const perStack = player?.poisonDamagePerStack || 30;
     const isUnhealable = s.poisoned?.unhealable || c.poisonedUnhealable;
-    badges.push({ key: 'poisoned', icon: isUnhealable ? '💀' : '☠️', tooltip: poisonTooltipText(stacks, perStack, isUnhealable), className: isUnhealable ? 'status-unhealable' : '' });
+    badges.push({ key: 'poisoned', icon: isUnhealable ? '💀' : '☠️', tooltip: poisonTooltipText(stacks, perStack, isUnhealable, !!s.poisoned?.deadly), className: isUnhealable ? 'status-unhealable' : '' });
   }
   if (s.negated || c.negated) {
     // Skeleton Death Knight applies negated with a `_dkSilenced`
@@ -8218,6 +8260,19 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
       key: 'polymorphed', icon: '🐱',
       tooltip: 'Polymorphed (Polymorph): Cannot use any Spells, but its Attack stat is increased by 100.',
     });
+  }
+  if (s.pranked && s.pranked.names) {
+    // „Pranked": je gesperrtem Namen ein Satz; Dauer je Name aus dem Ablaufzug (`expiresAtTurn`, Spielername aus `expiresForPlayer` — der Streich-Spieler ist der Gegner des Trägers)
+    const jetzt = (typeof window !== 'undefined') ? window._ppTurn : null;
+    const zeilen = Object.entries(s.pranked.names).map(([name, e]) => {
+      if (e.permanent) return `This Hero cannot use ${name} for the rest of the game.`;
+      const wer = spielerName(typeof e.opponent === 'number' ? e.opponent : null);
+      const wessen = wer ? `${wer}'s` : "its opponent's";
+      // Der Zug, an dessen Ende die Sperre fällt, ist `expiresAtTurn - 1`; liegt er hinter dem laufenden Zug, ist es der „nächste" Zug des Gegners.
+      const laeuft = (jetzt != null && typeof e.expiresAtTurn === 'number' && e.expiresAtTurn - 1 === jetzt);
+      return `This Hero cannot use ${name} until the end of ${wessen} ${laeuft ? '' : 'next '}turn.`;
+    });
+    badges.push({ key: 'pranked', icon: '🤡', tooltip: 'Pranked: ' + zeilen.join(' ') });
   }
   if (s.cursed) {
     badges.push({
@@ -8450,7 +8505,7 @@ function BuffColumn({ buffs, cardName, statuses }) {
     let txt = `Blessed: This Hero can have up to ${remaining} more additional Abilities attached to it this turn!`;
     if (data?.locked) txt += ' But it cannot act this turn.';
     return txt;
-  } }, cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, doomed: { icon: '☠️', tooltip: 'Doomed: This Hero\'s Attack stat is 0 and cannot be increased in any way (Doomed Pirate).' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, mao_negated: { icon: '🐈', tooltip: 'Mao-negated: This Creature\'s effects were re-fired by Mao and are now suppressed until the start of the activator\'s next turn.' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' }, forcesTargeting_creaturesOnly: { icon: '🛡️', tooltip: "Guarding: Your opponent cannot choose your other Creatures while this Creature stands. Your Heroes can still be chosen." }, niu_enhanced: { icon: '🐃', tooltip: (data) => `This Hero's next Attack will deal ${data?.totalDamage || 0} additional damage.` }, gou_protected: { icon: '🐕', tooltip: (data) => `Protected by Guardian Beast Gou — takes no damage from any source until the start of the activator's next turn.${(data?.grants?.length || 0) > 1 ? ` (${data.grants.length}× layered)` : ''}` }, calm: { icon: '🌙', tooltip: 'Calm: Next turn, this Hero may perform a second Action during its controller\'s Action Phase (counts as an additional Action). Stays even if the Hero is defeated.' }, calm_ready: { icon: '🕊️', tooltip: 'Calm: This Hero may perform a second Action during THIS Action Phase (counts as an additional Action). Fades at the end of the Action Phase if unused — even if the Hero is defeated.' }, second_action_grant: { icon: '🌑', tooltip: 'Second Action: This Hero may perform a second Action during the Action Phase this turn. The bonus is wasted if a different Hero performs the second Action first.' }, cold_strike: { icon: '❄️', tooltip: "Cold Strike: This Hero's Attacks and Spells Freeze each target they hit for 1 turn. Wears off at the end of this turn." }, empowered_strike: { icon: '💪', tooltip: "Empowered Strike: The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 150 and cannot be reduced or negated." }, sparkfly_gift_architect: { icon: '📐', tooltip: "Architect's Gift: You may once per turn draw cards until you have the same number of cards in your hand as your opponent." }, sparkfly_gift_attendant: { icon: '🪶', tooltip: "Attendant's Gift: This Creature is unaffected by your opponent's cards and effects, except damage." }, sparkfly_gift_worker: { icon: '🪲', tooltip: "Worker's Gift: You may once per turn make your opponent choose any card on their side of the board that is not a Hero and add it to your hand." }, damage_immune: { icon: '💠', tooltip: 'Takes no damage from any sources.' }, disrupted: { icon: '☢️', tooltip: 'Disrupted: Takes double damage from all sources.' }, magic_immune: { icon: '🛡️', tooltip: (data) => `The Hero is immune to Spells up to level ${data?.level ?? '?'}.` }, // v886 (Summoning Instructions): zeigt das beim Ausruesten gewaehlte X.
+  } }, cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, doomed: { icon: '☠️', tooltip: 'Doomed: This Hero\'s Attack stat is 0 and cannot be increased in any way (Doomed Pirate).' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, mao_negated: { icon: '🐈', tooltip: 'Mao-negated: This Creature\'s effects were re-fired by Mao and are now suppressed until the start of the activator\'s next turn.' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' }, forcesTargeting_creaturesOnly: { icon: '🛡️', tooltip: "Guarding: Your opponent cannot choose your other Creatures while this Creature stands. Your Heroes can still be chosen." }, niu_enhanced: { icon: '🐃', tooltip: (data) => `This Hero's next Attack will deal ${data?.totalDamage || 0} additional damage.` }, gou_protected: { icon: '🐕', tooltip: (data) => `Protected by Guardian Beast Gou — takes no damage from any source until the start of the activator's next turn.${(data?.grants?.length || 0) > 1 ? ` (${data.grants.length}× layered)` : ''}` }, calm: { icon: '🌙', tooltip: 'Calm: Next turn, this Hero may perform a second Action during its controller\'s Action Phase (counts as an additional Action). Stays even if the Hero is defeated.' }, calm_ready: { icon: '🕊️', tooltip: 'Calm: This Hero may perform a second Action during THIS Action Phase (counts as an additional Action). Fades at the end of the Action Phase if unused — even if the Hero is defeated.' }, second_action_grant: { icon: '🌑', tooltip: 'Second Action: This Hero may perform a second Action during the Action Phase this turn. The bonus is wasted if a different Hero performs the second Action first.' }, cold_strike: { icon: '❄️', tooltip: "Cold Strike: This Hero's Attacks and Spells Freeze each target they hit for 1 turn. Wears off at the end of this turn." }, empowered_strike: { icon: '💪', tooltip: "Empowered Strike: The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 150 and cannot be reduced or negated." }, unreasonable_anger: { icon: '💢', tooltip: 'Unreasonable Anger: Any damage this Hero deals to single targets is increased by 100. Lasts until the end of its controller\'s next turn.' }, sparkfly_gift_architect: { icon: '📐', tooltip: "Architect's Gift: You may once per turn draw cards until you have the same number of cards in your hand as your opponent." }, sparkfly_gift_attendant: { icon: '🪶', tooltip: "Attendant's Gift: This Creature is unaffected by your opponent's cards and effects, except damage." }, sparkfly_gift_worker: { icon: '🪲', tooltip: "Worker's Gift: You may once per turn make your opponent choose any card on their side of the board that is not a Hero and add it to your hand." }, damage_immune: { icon: '💠', tooltip: 'Takes no damage from any sources.' }, disrupted: { icon: '☢️', tooltip: 'Disrupted: Takes double damage from all sources.' }, magic_immune: { icon: '🛡️', tooltip: (data) => `The Hero is immune to Spells up to level ${data?.level ?? '?'}.` }, // v886 (Summoning Instructions): zeigt das beim Ausruesten gewaehlte X.
   summoningInstructionsX: { icon: '📘', tooltip: (data) => `Summoning Instructions: X = ${data?.level ?? '?'} — the equipped Hero may summon Creatures up to ${data?.level ?? '?'} levels above its Summoning Magic level (level 3 Creatures at most).` } };
   // medusa_petrified is surfaced through the Stunned status badge (as the
   // "Petrified" variant), so don't also render it as a separate buff icon —
