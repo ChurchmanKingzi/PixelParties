@@ -73,8 +73,11 @@ module.exports = {
     });
     if (!wahl || wahl.cancelled || !wahl.cardName || !db[wahl.cardName] || wahl.cardName === CARD_NAME) return false;
 
+    const { HOOKS } = require('./_hooks');
+    const alterName = inst.counters._zusatzName || null;
     inst.counters._zusatzName = wahl.cardName;
     inst.counters._zusatzNameZug = gs.turn;
+    await engine.runHooks(HOOKS.ON_NAME_CHANGED, { inst, name: wahl.cardName, oldName: alterName, _skipReactionCheck: true });   // Buchungen an Namensfamilien (Censpartan, Cykyran) neu rechnen
     engine._broadcastEvent('play_zone_animation', { type: 'shroomasaur_spores', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot });
     engine.log('shroomasaur_name', { player: gs.players[pi]?.username, name: wahl.cardName });
     await engine._delay(ANIM_MS * 0.6);

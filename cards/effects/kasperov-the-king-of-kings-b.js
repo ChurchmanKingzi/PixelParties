@@ -55,7 +55,7 @@ module.exports = {
       { cardOwner: pi, card: null, cardName: CARD_NAME, cardHeroIdx: ctx.cardHeroIdx },
       {
         minCount: 1, maxCount: 1, noHandSubstitute: true, cancellable: true,
-        filter: c => String(c.inst?.name || '').startsWith(PAWN) && !summonedThisTurn(engine, c.inst) && zoneLeer(engine, c.inst),
+        filter: c => anyName(c.inst, (n) => String(n || '').startsWith(PAWN)) && !summonedThisTurn(engine, c.inst) && zoneLeer(engine, c.inst),
         title: CARD_NAME,
         description: 'Sacrifice a "Pawn of Kings" (not summoned this turn) to place any "of Kings" Creature from your hand or deck into its Support Zone.',
         confirmLabel: '♚ Sacrifice!',

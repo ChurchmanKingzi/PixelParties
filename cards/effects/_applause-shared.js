@@ -30,6 +30,7 @@
 
 const { hasCardType } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
+const { anyName } = require('./_alias-name');
 
 const KEY = 'applause';
 const ARCHETYPE = 'Fun-Fun Circus';
@@ -88,7 +89,7 @@ function istCircus(engine, name) {
 /** Fun-Fun-Circus-Creatures auf dem Brett (beide Seiten), optional ohne `ausser`. */
 function circusCreatures(engine, ausser = null) {
   return engine.cardInstances.filter(i =>
-    i !== ausser && istBrettCreature(engine, i) && istCircus(engine, i.name));
+    i !== ausser && istBrettCreature(engine, i) && anyName(i, (n) => istCircus(engine, n)));   // Shroomasaur: Zusatzname zählt
 }
 
 /**

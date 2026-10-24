@@ -67,6 +67,7 @@ const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 
 const { isDragoName, DRAGO } = require('./_drago-shared');
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 
 const CARD_NAME = 'Black-Thorn Dragon';
 const EFFECT_DAMAGE = 200;
@@ -87,7 +88,7 @@ function makeSacrificeSpec(engine, route) {
     return {
       minCount: 1,
       maxCount: 1,
-      filter: (c) => isDragoName(c?.cardName) && c?.inst?.turnPlayed !== turn,
+      filter: (c) => anyName(c?.inst || { name: c?.cardName }, isDragoName) && c?.inst?.turnPlayed !== turn,
       showFilteredAsIneligible: true,
       title: CARD_NAME,
       description: `Sacrifice 1 "${DRAGO}" Creature you control that was not summoned this turn.`,
@@ -99,7 +100,7 @@ function makeSacrificeSpec(engine, route) {
   return {
     minCount: 2,
     maxCount: 2,
-    filter: (c) => isDragoName(c?.cardName),
+    filter: (c) => anyName(c?.inst || { name: c?.cardName }, isDragoName),
     // Der Text sagt hier NICHT „you control" (Al 23.10.): auch gegnerische Drago-Kreaturen zählen (jede Mischung).
     auchGegner: true,
     showFilteredAsIneligible: true,

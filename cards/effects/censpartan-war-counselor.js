@@ -204,6 +204,7 @@ module.exports = {
   onRevive: (ctx) => resyncFromCtx(ctx),
 
   hooks: {
+    onNameChanged: (ctx) => resyncFromCtx(ctx),   // W73c: Shroomasaur bekommt/verliert einen Zusatznamen - der Bestand der Ratgeber ändert sich
     // Der Schirm haengt am Feldzustand — nach jedem Ereignis, das ihn
     // aendern kann, neu ausrichten. Alle Hooks laufen ueber ALLE
     // Zuhoerer, ein Filter auf die gespielte Karte waere hier also

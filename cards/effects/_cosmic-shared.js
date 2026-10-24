@@ -130,7 +130,7 @@ function ownCosmicCreatures(engine, pi) {
     if (inst.faceDown) continue;
     const owner = inst.controller ?? inst.owner;
     if (owner !== pi) continue;
-    if (!COSMIC_DEPTHS_CREATURES.has(inst.name)) continue;
+    if (!hatNameIn(inst, COSMIC_DEPTHS_CREATURES)) continue;   // Shroomasaur: Zusatzname zählt
     out.push(inst);
   }
   return out;

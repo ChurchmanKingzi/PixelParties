@@ -79,7 +79,7 @@ function countOtherDragoCreatures(engine, pi, selfId) {
 function isDragoDeath(engine, deathInfo, pi) {
   if (!deathInfo) return false;
   if ((deathInfo.controller ?? deathInfo.owner) !== pi) return false;
-  return isDragoCreatureName(engine, deathInfo.name);
+  return anyName(deathInfo, (n) => isDragoCreatureName(engine, n));   // Todesdatensatz trägt `zusatzName`
 }
 
 module.exports = {
