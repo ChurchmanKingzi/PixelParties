@@ -33342,7 +33342,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Clear tooltip in case a hovered card was removed from hand
       setBoardTooltip(null);
       // Clear stale steal-hidden indices when hand state changes (sync arrived)
-      if (stealHiddenMe.size > 0) setStealHiddenMe(new Set());
+      // (Die Quellverdeckung des Diebstahls hebt `play_hand_steal` selbst auf: die Karten werden einzeln genommen, `stealQuelleVerdeckt` rechnet die verschobenen Plätze mit.)
       // Detect newly drawn cards (added at end of hand)
       const newDeckCount = me.deckCount || 0;
       const newPotionCount = me.potionDeckCount || 0;
@@ -33643,6 +33643,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // zusammen, nicht schon beim Abflug. Schlüssel `${besitzer}-${platz}` wie bei `bounceReturnHidden`.
   const [ankunftLeer, setAnkunftLeer] = useState(new Set());
   // Der letzte SICHTBARE Platz einer Hand behält die volle Kartenbreite (`:last-child` trifft sonst einen unsichtbaren Ankunftsplatz).
+  // Diebstahl: die gewählten Quellplätze bleiben verdeckt, bis ihre Karte WEG ist. Die Karten werden einzeln (aufsteigend) genommen; nach `entfernt` Karten sitzt der Platz, der
+  // ursprünglich `j` war, auf `j − entfernt` — verdeckt bleiben nur die noch nicht genommenen. `erwartet` = Handgröße beim Abflug, `anzahl` = Handgröße jetzt.
+  const stealQuelleVerdeckt = (menge, erwartet, anzahl, i) => {
+    if (!menge.size || erwartet < 0) return false;
+    const entfernt = erwartet - anzahl;
+    if (entfernt < 0) return false;
+    const sortiert = [...menge].sort((a, b) => a - b);
+    for (let k = entfernt; k < sortiert.length; k++) if (sortiert[k] - entfernt === i) return true;
+    return false;
+  };
   const letzterSichtbarerPlatz = (owner, anzahl) => {
     for (let k = anzahl - 1; k >= 0; k--) if (!ankunftLeer.has(`${owner}-${k}`)) return k;
     return -1;
@@ -33833,7 +33843,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       });
     }
     // Clear stale steal-hidden indices when opp hand state changes (sync arrived)
-    if (newCount !== prevCount && stealHiddenOpp.size > 0) setStealHiddenOpp(new Set());
     if (newCount < prevCount) oppHandShrinkRef.current = { to: newCount, at: Date.now() };
     prevOppHandCountRef.current = newCount;
   }, [opp.handCount]);
@@ -46830,11 +46839,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const zielBasis = (toRect && toRect.width > cardW0 * 0.5) ? toRect : (toRowRect || toRect);
 
         const flyEls = [];
+        const flugEnde = [];   // frühester Zeitpunkt, an dem Flugkarte k gelandet ist
         stealIndices.forEach((idx, i) => {
           const sr = sourceRects[i];
           if (!sr) return;
           const name = names[i] || '';
-          const ziel = handPlatzProjektion(destIsMe, basisAnzahl + i, endGroesse);
+          const ziel = handPlatzProjektion(destIsMe, basisAnzahl + i, basisAnzahl + i + 1);   // bei ihrer Landung hat die Hand genau diese Karte mehr (die Karten erscheinen einzeln)
           const targetX = ziel
             ? ziel.left
             : (zielBasis ? (zielBasis.left + zielBasis.width / 2 - cardW0 / 2 + i * (cardW0 * 0.6)) : sr.left);
@@ -46867,39 +46877,37 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // Jede Karte hat ihren eigenen Flug-Klang (wie ein Zug), zum Abflug dieser Karte.
           if (window.playSFX) setTimeout(() => window.playSFX('draw', { dedupe: 60 }), i * 100 + 40);
           flyEls.push(flyEl);
+          flugEnde.push(Date.now() + i * 100 + dur);
         });
-        // Die Klone bleiben stehen, bis die Karten WIRKLICH in der Zielhand erscheinen (der Zustand kommt gut 150 ms nach dem Ende des Flugs) — sonst sind sie in der Zwischenzeit
-        // einfach weg. Zeigt die Zielhand mehr Karten (oder ist die Frist um), werden Klone und Quellverdeckung zusammen aufgehoben.
-        // Angekommen heißt: der Zustand ist da — die QUELLHAND ist um die gestohlenen Karten kürzer (die Zielhand zu zählen trügt, solange die aufgelöste Karte noch darin liegt).
+        // Der Server nimmt die Karten EINZELN, im Takt der Landungen (je Karte ein Zustand). Jede Flugkarte bleibt stehen, bis ihre Karte WIRKLICH erschienen ist — die Quellhand ist dann um
+        // diese Karte kürzer; so ist sie nie einfach weg und erscheint genau bei ihrer Landung. Frist als Rückfall, falls der Zustand ausbleibt (Diebstahl vereitelt).
         const srcBase = `.game-hand-${fromLabel} .game-hand-cards`;
         const zaehleQuelle = () => document.querySelectorAll(`${srcBase} > .hand-slot, ${srcBase} > .hand-card`).length;
         const quelleVorher = zaehleQuelle();
-        let aufgeraeumt = false;
-        const aufraeumen = () => {
-          if (aufgeraeumt) return;
-          aufgeraeumt = true;
-          flyEls.forEach(el => el.remove());
-          setStealHiddenMe(new Set());
-          setStealHiddenOpp(new Set());
-        };
-        const fruehestens = Date.now() + batchEndMs;
+        const entfernt = new Set();
         const spaetestens = Date.now() + batchEndMs + 1200;
         const warte = setInterval(() => {
           const jetzt = Date.now();
-          if (jetzt >= spaetestens || (jetzt >= fruehestens && zaehleQuelle() <= quelleVorher - stealIndices.length)) { clearInterval(warte); aufraeumen(); }
+          const fort = jetzt >= spaetestens;
+          const verschwunden = quelleVorher - zaehleQuelle();
+          flyEls.forEach((el, k) => {
+            if (entfernt.has(k)) return;
+            if (fort || (jetzt >= flugEnde[k] && verschwunden >= k + 1)) { el.remove(); entfernt.add(k); }
+          });
+          if (fort || entfernt.size >= flyEls.length) {
+            clearInterval(warte);
+            flyEls.forEach(el => el.remove());
+            setStealHiddenMe(new Set());
+            setStealHiddenOpp(new Set());
+          }
         }, 30);
 
-        // Phase 3: Clear hidden states right as the clones dissolve.
-        setTimeout(() => {
-          // (Die Quellverdeckung hebt `aufraeumen` oben auf, sobald die Karten in der Zielhand stehen — die Verdeckung gilt nur, solange die Hand ihre Größe hat.)
-          // Bin ich der DIEB, landen die Karten in MEINER Hand — dort den
-          // Zieh-Anim ueberspringen. Bin ich das OPFER, landen sie in der
-          // GEGNERHAND: derselbe Gedanke, nur die andere Seite. Ohne den
-          // zweiten Zaehler zog der Gegner sie sichtbar aus seinem Deck.
-          if (!iAmVictim) stealSkipDrawRef.current = stealIndices.length;
-          else oppStealSkipDrawRef.current = stealIndices.length;
-          stealInProgressRef.current = false;
-        }, batchEndMs + 100);
+        // Bin ich der DIEB, landen die Karten in MEINER Hand — dort den Zieh-Anim überspringen. Bin ich das OPFER, landen sie in der GEGNERHAND: derselbe Gedanke, nur die andere Seite.
+        // Ohne den zweiten Zähler zog der Gegner sie sichtbar aus seinem Deck. Die Zähler stehen schon beim Abflug: die Karten kommen jetzt einzeln an (je Landung ein Zustand) und
+        // werden dabei verbraucht; was danach wächst (Lillys Nachzieher), bekommt seine normale Animation.
+        if (!iAmVictim) stealSkipDrawRef.current = stealIndices.length;
+        else oppStealSkipDrawRef.current = stealIndices.length;
+        stealInProgressRef.current = false;
       }, highlightMs);
     };
     socket.on('play_hand_steal', onHandSteal);
@@ -52800,7 +52808,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     // UND Winkel sitzen auf der Karte, gespiegelt zur
                     // eigenen Hand (sie haengt oben am Bild).
                     ...(window.handFanStyle?.(i, opp.handCount || 0, { seite: 'opp' })),
-                    ...((oppDrawHidden.has(i) || (stealHiddenOpp.has(i) && (opp.handCount || 0) === stealExpectedOppCountRef.current) || bounceReturnHidden.has(`${oppIdx}-${i}`)
+                    ...((oppDrawHidden.has(i) || stealQuelleVerdeckt(stealHiddenOpp, stealExpectedOppCountRef.current, opp.handCount || 0, i) || bounceReturnHidden.has(`${oppIdx}-${i}`)
                     || bounceReturnHidden.has(`${oppIdx}-${i}#${opp.handCount || 0}`)) ? { visibility: 'hidden' } : (((isBlindPick && !blindGesperrt) || pickEligible || isTreacherousClickable) ? { cursor: 'pointer' } : null)),
                     ...(ankunftLeer.has(`${oppIdx}-${i}`) ? { display: 'none' } : null),
                   }}
@@ -53836,7 +53844,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   && !isZonePickHandQueued;
                 const isStealMarked = stealMarkedMe.has(item.origIdx);
                 const isStealHighlighted = stealHighlightMe.has(item.origIdx);
-                const isStealHidden = stealHiddenMe.has(item.origIdx) && hand.length === stealExpectedMeCountRef.current;
+                const isStealHidden = stealQuelleVerdeckt(stealHiddenMe, stealExpectedMeCountRef.current, hand.length, item.origIdx);
                 // Luna-Kiai-style hand activation: card has a
                 // `handActivatedEffect` currently available. No badge —
                 // `getCardDimmed` un-dims it so it looks playable, and
