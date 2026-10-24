@@ -164,7 +164,7 @@ test('Neue Karten: gepostet; ohne Kanal oder bei Sendefehler NICHT als bekannt v
   const alle = renderer.allCards().filter(c => renderer.canRender(c.name)).map(c => c.name);
   const NEU = ['Mind Control', 'Kidnapping'];
   assert.ok(NEU.every(n => alle.includes(n)), 'Testkarten haben Kunst');
-  await db.kvSet('reset_welle_2026_10_24', 'schon erledigt');   // das einmalige Zurücksetzen hat hier nichts zu suchen (eigener Test unten)
+  await db.kvSet('reset_welle_2026_10_24b', 'schon erledigt');   // das einmalige Zurücksetzen hat hier nichts zu suchen (eigener Test unten)
   await db.kvSet('known_cards', alle.filter(n => !NEU.includes(n)));
   const bekannt = async () => new Set(await db.kvGet('known_cards'));
 
