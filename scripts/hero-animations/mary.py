@@ -14,7 +14,7 @@ src/cute-princess-mary.png).
   sie etwas ab.
 * Glut: von den Flügelspitzen lösen sich beim Abschlag kleine Funken.
 * Körper (`body_layer`): die Haare wehen (die Außenkante der Strähnen am Kopf wird zeilenweise verschoben, die langen Locken unter den
-  Schulterpolstern sind dieselbe Strähne und schwingen mit derselben, nur verzögerten Welle mit), die Arme schwingen seitwärts, der Saum
+  Schulterpolstern sind dieselbe Strähne und schwingen mit derselben, nur verzögerten Welle mit), die Arme schwingen seitwärts (gestreckt statt abgelöst, die Hand bleibt am Arm), der Saum
   des Kleides schwingt, und das Feuer am Kleid flackert (Farben wandern auf der Leiter Rot → Orange → Gelb nach oben). Der Kopf selbst
   bleibt starr (kein Dehnen und Stauchen).
 * Krone: ein Lichtband wandert einmal pro Schleife über die Krone; danach blitzen Glitzersterne über den Zacken auf.
@@ -138,24 +138,15 @@ def body_layer(i):
             out[y, lo:hi + 1] = 0
             seg = warp_row(BODY[y], a, b, d, side)
             out[y, lo:hi + 1] = np.where(seg[lo:hi + 1, 3:4] > 0, seg[lo:hi + 1], out[y, lo:hi + 1])
-    # 2) Arme schwingen seitwärts: die Hände wandern nach außen und zurück (dazu leicht auf und ab); der Spalt zum Mantel wird mit Arm gefüllt
-    o = max(-1, int(round(2.0 * math.sin(ph - 1.6))))                  # > 0: nach außen
-    dy_a = int(round(0.7 * math.sin(ph - 1.6 + math.pi / 2)))
-    for side in (-1, 1):
-        xs = range(29, 33) if side < 0 else range(45, 49)
-        hand = {(x, y): out[y, x].copy() for y in range(41, 44) for x in xs if out[y, x, 3] and tuple(out[y, x, :3]) in HAND}
-        if not hand:
-            continue
-        inner = max(x for x, _ in hand) if side < 0 else min(x for x, _ in hand)
-        for (x, y) in hand:
-            out[y, x] = 0
-        for (x, y), c in hand.items():
-            out[y + dy_a, x + side * o] = c
-        for y in range(41, 44):
-            for k in range(max(0, o)):
-                gx = inner - side * k
-                if not out[y + dy_a, gx, 3]:
-                    out[y + dy_a, gx] = (*(HAND_SKIN if y == 42 else HAND_LINE), 255)
+    # 2) Arme schwingen seitwärts: der ganze Arm samt Hand (Zeilen 41–43 zwischen Mantel und Handkante) wird nach außen gestreckt bzw. wieder
+    #    eingezogen, die Mantelkante bleibt stehen. So bleibt die Hand immer am Arm; es entsteht kein Spalt.
+    o = max(-1, int(round(2.6 * math.sin(ph - 1.6))))                  # > 0: nach außen
+    for y in range(41, 44):
+        for side in (-1, 1):
+            a, b = (29, 32) if side < 0 else (MIRROR - 32, MIRROR - 29)
+            lo, hi = (a - 4, b) if side < 0 else (a, b + 4)
+            seg = warp_row(out[y].copy(), a, b, o, side)
+            out[y, lo:hi + 1] = seg[lo:hi + 1]
     # 3) Saum schwingt
     for y in range(48, 56):
         dx = int(round(math.sin(ph - 2.2 - 0.3 * (y - 47)) * (y - 47) / 7.0 * 1.2))
@@ -179,8 +170,6 @@ def body_layer(i):
     return out
 
 
-HAND_LINE, HAND_SKIN = (0x59, 0x20, 0x0c), (0xf0, 0xca, 0x9e)
-HAND = {HAND_LINE, HAND_SKIN}                                   # Handfarben (Umriss, Haut)
 
 
 EMBER = [(255, 236, 170), (255, 190, 80), (240, 120, 40), (190, 60, 30)]
