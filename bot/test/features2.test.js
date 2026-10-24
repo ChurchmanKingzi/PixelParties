@@ -164,6 +164,7 @@ test('Neue Karten: gepostet; ohne Kanal oder bei Sendefehler NICHT als bekannt v
   const alle = renderer.allCards().filter(c => renderer.canRender(c.name)).map(c => c.name);
   const NEU = ['Mind Control', 'Kidnapping'];
   assert.ok(NEU.every(n => alle.includes(n)), 'Testkarten haben Kunst');
+  await db.kvSet('reset_welle_2026_10_24', 'schon erledigt');   // das einmalige Zurücksetzen hat hier nichts zu suchen (eigener Test unten)
   await db.kvSet('known_cards', alle.filter(n => !NEU.includes(n)));
   const bekannt = async () => new Set(await db.kvGet('known_cards'));
 
@@ -209,4 +210,25 @@ test('Neue Karten: gepostet; ohne Kanal oder bei Sendefehler NICHT als bekannt v
   assert.equal(sent.length, vorher + 1, 'Ruse gepostet');
   assert.match(msg.replies[0].content, /Posted 1 card/);
   assert.match(msg.replies[0].content, /Not found.*Atta, Speaker of Desires|Not found.*zzzzzz/);
+});
+
+test('Neue Karten: einmaliges Zurücksetzen der Wellenkarten — erscheinen beim nächsten Lauf genau einmal', async () => {
+  const renderer = require('../lib/card-renderer');
+  config.repoRoot = path.resolve(__dirname, '..', '..');
+  const { ctx, client, db } = await setup();
+  const g = guild(); const sent = [];
+  g.channels.cache.set('NC', { isTextBased: () => true, send: async p => { sent.push(p); } });
+  client.guilds.cache.set('G1', g);
+  config.channels.newCards = 'NC';
+  await ctx.cardsReload();
+  const alle = renderer.allCards().filter(c => renderer.canRender(c.name)).map(c => c.name);
+  await db.kvSet('known_cards', alle);                       // alles schon gezeigt
+  await ctx._feeds.pollCards(true);
+  assert.equal(sent.length, 5, 'die fünf Karten der Welle werden einmal gezeigt');
+  assert.ok(sent.every(p => p.content === '**New card beep-boop:**' && p.files.length === 1));
+  await ctx._feeds.pollCards(true);
+  assert.equal(sent.length, 5, 'danach nichts mehr');
+  await db.kvSet('known_cards', alle);                       // Schlüssel steht schon → kein zweites Zurücksetzen
+  await ctx._feeds.pollCards(true);
+  assert.equal(sent.length, 5);
 });
