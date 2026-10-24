@@ -98,8 +98,7 @@ module.exports = {
       const engine = ctx._engine;
       const quelle = { ...(ctx.source || {}), cardName: ctx.source?.name, damageType: ctx.type };
       if (!isAttackSpellOrCreatureSource(engine, quelle, { kinds: ['attack'] })) return;
-      const neu = Math.max(0, ctx.amount - REDUCTION);
-      ctx.setAmount(neu, { kette: { flat: -(ctx.amount - neu) } });   // Ricochet-Kettenbetrag: Abzug um den tatsächlich abgezogenen Betrag
+      ctx.modifyAmount(-REDUCTION);   // „Punkt vor Strich": Verdopplungen (Shrink) rechnet die Engine zuerst, der Abzug folgt; nicht unter 0 (die Projektion klemmt)
     },
   },
 };

@@ -3534,6 +3534,44 @@ const ZONE_ANIM_SFX = {
     { name: 'debuff',    opts: { rate: 0.9, volume: 0.8, delay: 560, category: null, dedupe: 0 } },
     { name: 'heavy_impact', opts: { rate: 1.3, volume: 0.5, delay: 600, category: null, dedupe: 0 } },
   ],
+  // Shrink (24.10.): der Rahmen presst sich zusammen — Wind nach innen (Zauberton, 0 ms), Ticken der Stufen, beim Einrasten (~560 ms) ein dumpfer Schlag und Abwertungston.
+  shrink_squeeze: [
+    { name: 'spell_cast', opts: { rate: 1.4, volume: 0.5 } },
+    { name: 'elem_wind',  opts: { rate: 1.6, volume: 0.35, delay: 80, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 1.6, volume: 0.3, delay: 220, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.0, volume: 0.3, delay: 380, category: null, dedupe: 0 } },
+    { name: 'debuff',     opts: { rate: 1.3, volume: 0.6, delay: 560, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.6, volume: 0.4, delay: 580, category: null, dedupe: 0 } },
+  ],
+  // Clone (24.10.): das Echo löst sich vom Helden — hoher Zauberton (0 ms), flimmerndes Surren, am Ende ein heller Ping beim Einrasten (~300 ms).
+  clone_echo: [
+    { name: 'spell_cast', opts: { rate: 1.6, volume: 0.45 } },
+    { name: 'ping',       opts: { rate: 2.4, volume: 0.3, delay: 120, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 1.9, volume: 0.3, delay: 260, category: null, dedupe: 0 } },
+    { name: 'buff',       opts: { rate: 1.5, volume: 0.35, delay: 300, category: null, dedupe: 0 } },
+  ],
+  // Arcane Eyes (24.10.): die Augen öffnen sich (leises Knarren, 0 ms), der Strahl streicht über die Zone (~620 ms, Wind + Ping), ein kurzes Schimmern zum Schluss.
+  arcane_eyes_open: [
+    { name: 'buff',       opts: { rate: 0.7, volume: 0.5 } },
+    { name: 'ping',       opts: { rate: 1.2, volume: 0.3, delay: 200, category: null, dedupe: 0 } },
+    { name: 'elem_wind',  opts: { rate: 1.3, volume: 0.3, delay: 620, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.4, volume: 0.35, delay: 800, category: null, dedupe: 0 } },
+  ],
+  // Hockey Genie (24.10.): der Puck schlägt ein (Schlag bei ~330 ms), Eis splittert, der Wunschrauch steigt auf.
+  hockey_wish: [
+    { name: 'elem_wind',  opts: { rate: 1.5, volume: 0.4 } },
+    { name: 'heavy_impact', opts: { rate: 1.4, volume: 0.45, delay: 330, category: null, dedupe: 0 } },
+    { name: 'elem_water', opts: { rate: 1.7, volume: 0.35, delay: 350, category: null, dedupe: 0 } },
+    { name: 'spell_cast', opts: { rate: 1.1, volume: 0.4, delay: 420, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.2, volume: 0.3, delay: 600, category: null, dedupe: 0 } },
+  ],
+  // Regeneration (24.10.): sanftes Aufblühen — Heilton (0 ms), Glitzern der aufsteigenden Kreuze, ein heller Ping zum Schluss. Nur der erste Teil uebernimmt die Sammelkategorie.
+  regeneration_bloom: [
+    { name: 'heal',       opts: { rate: 1.0, volume: 0.6 } },
+    { name: 'ping',       opts: { rate: 2.2, volume: 0.3, delay: 160, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.6, volume: 0.25, delay: 330, category: null, dedupe: 0 } },
+    { name: 'buff',       opts: { rate: 1.3, volume: 0.35, delay: 420, category: null, dedupe: 0 } },
+  ],
   liquid_rainbow: [
     { name: 'buff', opts: { rate: 1.2, volume: 0.7 } },
     { name: 'ping', opts: { rate: 1.7, volume: 0.5, delay: 520, category: null, dedupe: 0 } },
@@ -8030,6 +8068,12 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
       tooltip: `Under Orders (The Master's Orders): ${anhaenger} may perform Actions with this Hero as if they controlled it, but they cannot make it choose itself as a target for an Attack or Spell.`,
     });
   }
+  if (s.shrunk) {
+    badges.push({
+      key: 'shrunk', icon: '🤏',
+      tooltip: 'Shrunk (Shrink): All damage this Hero deals with Attacks becomes 1, and all damage it receives from Attacks is doubled.',
+    });
+  }
   if (s.polymorphed) {
     badges.push({
       key: 'polymorphed', icon: '🐱',
@@ -8254,6 +8298,8 @@ function BuffColumn({ buffs, cardName, statuses }) {
   if (st._spellImmune) statusBuffs.push(['spell_immune', { icon: '\uE900', tooltip: 'Unaffected by all Spells: Spells have no effect on this target — damage, healing, status effects, buffs and more. It can still be targeted, and Attacks and Creature effects work normally.' }]);
   // 24.10.: Stoneskin (Anhängsel) — vom Brett abgeleitet (`_stoneskin`), kein Zähler
   if (st._stoneskin) statusBuffs.push(['stoneskin', { icon: '🪨', tooltip: 'Stoneskin: Attacks deal 100 less damage to this Hero, and it cannot be Poisoned, Burned or Stunned.' }]);
+  // 24.10.: Regeneration (Anhängsel) — vom Brett abgeleitet (`_regeneration` = Anzahl der Karten), kein Zähler; die Menge steht auf der Karte (60/120/180 je nach Support Magic des Wirkers).
+  if (st._regeneration) statusBuffs.push(['regeneration', { icon: '🌱', tooltip: 'Regeneration: This Hero is healed at the start of each of its owner\'s turns (60/120/180 HP, depending on the caster\'s Support Magic level when the Spell was used).' + (st._regeneration > 1 ? ` (${st._regeneration}× attached)` : '') }]);
   if (st.untargetable) statusBuffs.push(['untargetable', { icon: '🦋', tooltip: 'Untargetable: Your opponent can\'t choose this Hero with Attacks, Spells or Creature effects while you control other Heroes that can be chosen. Wears off at the start of its owner\'s turn.' }]);
   if ((!buffs || Object.keys(buffs).length === 0) && statusBuffs.length === 0) return null;
   buffs = buffs || {};

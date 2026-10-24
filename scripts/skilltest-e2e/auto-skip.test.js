@@ -95,8 +95,9 @@ const place = (game, seat, name, hi, slot) => {
   // ── 3. Bot nutzt Broghans Effekt ──
   console.log('Der Bot nutzt Broghans Effekt');
   // Der Seed legt mit dem Kartenpool die Gegner-Helden fest — und von denen hängt der Score des Basisangriffs ab. Seed 21 lag nach neuen Karten (Pool wächst) knapp
-  // unter der Zwei-Drittel-Schwelle, Seed 23 liegt mit dem alten wie dem neuen Pool bei ~190 von 200.
-  const g3 = await quiet(() => runGame({ seats: 3, setupOnly: true, noProfileSeats: [0, 1, 2], seed: 23,
+  // unter der Zwei-Drittel-Schwelle, Seed 23 liegt mit dem alten wie dem neuen Pool bei ~190 von 200 — bis Welle 72 (Shrink, Regeneration, Clone, Arcane Eyes, Hockey Genie) auch ihn knapp
+  // darunter schob (132/200); Seed 28 liegt mit dem neuen Pool darüber.
+  const g3 = await quiet(() => runGame({ seats: 3, setupOnly: true, noProfileSeats: [0, 1, 2], seed: 28,
     mutatePrep: (prep) => { prep.players[0].heroes[0] = BROGHAN; } }));
   {
     const { room, host, gs, engine } = g3;
