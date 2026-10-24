@@ -4814,6 +4814,10 @@ function sendGameState(room, playerIdx, extra) {
       actionBlockedHeroes: room.engine
         ? (ps.heroes || []).map((h, hi) => !!(h?.name && h.hp > 0 && !room.engine.canHeroPerformAction(pi, hi, { ohneStatus: true })))   // W13 (Q137): Abzeichen nur für Plant Golem & Co., nicht für Frost/Betäubung
         : [],
+      // 24.10.: Helden, die dank einer Karte „unaffected by all Spells" sind (Black-Thorn Dragon, Skript-Flag `heroUnaffectedBySpells`) — abgeleitet, nie gespeichert; der Client zeigt ein Abzeichen.
+      spellImmuneHeroes: room.engine
+        ? (ps.heroes || []).map((h, hi) => !!(h?.name && room.engine.heroHasSpellImmunity(pi, hi)))
+        : [],
       // Als Vorgabe 29.9.: eine verdeckte Surprise sieht ihr KARTENBESITZER
       // (`originalOwner`) — auch auf der Gegenseite (gesetzt am geliehenen
       // Helden, Trapping); die Brettseite sieht fremde verdeckte Karten nicht.
@@ -6098,6 +6102,7 @@ function sendSpectatorGameState(room) {
       heroes: ps.heroes, abilityZones: ps.abilityZones,
       // v1349: verwahrte/versiegelte Zonen (Madame Guillotine) — rotes Kreuz, Anlegen gesperrt.
       verwahrteZonen: require('./cards/effects/_ability-verwahrung-shared').zonenFuerAnzeige(gs, spi),
+      spellImmuneHeroes: room.engine ? (ps.heroes || []).map((h, hi) => !!(h?.name && room.engine.heroHasSpellImmunity(spi, hi))) : [],   // 24.10.: s. oben
       surpriseZones: ps.surpriseZones.map((sz, hi) => (sz || []).map(cn => {
         const inst = room.engine?.cardInstances.find(c => c.owner === spi && c.zone === 'surprise' && c.heroIdx === hi && c.name === cn);
         if (inst && !inst.faceDown) return cn;
