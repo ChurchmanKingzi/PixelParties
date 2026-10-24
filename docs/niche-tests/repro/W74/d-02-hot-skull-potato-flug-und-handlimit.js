@@ -1,5 +1,5 @@
 'use strict';
-// W74d-02 · Hot Skull Potato: (1) Weiterreichen = sichtbarer Flug (`hot_potato_throw`, von → nach, während des Flugs in keiner Zone); (2) die Wirkung (Zahlung/Explosion) kommt VOR dem Abwurf auf die Handgröße.
+// W74d-02 · Hot Skull Potato: (1) Weiterreichen = sichtbarer Sprung der KARTE (`hot_potato_throw`, von → nach, während des Flugs in keiner Zone); (2) die Wirkung (Zahlung/Explosion) kommt VOR dem Abwurf auf die Handgröße.
 const H = require('../../lib/h.js');
 const CARD = 'Hot Skull Potato';
 const potato = (t) => t.engine.cardInstances.find(c => c.name === CARD && c.zone === 'support');
@@ -23,7 +23,7 @@ async function aufbau(handGroesse1) {
     let inZone = null;
     const orig = t.engine._delay.bind(t.engine);
     t.engine._delay = async (ms) => {
-      if (ms === 850) inZone = [0, 1].some(s => t.gs.players[s].supportZones.some(hz => hz.some(z => (z || []).includes(CARD))));
+      if (ms === 710) inZone = [0, 1].some(s => t.gs.players[s].supportZones.some(hz => hz.some(z => (z || []).includes(CARD))));
       return orig(ms);
     };
     t.gs.activePlayer = 1;
@@ -33,6 +33,7 @@ async function aufbau(handGroesse1) {
     const e = fl[0] || {};
     R.check('Start = alte Zone (Sitz 1), Ziel = neue Zone (Sitz 0)', e.targets && e.targets[0].owner === von.owner && e.targets[0].heroIdx === von.heroIdx && e.targets[0].zoneSlot === von.zoneSlot && e.targets[1].owner === 0, e.targets);
     const q = potato(t);
+    R.check('die Karte selbst springt: Start-Ziel trägt den Kartennamen', e.targets && e.targets[0].cardName === CARD, e.targets && e.targets[0]);
     R.check('Ziel-Ereignis zeigt die tatsächliche Landezone', q && e.targets && e.targets[1].heroIdx === q.heroIdx && e.targets[1].zoneSlot === q.zoneSlot, [q && [q.heroIdx, q.zoneSlot], e.targets && e.targets[1]]);
     R.check('während des Flugs liegt die Karte in keiner Zone', inZone === false, inZone);
     R.check('nach dem Flug liegt sie beim Spieler 0, Counter 2', q && t.engine.physicalSide(q) === 0 && q.counters.skullCounter === 2, q && [t.engine.physicalSide(q), q.counters.skullCounter]);
