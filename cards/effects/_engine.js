@@ -8125,11 +8125,14 @@ class GameEngine {
    * ist die Brettseite des Helden. Anders als Light Ball schuetzt es den
    * TRAEGER selbst.
    */
-  heroHasStatusImmunityAttachment(playerIdx, heroIdx) {
+  heroHasStatusImmunityAttachment(playerIdx, heroIdx, statusName = null) {
     for (const inst of this.cardInstances || []) {
       if (inst.zone !== ZONES.SUPPORT || inst.faceDown) continue;
       if (this.physicalSide(inst) !== playerIdx || inst.heroIdx !== heroIdx) continue;
-      if (loadCardEffect(inst.counters?._effectOverride || inst.name)?.immuneToNegativeStatuses) return true;
+      const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
+      if (script?.immuneToNegativeStatuses) return true;
+      // Einzel-Immunitaet eines Anhaengsels (Stoneskin: „cannot be Poisoned, Burned or Stunned") — nur, wenn der Aufrufer den Status nennt.
+      if (statusName && Array.isArray(script?.immuneToStatuses) && script.immuneToStatuses.includes(statusName)) return true;
     }
     return false;
   }
@@ -11810,26 +11813,46 @@ class GameEngine {
     return gewaehlt;
   }
 
-  async revealSearchedCards(playerIdx, cardNames, title) {
+  /**
+   * Zeigt dem Gegner die gesuchten/aufgenommenen Karten und wartet auf sein OK.
+   * `opts.together` (Meditation: „choose up to 2 …"): EIN gemeinsames Fenster für alle Karten
+   * (`deckSearchReveal` mit `cardNames`) statt eines Fensters je Karte; die Flüge/Meldungen je Karte
+   * bleiben. `opts.from` = Stapel, aus dem die Karten kamen ('deck' [Standard] | 'discard' | 'deleted') —
+   * nur für das Kartengedächtnis des Gegners und den Text des Fensters.
+   */
+  async revealSearchedCards(playerIdx, cardNames, title, opts = {}) {
     if (!cardNames || cardNames.length === 0) return;
     const ps = this.gs.players[playerIdx];
     const oppIdx = this.opponentOf(playerIdx);
     const searcherName = ps?.username || 'Opponent';
+    const from = opts.from || 'deck';
 
     for (const cardName of cardNames) {
       this._broadcastEvent('deck_search_add', { cardName, playerIdx });
       // Der Gegner sieht diese Karte AUS DEM DECK auf die Hand wandern —
       // beides ist damit oeffentlich bekannt (siehe Kartengedaechtnis).
-      this.noteKnownCard(oppIdx, cardName, 'deck');
+      if (from === 'deck') this.noteKnownCard(oppIdx, cardName, 'deck');   // nur aus dem Deck: `noteKnownCard` bucht jeden anderen Ort auf die Handliste
       this.noteKnownCard(oppIdx, cardName, 'hand');
       this.log('deck_search', { player: searcherName, card: cardName, by: title });
       this.sync();
       await this._delay(500);
+      if (opts.together) continue;
       await this.promptGeneric(oppIdx, {
         type: 'deckSearchReveal',
         cardName,
         searcherName,
         title,
+        cancellable: false,
+      });
+    }
+    if (opts.together) {
+      await this.promptGeneric(oppIdx, {
+        type: 'deckSearchReveal',
+        cardName: cardNames[0],
+        cardNames: cardNames.slice(),
+        searcherName,
+        title,
+        sourceLabel: from === 'discard' ? 'discard pile' : from === 'deleted' ? 'deleted cards' : 'deck',
         cancellable: false,
       });
     }
@@ -19132,7 +19155,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // attachment (`_lightBallProtects` skips the target's own
           // heroIdx). See helper docstring for the CC carve-out.
           const tgtHeroIdx = (ownerPs?.heroes || []).indexOf(target);
-          if (tgtHeroIdx >= 0 && this.heroHasStatusImmunityAttachment(ownerIdx, tgtHeroIdx)) {
+          if (tgtHeroIdx >= 0 && this.heroHasStatusImmunityAttachment(ownerIdx, tgtHeroIdx, statusName)) {
             this.log('status_blocked', { target: this._heroLabel(target), status: statusName, reason: 'status_immunity_attachment' });
             playBlockedAnim();
             return false;
@@ -50764,7 +50787,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (statusDef?.negative) {
       if (this._johannaSchuetzt(hero)) return true;
       if (this._lightBallProtects(playerIdx, 'hero', heroIdx)) return true;
-      if (this.heroHasStatusImmunityAttachment(playerIdx, heroIdx)) return true;
+      if (this.heroHasStatusImmunityAttachment(playerIdx, heroIdx, statusName)) return true;
     }
     if (hero.buffs?.submerged && this.isSubmergedProtected(playerIdx, hero, { festesZiel: opts.festesZiel })) return true;
     if (statusDef?.negative && hero.buffs?.negative_status_immune) return true;
@@ -50908,7 +50931,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       // Anhaengsel mit `immuneToNegativeStatuses` (Petrification Break):
       // schuetzt den TRAEGER selbst.
-      if (this.heroHasStatusImmunityAttachment(playerIdx, heroIdx)) {
+      if (this.heroHasStatusImmunityAttachment(playerIdx, heroIdx, statusName)) {
         this.log('status_blocked', { target: hero.name, status: statusName, reason: 'status_immunity_attachment' });
         playBlockedAnim();
         return;

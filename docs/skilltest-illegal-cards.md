@@ -347,7 +347,6 @@
 - Local Idol
 - Boots of Hermes
 - See through the Ruse
-- Teleport
 - Front Soldier
 - Cute Camera
 - Sinister Idol

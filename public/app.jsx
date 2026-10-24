@@ -8860,14 +8860,19 @@ function GameBoard({ gameState, lobby, onLeave }) {
               <div className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', textShadow: '0 2px 8px rgba(0,0,0,.8)' }}>
                 {ep.title || 'Card Searched'}
               </div>
-              <div style={{
-                boxShadow: '0 0 50px rgba(0,0,0,.9), 0 0 100px rgba(255,255,255,.08)',
-                borderRadius: 8,
-              }}>
-                <BoardCard cardName={ep.cardName} style={{ width: 220, height: 308, borderRadius: 8 }} />
+              {/* `cardNames`: mehrere Karten in EINEM Fenster (Meditation: 2 Karten aus der Ablage auf die Hand) */}
+              <div style={{ display: 'flex', gap: 18, alignItems: 'center', justifyContent: 'center' }}>
+                {(Array.isArray(ep.cardNames) && ep.cardNames.length > 0 ? ep.cardNames : [ep.cardName]).map((cn, i) => (
+                  <div key={i} style={{
+                    boxShadow: '0 0 50px rgba(0,0,0,.9), 0 0 100px rgba(255,255,255,.08)',
+                    borderRadius: 8,
+                  }}>
+                    <BoardCard cardName={cn} style={{ width: 220, height: 308, borderRadius: 8 }} />
+                  </div>
+                ))}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text2)' }}>
-                {ep.searcherName} searched this card from their deck.
+                {ep.searcherName} {Array.isArray(ep.cardNames) && ep.cardNames.length > 1 ? 'added these cards to their hand' : 'searched this card'} from their {ep.sourceLabel || 'deck'}.
               </div>
               <button className="btn btn-success" style={{ padding: '10px 36px', fontSize: 13 }}
                 onClick={() => {
