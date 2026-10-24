@@ -149,6 +149,7 @@ module.exports = {
 
     let ziel = null;           // { phys, heroIdx }
     let explicitZone = -1;
+    let explicitSupport = -1;
     if (helden.length === 1) {
       ziel = helden[0];
     } else if (helden.every(h => h.phys === pi)) {
@@ -167,6 +168,7 @@ module.exports = {
       const hi = typeof pickRes.heroIdx === 'number' ? pickRes.heroIdx : helden[0].heroIdx;
       ziel = helden.find(h => h.heroIdx === hi) || helden[0];
       explicitZone = typeof pickRes.zoneSlot === 'number' ? pickRes.zoneSlot : -1;
+      explicitSupport = typeof pickRes.supportSlot === 'number' ? pickRes.supportSlot : -1;
     } else {
       // Mit geliehenem Helden unter den Zielen: Heldenwahl ueber Brett-Klick (die
       // Anlege-Maske `abilityAttachTarget` kennt nur die eigene Heldenreihe).
@@ -229,6 +231,7 @@ module.exports = {
       skipAbilityGivenCheck: true,
       resistanzGeprueft: true,   // W14: oben schon gefragt
       targetZoneSlot: explicitZone >= 0 ? explicitZone : undefined,
+      ...(explicitSupport >= 0 ? { targetSupportSlot: explicitSupport, targetZoneArt: 'support' } : {}),
       ...(zielSeite !== pi ? { heroOwner: zielSeite } : {}),
     });
 
@@ -271,7 +274,7 @@ module.exports = {
     // Placement sparkle on the new ability slot (parity with the
     // standard ability-attach visual).
     engine._broadcastEvent('ability_activated', {
-      owner: zielSeite, heroIdx: targetHeroIdx, zoneIdx: res.zoneSlot,
+      owner: zielSeite, heroIdx: targetHeroIdx, zoneIdx: res.zoneSlot, zoneKind: res.zoneKind,
       abilityName,
     });
 

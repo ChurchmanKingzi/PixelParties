@@ -53,30 +53,6 @@ const CARD_NAME = 'Alex, Trainer of Heroes';
 const MAX_USES_PER_TURN = 2;      // v1444
 const USE_KEY = 'AlexTutor';
 
-/** Pick the zone slot the tutored ability will land in on `targetHeroIdx`. */
-function findTargetZone(abZones, cardName, engine = null, pi = null, heroIdx = null, wunsch = -1) {
-  // ★★ v1349: mit Engine-Kontext entscheidet die EINE Stelle
-  // (`engine.abilityZielZone`, verwahrte Abilities / Madame Guillotine).
-  if (engine && pi != null && heroIdx != null) {
-    return engine.abilityZielZone(pi, heroIdx, cardName, { wunschZone: wunsch });
-  }
-  const script = loadCardEffect(cardName);
-  if (script?.customPlacement) {
-    for (let z = 0; z < 3; z++) {
-      if (script.customPlacement.canPlace(abZones[z] || [])) return z;
-    }
-    return -1;
-  }
-  for (let z = 0; z < 3; z++) {
-    const slot = abZones[z] || [];
-    if (slot.length > 0 && slot[0] === cardName && slot.length < 3) return z;
-  }
-  for (let z = 0; z < 3; z++) {
-    if ((abZones[z] || []).length === 0) return z;
-  }
-  return -1;
-}
-
 module.exports = {
   activeIn: ['hero'],
 
@@ -119,7 +95,7 @@ module.exports = {
           && promptData.eligibleHeroIdxs.includes(cache.heroIdx)
           && cache.cardName === promptData.cardName) {
         delete engine._alexCpuPick;
-        return { heroIdx: cache.heroIdx, zoneSlot: cache.zoneSlot };
+        return { heroIdx: cache.heroIdx, zoneSlot: cache.zoneSlot, supportSlot: cache.supportSlot };
       }
       // Fall through if no cached pick — default brain picks for us.
       return undefined;
@@ -167,25 +143,14 @@ module.exports = {
         // Splice the ability out of the deck (mirrors Alex's real placement).
         const _taken_dIdx = await eng.takeFromPile(psp, 'deck', opt.cardName, { source: CARD_NAME });   // v820: Stapel-Schicht
         if (!_taken_dIdx) return false;
-        // Resolve the destination zone (stack onto existing, then first free).
-        const abZones = psp.abilityZones[opt.heroIdx] || [[], [], []];
-        psp.abilityZones[opt.heroIdx] = abZones;
-        const zone = findTargetZone(abZones, opt.cardName, eng, cpuIdx, opt.heroIdx);
-        if (zone < 0) return false;
-        if (!abZones[zone]) abZones[zone] = [];
-        abZones[zone].push(opt.cardName);
-        const inst = eng._trackCard(opt.cardName, cpuIdx, 'ability', opt.heroIdx, zone);
+        // Resolve the destination zone (stack onto existing, then first free; 24.10.: auch Support Zonen — Xal).
+        const ort = eng.abilityZielOrt(cpuIdx, opt.heroIdx, opt.cardName);
+        if (!ort) return false;
+        const inst = eng.abilityOrtBelegen(cpuIdx, opt.heroIdx, opt.cardName, ort);
         // Fire the standard placement hooks so any onPlay / onCardEnterZone
         // listeners (Performance's Divinity-stack snap, etc.) can affect
         // the rollout score the same way they would in real play.
-        await eng.runHooks('onPlay', {
-          _onlyCard: inst, playedCard: inst, cardName: opt.cardName,
-          zone: 'ability', heroIdx: opt.heroIdx, _skipReactionCheck: true,
-        });
-        await eng.runHooks('onCardEnterZone', {
-          enteringCard: inst, toZone: 'ability', toHeroIdx: opt.heroIdx,
-          _skipReactionCheck: true,
-        });
+        await eng.abilityOrtHooks(inst, ort, { _skipReactionCheck: true });
         return true;
       };
       let best = null;
@@ -199,12 +164,12 @@ module.exports = {
       }
       // Stash the chosen hero (and the deterministic zone) for the
       // follow-up abilityAttachTarget prompt.
-      const abZones = ps.abilityZones[best.heroIdx] || [[], [], []];
-      const zone = findTargetZone(abZones, best.cardName, engine, cpuIdx, best.heroIdx);
+      const ort = engine.abilityZielOrt(cpuIdx, best.heroIdx, best.cardName);
       engine._alexCpuPick = {
         cardName: best.cardName,
         heroIdx: best.heroIdx,
-        zoneSlot: zone >= 0 ? zone : -1,
+        zoneSlot: ort && ort.art === 'ability' ? ort.slot : -1,
+        supportSlot: ort && ort.art === 'support' ? ort.slot : -1,
       };
       return { cardName: best.cardName, source: best.source };
     })();
@@ -292,24 +257,18 @@ module.exports = {
       // when there's only one legal hero AND one legal zone — no UI.
       let targetHeroIdx = -1;
       let explicitZone = -1;
+      let explicitSupport = -1;
       let zielFeld = pi;   // Brettseite des gewaehlten Wirts
       if (eligibleWirte.length === 1) {
         const onlyHero = eligibleWirte[0].heroIdx;
         const onlyFeld = eligibleWirte[0].phys;
-        const abZonesCheck = engine.gs.players[onlyFeld].abilityZones[onlyHero] || [[], [], []];
-        const zone = findTargetZone(abZonesCheck, chosenAbility, engine, onlyFeld, onlyHero);
         // Single hero + the placement is deterministic (stack slot or only
-        // free slot) → no need to bother the player with a prompt.
-        const ambiguous = zone < 0 ? false : abZonesCheck.filter((s, z) => {
-          if (z === zone) return false;
-          const slot = s || [];
-          if (slot.length > 0 && slot[0] === chosenAbility && slot.length < 3) return true;
-          return slot.length === 0;
-        }).length > 0;
-        if (!ambiguous) {
+        // free slot — echte Zonen UND Support Zonen, Xal) → no need to bother the player with a prompt.
+        const orte = engine.abilityZielOrte(onlyFeld, onlyHero, chosenAbility);
+        if (orte.length === 1) {
           targetHeroIdx = onlyHero;
           zielFeld = onlyFeld;
-          explicitZone = zone;
+          if (orte[0].art === 'support') explicitSupport = orte[0].slot; else explicitZone = orte[0].slot;
         }
       }
       if (targetHeroIdx < 0 && eligibleWirte.some(e => e.phys !== pi)) {
@@ -344,6 +303,7 @@ module.exports = {
         if (typeof pickRes.heroIdx !== 'number' || !eligibleHeroes.includes(pickRes.heroIdx)) { zurueck(); return; }
         targetHeroIdx = pickRes.heroIdx;
         explicitZone = typeof pickRes.zoneSlot === 'number' ? pickRes.zoneSlot : -1;
+        explicitSupport = typeof pickRes.supportSlot === 'number' ? pickRes.supportSlot : -1;
       }
 
       // ★ W15a (Al, R3: „Ja" — Alex prallt an Resistance ab): Anlegen PER EFFEKT an den gewählten anderen Helden — vor jeder Kartenbewegung gefragt.
@@ -364,23 +324,21 @@ module.exports = {
       const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenAbility, { source: CARD_NAME });   // v820: Stapel-Schicht
       if (!_taken_deckIdx) { zurueck(); return; }
 
-      const abZones = hps.abilityZones[targetHeroIdx] || [[], [], []];
-      hps.abilityZones[targetHeroIdx] = abZones;
       // If the player clicked a specific zone, respect it (after re-validating
       // legality). Otherwise fall back to the auto-picker.
-      // v1349: gewuenschter Platz und Rueckfall an EINER Stelle.
-      const targetZone = findTargetZone(abZones, chosenAbility, engine, zielFeld, targetHeroIdx, explicitZone);
-      if (targetZone < 0) {
+      // v1349: gewuenschter Platz und Rueckfall an EINER Stelle; 24.10.: echte Zone ODER Support Zone (Xal).
+      const ort = engine.abilityZielOrt(zielFeld, targetHeroIdx, chosenAbility, {
+        wunschZone: explicitZone, wunschSupport: explicitSupport, wunschArt: explicitSupport >= 0 ? 'support' : undefined,
+      });
+      if (!ort) {
         // Race: the target zone filled between canAttach check and now.
         ps.mainDeck.push(chosenAbility);
         engine.shuffleDeck(pi, 'main');
         zurueck();
         return;
       }
-      if (!abZones[targetZone]) abZones[targetZone] = [];
-      abZones[targetZone].push(chosenAbility);
 
-      const inst = engine._trackCard(chosenAbility, zielFeld, 'ability', targetHeroIdx, targetZone);
+      const inst = engine.abilityOrtBelegen(zielFeld, targetHeroIdx, chosenAbility, ort);
       if (zielFeld !== pi) inst.originalOwner = pi;   // W31a: die Karte gehoert dem Spieler (wie bei jedem Anlegen an einen uebernommenen Helden)
       engine._broadcastEvent('deck_search_add', { cardName: chosenAbility, playerIdx: pi });
       engine.log('alex_ability_tutor', {
@@ -394,17 +352,10 @@ module.exports = {
       // (onPlay for any self-hook, onCardEnterZone for any listener on the
       // target hero). `_skipReactionCheck: true` matches every other
       // attach-from-non-hand-source path in the engine.
-      await engine.runHooks('onPlay', {
-        _onlyCard: inst, playedCard: inst, cardName: chosenAbility,
-        zone: 'ability', heroIdx: targetHeroIdx, _skipReactionCheck: true,
-      });
-      await engine.runHooks('onCardEnterZone', {
-        enteringCard: inst, toZone: 'ability', toHeroIdx: targetHeroIdx,
-        _skipReactionCheck: true,
-      });
+      await engine.abilityOrtHooks(inst, ort, { _skipReactionCheck: true });
 
       engine._broadcastEvent('ability_activated', {
-        owner: zielFeld, heroIdx: targetHeroIdx, zoneIdx: targetZone,
+        owner: zielFeld, heroIdx: targetHeroIdx, zoneIdx: ort.slot, zoneKind: ort.art,
         abilityName: chosenAbility,
       });
 

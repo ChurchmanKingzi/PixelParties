@@ -5061,20 +5061,27 @@ function isAtkBoostEquip(cardData) {
 // randomly so the CPU doesn't deterministically funnel every ability into
 // Hero 0. Resolves around abilityGivenThisTurn (1 attach per hero per turn).
 
-function heroHasAbility(ps, hi, cardName) {
-  const abZones = ps.abilityZones?.[hi] || [];
-  for (const slot of abZones) {
-    if ((slot || []).length > 0 && slot[0] === cardName) return true;
+// 24.10.: ein Ability-Stapel kann auch in einer SUPPORT Zone liegen (Xal, Xalibur) — hoechstens einer je Ability und Held, ueber beide Zonenarten.
+function abilityStapelHoehe(ps, hi, cardName) {
+  for (const slot of (ps.abilityZones?.[hi] || [])) {
+    if ((slot || []).length > 0 && slot[0] === cardName) return slot.length;
   }
-  return false;
+  let istAbility = false;
+  try { istAbility = require('./_card-db').getCardDB()[cardName]?.cardType === 'Ability'; } catch { istAbility = false; }
+  if (istAbility) {
+    for (const slot of (ps.supportZones?.[hi] || [])) {
+      if ((slot || []).length > 0 && slot[0] === cardName) return slot.length;
+    }
+  }
+  return 0;
+}
+
+function heroHasAbility(ps, hi, cardName) {
+  return abilityStapelHoehe(ps, hi, cardName) > 0;
 }
 
 function heroHasAbilityAtMaxLevel(ps, hi, cardName) {
-  const abZones = ps.abilityZones?.[hi] || [];
-  for (const slot of abZones) {
-    if ((slot || []).length >= 3 && slot[0] === cardName) return true;
-  }
-  return false;
+  return abilityStapelHoehe(ps, hi, cardName) >= 3;
 }
 
 function anyLivingHeroHasAbility(ps, cardName) {
@@ -5640,16 +5647,9 @@ function resolveAbilitySlot(engine, pi, hi, cardName) {
     return candidates[Math.floor(Math.random() * candidates.length)];
   }
 
-  // Stack onto existing same-name zone (up to level 3)
-  for (let z = 0; z < 3; z++) {
-    const zone = abZones[z] || [];
-    if (zone.length > 0 && zone[0] === cardName && zone.length < 3) return -1;
-  }
-  // Otherwise need a free zone
-  for (let z = 0; z < 3; z++) {
-    if ((abZones[z] || []).length === 0) return -1;
-  }
-  return null;
+  // 24.10.: EINE Stelle fuer den Zielort — bestehender Stapel (echte ODER Support Zone, Xal), sonst freie echte Zone, sonst freie
+  // Support Zone. `doPlayAbility` platziert bei -1 selbst genauso.
+  return engine.abilityZielOrt(pi, hi, cardName) ? -1 : null;
 }
 
 // ═══════════════════════════════════════════

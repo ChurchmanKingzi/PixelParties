@@ -7287,60 +7287,6 @@ function broadcastHandToBoard(room, ownerIdx, payload, forceOwnerAnim = false) {
 // pass a valid playerIdx. Returns true on success, false on early-return.
 
 /**
- * Freie (oder gleichnamig stapelbare) SUPPORT-Zone fuer eine Ability
- * (v767, Xal / Xalibur). Stapeln folgt derselben Regel wie in einer
- * echten Ability-Zone: gleicher Name, hoechstens 3.
- * `wunsch` ist der vom Client gezogene Slot, sofern brauchbar.
- */
-function findAbilitySupportSlot(ps, heroIdx, cardName, wunsch, gs = null, pi = null) {
-  const zonen = ps.supportZones?.[heroIdx] || [];
-  const anzahl = Math.max(3, zonen.length);
-  // ★★ v1349: verwahrte Abilities (Madame Guillotine) — dieselben Regeln
-  // wie in `engine.abilityZielZone`: ein verwahrter Stapel nimmt die neue
-  // Kopie (gesamt ≤ 3), versiegelte Plaetze sind belegt.
-  const V = require('./cards/effects/_ability-verwahrung-shared');
-  const mitVerwahrung = gs && pi != null;
-  const nimmt = (z) => !mitVerwahrung || V.nimmtAuf(gs, pi, heroIdx, 'support', z, cardName);
-  const frei = (z) => (zonen[z] || []).length === 0
-    && !(mitVerwahrung && V.versiegelt(gs, pi, heroIdx, 'support', z));
-  // ★ 24.10.: Karten mit eigener Platzierungsregel (Performance: nur auf einen belegten Stapel, höchstens 3) — in Support Zonen genauso.
-  // Nur Stapel aus ECHTEN Abilities zählen (eine Support Zone kann auch Ausrüstung oder eine Kreatur tragen).
-  const customPlacement = loadCardEffect(cardName)?.customPlacement;
-  if (customPlacement) {
-    const db = getCardDB();
-    const tauglich = (z) => {
-      const slot = zonen[z] || [];
-      return slot.length > 0 && db[slot[0]]?.cardType === 'Ability' && customPlacement.canPlace(slot)
-        && !(mitVerwahrung && V.versiegelt(gs, pi, heroIdx, 'support', z)) && nimmt(z);
-    };
-    if (wunsch >= 0 && wunsch < anzahl && tauglich(wunsch)) return wunsch;
-    for (let z = 0; z < anzahl; z++) if (tauglich(z)) return z;
-    return -1;
-  }
-  if (mitVerwahrung) {
-    const verwahrt = V.verwahrterStapel(gs, pi, heroIdx, cardName);
-    if (verwahrt) {
-      if (verwahrt.zoneKind !== 'support') return -1;
-      const slot = zonen[verwahrt.slotIdx] || [];
-      if (slot.length > 0 && slot[0] !== cardName) return -1;
-      return nimmt(verwahrt.slotIdx) ? verwahrt.slotIdx : -1;
-    }
-  }
-  // 1. Auf einen bestehenden gleichnamigen Stapel legen.
-  for (let z = 0; z < anzahl; z++) {
-    const slot = zonen[z] || [];
-    if (slot.length > 0 && slot[0] === cardName) return (slot.length < 3 && nimmt(z)) ? z : -1;
-  }
-  // 2. Der gewuenschte Platz, wenn frei.
-  if (wunsch >= 0 && wunsch < anzahl && frei(wunsch)) return wunsch;
-  // 3. Sonst der erste freie.
-  for (let z = 0; z < anzahl; z++) {
-    if (frei(z)) return z;
-  }
-  return -1;
-}
-
-/**
  * ★ ABILITY IN EINE SUPPORT ZONE LEGEN (Xal, Xalibur; 24.10.2026): derselbe Ablauf wie für eine echte Ability Zone — Karte aus der Hand, Instanz,
  * Flug, Reaktionsfenster (die Ability kann negiert werden), danach die Anlege-Hooks (`onPlay`, `onCardEnterZone`). Früher legte dieser Weg den
  * Namen nur in die Zone: keine Anlege-Wirkung (Fighting gab 0 ATK), keine Passiv-Hooks, kein Negieren.
@@ -7465,15 +7411,15 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
     // v769: Ein Held fuehrt je Ability hoechstens EINEN Stapel. Liegt
     // sie schon irgendwo, wird dort gestapelt statt einen zweiten
     // Stapel zu eroeffnen — und ist der voll, geht gar nichts.
-    const vorhanden = room.engine.heroAbilityStackOf(pi, heroIdx, cardName);
-    if (vorhanden && vorhanden.zoneKind === 'ability') {
+    // Eine Ability hat je Held hoechstens EINEN Stapel — ueber echte Zonen und Support Zonen zusammen.
+    const vorhanden = room.engine.abilityStapelOrtVon(pi, heroIdx, cardName);
+    if (vorhanden && vorhanden.art === 'ability') {
       // Die Ability liegt schon in einer ECHTEN Zone: dort wird gestapelt — der normale Weg unten (Instanz, Reaktionsfenster, Anlege-Hooks).
       // (Früher legte dieser Zweig den Namen nur in die Zone: keine Instanz, kein `onPlay`, kein Negieren.)
-      zoneSlot = vorhanden.slotIdx;
+      zoneSlot = vorhanden.slot;
       supportSlot = null;
     } else {
-      if (vorhanden && vorhanden.zoneKind === 'support' && vorhanden.level >= 3) return false;
-      const ziel = findAbilitySupportSlot(ps, heroIdx, cardName, supportSlot, gs, pi);
+      const ziel = room.engine.abilitySupportZielZone(pi, heroIdx, cardName, supportSlot);
       if (ziel < 0) return false;
       return abilityInSupportAnlegen(room, pi, { cardName, handIndex, heroIdx, supIdx: ziel, fromCreation, hero, heroOwner });
     }
@@ -7500,7 +7446,7 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
     const _hatStapel = abZones.some(z => (z || []).length > 0 && z[0] === cardName);
     if (_hatStapel) return false;
     const supIdx = room.engine.heroAcceptsAbilitiesInSupport(pi, heroIdx)
-      ? findAbilitySupportSlot(ps, heroIdx, cardName, zoneSlot, gs, pi)
+      ? room.engine.abilitySupportZielZone(pi, heroIdx, cardName, zoneSlot)
       : -1;
     if (supIdx < 0) return false;
     ps.abilityZones[heroIdx] = abZones;
