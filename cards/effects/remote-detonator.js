@@ -24,6 +24,7 @@
 //    ist wie bei Acid Vial kein Ziel.
 // ═══════════════════════════════════════════
 
+const { hatName, hatNameIn, namenIn } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt
 const CARD_NAME = 'Remote Detonator';
 const GOLEM = 'Sentient Bomb Golems';
 const PRO_GOLEM = 200;
@@ -31,7 +32,7 @@ const PRO_GOLEM = 200;
 /** Meine offenen Golems auf dem Brett. */
 function meineGolems(engine, pi) {
   return engine.cardInstances.filter(c =>
-    c.zone === 'support' && c.name === GOLEM && !c.faceDown
+    c.zone === 'support' && hatName(c, GOLEM) && !c.faceDown
     && (c.controller ?? c.owner) === pi);
 }
 

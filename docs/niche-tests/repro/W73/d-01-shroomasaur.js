@@ -135,5 +135,48 @@ const picker = (t) => t.prompts.filter(p => p.d && p.d.type === 'cardNamePicker'
     R.check('Gegner darf eine eigene', t.engine.isCreatureSummonable(CARD, 1, 1) === true);
   }
 
+  R.section('E · andere Kartenskripte nehmen den Zusatznamen wahr (Ifrit: Damus, Armageddon)');
+  {
+    const DAMUS = 'Damus, the Prophet of Apocalypse';
+    const lauf = async (alias) => {
+      const t = await H.fresh({ heroes: [[DAMUS, H.BLANK_HEROES[1], H.BLANK_HEROES[2]], null], hand: [['Armageddon'], []], deckSize: 12 });
+      const s = t.put(0, 1, 0, CARD); s.turnPlayed = 0;
+      if (alias) await nennen(t, 0, 1, 0, 'Ifrit');
+      return { t, s };
+    };
+    const apo = require('../../../../cards/effects/_apocalypse-shared.js');
+    {
+      const { t } = await lauf(false);
+      R.check('ohne Zusatznamen: keine Ifrit auf dem Brett', apo.ifritsOf(t.engine, 0).length === 0);
+    }
+    {
+      const { t, s } = await lauf(true);
+      R.check('mit Zusatznamen „Ifrit": Damus’ Zählung sieht 1 Ifrit', apo.ifritsOf(t.engine, 0).length === 1 && apo.ifritsOf(t.engine, 0)[0] === s, apo.ifritsOf(t.engine, 0).length);
+      R.check('… der Gegner kontrolliert sie nicht', apo.ifritsOf(t.engine, 1).length === 0);
+      // Damus-Schutz: „Ifrit"-Kreaturen nehmen keinen Schaden von gegnerischen Karten/Effekten
+      const vor = s.counters.currentHp ?? s.counters.maxHp ?? 90;
+      await t.run(() => t.engine.actionDealCreatureDamage({ name: 'ZZ', owner: 1, heroIdx: 0 }, s, 50, 'creature', { sourceOwner: 1 }));
+      R.check('Damus’ Schutz gilt für sie: kein Schaden von gegnerischen Effekten', (s.counters.currentHp ?? vor) === vor, [vor, s.counters.currentHp]);
+      // Zugwechsel: der Name ist wieder weg
+      await t.endTurn();
+      R.check('nach dem Zugwechsel zählt sie nicht mehr als Ifrit', apo.ifritsOf(t.engine, 0).length === 0 && !s.counters._zusatzName, s.counters);
+    }
+    {
+      // Armageddon: +100 je Ifrit auf dem Brett (beide Seiten)
+      const schaden = async (alias) => {
+        const { t } = await lauf(alias);
+        t.grantFor(0, 0, 'Armageddon');
+        t.gs.players[0].heroes[0].atk = 100;
+        t.targetFn = (valid) => valid.filter(v => v.id === 'hero-1-0').map(v => v.id);
+        const v = t.hp(1, 0);
+        await t.play(0, 'Armageddon', { hero: 0 });
+        t.targetFn = null;
+        return v - t.hp(1, 0);
+      };
+      const ohne = await schaden(false), mit = await schaden(true);
+      R.check(`Armageddon: mit dem Zusatznamen Ifrit +100 Schaden (${ohne} → ${mit})`, mit === ohne + 100, [ohne, mit]);
+    }
+  }
+
   R.finish();
 })().catch(e => { process.stderr.write('THROW ' + (e && e.stack || e) + '\n'); process.exit(2); });

@@ -53761,7 +53761,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                           }
                         }
                         // Shroomasaur (W73): der Zusatzname gilt nur in dem Zug, in dem er vergeben wurde — der Tooltip zeigt ihn grün neben dem echten Namen.
-                        if (cc?._zusatzName && cc._zusatzNameZug === gameState.turn) {
+                        if (cc?._zusatzName) {
                           tooltipOverride = { ...(tooltipOverride || baseCard || {}), extraName: cc._zusatzName };
                         }
                         // Goff/Gon-style attached Hero: swap to the
@@ -53974,7 +53974,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         <span className="head-counter-icon">🛡️</span>
                       </div>
                     ) : null}
-                    {cc?._zusatzName && cc._zusatzNameZug === gameState.turn ? (
+                    {cc?._zusatzName ? (
                       <div style={{ position: 'absolute', left: 0, right: 0, top: 2, textAlign: 'center', pointerEvents: 'none', zIndex: 6 }}>
                         <span style={{ display: 'inline-block', maxWidth: '94%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '1px 3px', fontFamily: "'Pixel Intv', 'Press Start 2P', monospace", fontSize: 'calc(8px * var(--board-scale))', lineHeight: 1.1, color: '#b3f9b8', background: '#29663f', border: '1px solid #3ddc57', textShadow: '1px 1px 0 #000' }}>{cc._zusatzName}</span>
                       </div>

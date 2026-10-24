@@ -62,6 +62,7 @@ const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 //  die Gegnerseite ausloescht", nicht „auch wenn es die Partie kostet".
 // ═══════════════════════════════════════════
 
+const { hatName, hatNameIn, namenIn } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt
 const { loadCardEffect } = require('./_loader');
 const { hasCardType } = require('./_hooks');
 const { IFRIT, ARMAGEDDON, ifritsOf, damusEffektWirkt, damusPlatzierungOffen } = require('./_apocalypse-shared');
@@ -79,7 +80,7 @@ function schaden(engine) {
   for (let pi = 0; pi < engine.playerCount(); pi++) {
     for (const inst of ifritsOf(engine, pi)) {
       if (engine.isCardPassiveDormant?.(inst)) continue;   // ★ W7a (C03-12, Al): gefroren/betäubt/negiert -> kein Aufschlag
-      summe += loadCardEffect(inst.name)?.armageddonBonus || 0;
+      summe += loadCardEffect(IFRIT)?.armageddonBonus || 0;   // Bonus je Ifrit (auch eine Karte mit dem Zusatznamen Ifrit)
     }
   }
   return summe;

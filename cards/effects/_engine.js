@@ -26082,6 +26082,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     this._hookHeapDeltaByName = Object.create(null);
     this._hookHeapDeltaByCard = Object.create(null);
 
+    // ── W73c (Shroomasaur): Zusatznamen gelten „for the rest of the turn" — mit dem Zugwechsel sind sie fort.
+    for (const _c of this.cardInstances) { if (_c.counters && _c.counters._zusatzName) { delete _c.counters._zusatzName; delete _c.counters._zusatzNameZug; } }
+
     // ── Einmal-Schadensschilde verfallen (v697): „until the start of
     // your next turn" — zu Beginn des Zuges ihres BESITZERS, VOR den
     // Status-Ticks (die Ticks des neuen Zuges sind nicht mehr gedeckt).
@@ -45238,13 +45241,13 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   /**
    * ★ W73c (Shroomasaur): „give this Creature the name of any other card IN ADDITION to its own name for the rest of the turn." Der Zusatzname hängt an der Instanz
-   * (`counters._zusatzName` + Stempel `_zusatzNameZug`) und gilt nur in dem Zug, in dem er vergeben wurde. `zusatzNameVon` liefert ihn (oder `null`), `instHatName` fragt „trägt diese Karte
+   * (`counters._zusatzName`) und gilt nur in dem Zug, in dem er vergeben wurde (die Engine räumt ihn zu Beginn des nächsten Zuges ab). Skripte fragen über `_alias-name.js` (`hatName`, `hatNameIn`, `namenIn`). `zusatzNameVon` liefert ihn (oder `null`), `instHatName` fragt „trägt diese Karte
    * den Namen?" (eigener ODER Zusatzname). Engine-Stellen, die Kartennamen auf dem Brett vergleichen und für die Zusatznamen zählen: „You can only control 1 X"
    * (`nurEinerSchonKontrolliert`, `zusatzNameSperrt`, `kontrolliert` aus `_double-shared`).
    */
   zusatzNameVon(inst) {
     const c = inst?.counters;
-    return (c && c._zusatzName && c._zusatzNameZug === this.gs.turn) ? c._zusatzName : null;
+    return (c && c._zusatzName) ? c._zusatzName : null;   // der Zusatzname verfällt zu Beginn des nächsten Zuges (`_zusatzNamenAbraeumen`)
   }
 
   instHatName(inst, name) {

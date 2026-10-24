@@ -13,6 +13,7 @@
 //  beim ersten Regelwechsel auseinander.
 // ═══════════════════════════════════════════
 
+const { hatName, hatNameIn, namenIn } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt
 const { hatEffekt } = require('./_gained-effects-shared');
 
 const IFRIT = 'Ifrit';
@@ -38,7 +39,7 @@ function hatDamusEffekt(hero) {
 function ifritsOf(engine, pi) {
   const out = [];
   for (const inst of (engine.cardInstances || [])) {
-    if (inst.name !== IFRIT) continue;
+    if (!hatName(inst, IFRIT)) continue;   // auch Shroomasaur mit dem Zusatznamen Ifrit
     if (inst.zone !== 'support' || inst.faceDown) continue;
     if ((inst.controller ?? inst.owner) !== pi) continue;
     out.push(inst);

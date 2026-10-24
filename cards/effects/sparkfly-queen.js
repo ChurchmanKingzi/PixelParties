@@ -57,6 +57,7 @@
 //  activation UI greys out for the rest of the turn.
 // ═══════════════════════════════════════════
 
+const { hatName, hatNameIn, namenIn } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt
 const { hasCardType, isArtifactCreature } = require('./_hooks');
 const { drawBlockedFor } = require('./_draw-block-shared');   // D1: Regel von Al
 const {
@@ -99,7 +100,7 @@ function countSparkflies(engine, pi) {
   let n = 0;
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
-    if (!SPARKFLY_NAMES.includes(inst.name)) continue;
+    if (!hatNameIn(inst, SPARKFLY_NAMES)) continue;
     if ((inst.controller ?? inst.owner) !== pi) continue;
     n++;
   }

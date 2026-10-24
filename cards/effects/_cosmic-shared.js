@@ -34,6 +34,7 @@
 //  including Invader in its picker.
 // ═══════════════════════════════════════════
 
+const { hatName, hatNameIn, namenIn } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt
 const { hasCardType } = require('./_hooks');
 
 // ─── ARCHETYPE NAMES ────────────────────────
@@ -114,7 +115,7 @@ function invaderLimitAllows(engine, pi, targetName) {
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support' || inst.faceDown) continue;
     if ((inst.controller ?? inst.owner) !== pi) continue;
-    if (inst.name === INVADER_NAME) return false;
+    if (hatName(inst, INVADER_NAME)) return false;
   }
   return true;
 }
