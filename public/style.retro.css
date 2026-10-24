@@ -13653,6 +13653,9 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .gold-gain-number { animation: goldFloat 1.6s ease-out forwards, ppGoldSchiller 1.2s steps(12) infinite; }
 .gold-gain-number.gold-gain-down { animation: goldFloatDown 1.6s ease-out forwards, ppGoldSchiller 1.2s steps(12) infinite; }
 @media (prefers-reduced-motion: reduce) { .pp-gold-zahl, .game-gold-value, .gold-gain-number { animation: none; } }
+/* Gold-Zahlen sind Anzeige, kein Text zum Kopieren: Die Auswahlfläche saß wegen der durchsichtigen Füllung (Hintergrund-Ausschnitt in Schrift) und der Konturfilter nur als schmaler Streifen
+   über der Zahl und wirkte kaputt. Ohne Auswahl bleibt die Zahl beim Markieren ihrer Umgebung unverändert (Al, 24.10.). */
+.pp-gold-zahl, .game-gold-value, .gold-gain-number, .gold-loss-number { -webkit-user-select: none; user-select: none; }
 
 /* ── Puzzle-Editor: Gold-Feld über die volle Breite, ohne Goldsack; Debuff-Knopf höher ── */
 .pz-hand-extras { width: 128px; gap: 8px; padding: 6px 7px; }
