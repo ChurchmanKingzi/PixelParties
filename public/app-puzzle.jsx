@@ -452,7 +452,7 @@ function CounterBadges({ source, defs }) {
           title={`${d.label}: ${source[d.key]}`}
           style={{ position: 'static' }}>
           <span className="head-counter-icon">{d.icon}</span>
-          {!d.boolean && <span className="head-counter-num">{d.stufe ? 'Lv' : '×'}{source[d.key]}</span>}
+          {!d.boolean && <span className="head-counter-num">{d.stufe ? 'Lv ' : '×'}{source[d.key]}</span>}
         </div>
       ))}
       {/* v708 (Puppets): Luck/Preserve nebeneinander in EINER Zeile. */}

@@ -53343,12 +53343,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         {/* Regeneration (Spell-Anhängsel): Stufe, als die sie läuft (60/120/180 HP je Zug) */}
                         {cards[cards.length - 1] === 'Regeneration' && cc?.regenerationLevel > 0 ? (
                       <div className="head-counter-badge"
-                        onMouseEnter={e => showGameTooltip(e, `Regeneration Lv${cc.regenerationLevel}: Heals the Hero for ${60 * cc.regenerationLevel} HP at the start of its owner's turns.`)}
+                        onMouseEnter={e => showGameTooltip(e, `Regeneration Lv ${cc.regenerationLevel}: Heals the Hero for ${60 * cc.regenerationLevel} HP at the start of its owner's turns.`)}
                         onMouseLeave={hideGameTooltip}
                         style={{ background: '#20ac37', borderColor: '#29663f', color: '#ffffff' }}
                       >
                         <span className="head-counter-icon"><PxIcon z="🌱" /></span>
-                        <span className="head-counter-num">Lv{cc.regenerationLevel}</span>
+                        <span className="head-counter-num">Lv {cc.regenerationLevel}</span>
                       </div>
                     ) : null}
                         {cc?.balance > 0 ? (
