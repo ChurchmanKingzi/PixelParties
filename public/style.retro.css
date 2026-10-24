@@ -13679,7 +13679,17 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .board-zone:is(.zone-ability-activatable, .zone-ability-free-activatable, .zone-creature-activatable, .zone-equip-activatable,
                .zone-hero-effect-active, .zone-friendship-bonus, .zone-permanent-activatable),
 .board-zone:has(> .status-badges-row), .board-zone:has(> .buff-column),
-.board-permanent-slot.zone-permanent-activatable { overflow: visible; z-index: 3; }
+.board-permanent-slot.zone-permanent-activatable { overflow: visible; z-index: auto; }
+/* Alle Zeichen und Abzeichen liegen über ALLEN Karten (Al, 24.10.): Die Zonen bilden keinen eigenen Stapelkontext mehr (`z-index: auto` statt 3 — jede Zone mit z-index 3
+   war ein Kontext, und die später gezeichnete rechte Nachbarzone deckte den Überstand der linken ab). Zeichen (::after), Status-, Buff- und Zonenabzeichen tragen dafür
+   eine hohe Ebene im gemeinsamen Kontext des Bretts und bleiben so über jeder Nachbarkarte. */
+.board-zone.zone-ability-activatable::after, .board-zone.zone-ability-free-activatable::after, .board-zone.zone-creature-activatable::after,
+.board-zone.zone-equip-activatable::after, .board-zone.zone-hero-effect-active::after, .board-zone.zone-friendship-bonus::after,
+.board-zone.zone-permanent-activatable::after, .board-permanent-slot.zone-permanent-activatable::after,
+.board-zone > .status-badges-row, .board-zone > .buff-column, .board-zone > .board-zone-badge { z-index: 40; }
+/* Der Dither-Ring lag mit z-index −1 im Kontext der Zone; ohne eigenen Kontext bliebe er sonst unter dem Hintergrund der Eltern */
+.zone-ability-activatable::before, .zone-ability-free-activatable::before, .zone-creature-activatable::before, .zone-equip-activatable::before,
+.zone-hero-effect-active::before, .zone-permanent-activatable::before { z-index: 0; }
 
 /* ═══ PIXEL-GLÜHEN der aktivierbaren Zonen (Vorschlag, Al 23.10.: „Das Glühen ist ein guter Punkt") ═══
    Statt weicher Scheine (Blur-Schatten, Alpha-Verläufe, gleitendes Pulsieren): drei harte Farbringe um die Zone, innen ein harter Rand, außen ein
