@@ -28,7 +28,8 @@ const CARD_NAME = 'Hot Skull Potato';
 const KEY = 'skullCounter';
 const GRUND = 50, JE_COUNTER = 50;
 const BLAST_MS = 1500;
-const FLUG_MS = 850;   // Dauer des Wurfs in die andere Zone (`hot_potato_throw`)
+const FLUG_MS = 850;   // Dauer des Sprungs in die andere Zone (`hot_potato_throw`)
+const MONTAGE_MS = 140;   // Vorlauf, bis der Client die Sprung-Animation eingehängt hat
 
 /** Freie Zonen bei Helden, die der GEGNER von `holder` kontrolliert. */
 function freieGegnerZonen(engine, holder) {
@@ -66,13 +67,15 @@ async function weiterreichen(engine, inst, holder, ziel) {
   const altSlot = alt?.supportZones?.[inst.heroIdx]?.[inst.zoneSlot];
   if (altSlot) { const i = altSlot.indexOf(CARD_NAME); if (i >= 0) altSlot.splice(i, 1); }
   const to = gs.players[oppIdx];
-  // Flug (Pixelart `hot_potato_throw` + Klang): die Karte verlässt die alte Zone sofort und liegt während des Flugs in keiner; erst bei der Landung steht sie in der neuen.
+  // Sprung (Pixelart `hot_potato_throw` + Klang): die KARTE selbst hüpft von der alten zur neuen Zone; währenddessen liegt sie in keiner, erst bei der Landung steht sie in der neuen.
   engine._broadcastEvent('play_zone_animation', {
     type: 'hot_potato_throw', zoneType: 'board', duration: FLUG_MS + 330,
-    targets: [{ owner: altSeite, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot }, { owner: oppIdx, heroIdx: ziel.heroIdx, zoneSlot: ziel.slotIdx }],
+    targets: [{ owner: altSeite, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot, cardName: CARD_NAME }, { owner: oppIdx, heroIdx: ziel.heroIdx, zoneSlot: ziel.slotIdx }],
   });
+  // Der Client hängt die Animation ~100 ms nach dem Ereignis ein: erst dann nimmt der Zustand die Karte aus der alten Zone, sonst fehlt sie einen Augenblick (die springende Karte IST die Karte).
+  await engine._delay(MONTAGE_MS);
   engine.sync();
-  await engine._delay(FLUG_MS);
+  await engine._delay(FLUG_MS - MONTAGE_MS);
   if (!to.supportZones[ziel.heroIdx]) to.supportZones[ziel.heroIdx] = [[], [], []];
   to.supportZones[ziel.heroIdx][ziel.slotIdx] = [CARD_NAME];
   inst.heroIdx = ziel.heroIdx;
