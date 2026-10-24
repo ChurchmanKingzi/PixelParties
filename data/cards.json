@@ -24455,7 +24455,7 @@
     "name": "Trap Sabotage",
     "cardType": "Spell",
     "subtype": "Normal",
-    "level": 1,
+    "level": 0,
     "hp": null,
     "atk": null,
     "cost": null,

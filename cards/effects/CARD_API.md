@@ -25256,11 +25256,11 @@ Text: „Choose any card from your discard pile and add it to your opponent's ha
 * Unspielbar bei leerer Ablage, Ablage-Sperre, Hand-Sperre/Erste-Runden-Schutz des Gegners, Spreading Rumor/Slow. CPU spielt sie nie von sich aus (`cpuSkipProactive`).
 * **Aufdecken beim Eintritt**: `handZugang` stempelt `revealOnEnterHand` (Crystals, Great Vanguard Demon, Grinning Cat …) auf die Hand des EMPFÄNGERS — die Karte liegt dort sofort aufgedeckt (im Puzzle mit der `permanent`-Marke in `revealedHandCards`), und Weakening Crystal negiert schon beim Eintritt. Nichts davon muss die Karte selbst tun.
 
-### Trap Sabotage (Spell, Destruction Magic Lv1)
+### Trap Sabotage (Spell, Destruction Magic Lv0)
 Text: „Choose a face-down Surprise your opponent controls and send it to the discard pile. Your opponent must send all copies of that Surprise from their hand and deck to their discard pile. If the user has at least Destruction Magic 1, this counts as an additional Action.“
 * **Ziele**: verdeckte echte Surprises (`engine._getAllSurpriseEntries`, nach Kontrolle) und verdeckte Surprise-Creatures in Bakhm-Support-Zonen; offene, festgesetzte und Cardinal-Beast-Karten nicht. Verdeckte Nicht-Surprises (Create Secret Room) werden dem Wirker einmal gezeigt (`deckSearchReveal`), bleiben verdeckt und sind kein Ziel. Namen verdeckter Ziele sieht der Wähler nicht.
 * **Ablegen**: Surprise Zone `actionDestroyCard`, Bakhm-Slot `sendBoardCardToDiscard`; Besitzer der Ablage = ursprünglicher Besitzer. **Kopien**: gleicher BASISNAME aus Hand (`actionDiscardHandCard`, ein Fenster „Hand-Interaktion / discard“, Boris darf verzichten) und Deck (`takeFromPile`, eine gesammelte Animation). Der Satz hängt nicht am Erfolg des Ablegens.
-* `inherentAction` als Funktion (`effectiveSchoolLevelForCaster` ≥ 1). Bild `trap_burn` (Pixelart: Feuerball, Flammen, Verkohlen von unten nach oben, Asche; `ANIM_REGISTRY` in `app-board.jsx`, Klänge in `ZONE_ANIM_SFX`). CPU wählt zufällig.
+* `inherentAction` als Funktion (`effectiveSchoolLevelForCaster` ≥ 1): die Karte ist Stufe 0, ein Held ohne Destruction Magic kann sie wirken, bekommt aber keine Zusatzaktion. Bild `trap_burn` (Pixelart: Feuerball, Flammen, Verkohlen von unten nach oben, Asche; `ANIM_REGISTRY` in `app-board.jsx`, Klänge in `ZONE_ANIM_SFX`). CPU wählt zufällig.
 
 ### Treasure Theft (Spell, Decay Magic Lv0)
 Text: „Choose an Artifact equipped to a Hero your opponent controls and equip it to the user. If the user has at least Decay Magic 1, this counts as an additional Action.“
