@@ -8790,6 +8790,8 @@ nur die Anzahl. Die passende Regel gab es schon: **`uniqueBy: 'owner'`**
 Klick auf dieselbe Seite prallt im Picker ab. `validateSelection` bleibt
 als serverseitiger Riegel bestehen.
 
+**Gegenstück `sameBy` (23.10., Voodoo Curse):** `sameBy: '<Feld>'` — alle gewählten Ziele müssen im Feld übereinstimmen („2 targets controlled by the same player“: Ziele tragen `kontrolleur`). Der Picker graut nach dem ersten Klick alle Ziele mit anderem Wert aus (`blockedTargetIds`, `togglePotionTarget` in `app-board.jsx`); serverseitig prüft `_zielObergrenzenVerstoss` (`same_by`) — damit gilt die Regel auch für `korrigiereZielAuswahl` (Abbruch/Auffüllen), die CPU-Standardauswahl und `doConfirmPotion`. Neue Picker-Regeln stehen immer an beiden Orten und in der Konfig-Weißliste von `promptEffectTarget`.
+
 
 ## Zonensperre gehört auch in die Spielbarkeitsliste (v926, Als Befund 12.9.)
 
@@ -25243,7 +25245,7 @@ Ausführliche Rulings stehen jeweils im Kopf des Skripts (`cards/effects/<slug>.
 ### The Master's Orders (Spell, Attachment, Decay Magic Lv1)
 Text: „Attach this card to a Hero your opponent controls. While this card is attached to a Hero, your opponent may perform Actions with it as if they controlled it, but they cannot make it choose itself as a target for an Attack or Spell. This is treated as a negative status effect.“
 * **„Your opponent“ = der ANHÄNGER** (Spieler, der die Karte gespielt hat, `inst.originalOwner`), also der Gegner des Kontrolleurs des Helden. Der Besitzer des Helden behält ihn für seine eigenen Züge.
-* **Status**: echter Status `ordered` („Under Orders“, negativ, heilbar; Registry `_hooks.js`, Abzeichen in `app-shared.jsx`). Cure/Beer/Juice … → `onStatusRemoved` (`_viaCleanse`) wirft ALLE Kopien am Helden in die Ablage ihres Besitzers. Ohne Status passiert nichts (immun, geheilt).
+* **Status**: echter Status `ordered` („Under Orders“, negativ, heilbar; Registry `_hooks.js`, Abzeichen in `app-shared.jsx`). Die Tooltips nennen den Spieler beim Namen: „<Anhänger> may perform Actions with this Hero …“ (`ordered.appliedBy`) und bei der Übernahme „Controlled by <Kontrolleur> (The Master's Orders) …“ (`charmed.controller`) — Namen aus `window._ppPlayerNames`, das das Brett bereitstellt (gilt für ALLE Charmed-Tooltips, nicht nur Orders). Cure/Beer/Juice … → `onStatusRemoved` (`_viaCleanse`) wirft ALLE Kopien am Helden in die Ablage ihres Besitzers. Ohne Status passiert nichts (immun, geheilt).
 * **Kontrolle**: in jedem Zug des Anhängers (`onTurnStart`, bei Anlegen im eigenen Zug sofort) übernimmt er den Helden zeitweise (`_charm-shared.temporaereKontrolle`, Marken `charmedBy`/`charmedFromOwner`/`charmedHeroIdx`, Status `charmed` mit `ohneSchutz` und `quelle`), Rechte „beschwören + ausrüsten“. Die Rückgabe ist generisch (`startTurn`). Während der Übernahme zählt der Held überall als Held des Anhängers (`heroSideOf`): „you control“ trifft ihn, „all targets your opponent controls“ nicht.
 * **Selbstwahl-Sperre** über `blocksTargetingAnywhere(gs, engine, info, inst)` (Alliance-Muster): der übernommene Held kann sich mit Attack/Spell nicht selbst wählen (auch kein Support-Spell); Abilities, Heldeneffekte und Creature-Effekte sind nicht erfasst.
 * Unspielbar im Erste-Runden-Schutz des Wirts (`blockedByFirstTurnProtection`). CPU: stärkster Gegnerheld (HP + 3·ATK).
@@ -25252,12 +25254,13 @@ Text: „Attach this card to a Hero your opponent controls. While this card is a
 Text: „Choose any card from your discard pile and add it to your opponent's hand. This counts as an additional Action.“
 * `inherentAction: true`. Galerie der eigenen Ablage (abbrechbar), dann Fenster „Hand-Interaktion / insert“ (Ambush the Scout), `takeFromPile` (Stapelsperren), Flug `play_pile_transfer` Ablage → Gegnerhand, `handZugang(oi, name, { originalOwner: pi })` — die Karte bleibt Eigentum des Wirkers.
 * Unspielbar bei leerer Ablage, Ablage-Sperre, Hand-Sperre/Erste-Runden-Schutz des Gegners, Spreading Rumor/Slow. CPU spielt sie nie von sich aus (`cpuSkipProactive`).
+* **Aufdecken beim Eintritt**: `handZugang` stempelt `revealOnEnterHand` (Crystals, Great Vanguard Demon, Grinning Cat …) auf die Hand des EMPFÄNGERS — die Karte liegt dort sofort aufgedeckt (im Puzzle mit der `permanent`-Marke in `revealedHandCards`), und Weakening Crystal negiert schon beim Eintritt. Nichts davon muss die Karte selbst tun.
 
-### Trap Sabotage (Spell, Destruction Magic Lv1)
+### Trap Sabotage (Spell, Destruction Magic Lv0)
 Text: „Choose a face-down Surprise your opponent controls and send it to the discard pile. Your opponent must send all copies of that Surprise from their hand and deck to their discard pile. If the user has at least Destruction Magic 1, this counts as an additional Action.“
 * **Ziele**: verdeckte echte Surprises (`engine._getAllSurpriseEntries`, nach Kontrolle) und verdeckte Surprise-Creatures in Bakhm-Support-Zonen; offene, festgesetzte und Cardinal-Beast-Karten nicht. Verdeckte Nicht-Surprises (Create Secret Room) werden dem Wirker einmal gezeigt (`deckSearchReveal`), bleiben verdeckt und sind kein Ziel. Namen verdeckter Ziele sieht der Wähler nicht.
 * **Ablegen**: Surprise Zone `actionDestroyCard`, Bakhm-Slot `sendBoardCardToDiscard`; Besitzer der Ablage = ursprünglicher Besitzer. **Kopien**: gleicher BASISNAME aus Hand (`actionDiscardHandCard`, ein Fenster „Hand-Interaktion / discard“, Boris darf verzichten) und Deck (`takeFromPile`, eine gesammelte Animation). Der Satz hängt nicht am Erfolg des Ablegens.
-* `inherentAction` als Funktion (`effectiveSchoolLevelForCaster` ≥ 1). Bild `trap_burn` (Pixelart: Feuerball, Flammen, Verkohlen von unten nach oben, Asche; `ANIM_REGISTRY` in `app-board.jsx`, Klänge in `ZONE_ANIM_SFX`). CPU wählt zufällig.
+* `inherentAction` als Funktion (`effectiveSchoolLevelForCaster` ≥ 1): die Karte ist Stufe 0, ein Held ohne Destruction Magic kann sie wirken, bekommt aber keine Zusatzaktion. Bild `trap_burn` (Pixelart: Feuerball, Flammen, Verkohlen von unten nach oben, Asche; `ANIM_REGISTRY` in `app-board.jsx`, Klänge in `ZONE_ANIM_SFX`). CPU wählt zufällig.
 
 ### Treasure Theft (Spell, Decay Magic Lv0)
 Text: „Choose an Artifact equipped to a Hero your opponent controls and equip it to the user. If the user has at least Decay Magic 1, this counts as an additional Action.“
@@ -25267,7 +25270,7 @@ Text: „Choose an Artifact equipped to a Hero your opponent controls and equip 
 
 ### Voodoo Curse (Spell, Decay Magic Lv2, Secret Rare)
 Text: „Choose 2 targets that are controlled by the same player and swap their current and max HP, including all bonuses from Attachments, equipped Artifacts and Abilities. Then, if both targets have an Attack stat, swap those as well.“
-* **Ziele**: lebende Helden und aufgedeckte Kreaturen, nach Kontrolle; beide vom SELBEN Spieler. Zwei abbrechbare Schritte, Rest ausgegraut.
+* **Ziele**: lebende Helden und aufgedeckte Kreaturen, nach Kontrolle; beide vom SELBEN Spieler. EIN abbrechbarer Picker für beide Ziele (`maxTotal: 2`, `minRequired: 2`, `sameBy: 'kontrolleur'` — nach dem ersten Klick sind alle Ziele des anderen Spielers ausgegraut), Rest ausgegraut. Die CPU antwortet mit beiden Ids auf einmal.
 * **Tausch** PAARWEISE (A bekommt max UND aktuelle HP von B und umgekehrt), als Gesamtsumme inkl. Boni; die Boni bleiben bei ihren Karten (spätere Toughness-Verluste ziehen vom getauschten Wert ab, max HP nie unter 1). ATK nur, wenn beide einen Attack stat haben (heute nur Helden), über `_applyHeroAtkDelta`.
 * **Schutz**: Helden `heroNonDamageEffectBlocked(…, 'max_hp')`, Kreaturen `isOmniImmune`; ist EIN Ziel geschützt, verpufft der ganze Tausch.
 * Bild `voodoo_swap` (Pixelart: Nadeln, Faden, zwei Kugeln kreuzen sich; Werte wandern bei `TAUSCH_MS`). CPU tauscht nur Gegnerpaare, bei denen der stärkere Angreifer die niedrigeren HP bekommt.

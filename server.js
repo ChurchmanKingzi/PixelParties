@@ -4814,6 +4814,10 @@ function sendGameState(room, playerIdx, extra) {
       actionBlockedHeroes: room.engine
         ? (ps.heroes || []).map((h, hi) => !!(h?.name && h.hp > 0 && !room.engine.canHeroPerformAction(pi, hi, { ohneStatus: true })))   // W13 (Q137): Abzeichen nur für Plant Golem & Co., nicht für Frost/Betäubung
         : [],
+      // 24.10.: Helden, die dank einer Karte „unaffected by all Spells" sind (Black-Thorn Dragon, Skript-Flag `heroUnaffectedBySpells`) — abgeleitet, nie gespeichert; der Client zeigt ein Abzeichen.
+      spellImmuneHeroes: room.engine
+        ? (ps.heroes || []).map((h, hi) => !!(h?.name && room.engine.heroHasSpellImmunity(pi, hi)))
+        : [],
       // Als Vorgabe 29.9.: eine verdeckte Surprise sieht ihr KARTENBESITZER
       // (`originalOwner`) — auch auf der Gegenseite (gesetzt am geliehenen
       // Helden, Trapping); die Brettseite sieht fremde verdeckte Karten nicht.
@@ -5619,7 +5623,9 @@ function sendGameState(room, playerIdx, extra) {
         // genauso verstummt aussieht wie bei einem echten Negated-Status.
         const _auraInfo = (!isFaceDown && !inst.counters?.negated) ? room.engine.creatureAuraInfo(inst) : null;
         const _auraNegiert = !!_auraInfo;
-        if (hasCounters || hasSummoningSickness || isFaceDown || isStolen || _teiltHp || _zoneAura || _auraNegiert) {
+        // 24.10.: „unaffected by all Spells" (Black-Thorn Dragon, Skript-Flag `unaffectedBySpells`) — abgeleitet; ruht bei Negierung/Frost/Betäubung (wie die Sperren der Engine).
+        const _spellImmun = !isFaceDown && !!loadCardEffect(inst.counters?._effectOverride || inst.name)?.unaffectedBySpells && !room.engine.isCardPassiveDormant(inst);
+        if (hasCounters || hasSummoningSickness || isFaceDown || isStolen || _teiltHp || _zoneAura || _auraNegiert || _spellImmun) {
           cc[key] = { ...inst.counters };
           if (_auraNegiert) {
             cc[key].negated = 1;
@@ -5628,6 +5634,7 @@ function sendGameState(room, playerIdx, extra) {
           }
           if (_zoneAura) cc[key]._zoneAura = _zoneAura;
           if (_teiltHp) cc[key]._sharesHpWithHero = true;
+          if (_spellImmun) cc[key]._spellImmune = true;
           if (hasSummoningSickness) cc[key].summoningSickness = true;
           if (isFaceDown) cc[key].faceDown = true;
           if (isStolen) cc[key]._stolenBy = inst.stolenBy;
@@ -6098,6 +6105,7 @@ function sendSpectatorGameState(room) {
       heroes: ps.heroes, abilityZones: ps.abilityZones,
       // v1349: verwahrte/versiegelte Zonen (Madame Guillotine) — rotes Kreuz, Anlegen gesperrt.
       verwahrteZonen: require('./cards/effects/_ability-verwahrung-shared').zonenFuerAnzeige(gs, spi),
+      spellImmuneHeroes: room.engine ? (ps.heroes || []).map((h, hi) => !!(h?.name && room.engine.heroHasSpellImmunity(spi, hi))) : [],   // 24.10.: s. oben
       surpriseZones: ps.surpriseZones.map((sz, hi) => (sz || []).map(cn => {
         const inst = room.engine?.cardInstances.find(c => c.owner === spi && c.zone === 'surprise' && c.heroIdx === hi && c.name === cn);
         if (inst && !inst.faceDown) return cn;
@@ -6361,7 +6369,9 @@ function sendSpectatorGameState(room) {
         // genauso verstummt aussieht wie bei einem echten Negated-Status.
         const _auraInfo = (!isFaceDown && !inst.counters?.negated) ? room.engine.creatureAuraInfo(inst) : null;
         const _auraNegiert = !!_auraInfo;
-        if (hasCounters || hasSummoningSickness || isFaceDown || isStolen || _teiltHp || _zoneAura || _auraNegiert) {
+        // 24.10.: „unaffected by all Spells" (Black-Thorn Dragon, Skript-Flag `unaffectedBySpells`) — abgeleitet; ruht bei Negierung/Frost/Betäubung (wie die Sperren der Engine).
+        const _spellImmun = !isFaceDown && !!loadCardEffect(inst.counters?._effectOverride || inst.name)?.unaffectedBySpells && !room.engine.isCardPassiveDormant(inst);
+        if (hasCounters || hasSummoningSickness || isFaceDown || isStolen || _teiltHp || _zoneAura || _auraNegiert || _spellImmun) {
           cc[key] = { ...inst.counters };
           if (_auraNegiert) {
             cc[key].negated = 1;
@@ -6370,6 +6380,7 @@ function sendSpectatorGameState(room) {
           }
           if (_zoneAura) cc[key]._zoneAura = _zoneAura;
           if (_teiltHp) cc[key]._sharesHpWithHero = true;
+          if (_spellImmun) cc[key]._spellImmune = true;
           if (hasSummoningSickness) cc[key].summoningSickness = true;
           if (isFaceDown) cc[key].faceDown = true;
           if (isStolen) cc[key]._stolenBy = inst.stolenBy;

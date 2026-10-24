@@ -12,6 +12,9 @@
 //  3. Die Karte verlässt die Ablage (`takeFromPile`: Stapel-Ausgangssperre, Stab-Sperre mit Freikauf), fliegt in die Hand des Gegners (`play_pile_transfer` Ablage → Hand über die
 //     Brettmitte) und Transmission selbst fliegt zeitgleich in die Ablage (`aufloesenderSpellInDieAblage`, wie Shooting Star).
 //
+//  4. Aufdecken beim Eintritt: die Karte kommt über `handZugang` auf die Hand des Gegners — Karten mit `revealOnEnterHand` (Crystals, Great Vanguard Demon …) liegen dort sofort aufgedeckt, ihre
+//     Handwirkung gilt für den EMPFÄNGER (Weakening Crystal negiert schon beim Eintritt). Die Karte muss dafür nichts tun.
+//
 //  ── ZUSATZAKTION ────────────────────────────────────────────────────────
 //  „This counts as an additional Action" — OHNE Bedingung → `inherentAction: true`: in der Main Phase spielbar, ohne eine Aktion zu kosten.
 //

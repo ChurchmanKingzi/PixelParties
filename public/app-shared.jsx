@@ -941,6 +941,12 @@ const PP_PX_ABZEICHEN_SPRITES = {
     '################', '..++########++..', '....+######+....', '.....+####+.....',
     '......####......', '......+##+......', '.......##.......', '.......##.......',
   ] },
+  drachenkopf: { pal: { K: '#08060c', N: '#282834', H: '#3e3e51', G: '#59606e', S: '#d2d2db', R: '#f03232', D: '#8b0d0d', W: '#ffffff' }, z: [
+    '..........K..K..', '.........KSK.KSK', '........KSK..KSK', '.....KKKKSKKKKK.',
+    '...KKHHHNNKKNNK.', '..KHHGHNNNNNNNNK', '.KHHNNNNNNNNNNNK', 'KHNNKRRKNNNNNNNK',
+    'KNNNKRWKNNNNNNK.', 'KNNNNNNNNNNNNK..', 'KNKNNNNNNNNNNK..', 'KSKSKNNNNNNNK...',
+    'KDSDSKNNNNNNK...', '.KKKKKKKKNNK....', '...........KK...', '................',
+  ] },
 };
 
 // Emoji → Abzeichen-Sprite. Vorrang vor PP_PX_ZEICHEN (PxIcon).
@@ -958,6 +964,8 @@ const PP_PX_ICONS = {
   '☢': 'ab_radioaktiv', '📘': 'ab_buch', '⛔': 'ab_halt', '🍀': 'ab_klee', '🥷': 'ab_ninja', '🤝': 'ab_haende',
   '🎹': 'ab_klavier', '🪑': 'ab_stuhl', '🧟': 'ab_zombie', '☥': 'ab_ankh', '🦷': 'ab_zahn', '🧬': 'ab_dna',
   '🪙': 'ab_muenze', '🌌': 'ab_galaxie', '✦': 'ab_funke',
+  // Eigenes Zeichen (Privatbereich, keine Unicode-Entsprechung): schwarzer Drachenkopf (Black-Thorn Dragon, Zauber-Immunität). Dasselbe Raster steht in scripts/pixel-emoji/handarbeit.json.
+  '\uE900': 'ab_drachenkopf',
 };
 for (const [n, s] of Object.entries(PP_PX_ABZEICHEN_SPRITES)) PP_PX_SPRITES['ab_' + n] = s;
 // Die Animationen (Pixelierer, PxZeichen) bekommen die neuen Zeichen mit,
@@ -7714,6 +7722,11 @@ window.poisonTooltipText = poisonTooltipText;
 
 function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isOpponentSide }) {
   const badges = [];
+  // Spielername zu einem Sitz-Index (das Brett stellt `window._ppPlayerNames` bereit); `null`, wenn unbekannt.
+  const spielerName = (idx) => {
+    const namen = (typeof window !== 'undefined') ? window._ppPlayerNames : null;
+    return (typeof idx === 'number' && namen && namen[idx]) || null;
+  };
   const s = statuses || {};
   const c = counters || {};
   // Buffs live on the hero/creature separately from statuses/counters. For
@@ -7958,9 +7971,10 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
     });
   }
   if (s.ordered) {
+    const anhaenger = spielerName(typeof s.ordered === 'object' ? s.ordered.appliedBy : null) || 'The opponent';   // wer „The Master's Orders“ gespielt hat
     badges.push({
       key: 'ordered', icon: '📜',
-      tooltip: "Under Orders (The Master's Orders): Your opponent may perform Actions with this Hero as if they controlled it, but they cannot make it choose itself as a target for an Attack or Spell.",
+      tooltip: `Under Orders (The Master's Orders): ${anhaenger} may perform Actions with this Hero as if they controlled it, but they cannot make it choose itself as a target for an Attack or Spell.`,
     });
   }
   if (s.cursed) {
@@ -8129,13 +8143,14 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
   // 28.9.) — der Tooltip nennt deshalb die jeweilige Auspraegung.
   if (s.charmed) {
     const ch = typeof s.charmed === 'object' ? s.charmed : {};
+    const ktrl = spielerName(ch.controller) || 'the opponent';   // der KONTROLLEUR beim Namen, nicht „its owner's opponent“
     const tip = ch.ohneSchutz
-      ? `Controlled by its owner's opponent${ch.quelle ? ` (${ch.quelle})` : ''} until it is defeated or the turn ends.`
+      ? `Controlled by ${ktrl}${ch.quelle ? ` (${ch.quelle})` : ''} until it is defeated or the turn ends.`
       : ch.onlyFromController
-        ? 'Charmed: Under opponent control for the rest of the turn. Unaffected by the controlling player\'s other cards and effects.'
+        ? `Charmed: Controlled by ${ktrl} for the rest of the turn. Unaffected by ${ktrl}'s other cards and effects.`
         : ch._loveShot
-          ? 'Charmed: Under opponent control for the rest of the turn. Immune to negative status effects, but takes damage normally.'
-          : 'Charmed: Under opponent control and immune to all effects.';
+          ? `Charmed: Controlled by ${ktrl} for the rest of the turn. Immune to negative status effects, but takes damage normally.`
+          : `Charmed: Controlled by ${ktrl} and immune to all effects.`;
     badges.push({ key: 'charmed', icon: '💘', tooltip: tip });
   }
   if (s.sirenLinked || c.sirenLinked) {
@@ -8176,6 +8191,8 @@ function BuffColumn({ buffs, cardName, statuses }) {
   // v1364: Butterfly Clouds Schutz — ein Buff, keine Status.
   // Truthy statt `=== true`: der Puzzle-Start normalisiert `true` zu
   // `{ appliedTurn: 0 }` (Als Befund v1365: Badge fehlte zu Puzzle-Beginn).
+  // 24.10.: „unaffected by all Spells" (Black-Thorn Dragon: Kreatur UND zugehöriger Held) — vom Server abgeleitet (`_spellImmune`), kein Zähler/Status
+  if (st._spellImmune) statusBuffs.push(['spell_immune', { icon: '\uE900', tooltip: 'Unaffected by all Spells: Spells have no effect on this target — damage, healing, status effects, buffs and more. It can still be targeted, and Attacks and Creature effects work normally.' }]);
   if (st.untargetable) statusBuffs.push(['untargetable', { icon: '🦋', tooltip: 'Untargetable: Your opponent can\'t choose this Hero with Attacks, Spells or Creature effects while you control other Heroes that can be chosen. Wears off at the start of its owner\'s turn.' }]);
   if ((!buffs || Object.keys(buffs).length === 0) && statusBuffs.length === 0) return null;
   buffs = buffs || {};

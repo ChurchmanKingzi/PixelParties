@@ -32341,6 +32341,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     window._ppTurn = gameState?.turn ?? null;
     window._ppMyIdx = myIdx;
   }, [gameState?.turn, myIdx]);
+  // Spielernamen je Sitz fuer die Status-Tooltips („Controlled by Alice“, „Alice may perform Actions …“) — `StatusBadges` liegt in app-shared und kennt den Spielzustand nicht.
+  const spielerNamenKey = (gameState?.players || []).map(p => (p && p.username) || '').join('\u0001');
+  React.useEffect(() => {
+    window._ppPlayerNames = spielerNamenKey ? spielerNamenKey.split('\u0001') : [];
+  }, [spielerNamenKey]);
 
   // ★ v1206: EINSCHLAG BEIM PLATZIEREN (Als Vorgabe 18.9.).
   // Vergleicht die Belegung aller Zonen mit der vorigen und laesst auf
@@ -48809,6 +48814,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         for (const t of selectable) if (belegt.has(t[cfg.uniqueBy])) blocked.add(t.id);
       }
     }
+    // `sameBy`: sobald ein Ziel gewählt ist, bleiben nur noch Ziele mit demselben Wert im Feld wählbar (Voodoo Curse: derselbe Kontrolleur).
+    if (cfg.sameBy) {
+      const werte = new Set(all.filter(t => sel.has(t.id)).map(t => t[cfg.sameBy]));
+      if (werte.size > 0) {
+        for (const t of selectable) if (!werte.has(t[cfg.sameBy])) blocked.add(t.id);
+      }
+    }
     if (cfg.maxBudget != null) {
       const verbraucht = all.filter(t => sel.has(t.id))
         .reduce((n, t) => n + (t.budgetCost ?? 0), 0);
@@ -48878,6 +48890,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           return t2 && t2[config.uniqueBy] === wert;
         });
         if (schonDa) return prev;                 // Klick prallt ab
+      }
+      // `sameBy`: ein Ziel mit anderem Wert im Feld wird nicht dazugenommen (der Picker graut es ohnehin aus).
+      if (config.sameBy && prev.length > 0) {
+        const wert = target[config.sameBy];
+        if (prev.some(id => { const t2 = pt.validTargets.find(t => t.id === id); return t2 && t2[config.sameBy] !== wert; })) return prev;
       }
       // `maxBudget` + `budgetCost` je Ziel: Summenregel (Grimoire:
       // „whose combined levels do not exceed 4").
@@ -50852,7 +50869,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     <PxIcon z="🚫" />
                   </div>
                 )}
-                {hero?.name && <BuffColumn buffs={hero.buffs} statuses={hero.statuses} cardName={hero.name} />}
+                {hero?.name && <BuffColumn buffs={hero.buffs} statuses={p.spellImmuneHeroes?.[i] ? { ...(hero.statuses || {}), _spellImmune: true } : hero.statuses} cardName={hero.name} />}
                 {/* ── Deepsea Counter badge (Siphem) ── */}
                 {/* ★ v1472: hier und an den Nachbar-Abzeichen stand
                     `cursor: 'help'` — der native Pfeil mit Fragezeichen
