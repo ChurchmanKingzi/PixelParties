@@ -8494,7 +8494,8 @@ const SOG_FLUG_MS = 820;
 //      malen(g, t, sz, teile) → zeichnet das Bild zur Zeit `t` (ms seit Einhaengen)
 //      `g`  Pinsel: put(x, y, farbe, deckung?)  block(x, y, w, h, farbe, deckung?)  ring(cx, cy, rx, ry, farbe, deckung?)
 //           disc(cx, cy, r, farbe, deckung?)   — alles in RASTERkoordinaten, Deckung < 1 = Bayer-gedithert
-//      `sz` { gw, gh, O: {x, y}, ziele: [{ x, y, w, h, len, selbst, dx, dy }], region: {x0, y0, w, h} | null, runde }   (`runde`: Zaehler des Ereignisses, Standard 1 — Duel)
+//      `sz` { gw, gh, O: {x, y}, ziele: [{ x, y, w, h, len, selbst, dx, dy }], region: {x0, y0, w, h} | null, runde, wucht }   (`runde`: Zaehler des Ereignisses, Standard 1 — Duel;
+//           `wucht`: Staerke des Ereignisses 1..3, Standard 1 — Zira Racer: waechst mit Level und Schaden)
 //           `region` = die optionale Flaeche (`regionBox`, z. B. eine ganze Brettseite), sonst `null`
 //           dx/dy = Einheitsrichtung Quelle → Ziel; `selbst` = die Quelle IST das Ziel (z. B. Assault Eagle waehlt sich selbst)
 //  Alle Ziele laufen im selben Takt — „gleichzeitig" ist Sache der Zeichenfunktion (gleiche Zeit, nicht gleiche Geschwindigkeit).
@@ -8507,7 +8508,7 @@ function ppSalve(malen, ende, vorbereiten, opts) {
   // von oben fallender Schild), wurde sonst an der Canvaskante abgeschnitten.
   // `opts.z` (12.10., Duel): Ebene des Canvas (Standard 10110, unter den Rammkarten auf 10120) — der Aufprall zweier Heldenkarten muss UEBER ihnen liegen.
   const S = 3, PAD = 60 + ((opts && opts.extra) || 0), TAKT = 33;
-  return function PixelSalveEffekt({ ox, oy, targetPoints, welt, regionBox, runde }) {
+  return function PixelSalveEffekt({ ox, oy, targetPoints, welt, regionBox, runde, wucht }) {
     const cvs = useRef(null);
     const sz = useMemo(() => {
       if (typeof ox !== 'number' || typeof oy !== 'number' || !Array.isArray(targetPoints) || targetPoints.length === 0) return null;
@@ -8532,7 +8533,7 @@ function ppSalve(malen, ende, vorbereiten, opts) {
         return { x: q.x, y: q.y, w: p.w / S, h: p.h / S, len, selbst: len < 6,
           dx: len > 0.01 ? (q.x - o.x) / len : 0, dy: len > 0.01 ? (q.y - o.y) / len : -1 };
       });
-      return { links, oben, gw, gh, O: o, ziele, region, runde: runde || 1 };
+      return { links, oben, gw, gh, O: o, ziele, region, runde: runde || 1, wucht: Math.max(1, Math.min(3, Number(wucht) || 1)) };
     }, []);
     const teile = useMemo(() => (sz && vorbereiten ? vorbereiten(sz) : null), [sz]);
     useEffect(() => {
@@ -28882,67 +28883,147 @@ const ANIM_REGISTRY = {
     });
   })(),
   // ═════════════════════════════════════════════════════════════════
-  //  Zira Racer (24.10.) — PIXELART, Blitz von Zira Racer zum Ziel (`ppProjektil`)
+  //  Zira Racer (24.10.) — PIXELART, der AUFPRALL, wenn Zira Racer sein Ziel rammt (Brett-Animation am Ziel, `wucht` 1..3 = Level der abgeworfenen Karte = Schaden 70/140/210)
   //
-  //  Ein gelb-oranger Pfeil rast geradlinig mit langem Schweif und waagerechten Windstreifen auf das Ziel und schlägt mit einem Sternring ein (acht Strahlen, Funken).
+  //  Die Karte selbst fährt als DOM-Ramm-Karte (`play_ram_animation`, Aufprall bei 12 % der Dauer); dieser Canvas beginnt im Moment der Berührung (t = 0) und malt, was die Karte
+  //  nicht kann. Die Wucht wächst in Stufen:
+  //    Lv1  Blitz, ein Stossring, acht Strahlen, wenige Splitter.
+  //    Lv2  mehr Strahlen, zwei Stossringe, Kreuzblitz, Staubwolke, mehr Splitter, die Zielkarte blitzt auf.
+  //    Lv3  zusätzlich Risse im Boden, drei Stossringe, grösserer Kreuzblitz, viele (auch grosse) Splitter, dichter Staub. (Bildschirmwackeln: `play_screen_shake`.)
   // ═════════════════════════════════════════════════════════════════
-  zira_dash: (() => {
+  zira_impact: (() => {
     const GOLD = ['#ffffff', '#f7f7ad', '#fad54a', '#f29a3e', '#aa5300'].map(ppHex);
-    return ppProjektil({
-      ende: 760, abflug: 100, einschlag: 460, fadeAb: 620, linear: true, schweif: GOLD, schweifLaenge: 10, schweifSchritt: 0.03, funkenFarben: [GOLD[1], GOLD[2], GOLD[3]], funken: 14,
-      kopf: (g, x, y, c) => {
-        const nx = -c.dy, ny = c.dx;
-        // Windstreifen hinter dem Kopf
-        for (const off of [-6, -3, 3, 6]) for (let d = 5; d < 20; d++) {
-          if (ppBayer(d + off * 3, Math.abs(off)) < 0.55 * (1 - d / 22)) g.put(x - c.dx * d + nx * off, y - c.dy * d + ny * off, GOLD[2], c.aus);
+    const STAUB = ['#e6e6e6', '#b9b9b9', '#929292', '#686868'].map(ppHex);
+    const RISS = ['#08060c', '#282834', '#aa5300'].map(ppHex);
+    const ENDE = 900, FADE = 240;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = (sz) => {
+      const w = sz.wucht;
+      return {
+        w,
+        splitter: Array.from({ length: ppFxN(6 + 9 * w) }, () => ({
+          a: Math.random() * Math.PI * 2, v: 34 + Math.random() * 46 + 14 * w, leben: 360 + Math.random() * 320,
+          farbe: [GOLD[2], GOLD[3], GOLD[4], STAUB[2], GOLD[1]][Math.floor(Math.random() * 5)], gross: w >= 3 && Math.random() < 0.35,
+        })),
+        strahlen: Array.from({ length: 4 + 4 * w }, (_, i) => ({
+          a: (i / (4 + 4 * w)) * Math.PI * 2 + (Math.random() - 0.5) * 0.22, l: (5 + 3.5 * w) * (0.7 + Math.random() * 0.6),
+        })),
+        staub: w < 2 ? [] : Array.from({ length: ppFxN(3 + 3 * w) }, (_, i) => ({
+          a: (i / ppFxN(3 + 3 * w)) * Math.PI * 2 + Math.random() * 0.6, d: 5 + Math.random() * (4 + 3 * w), r: 2 + Math.random() * (1.5 + w), start: Math.random() * 90,
+        })),
+        risse: w < 3 ? [] : Array.from({ length: 7 }, (_, i) => ({
+          a: (i / 7) * Math.PI * 2 + (Math.random() - 0.5) * 0.5, l: 10 + Math.random() * 12, zack: Array.from({ length: 10 }, () => (Math.random() - 0.5) * 2.2),
+        })),
+      };
+    };
+    const malen = (g, t, sz, teile) => {
+      const aus = t > ENDE - FADE ? Math.max(0, 1 - (t - (ENDE - FADE)) / FADE) : 1;
+      if (aus <= 0) return;
+      const w = teile.w;
+      sz.ziele.forEach((z) => {
+        const tx = z.x, ty = z.y;
+        // ── Die Zielkarte blitzt im Aufprall auf (hartes Dither-Raster, keine Überblendung) ──
+        if (w >= 2 && t < 130) g.block(tx - z.w / 2, ty - z.h / 2, Math.ceil(z.w), Math.ceil(z.h), GOLD[0], (0.22 + 0.13 * w) * (1 - t / 130) * aus);
+        // ── Blitz im Berührungspunkt ──
+        if (t < 110) g.disc(tx, ty, (3 + 3 * w) * (1 - t / 140), GOLD[0], aus * (1 - t / 110));
+        // ── Strahlen ──
+        if (t < 340) {
+          const f = 1 - t / 340, vor = klemme(t / 110, 0.15, 1);
+          for (const s of teile.strahlen) {
+            const l = s.l * vor;
+            for (let d = 2; d < l; d++) g.put(tx + Math.cos(s.a) * d, ty + Math.sin(s.a) * d, d < l * 0.45 ? GOLD[0] : d < l * 0.8 ? GOLD[2] : GOLD[3], f * aus);
+          }
         }
-        // Pfeilspitze: weisser Kern, gelbe Flügel
-        g.block(x - 1, y - 1, 3, 3, GOLD[0], c.aus);
-        g.put(x + c.dx * 3, y + c.dy * 3, GOLD[1], c.aus);
-        g.put(x - c.dx * 2 + nx * 2, y - c.dy * 2 + ny * 2, GOLD[1], c.aus);
-        g.put(x - c.dx * 2 - nx * 2, y - c.dy * 2 - ny * 2, GOLD[1], c.aus);
-      },
-      treffer: (g, tx, ty, c) => {
-        if (c.al < 220) {
-          const f = 1 - c.al / 220, r = 3 + c.al / 7;
-          g.ring(tx, ty, r, r, GOLD[1], f * c.aus);
-          g.ring(tx, ty, r * 0.6, r * 0.6, GOLD[0], f * c.aus);
-          for (let i = 0; i < 8; i++) { const w = (i / 8) * Math.PI * 2 + Math.PI / 8, l = 4 + c.al / 9; for (let d = 2; d < l; d++) g.put(tx + Math.cos(w) * d, ty + Math.sin(w) * d, d < l * 0.6 ? GOLD[0] : GOLD[2], f * c.aus); }
+        // ── Kreuzblitz (ab Lv2) ──
+        if (w >= 2 && t < 300) {
+          const f = 1 - t / 300, l = (4 + 5 * w) * klemme(t / 90, 0.2, 1);
+          for (let k = 0; k <= l; k++) {
+            const c = k < l * 0.4 ? GOLD[0] : GOLD[1];
+            g.put(tx + k, ty, c, f * aus); g.put(tx - k, ty, c, f * aus); g.put(tx, ty + k, c, f * aus); g.put(tx, ty - k, c, f * aus);
+            if (w >= 3) { g.put(tx + k, ty + 1, GOLD[2], f * aus); g.put(tx - k, ty - 1, GOLD[2], f * aus); g.put(tx + 1, ty - k, GOLD[2], f * aus); g.put(tx - 1, ty + k, GOLD[2], f * aus); }
+          }
         }
-      },
-    });
+        // ── Stossringe: Lv1 einer, Lv2 zwei, Lv3 drei, jeder um 70 ms versetzt ──
+        for (let i = 0; i < w; i++) {
+          const a2 = t - i * 70; if (a2 < 0 || a2 > 420) continue;
+          const f = 1 - a2 / 420, r = 3 + a2 / (11 - 2.2 * w) + 2 * i, rx = r * 1.15;
+          g.ring(tx, ty, rx, r * 0.95, i === 0 ? GOLD[1] : GOLD[2], f * aus);
+          if (w >= 2) g.ring(tx, ty, rx - 1, r * 0.95 - 1, GOLD[0], f * aus * 0.8);
+        }
+        // ── Staub (ab Lv2): graue Puffen steigen aus dem Aufprall auf ──
+        for (const p of teile.staub) {
+          const a2 = t - p.start; if (a2 < 0 || a2 > 620) continue;
+          const kk = a2 / 620, r = p.r * (0.6 + kk * 1.1), pal = STAUB[Math.min(3, Math.floor(kk * 4))];
+          g.disc(tx + Math.cos(p.a) * p.d * (0.4 + kk * 0.6), ty + Math.sin(p.a) * p.d * (0.4 + kk * 0.6) * 0.8 - kk * 7, r, pal, (1 - kk) * 0.65 * aus);
+        }
+        // ── Risse im Boden (Lv3): gezackte Linien wachsen aus dem Berührungspunkt und bleiben bis zum Ausblenden ──
+        for (const r of teile.risse) {
+          if (t < 30) continue;
+          const wachs = klemme((t - 30) / 160, 0, 1), len = r.l * wachs;
+          let x = tx, y = ty;
+          for (let d = 0; d < len; d++) {
+            const ab = r.a + (r.zack[d % r.zack.length]) * 0.35;
+            x += Math.cos(ab); y += Math.sin(ab);
+            g.put(x, y, RISS[0], aus); g.put(x + 1, y, RISS[1], aus * 0.9);
+            if (d < len * 0.6) g.put(x, y - 1, RISS[2], aus * 0.8);
+          }
+        }
+        // ── Splitter: fliegen mit Schwerkraft, ab Lv3 auch 2×2 grosse Brocken ──
+        for (const sp of teile.splitter) {
+          if (t > sp.leben) continue;
+          const kk = t / sp.leben, sek = t / 1000;
+          const px = tx + Math.cos(sp.a) * sp.v * sek, py = ty + Math.sin(sp.a) * sp.v * sek + 60 * sek * sek;
+          if (sp.gross) g.block(px, py, 2, 2, sp.farbe, (1 - kk) * aus); else g.put(px, py, sp.farbe, (1 - kk) * aus);
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 30 + 12 * 3 });
   })(),
   // ═════════════════════════════════════════════════════════════════
-  //  Glasowt (24.10.) — PIXELART, gläserne Lanze von Glasowt auf das brennende Ziel (`ppProjektil`)
+  //  Glasowt (24.10.) — PIXELART, geworfener Feuerball von Glasowt auf das brennende Ziel (`ppProjektil`)
   //
-  //  Eine lange, helle Glaslanze (weisse Spitze, hellblauer Schaft) schiesst geradlinig mit Glitzerschweif zum Ziel, zerspringt dort in kantige Scherben, und die Flammen am Ziel
-  //  verlöschen zischend (orange Glut wird grau und steigt als Dampf auf).
+  //  Ein Feuerball (weisser Kern, gelbe und orange Hülle, dunkelrote Haut) fliegt im hohen Bogen, flackert dabei und zieht Flammenzungen und Glut hinter sich her. Beim Aufprall platzt er zu einem
+  //  Feuerring, Flammenzungen schiessen am Ziel nach oben (das Feuer am Brennenden lodert auf), Funken regnen mit Schwerkraft.
   // ═════════════════════════════════════════════════════════════════
-  glasowt_shatter: (() => {
-    const GLAS = ['#ffffff', '#b3e8f9', '#66d9ff', '#4e77ca', '#02398c'].map(ppHex);
-    const GLUT = ['#f7f7ad', '#fad54a', '#f29a3e', '#aa5300'].map(ppHex);
-    const DAMPF = ['#d2d2db', '#a8a8a8', '#686868'].map(ppHex);
+  glasowt_fireball: (() => {
+    const FEUER = ['#ffffff', '#f7f7ad', '#fad54a', '#f29a3e', '#e94e53', '#b21a29', '#710122'].map(ppHex);
     return ppProjektil({
-      ende: 800, abflug: 140, einschlag: 460, fadeAb: 640, schweif: GLAS.slice(0, 4), schweifLaenge: 7, schweifSchritt: 0.04, funkenFarben: [GLAS[0], GLAS[1], GLAS[2], GLAS[3]], funken: 16,
+      ende: 820, abflug: 120, einschlag: 500, fadeAb: 680, bogen: 26, schweif: [FEUER[2], FEUER[3], FEUER[4], FEUER[5]], schweifLaenge: 8, schweifSchritt: 0.04,
+      funkenFarben: [FEUER[1], FEUER[2], FEUER[3], FEUER[4], FEUER[5]], funken: 16,
       kopf: (g, x, y, c) => {
         const nx = -c.dy, ny = c.dx;
-        for (let d = 0; d < 14; d++) {   // Lanze: Spitze vorn, Schaft nach hinten dicker
-          const col = d < 2 ? GLAS[0] : d < 8 ? GLAS[1] : GLAS[2];
-          g.put(x - c.dx * d + c.dx * 4, y - c.dy * d + c.dy * 4, col, c.aus);
-          if (d >= 2 && d < 11) { g.put(x - c.dx * d + c.dx * 4 + nx, y - c.dy * d + c.dy * 4 + ny, GLAS[2], c.aus); g.put(x - c.dx * d + c.dx * 4 - nx, y - c.dy * d + c.dy * 4 - ny, GLAS[3], c.aus); }
+        // Flammenzungen hinter dem Ball, flackernd
+        for (let i = 0; i < 6; i++) {
+          const wob = Math.sin(c.t / 55 + i * 1.9) * 2.6, rueck = 4 + i * 2.2, laenge = 2 + (i % 3);
+          for (let d = 0; d < laenge; d++) g.put(x - c.dx * (rueck + d) + nx * (wob + (d % 2 ? 1 : -1)), y - c.dy * (rueck + d) + ny * (wob + (d % 2 ? 1 : -1)), i < 3 ? FEUER[3] : FEUER[4], c.aus * (1 - i * 0.12));
         }
+        // Ball: Haut, Hülle, Glut, Kern (der Radius flackert um ein Pixel)
+        const fl = Math.sin(c.t / 40) > 0 ? 1 : 0;
+        g.disc(x, y, 5 + fl, FEUER[5], c.aus);
+        g.disc(x, y, 4 + fl, FEUER[4], c.aus);
+        g.disc(x, y, 3, FEUER[3], c.aus);
+        g.disc(x, y, 2, FEUER[2], c.aus);
+        g.disc(x, y, 1, FEUER[0], c.aus);
+        // Glutfunken lösen sich
+        for (let i = 0; i < 3; i++) g.put(x - c.dx * (7 + i * 4) + nx * Math.sin(c.t / 70 + i * 2) * 5, y - c.dy * (7 + i * 4) + ny * Math.sin(c.t / 70 + i * 2) * 5 + i, FEUER[1 + (i % 2)], c.aus * 0.8);
       },
       treffer: (g, tx, ty, c) => {
-        if (c.al < 160) {
-          const f = 1 - c.al / 160;
-          g.ring(tx, ty, 3 + c.al / 8, 3 + c.al / 8, GLAS[0], f * c.aus);
-          g.disc(tx, ty, 3 * f + 1, GLAS[0], f * c.aus);
+        if (c.al < 260) {
+          const f = 1 - c.al / 260, r = 3 + c.al / 6;
+          g.ring(tx, ty, r, r * 0.9, FEUER[3], f * c.aus);
+          g.ring(tx, ty, r * 0.62, r * 0.56, FEUER[2], f * c.aus);
+          g.disc(tx, ty, 4 * f + 1, FEUER[0], f * c.aus);
         }
-        // Flammen verlöschen: Glut wird grau und steigt als Dampf auf
+        // Flammenzungen schiessen am Ziel nach oben und lodern
         for (let i = 0; i < 9; i++) {
-          const a2 = c.al - 60 - i * 25; if (a2 < 0 || a2 > 520) continue;
-          const kk = a2 / 520, px = tx + (i - 4) * 3 + Math.sin(a2 / 90 + i) * 2, py = ty + 8 - kk * 26;
-          g.block(px, py, 2, 2, kk < 0.3 ? GLUT[Math.min(3, Math.floor(kk / 0.1))] : DAMPF[Math.min(2, Math.floor((kk - 0.3) / 0.24))], (1 - kk) * c.aus);
+          const a2 = c.al - i * 18; if (a2 < 0 || a2 > 520) continue;
+          const kk = a2 / 520, hoch = Math.min(1, kk * 3) * (14 + (i % 3) * 5) * (1 - kk * 0.55);
+          const px = tx + (i - 4) * 3 + Math.sin(a2 / 60 + i) * 1.4;
+          for (let h = 0; h < hoch; h++) {
+            const anteil = h / Math.max(1, hoch);
+            g.put(px, ty + 4 - h, anteil < 0.3 ? FEUER[4] : anteil < 0.6 ? FEUER[3] : anteil < 0.85 ? FEUER[2] : FEUER[1], (1 - kk) * c.aus);
+            if (h > 2 && h < hoch - 2) g.put(px + 1, ty + 4 - h, anteil < 0.5 ? FEUER[4] : FEUER[3], (1 - kk) * c.aus * 0.8);
+          }
         }
       },
     });
@@ -50703,7 +50784,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       if (t === 'glasowt') {
         const p = playerByName(entry.player);
-        return <span className="log-status">🔥 {cName('Glasowt')} — {pName(p.name, p.color)} shatters Burned {entry.target}: {entry.damage} damage that cannot be reduced, negated or redirected.</span>;
+        return <span className="log-status">🔥 {cName('Glasowt')} — {pName(p.name, p.color)} hurls a fireball at Burned {entry.target}: {entry.damage} damage that cannot be reduced, negated or redirected.</span>;
       }
       if (t === 'buttap') {
         const p = playerByName(entry.player);

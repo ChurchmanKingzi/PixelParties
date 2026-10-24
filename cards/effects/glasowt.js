@@ -22,8 +22,8 @@
 //  Der Schaden zählt als Kreatureneffekt (Typ `creature`).
 //
 //  ── Bild und Klang ──────────────────────────────────────────────────────
-//  `play_zone_animation` `glasowt_shatter` (Pixelart, ANIM_REGISTRY): eine gläserne Lanze schießt von Glasowt auf das brennende Ziel und zerspringt in Scherben, die Flammen
-//  verlöschen zischend. Klänge in ZONE_ANIM_SFX; Log `glasowt`.
+//  `play_zone_animation` `glasowt_fireball` (Pixelart, ANIM_REGISTRY): Glasowt WIRFT einen Feuerball im hohen Bogen auf das Ziel; er flackert, zieht Flammen und Glut hinter sich her und platzt beim
+//  Aufprall zu einem Feuerring, am Ziel lodern Flammenzungen auf. Klänge in ZONE_ANIM_SFX; Log `glasowt`.
 //
 //  ── CPU ─────────────────────────────────────────────────────────────────
 //  Bevorzugt einen gegnerischen Helden, der damit fällt, dann den mit den meisten HP; sonst die gegnerische Kreatur. Nie die eigene Seite.
@@ -31,8 +31,8 @@
 
 const CARD_NAME = 'Glasowt';
 const DAMAGE = 200;
-const LANZE_MS = 800;          // Länge der Animation (deckt sich mit `glasowt_shatter` im Client)
-const LANZE_HIT_MS = 520;      // Einschlag bei ~460 ms (+100 ms Einbau-Versatz des Clients)
+const WURF_MS = 820;           // Länge der Animation (deckt sich mit `glasowt_fireball` im Client)
+const WURF_HIT_MS = 600;       // Einschlag bei ~500 ms (+100 ms Einbau-Versatz des Clients)
 const NACH_MS = 260;
 
 /** Ist dieses Ziel gerade verbrannt? */
@@ -101,13 +101,13 @@ module.exports = {
     const ziel = Array.isArray(gewaehlt) ? gewaehlt[0] : null;
     if (!ziel) return false;      // Abbruch kostet nichts
 
-    // Die Lanze fliegt von Glasowt zum Ziel und zerspringt.
+    // Der Feuerball fliegt von Glasowt zum Ziel.
     engine._broadcastEvent('play_zone_animation', {
-      type: 'glasowt_shatter', zoneType: 'board', owner: seite, heroIdx: -1, zoneSlot: -1, duration: LANZE_MS,
+      type: 'glasowt_fireball', zoneType: 'board', owner: seite, heroIdx: -1, zoneSlot: -1, duration: WURF_MS,
       targets: [{ owner: ziel.owner, heroIdx: ziel.heroIdx, zoneSlot: ziel.type === 'hero' ? -1 : ziel.slotIdx }],
       originOwner: seite, originHeroIdx: heroIdx, originZoneSlot: ctx.card?.zoneSlot ?? -1,
     });
-    await engine._delay(LANZE_HIT_MS);
+    await engine._delay(WURF_HIT_MS);
 
     const source = { name: CARD_NAME, owner: pi, heroIdx };
     let dealt = 0;

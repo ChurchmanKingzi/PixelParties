@@ -17,8 +17,16 @@
 //  Der Level ist der aufgedruckte Level der Karte (`cards.json`). Das Abwerfen kann nicht „verhindert" werden — wer es mit Reaktionen unterläuft, zahlt trotzdem.
 //
 //  ── Bild und Klang ──────────────────────────────────────────────────────
-//  `play_zone_animation` `zira_dash` (Pixelart, ANIM_REGISTRY): ein gelb-oranger Blitz rast mit Windstreifen von Zira Racer auf das Ziel und schlägt dort mit einem Sternring ein. Klänge in
-//  ZONE_ANIM_SFX; Logs `zira_racer`.
+//  Zira Racer RAMMT sein Ziel: die Karte rast aus ihrer Zone in das Ziel (`engine.rammeBisKontakt`, dieselbe Ramm-Animation wie Heragas/Johanna), der Schaden fällt im Moment der
+//  Berührung. Im Aufprall läuft die Pixelart `zira_impact` (ANIM_REGISTRY, Brett-Animation am Ziel) — ihre WUCHT wächst mit dem Level der abgeworfenen Karte (= mit dem Schaden):
+//    Lv1 (70)  Funkenstern: Blitz, ein Stossring, acht Strahlen, wenige Splitter.
+//    Lv2 (140) mehr Strahlen, zwei Stossringe, mehr Splitter, Staubwolke, Bildschirmwackeln.
+//    Lv3 (210) Riss im Boden, drei Stossringe, Kreuzblitz, viele Splitter, Staub, starkes Bildschirmwackeln (`play_screen_shake` heavy).
+//  Der Klang wächst mit (ZONE_ANIM_SFX, `wucht`). Logs `zira_racer`.
+//
+//  ── Abwurf ohne Verzögerung ─────────────────────────────────────────────
+//  Der Abwurf ruft `actionDiscardHandCard` mit `_noGlow: true`: ohne das lässt die Engine ZUERST die Quelle 500 ms aufleuchten (`effectSourceGlow`), und der Klick auf die Handkarte zeigte
+//  seine Wirkung erst eine halbe Sekunde später. Die Karte fliegt jetzt sofort in die Ablage.
 //
 //  ── CPU ─────────────────────────────────────────────────────────────────
 //  Wirft die Creature mit dem höchsten Level (≤ 3) ab und trifft den gegnerischen Helden mit den wenigsten HP (Kill zuerst), sonst die schwächste Kreatur.
@@ -29,9 +37,11 @@ const { hasCardType } = require('./_hooks');
 const CARD_NAME = 'Zira Racer';
 const MAX_LEVEL = 3;
 const DAMAGE_PER_LEVEL = 70;
-const DASH_MS = 760;          // Länge der Animation (deckt sich mit `zira_dash` im Client)
-const DASH_HIT_MS = 520;      // Einschlag bei ~460 ms (+100 ms Einbau-Versatz des Clients)
-const NACH_MS = 260;
+const RAM_MS = 1000;          // Dauer der Ramm-Animation (Aufprall bei 12 %, danach der Rückflug)
+const IMPACT_MS = 900;       // Länge von `zira_impact` im Client
+const IMPACT_VOR_MS = 20;    // Der Aufprall wird kurz nach dem Rammen gesendet: Einbau-Versatz des Clients (100 ms) + 20 ms ≈ Berührung (12 % von RAM_MS)
+const SHAKE_VOR_MS = 80;     // Bildschirmwackeln ab Level 2: kurz vor der Berührung gesendet
+const NACH_MS = 360;         // der Rückflug darf zu Ende laufen, bevor der nächste Schritt kommt
 
 /** Handplätze, deren Karte als Abwurf taugt: Creature mit Level ≤ 3. */
 function kostenPlaetze(engine, pi) {
@@ -90,7 +100,8 @@ module.exports = {
     const schaden = DAMAGE_PER_LEVEL * level;
 
     if (!(await engine.borisVerzicht(pi, 1, { source: CARD_NAME }))) {
-      const ok = await engine.actionDiscardHandCard(pi, name, wahl.handIndex, { source: CARD_NAME, selfInflicted: true });
+      // `_noGlow`: sonst leuchtet die Quelle 500 ms auf, bevor die gewählte Karte abgeworfen wird (zu langer Delay nach dem Klick).
+      const ok = await engine.actionDiscardHandCard(pi, name, wahl.handIndex, { source: CARD_NAME, selfInflicted: true, _noGlow: true });
       if (!ok) return false;
     }
 
@@ -120,13 +131,25 @@ module.exports = {
     const ziel = Array.isArray(gewaehlt) ? gewaehlt[0] : null;
     if (!ziel) { engine.sync(); return true; }
 
-    // ③ Der Blitz rast los, dann der Schaden.
+    // ③ Zira Racer rammt das Ziel; der Schaden fällt im Moment der Berührung, der Aufprall wächst mit Level und Schaden.
+    const wucht = Math.max(1, Math.min(3, level));
+    const zielSlot = ziel.type === 'hero' ? -1 : ziel.slotIdx;
+    const rammen = engine.rammeBisKontakt({
+      sourceOwner: seite, sourceHeroIdx: heroIdx, sourceZoneSlot: ctx.card?.zoneSlot,
+      targetOwner: ziel.owner, targetHeroIdx: ziel.heroIdx, targetZoneSlot: zielSlot >= 0 ? zielSlot : undefined,
+      cardName: CARD_NAME, duration: RAM_MS,
+    });
+    await engine._delay(IMPACT_VOR_MS);
     engine._broadcastEvent('play_zone_animation', {
-      type: 'zira_dash', zoneType: 'board', owner: seite, heroIdx: -1, zoneSlot: -1, duration: DASH_MS,
-      targets: [{ owner: ziel.owner, heroIdx: ziel.heroIdx, zoneSlot: ziel.type === 'hero' ? -1 : ziel.slotIdx }],
+      type: 'zira_impact', zoneType: 'board', owner: seite, heroIdx: -1, zoneSlot: -1, duration: IMPACT_MS, wucht, schaden,
+      targets: [{ owner: ziel.owner, heroIdx: ziel.heroIdx, zoneSlot: zielSlot }],
       originOwner: seite, originHeroIdx: heroIdx, originZoneSlot: ctx.card?.zoneSlot ?? -1,
     });
-    await engine._delay(DASH_HIT_MS);
+    if (wucht >= 2) {
+      await engine._delay(SHAKE_VOR_MS);       // das Wackeln setzt erst mit der Berührung ein, nicht schon beim Anlauf
+      engine._broadcastEvent('play_screen_shake', { intensity: wucht >= 3 ? 'heavy' : 'normal' });
+    }
+    await rammen;
 
     const source = { name: CARD_NAME, owner: pi, heroIdx };
     if (ziel.type === 'hero') {
@@ -163,5 +186,5 @@ module.exports = {
     return wahl ? [wahl.id] : undefined;
   },
 
-  _test: { kostenPlaetze, DAMAGE_PER_LEVEL, MAX_LEVEL },
+  _test: { kostenPlaetze, DAMAGE_PER_LEVEL, MAX_LEVEL, RAM_MS, IMPACT_MS },
 };

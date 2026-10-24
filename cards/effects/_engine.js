@@ -20504,6 +20504,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (hero.atkSperren.includes(instId)) return false;
     const warGesperrt = this._isHeroAtkSuppressed(hero);
     hero.atkSperren.push(instId);
+    // Abzeichen „Doomed" (Debuff-Spalte am Helden): der Buff `doomed` spiegelt die Sperre — im Puzzle-Editor setzbar (der Loader legt die Sperre daraus an), im Spiel gesetzt/entfernt hier.
+    if (!hero.buffs) hero.buffs = {};
+    if (!hero.buffs.doomed) hero.buffs.doomed = { appliedTurn: this.gs?.turn || 0 };
     if (!warGesperrt) {
       const alt = hero.atk || 0;
       hero._cursedAtkSuppressed = alt;
@@ -20519,7 +20522,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     const i = hero.atkSperren.indexOf(instId);
     if (i < 0) return false;
     hero.atkSperren.splice(i, 1);   // eigene Liste, keine Kartenzone
-    if (hero.atkSperren.length === 0) delete hero.atkSperren;
+    if (hero.atkSperren.length === 0) {
+      delete hero.atkSperren;
+      if (hero.buffs?.doomed) delete hero.buffs.doomed;
+    }
     if (!this._isHeroAtkSuppressed(hero) && hero._cursedAtkSuppressed !== undefined) {
       const zurueck = hero._cursedAtkSuppressed || 0;
       delete hero._cursedAtkSuppressed;
@@ -54296,7 +54302,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       //     sie enden wie immer mit dem Zug.
       //   • `second_action_grant` (Weapon Unleashing): „soll im Tod nicht
       //     verfallen — und der Badge soll ausnahmsweise bestehenbleiben."
-      const NACHWIRKUNGEN = new Set(['blessed_skill', 'second_action_grant', 'calm', 'calm_ready']);
+      const NACHWIRKUNGEN = new Set(['blessed_skill', 'second_action_grant', 'calm', 'calm_ready', 'doomed']);   // `doomed`: die ATK-Sperre (Doomed Pirate) bleibt über den Tod hinaus
       if (hero.buffs && typeof hero.buffs === 'object') {
         const bleibtAmHelden = (quelle) => typeof quelle === 'string' && quelle
           && this.cardInstances.some(c => c.owner === pi && c.zone === 'support'

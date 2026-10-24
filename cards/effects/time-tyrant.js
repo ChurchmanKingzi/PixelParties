@@ -3,19 +3,19 @@
 //  CARD EFFECT: "Time Tyrant"
 //  Creature (Normal, Lv0, 70 HP, Summoning Magic)
 //
-//  „You may once per turn reveal the top card of your deck and then shuffle it back into your deck. If it was an Attack or Spell, draw cards equal to its level
-//   afterwards."
+//  „You may once per turn reveal the top card of your deck and then shuffle it back into your deck. If it was an Attack, Spell or Creature, draw cards equal to its
+//   level afterwards."
 //
 //  ── LEVEL ───────────────────────────────────────────────────────────────
-//  Jetzt Lv 0 (vorher Lv 2): Datenänderung in `data/cards.json`, kein Skripteingriff.
+//  Jetzt Lv 0 (vorher Lv 2) und der Text zählt auch CREATURES („Attack, Spell or Creature“): Datenänderungen in `data/cards.json`.
 //
 //  ── ABLAUF ──────────────────────────────────────────────────────────────
 //  `onCreatureEffect` (engine-HOPT je Instanz, bei nicht-`false`-Rückgabe; keine Aktion, keine Kosten), Vorlage: The Oracle of Heaven.
 //    ① Aufdecken: die oberste Karte fliegt in die Bildmitte, wird umgedreht (beide Spieler sehen sie) und zurück ins Deck gelegt (`decke`, Ziel `deck`). Aufdecken ist keine
 //       Suche (keine Such-Sperre).
 //    ② „shuffle it back into your deck": das GANZE Deck wird gemischt (`shuffleDeck`), die aufgedeckte Karte ist danach nicht mehr oben.
-//    ③ „If it was an Attack or Spell, draw cards equal to its level afterwards": war die Karte ein Attack oder ein Spell (auch Hybridkarten mit diesem Typ), zieht der Kontrolleur
-//       so viele Karten, wie ihr aufgedruckter Level angibt (Lv0 = keine; Stufen über den Kartenvorrat hinaus ziehen, was da ist). Andere Typen: nichts weiter.
+//    ③ „If it was an Attack, Spell or Creature, draw cards equal to its level afterwards": war die Karte ein Attack, ein Spell oder eine Creature (auch Hybridkarten mit einem dieser Typen),
+//       zieht der Kontrolleur so viele Karten, wie ihr aufgedruckter Level angibt (Lv0 = keine; Stufen über den Kartenvorrat hinaus ziehen, was da ist). Andere Typen (Artifact, Potion, Ability …): nichts weiter.
 //  Ohne Karte im Deck nicht aktivierbar.
 //
 //  ── Bild und Klang ──────────────────────────────────────────────────────
@@ -66,7 +66,7 @@ module.exports = {
 
     // ③ Attack oder Spell → so viele Karten ziehen, wie der Level sagt.
     const cd = engine._getCardDB()[name];
-    const zaehlt = !!cd && (hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell'));
+    const zaehlt = !!cd && (hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell') || hasCardType(cd, 'Creature'));
     const level = zaehlt ? (Number(cd.level) || 0) : 0;
     let gezogen = 0;
     if (level > 0) {
