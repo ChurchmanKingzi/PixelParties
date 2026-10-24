@@ -19297,7 +19297,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // restore as a no-op (the accumulator is already gone) and
       // continues with its own bookkeeping (Curse-card destroy
       // cascade, log entry).
-      if (key === 'cursed') {
+      if (key === 'cursed' && !this._isHeroAtkSuppressed(hero)) {   // Doomed Pirate hält die ATK weiter fest: Zwischenspeicher bleibt
         const restored = hero._cursedAtkSuppressed || 0;
         delete hero._cursedAtkSuppressed;
         if (restored > 0) {
@@ -20384,7 +20384,44 @@ this._deathWatch = (this._deathWatchStack || []).length
    * `hero.atk` (which Curse forces to 0).
    */
   _isHeroAtkSuppressed(hero) {
-    return !!hero?.statuses?.cursed;
+    return !!hero?.statuses?.cursed || (Array.isArray(hero?.atkSperren) && hero.atkSperren.length > 0);
+  }
+
+  /**
+   * ★ Doomed Pirate (24.10.): „that Hero's Attack stat becomes 0 and cannot be increased in any way" — solange die Kreatur auf dem Brett liegt.
+   * Zweite Sperre NEBEN dem Fluch, derselbe Zwischenspeicher (`hero._cursedAtkSuppressed`) und derselbe Trichter: `hero.atkSperren` listet die Instanz-Ids der
+   * Kreaturen, die den Helden festhalten; solange die Liste nicht leer ist (oder `cursed` steht), buchen ALLE ATK-Wege in den Zwischenspeicher statt in die
+   * sichtbare ATK. Die Rückgabe an die sichtbare ATK erfolgt erst, wenn KEINE Sperre mehr übrig ist (die Fluch-Rückgaben prüfen das ebenfalls).
+   * Gibt `true` zurück, wenn die Sperre neu angelegt wurde.
+   */
+  atkSperreAnlegen(hero, ownerIdx, heroIdx, instId) {
+    if (!hero?.name || instId == null) return false;
+    if (!Array.isArray(hero.atkSperren)) hero.atkSperren = [];
+    if (hero.atkSperren.includes(instId)) return false;
+    const warGesperrt = this._isHeroAtkSuppressed(hero);
+    hero.atkSperren.push(instId);
+    if (!warGesperrt) {
+      const alt = hero.atk || 0;
+      hero._cursedAtkSuppressed = alt;
+      hero.atk = 0;
+      if (alt > 0) this._broadcastEvent('fighting_atk_change', { owner: ownerIdx, heroIdx, amount: -alt });
+    }
+    return true;
+  }
+
+  /** Gegenstück zu `atkSperreAnlegen`: die Sperre dieser Kreatur fällt; ist es die letzte (und kein Fluch), kommt die ATK über den Trichter zurück. */
+  atkSperreLoesen(hero, ownerIdx, heroIdx, instId) {
+    if (!hero || !Array.isArray(hero.atkSperren)) return false;
+    const i = hero.atkSperren.indexOf(instId);
+    if (i < 0) return false;
+    hero.atkSperren.splice(i, 1);   // eigene Liste, keine Kartenzone
+    if (hero.atkSperren.length === 0) delete hero.atkSperren;
+    if (!this._isHeroAtkSuppressed(hero) && hero._cursedAtkSuppressed !== undefined) {
+      const zurueck = hero._cursedAtkSuppressed || 0;
+      delete hero._cursedAtkSuppressed;
+      if (zurueck > 0) this._applyHeroAtkDelta(hero, ownerIdx, heroIdx, zurueck);
+    }
+    return true;
   }
 
   /**
@@ -53929,6 +53966,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const verflucht = !!hero.statuses?.cursed;
     if (!verflucht && hero._cursedAtkSuppressed === undefined) return 0;
     if (verflucht) delete hero.statuses.cursed;
+    if (this._isHeroAtkSuppressed(hero)) return 0;   // Doomed Pirate liegt noch: ATK bleibt gesperrt (auch nach einer Wiederbelebung)
     const zurueck = hero._cursedAtkSuppressed || 0;
     delete hero._cursedAtkSuppressed;
     // Ein Held, der auf keiner Seite steht, hat keine ATK mehr, die jemand sieht — dort gibt es nichts zurueckzugeben.

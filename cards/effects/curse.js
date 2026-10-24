@@ -139,8 +139,10 @@ async function fluchAnlegen(engine, appliedBy, owner, heroIdx) {
   // Snapshot the live ATK so the cleanse path can restore it.
   // Subsequent grant/revoke/temp-atk while cursed will accumulate
   // into this same slot (see _isHeroAtkSuppressed in _engine.js).
-  targetHero._cursedAtkSuppressed = targetHero.atk || 0;
-  const dropAmount = targetHero.atk || 0;
+  // (Hält Doomed Pirate den Helden schon fest, steht der Gesamtwert bereits im Zwischenspeicher und die sichtbare ATK ist 0: nichts überschreiben.)
+  const schonGesperrt = targetHero._cursedAtkSuppressed !== undefined;
+  if (!schonGesperrt) targetHero._cursedAtkSuppressed = targetHero.atk || 0;
+  const dropAmount = schonGesperrt ? 0 : (targetHero.atk || 0);
   // ★ v1087: das ABSENKEN laeuft bewusst weiter direkt — zu
   // diesem Zeitpunkt ist `cursed` noch NICHT gesetzt, der Trichter
   // wuerde den Abzug also sichtbar buchen statt in den
@@ -414,8 +416,9 @@ module.exports = {
       const statusNochDa = !!hero.statuses?.cursed;
       if (statusNochDa || hero._cursedAtkSuppressed !== undefined) {
         if (statusNochDa) delete hero.statuses.cursed;
-        const restored = hero._cursedAtkSuppressed || 0;
-        delete hero._cursedAtkSuppressed;
+        // Doomed Pirate hält die ATK weiter fest: Zwischenspeicher bleibt, die Rückgabe übernimmt die Kreatur beim Abgang.
+        const restored = engine._isHeroAtkSuppressed(hero) ? 0 : (hero._cursedAtkSuppressed || 0);
+        if (!engine._isHeroAtkSuppressed(hero)) delete hero._cursedAtkSuppressed;
         if (restored > 0) {
           // ★ v1087: ueber den kanonischen Trichter, damit ATK-Auren
           // („Rioting Village") die Rueckgabe sehen. `cursed` ist eine
