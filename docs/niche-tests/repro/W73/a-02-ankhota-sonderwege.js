@@ -18,11 +18,18 @@ const fertig = (t) => t.run(() => t.engine._runPostChainActions());
     t.gs.players[0].heroes[1].atk = 10;
     const hp0 = t.hero(0, 0).maxHp;
     t.script.length = 0;
+    // tatsächlich gesendete Ereignisse (nach der zentralen Umschreibung in `_broadcastEvent`) mitschneiden
+    const gesendet = [];
+    t.engine.io = { to: () => ({ emit: (ev, d) => gesendet.push({ ev, d }) }), emit: () => {}, sockets: { sockets: new Map() } };
+    t.gs.players.forEach((p, i) => { p.socketId = 's' + i; });
     const r = await t.play(0, 'Deepsea Pirate', { hero: 1, slot: 0 });
     await fertig(t);
     const hand = t.pile(0, 'hand');
     if (mitAnkhota) {
       R.check('mit Ankhota: Deepsea Witch ist gelöscht, nicht auf der Hand', geloescht(t, 0, 'Deepsea Witch') === 1 && !hand.includes('Deepsea Witch'), { r, hand, del: t.pile(0, 'deletedPile') });
+      const fluege = gesendet.filter(g => g.ev === 'play_pile_transfer' && g.d && g.d.cardName === 'Deepsea Witch').map(g => g.d);
+      R.check('mit Ankhota: KEIN Flug der Witch zur Hand (das Verschwinden zeigt der Client als Löschung)', !fluege.some(e => e.to === 'hand'), fluege.map(e => e.from + '→' + e.to));
+      R.check('mit Ankhota: der Platz meldet creature_zone_move (keine Schadenszahl)', gesendet.some(g => g.ev === 'creature_zone_move' && g.d.heroIdx === 1 && g.d.zoneSlot === 0), gesendet.map(g => g.ev));
       R.check('mit Ankhota: Deepsea Pirate steht im frei gewordenen Platz', t.zone(0, 1, 0) === 'Deepsea Pirate', t.zone(0, 1, 0));
       R.check('mit Ankhota: Ankhotas Held +10 max HP', t.hero(0, 0).maxHp === hp0 + 10, [hp0, t.hero(0, 0).maxHp]);
     } else {
@@ -56,6 +63,22 @@ const fertig = (t) => t.run(() => t.engine._runPostChainActions());
     await t.run(() => ds.returnSupportCreatureToHand(t.engine, k, 'Test'));
     await fertig(t);
     R.check('keine Teppes-Zugkarte (nichts wurde zurückgegeben)', t.pile(0, 'hand').length === hand0, [hand0, t.pile(0, 'hand')]);
+  }
+
+  R.section('D · Todes-Anspruch (Fun-Fun Circus Director): mit Ankhota kommt die gefallene Kreatur nicht auf die Hand');
+  {
+    const t = await H.fresh({ hand: [['ZZ Filler', 'ZZ Filler', 'ZZ Filler'], []] });
+    t.put(0, 0, 0, CARD);
+    const d = t.put(0, 1, 0, 'Fun-Fun Circus Director'); d.turnPlayed = 0;
+    const k = t.put(0, 2, 0, 'Fun-Fun Circus Clown'); k.turnPlayed = 0;
+    t.gs.activePlayer = 1;
+    const gesendet = [];
+    t.engine.io = { to: () => ({ emit: (ev, d) => gesendet.push({ ev, d }) }), emit: () => {}, sockets: { sockets: new Map() } };
+    t.gs.players.forEach((p, i) => { p.socketId = 's' + i; });
+    await t.run(async () => { await t.engine.actionDealCreatureDamage({ name: 'ZZ Test', owner: 1, heroIdx: 0 }, k, 99999, 'creature', { sourceOwner: 1, canBeNegated: true }); await t.engine._runPostChainActions?.(); });
+    const fluege = gesendet.filter(g => g.ev === 'play_pile_transfer' && g.d && g.d.cardName === 'Fun-Fun Circus Clown').map(g => g.d);
+    R.check('Clown ist gelöscht, nicht auf der Hand', geloescht(t, 0, 'Fun-Fun Circus Clown') === 1 && !t.pile(0, 'hand').includes('Fun-Fun Circus Clown'), { hand: t.pile(0, 'hand'), del: t.pile(0, 'deletedPile'), fluege: fluege.map(e => e.from + '→' + e.to) });
+    R.check('kein Flug zur Hand', !fluege.some(e => e.to === 'hand'), fluege.map(e => e.from + '→' + e.to));
   }
 
   R.finish();

@@ -55721,6 +55721,15 @@ this._deathWatch = (this._deathWatchStack || []).length
         data = { ...data, deleteMode: true };
       }
     }
+    // ★ W73a (Ankhota): ein Sonderweg „Kreatur vom Brett auf die Hand" endet im Gelöscht-Stapel (`handZugangSync`) — den Flug zur HAND gibt es dann nicht. Das Verschwinden aus dem Platz zeigt der
+    // Diff-Detektor des Clients als Flug zum Gelöscht-Stapel (wie jede Löschung vom Brett, es gibt dafür keinen eigenen Broadcast); `creature_zone_move` hält dabei die Schadenszahl zurück.
+    // Zentral hier (statt an jedem der Flug-Aufrufe: Deepsea-Bounce/-Swap, Sparkfly, Winged Skeleton …).
+    if (event === 'play_pile_transfer' && data && data.from === 'support' && data.to === 'hand' && data.cardName && this.ankhotaLoeschtVomBrett(null, data.cardName)) {
+      if (Number.isInteger(data.fromHeroIdx) && Number.isInteger(data.fromSlotIdx)) {
+        this._broadcastEvent('creature_zone_move', { owner: data.fromOwner ?? data.owner, heroIdx: data.fromHeroIdx, zoneSlot: data.fromSlotIdx });
+      }
+      return;
+    }
     // ★ 12.10. (Amazing Finding, Als Befund: „sichtbarer Übergang zwischen ‚die Karte fliegt auf die Hand' und ‚die Karte landet an ihrer Zielposition'"):
     // Fluege aus der Bildmitte zur HAND bekommen den Platz der kuenftigen Karte mit (`destHandIdx` = aktuelle Handgroesse; gebucht wird die Karte erst NACH
     // dem Flug). Der Client rechnet damit den Landepunkt — sein DOM hinkt dem Zustand um einen Takt hinterher, sodass bei Folgen (Karte 2, 3) die vorige Karte
