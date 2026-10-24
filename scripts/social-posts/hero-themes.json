@@ -1253,6 +1253,7 @@
    ]
   ],
   "feet": 330,
-  "logoFront": true
+  "logoFront": true,
+  "shadowDy": 70
  }
 }

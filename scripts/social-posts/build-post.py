@@ -505,6 +505,8 @@ def main():
     ap.add_argument('--clean', action='store_true', help='Einzelbilder nach dem Kodieren löschen (spart Platz)')
     ap.add_argument('--intro', choices=['on', 'off'], default=None, help='Einblenden am Anfang (Standard: Reel an, Post aus)')
     ap.add_argument('--feet', type=int, default=None, help='Standlinie des Sprites, px ab Kartenoberkante')
+    ap.add_argument('--shadow-dy', type=int, default=None, help='Schatten um so viele px tiefer setzen (überschreibt shadowDy aus hero-themes.json)')
+    ap.add_argument('--px', type=int, default=None, help='Maßstab des Sprites (px je Sprite-Pixel), überschreibt hero-themes.json')
     ap.add_argument('--punch', action='store_true', help='Kraftvoller Start: die erste halbe Sekunde mit Bildschirmwackeln, Druckwelle und Blitz, Musik ohne Einblenden und auf einen Schlag der Musik geschnitten')
     args = ap.parse_args()
     reel = args.format == 'reel'
@@ -518,6 +520,10 @@ def main():
     spr = Sprite(args.slug)
     card_name = spr.meta['hero']
     hero_cfg = json.loads((HERE / 'hero-themes.json').read_text(encoding='utf-8')).get(card_name, {})
+    if args.px:
+        hero_cfg['px'] = args.px
+    if args.shadow_dy is not None:
+        hero_cfg['shadowDy'] = args.shadow_dy
     out = OUT / args.slug
     fdir = out / f'frames-{tag}'
     fdir.mkdir(parents=True, exist_ok=True)
@@ -685,7 +691,7 @@ def main():
             return canvas.convert('RGB')
         o_dark, o_light, sp, pad_px = spr.layers(f // per, stick_col, INK)
         if not hero_cfg.get('noShadow'):
-            canvas.alpha_composite(shadow, (card_x + CARD_W // 2 - shadow.width // 2, feet_y - U))
+            canvas.alpha_composite(shadow, (card_x + CARD_W // 2 - shadow.width // 2, feet_y - U + hero_cfg.get('shadowDy', 0)))      # shadowDy: Schatten tiefer setzen (schwebende Sprites)
         flash = intro and ts < T_SPR + T_FLASH
         for im in (o_dark, o_light, sp):
             if flash:                          # beim Auftauchen als weiße Silhouette
