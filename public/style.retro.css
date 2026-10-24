@@ -5364,7 +5364,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * { cursor: url("/cursor
 .board-zone-deleted .board-card-label { font-size: calc(20px * var(--board-scale)); min-width: calc(30px * var(--board-scale)); }
 .deck-empty-label { opacity: .6; }
 .board-stack { position: relative; width: calc(64px * var(--board-scale)); height: calc(90px * var(--board-scale)); }
-.board-tooltip { position: fixed; z-index: 9999; width: var(--tt-col-w, 360px); background: var(--bg2); border-left: 2px solid var(--accent); box-shadow: -2px 0 0 0 #000000; pointer-events: none; top: 0; right: 0; bottom: 0; overflow-y: auto; font-size: 14px; }
+.board-tooltip { position: fixed; z-index: 9999; width: var(--tt-col-w, 360px); background: var(--bg2); border-left: 2px solid var(--accent); box-shadow: -2px 0 0 0 #000000; pointer-events: none; top: 0; right: 0; bottom: 0; overflow-y: auto; scrollbar-gutter: stable; font-size: 14px; }
 /* Der Tooltip steht IMMER buendig rechts; die Ketten-Anzeige liegt ueber ihm (siehe `.reaction-chain-overlay`, sie weicht
    nicht mehr aus). */
 
