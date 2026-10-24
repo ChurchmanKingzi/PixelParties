@@ -8463,12 +8463,46 @@ function ppVerwahrung(spieler, hi, kind, z) {
 function ppVerwahrterStapel(spieler, hi, name) {
   return (spieler?.verwahrteZonen || []).find(v => v.heroIdx === hi && v.name === name) || null;
 }
+// ★ 24.10.: Eine Ability hat je Held hoechstens EINEN Stapel — ueber echte Ability Zonen UND Support Zonen (Xal, Xalibur) zusammen.
+// Spiegel von `engine.abilityStapelOrtVon`: ein Stapel in einer Support Zone zaehlt auch, wenn er gerade schlaeft.
+function ppStapelOrt(spieler, hi, name) {
+  const ab = spieler?.abilityZones?.[hi] || [];
+  for (let z = 0; z < ab.length; z++) { const s = ab[z] || []; if (s.length > 0 && s[0] === name) return { kind: 'ability', slot: z }; }
+  if ((window.CARDS_BY_NAME || {})[name]?.cardType !== 'Ability') return null;
+  const sup = spieler?.supportZones?.[hi] || [];
+  for (let z = 0; z < sup.length; z++) { const s = sup[z] || []; if (s.length > 0 && s[0] === name) return { kind: 'support', slot: z }; }
+  return null;
+}
+
+// ★ 24.10.: Spiegel von `engine.abilityZielOrt` — wohin kaeme eine neue Kopie? { kind, slot } oder null. `supportOk`: der Held nimmt Abilities in Support Zonen.
+function ppAbilityZielOrt(spieler, hi, name, { custom = false, supportOk = false } = {}) {
+  const ab = spieler?.abilityZones?.[hi] || [[], [], []];
+  const sup = spieler?.supportZones?.[hi] || [];
+  const supN = Math.max(3, sup.length);
+  const db = window.CARDS_BY_NAME || {};
+  if (custom) {
+    for (let z = 0; z < 3; z++) if ((ab[z] || []).length > 0 && ab[z].length < 3) return { kind: 'ability', slot: z };
+    if (supportOk) for (let z = 0; z < supN; z++) { const s = sup[z] || []; if (s.length > 0 && s.length < 3 && db[s[0]]?.cardType === 'Ability') return { kind: 'support', slot: z }; }
+    return null;
+  }
+  const vorhanden = ppStapelOrt(spieler, hi, name);
+  if (vorhanden) {
+    if (vorhanden.kind === 'support' && !supportOk) return null;
+    return ppAbilityZoneOk(spieler, hi, vorhanden.slot, name, vorhanden.kind) ? vorhanden : null;
+  }
+  for (let z = 0; z < 3; z++) if ((ab[z] || []).length === 0 && ppAbilityZoneOk(spieler, hi, z, name)) return { kind: 'ability', slot: z };
+  if (supportOk) for (let z = 0; z < supN; z++) if ((sup[z] || []).length === 0 && ppAbilityZoneOk(spieler, hi, z, name, 'support')) return { kind: 'support', slot: z };
+  return null;
+}
+
 function ppAbilityZoneOk(spieler, hi, z, name, kind = 'ability') {
   const zonen = kind === 'support' ? spieler?.supportZones : spieler?.abilityZones;
   const slot = (zonen?.[hi] || [])[z] || [];
   const v = ppVerwahrung(spieler, hi, kind, z);
   const stapel = ppVerwahrterStapel(spieler, hi, name);
   if (stapel && !(stapel.zoneKind === kind && stapel.slotIdx === z)) return false;   // nur EIN Stapel
+  const vorhanden = ppStapelOrt(spieler, hi, name);
+  if (vorhanden && !(vorhanden.kind === kind && vorhanden.slot === z)) return false;   // 24.10.: nur EIN Stapel ueber beide Zonenarten
   if (v.anzahl > 0) {
     if (v.name !== name && v.basis !== name) return false;   // v1352: auch die Basis (Performance)
     return (slot.length === 0 || slot[0] === name) && slot.length + v.anzahl + 1 <= 3;
@@ -37577,7 +37611,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
     if (isCustom) {
       // Custom placement (e.g. Performance): needs any occupied zone with <3 cards
-      return abZones.some(slot => (slot || []).length > 0 && (slot || []).length < 3);
+      if (abZones.some(slot => (slot || []).length > 0 && (slot || []).length < 3)) return true;
+      // 24.10.: Xal / Xalibur — auch ein belegter Ability-Stapel in einer Support Zone
+      if (!opts.nurAbilityZonen && (gameState.abilitySupportHeroes || []).includes(heroIdx)) {
+        return (playerData.supportZones?.[heroIdx] || []).some(slot => (slot || []).length > 0 && (slot || []).length < 3
+          && CARDS_BY_NAME[slot[0]]?.cardType === 'Ability');
+      }
+      return false;
     }
 
     // v1349: verwahrter Stapel (Madame Guillotine) — die Kopie gehoert dorthin.
@@ -37589,6 +37629,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if ((slot || []).length > 0 && slot[0] === abilityName) {
         return ppAbilityZoneOk(playerData, heroIdx, _z, abilityName);
       }
+    }
+    // 24.10.: Liegt der Stapel in einer SUPPORT Zone (Xal), gehoert die Kopie dorthin — und nirgendwo sonst hin.
+    const _supStapel = ppStapelOrt(playerData, heroIdx, abilityName);
+    if (_supStapel && _supStapel.kind === 'support') {
+      return !opts.nurAbilityZonen && (gameState.abilitySupportHeroes || []).includes(heroIdx)
+        && ppAbilityZoneOk(playerData, heroIdx, _supStapel.slot, abilityName, 'support');
     }
     // Doesn't have it — needs a free zone (versiegelte zaehlen nicht)
     if (abZones.some((slot, _z) => (slot || []).length === 0 && ppAbilityZoneOk(playerData, heroIdx, _z, abilityName))) return true;
@@ -39791,7 +39837,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           if (!prev || prev.targetHero < 0) return null;
           // During abilityAttach prompt — send as effect_prompt_response
           if (isAbilityAttachEligible) {
-            ppSendePromptAntwort(gameState, { cardName: prev.cardName, handIndex: prev.idx, heroIdx: prev.targetHero, zoneSlot: prev.targetZone });
+            ppSendePromptAntwort(gameState, { cardName: prev.cardName, handIndex: prev.idx, heroIdx: prev.targetHero, zoneSlot: prev.targetZone,
+              // 24.10.: auf eine Support Zone gezogen (Xal, Xalibur)
+              supportSlot: (prev.targetSupportZone != null && prev.targetSupportZone >= 0) ? prev.targetSupportZone : undefined });
           } else {
             socket.emit('play_ability', {
               roomId: gameState.roomId,
@@ -52405,26 +52453,34 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const abList = (p.abilityZones || [])[i] || [[],[],[]];
                 const isCustom = (gameState.customPlacementCards || []).includes(pick.cardName);
                 let targetSlot = -1;
-                if (isCustom) {
-                  for (let zi = 0; zi < 3; zi++) {
-                    if ((abList[zi] || []).length > 0 && abList[zi].length < 3) { targetSlot = zi; break; }
-                  }
-                } else {
-                  for (let zi = 0; zi < 3; zi++) {
-                    if ((abList[zi] || []).length > 0 && abList[zi][0] === pick.cardName && abList[zi].length < 3) { targetSlot = zi; break; }
-                  }
-                  if (targetSlot < 0) {
+                let targetSupport = -1;   // 24.10.: Support Zone (Xal, Xalibur)
+                if (isOpp) {
+                  // Styx: fremder Held — nur echte Ability Zonen.
+                  if (isCustom) {
                     for (let zi = 0; zi < 3; zi++) {
-                      if ((abList[zi] || []).length === 0) { targetSlot = zi; break; }
+                      if ((abList[zi] || []).length > 0 && abList[zi].length < 3) { targetSlot = zi; break; }
+                    }
+                  } else {
+                    for (let zi = 0; zi < 3; zi++) {
+                      if ((abList[zi] || []).length > 0 && abList[zi][0] === pick.cardName && abList[zi].length < 3) { targetSlot = zi; break; }
+                    }
+                    if (targetSlot < 0) {
+                      for (let zi = 0; zi < 3; zi++) {
+                        if ((abList[zi] || []).length === 0) { targetSlot = zi; break; }
+                      }
                     }
                   }
+                } else {
+                  // Eigener Held: bestehender Stapel (echte ODER Support Zone), sonst freie echte Zone, sonst freie Support Zone.
+                  const ort = ppAbilityZielOrt(p, i, pick.cardName, { custom: isCustom, supportOk: (gameState.abilitySupportHeroes || []).includes(i) });
+                  if (ort) { if (ort.kind === 'support') targetSupport = ort.slot; else targetSlot = ort.slot; }
                 }
-                if (targetSlot < 0) return;
+                if (targetSlot < 0 && targetSupport < 0) return;
                 if (pick.source === 'effectPrompt') {
                   // Server-driven tutor (Alex, …) — resolve the pending prompt.
                   // The server owns the actual placement; we just report
                   // where the player chose to land.
-                  ppSendePromptAntwort(gameState, { heroIdx: i, zoneSlot: targetSlot });
+                  ppSendePromptAntwort(gameState, { heroIdx: i, zoneSlot: targetSlot, ...(targetSupport >= 0 ? { supportSlot: targetSupport } : {}) });
                   setAbilityAttachPick(null);
                   return;
                 }
@@ -52433,6 +52489,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   roomId: gameState.roomId, cardName: pick.cardName,
                   handIndex: pick.handIndex, fromCreation: pick.fromCreation || undefined,
                   heroIdx: i, zoneSlot: targetSlot,
+                  ...(targetSupport >= 0 ? { supportSlot: targetSupport } : {}),
                   heroOwner: isOpp ? oppIdx : undefined,   // Styx
                 });
               }
@@ -53196,6 +53253,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   const abList = (p.abilityZones || [])[i] || [[],[],[]];
                   const isCustom = (gameState.customPlacementCards || []).includes(abilityAttachPick.cardName);
                   if (isCustom) return (abList[z] || []).length > 0 && abList[z].length < 3;
+                  if (ppStapelOrt(p, i, abilityAttachPick.cardName)?.kind === 'support') return false;   // 24.10.: der Stapel liegt in einer Support Zone (Xal)
                   let existingIdx = -1;
                   for (let zi = 0; zi < 3; zi++) {
                     if ((abList[zi] || []).length > 0 && abList[zi][0] === abilityAttachPick.cardName) { existingIdx = zi; break; }
@@ -53506,6 +53564,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // v768: Ability-Ziehen auf eine Support Zone (Xal).
               const isAbilitySupportTarget = !isOpp && abilityDrag
                 && abilityDrag.targetHero === i && abilityDrag.targetSupportZone === z;
+              // 24.10.: Click-to-attach (Effekt-Prompt `abilityAttachTarget` oder Handkarte angeklickt) auf eine SUPPORT Zone (Xal, Xalibur):
+              // dieselben Regeln wie die Ability Zonen — ein bestehender Stapel nimmt die Kopie, sonst eine freie Zone; hoechstens EIN Stapel je Ability.
+              const attachPickSupportValid = !isOpp && !!abilityAttachPick
+                && (gameState.abilitySupportHeroes || []).includes(i)
+                && !(Array.isArray(abilityAttachPick.eligibleHeroIdxs) && !abilityAttachPick.eligibleHeroIdxs.includes(i))
+                && canHeroReceiveAbility(p, i, abilityAttachPick.cardName, {
+                     skipAbilityGiven: !!abilityAttachPick.skipAbilityGiven,
+                     allowRestricted: abilityAttachPick.source === 'effectPrompt',
+                   })
+                && (((gameState.customPlacementCards || []).includes(abilityAttachPick.cardName))
+                  ? (((p.supportZones?.[i] || [])[z] || []).length > 0 && ((p.supportZones[i][z] || []).length < 3)
+                     && CARDS_BY_NAME[p.supportZones[i][z][0]]?.cardType === 'Ability')
+                  : ppAbilityZoneOk(p, i, z, abilityAttachPick.cardName, 'support'));
               // During creature drag: highlight valid zones, dim invalid ones.
               // v769: Eine AKTIVIERBARE Ability in dieser Support Zone
               // (Alchemy, Adventurousness …). Der Server meldet sie in
@@ -53888,10 +53959,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 || brackleSourceHidden.has(`${pi}-${i}-${z}`)
                 || pusherFlungHidden.has(`${pi}-${i}-${z}`);
               return (
-                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + ((gameState.creatureCounters || {})[`${pi}-${i}-${z}`]?._zoneAura === 'necro_flicker' ? ' board-zone-aura' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && equipTargetIds.some(id => accentGreenTargetIds.has(id)) ? ' potion-target-accent-green' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isRedMarkedEquipTarget ? ' potion-target-marked-red' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isAbilitySupportTarget ? ' board-zone-play-target' : '') + (supportAbilityEntry ? ' zone-ability-activatable' : '') + (abilityFlash && abilityFlash.zoneKind === 'support' && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z ? ' zone-ability-activated' : '') + (abilityBlockFlash && abilityBlockFlash.zoneKind === 'support' && abilityBlockFlash.owner === (isOpp ? oppIdx : myIdx) && abilityBlockFlash.heroIdx === i && abilityBlockFlash.zoneIdx === z ? ' zone-ability-blocked' : '') + (istSupportAbility && (isDead || isFrozenOrStunnedSup) ? ' board-zone-dead' : '') + ((isDragValidZoneAny || isCsppEmptySlot || isSummonPickZone) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + ((isHeroActionZoneDimmed && !isCsppEmptySlot) ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '') + stCreatureCls(pi, i, z)}
+                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + ((gameState.creatureCounters || {})[`${pi}-${i}-${z}`]?._zoneAura === 'necro_flicker' ? ' board-zone-aura' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && equipTargetIds.some(id => accentGreenTargetIds.has(id)) ? ' potion-target-accent-green' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isRedMarkedEquipTarget ? ' potion-target-marked-red' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + ((isAbilitySupportTarget || attachPickSupportValid) ? ' board-zone-play-target' : '') + (supportAbilityEntry ? ' zone-ability-activatable' : '') + (abilityFlash && abilityFlash.zoneKind === 'support' && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z ? ' zone-ability-activated' : '') + (abilityBlockFlash && abilityBlockFlash.zoneKind === 'support' && abilityBlockFlash.owner === (isOpp ? oppIdx : myIdx) && abilityBlockFlash.heroIdx === i && abilityBlockFlash.zoneIdx === z ? ' zone-ability-blocked' : '') + (istSupportAbility && (isDead || isFrozenOrStunnedSup) ? ' board-zone-dead' : '') + ((isDragValidZoneAny || isCsppEmptySlot || isSummonPickZone) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + ((isHeroActionZoneDimmed && !isCsppEmptySlot) ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '') + stCreatureCls(pi, i, z)}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'} data-card-name={cards[0] || ''}
                   data-versiegelt={ppVerwahrung(gameState.players?.[pi], i, 'support', z).versiegelt ? '1' : undefined}
-                  onClick={supportAbilityEntry ? () => {
+                  onClick={attachPickSupportValid ? () => {
+                    const pick = abilityAttachPick;
+                    if (window.playSFX) window.playSFX('ui_click');
+                    if (pick.source === 'effectPrompt') {
+                      ppSendePromptAntwort(gameState, { heroIdx: i, zoneSlot: -1, supportSlot: z });
+                      setAbilityAttachPick(null);
+                      return;
+                    }
+                    setAbilityAttachPick(null);
+                    socket.emit('play_ability', {
+                      roomId: gameState.roomId, cardName: pick.cardName,
+                      handIndex: pick.handIndex, fromCreation: pick.fromCreation || undefined,
+                      heroIdx: i, zoneSlot: -1, supportSlot: z,
+                    });
+                  } : supportAbilityEntry ? () => {
                     // v769: Aktivierbare Ability in einer Support Zone
                     // (Xal). Derselbe Kanal wie in einer echten
                     // Ability-Zone — nur `zoneKind` sagt, wo sie liegt.

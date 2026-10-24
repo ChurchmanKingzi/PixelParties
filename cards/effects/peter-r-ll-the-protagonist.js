@@ -26,32 +26,6 @@ const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Peter Röll, the Protagonist';
 
-/** Pick the zone slot the tutored ability will land in. Mirrors Alex's helper. */
-function findTargetZone(abZones, cardName, engine = null, pi = null, heroIdx = null, wunsch = -1) {
-  // ★★ v1349: mit Engine-Kontext entscheidet die EINE Stelle
-  // (`engine.abilityZielZone`, verwahrte Abilities / Madame Guillotine).
-  if (engine && pi != null && heroIdx != null) {
-    return engine.abilityZielZone(pi, heroIdx, cardName, { wunschZone: wunsch });
-  }
-  const script = loadCardEffect(cardName);
-  if (script?.customPlacement) {
-    for (let z = 0; z < 3; z++) {
-      if (script.customPlacement.canPlace(abZones[z] || [])) return z;
-    }
-    return -1;
-  }
-  // Stack onto an existing same-name slot (< 3 stacked) first ...
-  for (let z = 0; z < 3; z++) {
-    const slot = abZones[z] || [];
-    if (slot.length > 0 && slot[0] === cardName && slot.length < 3) return z;
-  }
-  // ... else first empty slot.
-  for (let z = 0; z < 3; z++) {
-    if ((abZones[z] || []).length === 0) return z;
-  }
-  return -1;
-}
-
 /** True if `hero` is currently controlled by `controllerIdx` (own or charmed). */
 function isHeroControlledBy(engine, hero, controllerIdx) {
   if (!hero) return false;
@@ -146,30 +120,19 @@ async function offerAttach(ctx) {
     const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenAbility, { source: CARD_NAME });   // v820: Stapel-Schicht
     if (!_taken_deckIdx) return;
 
-    const abZones = hps.abilityZones[heroIdx] || [[], [], []];
-    hps.abilityZones[heroIdx] = abZones;
-    const targetZone = findTargetZone(abZones, chosenAbility, engine, feld, heroIdx);
-    if (targetZone < 0) {
+    // 24.10.: echte Ability Zone ODER Support Zone (Xal); hoechstens EIN Stapel je Ability.
+    const ort = engine.abilityZielOrt(feld, heroIdx, chosenAbility);
+    if (!ort) {
       // Race: zone filled between the gate check and now. Restore.
       ps.mainDeck.push(chosenAbility);
       engine.shuffleDeck(pi, 'main');
       return;
     }
-    if (!abZones[targetZone]) abZones[targetZone] = [];
-    abZones[targetZone].push(chosenAbility);
-
-    const inst = engine._trackCard(chosenAbility, feld, 'ability', heroIdx, targetZone);
+    const inst = engine.abilityOrtBelegen(feld, heroIdx, chosenAbility, ort);
     if (feld !== pi) inst.originalOwner = pi;   // wie doPlayAbilityFremd: Seite `feld`, gehoert `pi`
     engine._broadcastEvent('deck_search_add', { cardName: chosenAbility, playerIdx: pi });
 
-    await engine.runHooks('onPlay', {
-      _onlyCard: inst, playedCard: inst, cardName: chosenAbility,
-      zone: 'ability', heroIdx, _skipReactionCheck: true,
-    });
-    await engine.runHooks('onCardEnterZone', {
-      enteringCard: inst, toZone: 'ability', toHeroIdx: heroIdx,
-      _skipReactionCheck: true,
-    });
+    await engine.abilityOrtHooks(inst, ort, { _skipReactionCheck: true });
 
     engine.shuffleDeck(pi, 'main');
     const oi = engine.opponentOf(pi);
