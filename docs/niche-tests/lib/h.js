@@ -416,10 +416,13 @@ function attachHelpers(t) {
       }
       for (let hi = 0; hi < 3; hi++) for (let zi = 0; zi < 3; zi++) {
         const z = ps.supportZones[hi][zi] || [];
-        if (z.length > 1) bad.push(`seat${s}.support[${hi}][${zi}] hält ${z.length} Karten: ${z.join(',')}`);
+        // Mehrere Karten in EINEM Platz sind nur der Equip-Stapel eines Helden mit `equipsShareZone` (Darion) erlaubt (Alice-Stapel: eigene Prüfung in lib/alice-brett.js).
+        const darionStapel = z.length > 1 && !!(engine.heroScript(s, hi) || {}).equipsShareZone && z.every(nm => engine.isEquipInZone(nm));
+        if (z.length > 1 && !darionStapel) bad.push(`seat${s}.support[${hi}][${zi}] hält ${z.length} Karten: ${z.join(',')}`);
         for (const nm of z) {
           const insts = engine.cardInstances.filter(c => c.zone === 'support' && c.owner === s && c.heroIdx === hi && c.zoneSlot === zi && c.name === nm);
-          if (insts.length !== 1) bad.push(`seat${s}.support[${hi}][${zi}] "${nm}": ${insts.length} Instanzen`);
+          const erwartet = darionStapel ? z.filter(x => x === nm).length : 1;
+          if (insts.length !== erwartet) bad.push(`seat${s}.support[${hi}][${zi}] "${nm}": ${insts.length} Instanzen (erwartet ${erwartet})`);
         }
       }
       for (const h of ps.heroes) if (h && h.name) {

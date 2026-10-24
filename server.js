@@ -7843,6 +7843,10 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     // a free-side equip targeting their Hero.
     if (!placementPs.supportZones[heroIdx]) placementPs.supportZones[heroIdx] = [[], [], []];
     let finalSlot = zoneSlot;
+    // ★ Darion, the Blood-Crazy Groundskeeper: ein neues Equip gehoert PFLICHT in den bestehenden Equip-Stapel des Helden — der Platz ist vorgegeben (auch wenn der Spieler
+    // keinen oder einen anderen gewaehlt hat); frei ist er nicht, er nimmt das Equip trotzdem auf.
+    const _equipStapelPlatz = room.engine.equipPflichtPlatz(placementOwner, heroIdx, cardName);
+    if (_equipStapelPlatz >= 0) finalSlot = _equipStapelPlatz;
     if (finalSlot < 0) {
       for (let z = 0; z < 3; z++) {
         if (!room.engine.supportSlotBelegt(placementOwner, heroIdx, z)) { finalSlot = z; break; }   // v1349: versiegelt = belegt
@@ -7850,7 +7854,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       if (finalSlot < 0) return false;
     }
     if (finalSlot < 0 || finalSlot >= 3) return false;
-    if (room.engine.supportSlotBelegt(placementOwner, heroIdx, finalSlot)) return false;   // v1349: versiegelt = belegt
+    if (_equipStapelPlatz < 0 && room.engine.supportSlotBelegt(placementOwner, heroIdx, finalSlot)) return false;   // v1349: versiegelt = belegt
 
     (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
     room.engine.notePlayedFromHand(pi);

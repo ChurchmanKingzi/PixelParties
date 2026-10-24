@@ -118,7 +118,9 @@ async function chooseAndEquip(engine, pi, entries, opts = {}) {
   const cost = typeof opts.costOf === 'function' ? (opts.costOf(entry.name, cd) || 0) : 0;
   if (cost > 0 && !engine.canAffordGold(pi, cost, entry.name)) return false;
 
-  const dests = equipDestinations(engine, pi, entry.name, { sides: [pi] });
+  // `opts.nurHeld` {side, heroIdx}: nur dieser Held (Darion: „equip it to this Hero").
+  const dests = equipDestinations(engine, pi, entry.name, { sides: [pi] })
+    .filter(d => !opts.nurHeld || (d.side === opts.nurHeld.side && d.heroIdx === opts.nurHeld.heroIdx));
   if (dests.length === 0) return false;
   let dest = dests[0];
   if (dests.length > 1) {

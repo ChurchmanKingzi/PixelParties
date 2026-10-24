@@ -16479,6 +16479,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
   }
 
+  /**
+   * Darion, the Blood-Crazy Groundskeeper — „All Artifacts equipped to this Hero share 1 Support Zone": der Platz, in den ein neues Equip
+   * `cardName` bei diesem Helden (Brettseite `seite`) PFLICHT-GEMAESS gehoert (der Platz mit den schon liegenden Equips), sonst -1.
+   * Zentrale Frage fuer jede Platzierung (Hand, Effekte, Umhaengen) — siehe `_equip-stack-shared.js`.
+   */
+  equipPflichtPlatz(seite, heroIdx, cardName) {
+    return require('./_equip-stack-shared').pflichtPlatzFuer(this, seite, heroIdx, cardName);
+  }
+
   safePlaceInSupport(cardName, playerIdx, heroIdx, zoneSlot, opts = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return null;
@@ -16506,6 +16515,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     let actualSlot = zoneSlot;
+    // ★ Darion: ein neues Equip gehoert in den bestehenden Equip-Stapel des Helden — Pflicht, kein Wunschplatz (`equipPflichtPlatz`).
+    const _equipStapelSlot = opts.coverNested ? -1 : this.equipPflichtPlatz(playerIdx, heroIdx, cardName);
+    if (_equipStapelSlot >= 0) actualSlot = _equipStapelSlot;
     // ── Geteilte Zonen (Alice, the Transfer Student) ─────────────────
     // ★ 18.8., Als Testbefund: die NORMALE Beschwoerung von der Hand
     // laeuft nicht ueber `actionPlaceCreature`, sondern hier durch.
@@ -16543,7 +16555,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Check if desired slot is occupied
     let shareHere = false;
     if (!coverHere && !_frei(actualSlot)) {
-      if ((ps.supportZones[heroIdx][actualSlot] || []).length > 0 && mayShare(actualSlot)) {
+      if ((ps.supportZones[heroIdx][actualSlot] || []).length > 0 && (_equipStapelSlot >= 0 || mayShare(actualSlot))) {
         // Gewuenschter Platz ist besetzt, aber von einer Namensgleichen
         // — die Karte stoesst dazu, statt woandershin verschoben zu
         // werden. Genau das ist Alices Wirkung.
@@ -17892,7 +17904,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         for (let si = 0; si < 3; si++) {
           if (((ps.supportZones[hi] || [])[si] || []).length === 0) { frei = true; break; }
         }
-        if (!frei) continue;
+        if (!frei && this.equipPflichtPlatz(playerIdx, hi, cardName) < 0) continue;   // Darion: der Equip-Stapel zaehlt als Platz
       }
       if (this.canEquipCardToHero(cardName, playerIdx, hi)) return true;
     }
@@ -17920,8 +17932,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const fromPs = gs.players[fromPlayerIdx];
     const toPs = gs.players[toPlayerIdx];
     if (!fromPs || !toPs) return { success: false };
+    // ★ Darion: ein Equip, das zu einem Helden mit Equip-Stapel wandert, kommt in DEN Stapel (Pflicht), egal welcher Platz gemeint war.
+    const _stapelZiel = this.istEquipArtifact(inst) ? this.equipPflichtPlatz(toPlayerIdx, destHeroIdx, inst.name) : -1;
+    if (_stapelZiel >= 0) destSlotIdx = _stapelZiel;
     const zielZone = (toPs.supportZones[destHeroIdx] || [])[destSlotIdx];
-    if (!Array.isArray(zielZone) || zielZone.length > 0) return { success: false };
+    if (!Array.isArray(zielZone) || (zielZone.length > 0 && _stapelZiel < 0)) return { success: false };
     // Ausruest-Beschraenkungen gelten AUCH beim Umhaengen (Al 19.8.:
     // „ein Crusader's-Equip kann NUR auf eine Cecilia gestohlen
     // werden"). Vorgelagerte Aufrufer sollten das schon im Auslöser
@@ -23838,6 +23853,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!heroCanBeEquipped(h)) continue;
         const sz = sidePs.supportZones?.[hi] || [];
         for (let z = 0; z < 3; z++) if ((sz[z] || []).length === 0) return true;
+        if (require('./_equip-stack-shared').stapelPlatz(this, this.gs.players.indexOf(sidePs), hi) >= 0 && require('./_equip-stack-shared').teilenAktiv(this, this.gs.players.indexOf(sidePs), hi)) return true;   // Darion: der Equip-Stapel nimmt weitere auf
       }
       return false;
     };
