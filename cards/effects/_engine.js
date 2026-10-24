@@ -3000,6 +3000,13 @@ class GameEngine {
   }
 
   async runHooks(hookName, hookCtx = {}) {
+    // ★ W73a (Ankhota): Kreaturen, die der Sonderweg gelöscht statt auf die Hand zurückgenommen hat, sind nicht „returned to hand" — aus der Meldung nehmen.
+    if (hookName === 'onCardsReturnedToHand' && Array.isArray(hookCtx?.returnedInsts) && hookCtx.returnedInsts.some(i => i?._ankhotaGeloescht)) {
+      const keep = hookCtx.returnedInsts.map(i => !i?._ankhotaGeloescht);
+      const pick = (arr) => Array.isArray(arr) && arr.length === keep.length ? arr.filter((_, k) => keep[k]) : arr;
+      hookCtx = { ...hookCtx, returnedCards: pick(hookCtx.returnedCards), returnedInsts: pick(hookCtx.returnedInsts), fromHeroIdxs: pick(hookCtx.fromHeroIdxs), fromZoneSlots: pick(hookCtx.fromZoneSlots), ...(hookCtx.fromOwners ? { fromOwners: pick(hookCtx.fromOwners) } : {}) };
+      if (!hookCtx.returnedInsts.length) return;
+    }
     // 23.10. (Tearing Mountain): das Schutzfenster „would be affected by a card or effect" (Cool Rescuer Monia, Elusive Hind, Warrior of Teocuilatl, Winged Skeleton,
     // Vinny …) NEGIERT den Effekt. Gilt für den gesetzten Status der Schutz als aufgehoben (`statusSchutzAufgehoben`), öffnet das Fenster gar nicht erst — auch nicht
     // für Karten, die es selbst um ihren Status-Effekt herum öffnen (Burning Skeleton, Grunge Harpyformer …; sie geben `statusName` mit).
@@ -13001,11 +13008,36 @@ class GameEngine {
    * Erzeugungen, die keine Such-Hooks ausloesen (auch aus nicht-async
    * Kontexten nutzbar). `false` = kein Spieler/Name.
    */
+  /**
+   * ★ W73a (Ankhota, the Burier): „Delete all Creatures that are moved from the board to anywhere else." — gilt die Löschung gerade für diese Kreatur-KARTE (Instanz `inst` oder Name `cardName`,
+   * die das Brett verlässt)? Wahr, solange irgendwo ein wirksamer Ankhota (Skript-Flag `deletesCreaturesMovedFromBoard`) offen auf dem Brett steht; Tokens zählen nicht (eigene Wege).
+   */
+  ankhotaLoeschtVomBrett(inst, cardName = null) {
+    const cd = inst ? (this.getEffectiveCardData(inst) || this._getCardDB()[inst.name]) : this._getCardDB()[cardName];
+    if (!cd || !hasCardType(cd, 'Creature') || hasCardType(cd, 'Token')) return false;
+    for (const c of this.cardInstances || []) {
+      if (c.zone !== ZONES.SUPPORT || c.faceDown || c.counters?.negated || c.counters?.nulled) continue;
+      if (!loadCardEffect(c.name)?.deletesCreaturesMovedFromBoard || this.isCardPassiveDormant(c)) continue;
+      return true;
+    }
+    return false;
+  }
+
   handZugangSync(pi, cardName, opts = {}) {
     pi = this._resolvePi(pi);
     const ps = this.gs.players[pi];
     if (!ps || !cardName) return false;
     if (this._tokenStattKarte(ps, cardName)) return false;   // Z5: Token nie auf die Hand
+    // ★ W73a (Ankhota): ein Sonderweg „vom Brett zurück auf die Hand" (Deepsea-Bounce/-Swap, Sparkfly, Jenny, Winged Skeleton …), der den zentralen Move umgeht, endet im Gelöscht-Stapel des Besitzers.
+    if ((opts.vonInst || opts.von === 'brett') && this.ankhotaLoeschtVomBrett(opts.vonInst || null, cardName)) {
+      const besitzer = opts.originalOwner ?? (opts.vonInst ? this.kartenBesitzerVon(opts.vonInst) : pi);
+      const bps = this.gs.players[besitzer] || ps;
+      if (opts.vonInst) opts.vonInst._ankhotaGeloescht = true;
+      bps.deletedPile.push(cardName);   // meldet die Löschung (Ankhotas Zuwachs) über den Stapel-Wächter
+      this.log('ankhota_delete', { player: bps.username, card: cardName, by: opts.source || null });
+      this.sync();
+      return null;
+    }
     if (!ps.hand) ps.hand = [];
     const idx = (opts.idx != null && opts.idx >= 0 && opts.idx <= ps.hand.length) ? opts.idx : ps.hand.length;
     ps.hand.splice(idx, 0, cardName);

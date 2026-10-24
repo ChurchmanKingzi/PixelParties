@@ -462,7 +462,7 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
   // erst danach die Instanz; ohne die Platzmarke landete eine dauerhaft uebernommene Fremdkreatur in der Ablage des Uebernehmers.
   const newInst = engine.handZugangSync(ps, cardName, { von: 'brett', originalOwner: engine.kartenBesitzerVon(targetInst) });
   // W3 (Al 14.10.2026): die Karte bleibt Eigentum ihres PERMANENTEN Besitzers (nicht der Brettseite, auf der sie gerade liegt).
-  newInst.originalOwner = engine.kartenBesitzerVon(targetInst);
+  if (newInst) newInst.originalOwner = engine.kartenBesitzerVon(targetInst);
 
   // (Der Flug ist oben schon rausgegangen — VOR dem Zustand, s. dort.)
   engine.log('sparkfly_steal', {
@@ -473,10 +473,12 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
     fromOwner: gs.players[owner]?.username,
   });
 
-  await engine.runHooks('onCardAddedToHand', {
-    playerIdx: pi, card: newInst, cardName,
-    source: sourceName, _skipReactionCheck: true,
-  });
+  if (newInst) {   // Ankhota: eine gelöschte Kreatur kam nie auf die Hand
+    await engine.runHooks('onCardAddedToHand', {
+      playerIdx: pi, card: newInst, cardName,
+      source: sourceName, _skipReactionCheck: true,
+    });
+  }
 
   engine.sync();
   return true;
