@@ -15884,7 +15884,7 @@
     "hp": 10,
     "atk": null,
     "cost": null,
-    "effect": "When you play this Creature, choose up to 2 Artifacts with different names from your discard pile and shuffle them back into your deck. When this Creature is defeated, you may search your deck for an Artifact, reveal it and add it to your hand. You can only activate this effect of \"Motharch Squire\" once per turn.",
+    "effect": "When you summon this Creature, choose up to 2 Artifacts with different names from your discard pile and shuffle them back into your deck. When this Creature is defeated, you may search your deck for an Artifact, reveal it and add it to your hand. You can only activate this effect of \"Motharch Squire\" once per turn.",
     "archetype": "Motharch",
     "setID": "PP CROSS",
     "banned": "",

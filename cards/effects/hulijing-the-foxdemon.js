@@ -12,8 +12,15 @@
 //
 //  ── INFRASTRUKTUR „HELD ALS KREATUR" ────────────────────────────────────
 //  Dieses ist die erste Karte mit „Hero treated as a Creature": Modell, Regeln und alle Anbindungen stehen in `_hero-creature-shared.js`. Kurz: die Kreatur liegt als Überlagerung
-//  (Zone `support` ohne Zonenplatz, Marke `_heldKreatur`) AUF Hulijing, ihre Hooks laufen mit Hulijing als Wirt, ihr Schaden ist Heldenschaden (HP unverändert), Wahlen „nur Kreaturen" bieten Hulijing mit
+//  (Zone `support` ohne Zonenplatz, Marke `_heldKreatur`) AUF Hulijing, ihre Hooks laufen mit Hulijing als Wirt, ihr Schaden ist Heldenschaden (geteilte HP, max HP = die der Kreatur, s. u.), Wahlen „nur Kreaturen" bieten Hulijing mit
 //  an, fällt sie, gilt sie auch als Kreatur besiegt (die Karte bleibt bis zum Zugende liegen), und am Zugende wird die Karte gelöscht.
+//
+//  ── MAX HP WÄHREND DER VERWANDLUNG (Ruling 24.10.) ──────────────────────
+//  Die AKTUELLEN HP bleiben unverändert, die MAXIMALEN HP werden auf die der Kreatur gesetzt (aufgedruckte HP), solange sie aufliegt. Liegen die aktuellen HP darüber, ist das ein
+//  Overheal wie bei Nao (z. B. 400 / 30): Heilung bringt dann 0, Schaden zehrt das Overheal ab. Alles, was die max HP liest, sieht den neuen Wert — z. B. heilt Lamenting Knight
+//  die HÄLFTE DER KREATUR-MAX-HP (90 → 45), auch wenn er auf Hulijing selbst liegt. Am Zugende wird die Differenz ADDITIV zurückgegeben (Änderungen währenddessen, z. B. Arnolds +40,
+//  bleiben; nie unter 1); aktuelle HP, die nur wegen eines erhöhten Maximums über dem alten lagen, verfallen auf den Stand beim Auflegen. Umsetzung: `erzeugen` / `maxHpZurueck`
+//  in `_hero-creature-shared.js` (Log `hero_creature_max_hp`); Heilung und `increaseMaxHp` auf die Überlagerung laufen auf den Helden.
 //
 //  ── AKTIVIERUNG ─────────────────────────────────────────────────────────
 //  Freier Heldeneffekt (kein „spend your Action" im Text), hart einmal pro Zug (Engine-HOPT). `heroEffect: true` + `onHeroEffect`.
