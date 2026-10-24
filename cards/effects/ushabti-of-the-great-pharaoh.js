@@ -54,6 +54,7 @@ module.exports = {
     const heroIdx = target.heroIdx;
     const slotIdx = target.slotIdx;
     const ps = gs.players[heroOwner];
+    if (engine.surprisesLockedFor(pi)) return false;   // Arcane Eyes (Welle 72): der Gegner kontrolliert wirksame Augen — keine Surprise setzen
 
     if ((ps.surpriseZones?.[heroIdx] || []).length > 0) return false;
 

@@ -93,6 +93,7 @@ async function place(engine, o) {
   const zonePs = gs.players[seite];
   const hero = zonePs?.heroes?.[heroIdx];
   if (!deckPs || !zonePs || !hero?.name || hero.hp <= 0) return null;
+  if (engine.surprisesLockedFor(pi)) return null;                             // Arcane Eyes (Welle 72): der Gegner kontrolliert wirksame Augen — keine Surprise setzen
   if (!zonePs.surpriseZones) zonePs.surpriseZones = [[], [], []];
   if ((zonePs.surpriseZones[heroIdx] || []).length > 0) return null;          // die Zone muss FREI sein (auch bei Bakhm: nicht seine Support Zonen)
   if (!(deckPs.mainDeck || []).includes(cardName)) return null;

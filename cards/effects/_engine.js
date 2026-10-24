@@ -4256,6 +4256,25 @@ class GameEngine {
         if (kJetzt != null) hookCtx._noIncreaseRef = (hookCtx._noIncreaseRef != null) ? Math.min(hookCtx._noIncreaseRef, kJetzt) : kJetzt;
       },
       /**
+       * „… damage becomes N" (Shrink, 24.10.): der Schaden WIRD N — unabhaengig von der Listener-Reihenfolge. Basis := N; schon gesammelte ERHOEHUNGEN (Verdopplung, +X) verfallen,
+       * Senkungen (Halbierung, Stoneskin −100 …) bleiben und wirken weiter auf N; spaetere Erhoehungen werden abgewiesen (einseitige Klammer wie `preventIncrease`), spaetere Senkungen
+       * wirken. Die Engine klemmt den Endbetrag zusaetzlich NACH den Boni, die die Hook-Runde umgehen (`_flatBonus`: Darge-Pfeile, Niu) auf N. `cannotBeReduced` hat Vorrang (kein Senken).
+       * Anders als `setAmount` loescht es keine fremden Senkungen — sonst haenge das Ergebnis davon ab, ob die Abzugs-Karte vor oder nach der Shrink-Karte laeuft.
+       */
+      becomeAmount(n) {
+        if (hookCtx.amount === undefined) return;
+        if (hookCtx.cannotBeReduced && n < engine._projectedAmount(hookCtx)) return;
+        hookCtx.amount = n;
+        if ((hookCtx._mul ?? 1) > 1) hookCtx._mul = 1;
+        if ((hookCtx._flat || 0) > 0) hookCtx._flat = 0;
+        if ((hookCtx._kMul ?? 1) > 1) hookCtx._kMul = 1;
+        if ((hookCtx._kFlat || 0) > 0) hookCtx._kFlat = 0;
+        hookCtx.cannotBeIncreased = true;
+        const jetzt = engine._projectedAmount(hookCtx);
+        hookCtx._noIncreaseFrom = (hookCtx._noIncreaseFrom != null) ? Math.min(hookCtx._noIncreaseFrom, jetzt) : jetzt;
+        hookCtx._becomesAmount = (hookCtx._becomesAmount != null) ? Math.min(hookCtx._becomesAmount, n) : n;
+      },
+      /**
        * Absolutes Setzen (Deckel, Nullsetzen). Fuer den Kettenbetrag (Ricochet, W50a) gilt es als SCHILD/NEGATION und wird nicht weitergegeben,
        * ausser `opt.kette` benennt es als Senkung: `{ kette: { mul: 0.5 } }` (Halbieren) bzw. `{ kette: { flat: -n } }` (Abzug um n).
        */
@@ -6729,14 +6748,25 @@ class GameEngine {
     });
     e.modifyAmount = (delta, opt) => {
       if (e.cannotBeReduced && delta < 0) return;
+      if (e._becomes != null && delta > 0) return;   // nach `becomeAmount` keine Erhoehung mehr
       e._flat += delta;
       if (!(opt && opt.schild)) e._kFlat += delta;   // `schild`: verbrauchbarer Einmal-Schutz, senkt den Treffer, nicht den Kettenbetrag
     };
     e.multiplyAmount = (factor) => {
       if (!(factor >= 0)) return;
       if (e.cannotBeReduced && factor < 1) return;
+      if (e._becomes != null && factor > 1) return;   // nach `becomeAmount` keine Erhoehung mehr
       e._mul *= factor;
       e._kMul *= factor;
+    };
+    e.becomeAmount = (n) => {   // „damage becomes N" (Shrink) — s. `ctx.becomeAmount`
+      if (e.cannotBeReduced && n < e.amount) return;
+      e._base = Math.max(0, n || 0);
+      if (e._mul > 1) e._mul = 1;
+      if (e._flat > 0) e._flat = 0;
+      if (e._kMul > 1) e._kMul = 1;
+      if (e._kFlat > 0) e._kFlat = 0;
+      e._becomes = (e._becomes != null) ? Math.min(e._becomes, n) : n;
     };
     e.setAmount = (v, opt) => {
       if (e.cannotBeReduced && v < e.amount) return;
@@ -6757,11 +6787,12 @@ class GameEngine {
   /** Sammler verrechnen, Eintrag wieder eine plain Zahl. */
   _settleCreatureEntry(e) {
     if (!e || typeof e.multiplyAmount !== 'function') return;
-    const endwert = e.amount;
+    let endwert = e.amount;
+    if (e._becomes != null && endwert > e._becomes) endwert = e._becomes;   // `becomeAmount`: kein Bonus (Pfeile, Elixir …) hebt den Betrag ueber N
     delete e.amount;                 // Accessor entfernen …
     e.amount = endwert;              // … und als Datenfeld neu setzen
-    delete e._base; delete e._flat; delete e._mul; delete e._kBase; delete e._kFlat; delete e._kMul;
-    delete e.modifyAmount; delete e.multiplyAmount; delete e.setAmount; delete e.lockReduction;
+    delete e._base; delete e._flat; delete e._mul; delete e._kBase; delete e._kFlat; delete e._kMul; delete e._becomes;
+    delete e.modifyAmount; delete e.multiplyAmount; delete e.setAmount; delete e.lockReduction; delete e.becomeAmount;
   }
 
   /**
@@ -9603,6 +9634,8 @@ class GameEngine {
     // per-arrow Attack bonus). Added AFTER the multiplier pass so
     // halving / doubling effects can't touch it.
     if (hookCtx._flatBonus && !hookCtx._kettenFolge) hookCtx.amount += hookCtx._flatBonus;
+    // `ctx.becomeAmount(n)` („damage becomes N", Shrink): auch Boni, die die Hook-Runde umgehen, koennen den Betrag nicht ueber N heben.
+    if (hookCtx._becomesAmount != null && hookCtx.amount > hookCtx._becomesAmount) hookCtx.amount = hookCtx._becomesAmount;
     // W50a (Ricochet, Al 22.10.2026): Kettenbetrag = Schaden nach allen SENKUNGEN, vor Schilden/Blocks/Negation/Deckeln (Haltepunkt HIER; die
     // Schilde folgen unten). Senkungen NACH dem Haltepunkt (Interference-Halbierung, Halbierungs-Reaktionen) kuerzen ihn per `_kettenSenkung`.
     if (opts?.vollOut) {
@@ -13053,11 +13086,73 @@ class GameEngine {
     if (bag.hand[cardName] <= 0) delete bag.hand[cardName];
   }
 
+  // ═══ ARCANE EYES (24.10., Welle 72) ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+  // „While you control this Creature, your opponent cannot place or activate Surprises and must play with their hand revealed." Die Karte ist ein DAUERNDER Passiv: sie wirkt, solange
+  // sie aufgedeckt auf dem Brett steht und nicht ruht (Frost, Betaeubung, Negation — `isCardPassiveDormant`). EINE Stelle fuer alle Leser:
+  //  • `arcaneEyesFor(ctrl)`            die wirksame Kopie, die `ctrl` kontrolliert (oder null),
+  //  • `surprisesLockedFor(pi)`         darf `pi` keine Surprises setzen/aktivieren? (der Gegner kontrolliert wirksame Augen),
+  //  • `handsRevealedTo(beob, besitzer)` sieht `beob` die GANZE Hand von `besitzer` (Zustandsversand, Gedaechtnis der CPU),
+  //  • `revealedHandIndices(pi)` / `anyHandCardRevealed()`  welche Handkarten gelten als aufgedeckt (alle Wege: Luna Kiai, Bamboo Shield, Crystals, Madaga, Arcane Eyes).
+  arcaneEyesFor(ctrlIdx) {
+    if (ctrlIdx == null || ctrlIdx < 0) return null;
+    return (this.cardInstances || []).find(c => c.name === 'Arcane Eyes' && c.zone === ZONES.SUPPORT && !c.faceDown
+      && this.kontrolleurVon(c) === ctrlIdx && !this.isCardPassiveDormant(c)) || null;
+  }
+
+  surprisesLockedFor(pi) {
+    return !!this.arcaneEyesFor(this.opponentOf(pi));
+  }
+
+  handsRevealedTo(observerIdx, ownerIdx) {
+    if (observerIdx == null || ownerIdx == null || observerIdx === ownerIdx) return false;
+    if (this.opponentOf(observerIdx) !== ownerIdx) return false;
+    return !!this.arcaneEyesFor(observerIdx);
+  }
+
+  /** Handindizes von `pi`, die als aufgedeckt gelten (Menge). */
+  revealedHandIndices(pi) {
+    const ps = this.gs.players?.[pi];
+    const out = new Set();
+    if (!ps) return out;
+    const hand = ps.hand || [];
+    if (this.handsRevealedTo(this.opponentOf(pi), pi)) { hand.forEach((_, i) => out.add(i)); return out; }
+    for (const m of [ps._revealedHandIndices, ps._permanentlyRevealedHandIndices]) {
+      for (const k of Object.keys(m || {})) { const i = +k; if (m[k] && i >= 0 && i < hand.length) out.add(i); }
+    }
+    // Karten, die selbst als aufgedeckt gestempelt sind (Crystals, Bamboo Shield, Luna Kiai pro Zug): K-te getrackte Instanz des Namens ↔ K-te Handposition des Namens
+    const rang = {}; const gestempelt = {};
+    for (const inst of (this.cardInstances || [])) {
+      if (inst.owner !== pi || inst.zone !== ZONES.HAND) continue;
+      const k = rang[inst.name] || 0; rang[inst.name] = k + 1;
+      if (inst.counters?._permanentlyRevealed || inst.counters?._revealedThisTurn) (gestempelt[inst.name] || (gestempelt[inst.name] = new Set())).add(k);
+    }
+    if (Object.keys(gestempelt).length > 0) {
+      const pos = {};
+      hand.forEach((name, i) => { const k = pos[name] || 0; pos[name] = k + 1; if (gestempelt[name]?.has(k)) out.add(i); });
+    }
+    // Madagas zeitweise Aufdeckung (Zaehler je Name, die LETZTEN N Kopien)
+    const zaehler = ps._revealedCardCounts;
+    if (zaehler && Object.keys(zaehler).length > 0 && (!ps._revealedCardExpiry || Date.now() < ps._revealedCardExpiry)) {
+      const rest = { ...zaehler };
+      for (let i = hand.length - 1; i >= 0; i--) { if (rest[hand[i]] > 0) { out.add(i); rest[hand[i]]--; } }
+    }
+    return out;
+  }
+
+  /** Ist irgendeine Handkarte irgendeines Spielers aufgedeckt? (Arcane Eyes: Zusatzaktion) */
+  anyHandCardRevealed() {
+    for (let pi = 0; pi < (this.gs.players || []).length; pi++) if (this.revealedHandIndices(pi).size > 0) return true;
+    return false;
+  }
+
   /** Aktuell aufgedeckte Handkarten in das Gedaechtnis der Gegenseite holen. */
   sweepRevealedHands() {
     for (let pi = 0; pi < (this.gs.players || []).length; pi++) {
       const ps = this.gs.players[pi];
-      const revealed = ps?._revealedHandIndices;
+      // Arcane Eyes: die ganze Hand liegt offen vor dem Kontrolleur der Augen
+      const revealed = this.handsRevealedTo(this.opponentOf(pi), pi)
+        ? Object.fromEntries((ps?.hand || []).map((_, i) => [i, true]))
+        : ps?._revealedHandIndices;
       if (!revealed) continue;
       const observer = this.opponentOf(pi);
       for (const key of Object.keys(revealed)) {
@@ -31982,6 +32077,23 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _waehlbar = validTargets.filter(t => !t.ineligible);
     if (_waehlbar.length === 0 && validTargets.some(t => t.ineligible)) return [];
 
+    // ★ Clone (24.10., Welle 72): „an exact copy … against the same target(s)". Waehrend einer Kopie (`gs._klonWiedergabe`) beantwortet die Engine die Zielwahlen des Wirkers
+    // mit der AUFGEZEICHNETEN Wahl des Originals (siehe `_zielwahlAbschliessen`, Aufnahme) — dieselbe Titelzeile, in Aufnahme-Reihenfolge. Nur die noch waehlbaren Ziele zaehlen;
+    // ist keines mehr waehlbar, bleibt die Wahl leer (die Kopie hat dann kein Ziel). Danach laufen Schutz-/Umlenk-Fenster wie bei jeder Wahl.
+    {
+      const wg = this.gs._klonWiedergabe;
+      if (wg && playerIdx === wg.pi) {
+        const k = wg.queue.findIndex(e => e.title === (config.title || ''));
+        if (k >= 0) {
+          const e = wg.queue.splice(k, 1)[0];
+          const ok = new Set(_waehlbar.map(t => t.id));
+          const ids = e.ids.filter(id => ok.has(id));
+          this.log('clone_replay_target', { title: config.title || '', wanted: e.ids, used: ids });
+          return await this._zielwahlAbschliessen(playerIdx, validTargets, config, ids);
+        }
+      }
+    }
+
     // ★ W63d: Zielwahl des ANDEREN Spielers (nicht des Kartenbesitzers) = der Auftritt ist committed (s. `promptGeneric`).
     if (this.gs._pendingCardReveal && playerIdx !== this.gs._pendingCardReveal.ownerIdx && !this._inMctsSim && !this._fastMode) this._firePendingCardReveal();
     // ★ W64b: Pflicht-Zielwahl (`cancellable: false`) des Besitzers = der Effekt hat begonnen → Auftritt VOR der Frage (s. `promptGeneric`).
@@ -32227,6 +32339,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // abbrechbare Wahl als Abbruch). Gueltige Antworten bleiben unveraendert; Abbruch (`null`) und `[]` auch. Der Mensch-Weg
     // weist Verstoesse schon in `doConfirmPotion` ab (Abfrage bleibt offen).
     picked = this.korrigiereZielAuswahl(validTargets, config, picked);
+    // ★ Clone (Aufnahme): die Zielwahlen des wirkenden Helden waehrend seines Attack-/Spell-Wurfs (`gs._klonAufnahme`, vom Server um `onPlay` gespannt) merken, damit eine Kopie
+    // dieselben Ziele bekommt. Nur die Wahl des Wirkers, nur wirkliche Auswahlen, und nicht waehrend einer Wiedergabe (eine Kopie zeichnet nichts auf).
+    {
+      const ra = this.gs._klonAufnahme;
+      if (ra && !this.gs._klonWiedergabe && playerIdx === ra.pi && Array.isArray(picked) && picked.length > 0) {
+        ra.eintraege.push({ title: config.title || '', ids: picked.slice() });
+      }
+    }
     const _pickedRoh = await this._disambiguateStackedTargets(playerIdx, validTargets, picked);
     const _gesperrt = new Set(validTargets.filter(t => t.ineligible).map(t => t.id));
     let _pickedIds = Array.isArray(_pickedRoh)
@@ -37398,6 +37518,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!ps) return null;
     const hero = ps.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return null;
+    if (this.surprisesLockedFor(playerIdx)) return null;             // Arcane Eyes (Welle 72): der Gegner kontrolliert wirksame Augen → keine Surprise setzen
     if (!ps.surpriseZones) ps.surpriseZones = [[], [], []];
     if ((ps.surpriseZones[heroIdx] || []).length > 0) return null;   // Zone belegt
     const deckIdx = (ps.mainDeck || []).indexOf(cardName);
@@ -41427,6 +41548,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * (`surpriseKontrolleur`). Ohne `reaktor` gilt die Brettseite.
    */
   _canHeroActivateSurprise(playerIdx, heroIdx, cardName, opts = {}) {
+    if (this.surprisesLockedFor(opts.reaktor ?? playerIdx)) return false;   // Arcane Eyes (Welle 72): der Gegner kontrolliert wirksame Augen → keine Surprise aktivierbar
     if (!opts.spellInHand && this.spellAuswahlOffen()) return false;   // W48a: im Zeitfenster der Spell-Auswahl ist keine Surprise aktivierbar (Hand-Reaktionen ausgenommen)
     const reaktor = opts.reaktor ?? playerIdx;
     if (this._reaktionGesperrt(reaktor)) return false;   // v1293 Reaktionssperre
@@ -41644,6 +41766,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[heroOwner];
     const cardName = inst.name;
     const zoneSlot = inst.zoneSlot;
+    if (this.surprisesLockedFor(ctx.cardController ?? ctx.cardOwner ?? this.kontrolleurVon(inst))) return false;   // Arcane Eyes (Welle 72): Surprises setzen ist gesperrt
 
     // Check if this creature is on a Bakhm hero
     const hero = ps?.heroes?.[heroIdx];
@@ -41760,6 +41883,10 @@ this._deathWatch = (this._deathWatchStack || []).length
   async _activateSurprise(playerIdx, heroIdx, cardName, sourceInfo, script, opts = {}) {
     if (this.spellAuswahlOffen()) {   // W48a: Zeitfenster der Spell-Auswahl (siehe `spellAuswahlOffen`) — die Surprise bleibt verdeckt liegen
       this.log('surprise_blocked_spell_selection', { card: cardName });
+      return null;
+    }
+    if (this.surprisesLockedFor(this.surpriseKontrolleur ? this.surpriseKontrolleur(playerIdx, heroIdx) : playerIdx)) {   // Arcane Eyes (Welle 72): „cannot activate Surprises" gilt auch fuer erzwungene Aktivierungen
+      this.log('surprise_blocked_arcane_eyes', { card: cardName });
       return null;
     }
     this._surpriseResolutionDepth = (this._surpriseResolutionDepth || 0) + 1;

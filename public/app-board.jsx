@@ -8856,6 +8856,270 @@ const SpellShackleChainsEffect = (() => {
 })();
 
 // ═════════════════════════════════════════════════════════════════
+//  Shrink: Zusammenpressen (`shrink_squeeze`) — PIXELART; Vorlage: das Kartenbild (die winzige Heldin unter ihrem riesigen Pixelabbild, Rosa/Violett)
+//
+//  Drei ineinanderliegende Pixelrahmen (violett, hell, dunkel) liegen weit um den Helden und ziehen sich in ganzen Pixelstufen zusammen (~70 ms je Stufe, ~560 ms),
+//  an den vier Kanten wandern Pfeilspitzen nach innen. Beim kleinsten Rahmen blitzt der Kern (Kreuzfunkel), der Rahmen blinkt zweimal und dithert dann weg
+//  (bei ~900 ms fort). Feste Palette, kein Leuchten, keine gedrehte Bitmap — Pfeile und Rahmen sind Pixel.
+// ═════════════════════════════════════════════════════════════════
+const ShrinkSqueezeEffect = (() => {
+  const PAL = ['#f1e5fa', '#d6b3f9', '#ba74ff', '#7a2bd0', '#401a66', '#fe7476'].map(ppHex);   // Glanz, Hell, Violett, Dunkel, Rand, Rosa
+  const ENDE = 900, FADE_AB = 700, ZIEH = 560, STUFEN = 8;
+  /** Rahmen (Rechteck-Ring, 1 Pixel dick) um (cx, cy) mit Halbbreite hw und Halbhöhe hh. */
+  const rahmen = (g, cx, cy, hw, hh, c, a) => {
+    for (let x = -hw; x <= hw; x++) { g.put(cx + x, cy - hh, c, a); g.put(cx + x, cy + hh, c, a); }
+    for (let y = -hh + 1; y < hh; y++) { g.put(cx - hw, cy + y, c, a); g.put(cx + hw, cy + y, c, a); }
+  };
+  /** Pfeilspitze „›" (zwei Pixel dick, Flügel 4 lang) mit Spitze bei (x, y), zeigt in Richtung (dx, dy) ∈ {(1,0), (-1,0), (0,1), (0,-1)}. */
+  const spitze = (g, x, y, dx, dy, c, a) => {
+    for (let k = -4; k <= 4; k++) {
+      const hinten = Math.abs(k);                                 // die Flügel liegen hinter der Spitze
+      const px = dx !== 0 ? x - dx * hinten : x + k, py = dx !== 0 ? y + k : y - dy * hinten;
+      g.put(px, py, c, a);
+      g.put(px - dx, py - dy, PAL[4], a);                          // dunkle Unterkante
+    }
+  };
+  /** Gefüllter Rahmen-Innenraum als Bayer-Dither (zwei Stufen), damit der gepresste Bereich als Fläche liest. */
+  const fuelle = (g, cx, cy, hw, hh, c, a) => {
+    for (let y = -hh + 1; y < hh; y++) for (let x = -hw + 1; x < hw; x++) g.put(cx + x, cy + y, c, a);
+  };
+  const malen = (g, t, sz) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
+    const dim = (st) => {
+      const k = 1 - st / STUFEN * 0.62;                            // Rahmen schrumpft auf ~38 %
+      return [Math.round(sz.hw * 1.35 * k), Math.round(sz.hh * 1.2 * k)];
+    };
+    const stufe = Math.min(STUFEN, Math.floor(Math.min(t, ZIEH) / (ZIEH / STUFEN)));
+    const [hw0, hh0] = dim(stufe);
+    // Nachbilder der zwei vorigen Stufen (gedithert) zeigen die Bewegung
+    for (const zu of [2, 1]) {
+      if (stufe - zu < 0) continue;
+      const [hwa, hha] = dim(stufe - zu);
+      rahmen(g, cx, cy, hwa, hha, PAL[2], aus * (zu === 1 ? 0.5 : 0.25));
+    }
+    fuelle(g, cx, cy, hw0, hh0, PAL[2], aus * 0.2);
+    const blinkt = t > ZIEH && t < ZIEH + 260 && Math.floor((t - ZIEH) / 65) % 2 === 0;
+    rahmen(g, cx, cy, hw0 + 2, hh0 + 2, PAL[4], aus);
+    rahmen(g, cx, cy, hw0 + 1, hh0 + 1, PAL[3], aus);
+    rahmen(g, cx, cy, hw0, hh0, blinkt ? PAL[0] : PAL[2], aus);
+    rahmen(g, cx, cy, hw0 - 1, hh0 - 1, PAL[1], aus);
+    if (t < ZIEH + 80) {                                           // Pfeile: von den Kanten nach innen (Abstand schrumpft mit dem Rahmen)
+      const ab = 6;
+      spitze(g, cx - hw0 - ab, cy, 1, 0, PAL[5], aus); spitze(g, cx + hw0 + ab, cy, -1, 0, PAL[5], aus);
+      spitze(g, cx, cy - hh0 - ab, 0, 1, PAL[5], aus); spitze(g, cx, cy + hh0 + ab, 0, -1, PAL[5], aus);
+      for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {             // Eckpfeile: diagonal nach innen (eine Pixelreihe je Schritt)
+        for (let i = 0; i < 4; i++) { g.put(cx + sx * (hw0 + ab - i), cy + sy * (hh0 + ab - i), PAL[5], aus); g.put(cx + sx * (hw0 + ab - i) - sx, cy + sy * (hh0 + ab - i), PAL[4], aus); }
+      }
+    }
+    if (t > ZIEH - 40 && t < ZIEH + 360) ppKreuzfunkel(g, cx - 1, cy - 1, Math.min(4, 1 + Math.floor((t - ZIEH + 40) / 90)), PAL, aus);
+  };
+  return ppPunktBild(malen, ENDE + 40, 300, 340);
+})();
+
+// ═════════════════════════════════════════════════════════════════
+//  Clone: Echo (`clone_echo`) — PIXELART; Vorlage: das Kartenbild (der durchscheinende Zwilling neben dem Helden, Lavendel/Hellblau)
+//
+//  Ein Abbild in Kartengröße löst sich in ganzen Pixelschritten vom Helden und schiebt sich nach rechts (0–300 ms), flimmert (zwei Bilder im Takt, Zeilen abwechselnd gedithert wie ein
+//  Abtastbild), hält kurz und dithert dann weg (bei ~700 ms fort). Eine Punktlinie verbindet beide, kleine Funken steigen auf. Feste Palette, kein Leuchten.
+// ═════════════════════════════════════════════════════════════════
+const CloneEchoEffect = (() => {
+  const PAL = ['#ffffff', '#d9c0ec', '#6d9bf8', '#0351c9', '#02398c'].map(ppHex);   // Glanz, Hell, Lavendel, Mittel, Rand
+  const ENDE = 700, FADE_AB = 480;
+  const vorbereiten = (sz) => ({
+    funken: Array.from({ length: ppFxN(8) }, () => ({ x: (Math.random() - 0.5) * sz.hw * 2.6, y: (Math.random() - 0.2) * sz.hh * 1.4, v: 12 + Math.random() * 20, start: 120 + Math.random() * 300, leben: 240 + Math.random() * 160 })),
+  });
+  const echo = (g, cx, cy, hw, hh, t, a) => {
+    const flimmer = Math.floor(t / 66) % 2;
+    for (let y = -hh; y <= hh; y++) {
+      const zeile = (y + hh + flimmer) % 2 === 0;
+      for (let x = -hw; x <= hw; x++) {
+        const rand = x === -hw || x === hw || y === -hh || y === hh;
+        if (rand) g.put(cx + x, cy + y, PAL[2], a);
+        else if (zeile) g.put(cx + x, cy + y, PAL[1], a * 0.28);
+        else g.put(cx + x, cy + y, PAL[3], a * 0.16);
+      }
+    }
+    for (let x = -hw + 2; x < hw - 1; x += 2) g.put(cx + x, cy - hh + 1, PAL[0], a);              // helle Oberkante (Glanz)
+  };
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
+    const stufe = Math.min(5, Math.floor(t / 60));                    // ganze Schritte
+    const dx = Math.round(sz.hw * 2.1 * stufe / 5);
+    if (stufe > 0) for (let x = 0; x < dx; x += 3) g.put(cx + x, cy, PAL[2], aus);   // Punktlinie zwischen Held und Echo
+    echo(g, cx + dx, cy, Math.round(sz.hw * 0.96), Math.round(sz.hh * 0.96), t, aus * (stufe < 2 ? 0.6 : 1));
+    for (const f of teile.funken) {
+      const k = (t - f.start) / f.leben;
+      if (k < 0 || k > 1) continue;
+      const px = cx + dx + f.x * 0.4, py = cy + f.y - f.v * (t - f.start) / 1000;
+      g.put(px, py, PAL[0], aus); g.put(px + 1, py, PAL[2], aus); g.put(px, py + 1, PAL[2], aus);
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 420, 340, vorbereiten);
+})();
+
+// ═════════════════════════════════════════════════════════════════
+//  Arcane Eyes: Augen öffnen sich (`arcane_eyes_open`) — PIXELART; Vorlage: das Kartenbild (zwei violette Augen in einer goldenen Backsteinwand)
+//
+//  Zwei Augen (17×11, weißer Augapfel mit grauem Schatten, violette Iris, dunkle Pupille mit Glanzpunkt, dunkler Rand) liegen als Lidstrich über der Zone und öffnen sich in vier ganzen
+//  Pixelstufen (0–420 ms), die Pupillen blicken links, rechts, geradeaus; ein goldener Abtaststrahl (Zeile mit gedithertem Schweif) streicht von oben nach unten über die Zone (620–900 ms),
+//  danach dithern die Augen weg (bei ~1150 ms fort). Feste Palette, kein Leuchten.
+// ═════════════════════════════════════════════════════════════════
+const ArcaneEyesOpenEffect = (() => {
+  const PAL = ['#ffffff', '#d2d2db', '#9aa3b6', '#7a2bd0', '#401a66', '#1a1a2e', '#f8ca21', '#fff196'].map(ppHex);   // Glanz, Weiß, Schatten, Iris, Iris dunkel, Rand/Pupille, Gold, Hellgold
+  const ENDE = 1150, FADE_AB = 900;
+  /** Ein Auge bei (cx, cy): `offen` 0..4 (halbe Lidhöhe 0,1,2,4,5 Zeilen), Pupille um `blick` Pixel versetzt. Mandelform: Halbbreite je Zeile aus der Ellipse (17×11 bei vollem Öffnen). */
+  const auge = (g, cx, cy, offen, blick, a) => {
+    const h = [0, 1, 2, 4, 5][offen], W = 8;
+    for (let y = -h; y <= h; y++) {
+      const w = Math.max(offen === 0 ? 4 : 2, Math.round(W * Math.sqrt(Math.max(0, 1 - (y / (h + 0.7)) ** 2))));
+      for (let x = -w; x <= w; x++) {
+        const rand = Math.abs(x) === w || Math.abs(y) === h;
+        g.put(cx + x, cy + y, rand ? PAL[5] : (y > 1 ? PAL[2] : y > -h + 1 ? PAL[1] : PAL[0]), a);
+      }
+    }
+    if (offen >= 3) {                                              // Iris (Kreis r 3) + Pupille (3×3) + Glanzpunkt, am Lid beschnitten
+      const ix = cx + blick;
+      for (let y = -3; y <= 3; y++) for (let x = -3; x <= 3; x++) {
+        if (x * x + y * y > 10 || Math.abs(y) >= h) continue;
+        g.put(ix + x, cy + y, x * x + y * y > 6 ? PAL[4] : PAL[3], a);
+      }
+      g.block(ix - 1, cy - 1, 3, 3, PAL[5], a);
+      g.put(ix - 2, cy - 2, PAL[0], a); g.put(ix - 1, cy - 2, PAL[0], a);
+    }
+  };
+  const malen = (g, t, sz) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
+    const offen = t < 120 ? 0 : t < 220 ? 1 : t < 320 ? 2 : t < 420 ? 3 : 4;
+    const blick = t < 420 ? 0 : t < 520 ? -2 : t < 620 ? 2 : t < 720 ? -1 : 0;
+    const dx = Math.round(sz.hw * 0.62);
+    auge(g, cx - dx, cy - 4, offen, blick, aus);
+    auge(g, cx + dx, cy - 4, offen, blick, aus);
+    // Abtaststrahl: eine goldene Zeile wandert von oben nach unten (ganze Pixelzeilen), dahinter ein Dither-Schweif
+    if (t > 620 && t < 900) {
+      const f = (t - 620) / 280;
+      const y = Math.round(sz.cy - sz.hh + f * sz.hh * 2);
+      for (let x = -Math.round(sz.hw * 0.95); x <= Math.round(sz.hw * 0.95); x++) {
+        g.put(cx + x, y, PAL[7], aus); g.put(cx + x, y - 1, PAL[6], aus);
+        for (let k = 2; k <= 6; k++) g.put(cx + x, y - k, PAL[6], aus * (0.34 - k * 0.04));
+      }
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 300, 300);
+})();
+
+// ═════════════════════════════════════════════════════════════════
+//  Hockey Genie: Wunsch (`hockey_wish`) — PIXELART; Vorlage: das Kartenbild (der Geist als Eishockeyspieler auf dem Eis, Puck und Schläger, Hellblau/Cyan)
+//
+//  Ein Puck (7×3, dunkel, helle Oberkante) schießt von links durch die Zone und zieht eine Eisspur (Dither, Cyan) hinter sich her (0–330 ms); beim Aufprall in der Mitte
+//  (330 ms) ein weißes Kreuzfunkel und vier Eissplitter, die in ganzen Pixelschritten nach außen fliegen; danach wirbelt Wunschrauch in zwei gegenläufigen Spiralen aus Pixeln
+//  nach oben (400–880 ms) und dithert weg (bei ~1000 ms fort). Feste Palette, kein Leuchten.
+// ═════════════════════════════════════════════════════════════════
+const HockeyWishEffect = (() => {
+  const PAL = ['#ffffff', '#e5f5fa', '#b4dff8', '#68c6fd', '#1788bd', '#1a1a2e', '#59606e'].map(ppHex);   // Glanz, Eis, Hellblau, Cyan, Blau, Rand/Puck, Puck hell
+  const ENDE = 1000, FADE_AB = 760;
+  const SPLITTER = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+  const malen = (g, t, sz) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
+    if (t < 420) {                                                 // Puck (11×5) mit dreizeiliger Eisspur
+      const f = Math.min(1, t / 330);
+      const px = Math.round(cx - sz.hw * 1.5 + f * sz.hw * 1.5);
+      for (let k = 1; k <= 22; k++) for (const dy of [-2, -1, 0, 1, 2]) {
+        g.put(px - 6 - k, cy + dy, k < 9 ? PAL[2] : PAL[3], aus * Math.max(0.06, 0.62 - k * 0.03) * (Math.abs(dy) === 2 ? 0.45 : Math.abs(dy) === 1 ? 0.75 : 1));
+      }
+      for (let x = -5; x <= 5; x++) {
+        g.put(px + x, cy - 2, PAL[5], aus);
+        g.put(px + x, cy - 1, Math.abs(x) < 4 ? PAL[6] : PAL[5], aus);
+        g.put(px + x, cy, PAL[5], aus); g.put(px + x, cy + 1, PAL[5], aus);
+        g.put(px + x, cy + 2, PAL[5], aus);
+      }
+      g.put(px - 3, cy - 1, PAL[0], aus); g.put(px - 2, cy - 1, PAL[0], aus);              // Glanz
+    }
+    if (t >= 330 && t < 700) {                                     // Aufprall: großes Kreuzfunkel + dicke Eissplitter
+      const k = (t - 330) / 370;
+      ppKreuzfunkel(g, cx - 1, cy - 1, Math.min(6, 2 + Math.floor(k * 7)), [PAL[0], PAL[1], PAL[2], PAL[3]], aus);
+      const r = 3 + Math.floor(k * 14);
+      for (const [sx, sy] of SPLITTER) {
+        for (let i = 0; i < 3; i++) { g.put(cx + sx * (r - i), cy + sy * (r - i), PAL[i === 0 ? 0 : 1], aus); g.put(cx + sx * (r - i) - sx, cy + sy * (r - i), PAL[3], aus); g.put(cx + sx * (r - i), cy + sy * (r - i) - sy, PAL[3], aus); }
+      }
+    }
+    if (t >= 380 && t < 900) {                                     // Wunschrauch: zwei gegenläufige Spiralen aus Pixelblöcken, steigen auf
+      const f = (t - 380) / 520;
+      for (const dir of [-1, 1]) for (let i = 0; i < 24; i++) {
+        const u = i / 24, w = dir * (u * 7 + f * 5), h = (u * 0.9 + f * 0.5) * sz.hh;
+        const x = cx + Math.cos(w) * (4 + u * sz.hw * 0.75), y = cy + 8 - h;
+        const blk = i % 4 === 0 ? 3 : 2;
+        g.block(x, y, blk, blk, i % 3 === 0 ? PAL[1] : i % 3 === 1 ? PAL[2] : PAL[3], aus * (1 - u * 0.45));
+      }
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 300, 300);
+})();
+
+// ═════════════════════════════════════════════════════════════════
+//  Regeneration: Aufblühen (`regeneration_bloom`) — PIXELART; Vorlage: das Kartenbild (nachwachsende Gliedmaßen)
+//
+//  Grüne Pixel-Kreuze (3×3 bzw. 5×5, heller Kern, dunkler Rand) steigen rund um den Helden auf und dithern oben weg; am Fuß weitet sich ein gepunkteter Ring in drei ganzen
+//  Pixelstufen, dazwischen blitzen kleine Funken. Bei ~1000 ms ist alles fort. Feste Palette, kein Leuchten.
+// ═════════════════════════════════════════════════════════════════
+const RegenerationBloomEffect = (() => {
+  const PAL = ['#ffffff', '#b3f9b8', '#3ddc57', '#20ac37', '#29663f'].map(ppHex);   // Glanz, Hell, Grün, Dunkelgrün, Rand
+  const ENDE = 1100, FADE_AB = 800;
+  const vorbereiten = (sz) => ({
+    kreuze: Array.from({ length: ppFxN(22) }, (_, i) => ({
+      x: (Math.random() - 0.5) * sz.hw * 1.8, y: sz.hh * (0.15 + Math.random() * 0.9),
+      v: 16 + Math.random() * 24, start: Math.random() * 440, leben: 520 + Math.random() * 260, gross: i % 3 === 0,
+    })),
+  });
+  /** Kreuz mit Rand: klein 5×5 (Arm 2), groß 7×7 (Arm 3), Arme zwei Pixel dick, heller Kern. */
+  const kreuz = (g, x, y, gross, c, a) => {
+    const X = Math.round(x), Y = Math.round(y), r = gross ? 3 : 2;
+    for (let i = -r - 1; i <= r + 1; i++) for (const d of [-1, 0, 1]) { g.put(X + i, Y + d, PAL[4], a); g.put(X + d, Y + i, PAL[4], a); }   // Rand
+    for (let i = -r; i <= r; i++) { g.put(X + i, Y, c, a); g.put(X, Y + i, c, a); }
+    for (let i = -r + 1; i <= r - 1; i++) { g.put(X + i, Y + 1, PAL[3], a); g.put(X + 1, Y + i, PAL[3], a); }                              // zweite Reihe: dunkler (Dicke 2)
+    g.put(X, Y, PAL[0], a); g.put(X - 1, Y, PAL[1], a); g.put(X, Y - 1, PAL[1], a);
+  };
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
+    // aufsteigendes Band aus grünem Dither über dem Helden (zwei Stufen, springt im Takt)
+    if (t < 640) {
+      const bandY = Math.round(sz.cy + sz.hh - (t / 640) * sz.hh * 2.1);
+      for (let y = bandY - 5; y <= bandY + 5; y++) for (let x = -Math.round(sz.hw * 0.9); x <= Math.round(sz.hw * 0.9); x++) {
+        if (y < sz.cy - sz.hh || y > sz.cy + sz.hh) continue;
+        g.put(cx + x, y, PAL[2], aus * (Math.abs(y - bandY) < 2 ? 0.34 : 0.16));
+      }
+    }
+    // gepunkteter Ring am Fuß, drei Stufen
+    const stufe = Math.min(2, Math.floor(t / 150));
+    if (t < 620) {
+      const rx = Math.round(sz.hw * (0.6 + 0.35 * stufe)), ry = Math.round(sz.hh * 0.18 * (1 + stufe * 0.5)), fy = cy + Math.round(sz.hh * 0.82);
+      for (let i = 0; i < 32; i++) {
+        const w = (i / 32) * Math.PI * 2;
+        g.put(cx + Math.cos(w) * rx, fy + Math.sin(w) * ry, i % 2 ? PAL[2] : PAL[1], aus * (t > 420 ? 0.5 : 1));
+        g.put(cx + Math.cos(w) * rx, fy + Math.sin(w) * ry + 1, PAL[4], aus * (t > 420 ? 0.5 : 1));
+      }
+    }
+    for (const k of teile.kreuze) {
+      const f = (t - k.start) / k.leben;
+      if (f < 0 || f > 1) continue;
+      const y = sz.cy + k.y - sz.hh * 0.5 - k.v * (t - k.start) / 1000 * 1.6;
+      kreuz(g, sz.cx + k.x, y, k.gross, f < 0.5 ? PAL[2] : PAL[1], aus * (f > 0.8 ? 0.5 : 1));
+    }
+    if (t > 120 && t < 520 && Math.floor(t / 100) % 2 === 0) ppKreuzfunkel(g, cx - 1 + (Math.floor(t / 100) % 3 - 1) * 6, cy - 6, 3, [PAL[0], PAL[1], PAL[2], PAL[3]], aus);
+  };
+  return ppPunktBild(malen, ENDE + 40, 300, 340, vorbereiten);
+})();
+
+// ═════════════════════════════════════════════════════════════════
 //  Liquid Luck: Regenbogen (`liquid_rainbow`) — PIXELART; Vorlage: das Kartenbild (Regenbogen, Goldtopf, Kobold)
 //
 //  Über der Karte wächst von links nach rechts ein Regenbogen in sieben Bändern (rot, orange, gelb, grün, blau, indigo, violett; je 3 Rasterpixel, in
@@ -17811,6 +18075,11 @@ const ANIM_REGISTRY = {
   gold_sparkle: GoldSparkleEffect,
   dragonegg_shimmer: DragoneggShimmerEffect,
   spell_shackle_chains: SpellShackleChainsEffect,
+  shrink_squeeze: ShrinkSqueezeEffect,
+  regeneration_bloom: RegenerationBloomEffect,
+  clone_echo: CloneEchoEffect,
+  arcane_eyes_open: ArcaneEyesOpenEffect,
+  hockey_wish: HockeyWishEffect,
   liquid_rainbow: LiquidRainbowEffect,
   hand_level_down: HandLevelDownEffect,
   mind_control_hex: MindControlHexEffect,
@@ -51158,6 +51427,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const isStunned = (hero?.statuses?.stunned || hero?.statuses?.webbed);
           // 24.10. Stoneskin: trägt der Held die Karte, wird NUR sein animierter Sprite versteinert (Karte bleibt unverändert; Sprite läuft weiter) — keine Betäubung, nur Optik.
           const hatSteinhaut = (p.supportZones?.[i] || []).some(z => (z || []).includes('Stoneskin'));
+          const regenAnzahl = (p.supportZones?.[i] || []).filter(z => (z || []).includes('Regeneration')).length;   // 24.10. Regeneration: nur Abzeichen (die Heilung rechnet der Server)
           const isImmune = hero?.statuses?.immune;
           const isNegated = hero?.statuses?.negated;
           const isNulled = hero?.statuses?.nulled;
@@ -51685,7 +51955,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     <PxIcon z="🚫" />
                   </div>
                 )}
-                {hero?.name && <BuffColumn buffs={hero.buffs} statuses={(p.spellImmuneHeroes?.[i] || hatSteinhaut) ? { ...(hero.statuses || {}), ...(p.spellImmuneHeroes?.[i] ? { _spellImmune: true } : null), ...(hatSteinhaut ? { _stoneskin: true } : null) } : hero.statuses} cardName={hero.name} />}
+                {hero?.name && <BuffColumn buffs={hero.buffs} statuses={(p.spellImmuneHeroes?.[i] || hatSteinhaut || regenAnzahl) ? { ...(hero.statuses || {}), ...(p.spellImmuneHeroes?.[i] ? { _spellImmune: true } : null), ...(hatSteinhaut ? { _stoneskin: true } : null), ...(regenAnzahl ? { _regeneration: regenAnzahl } : null) } : hero.statuses} cardName={hero.name} />}
                 {/* ── Deepsea Counter badge (Siphem) ── */}
                 {/* ★ v1472: hier und an den Nachbar-Abzeichen stand
                     `cursor: 'help'` — der native Pfeil mit Fragezeichen

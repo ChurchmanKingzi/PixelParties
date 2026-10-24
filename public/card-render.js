@@ -226,9 +226,10 @@
   // ── Farben (Style-Skript des Templates) ──
   // Wertefelder unten (HP links / Angriff rechts): Helden exakt mittig in ihren Feldern (HP x 180–380, Angriff x 470–670), Kreaturen/Artifacts weiter innen.
   // Gemeinsam fuer `draw` und die Glanzmaske (`nameMaskCanvas`), damit Zahl und Glanz deckungsgleich liegen.
+  // Artifact-Creature: die HP stehen mittig im Feld zwischen Herz- und Münz-Symbol (Feld x 180–377, Mitte 279 → Box 182 + 194/2).
   function hpBoxFor(t) {
     const heroBox = (isHero3(t) || isSuperhero(t)) && t !== 'boss';
-    return { left: heroBox ? 180 : t === 'artifactCreature' ? 240 : (t === 'summon' || t === 'tokenCreature') ? 275 : t === 'boss' ? 160 : 201,
+    return { left: heroBox ? 180 : t === 'artifactCreature' ? 182 : (t === 'summon' || t === 'tokenCreature') ? 275 : t === 'boss' ? 160 : 201,
       top: 984, width: heroBox ? 200 : 194, height: 60, size: 38, min: 1, align: 'center', ink: heroBox };
   }
   function atkBoxFor(t) {
