@@ -41900,6 +41900,26 @@ this._deathWatch = (this._deathWatchStack || []).length
       _fromDiscard: fromDiscard, _fromDeck: fromDeck,
       sourceInfo, _skipReactionCheck: true,
     };
+    // ★ 24.10. (Al: „bei See through the Ruse wird keine Chain gestartet, wie bei Reactions üblich"): hält der Gegner eine Reaktion auf die AKTIVIERUNG einer Surprise (`reactsToSurpriseActivation`),
+    // öffnet sich das ordentliche Kettenfenster mit der Surprise als erstem Glied — die Reaktion hängt sich als nächstes Glied daran (Bezahlen, Flug, Kettenanzeige, Gegenreaktion, Auflösung von
+    // oben nach unten wie bei jeder Reaction); negiert die Kette die Surprise, löst sie nicht auf (wie Boots of Hermes). Ohne eine solche Karte auf der Hand des Gegners öffnet sich nichts.
+    if (!this._inMctsSim && !this.gs.result && this._surpriseReactorHeld(steuerer)) {
+      const _aeussereS = this._inReactionCheck;
+      let _surpriseKette = null;
+      try {
+        _surpriseKette = await this.executeCardWithChain({
+          cardName, owner: steuerer, cardType: 'Surprise', goldCost: 0, heroIdx,
+          casterOwner: playerIdx, casterCheck: false, resolve: null, fromBoard: true,
+          isSurpriseActivation: true, surpriseHost: { owner: playerIdx, heroIdx: hostHeroIdx },
+        });
+      } finally {
+        this._inReactionCheck = _aeussereS;
+      }
+      if (_surpriseKette?.negated) {
+        surpriseHookCtx._surpriseNegated = true;
+        surpriseHookCtx._surpriseNegatedBy = 'a chain reaction';
+      }
+    }
     await this.runHooks('onSurpriseActivated', surpriseHookCtx);
     let surpriseNegated = !!surpriseHookCtx._surpriseNegated;
 
@@ -42365,6 +42385,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // der Hand, keine Aktion — nur Reaktionen mit `reactsToPlacement`
       // (Off Duty) greifen ein.
       isPlacement: !!cardInfo.isPlacement,
+      // 24.10. (See through the Ruse): die AKTIVIERUNG einer Surprise als Kettenglied — Reaktionen mit `reactsToSurpriseActivation` hängen sich daran und negieren es (`surpriseHost` = Zone der Karte).
+      isSurpriseActivation: !!cardInfo.isSurpriseActivation,
+      surpriseHost: cardInfo.surpriseHost || null,
       // W5b-Z1b: Beschwörung als inhärente Zusatzaktion (Priests: die Kosten sind das Zurückmischen, `beforeSummon` NACH dem Fenster).
       isInherentAction: !!cardInfo.isInherentAction,
       // ★ W34a: virtuelle Kette eines Effekts, der als Attack/Spell ZÄHLT (`alsAttackKette` / `alsSpellKette`): `'attack' | 'spell'`. Leser, die ein echtes Kartenspiel
@@ -43985,6 +44008,16 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /** Haelt der Gegner von `playerIdx` eine Handkarte, die auf Platzierungen reagiert? */
+  /** Hält ein Gegner von `steuerer` eine Reaktion auf die Aktivierung einer Surprise (`reactsToSurpriseActivation`, See through the Ruse) auf der Hand? */
+  _surpriseReactorHeld(steuerer) {
+    const traegt = (n) => !!loadCardEffect(n)?.reactsToSurpriseActivation;
+    for (let i = 0; i < this.playerCount(); i++) {
+      if (i === steuerer) continue;
+      if ((this.gs.players[i]?.hand || []).some(traegt)) return true;
+    }
+    return false;
+  }
+
   _placementReactorHeld(playerIdx) {
     const opp = this.gs.players[this.opponentOf(playerIdx)];
     if (!opp) return false;

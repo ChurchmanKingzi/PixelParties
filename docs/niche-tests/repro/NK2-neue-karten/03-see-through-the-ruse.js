@@ -16,7 +16,7 @@ const cpu = require('../../../../cards/effects/_cpu.js');
     const t = await H.fresh({ hand: [[RUSE, ...(o.handZusatz || [])], o.oppHand || []], deck: [Array(10).fill('ZZ Dummy'), Array(10).fill('ZZ Dummy')], gold: 100, ...o.fresh });
     decay(t, o.decay ?? 2);
     t.grantFor(1, 0, FLOOD); t.putSurprise(1, 0, FLOOD);
-    t.script.push({ match: d => d.type === 'confirm' && d.title === RUSE, answer: () => ({ confirmed: o.antwort !== false }) });
+    t.script.push({ match: d => d.type === 'confirm' && d.title === RUSE, answer: () => o.antwort !== false });   // Kettenfenster: `promptGeneric` liefert den Boolean
     t.targetFn = (valid) => { const v = valid.find(x => x.type === 'hero' && x.owner === 1 && x.heroIdx === 0); return v ? [v.id] : null; };
     return t;
   };
@@ -102,13 +102,23 @@ const cpu = require('../../../../cards/effects/_cpu.js');
     R.check('zwei Kopien: eine negiert, die zweite bleibt auf der Hand', t.pile(0, 'hand').filter(c => c === RUSE).length === 1 && t.pile(0, 'discardPile').filter(c => c === RUSE).length === 1, { hand: t.pile(0, 'hand'), disc: t.pile(0, 'discardPile') });
   }
   {
-    // Die Ruse wird im Kettenfenster negiert: die Surprise läuft normal weiter, die Karte ist trotzdem verbraucht
-    const t = await frisch();
-    const orig = t.engine.executeCardWithChain.bind(t.engine);
-    t.engine.executeCardWithChain = async (info) => info.cardName === RUSE ? { negated: true, chainFormed: true } : orig(info);
+    // Die Ruse wird in der Kette negiert (Silence des Gegners: „negate that Spell“): die Surprise läuft normal weiter, die Karte ist trotzdem verbraucht
+    const t = await frisch({ oppHand: ['Silence'] });
+    t.grantFor(1, 0, 'Silence');                               // ergänzt Decay Magic Lv2, ohne die Schule von Flooding zu verlieren
+    t.script.unshift({ match: d => d.type === 'confirm' && d.title === 'Silence', answer: () => false, once: true });   // erste Gelegenheit (gegen Fireball) auslassen
     const hp0 = t.hp(1, 0);
     await feuer(t);
-    R.check('Ruse im Kettenfenster negiert: Flooding wirkt weiter (Fireball negiert), Ruse in der Ablage', t.hp(1, 0) === hp0 && t.pile(0, 'discardPile').includes(RUSE), { hp: t.hp(1, 0), hp0, disc: t.pile(0, 'discardPile') });
+    R.check('Ruse in der Kette von Silence negiert: Flooding wirkt weiter (Fireball negiert), Ruse und Silence in den Ablagen', t.hp(1, 0) === hp0 && t.pile(0, 'discardPile').includes(RUSE) && t.pile(1, 'discardPile').includes('Silence'), { hp: t.hp(1, 0), hp0, disc: t.pile(0, 'discardPile'), oppDisc: t.pile(1, 'discardPile'), prompts: t.prompts.map(p => p.d.type + ':' + (p.d.title || '')) });
+    R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
+  }
+  {
+    // Die Ruse hängt als Kettenglied an der Surprise-Aktivierung: das Fenster zeigt die Surprise als erstes Glied
+    const t = await frisch();
+    let glieder = null;
+    const orig = t.engine._promptReactionsForChain.bind(t.engine);
+    t.engine._promptReactionsForChain = async (chain, ...r) => { if (!glieder && chain[0]?.isSurpriseActivation) glieder = chain.map(l => l.cardName + ':' + l.cardType); return orig(chain, ...r); };
+    await feuer(t);
+    R.check('echtes Kettenfenster: erstes Glied = die Surprise-Aktivierung (Flooding, cardType Surprise)', Array.isArray(glieder) && glieder[0] === FLOOD + ':Surprise', glieder);
   }
 
   R.section('E · Proaktiv: alle verdeckten Surprises der Gegnerseite aufdecken');
