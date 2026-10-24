@@ -26,6 +26,9 @@
 //  Surprise-Fenster laufen für die Kopie wie für jeden Wurf (ein Surprise des Gegners kann die Kopie negieren). Alle anderen Entscheidungen der Karte (Optionen, Karten wählen) trifft der Spieler
 //  neu. Eine Kopie wird nur angeboten, wenn mindestens ein aufgezeichnetes Ziel noch steht (lebender Held / Kreatur an seinem Platz) und die Karte jetzt noch spielbar ist
 //  (`spellPlayCondition`); eine „once per game"-Karte hat kein zweites Wirken. Kosten der Karte („to use this Spell", `payActivationCost`) zahlt die Kopie wie bei Magic Mirror.
+//  ★ Der KLON führt die Kopie aus (Al, 24.10.): Schadensquelle ist der Klon, nicht der Held (`gs._klonKopie` → Engine `istKlonQuelle`/`_klonSicht`: Shrink, Waffen-Boni, Pfeile und Angriffs-Fenster des Helden
+//  gelten für die Kopie nicht; Schutz des Ziels schon). Dashes und Projektile starten an seinem Platz (`_spellCasterOverride`), Surprises/Rückstoß sehen ihn als Angreifer (`_spellCasterCreature`);
+//  ATK und Fähigkeitsstufen sind die des Helden. Test: `docs/niche-tests/repro/W72/c-05`.
 //  Die Kopie ist KEIN Gebrauch einer Karte durch den Helden: keine Zähler (gespielte Attacks/Spells), kein `afterSpellResolved`, keine Aktion, keine Ablage — die Instanz verschwindet danach.
 //
 //  ── Bild und Klang ──────────────────────────────────────────────────────
@@ -151,7 +154,13 @@ module.exports = {
       gs._wirkerSeite = { pi, heroIdx: inst.heroIdx, heroOwner: feld };
       const aufnahmeAlt = gs._klonAufnahme;
       delete gs._klonAufnahme;
-      gs._klonKopie = true;
+      gs._klonKopie = { heroIdx: inst.heroIdx, feld, spellName: name, cloneId: inst.id };   // Quelle der Kopie ist der Klon (Engine `istKlonQuelle`)
+      // „Der Clone SELBST führt die Kopie aus": Animationen (Dash, Projektil, Aufschlag) starten an seinem Platz, Surprise-/Rückstoß-Fenster sehen ihn als Angreifer
+      // (Demon's-Gate-Muster: `_spellCasterOverride` + `_spellCasterCreature`); Fähigkeitsstufe und ATK bleiben die des Helden (`_wirkerSeite`, Hero-Kontext der Karte).
+      const casterOvrAlt = gs._spellCasterOverride;
+      const casterKreaturAlt = gs._spellCasterCreature;
+      gs._spellCasterOverride = { owner: pi, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot };
+      gs._spellCasterCreature = inst;
       gs._klonWiedergabe = { pi, queue: eintraege.map(e => ({ title: e.title, ids: e.ids.slice() })) };
       const geloeschtVor = (gs.players[pi].deletedPile || []).filter(n => n === name).length;
       try {
@@ -162,6 +171,8 @@ module.exports = {
         console.error(`[Clone] copy of "${name}" failed:`, err.message);
       } finally {
         delete gs._klonKopie;
+        if (casterOvrAlt === undefined) delete gs._spellCasterOverride; else gs._spellCasterOverride = casterOvrAlt;
+        if (casterKreaturAlt === undefined) delete gs._spellCasterCreature; else gs._spellCasterCreature = casterKreaturAlt;
         delete gs._klonWiedergabe;
         // „Delete this card" einer kopierten Karte (Meditation …): die Kopie ist keine Karte — das Duplikat im Löschstapel wieder nehmen
         if (script.deleteOnUse) {

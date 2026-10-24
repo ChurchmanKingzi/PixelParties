@@ -6646,6 +6646,7 @@ class GameEngine {
    */
   async _fireAttackDeclare(source, target, baseDamage) {
     if (source && source._attackDeclareFired) return Math.max(0, baseDamage || 0);
+    if (this.istKlonQuelle(source)) return Math.max(0, baseDamage || 0);   // der Klon greift an, nicht der Held: keine „when this Hero attacks"-Fenster
     const hookCtx = { source, target, amount: Math.max(0, baseDamage || 0) };
     await this.runHooks('onAttackDeclare', hookCtx);
     if (source) source._attackDeclareFired = true;
@@ -9302,7 +9303,7 @@ class GameEngine {
       amount = await this._fireAttackDeclare(source, target, amount);
     }
 
-    const hookCtx = { source, target, amount, type: type || 'normal', sourceHeroIdx: source?.heroIdx ?? -1, cancelled: false,
+    const hookCtx = { source: this._klonSicht(source), target, amount, type: type || 'normal', sourceHeroIdx: this._klonSicht(source)?.heroIdx ?? -1, cancelled: false,
       festesZiel: this.istEinzelzielTreffer(type, opts) };   // Einzelziel/Rueckstoss — Spiegelungen der Immunitaet lesen es
     // W49a (Ricochet, Folgetreffer): der Betrag steht fest („half as much as the previous one") — quellenseitige Erhoehungen (Hook-Boni, Pfeile,
     // Darge) sind im Betrag des Vorgaengers schon enthalten und kommen NICHT noch einmal drauf; Verteidigung des Ziels wirkt normal.
@@ -9551,7 +9552,7 @@ class GameEngine {
     // BEFORE the buff-multiplier pass below so Cloudy halves the arrow-
     // buffed total (arrows are part of the attack's base damage).
     const { applyArrowsBeforeDamage } = require('./_arrows-shared');
-    applyArrowsBeforeDamage(this, source, target, hookCtx);
+    if (!this.istKlonQuelle(source)) applyArrowsBeforeDamage(this, source, target, hookCtx);   // Pfeile gehören dem Helden, nicht dem Klon
 
     // ── W51c (Al, 22.10.2026): FRUEHES Hand-Reaktionsfenster „Schaden senken" ──────────────────────────────────────────────
     // Karten, die den Treffer VOR Schilden/Deckeln/HP-Boeden senken (Cloud in a Bottle: „Halve any damage … including that damage"), melden sich mit
@@ -9625,7 +9626,7 @@ class GameEngine {
     // accumulates flat bonus damage from each activation; consumed on
     // the next Attack damage event from that hero. Bypasses multipliers
     // by routing through `_flatBonus` (same channel as Darge's arrows).
-    if ((type === 'attack') && source?.owner != null && source?.heroIdx >= 0) {
+    if ((type === 'attack') && source?.owner != null && source?.heroIdx >= 0 && !this.istKlonQuelle(source)) {
       const sourceHero = this.gs.players[source.owner]?.heroes?.[source.heroIdx];
       const niuBuff = sourceHero?.buffs?.niu_enhanced;
       const niuBonus = niuBuff?.totalDamage || 0;
@@ -9979,7 +9980,7 @@ class GameEngine {
     if (!_isStatusTickSource) {
       this.log('damage', { source: source?.name, target: this._heroLabel(target), amount: actualAmount, damageType: type });
     }
-    await this.runHooks(HOOKS.AFTER_DAMAGE, { source, target, amount: actualAmount, realDealt, type, sourceHeroIdx: source?.heroIdx ?? -1, vollOut: opts?.vollOut });   // W51a: vollOut -> Cloud in a Bottle kuerzt den Ricochet-Kettenbetrag
+    await this.runHooks(HOOKS.AFTER_DAMAGE, { source: this._klonSicht(source), target, amount: actualAmount, realDealt, type, sourceHeroIdx: this._klonSicht(source)?.heroIdx ?? -1, vollOut: opts?.vollOut });   // W51a: vollOut -> Cloud in a Bottle kuerzt den Ricochet-Kettenbetrag
 
     // ── Elixir of Cold rider ──
     // When the source Hero carries the `cold_strike` buff and the
@@ -10160,8 +10161,8 @@ class GameEngine {
 
       // Fire afterDamage so Shield of Life/Death, Fireshield, etc. still react.
       await this.runHooks(HOOKS.AFTER_DAMAGE, {
-        source, target, amount: dealt, realDealt: dealt, type,
-        sourceHeroIdx: source?.heroIdx ?? -1,
+        source: this._klonSicht(source), target, amount: dealt, realDealt: dealt, type,
+        sourceHeroIdx: this._klonSicht(source)?.heroIdx ?? -1,
         _skipReactionCheck: opts._skipReactionCheck,
       });
 
@@ -29221,6 +29222,32 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ Clone (Al, 24.10.): „Der Clone SELBST führt die Kopie aus." Solange `gs._klonKopie` ({ heroIdx, feld, spellName }) läuft, ist jede Schadensquelle, die wie
+   * der kopierte Wurf des Helden aussieht (gleicher Held-Platz, Kartenname der Kopie), in Wahrheit der Klon — kein Held. Skripte bauen ihre Quelle selbst
+   * (`{ name, owner, heroIdx, heroOwner }`), darum erkennt die Engine sie hier an Platz und Namen.
+   */
+  istKlonQuelle(source) {
+    const k = this.gs?._klonKopie;
+    if (!k || typeof k !== 'object' || !source || typeof source !== 'object' || source._klonQuelle) return false;
+    if (source.heroIdx !== k.heroIdx) return false;
+    if ((source.heroOwner ?? source.owner ?? source.controller) !== k.feld) return false;
+    return source.name === k.spellName || source.cardName === k.spellName;
+  }
+
+  /**
+   * Die Sicht der Treffer-Hooks auf eine Schadensquelle: gehört sie dem Klon (`istKlonQuelle`), trägt sie KEINEN Helden-Index mehr (`heroIdx: -1`, `_klonSpalte` hält die Spalte).
+   * Alles, was am Helden der Quelle hängt (Shrink, Waffen-Boni, Pfeile, „when this Hero attacks"), sieht dann einen Nicht-Helden; Stoneskin & Co. am ZIEL wirken weiter.
+   */
+  _klonSicht(source) {
+    if (!this.istKlonQuelle(source)) return source;
+    const sicht = Object.assign(Object.create(Object.getPrototypeOf(source)), source);
+    sicht._klonSpalte = source.heroIdx;
+    sicht._klonQuelle = true;
+    sicht.heroIdx = -1;
+    return sicht;
+  }
+
+  /**
    * Styx 28.9.: Stammt `source` vom Helden in Spalte (`seite`, `heroIdx`)?
    * „Dieser Held" = gleiche Brettseite + gleicher Index. Bei Angriffen und
    * Zaubern eines uebernommenen Helden ist `source.owner` der Kontrolleur
@@ -29230,6 +29257,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   quelleIstHeld(source, seite, heroIdx) {
     if (!source || typeof source !== 'object') return false;
+    if (source._klonQuelle || this.istKlonQuelle(source)) return false;   // Clone: die Kopie führt der Klon aus, nicht der Held
     if (source.heroIdx !== heroIdx) return false;
     return (source.heroOwner ?? source.owner ?? source.controller) === seite;
   }
@@ -52786,6 +52814,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const _ecd = this.getEffectiveCardData(e.inst) || cd;
       e.originalLevel = isArtifactCreature(_ecd) ? null : (_ecd?.level ?? 0);
       // Track which hero dealt this damage (from source.heroIdx if available)
+      if (this.istKlonQuelle(e.source)) e.source = this._klonSicht(e.source);   // Clone: der Klon schlägt zu, nicht der Held
       e.sourceHeroIdx = e.source?.heroIdx ?? -1;
     }
 
