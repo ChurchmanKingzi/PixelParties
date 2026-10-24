@@ -1215,8 +1215,8 @@
  "Cute Princess Mary": {
   "name": "Mary",
   "title": "Cute Princess",
-  "music": "bgm_theme_cute.ogg",
-  "px": 10,
+  "music": "scripts/social-posts/music/bgm_mary.ogg",
+  "px": 14,
   "particles": [
    [
     "ember",
@@ -1252,8 +1252,8 @@
     8
    ]
   ],
-  "feet": 330,
+  "feet": 560,
   "logoFront": true,
-  "shadowDy": 70
+  "noShadow": true
  }
 }

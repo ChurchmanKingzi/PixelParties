@@ -1,6 +1,6 @@
 # Captions für alle Reels (Entwürfe, Englisch)
 
-53 Heroes mit Musikstück (Monia mit eigenem Stück, Mary mit dem Theme ihres Archetyps „Cute“). Je Reel liegt dieselbe Caption als Textdatei neben dem Video (`scripts/social-posts/out/reels/<slug>.txt`), zum direkten Einfügen. Erzeugt von `captions.py`; dort lassen sich die Texte ändern.
+53 Heroes mit eigenem Musikstück (Monia und Mary, die beiden zuletzt ergänzten, mit Stücken aus `scripts/social-posts/music/`). Je Reel liegt dieselbe Caption als Textdatei neben dem Video (`scripts/social-posts/out/reels/<slug>.txt`), zum direkten Einfügen. Erzeugt von `captions.py`; dort lassen sich die Texte ändern.
 
 Hinweise:
 

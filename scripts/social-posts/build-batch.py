@@ -29,7 +29,7 @@ ROOT = HERE.parents[1]
 OUT = HERE / 'out'
 REELS = OUT / 'reels'
 GENERIC = {'battle', 'battle1', 'battle2', 'battle3', 'menu', 'menu_diamond', 'shop', 'shop_diamond', 'login', 'puzzle'}
-EXTRA = ['Cool Rescuer Monia', 'Cute Princess Mary']      # ohne eigenes Stück in public/music; Musik (Monia: eigenes Stück, Mary: Archetyp-Theme „Cute“) und Einstellungen stehen in hero-themes.json
+EXTRA = ['Cool Rescuer Monia', 'Cute Princess Mary']      # ohne Treffer in public/music; Musik (scripts/social-posts/music/) und Einstellungen stehen in hero-themes.json
 EXCLUDE = {'Rubin, the Dragoneer Champion',                     # Fehltreffer bei der Musik (nur wegen des Worts „Champion“)
            'Definitely not Andras, the Human Weapon',           # keine Kartenkunst, Karte lässt sich nicht zeichnen
            'Champion, the Eye of the Storm'}                    # dito

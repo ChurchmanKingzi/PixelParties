@@ -349,7 +349,7 @@ def main():
     lines = [
         '# Captions für alle Reels (Entwürfe, Englisch)',
         '',
-        f'{len(rows)} Heroes mit Musikstück (Monia mit eigenem Stück, Mary mit dem Theme ihres Archetyps „Cute“). Je Reel liegt dieselbe Caption als Textdatei neben dem Video '
+        f'{len(rows)} Heroes mit eigenem Musikstück (Monia und Mary, die beiden zuletzt ergänzten, mit Stücken aus `scripts/social-posts/music/`). Je Reel liegt dieselbe Caption als Textdatei neben dem Video '
         '(`scripts/social-posts/out/reels/<slug>.txt`), zum direkten Einfügen. Erzeugt von `captions.py`; dort lassen sich die Texte ändern.',
         '',
         'Hinweise:',
