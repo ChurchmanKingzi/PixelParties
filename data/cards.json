@@ -24192,7 +24192,7 @@
     "hp": 70,
     "atk": null,
     "cost": null,
-    "effect": "You may once per turn reveal the top card of your deck and then shuffle it back into your deck. If it was an Attack or Spell, draw cards equal to its level afterwards.",
+    "effect": "You may once per turn reveal the top card of your deck and then shuffle it back into your deck. If it was an Attack, Spell or Creature, draw cards equal to its level afterwards.",
     "archetype": "",
     "setID": "PP CROSS",
     "banned": "",

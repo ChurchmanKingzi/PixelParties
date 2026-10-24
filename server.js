@@ -17514,6 +17514,13 @@ io.on('connection', (socket) => {
         }
         room.engine._resetTerrorTracking();
         await room.engine.runHooks('onGameStart', { _skipReactionCheck: true });
+        // ★ „Doomed" aus dem Puzzle-Editor (Buff `doomed` am Helden, 24.10.): die ATK-Sperre des Doomed Pirate, ohne dass eine Pirate auf dem Brett liegt. Sie wird NACH allen ATK-Buchungen
+        // des Starts (Fighting, Ausruestung, Polymorph über `onGameStart` …) angelegt, damit der Zwischenspeicher den Gesamtwert hält und die sichtbare ATK 0 ist.
+        for (let pi = 0; pi < (gs.players || []).length; pi++) {
+          (gs.players[pi]?.heroes || []).forEach((hero, hi) => {
+            if (hero?.name && hero.buffs?.doomed) room.engine.atkSperreAnlegen(hero, pi, hi, 'puzzle-doomed');
+          });
+        }
         // Mirror the normal-game pre-draw timing for cards whose
         // effect "triggers at the start of the game, before both
         // players draw their starting hands" (Bill, the Angry

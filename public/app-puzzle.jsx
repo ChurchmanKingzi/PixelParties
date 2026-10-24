@@ -3588,6 +3588,10 @@ function PuzzleCreator() {
       tooltip: 'Calm: this Hero may perform a second Action during the first Action Phase (as an additional Action). Fades at the end of that Action Phase if unused, even if the Hero is defeated.' },
     { key: 'cloudy', label: '☁️ Cloudy', color: '#7bbeea',
       tooltip: 'Cloudy: takes half damage from all sources.' },
+    // 24.10. (Doomed Pirate): die ATK-Sperre der Kreatur, ohne dass eine Pirate auf dem Brett liegen muss. Der Server legt daraus beim Puzzle-Start `engine.atkSperreAnlegen` an — NACH allen
+    // ATK-Buchungen (Fighting, Ausruestung, Polymorph …); Zuwaechse und Auren buchen danach nur noch in den Zwischenspeicher. Ein Debuff, steht aber (wie im Spiel) in der Buff-Spalte.
+    { key: 'doomed', label: '☠️ Doomed', color: '#e94e53', scope: 'hero',
+      tooltip: 'Doomed (Doomed Pirate): this Hero\'s Attack stat is 0 and cannot be increased in any way. A debuff — it stays for the whole game.' },
     { key: 'freeze_immune', label: '🔥 Freeze Immune', color: '#e37435',
       tooltip: 'Freeze Immune: cannot be Frozen.' },
     { key: 'submerged', label: '🌊 Submerged', color: '#4580f6', scope: 'oppHero',
