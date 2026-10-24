@@ -105,6 +105,7 @@ module.exports = {
       if (helden.length > 0) {
         let heroIdx = helden[0];
         let wunsch = -1;
+        let wunschSupport = -1;
         if (helden.length > 1) {
           const wahl = await engine.promptGeneric(pi, {
             type: 'abilityAttachTarget', cardName: top, eligibleHeroIdxs: helden,
@@ -115,21 +116,24 @@ module.exports = {
           });
           if (wahl && typeof wahl.heroIdx === 'number' && helden.includes(wahl.heroIdx)) heroIdx = wahl.heroIdx;
           if (wahl && typeof wahl.zoneSlot === 'number') wunsch = wahl.zoneSlot;
+          if (wahl && typeof wahl.supportSlot === 'number') wunschSupport = wahl.supportSlot;
         }
-        const zone = engine.abilityZielZone(pi, heroIdx, top, { wunschZone: wunsch });
-        if (zone >= 0 && oberste(engine, pi) === top) ziel = { heroIdx, zone };
+        // 24.10.: echte Ability Zone ODER Support Zone (Xal, Xalibur); hoechstens EIN Stapel je Ability.
+        const ort = engine.abilityZielOrt(pi, heroIdx, top, { wunschZone: wunsch, wunschSupport, wunschArt: wunschSupport >= 0 ? 'support' : undefined });
+        if (ort && oberste(engine, pi) === top) ziel = { heroIdx, ort };
         // ★ Welle 14 (Al, Q5): Resistance blockt das Anlegen per Effekt — vor jeder Kartenbewegung; die Karte geht dann den „Otherwise"-Weg (oben/unten).
         if (ziel && await engine.abilityAnlegenDurchResistanceBlockiert(pi, pi, ziel.heroIdx, CARD_NAME)) ziel = null;
       }
       if (ziel) {
         // Die Karte fliegt aus der Mitte in ihre Ability Zone; gebucht wird mit der Landung.
-        await gibFrei(engine, pi, key, top, { dest: 'ability', destHeroIdx: ziel.heroIdx, destSlotIdx: ziel.zone, destSide: pi });
+        await gibFrei(engine, pi, key, top, { dest: ziel.ort.art === 'support' ? 'support' : 'ability', destHeroIdx: ziel.heroIdx, destSlotIdx: ziel.ort.slot, destSide: pi });
         freigegeben = true;
         const entnommen = await engine.takeFromPile(pi, 'deck', top, { source: CARD_NAME });
         if (entnommen) {
           engine.handZugangSync(pi, top, { von: 'transit', source: CARD_NAME });   // Durchgang zur Anlage, keine Suche
           const res = await engine.attachAbilityFromHand(pi, top, ziel.heroIdx, {
-            skipAbilityGivenCheck: true, resistanzGeprueft: true, targetZoneSlot: ziel.zone, keinFlug: true,
+            skipAbilityGivenCheck: true, resistanzGeprueft: true, keinFlug: true,
+            ...(ziel.ort.art === 'support' ? { targetSupportSlot: ziel.ort.slot, targetZoneArt: 'support' } : { targetZoneSlot: ziel.ort.slot }),
           });
           if (res?.success) angelegtAn = ps.heroes[ziel.heroIdx]?.name || true;
           else engine.log('super_fan_fizzle', { player: ps.username, card: top });

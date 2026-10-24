@@ -31,7 +31,7 @@
 function heroCanAcceptFighting(ps, heroIdx, engine, side) {
   // M02-02: dieselbe Zonenwahl wie beim Anhängen (`abilityZielZone`) — sonst wird die Karte
   // bei vollem Fighting-Stapel (Lv3) plus freier Zone angeboten, aus dem Deck genommen und geht verloren.
-  if (engine && side != null) return engine.abilityZielZone(side, heroIdx, 'Fighting') >= 0;
+  if (engine && side != null) return engine.abilityZielOrt(side, heroIdx, 'Fighting') != null;   // 24.10.: auch Support Zonen (Xal)
   const abZones = ps.abilityZones[heroIdx] || [];
   for (let z = 0; z < 3; z++) {
     const slot = abZones[z] || [];
@@ -145,45 +145,29 @@ module.exports = {
       // ── Remove Fighting from deck ──
       if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: 'Muscle Training' }))) return;   // v820: Stapel-Schicht
 
-      // ── Find target ability zone ──
-      const abZones = hps.abilityZones[heroIdx] || [[], [], []];   // Als Befund 29.9.: Brettseite des Wirkers
-      hps.abilityZones[heroIdx] = abZones;   // Als Befund 29.9.: Brettseite des Wirkers
+      // ── Find target zone (24.10.: echte Ability Zone ODER Support Zone — Xal; hoechstens EIN Fighting-Stapel) ──
       // v1349: Zonenwahl an EINER Stelle (verwahrte Abilities, Madame Guillotine).
-      const targetZone = engine.abilityZielZone(hs, heroIdx, 'Fighting');   // Als Befund 29.9.: Brettseite des Wirkers
+      const ort = engine.abilityZielOrt(hs, heroIdx, 'Fighting');   // Als Befund 29.9.: Brettseite des Wirkers
 
-      if (targetZone < 0) return; // Shouldn't happen (spellPlayCondition guards this)
+      if (!ort) return; // Shouldn't happen (spellPlayCondition guards this)
 
-      // ── Attach Fighting ──
-      if (!abZones[targetZone]) abZones[targetZone] = [];
-      abZones[targetZone].push('Fighting');
-
+      // ── Attach Fighting + track card instance ──
       // Does NOT consume abilityGivenThisTurn (additional attachment)
-
-      // ── Track card instance + fire hooks ──
-      const inst = engine._trackCard('Fighting', hs, 'ability', heroIdx, targetZone);   // Als Befund 29.9.: Brettseite des Wirkers
+      const inst = engine.abilityOrtBelegen(hs, heroIdx, 'Fighting', ort);   // Als Befund 29.9.: Brettseite des Wirkers
       engine._broadcastEvent('deck_search_add', { cardName: 'Fighting', playerIdx: pi });
       engine.log('deck_search', { player: ps.username, card: 'Fighting', by: 'Muscle Training' });
 
-      // Fire Fighting's onPlay hook (grants ATK bonus)
-      await engine.runHooks('onPlay', {
-        _onlyCard: inst, playedCard: inst, cardName: 'Fighting',
-        zone: 'ability', heroIdx, _skipReactionCheck: true,
-      });
+      // Fire Fighting's onPlay hook (grants ATK bonus) + zone enter hook (triggers Creativity, etc.)
+      await engine.abilityOrtHooks(inst, ort, { _skipReactionCheck: true });
 
-      // Fire zone enter hook (triggers Creativity, etc.)
-      await engine.runHooks('onCardEnterZone', {
-        enteringCard: inst, toZone: 'ability', toHeroIdx: heroIdx,
-        _skipReactionCheck: true,
-      });
-
-      // Flash the target ability zone
+      // Flash the target zone
       engine._broadcastEvent('ability_activated', {
-        owner: hs, heroIdx, zoneIdx: targetZone, abilityName: 'Fighting',   // Als Befund 29.9.: Brettseite des Wirkers
+        owner: hs, heroIdx, zoneIdx: ort.slot, zoneKind: ort.art, abilityName: 'Fighting',   // Als Befund 29.9.: Brettseite des Wirkers
       });
 
       engine.log('muscle_training', {
         player: ps.username, hero: hero.name,
-        fightingLevel: abZones[targetZone].length,
+        fightingLevel: engine.abilityStapelVon(inst).length,
       });
 
       engine.sync();
