@@ -1,7 +1,7 @@
 'use strict';
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Trap Sabotage"
-//  Spell (Normal, Destruction Magic Lv1), PP SOD
+//  Spell (Normal, Destruction Magic Lv0), PP SOD
 //
 //  „Choose a face-down Surprise your opponent controls and send it to the discard pile. Your opponent must send all copies of that Surprise from their hand and deck to
 //   their discard pile. If the user has at least Destruction Magic 1, this counts as an additional Action."
@@ -28,8 +28,8 @@
 //     Hat die gewählte Surprise den Platz inzwischen von selbst verlassen (reagiert und aktiviert), verpufft der Zauber — ohne Karte gibt es keinen Namen.
 //
 //  ── ZUSATZAKTION ────────────────────────────────────────────────────────
-//  „If the user has at least Destruction Magic 1, this counts as an additional Action" → `inherentAction` als FUNKTION, je Held (`effectiveSchoolLevelForCaster`). Weil der Zauber
-//  selbst Destruction Magic 1 verlangt, trifft das regulär immer zu; die Funktion bleibt für „as if"-/Ausnahme-Wege (Stufe über Effekte erreicht, Stufe später gesenkt) maßgeblich.
+//  „If the user has at least Destruction Magic 1, this counts as an additional Action" → `inherentAction` als FUNKTION, je Held (`effectiveSchoolLevelForCaster`). Die Karte selbst ist Stufe 0:
+//  ein Held ohne Destruction Magic kann sie wirken, bekommt aber keine Zusatzaktion (sie kostet dann die Aktion; in der Main Phase ist sie für ihn nur mit Destruction Magic 1 spielbar).
 //
 //  ── ANNAHMEN ────────────────────────────────────────────────────────────
 //  „Your opponent" = der Kontrolleur der gewählten Surprise (im 1-gegen-1 der Gegner; im Skill Test mit mehreren Gegnern der, dessen Surprise gewählt wurde).
