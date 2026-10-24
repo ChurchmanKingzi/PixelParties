@@ -162,6 +162,15 @@ def warp_row(row, xa, xb, d, side):
     return out
 
 
+def arm_swing(y, i):
+    """Seitlicher Ausschlag des Arms in Zeile y (> 0: nach außen). Schlackern im 8er-Takt (zwei Schwünge je Flügelschlag), dazu eine
+    langsamere Welle im 16er-Takt, die jeden zweiten Schwung stärker ausfallen lässt; nach unten hängen die Zeilen etwas hinterher.
+    Die Hand ändert ihre Lage in fast jedem Frame (keine Pausen an den Umkehrpunkten)."""
+    w = min(1.0, max(0.0, (y - 37) / 6.0))
+    p = phase(i)
+    return w * (0.4 + 2.3 * math.sin(2 * p - 1.6 - 0.25 * (y - 37)) + 0.6 * math.sin(p - 0.5))
+
+
 def body_layer(i):
     ph = phase(i)
     out = BODY.copy()
@@ -175,18 +184,17 @@ def body_layer(i):
             out[y, lo:hi + 1] = 0
             seg = warp_row(BODY[y], a, b, d, side)
             out[y, lo:hi + 1] = np.where(seg[lo:hi + 1, 3:4] > 0, seg[lo:hi + 1], out[y, lo:hi + 1])
-    # 2) Arme schwingen seitwärts, jeder Arm als Einheit (Ärmel samt Hand und äußerem Umriss, siehe ARMS) um die Schulter: die obersten Zeilen
-    #    bewegen sich kaum, die Hand am weitesten (Scherung ≈ Drehung). Das Kleid bleibt stehen. Wo der Arm war, bleibt das Feld leer, dort
-    #    scheinen die Flügel dahinter durch.
-    o = max(-1, int(round(3.0 * math.sin(ph - 1.6))))                  # > 0: nach außen
-    if o:
-        for side in (-1, 1):
-            px_ = {(y, x): out[y, x].copy() for y, x in ARMS[side]}
-            for (y, x) in px_:
-                out[y, x] = 0
-            for (y, x), c in px_.items():
-                dx = int(round(o * min(1.0, max(0.0, (y - 37) / 6.0))))
-                out[y, x + side * dx] = c
+    # 2) Arme schlackern seitwärts, jeder Arm als Einheit (Ärmel samt Hand und äußerem Umriss, siehe ARMS) um die Schulter: die obersten Zeilen
+    #    bewegen sich kaum, die Hand am weitesten (Scherung ≈ Drehung), und die unteren Zeilen hängen dem Schwung leicht hinterher (Pendel).
+    #    Der Takt ist kurz (8 Frames) mit langsamer Überlagerung; die Hand ändert ihre Lage in fast jedem Frame.
+    #    Nach außen bis 3 px, nach innen bis 2 px. Das Kleid bleibt stehen; wo der Arm war, scheinen die Flügel dahinter durch.
+    for side in (-1, 1):
+        px_ = {(y, x): out[y, x].copy() for y, x in ARMS[side]}
+        for (y, x) in px_:
+            out[y, x] = 0
+        for (y, x), c in px_.items():
+            dx = max(-2, min(3, int(round(arm_swing(y, i)))))
+            out[y, x + side * dx] = c
     # 3) Saum schwingt
     for y in range(48, 56):
         dx = int(round(math.sin(ph - 2.2 - 0.3 * (y - 47)) * (y - 47) / 7.0 * 1.2))
