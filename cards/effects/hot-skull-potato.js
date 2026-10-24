@@ -66,6 +66,7 @@ async function weiterreichen(engine, inst, holder, ziel) {
   const alt = gs.players[altSeite];
   const altSlot = alt?.supportZones?.[inst.heroIdx]?.[inst.zoneSlot];
   if (altSlot) { const i = altSlot.indexOf(CARD_NAME); if (i >= 0) altSlot.splice(i, 1); }
+  const altHeld = inst.heroIdx, altSlot2 = inst.zoneSlot;   // für das Fenster „Kreatur wurde bewegt" (Explosion Toss)
   const to = gs.players[oppIdx];
   // Sprung (Pixelart `hot_potato_throw` + Klang): die KARTE selbst hüpft von der alten zur neuen Zone; währenddessen liegt sie in keiner, erst bei der Landung steht sie in der neuen.
   engine._broadcastEvent('play_zone_animation', {
@@ -87,6 +88,13 @@ async function weiterreichen(engine, inst, holder, ziel) {
   await engine._delay(250);
   engine.log('hot_skull_potato_pass', { player: gs.players[holder]?.username, counters: inst.counters[KEY] });
   engine.sync();
+  // „moved from one of your Heroes' Support Zones to an opponent's Hero's Support Zone": Hand-Fenster für den bisherigen Halter (Explosion Toss) — das ruft der Aufrufer, NACHDEM der Schild
+  // wieder steht („unaffected"), mit diesen Angaben.
+  return {
+    fromKtrl: holder, fromSeite: altSeite, fromHeroIdx: altHeld, fromSlot: altSlot2,
+    toSeite: oppIdx, toHeroIdx: ziel.heroIdx, toSlot: ziel.slotIdx,
+    source: { name: CARD_NAME, owner: holder, controller: holder },
+  };
 }
 
 /** Besiegen und 50 + 50 × Counter an alle Ziele des Halters. */
@@ -233,8 +241,10 @@ async function zugEnde(ctx) {
           ziel = (wahl && zonen.find(z => z.heroIdx === wahl.heroIdx && z.slotIdx === wahl.slotIdx)) || zonen[0];
         }
         schildAb(inst);
-        try { await weiterreichen(engine, inst, holder, ziel); } finally { schildAuf(inst); }
+        let fensterInfo = null;
+        try { fensterInfo = await weiterreichen(engine, inst, holder, ziel); } finally { schildAuf(inst); }
         weitergegeben = true;
+        if (fensterInfo) await engine._checkCreatureMovedHandReactions(inst, fensterInfo);
       }
     }
   }

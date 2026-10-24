@@ -8372,6 +8372,7 @@ const REAKTIONS_ANLAESSE = {
   hero_defeated_reaction:         'their Hero was defeated',   // v1340 Cheat Chair
   hero_defeat_window_reaction:    'a Hero was being defeated',   // v1490 Surprising Opportunity
   hero_revived_window_reaction:   'their Hero was revived',   // v1491 Triumphant Return
+  creature_moved_window_reaction: 'their Creature was moved to your side',   // 24.10. Explosion Toss
   after_damage_reaction:          'damage had landed',
   after_creature_damage_reaction: 'a Creature had taken damage',
   creature_damage_batch_reaction: 'Creatures had taken damage',
@@ -10314,6 +10315,292 @@ const HotPotatoThrowEffect = (() => {
       </>
     );
   };
+})();
+
+// ═════════════════════════════════════════════════════════════════
+//  Unreasonable Anger: Dampf (`unreasonable_steam`) — PIXELART; cartoonhafte Wut: Dampf steigt aus dem Helden, dazu die rote Zornader
+//
+//  Aus zwei Stellen am Kopf (links/rechts) steigen weiße Dampfwolken auf — schattierte Ballen (Licht oben links, Rand, Dither-Übergang), die beim Aufsteigen wachsen und gegen Ende der
+//  Lebensdauer wegdithern; zwischendurch stößt der Held schnelle Dampfstöße aus (kurze Pfiffstriche). Über dem Kopf pocht dreimal die rote Zornader (vier gebogene Klingen, Rand, Glanz).
+//  Feste Palette, kein Leuchten, ~1300 ms.
+// ═════════════════════════════════════════════════════════════════
+const UnreasonableSteamEffect = (() => {
+  const WEISS = ppHex('#ffffff'), HELL = ppHex('#e5edfa'), MITTE = ppHex('#d2d2db'), SCHATTEN = ppHex('#9aa3b6'), RAND = ppHex('#808898');
+  const ROT = ppHex('#e92f38'), DUNKELROT = ppHex('#b21a29'), ROTHELL = ppHex('#fe7476'), RANDROT = ppHex('#3a0000');
+  const ENDE = 1300, FADE_AB = 1000;
+  const ball = (g, cx, cy, r, a) => {
+    const r2 = r * r, R = Math.ceil(r);
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+      const d = dx * dx + dy * dy;
+      if (d > r2) continue;
+      if (d > (r - 1.2) * (r - 1.2)) { g.put(cx + dx, cy + dy, RAND, a); continue; }
+      const licht = ((-dx * 0.6 - dy * 0.8) / Math.max(1, r)) * 0.5 + 0.5;
+      const w = licht + (ppBayer(cx + dx, cy + dy) - 0.5) * 0.6;
+      g.put(cx + dx, cy + dy, w > 0.72 ? WEISS : w > 0.5 ? HELL : w > 0.28 ? MITTE : SCHATTEN, a);
+    }
+  };
+  const ader = (g, cx, cy, gr, a) => {
+    // vier gebogene Klingen um eine Mitte; `gr` = Größe (3..6)
+    for (let dy = -gr - 1; dy <= gr + 1; dy++) for (let dx = -gr - 1; dx <= gr + 1; dx++) {
+      if (dx === 0 || dy === 0) continue;
+      const s = Math.abs(dx) + Math.abs(dy);
+      if (s < 3 || s > gr + 1) continue;
+      const rand = s === 3 || s === gr + 1;
+      g.put(cx + dx, cy + dy, rand ? RANDROT : (dx < 0 && dy < 0 && s === 4) ? ROTHELL : (s === 4 ? ROT : DUNKELROT), a);
+    }
+  };
+  const vorbereiten = () => ({
+    wolken: Array.from({ length: 16 }, (_, i) => ({ seite: i % 2 === 0 ? -1 : 1, start: Math.floor(i / 2) * 140 + Math.random() * 60, r0: 5 + Math.random() * 2, drift: (Math.random() - 0.5) * 10, tempo: 56 + Math.random() * 20 })),
+    pfiffe: Array.from({ length: 6 }, (_, i) => ({ seite: i % 2 === 0 ? -1 : 1, start: 120 + i * 170, laenge: 5 + Math.floor(Math.random() * 4) })),
+  });
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), kopfY = Math.round(sz.cy - sz.hh * 0.42), ohr = Math.max(9, Math.round(sz.hw * 0.62));
+    // Dampfwolken: steigen links/rechts vom Kopf auf, wachsen, dithern am Ende ihrer Lebensdauer weg
+    for (const w of teile.wolken) {
+      const tt = t - w.start;
+      if (tt < 0 || tt > 760) continue;
+      const k = tt / 760;
+      const r = w.r0 + k * 8;
+      const x = cx + w.seite * (ohr + k * 7) + w.drift * k, y = kopfY - (tt / 1000) * w.tempo;
+      ball(g, Math.round(x), Math.round(y), r, aus * (k > 0.6 ? Math.max(0.15, 1 - (k - 0.6) / 0.4) : 1));
+    }
+    // Dampfstöße (kurze waagrechte Pfiffstriche aus dem Kopf)
+    for (const p of teile.pfiffe) {
+      const tt = t - p.start;
+      if (tt < 0 || tt > 170) continue;
+      const f = Math.floor(tt / 55) + 1;
+      for (let i = 0; i < p.laenge; i++) g.block(cx + p.seite * (ohr + 2 + i * 2 + f * 2), kopfY - 2 + (i % 2), 2, 1, i < 2 ? WEISS : HELL, aus * (1 - i / (p.laenge + 1)));
+    }
+    // Zornader: pocht dreimal (Größe in Stufen 3 → 6 → 4), sitzt links über dem Kopf
+    const ax = cx + Math.round(sz.hw * 0.7), ay = Math.round(kopfY - 16);
+    for (let n = 0; n < 3; n++) {
+      const tt = t - (160 + n * 330);
+      if (tt < 0 || tt > 300) continue;
+      const stufe = tt < 90 ? 5 : tt < 180 ? 9 : 7;
+      ader(g, ax, ay, stufe, aus);
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 300, 420, vorbereiten);
+})();
+
+// ═════════════════════════════════════════════════════════════════
+//  Nasty Prank: Wassereimer (`prank_bucket`) — PIXELART; ein Eimer fällt auf den Helden und kippt aus
+//
+//  Der Metalleimer (13×13, dreifach gezeichnet: Henkel, Rand, Wasserspiegel, Band, Glanz links oben, Schatten rechts) fällt in ganzen Pixelschritten von oben auf den Kopf (0–700 ms, beschleunigt),
+//  schlägt an (Funken und zwei Stauchungs-Takte), springt kopfüber (Reihenfolge der Zeilen gespiegelt) und gießt das Wasser aus: eine gedithert gefüllte Wasserfront läuft über die Karte nach unten,
+//  Tropfen spritzen mit Schwerkraft zu den Seiten. Der Eimer rutscht zum Boden und poltert; alles dithert ab ~1250 ms weg (~1500 ms). Feste Palette.
+// ═════════════════════════════════════════════════════════════════
+const PrankBucketEffect = (() => {
+  const P = { k: ppHex('#291f3d'), g: ppHex('#9aa3b6'), h: ppHex('#e5edfa'), d: ppHex('#808898'), w: ppHex('#4580f6'), v: ppHex('#b3d8f9') };
+  const EIMER = [
+    '...kkkkkkk...',
+    '..k.......k..',
+    '.k.........k.',
+    '.k.........k.',
+    'kkkkkkkkkkkkk',
+    'kwwvwwwwwwwwk',
+    'khhgggggggddk',
+    'khgggggggggdk',
+    '.kgggggggddk.',
+    '.kdddddddddk.',
+    '.kghggggggdk.',
+    '..kgggggddk..',
+    '..kkkkkkkkk..',
+  ];
+  const UMGEKEHRT = EIMER.slice().reverse();
+  const WASSER = [ppHex('#2f539d'), ppHex('#4580f6'), ppHex('#66b6ff'), ppHex('#b3d8f9'), ppHex('#ffffff')];
+  const ENDE = 1500, FALL = 700, FADE_AB = 1220;
+  const gross = (g, cx, cy, bild, a) => {
+    const h = bild.length, w = bild[0].length, x0 = Math.round(cx - w * 1.5), y0 = Math.round(cy - h * 3);
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const c = P[bild[j][i]]; if (c) g.block(x0 + i * 3, y0 + j * 3, 3, 3, c, a); }
+  };
+  const vorbereiten = () => ({
+    tropfen: Array.from({ length: ppFxN(26) }, () => ({ seite: Math.random() < 0.5 ? -1 : 1, v: 14 + Math.random() * 30, hoch: 14 + Math.random() * 20, start: FALL + 60 + Math.random() * 380, farbe: 1 + Math.floor(Math.random() * 3) })),
+    funken: Array.from({ length: 8 }, (_, i) => ({ w: (i / 8) * Math.PI * 2 + Math.random() * 0.4, v: 18 + Math.random() * 18 })),
+  });
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), kopf = Math.round(sz.cy - sz.hh * 0.62), unten = Math.round(sz.cy + sz.hh * 0.9);
+    const startY = kopf - 26;
+    if (t < FALL) {                                                                  // Fall: beschleunigt in ganzen Schritten, leichtes Pendeln
+      const k = t / FALL, y = startY + (kopf - startY) * k * k;
+      gross(g, cx + Math.round(Math.sin(t / 80) * 1), Math.round(y), EIMER, aus);
+      for (let i = 1; i <= 4; i++) g.block(cx - 12 + i * 5, Math.round(y) - 46 - i * 3, 1, 4, MITTE_STREIFEN, aus * 0.5);   // Fahrtstreifen
+    } else {
+      const tt = t - FALL;
+      // Stauchung: zwei Takte tiefer, dann Sprung auf den Kopf
+      const hop = tt < 66 ? 2 : tt < 130 ? 0 : tt < 260 ? -Math.round(Math.sin((tt - 130) / 130 * Math.PI) * 4) : 0;
+      // Eimer kippt kopfüber und rutscht nach ~700 ms zum Boden
+      const rutsch = tt > 520 ? Math.min(unten - kopf - 6, Math.round(((tt - 520) / 1000) * ((tt - 520) / 1000) * 260)) : 0;
+      const eimerY = kopf + hop + rutsch;
+      if (tt < 160) for (const f of teile.funken) g.put(cx + Math.cos(f.w) * f.v * tt / 400 * 1.6, kopf - 10 + Math.sin(f.w) * f.v * tt / 400 * 1.2, WASSER[4], aus);
+      // Wasserfront über die Karte nach unten (Dither, Glanzspitzen)
+      if (tt > 60) {
+        const front = Math.min(sz.hh * 2 * 1.05, (tt - 60) * 0.135), obenY = Math.round(sz.cy - sz.hh);
+        const links = Math.round(cx - sz.hw), rechts = Math.round(cx + sz.hw);
+        for (let y = obenY; y < obenY + front; y++) {
+          const tiefe = (y - obenY) / Math.max(1, front);
+          for (let x = links - 1; x <= rechts + 1; x++) {
+            const welle = Math.sin((x + y * 0.7 + t / 60)) * 0.12;
+            const dicht = (tiefe > 0.88 ? (1 - tiefe) / 0.12 : 1) * 0.62 + welle;
+            if (ppBayer(x, y) < dicht) g.put(x, y, WASSER[(Math.floor(y / 3) + x) % 7 === 0 ? 3 : (y - obenY) % 9 < 3 ? 2 : 1], aus);
+          }
+        }
+        // Wasserrand an der Front
+        for (let x = links; x <= rechts; x += 2) g.block(x, Math.round(obenY + front), 2, 1, WASSER[3], aus * 0.8);
+      }
+      gross(g, cx, eimerY, UMGEKEHRT, aus);   // der Eimer liegt über dem Wasser
+    }
+    // Spritzer zu den Seiten
+    for (const p of teile.tropfen) {
+      const tt = (t - p.start) / 1000;
+      if (tt < 0 || tt > 0.62) continue;
+      const x = cx + p.seite * (sz.hw * 0.7 + p.v * tt * 1.4), y = sz.cy - sz.hh * 0.3 - p.hoch * tt * 2 + tt * tt * 160;
+      g.block(Math.round(x), Math.round(y), 2, 2, WASSER[p.farbe], aus);
+      g.put(Math.round(x), Math.round(y), WASSER[4], aus);
+    }
+  };
+  const MITTE_STREIFEN = ppHex('#d2d2db');
+  return ppPunktBild(malen, ENDE + 40, 330, 600, vorbereiten);
+})();
+
+// ═════════════════════════════════════════════════════════════════
+//  Reverse Trap: „1 TON" (`reverse_trap_ton`) — PIXELART; ein cartooniger Eisenblock fällt auf die Karte / den Helden
+//
+//  Ein trapezförmiger Eisenklotz (46 breit, Henkelring, Aufschrift „1 TON" in 3×5-Pixelschrift, Glanz links oben, Schatten rechts per Dither, dunkler Rand) fällt aus dem Bild (Fahrtstreifen,
+//  beschleunigt in ganzen Pixeln) und schlägt bei ~620 ms auf: zwei Takte Stauchschatten unter der Karte, Staubring aus Pixeln, drei gelbe Kreuzfunkel als Aufschlagsterne, der Klotz ruckelt.
+//  Ab ~1300 ms dithert alles weg (~1700 ms). Feste Palette, kein Leuchten.
+// ═════════════════════════════════════════════════════════════════
+const ReverseTrapTonEffect = (() => {
+  const RAND = ppHex('#12101f'), DUNKEL = ppHex('#3e3e51'), MITTE = ppHex('#59606e'), HELL = ppHex('#808898'), GLANZ = ppHex('#d2d2db'), TEXT = ppHex('#e5edfa');
+  const STAUB = ppHex('#808898'), STAUB2 = ppHex('#9aa3b6');
+  const STERN = ['#ffffff', '#fff196', '#f8ca21', '#ff8b1a'].map(ppHex);
+  const ENDE = 1700, FALL = 620, FADE_AB = 1300;
+  const GLYPHEN = {
+    '1': ['.#.', '##.', '.#.', '.#.', '###'],
+    'T': ['###', '.#.', '.#.', '.#.', '.#.'],
+    'O': ['###', '#.#', '#.#', '#.#', '###'],
+    'N': ['#...#', '##..#', '#.#.#', '#..##', '#...#'],
+  };
+  const BW = 46, BH = 32;
+  // Klotz: Oberkante 38 breit, Unterkante 44 breit (trapezförmig), Henkelring oben; Schrift doppelt gezeichnet
+  const klotz = (g, cx, oben, a) => {
+    for (let r = 0; r < BH; r++) {
+      const w = Math.round(40 + 6 * (r / (BH - 1))), x0 = Math.round(cx - w / 2);
+      for (let i = 0; i < w; i++) {
+        const rand = r === 0 || r === BH - 1 || i === 0 || i === w - 1;
+        let c;
+        if (rand) c = RAND;
+        else if (r === 1 || i === 1) c = GLANZ;
+        else if (r === 2 || i === 2) c = HELL;
+        else if (i >= w - 4 || r >= BH - 3) c = ppBayer(x0 + i, oben + r) < 0.5 ? DUNKEL : MITTE;
+        else c = MITTE;
+        g.put(x0 + i, oben + r, c, a);
+      }
+    }
+    // Aufschrift „1 TON": 3×5-Glyphen, zweimal Schatten (+1,+1), Zeilenmitte
+    const text = '1 TON', SK = 2;
+    let breite = 0; for (const ch of text) breite += ch === ' ' ? 4 : GLYPHEN[ch][0].length * SK + 1; breite -= 1;
+    let x = Math.round(cx - breite / 2); const y = oben + 10;
+    for (const ch of text) {
+      if (ch === ' ') { x += 4; continue; }
+      const gl = GLYPHEN[ch], gb = gl[0].length;
+      for (let j = 0; j < 5; j++) for (let i = 0; i < gb; i++) if (gl[j][i] === '#') g.block(x + i * SK + 1, y + j * SK + 1, SK, SK, RAND, a);
+      for (let j = 0; j < 5; j++) for (let i = 0; i < gb; i++) if (gl[j][i] === '#') g.block(x + i * SK, y + j * SK, SK, SK, TEXT, a);
+      x += gb * SK + 1;
+    }
+    // Henkelring
+    for (let i = -6; i <= 6; i++) { g.put(cx + i, oben - 7, i === -6 || i === 6 ? RAND : (Math.abs(i) < 4 ? DUNKEL : HELL), a); g.put(cx + i, oben - 6, Math.abs(i) > 4 ? RAND : DUNKEL, a); }
+    for (let j = -5; j <= -1; j++) { g.put(cx - 6, oben + j, RAND, a); g.put(cx + 6, oben + j, RAND, a); g.put(cx - 5, oben + j, HELL, a); g.put(cx + 5, oben + j, DUNKEL, a); g.put(cx - 4, oben + j, MITTE, a); g.put(cx + 4, oben + j, MITTE, a); }
+  };
+  const vorbereiten = () => ({ staub: Array.from({ length: 16 }, (_, i) => ({ w: (i / 16) * Math.PI * 2, v: 18 + Math.random() * 16, grob: i % 3 === 0 })) });
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), landeOben = Math.round(sz.cy - BH / 2 + 2), startOben = landeOben - 84;
+    const bodenY = Math.round(sz.cy + sz.hh * 0.95);
+    if (t < FALL) {
+      const k = t / FALL, oben = Math.round(startOben + (landeOben - startOben) * k * k * k);
+      for (let i = -2; i <= 2; i++) for (let j = 1; j <= 3; j++) g.block(cx + i * 5, oben - 8 - j * 6, 1, 4, STAUB2, aus * (0.55 - j * 0.12));   // Fahrtstreifen
+      klotz(g, cx, oben, aus);
+      return;
+    }
+    const tt = t - FALL;
+    const wackel = tt < 200 ? (Math.floor(tt / 33) % 2 === 0 ? 1 : -1) : 0;
+    // Stauchschatten unter dem Klotz (breit, gedithert)
+    const sb = tt < 100 ? 28 : 25;
+    for (let dx = -sb - 6; dx <= sb + 6; dx++) for (let dy = -2; dy <= 2; dy++) { if ((dx * dx) / ((sb + 6) * (sb + 6)) + (dy * dy) / 6 <= 1 && ppBayer(cx + dx, bodenY + dy) < 0.6) g.put(cx + dx, bodenY + dy, RAND, aus); }
+    klotz(g, cx + wackel, landeOben + (tt < 66 ? 2 : 0), aus);
+    // Staubring
+    if (tt < 520) for (const s of teile.staub) {
+      const k = tt / 520;
+      const x = cx + Math.cos(s.w) * (20 + s.v * k * 1.4), y = bodenY - 2 + Math.sin(s.w) * (4 + s.v * k * 0.25) - k * 4;
+      g.block(Math.round(x), Math.round(y), s.grob ? 3 : 2, s.grob ? 3 : 2, k > 0.5 ? STAUB : STAUB2, aus * (k > 0.65 ? 0.5 : 1));
+    }
+    // Aufschlagsterne
+    if (tt < 300) { const arm = Math.min(4, Math.floor(tt / 55) + 1), nach = tt > 200 ? 3 : arm;
+      ppKreuzfunkel(g, cx - 28, landeOben - 2, nach, STERN, aus); ppKreuzfunkel(g, cx + 27, landeOben + 3, nach, STERN, aus); ppKreuzfunkel(g, cx - 2, landeOben - 16, nach, STERN, aus); }
+  };
+  return ppPunktBild(malen, ENDE + 40, 300, 360, vorbereiten);
+})();
+
+// ═════════════════════════════════════════════════════════════════
+//  „Deadly Poison": Gift, das heilt (`deadly_poison_heal`) — PIXELART; lila Giftschwaden mischen sich mit grüner Heilung
+//
+//  Um das Ziel wabern schattierte lila Giftwolken (Licht oben links, Rand, Dither-Übergänge) nach oben; dazwischen steigen grüne Heilkreuze (Plus, hellerer Kern) auf. Über 0–1100 ms kippt die
+//  Farbe der Wolken per Dither-Mischung von Lila zu Grün (die Giftwolke „heilt"), am Ende blitzt ein grünes Kreuzfunkel. Ab ~1100 ms dithert alles weg (~1500 ms). Feste Palette, kein Leuchten.
+// ═════════════════════════════════════════════════════════════════
+const DeadlyPoisonHealEffect = (() => {
+  const LILA = [ppHex('#d6bbf1'), ppHex('#b278ed'), ppHex('#7e41ba'), ppHex('#401a66')], GRUEN = [ppHex('#e5fae7'), ppHex('#75f091'), ppHex('#20ac37'), ppHex('#167927')];
+  const RAND_L = ppHex('#2b0b47'), RAND_G = ppHex('#1a4128'), KREUZ = [ppHex('#ffffff'), ppHex('#b3f9b8'), ppHex('#3ddc57'), ppHex('#20ac37')];
+  const ENDE = 1500, FADE_AB = 1100;
+  const wolke = (g, cx, cy, r, mix, a) => {
+    const r2 = r * r, R = Math.ceil(r);
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+      const d = dx * dx + dy * dy;
+      if (d > r2) continue;
+      const gruen = ppBayer(cx + dx + 2, cy + dy + 1) < mix;
+      if (d > (r - 1.2) * (r - 1.2)) { g.put(cx + dx, cy + dy, gruen ? RAND_G : RAND_L, a); continue; }
+      const licht = ((-dx * 0.6 - dy * 0.8) / Math.max(1, r)) * 0.5 + 0.5;
+      const w = licht + (ppBayer(cx + dx, cy + dy) - 0.5) * 0.6;
+      const pal = gruen ? GRUEN : LILA;
+      g.put(cx + dx, cy + dy, w > 0.7 ? pal[0] : w > 0.48 ? pal[1] : w > 0.26 ? pal[2] : pal[3], a);
+    }
+  };
+  const PLUS = ['..c..', '..c..', 'cchcc', '..c..', '..c..'];
+  const vorbereiten = (sz) => ({
+    wolken: Array.from({ length: 14 }, (_, i) => ({ w0: (i / 14) * Math.PI * 2, rad: sz.hw * (0.6 + Math.random() * 0.55), r: 8 + Math.random() * 5, start: Math.random() * 420, tempo: 20 + Math.random() * 18, dreh: (Math.random() < 0.5 ? -1 : 1) * (0.8 + Math.random() * 0.6) })),
+    kreuze: Array.from({ length: 7 }, (_, i) => ({ x: (i - 3) * (sz.hw * 0.42) + (Math.random() - 0.5) * 6, start: 120 + i * 120 + Math.random() * 60, tempo: 30 + Math.random() * 14, wippe: Math.random() * 6 })),
+  });
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
+    const mix = Math.max(0, Math.min(1, (t - 250) / 850));                               // Lila → Grün
+    for (const w of teile.wolken) {
+      const tt = t - w.start;
+      if (tt < 0) continue;
+      const k = Math.min(1, tt / 700);
+      const ang = w.w0 + (tt / 1000) * w.dreh;
+      const x = cx + Math.cos(ang) * w.rad * 0.9, y = cy + sz.hh * 0.55 + Math.sin(ang) * w.rad * 0.35 - (tt / 1000) * w.tempo;
+      wolke(g, Math.round(x), Math.round(y), w.r * (0.5 + 0.5 * k), mix, aus * (tt > 760 ? Math.max(0, 1 - (tt - 760) / 400) : 1));
+    }
+    for (const c of teile.kreuze) {
+      const tt = t - c.start;
+      if (tt < 0 || tt > 900) continue;
+      const x = cx + c.x + Math.sin(tt / 160 + c.wippe) * 2, y = cy + sz.hh * 0.7 - (tt / 1000) * c.tempo * 2.2;
+      const bild = PLUS.map(r => r.replace(/c/g, 'c'));
+      for (let j = 0; j < 5; j++) for (let i = 0; i < 5; i++) {
+        const ch = bild[j][i]; if (ch === '.') continue;
+        g.put(Math.round(x) - 2 + i, Math.round(y) - 2 + j, ch === 'h' ? KREUZ[0] : (j === 2 || i === 2) && (i + j) % 2 === 0 ? KREUZ[2] : KREUZ[1], aus * (tt > 700 ? 0.5 : 1));
+      }
+    }
+    if (t > 900 && t < 1250) ppKreuzfunkel(g, cx - 1, cy - sz.hh * 0.2, Math.min(4, Math.floor((t - 900) / 70) + 1), KREUZ, aus);
+  };
+  return ppPunktBild(malen, ENDE + 40, 280, 330, vorbereiten);
 })();
 
 const ANIM_REGISTRY = {
@@ -18793,6 +19080,11 @@ const ANIM_REGISTRY = {
   shroomasaur_spores: ShroomasaurSporesEffect,
   flesh_swarm: FleshSwarmEffect,
   hot_potato_blast: HotPotatoBlastEffect,
+  explosion_toss_blast: HotPotatoBlastEffect,   // Explosion Toss: dieselbe große Pixel-Explosion, zentriert auf der Creature
+  unreasonable_steam: UnreasonableSteamEffect,
+  prank_bucket: PrankBucketEffect,
+  reverse_trap_ton: ReverseTrapTonEffect,
+  deadly_poison_heal: DeadlyPoisonHealEffect,
   leafagami_leaves: LeafagamiLeavesEffect,
   bat_bite_drain: BatBiteDrainEffect,
   hot_potato_throw: HotPotatoThrowEffect,
@@ -52719,7 +53011,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {hero?.name && !figurDa && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
                 {hero?.name && !figurDa && isBleeding && <BleedingOverlay ticking={bleedTickingHeroes.includes(`${pi}-${i}`)} />}
                 {hero?.name && isPoisoned && <PoisonedOverlay stacks={isPoisoned.stacks || 1} nurZahl={figurDa}
-                  hinweis={window.poisonTooltipText ? window.poisonTooltipText(isPoisoned.stacks || 1, p?.poisonDamagePerStack || 30, isPoisoned.unhealable) : null}
+                  hinweis={window.poisonTooltipText ? window.poisonTooltipText(isPoisoned.stacks || 1, p?.poisonDamagePerStack || 30, isPoisoned.unhealable, !!isPoisoned.deadly) : null}
                   karte={hero.name} />}
                 {hero?.name && !figurDa && isHealReversed && <HealReversedOverlay />}
                 {hero?.name && !figurDa && isBerserked && <BerserkedOverlay />}
