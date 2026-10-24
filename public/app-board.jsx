@@ -289,6 +289,51 @@ function equipBezahlbarAuf(me, myIdx, cardName, card, handIdx, ownerIdx, heroIdx
   return goldKannZahlen(me, cardName, preis);
 }
 
+/**
+ * ★ Darion, the Blood-Crazy Groundskeeper: „All Artifacts equipped to this Hero share 1 Support Zone."
+ *
+ * Ist der Equip-Stapel dieses Helden aktiv (`equipShareHeroes`, vom Server) UND liegt dort schon ein Equip, gehoert jede weitere Ausruestung PFLICHT in
+ * genau diesen Platz — egal, wohin sie gezogen oder geklickt wird; der Server legt sie ohnehin dort hinein. Freie Zonen sind dann KEIN Ziel mehr, und
+ * der Held braucht auch keine freie Zone, um als Ziel zu taugen. Liefert den Basis-Platz (0–2) des Stapels, sonst -1.
+ */
+function istEquipKartenname(name) {
+  const c = CARDS_BY_NAME[name];
+  if (!c) return false;
+  return String(c.cardType || '').split('/').some(t => t.trim() === 'Artifact')
+    && (c.subtype || '').toLowerCase() === 'equipment';
+}
+function equipStapelSlot(sidePs, heroIdx) {
+  if (!sidePs?.equipShareHeroes?.[heroIdx]) return -1;
+  const zones = sidePs.supportZones?.[heroIdx] || [];
+  for (let z = 0; z < 3; z++) {
+    const slot = zones[z] || [];
+    if (slot.length > 0 && istEquipKartenname(slot[0])) return z;
+  }
+  return -1;
+}
+/** Nimmt dieser Held eine weitere Ausruestung auf? Entweder ein Equip-Stapel (Darion) oder mindestens eine freie Basis-Zone. */
+function equipHeldHatPlatz(sidePs, heroIdx) {
+  if (equipStapelSlot(sidePs, heroIdx) >= 0) return true;
+  const zones = sidePs?.supportZones?.[heroIdx] || [];
+  for (let z = 0; z < 3; z++) { if ((zones[z] || []).length === 0) return true; }
+  return false;
+}
+/** Der Platz, auf den eine Ausruestung bei diesem Helden ohne Zonenwahl faellt: der Equip-Stapel, sonst die erste freie Basis-Zone, sonst -1. */
+function equipAutoSlot(sidePs, heroIdx) {
+  const st = equipStapelSlot(sidePs, heroIdx);
+  if (st >= 0) return st;
+  const zones = sidePs?.supportZones?.[heroIdx] || [];
+  for (let z = 0; z < 3; z++) { if ((zones[z] || []).length === 0) return z; }
+  return -1;
+}
+/** Versatz (in Karten-Pixeln bei Massstab 1) je Stufe eines Equip-Stapels: wie beim Ability-Stapel ~5–6 px, bei vielen Karten kleiner, damit er in die Zone
+ *  passt — mindestens 2 px, also bleibt jede Karte als Streifen erkennbar. Gesamtueberhang ~12 px (wie ein Ability-Stapel der Hoehe 3), erst ab 7 Karten
+ *  wachsend (2 px je Karte). */
+function equipStapelVersatz(n) {
+  if (n <= 1) return 0;
+  return Math.max(2, Math.min(6, Math.floor(12 / (n - 1))));
+}
+
 function applyCrystalCostMods(me, cardName, baseCost) {
   if (!me) return baseCost;
   // Welle 11 (Q58): zwei Rusting Crystals auf der Hand verteuern einander (je Kopie zaehlt die andere als „anderes Artefakt").
@@ -32773,6 +32818,28 @@ function AbilityStack({ cards }) {
   );
 }
 
+/**
+ * ★ Darion: der Equip-Stapel. Gleiche Bauform wie `AbilityStack` — jede Karte ragt mit ihrem oberen Streifen heraus, die oberste liegt vorn —, nur OHNE die Obergrenze 3:
+ * der Stapel darf beliebig hoch werden. Der Versatz schrumpft mit der Kartenzahl (`equipStapelVersatz`), jede Karte bleibt als Streifen erkennbar und traegt ihren
+ * eigenen Hover-Tooltip (jede Karte ist ein eigenes `BoardCard`; unter dem Zeiger gewinnt die Karte, deren Streifen er trifft). Die Stueckzahl steht als Pixel-Ziffernbadge
+ * an der obersten Karte. Der Klick geht an die Zone durch (dort oeffnet er die Galerie bzw. waehlt das Ziel).
+ */
+function EquipStack({ cards, skins, geist }) {
+  const n = cards.length;
+  const schritt = equipStapelVersatz(n);
+  return (
+    <div className="board-equip-stack" style={{ '--eq-schritt': schritt }}>
+      {cards.map((c, ci) => (
+        // `geist`: die LETZTE Karte ist die Vorschau der gerade gezogenen Ausruestung (gestrichelter harter Rand statt Durchsichtigkeit).
+        <div key={ci} className={'board-equip-stack-card' + (geist && ci === n - 1 ? ' board-equip-stack-geist' : '')} style={{ top: `max(${ci}px, calc(${ci * schritt}px * var(--board-scale)))`, zIndex: ci + 1 }}>
+          <BoardCard cardName={c} skins={skins} noTooltip={!!(geist && ci === n - 1)} />
+          {ci === n - 1 && n > 1 && <div className="board-equip-stack-count">{n}</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Card name picker prompt component (for Luck, etc.) — must be a proper component to preserve state across re-renders
 const CARD_NAME_TYPE_COLORS = { Hero:'#a040ff', 'Ascended Hero':'#7a2bd0', Ability:'#4580f6', Artifact:'#c79e05', Creature:'#20ac37', Attack:'#f03232', Spell:'#f03232', Potion:'#7d3911' };
 // Dropdown variant of the generic Option Picker prompt. Used when a prompt
@@ -32811,8 +32878,61 @@ const CARD_NAME_TYPE_COLORS = { Hero:'#a040ff', 'Ascended Hero':'#7a2bd0', Abili
  * `canActivateFor(inst)` entscheidet je Zeile, ob sie ihren Effekt
  * zuenden kann; `onActivate` bekommt dann genau diese Instanz.
  */
+/**
+ * ★ Darion: die Galerie eines Equip-Stapels — dieselbe Doppelrolle wie `SharedZoneInstanceList` (Nachschlagen/Aktivieren und `instancePick`), aber als Raster von
+ * Kartenbildern (`CardMini`: Hover-Tooltip, Foil). Je Karte: laufende Nummer (unterste = 1), Name, Kosten und die Zustaende in der Sprache des Bretts (`StatusBadges`,
+ * `BuffColumn`). Keine HP-Balken — ein Equip hat keine (`hp == null`); haette eine Karte doch welche, steht der Wert als Zahl dabei. Pixelart: harte Ringe aus gestapelten
+ * `box-shadow`-Stufen (siehe `.equip-gal-*` in style.css), kein Weichzeichner.
+ */
+function EquipStackGallery({ instances, onPick, canActivateFor, onActivate }) {
+  const list = instances || [];
+  return (
+    <div className="equip-gal-grid">
+      {list.map((inst, i) => {
+        const card = CARDS_BY_NAME[inst.name];
+        const activatable = typeof canActivateFor === 'function' && canActivateFor(inst);
+        const clickable = !!onPick || activatable;
+        const handleClick = () => {
+          if (window.playSFX) window.playSFX('ui_click');
+          if (onPick) return onPick(inst);
+          if (activatable && onActivate) return onActivate(inst);
+        };
+        const kosten = inst.cost != null ? inst.cost : card?.cost;
+        return (
+          <div key={inst.instId || i}
+            className={'equip-gal-tile' + (activatable ? ' equip-gal-tile-aktiv' : '') + (onPick ? ' equip-gal-tile-pick' : '') + (clickable ? ' equip-gal-tile-klick' : '')}
+            onClick={clickable ? handleClick : undefined}>
+            <div className="equip-gal-nr">{i + 1}</div>
+            <div className="equip-gal-bild">
+              {card
+                ? <CardMini card={card} style={{ width: '100%', height: '100%', cursor: clickable ? 'pointer' : 'default' }} />
+                : <div className="board-card-text">{inst.name}</div>}
+            </div>
+            <div className="equip-gal-name">{inst.name}</div>
+            <div className="equip-gal-zeile">
+              {kosten != null && <span className="equip-gal-chip">Cost {kosten}</span>}
+              {inst.hp != null && <span className="equip-gal-chip">{inst.hp} HP</span>}
+              {inst.summonedThisTurn && <span className="equip-gal-chip">New</span>}
+              {activatable && <span className="equip-gal-chip equip-gal-chip-aktiv">Use</span>}
+            </div>
+            {/* Zustaende wie auf dem Brett; der Wrapper hebt die absolute Positionierung auf (siehe .stack-inst-badges). */}
+            <div className="stack-inst-badges equip-gal-zustand">
+              <StatusBadges statuses={inst.statuses} counters={inst.counters} buffs={inst.counters?.buffs} cardName={inst.name} />
+              <BuffColumn buffs={inst.counters?.buffs} statuses={inst.statuses} cardName={inst.name} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function SharedZoneInstanceList({ instances, onPick, canActivateFor, onActivate }) {
   const list = instances || [];
+  // ★ Darion: ein Equip-Stapel zeigt KARTENBILDER statt HP-Zeilen (Ausruestungen haben keine HP).
+  if (list.length > 0 && list.every(inst => inst.isEquip)) {
+    return <EquipStackGallery instances={list} onPick={onPick} canActivateFor={canActivateFor} onActivate={onActivate} />;
+  }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {list.map((inst, i) => {
@@ -37502,9 +37622,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             const hero = me.heroes[hi];
             if (!hero || !hero.name || hero.hp <= 0) return false;
             if (hero.statuses?.frozen) return false; // Can't equip to frozen heroes
-            const supZones = me.supportZones[hi] || [];
-            for (let z = 0; z < 3; z++) { if ((supZones[z] || []).length === 0) return true; }
-            return false;
+            return equipHeldHatPlatz(me, hi);   // freie Basis-Zone ODER Equip-Stapel (Darion)
           });
           if (!hasTarget) return true;
         }
@@ -39378,10 +39496,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const hostOk = hero && hero.name && (!hostAliveNeeded || hero.hp > 0) && bezahlbarAuf(side.owner, hi)
                 && (!side.nurKontrolle || istKontrollZiel(side.owner, hi));
               if (hostOk) {
-                const supZones = side.ps.supportZones?.[hi] || [];
-                for (let z = 0; z < 3; z++) {
-                  if ((supZones[z] || []).length === 0) { targetHero = hi; targetSlot = -1; targetOwner = side.owner; break; }
-                }
+                // Darion: auch ohne freie Zone ein gueltiges Ziel, solange der Held einen Equip-Stapel hat (Auto-Platz = Stapel).
+                if (equipHeldHatPlatz(side.ps, hi)) { targetHero = hi; targetSlot = -1; targetOwner = side.owner; }
               }
             }
           }
@@ -39402,7 +39518,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   && (!side.nurKontrolle || istKontrollZiel(side.owner, hi));
                 if (hostOk) {
                   const slotCards = (side.ps.supportZones?.[hi] || [])[si] || [];
-                  if (slotCards.length === 0) { targetHero = hi; targetSlot = si; targetOwner = side.owner; }
+                  // ★ Darion: bei einem Helden mit Equip-Stapel zaehlt NUR der Stapelplatz — ein Drop auf einen anderen Platz dieses Helden
+                  // (auch einen freien) geht als Stapelplatz an den Server (er legt das Equip ohnehin dort hinein).
+                  const stapelPlatz = equipStapelSlot(side.ps, hi);
+                  if (stapelPlatz >= 0) { targetHero = hi; targetSlot = stapelPlatz; targetOwner = side.owner; }
+                  else if (slotCards.length === 0) { targetHero = hi; targetSlot = si; targetOwner = side.owner; }
                 }
               }
             }
@@ -39870,9 +39990,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             const _hostFree = (sidePs) => [0, 1, 2].some(hi => {
               const h = sidePs?.heroes?.[hi];
               if (!h || !h.name || h.hp <= 0 || h.statuses?.frozen) return false;
-              const sz = sidePs.supportZones?.[hi] || [];
-              for (let z = 0; z < 3; z++) if ((sz[z] || []).length === 0) return true;
-              return false;
+              return equipHeldHatPlatz(sidePs, hi);   // freie Basis-Zone ODER Equip-Stapel (Darion)
             });
             // Free-side equips also light up the opponent's eligible
             // Heroes (no inherent canEquipToHero restriction).
@@ -52569,9 +52687,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const erlaubt = (gameState.equipEligibleHeroes || {})[equipPickSrc.cardName];
               if (Array.isArray(erlaubt) && !erlaubt.includes(i)) return true;
             }
-            const supZ = supZones[i] || [];
-            for (let z = 0; z < 3; z++) { if ((supZ[z] || []).length === 0) return false; }
-            return true;
+            return !equipHeldHatPlatz(p, i);   // weder freie Basis-Zone noch Equip-Stapel (Darion)
           })();
           // During heroAction (Coffee, Hu's any-hero variant, …),
           // `canHeroPlayCard` is too strict — it goes through the
@@ -52868,6 +52984,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               && equipBezahlbarAuf(me, myIdx, crossSidePlayPick.cardName, crossSidePlayPick.card, crossSidePlayPick.handIndex, pi, i)));
           const _csppHeroFreeSlot = _csppHeroEligible
             ? (() => {
+                // Darion: eine Ausruestung faellt bei einem Helden mit Equip-Stapel in den Stapel.
+                if (_csppIsEquip) { const st = equipStapelSlot(_csppHeroSide, i); if (st >= 0) return st; }
                 const zones = _csppHeroSide.supportZones?.[i] || [];
                 for (let z = 0; z < 3; z++) {
                   if ((zones[z] || []).length === 0) return z;
@@ -53961,8 +54079,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           for (let s = 0; s < maxRight - myRight; s++) renderOrder.push({ z: -1, isIsland: false, isSpacer: true });
 
           // First free base zone (for equip auto-place highlight)
-          let autoSlot = -1;
-          for (let fz = 0; fz < baseCount; fz++) { if (((supZones[i]||[])[fz]||[]).length === 0) { autoSlot = fz; break; } }
+          // ★ Darion: hat der Held einen Equip-Stapel, ist der Stapelplatz das einzige Auto-Ziel (die freien Zonen leuchten nicht).
+          let autoSlot = equipStapelSlot(p, i);
+          if (autoSlot < 0) for (let fz = 0; fz < baseCount; fz++) { if (((supZones[i]||[])[fz]||[]).length === 0) { autoSlot = fz; break; } }
           const supportGroup = (
           <div key={i} className="board-hero-group">
             {renderOrder.map((slot, renderIdx) => {
@@ -53978,6 +54097,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // Cross-side equip drag (Powder Keg etc.) drops onto OPP's
               // row instead of own — flip the side gate to `isOpp` when
               // the drag is flagged cross-side.
+              // ★ Darion: hat der Held dieser Zone einen Equip-Stapel, ist NUR der Stapelplatz ein Ziel fuer weitere Ausruestungen (die freien Zonen nicht);
+              // sonst zaehlt wie gewohnt jede leere Zone.
+              const _eqStapelHier = equipStapelSlot(p, i);
+              const _eqZielPlatz = (cz) => _eqStapelHier >= 0 ? cz === _eqStapelHier : cards.length === 0;
               const _equipDragSideMatch = playDrag?.isEquip
                 && (playDrag.isFreeSideEquip
                       ? (playDrag.targetOwner === (isOpp ? oppIdx : myIdx))
@@ -54189,7 +54312,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // legal even on own-side equipment plays.
               const _isCrossSideEquipDrag = !!(playDrag?.isEquip && playDrag.isCrossSideEquip);
               const isOppCrossSideEquipValid = isOpp && _isCrossSideEquipDrag
-                && cards.length === 0
+                && _eqZielPlatz(z)
                 && !!opp.heroes?.[i]?.name
                 && !isIsland
                 && z < 3;
@@ -54200,7 +54323,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // highlight path (_equipDragSideMatch) like any equip.
               const isOppFreeSideEquipValid = isOpp && !!playDrag?.isFreeSideEquip
                 && playDrag.targetOwner === oppIdx
-                && cards.length === 0
+                && _eqZielPlatz(z)
                 && !!opp.heroes?.[i]?.name && opp.heroes[i].hp > 0
                 && !opp.heroes[i].statuses?.frozen
                 && canHeroHostEquip(opp.heroes[i])   // Als Vorgabe 29.9.: Charme sperrt
@@ -54249,7 +54372,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const isOppKontrollEquipValid = isOpp && !!playDrag?.isEquip
                 && !playDrag.isFreeSideEquip && !playDrag.isCrossSideEquip
                 && (playDrag.kontrollZiele || []).some(k => k.owner === oppIdx && k.heroIdx === i)
-                && cards.length === 0 && !isIsland && z < 3;
+                && _eqZielPlatz(z) && !isIsland && z < 3;
               const isDragValidZoneAny = isDragValidZone || isShareDragZone || isOppCrossSideValid || isOppCrossSideEquipValid || isOppFreeSideEquipValid || isOppCharmedSummonValid || isOppKontrollEquipValid;
               // Zonen-Ausgrauen beim Ausruestungs-Drag (Als Vorgaben 17.8.).
               // Bisher dimmte ein Equip-Drag ueberhaupt KEINE Zone — die
@@ -54289,6 +54412,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // Geteilte Zone? Der Server schickt die Kopien einzeln in
               // `supportStacks`, Schluessel wie bei `creatureCounters`.
               const stackHere = (gameState.supportStacks || {})[`${pi}-${i}-${z}`];
+              // ★ Darion: mehrere Ausruestungen in EINEM Platz — gestapelt gezeichnet (`EquipStack`), die Zone laesst den Ueberhang sichtbar stehen.
+              const equipStapelAnzeige = cards.length >= 2 && cards.every(istEquipKartenname);
               // Artefakt-Kreatur? Bestimmt nur die FARBE des Abzeichens
               // (weiss statt gold, weil Gold auf Gold verschwand). Die
               // Pruefung ist dieselbe wie beim Rendern weiter unten:
@@ -54315,10 +54440,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               //   Handler"). Der Server markiert solche Eintraege mit
               //   `crossSide: true` und setzt `owner` auf die Seite, in
               //   deren Zonen die Karte steht.
-              const equipEffectEntry = cards.length > 0 && !isCreatureActivatable && (gameState.activatableEquips || []).find(c =>
+              // ★ Darion: ein Equip-Stapel hat mehrere Eintraege (je Instanz) — der Platz leuchtet, sobald EINES aktivierbar ist.
+              const equipEintraegeHier = cards.length > 0 && !isCreatureActivatable ? (gameState.activatableEquips || []).filter(c =>
                 c.heroIdx === i && c.zoneSlot === z
                 && (c.crossSide ? (isOpp && c.owner === oppIdx) : !isOpp)
-              );
+              ) : [];
+              const equipEffectEntry = equipEintraegeHier.find(c => c.canActivate === true) || equipEintraegeHier[0];
               const isEquipActivatable = equipEffectEntry?.canActivate === true && !klickPfadOffen;
               // Bakhm surprise drag highlight — highlighted while ANY
               // Surprise Creature is being dragged, regardless of cursor
@@ -54368,9 +54495,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const _csppSlotIsFreeSideEquip = !!crossSidePlayPick?.isFreeSideEquip;
               const _csppSlotArmOk = !crossSidePlayPick?.isHeroActionArm
                 || (!isOpp && ((gameState.effectPrompt?.heroIndicesByCard || {})[crossSidePlayPick.cardName] || []).includes(i));
+              // Darion: bei einem Helden mit Equip-Stapel leuchtet fuer eine Ausruestung nur der Stapelplatz (er ist belegt, nimmt aber weitere auf).
+              const _csppEqStapel = _csppSlotIsEquip ? equipStapelSlot(_csppSide, i) : -1;
               const isCsppEmptySlot = !!crossSidePlayPick
                 && _csppSlotArmOk
-                && cards.length === 0
+                && (_csppEqStapel >= 0 ? z === _csppEqStapel : cards.length === 0)
                 && (_csppSide.heroes?.[i]?.hp > 0)
                 && z < ((_csppSide.supportZones?.[i] || []).length || 3)
                 && (!_csppSlotIsEquip || ((!isOpp || _csppSlotIsFreeSideEquip) && !_csppSide.heroes?.[i]?.statuses?.frozen && z < 3
@@ -54397,7 +54526,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 || brackleSourceHidden.has(`${pi}-${i}-${z}`)
                 || pusherFlungHidden.has(`${pi}-${i}-${z}`);
               return (
-                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + ((gameState.creatureCounters || {})[`${pi}-${i}-${z}`]?._zoneAura === 'necro_flicker' ? ' board-zone-aura' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && equipTargetIds.some(id => accentGreenTargetIds.has(id)) ? ' potion-target-accent-green' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isRedMarkedEquipTarget ? ' potion-target-marked-red' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isAbilitySupportTarget ? ' board-zone-play-target' : '') + (supportAbilityEntry ? ' zone-ability-activatable' : '') + (abilityFlash && abilityFlash.zoneKind === 'support' && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z ? ' zone-ability-activated' : '') + (abilityBlockFlash && abilityBlockFlash.zoneKind === 'support' && abilityBlockFlash.owner === (isOpp ? oppIdx : myIdx) && abilityBlockFlash.heroIdx === i && abilityBlockFlash.zoneIdx === z ? ' zone-ability-blocked' : '') + (istSupportAbility && (isDead || isFrozenOrStunnedSup) ? ' board-zone-dead' : '') + ((isDragValidZoneAny || isCsppEmptySlot || isSummonPickZone) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + ((isHeroActionZoneDimmed && !isCsppEmptySlot) ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '') + stCreatureCls(pi, i, z)}
+                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + ((gameState.creatureCounters || {})[`${pi}-${i}-${z}`]?._zoneAura === 'necro_flicker' ? ' board-zone-aura' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && equipTargetIds.some(id => accentGreenTargetIds.has(id)) ? ' potion-target-accent-green' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isRedMarkedEquipTarget ? ' potion-target-marked-red' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isAbilitySupportTarget ? ' board-zone-play-target' : '') + (supportAbilityEntry ? ' zone-ability-activatable' : '') + (abilityFlash && abilityFlash.zoneKind === 'support' && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z ? ' zone-ability-activated' : '') + (abilityBlockFlash && abilityBlockFlash.zoneKind === 'support' && abilityBlockFlash.owner === (isOpp ? oppIdx : myIdx) && abilityBlockFlash.heroIdx === i && abilityBlockFlash.zoneIdx === z ? ' zone-ability-blocked' : '') + (istSupportAbility && (isDead || isFrozenOrStunnedSup) ? ' board-zone-dead' : '') + ((isDragValidZoneAny || isCsppEmptySlot || isSummonPickZone) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + ((isHeroActionZoneDimmed && !isCsppEmptySlot) ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (equipStapelAnzeige ? ' board-zone-equipstack' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '') + stCreatureCls(pi, i, z)}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'} data-card-name={cards[0] || ''}
                   data-versiegelt={ppVerwahrung(gameState.players?.[pi], i, 'support', z).versiegelt ? '1' : undefined}
                   onClick={supportAbilityEntry ? () => {
@@ -54471,6 +54600,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     if (slipperySelected == null) return;
                     respondToPrompt({ instId: slipperySelected, destHeroIdx: i, destSlot: z, destOwner: pi });
                     setSlipperySelected(null);
+                  } : isValidEquipTarget ? () => {
+                    // ★ Darion: laeuft eine Zielwahl und DIESER Platz (auch ein Equip-Stapel) ist ein gueltiges Ziel, schaltet der Klick das Ziel um — die
+                    // Galerie oeffnet sich erst danach (`instancePick`) bzw. beim Anklicken ausserhalb einer Zielwahl.
+                    equipTargetIds.forEach(id => togglePotionTarget(id));
                   } : (stackHere && stackHere.length >= 2) ? () => {
                     // ── Geteilte Zone: ein Klick IRGENDWO auf der Karte
                     // oeffnet die Instanz-Liste (Als Vorgabe 18.8.).
@@ -54481,7 +54614,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     // zuenden soll; das entscheidet die Liste.
                     if (window.playSFX) window.playSFX('ui_click');
                     setStackInspect({
-                      title: stackHere[0]?.name || 'Shared Zone',
+                      title: stackHere.every(x => x.isEquip) ? 'Equipped Artifacts' : (stackHere[0]?.name || 'Shared Zone'),
                       instances: stackHere,
                       heroIdx: i, zoneSlot: z, isOpp,
                       charmedOwner: creatureEffectEntry?.charmedOwner,
@@ -54507,7 +54640,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     }
                   } : isZonePickTarget ? () => respondToPrompt({ owner: pi, heroIdx: i, slotIdx: z }) : isValidEquipTarget ? () => equipTargetIds.forEach(id => togglePotionTarget(id)) : undefined}
                   style={zsMerge('support', {
-                    ...((isCsppEmptySlot || isSummonPickZone || isValidEquipTarget || isZonePickTarget || isProviderZone || isCreatureActivatable || isEquipActivatable || isSkatesCreature || isSkatesDest || isSlipperyCreature || isSlipperyDest || isChainPickCreatureValid || stCanSkipWith) ? { cursor: 'pointer' } : undefined),
+                    ...((isCsppEmptySlot || isSummonPickZone || isValidEquipTarget || isZonePickTarget || isProviderZone || isCreatureActivatable || isEquipActivatable || isSkatesCreature || isSkatesDest || isSlipperyCreature || isSlipperyDest || isChainPickCreatureValid || stCanSkipWith || (stackHere && stackHere.length >= 2 && stackHere[0]?.isEquip)) ? { cursor: 'pointer' } : undefined),
                     ...(isStolen && stolenColor ? { '--charmed-color': stolenColor } : undefined),
                   })}
                   ref={(el) => {
@@ -54580,7 +54713,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       nur, wenn dort keine gleichnamige Kopie liegt. In einer geteilten Zone (Alice) bliebe sonst der vorhandene Stapel
                       fuer die Dauer der Vorschau unsichtbar — die Zone wirkte leer; dort bleibt der Stapel stehen, die neue Kopie kommt
                       erst mit der Landung dazu. */}
-                  {(isPlayTarget || isAutoTarget) && playDrag.card && !(cards.length > 0 && cards.every(n => n === playDrag.cardName)) ? (
+                  {(isPlayTarget || isAutoTarget) && playDrag.card && playDrag.isEquip && _eqStapelHier === z && cards.length > 0 ? (
+                    // ★ Darion: die gezogene Ausruestung kommt als Vorschau OBEN auf den Stapel (der Stapel bleibt sichtbar).
+                    <EquipStack cards={[...cards, playDrag.cardName]} skins={gameSkins} geist />
+                  ) : (isPlayTarget || isAutoTarget) && playDrag.card && !(cards.length > 0 && cards.every(n => n === playDrag.cardName)) ? (
                     <BoardCard cardName={playDrag.cardName} hp={playDrag.card.hp} maxHp={playDrag.card.hp} hpPosition="creature" style={{ opacity: 0.5 }} />
                   ) : (!isOpp && pendingAdditionalPlay && pendingAdditionalPlay.heroIdx === i && pendingAdditionalPlay.zoneSlot === z
                       && !(cards.length > 0 && cards.every(n => n === pendingAdditionalPlay.cardName))) ? (
@@ -54700,7 +54836,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       : _ccSporified ? { filter: 'brightness(0.78) sepia(0.6) hue-rotate(-50deg) saturate(1.7) contrast(1.05)', transition: 'filter 0.5s' }
                       : undefined; return !isCreature ? (
                       <>
-                        <BoardCard cardName={cards[cards.length-1]} skins={gameSkins} />
+                        {equipStapelAnzeige
+                          ? <EquipStack cards={cards} skins={gameSkins} />
+                          : <BoardCard cardName={cards[cards.length-1]} skins={gameSkins} />}
                         {ladung ? (
                           <div className={'zone-charge-badge' + (ladung.remaining === 0 ? ' zone-charge-empty' : '')}
                             onMouseEnter={e => showGameTooltip(e, ladung.max != null
@@ -54911,6 +55049,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       // W62a: waehrend eine neue Kopie noch fliegt, zaehlt das Abzeichen nur die schon liegenden.
                       const stack = (stackVoll && cards.length < cardsVoll.length) ? stackVoll.slice(0, cards.length) : stackVoll;
                       if (!stack || stack.length < 2) return null;
+                      if (stack[0]?.isEquip) return null;   // Equip-Stapel (Darion): die Stueckzahl steht im Pixel-Badge des `EquipStack`
                       return (
                         <div className="head-counter-badge"
                           onMouseEnter={e => showGameTooltip(e, `${stack.length} Creatures share this Support Zone. Click the card to see each copy with its own HP, counters and statuses — and to use its effect.`)}
@@ -57922,9 +58061,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* ── Nachschlagen: was liegt in dieser geteilten Zone? ──
           Reines Ansehen, jederzeit schliessbar. Geoeffnet vom
           Stueckzahl-Abzeichen auf der Brettkarte. */}
-      {stackInspect && (
+      {stackInspect && (() => {
+        // ★ Darion: ein Equip-Stapel — Kartenbilder, breiteres Fenster, Aktivierung je Instanz (`instId`).
+        const istEquip = (stackInspect.instances || []).length > 0 && stackInspect.instances.every(i => i.isEquip);
+        const equipEintrag = (inst) => (gameState.activatableEquips || []).find(c =>
+          c.instId != null && c.instId === inst.instId && c.canActivate === true);
+        return (
         <div className="modal-overlay" onClick={() => setStackInspect(null)}>
-          <DraggablePanel className="modal animate-in" style={{ maxWidth: 420 }}>
+          <DraggablePanel className={'modal animate-in' + (istEquip ? ' equip-gal-modal' : '')} style={{ maxWidth: istEquip ? 640 : 420 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <span className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)' }}>
                 {stackInspect.title}
@@ -57933,19 +58077,37 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 onClick={() => setStackInspect(null)}>✕ CLOSE</button>
             </div>
             <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>
-              {(stackInspect.instances || []).length} Creatures share this Support Zone.
-              {stackInspect.isOpp ? '' : ' Click a copy to use its effect.'}
+              {istEquip
+                ? `${(stackInspect.instances || []).length} Artifacts share this Support Zone.${(!stackInspect.isOpp && (stackInspect.instances || []).some(equipEintrag)) ? ' Click a card to use its effect.' : ''}`
+                : `${(stackInspect.instances || []).length} Creatures share this Support Zone.${stackInspect.isOpp ? '' : ' Click a copy to use its effect.'}`}
             </div>
             <SharedZoneInstanceList
               instances={stackInspect.instances}
               /* Aktivierbarkeit kommt aus derselben Quelle wie beim
                  normalen Brettklick — `activatableCreatures`. Seit dem
                  Engine-Fix vom 18.8. steht dort ein Eintrag JE INSTANZ,
-                 vorher nur einer je Platz. Fremde Seite: nur ansehen. */
-              canActivateFor={stackInspect.isOpp ? null : (inst) =>
+                 vorher nur einer je Platz. Fremde Seite: nur ansehen.
+                 Equip-Stapel (Darion): `activatableEquips`, ebenfalls je Instanz. */
+              canActivateFor={stackInspect.isOpp ? null : istEquip
+                ? (inst) => !!equipEintrag(inst)
+                : (inst) =>
                 (gameState.activatableCreatures || []).some(c =>
                   c.instId === inst.instId && c.canActivate === true)}
               onActivate={(inst) => {
+                if (istEquip) {
+                  const e = equipEintrag(inst);
+                  if (!e) return;
+                  socket.emit('activate_equip_effect', {
+                    roomId: gameState.roomId,
+                    heroIdx: stackInspect.heroIdx,
+                    zoneSlot: stackInspect.zoneSlot,
+                    instId: inst.instId,
+                    // Held der Gegenspalte (uebernommen): die Brettseite nennen, sonst gilt die eigene Spalte.
+                    ...(e.owner != null && e.owner !== myIdx ? { heroOwner: e.owner } : {}),
+                  });
+                  setStackInspect(null);
+                  return;
+                }
                 socket.emit('activate_creature_effect', {
                   roomId: gameState.roomId,
                   heroIdx: stackInspect.heroIdx,
@@ -57958,7 +58120,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             />
           </DraggablePanel>
         </div>
-      )}
+        );
+      })()}
 
       {/* ── Effect Prompt: welche Kopie aus einer geteilten Zone? ── */}
       {/* Engine-seitig aus `_disambiguateStackedTargets`. Bewusst NICHT
@@ -57967,7 +58130,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           Kopien gemeint war. */}
       {isMyEffectPrompt && ep.type === 'instancePick' && (
         <div className="modal-overlay">
-          <DraggablePanel className="modal animate-in" style={{ maxWidth: 420 }}>
+          <DraggablePanel className={'modal animate-in' + ((ep.instances || []).length > 0 && ep.instances.every(i => i.isEquip) ? ' equip-gal-modal' : '')}
+            style={{ maxWidth: (ep.instances || []).length > 0 && ep.instances.every(i => i.isEquip) ? 640 : 420 }}>
             <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>
               {ep.title || 'Choose a copy'}
             </div>
@@ -59322,6 +59486,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 window.BoardCard = BoardCard;
 window.BoardZone = BoardZone;       // Skill Test (Vorbereitungs-Basis)
 window.AbilityStack = AbilityStack; // Skill Test (Vorbereitungs-Basis)
+window.EquipStack = EquipStack;     // Puzzle-Editor (Darion: Equip-Stapel)
 window.ReactionChainOverlay = ReactionChainOverlay;
 window.HeroIdleSprite = HeroIdleSprite;   // Skill Test (Vorbereitungs-Basis: animierte Helden)
 window.HeroSpriteEbene = HeroSpriteEbene; // Skill Test
