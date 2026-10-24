@@ -6020,13 +6020,13 @@ const PP_DRUCK_FARBEN = ['#ffffff', '#e5f5fa', '#b3e8f9', '#77c8ee', '#4e82cb', 
 const PP_DRUCK_BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => v / 16);
 
 /** Kleine Pixel-Leinwand: `put` setzt einen Pixel (mit Dithering bei a < 1), `kreis`/`ring` zeichnen Formen. */
-function ppDruckLeinwand(gw, gh) {
+function ppDruckLeinwand(gw, gh, farben = PP_DRUCK_FARBEN) {
   const buf = new Uint8ClampedArray(gw * gh * 4);
   const put = (x, y, c, a = 1) => {
     const X = Math.round(x), Y = Math.round(y);
     if (X < 0 || Y < 0 || X >= gw || Y >= gh || a <= 0) return;
     if (a < 1 && PP_DRUCK_BAYER[(Y & 3) * 4 + (X & 3)] >= a) return;
-    const f = PP_DRUCK_FARBEN[c];
+    const f = farben[c];
     const i = (Y * gw + X) * 4;
     buf[i] = f[0]; buf[i + 1] = f[1]; buf[i + 2] = f[2]; buf[i + 3] = 255;
   };
@@ -6154,6 +6154,127 @@ function DruckGeschoss({ p }) {
     <div aria-hidden="true" style={{ position: 'fixed', left: x0, top: y0, pointerEvents: 'none', zIndex: 10200 }}>
       <canvas ref={cvs} width={gw} height={gh}
         style={{ width: gw * s, height: gh * s, imageRendering: 'pixelated', display: 'block', filter: 'drop-shadow(0 0 5px rgba(119,200,238,.7))' }} />
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  „Magic Arrows" — lila Pixelart-Pfeil (`projectileShape: 'magicArrow'`)
+//
+//  Ein kleiner Pfeil (Schaft, Spitze, Federn) fliegt in ganzen Rasterpixeln vom
+//  Wirker zum Ziel, hinterlässt eine gepunktete Funkenspur und schlägt mit einem
+//  Pixelstern ein. Mehrere Pfeile derselben Karte starten im selben Augenblick
+//  (je ein Ereignis je Ziel). Alles prozedural auf einem 3×3-Raster (Canvas,
+//  `image-rendering: pixelated`), Bayer-Dithering statt Alpha, harte Palettenfarben,
+//  ~33 Bilder/s, keine Weichzeichner, keine gedrehten Bitmaps. Klang beim Einschlag
+//  aus der Komponente (die Abschuss-Klänge kommen vom Handler).
+// ═══════════════════════════════════════════════════════════════════
+const PP_ARKAN_FARBEN = ['#ffffff', '#d6b3f9', '#b278ed', '#9544d5', '#702db3', '#50008c', '#2e0a51']
+  .map(h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]);
+
+function ArkanPfeil({ p }) {
+  const s = 4;                                              // Bildschirmpixel je Rasterpixel
+  const pad = 56;
+  const x0 = Math.min(p.srcX, p.tgtX) - pad, y0 = Math.min(p.srcY, p.tgtY) - pad;
+  const bw = Math.abs(p.tgtX - p.srcX) + pad * 2, bh = Math.abs(p.tgtY - p.srcY) + pad * 2;
+  const gw = Math.ceil(bw / s), gh = Math.ceil(bh / s);
+  const dauer = p.dur || 380;
+  const NACH = 480;                                         // Länge des Einschlags nach der Ankunft
+  const cvs = useRef(null);
+  useEffect(() => {
+    const el = cvs.current;
+    if (!el || window._playAnimations === false) return undefined;
+    const ctx = el.getContext('2d');
+    const img = ctx.createImageData(gw, gh);
+    const L = ppDruckLeinwand(gw, gh, PP_ARKAN_FARBEN);
+    const Sx = (p.srcX - x0) / s, Sy = (p.srcY - y0) / s, Tx = (p.tgtX - x0) / s, Ty = (p.tgtY - y0) / s;
+    const dx = Tx - Sx, dy = Ty - Sy, len = Math.max(1, Math.hypot(dx, dy));
+    const ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
+    const zufall = (n) => { const q = Math.sin(n * 127.1 + 4.7) * 43758.5453; return q - Math.floor(q); };
+    const funken = Array.from({ length: 26 }, (_, j) => ({
+      q: 0.03 + zufall(j + 3) * 0.94, quer: (zufall(j + 30) - 0.5) * 6, farbe: 2 + Math.floor(zufall(j + 60) * 3),
+    }));
+    const zacken = Array.from({ length: 8 }, (_, k) => ({ w: (k / 8) * Math.PI * 2 + Math.PI / 8, f: k % 2 ? 0.65 : 1 }));
+    const zeichne = (t) => {
+      L.leeren();
+      const flug = Math.min(1, t / dauer);
+      const weg = len * (0.15 * flug + 0.85 * flug * flug);   // setzt an und schlägt schnell ein
+      const Hx = Sx + ux * weg, Hy = Sy + uy * weg;
+      // Aufblitzen am Schützen: Pixelkreuz
+      if (t < 150) {
+        const e = t / 150, r = 2 + Math.floor(e * 5);
+        for (let k = 0; k <= r; k++) {
+          const c = e < 0.5 ? (k < 2 ? 0 : 1) : 3;
+          L.put(Sx + k, Sy, c, 1 - e); L.put(Sx - k, Sy, c, 1 - e); L.put(Sx, Sy + k, c, 1 - e); L.put(Sx, Sy - k, c, 1 - e);
+        }
+      }
+      if (t <= dauer + 30) {
+        // Funkenspur: je älter, desto dunkler und blasser (Dithering)
+        for (const f of funken) {
+          const q = f.q * len;
+          if (q > weg - 6) continue;
+          const alter = Math.min(1, (weg - q) / (len * 0.55 + 18));
+          L.put(Sx + ux * q + nx * f.quer * (1 + alter), Sy + uy * q + ny * f.quer * (1 + alter), alter < 0.5 ? f.farbe : 5, 1 - alter * 0.8);
+        }
+        // Schweif direkt hinter dem Pfeil: zwei gepunktete Streifen
+        for (let k = 14; k <= 26; k++) {
+          const a = 1 - (k - 14) / 14;
+          L.put(Hx - ux * k + nx * 1, Hy - uy * k + ny * 1, k % 2 ? 4 : 5, a * 0.7);
+          L.put(Hx - ux * k - nx * 1, Hy - uy * k - ny * 1, k % 2 ? 5 : 4, a * 0.7);
+        }
+        const spot = (k, j, c) => L.put(Hx - ux * k + nx * j, Hy - uy * k + ny * j, c);
+        // Kontur zuerst (dunkel), dann Füllung — der Pfeil ist 3 Pixel dick, 18 Pixel lang
+        for (let k = 3; k <= 13; k++) { spot(k, 2, 6); spot(k, -2, 6); }
+        for (let k = -1; k <= 4; k++) { spot(k, 4 - Math.max(0, k) + 1, 6); spot(k, -(4 - Math.max(0, k) + 1), 6); }
+        spot(-3, 0, 6); spot(-2, 1, 6); spot(-2, -1, 6);
+        spot(14, 3, 6); spot(14, -3, 6); spot(15, 4, 6); spot(15, -4, 6); spot(16, 0, 6);
+        for (let k = 3; k <= 13; k++) { spot(k, 1, 4); spot(k, 0, k % 3 === 0 ? 2 : 3); spot(k, -1, 4); }      // Schaft
+        for (let k = -1; k <= 4; k++) { const br = 4 - Math.max(0, k); for (let j = -br; j <= br; j++) spot(k, j, j === 0 ? 0 : (Math.abs(j) === br ? 3 : j < 0 ? 2 : 1)); }   // Spitze
+        spot(-2, 0, 0);
+        for (let k = 10; k <= 15; k++) { const w = Math.floor((k - 9) / 2) + 1; for (let j = 1; j <= w; j++) { spot(k + 1, j + 1, j === w ? 5 : 4); spot(k + 1, -j - 1, j === w ? 5 : 4); } }   // Federn
+        spot(13, 0, 1);
+      }
+      // Einschlag: heller Kern, Pixelstern mit acht Zacken, gestufter Ring
+      if (t > dauer) {
+        const e = Math.min(1, (t - dauer) / NACH);
+        if (e < 0.3) {
+          const r = Math.round(6 * (1 - e / 0.3)) + 1;
+          for (let dy2 = -r; dy2 <= r; dy2++) for (let dx2 = -r; dx2 <= r; dx2++) {
+            if (Math.abs(dx2) + Math.abs(dy2) <= r) L.put(Tx + dx2, Ty + dy2, e < 0.1 ? 0 : (Math.abs(dx2) + Math.abs(dy2) === r ? 2 : 1));
+          }
+        }
+        L.ring(Tx, Ty, 3 + e * 17, 2.4 * (1 - e) + 1, e < 0.3 ? 1 : e < 0.6 ? 3 : 4, Math.max(0, 1 - e * 0.9));
+        for (const sp of zacken) {
+          const r0 = 3 + e * 15 * sp.f, l = Math.max(1, Math.round(5 * (1 - e)));
+          for (let k = 0; k < l; k++) {
+            L.put(Tx + Math.cos(sp.w) * (r0 + k), Ty + Math.sin(sp.w) * (r0 + k), k === l - 1 ? 0 : k === 0 ? 3 : 2, Math.max(0, 1.2 - e));
+          }
+        }
+      }
+      img.data.set(L.buf);
+      ctx.putImageData(img, 0, 0);
+    };
+    const t0 = performance.now();
+    let raf = 0, letzte = -1;
+    const schritt = (jetzt) => {
+      const t = jetzt - t0;
+      const fr = Math.floor(t / 30);                          // ~33 Bilder/s: ruhige Pixelart-Taktung
+      if (fr !== letzte) { letzte = fr; zeichne(t); }
+      if (t < dauer + NACH) raf = requestAnimationFrame(schritt);
+    };
+    raf = requestAnimationFrame(schritt);
+    const klang = setTimeout(() => {
+      if (!window.playSFX) return;
+      // gleichzeitig einschlagende Pfeile (eine Karte, bis zu drei Ziele) fallen zu EINEM Klang zusammen
+      window.playSFX('ping', { rate: 1.5, volume: 0.9, dedupe: 120, category: null });
+      window.playSFX('elem_lightning', { rate: 1.6, volume: 0.5, dedupe: 120, category: null, delay: 30 });
+    }, dauer);
+    return () => { cancelAnimationFrame(raf); clearTimeout(klang); };
+  }, []);
+  return (
+    <div aria-hidden="true" style={{ position: 'fixed', left: x0, top: y0, pointerEvents: 'none', zIndex: 10200 }}>
+      <canvas ref={cvs} width={gw} height={gh}
+        style={{ width: gw * s, height: gh * s, imageRendering: 'pixelated', display: 'block' }} />
     </div>
   );
 }
@@ -8565,6 +8686,87 @@ const DragoneggShimmerEffect = (() => {
     }
   };
   return ppPunktBild(malen, ENDE + 40, 260, 300, vorbereiten);
+})();
+
+// ═════════════════════════════════════════════════════════════════
+//  Spell Shackle: Ketten (`spell_shackle_chains`) — PIXELART; Vorlage: das Kartenbild (blaue, bedrohlich leuchtende Ketten um den Helden)
+//
+//  Eine Kette aus ovalen Gliedern (5×3 bzw. 3×5 Rasterpixel, dunkler Rand, blaue Füllung, heller Glanzpunkt, Glieder wechseln die Lage) legt sich Glied für
+//  Glied in einem Ring um die Karte; zwei lose Stränge kreuzen sich über ihr. Der Ring zieht sich in zwei ganzen Pixelstufen zusammen, dabei blitzen die Glieder
+//  hell auf (Weiß/Cyan), um jedes liegt ein gedithertes, flackerndes Leuchten (Bayer, steps), kleine Cyan-Funken steigen auf. Ab ~1000 ms dithert alles
+//  weg, bei 1400 ms ist es fort. Feste Palette (Blautöne der Kartenbilder), kein Weichzeichner, keine gedrehte Bitmap — jedes Glied wird in Pixeln gesetzt.
+// ═════════════════════════════════════════════════════════════════
+const SpellShackleChainsEffect = (() => {
+  const PAL = ['#ffffff', '#7fdfff', '#1ca9fd', '#4e82cb', '#2f539d', '#14285a'].map(ppHex);   // Glanz, Hell, Leuchten, Füllung, Schatten, Rand
+  const ENDE = 1400, FADE_AB = 1000, WACHS = 520, ZIEH_AB = 560;
+  const RING = 20, STRANG = 7;
+  const vorbereiten = (sz) => ({
+    funken: Array.from({ length: ppFxN(9) }, () => ({ w: Math.random() * Math.PI * 2, v: 10 + Math.random() * 18, start: 300 + Math.random() * 600, leben: 340 + Math.random() * 200 })),
+    blitze: Array.from({ length: RING }, () => Math.random() * 90),
+  });
+  /** Gefüllte Pixelscheibe (der Pinsel von `ppPunktBild` kennt nur `put`/`block`). */
+  const scheibe = (g, cx, cy, r, c, a) => {
+    const R = Math.ceil(r);
+    for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) if (i * i + j * j <= r * r) g.put(cx + i, cy + j, c, a);
+  };
+  /** Ein Kettenglied bei (x, y); `waagrecht` = liegendes Oval; `blitz` 0..1 = Aufleuchten; `a` = Deckung (Fade). */
+  const glied = (g, x, y, waagrecht, blitz, a) => {
+    const X = Math.round(x), Y = Math.round(y);
+    const w = waagrecht ? 7 : 5, h = waagrecht ? 5 : 7;
+    const x0 = X - (w >> 1), y0 = Y - (h >> 1);
+    g.block(x0 - 1, y0 - 1, w + 2, h + 2, PAL[5], a);                                // Rand
+    g.block(x0 + 1, y0 - 1, w - 2, 1, PAL[5], a); g.block(x0 + 1, y0 + h, w - 2, 1, PAL[5], a);
+    g.block(x0, y0, w, h, blitz > 0.5 ? PAL[1] : PAL[3], a);                          // Füllung
+    if (waagrecht) g.block(x0 + 2, y0 + 2, 3, 1, PAL[5], a); else g.block(x0 + 2, y0 + 2, 1, 3, PAL[5], a);   // Loch des Glieds
+    g.block(x0, y0, waagrecht ? 3 : 1, waagrecht ? 1 : 3, blitz > 0.5 ? PAL[0] : PAL[1], a);   // Glanzkante oben links
+    g.block(waagrecht ? x0 + w - 2 : x0 + w - 1, waagrecht ? y0 + h - 1 : y0 + h - 2, waagrecht ? 2 : 1, waagrecht ? 1 : 2, PAL[4], a);   // Schatten unten rechts
+  };
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const stufe = t < ZIEH_AB ? 0 : t < ZIEH_AB + 220 ? 1 : 2;                         // Ring zieht sich in ganzen Pixelstufen zu
+    const rx = Math.round(sz.hw * 1.06) + 4 - stufe * 2, ry = Math.round(sz.hh * 0.98) + 4 - stufe * 3;
+    const wachs = Math.min(1, t / WACHS);
+    const sichtbar = Math.floor(wachs * RING);
+    const blitzGlobal = (t > ZIEH_AB && t < ZIEH_AB + 160) || (t > 820 && t < 900) ? 1 : 0;
+    // gedithertes, flackerndes Leuchten (zwei Stufen, springt im Takt)
+    const flackern = Math.floor(t / 66) % 2 ? 0.34 : 0.22;
+    for (let i = 0; i < sichtbar; i++) {
+      const w = (i / RING) * Math.PI * 2 - Math.PI / 2;
+      const x = sz.cx + Math.cos(w) * rx, y = sz.cy + Math.sin(w) * ry;
+      scheibe(g, x, y, 5.2, PAL[2], flackern * aus);
+    }
+    // die beiden Stränge (von den oberen Ecken schräg über die Karte nach unten)
+    for (const sp of [-1, 1]) {
+      const n = Math.min(STRANG, Math.floor(wachs * (STRANG + 2)));
+      for (let k = 0; k < n; k++) {
+        const u = (k + 0.5) / STRANG;
+        const x = sz.cx + sp * (rx * 0.9 - u * rx * 1.8), y = sz.cy - ry * 0.85 + u * ry * 1.7;
+        scheibe(g, x, y, 4.6, PAL[2], flackern * aus);
+      }
+    }
+    for (const sp of [-1, 1]) {
+      const n = Math.min(STRANG, Math.floor(wachs * (STRANG + 2)));
+      for (let k = 0; k < n; k++) {
+        const u = (k + 0.5) / STRANG;
+        const x = sz.cx + sp * (rx * 0.9 - u * rx * 1.8), y = sz.cy - ry * 0.85 + u * ry * 1.7;
+        glied(g, x, y, k % 2 === 0, blitzGlobal, aus);
+      }
+    }
+    for (let i = 0; i < sichtbar; i++) {
+      const w = (i / RING) * Math.PI * 2 - Math.PI / 2;
+      const x = sz.cx + Math.cos(w) * rx, y = sz.cy + Math.sin(w) * ry;
+      const einzel = (t > 600 && t - 600 > teile.blitze[i] && t - 600 < teile.blitze[i] + 110) ? 1 : 0;
+      glied(g, x, y, Math.abs(Math.sin(w)) > 0.7 ? true : (i % 2 === 0 && Math.abs(Math.sin(w)) > 0.3), blitzGlobal || einzel, aus);
+    }
+    for (const f of teile.funken) {
+      const k = (t - f.start) / f.leben;
+      if (k < 0 || k > 1) continue;
+      const px = sz.cx + Math.cos(f.w) * sz.hw * 0.95, py = sz.cy + Math.sin(f.w) * sz.hh * 0.9 - f.v * (t - f.start) / 1000;
+      g.put(px, py, PAL[1], aus); g.put(px + 1, py, PAL[2], aus); g.put(px, py + 1, PAL[2], aus);
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 300, 340, vorbereiten);
 })();
 
 // ═════════════════════════════════════════════════════════════════
@@ -17522,6 +17724,7 @@ const ANIM_REGISTRY = {
   shadow_summon: ShadowSummonEffect,
   gold_sparkle: GoldSparkleEffect,
   dragonegg_shimmer: DragoneggShimmerEffect,
+  spell_shackle_chains: SpellShackleChainsEffect,
   liquid_rainbow: LiquidRainbowEffect,
   hand_level_down: HandLevelDownEffect,
   mind_control_hex: MindControlHexEffect,
@@ -43146,7 +43349,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         dur,
       }]);
       // Surefire-Pfeil: Einschlagsblitz (≈ 380 ms) läuft nach der Ankunft weiter.
-      setTimeout(() => setProjectileAnims(prev => prev.filter(a => a.id !== id)), dur + (projectileShape === 'surefire' ? 700 : projectileShape === 'pressure' ? 800 : 200));
+      setTimeout(() => setProjectileAnims(prev => prev.filter(a => a.id !== id)), dur + (projectileShape === 'surefire' ? 700 : projectileShape === 'pressure' ? 800 : projectileShape === 'magicArrow' ? 600 : 200));
     };
     socket.on('play_projectile_animation', onProjectileAnimation);
     // ★ WEAPON STORM (v805, Als Vorgabe): eine Barrage aus 10-20
@@ -54972,6 +55175,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <WeissPfeil key={p.id} p={p} />
       ) : p.projectileShape === 'pressure' ? (
         <DruckGeschoss key={p.id} p={p} />
+      ) : p.projectileShape === 'magicArrow' ? (
+        <ArkanPfeil key={p.id} p={p} />
       ) : (
         <div key={p.id} className="projectile-anim" style={{
           left: p.srcX, top: p.srcY,
@@ -56734,14 +56939,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               <div className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', textShadow: '0 2px 8px rgba(0,0,0,.8)' }}>
                 {ep.title || 'Card Searched'}
               </div>
-              <div style={{
-                boxShadow: '0 0 50px rgba(0,0,0,.9), 0 0 100px rgba(255,255,255,.08)',
-                borderRadius: 8,
-              }}>
-                <BoardCard cardName={ep.cardName} style={{ width: 220, height: 308, borderRadius: 8 }} />
+              {/* `cardNames`: mehrere Karten in EINEM Fenster (Meditation: 2 Karten aus der Ablage auf die Hand) */}
+              <div style={{ display: 'flex', gap: 18, alignItems: 'center', justifyContent: 'center' }}>
+                {(Array.isArray(ep.cardNames) && ep.cardNames.length > 0 ? ep.cardNames : [ep.cardName]).map((cn, i) => (
+                  <div key={i} style={{
+                    boxShadow: '0 0 50px rgba(0,0,0,.9), 0 0 100px rgba(255,255,255,.08)',
+                    borderRadius: 8,
+                  }}>
+                    <BoardCard cardName={cn} style={{ width: 220, height: 308, borderRadius: 8 }} />
+                  </div>
+                ))}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text2)' }}>
-                {ep.searcherName} searched this card from their deck.
+                {ep.searcherName} {Array.isArray(ep.cardNames) && ep.cardNames.length > 1 ? 'added these cards to their hand' : 'searched this card'} from their {ep.sourceLabel || 'deck'}.
               </div>
               <button className="btn btn-success" style={{ padding: '10px 36px', fontSize: 13 }}
                 onClick={() => {

@@ -2743,6 +2743,14 @@
 "id": "Lunatic_Hawk",
 "kind": "a"
 },
+"Magic Arrows": {
+"id": "Magic_Arrows",
+"kind": "a"
+},
+"Meditation": {
+"id": "Meditation",
+"kind": "a"
+},
 "MOE Bomb": {
 "id": "MOE_Bomb",
 "kind": "a"
@@ -4003,6 +4011,10 @@
 "id": "Spectral_Armor",
 "kind": "a"
 },
+"Spell Shackle": {
+"id": "Spell_Shackle",
+"kind": "a"
+},
 "Spice Mortar": {
 "id": "Spice_Mortar",
 "kind": "a"
@@ -4129,6 +4141,10 @@
 },
 "Stinky Stables": {
 "id": "Stinky_Stables",
+"kind": "a"
+},
+"Stoneskin": {
+"id": "Stoneskin",
 "kind": "a"
 },
 "Storm Piano": {
@@ -4293,6 +4309,10 @@
 },
 "Telekinesis": {
 "id": "Telekinesis",
+"kind": "a"
+},
+"Teleport": {
+"id": "Teleport",
 "kind": "a"
 },
 "Teleportal": {

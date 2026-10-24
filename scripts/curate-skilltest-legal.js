@@ -111,7 +111,7 @@ const GROUPS = [
       // Deck-Bezug
       'Homecoming', 'No Retreat!', 'Troop Annihilation', 'Anti Intruder System',
       // Surprise / Reaction / Potion des Gegners
-      'Local Idol', 'Boots of Hermes', 'See through the Ruse', 'Teleport', 'Front Soldier', 'Cute Camera', 'Sinister Idol', 'Blessing of the Sun', 'Balloons', 'Unguarded Gate',
+      'Local Idol', 'Boots of Hermes', 'See through the Ruse', 'Front Soldier', 'Cute Camera', 'Sinister Idol', 'Blessing of the Sun', 'Balloons', 'Unguarded Gate',
       // Heldenstufen / Sonderbedingungen
       'Cheat Chair', 'Fans in High Positions', 'Accidental Dodge', 'Test Flight', 'Anti Magic Shield', 'Stubborn Getaway', 'REVENGE!!!', 'Drowned Remains', 'Strong Shield', 'Homerun!',
       // Freeze / Ascend / Wiederbelebung / Kontrollwechsel
