@@ -2,7 +2,7 @@
 // W71d-01 · Spell Shackle (neue Karte, Spell Attachment, Decay Magic Lv2)
 //
 // Text: „At the beginning of each turn of the controller of the Hero this card is attached to, that Hero takes 50 damage for every Spell School Ability attached to it."
-// Geprüft: jede Ability-KARTE zählt (3× Destruction Magic = 150), fünf Zauberschulen, Fighting zählt nicht, Zug des Kontrolleurs (nicht des Gegners),
+// Geprüft: jede Ability-KARTE zählt (auch von negierten Abilities) (3× Destruction Magic = 150), fünf Zauberschulen, Fighting zählt nicht, Zug des Kontrolleurs (nicht des Gegners),
 //   Wirt auf eigener/gegnerischer Seite, mehrere Kopien, 0 Schulen → kein Auftritt/kein Schaden, besiegter Wirt, gefrorener/betäubter/negierter Wirt, Abilities negiert,
 //   Kontrollwechsel, Karte verlässt Zone, Animation + Auftritt, Besitz der Karte, Abbruch beim Anlegen.
 const H = require('../../lib/h.js');
@@ -107,7 +107,7 @@ async function zugBeginn(t, seat) { t.reset(); await t.turnStart(seat); }
     await anlegen(t, 0, 1, 0);
     t.heroStatus(1, 0, 'negated');
     await zugBeginn(t, 1);
-    R.check('hart negierter Wirt (Abilities aus): 0 Schulen → kein Schaden', t.hp(1, 0) === 800, t.hp(1, 0));
+    R.check('hart negierter Wirt (Abilities aus): die Abilities EXISTIEREN → 2 × 50 = 100 Schaden (Al 24.10.: Existenz, nicht Wirksamkeit)', t.hp(1, 0) === 700, t.hp(1, 0));
   }
   {
     const t = await H.fresh({ hand: [[CARD], []], abilities: { 1: { 0: [['Destruction Magic'], [], []] } } });

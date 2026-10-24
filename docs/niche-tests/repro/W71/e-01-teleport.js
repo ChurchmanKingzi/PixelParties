@@ -204,11 +204,11 @@ const waehle = (t, a, b, seat = 0) => { t.targetFn = (valid) => [`hero-${seat}-$
     // übernommener Gegnerheld (Sitz 0 kontrolliert Sitz-1-Held 0): Paar „eigener Held + übernommener" ist nicht möglich; zwei eigene gehen weiter
     const t = await H.fresh({ hand: [[CARD], []] });
     await t.run(() => t.engine.actionTakeHeroPermanently(0, 1, 0, { sourceName: 'test' }));
-    t.targetFn = (valid) => { t._v = valid.slice(); return [valid.find(v => isHero(v, 0, 0)).id, valid.find(v => isHero(v, 1, 0)).id]; };
+    t.targetFn = (valid) => { t._v = valid.slice(); return [valid.find(v => isHero(v, 0, 0)), valid.find(v => isHero(v, 1, 0))].filter(Boolean).map(v => v.id); };   // der Übernommene ist ausgegraut (die Harness blendet `ineligible` aus)
     const vor = JSON.stringify([names(t, 0), names(t, 1)]);
     await t.play(0, CARD, { hero: 1 });
-    R.check('übernommener Held wird angeboten', (t._v || []).some(v => isHero(v, 1, 0)), (t._v || []).map(v => v.id));
-    R.check('seitenübergreifendes Paar wird abgelehnt/abgebrochen — nichts getauscht, kein Absturz', JSON.stringify([names(t, 0), names(t, 1)]) === vor && t.errors.length === 0, [names(t, 0), names(t, 1), t.errors]);
+    R.check('übernommener Held ist kein wählbarer Partner (kein Paar derselben Brettseite)', !(t._v || []).some(v => isHero(v, 1, 0) && !v.ineligible), (t._v || []).map(v => v.id));
+    R.check('seitenübergreifendes Paar kommt nicht zustande — Gegnerseite unberührt, kein Absturz (ein Paar eigener Helden ist erlaubt)', JSON.stringify(names(t, 1)) === JSON.stringify(JSON.parse(vor)[1]) && t.errors.length === 0, [names(t, 0), names(t, 1), t.errors]);
     R.check('Karte nach Mehrfach-Ablehnung zurück auf der Hand (Abbruch)', t.pile(0, 'hand').includes(CARD) || t.pile(0, 'discardPile').includes(CARD));
   }
 

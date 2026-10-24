@@ -21,8 +21,9 @@
 //    zählt 3 (= 150 Schaden). „Spell Schools" sind die fünf aus
 //    `SPELL_SCHOOL_ABILITIES` (Decay, Destruction, Magic Arts, Summoning,
 //    Support; Fighting & Co. nicht). Ein Performance-Joker in einem
-//    Schulstapel zählt wie dort als Karte dieser Schule. Sind die Abilities
-//    des Wirts hart negiert (`heroAbilityLevelsBlanked`), zählt 0.
+//    Schulstapel zählt wie dort als Karte dieser Schule. ★ Es zählt die
+//    EXISTENZ, nicht die Wirksamkeit (Al, 24.10.2026): auch negierte
+//    Abilities zählen mit (kein `heroAbilityLevelsBlanked`).
 //    Mehrere Kopien am selben Helden schlagen einzeln zu.
 //  • Schaden: Typ `decay_spell`, Quelle = die Karte mit dem WIRKER als
 //    Besitzer (`originalOwner`), ohne Heldenquelle (`heroIdx: -1`) — kein
@@ -41,10 +42,11 @@ const { SPELL_SCHOOL_ABILITIES } = require('./_hooks');
 const CARD_NAME = 'Spell Shackle';
 const PER_SCHOOL_ABILITY = 50;
 
-/** Zauberschul-Ability-KARTEN am Helden (Brettseite `seite`): jede Karte eines Schulstapels zählt. */
+/** Zauberschul-Ability-KARTEN am Helden (Brettseite `seite`): jede Karte eines Schulstapels zählt — auch negierte (nur die Existenz zählt). */
 function schulKarten(engine, seite, heroIdx) {
+  const zonen = engine.gs.players[seite]?.abilityZones?.[heroIdx] || [];
   let n = 0;
-  for (const schule of SPELL_SCHOOL_ABILITIES) n += engine.heroSchoolLevel(schule, seite, heroIdx);
+  for (const schule of SPELL_SCHOOL_ABILITIES) n += engine.countAbilitiesForSchool(schule, zonen);
   return n;
 }
 

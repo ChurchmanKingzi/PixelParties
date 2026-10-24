@@ -40,6 +40,14 @@
 //  ④ „two Heroes you control": zwei lebende Helden, die der Spieler
 //    kontrolliert UND die in derselben Brettseite stehen (ein übernommener
 //    Gegnerheld kann nicht in die eigene Reihe wandern); Zielwahl abbrechbar.
+//  ④b ★ PUPPETS (Al, 24.10.2026): Tri Fecta/Tri Ad sind die EINZIGE Ausnahme von
+//    „Support Zones bleiben" — ihre Puppet-Tokens wandern mit dem Helden in die
+//    Spalte, in die er zieht (Token behalten Instanz, Counter [Luck/Preserve];
+//    die Aktivsperre der Spalte tauscht mit). Ist dort nicht genug Platz
+//    (freie Support Zones der Zielspalte, abzüglich ihrer eigenen Tokens, die ja
+//    selbst wandern), ist das Paar NICHT erlaubt: der Held ist dann kein Ziel
+//    für diesen Partner (Zielwahl: ausgegraut ohne gültigen Partner, bei einem
+//    ungültigen Paar neue Wahl).
 //  ⑤ „If this is the second Spell you use this turn …":
 //    `inherentAction` als Funktion über `ps.spellsPlayedThisTurn` (der
 //    Server zählt VOR dem Effekt; der zweite Zauber sieht 1).
@@ -60,10 +68,57 @@ function kontrollierte(engine, pi) {
   return out;
 }
 
-/** Gibt es zwei kontrollierte, lebende Helden derselben Brettseite? */
+const { isPuppetToken, isPuppetHero } = require('./_puppets-shared');
+
+/** Puppet-Tokens, die in den Support Zones von Spalte `col` (Brettseite `seite`) des Puppet-Helden stehen. */
+function puppetTokensDerSpalte(engine, seite, col) {
+  const hero = engine.gs.players[seite]?.heroes?.[col];
+  if (!hero?.name || !isPuppetHero(hero.name)) return [];
+  return engine.cardInstances.filter(c => c.zone === 'support' && engine.physicalSide(c) === seite
+    && c.heroIdx === col && isPuppetToken(c.name)).sort((x, y) => x.zoneSlot - y.zoneSlot);
+}
+
+/**
+ * Wohin wandern die Puppets beim Tausch von Spalte `a` und `b`? { ok, moves: [{ inst, toCol, toSlot }] }.
+ * Plätze der Zielspalte: leer, oder von einem Token belegt, das selbst auszieht. Nicht-Token-Karten bleiben liegen und blockieren.
+ * Gleicher Slot-Index, wenn frei, sonst der niedrigste freie.
+ */
+function puppetPlan(engine, seite, a, b) {
+  const ps = engine.gs.players[seite];
+  const quellen = [{ von: a, nach: b, tokens: puppetTokensDerSpalte(engine, seite, a) }, { von: b, nach: a, tokens: puppetTokensDerSpalte(engine, seite, b) }];
+  const ziehenAus = new Set(quellen.flatMap(q => q.tokens.map(i => i.id)));
+  const blockiert = (col, s) => {
+    const z = (ps.supportZones[col] || [])[s] || [];
+    if (z.length === 0) return false;
+    return !engine.cardInstances.some(c => ziehenAus.has(c.id) && c.heroIdx === col && c.zoneSlot === s);
+  };
+  const moves = [];
+  for (const q of quellen) {
+    if (q.tokens.length === 0) continue;
+    const n = Math.max(3, (ps.supportZones[q.nach] || []).length);
+    const belegt = new Set();
+    for (const inst of q.tokens) {
+      let slot = -1;
+      if (inst.zoneSlot < n && !blockiert(q.nach, inst.zoneSlot) && !belegt.has(inst.zoneSlot)) slot = inst.zoneSlot;
+      else for (let s = 0; s < n; s++) if (!blockiert(q.nach, s) && !belegt.has(s)) { slot = s; break; }
+      if (slot < 0) return { ok: false, moves: [], grund: 'puppet_zones' };
+      belegt.add(slot);
+      moves.push({ inst, toCol: q.nach, toSlot: slot });
+    }
+  }
+  return { ok: true, moves };
+}
+
+/** Darf dieses Paar tauschen? (zwei lebende Helden derselben Brettseite, Puppets finden Platz) */
+function paarGueltig(engine, x, y) {
+  if (x.seite !== y.seite || (x.heroIdx === y.heroIdx)) return false;
+  return puppetPlan(engine, x.seite, x.heroIdx, y.heroIdx).ok;
+}
+
+/** Gibt es zwei kontrollierte, lebende Helden, die tauschen dürfen? */
 function hatPaar(engine, pi) {
   const l = kontrollierte(engine, pi);
-  return l.some((x, i) => l.some((y, j) => j > i && x.seite === y.seite));
+  return l.some((x, i) => l.some((y, j) => j > i && paarGueltig(engine, x, y)));
 }
 
 /** Zählt diese Support-Karte als Wirtsbonus-Träger (Ausrüstung/Anhängsel)? Kreaturen, Tokens, Abilities nicht. */
@@ -102,6 +157,8 @@ function tauscheIndexInListe(liste, a, b) {
 async function tauscheHeldenplaetze(engine, seite, a, b, wirker) {
   const gs = engine.gs;
   const ps = gs.players[seite];
+  const plan = puppetPlan(engine, seite, a, b);
+  if (!plan.ok) return false;   // Puppets fänden keinen Platz: kein Tausch (die Zielwahl lässt so ein Paar gar nicht zu)
   const traeger = engine.cardInstances.filter(c => c.zone === 'support' && engine.physicalSide(c) === seite
     && (c.heroIdx === a || c.heroIdx === b) && traegtWirtsbonus(engine, c));
 
@@ -144,6 +201,19 @@ async function tauscheHeldenplaetze(engine, seite, a, b, wirker) {
     if ((inst.zone !== 'hero' && inst.zone !== 'ability') || engine.physicalSide(inst) !== seite) continue;
     if (inst.heroIdx === a) inst.heroIdx = b; else if (inst.heroIdx === b) inst.heroIdx = a;
   }
+  // Puppet-Tokens ziehen in die Spalte ihres Helden (stiller Umzug wie beim Tri-Ad-Tausch: keine Abgangs-Hooks, keine Niederlage-Prüfung dazwischen).
+  for (const m of plan.moves) {
+    const arr = ps.supportZones[m.inst.heroIdx][m.inst.zoneSlot];
+    const i = arr.indexOf(m.inst.name);
+    if (i >= 0) arr.splice(i, 1);
+  }
+  for (const m of plan.moves) {
+    if (!ps.supportZones[m.toCol][m.toSlot]) ps.supportZones[m.toCol][m.toSlot] = [];
+    ps.supportZones[m.toCol][m.toSlot].push(m.inst.name);
+    m.inst.heroIdx = m.toCol;
+    m.inst.zoneSlot = m.toSlot;
+  }
+  if (plan.moves.length > 0) tauscheSchluessel(gs._puppetActiveLock, `${seite}-${a}`, `${seite}-${b}`);   // „No other Token in the corresponding Hero's Support Zones …" hängt am Helden
   engine.sync();
 
   // ── ③ Eintritt der Ausrüstung/Anhängsel am NEUEN Wirt (Boni neu anlegen) ──
@@ -182,6 +252,7 @@ async function tauscheHeldenplaetze(engine, seite, a, b, wirker) {
     from: a, to: b, owner: seite,
   });
   engine.sync();
+  return true;
 }
 
 module.exports = {
@@ -190,7 +261,7 @@ module.exports = {
 
   activeIn: ['hand'],
   requiresTarget: true,
-  tauscheHeldenplaetze,
+  tauscheHeldenplaetze, paarGueltig, puppetPlan,
 
   // „If this is the second Spell you use this turn, this counts as an additional Action."
   // (`spellsPlayedThisTurn` zählt der Server vor dem Effekt: der zweite Zauber sieht 1.)
@@ -202,12 +273,12 @@ module.exports = {
     return !!engine && hatPaar(engine, pi);
   },
 
-  /** CPU: das erste gültige Paar derselben Brettseite. */
+  /** CPU: das erste gültige Paar (derselben Brettseite, Puppets finden Platz). */
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'effectTarget' || promptData?.config?.title !== CARD_NAME) return undefined;
     const ok = (promptData.validTargets || []).filter(t => t && t.type === 'hero' && !t.ineligible);
     for (let i = 0; i < ok.length; i++) for (let j = i + 1; j < ok.length; j++) {
-      if (ok[i].owner === ok[j].owner) return [ok[i].id, ok[j].id];
+      if (paarGueltig(engine, { seite: ok[i].owner, heroIdx: ok[i].heroIdx }, { seite: ok[j].owner, heroIdx: ok[j].heroIdx })) return [ok[i].id, ok[j].id];
     }
     return promptData.config.cancellable ? [] : undefined;
   },
@@ -222,7 +293,11 @@ module.exports = {
       if (!ps) { gs._spellCancelled = true; return; }
 
       const frei = kontrollierte(engine, pi);
-      const targets = frei.map(x => ({ id: `hero-${x.seite}-${x.heroIdx}`, type: 'hero', owner: x.seite, heroIdx: x.heroIdx, cardName: x.hero.name }));
+      // Helden ohne gültigen Partner (z. B. Tri Fecta, deren Puppets nirgends Platz fänden) bleiben sichtbar, aber ausgegraut.
+      const targets = frei.map(x => ({
+        id: `hero-${x.seite}-${x.heroIdx}`, type: 'hero', owner: x.seite, heroIdx: x.heroIdx, cardName: x.hero.name,
+        ...(frei.some(y => y !== x && paarGueltig(engine, x, y)) ? {} : { ineligible: true }),
+      }));
       if (!hatPaar(engine, pi)) { gs._spellCancelled = true; return; }
 
       let a = null, b = null;
@@ -231,7 +306,7 @@ module.exports = {
           title: CARD_NAME,
           description: versuch === 0
             ? 'Choose two Heroes you control — they swap positions, with their Abilities. Cards in Support Zones stay where they are.'
-            : 'Both Heroes must stand on the same side of the board. Choose two Heroes you control.',
+            : 'Both Heroes must stand on the same side of the board, and Puppet Tokens need enough free Support Zones in the other Hero\'s column. Choose two Heroes you control.',
           confirmLabel: '🌀 Teleport!',
           confirmClass: 'btn-info',
           cancellable: true,                 // zielende Karten sind immer abbrechbar (Als Regel 23.9.)
@@ -243,7 +318,7 @@ module.exports = {
         if (!picked || picked.length < 2) { gs._spellCancelled = true; return; }
         const ta = targets.find(t => t.id === picked[0]), tb = targets.find(t => t.id === picked[1]);
         if (!ta || !tb || (ta.owner === tb.owner && ta.heroIdx === tb.heroIdx)) { gs._spellCancelled = true; return; }
-        if (ta.owner === tb.owner) { a = ta; b = tb; }
+        if (paarGueltig(engine, { seite: ta.owner, heroIdx: ta.heroIdx }, { seite: tb.owner, heroIdx: tb.heroIdx })) { a = ta; b = tb; }
       }
       if (!a || !b) { gs._spellCancelled = true; return; }
 
