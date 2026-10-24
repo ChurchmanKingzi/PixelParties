@@ -25129,7 +25129,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Hand (damit man sie nicht selbst abwirft) und tauchte danach wieder
     // auf — und wer anschliessend in der Zielwahl abbrach, hatte die
     // Abwuerfe umsonst bezahlt. Die Hoehe steht beim Wirken fest.
-    const _wisdomKosten = cardData.cardType === 'Spell'
+    const _wisdomKosten = (cardData.cardType === 'Spell' && !opts.ohneWisdom)   // `ohneWisdom`: regardless of its level (Ghostly Warning, Atta) - keine Wisdom-Abwuerfe
       ? this.getWisdomDiscardCost(wirkerSeite, heroIdx, cardData,
           (fromZone === 'hand' && pool === ps.hand) ? poolIndex : undefined,
           wirkerSeite !== playerIdx ? playerIdx : undefined) : 0;   // wie doPlaySpell: Seite des Wirkers; W15b (C2): konkrete Handkopie; W16a (Frage 6): auch beim geliehenen Helden (Hand des Kontrolleurs)
@@ -27055,6 +27055,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       } catch (err) {
         console.error('[Engine] ⚠️  Spielergebundene Zugende-Aufträge abgebrochen — Zugübergabe läuft trotzdem weiter:', err.message);
         this.log('turn_end_player_effects_aborted', { turn: this.gs.turn, reason: String(err.message || '').slice(0, 240) });
+      }
+      // ★ Verzoegerte Zauber (Ghostly Warning, Atta): „At the end of your (opponent's) next turn … performs that Spell as an additional Action" — eigenes
+      // Fangnetz wie Hand of Death; die Eintraege sind reine Daten in `gs._verzoegerteZauber` (`_verzoegert-zauber-shared.js`).
+      try {
+        if (!_uebersprungen) await require('./_verzoegert-zauber-shared').faelligAbarbeiten(this);   // ein übersprungener Zug ist kein „next turn"
+      } catch (err) {
+        console.error('[Engine] ⚠️  Verzögerte Zauber abgebrochen — Zugübergabe läuft trotzdem weiter:', err.message);
+        this.log('delayed_spells_aborted', { turn: this.gs.turn, reason: String(err.message || '').slice(0, 240) });
       }
       try {
         await this._runPostChainActions();
