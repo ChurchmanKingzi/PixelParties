@@ -166,11 +166,13 @@ def warp_row(row, xa, xb, d, side):
 
 
 def arm_swing(y, i):
-    """Seitlicher Ausschlag des Arms in Zeile y (> 0: nach außen). Ein ruhiger Schwung je 16 Frames (≈ 1,1 s, zwei je Schleife); nach unten
-    hängen die Zeilen deutlich hinterher (Pendel), sodass auch dann etwas in Bewegung ist, wenn die Hand am Umkehrpunkt steht."""
+    """Seitlicher Ausschlag des Arms in Zeile y (> 0: nach außen). Ein ruhiger Schwung je 16 Frames (≈ 1,1 s, zwei je Schleife). Der Arm
+    bleibt dabei fast gerade (er dreht sich wie ein Stab um die Schulter); nur ein ganz leichtes Nachhängen nach unten (0,08 rad je Zeile)
+    sorgt dafür, dass er nicht starr wirkt. Größere Verzögerungen ließen ihn schlackern wie eine nasse Nudel (Krümmung bis 1,9 px,
+    jetzt unter 0,4 px)."""
     w = min(1.0, max(0.0, (y - 37) / 6.0))
     t = 2 * math.pi * (i % N) / N
-    return w * (0.3 + 2.2 * math.sin(2 * t - 1.6 - 0.5 * (y - 37)))
+    return w * (0.3 + 2.0 * math.sin(2 * t - 1.6 - 0.08 * (y - 37)))
 
 
 def arm_dy(i):
