@@ -33,6 +33,7 @@ const ANIM_MS = 1100;
 module.exports = {
   activeIn: ['support'],
   neverMultiTarget: true,   // staendige Ersatzwirkung, kein Flaechenschlag (der Text-Waechter liest all Creatures)
+  deletesCreaturesMovedFromBoard: true,   // Engine `ankhotaLoeschtVomBrett`: auch Sonderwege auf die Hand (Deepsea-Swap, Bounce …), die am zentralen Move vorbeilaufen
   deletesDefeatedCreaturesWhileOnBoard: true,   // besiegte Kreaturen (Schadens-Batch) werden gelöscht — s. Engine `_gefalleneKreaturenGeloescht`
 
   /** Engine-Hook `_kreaturenGeloeschtMelden`: `anzahl` Kreaturen wurden gelöscht. */
