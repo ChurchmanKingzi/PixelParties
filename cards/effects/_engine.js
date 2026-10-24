@@ -46684,8 +46684,14 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // ── Support-Zone: die Karte wandert als Ganzes ──
     if (eintrag.zoneKind === 'support') {
-      const inst = eintrag.cardInstance;
+      let inst = eintrag.cardInstance;
       if (!inst || inst.zone !== ZONES.SUPPORT) return false;
+      // W73d (Leafagami Snake): ein Support-STAPEL (Xal, Xalibur) hat je Karte eine Instanz — schon (geschützt) „abgeworfene" Kopien überspringen, die nächste nehmen.
+      if (this._laubGeschuetzt && this._laubGeschuetzt.has(inst.id)) {
+        inst = (this.cardInstances || []).find(c => c.zone === ZONES.SUPPORT && c.owner === inst.owner && c.heroIdx === inst.heroIdx
+          && c.zoneSlot === inst.zoneSlot && c.name === inst.name && !this._laubGeschuetzt.has(c.id)) || null;
+        if (!inst) return false;
+      }
       return this.sendBoardCardToDiscard(inst, opts);
     }
 
