@@ -35,6 +35,7 @@
 //  Ingo / Maya / Pes'zet still see the entry).
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const ARCHETYPE = 'Slippery';
 
 /** Hero indices adjacent to `heroIdx` in the 3-slot row. */
@@ -163,7 +164,7 @@ async function moveSlipperyCreature(engine, pi, inst, destHeroIdx, destSlot, opt
   // Callers granting a SEPARATE move (Pengu's rider) pass
   // `skipSlipperyMovedMark: true` so the target still gets its own
   // inherent turn-start move afterward.
-  if (!opts.skipSlipperyMovedMark && isSlipperyCard(inst.name, engine)) {
+  if (!opts.skipSlipperyMovedMark && anyName(inst, (n) => isSlipperyCard(n, engine))) {
     inst._slipperyMovedTurn = engine.gs.turn;
   }
 
@@ -314,7 +315,7 @@ function _collectMovableSlipperies(engine, pi) {
   const out = [];
   for (const inst of engine.cardInstances) {
     if ((inst.controller ?? inst.owner) !== pi) continue;
-    if (!isSlipperyCard(inst.name, engine)) continue;
+    if (!anyName(inst, (n) => isSlipperyCard(n, engine))) continue;
     if (!_slipperyEligibleNow(engine, inst)) continue;
     const dests = destinationsFor(engine, pi, inst);
     if (dests.length === 0) continue;
@@ -365,7 +366,7 @@ async function _runSlipperySubMode(engine, pi) {
   for (const inst of engine.cardInstances) {
     if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.zone !== 'support') continue;
-    if (!isSlipperyCard(inst.name, engine)) continue;
+    if (!anyName(inst, (n) => isSlipperyCard(n, engine))) continue;
     initialIds.add(inst.id);
   }
   const collect = () =>

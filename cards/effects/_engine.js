@@ -13913,7 +13913,7 @@ class GameEngine {
       if (cdZ && hasCardType(cdZ, 'Creature')) {
         await this.runHooks(HOOKS.ON_CREATURE_DEATH_CLAIM, {
           creature: {
-            name: targetCard.name, owner: targetCard.owner,
+            name: targetCard.name, zusatzName: targetCard.counters?._zusatzName || null, owner: targetCard.owner,
             originalOwner: targetCard.originalOwner,
             controller: targetCard.controller ?? targetCard.owner,
             heroIdx: targetCard.heroIdx, zoneSlot: targetCard.zoneSlot,
@@ -15531,6 +15531,7 @@ class GameEngine {
       }
       const deathInfo = {
         name: cardInstance.name,
+        zusatzName: cardInstance.counters?._zusatzName || null,   // W73c: Shroomasaur — Namensfamilien sehen den Zusatznamen auch im Todesdatensatz
         owner: cardInstance.owner,
         originalOwner: cardInstance.originalOwner,
         // ★ v1267: Kontrolleur zum Todeszeitpunkt — wie im Schadenspfad
@@ -39420,7 +39421,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const cardDB = this._getCardDB();
     const victimCd = victim.counters?._cardDataOverride || cardDB[victim.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!victimCd) return false;
-    if (victimCd.archetype !== 'Cosmic Depths') return false;
+    const _zusatzCd = victim.counters?._zusatzName ? cardDB[victim.counters._zusatzName] : null;   // W73c: Shroomasaur mit dem Namen einer Cosmic-Depths-Karte
+    if (victimCd.archetype !== 'Cosmic Depths' && _zusatzCd?.archetype !== 'Cosmic Depths') return false;
     if (!hasCardType(victimCd, 'Creature')) return false;
 
     const victimOwner = victim.controller ?? victim.owner;
@@ -46054,7 +46056,20 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   getEffectiveCardData(inst) {
     if (inst?.counters?._cardDataOverride) return inst.counters._cardDataOverride;
-    return this._getCardDB()[inst?.name] || null;
+    const base = this._getCardDB()[inst?.name] || null;
+    // ★ W73c (Shroomasaur): mit dem Namen einer anderen Karte „gehört" die Kreatur auch deren ARCHETYP (alle Archetyp-Prüfungen lesen die wirksamen Kartendaten) — Werte, Typ und Wirkung bleiben die eigenen.
+    const z = inst?.counters?._zusatzName;
+    if (z && base) {
+      const zc = this._getCardDB()[z];
+      if (zc && zc.archetype && zc.archetype !== base.archetype) {
+        const c = inst._zusatzCdCache;
+        if (c && c.z === z && c.base === base) return c.merged;
+        const merged = { ...base, archetype: zc.archetype };
+        inst._zusatzCdCache = { z, base, merged };
+        return merged;
+      }
+    }
+    return base;
   }
 
   /**
@@ -53802,7 +53817,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // etc.) can attribute the death to the correct side — a cross-side
     // placed Chilly Wizard dying counts as the CONTROLLER's creature,
     // not the original owner's.
-    const deathInfo = { name: e.inst.name, owner: e.inst.owner, originalOwner: e.inst.originalOwner, controller: e.inst.controller ?? e.inst.owner, seite: this.physicalSide(e.inst), heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot, instId: e.inst.id, level: this.kreaturLevelJetzt(e.inst), todStapel: (typeof e.inst.counters?._dyingThisBatch === 'number') ? e.inst.counters._dyingThisBatch : null };   // v1334: level; todStapel: Schadens-Stapel, in dem sie stirbt
+    const deathInfo = { name: e.inst.name, zusatzName: e.inst.counters?._zusatzName || null, owner: e.inst.owner, originalOwner: e.inst.originalOwner, controller: e.inst.controller ?? e.inst.owner, seite: this.physicalSide(e.inst), heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot, instId: e.inst.id, level: this.kreaturLevelJetzt(e.inst), todStapel: (typeof e.inst.counters?._dyingThisBatch === 'number') ? e.inst.counters._dyingThisBatch : null };   // v1334: level; todStapel: Schadens-Stapel, in dem sie stirbt
     // If this creature contributed to hand-size math (e.g. Royal Corgi's
     // -3 bonus, or a hypothetical reducer-creature), flag the owner for a
     // hand-limit recheck once the batch settles.

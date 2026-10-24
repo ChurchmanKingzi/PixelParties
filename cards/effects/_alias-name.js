@@ -33,4 +33,21 @@ function namenIn(inst, sammlung) {
   return out;
 }
 
-module.exports = { hatName, hatNameIn, namenIn };
+/** Der Zusatzname einer Instanz — oder eines Ereignis-Datensatzes (Tod/Eintritt tragen `zusatzName`), sonst `null`. */
+function zusatz(x) {
+  if (!x) return null;
+  return x.counters?._zusatzName || x.zusatzName || null;
+}
+
+/**
+ * Namensfamilien („X of Kings", Spider, Loyal …): trifft `fn(name)` auf den eigenen Namen ODER den Zusatznamen der Instanz zu?
+ * `fn` bekommt je einen Namen (String); `x` darf eine Instanz oder ein Datensatz mit `name` sein.
+ */
+function anyName(x, fn) {
+  if (!x) return false;
+  if (x.name != null && fn(x.name)) return true;
+  const z = zusatz(x);
+  return !!z && z !== x.name && !!fn(z);
+}
+
+module.exports = { hatName, hatNameIn, namenIn, zusatz, anyName };

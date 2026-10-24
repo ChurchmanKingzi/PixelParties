@@ -44,6 +44,7 @@
 //  a Deepsea for summon purposes.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { loadCardEffect } = require('./_loader');
 const { isSummonablePileCreature, hasCardType } = require('./_hooks');
 
@@ -241,7 +242,7 @@ function _bounceableAt(engine, pi, side, hi, si) {
     c.zoneSlot === si
   );
   if (!inst) return null;
-  if (!isDeepseaCreature(inst.name, engine, inst)) return null;
+  if (!anyName(inst, (n) => isDeepseaCreature(n, engine, inst))) return null;
   // "Not summoned this turn" — strictly less than current turn.
   // Ausnahme per KARTEN-VERTRAG (`isDeepseaBounceableSameTurn`,
   // aktuell Infected Squirrel): darf noch in der Beschwörungsrunde

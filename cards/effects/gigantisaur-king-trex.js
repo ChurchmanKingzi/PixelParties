@@ -53,6 +53,7 @@
 //  jeden Weg (auch Clown-Aura, die kein Status ist).
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const {
   isGigantisaurCreature,
 } = require('./_gigantisaurs-shared');
@@ -305,7 +306,7 @@ module.exports = {
         if ((c.controller ?? c.owner) !== pi) continue;
         if (c.heroIdx !== hi) continue;
         if (selfId && c.id === selfId) continue;
-        if (isGigantisaurCreature(c.name, engine)) return true;
+        if (anyName(c, (n) => isGigantisaurCreature(n, engine))) return true;
       }
       return false;
     };

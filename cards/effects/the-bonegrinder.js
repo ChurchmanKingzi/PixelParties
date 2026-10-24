@@ -21,6 +21,7 @@
 //       leaving instance + a draw at `onCardLeaveZone` time.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { isSkeletonCreature, findSkeletonsInDiscard } = require('./_skeleton-shared');
 
 const CARD_NAME = 'The Bonegrinder';
@@ -215,7 +216,7 @@ module.exports = {
       // (Ruling "Gestohlene Karten gehen in die Ablage ihres Besitzers"), nicht die seines Kontrolleurs.
       const targetController = engine.kartenBesitzerVon(leaving);
       if (targetController !== myController) return;
-      if (!isSkeletonCreature(leaving.name, engine)) return;
+      if (!anyName(leaving, (n) => isSkeletonCreature(n, engine))) return;
 
       // Per-turn cap on this Bonegrinder instance.
       const inst = ctx.card;

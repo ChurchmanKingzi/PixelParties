@@ -12,6 +12,7 @@
 //    same damage to the attacker as recoil.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const {
   gigantisaursCanSummon, isGigantisaurCreature,
 } = require('./_gigantisaurs-shared');
@@ -79,7 +80,7 @@ module.exports = {
         // Damaged Creature is owned by us AND is a Gigantisaur.
         const target = e.inst;
         if ((target.controller ?? target.owner) !== pi) continue;
-        if (!isGigantisaurCreature(target.name, engine)) continue;
+        if (!anyName(target, (n) => isGigantisaurCreature(n, engine))) continue;
         // Damage type qualifies.
         const type = e.type || 'normal';
         if (!TRIGGER_TYPES.has(type)) continue;

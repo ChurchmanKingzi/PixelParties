@@ -21,6 +21,7 @@
 //  get their own once-per-turn slot.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const { isLoyalCreature, getLoyalsInHand } = require('./_loyal-shared');
 
@@ -61,7 +62,7 @@ module.exports = {
       // card landed in OUR heroIdx's support zones.
       if (entering.heroIdx !== ctx.cardHeroIdx) return;
       // Loyal-only.
-      if (!isLoyalCreature(entering.name, ctx._engine)) return;
+      if (!anyName(entering, (n) => isLoyalCreature(n, ctx._engine))) return;
       // Fires for ANY Loyal entering Orthos's support zones — hand
       // summon, free additional Action, revive, illusion, bounce-place,
       // etc. The per-Orthos-instance HOPT below caps the chain to once

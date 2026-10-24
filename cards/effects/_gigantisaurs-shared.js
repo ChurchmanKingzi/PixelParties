@@ -40,6 +40,7 @@
 //  restriction only.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { hasCardType } = require('./_hooks');
 
 const ARCHETYPE = 'Gigantisaurs';
@@ -64,7 +65,7 @@ function heroHasGigantisaur(engine, pi, heroIdx, selfInstId = null) {
     if (engine.physicalSide(c) !== pi) continue;   // N5-03: die Zonen eines Helden sind seitengebunden (Brettseite), nicht kontrollgebunden - wie `uebernahmeUnzulaessig`
     if (c.heroIdx !== heroIdx) continue;
     if (selfInstId && c.id === selfInstId) continue;
-    const cd = c.counters?._cardDataOverride || cardDB[c.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
+    const cd = engine.getEffectiveCardData(c) || cardDB[c.name]; // token-override-aware (Biomancy Token — Als AoE-Report); W73c: Zusatzname bringt den Archetyp mit
     if (!cd) continue;
     if (cd.archetype === ARCHETYPE && hasCardType(cd, 'Creature')) return true;
   }
@@ -143,7 +144,7 @@ function countGigantisaursInSupport(pi, engine) {
   for (const c of engine.cardInstances) {
     if (c.zone !== 'support') continue;
     if ((c.controller ?? c.owner) !== pi) continue;
-    if (isGigantisaurCreature(c.name, engine)) n++;
+    if (anyName(c, (n) => isGigantisaurCreature(n, engine))) n++;
   }
   return n;
 }
@@ -160,7 +161,7 @@ function findOwnedGigantisaurs(pi, engine, opts = {}) {
     if (c.zone !== 'support') continue;
     if ((c.controller ?? c.owner) !== pi) continue;
     if (exclude && c.id === exclude) continue;
-    if (isGigantisaurCreature(c.name, engine)) out.push(c);
+    if (anyName(c, (n) => isGigantisaurCreature(n, engine))) out.push(c);
   }
   return out;
 }

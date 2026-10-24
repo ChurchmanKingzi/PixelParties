@@ -32,6 +32,7 @@
 //     refusal, etc.) compose correctly.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { loadCardEffect } = require('./_loader');
 const { isSpiderCreature } = require('./_spider-shared');
 
@@ -48,7 +49,7 @@ function controlsAnotherSpider(engine, pi, selfId = null) {
     if (inst.faceDown) continue;
     // W16c (A05-26): nur DIESE Karte selbst ist nicht "another" - eine schon liegende (andere) Baby Spider zaehlt.
     if (selfId != null && inst.id === selfId) continue;
-    if (isSpiderCreature(inst.name, engine)) return true;
+    if (anyName(inst, (n) => isSpiderCreature(n, engine))) return true;
   }
   return false;
 }

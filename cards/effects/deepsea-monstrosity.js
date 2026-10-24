@@ -25,6 +25,7 @@
 //  creatures). 1 per turn.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const {
   inherentActionIfBounceable,
   canBypassLevelReqIfBounceable,
@@ -82,7 +83,7 @@ module.exports = {
         if (inst.zone !== 'support') continue;
         if ((inst.controller ?? inst.owner) !== pi) continue;
         if (inst.id === selfInst.id) continue;
-        if (!isDeepseaCreature(inst.name, engine, inst)) continue;
+        if (!anyName(inst, (n) => isDeepseaCreature(n, engine, inst))) continue;
         candidates.push(inst);
       }
       if (candidates.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm

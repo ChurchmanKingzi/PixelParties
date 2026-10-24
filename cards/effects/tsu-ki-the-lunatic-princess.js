@@ -26,6 +26,7 @@
 //     Cycle card equipped onto Tsu'Ki.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { isLunaticCreature, isLunaticCycle } = require('./_lunatic-shared');
 
 module.exports = {
@@ -39,6 +40,6 @@ module.exports = {
   // just need to recognise the card. Lunatic Cycle cards cost 10 less
   // when equipped to Tsu'Ki.
   equipCostReduction(gs, playerIdx, heroIdx, cardData /* , engine */) {
-    return (cardData && isLunaticCycle(cardData.name)) ? 10 : 0;
+    return (cardData && anyName(cardData, (n) => isLunaticCycle(n))) ? 10 : 0;
   },
 };

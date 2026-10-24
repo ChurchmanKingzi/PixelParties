@@ -23,6 +23,7 @@
 //     Zone die toetende Karte liegt (Spielvokabular 8.8.).
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { hasCardType, ZONES } = require('./_hooks');
 
 const PARASEED_TOKEN = 'Paraseed';
@@ -57,7 +58,7 @@ function paraseedsOnHero(engine, physOwner, heroIdx, ignoreInstId) {
     // Gegenspalte gewanderte Paraseed vergiftet den Helden, unter dem
     // sie liegt, nicht den ihres Kontrolleurs.
     if (inst.owner !== physOwner) continue;
-    if (!isParaseedCreature(inst.name, engine)) continue;
+    if (!anyName(inst, (n) => isParaseedCreature(n, engine))) continue;
     out.push(inst);
   }
   return out;
