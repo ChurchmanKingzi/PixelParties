@@ -13,13 +13,17 @@ src/cute-princess-mary.png).
 * Fliegen: beim Abschlag wird Mary nach oben gedrückt, beim Aufschlag sinkt
   sie etwas ab.
 * Glut: von den Flügelspitzen lösen sich beim Abschlag kleine Funken.
+* Körper (`body_layer`): die Haare wehen (Strähnen am Kopf werden zeilenweise gedehnt bzw. gestaucht, die langen Locken schwingen am
+  weitesten), der Kopf wippt mit leichter Verzögerung gegen den Rumpf, die Hände flattern, der Saum des Kleides schwingt, und das
+  Feuer am Kleid flackert (Farben wandern auf der Leiter Rot → Orange → Gelb nach oben).
+* Krone: ein Lichtband wandert einmal pro Schleife über die Krone; danach blitzen Glitzersterne über den Zacken auf.
 """
 import math
 import sys
 from collections import Counter
 from PIL import Image
 import numpy as np
-from anim_common import save_outputs
+from anim_common import rgb, step, sweep_level, draw_sparkles, save_outputs
 
 BODY = np.array(Image.open('src/cute-princess-mary-body.png').convert('RGBA')).astype(int)
 WINGS = np.array(Image.open('src/cute-princess-mary-wings.png').convert('RGBA')).astype(int)
@@ -87,6 +91,93 @@ def sample_wing(side, i, x, y, oy):
     return col
 
 
+# --- Körper: Haare, Kopfwippen, Hände, Saum, Flackern, Krone -------------------------------------------------------------------------
+MIRROR = 77                                  # x' = 77 − x spiegelt links ↔ rechts (Gesichtsmitte zwischen x = 38 und 39)
+HAIR = {26: (33, 35), 27: (32, 35), 28: (32, 35), 29: (32, 35), 30: (31, 35), 31: (31, 35), 32: (31, 35), 33: (31, 35),   # Strähnen am Kopf
+        37: (31, 32), 38: (31, 32)}                                                                                         # lange Locken
+HEAD0, HEAD1 = 21, 33                         # Kopf-Zeilen (Krone bis Kinn)
+FLAME_LADDER = [(0xde, 0x50, 0x3c), (0xfc, 0x7e, 0x32), (0xfb, 0xae, 0x3c)]             # Rot → Orange → Gelb (Feuer am Kleid)
+CROWN_LADDER = [(0xde, 0x50, 0x3c), (0xfc, 0x7e, 0x32), (0xfb, 0xae, 0x3c), (0xf5, 0xe2, 0x84), (0xff, 0xe6, 0x7f), (0xfc, 0xe7, 0xd6)]
+CROWN = (35, 42, 21, 25)                      # x0, x1, y0, y1 der Krone
+SPARKS = [(42, 18, 18), (35, 18, 24), (39, 19, 29)]   # Glitzersterne über den Zacken: (x, y, Startframe)
+
+
+def hair_shift(y, i):
+    """Seitlicher Versatz der äußeren Kante der Strähnen in Zeile y (Wind von links, Welle läuft nach unten)."""
+    amp = 0.35 + 0.17 * (y - 26) if y < 34 else 2.1
+    return int(round(amp * math.sin(2 * math.pi * (i % N) / N - 0.38 * (y - 26))))
+
+
+def warp_row(row, xa, xb, d, side):
+    """Strähne in Zeile `row` zwischen xa..xb: Außenkante um d Pixel nach außen (d < 0: nach innen), die Innenkante bleibt stehen.
+    Die Pixel werden gedehnt bzw. gestaucht, es entstehen weder Lücken noch neue Farben."""
+    src = row[xa:xb + 1].copy()
+    n_src = xb - xa + 1
+    n_out = max(2, n_src + d)
+    out = np.zeros_like(row)
+    for j in range(n_out):
+        c = src[int(round(j * (n_src - 1) / (n_out - 1)))]
+        x = xb - n_out + 1 + j if side < 0 else xa + j
+        out[x] = c
+    return out
+
+
+def body_layer(i):
+    ph = phase(i)
+    out = BODY.copy()
+    # 1) Haare wehen
+    for y, (xa, xb) in HAIR.items():
+        w = hair_shift(y, i)
+        for side in (-1, 1):
+            a, b = (xa, xb) if side < 0 else (MIRROR - xb, MIRROR - xa)
+            d = -w if side < 0 else w
+            lo, hi = (a - 3, b) if side < 0 else (a, b + 3)
+            out[y, lo:hi + 1] = 0
+            seg = warp_row(BODY[y], a, b, d, side)
+            out[y, lo:hi + 1] = np.where(seg[lo:hi + 1, 3:4] > 0, seg[lo:hi + 1], out[y, lo:hi + 1])
+    # 2) Kopf wippt (leicht verzögert gegen den Rumpf); die Kinn-Zeile bleibt als Hals darunter stehen
+    dy_h = int(round(0.8 * math.sin(ph - 3.2)))
+    head = out[HEAD0:HEAD1 + 1].copy()
+    out[HEAD0:HEAD1] = 0
+    for y in range(head.shape[0]):
+        for x in range(SW):
+            if head[y, x, 3]:
+                out[HEAD0 + y + dy_h, x] = head[y, x]
+    # 3) Hände flattern
+    dy_a = int(round(1.0 * math.sin(ph - 1.6)))
+    if dy_a:
+        for xs in (range(29, 33), range(45, 49)):
+            hand = {(x, y): out[y, x].copy() for y in range(41, 44) for x in xs if out[y, x, 3] and tuple(out[y, x, :3]) in HAND}
+            for (x, y) in hand:
+                out[y, x] = 0
+            for (x, y), c in hand.items():
+                out[y + dy_a, x] = c
+    # 4) Saum schwingt
+    for y in range(48, 56):
+        dx = int(round(math.sin(ph - 2.2 - 0.3 * (y - 47)) * (y - 47) / 7.0 * 1.2))
+        if dx:
+            out[y, 27:51] = np.roll(out[y, 27:51], dx, axis=0)
+    # 5) Feuer am Kleid flackert (Farben wandern auf der Leiter)
+    for y in range(34, 57):
+        for x in range(SW):
+            if out[y, x, 3] and tuple(out[y, x, :3]) in FLAME_LADDER:
+                s = int(round(1.0 * math.sin(ph * 1.0 + 0.7 * x + 0.5 * y)))
+                if s:
+                    out[y, x, :3] = step(FLAME_LADDER, tuple(out[y, x, :3]), s)
+    # 6) Lichtband über die Krone
+    x0, x1, y0, y1 = CROWN
+    for y in range(y0 - 1, y1 + 1):
+        for x in range(x0, x1 + 1):
+            if out[y + dy_h, x, 3] and tuple(out[y + dy_h, x, :3]) in CROWN_LADDER:
+                lv = sweep_level(x, y, i, N, speed=1.25, slope=0.8, offset=29.0)
+                if lv:
+                    out[y + dy_h, x, :3] = step(CROWN_LADDER, tuple(out[y + dy_h, x, :3]), lv + 1)
+    return out, dy_h
+
+
+HAND = {(0x59, 0x20, 0x0c), (0xf0, 0xca, 0x9e)}                  # Handfarben (Umriss, Haut)
+
+
 EMBER = [(255, 236, 170), (255, 190, 80), (240, 120, 40), (190, 60, 30)]
 
 
@@ -100,11 +191,12 @@ def frame(i):
                 c = sample_wing(side, i, x, y, oy)
                 if c is not None:
                     out[y, x] = c
-    # Körper
+    # Körper (Haare, Kopf, Hände, Saum, Feuer, Krone: siehe body_layer)
+    body, dy_h = body_layer(i)
     for y in range(SH):
         for x in range(SW):
-            if BODY[y, x, 3]:
-                out[y + PT + oy, x + PL] = BODY[y, x]
+            if body[y, x, 3]:
+                out[y + PT + oy, x + PL] = body[y, x]
     # Funken von den Flügelspitzen (Abschlag)
     for k in range(6):
         t = (i + k * 5) % 12
@@ -124,6 +216,8 @@ def frame(i):
         xx, yy = int(round(ex)), int(round(ey))
         if 0 <= xx < W and 0 <= yy < H and out[yy, xx, 3] == 0:
             out[yy, xx] = (*EMBER[min(3, t // 2)], 255 - t * 22)
+    # Glitzersterne über der Krone (folgen dem Körper)
+    draw_sparkles(out, i, N, [(x + PL, y + PT + oy + dy_h, st) for x, y, st in SPARKS], rgb('ffef93'), rgb('ffd900'))
     return out
 
 
