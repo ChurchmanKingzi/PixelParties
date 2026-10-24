@@ -79,8 +79,8 @@ module.exports = {
         if (gs.hoptUsed?.[hoptKey] === gs.turn) continue;
 
         // Determine Biomancy level on this hero
-        const abZones = gs.players[feld]?.abilityZones?.[hi] || [];
-        const level = engine.countAbilitiesForSchool('Biomancy', abZones);
+        // 24.10.: echte Ability Zonen UND Support-Stapel (Xal).
+        const level = engine.countAbilitiesForSchool('Biomancy', engine.abilityStapelListe(feld, hi).map(e => e.namen));
         if (level <= 0) continue;
 
         eligible.push({ heroIdx: hi, level, hero, feld });

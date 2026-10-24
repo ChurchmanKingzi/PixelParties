@@ -55,7 +55,7 @@ module.exports = {
 
       // Only fire once per hero — skip if another Smugness instance on this hero already handled it
       const allSmugness = engine.cardInstances.filter(c =>
-        c.name === 'Smugness' && c.owner === feld && c.heroIdx === heroIdx && c.zone === 'ability'
+        c.name === 'Smugness' && c.owner === feld && c.heroIdx === heroIdx && engine.istWirksameAbility(c)
       );
       if (allSmugness.length > 0 && allSmugness[0].id !== ctx.card.id) return;
 
@@ -85,12 +85,9 @@ module.exports = {
 
       // Determine level from ability stack
       const ps = gs.players[pi];
-      const abZones = gs.players[feld].abilityZones[heroIdx] || [];
-      let level = 0;
-      for (const slot of abZones) {
-        if (!slot || slot.length === 0) continue;
-        if (slot[0] === 'Smugness') { level = slot.length; break; }
-      }
+      // 24.10.: echte Ability Zonen UND Support-Stapel (Xal).
+      const eintrag = engine.abilityStapelEintrag(feld, heroIdx, 'Smugness');
+      const level = eintrag ? eintrag.namen.length : 0;
       if (level <= 0) return;
 
       // Calculate retaliation damage

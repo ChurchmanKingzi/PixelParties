@@ -7303,6 +7303,20 @@ function findAbilitySupportSlot(ps, heroIdx, cardName, wunsch, gs = null, pi = n
   const nimmt = (z) => !mitVerwahrung || V.nimmtAuf(gs, pi, heroIdx, 'support', z, cardName);
   const frei = (z) => (zonen[z] || []).length === 0
     && !(mitVerwahrung && V.versiegelt(gs, pi, heroIdx, 'support', z));
+  // ★ 24.10.: Karten mit eigener Platzierungsregel (Performance: nur auf einen belegten Stapel, höchstens 3) — in Support Zonen genauso.
+  // Nur Stapel aus ECHTEN Abilities zählen (eine Support Zone kann auch Ausrüstung oder eine Kreatur tragen).
+  const customPlacement = loadCardEffect(cardName)?.customPlacement;
+  if (customPlacement) {
+    const db = getCardDB();
+    const tauglich = (z) => {
+      const slot = zonen[z] || [];
+      return slot.length > 0 && db[slot[0]]?.cardType === 'Ability' && customPlacement.canPlace(slot)
+        && !(mitVerwahrung && V.versiegelt(gs, pi, heroIdx, 'support', z)) && nimmt(z);
+    };
+    if (wunsch >= 0 && wunsch < anzahl && tauglich(wunsch)) return wunsch;
+    for (let z = 0; z < anzahl; z++) if (tauglich(z)) return z;
+    return -1;
+  }
   if (mitVerwahrung) {
     const verwahrt = V.verwahrterStapel(gs, pi, heroIdx, cardName);
     if (verwahrt) {
@@ -7324,6 +7338,65 @@ function findAbilitySupportSlot(ps, heroIdx, cardName, wunsch, gs = null, pi = n
     if (frei(z)) return z;
   }
   return -1;
+}
+
+/**
+ * ★ ABILITY IN EINE SUPPORT ZONE LEGEN (Xal, Xalibur; 24.10.2026): derselbe Ablauf wie für eine echte Ability Zone — Karte aus der Hand, Instanz,
+ * Flug, Reaktionsfenster (die Ability kann negiert werden), danach die Anlege-Hooks (`onPlay`, `onCardEnterZone`). Früher legte dieser Weg den
+ * Namen nur in die Zone: keine Anlege-Wirkung (Fighting gab 0 ATK), keine Passiv-Hooks, kein Negieren.
+ */
+async function abilityInSupportAnlegen(room, pi, { cardName, handIndex, heroIdx, supIdx, fromCreation, hero, heroOwner }) {
+  const gs = room.gameState;
+  const engine = room.engine;
+  const ps = gs.players[pi];
+  if (!ps.supportZones[heroIdx][supIdx]) ps.supportZones[heroIdx][supIdx] = [];
+  ps.supportZones[heroIdx][supIdx].push(cardName);
+  (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
+  engine.notePlayedFromHand(pi);
+  // Standardplatz zuerst, sonst Bonus-Platz (Divine Gift of Skill) — gemerkt, damit ein Negieren den richtigen zurückgibt.
+  const _hatteStandard = !ps.abilityGivenThisTurn[heroIdx];
+  engine.verbraucheAbilityAnlegen(pi, heroIdx);
+  const _consumedBonusSlot = !_hatteStandard;
+
+  const inst = engine._trackCard(cardName, pi, 'support', heroIdx, supIdx);
+  engine.log('ability_attached', { player: ps.username, card: cardName, hero: hero.name, zone: 'support' });
+  broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'support', heroIdx, slotIdx: supIdx });
+
+  try {
+    const chainResult = await engine.executeCardWithChain({
+      cardName, owner: pi, heroIdx, cardType: 'Ability', goldCost: 0,
+      chosenHero: { owner: (typeof heroOwner === 'number' ? heroOwner : pi), heroIdx },
+    });
+    if (chainResult.negated) {
+      const slot = ps.supportZones[heroIdx][supIdx] || [];
+      const idx = slot.lastIndexOf(cardName);
+      if (idx >= 0) slot.splice(idx, 1);
+      engine._untrackCard(inst.id);
+      const negatedAbilityOwner = engine._consumeHandCardOrigin(pi, cardName);
+      await engine.routeNegatedInitialCard(negatedAbilityOwner, cardName, chainResult, -1,
+        { fromZone: 'support', fromHeroIdx: heroIdx, fromSlotIdx: supIdx });
+      if (_consumedBonusSlot) {
+        if (!ps._bonusAbilityAttachments) ps._bonusAbilityAttachments = {};
+        ps._bonusAbilityAttachments[heroIdx] = (ps._bonusAbilityAttachments[heroIdx] || 0) + 1;
+        if (!hero.buffs) hero.buffs = {};
+        if (!hero.buffs.blessed_skill) hero.buffs.blessed_skill = { remaining: 0, locked: false, source: 'Divine Gift of Skill' };
+        hero.buffs.blessed_skill.remaining++;
+        hero.buffs.blessed_skill.locked = engine.isHeroSkillLocked(pi, heroIdx);
+      } else {
+        ps.abilityGivenThisTurn[heroIdx] = false;
+        if (hero.buffs?.blessed_skill) hero.buffs.blessed_skill.locked = engine.isHeroSkillLocked(pi, heroIdx);
+      }
+      engine.log('ability_negated', { card: cardName, player: ps.username });
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
+      return true;
+    }
+    await engine.abilityImSupportBetreten(inst);
+  } catch (err) {
+    console.error('[Engine] abilityInSupportAnlegen hooks error:', err.message, err.stack);
+  }
+  engine.sync();
+  for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
+  return true;
 }
 
 async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot, supportSlot, fromCreation, heroOwner }) {
@@ -7394,34 +7467,16 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
     // Stapel zu eroeffnen — und ist der voll, geht gar nichts.
     const vorhanden = room.engine.heroAbilityStackOf(pi, heroIdx, cardName);
     if (vorhanden && vorhanden.zoneKind === 'ability') {
-      if (vorhanden.level >= 3) return false;
-      // v1349: verwahrte Kopien zaehlen mit (Madame Guillotine).
-      if (room.engine.abilityZielZone(pi, heroIdx, cardName) !== vorhanden.slotIdx) return false;
-      abZones[vorhanden.slotIdx].push(cardName);
-      ps.abilityZones[heroIdx] = abZones;
-      (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
-      room.engine.notePlayedFromHand(pi);
-      room.engine.verbraucheAbilityAnlegen(pi, heroIdx);   // W16f (H04-20): Standardplatz zuerst, sonst Zusatzplatz (Divine Gift of Skill) + Blessed-Buff - auch beim Anlegen in Support Zones (Xal)
-      room.engine.log('ability_attached', {
-        player: ps.username, card: cardName, hero: hero.name, zone: 'ability',
-      });
-      room.engine.sync();
-      return true;
+      // Die Ability liegt schon in einer ECHTEN Zone: dort wird gestapelt — der normale Weg unten (Instanz, Reaktionsfenster, Anlege-Hooks).
+      // (Früher legte dieser Zweig den Namen nur in die Zone: keine Instanz, kein `onPlay`, kein Negieren.)
+      zoneSlot = vorhanden.slotIdx;
+      supportSlot = null;
+    } else {
+      if (vorhanden && vorhanden.zoneKind === 'support' && vorhanden.level >= 3) return false;
+      const ziel = findAbilitySupportSlot(ps, heroIdx, cardName, supportSlot, gs, pi);
+      if (ziel < 0) return false;
+      return abilityInSupportAnlegen(room, pi, { cardName, handIndex, heroIdx, supIdx: ziel, fromCreation, hero, heroOwner });
     }
-    if (vorhanden && vorhanden.zoneKind === 'support' && vorhanden.level >= 3) return false;
-    const ziel = findAbilitySupportSlot(ps, heroIdx, cardName, supportSlot, gs, pi);
-    if (ziel < 0) return false;
-    if (!ps.supportZones[heroIdx][ziel]) ps.supportZones[heroIdx][ziel] = [];
-    ps.supportZones[heroIdx][ziel].push(cardName);
-    room.engine._trackCard(cardName, pi, 'support', heroIdx, ziel);
-    (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
-    room.engine.notePlayedFromHand(pi);
-    room.engine.verbraucheAbilityAnlegen(pi, heroIdx);   // W16f (H04-20): Standardplatz zuerst, sonst Zusatzplatz (Divine Gift of Skill) + Blessed-Buff - auch beim Anlegen in Support Zones (Xal)
-    room.engine.log('ability_attached', {
-      player: ps.username, card: cardName, hero: hero.name, zone: 'support',
-    });
-    room.engine.sync();
-    return true;
   }
 
   // ★★ v1349: Zonenwahl an EINER Stelle (`engine.abilityZielZone`) —
@@ -7448,19 +7503,8 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
       ? findAbilitySupportSlot(ps, heroIdx, cardName, zoneSlot, gs, pi)
       : -1;
     if (supIdx < 0) return false;
-    if (!ps.supportZones[heroIdx][supIdx]) ps.supportZones[heroIdx][supIdx] = [];
-    ps.supportZones[heroIdx][supIdx].push(cardName);
-    room.engine._trackCard(cardName, pi, 'support', heroIdx, supIdx);
     ps.abilityZones[heroIdx] = abZones;
-    (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
-    room.engine.notePlayedFromHand(pi);
-    room.engine.verbraucheAbilityAnlegen(pi, heroIdx);   // W16f (H04-20): Standardplatz zuerst, sonst Zusatzplatz (Divine Gift of Skill) + Blessed-Buff - auch beim Anlegen in Support Zones (Xal)
-    room.engine.log('ability_attached', {
-      player: ps.username, card: cardName,
-      hero: hero.name, zone: 'support',
-    });
-    room.engine.sync();
-    return true;
+    return abilityInSupportAnlegen(room, pi, { cardName, handIndex, heroIdx, supIdx, fromCreation, hero, heroOwner });
   }
 
   ps.abilityZones[heroIdx] = abZones;

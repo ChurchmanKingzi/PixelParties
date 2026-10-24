@@ -33,8 +33,7 @@ module.exports = {
     for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
       const hero = oppPs.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
-      const abZones = oppPs.abilityZones[hi] || [];
-      if (abZones.some(z => (z || []).length > 0)) return true;
+      if (engine.abilityStapelListe(oppIdx, hi).length > 0) return true;   // 24.10.: auch Support-Stapel (Xal)
     }
     return false;
   },
@@ -50,15 +49,13 @@ module.exports = {
     // verschieden.
     if (abilityInfo.attachOwner === ownerIdx) return false;
     // Check that the hero has at least 1 other ability besides the new one
-    const attachPs = gs.players[abilityInfo.zoneOwner ?? abilityInfo.attachOwner];
-    const abZones = attachPs?.abilityZones?.[abilityInfo.attachHeroIdx] || [];
+    // 24.10.: echte Ability Zonen UND Support-Stapel (Xal).
     let otherAbilityCount = 0;
-    for (let z = 0; z < abZones.length; z++) {
-      const slot = abZones[z] || [];
-      if (slot.length === 0) continue;
+    for (const eintrag of engine.abilityStapelListe(abilityInfo.zoneOwner ?? abilityInfo.attachOwner, abilityInfo.attachHeroIdx)) {
+      const slot = eintrag.namen;
       // Check if this slot contains the newly attached ability
       const inst = abilityInfo.cardInstance;
-      if (inst && inst.zoneSlot === z && slot.includes(abilityInfo.cardName)) {
+      if (inst && inst.zoneSlot === eintrag.slot && engine.abilityStapelArt(inst) === eintrag.art && slot.includes(abilityInfo.cardName)) {
         // This slot contains the new ability. W16d (A08-25): auch ein Stapel (dieselbe Fähigkeit eine Stufe höher) ist
         // KEINE „different Ability" – die Optionenliste in onSurpriseActivate überspringt diesen Platz ebenso.
         continue;
@@ -87,8 +84,7 @@ module.exports = {
       for (let hi = 0; hi < (oppPs?.heroes || []).length; hi++) {
         const hero = oppPs.heroes[hi];
         if (!hero?.name || hero.hp <= 0) continue;
-        const abZones = oppPs.abilityZones[hi] || [];
-        const hasAbilities = abZones.some(z => (z || []).length > 0);
+        const hasAbilities = engine.abilityStapelListe(oppIdx, hi).length > 0;   // 24.10.: auch Support-Stapel (Xal)
         if (!hasAbilities) continue;
         heroTargets.push({ id: `hero-${oppIdx}-${hi}`, type: 'hero', owner: oppIdx, heroIdx: hi, cardName: hero.name });
       }
@@ -124,15 +120,13 @@ module.exports = {
     const attachedCardName = sourceInfo.cardName;
 
     // Build options: ability slots on the target hero, excluding the newly attached one
-    const abZones = attachPs?.abilityZones?.[attachHeroIdx] || [];
+    // 24.10.: echte Ability Zonen UND Support-Stapel (Xal).
     const options = [];
-    for (let z = 0; z < abZones.length; z++) {
-      const slot = abZones[z] || [];
-      if (slot.length === 0) continue;
-      // Skip the slot that contains the newly attached ability (if it's the only card there)
-      if (attachedInst && attachedInst.zoneSlot === z && slot.length === 1) continue;
-      // If the new ability was stacked, the top card IS the new one — pick a different slot
-      if (attachedInst && attachedInst.zoneSlot === z) continue;
+    for (const eintrag of engine.abilityStapelListe(attachOwner, attachHeroIdx)) {
+      const z = eintrag.slot;
+      const slot = eintrag.namen;
+      // Skip the stack that contains the newly attached ability (if it's the only card there, or the top card IS the new one)
+      if (attachedInst && attachedInst.zoneSlot === z && engine.abilityStapelArt(attachedInst) === eintrag.art) continue;
       const topCard = slot[slot.length - 1];
       // Performance sieht aus wie die Ability darunter — so zeigt es auch
       // die Auswahl (mehrere Performance uebereinander: die naechste
@@ -141,10 +135,11 @@ module.exports = {
       while (ai > 0 && slot[ai] === 'Performance') ai--;
       const shown = slot[ai];
       options.push({
-        id: `ability-${z}`,
+        id: `${eintrag.art}-${z}`,
         label: `${shown} (Lv${slot.length})`,
         description: `Return ${shown} to its owner's hand.`,
         zoneIdx: z,
+        art: eintrag.art,
         topCardName: topCard,
         color: '#cc8844',
       });
@@ -153,9 +148,11 @@ module.exports = {
     if (options.length === 0) return null;
 
     let selectedZoneIdx;
+    let selectedArt = 'ability';
     if (options.length === 1) {
       // Auto-select if only one option
       selectedZoneIdx = options[0].zoneIdx;
+      selectedArt = options[0].art;
     } else {
       const choice = await engine.promptGeneric(pi, {
         type: 'optionPicker',
@@ -169,24 +166,28 @@ module.exports = {
       const selected = options.find(o => o.id === choice.optionId);
       if (!selected) return null;
       selectedZoneIdx = selected.zoneIdx;
+      selectedArt = selected.art;
     }
 
-    const slot = abZones[selectedZoneIdx];
+    const slot = (selectedArt === 'support' ? attachPs.supportZones : attachPs.abilityZones)?.[attachHeroIdx]?.[selectedZoneIdx];
     if (!slot || slot.length === 0) return null;
     const bouncedCardName = slot[slot.length - 1];
 
     // Find the card instance for the top ability
     const bouncedInst = engine.cardInstances.find(c =>
-      c.owner === attachOwner && c.zone === 'ability' &&
+      c.owner === attachOwner && c.zone === (selectedArt === 'support' ? 'support' : 'ability') &&
       c.heroIdx === attachHeroIdx && c.zoneSlot === selectedZoneIdx &&
       c.name === bouncedCardName
     );
+
+    // Leafagami Snake: die Ability bleibt liegen, ihr Kontrolleur zieht (der Rückwurf auf die Hand ist ein Entfernen).
+    if (bouncedInst && await engine.abilityEntfernungVerhindert(bouncedInst, 'hand', { source: { name: 'Noble Mummy Guards', owner: pi } })) return null;
 
     // Fan animation on the ability zone
     engine._broadcastEvent('play_zone_animation', {
       type: 'fan_blow', owner: attachOwner,
       heroIdx: attachHeroIdx, zoneSlot: selectedZoneIdx,
-      zoneType: 'ability',
+      ...(selectedArt === 'support' ? {} : { zoneType: 'ability' }),
     });
     await engine._delay(500);
 

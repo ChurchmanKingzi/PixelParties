@@ -154,7 +154,10 @@ async function anlegen(engine, hs, heroIdx, name, ziel) {
   } else {
     if (!ps.supportZones[heroIdx][ziel.slot]) ps.supportZones[heroIdx][ziel.slot] = [];
     ps.supportZones[heroIdx][ziel.slot].push(name);
-    engine._trackCard(name, hs, 'support', heroIdx, ziel.slot);
+    const inst = engine._trackCard(name, hs, 'support', heroIdx, ziel.slot);
+    engine.sync();
+    // 24.10.: auch hier die Anlege-Hooks (Fighting-ATK …) — wie für eine echte Ability Zone.
+    await engine.abilityImSupportBetreten(inst, { _skipReactionCheck: true });
   }
   engine.log('ability_attached', {
     player: ps.username, card: name, hero: ps.heroes?.[heroIdx]?.name || CARD_NAME,

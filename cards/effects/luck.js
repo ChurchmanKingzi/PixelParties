@@ -38,6 +38,7 @@ module.exports = {
     const ps = gs.players[pi];
     const heroIdx = ctx.cardHeroIdx;
     const zoneIdx = ctx.card.zoneSlot;
+    const zoneKind = engine.abilityStapelArt(ctx.card) || 'ability';   // 24.10.: Luck kann in einer Support Zone liegen (Xal)
     const hero = ctx.attachedHero;
     if (!hero) return false;
 
@@ -71,7 +72,7 @@ module.exports = {
 
     // Store on hero for client tooltip access
     if (!hero._luckDeclared) hero._luckDeclared = {};
-    hero._luckDeclared[zoneIdx] = { target: declared, level, heroIdx };
+    hero._luckDeclared[zoneKind === 'support' ? 's' + zoneIdx : zoneIdx] = { target: declared, level, heroIdx };   // Schlüssel: Ability-Zone = Slot, Support Zone = `s<Slot>`
 
     // Store on card instance for hook access
     ctx.card.counters.luckTarget = declared;
@@ -99,7 +100,7 @@ module.exports = {
     await engine._delay(300);
 
     // Flash on Luck's ability zone
-    engine._broadcastEvent('ability_activated', { owner: ctx.cardHeroOwner, heroIdx, zoneIdx });
+    engine._broadcastEvent('ability_activated', { owner: ctx.cardHeroOwner, heroIdx, zoneIdx, zoneKind });
 
     engine.log('luck_declare', { player: ps.username, card: declared, level });
     engine.sync();
@@ -152,7 +153,7 @@ module.exports = {
       // Clear hero tooltip data
       const hero = ctx.attachedHero;
       if (hero?._luckDeclared) {
-        delete hero._luckDeclared[ctx.card.zoneSlot];
+        delete hero._luckDeclared[ctx._engine.abilityStapelArt(ctx.card) === 'support' ? 's' + ctx.card.zoneSlot : ctx.card.zoneSlot];
         if (Object.keys(hero._luckDeclared).length === 0) delete hero._luckDeclared;
       }
       ctx._engine.sync();

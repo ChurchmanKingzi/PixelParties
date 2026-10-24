@@ -54,24 +54,16 @@ module.exports = {
 
       // Find the Creativity slot and its current level
       // Level = slot length (includes Performance copies on top)
-      const ps = ctx.players[feld];
-      const abZones = ps.abilityZones[heroIdx] || [];
-      let creativitySlotIdx = -1;
-      let creativityLevel = 0;
-      for (let si = 0; si < abZones.length; si++) {
-        const slot = abZones[si] || [];
-        if (slot.length > 0 && slot[0] === 'Creativity') {
-          creativitySlotIdx = si;
-          creativityLevel = slot.length;
-          break;
-        }
-      }
+      // 24.10.: der Stapel kann in einer echten Ability Zone ODER in einer Support Zone (Xal) liegen.
+      const eintrag = engine.abilityStapelEintrag(feld, heroIdx, 'Creativity');
+      const creativitySlotIdx = eintrag ? eintrag.slot : -1;
+      let creativityLevel = eintrag ? eintrag.namen.length : 0;
 
       if (creativityLevel <= 0) return;
 
       // If the entering card was placed into the Creativity slot,
       // subtract 1 to get the level BEFORE attachment
-      if (entering.zoneSlot === creativitySlotIdx) {
+      if (eintrag && engine.abilityStapelArt(entering) === eintrag.art && entering.zoneSlot === creativitySlotIdx) {
         creativityLevel--;
       }
 
@@ -91,7 +83,7 @@ module.exports = {
 
       // Flash the Creativity ability zone (visible to all players)
       engine._broadcastEvent('ability_activated', {
-        owner: feld, heroIdx, zoneIdx: creativitySlotIdx,
+        owner: feld, heroIdx, zoneIdx: creativitySlotIdx, zoneKind: eintrag.art,
       });
 
       // Sync BEFORE drawing so the client sees the hand without the

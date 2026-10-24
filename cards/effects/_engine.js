@@ -3001,6 +3001,15 @@ class GameEngine {
   }
 
   async runHooks(hookName, hookCtx = {}) {
+    // ★ 24.10. (Xal): kommt eine Karte auf den Brett, die Abilities in Support Zonen erlaubt (Xalibur), gelten die dort wegen der Schlange liegen
+    // gebliebenen Abilities wieder — NACH den Listenern der Meldung (`syncSupportAbilities`).
+    if (hookName === 'onCardEnterZone' && hookCtx && hookCtx.enteringCard && !hookCtx._xalSync
+        && hookCtx.toZone === ZONES.SUPPORT && loadCardEffect(hookCtx.enteringCard.name)?.abilitiesInSupportZones) {
+      hookCtx._xalSync = true;
+      const r = await this.runHooks(hookName, hookCtx);
+      try { await this.syncSupportAbilities(hookCtx.enteringCard.owner, hookCtx.enteringCard.heroIdx); } catch (e) { console.error('[Engine] syncSupportAbilities:', e.message); }
+      return r;
+    }
     // ★ W73a (Ankhota): Kreaturen, die der Sonderweg gelöscht statt auf die Hand zurückgenommen hat, sind nicht „returned to hand" — aus der Meldung nehmen.
     if (hookName === 'onCardsReturnedToHand' && Array.isArray(hookCtx?.returnedInsts) && hookCtx.returnedInsts.some(i => i?._ankhotaGeloescht)) {
       const keep = hookCtx.returnedInsts.map(i => !i?._ankhotaGeloescht);
@@ -3452,7 +3461,15 @@ class GameEngine {
       if (hookCtx._onlyCard && c.id !== hookCtx._onlyCard.id) return false;
       const hookFn = c.getHook(hookName);
       if (!hookFn) return false;
-      if (!c.isActiveIn(c.zone)) return false;
+      // ★ ABILITY IN EINER SUPPORT ZONE (Xal, Xalibur; 24.10.): ein Ability-Skript (`activeIn: ['ability']`) wirkt dort wie in einer echten
+      // Ability Zone, solange der Held Abilities in Support Zonen nimmt (`supportAbilityLebt`). `_supportSync`: das Abgleichen beim Wegfall der
+      // Erlaubnis (`syncSupportAbilities`) darf die Wirkung noch zurücknehmen. `_hz` = die Zone, nach der unten gefiltert wird.
+      let _hz = c.zone;
+      if (!c.isActiveIn(_hz)) {
+        if (_hz !== ZONES.SUPPORT || !(c.heroIdx >= 0) || !c.isActiveIn(ZONES.ABILITY) || !this.istAbilityImSupport(c)) return false;
+        if (!hookCtx._supportSync && !this.supportAbilityLebt(c)) return false;
+        _hz = ZONES.ABILITY;
+      }
       // Abwurf-Klammer: Skripte mit `discardSofort` (Steam Dwarfs) antworten auf JEDE Karte sofort ('nur'),
       // alle anderen gebuendelt nach der Klammer ('ohne') - siehe `_abwurfHookVormerken`.
       if (hookCtx._sofortModus && (hookCtx._sofortModus === 'nur') !== !!loadCardEffect(c.name)?.discardSofort) return false;
@@ -3527,7 +3544,7 @@ class GameEngine {
             && this._isHeroEffectSilenced(c.controller ?? c.owner, c.heroIdx)) return false;
         // W16f (M02-08): Skript-Flag `bypassStatusFilterOnLeave` - die Rücknahme eines Stempel-Bonus (Fighting-ATK) beim Abgang der EIGENEN Karte
         // ist Buchführung und läuft in jedem Heldenzustand (sonst bliebe der Bonus einer nicht mehr vorhandenen Karte dauerhaft stehen).
-        if (c.zone === 'ability'
+        if (_hz === 'ability'
             && !loadCardEffect(c.name)?.bypassStatusFilter
             && !(hookName === 'onCardLeaveZone' && hookCtx.leavingCard && hookCtx.leavingCard.id === c.id
                  && loadCardEffect(c.name)?.bypassStatusFilterOnLeave)
@@ -3542,7 +3559,7 @@ class GameEngine {
       // Chilly Dog aura (Mischief Militia): own-side Frozen Creatures keep
       // their effects/abilities firing. Stunned/Negated/Nulled still
       // silence. The aura sets `gs._chillyDogActiveFor[<pi>] = true`.
-      if (c.zone === 'support'
+      if (c.zone === 'support' && _hz !== 'ability'
           && !loadCardEffect(c.name)?.bypassStatusFilter) {
         const hostPiCC = c.controller ?? c.owner;
         const chillyDogFreezeExemptC = this._isChillyDogActiveFor(hostPiCC);
@@ -6360,6 +6377,18 @@ class GameEngine {
         return result;
       },
     };
+    // ★ ABILITIES IN SUPPORT ZONEN (Xal …, 24.10.): für Ability-Skripte (`activeIn: ['ability']`, nicht `'support'`) tragen die Zonen-Ereignisse einer
+    // Support-Ability dieselben Zonen wie die einer echten — „as if they were Ability Zones". Support-Listener (Kreaturen, Ausrüstung) sehen weiter
+    // `'support'`: dort liegt die Karte tatsächlich.
+    if (ctx.fromZone === ZONES.SUPPORT || ctx.toZone === ZONES.SUPPORT || cardInstance.zone === ZONES.SUPPORT) {
+      const _sk = cardInstance.counters?._effectOverride ? loadCardEffect(cardInstance.counters._effectOverride) : cardInstance.loadScript();
+      if (_sk?.activeIn && _sk.activeIn.includes('ability') && !_sk.activeIn.includes('support')) {
+        const _weg = hookCtx.leavingCard || hookCtx._onlyCard;
+        if (ctx.fromZone === ZONES.SUPPORT && _weg && this.istAbilityImSupport(_weg)) ctx.fromZone = ZONES.ABILITY;
+        if (ctx.toZone === ZONES.SUPPORT && hookCtx.enteringCard && this.istAbilityImSupport(hookCtx.enteringCard)) ctx.toZone = ZONES.ABILITY;
+        if (cardInstance.zone === ZONES.SUPPORT && this.istAbilityImSupport(cardInstance)) ctx.cardZone = ZONES.ABILITY;
+      }
+    }
     return ctx;
   }
 
@@ -21131,7 +21160,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     for (const c of this.cardInstances) {
       const ag = c.counters?.atkGranted || 0;
       if (ag <= 0 || c.heroIdx !== heroIdx) continue;
-      if (c.zone === ZONES.ABILITY && c.owner === seite) summe += ag;
+      if ((c.zone === ZONES.ABILITY || this.supportAbilityLebt(c)) && c.owner === seite) summe += ag;   // 24.10.: auch Fighting in einer Support Zone (Xal)
       else if (c.zone === ZONES.SUPPORT && c.counters._atkTraeger && c.counters._atkTraeger.seite === seite && c.counters._atkTraeger.heroIdx === heroIdx) summe += ag;
     }
     summe += hero.permAtkDelta || 0;
@@ -21723,7 +21752,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (loadCardEffect(inst.counters?._effectOverride || inst.name)?.bypassStatusFilter) return false;
     const seite = inst.controller ?? inst.owner;
     if (inst.zone === ZONES.HERO) return this._isHeroEffectSilenced(seite, inst.heroIdx);
-    if (inst.zone === ZONES.ABILITY) return this._isHeroAbilityPassiveSilenced(seite, inst.heroIdx);
+    if (inst.zone === ZONES.ABILITY || this.istAbilityImSupport(inst)) return this._isHeroAbilityPassiveSilenced(seite, inst.heroIdx);   // 24.10.: auch eine Ability in einer Support Zone (Xal)
     if (inst.counters?._heldKreatur) return this.isCreatureEffectSuppressed(inst);   // Held als Kreatur: ruht mit dem Wirt
     if (inst.zone !== ZONES.SUPPORT) return false;
     const cd = this.getEffectiveCardData(inst) || this._getCardDB()[inst.name];
@@ -49534,6 +49563,140 @@ this._deathWatch = (this._deathWatchStack || []).length
       out.push([...slot]);
     }
     return out;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  ★ ABILITIES IN SUPPORT ZONEN: HOOKS (24.10.2026) — Xal, Xalibur, gewonnener Xal-Effekt
+  //
+  //  Eine Ability in einer Support Zone ist eine Instanz mit `zone: 'support'` (Kartentyp Ability). Die Skripte der Abilities kennen
+  //  aber nur `zone: 'ability'` (`activeIn: ['ability']`, `fromZone`/`toZone === 'ability'`, Stapel in `ps.abilityZones`). Damit sie dort
+  //  genauso wirken wie in einer echten Ability Zone („as if they were Ability Zones"), gilt EINE Regel für alle:
+  //
+  //    · Hook-Verteiler (`runHooks`): eine Ability in einer Support Zone ist für Skripte mit `activeIn: ['ability']` AKTIV, solange der
+  //      Held Abilities in Support Zonen nimmt (`supportAbilityLebt`) — mit denselben Stummschaltungen wie eine echte Ability.
+  //    · Kontext (`_createContext`): für Ability-Listener tragen Zonen-Ereignisse einer Support-Ability `fromZone`/`toZone: 'ability'`.
+  //    · Anlegen (`abilityImSupportBetreten`): `onPlay` + `onCardEnterZone` wie in `doPlayAbility` für echte Zonen.
+  //    · Schlafen (`syncSupportAbilities`): Fällt die Erlaubnis weg, die Karte bleibt aber liegen (Leafagami Snake schützt sie nach
+  //      Xaliburs Abgang), nimmt sie ihre Wirkung zurück (Fighting-ATK …) — kommt die Erlaubnis zurück, gilt sie wieder (ohne neues „Anlegen").
+  //    · Stapel lesen: Skripte lesen den Stapel einer Instanz über `abilityStapelVon(inst)` / `abilityStapelListe(seite, heroIdx)`
+  //      (echte Zonen + Support-Stapel) statt über `ps.abilityZones`.
+  // ═══════════════════════════════════════════════════════════════════
+
+  /** Liegt diese Instanz als ABILITY in einer Support Zone (Kartentyp Ability, offen)? Unabhängig davon, ob der Held das gerade erlaubt. */
+  istAbilityImSupport(inst) {
+    if (!inst || inst.zone !== ZONES.SUPPORT || inst.faceDown || !(inst.heroIdx >= 0)) return false;
+    const cd = this._getCardDB()[inst.name];
+    return !!cd && hasCardType(cd, 'Ability');
+  }
+
+  /**
+   * Wirkt diese Support-Ability gerade wie eine Ability Zone-Karte? Sie liegt in einer Support Zone UND der Held nimmt Abilities dort
+   * (Xal / Xalibur / gewonnener Effekt). `excludeId`: die abgehende Quelle zählt nicht mehr mit (Xalibur im eigenen `onCardLeaveZone`).
+   */
+  supportAbilityLebt(inst, excludeId = null) {
+    return this.istAbilityImSupport(inst) && this.heroAcceptsAbilitiesInSupport(inst.owner, inst.heroIdx, excludeId);
+  }
+
+  /** Zählt diese Instanz als ABILITY auf dem Brett — echte Ability Zone, oder lebende Support-Ability? (Skripte: statt `c.zone === 'ability'`.) */
+  istWirksameAbility(inst) {
+    return !!inst && (inst.zone === ZONES.ABILITY || this.supportAbilityLebt(inst));
+  }
+
+  /** Wo liegt der Stapel dieser Ability-Instanz? 'ability' (echte Zone) | 'support' (Support Zone) | null (keine Ability). */
+  abilityStapelArt(inst) {
+    if (!inst) return null;
+    if (inst.zone === ZONES.ABILITY) return 'ability';
+    return this.istAbilityImSupport(inst) ? 'support' : null;
+  }
+
+  /** Das Namen-Array des Stapels, in dem die Instanz liegt (live; Brettseite = `inst.owner`). Leer, wenn es keinen gibt. */
+  abilityStapelVon(inst) {
+    const art = this.abilityStapelArt(inst);
+    if (!art) return [];
+    const ps = this.gs.players[inst.owner];
+    const zonen = art === 'ability' ? ps?.abilityZones?.[inst.heroIdx] : ps?.supportZones?.[inst.heroIdx];
+    return (zonen || [])[inst.zoneSlot] || [];
+  }
+
+  /** Alle Instanzen desselben Stapels (gleiche Seite, Held, Zone, Slot). */
+  abilityStapelInstanzen(inst) {
+    if (!inst) return [];
+    return this.cardInstances.filter(c => c.zone === inst.zone && c.owner === inst.owner
+      && c.heroIdx === inst.heroIdx && c.zoneSlot === inst.zoneSlot && !c.faceDown);
+  }
+
+  /**
+   * ALLE Ability-Stapel eines Helden: echte Ability Zonen (Slot 0-2) und — nur, wenn der Held das nimmt — die Stapel in den Support Zonen.
+   * `[{ art: 'ability'|'support', slot, namen }]`, nur nichtleere; `namen` ist live. Für Stufen-Rechnungen (`countAbilitiesForSchool`) und
+   * Blitze (`ability_activated` trägt `zoneKind: art`, `zoneIdx: slot`).
+   */
+  abilityStapelListe(seite, heroIdx) {
+    const out = [];
+    const ps = this.gs.players[seite];
+    const ab = ps?.abilityZones?.[heroIdx] || [];
+    for (let z = 0; z < ab.length; z++) {
+      if ((ab[z] || []).length > 0) out.push({ art: 'ability', slot: z, namen: ab[z] });
+    }
+    if (this.heroAcceptsAbilitiesInSupport(seite, heroIdx)) {
+      const db = this._getCardDB();
+      const sup = ps?.supportZones?.[heroIdx] || [];
+      for (let z = 0; z < sup.length; z++) {
+        const slot = sup[z];
+        if (!slot || slot.length === 0) continue;
+        const cd = db[slot[0]];
+        if (!cd || !hasCardType(cd, 'Ability')) continue;
+        out.push({ art: 'support', slot: z, namen: slot });
+      }
+    }
+    return out;
+  }
+
+  /** Der Stapel-Eintrag einer Ability (nach Name) bei einem Helden, oder null. `slot[0] === name` wie `heroAbilityStackOf`, Performance-Stapel mit `includes`. */
+  abilityStapelEintrag(seite, heroIdx, abilityName, { auchWildcard = false } = {}) {
+    for (const e of this.abilityStapelListe(seite, heroIdx)) {
+      if (e.namen[0] === abilityName || (auchWildcard && e.namen.includes(abilityName))) return e;
+    }
+    return null;
+  }
+
+  /**
+   * Eine Ability wurde in eine Support Zone gelegt (Hand-Weg `doPlayAbility`, Chuck …): die Anlege-Hooks wie für eine echte Ability Zone.
+   * `onPlay` (zone 'ability') + `onCardEnterZone` (`toZone: 'ability'`).
+   */
+  async abilityImSupportBetreten(inst, extra = {}) {
+    if (!inst) return;
+    delete inst.counters._supportSchlief;
+    await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName: inst.name, zone: 'ability', heroIdx: inst.heroIdx, ...extra });
+    await this.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'ability', toHeroIdx: inst.heroIdx, ...extra });
+  }
+
+  /**
+   * Erlaubnis geändert (Xalibur geht oder kommt, Xal-Effekt gewonnen/verloren)? Gleicht die Wirkung der liegenden Support-Abilities ab:
+   *   · Erlaubnis weg, Karte liegt noch (Leafagami Snake): ihre Wirkung wird zurückgenommen (`onCardLeaveZone` mit `_supportSchlaeft`),
+   *   · Erlaubnis wieder da: die Wirkung gilt wieder (`onPlay` mit `_verwahrungRueckkehr` — KEIN neues Anlegen: kein Schaden, keine Karten).
+   * `excludeId`: die abgehende Quelle zählt nicht mehr mit.
+   */
+  async syncSupportAbilities(seite, heroIdx, excludeId = null) {
+    const ps = this.gs.players[seite];
+    if (!ps) return;
+    const erlaubt = this.heroAcceptsAbilitiesInSupport(seite, heroIdx, excludeId);
+    const insts = this.cardInstances.filter(c => c.owner === seite && c.heroIdx === heroIdx && this.istAbilityImSupport(c));
+    for (const inst of insts) {
+      const aktiv = !inst.counters._supportSchlief;   // Standard: wirksam; schlafen legt nur dieser Abgleich
+      if (!erlaubt && aktiv) {
+        inst.counters._supportSchlief = true;
+        await this.runHooks('onCardLeaveZone', {
+          _onlyCard: inst, leavingCard: inst, fromZone: 'support', fromOwner: seite, fromHeroIdx: heroIdx, fromZoneSlot: inst.zoneSlot,
+          _supportSchlaeft: true, _supportSync: true,
+        });
+      } else if (erlaubt && !aktiv) {
+        delete inst.counters._supportSchlief;
+        await this.runHooks('onPlay', {
+          _onlyCard: inst, playedCard: inst, cardName: inst.name, zone: 'ability', heroIdx,
+          _verwahrungRueckkehr: true, _supportSync: true,
+        });
+      }
+    }
   }
 
   _getCandidateAbilityZoneSets(playerIdx, heroIdx, trotzNegierung = false) {

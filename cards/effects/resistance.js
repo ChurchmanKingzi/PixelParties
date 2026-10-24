@@ -66,14 +66,11 @@ module.exports = {
       // ★ W7a (Al 14.10.2026): ein laufender Ability-Schutz — ruht bei Frost/Betäubung/„Abilities negiert" des Helden.
       if (engine._isHeroAbilityPassiveSilenced(pi, heroIdx)) return;
 
-      // Compute level + slot
-      const abZones = gs.players[pi]?.abilityZones?.[heroIdx] || [];
-      let level = 0;
-      let zoneSlot = -1;
-      for (let z = 0; z < abZones.length; z++) {
-        const slot = abZones[z] || [];
-        if (slot.length > 0 && slot[0] === CARD_NAME) { level = slot.length; zoneSlot = z; break; }
-      }
+      // Compute level + slot — 24.10.: echte Ability Zonen UND Support-Stapel (Xal)
+      const eintrag = engine.abilityStapelEintrag(pi, heroIdx, CARD_NAME);
+      const level = eintrag ? eintrag.namen.length : 0;
+      const zoneSlot = eintrag ? eintrag.slot : -1;
+      const zoneKind = eintrag ? eintrag.art : 'ability';
       if (level === 0) return;
 
       // Check block budget
@@ -96,7 +93,7 @@ module.exports = {
       // players, makes "an effect was just absorbed" obvious without
       // hunting through the log.
       if (zoneSlot >= 0) {
-        engine._broadcastEvent('ability_block_flash', { owner: pi, heroIdx, zoneIdx: zoneSlot });
+        engine._broadcastEvent('ability_block_flash', { owner: pi, heroIdx, zoneIdx: zoneSlot, zoneKind });
       }
       engine.sync();
     },
@@ -158,18 +155,11 @@ module.exports = {
         if (ruht) return;
       }
 
-      // Compute level from the ability zone slot
-      const abZones = gs.players[pi]?.abilityZones?.[heroIdx] || [];
-      let level = 0;
-      let zoneSlot = -1;
-      for (let z = 0; z < abZones.length; z++) {
-        const slot = abZones[z] || [];
-        if (slot.length > 0 && slot[0] === CARD_NAME) {
-          level = slot.length;
-          zoneSlot = z;
-          break;
-        }
-      }
+      // Compute level from the ability zone slot — 24.10.: echte Ability Zonen UND Support-Stapel (Xal)
+      const eintrag = engine.abilityStapelEintrag(pi, heroIdx, CARD_NAME);
+      const level = eintrag ? eintrag.namen.length : 0;
+      const zoneSlot = eintrag ? eintrag.slot : -1;
+      const zoneKind = eintrag ? eintrag.art : 'ability';
       if (level === 0) return;
 
       // Check block budget (Lv3 = unlimited)
@@ -212,7 +202,7 @@ module.exports = {
       // absorbed by Resistance" signal than the previous gold sparkle
       // on the hero zone (which read like an activation, not a block).
       if (zoneSlot >= 0) {
-        engine._broadcastEvent('ability_block_flash', { owner: pi, heroIdx, zoneIdx: zoneSlot });
+        engine._broadcastEvent('ability_block_flash', { owner: pi, heroIdx, zoneIdx: zoneSlot, zoneKind });
       }
       engine.sync();
     },

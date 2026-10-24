@@ -73,8 +73,8 @@ module.exports = {
 
       // Styx 28.9.: Zone und Held liegen auf der Brettseite (geliehener Held).
       const seite = ctx.cardHeroOwner ?? ctx.cardOwner;
-      const ps = ctx.players[seite];
-      const zone = (ps.abilityZones[ctx.cardHeroIdx] || [])[ctx.card.zoneSlot] || [];
+      // 24.10.: der Stapel der Instanz — echte Ability Zone ODER Support Zone (Xal).
+      const zone = ctx._engine.abilityStapelVon(ctx.card);
       const copyIndex = zone.length - 1;
 
       applyBonus(ctx._engine, ctx.card, hero, seite, ctx.cardHeroIdx, copyIndex);
@@ -90,7 +90,7 @@ module.exports = {
       const engine = ctx._engine;
       const seite = ctx.cardHeroOwner ?? ctx.cardOwner;   // Styx 28.9.: Brettseite
       const sameZone = engine.cardInstances.filter(c =>
-        c.owner === seite && c.zone === 'ability' &&
+        c.owner === seite && c.zone === ctx.card.zone &&
         c.heroIdx === ctx.cardHeroIdx && c.zoneSlot === ctx.card.zoneSlot &&
         c.name === 'Fighting'
       );
