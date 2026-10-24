@@ -13,13 +13,18 @@ src/cute-princess-mary.png).
 * Fliegen: beim Abschlag wird Mary nach oben gedrückt, beim Aufschlag sinkt
   sie etwas ab.
 * Glut: von den Flügelspitzen lösen sich beim Abschlag kleine Funken.
+* Körper (`body_layer`): die Haare wehen (die Außenkante der Strähnen am Kopf wird zeilenweise verschoben, die langen Locken unter den
+  Schulterpolstern sind dieselbe Strähne und schwingen mit derselben, nur verzögerten Welle mit), die Arme schwingen als Einheiten seitwärts (Ärmel samt Hand und Umriss um die Schulter; das Kleid bleibt stehen, die Flügel dahinter werden sichtbar), der Saum
+  des Kleides schwingt, und das Feuer am Kleid flackert (Farben wandern auf der Leiter Rot → Orange → Gelb nach oben). Der Kopf selbst
+  bleibt starr (kein Dehnen und Stauchen).
+* Krone: ein Lichtband wandert einmal pro Schleife über die Krone; danach blitzen Glitzersterne über den Zacken auf.
 """
 import math
 import sys
 from collections import Counter
 from PIL import Image
 import numpy as np
-from anim_common import save_outputs
+from anim_common import rgb, step, sweep_level, draw_sparkles, save_outputs
 
 BODY = np.array(Image.open('src/cute-princess-mary-body.png').convert('RGBA')).astype(int)
 WINGS = np.array(Image.open('src/cute-princess-mary-wings.png').convert('RGBA')).astype(int)
@@ -87,6 +92,154 @@ def sample_wing(side, i, x, y, oy):
     return col
 
 
+# --- Körper: Haare, Kopfwippen, Hände, Saum, Flackern, Krone -------------------------------------------------------------------------
+MIRROR = 77                                  # x' = 77 − x spiegelt links ↔ rechts (Gesichtsmitte zwischen x = 38 und 39)
+HAIR = {26: (33, 35), 27: (32, 35), 28: (32, 35), 29: (32, 35), 30: (31, 35), 31: (31, 35), 32: (31, 35), 33: (31, 35),   # Strähnen am Kopf
+        37: (31, 32), 38: (31, 32)}                                                                                         # lange Locken
+HEAD0, HEAD1 = 21, 33                         # Kopf-Zeilen (Krone bis Kinn)
+FLAME_LADDER = [(0xde, 0x50, 0x3c), (0xfc, 0x7e, 0x32), (0xfb, 0xae, 0x3c)]             # Rot → Orange → Gelb (Feuer am Kleid)
+CROWN_LADDER = [(0xde, 0x50, 0x3c), (0xfc, 0x7e, 0x32), (0xfb, 0xae, 0x3c), (0xf5, 0xe2, 0x84), (0xff, 0xe6, 0x7f), (0xfc, 0xe7, 0xd6)]
+CROWN = (35, 42, 21, 25)                      # x0, x1, y0, y1 der Krone
+SPARKS = [(42, 18, 18), (35, 18, 24), (39, 19, 29)]   # Glitzersterne über den Zacken: (x, y, Startframe)
+
+
+def _arm_masks():
+    """Pixelmengen der beiden Arme in der Körperebene. Der Umriss (dunkles Rot) trennt die Teile der Figur; ein Arm ist die zusammenhängende
+    Fläche, in der die Hand liegt (links bei (30, 42), rechts bei (47, 42)), samt seinem äußeren Umriss. Umrisspixel, an denen auch Kleid,
+    Schulterpolster oder Haar grenzen, gehören nicht dazu: sie bleiben stehen."""
+    from collections import deque
+    alpha = BODY[..., 3] > 0
+    line = np.array([[tuple(BODY[y, x, :3]) == (0x6f, 0x1a, 0x13) for x in range(SW)] for y in range(SH)])
+    lab = np.zeros((SH, SW), int)
+    n = 0
+    for y0 in range(SH):
+        for x0 in range(SW):
+            if alpha[y0, x0] and not line[y0, x0] and not lab[y0, x0]:
+                n += 1
+                lab[y0, x0] = n
+                q = deque([(y0, x0)])
+                while q:
+                    cy, cx = q.popleft()
+                    for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                        ny, nx = cy + dy, cx + dx
+                        if 0 <= ny < SH and 0 <= nx < SW and alpha[ny, nx] and not line[ny, nx] and not lab[ny, nx]:
+                            lab[ny, nx] = n
+                            q.append((ny, nx))
+    out = {}
+    for side, (hy, hx) in ((-1, (42, 30)), (1, (42, 47))):
+        core = lab == lab[hy, hx]
+        others = alpha & ~line & ~core
+        def near(mask, y, x):
+            return mask[max(0, y - 1):y + 2, max(0, x - 1):x + 2].any()
+        excl = {(y, x) for y in range(SH) for x in range(SW) if line[y, x] and near(core, y, x) and not near(others, y, x)}
+        core_px = sorted((int(y), int(x)) for y, x in zip(*np.nonzero(core)))
+        # Umriss relativ zu jedem Kernpixel: in welchen der vier Richtungen liegt ein Umrisspixel? (auch die mit Kleid/Polster/Haar geteilten)
+        rel = [(y, x, dy, dx) for (y, x) in core_px for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1))
+               if 0 <= y + dy < SH and 0 <= x + dx < SW and line[y + dy, x + dx]]
+        out[side] = {'core': core_px, 'rel': rel, 'clear': sorted(set(core_px) | excl)}
+    return out
+
+
+ARMS = _arm_masks()
+
+
+def hair_shift(y, i):
+    """Seitlicher Versatz der Außenkante der Haare in Zeile y (Wind von links). Die Welle läuft von oben nach unten durch die ganze
+    Strähne, auch durch die langen Locken unter den Schulterpolstern: dieselbe Formel, nur Zeile für Zeile verzögert, damit sie sich
+    wie die Fortsetzung des Haars am Kopf bewegen und nicht wie ein eigenes Teil."""
+    amp = 0.35 + 0.15 * (y - 26)
+    return int(round(amp * math.sin(2 * math.pi * (i % N) / N - 0.14 * (y - 26))))
+
+
+def warp_row(row, xa, xb, d, side):
+    """Strähne in Zeile `row` zwischen xa..xb: Außenkante um d Pixel nach außen (d < 0: nach innen), die Innenkante bleibt stehen.
+    Die Pixel werden gedehnt bzw. gestaucht, es entstehen weder Lücken noch neue Farben."""
+    src = row[xa:xb + 1].copy()
+    n_src = xb - xa + 1
+    n_out = max(1, n_src + d)
+    out = np.zeros_like(row)
+    for j in range(n_out):
+        c = src[int(round(j * (n_src - 1) / max(1, n_out - 1)))]
+        x = xb - n_out + 1 + j if side < 0 else xa + j
+        out[x] = c
+    return out
+
+
+def arm_swing(y, i):
+    """Seitlicher Ausschlag des Arms in Zeile y (> 0: nach außen). Ein ruhiger Schwung je 16 Frames (≈ 1,1 s, zwei je Schleife). Der Arm
+    bleibt dabei fast gerade (er dreht sich wie ein Stab um die Schulter); nur ein ganz leichtes Nachhängen nach unten (0,08 rad je Zeile)
+    sorgt dafür, dass er nicht starr wirkt. Größere Verzögerungen ließen ihn schlackern wie eine nasse Nudel (Krümmung bis 1,9 px,
+    jetzt unter 0,4 px)."""
+    w = min(1.0, max(0.0, (y - 37) / 6.0))
+    t = 2 * math.pi * (i % N) / N
+    return w * (0.3 + 2.0 * math.sin(2 * t - 1.6 - 0.08 * (y - 37)))
+
+
+def arm_dy(i):
+    """Der ganze Arm sinkt dabei um 0–1 Zeile ab und hebt sich wieder, gegenläufig zum seitlichen Schwung: steht die Hand seitlich am
+    Umkehrpunkt, bewegt sie sich gerade senkrecht (der Weg ist eine flache Ellipse, keine Pause)."""
+    t = 2 * math.pi * (i % N) / N
+    return int(math.floor(0.5 + 0.5 * math.sin(2 * t - 1.6 + math.pi / 2) + 0.5))
+
+
+def body_layer(i):
+    ph = phase(i)
+    out = BODY.copy()
+    # 1) Haare wehen
+    for y, (xa, xb) in HAIR.items():
+        w = hair_shift(y, i)
+        for side in (-1, 1):
+            a, b = (xa, xb) if side < 0 else (MIRROR - xb, MIRROR - xa)
+            d = -w if side < 0 else w
+            lo, hi = (a - 3, b) if side < 0 else (a, b + 3)
+            out[y, lo:hi + 1] = 0
+            seg = warp_row(BODY[y], a, b, d, side)
+            out[y, lo:hi + 1] = np.where(seg[lo:hi + 1, 3:4] > 0, seg[lo:hi + 1], out[y, lo:hi + 1])
+    # 2) Arme schlackern seitwärts, jeder Arm als Einheit (Ärmel samt Hand und äußerem Umriss, siehe ARMS) um die Schulter: die obersten Zeilen
+    #    bewegen sich kaum, die Hand am weitesten (Scherung ≈ Drehung), und die unteren Zeilen hängen dem Schwung leicht hinterher (Pendel).
+    #    Der Umriss wird mit jedem Kernpixel mitgenommen (in den Richtungen, in denen er im Original lag), damit er in keinem Frame Lücken hat.
+    #    Ein Schwung je 16 Frames (≈ 1,1 s) auf flacher Ellipse (seitlich plus 0–1 Zeile senkrecht), die Form des Arms ändert sich in jedem Frame.
+    #    Nach außen bis 3 px, nach innen bis 2 px. Das Kleid bleibt stehen; wo der Arm war, scheinen die Flügel dahinter durch.
+    LINE = (0x6f, 0x1a, 0x13, 255)
+    dy = arm_dy(i)
+    for side in (-1, 1):
+        arm = ARMS[side]
+        colors = {(y, x): out[y, x].copy() for y, x in arm['core']}
+        for (y, x) in arm['clear']:                                    # nur Kern und eigener Umriss; der mit dem Kleid geteilte Umriss bleibt stehen
+            out[y, x] = 0
+        shift = {y: max(-2, min(3, int(round(arm_swing(y, i))))) for y in range(SH)}
+        moved = {(y + dy, x + side * shift[y]): c for (y, x), c in colors.items()}
+        for (y, x, ddy, ddx) in arm['rel']:                            # Umriss mit jedem Kernpixel mitnehmen: lückenlos, auch bei Scherung
+            cell = (y + dy + ddy, x + side * shift[y] + ddx)
+            if cell not in moved:
+                out[cell] = LINE
+        for cell, c in moved.items():
+            out[cell] = c
+    # 3) Saum schwingt
+    for y in range(48, 56):
+        dx = int(round(math.sin(ph - 2.2 - 0.3 * (y - 47)) * (y - 47) / 7.0 * 1.2))
+        if dx:
+            out[y, 27:51] = np.roll(out[y, 27:51], dx, axis=0)
+    # 4) Feuer am Kleid flackert (Farben wandern auf der Leiter)
+    for y in range(34, 57):
+        for x in range(SW):
+            if out[y, x, 3] and tuple(out[y, x, :3]) in FLAME_LADDER:
+                s = int(round(1.0 * math.sin(ph * 1.0 + 0.7 * x + 0.5 * y)))
+                if s:
+                    out[y, x, :3] = step(FLAME_LADDER, tuple(out[y, x, :3]), s)
+    # 5) Lichtband über die Krone
+    x0, x1, y0, y1 = CROWN
+    for y in range(y0 - 1, y1 + 1):
+        for x in range(x0, x1 + 1):
+            if out[y, x, 3] and tuple(out[y, x, :3]) in CROWN_LADDER:
+                lv = sweep_level(x, y, i, N, speed=1.25, slope=0.8, offset=29.0)
+                if lv:
+                    out[y, x, :3] = step(CROWN_LADDER, tuple(out[y, x, :3]), lv + 1)
+    return out
+
+
+
+
 EMBER = [(255, 236, 170), (255, 190, 80), (240, 120, 40), (190, 60, 30)]
 
 
@@ -100,11 +253,12 @@ def frame(i):
                 c = sample_wing(side, i, x, y, oy)
                 if c is not None:
                     out[y, x] = c
-    # Körper
+    # Körper (Haare, Kopf, Hände, Saum, Feuer, Krone: siehe body_layer)
+    body = body_layer(i)
     for y in range(SH):
         for x in range(SW):
-            if BODY[y, x, 3]:
-                out[y + PT + oy, x + PL] = BODY[y, x]
+            if body[y, x, 3]:
+                out[y + PT + oy, x + PL] = body[y, x]
     # Funken von den Flügelspitzen (Abschlag)
     for k in range(6):
         t = (i + k * 5) % 12
@@ -124,6 +278,8 @@ def frame(i):
         xx, yy = int(round(ex)), int(round(ey))
         if 0 <= xx < W and 0 <= yy < H and out[yy, xx, 3] == 0:
             out[yy, xx] = (*EMBER[min(3, t // 2)], 255 - t * 22)
+    # Glitzersterne über der Krone (folgen dem Körper)
+    draw_sparkles(out, i, N, [(x + PL, y + PT + oy, st) for x, y, st in SPARKS], rgb('ffef93'), rgb('ffd900'))
     return out
 
 
