@@ -8781,6 +8781,20 @@ function TTTokenBox({ token }) {
     </TTBox>
   );
 }
+/**
+ * Zweite Karte unter dem Tooltip der ersten (`card._darunterKarte`): der Tooltip der Karte, die zugleich gilt — z. B. Hulijing, the Foxdemon als Held, solange sie eine Kreatur ist
+ * („Hero treated as a Creature"). Oben steht die Kreatur (was das Brett zeigt), darunter der volle Tooltip des Helden mit seinen Live-Werten. Die zweite Karte hat keine eigene zweite.
+ */
+function TTZweiteKarte({ card, titel }) {
+  const color = tooltipTypeColor(card.cardType);
+  return (
+    <TTBox color={color} className="tt-zweite">
+      {titel && <div className="tt-token-kopf"><span className="tt-token-marke">{titel}</span></div>}
+      <div className="tt-zweite-inhalt"><CardTooltipContent card={{ ...card, _darunterKarte: null }} /></div>
+    </TTBox>
+  );
+}
+
 /** Rubrik am Ende des Tooltips: je genanntem Token ein Kasten; ohne Token nichts. */
 function TTTokenSektion({ card }) {
   const tokens = ttRelatedTokens(card);
@@ -9036,6 +9050,8 @@ function CardTooltipContent({ card, children, imageUrl }) {
           {children}
           {/* Genannte Tokens (Bild + Effekt) ganz unten — in jedem Menue und Modus (Als Vorgabe 20.10.) */}
           <TTTokenSektion card={card} />
+          {/* Zweite Karte, die zugleich gilt (verwandelte Hulijing: oben die Kreatur, darunter der Held) */}
+          {card._darunterKarte && <TTZweiteKarte card={card._darunterKarte} titel={card._darunterTitel} />}
         </div>
       </div>
     </>

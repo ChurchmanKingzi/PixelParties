@@ -19,6 +19,7 @@
 //    ③ „If it's a level 0 Creature": zählt die WIRKSAME Handstufe der gerade geholten Karte (`effectiveCardLevel` mit `handIdx` — Handstufen-Effekte wie Coreling zählen, wie bei Slave
 //       Trader). Ist sie 0 UND gibt es einen tauglichen Beschwörer mit freier Zone („if possible"), fragt eine Ja/Nein-Abfrage („may"), ob sie SOFORT als Zusatzaktion beschworen werden
 //       soll (`sofortAusHandBeschwoeren`: ganz normale Beschwörung, Zone wählbar, `alsZusatzaktion`). Die Zone, die Pinaxolotl gerade frei gemacht hat, ist dabei verfügbar.
+//       Artifact Creatures (kein Level) und jede Creature mit Level ≥ 1 sind davon ausgeschlossen: sie landen nur auf der Hand, die Ja/Nein-Frage erscheint gar nicht.
 //
 //  ── Bild und Klang ──────────────────────────────────────────────────────
 //  `play_zone_animation` `pinaxolotl_bubbles` (Pixelart, ANIM_REGISTRY) auf dem frei gewordenen Platz: Blasen steigen auf und zerplatzen. Klänge in ZONE_ANIM_SFX; Log `pinaxolotl`.
@@ -27,7 +28,7 @@
 //  Sucht bevorzugt eine Lv0-Creature, die sich sofort beschwören lässt (Kartenvorteil + Zusatzaktion), sonst die Creature mit der höchsten Stufe.
 // ═══════════════════════════════════════════
 
-const { hasCardType, baseCardName } = require('./_hooks');
+const { hasCardType, baseCardName, isArtifactCreature, hasNumericCreatureLevel } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
 const { eligibleSummonZones, sofortAusHandBeschwoeren } = require('./_summon-eligibility');
 const { skipIfSearchBlocked } = require('./_search-shared');
@@ -53,6 +54,7 @@ function deckCreatures(engine, pi) {
 function moeglicheZonen(engine, pi, name) {
   const cd = engine._getCardDB()[name];
   if (!cd || !hasCardType(cd, 'Creature')) return [];
+  if (isArtifactCreature(cd) || !hasNumericCreatureLevel(cd)) return [];      // Artifact Creatures haben kein Level und werden nicht beschworen: nie „sofort beschwören"
   if (loadCardEffect(name)?.summonOnlyViaOwnEffect) return [];
   return eligibleSummonZones(engine, pi, name, { nachKontrolle: true, alsAktion: true })
     .filter(z => engine.isCreatureSummonable(name, z.owner ?? pi, z.heroIdx, { beschwoerer: pi }));
@@ -63,6 +65,7 @@ function handStufe(engine, pi, name) {
   const ps = engine.gs.players[pi];
   const cd = engine._getCardDB()[name];
   if (!ps || !cd) return null;
+  if (!hasNumericCreatureLevel(cd)) return null;      // ohne Level (Artifact Creature) ist es keine „level 0 Creature" — `Number(null)` wäre sonst 0
   const handIdx = (ps.hand || []).lastIndexOf(name);
   if (handIdx < 0) return null;
   const lv = engine.effectiveCardLevel(cd, pi, { handIdx });
