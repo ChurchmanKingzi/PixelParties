@@ -117,6 +117,7 @@ module.exports = {
       const name = wahl.cardName;
       if (ps.mainDeck.indexOf(name) < 0) { engine.shuffleDeck(pi, 'main'); engine.sync(); return; }
 
+      await engine.showTriggeredEffect(CARD_NAME);      // Auftritt erst jetzt: die Suche findet statt (nach dem „you may")
       // ── ② Auf die Hand (kanonischer Weg: ON_CARD_ADDED_TO_HAND feuert, Gegner sieht die Karte, Deck wird gemischt) ──
       await engine.actionAddCardFromDeckToHand(pi, name, { source: CARD_NAME, reveal: true, shuffle: true });
       engine.log('pinaxolotl', { player: ps.username, card: name });

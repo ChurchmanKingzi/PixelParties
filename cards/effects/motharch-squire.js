@@ -162,6 +162,7 @@ module.exports = {
       if (ps.mainDeck.indexOf(wahl.cardName) < 0) { engine.shuffleDeck(pi, 'main'); engine.sync(); return; }
       if (!engine.claimHOPT(HOPT_KEY, pi)) return;             // zwischen Anzeige und Wahl von einem anderen Squire verbraucht
 
+      await engine.showTriggeredEffect(CARD_NAME);             // Auftritt erst jetzt: die Suche findet statt (nach dem „you may")
       await engine.actionAddCardFromDeckToHand(pi, wahl.cardName, { source: CARD_NAME, reveal: true, shuffle: true });
       engine.log('motharch_squire_search', { player: ps.username, card: wahl.cardName });
       engine.sync();

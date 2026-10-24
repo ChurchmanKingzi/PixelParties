@@ -2899,6 +2899,16 @@ const ZONE_ANIM_SFX = {
     { name: 'buff', opts: { rate: 1.5, volume: 0.45 } },
     { name: 'ping', opts: { rate: 2.6, volume: 0.22, delay: 300, category: null, dedupe: 0 } },
   ],
+  // Hulijing (Held als Kreatur): Verwandlung — dunkler Zauberklang, Wind (Fuchsfeuer, ~150 ms), Ping beim Blitz (~650 ms); Löschen am Zugende — kurzes Verpuffen.
+  hero_creature_on: [
+    { name: 'elem_dark', opts: { rate: 1.1, volume: 0.45 } },
+    { name: 'elem_wind', opts: { rate: 1.3, volume: 0.3, delay: 150, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 1.8, volume: 0.3, delay: 650, category: null, dedupe: 0 } },
+  ],
+  hero_creature_off: [
+    { name: 'elem_wind', opts: { rate: 1.6, volume: 0.35 } },
+    { name: 'ping',      opts: { rate: 1.2, volume: 0.2, delay: 120, category: null, dedupe: 0 } },
+  ],
   // Arnold: Muskelspiel — Stärkung (0 ms), heller Heilklang (~120 ms) für die zusätzlichen HP.
   arnold_flex: [
     { name: 'buff', opts: { rate: 0.9, volume: 0.7 } },
