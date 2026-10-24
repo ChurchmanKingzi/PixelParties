@@ -7121,7 +7121,7 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 .pz-filter-sidebar { width: 200px; flex-shrink: 0; border-right: 2px solid var(--bg4); padding: 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
 /* Gallery column — search input on top, scrollable card grid below. */
 .pz-gallery-column { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 8px; gap: 6px; }
-.pz-search-results { flex: 1; height: 100%; overflow-y: auto; display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: max-content; gap: 5px; align-content: start; scrollbar-width: auto; scrollbar-color: #59606e #1a1a2e; }
+.pz-search-results { flex: 1; height: 100%; overflow-y: auto; overflow-x: hidden; padding: 4px; box-sizing: border-box; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: max-content; gap: 5px; align-content: start; scrollbar-width: auto; scrollbar-color: #59606e #1a1a2e; }
 .pz-search-results::-webkit-scrollbar { width: 18px; }
 /* Opaque track/thumb (composited equivalents of the old translucent
    white) so the panel's dither doesn't show through the scrollbar. */
