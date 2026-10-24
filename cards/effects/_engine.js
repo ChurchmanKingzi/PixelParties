@@ -22850,7 +22850,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // client grays the spell out when no non-silenced hero can
         // cast it, and so a silenced hero stops being highlighted as
         // a drag-drop / selection-menu target for Spells.
-        if (cd.cardType === 'Spell' && (hero.statuses?.magic_silenced || hero.statuses?.frightened)) {   // v879
+        if (cd.cardType === 'Spell' && (hero.statuses?.magic_silenced || hero.statuses?.frightened || hero.statuses?.polymorphed)) {   // v879; 24.10. Polymorph
           const s = loadCardEffect(cd.name);
           let ok = false;
           if (typeof s?.canPlayDespiteStatuses === 'function') {
@@ -23097,7 +23097,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // Nulled (Null Zone) blocks Spells here just like for own heroes.
           if (cd.cardType === 'Spell' && hero.statuses?.nulled) continue;
           // Magic-Silenced (Anti Magic Zone) blocks Spells.
-          if (cd.cardType === 'Spell' && (hero.statuses?.magic_silenced || hero.statuses?.frightened)) continue;   // v879
+          if (cd.cardType === 'Spell' && (hero.statuses?.magic_silenced || hero.statuses?.frightened || hero.statuses?.polymorphed)) continue;   // v879; 24.10. Polymorph
           // Berserked blocks Spells AND Creature summons, and caps Attacks at 2/turn.
           if ((cd.cardType === 'Spell' || cd.cardType === 'Creature') && hero.statuses?.berserked) continue;
           if (cd.cardType === 'Attack' && hero.statuses?.berserked && (hero._attacksThisTurn || 0) >= 2) continue;
@@ -23694,7 +23694,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // effects, and Artifacts are all still legal — only the Spell
     // card-type is blocked. Same `canPlayDespiteStatuses` opt-out as
     // the Nulled gate above.
-    if ((hero.statuses?.magic_silenced || hero.statuses?.frightened) && cardData.cardType === 'Spell') {   // v879
+    if ((hero.statuses?.magic_silenced || hero.statuses?.frightened || hero.statuses?.polymorphed) && cardData.cardType === 'Spell') {   // v879; 24.10. Polymorph
       const cardScript = loadCardEffect(cardData.name);
       let bypass = false;
       if (typeof cardScript?.canPlayDespiteStatuses === 'function') {
@@ -41442,7 +41442,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `canPlayDespiteStatuses` ausdruecklich davon ausnehmen.
     // W16g (R01-11): auch `nulled` (Null Zone) und `berserked` (Berserk) sperren Spells wie in `validateActionPlay`.
     if (cardData.cardType === 'Spell'
-        && (hero.statuses?.magic_silenced || hero.statuses?.frightened || hero.statuses?.nulled || hero.statuses?.berserked)) {
+        && (hero.statuses?.magic_silenced || hero.statuses?.frightened || hero.statuses?.nulled || hero.statuses?.berserked || hero.statuses?.polymorphed)) {
       const script = loadCardEffect(cardName);
       let bypass = false;
       if (typeof script?.canPlayDespiteStatuses === 'function') {
@@ -48779,7 +48779,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!this.canHeroPerformAction(seite, heroIdx, { ohneStatus: true })) return false;
     if (this.kontrollRechte(seite, heroIdx).zauber === false) return false;
     const st = hero.statuses || {};
-    if (st.nulled || st.magic_silenced || st.frightened || st.berserked) return false;
+    if (st.nulled || st.magic_silenced || st.frightened || st.berserked || st.polymorphed) return false;
     if (this._isHeroBlinded(seite, heroIdx)) return false;
     const p = Number.isInteger(pi) ? pi : seite;
     const ps = this.gs.players[p];
@@ -51958,6 +51958,50 @@ this._deathWatch = (this._deathWatchStack || []).length
     return false;
   }
 
+  /**
+   * ★ 24.10. (Redirecting Aura): Brettkarten mit dem Vertrag `onAoeRedirect(engine, inst, eintrag, kandidaten, kontext)` duerfen einen Treffer eines Flaechenschlags
+   * auf ein anderes Ziel der Trefferliste umlenken. Das Skript fragt, waehlt und liefert den gewaehlten KANDIDATEN-EINTRAG (oder null); die Engine tauscht den Eintrag:
+   * der umgeleitete Treffer behaelt seinen Betrag, das neue Ziel steht danach (zusaetzlich zu seinem eigenen Treffer) ein zweites Mal in der Liste — es wird zweimal getroffen.
+   * `eintrag` ist ein Helden-Eintrag `{ hero, heroIdx, owner, amount }`; Kandidaten sind die tatsaechlich getroffenen (nicht immunen) Helden-/Kreatur-Eintraege der Liste.
+   * Jede Aura geht ihre Eintraege einmal durch (Schnappschuss) — eine Umleitungskette endet so von selbst.
+   */
+  async _aoeUmleitungen(quelle, hitHeroes, creatureEntries, kontext) {
+    const insts = this.cardInstances.filter(inst => {
+      if (inst.zone !== ZONES.SUPPORT || inst.faceDown) return false;
+      const sc = loadCardEffect(inst.counters?._effectOverride || inst.name);
+      if (typeof sc?.onAoeRedirect !== 'function') return false;
+      if ((inst.counters?.negated || inst.counters?.nulled || inst.counters?.stunned) && !this._creatureNegationProof(inst)) return false;
+      return true;
+    });
+    for (const inst of insts) {
+      const sc = loadCardEffect(inst.counters?._effectOverride || inst.name);
+      const hostSeite = this.physicalSide(inst);
+      const meine = hitHeroes.filter(e => e.owner === hostSeite && e.heroIdx === inst.heroIdx && kontext.reagierHelden.includes(e));
+      for (const eintrag of meine) {
+        if (!hitHeroes.includes(eintrag)) continue;            // schon von einer anderen Aura weggeleitet
+        const kandidaten = [
+          ...hitHeroes.filter(e => e !== eintrag && kontext.reagierHelden.includes(e) && e.hero.hp > 0),
+          ...creatureEntries.filter(e => !e._immuneCreature && e.inst?.zone === ZONES.SUPPORT),
+        ];
+        if (kandidaten.length === 0) continue;
+        let wahl = null;
+        try { wahl = await sc.onAoeRedirect(this, inst, eintrag, kandidaten, { quelle, damageType: kontext.damageType, damage: kontext.damage }); }
+        catch (err) { console.error('[aoeUmleitung]', inst.name, err.message); }
+        if (!wahl || !kandidaten.includes(wahl)) continue;
+        const idx = hitHeroes.indexOf(eintrag);
+        if (idx >= 0) hitHeroes.splice(idx, 1);
+        if (wahl.hero) {
+          hitHeroes.push({ ...wahl, amount: eintrag.amount });
+          kontext.reagierHelden.push(hitHeroes[hitHeroes.length - 1]);
+        } else {
+          const neu = { ...wahl, amount: eintrag.amount, cancelled: false };
+          creatureEntries.push(neu);
+        }
+        this.sync();
+      }
+    }
+  }
+
   async dealDamageToTargets(quelle, targets, opts = {}) {
     const gs = this.gs;
     const config = opts;
@@ -52098,6 +52142,16 @@ this._deathWatch = (this._deathWatchStack || []).length
         await this.negationsBilder(reaktionsQuelle, aoeTargets2, ptResult, { ohneZauberBilder: !!opts.bilderGespielt });   // v1182
         return { heroes: [], creatures: [], cancelled: true };
       }
+    }
+
+    // ── SCHRITT 2b: UMLEITUNG VON FLAECHENTREFFERN (Redirecting Aura, 24.10.) ──────────────────────────────────────────────────────
+    // „When that Hero would be hit by an opponent's Spell or Creature effect, you may redirect that hit to any other target you control
+    // (even if it was already hit by the same Spell/effect)" — gilt ausdruecklich auch fuer Effekte, die niemanden WAEHLEN (Flame Avalanche).
+    // NUR echte Flaechenschlaege (`istFlaeche`, d. h. `aoeHit`): gewaehlte Mehrfachziele (Fireball, Book of Doom) hatten ihr Umleitungsfenster schon.
+    if (opts.istFlaeche && hitHeroes.length > 0) {
+      await this._aoeUmleitungen(quelle || quellObjekt, hitHeroes, creatureEntries, {
+        reagierHelden, reagierKreaturen, damageType, damage, opts,
+      });
     }
 
     await this._spieleWellenAnimation(config, quelle || quellObjekt, pi, heroIdx, [

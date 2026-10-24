@@ -2838,6 +2838,48 @@ const ZONE_ANIM_SFX = {
     { name: 'negate',             opts: { rate: 1.4, volume: 0.55, delay: 420, category: null, dedupe: 0 } },
     { name: 'creature_destroyed', opts: { rate: 1.5, volume: 0.5,  delay: 480, category: null, dedupe: 0 } },
   ],
+  // Time Distortion (24.10.) — das Zifferblatt erscheint (Zauberton, 0 ms), der Zeiger rast (tickende Pings), bei ~650 ms bricht es auf (Glitzern). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  time_distortion: [
+    { name: 'spell_cast', opts: { rate: 0.8, volume: 0.5 } },
+    { name: 'ping',       opts: { rate: 1.6, volume: 0.3, delay: 120, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 1.8, volume: 0.3, delay: 260, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.0, volume: 0.3, delay: 400, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.2, volume: 0.3, delay: 520, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.8, volume: 0.45, delay: 650, category: null, dedupe: 0 } },
+  ],
+  // Redirecting Aura (24.10.) — der Wirbel zieht sich zusammen (Zauberton, 0 ms), der Komet saust los (~260 ms, Wind), Einschlag bei ~700 ms (Ping und dumpfer Schlag). Nur der erste Teil uebernimmt die
+  // Sammelkategorie 'effect'.
+  redirect_aura: [
+    { name: 'spell_cast', opts: { rate: 1.5, volume: 0.45 } },
+    { name: 'elem_wind',  opts: { rate: 1.5, volume: 0.4,  delay: 260, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.2, volume: 0.5,  delay: 700, category: null, dedupe: 0 } },
+    { name: 'debuff',     opts: { rate: 1.7, volume: 0.35, delay: 720, category: null, dedupe: 0 } },
+  ],
+  // Exorcism (24.10.) — das Licht faellt (Zauberton, 0 ms), dunkle Schwaden steigen (Wind), bei ~560 ms der Schlag (Heilton, Glitzern). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  exorcism_light: [
+    { name: 'spell_cast',    opts: { rate: 0.9, volume: 0.5 } },
+    { name: 'elem_wind',     opts: { rate: 0.8, volume: 0.35, delay: 200, category: null, dedupe: 0 } },
+    { name: 'status_remove', opts: { rate: 1.0, volume: 0.8,  delay: 560, category: null, dedupe: 0 } },
+    { name: 'heal',          opts: { rate: 1.2, volume: 0.45, delay: 600, category: null, dedupe: 0 } },
+    { name: 'ping',          opts: { rate: 2.4, volume: 0.35, delay: 760, category: null, dedupe: 0 } },
+  ],
+  // Polymorph (24.10.) — der Zauberring spannt sich (Zauberton, 0 ms), bei ~520 ms die Verwandlung (Blitz, Glitzern), Rauch zischt davon. Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  polymorph_poof: [
+    { name: 'spell_cast', opts: { rate: 1.3, volume: 0.5 } },
+    { name: 'debuff',     opts: { rate: 0.9, volume: 0.5, delay: 400, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.0, volume: 0.45, delay: 520, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.6, volume: 0.35, delay: 640, category: null, dedupe: 0 } },
+    { name: 'elem_wind',  opts: { rate: 1.2, volume: 0.35, delay: 600, category: null, dedupe: 0 } },
+  ],
+  // Overheat (24.10.) — das Artefakt heizt sich auf (Feuerrauschen, 0 ms), Risse knistern (~200 ms), es platzt bei ~500 ms (Schlag, Splittern) und die Splitter zischen nach
+  // (~620 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  overheat: [
+    { name: 'elem_fire',          opts: { rate: 1.1, volume: 0.7 } },
+    { name: 'debuff',             opts: { rate: 1.6, volume: 0.35, delay: 200, category: null, dedupe: 0 } },
+    { name: 'heavy_impact',       opts: { rate: 1.1, volume: 0.65, delay: 500, category: null, dedupe: 0 } },
+    { name: 'creature_destroyed', opts: { rate: 1.4, volume: 0.5,  delay: 540, category: null, dedupe: 0 } },
+    { name: 'elem_water',         opts: { rate: 1.5, volume: 0.35, delay: 640, category: null, dedupe: 0 } },
+  ],
   // Breakthrough (11.10.) — Risse knistern (Schnitt, 0 ms), die Scheibe birst bei ~460 ms (Schlag), Scherben klirren (~500 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   breakthrough_shatter: [
     { name: 'slash',              opts: { rate: 1.5, volume: 0.45 } },
@@ -7986,6 +8028,12 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
     badges.push({
       key: 'ordered', icon: '📜',
       tooltip: `Under Orders (The Master's Orders): ${anhaenger} may perform Actions with this Hero as if they controlled it, but they cannot make it choose itself as a target for an Attack or Spell.`,
+    });
+  }
+  if (s.polymorphed) {
+    badges.push({
+      key: 'polymorphed', icon: '🐰',
+      tooltip: 'Polymorphed (Polymorph): Cannot use any Spells, but its Attack stat is increased by 100.',
     });
   }
   if (s.cursed) {

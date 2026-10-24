@@ -1495,6 +1495,10 @@
 "id": "Excavator_Bucket",
 "kind": "a"
 },
+"Exorcism": {
+"id": "Exorcism",
+"kind": "a"
+},
 "Experimental Potion": {
 "id": "Experimental_Potion",
 "kind": "a"
@@ -3119,6 +3123,10 @@
 "id": "Overheal_Shock",
 "kind": "a"
 },
+"Overheat": {
+"id": "Overheat",
+"kind": "a"
+},
 "Pangaia, the Dino Domain": {
 "id": "Pangaia_the_Dino_Domain",
 "kind": "a"
@@ -3281,6 +3289,10 @@
 },
 "Pollution Token": {
 "id": "Pollution_Token",
+"kind": "a"
+},
+"Polymorph": {
+"id": "Polymorph",
 "kind": "a"
 },
 "Populated Island Turtle": {
@@ -3461,6 +3473,10 @@
 },
 "Red Dragoneer": {
 "id": "Red_Dragoneer",
+"kind": "a"
+},
+"Redirecting Aura": {
+"id": "Redirecting_Aura",
 "kind": "a"
 },
 "Refreshing Night": {
@@ -4553,6 +4569,10 @@
 },
 "Time Bomblebee": {
 "id": "Time_Bomblebee",
+"kind": "a"
+},
+"Time Distortion": {
+"id": "Time_Distortion",
 "kind": "a"
 },
 "Timeless King Zi": {
