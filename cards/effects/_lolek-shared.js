@@ -148,7 +148,7 @@ async function chooseAndEquip(engine, pi, entries, opts = {}) {
     await engine._payCardCost(pi, cost, { cardName: entry.name });
     engine._broadcastEvent('gold_change', { owner: pi, amount: -cost });
   }
-  const eqOpts = { from: entry.source, source: opts.source || opts.title };
+  const eqOpts = { from: entry.source, source: opts.source || opts.title, ...(opts.animationType ? { animationType: opts.animationType } : {}) };
   const inst = await equipArtifactToHero(engine, pi, entry.name, dest.side, dest.heroIdx, dest.slotIdx, eqOpts);
   // ★ W16a (Al, Frage 3: „Ja!"): von Resistance abgefangen → der Einmal-Einsatz ist verbraucht (true, Kosten bleiben bezahlt wie bei Cool Repair), die Karte bleibt liegen.
   if (!inst && eqOpts.blockiert) {

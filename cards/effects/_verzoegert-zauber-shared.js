@@ -85,7 +85,8 @@ async function ausfuehren(engine, e) {
   if (!script?.hooks?.onPlay) return log('not_performable');   // Reaktionen/Surprises haben keinen Wirkungsrumpf — der Zauber bleibt gelöscht
   if (!(await ausGeloeschtEntnehmen(engine, pileOwnerPi, e.spellName, e.quelle))) return log('take_failed');
 
-  engine._broadcastEvent('delayed_spell_return', { playerIdx: e.castPi, owner: e.wirkerSeite, heroIdx: e.heroIdx, cardName: e.spellName, kind: e.kind });
+  // Bild: der verzoegerte Zauber kehrt zurueck — Ghostly Warning: der Geist gibt ihn frei; Atta: die Buecher schlagen auf (`play_zone_animation`, Hero als Anker).
+  engine._broadcastEvent('play_zone_animation', { type: e.kind === 'atta' ? 'atta_books' : 'ghostly_warning', owner: e.wirkerSeite, heroIdx: e.heroIdx, zoneSlot: -1, phase: 'return' });
   engine.sync();
   await engine._delay(700);
   engine.log('delayed_spell_cast', { kind: e.kind, player: castPs.username, hero: hero.name, spell: e.spellName });

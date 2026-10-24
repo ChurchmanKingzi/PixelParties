@@ -74,6 +74,7 @@ module.exports = {
         confirmLabel: '🔪 Equip!',
         costOf: (_name, cd) => halfCost(cd, engine, pi),
         nurHeld: darion,
+        animationType: 'darion_equip',   // Blutspritzer + das Equip schlaegt in den Stapel (Vorlage: das Kartenbild)
       });
       engine.sync();
     },

@@ -68,4 +68,40 @@ function stapelTiefe(engine, seite, heroIdx) {
   return s < 0 ? 0 : equipsAt(engine, seite, heroIdx, s).length;
 }
 
-module.exports = { teilenAktiv, equipsAt, stapelPlatz, pflichtPlatzFuer, stapelTiefe };
+/**
+ * Beschreibung einer Equip-Instanz fuer die Auswahl-Abfrage (`instancePick`) und fuer das Brett (`supportStacks`): Name, Kartentyp, Preis,
+ * Counter/Status — keine HP (ein Equip hat keine).
+ */
+function beschreibe(engine, inst) {
+  const cd = engine.getEffectiveCardData?.(inst) || engine._getCardDB()[inst.name];
+  return {
+    instId: inst.id,
+    name: inst.name,
+    cardType: cd?.cardType || 'Artifact',
+    isEquip: true,
+    cost: cd?.cost ?? null,
+    hp: null, maxHp: null,
+    counters: { ...(inst.counters || {}) },
+    statuses: { ...(inst.statuses || {}) },
+    summonedThisTurn: inst.turnPlayed === engine.gs.turn,
+  };
+}
+
+/** Hat dieser Held einen Equip-Stapel, der WEITERE Equips aufnimmt? (Teilen aktiv + schon ein Equip liegt) — zaehlt wie eine freie Zone. */
+function hatStapelPlatz(engine, seite, heroIdx) {
+  return teilenAktiv(engine, seite, heroIdx) && stapelPlatz(engine, seite, heroIdx) >= 0;
+}
+
+/**
+ * Die Plaetze, in die `cardName` bei diesem Helden gelegt werden kann: der Equip-Stapel (Pflicht, wenn vorhanden), sonst die freien Basis-Zonen
+ * (versiegelte zaehlen als belegt). Fuer Skripte, die ihre Zonenliste selbst bauen.
+ */
+function freieEquipZonen(engine, seite, heroIdx, cardName) {
+  const pflicht = pflichtPlatzFuer(engine, seite, heroIdx, cardName);
+  if (pflicht >= 0) return [pflicht];
+  const out = [];
+  for (let s = 0; s < 3; s++) if (!engine.supportSlotBelegt(seite, heroIdx, s)) out.push(s);
+  return out;
+}
+
+module.exports = { teilenAktiv, equipsAt, stapelPlatz, pflichtPlatzFuer, stapelTiefe, beschreibe, hatStapelPlatz, freieEquipZonen };

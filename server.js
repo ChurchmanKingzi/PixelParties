@@ -216,6 +216,7 @@ function zoneAuraFuer(room, seite, inst) {
 function buildSupportStacks(room) {
   if (!room?.engine) return {};
   const alice = require('./cards/effects/_alice-shared');
+  const equipStack = require('./cards/effects/_equip-stack-shared');
   const engine = room.engine;
   const byKey = {};
   for (const inst of engine.cardInstances) {
@@ -224,7 +225,12 @@ function buildSupportStacks(room) {
     const key = `${physicalSide}-${inst.heroIdx}-${inst.zoneSlot}`;
     if (byKey[key]) continue; // Platz schon abgearbeitet
     const stack = alice.stackAt(engine, physicalSide, inst.heroIdx, inst.zoneSlot);
-    if (stack.length <= 1) { byKey[key] = null; continue; }
+    if (stack.length <= 1) {
+      // ★ Darion: mehrere EQUIPS im selben Platz (ein Name je Karte) — dieselbe Meldung, mit Kartentyp/Preis statt HP.
+      const eqStapel = equipStack.equipsAt(engine, physicalSide, inst.heroIdx, inst.zoneSlot);
+      byKey[key] = eqStapel.length > 1 ? eqStapel.map(i => equipStack.beschreibe(engine, i)) : null;
+      continue;
+    }
     byKey[key] = stack.map(i => alice.describeInstance(engine, i));
   }
   const out = {};
@@ -4805,6 +4811,7 @@ function sendGameState(room, playerIdx, extra) {
       // Aus dem Spielerzustand, nicht vom Brett — die Wirkung ueberlebt
       // Alices Tod.
       sharesSupportZones: require('./cards/effects/_alice-shared').sharingActive(gs, pi),   // Z1: nach Kontrolle (H01-15)
+      equipShareHeroes: [0, 1, 2].map(h => require('./cards/effects/_equip-stack-shared').teilenAktiv(room.engine, pi, h)),   // Darion: Helden dieser Seite, deren Equips eine Zone teilen
       heroes: ps.heroes, abilityZones: ps.abilityZones,
       // v1349: verwahrte/versiegelte Zonen (Madame Guillotine) — rotes Kreuz, Anlegen gesperrt.
       verwahrteZonen: require('./cards/effects/_ability-verwahrung-shared').zonenFuerAnzeige(gs, pi),
@@ -6106,6 +6113,7 @@ function sendSpectatorGameState(room) {
       // Aus dem Spielerzustand, nicht vom Brett — die Wirkung ueberlebt
       // Alices Tod.
       sharesSupportZones: require('./cards/effects/_alice-shared').sharingActive(gs, spi),   // Z1: nach Kontrolle (H01-15)
+      equipShareHeroes: [0, 1, 2].map(h => require('./cards/effects/_equip-stack-shared').teilenAktiv(room.engine, spi, h)),   // Darion: Helden dieser Seite, deren Equips eine Zone teilen
       heroes: ps.heroes, abilityZones: ps.abilityZones,
       // v1349: verwahrte/versiegelte Zonen (Madame Guillotine) — rotes Kreuz, Anlegen gesperrt.
       verwahrteZonen: require('./cards/effects/_ability-verwahrung-shared').zonenFuerAnzeige(gs, spi),
@@ -11475,7 +11483,7 @@ async function doActivateDiscardEffect(room, pi, { instId }) {
   return true;
 }
 
-async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot, heroOwner: heroOwnerParam }) {
+async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot, heroOwner: heroOwnerParam, instId }) {
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
   if (pi !== gs.activePlayer) return false;
@@ -11529,16 +11537,18 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot, heroOwner: h
   // the same card). Defer the script-driven check below.
   const slot = (ps.supportZones[heroIdx] || [])[zoneSlot] || [];
   if (slot.length === 0) return false;
-  const cardName = slot[0];
 
   // ★ Bei Cross-Side gehoert die Instanz der GEGENSEITE der Zone, in
   // der sie liegt — `c.owner === pi` trifft dort nie zu. Ohne diesen
   // Zweig fand der Server die Karte nicht und der Klick verpuffte
   // (Als Befund 21.8.: „wird gehighlightet, Klick tut nichts").
+  // ★ Darion: teilen sich mehrere Equips den Platz, sagt `instId`, WELCHES gemeint ist (nur ein Equip dieses Platzes zaehlt, nie eine fremde Instanz).
   const inst = _crossInst || room.engine.cardInstances.find(c =>
     room.engine.physicalSide(c) === _brett && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot   // Z1: Brettseite
+    && (instId == null || c.id === instId)
   );
   if (!inst) return false;
+  const cardName = inst.name;
 
   // ★ Geliehene Identitaet (Future Tech Copy Device): die Karte heisst
   // weiter Copy Device, IST aber die kopierte Ausruestung. Das Skript

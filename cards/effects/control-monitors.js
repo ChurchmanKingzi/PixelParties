@@ -86,6 +86,14 @@ module.exports = {
     }
 
     const ziel = wahl === 'rest' ? andere : added;
+    // Bild: drei rote Monitore flackern ueber der Seite des Hinzufuegenden (Vorlage: das Kartenbild), danach fliegen die Karten in den Geloescht-Stapel.
+    const heroAnker = Math.max(0, (adderPs.heroes || []).findIndex(h => h?.name && h.hp > 0));
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'control_monitors', zoneType: 'board', owner: adder, heroIdx: -1, zoneSlot: -1, duration: 1300,
+      targets: [{ owner: adder, heroIdx: heroAnker, zoneSlot: -1, cardName: added[0] }],
+      originOwner: pi, originHeroIdx: 0, originZoneSlot: -1, mode: wahl,
+    });
+    await engine._delay(900);
     // Das Loeschen fasst die Hand des Gegners an → Hand-Interaktion (Ambush the Scout darf den Effekt negieren). Verschachteltes Fenster,
     // weil wir mitten in der aufloesenden Reaktionskette stehen.
     if (await engine.checkHandInteractionReaction(adder, 'discard', { byPi: pi, count: ziel.length, sourceName: CARD_NAME, verschachtelt: true })) {

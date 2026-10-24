@@ -32899,7 +32899,30 @@ this._deathWatch = (this._deathWatchStack || []).length
       const slotIdx = t.slotIdx ?? t.cardInstance?.zoneSlot;
       if (side == null || heroIdx == null || slotIdx == null) continue;
       const stack = alice.stackAt(this, side, heroIdx, slotIdx);
-      if (stack.length <= 1) continue;
+      // ★ Darion: ein Platz mit mehreren EQUIPS (ein Name je Karte) — dieselbe Rueckfrage, aber nur unter den Equips, die das Skript zulaesst
+      // (`t._erlaubteInstanzen`, gesetzt von den zentralen Aufzaehlern; ohne Angabe alle Equips des Stapels).
+      const eqStack = stack.length <= 1
+        ? require('./_equip-stack-shared').equipsAt(this, t.owner ?? side, heroIdx, slotIdx)
+            .filter(i => !t._erlaubteInstanzen || t._erlaubteInstanzen.includes(i.id))
+        : [];
+      if (stack.length <= 1 && eqStack.length <= 1) {
+        if (eqStack.length === 1) { t.cardInstance = eqStack[0]; t._cardInstance = eqStack[0]; t.cardName = eqStack[0].name; }
+        continue;
+      }
+      if (stack.length <= 1) {
+        const eqChoice = await this.promptGeneric(playerIdx, {
+          type: 'instancePick',
+          title: 'Equipped Artifacts',
+          description: 'These Artifacts share one Support Zone — choose which one you mean.',
+          instances: eqStack.map(i => require('./_equip-stack-shared').beschreibe(this, i)),
+          cancellable: false,
+        });
+        const gewaehlt = (eqChoice && eqChoice.instId) ? eqStack.find(i => i.id === eqChoice.instId) : null;
+        t.cardInstance = gewaehlt || eqStack[eqStack.length - 1];
+        t._cardInstance = t.cardInstance;
+        t.cardName = t.cardInstance.name;
+        continue;
+      }
 
       const choice = await this.promptGeneric(playerIdx, {
         type: 'instancePick',
@@ -32915,6 +32938,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // bleiben. Das ist das bisherige Verhalten und nie schlechter als
       // ein abgebrochener Effekt.
       t.cardInstance = wanted || stack[stack.length - 1];
+      t._cardInstance = t.cardInstance;   // Skripte, die ihre Ziele mit `_cardInstance` sammeln (The Yeeting …), lesen diese Form
       t.cardName = t.cardInstance.name;
     }
     return pickedIds;
@@ -46912,6 +46936,19 @@ this._deathWatch = (this._deathWatchStack || []).length
       for (let si = 0; si < zonen.length; si++) {
         const slot = zonen[si] || [];
         if (slot.length === 0) continue;
+        // ★ Darion: ein Platz mit MEHREREN Equips — ein Ziel je Platz, dahinter alle Equips, die den Filter erfuellen (`_erlaubteInstanzen`; die Rueckfrage
+        // „welches?" stellt `_disambiguateStackedTargets`).
+        const eqStapel = slot.length > 1 ? require('./_equip-stack-shared').equipsAt(this, playerIdx, hi, si) : [];
+        if (eqStapel.length > 1) {
+          const passend = eqStapel.filter(i => !opts.cardName || i.name === opts.cardName);
+          if (passend.length === 0) continue;
+          out.push({
+            id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx,
+            heroIdx: hi, slotIdx: si, cardName: passend[0].name, cardInstance: passend[0],
+            _erlaubteInstanzen: passend.map(i => i.id),
+          });
+          continue;
+        }
         const inst = this.kreaturAnBrett(playerIdx, hi, si);   // Z1: Brettseite
         // Zaehlt hier als Ability -> KEIN Artifact-Ziel.
         if (this.countsAsAbilityInZone(slot[0], inst || { zone: 'support' })) continue;
@@ -48818,9 +48855,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       for (let zi = 0; zi < (sps.supportZones[hi] || []).length; zi++) {
         const slot = (sps.supportZones[hi] || [])[zi] || [];
         if (slot.length === 0) continue;
-        const cardName = slot[0];
-        const inst = this.kreaturAnBrett(seite, hi, zi);   // Z1: Brettseite
+        // ★ Darion: ein Platz mit mehreren Equips — JEDES Equip ist einzeln aktivierbar (Eintrag mit eigener `instId`).
+        const _eqStapel = slot.length > 1 ? require('./_equip-stack-shared').equipsAt(this, seite, hi, zi) : [];
+        const _kandidaten = _eqStapel.length > 1 ? _eqStapel : [this.kreaturAnBrett(seite, hi, zi)];   // Z1: Brettseite
+        for (const inst of _kandidaten) {
         if (!inst || inst.faceDown) continue;
+        const cardName = inst.name;
 
         // ★ Geliehene Identitaet: eine Karte kann Ausruestung SEIN,
         // ohne so zu heissen (Future Tech Copy Device). Das Skript
@@ -48856,6 +48896,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           owner: seite, heroIdx: hi, zoneSlot: zi,
           cardName, canActivate, exhausted, instId: inst.id,
         });
+        }
       }
     }
 

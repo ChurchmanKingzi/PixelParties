@@ -89,7 +89,8 @@ module.exports = {
         heldenSperreFreigeben(gs, HOPT, pi);
         return;
       }
-      engine._broadcastEvent('card_reveal', { cardName: CARD_NAME, playerIdx: pi });
+      engine._broadcastEvent('play_zone_animation', { type: 'atta_books', owner: feld, heroIdx, zoneSlot: -1, phase: 'delete' });
+      await engine._delay(700);
       vormerken(engine, {
         kind: 'atta', quelle: CARD_NAME, zugspieler: engine.opponentOf(pi),
         spellName: name, pileOwnerPi, castPi: pi, wirkerSeite: feld, heroIdx,
