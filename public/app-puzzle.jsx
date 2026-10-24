@@ -3574,6 +3574,10 @@ function PuzzleCreator() {
       tooltip: 'Stolen: this Creature is originally owned by the OTHER player (as if taken with Dark Gear). No badge — it only sets the original owner at puzzle start.' },
   ];
   const BUFF_LIST = [
+    // 24.10. (Spy in the Enemy's Camp): die Spionage-Marke an einer Kreatur. KEIN Status und kein Buff im Spiel (`counters._spyMask`, Bitmaske der Sitze) — der Editor legt sie mit
+    // `true` an, der Server macht daraus das Bit der ANDEREN Seite (die Gegenseite der Kreatur darf ihren aktiven Effekt in ihrem Zug benutzen).
+    { key: '_spyMask', label: '👁️ Spied On', color: '#77c8ee', scope: 'creature', alsStatus: true,
+      tooltip: "Spied on (Spy in the Enemy's Camp): the OTHER player may activate this Creature's active effect during their own turn as if they controlled it. Not a status effect — healing can't remove it; it lasts until the Creature leaves the board." },
     // ★ v1364 (Als Wunsch): Butterfly Clouds Schutz fuer Helden. Liegt im
     // Spiel als `statuses.untargetable` — deshalb `alsStatus`: der Knopf
     // schaltet den Status, nicht `buffs`.

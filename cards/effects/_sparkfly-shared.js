@@ -375,7 +375,10 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
   // das Verschwinden der Kreatur las der Schadens-Melder als tödlichen Treffer (Schadenszahl am alten Platz): `creature_zone_move` sperrt das. Folgt der Zustand dem Event,
   // fängt der Client die Quelle noch am echten Platz ab und blendet sie für den Flug aus.
   const istTokenKarte = !!engine.isTokenCard?.(targetInst);
-  const handPlatz = ps.hand.length;                       // der Platz, den die Karte auf der Hand einnimmt
+  // Der Platz, den die Karte auf der Hand einnimmt — gerechnet OHNE die gerade aufgelöste Karte (Kidnapping, Mine! …): sie liegt bis zum Ende der Auflösung noch in der Hand und verlässt
+  // sie gleich danach; die Flugkopie soll auf dem Platz der FERTIGEN Hand landen, sonst springt die echte Karte beim Eintreffen um einen Platz zur Seite.
+  const handBasis = engine._handIndizesOhneAufloesende ? engine._handIndizesOhneAufloesende(ps).length : ps.hand.length;
+  const handPlatz = handBasis;
   const zoneBekannt = ['support', 'ability', 'permanent', 'area', 'surprise'].includes(zone);   // sonst bricht es unten ohne Wirkung ab
   if (zone === 'support') engine._broadcastEvent('creature_zone_move', { owner, heroIdx, zoneSlot });
   if (zoneBekannt && !istTokenKarte) {
@@ -396,6 +399,7 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
       // instance's id, which the handler accepts as a permId match.
       fromPermId: targetInst.counters?.permId || targetInst.id,
       toHandIdx: handPlatz,
+      finalHandSize: handBasis + 1,
     });
   }
 

@@ -148,8 +148,7 @@ module.exports = {
       if (!noch) { engine.log('kidnapping_fizzle', { player: ps.username, creature: name }); engine.sync(); return; }
       const moved = await stealBoardCardToHand(engine, pi, noch, CARD_NAME);
 
-      // Halten, bis der Flug Zone → Hand beendet ist (~700 ms), damit der Zauber erst DANACH in die Ablage geht.
-      await engine._delay(moved ? 750 : 450);
+      // Kein Warten auf den Flug Zone → Hand (24.10., Al): der Zauber darf sofort in die Ablage; die fliegende Kopie räumt den Handplatz selbst frei, wenn sie landet (Client `onPileTransfer`).
       engine.log(moved ? 'kidnapping' : 'kidnapping_blocked', {
         player: ps.username, opponent: gs.players[oi]?.username, creature: name,
       });

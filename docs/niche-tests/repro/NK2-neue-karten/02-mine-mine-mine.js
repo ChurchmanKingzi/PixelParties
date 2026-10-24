@@ -44,14 +44,22 @@ const H = require('../../lib/h.js');
     R.check('keine Engine-Fehler, Audit sauber', t.errors.length === 0 && t.audit().length === 0, { e: t.errors, a: t.audit() });
   }
 
-  R.section('A2 · Flug Zone → Hand: Haltezeit über das Ende der fliegenden Kopie hinaus (Al: Kopie und echte Karte waren kurz beide sichtbar)');
+  R.section('A2 · Flug Zone → Hand: ohne Charme kein Warten (24.10.: die fliegende Kopie räumt den Handplatz selbst frei), mit Charme erst Ankunft, dann Anlegen');
   {
     const t = await frisch();
     const delays = [];
     const orig = t.engine._delay;
     t.engine._delay = async (ms) => { delays.push(ms); return orig(ms); };
     await spiele(t);
-    R.check('nach dem Wegnehmen wartet die Karte mindestens 900 ms (Flug 700 + Entfernen der Kopie 100 + Puffer), BEVOR sie die Hand verlässt', delays.some(ms => ms >= 900), delays);
+    R.check('ohne Charme: nach dem Wegnehmen wartet die Karte nicht auf den Flug (keine Pause ≥ 700 ms)', !delays.some(ms => ms >= 700), delays);
+  }
+  {
+    const t = await frisch(); charme(t, 1);
+    const delays = [];
+    const orig = t.engine._delay;
+    t.engine._delay = async (ms) => { delays.push(ms); return orig(ms); };
+    await spiele(t);
+    R.check('mit Charme: vor dem Anlegen kommt die Karte erst sichtbar an (Pause ≥ 700 ms)', delays.some(ms => ms >= 700), delays);
   }
 
   R.section('B · Charme 1+: Zusatzaktion, optionales Anlegen ohne Kosten');

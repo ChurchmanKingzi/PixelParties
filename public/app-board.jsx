@@ -44195,6 +44195,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       // Hide the landing hand slot until the flying card arrives so both
       // copies aren't simultaneously visible. Keyed by `${tgtOwner}-${idx}`.
+      // ★ 24.10. (kein Doppelbild beim Eintreffen): der Handplatz wird in dem Moment frei gegeben, in dem die fliegende Kopie LANDET (Startversatz + Flugdauer, s. unten
+      // `kopieEntfernen`), und die Kopie verschwindet erst nach dem Neuaufbau der Hand. Vorher stand der Platz bei festen 720 ms offen, die Kopie noch bis `Dauer + 100` ms —
+      // 80 ms, in denen Kopie und echte Karte (um einige Pixel versetzt) zugleich zu sehen waren. Die Kopie liegt bis zum Entfernen deckend über dem Platz.
+      let handFreigabe = null;
       if (to === 'hand' && toHandIdx != null) {
         const hideKey = `${tgtOwner}-${toHandIdx}`;
         setBounceReturnHidden(prev => {
@@ -44202,18 +44206,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           next.add(hideKey);
           return next;
         });
-        setTimeout(() => {
+        if (zielLayout) setAnkunftLeer(prev => { const next = new Set(prev); next.add(hideKey); return next; });
+        let frei = false;
+        handFreigabe = () => {
+          if (frei) return;
+          frei = true;
           setBounceReturnHidden(prev => {
             if (!prev.has(hideKey)) return prev;
             const next = new Set(prev);
             next.delete(hideKey);
             return next;
           });
-        }, 720); // Animation is 700ms; +20ms to avoid a visible flicker.
-        if (zielLayout) {
-          setAnkunftLeer(prev => { const next = new Set(prev); next.add(hideKey); return next; });
-          setTimeout(() => setAnkunftLeer(prev => { if (!prev.has(hideKey)) return prev; const next = new Set(prev); next.delete(hideKey); return next; }), 720);
-        }
+          if (zielLayout) setAnkunftLeer(prev => { if (!prev.has(hideKey)) return prev; const next = new Set(prev); next.delete(hideKey); return next; });
+        };
+        setTimeout(handFreigabe, 3200);   // Notnagel: bricht der Flug unterwegs ab, wird spätestens hier aufgedeckt
       }
 
       // Mirror for hand → support: hide the destination support-slot's
@@ -44890,9 +44896,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
         }, 40);
       }
+      // Landet die Kopie auf der Hand: Platz frei geben und die Kopie im selben Takt entfernen (ohne `flushSync`: zwei Bilder später).
+      // Alle anderen Ziele behalten die alte Haltezeit.
+      const kopieEntfernen = (nach) => {
+        if (!handFreigabe) { setTimeout(() => card.remove(), nach + 100); return; }
+        setTimeout(() => {
+          // `flushSync`: der Platz ist im DOM wieder da, BEVOR die Kopie weggenommen wird — beides im selben Takt, kein Bild mit beiden und keins mit keinem.
+          if (ReactDOM.flushSync) { ReactDOM.flushSync(handFreigabe); card.remove(); }
+          else { handFreigabe(); requestAnimationFrame(() => requestAnimationFrame(() => card.remove())); }
+        }, nach);
+        setTimeout(() => card.remove(), nach + 700);   // Notnagel (Hintergrund-Tab: keine Bildfolge)
+      };
       const spawnFlight = () => {
         (_welt.welt && window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(card);
-        setTimeout(() => card.remove(), durationMs + 100);
+        kopieEntfernen(durationMs);
       };
       if (laneDelay > 0) {
         // ★ IMMER sofort einhaengen und nur die ANIMATION verzoegern
@@ -44908,7 +44925,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // nirgends. Brett-Quellen machten das laengst so; jetzt alle.
         card.style.animationDelay = laneDelay + 'ms';
         document.body.appendChild(card);
-        setTimeout(() => card.remove(), laneDelay + durationMs + 100);
+        kopieEntfernen(laneDelay + durationMs);
       } else spawnFlight();
     };
     socket.on('play_pile_transfer', onPileTransfer);

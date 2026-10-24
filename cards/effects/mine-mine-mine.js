@@ -33,7 +33,7 @@ const { istAusruestTraeger, freieBasisZonen, waehleAusruestPlatz, ruesteAusStape
 
 const CARD_NAME = 'Mine! Mine! Mine!';
 const CHARME = 'Charme';
-const FLUG_HALTEZEIT_MS = 950;   // Flug 700 ms + Entfernen der fliegenden Kopie (+100 ms) + Puffer, bevor die Auflösung weiterläuft und die Karte die Hand verlässt
+const FLUG_HALTEZEIT_MS = 750;   // nur VOR dem Anlegen per Charme: die Karte soll sichtbar auf der Hand ankommen (Flug 700 ms), bevor sie von dort zum Helden fliegt
 
 /** Hat der Nutzer (Brettseite `seite`, Held `heroIdx`) Charme in mindestens Stufe 1? */
 function hatCharme(engine, seite, heroIdx) {
@@ -166,10 +166,9 @@ module.exports = {
         player: ps.username, opponent: gs.players[oi]?.username, card: name, hero: tragerHeld?.name,
       });
       if (!moved) { engine.sync(); return; }
-      // Der Flug Zone → Hand läuft ab (700 ms Flug + 100 ms bis die fliegende Kopie entfernt ist), bevor es weitergeht. ★ 23.10. (Al: „die animierte Karte und die Karte, die dann auf der Hand
-      // bleibt, sind kurz beide sichtbar"): Mine! Mine! Mine! selbst liegt während der Auflösung noch in der Hand und verlässt sie erst NACH dem Effekt — wäre das schon bei ~750 ms, rückte die
-      // Hand zusammen, während die Kopie noch über dem alten Platz stand und der Platz der echten Karte sich verschob. Deshalb die Haltezeit über das Kopien-Ende hinaus.
-      await engine._delay(FLUG_HALTEZEIT_MS);
+      // Ohne Anlegen kein Warten (24.10., Al): die fliegende Kopie räumt den Handplatz selbst frei, sobald sie landet (Client `onPileTransfer`). Nur vor dem Anlegen per Charme soll die Karte
+      // erst sichtbar auf der Hand ankommen, bevor sie von dort zum Helden fliegt.
+      if (hatCharme(engine, heroSeite, heroIdx)) await engine._delay(FLUG_HALTEZEIT_MS);
 
       // ── 3. Charme 1+: gleich beim Nutzer anlegen (optional, ohne Kosten) ──
       if (!hatCharme(engine, heroSeite, heroIdx)) return;
