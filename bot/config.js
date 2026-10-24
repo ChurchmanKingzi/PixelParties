@@ -48,6 +48,12 @@ const num = (k, d) => { const n = Number(env(k)); return Number.isFinite(n) && e
 const list = (k, d = []) => (env(k) ? env(k).split(',').map(s => s.trim()).filter(Boolean) : d);
 const flag = (k, d = false) => (env(k) === '' ? d : /^(1|true|yes|on)$/i.test(env(k)));
 
+// Kanal „new-cards“. Fest im Code; eine Variable NEW_CARDS_CHANNEL_ID in der .env wird ignoriert (und beim Start gemeldet, wenn sie abweicht).
+const NEW_CARDS_CHANNEL_ID = '774670375303905291';
+if (process.env.NEW_CARDS_CHANNEL_ID && process.env.NEW_CARDS_CHANNEL_ID !== NEW_CARDS_CHANNEL_ID) {
+  console.warn(`[config] NEW_CARDS_CHANNEL_ID=${process.env.NEW_CARDS_CHANNEL_ID} in der .env wird ignoriert — der Kanal für neue Karten ist fest ${NEW_CARDS_CHANNEL_ID}.`);
+}
+
 const config = {
   token: env('DISCORD_TOKEN'),
   clientId: env('DISCORD_CLIENT_ID', '765902004160692245'),
@@ -67,7 +73,8 @@ const config = {
   channels: {
     welcome: env('WELCOME_CHANNEL_ID'),          // leer: Systemkanal des Servers
     modlog: env('MODLOG_CHANNEL_ID'),
-    newCards: env('NEW_CARDS_CHANNEL_ID', '774670375303905291'),   // neue Karten als Bilder (ohne .env-Eintrag gilt dieser)
+    // Neue Karten als Bilder: FEST eingetragen, bewusst NICHT per .env überschreibbar (ein alter oder falscher Eintrag NEW_CARDS_CHANNEL_ID in der .env hatte den Feed ins Leere geschickt).
+    newCards: NEW_CARDS_CHANNEL_ID,
     patchnotes: env('PATCHNOTES_CHANNEL_ID'),
     leaderboard: env('LEADERBOARD_CHANNEL_ID'),
     cardOfDay: env('CARD_OF_DAY_CHANNEL_ID'),

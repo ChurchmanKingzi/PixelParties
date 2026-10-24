@@ -2,7 +2,7 @@
 // ═══════════════════════════════════════════════════════════════════
 //  Feeds
 //   • Neue Karten: ändert sich data/cards.json (z. B. nach einem Deploy), postet der Bot die neuen
-//     Karten in NEW_CARDS_CHANNEL_ID — je Karte eine Nachricht mit dem Kartenbild und der Tagline „**New card beep-boop:**“.
+//     Karten in den festen Kanal config.channels.newCards (774670375303905291) — je Karte eine Nachricht mit dem Kartenbild und der Tagline „**New card beep-boop:**“.
 //   • Patchnotes: Karten, deren Eintrag in data/cards.json sich seit dem letzten Stand VERÄNDERT hat (Text, Werte, Kosten …),
 //     als Bilder in PATCHNOTES_CHANNEL_ID — keine Commit-Texte. Ganz neue Karten gehören in den Neue-Karten-Feed.
 //   • Bugfixes: inhaltliche Änderungen an bestehenden Karten-Skripten (cards/effects/*.js) und gemeinsamen Bausteinen für Wechselwirkungen
@@ -21,7 +21,7 @@ const NEW_CARD_TAGLINE = '**New card beep-boop:**';
 const PER_MESSAGE = 10;
 // Einmal-Zurücksetzung (siehe pollCards): Mind Control, Mine! Mine! Mine!, Secret Entrance, See through the Ruse, Spy in the Enemy's Camp.
 const WELLE_ZURUECK = {
-  key: 'reset_welle_2026_10_24',
+  key: 'reset_welle_2026_10_24b',
   karten: ['Mind Control', 'Mine! Mine! Mine!', 'Secret Entrance', 'See through the Ruse', "Spy in the Enemy's Camp"],
 };
 

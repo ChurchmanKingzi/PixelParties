@@ -229,7 +229,7 @@ Nur im Minigames-Kanal (fest eingestellt auf `1561796630762623036`; andere Kanä
 
 ### Feeds und Gemeinschaft
 * **Neue Karten:** Ändert sich `data/cards.json` (z. B. durch ein Deploy), postet der Bot jede neue Karte (mit Kartenbild) als eigene Nachricht — nur das Bild
-  mit der Tagline `**New card beep-boop:**` — in den Kanal für neue Karten (Standard `774670375303905291`, überschreibbar mit `NEW_CARDS_CHANNEL_ID`).
+  mit der Tagline `**New card beep-boop:**` — in den Kanal für neue Karten (**fest** `774670375303905291`; eine Variable `NEW_CARDS_CHANNEL_ID` in der `.env` wird ignoriert und beim Start gemeldet).
   Der allererste Lauf merkt sich nur den Bestand. Eine neue Karte erscheint erst, wenn ihr Kartenbild vorhanden ist (`data/card-art/index.json`).
   **Nichts geht still verloren:** Karten gelten erst als „bekannt“, wenn die Nachricht wirklich gesendet wurde. Ist der Kanal nicht erreichbar (falsche ID, dem Bot fehlen
   *View Channel* / *Send Messages* / *Attach Files*) oder scheitert das Senden, bleiben die Karten offen, der Bot versucht es bei jedem Lauf erneut und meldet das Problem **einmal je Fehler**
