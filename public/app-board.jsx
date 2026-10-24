@@ -10154,6 +10154,99 @@ const BatBiteDrainEffect = (() => {
   return ppPunktFlug(malen, ENDE + 40, vorbereiten);
 })();
 
+// ═════════════════════════════════════════════════════════════════
+//  Hot Skull Potato: Wurf in eine andere Zone (`hot_potato_throw`, Brett-Zweig mit `targets` = [von, nach]) — PIXELART; Vorlage: das Kartenbild (Kartoffel mit Totenkopf und brennender Lunte)
+//
+//  Die Kartoffel (11×10, doppelt gezeichnet, vier Stellungen: Vorderseite, Seite, Rückseite, Seite) hüpft aus der alten Zone, fliegt in einem Bogen in ganzen Pixelschritten zur neuen (0–820 ms) und dreht sich
+//  dabei im Bildtakt; die Lunte sprüht Funken, hinter ihr bleibt ein Dither-Rauchschweif. Beim Aufprall (820 ms) ein Staubring aus Pixeln und ein oranges Kreuzfunkel. Ab ~1100 ms fort.
+//  Die Karte selbst liegt während des Flugs in keiner Zone (die Engine setzt sie erst nach dem Flug um). Feste Palette, kein Leuchten.
+// ═════════════════════════════════════════════════════════════════
+const HotPotatoThrowEffect = (() => {
+  const P = { d: ppHex('#291f3d'), b: ppHex('#9d612f'), l: ppHex('#ca874e'), w: ppHex('#ebdcc1'), k: ppHex('#3e3e51'), f: ppHex('#6e4421') };
+  const VORNE = [
+    '....f......',
+    '....f......',
+    '..ddddddd..',
+    '.dbllllbbd.',
+    'dbbwwwwwbbd',
+    'dbwkkwkkwbd',
+    'dbwkkwkkwbd',
+    'dbbwwkwwbbd',
+    '.dbwkwkwbd.',
+    '..ddddddd..',
+  ];
+  const SEITE = [
+    '....f......',
+    '....f......',
+    '...ddddd...',
+    '..dbllbbd..',
+    '.dbbllbbbd.',
+    '.dbbbbbbbd.',
+    '.dbbbbbbbd.',
+    '.dbbbbbbbd.',
+    '..dbbbbbd..',
+    '...ddddd...',
+  ];
+  const HINTEN = [
+    '....f......',
+    '....f......',
+    '..ddddddd..',
+    '.dbllllbbd.',
+    'dbllbbbbbbd',
+    'dbbbbbbbbbd',
+    'dbbbblbbbbd',
+    'dbbbbbbbbbd',
+    '.dbbbbbbbd.',
+    '..ddddddd..',
+  ];
+  const STELLUNG = [VORNE, SEITE, HINTEN, SEITE];
+  const FLUG = 820, ENDE = 1150;
+  const FUNKE = [ppHex('#ffffff'), ppHex('#f8ca21'), ppHex('#ff8b1a'), ppHex('#e92f38')];
+  const RAUCH = [ppHex('#3e3e51'), ppHex('#291f3d')];
+  const vorbereiten = () => ({
+    funken: Array.from({ length: ppFxN(26) }, () => ({ start: Math.random() * (FLUG - 80), w: -Math.PI / 2 + (Math.random() - 0.5) * 2.6, v: 10 + Math.random() * 22, farbe: FUNKE[1 + Math.floor(Math.random() * 3)] })),
+    staub: Array.from({ length: 12 }, (_, i) => ({ w: (i / 12) * Math.PI * 2 + Math.random() * 0.4, v: 16 + Math.random() * 16 })),
+  });
+  const malen = (g, t, geo, teile) => {
+    const A = geo.a, B = geo.b;
+    const aus = t > ENDE - 150 ? Math.max(0, 1 - (t - (ENDE - 150)) / 150) : 1;
+    if (aus <= 0) return;
+    const dist = Math.hypot(B.x - A.x, B.y - A.y);
+    const qx = (A.x + B.x) / 2, qy = Math.min(A.y, B.y) - 16 - dist * 0.28;
+    const pos = (u) => ({ x: (1 - u) * (1 - u) * A.x + 2 * (1 - u) * u * qx + u * u * B.x, y: (1 - u) * (1 - u) * A.y + 2 * (1 - u) * u * qy + u * u * B.y });
+    const ease = (f) => f * f * (3 - 2 * f);
+    const f = Math.min(1, t / FLUG);
+    if (t < FLUG + 60) {
+      // Rauchschweif (Dither), Funken der Lunte
+      for (let s = 1; s <= 7; s++) {
+        const q = pos(Math.max(0, ease(f) - s * 0.045));
+        if (s * 0.045 > ease(f) + 0.0001) break;
+        g.block(Math.round(q.x) - 2, Math.round(q.y) - 2, 5, 5, RAUCH[s > 3 ? 1 : 0], aus * (0.62 - s * 0.07));
+      }
+      const p = pos(ease(f));
+      const X = Math.round(p.x), Y = Math.round(p.y);
+      const bild = STELLUNG[Math.floor(t / 100) % 4];                                   // jedes Spritepixel als 2×2 (22×20 Rasterpixel)
+      for (let j = 0; j < bild.length; j++) for (let i = 0; i < bild[j].length; i++) { const c = P[bild[j][i]]; if (c) g.block(X - 11 + i * 2, Y - 10 + j * 2, 2, 2, c, aus); }
+      // brennende Lunte: oben links, flackernde Spitze
+      const fl = Math.floor(t / 66) % 3;
+      g.block(X - 5, Y - 15 - (fl === 0 ? 2 : 0), 3, 3, FUNKE[1 + fl], aus);
+      g.block(X - 4, Y - 16 - (fl === 0 ? 2 : 0), 1, 2, FUNKE[0], aus);
+      for (const fk of teile.funken) {
+        const tt = (t - fk.start) / 1000;
+        if (tt < 0 || tt > 0.42) continue;
+        const hp = pos(ease(Math.min(1, fk.start / FLUG)));
+        g.put(hp.x - 4 + Math.cos(fk.w) * fk.v * tt * 1.6, hp.y - 15 + Math.sin(fk.w) * fk.v * tt * 1.6 + tt * tt * 50, fk.farbe, aus * (tt > 0.3 ? 0.5 : 1));
+      }
+    }
+    if (t >= FLUG && t < FLUG + 280) {                                                  // Aufprall: Staubring + Kreuzfunkel
+      const tt = (t - FLUG) / 1000;
+      for (const d of teile.staub) g.block(Math.round(B.x + Math.cos(d.w) * d.v * tt * 3), Math.round(B.y + 10 + Math.sin(d.w) * d.v * tt * 1.2), 3, 3, RAUCH[0], aus * (t > FLUG + 160 ? 0.5 : 1));
+      ppKreuzfunkel(g, B.x - 1, B.y - 1, Math.min(4, Math.floor((t - FLUG) / 50) + 1), [FUNKE[0], FUNKE[1], FUNKE[2], FUNKE[3]], aus);
+    }
+  };
+  return ppPunktFlug(malen, ENDE + 40, vorbereiten);
+})();
+
 const ANIM_REGISTRY = {
   // ── Kernschlag ueber dem ganzen Brett (Doomsday Bomb, v580) ───────
   // [Als Vorgabe 22.8.: „Eine zentrale, gewaltige Explosion in der
@@ -18633,6 +18726,7 @@ const ANIM_REGISTRY = {
   hot_potato_blast: HotPotatoBlastEffect,
   leafagami_leaves: LeafagamiLeavesEffect,
   bat_bite_drain: BatBiteDrainEffect,
+  hot_potato_throw: HotPotatoThrowEffect,
   arcane_eyes_open: ArcaneEyesOpenEffect,
   hockey_wish: HockeyWishEffect,
   pinaxolotl_bubbles: PinaxolotlBubblesEffect,
