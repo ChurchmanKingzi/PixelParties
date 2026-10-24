@@ -131,9 +131,12 @@ def _arm_masks():
         others = alpha & ~line & ~core
         def near(mask, y, x):
             return mask[max(0, y - 1):y + 2, max(0, x - 1):x + 2].any()
-        outline = {(y, x) for y in range(SH) for x in range(SW)
-                   if line[y, x] and near(core, y, x) and not near(others, y, x)}
-        out[side] = sorted({(y, x) for y, x in zip(*np.nonzero(core))} | outline)
+        excl = {(y, x) for y in range(SH) for x in range(SW) if line[y, x] and near(core, y, x) and not near(others, y, x)}
+        core_px = sorted((int(y), int(x)) for y, x in zip(*np.nonzero(core)))
+        # Umriss relativ zu jedem Kernpixel: in welchen der vier Richtungen liegt ein Umrisspixel? (auch die mit Kleid/Polster/Haar geteilten)
+        rel = [(y, x, dy, dx) for (y, x) in core_px for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1))
+               if 0 <= y + dy < SH and 0 <= x + dx < SW and line[y + dy, x + dx]]
+        out[side] = {'core': core_px, 'rel': rel, 'clear': sorted(set(core_px) | excl)}
     return out
 
 
@@ -192,16 +195,24 @@ def body_layer(i):
             out[y, lo:hi + 1] = np.where(seg[lo:hi + 1, 3:4] > 0, seg[lo:hi + 1], out[y, lo:hi + 1])
     # 2) Arme schlackern seitwärts, jeder Arm als Einheit (Ärmel samt Hand und äußerem Umriss, siehe ARMS) um die Schulter: die obersten Zeilen
     #    bewegen sich kaum, die Hand am weitesten (Scherung ≈ Drehung), und die unteren Zeilen hängen dem Schwung leicht hinterher (Pendel).
+    #    Der Umriss wird mit jedem Kernpixel mitgenommen (in den Richtungen, in denen er im Original lag), damit er in keinem Frame Lücken hat.
     #    Ein Schwung je 16 Frames (≈ 1,1 s) auf flacher Ellipse (seitlich plus 0–1 Zeile senkrecht), die Form des Arms ändert sich in jedem Frame.
     #    Nach außen bis 3 px, nach innen bis 2 px. Das Kleid bleibt stehen; wo der Arm war, scheinen die Flügel dahinter durch.
+    LINE = (0x6f, 0x1a, 0x13, 255)
+    dy = arm_dy(i)
     for side in (-1, 1):
-        px_ = {(y, x): out[y, x].copy() for y, x in ARMS[side]}
-        for (y, x) in px_:
+        arm = ARMS[side]
+        colors = {(y, x): out[y, x].copy() for y, x in arm['core']}
+        for (y, x) in arm['clear']:                                    # nur Kern und eigener Umriss; der mit dem Kleid geteilte Umriss bleibt stehen
             out[y, x] = 0
-        dy = arm_dy(i)
-        for (y, x), c in px_.items():
-            dx = max(-2, min(3, int(round(arm_swing(y, i)))))
-            out[y + dy, x + side * dx] = c
+        shift = {y: max(-2, min(3, int(round(arm_swing(y, i))))) for y in range(SH)}
+        moved = {(y + dy, x + side * shift[y]): c for (y, x), c in colors.items()}
+        for (y, x, ddy, ddx) in arm['rel']:                            # Umriss mit jedem Kernpixel mitnehmen: lückenlos, auch bei Scherung
+            cell = (y + dy + ddy, x + side * shift[y] + ddx)
+            if cell not in moved:
+                out[cell] = LINE
+        for cell, c in moved.items():
+            out[cell] = c
     # 3) Saum schwingt
     for y in range(48, 56):
         dx = int(round(math.sin(ph - 2.2 - 0.3 * (y - 47)) * (y - 47) / 7.0 * 1.2))
