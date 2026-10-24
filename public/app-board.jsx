@@ -401,7 +401,10 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
           setBoardTooltip(tooltipTarget);
         }, window.LONG_PRESS_MS || 400);
       }}>
-      <CardFoil card={card} skin={window.skinOfUrl ? window.skinOfUrl(imgUrl) : null} />
+      <CardFoil card={card} skin={window.skinOfUrl ? window.skinOfUrl(imgUrl) : null}
+        werte={(ohneGedruckt.length || handLevel != null || handCost != null) ? {
+          noHp: ohneGedruckt.includes('hp') || undefined, noAtk: ohneGedruckt.includes('atk') || undefined,
+          lv: handLevel != null ? handLevel : undefined, kost: handCost != null ? handCost : undefined } : null} />
       {faceDown ? (
         <img src="/cardback.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
       ) : imgUrl ? (

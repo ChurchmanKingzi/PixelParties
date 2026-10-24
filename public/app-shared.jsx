@@ -5984,19 +5984,23 @@ window.SkinHolo = SkinHolo;
  * Skin-Karten (`.skin-holo-name`), ohne Bild-Foil; in Grossansichten (>= 240 px) zusaetzlich als zweite Schicht der Glanz
  * auf allem uebrigen Text (`.skin-holo-text`). In Kleinansichten entfaellt sie — dort ist der Name nicht lesbar.
  */
-function FoilName({ card, tone, fkey }) {
+function FoilName({ card, tone, fkey, werte }) {
   const [ref, breit] = useEffektHuelle(ppEffektMin());
-  const [daten, setDaten] = useState(() => (card && window.CardRender && window.CardRender.nameCached(card)) || null);
+  // `werte`: Zahlen, die statt der gedruckten aufs Kartenbild kommen ({ hp, lv, kost, noHp, noAtk }) — die Maske des Glanzes bekommt dieselben,
+  // sonst glänzt die Schraffur auf dem gedruckten Wert statt auf dem sichtbaren.
+  const wk = werte ? JSON.stringify(werte) : '';
+  const [daten, setDaten] = useState(() => (card && window.CardRender && window.CardRender.nameCached(card, werte)) || null);
   useEffect(() => {
     let lebt = true;
     if (!card || !breit) return undefined;
-    const fertig = window.CardRender.nameCached(card);
+    const fertig = window.CardRender.nameCached(card, werte);
     if (fertig) { setDaten(fertig); return undefined; }
+    setDaten(null);
     window.CardImageShim.boot()
-      .then(() => window.CardRender.nameShimmerFor(card))
+      .then(() => window.CardRender.nameShimmerFor(card, werte))
       .then(d => { if (lebt) setDaten(d || null); });
     return () => { lebt = false; };
-  }, [card?.name, breit]);
+  }, [card?.name, breit, wk]);
   fkey = fkey || 'card:' + (card?.name || '');
   const phase = usePhase(fkey);
   // Auch der ÜBRIGE Text der Karte (Fähigkeitsfelder, Werte, Regeltext) bekommt den Glanz (Als Vorgabe 12.10.). Eigene Hülle mit
@@ -6088,7 +6092,7 @@ function FoilRim({ rim, fkey }) {
   );
 }
 
-function CardFoil({ card, foilType, skin }) {
+function CardFoil({ card, foilType, skin, werte }) {
   const type = foilType || card?.foil || null;
   const isFoil = type === 'secret_rare' || type === 'diamond_rare';
   const klein = useContext(FoilKleinContext);
@@ -6145,7 +6149,7 @@ function CardFoil({ card, foilType, skin }) {
         <FoilOverlay foilType={type} bands={meta.bands} motes={meta.motes}
           sparkles={meta.sparkles} shimmerOffset={meta.shimmerOffset} klein={klein} fkey={fkey} />
       )}
-      {foilSchicht && !klein && skinHoloAktiv() && <FoilName card={card} tone={type === 'diamond_rare' ? 'diamond' : 'gold'} fkey={fkey} />}
+      {foilSchicht && !klein && skinHoloAktiv() && <FoilName card={card} tone={type === 'diamond_rare' ? 'diamond' : 'gold'} fkey={fkey} werte={werte} />}
       {holoSkin && <SkinHolo skin={skin} fkey={fkey} />}
       {schraffur && <FoilHatch card={card} fkey={fkey} />}
       {rahmen && <FoilRim rim={rahmen} fkey={fkey} />}
@@ -8911,7 +8915,7 @@ function CardTooltipContent({ card, children, imageUrl }) {
             border: foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)'
                  : foilType === 'secret_rare' ? '2px solid rgba(250,213,74,.5)' : 'none'
           }} />
-          <CardFoil card={card} skin={skinOfUrl(imgUrl)} />
+          <CardFoil card={card} skin={skinOfUrl(imgUrl)} werte={bildHp != null ? { hp: bildHp } : null} />
         </div>
       )}
       <div>
