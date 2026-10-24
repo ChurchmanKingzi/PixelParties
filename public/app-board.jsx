@@ -8501,7 +8501,7 @@ const SOG_FLUG_MS = 820;
 //      `g`  Pinsel: put(x, y, farbe, deckung?)  block(x, y, w, h, farbe, deckung?)  ring(cx, cy, rx, ry, farbe, deckung?)
 //           disc(cx, cy, r, farbe, deckung?)   — alles in RASTERkoordinaten, Deckung < 1 = Bayer-gedithert
 //      `sz` { gw, gh, O: {x, y}, ziele: [{ x, y, w, h, len, selbst, dx, dy }], region: {x0, y0, w, h} | null, runde, wucht }   (`runde`: Zaehler des Ereignisses, Standard 1 — Duel;
-//           `wucht`: Staerke des Ereignisses 1..3, Standard 1 — Zira Racer: waechst mit Level und Schaden)
+//           `wucht`: Staerke des Ereignisses 1..3, Standard 1 — Zira Racer: waechst mit Level und Schaden; `mode`: Feld `mode` des Ereignisses oder null — Control Monitors: 'added' | 'rest')
 //           `region` = die optionale Flaeche (`regionBox`, z. B. eine ganze Brettseite), sonst `null`
 //           dx/dy = Einheitsrichtung Quelle → Ziel; `selbst` = die Quelle IST das Ziel (z. B. Assault Eagle waehlt sich selbst)
 //  Alle Ziele laufen im selben Takt — „gleichzeitig" ist Sache der Zeichenfunktion (gleiche Zeit, nicht gleiche Geschwindigkeit).
@@ -8514,7 +8514,7 @@ function ppSalve(malen, ende, vorbereiten, opts) {
   // von oben fallender Schild), wurde sonst an der Canvaskante abgeschnitten.
   // `opts.z` (12.10., Duel): Ebene des Canvas (Standard 10110, unter den Rammkarten auf 10120) — der Aufprall zweier Heldenkarten muss UEBER ihnen liegen.
   const S = 3, PAD = 60 + ((opts && opts.extra) || 0), TAKT = 33;
-  return function PixelSalveEffekt({ ox, oy, targetPoints, welt, regionBox, runde, wucht }) {
+  return function PixelSalveEffekt({ ox, oy, targetPoints, welt, regionBox, runde, wucht, mode }) {
     const cvs = useRef(null);
     const sz = useMemo(() => {
       if (typeof ox !== 'number' || typeof oy !== 'number' || !Array.isArray(targetPoints) || targetPoints.length === 0) return null;
@@ -8539,7 +8539,7 @@ function ppSalve(malen, ende, vorbereiten, opts) {
         return { x: q.x, y: q.y, w: p.w / S, h: p.h / S, len, selbst: len < 6,
           dx: len > 0.01 ? (q.x - o.x) / len : 0, dy: len > 0.01 ? (q.y - o.y) / len : -1 };
       });
-      return { links, oben, gw, gh, O: o, ziele, region, runde: runde || 1, wucht: Math.max(1, Math.min(3, Number(wucht) || 1)) };
+      return { links, oben, gw, gh, O: o, ziele, region, runde: runde || 1, wucht: Math.max(1, Math.min(3, Number(wucht) || 1)), mode: mode || null };
     }, []);
     const teile = useMemo(() => (sz && vorbereiten ? vorbereiten(sz) : null), [sz]);
     useEffect(() => {
@@ -8649,6 +8649,19 @@ function ppSprite(g, cx, cy, rows, pal, deckung) {
   for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const c = pal[rows[j][i]]; if (c) g.put(x0 + i, y0 + j, c, deckung); }
 }
 
+/** Deterministischer Zufall 0..1 aus drei Zahlen (Rauschen, das je Bild neu fällt, wenn `c` das Bild zählt). */
+function ppHash(a, b, c) { const x = Math.sin(a * 127.1 + b * 311.7 + (c || 0) * 74.7) * 43758.5453; return x - Math.floor(x); }
+/** Farbe aus einer Stufenleiter `pal` an der Stelle `s` (0 … pal.length-1); zwischen zwei Stufen wird mit dem Bayer-Raster gedithert, nie weich verlaufen. */
+function ppStufe(pal, s, X, Y) {
+  const n = pal.length - 1, v = Math.max(0, Math.min(n, s)), i = Math.min(n - 1, Math.floor(v));
+  return (v - i) > ppBayer(X, Y) ? pal[i + 1] : pal[i];
+}
+/** Linie in ganzen Rasterpixeln (Treppenstufen, kein Anti-Aliasing). */
+function ppLinie(g, x0, y0, x1, y1, c, a) {
+  const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
+  for (let i = 0; i <= n; i++) g.put(x0 + (x1 - x0) * (i / n), y0 + (y1 - y0) * (i / n), c, a);
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  PIXELART-BILDER AN EINEM PUNKT (23.10., Shimmering Dragonegg, Liquid Luck) — Vorlage: das jeweilige Kartenbild
 //  ACHTUNG Reihenfolge: die Paletten laufen beim Laden der Datei (`ppHex`, eine `const` weiter oben in dieser Datei) — dieser Block muss NACH `ppHex` stehen,
@@ -8658,15 +8671,15 @@ function ppSprite(g, cx, cy, rows, pal, deckung) {
 //  auf, auch im Welt-Feld): ein Canvas, ein Rasterpixel = 3 Bildschirmpixel (`image-rendering: pixelated`), feste Paletten, Bayer-Dithering statt Alpha,
 //  ~30 Bilder/s, KEIN Filter, KEIN Schein; die Wurzel trägt `data-pp-px="aus"` (die Grafik IST schon Pixelart).
 //    ppPunktBild(malen, ende, breite, hoehe, vorbereiten?) → Komponente
-//      malen(g, t, sz, teile): Pinsel `g` wie bei `ppSalve` (put/block); `sz` { gw, gh, cx, cy, hw, hh } in RASTERkoordinaten (cx/cy = Kartenmitte, hw/hh = halbe Karte)
+//      malen(g, t, sz, teile): Pinsel `g` wie bei `ppSalve` (put/block); `sz` { gw, gh, cx, cy, hw, hh, phase } in RASTERkoordinaten (cx/cy = Kartenmitte, hw/hh = halbe Karte; `phase` = Feld `phase` des Ereignisses oder null)
 // ═══════════════════════════════════════════════════════════════════
 function ppPunktBild(malen, ende, breite, hoehe, vorbereiten) {
   const S = 3, TAKT = 33;
-  return function PunktBildEffekt({ x, y, w, h }) {
+  return function PunktBildEffekt({ x, y, w, h, phase }) {
     const cvs = useRef(null);
     const sz = useMemo(() => {
       const gw = Math.ceil(breite / S), gh = Math.ceil(hoehe / S);
-      return { gw, gh, cx: gw / 2, cy: gh / 2, hw: ((w || 64) / S) / 2, hh: ((h || 90) / S) / 2 };
+      return { gw, gh, cx: gw / 2, cy: gh / 2, hw: ((w || 64) / S) / 2, hh: ((h || 90) / S) / 2, phase: phase || null };
     }, []);
     const teile = useMemo(() => (vorbereiten ? vorbereiten(sz) : null), []);
     useEffect(() => {
@@ -10281,6 +10294,10 @@ const HotPotatoThrowEffect = (() => {
     );
   };
 })();
+
+// Lebensdauer (ms) von Zonen-Animationen, die der Server OHNE `duration` schickt und die länger als die Standard-Sekunde laufen
+// (`onZoneAnim`: sonst wird das Bild nach 1000 ms abgeräumt). Ein `duration` im Ereignis geht vor.
+const ZONEN_ANIM_DAUER = { ghostly_warning: 1260, atta_books: 1400, darion_equip: 1060 };
 
 const ANIM_REGISTRY = {
   // ── Kernschlag ueber dem ganzen Brett (Doomsday Bomb, v580) ───────
@@ -28945,6 +28962,498 @@ const ANIM_REGISTRY = {
     return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
   })(),
   // ═══════════════════════════════════════════════════════════════════
+  //  Control Monitors — PIXELART, Brett-Animation (`zoneType: 'board'`, Hülle `ppSalve`; Vorlage: das Kartenbild — drei rote Monitore an der Steinwand, cyanfarbene Tränen)
+  //
+  //  Über dem Helden, bei dem die hinzugefügten Karten gelöscht werden (`targets[0]`), flackern drei rote Monitore auf (Rahmen, Scanlinien, Textzeilen / Fehlerbild /
+  //  „!!"-Balken wie im Kartenbild, gedithertes Flimmern, wandernder Fehlerstreifen); ein weißer Blitzstreifen fegt über jeden Schirm und löscht ihn (schwarz), dann
+  //  fällt der Monitor zur Linie und zum Punkt zusammen. `mode: 'rest'` (alle übrigen Karten): sechs Monitore in zwei Reihen. Dazu fallen drei cyanfarbene Tränen
+  //  vom Helden. Löschen bei ~800 ms (control-monitors.js wartet 900 ms); ENDE 1260 (`duration` 1300). Feste Palette, KEINE Unschärfe, KEIN Leuchten.
+  // ═══════════════════════════════════════════════════════════════════
+  control_monitors: (() => {
+    const RAHMEN = ['#141414', '#323232', '#59606e'].map(ppHex);              // außen schwarz, Blende, Lichtkante
+    const ROT = ['#ff8566', '#ef2929', '#b5171c', '#5b0102', '#3a0000'].map(ppHex);   // hell, Schirm, dunkler, Schatten, fast schwarz
+    const ROSA = ppHex('#f9b3b3'), MAG = ['#c80480', '#5a023a'].map(ppHex);
+    const WEISS = ppHex('#ffffff'), SCHWARZ = ppHex('#141414');
+    const TRAENE = ['#ffffff', '#08d3ef', '#1788bd'].map(ppHex);
+    const ENDE = 1260, LINIE = 90, FLIMMER = 260, FEGEN = 150, ZU = 110;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    // ── ein Monitor ──
+    const monitor = (g, t, cx, cy, mw, mh, art, i, t0, tLoesch) => {
+      const lt = t - t0, del = t - tLoesch, f = Math.floor(t / 33);
+      if (lt < 0 || del >= FEGEN + ZU) return;
+      const x0 = cx - Math.floor(mw / 2), y0 = cy - Math.floor(mh / 2), sw = mw - 4, sh = mh - 4;
+      const zeichneRahmen = (a) => {
+        for (let j = 0; j < mh; j++) for (let k = 0; k < mw; k++) {
+          const ring = Math.min(k, j, mw - 1 - k, mh - 1 - j);
+          if (ring === 0) g.put(x0 + k, y0 + j, RAHMEN[0], a);
+          else if (ring === 1) g.put(x0 + k, y0 + j, (k === 1 || j === 1) ? RAHMEN[2] : RAHMEN[1], a);
+        }
+      };
+      // Einschalten: weiße Linie wächst aus der Mitte, der Rahmen dithert herein
+      if (lt < LINIE) {
+        const k = lt / LINIE, w = Math.max(2, Math.round(mw * k));
+        zeichneRahmen(Math.max(0.25, k));
+        for (let n = 0; n < w; n++) g.put(cx - Math.floor(w / 2) + n, cy, WEISS);
+        return;
+      }
+      // Ausschalten: Bild fällt zur Linie, dann zum Punkt
+      if (del >= FEGEN) {
+        const k = (del - FEGEN) / ZU;
+        if (k < 0.6) {
+          const hh = Math.max(1, Math.round(mh * (1 - k / 0.6)));
+          for (let j = 0; j < hh; j++) for (let n = 0; n < mw; n++) {
+            const rand = j === 0 || j === hh - 1 || n === 0 || n === mw - 1;
+            g.put(x0 + n, cy - Math.floor(hh / 2) + j, rand ? RAHMEN[1] : SCHWARZ);
+          }
+          for (let n = 1; n < mw - 1; n++) g.put(x0 + n, cy, WEISS);
+        } else {
+          const w = Math.max(1, Math.round(mw * (1 - (k - 0.6) / 0.4)));
+          for (let n = 0; n < w; n++) g.put(cx - Math.floor(w / 2) + n, cy, WEISS);
+        }
+        return;
+      }
+      const flimmert = lt < FLIMMER;
+      if (flimmert && ppHash(i, f, 3) < 0.4) { zeichneRahmen(1); return; }          // Flimmerphase: Schirm fällt kurz aus
+      zeichneRahmen(1);
+      const fegt = del >= 0, px = fegt ? (del / FEGEN) * (sw + 7) - 4 : -99;
+      const bandY = Math.floor((t * 0.045 + i * 9) % (sh + 10)) - 5;
+      const streifen = !flimmert && (Math.floor(t / 110) + i) % 3 === 0;
+      for (let sy = 0; sy < sh; sy++) for (let sx = 0; sx < sw; sx++) {
+        const X = x0 + 2 + sx, Y = y0 + 2 + sy;
+        const d = sx - px;
+        let c;
+        if (fegt && d < -3) {                                                          // schon gelöscht: schwarz, ein paar rote Reste
+          g.put(X, Y, ppHash(sx + i * 17, sy, f) < 0.07 ? ROT[3] : SCHWARZ);
+          continue;
+        }
+        if (fegt && d < 0) { g.put(X, Y, d >= -2 ? WEISS : ROSA); continue; }          // der Blitzstreifen
+        if (art === 0) {                                                               // Textzeilen
+          c = ROT[1];
+          if (sy % 2 === 0 && ppHash(Math.floor((sx + i * 5) / 3), Math.floor(sy / 2) + Math.floor(t / 130), 1) > 0.42) c = ROSA;
+        } else if (art === 1) {                                                        // Fehlerbild: dunkler Himmel mit Zacke über magentafarbenem Grund
+          if (sy < sh * 0.5) {
+            c = ROT[3];
+            if (Math.abs(sx - (sw - 1) / 2) < (sh * 0.5 - sy) * 1.1) c = sy < sh * 0.22 ? ROT[0] : ROT[2];
+          } else c = (sy % 2 === 0) ? MAG[0] : MAG[1];
+        } else {                                                                       // „!!"-Balken
+          c = (sy >= sh * 0.6 && sy < sh * 0.8) ? ROT[2] : ROT[1];
+          if (sx % 4 === 1 && ((sy >= 1 && sy < sh - 3) || sy === sh - 2)) c = SCHWARZ;
+        }
+        g.put(X, Y, c);
+        if (sy % 2 === 1) g.put(X, Y, ROT[4], 0.3);                                    // Scanlinie (gedithert)
+        const pn = flimmert ? 0.22 : fegt ? 0.3 : 0.035;
+        if (ppHash(sx + i * 31, sy, f) < pn) { const r = ppHash(sy, sx, f + 7); g.put(X, Y, r > 0.6 ? WEISS : r > 0.3 ? ROSA : ROT[4]); }
+        if (streifen) { if (sy === bandY) g.put(X, Y, WEISS, 0.55); else if (sy === bandY + 1) g.put(X, Y, ROSA, 0.5); }
+      }
+    };
+    const malen = (g, t, sz) => {
+      const z = sz.ziele[0], rest = sz.mode === 'rest';
+      const mw = Math.round(klemme(z.w * 0.44, 12, 22)), mh = Math.round(mw * 0.72);
+      const n = rest ? 6 : 3, stein = rest ? 45 : 70, versatz = rest ? 38 : 45, tLoesch = rest ? 780 : 800;
+      const mitteY = z.y - z.h * (rest ? 0.1 : 0.12);
+      for (let i = 0; i < n; i++) {
+        const col = i % 3, row = Math.floor(i / 3);
+        const cx = Math.round(z.x + (col - 1) * (mw + 3));
+        const cy = Math.round(rest ? mitteY + (row - 0.5) * (mh + 3) : mitteY);
+        monitor(g, t, cx, cy, mw, mh, (i + row) % 3, i, i * stein, tLoesch + i * versatz);
+      }
+      // ── cyanfarbene Tränen laufen dem Helden über das Gesicht ──
+      for (let j = 0; j < 3; j++) {
+        const st = 140 + j * 170, k = (t - st) / 520;
+        if (k < 0 || k >= 1) continue;
+        const x = z.x + (j - 1) * 5 + (j === 1 ? 1 : 0), y = z.y - z.h * 0.04 + k * k * z.h * 0.42;
+        const a = k > 0.7 ? 1 - (k - 0.7) / 0.3 : 1;
+        g.put(x, y, TRAENE[1], a); g.put(x, y + 1, TRAENE[0], a); g.put(x, y - 1, TRAENE[2], a * 0.8);
+      }
+    };
+    return ppSalve(malen, ENDE, null, { extra: 24 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Celia, the Class Clown — PIXELART, Brett-Animation (`zoneType: 'board'`, Hülle `ppSalve`; Vorlage: das Kartenbild — das Mädchen mit der Kerzenkrone)
+  //
+  //  Über Celias Platz (`originOwner/-HeroIdx/-ZoneSlot`) flackern drei kleine Kerzenflammen; sie fliegen im Bogen zum Helden des gegnerischen Zaubers (`targets[0]`) und
+  //  setzen sich dort als drei Wachskerzen (Wachs wächst von unten, Flammen flackern in vier Stufen) wie eine Krone über seine Karte. Bei ~700 ms wächst eine vierte
+  //  Kerze, ein weißer Kreuzfunke zündet sie an (die Stufe steigt), ein Mini-„+1" steigt auf. Ab 900 ms dithert alles weg; ENDE 1100 (`duration` 1100, Wirkung nach 700 ms).
+  //  Ziffern sind Pixelsprites, keine Schrift. Feste Palette, KEINE Unschärfe, KEIN Leuchten.
+  // ═══════════════════════════════════════════════════════════════════
+  celia_candles: (() => {
+    const WACHS = ['#fff8e8', '#ccb799', '#a89370', '#6b4a2a'].map(ppHex);
+    const FL = { w: ppHex('#f8f8bd'), y: ppHex('#fbe181'), o: ppHex('#ff9b3a'), d: ppHex('#bd440f') };
+    const FUNKE = ['#ffffff', '#f8f8bd', '#fbe181', '#ff9b3a'].map(ppHex);
+    const RAND = ppHex('#6a1c14');
+    const ENDE = 1100, FADE_AB = 900;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    // Flammenbilder, 3 breit, 4 hoch (Spitze oben): gerade, links, rechts, hoch
+    const FLAMMEN = [
+      ['.o.', 'oyo', 'oyo', '.w.'],
+      ['o..', 'oyo', 'oyo', '.w.'],
+      ['..o', 'oyo', 'oyo', '.w.'],
+      ['.o.', '.oo', 'oyo', 'owo'],
+    ];
+    const flamme = (g, x, y, bild, a) => {                                  // (x, y) = linke obere Ecke
+      const rows = FLAMMEN[bild];
+      for (let j = 0; j < 4; j++) for (let i = 0; i < 3; i++) { const c = FL[rows[j][i]]; if (c) g.put(x + i, y + j, c, a); }
+    };
+    const kerze = (g, x, by, h, a) => {                                      // x = linke Spalte, by = unterste Zeile; h Zeilen Wachs
+      for (let j = 0; j < h; j++) {
+        g.put(x, by - j, WACHS[0], a); g.put(x + 1, by - j, j === h - 1 ? WACHS[0] : WACHS[1], a); g.put(x + 2, by - j, WACHS[2], a);
+      }
+      if (h > 0) g.put(x + 1, by - h, WACHS[3], a);                          // Docht
+    };
+    // Mini-Ziffern (3×5): „+" und „1"
+    const PLUS = ['...', '.#.', '###', '.#.', '...'], EINS = ['.#.', '##.', '.#.', '.#.', '###'];
+    const ziffer = (g, x, y, rows, c, a) => {
+      for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) if (rows[j][i] === '#') {
+        for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) g.put(x + i + dx, y + j + dy, RAND, a);
+      }
+      for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) if (rows[j][i] === '#') g.put(x + i, y + j, c, a);
+    };
+    const malen = (g, t, sz) => {
+      const z = sz.ziele[0], O = sz.O;
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const takt = Math.floor(t / 33);
+      const H = 8, basisY = Math.round(z.y - z.h * 0.16);
+      const bx = (k) => Math.round(z.x + (k - 1.5) * 8 - 1);                   // linke Spalte der Kerze k (0..3)
+      const by = (k) => basisY + Math.round(Math.abs(k - 1.5) * 2);
+      // ── Celias Krone: drei Flammen flackern über ihrem Platz, dann fliegen sie los ──
+      const FLUG_AB = 140, FLUG = 260, STAFFEL = 40;
+      for (let k = 0; k < 3; k++) {
+        const ab = FLUG_AB + k * STAFFEL, u = (t - ab) / FLUG;
+        const ax = O.x + (k - 1) * 5 - 1, ay = O.y - 9 - (k === 1 ? 1 : 0);
+        const tx = bx(k), ty = by(k) - H - 4;                                   // Landeplatz der Flamme (obere linke Ecke) über der Kerze
+        if (u < 0) { if (t < 700) flamme(g, ax, ay, (takt + k) % 3, Math.min(aus, klemme(t / 90, 0, 1))); continue; }
+        if (u < 1) {
+          const e = u * u * (3 - 2 * u);
+          const px = ax + (tx - ax) * e, py = ay + (ty - ay) * e - Math.sin(e * Math.PI) * 12;
+          for (let s = 4; s >= 1; s--) {                                         // Funkenschweif
+            const e2 = Math.max(0, e - s * 0.05);
+            g.put(ax + (tx - ax) * e2 + 1, ay + (ty - ay) * e2 - Math.sin(e2 * Math.PI) * 12 + 2, FUNKE[Math.min(3, s)], aus * (1 - s / 5));
+          }
+          flamme(g, px, py, (takt + k) % 3, aus);
+          continue;
+        }
+        // ── gelandet: Wachs wächst von unten, die Flamme sitzt oben darauf ──
+        const lg = klemme((t - (ab + FLUG)) / 120, 0, 1), h = Math.round(H * lg);
+        kerze(g, bx(k), by(k), h, aus);
+        flamme(g, bx(k), by(k) - h - 4, (takt + k * 2) % 4, aus);
+      }
+      // ── die vierte Kerze: wächst, wird angezündet, „+1" steigt auf ──
+      const T4 = 700;
+      if (t >= T4) {
+        const lg = klemme((t - T4) / 100, 0, 1), h = Math.round(H * lg);
+        kerze(g, bx(3), by(3), h, aus);
+        const zund = t - (T4 + 90);
+        if (zund >= 0) flamme(g, bx(3), by(3) - h - 4, zund < 66 ? 3 : (takt + 1) % 4, aus);
+        if (zund >= 0 && zund < 200) ppKreuzfunkel(g, bx(3), by(3) - h - 4, [1, 3, 4, 3, 2, 1][Math.floor(zund / 34)] || 1, FUNKE, aus);
+        if (zund >= 20) {
+          const k = klemme((zund - 20) / 240, 0, 1), y = by(3) - h - 14 - Math.round(k * 6);
+          ziffer(g, bx(3) - 4, y, PLUS, FUNKE[2], aus); ziffer(g, bx(3) + 1, y, EINS, FUNKE[2], aus);
+        }
+      }
+    };
+    return ppSalve(malen, ENDE, null, { extra: 24 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Ghostly Warning — PIXELART, Zonen-Animation am Helden (Hülle `ppPunktBild`; Vorlage: das Kartenbild — der weißhaarige Geist in Purpur, die Explosionswolke)
+  //
+  //  Ohne `phase` (Zauber wird negiert): ein bleicher kleiner Geist (weißer Kopf, gelbe Augen, Purpurmantel, erhobene Hand) schwebt über dem Helden auf. Eine gedithert
+  //  orangegelbe Explosionswolke erscheint, wird in seine Hand eingesogen (schrumpft, Funken laufen hinein) und verschwindet in einem Blinken (~820 ms).
+  //  `phase: 'return'` (der verzögerte Zauber kehrt zurück): die Hand öffnet sich (~300 ms), die Wolke bricht daraus hervor, wächst und verpufft in grauen Rauchfetzen.
+  //  ENDE 1200 (Standard-Dauer 1260 über ZONEN_ANIM_DAUER). Feste Palette, KEINE Unschärfe, KEIN Leuchten.
+  // ═══════════════════════════════════════════════════════════════════
+  ghostly_warning: (() => {
+    const GEIST = {
+      k: ppHex('#141414'), H: ppHex('#fff8e8'), h: ppHex('#b9b9b9'), s: ppHex('#929292'), y: ppHex('#ffd61a'), r: ppHex('#e73b41'),
+      p: ppHex('#291f3d'), m: ppHex('#5a023a'), M: ppHex('#c80480'), w: ppHex('#ffffff'),
+    };
+    const WOLKE = ['#fffbd2', '#fbe181', '#ffd61a', '#ff9b3a', '#cf5f00', '#aa5300'].map(ppHex);
+    const FUNKEN = ['#ffffff', '#fbe181', '#ff9b3a', '#cf5f00'].map(ppHex);
+    const RAUCH = ['#d2d2db', '#9aa3b6', '#59606e'].map(ppHex);
+    const WEISS = ppHex('#ffffff');
+    const ENDE = 1200;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    // Geist 12 × 22: Kopf (Zeile 0–9) und Mantel (10–21); die Augen (y) blinken über `AUGEN_ZU`
+    const KOERPER = [
+      '...kkkkkk...',
+      '..kHHHHHHk..',
+      '.kHHHHHHHHk.',
+      '.kHHHHHHHhk.',
+      '.kHyyHHyyhk.',
+      '.kHyyHHyyhk.',
+      '.kHHHHHHHhk.',
+      '.kHHHrrHHhk.',
+      '..khhhrhhk..',
+      '...kssssk...',
+      '...kpwwpk...',
+      '..kppwwppk..',
+      '.kppppppppk.',
+      '.kpmppppmpk.',
+      '.kpMppppMpk.',
+      '.kpmppppmpk.',
+      '.kppppppppk.',
+      '.kpppmmpppk.',
+      '..kppppppk..',
+      '..kpk..kpk..',
+      '..kMk..kMk..',
+      '..kkk..kkk..',
+    ];
+    const GEIST_ZU = KOERPER.map(r => r.replace(/y/g, 'H'));
+    const malen = (g, t, sz) => {
+      const rueck = sz.phase === 'return';
+      const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
+      const ein = klemme(t / 220, 0, 1), aus = t > 1000 ? Math.max(0, 1 - (t - 1000) / 200) : 1;
+      const ga = Math.min(Math.floor(ein * 5) / 5, aus);                             // Geist: gestuftes Einblenden (Dithering), danach gestuftes Ausblenden
+      if (ga <= 0) return;
+      const gx = cx - Math.round(sz.hw * 0.1), gy = cy + Math.round(sz.hh * 0.14) - Math.round((1 - ein) * 4) + Math.round(Math.sin(t / 150));
+      ppSprite(g, gx, gy, (t % 2400 > 2300 || (t > 640 && t < 700)) ? GEIST_ZU : KOERPER, GEIST, ga);
+      // ── die erhobene Hand ──
+      const hx = gx + 10, hy = gy - 6 + Math.round(Math.sin(t / 170 + 1));
+      ppLinie(g, gx + 5, gy + 1, hx - 1, hy + 2, GEIST.p, ga); ppLinie(g, gx + 6, gy + 1, hx, hy + 3, GEIST.p, ga);
+      g.put(hx - 1, hy + 3, GEIST.M, ga); g.put(hx, hy + 3, GEIST.M, ga);
+      const faust = rueck ? t < 300 : t >= 820 && t < 1000;
+      const hand = (offen) => {
+        g.block(hx - 2, hy - 1, 5, 5, GEIST.k, ga);
+        g.block(hx - 1, hy, 3, 3, GEIST.w, ga);
+        if (offen) { g.put(hx - 2, hy - 2, GEIST.w, ga); g.put(hx, hy - 2, GEIST.w, ga); g.put(hx + 2, hy - 2, GEIST.w, ga); }
+      };
+      hand(!faust);
+      // ── die Wolke ──
+      const R0 = klemme(sz.hh * 0.44, 9, 17);
+      const C0 = { x: cx + sz.hw * 0.6, y: cy - sz.hh * 0.62 };                      // Wolke über dem Helden
+      const wolke = (wx, wy, R, a, hitze) => {
+        if (R < 0.8 || a <= 0) return;
+        const lobes = [[0, 0, 1], [-0.5, -0.12, 0.7], [0.5, -0.15, 0.72], [0.08, -0.52, 0.62]];
+        const Ri = Math.ceil(R * 1.7), mx = Math.round(wx), my = Math.round(wy);
+        for (let j = -Ri; j <= Ri; j++) for (let i = -Ri; i <= Ri; i++) {
+          const X = mx + i, Y = my + j;
+          let dd = 9;
+          for (const [ox, oy, rr] of lobes) dd = Math.min(dd, Math.hypot(X - (wx + ox * R), (Y - (wy + oy * R)) * 1.1) / (R * rr));
+          dd += (ppHash(X, Y, 1) - 0.5) * 0.22;
+          if (dd >= 1) continue;
+          const rand = dd > 0.82 ? 1 - (dd - 0.82) / 0.18 : 1;
+          g.put(X, Y, ppStufe(WOLKE, dd * 3.4 + hitze + Math.max(0, (Y - wy) / R) * 0.6, X, Y), rand * a);
+        }
+      };
+      if (!rueck) {
+        // Wolke ploppt auf (60–300), hält (bis 380), wird eingesogen (380–820)
+        if (t >= 60 && t < 820) {
+          let wx = C0.x, wy = C0.y, R = R0, hitze = 0;
+          if (t < 300) R = R0 * (0.25 + 0.75 * Math.pow((t - 60) / 240, 0.7));
+          else if (t >= 380) {
+            const u = (t - 380) / 440, e = u * u;
+            wx = C0.x + (hx - C0.x) * e; wy = C0.y + (hy + 1 - C0.y) * e; R = Math.max(1.2, R0 * (1 - e) + 1.2 * e); hitze = e * 2.2;
+            for (let s = 1; s <= 7; s++) {                                                // Sog: Funken laufen in die Hand
+              const e2 = Math.max(0, e - s * 0.07);
+              g.put(C0.x + (hx - C0.x) * e2 + Math.sin(s * 2.1 + t / 60) * R * 0.5, C0.y + (hy + 1 - C0.y) * e2 + Math.cos(s * 1.7) * R * 0.4, FUNKEN[Math.min(3, Math.floor(s / 2))], 1 - s / 8);
+            }
+          }
+          wolke(wx, wy, R, 1, hitze);
+        }
+        // Blinken an der Hand: die Wolke ist verschluckt
+        if (t >= 820 && t < 940) {
+          const f = Math.floor((t - 820) / 33);
+          if (f % 2 === 0) { g.block(hx - 2, hy - 1, 5, 5, WEISS); ppKreuzfunkel(g, hx - 1, hy, f === 0 ? 3 : 2, FUNKEN, 1); }
+          else g.put(hx, hy + 1, FUNKEN[1]);
+        }
+      } else {
+        // Faust glimmt (120–300), öffnet sich bei 300: weißer Blitz, die Wolke bricht hervor (300–640), verpufft (640–1050)
+        if (t >= 120 && t < 300) for (let s = 0; s < 5; s++) { const w = (s / 5) * Math.PI * 2 + t / 90; g.put(hx + Math.cos(w) * 3.4, hy + 1 + Math.sin(w) * 3, FUNKEN[2], 0.8); }
+        if (t >= 300 && t < 360) { const f = Math.floor((t - 300) / 33); g.block(hx - 3, hy - 2, 7, 7, f % 2 === 0 ? WEISS : FUNKEN[1]); }
+        if (t >= 300 && t < 1050) {
+          const u = klemme((t - 300) / 340, 0, 1), e = 1 - Math.pow(1 - u, 3);
+          const wx = hx + (C0.x - hx) * e, wy = hy + (C0.y - hy) * e;
+          const R = 1.5 + (R0 * 1.35 - 1.5) * e;
+          const ab = t > 640 ? 1 - (t - 640) / 410 : 1;
+          wolke(wx, wy, R, ab, 0.1 + (1 - ab) * 3.2);
+          if (t > 640) for (let s = 0; s < 6; s++) {                                      // Rauchfetzen
+            const k = klemme((t - 640 - s * 30) / 340, 0, 1);
+            if (k <= 0 || k >= 1) continue;
+            const w = (s / 6) * Math.PI * 2 + 0.5, rr = R * (0.7 + 0.6 * k);
+            g.block(wx + Math.cos(w) * rr, wy + Math.sin(w) * rr * 0.8 - k * 6, 2, 2, RAUCH[Math.min(2, Math.floor(k * 3))], 1 - k);
+          }
+        }
+        if (t >= 300 && t < 700) for (let s = 0; s < 8; s++) {                           // Funken stieben aus der Hand
+          const w = -Math.PI / 2 + (s - 3.5) * 0.4, v = 26 + (s % 3) * 12, sek = (t - 300) / 1000, k = (t - 300) / 400;
+          if (k < 1) g.put(hx + Math.cos(w) * v * sek, hy + Math.sin(w) * v * sek + 60 * sek * sek, FUNKEN[Math.min(3, Math.floor(k * 4))], 1 - k);
+        }
+      }
+    };
+    return ppPunktBild(malen, ENDE, 300, 340);
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Atta, Speaker of Desires — PIXELART, Zonen-Animation am Helden (Hülle `ppPunktBild`; Vorlage: das Kartenbild — vier aufgeschlagene Bücher mit roter, grüner,
+  //  blauer und oranger Kante schweben um das weißhaarige Mädchen)
+  //
+  //  `phase: 'delete'`: die vier Bücher blenden ein (gedithert), kreisen eine halbe Runde um den Helden; ab ~560 ms klappt das rote Buch zu (Kreuzblitz), und eine
+  //  Funkenspur wird aus der Karte in das Buch eingesogen (sie wird weggesperrt); ab ~1050 ms dithern die Bücher weg. `phase: 'return'`: die vier Bücher fliegen
+  //  zugeklappt von außen herbei (Schweif), schlagen nacheinander auf (~440 ms) und blitzen weiß auf (~640 ms), Funken stieben aus der Mitte. ENDE 1340
+  //  (Standard-Dauer 1400 über ZONEN_ANIM_DAUER). Feste Palette, KEINE Unschärfe, KEIN Leuchten.
+  // ═══════════════════════════════════════════════════════════════════
+  atta_books: (() => {
+    const SEITEN = { k: ppHex('#27180c'), P: ppHex('#e2d8cb'), q: ppHex('#a89370'), l: ppHex('#7f7f7f') };
+    const DECKEL = [['#e73b41', '#8c0014'], ['#20ac37', '#167927'], ['#6d9bf8', '#2f539d'], ['#ff9b3a', '#bd440f']].map(p => p.map(ppHex));   // rot, grün, blau, orange (im Uhrzeigersinn ab links oben)
+    const FUNKEN = ['#ffffff', '#fbe181', '#ac87de', '#7e41ba'].map(ppHex);
+    const WEISS = ppHex('#ffffff');
+    const ENDE = 1340, FADE_AB = 1050;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const OFFEN = [
+      'kkkkkkkkkkkkkkkk', 'kPPPPPPkkPPPPPPk', 'kPllPlPkkPlPllPk', 'kPPPPPPkkPPPPPPk', 'kPlPllPkkPllPlPk',
+      'kPPPPPPkkPPPPPPk', 'kqqqqqqkkqqqqqqk', 'CCCCCCCCCCCCCCCC', 'cccccccccccccccc',
+    ];
+    const HALB = [
+      '..kkkkkkkkkkkk..', '.kPPPPPkkPPPPPk.', '.kPlPPPkkPPPlPk.', '.kPPlPPkkPPlPPk.', 'kqqqqqqkkqqqqqqk', 'CCCCCCCCCCCCCCCC', 'cccccccccccccccc',
+    ];
+    const ZU = ['kkkkkkkkkkkkkkkk', 'kCCCCCCCCCCCCCCk', 'kPPPPPPPPPPPPPPk', 'kcccccccccccccck', 'kkkkkkkkkkkkkkkk'];
+    const BILDER = [ZU, HALB, OFFEN];
+    const buch = (g, x, y, farbe, offen, a, weiss) => {
+      const pal = { ...SEITEN, C: DECKEL[farbe][0], c: DECKEL[farbe][1] };
+      if (weiss) { pal.P = WEISS; pal.q = WEISS; }
+      ppSprite(g, x, y, BILDER[offen], pal, a);
+    };
+    const vorbereiten = (sz) => ({
+      funken: Array.from({ length: ppFxN(16) }, (_, i) => ({
+        w: Math.random() * Math.PI * 2, r: sz.hw * (0.3 + Math.random() * 0.9), ab: 470 + i * 11, dauer: 200 + Math.random() * 60, farbe: Math.floor(Math.random() * 4),
+      })),
+      burst: Array.from({ length: ppFxN(14) }, () => ({ w: Math.random() * Math.PI * 2, v: 24 + Math.random() * 46, leben: 260 + Math.random() * 160 })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const rueck = sz.phase === 'return';
+      const cx = sz.cx, cy = sz.cy;
+      const ein = klemme(t / (rueck ? 120 : 180), 0, 1), aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      const a = Math.min(Math.floor(ein * 5) / 5, aus);
+      if (a <= 0) return;
+      const rx = Math.max(sz.hw + 6, 22), ry = Math.max(sz.hh * 0.42, 16);
+      // Drehung der Bücher (nur beim Löschen: eine halbe Runde, sanft anlaufend)
+      const u = klemme((t - 100) / 660, 0, 1), dreh = rueck ? 0 : (u * u * (3 - 2 * u)) * Math.PI;
+      const pos = (k, aussen) => {
+        const w = -Math.PI * 0.75 + k * Math.PI / 2 + dreh, f = 1 + aussen;
+        return { x: cx + Math.cos(w) * rx * f, y: cy + Math.sin(w) * ry * f + Math.round(Math.sin(t / 160 + k * 1.6) * 1.2), tiefe: Math.sin(w) };
+      };
+      const reihe = [0, 1, 2, 3].map(k => {
+        let aussen = 0;
+        if (rueck) { const v = klemme(t / 460, 0, 1); aussen = 1.6 * Math.pow(1 - v, 2); }
+        return { k, ...pos(k, aussen), aussen };
+      }).sort((p, q) => p.tiefe - q.tiefe);
+      const buch0 = pos(0, 0);
+      for (const b of reihe) {
+        let offen = 2, weiss = false;
+        if (rueck) {
+          const ot = 440 + b.k * 40;
+          offen = t < ot ? 0 : t < ot + 50 ? 1 : 2;
+          weiss = t >= 640 + b.k * 30 && t < 740 + b.k * 30 && Math.floor((t - 640) / 33) % 2 === 0;
+          if (b.aussen > 0.05) for (let s = 1; s <= 5; s++) {                              // Flugschweif nach außen
+            const w = Math.atan2(b.y - cy, b.x - cx), d = s * 3;
+            g.put(b.x + Math.cos(w) * d, b.y + Math.sin(w) * d, FUNKEN[Math.min(3, Math.floor(s / 2) + 1)], a * (1 - s / 6));
+          }
+        } else if (b.k === 0) {
+          offen = t < 560 ? 2 : t < 600 ? 1 : 0;
+        }
+        buch(g, b.x, b.y, b.k, offen, a, weiss);
+        if (rueck && t >= 640 + b.k * 30 && t < 740 + b.k * 30) ppKreuzfunkel(g, b.x - 1, b.y - 1, [2, 4, 3, 2, 1][Math.floor((t - 640 - b.k * 30) / 21)] || 1, FUNKEN, a);
+      }
+      if (!rueck) {
+        // Kreuzblitz am zuschlagenden Buch
+        if (t >= 600 && t < 710) ppKreuzfunkel(g, buch0.x - 1, buch0.y - 1, [4, 4, 3, 2, 1][Math.floor((t - 600) / 22)] || 1, FUNKEN, a);
+        // Funkenspur: aus der Karte (Mitte) in das Buch gesaugt
+        for (const f of teile.funken) {
+          const k = (t - f.ab) / f.dauer;
+          if (k < 0 || k >= 1) continue;
+          const e = k * k, sx = cx + Math.cos(f.w) * f.r, sy = cy + Math.sin(f.w) * f.r * 0.9;
+          for (let s = 0; s < 3; s++) {
+            const e2 = Math.max(0, e - s * 0.07);
+            g.put(sx + (buch0.x - sx) * e2, sy + (buch0.y - sy) * e2, FUNKEN[Math.min(3, s + (k > 0.7 ? 1 : 0))], a * (1 - s / 3));
+          }
+        }
+      } else if (t >= 640 && t < 1040) {
+        for (const f of teile.burst) {                                                     // Funken stieben aus der Mitte
+          const al = t - 640;
+          if (al >= f.leben) continue;
+          const sek = al / 1000, k = al / f.leben;
+          g.put(cx + Math.cos(f.w) * f.v * sek, cy + Math.sin(f.w) * f.v * sek + 50 * sek * sek, FUNKEN[Math.min(3, Math.floor(k * 4))], (1 - k) * a);
+        }
+      }
+    };
+    return ppPunktBild(malen, ENDE, 300, 300, vorbereiten);
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Darion, the Blood-Crazy Groundskeeper — PIXELART, Zonen-Animation am Support-Platz des Stapels (Hülle `ppPunktBild`; Vorlage: das Kartenbild — der blutbespritzte
+  //  Mann mit der blutigen Kettensäge auf rotem Teppich, der goldgelbe Vogel)
+  //
+  //  Eine rote Hiebspur (Schlitz in Pixelstufen, mit Sägezähnen) fährt quer über den Platz, ein zweiter Hieb kreuzt sie; Blutpunkte spritzen in Bögen und fallen, einige
+  //  bleiben als Fleck zurück. Bei ~420 ms rastet das Equip ein: goldener Rahmen schnappt in drei Stufen auf den Platz, Kreuzfunke und goldene Funken. Ab ~720 ms dithert alles
+  //  weg; ENDE 1000 (Standard-Dauer 1060 über ZONEN_ANIM_DAUER). Gold = die festen Münzfarben. Feste Palette, KEINE Unschärfe, KEIN Leuchten.
+  // ═══════════════════════════════════════════════════════════════════
+  darion_equip: (() => {
+    const BLUT = ['#ff8566', '#e73b41', '#8c0014', '#520a0c'].map(ppHex);
+    const GOLD = ['#ffffff', '#f7f7ad', '#fad54a', '#f29a3e', '#ee6428'].map(ppHex);
+    const ENDE = 1000, FADE_AB = 720, HIEB = 170, SCHNAPP = 420;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = (sz) => ({
+      tropfen: Array.from({ length: ppFxN(40) }, () => ({
+        gross: Math.random() < 0.25, u: Math.random(), vx: (Math.random() - 0.3) * 70, vy: -(12 + Math.random() * 56), leben: 420 + Math.random() * 280,
+      })),
+      funken: Array.from({ length: ppFxN(9) }, (_, i) => ({ w: (i / 9) * Math.PI * 2 + Math.random() * 0.5, v: 22 + Math.random() * 30, leben: 260 + Math.random() * 200 })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const cx = Math.round(sz.cx), cy = Math.round(sz.cy), hw = sz.hw, hh = sz.hh;
+      const A1 = { x: cx - hw * 1.1, y: cy - hh * 0.85 }, B1 = { x: cx + hw * 1.1, y: cy + hh * 0.75 };
+      const A2 = { x: cx + hw * 1.0, y: cy - hh * 0.7 }, B2 = { x: cx - hw * 0.9, y: cy + hh * 0.65 };
+      const strich = (A, B, ab) => {
+        const k = klemme((t - ab) / HIEB, 0, 1);
+        if (k <= 0) return;
+        const n = Math.ceil(Math.max(Math.abs(B.x - A.x), Math.abs(B.y - A.y))), kopf = Math.floor(n * k);
+        const alt = klemme((t - ab - HIEB) / 380, 0, 1);                                   // Spur dunkelt nach
+        for (let s = 0; s <= kopf; s++) {
+          const x = A.x + (B.x - A.x) * (s / n), y = A.y + (B.y - A.y) * (s / n);
+          const nah = kopf - s;                                                              // Abstand zur Klingenspitze
+          const c = nah < 3 && k < 1 ? BLUT[0] : alt < 0.5 ? BLUT[1] : BLUT[2];
+          g.put(x, y, c, aus); g.put(x, y + 1, alt < 0.5 ? BLUT[2] : BLUT[3], aus); g.put(x, y + 2, BLUT[3], aus * 0.6);
+          if (s % 3 === 0) g.put(x, y - 1, nah < 6 ? BLUT[0] : BLUT[1], aus);               // Sägezahn
+        }
+        if (k < 1) { const x = A.x + (B.x - A.x) * k, y = A.y + (B.y - A.y) * k; g.block(x - 1, y - 1, 2, 2, GOLD[0], aus); }
+      };
+      strich(A1, B1, 0);
+      strich(A2, B2, 110);
+      // ── Blutspritzer: entlang des ersten Hiebs, fallen mit Schwerkraft ──
+      const bodenY = cy + hh * 0.92;
+      for (const d of teile.tropfen) {
+        const te = d.u * HIEB, al = t - te;
+        if (al < 0) continue;
+        const sx = A1.x + (B1.x - A1.x) * d.u, sy = A1.y + (B1.y - A1.y) * d.u;
+        const sek = Math.min(al, d.leben) / 1000;
+        let x = sx + d.vx * sek, y = sy + d.vy * sek + 0.5 * 190 * sek * sek;
+        const gelandet = y >= bodenY;
+        if (gelandet) y = bodenY;
+        if (al < d.leben && !gelandet) {
+          const schnell = Math.hypot(d.vx, d.vy + 190 * sek) > 55;
+          g.block(x, y, d.gross ? 2 : schnell && Math.abs(d.vx) > Math.abs(d.vy) ? 2 : 1, d.gross ? 2 : schnell && Math.abs(d.vx) <= Math.abs(d.vy) ? 2 : 1, al > d.leben * 0.6 ? BLUT[2] : BLUT[1], aus);
+        } else {                                                                              // Fleck am Boden bzw. dort, wo der Tropfen endete
+          g.put(x, y, BLUT[2], aus); g.put(x + 1, y, BLUT[3], aus * 0.8); if (d.u > 0.5) g.put(x, y - 1, BLUT[2], aus * 0.6);
+        }
+      }
+      // ── Einrasten: goldener Rahmen schnappt in drei Stufen auf den Platz, Kreuzfunke, goldene Funken ──
+      const sa = t - SCHNAPP;
+      if (sa >= 0) {
+        if (sa < 130) {
+          const m = [8, 4, 1][Math.floor(sa / 44)], rw = Math.round(hw * 2) + 2 * m, rh = Math.round(hh * 2) + 2 * m;
+          const x0 = cx - Math.round(hw) - m, y0 = cy - Math.round(hh) - m;
+          for (let i = 0; i < rw; i++) for (const w of [0, 1]) { g.put(x0 + i, y0 + w, w ? GOLD[3] : GOLD[2], aus); g.put(x0 + i, y0 + rh - 1 - w, w ? GOLD[3] : GOLD[2], aus); }
+          for (let j = 0; j < rh; j++) for (const w of [0, 1]) { g.put(x0 + w, y0 + j, w ? GOLD[3] : GOLD[2], aus); g.put(x0 + rw - 1 - w, y0 + j, w ? GOLD[3] : GOLD[2], aus); }
+        }
+        if (sa < 250) ppKreuzfunkel(g, cx - 1, cy - 1, [2, 4, 5, 5, 4, 3, 2, 1][Math.floor(sa / 32)] || 1, GOLD, aus);
+        for (const f of teile.funken) {
+          if (sa >= f.leben) continue;
+          const sek = sa / 1000, k = sa / f.leben;
+          g.put(cx + Math.cos(f.w) * f.v * sek, cy + Math.sin(f.w) * f.v * sek + 40 * sek * sek, GOLD[Math.min(4, Math.floor(k * 4) + 1)], (1 - k) * aus);
+        }
+      }
+    };
+    return ppPunktBild(malen, ENDE, 300, 300, vorbereiten);
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
   //  Super Fan — PIXELART auf dem DECK (Als Vorgabe 10.10.; Vorlage: das Kartenbild — der Fan mit dem Leuchtstab, rosa und grüne Herzen)
   //
   //  Ein türkisfarbener Leuchtstab schwingt über dem Deck hin und her (Nachzieh-Schweif, gelbe Funkenstrahlen an der Spitze),
@@ -40870,7 +41379,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // (Telekinesis verdeckt die echte Karte, waehrend ihre Kopie
         // schwebt), finden sie darueber wieder. `eigeneSeite`: gehoert die
         // Zone dem Betrachter? (Eigene verdeckte Karten sieht er offen.)
-        playAnimation(type, sel, { duration: 1000, ...rest, ...(vonDaten || {}), ankerSel: sel, eigeneSeite: owner === myIdx });
+        playAnimation(type, sel, { duration: ZONEN_ANIM_DAUER[type] || 1000, ...rest, ...(vonDaten || {}), ankerSel: sel, eigeneSeite: owner === myIdx });
       }, window.ZONE_ANIM_MOUNT_DELAY_MS ?? 100);
     };
     // Applause Counter gestiegen: Klang + Abzeichen leuchtet kurz auf.
