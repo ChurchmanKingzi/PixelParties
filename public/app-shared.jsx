@@ -2888,6 +2888,22 @@ const ZONE_ANIM_SFX = {
     { name: 'heavy_impact', opts: { rate: 0.9, volume: 0.55, delay: 600, category: null, dedupe: 0 } },
     { name: 'debuff',       opts: { rate: 0.7, volume: 0.6,  delay: 640, category: null, dedupe: 0 } },
   ],
+  // Welle 4 (24.10.) — Pinaxolotl: Blasen steigen (Wasser, 0 ms) und zerplatzen (Ping, ~400 ms). Nur der erste Teil übernimmt die Sammelkategorie 'effect'.
+  pinaxolotl_bubbles: [
+    { name: 'elem_water', opts: { rate: 1.6, volume: 0.4 } },
+    { name: 'ping',       opts: { rate: 2.2, volume: 0.25, delay: 380, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.8, volume: 0.2,  delay: 520, category: null, dedupe: 0 } },
+  ],
+  // Motharch Squire: goldener Mottenstaub rieselt (weicher Zauberklang, 0 ms), Funkeln (~300 ms).
+  moth_dust: [
+    { name: 'buff', opts: { rate: 1.5, volume: 0.45 } },
+    { name: 'ping', opts: { rate: 2.6, volume: 0.22, delay: 300, category: null, dedupe: 0 } },
+  ],
+  // Arnold: Muskelspiel — Stärkung (0 ms), heller Heilklang (~120 ms) für die zusätzlichen HP.
+  arnold_flex: [
+    { name: 'buff', opts: { rate: 0.9, volume: 0.7 } },
+    { name: 'heal', opts: { rate: 1.4, volume: 0.35, delay: 120, category: null, dedupe: 0 } },
+  ],
   // Zira Racer (24.10.) — der AUFPRALL des Rammens klingt nach seiner Wucht (`wucht` 1..3 = Level der abgeworfenen Karte): ein kurzer Schlag und Ping bei Lv1, ab Lv2 dazu der harte Treffer,
   // bei Lv3 zusätzlich tiefes Poltern der Brocken. Das Anrasen selbst vertont `attack_ram` (Ramm-Animation). Delays > 0 laufen mit dem Einbau der Animation (= Berührung); nur der erste
   // Teil übernimmt die Sammelkategorie 'effect'.

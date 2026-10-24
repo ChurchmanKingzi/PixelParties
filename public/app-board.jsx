@@ -9021,6 +9021,106 @@ const HockeyWishEffect = (() => {
   return ppPunktBild(malen, ENDE + 40, 300, 300);
 })();
 
+// ═══════════════════════════════════════════════════════════════════
+//  Welle 4 (24.10.) — Pinaxolotl, Motharch Squire, Arnold: kleine Pixelart-Bilder über einer Zone (`ppPunktBild`, feste Paletten, Dither statt Alpha, kein Leuchten)
+// ═══════════════════════════════════════════════════════════════════
+/** Pixelkreis-Umriss (Mittelpunktverfahren, ganze Pixel) mit Radius r. */
+function ppKreisUmriss(g, cx, cy, r, c, a) {
+  const R = Math.max(1, Math.round(r));
+  for (let i = 0; i <= Math.ceil(R * 0.7071); i++) {
+    const j = Math.round(Math.sqrt(Math.max(0, R * R - i * i)));
+    for (const [x, y] of [[i, j], [j, i]]) {
+      g.put(cx + x, cy + y, c, a); g.put(cx - x, cy + y, c, a); g.put(cx + x, cy - y, c, a); g.put(cx - x, cy - y, c, a);
+    }
+  }
+}
+
+//  Pinaxolotl: Blasen (`pinaxolotl_bubbles`) — Vorlage: der Axolotl im Wasser. Hellblaue Blasen (Umriss mit weißem Glanzpunkt) steigen mit leichtem Wackeln über der Zone auf und
+//  zerplatzen oben in vier Funken; ~700 ms.
+const PinaxolotlBubblesEffect = (() => {
+  const PAL = ['#ffffff', '#b3d8f9', '#4e82cb', '#f7f7ad'].map(ppHex);
+  const ENDE = 800, N = 9;
+  const vorbereiten = (sz) => Array.from({ length: N }, (_, i) => ({
+    x: (Math.random() - 0.5) * sz.hw * 1.6, start: i * 45 + Math.random() * 40, tempo: 0.032 + Math.random() * 0.02, r: 2 + Math.floor(Math.random() * 3),
+    wack: Math.random() * 6.28, pop: 380 + Math.random() * 220,
+  }));
+  const malen = (g, t, sz, teile) => {
+    const aus = t > ENDE - 160 ? Math.max(0, 1 - (t - (ENDE - 160)) / 160) : 1;
+    if (aus <= 0) return;
+    for (const b of teile) {
+      const a2 = t - b.start; if (a2 < 0) continue;
+      const x = Math.round(sz.cx + b.x + Math.sin(a2 / 120 + b.wack) * 2), y = Math.round(sz.cy + sz.hh * 0.5 - a2 * b.tempo * 3);
+      if (a2 < b.pop) {
+        ppKreisUmriss(g, x, y, b.r, a2 > b.pop - 120 ? PAL[0] : PAL[1], aus);
+        g.put(x - 1, y - 1, PAL[0], aus);
+        if (b.r >= 3) g.put(x + 1, y + 1, PAL[2], aus);
+      } else if (a2 < b.pop + 140) {
+        const k = (a2 - b.pop) / 140, d = 2 + k * 5;                  // vier Funken fliegen auseinander
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) g.put(x + dx * d, y + dy * d, k < 0.5 ? PAL[0] : PAL[3], aus * (1 - k));
+      }
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 300, 300, vorbereiten);
+})();
+
+//  Motharch Squire: Mottenstaub (`moth_dust`) — Vorlage: die Motte. Goldene Staubkörner rieseln von oben über die Kreatur, wiegen sich hin und her und funkeln (Blinken in ganzen
+//  Pixelschritten); ~800 ms.
+const MothDustEffect = (() => {
+  const PAL = ['#fff196', '#fad54a', '#f29a3e', '#aa5300'].map(ppHex);
+  const ENDE = 900, N = 34;
+  const vorbereiten = (sz) => Array.from({ length: ppFxN(N) }, () => ({
+    x: (Math.random() - 0.5) * sz.hw * 2.1, y0: -sz.hh * 1.1 - Math.random() * 14, v: 0.02 + Math.random() * 0.03, ph: Math.random() * 6.28, start: Math.random() * 360, c: Math.floor(Math.random() * 3),
+  }));
+  const malen = (g, t, sz, teile) => {
+    const aus = t > ENDE - 220 ? Math.max(0, 1 - (t - (ENDE - 220)) / 220) : 1;
+    if (aus <= 0) return;
+    for (const k of teile) {
+      const a2 = t - k.start; if (a2 < 0) continue;
+      const x = Math.round(sz.cx + k.x + Math.sin(a2 / 150 + k.ph) * 3), y = Math.round(sz.cy + k.y0 + a2 * k.v * 3);
+      if (y > sz.cy + sz.hh) continue;
+      const blink = Math.floor(a2 / 66 + k.ph * 3) % 4 === 0;
+      g.put(x, y, blink ? PAL[0] : PAL[k.c], aus);
+      if (blink) { g.put(x + 1, y, PAL[1], aus); g.put(x - 1, y, PAL[1], aus); g.put(x, y + 1, PAL[1], aus); g.put(x, y - 1, PAL[1], aus); }
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 300, 340, vorbereiten);
+})();
+
+//  Arnold: Muskelspiel (`arnold_flex`) — Vorlage: der rosa Axolotl-Muskelprotz. Rosa Pixel-Kreuze (HP) und Aufwärtspfeile (ATK) steigen rund um den Helden auf, ein rosa Ring
+//  (zwei Pixelstufen) blitzt auf; ~1000 ms.
+const ArnoldFlexEffect = (() => {
+  const PAL = ['#ffffff', '#f8b4df', '#fc69c6', '#c80480', '#710122'].map(ppHex);
+  const ENDE = 1000;
+  const vorbereiten = (sz) => Array.from({ length: 8 }, (_, i) => ({
+    x: (i % 2 ? 1 : -1) * (sz.hw * 0.35 + Math.random() * sz.hw * 0.65), start: i * 70 + Math.random() * 50, tempo: 0.018 + Math.random() * 0.012, pfeil: i % 2 === 1,
+  }));
+  const kreuz = (g, x, y, a) => {
+    g.block(x - 1, y, 3, 1, PAL[1], a); g.block(x, y - 1, 1, 3, PAL[1], a); g.put(x, y, PAL[0], a);
+    g.put(x - 2, y, PAL[3], a); g.put(x + 2, y, PAL[3], a); g.put(x, y - 2, PAL[3], a); g.put(x, y + 2, PAL[3], a);
+  };
+  const pfeil = (g, x, y, a) => {
+    g.put(x, y - 3, PAL[0], a); g.block(x - 1, y - 2, 3, 1, PAL[1], a); g.block(x - 2, y - 1, 5, 1, PAL[1], a);
+    g.block(x, y, 1, 3, PAL[2], a); g.put(x - 1, y, PAL[3], a); g.put(x + 1, y, PAL[3], a);
+  };
+  const malen = (g, t, sz, teile) => {
+    const aus = t > ENDE - 220 ? Math.max(0, 1 - (t - (ENDE - 220)) / 220) : 1;
+    if (aus <= 0) return;
+    // Ring (Pixelstufen)
+    if (t < 380) {
+      const f = 1 - t / 380, r = 6 + t / 9;
+      ppKreisUmriss(g, Math.round(sz.cx), Math.round(sz.cy), r, PAL[2], f * aus);
+      ppKreisUmriss(g, Math.round(sz.cx), Math.round(sz.cy), r - 1, PAL[1], f * aus * 0.8);
+    }
+    for (const k of teile) {
+      const a2 = t - k.start; if (a2 < 0 || a2 > 760) continue;
+      const kk = a2 / 760, y = Math.round(sz.cy + sz.hh * 0.45 - a2 * k.tempo * 3.2), x = Math.round(sz.cx + k.x);
+      const f = (1 - kk) * aus;
+      if (k.pfeil) pfeil(g, x, y, f); else kreuz(g, x, y, f);
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 320, 340, vorbereiten);
+})();
+
 // ═════════════════════════════════════════════════════════════════
 //  Regeneration: Aufblühen (`regeneration_bloom`) — PIXELART; Vorlage: das Kartenbild (nachwachsende Gliedmaßen)
 //
@@ -18037,6 +18137,9 @@ const ANIM_REGISTRY = {
   regeneration_bloom: RegenerationBloomEffect,
   arcane_eyes_open: ArcaneEyesOpenEffect,
   hockey_wish: HockeyWishEffect,
+  pinaxolotl_bubbles: PinaxolotlBubblesEffect,
+  moth_dust: MothDustEffect,
+  arnold_flex: ArnoldFlexEffect,
   liquid_rainbow: LiquidRainbowEffect,
   hand_level_down: HandLevelDownEffect,
   mind_control_hex: MindControlHexEffect,
@@ -50789,6 +50892,31 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'buttap') {
         const p = playerByName(entry.player);
         return <span className="log-status">💥 {cName('Buttap')} — {pName(p.name, p.color)} reveals {cName(entry.revealed)}{entry.toHand ? <> and adds it to their hand.</> : <>{entry.target ? <>: {entry.damage} damage to {entry.target}, then it is shuffled back.</> : <>: no damage, then it is shuffled back.</>}</>}</span>;
+      }
+      if (t === 'pinaxolotl') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🔍 {cName('Pinaxolotl')} — {pName(p.name, p.color)} searches their deck and adds {cName(entry.card)} to their hand.</span>;
+      }
+      if (t === 'pinaxolotl_summon') {
+        const p = playerByName(entry.player);
+        return <span className="log-info">✨ {cName('Pinaxolotl')} — {pName(p.name, p.color)} {entry.summoned ? <>immediately summons {cName(entry.card)} as an additional Action.</> : <>cannot summon {cName(entry.card)} right now.</>}</span>;
+      }
+      if (t === 'motharch_squire_recycle') {
+        const p = playerByName(entry.player);
+        const karten = Array.isArray(entry.cards) ? entry.cards : [];
+        return <span className="log-status">🔄 {cName('Motharch Squire')} — {pName(p.name, p.color)} shuffles {karten.map((k, i) => <React.Fragment key={i}>{i > 0 ? ' and ' : ''}{cName(k)}</React.Fragment>)} back into their deck.</span>;
+      }
+      if (t === 'motharch_squire_search') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🔍 {cName('Motharch Squire')} — {pName(p.name, p.color)} searches their deck and adds {cName(entry.card)} to their hand.</span>;
+      }
+      if (t === 'arnold') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">✨ {cName('Arnold, the Maximum Lotl')} — {entry.ability} is attached: {entry.hero} gains <span className="log-amount">{entry.hp || 40}</span> HP (current and max) and <span className="log-amount">{entry.atk}</span> Attack.</span>;
+      }
+      if (t === 'lamenting_knight') {
+        const p = playerByName(entry.player);
+        return <span className="log-heal">✨ {cName('Lamenting Knight')} — {pName(p.name, p.color)} heals {entry.target} for <span className="log-amount">{entry.amount}</span> HP (half its max HP).</span>;
       }
       if (t === 'frost_breaker_no_free_action') {
         const p = playerByName(entry.player);
