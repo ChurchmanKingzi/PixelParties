@@ -9941,6 +9941,120 @@ const ShroomasaurSporesEffect = (() => {
 })();
 
 // ═════════════════════════════════════════════════════════════════
+//  Flesh-Eating Swarm Trap: Insektenschwarm (`flesh_swarm`) — PIXELART; Vorlage: das Kartenbild (der rot gesprenkelte Held im Schwarm)
+//
+//  Ein dichter Schwarm kleiner Fliegen (5×4 Pixel, dunkler Körper, helle Flügel in zwei Schlagbildern) kreist in engen Ellipsen um den Helden, zieht sich in Spiralen zusammen und
+//  beißt: rote Blutspritzer (2×2, gedithert) flackern über der Kartenmitte, immer dichter. Zum Schluss stieben die Fliegen auseinander und dithern weg (~1600 ms). Feste Palette, kein Leuchten.
+// ═════════════════════════════════════════════════════════════════
+const FleshSwarmEffect = (() => {
+  const KOERPER = ppHex('#291f3d'), FLUEGEL = ppHex('#e5edfa'), AUGE = ppHex('#e92f38'), BLUT = ppHex('#b21a29'), BLUT2 = ppHex('#e92f38');
+  const ENDE = 1600, FADE_AB = 1250, BISS_AB = 650;
+  const F1 = ['w...w', 'wwkww', '.kkk.', '..k..'];
+  const F2 = ['.....', 'wwkww', '.kkk.', '..k..'];
+  const vorbereiten = (sz) => ({
+    fliegen: Array.from({ length: ppFxN(36) }, () => ({
+      a0: Math.random() * Math.PI * 2, r0: 0.8 + Math.random() * 0.7, v: (2.6 + Math.random() * 2.2) * (Math.random() < 0.5 ? -1 : 1),
+      ph: Math.random() * 6, tilt: 0.55 + Math.random() * 0.35, start: Math.random() * 240, wild: Math.random() * 6,
+    })),
+    spritzer: Array.from({ length: ppFxN(26) }, () => ({ x: (Math.random() - 0.5) * 1.4, y: (Math.random() - 0.5) * 1.5, ab: BISS_AB + Math.random() * 720, farbe: Math.random() < 0.5 ? 0 : 1 })),
+  });
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const sek = t / 1000;
+    for (const f of teile.fliegen) {
+      const tt = t - f.start;
+      if (tt < 0) continue;
+      // Anflug von außen, Spirale nach innen, am Ende Zerstreuen
+      const nach = Math.min(1, tt / 520), eng = tt < 500 ? 1 : Math.max(0.28, 1 - (tt - 500) / 900), zerstreuen = t > 1180 ? (t - 1180) / 420 : 0;
+      const r = (f.r0 * (1.9 - 0.9 * nach)) * eng + zerstreuen * 1.6;
+      const a = f.a0 + sek * f.v + Math.sin(sek * 7 + f.wild) * 0.25;
+      const x = sz.cx + Math.cos(a) * sz.hw * r, y = sz.cy + Math.sin(a) * sz.hh * r * f.tilt + Math.sin(sek * 19 + f.ph) * 1.2;
+      ppSprite(g, x, y, Math.floor((tt + f.ph * 40) / 55) % 2 ? F1 : F2, { k: KOERPER, w: FLUEGEL }, aus);
+      if (tt > BISS_AB && eng < 0.5 && (Math.floor(tt / 90) + Math.floor(f.ph * 3)) % 4 === 0) g.put(x, y - 1, AUGE, aus);
+    }
+    for (const s of teile.spritzer) {
+      const tt = t - s.ab;
+      if (tt < 0 || tt > 360) continue;
+      g.block(sz.cx + s.x * sz.hw, sz.cy + s.y * sz.hh + tt / 90, 2, 2, s.farbe ? BLUT2 : BLUT, aus * (tt > 240 ? 0.5 : 1));
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 300, 340, vorbereiten);
+})();
+
+// ═════════════════════════════════════════════════════════════════
+//  Hot Skull Potato: Explosion (`hot_potato_blast`) — PIXELART; Vorlage: die Karte (der qualmende, zischende Schädel auf der Kartoffel)
+//
+//  Eine große Explosion (Raster 140×140): weißer Blitzkern, Feuerball in vier Farbringen (Weiß-Gelb-Orange-Rot, Rand per Bayer-Dithering aufgelöst), ein Druckring, der bis über die ganze
+//  Fläche läuft, Knochensplitter und Funken mit Schwerkraft, danach steigt dunkler Rauch auf und dithert weg (~1500 ms). Feste Palette, kein Leuchten, keine Verläufe.
+// ═════════════════════════════════════════════════════════════════
+const HotPotatoBlastEffect = (() => {
+  const WEISS = ppHex('#ffffff'), GELB = ppHex('#f8ca21'), ORANGE = ppHex('#ff8b1a'), ROT = ppHex('#e92f38'), DUNKELROT = ppHex('#b21a29');
+  const RAUCH = ppHex('#3e3e51'), RAUCH2 = ppHex('#291f3d'), KNOCHEN = ppHex('#ebdcc1'), RAND = ppHex('#291f3d');
+  const ENDE = 1500, FADE_AB = 1050;
+  const scheibe = (g, cx, cy, r, farbe, a) => {
+    const r2 = r * r, R = Math.ceil(r);
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) if (dx * dx + dy * dy <= r2) g.put(cx + dx, cy + dy, farbe, a);
+  };
+  const ring = (g, cx, cy, r, breite, farbe, a) => {
+    const lo = (r - breite) * (r - breite), hi = r * r, R = Math.ceil(r);
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) { const d = dx * dx + dy * dy; if (d <= hi && d >= lo) g.put(cx + dx, cy + dy, farbe, a); }
+  };
+  const vorbereiten = () => ({
+    splitter: Array.from({ length: ppFxN(30) }, () => ({ w: Math.random() * Math.PI * 2, v: 26 + Math.random() * 62, hell: Math.random() < 0.6, grav: 40 + Math.random() * 40, start: 100 + Math.random() * 120 })),
+    funken: Array.from({ length: ppFxN(26) }, () => ({ w: Math.random() * Math.PI * 2, v: 20 + Math.random() * 70, farbe: [GELB, ORANGE, ROT, WEISS][Math.floor(Math.random() * 4)], start: 80 + Math.random() * 200 })),
+    lappen: Array.from({ length: 9 }, (_, i) => ({ w: (i / 9) * Math.PI * 2 + (Math.random() - 0.5) * 0.5, d: 0.42 + Math.random() * 0.34, s: 0.38 + Math.random() * 0.22 })),
+    rauch: Array.from({ length: ppFxN(10) }, () => ({ x: (Math.random() - 0.5) * 60, y: (Math.random() - 0.5) * 26, r: 7 + Math.random() * 7, start: 520 + Math.random() * 280, v: 14 + Math.random() * 14 })),
+  });
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
+    // Rauch (hinten)
+    for (const s of teile.rauch) {
+      const tt = t - s.start;
+      if (tt < 0) continue;
+      const r = s.r * Math.min(1, tt / 260) * (1 + tt / 1400);
+      scheibe(g, Math.round(cx + s.x), Math.round(cy + s.y - (tt / 1000) * s.v), r, tt > 500 ? RAUCH : RAUCH2, aus * 0.5);
+    }
+    // Feuerball: ein Mittelkörper und neun Lappen (unregelmäßige Wolke), vier Farbschichten von außen nach innen
+    if (t < 980) {
+      const u = Math.min(1, t / 640), R = 48 * (1 - (1 - u) * (1 - u));
+      const abkling = t > 640 ? Math.max(0, 1 - (t - 640) / 340) : 1;
+      if (R > 0 && abkling > 0) {
+        const SCHICHTEN = [[DUNKELROT, 1.0], [ROT, 0.78], [ORANGE, 0.56], [GELB, 0.34]];
+        for (const [farbe, m] of SCHICHTEN) {
+          scheibe(g, cx, cy, R * 0.72 * m, farbe, abkling * aus);
+          for (const l of teile.lappen) scheibe(g, Math.round(cx + Math.cos(l.w) * R * l.d * m), Math.round(cy + Math.sin(l.w) * R * l.d * m * 0.9), R * l.s * m, farbe, abkling * aus);
+        }
+        if (t < 520) scheibe(g, cx, cy, R * 0.16, WEISS, aus);
+      }
+    }
+    // Blitzkern am Anfang
+    if (t < 160) scheibe(g, cx, cy, 6 + t / 12, WEISS, aus);
+    // Druckring
+    if (t > 120 && t < 760) {
+      const u = (t - 120) / 640;
+      ring(g, cx, cy, 14 + 56 * u, 2, u < 0.5 ? WEISS : GELB, aus * (u > 0.6 ? 0.5 : 1));
+    }
+    // Splitter und Funken
+    for (const p of teile.splitter) {
+      const tt = (t - p.start) / 1000;
+      if (tt < 0 || tt > 0.95) continue;
+      const x = cx + Math.cos(p.w) * p.v * tt * 2.2, y = cy + Math.sin(p.w) * p.v * tt * 1.6 + p.grav * tt * tt * 3;
+      g.block(x, y, 2, 2, p.hell ? KNOCHEN : RAND, aus);
+      g.put(x - 1, y - 1, RAND, aus * 0.7);
+    }
+    for (const f of teile.funken) {
+      const tt = (t - f.start) / 1000;
+      if (tt < 0 || tt > 0.7) continue;
+      g.put(cx + Math.cos(f.w) * f.v * tt * 2.6, cy + Math.sin(f.w) * f.v * tt * 2.0 + tt * tt * 30, f.farbe, aus * (tt > 0.5 ? 0.5 : 1));
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 420, 420, vorbereiten);
+})();
+
+// ═════════════════════════════════════════════════════════════════
 //  Leafagami Snake: Laubwirbel (`leafagami_leaves`) — PIXELART; Vorlage: das Kartenbild (Schlange aus gefaltetem Laub in Grün, Rot, Orange)
 //
 //  Bunte Blätter (4×4: Rand, Fläche in Rot/Orange/Gelb/Grün/Lime, hellere Ader) wirbeln in einer aufsteigenden Spirale um die geschützte Karte; die Blätter drehen sich in ganzen Schritten
@@ -18515,6 +18629,8 @@ const ANIM_REGISTRY = {
   regeneration_bloom: RegenerationBloomEffect,
   ankhota_sandstorm: AnkhotaSandstormEffect,
   shroomasaur_spores: ShroomasaurSporesEffect,
+  flesh_swarm: FleshSwarmEffect,
+  hot_potato_blast: HotPotatoBlastEffect,
   leafagami_leaves: LeafagamiLeavesEffect,
   bat_bite_drain: BatBiteDrainEffect,
   arcane_eyes_open: ArcaneEyesOpenEffect,
@@ -54225,6 +54341,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       >
                         <span className="head-counter-icon">😈</span>
                         <span className="head-counter-num">×{cc.demonCounter}</span>
+                      </div>
+                    ) : null}
+                    {cc?.skullCounter > 0 ? (
+                      <div className="head-counter-badge head-counter-badge--raised"
+                        onMouseEnter={e => showGameTooltip(e, `Skull Counters: ${cc.skullCounter}. At the end of its controller's turn it can be passed on for ${cc.skullCounter} discarded card${cc.skullCounter === 1 ? '' : 's'} — otherwise it explodes for ${50 + 50 * cc.skullCounter} damage to all of that player's targets.`)}
+                        onMouseLeave={hideGameTooltip}
+                        style={{ background: 'linear-gradient(135deg, #ebdcc1, #e92f38)', borderColor: '#291f3d' }}
+                      >
+                        <span className="head-counter-icon">💀</span>
+                        <span className="head-counter-num">×{cc.skullCounter}</span>
                       </div>
                     ) : null}
                     {cc?.bombCounters > 0 ? (

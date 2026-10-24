@@ -225,6 +225,7 @@ const HOOKS = {
   ON_FORM_CHANGED: 'onFormChanged',
 
   // ── W73c: Zusatzname (Shroomasaur) ──
+  ON_BOARD_CARD_TO_HAND: 'onBoardCardToHand',  // W74c (Wendy): a card moved from a player's SIDE OF THE BOARD (Support/Ability/Surprise Zone) into a hand — by actionMoveCard AND by the special bounce paths (`handZugangSync` with `von: 'brett'`/`vonInst`: Deepsea bounce/swap …). Not for deleted/discarded cards (Ankhota). State notification, no reaction window. Context: { bewegtName (card name), bewegteKarte (instance or null), vonZone, vonSeite (board side it left), handSeite (whose hand it entered), quelleSeite (player whose effect moved it, undefined = unknown) }
   ON_NAME_CHANGED: 'onNameChanged',  // Fires when a creature gains or loses an additional name (Shroomasaur; the engine drops it at the start of the next turn). Zustandsmeldung, kein Reaktionsfenster. Karten, die ihre Wirkung am Bestand einer Namensfamilie BUCHEN (Censpartan: Schirm, Cykyran: Base-ATK x2), buchen hier neu. Context: { inst, name (neuer Zusatzname oder null), oldName }
 
   // ── Control changes ──
