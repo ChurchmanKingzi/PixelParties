@@ -7997,7 +7997,7 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
   if (c._spyMask) {
     badges.push({
       key: 'spy_marked', icon: '👁️',
-      tooltip: "Spied on (Spy in the Enemy's Camp): the player who spied may activate this Creature's active effect during their own turn as if they controlled it. "
+      tooltip: "Spying (Spy in the Enemy's Camp): this Creature is a spy — the player who played the Spy may activate its active effect during their own turn as if they controlled it. "
         + 'This is not a status effect and cannot be healed. It lasts until the Creature leaves the board.',
     });
   }
