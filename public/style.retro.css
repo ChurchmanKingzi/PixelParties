@@ -2063,10 +2063,12 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
    Immune-Icons plus Rahmen und wirkten deutlich groesser. */
 .status-action-blocked-icon,
 .status-stealth-icon,
+.status-spell-immune-icon,
 .status-damage-proof-icon,
 .status-cheat-chair-icon { width: calc(18px * var(--board-scale)); height: calc(18px * var(--board-scale)); font-size: calc(10px * var(--board-scale)); line-height: 1; display: flex; align-items: center; justify-content: center; border-radius: 0; border: 1.5px solid; animation: none; filter: none; }
 .status-action-blocked-icon { top: 2px; background: linear-gradient(135deg, #55011a 0% 75%, #8c0014 75% 100%); border-color: #c7855b; box-shadow: 0 0 0 1px #fe5154; }
 .status-stealth-icon { top: calc(2px + 20px * var(--board-scale)); background: linear-gradient(135deg, #1a1a2e 0% 50%, #3e3e51 50% 100%); border-color: #9aa3b6; box-shadow: 0 0 0 1px #2f539d; }
+.status-spell-immune-icon { top: calc(2px + 40px * var(--board-scale)); background: linear-gradient(135deg, #2b0b47 0% 40%, #58238c 40% 100%); border-color: #d6bbf1; box-shadow: 0 0 0 1px #ba74ff; }
 .status-stealth-icon .status-stealth-lvl { position: absolute; right: -5px; bottom: -5px; font-size: calc(8px * var(--board-scale)); font-weight: 800; background: #1a1a2e; color: #ffffff; border: 2px solid #9aa3b6; border-radius: 0; padding: 0 3px; line-height: 11px; }
 .status-cheat-chair-icon { top: calc(2px + 60px * var(--board-scale)); background: linear-gradient(135deg, #72541d 0% 20%, #a87c00 20% 100%); border-color: #fff196; box-shadow: 0 0 0 1px #fad54a; }
 .status-damage-proof-icon { top: calc(2px + 40px * var(--board-scale)); background: linear-gradient(135deg, #2f539d 0% 100%); border-color: #bddcef; box-shadow: 0 0 0 1px #66b6ff; }
@@ -6424,6 +6426,7 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 .buff-icon > .pp-px-icon,
 .status-action-blocked-icon > .pp-px-icon,
 .status-stealth-icon > .pp-px-icon,
+.status-spell-immune-icon > .pp-px-icon,
 .status-damage-proof-icon > .pp-px-icon,
 .status-cheat-chair-icon > .pp-px-icon { width: 76%; height: 76%; }
 @keyframes ppPxBuffPuls {

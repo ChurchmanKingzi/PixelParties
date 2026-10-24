@@ -4165,6 +4165,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
    Immune-Icons plus Rahmen und wirkten deutlich groesser. */
 .status-action-blocked-icon,
 .status-stealth-icon,
+.status-spell-immune-icon,
 .status-damage-proof-icon,
 .status-cheat-chair-icon {
   width: calc(18px * var(--board-scale));
@@ -4188,6 +4189,13 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   background: linear-gradient(135deg, #1a1a2e, #3e3e51);
   border-color: #9ba3ca;
   box-shadow: 0 0 6px rgba(128,102,178,.7);
+}
+.status-spell-immune-icon {
+  /* 24.10.: Zauber-Immunität (Black-Thorn Dragon) — dunkles Violett, hellvioletter Rand. */
+  top: calc(2px + 40px * var(--board-scale));
+  background: linear-gradient(135deg, #2b0b47, #702db3);
+  border-color: #ac87de;
+  box-shadow: 0 0 6px rgba(163,106,251,.8);
 }
 .status-stealth-icon .status-stealth-lvl {
   position: absolute;
@@ -12736,6 +12744,7 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 .buff-icon > .pp-px-icon,
 .status-action-blocked-icon > .pp-px-icon,
 .status-stealth-icon > .pp-px-icon,
+.status-spell-immune-icon > .pp-px-icon,
 .status-damage-proof-icon > .pp-px-icon,
 .status-cheat-chair-icon > .pp-px-icon {
   width: 76%;

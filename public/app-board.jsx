@@ -50795,6 +50795,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     onMouseLeave={hideGameTooltip}
                   ><PxIcon z="⛔" /></div>
                 )}
+                {/* Zauber-Immunität (24.10., Black-Thorn Dragon): vom Server abgeleitet, kein Status */}
+                {hero?.name && p.spellImmuneHeroes?.[i] && (
+                  <div className="status-immune-icon status-spell-immune-icon badge-buff"
+                    onMouseEnter={e => showGameTooltip(e, 'Unaffected by all Spells (Black-Thorn Dragon): Spells have no effect on this Hero — damage, healing, status effects, buffs and more. The Hero can still be targeted, and Attacks and Creature effects work normally.')}
+                    onMouseLeave={hideGameTooltip}
+                  ><PxIcon z="🪬" /></div>
+                )}
                 {/* Stealth (v634): Abzeichen strikt aus der Ability-Zone abgeleitet —
                     kein Status, nichts fuer den Puzzle-Editor. Level = Belegungen. */}
                 {hero?.name && (() => {
