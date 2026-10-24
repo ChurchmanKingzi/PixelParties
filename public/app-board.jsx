@@ -8691,35 +8691,66 @@ const DragoneggShimmerEffect = (() => {
 // ═════════════════════════════════════════════════════════════════
 //  Spell Shackle: Ketten (`spell_shackle_chains`) — PIXELART; Vorlage: das Kartenbild (blaue, bedrohlich leuchtende Ketten um den Helden)
 //
-//  Eine Kette aus ovalen Gliedern (5×3 bzw. 3×5 Rasterpixel, dunkler Rand, blaue Füllung, heller Glanzpunkt, Glieder wechseln die Lage) legt sich Glied für
-//  Glied in einem Ring um die Karte; zwei lose Stränge kreuzen sich über ihr. Der Ring zieht sich in zwei ganzen Pixelstufen zusammen, dabei blitzen die Glieder
-//  hell auf (Weiß/Cyan), um jedes liegt ein gedithertes, flackerndes Leuchten (Bayer, steps), kleine Cyan-Funken steigen auf. Ab ~1000 ms dithert alles
-//  weg, bei 1400 ms ist es fort. Feste Palette (Blautöne der Kartenbilder), kein Weichzeichner, keine gedrehte Bitmap — jedes Glied wird in Pixeln gesetzt.
+//  Eine Eisenkette (24.10. überarbeitet: größere, offene Glieder): breite ovale Glieder (15×11 Rasterpixel, zwei Pixel dicker Ring, dunkler Rand, helle Kante oben
+//  links, Schatten unten rechts, INNEN ein echtes Loch von 11×7, durch das man hindurchsieht) wechseln sich mit hochkant stehenden Gliedern ab (schmaler Steg, der
+//  durch die Löcher der Nachbarn greift) — so greifen die Glieder wie bei einer echten Kette ineinander. Jedes Glied liegt mit seiner Achse entlang der Kette
+//  (Pixel für Pixel gerastert, keine gedrehte Bitmap). Die Kette legt sich Glied für Glied in einem Ring um die Karte; zwei lose Stränge kreuzen sich über ihr.
+//  Der Ring zieht sich in zwei ganzen Pixelstufen zusammen, dabei blitzen die Glieder hell auf (Weiß/Cyan), um jedes liegt ein gedithertes, flackerndes blaues
+//  Leuchten (Bayer, steps), kleine Cyan-Funken steigen auf. Ab ~1000 ms dithert alles weg, bei 1400 ms ist es fort. Feste Palette, kein Weichzeichner.
 // ═════════════════════════════════════════════════════════════════
 const SpellShackleChainsEffect = (() => {
-  const PAL = ['#ffffff', '#7fdfff', '#1ca9fd', '#4e82cb', '#2f539d', '#14285a'].map(ppHex);   // Glanz, Hell, Leuchten, Füllung, Schatten, Rand
+  // Glanz, Hell (Cyan-Blitz), Leuchten, Eisen hell, Eisen, Eisen Schatten, Rand
+  const PAL = ['#ffffff', '#7fdfff', '#1ca9fd', '#bddcef', '#7e7d9b', '#2d4362', '#1a1a2e'].map(ppHex);
   const ENDE = 1400, FADE_AB = 1000, WACHS = 520, ZIEH_AB = 560;
-  const RING = 20, STRANG = 7;
+  const TEILUNG = 16;                                      // Mittenabstand zweier breiter Glieder (Rasterpixel)
   const vorbereiten = (sz) => ({
     funken: Array.from({ length: ppFxN(9) }, () => ({ w: Math.random() * Math.PI * 2, v: 10 + Math.random() * 18, start: 300 + Math.random() * 600, leben: 340 + Math.random() * 200 })),
-    blitze: Array.from({ length: RING }, () => Math.random() * 90),
+    blitze: Array.from({ length: 48 }, () => Math.random() * 90),
   });
-  /** Gefüllte Pixelscheibe (der Pinsel von `ppPunktBild` kennt nur `put`/`block`). */
-  const scheibe = (g, cx, cy, r, c, a) => {
-    const R = Math.ceil(r);
-    for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) if (i * i + j * j <= r * r) g.put(cx + i, cy + j, c, a);
+  /** Kapsel um die Achse (Mitte, Winkel `ang`, Halblänge `h`): ruft `fn(X, Y, d, dx, dy)` für jedes Rasterpixel mit Abstand d ≤ `r` zur Achse. */
+  const kapsel = (cx, cy, ang, h, r, fn) => {
+    const ca = Math.cos(ang), sa = Math.sin(ang), R = Math.ceil(h + r) + 1;
+    for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) {
+      const u = i * ca + j * sa, v = -i * sa + j * ca;
+      const d = Math.hypot(Math.max(Math.abs(u) - h, 0), v);
+      if (d <= r) fn(cx + i, cy + j, d, i, j);
+    }
   };
-  /** Ein Kettenglied bei (x, y); `waagrecht` = liegendes Oval; `blitz` 0..1 = Aufleuchten; `a` = Deckung (Fade). */
-  const glied = (g, x, y, waagrecht, blitz, a) => {
-    const X = Math.round(x), Y = Math.round(y);
-    const w = waagrecht ? 7 : 5, h = waagrecht ? 5 : 7;
-    const x0 = X - (w >> 1), y0 = Y - (h >> 1);
-    g.block(x0 - 1, y0 - 1, w + 2, h + 2, PAL[5], a);                                // Rand
-    g.block(x0 + 1, y0 - 1, w - 2, 1, PAL[5], a); g.block(x0 + 1, y0 + h, w - 2, 1, PAL[5], a);
-    g.block(x0, y0, w, h, blitz > 0.5 ? PAL[1] : PAL[3], a);                          // Füllung
-    if (waagrecht) g.block(x0 + 2, y0 + 2, 3, 1, PAL[5], a); else g.block(x0 + 2, y0 + 2, 1, 3, PAL[5], a);   // Loch des Glieds
-    g.block(x0, y0, waagrecht ? 3 : 1, waagrecht ? 1 : 3, blitz > 0.5 ? PAL[0] : PAL[1], a);   // Glanzkante oben links
-    g.block(waagrecht ? x0 + w - 2 : x0 + w - 1, waagrecht ? y0 + h - 1 : y0 + h - 2, waagrecht ? 2 : 1, waagrecht ? 1 : 2, PAL[4], a);   // Schatten unten rechts
+  /** Breites Glied (Vorderansicht) bei (x, y), Achse entlang `ang`: Rand außen, Eisenring, offenes Loch in der Mitte. */
+  const breitesGlied = (g, x, y, ang, blitz, a) => {
+    const cx = Math.round(x), cy = Math.round(y);
+    kapsel(cx, cy, ang, 2, 5.5, (X, Y, d, i, j) => {
+      if (d <= 3.5) return;                                                         // das Loch: hier kommt nichts hin (man sieht hindurch)
+      if (d > 4.5) { g.put(X, Y, PAL[6], a); return; }                              // dunkler Rand
+      const licht = i + j;                                                          // oben links hell, unten rechts im Schatten
+      const c = licht < -1 ? (blitz ? PAL[0] : PAL[3]) : licht > 1 ? (blitz ? PAL[4] : PAL[5]) : (blitz ? PAL[1] : PAL[4]);
+      g.put(X, Y, c, a);
+    });
+  };
+  /** Hochkant stehendes Glied (Kantenansicht) bei (x, y): schmaler Steg entlang `ang`, dunkle Kanten, helle Mitte. */
+  const hochkantGlied = (g, x, y, ang, blitz, a) => {
+    const cx = Math.round(x), cy = Math.round(y);
+    kapsel(cx, cy, ang, 4, 1.5, (X, Y, d) => {
+      g.put(X, Y, d < 0.6 ? (blitz ? PAL[0] : PAL[3]) : (blitz ? PAL[4] : PAL[5]), a);
+    });
+  };
+  /** Weg des Rings: (x, y, Tangentenwinkel) bei Bogenlänge `sl` ab dem oberen Scheitel, im Uhrzeigersinn; Tabelle einmal je Bild. */
+  const ringWeg = (cx, cy, rx, ry) => {
+    const N = 240, pts = [];
+    let sum = 0, px = 0, py = 0;
+    for (let k = 0; k <= N; k++) {
+      const w = -Math.PI / 2 + (k / N) * Math.PI * 2, x = cx + Math.cos(w) * rx, y = cy + Math.sin(w) * ry;
+      if (k > 0) sum += Math.hypot(x - px, y - py);
+      pts.push({ x, y, l: sum, w }); px = x; py = y;
+    }
+    const an = (sl) => {
+      let lo = 0, hi = N;
+      while (hi - lo > 1) { const m = (lo + hi) >> 1; if (pts[m].l <= sl) lo = m; else hi = m; }
+      const A = pts[lo], B = pts[hi], f = B.l > A.l ? (sl - A.l) / (B.l - A.l) : 0;
+      const w = A.w + (B.w - A.w) * f;
+      return { x: cx + Math.cos(w) * rx, y: cy + Math.sin(w) * ry, ang: Math.atan2(ry * Math.cos(w), -rx * Math.sin(w)) };
+    };
+    return { laenge: sum, an };
   };
   const malen = (g, t, sz, teile) => {
     const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
@@ -8727,37 +8758,34 @@ const SpellShackleChainsEffect = (() => {
     const stufe = t < ZIEH_AB ? 0 : t < ZIEH_AB + 220 ? 1 : 2;                         // Ring zieht sich in ganzen Pixelstufen zu
     const rx = Math.round(sz.hw * 1.06) + 4 - stufe * 2, ry = Math.round(sz.hh * 0.98) + 4 - stufe * 3;
     const wachs = Math.min(1, t / WACHS);
-    const sichtbar = Math.floor(wachs * RING);
     const blitzGlobal = (t > ZIEH_AB && t < ZIEH_AB + 160) || (t > 820 && t < 900) ? 1 : 0;
-    // gedithertes, flackerndes Leuchten (zwei Stufen, springt im Takt)
-    const flackern = Math.floor(t / 66) % 2 ? 0.34 : 0.22;
-    for (let i = 0; i < sichtbar; i++) {
-      const w = (i / RING) * Math.PI * 2 - Math.PI / 2;
-      const x = sz.cx + Math.cos(w) * rx, y = sz.cy + Math.sin(w) * ry;
-      scheibe(g, x, y, 5.2, PAL[2], flackern * aus);
-    }
-    // die beiden Stränge (von den oberen Ecken schräg über die Karte nach unten)
+    const flackern = Math.floor(t / 66) % 2 ? 0.34 : 0.22;                            // gedithertes, flackerndes Leuchten (zwei Stufen, springt im Takt)
+    const einzelBlitz = (i) => (t > 600 && t - 600 > teile.blitze[i % 48] && t - 600 < teile.blitze[i % 48] + 110) ? 1 : 0;
+
+    // ── Glieder beider Ketten als Liste (Ring + zwei Stränge); gerade Nummern = breite Glieder, ungerade = hochkant dazwischen ──
+    const weg = ringWeg(sz.cx, sz.cy, rx, ry);
+    const F = Math.max(8, Math.round(weg.laenge / TEILUNG)), schritt = weg.laenge / F;
+    const ring = [];
+    for (let k = 0; k < 2 * F; k++) { const q = weg.an(k * schritt / 2); ring.push({ x: q.x, y: q.y, ang: q.ang, breit: k % 2 === 0, nr: k >> 1 }); }
+    const straenge = [];
     for (const sp of [-1, 1]) {
-      const n = Math.min(STRANG, Math.floor(wachs * (STRANG + 2)));
-      for (let k = 0; k < n; k++) {
-        const u = (k + 0.5) / STRANG;
-        const x = sz.cx + sp * (rx * 0.9 - u * rx * 1.8), y = sz.cy - ry * 0.85 + u * ry * 1.7;
-        scheibe(g, x, y, 4.6, PAL[2], flackern * aus);
-      }
+      const x0 = sz.cx + sp * rx * 0.8, y0 = sz.cy - ry * 0.8, x1 = sz.cx - sp * rx * 0.8, y1 = sz.cy + ry * 0.8;
+      const len = Math.hypot(x1 - x0, y1 - y0), ang = Math.atan2(y1 - y0, x1 - x0), n = Math.floor(len / (TEILUNG / 2));
+      const liste = [];
+      for (let k = 0; k < n; k++) { const f = (k * TEILUNG / 2) / len; liste.push({ x: x0 + (x1 - x0) * f, y: y0 + (y1 - y0) * f, ang, breit: k % 2 === 0, nr: 24 + (sp > 0 ? 0 : 12) + (k >> 1) }); }
+      straenge.push(liste);
     }
-    for (const sp of [-1, 1]) {
-      const n = Math.min(STRANG, Math.floor(wachs * (STRANG + 2)));
-      for (let k = 0; k < n; k++) {
-        const u = (k + 0.5) / STRANG;
-        const x = sz.cx + sp * (rx * 0.9 - u * rx * 1.8), y = sz.cy - ry * 0.85 + u * ry * 1.7;
-        glied(g, x, y, k % 2 === 0, blitzGlobal, aus);
-      }
-    }
-    for (let i = 0; i < sichtbar; i++) {
-      const w = (i / RING) * Math.PI * 2 - Math.PI / 2;
-      const x = sz.cx + Math.cos(w) * rx, y = sz.cy + Math.sin(w) * ry;
-      const einzel = (t > 600 && t - 600 > teile.blitze[i] && t - 600 < teile.blitze[i] + 110) ? 1 : 0;
-      glied(g, x, y, Math.abs(Math.sin(w)) > 0.7 ? true : (i % 2 === 0 && Math.abs(Math.sin(w)) > 0.3), blitzGlobal || einzel, aus);
+    const sichtR = Math.floor(wachs * ring.length);
+    const sichtS = (liste) => Math.min(liste.length, Math.floor(wachs * (liste.length + 4)));
+    const zeigeRing = ring.slice(0, sichtR);
+    const zeigeStr = straenge.map(l => l.slice(0, sichtS(l)));
+
+    // Leuchten hinter allem
+    for (const lst of [zeigeRing, ...zeigeStr]) for (const e of lst) if (e.breit) kapsel(Math.round(e.x), Math.round(e.y), e.ang, 2, 8, (X, Y, d) => { if (d > 5.5) g.put(X, Y, PAL[2], flackern * aus); });   // Leuchten nur AUSSEN ums Glied — das Loch bleibt frei
+    // Ring: erst die hochkant stehenden Glieder (hinten), dann die breiten (greifen darüber, ihr Loch gibt den Steg frei); danach die Stränge ebenso
+    for (const lst of [zeigeRing, ...zeigeStr]) {
+      for (const e of lst) if (!e.breit) hochkantGlied(g, e.x, e.y, e.ang, blitzGlobal || einzelBlitz(e.nr), aus);
+      for (const e of lst) if (e.breit) breitesGlied(g, e.x, e.y, e.ang, blitzGlobal || einzelBlitz(e.nr), aus);
     }
     for (const f of teile.funken) {
       const k = (t - f.start) / f.leben;
