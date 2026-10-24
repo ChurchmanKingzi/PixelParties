@@ -7484,6 +7484,7 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
   try {
     const chainResult = await room.engine.executeCardWithChain({
       cardName, owner: pi, heroIdx, cardType: 'Ability', goldCost: 0,
+      chosenHero: { owner: (typeof heroOwner === 'number' ? heroOwner : pi), heroIdx },   // W74b: der Held, an den die Ability angelegt wird
     });
 
     if (chainResult.negated) {
@@ -7585,6 +7586,7 @@ async function doPlayAbilityFremd(room, pi, { cardName, handIndex, heroIdx, zone
   try {
     const chainResult = await engine.executeCardWithChain({
       cardName, owner: pi, heroIdx, cardType: 'Ability', goldCost: 0,
+      chosenHero: { owner: heroOwner, heroIdx },   // W74b: der Held, an den die Ability angelegt wird
     });
     if (chainResult.negated) {
       const slot = abZones[ziel] || [];
@@ -7829,6 +7831,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
 
       const chainResult = await room.engine.executeCardWithChain({
         cardName, owner: pi, cardType: 'Artifact', goldCost: cost,
+        chosenHero: isEquip ? { owner: placementOwner, heroIdx } : null,   // W74b: der Held, dem die Ausruestung angelegt wird
         resolve: async () => {
           // `cardName` mit: nur so greift `selfGoldOverdraft` (Debt-O-Tron
           // Damage Fees darf sich selbst auch aus dem Minus bezahlen).
@@ -7994,6 +7997,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
 
       const chainResult = await room.engine.executeCardWithChain({
         cardName, owner: pi, cardType: 'Artifact', goldCost: cost,
+        chosenHero: isEquip ? { owner: placementOwner, heroIdx } : null,   // W74b: der Held, dem die Ausruestung angelegt wird
         resolve: async () => {
           // `cardName` mit: nur so greift `selfGoldOverdraft` (Debt-O-Tron
           // Damage Fees darf sich selbst auch aus dem Minus bezahlen).
@@ -8410,6 +8414,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       level: room.engine.effectiveCardLevel(cardData, pi, { heroIdx, handIdx: fromCreation ? undefined : handIndex }),
     };
   } catch { delete gs._gewirkteStufe; }
+  room.engine.verbrauchNaechsterSpellRabatt(pi, cardData);   // W74c (Wendy): der naechste Spell des Zuges hat den Rabatt verbraucht
   beginHandResolve(ps, cardName, handIndex, fromCreation);
 
   // Spell-in-flight counter — gates advancePhase so the turn can't end
@@ -8489,6 +8494,8 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     chainResult = _kostenAbbruch ? { negated: false, chainFormed: true, fizzled: false } : await room.engine.executeCardWithChain({
       cardName, owner: pi, cardType: cardData.cardType, goldCost: 0, heroIdx,
       resolve: null,
+      // W74b (Flesh-Eating Swarm Trap): ein Attachment waehlt seinen Helden beim Spielen.
+      chosenHero: (attachHeroIdx != null && attachHeroIdx >= 0) ? { owner: isSeat(gs, attachOwner) ? attachOwner : pi, heroIdx: attachHeroIdx } : null,
       // ★ v1328: Wirker-Seite (bezauberter Held) fuer die Handlungs-
       // faehigkeitspruefung beim Aufloesen; ein von einer Creature
       // gewirkter Spell hat keinen Helden-Wirker.
@@ -11747,6 +11754,13 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   try {
     chainResult = await room.engine.executeCardWithChain({
       cardName: potionName, owner: pi, cardType, goldCost: goldCost || 0,
+      // W74b (Flesh-Eating Swarm Trap): waehlt der Trank genau EINEN Helden (und sonst nichts), ist das der gewaehlte Held.
+      chosenHero: (() => {
+        const ids = Array.isArray(selectedIds) ? selectedIds : [];
+        if (ids.length !== 1) return null;
+        const t = (validTargets || []).find(v => v && v.id === ids[0]);
+        return (t && t.type === 'hero' && Number.isInteger(t.heroIdx)) ? { owner: t.owner, heroIdx: t.heroIdx } : null;
+      })(),
       resolve: script.resolve ? async () => {
         if (broadcastPotionAnim) broadcastPotionAnim();
         // v353: `'hand'` — der Spieler setzt die Karte gerade selbst aus

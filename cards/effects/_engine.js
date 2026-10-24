@@ -13046,6 +13046,14 @@ class GameEngine {
     this._autoRevealOnEnterHand(pi, idx, cardName);
     // ★ Welle 12 (Al, Rueckfrage 14, Lawn Gnome): „die Sperre wandert mit der Karte" — kommt die Karte vom BRETT (`opts.vonInst`: die verlassende Instanz),
     // darf das Skript (`beimRueckgangInHand(engine, ps, handIdx, inst)`) Handindex-Felder fuer die neue Handkopie setzen.
+    if (opts.vonInst || opts.von === 'brett') {
+      // ★ W74c (Wendy): Sonderwege „Brett → Hand" melden sich hier (der zentrale Weg in `_actionMoveCardKern` meldet selbst); nach der Kette, wie jede Folge-Reaktion.
+      const _seite = opts.vonInst ? this.physicalSide(opts.vonInst) : (opts.fromOwner ?? opts.originalOwner ?? pi);
+      const _kaVon = opts.vonInst?.zone || 'support';
+      this.queuePostChainAction(async () => {
+        await this.runHooks(HOOKS.ON_BOARD_CARD_TO_HAND, { bewegtName: cardName, bewegteKarte: opts.vonInst || null, vonZone: _kaVon, vonSeite: _seite, handSeite: pi, _skipReactionCheck: true });
+      });
+    }
     if (opts.vonInst) {
       try { loadCardEffect(cardName)?.beimRueckgangInHand?.(this, ps, idx, opts.vonInst); }
       catch (err) { console.error(`[beimRueckgangInHand] ${cardName} threw:`, err.message); }
@@ -15357,6 +15365,7 @@ class GameEngine {
     const _zuFremderHand = (fromZone === ZONES.SUPPORT && toZone === ZONES.HAND && Number.isInteger(opts.toPlayer)
       && opts.toPlayer !== (cardInstance.controller ?? cardInstance.owner)) ? opts.toPlayer : null;
     const _herkunftVorWechsel = cardInstance.originalOwner ?? cardInstance.owner;
+    const _brettSeiteVorher = fromZone === ZONES.SUPPORT ? this.physicalSide(cardInstance) : (cardInstance.controller ?? cardInstance.owner);   // W74c (Wendy): Brettseite VOR dem Zonenwechsel
     // W64c (Al 23.10.2026: „Bounce geht an den aktuellen Kontrolleur"): Brett → HAND geht in die Hand des KONTROLLEURS (auch gestohlen/uebernommen);
     // die Herkunft bleibt (Platzmarke unten), spaeteres Abwerfen/Loeschen/Spielen/Mischen geht in die Stapel des Besitzers. Brett → Ablage/Loeschstapel/Deck
     // einer gestohlenen/uebernommenen Karte geht dagegen zum BESITZER (W63c, Al: „IMMER in die Stapel des permanenten Besitzers").
@@ -15698,6 +15707,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     // die Zeile wird hier nur nicht mehr erzeugt, damit aeltere
     // Spielstaende und Mitschnitte lesbar bleiben.
     await this.runHooks(HOOKS.ON_CARD_ENTER_ZONE, { card: cardInstance, toZone, toHeroIdx });
+    // ★ W74c (Wendy): „when you add a card from your side of the board to your hand" — die eine Meldung für den zentralen Weg.
+    if (toZone === ZONES.HAND && (fromZone === ZONES.SUPPORT || fromZone === ZONES.ABILITY || fromZone === ZONES.SURPRISE)) {
+      await this.runHooks(HOOKS.ON_BOARD_CARD_TO_HAND, { bewegtName: cardInstance.name, bewegteKarte: cardInstance, vonZone: fromZone, vonSeite: _brettSeiteVorher, handSeite: _heimkehr ?? cardInstance.owner, quelleSeite: (typeof opts.sourceOwner === 'number') ? opts.sourceOwner : (typeof opts.source === 'object' && opts.source ? (opts.source.controller ?? opts.source.owner) : undefined), _skipReactionCheck: true });
+    }
     if (cardInstance._buddyAbgang) { delete cardInstance._buddyAbgang; this._untrackCard(cardInstance.id); }   // W64a: Fantasy Buddy → Spell-Karte nur als Name im Stapel
     // W5a: ein Token ohne Karte darunter ist nach dem Abgang nirgends mehr — keine Geister-Instanz im Gelöscht-Stapel.
     if (fromZone === ZONES.SUPPORT && toZone === ZONES.DELETED && this.isTokenCard(cardInstance) && !this.tokenUnterkarte(cardInstance)) {
@@ -26033,6 +26046,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // ueber eine ganze Partie mitwaechst.
         if (this.gs._effectImmunities) this.gs._effectImmunities.length = 0;
         delete ps._magicLevelReductions;
+        delete ps._naechsterSpellRabatt;   // W74c (Wendy): gilt nur für den Zug, in dem er entstand
         // v654: zugweise befristete Kopien-Rabatte (siehe Registrierung
         // von `_handLevelOffsetsExpireTurn`). Stempel aus einem
         // frueheren Zug → Offset und Stempel fallen; Hero-Filter der
@@ -42724,7 +42738,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /** Hooks that should NOT trigger reaction checks */
   static REACTION_SKIP_HOOKS = new Set([
-    'onPlay', 'onCardEnterZone', 'onEquipGained', 'onEquipLost', 'onFormChanged', 'onNameChanged', 'onPhaseStart', 'onGameStart', 'onBeforeHandDraw',
+    'onPlay', 'onCardEnterZone', 'onEquipGained', 'onEquipLost', 'onFormChanged', 'onNameChanged', 'onBoardCardToHand', 'onPhaseStart', 'onGameStart', 'onBeforeHandDraw',
     'onChainStart', 'onChainResolve', 'onEffectNegated', 'onNegationDealt', 'onResourceDrawReplace',
     'beforeDamage', 'afterDamage', 'beforeLevelChange',
     'onResourceSpend', 'onReactionActivated', 'onCardActivation',
@@ -42766,6 +42780,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       surpriseHost: cardInfo.surpriseHost || null,
       // W5b-Z1b: Beschwörung als inhärente Zusatzaktion (Priests: die Kosten sind das Zurückmischen, `beforeSummon` NACH dem Fenster).
       isInherentAction: !!cardInfo.isInherentAction,
+      // ★ W74b (Flesh-Eating Swarm Trap): der Held, den die Karte BEIM SPIELEN waehlt (Ausruestung, Attachment, Ability-Anlegen, Trank): `{ owner (Brettseite), heroIdx }`.
+      chosenHero: cardInfo.chosenHero || null,
       // ★ W34a: virtuelle Kette eines Effekts, der als Attack/Spell ZÄHLT (`alsAttackKette` / `alsSpellKette`): `'attack' | 'spell'`. Leser, die ein echtes Kartenspiel
       // verlangen (Shamanic Curse: der Zauber müsste in den Ablagestapel gehen), schließen solche Glieder aus.
       zaehltAlsArt: cardInfo.zaehltAlsArt || null,
@@ -42786,7 +42802,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Dieser Merker schliesst die Luecke; Vorgaenger gesichert, damit
     // verschachtelte Aufloesungen sich nicht ueberschreiben.
     const prevEffectSource = this._currentEffectSource;
-    this._currentEffectSource = { cardName, owner, cardType, heroIdx: heroIdx ?? -1 };   // Z3: heroIdx fuer `_umgebungsQuelle`
+    this._currentEffectSource = { cardName, owner, cardType, heroIdx: heroIdx ?? -1, fromBoard: !!fromBoard, isPlacement: !!cardInfo.isPlacement };   // Z3: heroIdx fuer `_umgebungsQuelle`; W74b: Herkunft fuer die Hand-Reaktionen auf gewaehlte Helden
     this._inReactionCheck = true;
     try {
       const eventDesc = `${cardName} was activated`;
@@ -50246,6 +50262,30 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ W74c (Wendy, the Shy Girl): „the next Spell you use this turn has its level reduced by 3". Eintrag je Spieler, gilt für den ZUG, in dem er entstand; der nächste
+   * gespielte SPELL (nicht Attack) verbraucht ihn (Server `doPlaySpell`, direkt nach dem Merken der gewirkten Stufe). Die Senkung läuft durch `_applyCardLevelReductions`
+   * (Spielbarkeit, Handstufe, Wisdom-Kosten) — wie jede andere Stufensenkung (Mindeststufe 0).
+   */
+  spellRabattVormerken(pi, amount, quelle = null) {
+    const ps = this.gs.players[pi];
+    if (!ps) return;
+    (ps._naechsterSpellRabatt || (ps._naechsterSpellRabatt = [])).push({ amount, turn: this.gs.turn, quelle });
+  }
+  _naechsterSpellRabattSumme(pi, cardData) {
+    if (cardData?.cardType !== 'Spell') return 0;
+    const liste = this.gs.players[pi]?._naechsterSpellRabatt;
+    if (!liste?.length) return 0;
+    let s = 0;
+    for (const r of liste) if (r.turn === this.gs.turn) s += r.amount;
+    return s;
+  }
+  verbrauchNaechsterSpellRabatt(pi, cardData) {
+    if (cardData?.cardType !== 'Spell') return;
+    const ps = this.gs.players[pi];
+    if (ps?._naechsterSpellRabatt?.length) ps._naechsterSpellRabatt = [];
+  }
+
+  /**
    * ★ W7a (H04-13, Al): Hand-Stufenrabatte, die an einen HELDEN gebunden sind (`_handLevelOffsetHeroFilter`) und von dessen
    * Heldeneffekt stammen (Skript-Flag `handLevelOffsetsArePassive`: Sid), ruhen bei Frost/Betäubung/Negation des Helden.
    * (Grenze: liegt auf demselben Helden zusätzlich ein Sparkfly-Queen-Rabatt mit gleichem Filter, ruht er hier mit.)
@@ -50400,6 +50440,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (r.cardName === cardData.name) total += r.amount;
       }
     }
+    total += this._naechsterSpellRabattSumme(playerIdx, cardData);   // W74c (Wendy)
     return Math.max(0, rawLevel - total);
   }
 
@@ -50834,6 +50875,15 @@ this._deathWatch = (this._deathWatchStack || []).length
         if ((inst.controller ?? inst.owner) !== playerIdx) continue;
         const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
         if (typeof script?.coverLevelGap !== 'function') continue;
+        // ★ W74a (Rosie, Kai): eine KREATUR in der Support Zone des Helden deckt mit einer Staerke, die sie selbst ausrechnet (`levelGapCapacity(engine, inst)`: Charme-/Fighting-Stufe
+        // des Helden); ruht sie (gefroren/betaeubt/negiert), deckt sie nichts. Ausruestung bleibt beim Zaehler `levelGapCoverage`.
+        if (typeof script.levelGapCapacity === 'function') {
+          if (this.isCardPassiveDormant(inst)) continue;
+          let kap = 0;
+          try { kap = Number(script.levelGapCapacity(this, inst)) || 0; } catch { kap = 0; }
+          if (kap > 0) ausruestungsGeber.push({ script, staerke: kap });
+          continue;
+        }
         ausruestungsGeber.push({ script, staerke: inst.counters?.levelGapCoverage || 1 });
       }
     }

@@ -5458,5 +5458,25 @@
 "Cheering Rabbit": {
 "id": "Cheering_Rabbit",
 "kind": "a"
+},
+"Rosie, the School Idol": {
+"id": "Rosie_the_School_Idol",
+"kind": "a"
+},
+"Kai, the Rowdy": {
+"id": "Kai_the_Rowdy",
+"kind": "a"
+},
+"Flesh-Eating Swarm Trap": {
+"id": "Flesh_Eating_Swarm_Trap",
+"kind": "a"
+},
+"Wendy, the Shy Girl": {
+"id": "Wendy_the_Shy_Girl",
+"kind": "a"
+},
+"Hot Skull Potato": {
+"id": "Hot_Skull_Potato",
+"kind": "a"
 }
 }

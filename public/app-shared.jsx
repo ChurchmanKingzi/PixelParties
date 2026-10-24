@@ -3597,6 +3597,22 @@ const ZONE_ANIM_SFX = {
     { name: 'ping',       opts: { rate: 1.8, volume: 0.25, delay: 340, category: null, dedupe: 0 } },
     { name: 'ping',       opts: { rate: 2.6, volume: 0.2, delay: 470, category: null, dedupe: 0 } },
   ],
+  // Welle 74 (24.10.): Flesh-Eating Swarm Trap — Summen des Schwarms (hoher Wind), Bisse in drei Schlägen.
+  flesh_swarm: [
+    { name: 'elem_wind',  opts: { rate: 2.4, volume: 0.35 } },
+    { name: 'debuff',     opts: { rate: 1.4, volume: 0.3, delay: 380, category: null, dedupe: 0 } },
+    { name: 'slash',      opts: { rate: 2.1, volume: 0.3, delay: 700, category: null, dedupe: 0 } },
+    { name: 'slash',      opts: { rate: 1.8, volume: 0.3, delay: 880, category: null, dedupe: 0 } },
+    { name: 'slash',      opts: { rate: 2.3, volume: 0.3, delay: 1060, category: null, dedupe: 0 } },
+  ],
+  // Hot Skull Potato: Zischen, dann der große Knall (tiefer Schlag + Wind + Knistern).
+  hot_potato_blast: [
+    { name: 'debuff',       opts: { rate: 1.8, volume: 0.3 } },
+    { name: 'heavy_impact', opts: { rate: 0.7, volume: 0.6, delay: 520, category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 0.8, volume: 0.45, delay: 560, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.6, volume: 0.25, delay: 760, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.0, volume: 0.2, delay: 900, category: null, dedupe: 0 } },
+  ],
   leafagami_leaves: [
     { name: 'elem_wind',  opts: { rate: 1.4, volume: 0.35 } },
     { name: 'ping',       opts: { rate: 2.2, volume: 0.25, delay: 140, category: null, dedupe: 0 } },
