@@ -48911,21 +48911,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
   }, []);
 
-  // ── Verworfene Aktion: der Server hat eine Aktion ohne jede Wirkung
-  // abgebrochen (ungueltige Lage, Sperre, Zug vorbei …) und uns den aktuellen
-  // Zustand geschickt. Hier nur der Hinweis dazu — hoechstens alle 3 s, damit
-  // wiederholtes Tippen die Anzeige nicht zumuellt.
-  useEffect(() => {
-    let zuletzt = 0;
-    const onActionRejected = () => {
-      const jetzt = Date.now();
-      if (jetzt - zuletzt < 3000) return;
-      zuletzt = jetzt;
-      if (notify) notify('That action isn\'t possible right now.', 'error');
-    };
-    socket.on('action_rejected', onActionRejected);
-    return () => { socket.off('action_rejected', onActionRejected); };
-  }, [notify]);
+  // ── Verworfene Aktion (`action_rejected`): der Server hat eine Aktion ohne jede Wirkung abgebrochen und uns den aktuellen Zustand geschickt. Der Spieler wird damit NICHT behelligt
+  // (24.10.: kein Hinweis „That action isn't possible right now", kein Fehlerton) — scheitert im Hintergrund still etwas, gleicht der neue Zustand die Anzeige ab.
 
   // ── Action Log socket listener (Chat: v1374 in `ChatPanel`) ──
   useEffect(() => {
