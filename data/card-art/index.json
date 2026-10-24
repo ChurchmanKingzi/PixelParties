@@ -5498,5 +5498,25 @@
 "Hot Skull Potato": {
 "id": "Hot_Skull_Potato",
 "kind": "a"
+},
+"Darion, the Blood-Crazy Groundskeeper": {
+"id": "Darion_the_Blood-Crazy_Groundskeeper",
+"kind": "a"
+},
+"Control Monitors": {
+"id": "Control_Monitors",
+"kind": "a"
+},
+"Celia, the Class Clown": {
+"id": "Celia_the_Class_Clown",
+"kind": "a"
+},
+"Ghostly Warning": {
+"id": "Ghostly_Warning",
+"kind": "a"
+},
+"Atta, Speaker of Desires": {
+"id": "Atta_Speaker_of_Desires",
+"kind": "a"
 }
 }
