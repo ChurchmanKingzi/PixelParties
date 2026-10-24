@@ -10933,6 +10933,9 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   right: 0;
   bottom: 0;
   overflow-y: auto;
+  /* Die Bildlaufleiste eines langen Texts nahm bisher erst beim Erscheinen Breite im Tooltip weg: die Karte wurde schmaler, der Text brach um — lange und kurze Tooltips sahen
+     verschieden aus (Acid Vial vs. Poison Vial). Der Streifen ist jetzt immer reserviert, das Layout bleibt gleich. */
+  scrollbar-gutter: stable;
   font-size: 14px;
 }
 /* Der Tooltip steht IMMER buendig rechts; die Ketten-Anzeige liegt ueber ihm (siehe `.reaction-chain-overlay`, sie weicht
