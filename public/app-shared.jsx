@@ -2880,6 +2880,36 @@ const ZONE_ANIM_SFX = {
     { name: 'creature_destroyed', opts: { rate: 1.4, volume: 0.5,  delay: 540, category: null, dedupe: 0 } },
     { name: 'elem_water',         opts: { rate: 1.5, volume: 0.35, delay: 640, category: null, dedupe: 0 } },
   ],
+  // Doomed Pirate (24.10.) — der dunkle Ring wirbelt (0 ms), der Totenkopf fliegt (Wind, ~200 ms), Aufprall bei ~600 ms (Schlag, Fluch), die Pfeile sinken. Nur der erste Teil uebernimmt die
+  // Sammelkategorie 'effect'.
+  doomed_pirate_curse: [
+    { name: 'elem_dark',    opts: { rate: 0.8, volume: 0.55 } },
+    { name: 'elem_wind',    opts: { rate: 0.9, volume: 0.35, delay: 200, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.9, volume: 0.55, delay: 600, category: null, dedupe: 0 } },
+    { name: 'debuff',       opts: { rate: 0.7, volume: 0.6,  delay: 640, category: null, dedupe: 0 } },
+  ],
+  // Zira Racer (24.10.) — der Blitz saust los (Geschoss, 0 ms, Wind), Einschlag bei ~460 ms (Schlag, Ping). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  zira_dash: [
+    { name: 'projectile',   opts: { rate: 1.6, volume: 0.45 } },
+    { name: 'elem_wind',    opts: { rate: 1.8, volume: 0.35, delay: 100, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.3, volume: 0.55, delay: 460, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.4, volume: 0.35, delay: 500, category: null, dedupe: 0 } },
+  ],
+  // Glasowt (24.10.) — die Lanze zischt los (0 ms), Einschlag bei ~460 ms (Klirren, Glitzern), die Flammen verloeschen (Zischen, ~620 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  glasowt_shatter: [
+    { name: 'projectile',         opts: { rate: 1.3, volume: 0.45 } },
+    { name: 'ping',               opts: { rate: 2.6, volume: 0.45, delay: 460, category: null, dedupe: 0 } },
+    { name: 'creature_destroyed', opts: { rate: 1.8, volume: 0.5,  delay: 480, category: null, dedupe: 0 } },
+    { name: 'elem_water',         opts: { rate: 1.6, volume: 0.35, delay: 620, category: null, dedupe: 0 } },
+  ],
+  // Buttap (24.10.) — die Kugeln sirren los (Zauberton, 0 ms; Pings im Takt der Umlaeufe), Einschlag bei ~480 ms (Schlag, Glitzern). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  buttap_orbs: [
+    { name: 'spell_cast',   opts: { rate: 1.4, volume: 0.4 } },
+    { name: 'ping',         opts: { rate: 1.8, volume: 0.3,  delay: 200, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.2, volume: 0.3,  delay: 320, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.2, volume: 0.5,  delay: 480, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.8, volume: 0.4,  delay: 520, category: null, dedupe: 0 } },
+  ],
   // Breakthrough (11.10.) — Risse knistern (Schnitt, 0 ms), die Scheibe birst bei ~460 ms (Schlag), Scherben klirren (~500 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   breakthrough_shatter: [
     { name: 'slash',              opts: { rate: 1.5, volume: 0.45 } },

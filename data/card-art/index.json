@@ -515,6 +515,10 @@
 "id": "Burning_Skeleton",
 "kind": "a"
 },
+"Buttap": {
+"id": "Buttap",
+"kind": "a"
+},
 "Butterfly Cloud": {
 "id": "Butterfly_Cloud",
 "kind": "a"
@@ -1359,6 +1363,10 @@
 "id": "Doom_Prophecy",
 "kind": "a"
 },
+"Doomed Pirate": {
+"id": "Doomed_Pirate",
+"kind": "a"
+},
 "Doomed Town Guard": {
 "id": "Doomed_Town_Guard",
 "kind": "a"
@@ -1877,6 +1885,10 @@
 },
 "Gigantisaur Triceras": {
 "id": "Gigantisaur_Triceras",
+"kind": "a"
+},
+"Glasowt": {
+"id": "Glasowt",
 "kind": "a"
 },
 "Glass Sword": {
@@ -4595,6 +4607,10 @@
 "id": "Time_Distortion",
 "kind": "a"
 },
+"Time Tyrant": {
+"id": "Time_Tyrant",
+"kind": "a"
+},
 "Timeless King Zi": {
 "id": "Timeless_King_Zi",
 "kind": "a"
@@ -5417,6 +5433,10 @@
 },
 "Spy in the Enemy's Camp": {
 "id": "Spy_in_the_Enemys_Camp",
+"kind": "a"
+},
+"Zira Racer": {
+"id": "Zira_Racer",
 "kind": "a"
 }
 }

@@ -8585,6 +8585,64 @@ function ppSalve(malen, ende, vorbereiten, opts) {
 
 
 // ═══════════════════════════════════════════════════════════════════
+//  PIXELART-GESCHOSSE — Quelle → Ziel (24.10., Welle 3: Doomed Pirate, Zira Racer, Glasowt, Buttap)
+//  Hülle über `ppSalve` für „etwas fliegt von der Karte zum Ziel und schlägt dort ein": Ursprung `ox/oy` (`originOwner`/`originHeroIdx`/`originZoneSlot`), Ziele `targetPoints` (`targets`).
+//    ppProjektil({ ende, abflug, einschlag, fadeAb?, bogen?, linear?, schweif: [Farben Kopf → Ende], schweifLaenge?, schweifSchritt?, funken?, funkenFarben?,
+//                  laden?(g, ox, oy, c), kopf(g, x, y, c), treffer(g, tx, ty, c) })
+//      c = { t, aus, dx, dy, k, zi, len, teile }   (k = Flugfortschritt 0..1; bei `treffer`: al = ms seit dem Einschlag)
+//  Alles Pixelart: Raster-Pixel (1 = 3 Bildschirmpixel), feste Farben, Bayer-Dithering statt Alpha, ~30 Bilder/s (ppSalve).
+// ═══════════════════════════════════════════════════════════════════
+function ppProjektil(cfg) {
+  const ENDE = cfg.ende, ABFLUG = cfg.abflug, EINSCHLAG = cfg.einschlag, FADE_AB = cfg.fadeAb || (ENDE - 160);
+  const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const SL = cfg.schweifLaenge || 6, SS = cfg.schweifSchritt || 0.035;
+  const vorbereiten = (sz) => ({
+    funken: sz.ziele.map(() => Array.from({ length: ppFxN(cfg.funken || 12) }, () => ({
+      ab: EINSCHLAG - 20 + Math.random() * 120, w: Math.random() * Math.PI * 2, v: 14 + Math.random() * 28, leben: 260 + Math.random() * 220,
+    }))),
+  });
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const OX = sz.O.x, OY = sz.O.y;
+    sz.ziele.forEach((z, zi) => {
+      const tx = OX + z.dx * z.len, ty = OY + z.dy * z.len;
+      const c = { t, aus, dx: z.dx, dy: z.dy, zi, len: z.len, teile };
+      if (cfg.laden && t < ABFLUG + 140) cfg.laden(g, OX, OY, { ...c, k: klemme(t / (ABFLUG + 140), 0, 1) });
+      // ── Flug ──
+      if (!z.selbst && t >= ABFLUG && t < EINSCHLAG + 40) {
+        const k = klemme((t - ABFLUG) / (EINSCHLAG - ABFLUG), 0, 1), e = cfg.linear ? k : k * k * (3 - 2 * k);
+        const nx = -z.dy, ny = z.dx, hubMax = (cfg.bogen || 0) * Math.min(1, z.len / 90);
+        const pos = (kk) => { const hub = Math.sin(kk * Math.PI) * hubMax; return [OX + z.dx * z.len * kk + nx * hub, OY + z.dy * z.len * kk + ny * hub]; };
+        for (let n = SL; n >= 1; n--) {
+          const [px, py] = pos(klemme(e - n * SS, 0, 1));
+          const col = cfg.schweif[Math.min(cfg.schweif.length - 1, Math.floor((n / SL) * cfg.schweif.length))];
+          g.block(px - 1, py - 1, 2, 2, col, aus * (1 - (n / (SL + 1)) * 0.75));
+        }
+        const [hx, hy] = pos(e);
+        cfg.kopf(g, hx, hy, { ...c, k: e });
+      }
+      // ── Einschlag ──
+      if (t >= EINSCHLAG - 20) {
+        cfg.treffer(g, tx, ty, { ...c, al: t - (EINSCHLAG - 20) });
+        const fc = cfg.funkenFarben || cfg.schweif;
+        for (const fu of teile.funken[zi]) {
+          const a2 = t - fu.ab; if (a2 < 0 || a2 > fu.leben) continue;
+          const kk = a2 / fu.leben, sek = a2 / 1000;
+          g.put(tx + Math.cos(fu.w) * fu.v * sek, ty + Math.sin(fu.w) * fu.v * sek + 40 * sek * sek, fc[Math.min(fc.length - 1, Math.floor(kk * fc.length))], (1 - kk) * aus);
+        }
+      }
+    });
+  };
+  return ppSalve(malen, ENDE + 40, vorbereiten, { extra: cfg.extra || 24 });
+}
+/** Kleines Pixelbild zeichnen: `rows` = Zeilen aus Zeichen, `pal` = { Zeichen: [r,g,b] }, Mittelpunkt (cx, cy). */
+function ppSprite(g, cx, cy, rows, pal, deckung) {
+  const h = rows.length, w = rows[0].length, x0 = Math.round(cx - w / 2), y0 = Math.round(cy - h / 2);
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const c = pal[rows[j][i]]; if (c) g.put(x0 + i, y0 + j, c, deckung); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
 //  PIXELART-BILDER AN EINEM PUNKT (23.10., Shimmering Dragonegg, Liquid Luck) — Vorlage: das jeweilige Kartenbild
 //  ACHTUNG Reihenfolge: die Paletten laufen beim Laden der Datei (`ppHex`, eine `const` weiter oben in dieser Datei) — dieser Block muss NACH `ppHex` stehen,
 //  sonst bricht das Laden von app-board.js ab (TDZ) und spätere Konstanten (PHASEN_KURZ …) bleiben undefiniert.
@@ -28829,6 +28887,136 @@ const ANIM_REGISTRY = {
       });
     };
     return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+  })(),
+  // ═════════════════════════════════════════════════════════════════
+  //  Doomed Pirate (24.10.) — PIXELART, Geschoss vom Piraten zum gewählten Helden (`ppProjektil`)
+  //
+  //  Ein Totenkopf (Knochen, schwarze Augenhöhlen) fliegt in hohem Bogen mit Nebelschweif; um den Piraten wirbelt vorher ein dunkler Ring. Beim Aufprall platzt ein dunkler Ring auf, und vier
+  //  rote Pfeile sinken nach unten: die ATK fällt auf 0. Die Sperre greift bei `FLUG_WARTE_MS` (doomed-pirate.js).
+  // ═════════════════════════════════════════════════════════════════
+  doomed_pirate_curse: (() => {
+    const NEBEL = ['#b9b9b9', '#929292', '#58238c', '#2b0b47'].map(ppHex);
+    const ROT = ['#f0bfbc', '#e94e53', '#b21a29', '#710122'].map(ppHex);
+    const PAL = { W: ppHex('#ebdcc1'), K: ppHex('#12101f') };
+    const SCHAEDEL = ['.WWWWW.', 'WWWWWWW', 'WKKWKKW', 'WWWKWWW', '.WWWWW.', '..WKW..'];
+    const PFEIL = ['RRRRR', '.RRR.', '..R..'];
+    return ppProjektil({
+      ende: 900, abflug: 160, einschlag: 600, fadeAb: 740, bogen: 22, schweif: NEBEL, funkenFarben: [NEBEL[1], NEBEL[2], NEBEL[3]], funken: 10,
+      laden: (g, ox, oy, c) => {
+        const r = 12 - 6 * c.k;
+        g.ring(ox, oy, r, r * 0.8, NEBEL[2], c.aus);
+        g.ring(ox, oy, r - 1, (r - 1) * 0.8, NEBEL[3], c.aus * 0.8);
+        for (let i = 0; i < 6; i++) { const w = (i / 6) * Math.PI * 2 + c.t / 80; g.put(ox + Math.cos(w) * r, oy + Math.sin(w) * r * 0.8, i % 2 ? NEBEL[0] : NEBEL[1], c.aus); }
+      },
+      kopf: (g, x, y, c) => ppSprite(g, x, y, SCHAEDEL, PAL, c.aus),
+      treffer: (g, tx, ty, c) => {
+        if (c.al < 220) {
+          const f = 1 - c.al / 220;
+          g.ring(tx, ty, 4 + c.al / 8, 4 + c.al / 8, NEBEL[2], f * c.aus);
+          g.ring(tx, ty, 6 + c.al / 6, 6 + c.al / 6, NEBEL[3], f * c.aus * 0.8);
+        }
+        // vier rote Pfeile sinken (die ATK fällt)
+        const palRot = { R: ROT[1] };
+        for (let i = 0; i < 4; i++) {
+          const a2 = c.al - i * 50; if (a2 < 0 || a2 > 380) continue;
+          const kk = a2 / 380, ox = (i - 1.5) * 7;
+          ppSprite(g, tx + ox, ty - 14 + kk * 22, PFEIL, palRot, (1 - kk) * c.aus);
+        }
+      },
+    });
+  })(),
+  // ═════════════════════════════════════════════════════════════════
+  //  Zira Racer (24.10.) — PIXELART, Blitz von Zira Racer zum Ziel (`ppProjektil`)
+  //
+  //  Ein gelb-oranger Pfeil rast geradlinig mit langem Schweif und waagerechten Windstreifen auf das Ziel und schlägt mit einem Sternring ein (acht Strahlen, Funken).
+  // ═════════════════════════════════════════════════════════════════
+  zira_dash: (() => {
+    const GOLD = ['#ffffff', '#f7f7ad', '#fad54a', '#f29a3e', '#aa5300'].map(ppHex);
+    return ppProjektil({
+      ende: 760, abflug: 100, einschlag: 460, fadeAb: 620, linear: true, schweif: GOLD, schweifLaenge: 10, schweifSchritt: 0.03, funkenFarben: [GOLD[1], GOLD[2], GOLD[3]], funken: 14,
+      kopf: (g, x, y, c) => {
+        const nx = -c.dy, ny = c.dx;
+        // Windstreifen hinter dem Kopf
+        for (const off of [-6, -3, 3, 6]) for (let d = 5; d < 20; d++) {
+          if (ppBayer(d + off * 3, Math.abs(off)) < 0.55 * (1 - d / 22)) g.put(x - c.dx * d + nx * off, y - c.dy * d + ny * off, GOLD[2], c.aus);
+        }
+        // Pfeilspitze: weisser Kern, gelbe Flügel
+        g.block(x - 1, y - 1, 3, 3, GOLD[0], c.aus);
+        g.put(x + c.dx * 3, y + c.dy * 3, GOLD[1], c.aus);
+        g.put(x - c.dx * 2 + nx * 2, y - c.dy * 2 + ny * 2, GOLD[1], c.aus);
+        g.put(x - c.dx * 2 - nx * 2, y - c.dy * 2 - ny * 2, GOLD[1], c.aus);
+      },
+      treffer: (g, tx, ty, c) => {
+        if (c.al < 220) {
+          const f = 1 - c.al / 220, r = 3 + c.al / 7;
+          g.ring(tx, ty, r, r, GOLD[1], f * c.aus);
+          g.ring(tx, ty, r * 0.6, r * 0.6, GOLD[0], f * c.aus);
+          for (let i = 0; i < 8; i++) { const w = (i / 8) * Math.PI * 2 + Math.PI / 8, l = 4 + c.al / 9; for (let d = 2; d < l; d++) g.put(tx + Math.cos(w) * d, ty + Math.sin(w) * d, d < l * 0.6 ? GOLD[0] : GOLD[2], f * c.aus); }
+        }
+      },
+    });
+  })(),
+  // ═════════════════════════════════════════════════════════════════
+  //  Glasowt (24.10.) — PIXELART, gläserne Lanze von Glasowt auf das brennende Ziel (`ppProjektil`)
+  //
+  //  Eine lange, helle Glaslanze (weisse Spitze, hellblauer Schaft) schiesst geradlinig mit Glitzerschweif zum Ziel, zerspringt dort in kantige Scherben, und die Flammen am Ziel
+  //  verlöschen zischend (orange Glut wird grau und steigt als Dampf auf).
+  // ═════════════════════════════════════════════════════════════════
+  glasowt_shatter: (() => {
+    const GLAS = ['#ffffff', '#b3e8f9', '#66d9ff', '#4e77ca', '#02398c'].map(ppHex);
+    const GLUT = ['#f7f7ad', '#fad54a', '#f29a3e', '#aa5300'].map(ppHex);
+    const DAMPF = ['#d2d2db', '#a8a8a8', '#686868'].map(ppHex);
+    return ppProjektil({
+      ende: 800, abflug: 140, einschlag: 460, fadeAb: 640, schweif: GLAS.slice(0, 4), schweifLaenge: 7, schweifSchritt: 0.04, funkenFarben: [GLAS[0], GLAS[1], GLAS[2], GLAS[3]], funken: 16,
+      kopf: (g, x, y, c) => {
+        const nx = -c.dy, ny = c.dx;
+        for (let d = 0; d < 14; d++) {   // Lanze: Spitze vorn, Schaft nach hinten dicker
+          const col = d < 2 ? GLAS[0] : d < 8 ? GLAS[1] : GLAS[2];
+          g.put(x - c.dx * d + c.dx * 4, y - c.dy * d + c.dy * 4, col, c.aus);
+          if (d >= 2 && d < 11) { g.put(x - c.dx * d + c.dx * 4 + nx, y - c.dy * d + c.dy * 4 + ny, GLAS[2], c.aus); g.put(x - c.dx * d + c.dx * 4 - nx, y - c.dy * d + c.dy * 4 - ny, GLAS[3], c.aus); }
+        }
+      },
+      treffer: (g, tx, ty, c) => {
+        if (c.al < 160) {
+          const f = 1 - c.al / 160;
+          g.ring(tx, ty, 3 + c.al / 8, 3 + c.al / 8, GLAS[0], f * c.aus);
+          g.disc(tx, ty, 3 * f + 1, GLAS[0], f * c.aus);
+        }
+        // Flammen verlöschen: Glut wird grau und steigt als Dampf auf
+        for (let i = 0; i < 9; i++) {
+          const a2 = c.al - 60 - i * 25; if (a2 < 0 || a2 > 520) continue;
+          const kk = a2 / 520, px = tx + (i - 4) * 3 + Math.sin(a2 / 90 + i) * 2, py = ty + 8 - kk * 26;
+          g.block(px, py, 2, 2, kk < 0.3 ? GLUT[Math.min(3, Math.floor(kk / 0.1))] : DAMPF[Math.min(2, Math.floor((kk - 0.3) / 0.24))], (1 - kk) * c.aus);
+        }
+      },
+    });
+  })(),
+  // ═════════════════════════════════════════════════════════════════
+  //  Buttap (24.10.) — PIXELART, drei Kugeln von Buttap zum Ziel (`ppProjektil`)
+  //
+  //  Drei rosa-violette Kugeln umkreisen sich auf dem Weg im leichten Bogen, ziehen Funkenschweif und platzen am Ziel zu einem Sternring (Kreuz aus Strahlen, kreisende Funken).
+  // ═════════════════════════════════════════════════════════════════
+  buttap_orbs: (() => {
+    const ROSA = ['#ffffff', '#f3bad3', '#f174ab', '#9544d5', '#58238c'].map(ppHex);
+    return ppProjektil({
+      ende: 800, abflug: 120, einschlag: 480, fadeAb: 640, bogen: 12, schweif: [ROSA[1], ROSA[2], ROSA[3], ROSA[4]], schweifLaenge: 6, funkenFarben: [ROSA[0], ROSA[1], ROSA[2], ROSA[3]], funken: 12,
+      kopf: (g, x, y, c) => {
+        for (let i = 0; i < 3; i++) {
+          const w = c.t / 70 + (i / 3) * Math.PI * 2, ox = Math.cos(w) * 5, oy = Math.sin(w) * 5;
+          g.disc(x + ox, y + oy, 2, i === 0 ? ROSA[2] : i === 1 ? ROSA[3] : ROSA[1], c.aus);
+          g.put(x + ox, y + oy - 1, ROSA[0], c.aus);
+        }
+        g.put(x, y, ROSA[0], c.aus);
+      },
+      treffer: (g, tx, ty, c) => {
+        if (c.al < 240) {
+          const f = 1 - c.al / 240, r = 3 + c.al / 7;
+          g.ring(tx, ty, r, r, ROSA[2], f * c.aus);
+          g.ring(tx, ty, r * 0.55, r * 0.55, ROSA[0], f * c.aus);
+          for (let i = 0; i < 8; i++) { const w = (i / 8) * Math.PI * 2 + c.al / 160, l = 3 + c.al / 8; for (let d = 2; d < l; d++) g.put(tx + Math.cos(w) * d, ty + Math.sin(w) * d, i % 2 ? ROSA[3] : ROSA[1], f * c.aus); }
+        }
+      },
+    });
   })(),
   // ═══════════════════════════════════════════════════════════════════
   //  Breakthrough (11.10.) — PIXELART, Brett-Animation auf der gewaehlten Surprise (Surprise Zone oder Support Zone; `targets`)
@@ -50544,6 +50732,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'overheat') {
         const p = playerByName(entry.player);
         return <span className="log-status">🔥 {cName('Overheat')} — {pName(p.name, p.color)}'s spell {entry.discarded ? <>sends {cName(entry.artifact)} to the discard pile</> : <>fails to remove {cName(entry.artifact)}</>}{entry.negated ? <> (the hit on {entry.hero} was negated)</> : entry.damaged ? <> and {entry.damaged} takes <span className="log-amount">{entry.damage}</span> damage</> : null}.</span>;
+      }
+      if (t === 'doomed_pirate') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">☠️ {cName('Doomed Pirate')} — {pName(p.name, p.color)} dooms {entry.hero}: its Attack stat becomes 0 and cannot be increased while the Pirate remains on the board.</span>;
+      }
+      if (t === 'zira_racer') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">⚡ {cName('Zira Racer')} — {pName(p.name, p.color)} discards {cName(entry.discarded)} (level {entry.level}){entry.target ? <> and deals {entry.damage} damage to {entry.target}</> : <>: no damage</>}.</span>;
+      }
+      if (t === 'time_tyrant') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">⏳ {cName('Time Tyrant')} — {pName(p.name, p.color)} reveals {cName(entry.revealed)} and shuffles it back{entry.drew > 0 ? <>, then draws {entry.drew} card{entry.drew > 1 ? 's' : ''}</> : null}.</span>;
+      }
+      if (t === 'glasowt') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🔥 {cName('Glasowt')} — {pName(p.name, p.color)} shatters Burned {entry.target}: {entry.damage} damage that cannot be reduced, negated or redirected.</span>;
+      }
+      if (t === 'buttap') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">💥 {cName('Buttap')} — {pName(p.name, p.color)} reveals {cName(entry.revealed)}{entry.toHand ? <> and adds it to their hand.</> : <>{entry.target ? <>: {entry.damage} damage to {entry.target}, then it is shuffled back.</> : <>: no damage, then it is shuffled back.</>}</>}</span>;
       }
       if (t === 'frost_breaker_no_free_action') {
         const p = playerByName(entry.player);
