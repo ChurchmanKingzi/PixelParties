@@ -8,9 +8,9 @@
 //
 //  ── ZIELE ───────────────────────────────────────────────────────────────
 //  „Targets" = lebende Helden (beider Seiten, nach KONTROLLE: ein übernommener Held zählt für den Übernehmer) und aufgedeckte Kreaturen in den Support Zones (`_istKreaturenInstanz`; keine
-//  Puppets & Co., keine verdeckten Karten). Beide Ziele müssen vom SELBEN Spieler kontrolliert werden — auch vom Wirker selbst (z. B. Held ↔ eigene Kreatur). Zwei Schritte:
-//  1. erstes Ziel (alle Ziele eines Spielers, der mindestens zwei hat; Rest ausgegraut), abbrechbar — dann bleibt die Karte auf der Hand;
-//  2. zweites Ziel (nur die übrigen Ziele DESSELBEN Kontrolleurs; Rest ausgegraut), abbrechbar.
+//  Puppets & Co., keine verdeckten Karten). Beide Ziele müssen vom SELBEN Spieler kontrolliert werden — auch vom Wirker selbst (z. B. Held ↔ eigene Kreatur). EIN Picker für beide Ziele
+//  (genau 2, abbrechbar — dann bleibt die Karte auf der Hand): alle Ziele eines Spielers, der mindestens zwei hat, sind wählbar, der Rest ist ausgegraut. Die Picker-Regel `sameBy: 'kontrolleur'`
+//  graut nach dem ersten Klick alle Ziele des anderen Spielers aus; bestätigt werden kann erst mit 2 Zielen (`minRequired: 2`).
 //  Erstrunden-Schutz: die Ziele des geschützten Gegners stehen nicht zur Wahl (wirkungslos).
 //
 //  ── DER TAUSCH ──────────────────────────────────────────────────────────
@@ -141,51 +141,27 @@ module.exports = {
       if (gr.length === 0) { gs._spellCancelled = true; return; }
 
       const mitAuge = engine._sourceIgnoresTargetingRestrictions?.(ctx.card);
-      const wahlOpts = {
+
+      // ── Beide Ziele in EINEM Picker: genau 2, vom selben Kontrolleur (`sameBy`: nach dem ersten Klick graut der Picker alle Ziele des anderen Spielers aus) ──
+      delete gs._zielNegiertDurchSchutz;
+      const alle = gr.flatMap(g => g.ziele);
+      const r = await engine.promptEffectTarget(pi, [...alle, ...ausgegrauteRestkarten(engine, alle)], {
         ...(mitAuge ? { ignoreUntargetable: true, _truthSeeingEye: true } : {}),
         chooserHeroIdx: heroIdx,
         title: CARD_NAME, source: CARD_NAME,
         confirmClass: 'btn-danger',
-        maxTotal: 1, exclusiveTypes: false, maxPerType: { hero: 1, equip: 1 },
-        cancellable: true,
-      };
-      const idVon = (r) => (Array.isArray(r) ? r[0] : r);
-
-      // ── 1. Erstes Ziel ──
-      delete gs._zielNegiertDurchSchutz;
-      const alle1 = gr.flatMap(g => g.ziele);
-      const r1 = await engine.promptEffectTarget(pi, [...alle1, ...ausgegrauteRestkarten(engine, alle1)], {
-        ...wahlOpts,
-        description: 'Choose the first of 2 targets controlled by the same player. They swap their current and max HP (and Attack stat).',
-        confirmLabel: '🪆 First target',
-      });
-      const id1 = idVon(r1);
-      gr = gruppen(engine, pi);
-      const g1 = id1 && gr.find(g => g.ziele.some(z => z.id === id1));
-      const a = g1 && g1.ziele.find(z => z.id === id1);
-      if (!a) {
-        if (id1 || gs._spellNegatedByEffect || gs._zielNegiertDurchSchutz) { delete gs._zielNegiertDurchSchutz; engine.sync(); return; }
-        gs._spellCancelled = true;
-        return;
-      }
-      delete gs._zielNegiertDurchSchutz;
-
-      // ── 2. Zweites Ziel: nur der DESSELBEN Kontrolleurs ──
-      const rest = g1.ziele.filter(z => z.id !== a.id);
-      engine._voodooErstes = a;     // die CPU wählt den Partner zum ersten Ziel
-      let r2;
-      try {
-        r2 = await engine.promptEffectTarget(pi, [...rest, ...ausgegrauteRestkarten(engine, rest)], {
-        ...wahlOpts,
-        description: `Choose the second target — it must be controlled by ${gs.players[g1.kontrolleur]?.username || 'the same player'} as well.`,
+        description: 'Choose 2 targets controlled by the same player. They swap their current and max HP (and Attack stat).',
         confirmLabel: '🪆 Swap!',
-        });
-      } finally { delete engine._voodooErstes; }
-      const id2 = idVon(r2);
-      const g2 = gruppen(engine, pi).find(g => g.kontrolleur === g1.kontrolleur);
-      const b = id2 && g2 && g2.ziele.find(z => z.id === id2 && z.id !== a.id);
-      if (!b) {
-        if (id2 || gs._spellNegatedByEffect || gs._zielNegiertDurchSchutz) { delete gs._zielNegiertDurchSchutz; engine.sync(); return; }
+        maxTotal: 2, minRequired: 2, sameBy: 'kontrolleur',
+        cancellable: true,
+      });
+      const ids = Array.isArray(r) ? r : (r ? [r] : []);
+      const gr2 = gruppen(engine, pi);
+      const g1 = ids.length === 2 && gr2.find(g => ids.every(id => g.ziele.some(z => z.id === id)));
+      const a = g1 && g1.ziele.find(z => z.id === ids[0]);
+      const b = g1 && g1.ziele.find(z => z.id === ids[1]);
+      if (!a || !b || a.id === b.id) {
+        if (ids.length > 0 || gs._spellNegatedByEffect || gs._zielNegiertDurchSchutz) { delete gs._zielNegiertDurchSchutz; engine.sync(); return; }
         gs._spellCancelled = true;
         return;
       }
@@ -252,36 +228,25 @@ module.exports = {
     },
   },
 
-  /** CPU: nur gegnerische Paare, und nur wenn sich der Tausch lohnt (stärkerer Angreifer → niedrigere HP). */
+  /** CPU: nur gegnerische Paare, und nur wenn sich der Tausch lohnt (stärkerer Angreifer → niedrigere HP). Antwort: beide Ziele auf einmal. */
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'effectTarget') return undefined;
     const { validTargets, config, playerIdx } = promptData || {};
     if (config?.title !== CARD_NAME || !Array.isArray(validTargets)) return undefined;
     const frei = validTargets.filter(t => !t.ineligible);
-    if (frei.length === 0) return [];
+    if (frei.length < 2) return [];
     const gegner = (t) => engine.opponentsOf(playerIdx).includes(t.kontrolleur ?? engine.kontrolleurVonHeld?.(t.owner, t.heroIdx));
     const ktrl = (t) => t.kontrolleur ?? (t.type === 'hero' ? engine.kontrolleurVonHeld(t.owner, t.heroIdx) : engine.kontrolleurVon(t.cardInstance));
-    const zweiter = String(config.confirmLabel || '').includes('Swap');
-    if (!zweiter) {
-      // Erstes Ziel: das beste Paar unter den gegnerischen Zielen.
-      let best = null, bestV = 0;
-      for (const a of frei) {
-        if (!gegner(a)) continue;
-        for (const b of frei) {
-          if (a.id === b.id || ktrl(a) !== ktrl(b)) continue;
-          const v = cpuPaarWert(engine, a, b);
-          if (v > bestV) { bestV = v; best = a; }
-        }
+    // Das beste Paar unter den gegnerischen Zielen (gleicher Kontrolleur).
+    let best = null, bestV = 0;
+    for (const a of frei) {
+      if (!gegner(a)) continue;
+      for (const b of frei) {
+        if (a.id === b.id || ktrl(a) !== ktrl(b)) continue;
+        const v = cpuPaarWert(engine, a, b);
+        if (v > bestV) { bestV = v; best = [a.id, b.id]; }
       }
-      return best ? [best.id] : [];
     }
-    // Zweites Ziel: der beste Partner für das erste (das der Zielwähler schon kennt: gleicher Kontrolleur, nicht ausgegraut).
-    const erstes = engine._voodooErstes;
-    let best = frei[0], bestV = -Infinity;
-    for (const b of frei) {
-      const v = erstes ? cpuPaarWert(engine, erstes, b) : 0;
-      if (v > bestV) { bestV = v; best = b; }
-    }
-    return [best.id];
+    return best || [];
   },
 };
