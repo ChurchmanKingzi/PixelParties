@@ -9092,6 +9092,66 @@ const MothDustEffect = (() => {
   return ppPunktBild(malen, ENDE + 40, 300, 340, vorbereiten);
 })();
 
+//  Lamenting Knight: heilende Tränen (`lament_tears`, Quelle → Ziel; `lament_rain` = nur der Regen an einem Punkt, für die entkoppelten Bilder einer negierten Karte) — Vorlage: der
+//  weinende Ritter. Am Ritter quellen zwei Tränen und rinnen die Wange hinab; dann fliegen große Tränen (mit zwei Begleittropfen) im Bogen zum Helden und regnen über ihm nieder. Jeder
+//  Tropfen spritzt am Boden auseinander, grüne Heilkreuze steigen auf. Pixelart: feste Paletten, Dither statt Alpha, Bewegung in ganzen Pixeln im Bildtakt; ~1700 ms (Einschlag ~940 ms).
+const TRAENE_PAL = { o: ppHex('#2f539d'), b: ppHex('#4e82cb'), l: ppHex('#b3d8f9'), w: ppHex('#ffffff') };
+const TRAENE_GROSS = ['..o..', '.obo.', '.obo.', 'obbbo', 'obwbo', 'obbbo', '.ooo.'];
+const TRAENE_KLEIN = ['.o.', 'owo', 'obo', '.o.'];
+const HEIL_GRUEN = ['#b3f9cf', '#75f091', '#4ceb70', '#00cc50'].map(ppHex);
+/** Ein grünes Heilkreuz (5×5) mit hellem Kern. */
+function ppHeilKreuz(g, x, y, a) {
+  g.block(x - 1, y, 3, 1, HEIL_GRUEN[2], a); g.block(x, y - 1, 1, 3, HEIL_GRUEN[2], a);
+  g.put(x, y, HEIL_GRUEN[0], a);
+  g.put(x - 2, y, HEIL_GRUEN[3], a); g.put(x + 2, y, HEIL_GRUEN[3], a); g.put(x, y - 2, HEIL_GRUEN[3], a); g.put(x, y + 2, HEIL_GRUEN[3], a);
+}
+/** Tränenregen über (cx, cy): `al` = ms seit Beginn, `a` = Deckkraft. Die Tropfen fallen aus der Höhe, kleine Wellen und vier Spritzer am „Boden", grüne Kreuze steigen auf. Nur put/block. */
+function ppTraenenRegen(g, cx, cy, al, a) {
+  const N = 14, FALL = 380, SPRITZ = 240;
+  for (let i = 0; i < N; i++) {
+    const a2 = al - ((i * 47) % 360); if (a2 < 0 || a2 > FALL + SPRITZ) continue;
+    const x = Math.round(cx + ((i * 37) % 23) - 11), boden = Math.round(cy + 6 + ((i * 5) % 5) - 2);
+    if (a2 < FALL) {
+      const y = Math.round((boden - 34) + 34 * Math.pow(a2 / FALL, 1.6));
+      ppSprite(g, x, y, i % 3 === 0 ? TRAENE_GROSS : TRAENE_KLEIN, TRAENE_PAL, a);
+    } else {
+      const k = (a2 - FALL) / SPRITZ, r = 1 + Math.round(k * 4), f = (1 - k) * a;
+      g.put(x - r, boden, TRAENE_PAL.l, f); g.put(x + r, boden, TRAENE_PAL.l, f); g.put(x - r + 1, boden + 1, TRAENE_PAL.b, f); g.put(x + r - 1, boden + 1, TRAENE_PAL.b, f);
+      for (const [dx, dy] of [[-1, -1], [1, -1], [-2, 0], [2, 0]]) g.put(x + dx * (1 + k * 4), boden - 1 + dy * k * 5 + k * k * 5, k < 0.5 ? TRAENE_PAL.w : TRAENE_PAL.l, f);
+    }
+  }
+  for (let j = 0; j < 3; j++) {
+    const a3 = al - (140 + j * 170); if (a3 < 0 || a3 > 560) continue;
+    const k = a3 / 560;
+    ppHeilKreuz(g, Math.round(cx + (j - 1) * 9), Math.round(cy + 4 - k * 22), (1 - k) * a);
+  }
+}
+const LamentRainEffect = ppPunktBild((g, t, sz) => {
+  const aus = t > 920 ? Math.max(0, 1 - (t - 920) / 260) : 1;
+  if (aus > 0) ppTraenenRegen(g, sz.cx, sz.cy, t, aus);
+}, 1200, 300, 330);
+const LamentTearsEffect = ppProjektil({
+  ende: 1700, abflug: 480, einschlag: 940, fadeAb: 1500, bogen: 20, extra: 120,
+  schweif: [TRAENE_PAL.l, TRAENE_PAL.b, TRAENE_PAL.o], schweifLaenge: 6, schweifSchritt: 0.03,
+  funkenFarben: [TRAENE_PAL.w, TRAENE_PAL.l, TRAENE_PAL.b], funken: 10,
+  // Der Ritter weint: zwei Tränen quellen oben an der Karte, rinnen die Wange hinab und tropfen ab.
+  laden: (g, ox, oy, c) => {
+    for (let i = 0; i < 2; i++) {
+      const a2 = c.t - i * 110; if (a2 < 0) continue;
+      const x = Math.round(ox + (i ? 4 : -4)), y0 = Math.round(oy - 7), rinn = Math.min(1, a2 / 420), y = Math.round(y0 + rinn * rinn * 15);
+      for (let yy = y0 + 2; yy < y - 2; yy += 2) g.put(x, yy, TRAENE_PAL.l, c.aus * 0.7);
+      ppSprite(g, x, y, TRAENE_KLEIN, TRAENE_PAL, c.aus * (a2 > 480 ? Math.max(0, 1 - (a2 - 480) / 140) : 1));
+    }
+  },
+  kopf: (g, x, y, c) => {
+    const nx = -c.dy, ny = c.dx;
+    ppSprite(g, x, y, TRAENE_GROSS, TRAENE_PAL, c.aus);
+    ppSprite(g, x - c.dx * 6 + nx * 4, y - c.dy * 6 + ny * 4 - 1, TRAENE_KLEIN, TRAENE_PAL, c.aus);
+    ppSprite(g, x - c.dx * 9 - nx * 4, y - c.dy * 9 - ny * 4 - 2, TRAENE_KLEIN, TRAENE_PAL, c.aus);
+  },
+  treffer: (g, tx, ty, c) => ppTraenenRegen(g, tx, ty, c.al, c.aus),
+});
+
 //  Arnold: Muskelspiel (`arnold_flex`) — Vorlage: der rosa Axolotl-Muskelprotz. Rosa Pixel-Kreuze (HP) und Aufwärtspfeile (ATK) steigen rund um den Helden auf, ein rosa Ring
 //  (zwei Pixelstufen) blitzt auf; ~1000 ms.
 const ArnoldFlexEffect = (() => {
@@ -18460,6 +18520,8 @@ const ANIM_REGISTRY = {
   arcane_eyes_open: ArcaneEyesOpenEffect,
   hockey_wish: HockeyWishEffect,
   pinaxolotl_bubbles: PinaxolotlBubblesEffect,
+  lament_tears: LamentTearsEffect,
+  lament_rain: LamentRainEffect,
   hero_creature_on: HeroCreatureOnEffect,
   hero_creature_off: HeroCreatureOffEffect,
   moth_dust: MothDustEffect,
@@ -51240,6 +51302,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'hero_creature_placed') {
         const p = playerByName(entry.player);
         return <span className="log-status">🦊 {cName(entry.hero)} — {pName(p.name, p.color)} places {cName(entry.creature)} (from {entry.from === 'deck' ? 'the deck' : 'the hand'}) on top of {entry.hero}: until the end of the turn it is treated as that Creature as well as a Hero.</span>;
+      }
+      if (t === 'hero_creature_max_hp') {
+        return <span className="log-info">🦊 {cName(entry.hero)}{entry.zurueck ? ' — max HP back to ' : ' — max HP becomes '}<span className="log-amount">{entry.to}</span>{entry.zurueck ? '.' : <> (that of {cName(entry.creature)}; current HP unchanged).</>}</span>;
       }
       if (t === 'hero_creature_deleted') {
         return <span className="log-info">💨 {cName(entry.creature)} is deleted from {entry.hero} at the end of the turn.</span>;

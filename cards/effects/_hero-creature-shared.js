@@ -194,11 +194,41 @@ function erzeugen(engine, pi, seite, heroIdx, name, turn) {
   inst.counters = inst.counters || {};
   inst.counters._heldKreatur = { seite, heroIdx };
   inst.counters._hasHaste = true;
-  // HP-Anzeige für Leser, die `counters.currentHp` lesen: Spiegel der Heldenwerte zum Zeitpunkt des Auflegens (Schaden wird ohnehin auf den Helden gebucht).
+  hero.heldKreatur = { instId: inst.id, name, turn };
+  // ★ MAX HP: solange die Kreatur aufliegt, sind die maximalen HP des Helden die der Kreatur (aufgedruckte HP); die AKTUELLEN HP bleiben unangetastet (liegen sie über dem neuen
+  // Maximum, ist das ein Overheal wie bei Nao: Heilung bringt dann 0, Schaden zehrt es ab). Die Differenz wird gemerkt und am Ende ADDITIV zurückgenommen (`maxHpZurueck`), damit
+  // Änderungen der max HP währenddessen (Arnold +40, Toughness …) erhalten bleiben.
+  const kreaturMax = Number(engine.getEffectiveCardData(inst)?.hp);
+  if (Number.isFinite(kreaturMax) && kreaturMax > 0) {
+    const vorher = hero.maxHp || hero.hp;
+    hero.heldKreatur.maxHpDelta = kreaturMax - vorher;
+    hero.heldKreatur.hpBeiAnlage = hero.hp;
+    hero.maxHp = kreaturMax;
+    engine.log('hero_creature_max_hp', { hero: hero.name, creature: name, from: vorher, to: kreaturMax });
+  }
+  // HP-Anzeige für Leser, die `counters.currentHp` lesen: Spiegel der Heldenwerte (Schaden wird ohnehin auf den Helden gebucht).
   inst.counters.maxHp = hero.maxHp || hero.hp;
   inst.counters.currentHp = hero.hp;
-  hero.heldKreatur = { instId: inst.id, name, turn };
   return inst;
+}
+
+/**
+ * Die max HP des Helden zurückgeben, wenn die Kreatur geht: die beim Auflegen gemerkte Differenz wird abgezogen (nie unter 1). Aktuelle HP, die nur wegen des erhöhten Maximums
+ * über dem alten lagen (Heilung bis zur Kreatur-Obergrenze), verfallen auf den Stand beim Auflegen — ein vorübergehendes Maximum schenkt keine dauerhaften HP. Gefallene Helden
+ * (0 HP) behalten ihre HP.
+ */
+function maxHpZurueck(engine, hero) {
+  const hk = hero?.heldKreatur;
+  if (!hk || hk.maxHpDelta === undefined) return;
+  const jetzt = hero.maxHp || hero.hp;
+  const neu = Math.max(1, jetzt - hk.maxHpDelta);
+  hero.maxHp = neu;
+  if (hero.hp > 0) {
+    const grenze = Math.max(neu, hk.hpBeiAnlage || 0);
+    if (hero.hp > grenze) hero.hp = grenze;
+  }
+  delete hk.maxHpDelta;
+  engine.log('hero_creature_max_hp', { hero: hero.name, creature: hk.name, from: jetzt, to: neu, zurueck: true });
 }
 
 /**
@@ -263,6 +293,7 @@ async function entfernen(engine, seite, heroIdx, opts = {}) {
     });
   }
   if (inst) engine._untrackCard(inst.id);
+  maxHpZurueck(engine, hero);
   delete hero.heldKreatur;
   engine._broadcastEvent('play_zone_animation', { type: 'hero_creature_off', owner: seite, heroIdx, zoneSlot: -1, duration: 900 });
   const bps = gs.players[besitzer];
@@ -397,5 +428,5 @@ function zielEintraege(engine, brettSeite, seiteFilter, config, quellName) {
 
 module.exports = {
   ZONE, skriptSicht, istUeberlagerung, spiegeln, ueberlagerung, istHeldKreatur, wirtVon, aktivierbareEintraege, ablehnungsgrund, schulStufe, kandidaten,
-  platzieren, anlegenOhneEinsatz, entfernen, zugendeAufraeumen, heldStirbt, bewegungAbfangen, zielEintraege, alsKreaturWaehlbar, WEGBEWEGENDE_WAHL, entferneFremdeUeberlagerungen,
+  platzieren, anlegenOhneEinsatz, entfernen, maxHpZurueck, zugendeAufraeumen, heldStirbt, bewegungAbfangen, zielEintraege, alsKreaturWaehlbar, WEGBEWEGENDE_WAHL, entferneFremdeUeberlagerungen,
 };

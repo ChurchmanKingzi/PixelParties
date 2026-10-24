@@ -11288,6 +11288,12 @@ class GameEngine {
       this.log('heal_blocked', { target: target.name, source: source?.name, reason: 'spell_immunity' });
       return;
     }
+    // ★ Held als Kreatur (Hulijing): die aufliegende Kreatur hat keine eigenen HP — Heilung geht an den Wirt-Helden (wie der Schaden, `_reroutePooledCreatureDamage`).
+    if (target.counters._heldKreatur) {
+      const w = require('./_hero-creature-shared').wirtVon(this, target);
+      if (w?.hero?.name && w.hero.hp > 0) return await this.actionHealHero(source, w.hero, amount);
+      return;
+    }
     // v704 (Puppets): Shared HP pool — Heilung eines Puppet-Tokens heilt
     // den Helden der Spalte.
     if (loadCardEffect(target.counters?._effectOverride || target.name)?.sharesHpWithHero && !this.isCardPassiveDormant(target)) {   // W8: der Pool ruht bei Frost/Betäubung/Negation
@@ -11776,6 +11782,11 @@ class GameEngine {
     // this correctly handles Nao-style overheal (currentHp can exceed maxHp).
     if (target.counters !== undefined) {
       if (this.kreaturSpellImmun(target, opts.source ?? null, opts)) return 0;   // 23.10.: „unaffected by all Spells"
+      // ★ Held als Kreatur (Hulijing): geteilte HP — das Maximum gehört dem Wirt-Helden.
+      if (target.counters._heldKreatur) {
+        const w = require('./_hero-creature-shared').wirtVon(this, target);
+        return w?.hero?.name ? this.increaseMaxHp(w.hero, amount, opts) : 0;
+      }
       const cd        = this._getCardDB()[target.name];
       const baseHp    = target.counters.maxHp    ?? cd?.hp ?? 0;
       const currentHp = target.counters.currentHp ?? baseHp;

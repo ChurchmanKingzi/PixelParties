@@ -15,8 +15,10 @@
 //  Obergrenze = max HP. Ein Held, der schon voll ist, darf trotzdem gewählt werden (die Heilung bringt 0).
 //
 //  ── Bild und Klang ──────────────────────────────────────────────────────
-//  Wie Skeleton Healer: Heilstrahl (`play_heal_beam`: steigt vom Ritter auf, trifft den Helden) und `heal_sparkle` auf dem Helden. Klänge laufen über diese Standardbilder;
-//  Log `lamenting_knight`.
+//  HEILENDE TRÄNEN (24.10., Pixelart, `play_zone_animation` `lament_tears`, Quelle → Ziel wie Glasowt): am Ritter quellen zwei Tränen und rinnen die Wange hinab, dann fliegen große
+//  Tränen im Bogen zum Helden und regnen über ihm nieder (Spritzer am Boden, grüne Heilkreuze steigen auf); ~1700 ms. Die Heilung greift beim Einschlag (~960 ms). Ursprung ist die Zone
+//  des Ritters (liegt er auf Hulijing, die Heldenzone, `originZoneSlot` −1). Klänge in ZONE_ANIM_SFX; Log `lamenting_knight`. Für die entkoppelten Bilder einer NEGIERTEN Karte
+//  (`spellVisual`) läuft nur der Regen (`lament_rain`).
 //
 //  ── CPU ─────────────────────────────────────────────────────────────────
 //  Der EIGENE Held, bei dem die Heilung am meisten bringt (fehlende HP, gedeckelt auf die Heilmenge); nie ein gegnerischer Held, es sei denn, nur gegnerische sind wählbar (dann bricht
@@ -24,6 +26,8 @@
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Lamenting Knight';
+const TRAENEN_MS = 1700;       // Länge der Animation (deckt sich mit `lament_tears` im Client)
+const TRAENEN_HIT_MS = 960;    // Einschlag der Tränen: hier greift die Heilung
 
 /** Heilmenge für einen Helden: die Hälfte seiner max HP, aufgerundet. */
 function healAmount(hero) {
@@ -38,7 +42,7 @@ function hatHeldenZiel(engine) {
 
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT, läuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
-  spellVisual: { impact: { type: 'heal_sparkle' }, impactMs: 260 },
+  spellVisual: { impact: { type: 'lament_rain' }, impactMs: 700 },
 
   activeIn: ['support'],
   creatureEffect: true,
@@ -71,19 +75,13 @@ module.exports = {
     if (!hero?.name || hero.hp <= 0) return false;
     const menge = healAmount(hero);
 
-    // Wie Skeleton Healer: Strahl steigt vom Ritter auf, trifft den Helden, Funkenregen.
-    engine._broadcastEvent('play_heal_beam', {
-      phase: 'rise', sourceOwner: seite, sourceHeroIdx: heroIdx, sourceZoneSlot: zoneSlot,
-      targetOwner: ziel.owner, targetHeroIdx: ziel.heroIdx, targetZoneSlot: -1,
+    // Der Ritter weint: Tränen quellen an ihm, fliegen im Bogen zum Helden und regnen über ihm nieder (Pixelart, `lament_tears`). Die Heilung greift beim Einschlag.
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'lament_tears', zoneType: 'board', owner: seite, heroIdx: -1, zoneSlot: -1, duration: TRAENEN_MS,
+      targets: [{ owner: ziel.owner, heroIdx: ziel.heroIdx, zoneSlot: -1 }],
+      originOwner: seite, originHeroIdx: heroIdx, originZoneSlot: zoneSlot,
     });
-    await engine._delay(500);
-    engine._broadcastEvent('play_heal_beam', {
-      phase: 'strike', sourceOwner: seite, sourceHeroIdx: heroIdx, sourceZoneSlot: zoneSlot,
-      targetOwner: ziel.owner, targetHeroIdx: ziel.heroIdx, targetZoneSlot: -1,
-    });
-    await engine._delay(350);
-    engine._broadcastEvent('play_zone_animation', { type: 'heal_sparkle', owner: ziel.owner, heroIdx: ziel.heroIdx, zoneSlot: -1 });
-    await engine._delay(200);
+    await engine._delay(TRAENEN_HIT_MS);
 
     if (hero.hp > 0) await ctx.healHero(hero, menge);
     engine.log('lamenting_knight', { player: engine.gs.players[pi]?.username, target: hero.name, amount: menge });

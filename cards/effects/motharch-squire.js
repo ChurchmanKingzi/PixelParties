@@ -3,13 +3,13 @@
 //  CARD EFFECT: "Motharch Squire"
 //  Creature (Normal, Lv0, 10 HP, Summoning Magic, Archetyp „Motharch")
 //
-//  „When you play this Creature, choose up to 2 Artifacts with different names from your discard pile and shuffle them back into your deck. When this Creature is defeated,
+//  „When you summon this Creature, choose up to 2 Artifacts with different names from your discard pile and shuffle them back into your deck. When this Creature is defeated,
 //   you may search your deck for an Artifact, reveal it and add it to your hand. You can only activate this effect of "Motharch Squire" once per turn."
 //
 //  ── NEUE WERTE ──────────────────────────────────────────────────────────
-//  Jetzt 10 HP (vorher 50); der Text ist unverändert (Datenänderung in `data/cards.json`).
+//  Jetzt 10 HP (vorher 50); Wortlaut 24.10.: „When you PLAY this Creature" → „When you SUMMON this Creature" (Datenänderung in `data/cards.json`; das Verhalten war schon On-Summon).
 //
-//  ── ① EINSATZ („When you play this Creature") ───────────────────────────
+//  ── ① EINSATZ („When you summon this Creature") ───────────────────────────
 //  `hooks.onPlay` (On-Summon-Vertrag: feuert bei JEDER Herkunft — Hand, Wiederbelebung, Effekt; Vorlage: Black Marketeer). Der Kontrolleur wählt BIS ZU 2 Artifacts mit
 //  VERSCHIEDENEN Namen (Basisnamen, [B]/[W] zählen als derselbe Name) aus der eigenen Ablage; sie werden ins Deck zurückgemischt (`actionRecycleCards`, `shuffle: true`).
 //  Die Wahl ist freiwillig im Sinn von „up to": Abbruch = keine Karte (die Beschwörung gilt trotzdem). Die Galerie zeigt jeden Artifact-Namen EINMAL (Basisname). Ist die Ablage
@@ -83,7 +83,7 @@ module.exports = {
   cpuMeta: { onDeathBenefit: 10 },
 
   hooks: {
-    /** „When you play this Creature, choose up to 2 Artifacts with different names from your discard pile and shuffle them back into your deck." */
+    /** „When you summon this Creature, choose up to 2 Artifacts with different names from your discard pile and shuffle them back into your deck." */
     onPlay: async (ctx) => {
       if (ctx.playedCard?.id !== ctx.card.id) return;
       const engine = ctx._engine;

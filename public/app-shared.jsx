@@ -2894,6 +2894,21 @@ const ZONE_ANIM_SFX = {
     { name: 'ping',       opts: { rate: 2.2, volume: 0.25, delay: 380, category: null, dedupe: 0 } },
     { name: 'ping',       opts: { rate: 2.8, volume: 0.2,  delay: 520, category: null, dedupe: 0 } },
   ],
+  // Lamenting Knight: heilende Tränen — Tränen quellen (Wasser, 0 ms) und tropfen (Pings), fliegen (~470 ms), der Regen setzt ein, Heilklang beim Einschlag (~940 ms) mit nachtropfenden Pings.
+  // Nur der erste Teil übernimmt die Sammelkategorie 'effect'. `lament_rain` (nur der Regen, entkoppeltes Bild einer negierten Karte) tropft und heilt leise.
+  lament_tears: [
+    { name: 'elem_water', opts: { rate: 1.9, volume: 0.35 } },
+    { name: 'ping',       opts: { rate: 2.4, volume: 0.2,  delay: 300,  category: null, dedupe: 0 } },
+    { name: 'elem_water', opts: { rate: 1.3, volume: 0.4,  delay: 470,  category: null, dedupe: 0 } },
+    { name: 'heal',       opts: { rate: 1.15, volume: 0.6, delay: 940,  category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.6, volume: 0.18, delay: 1060, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 3.0, volume: 0.15, delay: 1200, category: null, dedupe: 0 } },
+  ],
+  lament_rain: [
+    { name: 'elem_water', opts: { rate: 1.5, volume: 0.35 } },
+    { name: 'heal',       opts: { rate: 1.15, volume: 0.45, delay: 120, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.6, volume: 0.18, delay: 420, category: null, dedupe: 0 } },
+  ],
   // Motharch Squire: goldener Mottenstaub rieselt (weicher Zauberklang, 0 ms), Funkeln (~300 ms).
   moth_dust: [
     { name: 'buff', opts: { rate: 1.5, volume: 0.45 } },
