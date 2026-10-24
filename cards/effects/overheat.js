@@ -16,10 +16,11 @@
 //  ── ABLAUF ──────────────────────────────────────────────────────────────
 //  Erst wandert das Artefakt in die Ablage seines BESITZERS (`sendBoardCardToDiscard`: Leave-Hooks, der Bonus fällt vom Helden), dann nimmt der Träger 150
 //  Schaden (Typ `destruction_spell`). Beides sind zwei Sätze: Bleibt das Artefakt an einer Schutzklausel hängen, fällt der Schaden trotzdem.
-//  Der Schlag auf den Helden ist ein Treffer dieses Zaubers und gilt wie jeder Treffer ohne eigene Zielwahl als „diese Quelle wählt diesen Helden"
-//  (`engine.trefferAlsWahl`, Als Regel 24.9.): Umleitungen (Redirecting Aura, Alleria, Anti-Magnet …) greifen, die Liste der erlaubten Ziele sind die
-//  lebenden Helden beider Seiten — der Zauber trifft nur Helden. Eine Negation beendet den Schlag. Der Treffer ist ein Einzelziel-Treffer
-//  (`festesZiel`): Schutz der Bauart „solange es andere Ziele gibt" (Submerged, Dive Down) greift nicht, die Quelle kann nur diesen Helden treffen.
+//  Die Artefakt-Wahl IST der Treffer des Trägers: die Zielwahl trägt `hitsBearer: true`, damit Umleiter wissen, dass mit dem Artefakt sein Held getroffen wird. Redirecting Aura am
+//  Träger lenkt deshalb auf ein Artefakt eines ANDEREN eigenen Helden um (die Zielliste = Artefakte an lebenden Helden erzwingt „ein anderer Held mit Equip"); dann trifft Overheat
+//  dieses Artefakt und seinen Träger. Alle übrigen Umleiter/Negierer des Zielwahl-Fensters (Anti-Magnet, Challenge, Surprises …) gelten wie bei jeder Zielwahl.
+//  Der Schaden selbst ist ein Einzelziel-Treffer (`festesZiel`): Schutz der Bauart „solange es andere Ziele gibt" (Submerged, Dive Down) greift nicht, die Quelle kann nur diesen
+//  Helden treffen.
 //
 //  ── ZUSATZAKTION ────────────────────────────────────────────────────────
 //  „If the user has at least Decay Magic 1 AND Destruction Magic 1": BEIDE Schulen einzeln mindestens Stufe 1 (nicht die Summe!), gezählt mit
@@ -65,20 +66,6 @@ function artefaktZiel(engine, inst) {
     owner: seite, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name,
     cardInstance: inst, _cardInstance: inst,
   };
-}
-
-/** Alle lebenden Helden beider Seiten als Ziele des Schlags (Liste der erlaubten Umleitungsziele). */
-function heldenZiele(engine) {
-  const out = [];
-  for (let seite = 0; seite < (engine.gs.players || []).length; seite++) {
-    const heroes = engine.gs.players[seite]?.heroes || [];
-    for (let hi = 0; hi < heroes.length; hi++) {
-      const h = heroes[hi];
-      if (!h?.name || h.hp <= 0) continue;
-      out.push({ id: `hero-${seite}-${hi}`, type: 'hero', owner: seite, heroIdx: hi, cardName: h.name });
-    }
-  }
-  return out;
 }
 
 /** Hat dieser Wirker beide Schulen mindestens auf Stufe 1? */
@@ -127,6 +114,7 @@ module.exports = {
         minRequired: 1, maxTotal: 1,
         exclusiveTypes: true, maxPerType: { equip: 1 },
         alwaysConfirmable: false,
+        hitsBearer: true,       // die Wahl des Artefakts trifft seinen Träger (Redirecting Aura: Umleitung nur auf ein Artefakt eines anderen Helden)
         cancellable: true,
       });
       const id = Array.isArray(gewaehlt) ? gewaehlt[0] : gewaehlt;
@@ -142,7 +130,8 @@ module.exports = {
 
       // ── Bild: das Artefakt glüht und platzt ──
       engine._broadcastEvent('play_zone_animation', {
-        type: 'overheat', owner: tSeite, heroIdx: tHeroIdx, zoneSlot: treffer.slotIdx, duration: DAUER_MS,
+        type: 'overheat', zoneType: 'board', owner: tSeite, heroIdx: -1, zoneSlot: -1, duration: DAUER_MS,
+        targets: [{ owner: tSeite, heroIdx: tHeroIdx, zoneSlot: treffer.slotIdx }],
         originOwner: heroSeite, originHeroIdx: heroIdx, originZoneSlot: -1,
       });
       await engine._delay(PLATZEN_MS);
@@ -154,35 +143,17 @@ module.exports = {
       }
       const weg = vorher === 'support' && inst.zone !== 'support';
 
-      // ── 3. 150 Schaden an den Träger — als Treffer dieses Zaubers (Umleitung/Negation) ──
+      // ── 3. 150 Schaden an den Träger (die Umleitung der Wahl hat den Träger schon bestimmt) ──
       let getroffen = null;
-      let negiert = false;
       if (tHero?.name && tHero.hp > 0) {
-        const alle = heldenZiele(engine);
-        const original = alle.find(z => z.owner === tSeite && z.heroIdx === tHeroIdx);
-        let neu = original;
-        if (original) {
-          neu = await engine.trefferAlsWahl(
-            original, alle,
-            { name: CARD_NAME, owner: pi, controller: pi, heroIdx, zone: 'hand' },
-            { title: CARD_NAME, baseDamage: DAMAGE, damageType: 'destruction_spell' },
-          );
-        }
-        if (!neu) {
-          negiert = true;
-        } else {
-          const ziel = gs.players[neu.owner]?.heroes?.[neu.heroIdx];
-          if (ziel?.name && ziel.hp > 0) {
-            engine.sync();
-            await ctx.dealDamage(ziel, DAMAGE, 'destruction_spell', { festesZiel: true });
-            getroffen = ziel;
-          }
-        }
+        engine.sync();
+        await ctx.dealDamage(tHero, DAMAGE, 'destruction_spell', { festesZiel: true });
+        getroffen = tHero;
       }
 
       engine.log('overheat', {
         player: ps.username, artifact: treffer.cardName, hero: tHero?.name || null,
-        discarded: weg, damaged: getroffen?.name || null, negated: negiert, damage: DAMAGE,
+        discarded: weg, damaged: getroffen?.name || null, damage: DAMAGE,
       });
       engine.sync();
       await engine._delay(NACH_MS);

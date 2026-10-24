@@ -256,8 +256,8 @@ module.exports = {
       // ── Bild: die Lichtsäule ──
       if (weg.length > 0 || entfernen.length > 0) {
         engine._broadcastEvent('play_zone_animation', {
-          type: 'exorcism_light', owner: ziel.owner, heroIdx: ziel.heroIdx,
-          zoneSlot: ziel.type === 'hero' ? -1 : ziel.slotIdx, duration: LICHT_MS,
+          type: 'exorcism_light', zoneType: 'board', owner: ziel.owner, heroIdx: -1, zoneSlot: -1, duration: LICHT_MS,
+          targets: [{ owner: ziel.owner, heroIdx: ziel.heroIdx, zoneSlot: ziel.type === 'hero' ? -1 : ziel.slotIdx }],
           originOwner: heroSeite, originHeroIdx: heroIdx, originZoneSlot: -1,
         });
         await engine._delay(LICHT_VOR_MS);

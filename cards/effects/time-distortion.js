@@ -12,8 +12,9 @@
 //
 //  ── „CHOOSE A LEVEL 3 OR LOWER SPELL AMONG THEM, IF POSSIBLE" ───────────
 //  Wählbar ist ein aufgedeckter SPELL (Kartentyp Spell, jeder Untertyp) der Stufe 3 oder niedriger, den der Nutzer JETZT als Zusatzaktion wirken kann (`engine.kannSofortWirken`: Status des Helden —
-//  Null Zone, Eraser Beam, Frozen …; Spielbedingungen des Spells — z. B. ein Ziel muss existieren; Zusatzaktions-Sperren wie Duigno/Mission; „Only 1 per game"). Die STUFE des Helden spielt
-//  ausdrücklich keine Rolle („regardless of its level"). Eine Attack, Creature oder ein höherer Spell ist nicht wählbar.
+//  Null Zone, Frozen …; Spielbedingungen des Spells — z. B. ein Ziel muss existieren oder „This must be the only Spell you play this turn" (Eraser Beam: Time Distortion zählt schon als
+//  gespielter Spell, `_spellResolvedTurn`); Zusatzaktions-Sperren wie Duigno/Mission; „Only 1 per game"). Die Zusatzaktion STELLT Time Distortion — der Spell muss nicht selbst als
+//  Zusatzaktion spielbar sein (`inherentAction`). Die STUFE des Helden spielt ausdrücklich keine Rolle („regardless of its level"). Eine Attack, Creature oder ein höherer Spell ist nicht wählbar.
 //    • KEIN wählbarer Spell → die Karte FIZZELT (sichtbar, `zeigeFizzle`), alle aufgedeckten Karten werden zurückgemischt. Kein Spell geht verloren, die Aktion ist verbraucht.
 //    • Genau EIN wählbarer Spell → er wird ohne Rückfrage genommen. Mehrere → Galerie mit allen aufgedeckten Karten, die nicht wählbaren abgedunkelt, NICHT abbrechbar.
 //  Ist mindestens ein Spell wählbar, MUSS einer genutzt werden: die Galerie lässt sich nicht abbrechen, und auch der Guss ist Pflicht — Abbruch in der Zielwahl ist gesperrt
@@ -55,10 +56,15 @@ module.exports = {
       const hero = ctx.attachedHero || gs.players[heroSeite]?.heroes?.[heroIdx];
       if (!ps || !hero?.name || hero.hp <= 0) { gs._spellCancelled = true; return; }
       const db = engine._getCardDB();
+      // Time Distortion IST ein in diesem Zug gewirkter Spell: Bedingungen wie „This must be the only Spell you play this turn" (Eraser Beam) sehen ihn schon, bevor er aufgelöst ist
+      // (die Engine stempelt das sonst erst nach der Auflösung) — der Spell, den Time Distortion wirkt, wäre sonst nicht der zweite.
+      ps._spellResolvedTurn = gs.turn;
 
       // ── Der Auftritt: das Zifferblatt ──
       engine._broadcastEvent('play_zone_animation', {
-        type: 'time_distortion', owner: heroSeite, heroIdx, zoneSlot: -1, duration: UHR_MS,
+        type: 'time_distortion', zoneType: 'board', owner: heroSeite, heroIdx: -1, zoneSlot: -1, duration: UHR_MS,
+        targets: [{ owner: heroSeite, heroIdx, zoneSlot: -1 }],
+        originOwner: heroSeite, originHeroIdx: heroIdx, originZoneSlot: -1,
       });
       await engine._delay(UHR_VOR_MS);
 

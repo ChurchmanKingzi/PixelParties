@@ -30,8 +30,8 @@
 //  Zonen) mindestens eine Kreatur kontrolliert; Stand beim Ausspielen. Ohne Gegnerkreatur bleibt die Karte spielbar und kostet die Aktion (`cpuMeta.optionalInherent`).
 //
 //  ── PUZZLE ──────────────────────────────────────────────────────────────
-//  Im Puzzle-Aufbau läuft kein `onPlay`: `attachmentStatus` legt den Status an; `puzzleAnheften` verbucht den Bonus auf der Instanz, OHNE den ATK-Wert des Helden anzufassen (der
-//  ATK-Wert im Puzzle gilt als eingetragen inklusive Bonus) — so fällt er beim Heilen wieder um 100.
+//  Im Puzzle-Aufbau läuft kein `onPlay`: `attachmentStatus` legt den Status an (Server, `createPuzzleGame`), und der Bonus wird wie bei Fighting zu Puzzle-Beginn verrechnet (`onGameStart`
+//  → `actionSetAtkGrant`): der ATK-Wert im Puzzle ist der Grundwert, die +100 kommen dynamisch dazu und fallen beim Heilen/Abgang wieder weg.
 //
 //  ── Bild und Klang ──────────────────────────────────────────────────────
 //  `play_zone_animation` `polymorph_poof` (Pixelart, ANIM_REGISTRY): Rauchwolke aus Pixel-Kugeln, Sterne und ein Zauber-Ring um den Helden, der Held flackert hinter dem Rauch.
@@ -131,15 +131,6 @@ module.exports = {
     engine.sync();
   },
 
-  /** Puzzle-Aufbau: der ATK-Wert des Helden steht schon inklusive Bonus — nur die Buchung auf der Instanz anlegen, damit er beim Heilen wieder fällt. */
-  async puzzleAnheften(engine, inst) {
-    const hero = engine.gs.players[inst.owner]?.heroes?.[inst.heroIdx];
-    if (!hero?.name || !hero.statuses?.[STATUS_NAME]) return;
-    inst.counters = inst.counters || {};
-    inst.counters.atkGranted = ATK_BONUS;
-    inst.counters._atkTraeger = { seite: inst.owner, heroIdx: inst.heroIdx };
-  },
-
   hooks: {
     onPlay: async (ctx) => {
       if (ctx.cardZone !== 'hand') return;
@@ -158,7 +149,9 @@ module.exports = {
       const hero = gs.players[host.owner]?.heroes?.[host.heroIdx];
 
       engine._broadcastEvent('play_zone_animation', {
-        type: 'polymorph_poof', owner: host.owner, heroIdx: host.heroIdx, zoneSlot: -1, duration: POOF_MS,
+        type: 'polymorph_poof', zoneType: 'board', owner: host.owner, heroIdx: -1, zoneSlot: -1, duration: POOF_MS,
+        targets: [{ owner: host.owner, heroIdx: host.heroIdx, zoneSlot: -1 }],
+        originOwner: host.owner, originHeroIdx: host.heroIdx, originZoneSlot: -1,
       });
       await engine._delay(POOF_VOR_MS);
 
@@ -173,6 +166,19 @@ module.exports = {
       });
       engine.log('polymorph_attached', { player: gs.players[pi]?.username, hero: hero?.name, applied: gesetzt });
       engine.sync();
+    },
+
+    /**
+     * Puzzle-Beginn (wie Fighting): Anhängsel, die im Aufbau schon am Helden lagen, verrechnen ihren Bonus jetzt — der Status liegt dann bereits (`attachmentStatus`). Im normalen Spiel
+     * liegt zu Spielbeginn keine Polymorph-Karte auf dem Brett; ein Held, der den Status nicht trägt (immun, geheilt), bekommt auch keinen Bonus.
+     */
+    onGameStart: async (ctx) => {
+      const inst = ctx.card;
+      if (!inst || inst.name !== CARD_NAME || inst.zone !== 'support') return;
+      const engine = ctx._engine;
+      const hero = engine.gs.players[engine.physicalSide(inst)]?.heroes?.[inst.heroIdx];
+      if (!hero?.name || hero.hp <= 0 || !hero.statuses?.[STATUS_NAME]) return;
+      engine.actionSetAtkGrant(inst, ATK_BONUS);
     },
 
     // Aufräumen (Heilen wirft die Karte ab; Abgang nimmt den Status): geteilter Baustein. Das Anlegen übernimmt die Karte selbst (s. `polymorphAnlegen`).
