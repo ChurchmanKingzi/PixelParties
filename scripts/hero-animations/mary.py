@@ -14,7 +14,7 @@ src/cute-princess-mary.png).
   sie etwas ab.
 * Glut: von den Flügelspitzen lösen sich beim Abschlag kleine Funken.
 * Körper (`body_layer`): die Haare wehen (die Außenkante der Strähnen am Kopf wird zeilenweise verschoben, die langen Locken unter den
-  Schulterpolstern sind dieselbe Strähne und schwingen mit derselben, nur verzögerten Welle mit), die Arme schwingen als Einheiten seitwärts (Ärmel samt Hand um die Schulter, ohne dass die Hand wächst), der Saum
+  Schulterpolstern sind dieselbe Strähne und schwingen mit derselben, nur verzögerten Welle mit), die Arme schwingen als Einheiten seitwärts (Ärmel samt Hand und Umriss um die Schulter; das Kleid bleibt stehen, die Flügel dahinter werden sichtbar), der Saum
   des Kleides schwingt, und das Feuer am Kleid flackert (Farben wandern auf der Leiter Rot → Orange → Gelb nach oben). Der Kopf selbst
   bleibt starr (kein Dehnen und Stauchen).
 * Krone: ein Lichtband wandert einmal pro Schleife über die Krone; danach blitzen Glitzersterne über den Zacken auf.
@@ -103,6 +103,43 @@ CROWN = (35, 42, 21, 25)                      # x0, x1, y0, y1 der Krone
 SPARKS = [(42, 18, 18), (35, 18, 24), (39, 19, 29)]   # Glitzersterne über den Zacken: (x, y, Startframe)
 
 
+def _arm_masks():
+    """Pixelmengen der beiden Arme in der Körperebene. Der Umriss (dunkles Rot) trennt die Teile der Figur; ein Arm ist die zusammenhängende
+    Fläche, in der die Hand liegt (links bei (30, 42), rechts bei (47, 42)), samt seinem äußeren Umriss. Umrisspixel, an denen auch Kleid,
+    Schulterpolster oder Haar grenzen, gehören nicht dazu: sie bleiben stehen."""
+    from collections import deque
+    alpha = BODY[..., 3] > 0
+    line = np.array([[tuple(BODY[y, x, :3]) == (0x6f, 0x1a, 0x13) for x in range(SW)] for y in range(SH)])
+    lab = np.zeros((SH, SW), int)
+    n = 0
+    for y0 in range(SH):
+        for x0 in range(SW):
+            if alpha[y0, x0] and not line[y0, x0] and not lab[y0, x0]:
+                n += 1
+                lab[y0, x0] = n
+                q = deque([(y0, x0)])
+                while q:
+                    cy, cx = q.popleft()
+                    for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                        ny, nx = cy + dy, cx + dx
+                        if 0 <= ny < SH and 0 <= nx < SW and alpha[ny, nx] and not line[ny, nx] and not lab[ny, nx]:
+                            lab[ny, nx] = n
+                            q.append((ny, nx))
+    out = {}
+    for side, (hy, hx) in ((-1, (42, 30)), (1, (42, 47))):
+        core = lab == lab[hy, hx]
+        others = alpha & ~line & ~core
+        def near(mask, y, x):
+            return mask[max(0, y - 1):y + 2, max(0, x - 1):x + 2].any()
+        outline = {(y, x) for y in range(SH) for x in range(SW)
+                   if line[y, x] and near(core, y, x) and not near(others, y, x)}
+        out[side] = sorted({(y, x) for y, x in zip(*np.nonzero(core))} | outline)
+    return out
+
+
+ARMS = _arm_masks()
+
+
 def hair_shift(y, i):
     """Seitlicher Versatz der Außenkante der Haare in Zeile y (Wind von links). Die Welle läuft von oben nach unten durch die ganze
     Strähne, auch durch die langen Locken unter den Schulterpolstern: dieselbe Formel, nur Zeile für Zeile verzögert, damit sie sich
@@ -138,27 +175,18 @@ def body_layer(i):
             out[y, lo:hi + 1] = 0
             seg = warp_row(BODY[y], a, b, d, side)
             out[y, lo:hi + 1] = np.where(seg[lo:hi + 1, 3:4] > 0, seg[lo:hi + 1], out[y, lo:hi + 1])
-    # 2) Arme schwingen seitwärts, jeder Arm als Einheit (Ärmel samt Hand, Zeilen 40–47 zwischen Außenkante und Kleid) um die Schulter: die
-    #    oberen Zeilen bewegen sich kaum, der Ärmelsaum unten am weitesten (Scherung ≈ Drehung). Die Hand wird dabei nicht größer, sondern
-    #    wandert mit; der Spalt zum Kleid wird mit der Innenkante des Arms gefüllt.
+    # 2) Arme schwingen seitwärts, jeder Arm als Einheit (Ärmel samt Hand und äußerem Umriss, siehe ARMS) um die Schulter: die obersten Zeilen
+    #    bewegen sich kaum, die Hand am weitesten (Scherung ≈ Drehung). Das Kleid bleibt stehen. Wo der Arm war, bleibt das Feld leer, dort
+    #    scheinen die Flügel dahinter durch.
     o = max(-1, int(round(3.0 * math.sin(ph - 1.6))))                  # > 0: nach außen
-    for side in (-1, 1):
-        xa, xb = (29, 36) if side < 0 else (MIRROR - 36, MIRROR - 29)
-        inner = xb if side < 0 else xa
-        for y in range(40, 48):
-            dx = int(round(o * (y - 38) / 9.0))
-            if not dx:
-                continue
-            arm = {x: out[y, x].copy() for x in range(xa, xb + 1)}
-            for x in range(xa, xb + 1):
+    if o:
+        for side in (-1, 1):
+            px_ = {(y, x): out[y, x].copy() for y, x in ARMS[side]}
+            for (y, x) in px_:
                 out[y, x] = 0
-            for x, c in arm.items():
-                if c[3]:
-                    out[y, x + side * dx] = c
-            for k in range(max(0, dx)):                                   # Spalt zwischen Arm und Kleid füllen
-                gx = inner + side * k
-                if not out[y, gx, 3]:
-                    out[y, gx] = arm[inner]
+            for (y, x), c in px_.items():
+                dx = int(round(o * min(1.0, max(0.0, (y - 37) / 6.0))))
+                out[y, x + side * dx] = c
     # 3) Saum schwingt
     for y in range(48, 56):
         dx = int(round(math.sin(ph - 2.2 - 0.3 * (y - 47)) * (y - 47) / 7.0 * 1.2))
