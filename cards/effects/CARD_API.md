@@ -12917,6 +12917,10 @@ Gliedern, von denen jedes einzeln vergessen werden kann:
 6. bei `asDraw: true` zusaetzlich **`onDraw`** — der Hook von „Cute
    Meanie Melissa" (siehe unten).
 
+### Welle 78 — `zieheAusGegnerDeck(engine, pi, n, opts)` und „Cell Escape"
+
+„Draw N cards from your opponent's deck" (mehr als eine Karte) als EIN Ziehvorgang: `_opponent-deck-shared.js` → `zieheAusGegnerDeck`. Es nimmt die obersten Karten nacheinander (`takeTopFromOpponentDeck` mit `asDraw`, Herkunft bleibt beim Gegner) und läuft durch dieselben Fenster wie `actionDrawCards`: Hand-/Zieh-Sperre des Ziehenden, Erste-Runden-Immunität des Deckbesitzers, `beforeDrawBatch` (Tuscan Artist: genau 2/3 — Ruling 16.8. nennt ausdrücklich „Cell Escape"; Intrude), das Vor-Zieh-Fenster der Surprises (`_checkSurpriseBeforeOppDraw`), je Karte `onCardTakenFromOpponent` (Lilly) und `onDraw` mit gemeinsamer Vorgangs-Kennung `_drawBatch/_drawCount/_drawIndex` (Melissa: 1× je Vorgang, Dirty Smuggler: Menge), danach Handlimit-Wächter und `_pendingSurpriseDraws` (Pure Advantage Camel). Weniger Karten im Deck als bestellt: so viele wie da sind. **Cell Escape** (`cell-escape.js`, Lv 2 Decay Magic + Magic Arts): zwei getrennte Zieh-Anweisungen (2 + „2 more", Bedingung erst nach den ersten 2 Karten geprüft: ein KONTROLLIERTER lebender Held `frozen`/`stunned`) = zwei Ziehvorgänge; `inherentAction`; `oncePerGame` (`cellEscape`); gesperrt bei Hand-/Zieh-Sperre, Tuscan Artist, Erste-Runden-Schutz des Gegners, Boris (`stealsOpponentCards`) und leerem Gegnerdeck; kein „add" für Control Monitors. Animation `cell_escape` auf dem Gegner-Deck (Gitter fällt, Lichtkegel, Stäbe schwingen hoch; `mode: 'more'` = Frostfunken). „Love Shot" nutzt weiter den Einzelweg `takeTopFromOpponentDeck` (Zieh-Sperre prüft er nicht — nicht angefasst).
+
 ## ★★ v1184 — „Fireball" klammert seine Kreaturtreffer (Deepsea Idol greift wieder)
 
 Ursache ② aus v1183 behoben: Fireball arbeitete seine Ziele in einer Schleife

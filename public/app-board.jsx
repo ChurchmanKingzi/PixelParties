@@ -31960,6 +31960,116 @@ const ANIM_REGISTRY = {
     };
     return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
   })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Cell Escape (W78) — PIXELART, Brett-Animation auf dem GEGNER-DECK (`originDeck`, Ziel `{ deck: true }`, Hülle `ppSalve`; Vorlage: das Kartenbild — Zelle aus Stein,
+  //  Eisengitter, ein schräger Lichtkegel, der Gefangene (gefroren) im Licht)
+  //
+  //  Ein Eisengitter fällt Stab für Stab vor das Deck (Querbalken oben und unten, Nieten, Staubwolke beim Aufsetzen), ein schräger Lichtkegel (gedithert, Staubkörner steigen darin
+  //  auf) fällt hinein, die Stäbe zittern ein paar Bildchen lang — dann schwingen sie nach oben, der untere Balken fällt ab, der obere zieht sich in die Höhe: die Zelle ist offen,
+  //  die Karten (`play_pile_transfer`, Gegnerdeck → Hand) fliegen davon. `mode: 'more'` (zweiter Durchgang, wenn ein Held Frozen/Stunned ist): Frostfunken wandern an den Stäben
+  //  hinab, die Kanten der Stäbe sind eisblau, beim Aufschließen blitzt ein weißes Kreuz am Schloss. Feste Palette, Bayer-Dithering statt Alpha, KEIN Schein, KEINE Unschärfe.
+  //  Zeiten (cell-escape.js wartet 480 ms bis zur ersten Karte): Fall 0–~500, Licht ab 250, Zittern 480–760, Öffnen 760–1160, Licht aus bis 1500 (`duration` 1500).
+  // ═══════════════════════════════════════════════════════════════════
+  cell_escape: (() => {
+    const EISEN = ['#222222', '#3e3e51', '#686868', '#929292'].map(ppHex);        // dunkel, Schatten/Balken, Lichtkante, Niete
+    const LICHT = ['#d2d2db', '#a8a8a8'].map(ppHex);
+    const STAUB = ['#e6e6e6', '#d2d2db', '#a8a8a8'].map(ppHex);
+    const FROST = ['#b6eff7', '#08d3ef', '#1788bd', '#ffffff'].map(ppHex);
+    const ENDE = 1500, FALL = 220, STAB_VERSATZ = 20, LICHT_AB = 250, LICHT_ZU = 1150, ZITTERN_AB = 480, OEFFNEN = 760, OEFFNEN_DAUER = 300, STAB_AUF = 12;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = () => ({
+      staub: Array.from({ length: ppFxN(14) }, () => ({ fx: Math.random(), phase: Math.random(), v: 5 + Math.random() * 9, farbe: Math.floor(Math.random() * STAUB.length) })),
+      wolke: Array.from({ length: ppFxN(10) }, () => ({ seite: Math.random() < 0.5 ? -1 : 1, v: 8 + Math.random() * 14, hoch: 1 + Math.random() * 3, farbe: Math.floor(Math.random() * STAUB.length) })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const z = sz.ziele[0];
+      if (!z) return;
+      const mehr = sz.mode === 'more';
+      const W = Math.max(14, Math.round(z.w)), H = Math.max(18, Math.round(z.h));
+      const X0 = Math.round(z.x - W / 2) - 1, CW = W + 2;                      // Käfig: ein Pixel Rand um das Deck
+      const Y0 = Math.round(z.y - H / 2) - 2, CH = H + 4;
+      const n = Math.floor((CW - 2) / 4) + 1;                                  // ein Stab alle 4 Pixel, 2 Pixel breit
+      const stabX = (i) => X0 + 1 + i * 4 + Math.floor((CW - 2 - (n - 1) * 4 - 2) / 2);
+      const lichtA = (t < LICHT_AB ? 0 : klemme((t - LICHT_AB) / 300, 0, 1)) * (t > LICHT_ZU ? 1 - klemme((t - LICHT_ZU) / (ENDE - LICHT_ZU - 80), 0, 1) : 1);
+      // ── Lichtkegel: schräges Band von links oben nach rechts unten (gedithert), unter den Stäben ──
+      if (lichtA > 0) {
+        const c = CW * 0.4, hw = CW * 0.3;
+        for (let y = Y0; y < Y0 + CH; y++) for (let x = X0; x < X0 + CW; x++) {
+          const d = Math.abs((x - X0) - (y - Y0) * 0.55 - c);
+          if (d >= hw) continue;
+          const kante = 1 - d / hw;
+          g.put(x, y, kante > 0.55 ? LICHT[0] : LICHT[1], lichtA * (0.16 + 0.5 * kante));
+        }
+        for (const s of teile.staub) {
+          const y = Y0 + CH - ((t / 1000 * s.v + s.phase * CH) % CH), x = X0 + s.fx * CW + Math.sin(t / 260 + s.phase * 9) * 1.2;
+          g.put(x, y, STAUB[s.farbe], lichtA * (Math.floor(t / 100 + s.phase * 7) % 3 === 0 ? 0.35 : 0.9));
+        }
+      }
+      // ── Querbalken oben: fällt zuerst, hebt sich beim Öffnen und löst sich gedithert auf ──
+      const oeffnen = (i) => klemme((t - OEFFNEN - i * STAB_AUF) / OEFFNEN_DAUER, 0, 1);
+      const balkenAus = t < OEFFNEN + 240 ? 1 : 1 - klemme((t - (OEFFNEN + 240)) / 200, 0, 1);
+      const balkenHub = t < OEFFNEN + 240 ? 0 : Math.round(klemme((t - (OEFFNEN + 240)) / 200, 0, 1) * 6);
+      const oben = Y0 - Math.round((1 - klemme(t / 120, 0, 1)) * 8) - balkenHub;
+      if (balkenAus > 0) {
+        for (let x = 0; x < CW; x++) {
+          g.put(X0 + x, oben, EISEN[2], balkenAus); g.put(X0 + x, oben + 1, EISEN[0], balkenAus);
+          if (mehr && ppHash(x, Math.floor(t / 66), 9) < 0.12) g.put(X0 + x, oben, FROST[1], balkenAus);
+        }
+      }
+      // ── Stäbe: fallen gestaffelt, zittern, schwingen nach oben ──
+      let letzteLandung = 0;
+      for (let i = 0; i < n; i++) {
+        const fall = klemme((t - i * STAB_VERSATZ) / FALL, 0, 1);
+        if (fall <= 0) continue;
+        const voll = CH - 2;
+        let laenge = Math.round(voll * fall * fall);
+        if (fall >= 1) letzteLandung = Math.max(letzteLandung, i * STAB_VERSATZ + FALL);
+        const hub = oeffnen(i);
+        if (hub > 0) laenge = Math.round(voll * (1 - hub * hub));
+        if (laenge <= 0) continue;
+        const zit = t >= ZITTERN_AB && t < OEFFNEN ? (ppHash(i, Math.floor(t / 66), 5) > 0.55 ? (ppHash(i, Math.floor(t / 66), 6) > 0.5 ? 1 : -1) : 0) : 0;
+        const bx = stabX(i) + zit;
+        for (let j = 0; j < laenge; j++) {
+          const y = oben + 2 + j;
+          g.put(bx, y, mehr ? FROST[2] : EISEN[2]);
+          g.put(bx + 1, y, (y - Y0) % 8 === 5 ? EISEN[1] : EISEN[0]);
+        }
+        const spitze = oben + 2 + laenge - 1;                                  // Spitze des Stabs: Niete / Eiszapfen
+        g.put(bx, spitze, mehr ? FROST[0] : EISEN[3]);
+      }
+      // ── Querbalken unten: setzt auf, sobald der letzte Stab unten ist; fällt beim Öffnen ab ──
+      const landT = (n - 1) * STAB_VERSATZ + FALL;
+      if (t >= landT - 40 && t < OEFFNEN + 200) {
+        const ab = t < OEFFNEN ? 0 : Math.round(klemme((t - OEFFNEN) / 200, 0, 1) * 5);
+        const a = t < OEFFNEN ? 1 : 1 - klemme((t - OEFFNEN) / 200, 0, 1);
+        const y = Y0 + CH - 2 + ab;
+        for (let x = 0; x < CW; x++) { g.put(X0 + x, y, EISEN[2], a); g.put(X0 + x, y + 1, EISEN[0], a); }
+        for (let i = 0; i < n; i++) g.put(stabX(i), y, EISEN[3], a);
+        // Staubwolke beim Aufsetzen
+        const dt = t - (landT - 40);
+        if (dt >= 0 && dt < 300) {
+          const k = dt / 300;
+          for (const s of teile.wolke) g.put((s.seite < 0 ? X0 : X0 + CW) + s.seite * (1 + k * s.v * 0.5), y - Math.floor(k * s.hoch), STAUB[s.farbe], 1 - k);
+        }
+        // Schloss-Blitz beim Öffnen
+        if (t >= OEFFNEN && t < OEFFNEN + 100) {
+          const cx = X0 + Math.floor(CW / 2), cy = y;
+          g.put(cx, cy, FROST[3]); g.put(cx - 1, cy, FROST[3]); g.put(cx + 1, cy, FROST[3]); g.put(cx, cy - 1, FROST[3]);
+          if (t < OEFFNEN + 50) { g.put(cx - 2, cy, FROST[3], 0.6); g.put(cx + 2, cy, FROST[3], 0.6); g.put(cx, cy - 2, FROST[3], 0.6); }
+        }
+      }
+      // ── zweiter Durchgang: Frostfunken wandern an den Stäben hinab ──
+      if (mehr && t >= 120 && t < OEFFNEN + 240) {
+        const aus = t > OEFFNEN ? 1 - klemme((t - OEFFNEN) / 240, 0, 1) : 1;
+        for (let i = 0; i < n; i++) {
+          const y = Y0 + 2 + Math.floor((t * 0.06 + i * 11) % (CH - 4));
+          const bx = stabX(i);
+          g.put(bx, y, FROST[3], aus); g.put(bx, y - 1, FROST[0], aus * 0.85); g.put(bx, y - 2, FROST[1], aus * 0.6); g.put(bx + 1, y - 3, FROST[2], aus * 0.45);
+        }
+      }
+    };
+    return ppSalve(malen, ENDE, vorbereiten, { extra: 24 });
+  })(),
   // ═════════════════════════════════════════════════════════════════
   //  Kidnapping (23.10.) — PIXELART, Brett-Animation: ein Jutesack fällt auf die Kreatur (`targets: [{ owner, heroIdx, zoneSlot }]`, Ursprung = der wirkende Held)
   //
@@ -53452,6 +53562,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Breakthrough / Amazing Finding (breakthrough.js, amazing-finding.js)
       if (t === 'breakthrough') { const p = playerByName(entry.player); return <span className="log-status">💥 {pName(p.name, p.color)}'s {cName('Breakthrough')} sent {cName(entry.card)} to the discard pile!</span>; }
       if (t === 'amazing_finding') { const p = playerByName(entry.player); const a = entry.artifacts || []; return <span className="log-status">🔎 {pName(p.name, p.color)}'s {cName('Amazing Finding')} {a.length > 0 ? <>added {a.map((c, i) => <React.Fragment key={i}>{i > 0 ? ', ' : ''}{cName(c)}</React.Fragment>)} to their hand</> : <>found no Artifact</>}{entry.shuffled ? <> and shuffled {cName(entry.shuffled)} back into the deck</> : null}.</span>; }
+      // Cell Escape (cell-escape.js): Karten aus dem Gegnerdeck gezogen (keine Namen — der Gegner soll nicht sehen, was fehlt)
+      if (t === 'cell_escape') { const p = playerByName(entry.player); return <span className="log-status">🔓 {pName(p.name, p.color)}'s {cName('Cell Escape')} drew {entry.drawn} card{entry.drawn === 1 ? '' : 's'} from {entry.opponent}'s deck{entry.bonus ? ' (a Hero is Frozen or Stunned: 2 more!)' : ''}.</span>; }
       // Create Secret Room: Karte eingelegt / auf die Hand genommen / aktiviert (create-secret-room.js, _secret-room-shared.js)
       if (t === 'secret_room_set') { const p = playerByName(entry.player); return <span className="log-status">🚪 {pName(p.name, p.color)}'s {cName('Create Secret Room')} hid a card in {entry.hero}'s Surprise Zone.</span>; }
       if (t === 'secret_room_hand') { const p = playerByName(entry.player); return <span className="log-status">🚪 {pName(p.name, p.color)} took the hidden card out of the secret room into their hand ({entry.hero} was chosen by {cName(entry.by)}).</span>; }

@@ -3089,6 +3089,20 @@ const ZONE_ANIM_SFX = {
     { name: 'reveal', opts: { rate: 1.2, volume: 0.5, delay: 520, category: null, dedupe: 0 } },
     { name: 'ping',   opts: { rate: 2.5, volume: 0.45, delay: 560, category: null, dedupe: 0 } },
   ],
+  // Cell Escape (W78) — das Gitter faellt (Metallschleifen 0 ms, dumpfer Schlag beim Aufsetzen ~330 ms), das Schloss klickt (~760 ms, helles Klirren), die Staebe schwingen hoch (Wind, ~800 ms),
+  // beim Oeffnen ein Aufdeck-Ton. Zweiter Durchgang (`mode: 'more'`): zusaetzlich der Frost-Knack. Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  cell_escape: (p) => {
+    const mehr = !!(p && p.mode === 'more');
+    const teile = [
+      { name: 'slash',        opts: { rate: 0.6, volume: 0.3 } },
+      { name: 'heavy_impact', opts: { rate: 1.3, volume: 0.55, delay: 330, category: null, dedupe: 0 } },
+      { name: 'ping',         opts: { rate: 1.8, volume: 0.4,  delay: 760, category: null, dedupe: 0 } },
+      { name: 'elem_wind',    opts: { rate: 1.4, volume: 0.3,  delay: 800, category: null, dedupe: 0 } },
+      { name: 'reveal',       opts: { rate: 1.0, volume: 0.4,  delay: 860, category: null, dedupe: 0 } },
+    ];
+    if (mehr) teile.push({ name: 'elem_ice', opts: { rate: 1.3, volume: 0.45, delay: 120, category: null, dedupe: 0 } });
+    return teile;
+  },
   // Duel (12.10.) — die Helden rammen einander, Schlag auf Schlag; eine Animation je HIT (alle Zeiten sind animationsrelativ, `playSFXForZoneAnim` legt den Einbau-Versatz von 100 ms selbst dazu).
   // Hit 1 (`runde` 1): Ausholen und Anlauf (Schnitt ~80 / ~140 ms), Aufprall bei ~260 ms (Schlag, tiefer Schnitt, heller Klirr). Jeder weitere Hit: der Rückprall der Karten (leiser Schnitt, 0 ms),
   // Aufprall bei ~120 ms (Schlag, tiefer Schnitt, Klirr — etwas höher je Runde). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
