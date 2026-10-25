@@ -46,7 +46,12 @@ const { getCardDB: _getCardDB } = require('./_card-db');
  * ★★ v1349: mit `engine` + `pi` zaehlen versiegelte Plaetze (Madame
  * Guillotine) als belegt — `engine.supportSlotBelegt` ist die EINE Frage.
  */
-function freieBasisZonen(ps, heroIdx, engine = null, pi = null) {
+function freieBasisZonen(ps, heroIdx, engine = null, pi = null, cardName = null) {
+  // Darion: ein Equip (`cardName`) gehoert bei einem Helden mit Equip-Stapel PFLICHT in diesen Stapel — er ist dann der einzige Platz.
+  if (engine && pi != null && cardName) {
+    const pflicht = engine.equipPflichtPlatz(pi, heroIdx, cardName);
+    if (pflicht >= 0) return [pflicht];
+  }
   const out = [];
   for (let z = 0; z < 3; z++) {
     if (engine && pi != null) {
@@ -73,7 +78,7 @@ function istAusruestTraeger(engine, pi, heroIdx, cardName, seite = pi, kartenBes
     if (!heroCanBeEquipped(hero)) return false;
     if (engine.heroSideOf && engine.heroSideOf(pi, hero) !== pi) return false;
   }
-  if (freieBasisZonen(ps, heroIdx, engine, seite).length === 0) return false;
+  if (freieBasisZonen(ps, heroIdx, engine, seite, cardName).length === 0) return false;
   // W14b (Q153): `kartenBesitzer` = wem die Karte gehoert (Looting aus der Gegner-Ablage: der Gegner); `pi` kontrolliert den Traeger.
   // Gegnerseiten-Ausruestung (Control Device) nur an Helden, die der Kartenbesitzer NICHT kontrolliert.
   return engine.canEquipCardToHero(cardName, seite, heroIdx, { kartenBesitzer, kontrolleur: pi });
@@ -119,7 +124,7 @@ async function waehleAusruestPlatz(engine, pi, cardName, cfg = {}) {
   const ziele = [];
   for (const { seite, heroIdx: hi } of helden) {
     const sps = engine.gs.players[seite];
-    for (const si of freieBasisZonen(sps, hi, engine, seite)) {
+    for (const si of freieBasisZonen(sps, hi, engine, seite, cardName)) {
       ziele.push({ id: `equip-${seite}-${hi}-${si}`, type: 'equip', owner: seite, heroIdx: hi, slotIdx: si, cardName: '' });
     }
     ziele.push({ id: `hero-${seite}-${hi}`, type: 'hero', owner: seite, heroIdx: hi, cardName: sps.heroes[hi].name });
@@ -139,7 +144,7 @@ async function waehleAusruestPlatz(engine, pi, cardName, cfg = {}) {
   if (!ids || ids.length === 0) return null;
   const ziel = ziele.find(t => t.id === ids[0]);
   if (!ziel) return null;
-  const slot = ziel.type === 'equip' ? ziel.slotIdx : freieBasisZonen(engine.gs.players[ziel.owner], ziel.heroIdx, engine, ziel.owner)[0];
+  const slot = ziel.type === 'equip' ? ziel.slotIdx : freieBasisZonen(engine.gs.players[ziel.owner], ziel.heroIdx, engine, ziel.owner, cardName)[0];
   if (slot == null) return null;
   return { heroIdx: ziel.heroIdx, slot, seite: ziel.owner };
 }
@@ -166,7 +171,10 @@ async function ruesteAusStapelAus(engine, pi, stapel, cardName, heroIdx, slot, o
   // stammt (`originalOwner`), und landet spaeter wieder in DESSEN Ablage.
   const stapelBesitzer = (isSeat(engine, opts.stapelBesitzer)) ? opts.stapelBesitzer : pi;
   if (!istAusruestTraeger(engine, pi, heroIdx, cardName, seite, stapelBesitzer)) return null;
-  if (((zps.supportZones[heroIdx] || [])[slot] || []).length > 0) return null;
+  // ★ Darion: Pflicht-Platz im Equip-Stapel (statt eines freien Platzes); sonst muss die gewaehlte Zone frei sein.
+  const _stapelPlatz = engine.equipPflichtPlatz(seite, heroIdx, cardName);
+  if (_stapelPlatz >= 0) slot = _stapelPlatz;
+  else if (((zps.supportZones[heroIdx] || [])[slot] || []).length > 0) return null;
   // ★ W15a (Al, R3 und Regel W14a Q5): Ausrüsten PER EFFEKT (Weapon Collecting Wight, Riffel, Looting …) ist ein Nicht-Schaden-Effekt auf den Träger — Resistance fängt ihn ab.
   // Vor jeder Kartenbewegung gefragt: bei `true` bleibt die Karte im Stapel (Rückgabe `null` = nicht ausgerüstet, wie bei jedem anderen Fehlschlag).
   // ★ W16a (Al, Frage 3: „Ja!"): ein von Resistance abgefangener Effekt verbraucht den Einmal-Einsatz (Riffel, Weapon Collecting Wight …) — der Aufrufer liest `opts.blockiert`
@@ -199,7 +207,8 @@ async function ruesteAusStapelAus(engine, pi, stapel, cardName, heroIdx, slot, o
   if (handInstVor) engine._untrackCard(handInstVor.id);
 
   if (!zps.supportZones[heroIdx]) zps.supportZones[heroIdx] = [[], [], []];
-  zps.supportZones[heroIdx][slot] = [cardName];
+  if (_stapelPlatz >= 0) zps.supportZones[heroIdx][slot].push(cardName);   // Darion: oben auf den Equip-Stapel
+  else zps.supportZones[heroIdx][slot] = [cardName];
   const inst = engine._trackCard(cardName, seite, 'support', heroIdx, slot);
   if (vonHand) { if (herkunft != null && herkunft !== seite) inst.originalOwner = herkunft; }
   else if (stapelBesitzer !== seite) inst.originalOwner = stapelBesitzer;
@@ -284,6 +293,9 @@ function darfAn(engine, inst, seite, hi) {
 function umhaengFreieZonen(engine, seite, hi, opts = {}) {
   const ps = engine.gs.players[seite];
   const out = [];
+  // Darion: ein Equip kann nur in den Equip-Stapel des Zielhelden (Pflicht-Platz).
+  const pflicht = opts.cardName ? engine.equipPflichtPlatz(seite, hi, opts.cardName) : -1;
+  if (pflicht >= 0) return (opts.reserviert && opts.reserviert.has(`${seite}:${hi}:${pflicht}`)) ? out : [pflicht];
   if (engine.isSupportZoneLocked?.(seite, hi, { cardName: opts.cardName, via: 'move', instId: opts.instId })) return out;
   for (let si = 0; si < 3; si++) {
     if (opts.reserviert && opts.reserviert.has(`${seite}:${hi}:${si}`)) continue;

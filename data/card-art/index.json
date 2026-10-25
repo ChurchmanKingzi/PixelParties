@@ -5499,6 +5499,22 @@
 "id": "Hot_Skull_Potato",
 "kind": "a"
 },
+"Darion, the Blood-Crazy Groundskeeper": {
+"id": "Darion_the_Blood-Crazy_Groundskeeper",
+"kind": "a"
+},
+"Control Monitors": {
+"id": "Control_Monitors",
+"kind": "a"
+},
+"Celia, the Class Clown": {
+"id": "Celia_the_Class_Clown",
+"kind": "a"
+},
+"Ghostly Warning": {
+"id": "Ghostly_Warning",
+"kind": "a"
+},
 "Unreasonable Anger": {
 "id": "Unreasonable_Anger",
 "kind": "a"
@@ -5517,6 +5533,30 @@
 },
 "\"Deadly Poison\"": {
 "id": "Deadly_Poison",
+"kind": "a"
+},
+"Atta, Speaker of Desires": {
+"id": "Atta_Speaker_of_Desires",
+"kind": "a"
+},
+"The Golden Gate": {
+"id": "The_Golden_Gate",
+"kind": "a"
+},
+"Tail Slap": {
+"id": "Tail_Slap",
+"kind": "a"
+},
+"Ultimate Destroyer Punch": {
+"id": "Ultimate_Destroyer_Punch",
+"kind": "a"
+},
+"Crash Landing": {
+"id": "Crash_Landing",
+"kind": "a"
+},
+"Uncool Malfunction": {
+"id": "Uncool_Malfunction",
 "kind": "a"
 }
 }

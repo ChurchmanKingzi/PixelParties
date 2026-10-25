@@ -2821,6 +2821,60 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_wind',    opts: { rate: 1.9,  volume: 0.35, delay: 450, category: null, dedupe: 0 } },
     { name: 'negate',       opts: { rate: 0.9,  volume: 0.6, delay: 520, category: null, dedupe: 0 } },
   ],
+  // Control Monitors (24.10.) — die Monitore flackern an (Blitzknistern, 0 / ~120 ms), dumpfes Summen (~420 ms), der weiße Streifen löscht die Schirme (~800 ms: Abwurf-Klang
+  // und Verneinungs-Ton). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  control_monitors: [
+    { name: 'elem_lightning', opts: { rate: 1.9, volume: 0.3 } },
+    { name: 'elem_lightning', opts: { rate: 2.4, volume: 0.3, delay: 120, category: null, dedupe: 0 } },
+    { name: 'debuff',         opts: { rate: 0.9, volume: 0.4, delay: 420, category: null, dedupe: 0 } },
+    { name: 'discard',        opts: { rate: 0.8, volume: 0.7, delay: 800, category: null, dedupe: 0 } },
+    { name: 'negate',         opts: { rate: 1.2, volume: 0.5, delay: 830, category: null, dedupe: 0 } },
+  ],
+  // Celia, the Class Clown (24.10.) — die Kerzenflammen fliegen los (Zauberton und Feuerhauch, 0 / ~200 ms), die Kerzen setzen sich (hohe Pings, ~450 ms), die vierte
+  // zündet (~790 ms: Buff-Klang, heller Ping). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  celia_candles: [
+    { name: 'spell_cast', opts: { rate: 1.4, volume: 0.4 } },
+    { name: 'elem_fire',  opts: { rate: 1.8, volume: 0.35, delay: 200, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 1.6, volume: 0.45, delay: 450, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 1.9, volume: 0.4, delay: 540, category: null, dedupe: 0 } },
+    { name: 'buff',       opts: { rate: 1.2, volume: 0.6, delay: 760, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.4, volume: 0.5, delay: 800, category: null, dedupe: 0 } },
+  ],
+  // Ghostly Warning (24.10.) — der Geist erscheint (dunkles Raunen, 0 ms), die Wolke wird eingesogen (Windsog ab ~380 ms), das Blinken verschluckt sie (~820 ms: Verneinungs-Ton).
+  // `phase: 'return'`: Raunen, Hand öffnet sich (~300 ms Schlag mit Feuerrauschen), Verpuffen (Wind ~650 ms).
+  ghostly_warning: (p) => (p && p.phase === 'return') ? [
+    { name: 'elem_dark',    opts: { rate: 0.9, volume: 0.6 } },
+    { name: 'heavy_impact', opts: { rate: 0.8, volume: 0.5, delay: 320, category: null, dedupe: 0 } },
+    { name: 'elem_fire',    opts: { rate: 0.7, volume: 0.8, delay: 330, category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 1.3, volume: 0.45, delay: 660, category: null, dedupe: 0 } },
+  ] : [
+    { name: 'elem_dark', opts: { rate: 0.8, volume: 0.6 } },
+    { name: 'elem_wind', opts: { rate: 1.6, volume: 0.5, delay: 380, category: null, dedupe: 0 } },
+    { name: 'negate',    opts: { rate: 0.9, volume: 0.7, delay: 820, category: null, dedupe: 0 } },
+  ],
+  // Atta, Speaker of Desires (24.10.) — die Bücher rauschen heran (Wind, 0 ms), klappen zu (~600 ms: Schlag, Funkensog), Bildschirmende dunkles Brummen; `phase: 'return'`: Bücher
+  // fliegen herbei (Wind), schlagen auf (~440–560 ms: Ping, Papier), blitzen (~640 ms: Buff-Klang).
+  atta_books: (p) => (p && p.phase === 'return') ? [
+    { name: 'elem_wind', opts: { rate: 1.5, volume: 0.5 } },
+    { name: 'placement', opts: { rate: 1.6, volume: 0.5, delay: 440, category: null, dedupe: 0 } },
+    { name: 'placement', opts: { rate: 1.9, volume: 0.4, delay: 520, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 1.8, volume: 0.5, delay: 640, category: null, dedupe: 0 } },
+    { name: 'buff',      opts: { rate: 1.1, volume: 0.6, delay: 650, category: null, dedupe: 0 } },
+  ] : [
+    { name: 'elem_wind', opts: { rate: 1.3, volume: 0.45 } },
+    { name: 'debuff',    opts: { rate: 1.2, volume: 0.4, delay: 480, category: null, dedupe: 0 } },
+    { name: 'placement', opts: { rate: 0.8, volume: 0.9, delay: 600, category: null, dedupe: 0 } },
+    { name: 'elem_dark', opts: { rate: 1.1, volume: 0.5, delay: 620, category: null, dedupe: 0 } },
+  ],
+  // Darion, the Blood-Crazy Groundskeeper (24.10.) — Kettensäge: Hieb (Schnitt, 0 und ~110 ms), Blutspritzer (Schlag ~140 ms), das Equip rastet ein (~420 ms: Schlag, heller Ping).
+  // Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  darion_equip: [
+    { name: 'slash',        opts: { rate: 0.8, volume: 0.7 } },
+    { name: 'slash',        opts: { rate: 1.1, volume: 0.6, delay: 110, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.3, volume: 0.45, delay: 150, category: null, dedupe: 0 } },
+    { name: 'placement',    opts: { rate: 1.0, volume: 0.9, delay: 420, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 1.7, volume: 0.5, delay: 430, category: null, dedupe: 0 } },
+  ],
   // Cute Crown (10.10.) — die Flügel schlagen (Wind, 0 / ~110 / ~220 ms), das Juwel klingt hell (~300 ms), Herzen steigen auf (~520 ms). Nur der erste Teil uebernimmt die
   // Sammelkategorie 'effect'.
   crown_flutter: [
@@ -3679,6 +3733,46 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_water',   opts: { rate: 1.35, volume: 0.35, delay: 980, category: null, dedupe: 0 } },
     { name: 'ping',         opts: { rate: 1.2, volume: 0.25, delay: 1180, category: null, dedupe: 0 } },
   ],
+  // The Golden Gate (25.10.): Goldregen — Münzklang (0 ms), zwei helle Pings zum Aufsteigen der Münzen.
+  golden_gate_gold: [
+    { name: 'gold_gain',  opts: { rate: 1.3, volume: 0.7, delay: 1, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.4, volume: 0.25, delay: 200, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.8, volume: 0.2, delay: 380, category: null, dedupe: 0 } },
+  ],
+  golden_gate_sparkle: [
+    { name: 'spell_cast', opts: { rate: 1.3, volume: 0.4, delay: 1, category: null, dedupe: 0 } },
+    { name: 'buff',       opts: { rate: 1.5, volume: 0.4, delay: 120, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.4, volume: 0.25, delay: 260, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.9, volume: 0.2, delay: 420, category: null, dedupe: 0 } },
+  ],
+  // Tail Slap (25.10.): der Schwanz peitscht (Wind, 40 ms), der Schlag sitzt bei ~90 ms, Staub und Sterne danach.
+  tail_slap_hit: [
+    { name: 'elem_wind',    opts: { rate: 1.5, volume: 0.45, delay: 1, category: null, dedupe: 0 } },
+    { name: 'slash',        opts: { rate: 0.7, volume: 0.5, delay: 50, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.95, volume: 0.65, delay: 90, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.4, volume: 0.25, delay: 260, category: null, dedupe: 0 } },
+  ],
+  // Ultimate Destroyer Punch (25.10.): der kräftige Einschlag — Doppelschlag tief (0 ms), Knacken, Staubrauschen; die Landung auf dem Helden dumpf.
+  udp_impact: [
+    { name: 'heavy_impact',     opts: { rate: 0.45, volume: 0.95, delay: 1, category: null, dedupe: 0 } },
+    { name: 'heavy_impact',     opts: { rate: 0.8, volume: 0.6, delay: 1, category: null, dedupe: 0 } },
+    { name: 'critical_strike',  opts: { rate: 0.8, volume: 0.5, delay: 30, category: null, dedupe: 0 } },
+    { name: 'elem_wind',        opts: { rate: 0.6, volume: 0.4, delay: 90, category: null, dedupe: 0 } },
+    { name: 'debuff',           opts: { rate: 0.8, volume: 0.35, delay: 220, category: null, dedupe: 0 } },
+    { name: 'ping',             opts: { rate: 1.6, volume: 0.25, delay: 320, category: null, dedupe: 0 } },
+  ],
+  udp_land: [
+    { name: 'heavy_impact', opts: { rate: 0.6, volume: 0.8, delay: 1, category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 0.9, volume: 0.3, delay: 60, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 1.8, volume: 0.25, delay: 140, category: null, dedupe: 0 } },
+  ],
+  // Uncool Malfunction (25.10.): Kurzschluss-Knistern (Funken) und dumpfes Quellen des schwarzen Qualms.
+  uncool_smoke: [
+    { name: 'elem_lightning', opts: { rate: 1.9, volume: 0.25, delay: 1, category: null, dedupe: 0 } },
+    { name: 'elem_dark',      opts: { rate: 0.7, volume: 0.7, delay: 40, category: null, dedupe: 0 } },
+    { name: 'debuff',         opts: { rate: 0.6, volume: 0.45, delay: 160, category: null, dedupe: 0 } },
+    { name: 'elem_lightning', opts: { rate: 2.2, volume: 0.2, delay: 250, category: null, dedupe: 0 } },
+  ],
   // Reverse Trap — der 1-Tonnen-Klotz pfeift herab und schlägt dumpf auf.
   reverse_trap_ton: [
     { name: 'elem_wind',    opts: { rate: 0.6, volume: 0.4, delay: 1, category: null, dedupe: 0 } },
@@ -4089,6 +4183,17 @@ const ZONE_ANIM_SFX = {
   ev_alleria_spider_redirect: [
     { name: 'projectile', opts: { rate: 0.9, volume: 0.7, delay: 0, category: null, dedupe: 250 } },
     { name: 'elem_biomancy', opts: { rate: 1.1, volume: 0.6, delay: 250, category: null, dedupe: 250 } },
+  ],
+  // Kartenwurf (25.10., `play_card_throw`): Ultimate Destroyer Punch wirft die Creature auf den Helden (Aufschlag nach ~760 ms) / Crash Landing lässt die Ausrüstung in die Ablage stürzen (~860 ms).
+  ev_card_throw: [
+    { name: 'elem_wind',    opts: { rate: 1.1, volume: 0.6, delay: 1, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.7, volume: 0.8, delay: 760, category: null, dedupe: 0 } },
+  ],
+  ev_card_crash: [
+    { name: 'debuff',       opts: { rate: 1.4, volume: 0.4, delay: 1, category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 0.9, volume: 0.5, delay: 220, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.9, volume: 0.6, delay: 860, category: null, dedupe: 0 } },
+    { name: 'discard',      opts: { rate: 0.8, volume: 0.6, delay: 880, category: null, dedupe: 0 } },
   ],
   // Pusher schleudert die Karte nach oben
   ev_pusher_fling: [

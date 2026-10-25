@@ -159,7 +159,7 @@ module.exports = {
     let wahl = kosten && kosten.wahl;
     if (wahl) {
       const _zs = gs.players[wahl.seite];
-      const _frei = _zs && (((_zs.supportZones[wahl.heroIdx] || [])[wahl.slot] || []).length === 0);
+      const _frei = _zs && ((((_zs.supportZones[wahl.heroIdx] || [])[wahl.slot] || []).length === 0) || engine.equipPflichtPlatz(wahl.seite, wahl.heroIdx, wahl.equipName) === wahl.slot);   // Darion: der Equip-Stapel nimmt auf
       const _imDeck = ps.mainDeck.indexOf(wahl.equipName) >= 0;
       const _traeger = ausruestTraegerMitSeite(engine, pi, wahl.equipName).some(t => t.heroIdx === wahl.heroIdx && t.seite === wahl.seite);
       if (!_frei || !_imDeck || !_traeger) wahl = null;

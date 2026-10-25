@@ -253,6 +253,8 @@ module.exports = {
       tutored,
     });
     engine.sync();
+    // Control Monitors: N Karten aus dem Deck auf die Hand, bezahlt mit N abgeworfenen Handkarten (ein Fenster fuer den ganzen Effekt).
+    await engine.meldeHandZugangDurchAbwurf(pi, { names: tutored, discarded, source: CARD_NAME });
     return true;
   },
 

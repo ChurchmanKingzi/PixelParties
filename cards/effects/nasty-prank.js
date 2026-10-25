@@ -7,10 +7,13 @@
 //   next turn. If the user has at least Magic Arts 1, that Hero cannot perform another Attack/Spell with that name for the rest of the game instead. This counts as a negative status
 //   effect."
 //
-//  ── FENSTER ─────────────────────────────────────────────────────────────
-//  Kettenfenster (`isReaction`, Bauform Shamanic Curse): das letzte Kettenglied ist ein Attack-/Spell-KARTE des Gegners, gespielt von einem HELDEN (`heroIdx ≥ 0`; ein Effekt, der nur
-//  als Attack/Spell ZÄHLT [`zaehltAlsArt`: Alice …], hat keine Karte und keinen Namen, der sich sperren ließe). Die Karte negiert nichts — der laufende Attack/Spell wird ganz normal
-//  ausgeführt; gesperrt wird erst das NÄCHSTE Mal („another").
+//  ── FENSTER: `isSpellPerformedReaction` (neu, 25.10.) ──────────────────
+//  Hand-Fenster NACH der Auflösung (`engine._checkSpellPerformedHandReactions`, gerufen hinter `afterSpellResolved` im Spielweg `doPlaySpell` und im Sofort-Guss): „immediately when an
+//  opponent's Hero performs an Attack or Spell" — aber erst, wenn die Attack/der Spell NICHT MEHR abgebrochen werden kann (Al, 25.10.): negierte, abgebrochene oder verpuffte Karten
+//  öffnen das Fenster nie. Bis 24.10. hing die Karte als Kettenglied OBEN auf der Attack/dem Spell (Bauform Shamanic Curse) — dort konnte die Karte noch negiert werden, der Streich aber schon
+//  gewirkt haben. Jetzt keine Kette: Reverse Trap & Co. greifen über das Reaktionsfenster der gespielten Karte (`_reaktionGespielt`). Bedingung (`spellPerformedCondition`): der Ausführende ist
+//  ein HELD des Gegners (ein Effekt, der nur als Attack/Spell ZÄHLT, hat keine Karte und keinen Namen, der sich sperren ließe; eine Kreatur als Wirkerin zählt nicht) und mindestens ein eigener
+//  Held kann die Karte wirken. Die Karte negiert nichts — der Attack/Spell ist längst ausgeführt; gesperrt wird erst das NÄCHSTE Mal („another").
 //
 //  ── DER STATUS `pranked` („Pranked", 🤡) ────────────────────────────────
 //  Ein Statuseintrag je Held mit `names` = { [Kartenname]: { expiresAtTurn, expiresForPlayer, permanent, opponent } } — jeder Name läuft für sich ab. Mehrere Streiche mit verschiedenen
@@ -32,54 +35,39 @@ const ANIM_MS = 1500;
 const AUFSCHLAG_MS = 760;   // bis der Eimer auf dem Helden aufschlägt (deckt sich mit `prank_bucket` im Client)
 
 module.exports = {
-  isReaction: true,
+  // Reaction-Karte: nie aktiv aus der Hand spielbar.
   canActivate: () => false,
+  neverPlayable: true,
+  activeIn: ['hand'],
 
-  reactionCondition: (gs, pi, engine, chainCtx) => {
-    if (!chainCtx?.chain || chainCtx.chain.length < 1) return false;
-    const lastLink = chainCtx.chain[chainCtx.chain.length - 1];
-    if (!lastLink || lastLink.owner === pi) return false;
-    if (lastLink.cardType !== 'Attack' && lastLink.cardType !== 'Spell') return false;
-    if (lastLink.zaehltAlsArt) return false;                         // kein gespielter Spell/Attack: nichts, was sich namentlich sperren ließe
-    if (!(lastLink.heroIdx >= 0)) return false;                      // „an opponent's HERO performs": eine Kreatur als Wirkerin zählt nicht
-    const hSeite = lastLink.casterOwner ?? lastLink.owner;
-    const hero = gs.players[hSeite]?.heroes?.[lastLink.heroIdx];
-    if (!hero?.name || hero.hp <= 0) return false;
+  isSpellPerformedReaction: true,
 
-    const ps = gs.players[pi];
-    if (!ps) return false;
-    const cardData = engine._getCardDB()[CARD_NAME];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const h = ps.heroes[hi];
-      if (!h?.name || h.hp <= 0) continue;
-      if (h.statuses?.frozen || h.statuses?.stunned) continue;
-      if (engine.heroMeetsLevelReq(pi, hi, cardData)) return true;
-    }
-    return !!engine.fremderHeldKannStufe(pi, CARD_NAME);              // W20c: auch ein übernommener Held wirkt
+  spellPerformedCondition(gs, pi, engine, info) {
+    if (!info || info.performerOwner === pi) return false;
+    if (info.cardType !== 'Attack' && info.cardType !== 'Spell') return false;
+    const hero = gs.players[info.heroOwner]?.heroes?.[info.heroIdx];
+    if (!hero?.name || hero.hp <= 0) return false;                   // „an opponent's HERO performs": der Wirker muss ein Held sein (und noch stehen)
+    return true;
   },
 
-  resolve: async (engine, pi, selectedIds, validTargets, chain, myIndex) => {
-    if (!chain || myIndex === undefined) return;
+  async spellPerformedResolve(engine, pi, info, opts = {}) {
     const gs = engine.gs;
-    const target = chain[myIndex - 1];
-    const eigen = chain[myIndex];
-    if (!target) return;
-    const cardName = baseCardName(target.cardName || '');
-    const hSeite = target.casterOwner ?? target.owner;
-    const hi = target.heroIdx;
+    const cardName = baseCardName(info.spellName || '');
+    const hSeite = info.heroOwner;
+    const hi = info.heroIdx;
     const hero = gs.players[hSeite]?.heroes?.[hi];
     if (!hero?.name || hero.hp <= 0 || !cardName) return;
 
     // „If the user has at least Magic Arts 1" — der Nutzer = der Wirker dieser Karte.
-    const wHi = eigen?.casterHeroIdx ?? eigen?.heroIdx;
-    const wSeite = eigen?.casterOwner ?? pi;
+    const wHi = opts.casterIdx;
+    const wSeite = opts.casterSeite ?? pi;
     const dauerhaft = Number.isInteger(wHi) && wHi >= 0 && engine.effectiveSchoolLevelForCaster('Magic Arts', pi, wHi, wSeite) >= 1;
 
     engine._broadcastEvent('play_zone_animation', { type: 'prank_bucket', owner: hSeite, heroIdx: hi, zoneSlot: -1, duration: ANIM_MS });
     await engine._delay(AUFSCHLAG_MS);
 
     // Frist: der nächste Zug des Gegners nach dem laufenden endet → Ablauf zu Beginn des Zuges danach (Kopf).
-    const opp = target.owner;
+    const opp = info.performerOwner;
     const expiresAtTurn = gs.activePlayer === opp ? gs.turn + 3 : gs.turn + 2;
     const alt = hero.statuses?.pranked?.names || {};
     const names = {};

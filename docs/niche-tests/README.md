@@ -84,6 +84,8 @@ Rückgabe von `play`: `true` (vom Server **behandelt** – das schließt einen A
   Ja/Nein-Standard: `t.policy.confirm` (true/false); alles andere beantwortet die Engine-CPU-Politik (erste Option / bei abbrechbar: ablehnen). Antwortformen: Ja/Nein `{confirmed:true}`; Galerie `{cardName}` bzw. `{selectedCards:[…]}`;
   Option `{optionId}`; Zone `{heroIdx, slotIdx}` – am sichersten ist es, die Form im Skript der Karte nachzulesen.
 
+**Nach-Ketten-Aktionen** (`queuePostChainAction`: Shamanic Curse, Celia, Lunar Eclipse): der Server arbeitet sie im `.finally` jedes Socket-Handlers ab, die Harness nur auf Zuruf — `await t.drain()`. Reaktions-Prompts lehnst du per Skript mit `answer: () => false` ab (nicht `{confirmed:false}`).
+
 **Beobachten**: `t.errors` (verschluckte Engine-Fehler: `console.error` – der wichtigste Rauchmelder; immer prüfen!), `t.warns`, `t.events` (`_broadcastEvent`: Animationen, Karten-Reveal), `t.evs(name)`,
 `t.logs`/`t.lg(type)` (Spiel-Log), `t.prompts`, `t.targets`, `t.audit()` (Zustandsprüfung: NaN, ungültige Namen, Zone↔Instanz, HP>Max), `t.census()` + `t.censusDiff(vorher, nachher)` (Kartenbilanz),
 `t.engine.over` (`{called, winnerIdx, reason}` bei Spielende), `t.hp(seat, hi)`, `t.zone(seat, hi, slot)`, `t.pile(seat, 'hand'|'mainDeck'|'discardPile'|'deletedPile')`, `t.find(name, zone)`, `t.inst(pred)`.
