@@ -36620,6 +36620,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // ist. Deshalb React-State und nicht textContent: ein sync() mitten im
   // Countdown würde eine DOM-Manipulation sofort überschreiben.
   const [goldCrash, setGoldCrash] = useState(null);
+  // Betrayal (W78): die Goldzahlen bleiben auf dem Stand VOR der Zahlung, bis die Münz-/Stehl-Animation sie zählt (`betrayal_gold_hold` / `_release`); { Sitz: angezeigter Wert }.
+  const [betrayalHold, setBetrayalHold] = useState(null);
   const goldCrashRaf = useRef(null);
   // 'crash' (rot) oder 'recover' (gruen) — steuert die Zaehler-Klasse.
   const [goldCrashTone, setGoldCrashTone] = useState('crash');
@@ -46194,11 +46196,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // (`gold-muenze.png`, 12×12) ganzzahlig 2×, `image-rendering: pixelated`, Bewegung in ganzen 2-Pixel-Schritten im Bildtakt (~30 Bilder/s, Bogen aus Rasterstufen), harte
     // Goldrahmen aus gestapelten `box-shadow`-Ringen (kein Weichzeichner), Blinken je Bild statt weichem Pulsieren. Die Zeiten kommen vom Server (`betrayal.js`: stepMs/legMs/dwellMs).
     const onBetrayalCoins = ({ fromPlayer, toPlayer, targetOwner, targetHeroIdx, targetZoneSlot, coins, stepMs, legMs, dwellMs }) => {
-      if (window._playAnimations === false) return;
+      if (window._playAnimations === false) { setBetrayalHold(null); return; }
       const von = document.querySelector(`[data-gold-player="${fromPlayer}"]`);
       const nach = document.querySelector(`[data-gold-player="${toPlayer}"]`);
       const ziel = document.querySelector(`[data-support-zone][data-support-owner="${ownerLbl(targetOwner, myIdx)}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
-      if (!von || !nach || !ziel) return;
+      if (!von || !nach || !ziel) { setBetrayalHold(null); return; }
       if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_betrayal_coins');
       const N = Math.max(1, Math.min(8, Number(coins) || 5)), STEP = Number(stepMs) || 130, LEG = Number(legMs) || 360, DWELL = Number(dwellMs) || 100;
       const TAKT = 33, RASTER = 2, MUENZE = 24, BOGEN = 44;
@@ -46225,6 +46227,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const ENDE = (N - 1) * STEP + 2 * LEG + DWELL;
       const t0 = performance.now();
       let letzte = -1;
+      // Anzeige: je Abflug zählt die Zahl des Zahlers um 1 herunter, je Landung die des Empfängers um 1 hinauf (Stand vor der Zahlung hält `betrayalHold`).
+      const gestartet = new Set(), gelandet0 = new Set();
+      const zaehle = (sitz, d) => setBetrayalHold(h => (h && h[sitz] != null ? { ...h, [sitz]: h[sitz] + d } : h));
       const schritt = (jetzt) => {
         const t = jetzt - t0;
         const fr = Math.floor(t / TAKT);
@@ -46234,6 +46239,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           muenzen.forEach((m, i) => {
             const lt = t - i * STEP;
             let pos = null;
+            if (lt >= 0 && !gestartet.has(i)) { gestartet.add(i); zaehle(fromPlayer, -1); }
+            if (lt >= 2 * LEG + DWELL && !gelandet0.has(i)) { gelandet0.add(i); zaehle(toPlayer, 1); }
             if (lt >= 0 && lt < LEG) pos = bahn(A, B, Math.min(1, lt / LEG));
             else if (lt >= LEG && lt < LEG + DWELL) {
               const hup = [0, -6, -8, -4][Math.floor((lt - LEG) / TAKT) % 4];            // die Münze hüpft auf der Karte
@@ -46249,11 +46256,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           rKonto.style.display = gelandet && (fr % 2 === 0) ? 'block' : 'none';
         }
         if (t < ENDE + 140) requestAnimationFrame(schritt);
-        else { muenzen.forEach(m => m.remove()); rKreatur.remove(); rKonto.remove(); }
+        else { muenzen.forEach(m => m.remove()); rKreatur.remove(); rKonto.remove(); setBetrayalHold(null); }
       };
       requestAnimationFrame(schritt);
     };
     socket.on('betrayal_coins', onBetrayalCoins);
+    // Hold: die Zahlung ist im Zustand schon gebucht — die Anzeige bleibt auf dem alten Stand, bis eine Animation sie zählt. Freigabe: `betrayal_gold_release` ({ seats? } = nur diese Sitze),
+    // der Münzflug selbst oder spätestens nach 25 s (Sicherung gegen eine Negierung ohne Bilder).
+    let holdTimer = null;
+    const onBetrayalHold = ({ seats }) => {
+      if (!seats || window._playAnimations === false) return;
+      setBetrayalHold({ ...seats });
+      clearTimeout(holdTimer);
+      holdTimer = setTimeout(() => setBetrayalHold(null), 25000);
+    };
+    const onBetrayalRelease = ({ seats }) => {
+      if (!Array.isArray(seats)) { setBetrayalHold(null); return; }
+      setBetrayalHold(h => { if (!h) return h; const n = { ...h }; seats.forEach(x => delete n[x]); return Object.keys(n).length ? n : null; });
+    };
+    socket.on('betrayal_gold_hold', onBetrayalHold);
+    socket.on('betrayal_gold_release', onBetrayalRelease);
     const onJumpscareBox = ({ owner, heroIdx }) => {
       if (window.playSFX) window.playSFX('jumpscare', { category: 'effect' });
       const ownerLabel = ownerLbl(owner, myIdx);
@@ -51865,6 +51887,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('gold_gift_flight', onGoldGiftFlight);
       socket.off('gold_steal_burst', onGoldStealBurst);
       socket.off('betrayal_coins', onBetrayalCoins);
+      socket.off('betrayal_gold_hold', onBetrayalHold);
+      socket.off('betrayal_gold_release', onBetrayalRelease);
+      clearTimeout(holdTimer);
       socket.off('jumpscare_box', onJumpscareBox);
       socket.off('anti_magic_bubble', onAntiMagicBubble);
       socket.off('fireshield_corona', onFireshieldCorona);
@@ -57775,7 +57800,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             </div>
               <div className="game-gold-display">
                 <span className="game-gold-icon"></span>
-                <span className={'game-gold-value orbit-font' + (goldCrash ? (goldCrashTone === 'recover' ? ' gold-recovering' : ' gold-crashing') : '') + (goldIsNegative(goldCrash ? goldCrash[oppIdx] : opp.gold) ? ' gold-negative' : '')} data-gold-player={oppIdx}>{formatGold(goldCrash ? goldCrash[oppIdx] : opp.gold)}</span>
+                <span className={'game-gold-value orbit-font' + (goldCrash ? (goldCrashTone === 'recover' ? ' gold-recovering' : ' gold-crashing') : '') + (goldIsNegative(goldCrash ? goldCrash[oppIdx] : (betrayalHold && betrayalHold[oppIdx] != null ? betrayalHold[oppIdx] : opp.gold)) ? ' gold-negative' : '')} data-gold-player={oppIdx}>{formatGold(goldCrash ? goldCrash[oppIdx] : (betrayalHold && betrayalHold[oppIdx] != null ? betrayalHold[oppIdx] : opp.gold))}</span>
               </div>
           </div>
         </div>
@@ -58939,7 +58964,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             )}
             <div className="game-gold-display">
               <span className="game-gold-icon"></span>
-              <span className={'game-gold-value orbit-font' + (goldCrash ? (goldCrashTone === 'recover' ? ' gold-recovering' : ' gold-crashing') : '') + (goldIsNegative(goldCrash ? goldCrash[myIdx] : me.gold) ? ' gold-negative' : '')} data-gold-player={myIdx}>{formatGold(goldCrash ? goldCrash[myIdx] : me.gold)}</span>
+              <span className={'game-gold-value orbit-font' + (goldCrash ? (goldCrashTone === 'recover' ? ' gold-recovering' : ' gold-crashing') : '') + (goldIsNegative(goldCrash ? goldCrash[myIdx] : (betrayalHold && betrayalHold[myIdx] != null ? betrayalHold[myIdx] : me.gold)) ? ' gold-negative' : '')} data-gold-player={myIdx}>{formatGold(goldCrash ? goldCrash[myIdx] : (betrayalHold && betrayalHold[myIdx] != null ? betrayalHold[myIdx] : me.gold))}</span>
             </div>
           </div>
         </div>

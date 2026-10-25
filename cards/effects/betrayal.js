@@ -17,25 +17,28 @@
 //  ── ZIELWAHL ────────────────────────────────────────────────────────────
 //  Kanonische Spell-Zielwahl (`ctx.promptDamageTarget` mit `dealsDamage: false`, wie Memory Wipe / Capture): Schutz („cannot be chosen": Thicket, Great Wall of Deri, Cloud …),
 //  Umleitungs-, Surprise- und Reaktionsfenster, Truth-Seeing Eye des Nutzers. `condition` prüft nur, was keine Wählbarkeit ist: Stufe, Level vorhanden, Kontrolle wechselbar
-//  (kein Cardinal Beast, kein „control cannot change", kein `control_immune`, „You can only control 1 …" des Wirkers). Zu hohe Stufe: ausgegraut statt weg.
+//  (kein Cardinal Beast, kein „control cannot change", kein `control_immune`, „You can only control 1 …" des Wirkers). Zu hohe Stufe: ausgegraut statt weg. Die Wahl ist nach der Zahlung nicht abbrechbar. Die Wahl ist nach der Zahlung nicht abbrechbar.
 //
 //  ── PLATZ ───────────────────────────────────────────────────────────────
 //  „One of the USER's free Support Zones": nur die freien Zonen des ausführenden Helden (wie Capture, nicht wie Diplomacy). Eine freie Zone: automatisch; mehrere: Zonenwahl
-//  (abbrechbar). Alice-Teilung (W63a): auch die Zone einer GLEICHNAMIGEN Kreatur zählt, geteilte Zonen zuerst. „A Hero can only have 1 Gigantisaur": Zonen, die das verletzen,
+//  (nicht abbrechbar: schon bezahlt). Alice-Teilung (W63a): auch die Zone einer GLEICHNAMIGEN Kreatur zählt, geteilte Zonen zuerst. „A Hero can only have 1 Gigantisaur": Zonen, die das verletzen,
 //  fallen für die Kreatur weg (sonst wäre das Gold weg und die Übernahme scheiterte). Ist keine Zone frei, ist der Held kein Nutzer (`canPlayWithHero`).
 //  Geliehener Held (Love Shot, Charme): die Zone liegt auf dessen Brettseite, der neue Kontrolleur ist der Spieler (`opts.controller`).
 //
-//  ── KOSTEN: 5 GOLD AN DEN GEGNER ────────────────────────────────────────
-//  „You must pay your opponent 5 Gold to use this Spell" = Aktivierungskosten (Kosten-Vertrag W66b, Als Regel 23.10.: „Kosten generell erst, wenn committed ist"):
-//   • unspielbar (grau), solange der Spieler keine 5 Gold zahlen kann (`canAffordGold`: Debt-O-Tron-Kredit zählt, Gold-Sperre `goldLocked` sperrt die Karte);
-//   • bezahlt wird im `onTargetChosen`-Haken der Zielwahl — NACH der letzten abbrechbaren Wahl (Ziel, Zone), VOR den Reaktionsfenstern auf das Ziel
-//     (Muster Infected Greatmaw): ein Abbruch von Ziel oder Zone lässt Gold, Hand und Brett exakt wie vorher; ab dem Commit ist das Gold weg, auch wenn die Karte danach in
-//     der Zielwahl negiert wird (Invisibility Cloak, Storm Ring …) oder die Übernahme scheitert (Defending the Gate, Cardinal Beast, Schutzfenster der Kreatur, Resistance …);
-//     (Auch eine Umleitung der Zielwahl auf eine Kreatur, die der Text nicht erlaubt [zu hohe Stufe, Cardinal …], lässt die Übernahme entfallen — gezahlt ist gezahlt: Log `betrayal_fizzle`.)
-//   • wird die Karte schon in der Kette (vor `onPlay`) negiert, ist nie gezahlt worden;
-//   • der EMPFÄNGER ist der bisherige KONTROLLEUR der Kreatur („your opponent": im Zweikampf der Gegner, bei 3–4 Sitzen der, dem die Kreatur gehört, nicht der Besitzer).
-//     Er bekommt das Gold, wenn die letzte Münze landet (`actionGainGold`, also mit allen Gewinn-Hooks: Gold Trap des Wirkers, Gold-Sperre des Empfängers [Golden Arrow] — dann
-//     kommt nichts an, der Zahler hat trotzdem bezahlt, wie bei Festive Werz). Gold-freies Spielen (`kostenlosSpielen`) zahlt und überweist nichts.
+//  ── KOSTEN: 5 GOLD AN DEN GEGNER (Al, 25.10.2026) ──────────────────────
+//  „You must pay your opponent 5 Gold to use this Spell" = Kosten für das bloße EINSETZEN des Spells (Z7c, Vorbild Knife Throw): `payActivationCost` zahlt VOR dem Reaktionsfenster.
+//   • Nicht zahlbar (`canAffordGold`: Debt-O-Tron-Kredit zählt, Gold-Sperre `goldLocked` sperrt) → `false`: Karte bleibt auf der Hand, nichts passiert; die Karte ist dann auch grau.
+//   • Der Spell wird danach geblockt/negiert (Kette, Invisibility Cloak, Storm Ring …) → die 5 Gold bleiben beim Gegner. Die Zielwahl in `onPlay` ist nach der Zahlung NICHT mehr abbrechbar.
+//   • EMPFÄNGER = „your opponent" = `engine.opponentOf(pi)` (genau ein Gegner, im Skill Test der Fokus-Gegner); Ziele sind nur Kreaturen, die DIESER Gegner kontrolliert — so
+//     gilt „das Gold geht an den Kontrolleur der Kreatur" von selbst. Beide Buchungen (Zahler −5, Empfänger +5 über `actionGainGold`, also mit Gewinn-Hooks: Gold Trap,
+//     Gold-Sperre des Empfängers [Golden Arrow → kommt nichts an]) geschehen bei der Zahlung, genau einmal. Gold-freies Spielen (`kostenlosSpielen`) zahlt nichts.
+//   • ANZEIGE: der Zustand ist sofort gebucht, die Zahlen im Client halten aber den Stand vor der Zahlung (`betrayal_gold_hold`), bis die Animation sie zählt (Münzflug: je Abflug −1, je
+//     Landung +1; Stehl-Animation: Zahler beim Abflug, Empfänger nach der Landung) und `betrayal_gold_release` (oder die 25-s-Sicherung des Clients) sie freigibt.
+//   • AUSGANG → BILD (nichts wird doppelt gutgeschrieben):
+//       – Spell geblockt/negiert (kein `onPlay`; oder in der Zielwahl negiert): Stehl-Animation DIREKT vom eigenen zum Gegner-Gold (`gold_steal_burst`, Richtung umgekehrt zu Deepsea
+//         Pirate) — gespielt über `spellVisual` (die Engine ruft es bei jeder Negierung, die Bilder zeigt) und, wo die Engine keine Bilder spielt, am Ende von `onPlay`;
+//       – Wirkung gelingt ODER die Übernahme scheitert nach der Zahlung (Umleitung auf eine unzulässige Kreatur, Defending the Gate, Monia, Cardinal …): die Münz-Animation über die Kreatur;
+//         die Kreatur wechselt die Zone nur, wenn die Übernahme gelingt.
 //
 //  ── ZUSATZAKTION ────────────────────────────────────────────────────────
 //  „This counts as an additional Action" → `inherentAction: true` (immer; Main Phase: spielbar, Action Phase: verbraucht die Aktion nicht).
@@ -50,7 +53,7 @@
 //  `betrayal_coins` (Client, `onBetrayalCoins` in app-board.jsx, Pixelart): fünf Goldmünzen (das feste Münz-Sprite des Spielgestalters, `gold-muenze.png`, ganzzahlig 2×) fliegen im
 //  Takt von der EIGENEN Gold-Anzeige in ganzen Pixeln im Bogen zur Ziel-Kreatur, kreisen dort kurz (harter Goldrahmen blinkt) und fliegen zur Gold-Anzeige des Empfängers
 //  weiter. Verlässt die fünfte Münze die Kreatur (`LEAVE_MS`), fliegt diese (Engine-Flug `play_card_transfer`) in ihre neue Zone; die Münzen landen währenddessen. Klang:
-//  `ZONE_ANIM_SFX.ev_betrayal_coins` (Münzklang je Abflug und Landung).
+//  `ZONE_ANIM_SFX.ev_betrayal_coins` (Münzklang je Abflug und Landung). Geblockt/negiert: `gold_steal_burst` (Münzstrom, Klang `ev_gold_steal_burst`).
 //
 //  ── CPU ─────────────────────────────────────────────────────────────────
 //  Die CPU nimmt die wertvollste wählbare Kreatur (Stufe, HP, ATK); ob sie die Karte spielt, entscheiden ihre Bewertungen (Gold −5 / +5 beim Gegner gegen die Kreatur).
@@ -70,6 +73,7 @@ const LEG_MS = 360;
 const DWELL_MS = 100;
 const LEAVE_MS = (COINS - 1) * STEP_MS + LEG_MS + DWELL_MS;      // die fünfte Münze verlässt die Kreatur
 const LAND_MS = LEAVE_MS + LEG_MS;                               // die fünfte Münze landet beim Empfänger
+const STEHL_MS = 1100;                                           // Dauer des Münzstroms `gold_steal_burst` (Abflug bis Landung)
 
 /** Magic-Arts-Stufe des Nutzers (Brettseite `hs`), 1–3. */
 function maxLevelFuer(engine, pi, hs, heroIdx) {
@@ -107,7 +111,7 @@ function freieZonen(engine, hs, heroIdx, pi = null, inst = null) {
 function istZiel(engine, pi, inst, maxLv, mitSchutz) {
   if (!inst || inst.zone !== 'support' || inst.faceDown || inst.counters?._heldKreatur) return false;   // Held als Kreatur (Hulijing) wechselt nie die Kontrolle
   const ktrl = engine.kontrolleurVon(inst);
-  if (ktrl === pi || !engine.opponentsOf(pi).includes(ktrl)) return false;
+  if (ktrl === pi || ktrl !== engine.opponentOf(pi)) return false;      // nur Kreaturen DES Gegners („your opponent“), dem die 5 Gold gehören
   const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];
   if (!cd || !hasCardType(cd, 'Creature') || !engine.isChoosableAsCreature(inst, cd)) return false;
   if (!hasNumericCreatureLevel(cd)) return false;                       // Artifact-Kreaturen haben kein Level
@@ -154,6 +158,46 @@ function kreaturWert(engine, t) {
   return (cd.level || 0) * 2 + (cd.hp || 0) / 60 + (cd.atk || 0) / 40;
 }
 
+// ── Zahlung und Bilder ──────────────────────────────────────────────────
+
+/**
+ * Zahlt die 5 Gold (Zahler −5, Gegner +5) und merkt den Vorgang in `gs._betrayalPay`. Liefert `false`, wenn nicht zahlbar. Eine Stelle für `payActivationCost` und den Fallback in `onPlay`.
+ */
+async function zahle(engine, pi) {
+  const gs = engine.gs;
+  if (!engine.canAffordGold(pi, GOLD_KOSTEN, CARD_NAME)) return false;
+  const empf = engine.opponentOf(pi);
+  // Die Anzeige hält den Stand VOR der Zahlung, bis eine Animation sie zählt (Client: `betrayal_gold_hold`); der Zustand ist sofort gebucht.
+  engine._broadcastEvent('betrayal_gold_hold', { seats: { [pi]: gs.players[pi].gold || 0, [empf]: gs.players[empf]?.gold || 0 } });
+  const gezahlt = await engine._payCardCost(pi, GOLD_KOSTEN, { cardName: CARD_NAME });
+  if (gezahlt > 0) await engine.actionGainGold(empf, gezahlt, { source: CARD_NAME });
+  engine.log('betrayal_pay', { player: gs.players[pi]?.username, amount: gezahlt, to: gs.players[empf]?.username });
+  gs._betrayalPay = { pi, empf, betrag: gezahlt, turn: gs.turn, gezeigt: false };
+  if (!(gezahlt > 0)) engine._broadcastEvent('betrayal_gold_release', {});
+  engine.sync();
+  return true;
+}
+
+/** Gibt die gehaltene Anzeige frei (alle Sitze oder die genannten). */
+function gibFrei(engine, seats) {
+  engine._broadcastEvent('betrayal_gold_release', seats ? { seats } : {});
+}
+
+/**
+ * Stehl-Animation (Karte geblockt/negiert): Münzstrom direkt vom Zahler zum Gegner (`gold_steal_burst`, nur die Richtung ist umgekehrt zu Deepsea Pirate). Höchstens einmal je Zahlung —
+ * `spellVisual` (Engine bei Negierung) und das Ende von `onPlay` rufen beide; die Zahl des Zahlers fällt beim Abflug, die des Empfängers nach der Landung. Bildet nur ab, bucht nichts.
+ */
+async function stehlAnimation(engine) {
+  const p = engine.gs._betrayalPay;
+  if (!p || p.gezeigt || p.turn !== engine.gs.turn) return;
+  p.gezeigt = true;
+  if (!(p.betrag > 0)) return;
+  engine._broadcastEvent('gold_steal_burst', { fromPlayer: p.pi, toPlayer: p.empf, amount: p.betrag });
+  gibFrei(engine, [p.pi]);
+  await engine._delay(STEHL_MS);
+  gibFrei(engine);
+}
+
 module.exports = {
   requiresTarget: true,
   // ^ Blinded-Sperre (cards/effects/_hooks.js).
@@ -166,6 +210,15 @@ module.exports = {
   inherentAction: true,
 
   cpuMeta: { scalesWithSchool: SCHOOL },
+
+  // Entkoppelte Zauberbilder (v1179): wird der Spell geblockt/negiert, läuft `onPlay` nie — die Engine spielt dann das hier: die Stehl-Animation vom Zahler zum Gegner.
+  spellVisual: async (engine) => { await stehlAnimation(engine); },
+
+  // In der Kette negiert (kein `onPlay`, kein `spellVisual`): dieselbe Stehl-Animation; der Vorgang ist danach abgeschlossen. (Engine-Haken `routeNegatedInitialCard`, W78.)
+  async onInitialNegated(engine) {
+    await stehlAnimation(engine);
+    delete engine.gs._betrayalPay;
+  },
 
   /** Grau, solange kein eigener Held (Gold + freie Zone + Ziel) die Karte wirken könnte. */
   spellPlayCondition(gs, pi, engine) {
@@ -183,6 +236,12 @@ module.exports = {
     return heldTauglich(eng, pi, heroIdx);
   },
 
+  /** ★ Z7c: die 5 Gold („to use this Spell") VOR dem Reaktionsfenster; `false` = nicht zahlbar → die Karte bleibt auf der Hand. */
+  async payActivationCost(ctx) {
+    if (!(await zahle(ctx._engine, ctx.cardOwner))) return false;
+    if (ctx.card) ctx.card._kostenBezahlt = true;
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
@@ -193,99 +252,85 @@ module.exports = {
       const ps = gs.players[pi];
       const userHero = ctx.attachedHero || gs.players[hs]?.heroes?.[heroIdx];
       if (!ps || !userHero?.name || userHero.hp <= 0) { gs._spellCancelled = true; return; }
-      if (!engine.canAffordGold(pi, GOLD_KOSTEN, CARD_NAME)) { gs._spellCancelled = true; return; }
 
-      const maxLv = maxLevelFuer(engine, pi, hs, heroIdx);
-      const bezahlt = { ja: false };                          // Zustand der Zahlung (im Haken gesetzt, im finally abgerechnet)
+      // ── Kosten: Normalweg — `payActivationCost` hat vor der Kette bezahlt; sonst (Sofort-Weg) jetzt ──
+      if (ctx.card?._kostenBezahlt) delete ctx.card._kostenBezahlt;
+      else if (!(await zahle(engine, pi))) { gs._spellCancelled = true; return; }
+      const zahlung = gs._betrayalPay;
 
       try {
-        // ── Ziel (abbrechbar), dann Zone (abbrechbar), dann COMMIT + Zahlung — alles im Haken `onTargetChosen` ──
+        const maxLv = maxLevelFuer(engine, pi, hs, heroIdx);
+
+        // ── Ziel ──
+        // pflichtwahl: die 5 Gold sind beim Einsetzen schon bezahlt (payActivationCost, Z7c, Al 25.10.) — ab dort gibt es keinen Abbruch mehr
         const target = await ctx.promptDamageTarget({
           side: 'enemy',
           types: ['creature'],
           damageType: null,
           dealsDamage: false,
           title: CARD_NAME,
-          description: `Choose a Lv${maxLv} or lower Creature your opponent controls and take permanent control of it. You pay ${GOLD_KOSTEN} Gold to its controller.`,
+          description: `Choose a Lv${maxLv} or lower Creature your opponent controls and take permanent control of it. You paid ${GOLD_KOSTEN} Gold to your opponent.`,
           confirmLabel: '🗡️ Betray!',
           confirmClass: 'btn-warning',
-          cancellable: true,
+          cancellable: false,
+          noSpellCancel: true,               // nie zurück auf die Hand: es ist bezahlt
           dimUnmetCondition: true,           // zu hohe Stufe / nicht übernehmbar: ausgegraut statt weg
           condition: (t) => istZiel(engine, pi, t.cardInstance, maxLv, false),
-          onTargetChosen: async (gewaehlt) => {
-            // Ein Neuwurf der Zielwahl (totes Ziel nach einer Reaktion) betritt den Haken erneut: die Zahlung ist schon geleistet.
-            if (bezahlt.ja) return true;
-            const inst = gewaehlt?.cardInstance;
-            if (!inst || !istZiel(engine, pi, inst, maxLv, false)) return false;
-            if (!engine.canAffordGold(pi, GOLD_KOSTEN, CARD_NAME)) return false;
-
-            // Platz: eine freie Zone DES NUTZERS
-            const frei = freieZonen(engine, hs, heroIdx, pi, inst);
-            if (frei.length === 0) return false;
-            let zone = frei[0];
-            if (frei.length > 1) {
-              const picked = await ctx.promptZonePick(frei, {
-                title: CARD_NAME,
-                description: `Place ${inst.name} into one of ${userHero.name}'s free Support Zones.`,
-                cancellable: true,
-                heroShortcut: false,
-              });
-              if (!picked) return false;
-              zone = frei.find(z => z.heroIdx === picked.heroIdx && z.slotIdx === picked.slotIdx) || frei[0];
-            }
-
-            // ── COMMIT: ab hier gibt es keinen Abbruch mehr — erst jetzt wird bezahlt (W66b) ──
-            engine.commitAppearance();
-            const empfaenger = engine.kontrolleurVon(inst);
-            const seite = engine.physicalSide(inst);
-            const gezahlt = await engine._payCardCost(pi, GOLD_KOSTEN, { cardName: CARD_NAME });
-            bezahlt.ja = true;
-            bezahlt.betrag = gezahlt;
-            bezahlt.empfaenger = empfaenger;
-            bezahlt.zone = zone;
-            bezahlt.t0 = Date.now();
-            engine.log('betrayal_pay', { player: ps.username, amount: gezahlt, to: gs.players[empfaenger]?.username, creature: inst.name });
-
-            // Münzflug: eigene Gold-Anzeige → Kreatur → Gold-Anzeige des Empfängers. Die Zielwahl läuft weiter (Reaktionsfenster), sobald die fünfte Münze die Kreatur verlassen hat.
-            if (gezahlt > 0) {
-              engine._broadcastEvent('betrayal_coins', {
-                fromPlayer: pi, toPlayer: empfaenger,
-                targetOwner: seite, targetHeroIdx: inst.heroIdx, targetZoneSlot: inst.zoneSlot,
-                coins: COINS, stepMs: STEP_MS, legMs: LEG_MS, dwellMs: DWELL_MS,
-              });
-              await engine._delay(LEAVE_MS);
-            }
-            return true;
-          },
         });
 
-        // Abbruch (nichts bezahlt) oder in der Zielwahl negiert (bezahlt, Kreatur bleibt): nichts zu übernehmen.
+        // Kein Ziel mehr / in der Zielwahl negiert: die Stehl-Animation (läuft nur, wenn `spellVisual` sie nicht schon gespielt hat).
         if (!target) {
-          if (bezahlt.ja) engine.log('betrayal_fizzle', { player: ps.username, reason: 'negated' });
-          return;
-        }
-
-        // ── Übernahme: die lebende Instanz neu auflösen — eine Reaktion kann sie bewegt, übernommen oder entfernt haben ──
-        const inst = target.cardInstance && engine.cardInstances.find(c => c.id === target.cardInstance.id && c.zone === 'support');
-        if (!inst || engine.kontrolleurVon(inst) !== bezahlt.empfaenger) {
-          engine.log('betrayal_fizzle', { player: ps.username, creature: target.cardName, reason: 'gone' });
+          engine.log('betrayal_fizzle', { player: ps.username, reason: gs._spellNegatedByEffect ? 'negated' : 'no_target' });
+          await stehlAnimation(engine);
           engine.sync();
           return;
         }
-        const name = inst.name;
-        // Eine Umleitung in der Zielwahl (Challenge, Anti-Magnet …) darf nicht auf eine Kreatur führen, die der Text nicht erlaubt (zu hohe Stufe, Cardinal …): Kosten sind bezahlt, die Übernahme entfällt.
-        if (!istZiel(engine, pi, inst, maxLv, false)) { engine.log('betrayal_fizzle', { player: ps.username, creature: name, reason: 'illegal' }); engine.sync(); return; }
+        const inst = target.cardInstance && engine.cardInstances.find(c => c.id === target.cardInstance.id && c.zone === 'support');
+        const name = target.cardName;
 
-        // Platz noch frei? (sonst neu bestimmen; der Spieler hat sich schon festgelegt — Zonenwahl wiederholen wäre kein Abbruch mehr)
-        let zone = bezahlt.zone;
-        const noch = freieZonen(engine, hs, heroIdx, pi, inst);
+        // ── Zone: eine freie Zone DES NUTZERS (nicht abbrechbar) ──
+        let zone = null;
+        if (inst && istZiel(engine, pi, inst, maxLv, false)) {
+          const frei = freieZonen(engine, hs, heroIdx, pi, inst);
+          zone = frei[0] || null;
+          if (frei.length > 1) {
+            const picked = await ctx.promptZonePick(frei, {
+              title: CARD_NAME,
+              description: `Place ${inst.name} into one of ${userHero.name}'s free Support Zones.`,
+              cancellable: false,
+              heroShortcut: false,
+            });
+            zone = (picked && frei.find(z => z.heroIdx === picked.heroIdx && z.slotIdx === picked.slotIdx)) || frei[0];
+          }
+        }
+
+        // ── Münz-Animation über der Kreatur: Gold-Anzeige → Kreatur → Gold-Anzeige des Gegners (läuft auch, wenn die Übernahme danach scheitert) ──
+        zahlung.gezeigt = true;
+        const seite = inst ? engine.physicalSide(inst) : target.owner;
+        const t0 = Date.now();
+        if (zahlung.betrag > 0) {
+          engine._broadcastEvent('betrayal_coins', {
+            fromPlayer: pi, toPlayer: zahlung.empf,
+            targetOwner: seite, targetHeroIdx: inst ? inst.heroIdx : target.heroIdx, targetZoneSlot: inst ? inst.zoneSlot : target.slotIdx,
+            coins: COINS, stepMs: STEP_MS, legMs: LEG_MS, dwellMs: DWELL_MS,
+          });
+          await engine._delay(LEAVE_MS);
+        }
+
+        // ── Übernahme: die lebende Instanz neu auflösen — eine Reaktion kann sie bewegt, übernommen oder entfernt haben ──
+        const live = inst && engine.cardInstances.find(c => c.id === inst.id && c.zone === 'support');
+        if (!live || engine.kontrolleurVon(live) !== zahlung.empf) { engine.log('betrayal_fizzle', { player: ps.username, creature: name, reason: 'gone' }); engine.sync(); return; }
+        // Eine Umleitung der Zielwahl (Challenge, Anti-Magnet …) darf nicht auf eine Kreatur führen, die der Text nicht erlaubt (zu hohe Stufe, Cardinal …): Kosten sind bezahlt, die Übernahme entfällt.
+        if (!zone || !istZiel(engine, pi, live, maxLv, false)) { engine.log('betrayal_fizzle', { player: ps.username, creature: name, reason: zone ? 'illegal' : 'no_zone' }); engine.sync(); return; }
+        // Platz noch frei? (sonst neu bestimmen)
+        const noch = freieZonen(engine, hs, heroIdx, pi, live);
         if (!noch.some(z => z.heroIdx === zone.heroIdx && z.slotIdx === zone.slotIdx)) {
           if (noch.length === 0) { engine.log('betrayal_fizzle', { player: ps.username, creature: name, reason: 'no_zone' }); engine.sync(); return; }
           zone = noch[0];
         }
 
-        const vorher = engine.kontrolleurVon(inst);
-        const res = await engine.actionTransferCreature(inst, hs, zone.heroIdx, zone.slotIdx, {
+        const vorher = engine.kontrolleurVon(live);
+        const res = await engine.actionTransferCreature(live, hs, zone.heroIdx, zone.slotIdx, {
           sourceName: CARD_NAME, sourceOwner: pi, controller: pi,
         });
         if (!res?.success) {
@@ -294,19 +339,18 @@ module.exports = {
           return;
         }
         // „Permanent" schlägt eine vorübergehende Übernahme (Aligning Goals, Cute Conversion …): deren Rückgabe am Zugende würde die Betrayal-Übernahme sonst wieder aufheben.
-        if (inst.stolenBy != null) { delete inst.stolenBy; delete inst.stolenFromOwner; }
+        if (live.stolenBy != null) { delete live.stolenBy; delete live.stolenFromOwner; }
         engine.log('betrayal_control', {
           player: ps.username, creature: name, hero: userHero.name, from: gs.players[vorher]?.username,
         });
         engine.sync();
+        // Die Münzen landen währenddessen (der Flug der Kreatur dauert länger als `LEG_MS`); der Rest der Wartezeit, falls nicht.
+        const rest = LAND_MS - (Date.now() - t0);
+        if (rest > 0) await engine._delay(rest);
       } finally {
-        // Die letzte Münze landet: erst jetzt bekommt der Empfänger das Gold (gleichgültig, ob die Übernahme gelang — gezahlt ist gezahlt).
-        if (bezahlt.ja && bezahlt.betrag > 0) {
-          const rest = LAND_MS - (Date.now() - bezahlt.t0);
-          if (rest > 0) await engine._delay(rest);
-          await engine.actionGainGold(bezahlt.empfaenger, bezahlt.betrag, { source: CARD_NAME });
-          engine.sync();
-        }
+        // Anzeige freigeben (idempotent; der Client gibt nach dem Münzflug selbst frei).
+        if (zahlung && zahlung.betrag > 0) gibFrei(engine);
+        if (gs._betrayalPay === zahlung) delete gs._betrayalPay;
       }
     },
   },

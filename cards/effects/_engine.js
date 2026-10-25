@@ -45813,6 +45813,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[ownerIdx];
     if (!ps) return;
     ScTracking.kartenName(this.gs._scTracking?.[ownerIdx], cardName);   // Card of the Day!: eine negierte Karte wurde trotzdem gespielt
+    // ★ W78 (Betrayal): optionaler Karten-Haken `onInitialNegated(engine, ownerIdx, cardName, chainResult)` — die Karte wurde in der KETTE negiert (`onPlay` lief nie): sie kann hier ihre
+    // schon bezahlten Kosten sichtbar machen (Betrayal: Stehl-Animation der 5 Gold). Nur Bilder/Aufräumen, der Fluss der Karte bleibt unberührt.
+    {
+      const _sc = loadCardEffect(cardName);
+      if (typeof _sc?.onInitialNegated === 'function') {
+        try { await _sc.onInitialNegated(this, ownerIdx, cardName, chainResult); }
+        catch (err) { console.error(`[onInitialNegated] ${cardName}:`, err.message); }
+      }
+    }
     // v691: gestohlen (Key) — in die Hand des Diebes, mit Flug von der
     // Hand des Spielers zur Hand des Diebes (Handplatz-Ziel wie beim
     // Kadaver-Anspruch, sonst landet der Flug in der Handmitte).
