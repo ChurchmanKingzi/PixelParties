@@ -54,7 +54,21 @@ function geschuetzteKopien(engine, a) {
   return n;
 }
 
-function targetsFor(engine, pi, heroIdx, kinds) {
+/**
+ * Helden, die `pi` DAUERHAFT kontrolliert (Patty): eigene Spalte ohne die abgegebenen, plus die aus der Gegenspalte uebernommenen (`permaControlBy`,
+ * Paraseed Control). Temporaer gesteuerte Helden (Charme, Love Shot, Styx …) zaehlen nicht — ihre Abilities sind ohnehin geschuetzt
+ * (`abilityZoneGeschuetzt`). Gefallene Helden zaehlen mit (ihre Karte liegt weiter auf dem Brett). Die Abilities liegen in der Spalte des Vorbesitzers (`physOwner`).
+ * @returns {Array<{physOwner:number, heroIdx:number, hero:object}>}
+ */
+function permanentHeroes(engine, pi) {
+  return engine.heroesControlledBy(pi, { permanentOnly: true })
+    .filter(h => h.hero?.name && !engine.istTemporaerGesteuert(h.hero));
+}
+
+function targetsFor(engine, pi, heroIdx, kinds, heroes) {
+  // Mehrere Helden (Patty): die Ziele aller Helden zusammen; `heroes` = [{ physOwner, heroIdx }] oder eine Funktion, die sie liefert (je Durchlauf neu gefragt).
+  const liste = typeof heroes === 'function' ? heroes() : heroes;
+  if (Array.isArray(liste)) return liste.flatMap(h => targetsFor(engine, h.physOwner, h.heroIdx, kinds));
   const { abilities, equips } = sendables(engine, pi, heroIdx);
   const out = [];
   if (kinds.includes('ability')) {
@@ -98,6 +112,7 @@ function targetsFor(engine, pi, heroIdx, kinds) {
  * @param opts.describe     (sent, abilitiesSent, remaining) → Beschreibung
  * @param opts.sourceOwner  Verursacher, falls nicht der Waehlende (v1335)
  * @param opts.heroOwner    Brettseite des Helden, falls nicht `pi` (Als Befund 29.9.: geliehener Held)
+ * @param opts.heroes       statt EINES Helden mehrere: `[{ physOwner, heroIdx }]` oder eine Funktion, die sie je Durchlauf liefert (Patty: alle dauerhaft kontrollierten Helden, `permanentHeroes`)
  * @returns {{sent, abilitiesSent, equipsSent, aborted}}
  */
 async function sendCardsLoop(engine, pi, heroIdx, opts) {
@@ -114,7 +129,7 @@ async function sendCardsLoopKern(engine, pi, heroIdx, opts) {
   const max = opts.max == null ? Infinity : opts.max;
   let sent = 0, abilitiesSent = 0, equipsSent = 0, schleifen = 0, aborted = false;
   while (schleifen++ < 40 && sent < max) {
-    const ziele = targetsFor(engine, opts.heroOwner ?? pi, heroIdx, kinds);   // Als Befund 29.9.: Brettseite des Helden
+    const ziele = targetsFor(engine, opts.heroOwner ?? pi, heroIdx, kinds, opts.heroes);   // Als Befund 29.9.: Brettseite des Helden; `opts.heroes`: mehrere Helden (Patty)
     if (ziele.length === 0) break;
     const remaining = Math.max(0, min - sent);
     const fertigErlaubt = remaining === 0 && sent > 0;
@@ -200,4 +215,4 @@ function cpuSendFallback(engine, promptData, { school, wantMore } = {}) {
   return pick ? [pick.id] : [];
 }
 
-module.exports = { sendables, abilityCardCount, targetsFor, sendCardsLoop, cpuSendFallback };
+module.exports = { sendables, abilityCardCount, targetsFor, sendCardsLoop, cpuSendFallback, permanentHeroes };

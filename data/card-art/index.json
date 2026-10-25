@@ -3187,6 +3187,10 @@
 "id": "Paraseed_Zombie",
 "kind": "a"
 },
+"Patty, the Ninja of Revenge": {
+"id": "Patty_the_Ninja_of_Revenge",
+"kind": "a"
+},
 "Pawn Chain": {
 "id": "Pawn_Chain",
 "kind": "a"
@@ -5537,6 +5541,22 @@
 },
 "Atta, Speaker of Desires": {
 "id": "Atta_Speaker_of_Desires",
+"kind": "a"
+},
+"Vengeful Attack": {
+"id": "Vengeful_Attack",
+"kind": "a"
+},
+"Wise Village Elder": {
+"id": "Wise_Village_Elder",
+"kind": "a"
+},
+"You are the Chosen One!!!": {
+"id": "You_are_the_Chosen_One",
+"kind": "a"
+},
+"YOU'RE ALIVE?!": {
+"id": "YOURE_ALIVE",
 "kind": "a"
 },
 "The Golden Gate": {
