@@ -104,4 +104,33 @@ function freieEquipZonen(engine, seite, heroIdx, cardName) {
   return out;
 }
 
-module.exports = { teilenAktiv, equipsAt, stapelPlatz, pflichtPlatzFuer, stapelTiefe, beschreibe, hatStapelPlatz, freieEquipZonen };
+/**
+ * ★ „Any number of Artifacts" in einem Equip-Stapel (Disarm …): ein Stapel ist in der Zielwahl EIN Platz; welche seiner Karten gemeint sind, fragt dieser Baustein nach —
+ * Karte fuer Karte per `instancePick` (Bild-Galerie), ab der zweiten mit dem Knopf „Done". `mindestens` Karten muessen gewaehlt werden (dann ohne Knopf).
+ * Gibt die gewaehlten Instanzen in Wahlreihenfolge zurueck. Eine Antwort ohne brauchbare Karte zaehlt als „Done" (bzw. nimmt bei Pflicht die oberste).
+ */
+async function waehleMehrere(engine, pi, insts, { title, description, mindestens = 1, hoechstens = Infinity, doneLabel = '✓ Done' } = {}) {
+  const rest = [...insts];
+  const gewaehlt = [];
+  while (rest.length > 0 && gewaehlt.length < hoechstens) {
+    const pflicht = gewaehlt.length < mindestens;
+    const antwort = await engine.promptGeneric(pi, {
+      type: 'instancePick',
+      title: title || 'Equipped Artifacts',
+      description: description || 'These Artifacts share one Support Zone — choose which one you mean.',
+      instances: rest.map(i => beschreibe(engine, i)),
+      ...(pflicht ? {} : { doneLabel }),
+      cancellable: false,
+    });
+    const inst = antwort && antwort.instId ? rest.find(i => i.id === antwort.instId) : null;
+    if (!inst) {
+      if (pflicht) { gewaehlt.push(rest.pop()); continue; }
+      break;
+    }
+    gewaehlt.push(inst);
+    rest.splice(rest.indexOf(inst), 1);
+  }
+  return gewaehlt;
+}
+
+module.exports = { waehleMehrere, teilenAktiv, equipsAt, stapelPlatz, pflichtPlatzFuer, stapelTiefe, beschreibe, hatStapelPlatz, freieEquipZonen };

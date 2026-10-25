@@ -11,8 +11,8 @@ const EFFECTS = path.join(__dirname, '../../../../cards/effects');
 const MUSTER = /getArtifactTargets|type === 'equip'|type: 'equip'|sendBoardCardToDiscard|_ability-cost-shared|sendCardsLoop|getFreeSideEquipArtifacts|_targeting-shared|collectNonHeroBoardTargets/;
 const slug = (n) => n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const only = process.argv[2] ? process.argv[2].split(',') : null;
-const kandidaten = cards.filter(c => ['Spell', 'Attack', 'Artifact', 'Potion'].includes(c.cardType) && !(c.cardType === 'Artifact' && (c.subtype || '').toLowerCase() === 'equipment') && (c.subtype || '').toLowerCase() !== 'reaction' && (c.subtype || '').toLowerCase() !== 'surprise')
-  .filter(c => { if (only) return only.includes(c.name); try { return MUSTER.test(fs.readFileSync(path.join(EFFECTS, slug(c.name) + '.js'), 'utf-8')); } catch { return false; } })
+const kandidaten = cards.filter(c => ['Spell', 'Attack', 'Artifact', 'Potion', ...(process.env.SWEEP_ALLE || only ? ['Creature'] : [])].includes(c.cardType) && !(c.cardType === 'Artifact' && (c.subtype || '').toLowerCase() === 'equipment') && (c.subtype || '').toLowerCase() !== 'reaction' && (c.subtype || '').toLowerCase() !== 'surprise')
+  .filter(c => { if (only) return only.includes(c.name); if (process.env.SWEEP_ALLE) return true; try { return MUSTER.test(fs.readFileSync(path.join(EFFECTS, slug(c.name) + '.js'), 'utf-8')); } catch { return false; } })
   .map(c => c.name);
 
 async function lauf(name, eigene) {
@@ -30,6 +30,9 @@ async function lauf(name, eigene) {
     return [(eq || valid.find(v => v.type === 'hero' && v.owner === 1) || valid[0]).id];
   };
   t.policy.confirm = true;
+  // Voraussetzungen einzelner Karten
+  if (name === 'Coolness Overcharge') t.gs.players[0].coolnessStack = Array(6).fill(F);
+  if (name === 'Tengu Windstorm') t.gs.players[0].discardPile.push('Rebelliokai Terror Tengu');
   const weg0 = () => insts.filter(i => !(i.zone === 'support' && i.heroIdx === 0 && i.zoneSlot === 1 && i.owner === seite)).map(i => i.name);
   let fehler = null;
   try { await Promise.race([t.play(0, name, { hero: 0, noGrant: false }), new Promise((_, rej) => setTimeout(() => rej(new Error('Zeitlimit')), 15000))]); } catch (e) { fehler = e.message; }

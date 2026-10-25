@@ -11789,7 +11789,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
         // Support Zone liegt (Dark Gear & alle anderen zielenden Karten).
         await room.engine.gateVorZielen(pi, potionName, selectedIds, validTargets);
         // Darion: ein gewaehltes Equip-Ziel ist ein Platz mit mehreren Karten → nachfragen, welche gemeint ist (wie bei den Zaubern ueber `promptEffectTarget`).
-        await room.engine._disambiguateStackedTargets(pi, validTargets, selectedIds);
+        await room.engine._disambiguateStackedTargets(pi, validTargets, selectedIds, script.targetingConfig || null);
         return await script.resolve(room.engine, pi, selectedIds, validTargets, room.engine._takePaidArtifactCost(potionName, pi));
       } : null,
     });

@@ -167,7 +167,12 @@ module.exports = {
       // Nach der Abfrage neu einsammeln — das Brett kann sich bewegt haben.
       const frisch = [...anhaengselZiele(engine, target.owner, target.heroIdx), ...areaZiele(engine)];
       const treffer = ids.map(id => frisch.find(z => z.id === id)).filter(z => z?.cardInstance);
-      for (const z of treffer) z.cardInstance = z._cardInstance = engine.stapelWahlFuer(z);   // Darion: die gewaehlte Karte des Stapels, nicht die erste mit dieser ID
+      // Darion: die gewaehlte(n) Karte(n) des Stapels, nicht die erste mit dieser ID (Mehrfachwahl: je Karte ein Ziel)
+      for (const z of [...treffer]) {
+        const alle = engine.stapelWahlAlle(z);
+        z.cardInstance = z._cardInstance = alle[0] || z.cardInstance;
+        for (const inst of alle.slice(1)) treffer.push({ ...z, cardInstance: inst, _cardInstance: inst, cardName: inst.name });
+      }
       if (treffer.length === 0) { engine.sync(); return; }
 
       const quelle = { name: CARD_NAME, owner: pi, heroIdx, controller: pi };
