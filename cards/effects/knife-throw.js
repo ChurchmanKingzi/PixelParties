@@ -44,6 +44,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const ES = require('./_equip-stack-shared');
 
 const CARD_NAME = 'Knife Throw';
 const ATK_MULT = 2;
@@ -78,7 +79,14 @@ async function zahleKosten(ctx) {
   if (ausruestung.length === 0) return false;
 
   let opfer = ausruestung[0];
-  if (ausruestung.length > 1) {
+  // Darion: liegen mehrere Artefakte in EINEM Platz (gleiche Namen moeglich, eigene Counter), waehlt der Spieler die Karte per `instancePick` statt ueber den Namen.
+  const imStapel = ausruestung.some(i => ES.equipsAt(engine, engine.physicalSide(i), i.heroIdx, i.zoneSlot).length > 1);
+  if (ausruestung.length > 1 && imStapel) {
+    const [gewaehlt] = await ES.waehleMehrere(engine, pi, ausruestung, {
+      title: CARD_NAME, description: `Send one of ${hero.name}'s Artifacts to the discard pile to throw it.`, mindestens: 1, hoechstens: 1,
+    });
+    opfer = gewaehlt || ausruestung[0];
+  } else if (ausruestung.length > 1) {
     const wahl = await engine.promptGeneric(pi, {
       type: 'cardGallery', title: CARD_NAME,
       description: `Send one of ${hero.name}'s Artifacts to the discard pile to throw it.`,
