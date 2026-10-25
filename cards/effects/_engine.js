@@ -262,10 +262,12 @@ const CARD_FLOW_PACE_MS = 250;
 // when the hand-slot reveal completes.
 const CARD_FLOW_SETTLE_MS = 500;
 // Als Kosmetik-Ruling (Demo vs Cute Commando): Effekt-Abwürfe laufen
-// EINZELN mit ~0.5s Takt, davor leuchtet die Quell-Karte ~0.5s auf —
+// EINZELN im Takt, davor leuchtet die Quell-Karte ~0.5s auf —
 // der Spieler soll sehen, WAS WANN durch WELCHEN Effekt abgeworfen
 // wird. Draws behalten bewusst den schnelleren CARD_FLOW_PACE_MS.
-const DISCARD_PACE_MS = 500;
+// Al, 25.10.2026: Multi-Abwürfe/-Deletes von der Hand waren mit 500 ms
+// zu zäh → 300 ms (gilt für alle Wege, die `DISCARD_PACE_MS` / `_paceHandDiscard` nutzen).
+const DISCARD_PACE_MS = 300;
 // Takt zwischen den Ausruestungen eines sterbenden Helden. Etwas
 // knapper als der Handabwurf-Takt: es sind hoechstens drei Karten,
 // und der Tod soll sich nicht ziehen.
@@ -13103,7 +13105,7 @@ class GameEngine {
           ...(_abwurfOp != null ? { discardOp: _abwurfOp } : {}),   // W16b
         });
       }
-      // Als Takt: eine Karte nach der anderen, ~0.5s je Karte.
+      // Als Takt: eine Karte nach der anderen (DISCARD_PACE_MS je Karte).
       if (i < toDiscard - 1) {
         this.sync();
         await this._delay(DISCARD_PACE_MS);
@@ -19555,7 +19557,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
 
         // Als Takt (Kosmetik-Ruling): mehrere erzwungene Abwürfe
-        // laufen ~0.5s versetzt — bei menschlicher Wahl entsteht der
+        // laufen im Takt (DISCARD_PACE_MS) versetzt — bei menschlicher Wahl entsteht der
         // Abstand natürlich, bei CPU-Picks verhinderte erst dieser
         // Takt den Gleichzeitigkeits-Burst.
         if (toDiscard > 1 && i < toDiscard - 1 && actuallyDiscarded) {
