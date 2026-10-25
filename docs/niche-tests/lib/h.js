@@ -44,7 +44,7 @@ const PHASES = { START: 0, RESOURCE: 1, MAIN1: 2, ACTION: 3, MAIN2: 4, END: 5 };
 /** Heroes ohne implementierte Fähigkeit – neutrale Platzhalter, damit Hero-Passive nichts verfälschen. */
 const BLANK_HEROES = ['Tushu, the Knowledge Keeper', 'Rick, the Trigger Happy Undertaker', 'Zwei, the Lucky Thief'];
 /** Zweites neutrales Trio (für Tests mit 3+ Sitzen). */
-const BLANK_HEROES_B = ['Atta, Speaker of Desires', 'Hulijing, the Foxdemon', 'George, the Mad Tyrant King'];
+const BLANK_HEROES_B = ['Cuberto, Supreme Lord of Edges', 'Hulijing, the Foxdemon', 'George, the Mad Tyrant King'];
 
 /**
  * Inerte Testkarten (ohne Skript, kein Kartentext) – werden zur Laufzeit in die Karten-DB eingeschoben (die DB ist ein
@@ -159,6 +159,7 @@ async function fresh(o = {}) {
   t._promptCount = 0;
   engine.promptGeneric = async (pi, d, ...r) => {
     runaway();
+    engine._beobachtePrompt?.(pi, d);   // wie die echte promptGeneric: ein Suchergebnis-Fenster ist ein Aufdecken (Atta)
     t.prompts.push({ pi, d, sim: !!engine._inMctsSim });   // W71b: `sim` = Frage aus einem MCTS-Rollout der CPU (zählt nicht als echte Frage)
     for (const rule of t.script) {
       if (rule.used && rule.once) continue;
@@ -386,6 +387,8 @@ function attachHelpers(t) {
     } catch (e) { if (t.runaway) return { runaway: true, threw: e }; t.errors.push('[THROW] ' + (e && e.stack || e).toString().split('\n').slice(0, 4).join(' | ')); return { threw: e }; }
     finally { clearTimeout(timer); }
   };
+  /** Nach-Ketten-Aktionen abarbeiten (der Server tut das im `.finally` jedes Socket-Handlers; die Harness nur auf Zuruf): Shamanic Curse/Celia, Lunar Eclipse … */
+  t.drain = (o) => t.run(() => engine._runPostChainActions(), o);
   t.activateCreature = (seat, hi, slot, o) => t.run(() => host.doActivateCreatureEffect(room, seat, { heroIdx: hi, zoneSlot: slot, charmedOwner: o && o.charmedOwner }), o);   // `o.charmedOwner`: Kreatur auf der Gegenseite (geliehen / Spy in the Enemy's Camp)
   t.activateHero = (seat, hi, o = {}) => { gs.activePlayer = seat; t.phase(o.phase ?? PHASES.MAIN1); return t.run(() => host.doActivateHeroEffect(room, seat, { heroIdx: hi, chosenEffectName: o.effect }), o); };
   t.activateEquip = (seat, hi, slot, o = {}) => { gs.activePlayer = seat; t.phase(o.phase ?? PHASES.MAIN1); return t.run(() => host.doActivateEquipEffect(room, seat, { heroIdx: hi, zoneSlot: slot }), o); };
@@ -413,10 +416,13 @@ function attachHelpers(t) {
       }
       for (let hi = 0; hi < 3; hi++) for (let zi = 0; zi < 3; zi++) {
         const z = ps.supportZones[hi][zi] || [];
-        if (z.length > 1) bad.push(`seat${s}.support[${hi}][${zi}] hält ${z.length} Karten: ${z.join(',')}`);
+        // Mehrere Karten in EINEM Platz sind nur der Equip-Stapel eines Helden mit `equipsShareZone` (Darion) erlaubt (Alice-Stapel: eigene Prüfung in lib/alice-brett.js).
+        const darionStapel = z.length > 1 && !!(engine.heroScript(s, hi) || {}).equipsShareZone && z.every(nm => engine.isEquipInZone(nm));
+        if (z.length > 1 && !darionStapel) bad.push(`seat${s}.support[${hi}][${zi}] hält ${z.length} Karten: ${z.join(',')}`);
         for (const nm of z) {
           const insts = engine.cardInstances.filter(c => c.zone === 'support' && c.owner === s && c.heroIdx === hi && c.zoneSlot === zi && c.name === nm);
-          if (insts.length !== 1) bad.push(`seat${s}.support[${hi}][${zi}] "${nm}": ${insts.length} Instanzen`);
+          const erwartet = darionStapel ? z.filter(x => x === nm).length : 1;
+          if (insts.length !== erwartet) bad.push(`seat${s}.support[${hi}][${zi}] "${nm}": ${insts.length} Instanzen (erwartet ${erwartet})`);
         }
       }
       for (const h of ps.heroes) if (h && h.name) {

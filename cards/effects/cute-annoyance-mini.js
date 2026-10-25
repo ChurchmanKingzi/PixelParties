@@ -193,6 +193,10 @@ module.exports = {
       cancellable: false,
     });
 
+    // Control Monitors: 1 Karte aus dem Deck auf die Hand, bezahlt mit 1 Abwurf. Wurde sie geloescht, entfaellt der Beschwoerungs-Zusatz.
+    await engine.meldeHandZugangDurchAbwurf(pi, { names: [chosenName], discarded: 1, source: CARD_NAME });
+    if (!ps.hand.includes(chosenName)) { engine.sync(); return true; }
+
     // ── Step 4: optional rider — discard 1 more → summon now ──
     // Skip the prompt entirely if the rider can't actually fire:
     //   • hand has < 1 card to spend (the just-tutored card is the

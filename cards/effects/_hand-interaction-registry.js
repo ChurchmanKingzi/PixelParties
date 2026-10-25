@@ -106,8 +106,6 @@ const PENDING = [
     note: '2 ZUFÄLLIGE Karten — der Gegner wählt nicht.' },
   { name: 'Liberation', kind: 'reveal', via: 'manual',
     note: 'Hand ansehen, bis zu 3 Creatures daraus abwerfen — reveal UND discard.' },
-  { name: 'Control Monitors', kind: 'discard', via: 'manual',
-    note: 'Reaction — prüfen, ob sie selbst überhaupt eine Hand-Interaktion auslöst.' },
   { name: 'Vampire on Fire', kind: 'insert', via: 'manual',
     note: 'Verhindert das Hinzufügen und löscht stattdessen — Grenzfall, bei Umsetzung klären.' },
 ];

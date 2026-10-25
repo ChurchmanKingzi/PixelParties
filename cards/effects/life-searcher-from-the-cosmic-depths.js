@@ -149,6 +149,8 @@ module.exports = {
         title: CARD_NAME,
         cancellable: false,
       });
+      // Control Monitors: 1 Karte aus dem Deck auf die Hand, bezahlt mit 1 Abwurf.
+      await engine.meldeHandZugangDurchAbwurf(pi, { names: [chosen], discarded: 1, source: CARD_NAME });
     },
   },
 
