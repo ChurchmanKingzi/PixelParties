@@ -11,8 +11,10 @@
 //     Die Erwartung ist: Ich füge eine Karte meiner Hand hinzu, also sollte Monitors eingesetzt werden und die nehmen!") ────────────
 //  • AUSLÖSER ist JEDES Hinzufügen von 1 oder mehr Karten aus dem Deck ODER der Ablage des Gegners auf dessen Hand (Magnetic Potion, Gate to the
 //    Armory, Boomerang, Cute Dog …) — NICHT erst ein Tutor mit Abwurf. (Bis W72a las das Skript „by discarding the same number of cards from your hand"
-//    als Preis des HINZUFÜGENDEN; nur die Abwurf-Tutoren öffneten ein Fenster.) Nicht ausgelöst wird durch: Ziehen (draw ist kein „add"), Karte vom Brett
-//    zurück auf die Hand, Karten aus FREMDEN Stapeln (Infiltration, Xiong …), Potion Deck, Gelöscht-Stapel (Rückfragen an Al im Bericht).
+//    als Preis des HINZUFÜGENDEN; nur die Abwurf-Tutoren öffneten ein Fenster.) Nicht ausgelöst wird durch: Ziehen (draw ist kein „add" — auch nicht aus dem Potion Deck),
+//    Karte vom Brett zurück auf die Hand, Karten aus FREMDEN Stapeln (Infiltration, Xiong …), Gelöscht-Stapel, Zwischenzonen (Teleportal, Create Secret Room, Rha'Bi).
+//  • W72b (Al: „Doch, das betrifft etwa Philosopher's Stone"): Potion Deck UND Side Deck zählen als „their deck" — Philosopher's Stone, die Suche des Alchemic Journal
+//    (5 Gold) und Divine Gift of Edge (Side Deck) lösen das Fenster aus (`noteHandZugangAusStapel(…, { pile: 'potionDeck' | 'sideDeck' })`, `piles` im Hook).
 //  • „by discarding the same number of cards from your hand" ist der PREIS DES REAKTIONSSPIELERS („your hand" = die Hand dessen, der Control Monitors spielt):
 //    er wirft so viele Handkarten ab, wie der Gegner hinzugefügt hat, ZUSÄTZLICH zu Control Monitors selbst. Gewählt wird bei der Aktivierung
 //    (`reactionKostenWahl`, abbrechbar → nichts passiert), bezahlt erst danach (`reactionKostenZahlen`; Regel „Kosten erst nach dem Commit", W66b). Boris darf den Abwurf
