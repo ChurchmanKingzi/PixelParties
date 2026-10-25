@@ -3807,6 +3807,23 @@ const ZONE_ANIM_SFX = {
     { name: 'debuff',         opts: { rate: 0.6, volume: 0.45, delay: 160, category: null, dedupe: 0 } },
     { name: 'elem_lightning', opts: { rate: 2.2, volume: 0.2, delay: 250, category: null, dedupe: 0 } },
   ],
+  // REVENGE!!! (25.10.): ein wütender Schrei — tiefes Grollen, krachender Einschlag, Feuerfauchen, dann zornige Stöße.
+  revenge_rage: [
+    { name: 'heavy_impact',     opts: { rate: 0.4, volume: 0.9, delay: 1, category: null, dedupe: 0 } },
+    { name: 'critical_strike',  opts: { rate: 0.6, volume: 0.6, delay: 1, category: null, dedupe: 0 } },
+    { name: 'elem_fire',        opts: { rate: 0.7, volume: 0.6, delay: 80, category: null, dedupe: 0 } },
+    { name: 'elem_dark',        opts: { rate: 0.5, volume: 0.6, delay: 140, category: null, dedupe: 0 } },
+    { name: 'heavy_impact',     opts: { rate: 0.7, volume: 0.6, delay: 420, category: null, dedupe: 0 } },
+    { name: 'critical_strike',  opts: { rate: 0.9, volume: 0.45, delay: 700, category: null, dedupe: 0 } },
+    { name: 'elem_fire',        opts: { rate: 0.9, volume: 0.4, delay: 900, category: null, dedupe: 0 } },
+  ],
+  // Grand Feast (25.10.): Tellerklirren, Köstlichkeit zischt, sanfte Heilung.
+  grand_feast: [
+    { name: 'ping',      opts: { rate: 1.4, volume: 0.35, delay: 1, category: null, dedupe: 0 } },
+    { name: 'draw',      opts: { rate: 1.0, volume: 0.45, delay: 90, category: null, dedupe: 0 } },
+    { name: 'heal',      opts: { rate: 1.1, volume: 0.4, delay: 380, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 2.2, volume: 0.25, delay: 560, category: null, dedupe: 0 } },
+  ],
   // Reverse Trap — der 1-Tonnen-Klotz pfeift herab und schlägt dumpf auf.
   reverse_trap_ton: [
     { name: 'elem_wind',    opts: { rate: 0.6, volume: 0.4, delay: 1, category: null, dedupe: 0 } },
@@ -4228,6 +4245,15 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_wind',    opts: { rate: 0.9, volume: 0.5, delay: 220, category: null, dedupe: 0 } },
     { name: 'heavy_impact', opts: { rate: 0.9, volume: 0.6, delay: 860, category: null, dedupe: 0 } },
     { name: 'discard',      opts: { rate: 0.8, volume: 0.6, delay: 880, category: null, dedupe: 0 } },
+  ],
+  // Fake Legendary Sword (25.10.): die Karte reißt, zerspringt in Splitter, die klirrend davonfliegen.
+  ev_card_shatter: [
+    { name: 'debuff',          opts: { rate: 1.6, volume: 0.35, delay: 1, category: null, dedupe: 0 } },
+    { name: 'critical_strike', opts: { rate: 1.2, volume: 0.6, delay: 330, category: null, dedupe: 0 } },
+    { name: 'ping',            opts: { rate: 2.6, volume: 0.3, delay: 340, category: null, dedupe: 0 } },
+    { name: 'ping',            opts: { rate: 3.1, volume: 0.25, delay: 400, category: null, dedupe: 0 } },
+    { name: 'ping',            opts: { rate: 2.2, volume: 0.25, delay: 470, category: null, dedupe: 0 } },
+    { name: 'discard',         opts: { rate: 0.8, volume: 0.5, delay: 900, category: null, dedupe: 0 } },
   ],
   // Pusher schleudert die Karte nach oben
   ev_pusher_fling: [
