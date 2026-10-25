@@ -1,6 +1,6 @@
 'use strict';
 // W75 · Ghostly Warning — Held tot, Status/Level egal, Zustand zaehlt (Stapel verlassen und wieder da), Pflicht-Wirken, Fristen, Reaktions-Zauber, Wisdom, zwei Vormerkungen, Spielende.
-// Kartentext: „Play this card immediately when an opponent's Hero uses a Spell. Negate that Spell and delete it. At the end of your next turn, if that Hero is not defeated and that Spell is still deleted, that Hero immediately performs that Spell as an additional Action, regardless of its level and in spite of any negative status effects."
+// Kartentext: „Play this card immediately when an opponent's Hero uses a Normal Spell. Negate that Spell and delete it. At the end of your next turn, if that Hero is not defeated and that Spell is still deleted, that Hero immediately performs that Spell as an additional Action, regardless of its level and in spite of any negative status effects."
 // Erwartet: laut Kartentext und Kopfkommentar der Skripte. Aufruf: node docs/niche-tests/repro/W75/d-02-ghostly-warning-nischenfaelle.js   (Exit 0 = korrekt)
 const H = require('../../lib/h.js');
 const SH = require('../../../../cards/effects/_verzoegert-zauber-shared.js');

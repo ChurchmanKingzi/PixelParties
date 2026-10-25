@@ -8,9 +8,9 @@
 //   may delete all other cards in their hand instead."
 //
 //  ── AUSLEGUNG ─────────────────────────────────────────────────────
-//  • „by discarding the same number of cards from your hand" = der Hinzufuegende zahlt den Tutor mit dem Abwurf von GENAU so vielen
-//    Handkarten, wie er Karten aus Deck/Ablage auf die Hand nimmt (Cute Dog, Cute Annoyance Mini, Life-Searcher, Lunatic Cycle -
-//    New Moon, Inventing). „your hand" im Kartentext wird so gelesen, dass die Hand des Hinzufuegenden gemeint ist (nur dort laesst
+//  • „by discarding the same number of cards from your hand" = der Hinzufuegende zahlt den Tutor mit dem Abwurf von Handkarten
+//    (Cute Dog, Cute Annoyance Mini, Life-Searcher, Lunatic Cycle - New Moon, Inventing; Navigation zaehlt auch — Al, Welle 75:
+//    es fuegt eine Karte hinzu, der Abwurf der 2–3 Kopien ist der Preis). „your hand" im Kartentext wird so gelesen, dass die Hand des Hinzufuegenden gemeint ist (nur dort laesst
 //    sich abwerfen und hinzufuegen) — Rueckfrage an Al, falls anders gemeint.
 //  • Ein Fenster je Effekt, nicht je Karte („1 or more cards"): die Tutor-Karte ruft `engine.meldeHandZugangDurchAbwurf` EINMAL,
 //    wenn alle Karten auf der Hand liegen (Hook `onHandAddByDiscard`, Reaktionsfenster der Engine).

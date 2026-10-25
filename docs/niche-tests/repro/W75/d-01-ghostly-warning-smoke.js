@@ -1,6 +1,6 @@
 'use strict';
 // W75 · Ghostly Warning — Smoke: Negieren + Loeschen, Wirken am Ende des eigenen naechsten Zuges.
-// Kartentext: „Play this card immediately when an opponent's Hero uses a Spell. Negate that Spell and delete it. At the end of your next turn, if that Hero is not defeated and that Spell is still deleted, that Hero immediately performs that Spell as an additional Action, regardless of its level and in spite of any negative status effects."
+// Kartentext: „Play this card immediately when an opponent's Hero uses a Normal Spell. Negate that Spell and delete it. At the end of your next turn, if that Hero is not defeated and that Spell is still deleted, that Hero immediately performs that Spell as an additional Action, regardless of its level and in spite of any negative status effects."
 // Erwartet: laut Kartentext und Kopfkommentar der Skripte. Aufruf: node docs/niche-tests/repro/W75/d-01-ghostly-warning-smoke.js   (Exit 0 = korrekt)
 const H = require('../../lib/h.js');
 const F = H.INERT.filler, GW = 'Ghostly Warning';

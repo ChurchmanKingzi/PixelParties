@@ -9613,7 +9613,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Play this card immediately when an opponent's Hero uses a Spell. Negate that Spell and delete it. At the end of your next turn, if that Hero is not defeated and that Spell is still deleted, that Hero immediately performs that Spell as an additional Action, regardless of its level and in spite of any negative status effects.",
+    "effect": "Play this card immediately when an opponent's Hero uses a Normal Spell. Negate that Spell and delete it. At the end of your next turn, if that Hero is not defeated and that Spell is still deleted, that Hero immediately performs that Spell as an additional Action, regardless of its level and in spite of any negative status effects.",
     "archetype": "",
     "setID": "PP ART",
     "banned": "Banned",

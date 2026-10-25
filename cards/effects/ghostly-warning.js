@@ -3,7 +3,7 @@
 //  CARD EFFECT: "Ghostly Warning"
 //  Spell (Reaction) — Magic Arts Lv2
 //
-//  „Play this card immediately when an opponent's Hero uses a Spell. Negate that Spell and delete it. At the end of your next turn, if that Hero
+//  „Play this card immediately when an opponent's Hero uses a Normal Spell. Negate that Spell and delete it. At the end of your next turn, if that Hero
 //   is not defeated and that Spell is still deleted, that Hero immediately performs that Spell as an additional Action, regardless of its level
 //   and in spite of any negative status effects."
 //
@@ -16,13 +16,21 @@
 //  • Das Wirken ist PFLICHT (nicht abbrechbar, auch alle Zielwahlen nicht), ohne Stufen-, Status- und Phasenpruefung und ohne Wisdom-Abwuerfe. Der Held des
 //    GEGNERS fuehrt den Zauber aus (er entscheidet Ziele); die Aktion ist eine Zusatzaktion.
 //  • Die Hauptaktion des Zaubers ist verbraucht (wie bei jeder Negation); eine Ersatzaktion gibt es nicht.
-//  • „an opponent's Hero uses a Spell": ein Zauber, den eine KREATUR wirkt (`casterCheck: false`), oder ein Effekt, der nur als Spell zaehlt (Alice),
+//  • „a Normal Spell" (Al, Welle 75): nur Zauber mit Untertyp Normal. Reaktions-Zauber (Untertyp Reaction) sind kein Ziel — dasselbe Wort wie bei Atta,
+//    der ebenfalls nur Normal Spells loescht.
+//  • „an opponent's Hero uses a Normal Spell": ein Zauber, den eine KREATUR wirkt (`casterCheck: false`), oder ein Effekt, der nur als Spell zaehlt (Alice),
 //    ist nichts Loeschbares — keine Reaktion (wie bei Shamanic Curse).
 // ═══════════════════════════════════════════
 
 const { vormerken } = require('./_verzoegert-zauber-shared');
 
 const CARD_NAME = 'Ghostly Warning';
+
+/** „Normal Spell": Untertyp Normal (nicht Reaction & Co.) — wie bei Atta. */
+function istNormalSpell(engine, name) {
+  const cd = engine._getCardDB()[name];
+  return !!cd && (cd.subtype || '').toLowerCase() === 'normal';
+}
 
 module.exports = {
   // Entkoppelte Zauberbilder: wird die Karte NEGIERT, laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -36,6 +44,7 @@ module.exports = {
     const last = chain[chain.length - 1];
     if (!last || last.negated || last.chainClosed) return false;
     if (last.cardType !== 'Spell') return false;
+    if (!istNormalSpell(engine, last.cardName)) return false;
     if (!engine.opponentsOf(pi).includes(last.owner)) return false;
     if (last.zaehltAlsArt) return false;
     if (last.casterCheck === false) return false;
@@ -48,7 +57,7 @@ module.exports = {
     const gs = engine.gs;
     const targetIndex = myIndex - 1;
     const link = chain[targetIndex];
-    if (!link || link.negated || link.cardType !== 'Spell') return;
+    if (!link || link.negated || link.cardType !== 'Spell' || !istNormalSpell(engine, link.cardName)) return;
 
     const heroSeite = link.casterOwner ?? link.owner;
     const heroIdx = link.isInitialCard ? link.heroIdx : (link.casterHeroIdx ?? link.heroIdx);

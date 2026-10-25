@@ -22283,8 +22283,8 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /**
    * „Karten aus Deck/Ablage auf die Hand — bezahlt mit dem Abwurf derselben Anzahl Handkarten" (Cute Dog, Lunatic Cycle - New Moon,
-   * Life-Searcher, Inventing …). Die Tutor-Karte ruft das EINMAL, wenn alle Karten auf der Hand liegen. Feuert nur, wenn die Zahl
-   * der Karten gleich der Zahl der Abwuerfe ist (Kartentext Control Monitors: „by discarding the same number of cards").
+   * Life-Searcher, Inventing …). Die Tutor-Karte ruft das EINMAL, wenn alle Karten auf der Hand liegen. Feuert, sobald Karten
+   * hinzugefuegt UND Karten dafuer abgeworfen wurden — auch Navigation (2–3 Kopien weg, 1 Karte hinzu) zaehlt (Al, Welle 75).
    * Reaktionsfenster: Control Monitors. Danach prueft der Aufrufer, welche der Karten noch auf der Hand sind (`handHat`).
    * @returns {Promise<boolean>} true = ein Fenster wurde angeboten
    */
@@ -22292,7 +22292,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     pi = this._resolvePi(pi);
     if (this._inMctsSim || this._fastMode) return false;
     const liste = (names || []).filter(Boolean);
-    if (!liste.length || !(discarded > 0) || discarded !== liste.length) return false;
+    if (!liste.length || !(discarded > 0)) return false;   // Navigation: 2–3 abgeworfen, 1 hinzugefuegt — zaehlt ebenfalls (Al, Welle 75)
     await this.runHooks('onHandAddByDiscard', { playerIdx: pi, cardNames: liste, discarded, sourceName: source || null });
     return true;
   }
