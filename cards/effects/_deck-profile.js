@@ -975,7 +975,8 @@ function boardPairBonus(engine, pi, cardName, heroIdx) {
     if (typeof v === 'number') sum += v;
   };
   for (const slot of (ps.supportZones?.[heroIdx] || [])) {
-    if (slot && slot.length > 0) addFor(slot[0]);
+    // Darion: ein Equip-Stapel haelt mehrere verschiedene Karten in EINER Zone - jede Karte (je Name einmal) zaehlt fuer die Paar-Synergie, nicht nur die unterste.
+    if (slot && slot.length > 0) for (const n of new Set(slot)) addFor(n);
   }
   for (const slot of (ps.abilityZones?.[heroIdx] || [])) {
     if (slot && slot.length > 0) addFor(slot[0]);
