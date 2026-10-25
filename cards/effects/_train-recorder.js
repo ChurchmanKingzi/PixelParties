@@ -1196,7 +1196,8 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
         for (let hi = 0; hi < (heroes.length || 0); hi++) {
           const names = [];
           for (const slot of (ps?.supportZones?.[hi] || [])) {
-            if (slot && slot.length > 0) names.push(slot[0]);
+            // Darion: ein Equip-Stapel haelt mehrere verschiedene Karten - jede (je Name einmal) zaehlt fuer die Paar-Statistik (wie `boardPairBonus` in _deck-profile).
+            if (slot && slot.length > 0) for (const n of new Set(slot)) names.push(n);
           }
           for (const slot of (ps?.abilityZones?.[hi] || [])) {
             if (slot && slot.length > 0) names.push(slot[0]);

@@ -39,6 +39,7 @@
 const { hasCardType, heroCanBeEquipped } = require('./_hooks');
 const { freieBasisZonen, istUmhaengbaresEquip, darfAn, fuehreUmhaengenAus } = require('./_equip-shared');
 
+const ES = require('./_equip-stack-shared');
 const CARD_NAME = 'Inheritance Ceremony';
 const HOPT_KEY = 'inheritance-ceremony';
 const FLOW_MS = 1000;        // Länge von `inheritance_flow` (deckt sich mit der Animation im Client)
@@ -98,9 +99,28 @@ function maxHp(nutzer, ziel) {
 }
 
 /** Kann der Zauber mit diesem Paar etwas bewirken? */
+/**
+ * ★ Darion als ZIELHELD: seine Equips teilen EINE Zone. Hat er schon einen Stapel, braucht ein umgehaengtes Equip keine freie Zone (es kommt in den Stapel); hat er keinen, eroeffnet das erste Equip
+ * einen und alle weiteren kommen dazu (zusammen EINE freie Zone). Nicht-Equips (Anhaengsel) brauchen weiter je eine freie Zone.
+ */
+function platzBedarf(engine, ziel) {
+  const teilt = ES.teilenAktiv(engine, ziel.seite, ziel.heroIdx);
+  const frei = freieBasisZonen(engine.gs.players[ziel.seite], ziel.heroIdx, engine, ziel.seite);
+  const stapel = teilt ? ES.stapelPlatz(engine, ziel.seite, ziel.heroIdx) : -1;
+  return { teilt, frei, stapel };
+}
+/** Wie viele der Karten lassen sich hoechstens umhaengen? */
+function obergrenze(engine, ziel, karten) {
+  const b = platzBedarf(engine, ziel);
+  if (!b.teilt) return Math.min(b.frei.length, karten.length);
+  const eq = karten.filter(c => istUmhaengbaresEquip(engine, c)).length;
+  const anh = karten.length - eq;
+  if (b.stapel >= 0) return eq + Math.min(b.frei.length, anh);
+  if (eq > 0 && b.frei.length > 0) return eq + Math.min(b.frei.length - 1, anh);
+  return Math.min(b.frei.length, anh);
+}
 function wirkt(engine, pi, nutzer, ziel) {
-  const frei = freieBasisZonen(engine.gs.players[ziel.seite], ziel.heroIdx, engine, ziel.seite).length;
-  return (frei > 0 && bewegbareKarten(engine, pi, nutzer, ziel).length > 0) || maxHp(nutzer, ziel) > 0;
+  return (obergrenze(engine, ziel, bewegbareKarten(engine, pi, nutzer, ziel)) > 0) || maxHp(nutzer, ziel) > 0;
 }
 
 module.exports = {
@@ -154,8 +174,8 @@ module.exports = {
       const freie = freieBasisZonen(zps, ziel.heroIdx, engine, ziel.seite);
       const karten = bewegbareKarten(engine, pi, nutzer, ziel);
       let gewaehlt = [];
-      if (freie.length > 0 && karten.length > 0) {
-        const cap = Math.min(freie.length, karten.length);
+      const cap = obergrenze(engine, ziel, karten);
+      if (cap > 0 && karten.length > 0) {
         const zielId = (c) => `equip-${engine.physicalSide(c)}-${c.heroIdx}-${c.zoneSlot}`;     // die Seite, auf der die Karte LIEGT (Crimson Web: nicht ihr Besitzer)
         const ids = await engine.promptEffectTarget(pi, karten.map(c => ({
           id: zielId(c), type: 'equip', owner: engine.physicalSide(c), heroIdx: c.heroIdx, slotIdx: c.zoneSlot, cardName: c.name, cardInstance: c,
@@ -179,7 +199,24 @@ module.exports = {
       // (Spells/Attacks u. ä.) wandern danach wie bisher still über `actionTransferAttachment`.
       let bewegt = 0;
       const freiListe = freieBasisZonen(zps, ziel.heroIdx, engine, ziel.seite);
-      const zuteilung = gewaehlt.slice(0, freiListe.length).map((inst, i) => ({ inst, platz: freiListe[i] }));
+      // Darion als Zielheld: Equips gehen in seinen Stapel (vorhanden: Pflicht-Platz; sonst eroeffnet das erste eine freie Zone, die weiteren folgen), Anhaengsel nehmen je eine freie Zone.
+      const zuteilung = [];
+      const restFrei = [...freiListe];
+      let neuerStapel = -1;
+      for (const inst of gewaehlt) {
+        if (istUmhaengbaresEquip(engine, inst)) {
+          const pflicht = engine.equipPflichtPlatz(ziel.seite, ziel.heroIdx, inst.name);
+          if (pflicht >= 0) { zuteilung.push({ inst, platz: pflicht }); continue; }
+          if (neuerStapel >= 0) { zuteilung.push({ inst, platz: neuerStapel }); continue; }
+          if (restFrei.length === 0) continue;
+          const platz = restFrei.shift();
+          if (ES.teilenAktiv(engine, ziel.seite, ziel.heroIdx)) neuerStapel = platz;
+          zuteilung.push({ inst, platz });
+          continue;
+        }
+        if (restFrei.length === 0) continue;
+        zuteilung.push({ inst, platz: restFrei.shift() });
+      }
       const equips = zuteilung.filter(z => istUmhaengbaresEquip(engine, z.inst));
       if (equips.length) {
         const plan = equips.map(({ inst, platz }) => ({ inst, owner: ziel.seite, srcHeroIdx: inst.heroIdx, srcSlot: inst.zoneSlot, destHeroIdx: ziel.heroIdx, destSlot: platz }));

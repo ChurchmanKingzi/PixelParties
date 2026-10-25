@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Great Vanguard Demon"
-//  Creature (Summoning Magic Lv9, Normal, 200 HP) — PP MSHW, Secret Rare — Umsetzung 23.10.
+//  Creature (Summoning Magic Lv6, Normal, 200 HP) — PP MSHW, Secret Rare — Umsetzung 23.10.
 //
 //  „Reveal this card while it is in your hand. Whenever you play a Reaction Attack, Spell or Creature, reduce this card's level in your hand by 1.
 //   When you summon this Creature, place a Demon Counter on all Creatures you control. You may once per turn choose a target and deal damage equal to
@@ -15,7 +15,7 @@
 //  Jede eigene Reaction vom Typ Attack, Spell oder Creature (Untertyp Reaction — Artefakt- und Trank-Reactions stehen NICHT im Text) senkt die Stufe JEDER
 //  Kopie in der Hand um 1, dauerhaft, solange die Kopie in der Hand bleibt (kein Zugablauf). Gespeichert als Handindex-Feld `_handLevelOffsetsTransient`
 //  (Muster Looming Threat/Sparkfly Queen: wirkt nur in der Hand, folgt der physischen Kopie, summiert sich mit anderen Senkungen). Ausspielen, Zurückmischen,
-//  Abwerfen oder Löschen: die Kopie verlässt die Hand, der Eintrag fällt weg — kommt sie wieder, steht sie wieder auf 9 (nichts wandert aufs Brett).
+//  Abwerfen oder Löschen: die Kopie verlässt die Hand, der Eintrag fällt weg — kommt sie wieder, steht sie wieder auf der gedruckten Stufe 6 (nichts wandert aufs Brett).
 //  Die Stufe sinkt höchstens bis 0. „Whenever you play" = die Beobachter von `_card-played-shared.js` (Reaction-Spells/-Attacks über `afterSpellResolved`,
 //  Reaction-Creatures über den Zonen-Eintritt bzw. das Hand-Spielsignal, genau einmal je Karte); wie bei Luck zählt eine negierte Reaction nicht.
 //  Mehrere Kopien in der Hand senken zugleich, je Spielen genau einmal (die Kopie mit der kleinsten Id zählt für alle).

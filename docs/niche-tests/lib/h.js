@@ -417,7 +417,9 @@ function attachHelpers(t) {
       for (let hi = 0; hi < 3; hi++) for (let zi = 0; zi < 3; zi++) {
         const z = ps.supportZones[hi][zi] || [];
         // Mehrere Karten in EINEM Platz sind nur der Equip-Stapel eines Helden mit `equipsShareZone` (Darion) erlaubt (Alice-Stapel: eigene Prüfung in lib/alice-brett.js).
-        const darionStapel = z.length > 1 && !!(engine.heroScript(s, hi) || {}).equipsShareZone && z.every(nm => engine.isEquipInZone(nm));
+        // Instanzbewusst: ein Copy Device, das eine Ausrüstung kopiert (`treatAsEquip`), ist im Stapel ein Equip.
+        const darionStapel = z.length > 1 && !!(engine.heroScript(s, hi) || {}).equipsShareZone
+          && z.every(nm => engine.isEquipInZone(nm, engine.cardInstances.find(c => c.zone === 'support' && c.owner === s && c.heroIdx === hi && c.zoneSlot === zi && c.name === nm)));
         if (z.length > 1 && !darionStapel) bad.push(`seat${s}.support[${hi}][${zi}] hält ${z.length} Karten: ${z.join(',')}`);
         for (const nm of z) {
           const insts = engine.cardInstances.filter(c => c.zone === 'support' && c.owner === s && c.heroIdx === hi && c.zoneSlot === zi && c.name === nm);

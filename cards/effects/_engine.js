@@ -2463,6 +2463,7 @@ class GameEngine {
     }
     const inst = new CardInstance(name, owner, zone, heroIdx, zoneSlot);
     inst.turnPlayed = this.gs.turn || 0;
+    this._stempleStapelNr(inst);   // Darion: Legereihenfolge im Platz (Namen-Array und Instanzen bleiben so einander zuordenbar)
     this.cardInstances.push(inst);
     // W63c: eine fremde Handkarte (Charme Lv 2, Diebstahl, Geschenk …) betritt das Brett — die Instanz gehoert weiter ihrem BESITZER.
     if (zone === ZONES.SUPPORT || zone === ZONES.ABILITY || zone === ZONES.SURPRISE || zone === ZONES.AREA || zone === ZONES.HERO) this._stempelFremdHerkunft(inst);
@@ -2594,6 +2595,38 @@ class GameEngine {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Darion: laufende Nummer fuer die Legereihenfolge von Karten in einem Platz. Bewusst in einer WeakMap statt als Feld der Instanz (kein Teil des Spielstands: Snapshots,
+   * Zustandsvergleiche und Mitschnitte sehen sie nicht); fehlt der Eintrag (nach einem Wiederherstellen), gilt die Reihenfolge in `cardInstances`.
+   */
+  _stempleStapelNr(inst) {
+    if (!this._stapelNrMap) this._stapelNrMap = new WeakMap();
+    this._stapelNrMap.set(inst, (this._stapelNrZaehler = (this._stapelNrZaehler || 0) + 1));
+  }
+
+  /**
+   * Darion: nimmt den Eintrag von `inst` aus dem Namen-Array seines Platzes. Bei GLEICHNAMIGEN Karten im Stapel ([Club, Blade, Club]) wird nicht blind der erste Eintrag genommen,
+   * sondern der, der der Legereihenfolge (`_stapelNr`) der abgehenden Instanz entspricht - so bleibt die oberste Karte (letzter Name) die zuletzt gelegte. Gibt den Index zurueck (-1: nichts).
+   */
+  entferneNameAmPlatz(arr, inst) {
+    if (!Array.isArray(arr) || !inst) return -1;
+    const occ = [];
+    arr.forEach((n, i) => { if (n === inst.name) occ.push(i); });
+    if (occ.length === 0) return -1;
+    let idx = occ[0];
+    if (occ.length > 1) {
+      const seite = this.physicalSide(inst);
+      const gleich = this.cardInstances
+        .filter(c => c.zone === ZONES.SUPPORT && c.heroIdx === inst.heroIdx && c.zoneSlot === inst.zoneSlot && c.name === inst.name && this.physicalSide(c) === seite)
+        .map((c, i) => ({ c, n: this._stapelNrMap?.get(c) ?? (i - 1e9) }))   // ohne Stempel: Reihenfolge in cardInstances (vor den gestempelten)
+        .sort((a, b) => a.n - b.n).map(x => x.c);
+      const rang = gleich.indexOf(inst);
+      if (rang >= 0 && rang < occ.length) idx = occ[rang];
+    }
+    arr.splice(idx, 1);
+    return idx;
   }
 
   /** Remove a CardInstance from tracking. */
@@ -5378,10 +5411,12 @@ class GameEngine {
             for (let si = 0; si < (ps2.supportZones[hi] || []).length; si++) {
               const slot = (ps2.supportZones[hi] || [])[si] || [];
               if (slot.length === 0) continue;
-              const creatureName = slot[0];
               // Z1: Instanz ueber die BRETTSEITE (S02-17); „my"/„enemy" gilt fuer Kreaturen nach
               // KONTROLLE (S02-19, S03-06, M01-20, M01-22, C03-10) — nur `side: 'any'` ist seitenlos.
-              const inst = engine.kreaturAnBrett(playerIdx, hi, si);
+              const _kp = engine.kreaturImPlatz(playerIdx, hi, si);   // Darion: Kreatur im Equip-Stapel (Moana)
+              const inst = _kp.inst;
+              if (_kp.stapel && !inst) continue;
+              const creatureName = inst ? inst.name : slot[0];
               if (inst && !engine.kreaturPasstZurSeite(inst, side, pi)) continue;
               // Only actual Creatures are targetable — not Equipment, Heroes, etc.
               // v704 (Puppets): Tokens mit `choosableAsCreature` („can still
@@ -5389,7 +5424,7 @@ class GameEngine {
               const cd = (inst ? engine.getEffectiveCardData(inst) : null) || cardDB[creatureName];
               if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;
               if (inst?.faceDown) continue; // Face-down Bakhm surprises are not targetable
-              const t = { id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx, heroIdx: hi, slotIdx: si, cardName: creatureName, cardInstance: inst };
+              const t = { id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx, heroIdx: hi, slotIdx: si, cardName: creatureName, cardInstance: inst, ...(_kp.erlaubte ? { _erlaubteInstanzen: _kp.erlaubte } : {}) };
               if (config.condition && !config.condition(t, engine)) {
               if (!config.dimUnmetCondition) continue;
               t.ineligible = true; if (config.markUnmetRed) t.markRed = true;   // ausgegraut statt weg (s. dimUnmetCondition); `markUnmetRed` zeichnet sie zusaetzlich ROT
@@ -5994,16 +6029,18 @@ class GameEngine {
             for (let si = 0; si < (ps2.supportZones[hi] || []).length; si++) {
               const slot = (ps2.supportZones[hi] || [])[si] || [];
               if (slot.length === 0) continue;
-              const creatureName = slot[0];
               // Z1: Brettseite fuer die Instanz, Kontrolle fuer „my"/„enemy" (s. promptDamageTarget).
-              const inst2 = engine.kreaturAnBrett(playerIdx, hi, si);
+              const _kp2 = engine.kreaturImPlatz(playerIdx, hi, si);   // Darion: Kreatur im Equip-Stapel (Moana)
+              const inst2 = _kp2.inst;
+              if (_kp2.stapel && !inst2) continue;
+              const creatureName = inst2 ? inst2.name : slot[0];
               if (inst2 && !engine.kreaturPasstZurSeite(inst2, side, pi)) continue;
               // Only actual Creatures are targetable — not Equipment, Tokens, Spells, etc.
               // v704 (Puppets): Ausnahme Tokens mit `choosableAsCreature`.
               const cd = (inst2 ? engine.getEffectiveCardData(inst2) : null) || cardDB[creatureName];
               if (!cd || !engine.isChoosableAsCreature(inst2, cd)) continue;
               if (inst2?.faceDown) continue; // Face-down Bakhm surprises are not targetable
-              const t = { id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx, heroIdx: hi, slotIdx: si, cardName: creatureName, cardInstance: inst2 };
+              const t = { id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx, heroIdx: hi, slotIdx: si, cardName: creatureName, cardInstance: inst2, ...(_kp2.erlaubte ? { _erlaubteInstanzen: _kp2.erlaubte } : {}) };
               if (config.condition && !config.condition(t, engine)) {
               if (!config.dimUnmetCondition) continue;
               t.ineligible = true;   // ausgegraut statt weg (s. dimUnmetCondition)
@@ -18344,8 +18381,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const arr = ((gs.players[seite]?.supportZones || [])[srcHeroIdx] || [])[srcSlotIdx];
       if (Array.isArray(arr) && arr.indexOf(cardName) >= 0) { srcSlot = arr; break; }
     }
-    const srcIdx = srcSlot.indexOf(cardName);
-    if (srcIdx >= 0) srcSlot.splice(srcIdx, 1);
+    this.entferneNameAmPlatz(srcSlot, inst);
     this.sync();
 
     await this.runHooks('onCardLeaveZone', {
@@ -18376,6 +18412,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!toPs.supportZones[destHeroIdx]) toPs.supportZones[destHeroIdx] = [[], [], []];
     if (!toPs.supportZones[destHeroIdx][destSlotIdx]) toPs.supportZones[destHeroIdx][destSlotIdx] = [];
     toPs.supportZones[destHeroIdx][destSlotIdx].push(cardName);
+    this._stempleStapelNr(inst);   // Darion: oben auf dem Stapel
 
     // Crimson-Web-Modell (Besitzer ≠ Seite der Zone): der Besitzer bleibt der Wirker, nur die Kontrolle (= Seite der Zone) wandert.
     const besitzerBleibt = quellSeite !== inst.owner;
@@ -23036,6 +23073,23 @@ this._deathWatch = (this._deathWatchStack || []).length
     return inst ? (inst.originalOwner ?? inst.owner) : -1;
   }
 
+  /**
+   * Darion: die Kreatur-Ziele EINES Platzes. Normalfall: die Instanz am Platz (`kreaturAnBrett`). Liegt dort ein Equip-Stapel (Darion), kann darin eine Kreatur-Instanz stecken
+   * (Tempeste Moana: ein Instrument zaehlt als Creature) - nicht unbedingt die erste Karte: dann `inst` = die erste waehlbare Kreatur, `erlaubte` = ihre Instanz-IDs (Rueckfrage nur unter
+   * Kreaturen, nie unter den uebrigen Equips). Gibt es im Stapel keine Kreatur, ist `inst` null.
+   */
+  kreaturImPlatz(seite, heroIdx, zoneSlot) {
+    const slot = this.gs.players[seite]?.supportZones?.[heroIdx]?.[zoneSlot] || [];
+    if (slot.length > 1) {
+      const eq = require('./_equip-stack-shared').equipsAt(this, seite, heroIdx, zoneSlot);
+      if (eq.length > 1) {
+        const kre = eq.filter(i => this.isChoosableAsCreature(i, this.getEffectiveCardData(i) || this._getCardDB()[i.name]));
+        return { inst: kre[0] || null, erlaubte: kre.map(i => i.id), stapel: true };
+      }
+    }
+    return { inst: this.kreaturAnBrett(seite, heroIdx, zoneSlot), erlaubte: null, stapel: false };
+  }
+
   /** Instanz in der Support Zone (`heroIdx`, `zoneSlot`) auf der BRETTSEITE `seite` — unabhaengig von Besitzer/Kontrolleur. */
   kreaturAnBrett(seite, heroIdx, zoneSlot, name = null) {
     return this.cardInstances.find(c =>
@@ -24142,6 +24196,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       for (let z = 0; z < 3; z++) {
         if ((supZones[z] || []).length === 0) { oppHasFreeSlot = true; break; }
       }
+      // Darion: der Equip-Stapel des Gegnerhelden nimmt weitere Ausruestung auf, auch wenn alle Zonen belegt sind.
+      if (!oppHasFreeSlot && require('./_equip-stack-shared').hatStapelPlatz(this, oppIdx, hi)) oppHasFreeSlot = true;
     }
     if (!oppHasFreeSlot) return [];
 
@@ -33435,6 +33491,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     for (const id of pickedIds) {
       const t = (validTargets || []).find(v => v && v.id === id);
       if (!t || t.type !== 'equip' || t._eigeneStapelWahl) continue;   // W20b: Dark Deepsea God fragt den Stapel selbst (Teilauswahl)
+      // Darion: ein PLATZ-Ziel (Zonenwahl fuer ein NEUES Equip: ohne Karte, `cardName: ''`) meint den Platz, nicht eine Karte des Stapels — keine Rueckfrage „welches Equip?".
+      if (t._platzWahl || (!t.cardInstance && !t._cardInstance && !t.cardName)) continue;
+      // Darion: ein ABILITY-Ziel, das in der Support Zone liegt (Cloak of Edge: Charme, Memory Wipe …), nennt die Karte schon beim Namen - keine Rueckfrage unter den Nachbar-Equips.
+      if (!t._erlaubteInstanzen && t.cardName && this.countsAsAbilityInZone(t.cardName, { zone: 'support' })) continue;
       const side = t.cardInstance
         ? (t.cardInstance.controller ?? t.cardInstance.owner)
         : t.owner;
@@ -33444,9 +33504,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       const stack = alice.stackAt(this, side, heroIdx, slotIdx);
       // ★ Darion: ein Platz mit mehreren EQUIPS (ein Name je Karte) — dieselbe Rueckfrage, aber nur unter den Equips, die das Skript zulaesst
       // (`t._erlaubteInstanzen`, gesetzt von den zentralen Aufzaehlern; ohne Angabe alle Equips des Stapels).
+      // Ein KREATUR-Ziel (Tempeste Moana: ein Instrument zaehlt als Creature) ohne eigene Liste fragt nur unter den Kreaturen des Stapels, nie unter den uebrigen Equips.
+      const _istKreaturZiel = !!t.cardInstance && !t._erlaubteInstanzen && this.isChoosableAsCreature(t.cardInstance, this.getEffectiveCardData(t.cardInstance) || this._getCardDB()[t.cardInstance.name]);
       const eqStack = stack.length <= 1
         ? require('./_equip-stack-shared').equipsAt(this, t.owner ?? side, heroIdx, slotIdx)
             .filter(i => !t._erlaubteInstanzen || t._erlaubteInstanzen.includes(i.id))
+            .filter(i => !_istKreaturZiel || this.isChoosableAsCreature(i, this.getEffectiveCardData(i) || this._getCardDB()[i.name]))
         : [];
       if (stack.length <= 1 && eqStack.length <= 1) {
         if (eqStack.length === 1) { t.cardInstance = eqStack[0]; t._cardInstance = eqStack[0]; t.cardName = eqStack[0].name; this._merkeStapelWahl(t); }
@@ -34305,6 +34368,12 @@ this._deathWatch = (this._deathWatchStack || []).length
         // dort stumm verloren — dann lieber gar nicht umleiten.
         if (!(validTargets || []).some(t => t && t.id === redirected.id)) continue;
         liste[i] = redirected.id;
+        // Darion: wurde auf einen Equip-STAPEL umgeleitet, ohne dass dabei eine Karte gewaehlt wurde (der Umleiter hatte nur eine Moeglichkeit und fragte nicht), fragt die Engine jetzt,
+        // welches Equip gemeint ist - der Umleitende (Besitzer des neuen Ziels) waehlt. Hat die Umleitung schon gefragt, steht die Wahl in `_stapelWahl`.
+        if (redirected.type === 'equip' && redirected.id !== sel.id && !(this._stapelWahl && this._stapelWahl.has(redirected.id))) {
+          const neu = (validTargets || []).find(t => t && t.id === redirected.id);
+          if (neu) await this._disambiguateStackedTargets(neu.owner ?? sel.owner, validTargets, [neu.id], { maxTotal: 1 });
+        }
       }
     } finally {
       this._inRedirectWindow = false;
@@ -36316,8 +36385,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       for (const seite of new Set([targetOwnerIdx, gateSeite])) {
         for (const zonen of (this.gs.players[seite]?.supportZones || [])) {
           for (const slot of (zonen || [])) {
-            const n = Array.isArray(slot) ? slot[slot.length - 1] : slot;
-            if (n) _geschuetzt.set(n, (_geschuetzt.get(n) || 0) + 1);
+            // Darion: ein Equip-Stapel haelt mehrere Karten — jede Karte der Zone zaehlt (nicht nur die oberste).
+            for (const n of (Array.isArray(slot) ? slot : [slot])) {
+              if (n) _geschuetzt.set(n, (_geschuetzt.get(n) || 0) + 1);
+            }
           }
         }
       }
@@ -41953,20 +42024,22 @@ this._deathWatch = (this._deathWatchStack || []).length
       // die Brettseite des Traegers geht als `rxOpts.heroOwner` mit.
       for (const { physOwner: seite, heroIdx: hi } of this.heroesControlledBy(pi)) {
         const zonenPs = this.gs.players[seite];
+        const _rxBenutzt = new Set();   // Darion: gleichnamige Ausruestung im Stapel — jede Instanz kommt einzeln dran (nicht zweimal die erste)
         for (const slot of (zonenPs?.supportZones?.[hi] || [])) {
           const namen = Array.isArray(slot) ? slot : (slot ? [slot] : []);
           for (const cardName of namen) {
-            // ★ Override-bewusst (v575): eine Copy Device, die zu einer
-            // Weathercock geworden ist, heisst weiter Copy Device — mit
-            // `loadCardEffect(cardName)` wurde sie nie angeboten.
-            const script = this.supportCardScript(seite, hi, cardName);
-            if (!script?.isEquippedPostTargetReaction) continue;
             // Die INSTANZ mitreichen: eine Karte, die sich bisher ueber
             // ihren Namen in den Support Zonen suchte, findet sich unter
             // geliehener Identitaet sonst nicht selbst.
             const rxInst = this.cardInstances.find(c =>
               c.zone === 'support' && c.heroIdx === hi && c.name === cardName
-              && this.physicalSide(c) === seite) || null;
+              && this.physicalSide(c) === seite && !_rxBenutzt.has(c.id)) || null;
+            if (rxInst) _rxBenutzt.add(rxInst.id);
+            // ★ Override-bewusst (v575): eine Copy Device, die zu einer
+            // Weathercock geworden ist, heisst weiter Copy Device — mit
+            // `loadCardEffect(cardName)` wurde sie nie angeboten.
+            const script = rxInst ? loadCardEffect(rxInst.counters?._effectOverride || cardName) : this.supportCardScript(seite, hi, cardName);
+            if (!script?.isEquippedPostTargetReaction) continue;
             const rxOpts = { damageType, dealsDamage, heroChoiceIsCost: opts.heroChoiceIsCost === true, inst: rxInst, heroIdx: hi, heroOwner: seite };
             if (script.postTargetCondition
                 && !script.postTargetCondition(this.gs, pi, this, targetedHeroes, sourceCard, rxOpts)) continue;
@@ -44394,15 +44467,17 @@ this._deathWatch = (this._deathWatchStack || []).length
       // chainCtx, inst)` traegt, nimmt am selben Fenster teil — ohne Handkarte, wie die Board-Creature-Reaktion darueber. Je NAME ein Angebot
       // (die erste taugliche Kopie). Fuer Helden ohne solche Ausruestung laeuft die Schleife ohne Wirkung durch (nur Skript-Abfragen).
       for (const { physOwner: eSeite, heroIdx: eHi } of this.heroesControlledBy(pi)) {
+        const _eBenutzt = new Set();   // Darion: gleichnamige Ausruestung im Stapel — die erste TAUGLICHE Kopie zaehlt (nicht immer die erste Instanz)
         for (const slot of (this.gs.players[eSeite]?.supportZones?.[eHi] || [])) {
           const eNamen = Array.isArray(slot) ? slot : (slot ? [slot] : []);
           for (const eName of eNamen) {
             if (eligibleByName.has(eName)) continue;
-            const eScript = this.supportCardScript(eSeite, eHi, eName);
-            if (!eScript?.isEquipReaction || typeof eScript.equipReactionCondition !== 'function') continue;
             const eInst = this.cardInstances.find(c => c.zone === ZONES.SUPPORT && c.heroIdx === eHi && c.name === eName
-              && this.physicalSide(c) === eSeite && !c.faceDown);
+              && this.physicalSide(c) === eSeite && !c.faceDown && !_eBenutzt.has(c.id));
             if (!eInst) continue;
+            _eBenutzt.add(eInst.id);
+            const eScript = loadCardEffect(eInst.counters?._effectOverride || eName);
+            if (!eScript?.isEquipReaction || typeof eScript.equipReactionCondition !== 'function') continue;
             let okE = false;
             try { okE = !!eScript.equipReactionCondition(this.gs, pi, this, chainCtx, eInst); } catch { okE = false; }
             if (!okE) continue;
@@ -47285,7 +47360,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (inst.counters?._keinEquip || inst.counters?._gainedEffectOnly) return false;
     const cd = this.getEffectiveCardData(inst) || this._getCardDB()[inst.name];
     if (!cd) return false;
-    if (cd.cardType === 'Artifact' && (cd.subtype || '').toLowerCase() === 'equipment') return true;
+    // Tempeste Moana: ein Instrument zaehlt als Artifact/Creature (wirksame Daten) und bleibt Equipment - hasCardType statt exaktem Vergleich.
+    if (hasCardType(cd, 'Artifact') && (cd.subtype || '').toLowerCase().split('/').map(x => x.trim()).includes('equipment')) return true;
     return !!inst.counters?.treatAsEquip && (hasCardType(cd, 'Hero') || hasCardType(cd, 'Ascended Hero'));
   }
 
@@ -47379,10 +47455,12 @@ this._deathWatch = (this._deathWatchStack || []).length
         for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
           const slot = (ps.supportZones[hi] || [])[si] || [];
           if (slot.length === 0) continue;
-          const inst = this.kreaturAnBrett(seite, hi, si);
+          const _kp = this.kreaturImPlatz(seite, hi, si);   // Darion: Kreatur im Equip-Stapel (Moana)
+          const inst = _kp.inst;
+          if (_kp.stapel && !inst) continue;
           // Eine Karte ohne Instanz gilt wie bisher als Kreatur der Zonenseite.
           if (inst ? this.kontrolleurVon(inst) !== playerIdx : seite !== playerIdx) continue;
-          const cd = (inst ? this.getEffectiveCardData(inst) : null) || cardDB[slot[0]];
+          const cd = (inst ? this.getEffectiveCardData(inst) : null) || cardDB[inst ? inst.name : slot[0]];
           if (!cd || !this.isChoosableAsCreature(inst, cd)) continue; // v704: + choosableAsCreature
           // Harte Unwaehlbarkeit (Thicket, v724): gar nicht erst in die
           // Liste. Dieser Sammler speist die Targeting-Artefakte
@@ -47391,7 +47469,8 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (inst?.counters?.untargetable_all) continue;
           targets.push({
             id: `equip-${seite}-${hi}-${si}`, type: 'equip', owner: seite,
-            heroIdx: hi, slotIdx: si, cardName: slot[0], cardInstance: inst || null,
+            heroIdx: hi, slotIdx: si, cardName: inst ? inst.name : slot[0], cardInstance: inst || null,
+            ...(_kp.erlaubte ? { _erlaubteInstanzen: _kp.erlaubte } : {}),
           });
         }
       }
@@ -47637,8 +47716,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (slot.length === 0) continue;
         // ★ Darion: ein Platz mit MEHREREN Equips — ein Ziel je Platz, dahinter alle Equips, die den Filter erfuellen (`_erlaubteInstanzen`; die Rueckfrage
         // „welches?" stellt `_disambiguateStackedTargets`).
-        const eqStapel = slot.length > 1 ? require('./_equip-stack-shared').equipsAt(this, playerIdx, hi, si) : [];
-        if (eqStapel.length > 1) {
+        const eqAlle = slot.length > 1 ? require('./_equip-stack-shared').equipsAt(this, playerIdx, hi, si) : [];
+        // Eine Ausruestung, die in der Zone als ABILITY zaehlt (Cloak of Edge), ist hier kein Artifact-Ziel — auch nicht im Stapel (sie bleibt Sache von `getAbilityTargets`).
+        const eqStapel = eqAlle.filter(i => !this.countsAsAbilityInZone(i.name, i));
+        if (eqAlle.length > 1) {
           const passend = eqStapel.filter(i => !opts.cardName || i.name === opts.cardName);
           if (passend.length === 0) continue;
           out.push({
@@ -49513,16 +49594,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       const hero = ops.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
       for (let zi = 0; zi < (ops.supportZones?.[hi] || []).length; zi++) {
+        // Darion: ein Platz mit mehreren Karten haelt mehrere Instanzen (auch gleichnamige) — JEDE Instanz einzeln pruefen und mit `instId` melden
+        // (vorher: je NAME die erste Instanz, eine zweite Kopie im Stapel war nie aktivierbar).
+        const gesehen = new Set();
         for (const cardName of (ops.supportZones[hi][zi] || [])) {
           // ★ Geliehene Identitaet (Future Tech Copy Device): das
           // Verhalten steckt im Override, nicht im Namen der Karte.
-          // Die Instanz wird unten ohnehin gesucht — dieselbe Suche
-          // hier vorziehen, damit das Skript stimmt.
-          const _ovInst = this.cardInstances.find(c =>
-            c.name === cardName && c.zone === 'support'
-            && c.heroIdx === hi && c.zoneSlot === zi);
-          const script = loadCardEffect(_ovInst?.counters?._effectOverride || cardName);
-          if (!script?.equipEffect || !script?.placesOnOpponentBoard) continue;
           // ★ Eine Cross-Side-Karte liegt PER DEFINITION auf der
           // Gegenseite ihres Besitzers — die SEITE, in deren Zone sie
           // steht, bestimmt ihn also. `originalOwner` ist nur die
@@ -49530,15 +49607,19 @@ this._deathWatch = (this._deathWatchStack || []).length
           // suchen liess vorbelegte Karten unsichtbar bleiben.
           const inst = this.cardInstances.find(c =>
             c.name === cardName && c.zone === 'support'
-            && c.heroIdx === hi && c.zoneSlot === zi);
-          if (!inst || inst.faceDown) continue;
+            && c.heroIdx === hi && c.zoneSlot === zi && !gesehen.has(c.id));
+          if (!inst) continue;
+          gesehen.add(inst.id);
+          const script = loadCardEffect(inst.counters?._effectOverride || cardName);
+          if (!script?.equipEffect || !script?.placesOnOpponentBoard) continue;
+          if (inst.faceDown) continue;
           if (this.gs.hoptUsed?.[`equip-effect:${inst.id}`] === this.gs.turn) continue;
           if (typeof script.canActivateEquipEffect === 'function') {
             try {
               if (!script.canActivateEquipEffect(this._createContext(inst, {}))) continue;
             } catch { continue; }
           }
-          out.push({ heroIdx: hi, zoneSlot: zi, cardName, crossSide: true });
+          out.push({ heroIdx: hi, zoneSlot: zi, cardName, crossSide: true, instId: inst.id });
         }
       }
     }
@@ -49618,7 +49699,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       result.push({
         owner: oi, heroIdx: e.heroIdx, zoneSlot: e.zoneSlot,
         cardName: e.cardName, canActivate: true, exhausted: false,
-        crossSide: true,
+        crossSide: true, instId: e.instId,
       });
     }
 
@@ -56709,8 +56790,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           const seiten = [this.physicalSide(inst), inst.owner].filter((v, i, a) => v != null && v >= 0 && a.indexOf(v) === i);
           for (const s of seiten) {
             const arr = this.gs.players[s]?.supportZones?.[inst.heroIdx]?.[inst.zoneSlot];
-            const idx = arr ? arr.indexOf(inst.name) : -1;
-            if (idx >= 0) { arr.splice(idx, 1); break; }
+            if (arr && arr.includes(inst.name)) { this.entferneNameAmPlatz(arr, inst); break; }
           }
         }
         // ★ VERDECKTE KARTE AUFDECKEN (v775, Als Befund 5.9.).

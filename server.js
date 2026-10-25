@@ -11470,6 +11470,7 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot, heroOwner: h
   // Highlight").
   const _crossInst = room.engine.cardInstances.find(c =>
     c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
+    && (instId == null || c.id === instId)   // Darion: zwei Cross-Side-Karten im Stapel — die gemeinte Instanz
     && (gs.players[oi]?.supportZones?.[heroIdx]?.[zoneSlot] || []).includes(c.name)
     // Auch hier ueber das Override: eine Copy Device, die zu einem
     // Control Device geworden ist, liegt cross-side, heisst aber nicht so.

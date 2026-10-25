@@ -78,6 +78,15 @@ function wirtKannAusgeruestetWerden(ps, heroIdx) {
   return heroCanBeEquipped(ps?.heroes?.[heroIdx]);
 }
 
+/**
+ * Platz fuer das Non-Fungible Monkee beim Wirtshelden (Brettseite `feld`): bei einem Helden mit Equip-Stapel (Darion) NUR der Stapel — dort braucht es
+ * keine freie Zone —, sonst die erste freie Zone. -1 = kein Platz.
+ */
+function ausruestPlatz(engine, feld, heroIdx) {
+  const stapel = engine.equipPflichtPlatz(feld, heroIdx, NFM);
+  return stapel >= 0 ? stapel : freeSlotOn(engine.gs.players[feld], heroIdx);
+}
+
 module.exports = {
   activeIn: ['hand', 'support'],
   creatureEffect: true,
@@ -103,7 +112,7 @@ module.exports = {
     if (!ctx._borrowedUse && investHoptUsed(engine.gs, ctx.card)) return false;   // W12 (Q5): geliehene Verwendung ignoriert das eigene Einmal-Limit
     if (heroesWithInvest(ps, INVEST_COST).length === 0) return false;
     if (!nfmImDeck(ps)) return false;
-    return freeSlotOn(hps, ctx.cardHeroIdx) >= 0;
+    return ausruestPlatz(engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx) >= 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -124,7 +133,7 @@ module.exports = {
     if (!ctx._borrowedUse && investHoptUsed(gs, ctx.card)) return false;
     if (heroesWithInvest(ps, INVEST_COST).length === 0) return false;
     if (!nfmImDeck(ps)) return false;
-    if (freeSlotOn(hps, heroIdx) < 0) return false;
+    if (ausruestPlatz(engine, feld, heroIdx) < 0) return false;
 
     const bestaetigt = await engine.promptGeneric(pi, {
       type: 'confirm',
@@ -150,7 +159,7 @@ module.exports = {
       engine.log('criminal_monkee_fizzle', { player: ps.username, reason: 'no_nfm_in_deck' });
       return true;                                    // bezahlt ist bezahlt
     }
-    const slot = freeSlotOn(hps, heroIdx);
+    const slot = ausruestPlatz(engine, feld, heroIdx);
     if (slot < 0) {
       engine.log('criminal_monkee_fizzle', { player: ps.username, reason: 'no_free_zone' });
       return true;

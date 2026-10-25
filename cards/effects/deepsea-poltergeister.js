@@ -62,6 +62,8 @@ module.exports = {
         if (engine.countsAsAbilityInZone(inst.name, inst)) continue;
         if (!cd || !hasCardType(cd, 'Artifact')) continue;
         const ownerPi = inst.controller ?? inst.owner;
+        // ★ Darion: ein Equip-Stapel (mehrere Karten, ein Platz) ist EIN Ziel; welche Karte gemeint ist, fragt die Engine nach (`_disambiguateStackedTargets`).
+        if (targets.some(t => t.id === `equip-${ownerPi}-${inst.heroIdx}-${inst.zoneSlot}`)) continue;
         targets.push({
           id: `equip-${ownerPi}-${inst.heroIdx}-${inst.zoneSlot}`,
           type: 'equip', owner: ownerPi,

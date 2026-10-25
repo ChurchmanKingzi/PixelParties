@@ -3095,6 +3095,8 @@ function pickHeroForEquip(engine, pi, cardName, cardData, nurHelden = null) {
     for (let z = 0; z < 3; z++) {
       if ((zones[z] || []).length === 0) { hasFree = true; break; }
     }
+    // Darion: der Equip-Stapel des Helden nimmt weitere Ausruestung auf, auch ohne freie Zone.
+    if (!hasFree && engine.equipPflichtPlatz(pi, hi, cardName) >= 0) hasFree = true;
     if (hasFree) eligible.push(hi);
   }
   if (!eligible.length) return -1;
@@ -14592,4 +14594,4 @@ async function measureAreaValues(engine, helpers, cpuIdx) {
 // Gold-Bedarfsrechnung, die an zwei Stellen gepflegt wird, laeuft
 // garantiert auseinander. Rein additiv, kein Aufrufer geaendert.
 module.exports = { CPU_META_HELPERS, runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, mctsValueGoldVsDraw, mctsPickFromOptions, rolloutRestOfTurn, seedExploreAttempts, computeGoldDemand, mctsOpponentGoldEconomy,
-  _test: { activateCreatureEffects, activateHeroEffects, cpuGenericChoice, heroCheatBonusByName, heroEffectGateCheatBonus, candidateCheatBonus, heuristicCandidateCmp, ACTION_CHEAT_BONUS, pickCreatureZoneSlot, listEligibleHeroesForActionCard, resolveAbilityPlace, alleAbilityStapel, scoreAbilityPlacement, isAbilityStackSaturated, activateFreeAbilities, tryActionCostingAbility } };
+  _test: { pickHeroForEquip, activateCreatureEffects, activateHeroEffects, cpuGenericChoice, heroCheatBonusByName, heroEffectGateCheatBonus, candidateCheatBonus, heuristicCandidateCmp, ACTION_CHEAT_BONUS, pickCreatureZoneSlot, listEligibleHeroesForActionCard, resolveAbilityPlace, alleAbilityStapel, scoreAbilityPlacement, isAbilityStackSaturated, activateFreeAbilities, tryActionCostingAbility } };
