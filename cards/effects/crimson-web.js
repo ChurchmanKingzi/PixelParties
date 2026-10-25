@@ -419,6 +419,10 @@ module.exports = {
       const inst = ctx.card;
       if (!inst) return;
       if (ctx.fromZone !== 'support') return;
+      // Nur der Abgang des Netzes SELBST: `ctx.card` ist die lauschende Karte, die gehende steht in `leavingCard` / `_onlyCard`
+      // (sonst hob jede Karte, die irgendeine Support Zone verlaesst — auch ein Equip aus Darions Stapel —, den Status auf).
+      const gehend = ctx.leavingCard || ctx._onlyCard;
+      if (gehend && gehend.id !== inst.id) return;
       const lockedOwner = inst.counters?._crimsonWebLockedOwner;
       const lockedHeroIdx = inst.counters?._crimsonWebLockedHeroIdx;
       if (lockedOwner == null || lockedHeroIdx == null) return;
