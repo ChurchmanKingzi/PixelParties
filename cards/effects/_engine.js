@@ -9694,7 +9694,8 @@ class GameEngine {
     // they don't burn the resource on a piercing hit; this server-
     // side override is the universal safety net for cards that
     // forget the check.
-    if (hookCtx.cancelled && hookCtx.cannotBeNegated) {
+    // Mean Cute Cat: ein UMGELEITETER Treffer (`_umgeleitet`) ist keine Negierung — der Schaden ist schon beim neuen Ziel.
+    if (hookCtx.cancelled && hookCtx.cannotBeNegated && !hookCtx._umgeleitet) {
       this.log('piercing_override', {
         source: source?.name, target: this._heroLabel(target),
         reason: 'cannotBeNegated overrides beforeDamage cancellation',
@@ -10417,6 +10418,7 @@ class GameEngine {
         const hookCtx = { source: bq, target, amount, type, sourceHeroIdx: bq?.heroIdx ?? -1, trueDamage: true, cannotBeReduced: true, cannotBeNegated: true };
         hookCtx._kBase = amount; hookCtx._kMul = 1; hookCtx._kFlat = 0;
         await this.runHooks(HOOKS.BEFORE_TRUE_DAMAGE, hookCtx);
+        if (hookCtx.cancelled && hookCtx._umgeleitet) return { dealt: 0, cancelled: true };   // Mean Cute Cat: umgeleitet (der Schaden liegt schon beim neuen Ziel)
         const proj = this._projectedAmount(hookCtx);
         if (proj !== undefined && proj > amount) amount = proj;
       }

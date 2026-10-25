@@ -31343,6 +31343,145 @@ const ANIM_REGISTRY = {
     });
   })(),
   // ═════════════════════════════════════════════════════════════════
+  //  Mean Cute Cat (25.10.) — PIXELART, drei schwarze Fledermäuse fangen den Schaden ab und tragen ihn zur Umleitungs-Kreatur (`ppSalve`; Vorlage: das Kartenbild — drei schwarze
+  //  Fledermaus-/Katzenwesen mit roten Augen über blauem Wasser)
+  //
+  //  Ursprung = die Katze, `targets[0]` = das ursprüngliche Ziel (Held oder Kreatur), `targets[1]` = die Kreatur, die den Schaden bekommt. Ablauf (ENDE 1500):
+  //  0–240 ms die Fledermäuse steigen über der Katze auf (Flügelschlag in vier Bildern, rote Augen) · 240–560 flattern sie im Bogen zum Ziel · 560–760 umkreisen sie es; ein roter
+  //  Schlagfunke schrumpft, ein dunkler Dither-Fleck verschluckt ihn, aus ihm wird ein dunkelroter Ball · 760–1020 tragen sie den Ball (mit Schweif) zur Kreatur; blaue Wassertropfen
+  //  tropfen aus den Flügeln · 1020 Einschlag: drei rote Kratzer, Ringfunke, Funken, die Fledermäuse stieben auseinander · ab 1260 dithert alles weg.
+  //  Der Schaden fällt im Einschlag (Server wartet 1020 ms). Feste Palette (Schwarz-/Grautöne, Rot, Wasserblau), Bayer-Dithering statt Alpha, Bewegung in ganzen Pixeln, KEIN Schein.
+  // ═════════════════════════════════════════════════════════════════
+  mean_cat_bats: (() => {
+    const K = ppHex('#000000'), D = ppHex('#222222'), L = ppHex('#535353');
+    const R1 = ppHex('#ff1a1a'), R2 = ppHex('#c80000'), R3 = ppHex('#8f0000'), R4 = ppHex('#780000');
+    const W1 = ppHex('#ffffff'), W2 = ppHex('#e6e6e6');
+    const B1 = ppHex('#405f8c'), B2 = ppHex('#2d4362');
+    const T_AUF = 240, T_FLUG = 560, T_RING = 760, T_TRAGEN = 1020, ENDE = 1500, FADE_AB = 1260;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const glatt = (k) => k * k * (3 - 2 * k);
+    const mix = (a, b, k) => a + (b - a) * k;
+    // Aufstellung der drei Fledermäuse (Dreieck) rund um einen Mittelpunkt
+    const FORM = [[-11, 3], [0, -6], [11, 3]];
+    // Eine Fledermaus (Mitte cx/cy). bild 0..3: Flügelspitze hoch … runter.
+    const fledermaus = (g, cx, cy, bild, a) => {
+      cx = Math.round(cx); cy = Math.round(cy);
+      const spitze = [-5, -3, 0, 3][bild];
+      for (const s of [-1, 1]) {
+        for (let i = 2; i <= 6; i++) {
+          const oben = Math.round(-1 + (spitze + 1) * (i - 1) / 5);
+          const unten = oben + (i === 6 ? 0 : (i % 2 ? 2 : 3));
+          for (let y = oben; y <= unten; y++) g.put(cx + s * i, cy + y, y === oben ? L : (y === unten ? D : K), a);
+        }
+        g.put(cx + s, cy - 1, K, a);
+      }
+      g.block(cx - 1, cy - 2, 3, 4, K, a);                                  // Körper
+      g.put(cx - 1, cy - 3, K, a); g.put(cx + 1, cy - 3, K, a);              // Ohren
+      g.put(cx - 1, cy - 1, R1, a); g.put(cx + 1, cy - 1, R1, a);            // rote Augen
+      g.put(cx, cy + 2, K, a);                                               // Schwanzspitze
+    };
+    // Dunkelroter Ball (Radius 2) mit hellem Kern
+    const ball = (g, x, y, a) => {
+      g.disc(x, y, 2.2, R3, a); g.put(x, y, R1, a); g.put(x - 1, y - 1, R2, a);
+    };
+    const malen = (g, t, sz) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const O = sz.O;
+      const z0 = sz.ziele[0] || { x: O.x, y: O.y, w: 21, h: 30 };
+      const z1 = sz.ziele[sz.ziele.length - 1] || z0;
+      const fr = Math.floor(t / 66), bild = fr % 4;
+      const ringR = klemme(Math.min(z0.w, z0.h) * 0.6, 11, 16);
+      const bats = [];                                                       // [x, y, alpha, bildOffset]
+      let ballPos = null;
+      for (let i = 0; i < 3; i++) {
+        const fx = FORM[i][0], fy = FORM[i][1];
+        const wi = (bild + i) % 4;
+        const ang0 = (i / 3) * Math.PI * 2 - Math.PI / 2;
+        // Plätze rund um das ursprüngliche Ziel
+        const ringPos = (w, r) => [z0.x + Math.cos(w) * r, z0.y + Math.sin(w) * r * 0.7];
+        if (t < T_AUF) {                                                    // ① aufsteigen über der Katze
+          const k = glatt(klemme(t / T_AUF, 0, 1));
+          bats.push([O.x + fx, O.y - 4 + fy - k * 10, Math.min(aus, klemme(t / 150, 0, 1)), wi]);
+        } else if (t < T_FLUG) {                                            // ② im Bogen zum Ziel
+          const k = glatt((t - T_AUF) / (T_FLUG - T_AUF));
+          const [ex, ey] = ringPos(ang0, ringR);
+          const bogen = Math.sin(k * Math.PI) * -9 + Math.sin((fr + i * 2) * 1.3) * 1.2;
+          bats.push([mix(O.x + fx, ex, k), mix(O.y - 14 + fy, ey, k) + bogen, aus, wi]);
+        } else if (t < T_RING) {                                            // ③ umkreisen das Ziel und verschlucken den Schlag
+          const k = (t - T_FLUG) / (T_RING - T_FLUG);
+          const [px, py] = ringPos(ang0 + k * Math.PI * 1.5, mix(ringR, ringR * 0.6, k));
+          bats.push([px, py, aus, wi]);
+        } else if (t < T_TRAGEN) {                                          // ④ tragen den Ball zur Kreatur
+          const k = glatt((t - T_RING) / (T_TRAGEN - T_RING));
+          const hub = -Math.sin(k * Math.PI) * 9;
+          const mx = mix(z0.x, z1.x, k), my = mix(z0.y, z1.y, k) + hub;
+          ballPos = [mx, my];
+          bats.push([mx + fx, my + fy - 2, aus, wi]);
+        } else {                                                            // ⑤ stieben nach dem Einschlag auseinander
+          const al = t - T_TRAGEN;
+          const w = ang0 + 0.4, r = 5 + al / 28;
+          bats.push([z1.x + Math.cos(w) * r + fx * 0.4, z1.y + Math.sin(w) * r * 0.8 - al / 36, aus * (al > 220 ? Math.max(0, 1 - (al - 220) / 260) : 1), wi]);
+        }
+      }
+      // ── Schlagfunke am Ziel: schrumpft, wird verschluckt, wird zum Ball ──
+      if (t >= T_FLUG - 80 && t < T_RING) {
+        const k = klemme((t - (T_FLUG - 80)) / (T_RING - T_FLUG + 80), 0, 1);
+        const arm = Math.max(0, Math.round(5 * (1 - k)));
+        for (let a = 1; a <= arm; a++) {
+          const c = a === arm ? R2 : R1;
+          g.put(z0.x + a, z0.y, c, aus); g.put(z0.x - a, z0.y, c, aus); g.put(z0.x, z0.y + a, c, aus); g.put(z0.x, z0.y - a, c, aus);
+        }
+        g.disc(z0.x, z0.y, 2 + k * 7, K, 0.55 * aus);                          // dunkler Dither-Fleck verschluckt ihn
+        if (k > 0.55) ball(g, z0.x, z0.y, aus * klemme((k - 0.55) / 0.2, 0, 1));
+      }
+      // ── der Ball im Flug mit Schweif ──
+      if (ballPos) {
+        const k0 = (t - T_RING) / (T_TRAGEN - T_RING);
+        for (let n = 4; n >= 1; n--) {
+          const kk = glatt(klemme(k0 - n * 0.07, 0, 1));
+          g.block(mix(z0.x, z1.x, kk) - 1, mix(z0.y, z1.y, kk) - Math.sin(kk * Math.PI) * 9 - 1, 2, 2, n > 2 ? R4 : R3, aus * (1 - n * 0.2));
+        }
+        ball(g, ballPos[0], ballPos[1], aus);
+      }
+      // ── Einschlag: drei rote Kratzer + Ringfunke + Funken ──
+      if (t >= T_TRAGEN - 20) {
+        const al = t - (T_TRAGEN - 20);
+        for (let n = 0; n < 3; n++) {                                         // Kratzer (Krallen), nacheinander gezogen
+          const start = n * 36, laenge = klemme((al - start) / 90, 0, 1) * 12;
+          const ox = (n - 1) * 4;
+          for (let d = 0; d < laenge; d++) g.put(z1.x - 5 + ox + d * 0.7, z1.y - 6 + d, d % 5 === 4 ? R2 : R1, aus * (al > 300 ? Math.max(0, 1 - (al - 300) / 200) : 1));
+        }
+        if (al < 200) {
+          const arm = [1, 3, 5, 4, 3, 2, 1][Math.floor(al / 30)] || 1;
+          for (let a = 1; a <= arm; a++) {
+            const c = a === arm ? R3 : (a === 1 ? W1 : R1);
+            g.put(z1.x + a, z1.y, c, aus); g.put(z1.x - a, z1.y, c, aus); g.put(z1.x, z1.y + a, c, aus); g.put(z1.x, z1.y - a, c, aus);
+          }
+          g.block(z1.x - 1, z1.y - 1, 2, 2, W2, aus);
+        }
+        if (al < 300) {
+          const r = 3 + al / 24;
+          g.ring(z1.x, z1.y, r, r * 0.8, al < 120 ? R1 : R3, (1 - al / 300) * aus);
+        }
+        for (let n = 0; n < 9; n++) {                                         // Funken (Bogenflug, ganze Pixel)
+          const w = (n / 9) * Math.PI * 2 + 0.3, sek = Math.max(0, al - 20) / 1000;
+          if (al > 20 && al < 480) g.put(z1.x + Math.cos(w) * 40 * sek, z1.y + Math.sin(w) * 40 * sek + 30 * sek * sek, n % 2 ? R1 : R3, (1 - al / 480) * aus);
+        }
+      }
+      // ── Fledermäuse zuletzt (liegen über allem) + blaue Wassertropfen ──
+      bats.forEach(([x, y, a, wi], i) => {
+        if (a <= 0) return;
+        fledermaus(g, x, y, wi, a);
+        if (t > T_AUF && t < T_TRAGEN + 160) {
+          const dx = Math.round((ppHash(i, fr, 1) - 0.5) * 8), dy = 4 + Math.floor(ppHash(i, fr, 2) * 7);
+          if (ppHash(i, fr, 3) < 0.7) g.put(x + dx, y + dy, ppHash(i, fr, 4) < 0.5 ? B1 : B2, a);
+        }
+      });
+    };
+    return ppSalve(malen, ENDE, null, { extra: 40 });
+  })(),
+  // ═════════════════════════════════════════════════════════════════
   //  Patty, the Ninja of Revenge (25.10.) — PIXELART, schwarze Wurfsterne von Patty zum Ziel (`ppSalve`; `runde` = Zahl der Sterne = Zahl der geschickten Abilities)
   //
   //  Je Ability fliegt ein schwarzer Wurfstern (9×9, zwei Bilder im Wechsel: Kreuz und X, also ein drehender Stern in ganzen Pixeln) in sehr schneller Folge (alle 70 ms) von Patty
