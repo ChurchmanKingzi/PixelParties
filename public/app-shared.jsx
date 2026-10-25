@@ -3016,6 +3016,17 @@ const ZONE_ANIM_SFX = {
     { name: 'heavy_impact', opts: { rate: 1.2, volume: 0.5,  delay: 480, category: null, dedupe: 0 } },
     { name: 'ping',         opts: { rate: 2.8, volume: 0.4,  delay: 520, category: null, dedupe: 0 } },
   ],
+  // Mean Cute Cat (25.10.) — die Fledermäuse steigen flatternd auf (Wind, 0 ms), stürzen auf das Ziel (Schnitt ~300 ms), verschlucken den Schlag (Dunkelheit ~600 ms), tragen ihn davon (Wind ~780 ms) und
+  // schlagen bei der Kreatur ein (~1020 ms: Schlag, Kratzer, Pings). Nur der erste Teil übernimmt die Sammelkategorie 'effect'.
+  mean_cat_bats: [
+    { name: 'elem_wind',    opts: { rate: 1.9, volume: 0.3 } },
+    { name: 'slash',        opts: { rate: 1.7, volume: 0.32, delay: 300,  category: null, dedupe: 0 } },
+    { name: 'elem_dark',    opts: { rate: 0.8, volume: 0.45, delay: 600,  category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 2.3, volume: 0.28, delay: 780,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.15, volume: 0.55, delay: 1020, category: null, dedupe: 0 } },
+    { name: 'slash',        opts: { rate: 1.3, volume: 0.35, delay: 1040, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.6, volume: 0.28, delay: 1120, category: null, dedupe: 0 } },
+  ],
   // Patty (25.10.) — je Wurfstern ein Zischen beim Abwurf (alle 70 ms, die Tonhoehe wandert leicht) und ein heller Einschlag nach 280 ms Flug (`runde` = Zahl der Sterne; hoert nach 8 Sternen auf, damit
   // der Klang nicht zum Rauschen wird). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   patty_shuriken: ({ runde }) => {
