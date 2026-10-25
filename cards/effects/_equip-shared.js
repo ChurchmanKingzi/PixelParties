@@ -125,7 +125,8 @@ async function waehleAusruestPlatz(engine, pi, cardName, cfg = {}) {
   for (const { seite, heroIdx: hi } of helden) {
     const sps = engine.gs.players[seite];
     for (const si of freieBasisZonen(sps, hi, engine, seite, cardName)) {
-      ziele.push({ id: `equip-${seite}-${hi}-${si}`, type: 'equip', owner: seite, heroIdx: hi, slotIdx: si, cardName: '' });
+      // Darion: ein Zielplatz ist nur der PLATZ (auch der Equip-Stapel) — keine Rueckfrage „welches Equip meinst du?" (`_eigeneStapelWahl`).
+      ziele.push({ id: `equip-${seite}-${hi}-${si}`, type: 'equip', owner: seite, heroIdx: hi, slotIdx: si, cardName: '', _eigeneStapelWahl: true });
     }
     ziele.push({ id: `hero-${seite}-${hi}`, type: 'hero', owner: seite, heroIdx: hi, cardName: sps.heroes[hi].name });
   }
@@ -293,9 +294,18 @@ function darfAn(engine, inst, seite, hi) {
 function umhaengFreieZonen(engine, seite, hi, opts = {}) {
   const ps = engine.gs.players[seite];
   const out = [];
-  // Darion: ein Equip kann nur in den Equip-Stapel des Zielhelden (Pflicht-Platz).
+  // Darion: ein Equip kann nur in den Equip-Stapel des Zielhelden (Pflicht-Platz). Der Stapel nimmt MEHRERE Equips auf — dass ein anderes Equip desselben Zuges ihn schon
+  // reserviert hat, schliesst ihn nicht aus. Hat der Zielheld noch keinen Stapel, aber ein Equip dieses Zuges hat schon einen Platz bei ihm reserviert, ist DAS der Stapel.
   const pflicht = opts.cardName ? engine.equipPflichtPlatz(seite, hi, opts.cardName) : -1;
-  if (pflicht >= 0) return (opts.reserviert && opts.reserviert.has(`${seite}:${hi}:${pflicht}`)) ? out : [pflicht];
+  // Mehrere Equips in EINER Wahl (Fridge „any number"): der schon fuer ein anderes Equip vergebene Stapelplatz ist KEIN Hindernis, sondern der Platz, den alle teilen.
+  if (pflicht >= 0) return [pflicht];
+  // Darion ohne liegenden Stapel: wurde in dieser Wahl schon ein Equip an den Helden eingeplant, ist dessen Platz der entstehende Stapel — weitere Equips kommen dazu.
+  if (opts.reserviert && opts.cardName && istEquipKartenname(opts.cardName) && require('./_equip-stack-shared').teilenAktiv(engine, seite, hi)) {
+    for (const k of opts.reserviert) {
+      const [s, h, z] = String(k).split(':').map(Number);
+      if (s === seite && h === hi) return [z];
+    }
+  }
   if (engine.isSupportZoneLocked?.(seite, hi, { cardName: opts.cardName, via: 'move', instId: opts.instId })) return out;
   for (let si = 0; si < 3; si++) {
     if (opts.reserviert && opts.reserviert.has(`${seite}:${hi}:${si}`)) continue;
@@ -343,6 +353,20 @@ function umhaengZielHelden(engine, inst, opts = {}) {
 async function fuehreUmhaengenAus(engine, plan, opts = {}) {
   const gs = engine.gs;
   const anleger = opts.anleger;
+  // ★ Darion: alle Equips, die zu EINEM Helden mit geteilter Equip-Zone wandern, kommen in EINEN Platz — der Platz des liegenden Stapels, sonst der des ersten Equips dieses
+  // Zuges bei ihm (egal, welche freien Plaetze der Aufrufer vergeben hat). Nur Equips teilen; Anhaengsel behalten ihren Platz.
+  {
+    const ES = require('./_equip-stack-shared');
+    const gemeinsam = new Map();   // `${seite}:${held}` -> Platz des ersten Equips
+    for (const m of plan) {
+      if (!istEquipKartenname(m.inst.name) || !ES.teilenAktiv(engine, m.owner, m.destHeroIdx)) continue;
+      const pflicht = engine.equipPflichtPlatz(m.owner, m.destHeroIdx, m.inst.name);
+      const key = `${m.owner}:${m.destHeroIdx}`;
+      if (pflicht >= 0) m.destSlot = pflicht;
+      else if (gemeinsam.has(key)) m.destSlot = gemeinsam.get(key);
+      else gemeinsam.set(key, m.destSlot);
+    }
+  }
   // Abgaenge. Equip-Skripte (Legendary Sword, Vampiric Sword, Hammers, Blades …) pruefen `fromOwner/fromHeroIdx/fromZoneSlot` — die volle Nutzlast ist Pflicht.
   for (const m of plan) {
     const { inst, owner: equipOwner, srcHeroIdx, srcSlot } = m;
@@ -366,8 +390,7 @@ async function fuehreUmhaengenAus(engine, plan, opts = {}) {
       isMove: true, reason: 'moved',   // W52a
     });
     const srcArr = (ps.supportZones[srcHeroIdx] || [])[srcSlot] || [];
-    const i = srcArr.indexOf(inst.name);
-    if (i >= 0) srcArr.splice(i, 1);
+    engine.entferneNameAmPlatz(srcArr, inst);   // Darion: bei gleichnamigen Karten im Stapel der richtige Eintrag
     // Ab hier „unterwegs": bei mehreren gleichzeitig bewegten Karten sehen die Lauscher der NAECHSTEN Meldung die schon gemeldeten nicht mehr am alten Wirt
     // (wie nacheinander ausgefuehrte echte Abgaenge). Die Ankunft unten setzt `zone` wieder auf 'support' (Konvention '_umhaengen' wie bei `darfAn`).
     inst.zone = '_umhaengen';
@@ -389,6 +412,7 @@ async function fuehreUmhaengenAus(engine, plan, opts = {}) {
     if (!ps.supportZones[destHeroIdx]) ps.supportZones[destHeroIdx] = [[], [], []];
     if (!ps.supportZones[destHeroIdx][destSlot]) ps.supportZones[destHeroIdx][destSlot] = [];
     ps.supportZones[destHeroIdx][destSlot].push(inst.name);
+    engine._stempleStapelNr(inst);   // Darion: oben auf dem Stapel
     inst.zone = 'support';
     inst.heroIdx = destHeroIdx;
     inst.zoneSlot = destSlot;

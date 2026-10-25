@@ -86,8 +86,20 @@ function buildAbilityTargets(engine, pi) {
     // (W16f: ein übernommener Held der Gegenspalte bietet nur seine Ability Zones an;
     // `actionMoveCard` brächte die Karte in die Hand des Besitzers).
     if (physOwner === pi) for (const t of (engine.collectSupportZoneAbilities?.(pi, hi) || [])) {
+      const id = `equip-${pi}-${hi}-${t.slotIdx}`;
+      // Darion: in einem Equip-Stapel zaehlen nur die Karten als Ability, die dort so gelten (Cloak of Edge) — ein Ziel je Platz, dahinter genau diese Karten
+      // (`_erlaubteInstanzen`); die Rueckfrage der Engine waehlt die Karte, `gewaehlteInstanzen` liest sie. (Echte Ability-Stapel wie Xalibur: unveraendert.)
+      if (!t.istEchteAbility && t.inst) {
+        const schon = targets.find(x => x.id === id && x._erlaubteInstanzen);
+        if (schon) { schon._erlaubteInstanzen.push(t.inst.id); continue; }
+        targets.push({
+          id, type: 'equip', owner: pi, heroIdx: hi, slotIdx: t.slotIdx,
+          cardName: t.cardName, level: 1, cardInstance: t.inst, _erlaubteInstanzen: [t.inst.id],
+        });
+        continue;
+      }
       targets.push({
-        id: `equip-${pi}-${hi}-${t.slotIdx}`, type: 'equip',
+        id, type: 'equip',
         owner: pi, heroIdx: hi, slotIdx: t.slotIdx,
         cardName: t.cardName, level: 1,
       });
@@ -186,6 +198,15 @@ async function recallSupportCopy(engine, pi, heroIdx, slotIdx) {
   return true;
 }
 
+/** Darion: genau diese Karte aus dem Equip-Stapel zurueck auf die Hand (statt der obersten des Platzes). */
+async function recallSupportInst(engine, inst) {
+  if (!inst || inst.zone !== 'support') return false;
+  await engine.actionMoveCard(inst, 'hand', -1, -1, { source: CARD_NAME, sourceOwner: inst.owner });
+  if (inst.zone !== 'hand') return false; // Move blocked (immovable etc.).
+  engine.sync();
+  return true;
+}
+
 module.exports = {
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
@@ -226,7 +247,7 @@ module.exports = {
       cancellable: true,
       exclusiveTypes: false,
       maxPerType: { ability: targets.length },
-      maxTotal: targets.length,
+      maxTotal: targets.length + targets.reduce((n, x) => n + (x._erlaubteInstanzen ? x._erlaubteInstanzen.length - 1 : 0), 0),   // Darion: mehrere Karten aus einem Stapel
       minRequired: 0,
     });
     if (!selectedIds || selectedIds.length === 0) return false;
@@ -240,6 +261,12 @@ module.exports = {
       const t = targets.find(x => x.id === sid);
       if (!t) continue;
       const zone = t.type === 'equip' ? 'support' : 'ability';
+      // Darion: die gewaehlten Karten stehen fest (Rueckfrage der Engine) — kein „wie viele Kopien", jede Karte ist eine eigene Ability.
+      if (t._erlaubteInstanzen) {
+        const gewaehlt = engine.gewaehlteInstanzen(t).filter(i => i.zone === 'support');
+        if (gewaehlt.length) slotPlans.push({ zone, heroIdx: t.heroIdx, slotIdx: t.slotIdx, ability: t.cardName, count: gewaehlt.length, physOwner: t.owner, insts: gewaehlt });
+        continue;
+      }
       const stackSize = zone === 'ability'
         ? (gs.players[t.owner]?.abilityZones?.[t.heroIdx]?.[t.slotIdx] || []).length
         : supportSlotInsts(engine, pi, t.heroIdx, t.slotIdx).length;
@@ -279,7 +306,7 @@ module.exports = {
       for (let n = 0; n < plan.count; n++) {
         if (totalRecalled > 0) await engine._delay(STAGGER_MS);
         const ok = plan.zone === 'support'
-          ? await recallSupportCopy(engine, pi, plan.heroIdx, plan.slotIdx)
+          ? (plan.insts ? await recallSupportInst(engine, plan.insts[n]) : await recallSupportCopy(engine, pi, plan.heroIdx, plan.slotIdx))
           : await recallAbilityCopy(engine, pi, plan.heroIdx, plan.slotIdx, plan.physOwner);
         if (!ok) break; // Slot emptied mid-resolve (defensive).
         recalled++;

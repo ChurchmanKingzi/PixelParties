@@ -196,7 +196,7 @@ module.exports = {
 
       // Zone: genau eine frei → sie; sonst Wahl (nur eigene Helden; übernommene Helden nehmen die erste freie Zone).
       const sps = gs.players[heroSeite];
-      const frei = freieBasisZonen(sps, heroIdx, engine, heroSeite);
+      const frei = freieBasisZonen(sps, heroIdx, engine, heroSeite, name);   // Darion: mit dem Kartennamen — der Equip-Stapel ist der einzige Platz (keine Zonenwahl, keine freie Zone noetig)
       if (frei.length === 0) { engine.sync(); return; }
       let slot = frei[0];
       if (frei.length > 1 && heroSeite === pi) {

@@ -5558,5 +5558,25 @@
 "YOU'RE ALIVE?!": {
 "id": "YOURE_ALIVE",
 "kind": "a"
+},
+"The Golden Gate": {
+"id": "The_Golden_Gate",
+"kind": "a"
+},
+"Tail Slap": {
+"id": "Tail_Slap",
+"kind": "a"
+},
+"Ultimate Destroyer Punch": {
+"id": "Ultimate_Destroyer_Punch",
+"kind": "a"
+},
+"Crash Landing": {
+"id": "Crash_Landing",
+"kind": "a"
+},
+"Uncool Malfunction": {
+"id": "Uncool_Malfunction",
+"kind": "a"
 }
 }

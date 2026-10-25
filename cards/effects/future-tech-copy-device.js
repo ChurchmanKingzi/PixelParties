@@ -197,6 +197,9 @@ function equipPlaetze(engine, pi, name, sk) {
         if (!sk.canEquipToHero(gs, pi, hi, engine)) continue;
       } catch { continue; }
     }
+    // Darion: ein Held mit Equip-Stapel nimmt die kopierte Ausruestung NUR im Stapel auf (kein weiterer Platz, keine freie Zone noetig).
+    const stapel = engine.equipPflichtPlatz(seite, hi, name);
+    if (stapel >= 0) { out.push({ owner: seite, heroIdx: hi, slotIdx: stapel }); continue; }
     for (let zi = 0; zi < 3; zi++) {
       if (((ps.supportZones?.[hi] || [])[zi] || []).length === 0) {
         out.push({ owner: seite, heroIdx: hi, slotIdx: zi });
@@ -337,7 +340,14 @@ async function legeAlsAusruestungAn(engine, pi, name, sk) {
     }
   }
 
-  const platziert = engine.safePlaceInSupport(CARD_NAME, ziel.owner, ziel.heroIdx, ziel.slotIdx);
+  // Darion: Zielplatz ist der Equip-Stapel — die Copy-Device-Karte trägt noch ihren eigenen Namen (keine Ausrüstung nach Namen), also legt sie sich selbst oben auf den Stapel.
+  let platziert;
+  if (engine.equipPflichtPlatz(ziel.owner, ziel.heroIdx, name) === ziel.slotIdx) {
+    gs.players[ziel.owner].supportZones[ziel.heroIdx][ziel.slotIdx].push(CARD_NAME);
+    platziert = { inst: engine._trackCard(CARD_NAME, ziel.owner, 'support', ziel.heroIdx, ziel.slotIdx), actualSlot: ziel.slotIdx };
+  } else {
+    platziert = engine.safePlaceInSupport(CARD_NAME, ziel.owner, ziel.heroIdx, ziel.slotIdx);
+  }
   if (!platziert?.inst) return null;
   const { inst, actualSlot } = platziert;
 

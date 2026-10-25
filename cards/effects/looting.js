@@ -114,7 +114,7 @@ module.exports = {
 
     // ── 2. Platz: eine freie Basis-Support-Zone des Nutzers ──
     const zps = gs.players[seite];
-    const frei = freieBasisZonen(zps, casterIdx, engine, seite);
+    const frei = freieBasisZonen(zps, casterIdx, engine, seite, name);   // Darion: mit dem Kartennamen — ein Held mit Equip-Stapel hat nur diesen einen Platz (keine Zonenwahl, keine freie Zone noetig)
     if (frei.length === 0) return;
     let slot = frei[0];
     if (frei.length > 1) {
