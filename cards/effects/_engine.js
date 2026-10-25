@@ -50,6 +50,8 @@ const COOLNESS_LANDE_MS = 560;
 // Luecke zwischen Landung und dem Start der naechsten Karte.
 const COOLNESS_LUECKE_MS = 90;
 const MAX_CARD_INSTANCES = 2000;
+// W72b (Al): Stapel, aus denen ein Hinzufügen auf die Hand Control Monitors auslöst („their deck or discard pile"): Hauptdeck, Ablage, Potion Deck, Side Deck (`noteHandZugangAusStapel`).
+const HAND_ZUGANG_STAPEL = new Set(['deck', 'discard', 'potionDeck', 'sideDeck']);
 
 
 // ★ W58a: ATK-Multiplikator-Auren (Skript-Vertrag `heroAtkMultiplier`, z. B. Rioting Village) — je Skriptname einmal ermittelt; `sync()` fragt es fuer jede Instanz.
@@ -22579,7 +22581,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ★ W72a (Control Monitors): `toHand: true` sagt „diese Karte geht auf die Hand" — die Eigenbau-Tutoren (`takeFromPile` + `handZugangSync`/`hand.push` + eigener Hook) haben kein
     // gemeinsames Hand-Zugangs-Tor. Die Entnahme aus dem EIGENEN Deck/der EIGENEN Ablage wird deshalb hier vorgemerkt (`_handZugangUnterwegs`) und mit dem Fenster-Sammler
     // (`noteHandZugangAusStapel`) verrechnet: meldet ein Primitiv dieselbe Karte, zählt sie nur einmal; `returnToPile` nimmt die Vormerkung zurück.
-    if (opts.toHand && !opts.ohneZugangsFenster && (pile === 'deck' || pile === 'discard')) this._merkeHandZugangUnterwegs(pi, name, pile, opts.source || null);
+    if (opts.toHand && !opts.ohneZugangsFenster && HAND_ZUGANG_STAPEL.has(pile)) this._merkeHandZugangUnterwegs(pi, name, pile, opts.source || null);
     return { name, idx };
   }
 
@@ -22729,6 +22731,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const taken = await this.takeFromPile(pi, pile, cardName, opts);
     if (!taken) return false;
     ps.hand.push(taken.name);
+    if (pile === 'potionDeck' && !opts.ohneZugangsFenster) this.noteHandZugangAusStapel(pi, taken.name, { pile: 'potionDeck', source: opts.source || null });   // W72b: Potion Deck zählt als „their deck" (Control Monitors)
     const inst = this._trackCard(taken.name, pi, ZONES.HAND);
     this._pileFlight(pi, taken.name, pile, 'hand', { toHandIdx: ps.hand.length - 1, finalHandSize: ps.hand.length });
     this._autoRevealOnEnterHand(pi, ps.hand.length - 1, taken.name);
@@ -22740,7 +22743,8 @@ this._deathWatch = (this._deathWatchStack || []).length
   /**
    * ★ W72a (Al, Control Monitors): „adds 1 or more cards from their deck or discard pile to their hand" — JEDES Hinzufügen aus dem EIGENEN Deck
    * oder der EIGENEN Ablage auf die eigene Hand ist der Auslöser (Magnetic Potion, Gate to the Armory, Boomerang, Cute Dog …). Nicht: Ziehen
-   * (draw ist kein „add"), Karte vom Brett zurück auf die Hand, fremde Stapel (Infiltration, Xiong, Herbithorn Demon), Potion Deck, Gelöscht-Stapel.
+   * (draw ist kein „add" — auch nicht aus dem Potion Deck), Karte vom Brett zurück auf die Hand, fremde Stapel (Infiltration, Xiong, Herbithorn Demon), Gelöscht-Stapel.
+   * W72b (Al): Potion Deck (`pile: 'potionDeck'`: Philosopher's Stone, Alchemic Journal-Suche) und Side Deck (`pile: 'sideDeck'`: Divine Gift of Edge) zählen als „their deck".
    *
    * Die Meldung geschieht ZENTRAL in den Hand-Zugangs-Primitiven (`handZugang` mit von:'deck'|'ablage', `actionAddCardFromDeckToHand`,
    * `addCardFromDiscardToHand`; `addFromPileToHand`/`searchDeckForNamedCard` laufen über sie) — ein neuer Tutor, der diese Primitive benutzt, braucht nichts.
@@ -22754,7 +22758,9 @@ this._deathWatch = (this._deathWatchStack || []).length
   noteHandZugangAusStapel(pi, cardName, { pile = 'deck', source = null, fromOwner = null } = {}) {
     pi = this._resolvePi(pi);
     if (this._inMctsSim || this._fastMode || !cardName) return;
-    if (pile !== 'deck' && pile !== 'discard') return;                    // Potion Deck, Gelöscht-Stapel, Side Deck, Brett …: kein Auslöser
+    // W72b (Al: „Doch, das betrifft etwa Philosopher's Stone"): Potion Deck und Side Deck zählen als „their deck". Nicht: Gelöscht-Stapel, Brett, Zwischenzonen …
+    // Ziehen aus dem Potion Deck (`actionDrawFromPotionDeck`) ist ein Draw und meldet nichts.
+    if (!HAND_ZUGANG_STAPEL.has(pile)) return;
     if (fromOwner != null && fromOwner !== pi) return;                    // „their deck or discard pile": nur der EIGENE Stapel
     if (!this.gs?.players?.[pi]) return;
     this._vergissHandZugangUnterwegs(pi, cardName, pile);   // schon als Entnahme vorgemerkt (`toHand`): nicht doppelt zählen

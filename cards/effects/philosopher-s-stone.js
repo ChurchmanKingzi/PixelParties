@@ -21,6 +21,8 @@
 //  · Suche → die Such-Sperre greift (`blockedBySearchLock`). Nur eine Art
 //    Karte (oder gar keine) im Potion Deck → nicht angeboten (Als Vorgabe
 //    24.9.: die Suche braechte nichts gegenueber dem Zug). Danach wird das Potion Deck gemischt.
+//  · Control Monitors (W72b, Al): die Suche im Potion Deck ist ein „add … from their deck to their hand" und löst das Fenster aus (`noteHandZugangAusStapel`, pile 'potionDeck');
+//    das bloße Ziehen, das die Stone ersetzt, nicht.
 //  · Bild: die gesuchte Karte fliegt glitzernd aus dem Potion Deck auf die
 //    Hand (`flightStyle: 'glitzer'`, wie Relic in the Sky).
 // ═══════════════════════════════════════════
@@ -86,6 +88,9 @@ module.exports = {
     engine.sync();
     await engine._delay(650);
     const inst = engine.handZugangSync(ps, gewaehlt, { source: CARD_NAME });
+    // W72b (Al: „Doch, das betrifft etwa Philosopher's Stone"): das Potion Deck zählt als „their deck" — Control Monitors darf auf dieses Hinzufügen reagieren
+    // (Fenster am Ende der Wirkung; `takeFromPile(toHand)` hat die Entnahme schon vorgemerkt, die Meldung hier ist dieselbe Karte → zählt nur einmal).
+    engine.noteHandZugangAusStapel(pi, gewaehlt, { pile: 'potionDeck', source: CARD_NAME });
     // „reveal it": beiden zeigen, der Gegner bekommt die Such-Aufdeckung.
     engine._broadcastEvent('card_reveal', { cardName: gewaehlt, playerIdx: pi });
     const oi = engine.opponentOf(pi);

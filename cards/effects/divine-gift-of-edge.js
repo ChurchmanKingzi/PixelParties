@@ -80,6 +80,8 @@ async function doSideDeckPick(engine, pi, { cancellable }) {
 
   // Add to hand and track.
   engine.handZugangSync(ps, chosen, { source: CARD_NAME });
+  // W72b (Al): das Side Deck zählt als „their deck" — Control Monitors darf auf dieses Hinzufügen reagieren (Fenster am Ende der Wirkung).
+  engine.noteHandZugangAusStapel(pi, chosen, { pile: 'sideDeck', source: CARD_NAME });
 
   // Mark Divine Gift as used. Idempotent — the proactive play path's
   // engine-side `oncePerGame` consumption may also fire, but we set
