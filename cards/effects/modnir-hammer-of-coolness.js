@@ -70,14 +70,17 @@ module.exports = {
       if (hero.statuses?.frozen) continue;
       const slots = sps.supportZones?.[hi] || [];
       let leftmostFree = -1;
+      // ★ Darion: hat der Held schon einen Equip-Stapel, ist der Stapel der EINZIGE Platz fuer dieses Equip (keine freie Zone noetig, kein Wunschplatz).
+      const stapelPlatz = require('./_equip-stack-shared').pflichtPlatzFuer(engine, seite, hi, CARD_NAME);
       for (let si = 0; si < slots.length; si++) {
-        if (!slots[si] || slots[si].length === 0) {
+        if (stapelPlatz >= 0 ? si === stapelPlatz : (!slots[si] || slots[si].length === 0)) {
           if (leftmostFree < 0) leftmostFree = si;
           targets.push({
             id: `equip-${seite}-${hi}-${si}`,
             type: 'equip',
             owner: seite, heroIdx: hi, slotIdx: si,
             cardName: '',
+            ...(stapelPlatz >= 0 ? { _eigeneStapelWahl: true } : {}),   // Platzwahl, keine Kartenwahl: keine Rueckfrage „welches Equip?"
           });
         }
       }

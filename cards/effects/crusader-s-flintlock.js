@@ -53,9 +53,15 @@ module.exports = makeCrusaderArtifact({
     const opferHeld = target.heroIdx;
     // Momentaufnahme vor dem Abwerfen — die Liste veraendert sich,
     // sobald die erste Karte die Zone verlaesst.
-    const artefakte = engine.getArtifactTargets(opferSeite, { heroIdx: opferHeld })
-      .map(t => t.cardInstance)
-      .filter(Boolean);
+    // ★ Darion (Equip-Stapel): der Sammler meldet einen Stapel als EIN Ziel (`cardInstance` = nur die unterste Karte), alle seine Karten stehen in `_erlaubteInstanzen` —
+    // „all Artifacts that Hero is equipped with" sind ALLE Karten des Platzes. Eine Karte, die dort als Ability zaehlt (Cloak of Edge), ist kein Artifact.
+    const artefakte = [];
+    for (const t of engine.getArtifactTargets(opferSeite, { heroIdx: opferHeld })) {
+      const insts = t._erlaubteInstanzen
+        ? t._erlaubteInstanzen.map(id => engine.cardInstances.find(c => c.id === id))
+        : [t.cardInstance];
+      for (const i of insts) if (i && !engine.countsAsAbilityInZone(i.name, i)) artefakte.push(i);
+    }
     if (artefakte.length === 0) return;
 
     let abgeworfen = 0;
