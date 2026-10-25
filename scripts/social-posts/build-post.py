@@ -232,7 +232,7 @@ def bevel_frame(size, accent, thick=32):
 
 # ── Ebenen ────────────────────────────────────────────────────────────────────
 
-def tinted_logo(accent, scale_div=2):
+def tinted_logo(accent, px_per=2):
     logo = Image.open(ROOT / 'data' / 'logo.png').convert('RGBA')
     mask = Image.open(ROOT / 'data' / 'logo-tint-mask.png').convert('RGBA').split()[3]
     rgb = np.asarray(logo.convert('RGB'), dtype=np.float32)
@@ -241,8 +241,8 @@ def tinted_logo(accent, scale_div=2):
     out = rgb * (1 - m) + rgb * col * m
     res = Image.fromarray(out.clip(0, 255).astype(np.uint8), 'RGB').convert('RGBA')
     res.putalpha(logo.split()[3])
-    # 4 px je Logo-Pixel → 2 px je Logo-Pixel
-    return res.resize((logo.width // scale_div, logo.height // scale_div), Image.NEAREST)
+    # Original: 4 px je Logo-Pixel → standardmäßig 2 px je Logo-Pixel (px_per = 3 → 3 px usw.)
+    return res.resize((logo.width * px_per // 4, logo.height * px_per // 4), Image.NEAREST)
 
 
 def body_mask(frame):
@@ -506,6 +506,8 @@ def main():
     ap.add_argument('--intro', choices=['on', 'off'], default=None, help='Einblenden am Anfang (Standard: Reel an, Post aus)')
     ap.add_argument('--feet', type=int, default=None, help='Standlinie des Sprites, px ab Kartenoberkante')
     ap.add_argument('--shadow-dy', type=int, default=None, help='Schatten um so viele px tiefer setzen (überschreibt shadowDy aus hero-themes.json)')
+    ap.add_argument('--logo-px', type=int, default=None, help='Pixelgröße des Logos (px je Logo-Pixel, Standard 2), überschreibt logoPx aus hero-themes.json')
+    ap.add_argument('--head-top', type=int, default=None, help='Sprite so setzen, dass seine Oberkante bei y (px ab Bildoberkante) liegt, überschreibt feet/eyeAt')
     ap.add_argument('--px', type=int, default=None, help='Maßstab des Sprites (px je Sprite-Pixel), überschreibt hero-themes.json')
     ap.add_argument('--punch', action='store_true', help='Kraftvoller Start: die erste halbe Sekunde mit Bildschirmwackeln, Druckwelle und Blitz, Musik ohne Einblenden und auf einen Schlag der Musik geschnitten')
     args = ap.parse_args()
@@ -559,7 +561,7 @@ def main():
     mid_a.alpha_composite(card, (card_x, card_y))
     orn, gems = ornaments.frame_ornaments(plate_x, plate_y, plate.width, plate.height, accent, (W, H))
     mid_a.alpha_composite(orn)
-    logo = tinted_logo(accent)
+    logo = tinted_logo(accent, args.logo_px or hero_cfg.get('logoPx', 2))
     name_front = bool(hero_cfg.get('nameFront'))            # Name/Beiname/Link-Schild vor dem Sprite (bei sehr großen, tiefen Sprites)
     logo_front = bool(hero_cfg.get('logoFront'))            # Logo vor dem Sprite (bei Helden, die es überragen)
     logo_layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
@@ -603,6 +605,9 @@ def main():
     sy = feet_y - spr.foot * spr.px
     if 'eyeAt' in hero_cfg and 'faceY' in spr.meta:            # Sprite so setzen, dass sein Auge/Gesicht (faceY) bei y = eyeAt (px ab Kartenoberkante) liegt
         sy = card_y + hero_cfg['eyeAt'] - spr.meta['faceY'] * spr.px
+        feet_y = sy + spr.foot * spr.px
+    if args.head_top is not None:
+        sy = args.head_top - spr.vtop * spr.px
         feet_y = sy + spr.foot * spr.px
     shadow = pixel_ellipse(max(10, min(44, round((spr.right - spr.left) * spr.px * 0.75 / U))), 4, INK, 170)
 
