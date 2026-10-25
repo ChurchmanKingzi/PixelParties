@@ -25714,3 +25714,19 @@ Antworten von Al auf die offenen Fragen aus W72a: (1) **Potion Deck und Side Dec
 **Wächter:** `scripts/skilltest-e2e/ui-support-ability-zone.js` (echter Client: Klassen und gesendete Socket-Nachricht je Zonenart, Zusatzaktion, Gegner-Held).
 
 * **Al 25.10. (nach W73a):** Abilities in Support Zonen verhalten sich in der Bedienung **exakt** wie Abilities in Ability Zonen — gleiche Leuchtfarbe (frei = limegrün, Aktion = gold), freie Aktivierung ohne Rückfrage, Aktions-Aktivierung (auch aus dem heroAction-Prompt) mit der Rückfrage „Activate Ability?" (`pendingAbilityActivation` mit `zoneKind: 'support'`). Xal und Xalibur sind live.
+
+## Welle 74 / W74b — Cute Hydra: Abwurf als EIN Batch, Boris fragt beim Confirm (25.10.2026)
+
+**Anlass (Al):** „Boris' Interaktion mit Cute Hydra funktioniert nicht. Cute Hydra sollte NICHT jede Karte einzeln abwerfen, sondern diese als einen Batzen designieren und bei Confirm alle one by one abwerfen. Boris soll bei diesem Confirm fragen, ob er *diesen* Discard verhindern soll, was trotzdem die Counter generiert." Vorher warf jeder Klick sofort ab, Boris wurde nie gefragt (die Hydra lief nicht über `actionPromptForceDiscard`).
+
+**Ablauf (`cute-hydra.js`, `onPlay` — gilt für Hand-Beschwörung, Rettung „would be deleted" und Platzieren/Beschwören aus der Ablage gleichermaßen):**
+1. **Batch markieren:** EIN `handPick`-Prompt (`minSelect` 2, `maxSelect` = ganze Hand, `cancellable: false`, `hydraBatchDiscard: true`). Die Karten bleiben bis zum Confirm auf der Hand. Hard-Gate `canSummon` unverändert (Hydra auf der Hand + mindestens 2 andere Karten).
+2. **Confirm** → X = Anzahl der markierten Karten; der Server prüft die Antwort (verschiedene Plätze, Name stimmt) und füllt eine kaputte Antwort von rechts auf die Mindestzahl auf.
+3. **Boris:** `engine.borisVerzicht(pi, X, { source: 'Cute Hydra' })` — EINMAL für den ganzen Stapel, nur für den Kontrolleur der Hydra, nur mit wirksamem Boris und freiem HOPT `boris-discard`. Kein fremder Zwangsabwurf (Kosten) → kein Ambush-Fenster.
+4. **Kein Verzicht:** alle markierten Karten werden **nacheinander** (links → rechts, übliche Abwurf-Animation, `actionDiscardHandCard`) abgeworfen, in EINER `withDiscardBatch`-Klammer (Cute Bunny: ein Stapel mit `count` = X; `onDiscard` je Karte).
+5. **Verzicht:** nichts wird abgeworfen (kein `onDiscard`, kein Batch-Ende), der HOPT ist verbraucht (Boris-Skript). Der Abwurf ist KOSTE — sie zu überspringen negiert den Effekt nicht.
+6. **Counter:** in beiden Fällen **X + 1** Head Counter (W71a; bei Verzicht ist X die Größe des Stapels).
+
+**CPU:** `cpuResponse` beantwortet den `handPick` mit den entbehrlichsten Karten (je Karte über den `forceDiscard`-Bewerter bzw. den Engine-Standard: erste wählbare Karte, Puzzle) — mindestens 2, nur so viele, dass X + 1 die brauchbaren gegnerischen Ziele (Helden + Kreaturen) deckt. Hat die CPU Boris, bestätigt dessen `cpuResponse` den Verzicht.
+
+**Vertrag für ähnliche Karten („mindestens N abwerfen als Kosten"):** den Stapel EINMAL als `handPick` wählen lassen → `engine.borisVerzicht(pi, anzahl, …)` → bei Verzicht Kosten als bezahlt behandeln, sonst nacheinander `actionDiscardHandCard` in `withDiscardBatch` (Muster: `_extra-summon-shared.js` `zahleKostenMehrere`, Control Monitors). Nicht je Klick abwerfen.

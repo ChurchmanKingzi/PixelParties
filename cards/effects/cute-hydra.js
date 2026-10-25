@@ -19,16 +19,32 @@
 //     sets `ctx.rescued = true` so the engine
 //     skips the actual deletion.
 //
-//  2. HEAD COUNTERS ON SUMMON — when summoned,
-//     the player discards 2+ cards by clicking
-//     them directly in their hand: each click
-//     immediately commits a discard. After the
-//     first 2 mandatory discards, a "Done"
-//     button appears so the player can stop. The
-//     last card auto-ends the prompt. Hydra
-//     gains 1 Head Counter per discarded card
-//     PLUS 1 (W71a, Al: Kartentext "place that
-//     many Head Counters +1 on it" = X+1).
+//  2. HEAD COUNTERS ON SUMMON — when summoned, the
+//     player marks 2 or more cards in their hand as
+//     ONE batch (`handPick`, min 2, max = whole
+//     hand; the cards stay in hand until Confirm,
+//     no Cancel — the discard is a mandatory cost).
+//     W74b (Al): flow Batch → Confirm → Boris →
+//     Abwurf → Counter:
+//       a) the player marks the batch and presses
+//          Confirm (X = number of marked cards);
+//       b) Boris, the Guardian of Blackport (if the
+//          Hydra's CONTROLLER has an effective one
+//          and has not used his once-per-turn skip)
+//          is asked ONCE for the whole batch
+//          (`engine.borisVerzicht(pi, X, …)`);
+//       c) no skip: all marked cards are discarded
+//          ONE BY ONE (usual discard animation,
+//          per-card `onDiscard` hooks, one
+//          discard batch for Cute Bunny & co.);
+//       d) skip: NOTHING is discarded — the discard
+//          is a cost, and skipping a cost does not
+//          negate the effect;
+//       e) either way Hydra gains X + 1 Head
+//          Counters (W71a: "that many +1"; with
+//          skipped discard X = size of the batch).
+//     The delete-rescue / place-from-discard paths
+//     run through the very same `onPlay`.
 //
 //  HARD GATE — Hydra's `canSummon` REFUSES to
 //  let the engine surface her as playable when
@@ -87,6 +103,46 @@ function getHostHeroes(engine, pi) {
   return out;
 }
 
+/**
+ * W74b: wie viele Karten die CPU abwirft (X): so viele, dass die Head Counter (X + HEAD_BONUS) die brauchbaren gegnerischen Ziele
+ * decken - aber nie weniger als die Pflicht (SUMMON_DISCARD_MIN). Dieselbe Rechnung wie vorher je Klick ("Done" sobald Counter >= Ziele).
+ */
+function cpuZielzahlAbwurf(engine, cpuIdx) {
+  const opp = engine.gs.players[engine.opponentOf(cpuIdx)];
+  let viableTargets = 0;
+  if (opp) {
+    for (const h of (opp.heroes || [])) if (h?.name && h.hp > 0) viableTargets++;
+    for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
+      for (let z = 0; z < 3; z++) if ((opp.supportZones?.[hi]?.[z] || []).length > 0) viableTargets++;
+    }
+  }
+  return Math.max(SUMMON_DISCARD_MIN, viableTargets - HEAD_BONUS);
+}
+
+/**
+ * W74b: die Antwort der Batch-Auswahl pruefen (der Server glaubt dem Client nicht): nur verschiedene Plaetze, Name stimmt noch.
+ * Weniger als `minPick` gueltige Karten (kaputte/fehlende Antwort): der Rest wird von rechts aufgefuellt - der Abwurf ist
+ * eine Pflichtkoste, genau wie der Notfall-Abwurf der Engine (`actionPromptForceDiscard`).
+ * @returns {{handIndex:number, cardName:string}[]} aufsteigend nach Handplatz
+ */
+function pruefeAbwurfWahl(res, hand, minPick) {
+  const sel = res && !res.cancelled && Array.isArray(res.selectedCards) ? res.selectedCards : [];
+  const seen = new Set();
+  const out = [];
+  for (const g of sel) {
+    if (!g || !Number.isInteger(g.handIndex) || seen.has(g.handIndex)) continue;
+    if (hand[g.handIndex] == null || hand[g.handIndex] !== g.cardName) continue;
+    seen.add(g.handIndex);
+    out.push({ handIndex: g.handIndex, cardName: hand[g.handIndex] });
+  }
+  for (let i = hand.length - 1; i >= 0 && out.length < minPick; i--) {
+    if (seen.has(i)) continue;
+    seen.add(i);
+    out.push({ handIndex: i, cardName: hand[i] });
+  }
+  return out.sort((x, y) => x.handIndex - y.handIndex);
+}
+
 // ─── CARD MODULE ─────────────────────────
 
 module.exports = {
@@ -105,20 +161,21 @@ module.exports = {
   activeIn: ['support'],
 
   // ── CPU prompt overrides ──────────────────────────────────────────
-  // Three Hydra-titled prompts route through here:
+  // Two Hydra-titled prompts route through here:
   //   • `confirm` "🐉 Summon!" (delete-rescue) — engine default would
   //     decline cancellable confirms, so override to confirm. Cost is
   //     the standard hand-discards fired via `onPlay` after the
   //     summon, which the brain answers (least-bad pick) below.
-  //   • `forceDiscard` (mandatory iterations 1, 2 of the head-counter
-  //     loop) — defer to default (least-bad scoring).
-  //   • `forceDiscardCancellable` (iterations 3+) — STOP when current
-  //     Head Counter count already saturates the viable enemy target
-  //     pool. Each Head Counter past `viableTargets` is wasted (the
-  //     HOPT caps at "different targets" = headCounter), so the brain
-  //     should click "Done" instead of burning more hand cards. Below
-  //     that cap, defer to default — the per-card value scorer still
-  //     auto-protects too-precious singletons.
+  //   • `handPick` (W74b: the ONE batch selection of the head-counter
+  //     cost) — the CPU marks the least valuable cards: at least 2, and
+  //     no more than it takes for the Head Counters (X + 1) to cover the
+  //     viable enemy target pool (each Head Counter past that is wasted,
+  //     the HOPT caps at "different targets" = headCounter). Each pick
+  //     is delegated to the brain's own `forceDiscard` scorer (or the
+  //     engine default without a brain: first eligible card), so the
+  //     per-card valuation is the same one every other discard uses.
+  //   • `forceDiscard` (title Hydra) — only used by the delegation above;
+  //     defer to default (least-bad scoring).
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'generic') return undefined;
     const type = promptData?.type;
@@ -128,39 +185,26 @@ module.exports = {
       return { confirmed: true };
     }
 
-    // Mandatory click-to-discard: pick least-bad (default handler).
     if (type === 'forceDiscard') return undefined;
 
-    // Cancellable click-to-discard (post-min): pick "Done" once the
-    // Head Counter count saturates viable enemy targets; otherwise
-    // defer to default so the brain keeps loading Hydra against
-    // bigger boards while the cards being discarded are cheap.
-    if (type === 'forceDiscardCancellable') {
-      // W71a: die Frage nennt ihren Spieler (`controllerIdx`) - sonst zaehlte die CPU auf Sitz 1 die Ziele der EIGENEN Seite.
+    if (type === 'handPick' && promptData.hydraBatchDiscard) {
+      // The prompt names its player (`controllerIdx`) - otherwise the CPU on seat 1 would count the targets of its OWN side.
       const cpuIdx = promptData.controllerIdx ?? engine._cpuPlayerIdx;
-      const oppIdx = engine.opponentOf(cpuIdx);
-      const opp = engine.gs.players[oppIdx];
-      if (!opp) return undefined;
-
-      let viableTargets = 0;
-      for (const h of (opp.heroes || [])) {
-        if (h?.name && h.hp > 0) viableTargets++;
+      const ps = engine.gs.players[cpuIdx];
+      const eligible = (promptData.eligibleIndices || []).filter(i => ps?.hand?.[i] != null);
+      if (!ps || eligible.length === 0) return { selectedCards: [] };
+      const minPick = Math.min(promptData.minSelect ?? SUMMON_DISCARD_MIN, eligible.length);
+      const want = Math.min(eligible.length, Math.max(minPick, cpuZielzahlAbwurf(engine, cpuIdx)));
+      const rest = eligible.slice();
+      const out = [];
+      while (out.length < want && rest.length > 0) {
+        const r = engine._getCpuGenericResponse(
+          { type: 'forceDiscard', title: CARD_NAME, eligibleIndices: rest.slice(), controllerIdx: cpuIdx }, cpuIdx);
+        let idx = r && Number.isInteger(r.handIndex) && rest.includes(r.handIndex) ? r.handIndex : rest[0];
+        out.push({ handIndex: idx, cardName: ps.hand[idx] });
+        rest.splice(rest.indexOf(idx), 1);
       }
-      for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
-        for (let z = 0; z < 3; z++) {
-          const slot = opp.supportZones?.[hi]?.[z] || [];
-          if (slot.length > 0) viableTargets++;
-        }
-      }
-
-      // W71a: Counter = Abwuerfe + HEAD_BONUS (Kartentext "+1"). Sie zaehlen
-      // schon JETZT, nicht erst ab dem naechsten Abwurf.
-      const currentHeads = (promptData.currentDiscardCount || 0) + HEAD_BONUS;
-      // The ABOUT-TO-BE-discarded card would push the Head count to
-      // `currentHeads + 1`. If `currentHeads` already meets / exceeds
-      // viableTargets, that next discard buys nothing — click Done.
-      if (currentHeads >= viableTargets) return { cancelled: true };
-      return undefined; // let the default least-bad picker continue
+      return { selectedCards: out };
     }
 
     return undefined;
@@ -300,68 +344,59 @@ module.exports = {
 
       if (!inst.counters) inst.counters = {};
 
-      // Click-to-discard loop. Each iteration shows a forceDiscard
-      // (mandatory) or forceDiscardCancellable (post-minimum) prompt
-      // pinned to the player's hand UI; the player clicks a card and
-      // it's spliced + pushed to discard immediately. After
-      // SUMMON_DISCARD_MIN discards, the prompt switches to a "Done"
-      // button so the player can stop voluntarily. The loop also
-      // exits automatically when the hand empties out.
-      //
-      // canSummon already guarantees the discardable pool is ≥ 2 at
-      // summon-decision time, so the mandatory phase can always be
-      // satisfied (modulo bizarre mid-resolution hand mutations,
-      // which we still tolerate gracefully via the empty-hand check).
+      // W74b (Al): EINE Batch-Auswahl statt Einzel-Abwurf je Klick. Der Spieler markiert >= 2 Handkarten (bis zur ganzen Hand), die
+      // bleiben bis zum Confirm auf der Hand; kein Abbrechen (Pflicht-Abwurf wie bisher, `canSummon` sichert die Mindestzahl).
+      // Danach fragt Boris EINMAL fuer den ganzen Stapel; ohne Verzicht fliegen die Karten nacheinander in die Ablage.
+      // Der Abwurf ist eine KOSTE: verzichtet Boris, entfaellt nur der Abwurf - die Counter (X + 1) bekommt die Hydra trotzdem.
+      const handNow = ps.hand || [];
       let discarded = 0;
-      // W16c (A04-16): die Klick-Abwuerfe sind EIN Batch, damit Cute Bunny ("2 or more ... through an effect") reagiert.
-      await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
-      while ((ps.hand || []).length > 0) {
-        const remaining = SUMMON_DISCARD_MIN - discarded;
-        const isMandatory = discarded < SUMMON_DISCARD_MIN;
-
-        const result = await engine.promptGeneric(pi, {
-          type: isMandatory ? 'forceDiscard' : 'forceDiscardCancellable',
+      let skipped = false;
+      let batchSize = 0;
+      if (handNow.length > 0) {
+        const minPick = Math.min(SUMMON_DISCARD_MIN, handNow.length);
+        const res = await engine.promptGeneric(pi, {
+          type: 'handPick',
           title: CARD_NAME,
-          description: isMandatory
-            ? `Discard ${remaining} more card${remaining > 1 ? 's' : ''}. Each becomes a Head Counter on ${CARD_NAME}, plus ${HEAD_BONUS} more. (Discarded so far: ${discarded}.)`
-            : `Click another hand card to add a Head Counter, or click "Done" to stop. (Head Counters: ${discarded + HEAD_BONUS}.)`,
-          instruction: 'Click a card in your hand to discard it.',
-          cancellable: !isMandatory,
-          cancelLabel: 'Done',
-          // Surface the running discard count so the CPU's `cpuResponse`
-          // can decide whether further discards add useful Head Counters
-          // — see this script's `cpuResponse` below.
-          currentDiscardCount: discarded,
+          description: `Mark ${minPick} or more cards from your hand to discard (up to ${handNow.length}). `
+            + `Each becomes a Head Counter on ${CARD_NAME}, plus ${HEAD_BONUS} more.`,
+          eligibleIndices: handNow.map((_, i) => i),
+          minSelect: minPick,
+          maxSelect: handNow.length,
+          confirmLabel: '🐉 Discard marked cards',
+          cancellable: false,
+          hydraBatchDiscard: true,   // fuer cpuResponse (CPU-Batch)
           controllerIdx: pi,
         });
+        const chosen = pruefeAbwurfWahl(res, ps.hand || [], minPick);
+        batchSize = chosen.length;
 
-        // Voluntary stop after the minimum is met.
-        if (result?.cancelled) break;
-
-        // Defensive: malformed response or stale hand index — bail out.
-        if (!result || result.cardName == null) break;
-
-        // Commit via the engine helper — splices, pushes, MOVES the
-        // tracked inst's zone marker to 'discard' (load-bearing for
-        // discard-summon listeners like Cute Familiar that gate on
-        // `c.isActiveIn('discard')`), then fires onDiscard with the
-        // inst attached to the hook context.
-        const ok = await engine.actionDiscardHandCard(
-          pi, result.cardName, result.handIndex,
-          { source: CARD_NAME }
-        );
-        if (!ok) break;
-        discarded++;
-        engine.sync();
+        if (batchSize > 0) {
+          // Boris, the Guardian of Blackport: EIN Abwurf-Stapel = EINE Frage (nur fuer den Kontrolleur; verbraucht/unwirksam = keine Frage).
+          // Kein fremder Zwangsabwurf (selbst bezahlte Kosten) -> kein Ambush-Fenster, nur Boris.
+          skipped = await engine.borisVerzicht(pi, batchSize, { source: CARD_NAME });
+          if (!skipped) {
+            // W16c (A04-16): die Abwuerfe sind EIN Batch, damit Cute Bunny ("2 or more ... through an effect") reagiert.
+            await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
+              // Nacheinander, von links nach rechts: jede Karte rueckt nach dem Abwurf eine Stelle auf (Index - bereits abgeworfene).
+              for (const c of chosen) {
+                const ok = await engine.actionDiscardHandCard(pi, c.cardName, c.handIndex - discarded, { source: CARD_NAME });
+                if (!ok) break;
+                discarded++;
+                engine.sync();
+              }
+            });
+          }
+        }
       }
-      });   // end withDiscardBatch
 
-      if (discarded > 0) {
-        // W71a (Al): "place that many Head Counters +1 on it" = X+1.
-        const gained = discarded + HEAD_BONUS;
+      if (discarded > 0 || skipped) {
+        // W71a (Al): "place that many Head Counters +1 on it" = X+1. W74b: bei Boris-Verzicht ist X die Groesse des Stapels.
+        const x = skipped ? batchSize : discarded;
+        const gained = x + HEAD_BONUS;
         inst.counters.headCounter = (inst.counters.headCounter || 0) + gained;
         engine.log('cute_hydra_head_counters', {
           player: ps.username, gained, discarded,
+          ...(skipped ? { skippedByBoris: batchSize } : {}),
           total: inst.counters.headCounter,
         });
       } else {
