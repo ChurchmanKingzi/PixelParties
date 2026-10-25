@@ -49,6 +49,12 @@ module.exports = {
     const ablageBesitzer = inst.originalOwner ?? inst.owner;
     const quelle = { name: CARD_NAME, owner: pi, controller: pi, cardType: 'Artifact' };
 
+    // Kettenanzeige: das Vorlauf-Glied (die ausgerüstete Karte) wird NEGIERT — Glitch + 🚫 wie bei jedem negierten Kettenglied (Index −1 = Vorlauf, siehe `executeCardWithChain({ vorlauf })`).
+    if (engine._chainVorlauf) {
+      engine._broadcastEvent('reaction_chain_link_negated', { linkIndex: -1, cardName: name, owner: info.equipOwner, negationStyle: null });
+      engine.log('card_negated', { card: name, owner: info.equipOwner });
+      await engine._delay(700);
+    }
     engine._broadcastEvent('play_card_throw', {
       mode: 'crash', cardName: name, fromOwner: seite, fromHeroIdx: heroIdx, fromSlot: slot,
       discardOwner: ablageBesitzer, suppressDiscard: true, duration: FLUG_MS,
