@@ -112,6 +112,8 @@ module.exports = {
       //     they're uncapped beyond the card's natural 3-target max.
       // Total selection ceiling becomes min(3, F + ownSupportAvailable).
       const freeZones = countFreeZones(gs, pi);
+      // ★ Darion: ein Equip-Stapel ist EIN Ziel je Platz (die Rueckfrage „welches Equip?" stellt die Engine); unzulaessige Karten (z. B. `immovable`) nennt sie nicht.
+      targets.splice(0, targets.length, ...require('./_equip-stack-shared').gruppiereZiele(targets));
       // W5b-B5 (Al, Welle 5; wie die übrigen Destruction-Zauber unter Ida): Idas Held „can never hit more than 1 target
       // with a Destruction Spell" – höchstens EIN Ziel (und damit höchstens 1 Pollution Token).
       const idaEinzel = !!ctx._engine.heroFlagsLive(ctx.cardHeroOwner ?? pi, ctx.cardHeroIdx)?.forcesSingleTarget;
@@ -145,7 +147,19 @@ module.exports = {
         return;
       }
 
-      const picked = selectedIds.map(id => targets.find(t => t.id === id)).filter(Boolean).slice(0, maxTotal);   // W5b-B5: Obergrenze (Ida: 1) serverseitig durchsetzen
+      const gewaehlt = selectedIds.map(id => targets.find(t => t.id === id)).filter(Boolean).slice(0, maxTotal);   // W5b-B5: Obergrenze (Ida: 1) serverseitig durchsetzen
+      // Darion: aus einem Equip-Stapel koennen MEHRERE Karten gewaehlt sein (`gewaehlteInstanzen`); jede Karte zaehlt einzeln fuer die Obergrenzen (Gesamtzahl, fremde Karten <= freie Zonen).
+      const picked = [];
+      let fremde = 0;
+      for (const t of gewaehlt) {
+        const karten = t.type === 'equip' ? engine.gewaehlteInstanzen(t) : [t._cardInstance];
+        for (const inst of karten) {
+          if (!inst || picked.length >= maxTotal) continue;
+          if (!t.ownSupport) { if (fremde >= freeZones) continue; fremde++; }
+          picked.push({ ...t, _cardInstance: inst, cardInstance: inst, cardName: inst.name });
+        }
+      }
+      if (picked.length === 0) { gs._spellCancelled = true; return; }
 
       // ── Descending orbital beam animation on every target ──
       for (const t of picked) {
