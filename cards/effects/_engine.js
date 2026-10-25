@@ -9708,7 +9708,8 @@ class GameEngine {
     // they don't burn the resource on a piercing hit; this server-
     // side override is the universal safety net for cards that
     // forget the check.
-    if (hookCtx.cancelled && hookCtx.cannotBeNegated) {
+    // Mean Cute Cat: ein UMGELEITETER Treffer (`_umgeleitet`) ist keine Negierung — der Schaden ist schon beim neuen Ziel.
+    if (hookCtx.cancelled && hookCtx.cannotBeNegated && !hookCtx._umgeleitet) {
       this.log('piercing_override', {
         source: source?.name, target: this._heroLabel(target),
         reason: 'cannotBeNegated overrides beforeDamage cancellation',
@@ -10431,6 +10432,7 @@ class GameEngine {
         const hookCtx = { source: bq, target, amount, type, sourceHeroIdx: bq?.heroIdx ?? -1, trueDamage: true, cannotBeReduced: true, cannotBeNegated: true };
         hookCtx._kBase = amount; hookCtx._kMul = 1; hookCtx._kFlat = 0;
         await this.runHooks(HOOKS.BEFORE_TRUE_DAMAGE, hookCtx);
+        if (hookCtx.cancelled && hookCtx._umgeleitet) return { dealt: 0, cancelled: true };   // Mean Cute Cat: umgeleitet (der Schaden liegt schon beim neuen Ziel)
         const proj = this._projectedAmount(hookCtx);
         if (proj !== undefined && proj > amount) amount = proj;
       }
@@ -10798,6 +10800,7 @@ class GameEngine {
    */
   async _runHeroDefeatSequence(target, source, ownerIdx, opts = {}) {
     if (!target || target.hp > 0) return false;
+    require('./_pythia-shared').heldFaellt(this, target);   // Infallible Oracle Pythia: jeder Plan, der auf diesen Helden zielte, verfaellt (auch bei spaeterer Wiederbelebung)
     // SC (v1382, Double/Triple Kill): jeder Heldentod laeuft genau einmal
     // hier durch — `_koProcessed` verhindert Doppelzaehlung.
     if (!target._koProcessed && this.gs._scTracking) {
@@ -38509,6 +38512,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
     if (this._inCreaturePreDefeatReaction) return false;
     if (!creatureInst) return false;
+    // ★ W78 (Infallible Oracle Pythia): ERSATZ DER EIGENEN NIEDERLAGE — „When this Creature would be defeated, you may … instead". Skript-Vertrag
+    // `selfPreDefeat(engine, inst, source, amount, type, info) → Promise<boolean>` (true = gerettet, KEIN Tod, kein Todes-Trigger). Laeuft VOR den Hand-Reaktionen
+    // (die Karte ersetzt ihren eigenen Tod; nicht innerhalb einer laufenden Hand-Reaktion); ruht bei Frost/Betaeubung/Negation (Ersatzeffekt = laufendes Passiv) und beim unaufhaltsamen Besiegen (kommt hier nie an).
+    {
+      const _sp = loadCardEffect(creatureInst.counters?._effectOverride || creatureInst.name);
+      if (_sp?.selfPreDefeat && creatureInst.zone === ZONES.SUPPORT && !creatureInst.faceDown && !this.isCardPassiveDormant(creatureInst)) {
+        if (await _sp.selfPreDefeat(this, creatureInst, this._rewriteSourceForCreatureCaster(source), amount, type, info)) return true;
+      }
+    }
 
     // Demon's Gate-style creature-caster annotation.
     source = this._rewriteSourceForCreatureCaster(source);
@@ -45820,6 +45832,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[ownerIdx];
     if (!ps) return;
     ScTracking.kartenName(this.gs._scTracking?.[ownerIdx], cardName);   // Card of the Day!: eine negierte Karte wurde trotzdem gespielt
+    // ★ W78 (Betrayal): optionaler Karten-Haken `onInitialNegated(engine, ownerIdx, cardName, chainResult)` — die Karte wurde in der KETTE negiert (`onPlay` lief nie): sie kann hier ihre
+    // schon bezahlten Kosten sichtbar machen (Betrayal: Stehl-Animation der 5 Gold). Nur Bilder/Aufräumen, der Fluss der Karte bleibt unberührt.
+    {
+      const _sc = loadCardEffect(cardName);
+      if (typeof _sc?.onInitialNegated === 'function') {
+        try { await _sc.onInitialNegated(this, ownerIdx, cardName, chainResult); }
+        catch (err) { console.error(`[onInitialNegated] ${cardName}:`, err.message); }
+      }
+    }
     // v691: gestohlen (Key) — in die Hand des Diebes, mit Flug von der
     // Hand des Spielers zur Hand des Diebes (Handplatz-Ziel wie beim
     // Kadaver-Anspruch, sonst landet der Flug in der Handmitte).
@@ -57874,6 +57895,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     this._atkAurenAbgleichen();   // W58a: Rioting Village & Co. gelten fuer ALLE Helden (lebend, tot, frisch eingesetzt, aus der Abwesenheit zurueck)
     this._dynamischeAtkNachrechnen();   // W58a: Core/Gun folgen dem Ist-Zustand der Ablage (auch nach dem Todes-Aufraeumen und Direktzugriffen auf die Ablage)
     this._refreshAscensionReadiness();
+    require('./_pythia-shared').abgleichen(this);   // Infallible Oracle Pythia: Plaene/Marken („Death Foreseen") mit dem Brett abgleichen
     this._equipStapelAbgleichen();   // Darion: Effekt wieder frei → alle Equips in den groessten Stapel (nach der laufenden Wirkung)
     this._aufdeckenInHandAbgleichen();   // 23.10.: `revealAlwaysInHand` (Great Vanguard Demon) — aufgedeckt, sobald und solange die Karte auf der Hand liegt, egal wie sie dorthin kam
     // W18a (S01-04): die Sperre von Divine Gift of Skill hängt an der Magic-Arts-Stufe des NUTZERS (nicht des gesperrten Helden) und kann
