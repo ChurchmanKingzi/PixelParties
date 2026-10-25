@@ -22,6 +22,9 @@ const ja = (t) => t.script.push({ match: (d) => d.type === 'confirm' && d.title 
     R.check('Crash Landing in der Ablage von Sitz 1, 4 Gold bezahlt', t.pile(1, 'discardPile').includes(CARD) && g1 - t.gs.players[1].gold === 4, [t.pile(1, 'discardPile'), g1, t.gs.players[1].gold]);
     const a = t.evs('play_card_throw').find(e => e.mode === 'crash');
     R.check('Animation play_card_throw (crash) für den Club an der Zone, Ziel: Ablage von Sitz 0', !!a && a.cardName === CLUB && a.fromOwner === 0 && a.fromHeroIdx === 0 && a.discardOwner === 0 && a.suppressDiscard === true, a);
+    const up = t.evs('reaction_chain_update');
+    R.check('Kettenanzeige: Vorlauf = ausgerüsteter Club, Glied = Crash Landing', up.length === 1 && up[0].vorlauf && up[0].vorlauf.cardName === CLUB && up[0].links.length === 1 && up[0].links[0].cardName === CARD, up);
+    R.check('… Glied löst auf, Kette endet', t.evs('reaction_chain_link_resolved').length === 1 && t.evs('reaction_chain_done').length === 1, [t.evs('reaction_chain_link_resolved').length, t.evs('reaction_chain_done').length]);
     R.check('keine Engine-Fehler, Zustand sauber', sauber(t), { e: t.errors, a: t.audit() });
   }
 

@@ -18146,6 +18146,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     return this._rxEreignisFenster({
       flag: 'isEquipPlacedReaction', cond: 'equipPlacedCondition', res: 'equipPlacedResolve', tiefe: '_equipPlacedWindowDepth',
       log: 'equip_placed_window_reaction', ausloeser: info.equipOwner, info, auchAusloeser: true, kette: true,
+      vorlauf: { cardName: info.equipName, owner: info.equipOwner, cardType: 'Artifact' },
       nachricht: (c) => `${info.equipName} was equipped! Activate ${c}?`, linkesBild: info.equipName, ziel: info.equipName,
     });
   }
@@ -18217,6 +18218,7 @@ this._deathWatch = (this._deathWatchStack || []).length
               await this.executeCardWithChain({
                 cardName, owner: pi, cardType: allCards[cardName]?.cardType || 'Artifact', goldCost: 0, heroIdx: rxCast.casterIdx, casterOwner: rxCast.casterSeite ?? pi,
                 casterCheck: false, fromBoard: false, resolve: wirken,
+                vorlauf: cfg.vorlauf || null,
               });
             } else {
               await wirken();
@@ -43721,6 +43723,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     };
 
     let result;
+    // ★ 25.10. (Crash Landing): `cardInfo.vorlauf` = { cardName, owner, cardType } — das Ereignis, auf das die Karte antwortet (die ausgerüstete Karte), als ANZEIGE-Glied vor der Kette
+    // (die Kettenanzeige rechts zeigt erst ab 2 Gliedern). Es ist kein echtes Kettenglied: nur `_broadcastChainUpdate` hängt es vorn an, der Client verschiebt die Indizes.
+    const _vorherVorlauf = this._chainVorlauf;
+    this._chainVorlauf = cardInfo.vorlauf || null;
+    if (cardInfo.vorlauf) this._broadcastChainUpdate([initialLink]);
     // Wer loest hier gerade auf? Hook-getriebene Reaktionsfenster
     // (`_checkReactionCards`) bauen KEIN Kettenglied — sie starten mit
     // leerer Kette. Dark Ocean konnte dort deshalb nicht erkennen, dass
@@ -43741,7 +43748,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         let resolveResult = null;
         delete this.gs._discardOutDeclined;
         const _hoptVorher = resolve ? this._hoptAbzug() : null;
+        if (cardInfo.vorlauf) { this._broadcastEvent('reaction_chain_link_resolving', { linkIndex: 0, cardName, owner }); await this._delay(400); }
         if (resolve) resolveResult = this._applyDiscardOutDecline(cardName, await resolve(), _hoptVorher);
+        if (cardInfo.vorlauf) { this._broadcastEvent('reaction_chain_link_resolved', { linkIndex: 0, cardName, owner }); await this._delay(300); this._broadcastEvent('reaction_chain_done', {}); }
         result = { negated: false, chainFormed: false, resolveResult, negatedToDeleted: false };
       } else {
         result = {
@@ -43762,6 +43771,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         };
       }
     } finally {
+      this._chainVorlauf = _vorherVorlauf;
       this._inReactionCheck = false;
       this._currentEffectSource = prevEffectSource;
       // Flush pending surprise draws ONLY if this card actually resolved
@@ -45652,6 +45662,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   /** Broadcast chain state to both clients */
   _broadcastChainUpdate(chain) {
     this._broadcastEvent('reaction_chain_update', {
+      vorlauf: this._chainVorlauf || null,
       links: chain.map(l => ({
         id: l.id, cardName: l.cardName, owner: l.owner,
         cardType: l.cardType, isInitialCard: l.isInitialCard,
