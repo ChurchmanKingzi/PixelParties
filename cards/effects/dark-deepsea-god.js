@@ -357,11 +357,11 @@ async function _zahleTribut(ctx) {
   const batch = [];
   for (const inst of others) {
     if (!inst) continue;
-    await returnSupportCreatureToHand(engine, inst, CARD_NAME, { toPlayer: pi, batch, sourceOwner: pi });
+    await returnSupportCreatureToHand(engine, inst, CARD_NAME, { toPlayer: pi, batch, sourceOwner: pi, kosten: true });   // W71b: Tribut = Kosten, kein Monia-Fenster
   }
   for (const landingInst of landingInsts) {
     if (!landingInst) continue;
-    await returnSupportCreatureToHand(engine, landingInst, CARD_NAME, { toPlayer: pi, batch, sourceOwner: pi });
+    await returnSupportCreatureToHand(engine, landingInst, CARD_NAME, { toPlayer: pi, batch, sourceOwner: pi, kosten: true });
   }
   await fireReturnedBatch(engine, batch, CARD_NAME);
 

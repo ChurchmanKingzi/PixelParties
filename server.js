@@ -9675,7 +9675,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
  *   • At least one already-unstolen opp Creature must exist (otherwise
  *     the click is a no-op).
  */
-function doTriggerTreacherousCrystal(room, pi) {
+async function doTriggerTreacherousCrystal(room, pi) {   // W71b: async — das Übernehmen fragt das Schutzfenster (Cool Rescuer Monia & Co.)
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
   if (pi !== gs.activePlayer) return false;
@@ -9726,7 +9726,7 @@ function doTriggerTreacherousCrystal(room, pi) {
     // as supportable.
     const cd = cardDB[inst.name];
     if (!cd || cd.cardType !== 'Creature') continue;
-    const ok = room.engine.actionStealCreature(pi, inst, {
+    const ok = await room.engine.actionStealCreatureGefragt(pi, inst, {   // W71b: mit Schutzfenster ('control')
       sourceName: 'Treacherous Crystal',
     });
     if (ok) stolenCount++;
@@ -15897,13 +15897,13 @@ io.on('connection', (socket) => {
   // opt-in: clicking is the consent gesture. Steals revert at the
   // next turn start via the engine's `_revertStolenCreatures`
   // cleanup, same path Deepsea Succubus's temporary steals use.
-  socket.on('trigger_treacherous_crystal', (params) => {
+  socket.on('trigger_treacherous_crystal', async (params) => {
     if (!currentUser) return;
     const room = rooms.get(params?.roomId);
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    doTriggerTreacherousCrystal(room, pi);
+    try { await doTriggerTreacherousCrystal(room, pi); } catch (e) { console.error('[trigger_treacherous_crystal]', e.message); }
   });
 
   // Activate an equipped card's active effect (Slippery Skates, etc.)

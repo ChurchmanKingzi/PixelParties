@@ -292,7 +292,7 @@ module.exports = {
         engine.cleanseHeroStatuses(hero, target.owner, target.heroIdx, ['burned'], CARD_NAME);
       }
     } else if (target.cardInstance) {
-      engine.cleanseCreatureStatuses(target.cardInstance, ['burned'], CARD_NAME);
+      await engine.cleanseCreatureStatusesGefragt(target.cardInstance, ['burned'], CARD_NAME);
     }
 
     // ── Step 4: redirect placement if host/slot differs from drop ──

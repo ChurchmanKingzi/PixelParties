@@ -103,6 +103,7 @@ module.exports = {
       const zurueck = await returnSupportCreatureToHand(engine, inst, CARD_NAME, {
         animationType: 'moonlight_beam',
         sourceOwner: pi,
+        selbst: true,   // W71b: die Kreatur geht durch ihren EIGENEN Text zurück — kein Effekt auf sie von außen (kein Monia-Fenster)
         toPlayer: pi,   // W6 (Al 14.10.2026): „add this Creature YOU CONTROL back to YOUR hand" — ein gestohlener Falter kommt auf die Hand des Kontrolleurs
       });
       if (!zurueck?.returned) return;                 // z.B. Cardinal-Immunitaet

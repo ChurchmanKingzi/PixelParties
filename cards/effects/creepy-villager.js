@@ -92,7 +92,7 @@ module.exports = {
     await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
 
     // ── ① Der Villager geht zurueck auf die Hand ────────────────
-    const zurueck = await returnSupportCreatureToHand(engine, inst, CARD_NAME, { sourceOwner: pi });
+    const zurueck = await returnSupportCreatureToHand(engine, inst, CARD_NAME, { sourceOwner: pi, selbst: true });   // W71b: eigener Text, kein Monia-Fenster
     if (!zurueck?.returned) return false;
 
     // ── ② Der Gott steigt aus SEINER Zone auf ───────────────────

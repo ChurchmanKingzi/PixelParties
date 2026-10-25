@@ -91,6 +91,8 @@ async function applyToCreature(engine, inst, expiresAtTurn, expiresForPlayer, qu
     // future "negated-but-cleansable" cards.
     cleansable: true,
     selfInflicted: true,
+    fensterTrotzdem: true,   // W71b: globaler Effekt auf bestehende Kreaturen — Monia & Co. dürfen negieren
+    sourceOwner: quelleOwner,
     gwSourceOwner: quelleOwner,   // W17b: Golden Wings – nur der Gegner des Wirkers ist ausgenommen
     expiresAtTurn,
     expiresForPlayer,

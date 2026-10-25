@@ -289,6 +289,9 @@ module.exports = {
       engine._firePendingCardReveal();
     }
 
+    // W71b (Al, 25.10.2026): Verschieben durch eine Karte ist ein Effekt auf die Kreatur — Schutzfenster (Cool Rescuer Monia & Co.), VOR der ersten Änderung; negiert = Kreatur bleibt stehen.
+    if (!(await engine.kreaturBetroffen(inst, 'move', { name: 'Slippery Skates', owner: pi }, { sourceOwner: pi, detail: 'slide' }))) return false;
+
     // Suppress damage numbers for the creature leaving its zone
     engine._broadcastEvent('creature_zone_move', { owner: pi, heroIdx, zoneSlot: srcSlot });
 

@@ -133,6 +133,8 @@ module.exports = {
       }
       await engine.actionNegateCreature(inst, CARD_NAME, {
         selfInflicted: true,
+        fensterTrotzdem: true,   // W71b: globaler Effekt auf bestehende Kreaturen — Monia & Co. dürfen negieren
+        sourceOwner: pi,
         gwSourceOwner: pi,   // W17b: Golden Wings – nur der Gegner ist ausgenommen
         expiresAtTurn,
         expiresForPlayer,

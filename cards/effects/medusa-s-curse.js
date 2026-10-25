@@ -135,6 +135,9 @@ module.exports = {
       const expiresAtTurn = gs.turn + 2;
       const expiresForPlayer = pi;
 
+      // W71b (Al, 25.10.2026): das Schutzfenster der Kreaturen (Cool Rescuer Monia & Co.) öffnet VORAB für alle Kreaturen — sonst wäre Monias Held schon betäubt, bevor die erste Kreatur dran ist.
+      await engine.kreaturenVorab(creatureTargets, 'status', { name: "Medusa's Curse", owner: pi }, { sourceOwner: pi, statusName: 'stunned' });
+
       for (const ht of heroTargets) {
         await engine.addHeroStatus(ht.owner, ht.heroIdx, 'stunned', {
           appliedBy: pi,
