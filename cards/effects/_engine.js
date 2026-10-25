@@ -38651,6 +38651,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       const ablage = c.originalOwner ?? c.owner;
       const ps = this.gs.players?.[ablage];
       if (!ps || !c.name) return;
+      const _inst = this.cardInstances.find(x => x.id === c.instId);   // der Hub läuft vor `_untrackCard`; `hookCtx.creature` ist nur ein Auszug (ohne Counter)
+      if (_inst && this.isTokenCard(_inst)) return;   // Tokens (Fantasy Buddy, Biomancy …) kommen nie in die Ablage — kein Protokolleintrag
       (ps._besiegtLog || (ps._besiegtLog = [])).push({ name: c.name, turn: this.gs.turn });
     } catch (err) {
       console.error('[besiegtProtokoll]', err.message);
@@ -46552,6 +46554,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!zielPs.discardPile) zielPs.discardPile = [];
     zielPs.discardPile.push(weg.name);
     this._trackCard(weg.name, ziel, 'discard');
+    this.gs._spellFruehAbgelegt = { besitzer: ziel, name: weg.name };   // W67a (Live Show): Inyas Fantasy Buddy ERSETZT diese Ablage-Karte (Ticket `nimm`), er kommt nicht dazu
     this.sync();
     return { idx, name: weg.name };
   }

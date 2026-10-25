@@ -8837,7 +8837,22 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       // (Area/Attachment/Permanent, `_spellPlacedOnBoard`), auf die Hand zurückkehrt oder gelöscht wird.
       _buddyTicket = room.engine.neuesBuddyTicket('hand', {
         ablageErwartet: () => !gs._spellPlacedOnBoard && !gs._spellReturnToHand && !script?.deleteOnUse && !_attaLoescht,
+        // Hat der Zauber die Hand schon selbst verlassen (`aufloesenderSpellInDieAblage`: Live Show, Shooting Star …), liegt er bereits in der Ablage: der Buddy nimmt ihn von dort.
+        nimm: () => {
+          const f = gs._spellFruehAbgelegt;
+          if (!f || f.name !== cardName) return true;
+          delete gs._spellFruehAbgelegt;
+          const arr = gs.players[f.besitzer]?.discardPile;
+          const i = arr ? arr.lastIndexOf(cardName) : -1;
+          if (i >= 0) room.engine._takeFromPileCore(f.besitzer, gs.players[f.besitzer], arr, 'discard', i, cardName, { source: 'Card Game Player Inya' });
+          return true;
+        },
       });
+      // ★ 25.10. (Teleport): die Wirkerin/der Wirker steht nach dem Tausch auf dem ANDEREN Platz. Die Lauscher (Inya: „this Hero uses a Spell") vergleichen `heroIdx` mit dem aktuellen
+      // Platz ihres Helden — also den Platz NACH dem Tausch melden. (Die Variable `heroIdx` selbst bleibt der alte Platz: `heroesActedThisTurn` wird vom Teleport selbst nachgezogen.)
+      const _tpn = gs._teleportNachlauf;
+      const _hookHeroIdx = (_tpn && cardName === 'Teleport' && _tpn.pi === pi && _tpn.seite === (heroOwner ?? pi))
+        ? (heroIdx === _tpn.a ? _tpn.b : heroIdx === _tpn.b ? _tpn.a : heroIdx) : heroIdx;
       await room.engine.runHooks('afterSpellResolved', {
         // v778: `heroOwner` = in WESSEN Heldenreihe `heroIdx` zeigt.
         // Ohne das Feld war der Hook bei einem bezauberten Helden
@@ -8846,7 +8861,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         // „mein Held hat angegriffen" nicht von „der gleichindizierte
         // Held der Gegenseite hat angegriffen" unterscheiden.
         heroOwner,
-        spellName: cardName, spellCardData: cardData, heroIdx, casterIdx: pi,
+        spellName: cardName, spellCardData: cardData, heroIdx: _hookHeroIdx, casterIdx: pi,
         damageTargets: uniqueTargets, isSecondCast: !!gs._bartasSecondCast,
         // The provider instance whose additional-action token was just
         // consumed by THIS spell-play, or null if the spell was cast as
@@ -8858,6 +8873,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         _buddy: _buddyTicket,   // W67a: Inyas Fantasy Buddy (ersetzt die Ablage; siehe unten)
         _skipReactionCheck: true,
       });
+      delete gs._spellFruehAbgelegt;
       // ★ 25.10. (Nasty Prank): Hand-Fenster „ein Held hat eine Attack/einen Spell ausgeführt" — erst jetzt, wo nichts mehr verhindert werden kann (nicht negiert, nicht abgebrochen, nicht verpufft).
       if (!_gefizzelt && !gs._bartasSecondCast && Number.isInteger(heroIdx) && heroIdx >= 0 && (cardData.cardType === 'Spell' || cardData.cardType === 'Attack')) {
         await room.engine._checkSpellPerformedHandReactions({

@@ -434,7 +434,7 @@ function attachHelpers(t) {
       if (!Number.isInteger(ps.gold)) bad.push(`seat${s}.gold nicht ganzzahlig: ${ps.gold}`);
     }
     // Geister: Support-Instanzen ohne Namen in der Zone
-    for (const c of engine.cardInstances) if (c.zone === 'support' && c.owner != null) {
+    for (const c of engine.cardInstances) if (c.zone === 'support' && c.owner != null && !c.counters?._gainedEffectOnly) {   // unsichtbarer Träger eines gewonnenen Heldeneffekts (Dangerous Knowledge, Slot -1) ist keine Geister-Instanz
       const z = (gs.players[c.owner].supportZones[c.heroIdx] || [])[c.zoneSlot] || [];
       if (!z.includes(c.name)) bad.push(`Geister-Instanz "${c.name}" (seat${c.owner} hero${c.heroIdx} slot${c.zoneSlot}) – Zone leer/anders: [${z.join(',')}]`);
     }
