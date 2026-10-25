@@ -57412,6 +57412,28 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   // ─── SYNC STATE TO CLIENTS ────────────────
 
+  /** Darion (Al, 25.10.): Sobald das Teilen wieder gilt und Equips in mehreren Plaetzen liegen, werden sie nach der laufenden Wirkung zusammengefuehrt (`_equip-stack-shared.zusammenfuehren`). */
+  _equipStapelAbgleichen() {
+    if (this._equipMergeLaeuft) return;
+    if (this._equipMergeFn && (this._postChainActions || []).includes(this._equipMergeFn)) return;   // schon vorgemerkt
+    const es = require('./_equip-stack-shared');
+    let bedarf;
+    try { bedarf = es.zusammenfuehrenBedarf(this); } catch { return; }
+    if (!bedarf.length) return;
+    this._equipMergeFn = async () => {
+      this._equipMergeLaeuft = true;
+      try {
+        for (const b of es.zusammenfuehrenBedarf(this)) await es.zusammenfuehren(this, b.seite, b.heroIdx);
+      } catch (err) {
+        console.error('[Engine] Equip-Stapel zusammenfuehren:', err.message);
+      } finally {
+        this.sync();                     // erst melden, dann freigeben: der eigene Abgleich plant sich nicht noch einmal ein
+        this._equipMergeLaeuft = false;
+      }
+    };
+    this.queuePostChainAction(this._equipMergeFn);
+  }
+
   sync() {
     if (this._aborted) return;
     // v900: Sterbefenster-Diagnose — siehe `_deathWatch` im Todeszweig.
@@ -57437,6 +57459,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     this._atkAurenAbgleichen();   // W58a: Rioting Village & Co. gelten fuer ALLE Helden (lebend, tot, frisch eingesetzt, aus der Abwesenheit zurueck)
     this._dynamischeAtkNachrechnen();   // W58a: Core/Gun folgen dem Ist-Zustand der Ablage (auch nach dem Todes-Aufraeumen und Direktzugriffen auf die Ablage)
     this._refreshAscensionReadiness();
+    this._equipStapelAbgleichen();   // Darion: Effekt wieder frei → alle Equips in den groessten Stapel (nach der laufenden Wirkung)
     this._aufdeckenInHandAbgleichen();   // 23.10.: `revealAlwaysInHand` (Great Vanguard Demon) — aufgedeckt, sobald und solange die Karte auf der Hand liegt, egal wie sie dorthin kam
     // W18a (S01-04): die Sperre von Divine Gift of Skill hängt an der Magic-Arts-Stufe des NUTZERS (nicht des gesperrten Helden) und kann
     // sich ändern, ohne dass der gesperrte Held etwas tut (Nutzer legt Magic Arts an) — die Anzeigemarke bei jedem Abgleich nachziehen.

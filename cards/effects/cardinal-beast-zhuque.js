@@ -70,7 +70,12 @@ module.exports = {
     }
     for (const inst of engine.cardInstances) {
       if ((inst.controller ?? inst.owner) !== oppIdx || inst.zone !== 'support' || inst.faceDown) continue;
-      if (!inst.counters.burned) return true;
+      if (inst.counters.burned) continue;
+      // Wie die Zielliste von `onCreatureEffect`: nur Kreaturen mit HP (Al, 25.10.2026: Ausruestung ist kein Ziel).
+      const cd = inst.counters?._cardDataOverride || engine._getCardDB()[inst.name];
+      if (!cd || !hasCardType(cd, 'Creature')) continue;
+      if ((inst.counters?.currentHp ?? cd.hp ?? 0) <= 0) continue;
+      return true;
     }
     return false;
   },
