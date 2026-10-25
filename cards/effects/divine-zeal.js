@@ -202,7 +202,7 @@ module.exports = {
             && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
           );
           if (!inst) continue;
-          const removed = engine.cleanseCreatureStatuses(inst, statuses, CARD_NAME);
+          const removed = await engine.cleanseCreatureStatusesGefragt(inst, statuses, CARD_NAME);
           totalRemoved += (removed || []).length;
           engine._broadcastEvent('play_zone_animation', {
             type: 'super_saiyan_aura',

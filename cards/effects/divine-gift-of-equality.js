@@ -219,7 +219,10 @@ module.exports = {
           type: 'gold_sparkle', owner: secondT.owner, heroIdx: secondT.heroIdx, zoneSlot: secondT.slotIdx,
         });
         await engine._delay(500);
-        inst.counters.currentHp = leftover;
+        // W71b (Al, 25.10.2026): das Halbieren ist ein Effekt auf die Kreatur — Schutzfenster (Cool Rescuer Monia & Co.) VOR dem Schreiben. Negiert: die Kreatur behält ihre HP, die
+        // „HP, die das Ziel übrig hat" sind dann ihre aktuellen HP; die Wiederbelebung des Helden (kein Effekt auf eine Kreatur) läuft weiter.
+        if (await engine.kreaturBetroffen(inst, 'stats', { name: 'Divine Gift of Equality', owner: pi }, { sourceOwner: pi, detail: 'halve_hp' })) inst.counters.currentHp = leftover;
+        else leftover = currentHp;
       }
 
       engine.log('divine_gift_equality_halve', {

@@ -268,7 +268,7 @@ module.exports = {
       // so the target stays eligible in the Start Phase picker.
       const ok = await moveSlipperyCreature(
         engine, pi, liveInst, dest.heroIdx, dest.slotIdx,
-        { skipSlipperyMovedMark: true },
+        { skipSlipperyMovedMark: true, fremd: true, fremdName: CARD_NAME },   // W71b: Versetzen einer ANDEREN Kreatur = Effekt auf sie (Schutzfenster)
       );
       if (!ok) return;
 

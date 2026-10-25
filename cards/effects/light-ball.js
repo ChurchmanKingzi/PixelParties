@@ -180,7 +180,7 @@ module.exports = {
         // creature-status convention).
         const keys = engine.getCleansableCreatureStatusKeys(allyInst);
         if (keys.length === 0) continue;
-        const removed = engine.cleanseCreatureStatuses(
+        const removed = await engine.cleanseCreatureStatusesGefragt(
           allyInst, keys, CARD_NAME,
         );
         if ((removed || []).length === 0) continue;

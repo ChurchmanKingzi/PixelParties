@@ -82,7 +82,7 @@ module.exports = {
     if (!gs.hoptUsed) gs.hoptUsed = {};
     gs.hoptUsed[riegel(pi)] = gs.turn;
     await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi, source: inst });
-    const r = await returnSupportCreatureToHand(engine, inst, CARD_NAME, { sourceOwner: pi, animationType: 'summon' });
+    const r = await returnSupportCreatureToHand(engine, inst, CARD_NAME, { sourceOwner: pi, animationType: 'summon', selbst: true });
     if (!r?.returned) { delete gs.hoptUsed[riegel(pi)]; return false; }   // nichts passiert (z. B. immun) → der Riegel bleibt frei
     // Gelöscht statt zurückgenommen (Ankhota)? Dann „add back" ist nicht geschehen → kein Rabatt.
     if (inst._ankhotaGeloescht) return true;

@@ -284,7 +284,7 @@ module.exports = {
             }
           }
         } else if (tInst.zone === 'support') {
-          geheilt.push(...engine.cleanseCreatureStatuses(tInst, entfernen, CARD_NAME));
+          geheilt.push(...await engine.cleanseCreatureStatusesGefragt(tInst, entfernen, CARD_NAME));
         }
       }
 

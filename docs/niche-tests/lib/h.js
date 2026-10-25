@@ -159,7 +159,7 @@ async function fresh(o = {}) {
   t._promptCount = 0;
   engine.promptGeneric = async (pi, d, ...r) => {
     runaway();
-    t.prompts.push({ pi, d });
+    t.prompts.push({ pi, d, sim: !!engine._inMctsSim });   // W71b: `sim` = Frage aus einem MCTS-Rollout der CPU (zählt nicht als echte Frage)
     for (const rule of t.script) {
       if (rule.used && rule.once) continue;
       if (!rule.match || rule.match(d, pi)) {

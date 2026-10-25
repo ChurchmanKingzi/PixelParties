@@ -119,6 +119,10 @@ module.exports = {
       const sr = await engine.statusHitSurpriseWindow(ctx.card, ziele.filter(z => z.type === 'hero'), 'decay_spell', { ziele });   // W15a (R01-10): + Hand-Reaktionen (Post-Target)
       if (sr?.effectNegated) return;
 
+      // W71b (Al, 25.10.2026): „Freeze all targets" betrifft Helden UND Kreaturen zugleich — das Schutzfenster der Kreaturen (Cool Rescuer Monia & Co.) öffnet VORAB für alle Kreaturen, noch bevor
+      // der erste Held (vielleicht Monia selbst) eingefroren ist. Die späteren Einfrier-Aufrufe übernehmen das gemerkte Ergebnis.
+      await engine.kreaturenVorab(ziele.filter(z => z.type !== 'hero' && z.inst).map(z => z.inst), 'status', { name: CARD_NAME, owner: pi }, { sourceOwner: pi, statusName: 'frozen' });
+
       // ── Der Blizzard ────────────────────────────────────────────
       engine._broadcastEvent('iceage_blizzard', { owner: pi, duration: dauer });
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });

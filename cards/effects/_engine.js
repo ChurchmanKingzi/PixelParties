@@ -3056,6 +3056,20 @@ class GameEngine {
   }
 
   async runHooks(hookName, hookCtx = {}) {
+    // ★ W71b (Al, 25.10.2026 — Cool Rescuer Monia reagiert auf JEDEN Effekt auf Kreaturen): das Schutzfenster `beforeCreatureAffected` fragt je Kreatur, Effektart und Karte/Effekt in EINER Auflösung
+    // nur EINMAL — auch wenn der Effekt es vorab für alle seine Kreaturen geöffnet hat (`kreaturenVorab`: Iceage und Medusa's Curse treffen erst die Helden, Monia könnte sonst nicht mehr reagieren).
+    // Das Ergebnis (erlaubt / negiert) wird gemerkt und von allen späteren Fenstern derselben Kreatur/Art/Quelle übernommen; die Buchführung endet mit der Auflösung (`endeEffektImmunitaeten`).
+    if (hookName === 'beforeCreatureAffected' && hookCtx && hookCtx.creature && !hookCtx._fensterGemerkt) {
+      hookCtx._fensterGemerkt = true;
+      const _qn = (typeof hookCtx.source === 'string' ? hookCtx.source : (hookCtx.source && (hookCtx.source.cardName || hookCtx.source.name))) || this._effectSourceName() || '';
+      const _sk = `${hookCtx.creature.id}|${hookCtx.effectType || ''}|${_qn}`;
+      const _reg = this.gs._kreaturFenster || (this.gs._kreaturFenster = {});
+      const _alt = _reg[_sk];
+      if (_alt && _alt.turn === this.gs.turn && _alt.phase === this.gs.currentPhase) { if (!_alt.ok) hookCtx.cancelled = true; return; }
+      await this.runHooks(hookName, hookCtx);
+      _reg[_sk] = { ok: !hookCtx.cancelled, turn: this.gs.turn, phase: this.gs.currentPhase };
+      return;
+    }
     // ★ 24.10. (Xal): kommt eine Karte auf den Brett, die Abilities in Support Zonen erlaubt (Xalibur), gelten die dort wegen der Schlange liegen
     // gebliebenen Abilities wieder — NACH den Listenern der Meldung (`syncSupportAbilities`).
     if (hookName === 'onCardEnterZone' && hookCtx && hookCtx.enteringCard && !hookCtx._xalSync
@@ -9024,6 +9038,7 @@ class GameEngine {
     // W16f (H01-08): Monias Schild („negate any effects that card or effect has") gilt nur für DIESE Auflösung — er endet mit ihr,
     // auch wenn Monia selbst nie wieder am Zug ist (tot/gefroren: ihr `onTurnStart` räumt dann nicht mehr).
     if (this.gs && (this.gs._moniaShieldActive != null || this.gs._moniaAngebote)) { delete this.gs._moniaShieldActive; delete this.gs._moniaShieldSource; delete this.gs._moniaAngebote; }   // W58a: auch die Angebote der Aufloesung
+    if (this.gs && this.gs._kreaturFenster) delete this.gs._kreaturFenster;   // W71b: die Fenster-Buchführung von `kreaturBetroffen` endet mit der Auflösung
     // W16f (H03-10): Monia Bots True-Damage-Stempel gilt für Schaden AUS dem umgeleiteten Effekt — er endet mit dessen Auflösung (macht der Effekt keinen Schaden, verfällt er).
     if (this.gs && this.gs._redirectedTrueDamage) delete this.gs._redirectedTrueDamage;
   }
@@ -9049,6 +9064,61 @@ class GameEngine {
     const schildQuelle = this.gs._moniaShieldSource?.name;
     if (schildQuelle && q && q !== schildQuelle) return false;
     return true;
+  }
+
+  /**
+   * ★ W71b (Al, 25.10.2026 — „Cool Rescuer Monia sollte auf JEDEN Effekt reagieren können, der eine oder mehrere Creatures betreffen würde"):
+   * die EINE zentrale Frage „darf dieser Effekt diese Kreatur betreffen?". Öffnet das Schutzfenster `beforeCreatureAffected` (Cool Rescuer Monia,
+   * Elusive Hind, Warrior of Teocuilatl, Winged Skeleton, Puppets …) für eine Kreatur auf dem Brett und liefert, ob der Effekt wirken darf.
+   *
+   * WER ES RUFT: jedes Kreaturen-Primitiv, das den Zustand einer Kreatur ÄNDERT (Zerstören, Heilen, Status, Verschieben/Bounce, Kontrollwechsel, Buff/Debuff,
+   * Zähler, Level, Max-HP …) — NACH den eigenen Immunitätsprüfungen („unaffected by …" verhindert den Effekt ohnehin, kein Angebot) und VOR der ersten
+   * Zustandsänderung. Schaden läuft über den Stapel-Hook `beforeCreatureDamageBatch` (derselbe Zweck). Kartenskripte, die den Zustand einer FREMDEN Kreatur
+   * direkt schreiben (kein Primitiv dafür), rufen diese Funktion vor dem Schreiben: `if (!(await engine.kreaturBetroffen(inst, 'counter', CARD_NAME, { sourceOwner: pi }))) return;`.
+   *
+   * Was NICHT fragt: Ziel-Wahl ohne Wirkung (Anvisieren), Opfer/Tribut als Kosten (`isSacrifice`), Selbst-Effekte (Quelle == Kreatur; Monias Hook prüft das auch),
+   * natürliches Auslaufen (Status-/Buff-Dauer, Rückgabe gestohlener Kreaturen), das Beschwören selbst, dauerhafte Auren („while equipped").
+   *
+   * @param {CardInstance} inst   Kreatur auf dem Brett
+   * @param {string} art          'destroy' | 'heal' | 'status' | 'move' (Verschieben, Bounce, Tausch) | 'control' (Kontrollwechsel) | 'buff' | 'counter' | 'stats' (HP/Level/ATK) …
+   * @param {string|object} quelle  Name der Karte/des Effekts oder { name, owner, heroIdx }; ohne Angabe gilt der laufende Effekt (`_effectSourceName`)
+   * @param {object} [opts]       { sourceOwner, statusName, isSacrifice, detail } · `detail`: Feinart fürs Protokoll/CPU ('bounce' …)
+   * @returns {Promise<boolean>}  true = der Effekt darf die Kreatur betreffen · false = negiert (der Aufrufer lässt die Kreatur unberührt)
+   */
+  async kreaturBetroffen(inst, art, quelle, opts = {}) {
+    if (!inst || inst.zone !== ZONES.SUPPORT || inst.faceDown) return true;
+    if (opts.isSacrifice) return true;
+    const cd = this.getEffectiveCardData(inst) || this._getCardDB()[inst.name];
+    if (!cd || !hasCardType(cd, 'Creature')) return true;
+    const name = (typeof quelle === 'string' ? quelle : (quelle && (quelle.cardName || quelle.name))) || this._effectSourceName() || '';
+    const owner = typeof opts.sourceOwner === 'number' ? opts.sourceOwner
+      : (quelle && typeof quelle === 'object') ? (quelle.controller ?? quelle.owner)
+      : (this._currentEffectSource?.owner ?? this._activationSource?.owner);
+    const src = (quelle && typeof quelle === 'object') ? quelle : { name, ...(typeof owner === 'number' ? { owner } : {}) };
+    const hookCtx = {
+      creature: inst, effectType: art, source: src, cancelled: false, _skipReactionCheck: true,
+      ...(opts.statusName ? { statusName: opts.statusName } : {}),
+      ...(opts.detail ? { detail: opts.detail } : {}),
+    };
+    // Dieselbe Karte/derselbe Effekt fragt für dieselbe Kreatur und Art in EINER Auflösung nur einmal — das erledigt `runHooks` (Buchführung `gs._kreaturFenster`).
+    await this.runHooks(HOOKS.BEFORE_CREATURE_AFFECTED, hookCtx);
+    const erlaubt = !hookCtx.cancelled;
+    if (!erlaubt) this.log('creature_effect_negated', { creature: inst.name, effect: art, by: name || 'effect' });
+    return erlaubt;
+  }
+
+  /**
+   * ★ W71b: Fenster VORAB für mehrere Kreaturen. Effekte, die erst Helden und dann Kreaturen treffen (Iceage, Medusa's Curse: „all targets"), würden Monia schon durch den Status ihres Helden
+   * ausschalten, bevor die erste Kreatur dran ist. Solche Effekte rufen dies ganz am Anfang für ALLE ihre Kreaturen; die späteren Primitive (`applyCreatureStatus` …) übernehmen das gemerkte
+   * Ergebnis (gleiche Kreatur, Art und Quelle) ohne neue Frage. Liefert die Menge der Kreaturen (Instanz-Ids), die der Effekt treffen darf.
+   */
+  async kreaturenVorab(insts, art, quelle, opts = {}) {
+    const erlaubt = new Set();
+    for (const inst of insts || []) {
+      if (!inst) continue;
+      if (await this.kreaturBetroffen(inst, art, quelle, opts)) erlaubt.add(inst.id);
+    }
+    return erlaubt;
   }
 
   async _actionDealDamageImpl(source, target, amount, type, opts) {
@@ -15273,8 +15343,12 @@ class GameEngine {
     if (fromZone === 'support' && toZone !== ZONES.DISCARD && toZone !== ZONES.DELETED) {
       const cd = this.getEffectiveCardData(cardInstance) || this._getCardDB()[cardInstance.name];   // wirksame Kartendaten: Tokens liegen unter dem Namen einer Potion (Als Sweep 9.10.)
       if (cd && hasCardType(cd, 'Creature')) {
-        const hookCtx = { creature: cardInstance, effectType: 'move', source: null, cancelled: false, _skipReactionCheck: true };
-        await this.runHooks(HOOKS.BEFORE_CREATURE_AFFECTED, hookCtx);
+        // ★ W71b: die Quelle des Verschiebens/Zurücknehmens mitgeben (vorher `null`: Winged Skeleton & Co. sahen keinen Verursacher, Monias Schlüssel kam nur aus der laufenden Aktion).
+        const _mvOwner = typeof opts.sourceOwner === 'number' ? opts.sourceOwner : (this._currentEffectSource?.owner ?? this._activationSource?.owner);
+        const _mvSrc = typeof opts.source === 'string' ? { name: opts.source, ...(typeof _mvOwner === 'number' ? { owner: _mvOwner } : {}) }
+          : (opts.source && typeof opts.source === 'object') ? opts.source : null;
+        const hookCtx = { creature: cardInstance, effectType: 'move', source: _mvSrc, cancelled: false, _skipReactionCheck: true };
+        if (!opts.selbst && !opts.kosten && !opts._skipAffectedWindow) await this.runHooks(HOOKS.BEFORE_CREATURE_AFFECTED, hookCtx);
         if (hookCtx.cancelled) {
           this.log('move_blocked', { card: cardInstance.name, reason: 'creature protection' });
           return;
@@ -17761,6 +17835,18 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
+    // ★ W71b (Al, 25.10.2026): Kontrollwechsel/Versetzen durch eine Karte ist ein „Effekt auf die Kreatur" — Schutzfenster `beforeCreatureAffected` (Cool Rescuer Monia, Elusive Hind,
+    // Winged Skeleton …) wie bei Zerstören/Heilen/Bewegen. NACH allen Verhinderungen (Immunität, Tor, Sperre, Regeln), VOR der ersten Änderung; Dark Gear/Diplomacy zahlen ihre Kosten
+    // vorher (negierter Effekt: Kosten bezahlt, Kreatur bleibt). Eigene Texte (`ignoreGateShield`: Jumper Spider) und Eigen-Platzierungen (`selfInflicted`) fragen nicht.
+    if (!opts.ignoreGateShield && !opts.selfInflicted && !opts._skipAffectedWindow && inst.zone === 'support') {
+      const _qOwner = typeof opts.sourceOwner === 'number' ? opts.sourceOwner : neuerKtrl;
+      const _erlaubt = await this.kreaturBetroffen(inst, 'control', { name: opts.sourceName || this._effectSourceName() || '', owner: _qOwner }, { sourceOwner: _qOwner, detail: 'transfer' });
+      if (!_erlaubt) {
+        this.log('transfer_fizzle', { creature: inst.name, reason: 'creature_protection', from: fromPs.username, to: toPs.username });
+        return { success: false, protectedByWindow: true };
+      }
+    }
+
     const cardName = inst.name;
     const srcHeroIdx = inst.heroIdx;
     const srcSlotIdx = inst.zoneSlot;
@@ -19850,6 +19936,18 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ W71b (Al, 25.10.2026): Status von einer Kreatur ENTFERNEN (Beer, Juice, Cure, Tea, Elixir of Recovery, Divine Zeal, The Melting …) ist ein Effekt auf die Kreatur — Schutzfenster
+   * (`beforeCreatureAffected`, Cool Rescuer Monia & Co.) vor `cleanseCreatureStatuses`. Der Weg für alle Karten, die FREMDE Kreaturen heilen/auftauen; Selbst-Bereinigung einer Kreatur
+   * (Lunatic Golem, Cactus Creature) bleibt beim synchronen `cleanseCreatureStatuses`. Negiert: nichts wird entfernt (`[]`).
+   */
+  async cleanseCreatureStatusesGefragt(inst, statusKeys, source, opts = {}) {
+    if (!inst || !Array.isArray(statusKeys) || statusKeys.length === 0) return [];
+    const hatEtwas = statusKeys.some(k => inst.counters?.[k]);
+    if (hatEtwas && !(await this.kreaturBetroffen(inst, 'status', source, { sourceOwner: opts.sourceOwner, detail: 'cleanse' }))) return [];
+    return this.cleanseCreatureStatuses(inst, statusKeys, typeof source === 'string' ? source : (source?.name || 'effect'));
+  }
+
+  /**
    * Remove multiple statuses from a creature, skipping unhealable ones.
    * Centralized cleanse function — ALL cards that remove creature statuses should use this.
    * @param {object} inst - Card instance
@@ -20436,6 +20534,13 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this._triggerGateCheck(inst.controller ?? inst.owner, opts.source?.name || opts.sourceName || null, _gqS);
       if (this._isGateShielded(inst.controller ?? inst.owner, _gqS)) return false;
     }
+    // ★ W71b (Al, 25.10.2026): Buff/Debuff auf einer Kreatur ist ein „Effekt auf die Kreatur" — Schutzfenster `beforeCreatureAffected` ('buff'); NACH Immunität und Tor, VOR dem Schreiben.
+    // Kein Fenster bei Eigen-Platzierung/Kosten (`opts.selbst` / `opts.kosten`) und wenn der Aufrufer es schon geöffnet hat (`_skipAffectedWindow`).
+    if (!opts.selbst && !opts.kosten && !opts._skipAffectedWindow) {
+      const _bq = opts.source ?? opts.sourceName ?? null;
+      const _ok = await this.kreaturBetroffen(inst, 'buff', _bq, { sourceOwner: typeof opts.sourceOwner === 'number' ? opts.sourceOwner : undefined, detail: buffName });
+      if (!_ok) return false;
+    }
     if (!inst.counters.buffs) inst.counters.buffs = {};
     const buffDef = BUFF_EFFECTS[buffName] || {};
     inst.counters.buffs[buffName] = {
@@ -20485,6 +20590,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       // `_oppEffectImmune` is source-aware; this call site has no source
       // arg, so a lenient default lets own-side cleanses through.
       if (!opts.ignoreGateShield && inst.zone === 'support' && this._isGateShielded(inst.controller ?? inst.owner)) return; // Defending the Gate
+      // ★ W71b: Entfernen eines Buffs durch eine Karte ist ein Effekt auf die Kreatur (Schutzfenster 'buff'); nicht beim natürlichen Auslaufen (`opts.ablauf`) und nicht, wenn der Aufrufer es schon geöffnet hat.
+      if (!opts.ablauf && !opts.selbst && !opts.kosten && !opts._skipAffectedWindow) {
+        const _ok = await this.kreaturBetroffen(inst, 'buff', opts.source ?? opts.sourceName ?? null, { sourceOwner: typeof opts.sourceOwner === 'number' ? opts.sourceOwner : undefined, detail: 'remove:' + buffName });
+        if (!_ok) return;
+      }
     }
     const buffData = inst.counters.buffs[buffName];
     // Clear associated counters on expiry (e.g. dark_gear_negated clears negated)
@@ -20599,7 +20709,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Forward expiresForceClear so buffs that ALSO granted the immunity
         // (e.g. Golden Wings setting _cardinalImmune) can strip themselves
         // cleanly on expiry.
-        await this.actionRemoveCreatureBuff(inst, buffName, { forceClear: !!buffData.expiresForceClear });
+        await this.actionRemoveCreatureBuff(inst, buffName, { forceClear: !!buffData.expiresForceClear, ablauf: true });   // W71b: natürliches Auslaufen = kein Effekt auf die Kreatur
         // Stamp creature-side post-cleanse immunity (mirror of hero
         // `immune` granted at processStatusExpiry's END phase).
         // `cc_immune` blocks the CC creature-statuses (frozen / stunned
@@ -20766,7 +20876,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ★ W16b (A01-pollution-09): auch eine Negation ist ein „affected by a card or effect" — Schutzfenster `beforeCreatureAffected`
     // (Warrior of Teocuilatl & Co.). Nicht für Eigen-Platzierungen (`selfInflicted`: Kosten der negierenden Karte selbst) und nicht für
     // unverhinderbare Negationen (`unpreventable`); Aufrufer mit eigenem Fenster (Unwanted Audience) setzen `_skipAffectedWindow`.
-    if (!opts._skipAffectedWindow && !opts.selfInflicted && !hart && inst.zone === 'support') {
+    if (!opts._skipAffectedWindow && (!opts.selfInflicted || opts.fensterTrotzdem) && !hart && inst.zone === 'support') {   // W71b: `fensterTrotzdem` — globale Effekte (Anti Magic Zone, Pink Sky) nutzen `selfInflicted` nur, um das Tor zu überspringen; sie betreffen bestehende Kreaturen
       const _fenster = {
         creature: inst, effectType: 'status', statusName: 'negated',
         source: typeof source === 'string' ? { name: source, ...(typeof opts.sourceOwner === 'number' ? { owner: opts.sourceOwner } : {}) } : (source || { name: 'effect' }),
@@ -29846,11 +29956,10 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * Temporarily steal an opponent's Creature. Flips `inst.controller`,
-   * leaves `inst.owner` on the original owner's side, optionally flags
-   * `_stealImmortal`. Reverts at turn start.
+   * ★ W71b: die Vorprüfung des zeitweiligen Diebstahls (Immunität, Sperre, Regeln) — vorher der Kopf von `actionStealCreature`. Getrennt, damit der Wirkungs-Weg
+   * `actionStealCreatureGefragt` zwischen Vorprüfung und Zustandsänderung das Schutzfenster öffnen kann. Liefert true, wenn der Diebstahl möglich ist.
    */
-  actionStealCreature(stealerPi, inst, opts = {}) {
+  _stealMoeglich(stealerPi, inst, opts = {}) {
     if (!inst || inst.zone !== 'support') return false;
     if (inst.counters?._heldKreatur) return false;   // ★ HELD ALS KREATUR (Hulijing): nicht stehlbar (Sicherung)
     // Styx 28.9.: bestohlen wird der KONTROLLEUR. Eine ueber einen
@@ -29887,7 +29996,32 @@ this._deathWatch = (this._deathWatchStack || []).length
         return false;
       }
     }
+    return true;
+  }
 
+  /**
+   * ★ W71b (Al, 25.10.2026): Diebstahl MIT Schutzfenster — Vorprüfung, dann `beforeCreatureAffected` ('control'; Cool Rescuer Monia, Elusive Hind, Winged Skeleton …), dann
+   * `actionStealCreature`. Der Weg für alle Karten, die eine Kreatur zeitweilig übernehmen (Cute Conversion, Deepsea Succubus, Molinda, Treacherous Crystal, Lovely Teddy …).
+   * `opts.sourceOwner` = Besitzer des Effekts (Standard: der Dieb). Negiert das Fenster, bleibt die Kreatur wie sie ist (false).
+   */
+  async actionStealCreatureGefragt(stealerPi, inst, opts = {}) {
+    if (!this._stealMoeglich(stealerPi, inst, opts)) return false;
+    if (!opts._skipAffectedWindow && !opts.selfInflicted) {
+      const qOwner = typeof opts.sourceOwner === 'number' ? opts.sourceOwner : stealerPi;
+      const ok = await this.kreaturBetroffen(inst, 'control', { name: opts.sourceName || this._effectSourceName() || '', owner: qOwner }, { sourceOwner: qOwner, detail: 'steal' });
+      if (!ok) { this.log('steal_fizzle', { creature: inst.name, reason: 'creature_protection', by: opts.sourceName || 'Steal' }); return false; }
+    }
+    return this.actionStealCreature(stealerPi, inst, { ...opts, _geprueft: true });
+  }
+
+  /**
+   * Temporarily steal an opponent's Creature. Flips `inst.controller`,
+   * leaves `inst.owner` on the original owner's side, optionally flags
+   * `_stealImmortal`. Reverts at turn start.
+   */
+  actionStealCreature(stealerPi, inst, opts = {}) {
+    if (!opts._geprueft && !this._stealMoeglich(stealerPi, inst, opts)) return false;
+    const originalOwner = inst.controller ?? inst.owner;
     inst.stolenBy = stealerPi;
     inst.stolenFromOwner = originalOwner;
     inst.controller = stealerPi;
@@ -47002,6 +47136,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this.kreaturGegnerEffektImmun(inst, opts.source, opts)) return false;   // W17b: Golden Wings – nur gegnerische Quelle; ohne Quelle geschützt
     const ownerIdx = inst.owner;
     if (!this.gs.players[ownerIdx]) return false;
+    // W71b (Al, 25.10.2026): wird eine Kreatur als EFFEKT in die Ablage geschickt (Breakthrough auf eine offene Surprise-Kreatur), fragt das Schutzfenster (Cool Rescuer Monia & Co.);
+    // die Kosten-Wege (Barrier of Faith, Weapon Storm …: eigene Karten abwerfen) setzen `fenster` nicht.
+    if (opts.fenster && zone === ZONES.SUPPORT && !(await this.kreaturBetroffen(inst, 'destroy', opts.source ?? opts.sourceName ?? null, { sourceOwner: opts.sourceOwner, detail: 'discard' }))) return false;
     // W73d (Leafagami Snake): die Ability bleibt liegen, der Kontrolleur zieht — der Abwurf gilt für den Aufrufer (Kosten!) trotzdem als erfolgt.
     if (await this.abilityEntfernungVerhindert(inst, ZONES.DISCARD, opts)) return true;
     if (zone === ZONES.SUPPORT) {

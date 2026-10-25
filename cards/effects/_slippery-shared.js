@@ -126,6 +126,9 @@ async function moveSlipperyCreature(engine, pi, inst, destHeroIdx, destSlot, opt
   const srcIdx = srcArr.indexOf(inst.name);
   if (srcIdx < 0) return false;
   if (((ps.supportZones?.[destHeroIdx] || [])[destSlot] || []).length > 0 && !teilbarZiel(engine, inst, destHeroIdx, destSlot)) return false;   // W63a: belegt nur ok, wenn geteilt (Alice)
+  // W71b (Al, 25.10.2026): das Versetzen einer ANDEREN Kreatur (Pengus Zusatz, `opts.fremd`) ist ein Effekt auf sie — Schutzfenster (Cool Rescuer Monia & Co.); das eigene Gleiten
+  // einer Slippery-Kreatur am Zugbeginn ist ihr eigener Text (kein Fenster).
+  if (opts.fremd && !(await engine.kreaturBetroffen(inst, 'move', { name: opts.fremdName || 'Slippery Pengu', owner: pi }, { sourceOwner: pi, detail: 'slide' }))) return false;
 
   // Suppress the diff-detector's spurious damage-floater on the
   // source slot as the Creature leaves it.

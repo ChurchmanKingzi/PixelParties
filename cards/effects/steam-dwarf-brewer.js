@@ -89,6 +89,11 @@ module.exports = attachSteamEngine({
     });
     await engine._delay(300);
 
+    // W71b (Al, 25.10.2026): das Setzen der HP einer ANDEREN Kreatur ist ein Effekt auf sie — Schutzfenster (Cool Rescuer Monia & Co.) VOR dem Schreiben; negiert = Kreatur unverändert.
+    if (!(await engine.kreaturBetroffen(target.cardInstance, 'stats', { name: CARD_NAME, owner: pi }, { sourceOwner: pi, detail: 'set_hp' }))) {
+      engine.sync();
+      return true;
+    }
     // Apply the HP change — both increase and decrease paths are
     // handled by the shared helper.
     const delta = setCreatureHp(engine, target.cardInstance, myMax);

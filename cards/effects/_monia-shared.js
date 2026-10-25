@@ -84,16 +84,21 @@ function angenommenesAngebot(gs, key) {
   return (gs?._moniaAngebote || []).find(a => a.key === key && a.seite != null);
 }
 
-/** Hat dieser Kontrolleur das Angebot fuer diese Karte/diesen Effekt in dieser Aufloesung schon abgelehnt? */
-function angebotAbgelehnt(gs, key, pi) {
-  return (gs?._moniaAngebote || []).some(a => a.key === key && a.pi === pi && a.seite == null);
+/**
+ * Hat dieser Kontrolleur das Angebot fuer diese Karte/diesen Effekt in dieser Aufloesung schon abgelehnt?
+ * ★ W71b: `seite` (optional) = Brettseite der Kreatur, um die es jetzt geht. Eine Ablehnung gilt fuer den GANZEN Effekt (`fuer` fehlt: Schadensstapel mit beiden Seiten zur Wahl) oder nur fuer die
+ * Seite, die abgelehnt wurde (`fuer`: das Einzelfenster einer Kreatur) — trifft ein Effekt nacheinander erst eine Kreatur des Gegners (abgelehnt), dann eine eigene, fragt Monia fuer diese
+ * eigene Seite noch einmal (ein Angebot je Karte/Effekt UND Seite).
+ */
+function angebotAbgelehnt(gs, key, pi, seite) {
+  return (gs?._moniaAngebote || []).some(a => a.key === key && a.pi === pi && a.seite == null && (a.fuer == null || seite == null || a.fuer === seite));
 }
 
-/** Angebot festhalten: `seite` = geschuetzte Seite oder null (abgelehnt). */
-function angebotMerken(gs, key, pi, seite) {
+/** Angebot festhalten: `seite` = geschuetzte Seite oder null (abgelehnt); `fuer` (nur bei Ablehnung, W71b) = die Seite, fuer die abgelehnt wurde (sonst: fuer den ganzen Effekt). */
+function angebotMerken(gs, key, pi, seite, fuer) {
   if (!gs) return;
   if (!Array.isArray(gs._moniaAngebote)) gs._moniaAngebote = [];
-  gs._moniaAngebote.push({ key, pi, seite: seite == null ? null : seite });
+  gs._moniaAngebote.push({ key, pi, seite: seite == null ? null : seite, ...(seite == null && fuer != null ? { fuer } : {}) });
 }
 
 /** Ende der Aufloesung: Schildmarke und Angebote fallen. */
@@ -102,6 +107,7 @@ function angeboteBeenden(gs) {
   delete gs._moniaShieldActive;
   delete gs._moniaShieldSource;
   delete gs._moniaAngebote;
+  delete gs._kreaturFenster;   // W71b: Fenster-Buchführung von `engine.kreaturBetroffen`
 }
 
 module.exports = {

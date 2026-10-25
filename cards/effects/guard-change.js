@@ -177,6 +177,8 @@ async function moveCreature(engine, pi, inst, destOwner, destHeroIdx, destSlot) 
   if (sIdx < 0) return false;
   if (((dps.supportZones?.[destHeroIdx] || [])[destSlot] || []).length > 0
       && !require('./_alice-shared').canShareInto(engine, engine.kontrolleurVon(inst), destHeroIdx, destSlot, inst, destOwner)) return false;   // W63a: belegt nur ok, wenn geteilt (Alice)
+  // W71b (Al, 25.10.2026): Verschieben durch eine Karte ist ein Effekt auf die Kreatur — Schutzfenster (Cool Rescuer Monia & Co.), VOR der ersten Änderung; negiert = Kreatur bleibt stehen.
+  if (!(await engine.kreaturBetroffen(inst, 'move', { name: 'Guard Change', owner: pi }, { sourceOwner: pi, detail: 'reposition' }))) { engine.gs._gcNegiert = true; return false; }
 
   engine._broadcastEvent('creature_zone_move', { owner: aSeite, heroIdx: sH, zoneSlot: sS });
   sArr.splice(sIdx, 1);
@@ -216,6 +218,9 @@ async function swapCreatures(engine, pi, a, b) {
   const aIdx = aArr.indexOf(a.name);
   const bIdx = bArr.indexOf(b.name);
   if (aIdx < 0 || bIdx < 0) return false;
+  // W71b (Al, 25.10.2026): Verschieben durch eine Karte ist ein Effekt auf die Kreatur — Schutzfenster (Cool Rescuer Monia & Co.), VOR der ersten Änderung; negiert = Kreatur bleibt stehen.
+  if (!(await engine.kreaturBetroffen(a, 'move', { name: 'Guard Change', owner: pi }, { sourceOwner: pi, detail: 'swap' }))) { engine.gs._gcNegiert = true; return false; }
+  if (!(await engine.kreaturBetroffen(b, 'move', { name: 'Guard Change', owner: pi }, { sourceOwner: pi, detail: 'swap' }))) { engine.gs._gcNegiert = true; return false; }
 
   engine._broadcastEvent('creature_zone_move', { owner: aSeite, heroIdx: aH, zoneSlot: aS });
   engine._broadcastEvent('creature_zone_move', { owner: bSeite, heroIdx: bH, zoneSlot: bS });
@@ -369,7 +374,19 @@ module.exports = {
         return;
       }
 
+      delete gs._gcNegiert;
       const movedCount = await runGuardChangeMode(engine, pi);
+
+      // W71b: hat ein Schutzfenster (Cool Rescuer Monia & Co.) das Versetzen NEGIERT, war der Zauber gespielt (Karte verbraucht, Sperre belegt, Aktion bezahlt) — er wirkte nur nicht.
+      // Nur wenn der Spieler von sich aus nichts bewegt hat, gilt „min. 1" als Abbruch.
+      if (movedCount === 0 && gs._gcNegiert) {
+        delete gs._gcNegiert;
+        engine.claimHOPT(HOPT_KEY, pi);
+        engine.log('guard_change_negated', { player: ps.username });
+        engine.sync();
+        return;
+      }
+      delete gs._gcNegiert;
 
       // "min. 1" — nothing repositioned ⇒ the Spell does nothing;
       // return it to hand (no HOPT spent, no Action burned).
