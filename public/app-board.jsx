@@ -34759,6 +34759,19 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
   // the handPick prompt's cardTypes / typeLimits).
   const galleryCardTypes = ep.cardTypes || null;
   const galleryTypeLimits = ep.typeLimits || null;
+  // ★ Quellenregeln (CARD_API „Mehrere Quellen = ein Picker", 26.10.): Einträge tragen `source` (hand / deck / discard …). `sourceMax` = Höchstzahl je Quelle ({ hand: 3, deck: 1 });
+  // `exclusiveSources`: sobald ein Eintrag gewählt ist, sind ALLE Einträge anderer Quellen ausgegraut (Stellan/Stellin: „1 aus dem Deck ODER bis zu 3 aus der Hand"). Hat die Galerie
+  // mehr als eine Quelle, zeigt jeder Eintrag sein Herkunfts-Abzeichen (HAND / DECK …) wie die Einzelwahl.
+  const sourceMax = ep.sourceMax && typeof ep.sourceMax === 'object' ? ep.sourceMax : null;
+  const exclusiveSources = !!ep.exclusiveSources;
+  const mehrereQuellen = new Set(cards.map(c => c && c.source).filter(Boolean)).size > 1;
+  const quelleGesperrt = (auswahl, idx) => {
+    const src = cards[idx]?.source;
+    if (exclusiveSources && auswahl.length > 0 && cards[auswahl[0]]?.source !== src) return true;
+    if (sourceMax && src != null && sourceMax[src] !== undefined
+        && auswahl.filter(i => cards[i]?.source === src).length >= sourceMax[src]) return true;
+    return false;
+  };
   // Track selections by gallery INDEX rather than card name so duplicate
   // names (e.g. Spontaneous Reappearance showing 3 copies of the same
   // card in the discard pile) can be checked / unchecked independently.
@@ -34841,6 +34854,7 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
         return prev.filter(i => i !== idx);
       }
       if (prev.length >= maxSelect) return prev;
+      if (quelleGesperrt(prev, idx)) return prev;
       // Late-stage unique-floor gate — when slots are at the floor,
       // only NEW unique-from-list names are allowed in. Re-derive
       // here against `prev` (toggleCard's setState callback runs
@@ -34898,6 +34912,7 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
     onRespond({
       selectedCards: selected.map(i => cards[i]?.name).filter(Boolean),
       selectedIndices: [...selected],
+      selectedSources: selected.map(i => cards[i]?.source ?? null),
     });
   };
 
@@ -35015,7 +35030,8 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
               // Already-selected cards are exempt so the player can
               // still toggle them off if they made a mistake.
               const blockedByUniqueGate = onlyNewUniqueAllowed && !isSel && !isNewUniqueContribution(i);
-              const dimmed = wouldExceedBudget || atMax || blockedByUniqueGate || wouldExceedTypeCap || dupName;
+              const blockedBySource = !isSel && quelleGesperrt(selected, i);
+              const dimmed = wouldExceedBudget || atMax || blockedByUniqueGate || wouldExceedTypeCap || dupName || blockedBySource;
               // Pile-side badge for Guardian Beast deletion pickers:
               // entries from the activator's discard pile carry
               // `pileSide: 'own'`, opp's pile entries `pileSide: 'opp'`.
@@ -35036,6 +35052,20 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
                       outline: isSel ? '3px solid var(--accent)' : 'none',
                       filter: isSel ? 'brightness(1.2)' : (dimmed ? 'brightness(0.4) saturate(0.3)' : 'none'),
                     }} />
+                  {mehrereQuellen && entry.source && (
+                    <div className="gallery-source-badge" style={{
+                      background: entry.source === 'hand' ? 'rgba(75,205,124,.85)'
+                        : entry.source === 'discard' ? 'rgba(126,65,186,.85)'
+                        : entry.source === 'stack' ? 'rgba(127,223,255,.9)'
+                        : entry.source === 'outside' ? 'rgba(251,200,106,.9)'
+                        : 'rgba(78,130,203,.85)',
+                    }}>
+                      {entry.source === 'hand' ? 'HAND' : entry.source === 'discard' ? 'DISCARD' : entry.source === 'stack' ? 'STACK' : entry.source === 'outside' ? 'OUTSIDE' : 'DECK'}
+                    </div>
+                  )}
+                  {mehrereQuellen && entry.count > 1 && (
+                    <div style={{ position: 'absolute', bottom: 3, right: 3, background: 'rgba(0,0,0,.75)', color: '#fff', fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 3, pointerEvents: 'none', zIndex: 5, border: '1px solid rgba(255,255,255,.25)' }}>×{entry.count}</div>
+                  )}
                   {isSel && <div style={{ position: 'absolute', top: 3, right: 3, background: 'var(--accent)', color: '#000', fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 3, zIndex: 5 }}>✓</div>}
                   {pileBadge && <div style={{ position: 'absolute', top: 3, left: 3, background: pileBadge.bg, color: pileBadge.color, fontSize: 9, fontWeight: 800, padding: '1px 5px', borderRadius: 3, zIndex: 5, letterSpacing: '0.5px', textShadow: '0 0 2px rgba(0,0,0,0.9)' }}>{pileBadge.text}</div>}
                   {_budgetCap != null && !ep.hideCostUI && <div style={{ position: 'absolute', bottom: 3, left: 3, background: 'rgba(0,0,0,.7)', color: '#fad54a', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, zIndex: 5 }}>{entryCost}G</div>}
