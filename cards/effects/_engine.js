@@ -57432,6 +57432,31 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     };
     this.queuePostChainAction(this._equipMergeFn);
+    // Zusaetzlich (Al, 25.10.: im Puzzle-Modus blieb der Stapel nach dem Heilen getrennt): die Nach-Ketten-Warteschlange wird nur an Handler-Enden geleert und wartet dort auf ein
+    // „Brett ruhig"-Tor. Damit die Zusammenfuehrung nicht bis zur naechsten Aktion haengt, versucht ein Zeitgeber sie, sobald das Brett ruhig ist.
+    if (!this._inMctsSim && !this._fastMode && !this._equipMergeTimer) this._equipMergeTimerSetzen(0);
+  }
+
+  _equipMergeTimerSetzen(versuch) {
+    this._equipMergeTimer = setTimeout(() => {
+      this._equipMergeTimer = null;
+      this._equipMergeVersuch(versuch).catch(err => console.error('[Engine] Equip-Stapel (Zeitgeber):', err.message));
+    }, versuch === 0 ? 400 : 500);
+    this._equipMergeTimer.unref?.();
+  }
+
+  async _equipMergeVersuch(versuch) {
+    if (this._aborted || this.gs?.result || this._equipMergeLaeuft) return;
+    const es = require('./_equip-stack-shared');
+    let bedarf;
+    try { bedarf = es.zusammenfuehrenBedarf(this); } catch { return; }
+    if (!bedarf.length) return;                                   // inzwischen erledigt (Nach-Ketten-Aktion)
+    const gs = this.gs;
+    const ruhig = !this._inReactionCheck && !gs?.surprisePending && !((gs?._spellResolutionDepth || 0) > 0)
+      && !(gs?.players || []).some(p => p && p._resolvingCard) && !this._runningPostChain && !gs?.effectPrompt && !gs?.potionTargeting;
+    if (!ruhig) { if (versuch < 40) this._equipMergeTimerSetzen(versuch + 1); return; }
+    if (this._equipMergeFn) this._postChainActions = (this._postChainActions || []).filter(f => f !== this._equipMergeFn);
+    await this._equipMergeFn?.();
   }
 
   sync() {
