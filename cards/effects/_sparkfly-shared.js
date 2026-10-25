@@ -233,12 +233,16 @@ function collectNonHeroBoardTargets(gs, engine) {
     if (inst.zone === 'support') {
       const sa = supportAbilityZiel(engine, inst);   // 25.10.: Ability in einer Support Zone = Ability-Stapel (ein Ziel, oberste Kopie)
       if (sa !== undefined) { if (sa) targets.push(sa); continue; }
+      // ★ Darion: mehrere Equips im selben Platz = EIN Ziel je Platz (wie `_targeting-shared`); welche Karte gemeint ist, fragt `engine._disambiguateStackedTargets`.
+      const _id = `equip-${_brettSeite(engine, inst)}-${inst.heroIdx}-${inst.zoneSlot}`;
+      const _erstes = targets.find(x => x.id === _id);
+      if (_erstes && engine.istEquipArtifact && engine.istEquipArtifact(inst) && engine.istEquipArtifact(_erstes._cardInstance)) continue;
       targets.push({
         // ★ 26.9. (Als Befund, Crimson Web): ID und `owner` nennen die Seite, auf
         // der die Zone LIEGT — sonst findet der Client sie nicht. Eine an
         // den Angreifer angelegte Crimson Web gehoert dem Verteidiger,
         // steckt aber in einer Support Zone des Angreifers.
-        id: `equip-${_brettSeite(engine, inst)}-${inst.heroIdx}-${inst.zoneSlot}`,
+        id: _id,
         type: 'equip', owner: _brettSeite(engine, inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
         cardName: inst.name, _cardInstance: inst,
       });
@@ -420,8 +424,9 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
       // Nur DIESE Karte nehmen: liegen mehrere Karten im Platz (Darion: Equip-Stapel; Alices Kreaturenstapel; ein Ability-Stapel von Xal/Xalibur), bleiben die anderen liegen.
       const arr = ownerPs.supportZones[heroIdx][zoneSlot];
       // Ein Ability-Stapel verliert seine OBERSTE Kopie (letzter gleichnamiger Eintrag, die Stufe sinkt um 1).
-      const idx = Array.isArray(arr) ? (_supAbility ? arr.lastIndexOf(cardName) : arr.indexOf(cardName)) : -1;
+      const idx = Array.isArray(arr) && _supAbility ? arr.lastIndexOf(cardName) : -1;
       if (idx >= 0 && arr.length > 1) arr.splice(idx, 1);
+      else if (Array.isArray(arr) && !_supAbility && arr.length > 1 && arr.includes(cardName)) engine.entferneNameAmPlatz(arr, targetInst);   // Darion: nur die Karte, nicht den ganzen Platz
       else ownerPs.supportZones[heroIdx][zoneSlot] = [];
     }
   } else if (zone === 'ability') {
@@ -454,6 +459,7 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
   // Fire onCardLeaveZone for the moved card so any departing-listeners
   // (Pollution Piranha leave-hand-discard etc.) react before we stamp
   // it as hand-resident.
+  // ★ Darion (Equip-Stapel): `leavingCard` benennt die abgehende Karte — ohne sie hoeren auch die Stapelnachbarn „ich verlasse die Zone" (gleiche Koordinaten) und nehmen ihre Boni zurueck.
   await engine.runHooks('onCardLeaveZone', {
     card: targetInst,
     leavingCard: targetInst,   // 25.10.: ohne `leavingCard` erkennt die Engine eine Ability in einer Support Zone nicht (Fighting nimmt sonst seinen ATK-Bonus nicht zurück)

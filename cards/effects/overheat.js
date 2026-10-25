@@ -105,7 +105,7 @@ module.exports = {
       if (!ps || !hero?.name || hero.hp <= 0) { gs._spellCancelled = true; return; }
 
       // ── 1. Das Artefakt ──
-      const ziele = ausruestung(engine).map(i => artefaktZiel(engine, i));
+      const ziele = require('./_equip-stack-shared').gruppiereZiele(ausruestung(engine).map(i => artefaktZiel(engine, i)));   // Darion: ein Ziel je Stapelplatz, die Rueckfrage nennt nur die zulaessigen Karten
       if (ziele.length === 0) { gs._spellCancelled = true; return; }
       const gewaehlt = await engine.promptEffectTarget(pi, [...ziele, ...ausgegrauteRestkarten(engine, ziele)], {
         title: CARD_NAME, source: CARD_NAME,

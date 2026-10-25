@@ -134,8 +134,12 @@ async function runMove(engine, inst, ctx) {
   if (!picked || picked.length === 0) return false;
   const tgt = allTargets.find(t => targetToPromptEntry(t).id === picked[0]);
   if (!tgt) return false;
+  // Darion: alle Equips eines Stapels teilen die Ziel-ID — `allTargets.find` trifft immer die erste Karte. Die Rueckfrage der Engine
+  // („welches Equip?") schreibt die Wahl auf den Eintrag der Zielliste (`targetEntries`); von dort kommt die gewaehlte Karte.
+  const eintrag = targetEntries.find(e => e.id === picked[0]);
+  const ziel = (eintrag && eintrag.type === 'equip' && eintrag.cardInstance) ? eintrag.cardInstance : tgt.ref;
 
-  moveChangeCounters(engine, inst, tgt.ref, n);
+  moveChangeCounters(engine, inst, ziel, n);
   if (!ctx._borrowedUse) stampHopt(gs, HOPT_MOVE, inst.id);   // W13 (Al, Rueckfrage 9): geliehene Verwendung verbraucht den Stempel NICHT
   ctx._skipCreatureEffectHopt = true; // engine HOPT bypassed; script-level wins
   return true;

@@ -19,6 +19,18 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const { istEquipKartenname } = require('./_equip-shared');
+const { hasCardType } = require('./_hooks');
+
+/**
+ * Gehoert diese Instanz zum Equip-Stapel? Wie `engine.istEquipArtifact`, aber auch ein Equipment, das zusaetzlich als Kreatur zaehlt
+ * (Tempeste Moana: cardType „Artifact/Creature", Subtyp bleibt „Equipment") — es liegt weiter im Stapel und ist eines seiner Equips.
+ */
+function istStapelEquip(engine, inst) {
+  if (engine.istEquipArtifact(inst)) return true;
+  if (!inst || inst.zone !== 'support' || inst.counters?._keinEquip || inst.counters?._gainedEffectOnly) return false;
+  const cd = engine.getEffectiveCardData?.(inst) || engine._getCardDB()[inst.name];
+  return !!cd && hasCardType(cd, 'Artifact') && (cd.subtype || '').toLowerCase() === 'equipment';
+}
 
 /** Teilt dieser Held seine Equips? (Held lebt, Skript-Flag `equipsShareZone`, Effekt nicht stumm) */
 function teilenAktiv(engine, seite, heroIdx) {
@@ -38,7 +50,7 @@ function equipsAt(engine, seite, heroIdx, slot) {
     if (inst.zone !== 'support' || inst.heroIdx !== heroIdx || inst.zoneSlot !== slot) continue;
     if (inst.faceDown) continue;
     if (engine.physicalSide(inst) !== seite) continue;
-    if (!engine.istEquipArtifact(inst)) continue;
+    if (!istStapelEquip(engine, inst)) continue;
     out.push(inst);
   }
   return out;
@@ -133,4 +145,25 @@ async function waehleMehrere(engine, pi, insts, { title, description, mindestens
   return gewaehlt;
 }
 
-module.exports = { waehleMehrere, teilenAktiv, equipsAt, stapelPlatz, pflichtPlatzFuer, stapelTiefe, beschreibe, hatStapelPlatz, freieEquipZonen };
+/**
+ * ★ Skripte, die ihre Zielliste JE KARTE aufbauen (eine Zeile pro Instanz, eigene Filter wie `immovable`, `darfAn`, Preis …), liefern fuer einen Equip-Stapel mehrere Ziele mit DERSELBEN ID.
+ * Die Engine fragt dann bei der Wahl nach „welches Equip?" (`_disambiguateStackedTargets`) und kennt die Filter des Skripts nicht — sie bot alle Karten des Platzes an.
+ * Diese Funktion fasst Ziele mit gleicher ID zu EINEM zusammen (das erste) und vermerkt die vom Skript zugelassenen Karten in `_erlaubteInstanzen`; Einzelkarten bleiben unveraendert.
+ */
+function gruppiereZiele(ziele) {
+  const proId = new Map();
+  const out = [];
+  for (const z of ziele) {
+    const inst = z && z.type === 'equip' ? (z.cardInstance || z._cardInstance) : null;
+    if (!inst) { out.push(z); continue; }
+    // Gleiche ID UND gleiche Kontrolle: seitenfremd gelegte Karten (Plant Golem …) koennen die ID einer Karte auf der anderen Brettseite tragen — das ist KEIN Stapel.
+    const schluessel = z.id + '|' + (inst.controller ?? inst.owner);
+    const g = proId.get(schluessel);
+    if (!g) { proId.set(schluessel, { ziel: z, ids: [inst.id] }); out.push(z); }
+    else g.ids.push(inst.id);
+  }
+  for (const g of proId.values()) if (g.ids.length > 1) g.ziel._erlaubteInstanzen = g.ids;
+  return out;
+}
+
+module.exports = { gruppiereZiele, waehleMehrere, teilenAktiv, equipsAt, stapelPlatz, pflichtPlatzFuer, stapelTiefe, beschreibe, hatStapelPlatz, freieEquipZonen };

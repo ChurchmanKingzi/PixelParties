@@ -142,7 +142,7 @@ module.exports = {
       const heldLebt = !!(tgtHero && tgtHero.hp > 0);
       const anhaengsel = heldLebt ? anhaengselZiele(engine, target.owner, target.heroIdx) : [];
       const areas = areaZiele(engine);
-      const angebot = [...anhaengsel, ...areas];
+      const angebot = [...require('./_equip-stack-shared').gruppiereZiele(anhaengsel), ...areas];   // Darion: ein Ziel je Stapelplatz, die Rueckfrage nennt nur die zulaessigen Karten
       if (angebot.length === 0) { engine.sync(); return; }
 
       const beschr = anhaengsel.length > 0

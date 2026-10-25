@@ -154,7 +154,13 @@ module.exports = {
     }
 
     let opfer = kandidaten[0];
-    if (kandidaten.length > 1) {
+    if (kandidaten.length > 1 && new Set(kandidaten.map(i => i.zoneSlot)).size < kandidaten.length) {
+      // Darion: mehrere Artefakte teilen EINEN Platz (auch gleichnamige) — die Galerie wuerde nur den Namen liefern und immer die erste Kopie treffen; gefragt wird je Karte (Bild-Galerie `instancePick`).
+      const gew = await require('./_equip-stack-shared').waehleMehrere(engine, pi, kandidaten, {
+        title: CARD_NAME, description: 'Choose the Artifact to delete.', mindestens: 1, hoechstens: 1,
+      });
+      opfer = gew[0] || kandidaten[0];
+    } else if (kandidaten.length > 1) {
       const wahl = await engine.promptGeneric(pi, {
         type: 'cardGallery', title: CARD_NAME,
         description: "Choose the Artifact to delete.",
