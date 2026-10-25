@@ -26,7 +26,9 @@
 //     first 2 mandatory discards, a "Done"
 //     button appears so the player can stop. The
 //     last card auto-ends the prompt. Hydra
-//     gains 1 Head Counter per discarded card.
+//     gains 1 Head Counter per discarded card
+//     PLUS 1 (W71a, Al: Kartentext "place that
+//     many Head Counters +1 on it" = X+1).
 //
 //  HARD GATE — Hydra's `canSummon` REFUSES to
 //  let the engine surface her as playable when
@@ -53,6 +55,8 @@ const CARD_NAME = 'Cute Hydra';
 const RESCUE_HAND_THRESHOLD = 3;
 const SUMMON_DISCARD_MIN = 2;
 const HOPT_DAMAGE = 100;
+/** W71a (Al): "place that many Head Counters +1 on it" - X abgeworfene Karten geben X+1 Counter. */
+const HEAD_BONUS = 1;
 
 // ─── HELPERS ─────────────────────────────
 
@@ -132,7 +136,8 @@ module.exports = {
     // defer to default so the brain keeps loading Hydra against
     // bigger boards while the cards being discarded are cheap.
     if (type === 'forceDiscardCancellable') {
-      const cpuIdx = engine._cpuPlayerIdx;
+      // W71a: die Frage nennt ihren Spieler (`controllerIdx`) - sonst zaehlte die CPU auf Sitz 1 die Ziele der EIGENEN Seite.
+      const cpuIdx = promptData.controllerIdx ?? engine._cpuPlayerIdx;
       const oppIdx = engine.opponentOf(cpuIdx);
       const opp = engine.gs.players[oppIdx];
       if (!opp) return undefined;
@@ -148,7 +153,9 @@ module.exports = {
         }
       }
 
-      const currentHeads = promptData.currentDiscardCount || 0;
+      // W71a: Counter = Abwuerfe + HEAD_BONUS (Kartentext "+1"). Sie zaehlen
+      // schon JETZT, nicht erst ab dem naechsten Abwurf.
+      const currentHeads = (promptData.currentDiscardCount || 0) + HEAD_BONUS;
       // The ABOUT-TO-BE-discarded card would push the Head count to
       // `currentHeads + 1`. If `currentHeads` already meets / exceeds
       // viableTargets, that next discard buys nothing — click Done.
@@ -207,7 +214,7 @@ module.exports = {
       cancellable: true,
       gerrymanderEligible: true, // True "you may" — opt-in rescue summon.
     });
-    if (!confirmed) return; // ctx.rescued stays false → deletion proceeds
+    if (!confirmed || confirmed.cancelled || confirmed.confirmed === false) return; // ctx.rescued stays false → deletion proceeds
 
     // Pick destination Support Zone.
     // Kontrolle statt Seite (Styx 28.9.): Zonen tragen `owner` (physische Seite).
@@ -316,8 +323,8 @@ module.exports = {
           type: isMandatory ? 'forceDiscard' : 'forceDiscardCancellable',
           title: CARD_NAME,
           description: isMandatory
-            ? `Discard ${remaining} more card${remaining > 1 ? 's' : ''}. Each becomes a Head Counter on ${CARD_NAME}. (So far: ${discarded}.)`
-            : `Click another hand card to add a Head Counter, or click "Done" to stop. (Head Counters: ${discarded}.)`,
+            ? `Discard ${remaining} more card${remaining > 1 ? 's' : ''}. Each becomes a Head Counter on ${CARD_NAME}, plus ${HEAD_BONUS} more. (Discarded so far: ${discarded}.)`
+            : `Click another hand card to add a Head Counter, or click "Done" to stop. (Head Counters: ${discarded + HEAD_BONUS}.)`,
           instruction: 'Click a card in your hand to discard it.',
           cancellable: !isMandatory,
           cancelLabel: 'Done',
@@ -325,6 +332,7 @@ module.exports = {
           // can decide whether further discards add useful Head Counters
           // — see this script's `cpuResponse` below.
           currentDiscardCount: discarded,
+          controllerIdx: pi,
         });
 
         // Voluntary stop after the minimum is met.
@@ -349,9 +357,11 @@ module.exports = {
       });   // end withDiscardBatch
 
       if (discarded > 0) {
-        inst.counters.headCounter = (inst.counters.headCounter || 0) + discarded;
+        // W71a (Al): "place that many Head Counters +1 on it" = X+1.
+        const gained = discarded + HEAD_BONUS;
+        inst.counters.headCounter = (inst.counters.headCounter || 0) + gained;
         engine.log('cute_hydra_head_counters', {
-          player: ps.username, gained: discarded,
+          player: ps.username, gained, discarded,
           total: inst.counters.headCounter,
         });
       } else {

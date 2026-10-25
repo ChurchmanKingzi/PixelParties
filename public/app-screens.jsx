@@ -4678,7 +4678,7 @@ function RulesScreen({ onBack }) {
               <p className="rules-callout">Ascending a Hero immediately ends your turn!</p>
               <p>When a Hero Ascends, it gains new stats, but keeps any damage it already had as well as status effects and any other effects that affected it.</p>
               <h3 className="rules-sub-title orbit-font" style={{ color: '#a040ff' }}>Ascension Bonus</h3>
-              <p>When a Hero Ascends, its Ascension Bonus is applied. If the bonus specifies Abilities, you may attach them from your hand, deck, or discard pile to the Ascended Hero immediately. You may choose to attach fewer copies than specified. Other Ascension Bonuses apply a different effect instead.</p>
+              <p>When a Hero Ascends, its Ascension Bonus is applied. If the bonus specifies Abilities, you may attach them from your hand, deck, or discard pile to the Ascended Hero immediately. If it lists more than one Ability, choose one of them ("or", not "and"). You may choose to attach fewer copies than specified. Other Ascension Bonuses apply a different effect instead.</p>
             </div>
           </div>
 

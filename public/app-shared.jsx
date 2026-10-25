@@ -8992,10 +8992,8 @@ function ascensionBonusText(card) {
   if (abilities.length > 0) {
     const quelle = 'from your deck, hand and/or discard pile to this Hero.';
     if (abilities.length === 1) return `Attach up to ${abilities[0].n} copies of ${abilities[0].name} ${quelle}`;
-    // Mehrere Abilities: jede einzeln bis zu N (die Engine fragt je Ability getrennt).
-    if (abilities.every(a => a.n === abilities[0].n))
-      return `Attach up to ${abilities[0].n} copies each of ${abilities.map(a => a.name).join(' and ')} ${quelle}`;
-    return `Attach ${abilities.map(a => `up to ${a.n} copies of ${a.name}`).join(' and ')} ${quelle}`;
+    // Mehrere Abilities: ODER, nicht UND (Al, W71a) - die Engine laesst den Spieler EINE waehlen ("Choose one").
+    return `Attach ${abilities.map(a => `up to ${a.n} copies of ${a.name}`).join(' or ')} ${quelle}`;
   }
   // Unbekannte Form: das Stichwort der Karte als Satz stehen lassen.
   const text = felder.join(' ');

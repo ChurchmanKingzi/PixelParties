@@ -1,7 +1,8 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Arthor, Inheritor of the Barbarian Sword"
 //  Ascended Hero — 550 HP, 80 ATK — BANNED
-//  Starting abilities: Fighting 3, Summoning Magic 3
+//  Ascension bonus: Fighting 3 OR Summoning Magic 3 (W71a, Al: ODER, nicht UND -
+//  `performAscensionBonus` laesst den Spieler EINE Alternative waehlen)
 //
 //  Ascension condition (base Arthor + both equips):
 //  "Legendary Sword of a Barbarian King" AND

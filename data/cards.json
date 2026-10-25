@@ -9252,7 +9252,7 @@
     "hp": null,
     "atk": null,
     "cost": 4,
-    "effect": "Look at as many of the top cards of your deck as there are \"Future Tech Lamp\" cards in your discard pile +1. Add all Artifacts you find among those cards to your hand \nand shuffle the rest of the cards back into your deck.",
+    "effect": "Look at as many of the top cards of your deck as there are \"Future Tech Lamp\" cards in your discard pile +1. Add all Artifacts you find among those cards to your hand and shuffle the rest of the cards back into your deck. You can only play 1 \"Future Tech Lamp\" per turn.",
     "archetype": "Future Tech",
     "setID": "PP GBT",
     "banned": "",
