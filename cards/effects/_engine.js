@@ -36883,6 +36883,8 @@ this._deathWatch = (this._deathWatchStack || []).length
           && !script[triggerFlag](this.gs, playerIdx, entry.heroIdx, triggerInfo, this, seite)) continue;
 
       const canActivateOpts = entry.isBakhmSlot ? { isBakhmSlot: true } : { reaktor: playerIdx };
+      // ★ W78 (Bounce Trap: „… this Surprise's level becomes 0"): eine Surprise darf für DIESEN Auslöser Stufe 0 verlangen (`surpriseLevelZero`, dieselbe Signatur wie der typisierte Auslöser).
+      try { if (typeof script.surpriseLevelZero === 'function' && script.surpriseLevelZero(this.gs, playerIdx, entry.heroIdx, triggerInfo, this, seite)) canActivateOpts.stufeNull = true; } catch (err) { console.error(`[surpriseLevelZero] ${entry.cardName}:`, err.message); }
       if (!this._canHeroActivateSurprise(seite, entry.heroIdx, entry.cardName, canActivateOpts)) continue;
 
       const heroName = this.gs.players[seite]?.heroes?.[entry.heroIdx]?.name || 'Hero';
@@ -43002,7 +43004,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _lvQuelle = reaktor !== playerIdx ? { levelSourcePi: reaktor } : undefined;
     // 24.10. (Reverse Trap): eine verdeckt gelegte Surprise mit Stufe-0-Marke („its level becomes 0 … on the board") braucht keine Stufe.
     const _stufeNullBrett = !opts.spellInHand && this.cardInstances.some(c => c.name === cardName && c.zone === ZONES.SURPRISE && c.heroIdx === heroIdx && this.physicalSide(c) === playerIdx && c.counters?._rtLevel0);
-    if (!_stufeNullBrett && !this.heroMeetsLevelReq(playerIdx, heroIdx, cardData, _lvQuelle)) return false;
+    if (!_stufeNullBrett && !opts.stufeNull && !this.heroMeetsLevelReq(playerIdx, heroIdx, cardData, _lvQuelle)) return false;   // W78: `opts.stufeNull` = die Surprise verlangt für diesen Auslöser Stufe 0 (Bounce Trap)
 
     // ★★ v1154 („Santa Klaus", Als Befund 17.9.): dieselben Helden-
     // Sperren wie im normalen Spielweg (`validateActionPlay`) — das
@@ -49218,6 +49220,14 @@ this._deathWatch = (this._deathWatchStack || []).length
 
         result.push({ heroIdx: hi, heroName: hero.name, equippedCard: inst.name });
         // No break — allow multiple equipped hero effects per hero
+      }
+    }
+
+    // ★ W78 (True Form): „Transform back" — jederzeit im eigenen Zug (Main- und Action Phase), ohne Aktion, mehrfach möglich.
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      if (opts.onlyHeroIdx != null && hi !== opts.onlyHeroIdx) continue;
+      if (this.trueFormRevertInfo(playerIdx, playerIdx, hi)) {
+        result.push({ heroIdx: hi, heroName: ps.heroes[hi].name, effectName: 'Transform back', trueFormRevert: true });
       }
     }
 
@@ -58980,6 +58990,55 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     this.sync();
     return { success: true, newName };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  ★ W78 — TRUE FORM (Zurückverwandeln)
+  //  „You may at any time during your turn remove a Hero placed by this effect and send it to the discard pile to remove this effect."
+  //  Der Held trägt die Form als `plainHeroForm` auf dem Formstapel (`_formStack`, wie Tri Ad/Open Invitation); `hero._trueForm` merkt sich je
+  //  True-Form-Schicht die Stapeltiefe, in der sie liegt. Nur die OBERSTE Schicht darf entfernt werden, und nur, wenn die Form darunter
+  //  keinen Namensdoppelgänger unter den eigenen Helden erzeugt.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Kann der Held (`hs` = Brettseite, `heroIdx`) von `pi` jetzt eine True-Form-Schicht abwerfen?
+   * @returns {{ formName: string, baseName: string }|null}
+   */
+  trueFormRevertInfo(pi, hs, heroIdx) {
+    const hero = this.gs.players[hs]?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return null;
+    const marks = hero._trueForm;
+    if (!Array.isArray(marks) || marks.length === 0) return null;
+    const stack = Array.isArray(hero._formStack) ? hero._formStack : [];
+    while (marks.length && marks[marks.length - 1] > stack.length) marks.pop();   // Schicht wurde anders entfernt
+    if (marks.length === 0) { delete hero._trueForm; return null; }
+    if (marks[marks.length - 1] !== stack.length) return null;                    // oberste Form stammt nicht von True Form
+    if (this.heroSideOf(hs, hero) !== pi) return null;                            // nur der Kontrolleur
+    const baseName = stack[stack.length - 1];
+    if (!baseName || !this._getCardDB()[baseName]) return null;
+    // „nor revert into one if that would create a duplicate"
+    for (const { hero: h, physOwner, heroIdx: hi } of this.heroesControlledBy(pi)) {
+      if (physOwner === hs && hi === heroIdx) continue;
+      if (h.name === baseName) return null;
+    }
+    return { formName: hero.name, baseName };
+  }
+
+  /** Entfernt die oberste True-Form-Schicht: Form in die Ablage, Held kehrt zur Form darunter zurück. */
+  async performTrueFormRevert(pi, hs, heroIdx) {
+    const info = this.trueFormRevertInfo(pi, hs, heroIdx);
+    if (!info) return { success: false };
+    const hero = this.gs.players[hs].heroes[heroIdx];
+    const res = await this.performDescend(pi, heroIdx, {
+      ...(hs !== pi ? { heroOwner: hs } : {}),
+      // Wie Open Invitation: die Rücknahme einer nur GELEGTEN Form ist kein Abstieg und kann an der HP-Differenz tödlich sein.
+      notADescend: true,
+    });
+    if (!res?.success) return { success: false };
+    if (Array.isArray(hero._trueForm)) { hero._trueForm.pop(); if (hero._trueForm.length === 0) delete hero._trueForm; }
+    this.log('true_form_revert', { player: this.gs.players[pi]?.username, from: info.formName, to: info.baseName });
+    this.sync();
+    return { success: true, newName: res.newName };
   }
 
   /** Find which player owns a hero object. */

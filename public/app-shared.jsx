@@ -3817,6 +3817,32 @@ const ZONE_ANIM_SFX = {
     { name: 'critical_strike',  opts: { rate: 0.9, volume: 0.45, delay: 700, category: null, dedupe: 0 } },
     { name: 'elem_fire',        opts: { rate: 0.9, volume: 0.4, delay: 900, category: null, dedupe: 0 } },
   ],
+  // Bounce Trap (25.10.): Feder wird gespannt (dumpf), schnellt mit hellem „Boing" los, schwingt aus; die Rückkehr kommt mit Windstoß und Knall.
+  bounce_spring: [
+    { name: 'ping',         opts: { rate: 0.5, volume: 0.5, delay: 1, category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 2.0, volume: 0.5, delay: 190, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.1, volume: 0.8, delay: 200, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 1.7, volume: 0.5, delay: 300, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 1.4, volume: 0.35, delay: 400, category: null, dedupe: 0 } },
+  ],
+  bounce_burst: [
+    { name: 'heavy_impact', opts: { rate: 1.5, volume: 0.55, delay: 1, category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 1.6, volume: 0.4, delay: 20, category: null, dedupe: 0 } },
+  ],
+  // Cosmic Exploding Skull (25.10.): dunkles Raunen, Dimensionsknall, das Loch schließt sich.
+  cosmic_explosion: [
+    { name: 'elem_dark',        opts: { rate: 0.5, volume: 1.0, delay: 1, category: null, dedupe: 0 } },
+    { name: 'heavy_impact',     opts: { rate: 0.45, volume: 1.4, delay: 120, category: null, dedupe: 0 } },
+    { name: 'critical_strike',  opts: { rate: 0.6, volume: 0.6, delay: 180, category: null, dedupe: 0 } },
+    { name: 'elem_dark',        opts: { rate: 0.3, volume: 0.9, delay: 420, category: null, dedupe: 0 } },
+    { name: 'ping',             opts: { rate: 0.4, volume: 0.5, delay: 700, category: null, dedupe: 0 } },
+  ],
+  // Feral (25.10.): Wasserexplosion — Platschen und dumpfer Schlag.
+  water_burst: [
+    { name: 'elem_water',   opts: { rate: 0.9, volume: 1.3, delay: 1, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.6, volume: 0.6, delay: 10, category: null, dedupe: 0 } },
+    { name: 'elem_water',   opts: { rate: 1.3, volume: 0.6, delay: 150, category: null, dedupe: 0 } },
+  ],
   // Grand Feast (25.10.): Tellerklirren, Köstlichkeit zischt, sanfte Heilung.
   grand_feast: [
     { name: 'ping',      opts: { rate: 1.4, volume: 0.35, delay: 1, category: null, dedupe: 0 } },

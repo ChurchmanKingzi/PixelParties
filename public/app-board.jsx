@@ -8622,6 +8622,67 @@ function ppZickzackFlug(card, { dx, dy, dauer, start }) {
   requestAnimationFrame(schritt);
 }
 
+// Bounce Trap (25.10.): Flugstil `schleuder` (Support Zone → Hand) — die Feder wirft die Karte mit viel Schwung zurück.
+const SCHLEUDER_FLUG_MS = 820;
+/**
+ * Schleuder-Flug einer Karte (Bounce Trap, `flightStyle: 'schleuder'`) — PIXELART: die Karte (fester Ringrahmen, keine Drehung, keine Skalierung) bewegt sich in ganzen 3-Pixel-Schritten im Bildtakt
+ * (~30 Bilder/s): erst holt sie kurz aus (ein Stück gegen die Flugrichtung, wie eine zusammengedrückte Feder), dann schießt sie mit voller Wucht los (ease-out), federt am Ziel einmal nach.
+ * Dabei bleiben weiße und blaue Fahrtpixel zurück (`pt-glutpixel`). Wird vom Aufrufer nach `dauer` ms entfernt.
+ */
+function ppSchleuderFlug(card, { dx, dy, dauer, start }) {
+  const PX = 3, TAKT = 33;
+  const laenge = Math.hypot(dx, dy) || 1;
+  const ux = dx / laenge, uy = dy / laenge;
+  const FARBEN = ['#ffffff', '#e5f5fa', '#b3e8f9', '#77c8ee'];
+  const t0 = performance.now() + (start || 0);
+  let letzte = -1;
+  const raster = (v) => Math.round(v / PX) * PX;
+  if (window.playSFX) {
+    const s0 = start || 0;
+    window.playSFX('ping', { rate: 0.55, volume: 0.45, delay: s0 + 10, category: null, dedupe: 0 });
+    window.playSFX('elem_wind', { rate: 1.9, volume: 0.5, delay: s0 + Math.round(dauer * 0.16), category: null, dedupe: 0 });
+    window.playSFX('heavy_impact', { rate: 1.3, volume: 0.45, delay: s0 + dauer - 120, category: null, dedupe: 0 });
+  }
+  const schritt = (jetzt) => {
+    if (!card.isConnected && jetzt > t0 + 300) return;
+    const t = jetzt - t0;
+    if (t >= 0) {
+      const fr = Math.floor(t / TAKT);
+      if (fr !== letzte) {
+        letzte = fr;
+        const k = Math.min(1, t / dauer);
+        let weg;
+        if (k >= 1) weg = laenge;
+        else if (k < 0.16) weg = -Math.sin(k / 0.16 * Math.PI / 2) * 24;                       // Ausholen
+        else {
+          const m = (k - 0.16) / 0.84, e = 1 - Math.pow(1 - m, 3);                              // Wucht: schnell hinaus, langsam hinein
+          const nach = m > 0.82 ? Math.sin((m - 0.82) / 0.18 * Math.PI) * 0.035 : 0;           // Nachfedern am Ziel
+          weg = -24 * (1 - Math.min(1, m * 6)) + (laenge + 24) * e + laenge * nach;
+        }
+        card.style.transform = `translate(${raster(ux * weg)}px, ${raster(uy * weg)}px)`;
+        if (k > 0.12 && k < 0.92 && fr % 2 === 0) {                                              // Fahrtpixel fallen im halben Takt
+          const r = card.getBoundingClientRect();
+          if (r.width > 0) {
+            const gr = (Math.random() < 0.5 ? 1 : 2) * PX;
+            const sp = document.createElement('i');
+            sp.className = 'pt-glutpixel';
+            sp.style.cssText = [
+              `left:${Math.round(r.left + Math.random() * r.width)}px`, `top:${Math.round(r.top + Math.random() * r.height)}px`,
+              `width:${gr}px`, `height:${gr}px`, `background:${FARBEN[Math.floor(Math.random() * FARBEN.length)]}`,
+              `--gsx:${Math.round(-ux * (6 + Math.random() * 18))}px`, `--gsy:${Math.round(-uy * (6 + Math.random() * 18))}px`,
+              `animation-duration:${Math.round(260 + Math.random() * 200)}ms`,
+            ].join(';');
+            document.body.appendChild(sp);
+            setTimeout(() => sp.remove(), 520);
+          }
+        }
+      }
+    }
+    if (t < dauer + 60) requestAnimationFrame(schritt);
+  };
+  requestAnimationFrame(schritt);
+}
+
 // ppFxN (Partikel-Deckel fuer Telefone) lebt seit v1410 in app-shared.jsx.
 
 // ═══════════════════════════════════════════════════════════════════
@@ -11015,6 +11076,363 @@ const UncoolSmokeEffect = (() => {
   };
   return ppPunktBild(malen, ENDE + 40, 240, 300, vorbereiten);
 })();
+
+// ═════════════════════════════════════════════════════════════════
+//  WELLE 78 (25.10.) — Bounce Trap (`bounce_spring`, `bounce_burst`, Flugstil `schleuder`), Cosmic Exploding Skull (`cosmic_explosion`),
+//  Feral (Wasserprojektil `projectileShape: 'water'` + `water_burst`) — PIXELART (ppPunktBild: 3-Pixel-Raster, feste Paletten, Bayer-Dither, ~30 Bilder/s, kein Schein)
+//
+//  bounce_spring (760 ms, auf der Kreatur): eine Stahlfeder (Windungen als schattierte Zickzackbahn, Boden- und Kopfplatte) wird unter der Karte zusammengedrückt (0–200 ms),
+//     schnellt auf (200–330 ms, Überschwinger bis ~1,6 Kartenhöhen), schwingt gedämpft aus; gelbe Kreuzfunkel am Kopf, Fahrtlinien seitlich. Ab ~560 ms dithert alles weg.
+//  bounce_burst (560 ms, an der Startzone der Rückkehr): Staubring, zehn Fahrtstrahlen, Staubpixel.
+//  Flugstil `schleuder` (ppSchleuderFlug): die Karte holt kurz aus (rückwärts), wird mit viel Schwung zur Hand geschleudert (ease-out in ganzen 3-Pixel-Schritten) und federt am Ziel nach.
+//  cosmic_explosion (1000 ms, auf dem Totenkopf): weißer Blitz, ein schwarzes Dimensionsloch (gedithertes Violett am Rand, Sternenstaub darin) reißt auf und verschluckt die Karte, neun
+//     zackige Risse laufen quer über das Brett, drei Druckringe, Trümmer; ab ~720 ms schließt sich das Loch.
+//  water_burst (760 ms, auf dem Ziel): weißer Blitz, Wasserkuppel, Spritzkrone aus 22 Tropfen mit Schwerkraft, zwei Ringwellen, Schaumpixel.
+//  Wasserprojektil (`WasserGeschoss`): wabbelnde Wasserkugel mit Tropfenschweif, Wirbelpixel und Spritzern; die Explosion am Ziel ist `water_burst`.
+// ═════════════════════════════════════════════════════════════════
+const BounceSpringEffect = (() => {
+  const P = ['#ffffff', '#e5f5fa', '#b3e8f9', '#77c8ee', '#4e82cb', '#2f539d', '#2b457e', '#fad54a', '#f29a3e'].map(ppHex);
+  const ENDE = 760, LOS = 200, FADE_AB = 560;
+  // Federhöhe in Rasterpixeln: bis LOS zusammengedrückt, danach gedämpfte Schwingung um die Ruhehöhe
+  const hoehe = (t, ruhe) => {
+    const kurz = 7;
+    if (t < LOS) { const e = t / LOS; return Math.round(ruhe * 0.6 * (1 - e * e) + kurz * (e * e)); }
+    const u = (t - LOS) / 1000;
+    return Math.max(kurz, Math.round(ruhe + (kurz - ruhe) * Math.exp(-7 * u) * Math.cos(30 * u)));
+  };
+  const malen = (g, t, sz) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), hh = Math.ceil(sz.hh), hw = Math.ceil(sz.hw);
+    const boden = Math.round(sz.cy + hh + 3);
+    const ruhe = Math.round(hh * 1.5);
+    const h = hoehe(t, ruhe);
+    const komp = Math.max(0, Math.min(1, 1 - h / ruhe));
+    const amp = 8 + Math.round(komp * 5);
+    const n = 6;
+    // Windungen: lückenlose Zickzackbahn (fein abgetastet), vordere Hälfte hell, hintere dunkel
+    const feinheit = 5, schritte = Math.max(4, h * feinheit);
+    for (const hinten of [true, false]) {
+      for (let q = 0; q <= schritte; q++) {
+        const ph = (q / schritte) * n * Math.PI * 2, c = Math.cos(ph);
+        if ((c > 0) === hinten) continue;
+        const x = cx + Math.round(Math.sin(ph) * amp), y = boden - Math.round((q / schritte) * h);
+        if (hinten) { g.block(x - 1, y, 3, 2, P[5], aus); continue; }
+        g.block(x - 1, y, 3, 2, c > 0.55 ? P[1] : P[2], aus);
+        g.put(x - 1, y + 1, P[4], aus);
+      }
+    }
+    // Bodenplatte und Kopfplatte
+    g.block(cx - 12, boden + 1, 25, 3, P[6], aus);
+    g.block(cx - 12, boden + 1, 25, 1, P[4], aus);
+    const kopf = boden - h - 2;
+    g.block(cx - 10, kopf, 21, 3, P[5], aus);
+    g.block(cx - 10, kopf, 21, 1, P[2], aus);
+    g.block(cx - 10, kopf + 2, 21, 1, P[6], aus);
+    // Kreuzfunkel am Kopf beim Losschnellen
+    if (t >= LOS && t < LOS + 260) {
+      const k = (t - LOS) / 260, arm = [1, 2, 3, 4, 3, 2, 1][Math.min(6, Math.floor(k * 7))];
+      ppKreuzfunkel(g, cx - 16, kopf - 6, arm, [P[0], P[7], P[7], P[8]], aus);
+      ppKreuzfunkel(g, cx + 14, kopf - 2, Math.max(1, arm - 1), [P[0], P[7], P[7], P[8]], aus);
+    }
+    // Fahrtlinien seitlich der Karte
+    if (t >= LOS + 10 && t < LOS + 220) {
+      const k = (t - LOS - 10) / 210;
+      for (let i = 0; i < 6; i++) {
+        const sx = cx + (i < 3 ? -1 : 1) * (hw + 4 + (i % 3) * 4);
+        const len = 6 + (i % 3) * 3, y0 = boden - Math.round(k * (ruhe + 8)) - (i % 3) * 5;
+        for (let d = 0; d < len; d++) g.put(sx, y0 + d, d < 2 ? P[0] : P[3], aus * (1 - d / len));
+      }
+    }
+    // Staub am Boden beim Zusammendrücken
+    if (t < LOS + 140) {
+      const k = Math.min(1, t / (LOS + 140));
+      for (let i = 0; i < 8; i++) {
+        const dir = i < 4 ? -1 : 1, dx = (6 + (i % 4) * 4) + Math.round(k * 10);
+        g.block(cx + dir * dx, boden + 2 - Math.round(k * (2 + (i % 3))), 2, 2, i % 2 ? P[2] : P[3], aus * (1 - k * 0.6));
+      }
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 240, 330);
+})();
+
+const BounceBurstEffect = (() => {
+  const P = ['#ffffff', '#e5f5fa', '#b3e8f9', '#77c8ee', '#4e82cb', '#fad54a'].map(ppHex);
+  const ENDE = 560;
+  const vorbereiten = () => ({
+    strahlen: Array.from({ length: 10 }, (_, i) => ({ a: (i / 10) * Math.PI * 2 + Math.random() * 0.25, l: 7 + Math.random() * 9, r0: 6 + Math.random() * 4 })),
+    staub: Array.from({ length: ppFxN(16) }, () => { const a = Math.random() * Math.PI * 2; return { vx: Math.cos(a) * (18 + Math.random() * 36), vy: Math.sin(a) * (18 + Math.random() * 30) - 8, c: Math.random() < 0.5 ? 1 : 3, gross: Math.random() < 0.3 }; }),
+  });
+  const malen = (g, t, sz, teile) => {
+    const e = Math.min(1, t / ENDE), aus = Math.max(0, 1 - Math.max(0, e - 0.5) / 0.5);
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
+    if (t < 120) g.block(cx - 6, cy - 6, 12, 12, P[0], (1 - t / 120));
+    // Staubring (gedithert)
+    const R = 5 + e * 34, dick = 3.2 * (1 - e) + 1;
+    for (let dy = -Math.ceil(R + dick); dy <= Math.ceil(R + dick); dy++) for (let dx = -Math.ceil(R + dick); dx <= Math.ceil(R + dick); dx++) {
+      if (Math.abs(Math.hypot(dx, dy) - R) <= dick / 2) g.put(cx + dx, cy + dy, e < 0.3 ? P[0] : e < 0.6 ? P[2] : P[3], aus);
+    }
+    // Fahrtstrahlen
+    for (const s of teile.strahlen) {
+      const r = s.r0 + e * 30;
+      for (let d = 0; d < s.l * (1 - e * 0.5); d++) g.put(cx + Math.cos(s.a) * (r + d), cy + Math.sin(s.a) * (r + d), d < 2 ? P[0] : P[2], aus * (1 - d / s.l));
+    }
+    // Staubpixel
+    for (const p of teile.staub) {
+      const tt = t / 1000;
+      g.block(cx + p.vx * tt, cy + p.vy * tt + 40 * tt * tt, p.gross ? 2 : 1, p.gross ? 2 : 1, P[p.c], aus);
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 240, 240, vorbereiten);
+})();
+
+const CosmicExplosionEffect = (() => {
+  const P = ['#ffffff', '#d6b3f9', '#b278ed', '#9544d5', '#702db3', '#50008c', '#2e0a51', '#08060c', '#f8b4df'].map(ppHex);
+  const ENDE = 1000, LOCH_AUF = 560, LOCH_ZU = 720, RMAX = 52;
+  const zufall = (n) => { const q = Math.sin(n * 91.7 + 2.3) * 43758.5453; return q - Math.floor(q); };
+  const vorbereiten = () => ({
+    risse: Array.from({ length: 9 }, (_, i) => {
+      const a0 = (i / 9) * Math.PI * 2 + zufall(i + 3) * 0.5;
+      const pts = []; let x = 0, y = 0, a = a0;
+      for (let s = 0; s < 46; s++) { a += (zufall(i * 50 + s) - 0.5) * 0.7; x += Math.cos(a) * 2.2; y += Math.sin(a) * 2.2; pts.push([x, y]); }
+      return { pts, abzweig: 14 + Math.floor(zufall(i + 9) * 16), abA: a0 + (zufall(i + 20) < 0.5 ? 0.9 : -0.9) };
+    }),
+    truemmer: Array.from({ length: ppFxN(34) }, (_, j) => { const w = zufall(j + 1) * Math.PI * 2, v = 30 + zufall(j + 60) * 70; return { vx: Math.cos(w) * v, vy: Math.sin(w) * v, c: 4 + (j % 3), gross: zufall(j + 99) < 0.4 }; }),
+    sterne: Array.from({ length: 46 }, (_, j) => ({ w: zufall(j + 130) * Math.PI * 2, r: 6 + zufall(j + 170) * (RMAX - 8), s: zufall(j + 210) < 0.3 })),
+  });
+  const malen = (g, t, sz, teile) => {
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
+    const aus = t > 880 ? Math.max(0, 1 - (t - 880) / 120) : 1;
+    if (aus <= 0) return;
+    // Blitzraster über der ganzen Fläche
+    if (t < 130) {
+      const a = (1 - t / 130) * 0.55;
+      for (let Y = 0; Y < sz.gh; Y++) for (let X = 0; X < sz.gw; X++) if (ppBayer(X, Y) < a) g.put(X, Y, P[t < 50 ? 1 : 3], 1);
+    }
+    // Druckringe
+    for (let i = 0; i < 3; i++) {
+      const s0 = 90 + i * 120, e = (t - s0) / 520;
+      if (e < 0 || e > 1) continue;
+      const R = 8 + e * 118, dick = 4 * (1 - e) + 1;
+      for (let dy = -Math.ceil(R + dick); dy <= Math.ceil(R + dick); dy++) for (let dx = -Math.ceil(R + dick); dx <= Math.ceil(R + dick); dx++) {
+        if (Math.abs(Math.hypot(dx, dy) - R) <= dick / 2) g.put(cx + dx, cy + dy, e < 0.25 ? P[0] : e < 0.55 ? P[2] : P[4], aus * (1 - e * 0.85));
+      }
+    }
+    // Risse (wachsen von der Mitte, schwarzer Kern mit violettem Rand)
+    if (t > 70) {
+      const k = Math.min(1, (t - 70) / 480);
+      for (const r of teile.risse) {
+        const n = Math.floor(k * r.pts.length);
+        for (let q = 0; q < n; q++) {
+          const [x, y] = r.pts[q];
+          g.put(cx + x - 1, cy + y, P[3], aus); g.put(cx + x + 1, cy + y, P[3], aus); g.put(cx + x, cy + y - 1, P[3], aus);
+          g.block(cx + x, cy + y, 1, 2, P[7], aus);
+          if (q > r.abzweig && q < r.abzweig + 12) {
+            const j = q - r.abzweig, bx = x + Math.cos(r.abA) * j * 1.6, by = y + Math.sin(r.abA) * j * 1.6;
+            g.put(cx + bx, cy + by, P[7], aus); g.put(cx + bx + 1, cy + by, P[3], aus);
+          }
+        }
+      }
+    }
+    // Dimensionsloch
+    let R = 0;
+    if (t > 60 && t <= LOCH_AUF) { const e = (t - 60) / (LOCH_AUF - 60); R = RMAX * (1 - Math.pow(1 - e, 3)); }
+    else if (t > LOCH_AUF && t <= LOCH_ZU) R = RMAX;
+    else if (t > LOCH_ZU) R = RMAX * Math.max(0, 1 - (t - LOCH_ZU) / (ENDE - LOCH_ZU - 40));
+    if (R > 1) {
+      const dreh = t / 260;
+      for (let dy = -Math.ceil(R) - 3; dy <= Math.ceil(R) + 3; dy++) for (let dx = -Math.ceil(R) - 3; dx <= Math.ceil(R) + 3; dx++) {
+        const d = Math.hypot(dx, dy);
+        if (d > R + 3) continue;
+        if (d <= R) {
+          const rim = (R - d) / R;                               // 0 am Rand, 1 innen
+          let c = P[7];
+          if (rim < 0.07) c = P[1];
+          else if (rim < 0.16) c = ppBayer(cx + dx, cy + dy) < 0.5 ? P[3] : P[5];
+          else if (rim < 0.3) c = ppBayer(cx + dx, cy + dy) < (0.3 - rim) / 0.14 ? P[6] : P[7];
+          g.put(cx + dx, cy + dy, c, aus);
+        } else if (ppBayer(cx + dx, cy + dy) < 0.5) g.put(cx + dx, cy + dy, P[2], aus);   // Hof um den Rand
+      }
+      // Sternenstaub, der spiralig hineinfällt
+      for (const s of teile.sterne) {
+        const rr = (s.r * (1 - ((t / 700) % 1) * 0.35)) * (R / RMAX);
+        const w = s.w + dreh * (1.4 - rr / RMAX);
+        g.put(cx + Math.cos(w) * rr, cy + Math.sin(w) * rr * 0.9, s.s ? P[0] : P[1], aus);
+      }
+      // Wirbel im Loch
+      for (let i = 0; i < 3; i++) {
+        for (let q = 0; q < 26; q++) {
+          const rr = (q / 26) * R * 0.8, w = dreh * 1.6 + i * 2.09 + q * 0.18;
+          g.put(cx + Math.cos(w) * rr, cy + Math.sin(w) * rr, q < 12 ? P[5] : P[3], aus * 0.9);
+        }
+      }
+    }
+    // Weißer Kern am Anfang
+    if (t < 160) g.block(cx - 7, cy - 7, 14, 14, t < 60 ? P[0] : P[1], 1 - t / 160);
+    // Trümmer
+    if (t > 90) {
+      const tt = (t - 90) / 1000;
+      for (const q of teile.truemmer) {
+        const bremse = 1 - tt * 0.55;
+        g.block(cx + q.vx * tt * bremse, cy + q.vy * tt * bremse + 30 * tt * tt, q.gross ? 2 : 1, q.gross ? 2 : 1, P[q.c], aus * Math.max(0, 1 - tt * 0.9));
+      }
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 960, 720, vorbereiten);
+})();
+
+const WasserPalette = ['#ffffff', '#e5f5fa', '#b3e8f9', '#77c8ee', '#4e82cb', '#2f539d', '#2b457e'].map(ppHex);
+
+const WaterBurstEffect = (() => {
+  const P = WasserPalette;
+  const ENDE = 800;
+  const zufall = (n) => { const q = Math.sin(n * 127.1 + 4.7) * 43758.5453; return q - Math.floor(q); };
+  const vorbereiten = () => ({
+    tropfen: Array.from({ length: ppFxN(30) }, (_, j) => {
+      const w = -Math.PI / 2 + (zufall(j + 1) - 0.5) * 2.5, v = 70 + zufall(j + 40) * 80;
+      return { vx: Math.cos(w) * v, vy: Math.sin(w) * v, c: 1 + (j % 3), gross: zufall(j + 90) < 0.5 ? 3 : 2 };
+    }),
+    strahlen: Array.from({ length: 7 }, (_, j) => ({ w: -Math.PI / 2 + (j - 3) * 0.3 + (zufall(j + 7) - 0.5) * 0.12, l: 24 + zufall(j + 17) * 18 - Math.abs(j - 3) * 3 })),
+    schaum: Array.from({ length: ppFxN(18) }, (_, j) => { const a = zufall(j + 140) * Math.PI * 2, r = 5 + zufall(j + 180) * 14; return { a, r, v: 10 + zufall(j + 220) * 22 }; }),
+  });
+  const kreisFlaeche = (g, cx, cy, r, c, a) => { for (let dy = -Math.ceil(r); dy <= Math.ceil(r); dy++) for (let dx = -Math.ceil(r); dx <= Math.ceil(r); dx++) if (dx * dx + dy * dy <= r * r) g.put(cx + dx, cy + dy, c, a); };
+  const malen = (g, t, sz, teile) => {
+    const e = Math.min(1, t / ENDE), aus = Math.max(0, 1 - Math.max(0, e - 0.7) / 0.3);
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
+    // Blitz: weißer Kern + Dither-Hof
+    if (t < 160) {
+      const r = 6 + (t / 160) * 16;
+      kreisFlaeche(g, cx, cy, r, t < 80 ? P[0] : P[1], 1 - t / 190);
+      kreisFlaeche(g, cx, cy, r * 0.55, P[0], 1);
+    }
+    // Wasserkuppel (steigt, fällt), geschichtet gedithert
+    const hoehe = 26 * Math.sin(Math.min(1, t / 560) * Math.PI), breite = 18 + e * 20;
+    if (hoehe > 0.5) for (let dy = 0; dy <= Math.ceil(hoehe); dy++) {
+      const w = Math.round(breite * Math.sqrt(Math.max(0, 1 - (dy / hoehe) * (dy / hoehe))));
+      for (let dx = -w; dx <= w; dx++) {
+        const lage = dy / hoehe + (ppBayer(cx + dx, cy - dy) - 0.5) * 0.35 + Math.abs(dx) / (breite * 3);
+        g.put(cx + dx, cy - dy, lage < 0.22 ? P[5] : lage < 0.45 ? P[4] : lage < 0.72 ? P[3] : lage < 0.92 ? P[2] : P[0], aus);
+      }
+    }
+    // Wasserstrahlen: spitze Säulen im Fächer
+    const sk = Math.sin(Math.min(1, Math.max(0, (t - 40) / 520)) * Math.PI);
+    if (sk > 0.02) for (const st of teile.strahlen) {
+      const L = st.l * sk;
+      for (let d = Math.round(hoehe * 0.55); d < L + hoehe * 0.55; d++) {
+        const breitS = Math.max(1, Math.round(4 * (1 - (d - hoehe * 0.55) / L) + 0.4));
+        const x = cx + Math.cos(st.w) * d, y = cy + Math.sin(st.w) * d + d * d * 0.012;
+        for (let b = -Math.floor(breitS / 2); b <= Math.floor(breitS / 2); b++) {
+          const nx = -Math.sin(st.w) * b, ny = Math.cos(st.w) * b;
+          g.put(x + nx, y + ny, b < 0 ? P[4] : d > L * 0.8 + hoehe * 0.55 ? P[0] : P[2], aus);
+        }
+      }
+    }
+    // Ringwellen
+    for (let i = 0; i < 3; i++) {
+      const ee = (t - i * 100) / 600;
+      if (ee < 0 || ee > 1) continue;
+      const R = 6 + ee * [52, 40, 28][i], dick = 3.4 * (1 - ee) + 1;
+      for (let dy = -Math.ceil(R + dick); dy <= Math.ceil(R + dick); dy++) for (let dx = -Math.ceil(R + dick); dx <= Math.ceil(R + dick); dx++) {
+        if (Math.abs(Math.hypot(dx, dy * 1.3) - R) <= dick / 2) g.put(cx + dx, cy + dy, ee < 0.3 ? P[1] : ee < 0.65 ? P[3] : P[4], aus * (1 - ee * 0.5));
+      }
+    }
+    // Spritzkrone: Tropfen mit Schwerkraft (2–3 Pixel groß, heller Kopf)
+    const tt = t / 1000;
+    for (const q of teile.tropfen) {
+      const x = cx + q.vx * tt, y = cy + q.vy * tt + 210 * tt * tt;
+      g.block(x, y, q.gross, q.gross, P[q.c], aus);
+      g.put(x, y, P[0], aus);
+      g.put(x - q.vx * 0.014, y - (q.vy + 420 * tt) * 0.014, P[3], aus * 0.85);
+    }
+    // Schaum an der Wasserlinie
+    for (const s of teile.schaum) {
+      const r = s.r + t / 1000 * s.v;
+      g.block(cx + Math.cos(s.a) * r, cy + Math.sin(s.a) * r * 0.65, 2, 2, P[0], aus * (1 - e));
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 360, 330, vorbereiten);
+})();
+
+function WasserGeschoss({ p }) {
+  const s = 3;
+  const pad = 60;
+  const x0 = Math.min(p.srcX, p.tgtX) - pad, y0 = Math.min(p.srcY, p.tgtY) - pad;
+  const bw = Math.abs(p.tgtX - p.srcX) + pad * 2, bh = Math.abs(p.tgtY - p.srcY) + pad * 2;
+  const gw = Math.ceil(bw / s), gh = Math.ceil(bh / s);
+  const dauer = p.dur || 420;
+  const NACH = 360;
+  const cvs = useRef(null);
+  useEffect(() => {
+    const el = cvs.current;
+    if (!el || window._playAnimations === false) return undefined;
+    const ctx = el.getContext('2d');
+    const img = ctx.createImageData(gw, gh);
+    const L = ppDruckLeinwand(gw, gh, WasserPalette);
+    const Sx = (p.srcX - x0) / s, Sy = (p.srcY - y0) / s, Tx = (p.tgtX - x0) / s, Ty = (p.tgtY - y0) / s;
+    const dx = Tx - Sx, dy = Ty - Sy, len = Math.max(1, Math.hypot(dx, dy));
+    const ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
+    const zufall = (n) => { const q = Math.sin(n * 127.1 + 4.7) * 43758.5453; return q - Math.floor(q); };
+    const spritzer = Array.from({ length: 20 }, (_, j) => ({ q: 0.04 + zufall(j + 1) * 0.92, quer: (zufall(j + 40) - 0.5) * 2, v: 10 + zufall(j + 70) * 16 }));
+    const zeichne = (t) => {
+      L.leeren();
+      const flug = Math.min(1, t / dauer);
+      const weg = len * (1 - Math.pow(1 - flug, 1.6));        // schießt los, bremst leicht vor dem Ziel
+      const Hx = Sx + ux * weg, Hy = Sy + uy * weg;
+      if (t <= dauer + 30) {
+        // Tropfenschweif: schrumpfende Kreise hinter dem Kopf
+        for (let i = 1; i <= 8; i++) {
+          const d = i * 4.2;
+          if (weg < d) break;
+          const r = Math.max(1, 3.6 - i * 0.4);
+          L.kreis(Hx - ux * d + nx * Math.sin(t / 55 + i) * 1.2, Hy - uy * d + ny * Math.sin(t / 55 + i) * 1.2, r, i < 3 ? 3 : i < 6 ? 4 : 5, i < 6 ? 1 : 0.6);
+        }
+        // Spritzer, die abfallen
+        for (const sp of spritzer) {
+          const q = sp.q * len;
+          if (q > weg) continue;
+          const alt = (weg - q) / (len * 0.4 + 12);
+          if (alt > 1) continue;
+          L.put(Sx + ux * q + nx * sp.quer * (3 + alt * sp.v * 0.4), Sy + uy * q + ny * sp.quer * (3 + alt * sp.v * 0.4) + alt * alt * 9, alt < 0.4 ? 2 : 3, 1 - alt);
+        }
+        // Kopf: wabbelnde Wasserkugel
+        const wob = 1 + Math.sin(t / 45) * 0.12;
+        L.kreis(Hx, Hy, 6.2 * wob, 6);
+        L.kreis(Hx, Hy, 5.4 * wob, 4);
+        L.kreis(Hx, Hy, 4.2 * wob, 3);
+        L.kreis(Hx - 1.2, Hy - 1.4, 2.4, 2);
+        L.kreis(Hx - 1.8, Hy - 2, 1.2, 0);
+        for (let j = 0; j < 2; j++) {
+          const w = t * 0.03 + j * Math.PI;
+          L.put(Hx + Math.cos(w) * 7.4, Hy + Math.sin(w) * 7.4, 1);
+          L.put(Hx + Math.cos(w - 0.4) * 7.4, Hy + Math.sin(w - 0.4) * 7.4, 3, 0.7);
+        }
+      }
+      // Aufprall: kleiner Spritzring (die große Explosion kommt als Zonenbild)
+      if (t > dauer) {
+        const e = Math.min(1, (t - dauer) / NACH);
+        L.ring(Tx, Ty, 3 + e * 14, 2.4 * (1 - e) + 1, e < 0.4 ? 1 : 3, Math.max(0, 1 - e));
+      }
+      img.data.set(L.buf);
+      ctx.putImageData(img, 0, 0);
+    };
+    const t0 = performance.now();
+    let raf = 0, letzte = -1;
+    const schritt = (jetzt) => {
+      const t = jetzt - t0;
+      const fr = Math.floor(t / 30);
+      if (fr !== letzte) { letzte = fr; zeichne(t); }
+      if (t < dauer + NACH) raf = requestAnimationFrame(schritt);
+    };
+    raf = requestAnimationFrame(schritt);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  return (
+    <div aria-hidden="true" data-pp-px="aus" style={{ position: 'fixed', left: x0, top: y0, pointerEvents: 'none', zIndex: 10200 }}>
+      <canvas ref={cvs} width={gw} height={gh}
+        style={{ width: gw * s, height: gh * s, imageRendering: 'pixelated', display: 'block' }} />
+    </div>
+  );
+}
 
 // ═════════════════════════════════════════════════════════════════
 //  WELLE 77 (25.10.) — REVENGE!!! (`revenge_rage`) und Grand Feast (`grand_feast`) — PIXELART
@@ -19817,6 +20235,10 @@ const ANIM_REGISTRY = {
   udp_land: UdpLandEffect,
   uncool_smoke: UncoolSmokeEffect,
   revenge_rage: RevengeRageEffect,
+  bounce_spring: BounceSpringEffect,
+  bounce_burst: BounceBurstEffect,
+  cosmic_explosion: CosmicExplosionEffect,
+  water_burst: WaterBurstEffect,
   grand_feast: GrandFeastEffect,
   reverse_trap_ton: ReverseTrapTonEffect,
   deadly_poison_heal: DeadlyPoisonHealEffect,
@@ -46741,7 +47163,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         dur,
       }]);
       // Surefire-Pfeil: Einschlagsblitz (≈ 380 ms) läuft nach der Ankunft weiter.
-      setTimeout(() => setProjectileAnims(prev => prev.filter(a => a.id !== id)), dur + (projectileShape === 'surefire' ? 700 : projectileShape === 'pressure' ? 800 : projectileShape === 'magicArrow' ? 600 : 200));
+      setTimeout(() => setProjectileAnims(prev => prev.filter(a => a.id !== id)), dur + (projectileShape === 'surefire' ? 700 : projectileShape === 'pressure' ? 800 : projectileShape === 'water' ? 500 : projectileShape === 'magicArrow' ? 600 : 200));
     };
     socket.on('play_projectile_animation', onProjectileAnimation);
     // ★ WEAPON STORM (v805, Als Vorgabe): eine Barrage aus 10-20
@@ -48162,7 +48584,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // hand while new flies to support at the same time.
       if (to === 'support' && toHeroIdx != null && toSlotIdx != null) {
         const hideKey = `${tgtOwner}-${toHeroIdx}-${toSlotIdx}`;
-        const landeMs = flightStyle === 'zickzack' ? ZICKZACK_FLUG_MS : 720;   // YOU'RE ALIVE?!: der lange Zickzack-Flug verbirgt den Zielplatz bis zur Landung
+        const landeMs = flightStyle === 'zickzack' ? ZICKZACK_FLUG_MS : flightStyle === 'schleuder' ? SCHLEUDER_FLUG_MS : 720;   // YOU'RE ALIVE?!: der lange Zickzack-Flug verbirgt den Zielplatz bis zur Landung
         // ★ W62a: liegt dort schon mindestens eine Karte GLEICHEN Namens (geteilte Zone, Alice) und ist der Flug kein Umzug
         // innerhalb derselben Zone, bleiben die vorhandenen Karten sichtbar — nur die neue Kopie wird bis zur Landung verborgen.
         // Der Zustand kommt VOR dem Eintreffen des Flugs an (Engine: Flug, dann Zustand) oder knapp danach; gilt `vorhanden`
@@ -48511,6 +48933,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const isToHand = (to === 'hand');
       const isToSupport = (to === 'support');
       const isWindstorm = (flightStyle === 'windstorm');
+      const isSchleuder = (flightStyle === 'schleuder');   // Bounce Trap: Pixelart-Schleuderflug (ppSchleuderFlug)
       const isZickzack = (flightStyle === 'zickzack');   // YOU'RE ALIVE?!: Pixelart-Flug in ganzen Pixeln im Bildtakt (ppZickzackFlug)
       // Glow palette per flight style:
       //   • windstorm → cool cyan-white "wind sheen" (matches the
@@ -48520,7 +48943,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       //   • default discard / deleted / area / deck → classic violet
       //     fade-out.
       let glow;
-      if (isZickzack) {
+      if (isSchleuder) {
+        glow = 'box-shadow:0 0 0 3px #e5f5fa,0 0 0 6px #4e82cb';       // harter Pixelrahmen
+      } else if (isZickzack) {
         glow = 'box-shadow:0 0 0 3px #fad54a,0 0 0 6px #f29a3e';       // harter Pixelrahmen (gestapelte Ringe), kein weicher Schein
       } else if (isWindstorm) {
         glow = 'box-shadow:0 0 18px rgba(180,223,248,0.95),0 0 6px rgba(123,190,234,0.7)';
@@ -48538,7 +48963,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         : isWindstorm
           ? 'pileTransferWindstorm'
           : (isToHand || isToSupport ? 'pileTransferToHand' : 'pileTransfer');
-      const durationMs = _ausDemSog ? SOG_FLUG_MS : (isZickzack ? ZICKZACK_FLUG_MS : (isWindstorm ? 1200 : 700));
+      const durationMs = _ausDemSog ? SOG_FLUG_MS : (isZickzack ? ZICKZACK_FLUG_MS : isSchleuder ? SCHLEUDER_FLUG_MS : (isWindstorm ? 1200 : 700));
       const easing = _ausDemSog ? 'cubic-bezier(.25,.6,.35,1)'
         : (isWindstorm ? 'cubic-bezier(.45,.05,.55,.95)' : 'ease-in-out');
 
@@ -48645,8 +49070,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         : BRETT_ZIELE[to] ? kartenMassInZone(tgtEl)
         : massFuer(to);
       // Zickzack-Flug: die Karte hebt gleich im Mass ihres Ziels ab (keine stufenlose Skalierung eines Kartenbildes).
-      const flugB = isZickzack ? mZiel.b : mQuelle.b, flugH = isZickzack ? mZiel.h : mQuelle.h;
-      const ptScale = (!isZickzack && mQuelle.b > 0) ? (mZiel.b / mQuelle.b) : 1;
+      const flugB = (isZickzack || isSchleuder) ? mZiel.b : mQuelle.b, flugH = (isZickzack || isSchleuder) ? mZiel.h : mQuelle.h;
+      const ptScale = (!isZickzack && !isSchleuder && mQuelle.b > 0) ? (mZiel.b / mQuelle.b) : 1;
       const ptMin = Math.min(1, ptScale);
       card.style.cssText = [
         'position:fixed',
@@ -48663,13 +49088,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         card.style.animation = 'none';
         ppZickzackFlug(card, { dx: Math.round(dx), dy: Math.round(dy), dauer: durationMs, start: laneDelay || 0 });
       }
+      if (isSchleuder) {
+        card.style.animation = 'none';
+        ppSchleuderFlug(card, { dx: Math.round(dx), dy: Math.round(dy), dauer: durationMs, start: laneDelay || 0 });
+      }
       // ── Neigung (Als Befund 19.8.) ───────────────────────────────
       // „Wenn Trial of Dominance Creatures vom Board zum Deleted Pile
       // schickt, werden diese komplett flach, sie verlieren ihre
       // Perspektive."
       // Entscheidungstabelle in `flightTiltFor`, Neigung der Ebene
       // gemessen statt geraten in `readBoardTiltDeg`.
-      const flightTilt = isZickzack ? { startDeg: 0, endDeg: 0 } : flightTiltFor(from, to, readBoardTiltDeg(document));
+      const flightTilt = (isZickzack || isSchleuder) ? { startDeg: 0, endDeg: 0 } : flightTiltFor(from, to, readBoardTiltDeg(document));
       // Dieselbe Wartezeit wie die Flugbahn: bei Brett-Quellen haengt
       // der Knoten sofort im Dokument und nur der Start ist verschoben,
       // sonst wird der Knoten selbst spaeter eingehaengt (siehe unten).
@@ -58843,6 +59272,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <WeissPfeil key={p.id} p={p} />
       ) : p.projectileShape === 'pressure' ? (
         <DruckGeschoss key={p.id} p={p} />
+      ) : p.projectileShape === 'water' ? (
+        <WasserGeschoss key={p.id} p={p} />
       ) : p.projectileShape === 'magicArrow' ? (
         <ArkanPfeil key={p.id} p={p} />
       ) : (
