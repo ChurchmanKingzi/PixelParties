@@ -19288,7 +19288,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     // EINMAL pro Stapelabfrage, nicht je Karte. Gilt auch fuer
     // Selbst-Abwuerfe als KOSTEN (`selfInflicted`) — den Effekt
     // negiert das nicht, die Karte wird dadurch nur gratis.
-    {
+    //
+    // ★ W74a (Al): Boris wirkt NUR bei ABWURF. Ein LOESCHEN von der Hand (`deleteMode`: Wheels „delete 2", Acid Rain, Dante,
+    // Debt-o-Tron-/Item-Lock-Kosten …) ist kein Discard — keine Frage, kein Verzicht, kein HOPT-Verbrauch, kein Log.
+    if (!opts.deleteMode && !opts.delete && !opts.loeschen) {
       const boris = loadCardEffect('Boris, the Guardian of Blackport');
       if (boris?.offerDiscardSkip
           && await boris.offerDiscardSkip(this, playerIdx, count, opts)) {
@@ -46783,8 +46786,13 @@ this._deathWatch = (this._deathWatchStack || []).length
    * ueber `actionPromptForceDiscard` abwerfen lassen, fragen Boris hier
    * VOR ihrem Abwurf: `true` = der Spieler ignoriert den Abwurf komplett.
    * Ohne aktiven Boris sofort `false`, keine Abfrage.
+   *
+   * ★ W74a (Al): NUR fuer echte ABWUERFE. Wer Karten von der Hand LOESCHT (Kosten oder Wirkung), ruft das nicht auf — und wer es
+   * doch tut, bekommt mit `opts.deleteMode` / `opts.delete` / `opts.loeschen` ein `false` ohne Frage und ohne HOPT-Verbrauch.
+   * (Wächter: scripts/check-boris-delete.js.)
    */
   async borisVerzicht(pi, count, opts = {}) {
+    if (opts.deleteMode || opts.delete || opts.loeschen) return false;
     const boris = loadCardEffect('Boris, the Guardian of Blackport');
     if (!boris?.offerDiscardSkip || !(count > 0)) return false;
     try { return !!(await boris.offerDiscardSkip(this, pi, count, opts)); }

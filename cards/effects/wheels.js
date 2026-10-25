@@ -130,6 +130,7 @@ module.exports = {
 
     } else if (choice.optionId === 'draw4') {
       // ── Mode B: Draw 4, Delete 2 ──
+      // W74a (Al): Löschen ist kein Abwurf — Boris fragt hier NICHT (die Engine überspringt ihn bei `deleteMode`); nur Modus A („discard 1") ist ignorierbar.
       await engine.actionDrawCards(pi, 4);
 
       // Als Multi-Discard-Ruling: 2+ Deletes auf einmal laufen

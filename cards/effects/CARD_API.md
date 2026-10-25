@@ -19406,6 +19406,7 @@ their hand and cannot activate effects that would take control of any targets
 you control. You may once per turn ignore any effect that would force you to
 discard cards from your hand (including as a cost)."
 
+* (Ergänzt W74a, siehe Abschnitt „Welle 74 / W74a" ganz unten: Klausel 3 gilt NUR für Abwurf, nie für Löschen von der Hand.)
 * **Klausel 3 einmal pro Zug** (pro Spieler, HOPT `boris-discard`):
   `offerDiscardSkip` fragt nur, solange frei, und verbraucht erst beim
   tatsächlichen Verzicht (auch beim automatischen Verzicht auf unbezahlbare
@@ -25714,3 +25715,36 @@ Antworten von Al auf die offenen Fragen aus W72a: (1) **Potion Deck und Side Dec
 **Wächter:** `scripts/skilltest-e2e/ui-support-ability-zone.js` (echter Client: Klassen und gesendete Socket-Nachricht je Zonenart, Zusatzaktion, Gegner-Held).
 
 * **Al 25.10. (nach W73a):** Abilities in Support Zonen verhalten sich in der Bedienung **exakt** wie Abilities in Ability Zonen — gleiche Leuchtfarbe (frei = limegrün, Aktion = gold), freie Aktivierung ohne Rückfrage, Aktions-Aktivierung (auch aus dem heroAction-Prompt) mit der Rückfrage „Activate Ability?" (`pendingAbilityActivation` mit `zoneKind: 'support'`). Xal und Xalibur sind live.
+
+## Welle 74 / W74a — Boris ignoriert nur ABWURF, nie das LÖSCHEN von der Hand (25.10.2026)
+
+**Anlass (Al):** „Boris kann einmal pro Runde einen Discard ignorieren. Das funktioniert aktuell auch bei einem Delete von der Hand (etwa Wheels' ‚Delete 2'). Das sollte nicht gehen, Boris soll nur bei wirklichen Discard-Effekten wirken."
+
+**Ursache:** `actionPromptForceDiscard` fragte Boris (`offerDiscardSkip`) vor jedem Hand-Abwurf — auch mit `deleteMode: true`, dem Löschweg derselben Funktion (Wheels Modus B, Acid Rain, Dante, Item Lock, Debt-O-Tron-Kosten). Potion Juggler rief zusätzlich `borisVerzicht` für seine Löschkosten (Kommentar „Boris darf auch Löschkosten ignorieren" — per Al falsch).
+
+**Regel:** Boris (Frage, Verzicht, HOPT `boris-discard`, Log `boris_discard_skipped`, automatischer Verzicht bei zu kleiner Hand) greift NUR bei Abwurf (`discard`). Löschen von der Hand fragt ihn nie und stempelt den Einmal-pro-Zug-Verzicht nicht; ein späterer echter Discard im selben Zug bleibt ignorierbar. „Including as a cost" bleibt für echte Abwurf-Kosten bestehen.
+
+**Umsetzung:**
+* `_engine.js` `actionPromptForceDiscard`: Boris-Block nur ohne `opts.deleteMode` (auch `opts.delete` / `opts.loeschen`). `borisVerzicht(pi, count, opts)` und `boris.offerDiscardSkip(...)` geben bei diesen Flags sofort `false` zurück (defensiv, ohne Frage, ohne HOPT).
+* Ist die Hand beim LÖSCHEN zu klein, gilt unverändert die Regel des Effekts (löschen, was da ist) — nur der Boris-Auto-Verzicht entfällt.
+* `potion-juggler.js`: `borisVerzicht` für die Löschkosten entfernt (Potion wird immer gelöscht).
+* Wächter `scripts/check-boris-delete.js`: prüft die drei Tore und meldet jeden Boris-Aufrufer, dessen Kartentext „delete … from your hand" meint (Allowlist mit Begründung: Control Monitors — Boris nur für den Abwurf-PREIS).
+
+**Inventur (Karte | Wortlaut | Aufruf | Boris vorher → nachher):**
+
+| Karte / Fähigkeit | Wortlaut | Aufruf | vorher → nachher |
+|---|---|---|---|
+| Wheels Modus A | „draw 3 cards and discard 1" | `actionPromptForceDiscard` | ja → **ja** |
+| Wheels Modus B | „draw 4 cards and delete 2 cards from your hand" | `actionPromptForceDiscard`, `deleteMode` | ja → **nein** |
+| Potion Juggler | „delete a Potion from your hand or discard pile" (Kosten) | `borisVerzicht` | ja → **nein** |
+| Acid Rain | „delete 2 cards from their hand" | `actionPromptForceDiscard`, `deleteMode` | ja → **nein** |
+| Dante, the Wanderer of Hell | „delete … Spell from your hand … then delete the same number of cards −1" | erste Löschung direkt, zweite `deleteMode` | ja (2.) → **nein** |
+| Debt-O-Tron Modelle (Scrap Plow, Loan Shredder, Money Printer, Missing Parts, Backup Duplicator) | „by deleting 1 card from your hand" (Kosten) | `payHandCost` → `deleteMode` | ja → **nein** |
+| Item Lock (Status; Engine, server.js, `_free-artifact-shared.js`) | „delete 1 card from your hand to use an Artifact" | `deleteMode` | ja → **nein** |
+| Control Monitors | Preis „discarding the same number of cards from your hand" | `borisVerzicht` | ja → **ja** (echter Abwurf) |
+| Control Monitors | „Delete the cards your opponent added / all other cards" | `deleteFromPile` | nein → **nein** |
+| Pollution-Handlimit, Crestina (Schöpfungskarte), Golem Smash, Heart of Cards, Third Circle | Löschen aus Deck/Hand-Limit/Zone | kein Boris-Pfad | nein → **nein** |
+| alle übrigen `borisVerzicht`-/Zwangsabwurf-Karten (Draw, Accusation, Spreading Rumor, Pusher, Trap Sabotage, Tryse, Kit, Archer, Big Gwen Guard, Cute Annoyance Mini, Inventing, Lunatic Cycle - New Moon, Spike Trap, Shishi, Saras, Zira Racer, Sky Archeologist/Slave Trader/Super Fan, Bottled Flame/Lightning, Wisdom-Kosten …) | „discard …" | Abwurf | ja → **ja** |
+
+**Vertrag für neue Karten:** Löschen von der Hand → `actionPromptForceDiscard(…, { deleteMode: true })` oder `deleteFromPile`, **nie** `borisVerzicht` / `offerDiscardSkip`. Abwurf(-Kosten) → `actionPromptForceDiscard` (ohne `deleteMode`) bzw. `borisVerzicht`. Gemischte Texte (Wheels) trennen die Wege je Modus. `discardCostWaived` / `waivesDiscardCosts` gelten nur für Abwurfkosten (Wisdom), nie für Löschkosten.
+
