@@ -13817,3 +13817,29 @@ html[data-retro] .pp-fenster-kopf > .title-outline,
 html[data-retro] .title-outline,
 html[data-retro] .shop-reveal-label,
 html[data-retro] .leaderboard-name { text-shadow: none; }
+
+/* ─── Rückwärts-Rammen (Tail Slap, 25.10.) ──────────────────────────────
+   Der Held dreht sich um (harter Schnitt, kein Zwischenwinkel), weicht ein Stück vom Ziel zurück (Ausholen), rast mit der UNTERKANTE voran ins Ziel, prallt mit zwei
+   Wacklern ab, geht zurück und dreht sich wieder. Alle Bewegungen in groben Stufen (steps) — Pixelart-Takt, kein weiches Gleiten. `--ramAngle` ist schon um 180° versetzt.
+   Aufprall bei 26 % (deckt sich mit `rammeBisKontakt` im Server). */
+.ram-anim-card.ram-back { animation-name: ramBackCharge; animation-timing-function: steps(1, end); filter: none; }
+.ram-back .ram-flame-trail { display: none; }
+@keyframes ramBackCharge {
+  0%   { transform: translate(0, 0) rotate(0deg) scale(1); }
+  4%   { transform: translate(0, 0) rotate(var(--ramAngle, 180deg)) scale(1.06); }
+  8%   { transform: translate(calc(var(--ramDx) * -0.04), calc(var(--ramDy) * -0.04)) rotate(var(--ramAngle, 180deg)) scale(1.1); }
+  12%  { transform: translate(calc(var(--ramDx) * -0.09), calc(var(--ramDy) * -0.09)) rotate(var(--ramAngle, 180deg)) scale(1.12); }
+  16%  { transform: translate(calc(var(--ramDx) * 0.2), calc(var(--ramDy) * 0.2)) rotate(var(--ramAngle, 180deg)) scale(1.14); }
+  20%  { transform: translate(calc(var(--ramDx) * 0.55), calc(var(--ramDy) * 0.55)) rotate(var(--ramAngle, 180deg)) scale(1.18); }
+  24%  { transform: translate(calc(var(--ramDx) * 0.88), calc(var(--ramDy) * 0.88)) rotate(var(--ramAngle, 180deg)) scale(1.22); }
+  26%  { transform: translate(var(--ramDx), var(--ramDy)) rotate(var(--ramAngle, 180deg)) scale(1.16); }
+  29%  { transform: translate(calc(var(--ramDx) * 0.97 + 3px), calc(var(--ramDy) * 0.97)) rotate(var(--ramAngle, 180deg)) scale(1.08); }
+  32%  { transform: translate(calc(var(--ramDx) * 1 - 3px), var(--ramDy)) rotate(var(--ramAngle, 180deg)) scale(1.1); }
+  36%  { transform: translate(var(--ramDx), var(--ramDy)) rotate(var(--ramAngle, 180deg)) scale(1.06); }
+  44%  { transform: translate(calc(var(--ramDx) * 0.7), calc(var(--ramDy) * 0.7)) rotate(var(--ramAngle, 180deg)) scale(1.04); }
+  52%  { transform: translate(calc(var(--ramDx) * 0.4), calc(var(--ramDy) * 0.4)) rotate(var(--ramAngle, 180deg)) scale(1.02); }
+  60%  { transform: translate(calc(var(--ramDx) * 0.15), calc(var(--ramDy) * 0.15)) rotate(var(--ramAngle, 180deg)) scale(1); }
+  66%  { transform: translate(0, 0) rotate(var(--ramAngle, 180deg)) scale(1); }
+  72%  { transform: translate(0, 0) rotate(0deg) scale(1); }
+  100% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+}

@@ -25048,7 +25048,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Choose a Creature your opponent controls and defeat it. Then, deal damage equal to that Creature's max HP to the corresponding Hero. \nThis Attack's level is reduced by 1 for each of your defeated Heroes.",
+    "effect": "Choose a Creature your opponent controls and defeat it. Then, deal damage equal to that Creature's max HP to the corresponding Hero, to a maximum of 300. \nThis Attack's level is reduced by 1 for each of your defeated Heroes.",
     "archetype": "",
     "setID": "PP THW",
     "banned": "",

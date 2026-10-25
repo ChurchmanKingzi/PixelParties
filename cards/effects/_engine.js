@@ -7337,12 +7337,34 @@ class GameEngine {
   }
 
   /**
+   * ★ 25.10. — „UNCOOL MALFUNCTION": „Name an Ability. Your opponent cannot activate the active effect of Abilities with that name during their next turn."
+   * Speicher: `gs.players[pi]._abilityNameLocks = { [Basisname]: { expiresAtTurn, expiresForPlayer, by } }` — `expiresAtTurn` = Zug, zu dessen BEGINN die Sperre fällt (Frist ENDE des nächsten
+   * Zuges des Gesperrten; Skips verschiebt `fristenNachSkip`). Gelesen von `_abilityNegatedOnHero` — dem EINEN Prädikat aller Aktivierungswege (Listen, CPU, Server-Tore), das nur AKTIVE
+   * Effekte befragt; passive Effekte der Ability bleiben unberührt. `pi` = der Spieler, der die Ability führt (Kontrolle statt Seite).
+   */
+  abilityNameGesperrt(pi, abilityName) {
+    const l = this.gs.players?.[pi]?._abilityNameLocks;
+    if (!l || !abilityName) return false;
+    const key = baseCardName(abilityName);
+    const e = l[key];
+    if (!e) return false;
+    if (this.gs.turn >= e.expiresAtTurn) { delete l[key]; return false; }
+    return true;
+  }
+
+  /**
    * „… negate the effects of all «Charme» Abilities attached to it."
    *
    * Vertrag: `negatesHostAbilities: ['Charme', …]` am Anhaengsel.
    */
   _abilityNegatedOnHero(pi, heroIdx, abilityName) {
     if (!abilityName) return false;
+    // ★ 25.10. (Uncool Malfunction): der Spieler, der den Helden KONTROLLIERT, darf aktive Effekte von Abilities dieses Namens nicht aktivieren.
+    {
+      const held = this.gs.players[pi]?.heroes?.[heroIdx];
+      const ktrl = held?.name ? this.heroSideOf(pi, held) : pi;
+      if (this.abilityNameGesperrt(ktrl, abilityName)) return true;
+    }
     // S1 (C05-10): Stowaway negiert ALLE Abilities des Wirts (`heroAbilitiesNegated`).
     // W4a (Al, Welle 4): "Jede Negierung von Abilities" - auch die harte Standardform sperrt die Aktivierung (`heroAbilityLevelsBlanked`).
     if (this.heroAbilityLevelsBlanked(pi, heroIdx)) return true;
@@ -18065,20 +18087,54 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Angeboten wird jedem Spieler, der NICHT der Ausführende ist (Gegner), Reihenfolge ab dem Gegner des Ausführenden.
    */
   async _checkSpellPerformedHandReactions(raw) {
-    if (this.gs.result || !raw || this._inMctsSim) return;
-    if ((this._spellPerformedWindowDepth || 0) >= 3) return;
-    const performer = raw.performerOwner;
-    if (!Number.isInteger(performer)) return;
+    if (!raw || !Number.isInteger(raw.performerOwner)) return;
+    return this._rxEreignisFenster({
+      flag: 'isSpellPerformedReaction', cond: 'spellPerformedCondition', res: 'spellPerformedResolve', tiefe: '_spellPerformedWindowDepth',
+      log: 'spell_performed_window_reaction', ausloeser: raw.performerOwner, info: raw,
+      nachricht: (c) => `${raw.spellName} was performed! Activate ${c}?`, linkesBild: raw.spellName, ziel: raw.spellName,
+    });
+  }
+
+  /**
+   * ★ 25.10. — HAND-FENSTER „ein Artifact wurde an einen Helden ausgerüstet" (Crash Landing). Gerufen von `fireEquipGained` (dem EINEN Equip-Fenster: Hand-Spiel, Effekt-Ausrüsten,
+   * Umhängen), NACHDEM die Karte liegt und die Passiv-Lauscher (`onEquipGained`) gelaufen sind. Karten-Vertrag:
+   *   isEquipPlacedReaction: true,
+   *   equipPlacedCondition(gs, pi, engine, info) → bool,
+   *   async equipPlacedResolve(engine, pi, info, { casterIdx, casterSeite })
+   * `info` = { equipCard (Instanz), equipName, equipOwner (Anleger), equipHeroIdx, hostSide, heroController, kind, isMove, source }. Angeboten wird JEDEM Spieler (auch dem Anleger selbst),
+   * Reihenfolge ab dem Gegner des Anlegers.
+   */
+  async _checkEquipPlacedHandReactions(info) {
+    if (!info?.equipCard || !Number.isInteger(info.equipOwner)) return;
+    return this._rxEreignisFenster({
+      flag: 'isEquipPlacedReaction', cond: 'equipPlacedCondition', res: 'equipPlacedResolve', tiefe: '_equipPlacedWindowDepth',
+      log: 'equip_placed_window_reaction', ausloeser: info.equipOwner, info, auchAusloeser: true,
+      nachricht: (c) => `${info.equipName} was equipped! Activate ${c}?`, linkesBild: info.equipName, ziel: info.equipName,
+    });
+  }
+
+  /**
+   * Gemeinsamer Rumpf der Hand-Fenster „nach einem Ereignis" (Nasty Prank, Crash Landing): jedem Spieler (ab dem Gegner des Auslösers; `auchAusloeser`: auch ihm selbst) werden seine
+   * Handkarten mit dem Fenster-Flag angeboten — Wirker-Plan (`_rxCastPlan`), Gold, Ja/Nein, Wirker-Wahl, Einsetzen (`_rxHandkarteEinsetzen`: Flug, Kosten, Aufdecken, Reaktionsfenster
+   * des Gegners — Reverse Trap kann sie negieren), Wirkung, Abschluss (`_rxAufgeloest`). `cfg`: { flag, cond, res, tiefe (Schutz gegen Verschachtelung), log, ausloeser, info,
+   * nachricht(cardName), linkesBild, ziel, auchAusloeser }.
+   */
+  async _rxEreignisFenster(cfg) {
+    if (this.gs.result || this._inMctsSim) return;
+    if ((this[cfg.tiefe] || 0) >= 3) return;
+    const ausloeser = cfg.ausloeser;
     const allCards = this._getCardDB();
-    this._spellPerformedWindowDepth = (this._spellPerformedWindowDepth || 0) + 1;
+    this[cfg.tiefe] = (this[cfg.tiefe] || 0) + 1;
     try {
-      for (let i = 1; i < this.playerCount(); i++) {
-        const pi = (performer + i) % this.playerCount();
+      const n = this.playerCount();
+      for (let i = cfg.auchAusloeser ? 1 : 1; i <= n - (cfg.auchAusloeser ? 0 : 1); i++) {
+        const pi = (ausloeser + i) % n;
         const ps = this.gs.players[pi];
         if (!ps || this.gs.result) continue;
         if (this.darkOceanBlocksReaction(pi, null)) continue;
         if (this.gs.firstTurnProtectedPlayer === pi) continue;
-        const info = { ...raw, reactorIdx: pi };
+        const info = { ...cfg.info, reactorIdx: pi };
+        this._rxFensterInfo = info;   // für `cpuMeta.reactionHeuristic` (die Abfrage selbst trägt die Auslöser-Angaben nicht)
         const abgelehnt = new Set();
         for (let runde = 0; runde < 4; runde++) {
           if (this.gs.result) return;
@@ -18087,9 +18143,9 @@ this._deathWatch = (this._deathWatchStack || []).length
             if (abgelehnt.has(cardName)) continue;
             if (this._handPlayLockedFor(ps, cardName)) continue;
             const script = loadCardEffect(cardName);
-            if (!script?.isSpellPerformedReaction) continue;
+            if (!script?.[cfg.flag]) continue;
             this._noteRxWindow(ps, cardName, 'seen');
-            if (script.spellPerformedCondition && !script.spellPerformedCondition(this.gs, pi, this, info)) continue;
+            if (script[cfg.cond] && !script[cfg.cond](this.gs, pi, this, info)) continue;
             const rxCast = this._rxCastPlan(ps, cardName, script, { fensterInfo: info });
             if (!rxCast) { this._noteRxWindow(ps, cardName, 'hero'); continue; }
             const cost = allCards[cardName]?.cost || 0;
@@ -18098,23 +18154,23 @@ this._deathWatch = (this._deathWatchStack || []).length
               type: 'confirm',
               title: cardName,
               _handReactionWindow: true,
-              message: `${raw.spellName} was performed! Activate ${cardName}?`,
+              message: cfg.nachricht(cardName),
               showCard: cardName,
-              showCardLeft: raw.spellName,
+              showCardLeft: cfg.linkesBild,
               confirmLabel: '✨ Activate!',
               cancelLabel: 'No',
               cancellable: true,
             });
             if (!this._confirmSaidYes(confirmed)) { abgelehnt.add(cardName); continue; }
             if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { fensterInfo: info }))) { abgelehnt.add(cardName); continue; }
-            if (!(await this._rxHandkarteEinsetzen(pi, cardName, script, rxCast, { sourceOwner: performer }))) { abgelehnt.add(cardName); continue; }
-            this.log('spell_performed_window_reaction', { card: cardName, player: ps.username, target: raw.spellName });
+            if (!(await this._rxHandkarteEinsetzen(pi, cardName, script, rxCast, { sourceOwner: ausloeser }))) { abgelehnt.add(cardName); continue; }
+            this.log(cfg.log, { card: cardName, player: ps.username, target: cfg.ziel });
             try {
-              if (script.spellPerformedResolve) {
-                await script.spellPerformedResolve(this, pi, info, { casterIdx: rxCast.casterIdx, casterSeite: rxCast.casterSeite ?? pi });
+              if (script[cfg.res]) {
+                await script[cfg.res](this, pi, info, { casterIdx: rxCast.casterIdx, casterSeite: rxCast.casterSeite ?? pi });
               }
             } catch (err) {
-              console.error(`[SpellPerformedWindow] ${cardName} threw:`, err.message);
+              console.error(`[${cfg.log}] ${cardName} threw:`, err.message);
             }
             await this._rxAufgeloest(ps, cardName, rxCast.casterIdx, { heroOwner: rxCast.casterSeite ?? pi });
             this.sync();
@@ -18125,7 +18181,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
       }
     } finally {
-      this._spellPerformedWindowDepth = Math.max(0, (this._spellPerformedWindowDepth || 1) - 1);
+      this[cfg.tiefe] = Math.max(0, (this[cfg.tiefe] || 1) - 1);
     }
   }
 
@@ -25835,7 +25891,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   async rammeBisKontakt(ev) {
     const dauer = ev.duration || 1600;
     this._broadcastEvent('play_ram_animation', { ...ev, duration: dauer });
-    const anteil = ev.trailType === 'fire' ? 0.45 : 0.12;
+    const anteil = ev.rueckwaerts ? 0.26 : (ev.trailType === 'fire' ? 0.45 : 0.12);   // Tail Slap: Rückwärts-Rammen prallt bei 26 % auf
     await this._delay(Math.round(dauer * anteil) + 30);
   }
   /**
@@ -36335,6 +36391,13 @@ this._deathWatch = (this._deathWatchStack || []).length
       _skipReactionCheck: true,
     });
     if (inst.zone !== ZONES.SUPPORT) return null;   // ein Lauscher hat die Karte inzwischen entfernt
+    // ★ 25.10. (Crash Landing): Hand-Fenster „ein Artifact wurde ausgerüstet" — nur echte Equipment-Artifacts (`istEquipArtifact`), nicht Anhängsel/Kreaturen.
+    if (kind === 'equip' && this.istEquipArtifact?.(inst)) {
+      await this._checkEquipPlacedHandReactions({
+        equipCard: inst, equipName: inst.name, equipOwner: anleger, equipHeroIdx: inst.heroIdx, hostSide, heroController, kind, isMove: !!opts.isMove, source: opts.source,
+      });
+      if (inst.zone !== ZONES.SUPPORT) return null;   // die Reaktion hat die Karte entfernt
+    }
     return this._checkSurpriseOnEquip(anleger, inst.heroIdx, inst);
   }
 

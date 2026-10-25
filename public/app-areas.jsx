@@ -77,6 +77,7 @@ const AREA_OVERLAYS = {
   // 'partial' laege die deckende Szene dagegen OBEN auf allem.
   'Spatial Crevice':              { tier: 'opaque',      C: () => <SpatialCreviceOverlay /> },   // v1440: Kartenstil
   'Tearing Mountain':             { tier: 'opaque',      C: () => <TearingMountainOverlay /> },   // 23.10.: Lavaberg mit Wasserfall und Lavafluss
+  'The Golden Gate':              { tier: 'opaque',      C: () => <GoldenGateOverlay /> },   // W76: goldenes Tor im Abendlicht
 };
 
 /** Faserige Diagonale: Punkte von links oben nach rechts unten, leicht gezackt. */
@@ -5844,6 +5845,60 @@ const TearingMountainOverlay = React.memo(function TearingMountainOverlay() {
           0% { opacity: 0; background: #fff196; } 3% { opacity: 1; background: #fff196; } 22% { background: #ffd066; } 45% { background: #ff9b3a; }
           68% { background: #f87420; } 88% { background: #e37435; } 97%, 100% { opacity: 0; background: #e37435; }
         }
+      `}</style>
+    </PixelScene>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  THE GOLDEN GATE — goldenes Tor im Abendlicht (W76)
+//
+//  Kartenmotiv: ein riesiges Tor aus goldenen Ziegeln, im Torbogen
+//  strahlt schraeges Gold-Licht, davor ein Erdweg. Kunsthoehe 100.
+//  Ebenen (public/areas/golden-gate/): sky (Kachel, Bayer-Verlauf),
+//  clouds (Kachel, driftet), floor (Kachel, Pflaster), glow (2 Bilder,
+//  Lichtstreifen im Bogen laufen), gate (Versatzstueck 160 breit),
+//  twinkle (Funkelsprite, 3 Bilder), dazu aufsteigende Goldfunken.
+// ═══════════════════════════════════════════════════════════════════
+const GGT = '/areas/golden-gate/';
+const GGT_W = 160;
+const GGT_FUNKEN = [[-70, 20], [-52, 52], [-30, 14], [-12, 36], [14, 24], [34, 58], [56, 18], [72, 44], [-86, 66], [88, 70], [0, 8], [-40, 70]];
+const GGT_FARBEN = ['#fad54a', '#f7f7ad', '#f29a3e'];
+const GoldenGateOverlay = React.memo(function GoldenGateOverlay() {
+  const funkel = useMemo(() => GGT_FUNKEN.slice(0, ppFxN(GGT_FUNKEN.length)).map(([x, y], i) => ({ x, y, dur: [3.6, 4.8, 6][i % 3], delay: -((i * 5) % 11) / 2 })), []);
+  const staub = useMemo(() => ppZufall(ppFxN(14), (i) => ({
+    x: Math.round(-30 + ((i * 53) % 61)), y: 76 + (i % 3) * 3, steig: 22 + (i * 7) % 26, dx: ((i * 5) % 7) - 3,
+    dur: [5, 7, 9][i % 3], delay: -((i * 3) % 14) / 2, farbe: GGT_FARBEN[i % 3],
+  })), []);
+  return (
+    <PixelScene artH={100} bg="#f29a3e" className="golden-gate-overlay">
+      <PixelBand src={GGT + 'sky.png'} />
+      <PixelBand src={GGT + 'clouds.png'} className="pp-area-dyn ggt-wolken" />
+      <PixelBand src={GGT + 'floor.png'} />
+      {/* erstes Bild bleibt stehen (Play Animations: aus), das laufende Licht liegt darauf */}
+      <PixelPiece src={GGT + 'glow.png'} w={GGT_W} style={{ backgroundSize: '100% 200%', backgroundPosition: '50% 0%' }} />
+      <PixelPiece src={GGT + 'glow.png'} w={GGT_W} className="pp-area-dyn" style={{ backgroundSize: '100% 200%', animation: 'ppBand2 1.2s steps(1) infinite' }} />
+      <PixelPiece src={GGT + 'gate.png'} w={GGT_W} />
+      {funkel.map((f, i) => (
+        <i key={'f' + i} className="pp-area-dyn ggt-funkel" style={{ left: ppArtX(f.x - 2, 0), top: ppArt(f.y - 2), animation: `ppSprite3 .5s steps(1) infinite, ggtFunkel ${f.dur}s steps(1) ${f.delay}s infinite` }} />
+      ))}
+      {staub.map((f, i) => (
+        <i key={'s' + i} className="pp-area-dyn ggt-staub" style={{
+          left: ppArtX(f.x, 0), top: ppArt(f.y), background: f.farbe, '--dx': ppArt(f.dx), '--steig': ppArt(-f.steig),
+          animation: `ggtSteig ${f.dur}s steps(${f.steig}) ${f.delay}s infinite`,
+        }} />
+      ))}
+      <div className="pp-rand-dim" />
+      <style>{`
+        /* Wolken: eine Kachel (64 Kunstpixel) pro Umlauf, ganze Pixel */
+        .ggt-wolken { animation: ggtWolken 128s steps(64) infinite; }
+        @keyframes ggtWolken { from { background-position: 0 0; } to { background-position: calc(64 * var(--px)) 0; } }
+        /* Funkeln: 5×5-Sprite (Punkt, kleines, grosses Kreuz) blitzt kurz auf, sonst unsichtbar */
+        .ggt-funkel { position: absolute; width: calc(5 * var(--px)); height: calc(5 * var(--px)); background: url(${GGT}twinkle.png) 0 0 / 300% 100% no-repeat; opacity: 0; }
+        @keyframes ggtFunkel { 0%, 70% { opacity: 0; } 71%, 80% { opacity: 1; } 81%, 100% { opacity: 0; } }
+        /* Goldstaub: ein Kunstpixel steigt in ganzen Pixeln, blinkt am Ende weg */
+        .ggt-staub { position: absolute; width: var(--px); height: var(--px); opacity: 0; }
+        @keyframes ggtSteig { 0% { opacity: 0; transform: translate(0, 0); } 4%, 88% { opacity: 1; } 96%, 100% { opacity: 0; transform: translate(var(--dx), var(--steig)); } }
       `}</style>
     </PixelScene>
   );

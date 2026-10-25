@@ -32,7 +32,7 @@ const GEPRUEFT = new Set([
   'guardian-beast-niu', 'hockey-genie', 'jump-in-the-river', 'soul-shard-ka', 'the-cosmic-depths', 'the-master-s-key', 'unwanted-audience',
   // ENDE eines fremden/eigenen nächsten Zuges
   'anti-magic-zone', 'disruption-ray', 'forbidden-zone', 'medusa-s-curse', 'null-the-mage-slayer', 'null-zone', 'pink-sky', 'rool-the-troll-guard',
-  'skeleton-death-knight', 'smoke-vial', 'unreasonable-anger', 'nasty-prank',
+  'skeleton-death-knight', 'smoke-vial', 'unreasonable-anger', 'nasty-prank', 'uncool-malfunction',
   // BEGINN des nächsten eigenen Zuges (setzen `fristBeginn: true`)
   'cloud-pillow', 'howling-in-the-night', 'infinitely-reproducing-slime', 'locke-the-unseen-saboteur', 'loyal-shepherd', 'mao-the-vengeful-guardian',
   'necromancy', 'omikron-the-faceless-illusionist', 'sparky-slime', 'string-of-fine', 'unsettling-opportunist-vullary',
