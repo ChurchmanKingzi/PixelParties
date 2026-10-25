@@ -74,6 +74,7 @@ const config = {
     bugs: env('BUG_CHANNEL_ID'),
     bugfixes: env('BUGFIXES_CHANNEL_ID', '1562197315437989889'),   // Bugfixes an Karten/Wechselwirkungen mit Kartenbildern (ohne .env-Eintrag gilt dieser)
     // Kanal der Minispiele (!mystery, !guess, !pixle). Ohne .env-Eintrag gilt dieser; die ältere Variable MYSTERY_CHANNEL_ID bleibt als Rückfall gültig.
+    matchmaking: env('MATCHMAKING_CHANNEL_ID', '733828766794645504'),   // 💥-matchmaking: hier landen alle !duel-Herausforderungen (ohne .env-Eintrag gilt dieser)
     minigames: env('MINIGAMES_CHANNEL_ID', env('MYSTERY_CHANNEL_ID', '1561796630762623036')),
   },
 

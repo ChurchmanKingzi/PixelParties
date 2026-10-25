@@ -250,7 +250,7 @@ Nur im Minigames-Kanal (fest eingestellt auf `1561796630762623036`; andere Kanä
   in dem man die Karte **benutzt** hat — von der Hand, per Effekt aus Deck/Ablage, als Startheld oder Startfähigkeit, als Aszendierung (auch eine negierte Karte gilt als gespielt; nur gezogen/abgeworfen/gemillt
   zählt nicht). **Einmal je Berliner Tag und Spieler**; es gelten dieselben Anti-Farm-Regeln wie bei den anderen SC-Boni (Mindestdauer, Mindestzüge, Siege durch Verbindungsabbruch zählen nicht).
   Der Betrag steht in `data/sc-rewards.json` (`card_of_the_day`). Das Spiel zeigt „Card of the Day! — Daily!“ im Ergebnisbildschirm.
-* `!duel` — offene Herausforderung; wer „Accept“ klickt, bekommt den Gegner genannt (verabredet wird im Spiel unter *Who’s Online*).
+* `!duel` — offene Herausforderung, die **immer im Kanal 💥-matchmaking** erscheint (Standard-ID `733828766794645504`, änderbar mit `MATCHMAKING_CHANNEL_ID`; in `bot/.env` ist nichts nötig). Wer woanders tippt, bekommt einen kurzen Hinweis mit Link zum Kanal. Wer „Accept“ klickt, bekommt den Gegner genannt (verabredet wird im Spiel unter *Who’s Online*).
 * **Turniere (K.-o.)** 🔒: `!tournament create <Name>` → Spieler klicken **Join** → `!tournament start` (Auslosung, Freilose) →
   `!tournament win @Sieger` pro Spiel → Bracket und nächste Paarungen werden automatisch gepostet. Außerdem `dq @Nutzer`, `bracket`, `cancel`.
   Die Ergebnisse trägt ein Admin ein; das Spiel meldet sie nicht von selbst.
