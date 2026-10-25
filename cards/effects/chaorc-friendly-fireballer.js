@@ -247,6 +247,9 @@ module.exports = {
         description: 'Openly add a "Fireball" to your hand from your deck or discard pile?',
         confirmLabel: '🔥 Add!',
         cancellable: true,
+        // Such-Template (`_search-shared.js`): Hand-Suche kennzeichnen. `fireballSources` hat jeden Stapel einzeln auf Such-/Stapel-Sperren geprüft — die Einträge sind also schon frei;
+        // `searchPile` nennt bei zwei Quellen das Deck, bei einer diese eine.
+        searchToHand: true, searchPile: sources.length === 1 ? sources[0] : 'deck',
       });
       if (!pick || pick.cancelled || !pick.cardName) return;
       const from = sources.includes(pick.source) ? pick.source : sources[0];   // fehlt `source` (Automat): die erste Quelle (Deck vor Ablage)
