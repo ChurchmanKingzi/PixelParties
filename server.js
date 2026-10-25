@@ -9834,9 +9834,9 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
   if (charmedOwner != null && hero.charmedBy !== pi && hero.controlledBy !== pi) return false;
 
   // v769: Der Stapel kann in einer SUPPORT Zone liegen (Xal).
-  const abilitySlot = (zoneKind === 'support')
-    ? ps.supportZones?.[heroIdx]?.[zoneIdx]
-    : ps.abilityZones?.[heroIdx]?.[zoneIdx];
+  // W73a: `(heroIdx, zoneIdx)` ist nur zusammen mit der Zonenart eindeutig; ein Support-Stapel zaehlt nur, solange der Held Abilities in Support Zonen nimmt (die Engine-Listen
+  // fuehren schlafende Stapel nicht — der Socket-Weg haelt dieselbe Linie).
+  const abilitySlot = room.engine.abilityStapelAn(heroOwner, heroIdx, zoneKind, zoneIdx);
   if (!abilitySlot || abilitySlot.length === 0) return false;
   const abilityName = abilitySlot[0];
   const level = abilitySlot.length;
@@ -10003,7 +10003,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
       hoptReserved = false;
       // ★★ v1349: Aktiveffekt genutzt (Madame Guillotine & Co.).
       await room.engine.meldeAktivEffekt({
-        kind: 'ability', playerIdx: pi, heroIdx, cardName: abilityName, zoneIdx, isActionCost: false,
+        kind: 'ability', playerIdx: pi, heroIdx, cardName: abilityName, zoneIdx, zoneKind, isActionCost: false,
       });
       // Gefeuert — auch wenn die Karte den Schlüssel danach wieder
       // freigibt, weil sie mehrere Nutzungen pro Runde hat (Lethes
@@ -10745,9 +10745,9 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
 
   // v769: Der Stapel kann in einer SUPPORT Zone liegen (Xal, Xalibur).
   // Die Aktivierung selbst unterscheidet sich nicht — nur, wo er steht.
-  const abilitySlot = (zoneKind === 'support')
-    ? ps.supportZones?.[heroIdx]?.[zoneIdx]
-    : ps.abilityZones?.[heroIdx]?.[zoneIdx];
+  // W73a: `(heroIdx, zoneIdx)` ist nur zusammen mit der Zonenart eindeutig; ein Support-Stapel zaehlt nur, solange der Held Abilities in Support Zonen nimmt (die Engine-Listen
+  // fuehren schlafende Stapel nicht — der Socket-Weg haelt dieselbe Linie).
+  const abilitySlot = room.engine.abilityStapelAn(heroOwner, heroIdx, zoneKind, zoneIdx);
   if (!abilitySlot || abilitySlot.length === 0) return false;
   const abilityName = abilitySlot[0];
   const level = abilitySlot.length;
@@ -11030,7 +11030,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     // Universal action-resolved hook (see doPlaySpell for rationale).
     // ★★ v1349: Aktiveffekt genutzt (Madame Guillotine & Co.).
     await room.engine.meldeAktivEffekt({
-      kind: 'ability', playerIdx: pi, heroIdx, cardName: abilityName, zoneIdx, isActionCost: true,
+      kind: 'ability', playerIdx: pi, heroIdx, cardName: abilityName, zoneIdx, zoneKind, isActionCost: true,
     });
     await room.engine.runHooks('onAnyActionResolved', {
       actionType: 'ability_activation', playerIdx: pi, abilityName, heroIdx, heroOwner,
