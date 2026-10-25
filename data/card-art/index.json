@@ -5598,5 +5598,25 @@
 "Cuberto, Supreme Lord of Edges": {
 "id": "Cuberto_Supreme_Lord_of_Edges",
 "kind": "a"
+},
+"True Form": {
+"id": "True_Form",
+"kind": "a"
+},
+"Feral, the Fortress Breaker": {
+"id": "Feral_the_Fortress_Breaker",
+"kind": "a"
+},
+"Enemy of my Enemy": {
+"id": "Enemy_of_my_Enemy",
+"kind": "a"
+},
+"Cosmic Exploding Skull": {
+"id": "Cosmic_Exploding_Skull",
+"kind": "a"
+},
+"Bounce Trap": {
+"id": "Bounce_Trap",
+"kind": "a"
 }
 }
