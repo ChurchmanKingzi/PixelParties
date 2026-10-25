@@ -33184,7 +33184,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         ra.eintraege.push({ title: config.title || '', ids: picked.slice() });
       }
     }
-    const _pickedRoh = await this._disambiguateStackedTargets(playerIdx, validTargets, picked);
+    const _pickedRoh = await this._disambiguateStackedTargets(playerIdx, validTargets, picked, config);
     const _gesperrt = new Set(validTargets.filter(t => t.ineligible).map(t => t.id));
     let _pickedIds = Array.isArray(_pickedRoh)
       ? _pickedRoh.filter(id => !_gesperrt.has(id))
@@ -33394,17 +33394,34 @@ this._deathWatch = (this._deathWatchStack || []).length
   _merkeStapelWahl(t) {
     if (!t || !t.id || !t.cardInstance) return;
     if (!this._stapelWahl) this._stapelWahl = new Map();
-    this._stapelWahl.set(t.id, t.cardInstance);
+    this._stapelWahl.set(t.id, [t.cardInstance, ...(t._zusatzInstanzen || [])]);
+    // Skripte, die ihr Ziel danach ueber Koordinaten wiederfinden (`cardInstances.find(c => … zoneSlot === …)`), bekommen so die GEWAEHLTE Karte: sie rueckt vor ihre Stapelnachbarn.
+    const arr = this.cardInstances, w = t.cardInstance;
+    const ersterIdx = arr.findIndex(c => c.zone === ZONES.SUPPORT && c.owner === w.owner && c.heroIdx === w.heroIdx && c.zoneSlot === w.zoneSlot);
+    const wIdx = arr.indexOf(w);
+    if (ersterIdx >= 0 && wIdx > ersterIdx) { arr[wIdx] = arr[ersterIdx]; arr[ersterIdx] = w; }
   }
-  stapelWahlFuer(ziel) {
-    const w = ziel && this._stapelWahl ? this._stapelWahl.get(ziel.id) : null;
-    if (w) this._stapelWahl.delete(ziel.id);
-    if (w && w.zone === ZONES.SUPPORT && w.heroIdx === ziel.heroIdx && w.zoneSlot === ziel.slotIdx) return w;
-    return ziel?.cardInstance || null;
+  /** Alle gewaehlten Karten dieses Ziels (bei Mehrfachwahl im Stapel mehrere; sonst nur die Instanz des Ziels). Liefert die Wahl einmalig. */
+  stapelWahlAlle(ziel) {
+    const liste = ziel && this._stapelWahl ? this._stapelWahl.get(ziel.id) : null;
+    if (liste) this._stapelWahl.delete(ziel.id);
+    const gueltig = (liste || []).filter(w => w && w.zone === ZONES.SUPPORT && w.heroIdx === ziel.heroIdx && w.zoneSlot === ziel.slotIdx);
+    if (gueltig.length) return gueltig;
+    return ziel?.cardInstance ? [ziel.cardInstance] : [];
+  }
+  stapelWahlFuer(ziel) { return this.stapelWahlAlle(ziel)[0] || null; }
+
+  /** Darion: die Karten, die zu EINEM gewaehlten Ziel gehoeren — bei einem Equip-Stapel mit Mehrfachwahl die erste plus `_zusatzInstanzen`, sonst nur `cardInstance`. */
+  gewaehlteInstanzen(t) {
+    if (!t) return [];
+    return [t.cardInstance, ...(t._zusatzInstanzen || [])].filter(Boolean);
   }
 
-  async _disambiguateStackedTargets(playerIdx, validTargets, pickedIds) {
+  async _disambiguateStackedTargets(playerIdx, validTargets, pickedIds, config = null) {
     if (!Array.isArray(pickedIds) || pickedIds.length === 0) return pickedIds;
+    // Darion: erlaubt die Wahl MEHRERE Ausruestungen („any number …", „up to 2 …"), darf aus einem Stapel mehr als eine Karte kommen (`_zusatzInstanzen`).
+    const equipObergrenze = Math.min(config?.maxTotal ?? Infinity, config?.maxPerType?.equip ?? (config?.maxTotal != null ? Infinity : 1));
+    let zusaetzlich = 0;
     const alice = require('./_alice-shared');
     for (const id of pickedIds) {
       const t = (validTargets || []).find(v => v && v.id === id);
@@ -33427,6 +33444,15 @@ this._deathWatch = (this._deathWatchStack || []).length
         continue;
       }
       if (stack.length <= 1) {
+        const platz = equipObergrenze - (pickedIds.length - 1) - zusaetzlich;   // die uebrigen gewaehlten Ziele zaehlen je 1
+        if (platz > 1) {
+          const gew = await require('./_equip-stack-shared').waehleMehrere(this, playerIdx, eqStack, { mindestens: 1, hoechstens: platz });
+          t.cardInstance = gew[0]; t._cardInstance = gew[0]; t.cardName = gew[0].name;
+          t._zusatzInstanzen = gew.slice(1);
+          zusaetzlich += t._zusatzInstanzen.length;
+          this._merkeStapelWahl(t);
+          continue;
+        }
         const eqChoice = await this.promptGeneric(playerIdx, {
           type: 'instancePick',
           title: 'Equipped Artifacts',

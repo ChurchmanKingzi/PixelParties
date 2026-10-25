@@ -35,6 +35,7 @@
 
 const { hasCardType } = require('./_hooks');
 const { ausgegrauteRestkarten } = require('./_target-dim-shared');
+const { waehleMehrere } = require('./_equip-stack-shared');
 
 const CARD_NAME = 'Disarm';
 const DAUER_MS = 1100;       // Länge der Animation (deckt sich mit `disarm_snap` im Client)
@@ -71,6 +72,17 @@ function heldenMitAusruestung(engine) {
     }
   }
   return out;
+}
+
+/** Ziele der Artefakt-Wahl: ein Ziel je PLATZ. Ein Equip-Stapel (Darion) ist ein Platz mit mehreren Karten: welche gemeint sind, klaert danach `waehleMehrere`. */
+function artefaktZiele(ausruestung) {
+  const proPlatz = new Map();
+  for (const inst of ausruestung) { if (!proPlatz.has(inst.zoneSlot)) proPlatz.set(inst.zoneSlot, []); proPlatz.get(inst.zoneSlot).push(inst); }
+  return [...proPlatz.values()].map(insts => {
+    const z = ausruestungsZiel(insts[insts.length - 1]);
+    if (insts.length > 1) { z._eigeneStapelWahl = true; Object.defineProperty(z, '_stapelInsts', { value: insts, enumerable: false }); }   // nicht enumerierbar: geht nicht mit an den Client
+    return z;
+  });
 }
 
 function ausruestungsZiel(inst) {
@@ -131,7 +143,7 @@ module.exports = {
       // ── 2. Die Artefakte (mindestens 1) ──
       const ausruestung = ausruestungAm(engine, wahl.seite, wahl.heroIdx);
       if (ausruestung.length === 0) { gs._spellCancelled = true; return; }
-      const artZiele = ausruestung.map(ausruestungsZiel);
+      const artZiele = artefaktZiele(ausruestung);
       const gewaehlt = await engine.promptEffectTarget(pi, [...artZiele, ...ausgegrauteRestkarten(engine, artZiele)], {
         title: CARD_NAME, source: CARD_NAME,
         description: `Choose any number of Artifacts equipped to ${wahl.hero.name} (at least 1) to delete.`,
@@ -143,9 +155,8 @@ module.exports = {
       });
       const ids = Array.isArray(gewaehlt) ? gewaehlt : (gewaehlt ? [gewaehlt] : []);
       // Nach der Abfrage neu einsammeln — das Brett kann sich bewegt haben.
-      const frisch = ausruestungAm(engine, wahl.seite, wahl.heroIdx).map(ausruestungsZiel);
-      const treffer = ids.map(id => frisch.find(z => z.id === id)).filter(z => z?.cardInstance);
-      for (const z of treffer) z.cardInstance = z._cardInstance = engine.stapelWahlFuer(z);   // Darion: die gewaehlte Karte des Stapels, nicht die erste mit dieser ID
+      const frisch = artefaktZiele(ausruestungAm(engine, wahl.seite, wahl.heroIdx));
+      let treffer = ids.map(id => frisch.find(z => z.id === id)).filter(z => z?.cardInstance);
       if (treffer.length === 0) { gs._spellCancelled = true; return; }
 
       // ★ W16a (Al, 19.10.2026, Frage 2: „Attachments ja"): Disarm wählt einen HELDEN und löscht dessen Ausrüstung — ein Nicht-Schaden-Effekt auf den Helden, den Resistance abfängt
@@ -156,6 +167,17 @@ module.exports = {
         engine.sync();
         return;
       }
+
+      // Darion: ein gewaehlter Equip-Stapel ist EIN Platz — „any number" gilt auch darin: Karte fuer Karte waehlen (die erste ist Pflicht, danach „Done").
+      const einzelne = [];
+      for (const z of treffer) {
+        if (!z._stapelInsts) { einzelne.push(z); continue; }
+        const insts = z._stapelInsts.filter(i => i.zone === 'support');
+        const karten = await waehleMehrere(engine, pi, insts, { title: CARD_NAME, description: 'These Artifacts share one Support Zone — choose which ones to delete.' });
+        for (const inst of karten) einzelne.push({ ...ausruestungsZiel(inst), cardInstance: inst, _cardInstance: inst });
+      }
+      treffer = einzelne;
+      if (treffer.length === 0) { gs._spellCancelled = true; return; }
 
       // ── Bild: Ring um jedes Artefakt, Zerfall ──
       engine._broadcastEvent('play_zone_animation', {

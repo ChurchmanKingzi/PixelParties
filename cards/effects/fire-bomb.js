@@ -161,12 +161,14 @@ module.exports = {
       } else if (t.type === 'equip') {
         // Remove equip from support zone — fires onCardLeaveZone
         // Darion: bei einem Stapel hat die Rueckfrage die Karte gewaehlt (`t.cardInstance`).
-        const inst = (t.cardInstance && t.cardInstance.zone === 'support' && t.cardInstance.heroIdx === t.heroIdx && t.cardInstance.zoneSlot === t.slotIdx && t.cardInstance.name === t.cardName)
-          ? t.cardInstance
-          : engine.cardInstances.find(c =>
+        // Mehrfachwahl in einem Stapel: `gewaehlteInstanzen` liefert alle gewaehlten Karten dieses Platzes.
+        const einzeln = (t.cardInstance && t.cardInstance.zone === 'support' && t.cardInstance.heroIdx === t.heroIdx && t.cardInstance.zoneSlot === t.slotIdx && t.cardInstance.name === t.cardName)
+          ? engine.gewaehlteInstanzen(t)
+          : [engine.cardInstances.find(c =>
             c.owner === t.owner && c.zone === 'support' && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx && c.name === t.cardName
-          );
-        if (inst) {
+          )].filter(Boolean);
+        for (const inst of einzeln) {
+          if (inst.zone !== 'support') continue;
           // ★ Als Befund 28.8.: hier stand eine HANDGESCHRIEBENE
           // Entfernung — Zone splicen, Namen in die Ablage schieben,
           // Instanz aus `cardInstances` filtern. Zwei Folgen:
@@ -189,7 +191,7 @@ module.exports = {
             { name: 'Fire Bomb', owner: playerIdx }, inst,
             { ignoreGateShield: true, sourceName: 'Fire Bomb' },
           );
-          engine.log('destroy', { card: t.cardName, by: 'Fire Bomb' });
+          engine.log('destroy', { card: inst.name, by: 'Fire Bomb' });
         }
       }
     }
