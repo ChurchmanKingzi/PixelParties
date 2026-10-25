@@ -4004,7 +4004,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Play this card immediately when your opponent adds 1 or more cards from their deck or discard pile to their hand by discarding the same number of cards from your hand. Delete the cards your opponent added. Your opponent may delete all other cards in their hand instead.",
+    "effect": "Play this card immediately when your opponent adds 1 or more cards from their deck, Potion Deck or discard pile to their hand by discarding the same number of cards from your hand. Delete the cards your opponent added. Your opponent may delete all other cards in their hand instead.",
     "archetype": "",
     "setID": "PP ART",
     "banned": "",
