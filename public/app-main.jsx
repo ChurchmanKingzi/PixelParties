@@ -231,7 +231,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
   // Filter pool by name search.
   const visiblePool = poolOrder
     .map((e, i) => ({ name: e.name, gray: e.gray, id: e.id, idx: i }))
-    .filter(e => !filter || e.name.toLowerCase().includes(filter.toLowerCase()));
+    .filter(e => !filter || window.namePasst(e.name, filter));
 
   // Player ring shown top-left. Always rooted at "me" so the local seat
   // is at index 0; subsequent entries follow the snake direction so the
@@ -626,7 +626,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
   }, [poolCounts, allCards, cardDB]);
 
   const visibleList = filter
-    ? availableList.filter(e => e.name.toLowerCase().includes(filter.toLowerCase()))
+    ? availableList.filter(e => window.namePasst(e.name, filter))
     : availableList;
 
   // Klaenge wie im normalen Deckbauer: Hinzufuegen = draw, Entfernen = discard.
@@ -1026,7 +1026,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
         // 2) neue Karte: beliebig, aber kein Held/Token/freie Ability, nicht dieselbe, und die eingetauschten Karten haben verschiedene Namen
         const q = swapFilter.trim().toLowerCase();
         const zuListe = swapVon ? allCards.filter(c => c && c.name && c.name !== swapVon && c.cardType !== 'Hero' && c.cardType !== 'Token' && !istFrei(c.name) && !eingetauscht.has(c.name)
-          && (!q || c.name.toLowerCase().includes(q))).slice(0, 60) : [];
+          && (!q || window.namePasst(c.name, q))).slice(0, 60) : [];
         return (
           <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: '#08060c', display: 'flex', flexDirection: 'column', padding: 16, gap: 10 }} data-pp-px="aus">
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

@@ -2297,7 +2297,7 @@ function DeckBuilder() {
   const filteredCards = useMemo(() => {
     let result = AVAILABLE_CARDS;
     const f = filters;
-    if (f.name) result = result.filter(c => c.name.toLowerCase().includes(f.name.toLowerCase()));
+    if (f.name) result = result.filter(c => window.namePasst(c.name, f.name));
     if (f.effect) result = result.filter(c => window.effektTextPasst(c, f.effect));   // jedes Wort, beliebige Reihenfolge
     if (f.cardType) result = result.filter(c => c.cardType === f.cardType);
     if (f.subtype) result = result.filter(c => c.subtype === f.subtype);

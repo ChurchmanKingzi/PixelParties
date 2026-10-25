@@ -8032,6 +8032,15 @@ function effektTextPasst(card, suche) {
 }
 window.effektTextPasst = effektTextPasst;
 
+// Dasselbe für die Namenszeile: jedes eingegebene Wort muss im Kartennamen vorkommen (beliebige Reihenfolge, Teilwörter, Groß-/Kleinschreibung egal).
+function namePasst(name, suche) {
+  const woerter = String(suche == null ? '' : suche).toLowerCase().split(/\s+/).filter(Boolean);
+  if (woerter.length === 0) return true;
+  const text = String(name == null ? '' : name).toLowerCase();
+  return woerter.every(w => text.includes(w));
+}
+window.namePasst = namePasst;
+
 // ★★ v1166 — DOPPELSCHULEN-FILTER (Al 17.9.)
 //
 // „Double only" zeigt ausschliesslich Attacks, Spells und Creatures mit
