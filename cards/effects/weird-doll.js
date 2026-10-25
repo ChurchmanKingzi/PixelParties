@@ -43,18 +43,29 @@ module.exports = {
   },
 
   getValidTargets(gs, pi, engine) {
-    return _enumerateControlledAbilities(gs, pi, engine).map(ab => ({
+    const out = [];
+    for (const ab of _enumerateControlledAbilities(gs, pi, engine)) {
       // Eine Ability in einer SUPPORT-Zone (Xalibur, Cloak of Edge) bekommt Zonen-Typ und eigene ID — sonst
       // kollidiert sie mit der Ability-Zone gleicher Nummer und der Client hebt den falschen Slot hervor (F03-03).
-      id: `${ab.fromSupport ? 'equip' : 'ability'}-${ab.zoneOwner}-${ab.heroIdx}-${ab.slotIdx}`,
-      type: ab.fromSupport ? 'equip' : 'ability',
-      fromSupport: !!ab.fromSupport,
-      owner: ab.zoneOwner,
-      heroIdx: ab.heroIdx,
-      slotIdx: ab.slotIdx,
-      cardName: ab.cardName,
-      level: ab.level,
-    }));
+      const id = `${ab.fromSupport ? 'equip' : 'ability'}-${ab.zoneOwner}-${ab.heroIdx}-${ab.slotIdx}`;
+      if (ab.fromSupport && out.some(t => t.id === id)) continue;   // Darion: zwei Cloaks im selben Equip-Stapel sind EIN Ziel-Platz (die Wahl trifft die Rückfrage)
+      const t = {
+        id,
+        type: ab.fromSupport ? 'equip' : 'ability',
+        fromSupport: !!ab.fromSupport,
+        owner: ab.zoneOwner,
+        heroIdx: ab.heroIdx,
+        slotIdx: ab.slotIdx,
+        cardName: ab.cardName,
+        level: ab.level,
+      };
+      // Darion: im Equip-Stapel liegen auch Karten, die KEINE Ability sind — die Rückfrage „welches Equip?" darf nur die Ability-Karten anbieten (Cloak of Edge).
+      if (ab.fromSupport && engine?.collectSupportZoneAbilities) {
+        t._erlaubteInstanzen = engine.collectSupportZoneAbilities(ab.zoneOwner, ab.heroIdx).filter(e => e.slotIdx === ab.slotIdx && e.inst).map(e => e.inst.id);
+      }
+      out.push(t);
+    }
+    return out;
   },
 
   targetingConfig: {
@@ -88,8 +99,10 @@ module.exports = {
     // ── Ability in einer Support Zone: die Karte (bei einem Stapel die oberste Kopie) wandert über den
     // EINEN Brett→Ablage-Weg; die Ability-Zonen bleiben unberührt (F03-03).
     if (target.fromSupport) {
-      const eintrag = (engine.collectSupportZoneAbilities?.(target.owner, target.heroIdx) || [])
-        .find(e => e.slotIdx === target.slotIdx);
+      const eintraege = (engine.collectSupportZoneAbilities?.(target.owner, target.heroIdx) || []).filter(e => e.slotIdx === target.slotIdx);
+      // Darion: im Equip-Stapel zaehlt die in der Rückfrage gewählte Ability-Karte (zwei Cloaks), sonst die erste am Platz.
+      const gewaehlt = target.cardInstance && eintraege.find(e => e.inst === target.cardInstance);
+      const eintrag = gewaehlt || eintraege[0];
       if (!eintrag?.inst || eintrag.inst.zone !== 'support') return { cancelled: true };
       engine._broadcastEvent('play_zone_animation', {
         type: 'weird_doll_grow', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: -1,

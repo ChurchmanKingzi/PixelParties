@@ -73,14 +73,15 @@ function buildEligibleGallery(gs, pi, engine) {
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** True if this player has at least one alive hero with a free Support Zone. */
-function hasHeroWithFreeZone(ps) {
+/** True if this player has at least one alive hero with a free Support Zone (Darion: oder einem Equip-Stapel, der weitere Equips aufnimmt). */
+function hasHeroWithFreeZone(ps, engine = null, pi = null) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
     for (let si = 0; si < 3; si++) {
       if (((ps.supportZones[hi] || [])[si] || []).length === 0) return true;
     }
+    if (engine && pi != null && require('./_equip-stack-shared').hatStapelPlatz(engine, pi, hi)) return true;
   }
   return false;
 }
@@ -123,7 +124,7 @@ module.exports = {
   canActivate(gs, pi, engine) {
     const ps = gs.players[pi];
     if (!ps) return false;
-    if (!hasHeroWithFreeZone(ps)) return false;
+    if (!hasHeroWithFreeZone(ps, engine, pi)) return false;
     return buildEligibleGallery(gs, pi, engine).length > 0;
   },
 
@@ -175,8 +176,9 @@ module.exports = {
     const seite = platz.seite ?? pi;
     const zps = gs.players[seite];
 
-    // Final validation: slot still free + deck still contains the equip
-    if (((zps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0) return { aborted: true };
+    // Final validation: slot still free + deck still contains the equip (Darion: der Equip-Stapel des Helden nimmt weitere Equips auf)
+    if (((zps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0
+        && engine.equipPflichtPlatz(seite, destHeroIdx, equipName) !== destSlot) return { aborted: true };
     // ★ W15a (Al, R3 und Regel W14a Q5): Ausrüsten PER EFFEKT — Resistance des Trägers fängt es ab (vor jeder Kartenbewegung; die Ausrüstung bleibt im Deck, kein Mischen).
     // Der Artefakt-Einsatz ist gespielt und verbraucht.
     if (await engine.heroNonDamageEffectBlocked(seite, destHeroIdx, 'equip', { sourceOwner: pi, source: CARD_NAME })) {
