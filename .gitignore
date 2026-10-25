@@ -51,3 +51,12 @@ bot/node_modules/
 bot/.env
 bot/data/moniabot.db
 bot/data/moniabot.db-*
+
+# Nicht zum Spiel gehoerig (Al, 25.10.2026): Niche-Tests, Audits, Berichte und Dokumentation bleiben lokal — siehe CLAUDE.md / CARD_API.md
+/docs/
+*.md
+!/CLAUDE.md
+!/README.md
+!/cards/effects/CARD_API.md
+*.trail.json
+*_report.csv
