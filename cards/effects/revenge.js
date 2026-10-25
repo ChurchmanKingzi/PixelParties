@@ -9,9 +9,9 @@
 //  Hand-Fenster am Ende jedes Sterbe-Vorgangs (`engine._liefereNiederlagen` → `_checkTargetsDefeatedHandReactions`): ein Flächenschlag ist EIN Vorgang, Helden und Kreaturen zusammen.
 //  Die Engine führt je Spieler und Zug den Zähler der verlorenen ZIELE (`ps._zieleBesiegt`; Helden, Kreaturen und Tokens, gleich durch wen sie fielen) und liefert im `info` den Stand
 //  vor und nach dem Vorgang (`info.zaehler[pi] = { vorher, nachher, opfer }`).
-//  • „your SECOND target": der Zähler überschreitet in diesem Vorgang die 2 — `vorher ≤ 1` und `nachher ≥ 2`. Fällt das zweite Ziel zeitgleich mit weiteren (Flächenschlag: erstes + zweites,
-//    zweites + drittes + viertes …), gilt es trotzdem; ein späteres (drittes, viertes …) Ziel allein öffnet das Fenster NIE.
-//  • „by an opponent's card or effect": mindestens ein Opfer dieses Vorgangs fiel durch eine Karte/einen Effekt eines GEGNERS (nicht durch eigene Effekte, Statusschaden ohne Quelle usw.).
+//  • „your SECOND target … defeated BY AN OPPONENT'S card or effect" (Ruling 25.10.): gezählt werden NUR Ziele, die durch eine Karte/einen Effekt eines GEGNERS fielen (`info.zaehlerGegner`) — Tode durch
+//    eigene Effekte, Statusschaden ohne Quelle usw. zählen nicht mit, auch wenn sie davor oder dazwischen passieren. Das zweite VOM GEGNER besiegte Ziel öffnet das Fenster, selbst wenn es insgesamt
+//    schon das dritte oder spätere tote Ziel ist; ein weiteres danach (drittes …) nie. Fällt es zeitgleich mit weiteren (Flächenschlag), gilt es trotzdem (`vorher ≤ 1`, `nachher ≥ 2`).
 //  • „during your opponent's turn": der Zug gehört nicht dem Reagierenden.
 //
 //  ── WIRKUNG ─────────────────────────────────────────────────────────────
@@ -25,12 +25,6 @@
 const CARD_NAME = 'REVENGE!!!';
 const RAGE_MS = 1900;
 
-function ausGegnerHand(engine, e, pi) {
-  const q = e?.source;
-  const so = q?.controller ?? q?.owner;
-  return Number.isInteger(so) && so >= 0 && so !== pi && !!engine.gs.players[so];
-}
-
 module.exports = {
   canActivate: () => false,
   neverPlayable: true,
@@ -39,11 +33,10 @@ module.exports = {
   isTargetsDefeatedReaction: true,
 
   targetsDefeatedCondition(gs, pi, engine, info) {
-    const z = info?.zaehler?.[pi];
+    const z = info?.zaehlerGegner?.[pi];
     if (!z) return false;
     if (gs.activePlayer === pi || !Number.isInteger(gs.activePlayer)) return false;       // nur im Zug des Gegners
-    if (!(z.vorher <= 1 && z.nachher >= 2)) return false;                                  // genau der Vorgang, der das ZWEITE Ziel enthält
-    return z.opfer.some(e => ausGegnerHand(engine, e, pi));
+    return z.vorher <= 1 && z.nachher >= 2;                                                 // genau der Vorgang, der das ZWEITE vom Gegner besiegte Ziel enthält
   },
 
   async targetsDefeatedResolve(engine, pi, info, { casterIdx, casterSeite }) {
