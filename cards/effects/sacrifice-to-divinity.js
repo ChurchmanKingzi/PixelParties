@@ -121,22 +121,20 @@ module.exports = {
         return;
       }
 
-      // Source pick — only prompt if more than one source has copies.
+      // Source pick — EIN Picker mit Herkunfts-Label (CARD_API „Mehrere Quellen = ein Picker"): die Divinity erscheint je Quelle (HAND / DECK / DISCARD, mit Anzahl) in einer
+      // Galerie; mit nur einer Quelle gibt es nichts zu wählen (kein Dialog).
       let pickedSource = null;
       if (sources.length === 1) {
         pickedSource = sources[0].source;
       } else {
         const sourceRes = await engine.promptGeneric(pi, {
-          type: 'optionPicker',
+          type: 'cardGallery',
+          cards: sources,
           title: CARD_NAME,
-          description: 'Pick a "Divinity" from where?',
-          options: sources.map(s => ({
-            id: s.source,
-            label: `${s.source === 'hand' ? '✋' : s.source === 'deck' ? '📚' : '♻️'}  From your ${s.source} (${s.count} available)`,
-          })),
+          description: 'Take "Divinity" from your hand, deck or discard pile?',
           cancellable: false,
         });
-        pickedSource = sourceRes?.optionId || sources[0].source;
+        pickedSource = sources.some(s => s.source === sourceRes?.source) ? sourceRes.source : sources[0].source;
       }
 
       // ── Step 3: pick which Hero to attach Divinity to ──

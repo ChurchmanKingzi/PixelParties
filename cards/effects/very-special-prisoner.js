@@ -123,22 +123,20 @@ module.exports = {
     const sources = _availableDivinitySources(ps, engine, pi);
     if (sources.length === 0) return; // Defensive — reactionCondition gated this.
 
-    // Source pick — only prompt when both hand and deck have copies.
+    // Source pick — EIN Picker mit Herkunfts-Label (CARD_API „Mehrere Quellen = ein Picker"): die Divinity erscheint je Quelle (HAND / DECK, mit Anzahl) in einer Galerie;
+    // mit nur einer Quelle gibt es nichts zu wählen (kein Dialog).
     let pickedSource;
     if (sources.length === 1) {
       pickedSource = sources[0].source;
     } else {
       const sourceRes = await engine.promptGeneric(pi, {
-        type: 'optionPicker',
+        type: 'cardGallery',
+        cards: sources.map(s => ({ name: DIVINITY, source: s.source, count: s.count })),
         title: CARD_NAME,
-        description: 'Pick a "Divinity" from where?',
-        options: sources.map(s => ({
-          id: s.source,
-          label: `${s.source === 'hand' ? '✋' : '📚'}  From your ${s.source} (${s.count} available)`,
-        })),
+        description: 'Take "Divinity" from your hand or from your deck?',
         cancellable: false,
       });
-      pickedSource = sourceRes?.optionId || sources[0].source;
+      pickedSource = sources.some(s => s.source === sourceRes?.source) ? sourceRes.source : sources[0].source;
     }
 
     // Hero pick (W28a: alle vom Spieler KONTROLLIERTEN Helden, auch uebernommene Gegnerhelden).

@@ -824,11 +824,20 @@
     potion: { Reaction: 'quickPotion', Surprise: 'trapPotion', Area: 'areaPotion', Attachment: 'attachmentPotion' },
   };
   // „1) … 2) … 3) …“ -> drei Faehigkeiten-Texte ohne Nummer
+  // Eine Zeile ohne „N)“ gehoert zur Stufe davor: die Kartenvorlage bricht den Text um — mitten im Satz („… without this effect, ⏎ discard as many cards …“ bei Wisdom, „… for the rest of
+  // the ⏎ beginning of …“ bei Necromancy) oder nach dem ersten Satz („… of that Creature. ⏎ Negate the Creature's effects …“ bei Diplomacy Stufe 1 und 2). Bisher fiel so eine
+  // Fortsetzung weg — die Karte zeigte den Text abgeschnitten. (Karten ganz ohne „N)“ — Divinity, Performance — gehen diesen Weg nicht: `letzte` bleibt −1.)
   function abilityTexts(effect) {
     const out = ['', '', ''];
+    let letzte = -1;
     for (const line of String(effect || '').split('\n')) {
       const m = /^\s*([123])\)\s*(.*)$/.exec(line);
-      if (m) out[+m[1] - 1] = (out[+m[1] - 1] ? out[+m[1] - 1] + ' ' : '') + m[2].trim();
+      if (m) {
+        letzte = +m[1] - 1;
+        out[letzte] = (out[letzte] ? out[letzte] + ' ' : '') + m[2].trim();
+      } else if (letzte >= 0 && line.trim()) {
+        out[letzte] += ' ' + line.trim();
+      }
     }
     return out;
   }

@@ -51608,46 +51608,21 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
   }
 
-  heroMeetsLevelReq(playerIdx, heroIdx, cardData, opts = {}) {
+  /**
+   * ★ DIE EINE STUFENRECHNUNG FÜR „KANN DER HELD DIESE KARTE SPIELEN?" UND „WAS KOSTET WISDOM?" (Wisdom-Sweep 26.10.2026).
+   *
+   * Alles, was die Stufe einer Handkarte für einen Wirker VOR den Fähigkeits- und Kartensenkern (`_testLevelReqForZones`) ändert, steht hier an EINER Stelle:
+   * Heldenstempel (`levelOverrideCards`: Sol Rym, Fiedel, Trex, Archibald), absolute Setzung je Handkopie (Lawn Gnome), Hand-Offsets (Rocky Slime, Sparkfly Queen, Divine Gift …),
+   * Stufe je Nutzer (`levelOffsetForHero`: You are the Chosen One!!!), Mana Absorbing Crystal, Zuschläge (`mitLevelZuschlag`: Ellie, Celia, Shamanic Curse) und Lethe-Stempel.
+   * `heroMeetsLevelReq` (Spielbarkeit) UND `getWisdomDiscardCost` (Abwurf) lesen dieselbe Zahl — vorher rechnete Wisdom eine eigene, kürzere Kopie und übersah Kristall, Zuschläge,
+   * Stufe je Nutzer und Handkopie-Setzung: die Karte war spielbar, kostete aber zu wenig (oder gar nichts). Eine neue Stufenquelle gehört HIER hinein, nicht in eine der Aufrufer.
+   * @param {object} opts  { handIdx, levelSourcePi, pileSide }
+   * @returns {number} die rohe Stufe (≥ 0 nach Senkungen; Zuschläge dürfen sie erhöhen)
+   */
+  _spielRohStufe(playerIdx, heroIdx, cardData, opts = {}) {
     const ps = this.gs.players[playerIdx];
     const hero = ps?.heroes?.[heroIdx];
-    if (!hero?.name) return false;
-    // ★ v1108 („Love Shot", Als Testbefund 15.9.): WESSEN Ermaessigungen
-    // gelten, wenn ein GELIEHENER Held aus MEINER Hand spielt?
-    //
-    // Die Schulen und Stufen kommen vom Helden — also von `playerIdx`,
-    // der Seite, auf der er steht. Die KARTE kommt aber aus der Hand des
-    // Kontrolleurs, und dort liegen auch ihre Ermaessigungen (Area,
-    // Ethan, Hand-Offsets). Ohne Trennung fragte die Pruefung die
-    // Handablagen der falschen Seite ab: Als auf 0 reduzierter
-    // „Cataclysm" galt dem geliehenen Helden als Lv3 und war nicht
-    // spielbar.
-    //
-    // `opts.levelSourcePi` benennt die Seite, deren HAND und
-    // Ermaessigungen zaehlen. Ohne Angabe bleibt es bei `playerIdx` —
-    // alle bisherigen Aufrufer sind unveraendert.
     const lvlPi = (typeof opts.levelSourcePi === 'number') ? opts.levelSourcePi : playerIdx;
-    // Dead hero: the only legal plays are cards that explicitly bypass the
-    // Hero-as-caster requirement — i.e. Placement-style cards (Deepsea
-    // bounce-place, any future "install into this slot regardless of
-    // caster" mechanic). They opt in via `canBypassLevelReq`. Without this
-    // dead-hero-aware branch, dropping a Deepsea Creature onto a bounce
-    // target in a DEAD Hero's zone was silently rejected here, before
-    // validateActionPlay could consult `canBypassFreeZoneRequirement` and
-    // before the card's own beforeSummon ran the swap. Attacks / Spells /
-    // vanilla Creatures still correctly fail at the unchanged `return
-    // false` below.
-    if (hero.hp <= 0) {
-      const cardScript = loadCardEffect(cardData.name);
-      if (typeof cardScript?.canBypassLevelReq === 'function' && !opts.noPlacementBypass) {
-        try {
-          if (cardScript.canBypassLevelReq(this.gs, playerIdx, heroIdx, cardData, this, opts)) return true;
-        } catch (err) {
-          console.error(`[canBypassLevelReq dead-hero] ${cardData.name} threw:`, err.message);
-        }
-      }
-      return false;
-    }
     let rawLevel = cardData.level || 0;
     // Per-card level override (e.g. Sol Rym treats Chain Lightning as level 0)
     if (hero.levelOverrideCards && cardData.name && this._heroLevelOverride(playerIdx, heroIdx, cardData.name) != null) {
@@ -51725,6 +51700,50 @@ this._deathWatch = (this._deathWatchStack || []).length
       const bonus = this._getLetheStampBonus(playerIdx, cardData.name, opts.pileSide);
       if (bonus > 0) rawLevel += bonus;
     }
+    return rawLevel;
+  }
+
+  heroMeetsLevelReq(playerIdx, heroIdx, cardData, opts = {}) {
+    const ps = this.gs.players[playerIdx];
+    const hero = ps?.heroes?.[heroIdx];
+    if (!hero?.name) return false;
+    // ★ v1108 („Love Shot", Als Testbefund 15.9.): WESSEN Ermaessigungen
+    // gelten, wenn ein GELIEHENER Held aus MEINER Hand spielt?
+    //
+    // Die Schulen und Stufen kommen vom Helden — also von `playerIdx`,
+    // der Seite, auf der er steht. Die KARTE kommt aber aus der Hand des
+    // Kontrolleurs, und dort liegen auch ihre Ermaessigungen (Area,
+    // Ethan, Hand-Offsets). Ohne Trennung fragte die Pruefung die
+    // Handablagen der falschen Seite ab: Als auf 0 reduzierter
+    // „Cataclysm" galt dem geliehenen Helden als Lv3 und war nicht
+    // spielbar.
+    //
+    // `opts.levelSourcePi` benennt die Seite, deren HAND und
+    // Ermaessigungen zaehlen. Ohne Angabe bleibt es bei `playerIdx` —
+    // alle bisherigen Aufrufer sind unveraendert.
+    const lvlPi = (typeof opts.levelSourcePi === 'number') ? opts.levelSourcePi : playerIdx;
+    // Dead hero: the only legal plays are cards that explicitly bypass the
+    // Hero-as-caster requirement — i.e. Placement-style cards (Deepsea
+    // bounce-place, any future "install into this slot regardless of
+    // caster" mechanic). They opt in via `canBypassLevelReq`. Without this
+    // dead-hero-aware branch, dropping a Deepsea Creature onto a bounce
+    // target in a DEAD Hero's zone was silently rejected here, before
+    // validateActionPlay could consult `canBypassFreeZoneRequirement` and
+    // before the card's own beforeSummon ran the swap. Attacks / Spells /
+    // vanilla Creatures still correctly fail at the unchanged `return
+    // false` below.
+    if (hero.hp <= 0) {
+      const cardScript = loadCardEffect(cardData.name);
+      if (typeof cardScript?.canBypassLevelReq === 'function' && !opts.noPlacementBypass) {
+        try {
+          if (cardScript.canBypassLevelReq(this.gs, playerIdx, heroIdx, cardData, this, opts)) return true;
+        } catch (err) {
+          console.error(`[canBypassLevelReq dead-hero] ${cardData.name} threw:`, err.message);
+        }
+      }
+      return false;
+    }
+    let rawLevel = this._spielRohStufe(playerIdx, heroIdx, cardData, opts);   // eine Rechnung für Spielbarkeit UND Wisdom-Kosten (s. dort)
     if (rawLevel <= 0 && !cardData.spellSchool1) return true;
 
     // Test the level requirement against each candidate ability-zone
@@ -52656,48 +52675,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hero = ps?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return 0;
 
-    let rawLevel = cardData.level || 0;
-    if (hero.levelOverrideCards && cardData.name && this._heroLevelOverride(playerIdx, heroIdx, cardData.name) != null) {
-      rawLevel = this._heroLevelOverride(playerIdx, heroIdx, cardData.name);
-    }
-    // Mirror of heroMeetsLevelReq's per-index hand offset (Rocky Slime
-    // + Sparkfly Queen's transient rebate). Reduced spells need less
-    // Wisdom coverage just like they need less school level — same
-    // effective rawLevel input. The hero filter (Sparkfly Queen)
-    // applies here too: an offset reserved for a specific host hero
-    // shouldn't reduce another hero's Wisdom cost.
-    // ★ W16a (Al, Frage 6: „Lies die Hand des aktuellen Kontrolleurs"): `levelSourcePi` = Kontrolleur eines geliehenen/gecharmten Helden — Hand, Rabatte (Offsets) und
-    // Ermäßigungen kommen von SEINER Seite, der Held (Schulen, Stufen) bleibt `playerIdx`. Ohne Angabe wie bisher.
-    const lps_w = (typeof levelSourcePi === 'number') ? (this.gs.players[levelSourcePi] || ps) : ps;
-    const handArr_w = lps_w?.hand;
-    const offMap_w  = lps_w?._handLevelOffsets;
-    const transMap_w = lps_w?._handLevelOffsetsTransient;
-    const filterMap_w = lps_w?._handLevelOffsetHeroFilter;
-    if (cardData.name && handArr_w && (offMap_w || transMap_w)) {
-      let bestOffset = 0;
-      const _nurKopie_w = this._kopieNurIndex(handArr_w, cardData, handIdx);   // ★ W15b (C2): konkrete Kopie, siehe `heroMeetsLevelReq`
-      const scan = (map) => {
-        if (!map) return;
-        for (const k of Object.keys(map)) {
-          const idx = +k;
-          if (_nurKopie_w != null && idx !== _nurKopie_w) continue;
-          if (handArr_w[idx] !== cardData.name) continue;
-          if (filterMap_w && filterMap_w[k] != null && filterMap_w[k] !== heroIdx) continue;
-          if (filterMap_w && filterMap_w[k] != null && this._heldHandOffsetsRuhen(playerIdx, heroIdx)) continue;   // W7a (H04-13)
-          const v = map[k] || 0;
-          if (v < bestOffset) bestOffset = v;
-        }
-      };
-      scan(offMap_w);
-      scan(transMap_w);
-      if (bestOffset < 0) rawLevel = Math.max(0, rawLevel + bestOffset);
-    }
-    // Karten-Skript `levelOffsetForHero` (You are the Chosen One!!!) — dieselbe Stufe wie in `heroMeetsLevelReq`/`effectiveCardLevel`. Ohne diese Zeile sähen die Wisdom-Kosten die
-    // GEDRUCKTE Stufe (9), fänden keine Deckung (−1) und der Zauber würde trotz Stufenlücke OHNE Abwurf gespielt (Tester 25.10.: „ich werde nur EINMAL gepromptet").
-    {
-      const _heldOff_w = this._heldStufenOffset(playerIdx, heroIdx, cardData);
-      if (_heldOff_w) rawLevel = Math.max(0, rawLevel + _heldOff_w);
-    }
+    // EINE Stufenrechnung mit `heroMeetsLevelReq` (`_spielRohStufe`): Heldenstempel, Handkopie-Setzung, Hand-Offsets (Rabatt „nur die eine Kopie", Kontrolleur-Hand bei geliehenen
+    // Helden), Stufe je Nutzer, Mana Absorbing Crystal, Zuschläge (Ellie, Celia, Shamanic Curse). Wisdom zahlt die Lücke zur ECHTEN Stufe, nie zu einer gedruckten oder halb gerechneten.
+    let rawLevel = this._spielRohStufe(playerIdx, heroIdx, cardData, { handIdx, levelSourcePi });
     if (rawLevel <= 0 && !cardData.spellSchool1) return 0;
 
     // For Lizbeth-style borrowers, walk each candidate ability-zone set
@@ -52726,9 +52706,10 @@ this._deathWatch = (this._deathWatchStack || []).length
   _wisdomCostForZones(cardData, hero, rawLevel, abZones, playerIdx, heroIdx, levelSourcePi) {
     const levelAfterAbility = this._applySpellLevelReductions(cardData, rawLevel, abZones);
     // W16a (Frage 6): Ermäßigungen des Kontrolleurs (wie `_testLevelReqForZones`: `lvrPi` + `castHeroSide`)
-    const level = (typeof levelSourcePi === 'number' && levelSourcePi !== playerIdx)
-      ? this._applyCardLevelReductions(cardData, levelAfterAbility, levelSourcePi, heroIdx, { levelSourcePi, castHeroSide: playerIdx })
-      : this._applyCardLevelReductions(cardData, levelAfterAbility, playerIdx, heroIdx);
+    // Exakt dieselben Argumente wie `_testLevelReqForZones` (auch `castHeroSide` ohne Seitenwechsel): sonst sähen heldengebundene Senker beider Rechnungen verschiedene Wirker.
+    const level = this._applyCardLevelReductions(cardData, levelAfterAbility,
+      typeof levelSourcePi === 'number' ? levelSourcePi : playerIdx, heroIdx,
+      { ...(typeof levelSourcePi === 'number' ? { levelSourcePi } : {}), castHeroSide: playerIdx });
 
     const gap = this._spellLevelGap(cardData, level, abZones);
     if (gap === 0) return 0;
