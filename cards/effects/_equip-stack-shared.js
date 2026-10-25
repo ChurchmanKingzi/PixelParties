@@ -156,8 +156,10 @@ function gruppiereZiele(ziele) {
   for (const z of ziele) {
     const inst = z && z.type === 'equip' ? (z.cardInstance || z._cardInstance) : null;
     if (!inst) { out.push(z); continue; }
-    const g = proId.get(z.id);
-    if (!g) { proId.set(z.id, { ziel: z, ids: [inst.id] }); out.push(z); }
+    // Gleiche ID UND gleiche Kontrolle: seitenfremd gelegte Karten (Plant Golem …) koennen die ID einer Karte auf der anderen Brettseite tragen — das ist KEIN Stapel.
+    const schluessel = z.id + '|' + (inst.controller ?? inst.owner);
+    const g = proId.get(schluessel);
+    if (!g) { proId.set(schluessel, { ziel: z, ids: [inst.id] }); out.push(z); }
     else g.ids.push(inst.id);
   }
   for (const g of proId.values()) if (g.ids.length > 1) g.ziel._erlaubteInstanzen = g.ids;
