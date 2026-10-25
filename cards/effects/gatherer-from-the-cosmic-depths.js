@@ -58,6 +58,10 @@ async function runMove(engine, inst, ctx) {
 
   // Step 1: pick the source card.
   const sourceEntries = sources.map(targetToPromptEntry);
+  // Darion: Equips eines Stapels teilen die Ziel-ID — die Rueckfrage „welches Equip?" soll nur die Karten MIT Change Counters anbieten.
+  for (const e of sourceEntries) {
+    if (e.type === 'equip' && e.cardInstance) e._erlaubteInstanzen = sourceEntries.filter(x => x.id === e.id && x.cardInstance).map(x => x.cardInstance.id);
+  }
   const srcPicked = await engine.promptEffectTarget(pi, sourceEntries, {
     maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
     title: CARD_NAME,
@@ -71,7 +75,10 @@ async function runMove(engine, inst, ctx) {
   if (!srcPicked || srcPicked.length === 0) return false;
   const src = sources.find(s => targetToPromptEntry(s).id === srcPicked[0]);
   if (!src) return false;
-  const have = getChangeCounters(src.ref);
+  // Darion: bei einem Equip-Stapel liegt die gewaehlte Karte auf dem Eintrag der Zielliste (`src` waere immer die erste Karte des Stapels).
+  const srcEintrag = sourceEntries.find(e => e.id === srcPicked[0]);
+  const srcRef = (srcEintrag && srcEintrag.type === 'equip' && srcEintrag.cardInstance) ? srcEintrag.cardInstance : src.ref;
+  const have = getChangeCounters(srcRef);
   if (have <= 0) return false;
 
   // Step 2: pick how many.
@@ -82,7 +89,7 @@ async function runMove(engine, inst, ctx) {
   const countPick = await engine.promptGeneric(pi, {
     type: 'optionPicker',
     title: CARD_NAME,
-    description: `Move how many counters from ${src.ref.name}? (Source has ${have}.)`,
+    description: `Move how many counters from ${srcRef.name}? (Source has ${have}.)`,
     options: countOpts,
     cancellable: true,
   });
@@ -110,7 +117,7 @@ async function runMove(engine, inst, ctx) {
   const dst = destCreatures.find(c => `equip-${c.owner}-${c.heroIdx}-${c.zoneSlot}` === dstPicked[0]);
   if (!dst) return false;
 
-  moveChangeCounters(engine, src.ref, dst, n);
+  moveChangeCounters(engine, srcRef, dst, n);
   if (!ctx._borrowedUse) stampHopt(gs, HOPT_MOVE, inst.id);   // W13 (Al, Rueckfrage 9): geliehene Verwendung verbraucht den Stempel NICHT
   ctx._skipCreatureEffectHopt = true;
   return true;

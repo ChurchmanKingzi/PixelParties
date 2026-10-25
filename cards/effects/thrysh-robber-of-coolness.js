@@ -61,7 +61,7 @@ function _collectCandidates(engine, pi) {
  * target. Mirrors the shape used by Modnir/Swellpnir's own resolvers
  * so the picker UX is identical.
  */
-function _buildEquipTargets(engine, pi) {
+function _buildEquipTargets(engine, pi, cardName = null) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
   const targets = [];
@@ -71,14 +71,17 @@ function _buildEquipTargets(engine, pi) {
     if (hero.statuses?.frozen) continue;
     const slots = ps.supportZones?.[hi] || [];
     let leftmostFree = -1;
+    // Darion: ein Held mit Equip-Stapel nimmt `cardName` NUR in diesem Platz (braucht keine freie Zone); die Platzwahl ist keine Kartenwahl.
+    const stapel = cardName ? engine.equipPflichtPlatz(pi, hi, cardName) : -1;
     for (let si = 0; si < slots.length; si++) {
-      if (!slots[si] || slots[si].length === 0) {
+      if (stapel >= 0 ? si === stapel : (!slots[si] || slots[si].length === 0)) {
         if (leftmostFree < 0) leftmostFree = si;
         targets.push({
           id: `equip-${pi}-${hi}-${si}`,
           type: 'equip',
           owner: pi, heroIdx: hi, slotIdx: si,
           cardName: '',
+          ...(stapel >= 0 ? { _eigeneStapelWahl: true } : {}),
         });
       }
     }
@@ -117,12 +120,11 @@ module.exports = {
     if (!ctx._borrowedUse && ctx.card?.counters?.[HOPT_KEY] === ctx._engine.gs.turn) return false;   // W12 (Q5): geliehene Verwendung ignoriert den Stempel
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    if (_collectCandidates(engine, pi).length === 0) return false;
     // No equip-able destination → can't equip anywhere → block
     // activation entirely. Per the user's spec: dead/Frozen-only
     // Heroes or no-free-zones means Thrysh can't fire.
-    if (_buildEquipTargets(engine, pi).length === 0) return false;
-    return true;
+    // Darion: der Equip-Stapel zaehlt als Platz, je Kandidat gefragt.
+    return _collectCandidates(engine, pi).some(c => _buildEquipTargets(engine, pi, c.name).length > 0);
   },
 
   async onCreatureEffect(ctx) {
@@ -131,10 +133,9 @@ module.exports = {
     if (!ctx._borrowedUse && ctx.card?.counters?.[HOPT_KEY] === engine.gs.turn) return false;
     const ps = engine.gs.players[pi];
 
-    const candidates = _collectCandidates(engine, pi);
+    // Darion: nur Kandidaten anbieten, fuer die es einen Platz gibt (freie Zone ODER der Equip-Stapel des Helden).
+    const candidates = _collectCandidates(engine, pi).filter(c => _buildEquipTargets(engine, pi, c.name).length > 0);
     if (candidates.length === 0) return false;
-    const equipTargets = _buildEquipTargets(engine, pi);
-    if (equipTargets.length === 0) return false;
 
     // ── Stage 1: pick which Equip to rob ──
     const choice = await engine.promptGeneric(pi, {
@@ -156,6 +157,8 @@ module.exports = {
     if (!picked) return false;
 
     // ── Stage 2: pick equip target (unified for deck and Stack) ──
+    const equipTargets = _buildEquipTargets(engine, pi, choice.cardName);
+    if (equipTargets.length === 0) return false;
     const pick = await engine.promptEffectTarget(pi, equipTargets, {
       maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
       title: choice.cardName,
