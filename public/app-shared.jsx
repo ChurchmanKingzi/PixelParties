@@ -3497,6 +3497,14 @@ const ZONE_ANIM_SFX = {
     { name: 'projectile', opts: { rate: 1.25, volume: 0.9 } },
     { name: 'slash', opts: { rate: 1.05, volume: 1, delay: 180 } },
   ],
+  // Backstab (25.10.) — der Stich: leises Schwertzischen beim Ausholen (~260 ms), Schnitt beim Vorstoßen (~300 ms), dumpfer Einschlag mit hellem Ping bei 330 ms. Nur der erste Teil
+  // übernimmt die Sammelkategorie 'effect'.
+  backstab_stab: [
+    { name: 'projectile',   opts: { rate: 1.7, volume: 0.4,  delay: 255 } },
+    { name: 'slash',        opts: { rate: 0.85, volume: 0.9, delay: 315, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.3, volume: 0.45, delay: 335, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.4, volume: 0.3,  delay: 345, category: null, dedupe: 0 } },
+  ],
   // v724 (Thicket): dasselbe Pflanzen-Timbre, etwas tiefer und laenger
   // gefahren — das Dickicht ist dichter als der Rankenkranz.
   thicket_cover:           { name: 'elem_biomancy', opts: { rate: 0.85, volume: 1, delay: 120 } },
