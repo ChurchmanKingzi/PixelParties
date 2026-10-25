@@ -55,13 +55,21 @@ function singingOnBoard(engine) {
   return n;
 }
 
-/** Freie Basis-Support-Zones (0-2) der eigenen, lebenden Helden. */
+/**
+ * Platz fuer Ausruestungen bei den eigenen, lebenden Helden: freie Basis-Support-Zones (0-2).
+ * ★ Darion („All Artifacts equipped to this Hero share 1 Support Zone"): ein Held mit Equip-Stapel (oder wenigstens einer freien Zone, die den Stapel
+ * eroeffnet) nimmt beliebig viele weitere Ausruestungen auf — er zaehlt dann als „unbegrenzt" (`Infinity`).
+ */
 function ownFreeBaseZones(engine, pi) {
   const ps = engine.gs.players[pi];
+  const ES = require('./_equip-stack-shared');
   let n = 0;
   for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
     if (!ps.heroes[hi]?.name || ps.heroes[hi].hp <= 0) continue;
-    for (let si = 0; si < 3; si++) if (((ps.supportZones[hi] || [])[si] || []).length === 0) n++;
+    let frei = 0;
+    for (let si = 0; si < 3; si++) if (((ps.supportZones[hi] || [])[si] || []).length === 0) frei++;
+    if (ES.teilenAktiv(engine, pi, hi) && (frei > 0 || ES.stapelPlatz(engine, pi, hi) >= 0)) return Infinity;
+    n += frei;
   }
   return n;
 }
@@ -83,11 +91,26 @@ function hasExactSubset(costs, target, maxN) {
 function equippedArtifactTargets(engine) {
   const db = engine._getCardDB();
   const out = [];
+  const stapel = new Map();   // Darion: Platz -> Ziel (ein Ziel je Platz, dahinter alle Equips des Stapels)
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support' || inst.faceDown) continue;
     const cd = engine.getEffectiveCardData?.(inst) || db[inst.name];
     if (!cd || !hasCardType(cd, 'Artifact') || hasCardType(cd, 'Creature')) continue;
     const side = inst.controller ?? inst.owner;
+    // ★ Darion: mehrere Equips in EINEM Platz sind in der Zielwahl EIN Ziel (Platz-ID wie ueberall); welche Karte gemeint ist, fragt die Engine nach (`_disambiguateStackedTargets`).
+    if (engine.istEquipArtifact(inst)) {
+      const seite = engine.physicalSide(inst);
+      const key = `${seite}-${inst.heroIdx}-${inst.zoneSlot}`;
+      const ES = require('./_equip-stack-shared');
+      const alle = ES.equipsAt(engine, seite, inst.heroIdx, inst.zoneSlot);
+      if (alle.length > 1) {
+        if (stapel.has(key)) continue;
+        const ziel = { id: `equip-${seite}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip', owner: seite, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: alle[0].name, cardInstance: alle[0], _erlaubteInstanzen: alle.map(i => i.id) };
+        stapel.set(key, ziel);
+        out.push(ziel);
+        continue;
+      }
+    }
     out.push({ id: `equip-${side}-${inst.heroIdx}-${inst.zoneSlot}-${inst.id}`, type: 'equip', owner: side, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst });
   }
   return out;
@@ -194,7 +217,8 @@ module.exports = {
       for (const c of chosen) {
         const dests = equipDestinations(engine, pi, c.name, { sides: engine.gs.players.map((_, i) => i) });
         if (dests.length === 0) continue;
-        const zoneTargets = dests.map(d => ({ id: `equip-${d.side}-${d.heroIdx}-${d.slotIdx}`, type: 'equip', owner: d.side, heroIdx: d.heroIdx, slotIdx: d.slotIdx, cardName: '' }));
+        // `_eigeneStapelWahl`: Darion — hier wird ein PLATZ gewaehlt (auch Darions Stapel), keine Karte darin; die Engine fragt nicht nach „welches Equip?".
+        const zoneTargets = dests.map(d => ({ id: `equip-${d.side}-${d.heroIdx}-${d.slotIdx}`, type: 'equip', owner: d.side, heroIdx: d.heroIdx, slotIdx: d.slotIdx, cardName: '', _eigeneStapelWahl: true }));
         let dest = dests[0];
         if (dests.length > 1) {
           const ids = await engine.promptEffectTarget(pi, zoneTargets, {

@@ -85,6 +85,19 @@ module.exports = {
   hooks: {
     onHeroKO: companionHeldGefallen,    // der Held fällt → der Klon geht mit (kein eigener HP-Vorrat)
 
+    // ★ Darion (geteilte Equip-Zone): „same target(s)" ist die konkrete KARTE. Die Aufzeichnung kennt nur die Platz-ID (`equip-<Seite>-<Held>-<Platz>`); bei einem Stapel bleibt der Platz
+    // stehen, auch wenn die gewählte Karte weg ist — die Kopie würde dann eine ANDERE Karte des Stapels treffen (bei getrennten Zonen ist der Platz leer und das Ziel erloschen).
+    // Darum merkt sich der Klon, aus welchen Plätzen während des Original-Wurfs eine Ausrüstung abgegangen ist; solche Ziele gelten bei der Kopie als erloschen.
+    onCardLeaveZone: async (ctx) => {
+      const engine = ctx._engine;
+      const gs = engine.gs;
+      const rec = gs._klonAufnahme;
+      if (!rec || gs._klonWiedergabe || gs._klonKopie) return;
+      const weg = ctx.leavingCard;
+      if (!weg || ctx.fromZone !== 'support' || !engine.istEquipArtifact(weg)) return;
+      (rec.wegAusPlatz = rec.wegAusPlatz || []).push(`equip-${engine.physicalSide(weg)}-${weg.heroIdx}-${weg.zoneSlot}`);
+    },
+
     afterSpellResolved: async (ctx) => {
       const inst = ctx.card;
       if (!inst || inst.zone !== 'support' || inst.faceDown) return;
@@ -115,7 +128,8 @@ module.exports = {
       const script = loadCardEffect(name);
       if (!script?.hooks?.onPlay) { dbg('kein onPlay'); return; }
       if (script.oncePerGame || script.oncePerGameKey || NICHT_KLONBAR.some(r => r.test(cd.effect || ''))) { dbg('Limit/Einschränkung der Karte'); return; }   // ein zweites Wirken gibt das Limit nicht her
-      const eintraege = rec.eintraege.map(e => ({ title: e.title, ids: e.ids.filter(id => zielSteht(engine, id)) }));
+      const wegAusPlatz = new Set(rec.wegAusPlatz || []);   // Darion: Plätze, aus denen das Original eine Ausrüstung abgezogen hat (das gewählte Ziel ist dort weg)
+      const eintraege = rec.eintraege.map(e => ({ title: e.title, ids: e.ids.filter(id => zielSteht(engine, id) && !wegAusPlatz.has(id)) }));
       if (rec.eintraege.length > 0 && !eintraege.some(e => e.ids.length > 0)) { dbg('Ziele weg'); return; }   // keines der Ziele steht noch → „same target(s)" gibt es nicht mehr
       // Einschränkungen der Karte gelten für die Kopie (Al, 24.10.): die Voraussetzungen des SPIELENS (`spellPlayCondition`) müssen jetzt noch erfüllt sein.
       try { if (script.spellPlayCondition && !script.spellPlayCondition(gs, pi, engine)) { dbg('spellPlayCondition false'); return; } }
