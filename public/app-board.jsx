@@ -46059,6 +46059,71 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('gold_gift_flight', onGoldGiftFlight);
     socket.on('gold_steal_burst', onGoldStealBurst);
+    // ★★ BETRAYAL (25.10., Welle 78): fünf Goldmünzen fliegen im Takt von der EIGENEN Gold-Anzeige zur Ziel-Kreatur, verweilen dort kurz und fliegen zur Gold-Anzeige des
+    // Empfängers weiter (Vorlage: das Kartenbild — Münzen am Boden der Holzbrücke, die Schlangenfrau und der Ritter). PIXELART: das feste Münz-Sprite des Spielgestalters
+    // (`gold-muenze.png`, 12×12) ganzzahlig 2×, `image-rendering: pixelated`, Bewegung in ganzen 2-Pixel-Schritten im Bildtakt (~30 Bilder/s, Bogen aus Rasterstufen), harte
+    // Goldrahmen aus gestapelten `box-shadow`-Ringen (kein Weichzeichner), Blinken je Bild statt weichem Pulsieren. Die Zeiten kommen vom Server (`betrayal.js`: stepMs/legMs/dwellMs).
+    const onBetrayalCoins = ({ fromPlayer, toPlayer, targetOwner, targetHeroIdx, targetZoneSlot, coins, stepMs, legMs, dwellMs }) => {
+      if (window._playAnimations === false) return;
+      const von = document.querySelector(`[data-gold-player="${fromPlayer}"]`);
+      const nach = document.querySelector(`[data-gold-player="${toPlayer}"]`);
+      const ziel = document.querySelector(`[data-support-zone][data-support-owner="${ownerLbl(targetOwner, myIdx)}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
+      if (!von || !nach || !ziel) return;
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_betrayal_coins');
+      const N = Math.max(1, Math.min(8, Number(coins) || 5)), STEP = Number(stepMs) || 130, LEG = Number(legMs) || 360, DWELL = Number(dwellMs) || 100;
+      const TAKT = 33, RASTER = 2, MUENZE = 24, BOGEN = 44;
+      const mitte = (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, r }; };
+      const A = mitte(von), B = mitte(ziel), C = mitte(nach);
+      const raster = (v) => Math.round(v / RASTER) * RASTER;
+      const muenzen = Array.from({ length: N }, () => {
+        const m = document.createElement('div');
+        m.setAttribute('data-pp-px', 'aus');
+        m.style.cssText = `position:fixed;left:0;top:0;width:${MUENZE}px;height:${MUENZE}px;background:url('/gold-muenze.png') center/100% 100% no-repeat;image-rendering:pixelated;pointer-events:none;z-index:10250;display:none`;
+        document.body.appendChild(m);
+        return m;
+      });
+      // Harte Rahmen (gestapelte Ringe, keine Unschärfe): einer um die Kreatur (blinkt, solange Münzen dort sind), einer um die Zielanzeige (kurz nach jeder Landung).
+      const rahmen = (r, pad) => {
+        const d = document.createElement('div');
+        d.setAttribute('data-pp-px', 'aus');
+        d.style.cssText = `position:fixed;left:${Math.round(r.left - pad)}px;top:${Math.round(r.top - pad)}px;width:${Math.round(r.width + pad * 2)}px;height:${Math.round(r.height + pad * 2)}px;box-shadow:0 0 0 3px #fad54a,0 0 0 6px #b62600;pointer-events:none;z-index:10249;display:none`;
+        document.body.appendChild(d);
+        return d;
+      };
+      const rKreatur = rahmen(B.r, 3), rKonto = rahmen(C.r, 3);
+      const bahn = (p, q, k) => ({ x: p.x + (q.x - p.x) * k, y: p.y + (q.y - p.y) * k - Math.round(Math.sin(k * Math.PI) * BOGEN / RASTER) * RASTER });
+      const ENDE = (N - 1) * STEP + 2 * LEG + DWELL;
+      const t0 = performance.now();
+      let letzte = -1;
+      const schritt = (jetzt) => {
+        const t = jetzt - t0;
+        const fr = Math.floor(t / TAKT);
+        if (fr !== letzte) {
+          letzte = fr;
+          let aufKreatur = false, gelandet = false;
+          muenzen.forEach((m, i) => {
+            const lt = t - i * STEP;
+            let pos = null;
+            if (lt >= 0 && lt < LEG) pos = bahn(A, B, Math.min(1, lt / LEG));
+            else if (lt >= LEG && lt < LEG + DWELL) {
+              const hup = [0, -6, -8, -4][Math.floor((lt - LEG) / TAKT) % 4];            // die Münze hüpft auf der Karte
+              pos = { x: B.x, y: B.y + hup };
+              aufKreatur = true;
+            } else if (lt >= LEG + DWELL && lt < 2 * LEG + DWELL) pos = bahn(B, C, Math.min(1, (lt - LEG - DWELL) / LEG));
+            if (lt >= 2 * LEG + DWELL && lt < 2 * LEG + DWELL + 130) gelandet = true;
+            if (!pos) { m.style.display = 'none'; return; }
+            m.style.display = 'block';
+            m.style.transform = `translate(${raster(pos.x - MUENZE / 2)}px, ${raster(pos.y - MUENZE / 2)}px)`;
+          });
+          rKreatur.style.display = aufKreatur && (fr % 2 === 0) ? 'block' : 'none';       // blinkt im Bildtakt
+          rKonto.style.display = gelandet && (fr % 2 === 0) ? 'block' : 'none';
+        }
+        if (t < ENDE + 140) requestAnimationFrame(schritt);
+        else { muenzen.forEach(m => m.remove()); rKreatur.remove(); rKonto.remove(); }
+      };
+      requestAnimationFrame(schritt);
+    };
+    socket.on('betrayal_coins', onBetrayalCoins);
     const onJumpscareBox = ({ owner, heroIdx }) => {
       if (window.playSFX) window.playSFX('jumpscare', { category: 'effect' });
       const ownerLabel = ownerLbl(owner, myIdx);
@@ -51669,6 +51734,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('card_effect_flash', onCardEffectFlash);
       socket.off('gold_gift_flight', onGoldGiftFlight);
       socket.off('gold_steal_burst', onGoldStealBurst);
+      socket.off('betrayal_coins', onBetrayalCoins);
       socket.off('jumpscare_box', onJumpscareBox);
       socket.off('anti_magic_bubble', onAntiMagicBubble);
       socket.off('fireshield_corona', onFireshieldCorona);
@@ -54158,6 +54224,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'capture_control') {
         const p = playerByName(entry.player);
         return <span className="log-status">🪢 {cName('Capture')} — {pName(p.name, p.color)}'s {entry.hero} takes permanent control of {cName(entry.creature)}{entry.from ? ` from ${entry.from}` : ''}!</span>;
+      }
+      if (t === 'betrayal_pay') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🗡️ {cName('Betrayal')} — {pName(p.name, p.color)} pays {entry.to} <span className="log-amount" style={{color:'#fad54a'}}>{entry.amount}</span> Gold for {cName(entry.creature)}.</span>;
+      }
+      if (t === 'betrayal_control') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🗡️ {cName('Betrayal')} — {pName(p.name, p.color)}'s {entry.hero} takes permanent control of {cName(entry.creature)}{entry.from ? ` from ${entry.from}` : ''}!</span>;
+      }
+      if (t === 'betrayal_fizzle') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🗡️ {cName('Betrayal')} — {pName(p.name, p.color)} could not take control of {entry.creature ? cName(entry.creature) : 'the Creature'}.</span>;
       }
       if (t === 'capture_fizzle') {
         const p = playerByName(entry.player);

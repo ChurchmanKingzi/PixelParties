@@ -4258,6 +4258,12 @@ const ZONE_ANIM_SFX = {
     { name: 'gold_gain', opts: { rate: 1.25, volume: 0.8, delay: 0, category: null, dedupe: 0 } },
     { name: 'gold_gain', opts: { rate: 1.0, volume: 0.65, delay: 520, category: null, dedupe: 0 } },
   ],
+  // ★ Betrayal (25.10., Welle 78; `betrayal_coins`, Münzen von deiner Gold-Anzeige über die Kreatur zur Gold-Anzeige des Empfängers): ein Münzklang je Abflug (alle 130 ms)
+  //   und einer je Landung (Abflug + 960 ms) — die Zeiten decken sich mit `betrayal.js` (STEP_MS 130, LEG_MS 360, DWELL_MS 100). `category: null`: kein Verschlucken durch den Effektklang.
+  ev_betrayal_coins: [
+    ...[0, 1, 2, 3, 4].map(i => ({ name: 'gold_gain', opts: { rate: 1.3 - i * 0.04, volume: 0.6, delay: i * 130, category: null, dedupe: 0 } })),
+    ...[0, 1, 2, 3, 4].map(i => ({ name: 'gold_gain', opts: { rate: 0.95 + i * 0.05, volume: 0.55, delay: 820 + i * 130, category: null, dedupe: 0 } })),
+  ],
   // Willy: Klee, Regenbogen, Muenzen um den Helden
   ev_willy_leprechaun: [
     { name: 'buff', opts: { rate: 1.4, volume: 0.7, delay: 0, category: null, dedupe: 250 } },
