@@ -85,7 +85,7 @@ module.exports = {
         && c.heroIdx === target?.heroIdx && c.zoneSlot === target?.slotIdx);
     if (!inst || inst.zone !== 'support') return false;
 
-    const stolen = engine.actionStealCreature(pi, inst, {
+    const stolen = await engine.actionStealCreatureGefragt(pi, inst, {   // W71b: mit Schutzfenster ('control')
       sourceName: CARD_NAME,
       skipTakeControlHook: true,
     });

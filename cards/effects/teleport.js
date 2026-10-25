@@ -48,6 +48,10 @@
 //    selbst wandern), ist das Paar NICHT erlaubt: der Held ist dann kein Ziel
 //    für diesen Partner (Zielwahl: ausgegraut ohne gültigen Partner, bei einem
 //    ungültigen Paar neue Wahl).
+//  ④c ★ SUPPORT-ZONEN-ABILITIES (Al, 24.10.2026): Abilities in den Support Zones (Xal, Xalibur) sind Abilities und wandern MIT dem Helden — in die Support
+//    Zones der Spalte, in die er zieht. Dieselbe Platzregel wie bei den Puppets: das Paar ist nur erlaubt, wenn die Zielspalte sie TRÄGT (genug freie Support Zones,
+//    abzüglich der Plätze, die die eigenen wandernden Karten räumen). Verliert ein Held dadurch seine Erlaubnis (Xalibur bleibt in der alten Spalte liegen), schickt
+//    der Teleport alle diese Abilities NACH dem Tausch auf den Ablagestapel (`_support-ability-move-shared.js`; die Leafagami Snake schützt wie sonst).
 //  ⑤ „If this is the second Spell you use this turn …":
 //    `inherentAction` als Funktion über `ps.spellsPlayedThisTurn` (der
 //    Server zählt VOR dem Effekt; der zweite Zauber sieht 1).
@@ -78,35 +82,24 @@ function puppetTokensDerSpalte(engine, seite, col) {
     && c.heroIdx === col && isPuppetToken(c.name)).sort((x, y) => x.zoneSlot - y.zoneSlot);
 }
 
+const SM = require('./_support-ability-move-shared');
+
+/** Die Mitwanderer einer Spalte: Puppet-Tokens (Tri Fecta / Tri Ad) und Ability-Stapel in den Support Zones (Xal, Xalibur). */
+function mitwandererDerSpalte(engine, seite, col) {
+  const puppets = puppetTokensDerSpalte(engine, seite, col)
+    .map(inst => ({ art: 'puppet', seite, col, slot: inst.zoneSlot, namen: [inst.name], insts: [inst] }));
+  return [...puppets, ...SM.supportAbilityStapel(engine, seite, col)];
+}
+
 /**
- * Wohin wandern die Puppets beim Tausch von Spalte `a` und `b`? { ok, moves: [{ inst, toCol, toSlot }] }.
- * Plätze der Zielspalte: leer, oder von einem Token belegt, das selbst auszieht. Nicht-Token-Karten bleiben liegen und blockieren.
+ * Wohin wandern die Puppets UND die Support-Zonen-Abilities beim Tausch von Spalte `a` und `b`? { ok, moves: [{ mover, nach }] }.
+ * Plätze der Zielspalte: leer, oder von einer Karte belegt, die selbst auszieht. Alle anderen Karten bleiben liegen und blockieren.
  * Gleicher Slot-Index, wenn frei, sonst der niedrigste freie.
  */
 function puppetPlan(engine, seite, a, b) {
-  const ps = engine.gs.players[seite];
-  const quellen = [{ von: a, nach: b, tokens: puppetTokensDerSpalte(engine, seite, a) }, { von: b, nach: a, tokens: puppetTokensDerSpalte(engine, seite, b) }];
-  const ziehenAus = new Set(quellen.flatMap(q => q.tokens.map(i => i.id)));
-  const blockiert = (col, s) => {
-    const z = (ps.supportZones[col] || [])[s] || [];
-    if (z.length === 0) return false;
-    return !engine.cardInstances.some(c => ziehenAus.has(c.id) && c.heroIdx === col && c.zoneSlot === s);
-  };
-  const moves = [];
-  for (const q of quellen) {
-    if (q.tokens.length === 0) continue;
-    const n = Math.max(3, (ps.supportZones[q.nach] || []).length);
-    const belegt = new Set();
-    for (const inst of q.tokens) {
-      let slot = -1;
-      if (inst.zoneSlot < n && !blockiert(q.nach, inst.zoneSlot) && !belegt.has(inst.zoneSlot)) slot = inst.zoneSlot;
-      else for (let s = 0; s < n; s++) if (!blockiert(q.nach, s) && !belegt.has(s)) { slot = s; break; }
-      if (slot < 0) return { ok: false, moves: [], grund: 'puppet_zones' };
-      belegt.add(slot);
-      moves.push({ inst, toCol: q.nach, toSlot: slot });
-    }
-  }
-  return { ok: true, moves };
+  return SM.planeVerlagerung(engine,
+    { seite, col: a, movers: mitwandererDerSpalte(engine, seite, a) },
+    { seite, col: b, movers: mitwandererDerSpalte(engine, seite, b) });
 }
 
 /** Darf dieses Paar tauschen? (zwei lebende Helden derselben Brettseite, Puppets finden Platz) */
@@ -170,6 +163,7 @@ async function tauscheHeldenplaetze(engine, seite, a, b, wirker) {
       fromOwner: inst.owner, toZone: 'support',
       _skipReactionCheck: true,
       _equipLostGemeldet: true,
+      _teleportBewegung: true,   // 24.10.: nur ein Platzwechsel der Spalten — Xalibur räumt hier NICHT ab (die Erlaubnis wird NACH dem Tausch geprüft, siehe `raeumeNachTausch`)
     });
     if (inst.counters?._atkTraeger) engine.actionRevokeAtkAmTraeger(inst);
     await engine.fireEquipLost(inst, {
@@ -201,19 +195,10 @@ async function tauscheHeldenplaetze(engine, seite, a, b, wirker) {
     if ((inst.zone !== 'hero' && inst.zone !== 'ability') || engine.physicalSide(inst) !== seite) continue;
     if (inst.heroIdx === a) inst.heroIdx = b; else if (inst.heroIdx === b) inst.heroIdx = a;
   }
-  // Puppet-Tokens ziehen in die Spalte ihres Helden (stiller Umzug wie beim Tri-Ad-Tausch: keine Abgangs-Hooks, keine Niederlage-Prüfung dazwischen).
-  for (const m of plan.moves) {
-    const arr = ps.supportZones[m.inst.heroIdx][m.inst.zoneSlot];
-    const i = arr.indexOf(m.inst.name);
-    if (i >= 0) arr.splice(i, 1);
-  }
-  for (const m of plan.moves) {
-    if (!ps.supportZones[m.toCol][m.toSlot]) ps.supportZones[m.toCol][m.toSlot] = [];
-    ps.supportZones[m.toCol][m.toSlot].push(m.inst.name);
-    m.inst.heroIdx = m.toCol;
-    m.inst.zoneSlot = m.toSlot;
-  }
-  if (plan.moves.length > 0) tauscheSchluessel(gs._puppetActiveLock, `${seite}-${a}`, `${seite}-${b}`);   // „No other Token in the corresponding Hero's Support Zones …" hängt am Helden
+  // Puppet-Tokens und Support-Zonen-Abilities ziehen in die Spalte ihres Helden (stiller Umzug wie beim Tri-Ad-Tausch: keine Abgangs-Hooks, keine
+  // Niederlage-Prüfung dazwischen; die Boni der Abilities hängen am Helden und wandern mit ihm).
+  const verlagert = SM.fuehreVerlagerungAus(engine, plan);
+  if (plan.moves.some(m => m.mover.art === 'puppet')) tauscheSchluessel(gs._puppetActiveLock, `${seite}-${a}`, `${seite}-${b}`);   // „No other Token in the corresponding Hero's Support Zones …" hängt am Helden
   engine.sync();
 
   // ── ③ Eintritt der Ausrüstung/Anhängsel am NEUEN Wirt (Boni neu anlegen) ──
@@ -245,6 +230,9 @@ async function tauscheHeldenplaetze(engine, seite, a, b, wirker) {
       _skipReactionCheck: true,
     });
   }
+  // Hat ein Held dadurch seine Erlaubnis für Abilities in Support Zones verloren (Xalibur blieb in der alten Spalte liegen), gehen diese Abilities
+  // NACH dem Tausch (auch nach dem Wechsel der Ausrüstung) in die Ablage; die übrigen Spalten gleichen ihre Abilities ab.
+  await SM.raeumeNachTausch(engine, verlagert, CARD_NAME);
   if (typeof engine._refreshAscensionReadiness === 'function') { try { engine._refreshAscensionReadiness(); } catch { /* Beiwerk */ } }
   engine.log('teleport', {
     player: gs.players[wirker]?.username,

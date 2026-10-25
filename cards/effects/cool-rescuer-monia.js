@@ -20,6 +20,17 @@
 //  beforeCreatureAffected (Zerstoeren, Status, Bewegen, Heilen,
 //  Kontrolle).
 //
+//  ★ W71b (Al, 25.10.2026): „Sie sollte auf JEDEN Effekt reagieren koennen, der eine oder mehrere Creatures betreffen wuerde." Das Fenster
+//  `beforeCreatureAffected` oeffnet jetzt JEDES Primitiv, das den Zustand einer Kreatur aendert — zentral ueber `engine.kreaturBetroffen(inst, art,
+//  quelle, opts)` (Effektarten: destroy · heal · status · move [Verschieben, Bounce, Tausch] · control [Kontrollwechsel] · buff · counter · stats
+//  [HP/Max-HP]): Bounce (`returnSupportCreatureToHand`: Racket Arrow, Deepsea Encounter …), Uebernahmen (`actionTransferCreature`: Dark Gear,
+//  Diplomacy, Capture …; `actionStealCreatureGefragt`: Cute Conversion, Deepsea Succubus …), Buffs/Debuffs (`actionAddCreatureBuff`/`RemoveCreatureBuff`),
+//  Status entfernen (`cleanseCreatureStatusesGefragt`: Beer, Juice …), Verschieben (Guard Change, Slippery Ice/Skates, Ushabti, Missing People, Mass
+//  Routing), HP-/Marken-Schreiber einzelner Karten (Life Serum, Phoenix Bombardment, Voodoo Curse, Thicket …). Kein Fenster: Opfer/Tribut als Kosten,
+//  Selbst-Effekte, reines Anvisieren, natuerliches Auslaufen, dauerhafte Auren (CARD_API „Welle 71 / W71b").
+//  Neu im Angebot: die ausloesende Karte steht auch bei Nicht-Schaden links im Panel (`triggerCardName`), die Beschreibung nennt Karte und Wirkung,
+//  und ein ABGELEHNTES Einzelfenster gilt nur fuer die Seite der Kreatur (ein Flaecheneffekt fragt hoechstens einmal je Seite).
+//
 //  CPU (`cpuResponse`): nimmt das Angebot nur an, wenn die eigenen
 //  Kreaturen vom GEGNER bedroht sind (nie fuer die Kreaturen des Gegners,
 //  nie gegen den eigenen Effekt, nie gegen Heilung) und der Wert der
@@ -89,7 +100,7 @@ module.exports = {
    *   · die Option fuer die EIGENEN Kreaturen angeboten wird (`save-<eigener Sitz>`),
    *   · der Effekt nicht von der eigenen Seite kommt (kein Selbstschutz gegen den eigenen Plan) und keine Heilung ist,
    *   · der Wert der bedrohten Kreaturen die Kosten der schwaechsten Handkarte klar uebersteigt.
-   * Wert einer Kreatur: 20 + 15 × Level + min(40, HP/10); voll bei toedlichem Schaden oder Zerstoeren, ×0,8 Bewegen, ×0,6 Status/Sonstiges, sonst anteilig am Schaden (×0,7).
+   * Wert einer Kreatur: 20 + 15 × Level + min(40, HP/10); voll bei toedlichem Schaden, Zerstoeren oder Kontrollverlust (`control`), ×0,8 Bewegen/Bounce (`move`), ×0,6 Status/Buff/Werte/Sonstiges, sonst anteilig am Schaden (×0,7).
    * Kosten: Handwert der schwaechsten Karte (`engine._cpuEstimateHandValue`, sonst 20) + 10; bei nur 1 Handkarte muss der Wert hoch sein (≥ 80).
    */
   cpuResponse(engine, kind, promptData) {
@@ -98,6 +109,7 @@ module.exports = {
     const eigene = `save-${pi}`;
     if (!(promptData.options || []).some(o => o.id === eigene)) return null;     // nie die Kreaturen des Gegners retten
     if (info.quelleOwner === pi) return null;                                    // eigener Effekt
+    if (!(info.quelleOwner >= 0)) return null;                                   // W71b: Verursacher unbekannt (kein Besitzer) — nie eine Karte dafuer opfern
     if (info.effektTyp === 'heal') return null;                                  // Heilung muss man nicht verhindern
     const liste = info.schutz?.[pi] || [];
     if (!liste.length) return null;
@@ -106,7 +118,7 @@ module.exports = {
     let wert = 0;
     for (const c of liste) {
       const voll = 20 + 15 * (c.level || 0) + Math.min(40, Math.round((c.hp || 0) / 10));
-      const nsGewicht = info.effektTyp === 'destroy' ? 1 : (info.effektTyp === 'move' ? 0.8 : 0.6);   // Zerstoeren trifft am haertesten, Status/Sonstiges weniger
+      const nsGewicht = (info.effektTyp === 'destroy' || info.effektTyp === 'control') ? 1 : (info.effektTyp === 'move' ? 0.8 : 0.6);   // Zerstoeren/Kontrollverlust trifft am haertesten, Bewegen/Bounce weniger, Status/Buff/Werte noch weniger (W71b)
       const anteil = c.nichtSchaden ? nsGewicht : (c.hp > 0 && c.amount >= c.hp ? 1 : Math.min(1, (c.amount || 0) / Math.max(1, c.hp || 1)) * 0.7);
       wert += voll * anteil;
     }
@@ -180,7 +192,6 @@ module.exports = {
       }
       // Pro Karte/Effekt nur EIN Angebot: angenommen (egal von wem) oder von mir abgelehnt → keine neue Frage.
       if (angenommenesAngebot(gs, key)) return;
-      if (angebotAbgelehnt(gs, key, pi)) return;
 
       // Must have 1+ cards in controller's hand
       const ps = gs.players[pi];
@@ -194,6 +205,8 @@ module.exports = {
       // raw owner — so a cross-side-placed Creature on opp's board
       // counts under opp).
       const affectedOwners = new Set(promptable.map(e => e.inst.controller ?? e.inst.owner));
+      // Abgelehnt (W58a): fuer diese Karte/diesen Effekt nicht noch einmal fragen — W71b: es sei denn, eine betroffene Seite wurde noch nicht abgelehnt (Einzelfenster einer Kreatur).
+      if ([...affectedOwners].every(s => angebotAbgelehnt(gs, key, pi, s))) return;
 
       // Build prompt options (no "Cancel" — the panel has its own cancel button)
       let options;
@@ -345,7 +358,7 @@ module.exports = {
       if (engine.moniaSchildBlockt(creature, ctx.source, creatureSide)) { ctx.cancelled = true; return; }
       // Pro Karte/Effekt nur EIN Angebot: angenommen (auch fuer die andere Seite) oder von mir abgelehnt → keine neue Frage.
       if (angenommenesAngebot(gs, key)) return;
-      if (angebotAbgelehnt(gs, key, pi)) return;
+      if (angebotAbgelehnt(gs, key, pi, creatureSide)) return;   // W71b: abgelehnt gilt fuer diese Seite (ein Effekt kann nacheinander beide Seiten treffen)
 
       const ps = gs.players[pi];
       if (!ps || (ps.hand || []).length === 0) return;
@@ -358,20 +371,24 @@ module.exports = {
       ];
 
       const quelleOwner = ctx.source && typeof ctx.source === 'object' ? (ctx.source.owner ?? ctx.source.controller) : undefined;
+      // W71b: die ausloesende Karte steht links im Panel („Triggered by"), der Text nennt sie und die Wirkung.
+      const ausloeser = key || null;
+      const wirkung = { destroy: 'destroy', heal: 'heal', status: 'afflict', move: 'move', control: 'take control of', buff: 'change', stats: 'change the stats of' }[ctx.effectType] || 'affect';
       const result = await engine.promptGeneric(pi, {
         type: 'optionPicker',
         title: `${hero.name} — Cool Rescue!`,
-        description: `${ownerLabel.charAt(0).toUpperCase() + ownerLabel.slice(1)} ${creatureName} is in danger!`,
+        description: `${ownerLabel.charAt(0).toUpperCase() + ownerLabel.slice(1)} ${creatureName} is in danger${ausloeser ? ` — ${ausloeser} would ${wirkung} it` : ''}! Discard 1 card to protect it.`,
+        triggerCardName: ausloeser || undefined,
         options,
         cancellable: true,
         cpuDispatch: CARD_NAME,
         _moniaInfo: cpuInfo(engine, pi, [{ inst: creature, amount: 0, nichtSchaden: true }], quelleOwner, ctx.effectType),
       });
 
-      if (!result || !result.optionId || result.cancelled) { angebotMerken(gs, key, pi, null); return; }
+      if (!result || !result.optionId || result.cancelled) { angebotMerken(gs, key, pi, null, creatureSide); return; }
 
       const match = result.optionId.match(/^save-(\d+)$/);
-      if (!match) { angebotMerken(gs, key, pi, null); return; }
+      if (!match) { angebotMerken(gs, key, pi, null, creatureSide); return; }
       const protectOwner = parseInt(match[1]);
 
       angebotMerken(gs, key, pi, protectOwner);

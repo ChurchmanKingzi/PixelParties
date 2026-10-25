@@ -19,6 +19,9 @@
 //  GEPRÜFT WIRD: Skripte von Karten mit Kartentyp Ability (Code ohne Kommentare):
 //    (1) `abilityZones[…][… zoneSlot]` — der Stapel einer Instanz über ihren Slot,
 //    (2) `zone === 'ability'` / `zone !== 'ability'` auf einer Instanz.
+//  Dazu in ALLEN Effekt-Skripten (außer `_engine.js`):
+//    (3) `abilityZielZone(` — der Zielort einer neuen Ability-Kopie kommt aus `engine.abilityZielOrt(…)` (echte Zone ODER Support Zone,
+//        höchstens EIN Stapel je Ability über beide Zonenarten); `abilityZielZone` kennt nur die echten Zonen.
 //  Absichtliche Ausnahmen (z. B. nur echte Zonen gemeint) tragen in derselben Zeile den Vermerk `ability-stapel-ok`.
 //
 //  Aufruf:  node scripts/check-ability-stapel.js
@@ -45,6 +48,8 @@ function ohneKommentare(src) {
 const STAPEL_UEBER_SLOT = /abilityZones[^;\n]*\[\s*[\w.$?]*zoneSlot\s*\]/;
 const ZONEN_VERGLEICH = /\bzone\s*(?:===|!==)\s*['"]ability['"]/;
 
+const ZIELZONE_ECHT = /\babilityZielZone\s*\(/;
+
 const verdacht = [];
 for (const [name, karte] of Object.entries(KARTEN)) {
   if (karte.cardType !== 'Ability') continue;
@@ -61,11 +66,22 @@ for (const [name, karte] of Object.entries(KARTEN)) {
   }
 }
 
+// (3) `abilityZielZone(` in jedem Effekt-Skript außer der Engine selbst
+for (const datei of fs.readdirSync(EFFEKTE).filter(f => f.endsWith('.js') && f !== '_engine.js')) {
+  const roh = fs.readFileSync(path.join(EFFEKTE, datei), 'utf8');
+  const code = ohneKommentare(roh).split('\n');
+  const rohZeilen = roh.split('\n');
+  for (let i = 0; i < code.length; i++) {
+    if (/ability-stapel-ok/.test(rohZeilen[i])) continue;
+    if (ZIELZONE_ECHT.test(code[i])) verdacht.push({ datei, zeile: i + 1, art: 'abilityZielZone( — nur echte Zonen', text: rohZeilen[i].trim() });
+  }
+}
+
 if (verdacht.length === 0) {
-  console.log('[check-ability-stapel] OK — alle Ability-Skripte lesen ihren Stapel über die Engine-Helfer.');
+  console.log('[check-ability-stapel] OK — alle Ability-Skripte lesen ihren Stapel über die Engine-Helfer, kein Skript wählt den Zielort nur unter den echten Zonen.');
   process.exit(0);
 }
 console.log(`[check-ability-stapel] ${verdacht.length} Verdachtsfall/-fälle:\n`);
 for (const v of verdacht) console.log(`  ${v.datei}:${v.zeile}  [${v.art}]  ${v.text.slice(0, 140)}`);
-console.log('\n  → engine.abilityStapelVon / abilityStapelListe / abilityStapelEintrag / istWirksameAbility (siehe CARD_API.md, „Abilities in Support Zonen").');
+console.log('\n  → engine.abilityStapelVon / abilityStapelListe / abilityStapelEintrag / istWirksameAbility; Zielort einer neuen Kopie: engine.abilityZielOrt + abilityOrtBelegen + abilityOrtHooks (siehe CARD_API.md, „Abilities in Support Zonen").');
 process.exit(1);

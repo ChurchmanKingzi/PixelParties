@@ -1043,9 +1043,10 @@ async function runActionPhase(engine, helpers) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
     if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
-    const zones = ps.abilityZones?.[hi] || [];
-    for (let zi = 0; zi < zones.length; zi++) {
-      const slot = zones[zi] || [];
+    // 24.10.: auch die Stapel in Support Zonen (Xal, Xalibur) — `zoneKind` geht mit bis zum Server.
+    for (const _e of engine._aktivierungsStapel(cpuIdx, hi)) {
+      const zi = _e.zi;
+      const slot = _e.slot || [];
       if (slot.length === 0) continue;
       const abilityName = slot[0];
       const script = loadCardEffect(abilityName);
@@ -1055,7 +1056,7 @@ async function runActionPhase(engine, helpers) {
       if (script.canActivateAction && !script.canActivateAction(gs, cpuIdx, hi, slot.length, engine)) continue;
       const prev = actionAbilityBest.get(abilityName);
       if (!prev || slot.length > prev.level) {
-        actionAbilityBest.set(abilityName, { heroIdx: hi, zoneIdx: zi, level: slot.length });
+        actionAbilityBest.set(abilityName, { heroIdx: hi, zoneIdx: zi, level: slot.length, zoneKind: _e.zoneKind });
       }
     }
   }
@@ -1066,6 +1067,7 @@ async function runActionPhase(engine, helpers) {
       abilityName,
       heroIdx: best.heroIdx,
       zoneIdx: best.zoneIdx,
+      zoneKind: best.zoneKind,
       level: best.level,
       typeScore: 0,
     });
@@ -1259,6 +1261,7 @@ async function runActionPhase(engine, helpers) {
         await helpers.doActivateAbility(helpers.room, cpuIdx, {
           heroIdx: pick.heroIdx,
           zoneIdx: pick.zoneIdx,
+          ...(pick.zoneKind === 'support' ? { zoneKind: 'support' } : {}),
         });
       } else if (pick.cardType === 'HeroEffectAction') {
         await helpers.doActivateHeroEffect(helpers.room, cpuIdx, {
@@ -1388,9 +1391,9 @@ async function tryActionCostingAbility(engine, helpers) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
     if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
-    const zones = ps.abilityZones?.[hi] || [];
-    for (let zi = 0; zi < zones.length; zi++) {
-      const slot = zones[zi] || [];
+    for (const _e of engine._aktivierungsStapel(cpuIdx, hi)) {   // 24.10.: echte Zonen UND Support Zonen (Xal, Xalibur)
+      const zi = _e.zi;
+      const slot = _e.slot || [];
       if (slot.length === 0) continue;
       const abilityName = slot[0];
       const script = loadCardEffect(abilityName);
@@ -1399,7 +1402,7 @@ async function tryActionCostingAbility(engine, helpers) {
       if (gs.hoptUsed?.[hoptKey] === gs.turn) continue;
       if (script.canActivateAction && !script.canActivateAction(gs, cpuIdx, hi, slot.length, engine)) continue;
       cpuLog(`    → action-costing ability "${abilityName}" hero=${hi}`);
-      await helpers.doActivateAbility(helpers.room, cpuIdx, { heroIdx: hi, zoneIdx: zi });
+      await helpers.doActivateAbility(helpers.room, cpuIdx, { heroIdx: hi, zoneIdx: zi, ...(_e.zoneKind === 'support' ? { zoneKind: 'support' } : {}) });
       return true;
     }
   }
@@ -2225,12 +2228,12 @@ async function activateFreeAbilities(engine, helpers) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
-      const zones = ps.abilityZones?.[hi] || [];
-      for (let zi = 0; zi < zones.length; zi++) {
-        const slot = zones[zi] || [];
+      for (const _e of engine._aktivierungsStapel(cpuIdx, hi)) {   // 24.10.: echte Zonen UND Support Zonen (Xal, Xalibur)
+        const zi = _e.zi;
+        const slot = _e.slot || [];
         if (slot.length === 0) continue;
         const abilityName = slot[0];
-        const key = `${abilityName}|${hi}|${zi}`;
+        const key = `${abilityName}|${hi}|${_e.zoneKind === 'support' ? 's' : ''}${zi}`;
         if (tried.has(key)) continue;
         const script = loadCardEffect(abilityName);
         if (!script?.freeActivation || !script.onFreeActivate) continue;
@@ -2265,7 +2268,7 @@ async function activateFreeAbilities(engine, helpers) {
         if (script.canFreeActivate) {
           try {
             const inst = engine.cardInstances.find(c =>
-              c.owner === cpuIdx && c.zone === 'ability'
+              c.owner === cpuIdx && c.zone === (_e.zoneKind === 'support' ? 'support' : 'ability')
               && c.heroIdx === hi && c.zoneSlot === zi);
             if (!inst) continue;
             const ctx = engine._createContext(inst, { event: 'canFreeActivateCheck' });
@@ -2307,7 +2310,7 @@ async function activateFreeAbilities(engine, helpers) {
         // ZWISCHEN verschiedenen Abilities bleibt wie gehabt (der erste
         // gefundene Name gewinnt) — nur innerhalb desselben Namens wird
         // aufgestuft.
-        const kandidat = { heroIdx: hi, zoneIdx: zi, abilityName, key, level: slot.length };
+        const kandidat = { heroIdx: hi, zoneIdx: zi, zoneKind: _e.zoneKind, abilityName, key, level: slot.length };
         if (!pick || (pick.abilityName === abilityName && kandidat.level > pick.level)) {
           pick = kandidat;
         }
@@ -2335,7 +2338,7 @@ async function activateFreeAbilities(engine, helpers) {
       // kleinen Deck sollen genau die durchs reguläre Gate.
       !!pickAbilityScript?.blockedByHandLock || !!pickAbilityScript?.cpuMeta?.activationDraws);
     const committed = await mctsGatedActivation(engine, helpers, `free-ability ${pick.abilityName}`,
-      () => helpers.doActivateFreeAbility(helpers.room, cpuIdx, { heroIdx: pick.heroIdx, zoneIdx: pick.zoneIdx }),
+      () => helpers.doActivateFreeAbility(helpers.room, cpuIdx, { heroIdx: pick.heroIdx, zoneIdx: pick.zoneIdx, ...(pick.zoneKind === 'support' ? { zoneKind: 'support' } : {}) }),
       { alwaysCommit: pickAbilityAlwaysCommit });
     const nowClaimed = gs.hoptUsed?.[hoptKey] === gs.turn;
     // Karten, die den Engine-Schlüssel nach erfolgreicher Auflösung
@@ -3074,7 +3077,7 @@ function pickHeroForEquip(engine, pi, cardName, cardData, nurHelden = null) {
       }
       return pickHi;
     }
-    const teamMax = mctsTeamMaxSchoolLvl(gs, pi);
+    const teamMax = mctsTeamMaxSchoolLvl(gs, pi, engine);
     const scoreOf = (hi) => {
       _inEquipHeroValuation = true;
       try { return mctsEnemyHeroDynamicValue(engine, pi, hi, teamMax); }
@@ -3578,7 +3581,7 @@ function effectiveSpellSchoolLevel(engine, pi, hi, school) {
   const ps = engine.gs.players[pi];
   const hero = ps?.heroes?.[hi];
   if (!hero?.name) return 0;
-  const abZones = ps.abilityZones?.[hi] || [];
+  const abZones = alleAbilityStapel(engine, ps, hi);
   const real = engine.countAbilitiesForSchool(school, abZones);
   const heroScript = loadCardEffect(hero.name);
   const v = heroScript?.virtualSpellSchoolLevel;
@@ -4440,7 +4443,7 @@ function casterCastDrawCount(engine, pi, hi, cardData) {
   const ps = engine.gs?.players?.[pi];
   if (!ps) return 0;
   let draws = 0;
-  for (const slot of (ps.abilityZones?.[hi] || [])) {
+  for (const slot of alleAbilityStapel(engine, ps, hi)) {
     if (!slot || !slot.length) continue;
     const meta = loadCardEffect(slot[0])?.cpuMeta?.castTriggersDraw;
     if (!meta) continue;
@@ -4829,7 +4832,7 @@ function pickCreatureZoneSlot(engine, pi, heroIdx, cardName) {
     if (schools.length > 0 && lvl > 0) {
       let combined = 0;
       try {
-        for (const sc of schools) combined += engine.countAbilitiesForSchool(sc, ps.abilityZones?.[heroIdx]) || 0;
+        for (const sc of schools) combined += engine.countAbilitiesForSchool(sc, alleAbilityStapel(engine, ps, heroIdx)) || 0;
       } catch { combined = lvl; /* im Zweifel Altverhalten */ }
       const hero = ps.heroes?.[heroIdx];
       const heroBypass = hero?.bypassLevelReq && lvl <= hero.bypassLevelReq.maxLevel
@@ -5061,20 +5064,46 @@ function isAtkBoostEquip(cardData) {
 // randomly so the CPU doesn't deterministically funnel every ability into
 // Hero 0. Resolves around abilityGivenThisTurn (1 attach per hero per turn).
 
-function heroHasAbility(ps, hi, cardName) {
-  const abZones = ps.abilityZones?.[hi] || [];
-  for (const slot of abZones) {
-    if ((slot || []).length > 0 && slot[0] === cardName) return true;
+// 24.10.: ALLE Ability-Stapel eines Helden als Arrays — die echten Zonen UND die Stapel in Support Zonen (Xal, Xalibur, gewonnener Xal-Effekt).
+// Bewertungen, die Stufen und Schulen zaehlen, lesen hierueber statt `ps.abilityZones[hi]` (sonst sieht die CPU eine Support-Ability nicht).
+function alleAbilityStapel(engine, ps, hi) {
+  const out = [];
+  for (const slot of (ps?.abilityZones?.[hi] || [])) out.push(slot || []);
+  try {
+    // Vorabprüfung (billig, die Bewertung läuft in MCTS-Rollouts oft): nur wenn eine Support Zone überhaupt eine Ability-Karte trägt.
+    const db = engine?._getCardDB?.();
+    const sup = ps?.supportZones?.[hi] || [];
+    if (db && sup.some(slot => slot && slot.length > 0 && db[slot[0]]?.cardType === 'Ability')) {
+      const pi = engine.gs.players.indexOf(ps);
+      if (pi >= 0 && typeof engine.abilityStapelListe === 'function') {
+        for (const e of engine.abilityStapelListe(pi, hi)) if (e.art === 'support') out.push(e.namen);
+      }
+    }
+  } catch { /* ohne Engine-Helfer: nur die echten Zonen */ }
+  return out;
+}
+
+// 24.10.: ein Ability-Stapel kann auch in einer SUPPORT Zone liegen (Xal, Xalibur) — hoechstens einer je Ability und Held, ueber beide Zonenarten.
+function abilityStapelHoehe(ps, hi, cardName) {
+  for (const slot of (ps.abilityZones?.[hi] || [])) {
+    if ((slot || []).length > 0 && slot[0] === cardName) return slot.length;
   }
-  return false;
+  let istAbility = false;
+  try { istAbility = require('./_card-db').getCardDB()[cardName]?.cardType === 'Ability'; } catch { istAbility = false; }
+  if (istAbility) {
+    for (const slot of (ps.supportZones?.[hi] || [])) {
+      if ((slot || []).length > 0 && slot[0] === cardName) return slot.length;
+    }
+  }
+  return 0;
+}
+
+function heroHasAbility(ps, hi, cardName) {
+  return abilityStapelHoehe(ps, hi, cardName) > 0;
 }
 
 function heroHasAbilityAtMaxLevel(ps, hi, cardName) {
-  const abZones = ps.abilityZones?.[hi] || [];
-  for (const slot of abZones) {
-    if ((slot || []).length >= 3 && slot[0] === cardName) return true;
-  }
-  return false;
+  return abilityStapelHoehe(ps, hi, cardName) >= 3;
 }
 
 function anyLivingHeroHasAbility(ps, cardName) {
@@ -5161,8 +5190,8 @@ function scoreAbilityPlacement(engine, pi, heroIdx, cardName, _tiefe = 0) {
   // Spiel als TIE/no-result verbucht).
   if (_tiefe > 2) return 0;
   const ps = engine.gs.players[pi];
-  const abZones = ps?.abilityZones?.[heroIdx];
-  if (!abZones) return 0;
+  if (!ps?.abilityZones?.[heroIdx]) return 0;
+  const abZones = alleAbilityStapel(engine, ps, heroIdx);
   const cardDB = engine._getCardDB();
 
   // ── JOKER-ABILITIES (1.8., Als Report "die CPU tat nichts") ───────
@@ -5372,7 +5401,7 @@ function scoreAbilityPlacement(engine, pi, heroIdx, cardName, _tiefe = 0) {
   // (unlock×100) — wer die Schule WIRKLICH braucht, kriegt sie trotzdem.
   let attachDrawMalus = 0;
   if (deckIsDangerouslySmall(engine, pi)) {
-    for (const slot of (ps.abilityZones?.[heroIdx] || [])) {
+    for (const slot of alleAbilityStapel(engine, ps, heroIdx)) {
       if (!slot || !slot.length) continue;
       const meta = loadCardEffect(slot[0])?.cpuMeta?.attachTriggersDraw;
       if (!meta) continue;
@@ -5414,8 +5443,8 @@ function cd_anyDeckCardNeedsSchool(cardDB, ps, schoolName) {
 //     keep wanting more levels even past the cast threshold).
 function isAbilityStackSaturated(engine, pi, heroIdx, cardName) {
   const ps = engine.gs.players[pi];
-  const abZones = ps?.abilityZones?.[heroIdx];
-  if (!abZones) return false;
+  if (!ps?.abilityZones?.[heroIdx]) return false;
+  const abZones = alleAbilityStapel(engine, ps, heroIdx);
   const cardDB = engine._getCardDB();
   let currentLevel = 0;
   for (const slot of abZones) {
@@ -5475,7 +5504,7 @@ async function attachAbilities(engine, helpers) {
     // ability board state changes between attaches). Each Ability
     // opts in via `cpuMeta.cpuPlacementBias(engine, pi, helpers)`,
     // returning either null (no bias this pass) or
-    //   { allowedHeroes?: Set<heroIdx>, slotByHero?: Map<heroIdx, slotIdx> }
+    //   { allowedHeroes?: Set<heroIdx>, slotByHero?: Map<heroIdx, slotIdx>, supportSlotByHero?: Map<heroIdx, supportSlotIdx> }
     // When `allowedHeroes` is present, candidates whose heroIdx isn't
     // in the set are dropped from this pass. When `slotByHero` is
     // present and contains the candidate's heroIdx, it overrides the
@@ -5529,8 +5558,8 @@ async function attachAbilities(engine, helpers) {
         const bias = getBias(cardName);
         if (bias?.allowedHeroes && !bias.allowedHeroes.has(hi)) continue;
 
-        let slot = resolveAbilitySlot(engine, cpuIdx, hi, cardName);
-        if (slot === null) continue;
+        let place = resolveAbilityPlace(engine, cpuIdx, hi, cardName);
+        if (place === null) continue;
 
         // Spell-School saturation gate: if stacking this Ability would
         // exceed the deck's highest needed level for that school AND
@@ -5546,10 +5575,12 @@ async function attachAbilities(engine, helpers) {
         // Bias may override the auto-resolved slot for this hero
         // (Performance lands on the hero's Divinity zone specifically).
         if (bias?.slotByHero?.has(hi)) {
-          slot = bias.slotByHero.get(hi);
+          place = { zoneSlot: bias.slotByHero.get(hi), supportSlot: -1 };
+        } else if (bias?.supportSlotByHero?.has(hi)) {
+          place = { zoneSlot: -1, supportSlot: bias.supportSlotByHero.get(hi) };   // 24.10.: Stapel in einer Support Zone (Xal, Xalibur)
         }
 
-        const entry = { handIdx, cardName, fromCreation: ausVorrat, heroIdx: hi, zoneSlot: slot };
+        const entry = { handIdx, cardName, fromCreation: ausVorrat, heroIdx: hi, zoneSlot: place.zoneSlot, supportSlot: place.supportSlot };
         const thisHeroHasIt = heroHasAbility(ps, hi, cardName);
         if (thisHeroHasIt) {
           // Tier 1 (stack): always allowed — stacking improves an existing
@@ -5604,6 +5635,7 @@ async function attachAbilities(engine, helpers) {
       fromCreation: pick.fromCreation || undefined,
       heroIdx: pick.heroIdx,
       zoneSlot: pick.zoneSlot,
+      ...(pick.supportSlot >= 0 ? { supportSlot: pick.supportSlot } : {}),
     });
     cpuLog(`      ← ability "${pick.cardName}" done`);
     await pauseAction(engine);
@@ -5612,13 +5644,12 @@ async function attachAbilities(engine, helpers) {
 }
 
 /**
- * Returns a zoneSlot to use when calling doPlayAbility, or null if the Ability
- * cannot be attached to this Hero right now.
- *   >=0  : the specific zone to place into (required for customPlacement cards)
- *   -1   : let doPlayAbility auto-place (stack onto existing or first free zone)
- *   null : not attachable
+ * Wohin legt die CPU diese Ability? `{ zoneSlot, supportSlot }` für `doPlayAbility`, oder null, wenn sie nirgends passt.
+ *   zoneSlot >= 0     : eine bestimmte echte Ability Zone (Pflicht für customPlacement-Karten wie Performance)
+ *   supportSlot >= 0  : eine bestimmte Support Zone (Xal, Xalibur) — Performance auf einen Support-Stapel
+ *   zoneSlot === -1   : `doPlayAbility` wählt selbst (vorhandener Stapel, sonst erste freie Zone — echte vor Support Zonen)
  */
-function resolveAbilitySlot(engine, pi, hi, cardName) {
+function resolveAbilityPlace(engine, pi, hi, cardName) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   const hero = ps.heroes[hi];
@@ -5632,24 +5663,38 @@ function resolveAbilitySlot(engine, pi, hi, cardName) {
 
   if (script?.customPlacement) {
     // Custom placement cards (e.g. Performance) dictate which zones are legal.
+    // 24.10.: auch die Stapel in Support Zonen (Xal, Xalibur) — `abilitySupportZielZone` kennt `customPlacement`.
     const candidates = [];
     for (let z = 0; z < 3; z++) {
-      if (script.customPlacement.canPlace(abZones[z] || [])) candidates.push(z);
+      if (script.customPlacement.canPlace(abZones[z] || [])) candidates.push({ zoneSlot: z, supportSlot: -1 });
+    }
+    if (engine.heroAcceptsAbilitiesInSupport(pi, hi)) {
+      const anzahl = Math.max(3, (ps.supportZones?.[hi] || []).length);
+      for (let z = 0; z < anzahl; z++) {
+        if (engine.abilitySupportZielZone(pi, hi, cardName, z) === z) candidates.push({ zoneSlot: -1, supportSlot: z });
+      }
     }
     if (!candidates.length) return null;
     return candidates[Math.floor(Math.random() * candidates.length)];
   }
 
-  // Stack onto existing same-name zone (up to level 3)
-  for (let z = 0; z < 3; z++) {
-    const zone = abZones[z] || [];
-    if (zone.length > 0 && zone[0] === cardName && zone.length < 3) return -1;
-  }
-  // Otherwise need a free zone
-  for (let z = 0; z < 3; z++) {
-    if ((abZones[z] || []).length === 0) return -1;
-  }
-  return null;
+  // 24.10.: EINE Stelle fuer den Zielort — bestehender Stapel (echte ODER Support Zone, Xal), sonst freie echte Zone, sonst freie
+  // Support Zone. `doPlayAbility` platziert bei -1 selbst genauso.
+  return engine.abilityZielOrt(pi, hi, cardName) ? { zoneSlot: -1, supportSlot: -1 } : null;
+}
+
+/**
+ * Returns a zoneSlot to use when calling doPlayAbility, or null if the Ability
+ * cannot be attached to this Hero right now.
+ *   >=0  : the specific zone to place into (required for customPlacement cards)
+ *   -1   : let doPlayAbility auto-place (stack onto existing or first free zone)
+ *   null : not attachable
+ * (Nur für „passt es überhaupt?" — die CPU legt über `resolveAbilityPlace`, das auch Support Zonen kennt.)
+ */
+function resolveAbilitySlot(engine, pi, hi, cardName) {
+  const ort = resolveAbilityPlace(engine, pi, hi, cardName);
+  if (!ort) return null;
+  return ort.zoneSlot >= 0 ? ort.zoneSlot : -1;
 }
 
 // ═══════════════════════════════════════════
@@ -7803,6 +7848,12 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   // (`_cpuAutoConfirm` — Aufstiegsbonus „Add X to Hero?"), nimmt die
   // CPU immer — VOR allen Karten-Overrides und Kosten-Heuristiken.
   if (type === 'confirm' && promptData._cpuAutoConfirm) return { confirmed: true };
+  // W71a: ein optionPicker kann der CPU seine Wahl selbst vorschlagen (`_cpuOptionId` - Aufstiegsbonus
+  // "Choose one": die Engine kennt die anlegbaren Kopien), VOR den Karten-Overrides.
+  if (type === 'optionPicker' && promptData._cpuOptionId != null
+      && (promptData.options || []).some(o => String(o.id) === String(promptData._cpuOptionId))) {
+    return { optionId: String(promptData._cpuOptionId) };
+  }
 
   // Per-card override wins over the generic brain. Card authors export
   // `cpuResponse(engine, promptKind, promptData)` to customize how the CPU
@@ -9051,7 +9102,7 @@ function pickEnemyTargets(engine, enemyTargets, damage, maxSelect) {
   // system not knowing how much the creature was actually worth.
   const teamMaxSchoolLvls = {};
   const teamMax = (oppIdx) => {
-    if (teamMaxSchoolLvls[oppIdx] == null) teamMaxSchoolLvls[oppIdx] = mctsTeamMaxSchoolLvl(gs, oppIdx);
+    if (teamMaxSchoolLvls[oppIdx] == null) teamMaxSchoolLvls[oppIdx] = mctsTeamMaxSchoolLvl(gs, oppIdx, engine);
     return teamMaxSchoolLvls[oppIdx];
   };
   // When the prompt's targetingConfig forgets to declare `baseDamage`,
@@ -9315,7 +9366,7 @@ function scoreSelfStatusTarget(engine, target, statusName) {
     } catch { /* ignore card errors, treat as 0 */ }
   };
   applyScript(loadCardEffect(hero.name));
-  const abZones = ps.abilityZones?.[target.heroIdx] || [[], [], []];
+  const abZones = alleAbilityStapel(engine, ps, target.heroIdx);
   for (const slot of abZones) {
     for (const abName of (slot || [])) applyScript(loadCardEffect(abName));
   }
@@ -10056,7 +10107,7 @@ function attributeAggregateValue(engine, pi, kind, amount) {
     if (typeof heroScript?.supportYield === 'function') {
       try { apply(heroScript.supportYield(ctx)); } catch {}
     }
-    const abZones = ps.abilityZones?.[hi] || [];
+    const abZones = alleAbilityStapel(engine, ps, hi);
     for (const slot of abZones) {
       if (!slot || slot.length === 0) continue;
       const abScript = loadCardEffect(slot[0]);
@@ -10102,7 +10153,7 @@ function mctsHeroRoleTags(engine, oppIdx, hi) {
   // "caster-of-school" because the user explicitly mentioned that another
   // hero "capable of casting Spells of the same or even higher levels"
   // makes the original caster redundant.
-  const abZones = ps.abilityZones?.[hi] || [];
+  const abZones = alleAbilityStapel(engine, ps, hi);
   const schoolLevels = {};
   for (const slot of abZones) {
     if (!slot || slot.length === 0) continue;
@@ -10138,7 +10189,7 @@ function mctsCasterIsCovered(engine, oppIdx, hi) {
   const ps = engine.gs.players[oppIdx];
   const hero = ps?.heroes?.[hi];
   if (!hero?.name) return false;
-  const myAbZones = ps.abilityZones?.[hi] || [];
+  const myAbZones = alleAbilityStapel(engine, ps, hi);
   const mySchoolLevels = {};
   for (const slot of myAbZones) {
     if (!slot || slot.length === 0) continue;
@@ -10649,7 +10700,7 @@ function abilitySearchUnlockBonus(engine, pi, abilityName) {
     if (!hero?.name || hero.hp <= 0) return false;
     if (hero.statuses?.frozen || hero.statuses?.stunned) return false;
     if (typeof engine._testLevelReqForZones === 'function') {
-      const abZones = ps.abilityZones?.[hi] || [];
+      const abZones = alleAbilityStapel(engine, ps, hi);
       const simZones = abZones.map(slot => (slot ? slot.slice() : []));
       let placed = false;
       for (const slot of simZones) {
@@ -10665,7 +10716,7 @@ function abilitySearchUnlockBonus(engine, pi, abilityName) {
     }
     // Fallback ohne Engine-Helfer (ignoriert Reducer/Zweitschulen).
     let lvl = 0;
-    for (const slot of (ps.abilityZones?.[hi] || [])) {
+    for (const slot of alleAbilityStapel(engine, ps, hi)) {
       if (slot && slot[0] === abilityName) lvl = Math.max(lvl, slot.length);
     }
     return lvl + 1 >= (cd.level || 0);
@@ -10769,7 +10820,7 @@ function interferenceAoeDiscount(engine, pi, cardName) {
     // Schlag gar kein Flaechenschlag und „Interference" greift nicht.
     if (heroes.length + creatures.length < 2) return 0;
 
-    const teamMax = mctsTeamMaxSchoolLvl(engine.gs, opp);
+    const teamMax = mctsTeamMaxSchoolLvl(engine.gs, opp, engine);
     let gesamt = 0, blockiert = 0;
     for (const { hero, heroIdx, owner } of heroes) {
       const gewicht = 100 * mctsEnemyHeroDynamicValue(engine, owner, heroIdx, teamMax);
@@ -11111,7 +11162,7 @@ function mctsHeroSupportDetails(engine, pi, hi) {
     gold += y.goldPerTurn || 0;
     damage += y.damagePerTurn || 0;
   };
-  const abZones = ps.abilityZones?.[hi] || [];
+  const abZones = alleAbilityStapel(engine, ps, hi);
   for (const slot of abZones) {
     if (!slot || slot.length === 0) continue;
     const script = loadCardEffect(slot[0]);
@@ -11211,14 +11262,14 @@ function mctsValueGoldVsDraw(engine, pi, opts = {}) {
 // Highest Spell-School ability level on pi's live team. Used to identify
 // which hero is "the team's main spellcaster" — higher threat than a
 // secondary spellcaster with the same spell-school ability at the same level.
-function mctsTeamMaxSchoolLvl(gs, pi) {
+function mctsTeamMaxSchoolLvl(gs, pi, engine = null) {
   const ps = gs.players[pi];
   if (!ps) return 0;
   let topLvl = 0;
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
-    const abZones = ps.abilityZones?.[hi] || [];
+    const abZones = alleAbilityStapel(engine, ps, hi);
     for (const slot of abZones) {
       if (!slot || slot.length === 0) continue;
       if (SPELL_SCHOOL_ABILITIES.has(slot[0])) {
@@ -11243,7 +11294,7 @@ function mctsEnemyHeroThreat(engine, oppIdx, hi, teamMaxSchoolLvl) {
   const ps = gs.players[oppIdx];
   const hero = ps?.heroes?.[hi];
   if (!hero?.name || hero.hp <= 0) return 1.0;
-  const abZones = ps.abilityZones?.[hi] || [];
+  const abZones = alleAbilityStapel(engine, ps, hi);
   let myMaxSchoolLvl = 0;
   for (const slot of abZones) {
     if (!slot || slot.length === 0) continue;
@@ -11492,7 +11543,7 @@ function evaluateState(engine, cpuIdx) {
   let ownHp = 0;
   for (const h of (ps.heroes || [])) if (isAliveForEval(h)) ownHp += h.hp;
 
-  const oppTeamMaxSchoolLvl = mctsTeamMaxSchoolLvl(gs, oppIdx);
+  const oppTeamMaxSchoolLvl = mctsTeamMaxSchoolLvl(gs, oppIdx, engine);
   let oppWeightedHp = 0;
   let minOppHp = Infinity;
   for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
@@ -12104,10 +12155,8 @@ function evaluateState(engine, cpuIdx) {
     // Ability totals — cumulative stacked abilities matter more than fresh ones.
     let ownAb = 0, oppAb = 0;
     for (let hi = 0; hi < 3; hi++) {
-      for (let z = 0; z < 3; z++) {
-        ownAb += (ps.abilityZones?.[hi]?.[z] || []).length;
-        oppAb += (opp.abilityZones?.[hi]?.[z] || []).length;
-      }
+      for (const slot of alleAbilityStapel(engine, ps, hi)) ownAb += (slot || []).length;
+      for (const slot of alleAbilityStapel(engine, opp, hi)) oppAb += (slot || []).length;
     }
     score += 15 * (ownAb - oppAb);
     const sumEngineValue = (pl) => {
@@ -12667,6 +12716,7 @@ async function applyActionCandidate(engine, helpers, candidate) {
     const hoptBefore = engine.gs.hoptUsed?.[hoptKey];
     await helpers.doActivateAbility(helpers.room, cpuIdx, {
       heroIdx, zoneIdx: candidate.zoneIdx,
+      ...(candidate.zoneKind === 'support' ? { zoneKind: 'support' } : {}),
     });
     return engine.gs.hoptUsed?.[hoptKey] === engine.gs.turn && hoptBefore !== engine.gs.turn;
   }
@@ -14485,4 +14535,4 @@ async function measureAreaValues(engine, helpers, cpuIdx) {
 // Gold-Bedarfsrechnung, die an zwei Stellen gepflegt wird, laeuft
 // garantiert auseinander. Rein additiv, kein Aufrufer geaendert.
 module.exports = { CPU_META_HELPERS, runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, mctsValueGoldVsDraw, mctsPickFromOptions, rolloutRestOfTurn, seedExploreAttempts, computeGoldDemand, mctsOpponentGoldEconomy,
-  _test: { activateCreatureEffects, activateHeroEffects, cpuGenericChoice, heroCheatBonusByName, heroEffectGateCheatBonus, candidateCheatBonus, heuristicCandidateCmp, ACTION_CHEAT_BONUS, pickCreatureZoneSlot, listEligibleHeroesForActionCard } };
+  _test: { activateCreatureEffects, activateHeroEffects, cpuGenericChoice, heroCheatBonusByName, heroEffectGateCheatBonus, candidateCheatBonus, heuristicCandidateCmp, ACTION_CHEAT_BONUS, pickCreatureZoneSlot, listEligibleHeroesForActionCard, resolveAbilityPlace, alleAbilityStapel, scoreAbilityPlacement, isAbilityStackSaturated, activateFreeAbilities, tryActionCostingAbility } };

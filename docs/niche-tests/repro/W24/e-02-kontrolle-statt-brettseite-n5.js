@@ -10,7 +10,7 @@ const ROOT = path.resolve(__dirname, '../../../..');
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 function ladeTrigger() {
   const src = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
-  const i = src.indexOf('function doTriggerTreacherousCrystal(room, pi) {');
+  const i = src.indexOf('async function doTriggerTreacherousCrystal(room, pi) {');
   let depth = 0, k = src.indexOf('{', i);
   for (; k < src.length; k++) { if (src[k] === '{') depth++; else if (src[k] === '}') { depth--; if (depth === 0) break; } }
   const fn = new Function('require', 'opponentOfGs', 'roomPlayerCount', 'sendGameState', 'sendSpectatorGameState', src.slice(i, k + 1) + '\nreturn doTriggerTreacherousCrystal;');
@@ -29,7 +29,7 @@ function ladeTrigger() {
       const seitenfremdMeine = t.put(opp, 0, 0, H.INERT.creature, { controller: seat, counters: { crossSideControlled: seat } });   // steht beim Halter, kontrolliert vom Aktivierer
       const halters = t.put(opp, 0, 1, H.INERT.creature);
       t.gs.activePlayer = seat;
-      trig(t.room, seat);
+      await trig(t.room, seat);
       await sleep(100);
       R.check('Kreatur des Halters wird übernommen', halters.controller === seat, { c: halters.controller });
       R.check('eigene Kreatur des Aktivierers bleibt unverändert (kein stolenBy)', meine.controller === seat && meine.stolenBy == null, { c: meine.controller, s: meine.stolenBy });

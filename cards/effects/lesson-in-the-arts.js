@@ -27,7 +27,7 @@ const MAX = 3;
 
 /** Kann der Nutzer (Brettseite `hs`, Slot `hi`) noch eine Kopie aufnehmen? */
 function kannAufnehmen(engine, hs, hi) {
-  return engine.abilityZielZone(hs, hi, ABILITY) >= 0;
+  return engine.abilityZielOrt(hs, hi, ABILITY) != null;   // 24.10.: auch Support Zonen (Xal)
 }
 
 function kopien(ps, quelle) {

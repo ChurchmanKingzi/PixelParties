@@ -120,7 +120,7 @@ async function doCure(engine, pi, target, casterHeroIdx, casterSeite = pi) {
     // Remove all negative statuses from creature (centralized — skips
     // unhealable). Instance-aware key set so a per-instance-cleansable
     // negation (Unwanted Audience) is included alongside the globals.
-    const removedCreatureKeys = engine.cleanseCreatureStatuses(
+    const removedCreatureKeys = await engine.cleanseCreatureStatusesGefragt(
       inst, engine.getCleansableCreatureStatusKeys(inst), 'Cure');
     removed += removedCreatureKeys.length;
 

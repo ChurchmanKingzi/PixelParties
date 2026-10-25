@@ -7295,60 +7295,6 @@ function broadcastHandToBoard(room, ownerIdx, payload, forceOwnerAnim = false) {
 // pass a valid playerIdx. Returns true on success, false on early-return.
 
 /**
- * Freie (oder gleichnamig stapelbare) SUPPORT-Zone fuer eine Ability
- * (v767, Xal / Xalibur). Stapeln folgt derselben Regel wie in einer
- * echten Ability-Zone: gleicher Name, hoechstens 3.
- * `wunsch` ist der vom Client gezogene Slot, sofern brauchbar.
- */
-function findAbilitySupportSlot(ps, heroIdx, cardName, wunsch, gs = null, pi = null) {
-  const zonen = ps.supportZones?.[heroIdx] || [];
-  const anzahl = Math.max(3, zonen.length);
-  // ★★ v1349: verwahrte Abilities (Madame Guillotine) — dieselben Regeln
-  // wie in `engine.abilityZielZone`: ein verwahrter Stapel nimmt die neue
-  // Kopie (gesamt ≤ 3), versiegelte Plaetze sind belegt.
-  const V = require('./cards/effects/_ability-verwahrung-shared');
-  const mitVerwahrung = gs && pi != null;
-  const nimmt = (z) => !mitVerwahrung || V.nimmtAuf(gs, pi, heroIdx, 'support', z, cardName);
-  const frei = (z) => (zonen[z] || []).length === 0
-    && !(mitVerwahrung && V.versiegelt(gs, pi, heroIdx, 'support', z));
-  // ★ 24.10.: Karten mit eigener Platzierungsregel (Performance: nur auf einen belegten Stapel, höchstens 3) — in Support Zonen genauso.
-  // Nur Stapel aus ECHTEN Abilities zählen (eine Support Zone kann auch Ausrüstung oder eine Kreatur tragen).
-  const customPlacement = loadCardEffect(cardName)?.customPlacement;
-  if (customPlacement) {
-    const db = getCardDB();
-    const tauglich = (z) => {
-      const slot = zonen[z] || [];
-      return slot.length > 0 && db[slot[0]]?.cardType === 'Ability' && customPlacement.canPlace(slot)
-        && !(mitVerwahrung && V.versiegelt(gs, pi, heroIdx, 'support', z)) && nimmt(z);
-    };
-    if (wunsch >= 0 && wunsch < anzahl && tauglich(wunsch)) return wunsch;
-    for (let z = 0; z < anzahl; z++) if (tauglich(z)) return z;
-    return -1;
-  }
-  if (mitVerwahrung) {
-    const verwahrt = V.verwahrterStapel(gs, pi, heroIdx, cardName);
-    if (verwahrt) {
-      if (verwahrt.zoneKind !== 'support') return -1;
-      const slot = zonen[verwahrt.slotIdx] || [];
-      if (slot.length > 0 && slot[0] !== cardName) return -1;
-      return nimmt(verwahrt.slotIdx) ? verwahrt.slotIdx : -1;
-    }
-  }
-  // 1. Auf einen bestehenden gleichnamigen Stapel legen.
-  for (let z = 0; z < anzahl; z++) {
-    const slot = zonen[z] || [];
-    if (slot.length > 0 && slot[0] === cardName) return (slot.length < 3 && nimmt(z)) ? z : -1;
-  }
-  // 2. Der gewuenschte Platz, wenn frei.
-  if (wunsch >= 0 && wunsch < anzahl && frei(wunsch)) return wunsch;
-  // 3. Sonst der erste freie.
-  for (let z = 0; z < anzahl; z++) {
-    if (frei(z)) return z;
-  }
-  return -1;
-}
-
-/**
  * ★ ABILITY IN EINE SUPPORT ZONE LEGEN (Xal, Xalibur; 24.10.2026): derselbe Ablauf wie für eine echte Ability Zone — Karte aus der Hand, Instanz,
  * Flug, Reaktionsfenster (die Ability kann negiert werden), danach die Anlege-Hooks (`onPlay`, `onCardEnterZone`). Früher legte dieser Weg den
  * Namen nur in die Zone: keine Anlege-Wirkung (Fighting gab 0 ATK), keine Passiv-Hooks, kein Negieren.
@@ -7473,15 +7419,15 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
     // v769: Ein Held fuehrt je Ability hoechstens EINEN Stapel. Liegt
     // sie schon irgendwo, wird dort gestapelt statt einen zweiten
     // Stapel zu eroeffnen — und ist der voll, geht gar nichts.
-    const vorhanden = room.engine.heroAbilityStackOf(pi, heroIdx, cardName);
-    if (vorhanden && vorhanden.zoneKind === 'ability') {
+    // Eine Ability hat je Held hoechstens EINEN Stapel — ueber echte Zonen und Support Zonen zusammen.
+    const vorhanden = room.engine.abilityStapelOrtVon(pi, heroIdx, cardName);
+    if (vorhanden && vorhanden.art === 'ability') {
       // Die Ability liegt schon in einer ECHTEN Zone: dort wird gestapelt — der normale Weg unten (Instanz, Reaktionsfenster, Anlege-Hooks).
       // (Früher legte dieser Zweig den Namen nur in die Zone: keine Instanz, kein `onPlay`, kein Negieren.)
-      zoneSlot = vorhanden.slotIdx;
+      zoneSlot = vorhanden.slot;
       supportSlot = null;
     } else {
-      if (vorhanden && vorhanden.zoneKind === 'support' && vorhanden.level >= 3) return false;
-      const ziel = findAbilitySupportSlot(ps, heroIdx, cardName, supportSlot, gs, pi);
+      const ziel = room.engine.abilitySupportZielZone(pi, heroIdx, cardName, supportSlot);
       if (ziel < 0) return false;
       return abilityInSupportAnlegen(room, pi, { cardName, handIndex, heroIdx, supIdx: ziel, fromCreation, hero, heroOwner });
     }
@@ -7508,7 +7454,7 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
     const _hatStapel = abZones.some(z => (z || []).length > 0 && z[0] === cardName);
     if (_hatStapel) return false;
     const supIdx = room.engine.heroAcceptsAbilitiesInSupport(pi, heroIdx)
-      ? findAbilitySupportSlot(ps, heroIdx, cardName, zoneSlot, gs, pi)
+      ? room.engine.abilitySupportZielZone(pi, heroIdx, cardName, zoneSlot)
       : -1;
     if (supIdx < 0) return false;
     ps.abilityZones[heroIdx] = abZones;
@@ -9745,7 +9691,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
  *   • At least one already-unstolen opp Creature must exist (otherwise
  *     the click is a no-op).
  */
-function doTriggerTreacherousCrystal(room, pi) {
+async function doTriggerTreacherousCrystal(room, pi) {   // W71b: async — das Übernehmen fragt das Schutzfenster (Cool Rescuer Monia & Co.)
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
   if (pi !== gs.activePlayer) return false;
@@ -9796,7 +9742,7 @@ function doTriggerTreacherousCrystal(room, pi) {
     // as supportable.
     const cd = cardDB[inst.name];
     if (!cd || cd.cardType !== 'Creature') continue;
-    const ok = room.engine.actionStealCreature(pi, inst, {
+    const ok = await room.engine.actionStealCreatureGefragt(pi, inst, {   // W71b: mit Schutzfenster ('control')
       sourceName: 'Treacherous Crystal',
     });
     if (ok) stolenCount++;
@@ -9830,7 +9776,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
   let borrowerHeroIdx = null, borrowerOwner = pi;
   if (borrowedFromOwner != null) {
     if (charmedOwner != null) return false;
-    const borrow = room.engine._getAbilityBorrowerForOppSlot(pi, borrowedFromOwner, heroIdx, zoneIdx);
+    const borrow = room.engine._getAbilityBorrowerForOppSlot(pi, borrowedFromOwner, heroIdx, zoneIdx, zoneKind);
     if (!borrow) return false;
     borrowerHeroIdx = borrow.borrowerHeroIdx;
     borrowerOwner = borrow.borrowerOwner ?? pi;   // Styx 28.9.: Seite des Leihers
@@ -9893,8 +9839,9 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
   // Vorbelegung "nicht gefeuert" — der Erfolgspfad setzt um.
   room.engine.noteActivationOutcome(hoptKey, false);
 
+  // 24.10.: eine Ability in einer SUPPORT Zone (Xal, Xalibur) ist eine Instanz mit zone 'support' (vorher fand diese Suche sie nie).
   const inst = room.engine.cardInstances.find(c =>
-    c.owner === heroOwner && c.zone === 'ability' && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
+    c.owner === heroOwner && c.zone === (zoneKind === 'support' ? 'support' : 'ability') && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
   );
   if (!inst) return false;
 
@@ -9945,7 +9892,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
     // freie Ability schluepft.
     const abilitySurprise = chainResult.negated
       ? null
-      : await room.engine._checkSurpriseOnAbilityActivation(pi, heroIdx, zoneIdx, abilityName, heroOwner);   // Styx 28.9.: Brettseite
+      : await room.engine._checkSurpriseOnAbilityActivation(pi, heroIdx, zoneIdx, abilityName, heroOwner, zoneKind);   // Styx 28.9.: Brettseite
 
     if (chainResult.negated || abilitySurprise?.negateEffect) {
       // Gefeuert und gekontert — der Auftritt gehoert trotzdem dazu,
@@ -10733,7 +10680,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
   let borrowerHeroIdx = null, borrowerOwner = pi;
   if (borrowedFromOwner != null) {
     if (charmedOwner != null) return false; // charm + borrow combo not supported
-    const borrow = room.engine._getAbilityBorrowerForOppSlot(pi, borrowedFromOwner, heroIdx, zoneIdx);
+    const borrow = room.engine._getAbilityBorrowerForOppSlot(pi, borrowedFromOwner, heroIdx, zoneIdx, zoneKind);
     if (!borrow) return false;
     borrowerHeroIdx = borrow.borrowerHeroIdx;
     borrowerOwner = borrow.borrowerOwner ?? pi;   // Styx 28.9.: Seite des Leihers
@@ -10891,8 +10838,9 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
   let _heroCostFinalized = false;
 
   try {
+    // 24.10.: auch Abilities in Support Zonen (Xal, Xalibur) — Instanz mit zone 'support'.
     const inst = room.engine.cardInstances.find(c =>
-      c.owner === heroOwner && c.zone === 'ability' && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
+      c.owner === heroOwner && c.zone === (zoneKind === 'support' ? 'support' : 'ability') && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
     );
     if (!inst) return false;
 
@@ -10917,7 +10865,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     // Ausgang wie eine Negation aus der Kette.
     const abilitySurprise = chainResult.negated
       ? null
-      : await room.engine._checkSurpriseOnAbilityActivation(pi, heroIdx, zoneIdx, abilityName, heroOwner);   // Styx 28.9.: Brettseite
+      : await room.engine._checkSurpriseOnAbilityActivation(pi, heroIdx, zoneIdx, abilityName, heroOwner, zoneKind);   // Styx 28.9.: Brettseite
 
     if (chainResult.negated || abilitySurprise?.negateEffect) {
       if (gs._pendingCardReveal) room.engine._firePendingCardReveal();   // W63d: gefeuert und gekontert = gespielt
@@ -10941,10 +10889,10 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     const origHeroIdx = inst.heroIdx;
     {   // W63d: der Besitzer sofort, die Gegner über den zentralen Weg (Auftritts-Puffer hält die Animation bis zum Commit)
       const _ownSid = gs.players[pi]?.socketId;
-      if (_ownSid && !room.engine?._inMctsSim) io.to(_ownSid).emit('ability_activated', { owner: heroOwner, heroIdx, zoneIdx, abilityName });
-      if (!room.engine?._inMctsSim) emitToOpponentsGs(gs, io, pi, 'ability_activated', { owner: heroOwner, heroIdx, zoneIdx, abilityName });
+      if (_ownSid && !room.engine?._inMctsSim) io.to(_ownSid).emit('ability_activated', { owner: heroOwner, heroIdx, zoneIdx, zoneKind, abilityName });
+      if (!room.engine?._inMctsSim) emitToOpponentsGs(gs, io, pi, 'ability_activated', { owner: heroOwner, heroIdx, zoneIdx, zoneKind, abilityName });
     }
-    sendToSpectators(room, 'ability_activated', { owner: heroOwner, heroIdx, zoneIdx, abilityName });
+    sendToSpectators(room, 'ability_activated', { owner: heroOwner, heroIdx, zoneIdx, zoneKind, abilityName });
 
     if (charmedOwner != null) {
       inst.controller = pi; inst.owner = pi; inst.heroOwner = charmedOwner;
@@ -15967,13 +15915,13 @@ io.on('connection', (socket) => {
   // opt-in: clicking is the consent gesture. Steals revert at the
   // next turn start via the engine's `_revertStolenCreatures`
   // cleanup, same path Deepsea Succubus's temporary steals use.
-  socket.on('trigger_treacherous_crystal', (params) => {
+  socket.on('trigger_treacherous_crystal', async (params) => {
     if (!currentUser) return;
     const room = rooms.get(params?.roomId);
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    doTriggerTreacherousCrystal(room, pi);
+    try { await doTriggerTreacherousCrystal(room, pi); } catch (e) { console.error('[trigger_treacherous_crystal]', e.message); }
   });
 
   // Activate an equipped card's active effect (Slippery Skates, etc.)

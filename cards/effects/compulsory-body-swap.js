@@ -46,6 +46,12 @@
 //    helper also auto-skips when the user has
 //    nothing to play.
 //
+//  ★ SUPPORT-ZONEN-ABILITIES (Al, 24.10.2026): Abilities in den Support Zones (Xal, Xalibur) werden mitgetauscht — in die Support Zones
+//    des anderen Helden. Dieselbe Platzregel wie bei den Puppet-Tokens bei Teleport: ein Held kann nur mit einem getauscht werden, dessen
+//    Support Zones seine Support-Zone-Abilities TRAGEN würden (genug freie Zonen, abzüglich der Plätze, die die eigenen wandernden Abilities
+//    räumen). Hat ein Held danach keine Erlaubnis für Abilities in Support Zones (kein Xal, kein Xalibur), kommen die angekommenen Abilities in
+//    die Ablage (`_support-ability-move-shared.js`; die Leafagami Snake schützt wie sonst). Siehe CARD_API.md.
+//
 //  CPU-Handling (Als Auftrag 6.10.)
 //  ────────────────────────────────
 //  Die CPU tauscht die Abilities mit dem größten WERTIGKEITSDELTA — Details
@@ -68,6 +74,8 @@
 //  Der Zielprompt ist abbrechbar (Regel: zielende Karten sind immer abbrechbar).
 // ═══════════════════════════════════════════
 
+const SM = require('./_support-ability-move-shared');
+
 const CARD_NAME = 'Compulsory Body Swap';
 const ANIM_MS   = 1000;
 const MIN_GAIN  = 25;   // darunter lohnt weder der Cast noch ein Tausch (Eval-Punkte)
@@ -87,15 +95,30 @@ function heldWaehlbar(engine, pi, casterHeroIdx, h) {
   } catch { return true; }
 }
 
+/** Plan für die Support-Zonen-Abilities des Paares `x`, `y` ({ owner, heroIdx }). */
+function verlagerungsPlan(engine, x, y) {
+  return SM.planeVerlagerung(engine,
+    { seite: x.owner, col: x.heroIdx, movers: SM.supportAbilityStapel(engine, x.owner, x.heroIdx) },
+    { seite: y.owner, col: y.heroIdx, movers: SM.supportAbilityStapel(engine, y.owner, y.heroIdx) });
+}
+
+/** Tragen die Support Zones des einen die Support-Zone-Abilities des anderen (und umgekehrt)? */
+function paarMoeglich(engine, x, y) {
+  if (x.owner === y.owner && x.heroIdx === y.heroIdx) return false;
+  return verlagerungsPlan(engine, x, y).ok;
+}
+
 function bestePaare(engine, pi, casterHeroIdx, okFn) {
   const aw = require('./_ability-worth-shared');
   return aw.rankSwaps(engine, pi, {
     casterHeroIdx,
     ok: (h) => heldWaehlbar(engine, pi, casterHeroIdx, h) && (!okFn || okFn(h)),
+    okPair: (x, y) => paarMoeglich(engine, x, y),
   });
 }
 
 module.exports = {
+  paarMoeglich, verlagerungsPlan,
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hand'],
@@ -183,31 +206,44 @@ module.exports = {
         }
       }
       if (targets.length < 2) { gs._spellCancelled = true; return; }
+      // 24.10.: Helden, die mit keinem anderen tauschen können, weil die Support Zones des Partners ihre Support-Zone-Abilities nicht tragen würden,
+      // bleiben sichtbar, aber ausgegraut (wie bei Teleport und den Puppets).
+      for (const t of targets) {
+        if (!targets.some(u => u !== t && paarMoeglich(engine, t, u))) t.ineligible = true;
+      }
+      if (targets.every(t => t.ineligible)) { gs._spellCancelled = true; return; }
 
       // ── Step 2: prompt for exactly 2 heroes ──
       // exclusiveTypes:false means heroes from both sides are clickable
       // in one shot. minRequired/maxTotal pin the pick at exactly 2.
-      const picked = await engine.promptEffectTarget(pi, targets, {
-        title: CARD_NAME,
-        description: 'Choose any 2 Heroes (any player) to swap all their Abilities.',
-        confirmLabel: '🔄 Swap!',
-        confirmClass: 'btn-info',
-        cancellable: true,                 // zielende Karten sind immer abbrechbar (Als Regel 23.9.)
-        casterHeroIdx: userHeroId,         // für die CPU-Paarwahl (Zusatz-Aktion des Nutzers)
-        exclusiveTypes: false,
-        minRequired: 2,
-        maxTotal: 2,
-      });
-      if (!picked || picked.length < 2) { gs._spellCancelled = true; return; }
+      let a = null, b = null;
+      for (let versuch = 0; versuch < 6 && !a; versuch++) {
+        const picked = await engine.promptEffectTarget(pi, targets, {
+          title: CARD_NAME,
+          description: versuch === 0
+            ? 'Choose any 2 Heroes (any player) to swap all their Abilities.'
+            : 'The Support Zones of each Hero must have room for the other Hero\'s Abilities in Support Zones. Choose any 2 Heroes (any player).',
+          confirmLabel: '🔄 Swap!',
+          confirmClass: 'btn-info',
+          cancellable: true,                 // zielende Karten sind immer abbrechbar (Als Regel 23.9.)
+          casterHeroIdx: userHeroId,         // für die CPU-Paarwahl (Zusatz-Aktion des Nutzers)
+          exclusiveTypes: false,
+          minRequired: 2,
+          maxTotal: 2,
+        });
+        if (!picked || picked.length < 2) { gs._spellCancelled = true; return; }
 
-      const a = targets.find(t => t.id === picked[0]);
-      const b = targets.find(t => t.id === picked[1]);
-      if (!a || !b) { gs._spellCancelled = true; return; }
-      // Same-hero pick guard — promptEffectTarget already enforces
-      // distinct ids, but defend against future config drift.
-      if (a.owner === b.owner && a.heroIdx === b.heroIdx) {
-        gs._spellCancelled = true; return;
+        const ta = targets.find(t => t.id === picked[0]);
+        const tb = targets.find(t => t.id === picked[1]);
+        if (!ta || !tb) { gs._spellCancelled = true; return; }
+        // Same-hero pick guard — promptEffectTarget already enforces
+        // distinct ids, but defend against future config drift.
+        if (ta.owner === tb.owner && ta.heroIdx === tb.heroIdx) {
+          gs._spellCancelled = true; return;
+        }
+        if (paarMoeglich(engine, ta, tb)) { a = ta; b = tb; }
       }
+      if (!a || !b) { gs._spellCancelled = true; return; }
 
       const aPs = gs.players[a.owner];
       const bPs = gs.players[b.owner];
@@ -223,6 +259,17 @@ module.exports = {
       });
       // Swap state at the visual crossing point.
       await engine._delay(ANIM_MS / 2);
+
+      // ── Step 3b: die Support-Zonen-Abilities (Xal, Xalibur) wandern mit ──
+      // Plan erst JETZT (der Zustand kann sich während der Animation geändert haben); passt es nicht mehr, fizzelt der Tausch.
+      const supPlan = verlagerungsPlan(engine, a, b);
+      if (!supPlan.ok) {
+        engine.log('compulsory_body_swap_fizzle', { player: ps.username, reason: supPlan.grund || 'support_zones' });
+        engine.sync();
+        return;
+      }
+      const supInstsA = SM.supportAbilityStapel(engine, a.owner, a.heroIdx).flatMap(m => m.insts);   // gehen von A nach B
+      const supInstsB = SM.supportAbilityStapel(engine, b.owner, b.heroIdx).flatMap(m => m.insts);   // gehen von B nach A
 
       // ── Step 4: swap abilityZones arrays ──
       // Make sure both sides have the slots initialised so the swap
@@ -266,6 +313,8 @@ module.exports = {
       const bewegt = [
         ...toFlipToB.map(inst => ({ inst, von: a, nach: b })),
         ...toFlipToA.map(inst => ({ inst, von: b, nach: a })),
+        ...supInstsA.map(inst => ({ inst, von: a, nach: b })),   // Toughness / Fighting in einer Support Zone: der Bonus wandert mit
+        ...supInstsB.map(inst => ({ inst, von: b, nach: a })),
       ].filter(m => (m.inst.counters?.hpGranted || 0) > 0 || (m.inst.counters?.atkGranted || 0) > 0);
       const heroAt = (o) => gs.players[o.owner]?.heroes?.[o.heroIdx];
       for (const m of bewegt) {
@@ -291,6 +340,11 @@ module.exports = {
       }
       for (const inst of toFlipToB) repoint(inst, b.owner, b.heroIdx);
       for (const inst of toFlipToA) repoint(inst, a.owner, a.heroIdx);
+      // Die Stapel in den Support Zones: in die Support Zones des anderen Helden (Slot, Instanzen, Seite).
+      const verlagert = SM.fuehreVerlagerungAus(engine, supPlan);
+
+      // Hat ein Held dadurch keine Erlaubnis für Abilities in Support Zones (kein Xal, kein Xalibur), kommen die angekommenen Abilities in die Ablage.
+      await SM.raeumeNachTausch(engine, verlagert, CARD_NAME);
 
       engine.log('compulsory_body_swap', {
         player: ps.username,

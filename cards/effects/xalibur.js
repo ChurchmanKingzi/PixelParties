@@ -30,8 +30,6 @@
 //    loescht sie.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
-
 const CARD_NAME = 'Xalibur';
 
 module.exports = {
@@ -61,6 +59,9 @@ module.exports = {
       const weg = ctx.leavingCard || ctx._onlyCard;
       if (!weg || weg.id !== ctx.card.id) return;        // nur ich selbst
       if (ctx.fromZone !== 'support') return;
+      // Teleport tauscht nur die Plätze der Helden (Xalibur bleibt in seiner Spalte): nicht abräumen — Teleport prüft die Erlaubnis NACH dem Tausch
+      // und schickt die Abilities des Helden, der sie nicht mehr tragen darf, dann selbst in die Ablage.
+      if (ctx._teleportBewegung) return;
 
       const pi = ctx.fromOwner ?? weg.owner;
       const heroIdx = ctx.fromHeroIdx ?? weg.heroIdx;
@@ -71,31 +72,8 @@ module.exports = {
       // IST Xal, oder ein zweites Xalibur liegt an), bleibt alles.
       if (engine.heroAcceptsAbilitiesInSupport(pi, heroIdx, weg.id)) return;
 
-      const cardDB = engine._getCardDB();
-      const zonen = ps.supportZones?.[heroIdx] || [];
-      for (let zi = 0; zi < zonen.length; zi++) {
-        for (const kartenName of [...(zonen[zi] || [])]) {
-          const cd = cardDB[kartenName];
-          if (!cd || !hasCardType(cd, 'Ability')) continue;
-          engine._broadcastEvent('play_pile_transfer', {
-            owner: pi, cardName: kartenName,
-            from: 'support', to: 'discard',
-            fromHeroIdx: heroIdx, fromSlotIdx: zi,
-          });
-          const inst = (engine.cardInstances || []).find(c =>
-            c.zone === 'support' && c.owner === pi
-            && c.heroIdx === heroIdx && c.zoneSlot === zi && c.name === kartenName);
-          if (inst) {
-            await engine.actionMoveCard(inst, 'discard', -1, -1, { sourceName: CARD_NAME });
-          } else {
-            const idx = (zonen[zi] || []).indexOf(kartenName);
-            if (idx >= 0) zonen[zi].splice(idx, 1);
-            ps.discardPile.push(kartenName);
-          }
-        }
-      }
-      // Karten, die der Schlange wegen liegen geblieben sind, gelten nicht mehr als Ability: ihre Wirkung (Fighting-ATK …) geht zurück.
-      await engine.syncSupportAbilities(pi, heroIdx, weg.id);
+      // Der Abwurf liegt in der Engine (`sendeSupportAbilitiesInAblage`) — Teleport und Compulsory Body Swap brauchen ihn ebenfalls.
+      await engine.sendeSupportAbilitiesInAblage(pi, heroIdx, CARD_NAME, { excludeId: weg.id });
       engine.sync();
     },
   },

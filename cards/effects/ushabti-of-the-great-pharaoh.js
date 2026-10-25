@@ -60,6 +60,8 @@ module.exports = {
 
     await engine._triggerGateCheck(heroOwner, 'Ushabti of the Great Pharaoh');
     if (engine._isGateShielded(heroOwner)) return false;
+    // W71b (Al, 25.10.2026): das Verschwinden der Kreatur in die Surprise Zone ist ein Effekt auf sie — Schutzfenster (Cool Rescuer Monia & Co.), NACH dem Tor, VOR der ersten Änderung.
+    if (!(await engine.kreaturBetroffen(inst, 'move', { name: 'Ushabti of the Great Pharaoh', owner: pi }, { sourceOwner: pi, detail: 'entomb' }))) return false;
 
     engine._broadcastEvent('play_zone_animation', {
       type: 'sand_reset', owner: heroOwner, heroIdx, zoneSlot: slotIdx,

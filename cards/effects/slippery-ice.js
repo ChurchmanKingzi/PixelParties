@@ -122,6 +122,8 @@ async function moveCreature(engine, pi, inst, destHeroIdx, destSlot) {
   const srcZone = (ps.supportZones?.[srcHeroIdx] || [])[srcSlot] || [];
   const idxInSlot = srcZone.indexOf(inst.name);
   if (idxInSlot < 0) return false;
+  // W71b (Al, 25.10.2026): Verschieben durch eine Karte ist ein Effekt auf die Kreatur — Schutzfenster (Cool Rescuer Monia & Co.), VOR der ersten Änderung; negiert = Kreatur bleibt stehen.
+  if (!(await engine.kreaturBetroffen(inst, 'move', { name: 'Slippery Ice', owner: pi }, { sourceOwner: pi, detail: 'slide' }))) return false;
 
   // Suppress stray damage-number overlays on the source slot while it's
   // about to visually empty out.
@@ -234,7 +236,7 @@ module.exports = {
         // auto-slide has already locked in this turn's archetype
         // moves), so stamping `_slipperyMovedTurn` here is a no-op —
         // skip it for parity with the existing Slippery Ice mover.
-        moveOpts: { skipSlipperyMovedMark: true },
+        moveOpts: { skipSlipperyMovedMark: true, fremd: true, fremdName: CARD_NAME },   // W71b: Slippery Ice versetzt Kreaturen = Effekt auf sie (Schutzfenster)
         onLiveMove: (inst) => { movedInstIds.add(inst.id); moved++; },
       });
       if (moved === 0) return false;

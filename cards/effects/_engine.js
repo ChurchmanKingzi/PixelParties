@@ -6,6 +6,7 @@
 
 const { v4: uuidv4 } = require('uuid');
 const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS, hasCardType, hasSpellSchool, isArtifactCreature, hasNumericCreatureLevel, POISON_BASE_DAMAGE, BURN_BASE_DAMAGE, baseCardName, BLIND_STATUSES, getCleansableStatuses, kontrollRechteVon, KONTROLL_RECHTE, heroCanBeEquipped } = require('./_hooks');
+const ANGER_BONUS = 100;   // Unreasonable Anger: +100 an einem einzelnen Ziel
 const EMPOWERED_STRIKE_BONUS = 150;   // W49a (Al, 22.10.2026): Elixir of Strength gewaehrt +150 (frueher +100); Kartentext/Tooltip/Skript-Kopf nachgezogen
 // v1443: Hooks, deren Kontext die ausloesende Karte mitbekommt
 // (`ausloeserName`, s. `runHooks`) — fuer Reaktionen, die zeigen, worauf
@@ -2415,6 +2416,11 @@ class GameEngine {
           // W63c: Fremd-Abgangsbuch — jede FREMDE Karte, die die Hand verlaesst, wird gebucht, bis ihr Weg (Stapel, Brett) sie
           // verbraucht. Der Einzelsatz oben wird vom naechsten Splice ueberschrieben (Reaktionen im Kettenfenster); das Buch nicht.
           for (const e of rec) if (e.owner != null && e.owner !== pi) engine._bucheFremdAbgang(pi, e.cardName, e.owner);
+          // 24.10. (Reverse Trap): die Stufe-0-Marke der gestohlenen Handkarte reist mit aufs Brett (`_stempelFremdHerkunft`).
+          for (let i = 0; i < (delCount ?? 0) && start + i < this.length; i++) {
+            const hinst = engine._findHandInstanceAt(pi, start + i);
+            if (hinst?.counters?._rtLevel0) engine._bucheStufeNullAbgang(pi, this[start + i]);
+          }
         }
         if ((delCount ?? 0) > 0) {
           for (const [fieldName, fieldDef] of engine._handIndexedFields) {
@@ -2469,6 +2475,31 @@ class GameEngine {
    * Splice-Abfang der Hand (nur fuer Karten mit Herkunftsmarke `_handOriginals`) und werden verbraucht, sobald die Karte ihren Weg
    * gefunden hat: Stapel (`_consumeHandCardOrigin`, Ablage-Wege) oder Brett (`_stempelFremdHerkunft`). Zugwechsel verwirft Reste.
    */
+  _bucheStufeNullAbgang(pi, cardName) {
+    const ps = this.gs.players?.[pi];
+    if (!ps || !cardName) return;
+    const buch = (ps._stufeNullAbgang = (ps._stufeNullAbgang || []).filter(e => e.turn === this.gs.turn));
+    buch.push({ name: cardName, turn: this.gs.turn });
+    if (buch.length > 12) buch.shift();
+  }
+  _nimmStufeNullAbgang(pi, cardName) {
+    const buch = this.gs.players?.[pi]?._stufeNullAbgang;
+    if (!buch) return false;
+    for (let i = buch.length - 1; i >= 0; i--) {
+      if (buch[i].name === cardName && buch[i].turn === this.gs.turn) { buch.splice(i, 1); if (buch.length === 0) delete this.gs.players[pi]._stufeNullAbgang; return true; }
+    }
+    return false;
+  }
+  /** Brett-Eintritt einer Karte mit Stufe-0-Marke (Reverse Trap): Marke an der Instanz; Creatures tragen die Stufe 0 im Kartenwert. */
+  _stufeNullAufBrett(inst) {
+    if (!inst) return;
+    inst.counters = inst.counters || {};
+    inst.counters._rtLevel0 = true;
+    const basis = this._getCardDB()[inst.name];
+    if (basis && hasCardType(basis, 'Creature') && hasNumericCreatureLevel(basis)) {
+      inst.counters._cardDataOverride = { ...(inst.counters._cardDataOverride || basis), level: 0 };
+    }
+  }
   _bucheFremdAbgang(pi, cardName, owner) {
     const ps = this.gs.players?.[pi];
     if (!ps || !cardName || !Number.isInteger(owner) || owner === pi) return;
@@ -2477,6 +2508,28 @@ class GameEngine {
     const buch = (ps._fremdAbgang = (ps._fremdAbgang || []).filter(e => e.turn === this.gs.turn));
     buch.push({ name: cardName, owner, turn: this.gs.turn });
     if (buch.length > 12) buch.shift();
+  }
+
+  /**
+   * 24.10. (Reverse Trap): „Its level becomes 0 while it remains in your hand or on the board." — die Handinstanz an `handIdx` bekommt die Stufen-Setzung 0 (`counters.levelSet`, wie beim
+   * Inconspicuous Lawn Gnome; gelesen von `heroMeetsLevelReq` und `effectiveCardLevel`) plus die Marke `_rtLevel0`. Hand → Deck / Ablage / Gelöscht / Gegnerhand: die Instanz verschwindet,
+   * die Marke mit ihr. Hand → Brett: die Marke wandert über das Fremd-Abgangsbuch (`_bucheFremdAbgang` → `_stempelFremdHerkunft`) auf die Brettinstanz (Creatures: Stufe 0 im Kartenwert;
+   * verdeckte Surprises: Aktivierung mit Stufe 0). Karten ohne Stufe (Artifact-Surprise …) tragen die Marke folgenlos.
+   */
+  _stufeNullMarkieren(playerIdx, handIdx, cardName) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return null;
+    let inst = this._findHandInstanceAt(playerIdx, handIdx);
+    if (!inst || inst.name !== cardName) {
+      // Die Handinstanz entsteht beim Sync — Platzhalter am Spielerzustand, den `handZugangSync` einliest (Fallback)
+      if (!ps._stufeNullPending) ps._stufeNullPending = [];
+      ps._stufeNullPending.push({ name: cardName, turn: this.gs.turn });
+      return null;
+    }
+    inst.counters = inst.counters || {};
+    inst.counters.levelSet = 0;
+    inst.counters._rtLevel0 = true;
+    return inst;
   }
 
   /** Wie `_nimmFremdAbgang`, ohne den Eintrag zu entfernen. */
@@ -2518,6 +2571,7 @@ class GameEngine {
       let wert = besitzer;
       Object.defineProperty(inst, 'originalOwner', { get: () => wert, set: () => {}, enumerable: true, configurable: true });
       inst._herkunftGestempelt = true;
+      if (this._nimmStufeNullAbgang(pi, inst.name)) this._stufeNullAufBrett(inst);   // 24.10. Reverse Trap
       const waise = this.cardInstances.find(c => c !== inst && c.zone === ZONES.HAND && c.owner === pi && c.name === inst.name
         && c.originalOwner != null && c.originalOwner !== pi);
       if (waise) this._untrackCard(waise.id);
@@ -2536,6 +2590,7 @@ class GameEngine {
       let wert = o;
       Object.defineProperty(inst, 'originalOwner', { get: () => wert, set: () => {}, enumerable: true, configurable: true });
       inst._herkunftGestempelt = true;
+      if (this._findHandInstanceAt(pi, hi)?.counters?._rtLevel0) this._stufeNullAufBrett(inst);   // 24.10. Reverse Trap (die Karte legt sich während ihrer Auflösung selbst aufs Brett)
       return true;
     }
     return false;
@@ -3001,6 +3056,20 @@ class GameEngine {
   }
 
   async runHooks(hookName, hookCtx = {}) {
+    // ★ W71b (Al, 25.10.2026 — Cool Rescuer Monia reagiert auf JEDEN Effekt auf Kreaturen): das Schutzfenster `beforeCreatureAffected` fragt je Kreatur, Effektart und Karte/Effekt in EINER Auflösung
+    // nur EINMAL — auch wenn der Effekt es vorab für alle seine Kreaturen geöffnet hat (`kreaturenVorab`: Iceage und Medusa's Curse treffen erst die Helden, Monia könnte sonst nicht mehr reagieren).
+    // Das Ergebnis (erlaubt / negiert) wird gemerkt und von allen späteren Fenstern derselben Kreatur/Art/Quelle übernommen; die Buchführung endet mit der Auflösung (`endeEffektImmunitaeten`).
+    if (hookName === 'beforeCreatureAffected' && hookCtx && hookCtx.creature && !hookCtx._fensterGemerkt) {
+      hookCtx._fensterGemerkt = true;
+      const _qn = (typeof hookCtx.source === 'string' ? hookCtx.source : (hookCtx.source && (hookCtx.source.cardName || hookCtx.source.name))) || this._effectSourceName() || '';
+      const _sk = `${hookCtx.creature.id}|${hookCtx.effectType || ''}|${_qn}`;
+      const _reg = this.gs._kreaturFenster || (this.gs._kreaturFenster = {});
+      const _alt = _reg[_sk];
+      if (_alt && _alt.turn === this.gs.turn && _alt.phase === this.gs.currentPhase) { if (!_alt.ok) hookCtx.cancelled = true; return; }
+      await this.runHooks(hookName, hookCtx);
+      _reg[_sk] = { ok: !hookCtx.cancelled, turn: this.gs.turn, phase: this.gs.currentPhase };
+      return;
+    }
     // ★ 24.10. (Xal): kommt eine Karte auf den Brett, die Abilities in Support Zonen erlaubt (Xalibur), gelten die dort wegen der Schlange liegen
     // gebliebenen Abilities wieder — NACH den Listenern der Meldung (`syncSupportAbilities`).
     if (hookName === 'onCardEnterZone' && hookCtx && hookCtx.enteringCard && !hookCtx._xalSync
@@ -3840,7 +3909,7 @@ class GameEngine {
       // route benefits to the borrower's controller. Skipped if the
       // script opts out (`disableLizbethMirror: true`). The mirror flag
       // prevents recursion via _isLizbethMirror.
-      if (!hookCtx._isLizbethMirror && card.zone === 'ability' && card.heroIdx >= 0) {
+      if (!hookCtx._isLizbethMirror && (card.zone === 'ability' || this.supportAbilityLebt(card)) && card.heroIdx >= 0) {
         await this._fireLizbethMirrorIfApplicable(card, hookFn, hookName, hookCtx);
       }
 
@@ -8976,6 +9045,7 @@ class GameEngine {
     // W16f (H01-08): Monias Schild („negate any effects that card or effect has") gilt nur für DIESE Auflösung — er endet mit ihr,
     // auch wenn Monia selbst nie wieder am Zug ist (tot/gefroren: ihr `onTurnStart` räumt dann nicht mehr).
     if (this.gs && (this.gs._moniaShieldActive != null || this.gs._moniaAngebote)) { delete this.gs._moniaShieldActive; delete this.gs._moniaShieldSource; delete this.gs._moniaAngebote; }   // W58a: auch die Angebote der Aufloesung
+    if (this.gs && this.gs._kreaturFenster) delete this.gs._kreaturFenster;   // W71b: die Fenster-Buchführung von `kreaturBetroffen` endet mit der Auflösung
     // W16f (H03-10): Monia Bots True-Damage-Stempel gilt für Schaden AUS dem umgeleiteten Effekt — er endet mit dessen Auflösung (macht der Effekt keinen Schaden, verfällt er).
     if (this.gs && this.gs._redirectedTrueDamage) delete this.gs._redirectedTrueDamage;
   }
@@ -9001,6 +9071,61 @@ class GameEngine {
     const schildQuelle = this.gs._moniaShieldSource?.name;
     if (schildQuelle && q && q !== schildQuelle) return false;
     return true;
+  }
+
+  /**
+   * ★ W71b (Al, 25.10.2026 — „Cool Rescuer Monia sollte auf JEDEN Effekt reagieren können, der eine oder mehrere Creatures betreffen würde"):
+   * die EINE zentrale Frage „darf dieser Effekt diese Kreatur betreffen?". Öffnet das Schutzfenster `beforeCreatureAffected` (Cool Rescuer Monia,
+   * Elusive Hind, Warrior of Teocuilatl, Winged Skeleton, Puppets …) für eine Kreatur auf dem Brett und liefert, ob der Effekt wirken darf.
+   *
+   * WER ES RUFT: jedes Kreaturen-Primitiv, das den Zustand einer Kreatur ÄNDERT (Zerstören, Heilen, Status, Verschieben/Bounce, Kontrollwechsel, Buff/Debuff,
+   * Zähler, Level, Max-HP …) — NACH den eigenen Immunitätsprüfungen („unaffected by …" verhindert den Effekt ohnehin, kein Angebot) und VOR der ersten
+   * Zustandsänderung. Schaden läuft über den Stapel-Hook `beforeCreatureDamageBatch` (derselbe Zweck). Kartenskripte, die den Zustand einer FREMDEN Kreatur
+   * direkt schreiben (kein Primitiv dafür), rufen diese Funktion vor dem Schreiben: `if (!(await engine.kreaturBetroffen(inst, 'counter', CARD_NAME, { sourceOwner: pi }))) return;`.
+   *
+   * Was NICHT fragt: Ziel-Wahl ohne Wirkung (Anvisieren), Opfer/Tribut als Kosten (`isSacrifice`), Selbst-Effekte (Quelle == Kreatur; Monias Hook prüft das auch),
+   * natürliches Auslaufen (Status-/Buff-Dauer, Rückgabe gestohlener Kreaturen), das Beschwören selbst, dauerhafte Auren („while equipped").
+   *
+   * @param {CardInstance} inst   Kreatur auf dem Brett
+   * @param {string} art          'destroy' | 'heal' | 'status' | 'move' (Verschieben, Bounce, Tausch) | 'control' (Kontrollwechsel) | 'buff' | 'counter' | 'stats' (HP/Level/ATK) …
+   * @param {string|object} quelle  Name der Karte/des Effekts oder { name, owner, heroIdx }; ohne Angabe gilt der laufende Effekt (`_effectSourceName`)
+   * @param {object} [opts]       { sourceOwner, statusName, isSacrifice, detail } · `detail`: Feinart fürs Protokoll/CPU ('bounce' …)
+   * @returns {Promise<boolean>}  true = der Effekt darf die Kreatur betreffen · false = negiert (der Aufrufer lässt die Kreatur unberührt)
+   */
+  async kreaturBetroffen(inst, art, quelle, opts = {}) {
+    if (!inst || inst.zone !== ZONES.SUPPORT || inst.faceDown) return true;
+    if (opts.isSacrifice) return true;
+    const cd = this.getEffectiveCardData(inst) || this._getCardDB()[inst.name];
+    if (!cd || !hasCardType(cd, 'Creature')) return true;
+    const name = (typeof quelle === 'string' ? quelle : (quelle && (quelle.cardName || quelle.name))) || this._effectSourceName() || '';
+    const owner = typeof opts.sourceOwner === 'number' ? opts.sourceOwner
+      : (quelle && typeof quelle === 'object') ? (quelle.controller ?? quelle.owner)
+      : (this._currentEffectSource?.owner ?? this._activationSource?.owner);
+    const src = (quelle && typeof quelle === 'object') ? quelle : { name, ...(typeof owner === 'number' ? { owner } : {}) };
+    const hookCtx = {
+      creature: inst, effectType: art, source: src, cancelled: false, _skipReactionCheck: true,
+      ...(opts.statusName ? { statusName: opts.statusName } : {}),
+      ...(opts.detail ? { detail: opts.detail } : {}),
+    };
+    // Dieselbe Karte/derselbe Effekt fragt für dieselbe Kreatur und Art in EINER Auflösung nur einmal — das erledigt `runHooks` (Buchführung `gs._kreaturFenster`).
+    await this.runHooks(HOOKS.BEFORE_CREATURE_AFFECTED, hookCtx);
+    const erlaubt = !hookCtx.cancelled;
+    if (!erlaubt) this.log('creature_effect_negated', { creature: inst.name, effect: art, by: name || 'effect' });
+    return erlaubt;
+  }
+
+  /**
+   * ★ W71b: Fenster VORAB für mehrere Kreaturen. Effekte, die erst Helden und dann Kreaturen treffen (Iceage, Medusa's Curse: „all targets"), würden Monia schon durch den Status ihres Helden
+   * ausschalten, bevor die erste Kreatur dran ist. Solche Effekte rufen dies ganz am Anfang für ALLE ihre Kreaturen; die späteren Primitive (`applyCreatureStatus` …) übernehmen das gemerkte
+   * Ergebnis (gleiche Kreatur, Art und Quelle) ohne neue Frage. Liefert die Menge der Kreaturen (Instanz-Ids), die der Effekt treffen darf.
+   */
+  async kreaturenVorab(insts, art, quelle, opts = {}) {
+    const erlaubt = new Set();
+    for (const inst of insts || []) {
+      if (!inst) continue;
+      if (await this.kreaturBetroffen(inst, art, quelle, opts)) erlaubt.add(inst.id);
+    }
+    return erlaubt;
   }
 
   async _actionDealDamageImpl(source, target, amount, type, opts) {
@@ -9599,6 +9724,7 @@ class GameEngine {
     // Flaechenschlaege mit 2+ Zielen in der Klammer feuern nicht, siehe
     // `_applyEmpoweredStrikeIfApplicable`).
     this._applyEmpoweredStrikeIfApplicable(hookCtx);
+    this._applyAngerBonusIfApplicable(hookCtx);   // 24.10. Unreasonable Anger: +100 an einem einzelnen Ziel
 
     // ── Carris, the Time Keeper (v1444, neuer Text Al 26.9.) ─────────
     // „Any damage this Hero would take becomes 0." Die fruehere Klausel
@@ -15228,8 +15354,12 @@ class GameEngine {
     if (fromZone === 'support' && toZone !== ZONES.DISCARD && toZone !== ZONES.DELETED) {
       const cd = this.getEffectiveCardData(cardInstance) || this._getCardDB()[cardInstance.name];   // wirksame Kartendaten: Tokens liegen unter dem Namen einer Potion (Als Sweep 9.10.)
       if (cd && hasCardType(cd, 'Creature')) {
-        const hookCtx = { creature: cardInstance, effectType: 'move', source: null, cancelled: false, _skipReactionCheck: true };
-        await this.runHooks(HOOKS.BEFORE_CREATURE_AFFECTED, hookCtx);
+        // ★ W71b: die Quelle des Verschiebens/Zurücknehmens mitgeben (vorher `null`: Winged Skeleton & Co. sahen keinen Verursacher, Monias Schlüssel kam nur aus der laufenden Aktion).
+        const _mvOwner = typeof opts.sourceOwner === 'number' ? opts.sourceOwner : (this._currentEffectSource?.owner ?? this._activationSource?.owner);
+        const _mvSrc = typeof opts.source === 'string' ? { name: opts.source, ...(typeof _mvOwner === 'number' ? { owner: _mvOwner } : {}) }
+          : (opts.source && typeof opts.source === 'object') ? opts.source : null;
+        const hookCtx = { creature: cardInstance, effectType: 'move', source: _mvSrc, cancelled: false, _skipReactionCheck: true };
+        if (!opts.selbst && !opts.kosten && !opts._skipAffectedWindow) await this.runHooks(HOOKS.BEFORE_CREATURE_AFFECTED, hookCtx);
         if (hookCtx.cancelled) {
           this.log('move_blocked', { card: cardInstance.name, reason: 'creature protection' });
           return;
@@ -16865,6 +16995,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (_rcd && (_rcd.subtype || '') === 'Reaction' && hasCardType(_rcd, 'Creature')) {
         const _rBesitzer = rest.controller ?? playerIdx;
         if (await this._reaktionGespielt(_rBesitzer, cardName, 'Creature')) {
+          if (await this._nimmOffenenRaub(cardName, _rBesitzer)) return { negated: true, inst: null };   // 24.10. Reverse Trap: gestohlen, kein Ablage-Flug
           this._broadcastEvent('play_pile_transfer', {
             owner: _rBesitzer, cardName, from: 'hand', to: 'discard', asPlay: true, fromHandIdx: rest.fromHandIdx,
           });
@@ -17727,6 +17858,18 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
+    // ★ W71b (Al, 25.10.2026): Kontrollwechsel/Versetzen durch eine Karte ist ein „Effekt auf die Kreatur" — Schutzfenster `beforeCreatureAffected` (Cool Rescuer Monia, Elusive Hind,
+    // Winged Skeleton …) wie bei Zerstören/Heilen/Bewegen. NACH allen Verhinderungen (Immunität, Tor, Sperre, Regeln), VOR der ersten Änderung; Dark Gear/Diplomacy zahlen ihre Kosten
+    // vorher (negierter Effekt: Kosten bezahlt, Kreatur bleibt). Eigene Texte (`ignoreGateShield`: Jumper Spider) und Eigen-Platzierungen (`selfInflicted`) fragen nicht.
+    if (!opts.ignoreGateShield && !opts.selfInflicted && !opts._skipAffectedWindow && inst.zone === 'support') {
+      const _qOwner = typeof opts.sourceOwner === 'number' ? opts.sourceOwner : neuerKtrl;
+      const _erlaubt = await this.kreaturBetroffen(inst, 'control', { name: opts.sourceName || this._effectSourceName() || '', owner: _qOwner }, { sourceOwner: _qOwner, detail: 'transfer' });
+      if (!_erlaubt) {
+        this.log('transfer_fizzle', { creature: inst.name, reason: 'creature_protection', from: fromPs.username, to: toPs.username });
+        return { success: false, protectedByWindow: true };
+      }
+    }
+
     const cardName = inst.name;
     const srcHeroIdx = inst.heroIdx;
     const srcSlotIdx = inst.zoneSlot;
@@ -17822,7 +17965,91 @@ this._deathWatch = (this._deathWatchStack || []).length
     });
 
     this.sync();
+    // ★ 24.10. (Explosion Toss): Fenster „eine Kreatur wurde aus einer Zone EINES MEINER Helden in die Zone eines gegnerischen Helden bewegt" — fuer den bisherigen Kontrolleur.
+    if (!opts.skipMovedWindow) {
+      await this._checkCreatureMovedHandReactions(inst, {
+        fromKtrl: fromPlayerIdx, fromSeite, fromHeroIdx: srcHeroIdx, fromSlot: srcSlotIdx,
+        toSeite: toPlayerIdx, toHeroIdx: destHeroIdx, toSlot: destSlotIdx,
+        source: { name: opts.sourceName || null, owner: neuerKtrl, controller: neuerKtrl },
+      });
+    }
     return { success: true };
+  }
+
+  /**
+   * ★ 24.10. — HAND-FENSTER „eine Kreatur wurde aus einer Zone eines meiner Helden in die Zone eines gegnerischen Helden bewegt" (Explosion Toss).
+   *
+   * Karten-Vertrag:
+   *   isCreatureMovedReaction: true,
+   *   creatureMovedCondition(gs, pi, engine, info) → bool,
+   *   async creatureMovedResolve(engine, pi, info, { casterIdx, casterSeite })
+   *   optional: reactionCasterAllowed(gs, pi, heroIdx, engine, info, seite)
+   * `info` = { inst, creatureName, fromKtrl, fromSeite, fromHeroIdx, fromSlot, toSeite, toHeroIdx, toSlot, source, sourceOwner, reactorIdx }.
+   *
+   * Feuert nach jedem echten Zonenwechsel ueber `actionTransferCreature` (Dark Gear, Diplomacy, Capture, Jumper Spider …) und nach dem Weiterreichen der Hot Skull Potato (`engine._checkCreatureMovedHandReactions`
+   * wird dort von Hand gerufen). Angeboten wird nur dem bisherigen KONTROLLEUR (`fromKtrl`). Wirker, Kosten, Flug, Auftritt: `_rxCastPlan`/`_rxCastWirkerWaehlen`/`_rxHandkarteEinsetzen`/`_rxAufgeloest`.
+   */
+  async _checkCreatureMovedHandReactions(inst, raw) {
+    if (this.gs.result || !inst) return;
+    if ((this._creatureMovedWindowDepth || 0) >= 3) return;
+    const pi = raw.fromKtrl;
+    const ps = this.gs.players[pi];
+    if (!ps) return;
+    if (this.darkOceanBlocksReaction(pi, null)) return;
+    if (this.gs.firstTurnProtectedPlayer === pi) return;
+    const allCards = this._getCardDB();
+    const roh = raw.source?.controller ?? raw.source?.owner;
+    const info = { ...raw, inst, creatureName: inst.name, sourceOwner: Number.isInteger(roh) ? roh : this.opponentOf(pi), reactorIdx: pi };
+
+    this._creatureMovedWindowDepth = (this._creatureMovedWindowDepth || 0) + 1;
+    try {
+      const abgelehnt = new Set();
+      for (let runde = 0; runde < 4; runde++) {
+        if (this.gs.result) return;
+        let gespielt = false;
+        for (const cardName of [...new Set(ps.hand || [])]) {
+          if (abgelehnt.has(cardName)) continue;
+          if (this._handPlayLockedFor(ps, cardName)) continue;
+          const script = loadCardEffect(cardName);
+          if (!script?.isCreatureMovedReaction) continue;
+          this._noteRxWindow(ps, cardName, 'seen');
+          if (script.creatureMovedCondition && !script.creatureMovedCondition(this.gs, pi, this, info)) continue;
+          const rxCast = this._rxCastPlan(ps, cardName, script, { fensterInfo: info });
+          if (!rxCast) { this._noteRxWindow(ps, cardName, 'hero'); continue; }
+          const cost = allCards[cardName]?.cost || 0;
+          if (cost > 0 && !this._rxCanAfford(ps, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
+          const confirmed = await this.promptGeneric(pi, {
+            type: 'confirm',
+            title: cardName,
+            _handReactionWindow: true,
+            message: `${inst.name} was moved to your opponent's side! Activate ${cardName}?`,
+            showCard: cardName,
+            showCardLeft: inst.name,
+            confirmLabel: '✨ Activate!',
+            cancelLabel: 'No',
+            cancellable: true,
+          });
+          if (!this._confirmSaidYes(confirmed)) { abgelehnt.add(cardName); continue; }
+          if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { fensterInfo: info }))) { abgelehnt.add(cardName); continue; }
+          if (!(await this._rxHandkarteEinsetzen(pi, cardName, script, rxCast, { sourceOwner: info.sourceOwner }))) { abgelehnt.add(cardName); continue; }
+          this.log('creature_moved_window_reaction', { card: cardName, player: ps.username, target: inst.name });
+          try {
+            if (script.creatureMovedResolve) {
+              await script.creatureMovedResolve(this, pi, info, { casterIdx: rxCast.casterIdx, casterSeite: rxCast.casterSeite ?? pi });
+            }
+          } catch (err) {
+            console.error(`[CreatureMovedWindow] ${cardName} threw:`, err.message);
+          }
+          await this._rxAufgeloest(ps, cardName, rxCast.casterIdx, { heroOwner: rxCast.casterSeite ?? pi });
+          this.sync();
+          gespielt = true;
+          break;
+        }
+        if (!gespielt) break;
+      }
+    } finally {
+      this._creatureMovedWindowDepth = Math.max(0, (this._creatureMovedWindowDepth || 1) - 1);
+    }
   }
 
   /**
@@ -19735,6 +19962,18 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ W71b (Al, 25.10.2026): Status von einer Kreatur ENTFERNEN (Beer, Juice, Cure, Tea, Elixir of Recovery, Divine Zeal, The Melting …) ist ein Effekt auf die Kreatur — Schutzfenster
+   * (`beforeCreatureAffected`, Cool Rescuer Monia & Co.) vor `cleanseCreatureStatuses`. Der Weg für alle Karten, die FREMDE Kreaturen heilen/auftauen; Selbst-Bereinigung einer Kreatur
+   * (Lunatic Golem, Cactus Creature) bleibt beim synchronen `cleanseCreatureStatuses`. Negiert: nichts wird entfernt (`[]`).
+   */
+  async cleanseCreatureStatusesGefragt(inst, statusKeys, source, opts = {}) {
+    if (!inst || !Array.isArray(statusKeys) || statusKeys.length === 0) return [];
+    const hatEtwas = statusKeys.some(k => inst.counters?.[k]);
+    if (hatEtwas && !(await this.kreaturBetroffen(inst, 'status', source, { sourceOwner: opts.sourceOwner, detail: 'cleanse' }))) return [];
+    return this.cleanseCreatureStatuses(inst, statusKeys, typeof source === 'string' ? source : (source?.name || 'effect'));
+  }
+
+  /**
    * Remove multiple statuses from a creature, skipping unhealable ones.
    * Centralized cleanse function — ALL cards that remove creature statuses should use this.
    * @param {object} inst - Card instance
@@ -20321,6 +20560,13 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this._triggerGateCheck(inst.controller ?? inst.owner, opts.source?.name || opts.sourceName || null, _gqS);
       if (this._isGateShielded(inst.controller ?? inst.owner, _gqS)) return false;
     }
+    // ★ W71b (Al, 25.10.2026): Buff/Debuff auf einer Kreatur ist ein „Effekt auf die Kreatur" — Schutzfenster `beforeCreatureAffected` ('buff'); NACH Immunität und Tor, VOR dem Schreiben.
+    // Kein Fenster bei Eigen-Platzierung/Kosten (`opts.selbst` / `opts.kosten`) und wenn der Aufrufer es schon geöffnet hat (`_skipAffectedWindow`).
+    if (!opts.selbst && !opts.kosten && !opts._skipAffectedWindow) {
+      const _bq = opts.source ?? opts.sourceName ?? null;
+      const _ok = await this.kreaturBetroffen(inst, 'buff', _bq, { sourceOwner: typeof opts.sourceOwner === 'number' ? opts.sourceOwner : undefined, detail: buffName });
+      if (!_ok) return false;
+    }
     if (!inst.counters.buffs) inst.counters.buffs = {};
     const buffDef = BUFF_EFFECTS[buffName] || {};
     inst.counters.buffs[buffName] = {
@@ -20370,6 +20616,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       // `_oppEffectImmune` is source-aware; this call site has no source
       // arg, so a lenient default lets own-side cleanses through.
       if (!opts.ignoreGateShield && inst.zone === 'support' && this._isGateShielded(inst.controller ?? inst.owner)) return; // Defending the Gate
+      // ★ W71b: Entfernen eines Buffs durch eine Karte ist ein Effekt auf die Kreatur (Schutzfenster 'buff'); nicht beim natürlichen Auslaufen (`opts.ablauf`) und nicht, wenn der Aufrufer es schon geöffnet hat.
+      if (!opts.ablauf && !opts.selbst && !opts.kosten && !opts._skipAffectedWindow) {
+        const _ok = await this.kreaturBetroffen(inst, 'buff', opts.source ?? opts.sourceName ?? null, { sourceOwner: typeof opts.sourceOwner === 'number' ? opts.sourceOwner : undefined, detail: 'remove:' + buffName });
+        if (!_ok) return;
+      }
     }
     const buffData = inst.counters.buffs[buffName];
     // Clear associated counters on expiry (e.g. dark_gear_negated clears negated)
@@ -20484,7 +20735,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Forward expiresForceClear so buffs that ALSO granted the immunity
         // (e.g. Golden Wings setting _cardinalImmune) can strip themselves
         // cleanly on expiry.
-        await this.actionRemoveCreatureBuff(inst, buffName, { forceClear: !!buffData.expiresForceClear });
+        await this.actionRemoveCreatureBuff(inst, buffName, { forceClear: !!buffData.expiresForceClear, ablauf: true });   // W71b: natürliches Auslaufen = kein Effekt auf die Kreatur
         // Stamp creature-side post-cleanse immunity (mirror of hero
         // `immune` granted at processStatusExpiry's END phase).
         // `cc_immune` blocks the CC creature-statuses (frozen / stunned
@@ -20520,6 +20771,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         const hero = ps.heroes[hi];
         if (!hero?.statuses) continue;
+        // 24.10. Nasty Prank: jeder gesperrte Name läuft für sich ab; ist keiner mehr übrig, fällt der Status ganz weg.
+        if (filterEarly !== true && hero.statuses.pranked?.names) {
+          const namen = hero.statuses.pranked.names;
+          for (const [kn, e] of Object.entries(namen)) {
+            if (!e.permanent && this._ablaufFaellig(e.expiresAtTurn, e.expiresForPlayer, currentTurn, activePlayer)) { delete namen[kn]; expired = true; }
+          }
+          if (Object.keys(namen).length === 0) { await this.removeHeroStatus(pi, hi, 'pranked', { natuerlichesEnde: true, bypassUnhealable: true }); expired = true; }
+        }
         for (const [statusName, statusData] of Object.entries(hero.statuses)) {
           if (!statusData || typeof statusData !== 'object') continue;
           if (!this._ablaufFaellig(statusData.expiresAtTurn, statusData.expiresForPlayer, currentTurn, activePlayer)) continue;
@@ -20643,7 +20902,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ★ W16b (A01-pollution-09): auch eine Negation ist ein „affected by a card or effect" — Schutzfenster `beforeCreatureAffected`
     // (Warrior of Teocuilatl & Co.). Nicht für Eigen-Platzierungen (`selfInflicted`: Kosten der negierenden Karte selbst) und nicht für
     // unverhinderbare Negationen (`unpreventable`); Aufrufer mit eigenem Fenster (Unwanted Audience) setzen `_skipAffectedWindow`.
-    if (!opts._skipAffectedWindow && !opts.selfInflicted && !hart && inst.zone === 'support') {
+    if (!opts._skipAffectedWindow && (!opts.selfInflicted || opts.fensterTrotzdem) && !hart && inst.zone === 'support') {   // W71b: `fensterTrotzdem` — globale Effekte (Anti Magic Zone, Pink Sky) nutzen `selfInflicted` nur, um das Tor zu überspringen; sie betreffen bestehende Kreaturen
       const _fenster = {
         creature: inst, effectType: 'status', statusName: 'negated',
         source: typeof source === 'string' ? { name: source, ...(typeof opts.sourceOwner === 'number' ? { owner: opts.sourceOwner } : {}) } : (source || { name: 'effect' }),
@@ -23269,6 +23528,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // client grays the spell out when no non-silenced hero can
         // cast it, and so a silenced hero stops being highlighted as
         // a drag-drop / selection-menu target for Spells.
+        if ((cd.cardType === 'Spell' || cd.cardType === 'Attack') && this.heroPranked(hero, cd.name)) continue;   // 24.10. Nasty Prank
         if (cd.cardType === 'Spell' && (hero.statuses?.magic_silenced || hero.statuses?.frightened || hero.statuses?.polymorphed)) {   // v879; 24.10. Polymorph
           const s = loadCardEffect(cd.name);
           let ok = false;
@@ -23517,6 +23777,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (cd.cardType === 'Spell' && hero.statuses?.nulled) continue;
           // Magic-Silenced (Anti Magic Zone) blocks Spells.
           if (cd.cardType === 'Spell' && (hero.statuses?.magic_silenced || hero.statuses?.frightened || hero.statuses?.polymorphed)) continue;   // v879; 24.10. Polymorph
+          if ((cd.cardType === 'Spell' || cd.cardType === 'Attack') && this.heroPranked(hero, cd.name)) continue;   // 24.10. Nasty Prank
           // Berserked blocks Spells AND Creature summons, and caps Attacks at 2/turn.
           if ((cd.cardType === 'Spell' || cd.cardType === 'Creature') && hero.statuses?.berserked) continue;
           if (cd.cardType === 'Attack' && hero.statuses?.berserked && (hero._attacksThisTurn || 0) >= 2) continue;
@@ -24114,6 +24375,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // effects, and Artifacts are all still legal — only the Spell
     // card-type is blocked. Same `canPlayDespiteStatuses` opt-out as
     // the Nulled gate above.
+    // 24.10. (Nasty Prank): „cannot perform another Attack/Spell with that name" — namentliche Sperre (Status `pranked`), gilt für Attacks UND Spells, ohne Ausnahme.
+    if ((cardData.cardType === 'Spell' || cardData.cardType === 'Attack') && this.heroPranked(hero, cardData.name)) return null;
     if ((hero.statuses?.magic_silenced || hero.statuses?.frightened || hero.statuses?.polymorphed) && cardData.cardType === 'Spell') {   // v879; 24.10. Polymorph
       const cardScript = loadCardEffect(cardData.name);
       let bypass = false;
@@ -29747,11 +30010,10 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * Temporarily steal an opponent's Creature. Flips `inst.controller`,
-   * leaves `inst.owner` on the original owner's side, optionally flags
-   * `_stealImmortal`. Reverts at turn start.
+   * ★ W71b: die Vorprüfung des zeitweiligen Diebstahls (Immunität, Sperre, Regeln) — vorher der Kopf von `actionStealCreature`. Getrennt, damit der Wirkungs-Weg
+   * `actionStealCreatureGefragt` zwischen Vorprüfung und Zustandsänderung das Schutzfenster öffnen kann. Liefert true, wenn der Diebstahl möglich ist.
    */
-  actionStealCreature(stealerPi, inst, opts = {}) {
+  _stealMoeglich(stealerPi, inst, opts = {}) {
     if (!inst || inst.zone !== 'support') return false;
     if (inst.counters?._heldKreatur) return false;   // ★ HELD ALS KREATUR (Hulijing): nicht stehlbar (Sicherung)
     // Styx 28.9.: bestohlen wird der KONTROLLEUR. Eine ueber einen
@@ -29788,7 +30050,32 @@ this._deathWatch = (this._deathWatchStack || []).length
         return false;
       }
     }
+    return true;
+  }
 
+  /**
+   * ★ W71b (Al, 25.10.2026): Diebstahl MIT Schutzfenster — Vorprüfung, dann `beforeCreatureAffected` ('control'; Cool Rescuer Monia, Elusive Hind, Winged Skeleton …), dann
+   * `actionStealCreature`. Der Weg für alle Karten, die eine Kreatur zeitweilig übernehmen (Cute Conversion, Deepsea Succubus, Molinda, Treacherous Crystal, Lovely Teddy …).
+   * `opts.sourceOwner` = Besitzer des Effekts (Standard: der Dieb). Negiert das Fenster, bleibt die Kreatur wie sie ist (false).
+   */
+  async actionStealCreatureGefragt(stealerPi, inst, opts = {}) {
+    if (!this._stealMoeglich(stealerPi, inst, opts)) return false;
+    if (!opts._skipAffectedWindow && !opts.selfInflicted) {
+      const qOwner = typeof opts.sourceOwner === 'number' ? opts.sourceOwner : stealerPi;
+      const ok = await this.kreaturBetroffen(inst, 'control', { name: opts.sourceName || this._effectSourceName() || '', owner: qOwner }, { sourceOwner: qOwner, detail: 'steal' });
+      if (!ok) { this.log('steal_fizzle', { creature: inst.name, reason: 'creature_protection', by: opts.sourceName || 'Steal' }); return false; }
+    }
+    return this.actionStealCreature(stealerPi, inst, { ...opts, _geprueft: true });
+  }
+
+  /**
+   * Temporarily steal an opponent's Creature. Flips `inst.controller`,
+   * leaves `inst.owner` on the original owner's side, optionally flags
+   * `_stealImmortal`. Reverts at turn start.
+   */
+  actionStealCreature(stealerPi, inst, opts = {}) {
+    if (!opts._geprueft && !this._stealMoeglich(stealerPi, inst, opts)) return false;
+    const originalOwner = inst.controller ?? inst.owner;
     inst.stolenBy = stealerPi;
     inst.stolenFromOwner = originalOwner;
     inst.controller = stealerPi;
@@ -31819,9 +32106,20 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /**
    * Ascension bonus: lets a freshly-Ascended Hero take up to 3 copies
-   * of one ability from the caster's deck directly into its Ability
-   * Zone. Prompts the player between options if more than one is
-   * offered; fizzles silently if none are available.
+   * of an ability from the caster's deck/hand directly into its Ability
+   * Zone; fizzles silently if none are available.
+   *
+   * ★ W71a (Al, 25.10.2026: "Der Ascension-Bonus bei Abilities ist OR, nicht AND"):
+   * `abilityChoices` ist eine Liste von ALTERNATIVEN (ODER) - der Spieler
+   * waehlt EINE ("Choose one"), nur diese wird angelegt.
+   *   ['Fighting', 'Destruction Magic']        -> Fighting ODER Destruction Magic
+   *   ['Fighting']                             -> eine Alternative: kein Menue, nur das "Add X?"-Ja/Nein
+   *   [['Charme', 'Wisdom'], ['Fighting']]     -> (Charme UND Wisdom) ODER Fighting
+   *                                              (ein Eintrag als Liste = ein UND-Paket)
+   * Alternativen ohne verfuegbare Kopie (Deck/Hand) oder ohne freien Platz fallen
+   * weg; bleibt genau eine uebrig, entfaellt das Menue. Die CPU nimmt die
+   * Alternative mit den meisten anlegbaren Kopien (Gleichstand: schon vorhandene
+   * Ability / Schule des Helden, dann die erste).
    */
   async performAscensionBonus(pi, heroIdx, abilityChoices, heroOwner = pi) {
     const gs = this.gs;
@@ -31859,7 +32157,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const FLIGHT_MS = 600;
     const LAND_AT_MS = Math.round(FLIGHT_MS * 0.8);
     const placedInsts = [];
-    const placeOne = async (name, slotIdx, source) => {
+    const placeOne = async (name, ort, source) => {
+      const slotIdx = ort.slot;
       let handInst = null;
       let handIdx = -1;
       if (source === 'deck') {
@@ -31873,6 +32172,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Flug endet.
       this._broadcastEvent('deck_to_ability_animation', {
         owner: pi, heroIdx, slotIdx, cardName: name, count: 1, source,
+        ...(ort.art === 'support' ? { zoneKind: 'support' } : {}),
         ...(heroOwner !== pi ? { destOwner: heroOwner } : {}),
       });
       await this._delay(LAND_AT_MS);
@@ -31889,10 +32189,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (handInst) this._untrackCard(handInst.id);
         ps.hand.splice(handIdx, 1);
       }
-      if (!abZones[slotIdx]) abZones[slotIdx] = [];
-      abZones[slotIdx].push(name);
-      const inst = this._trackCard(name, heroOwner, 'ability', heroIdx, slotIdx);
-      placedInsts.push({ inst, name, slotIdx, source });
+      // 24.10.: echte Ability Zone ODER Support Zone (Xal, Xalibur) — `abilityOrtBelegen` legt Namen und Instanz an.
+      const inst = this.abilityOrtBelegen(heroOwner, heroIdx, name, ort);
+      placedInsts.push({ inst, name, slotIdx, source, ort });
       this.sync();
       await this._delay(FLIGHT_MS - LAND_AT_MS);
       return true;
@@ -31900,17 +32199,67 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // ★★ v1349: Zonenwahl und Obergrenze zentral (`abilityZielZone` —
     // zaehlt verwahrte Kopien mit, Madame Guillotine).
-    const nochPlatz = (name, slotIdx) => this.abilityZielZone(heroOwner, heroIdx, name) === slotIdx;
-    for (const name of abilityChoices) {
-      const slotIdx = this.abilityZielZone(heroOwner, heroIdx, name);
-      if (slotIdx < 0) continue;
+    // 24.10.: `abilityZielOrt` kennt auch die Support Zonen von Xal / Xalibur und erzwingt EINEN Stapel je Ability ueber beide Zonenarten.
+    // Ein GELIEHENER Held auf der Gegenspalte (`heroOwner !== pi`) bekommt wie bei `doPlayAbilityFremd` nur echte Zonen.
+    const zielOrt = (name) => {
+      if (heroOwner === pi) return this.abilityZielOrt(heroOwner, heroIdx, name);
+      const z = this.abilityZielZone(heroOwner, heroIdx, name);
+      return z >= 0 ? { art: 'ability', slot: z } : null;
+    };
+    const nochPlatz = (name, ort) => { const o = zielOrt(name); return !!o && o.art === ort.art && o.slot === ort.slot; };
+    const heroName = hps.heroes?.[heroIdx]?.name || 'this Hero';
+
+    // ── W71a: ODER-Alternativen (siehe Kopfkommentar) ──
+    const alternativen = (Array.isArray(abilityChoices) ? abilityChoices : [abilityChoices])
+      .map(a => (Array.isArray(a) ? a : [a]).filter(n => typeof n === 'string' && n))
+      .filter(a => a.length > 0);
+    /** Wie viele Kopien liessen sich JETZT anlegen (Deck + Hand, Stapel hoechstens Stufe 3)? 0 = Alternative nicht machbar. */
+    const anlegbar = (name) => {
+      if (!zielOrt(name)) return 0;
+      const verfuegbar = ps.mainDeck.filter(n => n === name).length + ps.hand.filter(n => n === name).length;
+      const gelegt = abZones.flat().filter(n => n === name).length;
+      return Math.max(0, Math.min(verfuegbar, 3 - gelegt));
+    };
+    const machbar = alternativen.filter(alt => alt.some(n => anlegbar(n) > 0));
+    if (machbar.length === 0) return;
+
+    let gewaehlt = machbar[0];
+    let wahlIstZusage = false;   // die Wahl im Menue ersetzt das "Add X?"
+    if (machbar.length > 1) {
+      const heroCd = this._getCardDB()[hps.heroes?.[heroIdx]?.name] || {};
+      const cpuWahl = machbar.map((alt, i) => ({
+        i,
+        kopien: alt.reduce((sum, n) => sum + anlegbar(n), 0),
+        vorhanden: alt.reduce((sum, n) => sum + abZones.flat().filter(x => x === n).length, 0),
+        schule: alt.some(n => n === heroCd.spellSchool1 || n === heroCd.spellSchool2) ? 1 : 0,
+      })).sort((a, b) => (b.kopien - a.kopien) || (b.vorhanden - a.vorhanden) || (b.schule - a.schule) || (a.i - b.i))[0].i;
+      const beschreibung = (alt) => `Attach up to 3 copies of ${alt.join(' and ')} from your deck or hand to ${heroName}.`;
+      const wahl = await this.promptGeneric(pi, {
+        type: 'optionPicker', title: 'Ascension Bonus',
+        description: `Choose one: ${machbar.map(alt => alt.join(' + ')).join(' or ')} - ${heroName}.`,
+        options: machbar.map((alt, i) => ({ id: String(i), label: alt.join(' + '), description: beschreibung(alt) })),
+        cancellable: true, cancelLabel: 'No, thanks',
+        _cpuOptionId: String(cpuWahl),
+      });
+      const idx = wahl && !wahl.cancelled ? Number(wahl.optionId ?? wahl.id) : NaN;
+      if (!Number.isInteger(idx) || !machbar[idx]) {
+        this.log('ascension_bonus_declined', { player: ps.username, hero: heroName, ability: machbar.map(alt => alt.join(' + ')).join(' / ') });
+        return;
+      }
+      gewaehlt = machbar[idx];
+      wahlIstZusage = true;
+    }
+
+    for (const name of gewaehlt) {
+      const ort = zielOrt(name);
+      if (!ort) continue;
       if (!ps.mainDeck.includes(name) && !ps.hand.includes(name)) continue;
       // v670 (Al 30.8.): der Bonus ist OPTIONAL — je Ability ein Ja/Nein
       // („Add Resistance to Monia?"). Die CPU bejaht immer
       // (`_cpuAutoConfirm`, cpuGenericChoice), ein Mensch darf ablehnen,
-      // etwa um eine Zone frei zu halten.
-      const heroName = hps.heroes?.[heroIdx]?.name || 'this Hero';
-      const antwort = await this.promptGeneric(pi, {
+      // etwa um eine Zone frei zu halten. W71a: wurde die Alternative im
+      // "Choose one"-Menue gewaehlt, ist DAS die Zusage - keine zweite Frage.
+      const antwort = wahlIstZusage ? { confirmed: true } : await this.promptGeneric(pi, {
         type: 'confirm', title: 'Ascension Bonus',
         message: `Add ${name} to ${heroName}?`,
         confirmLabel: `✨ Add ${name}!`, cancelLabel: 'No, thanks',
@@ -31920,11 +32269,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         this.log('ascension_bonus_declined', { player: ps.username, hero: heroName, ability: name });
         continue;
       }
-      while (nochPlatz(name, slotIdx)) {
-        if (!(await placeOne(name, slotIdx, 'deck'))) break;
+      while (nochPlatz(name, ort)) {
+        if (!(await placeOne(name, ort, 'deck'))) break;
       }
-      while (nochPlatz(name, slotIdx)) {
-        if (!(await placeOne(name, slotIdx, 'hand'))) break;
+      while (nochPlatz(name, ort)) {
+        if (!(await placeOne(name, ort, 'hand'))) break;
       }
     }
 
@@ -31932,6 +32281,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     this.shuffleDeck(pi);
 
+    // Echte Zone wie Support Zone: nur `onPlay` (die Anlege-Boni) — eine Support-Ability wirkt, solange der Held sie aufnimmt (`runHooks` → `supportAbilityLebt`).
     for (const { inst, name, slotIdx } of placedInsts) {
       await this.runHooks('onPlay', {
         _onlyCard: inst, playedCard: inst,
@@ -31946,8 +32296,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Log per (slot, name) — players care about the total per ability,
     // not the deck-vs-hand split.
     const logGroups = new Map();
-    for (const { name, slotIdx } of placedInsts) {
-      const key = `${slotIdx}-${name}`;
+    for (const { name, slotIdx, ort } of placedInsts) {
+      const key = `${ort.art}${slotIdx}-${name}`;
       if (!logGroups.has(key)) logGroups.set(key, { name, count: 0 });
       logGroups.get(key).count++;
     }
@@ -36232,7 +36582,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    *   `{ negateEffect: true }` laesst den Aufrufer die Aktivierung
    *   genauso abbrechen wie eine Negation aus der Kette.
    */
-  async _checkSurpriseOnAbilityActivation(activatorIdx, heroIdx, zoneIdx, abilityName, heroOwner = activatorIdx) {
+  async _checkSurpriseOnAbilityActivation(activatorIdx, heroIdx, zoneIdx, abilityName, heroOwner = activatorIdx, zoneKind = 'ability') {
     if (this._surpriseNestingBlocked()) return null;
     const opponentIdx = this.opponentOf(activatorIdx);
     // Styx 28.9.: `heroOwner` = Brettseite des Helden (uebernommen: Gegenseite);
@@ -36242,7 +36592,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Stufe = Stapelhoehe im Slot, dieselbe Rechnung wie in
       // `getAbilityTargets`. Surprises, die auf die Stufe schauen,
       // muessen sie nicht selbst herleiten.
-      level: (this.gs.players[heroOwner]?.abilityZones?.[heroIdx]?.[zoneIdx] || []).length,
+      level: ((zoneKind === 'support' ? this.gs.players[heroOwner]?.supportZones : this.gs.players[heroOwner]?.abilityZones)?.[heroIdx]?.[zoneIdx] || []).length,
     };
     const activatorName = this.gs.players[activatorIdx]?.username || 'Opponent';
     const heroName = this.gs.players[heroOwner]?.heroes?.[heroIdx]?.name || 'a Hero';
@@ -38147,11 +38497,23 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async _reaktionGespielt(ownerIdx, cardName, cardType, extra = {}) {
     if (this._inMctsSim) return false;
+    this._offenerRaub = null;   // 24.10. (Reverse Trap): ein Rest aus einem früheren Fenster gilt nicht für diese Reaction
     // N5-04: `extra.sourceOwner` = Besitzer der Karte/des Effekts, auf den die Reaction antwortet (Cute Camera: „in reaction to YOUR card or
     // effect"); fehlt er (ältere Fenster), kennt der Zuhörer die Quelle nicht und darf nicht danach filtern.
     const rxHook = { reactionOwner: ownerIdx, reactionCardName: cardName, reactionCardType: cardType || null, _skipReactionCheck: true,
       sourceOwner: Number.isInteger(extra.sourceOwner) && extra.sourceOwner >= 0 ? extra.sourceOwner : undefined };
     await this.runHooks('onReactionPlayed', rxHook);
+    // ★ 24.10. (Reverse Trap): auch eine VERDECKTE Surprise des Gegners darf eine gespielte Reaction (Attack, Spell, Creature) negieren — und sie dabei auf die eigene Hand nehmen.
+    if (!rxHook._reactionNegated && (cardType === 'Attack' || cardType === 'Spell' || cardType === 'Creature')) {
+      const res = await this._scanSurprisesAgainst(ownerIdx, 'surpriseReactionPlayedTrigger',
+        { reactionOwner: ownerIdx, cardName, cardType, sourceOwner: rxHook.sourceOwner },
+        { message: `${this.gs.players[ownerIdx]?.username || 'Your opponent'} played the Reaction ${cardName}.`, showCard: cardName, confirmLabel: '💥 Activate Surprise!' });
+      if (res && res.reactionNegated) {
+        rxHook._reactionNegated = true;
+        rxHook._reactionNegatedBy = res.negatedBy || 'a Surprise';
+        if (Number.isInteger(res.stolenTo)) { rxHook._reactionStolenTo = res.stolenTo; rxHook._stufeNull = !!res.stufeNull; }
+      }
+    }
     if (!rxHook._reactionNegated) return false;
     // Z7b: eine GANZ negierte Reaction verbraucht ihren Einmal-pro-Spiel-Stempel nicht (die Fenster stempeln beim Verlassen der Hand).
     {
@@ -38161,6 +38523,56 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     this.log('reaction_negated', { negator: rxHook._reactionNegatedBy || 'a reaction', negated: cardName, owner: ownerIdx });
     await this._meldeNegation({ negatedOwner: ownerIdx, negatorOwner: undefined, cardName, kind: 'reaction' });
+    if (Number.isInteger(rxHook._reactionStolenTo)) await this._stiehlGespielteReaktion(ownerIdx, cardName, rxHook._reactionStolenTo, !!rxHook._stufeNull);
+    return true;
+  }
+
+  /**
+   * ★ 24.10. (Reverse Trap): eine soeben negierte Hand-Reaction wandert in die HAND des Negierers. Liegt sie schon in der Ablage (alle Hand-Reaktionsfenster legen sie vor `_reaktionGespielt` dorthin),
+   * wird sie von dort geholt; sonst (Reaction-Creature, deren Aufrufer sie erst nach der Negation ablegt) merkt sich `_offenerRaub`, dass `summonCreatureWithHooks` sie statt dessen übergeben soll.
+   */
+  async _stiehlGespielteReaktion(ownerIdx, cardName, dieb, stufeNull) {
+    const ps = this.gs.players[ownerIdx];
+    const diebPs = this.gs.players[dieb];
+    if (!ps || !diebPs) return false;
+    const pilePs = this.handKartenBesitzerPs(ps, cardName) || ps;
+    const besitzer = Math.max(0, this.gs.players.indexOf(pilePs));
+    for (const pile of ['discardPile', 'deletedPile']) {
+      const arr = pilePs[pile];
+      const idx = Array.isArray(arr) ? arr.lastIndexOf(cardName) : -1;
+      if (idx < 0) continue;
+      arr.splice(idx, 1);
+      await this._reaktionInHandLegen(ownerIdx, cardName, dieb, besitzer, stufeNull, pile === 'discardPile' ? 'discard' : 'deleted');
+      return true;
+    }
+    this._offenerRaub = { cardName, ownerIdx, dieb, stufeNull };
+    return false;
+  }
+
+  /** Übergabe in die Hand des Diebes: Flug, Herkunftsmarke (kehrt zum Besitzer zurück), Stufe 0. */
+  async _reaktionInHandLegen(ownerIdx, cardName, dieb, besitzer, stufeNull, von) {
+    const diebPs = this.gs.players[dieb];
+    const zielIdx = diebPs.hand.length;
+    diebPs.hand.push(cardName);
+    this._tagHandCardOrigin(dieb, cardName, besitzer);
+    if (stufeNull) this._stufeNullMarkieren(dieb, zielIdx, cardName);
+    this._broadcastEvent('play_pile_transfer', {
+      cardName, from: von, to: 'hand', fromOwner: ownerIdx, toOwner: dieb, owner: ownerIdx,
+      toHandIdx: zielIdx, finalHandSize: diebPs.hand.length,
+    });
+    this.log('negated_card_stolen', { card: cardName, from: this.gs.players[ownerIdx]?.username, to: diebPs.username });
+    this.sync();
+    await this._delay(650);
+  }
+
+  /** Der Aufrufer einer negierten Reaction-Creature fragt: wurde sie gestohlen? Dann übergibt er sie hier und legt sie NICHT ab. */
+  async _nimmOffenenRaub(cardName, ownerIdx) {
+    const r = this._offenerRaub;
+    if (!r || r.cardName !== cardName || r.ownerIdx !== ownerIdx) return false;
+    this._offenerRaub = null;
+    const ps = this.gs.players[ownerIdx];
+    const pilePs = (ps && this.handKartenBesitzerPs(ps, cardName)) || ps;
+    await this._reaktionInHandLegen(ownerIdx, cardName, r.dieb, Math.max(0, this.gs.players.indexOf(pilePs)), r.stufeNull, 'hand');
     return true;
   }
 
@@ -40598,6 +41010,42 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * Nasty Prank (24.10.): trägt der Held den Status `pranked` mit diesem Kartennamen? (`names` = { [Name]: { expiresAtTurn, expiresForPlayer, permanent } }.)
+   * Die Einträge laufen je Name in `_processBuffExpiry` ab, hier zählt nur die Existenz.
+   */
+  heroPranked(hero, cardName) {
+    const n = hero?.statuses?.pranked?.names;
+    if (!n || !cardName) return false;
+    return Object.prototype.hasOwnProperty.call(n, baseCardName(cardName));
+  }
+
+  /**
+   * Unreasonable Anger rider (24.10.): trägt die Quelle (ein Held) den Buff `unreasonable_anger`, steigt JEDER Schaden, den dieser Held an EINEM einzelnen Ziel verursacht, um 100.
+   * Gleiche Auslegung wie bei Frog Race Boat: direkter Schaden des Helden (Attack, Spell, Effekt) — nicht Statusticks (kein Heldenindex) und nicht der Schaden einer Kreatur in seinen
+   * Zonen (`type === 'creature'` / Quelle in einer Support Zone). Kein Einzelziel (Mehrziel-Klammer mit 2+ Zielen, Batch mit 2+ Einträgen) → kein Bonus. Der Buff bleibt (Frist-Ablauf).
+   * @param {object} hookCtx  { source, target, type, amount, … }
+   * @param {number} [eintraege]  Anzahl der Ziele im Batch (Kreaturenpfad); Heldenpfad: 1
+   */
+  _applyAngerBonusIfApplicable(hookCtx, eintraege = 1) {
+    if (!hookCtx || !(hookCtx.amount > 0)) return;
+    const source = hookCtx.source;
+    if (!source || typeof source !== 'object') return;
+    if (hookCtx.type === 'creature' || source.zone === 'support') return;
+    const srcOwner = source.owner ?? source.controller;
+    const srcHi = source.heroIdx;
+    if (typeof srcOwner !== 'number' || typeof srcHi !== 'number' || srcHi < 0) return;
+    const srcHero = this.gs.players[srcOwner]?.heroes?.[srcHi];
+    if (!srcHero?.buffs?.unreasonable_anger) return;
+    if (this.gs._spellCasterOverride) return;                       // eine Creature wirkt den Zauber, nicht der Held
+    const _mh = this._multiHitScope;
+    if ((_mh?.total || 0) >= 2 && !_mh.ersterTrefferEinzel) return;
+    if (eintraege > 1) return;
+    hookCtx.amount += ANGER_BONUS;
+    if (hookCtx._kBase !== undefined) hookCtx._kBase += ANGER_BONUS;
+    this.log('unreasonable_anger_bonus', { hero: srcHero.name, target: hookCtx.target?.name, bonus: ANGER_BONUS });
+  }
+
+  /**
    * Elixir of Strength rider — runs at BEFORE_DAMAGE for hero damage and
    * mirrored for creature damage entries. If the source is a Hero
    * carrying the `empowered_strike` buff and the damage is an Attack:
@@ -41978,6 +42426,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Dieselbe Ausnahme wie im Hauptweg: eine Karte darf sich per
     // `canPlayDespiteStatuses` ausdruecklich davon ausnehmen.
     // W16g (R01-11): auch `nulled` (Null Zone) und `berserked` (Berserk) sperren Spells wie in `validateActionPlay`.
+    if ((cardData.cardType === 'Spell' || cardData.cardType === 'Attack') && this.heroPranked(hero, cardName)) return false;   // 24.10. Nasty Prank: auch Reaktionen/Surprises gleichen Namens
     if (cardData.cardType === 'Spell'
         && (hero.statuses?.magic_silenced || hero.statuses?.frightened || hero.statuses?.nulled || hero.statuses?.berserked || hero.statuses?.polymorphed)) {
       const script = loadCardEffect(cardName);
@@ -41993,7 +42442,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // bypassLevelReq, etc.).
     // ★ W20c: ein übernommener Held (`reaktor` ≠ Brettseite) wirkt mit SEINEN Schulen/Stufen, aber die Hand/Rabatte des Kontrolleurs gelten (W16a Frage 6).
     const _lvQuelle = reaktor !== playerIdx ? { levelSourcePi: reaktor } : undefined;
-    if (!this.heroMeetsLevelReq(playerIdx, heroIdx, cardData, _lvQuelle)) return false;
+    // 24.10. (Reverse Trap): eine verdeckt gelegte Surprise mit Stufe-0-Marke („its level becomes 0 … on the board") braucht keine Stufe.
+    const _stufeNullBrett = !opts.spellInHand && this.cardInstances.some(c => c.name === cardName && c.zone === ZONES.SURPRISE && c.heroIdx === heroIdx && this.physicalSide(c) === playerIdx && c.counters?._rtLevel0);
+    if (!_stufeNullBrett && !this.heroMeetsLevelReq(playerIdx, heroIdx, cardData, _lvQuelle)) return false;
 
     // ★★ v1154 („Santa Klaus", Als Befund 17.9.): dieselben Helden-
     // Sperren wie im normalen Spielweg (`validateActionPlay`) — das
@@ -42486,6 +42937,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (_surpriseKette?.negated) {
         surpriseHookCtx._surpriseNegated = true;
         surpriseHookCtx._surpriseNegatedBy = 'a chain reaction';
+        // 24.10. (Reverse Trap: „Negate it and add it to your hand"): die negierte Surprise wandert in die Hand des Negierers statt in die Ablage.
+        if (Number.isInteger(_surpriseKette.negatedToHandOf)) { surpriseHookCtx._surpriseStolenTo = _surpriseKette.negatedToHandOf; surpriseHookCtx._surpriseStolenStufeNull = !!_surpriseKette.negatedStufeNull; }
       }
     }
     await this.runHooks('onSurpriseActivated', surpriseHookCtx);
@@ -42853,7 +43306,19 @@ this._deathWatch = (this._deathWatchStack || []).length
       // flight (see Creature branch above).
       // Als Vorgabe 29.9.: Ablage beim KARTENBESITZER (`originalOwner`).
       const _ablage = (isSeat(this, inst?.originalOwner)) ? inst.originalOwner : playerIdx;
-      if (_surpriseBuddy.token) {
+      if (surpriseNegated && Number.isInteger(surpriseHookCtx._surpriseStolenTo) && this.gs.players[surpriseHookCtx._surpriseStolenTo] && !fromDeck) {
+        // 24.10. (Reverse Trap): die negierte Surprise fliegt aus ihrer Zone in die HAND des Negierers (mit Herkunftsmarke; Stufe 0 wie beim Reverse Trap).
+        const dieb = surpriseHookCtx._surpriseStolenTo, diebPs = this.gs.players[dieb];
+        const zielIdx = diebPs.hand.length;
+        this._broadcastEvent('play_pile_transfer', {
+          cardName, from: 'surprise', to: 'hand', fromOwner: playerIdx, toOwner: dieb, fromHeroIdx: hostHeroIdx,
+          toHandIdx: zielIdx, finalHandSize: zielIdx + 1,
+        });
+        diebPs.hand.push(cardName);
+        this._tagHandCardOrigin(dieb, cardName, _ablage);
+        if (surpriseHookCtx._surpriseStolenStufeNull) this._stufeNullMarkieren(dieb, zielIdx, cardName);
+        this.log('negated_card_stolen', { card: cardName, from: ps.username, to: diebPs.username });
+      } else if (_surpriseBuddy.token) {
         // W67a: Inyas Fantasy Buddy ersetzt die Ablage — weder Flug noch Ablageeintrag, nur die Surprise-Instanz räumt ab (der Token ist eine eigene Instanz).
       } else {
         if (!fromDeck) {
@@ -43008,6 +43473,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // discard — server play paths route via routeNegatedInitialCard.
           negatedToDeleted: !!initialLink._negatedToDeleted,
           negatedToHandOf: Number.isInteger(initialLink._negatedToHandOf) ? initialLink._negatedToHandOf : null,
+          negatedStufeNull: !!initialLink._negatedStufeNull,                // 24.10. Reverse Trap
           negatedToDeck: !!initialLink._negatedToDeck,                    // v1017
           negatedKeepInHand: !!initialLink._negatedKeepInHand,            // W5b-Z1b: No Retreat! auf die Priest-Zusatzbeschwörung
         };
@@ -44292,6 +44758,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           const zielIdx = diebPs.hand.length;
           diebPs.hand.push(link.cardName);
           this._tagHandCardOrigin(dieb, link.cardName, link.owner);   // kehrt spaeter zum Besitzer zurueck
+          if (link._negatedStufeNull) this._stufeNullMarkieren(dieb, zielIdx, link.cardName);
           if ((link.goldCost || 0) > 0 && oppPs) {
             oppPs.gold = (oppPs.gold || 0) + link.goldCost;
             this.log('gold_refund', { player: oppPs.username, amount: link.goldCost, reason: 'stolen reaction' });
@@ -44541,6 +45008,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // routeNegatedInitialCard; fuer Reaktions-Links in
       // _resolveReactionChain.
       if (Number.isInteger(opts.stealToHandOf)) chain[linkIndex]._negatedToHandOf = opts.stealToHandOf;
+      if (opts.stufeNull) chain[linkIndex]._negatedStufeNull = true;   // 24.10. Reverse Trap: die gestohlene Karte hat Stufe 0
       // ★ v1017 („Off Duty"): die negierte Karte wandert INS DECK und
       // wird gemischt, statt auf einen Stapel zu gehen. Fuer die
       // Initialkarte ueber `chainResult.negatedToDeck` →
@@ -44595,6 +45063,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     for (let i = 0; i < this.playerCount(); i++) {
       if (i === steuerer) continue;
       if ((this.gs.players[i]?.hand || []).some(traegt)) return true;
+      // 24.10. (Reverse Trap): auch eine VERDECKTE Surprise des Gegners kann auf die Aktivierung antworten (`isSurprise` + `isReaction`, wie Lunar Eclipse im Kettenfenster).
+      try { if (this._getAllSurpriseEntries(i).some(e => traegt(e.cardName))) return true; } catch { /* ignore */ }
     }
     return false;
   }
@@ -44750,6 +45220,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const zielIdx = diebPs.hand.length;
       diebPs.hand.push(cardName);
       this._tagHandCardOrigin(dieb, cardName, ownerIdx);   // kehrt spaeter zum Besitzer zurueck
+      if (chainResult?.negatedStufeNull) this._stufeNullMarkieren(dieb, zielIdx, cardName);   // 24.10. Reverse Trap
       this._broadcastEvent('play_pile_transfer', {
         cardName, from: 'hand', to: 'hand',
         fromOwner: ownerIdx, toOwner: dieb,
@@ -46828,6 +47299,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this.kreaturGegnerEffektImmun(inst, opts.source, opts)) return false;   // W17b: Golden Wings – nur gegnerische Quelle; ohne Quelle geschützt
     const ownerIdx = inst.owner;
     if (!this.gs.players[ownerIdx]) return false;
+    // W71b (Al, 25.10.2026): wird eine Kreatur als EFFEKT in die Ablage geschickt (Breakthrough auf eine offene Surprise-Kreatur), fragt das Schutzfenster (Cool Rescuer Monia & Co.);
+    // die Kosten-Wege (Barrier of Faith, Weapon Storm …: eigene Karten abwerfen) setzen `fenster` nicht.
+    if (opts.fenster && zone === ZONES.SUPPORT && !(await this.kreaturBetroffen(inst, 'destroy', opts.source ?? opts.sourceName ?? null, { sourceOwner: opts.sourceOwner, detail: 'discard' }))) return false;
     // W73d (Leafagami Snake): die Ability bleibt liegen, der Kontrolleur zieht — der Abwurf gilt für den Aufrufer (Kosten!) trotzdem als erfolgt.
     if (await this.abilityEntfernungVerhindert(inst, ZONES.DISCARD, opts)) return true;
     if (zone === ZONES.SUPPORT) {
@@ -47417,8 +47891,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         // the charmed Hero.
         if (!this.canHeroPerformAction(playerIdx, hi)) continue;
 
-        for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
-          const slot = (ops.abilityZones[hi] || [])[zi] || [];
+        for (const _e of this._aktivierungsStapel(oi, hi)) {
+          const zi = _e.zi, slot = _e.slot;
           if (slot.length === 0) continue;
           const abilityName = slot[0];
           const script = loadCardEffect(abilityName);
@@ -47435,7 +47909,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
           if (script.canActivateAction && !script.canActivateAction(this.gs, playerIdx, hi, slot.length, this)) continue;
 
-          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, charmedOwner: oi });
+          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, charmedOwner: oi, ...(_e.zoneKind === 'support' ? { zoneKind: 'support' } : {}) });
         }
       }
     }
@@ -47457,8 +47931,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (this.areActionsBlocked(playerIdx)) continue;
         if (this.isHeroSkillLocked(oi, hi)) continue;
 
-        for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
-          const slot = (ops.abilityZones[hi] || [])[zi] || [];
+        for (const _e of this._aktivierungsStapel(oi, hi)) {
+          const zi = _e.zi, slot = _e.slot;
           if (slot.length === 0) continue;
           const abilityName = slot[0];
           const script = loadCardEffect(abilityName);
@@ -47474,7 +47948,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
           if (script.canActivateAction && !script.canActivateAction(this.gs, playerIdx, hi, slot.length, this)) continue;
 
-          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, charmedOwner: oi });
+          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, charmedOwner: oi, ...(_e.zoneKind === 'support' ? { zoneKind: 'support' } : {}) });
         }
       }
     }
@@ -47509,8 +47983,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
         if (!borrowed) continue;
 
-        for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
-          const slot = (ops.abilityZones[hi] || [])[zi] || [];
+        for (const _e of this._aktivierungsStapel(oi, hi)) {
+          const zi = _e.zi, slot = _e.slot;
           if (slot.length === 0) continue;
           const abilityName = slot[0];
           const script = loadCardEffect(abilityName);
@@ -47526,12 +48000,23 @@ this._deathWatch = (this._deathWatchStack || []).length
 
           if (script.canActivateAction && !script.canActivateAction(this.gs, playerIdx, hi, slot.length, this)) continue;
 
-          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, borrowedFromOwner: oi });
+          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, borrowedFromOwner: oi, ...(_e.zoneKind === 'support' ? { zoneKind: 'support' } : {}) });
         }
       }
     }
 
     return result;
+  }
+
+  /**
+   * 24.10.: die Ability-Stapel eines Helden (Brettseite `seite`) fuer die Aktivierungslisten FREMDER Helden (Charme Lv3, Kontrolle, Lizbeth/Smugbeth):
+   * echte Ability Zonen IMMER, Support-Stapel nur, wenn der Held Abilities in Support Zonen nimmt (Xal, Xalibur). `[{ slot: Namen, zi: Slotindex, zoneKind }]`.
+   */
+  _aktivierungsStapel(seite, heroIdx) {
+    const ps = this.gs.players[seite];
+    const out = ((ps?.abilityZones?.[heroIdx]) || []).map((slot, zi) => ({ slot: slot || [], zi, zoneKind: 'ability' }));
+    for (const e of this.abilityStapelListe(seite, heroIdx)) if (e.art === 'support') out.push({ slot: e.namen, zi: e.slot, zoneKind: 'support' });
+    return out;
   }
 
   /** Cheap pre-check used by `getActivatableAbilities`: does `playerIdx`
@@ -49050,8 +49535,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Check script's canFreeActivate condition
         if (canActivate && script.canFreeActivate) {
           try {
+            // 24.10.: Abilities in Support Zonen (Xal, Xalibur) sind Instanzen mit zone 'support'.
             const inst = this.cardInstances.find(c =>
-              c.owner === playerIdx && c.zone === 'ability' && c.heroIdx === hi && c.zoneSlot === zi
+              c.owner === playerIdx && c.zone === (_eintrag.zoneKind === 'support' ? 'support' : 'ability') && c.heroIdx === hi && c.zoneSlot === zi
             );
             if (inst) {
               const ctx = this._createContext(inst, { event: 'canFreeActivateCheck' });
@@ -49080,8 +49566,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         if ((hero.statuses?.stunned || hero.statuses?.webbed)) continue;
         if (hero.statuses?.frozen && !chillyDogFreeAbilLift) continue;
 
-        for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
-          const slot = (ops.abilityZones[hi] || [])[zi] || [];
+        for (const _e of this._aktivierungsStapel(oi, hi)) {
+          const zi = _e.zi, slot = _e.slot;
           if (slot.length === 0) continue;
           const abilityName = slot[0];
           const script = loadCardEffect(abilityName);
@@ -49100,7 +49586,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (canActivate && script.canFreeActivate) {
             try {
               const inst = this.cardInstances.find(c =>
-                c.owner === oi && c.zone === 'ability' && c.heroIdx === hi && c.zoneSlot === zi
+                c.owner === oi && c.zone === (_e.zoneKind === 'support' ? 'support' : 'ability') && c.heroIdx === hi && c.zoneSlot === zi
               );
               if (inst) {
                 const ctx = this._createContext(inst, { event: 'canFreeActivateCheck' });
@@ -49109,7 +49595,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             } catch { canActivate = false; }
           }
 
-          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, canActivate, exhausted, charmedOwner: oi });
+          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, canActivate, exhausted, charmedOwner: oi, ...(_e.zoneKind === 'support' ? { zoneKind: 'support' } : {}) });
         }
       }
     }
@@ -49124,8 +49610,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         if ((hero.statuses?.stunned || hero.statuses?.webbed)) continue;
         if (hero.statuses?.frozen && !chillyDogFreeAbilLift) continue;
 
-        for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
-          const slot = (ops.abilityZones[hi] || [])[zi] || [];
+        for (const _e of this._aktivierungsStapel(oi, hi)) {
+          const zi = _e.zi, slot = _e.slot;
           if (slot.length === 0) continue;
           const abilityName = slot[0];
           const script = loadCardEffect(abilityName);
@@ -49144,7 +49630,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (canActivate && script.canFreeActivate) {
             try {
               const inst = this.cardInstances.find(c =>
-                c.owner === oi && c.zone === 'ability' && c.heroIdx === hi && c.zoneSlot === zi
+                c.owner === oi && c.zone === (_e.zoneKind === 'support' ? 'support' : 'ability') && c.heroIdx === hi && c.zoneSlot === zi
               );
               if (inst) {
                 const ctx = this._createContext(inst, { event: 'canFreeActivateCheck' });
@@ -49153,7 +49639,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             } catch { canActivate = false; }
           }
 
-          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, canActivate, exhausted, charmedOwner: oi });
+          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, canActivate, exhausted, charmedOwner: oi, ...(_e.zoneKind === 'support' ? { zoneKind: 'support' } : {}) });
         }
       }
     }
@@ -49184,8 +49670,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
         if (!borrowed) continue;
 
-        for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
-          const slot = (ops.abilityZones[hi] || [])[zi] || [];
+        for (const _e of this._aktivierungsStapel(oi, hi)) {
+          const zi = _e.zi, slot = _e.slot;
           if (slot.length === 0) continue;
           const abilityName = slot[0];
           const script = loadCardEffect(abilityName);
@@ -49222,7 +49708,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (canActivate && script.canFreeActivate) {
             try {
               const inst = this.cardInstances.find(c =>
-                c.owner === oi && c.zone === 'ability' && c.heroIdx === hi && c.zoneSlot === zi
+                c.owner === oi && c.zone === (_e.zoneKind === 'support' ? 'support' : 'ability') && c.heroIdx === hi && c.zoneSlot === zi
               );
               if (inst) {
                 // Build ctx with borrower-side cardOwner so per-hero
@@ -49240,6 +49726,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length,
             canActivate, exhausted, handLockBlocked,
             borrowedFromOwner: oi,
+            ...(_e.zoneKind === 'support' ? { zoneKind: 'support' } : {}),
           });
         }
       }
@@ -49326,9 +49813,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (opts.skipAbilityGivenCheck && !opts.resistanzGeprueft
         && await this.abilityAnlegenDurchResistanceBlockiert(playerIdx, feld, heroIdx, opts.source)) return { success: false, blocked: true };
 
-    const abZones = hps.abilityZones[heroIdx] || [[], [], []];
-    hps.abilityZones[heroIdx] = abZones;
-
     const script = loadCardEffect(cardName);
     // Restricted attachment — same gate as canAttachAbilityToHero.
     // Specific cards that legitimately install Divinity (etc.) pass
@@ -49336,11 +49820,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (script?.restrictedAttachment && !opts.allowRestricted) return { success: false };
     // ★★ v1349: Zonenwahl an EINER Stelle (verwahrte Abilities, Madame
     // Guillotine) — vorher eine eigene Kopie der Schleife.
-    const targetZone = this.abilityZielZone(feld, heroIdx, cardName, {
+    // 24.10.: echte Ability Zone ODER Support Zone (Xal, Xalibur) — hoechstens EIN Stapel je Ability ueber beide Zonenarten.
+    const ort = this.abilityZielOrt(feld, heroIdx, cardName, {
       wunschZone: opts.targetZoneSlot,
+      wunschSupport: opts.targetSupportSlot,
+      wunschArt: opts.targetZoneArt,
     });
 
-    if (targetZone < 0) return { success: false };
+    if (!ort) return { success: false };
 
     // Defensive: re-verify card is still in hand at expected position
     const verifyIdx = ps.hand.indexOf(cardName);
@@ -49359,7 +49846,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!this._fastMode && !opts.keinFlug) {
       this._broadcastEvent('hand_to_board_fly', {
         ownerIdx: playerIdx, cardName, handIndex: verifyIdx,
-        zoneType: 'ability', heroIdx, slotIdx: targetZone,
+        zoneType: ort.art === 'support' ? 'support' : 'ability', heroIdx, slotIdx: ort.slot,
         ...(fremd ? { destOwner: feld } : {}),
         _forceOwnerAnim: true,
       });
@@ -49372,8 +49859,6 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // Execute: remove from hand, add to zone
     ps.hand.splice(verifyIdx, 1);
-    if (!abZones[targetZone]) abZones[targetZone] = [];
-    abZones[targetZone].push(cardName);
 
     // Consume abilityGivenThisTurn unless opted out (v1356: zentral,
     // mit Bonus-Plaetzen von Divine Gift of Skill wie im Server-Handweg)
@@ -49381,8 +49866,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.verbraucheAbilityAnlegen(playerIdx, heroIdx);
     }
 
-    // Track card instance
-    const inst = this._trackCard(cardName, feld, 'ability', heroIdx, targetZone);
+    // Name in den Stapel + Instanz tracken
+    const inst = this.abilityOrtBelegen(feld, heroIdx, cardName, ort);
     if (fremd) {
       inst.originalOwner = kartenBesitzer ?? playerIdx;
       if (inst.originalOwner !== playerIdx && typeof this._consumeHandCardOrigin === 'function') {
@@ -49391,8 +49876,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     // Fire hooks
-    await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'ability', heroIdx, _skipReactionCheck: true });
-    await this.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'ability', toHeroIdx: heroIdx, _skipReactionCheck: true });
+    await this.abilityOrtHooks(inst, ort, { _skipReactionCheck: true });
 
     this.sync();
     // Log-Ereignis -> Client-Sound ('placement'). Der Hand-Play-Pfad in
@@ -49404,7 +49888,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     this.log('ability_attached', {
       player: ps.username, card: cardName, hero: hero.name,
     });
-    return { success: true, zoneSlot: targetZone, inst };
+    return { success: true, zoneSlot: ort.slot, zoneKind: ort.art, inst };
   }
 
   // ──────────────────────────────────────────────────────────────────
@@ -49485,6 +49969,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this.kontrollRechte(seite, heroIdx).zauber === false) return false;
     const st = hero.statuses || {};
     if (st.nulled || st.magic_silenced || st.frightened || st.berserked || st.polymorphed) return false;
+    if (opts.name && this.heroPranked(hero, opts.name)) return false;   // 24.10. Nasty Prank
     if (this._isHeroBlinded(seite, heroIdx)) return false;
     const p = Number.isInteger(pi) ? pi : seite;
     const ps = this.gs.players[p];
@@ -49881,6 +50366,48 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
   }
 
+  /**
+   * Alle ABILITIES in den Support Zonen dieses Helden in die Ablage schicken (Xalibur geht, Teleport / Compulsory Body Swap bringen einen Helden um
+   * seine Erlaubnis). Laeuft ueber `actionMoveCard` — die Leafagami Snake schuetzt auch hier (die Karte bleibt liegen, der Kontrolleur zieht).
+   * `opts.nurSlots`: nur diese Support-Slots (Set/Array von Slot-Indizes); `opts.excludeId`: die abgehende Erlaubnis-Quelle zaehlt nicht mehr mit.
+   * Danach gleicht `syncSupportAbilities` die uebrig gebliebenen (geschuetzten) Karten ab: ohne Erlaubnis schlafen sie.
+   */
+  async sendeSupportAbilitiesInAblage(seite, heroIdx, sourceName, opts = {}) {
+    const ps = this.gs.players[seite];
+    if (!ps) return;
+    const nur = opts.nurSlots ? new Set(opts.nurSlots) : null;
+    const cardDB = this._getCardDB();
+    const zonen = ps.supportZones?.[heroIdx] || [];
+    // Hat der Held die Erlaubnis SCHON verloren (Teleport / Compulsory Body Swap: die Abilities sind gerade erst bei ihm angekommen), feuert der Abgang der
+    // Karten keine Hooks mehr (`supportAbilityLebt` ist falsch) — ihre Wirkung (Fighting-ATK, Toughness-HP …) bliebe am Helden. Deshalb zuerst abgleichen:
+    // `syncSupportAbilities` nimmt die Wirkung zurück. (Beim Abgang von Xalibur zählt die Quelle noch mit: dort feuern die Hooks selbst, kein Vorab-Abgleich.)
+    if (!this.heroAcceptsAbilitiesInSupport(seite, heroIdx)) await this.syncSupportAbilities(seite, heroIdx, opts.excludeId ?? null);
+    for (let zi = 0; zi < zonen.length; zi++) {
+      if (nur && !nur.has(zi)) continue;
+      for (const kartenName of [...(zonen[zi] || [])]) {
+        const cd = cardDB[kartenName];
+        if (!cd || !hasCardType(cd, 'Ability')) continue;
+        this._broadcastEvent('play_pile_transfer', {
+          owner: seite, cardName: kartenName,
+          from: 'support', to: 'discard',
+          fromHeroIdx: heroIdx, fromSlotIdx: zi,
+        });
+        const inst = (this.cardInstances || []).find(c =>
+          c.zone === 'support' && c.owner === seite
+          && c.heroIdx === heroIdx && c.zoneSlot === zi && c.name === kartenName);
+        if (inst) {
+          await this.actionMoveCard(inst, 'discard', -1, -1, { sourceName });
+        } else {
+          const idx = (zonen[zi] || []).indexOf(kartenName);
+          if (idx >= 0) zonen[zi].splice(idx, 1);
+          ps.discardPile.push(kartenName);
+        }
+      }
+    }
+    await this.syncSupportAbilities(seite, heroIdx, opts.excludeId ?? null);
+    this.sync();
+  }
+
   _getCandidateAbilityZoneSets(playerIdx, heroIdx, trotzNegierung = false) {
     const ps = this.gs.players[playerIdx];
     // S1 (C05-10): Abilities negiert (Stowaway) — weder eigene noch geliehene noch Geraete-Zonen zaehlen.
@@ -49897,7 +50424,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const sets = [own];
     const sources = this._getAbilityBorrowSources(playerIdx, heroIdx, 'passive');
     for (const src of sources) {
-      const oppZones = this.gs.players[src.playerIdx]?.abilityZones?.[src.heroIdx] || [];
+      // 24.10.: auch die Stapel in den Support Zonen des Gegners (Xal, Xalibur) werden geliehen — „as if they were Ability Zones".
+      const oppZones = [
+        ...(this.gs.players[src.playerIdx]?.abilityZones?.[src.heroIdx] || []),
+        ...this.heroSupportAbilityStacks(src.playerIdx, src.heroIdx),
+      ];
       const filteredOpp = oppZones.filter(slot => {
         if (!slot || slot.length === 0) return false;
         const script = loadCardEffect(slot[0]);
@@ -49962,7 +50493,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * shares with the activator's own copies of the ability because it's
    * keyed on `(abilityName, activatingPi)`, not on the source slot.
    */
-  _getAbilityBorrowerForOppSlot(activatingPi, sourcePi, sourceHeroIdx, sourceZoneIdx) {
+  _getAbilityBorrowerForOppSlot(activatingPi, sourcePi, sourceHeroIdx, sourceZoneIdx, sourceZoneKind = 'ability') {
     if (sourcePi === activatingPi) return null; // not a borrow
     // Styx 28.9.: Leiher = Helden, die der Aktivierende kontrolliert;
     // `borrowerOwner` = deren Brettseite (geliehene Lizbeth → Gegenseite).
@@ -49973,7 +50504,10 @@ this._deathWatch = (this._deathWatchStack || []).length
           // Confirm the slot itself exists and is non-empty — the
           // activation path will fail anyway, but bailing here gives
           // a cleaner false return to the click handler.
-          const opSlot = this.gs.players[sourcePi]?.abilityZones?.[sourceHeroIdx]?.[sourceZoneIdx];
+          // 24.10.: die geliehene Ability kann in einer SUPPORT Zone des Gegners liegen (Xal, Xalibur) — dann muss sie dort wirklich als Ability liegen und lebendig sein.
+          const opSlot = sourceZoneKind === 'support'
+            ? this._aktivierungsStapel(sourcePi, sourceHeroIdx).find(e => e.zoneKind === 'support' && e.zi === sourceZoneIdx)?.slot
+            : this.gs.players[sourcePi]?.abilityZones?.[sourceHeroIdx]?.[sourceZoneIdx];
           if (opSlot && opSlot.length > 0) return { borrowerHeroIdx: hi, borrowerOwner: physOwner };
         }
       }
@@ -51544,9 +52078,160 @@ this._deathWatch = (this._deathWatchStack || []).length
     // directly and bypass this check entirely.
     if (script?.restrictedAttachment && !opts.allowRestricted) return false;
 
-    // ★★ v1349: EINE Stelle fuer die Zonenwahl (siehe `abilityZielZone`).
+    // ★★ v1349: EINE Stelle fuer die Zonenwahl (siehe `abilityZielZone`); 24.10.: auch Support Zonen (`abilityZielOrt`).
     void abZones;
-    return this.abilityZielZone(hs, heroIdx, cardName) >= 0;
+    return this.abilityZielOrt(hs, heroIdx, cardName) != null;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  ★ ZIELORT EINER NEUEN ABILITY-KOPIE: echte Ability Zone ODER Support Zone (24.10.2026)
+  //
+  //  Bei Xal / Xalibur / gewonnenem Xal-Effekt sind Support Zonen vollwertige Ability Zonen. Die Regeln, ueber BEIDE Zonenarten:
+  //    · Hoechstens EIN Stapel je Ability und Held — nicht Fighting in einer Ability Zone und noch einmal in einer Support Zone.
+  //    · Existiert der Stapel schon, gehoert die Kopie dorthin (Stufe < 3, Verwahrung beachtet).
+  //    · Sonst eine freie echte Zone, danach eine freie Support Zone (oder die gewuenschte Art zuerst).
+  //    · `customPlacement` (Performance): auf einen belegten Stapel (< 3) einer der beiden Zonenarten.
+  //  EINE Stelle fuer Hand-Weg, `attachAbilityFromHand`, Training, Alex, Muscle Training, Peter Roell, Divinity-Wege ...
+  // ═══════════════════════════════════════════════════════════════════
+
+  /**
+   * Der Stapel dieser Ability bei diesem Helden — echte Ability Zone ODER Support Zone. In der Support Zone zaehlt auch ein
+   * SCHLAFENDER Stapel (die Erlaubnis ist weg, die Karten liegen wegen der Schlange noch): er blockiert einen zweiten Stapel.
+   * @returns {{art:'ability'|'support', slot:number, level:number}|null}
+   */
+  abilityStapelOrtVon(playerIdx, heroIdx, abilityName) {
+    const ps = this.gs.players[playerIdx];
+    const ab = ps?.abilityZones?.[heroIdx] || [];
+    for (let z = 0; z < ab.length; z++) {
+      const slot = ab[z] || [];
+      if (slot.length > 0 && slot[0] === abilityName) return { art: 'ability', slot: z, level: slot.length };
+    }
+    const sup = ps?.supportZones?.[heroIdx] || [];
+    const db = this._getCardDB();
+    for (let z = 0; z < sup.length; z++) {
+      const slot = sup[z] || [];
+      if (slot.length > 0 && slot[0] === abilityName && db[abilityName] && hasCardType(db[abilityName], 'Ability')) {
+        return { art: 'support', slot: z, level: slot.length };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Die SUPPORT Zone, in die eine neue Kopie kaeme (Xal, Xalibur): ein gleichnamiger Stapel (< 3), sonst `wunsch` wenn frei, sonst die
+   * erste freie. Verwahrung (Madame Guillotine) und `customPlacement` (Performance: nur auf einen belegten Ability-Stapel) wie bei
+   * echten Zonen. Prueft NICHT, ob der Held das darf (`heroAcceptsAbilitiesInSupport`) — das tut `abilityZielOrt`.
+   * @returns {number} Zonenindex oder -1
+   */
+  abilitySupportZielZone(playerIdx, heroIdx, cardName, wunsch = -1) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return -1;
+    const zonen = ps.supportZones?.[heroIdx] || [];
+    const anzahl = Math.max(3, zonen.length);
+    const V = require('./_ability-verwahrung-shared');
+    const nimmt = (z) => V.nimmtAuf(this.gs, playerIdx, heroIdx, 'support', z, cardName);
+    const frei = (z) => (zonen[z] || []).length === 0 && !V.versiegelt(this.gs, playerIdx, heroIdx, 'support', z);
+    const customPlacement = loadCardEffect(cardName)?.customPlacement;
+    if (customPlacement) {
+      const db = this._getCardDB();
+      const tauglich = (z) => {
+        const slot = zonen[z] || [];
+        return slot.length > 0 && db[slot[0]] && hasCardType(db[slot[0]], 'Ability') && customPlacement.canPlace(slot)
+          && !V.versiegelt(this.gs, playerIdx, heroIdx, 'support', z) && nimmt(z);
+      };
+      if (wunsch >= 0 && wunsch < anzahl && tauglich(wunsch)) return wunsch;
+      for (let z = 0; z < anzahl; z++) if (tauglich(z)) return z;
+      return -1;
+    }
+    const verwahrt = V.verwahrterStapel(this.gs, playerIdx, heroIdx, cardName);
+    if (verwahrt) {
+      if (verwahrt.zoneKind !== 'support') return -1;
+      const slot = zonen[verwahrt.slotIdx] || [];
+      if (slot.length > 0 && slot[0] !== cardName) return -1;
+      return nimmt(verwahrt.slotIdx) ? verwahrt.slotIdx : -1;
+    }
+    for (let z = 0; z < anzahl; z++) {
+      const slot = zonen[z] || [];
+      if (slot.length > 0 && slot[0] === cardName) return (slot.length < 3 && nimmt(z)) ? z : -1;
+    }
+    if (wunsch >= 0 && wunsch < anzahl && frei(wunsch)) return wunsch;
+    for (let z = 0; z < anzahl; z++) if (frei(z)) return z;
+    return -1;
+  }
+
+  /**
+   * ★ WOHIN GEHOERT EINE NEUE KOPIE? `{ art: 'ability'|'support', slot }` oder null.
+   * @param {object} [opts]
+   *   @param {number} [opts.wunschZone]    gewuenschte ECHTE Zone (wie bisher bei `abilityZielZone`)
+   *   @param {number} [opts.wunschSupport] gewuenschte SUPPORT Zone
+   *   @param {'ability'|'support'} [opts.wunschArt] welche Zonenart zuerst versucht wird (Standard: echte Zone, dann Support Zone)
+   */
+  abilityZielOrt(playerIdx, heroIdx, cardName, opts = {}) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return null;
+    const wz = Number.isInteger(opts.wunschZone) ? opts.wunschZone : -1;
+    const ws = Number.isInteger(opts.wunschSupport) ? opts.wunschSupport : -1;
+    const supportErlaubt = this.heroAcceptsAbilitiesInSupport(playerIdx, heroIdx);
+    const echt = () => { const z = this.abilityZielZone(playerIdx, heroIdx, cardName, { wunschZone: wz }); return z >= 0 ? { art: 'ability', slot: z } : null; };
+    const stuetz = () => {
+      if (!supportErlaubt) return null;
+      const z = this.abilitySupportZielZone(playerIdx, heroIdx, cardName, ws);
+      return z >= 0 ? { art: 'support', slot: z } : null;
+    };
+    const reihenfolge = (opts.wunschArt === 'support' || (opts.wunschArt == null && ws >= 0 && wz < 0)) ? [stuetz, echt] : [echt, stuetz];
+    if (loadCardEffect(cardName)?.customPlacement) {
+      for (const f of reihenfolge) { const o = f(); if (o) return o; }
+      return null;
+    }
+    // Der Stapel existiert schon: genau dort — und nirgendwo sonst.
+    const stapel = this.abilityStapelOrtVon(playerIdx, heroIdx, cardName);
+    if (stapel) return stapel.art === 'ability' ? echt() : stuetz();
+    for (const f of reihenfolge) { const o = f(); if (o) return o; }
+    return null;
+  }
+
+  /** ALLE Orte, an die eine neue Kopie legal kaeme (fuer „ist die Wahl eindeutig?"): ein bestehender Stapel, sonst jede freie Zone. */
+  abilityZielOrte(playerIdx, heroIdx, cardName) {
+    const out = [];
+    const probe = (art, slot) => { out.push({ art, slot }); };
+    const stapel = this.abilityStapelOrtVon(playerIdx, heroIdx, cardName);
+    const customPlacement = loadCardEffect(cardName)?.customPlacement;
+    if (stapel && !customPlacement) {
+      const o = this.abilityZielOrt(playerIdx, heroIdx, cardName, stapel.art === 'ability' ? { wunschZone: stapel.slot } : { wunschSupport: stapel.slot, wunschArt: 'support' });
+      return o ? [o] : [];
+    }
+    for (let z = 0; z < 3; z++) {
+      if (this.abilityZielZone(playerIdx, heroIdx, cardName, { wunschZone: z }) === z) probe('ability', z);
+    }
+    if (this.heroAcceptsAbilitiesInSupport(playerIdx, heroIdx)) {
+      const n = Math.max(3, (this.gs.players[playerIdx]?.supportZones?.[heroIdx] || []).length);
+      for (let z = 0; z < n; z++) {
+        if (this.abilitySupportZielZone(playerIdx, heroIdx, cardName, z) === z) probe('support', z);
+      }
+    }
+    return out;
+  }
+
+  /** Legt eine Kopie an `ort`: Name in den Stapel + getrackte Instanz. KEINE Hooks. @returns {object} die Instanz */
+  abilityOrtBelegen(seite, heroIdx, cardName, ort) {
+    const ps = this.gs.players[seite];
+    if (ort.art === 'support') {
+      if (!ps.supportZones[heroIdx][ort.slot]) ps.supportZones[heroIdx][ort.slot] = [];
+      ps.supportZones[heroIdx][ort.slot].push(cardName);
+      return this._trackCard(cardName, seite, ZONES.SUPPORT, heroIdx, ort.slot);
+    }
+    const zonen = ps.abilityZones[heroIdx] || [[], [], []];
+    ps.abilityZones[heroIdx] = zonen;
+    if (!zonen[ort.slot]) zonen[ort.slot] = [];
+    zonen[ort.slot].push(cardName);
+    return this._trackCard(cardName, seite, ZONES.ABILITY, heroIdx, ort.slot);
+  }
+
+  /** Die Anlege-Hooks einer eben belegten Kopie (echte Zone: `onPlay` + `onCardEnterZone`; Support Zone: `abilityImSupportBetreten`). */
+  async abilityOrtHooks(inst, ort, extra = {}) {
+    if (ort.art === 'support') { await this.abilityImSupportBetreten(inst, extra); return; }
+    await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName: inst.name, zone: 'ability', heroIdx: inst.heroIdx, ...extra });
+    await this.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'ability', toHeroIdx: inst.heroIdx, ...extra });
   }
 
   /**
@@ -51590,6 +52275,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       for (let z = 0; z < 3; z++) if (tauglich(z)) return z;
       return -1;
     }
+
+    // ★ 24.10.: Eine Ability hat je Held hoechstens EINEN Stapel — ueber echte Ability Zonen UND Support Zonen (Xal, Xalibur) zusammen.
+    // Liegt sie schon in einer Support Zone (auch schlafend, s. `syncSupportAbilities`), eroeffnet eine echte Zone keinen zweiten.
+    if (this.abilityStapelOrtVon(playerIdx, heroIdx, cardName)?.art === 'support') return -1;
 
     const verwahrt = V.verwahrterStapel(this.gs, playerIdx, heroIdx, cardName);
     if (verwahrt) {
@@ -53740,6 +54429,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const proxy = { source: e.source, target: e.inst, type: e.type, amount: armiert ? e._base : e.amount };
       const _elixirVor = proxy.amount;
       this._applyEmpoweredStrikeIfApplicable(proxy);
+      this._applyAngerBonusIfApplicable(proxy, entries.filter(x => !x.cancelled && !x._immuneCreature).length);   // 24.10. Unreasonable Anger (nur ein Ziel im Batch)
       if (armiert) { e._base = Math.max(0, proxy.amount || 0); if (e._kBase !== undefined) e._kBase += e._base - _elixirVor; } else e.amount = proxy.amount;   // Basis, s.o. (W50a: Zuwachs auch in den Kettenbetrag)
       if (proxy.cannotBeReduced) e.cannotBeReduced = true;
       if (proxy.cannotBeNegated) e.cannotBeNegated = true;
@@ -54670,6 +55360,22 @@ this._deathWatch = (this._deathWatchStack || []).length
       const hero = ps.heroes[heroIdx];
       if (!hero || hero.hp <= 0) continue;
       const damage = await this.calculatePoisonDamage(ap, stacks);
+      // ★ 24.10. „Deadly Poison": solange der Giftstatus die Marke `deadly` trägt, HEILT der Tick statt zu schaden (nie über die Max-HP). Weitere Stapel erhöhen nur den Heilbetrag; wird das Gift entfernt
+      // (Beer, Cure …), geht die Marke mit ihm, und neues Gift schadet wieder normal.
+      if (hero.statuses.poisoned.deadly) {
+        if (hero.hp < hero.maxHp) {
+          this._broadcastEvent('play_zone_animation', { type: 'deadly_poison_heal', owner: ap, heroIdx, zoneSlot: -1, duration: 1500 });
+          await this._delay(520);
+          const vorher = hero.hp;
+          await this.actionHealHero({ name: 'Poison', owner: hero.statuses.poisoned?.deadly?.by ?? ap }, hero, damage);
+          this.log('poison_heal', { target: heroName, amount: hero.hp - vorher, nominal: damage, stacks, owner });
+          this.sync();
+          await this._delay(200);
+        } else {
+          this.log('poison_heal', { target: heroName, amount: 0, nominal: damage, stacks, owner });   // voll: nichts zu heilen, aber auch kein Schaden
+        }
+        continue;
+      }
       this._broadcastEvent('play_zone_animation', { type: 'poison_tick', owner: ap, heroIdx, zoneSlot: -1 });
       await this._delay(300);
       // v846: wie beim Burn-Tick — erst Schaden, dann Protokoll mit dem

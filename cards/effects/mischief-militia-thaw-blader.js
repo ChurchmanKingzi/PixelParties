@@ -154,7 +154,7 @@ module.exports = {
       );
       const stillAlive = engine.cardInstances.find(c => c.id === target.cardInstance.id && c.zone === 'support');
       if (stillAlive && stillAlive.counters?.frozen) {
-        engine.cleanseCreatureStatuses(stillAlive, ['frozen'], CARD_NAME);
+        await engine.cleanseCreatureStatusesGefragt(stillAlive, ['frozen'], CARD_NAME);   // W71b: gehört zum selben Effekt wie der Schaden (ein negierter Schaden lässt auch das Auftauen weg)
       }
     }
 

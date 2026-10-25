@@ -160,7 +160,7 @@ async function fresh(o = {}) {
   engine.promptGeneric = async (pi, d, ...r) => {
     runaway();
     engine._beobachtePrompt?.(pi, d);   // wie die echte promptGeneric: ein Suchergebnis-Fenster ist ein Aufdecken (Atta)
-    t.prompts.push({ pi, d });
+    t.prompts.push({ pi, d, sim: !!engine._inMctsSim });   // W71b: `sim` = Frage aus einem MCTS-Rollout der CPU (zählt nicht als echte Frage)
     for (const rule of t.script) {
       if (rule.used && rule.once) continue;
       if (!rule.match || rule.match(d, pi)) {

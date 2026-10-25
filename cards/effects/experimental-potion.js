@@ -75,10 +75,12 @@ module.exports = {
         c.owner === target.owner && c.zone === 'support'
         && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx);
       if (!inst || inst.zone !== 'support') return;
+      // W71b (Al, 25.10.2026): Dauermarke + Gift sind EIN Effekt auf die Kreatur — Schutzfenster (Cool Rescuer Monia & Co.) VOR der Marke; negiert = verbraucht, nichts geschieht.
+      if (!(await engine.kreaturBetroffen(inst, 'status', CARD_NAME, { sourceOwner: pi, statusName: 'poisoned' }))) return;
       if (!inst.counters) inst.counters = {};
       inst.counters.experimentalPotion = true;
       await engine.applyCreatureStatus(inst, 'poisoned', {
-        stacks: 1, addStacks: true, sourceOwner: pi, source: CARD_NAME,
+        stacks: 1, addStacks: true, sourceOwner: pi, source: CARD_NAME, _skipAffectedWindow: true,
       });
     }
 

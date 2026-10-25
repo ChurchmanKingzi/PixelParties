@@ -59,7 +59,8 @@ async function rettung(engine, pi, inst, source, amount) {
     toHandOf: gs.players[ownerIdx]?.username, blankedDamage: amount, from: source?.name || null,
   });
   engine.sync();
-  return { negated: true };
+  // W71b: negiert ein Schutzfenster (Cool Rescuer Monia & Co.) das Zurücknehmen, bleibt die Kreatur stehen — dann wird auch der Schaden nicht „geblankt".
+  return { negated: !(inst.zone === 'support' && (inst.controller ?? inst.owner) === ctrl && inst.heroIdx === heroIdx && inst.zoneSlot === zoneSlot) };
 }
 
 module.exports = {
