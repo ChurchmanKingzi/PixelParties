@@ -941,7 +941,7 @@ function DeckBuilder() {
     // Heroes and meaningless in a draft pool).
     if (isCube) result = result.filter(c => c.cardType !== 'Ability' || c.name === 'Performance');
     const f = filters;
-    if (f.name) result = result.filter(c => c.name.toLowerCase().includes(f.name.toLowerCase()));
+    if (f.name) result = result.filter(c => window.namePasst(c.name, f.name));
     if (f.effect) result = result.filter(c => window.effektTextPasst(c, f.effect));   // jedes Wort, beliebige Reihenfolge
     if (f.cardType) result = result.filter(c => c.cardType === f.cardType);
     if (f.subtype) result = result.filter(c => c.subtype === f.subtype);

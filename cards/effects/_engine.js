@@ -50,6 +50,8 @@ const COOLNESS_LANDE_MS = 560;
 // Luecke zwischen Landung und dem Start der naechsten Karte.
 const COOLNESS_LUECKE_MS = 90;
 const MAX_CARD_INSTANCES = 2000;
+// W72b (Al): Stapel, aus denen ein Hinzufügen auf die Hand Control Monitors auslöst („their deck or discard pile"): Hauptdeck, Ablage, Potion Deck, Side Deck (`noteHandZugangAusStapel`).
+const HAND_ZUGANG_STAPEL = new Set(['deck', 'discard', 'potionDeck', 'sideDeck']);
 
 
 // ★ W58a: ATK-Multiplikator-Auren (Skript-Vertrag `heroAtkMultiplier`, z. B. Rioting Village) — je Skriptname einmal ermittelt; `sync()` fragt es fuer jede Instanz.
@@ -2967,6 +2969,7 @@ class GameEngine {
       source: opts.source || null,
       _skipReactionCheck: true,
     });
+    if (!opts.ohneZugangsFenster) this.noteHandZugangAusStapel(toPlayerIdx, cardName, { pile: 'discard', fromOwner: fromOwnerIdx, source: opts.source || null });   // W72a: Control Monitors (nur eigene Ablage)
 
     return inst;
   }
@@ -3975,7 +3978,7 @@ class GameEngine {
     // Ausnahme `onCreatureSummoned` (Ruling 3.10.): eine NEUE Beschwoerung
     // mitten in einer laufenden Kette oeffnet trotzdem ihr eigenes
     // On-Summon-Fenster.
-    if ((!this._inReactionCheck || hookName === 'onCreatureSummoned' || hookName === 'onHandAddByDiscard' || hookCtx._verschachtelt)
+    if ((!this._inReactionCheck || hookName === 'onCreatureSummoned' || hookName === 'onHandAddFromPile' || hookCtx._verschachtelt)
         && !hookCtx._skipReactionCheck && !hookCtx._isReaction) {
       await this._checkReactionCards(hookName, hookCtx);
     }
@@ -13258,12 +13261,14 @@ class GameEngine {
         playerIdx: pi, card: inst, cardName, addedCard: inst, addedCardName: cardName,
       });
       this.noteDeckTutor(pi, cardName, opts.source || null, opts.searchSpec || null);
+      if (!opts.ohneZugangsFenster) this.noteHandZugangAusStapel(pi, cardName, { pile: 'deck', source: opts.source || null });   // W72a: Control Monitors
     } else if (opts.von === 'ablage') {
       await this.runHooks(HOOKS.ON_CARD_ADDED_FROM_DISCARD_TO_HAND, {
         playerIdx: pi, fromOwnerIdx: opts.fromOwnerIdx ?? pi,
         addedCard: inst, addedCardName: cardName,
         source: opts.source || null, _skipReactionCheck: true,
       });
+      if (!opts.ohneZugangsFenster) this.noteHandZugangAusStapel(pi, cardName, { pile: 'discard', fromOwner: opts.fromOwnerIdx ?? pi, source: opts.source || null });   // W72a
     } else {
       // ★ Z4 (F01-06): Rueckgabe/Bounce/Erzeugung/fremdes Deck feuern keinen Such-Hook — Handlimit-Waechter
       // (Charm of Balance) erfahren vom Zuwachs ueber `onHandGrew`. Kein Such-Hook, also keine Tutor-Zuhoerer.
@@ -22573,6 +22578,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (pile === 'potionDeck' && opts.shuffle) this._shuffleKostenVorlauf(pi, 'potion', opts._kostenVorlauf);   // v1361
     // `opts.geheim`: verdeckte Zuege (Create Secret Room) schreiben den Kartennamen NICHT ins Log, das an beide Spieler geht.
     this.log('pile_take', { player: ps.username, pile, ...(opts.geheim ? {} : { card: name }), by: opts.source || null });
+    // ★ W72a (Control Monitors): `toHand: true` sagt „diese Karte geht auf die Hand" — die Eigenbau-Tutoren (`takeFromPile` + `handZugangSync`/`hand.push` + eigener Hook) haben kein
+    // gemeinsames Hand-Zugangs-Tor. Die Entnahme aus dem EIGENEN Deck/der EIGENEN Ablage wird deshalb hier vorgemerkt (`_handZugangUnterwegs`) und mit dem Fenster-Sammler
+    // (`noteHandZugangAusStapel`) verrechnet: meldet ein Primitiv dieselbe Karte, zählt sie nur einmal; `returnToPile` nimmt die Vormerkung zurück.
+    if (opts.toHand && !opts.ohneZugangsFenster && HAND_ZUGANG_STAPEL.has(pile)) this._merkeHandZugangUnterwegs(pi, name, pile, opts.source || null);
     return { name, idx };
   }
 
@@ -22592,6 +22601,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[pi];
     const arr = this._pileArray(ps, pile);
     if (!arr || !name) return false;
+    this._vergissHandZugangUnterwegs(pi, name, pile);   // W72a: die Karte geht doch nicht auf die Hand
     // Mit Index: exakt dorthin zurueck (Zustand wie vor der Entnahme,
     // kein Mischen). Ohne Index: ans Ende, Deck wird gemischt.
     if (idx != null && idx >= 0 && idx <= arr.length) { arr.splice(idx, 0, name); return true; }
@@ -22721,6 +22731,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const taken = await this.takeFromPile(pi, pile, cardName, opts);
     if (!taken) return false;
     ps.hand.push(taken.name);
+    if (pile === 'potionDeck' && !opts.ohneZugangsFenster) this.noteHandZugangAusStapel(pi, taken.name, { pile: 'potionDeck', source: opts.source || null });   // W72b: Potion Deck zählt als „their deck" (Control Monitors)
     const inst = this._trackCard(taken.name, pi, ZONES.HAND);
     this._pileFlight(pi, taken.name, pile, 'hand', { toHandIdx: ps.hand.length - 1, finalHandSize: ps.hand.length });
     this._autoRevealOnEnterHand(pi, ps.hand.length - 1, taken.name);
@@ -22730,18 +22741,109 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * „Karten aus Deck/Ablage auf die Hand — bezahlt mit dem Abwurf derselben Anzahl Handkarten" (Cute Dog, Lunatic Cycle - New Moon,
-   * Life-Searcher, Inventing …). Die Tutor-Karte ruft das EINMAL, wenn alle Karten auf der Hand liegen. Feuert, sobald Karten
-   * hinzugefuegt UND Karten dafuer abgeworfen wurden — auch Navigation (2–3 Kopien weg, 1 Karte hinzu) zaehlt (Al, Welle 75).
-   * Reaktionsfenster: Control Monitors. Danach prueft der Aufrufer, welche der Karten noch auf der Hand sind (`handHat`).
-   * @returns {Promise<boolean>} true = ein Fenster wurde angeboten
+   * ★ W72a (Al, Control Monitors): „adds 1 or more cards from their deck or discard pile to their hand" — JEDES Hinzufügen aus dem EIGENEN Deck
+   * oder der EIGENEN Ablage auf die eigene Hand ist der Auslöser (Magnetic Potion, Gate to the Armory, Boomerang, Cute Dog …). Nicht: Ziehen
+   * (draw ist kein „add" — auch nicht aus dem Potion Deck), Karte vom Brett zurück auf die Hand, fremde Stapel (Infiltration, Xiong, Herbithorn Demon), Gelöscht-Stapel.
+   * W72b (Al): Potion Deck (`pile: 'potionDeck'`: Philosopher's Stone, Alchemic Journal-Suche) und Side Deck (`pile: 'sideDeck'`: Divine Gift of Edge) zählen als „their deck".
+   *
+   * Die Meldung geschieht ZENTRAL in den Hand-Zugangs-Primitiven (`handZugang` mit von:'deck'|'ablage', `actionAddCardFromDeckToHand`,
+   * `addCardFromDiscardToHand`; `addFromPileToHand`/`searchDeckForNamedCard` laufen über sie) — ein neuer Tutor, der diese Primitive benutzt, braucht nichts.
+   * Eigenbau (`takeFromPile` + `handZugangSync`, `hand.push`): `engine.noteHandZugangAusStapel(pi, name, { pile, source })` rufen (Wächter: `docs/niche-tests/repro/W72/a-18` und a-19).
+   *
+   * Ein Fenster je Effekt („1 or more"): die Zugänge werden gesammelt (Schlüssel Spieler + Quelle) und am Ende der Wirkung (Nach-Ketten-Aktion, wie
+   * `meldeAufgedeckt`) mit EINEM Hook `onHandAddFromPile` gemeldet. Wer nach dem Fenster weiterrechnen muss (Lunatic Cycle: Kostensenkung der
+   * Karte, Cute Annoyance Mini: Beschwörungs-Zusatz — beides entfällt, wenn die Karte gelöscht wurde), ruft `await engine.meldeHandZugangAusStapel(pi, { source })`
+   * SELBST direkt hinter dem letzten Zugang; das leert die Sammlung dieser Quelle, die Nach-Ketten-Aktion meldet nichts mehr doppelt.
    */
-  async meldeHandZugangDurchAbwurf(pi, { names, discarded, source } = {}) {
+  noteHandZugangAusStapel(pi, cardName, { pile = 'deck', source = null, fromOwner = null } = {}) {
+    pi = this._resolvePi(pi);
+    if (this._inMctsSim || this._fastMode || !cardName) return;
+    // W72b (Al: „Doch, das betrifft etwa Philosopher's Stone"): Potion Deck und Side Deck zählen als „their deck". Nicht: Gelöscht-Stapel, Brett, Zwischenzonen …
+    // Ziehen aus dem Potion Deck (`actionDrawFromPotionDeck`) ist ein Draw und meldet nichts.
+    if (!HAND_ZUGANG_STAPEL.has(pile)) return;
+    if (fromOwner != null && fromOwner !== pi) return;                    // „their deck or discard pile": nur der EIGENE Stapel
+    if (!this.gs?.players?.[pi]) return;
+    this._vergissHandZugangUnterwegs(pi, cardName, pile);   // schon als Entnahme vorgemerkt (`toHand`): nicht doppelt zählen
+    if (!this._handZugangSammlung) this._handZugangSammlung = [];
+    this._handZugangSammlung.push({ pi, name: cardName, pile, source: source || null, turn: this.gs.turn });
+    // Genau EINE Auswertung vormerken (Referenz statt Flag: `restore()` kappt die Warteschlange, ein Flag bliebe dann für immer gesetzt).
+    if (!this._handZugangFn || !(this._postChainActions || []).includes(this._handZugangFn)) {
+      this._handZugangFn = () => this._wertHandZugangAus();
+      this.queuePostChainAction(this._handZugangFn);
+    }
+  }
+
+  _merkeHandZugangUnterwegs(pi, name, pile, source) {
+    if (this._inMctsSim || this._fastMode || !name || !this.gs?.players?.[pi]) return;
+    if (!this._handZugangUnterwegs) this._handZugangUnterwegs = [];
+    this._handZugangUnterwegs.push({ pi, name, pile, source: source || null, turn: this.gs.turn });
+    // Auswertung vormerken (auch wenn kein Primitiv mehr meldet): dieselbe Nach-Ketten-Aktion wie bei `noteHandZugangAusStapel`.
+    if (!this._handZugangFn || !(this._postChainActions || []).includes(this._handZugangFn)) {
+      this._handZugangFn = () => this._wertHandZugangAus();
+      this.queuePostChainAction(this._handZugangFn);
+    }
+  }
+  _vergissHandZugangUnterwegs(pi, name, pile) {
+    const l = this._handZugangUnterwegs;
+    if (!l || !l.length) return;
+    const i = l.findIndex(e => e.pi === pi && e.name === name && e.pile === pile);
+    if (i >= 0) l.splice(i, 1);
+  }
+  /** Vorgemerkte Entnahmen (`toHand`) in die Sammlung übernehmen — `pi`/`source` = nur diese; ohne Angabe alle. */
+  _uebernehmeHandZugangUnterwegs(pi = null, source = undefined) {
+    const l = this._handZugangUnterwegs || [];
+    if (!l.length) return;
+    const bleibt = [];
+    for (const e of l) {
+      if ((pi != null && e.pi !== pi) || (source != null && e.source !== (source || null))) { bleibt.push(e); continue; }
+      if (!this._handZugangSammlung) this._handZugangSammlung = [];
+      this._handZugangSammlung.push({ pi: e.pi, name: e.name, pile: e.pile, source: e.source, turn: e.turn });
+    }
+    this._handZugangUnterwegs = bleibt;
+  }
+
+  /** Meldet die gesammelten Zugänge von `pi` (und Quelle `source`, falls angegeben) JETZT mit einem Hook `onHandAddFromPile`. @returns {Promise<boolean>} true = ein Fenster wurde angeboten */
+  async meldeHandZugangAusStapel(pi, { source } = {}) {
     pi = this._resolvePi(pi);
     if (this._inMctsSim || this._fastMode) return false;
-    const liste = (names || []).filter(Boolean);
-    if (!liste.length || !(discarded > 0)) return false;   // Navigation: 2–3 abgeworfen, 1 hinzugefuegt — zaehlt ebenfalls (Al, Welle 75)
-    await this.runHooks('onHandAddByDiscard', { playerIdx: pi, cardNames: liste, discarded, sourceName: source || null });
+    this._uebernehmeHandZugangUnterwegs(pi, source);
+    const alle = this._handZugangSammlung || [];
+    const frisch = (e) => e.turn >= this.gs.turn - 1;   // ein Zugangs-Eintrag überlebt höchstens den Zugwechsel (Aufstieg beendet den Zug, bevor die Nach-Ketten-Aktionen laufen)
+    const passt = (e) => e.pi === pi && (source == null || e.source === (source || null)) && frisch(e);
+    const mein = alle.filter(passt);
+    if (!mein.length) return false;
+    this._handZugangSammlung = alle.filter(e => !passt(e) && frisch(e));
+    return this._meldeHandZugangGruppe(pi, mein);
+  }
+
+  async _wertHandZugangAus() {
+    this._handZugangFn = null;
+    this._uebernehmeHandZugangUnterwegs();
+    const batch = (this._handZugangSammlung || []).filter(e => e.turn >= (this.gs?.turn ?? 0) - 1);
+    this._handZugangSammlung = [];
+    if (!batch.length) return;
+    const gruppen = new Map();
+    for (const e of batch) {
+      const k = `${e.pi}|${e.source || ''}`;
+      if (!gruppen.has(k)) gruppen.set(k, { pi: e.pi, eintraege: [] });
+      gruppen.get(k).eintraege.push(e);
+    }
+    for (const g of gruppen.values()) {
+      try { await this._meldeHandZugangGruppe(g.pi, g.eintraege); }
+      catch (err) { console.error('[Engine] onHandAddFromPile failed:', err.message); }
+    }
+  }
+
+  async _meldeHandZugangGruppe(pi, eintraege) {
+    const ps = this.gs.players[pi];
+    if (!ps) return false;
+    // Nur Karten melden, die noch auf der Hand liegen (der Effekt kann sie schon wieder abgeworfen/gespielt haben) — und nur eine Meldung je Effekt.
+    const rest = {};
+    for (const n of ps.hand || []) rest[n] = (rest[n] || 0) + 1;
+    const namen = [], piles = [];
+    for (const e of eintraege) { if ((rest[e.name] || 0) > 0) { rest[e.name]--; namen.push(e.name); piles.push(e.pile); } }
+    if (!namen.length) return false;
+    await this.runHooks('onHandAddFromPile', { playerIdx: pi, cardNames: namen, piles, sourceName: eintraege[0].source || null, hinzugefuegt: eintraege.length });
     return true;
   }
 
@@ -22772,7 +22874,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         return (ps.deletedPile || []).length > before;
       }
     }
-    const taken = await this.takeFromPile(pi, pile, cardName, opts);
+    // Aus der HAND: der Flug startet im genauen Handplatz (`fromHandIdx`, wie beim Abwurf) - sonst fliegt die Karte aus dem Nichts bzw. alle auf einmal.
+    let handIdx = -1;
+    if (pile === 'hand') handIdx = (Number.isInteger(opts.handIdx) && ps.hand[opts.handIdx] === cardName) ? opts.handIdx : ps.hand.indexOf(cardName);
+    const taken = await this.takeFromPile(pi, pile, handIdx >= 0 ? handIdx : cardName, opts);
     if (!taken) return false;
     // „deleted from anywhere"-Rettung (Ash Worms, Cute Hydra): zwischen Entnahme und
     // Geloescht-Stapel — auch fuer Karten ohne verfolgte Instanz (Deck, Hand, Puzzle-Ablage).
@@ -22787,7 +22892,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!_loeschPs.deletedPile) _loeschPs.deletedPile = [];
     _loeschPs.deletedPile.push(taken.name);
     this._trackCard(taken.name, _loeschIdx >= 0 ? _loeschIdx : pi, ZONES.DELETED);
-    this._pileFlight(pi, taken.name, pile, 'deleted');
+    this._pileFlight(pi, taken.name, pile, 'deleted', handIdx >= 0
+      ? { fromHandIdx: handIdx, ...(_loeschIdx >= 0 && _loeschIdx !== pi ? { fromOwner: pi, toOwner: _loeschIdx } : {}) } : {});
     this.log('card_deleted', { player: ps.username, card: taken.name, from: pile, by: opts.source || null });
     this.sync();
     return true;
@@ -25267,12 +25373,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Handle ability activation
     if (actionResult.abilityActivation) {
       const { zoneIdx } = actionResult;
+      // W73a: die Antwort traegt die Zonenart — Ability Zone 0 und Support Zone 0 (Xal) sind verschiedene Stapel mit gleicher Nummer.
+      const zoneKind = actionResult.zoneKind === 'support' ? 'support' : 'ability';
       // ★ W35a (Al, Frage 3): Ability eines UEBERNOMMENEN Helden (Guardian Beast Hu) — nur, wenn der Prompt genau diesen Zonenstapel angeboten hat (Eintrag mit `charmedOwner`); Zonen und
       // Instanz liegen auf der Brettseite des Helden (`abSeite`), Spieler (HOPT, Sperren, Hand/Gold) bleibt `playerIdx` — wie `doActivateAbility` mit `charmedOwner`.
       const abSeite = _leihSeite ?? playerIdx;
       if (_leihSeite != null && !(angebot.activatableAbilities || []).some(e =>
         e.heroIdx === heroIdx && e.zoneIdx === zoneIdx && e.charmedOwner === _leihSeite && e.zoneKind !== 'support')) return { retry: true };
-      const slot = (this.gs.players[abSeite]?.abilityZones?.[heroIdx] || [])[zoneIdx] || [];
+      if (zoneKind === 'support' && _leihSeite != null) return { retry: true };   // Support-Abilities eines uebernommenen Helden bietet die Zusatzaktion nicht an
+      const slot = this.abilityStapelAn(abSeite, heroIdx, zoneKind, zoneIdx) || [];
       if (slot.length === 0) return { retry: true };
       const abilityName = slot[0];
       const level = slot.length;
@@ -25284,7 +25393,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.gs.hoptUsed[hoptKey] = this.gs.turn;
 
       const inst = this.cardInstances.find(c =>
-        c.owner === abSeite && c.zone === 'ability' && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
+        c.owner === abSeite && c.zone === (zoneKind === 'support' ? 'support' : 'ability') && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
       );
       if (!inst) {
         // Stempel wieder loesen — die Aktivierung hat nie stattgefunden.
@@ -25292,7 +25401,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         return { retry: true };
       }
 
-      this._broadcastEvent('ability_activated', { owner: abSeite, heroIdx, zoneIdx, abilityName });
+      this._broadcastEvent('ability_activated', { owner: abSeite, heroIdx, zoneIdx, zoneKind, abilityName });
       // W35a: uebernommener Held — die Instanz gehoert waehrend der Aktivierung dem Kontrolleur, `heroOwner` = Brettseite (Muster `doActivateAbility`); danach wiederhergestellt.
       const _abOrig = _leihSeite != null ? { controller: inst.controller, owner: inst.owner } : null;
       if (_abOrig) { inst.controller = playerIdx; inst.owner = playerIdx; inst.heroOwner = _leihSeite; }
@@ -25322,7 +25431,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         return { retry: true };
       }
       await this.meldeAktivEffekt({
-        kind: 'ability', playerIdx, heroIdx, cardName: abilityName, zoneIdx, isActionCost: true,
+        kind: 'ability', playerIdx, heroIdx, cardName: abilityName, zoneIdx, zoneKind, isActionCost: true,
       });
       // ★ 28.8.: fehlte hier. Der normale Weg (`doActivateAbility`)
       // feuert den Haken; ueber eine Zusatzaktion aktiviert blieb
@@ -26161,7 +26270,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         erlaubt = activatableHeroEffects.some(e => e.charmedOwner === antwortSeite && e.heroIdx === handelnderHeld
           && (!actionResult.effectName || e.effectName === actionResult.effectName));
       } else if (actionResult.abilityActivation) {
-        erlaubt = activatableAbilities.some(e => e.charmedOwner === antwortSeite && e.heroIdx === handelnderHeld && e.zoneIdx === actionResult.zoneIdx);
+        erlaubt = activatableAbilities.some(e => e.charmedOwner === antwortSeite && e.heroIdx === handelnderHeld && e.zoneIdx === actionResult.zoneIdx && (e.zoneKind === 'support') === (actionResult.zoneKind === 'support'));   // W73a: mit Zonenart
       } else {
         erlaubt = (fremdeHelden[actionResult.cardName] || []).some(f => f.heroOwner === antwortSeite && f.heroIdx === handelnderHeld);
       }
@@ -29356,6 +29465,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Sie liegt bewusst auf der ENGINE, nicht auf `gs`: `searchSpec`
     // darf eine Funktion enthalten, und `gs` wird serialisiert.
     this.noteDeckTutor(pi, cardName, opts.source || null, opts.searchSpec || null);
+    if (!opts.ohneZugangsFenster) this.noteHandZugangAusStapel(pi, cardName, { pile: 'deck', source: opts.source || null });   // W72a: Control Monitors
 
     if (opts.shuffle) this.shuffleDeck(pi, 'main');
     this.sync();
@@ -29721,6 +29831,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       fromHandIdx: handIdx, toHandIdx,
       // `opts.finalHandSize` (Live Show): mehrere Karten fliegen nacheinander in dieselbe Hand — jede wird gegen die Endgröße der Hand projiziert.
       ...(opts.finalHandSize ? { finalHandSize: opts.finalHandSize, zielLayout: true } : null),
+      // W77 (The Root of all Presents): Flugstil (`lichterkette`) und Klang der verschenkten Karte
+      ...(opts.flightStyle ? { flightStyle: opts.flightStyle } : null),
+      ...(opts.flightSfx ? { sfx: opts.flightSfx } : null),
     });
 
     await this.runHooks(HOOKS.ON_CARD_TRANSFERRED_TO_OPP_HAND, {
@@ -38651,6 +38764,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       const ablage = c.originalOwner ?? c.owner;
       const ps = this.gs.players?.[ablage];
       if (!ps || !c.name) return;
+      const _inst = this.cardInstances.find(x => x.id === c.instId);   // der Hub läuft vor `_untrackCard`; `hookCtx.creature` ist nur ein Auszug (ohne Counter)
+      if (_inst && this.isTokenCard(_inst)) return;   // Tokens (Fantasy Buddy, Biomancy …) kommen nie in die Ablage — kein Protokolleintrag
       (ps._besiegtLog || (ps._besiegtLog = [])).push({ name: c.name, turn: this.gs.turn });
     } catch (err) {
       console.error('[besiegtProtokoll]', err.message);
@@ -38777,7 +38892,59 @@ this._deathWatch = (this._deathWatchStack || []).length
       } catch (err) {
         console.error('[onTargetsDefeated]', err.message);
       }
+      // ★ W77 (REVENGE!!!, Grand Feast): Hand-Fenster „ein Vorgang hat Ziele besiegt" — nach den Passiv-Hooks, am fertigen Zustand.
+      try {
+        await this._checkTargetsDefeatedHandReactions([...liste, ...helden]);
+      } catch (err) {
+        console.error('[TargetsDefeatedReaction]', err.message);
+      }
     }
+  }
+
+  /**
+   * ★ W77 — Hand-Fenster für JEDEN abgeschlossenen Sterbe-Vorgang (Flächenschlag = EIN Vorgang, siehe `_mitNiederlagenSammler`): Karten mit
+   *   isTargetsDefeatedReaction: true,
+   *   targetsDefeatedCondition(gs, pi, engine, info) → bool,
+   *   async targetsDefeatedResolve(engine, pi, info, { casterIdx, casterSeite })
+   * `info` = { defeated: [Einträge der Kreaturen UND Helden dieses Vorgangs, je mit `source`], reactorIdx, zaehler: { [Spieler]: { vorher, nachher, opfer } }, zaehlerGegner: (dasselbe, aber nur Ziele, die durch eine Karte/einen Effekt eines GEGNERS fielen) }.
+   * `zaehler[pi]` zählt die besiegten ZIELE (Helden und Kreaturen, Tokens eingeschlossen), die `pi` in DIESEM Zug verloren hat: `vorher` = Stand vor dem Vorgang, `nachher` = danach,
+   * `opfer` = die Opfer dieses Vorgangs. Der Zähler läuft je Spieler und Zug (`ps._zieleBesiegt = { turn, n }`) und wird hier fortgeschrieben, auch wenn niemand reagiert.
+   * Die Aktivierung ist ein Kettenglied (`kette`), die Kettenanzeige zeigt das erste Opfer als Vorlauf.
+   */
+  async _checkTargetsDefeatedHandReactions(alle) {
+    if (!Array.isArray(alle) || alle.length === 0) return;
+    const gs = this.gs;
+    const zaehler = {};
+    const nachSpieler = new Map();
+    for (const e of alle) {
+      const ctrl = e.controller ?? e.owner;
+      if (!isSeat(this, ctrl)) continue;
+      if (!nachSpieler.has(ctrl)) nachSpieler.set(ctrl, []);
+      nachSpieler.get(ctrl).push(e);
+    }
+    const zaehlerGegner = {};
+    for (const [pi, opfer] of nachSpieler) {
+      const ps = gs.players[pi];
+      if (!ps) continue;
+      if (!ps._zieleBesiegt || ps._zieleBesiegt.turn !== gs.turn) ps._zieleBesiegt = { turn: gs.turn, n: 0, gegner: 0 };
+      const vorher = ps._zieleBesiegt.n;
+      ps._zieleBesiegt.n += opfer.length;
+      zaehler[pi] = { vorher, nachher: ps._zieleBesiegt.n, opfer };
+      // Zweiter Zähler (REVENGE!!!: „your second target is defeated BY AN OPPONENT'S card or effect"): nur Ziele, die durch eine Karte/einen Effekt eines Gegners fielen.
+      const vonGegner = opfer.filter(e => { const q = e.source; const so = q?.controller ?? q?.owner; return isSeat(this, so) && so !== pi; });
+      const gv = ps._zieleBesiegt.gegner || 0;
+      ps._zieleBesiegt.gegner = gv + vonGegner.length;
+      zaehlerGegner[pi] = { vorher: gv, nachher: gv + vonGegner.length, opfer: vonGegner };
+    }
+    if (this._inMctsSim || gs.result) return;
+    const erster = alle[0];
+    await this._rxEreignisFenster({
+      flag: 'isTargetsDefeatedReaction', cond: 'targetsDefeatedCondition', res: 'targetsDefeatedResolve', tiefe: '_zieleBesiegtFensterTiefe',
+      log: 'targets_defeated_window_reaction', ausloeser: gs.activePlayer ?? 0, auchAusloeser: true, kette: true,
+      vorlauf: { cardName: erster.name, owner: erster.owner, cardType: erster.hero ? 'Hero' : 'Creature' },
+      info: { defeated: alle, zaehler, zaehlerGegner },
+      nachricht: (c) => `${erster.name} was defeated! Activate ${c}?`, linkesBild: erster.name, ziel: erster.name,
+    });
   }
 
   /**
@@ -43768,7 +43935,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     onCardActivation: 'A card was activated',
     onReactionActivated: 'A reaction was activated',
     onTakeControl: 'A target was taken control of',
-    onHandAddByDiscard: 'Cards were added to a hand from a deck or discard pile by discarding the same number of cards',
+    onHandAddFromPile: 'Cards were added to a hand from a deck or discard pile',
   };
 
   /** Hooks that should NOT trigger reaction checks */
@@ -44943,7 +45110,22 @@ this._deathWatch = (this._deathWatchStack || []).length
         wisdomCost = this._rxWisdomKosten(pi, reactionCasterSeite, reactionCasterHeroIdx, cardData);
       }
 
-      await this._rxPay(ps, cost, { cardName: chosenName, inHandIdx: actualHandIdx });   // inHandIdx: die Karte liegt hier noch in der Hand (Item-Lock-Kosten duerfen sie nicht treffen)
+      // ★ W72a (Al, Control Monitors): Reaktionen, deren Kartentext eine vom Spieler GEWÄHLTE Zahlung verlangt (Handkarten abwerfen), wählen sie HIER —
+      // hinter der letzten abbrechbaren Frage (Aktivieren, Wirker), vor jeder Zahlung. Vertrag `reactionKostenWahl(engine, pi, chainCtx, { handIdx, casterHeroIdx,
+      // casterSeite, wisdomCost })` → Wahl-Objekt (bezahlt wird noch nichts) oder `false`/`null` = abgebrochen: nichts passiert, die Reaktion kommt nicht zustande.
+      // Bezahlt wird danach (`reactionKostenZahlen(engine, pi, wahl, chainCtx)`), sobald die Karte die Hand verlassen hat und das Glied feststeht.
+      let kostenWahl = null;
+      if (typeof script.reactionKostenWahl === 'function') {
+        kostenWahl = await script.reactionKostenWahl(this, pi, chainCtx, {
+          handIdx: actualHandIdx, casterHeroIdx: reactionCasterHeroIdx, casterSeite: reactionCasterSeite, wisdomCost,
+        });
+        if (!kostenWahl) continue;
+        // Die Hand kann sich während der Frage geändert haben (Hook, Zeitablauf): die Karte muss noch da sein.
+        if (ps.hand[actualHandIdx] !== chosenName && ps.hand.indexOf(chosenName) < 0) continue;
+      }
+      const actualHandIdxNachWahl = ps.hand[actualHandIdx] === chosenName ? actualHandIdx : ps.hand.indexOf(chosenName);
+
+      await this._rxPay(ps, cost, { cardName: chosenName, inHandIdx: actualHandIdxNachWahl });   // inHandIdx: die Karte liegt hier noch in der Hand (Item-Lock-Kosten duerfen sie nicht treffen)
 
       // KEIN Eintrag und KEIN Flug an dieser Stelle.
       // v202 hat hier den Flug abgeschickt, v204 zusaetzlich den
@@ -44953,7 +45135,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // (Card Game Player Inya) entscheiden sich erst beim Aufloesen
       // der Kette. Flug UND Eintrag passieren deshalb jetzt gemeinsam
       // dort, wo das Ziel bekannt ist — siehe _resolveReactionChain.
-      ps.hand.splice(actualHandIdx, 1);
+      ps.hand.splice(actualHandIdxNachWahl, 1);
 
       // ★ v1031: … und die Partie-Grenze verbrauchen. Der Stempel sitzt
       // hier, wo die Karte die Hand verlaesst. ★ Z7b (Als Entscheidung,
@@ -44973,6 +45155,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       this.log('reaction_activated', { card: chosenName, player: ps.username, chainPosition: chain.length, source: 'hand' });
       this._broadcastEvent('card_reveal', { cardName: chosenName });
+      if (kostenWahl && typeof script.reactionKostenZahlen === 'function') await script.reactionKostenZahlen(this, pi, kostenWahl, chainCtx);   // W72a: die gewählte Zahlung (Abwurf) — die Karte ist schon aus der Hand, der Gegner hat sie gesehen
 
       const engine = this;
       const reactionOwner = pi;
@@ -44988,7 +45171,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // MITTE des Handbereichs zurueck. Genau das sah Al bei „The
         // Master's Plan": die Karte flog aus der Handmitte statt von
         // ihrem Platz.
-        fromHandIdx: actualHandIdx,
+        fromHandIdx: actualHandIdxNachWahl,
         _opgNeu,   // Z7b: Partie-Stempel dieser Aktivierung (Rueckgabe bei ganzer Negation)
         casterHeroIdx: reactionCasterHeroIdx,
         heroIdx: reactionCasterHeroIdx,
@@ -46552,6 +46735,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!zielPs.discardPile) zielPs.discardPile = [];
     zielPs.discardPile.push(weg.name);
     this._trackCard(weg.name, ziel, 'discard');
+    this.gs._spellFruehAbgelegt = { besitzer: ziel, name: weg.name };   // W67a (Live Show): Inyas Fantasy Buddy ERSETZT diese Ablage-Karte (Ticket `nimm`), er kommt nicht dazu
     this.sync();
     return { idx, name: weg.name };
   }
@@ -48450,6 +48634,19 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     return result;
+  }
+
+  /**
+   * W73a: der Namen-Stapel an (Brettseite, Held, Zonenart, Zonenindex) — die EINE Aufloesung fuer jeden Weg, der eine Aktivierung per `(heroIdx, zoneIdx)` annimmt
+   * (Sockets `activate_ability` / `activate_free_ability`, Antwort der Zusatzaktion). `(heroIdx, zoneIdx)` allein ist mehrdeutig: Ability Zone 0 und Support Zone 0 tragen dieselbe
+   * Nummer. `zoneKind: 'support'` gilt NUR fuer einen lebenden Support-Stapel (der Held nimmt Abilities in Support Zonen, die Karte ist eine Ability); alles andere ist die Ability Zone.
+   * @returns {string[]|null} der Stapel (Laenge = Stufe) oder null
+   */
+  abilityStapelAn(seite, heroIdx, zoneKind, zoneIdx) {
+    if (zoneKind === 'support') {
+      return this._aktivierungsStapel(seite, heroIdx).find(e => e.zoneKind === 'support' && e.zi === zoneIdx)?.slot || null;
+    }
+    return this.gs.players[seite]?.abilityZones?.[heroIdx]?.[zoneIdx] || null;
   }
 
   /**
@@ -57584,6 +57781,53 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   // ─── SYNC STATE TO CLIENTS ────────────────
 
+  /** Darion (Al, 25.10.): Sobald das Teilen wieder gilt und Equips in mehreren Plaetzen liegen, werden sie nach der laufenden Wirkung zusammengefuehrt (`_equip-stack-shared.zusammenfuehren`). */
+  _equipStapelAbgleichen() {
+    if (this._equipMergeLaeuft) return;
+    if (this._equipMergeFn && (this._postChainActions || []).includes(this._equipMergeFn)) return;   // schon vorgemerkt
+    const es = require('./_equip-stack-shared');
+    let bedarf;
+    try { bedarf = es.zusammenfuehrenBedarf(this); } catch { return; }
+    if (!bedarf.length) return;
+    this._equipMergeFn = async () => {
+      this._equipMergeLaeuft = true;
+      try {
+        for (const b of es.zusammenfuehrenBedarf(this)) await es.zusammenfuehren(this, b.seite, b.heroIdx);
+      } catch (err) {
+        console.error('[Engine] Equip-Stapel zusammenfuehren:', err.message);
+      } finally {
+        this.sync();                     // erst melden, dann freigeben: der eigene Abgleich plant sich nicht noch einmal ein
+        this._equipMergeLaeuft = false;
+      }
+    };
+    this.queuePostChainAction(this._equipMergeFn);
+    // Zusaetzlich (Al, 25.10.: im Puzzle-Modus blieb der Stapel nach dem Heilen getrennt): die Nach-Ketten-Warteschlange wird nur an Handler-Enden geleert und wartet dort auf ein
+    // „Brett ruhig"-Tor. Damit die Zusammenfuehrung nicht bis zur naechsten Aktion haengt, versucht ein Zeitgeber sie, sobald das Brett ruhig ist.
+    if (!this._inMctsSim && !this._fastMode && !this._equipMergeTimer) this._equipMergeTimerSetzen(0);
+  }
+
+  _equipMergeTimerSetzen(versuch) {
+    this._equipMergeTimer = setTimeout(() => {
+      this._equipMergeTimer = null;
+      this._equipMergeVersuch(versuch).catch(err => console.error('[Engine] Equip-Stapel (Zeitgeber):', err.message));
+    }, versuch === 0 ? 400 : 500);
+    this._equipMergeTimer.unref?.();
+  }
+
+  async _equipMergeVersuch(versuch) {
+    if (this._aborted || this.gs?.result || this._equipMergeLaeuft) return;
+    const es = require('./_equip-stack-shared');
+    let bedarf;
+    try { bedarf = es.zusammenfuehrenBedarf(this); } catch { return; }
+    if (!bedarf.length) return;                                   // inzwischen erledigt (Nach-Ketten-Aktion)
+    const gs = this.gs;
+    const ruhig = !this._inReactionCheck && !gs?.surprisePending && !((gs?._spellResolutionDepth || 0) > 0)
+      && !(gs?.players || []).some(p => p && p._resolvingCard) && !this._runningPostChain && !gs?.effectPrompt && !gs?.potionTargeting;
+    if (!ruhig) { if (versuch < 40) this._equipMergeTimerSetzen(versuch + 1); return; }
+    if (this._equipMergeFn) this._postChainActions = (this._postChainActions || []).filter(f => f !== this._equipMergeFn);
+    await this._equipMergeFn?.();
+  }
+
   sync() {
     if (this._aborted) return;
     // v900: Sterbefenster-Diagnose — siehe `_deathWatch` im Todeszweig.
@@ -57609,6 +57853,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     this._atkAurenAbgleichen();   // W58a: Rioting Village & Co. gelten fuer ALLE Helden (lebend, tot, frisch eingesetzt, aus der Abwesenheit zurueck)
     this._dynamischeAtkNachrechnen();   // W58a: Core/Gun folgen dem Ist-Zustand der Ablage (auch nach dem Todes-Aufraeumen und Direktzugriffen auf die Ablage)
     this._refreshAscensionReadiness();
+    this._equipStapelAbgleichen();   // Darion: Effekt wieder frei → alle Equips in den groessten Stapel (nach der laufenden Wirkung)
     this._aufdeckenInHandAbgleichen();   // 23.10.: `revealAlwaysInHand` (Great Vanguard Demon) — aufgedeckt, sobald und solange die Karte auf der Hand liegt, egal wie sie dorthin kam
     // W18a (S01-04): die Sperre von Divine Gift of Skill hängt an der Magic-Arts-Stufe des NUTZERS (nicht des gesperrten Helden) und kann
     // sich ändern, ohne dass der gesperrte Held etwas tut (Nutzer legt Magic Arts an) — die Anzeigemarke bei jedem Abgleich nachziehen.

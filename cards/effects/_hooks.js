@@ -70,10 +70,11 @@ const HOOKS = {
   // Feuert NUR, wenn ein FREMDER Effekt die Hand anfasst — eigene Kosten
   // (byPi === targetPi) oeffnen kein Fenster.
   ON_HAND_INTERACTION: 'onHandInteraction',
-  // Feuert, NACHDEM ein Spieler per Effekt N Karten aus Deck/Ablage auf die Hand genommen hat UND dafuer genau N Handkarten abgeworfen
-  // hat (Cute Dog, Lunatic Cycle - New Moon, Life-Searcher, Inventing …). Genau EIN Aufruf je Effekt (nicht je Karte).
-  // Kontext: { playerIdx (der Hinzufuegende), cardNames[], discarded, sourceName }. Reaktionsfenster (Control Monitors).
-  ON_HAND_ADD_BY_DISCARD: 'onHandAddByDiscard',
+  // W72a: Feuert, NACHDEM ein Spieler per Effekt 1 oder mehr Karten aus SEINEM Deck oder SEINER Ablage auf die Hand genommen hat
+  // (Magnetic Potion, Gate to the Armory, Cute Dog, Boomerang … — nicht: Ziehen, Brett → Hand, fremde Stapel, Potion Deck). Genau EIN Aufruf je
+  // Effekt (nicht je Karte), am Ende der Wirkung (Nach-Ketten-Aktion) oder früher, wenn die Tutor-Karte `engine.meldeHandZugangAusStapel` selbst ruft.
+  // Kontext: { playerIdx (der Hinzufuegende), cardNames[], piles[] ('deck'|'discard' je Karte), sourceName }. Reaktionsfenster (Control Monitors).
+  ON_HAND_ADD_FROM_PILE: 'onHandAddFromPile',
   // Ein Spieler hat Karten aus Hand/Deck AUFGEDECKT (Suchergebnis, gezeigte Handkarte, oberste Deckkarte) — NICHT durch den Effekt einer Ability.
   // Gesammelt je Wirkung, EIN Aufruf am Ende der Wirkung (Nach-Ketten-Aktion). Kontext: { playerIdx, cardNames[], zone ('hand'|'deck'), sourceName }.
   // Zuhoerer: Atta, Speaker of Desires. Siehe `engine.meldeAufgedeckt`.

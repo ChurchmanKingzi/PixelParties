@@ -64,6 +64,7 @@
 //  the target-redirect hub above.
 // ═══════════════════════════════════════════
 
+const { istHeldOderKreatur } = require('./_targeting-shared');
 const CARD_NAME = 'Anti-Magnet';
 const GOLD_COST = 2;
 
@@ -73,9 +74,10 @@ const GOLD_COST = 2;
  * opponent picks the redirect from, and its non-emptiness is also the
  * "while you control other possible targets" usability gate.
  */
-function getOtherValidTargets(selected, validTargets) {
+function getOtherValidTargets(selected, validTargets, engine) {
   if (!Array.isArray(validTargets)) return [];
-  return validTargets.filter(t => t && t.id !== selected.id);
+  // Al, 25.10.2026: „target" = Held oder Kreatur - Ausruestung, Anhaengsel, Areas ... sind keine Umleitungsziele und zaehlen nicht als „other possible target".
+  return validTargets.filter(t => t && t.id !== selected.id && istHeldOderKreatur(engine, t));
 }
 
 module.exports = {
@@ -98,6 +100,7 @@ module.exports = {
     // NICHT aus (Alleria-Muster).
     const kind = engine?.sourceEffectKind ? engine.sourceEffectKind(sourceCard) : null;
     if (kind !== 'attack' && kind !== 'spell' && kind !== 'creature') return false;
+    if (!istHeldOderKreatur(engine, selected)) return false;   // das gewaehlte Ziel muss ein Held oder eine Kreatur sein (Al, 25.10.)
     // Must be a target the Anti-Magnet player controls.
     // Kontrolle statt Seite (Styx 28.9.).
     if ((engine?.zielSeite ? engine.zielSeite(selected) : selected.owner) !== pi) return false;
@@ -109,7 +112,7 @@ module.exports = {
     // "while you control other possible targets" → W12 (Al, Q88/F01-08): „Es braucht mindestens ein zweites **eigenes**
     // legales Ziel." Der Besitzer muss selbst (Kontrolle statt Seite) ein ZWEITES legales Ziel des Effekts kontrollieren;
     // ein beliebiges anderes Ziel (z. B. ein Held des Angreifers) genuegt nicht.
-    return getOtherValidTargets(selected, validTargets)
+    return getOtherValidTargets(selected, validTargets, engine)
       .some(t => (engine?.zielSeite ? engine.zielSeite(t) : t.owner) === pi);
   },
 
@@ -121,7 +124,7 @@ module.exports = {
   onRedirect: async (engine, pi, selected, validTargets, config, sourceCard) => {
     const gs = engine.gs;
     const ps = gs.players[pi];
-    const eligible = getOtherValidTargets(selected, validTargets);
+    const eligible = getOtherValidTargets(selected, validTargets, engine);
     if (eligible.length === 0) return null;
 
     // The opponent (the source's controller) chooses the new target.

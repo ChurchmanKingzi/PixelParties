@@ -60,11 +60,11 @@ module.exports = {
       // Der genutzte Stapel: `ctx.cardName` ist hier die Lab selbst (Hook-Kontext), der Name der genutzten Ability steht nicht
       // im Kontext — er folgt aus Held + Zone der Meldung (`zoneIdx`; Ability Zone, sonst Support-Zonen-Stapel wie bei Xal).
       const ps = gs.players[pi];
-      const abSlot = ps.abilityZones?.[lab.heroIdx]?.[ctx.zoneIdx];
-      const supSlot = ps.supportZones?.[lab.heroIdx]?.[ctx.zoneIdx];
-      const zoneKind = (abSlot && abSlot[0] === ABILITY) ? 'ability'
-        : (supSlot && supSlot[0] === ABILITY && engine.heroAcceptsAbilitiesInSupport(pi, lab.heroIdx)) ? 'support' : null;
-      if (!zoneKind) return;                                  // eine andere Ability wurde genutzt
+      // W73a: `(heroIdx, zoneIdx)` gilt nur MIT der Zonenart — Ability Zone 0 und Support Zone 0 tragen dieselbe Nummer (vorher hielt die Lab ein Training in Support Zone 0 fuer die Inventing in Ability Zone 0).
+      const zoneKind = ctx.zoneKind === 'support' ? 'support' : 'ability';
+      const abSlot = zoneKind === 'ability' ? ps.abilityZones?.[lab.heroIdx]?.[ctx.zoneIdx] : null;
+      const supSlot = zoneKind === 'support' && engine.heroAcceptsAbilitiesInSupport(pi, lab.heroIdx) ? ps.supportZones?.[lab.heroIdx]?.[ctx.zoneIdx] : null;
+      if ((abSlot || supSlot || [])[0] !== ABILITY) return;   // eine andere Ability wurde genutzt
       const level = (zoneKind === 'ability' ? abSlot : supSlot).length;
       const abInst = engine.cardInstances.find(c =>
         c.owner === pi && c.heroIdx === lab.heroIdx && c.name === ABILITY && c.zone === zoneKind && c.zoneSlot === ctx.zoneIdx);

@@ -179,6 +179,7 @@ module.exports = {
       engine._broadcastEvent('card_reveal', { cardName: fuerSucher });
       engine._broadcastEvent('deck_search_add', { cardName: fuerSucher, playerIdx: pi });
       const inst = engine.handZugangSync(pi, fuerSucher, { source: CARD_NAME });
+      engine.noteHandZugangAusStapel(pi, fuerSucher, { pile: 'deck', source: CARD_NAME });   // W72a: der Suchende bekommt eine Karte aus seinem eigenen Deck (Control Monitors)
       await engine.runHooks(HOOKS.ON_CARD_ADDED_TO_HAND, {
         playerIdx: pi, card: inst, cardName: fuerSucher, addedCard: inst, addedCardName: fuerSucher,
       });

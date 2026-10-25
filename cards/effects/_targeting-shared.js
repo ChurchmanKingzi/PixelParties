@@ -214,4 +214,18 @@ function collectNonHeroBoardTargets(gs, engine) {
   return targets;
 }
 
-module.exports = { isOppCreatureEffect, collectNonHeroBoardTargets, areaTargetId, coolnessSpitzeZiel, supportAbilityZiel };
+/**
+ * „Target" im Sinn von Anti-Magnet, Perfect Disguise, Skeleton Archer, Zhuque (Al, 25.10.2026): nur HELDEN und KREATUREN. Ausruestung, Anhaengsel, Areas, Abilities, Surprises
+ * und Permanents sind keine Ziele. `t` ist ein Zielobjekt (`type` 'hero' | 'equip' ... mit `cardInstance`/`_cardInstance`/`cardName`) ODER eine Instanz im Support.
+ */
+function istHeldOderKreatur(engine, t) {
+  if (!t) return false;
+  if (t.type === 'hero') return true;
+  const inst = t.zone ? t : (t.cardInstance || t._cardInstance || null);
+  if (!inst && t.type !== 'equip') return false;
+  if (t.type && t.type !== 'equip' && !t.zone) return false;
+  const cd = inst ? (engine.getEffectiveCardData?.(inst) || engine._getCardDB()[inst.name]) : engine._getCardDB()[t.cardName];
+  return engine.isChoosableAsCreature(inst, cd);
+}
+
+module.exports = { istHeldOderKreatur, isOppCreatureEffect, collectNonHeroBoardTargets, areaTargetId, coolnessSpitzeZiel, supportAbilityZiel };

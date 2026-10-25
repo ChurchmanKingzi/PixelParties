@@ -231,7 +231,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
   // Filter pool by name search.
   const visiblePool = poolOrder
     .map((e, i) => ({ name: e.name, gray: e.gray, id: e.id, idx: i }))
-    .filter(e => !filter || e.name.toLowerCase().includes(filter.toLowerCase()));
+    .filter(e => !filter || window.namePasst(e.name, filter));
 
   // Player ring shown top-left. Always rooted at "me" so the local seat
   // is at index 0; subsequent entries follow the snake direction so the
@@ -496,7 +496,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
     : null;
 
   // Pool counts (incl. assigned hero, which the server pushed into pool).
-  const poolCounts = useMemo(() => {
+  const basisCounts = useMemo(() => {
     const c = {};
     for (const n of (build?.pool || [])) c[n] = (c[n] || 0) + 1;
     return c;
@@ -524,6 +524,31 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
   const [potionDeck, setPotionDeck] = useState([]);
   const [sideDeck, setSideDeck] = useState([]);
   const [filter, setFilter] = useState('');
+
+  // ★ W77 — Cuberto, Supreme Lord of Edges: als Starthelden darf er bis zu 5 gedraftete Karten gegen beliebige andere tauschen (verschiedene Namen). `swaps` = [{ from, to }];
+  // `swapHeroes` (Server, aus dem Skript-Kennzeichen `cubeDraftSwap`) nennt die tauschfähigen Helden im Pool mit ihrer Höchstzahl. Der EFFEKTIVE Pool = Pool − from + to.
+  const [swaps, setSwaps] = useState([]);
+  const [swapOffen, setSwapOffen] = useState(false);
+  const [swapVon, setSwapVon] = useState(null);
+  const [swapFilter, setSwapFilter] = useState('');
+  const swapHeroes = build?.swapHeroes || {};
+  const tauschMax = heroes.reduce((m, h) => Math.max(m, (h?.hero && swapHeroes[h.hero]) || 0), 0);
+  const poolCounts = useMemo(() => {
+    const c = { ...basisCounts };
+    for (const sw of swaps) { c[sw.from] = (c[sw.from] || 0) - 1; c[sw.to] = (c[sw.to] || 0) + 1; }
+    return c;
+  }, [basisCounts, swaps]);
+  // Eingetauschte Karten im Deck wieder zu ihren Ursprungskarten machen (je Tausch die erste Kopie).
+  const tauschRueckgaengig = (liste) => {
+    const ersetze = (arr) => { const out = [...arr]; for (const sw of liste) { const i = out.indexOf(sw.to); if (i >= 0) out[i] = sw.from; } return out; };
+    setMainDeck(ersetze); setPotionDeck(ersetze); setSideDeck(ersetze);
+  };
+  // Cuberto ist kein Starthelden mehr: alle Tausche verfallen, die eingetauschten Karten werden wieder zu ihren Ursprungskarten.
+  useEffect(() => {
+    if (tauschMax > 0 || swaps.length === 0) return;
+    tauschRueckgaengig(swaps);
+    setSwaps([]); setSwapOffen(false); setSwapVon(null);
+  }, [tauschMax]);
 
   // One-time bootstrap: seed deck name and auto-fill hero slots from
   // the drafted heroes (so the player isn't staring at empty slots).
@@ -580,7 +605,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
     const list = [];
     const seen = new Set();
     for (const name of Object.keys(poolCounts)) {
-      if (seen.has(name)) continue;
+      if (seen.has(name) || (poolCounts[name] || 0) <= 0) continue;
       seen.add(name);
       list.push({ name, count: poolCounts[name], free: false });
     }
@@ -601,7 +626,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
   }, [poolCounts, allCards, cardDB]);
 
   const visibleList = filter
-    ? availableList.filter(e => e.name.toLowerCase().includes(filter.toLowerCase()))
+    ? availableList.filter(e => window.namePasst(e.name, filter))
     : availableList;
 
   // Klaenge wie im normalen Deckbauer: Hinzufuegen = draw, Entfernen = discard.
@@ -715,6 +740,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
         mainDeck,
         potionDeck,
         sideDeck,
+        ...(tauschMax > 0 && swaps.length > 0 ? { cubertoSwaps: swaps } : {}),
       },
     });
   };
@@ -918,6 +944,30 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
           <div style={{ fontSize: 9, color: 'var(--text2)', marginBottom: 6 }}>Click: add · Shift+click: Potion Deck · Ctrl+click: Main Deck (Heroes too) · Right-click: Side Deck</div>
           <input className="input" placeholder="🔍 Filter by name..." value={filter} onChange={e => setFilter(e.target.value)}
             style={{ marginBottom: 8, fontSize: 11, padding: '4px 8px' }} />
+          {Object.keys(swapHeroes).length > 0 && (
+            <div style={{ border: '1px solid ' + (tauschMax > 0 ? '#b3d8f9' : 'var(--bg4)'), borderRadius: 4, padding: 6, marginBottom: 8, background: 'rgba(179,216,249,.07)' }}>
+              <div className="orbit-font" style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, color: tauschMax > 0 ? '#b3d8f9' : 'var(--text2)', marginBottom: 4 }}>
+                🧊 {Object.keys(swapHeroes)[0].split(',')[0].toUpperCase()} — SWAP {swaps.length}/{tauschMax || Math.max(...Object.values(swapHeroes))}
+              </div>
+              {tauschMax === 0 ? (
+                <div style={{ fontSize: 10, color: 'var(--text2)' }}>Make {Object.keys(swapHeroes)[0]} one of your Starting Heroes to swap up to {Math.max(...Object.values(swapHeroes))} drafted cards for any other cards (different names).</div>
+              ) : (
+                <>
+                  {swaps.map((sw, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, marginBottom: 2 }}>
+                      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sw.from} → <strong>{sw.to}</strong></span>
+                      <button className="btn btn-danger" style={{ padding: '0 6px', fontSize: 10 }} title="Undo this swap"
+                        onClick={() => { tauschRueckgaengig([sw]); setSwaps(prev => prev.filter((_, k) => k !== i)); }}>✕</button>
+                    </div>
+                  ))}
+                  <button className="btn" disabled={swaps.length >= tauschMax} style={{ width: '100%', fontSize: 10, padding: '3px 6px' }}
+                    onClick={() => { setSwapOffen(true); setSwapVon(null); setSwapFilter(''); }}>
+                    ＋ Swap a drafted card{swaps.length >= tauschMax ? ' (limit reached)' : ''}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
           <div style={{ flex: 1, overflowY: 'auto' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
               {visibleList.map(({ name, count, free }) => {
@@ -966,6 +1016,47 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
         {/* Platz fuer den grossen Karten-Tooltip (rechte Leiste), damit er keine Karten ueberdeckt */}
         <div className="cube-draft-tt-gutter" style={{ flexShrink: 0 }} />
       </div>
+
+      {swapOffen && (() => {
+        const eingetauscht = new Set(swaps.map(x => x.to));
+        const istFrei = (n) => cardDB[n]?.cardType === 'Ability' && n !== 'Performance';
+        // 1) Karte aus dem Pool, die wegkommt: eine UNGENUTZTE Kopie, kein Held, keine freie Ability, keine eingetauschte Karte
+        const vonListe = Object.keys(poolCounts).filter(n => cardDB[n] && cardDB[n].cardType !== 'Hero' && !istFrei(n) && !eingetauscht.has(n) && remainingFor(n) > 0)
+          .sort((a, b) => a.localeCompare(b));
+        // 2) neue Karte: beliebig, aber kein Held/Token/freie Ability, nicht dieselbe, und die eingetauschten Karten haben verschiedene Namen
+        const q = swapFilter.trim().toLowerCase();
+        const zuListe = swapVon ? allCards.filter(c => c && c.name && c.name !== swapVon && c.cardType !== 'Hero' && c.cardType !== 'Token' && !istFrei(c.name) && !eingetauscht.has(c.name)
+          && (!q || window.namePasst(c.name, q))).slice(0, 60) : [];
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: '#08060c', display: 'flex', flexDirection: 'column', padding: 16, gap: 10 }} data-pp-px="aus">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <h3 className="orbit-font" style={{ fontSize: 14, color: '#b3d8f9', margin: 0 }}>🧊 SWAP A DRAFTED CARD</h3>
+              <span style={{ fontSize: 11, color: 'var(--text2)' }}>{swapVon ? `Replace "${swapVon}" with…` : '1. Choose the drafted card that goes away'}</span>
+              <div style={{ flex: 1 }} />
+              {swapVon && <button className="btn" onClick={() => setSwapVon(null)}>← Back</button>}
+              <button className="btn btn-danger" onClick={() => setSwapOffen(false)}>Cancel</button>
+            </div>
+            {swapVon && (
+              <input className="input" autoFocus placeholder="🔍 Search any card by name…" value={swapFilter} onChange={e => setSwapFilter(e.target.value)} style={{ fontSize: 12, padding: '4px 8px' }} />
+            )}
+            <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 6, alignContent: 'start' }}>
+              {!swapVon && vonListe.map(n => (
+                <div key={n} style={{ aspectRatio: '5 / 7', cursor: 'pointer' }} onClick={() => { setSwapVon(n); setSwapFilter(''); }} title={n}>
+                  <CardMini card={cardDB[n]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                </div>
+              ))}
+              {swapVon && zuListe.map(c => (
+                <div key={c.name} style={{ aspectRatio: '5 / 7', cursor: 'pointer' }} title={c.name}
+                  onClick={() => { setSwaps(prev => [...prev, { from: swapVon, to: c.name }]); setSwapOffen(false); setSwapVon(null); sfx('draw'); }}>
+                  <CardMini card={cardDB[c.name]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                </div>
+              ))}
+              {!swapVon && vonListe.length === 0 && <div style={{ gridColumn: '1/-1', color: 'var(--text2)', fontSize: 12, fontStyle: 'italic' }}>No unused drafted cards to swap — take cards out of your deck first.</div>}
+              {swapVon && zuListe.length === 0 && <div style={{ gridColumn: '1/-1', color: 'var(--text2)', fontSize: 12, fontStyle: 'italic' }}>No cards match.</div>}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -93,6 +93,8 @@ module.exports = {
       if (idx < 0) return;
       ps.potionDeck.splice(idx, 1);
       engine.handZugangSync(ps, chosenName, { ohneInstanz: true });
+      // W72b (Al): das Potion Deck zählt als „their deck" — die SUCHE (+5 Gold) löst Control Monitors aus; das bloße Ziehen (Modus „draw") ist ein Draw und nicht.
+      engine.noteHandZugangAusStapel(pi, chosenName, { pile: 'potionDeck', source: 'Alchemic Journal' });
 
       // Lock chosen potion name for the turn
       if (!ps._creationLockedNames) ps._creationLockedNames = new Set();

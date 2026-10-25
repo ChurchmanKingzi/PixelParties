@@ -41,6 +41,7 @@
 //    standard `oncePerGame` + `oncePerGameKey`.
 // ═══════════════════════════════════════════
 
+const { istHeldOderKreatur } = require('./_targeting-shared');
 const CARD_NAME = 'Perfect Disguise';
 const ONCE_PER_GAME_KEY = 'perfectDisguise';
 
@@ -127,6 +128,7 @@ module.exports = {
         if (inst.zone !== 'support') continue;
         if ((inst.controller ?? inst.owner) !== pi) continue;
         if (inst.faceDown) continue;
+        if (!istHeldOderKreatur(engine, inst)) continue;   // „target you control" = Held oder Kreatur (Al, 25.10.): keine Ausruestung, kein Anhaengsel
         targets.push({
           id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
           type: 'equip',

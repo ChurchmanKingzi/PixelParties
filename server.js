@@ -8837,7 +8837,22 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       // (Area/Attachment/Permanent, `_spellPlacedOnBoard`), auf die Hand zurückkehrt oder gelöscht wird.
       _buddyTicket = room.engine.neuesBuddyTicket('hand', {
         ablageErwartet: () => !gs._spellPlacedOnBoard && !gs._spellReturnToHand && !script?.deleteOnUse && !_attaLoescht,
+        // Hat der Zauber die Hand schon selbst verlassen (`aufloesenderSpellInDieAblage`: Live Show, Shooting Star …), liegt er bereits in der Ablage: der Buddy nimmt ihn von dort.
+        nimm: () => {
+          const f = gs._spellFruehAbgelegt;
+          if (!f || f.name !== cardName) return true;
+          delete gs._spellFruehAbgelegt;
+          const arr = gs.players[f.besitzer]?.discardPile;
+          const i = arr ? arr.lastIndexOf(cardName) : -1;
+          if (i >= 0) room.engine._takeFromPileCore(f.besitzer, gs.players[f.besitzer], arr, 'discard', i, cardName, { source: 'Card Game Player Inya' });
+          return true;
+        },
       });
+      // ★ 25.10. (Teleport): die Wirkerin/der Wirker steht nach dem Tausch auf dem ANDEREN Platz. Die Lauscher (Inya: „this Hero uses a Spell") vergleichen `heroIdx` mit dem aktuellen
+      // Platz ihres Helden — also den Platz NACH dem Tausch melden. (Die Variable `heroIdx` selbst bleibt der alte Platz: `heroesActedThisTurn` wird vom Teleport selbst nachgezogen.)
+      const _tpn = gs._teleportNachlauf;
+      const _hookHeroIdx = (_tpn && cardName === 'Teleport' && _tpn.pi === pi && _tpn.seite === (heroOwner ?? pi))
+        ? (heroIdx === _tpn.a ? _tpn.b : heroIdx === _tpn.b ? _tpn.a : heroIdx) : heroIdx;
       await room.engine.runHooks('afterSpellResolved', {
         // v778: `heroOwner` = in WESSEN Heldenreihe `heroIdx` zeigt.
         // Ohne das Feld war der Hook bei einem bezauberten Helden
@@ -8846,7 +8861,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         // „mein Held hat angegriffen" nicht von „der gleichindizierte
         // Held der Gegenseite hat angegriffen" unterscheiden.
         heroOwner,
-        spellName: cardName, spellCardData: cardData, heroIdx, casterIdx: pi,
+        spellName: cardName, spellCardData: cardData, heroIdx: _hookHeroIdx, casterIdx: pi,
         damageTargets: uniqueTargets, isSecondCast: !!gs._bartasSecondCast,
         // The provider instance whose additional-action token was just
         // consumed by THIS spell-play, or null if the spell was cast as
@@ -8858,6 +8873,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         _buddy: _buddyTicket,   // W67a: Inyas Fantasy Buddy (ersetzt die Ablage; siehe unten)
         _skipReactionCheck: true,
       });
+      delete gs._spellFruehAbgelegt;
       // ★ 25.10. (Nasty Prank): Hand-Fenster „ein Held hat eine Attack/einen Spell ausgeführt" — erst jetzt, wo nichts mehr verhindert werden kann (nicht negiert, nicht abgebrochen, nicht verpufft).
       if (!_gefizzelt && !gs._bartasSecondCast && Number.isInteger(heroIdx) && heroIdx >= 0 && (cardData.cardType === 'Spell' || cardData.cardType === 'Attack')) {
         await room.engine._checkSpellPerformedHandReactions({
@@ -9818,9 +9834,9 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
   if (charmedOwner != null && hero.charmedBy !== pi && hero.controlledBy !== pi) return false;
 
   // v769: Der Stapel kann in einer SUPPORT Zone liegen (Xal).
-  const abilitySlot = (zoneKind === 'support')
-    ? ps.supportZones?.[heroIdx]?.[zoneIdx]
-    : ps.abilityZones?.[heroIdx]?.[zoneIdx];
+  // W73a: `(heroIdx, zoneIdx)` ist nur zusammen mit der Zonenart eindeutig; ein Support-Stapel zaehlt nur, solange der Held Abilities in Support Zonen nimmt (die Engine-Listen
+  // fuehren schlafende Stapel nicht — der Socket-Weg haelt dieselbe Linie).
+  const abilitySlot = room.engine.abilityStapelAn(heroOwner, heroIdx, zoneKind, zoneIdx);
   if (!abilitySlot || abilitySlot.length === 0) return false;
   const abilityName = abilitySlot[0];
   const level = abilitySlot.length;
@@ -9987,7 +10003,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
       hoptReserved = false;
       // ★★ v1349: Aktiveffekt genutzt (Madame Guillotine & Co.).
       await room.engine.meldeAktivEffekt({
-        kind: 'ability', playerIdx: pi, heroIdx, cardName: abilityName, zoneIdx, isActionCost: false,
+        kind: 'ability', playerIdx: pi, heroIdx, cardName: abilityName, zoneIdx, zoneKind, isActionCost: false,
       });
       // Gefeuert — auch wenn die Karte den Schlüssel danach wieder
       // freigibt, weil sie mehrere Nutzungen pro Runde hat (Lethes
@@ -10729,9 +10745,9 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
 
   // v769: Der Stapel kann in einer SUPPORT Zone liegen (Xal, Xalibur).
   // Die Aktivierung selbst unterscheidet sich nicht — nur, wo er steht.
-  const abilitySlot = (zoneKind === 'support')
-    ? ps.supportZones?.[heroIdx]?.[zoneIdx]
-    : ps.abilityZones?.[heroIdx]?.[zoneIdx];
+  // W73a: `(heroIdx, zoneIdx)` ist nur zusammen mit der Zonenart eindeutig; ein Support-Stapel zaehlt nur, solange der Held Abilities in Support Zonen nimmt (die Engine-Listen
+  // fuehren schlafende Stapel nicht — der Socket-Weg haelt dieselbe Linie).
+  const abilitySlot = room.engine.abilityStapelAn(heroOwner, heroIdx, zoneKind, zoneIdx);
   if (!abilitySlot || abilitySlot.length === 0) return false;
   const abilityName = abilitySlot[0];
   const level = abilitySlot.length;
@@ -11014,7 +11030,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     // Universal action-resolved hook (see doPlaySpell for rationale).
     // ★★ v1349: Aktiveffekt genutzt (Madame Guillotine & Co.).
     await room.engine.meldeAktivEffekt({
-      kind: 'ability', playerIdx: pi, heroIdx, cardName: abilityName, zoneIdx, isActionCost: true,
+      kind: 'ability', playerIdx: pi, heroIdx, cardName: abilityName, zoneIdx, zoneKind, isActionCost: true,
     });
     await room.engine.runHooks('onAnyActionResolved', {
       actionType: 'ability_activation', playerIdx: pi, abilityName, heroIdx, heroOwner,
@@ -13492,6 +13508,7 @@ function cubeBuildBroadcast(room, io) {
       seatIdx,
       pool,
       assignedHero: cd.assignedHeroes?.[seatIdx] || null,
+      swapHeroes: require('./cards/effects/_cube-swap-shared').tauschHelden(pool, getCardDB()),   // W77 (Cuberto): Helden im Pool, die Karten tauschen dürfen → max. Anzahl
       cubeName: cd.cubeName,
       submittedDeck: cd.builtDecks?.[seatIdx] || null,
       ready: !!cd.readySeats?.[seatIdx],
@@ -13555,6 +13572,12 @@ function validateDraftedDeck(deck, pool, cardDB) {
   const poolCounts = {};
   for (const name of pool) poolCounts[name] = (poolCounts[name] || 0) + 1;
 
+  // ★ W77 (Cuberto, Supreme Lord of Edges): ein Starthelden-Kartentausch (`deck.cubertoSwaps`) verändert den Pool — bis zu 5 gedraftete Karten gegen andere (verschiedene Namen).
+  const CubeSwap = require('./cards/effects/_cube-swap-shared');
+  const tausch = CubeSwap.pruefeTausch(deck, poolCounts, cardDB);
+  if (!tausch.ok) return { ok: false, reason: tausch.reason };
+  const poolMitTausch = CubeSwap.poolNachTausch(poolCounts, tausch.swaps);
+
   // Starthelden-Kandidaten im Pool (inkl. zugewiesenem Helden). Helden mit „cannot be one of your
   // Starting Heroes“ (Quetzahuitl) zaehlen nicht — sie duerfen nur im Main Deck liegen.
   const filledList = heroes.filter(h => h && h.hero);
@@ -13601,7 +13624,7 @@ function validateDraftedDeck(deck, pool, cardDB) {
     if (!cd) return { ok: false, reason: `Unknown card "${name}"` };
     // Non-Performance Abilities are infinite (drafted pool isn't required).
     if (cd.cardType === 'Ability' && name !== 'Performance') continue;
-    const available = poolCounts[name] || 0;
+    const available = poolMitTausch[name] || 0;
     if (count > available) {
       return { ok: false, reason: `Not enough "${name}" in pool (have ${available}, used ${count})` };
     }
@@ -15719,7 +15742,7 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    doPlayAbility(room, pi, params).catch(err => console.error('[play_ability] error:', err.message));
+    doPlayAbility(room, pi, params).catch(err => console.error('[play_ability] error:', err.message)).finally(() => room.engine?._runPostChainActions?.());   // W72a: Anlege-Auslöser (Kit …) melden Karten aus Deck/Ablage — das Control-Monitors-Fenster öffnet hier
   });
 
   // ── Place a Surprise card face-down into a Hero's Surprise Zone ──
@@ -16126,7 +16149,7 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    doConfirmPotion(room, pi, params).catch(err => console.error('[confirm_potion] error:', err.message));
+    doConfirmPotion(room, pi, params).catch(err => console.error('[confirm_potion] error:', err.message)).finally(() => room.engine?._runPostChainActions?.());   // W72a: Trank mit Zielwahl, der Karten aus Deck/Ablage holt (Control Monitors)
   });
 
   // Broadcast targeting selections to opponent
@@ -16612,6 +16635,7 @@ io.on('connection', (socket) => {
     try {
       const result = await room.engine.performAscension(pi, heroIdx, cardName, handIndex, { fromCreation, heroOwner: hs });
       if (!result.success) return;
+      try { await room.engine._runPostChainActions(); } catch (err) { console.error('[ascend_hero] Nach-Ketten-Aktionen:', err.message); }   // W72a: Aufstiegsbonus „add … from your deck" (Beato, Waflav) → Control-Monitors-Fenster VOR dem Zugende
       // Skip to End Phase if required
       if (result.skipEndPhase) {
         // GRUNDMECHANIK, kein Karteneffekt (Als Ruling 16.8.): der
