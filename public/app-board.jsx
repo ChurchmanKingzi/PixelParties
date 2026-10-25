@@ -41191,11 +41191,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
         // Stufen-Hinweis (You are the Chosen One!!!): welcher EIGENE Held liegt unter dem Zeiger — unabhängig davon, ob er die Karte wirken darf. Der Server liefert die Stufe, die
         // die Karte für jeden Helden hätte (`heroPlayableCards.stufen`); auf dem Helden erscheint sie als Abzeichen (`.hero-level-hint`).
-        let hoverHero = -1;
+        // Das Abzeichen liegt auf Wurzelebene ÜBER der Sprite-Ebene der Helden (die Figur würde es sonst verdecken) und erscheint nur, solange der Zeiger direkt auf dem Helden-Feld ist —
+        // deshalb merkt sich der Zug das Rechteck des Feldes (`hoverHeroRect`, Bildschirmkoordinaten).
+        let hoverHero = -1, hoverHeroRect = null;
         if (gameState.heroPlayableCards?.stufen?.[cardName]) {
           for (const el of document.querySelectorAll('[data-hero-zone][data-hero-owner="me"]')) {
             const r = el.getBoundingClientRect();
-            if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) hoverHero = parseInt(el.dataset.heroIdx);
+            if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+              hoverHero = parseInt(el.dataset.heroIdx);
+              hoverHeroRect = { left: r.left, top: r.top, width: r.width, height: r.height };
+            }
           }
         }
 
@@ -41254,7 +41259,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
         }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, hoverHero, targetSlot: targetSlot, targetAttachOwner, creatureCasterSlot, creatureCasterInstId, isSpell: !surpriseTarget, isSurprise: surpriseTarget, surpriseOpp: surpriseTarget && surpriseOpp, charmedOwner: surpriseTarget ? undefined : targetCharmedOwner , fromCreation });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, hoverHero, hoverHeroRect, targetSlot: targetSlot, targetAttachOwner, creatureCasterSlot, creatureCasterInstId, isSpell: !surpriseTarget, isSurprise: surpriseTarget, surpriseOpp: surpriseTarget && surpriseOpp, charmedOwner: surpriseTarget ? undefined : targetCharmedOwner , fromCreation });
       } else if (isAscensionPlayable) {
         // Ascended Hero drag — target hero zones with eligible base heroes
         let targetHero = -1;
@@ -54689,10 +54694,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     Rahmen allein sagt nur „hier stimmt etwas nicht" —
                     das Schild sagt, WEM der Held jetzt gehoert, und
                     steht auf beiden Seiten des Bretts. */}
-                {/* Stufen-Hinweis beim Ziehen einer Karte mit heldenabhängiger Stufe (You are the Chosen One!!!): die Stufe, die sie für DIESEN Helden hätte. */}
-                {!isOpp && playDrag && playDrag.hoverHero === i && gameState.heroPlayableCards?.stufen?.[playDrag.cardName]?.[i] != null && (
-                  <div className="hero-level-hint">Lv {gameState.heroPlayableCards.stufen[playDrag.cardName][i]}</div>
-                )}
                 {isPermaControlled && (
                   <div className={'hero-owned-badge' + (hero.permaControlBy === myIdx ? ' hero-owned-mine' : '')}>
                     {hero.permaControlBy === myIdx ? '⛓ Yours' : '⛓ ' + (opp?.username || 'Opponent') + "'s"}
@@ -58450,6 +58451,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {playDrag && (
         <div className="hand-floating-card" style={{ left: 0, top: 0, transform: `translate3d(${playDrag.mouseX - (playDrag.griffX ?? 32)}px, ${playDrag.mouseY - (playDrag.griffY ?? 45)}px, 0) rotate(3deg)` }}>
           <BoardCard cardName={playDrag.cardName} />
+        </div>
+      )}
+      {/* Stufen-Hinweis beim Ziehen einer Karte mit heldenabhängiger Stufe (You are the Chosen One!!!): die Stufe, die sie für den Helden unter dem Zeiger hätte. Auf Wurzelebene (über
+          der Sprite-Ebene, z-index 51, und über der Zieh-Karte), nur solange der Zeiger direkt auf dem Helden ist. */}
+      {playDrag && playDrag.hoverHero >= 0 && playDrag.hoverHeroRect && gameState.heroPlayableCards?.stufen?.[playDrag.cardName]?.[playDrag.hoverHero] != null && (
+        <div className="hero-level-hint" style={{ left: Math.round(playDrag.hoverHeroRect.left + playDrag.hoverHeroRect.width / 2), top: Math.round(playDrag.hoverHeroRect.top) + 4 }}>
+          Lv {gameState.heroPlayableCards.stufen[playDrag.cardName][playDrag.hoverHero]}
         </div>
       )}
       {abilityDrag && (

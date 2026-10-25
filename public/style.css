@@ -10725,11 +10725,11 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 .hero-owned-badge.hero-owned-mine { opacity: .95; }
 
 /* Stufen-Hinweis beim Ziehen einer Karte mit heldenabhängiger Stufe (You are the Chosen One!!!) — PIXELART: harter Rahmen aus gestapelten Ringen, feste Farben, kein Schein. */
+/* Auf Wurzelebene (position: fixed) über der Sprite-Ebene der Helden (51) und der Zieh-Karte (10000); Lage per Inline-Stil aus dem Rechteck des Helden-Feldes. */
 .hero-level-hint {
-  position: absolute;
-  top: 4px; left: 50%;
+  position: fixed;
   transform: translateX(-50%);
-  z-index: 7;
+  z-index: 10001;
   padding: 2px 8px;
   font-size: 14px;
   line-height: 16px;

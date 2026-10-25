@@ -11,9 +11,10 @@
 //  • „Additional": das Anlegen verbraucht das Anlegen dieses Helden für den Zug NICHT (`skipAbilityGivenCheck`, wie Training); es gelten die Zonenregeln des Anlegens
 //    (`canAttachAbilityToHero` → freie Zone oder gleichnamiger Stapel unter Stufe 3, Support-Zonen-Stapel bei Xal/Xalibur, verwahrte Zonen, `restrictedAttachment`).
 //    Das Anlegen PER EFFEKT prallt an Resistance ab (der Einsatz gilt dann als gewirkt, die Karte bleibt, wo sie war).
-//  • Hand: wie bei Training — Fähigkeitskarte aus der Hand auf den Helden (Ziel-Zone wählbar). Deck: Galerie der anlegbaren Abilities, die gewählte Karte wird gesucht und angelegt
-//    (kein Mischen, keine Kosten). Summoning Magic 1 = `heroSchoolLevel('Summoning Magic') ≥ 1` des Helden; mit ihr darf der Spieler zwischen Hand und Deck wählen („instead":
-//    entweder-oder), ohne sie nur die Hand.
+//  • EIN Picker für alle Quellen (Regel „Mehrere Quellen = ein Picker", CARD_API.md): eine Kartengalerie mit allen anlegbaren Abilities der HAND und — mit Summoning Magic 1
+//    (`heroSchoolLevel('Summoning Magic') ≥ 1` des Helden) — des DECKS; jeder Eintrag trägt sein Herkunfts-Label (HAND / DECK, wie bei Barker und Hulijing). Es gibt KEINE Vorfrage
+//    „Hand oder Deck?". Gleichnamige Karten aus Hand und Deck sind zwei Einträge („instead": die Wahl entscheidet die Quelle). Die Karte wird an die erste passende Stelle des
+//    Helden gelegt (Stapel einer gleichnamigen Ability, sonst die erste freie Zone — wie bei Super Fan und dem Deck-Zweig von Training); keine Kosten, kein Mischen.
 //  • Einmal pro Zug je Karte (Engine-HOPT bei nicht-`false`-Rückgabe). Abbrechen vor dem Anlegen verbraucht den Effekt nicht („you MAY").
 //
 //  ── Bild und Klang ────────────────────────────────────────────────────
@@ -21,11 +22,10 @@
 //  verschwinden gedithert — er bringt dem Helden etwas bei. Klang in ZONE_ANIM_SFX; Log `wise_village_elder`.
 //
 //  ── CPU ─────────────────────────────────────────────────────────────
-//  Hand-Prompt wie Training (`abilityAttach`: vorhandene Abilities des Helden stapeln, dann neue, dann gestreute); Hand oder Deck: das Deck (kostet keine Handkarte); die Galerie nach demselben Muster.
+//  Die Galerie wird nach `cpuBeste` beantwortet (vorhandene Abilities des Helden stapeln, dann neue, dann gestreute); Deckeinträge gehen vor (kosten keine Handkarte).
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
-const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Wise Village Elder';
 const LEHR_MS = 1500;        // Länge von `elder_teaching` im Client
@@ -88,38 +88,17 @@ function cpuBeste(engine, pi, heroIdx, namen) {
   return s(t1)[0] || s(t2)[0] || s(t3)[0] || null;
 }
 
-/** Aus der Hand anlegen (wie Training Stufe 1). @returns {'ok'|'blocked'|'abbruch'} */
-async function ausDerHand(engine, pi, feld, heroIdx, heroName, ortCtx) {
-  const eligible = handAbilities(engine, pi, feld, heroIdx);
-  if (eligible.length === 0) return 'abbruch';
-  let cardName, zoneOpts = {};
-  if (feld === pi) {
-    const result = await engine.promptGeneric(pi, {
-      type: 'abilityAttach', ownerIdx: pi, heroIdx, eligibleCards: eligible,
-      title: CARD_NAME, description: `Attach an Ability from your hand to ${heroName}.`,
-      cancellable: true, canFinish: false,
-    });
-    if (!result || result.cancelled || result.finished || !result.cardName || !eligible.includes(result.cardName)) return 'abbruch';
-    cardName = result.cardName;
-    zoneOpts = { targetZoneSlot: result.zoneSlot, targetSupportSlot: result.supportSlot };
-    // Karten bleiben gedimmt, bis das Anlegen durch ist (kein kurzes Aufflackern) — wie Training.
-    engine.gs.effectPrompt = { type: 'abilityAttach', ownerIdx: pi, eligibleCards: [], heroIdx, title: CARD_NAME, description: '', cancellable: false, canFinish: false };
-  } else {
-    // Übernommener Held der Gegenspalte: das Zieh-Prompt kennt nur eigene Helden → Handkarte wählen (wie Training bei geliehenen Helden).
-    const ps = engine.gs.players[pi];
-    const indices = (ps.hand || []).map((n, i) => (eligible.includes(n) ? i : -1)).filter(i => i >= 0);
-    const result = await engine.promptGeneric(pi, {
-      type: 'handPick', title: CARD_NAME, description: `Attach an Ability from your hand to ${heroName}.`,
-      eligibleIndices: indices, minSelect: 1, maxSelect: 1, cancellable: true, confirmLabel: '📚 Attach!', pickIntent: 'use',
-    });
-    const pick = result && !result.cancelled && Array.isArray(result.selectedCards) ? result.selectedCards[0] : null;
-    if (!pick?.cardName || !eligible.includes(pick.cardName)) return 'abbruch';
-    cardName = pick.cardName;
-    zoneOpts = { heroOwner: feld };
-  }
+/** Die Galerie: erst die Hand, dann das Deck (je alphabetisch), jeder Eintrag mit seinem Herkunfts-Label (`source`). Deck nur mit Summoning Magic 1. */
+function galerieFuer(engine, pi, feld, heroIdx) {
+  const hand = handAbilities(engine, pi, feld, heroIdx).sort((a, b) => a.localeCompare(b)).map(name => ({ name, source: 'hand' }));
+  const deck = deckErlaubt(engine, feld, heroIdx) ? deckAbilities(engine, pi, feld, heroIdx) : [];
+  return [...hand, ...deck];
+}
+
+/** Aus der Hand anlegen. @returns {'ok'|'blocked'|'abbruch'} */
+async function ausDerHand(engine, pi, feld, heroIdx, heroName, cardName, ortCtx) {
   await ortCtx.lehren();
-  const res = await engine.attachAbilityFromHand(pi, cardName, heroIdx, { skipAbilityGivenCheck: true, source: CARD_NAME, ...zoneOpts });
-  engine.gs.effectPrompt = null;
+  const res = await engine.attachAbilityFromHand(pi, cardName, heroIdx, { skipAbilityGivenCheck: true, source: CARD_NAME, ...(feld !== pi ? { heroOwner: feld } : {}) });
   engine.sync();
   if (res.blocked) return 'blocked';
   if (!res.success) return 'abbruch';
@@ -131,18 +110,8 @@ async function ausDerHand(engine, pi, feld, heroIdx, heroName, ortCtx) {
 }
 
 /** Aus dem Deck anlegen (wie Training Stufe 3, Option B). @returns {'ok'|'blocked'|'abbruch'} */
-async function ausDemDeck(engine, pi, feld, heroIdx, heroName, ortCtx) {
+async function ausDemDeck(engine, pi, feld, heroIdx, heroName, cardName, ortCtx) {
   const ps = engine.gs.players[pi];
-  const galerie = deckAbilities(engine, pi, feld, heroIdx);
-  if (galerie.length === 0) return 'abbruch';
-  const picked = await engine.promptGeneric(pi, {
-    type: 'cardGallery', cards: galerie, title: CARD_NAME, ownerIdx: pi, heroIdx,        // ownerIdx/heroIdx: für die CPU-Antwort
-    description: `Choose an Ability from your deck to attach to ${heroName}.`,
-    cancellable: true,
-  });
-  if (!picked || picked.cancelled || !picked.cardName) return 'abbruch';
-  const cardName = picked.cardName;
-  if (!galerie.some(g => g.name === cardName)) return 'abbruch';
   // Anlegen per Effekt prallt an Resistance ab (die Karte bleibt im Deck, kein Mischen); der Einsatz gilt als gewirkt.
   if (await engine.abilityAnlegenDurchResistanceBlockiert(pi, feld, heroIdx, CARD_NAME)) {
     engine.log('wise_village_elder_blocked', { player: ps.username, ability: cardName, hero: heroName });
@@ -188,25 +157,22 @@ module.exports = {
     const { feld, heroIdx, hero, pi } = h;
     const heroName = hero.name;
 
-    const hand = handAbilities(engine, pi, feld, heroIdx);
-    const deckOk = deckErlaubt(engine, feld, heroIdx) && deckAbilities(engine, pi, feld, heroIdx).length > 0;
-    if (hand.length === 0 && !deckOk) return false;
-
-    // Quelle: Hand oder (mit Summoning Magic 1) Deck — „instead".
-    let quelle = hand.length > 0 ? 'hand' : 'deck';
-    if (hand.length > 0 && deckOk) {
-      const opt = await engine.promptGeneric(pi, {
-        type: 'optionPicker', title: CARD_NAME, showCard: CARD_NAME,
-        description: `${heroName} has Summoning Magic 1 or higher: attach an additional Ability from your hand — or from your deck instead?`,
-        options: [
-          { id: 'hand', label: 'From my hand' },
-          { id: 'deck', label: 'From my deck instead' },
-        ],
-        cancellable: true,
-      });
-      if (!opt || opt.cancelled || !opt.optionId) return false;           // „may": Abbruch verbraucht den Effekt nicht
-      quelle = opt.optionId === 'deck' ? 'deck' : 'hand';
-    }
+    // EIN Picker für alle Quellen: Hand und (mit Summoning Magic 1) Deck, jeder Eintrag mit Herkunfts-Label — keine Vorfrage „Hand oder Deck?".
+    const galerie = galerieFuer(engine, pi, feld, heroIdx);
+    if (galerie.length === 0) return false;
+    const deckOk = galerie.some(g => g.source === 'deck');
+    const picked = await engine.promptGeneric(pi, {
+      type: 'cardGallery', cards: galerie, title: CARD_NAME, ownerIdx: pi, heroIdx,        // ownerIdx/heroIdx: für die CPU-Antwort
+      description: `Choose an additional Ability to attach to ${heroName} — from your hand${deckOk ? ' or, with Summoning Magic 1, from your deck instead' : ''}.`,
+      confirmLabel: '📚 Attach!',
+      cancellable: true,
+    });
+    if (!picked || picked.cancelled || !picked.cardName) return false;           // „may": Abbruch verbraucht den Effekt nicht
+    // Herkunft: die Antwort nennt sie; fehlt sie (Automat), gilt die erste passende Karte (Hand vor Deck).
+    const treffer = galerie.find(g => g.name === picked.cardName && (!picked.source || g.source === picked.source));
+    if (!treffer) return false;
+    const cardName = treffer.name;
+    const quelle = treffer.source;
 
     // Die Sprechblasen laufen, sobald die Wahl feststeht und das Anlegen sicher ist (nach der letzten abbrechbaren Frage).
     let gelehrt = false;
@@ -224,22 +190,21 @@ module.exports = {
     };
 
     const ergebnis = quelle === 'deck'
-      ? await ausDemDeck(engine, pi, feld, heroIdx, heroName, ortCtx)
-      : await ausDerHand(engine, pi, feld, heroIdx, heroName, ortCtx);
+      ? await ausDemDeck(engine, pi, feld, heroIdx, heroName, cardName, ortCtx)
+      : await ausDerHand(engine, pi, feld, heroIdx, heroName, cardName, ortCtx);
     return ergebnis !== 'abbruch';      // 'ok' und 'blocked' (von Resistance abgefangen) zählen als gewirkt
   },
 
-  /** CPU: Hand-Prompt wie Training; Quelle = Deck; Galerie nach demselben Muster. */
+  /** CPU: die Galerie nach `cpuBeste`; Deckeinträge zuerst (kosten keine Handkarte), sonst die Hand. */
   cpuResponse(engine, kind, payload) {
-    if (kind !== 'generic' || !payload || payload.title !== CARD_NAME) return undefined;
-    if (payload.type === 'abilityAttach') return loadCardEffect('Training').cpuResponse(engine, kind, payload);
-    if (payload.type === 'optionPicker') return { optionId: 'deck' };
-    if (payload.type === 'cardGallery') {
-      const pick = cpuBeste(engine, payload.ownerIdx, payload.heroIdx, (payload.cards || []).map(c => c.name));
-      return pick ? { cardName: pick } : undefined;
+    if (kind !== 'generic' || !payload || payload.title !== CARD_NAME || payload.type !== 'cardGallery') return undefined;
+    const karten = payload.cards || [];
+    for (const quelle of ['deck', 'hand']) {
+      const pick = cpuBeste(engine, payload.ownerIdx, payload.heroIdx, karten.filter(c => c.source === quelle).map(c => c.name));
+      if (pick) return { cardName: pick, source: quelle };
     }
     return undefined;
   },
 
-  _test: { entsprechenderHeld, handAbilities, deckAbilities, deckErlaubt, LEHR_MS },
+  _test: { entsprechenderHeld, handAbilities, deckAbilities, deckErlaubt, galerieFuer, LEHR_MS },
 };

@@ -11,7 +11,9 @@
 //    ist nicht mehr „permanent controlled" (seine Abilities sind ohnehin geschuetzt, `abilityZoneGeschuetzt`); ein per Charme geliehener fremder Held zaehlt nicht
 //    (`engine.heroesControlledBy(pi, { permanentOnly: true })` + `istTemporaerGesteuert`). Gesammelt in `_ability-cost-shared.permanentHeroes`.
 //  • „Any number": mindestens EINE Ability — der Spieler klickt sie nacheinander an (ein Klick schickt die oberste Kopie des Stapels; Support-Zonen-Stapel von Xal/Xalibur
-//    zaehlen mit), „Done" beendet das Sammeln. Vor der ersten Ability ist die Wahl abbrechbar (Aktivierung zurueck, nichts verbraucht); danach ist die Zielwahl nicht mehr
+//    zaehlen mit), „Done" beendet das Sammeln.
+//  • EIN Held je Aktivierung (Als Vorgabe 25.10.): die ERSTE geschickte Ability legt den Helden fest; danach sind nur noch dessen Abilities wahlbar (die der uebrigen
+//    kontrollierten Helden verschwinden aus der Wahl). Die naechste Aktivierung (auch die Wiederholung durch Idej Sword – Kunagi) darf einen anderen Helden waehlen. Vor der ersten Ability ist die Wahl abbrechbar (Aktivierung zurueck, nichts verbraucht); danach ist die Zielwahl nicht mehr
 //    abbrechbar (die Abilities sind weg).
 //  • Leafagami Snake: das Ablegen wird verhindert (die Ability bleibt liegen, der Kontrolleur zieht eine Karte), die Ability zaehlt aber als gewaehlt — der Schaden
 //    entsteht trotzdem (wie bei Weapon Storm: der Preis gilt als bezahlt).
@@ -47,9 +49,14 @@ function schadenFuer(anzahl) {
   return Math.min(MAX_SCHADEN, PRO_ABILITY * Math.max(0, anzahl));
 }
 
-/** Die Helden, deren Abilities Patty schicken darf (Brettspalte + Heldenindex). */
-function quellHelden(engine, pi) {
-  return () => permanentHeroes(engine, pi).map(h => ({ physOwner: h.physOwner, heroIdx: h.heroIdx }));
+/**
+ * Die Helden, deren Abilities Patty schicken darf (Brettspalte + Heldenindex). `festgelegt.held` = der Held der ersten geschickten Ability (`{ physOwner, heroIdx }`):
+ * ab dann zaehlt nur noch er — die Abilities der anderen Helden sind in dieser Aktivierung nicht mehr waehlbar.
+ */
+function quellHelden(engine, pi, festgelegt) {
+  return () => permanentHeroes(engine, pi)
+    .map(h => ({ physOwner: h.physOwner, heroIdx: h.heroIdx }))
+    .filter(h => !festgelegt?.held || (h.physOwner === festgelegt.held.physOwner && h.heroIdx === festgelegt.held.heroIdx));
 }
 
 /** Gibt es mindestens eine Ability, die Patty schicken koennte? */
@@ -90,14 +97,17 @@ module.exports = {
     if (!ps) return false;
     if (!hatSendbareAbility(engine, pi)) return false;
 
-    // 1) Abilities waehlen und ablegen — mindestens eine, beliebig viele; vor der ersten abbrechbar.
+    // 1) Abilities waehlen und ablegen — mindestens eine, beliebig viele, alle von DEMSELBEN Helden; vor der ersten abbrechbar.
+    const festgelegt = { held: null };
+    const heldName = () => gs.players[festgelegt.held.physOwner]?.heroes?.[festgelegt.held.heroIdx]?.name || 'that Hero';
     const res = await sendCardsLoop(engine, pi, heroIdx, {
-      cardName: CARD_NAME, kinds: ['ability'], min: 1, amount: 0, heroes: quellHelden(engine, pi),
+      cardName: CARD_NAME, kinds: ['ability'], min: 1, amount: 0, heroes: quellHelden(engine, pi, festgelegt),
       cancelAtZero: true,
       confirmLabel: '🥷 Send',
+      onSent: (ziel) => { if (!festgelegt.held) festgelegt.held = { physOwner: ziel.owner, heroIdx: ziel.heroIdx }; },
       describe: (sent) => sent === 0
-        ? `Click an Ability attached to a Hero you permanently control to send it to the discard pile — each Ability adds ${PRO_ABILITY} damage (max ${MAX_SCHADEN}).`
-        : `Sent ${sent} — currently ${schadenFuer(sent)} damage${sent >= MAX_ABILITIES ? ' (maximum)' : ''}. Click the next Ability, or stop here.`,
+        ? `Click an Ability attached to a Hero you permanently control to send it to the discard pile — each Ability adds ${PRO_ABILITY} damage (max ${MAX_SCHADEN}). All Abilities must come from the same Hero.`
+        : `Sent ${sent} — currently ${schadenFuer(sent)} damage${sent >= MAX_ABILITIES ? ' (maximum)' : ''}. Click the next Ability of ${heldName()}, or stop here.`,
     });
     if (res.aborted || res.sent === 0) return false;     // nichts abgelegt: der Effekt ist nicht verbraucht
 
@@ -161,7 +171,19 @@ module.exports = {
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'effectTarget') return undefined;
     if (promptData?.config?._abilityCost?.cardName !== CARD_NAME) return undefined;
-    return cpuSendFallback(engine, promptData, {
+    // Erste Wahl legt den Helden fest: der mit den meisten Ability-Karten (Stapelhoehe zaehlt), damit sich das Opfer lohnt; bei Gleichstand der erste.
+    let vt = promptData.validTargets;
+    if (promptData.config._abilityCost.sent === 0 && Array.isArray(vt) && vt.length > 1) {
+      const proHeld = new Map();
+      for (const t of vt) {
+        const k = `${t.owner}:${t.heroIdx}`;
+        proHeld.set(k, (proHeld.get(k) || 0) + (t._send?.entry?.level || 1));
+      }
+      let bestK = null, bestN = -1;
+      for (const [k, n] of proHeld) if (n > bestN) { bestK = k; bestN = n; }
+      vt = vt.filter(t => `${t.owner}:${t.heroIdx}` === bestK);
+    }
+    return cpuSendFallback(engine, { ...promptData, validTargets: vt }, {
       wantMore: (st) => st.sent < CPU_MAX_SENDEN && st.sent < MAX_ABILITIES,
     });
   },
