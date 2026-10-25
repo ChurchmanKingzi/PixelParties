@@ -63,13 +63,13 @@ async function aufbau(o = {}) {
     R.check('Karte liegt in der Ablage', t.pile(0, 'discardPile').includes(CARD), t.pile(0, 'discardPile'));
   }
 
-  R.section('D · Schutz: geschützte Creature bleibt stehen, der Schaden fällt trotzdem („Then"); besiegter Held: kein Schaden');
+  R.section('D · Schutz: geschützte Creature bleibt stehen UND der Held bleibt unversehrt (Ruling 25.10.); besiegter Held: kein Schaden');
   {
     const { t, k } = await aufbau({ maxHp: 200, heroIdx: 1, counters: { _cardinalImmune: 1 } });
     const hp = t.hp(1, 1);
     await t.play(0, CARD, { hero: 0, noGrant: true });
     R.check('Cardinal-Immunität: Creature bleibt stehen', k.zone === 'support', k.zone);
-    R.check('… der Held nimmt trotzdem 200', hp - t.hp(1, 1) === 200, [hp, t.hp(1, 1)]);
+    R.check('… und der Held nimmt keinen Schaden', hp === t.hp(1, 1), [hp, t.hp(1, 1)]);
   }
   {
     const { t, k } = await aufbau({ maxHp: 200, heroIdx: 1 });

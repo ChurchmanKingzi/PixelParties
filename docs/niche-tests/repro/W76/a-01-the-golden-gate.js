@@ -26,7 +26,7 @@ const sauber = (t) => t.errors.length === 0 && t.audit().length === 0;
     R.check('keine Engine-Fehler, Zustand sauber', sauber(t), { e: t.errors, a: t.audit() });
   }
 
-  R.section('B · Direkt platzierte/wiederbelebte Creatures zahlen; Bewegung und Token nicht');
+  R.section('B · Wie bei Ingo: Platzieren, Bewegung in eine neue Zone und Creature-Token zahlen');
   {
     const t = await H.fresh({ hand: [[], []], deckSize: 20, gold: [100, 100], active: 0 });
     t.putArea(0, CARD);
@@ -37,8 +37,11 @@ const sauber = (t) => t.errors.length === 0 && t.audit().length === 0;
     R.check('die Creature liegt auf dem Brett', !!k, !!k);
     const g1 = t.gs.players[0].gold;
     await t.run(() => t.engine.actionTransferCreature(k, 1, 0, 2, { sourceName: 'Dark Gear', skipAnimation: true }));
-    R.check('Seitenwechsel (Bewegung): kein Gold für Sitz 0', t.gs.players[0].gold === g1, [g1, t.gs.players[0].gold]);
-    R.check('… und auch keins für Sitz 1 (nicht „placed")', t.gs.players[1].gold === 100, t.gs.players[1].gold);
+    R.check('Seitenwechsel (Bewegung): kein Gold mehr für Sitz 0', t.gs.players[0].gold === g1, [g1, t.gs.players[0].gold]);
+    R.check('… sondern +2 Gold für Sitz 1, in dessen Zone sie jetzt liegt (Bewegung zählt wie bei Ingo)', t.gs.players[1].gold === 102, t.gs.players[1].gold);
+    const g0t = t.gs.players[0].gold;
+    await t.run(() => t.engine.actionPlaceCreature('Mummy Token', 0, 0, 3, { source: 'test' }));
+    R.check('Creature-Token zählt wie bei Ingo: +2 Gold', t.gs.players[0].gold === g0t + 2, [g0t, t.gs.players[0].gold]);
     R.check('keine Engine-Fehler, Zustand sauber', sauber(t), { e: t.errors, a: t.audit() });
   }
 
