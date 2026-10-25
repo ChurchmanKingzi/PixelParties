@@ -1060,6 +1060,15 @@ async function runActionPhase(engine, helpers) {
       }
     }
   }
+  // 25.10.: auch fremde Stapel (kontrollierte Helden: Charme Lv3, Styx; geliehene: Lizbeth, Smugbeth) — die Engine-Liste hat HOPT und Sperren schon geprüft.
+  for (const e of fremdeAbilityEintraege(engine.getActivatableAbilities(cpuIdx))) {
+    const script = loadCardEffect(e.abilityName);
+    if (!script?.actionCost || !script?.onActivate) continue;
+    const prev = actionAbilityBest.get(e.abilityName);
+    if (!prev || e.level > prev.level) {
+      actionAbilityBest.set(e.abilityName, { heroIdx: e.heroIdx, zoneIdx: e.zoneIdx, level: e.level, zoneKind: e.zoneKind, charmedOwner: e.charmedOwner, borrowedFromOwner: e.borrowedFromOwner });
+    }
+  }
   for (const [abilityName, best] of actionAbilityBest) {
     candidates.push({
       cardType: 'AbilityAction',
@@ -1068,6 +1077,8 @@ async function runActionPhase(engine, helpers) {
       heroIdx: best.heroIdx,
       zoneIdx: best.zoneIdx,
       zoneKind: best.zoneKind,
+      ...(best.charmedOwner != null ? { charmedOwner: best.charmedOwner } : {}),
+      ...(best.borrowedFromOwner != null ? { borrowedFromOwner: best.borrowedFromOwner } : {}),
       level: best.level,
       typeScore: 0,
     });
@@ -1258,11 +1269,7 @@ async function runActionPhase(engine, helpers) {
     let skipCreatureForNoSlot = false;
     const actionFn = async () => {
       if (pick.cardType === 'AbilityAction') {
-        await helpers.doActivateAbility(helpers.room, cpuIdx, {
-          heroIdx: pick.heroIdx,
-          zoneIdx: pick.zoneIdx,
-          ...(pick.zoneKind === 'support' ? { zoneKind: 'support' } : {}),
-        });
+        await helpers.doActivateAbility(helpers.room, cpuIdx, abilityNutzlast(pick));
       } else if (pick.cardType === 'HeroEffectAction') {
         await helpers.doActivateHeroEffect(helpers.room, cpuIdx, {
           heroIdx: pick.heroIdx,
@@ -1405,6 +1412,14 @@ async function tryActionCostingAbility(engine, helpers) {
       await helpers.doActivateAbility(helpers.room, cpuIdx, { heroIdx: hi, zoneIdx: zi, ...(_e.zoneKind === 'support' ? { zoneKind: 'support' } : {}) });
       return true;
     }
+  }
+  // 25.10.: fremde Stapel (kontrolliert / geliehen) — die Engine-Liste hat Sperren und HOPT schon geprüft.
+  for (const e of fremdeAbilityEintraege(engine.getActivatableAbilities(cpuIdx))) {
+    const script = loadCardEffect(e.abilityName);
+    if (!script?.actionCost || !script?.onActivate) continue;
+    cpuLog(`    → action-costing ability "${e.abilityName}" (${e.charmedOwner != null ? 'kontrolliert' : 'geliehen'}) hero=${e.heroIdx}`);
+    await helpers.doActivateAbility(helpers.room, cpuIdx, abilityNutzlast(e));
+    return true;
   }
   return false;
 }
@@ -2211,6 +2226,22 @@ async function activatePermanents(engine, helpers) {
   }
 }
 
+// ★ 25.10.2026 (Xal-Runde 5): FREMDE Ability-Stapel der CPU — von ihr kontrollierte Helden (Charme Lv3, Styx, Controlled Attack: `charmedOwner`) und geliehene
+// (Lizbeth, Smugbeth: `borrowedFromOwner`), in echten Ability Zonen wie in Support Zonen (Xal, Xalibur). Die Engine-Listen (`getFreeActivatableAbilities`,
+// `getActivatableAbilities`) haben Sperren, HOPT und kartenseitige Bedingungen schon geprüft — es sind dieselben Listen, die der Mensch im Client sieht.
+function fremdeAbilityEintraege(liste) {
+  return (liste || []).filter(e => e && (e.charmedOwner != null || e.borrowedFromOwner != null));
+}
+/** Nutzlast für `doActivateAbility` / `doActivateFreeAbility`: Platz plus Herkunft (Zonenart, Kontrolle, Leihe). */
+function abilityNutzlast(e) {
+  return {
+    heroIdx: e.heroIdx, zoneIdx: e.zoneIdx,
+    ...(e.zoneKind === 'support' ? { zoneKind: 'support' } : {}),
+    ...(e.charmedOwner != null ? { charmedOwner: e.charmedOwner } : {}),
+    ...(e.borrowedFromOwner != null ? { borrowedFromOwner: e.borrowedFromOwner } : {}),
+  };
+}
+
 async function activateFreeAbilities(engine, helpers) {
   const cpuIdx = engine._cpuPlayerIdx;
   const gs = engine.gs;
@@ -2319,6 +2350,28 @@ async function activateFreeAbilities(engine, helpers) {
       }
       if (pick && pick.level >= 3) break;
     }
+    // Fremde Stapel (kontrolliert / geliehen) — nur wenn die eigenen nichts Besseres desselben Namens haben (höchste Stufe je Name gewinnt).
+    for (const e of fremdeAbilityEintraege(engine.getFreeActivatableAbilities(cpuIdx))) {
+      if (!e.canActivate) continue;
+      const abilityName = e.abilityName;
+      const key = `${abilityName}|${e.charmedOwner != null ? 'c' + e.charmedOwner : 'b' + e.borrowedFromOwner}|${e.heroIdx}|${e.zoneKind === 'support' ? 's' : ''}${e.zoneIdx}`;
+      if (tried.has(key)) continue;
+      const script = loadCardEffect(abilityName);
+      if (!script?.freeActivation || !script.onFreeActivate) continue;
+      if (gs.players[cpuIdx]?.handLocked || gs.players[cpuIdx]?.drawLocked) {
+        const skip = script.cpuSkipActivationWhenDrawLocked;
+        let sperren = false;
+        try { sperren = typeof skip === 'function' ? !!skip(e.level) : !!skip; } catch { sperren = false; }
+        if (sperren) continue;
+      }
+      if (typeof script.cpuMeta?.shouldActivateNow === 'function') {
+        let shouldFire = true;
+        try { shouldFire = !!script.cpuMeta.shouldActivateNow(engine, cpuIdx); } catch { shouldFire = true; }
+        if (!shouldFire) { tried.add(key); continue; }
+      }
+      const kandidat = { ...abilityNutzlast(e), abilityName, key, level: e.level };
+      if (!pick || (pick.abilityName === abilityName && kandidat.level > pick.level)) pick = kandidat;
+    }
     if (!pick) return;
     if (pick.level > 1) {
       cpuLog(`      [free-ability] "${pick.abilityName}" Lv${pick.level} auf Held ${pick.heroIdx} gewählt (stärkste Kopie)`);
@@ -2338,7 +2391,7 @@ async function activateFreeAbilities(engine, helpers) {
       // kleinen Deck sollen genau die durchs reguläre Gate.
       !!pickAbilityScript?.blockedByHandLock || !!pickAbilityScript?.cpuMeta?.activationDraws);
     const committed = await mctsGatedActivation(engine, helpers, `free-ability ${pick.abilityName}`,
-      () => helpers.doActivateFreeAbility(helpers.room, cpuIdx, { heroIdx: pick.heroIdx, zoneIdx: pick.zoneIdx, ...(pick.zoneKind === 'support' ? { zoneKind: 'support' } : {}) }),
+      () => helpers.doActivateFreeAbility(helpers.room, cpuIdx, abilityNutzlast(pick)),
       { alwaysCommit: pickAbilityAlwaysCommit });
     const nowClaimed = gs.hoptUsed?.[hoptKey] === gs.turn;
     // Karten, die den Engine-Schlüssel nach erfolgreicher Auflösung
@@ -12708,10 +12761,7 @@ async function applyActionCandidate(engine, helpers, candidate) {
     // "did this fire" signal since hand won't shrink.
     const hoptKey = `ability-action:${candidate.abilityName}:${cpuIdx}`;
     const hoptBefore = engine.gs.hoptUsed?.[hoptKey];
-    await helpers.doActivateAbility(helpers.room, cpuIdx, {
-      heroIdx, zoneIdx: candidate.zoneIdx,
-      ...(candidate.zoneKind === 'support' ? { zoneKind: 'support' } : {}),
-    });
+    await helpers.doActivateAbility(helpers.room, cpuIdx, abilityNutzlast({ ...candidate, heroIdx }));
     return engine.gs.hoptUsed?.[hoptKey] === engine.gs.turn && hoptBefore !== engine.gs.turn;
   }
   if (cardType === 'HeroEffectAction') {

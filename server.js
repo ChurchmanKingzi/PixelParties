@@ -5455,6 +5455,16 @@ function sendGameState(room, playerIdx, extra) {
       }
       return out;
     })(),
+    // 25.10.2026: dieselbe Auskunft fuer JEDE Seite (Index = Spielersitz) — ein kontrollierter Xal/Xalibur-Held der Gegenseite nimmt Abilities
+    // ebenfalls in seine Support Zonen (`doPlayAbilityFremd`).
+    abilitySupportHeroesBySeat: (() => {
+      if (!room.engine) return [];
+      return (gs.players || []).map((p, si) => {
+        const out = [];
+        for (let hi = 0; hi < (p?.heroes || []).length; hi++) if (room.engine.heroAcceptsAbilitiesInSupport(si, hi)) out.push(hi);
+        return out;
+      });
+    })(),
     customPlacementCards: (() => {
       const ps2 = gs.players[playerIdx];
       const names = new Set();
@@ -6299,6 +6309,7 @@ function sendSpectatorGameState(room) {
     setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
     summonBlocked: gs.summonBlocked || [],
     abilitySupportHeroes: [],
+    abilitySupportHeroesBySeat: [],
     customPlacementCards: [],
     customHostPickCards: [],
     ascendedOnlyAbilities: [],
@@ -7369,7 +7380,7 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
   // den dieser Spieler gerade kontrolliert — eigener Weg, weil hier
   // Spielerzustand (Hand) und Heldenseite (Zonen) auseinanderfallen.
   if (heroOwner != null && heroOwner !== pi) {
-    return doPlayAbilityFremd(room, pi, { cardName, handIndex, heroIdx, zoneSlot, fromCreation, heroOwner });
+    return doPlayAbilityFremd(room, pi, { cardName, handIndex, heroIdx, zoneSlot, supportSlot, fromCreation, heroOwner });
   }
 
   // ── ASCENDED-ONLY-ABILITIES DURCHSETZEN (1.8.) ─────────────────────
@@ -7540,10 +7551,15 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
  * angelegt hat (`inst.originalOwner = pi` → dessen Ablage). Die
  * Einmal-pro-Zug-Grenze fuehrt die Kontrollmarke (`abilityZug`), nicht
  * `abilityGivenThisTurn` des Besitzers — dessen Stempel stammen aus
- * SEINEM letzten Zug. Keine Xal-/Xalibur-Support-Zonen, keine Boni
- * aus Divine Gift of Skill (die gelten fuer eigene Helden).
+ * SEINEM letzten Zug. Keine Boni aus Divine Gift of Skill (die gelten
+ * fuer eigene Helden).
+ *
+ * 25.10.2026 (Xal-Runde 5): Ist der kontrollierte Held ein Xal oder traegt er
+ * Xalibur, sind seine SUPPORT Zonen fuer Abilities offen (`engine.abilityZielOrt`
+ * auf der Brettseite des Helden — hoechstens ein Stapel je Ability ueber beide
+ * Zonenarten, Verwahrung/Versiegelung wie ueberall).
  */
-async function doPlayAbilityFremd(room, pi, { cardName, handIndex, heroIdx, zoneSlot, fromCreation, heroOwner }) {
+async function doPlayAbilityFremd(room, pi, { cardName, handIndex, heroIdx, zoneSlot, supportSlot, fromCreation, heroOwner }) {
   const gs = room.gameState;
   const engine = room.engine;
   const ps = gs.players[pi];
@@ -7554,24 +7570,23 @@ async function doPlayAbilityFremd(room, pi, { cardName, handIndex, heroIdx, zone
   if (script?.ascendedHeroOnly && getCardDB()[hero.name]?.cardType !== 'Ascended Hero') return false;
   if (script?.canAttachToHero && !script.canAttachToHero(gs, heroOwner, heroIdx, engine)) return false;
 
-  const ziel = engine.abilityZielZone(heroOwner, heroIdx, cardName, { wunschZone: zoneSlot });
-  if (ziel < 0) return false;
+  const ort = engine.abilityZielOrt(heroOwner, heroIdx, cardName, { wunschZone: zoneSlot, wunschSupport: supportSlot });
+  if (!ort) return false;
   if (!hps.abilityZones[heroIdx]) hps.abilityZones[heroIdx] = [[], [], []];
-  const abZones = hps.abilityZones[heroIdx];
   // Kartenbesitzer (Ablage-Ziel) aus der Herkunft der Handkarte: eine
   // gestohlene Handkarte gehoert weiter ihrem Ursprungsspieler.
   const kartenBesitzer = fromCreation ? pi : engine._handCardPileOwner(pi, cardName, handIndex);
-  if (!abZones[ziel]) abZones[ziel] = [];
-  abZones[ziel].push(cardName);
+  const inst = engine.abilityOrtBelegen(heroOwner, heroIdx, cardName, ort);   // Name in den Stapel + getrackte Instanz (echte Zone ODER Support Zone)
   (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
   engine.notePlayedFromHand(pi);
   hero._abilityZug = gs.turn;   // Als Vorgabe 29.9.: am Helden (auch dauerhafte Uebernahme)
-
-  const inst = engine._trackCard(cardName, heroOwner, 'ability', heroIdx, ziel);
   inst.originalOwner = kartenBesitzer;
+  const ziel = ort.slot;
+  const zonenArt = ort.art === 'support' ? 'support' : 'ability';
+  const stapelListe = () => ((zonenArt === 'support' ? hps.supportZones : hps.abilityZones)[heroIdx] || [])[ziel] || [];
 
-  engine.log('ability_attached', { player: ps.username, card: cardName, hero: hero.name, foreignHero: true });
-  broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'ability', heroIdx, slotIdx: ziel, destOwner: heroOwner });
+  engine.log('ability_attached', { player: ps.username, card: cardName, hero: hero.name, foreignHero: true, ...(zonenArt === 'support' ? { zone: 'support' } : {}) });
+  broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: zonenArt, heroIdx, slotIdx: ziel, destOwner: heroOwner });
 
   try {
     const chainResult = await engine.executeCardWithChain({
@@ -7579,14 +7594,14 @@ async function doPlayAbilityFremd(room, pi, { cardName, handIndex, heroIdx, zone
       chosenHero: { owner: heroOwner, heroIdx },   // W74b: der Held, an den die Ability angelegt wird
     });
     if (chainResult.negated) {
-      const slot = abZones[ziel] || [];
+      const slot = stapelListe();
       const idx = slot.lastIndexOf(cardName);
       if (idx >= 0) slot.splice(idx, 1);
       engine._untrackCard(inst.id);
       delete hero._abilityZug;
       const negatedAbilityOwner = engine._consumeHandCardOrigin(pi, cardName);
       await engine.routeNegatedInitialCard(negatedAbilityOwner, cardName, chainResult, -1,
-        { fromZone: 'ability', fromHeroIdx: heroIdx, fromSlotIdx: ziel });
+        { fromZone: zonenArt, fromHeroIdx: heroIdx, fromSlotIdx: ziel });
       engine.log('ability_negated', { card: cardName, player: ps.username });
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
@@ -7594,8 +7609,7 @@ async function doPlayAbilityFremd(room, pi, { cardName, handIndex, heroIdx, zone
     // Herkunftsmarke der Handkarte ist jetzt an der Instanz — verbrauchen,
     // sonst gilt eine spaetere gleichnamige Handkarte als fremd.
     if (kartenBesitzer !== pi) engine._consumeHandCardOrigin(pi, cardName);
-    await engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'ability', heroIdx });
-    await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'ability', toHeroIdx: heroIdx });
+    await engine.abilityOrtHooks(inst, ort);   // echte Zone: onPlay + onCardEnterZone; Support Zone: abilityImSupportBetreten
   } catch (err) {
     console.error('[Engine] doPlayAbilityFremd hooks error:', err.message, err.stack);
   }

@@ -82,6 +82,31 @@ function coolnessSpitzeZiel(engine, inst) {
   };
 }
 
+/**
+ * 25.10.2026 (Al, Xal-Runde 4: „Sun Beam und co sollen Support-Zone-Abilities als Abilities behandeln – und entsprechend die oberste Kopie davon entfernen"):
+ * Eine Ability in einer Support Zone (Xal, Xalibur, gewonnener Xal-Effekt; auch eine schlafende, von der Leafagami Snake gehaltene) ist für „any card on the board that
+ * is not a Hero" eine ABILITY — ein Stapel ist wie in einer Ability Zone EIN Ziel, vertreten von seiner OBERSTEN Kopie (`engine.supportAbilitySpitze`). Abwerfen, Zerstören oder
+ * Zurückschicken trifft genau diese eine Kopie, die Stufe sinkt um 1. Die Ziel-ID bleibt die der Support Zone (`equip-<Seite>-<Held>-<Slot>`, Art 'equip'): so
+ * hebt der Client genau diese Zone hervor.
+ *
+ * EINE Stelle für jeden Sammler („Nicht-Helden-Zielmenge"); er ruft sie am Anfang seines Support-Zweigs:
+ *   const sa = supportAbilityZiel(engine, inst);
+ *   if (sa !== undefined) { if (sa) targets.push(sa); continue; }
+ * Rückgabe: `undefined` = keine Support-Ability (der Sammler arbeitet wie bisher), `null` = Kopie unterhalb der Spitze (überspringen), sonst das Ziel
+ * (`istAbilityStapel: true`, `level` = Stapelhöhe).
+ */
+function supportAbilityZiel(engine, inst) {
+  if (!engine?.istAbilityImSupport?.(inst)) return undefined;
+  if (engine.supportAbilitySpitze(inst) !== inst) return null;
+  const seite = _brettSeite(engine, inst);
+  return {
+    id: `equip-${seite}-${inst.heroIdx}-${inst.zoneSlot}`,
+    type: 'equip', owner: seite, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
+    cardName: inst.name, cardInstance: inst, _cardInstance: inst,
+    zoneKind: 'support', istAbilityStapel: true, level: engine.abilityStapelVon(inst).length || 1,
+  };
+}
+
 function collectNonHeroBoardTargets(gs, engine) {
   const targets = [];
   const seen = new Set();
@@ -108,6 +133,8 @@ function collectNonHeroBoardTargets(gs, engine) {
     seen.add(inst.id);
 
     if (inst.zone === 'support') {
+      const sa = supportAbilityZiel(engine, inst);   // 25.10.: Ability in einer Support Zone = Ability-Stapel, ein Ziel, oberste Kopie
+      if (sa !== undefined) { if (sa) targets.push(sa); continue; }
       targets.push({
         // ★ 26.9. (Als Befund, Crimson Web): ID und `owner` nennen die Seite, auf
         // der die Zone LIEGT — sonst findet der Client sie nicht. Eine an
@@ -177,4 +204,4 @@ function collectNonHeroBoardTargets(gs, engine) {
   return targets;
 }
 
-module.exports = { isOppCreatureEffect, collectNonHeroBoardTargets, areaTargetId, coolnessSpitzeZiel };
+module.exports = { isOppCreatureEffect, collectNonHeroBoardTargets, areaTargetId, coolnessSpitzeZiel, supportAbilityZiel };

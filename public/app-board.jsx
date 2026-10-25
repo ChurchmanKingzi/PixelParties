@@ -37900,12 +37900,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
     const abZones = playerData.abilityZones[heroIdx] || [[], [], []];
     const isCustom = (gameState.customPlacementCards || []).includes(abilityName);
+    // 25.10.: `opts.supportHeroes` = die Xal-/Xalibur-Helden DIESER Seite (Gegenseite: ein kontrollierter Xal nimmt Abilities ebenfalls in seine Support Zonen).
+    const supportOk = (opts.supportHeroes || gameState.abilitySupportHeroes || []).includes(heroIdx);
 
     if (isCustom) {
       // Custom placement (e.g. Performance): needs any occupied zone with <3 cards
       if (abZones.some(slot => (slot || []).length > 0 && (slot || []).length < 3)) return true;
       // 24.10.: Xal / Xalibur — auch ein belegter Ability-Stapel in einer Support Zone
-      if (!opts.nurAbilityZonen && (gameState.abilitySupportHeroes || []).includes(heroIdx)) {
+      if (supportOk) {
         return (playerData.supportZones?.[heroIdx] || []).some(slot => (slot || []).length > 0 && (slot || []).length < 3
           && CARDS_BY_NAME[slot[0]]?.cardType === 'Ability');
       }
@@ -37925,7 +37927,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // 24.10.: Liegt der Stapel in einer SUPPORT Zone (Xal), gehoert die Kopie dorthin — und nirgendwo sonst hin.
     const _supStapel = ppStapelOrt(playerData, heroIdx, abilityName);
     if (_supStapel && _supStapel.kind === 'support') {
-      return !opts.nurAbilityZonen && (gameState.abilitySupportHeroes || []).includes(heroIdx)
+      return supportOk
         && ppAbilityZoneOk(playerData, heroIdx, _supStapel.slot, abilityName, 'support');
     }
     // Doesn't have it — needs a free zone (versiegelte zaehlen nicht)
@@ -37933,7 +37935,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // v768: Xal / Xalibur — eine freie (oder gleichnamige) SUPPORT Zone
     // zaehlt genauso. Ohne das blieb die Handkarte grau, sobald die drei
     // echten Zonen voll waren.
-    if (!opts.nurAbilityZonen && (gameState.abilitySupportHeroes || []).includes(heroIdx)) {
+    if (supportOk) {
       const supZones = playerData.supportZones?.[heroIdx] || [];
       return supZones.some((slot, _z) => ppAbilityZoneOk(playerData, heroIdx, _z, abilityName, 'support'));
     }
@@ -37942,14 +37944,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   // ★ Styx, the Opened Gate (28.9.): ein FREMDER Held, den ich gerade
   // kontrolliere und dessen Kontrollmarke Abilities erlaubt — einmal pro
-  // Zug, nur echte Ability Zones. Dieselben Felder wie der Server
+  // Zug; ist er ein Xal / traegt Xalibur, auch seine Support Zonen (25.10.). Dieselben Felder wie der Server
   // (`engine.darfFremdAbilityAnlegen`).
   const canForeignHeroReceiveAbility = (heroIdx, abilityName) => {
     const h = opp?.heroes?.[heroIdx];
     if (!h?.name || h.hp <= 0 || h.charmedBy !== myIdx) return false;
     const ch = h.statuses?.charmed;
     if (!ch?.abilitiesErlaubt || ch.abilityZug === gameState.turn) return false;
-    return canHeroReceiveAbility(opp, heroIdx, abilityName, { skipAbilityGiven: true, nurAbilityZonen: true });
+    return canHeroReceiveAbility(opp, heroIdx, abilityName, { skipAbilityGiven: true, supportHeroes: (gameState.abilitySupportHeroesBySeat || [])[oppIdx] || [] });
   };
 
   // Check if a hero can play a card (fully server-driven via heroPlayableCards).
@@ -38856,9 +38858,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           for (const el of supEls) {
             const r = el.getBoundingClientRect();
             if (mx < r.left || mx > r.right || my < r.top || my > r.bottom) continue;
-            if (el.dataset.supportOwner !== 'me') continue;
+            // 25.10.: auch die Support Zone eines kontrollierten Xal/Xalibur-Helden der Gegenseite (Styx, Charme …) — wie die Ability Zonen dort.
+            const fremdSup = el.dataset.supportOwner === 'opp';
+            if (el.dataset.supportOwner !== 'me' && !fremdSup) continue;
             const hi = parseInt(el.dataset.supportHero);
             const zi = parseInt(el.dataset.supportSlot);
+            if (fremdSup) {
+              if (abilityAttachPrompt || !canForeignHeroReceiveAbility(hi, cardName)) continue;
+              if (!((gameState.abilitySupportHeroesBySeat || [])[oppIdx] || []).includes(hi)) continue;
+              if (!ppAbilityZoneOk(opp, hi, zi, cardName, 'support')) continue;
+              targetHero = hi; targetZone = -1; targetSupportZone = zi; targetOpp = true;
+              continue;
+            }
             if (!(gameState.abilitySupportHeroes || []).includes(hi)) continue;
             const held = me.heroes[hi];
             if (!held?.name || held.hp <= 0) continue;
@@ -52749,25 +52760,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const isCustom = (gameState.customPlacementCards || []).includes(pick.cardName);
                 let targetSlot = -1;
                 let targetSupport = -1;   // 24.10.: Support Zone (Xal, Xalibur)
-                if (isOpp) {
-                  // Styx: fremder Held — nur echte Ability Zonen.
-                  if (isCustom) {
-                    for (let zi = 0; zi < 3; zi++) {
-                      if ((abList[zi] || []).length > 0 && abList[zi].length < 3) { targetSlot = zi; break; }
-                    }
-                  } else {
-                    for (let zi = 0; zi < 3; zi++) {
-                      if ((abList[zi] || []).length > 0 && abList[zi][0] === pick.cardName && abList[zi].length < 3) { targetSlot = zi; break; }
-                    }
-                    if (targetSlot < 0) {
-                      for (let zi = 0; zi < 3; zi++) {
-                        if ((abList[zi] || []).length === 0) { targetSlot = zi; break; }
-                      }
-                    }
-                  }
-                } else {
-                  // Eigener Held: bestehender Stapel (echte ODER Support Zone), sonst freie echte Zone, sonst freie Support Zone.
-                  const ort = ppAbilityZielOrt(p, i, pick.cardName, { custom: isCustom, supportOk: (gameState.abilitySupportHeroes || []).includes(i) });
+                {
+                  // Eigener Held ODER fremder, kontrollierter Held (Styx, 25.10.: auch dessen Support Zonen, wenn er Xal ist / Xalibur trägt):
+                  // bestehender Stapel (echte ODER Support Zone), sonst freie echte Zone, sonst freie Support Zone.
+                  const supHelden = isOpp ? ((gameState.abilitySupportHeroesBySeat || [])[oppIdx] || []) : (gameState.abilitySupportHeroes || []);
+                  const ort = ppAbilityZielOrt(p, i, pick.cardName, { custom: isCustom, supportOk: supHelden.includes(i) });
                   if (ort) { if (ort.kind === 'support') targetSupport = ort.slot; else targetSlot = ort.slot; }
                 }
                 if (targetSlot < 0 && targetSupport < 0) return;
@@ -53858,17 +53855,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // Token spawn) clickable on opp's row.
               const isZonePickTarget = zonePickSet.has(`${pi}-${i}-${z}`);
               // v768: Ability-Ziehen auf eine Support Zone (Xal).
-              const isAbilitySupportTarget = !isOpp && abilityDrag
+              const isAbilitySupportTarget = !!abilityDrag && (isOpp ? !!abilityDrag.targetOpp : !abilityDrag.targetOpp)
                 && abilityDrag.targetHero === i && abilityDrag.targetSupportZone === z;
               // 24.10.: Click-to-attach (Effekt-Prompt `abilityAttachTarget` oder Handkarte angeklickt) auf eine SUPPORT Zone (Xal, Xalibur):
               // dieselben Regeln wie die Ability Zonen — ein bestehender Stapel nimmt die Kopie, sonst eine freie Zone; hoechstens EIN Stapel je Ability.
-              const attachPickSupportValid = !isOpp && !!abilityAttachPick
-                && (gameState.abilitySupportHeroes || []).includes(i)
+              // 25.10.: auch auf die Support Zone eines kontrollierten Xal/Xalibur-Helden (nur beim Spielen aus der Hand, wie die Ability Zonen dort).
+              const attachPickSupportValid = !!abilityAttachPick
+                && (isOpp ? ((gameState.abilitySupportHeroesBySeat || [])[oppIdx] || []).includes(i) : (gameState.abilitySupportHeroes || []).includes(i))
+                && !(isOpp && (abilityAttachPick.source === 'effectPrompt' || (gameState.customPlacementCards || []).includes(abilityAttachPick.cardName) || !canForeignHeroReceiveAbility(i, abilityAttachPick.cardName)))
                 && !(Array.isArray(abilityAttachPick.eligibleHeroIdxs) && !abilityAttachPick.eligibleHeroIdxs.includes(i))
-                && canHeroReceiveAbility(p, i, abilityAttachPick.cardName, {
+                && (isOpp || canHeroReceiveAbility(p, i, abilityAttachPick.cardName, {
                      skipAbilityGiven: !!abilityAttachPick.skipAbilityGiven,
                      allowRestricted: abilityAttachPick.source === 'effectPrompt',
-                   })
+                   }))
                 && (((gameState.customPlacementCards || []).includes(abilityAttachPick.cardName))
                   ? (((p.supportZones?.[i] || [])[z] || []).length > 0 && ((p.supportZones[i][z] || []).length < 3)
                      && CARDS_BY_NAME[p.supportZones[i][z][0]]?.cardType === 'Ability')
@@ -54276,6 +54275,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       roomId: gameState.roomId, cardName: pick.cardName,
                       handIndex: pick.handIndex, fromCreation: pick.fromCreation || undefined,
                       heroIdx: i, zoneSlot: -1, supportSlot: z,
+                      heroOwner: isOpp ? oppIdx : undefined,   // Styx / Charme: fremder, kontrollierter Held
                     });
                   } : supportAbilityEntry ? () => {
                     // v769: Aktivierbare Ability in einer Support Zone
