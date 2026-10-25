@@ -173,6 +173,7 @@ module.exports = {
     for (const name of playerCards) {
       engine._broadcastEvent('deck_search_add', { cardName: name, playerIdx: pi });
       engine.handZugangSync(ps, name, {  });
+      engine.noteHandZugangAusStapel(pi, name, { pile: 'deck', source: 'Magic Lamp' });   // W72a: die 2 eigenen Karten kommen aus dem eigenen Deck (Control Monitors)
       // Self-routed cards: track for parity. originalOwner defaults to
       // pi (the holder), so no override needed.
       engine.log('card_added_to_hand', { card: name, player: ps.username, by: 'Magic Lamp' });

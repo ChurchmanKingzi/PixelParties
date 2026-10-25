@@ -234,6 +234,7 @@ module.exports = {
 
         deck.splice(copyIdx, 1);
         engine.handZugangSync(ps, chosenName, { ohneInstanz: true });
+        engine.noteHandZugangAusStapel(pi, chosenName, { pile: 'deck', source: 'Mass Multiplication' });   // W72a: Control Monitors
         added++;
 
         // Deck-search reveal animation for THIS copy, then yield so each
