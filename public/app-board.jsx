@@ -52097,6 +52097,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (e.key !== 'Escape') return;
       e.stopImmediatePropagation();
       if (showEndTurnConfirm) { cancelEndTurn(); return; }
+      // Stapel-Menü (Darions Equip-Stapel, Alices Creatures …, reines Nachschlagen): Escape schließt NUR dieses Menü — kein „Surrender?".
+      if (stackInspect) { setStackInspect(null); return; }
       if (summonOrRevealPick) { setSummonOrRevealPick(null); return; }
       if (spellHeroPick) { setSpellHeroPick(null); return; }
       if (abilityAttachPick) {
@@ -52146,7 +52148,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     window.addEventListener('keydown', handleEsc, true);
     return () => window.removeEventListener('keydown', handleEsc, true);
-  }, [showSurrender, showEndTurnConfirm, cancelEndTurn, spellHeroPick, abilityAttachPick, summonOrRevealPick, pendingBouncePick, deckViewer, pileViewer, gameState.potionTargeting, gameState.effectPrompt, pendingAdditionalPlay, pendingAbilityActivation, gameState.mulliganPending, mulliganDecided, gameState.result, isSpectator, gameState.players?.[myIdx]?.freeArtifactArmed]);
+  }, [showSurrender, showEndTurnConfirm, cancelEndTurn, stackInspect, spellHeroPick, abilityAttachPick, summonOrRevealPick, pendingBouncePick, deckViewer, pileViewer, gameState.potionTargeting, gameState.effectPrompt, pendingAdditionalPlay, pendingAbilityActivation, gameState.mulliganPending, mulliganDecided, gameState.result, isSpectator, gameState.players?.[myIdx]?.freeArtifactArmed]);
 
   // Enter/Space confirms active confirmation dialogs and prompts
   useEffect(() => {
