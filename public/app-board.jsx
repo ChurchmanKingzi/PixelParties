@@ -55081,8 +55081,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       '| Abfrage=', gameState.effectPrompt
                         ? (gameState.effectPrompt.title || gameState.effectPrompt.type) : 'nein');
                   }}
-                  data-bounce-hiding={(bounceOutgoingHidden.has(`${pi}-${i}-${z}`)
-                    || bounceOutgoingHidden.has(`${pi}-${i}-${z}::${cards[0] || ''}`)) ? 'true' : undefined}
+                  // Darions Equip-Stapel: das Verstecken gilt dem ganzen Platz, ein Stapel hat aber weitere Karten, die liegen bleiben. Beim Abwurf EINER Ausruestung
+                  // (Breaking Strike …) wurde sonst der ganze Stapel 720 ms leer gezeigt, sobald der Name der fliegenden Karte zur ersten Karte des Platzes passte.
+                  data-bounce-hiding={(!p.equipShareHeroes?.[i] && (bounceOutgoingHidden.has(`${pi}-${i}-${z}`)
+                    || bounceOutgoingHidden.has(`${pi}-${i}-${z}::${cards[0] || ''}`))) ? 'true' : undefined}
                   data-support-ramming={isSupportRamming ? 'true' : undefined}
                   // Alliance (v870, Als Vorgabe): Zeiger auf der Karte →
                   // BEIDE verbundenen Helden hervorheben, auch einen
