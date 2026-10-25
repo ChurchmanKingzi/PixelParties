@@ -13508,6 +13508,7 @@ function cubeBuildBroadcast(room, io) {
       seatIdx,
       pool,
       assignedHero: cd.assignedHeroes?.[seatIdx] || null,
+      swapHeroes: require('./cards/effects/_cube-swap-shared').tauschHelden(pool, getCardDB()),   // W77 (Cuberto): Helden im Pool, die Karten tauschen dürfen → max. Anzahl
       cubeName: cd.cubeName,
       submittedDeck: cd.builtDecks?.[seatIdx] || null,
       ready: !!cd.readySeats?.[seatIdx],
@@ -13571,6 +13572,12 @@ function validateDraftedDeck(deck, pool, cardDB) {
   const poolCounts = {};
   for (const name of pool) poolCounts[name] = (poolCounts[name] || 0) + 1;
 
+  // ★ W77 (Cuberto, Supreme Lord of Edges): ein Starthelden-Kartentausch (`deck.cubertoSwaps`) verändert den Pool — bis zu 5 gedraftete Karten gegen andere (verschiedene Namen).
+  const CubeSwap = require('./cards/effects/_cube-swap-shared');
+  const tausch = CubeSwap.pruefeTausch(deck, poolCounts, cardDB);
+  if (!tausch.ok) return { ok: false, reason: tausch.reason };
+  const poolMitTausch = CubeSwap.poolNachTausch(poolCounts, tausch.swaps);
+
   // Starthelden-Kandidaten im Pool (inkl. zugewiesenem Helden). Helden mit „cannot be one of your
   // Starting Heroes“ (Quetzahuitl) zaehlen nicht — sie duerfen nur im Main Deck liegen.
   const filledList = heroes.filter(h => h && h.hero);
@@ -13617,7 +13624,7 @@ function validateDraftedDeck(deck, pool, cardDB) {
     if (!cd) return { ok: false, reason: `Unknown card "${name}"` };
     // Non-Performance Abilities are infinite (drafted pool isn't required).
     if (cd.cardType === 'Ability' && name !== 'Performance') continue;
-    const available = poolCounts[name] || 0;
+    const available = poolMitTausch[name] || 0;
     if (count > available) {
       return { ok: false, reason: `Not enough "${name}" in pool (have ${available}, used ${count})` };
     }

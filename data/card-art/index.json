@@ -5578,5 +5578,25 @@
 "Uncool Malfunction": {
 "id": "Uncool_Malfunction",
 "kind": "a"
+},
+"REVENGE!!!": {
+"id": "REVENGE",
+"kind": "a"
+},
+"Grand Feast": {
+"id": "Grand_Feast",
+"kind": "a"
+},
+"Fake Legendary Sword": {
+"id": "Fake_Legendary_Sword",
+"kind": "a"
+},
+"The Root of all Presents": {
+"id": "The_Root_of_all_Presents",
+"kind": "a"
+},
+"Cuberto, Supreme Lord of Edges": {
+"id": "Cuberto_Supreme_Lord_of_Edges",
+"kind": "a"
 }
 }

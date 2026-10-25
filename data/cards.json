@@ -8125,7 +8125,7 @@
   {
     "name": "Fake Legendary Sword",
     "cardType": "Artifact",
-    "subtype": "Reaction",
+    "subtype": "Normal",
     "level": null,
     "hp": null,
     "atk": null,
@@ -10354,7 +10354,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Play this card immediately when one of your Heroes defeats an opponent's Creature with an Attack or Spell. Heal all targets you control for 80 HP.",
+    "effect": "Play this card immediately when one of your Heroes defeats a Creature with an Attack or Spell. Heal all targets you control for 80 HP.",
     "archetype": "",
     "setID": "PP THW",
     "banned": "",

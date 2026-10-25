@@ -29721,6 +29721,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       fromHandIdx: handIdx, toHandIdx,
       // `opts.finalHandSize` (Live Show): mehrere Karten fliegen nacheinander in dieselbe Hand — jede wird gegen die Endgröße der Hand projiziert.
       ...(opts.finalHandSize ? { finalHandSize: opts.finalHandSize, zielLayout: true } : null),
+      // W77 (The Root of all Presents): Flugstil (`lichterkette`) und Klang der verschenkten Karte
+      ...(opts.flightStyle ? { flightStyle: opts.flightStyle } : null),
+      ...(opts.flightSfx ? { sfx: opts.flightSfx } : null),
     });
 
     await this.runHooks(HOOKS.ON_CARD_TRANSFERRED_TO_OPP_HAND, {
@@ -38779,7 +38782,53 @@ this._deathWatch = (this._deathWatchStack || []).length
       } catch (err) {
         console.error('[onTargetsDefeated]', err.message);
       }
+      // ★ W77 (REVENGE!!!, Grand Feast): Hand-Fenster „ein Vorgang hat Ziele besiegt" — nach den Passiv-Hooks, am fertigen Zustand.
+      try {
+        await this._checkTargetsDefeatedHandReactions([...liste, ...helden]);
+      } catch (err) {
+        console.error('[TargetsDefeatedReaction]', err.message);
+      }
     }
+  }
+
+  /**
+   * ★ W77 — Hand-Fenster für JEDEN abgeschlossenen Sterbe-Vorgang (Flächenschlag = EIN Vorgang, siehe `_mitNiederlagenSammler`): Karten mit
+   *   isTargetsDefeatedReaction: true,
+   *   targetsDefeatedCondition(gs, pi, engine, info) → bool,
+   *   async targetsDefeatedResolve(engine, pi, info, { casterIdx, casterSeite })
+   * `info` = { defeated: [Einträge der Kreaturen UND Helden dieses Vorgangs, je mit `source`], reactorIdx, zaehler: { [Spieler]: { vorher, nachher, opfer } } }.
+   * `zaehler[pi]` zählt die besiegten ZIELE (Helden und Kreaturen, Tokens eingeschlossen), die `pi` in DIESEM Zug verloren hat: `vorher` = Stand vor dem Vorgang, `nachher` = danach,
+   * `opfer` = die Opfer dieses Vorgangs. Der Zähler läuft je Spieler und Zug (`ps._zieleBesiegt = { turn, n }`) und wird hier fortgeschrieben, auch wenn niemand reagiert.
+   * Die Aktivierung ist ein Kettenglied (`kette`), die Kettenanzeige zeigt das erste Opfer als Vorlauf.
+   */
+  async _checkTargetsDefeatedHandReactions(alle) {
+    if (!Array.isArray(alle) || alle.length === 0) return;
+    const gs = this.gs;
+    const zaehler = {};
+    const nachSpieler = new Map();
+    for (const e of alle) {
+      const ctrl = e.controller ?? e.owner;
+      if (!isSeat(this, ctrl)) continue;
+      if (!nachSpieler.has(ctrl)) nachSpieler.set(ctrl, []);
+      nachSpieler.get(ctrl).push(e);
+    }
+    for (const [pi, opfer] of nachSpieler) {
+      const ps = gs.players[pi];
+      if (!ps) continue;
+      if (!ps._zieleBesiegt || ps._zieleBesiegt.turn !== gs.turn) ps._zieleBesiegt = { turn: gs.turn, n: 0 };
+      const vorher = ps._zieleBesiegt.n;
+      ps._zieleBesiegt.n += opfer.length;
+      zaehler[pi] = { vorher, nachher: ps._zieleBesiegt.n, opfer };
+    }
+    if (this._inMctsSim || gs.result) return;
+    const erster = alle[0];
+    await this._rxEreignisFenster({
+      flag: 'isTargetsDefeatedReaction', cond: 'targetsDefeatedCondition', res: 'targetsDefeatedResolve', tiefe: '_zieleBesiegtFensterTiefe',
+      log: 'targets_defeated_window_reaction', ausloeser: gs.activePlayer ?? 0, auchAusloeser: true, kette: true,
+      vorlauf: { cardName: erster.name, owner: erster.owner, cardType: erster.hero ? 'Hero' : 'Creature' },
+      info: { defeated: alle, zaehler },
+      nachricht: (c) => `${erster.name} was defeated! Activate ${c}?`, linkesBild: erster.name, ziel: erster.name,
+    });
   }
 
   /**

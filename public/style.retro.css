@@ -13843,3 +13843,19 @@ html[data-retro] .leaderboard-name { text-shadow: none; }
   72%  { transform: translate(0, 0) rotate(0deg) scale(1); }
   100% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
 }
+
+/* ─── REVENGE!!! (25.10.): Wut-Raster über den ganzen Bildschirm ──────────────────────────────
+   Ein hartes 4-px-Schachbrett in dunklem Rot (Dither statt Alpha) blitzt im Bildtakt in kurzen Stößen auf — keine weichen Überblendungen. */
+.revenge-tint {
+  position: fixed; inset: 0; z-index: 10090; pointer-events: none;
+  background: repeating-conic-gradient(#8f0a14 0% 25%, transparent 0% 50%) 0 0 / 8px 8px;
+  animation: revengeTint 1.7s steps(1) forwards;
+}
+@keyframes revengeTint {
+  0% { opacity: 1; } 5% { opacity: 0; } 8% { opacity: 1; } 14% { opacity: 0; } 17% { opacity: 1; } 26% { opacity: 0; }
+  30% { opacity: 1; } 38% { opacity: 0; } 44% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 0; }
+}
+
+/* ─── The Root of all Presents (25.10.): Lichterkette am fliegenden Geschenk — Birnchen blinken hart zwischen zwei Tönen, die Lichtpixel fallen in Schritten ─────────────── */
+@keyframes ptLichterBlink { 0% { background: var(--c1); } 50% { background: var(--c2); } }
+@keyframes ptLichterSpur { from { transform: translate(0, 0); } to { transform: translate(var(--gsx, 0), var(--gsy, 12px)); } }
