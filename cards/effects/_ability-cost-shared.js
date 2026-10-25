@@ -167,7 +167,8 @@ async function sendCardsLoopKern(engine, pi, heroIdx, opts) {
       weg = await engine.discardAbilityTopCopy(ziel._send.entry, { source: opts.cardName, sourceOwner: opts.sourceOwner ?? pi });
       if (weg) abilitiesSent++;
     } else {
-      weg = await engine.sendBoardCardToDiscard(ziel._send.inst, { source: opts.cardName, sourceOwner: opts.sourceOwner ?? pi });
+      // Darion: die Wahl im Stapel (`_disambiguateStackedTargets`) steht am gewaehlten Ziel; `_send.inst` ist nur die Instanz beim Aufzaehlen (die oberste).
+      weg = await engine.sendBoardCardToDiscard(ziel.cardInstance || ziel._send.inst, { source: opts.cardName, sourceOwner: opts.sourceOwner ?? pi });
       if (weg) equipsSent++;
     }
     if (!weg) continue;

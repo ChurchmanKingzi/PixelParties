@@ -122,7 +122,7 @@ module.exports = {
       const treffer = id && ausruestung(engine).map(i => artefaktZiel(engine, i)).find(z => z.id === id);
       if (!treffer) { gs._spellCancelled = true; return; }
 
-      const inst = treffer.cardInstance;
+      const inst = engine.stapelWahlFuer(treffer);   // Darion: die gewaehlte Karte des Stapels, nicht die erste mit dieser ID
       const tSeite = treffer.owner;
       const tHeroIdx = treffer.heroIdx;
       const tHero = gs.players[tSeite]?.heroes?.[tHeroIdx];

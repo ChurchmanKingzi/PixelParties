@@ -33330,6 +33330,23 @@ this._deathWatch = (this._deathWatchStack || []).length
    *
    * Ohne Alice ist das ein No-op: `isStacked` ist dann nie wahr.
    */
+  /**
+   * ★ Darion (Al: „entfernt wird IMMER das oberste Equip"): die Ziel-IDs von Ausruestungen heissen `equip-<Seite>-<Held>-<Platz>` — alle Karten eines Stapels teilen sie.
+   * Skripte, die ihre Ziele NACH der Abfrage neu einsammeln und per ID wiederfinden (`frisch.find(z => z.id === id)`), fielen deshalb immer auf die erste Karte zurueck.
+   * `_disambiguateStackedTargets` merkt die Wahl je ID; `stapelWahlFuer(ziel)` liefert sie (einmalig) und sonst die Instanz des Ziels.
+   */
+  _merkeStapelWahl(t) {
+    if (!t || !t.id || !t.cardInstance) return;
+    if (!this._stapelWahl) this._stapelWahl = new Map();
+    this._stapelWahl.set(t.id, t.cardInstance);
+  }
+  stapelWahlFuer(ziel) {
+    const w = ziel && this._stapelWahl ? this._stapelWahl.get(ziel.id) : null;
+    if (w) this._stapelWahl.delete(ziel.id);
+    if (w && w.zone === ZONES.SUPPORT && w.heroIdx === ziel.heroIdx && w.zoneSlot === ziel.slotIdx) return w;
+    return ziel?.cardInstance || null;
+  }
+
   async _disambiguateStackedTargets(playerIdx, validTargets, pickedIds) {
     if (!Array.isArray(pickedIds) || pickedIds.length === 0) return pickedIds;
     const alice = require('./_alice-shared');
@@ -33350,7 +33367,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             .filter(i => !t._erlaubteInstanzen || t._erlaubteInstanzen.includes(i.id))
         : [];
       if (stack.length <= 1 && eqStack.length <= 1) {
-        if (eqStack.length === 1) { t.cardInstance = eqStack[0]; t._cardInstance = eqStack[0]; t.cardName = eqStack[0].name; }
+        if (eqStack.length === 1) { t.cardInstance = eqStack[0]; t._cardInstance = eqStack[0]; t.cardName = eqStack[0].name; this._merkeStapelWahl(t); }
         continue;
       }
       if (stack.length <= 1) {
@@ -33365,6 +33382,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         t.cardInstance = gewaehlt || eqStack[eqStack.length - 1];
         t._cardInstance = t.cardInstance;
         t.cardName = t.cardInstance.name;
+        this._merkeStapelWahl(t);
         continue;
       }
 
@@ -33384,6 +33402,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       t.cardInstance = wanted || stack[stack.length - 1];
       t._cardInstance = t.cardInstance;   // Skripte, die ihre Ziele mit `_cardInstance` sammeln (The Yeeting …), lesen diese Form
       t.cardName = t.cardInstance.name;
+      this._merkeStapelWahl(t);
     }
     return pickedIds;
   }

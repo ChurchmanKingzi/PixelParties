@@ -160,9 +160,12 @@ module.exports = {
         }
       } else if (t.type === 'equip') {
         // Remove equip from support zone — fires onCardLeaveZone
-        const inst = engine.cardInstances.find(c =>
-          c.owner === t.owner && c.zone === 'support' && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx && c.name === t.cardName
-        );
+        // Darion: bei einem Stapel hat die Rueckfrage die Karte gewaehlt (`t.cardInstance`).
+        const inst = (t.cardInstance && t.cardInstance.zone === 'support' && t.cardInstance.heroIdx === t.heroIdx && t.cardInstance.zoneSlot === t.slotIdx && t.cardInstance.name === t.cardName)
+          ? t.cardInstance
+          : engine.cardInstances.find(c =>
+            c.owner === t.owner && c.zone === 'support' && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx && c.name === t.cardName
+          );
         if (inst) {
           // ★ Als Befund 28.8.: hier stand eine HANDGESCHRIEBENE
           // Entfernung — Zone splicen, Namen in die Ablage schieben,
