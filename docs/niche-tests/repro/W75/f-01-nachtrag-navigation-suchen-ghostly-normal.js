@@ -3,6 +3,7 @@
 // Kartentexte: Control Monitors „… when your opponent adds 1 or more cards from their deck or discard pile to their hand by discarding the same number of cards …";
 //   Atta „… when you reveal exactly 1 Normal Spell from your deck or hand that this Hero can use, except by the effect of an Ability, you may delete that Spell. …";
 //   Ghostly Warning „Play this card immediately when an opponent's Hero uses a Normal Spell. Negate that Spell and delete it. …"
+// W72a: der Reaktionsspieler zahlt N weitere Handkarten — Seat 0 haelt deshalb eine Preis-Karte (F) mehr.
 // Erwartet: laut Kartentext und Rulings von Al (Welle 75). Aufruf: node docs/niche-tests/repro/W75/f-01-nachtrag-navigation-suchen-ghostly-normal.js   (Exit 0 = korrekt)
 const H = require('../../lib/h.js');
 const F = H.INERT.filler, ATTA = 'Atta, Speaker of Desires';
@@ -10,7 +11,7 @@ const F = H.INERT.filler, ATTA = 'Atta, Speaker of Desires';
   const R = H.runner();
 
   R.section('Navigation Lv3 (2 Kopien weg, 1 Karte hinzu) → Control Monitors loescht die Karte');
-  let t = await H.fresh({ active: 1, hand: [['Control Monitors'], [F, F, 'Fireball']], deck: [[], ['Cute Hydra', F, F, F]], abilities: { 1: { 0: [[], ['Navigation', 'Navigation', 'Navigation'], []] } } });
+  let t = await H.fresh({ active: 1, hand: [['Control Monitors', F], [F, F, 'Fireball']], deck: [[], ['Cute Hydra', F, F, F]], abilities: { 1: { 0: [[], ['Navigation', 'Navigation', 'Navigation'], []] } } });
   t.grantFor(0, 0, 'Control Monitors');
   t.script.push({ match: d => d.type === 'forceDiscardCancellable' || d.type === 'forceDiscard', answer: () => ({ cardName: F, handIndex: t.pile(1, 'hand').indexOf(F) }) });
   t.script.push({ match: d => d.type === 'cardGallery' && /Navigation/.test(d.title || ''), answer: () => ({ cardName: 'Cute Hydra' }) });

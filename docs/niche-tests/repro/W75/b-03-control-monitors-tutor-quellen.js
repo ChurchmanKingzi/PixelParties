@@ -1,6 +1,7 @@
 'use strict';
 // W75 · Control Monitors — Tutor-Quellen: Cute Dog (2/2, 1/1), Inventing Lv3.
 // Kartentext: „Play this card immediately when your opponent adds 1 or more cards from their deck or discard pile to their hand by discarding the same number of cards from your hand. Delete the cards your opponent added. Your opponent may delete all other cards in their hand instead."
+// W72a: der Reaktionsspieler zahlt N weitere Handkarten (N = Zahl der hinzugefuegten Karten) — seine Hand haelt deshalb N Preis-Karten mehr; sonst wie W75.
 // Erwartet: laut Kartentext und Kopfkommentar der Skripte. Aufruf: node docs/niche-tests/repro/W75/b-03-control-monitors-tutor-quellen.js   (Exit 0 = korrekt)
 const H = require('../../lib/h.js');
 const F = H.INERT.filler;
@@ -8,7 +9,7 @@ const F = H.INERT.filler;
   const R = H.runner();
   // Cute Dog: 2 Abwuerfe -> 2 Karten -> EIN Fenster, beide geloescht
   R.section('Cute Dog 2 Abwuerfe / 2 Karten');
-  let t = await H.fresh({ active: 1, hand: [['Control Monitors'], [F, F, 'Fireball']], deck: [[], ['Cute Hydra', 'Cute Phoenix', F, F, F]] });
+  let t = await H.fresh({ active: 1, hand: [['Control Monitors', F, F], [F, F, 'Fireball']], deck: [[], ['Cute Hydra', 'Cute Phoenix', F, F, F]] });
   t.grantFor(0, 0, 'Control Monitors');
   const dog = t.put(1, 0, 0, 'Cute Dog'); dog.turnPlayed = 1;
   t.script.push({ match: d => d.type === 'forceDiscard' || d.type === 'forceDiscardCancellable', answer: () => ({ cardName: F, handIndex: t.pile(1, 'hand').indexOf(F) }) });
@@ -22,7 +23,7 @@ const F = H.INERT.filler;
 
   // Cute Dog: 1 Abwurf, 1 Karte
   R.section('Cute Dog 1 Abwurf / 1 Karte');
-  t = await H.fresh({ active: 1, hand: [['Control Monitors'], [F, 'Fireball']], deck: [[], ['Cute Hydra', F, F, F]] });
+  t = await H.fresh({ active: 1, hand: [['Control Monitors', F], [F, 'Fireball']], deck: [[], ['Cute Hydra', F, F, F]] });
   t.grantFor(0, 0, 'Control Monitors');
   const dog2 = t.put(1, 0, 0, 'Cute Dog'); dog2.turnPlayed = 1;
   t.script.push({ match: d => d.type === 'forceDiscard' || d.type === 'forceDiscardCancellable', answer: (d) => d.type === 'forceDiscardCancellable' ? { cancelled: true } : ({ cardName: F, handIndex: t.pile(1, 'hand').indexOf(F) }) });
@@ -31,7 +32,7 @@ const F = H.INERT.filler;
 
   // Cute Dog: 2 Abwuerfe aber nur 1 passende Karte im Deck -> nicht gleiche Anzahl -> kein Fenster
   R.section('Cute Dog 2 Abwuerfe / nur 1 gefunden -> kein Fenster');
-  t = await H.fresh({ active: 1, hand: [['Control Monitors'], [F, F, 'Fireball']], deck: [[], ['Cute Hydra', F, F, F]] });
+  t = await H.fresh({ active: 1, hand: [['Control Monitors', F], [F, F, 'Fireball']], deck: [[], ['Cute Hydra', F, F, F]] });
   t.grantFor(0, 0, 'Control Monitors');
   const dog3 = t.put(1, 0, 0, 'Cute Dog'); dog3.turnPlayed = 1;
   t.script.push({ match: d => d.type === 'forceDiscard' || d.type === 'forceDiscardCancellable', answer: () => ({ cardName: F, handIndex: t.pile(1, 'hand').indexOf(F) }) });
@@ -41,7 +42,7 @@ const F = H.INERT.filler;
 
   // Inventing Lv3
   R.section('Inventing Lv3');
-  t = await H.fresh({ active: 1, hand: [['Control Monitors'], [F, 'Fireball']], deck: [[], ['Cute Hydra', F, F, F]], abilities: { 1: { 0: [[], ['Inventing', 'Inventing', 'Inventing'], []] } } });
+  t = await H.fresh({ active: 1, hand: [['Control Monitors', F], [F, 'Fireball']], deck: [[], ['Cute Hydra', F, F, F]], abilities: { 1: { 0: [[], ['Inventing', 'Inventing', 'Inventing'], []] } } });
   t.grantFor(0, 0, 'Control Monitors');
   R.note('inv', JSON.stringify(t.gs.players[1].abilityZones[0]));
   t.script.push({ match: d => d.type === 'forceDiscardCancellable' || d.type === 'forceDiscard', answer: () => ({ cardName: F, handIndex: 0 }) });
