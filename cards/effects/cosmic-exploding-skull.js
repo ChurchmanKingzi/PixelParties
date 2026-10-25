@@ -31,7 +31,7 @@ const VOR_MS = 520;         // die Creatures fallen, wenn der Riss aufreißt
 /** Hat der entsprechende Held eine Zauberschul-Ability außer Summoning Magic? */
 function hatSchulAbility(engine, seite, heroIdx) {
   const hero = engine.gs.players[seite]?.heroes?.[heroIdx];
-  if (!hero?.name) return false;
+  if (!hero?.name || hero.hp <= 0) return false;                          // wie Cosmic Skeleton: der Held muss am Leben sein
   if (engine.heroAbilityLevelsBlanked?.(seite, heroIdx)) return false;
   return spellSchoolAbilitiesOn(engine.gs.players[seite]?.abilityZones?.[heroIdx] || [], VALID_SCHOOLS).length > 0;
 }
@@ -69,7 +69,7 @@ module.exports = {
       if ((tot.instId ?? tot.id) !== ich.id) return;                       // nur der eigene Tod
 
       const pi = ich.controller ?? ich.owner;
-      const seite = engine.physicalSide(ich);
+      const seite = ctx.cardHeroOwner ?? engine.physicalSide(ich);        // wie Cosmic Skeleton: Brettseite des Helden
       const heroIdx = ich.heroIdx;
       const heldName = engine.gs.players[seite]?.heroes?.[heroIdx]?.name || null;
 
