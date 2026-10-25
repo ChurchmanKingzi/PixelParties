@@ -55,7 +55,7 @@ const wegnehmen = (t, k, hi = 2, slot = 1) => t.run(() => t.engine.actionTransfe
     R.check('gegnerische Kreatur wandert zu MIR: kein Angebot (nicht aus meinen Zonen)', angebot(t) === 0, angebot(t));
   }
 
-  R.section('C · Hot Skull Potato weitergereicht: der bisherige Halter darf Explosion Toss spielen (Schaden an den Gastgeber-Held; die Kartoffel ist „unaffected")');
+  R.section('C · Hot Skull Potato weitergereicht: der bisherige Halter darf Explosion Toss spielen (Kartoffel wird besiegt trotz „unaffected" — die Toss ist ihre Ausnahme; Schaden 200 an den Gastgeber-Held, Kartoffel Lv2)');
   {
     const t = await H.fresh({ hand: [['ZZ Filler', 'ZZ Filler', CARD], ['ZZ Filler']], deckSize: 30, gold: [100, 100], active: 0 });
     t.setAbilities(0, 0, [['Destruction Magic'], [], []]);
@@ -68,11 +68,12 @@ const wegnehmen = (t, k, hi = 2, slot = 1) => t.run(() => t.engine.actionTransfe
     t.gs.activePlayer = 0;
     await t.run(async () => { await t.engine.runHooks('onTurnEnd', { turn: t.gs.turn, activePlayer: 0 }); await t.engine._runPostChainActions(); });
     const q = t.engine.cardInstances.find(c => c.name === 'Hot Skull Potato' && c.zone === 'support');
-    R.check('Kartoffel wurde weitergereicht (liegt auf Sitz 1)', q && t.engine.physicalSide(q) === 1, q && t.engine.physicalSide(q));
+    R.check('Kartoffel wurde weitergereicht und von der Toss besiegt (nicht mehr auf dem Brett)', !q, q && [q.zone, t.engine.physicalSide(q)]);
     R.check('der bisherige Halter bekam das Angebot', angebot(t) === 1 && t.prompts.some(pr => pr.pi === 0 && pr.d && pr.d.title === CARD), t.prompts.map(pr => [pr.pi, pr.d && pr.d.title]));
-    R.check('die Kartoffel steht weiter (unaffected), Karte verbraucht', !!q && t.pile(0, 'discardPile').includes(CARD), t.pile(0, 'discardPile'));
+    R.check('Toss verbraucht, die Kartoffel liegt in der Ablage ihres Besitzers', t.pile(0, 'discardPile').includes(CARD) && t.pile(0, 'discardPile').includes('Hot Skull Potato'), t.pile(0, 'discardPile'));
     const hpN = [0, 1, 2].map(h => t.hp(1, h));
-    R.check('der Gastgeber-Held der Zielzone erlitt 100 (Kartoffel ohne Stufe zählt ≤ 1)', hpV.some((v, h) => hpN[h] === v - 100) || hpV.some((v, h) => hpN[h] < v), [hpV, hpN]);
+    R.check('der Gastgeber-Held der Zielzone erlitt 200 (Kartoffel Lv2)', hpV.some((v, h) => hpN[h] === v - 200), [hpV, hpN]);
+    R.check('keine Explosion der Kartoffel (kein weiterer Schaden an den Helden von Sitz 0)', [0, 1, 2].every(h => t.hp(0, h) === 800 || t.hp(0, h) === t.gs.players[0].heroes[h].maxHp), [0, 1, 2].map(h => t.hp(0, h)));
     R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   }
   R.finish();
