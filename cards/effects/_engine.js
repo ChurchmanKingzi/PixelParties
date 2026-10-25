@@ -58206,7 +58206,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       ascensionDelta = Math.max(0, Math.min(ascensionDelta, hero.maxHpCapped - (hero.maxHp || oldBaseMaxHp)));
     }
     const newMaxHp = Math.max(1, (hero.maxHp || oldBaseMaxHp) + ascensionDelta);
-    const newHp = Math.max(1, (hero.hp || 0) + ascensionDelta);
+    // `opts.keepHp` (True Form): die AKTUELLEN HP bleiben unberührt — nur max HP wechselt (aktuelle HP über max HP sind erlaubt).
+    const newHp = opts.keepHp ? (hero.hp || 0) : Math.max(1, (hero.hp || 0) + ascensionDelta);
 
     hero.name = cardName;
     hero.hp = newHp;
@@ -58882,8 +58883,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     //
     //   Ein bereits besiegter Held faellt in KEINEM der beiden Faelle
     //   ein zweites Mal.
-    const stirbtAnDerDifferenz = !warBesiegt && rohHp <= 0 && !!opts.notADescend;
-    if (warBesiegt) {
+    const stirbtAnDerDifferenz = !warBesiegt && rohHp <= 0 && !!opts.notADescend && !opts.keepHp;
+    if (opts.keepHp) {
+      // True Form: aktuelle HP bleiben, nur max HP wechselt; der Held stirbt nie daran (aktuelle HP über max HP sind erlaubt).
+      hero.hp = alteHp;
+    } else if (warBesiegt) {
       // Kein Revive, auch nicht ueber die Gutschrift bei negativer
       // Differenz — auf BEIDEN Wegen. Bleibt liegen.
       hero.hp = 0;
@@ -59034,8 +59038,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hero = this.gs.players[hs].heroes[heroIdx];
     const res = await this.performDescend(pi, heroIdx, {
       ...(hs !== pi ? { heroOwner: hs } : {}),
-      // Wie Open Invitation: die Rücknahme einer nur GELEGTEN Form ist kein Abstieg und kann an der HP-Differenz tödlich sein.
       notADescend: true,
+      keepHp: true,           // aktuelle HP bleiben unberührt, der Held stirbt nie an der Rücknahme
     });
     if (!res?.success) return { success: false };
     if (Array.isArray(hero._trueForm)) { hero._trueForm.pop(); if (hero._trueForm.length === 0) delete hero._trueForm; }
