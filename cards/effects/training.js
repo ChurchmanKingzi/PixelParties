@@ -29,6 +29,7 @@
 const { hasCardType } = require('./_hooks');
 
 const { loadCardEffect } = require('./_loader');
+const { pickAusQuellen } = require('./_source-pick-shared');
 
 // ─── HELPERS ─────────────────────────────
 
@@ -72,6 +73,57 @@ function getEligibleDeckAbilities(engine, playerIdx, heroIdx, feld = playerIdx) 
   return Object.entries(countMap)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([name, count]) => ({ name, source: 'deck', count }));
+}
+
+/**
+ * Hand-Abilities als Galerie-Eintraege — EIN Eintrag je Karte auf der Hand (gleichnamige Kopien einzeln: „bis zu N aus der Hand" darf dieselbe Ability mehrfach nennen).
+ * @returns {{ name, source }[]}
+ */
+function getHandAbilityEntries(engine, playerIdx, heroIdx, feld = playerIdx) {
+  const ps = engine.gs.players[playerIdx];
+  if (!ps) return [];
+  const cardDB = engine._getCardDB();
+  const result = [];
+  for (const cardName of (ps.hand || [])) {
+    const cd = cardDB[cardName];
+    if (!cd || !hasCardType(cd, 'Ability')) continue;
+    if (!engine.canAttachAbilityToHero(feld, cardName, heroIdx)) continue;
+    result.push({ name: cardName, source: 'hand' });
+  }
+  return result;
+}
+
+/**
+ * Option A nach der Wahl im gemeinsamen Quellen-Picker: die gewaehlten Hand-Abilities der Reihe nach anlegen (Zone automatisch — wie Wise Village Elder).
+ * Nach jedem Anlegen kann sich die Eignung aendern (Zonen belegt) — dann endet die Reihe. @returns {number} Anzahl (abgefangen = 1, wie doHandAttach)
+ */
+async function handAnlegenGewaehlt(engine, playerIdx, heroIdx, names, trainingOrt, feld = playerIdx) {
+  const ps = engine.gs.players[playerIdx];
+  let attached = 0;
+  let blockiert = false;
+  for (const cardName of names) {
+    if (!(ps.hand || []).includes(cardName)) break;
+    if (!engine.canAttachAbilityToHero(feld, cardName, heroIdx)) break;
+    const attachResult = await engine.attachAbilityFromHand(playerIdx, cardName, heroIdx, {
+      skipAbilityGivenCheck: true,
+      ...(feld !== playerIdx ? { heroOwner: feld } : {}),
+    });
+    if (attachResult.blocked) { blockiert = true; break; }
+    if (!attachResult.success) break;
+    attached++;
+    if (attached === 1) {
+      engine._broadcastEvent('ability_activated', {
+        owner: feld, heroIdx, zoneIdx: trainingOrt.slot, zoneKind: trainingOrt.art, abilityName: 'Training',
+      });
+      await engine._delay(400);
+    }
+    engine._broadcastEvent('ability_activated', {
+      owner: feld, heroIdx, zoneIdx: attachResult.zoneSlot, zoneKind: attachResult.zoneKind, abilityName: cardName,
+    });
+    engine.sync();
+    await engine._delay(300);
+  }
+  return attached || (blockiert ? 1 : 0);
 }
 
 /**
@@ -206,7 +258,7 @@ async function doHandAttachFremd(engine, playerIdx, heroIdx, maxAttach, training
  * @param {{slot:number, art:string}} trainingOrt - Training's own zone (for activation flash)
  * @returns {boolean} true if resolved (ability attached)
  */
-async function doDeckSearch(engine, playerIdx, heroIdx, level, trainingOrt, feld = playerIdx) {
+async function doDeckSearch(engine, playerIdx, heroIdx, level, trainingOrt, feld = playerIdx, vorgewaehlt = null) {
   const ps = engine.gs.players[playerIdx];
   if (!ps) return false;
   // Styx 28.9.: Deck/Ablage/Hand = `playerIdx`, Held und Zonen = `feld`.
@@ -253,13 +305,16 @@ async function doDeckSearch(engine, playerIdx, heroIdx, level, trainingOrt, feld
     return false;
   }
 
-  const picked = await engine.promptGeneric(playerIdx, {
-    type: 'cardGallery',
-    cards: galleryCards,
-    title: 'Training',
-    description: `Choose an Ability to attach to ${heroName}.`,
-    cancellable: false, // Already committed (discard paid at Lv2, or free at Lv3)
-  });
+  // `vorgewaehlt`: die Ability wurde schon im gemeinsamen Quellen-Picker (Hand ODER Deck) gewaehlt — dann keine zweite Galerie.
+  const picked = (vorgewaehlt && galleryCards.some(c => c.name === vorgewaehlt))
+    ? { cardName: vorgewaehlt }
+    : await engine.promptGeneric(playerIdx, {
+      type: 'cardGallery',
+      cards: galleryCards,
+      title: 'Training',
+      description: `Choose an Ability to attach to ${heroName}.`,
+      cancellable: false, // Already committed (discard paid at Lv2, or free at Lv3)
+    });
 
   if (!picked || !picked.cardName) return false;
 
@@ -465,45 +520,34 @@ module.exports = {
     }
     if (!canOptionA && !canOptionB) return false; // Shouldn't happen (canFreeActivate guards this)
 
-    // Both options available — let the player choose
-    const optionA = {
-      id: 'hand',
-      label: `Attach from Hand (up to ${maxHandAttach})`,
-      description: `Drag up to ${maxHandAttach} Abilities from your hand onto ${heroName}.`,
-      color: '#7fffaa',
-    };
-    const optionB = level === 3
-      ? {
-          id: 'deck',
-          label: 'Search Deck',
-          description: `Attach 1 Ability from your deck to ${heroName}. No cost.`,
-          color: 'var(--accent)',
-        }
-      : {
-          id: 'deck',
-          label: 'Search Deck (costs 1 Discard)',
-          description: `Discard 1 card, then attach 1 Ability from your deck to ${heroName}.`,
-          color: 'var(--accent)',
-        };
-
-    const choice = await engine.promptGeneric(pi, {
-      type: 'optionPicker',
+    // Both options available — EIN Picker mit Herkunfts-Label (CARD_API „Mehrere Quellen = ein Picker"): die Abilities der Hand UND die des Decks in einer Galerie.
+    // Eine aus dem Deck waehlen graut alles andere aus; eine aus der Hand waehlen graut das Deck aus, bis zu N aus der Hand.
+    const deckEintraege = getEligibleDeckAbilities(engine, pi, heroIdx, feld);
+    const handEintraege = getHandAbilityEntries(engine, pi, heroIdx, feld);
+    const wahl = await pickAusQuellen(engine, pi, {
+      cards: [...handEintraege, ...deckEintraege],
+      maxJeQuelle: { hand: maxHandAttach, deck: 1 },
       title: `Training Lv.${level} — ${heroName}`,
-      description: 'Choose an effect:',
-      options: [optionA, optionB],
+      description: level === 3
+        ? `Attach up to ${maxHandAttach} Abilities from your hand to ${heroName} — or 1 Ability from your deck (no cost).`
+        : `Attach up to ${maxHandAttach} Abilities from your hand to ${heroName} — or 1 Ability from your deck (costs 1 discard).`,
+      confirmLabel: '📚 Attach!',
       cancellable: true,
       gerrymanderEligible: true, // Hand attach vs Deck search are distinct effects.
+      optionLabels: {
+        hand: `Attach from Hand (up to ${maxHandAttach})`,
+        deck: level === 3 ? 'Search Deck' : 'Search Deck (costs 1 Discard)',
+      },
+      extra: { cpuSourceOrder: ['hand', 'deck'] },
     });
+    if (!wahl) return false;
 
-    if (!choice || choice.cancelled) return false;
-
-    if (choice.optionId === 'hand') {
-      const attached = await doHandAttach(engine, pi, heroIdx, maxHandAttach, trainingOrt, feld);
+    if (wahl.source === 'hand') {
+      const attached = await handAnlegenGewaehlt(engine, pi, heroIdx, wahl.names, trainingOrt, feld);
       return attached > 0;
     }
-    if (choice.optionId === 'deck') {
-      const resolved = await doDeckSearch(engine, pi, heroIdx, level, trainingOrt, feld);
-      return resolved;
+    if (wahl.source === 'deck') {
+      return await doDeckSearch(engine, pi, heroIdx, level, trainingOrt, feld, wahl.names[0]);
     }
 
     return false;

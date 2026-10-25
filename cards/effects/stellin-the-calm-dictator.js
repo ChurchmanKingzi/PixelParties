@@ -37,6 +37,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType, isSummonablePileCreature } = require('./_hooks');
+const { pickAusQuellen } = require('./_source-pick-shared');
 
 const CARD_NAME    = 'Stellin, the Calm Dictator';
 const ATTACHABLE   = 'Stellan, the Calm Cat';
@@ -218,49 +219,30 @@ async function runStellinEffect(ctx) {
   });
   if (!anyHostable(handEligible) && !anyHostable(deckEligible)) return false;
 
-  // ── Source pick (hand / deck / cancel) ──
-  let source;
-  if (handEligible.length > 0 && deckEligible.length > 0
-      && anyHostable(handEligible) && anyHostable(deckEligible)) {
-    const freeSlotsTotal = totalFreeSlotsOnSide(engine, pi);
-    const handCap = Math.min(MAX_FROM_HAND, handEligible.length, require('./_alice-shared').sharingActive(gs, pi) ? MAX_FROM_HAND : freeSlotsTotal);   // W63a: mit Alice-Teilung begrenzt die Zahl freier Zonen nicht
-    const optRes = await engine.promptGeneric(pi, {
-      type: 'optionPicker',
-      title: CARD_NAME,
-      description: 'Place Creatures from where?',
-      options: [
-        { id: 'hand', label: `✋  Up to ${handCap} from hand` },
-        { id: 'deck', label: '📚  1 from deck' },
-      ],
-      cancellable: true,
-      gerrymanderEligible: true, // Batch-from-hand vs targeted-deck-search are distinct effects.
-    });
-    if (!optRes || optRes.cancelled || !optRes.optionId) return false;
-    source = optRes.optionId;
-  } else if (handEligible.length > 0 && anyHostable(handEligible)) {
-    source = 'hand';
-  } else {
-    source = 'deck';
-  }
+  // ── EIN Picker für Hand UND Deck (CARD_API „Mehrere Quellen = ein Picker") ──
+  // Gleiche Galerie wie bisher (Mehrfachwahl), aber mit den Karten beider Quellen und ihrem Herkunftsabzeichen (HAND / DECK). Quellensperre: wählt man eine Karte aus dem Deck,
+  // ist alles andere ausgegraut (es bleibt bei EINER); wählt man eine aus der Hand, ist das Deck ausgegraut und man darf bis zu `handCap` Karten aus der Hand nehmen.
+  const freeSlotsTotal = totalFreeSlotsOnSide(engine, pi);
+  const handCap = Math.min(MAX_FROM_HAND, handEligible.length, require('./_alice-shared').sharingActive(gs, pi) ? MAX_FROM_HAND : freeSlotsTotal);   // W63a: mit Alice-Teilung begrenzt die Zahl freier Zonen nicht
+  const hostable = (cn) => { const cd = cardDB[cn]; return !!cd && anyHostHero(engine, pi, cd); };   // Kontrolle statt Seite (Styx 28.9.)
+  const handWahl = handEligible.filter(hostable);
+  const deckWahl = deckEligible.filter(hostable);
+  const wahl = await pickAusQuellen(engine, pi, {
+    cards: [
+      ...handWahl.map(cn => ({ name: cn, source: 'hand' })),
+      ...deckWahl.slice().sort((x, y) => x.localeCompare(y)).map(cn => ({ name: cn, source: 'deck', count: countCopies(ps.mainDeck, cn) })),
+    ],
+    maxJeQuelle: { ...(handWahl.length > 0 ? { hand: Math.max(1, handCap) } : {}), ...(deckWahl.length > 0 ? { deck: 1 } : {}) },
+    title: CARD_NAME,
+    description: `Choose up to ${Math.max(1, handCap)} Level 0 Creature${handCap > 1 ? 's' : ''} with different names from your hand — or 1 from your deck — to summon. You'll pick a Hero for each.`,
+    confirmLabel: '✨ Summon!',
+    confirmClass: 'btn-success',
+  });
+  if (!wahl) return false;
+  const source = wahl.source;
 
   if (source === 'hand') {
-    const freeSlotsTotal = totalFreeSlotsOnSide(engine, pi);
-    const handCap = Math.min(MAX_FROM_HAND, handEligible.length, require('./_alice-shared').sharingActive(gs, pi) ? MAX_FROM_HAND : freeSlotsTotal);   // W63a: mit Alice-Teilung begrenzt die Zahl freier Zonen nicht
-    const gallery = handEligible.map(cn => ({ name: cn, source: 'hand' }));
-    const picked = await engine.promptGeneric(pi, {
-      type: 'cardGalleryMulti',
-      cards: gallery,
-      selectCount: handCap,
-      minSelect: 0,
-      title: CARD_NAME,
-      description: `Choose up to ${handCap} Level 0 Creature${handCap > 1 ? 's' : ''} with different names from your hand to summon. You'll pick a Hero for each.`,
-      confirmLabel: '✨ Summon!',
-      confirmClass: 'btn-success',
-      cancellable: true,
-    });
-    if (!picked || picked.cancelled) return false;
-    const chosen = Array.isArray(picked.selectedCards) ? picked.selectedCards : [];
-    if (chosen.length === 0) return false;
+    const chosen = wahl.names;
 
     let placed = 0;
     let userCancelled = false;
@@ -302,24 +284,7 @@ async function runStellinEffect(ctx) {
   }
 
   // ── Deck path ──
-  const gallery = deckEligible
-    .filter(cn => {
-      const cd = cardDB[cn];
-      if (!cd) return false;
-      return anyHostHero(engine, pi, cd);   // Kontrolle statt Seite (Styx 28.9.)
-    })
-    .map(cn => ({ name: cn, source: 'deck', count: countCopies(ps.mainDeck, cn) }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  if (gallery.length === 0) return false;
-  const picked = await engine.promptGeneric(pi, {
-    type: 'cardGallery',
-    cards: gallery,
-    title: CARD_NAME,
-    description: `Choose a Level 0 Creature from your deck to summon.`,
-    cancellable: true,
-  });
-  if (!picked || picked.cancelled || !picked.cardName) return false;
-  const chosenName = picked.cardName;
+  const chosenName = wahl.names[0];
   const cd = cardDB[chosenName];
   if (!cd) return false;
 

@@ -2,8 +2,8 @@
 //  GEMEINSAMER BAUSTEIN: „Increase that Spell's level by 1. If the Spell's level is then too high for its user to use, negate it and send
 //  it to the discard pile."  (Shamanic Curse, Celia, the Class Clown)
 //
-//  Die Stufe wird NICHT dauerhaft veraendert: fuer die Pruefung wird `levelOverrideCards` des Wirkers kurz auf Stufe+1 gesetzt und
-//  `getWisdomDiscardCost` gefragt (-1 = auch ueber Wisdom nicht zu decken). Wisdom-Helden zahlen den Zusatz-Abwurf TATSAECHLICH
+//  Die Stufe wird NICHT dauerhaft veraendert: fuer die Pruefung steht kurz ein Level-ZUSCHLAG von +1 auf dem Zauber (`engine._levelZuschlaege`, nach allen Senkungen) und
+//  `getWisdomDiscardCost` wird gefragt (-1 = auch ueber Wisdom nicht zu decken). Wisdom-Helden zahlen den Zusatz-Abwurf TATSAECHLICH
 //  (die urspruenglichen Wisdom-Kosten zahlt `doPlaySpell` nach der Aufloesung; hier kommt nur die Differenz dazu).
 //
 //  Rueckgabe `{ status, link }`:
@@ -40,22 +40,18 @@ async function stufeErhoehen(engine, chain, targetIndex, opts = {}) {
     return { status: 'abort', link: targetLink };
   }
 
-  // Determine the new required Wisdom cost when the spell's effective
-  // level goes up by 1. Temporarily patch the caster's levelOverrideCards
-  // so engine.getWisdomDiscardCost sees the bumped level.
-  if (!castingHero.levelOverrideCards) castingHero.levelOverrideCards = {};
-  const hadOverride = Object.prototype.hasOwnProperty.call(castingHero.levelOverrideCards, spellName);
-  const prevOverride = hadOverride ? castingHero.levelOverrideCards[spellName] : undefined;
-  const currentLevel = prevOverride != null ? prevOverride : (spellCd.level || 0);
-  castingHero.levelOverrideCards[spellName] = currentLevel + 1;
-
-  const newCost = engine.getWisdomDiscardCost(heroSeite, castingHi, spellCd);
-
-  // Restore override exactly as it was
-  if (!hadOverride) delete castingHero.levelOverrideCards[spellName];
-  else castingHero.levelOverrideCards[spellName] = prevOverride;
+  // Neue Wisdom-Kosten bei Stufe +1: ein ZUSCHLAG (`_levelZuschlaege`, wie Ellie) statt eines Heldenstempels. Der Zuschlag liegt NACH allen Senkungen und Setzungen — die Stufe, die der
+  // Zauber gerade WIRKLICH trägt, wird um 1 erhöht (Wisdom-Sweep 26.10.: der frühere Stempel „gedruckte Stufe + 1" sah weder Hand-Rabatte noch Chosen-One-Senkung noch den Kristall und
+  // wurde von der Handkopie-Setzung überschrieben). Hand und Ermäßigungen kommen vom Kontrolleur `oppIdx`, der Held von seiner Brettseite `heroSeite`.
+  const levelQuelle = heroSeite !== oppIdx ? oppIdx : undefined;
+  let newCost;
+  const zuschlag = { pi: oppIdx, heroIdx: castingHi, amount: 1, filter: (cd) => cd?.name === spellName };
+  if (!engine._levelZuschlaege) engine._levelZuschlaege = [];
+  engine._levelZuschlaege.push(zuschlag);
+  try { newCost = engine.getWisdomDiscardCost(heroSeite, castingHi, spellCd, undefined, levelQuelle); }
+  finally { engine._levelZuschlaege = engine._levelZuschlaege.filter(z => z !== zuschlag); }
   // W5b-B9 (Al, Welle 5): der erhöhte Level kostet bei Wisdom-Helden den Zusatz-Abwurf TATSÄCHLICH.
-  const oldCost = Math.max(0, engine.getWisdomDiscardCost(heroSeite, castingHi, spellCd));
+  const oldCost = Math.max(0, engine.getWisdomDiscardCost(heroSeite, castingHi, spellCd, undefined, levelQuelle));
 
   // newCost: -1 means uncoverable (no Wisdom path exists), otherwise the
   // required extra discards. Spell survives iff the caster CAN cover it

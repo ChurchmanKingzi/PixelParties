@@ -4199,6 +4199,20 @@ class GameEngine {
   }
 
   /**
+   * Die noch offenen Wisdom-Kosten des Zaubers, der gerade seinen `onPlay` ausführt, JETZT zahlen — statt erst nach seinem Ende (Standard, v1323). Gebraucht für Karten, deren Effekt
+   * SELBST eine Karte spielt (You are the Chosen One!!!): der innere Zauber zahlt seine Kosten in seinem eigenen Lauf, der äußere erst danach — dann kann die Hand leer sein (Kosten
+   * gratis) und die Abfragen kommen in der falschen Reihenfolge. Der Aufrufer ruft das VOR dem Zweitguss; der Server zahlt danach nicht noch einmal. Ohne Wisdom-Kosten, ohne offenen
+   * Zauber oder für einen anderen Spieler: nichts. @returns {Promise<boolean>} wahr, wenn hier gezahlt wurde
+   */
+  async zahleOffeneWisdom(pi) {
+    const o = this._wisdomOffen;
+    if (!o || o.bezahlt || o.pi !== pi) return false;
+    o.bezahlt = true;
+    await o.bezahle();
+    return true;
+  }
+
+  /**
    * Effektive Seiten einer Instanz (Styx 28.9. aus `_createContext` gezogen,
    * damit Kontext und Engine-Filter nie auseinanderlaufen):
    * `owner`/`controller` = wer mit der Karte handelt (Charme, gestohlene und
@@ -19293,7 +19307,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     // EINMAL pro Stapelabfrage, nicht je Karte. Gilt auch fuer
     // Selbst-Abwuerfe als KOSTEN (`selfInflicted`) — den Effekt
     // negiert das nicht, die Karte wird dadurch nur gratis.
-    {
+    //
+    // ★ W74a (Al): Boris wirkt NUR bei ABWURF. Ein LOESCHEN von der Hand (`deleteMode`: Wheels „delete 2", Acid Rain, Dante,
+    // Debt-o-Tron-/Item-Lock-Kosten …) ist kein Discard — keine Frage, kein Verzicht, kein HOPT-Verbrauch, kein Log.
+    if (!opts.deleteMode && !opts.delete && !opts.loeschen) {
       const boris = loadCardEffect('Boris, the Guardian of Blackport');
       if (boris?.offerDiscardSkip
           && await boris.offerDiscardSkip(this, playerIdx, count, opts)) {
@@ -36888,6 +36905,8 @@ this._deathWatch = (this._deathWatchStack || []).length
           && !script[triggerFlag](this.gs, playerIdx, entry.heroIdx, triggerInfo, this, seite)) continue;
 
       const canActivateOpts = entry.isBakhmSlot ? { isBakhmSlot: true } : { reaktor: playerIdx };
+      // ★ W78 (Bounce Trap: „… this Surprise's level becomes 0"): eine Surprise darf für DIESEN Auslöser Stufe 0 verlangen (`surpriseLevelZero`, dieselbe Signatur wie der typisierte Auslöser).
+      try { if (typeof script.surpriseLevelZero === 'function' && script.surpriseLevelZero(this.gs, playerIdx, entry.heroIdx, triggerInfo, this, seite)) canActivateOpts.stufeNull = true; } catch (err) { console.error(`[surpriseLevelZero] ${entry.cardName}:`, err.message); }
       if (!this._canHeroActivateSurprise(seite, entry.heroIdx, entry.cardName, canActivateOpts)) continue;
 
       const heroName = this.gs.players[seite]?.heroes?.[entry.heroIdx]?.name || 'Hero';
@@ -43016,7 +43035,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _lvQuelle = reaktor !== playerIdx ? { levelSourcePi: reaktor } : undefined;
     // 24.10. (Reverse Trap): eine verdeckt gelegte Surprise mit Stufe-0-Marke („its level becomes 0 … on the board") braucht keine Stufe.
     const _stufeNullBrett = !opts.spellInHand && this.cardInstances.some(c => c.name === cardName && c.zone === ZONES.SURPRISE && c.heroIdx === heroIdx && this.physicalSide(c) === playerIdx && c.counters?._rtLevel0);
-    if (!_stufeNullBrett && !this.heroMeetsLevelReq(playerIdx, heroIdx, cardData, _lvQuelle)) return false;
+    if (!_stufeNullBrett && !opts.stufeNull && !this.heroMeetsLevelReq(playerIdx, heroIdx, cardData, _lvQuelle)) return false;   // W78: `opts.stufeNull` = die Surprise verlangt für diesen Auslöser Stufe 0 (Bounce Trap)
 
     // ★★ v1154 („Santa Klaus", Als Befund 17.9.): dieselben Helden-
     // Sperren wie im normalen Spielweg (`validateActionPlay`) — das
@@ -46810,8 +46829,13 @@ this._deathWatch = (this._deathWatchStack || []).length
    * ueber `actionPromptForceDiscard` abwerfen lassen, fragen Boris hier
    * VOR ihrem Abwurf: `true` = der Spieler ignoriert den Abwurf komplett.
    * Ohne aktiven Boris sofort `false`, keine Abfrage.
+   *
+   * ★ W74a (Al): NUR fuer echte ABWUERFE. Wer Karten von der Hand LOESCHT (Kosten oder Wirkung), ruft das nicht auf — und wer es
+   * doch tut, bekommt mit `opts.deleteMode` / `opts.delete` / `opts.loeschen` ein `false` ohne Frage und ohne HOPT-Verbrauch.
+   * (Wächter: scripts/check-boris-delete.js.)
    */
   async borisVerzicht(pi, count, opts = {}) {
+    if (opts.deleteMode || opts.delete || opts.loeschen) return false;
     const boris = loadCardEffect('Boris, the Guardian of Blackport');
     if (!boris?.offerDiscardSkip || !(count > 0)) return false;
     try { return !!(await boris.offerDiscardSkip(this, pi, count, opts)); }
@@ -49244,6 +49268,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
+    // ★ W78 (True Form): „Transform back" — jederzeit im eigenen Zug (Main- und Action Phase), ohne Aktion, mehrfach möglich.
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      if (opts.onlyHeroIdx != null && hi !== opts.onlyHeroIdx) continue;
+      if (this.trueFormRevertInfo(playerIdx, playerIdx, hi)) {
+        result.push({ heroIdx: hi, heroName: ps.heroes[hi].name, effectName: 'Transform back', trueFormRevert: true });
+      }
+    }
+
     // Also check charmed opponent heroes (Charme Lv3, Golden Apple, Styx).
     // ★ Styx 28.9. (Spieltest: geliehener Dajan in Main 1 markiert, aber
     // der Server verlangte eine Zusatzaktion; in der Action Phase nicht
@@ -51605,46 +51637,21 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
   }
 
-  heroMeetsLevelReq(playerIdx, heroIdx, cardData, opts = {}) {
+  /**
+   * ★ DIE EINE STUFENRECHNUNG FÜR „KANN DER HELD DIESE KARTE SPIELEN?" UND „WAS KOSTET WISDOM?" (Wisdom-Sweep 26.10.2026).
+   *
+   * Alles, was die Stufe einer Handkarte für einen Wirker VOR den Fähigkeits- und Kartensenkern (`_testLevelReqForZones`) ändert, steht hier an EINER Stelle:
+   * Heldenstempel (`levelOverrideCards`: Sol Rym, Fiedel, Trex, Archibald), absolute Setzung je Handkopie (Lawn Gnome), Hand-Offsets (Rocky Slime, Sparkfly Queen, Divine Gift …),
+   * Stufe je Nutzer (`levelOffsetForHero`: You are the Chosen One!!!), Mana Absorbing Crystal, Zuschläge (`mitLevelZuschlag`: Ellie, Celia, Shamanic Curse) und Lethe-Stempel.
+   * `heroMeetsLevelReq` (Spielbarkeit) UND `getWisdomDiscardCost` (Abwurf) lesen dieselbe Zahl — vorher rechnete Wisdom eine eigene, kürzere Kopie und übersah Kristall, Zuschläge,
+   * Stufe je Nutzer und Handkopie-Setzung: die Karte war spielbar, kostete aber zu wenig (oder gar nichts). Eine neue Stufenquelle gehört HIER hinein, nicht in eine der Aufrufer.
+   * @param {object} opts  { handIdx, levelSourcePi, pileSide }
+   * @returns {number} die rohe Stufe (≥ 0 nach Senkungen; Zuschläge dürfen sie erhöhen)
+   */
+  _spielRohStufe(playerIdx, heroIdx, cardData, opts = {}) {
     const ps = this.gs.players[playerIdx];
     const hero = ps?.heroes?.[heroIdx];
-    if (!hero?.name) return false;
-    // ★ v1108 („Love Shot", Als Testbefund 15.9.): WESSEN Ermaessigungen
-    // gelten, wenn ein GELIEHENER Held aus MEINER Hand spielt?
-    //
-    // Die Schulen und Stufen kommen vom Helden — also von `playerIdx`,
-    // der Seite, auf der er steht. Die KARTE kommt aber aus der Hand des
-    // Kontrolleurs, und dort liegen auch ihre Ermaessigungen (Area,
-    // Ethan, Hand-Offsets). Ohne Trennung fragte die Pruefung die
-    // Handablagen der falschen Seite ab: Als auf 0 reduzierter
-    // „Cataclysm" galt dem geliehenen Helden als Lv3 und war nicht
-    // spielbar.
-    //
-    // `opts.levelSourcePi` benennt die Seite, deren HAND und
-    // Ermaessigungen zaehlen. Ohne Angabe bleibt es bei `playerIdx` —
-    // alle bisherigen Aufrufer sind unveraendert.
     const lvlPi = (typeof opts.levelSourcePi === 'number') ? opts.levelSourcePi : playerIdx;
-    // Dead hero: the only legal plays are cards that explicitly bypass the
-    // Hero-as-caster requirement — i.e. Placement-style cards (Deepsea
-    // bounce-place, any future "install into this slot regardless of
-    // caster" mechanic). They opt in via `canBypassLevelReq`. Without this
-    // dead-hero-aware branch, dropping a Deepsea Creature onto a bounce
-    // target in a DEAD Hero's zone was silently rejected here, before
-    // validateActionPlay could consult `canBypassFreeZoneRequirement` and
-    // before the card's own beforeSummon ran the swap. Attacks / Spells /
-    // vanilla Creatures still correctly fail at the unchanged `return
-    // false` below.
-    if (hero.hp <= 0) {
-      const cardScript = loadCardEffect(cardData.name);
-      if (typeof cardScript?.canBypassLevelReq === 'function' && !opts.noPlacementBypass) {
-        try {
-          if (cardScript.canBypassLevelReq(this.gs, playerIdx, heroIdx, cardData, this, opts)) return true;
-        } catch (err) {
-          console.error(`[canBypassLevelReq dead-hero] ${cardData.name} threw:`, err.message);
-        }
-      }
-      return false;
-    }
     let rawLevel = cardData.level || 0;
     // Per-card level override (e.g. Sol Rym treats Chain Lightning as level 0)
     if (hero.levelOverrideCards && cardData.name && this._heroLevelOverride(playerIdx, heroIdx, cardData.name) != null) {
@@ -51722,6 +51729,50 @@ this._deathWatch = (this._deathWatchStack || []).length
       const bonus = this._getLetheStampBonus(playerIdx, cardData.name, opts.pileSide);
       if (bonus > 0) rawLevel += bonus;
     }
+    return rawLevel;
+  }
+
+  heroMeetsLevelReq(playerIdx, heroIdx, cardData, opts = {}) {
+    const ps = this.gs.players[playerIdx];
+    const hero = ps?.heroes?.[heroIdx];
+    if (!hero?.name) return false;
+    // ★ v1108 („Love Shot", Als Testbefund 15.9.): WESSEN Ermaessigungen
+    // gelten, wenn ein GELIEHENER Held aus MEINER Hand spielt?
+    //
+    // Die Schulen und Stufen kommen vom Helden — also von `playerIdx`,
+    // der Seite, auf der er steht. Die KARTE kommt aber aus der Hand des
+    // Kontrolleurs, und dort liegen auch ihre Ermaessigungen (Area,
+    // Ethan, Hand-Offsets). Ohne Trennung fragte die Pruefung die
+    // Handablagen der falschen Seite ab: Als auf 0 reduzierter
+    // „Cataclysm" galt dem geliehenen Helden als Lv3 und war nicht
+    // spielbar.
+    //
+    // `opts.levelSourcePi` benennt die Seite, deren HAND und
+    // Ermaessigungen zaehlen. Ohne Angabe bleibt es bei `playerIdx` —
+    // alle bisherigen Aufrufer sind unveraendert.
+    const lvlPi = (typeof opts.levelSourcePi === 'number') ? opts.levelSourcePi : playerIdx;
+    // Dead hero: the only legal plays are cards that explicitly bypass the
+    // Hero-as-caster requirement — i.e. Placement-style cards (Deepsea
+    // bounce-place, any future "install into this slot regardless of
+    // caster" mechanic). They opt in via `canBypassLevelReq`. Without this
+    // dead-hero-aware branch, dropping a Deepsea Creature onto a bounce
+    // target in a DEAD Hero's zone was silently rejected here, before
+    // validateActionPlay could consult `canBypassFreeZoneRequirement` and
+    // before the card's own beforeSummon ran the swap. Attacks / Spells /
+    // vanilla Creatures still correctly fail at the unchanged `return
+    // false` below.
+    if (hero.hp <= 0) {
+      const cardScript = loadCardEffect(cardData.name);
+      if (typeof cardScript?.canBypassLevelReq === 'function' && !opts.noPlacementBypass) {
+        try {
+          if (cardScript.canBypassLevelReq(this.gs, playerIdx, heroIdx, cardData, this, opts)) return true;
+        } catch (err) {
+          console.error(`[canBypassLevelReq dead-hero] ${cardData.name} threw:`, err.message);
+        }
+      }
+      return false;
+    }
+    let rawLevel = this._spielRohStufe(playerIdx, heroIdx, cardData, opts);   // eine Rechnung für Spielbarkeit UND Wisdom-Kosten (s. dort)
     if (rawLevel <= 0 && !cardData.spellSchool1) return true;
 
     // Test the level requirement against each candidate ability-zone
@@ -52653,42 +52704,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hero = ps?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return 0;
 
-    let rawLevel = cardData.level || 0;
-    if (hero.levelOverrideCards && cardData.name && this._heroLevelOverride(playerIdx, heroIdx, cardData.name) != null) {
-      rawLevel = this._heroLevelOverride(playerIdx, heroIdx, cardData.name);
-    }
-    // Mirror of heroMeetsLevelReq's per-index hand offset (Rocky Slime
-    // + Sparkfly Queen's transient rebate). Reduced spells need less
-    // Wisdom coverage just like they need less school level — same
-    // effective rawLevel input. The hero filter (Sparkfly Queen)
-    // applies here too: an offset reserved for a specific host hero
-    // shouldn't reduce another hero's Wisdom cost.
-    // ★ W16a (Al, Frage 6: „Lies die Hand des aktuellen Kontrolleurs"): `levelSourcePi` = Kontrolleur eines geliehenen/gecharmten Helden — Hand, Rabatte (Offsets) und
-    // Ermäßigungen kommen von SEINER Seite, der Held (Schulen, Stufen) bleibt `playerIdx`. Ohne Angabe wie bisher.
-    const lps_w = (typeof levelSourcePi === 'number') ? (this.gs.players[levelSourcePi] || ps) : ps;
-    const handArr_w = lps_w?.hand;
-    const offMap_w  = lps_w?._handLevelOffsets;
-    const transMap_w = lps_w?._handLevelOffsetsTransient;
-    const filterMap_w = lps_w?._handLevelOffsetHeroFilter;
-    if (cardData.name && handArr_w && (offMap_w || transMap_w)) {
-      let bestOffset = 0;
-      const _nurKopie_w = this._kopieNurIndex(handArr_w, cardData, handIdx);   // ★ W15b (C2): konkrete Kopie, siehe `heroMeetsLevelReq`
-      const scan = (map) => {
-        if (!map) return;
-        for (const k of Object.keys(map)) {
-          const idx = +k;
-          if (_nurKopie_w != null && idx !== _nurKopie_w) continue;
-          if (handArr_w[idx] !== cardData.name) continue;
-          if (filterMap_w && filterMap_w[k] != null && filterMap_w[k] !== heroIdx) continue;
-          if (filterMap_w && filterMap_w[k] != null && this._heldHandOffsetsRuhen(playerIdx, heroIdx)) continue;   // W7a (H04-13)
-          const v = map[k] || 0;
-          if (v < bestOffset) bestOffset = v;
-        }
-      };
-      scan(offMap_w);
-      scan(transMap_w);
-      if (bestOffset < 0) rawLevel = Math.max(0, rawLevel + bestOffset);
-    }
+    // EINE Stufenrechnung mit `heroMeetsLevelReq` (`_spielRohStufe`): Heldenstempel, Handkopie-Setzung, Hand-Offsets (Rabatt „nur die eine Kopie", Kontrolleur-Hand bei geliehenen
+    // Helden), Stufe je Nutzer, Mana Absorbing Crystal, Zuschläge (Ellie, Celia, Shamanic Curse). Wisdom zahlt die Lücke zur ECHTEN Stufe, nie zu einer gedruckten oder halb gerechneten.
+    let rawLevel = this._spielRohStufe(playerIdx, heroIdx, cardData, { handIdx, levelSourcePi });
     if (rawLevel <= 0 && !cardData.spellSchool1) return 0;
 
     // For Lizbeth-style borrowers, walk each candidate ability-zone set
@@ -52717,9 +52735,10 @@ this._deathWatch = (this._deathWatchStack || []).length
   _wisdomCostForZones(cardData, hero, rawLevel, abZones, playerIdx, heroIdx, levelSourcePi) {
     const levelAfterAbility = this._applySpellLevelReductions(cardData, rawLevel, abZones);
     // W16a (Frage 6): Ermäßigungen des Kontrolleurs (wie `_testLevelReqForZones`: `lvrPi` + `castHeroSide`)
-    const level = (typeof levelSourcePi === 'number' && levelSourcePi !== playerIdx)
-      ? this._applyCardLevelReductions(cardData, levelAfterAbility, levelSourcePi, heroIdx, { levelSourcePi, castHeroSide: playerIdx })
-      : this._applyCardLevelReductions(cardData, levelAfterAbility, playerIdx, heroIdx);
+    // Exakt dieselben Argumente wie `_testLevelReqForZones` (auch `castHeroSide` ohne Seitenwechsel): sonst sähen heldengebundene Senker beider Rechnungen verschiedene Wirker.
+    const level = this._applyCardLevelReductions(cardData, levelAfterAbility,
+      typeof levelSourcePi === 'number' ? levelSourcePi : playerIdx, heroIdx,
+      { ...(typeof levelSourcePi === 'number' ? { levelSourcePi } : {}), castHeroSide: playerIdx });
 
     const gap = this._spellLevelGap(cardData, level, abZones);
     if (gap === 0) return 0;
@@ -58217,7 +58236,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       ascensionDelta = Math.max(0, Math.min(ascensionDelta, hero.maxHpCapped - (hero.maxHp || oldBaseMaxHp)));
     }
     const newMaxHp = Math.max(1, (hero.maxHp || oldBaseMaxHp) + ascensionDelta);
-    const newHp = Math.max(1, (hero.hp || 0) + ascensionDelta);
+    // `opts.keepHp` (True Form): die AKTUELLEN HP bleiben unberührt — nur max HP wechselt (aktuelle HP über max HP sind erlaubt).
+    const newHp = opts.keepHp ? (hero.hp || 0) : Math.max(1, (hero.hp || 0) + ascensionDelta);
 
     hero.name = cardName;
     hero.hp = newHp;
@@ -58893,8 +58913,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     //
     //   Ein bereits besiegter Held faellt in KEINEM der beiden Faelle
     //   ein zweites Mal.
-    const stirbtAnDerDifferenz = !warBesiegt && rohHp <= 0 && !!opts.notADescend;
-    if (warBesiegt) {
+    const stirbtAnDerDifferenz = !warBesiegt && rohHp <= 0 && !!opts.notADescend && !opts.keepHp;
+    if (opts.keepHp) {
+      // True Form: aktuelle HP bleiben, nur max HP wechselt; der Held stirbt nie daran (aktuelle HP über max HP sind erlaubt).
+      hero.hp = alteHp;
+    } else if (warBesiegt) {
       // Kein Revive, auch nicht ueber die Gutschrift bei negativer
       // Differenz — auf BEIDEN Wegen. Bleibt liegen.
       hero.hp = 0;
@@ -59004,6 +59027,55 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     this.sync();
     return { success: true, newName };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  ★ W78 — TRUE FORM (Zurückverwandeln)
+  //  „You may at any time during your turn remove a Hero placed by this effect and send it to the discard pile to remove this effect."
+  //  Der Held trägt die Form als `plainHeroForm` auf dem Formstapel (`_formStack`, wie Tri Ad/Open Invitation); `hero._trueForm` merkt sich je
+  //  True-Form-Schicht die Stapeltiefe, in der sie liegt. Nur die OBERSTE Schicht darf entfernt werden, und nur, wenn die Form darunter
+  //  keinen Namensdoppelgänger unter den eigenen Helden erzeugt.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Kann der Held (`hs` = Brettseite, `heroIdx`) von `pi` jetzt eine True-Form-Schicht abwerfen?
+   * @returns {{ formName: string, baseName: string }|null}
+   */
+  trueFormRevertInfo(pi, hs, heroIdx) {
+    const hero = this.gs.players[hs]?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return null;
+    const marks = hero._trueForm;
+    if (!Array.isArray(marks) || marks.length === 0) return null;
+    const stack = Array.isArray(hero._formStack) ? hero._formStack : [];
+    while (marks.length && marks[marks.length - 1] > stack.length) marks.pop();   // Schicht wurde anders entfernt
+    if (marks.length === 0) { delete hero._trueForm; return null; }
+    if (marks[marks.length - 1] !== stack.length) return null;                    // oberste Form stammt nicht von True Form
+    if (this.heroSideOf(hs, hero) !== pi) return null;                            // nur der Kontrolleur
+    const baseName = stack[stack.length - 1];
+    if (!baseName || !this._getCardDB()[baseName]) return null;
+    // „nor revert into one if that would create a duplicate"
+    for (const { hero: h, physOwner, heroIdx: hi } of this.heroesControlledBy(pi)) {
+      if (physOwner === hs && hi === heroIdx) continue;
+      if (h.name === baseName) return null;
+    }
+    return { formName: hero.name, baseName };
+  }
+
+  /** Entfernt die oberste True-Form-Schicht: Form in die Ablage, Held kehrt zur Form darunter zurück. */
+  async performTrueFormRevert(pi, hs, heroIdx) {
+    const info = this.trueFormRevertInfo(pi, hs, heroIdx);
+    if (!info) return { success: false };
+    const hero = this.gs.players[hs].heroes[heroIdx];
+    const res = await this.performDescend(pi, heroIdx, {
+      ...(hs !== pi ? { heroOwner: hs } : {}),
+      notADescend: true,
+      keepHp: true,           // aktuelle HP bleiben unberührt, der Held stirbt nie an der Rücknahme
+    });
+    if (!res?.success) return { success: false };
+    if (Array.isArray(hero._trueForm)) { hero._trueForm.pop(); if (hero._trueForm.length === 0) delete hero._trueForm; }
+    this.log('true_form_revert', { player: this.gs.players[pi]?.username, from: info.formName, to: info.baseName });
+    this.sync();
+    return { success: true, newName: res.newName };
   }
 
   /** Find which player owns a hero object. */

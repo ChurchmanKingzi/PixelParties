@@ -152,6 +152,41 @@ test('diffCards: nur veränderte Karten; neue/entfernte/Nebenfelder zählen nich
   assert.deepEqual(d([A], [{ ...A, cost: 3 }]), [{ name: 'A', fields: ['cost'] }], 'neues Feld');
 });
 
+// ── !duel: immer im Matchmaking-Kanal ──
+test('!duel postet die Herausforderung immer im Matchmaking-Kanal; woanders getippt gibt es einen Hinweis; ohne erreichbaren Kanal bleibt es im Befehlskanal', async () => {
+  const { ctx, config } = await setup({ user: async id => ({ user: { username: 'Game' + id.slice(-2) } }) });
+  assert.equal(config.channels.matchmaking, '733828766794645504', 'Standard-ID ohne .env-Eintrag');
+  const posted = [];
+  const mm = { id: config.channels.matchmaking, isTextBased: () => true, send: async p => { posted.push(p); return { id: 'P1', edit: async () => {} }; } };
+  const m = member({ id: '300000000000000021' });
+  const g = guild({ members: [m] });
+  g.channels.cache.set(mm.id, mm);
+
+  // aus einem anderen Kanal getippt (Testkanal C1)
+  const msg = message({ guild: g, member: m, content: '!duel' });
+  await ctx.handleMessage(msg);
+  assert.equal(posted.length, 1, 'Herausforderung im Matchmaking-Kanal');
+  assert.match(posted[0].embeds[0].data.description, /<@300000000000000021> is looking for a duel \(in-game: \*\*Game21\*\*\)/);
+  assert.ok(posted[0].components.length, 'Accept-Knopf');
+  assert.equal(msg.deleted, true, 'Befehl wird gelöscht');
+  assert.match(msg.replies.at(-1).content, /your challenge is up in <#733828766794645504>/);
+  assert.deepEqual(msg.replies.at(-1).allowedMentions, { users: ['300000000000000021'] });
+
+  // direkt im Matchmaking-Kanal getippt: kein zusätzlicher Hinweis
+  const msg2 = message({ guild: g, member: m, content: '!duel' });
+  msg2.channel = { ...msg2.channel, id: mm.id, send: mm.send };
+  await ctx.handleMessage(msg2);
+  assert.equal(posted.length, 2);
+  assert.equal(msg2.replies.length, 0);
+
+  // Kanal nicht erreichbar → Rückfall auf den Kanal des Befehls
+  g.channels.cache.delete(mm.id);
+  const msg3 = message({ guild: g, member: m, content: '!duel' });
+  await ctx.handleMessage(msg3);
+  assert.equal(posted.length, 2);
+  assert.ok(msg3.replies.at(-1).embeds, 'Herausforderung im Befehlskanal');
+});
+
 test('Neue Karten: gepostet; ohne Kanal oder bei Sendefehler NICHT als bekannt vermerkt und später nachgeholt; !announce stellt Karten von Hand ein', async () => {
   const renderer = require('../lib/card-renderer');
   config.repoRoot = path.resolve(__dirname, '..', '..');      // der Patchnotes-Test oben hat repoRoot auf ein Temp-Repo gestellt

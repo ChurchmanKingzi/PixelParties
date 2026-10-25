@@ -8267,8 +8267,16 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     if (!cards.length) return null;
     const c = pickBestGalleryCard(engine, cpuIdx, cards,
       promptData.menuSource || promptData._gerryOriginalTitle || promptData.title || null);
-    _logGalleryPick(engine, promptData, cpuIdx, [c.name]);
-    return { cardName: c.name, source: c.source };
+    // Gleichnamige Einträge aus mehreren Quellen („Mehrere Quellen = ein Picker", CARD_API): die Karte nennt per `cpuSourceOrder` ihre Reihenfolge der Quellen
+    // (['deck', 'hand'] …); die Bewertung wählt den NAMEN, die Reihenfolge die Quelle. Ohne Angabe bleibt es beim ersten Eintrag wie bisher.
+    let wahl = c;
+    if (Array.isArray(promptData.cpuSourceOrder)) {
+      const rang = (e) => { const r = promptData.cpuSourceOrder.indexOf(e.source); return r < 0 ? 99 : r; };
+      const gleiche = cards.filter(e => e.name === c.name).sort((x, y) => rang(x) - rang(y));
+      if (gleiche.length) wahl = gleiche[0];
+    }
+    _logGalleryPick(engine, promptData, cpuIdx, [wahl.name]);
+    return { cardName: wahl.name, source: wahl.source };
   }
   if (type === 'cardGalleryMulti') {
     const cards = promptData.cards || [];
@@ -8287,6 +8295,42 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     // Crestina) und der offenen Poolwahl — genau die Formen 4 und 5.
     pickBestGalleryCard(engine, cpuIdx, cards,
       promptData.menuSource || promptData._gerryOriginalTitle || promptData.title || null); // stamps `_galleryScore`
+    // Quellenregeln („Mehrere Quellen = ein Picker", CARD_API): `exclusiveSources` + `sourceMax` — die Wahl bleibt in EINER Quelle, je Quelle höchstens `sourceMax[quelle]`
+    // verschiedene Karten (Stellan/Stellin: bis zu 3 aus der Hand ODER 1 aus dem Deck). Je Quelle zählen die besten Einträge nach Galerie-Wert; die Quelle mit dem höchsten
+    // Gesamtwert gewinnt. Die Antwort nennt Indizes UND Quellen (gleichnamige Karten aus zwei Quellen sind zwei Einträge — Namen allein wären zweideutig).
+    if (promptData.exclusiveSources && promptData.sourceMax && typeof promptData.sourceMax === 'object') {
+      const gruppen = {};
+      cards.forEach((c, i) => { (gruppen[c.source] = gruppen[c.source] || []).push({ i, name: c.name, quelle: c.source, wert: Number.isFinite(c._galleryScore) ? c._galleryScore : 0 }); });
+      let beste = null, besterWert = -Infinity;
+      for (const [quelle, liste] of Object.entries(gruppen)) {
+        const max = promptData.sourceMax[quelle] ?? 1;
+        const gewaehlt = [], namen = new Set();
+        for (const e of liste.slice().sort((a, b) => b.wert - a.wert)) {
+          if (gewaehlt.length >= max) break;
+          if (namen.has(e.name)) continue;
+          namen.add(e.name); gewaehlt.push(e);
+        }
+        const summe = gewaehlt.reduce((x, e) => x + e.wert, 0);
+        if (gewaehlt.length > 0 && summe > besterWert) { besterWert = summe; beste = gewaehlt; }
+      }
+      // `cpuSourceOrder` (['hand', 'deck'] …): die Karte nennt eine feste Vorliebe — die erste Quelle der Liste mit wählbaren Einträgen gewinnt, der Wert entscheidet nur innerhalb.
+      if (Array.isArray(promptData.cpuSourceOrder)) {
+        for (const q of promptData.cpuSourceOrder) {
+          if (!gruppen[q]?.length) continue;
+          const max = promptData.sourceMax[q] ?? 1;
+          const gewaehlt = [], namen = new Set();
+          for (const e of gruppen[q].slice().sort((a, b) => b.wert - a.wert)) {
+            if (gewaehlt.length >= max) break;
+            if (namen.has(e.name)) continue;
+            namen.add(e.name); gewaehlt.push(e);
+          }
+          if (gewaehlt.length) { beste = gewaehlt; break; }
+        }
+      }
+      const wahl = beste || [];
+      _logGalleryPick(engine, promptData, cpuIdx, wahl.map(e => e.name));
+      return { selectedCards: wahl.map(e => e.name), selectedIndices: wahl.map(e => e.i), selectedSources: wahl.map(e => e.quelle) };
+    }
     const plan = cpuGalleryMultiPlan(promptData);
     if (plan.hardCount) {
       // EXACT-count prompt (Timeless King Zi / Magic Lamp / Crestina).

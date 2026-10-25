@@ -8609,13 +8609,30 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // Z7b: Abzug der Einmal-Stempel VOR dem `onPlay` — wird der Zauber nach der Zielwahl GANZ negiert
     // (MOE Shield, Storm Ring, Frost Rune …), hat er nie aufgeloest und gibt sie unten zurück.
     const _stempelVorher = _gefizzelt ? null : room.engine._stempelAbzug(pi);
+    let _wisdomVorab = false;   // die Karte hat ihre Wisdom-Kosten selbst schon gezahlt (`engine.zahleOffeneWisdom`)
     if (!_gefizzelt && !_kostenAbbruch) {
       const _wirkerHook = gs._wirkerSeite;
       gs._wirkerSeite = { pi, heroIdx, heroOwner };
       gs._klonAufnahme = { pi, heroIdx, heroOwner, name: cardName, eintraege: [] };   // Clone (Welle 72): die Zielwahlen dieses Wurfs merken (Engine: `_zielwahlAbschliessen`)
+      // Karten, deren Effekt selbst eine Karte spielt (You are the Chosen One!!!), zahlen die Wisdom-Kosten VOR diesem Zweitguss: sonst zahlt der innere Zauber zuerst, und die Hand kann
+      // beim äußeren leer sein (Kosten gratis). Der Bezahler steht an der Engine bereit; wer ihn nicht ruft, zahlt wie bisher nach dem Ende des Zaubers.
+      const _wisdomOffenVorher = room.engine._wisdomOffen;
+      const _wisdomOffen = wisdomDiscardCost > 0 ? {
+        pi, bezahlt: false,
+        bezahle: async () => {
+          const _rIdx0 = getResolvingHandIndex(ps);
+          const _pool0 = fromCreation ? ps.hand.map((_, i) => i) : ps.hand.map((_, i) => i).filter(i => i !== _rIdx0);
+          await room.engine.actionPromptForceDiscard(pi, wisdomDiscardCost, {
+            title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true, eligibleIndices: _pool0,
+          });
+        },
+      } : null;
+      room.engine._wisdomOffen = _wisdomOffen;
       try {
         await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
       } finally {
+        room.engine._wisdomOffen = _wisdomOffenVorher;
+        _wisdomVorab = !!_wisdomOffen?.bezahlt;
         if (_wirkerHook === undefined) delete gs._wirkerSeite; else gs._wirkerSeite = _wirkerHook;
       }
     }
@@ -8800,9 +8817,9 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // ganz am Ende, nach dem Zweitguss, und beide Kosten fielen gebuendelt
     // an. Der Zauber liegt hier noch in der Hand — er ist vom Abwurf
     // ausgenommen (`eligibleIndices`).
-    let _wisdomBezahlt = false;
+    let _wisdomBezahlt = _wisdomVorab;
     let _buddyTicket = null;   // W67a: Inyas Fantasy Buddy (gesetzt vor `afterSpellResolved`)
-    if (wisdomDiscardCost > 0 && !_gefizzelt) {
+    if (wisdomDiscardCost > 0 && !_gefizzelt && !_wisdomBezahlt) {   // `_wisdomBezahlt` schon wahr: die Karte hat vorab gezahlt (`engine.zahleOffeneWisdom`)
       const _rIdx = getResolvingHandIndex(ps);
       const _pool = fromCreation ? ps.hand.map((_, i) => i) : ps.hand.map((_, i) => i).filter(i => i !== _rIdx);
       await room.engine.actionPromptForceDiscard(pi, wisdomDiscardCost, {
@@ -11109,8 +11126,11 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
   // covers hero effects too. Stunned / negated still silence them.
   // Chilly Dog (Mischief Militia) lifts the Frozen-only silence on
   // the activator's own side.
-  if ((hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated) return false;
-  if (hero.statuses?.frozen && !room.engine._isChillyDogActiveFor(pi)) return false;
+  // ★ W78 (True Form): „Transform back" ist ein Effekt des ZAUBERS, kein Heldeneffekt — ein betäubter/negierter/gefrorener Held kann sich trotzdem zurückverwandeln.
+  const trueFormRevert = room.engine.trueFormRevertInfo(pi, heroOwner, heroIdx);
+  const heldStumm = !!((hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated
+    || (hero.statuses?.frozen && !room.engine._isChillyDogActiveFor(pi)));
+  if (heldStumm && !trueFormRevert) return false;
   if (charmedOwner != null && hero.charmedBy !== pi && hero.controlledBy !== pi) return false;
   // _actionLockedTurn (Treasure Hunter's Backpack, etc.) blocks "Actions"
   // only — Spell/Attack/Creature plays and `actionCost` Ability activations.
@@ -11123,7 +11143,9 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
   const mummyScript = hasMummyToken ? loadCardEffect('Mummy Token') : null;
   const ownScript = heroScriptOf(hero);
 
-  if (hasMummyToken && mummyScript?.heroEffect && mummyScript?.onHeroEffect) {
+  if (heldStumm) {
+    // nur die Rückverwandlung (s. oben)
+  } else if (hasMummyToken && mummyScript?.heroEffect && mummyScript?.onHeroEffect) {
     const mummyInst = room.engine.cardInstances.find(c =>
       c.owner === heroOwner && c.zone === 'support' && c.heroIdx === heroIdx && c.name === 'Mummy Token'
     );
@@ -11162,7 +11184,7 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
     }
   }
 
-  for (const ci of room.engine.cardInstances) {
+  for (const ci of (heldStumm ? [] : room.engine.cardInstances)) {
     if (ci.owner !== heroOwner || ci.zone !== 'support' || ci.heroIdx !== heroIdx) continue;
     if (!ci.counters?.treatAsEquip) continue;
     // Gegenstueck zum Riegel in `getActiveHeroEffects` — sonst bietet
@@ -11184,6 +11206,14 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
     if (ok) availableEffects.push({ name: ci.name, script: eqScript, inst: ci, hoptKey });
   }
 
+  // ★ W78 (True Form): „Transform back" steht im selben Menü wie der Effekt des verwandelten Helden (Klick auf den Helden → Wahl).
+  if (trueFormRevert) {
+    const heroInst = room.engine.cardInstances.find(c => c.owner === heroOwner && c.zone === 'hero' && c.heroIdx === heroIdx);
+    if (heroInst) availableEffects.push({
+      name: 'Transform back', trueFormRevert: true, inst: heroInst, hoptKey: null,
+      script: { heroEffect: `Remove ${trueFormRevert.formName} (discard pile) and return to ${trueFormRevert.baseName}.` },
+    });
+  }
   if (availableEffects.length === 0) return false;
 
   // ── Re-entry guard ─────────────────────────────────────────────────
@@ -11235,6 +11265,12 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
       chosen = idx >= 0 ? availableEffects[idx] : null;
     }
     if (!chosen?.inst) return false;
+    if (chosen.trueFormRevert) {
+      // Kein Heldeneffekt im Regelsinn: keine Kette, kein Einmal-Stempel, keine Aktion — „at any time during your turn".
+      await room.engine.performTrueFormRevert(pi, heroOwner, heroIdx);
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
+      return true;
+    }
     if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, chosen.name, room.engine)) return false;
 
     // ── Action-economy gate for `heroEffectActionCost: true` heroes ──

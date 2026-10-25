@@ -34,16 +34,19 @@
 const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const W = require('./_waflav-shared');
 const { drawBlockedFor } = require('./_draw-block-shared');   // D1: Regel von Al
+const { pickAusQuellen } = require('./_source-pick-shared');   // „Mehrere Quellen = ein Picker"
 
 const CARD_NAME = 'Waflav, the Metamorphing Monstrosity';
 const DRAW_COUNT = 3;
 const MAX_HAND_ATTACH = 3;
 
+// Das Menue kennt zwei Eintraege: Draw und „Attach". „Attach" fasst die beiden Anlege-Effekte (Deck / Hand) zusammen — ihre Quelle waehlt der Spieler in EINEM Picker mit
+// Herkunfts-Label (CARD_API „Mehrere Quellen = ein Picker"). Die Einmal-pro-Zug-Stempel bleiben getrennt (`deck`, `hand`): wer aus dem Deck anlegt, sperrt nur den Deck-Effekt.
 const EFFECTS = [
   { id: 'draw',      label: '🃏 Draw 3 cards' },
-  { id: 'deck',      label: '📚 Attach an Ability from your deck' },
-  { id: 'hand',      label: '✋ Attach up to 3 Abilities from your hand' },
+  { id: 'attach',    label: '📚 Attach Abilities from your deck or hand' },
 ];
+const ATTACH_QUELLEN = ['deck', 'hand'];
 
 const effKey = (id, pi, hi) => heldenSperreKey(`waflav-effect:${id}`, pi);   // v1275: pro Spieler (Ruling 22.9.)
 
@@ -61,6 +64,7 @@ function effectAvailable(engine, id, pi, heroIdx, hs = pi) {
   if (!ps) return false;
   if (id === 'deck') return W.attachableAbilitiesIn(engine, pi, heroIdx, ps.mainDeck, hs).length > 0;
   if (id === 'hand') return W.attachableAbilitiesIn(engine, pi, heroIdx, ps.hand, hs).length > 0;
+  if (id === 'attach') return ATTACH_QUELLEN.some(q => effectAvailable(engine, q, pi, heroIdx, hs));
   return !drawBlockedFor(engine, pi);   // 'draw' - D1 (Regel von Al): reiner Zug, unter Hand-/Zieh-Sperre keine Wahl (Counter nicht fuer nichts)
 }
 
@@ -103,20 +107,20 @@ async function doDraw(engine, pi, heroIdx, hs = pi) {
 }
 
 // ── Effect 2: "Attach an additional Ability from your deck." ─────────
-async function doDeckAttach(engine, pi, heroIdx, hs = pi) {
+async function doDeckAttach(engine, pi, heroIdx, hs = pi, vorgewaehlt = null) {
   const ps = engine.gs.players[pi];
   const names = abilityNamesIn(engine, pi, heroIdx, ps.mainDeck, hs);
   if (names.length === 0) return false;
 
-  const choice = await engine.promptGeneric(pi, {
+  // `vorgewaehlt`: die Ability kam schon aus dem gemeinsamen Quellen-Picker — keine zweite Galerie.
+  const picked = (vorgewaehlt && names.includes(vorgewaehlt)) ? vorgewaehlt : (await engine.promptGeneric(pi, {
     type: 'cardGallery',
     title: CARD_NAME,
     source: CARD_NAME,
     description: 'Attach an Ability from your deck to this Hero.',
     cards: gallery(names, 'deck'),
     cancellable: true,
-  });
-  const picked = choice?.cardName || null;
+  }))?.cardName || null;
   if (!picked) return false;
 
   // ★ W16a (Al, Frage 3: „Ja!"): Anlegen PER EFFEKT prallt an Resistance ab — VOR jeder Kartenbewegung gefragt (die Ability bleibt im Deck, kein Mischen). Die Wahl war getroffen:
@@ -153,22 +157,30 @@ async function doDeckAttach(engine, pi, heroIdx, hs = pi) {
 }
 
 // ── Effect 3: "Attach up to 3 Abilities from your hand ..." ──────────
-async function doHandAttach(engine, pi, heroIdx, hs = pi) {
+async function doHandAttach(engine, pi, heroIdx, hs = pi, vorgewaehlt = null) {
   const ps = engine.gs.players[pi];
   let attached = 0;
   let blockiert = false;
+  // `vorgewaehlt`: die (bis zu 3) Abilities kamen schon aus dem gemeinsamen Quellen-Picker — der Reihe nach anlegen, ohne weitere Galerie.
+  const reihe = Array.isArray(vorgewaehlt) ? vorgewaehlt.slice(0, MAX_HAND_ATTACH) : null;
   for (let i = 0; i < MAX_HAND_ATTACH; i++) {
     const names = abilityNamesIn(engine, pi, heroIdx, ps.hand, hs);
     if (names.length === 0) break;
-    const choice = await engine.promptGeneric(pi, {
-      type: 'cardGallery',
-      title: CARD_NAME,
-      source: CARD_NAME,
-      description: `Attach an Ability from your hand (${attached}/${MAX_HAND_ATTACH} attached). Cancel to stop.`,
-      cards: gallery(names, 'hand'),
-      cancellable: true,          // "up to 3"
-    });
-    const picked = choice?.cardName || null;
+    let picked;
+    if (reihe) {
+      picked = reihe[i] || null;
+      if (picked && !names.includes(picked)) break;   // inzwischen nicht mehr anlegbar (Zonen belegt …)
+    } else {
+      const choice = await engine.promptGeneric(pi, {
+        type: 'cardGallery',
+        title: CARD_NAME,
+        source: CARD_NAME,
+        description: `Attach an Ability from your hand (${attached}/${MAX_HAND_ATTACH} attached). Cancel to stop.`,
+        cards: gallery(names, 'hand'),
+        cancellable: true,          // "up to 3"
+      });
+      picked = choice?.cardName || null;
+    }
     if (!picked) break;
     const res = await engine.attachAbilityFromHand(pi, picked, heroIdx, {
       skipAbilityGivenCheck: true, ...(hs !== pi ? { heroOwner: hs } : {}),
@@ -186,7 +198,40 @@ async function doHandAttach(engine, pi, heroIdx, hs = pi) {
   return true;
 }
 
-const RUNNERS = { draw: doDraw, deck: doDeckAttach, hand: doHandAttach };
+// ── Effects 2 + 3 in EINEM Picker: Deck ("an additional Ability") ODER Hand ("up to 3 Abilities") ──
+// Eintraege aller noch freien Quellen mit Herkunfts-Label; ein Deck-Eintrag graut die Hand aus, ein Hand-Eintrag das Deck (bis zu 3). Der gewaehlte Effekt wird gestempelt.
+async function doAttach(engine, pi, heroIdx, hs = pi) {
+  const ps = engine.gs.players[pi];
+  const cards = [];
+  if (effectAvailable(engine, 'deck', pi, heroIdx, hs)) {
+    const deckNamen = abilityNamesIn(engine, pi, heroIdx, ps.mainDeck, hs);
+    for (const n of deckNamen) cards.push({ name: n, source: 'deck', count: ps.mainDeck.filter(x => x === n).length });
+  }
+  if (effectAvailable(engine, 'hand', pi, heroIdx, hs)) {
+    const handNamen = new Set(abilityNamesIn(engine, pi, heroIdx, ps.hand, hs));
+    for (const n of ps.hand) if (handNamen.has(n)) cards.push({ name: n, source: 'hand' });
+  }
+  if (cards.length === 0) return false;
+  const wahl = await pickAusQuellen(engine, pi, {
+    cards,
+    maxJeQuelle: { hand: MAX_HAND_ATTACH, deck: 1 },
+    title: CARD_NAME,
+    description: 'Attach an additional Ability from your deck — or up to 3 Abilities from your hand.',
+    confirmLabel: '📚 Attach!',
+    cancellable: true,
+    gerrymanderEligible: false,   // Waflavs Menue ist keine Gegnerentscheidung zwischen Effekten (kein optionPicker mit gerrymanderEligible)
+    extra: { source: CARD_NAME, cpuSourceOrder: ['hand', 'deck'] },
+  });
+  if (!wahl) return false;
+  if (wahl.source === 'deck') {
+    const ok = await doDeckAttach(engine, pi, heroIdx, hs, wahl.names[0]);
+    return ok ? { ok: true, stamp: 'deck' } : false;
+  }
+  const ok = await doHandAttach(engine, pi, heroIdx, hs, wahl.names);
+  return ok ? { ok: true, stamp: 'hand' } : false;
+}
+
+const RUNNERS = { draw: doDraw, attach: doAttach };
 
 module.exports = {
   activeIn: ['hero'],
@@ -239,10 +284,10 @@ module.exports = {
 
     // Pay only once the effect actually resolves — a cancelled gallery
     // must not eat the Counter.
-    const ok = await RUNNERS[mode](engine, pi, heroIdx, hs);
-    if (ok) {
+    const res = await RUNNERS[mode](engine, pi, heroIdx, hs);
+    if (res) {
       W.spendEvo(engine, hs, heroIdx, 1);
-      stampEffect(engine, mode, pi, heroIdx);
+      stampEffect(engine, res.stamp || mode, pi, heroIdx);   // „attach" stempelt den tatsaechlich gewaehlten Effekt (deck / hand)
       engine.sync();
     }
     return W.finishSelfManagedHeroEffect(engine);
