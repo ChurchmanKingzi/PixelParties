@@ -209,6 +209,7 @@ module.exports = {
     // Flash the Diplomacy ability zone
     engine._broadcastEvent('ability_activated', {
       owner: ctx.cardHeroOwner ?? ctx.cardOriginalOwner, heroIdx, zoneIdx: ctx.card.zoneSlot,   // Styx 28.9.: Brettseite
+      zoneKind: engine.abilityStapelArt(ctx.card) === 'support' ? 'support' : 'ability',   // W73a: in einer Support Zone (Xal) leuchtet diese, nicht die gleichnummerierte Ability Zone
     });
 
     // Play dove projectiles from Diplomacy hero to target creature (staggered)

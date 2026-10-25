@@ -25369,12 +25369,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Handle ability activation
     if (actionResult.abilityActivation) {
       const { zoneIdx } = actionResult;
+      // W73a: die Antwort traegt die Zonenart — Ability Zone 0 und Support Zone 0 (Xal) sind verschiedene Stapel mit gleicher Nummer.
+      const zoneKind = actionResult.zoneKind === 'support' ? 'support' : 'ability';
       // ★ W35a (Al, Frage 3): Ability eines UEBERNOMMENEN Helden (Guardian Beast Hu) — nur, wenn der Prompt genau diesen Zonenstapel angeboten hat (Eintrag mit `charmedOwner`); Zonen und
       // Instanz liegen auf der Brettseite des Helden (`abSeite`), Spieler (HOPT, Sperren, Hand/Gold) bleibt `playerIdx` — wie `doActivateAbility` mit `charmedOwner`.
       const abSeite = _leihSeite ?? playerIdx;
       if (_leihSeite != null && !(angebot.activatableAbilities || []).some(e =>
         e.heroIdx === heroIdx && e.zoneIdx === zoneIdx && e.charmedOwner === _leihSeite && e.zoneKind !== 'support')) return { retry: true };
-      const slot = (this.gs.players[abSeite]?.abilityZones?.[heroIdx] || [])[zoneIdx] || [];
+      if (zoneKind === 'support' && _leihSeite != null) return { retry: true };   // Support-Abilities eines uebernommenen Helden bietet die Zusatzaktion nicht an
+      const slot = this.abilityStapelAn(abSeite, heroIdx, zoneKind, zoneIdx) || [];
       if (slot.length === 0) return { retry: true };
       const abilityName = slot[0];
       const level = slot.length;
@@ -25386,7 +25389,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.gs.hoptUsed[hoptKey] = this.gs.turn;
 
       const inst = this.cardInstances.find(c =>
-        c.owner === abSeite && c.zone === 'ability' && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
+        c.owner === abSeite && c.zone === (zoneKind === 'support' ? 'support' : 'ability') && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
       );
       if (!inst) {
         // Stempel wieder loesen — die Aktivierung hat nie stattgefunden.
@@ -25394,7 +25397,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         return { retry: true };
       }
 
-      this._broadcastEvent('ability_activated', { owner: abSeite, heroIdx, zoneIdx, abilityName });
+      this._broadcastEvent('ability_activated', { owner: abSeite, heroIdx, zoneIdx, zoneKind, abilityName });
       // W35a: uebernommener Held — die Instanz gehoert waehrend der Aktivierung dem Kontrolleur, `heroOwner` = Brettseite (Muster `doActivateAbility`); danach wiederhergestellt.
       const _abOrig = _leihSeite != null ? { controller: inst.controller, owner: inst.owner } : null;
       if (_abOrig) { inst.controller = playerIdx; inst.owner = playerIdx; inst.heroOwner = _leihSeite; }
@@ -25424,7 +25427,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         return { retry: true };
       }
       await this.meldeAktivEffekt({
-        kind: 'ability', playerIdx, heroIdx, cardName: abilityName, zoneIdx, isActionCost: true,
+        kind: 'ability', playerIdx, heroIdx, cardName: abilityName, zoneIdx, zoneKind, isActionCost: true,
       });
       // ★ 28.8.: fehlte hier. Der normale Weg (`doActivateAbility`)
       // feuert den Haken; ueber eine Zusatzaktion aktiviert blieb
@@ -26263,7 +26266,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         erlaubt = activatableHeroEffects.some(e => e.charmedOwner === antwortSeite && e.heroIdx === handelnderHeld
           && (!actionResult.effectName || e.effectName === actionResult.effectName));
       } else if (actionResult.abilityActivation) {
-        erlaubt = activatableAbilities.some(e => e.charmedOwner === antwortSeite && e.heroIdx === handelnderHeld && e.zoneIdx === actionResult.zoneIdx);
+        erlaubt = activatableAbilities.some(e => e.charmedOwner === antwortSeite && e.heroIdx === handelnderHeld && e.zoneIdx === actionResult.zoneIdx && (e.zoneKind === 'support') === (actionResult.zoneKind === 'support'));   // W73a: mit Zonenart
       } else {
         erlaubt = (fremdeHelden[actionResult.cardName] || []).some(f => f.heroOwner === antwortSeite && f.heroIdx === handelnderHeld);
       }
@@ -48627,6 +48630,19 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     return result;
+  }
+
+  /**
+   * W73a: der Namen-Stapel an (Brettseite, Held, Zonenart, Zonenindex) — die EINE Aufloesung fuer jeden Weg, der eine Aktivierung per `(heroIdx, zoneIdx)` annimmt
+   * (Sockets `activate_ability` / `activate_free_ability`, Antwort der Zusatzaktion). `(heroIdx, zoneIdx)` allein ist mehrdeutig: Ability Zone 0 und Support Zone 0 tragen dieselbe
+   * Nummer. `zoneKind: 'support'` gilt NUR fuer einen lebenden Support-Stapel (der Held nimmt Abilities in Support Zonen, die Karte ist eine Ability); alles andere ist die Ability Zone.
+   * @returns {string[]|null} der Stapel (Laenge = Stufe) oder null
+   */
+  abilityStapelAn(seite, heroIdx, zoneKind, zoneIdx) {
+    if (zoneKind === 'support') {
+      return this._aktivierungsStapel(seite, heroIdx).find(e => e.zoneKind === 'support' && e.zi === zoneIdx)?.slot || null;
+    }
+    return this.gs.players[seite]?.abilityZones?.[heroIdx]?.[zoneIdx] || null;
   }
 
   /**
