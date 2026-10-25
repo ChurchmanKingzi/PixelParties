@@ -13919,7 +13919,7 @@ class GameEngine {
 
   /** Ist diese Karte durch den Schutz oben unberuehrbar? */
   abilityZoneGeschuetzt(inst) {
-    if (!inst || inst.zone !== ZONES.ABILITY) return false;
+    if (!inst || (inst.zone !== ZONES.ABILITY && !this.istAbilityImSupport(inst))) return false;   // 25.10.: auch eine Ability in einer Support Zone (Xal) — sie zählt als Ability
     const hero = this.gs.players[inst.owner]?.heroes?.[inst.heroIdx];
     return this.istTemporaerGesteuert(hero);
   }
@@ -32283,12 +32283,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ★★ v1349: Zonenwahl und Obergrenze zentral (`abilityZielZone` —
     // zaehlt verwahrte Kopien mit, Madame Guillotine).
     // 24.10.: `abilityZielOrt` kennt auch die Support Zonen von Xal / Xalibur und erzwingt EINEN Stapel je Ability ueber beide Zonenarten.
-    // Ein GELIEHENER Held auf der Gegenspalte (`heroOwner !== pi`) bekommt wie bei `doPlayAbilityFremd` nur echte Zonen.
-    const zielOrt = (name) => {
-      if (heroOwner === pi) return this.abilityZielOrt(heroOwner, heroIdx, name);
-      const z = this.abilityZielZone(heroOwner, heroIdx, name);
-      return z >= 0 ? { art: 'ability', slot: z } : null;
-    };
+    // 25.10.: auch ein GELIEHENER/kontrollierter Held auf der Gegenspalte (`heroOwner !== pi`, Xal oder Xalibur) nimmt Abilities in seine Support Zonen — wie bei `doPlayAbilityFremd`.
+    const zielOrt = (name) => this.abilityZielOrt(heroOwner, heroIdx, name);
     const nochPlatz = (name, ort) => { const o = zielOrt(name); return !!o && o.art === ort.art && o.slot === ort.slot; };
     const heroName = hps.heroes?.[heroIdx]?.name || 'this Hero';
 
@@ -32647,7 +32643,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     for (const t of validTargets) {
       if (!t || t.ineligible) continue;
       const istAbilityZiel = t.type === 'ability' || t.zoneKind === 'ability'
-        || t.cardInstance?.zone === 'ability';
+        || t.cardInstance?.zone === 'ability'
+        || this.istAbilityImSupport(t.cardInstance || t._cardInstance);   // 25.10.: eine Ability in einer Support Zone (Xal) zählt als Ability
       if (!istAbilityZiel) continue;
       const hero = this.gs.players[t.cardInstance?.owner ?? t.owner]?.heroes?.[t.cardInstance?.heroIdx ?? t.heroIdx];
       if (this.istTemporaerGesteuert(hero)) t.ineligible = true;
@@ -34970,6 +34967,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       traeger.counters._gainedInited = true;
       await this.initGainedHeroEffect(traeger, 'gainedHeroEffect');
     }
+    // 25.10.2026 (Xal-Runde 5): ein gewonnener Xal-Effekt (`abilitiesInSupportZones`) gibt dem Helden die Erlaubnis zurück — Abilities, die seit Xaliburs Abgang nur
+    // wegen der Leafagami Snake in seinen Support Zonen liegen und schlafen, gelten wieder. (`syncSupportAbilities` gleicht in beide Richtungen ab.)
+    if (offen.length > 0) await this.syncSupportAbilities(pi, heroIdx);
   }
 
   /** Gegenstueck: der Effekt geht wieder weg (Fee verlaesst die Zone, Held stirbt …). */
@@ -34997,6 +34997,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     this.log('hero_effect_lost', {
       player: this.gs.players[pi]?.username, hero: hero.name, lost: cardName,
     });
+    // 25.10.2026 (Xal-Runde 5): war es der Xal-Effekt (`abilitiesInSupportZones`) und nimmt der Held jetzt keine Abilities mehr in seine Support Zonen, gilt dasselbe wie bei
+    // Xaliburs Abgang: seine Abilities dort gehen in die Ablage (die Leafagami Snake hält sie, dann schlafen sie). Sonst blieben sie samt ihrer Boni liegen.
+    if (loadCardEffect(cardName)?.abilitiesInSupportZones && !this.heroAcceptsAbilitiesInSupport(pi, heroIdx)) {
+      await this.sendeSupportAbilitiesInAblage(pi, heroIdx, cardName);
+    } else {
+      await this.syncSupportAbilities(pi, heroIdx);
+    }
   }
 
   async initGainedHeroEffect(inst, grund = null) {
@@ -50401,6 +50408,22 @@ this._deathWatch = (this._deathWatchStack || []).length
     return !!inst && (inst.zone === ZONES.ABILITY || this.supportAbilityLebt(inst));
   }
 
+  /**
+   * Die OBERSTE Kopie des Ability-Stapels, in dem diese Support-Ability-Instanz liegt (25.10.2026, Xal-Runde 4: „Sun Beam und co sollen
+   * Support-Zone-Abilities als Abilities behandeln und die oberste Kopie davon entfernen"). Ein Stapel in einer Support Zone hat je Kopie eine Instanz
+   * im selben Slot; für „any card on the board"-Zielsammler ist er wie ein Ability-Zonen-Stapel EIN Ziel, vertreten von dieser Instanz — Abwerfen,
+   * Zerstören oder Zurückschicken trifft genau eine Kopie, die Stufe sinkt um 1. `null`, wenn `inst` keine Support-Ability ist.
+   * Schon „geschützte" Kopien (Leafagami Snake in einer Schleife, `_laubGeschuetzt`) zählen nicht mehr.
+   */
+  supportAbilitySpitze(inst) {
+    if (!this.istAbilityImSupport(inst)) return null;
+    const namen = this.abilityStapelVon(inst);
+    const spitzenName = namen.length ? namen[namen.length - 1] : inst.name;
+    const kopien = this.abilityStapelInstanzen(inst)
+      .filter(c => c.name === spitzenName && !(this._laubGeschuetzt && this._laubGeschuetzt.has(c.id)));
+    return kopien.length ? kopien[kopien.length - 1] : null;
+  }
+
   /** Wo liegt der Stapel dieser Ability-Instanz? 'ability' (echte Zone) | 'support' (Support Zone) | null (keine Ability). */
   abilityStapelArt(inst) {
     if (!inst) return null;
@@ -50528,7 +50551,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           c.zone === 'support' && c.owner === seite
           && c.heroIdx === heroIdx && c.zoneSlot === zi && c.name === kartenName);
         if (inst) {
-          await this.actionMoveCard(inst, 'discard', -1, -1, { sourceName });
+          await this.actionMoveCard(inst, 'discard', -1, -1, { sourceName, _ignoreCharmSchutz: true });   // Aufräumen nach Wegfall der Erlaubnis, kein Effekt auf die Karte: der Charme-Schutz gilt hier nicht
         } else {
           const idx = (zonen[zi] || []).indexOf(kartenName);
           if (idx >= 0) zonen[zi].splice(idx, 1);
