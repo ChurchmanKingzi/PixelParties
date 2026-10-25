@@ -137,7 +137,7 @@ module.exports = {
     }
 
     // Control Monitors: 1 Karte aus dem Deck auf die Hand, bezahlt mit 1 Abwurf. Wurde sie geloescht, entfaellt die Kostensenkung.
-    await engine.meldeHandZugangDurchAbwurf(pi, { names: [chosen], discarded: 1, source: CARD_NAME });
+    await engine.meldeHandZugangAusStapel(pi, { source: CARD_NAME });
 
     // ── Step 4: that card's Cost becomes 4 for the rest of the turn ──
     // Per-turn field (wiped at the next turn start) that follows the

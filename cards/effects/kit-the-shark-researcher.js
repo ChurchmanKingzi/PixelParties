@@ -277,6 +277,7 @@ module.exports = {
         // hooks (any future "when X enters your hand" listener)
         // compose correctly.
         engine.handZugangSync(ps, revealedName, { source: CARD_NAME, ohneInstanz: true });
+        engine.noteHandZugangAusStapel(pi, revealedName, { pile: 'deck', source: CARD_NAME });   // W72a: die aufgedeckte Karte kommt aus dem Deck (Control Monitors)
         engine._trackCard(revealedName, pi, 'hand', -1, -1);
         await engine.runHooks('onCardAddedToHand', {
           playerIdx: pi, cardName: revealedName, _skipReactionCheck: true,

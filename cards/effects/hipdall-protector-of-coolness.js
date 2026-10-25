@@ -93,7 +93,7 @@ module.exports = {
       // Pull the card back out of the destination pile/hand if it landed.
       let recovered = false;
       if (toZone === 'discard') {
-        if (await engine.takeFromPile(ps, 'discard', cardName, { source: CARD_NAME, last: true, toHand: true })) recovered = true;   // v820: Stapel-Schicht
+        if (await engine.takeFromPile(ps, 'discard', cardName, { source: CARD_NAME, last: true, toHand: true, ohneZugangsFenster: true })) recovered = true;   // v820: Stapel-Schicht
       } else if (toZone === 'deleted') {
         if (await engine.takeFromPile(ps, 'deleted', cardName, { source: CARD_NAME, last: true })) recovered = true;   // v820: Stapel-Schicht
       } else if (toZone === 'hand') {
@@ -103,7 +103,7 @@ module.exports = {
       if (!recovered) return;
 
       if (toZone !== 'hand') {
-        await engine.handZugang(ps, cardName, { von: 'ablage', source: CARD_NAME, ohneInstanz: true });
+        await engine.handZugang(ps, cardName, { von: 'ablage', source: CARD_NAME, ohneInstanz: true, ohneZugangsFenster: true });   // W72a: kommt aus dem Coolness Stack, nicht aus Deck/Ablage (Control Monitors)
         // Move the leaving inst back to hand. ctx.card on a leave-zone
         // hook is the LISTENING inst (Hipdall itself); the leaving
         // inst is exposed differently — we lookup by name+toZone.

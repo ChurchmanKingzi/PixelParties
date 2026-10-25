@@ -15742,7 +15742,7 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    doPlayAbility(room, pi, params).catch(err => console.error('[play_ability] error:', err.message));
+    doPlayAbility(room, pi, params).catch(err => console.error('[play_ability] error:', err.message)).finally(() => room.engine?._runPostChainActions?.());   // W72a: Anlege-Auslöser (Kit …) melden Karten aus Deck/Ablage — das Control-Monitors-Fenster öffnet hier
   });
 
   // ── Place a Surprise card face-down into a Hero's Surprise Zone ──
@@ -16149,7 +16149,7 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    doConfirmPotion(room, pi, params).catch(err => console.error('[confirm_potion] error:', err.message));
+    doConfirmPotion(room, pi, params).catch(err => console.error('[confirm_potion] error:', err.message)).finally(() => room.engine?._runPostChainActions?.());   // W72a: Trank mit Zielwahl, der Karten aus Deck/Ablage holt (Control Monitors)
   });
 
   // Broadcast targeting selections to opponent
@@ -16635,6 +16635,7 @@ io.on('connection', (socket) => {
     try {
       const result = await room.engine.performAscension(pi, heroIdx, cardName, handIndex, { fromCreation, heroOwner: hs });
       if (!result.success) return;
+      try { await room.engine._runPostChainActions(); } catch (err) { console.error('[ascend_hero] Nach-Ketten-Aktionen:', err.message); }   // W72a: Aufstiegsbonus „add … from your deck" (Beato, Waflav) → Control-Monitors-Fenster VOR dem Zugende
       // Skip to End Phase if required
       if (result.skipEndPhase) {
         // GRUNDMECHANIK, kein Karteneffekt (Als Ruling 16.8.): der

@@ -2967,6 +2967,7 @@ class GameEngine {
       source: opts.source || null,
       _skipReactionCheck: true,
     });
+    if (!opts.ohneZugangsFenster) this.noteHandZugangAusStapel(toPlayerIdx, cardName, { pile: 'discard', fromOwner: fromOwnerIdx, source: opts.source || null });   // W72a: Control Monitors (nur eigene Ablage)
 
     return inst;
   }
@@ -3975,7 +3976,7 @@ class GameEngine {
     // Ausnahme `onCreatureSummoned` (Ruling 3.10.): eine NEUE Beschwoerung
     // mitten in einer laufenden Kette oeffnet trotzdem ihr eigenes
     // On-Summon-Fenster.
-    if ((!this._inReactionCheck || hookName === 'onCreatureSummoned' || hookName === 'onHandAddByDiscard' || hookCtx._verschachtelt)
+    if ((!this._inReactionCheck || hookName === 'onCreatureSummoned' || hookName === 'onHandAddFromPile' || hookCtx._verschachtelt)
         && !hookCtx._skipReactionCheck && !hookCtx._isReaction) {
       await this._checkReactionCards(hookName, hookCtx);
     }
@@ -13258,12 +13259,14 @@ class GameEngine {
         playerIdx: pi, card: inst, cardName, addedCard: inst, addedCardName: cardName,
       });
       this.noteDeckTutor(pi, cardName, opts.source || null, opts.searchSpec || null);
+      if (!opts.ohneZugangsFenster) this.noteHandZugangAusStapel(pi, cardName, { pile: 'deck', source: opts.source || null });   // W72a: Control Monitors
     } else if (opts.von === 'ablage') {
       await this.runHooks(HOOKS.ON_CARD_ADDED_FROM_DISCARD_TO_HAND, {
         playerIdx: pi, fromOwnerIdx: opts.fromOwnerIdx ?? pi,
         addedCard: inst, addedCardName: cardName,
         source: opts.source || null, _skipReactionCheck: true,
       });
+      if (!opts.ohneZugangsFenster) this.noteHandZugangAusStapel(pi, cardName, { pile: 'discard', fromOwner: opts.fromOwnerIdx ?? pi, source: opts.source || null });   // W72a
     } else {
       // ★ Z4 (F01-06): Rueckgabe/Bounce/Erzeugung/fremdes Deck feuern keinen Such-Hook — Handlimit-Waechter
       // (Charm of Balance) erfahren vom Zuwachs ueber `onHandGrew`. Kein Such-Hook, also keine Tutor-Zuhoerer.
@@ -22573,6 +22576,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (pile === 'potionDeck' && opts.shuffle) this._shuffleKostenVorlauf(pi, 'potion', opts._kostenVorlauf);   // v1361
     // `opts.geheim`: verdeckte Zuege (Create Secret Room) schreiben den Kartennamen NICHT ins Log, das an beide Spieler geht.
     this.log('pile_take', { player: ps.username, pile, ...(opts.geheim ? {} : { card: name }), by: opts.source || null });
+    // ★ W72a (Control Monitors): `toHand: true` sagt „diese Karte geht auf die Hand" — die Eigenbau-Tutoren (`takeFromPile` + `handZugangSync`/`hand.push` + eigener Hook) haben kein
+    // gemeinsames Hand-Zugangs-Tor. Die Entnahme aus dem EIGENEN Deck/der EIGENEN Ablage wird deshalb hier vorgemerkt (`_handZugangUnterwegs`) und mit dem Fenster-Sammler
+    // (`noteHandZugangAusStapel`) verrechnet: meldet ein Primitiv dieselbe Karte, zählt sie nur einmal; `returnToPile` nimmt die Vormerkung zurück.
+    if (opts.toHand && !opts.ohneZugangsFenster && (pile === 'deck' || pile === 'discard')) this._merkeHandZugangUnterwegs(pi, name, pile, opts.source || null);
     return { name, idx };
   }
 
@@ -22592,6 +22599,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[pi];
     const arr = this._pileArray(ps, pile);
     if (!arr || !name) return false;
+    this._vergissHandZugangUnterwegs(pi, name, pile);   // W72a: die Karte geht doch nicht auf die Hand
     // Mit Index: exakt dorthin zurueck (Zustand wie vor der Entnahme,
     // kein Mischen). Ohne Index: ans Ende, Deck wird gemischt.
     if (idx != null && idx >= 0 && idx <= arr.length) { arr.splice(idx, 0, name); return true; }
@@ -22730,18 +22738,106 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * „Karten aus Deck/Ablage auf die Hand — bezahlt mit dem Abwurf derselben Anzahl Handkarten" (Cute Dog, Lunatic Cycle - New Moon,
-   * Life-Searcher, Inventing …). Die Tutor-Karte ruft das EINMAL, wenn alle Karten auf der Hand liegen. Feuert, sobald Karten
-   * hinzugefuegt UND Karten dafuer abgeworfen wurden — auch Navigation (2–3 Kopien weg, 1 Karte hinzu) zaehlt (Al, Welle 75).
-   * Reaktionsfenster: Control Monitors. Danach prueft der Aufrufer, welche der Karten noch auf der Hand sind (`handHat`).
-   * @returns {Promise<boolean>} true = ein Fenster wurde angeboten
+   * ★ W72a (Al, Control Monitors): „adds 1 or more cards from their deck or discard pile to their hand" — JEDES Hinzufügen aus dem EIGENEN Deck
+   * oder der EIGENEN Ablage auf die eigene Hand ist der Auslöser (Magnetic Potion, Gate to the Armory, Boomerang, Cute Dog …). Nicht: Ziehen
+   * (draw ist kein „add"), Karte vom Brett zurück auf die Hand, fremde Stapel (Infiltration, Xiong, Herbithorn Demon), Potion Deck, Gelöscht-Stapel.
+   *
+   * Die Meldung geschieht ZENTRAL in den Hand-Zugangs-Primitiven (`handZugang` mit von:'deck'|'ablage', `actionAddCardFromDeckToHand`,
+   * `addCardFromDiscardToHand`; `addFromPileToHand`/`searchDeckForNamedCard` laufen über sie) — ein neuer Tutor, der diese Primitive benutzt, braucht nichts.
+   * Eigenbau (`takeFromPile` + `handZugangSync`, `hand.push`): `engine.noteHandZugangAusStapel(pi, name, { pile, source })` rufen (Wächter: `docs/niche-tests/repro/W72/a-18` und a-19).
+   *
+   * Ein Fenster je Effekt („1 or more"): die Zugänge werden gesammelt (Schlüssel Spieler + Quelle) und am Ende der Wirkung (Nach-Ketten-Aktion, wie
+   * `meldeAufgedeckt`) mit EINEM Hook `onHandAddFromPile` gemeldet. Wer nach dem Fenster weiterrechnen muss (Lunatic Cycle: Kostensenkung der
+   * Karte, Cute Annoyance Mini: Beschwörungs-Zusatz — beides entfällt, wenn die Karte gelöscht wurde), ruft `await engine.meldeHandZugangAusStapel(pi, { source })`
+   * SELBST direkt hinter dem letzten Zugang; das leert die Sammlung dieser Quelle, die Nach-Ketten-Aktion meldet nichts mehr doppelt.
    */
-  async meldeHandZugangDurchAbwurf(pi, { names, discarded, source } = {}) {
+  noteHandZugangAusStapel(pi, cardName, { pile = 'deck', source = null, fromOwner = null } = {}) {
+    pi = this._resolvePi(pi);
+    if (this._inMctsSim || this._fastMode || !cardName) return;
+    if (pile !== 'deck' && pile !== 'discard') return;                    // Potion Deck, Gelöscht-Stapel, Side Deck, Brett …: kein Auslöser
+    if (fromOwner != null && fromOwner !== pi) return;                    // „their deck or discard pile": nur der EIGENE Stapel
+    if (!this.gs?.players?.[pi]) return;
+    this._vergissHandZugangUnterwegs(pi, cardName, pile);   // schon als Entnahme vorgemerkt (`toHand`): nicht doppelt zählen
+    if (!this._handZugangSammlung) this._handZugangSammlung = [];
+    this._handZugangSammlung.push({ pi, name: cardName, pile, source: source || null, turn: this.gs.turn });
+    // Genau EINE Auswertung vormerken (Referenz statt Flag: `restore()` kappt die Warteschlange, ein Flag bliebe dann für immer gesetzt).
+    if (!this._handZugangFn || !(this._postChainActions || []).includes(this._handZugangFn)) {
+      this._handZugangFn = () => this._wertHandZugangAus();
+      this.queuePostChainAction(this._handZugangFn);
+    }
+  }
+
+  _merkeHandZugangUnterwegs(pi, name, pile, source) {
+    if (this._inMctsSim || this._fastMode || !name || !this.gs?.players?.[pi]) return;
+    if (!this._handZugangUnterwegs) this._handZugangUnterwegs = [];
+    this._handZugangUnterwegs.push({ pi, name, pile, source: source || null, turn: this.gs.turn });
+    // Auswertung vormerken (auch wenn kein Primitiv mehr meldet): dieselbe Nach-Ketten-Aktion wie bei `noteHandZugangAusStapel`.
+    if (!this._handZugangFn || !(this._postChainActions || []).includes(this._handZugangFn)) {
+      this._handZugangFn = () => this._wertHandZugangAus();
+      this.queuePostChainAction(this._handZugangFn);
+    }
+  }
+  _vergissHandZugangUnterwegs(pi, name, pile) {
+    const l = this._handZugangUnterwegs;
+    if (!l || !l.length) return;
+    const i = l.findIndex(e => e.pi === pi && e.name === name && e.pile === pile);
+    if (i >= 0) l.splice(i, 1);
+  }
+  /** Vorgemerkte Entnahmen (`toHand`) in die Sammlung übernehmen — `pi`/`source` = nur diese; ohne Angabe alle. */
+  _uebernehmeHandZugangUnterwegs(pi = null, source = undefined) {
+    const l = this._handZugangUnterwegs || [];
+    if (!l.length) return;
+    const bleibt = [];
+    for (const e of l) {
+      if ((pi != null && e.pi !== pi) || (source != null && e.source !== (source || null))) { bleibt.push(e); continue; }
+      if (!this._handZugangSammlung) this._handZugangSammlung = [];
+      this._handZugangSammlung.push({ pi: e.pi, name: e.name, pile: e.pile, source: e.source, turn: e.turn });
+    }
+    this._handZugangUnterwegs = bleibt;
+  }
+
+  /** Meldet die gesammelten Zugänge von `pi` (und Quelle `source`, falls angegeben) JETZT mit einem Hook `onHandAddFromPile`. @returns {Promise<boolean>} true = ein Fenster wurde angeboten */
+  async meldeHandZugangAusStapel(pi, { source } = {}) {
     pi = this._resolvePi(pi);
     if (this._inMctsSim || this._fastMode) return false;
-    const liste = (names || []).filter(Boolean);
-    if (!liste.length || !(discarded > 0)) return false;   // Navigation: 2–3 abgeworfen, 1 hinzugefuegt — zaehlt ebenfalls (Al, Welle 75)
-    await this.runHooks('onHandAddByDiscard', { playerIdx: pi, cardNames: liste, discarded, sourceName: source || null });
+    this._uebernehmeHandZugangUnterwegs(pi, source);
+    const alle = this._handZugangSammlung || [];
+    const frisch = (e) => e.turn >= this.gs.turn - 1;   // ein Zugangs-Eintrag überlebt höchstens den Zugwechsel (Aufstieg beendet den Zug, bevor die Nach-Ketten-Aktionen laufen)
+    const passt = (e) => e.pi === pi && (source == null || e.source === (source || null)) && frisch(e);
+    const mein = alle.filter(passt);
+    if (!mein.length) return false;
+    this._handZugangSammlung = alle.filter(e => !passt(e) && frisch(e));
+    return this._meldeHandZugangGruppe(pi, mein);
+  }
+
+  async _wertHandZugangAus() {
+    this._handZugangFn = null;
+    this._uebernehmeHandZugangUnterwegs();
+    const batch = (this._handZugangSammlung || []).filter(e => e.turn >= (this.gs?.turn ?? 0) - 1);
+    this._handZugangSammlung = [];
+    if (!batch.length) return;
+    const gruppen = new Map();
+    for (const e of batch) {
+      const k = `${e.pi}|${e.source || ''}`;
+      if (!gruppen.has(k)) gruppen.set(k, { pi: e.pi, eintraege: [] });
+      gruppen.get(k).eintraege.push(e);
+    }
+    for (const g of gruppen.values()) {
+      try { await this._meldeHandZugangGruppe(g.pi, g.eintraege); }
+      catch (err) { console.error('[Engine] onHandAddFromPile failed:', err.message); }
+    }
+  }
+
+  async _meldeHandZugangGruppe(pi, eintraege) {
+    const ps = this.gs.players[pi];
+    if (!ps) return false;
+    // Nur Karten melden, die noch auf der Hand liegen (der Effekt kann sie schon wieder abgeworfen/gespielt haben) — und nur eine Meldung je Effekt.
+    const rest = {};
+    for (const n of ps.hand || []) rest[n] = (rest[n] || 0) + 1;
+    const namen = [], piles = [];
+    for (const e of eintraege) { if ((rest[e.name] || 0) > 0) { rest[e.name]--; namen.push(e.name); piles.push(e.pile); } }
+    if (!namen.length) return false;
+    await this.runHooks('onHandAddFromPile', { playerIdx: pi, cardNames: namen, piles, sourceName: eintraege[0].source || null, hinzugefuegt: eintraege.length });
     return true;
   }
 
@@ -29356,6 +29452,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Sie liegt bewusst auf der ENGINE, nicht auf `gs`: `searchSpec`
     // darf eine Funktion enthalten, und `gs` wird serialisiert.
     this.noteDeckTutor(pi, cardName, opts.source || null, opts.searchSpec || null);
+    if (!opts.ohneZugangsFenster) this.noteHandZugangAusStapel(pi, cardName, { pile: 'deck', source: opts.source || null });   // W72a: Control Monitors
 
     if (opts.shuffle) this.shuffleDeck(pi, 'main');
     this.sync();
@@ -43819,7 +43916,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     onCardActivation: 'A card was activated',
     onReactionActivated: 'A reaction was activated',
     onTakeControl: 'A target was taken control of',
-    onHandAddByDiscard: 'Cards were added to a hand from a deck or discard pile by discarding the same number of cards',
+    onHandAddFromPile: 'Cards were added to a hand from a deck or discard pile',
   };
 
   /** Hooks that should NOT trigger reaction checks */
@@ -44994,7 +45091,22 @@ this._deathWatch = (this._deathWatchStack || []).length
         wisdomCost = this._rxWisdomKosten(pi, reactionCasterSeite, reactionCasterHeroIdx, cardData);
       }
 
-      await this._rxPay(ps, cost, { cardName: chosenName, inHandIdx: actualHandIdx });   // inHandIdx: die Karte liegt hier noch in der Hand (Item-Lock-Kosten duerfen sie nicht treffen)
+      // ★ W72a (Al, Control Monitors): Reaktionen, deren Kartentext eine vom Spieler GEWÄHLTE Zahlung verlangt (Handkarten abwerfen), wählen sie HIER —
+      // hinter der letzten abbrechbaren Frage (Aktivieren, Wirker), vor jeder Zahlung. Vertrag `reactionKostenWahl(engine, pi, chainCtx, { handIdx, casterHeroIdx,
+      // casterSeite, wisdomCost })` → Wahl-Objekt (bezahlt wird noch nichts) oder `false`/`null` = abgebrochen: nichts passiert, die Reaktion kommt nicht zustande.
+      // Bezahlt wird danach (`reactionKostenZahlen(engine, pi, wahl, chainCtx)`), sobald die Karte die Hand verlassen hat und das Glied feststeht.
+      let kostenWahl = null;
+      if (typeof script.reactionKostenWahl === 'function') {
+        kostenWahl = await script.reactionKostenWahl(this, pi, chainCtx, {
+          handIdx: actualHandIdx, casterHeroIdx: reactionCasterHeroIdx, casterSeite: reactionCasterSeite, wisdomCost,
+        });
+        if (!kostenWahl) continue;
+        // Die Hand kann sich während der Frage geändert haben (Hook, Zeitablauf): die Karte muss noch da sein.
+        if (ps.hand[actualHandIdx] !== chosenName && ps.hand.indexOf(chosenName) < 0) continue;
+      }
+      const actualHandIdxNachWahl = ps.hand[actualHandIdx] === chosenName ? actualHandIdx : ps.hand.indexOf(chosenName);
+
+      await this._rxPay(ps, cost, { cardName: chosenName, inHandIdx: actualHandIdxNachWahl });   // inHandIdx: die Karte liegt hier noch in der Hand (Item-Lock-Kosten duerfen sie nicht treffen)
 
       // KEIN Eintrag und KEIN Flug an dieser Stelle.
       // v202 hat hier den Flug abgeschickt, v204 zusaetzlich den
@@ -45004,7 +45116,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // (Card Game Player Inya) entscheiden sich erst beim Aufloesen
       // der Kette. Flug UND Eintrag passieren deshalb jetzt gemeinsam
       // dort, wo das Ziel bekannt ist — siehe _resolveReactionChain.
-      ps.hand.splice(actualHandIdx, 1);
+      ps.hand.splice(actualHandIdxNachWahl, 1);
 
       // ★ v1031: … und die Partie-Grenze verbrauchen. Der Stempel sitzt
       // hier, wo die Karte die Hand verlaesst. ★ Z7b (Als Entscheidung,
@@ -45024,6 +45136,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       this.log('reaction_activated', { card: chosenName, player: ps.username, chainPosition: chain.length, source: 'hand' });
       this._broadcastEvent('card_reveal', { cardName: chosenName });
+      if (kostenWahl && typeof script.reactionKostenZahlen === 'function') await script.reactionKostenZahlen(this, pi, kostenWahl, chainCtx);   // W72a: die gewählte Zahlung (Abwurf) — die Karte ist schon aus der Hand, der Gegner hat sie gesehen
 
       const engine = this;
       const reactionOwner = pi;
@@ -45039,7 +45152,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // MITTE des Handbereichs zurueck. Genau das sah Al bei „The
         // Master's Plan": die Karte flog aus der Handmitte statt von
         // ihrem Platz.
-        fromHandIdx: actualHandIdx,
+        fromHandIdx: actualHandIdxNachWahl,
         _opgNeu,   // Z7b: Partie-Stempel dieser Aktivierung (Rueckgabe bei ganzer Negation)
         casterHeroIdx: reactionCasterHeroIdx,
         heroIdx: reactionCasterHeroIdx,
