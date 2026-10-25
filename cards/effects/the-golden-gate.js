@@ -6,9 +6,8 @@
 //  „Whenever a Creature is placed into a player's Support Zone, that player gains 2 Gold."
 //
 //  ── AUSLEGUNG ───────────────────────────────────────────────────────────
-//  • „placed into a Support Zone": jede FRISCH aufs Brett kommende Creature — Beschwörung, Platzieren, Wiederbeleben (`onCardEnterZone` mit `toZone: 'support'`). Wie bei Pangaia zählen
-//    BEWEGUNGEN (`_isMove`: Slippery Skates, Dark Gear, Diplomacy, Weiterreichen der Hot Skull Potato …) nicht — die Creature liegt dort schon, sie wird nicht „placed".
-//    Token (Biomancy …) sind keine Creature-Karten und zählen wie bei Pangaia nicht.
+//  • „placed into a Support Zone": derselbe Auslöser wie bei Ingo, Investor of Evil (`onCardEnterZone` mit `toZone: 'support'`, Ruling des Spielgestalters 25.10.): Beschwörung, Platzieren,
+//    Wiederbeleben UND Bewegungen in eine neue Zone (`_isMove`: Slippery Skates, Dark Gear, Diplomacy …) zählen; ebenso Token mit Creature-Untertyp (Biomancy …) und verdeckte Creatures.
 //  • „that player": der Spieler, dessen Support Zone es ist — der KONTROLLEUR des Helden, in dessen Zone die Creature landet (`heroSideOf`: ein geliehener Held zählt für den Entleiher, ein an den
 //    Gegner abgegebener eigener Held für den Gegner). Beide Spieler profitieren, jeder von seinen eigenen Zonen; auch Plant-Golem-Platzierungen in die gegnerische Zone zahlen DEM Gegner.
 //  • Gold über `actionGainGold` (Gold-Sperren, Boni und Ersatz-Effekte greifen wie bei jedem Effekt-Gold).
@@ -42,11 +41,9 @@ module.exports = {
       if (ctx.cardZone !== 'area') return;                 // nur solange sie LIEGT (nicht aus der Hand)
       const entering = ctx.enteringCard;
       if (!entering || ctx.toZone !== 'support') return;
-      if (ctx._isMove) return;                             // Bewegung ≠ „placed"
       const engine = ctx._engine;
-      const cd = entering.counters?._cardDataOverride || engine._getCardDB()[entering.name];
-      if (!cd || cd.cardType === 'Token' || !hasCardType(cd, 'Creature')) return;
-      if (entering.faceDown) return;
+      const cd = engine.getEffectiveCardData(entering) || engine._getCardDB()[entering.name];
+      if (!cd || !hasCardType(cd, 'Creature')) return;     // Token mit Untertyp Creature zählen mit (wie bei Ingo)
 
       // „that player" = Kontrolleur des Helden, in dessen Zone die Creature landet.
       const seite = engine.physicalSide(entering);

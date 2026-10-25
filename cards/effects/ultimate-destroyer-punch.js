@@ -8,8 +8,8 @@
 //
 //  ── AUSLEGUNG ───────────────────────────────────────────────────────────
 //  • Ziel: eine offene Creature, die der Gegner kontrolliert (Zielregeln der Engine gelten: ein Schutz verhindert das WÄHLEN, nicht das Besiegen). Pflichtwahl; Abbruch legt die Karte zurück.
-//  • „defeat it": `actionDestroyCard` mit der Karte als Quelle — Schutz (Cardinal Beasts, Defending the Gate, Rettungsfenster …) lässt sie stehen. Die beiden Sätze sind getrennte
-//    Anweisungen („Then"): der Schaden fällt auch, wenn die Creature sich dem Besiegen entzieht (wie bei Explosion Toss).
+//  • „defeat it": `actionDestroyCard` mit der Karte als Quelle — Schutz (Cardinal Beasts, Defending the Gate, Rettungsfenster …) lässt sie stehen. Ruling 25.10.: bleibt die
+//    Creature stehen, entfällt auch der Heldenschaden (nur eine tatsächlich besiegte Creature wird geworfen/schlägt ein).
 //  • „max HP": das Maximum der Creature zum Zeitpunkt des Schlags (`counters.maxHp`, sonst gedruckte HP) — gemerkt VOR dem Besiegen. Höchstens 300.
 //  • „the corresponding Hero": der Held, in dessen Support Zone die Creature stand (Brettseite + Index zum Zeitpunkt der Wahl). Ist er schon besiegt, verpufft der Schaden.
 //  • Schaden-Typ `attack` (Quelle: die Karte, Angreifer = der Held); er hängt nicht an der ATK des Angreifers (kein `usesHeroAtk`). Wie Midnight Assault keine Zielerklärung („attack declare"), da der Held nicht gewählt wird.
@@ -138,9 +138,9 @@ module.exports = {
       engine.sync();
       if (fliegt) await engine._delay(FLUG_MS - MONTAGE_MS);
 
-      // ③ Schaden an den zugehörigen Helden (auch wenn die Creature sich dem Besiegen entzogen hat — „Then").
+      // ③ Schaden an den zugehörigen Helden — nur, wenn die Creature wirklich besiegt wurde (Ruling 25.10.: geschützt → auch kein Heldenschaden).
       const th = gs.players[zSeite]?.heroes?.[zHero];
-      if (th?.name && th.hp > 0 && schaden > 0) {
+      if (besiegt && th?.name && th.hp > 0 && schaden > 0) {
         engine._broadcastEvent('play_zone_animation', { type: 'udp_land', owner: zSeite, heroIdx: zHero, zoneSlot: -1, duration: 700 });
         await engine._delay(180);
         if (th.hp > 0) await engine.actionDealDamage(attackSource, th, schaden, 'attack');
