@@ -11126,8 +11126,11 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
   // covers hero effects too. Stunned / negated still silence them.
   // Chilly Dog (Mischief Militia) lifts the Frozen-only silence on
   // the activator's own side.
-  if ((hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated) return false;
-  if (hero.statuses?.frozen && !room.engine._isChillyDogActiveFor(pi)) return false;
+  // ★ W78 (True Form): „Transform back" ist ein Effekt des ZAUBERS, kein Heldeneffekt — ein betäubter/negierter/gefrorener Held kann sich trotzdem zurückverwandeln.
+  const trueFormRevert = room.engine.trueFormRevertInfo(pi, heroOwner, heroIdx);
+  const heldStumm = !!((hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated
+    || (hero.statuses?.frozen && !room.engine._isChillyDogActiveFor(pi)));
+  if (heldStumm && !trueFormRevert) return false;
   if (charmedOwner != null && hero.charmedBy !== pi && hero.controlledBy !== pi) return false;
   // _actionLockedTurn (Treasure Hunter's Backpack, etc.) blocks "Actions"
   // only — Spell/Attack/Creature plays and `actionCost` Ability activations.
@@ -11140,7 +11143,9 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
   const mummyScript = hasMummyToken ? loadCardEffect('Mummy Token') : null;
   const ownScript = heroScriptOf(hero);
 
-  if (hasMummyToken && mummyScript?.heroEffect && mummyScript?.onHeroEffect) {
+  if (heldStumm) {
+    // nur die Rückverwandlung (s. oben)
+  } else if (hasMummyToken && mummyScript?.heroEffect && mummyScript?.onHeroEffect) {
     const mummyInst = room.engine.cardInstances.find(c =>
       c.owner === heroOwner && c.zone === 'support' && c.heroIdx === heroIdx && c.name === 'Mummy Token'
     );
@@ -11179,7 +11184,7 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
     }
   }
 
-  for (const ci of room.engine.cardInstances) {
+  for (const ci of (heldStumm ? [] : room.engine.cardInstances)) {
     if (ci.owner !== heroOwner || ci.zone !== 'support' || ci.heroIdx !== heroIdx) continue;
     if (!ci.counters?.treatAsEquip) continue;
     // Gegenstueck zum Riegel in `getActiveHeroEffects` — sonst bietet
@@ -11201,6 +11206,14 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
     if (ok) availableEffects.push({ name: ci.name, script: eqScript, inst: ci, hoptKey });
   }
 
+  // ★ W78 (True Form): „Transform back" steht im selben Menü wie der Effekt des verwandelten Helden (Klick auf den Helden → Wahl).
+  if (trueFormRevert) {
+    const heroInst = room.engine.cardInstances.find(c => c.owner === heroOwner && c.zone === 'hero' && c.heroIdx === heroIdx);
+    if (heroInst) availableEffects.push({
+      name: 'Transform back', trueFormRevert: true, inst: heroInst, hoptKey: null,
+      script: { heroEffect: `Remove ${trueFormRevert.formName} (discard pile) and return to ${trueFormRevert.baseName}.` },
+    });
+  }
   if (availableEffects.length === 0) return false;
 
   // ── Re-entry guard ─────────────────────────────────────────────────
@@ -11252,6 +11265,12 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
       chosen = idx >= 0 ? availableEffects[idx] : null;
     }
     if (!chosen?.inst) return false;
+    if (chosen.trueFormRevert) {
+      // Kein Heldeneffekt im Regelsinn: keine Kette, kein Einmal-Stempel, keine Aktion — „at any time during your turn".
+      await room.engine.performTrueFormRevert(pi, heroOwner, heroIdx);
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
+      return true;
+    }
     if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, chosen.name, room.engine)) return false;
 
     // ── Action-economy gate for `heroEffectActionCost: true` heroes ──

@@ -282,7 +282,7 @@ function hasBounceableDeepsea(gs, playerIdx) {
  * placed, a fresh instance is created.
  *
  * @param {object} [opts] - { animationType } ueberschreibt das Bild
- *   der Ruecknahme (Standard: `deep_sea_bubbles`).
+ *   der Ruecknahme (Standard: `deep_sea_bubbles`); `flugStil` setzt den Client-Flugstil des Rueckflugs.
  * @returns {Promise<{ returned: boolean }>}
  */
 async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) {
@@ -362,6 +362,7 @@ async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) 
     ...(seite !== ownerIdx ? { fromOwner: seite, toOwner: ownerIdx } : {}),   // Styx 28.9.
     fromHeroIdx: heroIdx, fromSlotIdx: slotIdx,
     toHandIdx,
+    ...(opts.flugStil ? { flightStyle: opts.flugStil } : {}),   // Bounce Trap: Flugstil 'schleuder'
   });
 
   // Remove name from support slot.
