@@ -409,8 +409,7 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
     if (ownerPs.supportZones?.[heroIdx]) {
       // Nur DIESE Karte nehmen: liegen mehrere Karten im Platz (Darion: Equip-Stapel; Alices Kreaturenstapel), bleiben die anderen liegen.
       const arr = ownerPs.supportZones[heroIdx][zoneSlot];
-      const idx = Array.isArray(arr) ? arr.indexOf(cardName) : -1;
-      if (idx >= 0 && arr.length > 1) arr.splice(idx, 1);
+      if (Array.isArray(arr) && arr.length > 1 && arr.includes(cardName)) engine.entferneNameAmPlatz(arr, targetInst);
       else ownerPs.supportZones[heroIdx][zoneSlot] = [];
     }
   } else if (zone === 'ability') {
