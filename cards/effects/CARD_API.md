@@ -25712,3 +25712,5 @@ Antworten von Al auf die offenen Fragen aus W72a: (1) **Potion Deck und Side Dec
 **Sweep ohne Befund** (kennen die Zonenart oder arbeiten mit getrennten Ziel-IDs `ability-…` / `equip-…`): CPU (`abilityNutzlast`, `actionAbilityBest`, `fremdeAbilityEintraege`), Charme/Lizbeth/Smugbeth (`_aktivierungsStapel`, `_getAbilityBorrowerForOppSlot`), `getAbilityTargets`, Sun Beam & Co. (Support-Abilities laufen als `equip-…`-Ziele). `public/app.jsx` ist der tote Monolith (nicht gebaut) und bleibt unberührt.
 
 **Wächter:** `scripts/skilltest-e2e/ui-support-ability-zone.js` (echter Client: Klassen und gesendete Socket-Nachricht je Zonenart, Zusatzaktion, Gegner-Held).
+
+* **Al 25.10. (nach W73a):** Abilities in Support Zonen verhalten sich in der Bedienung **exakt** wie Abilities in Ability Zonen — gleiche Leuchtfarbe (frei = limegrün, Aktion = gold), freie Aktivierung ohne Rückfrage, Aktions-Aktivierung (auch aus dem heroAction-Prompt) mit der Rückfrage „Activate Ability?" (`pendingAbilityActivation` mit `zoneKind: 'support'`). Xal und Xalibur sind live.

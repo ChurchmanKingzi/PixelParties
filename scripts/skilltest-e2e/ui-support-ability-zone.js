@@ -117,8 +117,10 @@ const toolsDir = (process.env.NODE_PATH || '').split(path.delimiter).find(d => f
     await page.locator(AB('me', 0, 0)).click(); await sleep(500);
     check('K4: Klick auf die Toughness-Zone sendet nichts und oeffnet keine Bestaetigung', (await emits()).length === 0 && (await page.locator('text=Activate Ability').count()) === 0, await emits());
     await page.locator(SU('me', 0, 0)).click(); await sleep(500);
+    check('K4: Klick auf die Support Zone oeffnet erst die Rueckfrage „Activate Ability?" (wie die Ability Zonen), sendet noch nichts', (await emits()).length === 0 && (await page.locator('text=Activate Ability').count()) >= 1, await emits());
+    await page.locator('button:has-text("Yes!")').click(); await sleep(500);
     const e4 = await emits();
-    check('K4: Klick auf die Support Zone sendet activate_ability mit zoneKind support', e4.length === 1 && e4[0][0] === 'activate_ability' && e4[0][1].zoneKind === 'support' && e4[0][1].zoneIdx === 0, e4);
+    check('K4: nach „Yes!" geht activate_ability mit zoneKind support raus', e4.length === 1 && e4[0][0] === 'activate_ability' && e4[0][1].zoneKind === 'support' && e4[0][1].zoneIdx === 0, e4);
 
     // ── 5) Zusatzaktion (heroAction-Prompt) bietet die Support-Ability an: Toughness in der Ability Zone 0 darf nicht mitleuchten, der Klick traegt die Zonenart ──
     await einspielen(`
@@ -132,8 +134,10 @@ const toolsDir = (process.env.NODE_PATH || '').split(path.delimiter).find(d => f
     await page.locator(AB('me', 0, 0)).click({ force: true }); await sleep(500);
     check('K5: Klick auf die Toughness-Zone sendet nichts / oeffnet keine Bestaetigung', (await emits()).length === 0 && (await page.locator('text=Activate Ability').count()) === 0, await emits());
     await page.locator(SU('me', 0, 0)).click({ force: true }); await sleep(500);
+    check('K5: Klick auf die Support Zone oeffnet erst die Rueckfrage „Activate Ability?" (wie die Ability Zonen)', (await emits()).length === 0 && (await page.locator('text=Activate Ability').count()) >= 1, await emits());
+    await page.locator('button:has-text("Yes!")').click(); await sleep(500);
     const e5 = await emits();
-    check('K5: Klick auf die Support Zone antwortet dem Prompt mit abilityActivation + zoneKind support', e5.length === 1 && e5[0][0] === 'effect_prompt_response'
+    check('K5: nach „Yes!" antwortet der Client dem Prompt mit abilityActivation + zoneKind support', e5.length === 1 && e5[0][0] === 'effect_prompt_response'
       && e5[0][1].response && e5[0][1].response.abilityActivation === true && e5[0][1].response.zoneKind === 'support' && e5[0][1].response.zoneIdx === 0 && e5[0][1].response.heroIdx === 0, e5);
 
     // ── 6) Gegenprobe zu 5: Aktion in der ABILITY Zone, Toughness im Support — Antwort ohne zoneKind support ──

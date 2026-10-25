@@ -56150,20 +56150,31 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   } : heroActionSupportEntry ? () => {
                     // W73a: Antwort auf den heroAction-Prompt (Zusatzaktion) MIT Zonenart — ohne sie traf die Antwort die gleichnummerierte Ability Zone
                     if (window.playSFX) window.playSFX('ui_click');
-                    ppSendePromptAntwort(gameState, { abilityActivation: true, heroIdx: i, zoneIdx: z, zoneKind: 'support' });
+                    // Al 25.10.: Support-Zonen-Abilities verhalten sich EXAKT wie Ability-Zonen-Abilities — auch mit Rückfrage „Activate Ability?"
+                    setPendingAbilityActivation({ heroIdx: i, zoneIdx: z, zoneKind: 'support', abilityName: heroActionSupportEntry.abilityName, level: heroActionSupportEntry.level, isHeroAction: true });
                   } : (supportAbilityEntry && !isEffectLocked) ? () => {
                     // v769: Aktivierbare Ability in einer Support Zone
                     // (Xal). Derselbe Kanal wie in einer echten
                     // Ability-Zone — nur `zoneKind` sagt, wo sie liegt.
                     if (window.playSFX) window.playSFX('ui_click');
-                    socket.emit(supportAbilityFrei ? 'activate_free_ability' : 'activate_ability', {
-                      roomId: gameState.roomId,
-                      heroIdx: supportAbilityEntry.heroIdx,
-                      zoneIdx: supportAbilityEntry.zoneIdx,
-                      zoneKind: 'support',
-                      charmedOwner: supportAbilityEntry.charmedOwner,
-                      borrowedFromOwner: supportAbilityEntry.borrowedFromOwner,
-                    });
+                    if (supportAbilityFrei) {
+                      // Freie Aktivierung: ohne Rückfrage (wie bei den Ability Zonen)
+                      socket.emit('activate_free_ability', {
+                        roomId: gameState.roomId,
+                        heroIdx: supportAbilityEntry.heroIdx,
+                        zoneIdx: supportAbilityEntry.zoneIdx,
+                        zoneKind: 'support',
+                        charmedOwner: supportAbilityEntry.charmedOwner,
+                        borrowedFromOwner: supportAbilityEntry.borrowedFromOwner,
+                      });
+                    } else {
+                      // Al 25.10.: Aktions-Ability in einer Support Zone — Rückfrage „Activate Ability?" wie bei den Ability Zonen
+                      setPendingAbilityActivation({
+                        heroIdx: supportAbilityEntry.heroIdx, zoneIdx: supportAbilityEntry.zoneIdx, zoneKind: 'support',
+                        abilityName: supportAbilityEntry.abilityName, level: supportAbilityEntry.level,
+                        charmedOwner: supportAbilityEntry.charmedOwner, borrowedFromOwner: supportAbilityEntry.borrowedFromOwner,
+                      });
+                    }
                   } : isCsppEmptySlot ? () => {
                     // Click-pick destination chosen → route through the
                     // summoner picker / auto-summoner helper. Destination
@@ -60355,7 +60366,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const pa = pendingAbilityActivation;
                 setPendingAbilityActivation(null);
                 if (pa.isHeroAction) {
-                  ppSendePromptAntwort(gameState, { abilityActivation: true, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx, ...(pa.heroActionOwner != null ? { heroOwner: pa.heroActionOwner } : {}) });   // W35a: uebernommener Gegnerheld (Hu)
+                  ppSendePromptAntwort(gameState, { abilityActivation: true, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx, ...(pa.zoneKind === 'support' ? { zoneKind: 'support' } : {}), ...(pa.heroActionOwner != null ? { heroOwner: pa.heroActionOwner } : {}) });   // W35a: uebernommener Gegnerheld (Hu)
                 } else {
                   socket.emit('activate_ability', { roomId: gameState.roomId, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx, zoneKind: pa.zoneKind, charmedOwner: pa.charmedOwner, borrowedFromOwner: pa.borrowedFromOwner });
                 }
