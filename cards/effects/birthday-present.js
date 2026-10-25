@@ -214,6 +214,7 @@ module.exports = {
 
     for (const name of playerCards) {
       engine.handZugangSync(ps, name, { source: CARD_NAME });
+      engine.noteHandZugangAusStapel(pi, name, { pile: 'deck', source: CARD_NAME });   // W72a: die 2 eigenen Karten kommen aus dem eigenen Deck (Control Monitors)
       // originalOwner defaults to pi (own deck → own hand) — no override.
       engine.log('card_added_to_hand', { card: name, player: ps.username, by: CARD_NAME });
     }

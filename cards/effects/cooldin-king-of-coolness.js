@@ -91,6 +91,7 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
       reveal: false,
       shuffle: true,
       _bypassHandLock: true,
+      ohneZugangsFenster: true,   // W72a: Zwischenschritt Deck → Hand → Brett in einem Zug, kein „add to hand" (Control Monitors)
     });
     if (!ok) return false;
   }

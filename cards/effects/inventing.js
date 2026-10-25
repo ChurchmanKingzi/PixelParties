@@ -149,7 +149,7 @@ module.exports = {
     // Move from deck to hand + reveal
     const _gesucht = await engine.searchDeckForNamedCard(pi, foundName, CARD_NAME);
     // Control Monitors: 1 Karte aus dem Deck auf die Hand, bezahlt mit 1 Abwurf.
-    if (_gesucht) await engine.meldeHandZugangDurchAbwurf(pi, { names: [foundName], discarded: 1, source: 'Inventing' });
+    if (_gesucht) await engine.meldeHandZugangAusStapel(pi, { source: CARD_NAME });
 
     // Lock that card name for the rest of the turn (reuses creation lock system)
     if (!ps._creationLockedNames) ps._creationLockedNames = new Set();

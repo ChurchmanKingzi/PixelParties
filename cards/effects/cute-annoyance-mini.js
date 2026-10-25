@@ -194,7 +194,7 @@ module.exports = {
     });
 
     // Control Monitors: 1 Karte aus dem Deck auf die Hand, bezahlt mit 1 Abwurf. Wurde sie geloescht, entfaellt der Beschwoerungs-Zusatz.
-    await engine.meldeHandZugangDurchAbwurf(pi, { names: [chosenName], discarded: 1, source: CARD_NAME });
+    await engine.meldeHandZugangAusStapel(pi, { source: CARD_NAME });
     if (!ps.hand.includes(chosenName)) { engine.sync(); return true; }
 
     // ── Step 4: optional rider — discard 1 more → summon now ──

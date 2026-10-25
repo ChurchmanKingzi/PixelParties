@@ -11016,6 +11016,183 @@ const UncoolSmokeEffect = (() => {
   return ppPunktBild(malen, ENDE + 40, 240, 300, vorbereiten);
 })();
 
+// ═════════════════════════════════════════════════════════════════
+//  WELLE 77 (25.10.) — REVENGE!!! (`revenge_rage`) und Grand Feast (`grand_feast`) — PIXELART
+//
+//  revenge_rage (2000 ms, auf dem Wirker-Helden): unbändige Wut. Ein rotes Dither-Raster blitzt über die Karte (0–150 ms) und über den ganzen Bildschirm (Checker-Raster, harte Blitze,
+//     `RevengeTint`), 22 schwarz-rote Wutlinien schießen strahlenförmig aus der Karte und flackern im 66-ms-Takt neu, 16 Pixelflammen (rot → orange → gelb, Bayer-Dither an den Stufen)
+//     lodern rund um die Karte, drei Wutzeichen (💢 als vier Bögen, pulsierend 5 ↔ 7 Pixel) poppen am Kopf auf, drei weiße „!!!" mit dunkelrotem Rand zittern darüber, Glut steigt auf.
+//     Dazu schickt die Engine `play_screen_shake` (heavy).
+//  grand_feast (1500 ms, auf jedem eigenen Ziel): ein Teller (Rand, Schatten) wächst in Breitenstufen unter der Karte auf, darauf poppt ein Gericht (Braten, Kuchen, Apfel oder Brot,
+//     schattiert), Dampfschwaden steigen auf, grüne Heilkreuze und Kreuzfunkel schweben empor. Ab ~1100 ms dithert alles weg.
+// ═════════════════════════════════════════════════════════════════
+const RevengeRageEffect = (() => {
+  const P = ['#ffffff', '#f7f7ad', '#fad54a', '#f29a3e', '#ee6428', '#c0141c', '#8c0014', '#3a0000', '#08060c'].map(ppHex);
+  const ENDE = 2000, FADE_AB = 1500;
+  const vorbereiten = (sz) => ({
+    linien: Array.from({ length: 22 }, (_, i) => ({ a: (i / 22) * Math.PI * 2 + (Math.random() - 0.5) * 0.18, l: 14 + Math.random() * 22, r0: 4 + Math.random() * 6, rot: Math.random() < 0.45 })),
+    zungen: Array.from({ length: 16 }, (_, i) => {
+      const k = i / 16, umfang = (sz.hw * 2 + sz.hh * 2) * 2;
+      return { u: k * umfang, h: 9 + Math.random() * 9, ph: Math.random() * 6.28, v: 1 + Math.random() };
+    }),
+    glut: Array.from({ length: ppFxN(26) }, () => ({ x: (Math.random() - 0.5) * (sz.hw * 2 + 18), v: 14 + Math.random() * 26, start: Math.random() * 1100, drift: (Math.random() - 0.5) * 8, gross: Math.random() < 0.3, farbe: Math.floor(2 + Math.random() * 3) })),
+    zeichen: [[1, -0.2, 120, 7], [-1, -0.45, 300, 6], [0.55, -0.85, 480, 5]],
+  });
+  // 💢 als vier Bögen mit Lücken an den Achsen: Rot mit dunklem Rand
+  const wutzeichen = (g, cx, cy, r, a) => {
+    const R = Math.ceil(r) + 3;
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+      const d = Math.hypot(dx, dy);
+      const ang = ((Math.atan2(dy, dx) * 180 / Math.PI) + 360) % 90;
+      if (d >= r - 1.6 && d <= r + 1.6 && ang >= 20 && ang <= 70) g.put(cx + dx, cy + dy, d < r - 0.4 ? P[3] : d < r + 0.6 ? P[4] : P[5], a);
+    }
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+      const d = Math.hypot(dx, dy);
+      const ang = ((Math.atan2(dy, dx) * 180 / Math.PI) + 360) % 90;
+      const innen = d >= r - 1.6 && d <= r + 1.6 && ang >= 20 && ang <= 70;
+      if (!innen && d >= r - 2.9 && d <= r + 2.9 && ang >= 12 && ang <= 78) g.put(cx + dx, cy + dy, P[8], a);
+    }
+  };
+  const AUSRUF = ['010', '010', '010', '010', '010', '000', '010'];   // 3×7
+  const ausruf = (g, x, y, a) => {
+    for (let j = 0; j < 7; j++) for (let i = 0; i < 3; i++) if (AUSRUF[j][i] === '1') {
+      for (let k = -1; k <= 1; k++) for (let m = -1; m <= 1; m++) g.block(x + i * 2 + k, y + j * 2 + m, 2, 2, P[7], a);
+    }
+    for (let j = 0; j < 7; j++) for (let i = 0; i < 3; i++) if (AUSRUF[j][i] === '1') { g.block(x + i * 2, y + j * 2, 2, 2, P[0], a); g.put(x + i * 2, y + j * 2, P[1], a); }
+  };
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy), hw = Math.ceil(sz.hw), hh = Math.ceil(sz.hh);
+    // Blitzraster
+    if (t < 150) g.block(0, 0, sz.gw, sz.gh, P[5], (1 - t / 150) * 0.85 * aus);
+    // Wutlinien (flackern im 66-ms-Takt)
+    const tick = Math.floor(t / 66);
+    for (let i = 0; i < teile.linien.length; i++) {
+      const l = teile.linien[i];
+      if ((tick + i) % 4 === 3) continue;
+      const wachs = Math.min(1, t / 240), len = l.l * wachs * (0.7 + 0.3 * ((tick + i) % 3) / 2);
+      for (let d = 0; d < len; d++) {
+        const r = Math.max(hw, hh) + l.r0 + d;
+        const x = cx + Math.cos(l.a) * r * (hw / Math.max(hw, hh) * 0.55 + 0.45), y = cy + Math.sin(l.a) * r * (hh / Math.max(hw, hh) * 0.55 + 0.45);
+        g.put(x, y, l.rot ? P[5] : P[8], aus * (1 - d / len * 0.5));
+        if (d < len * 0.5) g.put(x + 1, y, l.rot ? P[4] : P[7], aus * 0.8);
+      }
+    }
+    // Flammen um den Kartenrand
+    const u2 = (sz.hw * 2 + sz.hh * 2) * 2;
+    for (const z of teile.zungen) {
+      const wob = Math.sin(t / 70 * z.v + z.ph), hoch = Math.round(z.h * (0.75 + 0.25 * wob) * Math.min(1, t / 300));
+      let u = z.u % u2, px, py;
+      if (u < sz.hw * 2) { px = cx - hw + u; py = cy + hh; }
+      else if ((u -= sz.hw * 2) < sz.hh * 2) { px = cx + hw; py = cy + hh - u; }
+      else if ((u -= sz.hh * 2) < sz.hw * 2) { px = cx + hw - u; py = cy - hh; }
+      else { u -= sz.hw * 2; px = cx - hw; py = cy - hh + u; }
+      for (let j = 0; j < hoch; j++) {
+        const k = j / Math.max(1, hoch), breite = Math.max(1, Math.round(3 * Math.pow(1 - k, 0.8)) + (j < 3 ? 1 : 0)), versatz = Math.round(Math.sin(j / 3 + t / 90 + z.ph) * (1 + k));
+        for (let b = -Math.floor(breite / 2); b <= Math.floor(breite / 2); b++) {
+          const x = px + b + versatz, y = py - j;
+          const w = k + (ppBayer(x, y) - 0.5) * 0.45;
+          g.put(x, y, w < 0.08 ? P[1] : w < 0.24 ? P[2] : w < 0.46 ? P[3] : w < 0.72 ? P[4] : P[5], aus);
+        }
+      }
+    }
+    // Glut
+    for (const e of teile.glut) {
+      const tt = (t - e.start) / 1000; if (tt < 0 || tt > 1.1) continue;
+      const x = cx + e.x + e.drift * tt, y = cy + hh - e.v * tt * 1.6;
+      g.block(x, y, e.gross ? 2 : 1, e.gross ? 2 : 1, P[e.farbe], aus * (1 - tt / 1.1));
+    }
+    // Wutzeichen am Kopf (pulsieren)
+    for (const [sx, sy, start, r0] of teile.zeichen) {
+      if (t < start) continue;
+      const r = r0 + (Math.floor((t - start) / 100) % 2) * 2;
+      wutzeichen(g, cx + sx * (hw + 6), cy + sy * hh * 1.1, r, aus);
+    }
+    // „!!!" über der Karte, zittert
+    if (t > 560) for (let i = 0; i < 3; i++) {
+      if (t < 560 + i * 90) continue;
+      const zx = ((tick + i * 2) % 3) - 1, zy = ((tick + i) % 2);
+      ausruf(g, cx - 12 + i * 9 + zx, cy - hh - 22 + zy, aus);
+    }
+  };
+  const Leinwand = ppPunktBild(malen, ENDE + 40, 420, 420, vorbereiten);
+  return function RevengeRage(props) { return (<><Leinwand {...props} /><div aria-hidden="true" data-pp-px="aus" className="revenge-tint" /></>); };
+})();
+
+const GrandFeastEffect = (() => {
+  const TELLER = ['#ffffff', '#d2d2db', '#9aa3b6', '#59606e'].map(ppHex);
+  const DAMPF = ['#ffffff', '#d2d2db'].map(ppHex);
+  const GRUEN = ['#b3f9b8', '#80bf59', '#167927'].map(ppHex);
+  const GOLD = ['#ffffff', '#f7f7ad', '#fad54a', '#f29a3e'].map(ppHex);
+  const BRATEN = { rand: ppHex('#4a2a10'), t: ['#f4ae64', '#ca874e', '#9d612f', '#7d3911'].map(ppHex) };
+  const APFEL = { rand: ppHex('#520a0c'), t: ['#ff6666', '#c0141c', '#8c0014', '#710122'].map(ppHex) };
+  const KUCHEN = ['#fffbd2', '#e0c085', '#ca874e', '#e58092', '#ae264c', '#c0141c'].map(ppHex);
+  const BROT = ['#fbc86a', '#d1a148', '#9d612f', '#7d3911'].map(ppHex);
+  const ENDE = 1500, FADE_AB = 1100;
+  const vorbereiten = () => ({
+    gericht: Math.floor(Math.random() * 4),
+    dampf: Array.from({ length: 4 }, (_, i) => ({ x: (i - 1.5) * 4, start: 320 + i * 130, ph: Math.random() * 6 })),
+    kreuze: Array.from({ length: ppFxN(6) }, (_, i) => ({ x: (Math.random() - 0.5) * 1.6, v: 16 + Math.random() * 14, start: 360 + i * 110, ph: Math.random() * 6 })),
+  });
+  const speise = (g, art, x, y, a) => {
+    if (art === 0) {                       // Braten mit Knochen
+      ppW76Kugel(g, x, y - 4, 5, BRATEN, a);
+      g.block(x + 2, y - 11, 2, 3, TELLER[0], a); g.block(x + 4, y - 12, 2, 2, TELLER[0], a); g.put(x + 3, y - 9, TELLER[2], a);
+    } else if (art === 1) {                // Kuchenstück
+      g.block(x - 5, y - 6, 10, 6, KUCHEN[1], a); g.block(x - 5, y - 4, 10, 1, KUCHEN[0], a); g.block(x - 5, y - 1, 10, 1, KUCHEN[2], a);
+      g.block(x - 5, y - 9, 10, 3, KUCHEN[3], a); g.block(x - 5, y - 7, 10, 1, KUCHEN[4], a); g.block(x - 5, y - 9, 10, 1, KUCHEN[3], a);
+      g.block(x - 1, y - 12, 3, 3, KUCHEN[5], a); g.put(x - 1, y - 12, TELLER[0], a);
+    } else if (art === 2) {                // Apfel
+      ppW76Kugel(g, x, y - 4, 4, APFEL, a); g.block(x, y - 10, 1, 3, BRATEN.t[3], a); g.block(x + 1, y - 10, 3, 2, GRUEN[1], a);
+    } else {                               // Brot
+      for (let dy = -3; dy <= 3; dy++) for (let dx = -7; dx <= 7; dx++) {
+        if ((dx * dx) / 49 + (dy * dy) / 12 > 1) continue;
+        const k = (dy + 3) / 6;
+        const schnitt = ((dx + dy * 2 + 20) % 5) === 0 && dy < 1 && Math.abs(dx) < 5;
+        g.put(x + dx, y - 4 + dy, schnitt ? BROT[3] : k < 0.3 ? BROT[0] : k < 0.7 ? BROT[1] : BROT[2], a);
+      }
+    }
+  };
+  const plus = (g, x, y, a) => { g.block(x - 2, y - 1, 5, 3, GRUEN[2], a); g.block(x - 1, y - 2, 3, 5, GRUEN[2], a); g.block(x - 1, y, 3, 1, GRUEN[1], a); g.block(x, y - 1, 1, 3, GRUEN[1], a); g.put(x, y, GRUEN[0], a); };
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy), hh = Math.ceil(sz.hh), hw = Math.ceil(sz.hw);
+    const ty = cy + Math.round(hh * 0.55);
+    // Teller: wächst in Breitenstufen
+    const rx = Math.min(Math.round(hw * 0.95), [0, 4, 8, 11, 13][Math.min(4, Math.floor(t / 70))] + (hw > 12 ? 2 : 0));
+    if (rx > 0) {
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -rx; dx <= rx; dx++) {
+        const e = (dx * dx) / (rx * rx + 0.01) + (dy * dy) / 5;
+        if (e > 1) continue;
+        g.put(cx + dx, ty + dy, e > 0.8 ? TELLER[2] : dy > 0 ? TELLER[1] : TELLER[0], aus);
+      }
+      for (let dx = -rx + 2; dx <= rx - 2; dx++) g.put(cx + dx, ty + 3, ppBayer(dx, 3) < 0.5 ? TELLER[3] : TELLER[2], aus);   // Schatten
+    }
+    // Gericht poppt auf (Hüpfer in ganzen Pixeln)
+    if (t > 200) { const k = (t - 200) / 1000, hop = k < 0.16 ? -Math.round(Math.sin(k / 0.16 * Math.PI) * 6) : 0; speise(g, teile.gericht, cx, ty - 1 + hop, aus); }
+    // Dampf
+    for (const d of teile.dampf) {
+      const tt = (t - d.start) / 1000; if (tt < 0 || tt > 0.9) continue;
+      for (let j = 0; j < 4; j++) {
+        const yy = ty - 12 - tt * 26 - j * 3, xx = cx + d.x + Math.round(Math.sin(tt * 5 + d.ph + j * 0.9) * 2);
+        if (ppBayer(xx, yy) < (1 - tt / 0.9) * 0.9) g.block(xx, yy, 2, 2, j % 2 ? DAMPF[1] : DAMPF[0], aus);
+      }
+    }
+    // Heilkreuze und Funkel
+    for (const k of teile.kreuze) {
+      const tt = (t - k.start) / 1000; if (tt < 0 || tt > 0.9) continue;
+      plus(g, cx + k.x * hw + Math.round(Math.sin(tt * 6 + k.ph) * 2), ty - 6 - tt * k.v * 1.4, aus * (1 - tt / 0.9));
+    }
+    for (let i = 0; i < 3; i++) {
+      const tt = t - 420 - i * 200; if (tt < 0 || tt > 360) continue;
+      ppKreuzfunkel(g, cx + (i - 1) * hw * 0.8, cy - hh * 0.4 - i * 3, [1, 2, 3, 2, 1][Math.min(4, Math.floor(tt / 72))], GOLD, aus);
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 240, 270, vorbereiten);
+})();
+
 
 // ═════════════════════════════════════════════════════════════════
 //  Reverse Trap: „1 TON" (`reverse_trap_ton`) — PIXELART; ein cartooniger Eisenblock fällt auf die Karte / den Helden
@@ -19639,6 +19816,8 @@ const ANIM_REGISTRY = {
   udp_impact: UdpImpactGrossEffect,
   udp_land: UdpLandEffect,
   uncool_smoke: UncoolSmokeEffect,
+  revenge_rage: RevengeRageEffect,
+  grand_feast: GrandFeastEffect,
   reverse_trap_ton: ReverseTrapTonEffect,
   deadly_poison_heal: DeadlyPoisonHealEffect,
   leafagami_leaves: LeafagamiLeavesEffect,
@@ -35728,7 +35907,109 @@ function handPlatzProjektion(isMe, handIdx, finalHandSize) {
 //    crash — die Karte wackelt in der Zone (±2 px, vier Takte), hebt sich einen Takt, KREISELT um die Hochachse (Breitenstufen 100 – 50 – 10 – 50 % mit Spiegelung am Nulldurchgang,
 //            also ein Kippen wie eine Münze, nie ein gedrehtes Bild) und stürzt beschleunigt zum Ablagestapel; dort Staubring und Funken, dann ist sie fort.
 // ═════════════════════════════════════════════════════════════════
+/**
+ * Kartensplitter (`play_card_throw` Modus `shatter`, Fake Legendary Sword) — PIXELART: die Karte reißt (Risse wachsen in 2-px-Strichen von der Mitte aus, die Karte zittert),
+ * dann zerspringt sie in ~48 scharfkantige Dreiecke desselben Kartenbildes. Die Splitter fliegen mit Schwerkraft in ganzen 2-px-Schritten im Bildtakt davon (KEINE Drehung, KEINE Skalierung,
+ * kein Alpha) und verschwinden einzeln; dazu Funken und Staubquadrate. Ablauf: 0–340 ms Risse, ab 340 ms Zerbersten, Ende bei `dauer`.
+ */
+function ppKartenSplitter({ cardUrl, A, dauer }) {
+  const TAKT = 33, BRUCH = 340;
+  const raus = (v) => 2 * Math.round(v / 2);
+  const CW = 2 * Math.round((A.w || 64) / 2), CH = 2 * Math.round((A.h || 90) / 2);
+  const L0 = A.x - CW / 2, T0 = A.y - CH / 2;
+  const FUNKE = ['#ffffff', '#f7f7ad', '#fad54a'], STAUB = ['#d2d2db', '#9aa3b6', '#808898'], RISS = '#08060c';
+  // Gitter mit gewürfelten Innenpunkten
+  const SP = 4, ZE = 6, pts = [];
+  for (let j = 0; j <= ZE; j++) for (let i = 0; i <= SP; i++) {
+    const x = (i / SP) * CW, y = (j / ZE) * CH;
+    const rand = i === 0 || i === SP || j === 0 || j === ZE;
+    pts.push([rand ? x : x + (Math.random() - 0.5) * (CW / SP) * 0.7, (j === 0 || j === ZE) ? y : y + (Math.random() - 0.5) * (CH / ZE) * 0.7]);
+    if (i === 0 || i === SP) pts[pts.length - 1][0] = x;
+  }
+  const P = (i, j) => pts[j * (SP + 1) + i];
+  const dreiecke = [];
+  for (let j = 0; j < ZE; j++) for (let i = 0; i < SP; i++) {
+    const a = P(i, j), b = P(i + 1, j), c = P(i + 1, j + 1), d = P(i, j + 1);
+    if (Math.random() < 0.5) { dreiecke.push([a, b, c]); dreiecke.push([a, c, d]); } else { dreiecke.push([a, b, d]); dreiecke.push([b, c, d]); }
+  }
+  const teile = [], splitter = [];
+  const hinzu = (x, y, g, farbe, leben) => {
+    const f = document.createElement('i');
+    f.style.cssText = `position:fixed;display:block;pointer-events:none;z-index:10102;border-radius:0;left:${raus(x)}px;top:${raus(y)}px;width:${g}px;height:${g}px;background:${farbe}`;
+    f.setAttribute('data-pp-px', 'aus');
+    document.body.appendChild(f);
+    teile.push({ f, ende: performance.now() + leben });
+  };
+  const mitte = [CW / 2, CH / 2];
+  for (const tri of dreiecke) {
+    const el = document.createElement('div');
+    const cs = [(tri[0][0] + tri[1][0] + tri[2][0]) / 3, (tri[0][1] + tri[1][1] + tri[2][1]) / 3];
+    const poly = tri.map(([x, y]) => `${Math.round(x)}px ${Math.round(y)}px`).join(',');
+    el.setAttribute('data-pp-px', 'aus'); el.setAttribute('aria-hidden', 'true');
+    el.style.cssText = `position:fixed;pointer-events:none;z-index:10100;width:${CW}px;height:${CH}px;left:${raus(L0)}px;top:${raus(T0)}px;background:url("${cardUrl || ''}") 0 0 / 100% 100% no-repeat;image-rendering:pixelated;clip-path:polygon(${poly})`;
+    document.body.appendChild(el);
+    const dx = cs[0] - mitte[0], dy = cs[1] - mitte[1], n = Math.max(1, Math.hypot(dx, dy));
+    splitter.push({ el, vx: (dx / n) * (60 + Math.random() * 120) + (Math.random() - 0.5) * 30, vy: (dy / n) * (60 + Math.random() * 120) - 70 - Math.random() * 90, weg: BRUCH + 420 + Math.random() * 420, cs });
+  }
+  // Risse: Kanten der Dreiecke, nach Abstand zur Mitte aufsteigend sichtbar (2-px-Striche auf einer Leinwand)
+  const cvs = document.createElement('canvas');
+  cvs.width = CW / 2; cvs.height = CH / 2;
+  cvs.setAttribute('data-pp-px', 'aus');
+  cvs.style.cssText = `position:fixed;pointer-events:none;z-index:10101;left:${raus(L0)}px;top:${raus(T0)}px;width:${CW}px;height:${CH}px;image-rendering:pixelated`;
+  document.body.appendChild(cvs);
+  const cx2 = cvs.getContext('2d');
+  const kanten = [];
+  for (const tri of dreiecke) for (let k = 0; k < 3; k++) {
+    const a = tri[k], b = tri[(k + 1) % 3], m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    kanten.push({ a, b, d: Math.hypot(m[0] - mitte[0], m[1] - mitte[1]), gezeichnet: false });
+  }
+  kanten.sort((p, q) => p.d - q.d);
+  const dmax = kanten[kanten.length - 1].d || 1;
+  const strich = (a, b) => {
+    const n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 2);
+    for (let i = 0; i <= n; i++) {
+      const x = Math.floor((a[0] + (b[0] - a[0]) * i / n) / 2), y = Math.floor((a[1] + (b[1] - a[1]) * i / n) / 2);
+      cx2.fillStyle = RISS; cx2.fillRect(x, y, 1, 1);
+    }
+  };
+  const t0 = performance.now();
+  let letzter = -1, raf = 0, fertig = false, gebrochen = false;
+  const bild = () => {
+    const t = performance.now() - t0, takt = Math.floor(t / TAKT);
+    if (takt !== letzter && !fertig) {
+      letzter = takt;
+      const tq = takt * TAKT;
+      if (tq < BRUCH) {
+        const f = tq / BRUCH, w = (takt % 2 === 0 ? 2 : -2) * (f > 0.3 ? 1 : 0), h = (takt % 3 === 0 ? 2 : 0) * (f > 0.5 ? 1 : 0);
+        for (const sp of splitter) { sp.el.style.left = raus(L0 + w) + 'px'; sp.el.style.top = raus(T0 + h) + 'px'; }
+        cvs.style.left = raus(L0 + w) + 'px'; cvs.style.top = raus(T0 + h) + 'px';
+        for (const k of kanten) if (!k.gezeichnet && k.d / dmax <= f * 1.05) { k.gezeichnet = true; strich(k.a, k.b); }
+      } else {
+        if (!gebrochen) {
+          gebrochen = true;
+          cvs.remove();
+          for (let i = 0; i < 18; i++) hinzu(A.x + (Math.random() - 0.5) * CW, A.y + (Math.random() - 0.5) * CH, i % 3 === 0 ? 6 : 4, FUNKE[i % 3], 200 + Math.random() * 240);
+          for (let i = 0; i < 12; i++) hinzu(A.x + (Math.random() - 0.5) * CW * 0.9, A.y + (Math.random() - 0.5) * CH * 0.9, 4, STAUB[i % 3], 260 + Math.random() * 220);
+        }
+        const sek = (tq - BRUCH) / 1000;
+        for (const sp of splitter) {
+          if (tq - BRUCH > sp.weg - BRUCH) { sp.el.style.visibility = 'hidden'; continue; }
+          sp.el.style.left = raus(L0 + sp.vx * sek) + 'px';
+          sp.el.style.top = raus(T0 + sp.vy * sek + 520 * sek * sek) + 'px';
+        }
+      }
+    }
+    const jetzt = performance.now();
+    for (let i = teile.length - 1; i >= 0; i--) if (jetzt >= teile[i].ende) { teile[i].f.remove(); teile.splice(i, 1); }
+    if (t < dauer + 900) raf = requestAnimationFrame(bild); else abraeumen();
+  };
+  const abraeumen = () => { if (fertig) return; fertig = true; cancelAnimationFrame(raf); cvs.remove(); for (const sp of splitter) sp.el.remove(); for (const e of teile) e.f.remove(); teile.length = 0; };
+  raf = requestAnimationFrame(bild);
+  return abraeumen;
+}
+
 function ppKartenWurf({ mode, cardUrl, A, B, dauer }) {
+  if (mode === 'shatter') return ppKartenSplitter({ cardUrl, A, dauer });
   const TAKT = 33;
   const RAND = '#291f3d', RING = mode === 'crash' ? '#808898' : '#ee6428', STAUB = ['#d2d2db', '#9aa3b6', '#808898'], FUNKE = ['#ffffff', '#f7f7ad', '#fad54a'];
   const raus = (v) => 2 * Math.round(v / 2);
@@ -44232,16 +44513,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // ★ 25.10. (Ultimate Destroyer Punch, Crash Landing): die KARTE selbst fliegt in Pixelschritten (`ppKartenWurf`) — `throw` zum Helden, `crash` in den Ablagestapel. Die Quell-Zone ist
     // währenddessen leer gemalt (gleiche Maske wie beim Pusher), der Standardflug zur Ablage wird auf Wunsch unterdrückt (`suppressDiscard`, gleicher Eimer wie Brackle).
     const onCardThrow = ({ mode, cardName, fromOwner, fromHeroIdx, fromSlot, toOwner, toHeroIdx, discardOwner, suppressDiscard, duration }) => {
-      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(mode === 'crash' ? 'ev_card_crash' : 'ev_card_throw');
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(mode === 'crash' ? 'ev_card_crash' : mode === 'shatter' ? 'ev_card_shatter' : 'ev_card_throw');
       const srcEl = document.querySelector(`[data-support-zone][data-support-owner="${ownerLbl(fromOwner, myIdx)}"][data-support-hero="${fromHeroIdx}"][data-support-slot="${fromSlot}"]`);
-      const dstEl = mode === 'crash'
+      const dstEl = mode === 'shatter' ? srcEl : mode === 'crash'
         ? document.querySelector((discardOwner ?? fromOwner) === myIdx ? '[data-my-discard]' : '[data-opp-discard]')
         : document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLbl(toOwner, myIdx)}"][data-hero-idx="${toHeroIdx}"]`);
       if (!srcEl || !dstEl) return;
       const sr = srcEl.getBoundingClientRect(), dr = dstEl.getBoundingClientRect();
       const dauer = duration || 800;
       const hideKey = `${fromOwner}-${fromHeroIdx}-${fromSlot}`;
-      setPusherFlungHidden(prev => { const n = new Set(prev); n.add(hideKey); return n; });
+      // Darion (Fake Legendary Sword): liegt noch eine ANDERE Karte im Equip-Stapel, bleibt die Zone sichtbar — die Splitter liegen als Überlagerung über der Karte, und der Stapel zeigt
+      // sich nach dem Entfernen (Zustand) sofort mit den übrigen Equips; die ganze Zone zu verstecken ließe den Stapel unsichtbar.
+      const stapelGroesse = ((spielerLiveRef.current?.[fromOwner]?.supportZones?.[fromHeroIdx] || [])[fromSlot] || []).length;
+      const verstecken = !(mode === 'shatter' && stapelGroesse > 1);
+      if (verstecken) setPusherFlungHidden(prev => { const n = new Set(prev); n.add(hideKey); return n; });
       let suppressKey = null;
       if (suppressDiscard) {
         suppressKey = `${discardOwner ?? fromOwner}-${cardName}`;
@@ -44256,7 +44541,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => {
         stop();
         setPusherFlungHidden(prev => { if (!prev.has(hideKey)) return prev; const n = new Set(prev); n.delete(hideKey); return n; });
-      }, dauer + 900);
+      }, mode === 'shatter' ? dauer + 100 : dauer + 900);
       if (suppressKey) setTimeout(() => {
         const sm = brackleDiscardSuppressRef.current, cur = sm.get(suppressKey) || 0;
         if (cur <= 1) sm.delete(suppressKey); else sm.set(suppressKey, cur - 1);
@@ -48423,6 +48708,56 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Schichten: Funkeln AUF der Karte (Kinder der Flugkarte, fliegen mit)
       // und eine Spur aus Sternchen, die an der jeweils aktuellen Position
       // der Karte entsteht und zurueckbleibt. Nur `transform`/`opacity`.
+      // ★ 25.10. — Flugstil 'lichterkette' (The Root of all Presents, Als Vorgabe: „bunte Lichterketten um die verschenkten Karten, während sie zur Gegnerhand fliegen") — PIXELART:
+      // ein grüner Draht (harte Ringe, kein Schein) rund um die Karte, daran 34 bunte Birnchen (6×6, Rand, zwei Töne), die im Bildtakt zwischen hell und dunkel blinken; dahinter fallen
+      // bunte Lichtpixel (4×4) in Schritten ab. Alles in fester Palette, nur ganzzahlige Verschiebungen.
+      if (flightStyle === 'lichterkette') {
+        card.style.overflow = 'visible';
+        card.style.boxShadow = '0 0 0 2px #2f4e1d, 0 0 0 4px #0a1a04';
+        const BIRNEN = [['#f03232', '#780014'], ['#00cc50', '#29663f'], ['#f8ca21', '#8b5b04'], ['#6d9bf8', '#02398c'], ['#fc69c6', '#5a023a'], ['#ff9a1a', '#7d3911']];
+        const oben = 8, unten = 8, links = 9, rechts = 9;
+        const lagen = [];
+        for (let i = 0; i < oben; i++) lagen.push([(i + 0.5) / oben * 100, -2]);
+        for (let i = 0; i < rechts; i++) lagen.push([102, (i + 0.5) / rechts * 100]);
+        for (let i = 0; i < unten; i++) lagen.push([100 - (i + 0.5) / unten * 100, 102]);
+        for (let i = 0; i < links; i++) lagen.push([-2, 100 - (i + 0.5) / links * 100]);
+        const anzahl = Math.min(lagen.length, ppFxN(lagen.length));
+        for (let i = 0; i < anzahl; i++) {
+          const [lx, ty] = lagen[Math.floor(i * lagen.length / anzahl)];
+          const b = BIRNEN[i % BIRNEN.length];
+          const e = document.createElement('i');
+          e.setAttribute('data-pp-px', 'aus');
+          e.style.cssText = [
+            'position:absolute', 'display:block', 'pointer-events:none', 'z-index:2', 'width:6px', 'height:6px', 'margin:-3px 0 0 -3px', 'border-radius:0',
+            `left:${lx.toFixed(1)}%`, `top:${ty.toFixed(1)}%`, `background:${b[0]}`, `--c1:${b[0]}`, `--c2:${b[1]}`, 'box-shadow:0 0 0 1px #0a1a04',
+            `animation:ptLichterBlink 460ms steps(1) ${-((i * 97) % 460)}ms infinite`,
+          ].join(';');
+          card.appendChild(e);
+        }
+        const spurStart = (laneDelay || 0);
+        const spurEnde = spurStart + Math.round(durationMs * 0.9);
+        const t0 = Date.now();
+        const spurTakt = setInterval(() => {
+          const t = Date.now() - t0;
+          if (t < spurStart) return;
+          if (t > spurEnde || !card.isConnected) { clearInterval(spurTakt); return; }
+          const r = card.getBoundingClientRect();
+          if (!r.width) return;
+          for (let k = 0; k < 2; k++) {
+            const sp = document.createElement('i');
+            const farbe = BIRNEN[Math.floor(Math.random() * BIRNEN.length)][0];
+            sp.setAttribute('data-pp-px', 'aus');
+            sp.style.cssText = [
+              'position:fixed', 'display:block', 'pointer-events:none', 'z-index:10199', 'width:4px', 'height:4px', 'border-radius:0',
+              `left:${2 * Math.round((r.left + Math.random() * r.width) / 2)}px`, `top:${2 * Math.round((r.top + Math.random() * r.height) / 2)}px`, `background:${farbe}`,
+              `--gsx:${2 * Math.round((Math.random() - 0.5) * 12)}px`, `--gsy:${2 * Math.round(8 + Math.random() * 10)}px`,
+              'animation:ptLichterSpur 520ms steps(6) forwards',
+            ].join(';');
+            document.body.appendChild(sp);
+            setTimeout(() => sp.remove(), 540);
+          }
+        }, 60);
+      }
       if (flightStyle === 'glitzer') {
         card.style.boxShadow = '0 0 16px rgba(255,241,150,.95), 0 0 34px rgba(255,217,102,.55)';
         card.style.overflow = 'visible';
@@ -55100,7 +55435,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // W35a (Guardian Beast Hu): auch die Abilities eines UEBERNOMMENEN Gegnerhelden (Eintrag mit `charmedOwner` = Brettseite).
                 const heroActionPromptAbilities = (gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt?.ownerIdx === myIdx)
                   ? (gameState.effectPrompt.activatableAbilities || []).filter(a => isOpp ? a.charmedOwner === oppIdx : !a.charmedOwner) : [];
-                const isHeroActionActivatable = heroActionPromptAbilities.some(a => a.heroIdx === i && a.zoneIdx === z);
+                // W73a: (heroIdx, zoneIdx) gilt nur MIT der Zonenart — ein Eintrag einer SUPPORT Zone (Xal, `zoneKind: 'support'`) gehoert nicht zur gleichnummerierten Ability Zone
+                // (vorher leuchtete z. B. die Toughness in Ability Zone 1, sobald die Zusatzaktion eine Ability in Support Zone 1 anbot).
+                const isHeroActionActivatable = heroActionPromptAbilities.some(a => a.zoneKind !== 'support' && a.heroIdx === i && a.zoneIdx === z);
                 // Boris beim Gegner sperrt Steal-/Kontroll-Abilities
                 // (Charme Lv2). Serverseitig laeuft die Sperre in
                 // doActivateAbility / doActivateFreeAbility — hier wird
@@ -55417,8 +55754,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const _supGehoert = (a) => !isOpp
                 ? (!a.charmedOwner && !a.borrowedFromOwner)
                 : (a.charmedOwner === pi || a.borrowedFromOwner === pi);
-              const supportAbilityEntry = !klickPfadOffen
-                ? ((gameState.activatableAbilities || []).find(a =>
+              // W73a: Boris beim Gegner sperrt Steal-/Kontroll-Abilities — wie bei den Ability Zonen (`isBorisBlockedAbility`) wird die Support-Ability dann nicht angeboten.
+              const isBorisBlockedSupportAbility = !isOpp && istSupportAbility
+                && ((gameState.borisBlocked?.abilities) || []).includes(cards[0]);
+              // W73a: Zusatzaktion (heroAction-Prompt): der Prompt bietet die Ability dieser SUPPORT Zone an (`zoneKind: 'support'`); die Antwort traegt die Zonenart.
+              const heroActionSupportEntry = (!isOpp && !klickPfadOffen && !isBorisBlockedSupportAbility
+                  && gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt?.ownerIdx === myIdx)
+                ? (gameState.effectPrompt.activatableAbilities || []).find(a =>
+                    a.zoneKind === 'support' && a.heroIdx === i && a.zoneIdx === z && !a.charmedOwner && !a.borrowedFromOwner)
+                : null;
+              const supportAbilityEntry = (!klickPfadOffen && !isBorisBlockedSupportAbility)
+                ? (heroActionSupportEntry
+                   || (gameState.activatableAbilities || []).find(a =>
                       a.zoneKind === 'support' && a.heroIdx === i && a.zoneIdx === z && _supGehoert(a))
                    || (gameState.freeActivatableAbilities || []).find(a =>
                       a.zoneKind === 'support' && a.heroIdx === i && a.zoneIdx === z && a.canActivate !== false && _supGehoert(a)))
@@ -55786,7 +56133,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 || brackleSourceHidden.has(`${pi}-${i}-${z}`)
                 || pusherFlungHidden.has(`${pi}-${i}-${z}`);
               return (
-                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + ((gameState.creatureCounters || {})[`${pi}-${i}-${z}`]?._zoneAura === 'necro_flicker' ? ' board-zone-aura' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && equipTargetIds.some(id => accentGreenTargetIds.has(id)) ? ' potion-target-accent-green' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isRedMarkedEquipTarget ? ' potion-target-marked-red' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + ((isAbilitySupportTarget || attachPickSupportValid) ? ' board-zone-play-target' : '') + (supportAbilityEntry ? ' zone-ability-activatable' : '') + (abilityFlash && abilityFlash.zoneKind === 'support' && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z ? ' zone-ability-activated' : '') + (abilityBlockFlash && abilityBlockFlash.zoneKind === 'support' && abilityBlockFlash.owner === (isOpp ? oppIdx : myIdx) && abilityBlockFlash.heroIdx === i && abilityBlockFlash.zoneIdx === z ? ' zone-ability-blocked' : '') + (istSupportAbility && (isDead || isFrozenOrStunnedSup) ? ' board-zone-dead' : '') + ((isDragValidZoneAny || isCsppEmptySlot || isSummonPickZone) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + ((isHeroActionZoneDimmed && !isCsppEmptySlot) ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (equipStapelAnzeige ? ' board-zone-equipstack' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '') + stCreatureCls(pi, i, z)}
+                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + ((gameState.creatureCounters || {})[`${pi}-${i}-${z}`]?._zoneAura === 'necro_flicker' ? ' board-zone-aura' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && equipTargetIds.some(id => accentGreenTargetIds.has(id)) ? ' potion-target-accent-green' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isRedMarkedEquipTarget ? ' potion-target-marked-red' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + ((isAbilitySupportTarget || attachPickSupportValid) ? ' board-zone-play-target' : '') + (supportAbilityEntry && !supportAbilityFrei ? ' zone-ability-activatable' : '') + (supportAbilityEntry && supportAbilityFrei ? ' zone-ability-free-activatable' : '') + (isBorisBlockedSupportAbility ? ' zone-ability-boris-blocked' : '') + (abilityFlash && abilityFlash.zoneKind === 'support' && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z ? ' zone-ability-activated' : '') + (abilityBlockFlash && abilityBlockFlash.zoneKind === 'support' && abilityBlockFlash.owner === (isOpp ? oppIdx : myIdx) && abilityBlockFlash.heroIdx === i && abilityBlockFlash.zoneIdx === z ? ' zone-ability-blocked' : '') + (istSupportAbility && (isDead || isFrozenOrStunnedSup) ? ' board-zone-dead' : '') + ((isDragValidZoneAny || isCsppEmptySlot || isSummonPickZone) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + ((isHeroActionZoneDimmed && !isCsppEmptySlot) ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (equipStapelAnzeige ? ' board-zone-equipstack' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '') + stCreatureCls(pi, i, z)}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'} data-card-name={cards[0] || ''}
                   data-versiegelt={ppVerwahrung(gameState.players?.[pi], i, 'support', z).versiegelt ? '1' : undefined}
                   onClick={attachPickSupportValid ? () => {
@@ -55804,19 +56151,34 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       heroIdx: i, zoneSlot: -1, supportSlot: z,
                       heroOwner: isOpp ? oppIdx : undefined,   // Styx / Charme: fremder, kontrollierter Held
                     });
-                  } : supportAbilityEntry ? () => {
+                  } : heroActionSupportEntry ? () => {
+                    // W73a: Antwort auf den heroAction-Prompt (Zusatzaktion) MIT Zonenart — ohne sie traf die Antwort die gleichnummerierte Ability Zone
+                    if (window.playSFX) window.playSFX('ui_click');
+                    // Al 25.10.: Support-Zonen-Abilities verhalten sich EXAKT wie Ability-Zonen-Abilities — auch mit Rückfrage „Activate Ability?"
+                    setPendingAbilityActivation({ heroIdx: i, zoneIdx: z, zoneKind: 'support', abilityName: heroActionSupportEntry.abilityName, level: heroActionSupportEntry.level, isHeroAction: true });
+                  } : (supportAbilityEntry && !isEffectLocked) ? () => {
                     // v769: Aktivierbare Ability in einer Support Zone
                     // (Xal). Derselbe Kanal wie in einer echten
                     // Ability-Zone — nur `zoneKind` sagt, wo sie liegt.
                     if (window.playSFX) window.playSFX('ui_click');
-                    socket.emit(supportAbilityFrei ? 'activate_free_ability' : 'activate_ability', {
-                      roomId: gameState.roomId,
-                      heroIdx: supportAbilityEntry.heroIdx,
-                      zoneIdx: supportAbilityEntry.zoneIdx,
-                      zoneKind: 'support',
-                      charmedOwner: supportAbilityEntry.charmedOwner,
-                      borrowedFromOwner: supportAbilityEntry.borrowedFromOwner,
-                    });
+                    if (supportAbilityFrei) {
+                      // Freie Aktivierung: ohne Rückfrage (wie bei den Ability Zonen)
+                      socket.emit('activate_free_ability', {
+                        roomId: gameState.roomId,
+                        heroIdx: supportAbilityEntry.heroIdx,
+                        zoneIdx: supportAbilityEntry.zoneIdx,
+                        zoneKind: 'support',
+                        charmedOwner: supportAbilityEntry.charmedOwner,
+                        borrowedFromOwner: supportAbilityEntry.borrowedFromOwner,
+                      });
+                    } else {
+                      // Al 25.10.: Aktions-Ability in einer Support Zone — Rückfrage „Activate Ability?" wie bei den Ability Zonen
+                      setPendingAbilityActivation({
+                        heroIdx: supportAbilityEntry.heroIdx, zoneIdx: supportAbilityEntry.zoneIdx, zoneKind: 'support',
+                        abilityName: supportAbilityEntry.abilityName, level: supportAbilityEntry.level,
+                        charmedOwner: supportAbilityEntry.charmedOwner, borrowedFromOwner: supportAbilityEntry.borrowedFromOwner,
+                      });
+                    }
                   } : isCsppEmptySlot ? () => {
                     // Click-pick destination chosen → route through the
                     // summoner picker / auto-summoner helper. Destination
@@ -60008,7 +60370,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const pa = pendingAbilityActivation;
                 setPendingAbilityActivation(null);
                 if (pa.isHeroAction) {
-                  ppSendePromptAntwort(gameState, { abilityActivation: true, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx, ...(pa.heroActionOwner != null ? { heroOwner: pa.heroActionOwner } : {}) });   // W35a: uebernommener Gegnerheld (Hu)
+                  ppSendePromptAntwort(gameState, { abilityActivation: true, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx, ...(pa.zoneKind === 'support' ? { zoneKind: 'support' } : {}), ...(pa.heroActionOwner != null ? { heroOwner: pa.heroActionOwner } : {}) });   // W35a: uebernommener Gegnerheld (Hu)
                 } else {
                   socket.emit('activate_ability', { roomId: gameState.roomId, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx, zoneKind: pa.zoneKind, charmedOwner: pa.charmedOwner, borrowedFromOwner: pa.borrowedFromOwner });
                 }

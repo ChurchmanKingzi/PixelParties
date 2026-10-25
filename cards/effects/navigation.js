@@ -167,7 +167,7 @@ module.exports = {
       reveal: true,
     });
     // Control Monitors (Al, Welle 75): Navigation fuegt eine Karte hinzu, bezahlt mit dem Abwurf der Kopien → Reaktionsfenster.
-    await engine.meldeHandZugangDurchAbwurf(pi, { names: [searchResult.cardName], discarded: requiredCopies, source: 'Navigation' });
+    await engine.meldeHandZugangAusStapel(pi, { source: 'Navigation' });
 
     // ── Step 4: Lock hand if Lv1 or Lv2 ──
 

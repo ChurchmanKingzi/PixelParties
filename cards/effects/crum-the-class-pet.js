@@ -116,6 +116,7 @@ module.exports = {
     await engine._delay(650);
 
     const spellInst = engine.handZugangSync(ps, spell, { source: CARD_NAME });
+    engine.noteHandZugangAusStapel(pi, spell, { pile: 'discard', source: CARD_NAME });   // W72a: Control Monitors
     const spellIdx = ps.hand.length - 1;
     // Marke VOR den Hooks setzen — ein Hook (z.B. ein Abwurf) koennte die
     // Hand umbauen; das Handfeld folgt der Kopie ab hier von selbst.
