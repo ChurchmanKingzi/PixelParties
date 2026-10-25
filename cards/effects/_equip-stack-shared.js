@@ -166,4 +166,75 @@ function gruppiereZiele(ziele) {
   return out;
 }
 
-module.exports = { gruppiereZiele, waehleMehrere, teilenAktiv, equipsAt, stapelPlatz, pflichtPlatzFuer, stapelTiefe, beschreibe, hatStapelPlatz, freieEquipZonen };
+/**
+ * ★ ZUSAMMENFUEHREN (Al, 25.10.2026): Verliert Darion seinen Effekt (Frozen/Stunned/Negated, Rueckverwandlung ...), behaelt er seinen Stapel, neue Equips landen aber in anderen Zonen.
+ * Sobald das Teilen wieder gilt, kommen ALLE Equips des Helden in den GROESSTEN Stapel (bei Gleichstand den AELTESTEN: den, dessen aelteste Karte frueher gelegt wurde) —
+ * sichtbar: jede Karte fliegt (`play_card_transfer`) aus ihrem Platz in den gemeinsamen. Reines Umlagern am selben Helden: keine Leave-/Enter-Hooks, kein „Equip gained"-Fenster.
+ *
+ * `zusammenfuehrenBedarf`: die Helden (Brettseite + Index), bei denen das Teilen aktiv ist und Equips in mehr als einem Basis-Platz liegen. Billig genug fuer jeden `sync()`.
+ */
+function zusammenfuehrenBedarf(engine) {
+  const out = [];
+  const players = engine.gs?.players || [];
+  for (let seite = 0; seite < players.length; seite++) {
+    const ps = players[seite];
+    for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
+      const zonen = ps.supportZones?.[hi];
+      if (!zonen) continue;
+      let belegt = 0;
+      for (let s = 0; s < 3; s++) if ((zonen[s] || []).length > 0) belegt++;
+      if (belegt < 2) continue;
+      if (!teilenAktiv(engine, seite, hi)) continue;
+      let mitEquips = 0;
+      for (let s = 0; s < 3; s++) if (equipsAt(engine, seite, hi, s).length > 0) mitEquips++;
+      if (mitEquips >= 2) out.push({ seite, heroIdx: hi });
+    }
+  }
+  return out;
+}
+
+/** Alter eines Platzes: die Legenummer seiner aeltesten Karte (kleiner = aelter); ohne Stempel gilt die Reihenfolge in `cardInstances`. */
+function platzAlter(engine, insts) {
+  let min = Infinity;
+  for (const inst of insts) {
+    const n = engine._stapelNrMap?.get(inst) ?? (engine.cardInstances.indexOf(inst) - 1e9);
+    if (n < min) min = n;
+  }
+  return min;
+}
+
+async function zusammenfuehren(engine, seite, heroIdx) {
+  if (!teilenAktiv(engine, seite, heroIdx)) return false;
+  const ps = engine.gs.players[seite];
+  const plaetze = [];
+  for (let s = 0; s < 3; s++) {
+    const insts = equipsAt(engine, seite, heroIdx, s);
+    if (insts.length > 0) plaetze.push({ s, insts, alter: platzAlter(engine, insts) });
+  }
+  if (plaetze.length < 2) return false;
+  const rang = [...plaetze].sort((a, b) => (b.insts.length - a.insts.length) || (a.alter - b.alter));
+  const ziel = rang[0].s;
+  engine.log('equip_stapel_zusammen', { player: ps.username, hero: ps.heroes[heroIdx]?.name, slot: ziel });
+  const quellen = plaetze.filter(p => p.s !== ziel).sort((a, b) => a.alter - b.alter);
+  for (const q of quellen) {
+    for (const inst of [...q.insts]) {
+      if (inst.zone !== 'support' || inst.zoneSlot !== q.s) continue;
+      const von = ps.supportZones[heroIdx][q.s];
+      engine.entferneNameAmPlatz(von, inst);
+      engine.sync();
+      engine._broadcastEvent('play_card_transfer', {
+        sourceOwner: seite, sourceHeroIdx: heroIdx, sourceZoneSlot: q.s,
+        targetOwner: seite, targetHeroIdx: heroIdx, targetZoneSlot: ziel,
+        cardName: inst.name, duration: 600,
+      });
+      await engine._delay(700);
+      ps.supportZones[heroIdx][ziel].push(inst.name);
+      inst.zoneSlot = ziel;
+      engine._stempleStapelNr(inst);   // oben auf den Stapel
+      engine.sync();
+    }
+  }
+  return true;
+}
+
+module.exports = { zusammenfuehrenBedarf, zusammenfuehren, gruppiereZiele, waehleMehrere, teilenAktiv, equipsAt, stapelPlatz, pflichtPlatzFuer, stapelTiefe, beschreibe, hatStapelPlatz, freieEquipZonen };
