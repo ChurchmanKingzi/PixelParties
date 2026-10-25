@@ -58645,6 +58645,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               instances={ep.instances}
               onPick={(inst) => respondToPrompt({ instId: inst.instId })}
             />
+            {ep.doneLabel && (
+              <div style={{ marginTop: 12, textAlign: 'center' }}>
+                <button className="btn btn-primary" onClick={() => respondToPrompt({ done: true })}>{ep.doneLabel}</button>
+              </div>
+            )}
           </DraggablePanel>
         </div>
       )}
