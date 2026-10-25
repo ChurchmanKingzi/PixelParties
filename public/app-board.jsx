@@ -27367,6 +27367,106 @@ const ANIM_REGISTRY = {
     };
   })(),
   // ═══════════════════════════════════════════════════════════════════
+  //  Backstab (25.10.) — PIXELART, der Stich eines Schwerts aus Richtung des ausführenden Helden ins Ziel (Brett-Animation, Hülle `ppSalve`; Vorlage: das Kartenbild — das
+  //  grüne Schlangenwesen sticht mit dem Schwert zu)
+  //
+  //  Ein Pixel-Schwert (Kontur, dreistufige Klinge, goldene Parierstange, brauner Griff) erscheint gedithert vor dem Ziel, die Spitze auf das Ziel gerichtet und aus der Richtung des
+  //  ausführenden Helden (Ursprung → Ziel). Es holt in Stufen aus (~100–260 ms, ein Glanzpunkt läuft über die Klinge), verharrt kurz und STÖSST in zwei Bildern vor (Windstreifen);
+  //  Einschlag bei 330 ms: Kreuzfunkel an der Spitze, Aufblitzen der Zielkarte (hartes Dither-Raster), Funken und rote Spritzer fliegen mit Schwerkraft zurück entlang der Stichbahn. Das
+  //  Schwert zittert kurz im Ziel, wird zurückgezogen und dithert ab ~740 ms weg; ENDE 900. Bewegung nur in ganzen Pixeln im Bildtakt (~30 Bilder/s), feste Palette, KEIN Schein,
+  //  KEINE Drehung eines Kartenbildes (die Klinge ist pro Bild als Linie in Treppenstufen gezeichnet).
+  // ═══════════════════════════════════════════════════════════════════
+  backstab_stab: (() => {
+    const KONTUR = ppHex('#1a1a2e');
+    const STAHL = { W: ppHex('#ffffff'), L: ppHex('#e5edfa'), M: ppHex('#b4cff8'), D: ppHex('#7e7d9b') };   // Glanzkante, hell, mittel, dunkel
+    const GOLD = ppHex('#f9ac20'), GOLD_D = ppHex('#c68206'), GRIFF = ppHex('#7d3911'), GRIFF_D = ppHex('#4a2a10');
+    const FUNKEN = ['#ffffff', '#f9ecb3', '#fbc86a', '#e37435'].map(ppHex);
+    const BLUT = ['#e92f38', '#b5171c', '#8b0d0d'].map(ppHex);
+    const ENDE = 900, EINSCHLAG = 330, FADE_AB = 740;
+    const KLINGE = 17;                                                   // Klingenlänge in Rasterpixeln; danach Parierstange (2), Griff (4), Knauf (2)
+    // Halbbreite der Silhouette an Stelle i (0 = Spitze, wächst Richtung Griff)
+    const halbbreite = (i) => i < 0 ? -1 : i <= 2 ? 0 : i <= KLINGE ? 1 : i <= KLINGE + 2 ? 4 : i <= KLINGE + 6 ? 0 : i <= KLINGE + 8 ? 1 : -1;
+    // Das Schwert: Spitze (tx, ty), Stossrichtung (dx, dy) = Einheitsvektor Richtung Ziel; der Körper liegt hinter der Spitze.
+    const schwert = (g, tx, ty, dx, dy, a) => {
+      const nx = -dy, ny = dx, ENDE_I = KLINGE + 8;
+      const pt = (i, k) => [tx - dx * i + nx * k, ty - dy * i + ny * k];
+      for (let i = -1; i <= ENDE_I + 1; i++) {                           // Kontur zuerst (eine Stufe breiter als die Silhouette)
+        const hb = Math.max(halbbreite(i - 1), halbbreite(i), halbbreite(i + 1)) + 1;
+        for (let k = -hb; k <= hb; k++) { const [x, y] = pt(i, k); g.put(x, y, KONTUR, a); }
+      }
+      for (let i = 0; i <= ENDE_I; i++) {
+        const hb = halbbreite(i);
+        if (hb < 0) continue;
+        for (let k = -hb; k <= hb; k++) {
+          let c;
+          if (i <= KLINGE) c = k > 0 ? STAHL.W : k < 0 ? STAHL.D : (i > KLINGE - 5 ? STAHL.M : STAHL.L);
+          else if (i <= KLINGE + 2) c = (i === KLINGE + 1) ? GOLD : GOLD_D;
+          else if (i <= KLINGE + 6) c = ((i + k) % 2 === 0) ? GRIFF : GRIFF_D;
+          else c = (i === KLINGE + 7) ? GOLD : GOLD_D;
+          const [x, y] = pt(i, k);
+          g.put(x, y, c, a);
+        }
+      }
+    };
+    const vorbereiten = (sz) => ({
+      funken: sz.ziele.map(() => Array.from({ length: ppFxN(18) }, () => ({ w: Math.random() - 0.5, v: 18 + Math.random() * 42, leben: 240 + Math.random() * 230 }))),
+      blut: sz.ziele.map(() => Array.from({ length: ppFxN(10) }, () => ({ w: Math.random() - 0.5, v: 14 + Math.random() * 34, leben: 380 + Math.random() * 280, gross: Math.random() < 0.4 }))),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const ein = Math.min(1, (Math.floor(t / 25) + 1) / 4);              // gestuftes Einblenden (Dithering)
+      const a = Math.min(ein, aus);
+      sz.ziele.forEach((z, zi) => {
+        const dx = z.dx, dy = z.dy, nx = -dy, ny = dx;
+        // Abstand Kartenmitte → Kartenkante entlang der Stossrichtung
+        const rK = Math.min(Math.abs(dx) > 0.001 ? (z.w / 2) / Math.abs(dx) : 999, Math.abs(dy) > 0.001 ? (z.h / 2) / Math.abs(dy) : 999);
+        const stand = rK + 6, tief = rK * 0.2;
+        // Abstand der Spitze von der Kartenmitte (positiv = Quellseite): Ausholen in Stufen, Stoss in zwei Bildern, Einschlag, Zurückziehen
+        let td;
+        if (t < 100) td = stand;
+        else if (t < 260) td = stand + Math.min(8, Math.floor((t - 100) / 33) * 2);
+        else if (t < 297) td = stand + 8;
+        else if (t < EINSCHLAG) td = stand - 4;
+        else if (t < 560) td = tief;
+        else td = tief + Math.floor((t - 560) / 33) * 2;
+        // seitliches Zittern im Ziel (1 Pixel, im Bildtakt)
+        const zitter = (t >= EINSCHLAG && t < 430) ? (Math.floor(t / 33) % 2 === 0 ? 1 : -1) : 0;
+        const sx = z.x - dx * td + nx * zitter, sy = z.y - dy * td + ny * zitter;
+        // Windstreifen hinter dem Griff beim Stoss
+        if (t >= 297 && t < 365) for (let s = -1; s <= 1; s++) for (let i = KLINGE + 2; i < KLINGE + 9; i++) if ((i + s) % 2 === 0) g.put(sx - dx * i + nx * s * 3, sy - dy * i + ny * s * 3, STAHL.M, a * 0.7);
+        schwert(g, sx, sy, dx, dy, a);
+        // Glanzpunkt läuft beim Ausholen über die Klinge
+        if (t >= 200 && t < 297) {
+          const i = 2 + Math.floor(((t - 200) / 97) * (KLINGE - 3)), gx = Math.round(sx - dx * i), gy = Math.round(sy - dy * i);
+          g.put(gx, gy, STAHL.W, a); g.put(gx + 1, gy, STAHL.W, a); g.put(gx - 1, gy, STAHL.W, a); g.put(gx, gy + 1, STAHL.W, a); g.put(gx, gy - 1, STAHL.W, a);
+        }
+        if (t < EINSCHLAG) return;
+        const al = t - EINSCHLAG, hx = z.x - dx * tief, hy = z.y - dy * tief;   // Einschlagstelle (Spitze im Ziel)
+        // Zielkarte blitzt im Einschlag auf (hartes Dither-Raster, keine Überblendung)
+        if (al < 66) g.block(z.x - z.w / 2, z.y - z.h / 2, Math.ceil(z.w), Math.ceil(z.h), STAHL.W, 0.34 * (1 - al / 66) * aus);
+        // Kreuzfunkel an der Spitze
+        if (al < 120) ppKreuzfunkel(g, hx - 1, hy - 1, [4, 4, 3, 2, 1][Math.floor(al / 24)] || 1, FUNKEN, aus);
+        // Funken: spritzen zurück entlang der Stichbahn (Kegel um die Gegenrichtung), mit Schwerkraft
+        const basis = Math.atan2(-dy, -dx);
+        for (const f of teile.funken[zi]) {
+          if (al > f.leben) continue;
+          const k = al / f.leben, sek = al / 1000, w = basis + f.w * 2.7;
+          g.put(hx + Math.cos(w) * f.v * sek, hy + Math.sin(w) * f.v * sek + 70 * sek * sek, FUNKEN[Math.min(3, Math.floor(k * 4))], (1 - k * k) * aus);
+        }
+        // rote Spritzer: schwerer, 1×1 oder 2×2, fallen und verblassen im Raster
+        for (const b of teile.blut[zi]) {
+          if (al > b.leben) continue;
+          const k = al / b.leben, sek = al / 1000, w = basis + b.w * 2.2;
+          const px = hx + Math.cos(w) * b.v * sek, py = hy + Math.sin(w) * b.v * sek + 90 * sek * sek;
+          if (b.gross) g.block(px, py, 2, 2, BLUT[Math.min(2, Math.floor(k * 3))], (1 - k * 0.8) * aus);
+          else g.put(px, py, BLUT[Math.min(2, Math.floor(k * 3))], (1 - k * 0.8) * aus);
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 50 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
   //  Opfer-Messer — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!")
   //
   //  Prozedural auf einem kleinen Raster (Canvas, `image-rendering: pixelated`, ~33 Bilder/s), feste Palette,
@@ -53710,6 +53810,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'vengeful_attack') {
         const p = playerByName(entry.player);
         return <span className="log-damage">🗡️ {cName('Vengeful Attack')} — {pName(p.name, p.color)}'s {entry.hero} takes revenge on {entry.target || 'the target'}{entry.damage != null ? <>: <span className="log-amount">{entry.damage}</span> damage</> : null}.</span>;
+      }
+      if (t === 'backstab') {
+        const p = playerByName(entry.player);
+        return <span className="log-damage">🗡️ {cName('Backstab')} — {pName(p.name, p.color)} stabs {entry.target || 'the target'} with {entry.hero}'s blade{entry.damage != null ? <>: <span className="log-amount">{entry.damage}</span> damage</> : null}.</span>;
+      }
+      if (t === 'backstab_blocked') {
+        return <span className="log-info">🗡️ {cName('Backstab')} — {entry.hero} can no longer attack: the stab fizzles.</span>;
       }
       if (t === 'wise_village_elder') {
         const p = playerByName(entry.player);

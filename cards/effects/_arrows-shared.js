@@ -106,6 +106,9 @@ function arrowTriggerCondition(gs, pi, engine, chainCtx, _opts = {}) {
   if (!initial) return false;
   if (initial.cardType !== 'Attack') return false;
   if (initial.owner !== pi) return false;
+  // Backstab: die Attack führt ein Held des GEGNERS aus („a Hero you control performs an Attack" trifft nicht zu) — kein Pfeil des Spielers (der Pfeil würde den spielenden eigenen Helden
+  // scharf stellen, der Schaden kommt aber vom Gegnerhelden: er verpuffte). Skript-Flagge `attackPerformedByOpponentHero`.
+  if (require('./_loader').loadCardEffect(initial.cardName)?.attackPerformedByOpponentHero) return false;
 
   // Caster hero must exist and be alive. The INITIAL link uses `heroIdx`
   // (executeCardWithChain, see _engine.js:9042); the `casterHeroIdx`
