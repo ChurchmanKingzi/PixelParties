@@ -70,5 +70,15 @@ const ja = (t) => t.script.push({ match: (d) => d.type === 'confirm' && d.title 
     R.check('Reverse Trap wird nicht angeboten', !t.prompts.some(p => p.d && p.d.title === 'Reverse Trap'), t.prompts.map(p => [p.pi, p.d && p.d.title]));
     R.check('Crash Landing wirkt normal (Club in der Ablage)', t.pile(0, 'discardPile').includes(CLUB), t.pile(0, 'discardPile'));
   }
+
+  R.section('E · Die Aktivierung öffnet eine KETTE: der Gegner darf antworten (Tool Freezer negiert Crash Landing → das Equip bleibt)');
+  {
+    const t = await H.fresh({ hand: [[CLUB, 'Tool Freezer'], [CARD]], deckSize: 20, gold: [100, 100], active: 0 });
+    ja(t);
+    t.script.push({ match: (d) => d.title === 'Tool Freezer' || (d.options || []).some(o => /Tool Freezer/.test(o.label || o.name || '')), answer: (d) => d.type === 'confirm' ? { confirmed: true } : { selectedId: ((d.options || []).find(o => /Tool Freezer/.test(o.label || o.name || '')) || {}).id } });
+    await t.play(0, CLUB, { hero: 0, slot: 0 });
+    R.check('Sitz 0 bekam ein Kettenangebot auf Crash Landing', t.prompts.some(p => p.pi === 0 && p.d && JSON.stringify(p.d).includes('Tool Freezer') && JSON.stringify(p.d).includes(CARD)), t.prompts.map(p => [p.pi, p.d && p.d.type, p.d && p.d.title]));
+    R.check('Crash Landing wurde negiert: der Club liegt noch am Helden', t.engine.cardInstances.some(c => c.name === CLUB && c.zone === 'support'), t.engine.cardInstances.filter(c => c.name === CLUB).map(c => c.zone));
+  }
   R.finish();
 })().catch(e => { process.stderr.write('THROW ' + (e && e.stack || e) + '\n'); process.exit(2); });

@@ -18145,7 +18145,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!info?.equipCard || !Number.isInteger(info.equipOwner)) return;
     return this._rxEreignisFenster({
       flag: 'isEquipPlacedReaction', cond: 'equipPlacedCondition', res: 'equipPlacedResolve', tiefe: '_equipPlacedWindowDepth',
-      log: 'equip_placed_window_reaction', ausloeser: info.equipOwner, info, auchAusloeser: true,
+      log: 'equip_placed_window_reaction', ausloeser: info.equipOwner, info, auchAusloeser: true, kette: true,
       nachricht: (c) => `${info.equipName} was equipped! Activate ${c}?`, linkesBild: info.equipName, ziel: info.equipName,
     });
   }
@@ -18154,7 +18154,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Gemeinsamer Rumpf der Hand-Fenster „nach einem Ereignis" (Nasty Prank, Crash Landing): jedem Spieler (ab dem Gegner des Auslösers; `auchAusloeser`: auch ihm selbst) werden seine
    * Handkarten mit dem Fenster-Flag angeboten — Wirker-Plan (`_rxCastPlan`), Gold, Ja/Nein, Wirker-Wahl, Einsetzen (`_rxHandkarteEinsetzen`: Flug, Kosten, Aufdecken, Reaktionsfenster
    * des Gegners — Reverse Trap kann sie negieren), Wirkung, Abschluss (`_rxAufgeloest`). `cfg`: { flag, cond, res, tiefe (Schutz gegen Verschachtelung), log, ausloeser, info,
-   * nachricht(cardName), linkesBild, ziel, auchAusloeser }.
+   * nachricht(cardName), linkesBild, ziel, auchAusloeser, kette (Aktivierung als Kettenglied: `executeCardWithChain`, der Gegner darf antworten) }.
    */
   async _rxEreignisFenster(cfg) {
     if (this.gs.result || this._inMctsSim) return;
@@ -18202,12 +18202,24 @@ this._deathWatch = (this._deathWatchStack || []).length
             if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { fensterInfo: info }))) { abgelehnt.add(cardName); continue; }
             if (!(await this._rxHandkarteEinsetzen(pi, cardName, script, rxCast, { sourceOwner: ausloeser }))) { abgelehnt.add(cardName); continue; }
             this.log(cfg.log, { card: cardName, player: ps.username, target: cfg.ziel });
-            try {
-              if (script[cfg.res]) {
-                await script[cfg.res](this, pi, info, { casterIdx: rxCast.casterIdx, casterSeite: rxCast.casterSeite ?? pi });
+            const wirken = async () => {
+              try {
+                if (script[cfg.res]) {
+                  await script[cfg.res](this, pi, info, { casterIdx: rxCast.casterIdx, casterSeite: rxCast.casterSeite ?? pi });
+                }
+              } catch (err) {
+                console.error(`[${cfg.log}] ${cardName} threw:`, err.message);
               }
-            } catch (err) {
-              console.error(`[${cfg.log}] ${cardName} threw:`, err.message);
+            };
+            if (cfg.kette) {
+              // ★ 25.10. (Crash Landing, Al: „öffnet noch keine Chain"): die Aktivierung ist ein echtes KETTENGLIED — der Gegner (und danach der Aktivierende) darf mit Reaktionen antworten,
+              // die Kette löst rückwärts auf; wird die Karte negiert, fällt ihre Wirkung aus (sie liegt schon in der Ablage, Kosten bleiben bezahlt).
+              await this.executeCardWithChain({
+                cardName, owner: pi, cardType: allCards[cardName]?.cardType || 'Artifact', goldCost: 0, heroIdx: rxCast.casterIdx, casterOwner: rxCast.casterSeite ?? pi,
+                casterCheck: false, fromBoard: false, resolve: wirken,
+              });
+            } else {
+              await wirken();
             }
             await this._rxAufgeloest(ps, cardName, rxCast.casterIdx, { heroOwner: rxCast.casterSeite ?? pi });
             this.sync();
