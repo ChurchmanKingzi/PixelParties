@@ -139,9 +139,6 @@ module.exports = {
 
   spellVisual: { impact: { type: 'hot_potato_blast' }, impactMs: 600 },
 
-  /** „Unaffected by all OTHER cards and effects": Explosion Toss ist die gewollte Ausnahme — sie besiegt die Kartoffel (Al, 25.10.). Liest die Toss (`unaffectedExcept`). */
-  unaffectedExcept: ['Explosion Toss'],
-
   canSummon: (ctx) => freieGegnerZonen(ctx._engine, ctx.cardOwner).length > 0,
 
   // CPU: bezahlen, wenn es billig ist (≤ 2 Karten) oder die Hand reichlich gefüllt ist; sonst lieber sprengen.

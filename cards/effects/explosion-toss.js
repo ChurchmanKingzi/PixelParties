@@ -13,7 +13,7 @@
 //  Zonenwechsel (Aligning Goals, Deepsea Succubus) ist keine Bewegung und löst nichts aus.
 //
 //  ── WIRKUNG ─────────────────────────────────────────────────────────────
-//  „Defeat that Creature": `actionDestroyCard` in der Zone des Gegners (Todes-Hooks, Schutz — Cardinal Beasts, Defending the Gate — lassen sie stehen; die Hot Skull Potato nennt die Toss als Ausnahme ihres „unaffected" [`unaffectedExcept`] und fällt).
+//  „Defeat that Creature": `actionDestroyCard` in der Zone des Gegners (Todes-Hooks, Schutz — Cardinal Beasts, Defending the Gate, die Hot Skull Potato „unaffected" — lassen sie stehen).
 //  „the opponent's Hero": der HELD, in dessen Support Zone die Kreatur gelandet ist (der Gastgeber der Zielzone). Schaden 100/200/300 nach der Stufe der Kreatur (Stufe ≤ 1 → 100, 2 → 200,
 //  ab 3 → 300; Kreaturen ohne Stufe zählen als ≤ 1), Typ `destruction_spell`, Quelle = die Karte mit dem WIRKER als Held. Der Schaden fällt auch dann, wenn die Kreatur sich dem Besiegen entzieht
 //  (die beiden Teile sind getrennte Anweisungen).
@@ -23,7 +23,6 @@
 // ═══════════════════════════════════════════
 
 const { hasNumericCreatureLevel } = require('./_hooks');
-const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Explosion Toss';
 const BLAST_MS = 1500;
@@ -69,14 +68,7 @@ module.exports = {
       });
       await engine._delay(KNALL_MS);
       if (inst.zone === 'support') {
-        // Hot Skull Potato („unaffected by all OTHER cards and effects") nennt diese Karte als Ausnahme (`unaffectedExcept`): ihr Schild fällt für den Augenblick des Besiegens (Al, 25.10.).
-        const ausnahme = !!inst.counters?._cardinalImmune && (loadCardEffect(inst.name)?.unaffectedExcept || []).includes(CARD_NAME);
-        if (ausnahme) delete inst.counters._cardinalImmune;
-        try {
-          await engine.actionDestroyCard(quelle, inst, { sourceOwner: pi, sourceName: CARD_NAME, fireCreatureDeath: true });
-        } finally {
-          if (ausnahme && inst.zone === 'support' && inst.counters) inst.counters._cardinalImmune = 1;   // blieb sie stehen (anderer Schutz), gilt der Schild weiter
-        }
+        await engine.actionDestroyCard(quelle, inst, { sourceOwner: pi, sourceName: CARD_NAME, fireCreatureDeath: true });
       }
     }
     if (nach?.name && nach.hp > 0) {
