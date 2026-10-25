@@ -113,6 +113,7 @@ function targetsFor(engine, pi, heroIdx, kinds, heroes) {
  * @param opts.sourceOwner  Verursacher, falls nicht der Waehlende (v1335)
  * @param opts.heroOwner    Brettseite des Helden, falls nicht `pi` (Als Befund 29.9.: geliehener Held)
  * @param opts.heroes       statt EINES Helden mehrere: `[{ physOwner, heroIdx }]` oder eine Funktion, die sie je Durchlauf liefert (Patty: alle dauerhaft kontrollierten Helden, `permanentHeroes`)
+ * @param opts.onSent       `(ziel) => void`, nach jeder tatsaechlich bezahlten Karte (Patty merkt sich den Helden der ersten Ability; `opts.heroes` liefert danach nur noch ihn)
  * @returns {{sent, abilitiesSent, equipsSent, aborted}}
  */
 async function sendCardsLoop(engine, pi, heroIdx, opts) {
@@ -188,6 +189,7 @@ async function sendCardsLoopKern(engine, pi, heroIdx, opts) {
     }
     if (!weg) continue;
     sent++;
+    if (typeof opts.onSent === 'function') opts.onSent(ziel);
     engine.sync();
     await engine._delay(350);
   }
