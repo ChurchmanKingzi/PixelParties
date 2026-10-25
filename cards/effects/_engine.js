@@ -10786,6 +10786,7 @@ class GameEngine {
    */
   async _runHeroDefeatSequence(target, source, ownerIdx, opts = {}) {
     if (!target || target.hp > 0) return false;
+    require('./_pythia-shared').heldFaellt(this, target);   // Infallible Oracle Pythia: jeder Plan, der auf diesen Helden zielte, verfaellt (auch bei spaeterer Wiederbelebung)
     // SC (v1382, Double/Triple Kill): jeder Heldentod laeuft genau einmal
     // hier durch — `_koProcessed` verhindert Doppelzaehlung.
     if (!target._koProcessed && this.gs._scTracking) {
@@ -38492,6 +38493,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
     if (this._inCreaturePreDefeatReaction) return false;
     if (!creatureInst) return false;
+    // ★ W78 (Infallible Oracle Pythia): ERSATZ DER EIGENEN NIEDERLAGE — „When this Creature would be defeated, you may … instead". Skript-Vertrag
+    // `selfPreDefeat(engine, inst, source, amount, type, info) → Promise<boolean>` (true = gerettet, KEIN Tod, kein Todes-Trigger). Laeuft VOR den Hand-Reaktionen
+    // (die Karte ersetzt ihren eigenen Tod; nicht innerhalb einer laufenden Hand-Reaktion); ruht bei Frost/Betaeubung/Negation (Ersatzeffekt = laufendes Passiv) und beim unaufhaltsamen Besiegen (kommt hier nie an).
+    {
+      const _sp = loadCardEffect(creatureInst.counters?._effectOverride || creatureInst.name);
+      if (_sp?.selfPreDefeat && creatureInst.zone === ZONES.SUPPORT && !creatureInst.faceDown && !this.isCardPassiveDormant(creatureInst)) {
+        if (await _sp.selfPreDefeat(this, creatureInst, this._rewriteSourceForCreatureCaster(source), amount, type, info)) return true;
+      }
+    }
 
     // Demon's Gate-style creature-caster annotation.
     source = this._rewriteSourceForCreatureCaster(source);
@@ -57857,6 +57867,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     this._atkAurenAbgleichen();   // W58a: Rioting Village & Co. gelten fuer ALLE Helden (lebend, tot, frisch eingesetzt, aus der Abwesenheit zurueck)
     this._dynamischeAtkNachrechnen();   // W58a: Core/Gun folgen dem Ist-Zustand der Ablage (auch nach dem Todes-Aufraeumen und Direktzugriffen auf die Ablage)
     this._refreshAscensionReadiness();
+    require('./_pythia-shared').abgleichen(this);   // Infallible Oracle Pythia: Plaene/Marken („Death Foreseen") mit dem Brett abgleichen
     this._equipStapelAbgleichen();   // Darion: Effekt wieder frei → alle Equips in den groessten Stapel (nach der laufenden Wirkung)
     this._aufdeckenInHandAbgleichen();   // 23.10.: `revealAlwaysInHand` (Great Vanguard Demon) — aufgedeckt, sobald und solange die Karte auf der Hand liegt, egal wie sie dorthin kam
     // W18a (S01-04): die Sperre von Divine Gift of Skill hängt an der Magic-Arts-Stufe des NUTZERS (nicht des gesperrten Helden) und kann

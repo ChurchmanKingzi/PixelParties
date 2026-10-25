@@ -2721,6 +2721,9 @@ ihren Verbrauch selbst und setzt `ctx._skipHeroEffectHopt = true`, statt
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `canSummon` | `(ctx) → bool` | Extra summoning condition. Return `false` to block. |
+| `selfPreDefeat` | `async (engine, inst, source, amount, type, info) → bool` | W78 (Infallible Oracle Pythia): **„When this Creature would be defeated, … instead"** — Ersatz der eigenen Niederlage. Die Engine ruft es aus `_checkCreaturePreDefeatHandReactions` (Schadenstod, Zerstörung, Insta-Kill-Effekte — nicht beim unaufhaltsamen Besiegen), VOR den Hand-Reaktionen; es ruht bei Frost/Betäubung/Negation (`isCardPassiveDormant`). `true` = gerettet: kein Tod, keine Todes-Trigger, die Instanz bleibt samt Countern; die Karte heilt/opfert selbst. `info.isSacrifice` = Opfer als Kosten (Karte entscheidet, ob sie ersetzt; Pythia nicht). Vorbild: `infallible-oracle-pythia.js`. |
+
+> **Pythia-Zustand (W78):** Plan (`counters.pythiaPlan`) und Zähler (`counters.pythiaCounters`) liegen an der Pythia-Instanz; die Anzeige-Marke „Death Foreseen by Pythia" (`hero._pythiaMark` / `counters._pythiaMark`) wird bei JEDEM `engine.sync()` aus den Plänen abgeleitet (`_pythia-shared.js` → `abgleichen`), ein besiegter Held lässt seine Pläne verfallen (`heldFaellt`, Anfang von `_runHeroDefeatSequence`). Marke/Plan nie von Hand setzen oder löschen. Animation `pythia_flames` (Phasen `mark`/`tick`/`doom`/`burn`/`save`).
 
 ### Reactions
 

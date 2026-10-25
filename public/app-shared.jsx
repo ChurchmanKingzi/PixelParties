@@ -2737,6 +2737,29 @@ const ZONE_ANIM_SFX = {
   level_down:              { name: 'debuff', opts: { rate: 0.9, volume: 0.7 } },   // Looming Threat: Stufe sinkt
   hand_level_down:         { name: 'debuff', opts: { rate: 1.0, volume: 0.6 } },   // Great Vanguard Demon: Stufe sinkt (Pixelart, die Karte bleibt sichtbar)
   mind_control_hex:        { name: 'elem_dark', opts: { rate: 0.8, volume: 0.6 } },   // Mind Control: Hypnose-Spirale über dem übernommenen Helden (Pixelart)
+  // Infallible Oracle Pythia (W78) — grüne Flammen. `mark`: Aufflackern (Aufdeck-Ton + leises Zischen); `tick`: ein Flämmchen auf Pythia (Ping); `doom`: die Flammen lodern
+  // auf (Feuerrauschen, tiefes Brummen) und schlagen über dem Ziel zusammen (~1100 ms, Schlag); `burn`: das Opfer verbrennt; `save`: Pythia wird von den Flammen geheilt (Heil-Ton).
+  pythia_flames: (p) => {
+    const ph = p && p.phase;
+    if (ph === 'tick') return [{ name: 'ping', opts: { rate: 1.5, volume: 0.4 } }];
+    if (ph === 'save') return [
+      { name: 'elem_fire', opts: { rate: 1.3, volume: 0.45 } },
+      { name: 'heal',      opts: { rate: 1.1, volume: 0.6, delay: 380, category: null, dedupe: 0 } },
+    ];
+    if (ph === 'burn') return [
+      { name: 'elem_fire', opts: { rate: 0.9, volume: 0.7 } },
+      { name: 'elem_dark', opts: { rate: 0.8, volume: 0.45, delay: 500, category: null, dedupe: 0 } },
+    ];
+    if (ph === 'doom') return [
+      { name: 'elem_fire',    opts: { rate: 0.8, volume: 0.7 } },
+      { name: 'elem_dark',    opts: { rate: 0.7, volume: 0.5, delay: 250, category: null, dedupe: 0 } },
+      { name: 'heavy_impact', opts: { rate: 0.7, volume: 0.6, delay: 1050, category: null, dedupe: 0 } },
+    ];
+    return [
+      { name: 'reveal',    opts: { rate: 0.9, volume: 0.45 } },
+      { name: 'elem_fire', opts: { rate: 1.6, volume: 0.3, delay: 150, category: null, dedupe: 0 } },
+    ];
+  },
   // Spy in the Enemy's Camp (23.10.) — das Auge öffnet sich (Aufdeck-Ton, 0 ms), beim Blinzeln ein Ping (~560 ms). Nur der erste Teil übernimmt die Sammelkategorie 'effect'.
   spy_mark: [
     { name: 'reveal', opts: { rate: 1.4, volume: 0.45 } },
@@ -8510,6 +8533,18 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
       tooltip: "Spying (Spy in the Enemy's Camp): this Creature is a spy — the player who played the Spy may activate its active effect during their own turn as if they controlled it. "
         + 'This is not a status effect and cannot be healed. It lasts until the Creature leaves the board.',
     });
+  }
+  // W78 („Infallible Oracle Pythia"): vorgemerkter Tod — Marke am Helden (`_pythiaMark`, per Spread durchgereicht) bzw. an der Kreatur (`counters._pythiaMark`); KEIN Status.
+  {
+    const pm = s._pythiaMark || c._pythiaMark;
+    if (pm) {
+      const n = pm.n || 1;
+      badges.push({
+        key: 'pythia_foreseen', icon: '🔮',
+        tooltip: `Death Foreseen by Pythia: ${n > 1 ? `${n} Infallible Oracle Pythias have` : 'Infallible Oracle Pythia has'} chosen this target. When the third Pythia Counter is placed on ${n > 1 ? 'one of them' : 'her'} (now ${pm.counters || 0} of 3), `
+          + `this ${isHero ? 'Hero' : 'Creature'} is immediately defeated. This is not a status effect and cannot be healed. It ends if ${n > 1 ? 'that Pythia' : 'Pythia'} or this target leaves the board.`,
+      });
+    }
   }
   // 23.10. („Mind Control"): der Wirtsheld gehört dem Besitzer der Karte, solange sie angelegt ist.
   if (s.mind_controlled) {
