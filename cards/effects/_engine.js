@@ -22772,7 +22772,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         return (ps.deletedPile || []).length > before;
       }
     }
-    const taken = await this.takeFromPile(pi, pile, cardName, opts);
+    // Aus der HAND: der Flug startet im genauen Handplatz (`fromHandIdx`, wie beim Abwurf) - sonst fliegt die Karte aus dem Nichts bzw. alle auf einmal.
+    let handIdx = -1;
+    if (pile === 'hand') handIdx = (Number.isInteger(opts.handIdx) && ps.hand[opts.handIdx] === cardName) ? opts.handIdx : ps.hand.indexOf(cardName);
+    const taken = await this.takeFromPile(pi, pile, handIdx >= 0 ? handIdx : cardName, opts);
     if (!taken) return false;
     // „deleted from anywhere"-Rettung (Ash Worms, Cute Hydra): zwischen Entnahme und
     // Geloescht-Stapel — auch fuer Karten ohne verfolgte Instanz (Deck, Hand, Puzzle-Ablage).
@@ -22787,7 +22790,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!_loeschPs.deletedPile) _loeschPs.deletedPile = [];
     _loeschPs.deletedPile.push(taken.name);
     this._trackCard(taken.name, _loeschIdx >= 0 ? _loeschIdx : pi, ZONES.DELETED);
-    this._pileFlight(pi, taken.name, pile, 'deleted');
+    this._pileFlight(pi, taken.name, pile, 'deleted', handIdx >= 0
+      ? { fromHandIdx: handIdx, ...(_loeschIdx >= 0 && _loeschIdx !== pi ? { fromOwner: pi, toOwner: _loeschIdx } : {}) } : {});
     this.log('card_deleted', { player: ps.username, card: taken.name, from: pile, by: opts.source || null });
     this.sync();
     return true;

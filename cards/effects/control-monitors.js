@@ -66,9 +66,13 @@ module.exports = {
     const added = nochAufDerHand(adderPs, hc.cardNames || []);
     if (!added.length) return;
 
-    // „Other" = Hand ohne je ein Exemplar der hinzugefuegten Karten.
-    const andere = [...adderPs.hand];
-    for (const n of added) { const k = andere.indexOf(n); if (k >= 0) andere.splice(k, 1); }
+    // Handplaetze: die hinzugefuegten Karten liegen hinten auf der Hand (je Name der letzte freie Platz); „other" = alle uebrigen Plaetze.
+    const hinzu = new Set();
+    for (const n of added) {
+      for (let i = adderPs.hand.length - 1; i >= 0; i--) if (adderPs.hand[i] === n && !hinzu.has(i)) { hinzu.add(i); break; }
+    }
+    const andereIdx = adderPs.hand.map((_, i) => i).filter(i => !hinzu.has(i));
+    const andere = andereIdx.map(i => adderPs.hand[i]);
 
     let wahl = 'added';
     if (andere.length > 0) {
@@ -85,7 +89,7 @@ module.exports = {
       wahl = res?.optionId === 'rest' ? 'rest' : 'added';
     }
 
-    const ziel = wahl === 'rest' ? andere : added;
+    const zielIdx = wahl === 'rest' ? andereIdx : [...hinzu];
     // Bild: drei rote Monitore flackern ueber der Seite des Hinzufuegenden (Vorlage: das Kartenbild), danach fliegen die Karten in den Geloescht-Stapel.
     const heroAnker = Math.max(0, (adderPs.heroes || []).findIndex(h => h?.name && h.hp > 0));
     engine._broadcastEvent('play_zone_animation', {
@@ -96,13 +100,19 @@ module.exports = {
     await engine._delay(900);
     // Das Loeschen fasst die Hand des Gegners an → Hand-Interaktion (Ambush the Scout darf den Effekt negieren). Verschachteltes Fenster,
     // weil wir mitten in der aufloesenden Reaktionskette stehen.
-    if (await engine.checkHandInteractionReaction(adder, 'discard', { byPi: pi, count: ziel.length, sourceName: CARD_NAME, verschachtelt: true })) {
+    if (await engine.checkHandInteractionReaction(adder, 'discard', { byPi: pi, count: zielIdx.length, sourceName: CARD_NAME, verschachtelt: true })) {
       engine.log('control_monitors_negated', { player: gs.players[pi]?.username, opponent: adderPs.username });
       return;
     }
+    // Eine nach der anderen (wie Staff of Uncontrollable Destruction: von hinten nach vorn, damit die niedrigeren Plaetze stabil bleiben), jede fliegt aus ihrem Handplatz
+    // und bleibt bis dahin sichtbar auf der Hand; zwischen zwei Karten der uebliche Abwurf-Takt.
     let geloescht = 0;
-    for (const n of ziel) {
-      if (await engine.deleteFromPile(adder, 'hand', n, { source: CARD_NAME, sourceOwner: pi })) geloescht++;
+    const namen = zielIdx.map(i => adderPs.hand[i]);
+    const reihenfolge = zielIdx.map((i, k) => ({ i, n: namen[k] })).sort((a, b) => b.i - a.i);
+    for (const { i, n } of reihenfolge) {
+      await engine._paceHandDiscard?.();
+      if (await engine.deleteFromPile(adder, 'hand', n, { source: CARD_NAME, sourceOwner: pi, handIdx: i })) geloescht++;
+      engine._stampHandDiscard?.();
     }
     hc.geloeschtDurchMonitors = (hc.geloeschtDurchMonitors || 0) + geloescht;
     engine.log('control_monitors', { player: gs.players[pi]?.username, opponent: adderPs.username, choice: wahl, deleted: geloescht, added });
