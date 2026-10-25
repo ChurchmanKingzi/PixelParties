@@ -9649,6 +9649,135 @@ const SpyMarkEffect = (() => {
   return ppPunktBild(malen, ENDE + 40, 200, 260);
 })();
 
+// ═════════════════════════════════════════════════════════════════
+//  Infallible Oracle Pythia: grüne Flammen (`pythia_flames`) — PIXELART, Hülle `ppPunktBild`; Vorlage: das Kartenbild (grünhaarige Seherin zwischen vier grünen Flammenschalen)
+//
+//  Vier Steinschalen mit spitzen grünen Flammen (hell-grüner Kern, grüne Mitte, dunkelgrüner Rand; je Schale drei Zungen, die in ganzen Pixeln flackern) umringen die Karte; Funken steigen auf.
+//  `phase` (Feld des Ereignisses; ohne Angabe = 'doom'):
+//   • 'doom' (~1500 ms, der Tod ist besiegelt): die Schalen erscheinen (Dither), die Flammen wachsen in Stufen, lodern, schlagen bei ~1150 ms über der Karte zusammen (Blitzkreuz, grüner Dither über der
+//     Karte) und fallen in sich zusammen — genau dann wird das Ziel besiegt;
+//   • 'burn' (~1100 ms, ein Opfer verbrennt): wie 'doom', ohne Schalen-Blitz, kürzer;
+//   • 'mark' (~900 ms, Ziel gewählt): vier kleine Flammen flackern kurz auf und dithern weg;
+//   • 'tick' (~650 ms, Pythia legt einen Counter): ein einzelnes Flämmchen über ihr;
+//   • 'save' (~1000 ms, Selbstheilung): die Flammen steigen um Pythia auf und ziehen in einem grünen Funkenkranz in sie hinein.
+//  Feste Palette (Grün aus den Flammenschalen, Grau der Schalen), Bayer-Dither statt Alpha, kein Leuchten, ~30 Bilder/s.
+// ═════════════════════════════════════════════════════════════════
+const PythiaFlamesEffect = (() => {
+  const FLAMME = ['#b3f9cf', '#75f091', '#4ceb70', '#20ac37', '#167927'].map(ppHex);
+  const FUNKE = ['#b3f9cf', '#4ceb70', '#20ac37'].map(ppHex);
+  const SCHALE = { k: ppHex('#282834'), d: ppHex('#59606e'), m: ppHex('#9aa3b6'), l: ppHex('#d2d2db') };
+  const WEISS = ppHex('#ffffff');
+  const ENDE = 1500;
+  const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  // Steinschale 12 × 5: heller Rand, dunkler Bauch, Standfuß
+  const BOWL = ['.kllllllllk.', 'kmmmmmmmmmmk', '.kdmmmmmmdk.', '..kdddddkk..', '...kkkkkk...'];
+  // Eine Flammenzunge: Fuß (bx, by) = Mitte unten, Höhe H, Breite W; Spitze schwankt, der Rand franst in ganzen Pixeln aus.
+  const zunge = (g, bx, by, H, W, t, seed, a, heiss) => {
+    if (H < 2 || a <= 0) return;
+    const fr = Math.floor(t / 66);
+    for (let r = 0; r < H; r++) {
+      const f = r / H;
+      const prof = f < 0.28 ? 0.72 + 0.28 * (f / 0.28) : Math.pow(Math.max(0, 1 - (f - 0.28) / 0.72), 0.9);
+      const sway = Math.round(Math.sin(t / 120 + seed * 2.3 + f * 3.4) * f * W * 0.24);
+      let hw = Math.round((W / 2) * prof);
+      if (ppHash(r, seed, fr) < 0.28) hw -= 1;                        // ausgefranster Rand
+      if (hw < 0) continue;
+      const y = Math.round(by - r);
+      for (let x = -hw; x <= hw; x++) {
+        const d = Math.abs(x) / (hw + 0.6);
+        const v = heiss - 0.35 + f * 1.3 + d * 2.5 + (ppHash(x + seed * 7, r, fr) - 0.5) * 0.55;
+        g.put(bx + x + sway, y, ppStufe(FLAMME, v, bx + x + sway, y), a);
+      }
+    }
+  };
+  // Eine Schale samt Flamme (drei Zungen: hoch in der Mitte, zwei kürzere an den Seiten)
+  const schale = (g, x, y, H, t, seed, a, mitSchale, heiss) => {
+    if (mitSchale) ppSprite(g, x, y - 2, BOWL, SCHALE, a);
+    const by = y - 4;
+    zunge(g, x, by, H, 7, t, seed, a, heiss);
+    zunge(g, x - 3, by, Math.round(H * 0.6), 4, t + 90, seed + 1, a, heiss + 0.3);
+    zunge(g, x + 3, by, Math.round(H * 0.72), 4, t + 40, seed + 2, a, heiss + 0.3);
+  };
+  const vorbereiten = (sz) => ({
+    funken: Array.from({ length: 16 }, (_, i) => ({
+      s: i % 4, dx: (Math.random() - 0.5) * 7, v: 20 + Math.random() * 22, start: Math.random() * 700, leben: 380 + Math.random() * 260,
+    })),
+  });
+  const malen = (g, t, sz, teile) => {
+    const ph = sz.phase || 'doom';
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy), hw = sz.hw, hh = sz.hh;
+    const hoch = Math.round(hh * 1.45);
+    // Standorte der vier Schalen: außen tief, innen vor dem unteren Kartenrand (wie auf dem Kartenbild)
+    const orte = [
+      { x: cx - Math.round(hw + 7), y: cy + Math.round(hh * 0.85) },
+      { x: cx + Math.round(hw + 7), y: cy + Math.round(hh * 0.85) },
+      { x: cx - Math.round(hw * 0.5 + 1), y: cy + Math.round(hh * 1.0) },
+      { x: cx + Math.round(hw * 0.5 + 1), y: cy + Math.round(hh * 1.0) },
+    ];
+    if (ph === 'tick') {
+      if (t > 650) return;
+      const aus = t > 400 ? 1 - (t - 400) / 250 : 1;
+      const grow = Math.floor(klemme(t / 200, 0, 1) * 4) / 4;
+      schale(g, cx, cy - Math.round(hh * 0.55), Math.round(11 * grow), t, 3, aus, false, 0);
+      return;
+    }
+    if (ph === 'mark') {
+      if (t > 900) return;
+      const aus = t > 520 ? 1 - (t - 520) / 380 : 1;
+      const grow = Math.floor(klemme(t / 220, 0, 1) * 5) / 5;
+      orte.forEach((o, i) => schale(g, o.x, o.y, Math.round(hoch * 0.5 * grow), t, i * 3, aus, false, 0.4));
+      return;
+    }
+    if (ph === 'save') {
+      if (t > 1000) return;
+      const grow = Math.floor(klemme(t / 300, 0, 1) * 6) / 6;
+      const zieh = t > 400 ? klemme((t - 400) / 260, 0, 1) : 0;          // ab 400 ms ziehen die Flammen zur Kartenmitte und schrumpfen
+      const aus = t > 700 ? 1 - (t - 700) / 300 : 1;
+      orte.forEach((o, i) => {
+        const x = Math.round(o.x + (cx - o.x) * zieh), y = Math.round(o.y + (cy + hh * 0.3 - o.y) * zieh);
+        schale(g, x, y, Math.round(hoch * grow * (1 - 0.7 * zieh)), t, i * 3, aus, false, 0.1);
+      });
+      if (t > 420 && t < 760) {                                          // grüner Funkenkranz um die Karte, kreist einwärts
+        for (let k = 0; k < 10; k++) {
+          const w = (k / 10) * Math.PI * 2 + t / 160, rr = (1 - klemme((t - 420) / 340, 0, 1)) * (hw + 9) + 2;
+          g.block(cx + Math.cos(w) * rr, cy + Math.sin(w) * rr * (hh / hw) * 0.8, 2, 2, FUNKE[k % 3], aus);
+        }
+        if (t > 560 && t < 680) ppKreuzfunkel(g, cx - 1, cy - 1, Math.floor((t - 560) / 40) + 1 > 3 ? 2 : Math.floor((t - 560) / 40) + 1, FUNKE.concat([FUNKE[2]]), 1);
+      }
+      return;
+    }
+    // 'doom' und 'burn'
+    const doom = ph !== 'burn';
+    const ende = doom ? 1500 : 1100, vorbei = doom ? 1150 : 700;          // ab `vorbei` fällt alles in sich zusammen
+    if (t > ende) return;
+    const ein = klemme(t / 200, 0, 1);
+    const grow = Math.floor(klemme((t - 100) / 330, 0, 1) * 6) / 6;
+    const zu = t > vorbei ? klemme((t - vorbei) / (ende - vorbei), 0, 1) : 0;
+    const aus = zu > 0 ? 1 - zu : 1;
+    const hf = grow * (1 - 0.8 * zu);
+    orte.forEach((o, i) => {
+      const x = Math.round(o.x + (cx - o.x) * zu * 0.5);
+      schale(g, x, o.y, Math.round(hoch * hf), t, i * 3 + 1, ein < 1 ? Math.floor(ein * 5) / 5 : aus, zu < 0.6, 0);
+    });
+    // Funken steigen von den Schalen auf
+    for (const f of teile.funken) {
+      const k = (t - f.start) / f.leben;
+      if (k < 0 || k >= 1 || t > vorbei + 100) continue;
+      const o = orte[f.s];
+      g.block(o.x + f.dx, o.y - 6 - f.v * (t - f.start) / 1000, 2, 2, FUNKE[Math.min(2, Math.floor(k * 3))], 1 - k);
+    }
+    if (doom && t >= vorbei - 40 && t < vorbei + 160) {                  // die Flammen schlagen über der Karte zusammen: Blitzkreuz + grüner Dither über dem Ziel
+      const f2 = Math.floor((t - (vorbei - 40)) / 33);
+      const w = Math.round(hw), h = Math.round(hh);
+      for (let y = -h; y <= h; y++) for (let x = -w; x <= w; x++) {
+        if ((x + y + f2) % 2 === 0) g.put(cx + x, cy + y, FLAMME[1 + (f2 % 2)], 0.45);
+      }
+      ppKreuzfunkel(g, cx - 1, cy - 1, f2 < 2 ? 4 : 6 - f2, FUNKE.concat([FUNKE[2]]), 1);
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 300, 340, vorbereiten);
+})();
+
 // ═══════════════════════════════════════════════════════════════════
 //  Glass Wall (12.10.) — PIXELART, Held-Animation (`glass_wall_up`, `glass_wall_shatter`; Ursprung = die Heldenzone, `x`/`y` Mitte, `w`/`h` Kartengrösse)
 //
@@ -19836,6 +19965,7 @@ const ANIM_REGISTRY = {
   hand_level_down: HandLevelDownEffect,
   mind_control_hex: MindControlHexEffect,
   spy_mark: SpyMarkEffect,
+  pythia_flames: PythiaFlamesEffect,
   // ── Circles of Hell (Animationen) ──────────────────────────────────
   // Farben aus den Pixelart-Hintergruenden der Kreise (Flammen #f8f8bd … #520a0c).
   // ★ The Sixth Circle: Hoellen-Charme — blutrote Siegelringe, aufsteigende Schlieren, dunkler Blitz.
@@ -53711,6 +53841,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const p = playerByName(entry.player);
         return <span className="log-damage">🗡️ {cName('Vengeful Attack')} — {pName(p.name, p.color)}'s {entry.hero} takes revenge on {entry.target || 'the target'}{entry.damage != null ? <>: <span className="log-amount">{entry.damage}</span> damage</> : null}.</span>;
       }
+      if (t === 'pythia_foresee') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🔮 {cName('Infallible Oracle Pythia')} — {pName(p.name, p.color)} foresees the death of {entry.target}.</span>;
+      }
+      if (t === 'pythia_counter') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🔮 {cName('Infallible Oracle Pythia')} — {pName(p.name, p.color)} places a Pythia Counter ({entry.counters}).</span>;
+      }
+      if (t === 'pythia_defeat') {
+        const p = playerByName(entry.player);
+        return <span className="log-damage">🔥 {cName('Infallible Oracle Pythia')} — the third Pythia Counter: green flames defeat {entry.target} for {pName(p.name, p.color)}.</span>;
+      }
+      if (t === 'pythia_fizzle') {
+        return <span className="log-info">🔮 {cName('Infallible Oracle Pythia')} — the third Pythia Counter, but the chosen target is gone: nothing happens.</span>;
+      }
+      if (t === 'pythia_save') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🔥 {cName('Infallible Oracle Pythia')} — {pName(p.name, p.color)} sacrifices {entry.sacrificed}; Pythia is fully healed instead of being defeated.</span>;
+      }
+      if (t === 'pythia_save_failed') {
+        return <span className="log-info">🔥 {cName('Infallible Oracle Pythia')} — the sacrifice of {entry.sacrificed} did not go through; Pythia is defeated.</span>;
+      }
       if (t === 'wise_village_elder') {
         const p = playerByName(entry.player);
         return <span className="log-status">💬 {cName('Wise Village Elder')} — {pName(p.name, p.color)} attaches {cName(entry.card)} from their {entry.from === 'deck' ? 'deck' : 'hand'} to {entry.hero} as an additional attachment.</span>;
@@ -54872,7 +55024,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     die Bedingung davor war eine zweite Liste aller Status, die
                     jeder neue Status verfehlen konnte (v1142: „Aged"; nie in
                     ihr standen auch Bleeding und Charmed). */}
-                {hero?.name && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife, _extraLifeStack: hero._extraLifeStack, _oneShotDmgShields: hero._oneShotDmgShields, _targetBlockers: hero._targetBlockers }} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} isOpponentSide={isOpp} />}
+                {hero?.name && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife, _extraLifeStack: hero._extraLifeStack, _oneShotDmgShields: hero._oneShotDmgShields, _targetBlockers: hero._targetBlockers, _pythiaMark: hero._pythiaMark }} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} isOpponentSide={isOpp} />}
                 {/* ★ v1342: Immune/Shielded sind STATUS — sie stehen jetzt auch beim
                     Helden in der linken Status-Spalte (wie bei Kreaturen), nicht
                     mehr als eigenes Schild oben rechts. */}
@@ -56785,6 +56937,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       >
                         <span className="head-counter-icon">💣</span>
                         <span className="head-counter-num">×{cc.bombCounters}</span>
+                      </div>
+                    ) : null}
+                    {(cc?.pythiaCounters > 0 || cc?.pythiaPlan) ? (
+                      <div className="head-counter-badge"
+                        onMouseEnter={e => showGameTooltip(e, `Pythia Counters: ${cc.pythiaCounters || 0}. Pythia places 1 at the beginning of each of her controller's turns. When the third is placed, ${cc.pythiaPlan ? `the chosen target (${cc.pythiaPlan.cardName}) is immediately defeated` : 'nothing happens (the chosen target is gone)'}.`)}
+                        onMouseLeave={hideGameTooltip}
+                        style={{ background: '#3ddc57', borderColor: '#167927', color: '#0f2412' }}
+                      >
+                        <span className="head-counter-icon"><PxIcon z="🔮" /></span>
+                        <span className="head-counter-num">×{cc.pythiaCounters || 0}</span>
                       </div>
                     ) : null}
                     {cc?.changeCounter > 0 ? (
