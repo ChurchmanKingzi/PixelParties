@@ -1,4 +1,4 @@
-const { areaTargetId, coolnessSpitzeZiel } = require('./_targeting-shared');
+const { areaTargetId, coolnessSpitzeZiel, supportAbilityZiel } = require('./_targeting-shared');
 // ═══════════════════════════════════════════
 //  SPELL: "Coolness Overcharge"
 //  Stack must have ≥6 cards.
@@ -165,6 +165,8 @@ function collectTargets(engine) {
     if (seen.has(inst.id)) continue;
     seen.add(inst.id);
     if (inst.zone === 'support') {
+      const sa = supportAbilityZiel(engine, inst);   // 25.10.: Ability in einer Support Zone = Ability-Stapel (ein Ziel, oberste Kopie)
+      if (sa !== undefined) { if (sa) targets.push(sa); continue; }
       targets.push({ id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip',
         owner: inst.owner, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
         cardName: inst.name, _cardInstance: inst });

@@ -44,7 +44,7 @@ const { hasCardType } = require('./_hooks');
 // v685: Zeitmarke und Schwelle leben in `_turn-end-recency-shared` —
 // Heragas liest dieselbe Marke mit umgekehrtem Vorzeichen.
 const { lastTurnEndTick, stampTurnEnd } = require('./_turn-end-recency-shared');
-const { areaTargetId, coolnessSpitzeZiel } = require('./_targeting-shared');
+const { areaTargetId, coolnessSpitzeZiel, supportAbilityZiel } = require('./_targeting-shared');
 
 const CARD_NAME = 'Wall Breaker General Ralzish';
 
@@ -95,6 +95,8 @@ function collectTargets(engine, controllerIdx) {
     seen.add(inst.id);
 
     if (inst.zone === 'support') {
+      const sa = supportAbilityZiel(engine, inst);   // 25.10.: Ability in einer Support Zone = Ability-Stapel (ein Ziel, oberste Kopie)
+      if (sa !== undefined) { if (sa) targets.push(sa); continue; }
       // "You cannot choose a Creature that was summoned since the end
       // of your last turn." Only applies to actual Creatures — Equip
       // Artifacts in a Support Zone are always choosable.

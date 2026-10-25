@@ -51,6 +51,8 @@ function pickableOppCards(engine, listenerOwner) {
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
+    // 25.10.2026 (Xal-Runde 4): eine Ability in einer Support Zone ist eine Ability — ein Stapel ist EIN Ziel (oberste Kopie), nicht eins je Karte.
+    if (engine.istAbilityImSupport(inst) && engine.supportAbilitySpitze(inst) !== inst) continue;
     // W5a (Al 14.10.2026, A05-03; Praezisierung: „'Opponent's side of the board' ist einfach Nomenklatur fuer 'Creature, die der
     // Opponent kontrolliert'"): waehlbar sind Karten, die der GEGNER kontrolliert (nach KONTROLLE, nicht nach Brettseite) —
     // nie eine, die der Wirker selbst kontrolliert. Ziel-IDs/Zonenzugriffe nennen die BRETTSEITE (`physicalSide`, Z1); die Karte
@@ -173,6 +175,12 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
       player: gs.players[pi]?.username,
       target: cardName, reason: 'cosmic-malfunction',
     });
+    engine.sync();
+    return;
+  }
+
+  // 25.10.2026: Leafagami Snake — eine Ability (Ability Zone oder Support Zone) bleibt liegen, der Kontrolleur der Schlange zieht (HOPT ist verbraucht).
+  if (await engine.abilityEntfernungVerhindert(targetInst, 'deck', { source: { name: CARD_NAME, owner: pi } })) {
     engine.sync();
     return;
   }
