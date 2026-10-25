@@ -92,7 +92,7 @@ module.exports = {
             player: gs.players[pi].username, target: tgtHero.name, amount: HP_BOOST,
           });
         }
-      } else if (target.cardInstance) {
+      } else if (target.cardInstance && await engine.kreaturBetroffen(target.cardInstance, 'stats', { name: 'Maya, the Nature Fairy', owner: pi }, { sourceOwner: pi, detail: 'max_hp' })) {   // W71b: Schutzfenster (Cool Rescuer Monia & Co.)
         ctx.increaseMaxHp(target.cardInstance, HP_BOOST);
         engine.log('maya_boost_creature', {
           player: gs.players[pi].username, target: target.cardInstance.name, amount: HP_BOOST,

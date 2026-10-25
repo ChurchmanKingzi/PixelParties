@@ -134,7 +134,7 @@ module.exports = {
       let geholt = 0;
       for (const inst of beute) {
         if (inst.zone !== 'support') continue;
-        const ok = engine.actionStealCreature(pi, inst, {
+        const ok = await engine.actionStealCreatureGefragt(pi, inst, {   // W71b: mit Schutzfenster ('control')
           sourceName: CARD_NAME,
           damageImmune: true,
           omniImmune: true,          // ★ „unaffected by all cards and effects"

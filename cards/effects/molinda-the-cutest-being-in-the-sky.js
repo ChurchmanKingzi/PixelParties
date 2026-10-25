@@ -103,7 +103,7 @@ module.exports = {
     if (target.type === 'hero') {
       ok = engine.actionStealHero(pi, target.owner, target.heroIdx, { sourceName: CARD_NAME });
     } else if (target.cardInstance) {
-      ok = engine.actionStealCreature(pi, target.cardInstance, { sourceName: CARD_NAME });
+      ok = await engine.actionStealCreatureGefragt(pi, target.cardInstance, { sourceName: CARD_NAME });   // W71b: mit Schutzfenster ('control')
     }
     if (!ok) return false;
     engine.log('molinda_charm', { player: ps.username, target: target.cardName || target.name || null });

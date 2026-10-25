@@ -113,6 +113,11 @@ module.exports = {
       engine.sync();
       return;
     }
+    // W71b (Al, 25.10.2026): der HP-Gewinn auf einer Kreatur ist ein Effekt auf sie — Schutzfenster (Cool Rescuer Monia & Co.) VOR dem Schreiben (wie Resistance beim Helden: Animation lief schon).
+    if (target.type !== 'hero' && !(await engine.kreaturBetroffen(ziel, 'stats', { name: CARD_NAME, owner: pi }, { sourceOwner: pi, detail: 'max_hp' }))) {
+      engine.sync();
+      return;
+    }
     const gestiegen = engine.increaseMaxHp(ziel, HP_GAIN);
     engine.log('life_serum', {
       player: gs.players[pi]?.username,

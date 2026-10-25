@@ -88,6 +88,10 @@ async function insDeck(engine, inst, maxLevel, pi) {
     return null;
   }
 
+  // W71b (Al, 25.10.2026): das Zurückmischen ist ein Effekt auf die Kreatur — Schutzfenster (Cool Rescuer Monia & Co.) NACH der Immunität, VOR der ersten Änderung. Ein Angebot je Zauber
+  // (Monias Buchführung `gs._moniaAngebote`): angenommen schützt es die Seite für alle weiteren Kreaturen dieses Zaubers, abgelehnt fragt nicht noch einmal.
+  if (!(await engine.kreaturBetroffen(inst, 'move', { name: CARD_NAME, owner: pi }, { sourceOwner: pi, detail: 'to_deck' }))) return null;
+
   engine._broadcastEvent('play_pile_transfer', {
     fromOwner: kontrolleur, toOwner: heim,
     cardName, from: 'support', to: 'deck',

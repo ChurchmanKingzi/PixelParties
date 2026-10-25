@@ -125,6 +125,8 @@ module.exports = {
     ) || target.cardInstance;
     if (!inst || inst.zone !== 'support') return false;
     if (!darfInsDickicht(engine, inst, pi)) return false;
+    // W71b (Al, 25.10.2026): die Sperre ist ein Effekt auf die Kreatur — Schutzfenster (Cool Rescuer Monia & Co.) VOR dem Schreiben; negiert = verbraucht, Kreatur unverändert.
+    if (!(await engine.kreaturBetroffen(inst, 'buff', 'Thicket', { sourceOwner: pi, detail: 'untargetable' }))) return true;
 
     if (!inst.counters) inst.counters = {};
     inst.counters.untargetable_all = 1;

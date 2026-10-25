@@ -152,7 +152,7 @@ module.exports = {
     const zps = gs.players[seite];
     if (seite !== pi && !engine.darfFremdAusruesten(pi, seite, heroIdx)) return false;
 
-    if (freieSlots(zps, heroIdx).length === 0) return false;
+    if (freieSlots(zps, heroIdx).length === 0 && !require('./_equip-stack-shared').hatStapelPlatz(engine, seite, heroIdx)) return false;   // Darion: der Equip-Stapel zaehlt als Platz
 
     const wahl = kandidaten(gs, pi, heroIdx, engine, seite);
     if (wahl.length === 0) return false;

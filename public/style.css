@@ -10844,6 +10844,134 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   /* Die Zahl darf den Hover/Tooltip der Ability darunter nicht abfangen (wie die Spell-School-Marker bei Beato). */
   pointer-events: none;
 }
+/* ── EQUIP-STAPEL (Darion, the Blood-Crazy Groundskeeper) ───────────────
+   „All Artifacts equipped to this Hero share 1 Support Zone." Gleiche Bauform wie `.board-ability-stack` (jede Karte ragt mit ihrem oberen Streifen heraus,
+   die oberste liegt vorn), aber OHNE Obergrenze: den Versatz setzt `EquipStack` je Kartenzahl (`equipStapelVersatz`, schrumpft von 6 auf 2 px), die Zone laesst den
+   Ueberhang stehen. Jede Karte ist ein eigenes `BoardCard` mit eigenem Tooltip. Pixelart: harte Trennlinie je Karte, Stueckzahl als Ziffern-Badge mit gestapelten Ringen. */
+.board-zone-equipstack {
+  overflow: visible;
+  z-index: 3;
+}
+.board-equip-stack {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.board-equip-stack-card {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.board-equip-stack-card .board-card {
+  box-shadow: 0 -1px 0 0 #000000;
+}
+/* Vorschau der gezogenen Ausruestung: harter gestrichelter Rand statt Durchsichtigkeit. */
+.board-equip-stack-geist .board-card {
+  outline: 2px dashed #ffffff;
+  outline-offset: -2px;
+}
+.board-equip-stack-count {
+  position: absolute;
+  right: calc(3px * var(--board-scale));
+  bottom: calc(3px * var(--board-scale));
+  z-index: 6;
+  min-width: calc(11px * var(--board-scale));
+  padding: calc(2px * var(--board-scale)) calc(2px * var(--board-scale)) calc(1px * var(--board-scale)) calc(3px * var(--board-scale));
+  font-family: 'Pixel Intv', 'Press Start 2P', monospace;
+  font-size: calc(9px * var(--board-scale));
+  line-height: 1;
+  text-align: center;
+  color: #ffffff;
+  background: #000000;
+  box-shadow: 0 0 0 1px #c79e05, 0 0 0 2px #000000;
+  /* Die Zahl darf Hover und Klick der Karte darunter nicht abfangen. */
+  pointer-events: none;
+}
+
+/* Galerie eines Equip-Stapels (Klick auf den Stapel bzw. `instancePick`): Raster aus Kartenbildern, harte Ringe, kein Weichzeichner. */
+.equip-gal-modal {
+  width: min(640px, calc(94 * var(--vw)));
+  max-height: calc(80dvh / var(--ui-scale, 1));
+  overflow-y: auto;
+}
+.equip-gal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 12px 10px;
+  padding: 3px;
+}
+.equip-gal-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px;
+  background: #222222;
+  box-shadow: 0 0 0 1px #535353, 0 0 0 2px #000000;
+}
+.equip-gal-tile-klick { cursor: pointer; }
+.equip-gal-tile-klick:hover { box-shadow: 0 0 0 1px #ffffff, 0 0 0 2px #000000; }
+.equip-gal-tile-aktiv { box-shadow: 0 0 0 2px #c79e05, 0 0 0 3px #000000; }
+.equip-gal-tile-aktiv:hover { box-shadow: 0 0 0 2px #ffffff, 0 0 0 3px #000000; }
+.equip-gal-nr {
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  z-index: 3;
+  min-width: 14px;
+  padding: 2px 3px 1px 4px;
+  font-family: 'Pixel Intv', 'Press Start 2P', monospace;
+  font-size: 9px;
+  line-height: 1;
+  text-align: center;
+  color: #ffffff;
+  background: #000000;
+  box-shadow: 0 0 0 1px #686868;
+  pointer-events: none;
+}
+.equip-gal-bild {
+  width: 100%;
+  aspect-ratio: 64 / 90;
+}
+.equip-gal-bild > * { width: 100%; height: 100%; }
+.equip-gal-name {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.equip-gal-zeile {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+.equip-gal-chip {
+  padding: 1px 4px;
+  font-size: 9px;
+  line-height: 1.3;
+  color: #e6e6e6;
+  background: #323232;
+  box-shadow: 0 0 0 1px #686868;
+}
+.equip-gal-chip-aktiv {
+  color: #000000;
+  background: #c79e05;
+  box-shadow: 0 0 0 1px #000000;
+  font-weight: 700;
+}
+.equip-gal-zustand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.equip-gal-zustand:empty { display: none; }
+
 .board-card-text {
   width: 100%; height: 100%;
   display: flex;

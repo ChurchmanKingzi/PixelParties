@@ -158,7 +158,7 @@ module.exports = {
           c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
         );
         if (inst) {
-          engine.cleanseCreatureStatuses(inst, selectedStatuses, 'Elixir of Recovery');
+          await engine.cleanseCreatureStatusesGefragt(inst, selectedStatuses, 'Elixir of Recovery');
         }
         engine._broadcastEvent('play_zone_animation', {
           type: 'recovery_drops', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: target.slotIdx,

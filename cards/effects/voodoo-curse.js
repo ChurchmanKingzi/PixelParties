@@ -192,6 +192,8 @@ module.exports = {
           if (await engine.heroNonDamageEffectBlocked(w.seite, w.heroIdx, 'max_hp', { sourceOwner: pi, source: CARD_NAME })) blockiert = true;
         } else if (engine.isOmniImmune(w.inst, quelle, { source: quelle, sourceOwner: pi })) {
           blockiert = true;
+        } else if (!(await engine.kreaturBetroffen(w.inst, 'stats', quelle, { sourceOwner: pi, detail: 'swap_hp' }))) {
+          blockiert = true;   // W71b (Al, 25.10.2026): Schutzfenster (Cool Rescuer Monia & Co.) — ein negierter Teil lässt den ganzen Tausch verpuffen
         }
       }
       if (blockiert) {

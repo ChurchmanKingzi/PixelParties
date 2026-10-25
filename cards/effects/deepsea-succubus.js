@@ -82,7 +82,7 @@ module.exports = {
         }
       } else if (target.cardInstance) {
         // actionStealCreature marks controller and damage-immune flag. No move.
-        engine.actionStealCreature(pi, target.cardInstance, {
+        await engine.actionStealCreatureGefragt(pi, target.cardInstance, {   // W71b: mit Schutzfenster ('control')
           damageImmune: true, sourceName: CARD_NAME,
         });
         engine._broadcastEvent('play_zone_animation', {

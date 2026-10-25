@@ -50,6 +50,7 @@ function _hasHeroWithFreeZone(ps, engine, pi) {
     for (const { physOwner, heroIdx, hero } of engine.heroesControlledBy(pi)) {
       if (!hero?.name || hero.hp <= 0) continue;
       for (let si = 0; si < 3; si++) if (!engine.supportSlotBelegt(physOwner, heroIdx, si)) return true;
+      if (require('./_equip-stack-shared').hatStapelPlatz(engine, physOwner, heroIdx)) return true;   // Darion: der Equip-Stapel nimmt weitere auf
     }
     return false;
   }

@@ -339,6 +339,19 @@ async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) 
     return { returned: false };
   }
 
+  // ★ W71b (Al, 25.10.2026 — Cool Rescuer Monia reagiert auf JEDEN Effekt auf Kreaturen): „Zurück auf die Hand" durch eine Karte (Racket Arrow, Chasing the Legend, Deepsea
+  // Encounter, Divine Gift of the Deepsea …) ist ein Effekt auf die Kreatur → Schutzfenster `beforeCreatureAffected` ('move', Feinart 'bounce'), NACH der Immunität, VOR der
+  // ersten Änderung. Kein Fenster: das eigene Opfer/Tribut als Kosten (`opts.kosten` / `isSacrifice`, z. B. Dark Deepsea God) und Rückgabe der Kreatur durch ihren eigenen Text
+  // (`opts.selbst`, Wendy, Moonlight Butterfly, Creepy Villager). Wird der Effekt negiert, bleibt die Kreatur stehen (`{ returned: false, negated: true }`).
+  if (!opts.kosten && !opts.isSacrifice && !opts.selbst && !opts._skipAffectedWindow) {
+    const _erlaubt = await engine.kreaturBetroffen(inst, 'move', { name: sourceName || '', ...(typeof opts.sourceOwner === 'number' ? { owner: opts.sourceOwner } : {}) },
+      { sourceOwner: opts.sourceOwner, detail: 'bounce' });
+    if (!_erlaubt) {
+      engine.log('bounce_blocked', { card: inst.name, by: sourceName, reason: 'creature protection' });
+      return { returned: false, negated: true };
+    }
+  }
+
   // Pile-transfer animation needs the SOURCE slot coordinates (to anchor
   // the flying card on the creature's current Support Zone) and the
   // DESTINATION index (the hand slot it's about to occupy — end of hand
