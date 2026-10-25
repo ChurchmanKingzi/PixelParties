@@ -38893,7 +38893,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    *   isTargetsDefeatedReaction: true,
    *   targetsDefeatedCondition(gs, pi, engine, info) → bool,
    *   async targetsDefeatedResolve(engine, pi, info, { casterIdx, casterSeite })
-   * `info` = { defeated: [Einträge der Kreaturen UND Helden dieses Vorgangs, je mit `source`], reactorIdx, zaehler: { [Spieler]: { vorher, nachher, opfer } } }.
+   * `info` = { defeated: [Einträge der Kreaturen UND Helden dieses Vorgangs, je mit `source`], reactorIdx, zaehler: { [Spieler]: { vorher, nachher, opfer } }, zaehlerGegner: (dasselbe, aber nur Ziele, die durch eine Karte/einen Effekt eines GEGNERS fielen) }.
    * `zaehler[pi]` zählt die besiegten ZIELE (Helden und Kreaturen, Tokens eingeschlossen), die `pi` in DIESEM Zug verloren hat: `vorher` = Stand vor dem Vorgang, `nachher` = danach,
    * `opfer` = die Opfer dieses Vorgangs. Der Zähler läuft je Spieler und Zug (`ps._zieleBesiegt = { turn, n }`) und wird hier fortgeschrieben, auch wenn niemand reagiert.
    * Die Aktivierung ist ein Kettenglied (`kette`), die Kettenanzeige zeigt das erste Opfer als Vorlauf.
@@ -38909,13 +38909,19 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!nachSpieler.has(ctrl)) nachSpieler.set(ctrl, []);
       nachSpieler.get(ctrl).push(e);
     }
+    const zaehlerGegner = {};
     for (const [pi, opfer] of nachSpieler) {
       const ps = gs.players[pi];
       if (!ps) continue;
-      if (!ps._zieleBesiegt || ps._zieleBesiegt.turn !== gs.turn) ps._zieleBesiegt = { turn: gs.turn, n: 0 };
+      if (!ps._zieleBesiegt || ps._zieleBesiegt.turn !== gs.turn) ps._zieleBesiegt = { turn: gs.turn, n: 0, gegner: 0 };
       const vorher = ps._zieleBesiegt.n;
       ps._zieleBesiegt.n += opfer.length;
       zaehler[pi] = { vorher, nachher: ps._zieleBesiegt.n, opfer };
+      // Zweiter Zähler (REVENGE!!!: „your second target is defeated BY AN OPPONENT'S card or effect"): nur Ziele, die durch eine Karte/einen Effekt eines Gegners fielen.
+      const vonGegner = opfer.filter(e => { const q = e.source; const so = q?.controller ?? q?.owner; return isSeat(this, so) && so !== pi; });
+      const gv = ps._zieleBesiegt.gegner || 0;
+      ps._zieleBesiegt.gegner = gv + vonGegner.length;
+      zaehlerGegner[pi] = { vorher: gv, nachher: gv + vonGegner.length, opfer: vonGegner };
     }
     if (this._inMctsSim || gs.result) return;
     const erster = alle[0];
@@ -38923,7 +38929,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       flag: 'isTargetsDefeatedReaction', cond: 'targetsDefeatedCondition', res: 'targetsDefeatedResolve', tiefe: '_zieleBesiegtFensterTiefe',
       log: 'targets_defeated_window_reaction', ausloeser: gs.activePlayer ?? 0, auchAusloeser: true, kette: true,
       vorlauf: { cardName: erster.name, owner: erster.owner, cardType: erster.hero ? 'Hero' : 'Creature' },
-      info: { defeated: alle, zaehler },
+      info: { defeated: alle, zaehler, zaehlerGegner },
       nachricht: (c) => `${erster.name} was defeated! Activate ${c}?`, linkesBild: erster.name, ziel: erster.name,
     });
   }
