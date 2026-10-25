@@ -37201,6 +37201,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   // Area zone positioning — measure hero zones to find midpoints between columns
   const boardCenterRef = useRef(null);
+  // Ebene UNTER den animierten Heldenfiguren (Sprite-Hülle, z-index 51), aber über Brett und Karten: Animationen mit `unterFiguren: true` (You are the Chosen One!!!: die Aura steht
+  // HINTER dem Helden) werden per Portal hierher gehängt. Ein State statt Ref, damit der Render nach dem Einhängen des Knotens neu läuft.
+  const [unterFigurenEl, setUnterFigurenEl] = useState(null);
   const [areaPositions, setAreaPositions] = useState([undefined, undefined]);
 
   // ★ Layout-Effekt (Als Befund: beim Betreten zuckte das ganze Feld auf der
@@ -58302,6 +58305,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {/* ★ v1451: Sprite-Ebene der Helden-Idle-Animationen — Zwilling der Brettebene, in dem die Figuren in echtem 3D
                 aufrecht stehen (siehe HeroIdleAnims). ★ 10.10.: ausserhalb des Clips, in eigener Huelle, damit sie im Stapelkontext
                 der Phasenspalte steht und ueber ihr liegt (`.board-plane-clip` ist dafuer selbst isoliert, `.board-center` nicht). */}
+            {/* Ebene für Animationen UNTER den Heldenfiguren (`unterFiguren: true`): gleicher z-index wie die Sprite-Hülle, aber im DOM davor — die Figuren malen darüber. */}
+            <div ref={setUnterFigurenEl} className="fx-unter-figuren" aria-hidden="true" />
             <HeroSpriteEbene ueber />
           </div>
 
@@ -58948,10 +58953,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       ))}
 
       {/* Modular game animations (explosions, etc.) — Welt-Anteil */}
-      {gameAnims.filter(a => a.welt).map(a => (
+      {gameAnims.filter(a => a.welt && !(a.unterFiguren && unterFigurenEl)).map(a => (
         <GameAnimationRenderer key={a.id} {...a} />
       ))}
       </div>
+      {/* Animationen mit `unterFiguren`: in der Ebene hinter den Heldenfiguren (Portal in `.board-center`); ohne Ebene (Zuschauer-Layouts u. ä.) bleibt es beim Welt-Anteil oben. */}
+      {unterFigurenEl && gameAnims.some(a => a.welt && a.unterFiguren) && ReactDOM.createPortal(
+        <div className="fx-welt-lock">
+          {gameAnims.filter(a => a.welt && a.unterFiguren).map(a => (
+            <GameAnimationRenderer key={a.id} {...a} />
+          ))}
+        </div>, unterFigurenEl)}
 
       {/* v1151: Zielmarken, vorhergesagter Zielpfad, Wahl-Blitze
           (die Ebene ist seit v1258 selbst eine Welt-Huelle) */}

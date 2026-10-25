@@ -262,10 +262,12 @@ const CARD_FLOW_PACE_MS = 250;
 // when the hand-slot reveal completes.
 const CARD_FLOW_SETTLE_MS = 500;
 // Als Kosmetik-Ruling (Demo vs Cute Commando): Effekt-Abwürfe laufen
-// EINZELN mit ~0.5s Takt, davor leuchtet die Quell-Karte ~0.5s auf —
+// EINZELN im Takt, davor leuchtet die Quell-Karte ~0.5s auf —
 // der Spieler soll sehen, WAS WANN durch WELCHEN Effekt abgeworfen
 // wird. Draws behalten bewusst den schnelleren CARD_FLOW_PACE_MS.
-const DISCARD_PACE_MS = 500;
+// Al, 25.10.2026: Multi-Abwürfe/-Deletes von der Hand waren mit 500 ms
+// zu zäh → 300 ms (gilt für alle Wege, die `DISCARD_PACE_MS` / `_paceHandDiscard` nutzen).
+const DISCARD_PACE_MS = 300;
 // Takt zwischen den Ausruestungen eines sterbenden Helden. Etwas
 // knapper als der Handabwurf-Takt: es sind hoechstens drei Karten,
 // und der Tod soll sich nicht ziehen.
@@ -4194,6 +4196,20 @@ class GameEngine {
     delete inst._darkDealVon;
     delete inst._darkDealVorher;
     this.sync();
+  }
+
+  /**
+   * Die noch offenen Wisdom-Kosten des Zaubers, der gerade seinen `onPlay` ausführt, JETZT zahlen — statt erst nach seinem Ende (Standard, v1323). Gebraucht für Karten, deren Effekt
+   * SELBST eine Karte spielt (You are the Chosen One!!!): der innere Zauber zahlt seine Kosten in seinem eigenen Lauf, der äußere erst danach — dann kann die Hand leer sein (Kosten
+   * gratis) und die Abfragen kommen in der falschen Reihenfolge. Der Aufrufer ruft das VOR dem Zweitguss; der Server zahlt danach nicht noch einmal. Ohne Wisdom-Kosten, ohne offenen
+   * Zauber oder für einen anderen Spieler: nichts. @returns {Promise<boolean>} wahr, wenn hier gezahlt wurde
+   */
+  async zahleOffeneWisdom(pi) {
+    const o = this._wisdomOffen;
+    if (!o || o.bezahlt || o.pi !== pi) return false;
+    o.bezahlt = true;
+    await o.bezahle();
+    return true;
   }
 
   /**
@@ -13103,7 +13119,7 @@ class GameEngine {
           ...(_abwurfOp != null ? { discardOp: _abwurfOp } : {}),   // W16b
         });
       }
-      // Als Takt: eine Karte nach der anderen, ~0.5s je Karte.
+      // Als Takt: eine Karte nach der anderen (DISCARD_PACE_MS je Karte).
       if (i < toDiscard - 1) {
         this.sync();
         await this._delay(DISCARD_PACE_MS);
@@ -19555,7 +19571,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
 
         // Als Takt (Kosmetik-Ruling): mehrere erzwungene Abwürfe
-        // laufen ~0.5s versetzt — bei menschlicher Wahl entsteht der
+        // laufen im Takt (DISCARD_PACE_MS) versetzt — bei menschlicher Wahl entsteht der
         // Abstand natürlich, bei CPU-Picks verhinderte erst dieser
         // Takt den Gleichzeitigkeits-Burst.
         if (toDiscard > 1 && i < toDiscard - 1 && actuallyDiscarded) {
@@ -52675,6 +52691,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       scan(offMap_w);
       scan(transMap_w);
       if (bestOffset < 0) rawLevel = Math.max(0, rawLevel + bestOffset);
+    }
+    // Karten-Skript `levelOffsetForHero` (You are the Chosen One!!!) — dieselbe Stufe wie in `heroMeetsLevelReq`/`effectiveCardLevel`. Ohne diese Zeile sähen die Wisdom-Kosten die
+    // GEDRUCKTE Stufe (9), fänden keine Deckung (−1) und der Zauber würde trotz Stufenlücke OHNE Abwurf gespielt (Tester 25.10.: „ich werde nur EINMAL gepromptet").
+    {
+      const _heldOff_w = this._heldStufenOffset(playerIdx, heroIdx, cardData);
+      if (_heldOff_w) rawLevel = Math.max(0, rawLevel + _heldOff_w);
     }
     if (rawLevel <= 0 && !cardData.spellSchool1) return 0;
 
