@@ -10386,85 +10386,198 @@ const UnreasonableSteamEffect = (() => {
 })();
 
 // ═════════════════════════════════════════════════════════════════
-//  Nasty Prank: Wassereimer (`prank_bucket`) — PIXELART; ein Eimer fällt auf den Helden und kippt aus
+//  Nasty Prank: Wassereimer (`prank_bucket`) — PIXELART; ein Eimer fällt auf den Helden, kippt und durchnässt ihn
 //
-//  Der Metalleimer (13×13, dreifach gezeichnet: Henkel, Rand, Wasserspiegel, Band, Glanz links oben, Schatten rechts) fällt in ganzen Pixelschritten von oben auf den Kopf (0–700 ms, beschleunigt),
-//  schlägt an (Funken und zwei Stauchungs-Takte), springt kopfüber (Reihenfolge der Zeilen gespiegelt) und gießt das Wasser aus: eine gedithert gefüllte Wasserfront läuft über die Karte nach unten,
-//  Tropfen spritzen mit Schwerkraft zu den Seiten. Der Eimer rutscht zum Boden und poltert; alles dithert ab ~1250 ms weg (~1500 ms). Feste Palette.
+//  Der Metalleimer wird Pixel für Pixel gemalt (15 breit, nach unten verjüngt): Zylinder-Schattierung von links (Licht) nach rechts (Schatten) in fünf Graustufen mit Bayer-Dithering an den
+//  Übergängen, dunkler Rand, zwei Bänder mit Glanzkante und Nieten, innen der Wasserspiegel (zweifarbig gedithert, Glanzpunkte), ein Henkelbogen mit Glanz. Abläufe:
+//   0–700 ms   Fall (beschleunigt in ganzen Pixeln, Fahrtstreifen, Schwapp-Tropfen steigen aus dem Eimer auf)
+//   700 ms     Aufschlag: zwei Stauchungs-Takte, Spritzkrone aus Tropfen (2×2 mit Glanz und Schatten), zwei Kreuzfunkel in Wasserfarben
+//   760–1250   Eimer kippt in drei Stufen (Scherung der Zeilen, dann kopfüber); ein Wasserstrahl (gedithert, laufende Glanzstreifen) schießt auf den Helden, eine Wasserfront läuft
+//              wellig über die Karte: drei Wassertöne in Wellenbändern, Schaumlinie mit Bläschen, nasse Schattenpunkte hinter der Front
+//   900–1400   Tropfen hängen am Kartenrand und fallen; am Boden wächst eine Pfütze (gedithert, Ringwellen); der Eimer rutscht zum Boden und poltert zweimal
+//   ab ~1220   alles dithert weg (~1500 ms). Feste Palette, kein Leuchten.
 // ═════════════════════════════════════════════════════════════════
 const PrankBucketEffect = (() => {
-  const P = { k: ppHex('#291f3d'), g: ppHex('#9aa3b6'), h: ppHex('#e5edfa'), d: ppHex('#808898'), w: ppHex('#4580f6'), v: ppHex('#b3d8f9') };
-  const EIMER = [
-    '...kkkkkkk...',
-    '..k.......k..',
-    '.k.........k.',
-    '.k.........k.',
-    'kkkkkkkkkkkkk',
-    'kwwvwwwwwwwwk',
-    'khhgggggggddk',
-    'khgggggggggdk',
-    '.kgggggggddk.',
-    '.kdddddddddk.',
-    '.kghggggggdk.',
-    '..kgggggddk..',
-    '..kkkkkkkkk..',
-  ];
-  const UMGEKEHRT = EIMER.slice().reverse();
+  const K = ppHex('#291f3d');
+  const M = [ppHex('#e5edfa'), ppHex('#d2d2db'), ppHex('#9aa3b6'), ppHex('#808898'), ppHex('#59606e'), ppHex('#3e3e51')];   // Metall: hell → dunkel
   const WASSER = [ppHex('#2f539d'), ppHex('#4580f6'), ppHex('#66b6ff'), ppHex('#b3d8f9'), ppHex('#ffffff')];
   const ENDE = 1500, FALL = 700, FADE_AB = 1220;
-  const gross = (g, cx, cy, bild, a) => {
-    const h = bild.length, w = bild[0].length, x0 = Math.round(cx - w * 1.5), y0 = Math.round(cy - h * 3);
-    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const c = P[bild[j][i]]; if (c) g.block(x0 + i * 3, y0 + j * 3, 3, 3, c, a); }
+  const EH = 15, TOP_HW = 7.5, BOT_HW = 5.5;     // Eimerhöhe und halbe Breite oben/unten (Rasterpixel)
+  const BAND = [3, 10];                           // Zeilen der beiden Bänder (von der Öffnung aus gezählt)
+
+  /**
+   * Eimer malen. (cx, cy) = Mitte; `scher` = Zeilenversatz je Zeile (Kippen); `umgekehrt` = kopfüber (Öffnung unten); `stauch` = Zeilen, die der Eimer flacher ist;
+   * `wasser` = Wasserspiegel in der Öffnung sichtbar; `t` = Zeit für das Glitzern.
+   */
+  const eimer = (g, cx, cy, o, a) => {
+    const { scher = 0, umgekehrt = false, stauch = 0, wasser = true, t = 0 } = o || {};
+    const h = EH - stauch, y0 = Math.round(cy - h / 2);
+    for (let j = 0; j < h; j++) {
+      const r = umgekehrt ? h - 1 - j : j;                       // Zeile von der Öffnung aus
+      const tt = r / (EH - 1), hw = TOP_HW + (BOT_HW - TOP_HW) * tt;
+      const ox = Math.round((j - h / 2) * scher);
+      const y = y0 + j, hwI = Math.round(hw);
+      for (let dx = -hwI; dx <= hwI; dx++) {
+        const x = cx + ox + dx;
+        const rand = Math.abs(dx) >= hwI || r === EH - 1 || (r === 0 && !wasser);
+        if (rand) { g.put(x, y, K, a); continue; }
+        // Öffnung: die ersten drei Zeilen zeigen das Innere (Wasserspiegel) bzw. die Lippe, wenn der Eimer kopfüber steht
+        if (r <= 2) {
+          const lippe = r === 0 || Math.abs(dx) >= hwI - 1;
+          if (lippe) { g.put(x, y, dx < 0 ? M[0] : M[2], a); continue; }
+          if (wasser && !umgekehrt) {
+            const glitzer = ((x * 7 + y * 3 + Math.floor(t / 90)) % 11) === 0;
+            const tone = ppBayer(x, y) < 0.5 + 0.2 * Math.sin(x * 0.8 + t / 120) ? WASSER[2] : WASSER[1];
+            g.put(x, y, glitzer ? WASSER[4] : (r === 1 && dx < -1) ? WASSER[3] : tone, a);
+          } else g.put(x, y, M[4], a);                          // leerer Eimer: dunkles Innere
+          continue;
+        }
+        // Zylinder-Schattierung: Licht von links, Bayer-Dither an den Stufen
+        const u = dx / hw;
+        let b = 0.62 + (umgekehrt ? 0.08 : 0) - 0.5 * u + (ppBayer(x, y) - 0.5) * 0.34;
+        let c = b > 0.92 ? M[0] : b > 0.68 ? M[1] : b > 0.46 ? M[2] : b > 0.24 ? M[3] : M[4];
+        // Bänder: dunkler Streifen mit heller Kante darüber und Nieten
+        if (r === BAND[0] || r === BAND[1]) c = b > 0.5 ? M[3] : M[4];
+        else if (r === BAND[0] - 1 || r === BAND[1] - 1) c = b > 0.5 ? M[0] : M[2];
+        if ((r === BAND[0] || r === BAND[1]) && (Math.abs(dx) === hwI - 2 || dx === 0) ) c = M[1];
+        // Boden: leichte Rundung (Randschatten unten)
+        if (r >= EH - 3) c = b > 0.5 ? M[3] : M[5];
+        g.put(x, y, c, a);
+      }
+    }
+    // Henkel: Bogen über der Öffnung (aufrecht) bzw. unter der Lippe (kopfüber), 2 Pixel dick mit Glanz links
+    const hx = cx + Math.round(((umgekehrt ? h - 1 : 0) - h / 2) * scher);
+    const kante = umgekehrt ? y0 + h : y0 - 1;
+    const dir = umgekehrt ? 1 : -1;
+    for (let k = 0; k <= 16; k++) {
+      const th = (k / 16) * Math.PI;
+      const px = hx + Math.round(Math.cos(th) * (TOP_HW - 0.5)), py = kante + dir * Math.round(Math.sin(th) * 6);
+      g.put(px, py, K, a); g.put(px, py + dir, M[th > Math.PI / 2 ? 3 : 1], a);
+      g.put(px + (th > Math.PI / 2 ? 1 : -1), py, K, a);
+    }
   };
-  const vorbereiten = () => ({
-    tropfen: Array.from({ length: ppFxN(26) }, () => ({ seite: Math.random() < 0.5 ? -1 : 1, v: 14 + Math.random() * 30, hoch: 14 + Math.random() * 20, start: FALL + 60 + Math.random() * 380, farbe: 1 + Math.floor(Math.random() * 3) })),
-    funken: Array.from({ length: 8 }, (_, i) => ({ w: (i / 8) * Math.PI * 2 + Math.random() * 0.4, v: 18 + Math.random() * 18 })),
+
+  const tropfen = (g, x, y, tone, a) => {                                         // 2×2 Tropfen mit Glanz oben links und Schatten unten rechts
+    const X = Math.round(x), Y = Math.round(y);
+    g.block(X, Y, 2, 2, WASSER[tone], a); g.put(X, Y, WASSER[Math.min(4, tone + 2)], a); g.put(X + 1, Y + 1, WASSER[Math.max(0, tone - 1)], a);
+  };
+
+  const vorbereiten = (sz) => ({
+    schwapp: Array.from({ length: 7 }, (_, i) => ({ x: (i - 3) * 1.8 + (Math.random() - 0.5) * 2, v: 10 + Math.random() * 14, start: 120 + i * 70 + Math.random() * 40 })),
+    krone: Array.from({ length: ppFxN(30) }, (_, i) => ({ w: -Math.PI * (0.08 + 0.84 * (i / 29)) + (Math.random() - 0.5) * 0.15, v: 40 + Math.random() * 44, farbe: 1 + Math.floor(Math.random() * 3) })),
+    spritzer: Array.from({ length: ppFxN(22) }, () => ({ seite: Math.random() < 0.5 ? -1 : 1, v: 14 + Math.random() * 30, hoch: 12 + Math.random() * 18, start: FALL + 120 + Math.random() * 420, farbe: 1 + Math.floor(Math.random() * 3) })),
+    traeufe: Array.from({ length: 8 }, (_, i) => ({ x: -sz.hw + 2 + (i + Math.random() * 0.6) * ((sz.hw * 2 - 4) / 8), start: 880 + Math.random() * 280, laenge: 3 + Math.floor(Math.random() * 6), tempo: 40 + Math.random() * 25 })),
   });
+
   const malen = (g, t, sz, teile) => {
     const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
     if (aus <= 0) return;
-    const cx = Math.round(sz.cx), kopf = Math.round(sz.cy - sz.hh * 0.62), unten = Math.round(sz.cy + sz.hh * 0.9);
-    const startY = kopf - 26;
-    if (t < FALL) {                                                                  // Fall: beschleunigt in ganzen Schritten, leichtes Pendeln
-      const k = t / FALL, y = startY + (kopf - startY) * k * k;
-      gross(g, cx + Math.round(Math.sin(t / 80) * 1), Math.round(y), EIMER, aus);
-      for (let i = 1; i <= 4; i++) g.block(cx - 12 + i * 5, Math.round(y) - 46 - i * 3, 1, 4, MITTE_STREIFEN, aus * 0.5);   // Fahrtstreifen
+    const cx = Math.round(sz.cx), kopf = Math.round(sz.cy - sz.hh * 0.62), unten = Math.round(sz.cy + sz.hh * 0.92);
+    const obenY = Math.round(sz.cy - sz.hh), links = Math.round(cx - sz.hw), rechts = Math.round(cx + sz.hw);
+    const startY = kopf - 30;
+
+    if (t < FALL) {
+      // Fall: beschleunigt in ganzen Schritten, leichtes Pendeln, Fahrtstreifen, Schwapp-Tropfen
+      const k = t / FALL, y = Math.round(startY + (kopf - startY) * k * k), pend = Math.round(Math.sin(t / 80) * 1);
+      for (let i = -2; i <= 2; i++) g.block(cx + i * 4 + pend, y - 24 - Math.abs(i) * 2, 1, 6 + (2 - Math.abs(i)) * 2, i === 0 ? M[1] : M[2], aus * 0.55);
+      for (const sw of teile.schwapp) {
+        const tt = (t - sw.start) / 1000;
+        if (tt < 0 || tt > 0.5) continue;
+        tropfen(g, cx + pend + sw.x, y - 9 - sw.v * tt + tt * tt * 90, 2, aus);
+      }
+      eimer(g, cx + pend, y, { t }, aus);
     } else {
       const tt = t - FALL;
-      // Stauchung: zwei Takte tiefer, dann Sprung auf den Kopf
-      const hop = tt < 66 ? 2 : tt < 130 ? 0 : tt < 260 ? -Math.round(Math.sin((tt - 130) / 130 * Math.PI) * 4) : 0;
-      // Eimer kippt kopfüber und rutscht nach ~700 ms zum Boden
-      const rutsch = tt > 520 ? Math.min(unten - kopf - 6, Math.round(((tt - 520) / 1000) * ((tt - 520) / 1000) * 260)) : 0;
-      const eimerY = kopf + hop + rutsch;
-      if (tt < 160) for (const f of teile.funken) g.put(cx + Math.cos(f.w) * f.v * tt / 400 * 1.6, kopf - 10 + Math.sin(f.w) * f.v * tt / 400 * 1.2, WASSER[4], aus);
-      // Wasserfront über die Karte nach unten (Dither, Glanzspitzen)
+      // Aufschlag: Stauchung (2 Takte), dann Hüpfer
+      const stauch = tt < 66 ? 3 : tt < 130 ? 1 : 0;
+      const hop = tt < 130 ? 0 : tt < 260 ? -Math.round(Math.sin((tt - 130) / 130 * Math.PI) * 4) : 0;
+      // Kippstufen: 0 aufrecht → 0.35 → 0.7 → kopfüber
+      const stufe = tt < 200 ? 0 : tt < 330 ? 1 : tt < 460 ? 2 : 3;
+      const scher = [0, 0.35, 0.7, 0][stufe], umgekehrt = stufe === 3;
+      // Rutschen zum Boden ab ~620 ms, zweimal poltern
+      const rt = Math.max(0, tt - 620);
+      const fall = Math.min(unten - kopf - 6, Math.round((rt / 1000) * (rt / 1000) * 300));
+      const poltern = rt > 0 && fall >= unten - kopf - 6 ? (rt < 520 ? -Math.round(Math.abs(Math.sin((rt - 380) / 90 * Math.PI)) * 3) : 0) : 0;
+      const eimerY = kopf + hop + fall + poltern;
+      const ex = cx + (stufe >= 1 ? Math.min(4, stufe * 2) : 0);
+
+      // Spritzkrone und Funkel am Aufschlag
+      if (tt < 320) for (const f of teile.krone) {
+        const sek = tt / 1000;
+        tropfen(g, cx + Math.cos(f.w) * f.v * sek * 1.5, kopf - 6 + Math.sin(f.w) * f.v * sek * 1.3 + 150 * sek * sek, f.farbe, aus * (1 - tt / 360));
+      }
+      if (tt < 200) { const arm = tt < 60 ? 1 : tt < 130 ? 3 : 2; ppKreuzfunkel(g, cx - 10, kopf - 8, arm, [WASSER[4], WASSER[3], WASSER[2], WASSER[1]], aus); ppKreuzfunkel(g, cx + 9, kopf - 10, Math.max(1, arm - 1), [WASSER[4], WASSER[3], WASSER[2], WASSER[1]], aus); }
+
+      // Wasserstrahl aus der Öffnung auf den Helden (ab dem ersten Kippen bis ~1000 ms)
+      if (tt >= 200 && tt < 700 && stufe < 3) {
+        const breite = stufe === 1 ? 3 : 5, sx = ex + 5 + stufe * 2, sy = eimerY - 2 + stufe;
+        for (let y = sy; y < kopf + 12; y++) for (let dx = -Math.floor(breite / 2); dx <= Math.floor(breite / 2); dx++) {
+          const x = sx + dx + Math.round((y - sy) * 0.04);
+          const streif = ((y - sy) + Math.floor(t / 33) * 2) % 6 < 2;
+          if (ppBayer(x, y) < (Math.abs(dx) === Math.floor(breite / 2) ? 0.45 : 0.9)) g.put(x, y, streif ? WASSER[3] : (dx < 0 ? WASSER[2] : WASSER[1]), aus);
+        }
+      }
+
+      // Wasserfront über die Karte: Wellenbänder in drei Tönen, Schaumlinie, nasse Punkte dahinter
       if (tt > 60) {
-        const front = Math.min(sz.hh * 2 * 1.05, (tt - 60) * 0.135), obenY = Math.round(sz.cy - sz.hh);
-        const links = Math.round(cx - sz.hw), rechts = Math.round(cx + sz.hw);
+        const front = Math.min(sz.hh * 2 * 1.05, (tt - 60) * 0.135);
         for (let y = obenY; y < obenY + front; y++) {
           const tiefe = (y - obenY) / Math.max(1, front);
           for (let x = links - 1; x <= rechts + 1; x++) {
-            const welle = Math.sin((x + y * 0.7 + t / 60)) * 0.12;
-            const dicht = (tiefe > 0.88 ? (1 - tiefe) / 0.12 : 1) * 0.62 + welle;
-            if (ppBayer(x, y) < dicht) g.put(x, y, WASSER[(Math.floor(y / 3) + x) % 7 === 0 ? 3 : (y - obenY) % 9 < 3 ? 2 : 1], aus);
+            const welle = Math.sin(x * 0.5 + y * 0.35 + t / 70) * 0.14;
+            const dicht = (tiefe > 0.86 ? (1 - tiefe) / 0.14 : 1) * 0.6 + welle;
+            if (ppBayer(x, y) >= dicht) continue;
+            const band = (y - obenY + Math.round(Math.sin(x / 3 + t / 110) * 2) + 40) % 8;
+            g.put(x, y, band === 0 ? WASSER[3] : band < 3 ? WASSER[2] : band < 6 ? WASSER[1] : WASSER[0], aus);
           }
+          // nasse Schattenpunkte
+          if (tiefe < 0.8 && y % 2 === 0) for (let x = links; x <= rechts; x++) if (ppBayer(x + 2, y) < 0.14) g.put(x, y, WASSER[0], aus);
         }
-        // Wasserrand an der Front
-        for (let x = links; x <= rechts; x += 2) g.block(x, Math.round(obenY + front), 2, 1, WASSER[3], aus * 0.8);
+        // Schaumlinie mit Bläschen
+        const fy = Math.round(obenY + front);
+        for (let x = links; x <= rechts; x++) {
+          const h = Math.round(Math.sin(x * 0.9 + t / 60));
+          g.put(x, fy + h, WASSER[4], aus * 0.9); if ((x + Math.floor(t / 66)) % 5 === 0) g.put(x, fy + h - 1, WASSER[3], aus);
+        }
       }
-      gross(g, cx, eimerY, UMGEKEHRT, aus);   // der Eimer liegt über dem Wasser
+
+      // Tropfen am Kartenrand: hängen, wachsen, fallen
+      for (const d of teile.traeufe) {
+        const dt = t - d.start;
+        if (dt < 0) continue;
+        const x = Math.round(cx + d.x), hang = Math.min(d.laenge, Math.floor(dt / 60));
+        if (dt < 520) { g.block(x, unten, 1, hang, WASSER[1], aus); g.put(x, unten + hang, WASSER[3], aus); }
+        else { const sek = (dt - 520) / 1000, yy = unten + d.laenge + sek * sek * 220 + sek * d.tempo * 0.4; if (yy < unten + 24) tropfen(g, x, yy, 2, aus); }
+      }
+
+      // Pfütze am Boden: wächst, Dither-Füllung, Ringwellen
+      if (tt > 520) {
+        const k = Math.min(1, (tt - 520) / 520), px = cx, py = unten + 6, rx = Math.round(sz.hw * 1.1 * k), ry = Math.max(1, Math.round(3.5 * k));
+        for (let dy = -ry; dy <= ry; dy++) for (let dx = -rx; dx <= rx; dx++) {
+          const e = (dx * dx) / (rx * rx + 0.01) + (dy * dy) / (ry * ry + 0.01);
+          if (e > 1) continue;
+          const kante = e > 0.72;
+          if (kante ? ppBayer(px + dx, py + dy) < 0.8 : true) g.put(px + dx, py + dy, kante ? WASSER[0] : (ppBayer(px + dx, py + dy) < 0.4 ? WASSER[1] : WASSER[2]), aus);
+        }
+        for (let n = 0; n < 2; n++) {
+          const rk = ((t - 700 - n * 280) % 760) / 760;
+          if (t < 700 + n * 280 || rk < 0 || k < 0.5) continue;
+          const rrx = Math.round(rx * (0.2 + rk * 0.7)), rry = Math.max(1, Math.round(ry * (0.2 + rk * 0.7)));
+          for (let a2 = 0; a2 < 28; a2++) { const w = (a2 / 28) * Math.PI * 2; if (ppBayer(a2, n) < 1 - rk) g.put(px + Math.cos(w) * rrx, py + Math.sin(w) * rry, WASSER[3], aus); }
+        }
+      }
+
+      eimer(g, ex, eimerY, { scher, umgekehrt, stauch, wasser: stufe < 3, t }, aus);   // der Eimer liegt über dem Wasser
     }
-    // Spritzer zu den Seiten
-    for (const p of teile.tropfen) {
+
+    // Spritzer zu den Seiten (Schwerkraft)
+    for (const p of teile.spritzer) {
       const tt = (t - p.start) / 1000;
       if (tt < 0 || tt > 0.62) continue;
-      const x = cx + p.seite * (sz.hw * 0.7 + p.v * tt * 1.4), y = sz.cy - sz.hh * 0.3 - p.hoch * tt * 2 + tt * tt * 160;
-      g.block(Math.round(x), Math.round(y), 2, 2, WASSER[p.farbe], aus);
-      g.put(Math.round(x), Math.round(y), WASSER[4], aus);
+      tropfen(g, cx + p.seite * (sz.hw * 0.7 + p.v * tt * 1.4), sz.cy - sz.hh * 0.3 - p.hoch * tt * 2 + tt * tt * 160, p.farbe, aus);
     }
   };
-  const MITTE_STREIFEN = ppHex('#d2d2db');
-  return ppPunktBild(malen, ENDE + 40, 330, 600, vorbereiten);
+  return ppPunktBild(malen, ENDE + 40, 360, 640, vorbereiten);
 })();
 
 // ═════════════════════════════════════════════════════════════════

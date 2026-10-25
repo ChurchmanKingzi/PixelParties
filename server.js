@@ -8829,6 +8829,12 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         _buddy: _buddyTicket,   // W67a: Inyas Fantasy Buddy (ersetzt die Ablage; siehe unten)
         _skipReactionCheck: true,
       });
+      // ★ 25.10. (Nasty Prank): Hand-Fenster „ein Held hat eine Attack/einen Spell ausgeführt" — erst jetzt, wo nichts mehr verhindert werden kann (nicht negiert, nicht abgebrochen, nicht verpufft).
+      if (!_gefizzelt && !gs._bartasSecondCast && Number.isInteger(heroIdx) && heroIdx >= 0 && (cardData.cardType === 'Spell' || cardData.cardType === 'Attack')) {
+        await room.engine._checkSpellPerformedHandReactions({
+          spellName: cardName, cardType: cardData.cardType, cardData, performerOwner: pi, heroOwner, heroIdx,
+        });
+      }
     }
 
     // Clean up any armed-arrow modifiers that chained onto THIS attack —

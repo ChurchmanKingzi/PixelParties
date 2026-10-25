@@ -17944,6 +17944,83 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ 25.10. — HAND-FENSTER „ein Held hat eine Attack/einen Spell AUSGEFÜHRT" (Nasty Prank). Es öffnet erst NACH der Auflösung (`afterSpellResolved`) und nur, wenn die Karte weder
+   * negiert noch abgebrochen wurde: ab dann kann der Attack/Spell nichts mehr verhindert werden („Play this card immediately when an opponent's Hero performs an Attack or Spell",
+   * Al: die Reaktion darf erst greifen, wenn die Attack/der Spell nicht mehr abbrechbar ist). Keine Kette — Reverse Trap & Co. greifen über `_reaktionGespielt`.
+   *
+   * Karten-Vertrag:
+   *   isSpellPerformedReaction: true,
+   *   spellPerformedCondition(gs, pi, engine, info) → bool,
+   *   async spellPerformedResolve(engine, pi, info, { casterIdx, casterSeite })
+   * `info` = { spellName, cardType, cardData, performerOwner, heroOwner, heroIdx, reactorIdx }.
+   * Angeboten wird jedem Spieler, der NICHT der Ausführende ist (Gegner), Reihenfolge ab dem Gegner des Ausführenden.
+   */
+  async _checkSpellPerformedHandReactions(raw) {
+    if (this.gs.result || !raw || this._inMctsSim) return;
+    if ((this._spellPerformedWindowDepth || 0) >= 3) return;
+    const performer = raw.performerOwner;
+    if (!Number.isInteger(performer)) return;
+    const allCards = this._getCardDB();
+    this._spellPerformedWindowDepth = (this._spellPerformedWindowDepth || 0) + 1;
+    try {
+      for (let i = 1; i < this.playerCount(); i++) {
+        const pi = (performer + i) % this.playerCount();
+        const ps = this.gs.players[pi];
+        if (!ps || this.gs.result) continue;
+        if (this.darkOceanBlocksReaction(pi, null)) continue;
+        if (this.gs.firstTurnProtectedPlayer === pi) continue;
+        const info = { ...raw, reactorIdx: pi };
+        const abgelehnt = new Set();
+        for (let runde = 0; runde < 4; runde++) {
+          if (this.gs.result) return;
+          let gespielt = false;
+          for (const cardName of [...new Set(ps.hand || [])]) {
+            if (abgelehnt.has(cardName)) continue;
+            if (this._handPlayLockedFor(ps, cardName)) continue;
+            const script = loadCardEffect(cardName);
+            if (!script?.isSpellPerformedReaction) continue;
+            this._noteRxWindow(ps, cardName, 'seen');
+            if (script.spellPerformedCondition && !script.spellPerformedCondition(this.gs, pi, this, info)) continue;
+            const rxCast = this._rxCastPlan(ps, cardName, script, { fensterInfo: info });
+            if (!rxCast) { this._noteRxWindow(ps, cardName, 'hero'); continue; }
+            const cost = allCards[cardName]?.cost || 0;
+            if (cost > 0 && !this._rxCanAfford(ps, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
+            const confirmed = await this.promptGeneric(pi, {
+              type: 'confirm',
+              title: cardName,
+              _handReactionWindow: true,
+              message: `${raw.spellName} was performed! Activate ${cardName}?`,
+              showCard: cardName,
+              showCardLeft: raw.spellName,
+              confirmLabel: '✨ Activate!',
+              cancelLabel: 'No',
+              cancellable: true,
+            });
+            if (!this._confirmSaidYes(confirmed)) { abgelehnt.add(cardName); continue; }
+            if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { fensterInfo: info }))) { abgelehnt.add(cardName); continue; }
+            if (!(await this._rxHandkarteEinsetzen(pi, cardName, script, rxCast, { sourceOwner: performer }))) { abgelehnt.add(cardName); continue; }
+            this.log('spell_performed_window_reaction', { card: cardName, player: ps.username, target: raw.spellName });
+            try {
+              if (script.spellPerformedResolve) {
+                await script.spellPerformedResolve(this, pi, info, { casterIdx: rxCast.casterIdx, casterSeite: rxCast.casterSeite ?? pi });
+              }
+            } catch (err) {
+              console.error(`[SpellPerformedWindow] ${cardName} threw:`, err.message);
+            }
+            await this._rxAufgeloest(ps, cardName, rxCast.casterIdx, { heroOwner: rxCast.casterSeite ?? pi });
+            this.sync();
+            gespielt = true;
+            break;
+          }
+          if (!gespielt) break;
+        }
+      }
+    } finally {
+      this._spellPerformedWindowDepth = Math.max(0, (this._spellPerformedWindowDepth || 1) - 1);
+    }
+  }
+
+  /**
    * Ein EQUIP oder ATTACHMENT von einem Helden auf einen anderen
    * umhaengen — auch ueber die Seiten hinweg.
    *
@@ -25374,6 +25451,12 @@ this._deathWatch = (this._deathWatchStack || []).length
           _buddy: _buddyTicket,   // W67a
           _skipReactionCheck: true,
         });
+        // ★ 25.10. (Nasty Prank): Hand-Fenster „ein Held hat eine Attack/einen Spell ausgeführt" — erst nach der Auflösung (nicht negiert, nicht abgebrochen).
+        if (!this.gs._bartasSecondCast && Number.isInteger(heroIdx) && heroIdx >= 0) {
+          await this._checkSpellPerformedHandReactions({
+            spellName: cardName, cardType: cardData.cardType, cardData, performerOwner: playerIdx, heroOwner: opts.heroOwner ?? playerIdx, heroIdx,
+          });
+        }
       }
       // Z7b: ganz negiert (MOE Shield, Frost Rune …) = nie aufgeloest → kein „1 pro Spiel"-Stempel unten;
       // nur das Ergebnis verhindert (Teil-Negierung) = verbraucht, Zaehler-Lauscher hoeren `afterSpellPrevented`.
@@ -43895,6 +43978,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (eligibleByName.has(sName)) continue; // a hand copy already offered
         const sScript = loadCardEffect(sName);
         if (!sScript?.isSurprise || !sScript?.isReaction) continue;
+        // ★ 25.10. (Reverse Trap, Lunar Eclipse): eine Surprise, die in DIESER Kette schon aktiviert wurde, bleibt aufgedeckt in ihrer Zone liegen (`skipPostResolveDiscard`, das Kettenende räumt
+        // sie ab) — sie darf in derselben Kette nicht noch einmal antworten. Erkennbar am Aufräum-Eintrag bzw. an der aufgedeckten Instanz.
+        if ((this._pendingSurpriseReactionCleanup || []).some(e => e.pi === sSeite && e.heroIdx === shi && e.cardName === sName)) continue;
+        if (this.cardInstances.some(c => c.owner === sSeite && c.zone === ZONES.SURPRISE && c.heroIdx === shi && c.name === sName && c.faceDown === false)) continue;
         if (sScript.reactionCondition
             && !sScript.reactionCondition(this.gs, pi, this, chainCtx)) continue;
         if (!this._canHeroActivateSurprise(sSeite, shi, sName, { reaktor: pi })) continue;

@@ -8672,6 +8672,13 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
       ps.discardPile.pop();
       ps.hand.splice(idx, 0, removed);
       value += Math.max(0, baseScore - scoreWithout);
+      // ★ 25.10. (Explosion Toss): eine Hand-Reaktion, die genau auf den Effekt wartet, dessen KOSTE dieser Abwurf ist (Hot Skull Potato → Explosion Toss), nicht als Kosten verheizen.
+      // `cpuMeta.keepOnDiscardFor`: Namen der Quellen, bei denen die Karte auf der Hand bleiben soll.
+      try {
+        const keepFor = loadCardEffect(name)?.cpuMeta?.keepOnDiscardFor;
+        const quelle = promptData.costFor || promptData.source;
+        if (Array.isArray(keepFor) && quelle && keepFor.includes(quelle)) value += 150;
+      } catch { /* Beiwerk */ }
       return { idx, name, value };
     });
     scored.sort((a, b) => a.value - b.value);
