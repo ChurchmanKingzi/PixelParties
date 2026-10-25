@@ -24,6 +24,11 @@
 //       irgendwo, nicht zwingend im Aufruf: Cecilia reicht ihn über
 //       eine Konstante (`BONUS_ABILITY = 'Charme'`).
 //
+//    3. ODER, NICHT UND (W71a) — mehrere Ability-Boni auf einer Karte
+//       („Fighting 3" + „Destruction Magic 3") sind Alternativen: sie
+//       stehen als Liste in EINEM `performAscensionBonus`-Aufruf, der
+//       Spieler wählt eine. Zwei Aufrufe nacheinander wären UND.
+//
 //  Aufruf:  node scripts/check-ascension-bonus.js
 //  Rückgabe 0 = sauber, 1 = mindestens ein Ascended ohne Bonus.
 // ════════════════════════════════════════════════════════════════
@@ -82,6 +87,23 @@ for (const karte of karten) {
       maengel.push(`${karte.name}: Bonus „${bonus}", aber kein Aufruf von \`performAscensionBonus(\``);
     } else if (!literal.test(code)) {
       maengel.push(`${karte.name}: Bonus „${bonus}", aber „${ability}" steht nirgends als Zeichenkette im Code`);
+    }
+  }
+
+  // 3. ODER, NICHT UND (W71a, Al 25.10.2026): stehen mehrere Ability-Boni auf der Karte, sind das ALTERNATIVEN
+  //    (der Spieler waehlt EINE). Sie muessen in EINEM `performAscensionBonus`-Aufruf stehen - zwei Aufrufe
+  //    nacheinander waeren wieder eine UND-Folge.
+  const aufrufe = code.match(/performAscensionBonus\s*\(/g) || [];
+  if (aufrufe.length > 1) {
+    maengel.push(`${karte.name}: ${aufrufe.length}× \`performAscensionBonus(\` - mehrere Ability-Boni gehören als Alternativen in EINEN Aufruf (ODER, nicht UND)`);
+  }
+  const abBoni = boni.map(t => t.match(/^(.+?) (\d+)$/)).filter(m => m && abilities.has(m[1])).map(m => m[1]);
+  if (abBoni.length > 1) {
+    const aufruf = /performAscensionBonus\s*\([^)]*?\[([^\]]*)\]/.exec(code);
+    if (aufruf) {
+      for (const ab of abBoni) {
+        if (!aufruf[1].includes(ab)) maengel.push(`${karte.name}: Ability-Bonus „${ab}" fehlt in der Alternativen-Liste des \`performAscensionBonus\`-Aufrufs`);
+      }
     }
   }
 }

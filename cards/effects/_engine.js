@@ -31918,9 +31918,20 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /**
    * Ascension bonus: lets a freshly-Ascended Hero take up to 3 copies
-   * of one ability from the caster's deck directly into its Ability
-   * Zone. Prompts the player between options if more than one is
-   * offered; fizzles silently if none are available.
+   * of an ability from the caster's deck/hand directly into its Ability
+   * Zone; fizzles silently if none are available.
+   *
+   * ★ W71a (Al, 25.10.2026: "Der Ascension-Bonus bei Abilities ist OR, nicht AND"):
+   * `abilityChoices` ist eine Liste von ALTERNATIVEN (ODER) - der Spieler
+   * waehlt EINE ("Choose one"), nur diese wird angelegt.
+   *   ['Fighting', 'Destruction Magic']        -> Fighting ODER Destruction Magic
+   *   ['Fighting']                             -> eine Alternative: kein Menue, nur das "Add X?"-Ja/Nein
+   *   [['Charme', 'Wisdom'], ['Fighting']]     -> (Charme UND Wisdom) ODER Fighting
+   *                                              (ein Eintrag als Liste = ein UND-Paket)
+   * Alternativen ohne verfuegbare Kopie (Deck/Hand) oder ohne freien Platz fallen
+   * weg; bleibt genau eine uebrig, entfaellt das Menue. Die CPU nimmt die
+   * Alternative mit den meisten anlegbaren Kopien (Gleichstand: schon vorhandene
+   * Ability / Schule des Helden, dann die erste).
    */
   async performAscensionBonus(pi, heroIdx, abilityChoices, heroOwner = pi) {
     const gs = this.gs;
@@ -32008,16 +32019,59 @@ this._deathWatch = (this._deathWatchStack || []).length
       return z >= 0 ? { art: 'ability', slot: z } : null;
     };
     const nochPlatz = (name, ort) => { const o = zielOrt(name); return !!o && o.art === ort.art && o.slot === ort.slot; };
-    for (const name of abilityChoices) {
+    const heroName = hps.heroes?.[heroIdx]?.name || 'this Hero';
+
+    // ── W71a: ODER-Alternativen (siehe Kopfkommentar) ──
+    const alternativen = (Array.isArray(abilityChoices) ? abilityChoices : [abilityChoices])
+      .map(a => (Array.isArray(a) ? a : [a]).filter(n => typeof n === 'string' && n))
+      .filter(a => a.length > 0);
+    /** Wie viele Kopien liessen sich JETZT anlegen (Deck + Hand, Stapel hoechstens Stufe 3)? 0 = Alternative nicht machbar. */
+    const anlegbar = (name) => {
+      if (!zielOrt(name)) return 0;
+      const verfuegbar = ps.mainDeck.filter(n => n === name).length + ps.hand.filter(n => n === name).length;
+      const gelegt = abZones.flat().filter(n => n === name).length;
+      return Math.max(0, Math.min(verfuegbar, 3 - gelegt));
+    };
+    const machbar = alternativen.filter(alt => alt.some(n => anlegbar(n) > 0));
+    if (machbar.length === 0) return;
+
+    let gewaehlt = machbar[0];
+    let wahlIstZusage = false;   // die Wahl im Menue ersetzt das "Add X?"
+    if (machbar.length > 1) {
+      const heroCd = this._getCardDB()[hps.heroes?.[heroIdx]?.name] || {};
+      const cpuWahl = machbar.map((alt, i) => ({
+        i,
+        kopien: alt.reduce((sum, n) => sum + anlegbar(n), 0),
+        vorhanden: alt.reduce((sum, n) => sum + abZones.flat().filter(x => x === n).length, 0),
+        schule: alt.some(n => n === heroCd.spellSchool1 || n === heroCd.spellSchool2) ? 1 : 0,
+      })).sort((a, b) => (b.kopien - a.kopien) || (b.vorhanden - a.vorhanden) || (b.schule - a.schule) || (a.i - b.i))[0].i;
+      const beschreibung = (alt) => `Attach up to 3 copies of ${alt.join(' and ')} from your deck or hand to ${heroName}.`;
+      const wahl = await this.promptGeneric(pi, {
+        type: 'optionPicker', title: 'Ascension Bonus',
+        description: `Choose one: ${machbar.map(alt => alt.join(' + ')).join(' or ')} - ${heroName}.`,
+        options: machbar.map((alt, i) => ({ id: String(i), label: alt.join(' + '), description: beschreibung(alt) })),
+        cancellable: true, cancelLabel: 'No, thanks',
+        _cpuOptionId: String(cpuWahl),
+      });
+      const idx = wahl && !wahl.cancelled ? Number(wahl.optionId ?? wahl.id) : NaN;
+      if (!Number.isInteger(idx) || !machbar[idx]) {
+        this.log('ascension_bonus_declined', { player: ps.username, hero: heroName, ability: machbar.map(alt => alt.join(' + ')).join(' / ') });
+        return;
+      }
+      gewaehlt = machbar[idx];
+      wahlIstZusage = true;
+    }
+
+    for (const name of gewaehlt) {
       const ort = zielOrt(name);
       if (!ort) continue;
       if (!ps.mainDeck.includes(name) && !ps.hand.includes(name)) continue;
       // v670 (Al 30.8.): der Bonus ist OPTIONAL — je Ability ein Ja/Nein
       // („Add Resistance to Monia?"). Die CPU bejaht immer
       // (`_cpuAutoConfirm`, cpuGenericChoice), ein Mensch darf ablehnen,
-      // etwa um eine Zone frei zu halten.
-      const heroName = hps.heroes?.[heroIdx]?.name || 'this Hero';
-      const antwort = await this.promptGeneric(pi, {
+      // etwa um eine Zone frei zu halten. W71a: wurde die Alternative im
+      // "Choose one"-Menue gewaehlt, ist DAS die Zusage - keine zweite Frage.
+      const antwort = wahlIstZusage ? { confirmed: true } : await this.promptGeneric(pi, {
         type: 'confirm', title: 'Ascension Bonus',
         message: `Add ${name} to ${heroName}?`,
         confirmLabel: `✨ Add ${name}!`, cancelLabel: 'No, thanks',

@@ -7848,6 +7848,12 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   // (`_cpuAutoConfirm` — Aufstiegsbonus „Add X to Hero?"), nimmt die
   // CPU immer — VOR allen Karten-Overrides und Kosten-Heuristiken.
   if (type === 'confirm' && promptData._cpuAutoConfirm) return { confirmed: true };
+  // W71a: ein optionPicker kann der CPU seine Wahl selbst vorschlagen (`_cpuOptionId` - Aufstiegsbonus
+  // "Choose one": die Engine kennt die anlegbaren Kopien), VOR den Karten-Overrides.
+  if (type === 'optionPicker' && promptData._cpuOptionId != null
+      && (promptData.options || []).some(o => String(o.id) === String(promptData._cpuOptionId))) {
+    return { optionId: String(promptData._cpuOptionId) };
+  }
 
   // Per-card override wins over the generic brain. Card authors export
   // `cpuResponse(engine, promptKind, promptData)` to customize how the CPU
