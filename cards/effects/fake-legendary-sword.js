@@ -7,7 +7,7 @@
 //
 //  ── AUSLEGUNG ───────────────────────────────────────────────────────────
 //  • Gewöhnliches, aktiv gespieltes Ziel-Artefakt (Vertrag `isTargetingArtifact` / `getValidTargets` / `resolve`, Muster Arcane Lamp). Ziel: ein ausgerüstetes Artefakt BEIDER Seiten
-//    (Ziel-Typ `equip`, offen, Equipment — `engine.isEquipInZone`; unbewegliche Karten und Cardinal Beasts nicht). Teilen mehrere Artefakte einen Platz (Darion), wählt man danach das eine.
+//    (Ziel-Typ `equip`, offen, Equipment — `engine.isEquipInZone`; unbewegliche Karten und Cardinal Beasts nicht). Teilen mehrere Artefakte einen Platz (Darion), fragt die Engine selbst einmal „welches Equip?" (`_disambiguateStackedTargets`).
 //    Ohne ausgerüstetes Artefakt irgendwo ist die Karte grau (`canActivate`).
 //  • „send it to the discard pile": `actionDestroyCard` mit `skipPileTransfer` — der Standardflug zum Stapel entfällt, die Karte zersplittert statt zu fliegen (s. u.). Sie landet im Ablagestapel
 //    ihres BESITZERS. Steht sie unter Schutz (Board-Wächter, Immunität …), bleibt sie liegen — dann gibt es auch keinen Bonus.
@@ -20,12 +20,12 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
-const { waehleMehrere } = require('./_equip-stack-shared');
 
 const CARD_NAME = 'Fake Legendary Sword';
 const BONUS = 40;
-const SHATTER_MS = 1100;
+const SHATTER_MS = 1100;     // Länge der Splitter-Animation im Client (läuft PARALLEL weiter, die Karte selbst fliegt schon in die Ablage)
 const MONTAGE_MS = 140;
+const NACH_MS = 120;         // kurzer Nachlauf, dann geht die Karte weiter
 
 /** Alle ausgerüsteten, zerstörbaren Artefakte (beide Seiten). */
 function ausruestung(engine) {
@@ -95,15 +95,9 @@ module.exports = {
     const ziel = (validTargets || this.getValidTargets(engine.gs, pi, engine)).find(t => t.id === selectedIds[0]);
     if (!ziel) return { cancelled: true };
     const gs = engine.gs;
-    let inst = engine.cardInstances.find(c => c.id === ziel.cardInstance?.id);
-    // Teilen mehrere Artefakte den Platz (Darion), wählt man das eine (der Stapel wird frisch vom Brett gelesen).
-    if (inst) {
-      const insts = ausruestung(engine).filter(i => i.owner === inst.owner && i.heroIdx === inst.heroIdx && i.zoneSlot === inst.zoneSlot);
-      if (insts.length > 1) {
-        const karten = await waehleMehrere(engine, pi, insts, { title: CARD_NAME, description: 'These Artifacts share one Support Zone — choose the one to shatter.', mindestens: 1, hoechstens: 1 });
-        inst = karten?.[0] || null;
-      }
-    }
+    // Darion: liegen mehrere Equips auf dem Platz, hat die Engine schon gefragt („welches Equip?", `_disambiguateStackedTargets`) und die gewählte Karte in `ziel.cardInstance` eingetragen —
+    // eine zweite Rückfrage gibt es hier nicht.
+    const inst = engine.cardInstances.find(c => c.id === ziel.cardInstance?.id);
     if (!inst || inst.zone !== 'support') return { cancelled: true };
 
     const seite = engine.physicalSide(inst), heroIdx = inst.heroIdx, slot = inst.zoneSlot, name = inst.name;
@@ -121,7 +115,7 @@ module.exports = {
     await engine.actionDestroyCard(quelle, inst, { sourceOwner: pi, sourceName: CARD_NAME, skipPileTransfer: true });
     const weg = inst.zone !== 'support';
     engine.sync();
-    await engine._delay(SHATTER_MS - MONTAGE_MS);
+    await engine._delay(NACH_MS);
 
     if (weg && eigen && hero?.name && hero.hp > 0) engine.actionPermAtk(hero, seite, heroIdx, BONUS, CARD_NAME);
     engine.log('fake_legendary_sword', { player: gs.players[pi]?.username, artifact: name, host: hero?.name || null, own: eigen, sent: weg });

@@ -44522,7 +44522,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const sr = srcEl.getBoundingClientRect(), dr = dstEl.getBoundingClientRect();
       const dauer = duration || 800;
       const hideKey = `${fromOwner}-${fromHeroIdx}-${fromSlot}`;
-      setPusherFlungHidden(prev => { const n = new Set(prev); n.add(hideKey); return n; });
+      // Darion (Fake Legendary Sword): liegt noch eine ANDERE Karte im Equip-Stapel, bleibt die Zone sichtbar — die Splitter liegen als Überlagerung über der Karte, und der Stapel zeigt
+      // sich nach dem Entfernen (Zustand) sofort mit den übrigen Equips; die ganze Zone zu verstecken ließe den Stapel unsichtbar.
+      const stapelGroesse = ((spielerLiveRef.current?.[fromOwner]?.supportZones?.[fromHeroIdx] || [])[fromSlot] || []).length;
+      const verstecken = !(mode === 'shatter' && stapelGroesse > 1);
+      if (verstecken) setPusherFlungHidden(prev => { const n = new Set(prev); n.add(hideKey); return n; });
       let suppressKey = null;
       if (suppressDiscard) {
         suppressKey = `${discardOwner ?? fromOwner}-${cardName}`;
@@ -44537,7 +44541,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => {
         stop();
         setPusherFlungHidden(prev => { if (!prev.has(hideKey)) return prev; const n = new Set(prev); n.delete(hideKey); return n; });
-      }, dauer + 900);
+      }, mode === 'shatter' ? dauer + 100 : dauer + 900);
       if (suppressKey) setTimeout(() => {
         const sm = brackleDiscardSuppressRef.current, cur = sm.get(suppressKey) || 0;
         if (cur <= 1) sm.delete(suppressKey); else sm.set(suppressKey, cur - 1);
