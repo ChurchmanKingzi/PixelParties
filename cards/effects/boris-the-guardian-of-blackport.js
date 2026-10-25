@@ -36,6 +36,10 @@
 //    je Karte.
 //  • Kosten zu ueberspringen negiert den Effekt NICHT
 //    — Boris macht solche Karten schlicht gratis.
+//  • ★ W74a (Al): Boris wirkt NUR bei ABWURF (discard). Karten von
+//    der Hand LOESCHEN (Wheels „delete 2", Potion Juggler, Acid Rain,
+//    Dante, Debt-o-Tron/Item Lock …) ist kein Discard: keine Frage,
+//    kein Verzicht, HOPT bleibt frei. Wächter: check-boris-delete.js.
 //  • Reihenfolge bei fremdem Zwangsabwurf: ERST das
 //    Ambush-Reaktionsfenster, und nur wenn dort nicht
 //    negiert wurde, fragt Boris.
@@ -113,6 +117,8 @@ module.exports = {
     // weiss, ob seine Abfrage Teil einer solchen Kette ist. Der normale
     // Zwangsabwurf trifft immer nur EINEN Spieler und kann deshalb
     // nicht kreisen.
+    // ★ W74a (Al): nur ABWURF — „delete cards from your hand" (Wheels, Potion Juggler, Acid Rain, Dante, Item Lock …) ist kein Discard.
+    if (opts.deleteMode || opts.delete || opts.loeschen) return false;
     if (!borisActive(engine, pi)) return false;
     if (verzichtVerbraucht(engine, pi)) return false;   // v1376: einmal pro Zug
     const ps = engine.gs.players[pi];
