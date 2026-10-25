@@ -79,6 +79,6 @@ module.exports = {
     await engine._delay(BLAST_MS - KNALL_MS - 300);
   },
 
-  /** CPU: nimmt jede Gelegenheit (die gegnerische Übernahme wird zur Explosion). */
-  cpuMeta: { reactionHeuristic: () => true },
+  /** CPU: nimmt jede Gelegenheit (die gegnerische Übernahme wird zur Explosion); wirft die Karte nicht als Kosten der Hot Skull Potato ab (die Übergabe löst sie ja gleich aus). */
+  cpuMeta: { reactionHeuristic: () => true, keepOnDiscardFor: ['Hot Skull Potato'] },
 };

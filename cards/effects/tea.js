@@ -250,7 +250,7 @@ module.exports = {
         c.heroIdx === firstTarget.heroIdx && c.zoneSlot === firstTarget.slotIdx
       );
       if (inst) {
-        actuallyRemoved = engine.cleanseCreatureStatuses(inst, removedStatuses, 'Tea') || [];
+        actuallyRemoved = (await engine.cleanseCreatureStatusesGefragt(inst, removedStatuses, 'Tea')) || [];
       }
     }
 

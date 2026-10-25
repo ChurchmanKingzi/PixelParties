@@ -11,7 +11,7 @@ const H = require('../../lib/h.js');
 const ROOT = path.resolve(__dirname, '../../../..');
 function ladeTrigger() {
   const src = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
-  const i = src.indexOf('function doTriggerTreacherousCrystal(room, pi) {');
+  const i = src.indexOf('async function doTriggerTreacherousCrystal(room, pi) {');
   let depth = 0, k = src.indexOf('{', i);
   for (; k < src.length; k++) { if (src[k] === '{') depth++; else if (src[k] === '}') { depth--; if (depth === 0) break; } }
   const fn = new Function('require', 'opponentOfGs', 'roomPlayerCount', 'sendGameState', 'sendSpectatorGameState', src.slice(i, k + 1) + '\nreturn doTriggerTreacherousCrystal;');
@@ -29,7 +29,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     const eigene = t.put(hold, 0, 0, H.INERT.creature);                             // Kreatur des Halters auf seiner Seite
     const fremd = t.put(act, 0, 0, H.INERT.creature, { controller: hold, counters: { crossSideControlled: hold } });        // Kreatur auf MEINER Seite, vom Halter kontrolliert
     t.gs.activePlayer = act;
-    const r = trig(t.room, act);
+    const r = await trig(t.room, act);
     await sleep(100);
     R.check('Gegenprobe: Kreatur des Halters auf seiner Seite wird übernommen', eigene.controller === act, { r, controller: eigene.controller });
     R.check('„all Creatures you control": auch die vom Halter kontrollierte Kreatur auf der Gegenseite wird übernommen', fremd.controller === act, { owner: fremd.owner, controller: fremd.controller });

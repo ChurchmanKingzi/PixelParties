@@ -2821,6 +2821,60 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_wind',    opts: { rate: 1.9,  volume: 0.35, delay: 450, category: null, dedupe: 0 } },
     { name: 'negate',       opts: { rate: 0.9,  volume: 0.6, delay: 520, category: null, dedupe: 0 } },
   ],
+  // Control Monitors (24.10.) — die Monitore flackern an (Blitzknistern, 0 / ~120 ms), dumpfes Summen (~420 ms), der weiße Streifen löscht die Schirme (~800 ms: Abwurf-Klang
+  // und Verneinungs-Ton). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  control_monitors: [
+    { name: 'elem_lightning', opts: { rate: 1.9, volume: 0.3 } },
+    { name: 'elem_lightning', opts: { rate: 2.4, volume: 0.3, delay: 120, category: null, dedupe: 0 } },
+    { name: 'debuff',         opts: { rate: 0.9, volume: 0.4, delay: 420, category: null, dedupe: 0 } },
+    { name: 'discard',        opts: { rate: 0.8, volume: 0.7, delay: 800, category: null, dedupe: 0 } },
+    { name: 'negate',         opts: { rate: 1.2, volume: 0.5, delay: 830, category: null, dedupe: 0 } },
+  ],
+  // Celia, the Class Clown (24.10.) — die Kerzenflammen fliegen los (Zauberton und Feuerhauch, 0 / ~200 ms), die Kerzen setzen sich (hohe Pings, ~450 ms), die vierte
+  // zündet (~790 ms: Buff-Klang, heller Ping). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  celia_candles: [
+    { name: 'spell_cast', opts: { rate: 1.4, volume: 0.4 } },
+    { name: 'elem_fire',  opts: { rate: 1.8, volume: 0.35, delay: 200, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 1.6, volume: 0.45, delay: 450, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 1.9, volume: 0.4, delay: 540, category: null, dedupe: 0 } },
+    { name: 'buff',       opts: { rate: 1.2, volume: 0.6, delay: 760, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.4, volume: 0.5, delay: 800, category: null, dedupe: 0 } },
+  ],
+  // Ghostly Warning (24.10.) — der Geist erscheint (dunkles Raunen, 0 ms), die Wolke wird eingesogen (Windsog ab ~380 ms), das Blinken verschluckt sie (~820 ms: Verneinungs-Ton).
+  // `phase: 'return'`: Raunen, Hand öffnet sich (~300 ms Schlag mit Feuerrauschen), Verpuffen (Wind ~650 ms).
+  ghostly_warning: (p) => (p && p.phase === 'return') ? [
+    { name: 'elem_dark',    opts: { rate: 0.9, volume: 0.6 } },
+    { name: 'heavy_impact', opts: { rate: 0.8, volume: 0.5, delay: 320, category: null, dedupe: 0 } },
+    { name: 'elem_fire',    opts: { rate: 0.7, volume: 0.8, delay: 330, category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 1.3, volume: 0.45, delay: 660, category: null, dedupe: 0 } },
+  ] : [
+    { name: 'elem_dark', opts: { rate: 0.8, volume: 0.6 } },
+    { name: 'elem_wind', opts: { rate: 1.6, volume: 0.5, delay: 380, category: null, dedupe: 0 } },
+    { name: 'negate',    opts: { rate: 0.9, volume: 0.7, delay: 820, category: null, dedupe: 0 } },
+  ],
+  // Atta, Speaker of Desires (24.10.) — die Bücher rauschen heran (Wind, 0 ms), klappen zu (~600 ms: Schlag, Funkensog), Bildschirmende dunkles Brummen; `phase: 'return'`: Bücher
+  // fliegen herbei (Wind), schlagen auf (~440–560 ms: Ping, Papier), blitzen (~640 ms: Buff-Klang).
+  atta_books: (p) => (p && p.phase === 'return') ? [
+    { name: 'elem_wind', opts: { rate: 1.5, volume: 0.5 } },
+    { name: 'placement', opts: { rate: 1.6, volume: 0.5, delay: 440, category: null, dedupe: 0 } },
+    { name: 'placement', opts: { rate: 1.9, volume: 0.4, delay: 520, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 1.8, volume: 0.5, delay: 640, category: null, dedupe: 0 } },
+    { name: 'buff',      opts: { rate: 1.1, volume: 0.6, delay: 650, category: null, dedupe: 0 } },
+  ] : [
+    { name: 'elem_wind', opts: { rate: 1.3, volume: 0.45 } },
+    { name: 'debuff',    opts: { rate: 1.2, volume: 0.4, delay: 480, category: null, dedupe: 0 } },
+    { name: 'placement', opts: { rate: 0.8, volume: 0.9, delay: 600, category: null, dedupe: 0 } },
+    { name: 'elem_dark', opts: { rate: 1.1, volume: 0.5, delay: 620, category: null, dedupe: 0 } },
+  ],
+  // Darion, the Blood-Crazy Groundskeeper (24.10.) — Kettensäge: Hieb (Schnitt, 0 und ~110 ms), Blutspritzer (Schlag ~140 ms), das Equip rastet ein (~420 ms: Schlag, heller Ping).
+  // Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  darion_equip: [
+    { name: 'slash',        opts: { rate: 0.8, volume: 0.7 } },
+    { name: 'slash',        opts: { rate: 1.1, volume: 0.6, delay: 110, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.3, volume: 0.45, delay: 150, category: null, dedupe: 0 } },
+    { name: 'placement',    opts: { rate: 1.0, volume: 0.9, delay: 420, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 1.7, volume: 0.5, delay: 430, category: null, dedupe: 0 } },
+  ],
   // Cute Crown (10.10.) — die Flügel schlagen (Wind, 0 / ~110 / ~220 ms), das Juwel klingt hell (~300 ms), Herzen steigen auf (~520 ms). Nur der erste Teil uebernimmt die
   // Sammelkategorie 'effect'.
   crown_flutter: [
@@ -8992,10 +9046,8 @@ function ascensionBonusText(card) {
   if (abilities.length > 0) {
     const quelle = 'from your deck, hand and/or discard pile to this Hero.';
     if (abilities.length === 1) return `Attach up to ${abilities[0].n} copies of ${abilities[0].name} ${quelle}`;
-    // Mehrere Abilities: jede einzeln bis zu N (die Engine fragt je Ability getrennt).
-    if (abilities.every(a => a.n === abilities[0].n))
-      return `Attach up to ${abilities[0].n} copies each of ${abilities.map(a => a.name).join(' and ')} ${quelle}`;
-    return `Attach ${abilities.map(a => `up to ${a.n} copies of ${a.name}`).join(' and ')} ${quelle}`;
+    // Mehrere Abilities: ODER, nicht UND (Al, W71a) - die Engine laesst den Spieler EINE waehlen ("Choose one").
+    return `Attach ${abilities.map(a => `up to ${a.n} copies of ${a.name}`).join(' or ')} ${quelle}`;
   }
   // Unbekannte Form: das Stichwort der Karte als Satz stehen lassen.
   const text = felder.join(' ');

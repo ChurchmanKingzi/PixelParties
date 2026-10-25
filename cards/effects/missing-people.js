@@ -112,6 +112,8 @@ module.exports = {
         engine.log('destroy_blocked', { card: inst.name, reason: 'Defending the Gate' });
         return;
       }
+      // W71b (Al, 25.10.2026): das Wegnehmen vom Brett ist ein Effekt auf die Kreatur — Schutzfenster (Cool Rescuer Monia & Co.), NACH dem Tor, VOR der ersten Änderung.
+      if (!(await engine.kreaturBetroffen(inst, 'move', { name: CARD_NAME, owner: pi }, { sourceOwner: pi, detail: 'to_deck' }))) return;
 
       // ── Blende: die KARTE wird transparent (Als Vorgabe) ──────────
       engine._broadcastEvent('zone_fade', {

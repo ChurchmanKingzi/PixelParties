@@ -1,7 +1,8 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Taio, Absorber of the Mountain's Heart"
 //  Ascended Hero — 600 HP / 120 ATK
-//  Starting abilities (printed): Fighting 3 + Destruction Magic 3
+//  Ascension bonus (printed): Fighting 3 OR Destruction Magic 3
+//  (W71a, Al: ODER, nicht UND - der Spieler waehlt EINE der beiden)
 //
 //  Ascension condition (enforced by `taio-the-sun-fencer.js`):
 //    • Base Taio is "Taio, the Sun Fencer"
@@ -17,9 +18,9 @@
 //
 //  Wiring:
 //    • Ascension bonus: `performAscensionBonus(['Fighting',
-//      'Destruction Magic'])` tops the existing Fighting stack to
-//      3 and installs Destruction Magic up to 3 in the next free
-//      slot. Mirrors Arthor Inheritor / every other Ascended Hero
+//      'Destruction Magic'])` - die Liste sind ALTERNATIVEN (W71a):
+//      "Choose one", nur die gewaehlte Ability wird bis Stufe 3
+//      angelegt. Mirrors Arthor Inheritor / every other Ascended Hero
 //      that uses the canonical engine helper.
 //    • Trigger: `afterSpellResolved` — fires after Spell/Attack
 //      resolution (parity with Bartas, Archibald, etc.). Gated to:

@@ -416,12 +416,13 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
 
   // Remove from its source zone.
   if (zone === 'support') {
-    if (_supAbility) {
-      // Ein Ability-Stapel in einer Support Zone: nur diese eine Kopie geht (die Stufe sinkt um 1), nicht der ganze Slot.
-      const sl = ownerPs.supportZones?.[heroIdx]?.[zoneSlot];
-      if (Array.isArray(sl)) { const idx = sl.lastIndexOf(cardName); if (idx >= 0) sl.splice(idx, 1); }
-    } else if (ownerPs.supportZones?.[heroIdx]) {
-      ownerPs.supportZones[heroIdx][zoneSlot] = [];
+    if (ownerPs.supportZones?.[heroIdx]) {
+      // Nur DIESE Karte nehmen: liegen mehrere Karten im Platz (Darion: Equip-Stapel; Alices Kreaturenstapel; ein Ability-Stapel von Xal/Xalibur), bleiben die anderen liegen.
+      const arr = ownerPs.supportZones[heroIdx][zoneSlot];
+      // Ein Ability-Stapel verliert seine OBERSTE Kopie (letzter gleichnamiger Eintrag, die Stufe sinkt um 1).
+      const idx = Array.isArray(arr) ? (_supAbility ? arr.lastIndexOf(cardName) : arr.indexOf(cardName)) : -1;
+      if (idx >= 0 && arr.length > 1) arr.splice(idx, 1);
+      else ownerPs.supportZones[heroIdx][zoneSlot] = [];
     }
   } else if (zone === 'ability') {
     const slot = ownerPs.abilityZones?.[heroIdx]?.[zoneSlot];

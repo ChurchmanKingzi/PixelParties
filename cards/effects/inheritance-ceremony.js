@@ -166,7 +166,7 @@ module.exports = {
         });
         if (ids == null) { gs._spellCancelled = true; return; }              // Abbruch: noch nichts geschehen
         gewaehlt = (Array.isArray(ids) ? ids : [])
-          .map(id => karten.find(c => zielId(c) === id)).filter(Boolean).slice(0, cap)
+          .flatMap(id => { const c = karten.find(k => zielId(k) === id); return c ? engine.stapelWahlAlle({ id, heroIdx: c.heroIdx, slotIdx: c.zoneSlot, cardInstance: c }) : []; }).slice(0, cap)   // Darion: die gewaehlte(n) Karte(n) des Stapels
           .sort((a, b) => a.zoneSlot - b.zoneSlot);
       }
 

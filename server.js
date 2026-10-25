@@ -216,6 +216,7 @@ function zoneAuraFuer(room, seite, inst) {
 function buildSupportStacks(room) {
   if (!room?.engine) return {};
   const alice = require('./cards/effects/_alice-shared');
+  const equipStack = require('./cards/effects/_equip-stack-shared');
   const engine = room.engine;
   const byKey = {};
   for (const inst of engine.cardInstances) {
@@ -224,7 +225,12 @@ function buildSupportStacks(room) {
     const key = `${physicalSide}-${inst.heroIdx}-${inst.zoneSlot}`;
     if (byKey[key]) continue; // Platz schon abgearbeitet
     const stack = alice.stackAt(engine, physicalSide, inst.heroIdx, inst.zoneSlot);
-    if (stack.length <= 1) { byKey[key] = null; continue; }
+    if (stack.length <= 1) {
+      // ★ Darion: mehrere EQUIPS im selben Platz (ein Name je Karte) — dieselbe Meldung, mit Kartentyp/Preis statt HP.
+      const eqStapel = equipStack.equipsAt(engine, physicalSide, inst.heroIdx, inst.zoneSlot);
+      byKey[key] = eqStapel.length > 1 ? eqStapel.map(i => equipStack.beschreibe(engine, i)) : null;
+      continue;
+    }
     byKey[key] = stack.map(i => alice.describeInstance(engine, i));
   }
   const out = {};
@@ -4805,6 +4811,7 @@ function sendGameState(room, playerIdx, extra) {
       // Aus dem Spielerzustand, nicht vom Brett — die Wirkung ueberlebt
       // Alices Tod.
       sharesSupportZones: require('./cards/effects/_alice-shared').sharingActive(gs, pi),   // Z1: nach Kontrolle (H01-15)
+      equipShareHeroes: [0, 1, 2].map(h => require('./cards/effects/_equip-stack-shared').teilenAktiv(room.engine, pi, h)),   // Darion: Helden dieser Seite, deren Equips eine Zone teilen
       heroes: ps.heroes, abilityZones: ps.abilityZones,
       // v1349: verwahrte/versiegelte Zonen (Madame Guillotine) — rotes Kreuz, Anlegen gesperrt.
       verwahrteZonen: require('./cards/effects/_ability-verwahrung-shared').zonenFuerAnzeige(gs, pi),
@@ -6116,6 +6123,7 @@ function sendSpectatorGameState(room) {
       // Aus dem Spielerzustand, nicht vom Brett — die Wirkung ueberlebt
       // Alices Tod.
       sharesSupportZones: require('./cards/effects/_alice-shared').sharingActive(gs, spi),   // Z1: nach Kontrolle (H01-15)
+      equipShareHeroes: [0, 1, 2].map(h => require('./cards/effects/_equip-stack-shared').teilenAktiv(room.engine, spi, h)),   // Darion: Helden dieser Seite, deren Equips eine Zone teilen
       heroes: ps.heroes, abilityZones: ps.abilityZones,
       // v1349: verwahrte/versiegelte Zonen (Madame Guillotine) — rotes Kreuz, Anlegen gesperrt.
       verwahrteZonen: require('./cards/effects/_ability-verwahrung-shared').zonenFuerAnzeige(gs, spi),
@@ -7803,6 +7811,10 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     // a free-side equip targeting their Hero.
     if (!placementPs.supportZones[heroIdx]) placementPs.supportZones[heroIdx] = [[], [], []];
     let finalSlot = zoneSlot;
+    // ★ Darion, the Blood-Crazy Groundskeeper: ein neues Equip gehoert PFLICHT in den bestehenden Equip-Stapel des Helden — der Platz ist vorgegeben (auch wenn der Spieler
+    // keinen oder einen anderen gewaehlt hat); frei ist er nicht, er nimmt das Equip trotzdem auf.
+    const _equipStapelPlatz = room.engine.equipPflichtPlatz(placementOwner, heroIdx, cardName);
+    if (_equipStapelPlatz >= 0) finalSlot = _equipStapelPlatz;
     if (finalSlot < 0) {
       for (let z = 0; z < 3; z++) {
         if (!room.engine.supportSlotBelegt(placementOwner, heroIdx, z)) { finalSlot = z; break; }   // v1349: versiegelt = belegt
@@ -7810,7 +7822,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       if (finalSlot < 0) return false;
     }
     if (finalSlot < 0 || finalSlot >= 3) return false;
-    if (room.engine.supportSlotBelegt(placementOwner, heroIdx, finalSlot)) return false;   // v1349: versiegelt = belegt
+    if (_equipStapelPlatz < 0 && room.engine.supportSlotBelegt(placementOwner, heroIdx, finalSlot)) return false;   // v1349: versiegelt = belegt
 
     (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
     room.engine.notePlayedFromHand(pi);
@@ -8267,6 +8279,8 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   }
 
   const heroOwner = charmedOwner != null ? charmedOwner : pi;
+  // ★ Atta: „Spells this Hero uses that would be sent to the discard pile are deleted instead" — beim Wirken festgestellt (der Held kann waehrend der Aufloesung fallen).
+  const _attaLoescht = cardData.cardType === 'Spell' && room.engine.spellGoesToDeletedInstead(heroOwner, heroIdx);
   // ★ W15b (C2): Wisdom-Kosten der konkreten Handkarte (Rabatt „nur die eine Kopie"); geliehener Held/Vorrat: namensweit.
   // ★ W16a (Al, Frage 6): auch beim geliehenen/gecharmten Helden zählt die konkrete Handkopie des Kontrolleurs `pi` (Hand und Rabatt des Kontrolleurs, nicht des Helden-Besitzers).
   const wisdomDiscardCost = room.engine.getWisdomDiscardCost(heroOwner, heroIdx, cardData, !fromCreation ? handIndex : undefined, heroOwner !== pi ? pi : undefined);
@@ -8534,6 +8548,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       const discardOwner = room.engine._consumeHandCardOrigin(pi, cardName);
       // `hi` = the pre-splice hand slot; the client hasn't synced the
       // splice yet, so the slot still renders → flight starts there.
+      if (_attaLoescht) chainResult.negatedToDeleted = true;   // Atta: der negierte Zauber waere in die Ablage gegangen → gelöscht
       await room.engine.routeNegatedInitialCard(discardOwner, cardName, chainResult, hi);
       room.engine._untrackCard(inst.id);
       // ★ v1323 (Tester-Befund 23.9.): die AKTIVIERUNG wurde negiert (The
@@ -8821,7 +8836,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       // W67a: Ticket für Inyas Fantasy Buddy (Hand-Spiel): würde die Karte nach dem Auflösen in die Ablage gehen? Nicht, wenn sie sich selbst aufs Brett gelegt hat
       // (Area/Attachment/Permanent, `_spellPlacedOnBoard`), auf die Hand zurückkehrt oder gelöscht wird.
       _buddyTicket = room.engine.neuesBuddyTicket('hand', {
-        ablageErwartet: () => !gs._spellPlacedOnBoard && !gs._spellReturnToHand && !script?.deleteOnUse,
+        ablageErwartet: () => !gs._spellPlacedOnBoard && !gs._spellReturnToHand && !script?.deleteOnUse && !_attaLoescht,
       });
       await room.engine.runHooks('afterSpellResolved', {
         // v778: `heroOwner` = in WESSEN Heldenreihe `heroIdx` zeigt.
@@ -8843,6 +8858,12 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         _buddy: _buddyTicket,   // W67a: Inyas Fantasy Buddy (ersetzt die Ablage; siehe unten)
         _skipReactionCheck: true,
       });
+      // ★ 25.10. (Nasty Prank): Hand-Fenster „ein Held hat eine Attack/einen Spell ausgeführt" — erst jetzt, wo nichts mehr verhindert werden kann (nicht negiert, nicht abgebrochen, nicht verpufft).
+      if (!_gefizzelt && !gs._bartasSecondCast && Number.isInteger(heroIdx) && heroIdx >= 0 && (cardData.cardType === 'Spell' || cardData.cardType === 'Attack')) {
+        await room.engine._checkSpellPerformedHandReactions({
+          spellName: cardName, cardType: cardData.cardType, cardData, performerOwner: pi, heroOwner, heroIdx,
+        });
+      }
     }
 
     // Clean up any armed-arrow modifiers that chained onto THIS attack —
@@ -8897,7 +8918,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       room.engine._broadcastEvent('play_pile_transfer', {
         fromOwner: pi, toOwner: spellPileOwner, cardName,
         from: fromCreation ? 'creation' : 'hand',
-        to: (script && script.deleteOnUse) ? 'deleted' : 'discard',
+        to: ((script && script.deleteOnUse) || _attaLoescht) ? 'deleted' : 'discard',
         fromHandIdx: resolveHi,
       });
     }
@@ -8921,7 +8942,8 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         // Fremde Herkunft (gestohlen, Magic Lamp) → Ablage des
         // URSPRUENGLICHEN Besitzers. Oben vor dem Flug ermittelt, damit
         // Flug und Landung denselben Stapel meinen.
-        gs.players[spellPileOwner].discardPile.push(cardName);
+        if (_attaLoescht) gs.players[spellPileOwner].deletedPile.push(cardName);   // Atta: gelöscht statt abgelegt
+        else gs.players[spellPileOwner].discardPile.push(cardName);
       }
       // ★ INSTANZ IN DER ABLAGE WEITERLEBEN LASSEN (v808, Als Befund 6.9.).
       // Ein Spell, dessen Wirkung an seiner INSTANZ haengt (Weapon
@@ -9689,7 +9711,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
  *   • At least one already-unstolen opp Creature must exist (otherwise
  *     the click is a no-op).
  */
-function doTriggerTreacherousCrystal(room, pi) {
+async function doTriggerTreacherousCrystal(room, pi) {   // W71b: async — das Übernehmen fragt das Schutzfenster (Cool Rescuer Monia & Co.)
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
   if (pi !== gs.activePlayer) return false;
@@ -9740,7 +9762,7 @@ function doTriggerTreacherousCrystal(room, pi) {
     // as supportable.
     const cd = cardDB[inst.name];
     if (!cd || cd.cardType !== 'Creature') continue;
-    const ok = room.engine.actionStealCreature(pi, inst, {
+    const ok = await room.engine.actionStealCreatureGefragt(pi, inst, {   // W71b: mit Schutzfenster ('control')
       sourceName: 'Treacherous Crystal',
     });
     if (ok) stolenCount++;
@@ -11429,7 +11451,7 @@ async function doActivateDiscardEffect(room, pi, { instId }) {
   return true;
 }
 
-async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot, heroOwner: heroOwnerParam }) {
+async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot, heroOwner: heroOwnerParam, instId }) {
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
   if (pi !== gs.activePlayer) return false;
@@ -11483,16 +11505,18 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot, heroOwner: h
   // the same card). Defer the script-driven check below.
   const slot = (ps.supportZones[heroIdx] || [])[zoneSlot] || [];
   if (slot.length === 0) return false;
-  const cardName = slot[0];
 
   // ★ Bei Cross-Side gehoert die Instanz der GEGENSEITE der Zone, in
   // der sie liegt — `c.owner === pi` trifft dort nie zu. Ohne diesen
   // Zweig fand der Server die Karte nicht und der Klick verpuffte
   // (Als Befund 21.8.: „wird gehighlightet, Klick tut nichts").
+  // ★ Darion: teilen sich mehrere Equips den Platz, sagt `instId`, WELCHES gemeint ist (nur ein Equip dieses Platzes zaehlt, nie eine fremde Instanz).
   const inst = _crossInst || room.engine.cardInstances.find(c =>
     room.engine.physicalSide(c) === _brett && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot   // Z1: Brettseite
+    && (instId == null || c.id === instId)
   );
   if (!inst) return false;
+  const cardName = inst.name;
 
   // ★ Geliehene Identitaet (Future Tech Copy Device): die Karte heisst
   // weiter Copy Device, IST aber die kopierte Ausruestung. Das Skript
@@ -11778,6 +11802,8 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
         // v1444: Defending the Gate, sobald ein Ziel in einer gegnerischen
         // Support Zone liegt (Dark Gear & alle anderen zielenden Karten).
         await room.engine.gateVorZielen(pi, potionName, selectedIds, validTargets);
+        // Darion: ein gewaehltes Equip-Ziel ist ein Platz mit mehreren Karten → nachfragen, welche gemeint ist (wie bei den Zaubern ueber `promptEffectTarget`).
+        await room.engine._disambiguateStackedTargets(pi, validTargets, selectedIds, script.targetingConfig || null);
         return await script.resolve(room.engine, pi, selectedIds, validTargets, room.engine._takePaidArtifactCost(potionName, pi));
       } : null,
     });
@@ -15911,13 +15937,13 @@ io.on('connection', (socket) => {
   // opt-in: clicking is the consent gesture. Steals revert at the
   // next turn start via the engine's `_revertStolenCreatures`
   // cleanup, same path Deepsea Succubus's temporary steals use.
-  socket.on('trigger_treacherous_crystal', (params) => {
+  socket.on('trigger_treacherous_crystal', async (params) => {
     if (!currentUser) return;
     const room = rooms.get(params?.roomId);
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    doTriggerTreacherousCrystal(room, pi);
+    try { await doTriggerTreacherousCrystal(room, pi); } catch (e) { console.error('[trigger_treacherous_crystal]', e.message); }
   });
 
   // Activate an equipped card's active effect (Slippery Skates, etc.)

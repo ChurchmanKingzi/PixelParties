@@ -402,7 +402,8 @@ module.exports = {
           minRequired: 1,
         });
         const treffer = pick && pick.length ? ziele.find(t => t.id === pick[0]) : null;
-        if (treffer) gewaehlt = karten.find(k => k.slot === treffer.slotIdx) || gewaehlt;
+        // Darion: ein Stapel ist EIN Platz mit mehreren Karten — die Rueckfrage der Engine hat die Karte gewaehlt (`treffer.cardInstance`).
+        if (treffer) gewaehlt = karten.find(k => k.inst === treffer.cardInstance) || karten.find(k => k.slot === treffer.slotIdx) || gewaehlt;
       }
       await engine.actionMoveCard(gewaehlt.inst, 'discard', -1, -1, {
         source: CARD_NAME, sourceOwner: pi,

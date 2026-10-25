@@ -189,6 +189,8 @@ module.exports = {
         && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
       ) || target.cardInstance;
       if (!inst || inst.zone !== 'support') return false;
+      // W71b (Al, 25.10.2026): Schutzfenster (Cool Rescuer Monia & Co.) VOR dem Schreiben; negiert = verbraucht, Kreatur unverändert.
+      if (!(await engine.kreaturBetroffen(inst, 'buff', 'Perfect Disguise', { sourceOwner: pi, detail: 'untargetable' }))) return true;
       if (!inst.counters) inst.counters = {};
       inst.counters.softUntargetable_by_opponent = 1;
       inst.counters.softUntargetable_by_opponent_pi = oi;

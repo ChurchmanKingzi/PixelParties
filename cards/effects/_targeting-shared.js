@@ -135,12 +135,22 @@ function collectNonHeroBoardTargets(gs, engine) {
     if (inst.zone === 'support') {
       const sa = supportAbilityZiel(engine, inst);   // 25.10.: Ability in einer Support Zone = Ability-Stapel, ein Ziel, oberste Kopie
       if (sa !== undefined) { if (sa) targets.push(sa); continue; }
+      const _id = `equip-${_brettSeite(engine, inst)}-${inst.heroIdx}-${inst.zoneSlot}`;
+      // ★ Darion: mehrere Equips im selben Platz = EIN Ziel je Platz (der Client kennt nur Plaetze); `_erlaubteInstanzen` nennt die waehlbaren Equips, die Rueckfrage
+      // „welches?" stellt `engine._disambiguateStackedTargets`. (Alices Kreaturen-Stapel bleiben wie bisher doppelt gelistet.)
+      const _eqSchon = targets.find(x => x.id === _id && x._erlaubteInstanzen);
+      if (_eqSchon) { _eqSchon._erlaubteInstanzen.push(inst.id); continue; }
+      const _erstes = targets.find(x => x.id === _id);
+      if (_erstes && engine.istEquipArtifact && engine.istEquipArtifact(inst) && engine.istEquipArtifact(_erstes._cardInstance)) {
+        _erstes._erlaubteInstanzen = [_erstes._cardInstance.id, inst.id];
+        continue;
+      }
       targets.push({
         // ★ 26.9. (Als Befund, Crimson Web): ID und `owner` nennen die Seite, auf
         // der die Zone LIEGT — sonst findet der Client sie nicht. Eine an
         // den Angreifer angelegte Crimson Web gehoert dem Verteidiger,
         // steckt aber in einer Support Zone des Angreifers.
-        id: `equip-${_brettSeite(engine, inst)}-${inst.heroIdx}-${inst.zoneSlot}`,
+        id: _id,
         type: 'equip', owner: _brettSeite(engine, inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
         cardName: inst.name, _cardInstance: inst,
       });

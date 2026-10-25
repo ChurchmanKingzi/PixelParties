@@ -224,7 +224,9 @@ module.exports = {
           }
         } else {
           const inst = tgt.cardInstance;
-          if (inst && engine.canApplyCreatureStatus(inst, sName)) {
+          // W71b (Al, 25.10.2026): das Anhängen des umgeleiteten Status ist ein Effekt dieser Karte auf die Zielkreatur — Schutzfenster (Cool Rescuer Monia & Co.) VOR dem Schreiben.
+          if (inst && engine.canApplyCreatureStatus(inst, sName)
+              && await engine.kreaturBetroffen(inst, 'status', { name: 'Cactus Creature', owner: pi }, { sourceOwner: pi, statusName: sName })) {
             inst.counters[sName] = 1;
           }
         }

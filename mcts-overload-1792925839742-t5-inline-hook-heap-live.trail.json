@@ -1,0 +1,41 @@
+{
+  "reason": "inline-hook-heap-live",
+  "turn": 5,
+  "phase": 3,
+  "activePlayer": 0,
+  "timestamp": "2026-10-25T10:57:19.742Z",
+  "damageCallsThisTurn": 1,
+  "damageCallsTotal": 1,
+  "hooksFiredThisTurn": 20,
+  "instanceCount": 12,
+  "memory": {
+    "rssMB": 1649,
+    "heapTotalMB": 1529,
+    "heapUsedMB": 1479,
+    "externalMB": 3
+  },
+  "hookHistogram": {
+    "onPlay": 1,
+    "onCardLeaveZone": 5,
+    "onEquipLost": 3,
+    "onCardEnterZone": 5,
+    "onAttackDeclare": 1,
+    "beforeDamage": 1,
+    "afterDamage": 1,
+    "afterSpellResolved": 1,
+    "onEffectCountedAsArt": 1,
+    "onActionUsed": 1
+  },
+  "hookFiresByCard": {
+    "Weapon Storm": 1,
+    "Blade of the Frostbringer": 1,
+    "Fighting": 9,
+    "Cute Crown": 2,
+    "Club of Gobbo": 1
+  },
+  "hookHeapDeltaByName": {},
+  "hookHeapDeltaByCard": {},
+  "candidateHeapDelta": {},
+  "trail": [],
+  "actionRecursionTrace": []
+}

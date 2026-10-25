@@ -22,7 +22,7 @@ process.on('unhandledRejection', e => { process.stderr.write('UNHANDLED ' + (e &
     const w = B.waechter(t);
     t.ktrl = ktrl; t.besitzer = besitzer;
     const inst = t.put(besitzer, 0, 0, name); inst.turnPlayed = 1;
-    const r = await t.run(() => t.engine.actionTransferCreature(inst, ktrl, 0, 0, {}));
+    const r = await t.run(() => t.engine.actionTransferCreature(inst, ktrl, 0, 0, { _skipAffectedWindow: true }));   // W71b: Testaufbau ohne Verursacher — kein Schutzfenster (Winged Skeleton würde sonst die Übernahme selbst negieren)
     R.check(`${name}: von Sitz ${ktrl} übernommen`, r && r.success && inst.controller === ktrl && inst.originalOwner === besitzer, { r: r && r.success, c: inst.controller, o: inst.originalOwner });
     return { t, w, inst };
   };

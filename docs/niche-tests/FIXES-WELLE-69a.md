@@ -17,6 +17,10 @@ Umgesetzt vom Agenten **W69a** (Zweig `wave69/W69a`) auf Entscheidungen von Al v
 a. **Hammer Throw:** „every other turn" zählt jetzt in den echten Zügen des **Betroffenen** (so war schon die Erklärung im Skript gemeint). Soll stattdessen der **Werfer** zählen? (Ohne Skip identisch.)
 b. **Willy:** Ist der nominell erste Zug übersprungen, löst jetzt der erste ECHTE eigene Zug „draw 5 or gain 30" aus. Passt das — oder soll der Effekt bei einem übersprungenen ersten Zug verfallen?
 
+### Antworten von Al
+a. **Hammer Throw:** Es zählen die echten Züge des **Betroffenen** – so umgesetzt, keine Änderung nötig.
+b. **Willy:** „Das ist korrekt so" – der erste echte eigene Zug löst den Effekt aus.
+
 ## Ergebnis der Gesamtläufe
 * **Repro `W69/a-01`**: 198 Prüfungen grün; auf dem Ausgangsstand (3a9104ae) 48 von 166 prüfbaren rot (Kategorie 0, die neuen Hilfen, stürzt dort ab), alle Gegenproben ohne Skip und die ereignisgebundenen Karten grün.
 * **Gesamtlauf** (`runall`, alle 1363 Repros inkl. `W69/a-01`; Zeitlimit je Datei 300 s): 1363 × „tritt NICHT auf" (= korrekt), 0 Fehler, 0 Zeitüberschreitungen.

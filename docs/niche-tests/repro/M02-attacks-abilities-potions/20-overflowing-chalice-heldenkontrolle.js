@@ -21,7 +21,7 @@ const H = require('../../lib/h.js');
   const a = await optionen(t => charm(t, 0, 1, 1));
   R.check('eigener, vom Gegner gecharmter Held (Rick) wird nicht angeboten', a && !a.some(n => /Rick/.test(n)), a);
   const b = await optionen(t => charm(t, 1, 0, 0));
-  R.check('von mir gecharmter Gegnerheld (Atta) wird angeboten', b && b.some(n => /Atta/.test(n)), b);
+  R.check('von mir gecharmter Gegnerheld (Atta/Cuberto: Platzhalter der Harness) wird angeboten', b && b.some(n => /Atta|Cuberto/.test(n)), b);
   // Pressed Skill: „attach it to a Hero you control" – gleiche Klasse
   async function ps(setup) {
     const t = await H.fresh({ hand: [['Pressed Skill'], []], hp: 800, deck: [['Wealth', 'ZZ Dummy'], []] });

@@ -7901,6 +7901,12 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   // (`_cpuAutoConfirm` — Aufstiegsbonus „Add X to Hero?"), nimmt die
   // CPU immer — VOR allen Karten-Overrides und Kosten-Heuristiken.
   if (type === 'confirm' && promptData._cpuAutoConfirm) return { confirmed: true };
+  // W71a: ein optionPicker kann der CPU seine Wahl selbst vorschlagen (`_cpuOptionId` - Aufstiegsbonus
+  // "Choose one": die Engine kennt die anlegbaren Kopien), VOR den Karten-Overrides.
+  if (type === 'optionPicker' && promptData._cpuOptionId != null
+      && (promptData.options || []).some(o => String(o.id) === String(promptData._cpuOptionId))) {
+    return { optionId: String(promptData._cpuOptionId) };
+  }
 
   // Per-card override wins over the generic brain. Card authors export
   // `cpuResponse(engine, promptKind, promptData)` to customize how the CPU
@@ -8719,6 +8725,13 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
       ps.discardPile.pop();
       ps.hand.splice(idx, 0, removed);
       value += Math.max(0, baseScore - scoreWithout);
+      // ★ 25.10. (Explosion Toss): eine Hand-Reaktion, die genau auf den Effekt wartet, dessen KOSTE dieser Abwurf ist (Hot Skull Potato → Explosion Toss), nicht als Kosten verheizen.
+      // `cpuMeta.keepOnDiscardFor`: Namen der Quellen, bei denen die Karte auf der Hand bleiben soll.
+      try {
+        const keepFor = loadCardEffect(name)?.cpuMeta?.keepOnDiscardFor;
+        const quelle = promptData.costFor || promptData.source;
+        if (Array.isArray(keepFor) && quelle && keepFor.includes(quelle)) value += 150;
+      } catch { /* Beiwerk */ }
       return { idx, name, value };
     });
     scored.sort((a, b) => a.value - b.value);

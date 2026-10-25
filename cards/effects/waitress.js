@@ -119,7 +119,7 @@ async function cleanseTargetWithBeerBubbles(engine, target, statusKeys, sourceNa
       engine.cleanseHeroStatuses(hero, target.owner, target.heroIdx, statusKeys, sourceName);
     }
   } else if (target.cardInstance) {
-    engine.cleanseCreatureStatuses(target.cardInstance, statusKeys, sourceName);
+    await engine.cleanseCreatureStatusesGefragt(target.cardInstance, statusKeys, sourceName);
   }
 }
 
