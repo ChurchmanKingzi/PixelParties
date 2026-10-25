@@ -179,6 +179,7 @@
   ]
  },
  "Bakhm, the Desert Digger": {
+  "noShadow": true,
   "particles": [
    [
     "gas",
