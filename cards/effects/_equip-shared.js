@@ -125,7 +125,8 @@ async function waehleAusruestPlatz(engine, pi, cardName, cfg = {}) {
   for (const { seite, heroIdx: hi } of helden) {
     const sps = engine.gs.players[seite];
     for (const si of freieBasisZonen(sps, hi, engine, seite, cardName)) {
-      ziele.push({ id: `equip-${seite}-${hi}-${si}`, type: 'equip', owner: seite, heroIdx: hi, slotIdx: si, cardName: '' });
+      // Darion: der Stapelplatz ist Pflicht-Ziel einer PLATZwahl — keine Rueckfrage „welches Equip?" (`_eigeneStapelWahl`).
+      ziele.push({ id: `equip-${seite}-${hi}-${si}`, type: 'equip', owner: seite, heroIdx: hi, slotIdx: si, cardName: '', ...(engine.equipPflichtPlatz(seite, hi, cardName) === si ? { _eigeneStapelWahl: true } : {}) });
     }
     ziele.push({ id: `hero-${seite}-${hi}`, type: 'hero', owner: seite, heroIdx: hi, cardName: sps.heroes[hi].name });
   }

@@ -443,8 +443,10 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
   // Fire onCardLeaveZone for the moved card so any departing-listeners
   // (Pollution Piranha leave-hand-discard etc.) react before we stamp
   // it as hand-resident.
+  // ★ Darion (Equip-Stapel): `leavingCard` benennt die abgehende Karte — ohne sie hoeren auch die Stapelnachbarn „ich verlasse die Zone" (gleiche Koordinaten) und nehmen ihre Boni zurueck.
   await engine.runHooks('onCardLeaveZone', {
     card: targetInst,
+    leavingCard: targetInst,
     fromZone: zone,
     fromOwner: owner,
     fromHeroIdx: heroIdx,

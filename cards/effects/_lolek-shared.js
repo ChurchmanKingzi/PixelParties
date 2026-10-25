@@ -127,6 +127,7 @@ async function chooseAndEquip(engine, pi, entries, opts = {}) {
     const zoneTargets = dests.map(d => ({
       id: `equip-${d.side}-${d.heroIdx}-${d.slotIdx}`, type: 'equip',
       owner: d.side, heroIdx: d.heroIdx, slotIdx: d.slotIdx, cardName: '',
+      ...(engine.equipPflichtPlatz(d.side, d.heroIdx, entry.name) === d.slotIdx ? { _eigeneStapelWahl: true } : {}),   // Darion: Platzwahl im Stapel, keine Rueckfrage „welches Equip?"
     }));
     const ids = await engine.promptEffectTarget(pi, zoneTargets, {
       maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
