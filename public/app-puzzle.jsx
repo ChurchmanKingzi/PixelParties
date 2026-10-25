@@ -731,7 +731,7 @@ function PuzzleCreator() {
     let result = window.AVAILABLE_CARDS || [];
     // Sidebar filter set — mirrors the deck builder's filter pipeline.
     const f = puzzleFilters;
-    if (f.name) result = result.filter(c => c.name.toLowerCase().includes(f.name.toLowerCase()));
+    if (f.name) result = result.filter(c => window.namePasst(c.name, f.name));
     if (f.effect) result = result.filter(c => window.effektTextPasst(c, f.effect));   // jedes Wort, beliebige Reihenfolge
     if (f.cardType) result = result.filter(c => c.cardType === f.cardType);
     if (f.subtype) result = result.filter(c => c.subtype === f.subtype);
