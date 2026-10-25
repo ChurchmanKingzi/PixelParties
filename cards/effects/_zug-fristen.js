@@ -79,6 +79,8 @@ function fristenNachSkip(engine, S, Ts) {
     }
     // MOE Shield: „you cannot draw cards until the end of your next turn" — `drawLockedUntilTurn` = Zug, an dessen ENDE die Sperre fällt.
     wert(ps, 'drawLockedUntilTurn');
+    // Uncool Malfunction (25.10.): Sperre aktiver Ability-Effekte je Name, Frist = ENDE des nächsten Zuges des Gesperrten.
+    for (const e of Object.values(ps._abilityNameLocks || {})) stempel(e);
     // Perilous Journey: „During your next turn, you may Ascend …" — Fenster = GENAU dieser Zug.
     for (const g of Object.values(ps._handAscensionGrants || {})) wert(g, 'turn');
   }

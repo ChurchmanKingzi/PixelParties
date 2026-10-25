@@ -3733,6 +3733,46 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_water',   opts: { rate: 1.35, volume: 0.35, delay: 980, category: null, dedupe: 0 } },
     { name: 'ping',         opts: { rate: 1.2, volume: 0.25, delay: 1180, category: null, dedupe: 0 } },
   ],
+  // The Golden Gate (25.10.): Goldregen — Münzklang (0 ms), zwei helle Pings zum Aufsteigen der Münzen.
+  golden_gate_gold: [
+    { name: 'gold_gain',  opts: { rate: 1.3, volume: 0.7, delay: 1, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.4, volume: 0.25, delay: 200, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.8, volume: 0.2, delay: 380, category: null, dedupe: 0 } },
+  ],
+  golden_gate_sparkle: [
+    { name: 'spell_cast', opts: { rate: 1.3, volume: 0.4, delay: 1, category: null, dedupe: 0 } },
+    { name: 'buff',       opts: { rate: 1.5, volume: 0.4, delay: 120, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.4, volume: 0.25, delay: 260, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.9, volume: 0.2, delay: 420, category: null, dedupe: 0 } },
+  ],
+  // Tail Slap (25.10.): der Schwanz peitscht (Wind, 40 ms), der Schlag sitzt bei ~90 ms, Staub und Sterne danach.
+  tail_slap_hit: [
+    { name: 'elem_wind',    opts: { rate: 1.5, volume: 0.45, delay: 1, category: null, dedupe: 0 } },
+    { name: 'slash',        opts: { rate: 0.7, volume: 0.5, delay: 50, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.95, volume: 0.65, delay: 90, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.4, volume: 0.25, delay: 260, category: null, dedupe: 0 } },
+  ],
+  // Ultimate Destroyer Punch (25.10.): der kräftige Einschlag — Doppelschlag tief (0 ms), Knacken, Staubrauschen; die Landung auf dem Helden dumpf.
+  udp_impact: [
+    { name: 'heavy_impact',     opts: { rate: 0.45, volume: 0.95, delay: 1, category: null, dedupe: 0 } },
+    { name: 'heavy_impact',     opts: { rate: 0.8, volume: 0.6, delay: 1, category: null, dedupe: 0 } },
+    { name: 'critical_strike',  opts: { rate: 0.8, volume: 0.5, delay: 30, category: null, dedupe: 0 } },
+    { name: 'elem_wind',        opts: { rate: 0.6, volume: 0.4, delay: 90, category: null, dedupe: 0 } },
+    { name: 'debuff',           opts: { rate: 0.8, volume: 0.35, delay: 220, category: null, dedupe: 0 } },
+    { name: 'ping',             opts: { rate: 1.6, volume: 0.25, delay: 320, category: null, dedupe: 0 } },
+  ],
+  udp_land: [
+    { name: 'heavy_impact', opts: { rate: 0.6, volume: 0.8, delay: 1, category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 0.9, volume: 0.3, delay: 60, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 1.8, volume: 0.25, delay: 140, category: null, dedupe: 0 } },
+  ],
+  // Uncool Malfunction (25.10.): Kurzschluss-Knistern (Funken) und dumpfes Quellen des schwarzen Qualms.
+  uncool_smoke: [
+    { name: 'elem_lightning', opts: { rate: 1.9, volume: 0.25, delay: 1, category: null, dedupe: 0 } },
+    { name: 'elem_dark',      opts: { rate: 0.7, volume: 0.7, delay: 40, category: null, dedupe: 0 } },
+    { name: 'debuff',         opts: { rate: 0.6, volume: 0.45, delay: 160, category: null, dedupe: 0 } },
+    { name: 'elem_lightning', opts: { rate: 2.2, volume: 0.2, delay: 250, category: null, dedupe: 0 } },
+  ],
   // Reverse Trap — der 1-Tonnen-Klotz pfeift herab und schlägt dumpf auf.
   reverse_trap_ton: [
     { name: 'elem_wind',    opts: { rate: 0.6, volume: 0.4, delay: 1, category: null, dedupe: 0 } },
@@ -4143,6 +4183,17 @@ const ZONE_ANIM_SFX = {
   ev_alleria_spider_redirect: [
     { name: 'projectile', opts: { rate: 0.9, volume: 0.7, delay: 0, category: null, dedupe: 250 } },
     { name: 'elem_biomancy', opts: { rate: 1.1, volume: 0.6, delay: 250, category: null, dedupe: 250 } },
+  ],
+  // Kartenwurf (25.10., `play_card_throw`): Ultimate Destroyer Punch wirft die Creature auf den Helden (Aufschlag nach ~760 ms) / Crash Landing lässt die Ausrüstung in die Ablage stürzen (~860 ms).
+  ev_card_throw: [
+    { name: 'elem_wind',    opts: { rate: 1.1, volume: 0.6, delay: 1, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.7, volume: 0.8, delay: 760, category: null, dedupe: 0 } },
+  ],
+  ev_card_crash: [
+    { name: 'debuff',       opts: { rate: 1.4, volume: 0.4, delay: 1, category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 0.9, volume: 0.5, delay: 220, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.9, volume: 0.6, delay: 860, category: null, dedupe: 0 } },
+    { name: 'discard',      opts: { rate: 0.8, volume: 0.6, delay: 880, category: null, dedupe: 0 } },
   ],
   // Pusher schleudert die Karte nach oben
   ev_pusher_fling: [
