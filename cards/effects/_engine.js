@@ -4197,6 +4197,20 @@ class GameEngine {
   }
 
   /**
+   * Die noch offenen Wisdom-Kosten des Zaubers, der gerade seinen `onPlay` ausführt, JETZT zahlen — statt erst nach seinem Ende (Standard, v1323). Gebraucht für Karten, deren Effekt
+   * SELBST eine Karte spielt (You are the Chosen One!!!): der innere Zauber zahlt seine Kosten in seinem eigenen Lauf, der äußere erst danach — dann kann die Hand leer sein (Kosten
+   * gratis) und die Abfragen kommen in der falschen Reihenfolge. Der Aufrufer ruft das VOR dem Zweitguss; der Server zahlt danach nicht noch einmal. Ohne Wisdom-Kosten, ohne offenen
+   * Zauber oder für einen anderen Spieler: nichts. @returns {Promise<boolean>} wahr, wenn hier gezahlt wurde
+   */
+  async zahleOffeneWisdom(pi) {
+    const o = this._wisdomOffen;
+    if (!o || o.bezahlt || o.pi !== pi) return false;
+    o.bezahlt = true;
+    await o.bezahle();
+    return true;
+  }
+
+  /**
    * Effektive Seiten einer Instanz (Styx 28.9. aus `_createContext` gezogen,
    * damit Kontext und Engine-Filter nie auseinanderlaufen):
    * `owner`/`controller` = wer mit der Karte handelt (Charme, gestohlene und
@@ -52665,6 +52679,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       scan(offMap_w);
       scan(transMap_w);
       if (bestOffset < 0) rawLevel = Math.max(0, rawLevel + bestOffset);
+    }
+    // Karten-Skript `levelOffsetForHero` (You are the Chosen One!!!) — dieselbe Stufe wie in `heroMeetsLevelReq`/`effectiveCardLevel`. Ohne diese Zeile sähen die Wisdom-Kosten die
+    // GEDRUCKTE Stufe (9), fänden keine Deckung (−1) und der Zauber würde trotz Stufenlücke OHNE Abwurf gespielt (Tester 25.10.: „ich werde nur EINMAL gepromptet").
+    {
+      const _heldOff_w = this._heldStufenOffset(playerIdx, heroIdx, cardData);
+      if (_heldOff_w) rawLevel = Math.max(0, rawLevel + _heldOff_w);
     }
     if (rawLevel <= 0 && !cardData.spellSchool1) return 0;
 
