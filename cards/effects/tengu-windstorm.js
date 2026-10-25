@@ -177,7 +177,7 @@ function _collectBoardTargets(gs, engine) {
       if (spitze) targets.push(spitze);
     }
   }
-  return targets;
+  return require('./_equip-stack-shared').gruppiereZiele(targets);   // Darion: ein Ziel je Stapelplatz, die Rueckfrage nennt nur die zulaessigen Karten
 }
 
 /**

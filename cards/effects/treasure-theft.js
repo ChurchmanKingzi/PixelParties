@@ -132,7 +132,7 @@ module.exports = {
       if (insts.length === 0) { gs._spellCancelled = true; return; }
 
       // ── 1. Zielwahl ──
-      const echte = insts.map(i => zielObjekt(engine, i));
+      const echte = require('./_equip-stack-shared').gruppiereZiele(insts.map(i => zielObjekt(engine, i)));   // Darion: ein Ziel je Stapelplatz, die Rueckfrage nennt nur die zulaessigen Karten
       const gewaehlt = await engine.promptEffectTarget(pi, [...echte, ...ausgegrauteRestkarten(engine, echte)], {
         title: CARD_NAME, source: CARD_NAME,
         description: `Choose an Artifact equipped to a Hero your opponent controls. ${nutzer.name} equips it.`,

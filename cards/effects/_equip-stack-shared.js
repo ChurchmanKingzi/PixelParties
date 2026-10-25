@@ -145,4 +145,23 @@ async function waehleMehrere(engine, pi, insts, { title, description, mindestens
   return gewaehlt;
 }
 
-module.exports = { waehleMehrere, teilenAktiv, equipsAt, stapelPlatz, pflichtPlatzFuer, stapelTiefe, beschreibe, hatStapelPlatz, freieEquipZonen };
+/**
+ * ★ Skripte, die ihre Zielliste JE KARTE aufbauen (eine Zeile pro Instanz, eigene Filter wie `immovable`, `darfAn`, Preis …), liefern fuer einen Equip-Stapel mehrere Ziele mit DERSELBEN ID.
+ * Die Engine fragt dann bei der Wahl nach „welches Equip?" (`_disambiguateStackedTargets`) und kennt die Filter des Skripts nicht — sie bot alle Karten des Platzes an.
+ * Diese Funktion fasst Ziele mit gleicher ID zu EINEM zusammen (das erste) und vermerkt die vom Skript zugelassenen Karten in `_erlaubteInstanzen`; Einzelkarten bleiben unveraendert.
+ */
+function gruppiereZiele(ziele) {
+  const proId = new Map();
+  const out = [];
+  for (const z of ziele) {
+    const inst = z && z.type === 'equip' ? (z.cardInstance || z._cardInstance) : null;
+    if (!inst) { out.push(z); continue; }
+    const g = proId.get(z.id);
+    if (!g) { proId.set(z.id, { ziel: z, ids: [inst.id] }); out.push(z); }
+    else g.ids.push(inst.id);
+  }
+  for (const g of proId.values()) if (g.ids.length > 1) g.ziel._erlaubteInstanzen = g.ids;
+  return out;
+}
+
+module.exports = { gruppiereZiele, waehleMehrere, teilenAktiv, equipsAt, stapelPlatz, pflichtPlatzFuer, stapelTiefe, beschreibe, hatStapelPlatz, freieEquipZonen };
