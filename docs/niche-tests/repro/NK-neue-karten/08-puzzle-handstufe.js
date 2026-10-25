@@ -24,9 +24,9 @@ const H = require('../../lib/h.js');
     const t = await frisch([GV, GV]);
     t.setAbilities(0, 0, [['Summoning Magic', 'Summoning Magic'], [], []]);           // Summoning Magic Lv2
     setzeStufe(t, 0, 1, 2);
-    R.check('gedruckte Kopie (Lv9): effektive Stufe 9', stufe(t, 0, 0) === 9, stufe(t, 0, 0));
+    R.check('gedruckte Kopie: effektive Stufe = gedruckte Stufe', stufe(t, 0, 0) === H.DB[GV].level, stufe(t, 0, 0));
     R.check('gesetzte Kopie: effektive Stufe 2', stufe(t, 0, 1) === 2, stufe(t, 0, 1));
-    R.check('Held mit Summoning Magic Lv2 darf die Lv2-Kopie, nicht die Lv9-Kopie', darf(t, 0, 1) === true && darf(t, 0, 0) === false, { auf2: darf(t, 0, 1), auf9: darf(t, 0, 0) });
+    R.check('Held mit Summoning Magic Lv2 darf die Lv2-Kopie, nicht die gedruckte Kopie', darf(t, 0, 1) === true && darf(t, 0, 0) === false, { auf2: darf(t, 0, 1), auf9: darf(t, 0, 0) });
   }
 
   R.section('B · Erhöhte Stufe (der Editor lässt auch nach oben stellen)');
@@ -58,9 +58,9 @@ const H = require('../../lib/h.js');
   R.section('D · Gleichnamige Kopien tragen getrennte Stufen');
   {
     const t = await frisch([GV, GV, GV]);
-    setzeStufe(t, 0, 0, 4); setzeStufe(t, 0, 2, 7);
+    setzeStufe(t, 0, 0, 4); setzeStufe(t, 0, 2, 5);
     const s = [0, 1, 2].map(i => stufe(t, 0, i));
-    R.check('Index 0 → 4, 1 → 9 (gedruckt), 2 → 7', s[0] === 4 && s[1] === 9 && s[2] === 7, s);
+    R.check('Index 0 → 4, 1 → gedruckt, 2 → 5', s[0] === 4 && s[1] === H.DB[GV].level && s[2] === 5, s);
   }
 
   R.section('E · Gegnerhand (Sitz 1) — dieselbe Setzung');

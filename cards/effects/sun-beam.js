@@ -15,7 +15,7 @@
 // ═══════════════════════════════════════════
 
 const { placePollutionTokens, countFreeZones } = require('./_pollution-shared');
-const { areaTargetId } = require('./_targeting-shared');
+const { areaTargetId, supportAbilityZiel } = require('./_targeting-shared');
 
 const POLLUTION_TOKEN = 'Pollution Token';
 const SUN_BEAM_MAX = 3;
@@ -58,6 +58,19 @@ module.exports = {
         if (inst.name === POLLUTION_TOKEN) continue; // explicit exclusion
 
         if (inst.zone === 'support') {
+          // 25.10.2026 (Xal-Runde 4): eine Ability in einer Support Zone ist eine ABILITY — ein Stapel ist EIN Ziel, getroffen wird seine oberste Kopie
+          // (`supportAbilityZiel`). Nur eine Stufe-1-Ability gibt ihren Slot frei; bei höherem Stapel bleibt er belegt und schafft keinen Platz für ein Token.
+          const sa = supportAbilityZiel(engine, inst);
+          if (sa !== undefined) {
+            if (sa) {
+              const eigen = (inst.controller ?? inst.owner) === pi;
+              const schafftPlatz = eigen && sa.level <= 1;
+              if (schafftPlatz) ownSupportAvailable++;
+              targets.push({ ...sa, ownSupport: schafftPlatz });
+            }
+            seenInstIds.add(inst.id);
+            continue;
+          }
           // "Your" / "opponent's" is the CONTROLLER axis. A Creature
           // you originally own but cross-side-placed onto opp's board
           // counts as theirs for picker semantics.

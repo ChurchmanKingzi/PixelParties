@@ -1,4 +1,4 @@
-const { areaTargetId, coolnessSpitzeZiel } = require('./_targeting-shared');
+const { areaTargetId, coolnessSpitzeZiel, supportAbilityZiel } = require('./_targeting-shared');
 const { anyName, hatName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt
 // ═══════════════════════════════════════════
 //  Shared Sparkfly archetype helpers.
@@ -231,6 +231,8 @@ function collectNonHeroBoardTargets(gs, engine) {
     seen.add(inst.id);
 
     if (inst.zone === 'support') {
+      const sa = supportAbilityZiel(engine, inst);   // 25.10.: Ability in einer Support Zone = Ability-Stapel (ein Ziel, oberste Kopie)
+      if (sa !== undefined) { if (sa) targets.push(sa); continue; }
       // ★ Darion: mehrere Equips im selben Platz = EIN Ziel je Platz (wie `_targeting-shared`); welche Karte gemeint ist, fragt `engine._disambiguateStackedTargets`.
       const _id = `equip-${_brettSeite(engine, inst)}-${inst.heroIdx}-${inst.zoneSlot}`;
       const _erstes = targets.find(x => x.id === _id);
@@ -314,6 +316,14 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
 
   // W19a (Al, 19.10.2026): die oberste Karte eines Coolness Stacks ist ein gültiges Ziel („any card on the board that is not a Hero").
   if (targetInst.zone === 'coolnessStack') return await _stackSpitzeAufHand(engine, pi, targetInst, sourceName);
+
+  // 25.10.2026 (Xal-Runde 4): eine Ability (Ability Zone ODER Support Zone) wandert nur als OBERSTE KOPIE auf die Hand, und die Leafagami Snake schützt sie wie überall
+  // („When Abilities would be removed from Heroes you control, don't remove them and draw a card instead"): sie bleibt liegen, der Kontrolleur der Schlange zieht.
+  if (await engine.abilityEntfernungVerhindert(targetInst, 'hand', { source: { name: sourceName, owner: pi } })) {
+    engine.log('steal_to_hand_blocked', { card: targetInst.name, by: sourceName, reason: 'Leafagami Snake' });
+    return false;
+  }
+  const _supAbility = engine.istAbilityImSupport(targetInst);
 
   // W66d: Brettseite einer Support-Karte = wo ihre Zone liegt (`physicalSide`), nicht `inst.owner` — Plant Golem (Besitzer = Beschwoerer, liegt beim Gegner) und
   // eine an den Angreifer angelegte Crimson Web blieben sonst als Geister-Name in ihrer Zone stehen (die Zone der FALSCHEN Seite wurde geleert).
@@ -411,9 +421,12 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
   // Remove from its source zone.
   if (zone === 'support') {
     if (ownerPs.supportZones?.[heroIdx]) {
-      // Nur DIESE Karte nehmen: liegen mehrere Karten im Platz (Darion: Equip-Stapel; Alices Kreaturenstapel), bleiben die anderen liegen.
+      // Nur DIESE Karte nehmen: liegen mehrere Karten im Platz (Darion: Equip-Stapel; Alices Kreaturenstapel; ein Ability-Stapel von Xal/Xalibur), bleiben die anderen liegen.
       const arr = ownerPs.supportZones[heroIdx][zoneSlot];
-      if (Array.isArray(arr) && arr.length > 1 && arr.includes(cardName)) engine.entferneNameAmPlatz(arr, targetInst);
+      // Ein Ability-Stapel verliert seine OBERSTE Kopie (letzter gleichnamiger Eintrag, die Stufe sinkt um 1).
+      const idx = Array.isArray(arr) && _supAbility ? arr.lastIndexOf(cardName) : -1;
+      if (idx >= 0 && arr.length > 1) arr.splice(idx, 1);
+      else if (Array.isArray(arr) && !_supAbility && arr.length > 1 && arr.includes(cardName)) engine.entferneNameAmPlatz(arr, targetInst);   // Darion: nur die Karte, nicht den ganzen Platz
       else ownerPs.supportZones[heroIdx][zoneSlot] = [];
     }
   } else if (zone === 'ability') {
@@ -449,7 +462,7 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
   // ★ Darion (Equip-Stapel): `leavingCard` benennt die abgehende Karte — ohne sie hoeren auch die Stapelnachbarn „ich verlasse die Zone" (gleiche Koordinaten) und nehmen ihre Boni zurueck.
   await engine.runHooks('onCardLeaveZone', {
     card: targetInst,
-    leavingCard: targetInst,
+    leavingCard: targetInst,   // 25.10.: ohne `leavingCard` erkennt die Engine eine Ability in einer Support Zone nicht (Fighting nimmt sonst seinen ATK-Bonus nicht zurück)
     fromZone: zone,
     fromOwner: owner,
     fromHeroIdx: heroIdx,

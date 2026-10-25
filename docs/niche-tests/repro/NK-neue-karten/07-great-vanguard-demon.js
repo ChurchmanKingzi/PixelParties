@@ -4,11 +4,12 @@
 //   When you summon this Creature, place a Demon Counter on all Creatures you control. You may once per turn choose a target and deal damage equal to 50 times
 //   the combined number of Demon Counters on all cards on the board to it."
 // Entscheidungen Al: Aufdecken passiert IMMER, wenn die Karte auf die Hand kommt (egal wie, von wo); jede eigene Reaction senkt die Stufe, solange die Karte in der Hand bleibt;
-// Ausspielen, Zurückmischen, Abwerfen, Löschen setzt auf 9 zurück; Demon Counter = dieselben wie bei Horned Demon (er profitiert von ihnen).
+// Ausspielen, Zurückmischen, Abwerfen, Löschen setzt auf L zurück; Demon Counter = dieselben wie bei Horned Demon (er profitiert von ihnen).
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
   const GV = 'Great Vanguard Demon', HD = 'Horned Demon';
+  const L = H.DB[GV].level;   // gedruckte Stufe aus data/cards.json (Balancing: 9 → 6)
   const stufe = (t, seat, idx) => t.engine.effectiveCardLevel(H.DB[GV], seat, { handIdx: idx, heroIdx: 0 });
   const dc = (inst) => (inst && inst.counters && inst.counters.demonCounter) || 0;
   const frisch = async (hand0, hand1, o = {}) => H.fresh({ hand: [hand0, hand1], deck: [Array(10).fill('ZZ Dummy'), Array(10).fill('ZZ Dummy')], gold: 100, ...o });
@@ -62,21 +63,21 @@ const H = require('../../lib/h.js');
   }
   {
     const t = await frisch([], [GV]);
-    R.check('Ausgangslage: gedruckte Stufe 9', stufe(t, 1, 0) === 9, stufe(t, 1, 0));
+    R.check('Ausgangslage: gedruckte Stufe aus den Kartendaten', stufe(t, 1, 0) === L, stufe(t, 1, 0));
   }
   {
     const t = await fenster('Test Flight', [1, 0, ['Magic Arts', 'Magic Arts']]);
     const i = t.gs.players[1].hand.indexOf(GV);
     const anim = t.events.filter(e => e.ev === 'play_hand_card_animation');
     R.check('Animation: genau eine, Pixelart-Typ hand_level_down, am Kartennamen verankert (nicht am Engine-Index), Index = Platz der Karte', anim.length === 1 && anim[0].data.animType === 'hand_level_down' && anim[0].data.cardName === GV && anim[0].data.handIdx === i && anim[0].data.owner === 1, anim.map(a => a.data));
-    R.check('Reaction-SPELL (Test Flight) vom Besitzer gespielt: Stufe 8', t.pile(1, 'discardPile').includes('Test Flight') && stufe(t, 1, i) === 8, { discard: t.pile(1, 'discardPile'), level: stufe(t, 1, i) });
+    R.check('Reaction-SPELL (Test Flight) vom Besitzer gespielt: Stufe L-1', t.pile(1, 'discardPile').includes('Test Flight') && stufe(t, 1, i) === L - 1, { discard: t.pile(1, 'discardPile'), level: stufe(t, 1, i) });
     R.check('… genau einmal gezählt, Karte weiter aufgedeckt, keine Engine-Fehler', t.gs.players[1]._handLevelOffsetsTransient?.[i] === -1 && !!t.gs.players[1]._permanentlyRevealedHandIndices?.[i] && t.errors.length === 0, { off: t.gs.players[1]._handLevelOffsetsTransient, e: t.errors });
   }
   {
     // Reaction Attack (Challenge: Umleitung) — Sitz 1 reagiert mit Held 1 (Fighting)
     const t = await fenster('Challenge', [1, 1, ['Fighting']]);
     const i = t.gs.players[1].hand.indexOf(GV);
-    R.check('Reaction-ATTACK (Challenge) gespielt: Stufe 8', t.pile(1, 'discardPile').includes('Challenge') && stufe(t, 1, i) === 8, { discard: t.pile(1, 'discardPile'), level: stufe(t, 1, i), hand: t.pile(1, 'hand') });
+    R.check('Reaction-ATTACK (Challenge) gespielt: Stufe L-1', t.pile(1, 'discardPile').includes('Challenge') && stufe(t, 1, i) === L - 1, { discard: t.pile(1, 'discardPile'), level: stufe(t, 1, i), hand: t.pile(1, 'hand') });
   }
   {
     // Der GEGNER sieht die gesenkte Stufe: der Zustand für Sitz 0 trägt bei der aufgedeckten Handkarte von Sitz 1 `handLevel` (Client malt `?lv=`)
@@ -87,7 +88,7 @@ const H = require('../../lib/h.js');
     t.host.sendGameState(t.room, 0);
     const z = gesendet.filter(g => g.sid === 'S0').pop();
     const rev = z && z.data.players && z.data.players[1] && z.data.players[1].revealedHandCards;
-    R.check('Gegner-Zustand: aufgedeckte Karte mit handLevel 8 (gedruckt 9)', Array.isArray(rev) && rev.some(e => e.name === GV && e.handLevel === 8), rev);
+    R.check('Gegner-Zustand: aufgedeckte Karte mit handLevel L-1 (gedruckt L)', Array.isArray(rev) && rev.some(e => e.name === GV && e.handLevel === L - 1), rev);
     t.gs.players[1]._handLevelOffsetsTransient = {};
     gesendet.length = 0; t.host.sendGameStateErzwungen(t.room, 0);
     const z2 = gesendet.filter(g => g.sid === 'S0').pop();
@@ -103,41 +104,41 @@ const H = require('../../lib/h.js');
     await t.run(() => t.engine.actionDealCreatureDamage({ name: 'Fireball', owner: 0, heroIdx: 0 }, opfer, 9999, 'destruction_spell', { sourceOwner: 0 }));
     const gespielt = !!t.find('Doomed Town Guard', 'support') || t.pile(1, 'discardPile').includes('Doomed Town Guard');
     const i = t.gs.players[1].hand.indexOf(GV);
-    R.check('Reaction-CREATURE (Doomed Town Guard) gespielt: Stufe 8 (genau einmal)', gespielt && stufe(t, 1, i) === 8, { gespielt, level: stufe(t, 1, i), off: t.gs.players[1]._handLevelOffsetsTransient, errors: t.errors.slice(0, 2) });
+    R.check('Reaction-CREATURE (Doomed Town Guard) gespielt: Stufe L-1 (genau einmal)', gespielt && stufe(t, 1, i) === L - 1, { gespielt, level: stufe(t, 1, i), off: t.gs.players[1]._handLevelOffsetsTransient, errors: t.errors.slice(0, 2) });
   }
   {
     // Nicht zählen: Normal-Spell, Artefakt-Reaction (nicht im Text), gegnerische Reaction
     const t = await frisch([GV, 'Fireball'], []);
     t.targetFn = (valid) => { const v = valid.find(x => x.owner === 1) || valid[0]; return v ? [v.id] : null; };
     await t.play(0, 'Fireball', { hero: 0 });
-    R.check('normaler Spell (Fireball) senkt nicht', stufe(t, 0, t.gs.players[0].hand.indexOf(GV)) === 9, stufe(t, 0, 0));
+    R.check('normaler Spell (Fireball) senkt nicht', stufe(t, 0, t.gs.players[0].hand.indexOf(GV)) === L, stufe(t, 0, 0));
     const u = await fenster('Anti-Magnet', [1, 0, []]);
     // fenster() wirft den Anti-Magnet nur, wenn er in der Hand ist; hier liegt er zusätzlich
     const u2 = await frisch([], [GV, 'Anti-Magnet']);
     u2.grantFor(1, 0, 'Anti-Magnet'); u2.put(1, 0, 1, H.INERT.big);
     u2.targetFn = (valid) => { const v = valid.find(x => x.owner === 1 && x.type === 'hero' && x.heroIdx === 0) || valid.find(x => x.owner === 1); return v ? [v.id] : null; };
     await u2.play(0, 'Meteor Crash', { hero: 0 });
-    R.check('Reaction-ARTEFAKT (Anti-Magnet) wurde gespielt, steht aber nicht im Text: keine Senkung', u2.pile(1, 'discardPile').includes('Anti-Magnet') && stufe(u2, 1, u2.gs.players[1].hand.indexOf(GV)) === 9, { discard: u2.pile(1, 'discardPile'), level: stufe(u2, 1, 0) });
+    R.check('Reaction-ARTEFAKT (Anti-Magnet) wurde gespielt, steht aber nicht im Text: keine Senkung', u2.pile(1, 'discardPile').includes('Anti-Magnet') && stufe(u2, 1, u2.gs.players[1].hand.indexOf(GV)) === L, { discard: u2.pile(1, 'discardPile'), level: stufe(u2, 1, 0) });
     // gegnerische Reaction: Sitz 0 hält den Dämon, Sitz 1 reagiert
     const v = await frisch([GV], ['Test Flight']);
     v.setAbilities(1, 0, [['Magic Arts', 'Magic Arts'], [], []]); v.grantFor(1, 0, 'Test Flight');
     v.targetFn = (valid) => { const x = valid.find(y => y.owner === 1 && y.type === 'hero' && y.heroIdx === 0); return x ? [x.id] : null; };
     await v.play(0, 'Meteor Crash', { hero: 0 }).catch(() => {});
-    R.check('GEGNERISCHE Reaction senkt die Stufe NICHT', stufe(v, 0, v.gs.players[0].hand.indexOf(GV)) === 9, stufe(v, 0, 0));
+    R.check('GEGNERISCHE Reaction senkt die Stufe NICHT', stufe(v, 0, v.gs.players[0].hand.indexOf(GV)) === L, stufe(v, 0, 0));
   }
   {
-    // Zwei Kopien: beide sinken je Reaction um 1; eine später gezogene Kopie startet bei 9; Dauer über Zugwechsel
+    // Zwei Kopien: beide sinken je Reaction um 1; eine später gezogene Kopie startet bei L; Dauer über Zugwechsel
     const t = await frisch([], [GV, GV, 'Test Flight']);
     t.setAbilities(1, 0, [['Magic Arts', 'Magic Arts'], [], []]); t.grantFor(1, 0, 'Test Flight'); t.put(1, 0, 1, H.INERT.big);
     t.targetFn = (valid) => { const v = valid.find(x => x.owner === 1 && x.type === 'hero' && x.heroIdx === 0) || valid.find(x => x.owner === 1); return v ? [v.id] : null; };
     await t.play(0, 'Meteor Crash', { hero: 0 });
     const idxs = t.gs.players[1].hand.map((n, k) => n === GV ? k : -1).filter(k => k >= 0);
-    R.check('zwei Kopien in der Hand: BEIDE auf Stufe 8, je Reaction genau eine Senkung', idxs.length === 2 && idxs.every(k => stufe(t, 1, k) === 8), idxs.map(k => stufe(t, 1, k)));
+    R.check('zwei Kopien in der Hand: BEIDE auf Stufe L-1, je Reaction genau eine Senkung', idxs.length === 2 && idxs.every(k => stufe(t, 1, k) === L - 1), idxs.map(k => stufe(t, 1, k)));
     t.addHand(1, GV); t.engine.sync();
     const k3 = t.gs.players[1].hand.length - 1;
-    R.check('eine danach gezogene dritte Kopie steht auf 9, die beiden anderen bleiben auf 8', stufe(t, 1, k3) === 9 && idxs.every(k => stufe(t, 1, k) === 8), [...idxs, k3].map(k => stufe(t, 1, k)));
+    R.check('eine danach gezogene dritte Kopie steht auf L, die beiden anderen bleiben auf 8', stufe(t, 1, k3) === L && idxs.every(k => stufe(t, 1, k) === L - 1), [...idxs, k3].map(k => stufe(t, 1, k)));
     await t.endTurn(); await t.endTurn();
-    R.check('die Senkung hält über Zugwechsel (kein Ablauf)', idxs.every(k => stufe(t, 1, k) === 8), idxs.map(k => stufe(t, 1, k)));
+    R.check('die Senkung hält über Zugwechsel (kein Ablauf)', idxs.every(k => stufe(t, 1, k) === L - 1), idxs.map(k => stufe(t, 1, k)));
   }
   {
     // Untergrenze 0: zehn Reactions in Folge
@@ -147,8 +148,8 @@ const H = require('../../lib/h.js');
     R.check('mehr Senkungen als Stufen: die Stufe bleibt bei 0 (nicht negativ)', stufe(t, 0, 0) === 0, stufe(t, 0, 0));
   }
 
-  // ───────────────────────── C · Zurücksetzen auf 9 ─────────────────────────
-  R.section('C · Ausspielen, Zurückmischen, Abwerfen, Löschen setzen die Stufe auf 9 zurück');
+  // ───────────────────────── C · Zurücksetzen auf L ─────────────────────────
+  R.section('C · Ausspielen, Zurückmischen, Abwerfen, Löschen setzen die Stufe auf L zurück');
   for (const [weg, aktion] of [
     ['abwerfen (Effekt)', async (t) => { await t.run(() => t.engine.actionDiscardCards ? t.engine.actionDiscardCards(1, [GV]) : (t.gs.players[1].hand.splice(t.gs.players[1].hand.indexOf(GV), 1), t.gs.players[1].discardPile.push(GV))); }],
     ['direkt aus der Hand in die Ablage', async (t) => { const i = t.gs.players[1].hand.indexOf(GV); t.gs.players[1].hand.splice(i, 1); t.gs.players[1].discardPile.push(GV); }],
@@ -161,12 +162,12 @@ const H = require('../../lib/h.js');
     await aktion(t);
     t.gs.players[1].hand.push('Fireball'); t.gs.players[1].hand.splice(i0, 0, GV);   // eine NEUE Kopie landet auf demselben Platz
     t.engine._trackCard(GV, 1, 'hand');
-    R.check(`${weg}: die neue Kopie auf demselben Platz startet wieder bei 9`, stufe(t, 1, i0) === 9, { level: stufe(t, 1, i0), off: t.gs.players[1]._handLevelOffsetsTransient });
+    R.check(`${weg}: die neue Kopie auf demselben Platz startet wieder bei L`, stufe(t, 1, i0) === L, { level: stufe(t, 1, i0), off: t.gs.players[1]._handLevelOffsetsTransient });
   }
   {
     // Ausspielen: gesenkte Kopie wird beschworen; die Kopie in der Ablage/auf dem Brett trägt keine Senkung weiter
     const t = await frisch([GV], []);
-    t.gs.players[0]._handLevelOffsetsTransient = { 0: -8 };
+    t.gs.players[0]._handLevelOffsetsTransient = { 0: -(L - 1) };
     t.grantFor(0, 0, GV);
     const r = await t.play(0, GV, { hero: 0, slot: 0 });
     R.check('auf Stufe 1 gesenkt → spielbar (Beschwörung gelingt)', r === true && t.zone(0, 0, 0) === GV, { r, z: t.zone(0, 0, 0) });
@@ -176,12 +177,12 @@ const H = require('../../lib/h.js');
 
   {
     // Spielbarkeit hängt an der gesenkten Stufe: Held mit Summoning Magic 3 → Stufe 3 reicht, Stufe 4 nicht
-    for (const [off, erwartet] of [[-6, true], [-5, false]]) {
+    for (const [off, erwartet] of [[3 - L, true], [4 - L, false]]) {
       const t = await frisch([GV], []);
       t.setAbilities(0, 0, [['Summoning Magic', 'Summoning Magic', 'Summoning Magic'], [], []]);
       t.gs.players[0]._handLevelOffsetsTransient = { 0: off };
       const r = await t.play(0, GV, { hero: 0, slot: 0, noGrant: true });
-      R.check(`Summoning Magic 3, Stufe ${9 + off}: ${erwartet ? 'spielbar' : 'nicht spielbar'}`, (r === true) === erwartet, { r, level: 9 + off });
+      R.check(`Summoning Magic 3, Stufe ${L + off}: ${erwartet ? 'spielbar' : 'nicht spielbar'}`, (r === true) === erwartet, { r, level: L + off });
     }
   }
 
@@ -191,7 +192,7 @@ const H = require('../../lib/h.js');
     const t = await frisch([GV], []);
     const eigen1 = t.put(0, 0, 0, H.INERT.creature), eigen2 = t.put(0, 1, 0, H.INERT.creature), fremd = t.put(1, 0, 0, H.INERT.creature);
     const horned = t.put(0, 2, 0, HD);
-    t.grantFor(0, 0, GV); t.gs.players[0]._handLevelOffsetsTransient = { 0: -9 };
+    t.grantFor(0, 0, GV); t.gs.players[0]._handLevelOffsetsTransient = { 0: -L };
     const r = await t.play(0, GV, { hero: 0, slot: 2 });
     const gv = t.find(GV, 'support');
     R.check('Dämon beschworen', r === true && !!gv, { r });
@@ -207,7 +208,7 @@ const H = require('../../lib/h.js');
     const eigen = t.put(0, 0, 0, H.INERT.creature);
     const beute = t.put(1, 0, 0, H.INERT.creature, { controller: 0 });     // vom Gegner gestohlen: „Creatures you control"
     const meine_beim_gegner = t.put(0, 1, 0, H.INERT.creature, { controller: 1 });   // meine, aber vom Gegner kontrolliert
-    t.grantFor(0, 0, GV); t.gs.players[0]._handLevelOffsetsTransient = { 0: -9 };
+    t.grantFor(0, 0, GV); t.gs.players[0]._handLevelOffsetsTransient = { 0: -L };
     await t.play(0, GV, { hero: 0, slot: 2 });
     R.check('Kontrolle zählt: die erbeutete Creature bekommt einen Counter, meine vom Gegner kontrollierte nicht', dc(beute) === 1 && dc(meine_beim_gegner) === 0 && dc(eigen) === 1, [dc(beute), dc(meine_beim_gegner), dc(eigen)]);
   }
@@ -217,7 +218,7 @@ const H = require('../../lib/h.js');
   {
     const t = await frisch([GV], []);
     const horned = t.put(0, 1, 0, HD); horned.turnPlayed = 1;
-    t.grantFor(0, 0, GV); t.gs.players[0]._handLevelOffsetsTransient = { 0: -9 };
+    t.grantFor(0, 0, GV); t.gs.players[0]._handLevelOffsetsTransient = { 0: -L };
     await t.play(0, GV, { hero: 0, slot: 2 });
     R.check('Horned Demon trägt den Counter aus der Beschwörung', dc(horned) === 1, dc(horned));
     t.gs.activePlayer = 0; t.phase(2); t.resetActions(0);
