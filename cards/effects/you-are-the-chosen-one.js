@@ -50,8 +50,17 @@ function andereKarten(engine, pi, heroIdx, hs) {
   pruefTiefe++;
   try {
     const db = engine._getCardDB();
+    // Wisdom: die Kosten dieser Karte werden VOR der Zusatzaktion gezahlt (`engine.zahleOffeneWisdom`), die des gespielten Zaubers danach — beide müssen aus der Hand bezahlbar sein, sonst
+    // endet die Pflichtaktion in einer Sackgasse (Karte und Abwürfe weg, nichts gespielt). Beim Auflösen (`_wisdomOffen` gesetzt) ist die eigene Zahlung schon erfolgt: nichts mehr zu reservieren.
+    const eigen = engine._wisdomOffen ? 0 : engine.getWisdomDiscardCost(hs, heroIdx, db[CARD_NAME]);
+    const hand = engine.gs.players[pi]?.hand?.length || 0;
     return engine.getHeroEligibleActionCards(pi, heroIdx, hs !== pi ? hs : null)
-      .filter(n => n !== CARD_NAME && (db[n]?.cardType === 'Attack' || db[n]?.cardType === 'Spell'));
+      .filter(n => n !== CARD_NAME && (db[n]?.cardType === 'Attack' || db[n]?.cardType === 'Spell'))
+      .filter(n => {
+        if (!(eigen > 0) || db[n]?.cardType !== 'Spell') return true;
+        const kosten = engine.getWisdomDiscardCost(hs, heroIdx, db[n]);
+        return !(kosten > 0) || hand - 2 - eigen >= kosten;      // ohne diese Karte und den Zauber selbst
+      });
   } finally { pruefTiefe--; }
 }
 
@@ -95,8 +104,11 @@ module.exports = {
       const hero = ctx.attachedHero || gs.players[hs]?.heroes?.[heroIdx];
       if (!ps || !hero?.name) return;
 
+      // 0) Die Wisdom-Kosten dieser Karte VOR der Zusatzaktion (der Zweitguss zahlt seine eigenen): erst Chosen One, dann der gespielte Zauber.
+      await engine.zahleOffeneWisdom(pi);
+
       // 1) Die Aura.
-      engine._broadcastEvent('play_zone_animation', { type: 'chosen_one_aura', owner: hs, heroIdx, zoneSlot: -1, duration: AURA_MS });
+      engine._broadcastEvent('play_zone_animation', { type: 'chosen_one_aura', owner: hs, heroIdx, zoneSlot: -1, duration: AURA_MS, unterFiguren: true });
       await engine._delay(AURA_VOR_MS);
 
       // 2) Die Pflichtaktion: eine Attack oder ein Spell aus der Hand mit dem Nutzer.

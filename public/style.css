@@ -3769,6 +3769,14 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   perspective: var(--board-persp);
   perspective-origin: var(--board-anchor-x, 50%) 30%;
 }
+/* Ebene für Animationen UNTER den Heldenfiguren (`unterFiguren: true`, z. B. die Aura von You are the Chosen One!!!): derselbe z-index wie die Sprite-Hülle, im DOM aber davor — die Figuren
+   malen darüber, Brett und Karten liegen darunter. Die Animationen selbst sitzen in einer `.fx-welt-lock`-Hülle (fixed, Scrollstand zurückgenommen). */
+.fx-unter-figuren {
+  position: absolute;
+  left: 0; top: 0; width: 0; height: 0;
+  pointer-events: none;
+  z-index: 51;
+}
 .hero-idle-anker { display: none; }
 .hero-idle-platz {
   position: absolute;
