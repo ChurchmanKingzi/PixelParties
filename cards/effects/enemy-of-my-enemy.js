@@ -163,7 +163,10 @@ module.exports = {
       // ── 4. Die andere wird ins Deck ihres ursprünglichen Besitzers gemischt ──
       const nameAndere = behalten.name;
       let gemischt = false;
-      if (behalten.zone === 'support') {
+      // Cool Rescuer Monia & Co.: „zurück ins Deck" ist ein Effekt auf die Kreatur (Schutzfenster; negiert → sie bleibt liegen).
+      const erlaubt = behalten.zone === 'support'
+        && await engine.kreaturBetroffen(behalten, 'move', { name: CARD_NAME, owner: pi }, { sourceOwner: pi, detail: 'shuffle' });
+      if (erlaubt && behalten.zone === 'support') {
         const besitzer = engine.kartenBesitzerVon(behalten);
         if (engine.isTokenCard(behalten)) {
           await engine.actionMoveCard(behalten, 'deleted', -1, -1, { source: CARD_NAME, _skipReactionCheck: true });
