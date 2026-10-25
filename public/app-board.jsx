@@ -42014,19 +42014,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     };
     // Reaction chain events
-    const onChainUpdate = ({ links }) => {
-      setReactionChain(links.map(l => ({ ...l, status: l.negated ? 'negated' : 'pending' })));
+    // `vorlauf`: das Ereignis, auf das die Kette antwortet (z. B. die ausgeruestete Karte bei Crash Landing) — nur Anzeige, steht vorn, schiebt die Glied-Indizes um 1.
+    const onChainUpdate = ({ links, vorlauf }) => {
+      const vor = vorlauf ? [{ id: 'vorlauf', cardName: vorlauf.cardName, owner: vorlauf.owner, cardType: vorlauf.cardType, isInitialCard: true, _vorlauf: true, status: 'resolved' }] : [];
+      setReactionChain([...vor, ...links.map(l => ({ ...l, isInitialCard: vorlauf ? false : l.isInitialCard, status: l.negated ? 'negated' : 'pending' }))]);
     };
+    const chainIdx = (prev, i) => i + (prev?.[0]?._vorlauf ? 1 : 0);
     const onChainResolvingStart = () => {}; // Chain is about to resolve
     const onChainLinkResolving = ({ linkIndex }) => {
       if (window.playSFX) window.playSFX('spell_cast', { dedupe: 400 });   // ohne Slot 'effect' (s. `spell_played` in app-shared.jsx)
-      setReactionChain(prev => prev?.map((l, i) => i === linkIndex ? { ...l, status: 'resolving' } : l));
+      setReactionChain(prev => prev?.map((l, i) => i === chainIdx(prev, linkIndex) ? { ...l, status: 'resolving' } : l));
     };
     const onChainLinkResolved = ({ linkIndex }) => {
-      setReactionChain(prev => prev?.map((l, i) => i === linkIndex ? { ...l, status: 'resolved' } : l));
+      setReactionChain(prev => prev?.map((l, i) => i === chainIdx(prev, linkIndex) ? { ...l, status: 'resolved' } : l));
     };
     const onChainLinkNegated = ({ linkIndex, negationStyle }) => {
-      setReactionChain(prev => prev?.map((l, i) => i === linkIndex ? { ...l, status: 'negated', negated: true, negationStyle: negationStyle || null } : l));
+      setReactionChain(prev => prev?.map((l, i) => i === chainIdx(prev, linkIndex) ? { ...l, status: 'negated', negated: true, negationStyle: negationStyle || null } : l));
     };
     const onChainDone = () => {
       setTimeout(() => setReactionChain(null), 800);
