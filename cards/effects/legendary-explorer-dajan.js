@@ -155,6 +155,7 @@ async function _playEquip(engine, pi, cardName, cd, cost) {
         destTargets.push({
           id: `equip-${seite}-${hi}-${si}`, type: 'equip',
           owner: seite, heroIdx: hi, slotIdx: si, cardName: '',
+          _eigeneStapelWahl: true,   // Darion: ein Zielplatz, keine Karte — die Engine soll im Equip-Stapel nicht „welches Equip?" fragen
         });
       }
     }
