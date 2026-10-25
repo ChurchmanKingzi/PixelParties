@@ -143,7 +143,8 @@ module.exports = {
       const id = Array.isArray(gewaehlt) ? gewaehlt[0] : gewaehlt;
       // Nach der Abfrage neu einsammeln — das Brett kann sich bewegt haben (Reaktionsfenster der Zielwahl).
       insts = zielInstanzen(engine, pi, hs, heroIdx);
-      const inst = id && insts.map(i => zielObjekt(engine, i)).find(z => z.id === id)?.cardInstance;
+      const gewaehltesZiel = id && insts.map(i => zielObjekt(engine, i)).find(z => z.id === id);
+      const inst = gewaehltesZiel ? engine.stapelWahlFuer(gewaehltesZiel) : null;   // Darion: die gewaehlte Karte des Stapels, nicht die erste mit dieser ID
       if (!inst) {
         // Von einer Reaktion in der Zielwahl negiert: der Zauber ist gespielt und verbraucht. Sonst echter Abbruch → die Karte bleibt auf der Hand.
         if (id || gs._spellNegatedByEffect || gs._zielNegiertDurchSchutz) { delete gs._zielNegiertDurchSchutz; engine.sync(); return; }

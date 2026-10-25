@@ -145,6 +145,7 @@ module.exports = {
       // Nach der Abfrage neu einsammeln — das Brett kann sich bewegt haben.
       const frisch = ausruestungAm(engine, wahl.seite, wahl.heroIdx).map(ausruestungsZiel);
       const treffer = ids.map(id => frisch.find(z => z.id === id)).filter(z => z?.cardInstance);
+      for (const z of treffer) z.cardInstance = z._cardInstance = engine.stapelWahlFuer(z);   // Darion: die gewaehlte Karte des Stapels, nicht die erste mit dieser ID
       if (treffer.length === 0) { gs._spellCancelled = true; return; }
 
       // ★ W16a (Al, 19.10.2026, Frage 2: „Attachments ja"): Disarm wählt einen HELDEN und löscht dessen Ausrüstung — ein Nicht-Schaden-Effekt auf den Helden, den Resistance abfängt
