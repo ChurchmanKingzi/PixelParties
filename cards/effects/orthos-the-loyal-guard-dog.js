@@ -21,6 +21,7 @@
 //  get their own once-per-turn slot.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const { isLoyalCreature, getLoyalsInHand } = require('./_loyal-shared');
 
@@ -61,7 +62,7 @@ module.exports = {
       // card landed in OUR heroIdx's support zones.
       if (entering.heroIdx !== ctx.cardHeroIdx) return;
       // Loyal-only.
-      if (!isLoyalCreature(entering.name, ctx._engine)) return;
+      if (!anyName(entering, (n) => isLoyalCreature(n, ctx._engine))) return;
       // Fires for ANY Loyal entering Orthos's support zones — hand
       // summon, free additional Action, revive, illusion, bounce-place,
       // etc. The per-Orthos-instance HOPT below caps the chain to once
@@ -87,11 +88,11 @@ module.exports = {
         if (gs.hoptUsed) delete gs.hoptUsed[hoptKey];
         return;
       }
-      const zones = gs.players[feld]?.supportZones?.[ctx.cardHeroIdx] || [];
+      // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte): freie Zone ODER — mit Alice-Teilung — die Zone einer GLEICHNAMIGEN Loyal-Creature
+      // (`engine.ersteBeschwoerZone`, je Handkarte; geteilte zuerst).
+      const zoneFuer = (n) => engine.ersteBeschwoerZone(pi, n, { seite: feld, heroIdx: ctx.cardHeroIdx, nurBasis: true, namedHeroesOnly: true });
       let freeSlot = -1;
-      for (let z = 0; z < 3; z++) {
-        if ((zones[z] || []).length === 0) { freeSlot = z; break; }
-      }
+      for (const l of handLoyals) { const z0 = zoneFuer(l.name); if (z0) { freeSlot = z0.slotIdx; break; } }
       if (freeSlot < 0) {
         if (gs.hoptUsed) delete gs.hoptUsed[hoptKey];
         return;
@@ -148,11 +149,7 @@ module.exports = {
       }
 
       // Re-pick the slot fresh — board state can shift across awaits.
-      const zones2 = gs.players[feld]?.supportZones?.[ctx.cardHeroIdx] || [];
-      let destSlot = -1;
-      for (let z = 0; z < 3; z++) {
-        if ((zones2[z] || []).length === 0) { destSlot = z; break; }
-      }
+      const destSlot = zoneFuer(pickedLoyal)?.slotIdx ?? -1;   // W63a: geteilte Zone (Alice) zuerst, dann die erste leere
       if (destSlot < 0) {
         if (gs.hoptUsed) delete gs.hoptUsed[hoptKey];
         return;

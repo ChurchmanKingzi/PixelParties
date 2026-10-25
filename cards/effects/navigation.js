@@ -166,6 +166,8 @@ module.exports = {
       source: 'Navigation',
       reveal: true,
     });
+    // Control Monitors (Al, Welle 75): Navigation fuegt eine Karte hinzu, bezahlt mit dem Abwurf der Kopien → Reaktionsfenster.
+    await engine.meldeHandZugangAusStapel(pi, { source: 'Navigation' });
 
     // ── Step 4: Lock hand if Lv1 or Lv2 ──
 

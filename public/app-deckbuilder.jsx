@@ -727,7 +727,7 @@ function DeckBuilder() {
     const items = [
       isCover
         ? { label: 'Remove as cover card', icon: '✕', color: 'var(--danger)', action: () => setCoverCard('') }
-        : { label: 'Make this the cover card', icon: '⭐', color: '#ffd700', action: () => setCoverCard(cardName) },
+        : { label: 'Make this the cover card', icon: '⭐', color: '#fad54a', action: () => setCoverCard(cardName) },
     ];
     if (hasSkins) {
       const availOpts = ownedSkins ? SKINS_DB[cardName].filter(s => ownedSkins.has(s)) : SKINS_DB[cardName].filter(s => !window.UNLOCKABLE_SKINS.has(s));
@@ -748,34 +748,34 @@ function DeckBuilder() {
     if (!card || !currentDeck) return;
     const items = [];
     if (isCubeDeck(currentDeck)) {
-      items.push({ label: 'Add to Cube', icon: '🧊', color: '#9ad8ff', disabled: !canAddCard(currentDeck, cardName, 'main'), action: () => addCardTo(cardName, 'main') });
+      items.push({ label: 'Add to Cube', icon: '🧊', color: '#b3d8f9', disabled: !canAddCard(currentDeck, cardName, 'main'), action: () => addCardTo(cardName, 'main') });
       setCtxMenu({ x: e.clientX, y: e.clientY, items });
       return;
     }
     if (card.cardType === 'Hero') {
-      items.push({ label: 'Add to Heroes', icon: '👑', color: '#ffd700', disabled: !canAddCard(currentDeck, cardName, 'hero'), action: () => addCardTo(cardName, 'hero') });
+      items.push({ label: 'Add to Heroes', icon: '👑', color: '#fad54a', disabled: !canAddCard(currentDeck, cardName, 'hero'), action: () => addCardTo(cardName, 'hero') });
       // Heroes are also legal in the Main Deck (Goff-style attach
       // mechanic) up to 4 copies. Always offer the option; canAddCard
       // disables it when the cap or 60-card limit is hit.
-      items.push({ label: 'Add to Main Deck', icon: '📋', color: '#44aaff', disabled: !canAddCard(currentDeck, cardName, 'main'), action: () => addCardTo(cardName, 'main') });
+      items.push({ label: 'Add to Main Deck', icon: '📋', color: '#1ca9fd', disabled: !canAddCard(currentDeck, cardName, 'main'), action: () => addCardTo(cardName, 'main') });
       // Kerthwack: „your Potion Deck may contain any card" — auch Helden.
       if (potionDeckAccepts(currentDeck, card)) {
-        items.push({ label: 'Add to Potion Deck', icon: '🧪', color: '#44ffaa', disabled: !canAddCard(currentDeck, cardName, 'potion'), action: () => addCardTo(cardName, 'potion') });
+        items.push({ label: 'Add to Potion Deck', icon: '🧪', color: '#66ffa2', disabled: !canAddCard(currentDeck, cardName, 'potion'), action: () => addCardTo(cardName, 'potion') });
       }
     } else if (card.cardType === 'Potion') {
-      items.push({ label: 'Add to Potion Deck', icon: '🧪', color: '#44ffaa', disabled: !canAddCard(currentDeck, cardName, 'potion'), action: () => addCardTo(cardName, 'potion') });
+      items.push({ label: 'Add to Potion Deck', icon: '🧪', color: '#66ffa2', disabled: !canAddCard(currentDeck, cardName, 'potion'), action: () => addCardTo(cardName, 'potion') });
       if (hasNicolasHero(currentDeck)) {
-        items.push({ label: 'Add to Main Deck', icon: '📋', color: '#44aaff', disabled: !canAddCard(currentDeck, cardName, 'main'), action: () => addCardTo(cardName, 'main') });
+        items.push({ label: 'Add to Main Deck', icon: '📋', color: '#1ca9fd', disabled: !canAddCard(currentDeck, cardName, 'main'), action: () => addCardTo(cardName, 'main') });
       }
     } else {
-      items.push({ label: 'Add to Main Deck', icon: '📋', color: '#44aaff', disabled: !canAddCard(currentDeck, cardName, 'main'), action: () => addCardTo(cardName, 'main') });
+      items.push({ label: 'Add to Main Deck', icon: '📋', color: '#1ca9fd', disabled: !canAddCard(currentDeck, cardName, 'main'), action: () => addCardTo(cardName, 'main') });
       // Starthelden mit Potion-Deck-Klausel (Chaos-Diamond, Pinta, …): ihre Karten duerfen ins Potion Deck; mit einer
       // Erlaubnis (Kerthwack) jede Karte. Ohne beides lehnt `potionDeckAccepts` jede Nicht-Potion ab.
       if (potionDeckAccepts(currentDeck, card)) {
-        items.push({ label: 'Add to Potion Deck', icon: '🧪', color: '#44ffaa', disabled: !canAddCard(currentDeck, cardName, 'potion'), action: () => addCardTo(cardName, 'potion') });
+        items.push({ label: 'Add to Potion Deck', icon: '🧪', color: '#66ffa2', disabled: !canAddCard(currentDeck, cardName, 'potion'), action: () => addCardTo(cardName, 'potion') });
       }
     }
-    items.push({ label: 'Add to Side Deck', icon: '📦', color: '#888', disabled: !canAddCard(currentDeck, cardName, 'side'), action: () => addCardTo(cardName, 'side') });
+    items.push({ label: 'Add to Side Deck', icon: '📦', color: '#7f7f7f', disabled: !canAddCard(currentDeck, cardName, 'side'), action: () => addCardTo(cardName, 'side') });
     setCtxMenu({ x: e.clientX, y: e.clientY, items });
   }, [currentDeck, addCardTo]);
 
@@ -941,8 +941,8 @@ function DeckBuilder() {
     // Heroes and meaningless in a draft pool).
     if (isCube) result = result.filter(c => c.cardType !== 'Ability' || c.name === 'Performance');
     const f = filters;
-    if (f.name) result = result.filter(c => c.name.toLowerCase().includes(f.name.toLowerCase()));
-    if (f.effect) result = result.filter(c => c.effect && c.effect.toLowerCase().includes(f.effect.toLowerCase()));
+    if (f.name) result = result.filter(c => window.namePasst(c.name, f.name));
+    if (f.effect) result = result.filter(c => window.effektTextPasst(c, f.effect));   // jedes Wort, beliebige Reihenfolge
     if (f.cardType) result = result.filter(c => c.cardType === f.cardType);
     if (f.subtype) result = result.filter(c => c.subtype === f.subtype);
     if (f.archetype) result = result.filter(c => c.archetype === f.archetype);
@@ -1449,8 +1449,8 @@ function DeckBuilder() {
                 <button style={{ background: 'none', border: 'none', color: 'var(--text2)', cursor: 'pointer', fontSize: 12 }}
                   onClick={() => { setRenameVal(currentDeck?.name || ''); setRenaming(true); }}>✏️</button>
                 {validation.legal
-                  ? <span className="badge" style={{ background: 'rgba(51,255,136,.12)', color: 'var(--success)' }}>LEGAL</span>
-                  : <span className="badge" style={{ background: 'rgba(255,51,102,.12)', color: 'var(--danger)' }} title={validation.reasons.join(' · ')}>ILLEGAL</span>}
+                  ? <span className="badge" style={{ background: 'rgba(76,235,112,.12)', color: 'var(--success)' }}>LEGAL</span>
+                  : <span className="badge" style={{ background: 'rgba(252,28,95,.12)', color: 'var(--danger)' }} title={validation.reasons.join(' · ')}>ILLEGAL</span>}
               </>
             )}
           </div>
@@ -1522,7 +1522,7 @@ function DeckBuilder() {
                   const v = isDeckLegal(d); const hasChanges = unsaved[d.id];
                   return (
                     <div key={d.id} role="button" className={'deck-list-item' + (i === activeIdx && !isSampleMode ? ' active' : '')} onClick={() => { setActiveIdx(i); setSampleActive(-1); setDeckDropdownOpen(false); }}>
-                      {d.isDefault && <span style={{ color: '#ffd700', fontSize: 10 }}>★</span>}
+                      {d.isDefault && <span style={{ color: '#fad54a', fontSize: 10 }}>★</span>}
                       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}{hasChanges ? ' *' : ''}</span>
                       <span style={{ fontSize: 8, color: v.legal ? 'var(--success)' : 'var(--danger)' }}>{v.legal ? '✓' : '✗'}</span>
                     </div>
@@ -1540,7 +1540,7 @@ function DeckBuilder() {
                         const v = isDeckLegal(d); const hasChanges = unsaved[d.id];
                         return (
                           <div key={d.id} role="button" className={'deck-list-item' + (i === activeIdx && !isSampleMode ? ' active' : '')} onClick={() => { setActiveIdx(i); setSampleActive(-1); setDeckDropdownOpen(false); }}>
-                            <span style={{ color: '#9ad8ff', fontSize: 10 }}>🧊</span>
+                            <span style={{ color: '#b3d8f9', fontSize: 10 }}>🧊</span>
                             <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}{hasChanges ? ' *' : ''}</span>
                             <span style={{ fontSize: 8, color: v.legal ? 'var(--success)' : 'var(--danger)' }}>{v.legal ? '✓' : '✗'}</span>
                           </div>
@@ -1557,7 +1557,7 @@ function DeckBuilder() {
                   return (
                     <>
                       <div style={{ padding: '6px 8px 4px', display: 'flex', alignItems: 'center', gap: 6, borderTop: '1px solid var(--bg4)', marginTop: 4 }}>
-                        <span style={{ fontSize: 9, color: '#ffd700', fontWeight: 700, flex: 1 }}>🏆 DRAFTED DECKS</span>
+                        <span style={{ fontSize: 9, color: '#fad54a', fontWeight: 700, flex: 1 }}>🏆 DRAFTED DECKS</span>
                       </div>
                       {draftedEntries.map(({ d, i }) => {
                         const hasChanges = unsaved[d.id];
@@ -1569,7 +1569,7 @@ function DeckBuilder() {
                           <div key={d.id} role="button" title={tip}
                             className={'deck-list-item' + (i === activeIdx && !isSampleMode ? ' active' : '')}
                             onClick={() => { setActiveIdx(i); setSampleActive(-1); setDeckDropdownOpen(false); }}>
-                            <span style={{ color: '#ffd700', fontSize: 10 }}>🏆</span>
+                            <span style={{ color: '#fad54a', fontSize: 10 }}>🏆</span>
                             <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}{hasChanges ? ' *' : ''}</span>
                           </div>
                         );
@@ -1641,7 +1641,7 @@ function DeckBuilder() {
               <DropSection sectionId="main"
                 onDrop={(d) => { if (d?.cardName) addCardTo(d.cardName, 'main'); }}
                 onDragPos={onGalleryDragPos} className="deck-section">
-                <SecHeader sec="main" color="#9ad8ff" icon="🧊" label="CUBE"
+                <SecHeader sec="main" color="#b3d8f9" icon="🧊" label="CUBE"
                   count={(currentDeck?.mainDeck||[]).length} max={CUBE_SIZE}
                   extra={<TipBtn tip="Sort" className="btn" style={{ padding:'2px 6px', fontSize:8 }} onClick={() => sortSec('main')}>↕</TipBtn>} />
                 <div className="deck-section-body" data-deck-section="main">
@@ -1655,7 +1655,7 @@ function DeckBuilder() {
                       const menuItems = [
                         isCover
                           ? { label: 'Remove as cover card', icon: '✕', color: 'var(--danger)', action: () => setCoverCard('') }
-                          : { label: 'Make this the cover card', icon: '⭐', color: '#ffd700', action: () => setCoverCard(item.card) },
+                          : { label: 'Make this the cover card', icon: '⭐', color: '#fad54a', action: () => setCoverCard(item.card) },
                       ];
                       if (hasSkins) {
                         const availOpts = ownedSkins ? SKINS_DB[item.card].filter(s => ownedSkins.has(s)) : SKINS_DB[item.card].filter(s => !window.UNLOCKABLE_SKINS.has(s));
@@ -1683,7 +1683,7 @@ function DeckBuilder() {
                         <div style={{
                           position: 'absolute', bottom: 2, right: 2,
                           background: 'rgba(0,0,0,.85)', color: '#fff',
-                          border: '1px solid #9ad8ff', borderRadius: 4,
+                          border: '1px solid #b3d8f9', borderRadius: 4,
                           padding: '1px 5px', fontSize: 11, fontWeight: 700,
                           fontFamily: "var(--font-body), sans-serif", lineHeight: 1.2,
                           pointerEvents: 'none', zIndex: 2
@@ -1702,7 +1702,7 @@ function DeckBuilder() {
               const slot = dt && dt.section === 'hero' ? dt.idx : null;
               handleDrop('hero', { ...d, targetSlot: slot }, mx, my);
             }} onDragPos={onGalleryDragPos} className="deck-section">
-              <SecHeader sec="heroes" color="#bb77ff" icon="👑" label="HEROES" count={heroes.filter(h=>h&&h.hero).length} max={heroSoll} />
+              <SecHeader sec="heroes" color="#ba74ff" icon="👑" label="HEROES" count={heroes.filter(h=>h&&h.hero).length} max={heroSoll} />
               <div className="db-hero-row" data-deck-section="hero">
                 {heroes.map((h, i) => {
                   // ★ v992 (Als Vorgabe 12.9.): Mit „Zhigao, the Heavenly
@@ -1753,7 +1753,7 @@ function DeckBuilder() {
                           if (abCard) return <CardMini key={ai} card={abCard} onClick={() => {}} />;
                           return (
                             <div key={ai} className="ability-slot" style={{ padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              {ab ? <span style={{ color: '#ffff44' }}>{ab}</span> : <span style={{ color: 'var(--text2)' }}>Ability {ai + 1}</span>}
+                              {ab ? <span style={{ color: '#ffeb1a' }}>{ab}</span> : <span style={{ color: 'var(--text2)' }}>Ability {ai + 1}</span>}
                             </div>
                           );
                         })}
@@ -1767,7 +1767,7 @@ function DeckBuilder() {
 
             {/* ── MAIN DECK ── */}
             <DropSection sectionId="main" onDrop={(d, mx, my) => handleDrop('main', d, mx, my)} onDragPos={onGalleryDragPos} className="deck-section">
-              <SecHeader sec="main" color="#44aaff" icon="📋" label="MAIN DECK" count={(currentDeck?.mainDeck||[]).length} max={window.mainDeckMax ? window.mainDeckMax(currentDeck) : 60}
+              <SecHeader sec="main" color="#1ca9fd" icon="📋" label="MAIN DECK" count={(currentDeck?.mainDeck||[]).length} max={window.mainDeckMax ? window.mainDeckMax(currentDeck) : 60}
                 extra={<><TipBtn tip="Shuffle" className="btn" style={{ padding:'2px 6px', fontSize:8 }} onClick={shuffleMain}>🔀</TipBtn><TipBtn tip="Sort" className="btn" style={{ padding:'2px 6px', fontSize:8 }} onClick={() => sortSec('main')}>↕</TipBtn></>} />
               <div className={'deck-section-body' + (handHighlight ? ' hand-veil' : '')} data-deck-section="main">
                 {buildDeckDisplay('main', currentDeck?.mainDeck || []).map((item, idx) => {
@@ -1787,7 +1787,7 @@ function DeckBuilder() {
 
             {/* ── POTION DECK ── */}
             <DropSection sectionId="potion" onDrop={(d, mx, my) => handleDrop('potion', d, mx, my)} onDragPos={onGalleryDragPos} className="deck-section">
-              <SecHeader sec="potion" color="#c8a060" icon="🧪" label="POTION DECK" count={(currentDeck?.potionDeck||[]).length} max={15}
+              <SecHeader sec="potion" color="#b29466" icon="🧪" label="POTION DECK" count={(currentDeck?.potionDeck||[]).length} max={15}
                 note={potionPermissions(currentDeck).length > 0 && potionClauses(currentDeck).length === 0 ? '(0 or 5–15 · any card, max 2 each)' : '(0 or 5–15)'}
                 extra={<TipBtn tip="Sort" className="btn" style={{ padding:'2px 6px', fontSize:8 }} onClick={() => sortSec('potion')}>↕</TipBtn>} />
               <div className="deck-section-body" data-deck-section="potion">
@@ -1808,7 +1808,7 @@ function DeckBuilder() {
 
             {/* ── SIDE DECK ── */}
             <DropSection sectionId="side" onDrop={(d, mx, my) => handleDrop('side', d, mx, my)} onDragPos={onGalleryDragPos} className="deck-section">
-              <SecHeader sec="side" color="#888" icon="📦" label="SIDE DECK" count={(currentDeck?.sideDeck||[]).length} max={15}
+              <SecHeader sec="side" color="#7f7f7f" icon="📦" label="SIDE DECK" count={(currentDeck?.sideDeck||[]).length} max={15}
                 extra={<TipBtn tip="Sort" className="btn" style={{ padding:'2px 6px', fontSize:8 }} onClick={() => sortSec('side')}>↕</TipBtn>} />
               <div className="deck-section-body" data-deck-section="side">
                 {buildDeckDisplay('side', currentDeck?.sideDeck || []).map((item, idx) => {

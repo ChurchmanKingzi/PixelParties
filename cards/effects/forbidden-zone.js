@@ -162,7 +162,7 @@ module.exports = {
       // when `_spellPlacedOnBoard` is set, so we handle untracking
       // ourselves here.
       gs._spellPlacedOnBoard = true;
-      ps.deletedPile.push(CARD_NAME);
+      engine.handKartenBesitzerPs(ps, CARD_NAME).deletedPile.push(CARD_NAME);   // W64c: Loeschstapel des permanenten Besitzers (gestohlene Handkarte)
       engine._untrackCard(ctx.card.id);
 
       engine.log('forbidden_zone', {

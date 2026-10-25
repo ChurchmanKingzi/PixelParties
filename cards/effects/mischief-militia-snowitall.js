@@ -283,23 +283,28 @@ module.exports = {
     }
 
     // ── Step 3: splice from hand + summon with full hooks ──
-    // Zone confirmed → the effect is now officially committing.
-    // Restore the engine's pending card reveal + play log and fire
-    // them so opp sees SnowItAll's activation banner exactly at the
-    // moment of commitment (not at hand-pick time). HOPT stamping
-    // is handled by the engine on our non-false return.
+    // Zone confirmed → the effect is committing. ★ W65a: ABER die Beschwoerungskosten der gewaehlten Kreatur (Opfer-/Tribut-Wahl,
+    // abbrechbar) kommen noch: solange der Spieler sie abbrechen kann, sieht der Gegner nichts (kein Banner, keine Zeile). Erst
+    // wenn die Kosten bezahlt sind, wird der gemerkte Auftritt gezeigt — dann die Landung. HOPT bleibt bei einem Abbruch frei.
     if (savedReveal) engine.gs._pendingCardReveal = savedReveal;
     if (savedPlayLog) engine.gs._pendingPlayLog = savedPlayLog;
-    engine._firePendingCardReveal();
 
     const handIdx = ps.hand.indexOf(chosenName);
     if (handIdx < 0) return false;
     engine.takeFromPileSync(ps, 'hand', handIdx);
 
-    const summonResult = await engine.summonCreatureWithHooks(
-      chosenName, dest.owner, dest.heroIdx, dest.slotIdx,
-      { source: CARD_NAME, controller: pi },   // Kontrolle statt Seite (Styx 28.9.): Feldseite + Kontrolleur
-    );
+    const kernOpts = { source: CARD_NAME, controller: pi };   // Kontrolle statt Seite (Styx 28.9.): Feldseite + Kontrolleur
+    if (!(await engine._beschwoerungKostenVorAuftritt(chosenName, dest.owner, dest.heroIdx, dest.slotIdx, kernOpts))) {
+      // Kosten abgebrochen / Sperre: Karte zurueck auf die Hand, der Effekt gilt als nicht benutzt, der Gegner hat nichts gesehen.
+      delete engine.gs._pendingCardReveal; delete engine.gs._pendingPlayLog;
+      engine.returnToPile(ps, 'hand', chosenName, handIdx);   // v1394
+      engine.sync();
+      return false;
+    }
+    kernOpts._sperrenGeprueft = true; kernOpts._kostenGezahlt = true;
+    engine._firePendingCardReveal();
+
+    const summonResult = await engine.summonCreatureWithHooks(chosenName, dest.owner, dest.heroIdx, dest.slotIdx, kernOpts);
     if (!summonResult?.inst) {
       // Race / cancelled by a beforeSummon cost — refund the hand card.
       engine.returnToPile(ps, 'hand', chosenName, handIdx);   // v1394

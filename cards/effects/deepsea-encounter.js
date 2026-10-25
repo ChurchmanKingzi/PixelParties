@@ -154,7 +154,8 @@ module.exports = {
     if (replacements.length === 0) return null;
 
     // Bounce the target.
-    await returnSupportCreatureToHand(engine, bouncedInst, CARD_NAME, { sourceOwner: pi });
+    const bounceRes = await returnSupportCreatureToHand(engine, bouncedInst, CARD_NAME, { sourceOwner: pi });
+    if (!bounceRes?.returned) return null;   // W71b: ein Schutzfenster (Cool Rescuer Monia & Co.) hat das Zurücknehmen negiert — die Kreatur bleibt, es wird nichts platziert
 
     // v1360 (Audit „same Support Zone"): Austritts-Listener (Rider Warg →
     // „als geopfert" → Corpse Cannibal) koennen den Platz sofort fuellen.
@@ -175,7 +176,7 @@ module.exports = {
     engine.takeFromPileSync(ps, 'hand', handIdx);
 
     if (engine.supportSlotBelegt(pi, bouncedHeroIdx, bouncedSlotIdx)) {   // v1360
-      engine.handZugangSync(ps, newName, { von: 'brett', source: CARD_NAME, ohneInstanz: true });
+      engine.handZugangRueckgabe(ps, newName, { von: 'brett', source: CARD_NAME, ohneInstanz: true });   // W64c: unverrichtet zurück — Herkunft einer gestohlenen Handkarte bleibt
       await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });
       return null;
     }

@@ -9,6 +9,8 @@
 //         Action (conditional `inherentAction`).
 //   • 2+  Whenever you equip an Artifact to a
 //         Hero, its controller draws 1 card.
+//         (W52a: zieht der Kontrolleur des HELDEN, an den
+//         angelegt wird — nicht der Ausruestende.)
 //   • 3+  The current and max HP of all Creatures
 //         you summon are doubled.
 //   • 4+  Activated, once/turn, FREE: summon a
@@ -39,6 +41,7 @@
 //  haelt den Spieler danach in der Action Phase.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { hasCardType } = require('./_hooks');
 const {
   countDistinctLunaticCycle,
@@ -110,17 +113,6 @@ function handLunaticCreatures(engine, pi) {
   return out;
 }
 
-/**
- * Wer hat `inst` ausgeruestet? Kontrolle statt Seite (Styx 28.9.): an einen
- * Gegnerhelden gelegt (freie Ausruestung, server `doPlayArtifact`), liegt die
- * Instanz auf dessen Seite (`owner`), `originalOwner` ist der Ausruestende.
- * Sonst der Kontrolleur (Charme: auch an einem geliehenen Helden).
- */
-function ausruester(engine, inst) {
-  if (inst.originalOwner != null && inst.originalOwner !== inst.owner) return inst.originalOwner;
-  return engine.effektiveSeiten(inst).controller ?? inst.owner;
-}
-
 /** First free Support Zone across the player's living Heroes, honoring
  *  the Creature's own summon gate. Returns [{owner,heroIdx,slotIdx}, …].
  *  Styx 28.9.: alle Helden, die `pi` KONTROLLIERT (auch uebernommene der
@@ -136,7 +128,9 @@ function freeZonesFor(engine, pi, creatureName) {
       if ((zonen[zi] || []).length === 0) out.push({ owner: physOwner, heroIdx: hi, slotIdx: zi });
     }
   }
-  return out;
+  // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte): auch die Zone einer GLEICHNAMIGEN Creature (Alice-Teilung) — geteilte zuerst.
+  return require('./_alice-shared').mitGeteilten(engine, pi, creatureName, out, {},
+    z => engine.isCreatureSummonable(creatureName, z.owner, z.heroIdx, { _bypassBeforeSummon: true }));
 }
 
 module.exports = {
@@ -248,6 +242,34 @@ module.exports = {
       }
     },
 
+    /**
+     * ★ W52a (Al, 22.10.2026) — Stufe 2+: „Whenever YOU equip an Artifact to a Hero, ITS CONTROLLER draws 1 card."
+     * Al: „Lunatic Hawk lässt explizit den Spieler, an dessen Hero man anlegt, ziehen. Kontrolliert P1 Hawk und legt selbst ein Equip an einen gegnerischen Hero, zieht P2."
+     * → Trigger: der Hawk-Besitzer ist der AUSRUESTENDE (`ctx.equipOwner`, Hook `onEquipGained`); gezogen wird vom aktuellen KONTROLLEUR des Helden, an den ausgeruestet
+     * wird (`ctx.heroController`: Charme/Uebernahme zaehlen). „Artifact": ein Equipment-Artifact oder ein als Equip angelegter Held (Initiation Ritual: „treated as an
+     * equippable Artifact"); ein Anhaengsel (Spell/Attack) oder Tempelunas angehaengte Fee zaehlt nicht. Auch ein UMHAENGEN per Slippery Fridge / Inheritance Ceremony (Equip-Teil) ist
+     * „you equip" (Al: „Ja, Fridge feuert on-equip. Damit etwas umzuhängen triggert also Hawk."): der Ausfuehrende ist der Anlegende, jedes umgehaengte Equip zieht einzeln 1 Karte
+     * vom Kontrolleur des Zielhelden; Anhaengsel (Spells/Attacks) sind keine Artifacts. Vorher zog der Hawk-Besitzer selbst (= der Ausruestende), egal an wessen Held, und nie beim Umhaengen.
+     */
+    onEquipGained: async (ctx) => {
+      const engine = ctx._engine;
+      const inst = ctx.card;
+      if (!inst || inst.zone !== 'support') return;
+      const pi = ctx.cardOwner;
+      const entering = ctx.equipCard;
+      if (!entering || entering.id === inst.id || entering.zone !== 'support') return;
+      if (ctx.equipOwner !== pi) return;                             // nur „you equip" — beim Umhaengen ist das der Ausfuehrende (Fridge/Ceremony)
+      if (countDistinctLunaticCycle(engine) < 2) return;             // Stufe 2+
+      if (engine.countsAsAbilityInZone(entering.name, entering)) return;   // Cloak of Edge & Co. zaehlen in der Zone als Ability (Ruling 5.8.)
+      if (!engine.istEquipArtifact(entering)) return;
+      const zieher = ctx.heroController ?? pi;
+      await engine.actionDrawCards(zieher, 1);
+      engine.log('lunatic_hawk_equip_draw', {
+        player: engine.gs.players[zieher]?.username, artifact: entering.name, equipper: engine.gs.players[pi]?.username,
+      });
+      engine.sync();
+    },
+
     onCardEnterZone: async (ctx) => {
       const engine = ctx._engine;
       const inst = ctx.card;
@@ -262,27 +284,9 @@ module.exports = {
       if (!cd) return;
 
       // ── Tier 5: ein Lunatic Cycle hebt die Zahl mitten im Zug auf 5 ──
-      if (n >= 5 && isLunaticCycle(entering.name)) await tier5Grant(ctx);
+      if (n >= 5 && anyName(entering, (n) => isLunaticCycle(n))) await tier5Grant(ctx);
 
-      // ── Tier 2+: an Artifact equipped to a Hero → its controller
-      //    (= you, the equipper) draws 1. Only when YOU equip. ──
-      // Kontrolle statt Seite (Styx 28.9.): der Ausruestende, nicht die
-      // Brettseite der Ausruestung (siehe `ausruester`).
-      // Cloak of Edge & Co. zaehlen in der Support-Zone als ABILITY
-      // (Als Ruling 5.8.) — sie loesen den Artefakt-Trigger nicht aus.
-      if (ctx._engine.countsAsAbilityInZone(entering.name, entering)) return;
-      if (n >= 2
-        && cd.cardType === 'Artifact'
-        && (cd.subtype || '').toLowerCase() === 'equipment'
-        && ausruester(engine, entering) === pi
-        && !ctx._isMove) {
-        await engine.actionDrawCards(pi, 1);
-        engine.log('lunatic_hawk_equip_draw', {
-          player: engine.gs.players[pi]?.username, artifact: entering.name,
-        });
-        engine.sync();
-        return;
-      }
+      // (Tier 2+ — das Ziehen beim Ausruesten — liegt seit W52a im Hook `onEquipGained` unten.)
 
       // ── Tier 3+: double current & max HP of Creatures YOU summon ──
       // Kontrolle statt Seite (Styx 28.9.): „you summon" = Kontrolleur.

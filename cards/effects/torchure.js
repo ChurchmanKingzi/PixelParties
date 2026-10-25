@@ -57,6 +57,7 @@ module.exports = {
         side: 'my',
         types: ['hero'],
         damageType: 'status',
+        heroChoiceIsCost: true, // „… to play this card“: die Heldenwahl ist der KOSTENPUNKT, nicht das Ziel einer Wirkung (Flesh-Eating Swarm Trap reagiert nicht)
         dealsDamage: false, // Poison only — no damage; don't wake damage-mitigation Reactions (Spectral Armor)
         title: 'Torchure',
         // Statusangabe fuer den LERNKANAL (Als Vorgabe 9.8.): diese Karte

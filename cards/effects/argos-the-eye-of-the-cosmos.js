@@ -77,6 +77,21 @@ function cdCreaturesAtLevelInHandOrDeck(engine, pi, lvl) {
   return out;
 }
 
+/** Gallery entries of the placeable CD Creatures at an exact level: one per name AND source (hand first, then deck), each with its origin label. */
+function cdEintraegeAtLevel(engine, pi, lvl) {
+  const ps = engine.gs.players[pi];
+  const out = [];
+  for (const quelle of ['hand', 'deck']) {
+    const liste = quelle === 'hand' ? ps?.hand : ps?.mainDeck;
+    const names = new Set();
+    for (const c of cdCreaturesAtLevelInHandOrDeck(engine, pi, lvl)) names.add(c.name);
+    const gezaehlt = {};
+    for (const n of (liste || [])) if (names.has(n)) gezaehlt[n] = (gezaehlt[n] || 0) + 1;
+    for (const [name, count] of Object.entries(gezaehlt).sort(([x], [y]) => x.localeCompare(y))) out.push({ name, source: quelle, ...(quelle === 'deck' ? { count } : {}) });
+  }
+  return out;
+}
+
 module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
@@ -89,46 +104,21 @@ module.exports = {
     counterConsumer: true,
   },
 
-  // Argos opens three prompts in sequence: level picker, creature
-  // gallery, source picker. The CPU's default heuristics handle the
-  // first two acceptably (the level picker's "last option" matches the
-  // highest level — the strongest pick when affordable, and the
-  // gallery uses `pickBestGalleryCard`). The SOURCE picker (hand vs
-  // deck) needs a smarter default: picking `deck` triggers Cosmic
-  // Manipulation's reaction if CM is in hand (huge tempo bonus), but
-  // wastes deck count otherwise. Picking `hand` preserves the deck
-  // and avoids signalling our search.
+  // Argos opens two prompts in sequence: the level picker and ONE creature gallery for hand AND deck (each entry carries its HAND / DECK label). The CPU's default heuristics
+  // handle the level picker acceptably except that the optionPicker default takes the FIRST option — the CPU only ever placed Lv1 even with full counters. Argos' counters
+  // expire at his own turn start (Passive 2), "use it or lose it": take the highest available level. The gallery's creature choice is the default (`pickBestGalleryCard`);
+  // for the SAME creature in both sources the prompt's `cpuSourceOrder` decides: deck first with Cosmic Manipulation in hand (its reaction fires on direct-from-deck
+  // summons and yields draws + counters), otherwise hand first (preserves deck thickness, no search signal).
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'generic') return undefined;
     if (promptData?.type !== 'optionPicker') return undefined;
     const optIds = (promptData.options || []).map(o => o?.id);
-    // Level-Picker (numerische Option-IDs = Counter-Anzahl): Der
-    // optionPicker-Default nimmt stur die ERSTE Option — die CPU
-    // beschwor damit immer nur Lv1, selbst mit vollen Countern.
-    // Argos' Counter verfallen am eigenen Zugstart (Passive 2),
-    // "use it or lose it": höchstes verfügbares Level wählen.
     const numeric = optIds.filter(id => /^\d+$/.test(id || ''));
     if (numeric.length === optIds.length && numeric.length > 0) {
       const best = numeric.map(Number).sort((a, b) => b - a)[0];
       return { optionId: String(best) };
     }
-    // Source picker has exactly { hand, deck } option ids.
-    const isSourcePicker = optIds.length === 2
-      && optIds.includes('hand') && optIds.includes('deck');
-    if (!isSourcePicker) return undefined;
-
-    const cpuIdx = engine._cpuPlayerIdx;
-    const ps = engine.gs.players[cpuIdx];
-    if (!ps) return undefined;
-
-    // If Cosmic Manipulation is in hand, prefer deck — the CM reaction
-    // fires on direct-from-deck summons and yields draws + counters.
-    if ((ps.hand || []).includes('Cosmic Manipulation')) {
-      return { optionId: 'deck' };
-    }
-    // Otherwise prefer hand to preserve deck thickness and avoid
-    // burning a search this turn.
-    return { optionId: 'hand' };
+    return undefined;
   },
 
   hooks: {
@@ -228,60 +218,26 @@ module.exports = {
     const chosenLvl = parseInt(lvlPick.optionId, 10);
     if (!Number.isInteger(chosenLvl) || chosenLvl < 1 || chosenLvl > have) return false;
 
-    // Step 2: which creature? Build gallery of (hand + deck) candidates.
-    const candidates = cdCreaturesAtLevelInHandOrDeck(engine, pi, chosenLvl);
-    if (candidates.length === 0) return false;
-
-    // Count copies per name (across hand + deck combined for the
-    // gallery display; the source is committed at the splice step).
-    const tally = {};
-    for (const c of candidates) {
-      const key = c.name;
-      if (!tally[key]) tally[key] = { hand: 0, deck: 0 };
-      const ps2 = gs.players[pi];
-      const handCount = (ps2?.hand || []).filter(n => n === c.name).length;
-      const deckCount = (ps2?.mainDeck || []).filter(n => n === c.name).length;
-      tally[key].hand = handCount;
-      tally[key].deck = deckCount;
-    }
-    const gallery = Object.entries(tally)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([name, t]) => ({
-        name, source: 'mixed', count: t.hand + t.deck,
-      }));
-
+    // Step 2: which creature — and from where? EIN Picker für Hand UND Deck (CARD_API „Mehrere Quellen = ein Picker"): jede wählbare Kreatur je Quelle ein Eintrag mit
+    // Herkunfts-Label (HAND / DECK); gleichnamige Karten in beiden Quellen sind zwei Einträge. Es gibt keine Vorfrage „Hand oder Deck?" mehr.
+    const eintraege = cdEintraegeAtLevel(engine, pi, chosenLvl);
+    if (eintraege.length === 0) return false;
+    // Reihenfolge der Quellen für die CPU: Cosmic Manipulation auf der Hand → erst Deck (die Reaktion feuert bei Deck-Beschwörungen), sonst Hand schonen (kein Such-Signal).
+    const cmInHand = (ps.hand || []).includes('Cosmic Manipulation');
     const pickCard = await engine.promptGeneric(pi, {
       type: 'cardGallery',
-      cards: gallery,
+      cards: eintraege,
       title: CARD_NAME,
-      description: `Place which Lv${chosenLvl} "Cosmic Depths" Creature into ${hero.name}'s free Support Zone?`,
+      description: `Place which Lv${chosenLvl} "Cosmic Depths" Creature into ${hero.name}'s free Support Zone — from your hand or your deck?`,
       cancellable: false,
+      cpuSourceOrder: cmInHand ? ['deck', 'hand'] : ['hand', 'deck'],
     });
     if (!pickCard?.cardName) return false;
     const chosenName = pickCard.cardName;
-    if (!candidates.some(c => c.name === chosenName)) return false;
-
-    // Step 3: source — prefer hand if available; else deck. (Player
-    // can't have "neither" because the candidate was built from
-    // hand+deck and at least one source contains it.)
-    const handIdx = (ps.hand || []).indexOf(chosenName);
-    const deckIdx = (ps.mainDeck || []).indexOf(chosenName);
-    let source;
-    if (handIdx >= 0 && deckIdx >= 0) {
-      // Both — let the player pick.
-      const opts = [
-        { id: 'hand', label: 'From your hand' },
-        { id: 'deck', label: 'From your deck' },
-      ];
-      const srcPick = await engine.promptGeneric(pi, {
-        type: 'optionPicker',
-        title: CARD_NAME,
-        description: `Where should ${chosenName} come from?`,
-        options: opts, cancellable: false,
-      });
-      source = srcPick?.optionId || 'hand';
-    } else if (handIdx >= 0) source = 'hand';
-    else source = 'deck';
+    // Herkunft: die Antwort nennt sie; fehlt sie (Automat), gilt die erste passende Karte (Hand vor Deck).
+    const treffer = eintraege.find(e => e.name === chosenName && (!pickCard.source || e.source === pickCard.source));
+    if (!treffer) return false;
+    const source = treffer.source;
 
     // Pay the counter cost AFTER the source is locked in (so a UI
     // dismiss before this point doesn't cost counters).

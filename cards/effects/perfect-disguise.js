@@ -41,6 +41,7 @@
 //    standard `oncePerGame` + `oncePerGameKey`.
 // ═══════════════════════════════════════════
 
+const { istHeldOderKreatur } = require('./_targeting-shared');
 const CARD_NAME = 'Perfect Disguise';
 const ONCE_PER_GAME_KEY = 'perfectDisguise';
 
@@ -127,6 +128,7 @@ module.exports = {
         if (inst.zone !== 'support') continue;
         if ((inst.controller ?? inst.owner) !== pi) continue;
         if (inst.faceDown) continue;
+        if (!istHeldOderKreatur(engine, inst)) continue;   // „target you control" = Held oder Kreatur (Al, 25.10.): keine Ausruestung, kein Anhaengsel
         targets.push({
           id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
           type: 'equip',
@@ -174,7 +176,8 @@ module.exports = {
       // specifically" detail isn't needed here because hero
       // untargetable already filters opponent-side picks only (own-
       // side picks bypass via the `if (owner === pi) continue` skip).
-      hero.statuses.untargetable = true;
+      // W68a: „during their next turn" — zählt den nächsten ECHTEN Gegnerzug (`gegnerZug`; ein Skip des Gegners verlängert den Schutz, s. `_zug-fristen.js`).
+      hero.statuses.untargetable = { gegnerZug: true };
       engine.log('perfect_disguise', {
         player: ps.username, target: hero.name, type: 'hero',
       });
@@ -188,9 +191,12 @@ module.exports = {
         && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
       ) || target.cardInstance;
       if (!inst || inst.zone !== 'support') return false;
+      // W71b (Al, 25.10.2026): Schutzfenster (Cool Rescuer Monia & Co.) VOR dem Schreiben; negiert = verbraucht, Kreatur unverändert.
+      if (!(await engine.kreaturBetroffen(inst, 'buff', 'Perfect Disguise', { sourceOwner: pi, detail: 'untargetable' }))) return true;
       if (!inst.counters) inst.counters = {};
       inst.counters.softUntargetable_by_opponent = 1;
       inst.counters.softUntargetable_by_opponent_pi = oi;
+      inst.counters.softUntargetable_gegnerZug = true;   // W68a (s. oben)
       engine.log('perfect_disguise', {
         player: ps.username, target: inst.name, type: 'creature',
       });

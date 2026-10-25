@@ -38,4 +38,22 @@ function abgangsBetrag(engine, abgehend, schluessel) {
   return betrag;
 }
 
-module.exports = { abgangsBetrag };
+/**
+ * 0-basierter Platz der Kopie `karte` im Stapel = Anzahl der gleichnamigen Kopien desselben Stapels, die ihren Bonus SCHON tragen
+ * (`counters.<schluessel> > 0`), ohne `karte` selbst.
+ *
+ * ★ 25.10.2026 (Xal-Runde 5): `onPlay` rechnete den Platz als „Stapelhoehe - 1". Das stimmt nur, wenn die Kopien EINZELN nacheinander
+ * ankommen. Kommen mehrere auf einmal (Aufstiegsbonus: erst alle Kopien legen, danach ihre `onPlay`; Aufwachen einer schlafenden
+ * Support-Stapel nach Xalibur-Abgang), sah JEDE Kopie die volle Hoehe und gab den Bonus der obersten Stufe — Fighting 3 aus dem
+ * Aufstiegsbonus brachte +60 ATK statt +40, Toughness 3 +600 HP statt +400. Die bereits versorgten Kopien zu zaehlen ist in beiden
+ * Faellen richtig (wie schon `onGameStart`).
+ */
+function kopienIndex(engine, karte, schluessel) {
+  if (!karte) return 0;
+  return (engine.cardInstances || []).filter(c =>
+    c !== karte && c.id !== karte.id && c.name === karte.name && c.zone === karte.zone
+    && c.owner === karte.owner && c.heroIdx === karte.heroIdx && c.zoneSlot === karte.zoneSlot
+    && (c.counters?.[schluessel] || 0) > 0).length;
+}
+
+module.exports = { abgangsBetrag, kopienIndex };

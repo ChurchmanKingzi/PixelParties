@@ -43,11 +43,14 @@ module.exports = {
       const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
       if (engine.isHeroIncapacitated(feld, heroIdx) || hero.statuses?.negated) return;
-      if (!engine.claimHOPT('locke-sabotage', pi)) return;
+      if (engine.gs.hoptUsed?.[`locke-sabotage:${pi}`] === gs.turn) return;   // W66b: nur nachsehen — beansprucht wird ERST nach der Zielwahl (Abbruch verbraucht nichts)
 
       // Ziel-Picker mit allen Filtern (Untargetable, Stealth, Boris …);
       // `dealsDamage: false` — ein reiner Status-Effekt, keine Schadens-
       // Reaktionen.
+      // W66b (Al, 23.10.2026): „Abbruch verbraucht keine Limits" — ein echter Abbruch der Zielwahl lässt die Einmal-Sperre frei; wurde der Effekt in der Zielwahl NEGIERT/abgeblockt
+      // (Reaktionsfenster, Schutz), ist er für die Runde verbraucht (Muster Alice, W35a).
+      const _negVorher = gs._spellNegatedByEffect; delete gs._spellNegatedByEffect; delete gs._zielNegiertDurchSchutz;
       const target = await ctx.promptDamageTarget({
         side: 'enemy', types: ['hero', 'creature'], dealsDamage: false, damageType: 'other',
         appliesStatus: 'negated',
@@ -56,7 +59,11 @@ module.exports = {
         confirmLabel: '🕶️ Sabotage!', confirmClass: 'btn-danger',
         cancellable: true, source: CARD_NAME,
       });
-      if (!target) return;
+      const _negiert = !target && (!!gs._spellNegatedByEffect || !!gs._zielNegiertDurchSchutz);
+      delete gs._zielNegiertDurchSchutz;
+      if (_negVorher) gs._spellNegatedByEffect = _negVorher; else delete gs._spellNegatedByEffect;
+      if (!target) { if (_negiert) engine.claimHOPT('locke-sabotage', pi); return; }
+      if (!engine.claimHOPT('locke-sabotage', pi)) return;   // W66b (Al, 23.10.2026): Limit erst nach dem Commit
 
       const oppIdx = engine.opponentOf(pi);
       if (target.type === 'hero') {
@@ -64,12 +71,12 @@ module.exports = {
         if (!th?.name || th.hp <= 0) return;
         await engine.addHeroStatus(target.owner, target.heroIdx, 'negated', {
           appliedBy: pi, source: CARD_NAME,
-          expiresAtTurn: gs.turn + 2, expiresForPlayer: pi,
+          expiresAtTurn: gs.turn + 2, expiresForPlayer: pi, fristBeginn: true,   // W68a: „until the beginning of your next turn" (ein übersprungener Zug beendet sie nicht)
           effectOnly: true,   // W4a (Al): Text sagt nur "effects are negated" -> leichte Form, Abilities laufen weiter
         });
       } else if (target.cardInstance) {
         await engine.actionNegateCreature(target.cardInstance, CARD_NAME, {
-          expiresAtTurn: gs.turn + 2, expiresForPlayer: pi,
+          expiresAtTurn: gs.turn + 2, expiresForPlayer: pi, fristBeginn: true,
           buffKey: 'locke_negated', removeAnim: 'status_remove',
           cleansable: true,   // „This counts as a negative status effect."
         });

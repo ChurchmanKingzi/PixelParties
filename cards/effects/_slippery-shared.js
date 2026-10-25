@@ -35,6 +35,7 @@
 //  Ingo / Maya / Pes'zet still see the entry).
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const ARCHETYPE = 'Slippery';
 
 /** Hero indices adjacent to `heroIdx` in the 3-slot row. */
@@ -71,10 +72,30 @@ function destinationsFor(engine, pi, inst) {
           heroIdx: hi, slotIdx: zi,
           label: `${heroLabel} — Slot ${zi + 1}`,
         });
+      } else if (teilbarZiel(engine, inst, hi, zi)) {
+        // ★ W63a (Al, 22.10.2026: „Solange der Effekt aktiv ist, kann eine Creature in eine geteilte Zone bewegt werden"): mit Alice-Teilung des Kontrolleurs
+        // ist auch die Zone einer GLEICHNAMIGEN Creature ein Ziel (die Creatures teilen sich dann die Zone).
+        const tiefe = (zones[zi] || []).length;
+        out.push({
+          heroIdx: hi, slotIdx: zi, shared: true, stackDepth: tiefe,
+          label: `${heroLabel} — Slot ${zi + 1} (×${tiefe})`,
+        });
       }
     }
   }
-  return out;
+  // Geteilte Zonen zuerst (Al: erst die geteilte Zone, DANN die erste leere) — die Standardvorauswahl.
+  return out.some(z => z.shared) ? [...out.filter(z => z.shared), ...out.filter(z => !z.shared)] : out;
+}
+
+/**
+ * ★ W63a: darf `inst` in die BELEGTE Zone (Held `hi`, Slot `zi`) der Brettseite der Kreatur ziehen, weil dort nur GLEICHNAMIGE Creatures liegen und ihr Kontrolleur
+ * die Alice-Teilung hat (`_alice-shared.canShareInto`)? Bewegung triggert nie On-Summon (`_isMove`), die Instanz wird nur umgehaengt.
+ */
+function teilbarZiel(engine, inst, hi, zi) {
+  if (!inst?.name) return false;
+  const seite = engine.physicalSide ? engine.physicalSide(inst) : (inst.owner ?? 0);
+  const ktrl = engine.kontrolleurVon ? engine.kontrolleurVon(inst) : (inst.controller ?? inst.owner);
+  return require('./_alice-shared').canShareInto(engine, ktrl, hi, zi, inst, seite);
 }
 
 /**
@@ -104,7 +125,10 @@ async function moveSlipperyCreature(engine, pi, inst, destHeroIdx, destSlot, opt
   const srcArr = (ps.supportZones?.[srcHeroIdx] || [])[srcSlot] || [];
   const srcIdx = srcArr.indexOf(inst.name);
   if (srcIdx < 0) return false;
-  if (((ps.supportZones?.[destHeroIdx] || [])[destSlot] || []).length > 0) return false;
+  if (((ps.supportZones?.[destHeroIdx] || [])[destSlot] || []).length > 0 && !teilbarZiel(engine, inst, destHeroIdx, destSlot)) return false;   // W63a: belegt nur ok, wenn geteilt (Alice)
+  // W71b (Al, 25.10.2026): das Versetzen einer ANDEREN Kreatur (Pengus Zusatz, `opts.fremd`) ist ein Effekt auf sie — Schutzfenster (Cool Rescuer Monia & Co.); das eigene Gleiten
+  // einer Slippery-Kreatur am Zugbeginn ist ihr eigener Text (kein Fenster).
+  if (opts.fremd && !(await engine.kreaturBetroffen(inst, 'move', { name: opts.fremdName || 'Slippery Pengu', owner: pi }, { sourceOwner: pi, detail: 'slide' }))) return false;
 
   // Suppress the diff-detector's spurious damage-floater on the
   // source slot as the Creature leaves it.
@@ -143,7 +167,7 @@ async function moveSlipperyCreature(engine, pi, inst, destHeroIdx, destSlot, opt
   // Callers granting a SEPARATE move (Pengu's rider) pass
   // `skipSlipperyMovedMark: true` so the target still gets its own
   // inherent turn-start move afterward.
-  if (!opts.skipSlipperyMovedMark && isSlipperyCard(inst.name, engine)) {
+  if (!opts.skipSlipperyMovedMark && anyName(inst, (n) => isSlipperyCard(n, engine))) {
     inst._slipperyMovedTurn = engine.gs.turn;
   }
 
@@ -294,7 +318,7 @@ function _collectMovableSlipperies(engine, pi) {
   const out = [];
   for (const inst of engine.cardInstances) {
     if ((inst.controller ?? inst.owner) !== pi) continue;
-    if (!isSlipperyCard(inst.name, engine)) continue;
+    if (!anyName(inst, (n) => isSlipperyCard(n, engine))) continue;
     if (!_slipperyEligibleNow(engine, inst)) continue;
     const dests = destinationsFor(engine, pi, inst);
     if (dests.length === 0) continue;
@@ -345,7 +369,7 @@ async function _runSlipperySubMode(engine, pi) {
   for (const inst of engine.cardInstances) {
     if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.zone !== 'support') continue;
-    if (!isSlipperyCard(inst.name, engine)) continue;
+    if (!anyName(inst, (n) => isSlipperyCard(n, engine))) continue;
     initialIds.add(inst.id);
   }
   const collect = () =>
@@ -446,6 +470,7 @@ module.exports = {
   ARCHETYPE,
   adjacentHeroIndices,
   destinationsFor,
+  teilbarZiel,
   moveSlipperyCreature,
   onSlipperyTurnStart,
   slipperyOnMoveGate,

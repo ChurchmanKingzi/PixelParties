@@ -54,11 +54,14 @@ module.exports = {
     const heroIdx = target.heroIdx;
     const slotIdx = target.slotIdx;
     const ps = gs.players[heroOwner];
+    if (engine.surprisesLockedFor(pi)) return false;   // Arcane Eyes (Welle 72): der Gegner kontrolliert wirksame Augen — keine Surprise setzen
 
     if ((ps.surpriseZones?.[heroIdx] || []).length > 0) return false;
 
     await engine._triggerGateCheck(heroOwner, 'Ushabti of the Great Pharaoh');
     if (engine._isGateShielded(heroOwner)) return false;
+    // W71b (Al, 25.10.2026): das Verschwinden der Kreatur in die Surprise Zone ist ein Effekt auf sie — Schutzfenster (Cool Rescuer Monia & Co.), NACH dem Tor, VOR der ersten Änderung.
+    if (!(await engine.kreaturBetroffen(inst, 'move', { name: 'Ushabti of the Great Pharaoh', owner: pi }, { sourceOwner: pi, detail: 'entomb' }))) return false;
 
     engine._broadcastEvent('play_zone_animation', {
       type: 'sand_reset', owner: heroOwner, heroIdx, zoneSlot: slotIdx,

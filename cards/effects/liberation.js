@@ -70,7 +70,7 @@ function zurueckholbare(engine, pi) {
 }
 
 /** ALLE freien Support Zones auf meiner Seite (place: Heldenzustand egal). */
-function freieZonen(engine, pi) {
+function freieZonen(engine, pi, name = null) {
   const ps = engine.gs.players[pi];
   const zonen = [];
   for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
@@ -88,6 +88,9 @@ function freieZonen(engine, pi) {
       });
     }
   }
+  // ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): mit `name` (der zurueckgeholten
+  // Kreatur) zaehlt bei Alice-Teilung des Spielers auch die Zone einer GLEICHNAMIGEN Creature — geteilte zuerst.
+  if (name) return require('./_alice-shared').mitGeteilten(engine, pi, name, zonen, { nachKontrolle: false, livingHeroesOnly: false, nurBasis: true });
   return zonen;
 }
 
@@ -98,7 +101,7 @@ function kannBergen(engine, pi) {
 }
 
 function kannBefreien(engine, pi) {
-  return zurueckholbare(engine, pi).length > 0 && freieZonen(engine, pi).length > 0;
+  return zurueckholbare(engine, pi).some(i => freieZonen(engine, pi, i.name).length > 0);   // W63a: frei oder (Alice) geteilt, je Kreatur
 }
 
 // ─── Effekt 1: aus Ablage oder Deleted Pile auf die Hand ─────────
@@ -191,7 +194,7 @@ async function bergen(engine, pi, ctx) {
   // `_spellPlacedOnBoard` abgeklemmt (Bauform aus forbidden-zone.js),
   // das Untracking uebernimmt die Karte deshalb selbst.
   gs._spellPlacedOnBoard = true;
-  ps.deletedPile.push(CARD_NAME);
+  engine.handKartenBesitzerPs(ps, CARD_NAME).deletedPile.push(CARD_NAME);   // W64c: Loeschstapel des permanenten Besitzers (gestohlene Handkarte)
   if (ctx?.card?.id) engine._untrackCard(ctx.card.id);
   engine.sync();
   return true;
@@ -203,12 +206,12 @@ async function befreien(engine, pi) {
   const gs = engine.gs;
 
   for (;;) {
-    const offen = zurueckholbare(engine, pi);
-    if (offen.length === 0) break;
-    const zonen = freieZonen(engine, pi);
-    if (zonen.length === 0) break;          // kein Platz mehr — Rest bleibt drueben
-
+    // W63a: die naechste Kreatur MIT Platz (frei oder — Alice-Teilung — geteilt)
+    const offen = zurueckholbare(engine, pi).filter(i => freieZonen(engine, pi, i.name).length > 0);
+    if (offen.length === 0) break;          // kein Platz mehr — Rest bleibt drueben
     const inst = offen[0];
+    const zonen = freieZonen(engine, pi, inst.name);
+
     const ziel = zonen.length === 1 ? zonen[0]
       : (await engine.promptGeneric(pi, {
           type: 'zonePick', zones: zonen, title: CARD_NAME,

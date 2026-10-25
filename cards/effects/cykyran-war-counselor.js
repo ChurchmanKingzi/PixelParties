@@ -43,6 +43,22 @@
 //  Absicht: dort haengt die Curse-Regel ("Angriff ist
 //  0"), die eine direkte Zuweisung umgehen wuerde.
 //
+//  ── ①b Formwechsel (W55a, Al: „Die Verdopplung muss neu berechnet werden!") ──
+//  Aufstieg/Abstieg (`performAscension`/`performDescend`) setzen `hero.baseAtk` auf den GEDRUCKTEN Wert der
+//  neuen Form zurueck (`_atkNachFormwechsel`: gedruckter Wert + fortbestehende Boni; die Verdopplung gehoert
+//  zur alten Basis und ist dabei erloschen). Vorher blieb `_cykyranBonus` mit dem ALTEN Betrag stehen:
+//  der Held stand ohne Verdopplung da (Test: 40 -> 80, nach dem Aufstieg 90 statt 180) und ein spaeterer
+//  Abgleich rechnete `natuerlich = baseAtk - altem Bonus` falsch (100 statt 180).
+//  Jetzt in zwei Schichten:
+//    • `onFormChanged` (neuer Engine-Hook, feuert direkt nach der Zustandsuebertragung): `resync` bucht auf
+//      die neue Basis um — alte Buchung zuruecknehmen (sie ist mit dem Zuruecksetzen der Basis schon weg,
+//      es gibt nichts abzuziehen) und, solange die Bedingung gilt, die NEUE Basis einmal verdoppeln.
+//    • Selbstheilung im `resync` selbst: die Buchung traegt den Formwechsel-Zaehler `hero._formGen`
+//      (`_cykyranGen`). Weicht er ab, ist die Buchung verwaist und zaehlt als 0 — egal ueber welchen
+//      Weg der Abgleich laeuft (jeder andere Hook, Zugbeginn, Wiederbelebung …).
+//  Boni (Ausruestung, Fighting, dauerhafte Zuwaechse `permAtkDelta`, befristete Gaben) werden nicht
+//  verdoppelt: verdoppelt wird allein `baseAtk` (= gedruckter Wert der aktuellen Form).
+//
 //  ── ② Der Schuss ──
 //  "one of your Heroes" — der Spieler waehlt, welcher
 //  Held den Wert stellt; gedeckelt bei 300. Der
@@ -87,6 +103,14 @@ function resync(engine, pi, ausserId = null) {
     const hero = heroes[hi];
     if (!hero?.name) continue;
     const kontrolliert = engine.heroSideOf(p, hero) === pi;
+    // W55a: verwaiste Buchung (der Held hat seit dem Setzen die Form gewechselt): `baseAtk` ist dabei auf den
+    // gedruckten Wert der neuen Form zurueckgesetzt worden, die Verdopplung steckt nicht mehr darin —
+    // es gibt nichts zurueckzunehmen. Aeltere Staende ohne Stempel (`_cykyranGen` fehlt) gelten als frisch.
+    if (hero._cykyranBonus && hero._cykyranGen !== undefined && hero._cykyranGen !== (hero._formGen || 0)) {
+      hero._cykyranBonus = 0;
+      delete hero._cykyranBy;
+      delete hero._cykyranGen;
+    }
     const current = hero._cykyranBonus || 0;
     if (!kontrolliert && !(current && (hero._cykyranBy ?? p) === pi)) continue;
     // Natuerlicher Basiswert = gespeicherte Basis minus unser eigener
@@ -101,6 +125,7 @@ function resync(engine, pi, ausserId = null) {
     if (hero.baseAtk !== undefined) hero.baseAtk = Math.max(0, hero.baseAtk + delta);
     hero._cykyranBonus = wanted;
     hero._cykyranBy = pi;
+    hero._cykyranGen = hero._formGen || 0;
   }
   }
 }
@@ -231,6 +256,7 @@ module.exports = {
   onRevive: (ctx) => resyncFromCtx(ctx),
 
   hooks: {
+    onNameChanged: (ctx) => resyncFromCtx(ctx),   // W73c: Shroomasaur bekommt/verliert einen Zusatznamen - der Bestand der Ratgeber ändert sich
     // Bedingung UND Grundwert koennen sich bei jedem dieser Ereignisse
     // aendern — kein Filter auf die gespielte Karte, gerade FREMDE
     // Beschwoerungen und Tode veraendern ja die Ratgeberzahl.
@@ -247,6 +273,8 @@ module.exports = {
       resyncFromCtx(ctx);
     },
     onTurnStart: (ctx) => resyncFromCtx(ctx),
+    // W55a: Aufstieg/Abstieg — die Verdopplung auf den NEUEN Grundwert umbuchen (siehe ①b)
+    onFormChanged: (ctx) => resyncFromCtx(ctx),
     afterDamage: (ctx) => resyncFromCtx(ctx),
     // W7a: Frost/Betäubung/Negation kommen und gehen
     onPhaseStart: (ctx) => resyncFromCtx(ctx),

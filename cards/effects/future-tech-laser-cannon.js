@@ -49,10 +49,8 @@ function zuschlagNachrechnen(ctx) {
   if (!inst.counters) inst.counters = {};
   const bisher = inst.counters.atkGranted || 0;
   const delta = ATK_BONUS - bisher;
-  if (delta === 0) return;
-
-  engine._applyHeroAtkDelta(hero, owner, heroIdx, delta);
-  inst.counters.atkGranted = ATK_BONUS;
+  // W53a: EIN Baustein fuer Ausruestungs-ATK — bucht auf den Zielwert, nur am aktuellen Traeger, pro Instanz genau einmal (siehe `engine.actionSetAtkGrant`).
+  if (!engine.actionSetAtkGrant(inst, ATK_BONUS)) return;
   engine.log('ft_laser_cannon_atk', { hero: hero.name, bonus: ATK_BONUS, delta });
   engine.sync();
 }
@@ -92,14 +90,10 @@ module.exports = {
       const bisher = inst.counters?.atkGranted || 0;
       if (!bisher) return;
       const engine = ctx._engine;
-      const owner = ctx.fromOwner ?? inst.owner;
-      const heroIdx = ctx.fromHeroIdx ?? inst.heroIdx;
-      const hero = engine.gs.players[owner]?.heroes?.[heroIdx];
-      inst.counters.atkGranted = 0;
-      if (!hero?.name) return;
-      engine._applyHeroAtkDelta(hero, owner, heroIdx, -bisher);
-      engine.log('ft_laser_cannon_atk', { hero: hero.name, bonus: 0, delta: -bisher });
-      engine.sync();
+      // W53a: abgezogen wird dort, wo die Buchung liegt (Stempel `_atkTraeger`), nicht dort, wo die Karte beim Abgang gerade steht.
+      const hero = engine.gs.players[ctx.fromOwner ?? inst.owner]?.heroes?.[ctx.fromHeroIdx ?? inst.heroIdx];
+      engine.actionRevokeAtkAmTraeger(inst);
+      engine.log('ft_laser_cannon_atk', { hero: hero?.name, bonus: 0, delta: -bisher });
     },
   },
 };

@@ -21,6 +21,7 @@
 //    name" = andere Familie als das zweite Opfer (Als Rulings 12/13).
 //    Platzieren regardless of level, keine Aktion, auch zu toten Helden.
 // ═══════════════════════════════════════════
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const {
   PAWN, familyName, isOfKingsName, isOfKingsCreatureData, boardOfKingsOnBoard,
   collectHandAndDeck, pickFromHandOrDeck, placeFromHandOrDeck, ofKingsCpuAnswer,
@@ -63,7 +64,7 @@ module.exports = {
       const spec = {
         minCount: 1, maxCount: 1, noHandSubstitute: true, cancellable: true,
         // W20b (Al, 20.10.2026: Opfer-Zonen-Regel für jede Opfer-Beschwörung): der Ersatz kommt in die Zone des zweiten Opfers - nur Zonen, die es leert (kein Alice-Stapel).
-        filter: c => isOfKingsName(c.inst?.name) && c.inst?.id !== victim.id && c.inst?.id !== victim.instId
+        filter: c => anyName(c.inst, (n) => isOfKingsName(n)) && c.inst?.id !== victim.id && c.inst?.id !== victim.instId
           && engine.zoneFreiNachKostenzahlung(engine.physicalSide(c.inst), c.inst.heroIdx, c.inst.zoneSlot, c.inst),
         title: CARD_NAME,
         description: `${victim.name} is being sacrificed. Sacrifice another "of Kings" Creature you control to replace it with an "of Kings" Creature of a different name from your hand or deck?`,

@@ -12,7 +12,7 @@
 
 module.exports = {
   isTargetingArtifact: true,
-  deferBroadcast: true,
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral (Auftritts-Puffer) VOR dem ersten Effektschritt, nach der letzten abbrechbaren Wahl.
 
   // ── CPU prompt routing (fast heuristic, NO nested MCTS) ───────────
   // Previous implementation routed both prompts through nested MCTS
@@ -381,21 +381,23 @@ function _scoreEnemyCard(engine, target) {
   // Abilities — REDUNDANCY GATE: if another living enemy Hero already
   // has the same Ability at equal-or-higher level, removing this copy
   // is wasted (the team's effective level is unchanged). Skip entirely.
-  if (target.type === 'ability') {
+  // 25.10.2026 (Xal-Runde 5): ein Ability-Stapel in einer Support Zone (`istAbilityStapel`) ist eine Ability — gleiche Bewertung, Stufe = Stapelhöhe,
+  // und die Redundanzprüfung liest die Stapel beider Zonenarten (`abilityStapelListe`).
+  if (target.type === 'ability' || target.istAbilityStapel) {
     const heroIdx = inst.heroIdx;
     const slotIdx = inst.zoneSlot;
-    const slot = opp.abilityZones?.[heroIdx]?.[slotIdx] || [];
-    const level = slot.length;
+    const level = target.istAbilityStapel
+      ? (target.level || 0)
+      : (opp.abilityZones?.[heroIdx]?.[slotIdx] || []).length;
     if (level <= 0) return 0;
     const abilityName = inst.name;
     for (let h = 0; h < (opp.heroes || []).length; h++) {
       if (h === heroIdx) continue;
       const otherHero = opp.heroes[h];
       if (!otherHero?.name || otherHero.hp <= 0) continue;
-      const otherZones = opp.abilityZones?.[h] || [];
-      for (const otherSlot of otherZones) {
-        if ((otherSlot || [])[0] !== abilityName) continue;
-        if ((otherSlot.length || 0) >= level) return 0; // redundant copy
+      for (const e of engine.abilityStapelListe(oppIdx, h)) {
+        if ((e.namen || [])[0] !== abilityName) continue;
+        if ((e.namen.length || 0) >= level) return 0; // redundant copy
       }
     }
     return level * 100;

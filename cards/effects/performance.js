@@ -34,6 +34,7 @@ module.exports = {
       const heroes = ps.heroes || [];
       const allowedHeroes = new Set();
       const slotByHero = new Map();
+      const supportSlotByHero = new Map();   // 24.10.: Divinity-Stapel in einer Support Zone (Xal, Xalibur)
       for (let hi = 0; hi < heroes.length; hi++) {
         const hero = heroes[hi];
         if (!hero?.name || hero.hp <= 0) continue;
@@ -47,9 +48,19 @@ module.exports = {
           slotByHero.set(hi, z);
           break;
         }
+        if (allowedHeroes.has(hi) || !engine.heroAcceptsAbilitiesInSupport(pi, hi)) continue;
+        const sup = ps.supportZones?.[hi] || [];
+        for (let z = 0; z < sup.length; z++) {
+          const zoneArr = sup[z] || [];
+          if (zoneArr.length === 0 || zoneArr.length >= 3 || zoneArr[0] !== 'Divinity') continue;
+          if (engine.abilitySupportZielZone(pi, hi, 'Performance', z) !== z) continue;
+          allowedHeroes.add(hi);
+          supportSlotByHero.set(hi, z);
+          break;
+        }
       }
       if (allowedHeroes.size === 0) return null;
-      return { allowedHeroes, slotByHero };
+      return { allowedHeroes, slotByHero, supportSlotByHero };
     },
   },
 
@@ -81,8 +92,7 @@ module.exports = {
       // Performance copies the ability below it — delegate to that ability's onPlay.
       // This makes Performance trigger stat bonuses (Fighting ATK, Toughness HP, etc.)
       // just like a real copy of that ability would.
-      const ps = ctx.players[ctx.cardHeroOwner ?? ctx.cardOwner];   // Styx 28.9.: Brettseite
-      const zone = (ps.abilityZones[ctx.cardHeroIdx] || [])[ctx.card.zoneSlot] || [];
+      const zone = ctx._engine.abilityStapelVon(ctx.card);   // Styx 28.9.: Brettseite; 24.10.: auch ein Stapel in einer Support Zone (Xal)
       if (zone.length < 2) return; // No ability below (shouldn't happen with customPlacement)
       // ── Kopierziel auflösen: erste NICHT-Performance-Karte im Slot ──
       // zone[0] kann selbst 'Performance' sein (z. B. wenn ein Effekt die

@@ -20,6 +20,20 @@
 //      what we need for a board-state trigger.
 //    • Per-turn guard: counters.triggeredOnTurn holds
 //      the turn number of the last firing.
+//
+//  ★ W61a (Al) — DIVER HELMET: Acid Rain ist eine Area, und
+//  „The equipped Hero and all cards in its Support Zones are
+//  unaffected by Areas." Die freien Support Zones eines Helden mit
+//  Diver Helmet sind für den Pollution Token NICHT wählbar (weder in
+//  der Zonenliste noch beim Zählen der Token-Option). Hat der Spieler
+//  keine freie Zone eines Helden ohne Helm, entfällt die Token-Option
+//  (nur „2 Karten löschen"; bei weniger als 2 Karten bleibt das Ruling:
+//  Fizzle, `acid_rain_fizzle`). Die Frage stellt EINE Stelle:
+//  `engine.heldIstVonAreasAusgenommen(Seite, Held)`; sie wird bei jeder
+//  Platzierung und nach dem Zonen-Prompt erneut gestellt (der Helm kann
+//  dazwischen kommen/gehen). Kommt der Helm erst nach der Wahl „Token"
+//  und lässt keine Zone mehr übrig, fällt die Strafe auf „2 Karten
+//  löschen" zurück, falls möglich („must … OR …").
 // ═══════════════════════════════════════════
 
 const { placePollutionTokens, countFreeZones } = require('./_pollution-shared');
@@ -112,7 +126,9 @@ module.exports = {
       const spellStillInHand = turnPs._resolvingCard ? 1 : 0;
       const effectiveHandSize = (turnPs.hand || []).length - spellStillInHand;
       const canDelete = effectiveHandSize >= 2;
-      const canPlaceToken = countFreeZones(gs, turnPlayer, { aliveOnly: true }) > 0;      // „one of their Heroes' free Support Zones“: lebende Heroes
+      // „one of their Heroes' free Support Zones“: lebende Heroes; ★ W61a: Helden mit Diver Helmet sind von Areas ausgenommen → ihre Zonen zählen nicht.
+      const zoneOpts = { aliveOnly: true, excludeHero: (hi) => engine.heldIstVonAreasAusgenommen(turnPlayer, hi) };
+      const canPlaceToken = countFreeZones(gs, turnPlayer, zoneOpts) > 0;
 
       if (!canDelete && !canPlaceToken) {
         engine.log('acid_rain_fizzle', {
@@ -150,8 +166,14 @@ module.exports = {
             cancellable: cfg?.cancellable !== false,
           }),
         };
-        await placePollutionTokens(engine, turnPlayer, 1, 'Acid Rain', { promptCtx: promptCtxShim, aliveOnly: true });
-      } else {
+        const res = await placePollutionTokens(engine, turnPlayer, 1, 'Acid Rain', { promptCtx: promptCtxShim, ...zoneOpts });
+        // ★ W61a: Helm kam nach der Wahl und nahm die letzte Zone weg → die Strafe fällt auf „2 Karten löschen" zurück (falls möglich).
+        if (res.placed === 0) {
+          const handJetzt = (turnPs.hand || []).length - (turnPs._resolvingCard ? 1 : 0);
+          if (handJetzt >= 2) chosen = 'delete';
+        }
+      }
+      if (chosen !== 'token') {
         await engine.actionPromptForceDiscard(turnPlayer, 2, {
           title: 'Acid Rain — Delete 2 Cards',
           description: 'Acid Rain forces you to delete 2 cards from your hand.',

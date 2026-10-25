@@ -25,6 +25,11 @@
 //    that path is a voluntary self-sacrifice that must
 //    bypass protections.)
 //
+//    ★ W66a (Al, 23.10.2026: „Bitte nimm alles zurück, was ich fälschlicherweise zu Eraser Beam angemerkt habe"): die W64a-Auslegung
+//    „defeat umgeht Schadensimmunität" galt NUR Eraser Beam und beruhte auf einer Verwechslung (gemeint war Hand of Death) — zurückgenommen.
+//    Eraser Beam läuft wieder als 999999 Schaden durch die Schadens-/Zerstörungs-Pipelines; Inyas „takes no damage", Immortal, Carris,
+//    Storm Piano, Egg of God, Resilient Monkee halten ihn ab, Effekt-Schutz wie zuvor. Zeitpunkt: sofort (unverändert).
+//
 //  "Only Spell this turn" enforcement:
 //    - CAST TIME: `spellPlayCondition` reads
 //      `ps._eraserBeamPriorSpellTurn`, stamped via a
@@ -175,7 +180,14 @@ module.exports = {
       if (target.type === 'hero') {
         const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (tgtHero && tgtHero.hp > 0) {
-          await ctx.dealDamage(tgtHero, ERASE_DAMAGE, 'destruction_spell');
+          // W66a (Al, 23.10.2026: „der Resistance-Schutz sollte JEDE Form von defeat abdecken"): „defeat it" ist ein Nicht-Schaden-Effekt auf den Helden —
+          // Resistance (W13/W14-Ruling, Stufen: 1/2 erste Karten je Zug, 3 alles außer Schaden) fängt ihn ab, bevor der Riesenschaden läuft. Alle übrigen
+          // Schichten (Zielschutz, Anti Magic, Submerged, Schadensschutz …) wirken wie bisher in der Schadens-Pipeline.
+          if (await engine.heroNonDamageEffectBlocked(target.owner, target.heroIdx, 'defeat', { sourceOwner: pi, source: CARD_NAME })) {
+            engine.log('defeat_negated', { hero: tgtHero.name, source: CARD_NAME, reason: 'hero_effect_blocked' });
+          } else {
+            await ctx.dealDamage(tgtHero, ERASE_DAMAGE, 'destruction_spell');
+          }
         }
       } else if (target.cardInstance) {
         await engine.processCreatureDamageBatch([{

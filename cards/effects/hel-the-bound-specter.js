@@ -354,22 +354,18 @@ module.exports = {
       // „If you can't, defeat this Hero".
       if (feld !== pi && !engine.kontrollRechte(feld, helHeroIdx).ausruesten) return doDefeat('cant_equip');
 
-      // Source: player chooses only when BOTH piles hold a copy
-      // (mandatory effect — they must pick one). Otherwise automatic.
+      // Source: EIN Picker mit Herkunfts-Label (CARD_API „Mehrere Quellen = ein Picker") — hält BEIDE Stapel eine Kopie, zeigt die Galerie das Artefakt zweimal (HAND / DISCARD);
+      // Pflichtwirkung, also nicht abbrechbar (kein „Cancel = Ablage" mehr). Sonst automatisch.
       let fromHand;
       if (handHas && discHas) {
         const pick = await engine.promptGeneric(pi, {
-          type: 'confirm',
+          type: 'cardGallery',
+          cards: [{ name, source: 'hand' }, { name, source: 'discard' }],
           title: CARD_NAME,
-          message: `${helHero.name}: equip "${name}" (Cost ${cost} Gold). Take it from your Hand or your Discard Pile?`,
-          showCard: name,
-          confirmLabel: '✋ From Hand',
-          cancelLabel: '🗑️ From Discard Pile',
-          cancellable: true,
+          description: `${helHero.name}: equip "${name}" (Cost ${cost} Gold). Take it from your hand or from your discard pile?`,
+          cancellable: false,
         });
-        // confirm → Hand; cancel/decline → Discard Pile (Johanna shape).
-        fromHand = !!pick
-          && !(typeof pick === 'object' && (pick.cancelled || pick.confirmed === false));
+        fromHand = pick?.source !== 'discard';
       } else {
         fromHand = handHas;
       }

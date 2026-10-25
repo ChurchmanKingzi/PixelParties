@@ -40,6 +40,7 @@
 //  Geschenk, kein zweiter Zug.
 // ═══════════════════════════════════════════
 
+const { equipZustandHooks } = require('./_hooks');   // W51b: Umhaengen (Fridge/Ceremony) als Verlassen+Betreten sehen
 const CARD_NAME = 'Kohta, the Silent Observer';
 const HOPT_KEY = 'kohta-silent-observer';
 const MAX_LEVEL = 2;
@@ -103,7 +104,9 @@ module.exports = {
     dealsDamage: true,
   },
 
-  hooks: {
+  hooks: equipZustandHooks({
+    // W51b: `equipZustandHooks` — Umhaengen (Slippery Fridge / Inheritance Ceremony) sendet Enter/Leave nur an die bewegte Karte; dieser Zustandslauscher bekommt es ueber
+    // `onEquipLost` / `onEquipGained` (isMove) mit denselben Handlern (siehe _hooks.js).
     // Bereitschaft bei jedem Wechsel in den eigenen Support Zones neu
     // bewerten (v910, Riffel-Muster).
     // Styx 28.9.: Pruefung auf der Brettseite des Helden (`cardHeroOwner`).
@@ -188,5 +191,5 @@ module.exports = {
       // Sperre zurueckgegeben — dann hat Kohta nichts verbraucht.
       if (!gefeuert && gs.hoptUsed) delete gs.hoptUsed[`${HOPT_KEY}:${pi}`];
     },
-  },
+  }),
 };

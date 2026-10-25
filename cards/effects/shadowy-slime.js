@@ -69,7 +69,7 @@ module.exports = {
       if (eligibleCards.length === 0) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { playerIdx: pi, grund: 'no_target' }); return; }
 
       // Find free support zones on the SAME hero only
-      const getFreeZones = () => {
+      const getFreeZones = (forCardName = null) => {
         const zones = [];
         const hero = hps.heroes[heroIdx];
         // ── ALS RULING (31.7.) ──────────────────────────────────────
@@ -84,11 +84,18 @@ module.exports = {
             zones.push({ heroIdx, slotIdx: s, label: `${hero.name} — Support ${s + 1}`, ...(feld !== pi ? { owner: feld } : {}) });
           }
         }
-        return zones;
+        // ★ W62a: mit Alice-Teilung ist auch die Zone einer GLEICHNAMIGEN Creature ein Ziel; `beschwoerZonenFuer` kennt die Kontrolle.
+        // ★ W63a (Al, 22.10.2026): erst die geteilte Zone, DANN die erste leere.
+        if (forCardName) {
+          for (const z of engine.beschwoerZonenFuer(pi, forCardName, { seite: feld, heroIdx, namedHeroesOnly: true })) {
+            if (z.shared) zones.push({ heroIdx, slotIdx: z.slotIdx, label: z.label, shared: true, ...(feld !== pi ? { owner: feld } : {}) });
+          }
+        }
+        return require('./_alice-shared').geteiltZuerst(zones);
       };
 
-      // Fizzle if no free zones on this hero
-      if (getFreeZones().length === 0) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { playerIdx: pi, grund: 'zone_taken' }); return; }
+      // Fizzle if no free zones on this hero (W62a: oder eine geteilte Zone fuer eine der Karten)
+      if (getFreeZones().length === 0 && !eligibleCards.some(c => getFreeZones(c.name).length > 0)) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { playerIdx: pi, grund: 'zone_taken' }); return; }
 
       // Step 1: Confirm
       const confirmed = await ctx.promptConfirmEffect({
@@ -120,7 +127,7 @@ module.exports = {
         if (!selected) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { stumm: true }); return; } // Escape = abort   // W24d (N4-14)
 
         // Step 3: Pick a zone (same hero only)
-        const freeZones = getFreeZones();
+        const freeZones = getFreeZones(selected.cardName);
         if (freeZones.length === 0) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { stumm: true }); return; }   // W24d (N4-14)
 
         const zone = await ctx.promptZonePick(freeZones, {
@@ -138,8 +145,7 @@ module.exports = {
 
         // Place into support zone
         const si = zone.slotIdx;
-        if (!hps.supportZones[heroIdx]) hps.supportZones[heroIdx] = [[], [], []];
-        hps.supportZones[heroIdx][si] = [cardName];
+        engine.zoneEintragen(feld, heroIdx, si, cardName, pi);   // W62a: gleichnamige Kreatur (Alice) → dazustapeln statt ueberschreiben
 
         // Track card instance with placement flag
         const inst = engine._trackCard(cardName, feld, 'support', heroIdx, si);

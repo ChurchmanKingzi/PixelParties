@@ -126,12 +126,15 @@ module.exports = {
       const maxEquips = Math.min(2, otherHeroes.length);
 
       /** Hat Held `hi` eine freie Support-Zone? */
+      const ES = require('./_equip-stack-shared');
+      /** Darion: der Equip-Stapel des Helden (Pflicht-Platz fuer jedes weitere Equip), sonst -1. */
+      const stapelSlot = (hi) => (ES.teilenAktiv(engine, pi, hi) ? ES.stapelPlatz(engine, pi, hi) : -1);
       const hasFreeZone = (hi) => {
         const supZones = ps.supportZones[hi] || [[], [], []];
         for (let s = 0; s < 3; s++) {
           if ((supZones[s] || []).length === 0) return true;
         }
-        return false;
+        return stapelSlot(hi) >= 0;   // Darion: der Stapel nimmt weitere Equips auf
       };
       /** Die anderen Helden, an die `equipName` JETZT legal darf
        *  (Spielbedingung der Karte + freie Support-Zone). */
@@ -244,11 +247,13 @@ module.exports = {
           });
           // Free support zone targets
           const supZones = ps.supportZones[h.heroIdx] || [[], [], []];
+          const _stapel = stapelSlot(h.heroIdx);   // Darion: der Stapel ist der einzige Platz
           for (let s = 0; s < 3; s++) {
-            if ((supZones[s] || []).length === 0) {
+            if (_stapel >= 0 ? s === _stapel : (supZones[s] || []).length === 0) {
               targets.push({
                 id: `equip-${pi}-${h.heroIdx}-${s}`, type: 'equip',
                 owner: pi, heroIdx: h.heroIdx, slotIdx: s, cardName: '',
+                _eigeneStapelWahl: true,   // Darion: ein Zielplatz, keine Karte — keine Rueckfrage „welches Equip?"
               });
             }
           }
@@ -266,6 +271,7 @@ module.exports = {
         if (target.type === 'equip') return { heroIdx: target.heroIdx, slotIdx: target.slotIdx };
         // Hero click → find first free support zone
         const supZones = ps.supportZones[target.heroIdx] || [[], [], []];
+        if (stapelSlot(target.heroIdx) >= 0) return { heroIdx: target.heroIdx, slotIdx: stapelSlot(target.heroIdx) };   // Darion
         for (let s = 0; s < 3; s++) {
           if ((supZones[s] || []).length === 0) return { heroIdx: target.heroIdx, slotIdx: s };
         }
@@ -324,11 +330,15 @@ module.exports = {
         }
       }
 
-      for (const { equipName, heroIdx, slotIdx } of assignments) {
+      for (const { equipName, heroIdx, slotIdx: _wunschSlot } of assignments) {
+        let slotIdx = _wunschSlot;
         // Letzte Pruefung direkt vor dem Anlegen: Spielbedingung und
         // freie Zone muessen JETZT noch stimmen.
         if (!engine.canEquipCardToHero(equipName, pi, heroIdx)) continue;
-        if (((ps.supportZones[heroIdx] || [])[slotIdx] || []).length > 0) continue;
+        // Darion: liegt dort schon ein Equip-Stapel, ist er der Pflicht-Platz — das Equip kommt DAZU (statt den Platz zu ueberschreiben bzw. wegen „belegt" auszufallen).
+        const _stapelPlatz = engine.equipPflichtPlatz(pi, heroIdx, equipName);
+        if (_stapelPlatz >= 0) slotIdx = _stapelPlatz;
+        else if (((ps.supportZones[heroIdx] || [])[slotIdx] || []).length > 0) continue;
 
         // Remove from deck
         const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', equipName, { source: 'bill-the-angry-auctioneer' });   // v820: Stapel-Schicht
@@ -338,7 +348,8 @@ module.exports = {
 
         // Place equipment
         if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
-        ps.supportZones[heroIdx][freeSlot] = [equipName];
+        if (_stapelPlatz >= 0) ps.supportZones[heroIdx][freeSlot].push(equipName);
+        else ps.supportZones[heroIdx][freeSlot] = [equipName];
 
         // Track card instance
         const inst = engine._trackCard(equipName, pi, 'support', heroIdx, freeSlot);

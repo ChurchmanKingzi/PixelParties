@@ -49,6 +49,23 @@ function getFreeSupportZonesForHero(ps, heroIdx) {
   return zones;
 }
 
+/**
+ * ★ W62a: freie Zonen des Helden PLUS — mit Alice-Teilung des Nutzers — die Zonen, in denen schon nur GLEICHNAMIGE Kreaturen
+ * liegen („Creatures with identical names … share 1 Support Zone"). W63a (Al): GETEILTE zuerst, dann die freien. Ohne `name` nur die freien.
+ */
+function zonenFuerHeld(engine, ps, pi, heroIdx, name) {
+  const frei = getFreeSupportZonesForHero(ps, heroIdx);
+  if (!name || !ps.heroes?.[heroIdx]?.name) return frei;
+  const { canShareInto } = require('./_alice-shared');
+  const geteilt = [];
+  for (let si = 0; si < 3; si++) {
+    if (!canShareInto(engine, pi, heroIdx, si, name)) continue;
+    const h = ps.heroes[heroIdx];
+    geteilt.push({ heroIdx, slotIdx: si, shared: true, label: `${h.name}${h.hp <= 0 ? ' (KO)' : ''} — Slot ${si + 1} (×${(ps.supportZones[heroIdx][si] || []).length})` });
+  }
+  return [...geteilt, ...frei];   // W63a (Al, 22.10.2026): erst die geteilte Zone, DANN die erste leere
+}
+
 module.exports = {
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
@@ -62,9 +79,11 @@ module.exports = {
   spellPlayCondition(gs, pi, engine) {
     const ps = gs.players[pi];
     if (!ps) return false;
-    if (findSkeletonsInDiscard(ps, engine).length === 0) return false;
+    const skelette = findSkeletonsInDiscard(ps, engine);
+    if (skelette.length === 0) return false;
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       if (getFreeSupportZonesForHero(ps, hi).length > 0) return true;
+      if (engine && skelette.some(c => zonenFuerHeld(engine, ps, pi, hi, c.name).length > 0)) return true;   // W62a: geteilte Zone (Alice)
     }
     return false;
   },
@@ -76,8 +95,9 @@ module.exports = {
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
     const ps = gs.players[pi];
     if (!ps) return false;
-    if (findSkeletonsInDiscard(ps, engine).length === 0) return false;
-    return getFreeSupportZonesForHero(ps, heroIdx).length > 0;
+    const skelette = findSkeletonsInDiscard(ps, engine);
+    if (skelette.length === 0) return false;
+    return skelette.some(c => zonenFuerHeld(engine, ps, pi, heroIdx, c.name).length > 0);   // W62a: frei ODER geteilte Zone (Alice)
   },
 
   hooks: {
@@ -96,11 +116,9 @@ module.exports = {
       // any race where a zone got filled between gate-check and
       // resolution).
       const initialHeroZones = getFreeSupportZonesForHero(ps, heroIdx);
-      if (initialHeroZones.length === 0) { gs._spellCancelled = true; return; }
-
-      // Build the gallery from discard (deduped by name with counts so
-      // the player can revive multiples of the same Skeleton).
-      const inDiscard = findSkeletonsInDiscard(ps, engine);
+      // W62a: Build the gallery from discard (deduped by name with counts so the player can revive multiples of the same Skeleton).
+      // Nur Skelette, fuer die der Held eine Zone hat (frei, oder — mit Alice-Teilung — die Zone einer gleichnamigen Creature).
+      const inDiscard = findSkeletonsInDiscard(ps, engine).filter(c => zonenFuerHeld(engine, ps, pi, heroIdx, c.name).length > 0);
       if (inDiscard.length === 0) { gs._spellCancelled = true; return; }
       const totalAvailable = inDiscard.reduce((n, c) => n + c.count, 0);
       // Cap is bounded by THREE constraints: the card's own MAX (3),
@@ -108,7 +126,10 @@ module.exports = {
       // Zones the casting Hero has right now. The third constraint is
       // what the user explicitly asked for — the gallery shouldn't let
       // the player pick more Skeletons than there's space for.
-      const cap = Math.min(MAX_RAISES, totalAvailable, initialHeroZones.length);
+      // W62a: Mit Alice-Teilung koennen gleichnamige Skelette in EINE Zone — dann begrenzt nicht die Zahl freier Zonen
+      // (die Verteilung entscheidet sich erst beim Platzieren: ein nicht mehr platzierbares Skelett bleibt in der Ablage).
+      const { sharingActive } = require('./_alice-shared');
+      const cap = sharingActive(gs, pi) ? Math.min(MAX_RAISES, totalAvailable) : Math.min(MAX_RAISES, totalAvailable, initialHeroZones.length);
 
       const galleryCards = inDiscard.map(c => ({
         name: c.name, source: 'discard', count: c.count,
@@ -152,8 +173,8 @@ module.exports = {
       // to the CASTING Hero only (recomputed each iteration since the
       // previous placement just consumed one of them).
       for (const name of accepted) {
-        const zones = getFreeSupportZonesForHero(ps, heroIdx);
-        if (zones.length === 0) break;
+        const zones = zonenFuerHeld(engine, ps, pi, heroIdx, name);   // W62a: + geteilte Zone (Alice)
+        if (zones.length === 0) continue;
         let zone;
         if (zones.length === 1) {
           zone = zones[0];

@@ -31,9 +31,8 @@ module.exports = {
       const cardDB = engine._getCardDB();
       const damages = [200, 150, 100];
 
-      // Stream card to opponent
-      const oppSid = gs.players[oppIdx]?.socketId;
-      if (oppSid) engine.io.to(oppSid).emit('card_reveal', { cardName: 'Chain Lightning' });
+      // Stream card to opponent (W64b: zentral über den Auftritts-Puffer — das eigene card_reveal zeigte die Karte doppelt)
+      engine.commitAppearance();
       await engine._delay(200);
 
       // Build all opponent targets

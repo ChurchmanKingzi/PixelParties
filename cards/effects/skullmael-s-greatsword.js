@@ -75,8 +75,16 @@ function vomWirt(ctx, quelle, typ) {
   return seite === (ctx.cardHeroOwner ?? ctx.cardController ?? ctx.cardOwner);
 }
 
-/** Freie Support Zones des ausgeruesteten Helden. */
-function freieZonen(engine, pi, heroIdx) {
+/**
+ * Freie Support Zones des ausgeruesteten Helden (`pi` = Brettseite).
+ * ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): mit `name` (und dem
+ * Beschwoerer `sharer`) zaehlt auch die Zone einer GLEICHNAMIGEN Creature (Alice-Teilung), geteilte zuerst — `engine.beschwoerZonenFuer`.
+ */
+function freieZonen(engine, pi, heroIdx, name = null, sharer = pi) {
+  if (name) {
+    return engine.beschwoerZonenFuer(sharer, name, { seite: pi, heroIdx, nurBasis: true, namedHeroesOnly: true })
+      .map(z => ({ owner: pi, heroIdx, slotIdx: z.slotIdx, ...(z.shared ? { shared: true, stackDepth: z.stackDepth, label: z.label } : {}) }));
+  }
   const zonen = engine.gs.players[pi]?.supportZones?.[heroIdx] || [];
   const out = [];
   for (let z = 0; z < 3; z++) if ((zonen[z] || []).length === 0) out.push({ owner: pi, heroIdx, slotIdx: z });
@@ -155,9 +163,9 @@ async function bieteBeschwoerungAn(ctx, quelle) {
   const hoptKey = `skullmael-greatsword:${ich.id}`;
   if (gs.hoptUsed?.[`${hoptKey}:${pi}`] === gs.turn) return;
 
-  if (freieZonen(engine, feld, heroIdx).length === 0) return;
   const frisch = quelle._skullmaelFresh;
-  const kandidaten = beschwoerbareAusAblage(engine, pi, heroIdx, frisch, feld);
+  // W63a: nur Karten mit Zone (frei oder — Alice-Teilung — geteilt)
+  const kandidaten = beschwoerbareAusAblage(engine, pi, heroIdx, frisch, feld).filter(k => freieZonen(engine, feld, heroIdx, k.name, pi).length > 0);
   if (kandidaten.length === 0) return;
 
   // ★ ZURUECK STATT ABBRUCH (Als Vorgabe 12.9.): „Back" in der
@@ -181,7 +189,7 @@ async function bieteBeschwoerungAn(ctx, quelle) {
     gewaehlt = wahl.cardName;
 
     // Zwischen Galerie und Zonenwahl kann sich das Brett aendern.
-    const zonen = freieZonen(engine, feld, heroIdx);
+    const zonen = freieZonen(engine, feld, heroIdx, gewaehlt, pi);   // W63a: Zonen der gewaehlten Karte (geteilte zuerst)
     if (zonen.length === 0) return;
     if (zonen.length === 1) { ziel = zonen[0]; break; }
 
@@ -198,26 +206,26 @@ async function bieteBeschwoerungAn(ctx, quelle) {
   }
   const wahl = { cardName: gewaehlt };
 
-  // ── Ab hier ist es verbindlich: Anspruch und Auftritt ─────────────
-  if (!engine.claimHOPT(hoptKey, pi)) return;
-  await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
-
-  // Animation (v954, Als Vorgabe): schwarze Magie und Nekromantie auf
-  // der Zielzone — Runenkreis, nekrotische Flammen, aufsteigende
-  // Knochen, dann der dunkle Blitz, mit dem die Kreatur steht. Eigener
-  // Typ `undead_revival` (nicht `necromancy_summon` der Ability: der
-  // Klang haengt am Typ). Der Vorlauf laesst das Ritual laufen, bevor
-  // die Karte aus der Ablage einfliegt.
-  engine._broadcastEvent('play_zone_animation', {
-    type: 'undead_revival', owner: feld,
-    heroIdx: ziel.heroIdx, zoneSlot: ziel.slotIdx,
-    duration: 1400,
-  });
-  await engine._delay(760);
-
+  // ── ★ W66b (Al, 23.10.2026): „Wird einer der Effekte abgebrochen, werden dadurch alle Limits nicht verbraucht." ──
+  // Die Kosten-/Opfer-/Tribut-Wahl der beschworenen Kreatur (`beforeSummon`) ist die LETZTE Abbruchstelle: `summonFromPile` fragt sie zuerst, ein Abbruch dort gibt die Karte
+  // an ihren Platz in der Ablage zurück — Einmal-Sperre unberührt, Banner und Animation nie gezeigt. ERST danach (`nachKostenAnim`, hinter der letzten Abbruchstelle):
+  // Anspruch (HOPT), Auftritt (Banner), Animation; dann Flug und Landung.
+  // Animation (v954, Als Vorgabe): schwarze Magie und Nekromantie auf der Zielzone — Runenkreis, nekrotische Flammen, aufsteigende Knochen, dann der dunkle Blitz, mit dem die
+  // Kreatur steht. Eigener Typ `undead_revival` (nicht `necromancy_summon` der Ability: der Klang haengt am Typ). Der Vorlauf laesst das Ritual laufen, bevor die Karte aus
+  // der Ablage einfliegt.
   const inst = await engine.summonFromPile(pi, 'discard', wahl.cardName, ziel.heroIdx, ziel.slotIdx, {
     source: CARD_NAME,
     ...(feld !== pi ? { heldSeite: feld } : {}),   // Styx 28.9.
+    nachKostenAnim: async () => {
+      engine.claimHOPT(hoptKey, pi);
+      await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'undead_revival', owner: feld,
+        heroIdx: ziel.heroIdx, zoneSlot: ziel.slotIdx,
+        duration: 1400,
+      });
+      await engine._delay(760);
+    },
   });
   if (!inst) return;
 

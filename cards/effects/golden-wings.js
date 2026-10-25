@@ -126,13 +126,15 @@ async function applyBuff(engine, pi, inst, promptCtxShim, vorab) {
   // immunity counters. On expiry, clearCountersOnExpire strips both
   // flags together, and expiresForceClear lets the expiry path bypass
   // _gwImmune's guard in actionRemoveCreatureBuff.
-  await engine.actionAddCreatureBuff(inst, 'golden_wings', {
+  const gewirkt = await engine.actionAddCreatureBuff(inst, 'golden_wings', {
     expiresAtTurn: gs.turn + 1,
     expiresForPlayer: engine.opponentOf(gs.activePlayer), // end of current half-turn, whichever side we're on
     expiresForceClear: true,
     source: 'Golden Wings',
     clearCountersOnExpire: ['_gwImmune', 'untargetable_by_opponent', 'untargetable_by_opponent_pi'],
   });
+  // W71b: negiert ein Schutzfenster (Cool Rescuer Monia & Co.) den Buff, fallen auch die Immunitäts-Marken weg (ein Effekt, eine Negation).
+  if (gewirkt === false) { engine.log('golden_wings_negated', { player: ps.username, creature: inst.name }); engine.sync(); return; }
   inst.counters._gwImmune = true;   // W17b: quellenbewusst (nur Gegner), nicht `_cardinalImmune`
   inst.counters.untargetable_by_opponent = 1;
   inst.counters.untargetable_by_opponent_pi = engine.opponentOf(pi);

@@ -86,14 +86,13 @@ function _eligibleDestinations(engine, pi, cardName) {
     if (!engine.heroMeetsLevelReq(physOwner, hi, cd)) continue;
     // Z6 (A06-34): "as additional Actions" - Beschwoerungssperre und Aktionssperre des Helden gelten (`_summon-eligibility`).
     if (!canHeroSummon(engine, pi, hi, cd, { alsAktion: true, physOwner })) continue;
-    const zones = engine.gs.players[physOwner].supportZones?.[hi] || [[], [], []];
-    for (let zi = 0; zi < 3; zi++) {
-      if ((zones[zi] || []).length === 0) {
-        out.push({ owner: physOwner, heroIdx: hi, slotIdx: zi });
-      }
+    // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): freie Zonen UND — mit
+    // Alice-Teilung des Beschwoerers — die Zone einer GLEICHNAMIGEN Creature (`engine.beschwoerZonenFuer`).
+    for (const zz of engine.beschwoerZonenFuer(pi, cardName, { seite: physOwner, heroIdx: hi, nurBasis: true, namedHeroesOnly: true })) {
+      out.push({ owner: physOwner, heroIdx: hi, slotIdx: zz.slotIdx, ...(zz.shared ? { shared: true, stackDepth: zz.stackDepth } : {}) });
     }
   }
-  return out;
+  return require('./_alice-shared').geteiltZuerst(out);
 }
 
 /**
@@ -131,6 +130,12 @@ function _totalUsableSummonZones(engine, pi, eligibleNames) {
     const zones = engine.gs.players[physOwner].supportZones?.[hi] || [[], [], []];
     for (let zi = 0; zi < 3; zi++) {
       if ((zones[zi] || []).length === 0) n++;
+    }
+    // W63a: mit Alice-Teilung nimmt eine Zone mit gleichnamiger Creature die Karte desselben Namens zusaetzlich auf (obere Schranke).
+    for (const name of eligibleNames) {
+      const cd = cardDB[name];
+      if (!cd || !engine.heroMeetsLevelReq(physOwner, hi, cd) || !canHeroSummon(engine, pi, hi, cd, { alsAktion: true, physOwner })) continue;
+      if (engine.beschwoerZonenFuer(pi, name, { seite: physOwner, heroIdx: hi, nurBasis: true, namedHeroesOnly: true }).some(z => z.shared)) n++;
     }
   }
   return n;
@@ -259,7 +264,8 @@ module.exports = {
             owner:   d.owner,   // Kontrolle statt Seite (Styx 28.9.)
             heroIdx: d.heroIdx,
             slotIdx: d.slotIdx,
-            label:   `${engine.gs.players[d.owner]?.heroes?.[d.heroIdx]?.name || 'Hero'} — Support ${d.slotIdx + 1}`,
+            label:   `${engine.gs.players[d.owner]?.heroes?.[d.heroIdx]?.name || 'Hero'} — Support ${d.slotIdx + 1}${d.shared ? ` (×${d.stackDepth})` : ''}`,
+            ...(d.shared ? { shared: true, stackDepth: d.stackDepth } : {}),   // W63a: geteilte Zone (Alice) vorn, mit Kennzeichen
           }));
           const picked = await engine.promptGeneric(pi, {
             type:        'zonePick',

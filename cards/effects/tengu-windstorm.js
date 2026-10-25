@@ -1,4 +1,4 @@
-const { areaTargetId, coolnessSpitzeZiel } = require('./_targeting-shared');
+const { areaTargetId, coolnessSpitzeZiel, supportAbilityZiel } = require('./_targeting-shared');
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Tengu Windstorm"
 //  Spell (Decay Magic Lv0, Normal). BANNED.
@@ -111,6 +111,8 @@ function _collectBoardTargets(gs, engine) {
     seen.add(inst.id);
 
     if (inst.zone === 'support') {
+      const sa = supportAbilityZiel(engine, inst);   // 25.10.: Ability in einer Support Zone = Ability-Stapel (ein Ziel, oberste Kopie)
+      if (sa !== undefined) { if (sa) targets.push(sa); continue; }
       targets.push({
         id:       `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
         type:     'equip',
@@ -177,7 +179,7 @@ function _collectBoardTargets(gs, engine) {
       if (spitze) targets.push(spitze);
     }
   }
-  return targets;
+  return require('./_equip-stack-shared').gruppiereZiele(targets);   // Darion: ein Ziel je Stapelplatz, die Rueckfrage nennt nur die zulaessigen Karten
 }
 
 /**
@@ -218,6 +220,12 @@ async function _bounceToDeck(engine, inst, position /* 'top' | 'bottom' */, sour
     if (position === 'top') ownerPs.mainDeck.unshift(popped.cardName);
     else ownerPs.mainDeck.push(popped.cardName);
     engine.log('tengu_windstorm_bounce', { player: ownerPs.username, card: popped.cardName, from: 'coolnessStack', position, by: sourceName });
+    engine.sync();
+    return true;
+  }
+  // 25.10.2026 (Xal-Runde 4): eine Ability (Ability Zone, oder oberste Kopie in einer Support Zone) wird von der Leafagami Snake gehalten — sie bleibt liegen,
+  // der Kontrolleur der Schlange zieht (der Effekt gilt als aufgelöst, wie bei Noble Mummy Guards).
+  if (await engine.abilityEntfernungVerhindert(inst, 'deck', { source: { name: sourceName } })) {
     engine.sync();
     return true;
   }

@@ -43,7 +43,7 @@ const SCHADEN   = 150;
 
 /** Freie Support Zones, in die dieser Spieler jetzt beschwoeren darf. */
 function beschwoerbareZonen(engine, pi) {
-  return engine.getFreeSupportZones(pi, { nachKontrolle: true })
+  return engine.beschwoerZonenFuer(pi, CARD_NAME, { nachKontrolle: true })   // W62a: + Zone einer gleichnamigen Creature (Alice-Teilung)
     .filter(z => darfUeberHeld(engine, pi, z.owner, z.heroIdx));
 }
 

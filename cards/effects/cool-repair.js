@@ -50,6 +50,7 @@ function _hasHeroWithFreeZone(ps, engine, pi) {
     for (const { physOwner, heroIdx, hero } of engine.heroesControlledBy(pi)) {
       if (!hero?.name || hero.hp <= 0) continue;
       for (let si = 0; si < 3; si++) if (!engine.supportSlotBelegt(physOwner, heroIdx, si)) return true;
+      if (require('./_equip-stack-shared').hatStapelPlatz(engine, physOwner, heroIdx)) return true;   // Darion: der Equip-Stapel nimmt weitere auf
     }
     return false;
   }
@@ -182,8 +183,9 @@ module.exports = {
     const destSeite = platz.seite;
     const dps = gs.players[destSeite];
 
-    // Final validation: slot still free?
-    if (((dps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0) return { cancelled: true };
+    // Final validation: slot still free? (Darion: der Equip-Stapel des Helden nimmt weitere Equips auf — dort ist „belegt" der Normalfall.)
+    if (((dps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0
+        && engine.equipPflichtPlatz(destSeite, destHeroIdx, equipName) !== destSlot) return { cancelled: true };
 
     // ── Step 4: Deduct dynamic gold cost ──
     if (repairCost > 0) {

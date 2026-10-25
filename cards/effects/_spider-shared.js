@@ -15,6 +15,7 @@
 //  `archetype: "Spider"`. No per-card archetype overrides today.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const SPIDER_ARCHETYPE = 'Spiders';
 
 /** Is this card a Spider Creature? */
@@ -38,7 +39,7 @@ function countSpiderCreaturesControlled(engine, playerIdx) {
     if ((inst.controller ?? inst.owner) !== playerIdx) continue;
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
-    if (!isSpiderCreature(inst.name, engine)) continue;
+    if (!anyName(inst, (n) => isSpiderCreature(n, engine))) continue;
     n++;
   }
   return n;
@@ -54,7 +55,7 @@ function countSpiderCreaturesOnBoard(engine) {
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
-    if (!isSpiderCreature(inst.name, engine)) continue;
+    if (!anyName(inst, (n) => isSpiderCreature(n, engine))) continue;
     n++;
   }
   return n;

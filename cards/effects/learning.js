@@ -84,9 +84,9 @@ const CARD_NAME = 'Learning';
  * ability slot it lives in. Performance copies stack into the same slot
  * as their base, so slot.length naturally counts them too.
  */
-function learningLevelOf(ps, heroIdx, zoneSlot) {
-  const slot = (ps.abilityZones?.[heroIdx] || [])[zoneSlot] || [];
-  return slot.length || 0;
+function learningLevelOf(engine, inst) {
+  // 24.10.: der Stapel der Instanz — echte Ability Zone ODER Support Zone (Xal).
+  return engine.abilityStapelVon(inst).length || 0;
 }
 
 function isMagicArts(cd) {
@@ -256,7 +256,7 @@ function wisdomPayableIndices(ps, triggeringName) {
  * the triggering Spell's hand index excluded so it can't be siphoned
  * away from the outer handler that owns its lifecycle.
  */
-async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZoneSlot, triggeringName, hs = pi) {
+async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZoneSlot, triggeringName, hs = pi, abilityZoneKind = 'ability') {
   const gs = engine.gs;
   const ps = gs.players[pi];
   const cardDB = engine._getCardDB();
@@ -321,7 +321,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
 
   // ── Flash on Learning's slot before resolution. ──
   engine._broadcastEvent('ability_activated', {
-    owner: hs, heroIdx, zoneIdx: abilityZoneSlot,
+    owner: hs, heroIdx, zoneIdx: abilityZoneSlot, zoneKind: abilityZoneKind,
   });
 
   // ── Step 2: reaction window (spell still in hand — Anti Magic
@@ -466,7 +466,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
     // Cancelled mid-prompt — Archibald-style: HOPT was already claimed
     // when the gallery confirmed, treat it as a fizzled cast and send
     // the chosen Spell to discard so the play isn't refunded.
-    ps.discardPile.push(cardName);
+    engine.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);   // W63c: Ablage des permanenten Besitzers
     if (handInst) engine._untrackCard(handInst.id);
   }
 
@@ -538,7 +538,8 @@ module.exports = {
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
       const abilityZoneSlot = ctx.card.zoneSlot;
-      const level = learningLevelOf(gs.players[ctx.cardHeroOwner ?? pi] || ps, heroIdx, abilityZoneSlot);   // Als Befund 29.9.: Ability-Zone auf der Brettseite des Helden
+      const abilityZoneKind = engine.abilityStapelArt(ctx.card) || 'ability';
+      const level = learningLevelOf(engine, ctx.card);   // Als Befund 29.9.: Ability-Zone auf der Brettseite des Helden
       if (level <= 0) return;
 
       // Trigger predicate: Lv1/Lv2 require the trigger Spell to be
@@ -588,7 +589,7 @@ module.exports = {
       const stillEligible = liveEligible.some(i => ps.hand[i] === pickedName);
       if (!stillEligible) return;
 
-      await castLearningSpell(engine, pi, heroIdx, hero, pickedName, abilityZoneSlot, triggeringName, hs);
+      await castLearningSpell(engine, pi, heroIdx, hero, pickedName, abilityZoneSlot, triggeringName, hs, abilityZoneKind);
     },
   },
 };

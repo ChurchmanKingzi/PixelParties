@@ -58,6 +58,7 @@ function liveOwnHeroes(gs, pi, engine) {
 function heroCanBeBurned(hero, engine = null, quelle = null) {
   if (!hero?.name || hero.hp <= 0) return false;
   if (hero.statuses?.burned) return false;
+  if (engine?.statusSchutzAufgehoben?.('burned', hero)) return true;   // 23.10. Tearing Mountain: kein Schutz verhindert Burn
   if (hero.statuses?.immune) return false;
   // Charme schuetzt nur in seiner Auspraegung (Charme Lv3: alles, Golden
   // Apple: nur gegen den Kontrolleur, Styx: gar nicht) — `_charmBlocksFrom`.

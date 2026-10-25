@@ -43,6 +43,8 @@ function fakeEngine(players, { turn = 5 } = {}) {
     _isHeroEffectSilenced: () => false,
     heroHoptKey: (n, pi) => `hero-effect:${n}:${pi}`,
     getFreeSupportZones: () => [{ owner: 0, heroIdx: 0, slotIdx: 0 }],
+    beschwoerZonenFuer: () => [{ owner: 0, heroIdx: 0, slotIdx: 0 }],   // W62a: die zentrale Zonenfrage der Engine (frei + geteilt)
+    hatBeschwoerZone: () => true,
     heroEffectIdentity(p, hi) { return this.gs.players[p].heroes[hi].name; },
     _deckProfileCache: [null, null],      // kein Profil (und kein Laden der echten Profile)
   };

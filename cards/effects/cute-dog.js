@@ -118,8 +118,8 @@ function getHostHeroes(engine, pi) {
   for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp <= 0) continue;
     if (h.statuses?.frozen || h.statuses?.stunned) continue;
-    const supZones = engine.gs.players[physOwner]?.supportZones?.[hi] || [];
-    if (!supZones.some(slot => (slot || []).length === 0)) continue;
+    // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte): freie Zone ODER — mit Alice-Teilung — die Zone eines gleichnamigen Cute Dog.
+    if (!engine.hatBeschwoerZone(pi, CARD_NAME, { seite: physOwner, heroIdx: hi, nurBasis: true, namedHeroesOnly: true })) continue;
     if (!engine.heroMeetsLevelReq(physOwner, hi, cd)) continue;
     out.push({ owner: physOwner, heroIdx: hi });
   }
@@ -253,6 +253,8 @@ module.exports = {
       tutored,
     });
     engine.sync();
+    // Control Monitors: N Karten aus dem Deck auf die Hand, bezahlt mit N abgeworfenen Handkarten (ein Fenster fuer den ganzen Effekt).
+    await engine.meldeHandZugangAusStapel(pi, { source: CARD_NAME });
     return true;
   },
 
@@ -328,16 +330,15 @@ module.exports = {
       if (!confirmed) return;
 
       // ── Pick destination zone ──
-      const zones = [];
+      let zones = [];
       for (const { owner, heroIdx: hi } of hosts) {   // Kontrolle statt Seite (Styx 28.9.)
         const hps = engine.gs.players[owner];
-        const sup = hps?.supportZones?.[hi] || [];
-        for (let s = 0; s < 3; s++) {
-          if ((sup[s] || []).length === 0) {
-            zones.push({ owner, heroIdx: hi, slotIdx: s, label: `${hps.heroes[hi].name} — Support ${s + 1}` });
-          }
+        // W63a: freie Zonen UND (Alice-Teilung) die Zone eines gleichnamigen Cute Dog — `engine.beschwoerZonenFuer`
+        for (const zz of engine.beschwoerZonenFuer(pi, CARD_NAME, { seite: owner, heroIdx: hi, nurBasis: true, namedHeroesOnly: true })) {
+          zones.push({ owner, heroIdx: hi, slotIdx: zz.slotIdx, label: `${hps.heroes[hi].name} — Support ${zz.slotIdx + 1}${zz.shared ? ` (×${zz.stackDepth})` : ''}`, ...(zz.shared ? { shared: true, stackDepth: zz.stackDepth } : {}) });
         }
       }
+      zones = require('./_alice-shared').geteiltZuerst(zones);   // W63a (Al): erst die geteilte Zone, DANN die erste leere
       if (zones.length === 0) return;
 
       let chosen;

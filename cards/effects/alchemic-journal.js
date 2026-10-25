@@ -11,7 +11,7 @@ const { baseCardName } = require('./_hooks');
 
 module.exports = {
   isTargetingArtifact: true,
-  deferBroadcast: true,
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral (Auftritts-Puffer) VOR dem ersten Effektschritt, nach der letzten abbrechbaren Wahl.
   // Both modes (draw + search) move a Potion from deck to hand —
   // hand-locked controllers can't do either. Blocks the artifact
   // entirely while the lock is active.
@@ -93,6 +93,8 @@ module.exports = {
       if (idx < 0) return;
       ps.potionDeck.splice(idx, 1);
       engine.handZugangSync(ps, chosenName, { ohneInstanz: true });
+      // W72b (Al): das Potion Deck zählt als „their deck" — die SUCHE (+5 Gold) löst Control Monitors aus; das bloße Ziehen (Modus „draw") ist ein Draw und nicht.
+      engine.noteHandZugangAusStapel(pi, chosenName, { pile: 'potionDeck', source: 'Alchemic Journal' });
 
       // Lock chosen potion name for the turn
       if (!ps._creationLockedNames) ps._creationLockedNames = new Set();

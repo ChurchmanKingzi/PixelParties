@@ -97,8 +97,12 @@ module.exports = {
 
       const cardDB = engine._getCardDB();
       const cd = cardDB[entering.name];
-      if (!cd || cd.cardType !== 'Artifact') return;
-      if ((cd.subtype || '').toLowerCase() !== 'equipment') return;
+      if (!cd) return;
+      // ★ W52a (Al, 22.10.2026: „Nein, soll angeboten werden!"): ein Equipment-Artifact ODER ein als Equip angelegter HELD („While a Hero is equipped via this effect, it is
+      // treated as an equippable Artifact" — Initiation Ritual; ebenso die angelegte Gestalt des Shapeshifters). Der Schutz-Effekt haengt dann an diesem angelegten Helden
+      // („While that Artifact is equipped to a Hero …"): die Engine liest `counters.antiMagicEnchanted` an jeder Support-Karte des Wirts. NICHT dazu zaehlt Tempelunas
+      // angehaengte Fee (angehaengt, kein Equip — `_keinEquip`).
+      if (!engine.istEquipArtifact(entering)) return;
 
       // Welle 11 (Al, R6: „Jedes Equip zählt, egal wer es anlegt."): jedes angelegte Artefakt – auch auf der Gegenseite
       // und auch vom Gegner angelegt – darf verzaubert werden (vorher nur Artefakte der eigenen Brettseite). Die Negier-Fähigkeit
@@ -172,6 +176,7 @@ module.exports = {
       await engine._delay(AME_FLUG_MS);
 
       engine.takeFromPileSync(ps, 'hand', handIdx);
+      const _ablagePs = engine.handKartenBesitzerPs(ps, 'Anti Magic Enchantment');   // W63c: Ablage des permanenten Besitzers (gestohlene Handkarte)
       // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
       // Startplatz der abfliegenden Karte nur, solange die Hand noch so
       // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
@@ -199,7 +204,7 @@ module.exports = {
       if (!entering.counters.buffs) entering.counters.buffs = {};
       entering.counters.buffs.anti_magic_enchanted = { source: 'Anti Magic Enchantment' };
 
-      ps.discardPile.push('Anti Magic Enchantment');
+      _ablagePs.discardPile.push('Anti Magic Enchantment');
       inst.zone = 'discard';
 
       engine.log('anti_magic_enchantment_applied', {

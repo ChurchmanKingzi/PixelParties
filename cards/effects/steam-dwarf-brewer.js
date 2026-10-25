@@ -3,9 +3,9 @@
 //  Creature (Summoning Magic Lv1, archetype
 //  "Steam Dwarfs") — 50 HP.
 //
-//  ① STEAM ENGINE passive (shared): once per
-//    turn, when you discard 1+ cards, gain +50
-//    current & max HP.
+//  ① STEAM ENGINE passive (shared): whenever you
+//    discard 1+ cards, gain +10 current & max HP
+//    per discarded card.
 //  ② Once per turn: choose another Creature you
 //    control and set its current & max HP equal
 //    to this Creature's max HP.
@@ -89,6 +89,11 @@ module.exports = attachSteamEngine({
     });
     await engine._delay(300);
 
+    // W71b (Al, 25.10.2026): das Setzen der HP einer ANDEREN Kreatur ist ein Effekt auf sie — Schutzfenster (Cool Rescuer Monia & Co.) VOR dem Schreiben; negiert = Kreatur unverändert.
+    if (!(await engine.kreaturBetroffen(target.cardInstance, 'stats', { name: CARD_NAME, owner: pi }, { sourceOwner: pi, detail: 'set_hp' }))) {
+      engine.sync();
+      return true;
+    }
     // Apply the HP change — both increase and decrease paths are
     // handled by the shared helper.
     const delta = setCreatureHp(engine, target.cardInstance, myMax);

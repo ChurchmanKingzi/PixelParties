@@ -40,7 +40,7 @@ function countElvenOnBoard(engine, ownerIdx, exceptInstId = null) {
     if (inst.controller !== ownerIdx) continue;
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
-    const cd = cardDB[inst.name];
+    const cd = (engine.getEffectiveCardData ? engine.getEffectiveCardData(inst) : null) || cardDB[inst.name];   // W73c: Zusatzname (Shroomasaur) bringt den Archetyp mit
     if (isElvenCreature(cd)) count++;
   }
   return count;

@@ -44,7 +44,7 @@ function PzAmbiance({ variant }) {
         dy: -((isHand ? 20 : 40) + Math.random() * (isHand ? 60 : 130)),
         max: (isHand ? 0.22 : 0.14) + Math.random() * 0.22,
         color: Math.random() < 0.25 ? '#ffffff'
-             : (Math.random() < 0.5 ? '#00f0ff' : '#ff5577'),
+             : (Math.random() < 0.5 ? '#66b6ff' : '#ec2d62'),
       });
     }
     return arr;
@@ -76,6 +76,7 @@ const PZ_BG_KEY = 'pz-creator-backgrounds';
 // Waechst die Liste, waechst sie genau hier.
 const PZ_ATTACHMENT_MIT_WERTEN = new Set([
   'Anti Magic',        // Stufe 1-3 (editAntiMagicLevel)
+  'Regeneration',      // Stufe 1-3 (editRegenerationLevel): als welches Level der Zauber behandelt wird (60/120/180 HP)
 ]);
 
 // ★ v1212: Ziehquelle → Kartenreihe, die sich neigt. Modulweit, nicht
@@ -194,7 +195,7 @@ const PLAYER_DEBUFF_REGISTRY = [
 // the top of the board, so its dropdown opens DOWNWARD.
 function DebuffSelector({ side, selected, onChange, isOpen, onToggle, onClose, kompakt }) {
   const isOpp = side === 'opp';
-  const accent = isOpp ? '#ff8844' : '#88ccff';
+  const accent = isOpp ? '#e37435' : '#7bbeea';
   const containerRef = useRef(null);
 
   // Click-outside dismissal — close the dropdown when the user clicks
@@ -227,8 +228,8 @@ function DebuffSelector({ side, selected, onChange, isOpen, onToggle, onClose, k
         className="pz-debuff-btn"
         onClick={onToggle}
         style={{
-          padding: kompakt ? '3px 2px' : '6px 10px',
-          fontSize: kompakt ? 10 : 11, fontWeight: 700,
+          padding: kompakt ? '9px 4px' : '6px 10px',
+          fontSize: kompakt ? 14 : 11, fontWeight: 700,
           background: isOpen ? `rgba(${isOpp ? '255,136,68' : '136,204,255'},.18)` : 'rgba(0,0,0,.25)',
           border: `1px solid ${accent}55`,
           color: accent,
@@ -247,7 +248,7 @@ function DebuffSelector({ side, selected, onChange, isOpen, onToggle, onClose, k
           right: 0,
           ...dropdownPosStyle,
           width: 270, maxHeight: 320, overflowY: 'auto',
-          background: 'rgba(15,15,25,0.97)',
+          background: 'rgba(18,16,31,0.97)',
           border: `1px solid ${accent}66`,
           borderRadius: 6,
           padding: '6px 4px',
@@ -303,7 +304,6 @@ function HandNebenspalte({ si, seite, gold, onGold, ...debuffProps }) {
   return (
     <div className="pz-hand-extras">
       <label className="pz-gold-feld" title="Starting Gold (−999 … 999)">
-        <span aria-hidden="true">💰</span>
         {/* Negatives Gold ist seit dem Debt-O-Tron-Archetyp ein
             gueltiger Zustand und muss auch im Puzzle einstellbar sein
             (Als Vorgabe 16.8.). Untergrenze −999, Obergrenze 999, und
@@ -315,7 +315,9 @@ function HandNebenspalte({ si, seite, gold, onGold, ...debuffProps }) {
         <input className="input" type="number" min="-999" max="999"
           value={gold ?? 0}
           onChange={(e) => onGold(Math.min(999, Math.max(-999, parseInt(e.target.value) || 0)))}
-          style={{ color: (gold ?? 0) < 0 ? '#ff5c5c' : undefined }} />
+          style={{ caretColor: '#fad54a' }} />
+        {/* Die Zahl selbst zeichnet dieses Element in Gold (Verlauf, Kontur, Schiller) — das Feld darunter nimmt nur die Eingabe an */}
+        <span className={'pz-gold-zahl pp-gold-zahl' + ((gold ?? 0) < 0 ? ' gold-negative' : '')} aria-hidden="true">{gold ?? 0}</span>
       </label>
       <DebuffSelector side={seite} kompakt {...debuffProps} />
     </div>
@@ -337,8 +339,12 @@ const PUZZLE_COUNTER_BADGES = [
   // Fun-Fun Circus: Applause Counter auf beliebigen Creatures.
   { key: 'applause',          icon: '👏', label: 'Applause Counters' },
   { key: 'bunnyBombCounter',  icon: '🧨', label: 'Bomb Counters' },
+  // Regeneration (Welle 72): die Stufe, als die der Zauber behandelt wird — als „Lv N" statt „×N".
+  { key: 'regenerationLevel', icon: '🌱', label: 'Regeneration Level', stufe: true },
   // Demon Counter (v601) — Horned Demon, Baaliel; spaeter Great Vanguard Demon.
   { key: 'demonCounter',      icon: '😈', label: 'Demon Counters' },
+  // Hot Skull Potato (Welle 74): Skull Counter, 100 Schaden je Zähler beim Zünden.
+  { key: 'skullCounter',      icon: '💀', label: 'Skull Counters' },
   // Puppets (v707): Luck (Lucky Puppet Laki) / Preserve (Preserving Puppet Vinny).
   { key: 'luck',              icon: '🍀', label: 'Luck Counters', row: 'puppet' },
   { key: 'preserve',          icon: '🔒', label: 'Preserve Counters', row: 'puppet' },
@@ -362,6 +368,26 @@ function puppetsInPlay(players) {
 const VENA_NAME = 'Vena, the Bounty Huntress';
 function venaAufSeite(player) {
   return (player?.heroes || []).some(h => h?.name === VENA_NAME);
+}
+
+// 23.10. — Stufen je Handkopie (`handLv` / `oppHandLv`, s. PuzzleCreator): Listen parallel zur Hand, null/fehlend = gedruckte Stufe.
+const LV_MAX = 99;
+function lvEntfernen(lv, idx) { return lv.filter((_, i) => i !== idx); }
+function lvEinfuegen(lv, idx) { if (lv.length <= idx) return lv; const n = [...lv]; n.splice(idx, 0, null); return n; }
+function lvUmsortieren(lv, von, nach, laenge) {
+  const voll = Array.from({ length: laenge }, (_, i) => lv[i] ?? null);
+  return window.handMove(voll, von, nach);
+}
+/** Kartenbild einer Handkopie: mit gewählter Stufe malt der Renderer sie wie in der echten Hand (`?lv=`, grün gesenkt / rot erhöht). */
+function cardImageMitStufe(name, lv) {
+  const url = cardImageUrl(name);
+  const c = window.CARDS_BY_NAME?.[name];
+  return url && Number.isInteger(lv) && c && c.level != null && lv !== c.level ? url + '?lv=' + lv : url;
+}
+/** Für Export/Start: nur setzen, wenn mindestens eine Kopie eine eigene Stufe trägt; sonst fehlt das Feld (ältere Puzzles bleiben bytegleich). */
+function lvFuerDaten(lv, hand) {
+  if (!lv.some((v, i) => v != null && i < hand.length)) return undefined;
+  return hand.map((_, i) => (Number.isInteger(lv[i]) ? lv[i] : null));
 }
 
 // ★★ v1143 — Gate des Schalters „Has taken damage this game". Karten,
@@ -428,7 +454,7 @@ function CounterBadges({ source, defs }) {
           title={`${d.label}: ${source[d.key]}`}
           style={{ position: 'static' }}>
           <span className="head-counter-icon">{d.icon}</span>
-          {!d.boolean && <span className="head-counter-num">×{source[d.key]}</span>}
+          {!d.boolean && <span className="head-counter-num">{d.stufe ? 'Lv ' : '×'}{source[d.key]}</span>}
         </div>
       ))}
       {/* v708 (Puppets): Luck/Preserve nebeneinander in EINER Zeile. */}
@@ -522,6 +548,12 @@ function PuzzleCreator() {
   const [doomCounters, setDoomCounters] = useState(saved?.doomCounters || [0, 0]);
   const [hand, setHand] = useState(saved?.hand || []);
   const [oppHand, setOppHand] = useState(saved?.oppHand || []);
+  // 23.10. (Al): Level je HANDKOPIE von Hand anpassen (Linksklick auf eine Karte mit Level). Parallel zu `hand` / `oppHand`: `handLv[i]` ist die
+  // gewählte Stufe der Karte `hand[i]` oder null/fehlend = gedruckte Stufe. Die Liste darf kürzer sein als die Hand (angehängte Karten haben keinen
+  // Eintrag); Entfernen, Umsortieren und Einfügen halten sie über `lvEntfernen` / `lvUmsortieren` / `lvEinfuegen` im Takt. Beim Start gesetzt als
+  // `counters.levelSet` der Handinstanz (`createPuzzleGame`, dieselbe absolute Setzung wie beim Inconspicuous Lawn Gnome).
+  const [handLv, setHandLv] = useState(saved?.handLv || []);
+  const [oppHandLv, setOppHandLv] = useState(saved?.oppHandLv || []);
   const [puzzleName, setPuzzleName] = useState(saved?.puzzleName || '');
   // Per-player starting debuff lists. Each entry is a key from
   // PLAYER_DEBUFF_REGISTRY below; the server applies them at puzzle
@@ -699,8 +731,8 @@ function PuzzleCreator() {
     let result = window.AVAILABLE_CARDS || [];
     // Sidebar filter set — mirrors the deck builder's filter pipeline.
     const f = puzzleFilters;
-    if (f.name) result = result.filter(c => c.name.toLowerCase().includes(f.name.toLowerCase()));
-    if (f.effect) result = result.filter(c => c.effect && c.effect.toLowerCase().includes(f.effect.toLowerCase()));
+    if (f.name) result = result.filter(c => window.namePasst(c.name, f.name));
+    if (f.effect) result = result.filter(c => window.effektTextPasst(c, f.effect));   // jedes Wort, beliebige Reihenfolge
     if (f.cardType) result = result.filter(c => c.cardType === f.cardType);
     if (f.subtype) result = result.filter(c => c.subtype === f.subtype);
     if (f.archetype) result = result.filter(c => c.archetype === f.archetype);
@@ -1134,8 +1166,8 @@ function PuzzleCreator() {
 
   // ── Auto-save state to localStorage on every change ──
   useEffect(() => {
-    try { localStorage.setItem('pz-creator-state', JSON.stringify({ players, areaZones, doomCounters, hand, oppHand, puzzleName, meDebuffs, oppDebuffs })); } catch (_) {}
-  }, [players, areaZones, doomCounters, hand, oppHand, puzzleName, meDebuffs, oppDebuffs]);
+    try { localStorage.setItem('pz-creator-state', JSON.stringify({ players, areaZones, doomCounters, hand, oppHand, handLv, oppHandLv, puzzleName, meDebuffs, oppDebuffs })); } catch (_) {}
+  }, [players, areaZones, doomCounters, hand, oppHand, handLv, oppHandLv, puzzleName, meDebuffs, oppDebuffs]);
 
   const puzzleIgnoreRef = useRef(false); // true after leaving — blocks inflight game_state updates
 
@@ -1215,6 +1247,8 @@ function PuzzleCreator() {
     setDoomCounters([0, 0]);
     setHand([]);
     setOppHand([]);
+    setHandLv([]);
+    setOppHandLv([]);
     setMeDebuffs([]);
     setOppDebuffs([]);
     setValidated(false);
@@ -1757,9 +1791,19 @@ function PuzzleCreator() {
   // user-facing actions AND as part of drag-to-place flows where they'd
   // double up with placement/discard. Call sites play the sound instead.
   const addToHand = useCallback((card) => { setHand(prev => [...prev, card.name]); invalidate(); }, [invalidate]);
-  const removeFromHand = useCallback((idx) => { setHand(prev => prev.filter((_, i) => i !== idx)); invalidate(); }, [invalidate]);
+  const removeFromHand = useCallback((idx) => { setHand(prev => prev.filter((_, i) => i !== idx)); setHandLv(prev => lvEntfernen(prev, idx)); invalidate(); }, [invalidate]);
   const addToOppHand = useCallback((card) => { setOppHand(prev => [...prev, card.name]); invalidate(); }, [invalidate]);
-  const removeFromOppHand = useCallback((idx) => { setOppHand(prev => prev.filter((_, i) => i !== idx)); invalidate(); }, [invalidate]);
+  const removeFromOppHand = useCallback((idx) => { setOppHand(prev => prev.filter((_, i) => i !== idx)); setOppHandLv(prev => lvEntfernen(prev, idx)); invalidate(); }, [invalidate]);
+  /** Stufe der Handkopie `idx` setzen (`wert` = gedruckte Stufe oder null → zurück auf die gedruckte). */
+  const setzeLv = useCallback((istOpp, idx, wert, gedruckt) => {
+    const neu = (wert == null || wert === gedruckt) ? null : Math.max(0, Math.min(LV_MAX, wert));
+    (istOpp ? setOppHandLv : setHandLv)(prev => {
+      const n = Array.from({ length: Math.max(prev.length, idx + 1) }, (_, i) => prev[i] ?? null);
+      n[idx] = neu;
+      return n;
+    });
+    invalidate();
+  }, [invalidate]);
   // ★ v1427 (Als Befund 25.9.: Karten aus der Creation Zone liessen sich
   // per Ziehen nicht wegbewegen). Jede Ablage raeumte ihre Quelle mit
   // „oppHand → Gegnerhand, SONST eigene Hand" — ein Zug aus Crestinas
@@ -1852,8 +1896,33 @@ function PuzzleCreator() {
     return Math.max(1, Math.min(3, n || 1));
   }, []);
 
+  // ★ Darion, the Blood-Crazy Groundskeeper: „All Artifacts equipped to this Hero share 1 Support Zone." Der Editor kennt keine Kartenskripte — die Heldennamen
+  // stehen hier (Spiegel von `equipsShareZone` im Heldenskript; `EQUIP_STAPEL_HELDEN` ergaenzen, wenn ein weiterer Held das kann).
+  const EQUIP_STAPEL_HELDEN = ['Darion, the Blood-Crazy Groundskeeper'];
+  const istEquipName = useCallback((n) => {
+    const c = getCard(n);
+    return !!c && c.cardType === 'Artifact' && (c.subtype || '').toLowerCase() === 'equipment';
+  }, [getCard]);
+  /** Der Platz (0–2) des Equip-Stapels dieses Helden, sonst -1 — nur, wenn der Held seine Equips teilt. */
+  const equipStapelPlatz = useCallback((p, hi) => {
+    const held = p?.heroes?.[hi];
+    if (!held || !EQUIP_STAPEL_HELDEN.includes(held.name || held)) return -1;
+    const zonen = p.supportZones?.[hi] || [];
+    for (let z = 0; z < 3; z++) { if ((zonen[z] || []).length > 0 && istEquipName(zonen[z][0])) return z; }
+    return -1;
+  }, [istEquipName]);
+
   const placeSupport = useCallback((cardName, si, hi, slot) => {
     if (window.playSFX) window.playSFX('placement');
+    // ★ Darion: ein weiteres Equip STAPELT sich auf den Equip-Stapel des Helden — egal, auf welche seiner Zonen es fiel (wie im Spiel, wo der Server
+    // es Pflicht in den Stapel legt); beliebig viele. Das ERSTE Equip legt wie gewohnt in die gewaehlte Zone und eroeffnet den Stapel.
+    if (istEquipName(cardName)) {
+      const st = equipStapelPlatz(players[si], hi);
+      if (st >= 0) {
+        updatePlayer(si, (p) => { p.supportZones[hi][st].push(cardName); return p; });
+        return;
+      }
+    }
     const zone = players[si].supportZones[hi][slot];
     // v768: Abilities in einer Support Zone (Xal) STAPELN wie in einer
     // echten Ability-Zone — gleicher Name, hoechstens 3. Ohne diesen
@@ -1925,7 +1994,7 @@ function PuzzleCreator() {
       }
       return p;
     });
-  }, [players, updatePlayer, getCard, getHeroBiomancyLevel]);
+  }, [players, updatePlayer, getCard, getHeroBiomancyLevel, istEquipName, equipStapelPlatz]);
 
   const placeSurprise = useCallback((cardName, si, hi) => {
     if (!players[si].heroes[hi]) { notify('Place a Hero first!', 'error'); return; }
@@ -1978,6 +2047,9 @@ function PuzzleCreator() {
     if (zt === 'hero') updatePlayer(si, (p) => { p.heroes[hi] = null; p.abilityZones[hi] = [[], [], []]; p.supportZones[hi] = [[], [], []]; p.surpriseZones[hi] = []; if (p.islandZoneCount) p.islandZoneCount[hi] = 0; return p; });
     else if (zt === 'ability') updatePlayer(si, (p) => { p.abilityZones[hi][slot] = []; return p; });
     else if (zt === 'support') updatePlayer(si, (p) => {
+      // ★ Darion: aus einem Equip-Stapel faellt nur die OBERSTE Karte, der Rest bleibt liegen.
+      const zoneAlt = p.supportZones[hi][slot] || [];
+      if (zoneAlt.length > 1 && zoneAlt.every(istEquipName)) { p.supportZones[hi][slot] = zoneAlt.slice(0, -1); return p; }
       const removedCard = p.supportZones[hi][slot][0];
       p.supportZones[hi][slot] = [];
       // Clear creature metadata
@@ -2003,7 +2075,7 @@ function PuzzleCreator() {
     // Area, nicht die ganze Zone.
     else if (zt === 'area') updateArea(si, (prev) => prev.filter((_, i) => i !== slot));
     else if (zt === 'permanent') updatePlayer(si, (p) => { p.permanents.splice(slot, 1); return p; });
-  }, [updatePlayer, updateArea]);
+  }, [updatePlayer, updateArea, istEquipName]);
 
   /**
    * Nimmt dieser Held Abilities in seine Support Zones? (v768)
@@ -2178,7 +2250,7 @@ function PuzzleCreator() {
     // `transform` (nur Compositor, kein Layout) statt per `left`/`top`.
     // `will-change` legt sie auf eine eigene Ebene, damit der Schatten
     // nicht bei jeder Bewegung neu gemalt wird.
-    ghost.style.cssText = `position:fixed;left:0;top:0;transform:translate(${Math.round(e.clientX - hx)}px,${Math.round(e.clientY - hy)}px);will-change:transform;width:${gb}px;height:${gh}px;border:2px solid var(--accent,#0ff);border-radius:4px;background:var(--bg3,#222);overflow:hidden;pointer-events:none;z-index:100000;box-sizing:border-box;box-shadow:0 4px 14px rgba(0,0,0,.55);`;
+    ghost.style.cssText = `position:fixed;left:0;top:0;transform:translate(${Math.round(e.clientX - hx)}px,${Math.round(e.clientY - hy)}px);will-change:transform;width:${gb}px;height:${gh}px;border:2px solid var(--accent,#66b6ff);border-radius:4px;background:var(--bg3,#222);overflow:hidden;pointer-events:none;z-index:100000;box-sizing:border-box;box-shadow:0 4px 14px rgba(0,0,0,.55);`;
     const url = cardImageUrl(cardName);
     // ★ Ziehbild OHNE Nachladen: das Browser-Ziehbild wird im Moment von
     // `setDragImage` aufgenommen. Ein frisch erzeugtes <img> ist dann noch
@@ -2314,6 +2386,9 @@ function PuzzleCreator() {
             p.heroes[hi].hp = entityData.data.hp;
             p.heroes[hi].maxHp = entityData.data.maxHp;
             p.heroes[hi].atk = entityData.data.atk;
+            // Hulijing: die aufliegende Kreatur zieht mit dem Helden um (und bleibt nicht am Platz zurück).
+            if (entityData.data.heldKreatur && entityData.data.hp > 0) p.heroes[hi].heldKreatur = { name: entityData.data.heldKreatur.name };
+            else delete p.heroes[hi].heldKreatur;
             if (entityData.data.hp <= 0) {
               p.heroes[hi].statuses = {};
               p.heroes[hi].buffs = undefined;
@@ -2514,12 +2589,12 @@ function PuzzleCreator() {
     // wie im Duell.
     const misch = (arr) => window.handMove(arr, vonIdx, nachIdx);
     // Vier Haelften: eigene Hand/Vorrat und dieselben beim Gegner.
-    if (zone === 'hand') setHand(prev => misch(prev));
-    else if (zone === 'oppHand') setOppHand(prev => misch(prev));
+    if (zone === 'hand') { setHand(prev => misch(prev)); setHandLv(prev => lvUmsortieren(prev, vonIdx, nachIdx, hand.length)); }
+    else if (zone === 'oppHand') { setOppHand(prev => misch(prev)); setOppHandLv(prev => lvUmsortieren(prev, vonIdx, nachIdx, oppHand.length)); }
     else if (zone === 'oppCreation') updatePlayer(1, pp => { pp.creationZone = misch(pp.creationZone || []); return pp; });
     else updatePlayer(0, pp => { pp.creationZone = misch(pp.creationZone || []); return pp; });
     invalidate();
-  }, [updatePlayer, invalidate]);
+  }, [updatePlayer, invalidate, hand.length, oppHand.length]);
 
   const handleHandDrop = useCallback((e) => {
     e.preventDefault();
@@ -2533,6 +2608,7 @@ function PuzzleCreator() {
       removeFromCreation(dragHandIdx);
       const ziel = tropfIndex(e.clientX, '[data-pz-hand="hand"]');
       setHand(prev => { const n = [...prev]; n.splice(ziel, 0, name); return n; });
+      setHandLv(prev => lvEinfuegen(prev, ziel));
       if (window.playSFX) window.playSFX('draw');
       setDragCardName(null); setDragHandIdx(null); setDragSource(null);
       setDragHandSource(null); setDragOverZone(null); setDropGap(null); setZiehLaeuft(false);
@@ -2683,6 +2759,7 @@ function PuzzleCreator() {
       });
       const ziel = tropfIndex(e.clientX, '[data-pz-hand="oppHand"]');
       setOppHand(prev => { const n = [...prev]; n.splice(ziel, 0, name); return n; });
+      setOppHandLv(prev => lvEinfuegen(prev, ziel));
       if (window.playSFX) window.playSFX('draw');
       setDragCardName(null); setDragHandIdx(null); setDragSource(null);
       setDragHandSource(null); setDragOverZone(null); setDropGap(null); setZiehLaeuft(false);
@@ -2785,6 +2862,9 @@ function PuzzleCreator() {
   // ueberhaupt nicht testen — dieselbe Begruendung wie bei Waflavs
   // Evolution Counters. Null fuer alle anderen Helden.
   const [editCeciliaDefeated, setEditCeciliaDefeated] = useState(null);
+  // Hulijing, the Foxdemon (Welle 4): die Kreatur, die gerade AUF ihr liegt („Hero treated as a Creature", `hero.heldKreatur = { name }`). Der Server legt sie beim Puzzle-Start auf
+  // (ohne Einsatz-Effekt, ohne Beschwörung) — sie gilt bis zum Zugende und wird dann gelöscht. '' = keine; null für alle anderen Helden.
+  const [editHeldKreatur, setEditHeldKreatur] = useState(null);
   // Diamond, the Keeper of Peace: HP, die sie durch ihren eigenen Effekt
   // verloren hat (`hero._diamondSelfLoss`) — Aufstiegsbedingung von
   // „Diamond, the Bulwark of Peace" (150). Null fuer andere Helden.
@@ -2813,6 +2893,7 @@ function PuzzleCreator() {
   const [editBunnyBombCounter, setEditBunnyBombCounter] = useState(null);
   // Demon Counter (v601): null = Abschnitt verborgen (keine Demon-Counter-Karte).
   const [editDemonCounter, setEditDemonCounter] = useState(null);
+  const [editSkullCounter, setEditSkullCounter] = useState(null);   // Hot Skull Potato
   // Puppets (v707): null = Editor ausgeblendet, sonst true/false.
   const [editLuckCounter, setEditLuckCounter] = useState(null);
   const [editPreserveCounter, setEditPreserveCounter] = useState(null);
@@ -2831,6 +2912,10 @@ function PuzzleCreator() {
   // and target-filter both use the authored level. Null when the open
   // editor target isn't an Anti Magic.
   const [editAntiMagicLevel, setEditAntiMagicLevel] = useState(null);
+  // For Regeneration: the Support Magic level (1/2/3) the Spell is treated as — it heals 60/120/180 HP at the start of each of its owner's turns. Stored under
+  // `_creatureStatuses[hi-slot].regenerationLevel` and applied server-side as `inst.counters.regenerationLevel` (the value the card's turn-start heal reads).
+  // Null when the open editor target isn't a Regeneration.
+  const [editRegenerationLevel, setEditRegenerationLevel] = useState(null);
   // Cards whose puzzle starting state can include Change Counters.
   // Hardcoded here because the script-side `cpuMeta.counterConsumer`
   // flag isn't reachable from the client; mirrors the convention used
@@ -2906,14 +2991,17 @@ function PuzzleCreator() {
     setEditEvolutionCounter(null);
     setEditInvestCounter(null);
     setEditCeciliaDefeated(null);
+    setEditHeldKreatur(null);
     setEditDiamondLoss(null);
     setEditJeGetroffen(null);
     setEditBalanceCounter(null);
     setEditApplause(null);
     setEditBunnyBombCounter(null);
     setEditDemonCounter(null);
+    setEditSkullCounter(null);
     setEditSparkflyGifts(null);
     setEditAntiMagicLevel(null);
+    setEditRegenerationLevel(null);
     if (zt === 'hero') {
       const h = p.heroes[hi]; if (!h) return;
       klangBeimOeffnen();
@@ -2949,6 +3037,7 @@ function PuzzleCreator() {
       setEditCeciliaDefeated(h.name === 'Cecilia, the Harrowing Crusader'
         ? !!h._ceciliaDefeatedOnce
         : null);
+      setEditHeldKreatur(h.name === 'Hulijing, the Foxdemon' ? (h.heldKreatur?.name || '') : null);
       setEditDiamondLoss(h.name === 'Diamond, the Keeper of Peace'
         ? (h._diamondSelfLoss || 0)
         : null);
@@ -3054,6 +3143,7 @@ function PuzzleCreator() {
       setEditApplause(String(c?.cardType || '').split('/').some(t => t.trim() === 'Creature') && funFunImPuzzle(players, hand, oppHand, getCard) ? (cs.applause || 0) : null);
       // Bunny Bombs: Bomb Counter aus dem gespeicherten Zustand holen.
       setEditDemonCounter(cardUsesDemonCounters(c) ? (cs.demonCounter || 0) : null);
+      setEditSkullCounter(c?.name === 'Hot Skull Potato' ? (cs.skullCounter || 0) : null);
       // Puppets (v707): Luck/Preserve auf Creatures und Tokens.
       {
         const isCrOrToken = !!c && (String(c.cardType || '').includes('Creature') || c.cardType === 'Token');
@@ -3080,6 +3170,10 @@ function PuzzleCreator() {
       // section stays hidden.
       setEditAntiMagicLevel(c?.name === 'Anti Magic'
         ? Math.max(1, Math.min(3, cs.antiMagicLevel || 1))
+        : null);
+      // Regeneration: hydrate the level (1/2/3), default 1 (the level an unedited card heals as).
+      setEditRegenerationLevel(c?.name === 'Regeneration'
+        ? Math.max(1, Math.min(3, cs.regenerationLevel || 1))
         : null);
     }
   }, [players, getCard, hand, oppHand]);
@@ -3129,6 +3223,11 @@ function PuzzleCreator() {
         }
         // Logan: Invest Counters. Gleiche Speicherform, damit Server
         // und Client sie ohne Sonderfall durchreichen.
+        // Hulijing: aufliegende Kreatur — nur auf einem lebenden Helden (ein gefallener trägt keine).
+        if (editHeldKreatur != null) {
+          if (editHeldKreatur && p.heroes[hi].hp > 0) p.heroes[hi].heldKreatur = { name: editHeldKreatur };
+          else delete p.heroes[hi].heldKreatur;
+        }
         if (editCeciliaDefeated != null && editCeciliaDefeated) {
           p.heroes[hi]._ceciliaDefeatedOnce = true;
         } else if (editCeciliaDefeated != null) {
@@ -3267,6 +3366,8 @@ function PuzzleCreator() {
         merged.bunnyBombCounter = editBunnyBombCounter;
       }
       // Demon Counter (v601): Server legt sie auf `inst.counters.demonCounter`.
+      delete merged.skullCounter;
+      if (editSkullCounter != null && editSkullCounter > 0) merged.skullCounter = editSkullCounter;
       delete merged.demonCounter;
       if (editDemonCounter != null && editDemonCounter > 0) {
         merged.demonCounter = editDemonCounter;
@@ -3295,11 +3396,16 @@ function PuzzleCreator() {
       if (c?.name === 'Anti Magic' && editAntiMagicLevel != null) {
         merged.antiMagicLevel = Math.max(1, Math.min(3, editAntiMagicLevel));
       }
+      // Regeneration: persist the level the Spell is treated as (read by its turn-start heal via `counters.regenerationLevel`).
+      delete merged.regenerationLevel;
+      if (c?.name === 'Regeneration' && editRegenerationLevel != null) {
+        merged.regenerationLevel = Math.max(1, Math.min(3, editRegenerationLevel));
+      }
       p._creatureStatuses[hi + '-' + slot] = merged;
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editSkin, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editDiamondLoss, editJeGetroffen, editBountyMark, editBalanceCounter, editApplause, editBunnyBombCounter, editDemonCounter, editSparkflyGifts, editAntiMagicLevel, updatePlayer, getCard, statusScopePasst]);
+  }, [editTarget, editSkin, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editHeldKreatur, editDiamondLoss, editJeGetroffen, editBountyMark, editBalanceCounter, editApplause, editBunnyBombCounter, editDemonCounter, editSkullCounter, editSparkflyGifts, editAntiMagicLevel, editRegenerationLevel, updatePlayer, getCard, statusScopePasst]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -3311,7 +3417,7 @@ function PuzzleCreator() {
       setEditHp('0');
       setEditStatuses({});
       setEditBuffs({});
-      updatePlayer(si, (p) => { if (p.heroes[hi]) { p.heroes[hi].hp = 0; p.heroes[hi].statuses = {}; p.heroes[hi].buffs = undefined; } return p; });
+      updatePlayer(si, (p) => { if (p.heroes[hi]) { p.heroes[hi].hp = 0; p.heroes[hi].statuses = {}; p.heroes[hi].buffs = undefined; delete p.heroes[hi].heldKreatur; } return p; });
     } else {
       // Revive: set HP to maxHp
       const full = String(h.maxHp || 0);
@@ -3338,14 +3444,14 @@ function PuzzleCreator() {
     }
     // Send puzzle to server — starts a real battle against a CPU opponent
     puzzleIgnoreRef.current = false;
-    socket.emit('start_puzzle', { players, areaZones, doomCounters, hand, oppHand, playerDebuffs: [meDebuffs, oppDebuffs] });
-  }, [players, areaZones, doomCounters, hand, oppHand, meDebuffs, oppDebuffs, notify]);
+    socket.emit('start_puzzle', { players, areaZones, doomCounters, hand, oppHand, handLevels: lvFuerDaten(handLv, hand), oppHandLevels: lvFuerDaten(oppHandLv, oppHand), playerDebuffs: [meDebuffs, oppDebuffs] });
+  }, [players, areaZones, doomCounters, hand, oppHand, handLv, oppHandLv, meDebuffs, oppDebuffs, notify]);
 
   const handleExport = useCallback(() => {
     if (!validated) return;
-    const data = { players, areaZones, doomCounters, hand, oppHand, playerDebuffs: [meDebuffs, oppDebuffs], version: 1 };
+    const data = { players, areaZones, doomCounters, hand, oppHand, handLevels: lvFuerDaten(handLv, hand), oppHandLevels: lvFuerDaten(oppHandLv, oppHand), playerDebuffs: [meDebuffs, oppDebuffs], version: 1 };
     socket.emit('export_puzzle', data);
-  }, [validated, players, areaZones, hand, oppHand, meDebuffs, oppDebuffs]);
+  }, [validated, players, areaZones, hand, oppHand, handLv, oppHandLv, meDebuffs, oppDebuffs]);
 
   // Listen for encrypted puzzle from server
   useEffect(() => {
@@ -3472,19 +3578,19 @@ function PuzzleCreator() {
   }, [players, getCard]);
 
   const STATUS_LIST = [
-    { key: 'frozen', label: '❄️ Frozen', color: '#66ccff',
+    { key: 'frozen', label: '❄️ Frozen', color: '#68c6fd',
       tooltip: 'Frozen: cannot act and has its effects and Abilities negated. Wears off at the end of its owner\'s turn.' },
-    { key: 'stunned', label: '⚡ Stunned', color: '#ffdd44',
+    { key: 'stunned', label: '⚡ Stunned', color: '#ffe23d',
       tooltip: 'Stunned: cannot act and has its effects and Abilities negated. Wears off at the end of its owner\'s turn.' },
-    { key: 'burned', label: '🔥 Burned', color: '#ff6633',
+    { key: 'burned', label: '🔥 Burned', color: '#f87420',
       tooltip: 'Burned: takes 60 damage at the start of each of its owner\'s turns. Permanent until cleansed or healed.' },
-    { key: 'bleeding', label: '🩸 Bleeding', color: '#e0324c',
+    { key: 'bleeding', label: '🩸 Bleeding', color: '#e94e53',
       tooltip: 'Bleeding: takes 50 damage after each of its own actions (Attack, Spell, Creature, action-costing Ability or Hero effect, additional Actions), active Hero effects without action cost, and active Creature effects. Permanent until cleansed.' },
-    { key: 'poisoned', label: '☠️ Poisoned', color: '#aa44ff', stacks: true,
+    { key: 'poisoned', label: '☠️ Poisoned', color: '#a040ff', stacks: true,
       tooltip: 'Poisoned: takes 30 damage per stack at the start of each of its owner\'s turns. Permanent until cleansed or healed.' },
-    { key: 'negated', label: '🚫 Negated', color: '#888',
+    { key: 'negated', label: '🚫 Negated', color: '#7f7f7f',
       tooltip: 'Negated: has its effects negated. Heroes also lose their attached Abilities. Wears off at the end of its owner\'s turn.' },
-    { key: 'bound', label: '⛓️ Bound', color: '#9988aa',
+    { key: 'bound', label: '⛓️ Bound', color: '#7e7d9b',
       tooltip: 'Bound: cannot perform Actions. Wears off at the end of its owner\'s turn.' },
     // Skeleton Death Knight's cosmetic skin of Bound (heroes) /
     // Negated (creatures). Saved by transforming the toggle into the
@@ -3494,7 +3600,7 @@ function PuzzleCreator() {
     // handles it without per-card hacks. Hydrated by detecting those
     // markers on click and lighting up this toggle instead of the
     // underlying primitive.
-    { key: 'silenced', label: '🤐 Silenced', color: '#1f8a44',
+    { key: 'silenced', label: '🤐 Silenced', color: '#2ca058',
       tooltip: 'Silenced: Heroes cannot perform Actions; Creatures have their effects negated. Skeleton Death Knight\'s effect.' },
     // v879 (Howling in the Night, Als Vorgabe): fuer HELDEN setzbar.
     // Der Status ist funktional die Spell-Sperre; der Editor speichert
@@ -3504,7 +3610,7 @@ function PuzzleCreator() {
     // Status im Regelsinn, aber derselbe Schalterkasten — der Editor
     // speichert es als Zaehler `levelGapCoverage`, genau den die Engine
     // und das Abzeichen lesen.
-    { key: 'summoningInstructionsX', label: '📘 Summoning Instructions X', color: '#6688cc',
+    { key: 'summoningInstructionsX', label: '📘 Summoning Instructions X', color: '#4e82cb',
       // v889 (Als Vorgabe): X ist keine Option, sondern eine Eigenschaft
       // der Karte — immer aktiv, Vorgabe 1, abschalten gibt es nicht.
       scope: 'equipSummoningInstructions', stacks: true, stackMin: 1, stackMax: 3, alwaysOn: true,
@@ -3512,64 +3618,72 @@ function PuzzleCreator() {
     // v1330: Soul Transmigration Ritual. Der Statustyp ist in der Engine
     // unentfernbar (`unremovable`) — der Editor speichert ihn wie jeden
     // anderen Heldenstatus, kein Sonderweg im Loader.
-    { key: 'soul_transmitted', label: '🕯️ Soul Transmitted', color: '#9a7ad0', scope: 'hero',
+    { key: 'soul_transmitted', label: '🕯️ Soul Transmitted', color: '#ac87de', scope: 'hero',
       tooltip: 'Soul Transmitted: the next time this Hero is defeated, it is deleted with all cards in its Ability and Support Zones, except Creatures. Cannot be removed.' },
-    { key: 'frightened', label: '😱 Frightened', color: '#8866cc', scope: 'hero',
+    { key: 'frightened', label: '😱 Frightened', color: '#b278ed', scope: 'hero',
       tooltip: 'Frightened: cannot use Spells. Attacks, Creatures, Abilities and Hero effects are unaffected.' },
-    { key: 'shielded', label: '🛡️ Shielded', color: '#44ddff',
+    { key: 'shielded', label: '🛡️ Shielded', color: '#08d3ef',
       tooltip: 'Shielded: immune to ALL status effects (first-turn protection variant).' },
-    { key: 'immune', label: '✨ Immune', color: '#ffdd88',
+    { key: 'immune', label: '✨ Immune', color: '#fbe181',
       tooltip: 'Immune: cannot have CC statuses (Frozen / Stunned / Negated / Bound) re-applied. Wears off at the start of its owner\'s next turn.' },
-    { key: 'healReversed', label: '💔 Heal Reversed', color: '#ff4488',
+    { key: 'healReversed', label: '💔 Heal Reversed', color: '#ea2f80',
       tooltip: 'Heal Reversed: any healing this target would receive deals damage instead.' },
-    { key: 'untargetable', label: '👻 Untargetable', color: '#aaaacc', scope: 'creature',
+    { key: 'untargetable', label: '👻 Untargetable', color: '#9ba3ca', scope: 'creature',
       tooltip: 'Untargetable: cannot be chosen as a target by Attacks, Spells, or Creature effects.' },
     // v723: kein echter Status, sondern eine Herkunftsangabe — die
     // Kreatur gehoert urspruenglich der Gegenseite (`originalOwner`),
     // so wie nach einem Dark Gear. Bewusst OHNE Badge, im Spiel ist
     // davon nichts zu sehen; sie dient dem Testen von Karten, die
     // dauerhafte Kontrolle lesen oder brechen (Liberation).
-    { key: 'stolen', label: '🔄 Stolen', color: '#ff9944', scope: 'creature',
+    { key: 'stolen', label: '🔄 Stolen', color: '#ff9b3a', scope: 'creature',
       tooltip: 'Stolen: this Creature is originally owned by the OTHER player (as if taken with Dark Gear). No badge — it only sets the original owner at puzzle start.' },
   ];
   const BUFF_LIST = [
+    // 24.10. (Spy in the Enemy's Camp): die Spionage-Marke an einer Kreatur. KEIN Status und kein Buff im Spiel (`counters._spyMask`, Bitmaske der Sitze) — der Editor legt sie mit
+    // `true` an, der Server macht daraus das Bit der ANDEREN Seite (die Gegenseite der Kreatur darf ihren aktiven Effekt in ihrem Zug benutzen).
+    { key: '_spyMask', label: '👁️ Spying', color: '#77c8ee', scope: 'creature', alsStatus: true,
+      tooltip: "Spying (Spy in the Enemy's Camp): this Creature is a spy — the OTHER player may activate its active effect during their own turn as if they controlled it. Not a status effect — healing can't remove it; it lasts until the Creature leaves the board." },
     // ★ v1364 (Als Wunsch): Butterfly Clouds Schutz fuer Helden. Liegt im
     // Spiel als `statuses.untargetable` — deshalb `alsStatus`: der Knopf
     // schaltet den Status, nicht `buffs`.
-    { key: 'untargetable', label: '🦋 Untargetable', color: '#c9a2ff', scope: 'hero', alsStatus: true,
+    { key: 'untargetable', label: '🦋 Untargetable', color: '#ac87de', scope: 'hero', alsStatus: true,
       tooltip: 'Untargetable: the opponent can\'t choose this Hero with Attacks, Spells or Creature effects while its controller has other Heroes that can be chosen.' },
     // Calm Diatribe: zweite Aktion in der Action Phase; bleibt auch bei totem Helden bis zum Phasenende.
-    { key: 'calm', label: '🕊️ Calm', color: '#9ad7c4', scope: 'hero',
+    { key: 'calm', label: '🕊️ Calm', color: '#91e6e6', scope: 'hero',
       tooltip: 'Calm: this Hero may perform a second Action during the first Action Phase (as an additional Action). Fades at the end of that Action Phase if unused, even if the Hero is defeated.' },
-    { key: 'cloudy', label: '☁️ Cloudy', color: '#88bbdd',
+    { key: 'cloudy', label: '☁️ Cloudy', color: '#7bbeea',
       tooltip: 'Cloudy: takes half damage from all sources.' },
-    { key: 'freeze_immune', label: '🔥 Freeze Immune', color: '#ff8844',
+    // 24.10. (Doomed Pirate): die ATK-Sperre der Kreatur, ohne dass eine Pirate auf dem Brett liegen muss. Der Server legt daraus beim Puzzle-Start `engine.atkSperreAnlegen` an — NACH allen
+    // ATK-Buchungen (Fighting, Ausruestung, Polymorph …); Zuwaechse und Auren buchen danach nur noch in den Zwischenspeicher. Ein Debuff, steht aber (wie im Spiel) in der Buff-Spalte.
+    { key: 'doomed', label: '☠️ Doomed', color: '#e94e53', scope: 'hero',
+      tooltip: 'Doomed (Doomed Pirate): this Hero\'s Attack stat is 0 and cannot be increased in any way. A debuff — it stays for the whole game.' },
+    { key: 'freeze_immune', label: '🔥 Freeze Immune', color: '#e37435',
       tooltip: 'Freeze Immune: cannot be Frozen.' },
-    { key: 'submerged', label: '🌊 Submerged', color: '#4488ff', scope: 'oppHero',
+    { key: 'submerged', label: '🌊 Submerged', color: '#4580f6', scope: 'oppHero',
       tooltip: 'Submerged: unaffected by all cards and effects while other possible targets exist on this side.' },
-    { key: 'negative_status_immune', label: '😎 Status Immune', color: '#44ff88',
+    { key: 'negative_status_immune', label: '😎 Status Immune', color: '#4ceb70',
       tooltip: 'Negative Status Immune: cannot have any negative status effect applied.' },
     // String of Fine — 0-damage shield until controller's next turn.
     // True damage (Acid Vial, Rockfall, etc.) bypasses this by design.
-    { key: 'damage_immune', label: '💠 Damage Immune', color: '#88ddff',
+    { key: 'damage_immune', label: '💠 Damage Immune', color: '#7fdfff',
       tooltip: 'Damage Immune: takes no damage from any sources. (Bypassed by unblockable damage like Acid Vial.)' },
     // Taunt: the opponent must target this Hero/Creature with Attacks,
     // Spells, and Creature effects if possible. Multiple Taunters on a
     // side = opponent picks any. Applies to Heroes AND Creatures.
-    { key: 'forcesTargeting', label: '🎯 Taunt', color: '#ff5060',
+    { key: 'forcesTargeting', label: '🎯 Taunt', color: '#fe5154',
       tooltip: 'Taunt: the opponent MUST target this with Attacks / Spells / Creature effects when possible. Multiple Taunters → opponent picks one.' },
     // v849: Nur-Creatures-Variante des Taunts (Doomed Town Guard). Der
     // Schutzschirm deckt ausschliesslich die CREATURES der eigenen
     // Seite — die Helden dahinter bleiben waehlbar. Sinnlos ohne den
     // Taunt selbst, deshalb setzt der Puzzle-Loader beide Zaehler,
     // sobald dieser Schalter gesetzt ist (server.js).
-    { key: 'forcesTargeting_creaturesOnly', label: '🛡️ Guarding', color: '#ff8a60', scope: 'creature',
+    { key: 'forcesTargeting_creaturesOnly', label: '🛡️ Guarding', color: '#ff8566', scope: 'creature',
       tooltip: 'Guarding (Taunt, Creatures only): your opponent cannot choose your OTHER Creatures while this Creature stands — your Heroes stay selectable. Implies Taunt.' },
     // Equip-Artifact-only buff: Anti Magic Enchantment. The scope tag below
     // flips rendering so this buff ONLY shows up when editing an Equipment
     // Artifact, and for that zone type ONLY this buff is offered (all
     // creature/hero statuses + buffs are hidden).
-    { key: 'anti_magic_enchanted', label: '🛡️ Anti Magic Enchantment', color: '#ffaa33', scope: 'equip',
+    { key: 'anti_magic_enchanted', label: '🛡️ Anti Magic Enchantment', color: '#f9ac20', scope: 'equip',
       tooltip: 'Anti Magic Enchantment: once per turn, the controlling player may negate a Spell that hits the equipped Hero.' },
   ];
 
@@ -3724,7 +3838,7 @@ function PuzzleCreator() {
   // DOM (siehe `setDragOverZone`) — die Magnetsuche liefert ohnehin nur
   // Zonen, die die Karte annehmen. Hier bleibt die Antipp-Markierung.
   const hl = (zt, si, hi, slot) => {
-    if (mobileSelected && canDrop(mobileSelected.cardName, zt, si, hi, slot)) return { boxShadow: '0 0 10px rgba(0,240,255,.3)', borderColor: 'var(--accent)' };
+    if (mobileSelected && canDrop(mobileSelected.cardName, zt, si, hi, slot)) return { boxShadow: '0 0 10px rgba(102,182,255,.3)', borderColor: 'var(--accent)' };
     return undefined;
   };
 
@@ -3860,7 +3974,15 @@ function PuzzleCreator() {
                 data-hero-zone="1" data-hero-idx={hi} data-hero-owner={isOpp ? 'opp' : 'me'}
                 {...zh('hero', si, hi, 0)}>
                 {hero ? <>
-                  <BoardCard cardName={hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" skins={hero.skin ? { [hero.name]: hero.skin } : undefined} />
+                  <BoardCard cardName={(hero.heldKreatur?.name && CARDS_BY_NAME[hero.heldKreatur.name]) ? hero.heldKreatur.name : hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" skins={hero.skin ? { [hero.name]: hero.skin } : undefined}
+                    {...((hero.heldKreatur?.name && CARDS_BY_NAME[hero.heldKreatur.name] && CARDS_BY_NAME[hero.name]) ? { tooltipDarunter: { ...CARDS_BY_NAME[hero.name], _liveHp: hero.hp, _liveMaxHp: hero.maxHp, _liveAtk: hero.atk }, tooltipDarunterTitel: 'Also treated as a Hero' } : null)} />
+                  {hero.heldKreatur?.name && CARDS_BY_NAME[hero.heldKreatur.name] && (
+                    <div className="attached-hero-badge" data-pz-held-badge="1"
+                      title={`${hero.name} is treated as ${hero.heldKreatur.name} until the end of the turn`}
+                      style={{ position: 'absolute', top: 2, left: 2, background: 'rgba(0,0,0,.65)', color: '#f4ae64', fontSize: 10, padding: '1px 4px', borderRadius: 3, pointerEvents: 'none', zIndex: 5 }}>
+                      🦊 {(hero.name || '').split(',')[0]}
+                    </div>
+                  )}
                   {hero.statuses?.frozen && <FrozenOverlay />}
                   {(hero.statuses?.stunned || hero.statuses?.webbed) && <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>}
                   {hero.statuses?.negated && <NegatedOverlay />}
@@ -3912,7 +4034,7 @@ function PuzzleCreator() {
               {/* Permanents column so it doesn't push the permanents down. */}
               {hi === 2 && (areaZones[si] || []).includes('Wowhalla, the Hall of the Cool') && (
                 <div style={{ position: 'absolute', left: '100%', ...spiegelOben(0), marginLeft: 'calc(8px * var(--board-scale))' }}>
-                  <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(120,210,255,.6)', background: 'rgba(120,210,255,.08)', cursor: (p.coolnessStack || []).length > 0 ? 'pointer' : undefined, position: 'relative' }} data-pz-ziel={'coolness-' + si} data-pz-glow="blau"
+                  <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(119,200,238,.6)', background: 'rgba(119,200,238,.08)', cursor: (p.coolnessStack || []).length > 0 ? 'pointer' : undefined, position: 'relative' }} data-pz-ziel={'coolness-' + si} data-pz-glow="blau"
                     onClick={() => (p.coolnessStack || []).length > 0 && oeffneStapel({ si, key: 'coolnessStack' })}
                     onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('coolness-' + si); }}
                     onDragLeave={() => setDragOverZone(null)}
@@ -3920,7 +4042,7 @@ function PuzzleCreator() {
                     {(p.coolnessStack || []).length > 0 ? <>
                       <BoardCard cardName={p.coolnessStack[p.coolnessStack.length - 1]} />
                       <div className="board-card-label">{p.coolnessStack.length}</div>
-                    </> : <div className="board-zone-empty" style={{ color: 'rgba(120,210,255,.8)', fontSize: 'calc(8px * var(--board-scale))' }}>Coolness</div>}
+                    </> : <div className="board-zone-empty" style={{ color: 'rgba(119,200,238,.8)', fontSize: 'calc(8px * var(--board-scale))' }}>Coolness</div>}
                   </div>
                 </div>
               )}
@@ -3933,7 +4055,7 @@ function PuzzleCreator() {
               {/* sie das Feld verlassen hat (Als Ruling 4).               */}
               {hi === 2 && (
                 <div style={{ position: 'absolute', left: '100%', ...spiegelOben('calc(78px * var(--board-scale))'), marginLeft: 'calc(8px * var(--board-scale))' }}>
-                  <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(230,190,90,.6)', background: 'rgba(230,190,90,.08)', cursor: (p.creationZone || []).length > 0 ? 'pointer' : undefined, position: 'relative' }} data-pz-ziel={'creation-' + si} data-pz-glow="gold"
+                  <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(251,200,106,.6)', background: 'rgba(251,200,106,.08)', cursor: (p.creationZone || []).length > 0 ? 'pointer' : undefined, position: 'relative' }} data-pz-ziel={'creation-' + si} data-pz-glow="gold"
                     onClick={() => (p.creationZone || []).length > 0 && oeffneStapel({ si, key: 'creationZone' })}
                     // ★ v1427: Rechtsklick entfernt die oberste Karte — wie
                     // in der Vorrats-Reihe der Handleiste. Fuer alle weiteren
@@ -3949,7 +4071,7 @@ function PuzzleCreator() {
                     {(p.creationZone || []).length > 0 ? <>
                       <BoardCard cardName={p.creationZone[p.creationZone.length - 1]} />
                       <div className="board-card-label">{p.creationZone.length}</div>
-                    </> : <div className="board-zone-empty" style={{ color: 'rgba(230,190,90,.85)', fontSize: 'calc(8px * var(--board-scale))' }}>Creation</div>}
+                    </> : <div className="board-zone-empty" style={{ color: 'rgba(251,200,106,.85)', fontSize: 'calc(8px * var(--board-scale))' }}>Creation</div>}
                   </div>
                 </div>
               )}
@@ -3969,12 +4091,12 @@ function PuzzleCreator() {
                     // einen Ablegeplatz vortaeuschen, den es nicht gibt.
                     <div key={pm.id} title={pm.name} data-pz-perm={si + '-' + i}
                       onContextMenu={(e) => { e.preventDefault(); if (window.playSFX) window.playSFX('discard', { dedupe: 60 }); removeCard(si, 'permanent', 0, i); }}>
-                      <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(255,215,0,.5)', background: 'rgba(255,215,0,.08)', cursor: 'pointer' }}>
+                      <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(250,213,74,.5)', background: 'rgba(250,213,74,.08)', cursor: 'pointer' }}>
                         <BoardCard cardName={pm.name} />
                       </div>
                     </div>
                   ))}
-                  <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderStyle: 'dashed', borderColor: 'rgba(255,215,0,.3)' }}
+                  <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderStyle: 'dashed', borderColor: 'rgba(250,213,74,.3)' }}
                     onDragOver={(e) => { e.preventDefault(); if (dragCardName) setDragOverZone('perm-' + si); }}
                     onDragLeave={() => setDragOverZone(null)}
                     onDrop={(e) => { e.preventDefault(); setDragOverZone(null); if (dragCardName != null) { if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot); placePermanent(dragCardName, si); entferneAusHandquelle(dragHandSource, dragHandIdx); setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); dragEntityData.current = null; } }}>
@@ -4041,7 +4163,7 @@ function PuzzleCreator() {
                 const cards = allSlots[slot] || [];
                 const c = cards.length > 0 ? getCard(cards[0]) : null;
                 return (
-                  <div key={slot} className={'board-zone board-zone-support' + (item.isIsland ? ' board-zone-island' : '')}
+                  <div key={slot} className={'board-zone board-zone-support' + (item.isIsland ? ' board-zone-island' : '') + ((cards.length >= 2 && cards.every(n => { const ec = getCard(n); return !!ec && ec.cardType === 'Artifact' && (ec.subtype || '').toLowerCase() === 'equipment'; })) ? ' board-zone-equipstack' : '')}
                     style={{ ...zs('support'), ...hl('support', si, hi, slot) }}
                     data-support-zone="1" data-support-owner={isOpp ? 'opp' : 'me'}
                     {...zh('support', si, hi, slot)}>
@@ -4060,6 +4182,10 @@ function PuzzleCreator() {
                             {cards.length > 1 && <div className="board-card-label">{cards.length}</div>}
                           </div>
                         );
+                      }
+                      // ★ Darion: mehrere Ausruestungen in einem Platz — gestapelt wie im Spiel (`EquipStack`, ohne Obergrenze).
+                      if (cards.length >= 2 && cards.every(n => { const ec = getCard(n); return !!ec && ec.cardType === 'Artifact' && (ec.subtype || '').toLowerCase() === 'equipment'; })) {
+                        return <EquipStack cards={cards} />;
                       }
                       const cs = p._creatureStatuses?.[hi + '-' + slot] || {};
                       // Biomancy Tokens render their HP bar from the stored
@@ -4085,7 +4211,7 @@ function PuzzleCreator() {
                       return <>
                         <BoardCard cardName={cards[0]} hp={showHp ? hpVal : undefined} maxHp={maxHpVal} hpPosition={showHp ? 'bottom' : undefined} tooltipCardOverride={tooltipOverride} />
                         {isBiomancyToken && (
-                          <div style={{ position: 'absolute', top: 2, left: 2, background: 'rgba(20,80,30,.9)', color: '#8fe8a0', fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 3, border: '1px solid rgba(80,200,120,.6)', pointerEvents: 'none' }}>Lv{cs.biomancyLevel}</div>
+                          <div style={{ position: 'absolute', top: 2, left: 2, background: 'rgba(47,78,29,.9)', color: '#b3f9b8', fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 3, border: '1px solid rgba(75,205,124,.6)', pointerEvents: 'none' }}>Lv{cs.biomancyLevel}</div>
                         )}
                         {cs.frozen && <FrozenOverlay />}
                         {cs.burned && <BurnedOverlay />}
@@ -4166,7 +4292,7 @@ function PuzzleCreator() {
   }
 
   return (
-    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #10101d 40%, #0a0a12 100%)' }}>
+    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #08060c 0%, #12101f 40%, #08060c 100%)' }}>
       <div className="top-bar">
         {/* v1260 (Al 20.9.): die ganze Kopfzeile skaliert mit dem Back-Knopf —
             Titel 26, Eingaben 14, Schalter 13, Aktionsknoepfe im Basismass. */}
@@ -4193,8 +4319,8 @@ function PuzzleCreator() {
         <button className="btn btn-danger" onClick={handleReset} style={{ padding: '10px 20px', display: 'inline-flex', alignItems: 'center' }}>↺ RESET</button>
         <button className="btn" onClick={handleVerify} style={{ padding: '10px 20px', display: 'inline-flex', alignItems: 'center', borderColor: 'var(--success)', color: 'var(--success)' }}>⚔️ TEST PUZZLE</button>
         <button className="btn" onClick={handleExport} disabled={!validated}
-          style={{ padding: '10px 20px', display: 'inline-flex', alignItems: 'center', borderColor: validated ? '#ff8800' : 'var(--bg4)', color: validated ? '#ff8800' : 'var(--text2)', opacity: validated ? 1 : 0.4 }}>↓ EXPORT</button>
-        {validated && <span className="badge" style={{ background: 'rgba(51,255,136,.12)', color: 'var(--success)', fontSize: 12, padding: '4px 10px' }}>VALIDATED</span>}
+          style={{ padding: '10px 20px', display: 'inline-flex', alignItems: 'center', borderColor: validated ? '#ff8b1a' : 'var(--bg4)', color: validated ? '#ff8b1a' : 'var(--text2)', opacity: validated ? 1 : 0.4 }}>↓ EXPORT</button>
+        {validated && <span className="badge" style={{ background: 'rgba(76,235,112,.12)', color: 'var(--success)', fontSize: 12, padding: '4px 10px' }}>VALIDATED</span>}
         <VolumeControl />
       </div>
 
@@ -4402,7 +4528,7 @@ function PuzzleCreator() {
             <div className="pz-hand-cards" data-pz-hand="oppHand" data-pz-ziel="oppHand hand:oppHand" data-pz-glow="hand"
               style={{ '--hand-max-lift': window.handFanMaxLift?.(oppHand.length, { seite: 'opp' }) ?? 0 }}>
               {oppHand.map((cardName, i) => {
-                const img = cardImageUrl(cardName);
+                const img = cardImageMitStufe(cardName, oppHandLv[i]);
                 // Gespiegelt zur eigenen Hand (Als Befund 28.8.).
                 const gapPosOh = dropGap?.zone === 'oppHand'
                   ? (dragHandIdx != null && dropGap.idx >= dragHandIdx ? dropGap.idx + 1 : dropGap.idx)
@@ -4598,7 +4724,7 @@ function PuzzleCreator() {
                 // bewegt genau sie.
                 const azStack = areaZones[si] || [];
                 const zone = (
-                  <div key={'az' + si} className="board-zone pz-area-zone" style={{ ...(zs('area') || {}), borderColor: 'rgba(255,51,102,.5)', backgroundColor: zs('area') ? undefined : 'rgba(255,51,102,.08)', ...hl('area', si, 0, azStack.length) }} {...zh('area', si, 0, azStack.length)}>
+                  <div key={'az' + si} className="board-zone pz-area-zone" style={{ ...(zs('area') || {}), borderColor: 'rgba(252,28,95,.5)', backgroundColor: zs('area') ? undefined : 'rgba(252,28,95,.08)', ...hl('area', si, 0, azStack.length) }} {...zh('area', si, 0, azStack.length)}>
                     {azStack.length > 0 ? (
                       <div className="board-area-stack">
                         {azStack.map((nm, ai) => {
@@ -4697,7 +4823,7 @@ function PuzzleCreator() {
         <div className="pz-hand-cards" data-pz-hand="hand" data-pz-ziel="hand hand:hand" data-pz-glow="hand"
           style={{ '--hand-max-lift': window.handFanMaxLift?.(hand.length) ?? 0 }}>
           {hand.map((cardName, i) => {
-            const img = cardImageUrl(cardName);
+            const img = cardImageMitStufe(cardName, handLv[i]);
             // Zieh-Luecke VOR diesem Platz, wenn der Zeiger hier steht.
             // ★ Der Index kommt OHNE die gezogene Karte; hier steht sie
             // aber noch drin. Deshalb `+1` ab dem Ursprung — dieselbe
@@ -4864,7 +4990,7 @@ function PuzzleCreator() {
             }) }}>
           <CardTooltipContent card={tooltipCard}>
             {tooltipCard.cardType === 'Ascended Hero' && ascensionMap[tooltipCard.name] &&
-              <div style={{ fontSize: 13, color: '#ff44ff', marginTop: 6 }}>Base Hero: {ascensionMap[tooltipCard.name]}</div>}
+              <div style={{ fontSize: 13, color: '#f821e3', marginTop: 6 }}>Base Hero: {ascensionMap[tooltipCard.name]}</div>}
           </CardTooltipContent>
         </div>
       )}
@@ -4976,19 +5102,20 @@ function PuzzleCreator() {
         // `_creatureStatuses[hi-slot].<feld>` bzw. am Helden (`hero._…Counters`) — unverändert, nur die Darstellung ist neu.
         const zaehlerFelder = [];
         const feld = (key, icon, label, wert, setze, farbe, tip, schritt) => { if (wert != null) zaehlerFelder.push({ key, icon, label, wert, setze, farbe, tip, schritt }); };
-        feld('applause', '👏', 'Applause', editApplause, setEditApplause, '#ffd24a', 'Applause Counters on this Creature at the start of the puzzle.');
-        feld('bomb', '💣', 'Bomb', editBunnyBombCounter, setEditBunnyBombCounter, '#ff8a4c', `Bunny Bombs: explodes for ${(editBunnyBombCounter || 0) * 20} damage to every target on the board when defeated (20 per Bomb Counter).`);
-        feld('demon', '😈', 'Demon', editDemonCounter, setEditDemonCounter, '#d98cff', `Horned Demon's strike deals ${(editDemonCounter || 0) * 50} damage (50 per Demon Counter).`);
+        feld('applause', '👏', 'Applause', editApplause, setEditApplause, '#fad54a', 'Applause Counters on this Creature at the start of the puzzle.');
+        feld('bomb', '💣', 'Bomb', editBunnyBombCounter, setEditBunnyBombCounter, '#e37435', `Bunny Bombs: explodes for ${(editBunnyBombCounter || 0) * 20} damage to every target on the board when defeated (20 per Bomb Counter).`);
+        feld('demon', '😈', 'Demon', editDemonCounter, setEditDemonCounter, '#c98aff', `Horned Demon's strike deals ${(editDemonCounter || 0) * 50} damage (50 per Demon Counter).`);
+        feld('skull', '💀', 'Skull', editSkullCounter, setEditSkullCounter, '#b9b9b9', `Hot Skull Potato: when it explodes it deals ${50 + (editSkullCounter || 0) * 50} damage (50 + 50 per Skull Counter).`);
         if (!isBiomancyTokenEdit && editTarget.zt === 'support' && _editCard?.name === 'Cute Hydra') {
-          feld('head', '🐲', 'Heads', editHeadCounter, setEditHeadCounter, '#ffd5b3', "Head Counters: cap the number of different targets Hydra's once-per-turn strike can hit.");
+          feld('head', '🐲', 'Heads', editHeadCounter, setEditHeadCounter, '#f7e0b5', "Head Counters: cap the number of different targets Hydra's once-per-turn strike can hit.");
         }
-        feld('balance', '⚖️', 'Balance', editBalanceCounter, setEditBalanceCounter, '#f6d36b', 'Balance Counters: number of cards Charm of Balance lets the player draw on activation.');
-        feld('change', '🌌', 'Change', editChangeCounter, setEditChangeCounter, '#cf9bff', 'Change Counters: Cosmic Depths counters this card starts the puzzle with — spendable on turn 1.');
-        feld('evolution', '🧬', 'Evolution', editEvolutionCounter, setEditEvolutionCounter, '#8fffc4', 'Evolution Counters (Waflav): the archetype’s whole resource. Ascension costs: Stormkissed 1 · Flamebathed / Swampborne / Thunderstruck 2 · Deep-Drowned 4.');
-        feld('invest', '🪙', 'Invest', editInvestCounter, setEditInvestCounter, '#ffe08f', `Invest Counters (Logan): cash in at end of turn for ${editInvestCounter || 0} Gold or ${(editInvestCounter || 0) * 5} damage. Lost entirely at 0 Gold.`);
-        feld('luck', '🍀', 'Luck', editLuckCounter, setEditLuckCounter, '#7fdc7f', 'Luck Counters: Lucky Puppet Laki may remove ALL Luck Counters to redirect an opponent’s card or effect chosen on a lucky target.');
-        feld('preserve', '🔒', 'Preserve', editPreserveCounter, setEditPreserveCounter, '#8fc8ff', 'Preserve Counters: Preserving Puppet Vinny may remove ALL Preserve Counters to negate an opponent’s card or effect on preserved Creatures.');
-        feld('diamond', '💎', 'Self Dmg', editDiamondLoss, setEditDiamondLoss, '#7fe8ff', 'Diamond, the Keeper of Peace: Self Damage inflicted so far — HP lost due to her own effect (150+ is the Ascension condition). The buttons change it by 30.', 30);
+        feld('balance', '⚖️', 'Balance', editBalanceCounter, setEditBalanceCounter, '#ffd066', 'Balance Counters: number of cards Charm of Balance lets the player draw on activation.');
+        feld('change', '🌌', 'Change', editChangeCounter, setEditChangeCounter, '#c98aff', 'Change Counters: Cosmic Depths counters this card starts the puzzle with — spendable on turn 1.');
+        feld('evolution', '🧬', 'Evolution', editEvolutionCounter, setEditEvolutionCounter, '#68fdc1', 'Evolution Counters (Waflav): the archetype’s whole resource. Ascension costs: Stormkissed 1 · Flamebathed / Swampborne / Thunderstruck 2 · Deep-Drowned 4.');
+        feld('invest', '🪙', 'Invest', editInvestCounter, setEditInvestCounter, '#fbe181', `Invest Counters (Logan): cash in at end of turn for ${editInvestCounter || 0} Gold or ${(editInvestCounter || 0) * 5} damage. Lost entirely at 0 Gold.`);
+        feld('luck', '🍀', 'Luck', editLuckCounter, setEditLuckCounter, '#75f091', 'Luck Counters: Lucky Puppet Laki may remove ALL Luck Counters to redirect an opponent’s card or effect chosen on a lucky target.');
+        feld('preserve', '🔒', 'Preserve', editPreserveCounter, setEditPreserveCounter, '#7bbeea', 'Preserve Counters: Preserving Puppet Vinny may remove ALL Preserve Counters to negate an opponent’s card or effect on preserved Creatures.');
+        feld('diamond', '💎', 'Self Dmg', editDiamondLoss, setEditDiamondLoss, '#6be9fa', 'Diamond, the Keeper of Peace: Self Damage inflicted so far — HP lost due to her own effect (150+ is the Ascension condition). The buttons change it by 30.', 30);
         return (
         <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setEditTarget(null); }}>
           <div className="modal" style={{ maxWidth: 400, padding: 20, maxHeight: '80vh', overflowY: 'auto' }}>
@@ -4999,7 +5126,7 @@ function PuzzleCreator() {
               <div className="pz-statzeile">
                 {!hideHp && (
                   <label className="pz-feld">
-                    <span className="pz-feld-label" style={{ color: '#ff4466' }}>HP</span>
+                    <span className="pz-feld-label" style={{ color: '#ec2d62' }}>HP</span>
                     <input className="input pz-zahl pz-zahl-einzeln" type="number" max={PZ_ZAHL_MAX} value={editHp}
                       onChange={(e) => setEditHp(e.target.value === '' ? '' : String(Math.min(PZ_ZAHL_MAX, parseInt(e.target.value, 10) || 0)))}
                       onKeyDown={(e) => e.key === 'Enter' && saveStats()} autoFocus />
@@ -5007,7 +5134,7 @@ function PuzzleCreator() {
                 )}
                 {!hideHp && editTarget.zt === 'hero' && (
                   <label className="pz-feld">
-                    <span className="pz-feld-label" style={{ color: '#ff8844' }}>MAX HP</span>
+                    <span className="pz-feld-label" style={{ color: '#e37435' }}>MAX HP</span>
                     <input className="input pz-zahl pz-zahl-einzeln" type="number" max={PZ_ZAHL_MAX} value={editMaxHp}
                       onChange={(e) => setEditMaxHp(e.target.value === '' ? '' : String(Math.min(PZ_ZAHL_MAX, parseInt(e.target.value, 10) || 0)))}
                       onKeyDown={(e) => e.key === 'Enter' && saveStats()} />
@@ -5015,7 +5142,7 @@ function PuzzleCreator() {
                 )}
                 {!hideHp && editTarget.zt === 'hero' && (
                   <label className="pz-feld">
-                    <span className="pz-feld-label" style={{ color: '#aabbcc' }}>ATK</span>
+                    <span className="pz-feld-label" style={{ color: '#a5b0c0' }}>ATK</span>
                     <input className="input pz-zahl pz-zahl-einzeln" type="number" max={PZ_ZAHL_MAX} value={editAtk}
                       onChange={(e) => setEditAtk(e.target.value === '' ? '' : String(Math.min(PZ_ZAHL_MAX, parseInt(e.target.value, 10) || 0)))}
                       onKeyDown={(e) => e.key === 'Enter' && saveStats()} />
@@ -5035,7 +5162,7 @@ function PuzzleCreator() {
                     const active = (editBiomancyLevel || 1) === lv;
                     return (
                       <button key={lv} className={'btn ' + (active ? 'btn-success' : '')}
-                        style={{ flex: 1, padding: '10px 0', fontSize: 12, borderColor: active ? '#44dd66' : 'var(--bg4)' }}
+                        style={{ flex: 1, padding: '10px 0', fontSize: 12, borderColor: active ? '#4ceb70' : 'var(--bg4)' }}
                         onClick={() => setEditBiomancyLevel(lv)}>
                         Biomancy Level {lv}
                         <div style={{ fontSize: 10, opacity: 0.8, marginTop: 2 }}>{stats} HP / {stats} dmg</div>
@@ -5074,7 +5201,7 @@ function PuzzleCreator() {
               const attached = !!editAttachedHero;
               return (
                 <button className={'btn ' + (attached ? 'btn-success' : '')}
-                  style={{ width: '100%', padding: '8px 0', fontSize: 11, marginBottom: 12, borderColor: attached ? '#44dd66' : 'var(--bg4)' }}
+                  style={{ width: '100%', padding: '8px 0', fontSize: 11, marginBottom: 12, borderColor: attached ? '#4ceb70' : 'var(--bg4)' }}
                   onClick={() => setEditAttachedHero(attached ? null : heroName)}>
                   {attached
                     ? `✅ ${heroName} attached — click to detach`
@@ -5099,10 +5226,32 @@ function PuzzleCreator() {
                     const active = editAntiMagicLevel === lv;
                     return (
                       <button key={lv} className={'btn ' + (active ? 'btn-success' : '')}
-                        style={{ flex: 1, padding: '10px 0', fontSize: 12, borderColor: active ? '#44dd66' : 'var(--bg4)' }}
+                        style={{ flex: 1, padding: '10px 0', fontSize: 12, borderColor: active ? '#4ceb70' : 'var(--bg4)' }}
                         onClick={() => setEditAntiMagicLevel(lv)}>
                         Level {lv}
                         <div style={{ fontSize: 10, opacity: 0.8, marginTop: 2 }}>Immune to ≤ Lv{lv} Spells</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {/* Regeneration Level picker — visible only when the edit target is a Regeneration Spell. Stamps `regenerationLevel` into `_creatureStatuses[hi-slot]`,
+                which the puzzle loader applies as `inst.counters.regenerationLevel`; the card then shows a "Lv N" badge and heals 60/120/180 HP per turn start. */}
+            {!isBiomancyTokenEdit && editTarget.zt === 'support' && _editCard?.name === 'Regeneration' && editRegenerationLevel != null && (
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                  🌱 Regeneration Level
+                </span>
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  {[1, 2, 3].map(lv => {
+                    const active = editRegenerationLevel === lv;
+                    return (
+                      <button key={lv} className={'btn ' + (active ? 'btn-success' : '')}
+                        style={{ flex: 1, padding: '10px 0', fontSize: 12, borderColor: active ? '#4ceb70' : 'var(--bg4)' }}
+                        onClick={() => setEditRegenerationLevel(lv)}>
+                        Level {lv}
+                        <div style={{ fontSize: 10, opacity: 0.8, marginTop: 2 }}>Heals {60 * lv} HP / turn</div>
                       </button>
                     );
                   })}
@@ -5139,6 +5288,26 @@ function PuzzleCreator() {
                 </div>
               </div>
             )}
+            {editHeldKreatur != null && (() => {
+              const kreaturen = Object.values(CARDS_BY_NAME).filter(c => c && c.cardType === 'Creature')
+                .sort((a, b) => (Number(a.level) || 0) - (Number(b.level) || 0) || a.name.localeCompare(b.name));
+              return (
+                <div style={{ marginBottom: 14 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                    🦊 Creature on this Hero
+                  </span>
+                  <select value={editHeldKreatur} onChange={(e) => setEditHeldKreatur(e.target.value)}
+                    data-pz-held-kreatur="1"
+                    style={{ display: 'block', width: '100%', marginTop: 6, fontSize: 12, padding: '4px 6px', background: 'var(--bg2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4 }}>
+                    <option value="">— none —</option>
+                    {kreaturen.map(c => <option key={c.name} value={c.name}>{`Lv ${c.level ?? 0} · ${c.name}`}</option>)}
+                  </select>
+                  <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 4 }}>
+                    "Hulijing, the Foxdemon" is treated as this Creature for the rest of the turn (HP unchanged, still a Hero) and the card is deleted at the end of the turn. It is placed without its "when you play" effect.
+                  </div>
+                </div>
+              );
+            })()}
             {editCeciliaDefeated != null && (
               <div style={{ marginBottom: 14 }}>
                 <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
@@ -5176,7 +5345,7 @@ function PuzzleCreator() {
                         <button key={slotIdx}
                           className={'btn ' + (active ? 'btn-success' : '')}
                           style={{ width: '100%', padding: '8px 12px', fontSize: 12, textAlign: 'left',
-                            borderColor: active ? '#44dd66' : 'var(--bg4)' }}
+                            borderColor: active ? '#4ceb70' : 'var(--bg4)' }}
                           onClick={() => setEditLinkedHeroSlot(active ? null : slotIdx)}>
                           {active ? '✅ ' : '○ '}
                           {`Slot ${slotIdx + 1} (${SLOT_LABELS[slotIdx]}) — ${heroName || '(Empty)'}`}
@@ -5217,7 +5386,7 @@ function PuzzleCreator() {
                         <button key={g.id}
                           className={'btn ' + (active ? 'btn-success' : '')}
                           style={{ width: '100%', padding: '8px 12px', fontSize: 12, textAlign: 'left',
-                            borderColor: active ? '#44dd66' : 'var(--bg4)' }}
+                            borderColor: active ? '#4ceb70' : 'var(--bg4)' }}
                           onClick={() => setEditSparkflyGifts({ ...editSparkflyGifts, [g.id]: !active })}>
                           <div style={{ fontWeight: 700 }}>{(active ? '✅ ' : '○ ') + g.icon + ' ' + g.label}</div>
                           <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.85, marginTop: 2 }}>{g.text}</div>
@@ -5421,7 +5590,7 @@ function PuzzleCreator() {
                     setDoomEdit(d => ({ ...d, wert: Number.isFinite(n) ? Math.max(0, Math.min(19, n)) : 0 }));
                   }}
                   onKeyDown={(e) => e.key === 'Enter' && speichereDoom()}
-                  style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#ff8f8f' }} />
+                  style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#ec7f79' }} />
                 <button className="btn" style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
                   disabled={doomEdit.wert >= 19}
                   onClick={() => setDoomEdit(d => ({ ...d, wert: Math.min(19, d.wert + 1) }))}>+</button>
@@ -5454,6 +5623,30 @@ function PuzzleCreator() {
           setMobileSelected(null);
         }}>✕ Remove</div>
       )}
+      {/* ── Stufe der gewählten Handkarte (23.10., Al): Linksklick wählt die Karte, und hat sie ein Level, erscheint hier die Stufenwahl. */}
+      {mobileSelected && removePopupPos && (mobileSelected.handSource === 'hand' || mobileSelected.handSource === 'oppHand') && (() => {
+        const kc = getCard(mobileSelected.cardName);
+        if (!kc || kc.level == null) return null;
+        const istOpp = mobileSelected.handSource === 'oppHand';
+        const idx = mobileSelected.handIdx;
+        const lvListe = istOpp ? oppHandLv : handLv;
+        const gesetzt = Number.isInteger(lvListe[idx]);
+        const aktuell = gesetzt ? lvListe[idx] : kc.level;
+        return (
+          <div className="pz-lv-pop" data-pz-lv-pop style={{
+            position: 'fixed',
+            left: removePopupPos.left,
+            top: removePopupPos.top,
+            transform: istOpp ? 'translate(-50%, 28px)' : 'translate(-50%, calc(-100% - 28px))',
+            zIndex: 999999,
+          }} onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+            <button className="pz-lv-btn" data-pz-lv="down" onClick={() => setzeLv(istOpp, idx, aktuell - 1, kc.level)}>-</button>
+            <span className={'pz-lv-wert' + (gesetzt ? (aktuell < kc.level ? ' pz-lv-tiefer' : ' pz-lv-hoeher') : '')} data-pz-lv="wert">Lv {aktuell}</span>
+            <button className="pz-lv-btn" data-pz-lv="up" onClick={() => setzeLv(istOpp, idx, aktuell + 1, kc.level)}>+</button>
+            <button className="pz-lv-reset" data-pz-lv="reset" disabled={!gesetzt} onClick={() => setzeLv(istOpp, idx, null, kc.level)}>RESET ({kc.level})</button>
+          </div>
+        );
+      })()}
     </div>
   );
 }

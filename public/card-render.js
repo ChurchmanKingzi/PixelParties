@@ -31,7 +31,7 @@
   const OVER_GREEN = 'rgb(76,235,112)', OVER_RED = 'rgb(255,72,72)', OVER_OUTLINE = 'rgb(8,6,12)';   // aktuelle Werte: verringert / erhoeht, Kontur
   let TEXT_MASK = false;                      // waehrend `textLayer` gesetzt: aller Text weiss (Maske), siehe `draw(…, textOnly)`
   const INK_TRAIL_U = 200;                    // Vorschub minus Tintenbreite: 1 Schrift-Pixel Abstand hinter jedem Zeichen
-  const OPT = { boldU: 50, statusOutline: 0.5, dy: 0, dx: 0, slack: 0, trail: false, step: 0.05, hextra: 0, forcePt: 0, bsteps: 7, silverRim: true, nl: 'space', symDx: 0, symDy: 0, symMode: 'rule', hardOutlines: true };
+  const OPT = { nameOutline: !/[?&]namenkontur=0/.test(typeof location !== 'undefined' ? location.search : ''), boldU: 50, statusOutline: 0.5, dy: 0, dx: 0, slack: 0, trail: false, step: 0.05, hextra: 0, forcePt: 0, bsteps: 7, silverRim: true, nl: 'space', symDx: 0, symDy: 0, symMode: 'rule', hardOutlines: true };
 
   // ── Schrift: Umrisse und Vorschubbreiten aus cardgen/glyphs.json ──
   // Pixel Intv besteht nur aus Rechtecken, hat kein Kerning und Breiten in Vielfachen von 200 Einheiten.
@@ -224,9 +224,24 @@
   }
 
   // ── Farben (Style-Skript des Templates) ──
+  // Wertefelder unten (HP links / Angriff rechts): Helden exakt mittig in ihren Feldern (HP x 180–380, Angriff x 470–670), Kreaturen/Artifacts weiter innen.
+  // Gemeinsam fuer `draw` und die Glanzmaske (`nameMaskCanvas`), damit Zahl und Glanz deckungsgleich liegen.
+  // Artifact-Creature: die HP stehen mittig im Feld zwischen Herz- und Münz-Symbol (Feld x 180–377, Mitte 279 → Box 182 + 194/2).
+  function hpBoxFor(t) {
+    const heroBox = (isHero3(t) || isSuperhero(t)) && t !== 'boss';
+    return { left: heroBox ? 180 : t === 'artifactCreature' ? 182 : (t === 'summon' || t === 'tokenCreature') ? 275 : t === 'boss' ? 160 : 201,
+      top: 984, width: heroBox ? 200 : 194, height: 60, size: 38, min: 1, align: 'center', ink: heroBox };
+  }
+  function atkBoxFor(t) {
+    const heroBox = (isHero3(t) || isSuperhero(t)) && t !== 'boss';
+    return { left: heroBox ? 470 : t === 'artifact' ? 296 : 504, top: 984, width: heroBox ? 200 : isArti2(t) ? 150 : 94,
+      height: 60, size: 38, min: 1, align: 'center', ink: heroBox };
+  }
+  const hatHp = t => isHero3(t) || isSuperhero(t) || t === 'summon' || t === 'tokenCreature' || t === 'artifactCreature';
+  const LEVEL_BOX = { left: 650, top: 550, width: 110, height: 110, size: 65, min: 1, align: 'center', vAlign: 'middle' };   // Stufenzahl (Zauber, Kreaturen)
   const C = {
     white: 'rgb(255,255,255)', boss: 'rgb(200,0,0)', bossText: 'rgb(240,50,50)', token: 'rgb(50,50,50)',
-    sapphire: 'rgb(8,211,239)', diamond: 'rgb(145,230,230)', diamondLight: 'rgb(178,238,238)', diamondMuted: 'rgb(116,184,184)', diamondDark: 'rgb(102,161,161)', artifact: 'rgb(182,38,0)', sup: 'rgb(255,221,0)',
+    sapphire: 'rgb(8,211,239)', diamond: 'rgb(145,230,230)', diamondLight: 'rgb(178,238,238)', diamondMuted: 'rgb(116,184,184)', diamondDark: 'rgb(102,161,161)', artifact: 'rgb(182,38,0)', sup: 'rgb(250,213,74)',
     supArti: 'rgb(255,125,0)', rare: 'rgb(173,97,0)',
   };
 
@@ -480,7 +495,7 @@
       };
       // `outline`: dunkle Kontur um die Zahl (8 Richtungen, 0,7 Schrift-Pixel) — hebt farbige Werte (gruen/rot) auf jedem Rahmen ab
       if (o.outline && !TEXT_MASK) {
-        const d = Math.max(2, Math.round(pt * PT * 200 / UPM * 0.7));
+        const d = Math.max(2, Math.round(pt * PT * 200 / UPM * 0.7 * (o.outlineFactor || 1)));
         ctx.fillStyle = o.outline;
         for (const [ox, oy] of [[-d, 0], [d, 0], [0, -d], [0, d], [-d, -d], [d, -d], [-d, d], [d, d]]) paint(ox, oy);
         ctx.fillStyle = TEXT_MASK ? '#fff' : o.color;
@@ -490,6 +505,14 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
 
+  /** Münzen-Gold in vier harten Bändern (hell / Gold / Orange / Dunkelorange), Kanten ohne Übergang — dieselben Farben wie die Goldzahlen im Duell. */
+  function muenzGoldFill(ctx, top, height) {
+    // Verlauf über die Tintenhöhe der Schrift (Oberkante der Großbuchstaben bis Unterkante), nicht über die ganze Zeile
+    const g = ctx.createLinearGradient(0, top + height * 0.14, 0, top + height * 0.86);
+    const stufen = [[0, '#f7f7ad'], [0.3, '#fad54a'], [0.62, '#f29a3e']];
+    stufen.forEach(([p, c], i) => { g.addColorStop(p, c); g.addColorStop(i + 1 < stufen.length ? stufen[i + 1][0] - 0.001 : 1, c); });
+    return g;
+  }
   // Goldener Verlauf fuer Skin-Namen (oben hell, unten tief; harte Kante in der Mitte wie bei gebuerstetem Gold)
   function goldFill(ctx, top, height) {
     const g = ctx.createLinearGradient(0, top + height * 0.12, 0, top + height * 0.88);
@@ -499,6 +522,19 @@
   }
 
   // ═════════════ Farben je Karte ═════════════
+  /** TEST (Al, 23.10.): Kontur der Kartennamen in einem dunkleren Ton der jeweiligen Karte — aus der Namensplatte des Rahmens abgetastet
+   *  (mittlerer Farbwert eines Streifens am Rand der Platte, wo selten Schrift steht), auf 60 % Helligkeit abgedunkelt. Schalter: `OPT.nameOutline`
+   *  (Standard an; `?namenkontur=0` in der Adresse schaltet aus). */
+  function nameOutlineColor(ctx, sup) {
+    try {
+      const x0 = sup ? 56 : 108, ys = [62, 70, 78, 86, 94];
+      const px = ys.map(y => Array.from(ctx.getImageData(x0, y, 1, 1).data));
+      const hell = c => c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11;
+      px.sort((a, b) => hell(a) - hell(b));
+      const m = px[Math.floor(px.length / 2)];
+      return 'rgb(' + [0, 1, 2].map(i => Math.round(m[i] * 0.6)).join(',') + ')';
+    } catch (e) { return null; }
+  }
   function nameColor(s) {
     const t = s.type, r = s.rarity;
     if (t === 'boss') return C.boss;
@@ -682,9 +718,17 @@
 
     // 3) Namenszeile (z 2) — Superhelden: breiter
     const sup = isSuperhero(t);
+    // Super Rares (außer Artifacts): Name in den Münzen-Goldtönen (data/palette-fest.json), in vier harten Bändern wie die Goldzahlen, Kontur in Münzen-Rotbraun
+    const supGold = spec.rarity === 'super rare' && !isArti2(t) && !isSuperhero(t) && t !== 'boss' && !isToken(t);
+    // Dieselbe Behandlung (Farbe, Münzen-Gold-Bänder, Kontur) bekommen Stufe und Kosten — nur die Höhe des Verlaufs richtet sich nach der jeweiligen Zeile.
+    const fillFor = (top, height) => spec.nameGold ? goldFill(ctx, top, height) : supGold ? muenzGoldFill(ctx, top, height) : nameColor(spec);
+    // Artifacts: dunkle Schrift auf heller Platte — dort keine Kontur; nur die goldene Schrift der Super-Rare-Artifacts (Orange auf Hellgelb) bekommt eine deutliche, dunkle Kontur
+    const supArtiGold = spec.rarity === 'super rare' && isArti2(t);
+    const nameOut = OPT.nameOutline && !textOnly ? (supArtiGold ? 'rgb(112,28,0)' : isArti2(t) ? null : supGold ? 'rgb(182,38,0)' : nameOutlineColor(ctx, sup)) : null;
+    const nameOutF = supArtiGold ? 0.7 : 0.5;
     if (!textOnly) drawLine(ctx, spec.name, {
       left: sup ? 48 : 103, top: 48, width: sup ? 654 : 544, height: 55, size: 50, min: 48,
-      align: 'center', color: spec.nameGold ? goldFill(ctx, 48, 55) : nameColor(spec),
+      align: 'center', color: fillFor(48, 55), outline: nameOut, outlineFactor: nameOutF,
     });
 
     // 4) Faehigkeiten-Felder der Helden
@@ -701,11 +745,13 @@
     // 5) Zauberschule (links) und Stufe (rechts) — Zauber und Kreaturen
     if (t === 'spell' || t === 'summon') {
       if (spec.school && !textOnly) sprite(ctx, 'school.' + spec.school, 0, 550, 110, 110);
-      // `lvOver`: aktuelle Stufe (Hand: Rabatt gruen, Zuschlag rot), mit dunkler Kontur
-      if (spec.level != null || spec.lvOver != null) drawLine(ctx, String(spec.lvOver != null ? spec.lvOver : spec.level), {
-        left: 650, top: 550, width: 110, height: 110, size: 65, min: 1, align: 'center', vAlign: 'middle',
-        color: spec.lvOver != null ? spec.lvColor : levelColor(spec), outline: spec.lvOver != null ? OVER_OUTLINE : null,
-      });
+      // `lvOver`: aktuelle Stufe (Hand: Rabatt gruen, Zuschlag rot), mit dunkler Kontur. Sonst wie der Name; der Glanz (Foil) liegt in der Namensmaske.
+      if (!textOnly && (spec.level != null || spec.lvOver != null)) {
+        const ueber = spec.lvOver != null;
+        drawLine(ctx, String(ueber ? spec.lvOver : spec.level), Object.assign({}, LEVEL_BOX, {
+          color: ueber ? spec.lvColor : fillFor(LEVEL_BOX.top, LEVEL_BOX.height), outline: ueber ? OVER_OUTLINE : nameOut, outlineFactor: ueber ? 1 : nameOutF,
+        }));
+      }
     }
     // Kartenart-Symbol unten links (Falle, Reaktion, Flaeche, Anhang)
     if (!textOnly && spec.kind && (t === 'spell' || t === 'summon' || t === 'potion' || t === 'artifact')) {
@@ -717,27 +763,23 @@
 
     // 7) Werte (HP, Angriff / Kosten) — `noHp` / `noAtk`: die Zahl weglassen (Brett: dort liegt der Live-Wert darueber)
     const stat = statColor(spec);
-    if (isHero3(t) || sup || t === 'summon' || t === 'tokenCreature' || t === 'artifactCreature') {
+    if (hatHp(t)) {
       // Helden ohne feste Werte (Ascended Hero „stats equal its base Hero's“) zeigen „?“ in beiden Feldern
       const unknown = isHero3(t) || sup;
-      // Helden: die Zahlen stehen exakt mittig in ihren Feldern (HP-Feld x 180–380, Angriffs-Feld x 470–670 im
-      // Rahmen) — egal, wie viele Stellen sie haben. Frueher lagen sie ~18 px zu weit innen (HP zu weit rechts,
-      // ATK zu weit links). Boss-Rahmen: unveraendert.
-      const heroBox = (isHero3(t) || sup) && t !== 'boss';
-      if (!spec.noHp && (spec.hp != null || unknown)) drawLine(ctx, spec.hp != null ? String(spec.hp) : '?', {
-        left: heroBox ? 180 : t === 'artifactCreature' ? 240 : (t === 'summon' || t === 'tokenCreature') ? 275 : t === 'boss' ? 160 : 201,
-        top: 984, width: heroBox ? 200 : 194, height: 60, size: 38, min: 1, align: 'center', color: stat, ink: heroBox,
-      });
+      // HP (Helden, Kreaturen) und Angriff (Helden): wie der Name (Farbe, Münzen-Gold, Kontur); der Glanz liegt in der Namensmaske — deshalb nicht in der Textmaske
+      if (!textOnly && !spec.noHp && (spec.hp != null || unknown)) drawLine(ctx, spec.hp != null ? String(spec.hp) : '?', Object.assign({}, hpBoxFor(t), {
+        color: fillFor(984, 60), outline: nameOut, outlineFactor: nameOutF,
+      }));
     }
     if (isHero3(t) || sup || t === 'summon' || isArti2(t)) {
-      const heroBox = (isHero3(t) || sup) && t !== 'boss';
+      const heroAtk = isHero3(t) || sup;
       // `costOver`: aktuelle Kosten eines Artifacts (sitzen im Wertefeld der Mitte), gruen/rot mit dunkler Kontur
       const kostet = isArti2(t) && spec.costOver != null;
-      if (!spec.noAtk && (spec.atk != null || kostet || isHero3(t) || sup)) drawLine(ctx, kostet ? String(spec.costOver) : spec.atk != null ? String(spec.atk) : '?', {
-        left: heroBox ? 470 : t === 'artifact' ? 296 : 504, top: 984, width: heroBox ? 200 : isArti2(t) ? 150 : 94,
-        height: 60, size: 38, min: 1, align: 'center', color: kostet ? spec.costColor : stat, ink: heroBox,
-        outline: kostet ? OVER_OUTLINE : null, costX: isArti2(t),
-      });
+      // Kosten eines Artifacts und Angriff eines Helden: wie der Name (Farbe, Kontur); Glanz über die Namensmaske — deshalb nicht noch einmal in der Textmaske
+      if (!spec.noAtk && !(textOnly && (isArti2(t) || heroAtk)) && (spec.atk != null || kostet || isHero3(t) || sup)) drawLine(ctx, kostet ? String(spec.costOver) : spec.atk != null ? String(spec.atk) : '?', Object.assign({}, atkBoxFor(t), {
+        color: kostet ? spec.costColor : (isArti2(t) || heroAtk) ? fillFor(984, 60) : stat,
+        outline: kostet ? OVER_OUTLINE : (isArti2(t) || heroAtk) ? nameOut : null, outlineFactor: nameOutF, costX: isArti2(t),
+      }));
     }
 
     // 8) Regeltext — Faehigkeiten haben drei Textfelder, alle anderen Karten eines
@@ -782,11 +824,20 @@
     potion: { Reaction: 'quickPotion', Surprise: 'trapPotion', Area: 'areaPotion', Attachment: 'attachmentPotion' },
   };
   // „1) … 2) … 3) …“ -> drei Faehigkeiten-Texte ohne Nummer
+  // Eine Zeile ohne „N)“ gehoert zur Stufe davor: die Kartenvorlage bricht den Text um — mitten im Satz („… without this effect, ⏎ discard as many cards …“ bei Wisdom, „… for the rest of
+  // the ⏎ beginning of …“ bei Necromancy) oder nach dem ersten Satz („… of that Creature. ⏎ Negate the Creature's effects …“ bei Diplomacy Stufe 1 und 2). Bisher fiel so eine
+  // Fortsetzung weg — die Karte zeigte den Text abgeschnitten. (Karten ganz ohne „N)“ — Divinity, Performance — gehen diesen Weg nicht: `letzte` bleibt −1.)
   function abilityTexts(effect) {
     const out = ['', '', ''];
+    let letzte = -1;
     for (const line of String(effect || '').split('\n')) {
       const m = /^\s*([123])\)\s*(.*)$/.exec(line);
-      if (m) out[+m[1] - 1] = (out[+m[1] - 1] ? out[+m[1] - 1] + ' ' : '') + m[2].trim();
+      if (m) {
+        letzte = +m[1] - 1;
+        out[letzte] = (out[letzte] ? out[letzte] + ' ' : '') + m[2].trim();
+      } else if (letzte >= 0 && line.trim()) {
+        out[letzte] += ' ' + line.trim();
+      }
     }
     return out;
   }
@@ -878,6 +929,22 @@
     return meta;
   }
 
+  /** Abweichende Werte, die statt der gedruckten aufs Bild kommen (HP im Tooltip, Stufe/Kosten in der Hand, weggelassene Zahlen auf dem Brett).
+   *  Gemeinsam fuer das Kartenbild (`renderCard`) und die Namensmaske des Foils (`nameLayer`) — sonst glänzt die Schraffur auf dem gedruckten Wert. */
+  function applyOverrides(spec, card, o) {
+    if (o.hp != null) spec.hp = o.hp;
+    if (o.noHp) spec.noHp = true;
+    if (o.stufe >= 1 && o.stufe <= 3) spec.stufe = o.stufe;
+    if (o.noAtk) spec.noAtk = true;
+    // aktuelle Stufe / Kosten (Hand): gruen, wenn niedriger als gedruckt, rot, wenn hoeher; gleich -> unveraendert gedruckt
+    if (o.lv != null && card.level != null && o.lv !== card.level) { spec.lvOver = o.lv; spec.lvColor = o.lv < card.level ? OVER_GREEN : OVER_RED; }
+    // Variable Kosten („4X"): das X bleibt dran (aus 4X wird 8X); ein reines „X" hat keine Zahl, die man ersetzen koennte.
+    if (o.kost != null && card.cost != null && o.kost !== card.cost && (!card.costLabel || /^\d/.test(card.costLabel))) {
+      spec.costOver = o.kost + (card.costLabel ? String(card.costLabel).replace(/^\d+/, '') : '');
+      spec.costColor = o.kost < card.cost ? OVER_GREEN : OVER_RED;
+    }
+  }
+
   /**
    * Komplette Karte als Canvas.
    * @param {object} card  Karte aus cards.json
@@ -899,17 +966,7 @@
     const m = Object.assign({}, meta.cards[card.name]);
     if (skin) { if (skin.r) m.r = skin.r; if (skin.f) m.f = skin.f; }
     const spec = specFromCard(card, m, skin ? { name: skin.name || o.skin } : null);
-    if (o.hp != null) spec.hp = o.hp;
-    if (o.noHp) spec.noHp = true;
-    if (o.stufe >= 1 && o.stufe <= 3) spec.stufe = o.stufe;
-    if (o.noAtk) spec.noAtk = true;
-    // aktuelle Stufe / Kosten (Hand): gruen, wenn niedriger als gedruckt, rot, wenn hoeher; gleich -> unveraendert gedruckt
-    if (o.lv != null && card.level != null && o.lv !== card.level) { spec.lvOver = o.lv; spec.lvColor = o.lv < card.level ? OVER_GREEN : OVER_RED; }
-    // Variable Kosten („4X"): das X bleibt dran (aus 4X wird 8X); ein reines „X" hat keine Zahl, die man ersetzen koennte.
-    if (o.kost != null && card.cost != null && o.kost !== card.cost && (!card.costLabel || /^\d/.test(card.costLabel))) {
-      spec.costOver = o.kost + (card.costLabel ? String(card.costLabel).replace(/^\d+/, '') : '');
-      spec.costColor = o.kost < card.cost ? OVER_GREEN : OVER_RED;
-    }
+    applyOverrides(spec, card, o);
     // Skin-Holo: der Name steht golden auf der Karte (siehe unten, HOLO-TEXTUR); die schillernden Schichten
     // darueber zeichnet das Spiel als eigene DOM-Lage (SkinHolo in app-shared.jsx).
     if (skin && holoOn(skin)) spec.nameGold = true;
@@ -1037,14 +1094,36 @@
     return c;
   }
 
-  /** Umriss der Namensbuchstaben: nur der Name, weiss, in einem Streifen ueber die ganze Kartenbreite (Hoehe 110 ab y = 20) */
-  const NAME_STRIP = { x: 0, y: 20, w: W, h: 110 };
+  /** Umriss von Name, Stufe und Kosten: weiss, in voller Kartengroesse (750 x 1050) — Name, Stufenzahl und Artifact-Kosten bekommen denselben Glanz. */
+  const NAME_STRIP = { x: 0, y: 0, w: W, h: H };
   function nameMaskCanvas(spec, geo) {
     const c = document.createElement('canvas'); c.width = NAME_STRIP.w; c.height = NAME_STRIP.h;
-    drawLine(c.getContext('2d'), spec.name, {
-      left: geo.nameBox.left, top: geo.nameBox.top - NAME_STRIP.y, width: geo.nameBox.width, height: geo.nameBox.height,
+    const g = c.getContext('2d');
+    drawLine(g, spec.name, {
+      left: geo.nameBox.left, top: geo.nameBox.top, width: geo.nameBox.width, height: geo.nameBox.height,
       size: 50, min: 48, align: 'center', color: '#fff',
     });
+    if (spec.level != null || spec.lvOver != null) drawLine(g, String(spec.lvOver != null ? spec.lvOver : spec.level), Object.assign({}, LEVEL_BOX, { color: '#fff' }));
+    if (isArti2(spec.type) && !spec.noAtk && (spec.atk != null || spec.costOver != null)) {
+      drawLine(g, spec.costOver != null ? String(spec.costOver) : String(spec.atk), {
+        left: spec.type === 'artifact' ? 296 : 504, top: 984, width: 150, height: 60, size: 38, min: 1, align: 'center', color: '#fff', costX: true,
+      });
+    }
+    // HP (Helden, Kreaturen) und Angriff (Helden): gleicher Glanz wie der Name
+    const tt = spec.type, unbekannt = isHero3(tt) || isSuperhero(tt);
+    if (hatHp(tt) && !spec.noHp && (spec.hp != null || unbekannt)) drawLine(g, spec.hp != null ? String(spec.hp) : '?', Object.assign({}, hpBoxFor(tt), { color: '#fff' }));
+    if (unbekannt && !spec.noAtk) drawLine(g, spec.atk != null ? String(spec.atk) : '?', Object.assign({}, atkBoxFor(tt), { color: '#fff' }));
+    // Seltenheits-Stempel unten rechts (Stern / Diamant / Saphir) der Foil-Karten: gleicher Glanz wie der Name
+    if (spec.rarity === 'super rare' || spec.rarity === 'diamond' || spec.rarity === 'sapphire') {
+      const stamp = STAMP[spec.rarity];
+      const t2 = document.createElement('canvas'); t2.width = 45; t2.height = 45;
+      const g2 = t2.getContext('2d');
+      const white = isArti2(spec.type) && (stamp !== 'diamond' && stamp !== 'sapphire');
+      if (sprite(g2, (white ? 'cornerW.' : 'corner.') + stamp, 0, 0, 45, 45)) {
+        g2.globalCompositeOperation = 'source-in'; g2.fillStyle = '#fff'; g2.fillRect(0, 0, 45, 45);
+        g.drawImage(t2, 689, 989);
+      }
+    }
     return c;
   }
 
@@ -1098,8 +1177,9 @@
   }
 
   /** Nur der Namensumriss einer Karte (Super Rare / Diamond Rare tragen den Namensglanz ebenfalls). */
-  function nameLayer(card) {
+  function nameLayer(card, o) {
     const spec = specFromCard(card, meta.cards[card.name], null);
+    if (o) applyOverrides(spec, card, o);
     return { type: spec.type, nameStrip: NAME_STRIP, nameMask: nameMaskCanvas(spec, holoGeometry(spec.type)) };
   }
 
@@ -1179,7 +1259,18 @@
     return val;
   }
   function holoCached(skin) { return holoDone.get(skin) || null; }
-  function nameCached(card) { return nameDone.get(card.name) || null; }
+  /** Anhang des Schluessels fuer Karten mit abweichenden Werten (`|h=630|l=2|k=3|o=hp,atk`); leer ohne Abweichung. */
+  function nameVariant(card, o) {
+    if (!o) return '';
+    const t = [];
+    if (o.hp != null && o.hp !== card.hp) t.push('h=' + o.hp);
+    if (o.lv != null && card.level != null && o.lv !== card.level) t.push('l=' + o.lv);
+    if (o.kost != null && card.cost != null && o.kost !== card.cost) t.push('k=' + o.kost);
+    if (o.noHp) t.push('oh');
+    if (o.noAtk) t.push('oa');
+    return t.length ? '|' + t.join('|') : '';
+  }
+  function nameCached(card, o) { return nameDone.get(card.name + nameVariant(card, o)) || null; }
   function holoFor(card, skin) {
     if (!HOLO.on || !card || !skin) return Promise.resolve(null);
     const hit = holoDone.get(skin);
@@ -1314,28 +1405,28 @@
   function rimCached(rk) { return (rk && rimDone.get(rk.kind)) || null; }
 
   /** Namensglanz fuer Karten mit Foil (Super Rare / Diamond Rare): Umriss der Buchstaben + Lage. */
-  function nameShimmerFor(card) {
+  function nameShimmerFor(card, o) {
     if (!HOLO.on || !card) return Promise.resolve(null);
-    const hit = nameDone.get(card.name);
+    const sfx = nameVariant(card, o), nk = card.name + sfx;
+    const hit = nameDone.get(nk);
     if (hit) return Promise.resolve(hit);
-    const key = 'n:' + card.name;
+    const key = 'n:' + nk;
     if (holoWait.has(key)) return holoWait.get(key);
     const job = holoChain.then(async () => {
       await new Promise(r => setTimeout(r, 0));
-      const ck = 'n:' + card.name;
-      let rec = await cacheGet(ck);
+      let rec = await cacheGet(key);
       if (!(rec && rec.name instanceof Blob && rec.strip)) {
-        const L = nameLayer(card), name = await toBlob(L.nameMask);
+        const L = nameLayer(card, o), name = await toBlob(L.nameMask);
         if (!name) return null;
         rec = { name, strip: L.nameStrip };
-        cachePut(ck, rec, name.size);
+        cachePut(key, rec, name.size);
       }
       const url = urlOf(rec.name), strip = rec.strip;
-      return lru(nameDone, card.name, {
+      return lru(nameDone, nk, {
         vars: { '--sh-ny': pc(strip.y, H), '--sh-nh': pc(strip.h, H), '--sh-name': 'url(' + url + ')' },
         urls: [url],
       }, NAME_MAX);
-    }).catch(err => { console.warn('[card-render] Namensglanz', card.name, err && err.message); return null; })
+    }).catch(err => { console.warn('[card-render] Namensglanz', nk, err && err.message); return null; })
       .finally(() => holoWait.delete(key));
     holoChain = job.catch(() => {});
     holoWait.set(key, job);

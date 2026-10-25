@@ -79,6 +79,7 @@ function platzschutz(engine, pi, heroIdx, surpriseName, seite = pi) {
   return (zone) => {
     // Nur der Traeger-Held (Brettseite + Index) ist geschuetzt (Styx 28.9.).
     if ((zone.owner ?? pi) !== seite || zone.heroIdx !== heroIdx) return true;
+    if (zone.shared) return true;   // W62a: eine geteilte Zone (Alice) nimmt dem Surprise-Kreatur-Platz nichts weg
     return freieZonen(engine.gs.players[seite], heroIdx) > 1;
   };
 }

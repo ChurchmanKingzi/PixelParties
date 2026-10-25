@@ -58,6 +58,11 @@ function getFreeZones(gs, playerIdx, uebernahmeInst = null, engine = null) {
       }
     }
   }
+  // ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): mit Alice-Teilung des Spielers
+  // zaehlt auch die Zone einer GLEICHNAMIGEN Creature als „free" fuer die uebernommene Kreatur — geteilte zuerst.
+  if (uebernahmeInst && eng) {
+    return require('./_alice-shared').mitGeteilten(eng, playerIdx, uebernahmeInst.name, zones, { nachKontrolle: false, livingHeroesOnly: false, nurBasis: true });
+  }
   return zones;
 }
 
@@ -158,7 +163,10 @@ module.exports = {
     if (hasOpponentCreatures(eng, pi)) return false;
     const targets = getStealableCreatures(eng, pi);
     if (targets.length === 0) return false;
-    if (getFreeZones(gs, pi).length === 0) return false;
+    if (getFreeZones(gs, pi).length === 0) {
+      // W63a: keine freie Zone — mit Alice-Teilung reicht die Zone einer GLEICHNAMIGEN Creature fuer ein Ziel
+      if (!targets.some(t => getFreeZones(gs, pi, t.cardInstance, eng).length > 0)) return false;
+    }
     return true;
   },
 

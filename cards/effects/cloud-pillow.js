@@ -83,6 +83,7 @@ module.exports = {
         sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
         expiresAtTurn: expiresTurn,
         expiresForPlayer: pi,
+        fristBeginn: true,   // W68a: „until the beginning of your next turn"
         source: 'Cloud Pillow',
         addAnim: 'cloud_gather',
         removeAnim: 'cloud_disperse',
@@ -97,6 +98,7 @@ module.exports = {
       await engine.actionAddCreatureBuff(inst, 'cloudy', {
         expiresAtTurn: expiresTurn,
         expiresForPlayer: pi,
+        fristBeginn: true,
         source: 'Cloud Pillow',
         addAnim: 'cloud_gather',
         removeAnim: 'cloud_disperse',

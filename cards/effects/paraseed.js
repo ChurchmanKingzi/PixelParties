@@ -27,6 +27,7 @@
 //    noch einmal von der Obergrenze ab.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const {
   isParaseedCreature, paraseedsOnHero, paraseedWirkt, syncParaseedPoison, syncAllParaseedPoison,
   killerHeroOf, freeSlotOnHero,
@@ -149,13 +150,13 @@ module.exports = {
       const engine = ctx._engine;
       const tot = ctx.creature;
       if (!tot || tot.instId !== ctx.card.id) return;      // nur ich selbst
-      if (!isParaseedCreature(tot.name, engine)) return;
+      if (!anyName(tot, (n) => isParaseedCreature(n, engine))) return;
       if (!paraseedWirkt(engine, ctx.card)) return;        // W7a: Ersatzeffekt „einnisten" ruht -> Ablage
 
       const toeter = killerHeroOf(engine, ctx.source);
       if (!toeter) return;                                  // Artifact/Potion/Status
 
-      const slot = freeSlotOnHero(engine, toeter.owner, toeter.heroIdx);
+      const slot = freeSlotOnHero(engine, toeter.owner, toeter.heroIdx, tot.name);   // W63a: auch die Zone einer GLEICHNAMIGEN Paraseed (Alice-Teilung des Toeters), geteilte zuerst
       if (slot < 0) return;                                 // keine freie Zone → Ablage
 
       const inst = engine.cardInstances.find(c => c.id === tot.instId);

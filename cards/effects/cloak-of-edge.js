@@ -113,7 +113,8 @@ module.exports = {
     if (!engine.gs.hoptUsed) engine.gs.hoptUsed = {};
     engine.gs.hoptUsed[`free-ability:${CARD_NAME}:${pi}`] = engine.gs.turn;
 
-    engine.actionGrantAtk(ctx.card, hero, feld, heroIdx, ATK_GAIN);
+    // W54a: DAUERHAFT und ohne Kartenbindung — der Zuwachs steht in hero.permAtkDelta (ueberlebt Aufstieg/Abstieg), nicht als Buchung der Karteninstanz.
+    engine.actionPermAtk(hero, feld, heroIdx, ATK_GAIN, CARD_NAME);
 
     engine.log('cloak_of_edge_atk', {
       player: engine.gs.players[pi]?.username,

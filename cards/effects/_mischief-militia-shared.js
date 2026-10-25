@@ -164,6 +164,9 @@ function enumerateFreezableNonFrozenTargets(engine, opts = {}) {
         const ctrl = inst.controller ?? inst.owner;
         if (ctrl !== opts.side) continue;
       }
+      // Nur Kreaturen sind Ziele eines Freeze — Ausruestung (auch im Equip-Stapel von Darion: mehrere Karten teilen EINE Ziel-ID) und Anhaengsel nicht.
+      const _cd = engine.getEffectiveCardData?.(inst) || engine._getCardDB?.()[inst.name];
+      if (!_cd || !engine.isChoosableAsCreature(inst, _cd)) continue;
       if (!engine.canTargetForStatus(inst, 'frozen')) continue;
       out.push({
         id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,

@@ -262,8 +262,11 @@ async function performDescent(engine, pi, dyingHero, handInst) {
       for (let zi = 0; zi < abZones.length; zi++) {
         const slot = abZones[zi] || [];
         for (const name of slot) {
-          if (!ps.deletedPile) ps.deletedPile = [];
-          ps.deletedPile.push(name);
+          // W64c: Loeschstapel des permanenten BESITZERS der Karte (eine uebernommene Kreatur / fremde Ausruestung in der Zone gehoert nicht dem Nutzer)
+          const _inst = heroInsts.find(c => c.zone === 'ability' && c.zoneSlot === zi && c.name === name);
+          const _loeschPs = (_inst ? engine.gs.players[engine.kartenBesitzerVon(_inst)] : null) || ps;
+          if (!_loeschPs.deletedPile) _loeschPs.deletedPile = [];
+          _loeschPs.deletedPile.push(name);
         }
         abZones[zi] = [];
       }
@@ -272,8 +275,11 @@ async function performDescent(engine, pi, dyingHero, handInst) {
       for (let zi = 0; zi < supZones.length; zi++) {
         const slot = supZones[zi] || [];
         for (const name of slot) {
-          if (!ps.deletedPile) ps.deletedPile = [];
-          ps.deletedPile.push(name);
+          // W64c: Loeschstapel des permanenten BESITZERS der Karte (eine uebernommene Kreatur / fremde Ausruestung in der Zone gehoert nicht dem Nutzer)
+          const _inst = heroInsts.find(c => c.zone === 'support' && c.zoneSlot === zi && c.name === name);
+          const _loeschPs = (_inst ? engine.gs.players[engine.kartenBesitzerVon(_inst)] : null) || ps;
+          if (!_loeschPs.deletedPile) _loeschPs.deletedPile = [];
+          _loeschPs.deletedPile.push(name);
         }
         supZones[zi] = [];
       }
@@ -357,35 +363,24 @@ async function performDescent(engine, pi, dyingHero, handInst) {
     const pulledFrom = pullDivinityFromAnySource(ps, engine);
     if (!pulledFrom) break;
 
-    const abZones = ps.abilityZones[targetHeroIdx];
-    void abZones;
-    // v1349: Zonenwahl an EINER Stelle (verwahrte Abilities, Madame Guillotine).
-    const targetZone = engine.abilityZielZone(pi, targetHeroIdx, DIVINITY);
-    if (targetZone < 0) {
+    // v1349: Zonenwahl an EINER Stelle (verwahrte Abilities, Madame Guillotine); 24.10.: auch Support Zonen (Xal).
+    const ort = engine.abilityZielOrt(pi, targetHeroIdx, DIVINITY);
+    if (!ort) {
       // Out of room — refund the pulled copy back to where it came from.
       refundDivinity(engine, pi, pulledFrom);
       break;
     }
 
-    if (!abZones[targetZone]) abZones[targetZone] = [];
-    abZones[targetZone].push(DIVINITY);
-    const divInst = engine._trackCard(DIVINITY, pi, 'ability', targetHeroIdx, targetZone);
+    const divInst = engine.abilityOrtBelegen(pi, targetHeroIdx, DIVINITY, ort);
 
     if (pulledFrom === 'deck') {
       engine._broadcastEvent('deck_search_add', { cardName: DIVINITY, playerIdx: pi });
       engine.shuffleDeck(pi, 'main');
     }
 
-    await engine.runHooks('onPlay', {
-      _onlyCard: divInst, playedCard: divInst, cardName: DIVINITY,
-      zone: 'ability', heroIdx: targetHeroIdx, _skipReactionCheck: true,
-    });
-    await engine.runHooks('onCardEnterZone', {
-      enteringCard: divInst, toZone: 'ability', toHeroIdx: targetHeroIdx,
-      _skipReactionCheck: true,
-    });
+    await engine.abilityOrtHooks(divInst, ort, { _skipReactionCheck: true });
     engine._broadcastEvent('ability_activated', {
-      owner: pi, heroIdx: targetHeroIdx, zoneIdx: targetZone, abilityName: DIVINITY,
+      owner: pi, heroIdx: targetHeroIdx, zoneIdx: ort.slot, zoneKind: ort.art, abilityName: DIVINITY,
     });
     attached++;
   }

@@ -32,16 +32,10 @@ function getTypeId(heroIdx) {
  * Get the Friendship level for a specific hero.
  * Returns the count of 'Friendship' (+ Performance wildcards) in the ability zones.
  */
-function getFriendshipLevel(ps, heroIdx) {
-  const abZones = ps.abilityZones[heroIdx] || [];
-  for (let z = 0; z < 3; z++) {
-    const slot = abZones[z] || [];
-    if (slot.length === 0) continue;
-    if (slot[0] === 'Friendship') return slot.length;
-    // Check if Friendship is anywhere in the stack (Performance on top)
-    if (slot.includes('Friendship')) return slot.length;
-  }
-  return 0;
+function getFriendshipLevel(engine, feld, heroIdx) {
+  // 24.10.: echte Ability Zonen UND Support-Stapel (Xal); Friendship irgendwo im Stapel (Performance darüber) zählt.
+  const e = engine.abilityStapelEintrag(feld, heroIdx, 'Friendship', { auchWildcard: true });
+  return e ? e.namen.length : 0;
 }
 
 /**
@@ -59,7 +53,7 @@ function buildFilter(engine, pi, heroIdx, feld = pi) {
     const hps = engine.gs.players[feld] || ps;
 
     // Lv1 restriction: no Support Spells used yet this turn
-    const level = getFriendshipLevel(hps, heroIdx);
+    const level = getFriendshipLevel(engine, feld, heroIdx);
     if (level <= 1) {
       if (ps.supportSpellUsedThisTurn || ps.supportSpellLocked) return false;
     }
@@ -86,7 +80,7 @@ function buildFilter(engine, pi, heroIdx, feld = pi) {
 function setupAdditionalAction(engine, pi, heroIdx, feld = pi) {
   const ps = engine.gs.players[feld];   // Styx 28.9.: Brettseite des Helden
   if (!ps) return;
-  const level = getFriendshipLevel(ps, heroIdx);
+  const level = getFriendshipLevel(engine, feld, heroIdx);
   if (level <= 0) return;
 
   const typeId = getTypeId(heroIdx);
@@ -99,7 +93,7 @@ function setupAdditionalAction(engine, pi, heroIdx, feld = pi) {
 
   // Find the Friendship card instance for this hero to grant the action
   const friendshipInst = engine.cardInstances.find(c =>
-    c.owner === feld && c.zone === 'ability' && c.heroIdx === heroIdx && c.name === 'Friendship'
+    c.owner === feld && engine.istWirksameAbility(c) && c.heroIdx === heroIdx && c.name === 'Friendship'
   );
   if (friendshipInst) {
     engine.grantAdditionalAction(friendshipInst, typeId);
@@ -199,7 +193,7 @@ module.exports = {
       const spellData = ctx.spellCardData;
       if (!spellData || !hasSpellSchool(spellData, 'Support Magic')) return;
 
-      const level = getFriendshipLevel(hps, heroIdx);
+      const level = getFriendshipLevel(engine, feld, heroIdx);
       if (level < 2) return; // Lv1 grants the action but no draw
 
       const drawCount = level >= 3 ? 3 : 1;
@@ -219,14 +213,11 @@ module.exports = {
       }
 
       // Play sparkle animation on Friendship's ability zone
-      const abZones = hps.abilityZones[heroIdx] || [];
-      for (let z = 0; z < 3; z++) {
-        if ((abZones[z] || []).includes('Friendship')) {
-          engine._broadcastEvent('ability_activated', {
-            owner: feld, heroIdx, zoneIdx: z, abilityName: 'Friendship',
-          });
-          break;
-        }
+      const fe = engine.abilityStapelEintrag(feld, heroIdx, 'Friendship', { auchWildcard: true });
+      if (fe) {
+        engine._broadcastEvent('ability_activated', {
+          owner: feld, heroIdx, zoneIdx: fe.slot, zoneKind: fe.art, abilityName: 'Friendship',
+        });
       }
       await engine._delay(300);
 

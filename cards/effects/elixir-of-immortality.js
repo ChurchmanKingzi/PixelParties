@@ -48,7 +48,7 @@ async function loeseAusstehende(ctx) {
 
 module.exports = {
   isPotion: true,
-  deferBroadcast: true,
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral (`commitAppearance()` im resolve).
   activeIn: ['permanent'],
   // Engine-level opt-in honoured by `checkAllHeroesDead()`. While this
   // permanent is on the owner's side, an all-heroes-dead state does
@@ -86,11 +86,7 @@ module.exports = {
     if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
     ps._oncePerGameUsed.add('elixirOfImmortality');
 
-    const oi = engine.opponentOf(pi);
-    const oppSid = engine.gs.players[oi]?.socketId;
-    if (oppSid && engine.io) {
-      engine.io.to(oppSid).emit('card_reveal', { cardName: 'Elixir of Immortality' });
-    }
+    engine.commitAppearance();   // W64b: zentral (Gegner + Zuschauer)
     await engine._delay(100);
 
     if (!ps.permanents) ps.permanents = [];
@@ -391,30 +387,26 @@ async function reviveCreature(engine, pi, chosen) {
   const canPlaceOn = (hi) =>
     engine.isCreatureSummonable(chosen.name, pi, hi, { _bypassBeforeSummon: true });
 
+  // ★ W62a: mit Alice-Teilung gilt auch die Zone einer GLEICHNAMIGEN Creature als Landeplatz (W63a: der alte Platz, sonst geteilt vor frei) — `engine.zoneEintragen` legt dazu.
+  const { canShareInto } = require('./_alice-shared');
+  const teilbar = (hi, z) => z < 3 && canShareInto(engine, pi, hi, z, chosen.name);
   const origSlot = (ps.supportZones[chosen.heroIdx] || [])[chosen.zoneSlot] || [];
-  if (origSlot.length === 0 && ps.heroes[chosen.heroIdx]?.hp > 0 && canPlaceOn(chosen.heroIdx)) {
+  if ((origSlot.length === 0 || teilbar(chosen.heroIdx, chosen.zoneSlot)) && ps.heroes[chosen.heroIdx]?.hp > 0 && canPlaceOn(chosen.heroIdx)) {
     targetHi = chosen.heroIdx;
     targetSi = chosen.zoneSlot;
   }
 
+  // ★ W63a (Al, 22.10.2026: „erst die geteilte Zone, sofern Alices Effekt aktiv ist, DANN die erste leere"): faellt der alte Platz weg, waehlt das Elixir die
+  // Zone selbst — zuerst eine geteilte Zone (gleichnamige Creature, Alice), sonst die erste freie; zuerst am Helden des Gefallenen, dann an den anderen.
   if (targetHi < 0 && ps.heroes[chosen.heroIdx]?.hp > 0 && canPlaceOn(chosen.heroIdx)) {
-    const supZones = ps.supportZones[chosen.heroIdx] || [];
-    for (let z = 0; z < supZones.length; z++) {
-      if ((supZones[z] || []).length === 0) { targetHi = chosen.heroIdx; targetSi = z; break; }
-    }
+    const z0 = engine.beschwoerZonenFuer(pi, chosen.name, { heroIdx: chosen.heroIdx, livingHeroesOnly: true })[0];
+    if (z0) { targetHi = chosen.heroIdx; targetSi = z0.slotIdx; }
   }
 
   if (targetHi < 0) {
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      if (hi === chosen.heroIdx) continue;
-      if (!ps.heroes[hi]?.name || ps.heroes[hi].hp <= 0) continue;
-      if (!canPlaceOn(hi)) continue;
-      const supZones = ps.supportZones[hi] || [];
-      for (let z = 0; z < supZones.length; z++) {
-        if ((supZones[z] || []).length === 0) { targetHi = hi; targetSi = z; break; }
-      }
-      if (targetHi >= 0) break;
-    }
+    const kand = engine.beschwoerZonenFuer(pi, chosen.name, { livingHeroesOnly: true })
+      .filter(z => z.heroIdx !== chosen.heroIdx && canPlaceOn(z.heroIdx));
+    if (kand.length) { targetHi = kand[0].heroIdx; targetSi = kand[0].slotIdx; }
   }
 
   if (targetHi < 0) {
@@ -436,8 +428,7 @@ async function reviveCreature(engine, pi, chosen) {
     return;
   }
 
-  if (!ps.supportZones[targetHi]) ps.supportZones[targetHi] = [[], [], []];
-  ps.supportZones[targetHi][targetSi] = [chosen.name];
+  engine.zoneEintragen(pi, targetHi, targetSi, chosen.name, pi);   // W62a: gleichnamige Kreatur (Alice) → dazustapeln statt ueberschreiben
 
   // v324: NICHT je Wiederbelebung die 0,83-MB-Kartendatei lesen und parsen,
   // nur um EINEN hp-Wert nachzuschlagen — dieselbe Klasse wie v323.

@@ -216,7 +216,9 @@ module.exports = {
       if (!opfer?.name || opfer.hp <= 0) { engine.sync(); return true; }
       // W39a: „besiegt mit einer Attack" (Death-Leser: Future Tech Bazooka) und Treffer ohne Schaden an die Schadens-Leser (Explosivo's Sword, Don Quisto, Wavilion, Skullmael's Greatsword,
       // Heart of Ice …) — `meldeTreffer` feuert ihn NACH hp = 0, VOR den KO-Hooks (wie der Schadenspfad).
-      await engine.actionDefeatHero(quelle, opfer, { sourceName: CARD_NAME, type: 'attack', meldeTreffer: true });
+      // W66a (Al, 23.10.2026: Effekt-Schutz gegen JEDE Form von „defeat"): Zielschutz „or HIT", Charmed, Submerged, Versteinerung, Quellen-Immunität … (`wirkungsSchutz`),
+      // Schadens-Schutz gilt nicht (kein Schaden). Typ `attack`: Anti Magic (Spell-Schutz) greift hier nicht, Attack-Schutz („cannot be hit by Attacks") schon.
+      await engine.actionDefeat(quelle, opfer, { sourceName: CARD_NAME, type: 'attack', meldeTreffer: true, damageType: 'attack', wirkungsSchutz: true });
     } else {
       const opfer = ziel.cardInstance
         || engine.findCards({ controller: ziel.owner, zone: 'support', heroIdx: ziel.heroIdx })

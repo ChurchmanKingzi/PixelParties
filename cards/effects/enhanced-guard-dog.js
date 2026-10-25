@@ -58,7 +58,7 @@ const CARD_NAME = 'Enhanced Guard Dog';
  * freie Zone. Bauform von Doomed Town Guard.
  */
 function summonableZones(engine, pi) {
-  return engine.getFreeSupportZones(pi, { nachKontrolle: true })
+  return engine.beschwoerZonenFuer(pi, CARD_NAME, { nachKontrolle: true })   // W62a: + Zone einer gleichnamigen Creature (Alice-Teilung)
     .filter(z => darfUeberHeld(engine, pi, z.owner, z.heroIdx));
 }
 

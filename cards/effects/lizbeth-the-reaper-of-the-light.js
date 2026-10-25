@@ -106,10 +106,9 @@ function maxOpponentAbilityLevel(engine, pi, abilityName) {
   for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(oi)) {
     if (!hero?.name || hero.hp <= 0) continue;
     if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
-    const abZones = engine.gs.players[physOwner]?.abilityZones?.[hi] || [];
-    for (const slot of abZones) {
-      if (!slot || slot.length === 0) continue;
-      if (slot[0] === abilityName && slot.length > max) max = slot.length;
+    // 24.10.: auch die Stapel in den Support Zonen des Gegners (Xal, Xalibur).
+    for (const e of engine.abilityStapelListe(physOwner, hi)) {
+      if (e.namen[0] === abilityName && e.namen.length > max) max = e.namen.length;
     }
   }
   return max;
@@ -124,7 +123,7 @@ function fightingTotalForHero(engine, pi, heroIdx) {
   if (!hero?.name || hero.hp <= 0) return 0;
   let total = 0;
   for (const inst of engine.cardInstances) {
-    if (inst.zone !== 'ability') continue;
+    if (!engine.istWirksameAbility(inst)) continue;   // 24.10.: auch Fighting in einer Support Zone (Xal, Xalibur)
     if (inst.name !== 'Fighting') continue;
     if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.heroIdx !== heroIdx) continue;
@@ -432,7 +431,9 @@ async function handleBiomancyMirror(ctx) {
   const feld = ctx.cardHeroOwner ?? pi;
   // Lizbeth herself must have a free Support slot.
   const supZones = gs.players[feld]?.supportZones?.[heroIdx] || [[], [], []];
-  if (![0, 1, 2].some(z => (supZones[z] || []).length === 0)) return;
+  // W64a (Al, 23.10.2026): bei aktiver Alice-Teilung zaehlt auch die Zone eines Tokens GLEICHEN Namens.
+  if (![0, 1, 2].some(z => (supZones[z] || []).length === 0)
+      && require('./_biomancy-shared').teilbareSlots(engine, pi, feld, heroIdx, ctx.potionName).length === 0) return;
 
   // Soft HOPT per turn.
   if (!gs.hoptUsed) gs.hoptUsed = {};

@@ -126,8 +126,10 @@ module.exports = {
       if (ctx.toZone !== undefined && ctx.toZone !== 'discard') return;
 
       // Confirm the leaving card is The White Eye itself (match by slot)
+      // ★ Darion (Equip-Stapel): mehrere Equips teilen Held + Platz — „die erste Instanz am Platz" ist dort ein Nachbar. Die abgehende Karte nennt der Abgang selbst
+      // (`leavingCard`, beim Heldentod-Aufraeumen `_onlyCard`); nur ohne beides gilt der Koordinatenvergleich wie bisher.
       const engine = ctx._engine;
-      const leavingInst = engine.cardInstances.find(c =>
+      const leavingInst = ctx.leavingCard || ctx._onlyCard || engine.cardInstances.find(c =>
         (c.owner === ctx.cardOwner || c.owner === ctx.cardHeroOwner) && c.zone === 'support' &&   // Styx 28.9.: Brettseite
         c.heroIdx === ctx.fromHeroIdx && c.zoneSlot === ctx.fromZoneSlot,
       );

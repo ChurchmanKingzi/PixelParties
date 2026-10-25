@@ -27,6 +27,7 @@
 //       of Skullmael starts fresh.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { isSkeletonCreature } = require('./_skeleton-shared');
 
 const CARD_NAME = 'Skeleton King Skullmael';
@@ -86,7 +87,7 @@ module.exports = {
       if (enterController !== myController) return;
 
       const engine = ctx._engine;
-      if (!isSkeletonCreature(entering.name, engine)) return;
+      if (!anyName(entering, (n) => isSkeletonCreature(n, engine))) return;
 
       // Lift summoning sickness so the Skeleton can fire its active
       // creature effect this turn. Mark with the Haste flag rather

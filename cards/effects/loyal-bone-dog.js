@@ -45,6 +45,7 @@
 //      automatically.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { isLoyalCreature } = require('./_loyal-shared');
 const { isSkeletonCreature } = require('./_skeleton-shared');
 
@@ -81,8 +82,8 @@ module.exports = {
     // case implicitly: a Bone Dog only fires from HAND, so a Bone Dog
     // on the board dying could only be saved by ANOTHER Bone Dog in
     // hand, which is fine per card text.
-    if (isLoyalCreature(creatureInst.name, engine)) return true;
-    if (isSkeletonCreature(creatureInst.name, engine)) return true;
+    if (anyName(creatureInst, (n) => isLoyalCreature(n, engine))) return true;
+    if (anyName(creatureInst, (n) => isSkeletonCreature(n, engine))) return true;
     return false;
   },
 

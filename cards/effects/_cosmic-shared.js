@@ -34,6 +34,7 @@
 //  including Invader in its picker.
 // ═══════════════════════════════════════════
 
+const { hatName, hatNameIn, namenIn } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt
 const { hasCardType } = require('./_hooks');
 
 // ─── ARCHETYPE NAMES ────────────────────────
@@ -114,7 +115,7 @@ function invaderLimitAllows(engine, pi, targetName) {
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support' || inst.faceDown) continue;
     if ((inst.controller ?? inst.owner) !== pi) continue;
-    if (inst.name === INVADER_NAME) return false;
+    if (hatName(inst, INVADER_NAME)) return false;
   }
   return true;
 }
@@ -129,7 +130,7 @@ function ownCosmicCreatures(engine, pi) {
     if (inst.faceDown) continue;
     const owner = inst.controller ?? inst.owner;
     if (owner !== pi) continue;
-    if (!COSMIC_DEPTHS_CREATURES.has(inst.name)) continue;
+    if (!hatNameIn(inst, COSMIC_DEPTHS_CREATURES)) continue;   // Shroomasaur: Zusatzname zählt
     out.push(inst);
   }
   return out;
@@ -359,7 +360,33 @@ function targetToPromptEntry(t) {
   };
 }
 
+/**
+ * ★ W64a (Al, 23.10.2026: Creature-Tokens gleichen Namens teilen bei aktiver Alice-Teilung eine Zone): BELEGTE Zonen beider Seiten, in die ein weiterer
+ * Invader Token dazustossen darf (`canShareInto`: dort liegen nur gleichnamige Kreaturen/Creature-Tokens und die Brettseite — der Token gehoert ihr — teilt).
+ * Gleiche Form wie die freien Eintraege von `allFreeSupportSlotsBothSides`, dazu `shared: true`, `stackDepth`.
+ */
+function geteilteSlotsBeiderSeiten(engine, tokenName = INVADER_TOKEN_NAME) {
+  const { canShareInto } = require('./_alice-shared');
+  const out = [];
+  for (let pi = 0; pi < engine.playerCount(); pi++) {
+    const ps = engine.gs.players[pi];
+    if (!ps) continue;
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const h = ps.heroes[hi];
+      if (!h?.name) continue;
+      const zones = ps.supportZones?.[hi] || [[], [], []];
+      for (let zi = 0; zi < 3; zi++) {
+        if ((zones[zi] || []).length > 0 && canShareInto(engine, pi, hi, zi, tokenName, pi)) {
+          out.push({ owner: pi, heroIdx: hi, slotIdx: zi, heroName: h.name, shared: true, stackDepth: zones[zi].length });
+        }
+      }
+    }
+  }
+  return out;
+}
+
 module.exports = {
+  geteilteSlotsBeiderSeiten,
   COSMIC_DEPTHS_CREATURES,
   COSMIC_DEPTHS_ANY,
   SELF_COUNTERING_CARDS,

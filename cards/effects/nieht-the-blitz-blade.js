@@ -201,6 +201,10 @@ module.exports = {
 
       const bonusInst = engine._trackCard(bonusName, pi, 'hand', heroIdx, -1);
       if (feld !== pi) bonusInst.heroOwner = feld;   // Styx 28.9.: wie der Server bei Uebernahme
+      // Clone (Welle 72): auch die Bonus-Attack ist ein „Normal Attack, den der Held benutzt" — die Zielwahlen (hier das erzwungene Ziel) werden aufgezeichnet; die Aufzeichnung der ersten Attack
+      // (die Clone nach diesem Hook noch lesen kann) wird gesichert und danach wiederhergestellt.
+      const klonAufnahmeAlt = gs._klonAufnahme;
+      gs._klonAufnahme = { pi, heroIdx, heroOwner: feld, name: bonusName, eintraege: [] };
       try {
         await engine.runHooks('onPlay', {
           _onlyCard: bonusInst, playedCard: bonusInst,
@@ -229,6 +233,7 @@ module.exports = {
       }
 
       // Cleanup tracking.
+      if (klonAufnahmeAlt === undefined) delete gs._klonAufnahme; else gs._klonAufnahme = klonAufnahmeAlt;
       delete gs._spellDamageLog;
       delete gs._spellExcludeTargets;
       // Defensive: clear forced-target in case the bonus Attack
@@ -238,7 +243,7 @@ module.exports = {
       delete gs._forcedDamageTarget;
 
       engine._untrackCard(bonusInst.id);
-      ps.discardPile.push(bonusName);
+      engine.handKartenBesitzerPs(ps, bonusName).discardPile.push(bonusName);   // W63c: Ablage des permanenten Besitzers
 
       engine.log('nieht_blitz_extra_attack', {
         player: ps.username, hero: hero.name,

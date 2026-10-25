@@ -7,6 +7,11 @@
 //    different name equipped to this Hero.
 //    Recalculated whenever an Artifact enters
 //    or leaves this Hero's Support Zone.
+//    W51b: auch beim UMHAENGEN (Slippery Fridge / Inheritance
+//    Ceremony): `hooks` laeuft durch `equipZustandHooks` — der Leave-
+//    Handler hoert zusaetzlich auf `onEquipLost`, der Enter-Handler auf
+//    `onEquipGained` (nur `isMove`); das echte Enter/Leave eines
+//    Umhaengens geht nur an die bewegte Karte.
 //
 //  ② Restriction: this Hero can never hit more
 //    than 1 target with an Attack.
@@ -17,7 +22,7 @@
 //    check the same flag.
 // ═══════════════════════════════════════════
 
-const { hasCardType, baseCardName } = require('./_hooks');
+const { hasCardType, baseCardName, equipZustandHooks } = require('./_hooks');
 
 const CARD_NAME = 'Toras, Master of all Weapons';
 const ATK_PER_ARTIFACT = 40;
@@ -114,7 +119,9 @@ function clearFlag(ctx) {
 module.exports = {
   activeIn: ['hero'],
 
-  hooks: {
+  hooks: equipZustandHooks({
+    // W51b: `equipZustandHooks` — Umhaengen (Slippery Fridge / Inheritance Ceremony) sendet Enter/Leave nur an die bewegte Karte; dieser Zustandslauscher bekommt es ueber
+    // `onEquipLost` / `onEquipGained` (isMove) mit denselben Handlern (siehe _hooks.js).
     // ── Register flag + calculate initial bonus ──────────────────────────────
 
     onGameStart: (ctx) => {
@@ -150,7 +157,8 @@ module.exports = {
       if (ctx.fromZone !== 'support') return;
       if (ctx.fromHeroIdx !== ctx.cardHeroIdx) return;
 
-      const leavingInst = ctx._engine.cardInstances.find(c =>
+      // W51b: bei `onEquipLost` (Umhaengen) ist `leavingCard` die bewegte Karte; sonst wie bisher ueber den Platz suchen.
+      const leavingInst = ctx.leavingCard || ctx._engine.cardInstances.find(c =>
         c.owner === (ctx.cardHeroOwner ?? ctx.cardOwner) && c.zone === 'support' &&
         c.heroIdx === ctx.fromHeroIdx && c.zoneSlot === ctx.fromZoneSlot,
       );
@@ -181,5 +189,5 @@ module.exports = {
       if (ctx.card?.counters) ctx.card.counters.torasAtkBonus = 0;
       clearFlag(ctx);
     },
-  },
+  }),
 };

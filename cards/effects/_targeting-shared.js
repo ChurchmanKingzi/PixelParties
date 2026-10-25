@@ -82,6 +82,31 @@ function coolnessSpitzeZiel(engine, inst) {
   };
 }
 
+/**
+ * 25.10.2026 (Al, Xal-Runde 4: „Sun Beam und co sollen Support-Zone-Abilities als Abilities behandeln – und entsprechend die oberste Kopie davon entfernen"):
+ * Eine Ability in einer Support Zone (Xal, Xalibur, gewonnener Xal-Effekt; auch eine schlafende, von der Leafagami Snake gehaltene) ist für „any card on the board that
+ * is not a Hero" eine ABILITY — ein Stapel ist wie in einer Ability Zone EIN Ziel, vertreten von seiner OBERSTEN Kopie (`engine.supportAbilitySpitze`). Abwerfen, Zerstören oder
+ * Zurückschicken trifft genau diese eine Kopie, die Stufe sinkt um 1. Die Ziel-ID bleibt die der Support Zone (`equip-<Seite>-<Held>-<Slot>`, Art 'equip'): so
+ * hebt der Client genau diese Zone hervor.
+ *
+ * EINE Stelle für jeden Sammler („Nicht-Helden-Zielmenge"); er ruft sie am Anfang seines Support-Zweigs:
+ *   const sa = supportAbilityZiel(engine, inst);
+ *   if (sa !== undefined) { if (sa) targets.push(sa); continue; }
+ * Rückgabe: `undefined` = keine Support-Ability (der Sammler arbeitet wie bisher), `null` = Kopie unterhalb der Spitze (überspringen), sonst das Ziel
+ * (`istAbilityStapel: true`, `level` = Stapelhöhe).
+ */
+function supportAbilityZiel(engine, inst) {
+  if (!engine?.istAbilityImSupport?.(inst)) return undefined;
+  if (engine.supportAbilitySpitze(inst) !== inst) return null;
+  const seite = _brettSeite(engine, inst);
+  return {
+    id: `equip-${seite}-${inst.heroIdx}-${inst.zoneSlot}`,
+    type: 'equip', owner: seite, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
+    cardName: inst.name, cardInstance: inst, _cardInstance: inst,
+    zoneKind: 'support', istAbilityStapel: true, level: engine.abilityStapelVon(inst).length || 1,
+  };
+}
+
 function collectNonHeroBoardTargets(gs, engine) {
   const targets = [];
   const seen = new Set();
@@ -108,12 +133,24 @@ function collectNonHeroBoardTargets(gs, engine) {
     seen.add(inst.id);
 
     if (inst.zone === 'support') {
+      const sa = supportAbilityZiel(engine, inst);   // 25.10.: Ability in einer Support Zone = Ability-Stapel, ein Ziel, oberste Kopie
+      if (sa !== undefined) { if (sa) targets.push(sa); continue; }
+      const _id = `equip-${_brettSeite(engine, inst)}-${inst.heroIdx}-${inst.zoneSlot}`;
+      // ★ Darion: mehrere Equips im selben Platz = EIN Ziel je Platz (der Client kennt nur Plaetze); `_erlaubteInstanzen` nennt die waehlbaren Equips, die Rueckfrage
+      // „welches?" stellt `engine._disambiguateStackedTargets`. (Alices Kreaturen-Stapel bleiben wie bisher doppelt gelistet.)
+      const _eqSchon = targets.find(x => x.id === _id && x._erlaubteInstanzen);
+      if (_eqSchon) { _eqSchon._erlaubteInstanzen.push(inst.id); continue; }
+      const _erstes = targets.find(x => x.id === _id);
+      if (_erstes && engine.istEquipArtifact && engine.istEquipArtifact(inst) && engine.istEquipArtifact(_erstes._cardInstance)) {
+        _erstes._erlaubteInstanzen = [_erstes._cardInstance.id, inst.id];
+        continue;
+      }
       targets.push({
         // ★ 26.9. (Als Befund, Crimson Web): ID und `owner` nennen die Seite, auf
         // der die Zone LIEGT — sonst findet der Client sie nicht. Eine an
         // den Angreifer angelegte Crimson Web gehoert dem Verteidiger,
         // steckt aber in einer Support Zone des Angreifers.
-        id: `equip-${_brettSeite(engine, inst)}-${inst.heroIdx}-${inst.zoneSlot}`,
+        id: _id,
         type: 'equip', owner: _brettSeite(engine, inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
         cardName: inst.name, _cardInstance: inst,
       });
@@ -177,4 +214,18 @@ function collectNonHeroBoardTargets(gs, engine) {
   return targets;
 }
 
-module.exports = { isOppCreatureEffect, collectNonHeroBoardTargets, areaTargetId, coolnessSpitzeZiel };
+/**
+ * „Target" im Sinn von Anti-Magnet, Perfect Disguise, Skeleton Archer, Zhuque (Al, 25.10.2026): nur HELDEN und KREATUREN. Ausruestung, Anhaengsel, Areas, Abilities, Surprises
+ * und Permanents sind keine Ziele. `t` ist ein Zielobjekt (`type` 'hero' | 'equip' ... mit `cardInstance`/`_cardInstance`/`cardName`) ODER eine Instanz im Support.
+ */
+function istHeldOderKreatur(engine, t) {
+  if (!t) return false;
+  if (t.type === 'hero') return true;
+  const inst = t.zone ? t : (t.cardInstance || t._cardInstance || null);
+  if (!inst && t.type !== 'equip') return false;
+  if (t.type && t.type !== 'equip' && !t.zone) return false;
+  const cd = inst ? (engine.getEffectiveCardData?.(inst) || engine._getCardDB()[inst.name]) : engine._getCardDB()[t.cardName];
+  return engine.isChoosableAsCreature(inst, cd);
+}
+
+module.exports = { istHeldOderKreatur, isOppCreatureEffect, collectNonHeroBoardTargets, areaTargetId, coolnessSpitzeZiel, supportAbilityZiel };

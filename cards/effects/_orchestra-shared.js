@@ -40,6 +40,9 @@ function equipDestinations(engine, pi, cardName, opts = {}) {
   const out = [];
   const platz = (side, hi) => {
     const ps = engine.gs.players[side];
+    // Darion: bei einem Helden mit Equip-Stapel ist der Stapel der einzige Platz fuer ein Equip.
+    const pflicht = engine.equipPflichtPlatz ? engine.equipPflichtPlatz(side, hi, cardName) : -1;
+    if (pflicht >= 0) { out.push({ side, heroIdx: hi, slotIdx: pflicht }); return; }
     for (let si = 0; si < 3; si++) {
       if (((ps.supportZones[hi] || [])[si] || []).length === 0) out.push({ side, heroIdx: hi, slotIdx: si });
     }
@@ -78,7 +81,10 @@ async function equipArtifactToHero(engine, pi, cardName, ownerOfHero, heroIdx, s
   const pool = from === 'deck' ? ps.mainDeck : from === 'discard' ? ps.discardPile : ps.hand;
   const idx = (pool || []).indexOf(cardName);
   if (idx < 0) return null;
-  if (((hps.supportZones[heroIdx] || [])[slotIdx] || []).length > 0) return null;
+  // ★ Darion: Pflicht-Platz im Equip-Stapel des Helden (statt eines freien Platzes).
+  const _stapelPlatz = engine.equipPflichtPlatz ? engine.equipPflichtPlatz(ownerOfHero, heroIdx, cardName) : -1;
+  if (_stapelPlatz >= 0) slotIdx = _stapelPlatz;
+  else if (((hps.supportZones[heroIdx] || [])[slotIdx] || []).length > 0) return null;
   // ★ Welle 14 (Al, Q5 aus W13b): Resistance blockt auch EIGENE Effekte auf den Träger — „Ausrüsten per Effekt" (dieser Helfer: Orchester, Lolek, Deepsea Treasure,
   // Free-Artifact-Karten) ist ein Nicht-Schaden-Effekt auf den Helden. Das normale Ausspielen einer Ausrüstung von der Hand (Standard-Spielaktion) läuft nicht hier.
   // Vor jeder Kartenbewegung gefragt: bei `true` bleibt die Karte, wo sie war (Aufrufer lesen `null` als "nicht ausgerüstet").
@@ -109,7 +115,10 @@ async function equipArtifactToHero(engine, pi, cardName, ownerOfHero, heroIdx, s
   await engine.runHooks('onPlay', {
     _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: slotIdx,
   });
-  await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _isEffectEquip: true });   // W16e (F03-21): per Effekt angelegt
+  // W51c (Al): AUSRUESTENDER ist `pi` (wer die Karte aus Hand/Deck/Ablage ausspielt), NICHT der Kontrolleur der Zone: liegt die Karte bei einem fremden Helden (Orchester: „Heroes on the
+  // board"), ist `inst.controller` der Gastgeber — ohne `_equipAnleger` galt dann dieser als Anlegender (Afflicted Pests/LOCUST des Orchester-Spielers feuerten auf die EIGENE Aktion,
+  // die des Gegners nicht).
+  await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _isEffectEquip: true, _equipAnleger: pi });   // W16e (F03-21): per Effekt angelegt
   engine.sync();
   return inst;
 }

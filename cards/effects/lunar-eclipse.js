@@ -28,6 +28,7 @@
 //  hook the engine calls on flip.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { hasCardType } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
 const { isLunaticCycle } = require('./_lunatic-shared');
@@ -39,7 +40,7 @@ function ownLunaticCycleInsts(engine, pi) {
   return (engine.cardInstances || []).filter(c =>
     c && c.zone === 'support' && !c.faceDown
     && (c.controller ?? c.owner) === pi
-    && isLunaticCycle(c.name));
+    && anyName(c, (n) => isLunaticCycle(n)));
 }
 
 module.exports = {

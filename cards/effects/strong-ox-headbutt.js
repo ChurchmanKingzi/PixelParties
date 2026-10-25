@@ -113,25 +113,19 @@ module.exports = {
       }
 
       // 3rd Attack bonus: remove an Ability from target Hero
+      // „choose an Ability attached to the target and send it to the discard pile, if possible"
+      // 24.10.2026: ALLE Abilities des Helden — die in den Ability Zonen und die Stapel in seinen Support Zonen (Xal, Xalibur). Abgeworfen wird ueber die
+      // zentrale Engine-Primitive (`discardAbilityTopCopy`): sie nimmt die oberste Kopie, kennt Zonenart und Stapelhoehe, und „if possible" gilt wirklich
+      // (Leafagami Snake schuetzt die Karte, Resistance faengt den Effekt auf den Helden ab).
       if (is3rd && target.type === 'hero') {
         const targetHero = gs.players[tgtOwner]?.heroes?.[tgtHeroIdx];
         if (targetHero && targetHero.hp > 0) {
-          // Check if target hero has any abilities
-          const abZones = gs.players[tgtOwner].abilityZones[tgtHeroIdx] || [];
-          const abilityTargets = [];
-          for (let z = 0; z < abZones.length; z++) {
-            const slot = abZones[z] || [];
-            if (slot.length > 0) {
-              abilityTargets.push({
-                id: `ability-${tgtOwner}-${tgtHeroIdx}-${z}`,
-                type: 'ability',
-                owner: tgtOwner,
-                heroIdx: tgtHeroIdx,
-                slotIdx: z,
-                cardName: slot[slot.length - 1], // Top copy
-              });
-            }
-          }
+          const sammeln = () => engine.getAbilityTargets(tgtOwner, { heroIdx: tgtHeroIdx });
+          const abilityTargets = sammeln().map(e => ({
+            id: e.id, type: e.type, owner: e.owner, heroIdx: e.heroIdx, slotIdx: e.slotIdx,
+            cardName: e.zoneKind === 'support' ? e.cardName : (gs.players[tgtOwner].abilityZones[tgtHeroIdx]?.[e.slotIdx] || []).slice(-1)[0] || e.cardName,   // oberste Kopie
+            cardInstance: e.cardInstance || undefined,
+          }));
 
           if (abilityTargets.length > 0) {
             // Ask player if they want to remove an ability
@@ -154,41 +148,16 @@ module.exports = {
                 confirmLabel: '⚒️ Remove!',
                 confirmClass: 'btn-danger',
                 cancellable: true,
-                exclusiveTypes: true,
-                maxPerType: { ability: 1 },
+                exclusiveTypes: false,                       // Ability Zonen (`ability`) und Support Zonen (`equip`) in einer Wahl
+                maxPerType: { ability: 1, equip: 1 },
               });
 
               if (picked && picked.length > 0) {
-                const abilityTarget = abilityTargets.find(t => t.id === picked[0]);
-                if (abilityTarget) {
-                  const zone = abZones[abilityTarget.slotIdx] || [];
-                  if (zone.length > 0) {
-                    const removed = zone.pop();
-                    const inst = engine.cardInstances.find(c =>
-                      c.owner === tgtOwner && c.zone === 'ability' &&
-                      c.heroIdx === tgtHeroIdx && c.zoneSlot === abilityTarget.slotIdx && c.name === removed
-                    );
-                    // ★ 28.8., Als Befund: ohne diesen Vorab-Flug ist die Karte
-                    // in dem Moment UNSICHTBAR, in dem sie die Zone verlaesst —
-                    // bis der Diff-Animator ihren Weg zeichnet. Der Vorab-Flug
-                    // ist genau das, was sie in diesem Moment zeigt (Lehre vom
-                    // 18.8., in `actionDestroyCard` woertlich kommentiert). Er
-                    // meldet den Namen ausserdem im Unterdrueckungs-Eimer des
-                    // Clients an, sodass kein zweiter Flug daneben laeuft.
-                    engine._broadcastEvent('play_pile_transfer', {
-                      owner: inst?.originalOwner ?? tgtOwner,
-                      cardName: removed, from: 'ability', to: 'discard',
-                      fromHeroIdx: tgtHeroIdx, fromSlotIdx: abilityTarget.slotIdx,
-                    });
-                    if (inst) {
-                      await engine.runHooks('onCardLeaveZone', { _onlyCard: inst, card: inst, fromZone: 'ability', fromHeroIdx: tgtHeroIdx });
-                      engine.cardInstances = engine.cardInstances.filter(c => c.id !== inst.id);
-                      gs.players[inst.originalOwner].discardPile.push(removed);
-                    } else {
-                      gs.players[tgtOwner].discardPile.push(removed);
-                    }
-                    engine.log('ability_removed', { card: removed, by: 'Strong Ox Headbutt', from: targetHero.name });
-                  }
+                // Nach der Abfrage neu einsammeln: das Brett kann sich bewegt haben, und die Primitive arbeitet auf Slot-Indizes.
+                const eintrag = sammeln().find(e => e.id === picked[0]);
+                if (eintrag) {
+                  const abgeworfen = await engine.discardAbilityTopCopy(eintrag, { source: 'Strong Ox Headbutt', sourceOwner: pi, effectOnHero: true });
+                  if (abgeworfen) engine.log('ability_removed', { card: eintrag.cardName, by: 'Strong Ox Headbutt', from: targetHero.name });
                 }
               }
             }

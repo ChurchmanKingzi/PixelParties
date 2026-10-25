@@ -69,6 +69,16 @@ const UMLEITBARE_SUBTYPEN = new Set(['Equipment', 'Attachment']);
 // Der Träger braucht Platz für ZWEI Karten.
 const BENOETIGTE_ZONEN = 2;
 
+/**
+ * ★ Darion: hat der Träger einen Equip-Stapel („All Artifacts equipped to this Hero share 1 Support Zone"), kommt die umgeleitete Ausrüstung in DEN Stapel
+ * (Pflicht-Platz, keine freie Zone nötig) — dann fehlt nur Platz für die Kreatur. Sonst wie gedruckt: eine Zone für die Karte, eine für LOCUST.
+ */
+function benoetigteZonen(engine, seite, heroIdx, cardName) {
+  let pflicht = -1;
+  try { pflicht = engine?.equipPflichtPlatz ? engine.equipPflichtPlatz(seite, heroIdx, cardName) : -1; } catch { pflicht = -1; }
+  return pflicht >= 0 ? BENOETIGTE_ZONEN - 1 : BENOETIGTE_ZONEN;
+}
+
 /** Freie Support-Slots eines Helden, als Indexliste. */
 function freieZonen(gs, pi, heroIdx) {
   const zonen = gs.players[pi]?.supportZones?.[heroIdx] || [];
@@ -99,7 +109,8 @@ module.exports = {
     const inst = info.cardInstance;
     if (!inst || inst.zone !== 'support') return false;
     const cd = engine?._getCardDB?.()[info.cardName];
-    if (!cd || !UMLEITBARE_SUBTYPEN.has(cd.subtype)) return false;
+    // W52a (Al, 22.10.2026): ein als Equip angelegter Held („treated as an equippable Artifact", Initiation Ritual) ist ein Artifact und damit umleitbar.
+    if (!cd || (!UMLEITBARE_SUBTYPEN.has(cd.subtype) && !engine?.istEquipArtifact?.(inst))) return false;
     // ★ Ausruest-Beschraenkungen gelten auch beim Stehlen (Al 19.8.):
     // ein „Crusader's"-Artefakt kann NUR auf eine Cecilia wandern.
     // Ohne legalen Traeger ist die Karte kein Ziel — dann wird der
@@ -107,7 +118,7 @@ module.exports = {
     // Als Vorgabe 29.9.: Traeger = Held der Zone auf ihrer Brettseite.
     if (!engine?.canEquipCardToHero?.(info.cardName, seite, heroIdx)) return false;
     // Als Vorgabe: zwei freie Zonen, sonst gar nicht erst anbieten.
-    if (freieZonen(gs, seite, heroIdx).length < BENOETIGTE_ZONEN) return false;
+    if (freieZonen(gs, seite, heroIdx).length < benoetigteZonen(engine, seite, heroIdx, info.cardName)) return false;
     return hasCybugFuel(gs, ownerIdx, FUEL_CARD);
   },
 
@@ -130,7 +141,7 @@ module.exports = {
     const frei = freieZonen(gs, traegerSeite, traegerHeroIdx);
     // Erneut prüfen: zwischen Auslöser und jetzt kann sich das Brett
     // bewegt haben. Ohne zwei Zonen bliebe die Kreatur ohne Platz.
-    if (frei.length < BENOETIGTE_ZONEN) return null;
+    if (frei.length < benoetigteZonen(engine, traegerSeite, traegerHeroIdx, inst.name)) return null;
 
     // Kosten ZUERST. Ist die Kopie zwischenzeitlich weg, scheitert die
     // Aktivierung sauber und die Karte bleibt beim Gegner.

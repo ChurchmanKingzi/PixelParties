@@ -32,6 +32,18 @@
 // ═══════════════════════════════════════════
 
 /**
+ * Flug „Gegnerdeck → eigene Hand": NUR der Nehmende sieht die echte Karte fliegen. Gegner und Zuschauer bekommen einen verdeckten
+ * Flug (`cardName: '?'`, `faceDown: true` — der Client zeichnet den Kartenrücken), wie bei jedem normalen Ziehen. Sonst sähe der
+ * Gegner die Karte aus SEINEM Deck offen davonfliegen und wüsste, was gezogen wurde.
+ */
+function flugDeckZuHand(engine, pi, daten) {
+  const andere = [];
+  for (let i = 0; i < engine.playerCount(); i++) if (i !== pi) andere.push(i);
+  engine._broadcastEvent('play_pile_transfer', daten, { toPlayers: [pi], toSpectators: false });
+  engine._broadcastEvent('play_pile_transfer', { ...daten, cardName: '?', faceDown: true }, { toPlayers: andere });
+}
+
+/**
  * Nimmt die oberste Karte aus dem Deck des Gegners auf die eigene Hand.
  *
  * @param {object} engine
@@ -56,7 +68,7 @@ async function takeTopFromOpponentDeck(engine, pi, opts = {}) {
   const cardName = ops.mainDeck[0];
 
   // ① Flug ZUERST — siehe Kopf.
-  engine._broadcastEvent('play_pile_transfer', {
+  flugDeckZuHand(engine, pi, {
     fromOwner: oi, toOwner: pi, cardName, from: 'deck', to: 'hand',
     toHandIdx: ps.hand.length,
   });
@@ -108,4 +120,4 @@ async function takeTopFromOpponentDeck(engine, pi, opts = {}) {
   return cardName;
 }
 
-module.exports = { takeTopFromOpponentDeck };
+module.exports = { takeTopFromOpponentDeck, flugDeckZuHand };

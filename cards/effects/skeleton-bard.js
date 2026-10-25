@@ -21,6 +21,7 @@
 //  picking nothing leaves the slot free to retry.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { loadCardEffect } = require('./_loader');
 const { isSkeletonCreature } = require('./_skeleton-shared');
 
@@ -46,7 +47,7 @@ function eligibleTargets(engine, pi, selfId) {
     if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.id === selfId) continue;
     if (inst.faceDown) continue;
-    if (!isSkeletonCreature(inst.name, engine, inst)) continue;
+    if (!anyName(inst, (n) => isSkeletonCreature(n, engine, inst))) continue;
     const effectName = inst.counters?._effectOverride || inst.name;
     const script = loadCardEffect(effectName);
     if (!script?.creatureEffect) continue;

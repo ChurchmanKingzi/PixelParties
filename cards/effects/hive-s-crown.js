@@ -85,8 +85,7 @@ async function zahleOpfer(engine, pi, selectedIds, validTargets) {
   }
 
   // Reveal Hive's Crown to both sides now that the player has committed.
-  engine._broadcastEvent('card_reveal', { cardName: CARD_NAME });
-  delete engine.gs._pendingCardReveal;
+  engine.commitAppearance();
   await engine._delay(300);
 
   // ── Sacrifice the chosen Sparkfly creature. ──
@@ -127,7 +126,7 @@ async function zahleOpfer(engine, pi, selectedIds, validTargets) {
 
 module.exports = {
   isTargetingArtifact: true,
-  deferBroadcast: true,
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral (`commitAppearance()`).
 
   /**
    * CPU helpers — Hive's Crown surfaces two prompts:
@@ -289,19 +288,19 @@ module.exports = {
     const sources = queenSourcesFor(gs, ps, { turnPlayed: k.turnPlayed });
 
     // ── Step 1: pick the Queen source (hand vs deck). ──
+    // EIN Picker mit Herkunfts-Label (CARD_API „Mehrere Quellen = ein Picker"): sind beide Quellen möglich, zeigt die Galerie die Queen zweimal — HAND und DECK; mit nur
+    // einer Quelle gibt es nichts zu wählen (kein Dialog).
     let queenSource;
     if (sources.hand && sources.deck) {
       const choice = await engine.promptGeneric(pi, {
-        type: 'optionPicker',
+        type: 'cardGallery',
+        cards: [{ name: QUEEN_NAME, source: 'hand' }, { name: QUEEN_NAME, source: 'deck' }],
         title: CARD_NAME,
-        description: 'Bring "Sparkfly Queen" from where?',
-        options: [
-          { id: 'hand', label: '✋  From your hand' },
-          { id: 'deck', label: '📚  From your deck' },
-        ],
+        description: 'Bring "Sparkfly Queen" from your hand or from your deck?',
+        confirmLabel: '👑 Crown!',
         cancellable: false,
       });
-      queenSource = choice?.optionId === 'deck' ? 'deck' : 'hand';
+      queenSource = choice?.source === 'deck' ? 'deck' : 'hand';
     } else if (sources.hand || sources.deck) {
       queenSource = sources.hand ? 'hand' : 'deck';
     } else {

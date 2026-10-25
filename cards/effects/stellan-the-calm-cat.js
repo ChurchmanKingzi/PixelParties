@@ -39,6 +39,7 @@
 
 const { heldenSperreFrei, heldenSperreFreigeben, heldenSperreSetzen } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const { hasCardType, isSummonablePileCreature, STATUS_EFFECTS } = require('./_hooks');
+const { pickAusQuellen } = require('./_source-pick-shared');
 
 const CARD_NAME   = 'Stellan, the Calm Cat';
 const HOPT_KEY    = 'stellanTriggeredThisTurn';
@@ -67,6 +68,14 @@ function freeStellanSlots(ps, heroIdx) {
     if ((zones[z] || []).length === 0) out.push(z);
   }
   return out;
+}
+
+/**
+ * ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): Stellans Zonen fuer `name` —
+ * freie, und mit Alice-Teilung des Kontrolleurs die Zone einer GLEICHNAMIGEN Creature (geteilte zuerst). `engine.beschwoerZonenFuer`.
+ */
+function zonenFuer(engine, pi, feld, heroIdx, name) {
+  return engine.beschwoerZonenFuer(pi, name, { seite: feld, heroIdx, nurBasis: true, namedHeroesOnly: true });
 }
 
 /**
@@ -125,65 +134,48 @@ async function runStellanEffect(ctx) {
   // consume the trigger (refund on cancel only, not on no-legal-target).
   if (ps.summonLocked) return false;
   const freeSlots = freeStellanSlots(fs, heroIdx);
-  if (freeSlots.length === 0) return false;
-
-  const handEligible = levelZeroCreatureNames(engine, pi, ps.hand);
-  const deckEligible = levelZeroCreatureNames(engine, pi, ps.mainDeck);
+  const teilt = require('./_alice-shared').sharingActive(gs, pi);   // W63a: Alice-Teilung — die Zahl freier Zonen begrenzt dann nicht mehr
+  // W63a: nur Namen, fuer die Stellan eine Zone hat (frei oder geteilt)
+  const handEligible = levelZeroCreatureNames(engine, pi, ps.hand).filter(cn => zonenFuer(engine, pi, feld, heroIdx, cn).length > 0);
+  const deckEligible = levelZeroCreatureNames(engine, pi, ps.mainDeck).filter(cn => zonenFuer(engine, pi, feld, heroIdx, cn).length > 0);
+  if (freeSlots.length === 0 && !teilt) return false;
   if (handEligible.length === 0 && deckEligible.length === 0) return false;
 
-  // ── Source pick (hand / deck / cancel) ──
-  let source;
-  if (handEligible.length > 0 && deckEligible.length > 0) {
-    const handCap = Math.min(MAX_FROM_HAND, freeSlots.length, handEligible.length);
-    const optRes = await engine.promptGeneric(pi, {
-      type: 'optionPicker',
-      title: CARD_NAME,
-      description: 'Place Creatures from where?',
-      options: [
-        { id: 'hand', label: `✋  Up to ${handCap} from hand` },
-        { id: 'deck', label: '📚  1 from deck' },
-      ],
-      cancellable: true,
-      gerrymanderEligible: true, // Batch-from-hand vs targeted-deck-search.
-    });
-    if (!optRes || optRes.cancelled || !optRes.optionId) return false;
-    source = optRes.optionId;
-  } else if (handEligible.length > 0) {
-    source = 'hand';
-  } else {
-    source = 'deck';
-  }
+  // ── EIN Picker für Hand UND Deck (CARD_API „Mehrere Quellen = ein Picker") ──
+  // Gleiche Galerie wie bisher (Mehrfachwahl), aber mit den Karten beider Quellen und ihrem Herkunfts-Abzeichen (HAND / DECK). Quellensperre: wählt man eine Karte aus dem Deck,
+  // ist alles andere ausgegraut (es bleibt bei EINER); wählt man eine aus der Hand, ist das Deck ausgegraut und man darf bis zu `handCap` Karten aus der Hand nehmen.
+  const handCap = Math.min(MAX_FROM_HAND, teilt ? MAX_FROM_HAND : freeSlots.length, handEligible.length);
+  const wahl = await pickAusQuellen(engine, pi, {
+    cards: [
+      ...handEligible.map(cn => ({ name: cn, source: 'hand' })),
+      ...deckEligible.slice().sort((x, y) => x.localeCompare(y)).map(cn => ({ name: cn, source: 'deck', count: countCopies(ps.mainDeck, cn) })),
+    ],
+    maxJeQuelle: { ...(handEligible.length > 0 ? { hand: handCap } : {}), ...(deckEligible.length > 0 ? { deck: 1 } : {}) },
+    title: CARD_NAME,
+    description: `Choose up to ${handCap} Level 0 Creature${handCap > 1 ? 's' : ''} with different names from your hand — or 1 from your deck — to summon onto ${CARD_NAME}.`,
+    confirmLabel: '✨ Summon!',
+    confirmClass: 'btn-success',
+  });
+  if (!wahl) return false;
+  const source = wahl.source;
 
   if (source === 'hand') {
-    const handCap = Math.min(MAX_FROM_HAND, freeSlots.length, handEligible.length);
-    const gallery = handEligible.map(cn => ({ name: cn, source: 'hand' }));
-    const picked = await engine.promptGeneric(pi, {
-      type: 'cardGalleryMulti',
-      cards: gallery,
-      selectCount: handCap,
-      minSelect: 0,
-      title: CARD_NAME,
-      description: `Choose up to ${handCap} Level 0 Creature${handCap > 1 ? 's' : ''} with different names from your hand to summon onto ${CARD_NAME}.`,
-      confirmLabel: '✨ Summon!',
-      confirmClass: 'btn-success',
-      cancellable: true,
-    });
-    if (!picked || picked.cancelled) return false;
-    const chosen = Array.isArray(picked.selectedCards) ? picked.selectedCards : [];
-    if (chosen.length === 0) return false;
+    const chosen = wahl.names;
 
     // Re-snapshot the free slot list — nothing has mutated state between the
     // earlier read and here (prompts are pure), but we want the freshest
     // view in case a future hook interleaves something.
-    const slots = freeStellanSlots(fs, heroIdx);
     let placed = 0;
-    for (let i = 0; i < chosen.length && i < slots.length; i++) {
+    for (let i = 0; i < chosen.length; i++) {
       const cardName = chosen[i];
       // Re-verify the card is still in hand — a prior placement's onPlay
       // could have moved cards around, which would invalidate our
       // pre-computed list.
       if ((ps.hand || []).indexOf(cardName) < 0) continue;
-      const res = await engine.actionPlaceCreature(cardName, pi, heroIdx, slots[i], {
+      // W63a: Zone je Karte, frisch gefragt — geteilte Zone (Alice) zuerst, dann die erste freie (eine eben belegte Zone faellt weg).
+      const zielZone = zonenFuer(engine, pi, feld, heroIdx, cardName)[0];
+      if (!zielZone) continue;
+      const res = await engine.actionPlaceCreature(cardName, pi, heroIdx, zielZone.slotIdx, {
         source: 'hand',
         sourceName: CARD_NAME,
         countAsSummon: false,
@@ -199,22 +191,11 @@ async function runStellanEffect(ctx) {
   }
 
   // ── Deck path ──
-  const gallery = deckEligible
-    .map(cn => ({ name: cn, source: 'deck', count: countCopies(ps.mainDeck, cn) }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  const picked = await engine.promptGeneric(pi, {
-    type: 'cardGallery',
-    cards: gallery,
-    title: CARD_NAME,
-    description: `Choose a Level 0 Creature from your deck to summon onto ${CARD_NAME}.`,
-    cancellable: true,
-  });
-  if (!picked || picked.cancelled || !picked.cardName) return false;
-  const chosenName = picked.cardName;
+  const chosenName = wahl.names[0];
   const _taken_deckIdx = await engine.deckEntnahme(ps,  chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
   if (!_taken_deckIdx) return false;
 
-  const slot = freeStellanSlots(fs, heroIdx)[0];
+  const slot = zonenFuer(engine, pi, feld, heroIdx, chosenName)[0]?.slotIdx;   // W63a: geteilte Zone (Alice) zuerst, dann die erste freie
   if (slot == null) {
     // Race: all slots filled between the free-slot check and here. Refund
     // the deck card so we don't silently eat it.

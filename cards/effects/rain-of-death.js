@@ -97,7 +97,7 @@ function collectRemovableAbilities(engine, playerIdx) {
     // abilities the hero actually started with, removing later stacks.
     for (const inst of engine.cardInstances) {
       if (inst.owner !== playerIdx) continue;
-      if (inst.zone !== 'ability') continue;
+      if (!engine.istWirksameAbility(inst)) continue;   // 24.10.: echte Ability Zone ODER Support Zone (Xal)
       if (inst.heroIdx !== hi) continue;
 
       const limit = startingCounts[inst.name] || 0;
@@ -157,7 +157,7 @@ module.exports = {
         engine._broadcastEvent('play_zone_animation', {
           type: 'rain_of_death', owner: inst.owner,
           heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
-          zoneType: 'ability',
+          ...(inst.zone === 'support' ? {} : { zoneType: 'ability' }),
         });
       }
       await engine._delay(1400);
@@ -191,13 +191,15 @@ module.exports = {
       const deleteAbility = (inst) => {
         const ps = gs.players[inst.owner];
         if (!ps) return;
-        const slotArr = ps.abilityZones?.[inst.heroIdx]?.[inst.zoneSlot];
+        const slotArr = (inst.zone === 'support' ? ps.supportZones : ps.abilityZones)?.[inst.heroIdx]?.[inst.zoneSlot];
         if (Array.isArray(slotArr)) {
           const nameIdx = slotArr.indexOf(inst.name);
           if (nameIdx >= 0) slotArr.splice(nameIdx, 1);
         }
-        if (!ps.deletedPile) ps.deletedPile = [];
-        ps.deletedPile.push(inst.name);
+        // W64c: Loeschstapel des permanenten BESITZERS der Ability-Karte (z. B. eine zeitweise angelegte Ability des Gegners), nicht der Brettseite
+        const loeschPs = gs.players[engine.kartenBesitzerVon(inst)] || ps;
+        if (!loeschPs.deletedPile) loeschPs.deletedPile = [];
+        loeschPs.deletedPile.push(inst.name);
         inst.zone = 'deleted';
         engine.log('ability_deleted', {
           player: ps.username, ability: inst.name,

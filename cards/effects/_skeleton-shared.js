@@ -21,6 +21,7 @@
 //      without needing its own special case.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const SKELETON_ARCHETYPE = 'Skeletons';
 
 // Names that count as Skeleton even though their
@@ -78,7 +79,7 @@ function getControlledSkeletons(engine, playerIdx) {
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
     if ((inst.controller ?? inst.owner) !== playerIdx) continue;
-    if (!isSkeletonCreature(inst.name, engine)) continue;
+    if (!anyName(inst, (n) => isSkeletonCreature(n, engine))) continue;
     out.push(inst);
   }
   return out;

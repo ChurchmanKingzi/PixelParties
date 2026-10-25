@@ -117,6 +117,10 @@ module.exports = {
       description: `Pick exactly ${DELETE_COST} cards from the discard piles to delete and gain an additional Action with any Hero.`,
       sourceName: CARD_NAME,
       cancellable: true,
+      // ★ W66b (Al, 23.10.2026): „Abbruch: nichts gelöscht, Einmal-Sperre nicht verbraucht, der Gegner sieht nichts." Die 5 Karten müssen schon vor der Aktionswahl aus der Ablage sein
+      // (sonst wäre ein Guardian Beast gar nicht spielbar) — das geschieht im Kosten-Vorlauf der Engine: der Gegner sieht erst etwas, wenn die Aktion committed ist; ein Abbruch legt
+      // sie unsichtbar und exakt zurück.
+      vorlauf: true,
     });
     if (!deleted || deleted.length < DELETE_COST) return false;
 

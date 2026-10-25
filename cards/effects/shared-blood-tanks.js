@@ -41,6 +41,20 @@
 //    Spieler eine Kopie kontrollieren: der urspruengliche Tick loest
 //    beide aus, die Ketten selbst loesen nichts mehr aus.
 //
+//  • ★ W60a/W61a — DIVER HELMET (CARD_API „Areas — respect Diver Helmet"):
+//    „The equipped Hero and all cards in its Support Zones are unaffected by
+//    Areas." Entscheidung von Al (W61a): der Helm schuetzt vor der WIRKUNG der
+//    Area, nicht davor, AUSLOESER zu sein. Also: (a) der Kettenschaden trifft
+//    einen Helm-Helden und die Karten/Kreaturen in dessen Support Zones NICHT
+//    (Pruefung bei jedem Schlag neu — der Helm kann mitten in der Kette
+//    kommen oder gehen), (b) nimmt ein solches Ziel selbst Bleed-Schaden aus
+//    anderer Quelle (eigener Tick), LOEST es die Kette aus und die anderen
+//    blutenden Ziele nehmen Kettenschaden. (W60a hatte Ausloeser und Opfer
+//    symmetrisch ausgenommen; der Ausloeser-Teil ist mit W61a zurueckgenommen.)
+//    Zentrale Fragen: `engine.heldIstVonAreasAusgenommen(Seite, Held)` und
+//    `engine.karteIstVonAreasAusgenommen(inst)` (Karte in den Support Zones
+//    eines Helm-Helden).
+//
 //  • Der Kettenschaden ist echter Bleed-Schaden: Betrag ueber
 //    `engine._bleedDamageAmount` (also inklusive `beforeBleedDamage`-
 //    Aenderungen fremder Karten), Typ `status`, ohne Zielwahl- und
@@ -58,6 +72,17 @@ function istDasselbe(ziel, getroffen) {
     return ziel.type === 'hero' && ziel.owner === getroffen.owner && ziel.heroIdx === getroffen.heroIdx;
   }
   return ziel.type !== 'hero' && ziel.cardInstance?.id === getroffen.inst?.id;
+}
+
+/**
+ * ★ W60a — Diver Helmet: „The equipped Hero and all cards in its Support Zones are unaffected by Areas." (CARD_API „Areas — respect Diver Helmet")
+ * Ist dieses Ziel (Picker-Objekt aus `collectPlayerTargets`) von Areas ausgenommen? Held → `heldIstVonAreasAusgenommen(Brettseite, Index)`, Karte in einer Support Zone
+ * (Kreatur, Puppet …) → `karteIstVonAreasAusgenommen(inst)`. Die Frage wird bei JEDEM Schlag neu gestellt (der Helm kann mitten in der Kette kommen/gehen).
+ */
+function istAusgenommen(engine, ziel) {
+  if (!ziel) return false;
+  if (ziel.type === 'hero') return engine.heldIstVonAreasAusgenommen(ziel.owner, ziel.heroIdx);
+  return engine.karteIstVonAreasAusgenommen(ziel.cardInstance || ziel.inst);
 }
 
 /** Einen Bleed-Tick an ein Ziel austeilen — ohne das Fenster erneut zu oeffnen. */
@@ -134,10 +159,14 @@ module.exports = {
       const besitzer = getroffen.owner;
       if (besitzer == null) return;
 
-      // Alle ANDEREN blutenden Ziele derselben Seite.
+      // ★ W61a (Al): ein Helm-Ziel (Held mit Helm / Karte in dessen Support Zones) DARF die Kette ausloesen — der Helm schuetzt nur vor der Wirkung der Area (Kettenschaden), nicht
+      // davor, Ausloeser zu sein. Hier also bewusst KEINE Ausnahme fuer `getroffen`; ausgenommen werden nur die OPFER (unten).
+
+      // Alle ANDEREN blutenden Ziele derselben Seite. Ausgenommene Ziele (Helm) werden von der Kette nicht getroffen — aber erst BEIM Schlag geprueft (unten): der Helm kann
+      // zwischen zwei Schlaegen kommen UND gehen, die Zielliste darf ihn nicht vorab festschreiben. Hier nur: gibt es ueberhaupt jemanden, den die Kette jetzt treffen wuerde?
       const ziele = collectPlayerTargets(engine, besitzer)
         .filter(t => isTargetBleeding(engine, t) && !istDasselbe(t, getroffen));
-      if (ziele.length === 0) return;
+      if (!ziele.some(t => !istAusgenommen(engine, t))) return;
 
       // ★ Grundregel (CARD_API): ein Effekt, der aus einem HOOK heraus
       // feuert, streamt seine Karte an BEIDE Spieler. `source` entprellt
@@ -152,6 +181,7 @@ module.exports = {
         // Zwischen zwei Ticks kann sich das Brett aendern (ein Ziel
         // stirbt am vorigen Tick) — vor jedem Schlag neu pruefen.
         if (!isTargetBleeding(engine, ziel)) continue;
+        if (istAusgenommen(engine, ziel)) continue;     // ★ W60a: Opfer-Ausnahme, Helm kam ggf. mitten in der Kette
         const betrag = await kettenTick(engine, ziel);
         if (betrag > 0) getroffenZahl++;
       }

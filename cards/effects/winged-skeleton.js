@@ -30,6 +30,7 @@
 //  get their own activation per the default Creature HOPT semantics.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { isSkeletonCreature } = require('./_skeleton-shared');
 
 const CARD_NAME = 'Winged Skeleton';
@@ -52,23 +53,27 @@ function stampUsed(gs, inst) {
  */
 function bounceSkeletonToHand(engine, targetInst) {
   const gs = engine.gs;
-  const ownerIdx = targetInst.owner;
-  const ownerPs  = gs.players[ownerIdx];
-  if (!ownerPs) return false;
-  const supportSlot = ownerPs.supportZones?.[targetInst.heroIdx]?.[targetInst.zoneSlot] || [];
+  // W64c (Al 23.10.2026: „Bounce geht an den aktuellen Kontrolleur", Herkunft bleibt): Brettseite = wo die Kreatur liegt, Hand = die des KONTROLLEURS
+  // („return that Creature back to YOUR hand"), Besitzer = permanenter Besitzer (Platzmarke → spätere Stapel gehören ihm).
+  const seite = engine.physicalSide(targetInst);
+  const ktrl = engine.kontrolleurVon(targetInst);
+  const besitzer = engine.kartenBesitzerVon(targetInst);
+  const boardPs = gs.players[seite];
+  const handPs = gs.players[ktrl];
+  if (!boardPs || !handPs) return false;
+  const supportSlot = boardPs.supportZones?.[targetInst.heroIdx]?.[targetInst.zoneSlot] || [];
   const slotIdx = supportSlot.indexOf(targetInst.name);
   if (slotIdx >= 0) supportSlot.splice(slotIdx, 1);
-  const handInst = engine.handZugangSync(ownerPs, targetInst.name, { von: 'brett', source: CARD_NAME });
-  handInst.originalOwner = targetInst.originalOwner;
+  engine.handZugangSync(handPs, targetInst.name, { von: 'brett', source: CARD_NAME, ...(besitzer !== ktrl ? { originalOwner: besitzer } : {}) });
   engine._broadcastEvent('play_pile_transfer', {
-    fromOwner: ownerIdx,
-    toOwner: ownerIdx,
+    fromOwner: seite,
+    toOwner: ktrl,
     cardName: targetInst.name,
     from: 'support',
     to: 'hand',
     fromHeroIdx: targetInst.heroIdx,
     fromSlotIdx: targetInst.zoneSlot,
-    toHandIdx: ownerPs.hand.length - 1,
+    toHandIdx: handPs.hand.length - 1,
   });
   engine._untrackCard(targetInst.id);
   return true;
@@ -131,7 +136,7 @@ module.exports = {
       if (sourceOwner === myController) return;
       const targetController = targetInst.controller ?? targetInst.owner;
       if (targetController !== myController) return;
-      if (!isSkeletonCreature(targetInst.name, engine)) return;
+      if (!anyName(targetInst, (n) => isSkeletonCreature(n, engine))) return;
 
       const verb = (ctx.effectType === 'destroy') ? 'targeted'
                  : (ctx.effectType === 'move')    ? 'is moving'
@@ -173,7 +178,7 @@ module.exports = {
       if (sourceOwner === myController) return;
       const targetController = targetInst.controller ?? targetInst.owner;
       if (targetController !== myController) return;
-      if (!isSkeletonCreature(targetInst.name, engine)) return;
+      if (!anyName(targetInst, (n) => isSkeletonCreature(n, engine))) return;
 
       const accepted = await offerNegation(ctx, targetInst, entry.source?.name, `targeted (${entry.amount} dmg)`);
       if (accepted) {

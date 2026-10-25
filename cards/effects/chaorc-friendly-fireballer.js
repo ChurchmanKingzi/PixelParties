@@ -238,22 +238,21 @@ module.exports = {
       const sources = fireballSources(engine, pi);
       if (sources.length === 0) return;
 
-      // Single prompt: the source options ARE the opt-in, the Cancel
-      // button is the opt-out — no separate confirm. Only piles that
-      // actually hold a "Fireball" are offered.
-      const OPT = {
-        deck: { id: 'deck', label: '📚 From deck' },
-        discard: { id: 'discard', label: '♻️ From discard pile' },
-      };
+      // EIN Picker für alle Quellen (CARD_API „Mehrere Quellen = ein Picker"): je Pile, das eine „Fireball" hält, ein Eintrag mit seinem Herkunfts-Label (DECK / DISCARD) —
+      // die Wahl der Karte ist die Wahl der Quelle. Die Galerie ist zugleich das Opt-in (Abbrechen = nicht hinzufügen), kein getrenntes Bestätigen.
       const pick = await engine.promptGeneric(pi, {
-        type: 'optionPicker',
+        type: 'cardGallery',
+        cards: sources.map(s => ({ name: FIREBALL, source: s })),
         title: CARD_NAME,
-        description: 'Openly add a "Fireball" to your hand from:',
-        options: sources.map(s => OPT[s]),
+        description: 'Openly add a "Fireball" to your hand from your deck or discard pile?',
+        confirmLabel: '🔥 Add!',
         cancellable: true,
+        // Such-Template (`_search-shared.js`): Hand-Suche kennzeichnen. `fireballSources` hat jeden Stapel einzeln auf Such-/Stapel-Sperren geprüft — die Einträge sind also schon frei;
+        // `searchPile` nennt bei zwei Quellen das Deck, bei einer diese eine.
+        searchToHand: true, searchPile: sources.length === 1 ? sources[0] : 'deck',
       });
-      if (!pick || pick.cancelled || !pick.optionId) return;
-      const from = pick.optionId;
+      if (!pick || pick.cancelled || !pick.cardName) return;
+      const from = sources.includes(pick.source) ? pick.source : sources[0];   // fehlt `source` (Automat): die erste Quelle (Deck vor Ablage)
 
       const pile = from === 'deck' ? ps.mainDeck : ps.discardPile;
       const idx = (pile || []).indexOf(FIREBALL);

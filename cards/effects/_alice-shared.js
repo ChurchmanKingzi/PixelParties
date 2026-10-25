@@ -43,6 +43,22 @@
 const ALICE_NAME = 'Alice, the Transfer Student';
 
 /**
+ * ★ W66b (Al, 23.10.2026: „Die Fantasy-Buddies sollten eine Zone mit ALLEN Fantasy Buddies teilen, unabhängig vom Spell-Namen."):
+ * Inyas Fantasy Buddy Token trägt je nach Zauber Anzeige-Name und -Bild (`inst.name` = Zaubername), ist aber IMMER ein „Fantasy Buddy Token".
+ * Für die Alice-Teilung („Creatures with identical names … share 1 Support Zone") zählen alle Buddys als gleichnamig: ihr Teil-Name ist dieser Name.
+ */
+const FANTASY_BUDDY_TEILNAME = 'Fantasy Buddy Token';
+
+/**
+ * Der Name, unter dem eine Kreatur / ein Token Zonen teilt: Instanz mit `counters._fantasyBuddyToken` → „Fantasy Buddy Token", sonst ihr Name.
+ * Akzeptiert eine Instanz (bevorzugt — auch fürs Bewegen bestehender Karten) oder einen Namen (dann unverändert).
+ */
+function teilName(x) {
+  if (x && typeof x === 'object') return x.counters && x.counters._fantasyBuddyToken ? FANTASY_BUDDY_TEILNAME : x.name;
+  return x;
+}
+
+/**
  * Teilt `pi` seine Support-Zonen?
  *
  * ★ 18.8., Als Testbefund: „Transfer-Alices Effekt persistiert noch
@@ -142,12 +158,13 @@ function isStacked(engine, pi, heroIdx, slotIdx) {
  * und dort bereits mindestens eine Kreatur GLEICHEN Namens liegt.
  */
 function canShareInto(engine, pi, heroIdx, slotIdx, cardName, feld = pi) {
-  if (!cardName) return false;
+  const name = teilName(cardName);   // W66b: `cardName` darf auch eine Instanz sein (Fantasy Buddys zaehlen alle als Fantasy Buddy Token)
+  if (!name) return false;
   if (!sharingActive(engine.gs, pi)) return false;
   // `feld` (Styx 28.9.): physische Seite des Platzes, `pi` der Beschwoerer.
   const stack = stackAt(engine, pi, heroIdx, slotIdx, feld);
   if (stack.length === 0) return false;
-  return stack.every(i => i.name === cardName);
+  return stack.every(i => teilName(i) === name || i.name === name);   // `i.name === name`: Rueckwaertsverstaendnis — wer den Zaubernamen eines Buddys uebergibt, trifft weiter seine eigene Zone
 }
 
 /**
@@ -177,6 +194,36 @@ function shareableSupportZones(engine, pi, cardName, opts = {}) {
     }
   }
   return zones;
+}
+
+/**
+ * ★ W63a (Al, 22.10.2026: „es sollte immer gelten: erst die geteilte Zone, sofern Alices Effekt aktiv ist, DANN die erste leere"):
+ * stellt in einer Zonenliste die GETEILTEN Eintraege (`shared: true`) VOR die freien — stabil, sonst unveraendert. Wer eine Zone selbst
+ * bestimmt (kein Spielerentscheid), nimmt danach `[0]`; bei einer Spielerwahl ist die geteilte Zone die Standardvorauswahl.
+ * @param {Array<{shared?: boolean}>} zones
+ */
+function geteiltZuerst(zones) {
+  if (!Array.isArray(zones) || !zones.some(z => z && z.shared)) return zones;
+  return [...zones.filter(z => z.shared), ...zones.filter(z => !z.shared)];
+}
+
+/**
+ * ★ W63a (Al, 22.10.2026: „das sollte allgemein fuer alle Beschwoerungs-/Platzierungs-Effekte gelten"): ergaenzt die FREIEN Zonen eines Skripts, das
+ * seine Zonenliste selbst baut (eigene Filter: Held-Zustand, Sperren, `canSummon`), um die GETEILTEN Zonen der Alice-Teilung — und stellt sie VORN.
+ * Die geteilten Zonen kommen aus der zentralen Frage `engine.beschwoerZonenFuer(pi, cardName, opts)`; `filter(z)` kann sie zusaetzlich einschraenken
+ * (z. B. `isCreatureSummonable` je Held). Gleiche Form wie die freien Eintraege: `{ owner, heroIdx, slotIdx, label, shared: true, stackDepth }`.
+ * Ohne Alice-Teilung (oder ohne gleichnamige Creature) bleibt `frei` unveraendert.
+ * @param {object} engine · @param {number} pi Beschwoerer · @param {string} cardName
+ * @param {Array} frei die freien Zonen des Skripts
+ * @param {object} [opts] wie `getFreeSupportZones` (Standard: `nachKontrolle: true`, `livingHeroesOnly: true`)
+ * @param {(z: object) => boolean} [filter]
+ */
+function mitGeteilten(engine, pi, cardName, frei, opts = {}, filter = null) {
+  if (!cardName) return frei;
+  const geteilt = engine.beschwoerZonenFuer(pi, cardName, { nachKontrolle: true, livingHeroesOnly: true, ...opts })
+    .filter(z => z.shared && (!filter || filter(z)))
+    .map(z => ({ owner: z.owner ?? pi, heroIdx: z.heroIdx, slotIdx: z.slotIdx, label: z.label, shared: true, stackDepth: z.stackDepth }));
+  return geteilt.length ? [...geteilt, ...frei] : frei;
 }
 
 /**
@@ -224,8 +271,25 @@ function describeInstance(engine, inst) {
   };
 }
 
+/**
+ * ★ W63a — erster Platz auf EINEM bestimmten Helden (Brettseite `feld`, auch ein seitenfremd kontrollierter Held), ohne Held-/Kontrollfilter der
+ * Zonenlisten: erst (Alice-Teilung des Beschwoerers `sharer`) die Zone einer GLEICHNAMIGEN Creature, DANN die erste leere. -1 = kein Platz.
+ */
+function ersterPlatzAufHeld(engine, feld, heroIdx, cardName, sharer = feld) {
+  const zonen = engine.gs.players[feld]?.supportZones?.[heroIdx] || [];
+  if (cardName) for (let si = 0; si < 3; si++) {
+    if ((zonen[si] || []).length > 0 && canShareInto(engine, sharer, heroIdx, si, cardName, feld)) return si;
+  }
+  const anzahl = Math.max(3, zonen.length);
+  for (let si = 0; si < anzahl; si++) if (!zonen[si] || zonen[si].length === 0) return si;
+  return -1;
+}
+
 module.exports = {
   ALICE_NAME,
+  FANTASY_BUDDY_TEILNAME,
+  teilName,
+  ersterPlatzAufHeld,
   sharingActive,
   armSharing,
   stackAt,
@@ -233,5 +297,7 @@ module.exports = {
   isStacked,
   canShareInto,
   shareableSupportZones,
+  geteiltZuerst,
+  mitGeteilten,
   describeInstance,
 };

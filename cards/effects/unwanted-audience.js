@@ -75,10 +75,10 @@ async function sleepCreature(engine, inst, ownerPi) {
   // W5b-Z2 (Al, Welle 5: „Monia kann darauf reagieren"): Cool Rescuer Monia schützt „Creatures either player controls, die von
   // einer Karte/einem Effekt betroffen würden" – das Setzen der Negierung hat das Fenster `beforeCreatureAffected` bisher
   // nie geöffnet (wie bei Gift: `actionApplyCreaturePoison`). Bricht Monia ab, schläft die Kreatur nicht ein.
-  // Monias Schild („… all Creatures") steht für diesen Effekt schon: seine Sperre „1 pro Zug" liegt nach dem ersten Treffer vor
-  // dem Schild-Zweig in Monias Hook, also hier selbst prüfen.
-  if (engine.gs._moniaShieldActive != null && (inst.controller ?? inst.owner) === engine.gs._moniaShieldActive) return;
-  const fensterCtx = { creature: inst, effectType: 'status', source: { name: CARD_NAME, owner: ownerPi }, cancelled: false, _skipReactionCheck: true };
+  // Monias Schild („… all Creatures") steht für diesen Effekt schon (angenommenes Angebot bei einer früheren Kreatur): kein weiteres Fenster, die Kreatur schläft nicht ein.
+  // (W58a: die Einmal-pro-Zug-Sperre ist weg; Monias Hook prüft den Schild selbst — die Prüfung hier spart nur das Fenster.)
+  if (engine.moniaSchildBlockt(inst, { name: CARD_NAME }, inst.controller ?? inst.owner)) return;
+  const fensterCtx = { creature: inst, effectType: 'status', statusName: 'negated', source: { name: CARD_NAME, owner: ownerPi }, cancelled: false, _skipReactionCheck: true };
   await engine.runHooks('beforeCreatureAffected', fensterCtx);
   if (fensterCtx.cancelled) return;
   // ★ W14b (Q152, Al: „NUR aktive Effekte, passive Komponenten bleiben unberührt!"): kein `negated` mehr (das legte die GANZE Kreatur still,
@@ -234,7 +234,7 @@ module.exports = {
             if (!creatureHasActiveEffect(engine, cInst)) continue;
             await sleepCreature(engine, cInst, pi);
           }
-          delete gs._moniaShieldActive;   // Z2: Monias Schild gilt für DIESEN Effekt (alle Kreaturen), nicht darüber hinaus
+          require('./_monia-shared').angeboteBeenden(gs);   // Z2: Monias Schild gilt für DIESEN Effekt (alle Kreaturen), nicht darüber hinaus
           engine.log('unwanted_audience', {
             player: ps.username, target: gs.players[oppIdx]?.username,
           });
@@ -251,7 +251,7 @@ module.exports = {
         inst.heroIdx = -1;
         inst.zoneSlot = -1;
       }
-      ps.discardPile.push(CARD_NAME);
+      engine.handKartenBesitzerPs(ps, CARD_NAME).discardPile.push(CARD_NAME);   // W63c: Ablage des permanenten Besitzers
 
       if (chainResult.negated) {
         engine.log('unwanted_audience_negated', { player: ps.username });
@@ -276,7 +276,7 @@ module.exports = {
       if (inst.counters?.active_locked) return;      // already asleep (idempotent vs. dup copies)
       if (!creatureHasActiveEffect(engine, inst)) return;
       await sleepCreature(engine, inst, ua.owner);
-      delete gs._moniaShieldActive;   // Z2: Schild nur für diese Auslösung
+      require('./_monia-shared').angeboteBeenden(gs);   // Z2: Schild nur für diese Auslösung
       engine.sync();
     },
 

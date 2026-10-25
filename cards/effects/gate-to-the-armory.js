@@ -87,6 +87,13 @@ function _firstFreeSlot(ps, heroIdx) {
   return -1;
 }
 
+/** Darion: der Platz fuer `cardName` beim Nutzer — der Equip-Stapel (Pflicht, braucht keine freie Zone), sonst die erste freie Zone; -1 = keiner. */
+function _zielPlatz(engine, seite, heroIdx, cardName) {
+  const pflicht = engine.equipPflichtPlatz(seite, heroIdx, cardName);
+  if (pflicht >= 0) return pflicht;
+  return _firstFreeSlot(engine.gs.players[seite], heroIdx);
+}
+
 module.exports = {
   // CPU: in der Action Phase als NORMALE Aktion spielbar (Als Auftrag 5.10.) — die
   // Frage „Zusatzaktion (Zugende) oder normale Aktion?" beantwortet `cpuResponse` mit
@@ -225,7 +232,7 @@ module.exports = {
         // Als Vorgabe 29.9.: bezaubert sperrt nur ohne Recht `ausruesten`.
         if (userSeite !== pi ? !engine.darfFremdAusruesten(pi, userSeite, heroIdx) : !heroCanBeEquipped(userHero)) return false;
         // Free slot required to host the Equipment.
-        if (_firstFreeSlot(ups, heroIdx) < 0) return false;
+        if (_zielPlatz(engine, userSeite, heroIdx, pickedName) < 0) return false;   // Darion: der Equip-Stapel nimmt auch ohne freie Zone auf
 
         const equipScript = loadCardEffect(pickedName);
         // Stack-only Equips (Modnir, Swellpnir) carry `neverPlayable`
@@ -298,7 +305,7 @@ module.exports = {
         player: ps.username, card: pickedName, source: pickedEntry.source,
       });
 
-      const freeSlot = direkt ? _firstFreeSlot(ups, heroIdx) : -1;
+      const freeSlot = direkt ? _zielPlatz(engine, userSeite, heroIdx, pickedName) : -1;
       let placed = null;
       if (direkt && freeSlot >= 0) {
         engine._broadcastEvent('play_zone_animation', {
@@ -369,8 +376,10 @@ module.exports = {
       // replacement-Action prompt.
       if (wasInherent) {
         engine.log('gate_to_armory_end_turn', { player: ps.username });
+        const zugDerKarte = gs.turn;
         engine.queuePostChainAction(async () => {
           if (gs.result) return; // game already over
+          if (gs.turn !== zugDerKarte || gs.activePlayer !== pi) return;   // veraltet: gilt nur dem Zug, in dem Gate gespielt wurde
           const cur = gs.currentPhase;
           if (cur >= 2 && cur <= 4) {
             await engine.advanceToPhase(pi, 5);

@@ -107,6 +107,13 @@ function eligibleSummonZones(engine, pi, cardName, opts = {}) {
   const helden = opts.nachKontrolle && engine.heroesControlledBy
     ? engine.heroesControlledBy(pi)
     : (ps.heroes || []).map((hero, heroIdx) => ({ physOwner: pi, heroIdx, hero }));
+  // ★ W62a (Al: „Pintas Effekt erkennt Zonen mit bereits liegenden gleichnamigen Creatures nicht"): mit „Alice, the Transfer Student"
+  // (Alice-Teilung des Beschwoerers) ist auch eine BELEGTE Zone ein Landeplatz, in der schon nur Kreaturen GLEICHEN Namens liegen —
+  // wie beim Hand-Weg (`validateActionPlay` + `canShareInto`). ★ W63a (Al, 22.10.2026: „erst die geteilte Zone, sofern Alices Effekt aktiv ist,
+  // DANN die erste leere"): die geteilten Zonen (`shared: true`) stehen VORN, die freien dahinter (wer `[0]` nimmt, nimmt die geteilte);
+  // `opts.geteilt === false` schaltet das ab (Aufrufer, die ausdruecklich einen LEEREN Platz brauchen).
+  const { canShareInto } = require('./_alice-shared');
+  const geteilt = [];
   for (const { physOwner, heroIdx: hi, hero } of helden) {
     if (!canHeroSummon(engine, pi, hi, cd, { ...pruef, physOwner })) continue;
     const zones = engine.gs.players[physOwner]?.supportZones?.[hi] || [];
@@ -118,10 +125,18 @@ function eligibleSummonZones(engine, pi, cardName, opts = {}) {
           label: `${hero.name} — Slot ${zi + 1}`,
           ...(opts.nachKontrolle ? { owner: physOwner } : {}),
         });
+      } else if (opts.geteilt !== false && canShareInto(engine, pi, hi, zi, cardName, physOwner)) {
+        const tiefe = (zones[zi] || []).length;
+        geteilt.push({
+          heroIdx: hi, slotIdx: zi,
+          label: `${hero.name} — Slot ${zi + 1} (×${tiefe})`,
+          shared: true, stackDepth: tiefe,
+          ...(opts.nachKontrolle ? { owner: physOwner } : {}),
+        });
       }
     }
   }
-  return out;
+  return geteilt.length ? [...geteilt, ...out] : out;
 }
 
 /**

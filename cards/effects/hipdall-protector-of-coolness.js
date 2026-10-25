@@ -93,7 +93,7 @@ module.exports = {
       // Pull the card back out of the destination pile/hand if it landed.
       let recovered = false;
       if (toZone === 'discard') {
-        if (await engine.takeFromPile(ps, 'discard', cardName, { source: CARD_NAME, last: true, toHand: true })) recovered = true;   // v820: Stapel-Schicht
+        if (await engine.takeFromPile(ps, 'discard', cardName, { source: CARD_NAME, last: true, toHand: true, ohneZugangsFenster: true })) recovered = true;   // v820: Stapel-Schicht
       } else if (toZone === 'deleted') {
         if (await engine.takeFromPile(ps, 'deleted', cardName, { source: CARD_NAME, last: true })) recovered = true;   // v820: Stapel-Schicht
       } else if (toZone === 'hand') {
@@ -103,7 +103,7 @@ module.exports = {
       if (!recovered) return;
 
       if (toZone !== 'hand') {
-        await engine.handZugang(ps, cardName, { von: 'ablage', source: CARD_NAME, ohneInstanz: true });
+        await engine.handZugang(ps, cardName, { von: 'ablage', source: CARD_NAME, ohneInstanz: true, ohneZugangsFenster: true });   // W72a: kommt aus dem Coolness Stack, nicht aus Deck/Ablage (Control Monitors)
         // Move the leaving inst back to hand. ctx.card on a leave-zone
         // hook is the LISTENING inst (Hipdall itself); the leaving
         // inst is exposed differently — we lookup by name+toZone.
@@ -154,18 +154,18 @@ async function summonFromStack(engine, pi, cardName) {
     // BESCHWOREN — der Held braucht die Stufe (Wildur Lv1: Summoning Magic 1).
     // (Glorious Rebirth „Place that Creature" bleibt ohne Stufe.)
     if (cd && !engine.heroMeetsLevelReq(pi, hi, cd)) continue;
-    const slots = ps.supportZones?.[hi] || [];
+    // ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): freie Zonen UND — mit Alice-Teilung —
+    // die Zone einer GLEICHNAMIGEN Creature (`engine.beschwoerZonenFuer`); der Helden-Klick nimmt die erste Zone der Liste, also die geteilte.
     let leftmostFree = -1;
-    for (let si = 0; si < slots.length; si++) {
-      if (!slots[si] || slots[si].length === 0) {
-        if (leftmostFree < 0) leftmostFree = si;
-        targets.push({
-          id: `equip-${pi}-${hi}-${si}`,
-          type: 'equip',
-          owner: pi, heroIdx: hi, slotIdx: si,
-          cardName: '',
-        });
-      }
+    for (const zz of engine.beschwoerZonenFuer(pi, cardName, { heroIdx: hi, namedHeroesOnly: true })) {
+      if (leftmostFree < 0) leftmostFree = zz.slotIdx;
+      targets.push({
+        id: `equip-${pi}-${hi}-${zz.slotIdx}`,
+        type: 'equip',
+        owner: pi, heroIdx: hi, slotIdx: zz.slotIdx,
+        cardName: '',
+        ...(zz.shared ? { shared: true } : {}),
+      });
     }
     if (leftmostFree >= 0) {
       targets.push({

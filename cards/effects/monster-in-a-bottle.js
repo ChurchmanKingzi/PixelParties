@@ -42,10 +42,15 @@ function canHeroSummon(engine, ps, pi, heroIdx, creatureData, source) {
 /**
  * Check if a hero has at least one free base support zone.
  */
-function hasFreeZone(ps, heroIdx) {
+function hasFreeZone(ps, heroIdx, engine = null, pi = null, cardName = null) {
   const supZones = ps.supportZones[heroIdx] || [];
   for (let z = 0; z < 3; z++) {
     if ((supZones[z] || []).length === 0) return true;
+  }
+  // W62a: mit Alice-Teilung zaehlt auch die Zone einer GLEICHNAMIGEN Creature (Landeplatz fuer die Kopie)
+  if (engine && cardName && pi != null) {
+    const { canShareInto } = require('./_alice-shared');
+    for (let z = 0; z < 3; z++) if (canShareInto(engine, pi, heroIdx, z, cardName)) return true;
   }
   return false;
 }
@@ -91,7 +96,7 @@ function getEligibleCreatures(gs, pi, engine = null) {
       let canSummon = false;
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         if (engine && !canHeroSummon(engine, ps, pi, hi, cd, source)) continue;
-        if (!hasFreeZone(ps, hi)) continue;
+        if (!hasFreeZone(ps, hi, engine, pi, name)) continue;
         if (engine && !engine.isCreatureSummonable(name, pi, hi, { _bypassBeforeSummon: true })) continue;
         canSummon = true;
         break;
@@ -114,7 +119,7 @@ module.exports = {
   // des Loaders wuerde sonst unter Knight of Kings [B] die ganze Karte sperren.
   blockedByPileLock: false,
   isPotion: true,
-  deferBroadcast: true, // Broadcast after creature+zone selected, not before
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral; `commitAppearance()` unten = nach Kreatur + Zone.
 
   canActivate(gs, pi, engine) {
     const ps = gs.players[pi];
@@ -161,7 +166,7 @@ module.exports = {
           let canSummon = false;
           for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
             if (!canHeroSummon(engine, ps, pi, hi, cd, source)) continue;
-            if (!hasFreeZone(ps, hi)) continue;
+            if (!hasFreeZone(ps, hi, engine, pi, name)) continue;   // W62a: frei oder geteilt (Alice)
             if (!engine.isCreatureSummonable(name, pi, hi, { _bypassBeforeSummon: true })) continue;
             canSummon = true;
             break;
@@ -199,7 +204,7 @@ module.exports = {
       if (!cd) return { cancelled: true };
 
       // Step 2: Pick a support zone on an eligible hero
-      const freeZones = [];
+      let freeZones = [];
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         if (!canHeroSummon(engine, ps, pi, hi, cd, creatureSource)) continue;
         if (!engine.isCreatureSummonable(creatureName, pi, hi, { _bypassBeforeSummon: true })) continue;
@@ -211,7 +216,15 @@ module.exports = {
           }
         }
       }
+      // W62a: + Zonen gleichnamiger Creatures (Alice-Teilung), hinter den freien
+      for (const z of engine.beschwoerZonenFuer(pi, creatureName, {})) {
+        if (z.shared && canHeroSummon(engine, ps, pi, z.heroIdx, cd, creatureSource)
+            && engine.isCreatureSummonable(creatureName, pi, z.heroIdx, { _bypassBeforeSummon: true })) {
+          freeZones.push({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, shared: true, label: z.label });
+        }
+      }
 
+      freeZones = require('./_alice-shared').geteiltZuerst(freeZones);   // W63a (Al, 22.10.2026): erst die geteilte Zone, DANN die erste leere
       if (freeZones.length === 0) return { cancelled: true };
 
       const zone = await engine.promptGeneric(pi, {
@@ -223,12 +236,8 @@ module.exports = {
       });
       if (!zone) continue; // Back → re-pick creature
 
-      // All decisions finalized — broadcast card to opponent NOW
-      const oi = engine.opponentOf(pi);
-      const oppSid = gs.players[oi]?.socketId;
-      if (oppSid && engine.io) {
-        engine.io.to(oppSid).emit('card_reveal', { cardName: 'Monster in a Bottle' });
-      }
+      // All decisions finalized — stream the card NOW (W64b: zentral über den Auftritts-Puffer, auch für Zuschauer)
+      engine.commitAppearance();
       await engine._delay(100);
 
       // Execute: remove from source, place into support zone
@@ -245,8 +254,7 @@ module.exports = {
 
       const hi = zone.heroIdx;
       const si = zone.slotIdx;
-      if (!ps.supportZones[hi]) ps.supportZones[hi] = [[], [], []];
-      ps.supportZones[hi][si] = [creatureName];
+      engine.zoneEintragen(pi, hi, si, creatureName, pi);   // W62a: gleichnamige Kreatur (Alice) → dazustapeln statt ueberschreiben
 
       // Track card instance
       const inst = engine._trackCard(creatureName, pi, 'support', hi, si);

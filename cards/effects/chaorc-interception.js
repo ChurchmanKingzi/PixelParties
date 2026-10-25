@@ -25,6 +25,7 @@
 // ═══════════════════════════════════════════
 
 const { isChaorcCreature } = require('./_chaorcs-shared');
+const { anyName } = require('./_alias-name');
 
 const CARD_NAME = 'Chaorc Interception';
 
@@ -46,7 +47,7 @@ function targetKeys(targetedHeroes) {
 function availableTributes(engine, pi, targetedHeroes) {
   const { ids, slots } = targetKeys(targetedHeroes);
   return engine.getSacrificableCreatures(pi).filter(c => {
-    if (!isChaorcCreature(c.cardName, engine)) return false;
+    if (!anyName(c.inst || { name: c.cardName }, (n) => isChaorcCreature(n, engine))) return false;   // Shroomasaur: Zusatzname zählt
     if (ids.has(c.inst.id)) return false;
     if (slots.has(`${c.inst.owner}:${c.inst.heroIdx}:${c.inst.zoneSlot}`)) return false;
     return true;

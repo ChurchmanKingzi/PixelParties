@@ -5,7 +5,7 @@
 //  Play this card immediately when the user would take any damage.
 //  Choose any number of Artifacts equipped and Abilities attached to
 //  the user and send them to the discard pile. The user heals for
-//  80 HP times the number of cards sent. This Spell's level is
+//  80 HP times the number of cards you chose. This Spell's level is
 //  reduced by the number of Abilities you send with this effect.
 //
 //  ── Als Rulings (6.9.) ────────────────────────────────────────────
@@ -140,7 +140,9 @@ function plan(engine, pi, heroIdx, opts = {}) {
     if (w === 0) { minFree = k; break; }
     if (minPaid < 0 && handFree >= w) minPaid = k;
   }
-  return { minFree, minPaid, total, equips: equips.length, hero };
+  // Darion: ein Equip-Stapel ist EIN Ziel (`_erlaubteInstanzen`), zaehlt aber mit jeder seiner Karten.
+  const equipKarten = equips.reduce((n, e) => n + (e._erlaubteInstanzen ? e._erlaubteInstanzen.length : 1), 0);
+  return { minFree, minPaid, total, equips: equipKarten, hero };
 }
 
 function castable(p) {
@@ -291,7 +293,8 @@ module.exports = {
         weg = await engine.discardAbilityTopCopy(ziel._wa.entry, { source: CARD_NAME, sourceOwner: ownerIdx });
         if (weg) abilitiesSent++;
       } else {
-        weg = await engine.sendBoardCardToDiscard(ziel._wa.inst, { source: CARD_NAME, sourceOwner: ownerIdx });
+        // Darion: die Wahl im Stapel (`_disambiguateStackedTargets`) steht am gewaehlten Ziel; `_wa.inst` ist nur die Instanz beim Aufzaehlen (die oberste).
+        weg = await engine.sendBoardCardToDiscard(ziel.cardInstance || ziel._wa.inst, { source: CARD_NAME, sourceOwner: ownerIdx });
       }
       if (!weg) continue;
       sent++;

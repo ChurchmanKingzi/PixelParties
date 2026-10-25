@@ -87,13 +87,13 @@ const MAX_DAMAGE = 300;
 // overlay — and the client-side diff-detector that would otherwise
 // animate the destroy's discard-flight from the source slot is
 // pre-suppressed so it doesn't double-up.
-const LOAD_MS    = 1100;        // Creature slot → Brackle (slow, weighty).
-const HOLD_MS    =  400;        // Creature visibly parked on Brackle.
-const FIRE_MS    =  300;        // Brackle → target (snappy release).
-const IMPACT_MS  =  300;        // Creature parked at target while the
+const LOAD_MS    =  650;        // Creature slot → Brackle (zügig, aber mit Gewicht).
+const HOLD_MS    =  200;        // Creature visibly parked on Brackle.
+const FIRE_MS    =  200;        // Brackle → target (snappy release).
+const IMPACT_MS  =  200;        // Creature parked at target while the
                                 // explosion plays — sells the hit
                                 // before the body flies to discard.
-const DISCARD_MS =  500;        // Target → discard pile.
+const DISCARD_MS =  350;        // Target → discard pile.
 
 // Damage lands ~70% through the fire phase — early enough that the
 // impact reads as "the catapulted Creature hit the target" before
@@ -265,6 +265,9 @@ module.exports = {
         // Das Opfer wird erst nach dem Schaden abgelegt, steht aber nicht
         // mehr zur Wahl (sonst Selbstbeschuss + doppelte Ablage, H01-heroes-17).
         condition: (t) => t.cardInstance?.id !== creatureInst.id,
+        // Das Opfer bleibt auf dem Brett sichtbar, aber gesperrt und ROT markiert — kein Fehlklick auf die eigene Opfer-Kreatur.
+        dimUnmetCondition: true,
+        markUnmetRed: true,
       }));
       if (target || negiert) break;     // Have both a sacrifice AND a target (or a negated hit) — proceed.
       // Target prompt cancelled → loop back to sacrifice picker.

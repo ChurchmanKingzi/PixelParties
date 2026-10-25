@@ -159,6 +159,10 @@
 "id": "Aquatic_Spear",
 "kind": "a"
 },
+"Arcane Eyes": {
+"id": "Arcane_Eyes",
+"kind": "a"
+},
 "Arcane Lamp": {
 "id": "Arcane_Lamp",
 "kind": "a"
@@ -185,6 +189,10 @@
 },
 "Army of the Cute": {
 "id": "Army_of_the_Cute",
+"kind": "a"
+},
+"Arnold, the Maximum Lotl": {
+"id": "Arnold_the_Maximum_Lotl",
 "kind": "a"
 },
 "Arrival from the Cosmic Depths": {
@@ -511,6 +519,10 @@
 "id": "Burning_Skeleton",
 "kind": "a"
 },
+"Buttap": {
+"id": "Buttap",
+"kind": "a"
+},
 "Butterfly Cloud": {
 "id": "Butterfly_Cloud",
 "kind": "a"
@@ -709,6 +721,10 @@
 },
 "Cloak of Edge": {
 "id": "Cloak_of_Edge",
+"kind": "a"
+},
+"Clone": {
+"id": "Clone",
 "kind": "a"
 },
 "Cloud Pillow": {
@@ -1351,6 +1367,10 @@
 "id": "Doom_Prophecy",
 "kind": "a"
 },
+"Doomed Pirate": {
+"id": "Doomed_Pirate",
+"kind": "a"
+},
 "Doomed Town Guard": {
 "id": "Doomed_Town_Guard",
 "kind": "a"
@@ -1493,6 +1513,10 @@
 },
 "Excavator Bucket": {
 "id": "Excavator_Bucket",
+"kind": "a"
+},
+"Exorcism": {
+"id": "Exorcism",
 "kind": "a"
 },
 "Experimental Potion": {
@@ -1867,6 +1891,10 @@
 "id": "Gigantisaur_Triceras",
 "kind": "a"
 },
+"Glasowt": {
+"id": "Glasowt",
+"kind": "a"
+},
 "Glass Sword": {
 "id": "Glass_Sword",
 "kind": "a"
@@ -2187,6 +2215,10 @@
 "id": "Hives_Crown",
 "kind": "a"
 },
+"Hockey Genie": {
+"id": "Hockey_Genie",
+"kind": "a"
+},
 "Hole in the Sky": {
 "id": "Hole_in_the_Sky",
 "kind": "a"
@@ -2213,6 +2245,10 @@
 },
 "Howling in the Night": {
 "id": "Howling_in_the_Night",
+"kind": "a"
+},
+"Hulijing, the Foxdemon": {
+"id": "Hulijing_the_Foxdemon",
 "kind": "a"
 },
 "Hunting": {
@@ -2463,6 +2499,10 @@
 "id": "Key_the_Cursed_Thief",
 "kind": "a"
 },
+"Kidnapping": {
+"id": "Kidnapping",
+"kind": "a"
+},
 "Kirin Firebreath": {
 "id": "Kirin_Firebreath",
 "kind": "a"
@@ -2509,6 +2549,10 @@
 },
 "Ladder to the Sky": {
 "id": "Ladder_to_the_Sky",
+"kind": "a"
+},
+"Lamenting Knight": {
+"id": "Lamenting_Knight",
 "kind": "a"
 },
 "Land Sharks": {
@@ -2733,6 +2777,14 @@
 },
 "Lunatic Hawk": {
 "id": "Lunatic_Hawk",
+"kind": "a"
+},
+"Magic Arrows": {
+"id": "Magic_Arrows",
+"kind": "a"
+},
+"Meditation": {
+"id": "Meditation",
 "kind": "a"
 },
 "MOE Bomb": {
@@ -2975,6 +3027,10 @@
 "id": "Moonlight_Butterfly",
 "kind": "a"
 },
+"Motharch Squire": {
+"id": "Motharch_Squire",
+"kind": "a"
+},
 "Mountain Boars": {
 "id": "Mountain_Boars",
 "kind": "a"
@@ -3107,6 +3163,10 @@
 "id": "Overheal_Shock",
 "kind": "a"
 },
+"Overheat": {
+"id": "Overheat",
+"kind": "a"
+},
 "Pangaia, the Dino Domain": {
 "id": "Pangaia_the_Dino_Domain",
 "kind": "a"
@@ -3125,6 +3185,10 @@
 },
 "Paraseed Zombie": {
 "id": "Paraseed_Zombie",
+"kind": "a"
+},
+"Patty, the Ninja of Revenge": {
+"id": "Patty_the_Ninja_of_Revenge",
 "kind": "a"
 },
 "Pawn Chain": {
@@ -3211,6 +3275,10 @@
 "id": "Pillar_of_Light",
 "kind": "a"
 },
+"Pinaxolotl": {
+"id": "Pinaxolotl",
+"kind": "a"
+},
 "Pink Sky": {
 "id": "Pink_Sky",
 "kind": "a"
@@ -3269,6 +3337,10 @@
 },
 "Pollution Token": {
 "id": "Pollution_Token",
+"kind": "a"
+},
+"Polymorph": {
+"id": "Polymorph",
 "kind": "a"
 },
 "Populated Island Turtle": {
@@ -3451,8 +3523,16 @@
 "id": "Red_Dragoneer",
 "kind": "a"
 },
+"Redirecting Aura": {
+"id": "Redirecting_Aura",
+"kind": "a"
+},
 "Refreshing Night": {
 "id": "Refreshing_Night",
+"kind": "a"
+},
+"Regeneration": {
+"id": "Regeneration",
 "kind": "a"
 },
 "Reincarnation": {
@@ -3701,6 +3781,10 @@
 },
 "Shooting Star": {
 "id": "Shooting_Star",
+"kind": "a"
+},
+"Shrink": {
+"id": "Shrink",
 "kind": "a"
 },
 "Shu'Chaku, the Blood Moon Projection": {
@@ -3983,6 +4067,10 @@
 "id": "Spectral_Armor",
 "kind": "a"
 },
+"Spell Shackle": {
+"id": "Spell_Shackle",
+"kind": "a"
+},
 "Spice Mortar": {
 "id": "Spice_Mortar",
 "kind": "a"
@@ -4109,6 +4197,10 @@
 },
 "Stinky Stables": {
 "id": "Stinky_Stables",
+"kind": "a"
+},
+"Stoneskin": {
+"id": "Stoneskin",
 "kind": "a"
 },
 "Storm Piano": {
@@ -4259,6 +4351,10 @@
 "id": "Teal_Fishing_Rod",
 "kind": "a"
 },
+"Tearing Mountain": {
+"id": "Tearing_Mountain",
+"kind": "a"
+},
 "Tears of Creation": {
 "id": "Tears_of_Creation",
 "kind": "a"
@@ -4269,6 +4365,10 @@
 },
 "Telekinesis": {
 "id": "Telekinesis",
+"kind": "a"
+},
+"Teleport": {
+"id": "Teleport",
 "kind": "a"
 },
 "Teleportal": {
@@ -4393,6 +4493,10 @@
 },
 "The Master's Key": {
 "id": "The_Masters_Key",
+"kind": "a"
+},
+"The Master's Orders": {
+"id": "The_Masters_Orders",
 "kind": "a"
 },
 "The Master's Plan": {
@@ -4523,6 +4627,14 @@
 "id": "Time_Bomblebee",
 "kind": "a"
 },
+"Time Distortion": {
+"id": "Time_Distortion",
+"kind": "a"
+},
+"Time Tyrant": {
+"id": "Time_Tyrant",
+"kind": "a"
+},
 "Timeless King Zi": {
 "id": "Timeless_King_Zi",
 "kind": "a"
@@ -4571,6 +4683,14 @@
 "id": "Transdimensional_Stab",
 "kind": "b"
 },
+"Transmission": {
+"id": "Transmission",
+"kind": "a"
+},
+"Trap Sabotage": {
+"id": "Trap_Sabotage",
+"kind": "a"
+},
 "Trapping": {
 "id": "Trapping",
 "kind": "a"
@@ -4597,6 +4717,10 @@
 },
 "Treasure Skeleton": {
 "id": "Treasure_Skeleton",
+"kind": "a"
+},
+"Treasure Theft": {
+"id": "Treasure_Theft",
 "kind": "a"
 },
 "Tri Ad, the Puppet Mistress": {
@@ -4729,6 +4853,10 @@
 },
 "Voice in your Head": {
 "id": "Voice_in_your_Head",
+"kind": "a"
+},
+"Voodoo Curse": {
+"id": "Voodoo_Curse",
 "kind": "a"
 },
 "Waflav, the Metamorphing Monstrosity": {
@@ -5289,6 +5417,206 @@
 },
 "skin/Layn Summoner of Weapons": {
 "id": "Layn_Summoner_of_Weapons",
+"kind": "a"
+},
+"Black-Thorn Dragon": {
+"id": "Black_Thorn_Dragon",
+"kind": "a"
+},
+"Shimmering Dragonegg": {
+"id": "Shimmering_Dragonegg",
+"kind": "a"
+},
+"Liquid Luck": {
+"id": "Liquid_Luck",
+"kind": "a"
+},
+"Great Vanguard Demon": {
+"id": "Great_Vanguard_Demon",
+"kind": "a"
+},
+"Mind Control": {
+"id": "Mind_Control",
+"kind": "a"
+},
+"Mine! Mine! Mine!": {
+"id": "Mine_Mine_Mine",
+"kind": "a"
+},
+"Robird": {
+"id": "Robird",
+"kind": "a"
+},
+"Secret Entrance": {
+"id": "Secret_Entrance",
+"kind": "a"
+},
+"See through the Ruse": {
+"id": "See_through_the_Ruse",
+"kind": "a"
+},
+"Spy in the Enemy's Camp": {
+"id": "Spy_in_the_Enemys_Camp",
+"kind": "a"
+},
+"Zira Racer": {
+"id": "Zira_Racer",
+"kind": "a"
+},
+"Ankhota, the Burier": {
+"id": "Ankhota_the_Burier",
+"kind": "a"
+},
+"Shroomasaur": {
+"id": "Shroomasaur",
+"kind": "a"
+},
+"Leafagami Snake": {
+"id": "Leafagami_Snake",
+"kind": "a"
+},
+"Fruit Bat, Nosferapple": {
+"id": "Fruit_Bat_Nosferapple",
+"kind": "a"
+},
+"Cheering Rabbit": {
+"id": "Cheering_Rabbit",
+"kind": "a"
+},
+"Rosie, the School Idol": {
+"id": "Rosie_the_School_Idol",
+"kind": "a"
+},
+"Kai, the Rowdy": {
+"id": "Kai_the_Rowdy",
+"kind": "a"
+},
+"Flesh-Eating Swarm Trap": {
+"id": "Flesh_Eating_Swarm_Trap",
+"kind": "a"
+},
+"Wendy, the Shy Girl": {
+"id": "Wendy_the_Shy_Girl",
+"kind": "a"
+},
+"Hot Skull Potato": {
+"id": "Hot_Skull_Potato",
+"kind": "a"
+},
+"Darion, the Blood-Crazy Groundskeeper": {
+"id": "Darion_the_Blood-Crazy_Groundskeeper",
+"kind": "a"
+},
+"Control Monitors": {
+"id": "Control_Monitors",
+"kind": "a"
+},
+"Celia, the Class Clown": {
+"id": "Celia_the_Class_Clown",
+"kind": "a"
+},
+"Ghostly Warning": {
+"id": "Ghostly_Warning",
+"kind": "a"
+},
+"Unreasonable Anger": {
+"id": "Unreasonable_Anger",
+"kind": "a"
+},
+"Reverse Trap": {
+"id": "Reverse_Trap",
+"kind": "a"
+},
+"Nasty Prank": {
+"id": "Nasty_Prank",
+"kind": "a"
+},
+"Explosion Toss": {
+"id": "Explosion_Toss",
+"kind": "a"
+},
+"\"Deadly Poison\"": {
+"id": "Deadly_Poison",
+"kind": "a"
+},
+"Atta, Speaker of Desires": {
+"id": "Atta_Speaker_of_Desires",
+"kind": "a"
+},
+"Vengeful Attack": {
+"id": "Vengeful_Attack",
+"kind": "a"
+},
+"Wise Village Elder": {
+"id": "Wise_Village_Elder",
+"kind": "a"
+},
+"You are the Chosen One!!!": {
+"id": "You_are_the_Chosen_One",
+"kind": "a"
+},
+"YOU'RE ALIVE?!": {
+"id": "YOURE_ALIVE",
+"kind": "a"
+},
+"The Golden Gate": {
+"id": "The_Golden_Gate",
+"kind": "a"
+},
+"Tail Slap": {
+"id": "Tail_Slap",
+"kind": "a"
+},
+"Ultimate Destroyer Punch": {
+"id": "Ultimate_Destroyer_Punch",
+"kind": "a"
+},
+"Crash Landing": {
+"id": "Crash_Landing",
+"kind": "a"
+},
+"Uncool Malfunction": {
+"id": "Uncool_Malfunction",
+"kind": "a"
+},
+"REVENGE!!!": {
+"id": "REVENGE",
+"kind": "a"
+},
+"Grand Feast": {
+"id": "Grand_Feast",
+"kind": "a"
+},
+"Fake Legendary Sword": {
+"id": "Fake_Legendary_Sword",
+"kind": "a"
+},
+"The Root of all Presents": {
+"id": "The_Root_of_all_Presents",
+"kind": "a"
+},
+"Cuberto, Supreme Lord of Edges": {
+"id": "Cuberto_Supreme_Lord_of_Edges",
+"kind": "a"
+},
+"True Form": {
+"id": "True_Form",
+"kind": "a"
+},
+"Feral, the Fortress Breaker": {
+"id": "Feral_the_Fortress_Breaker",
+"kind": "a"
+},
+"Enemy of my Enemy": {
+"id": "Enemy_of_my_Enemy",
+"kind": "a"
+},
+"Cosmic Exploding Skull": {
+"id": "Cosmic_Exploding_Skull",
+"kind": "a"
+},
+"Bounce Trap": {
+"id": "Bounce_Trap",
 "kind": "a"
 }
 }

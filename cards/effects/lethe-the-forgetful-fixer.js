@@ -64,7 +64,7 @@ const NECRO_KEY = 'letheNecromancy';
  */
 function necromancyInstanz(engine, feld, heroIdx) {
   return (engine?.cardInstances || []).find(c => c
-    && c.name === 'Necromancy' && c.zone === 'ability'
+    && c.name === 'Necromancy' && engine.istWirksameAbility(c)   // 24.10.: auch in einer Support Zone (Xal)
     && c.heroIdx === heroIdx
     && (c.heroOwner ?? c.owner) === feld) || null;
 }

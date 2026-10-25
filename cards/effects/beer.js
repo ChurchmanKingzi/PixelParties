@@ -178,7 +178,7 @@ module.exports = {
           c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
         );
         if (inst) {
-          engine.cleanseCreatureStatuses(inst, statuses, 'Beer');
+          await engine.cleanseCreatureStatusesGefragt(inst, statuses, 'Beer');
         }
         engine._broadcastEvent('play_zone_animation', { type: 'beer_bubbles', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: target.slotIdx });
       }

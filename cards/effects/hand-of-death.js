@@ -11,85 +11,190 @@
 //   effect, skip your next turn. You can only
 //   play 1 «Hand of Death» per turn."
 //
-//  Architecture
+//  Architecture  (★ W66a — der Effekt gehört dem SPIELER, nicht der Karte)
 //  ────────────
-//  Hand of Death resolves like a normal Spell —
-//  the card goes to the caster's discard pile.
-//  The pending delayed-defeat effect lives on
-//  `ps._handOfDeathArmed` (per-player state, set
-//  in onPlay). At end-of-turn, ANY Hand of Death
-//  instance in either player's discard pile fires
-//  its `onTurnEnd` listener — instances in piles
-//  are auto-tracked by `_ensurePileListeners`
-//  because `onTurnEnd` is in the engine's
-//  PILE_RELEVANT_HOOKS set. The listener reads
-//  `ps._handOfDeathArmed`, gates on the trigger
-//  window, fires the effect, and clears the flag.
+//  Hand of Death resolves like a normal Spell. Der verzögerte Defeat lebt
+//  AUSSCHLIESSLICH am Spielerzustand `ps._handOfDeathArmed` (gesetzt in
+//  onPlay) und wird von der ENGINE ausgelöst: `switchTurn` ruft am Zugende
+//  (nach `ON_TURN_END`, in einem eigenen Fangnetz — auch wenn ein anderer
+//  Zugende-Hook abbricht) `nachholenOhneKarte(engine)`. Es gibt KEINEN
+//  Karten-Listener mehr: weder die Ablage-Instanz (`_ensurePileListeners`),
+//  noch eine Hand-/Brett-Instanz, noch ein Fantasy Buddy Token (Inya) spielt
+//  für das Auslösen eine Rolle — die Karte darf in der Hand, der Ablage, im
+//  Deck, als Token auf dem Brett liegen oder weg sein; Token lebt oder stirbt.
+//  (Vorher: `hooks.onTurnEnd` an der Ablage-Instanz + Nachhol-Weg der Engine
+//  — zwei Wege, die sich gegenseitig verdeckten; Tests mit Direktaufruf
+//  sahen nur den einen.)
 //
 //  ── Trigger window ──
-//  Fires at the END of the OPPONENT's NEXT turn —
-//  the first turn-end after the cast where the
-//  active player is the OPPOSITE side of the
-//  caster. Concretely:
-//    `gs.turn === armedOnTurn + 1`
-//        AND
-//    `gs.activePlayer !== ownerIdx`
+//  Fires at the END of the first turn of a player OTHER than the caster
+//  after the cast turn — "the end of your opponent's next turn":
+//    `gs.activePlayer !== ownerIdx  AND  gs.turn > armedOnTurn`
+//  (W66a: war `gs.turn === armedOnTurn + 1`; ein übersprungener Zugwechsel
+//  oder verschobene Zugnummer ließ den Eintrag sonst für immer stehen.)
 //
 //  Worked example: P0 casts on turn 5.
-//    • Turn 5 end (P0): turn=5, skipped (`turn !==
-//      armedOnTurn+1`). Flag still armed.
-//    • Turn 6 end (P1): turn=6, activePlayer=1,
-//      ownerIdx=0 → fires.
+//    • Turn 5 end (P0): active = caster → skipped. Flag still armed.
+//    • Turn 6 end (P1): turn 6 > 5, active ≠ caster → fires.
+//  ★ W67a (Al, 23.10.2026): ein ÜBERSPRUNGENER Gegnerzug (Guardian Beast Zhu,
+//  „skip your next turn") zählt NICHT als „your opponent's next turn" — er
+//  endet zwar formal (`_switchTurnInner({ uebersprungen: true })`), aber dort
+//  ruft die Engine `nachholenOhneKarte` NICHT; der Auftrag bleibt liegen und
+//  feuert am Ende des nächsten tatsächlich gespielten Gegnerzuges.
 //
-//  ── Welle 14 (Q171, Al 16.10.2026: „Ja!") ──
-//  Der verzoegerte Effekt haengt am ZAUBER, nicht an der Karte in der
-//  Ablage: wird die Karte vor dem Fenster aus der Ablage geholt (Magic
-//  Sapphire, Meditation) oder liegt sie sonst nirgends mit Listener,
-//  loest er trotzdem aus. Die Engine ruft dafuer am Zugende (direkt
-//  nach `ON_TURN_END`) `nachholenOhneKarte` auf: steht noch ein
-//  `_handOfDeathArmed` im Fenster (die Ablage-Instanz hat ihn nicht
-//  verbraucht), laeuft derselbe `onTurnEnd`-Rumpf ueber eine kurzlebige
-//  Hilfsinstanz.
-//
-//  ── Immunities respected at trigger time ──
-//  Hero targets:
-//    • Anti Magic — `engine._isHeroSpellProtected`
-//      returns true if the target wears an Anti
-//      Magic buff at Lv 1+ (Hand of Death is Lv 1
-//      Destruction Spell).
-//    • Resistance — fire `BEFORE_HERO_EFFECT`
-//      hook; Resistance's listener may cancel.
-//    • First-turn protection — already gated by
-//      `actionDefeatHero` internally.
-//  Creature targets:
-//    • Cardinal Beast, Defending the Gate, first-
-//      turn shield, _stealImmortal, etc. — all
-//      gated by `actionDestroyCard` internally.
-//      We sniff `inst.zone` post-call to verify
-//      the destroy actually landed.
+//  ── Schutzschichten (★ W66a, Al: „Resistance … JEDE Form von defeat") ──
+//  Der Kill läuft über `engine.actionDefeat(..., { wirkungsSchutz: true })`:
+//  Held → `actionDefeatHero`: Erstrunden-Schutz, Resistance (Stufen),
+//  Effekt-Immunität, Spell-Schild, Zielschutz „or HIT" (Dive Down, Jetpack,
+//  Alluring Light …), Anti Magic Enchantment, Anti Magic, Charmed,
+//  Quellen-Immunität, Versteinert, Submerged, „would be defeated"-
+//  Reaktionen. Kreatur → `actionDestroyCard` (Cardinal, Gate Shield,
+//  Puppets-Wächter, Monia, Golden Wings …). SCHADENS-Schutz (Schadens-
+//  immunität, Inyas „takes no damage") gilt NICHT: kein Schaden.
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Hand of Death';
 const HOPT_KEY = 'hand-of-death';
 
+/** Steht für `pi` ein Auftrag im Fenster „Ende des nächsten gegnerischen Zuges"? */
+function imFenster(gs, pi) {
+  const armed = gs.players[pi]?._handOfDeathArmed;
+  if (!armed || typeof armed.armedOnTurn !== 'number') return false;
+  return gs.activePlayer !== pi && gs.turn > armed.armedOnTurn;
+}
+
 /**
- * Welle 14 (Q171): Ausloesung ohne Karte in der Ablage (s. Kopf). Von der Engine nach
- * `ON_TURN_END` gerufen. Laeuft nur, wenn der Ablage-Listener den Eintrag nicht schon
- * verbraucht hat (er loescht `_handOfDeathArmed` im Fenster sofort).
+ * ★ W66a: der verzögerte Effekt — unabhängig von jeder Karteninstanz. Der Auftrag liegt am Spieler (`ps._handOfDeathArmed`) und wird SOFORT
+ * verbraucht (genau einmal). Eine kurzlebige Hilfsinstanz in der Ablage des Wirkers trägt nur den Kontext für die Zielwahl (`ctx.promptDamageTarget`).
+ */
+async function ausloesen(engine, ownerIdx) {
+  const gs = engine.gs;
+  const ps = gs.players[ownerIdx];
+  const armed = ps?._handOfDeathArmed;
+  if (!ps || !armed) return;
+  delete ps._handOfDeathArmed;
+
+  // ── User-status gate ──
+  const userHeroIdx = armed.casterHeroIdx;
+  const userSeite = armed.casterHeroOwner ?? ownerIdx;   // Als Befund 29.9.: Brettseite des Wirkers
+  const userHero = gs.players[userSeite]?.heroes?.[userHeroIdx];
+  if (!userHero?.name || userHero.hp <= 0) {
+    engine.log('hand_of_death_fizzle', { player: ps.username, reason: 'user_defeated' });
+    return;
+  }
+  if (userHero.statuses?.frozen) {
+    engine.log('hand_of_death_fizzle', { player: ps.username, reason: 'user_frozen' });
+    return;
+  }
+  if (userHero.statuses?.stunned || userHero.statuses?.webbed) {
+    engine.log('hand_of_death_fizzle', { player: ps.username, reason: 'user_stunned' });
+    return;
+  }
+
+  const tmp = engine._trackCard(CARD_NAME, ownerIdx, 'discard');
+  tmp.heroIdx = userHeroIdx;
+  if (userSeite !== ownerIdx) tmp.heroOwner = userSeite;
+  try {
+    const ctx = engine._createContext(tmp, { turn: gs.turn, activePlayer: gs.activePlayer });
+
+    // Caster flourish — same dark-swarm cue tying the trigger to the user before the picker opens.
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'dark_swarm', owner: userSeite,   // Als Befund 29.9.: Brettseite des Wirkers
+      heroIdx: userHeroIdx, zoneSlot: -1,
+    });
+    await engine._delay(300);
+
+    // ── Prompt: pick any target ("you may") ──
+    // `dealsDamage: false` opts out of damage-mitigation post-target reactions (Spectral Armor / Bamboo Shield / Sculpture Guards).
+    // `damageType: 'destruction_spell'` keeps the school tag. `cancellable: true` = das „may".
+    const sourceMeta = {
+      name: CARD_NAME, owner: ownerIdx, heroIdx: userHeroIdx, heroOwner: userSeite,   // Als Befund 29.9.: Brettseite des Wirkers
+      controller: ownerIdx,
+    };
+    const target = await ctx.promptDamageTarget({
+      side: 'any',
+      types: ['hero', 'creature'],
+      damageType: 'destruction_spell',
+      dealsDamage: false,
+      title: CARD_NAME,
+      description: 'Choose any target — it is defeated.',
+      confirmLabel: '💀 Defeat!',
+      confirmClass: 'btn-danger',
+      cancellable: true,
+    });
+
+    if (!target) {
+      engine.log('hand_of_death_fizzle', { player: ps.username, reason: 'cancelled' });
+      return;
+    }
+
+    // ── Resolve the defeat ──
+    let defeated = false;
+    if (target.type === 'hero') {
+      const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
+      if (hero?.name && hero.hp > 0) {
+        // ★ W66a: EIN Baustein für „defeat" — Resistance, Zielschutz, Anti Magic (Buff + Enchantment), Charmed, Submerged, Versteinerung,
+        // Erstrunden-Schutz, Spell-Schild und „would be defeated"-Reaktionen entscheiden in `actionDefeatHero`. Die Strike-Animation
+        // läuft erst, wenn der Tod feststeht (`vorTod`), nicht bei einem abgeprallten Effekt.
+        const r = await engine.actionDefeat(sourceMeta, hero, {
+          sourceOwner: ownerIdx, reason: CARD_NAME,
+          damageType: 'destruction_spell', wirkungsSchutz: true,
+          vorTod: async () => {
+            engine._broadcastEvent('play_zone_animation', {
+              type: 'hand_of_death_strike',
+              owner: target.owner, heroIdx: target.heroIdx, zoneSlot: -1,
+              duration: 1700,
+            });
+            await engine._delay(900); // sync the defeat with the impact
+          },
+        });
+        defeated = !!r?.defeated;
+        if (!defeated) engine.log('hand_of_death_blocked', { target: hero.name, reason: r?.reason || (r?.blocked ? 'effect_cancelled' : 'prevented') });
+        else await engine._delay(400);   // let the strike animation finish blooming after the defeat numbers settle
+      }
+    } else {
+      // 'equip' / 'creature' — a Creature in a Support Zone.
+      const inst = target.cardInstance || engine.kreaturAnBrett(target.owner, target.heroIdx, target.slotIdx);   // Z1: Brettseite
+      if (inst && inst.zone === 'support') {
+        engine._broadcastEvent('play_zone_animation', {
+          type: 'hand_of_death_strike',
+          owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
+          duration: 1700,
+        });
+        await engine._delay(900);
+        // `actionDestroyCard` (über `actionDefeat`) kennt jede Kreatur-Immunität (Cardinal Beast, Defending the Gate, Erstrunden-Schutz, _stealImmortal,
+        // _damageDestroyImmune, Sparkfly-Geschenk, Puppets-Wächter, Monia …) und löst die Tod-Hooks aus; ob die Zerstörung landete, zeigt die Zone.
+        const r = await engine.actionDefeat(sourceMeta, inst, { sourceOwner: ownerIdx, sourceName: CARD_NAME });
+        defeated = !!r?.defeated;
+        await engine._delay(400);
+      }
+    }
+
+    // ── Skip-next-turn rider ──
+    // Only when a target was actually defeated. Uses the engine's canonical `_skipNextTurn` flag (Guardian Beast Zhu's mechanism) —
+    // `switchTurn` reads it and skips the player's upcoming turn automatically.
+    if (defeated) {
+      ps._skipNextTurn = true;
+      engine.log('hand_of_death_skip_turn', { player: ps.username, target: target.cardName });
+    }
+
+    engine.log('hand_of_death_resolved', { player: ps.username, target: target.cardName, defeated });
+    engine.sync();
+  } finally {
+    engine._untrackCard(tmp.id);
+  }
+}
+
+/**
+ * Von der Engine am Zugende gerufen (`switchTurn`, nach `ON_TURN_END`, eigenes Fangnetz): löst jeden fälligen Auftrag aus. Der Name stammt aus
+ * Welle 14 (Q171, „ohne Karte in der Ablage") — seit W66a ist das der EINZIGE Weg (kein Ablage-Listener mehr).
  */
 async function nachholenOhneKarte(engine) {
   const gs = engine.gs;
   for (let pi = 0; pi < engine.playerCount(); pi++) {
-    const armed = gs.players[pi]?._handOfDeathArmed;
-    if (!armed || typeof armed.armedOnTurn !== 'number') continue;
-    if (gs.turn !== armed.armedOnTurn + 1 || gs.activePlayer === pi) continue;
-    const tmp = engine._trackCard(CARD_NAME, pi, 'discard');
-    try {
-      await module.exports.hooks.onTurnEnd(
-        engine._createContext(tmp, { turn: gs.turn, activePlayer: gs.activePlayer }));
-    } finally {
-      engine._untrackCard(tmp.id);
-    }
+    if (gs.result) return;
+    if (!imFenster(gs, pi)) continue;
+    await ausloesen(engine, pi);
   }
 }
 
@@ -106,7 +211,8 @@ module.exports = {
     impact: { type: 'dark_swarm' }, impactMs: 260,
   },
 
-  activeIn: ['hand', 'discard'],
+  // W66a: nur die Handkarte spielt (onPlay); der verzögerte Teil hängt am Spieler (`ps._handOfDeathArmed`), nicht an einer Instanz.
+  activeIn: ['hand'],
 
   /** Greys out in hand after one cast this turn. */
   spellPlayCondition(gs, pi) {
@@ -117,7 +223,7 @@ module.exports = {
   hooks: {
     onPlay: async (ctx) => {
       // Self-cast gate: only fire when THIS specific hand instance is
-      // the played card (filters cross-fires from siblings in discard).
+      // the played card (filters cross-fires from siblings in hand).
       if (ctx.cardZone !== 'hand') return;
       if (ctx.playedCard?.id !== ctx.card.id) return;
 
@@ -135,12 +241,8 @@ module.exports = {
         return;
       }
 
-      // Arm the pending effect on player state. The discarded Hand of
-      // Death instance's `onTurnEnd` listener (fired via
-      // `_ensurePileListeners` for the engine's PILE_RELEVANT_HOOKS
-      // set) reads this flag at the trigger window. Overwrites any
-      // previous armed entry — HOPT enforces 1/turn so there's only
-      // ever at most one pending effect per player.
+      // Arm the pending effect on player state (W66a: the ONLY carrier). Overwrites any previous armed entry — HOPT enforces 1/turn so
+      // there's only ever at most one pending effect per player.
       ps._handOfDeathArmed = {
         armedOnTurn: gs.turn,
         casterHeroIdx: heroIdx, casterHeroOwner: ctx.cardHeroOwner ?? pi,   // Als Befund 29.9.: Brettseite des Wirkers
@@ -161,191 +263,7 @@ module.exports = {
       });
       engine.sync();
       // No `_spellPlacedOnBoard` — the Spell flows through the
-      // standard hand → discard disposition.
-    },
-
-    /**
-     * Delayed trigger — fires at the END of the OPPONENT's NEXT turn.
-     *   `gs.turn === armedOnTurn + 1  AND  gs.activePlayer !== ownerIdx`
-     *
-     * Skips the cast-turn end (active player is still the caster) and
-     * fires on the very next turn-end after the opponent's turn rolls
-     * back through end-of-turn handling.
-     */
-    onTurnEnd: async (ctx) => {
-      // Only listen from discard. `_ensurePileListeners` auto-tracks
-      // an instance for the discarded card name, so the listener fires
-      // even though `onPlay` doesn't manually re-track.
-      if (ctx.card.zone !== 'discard') return;
-
-      const engine = ctx._engine;
-      const gs = engine.gs;
-      const ownerIdx = ctx.card.originalOwner ?? ctx.cardOwner;
-      const ps = gs.players[ownerIdx];
-      if (!ps) return;
-
-      const armed = ps._handOfDeathArmed;
-      if (!armed || typeof armed.armedOnTurn !== 'number') return;
-
-      // ── Trigger window: end of OPPONENT's NEXT turn ──
-      if (gs.turn !== armed.armedOnTurn + 1 || gs.activePlayer === ownerIdx) return;
-
-      // Claim the armed slot immediately. Multiple HoD instances may
-      // share the discard pile (e.g. casts across different turns) —
-      // clearing the flag here ensures only one listener resolves
-      // the effect.
-      delete ps._handOfDeathArmed;
-
-      // ── User-status gate ──
-      const userHeroIdx = armed.casterHeroIdx;
-      const userSeite = armed.casterHeroOwner ?? ownerIdx;   // Als Befund 29.9.: Brettseite des Wirkers
-      const userHero = gs.players[userSeite]?.heroes?.[userHeroIdx];
-      if (!userHero?.name || userHero.hp <= 0) {
-        engine.log('hand_of_death_fizzle', {
-          player: ps.username, reason: 'user_defeated',
-        });
-        return;
-      }
-      if (userHero.statuses?.frozen) {
-        engine.log('hand_of_death_fizzle', {
-          player: ps.username, reason: 'user_frozen',
-        });
-        return;
-      }
-      if (userHero.statuses?.stunned || userHero.statuses?.webbed) {
-        engine.log('hand_of_death_fizzle', {
-          player: ps.username, reason: 'user_stunned',
-        });
-        return;
-      }
-
-      // Caster flourish — same dark-swarm cue tying the trigger to the
-      // user before the picker opens.
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'dark_swarm', owner: userSeite,   // Als Befund 29.9.: Brettseite des Wirkers
-        heroIdx: userHeroIdx, zoneSlot: -1,
-      });
-      await engine._delay(300);
-
-      // ── Prompt: pick any target ──
-      // `dealsDamage: false` opts out of damage-mitigation post-target
-      // reactions (Spectral Armor / Bamboo Shield / Sculpture Guards).
-      // `damageType: 'destruction_spell'` keeps the school tag.
-      const sourceMeta = {
-        name: CARD_NAME, owner: ownerIdx, heroIdx: userHeroIdx, heroOwner: userSeite,   // Als Befund 29.9.: Brettseite des Wirkers
-        controller: ownerIdx,
-      };
-      const target = await ctx.promptDamageTarget({
-        side: 'any',
-        types: ['hero', 'creature'],
-        damageType: 'destruction_spell',
-        dealsDamage: false,
-        title: CARD_NAME,
-        description: 'Choose any target — it is defeated.',
-        confirmLabel: '💀 Defeat!',
-        confirmClass: 'btn-danger',
-        cancellable: true,
-      });
-
-      if (!target) {
-        engine.log('hand_of_death_fizzle', {
-          player: ps.username, reason: 'cancelled',
-        });
-        return;
-      }
-
-      // ── Resolve the defeat ──
-      let defeated = false;
-      if (target.type === 'hero') {
-        const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
-        if (hero?.name && hero.hp > 0) {
-
-          // Anti Magic gate (Lv 1 Destruction Spell — covered by AM 1+).
-          if (engine._isHeroSpellProtected(hero, CARD_NAME)) {
-            engine.log('hand_of_death_blocked', {
-              target: hero.name, reason: 'magic_immune',
-            });
-            engine._playAntiMagicBlockedAnim(hero);
-            return; // No defeat → no skip-next-turn rider.
-          }
-
-          // Resistance gate (and any other `BEFORE_HERO_EFFECT`
-          // listener). The hook gives Resistance — and future
-          // similar non-damage-effect-cancellers — a chance to
-          // cancel before any visible mutation lands.
-          const blockCtx = {
-            playerIdx: target.owner,
-            heroIdx: target.heroIdx,
-            hero,
-            effectType: 'defeat',
-            cancelled: false,
-            _skipReactionCheck: true,
-          };
-          await engine.runHooks('beforeHeroEffect', blockCtx);
-          if (blockCtx.cancelled) {
-            engine.log('hand_of_death_blocked', {
-              target: hero.name, reason: 'effect_cancelled',
-            });
-            return; // No defeat → no skip-next-turn rider.
-          }
-
-          // ── Strike animation — the flashy bit ──
-          // Anchored to the target Hero's slot. Pass `duration` to keep
-          // the component mounted through its full 1700ms lifespan.
-          engine._broadcastEvent('play_zone_animation', {
-            type: 'hand_of_death_strike',
-            owner: target.owner, heroIdx: target.heroIdx, zoneSlot: -1,
-            duration: 1700,
-          });
-          await engine._delay(900); // sync the defeat with the impact
-
-          const result = await engine.actionDefeatHero(sourceMeta, hero);
-          defeated = !!result?.defeated;
-
-          // Let the strike animation finish blooming after the defeat
-          // numbers settle.
-          await engine._delay(400);
-        }
-      } else {
-        // 'equip' / 'creature' — a Creature in a Support Zone.
-        const inst = target.cardInstance || engine.kreaturAnBrett(target.owner, target.heroIdx, target.slotIdx);   // Z1: Brettseite
-        if (inst && inst.zone === 'support') {
-          // ── Strike animation on the Creature's slot ──
-          engine._broadcastEvent('play_zone_animation', {
-            type: 'hand_of_death_strike',
-            owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
-            duration: 1700,
-          });
-          await engine._delay(900);
-
-          // `actionDestroyCard` handles every creature immunity
-          // (Cardinal Beast, Defending the Gate, first-turn shield,
-          // _stealImmortal, _damageDestroyImmune, Sparkfly Attendant
-          // gift, etc.) internally and is silent on success/failure.
-          // Sniff `inst.zone` post-call to verify the destroy landed.
-          await engine.actionDestroyCard(sourceMeta, inst);
-          defeated = inst.zone !== 'support';
-
-          await engine._delay(400);
-        }
-      }
-
-      // ── Skip-next-turn rider ──
-      // Only when a target was actually defeated. Uses the engine's
-      // canonical `_skipNextTurn` flag (Guardian Beast Zhu's
-      // mechanism) — `switchTurn` reads it and skips the player's
-      // upcoming turn automatically.
-      if (defeated) {
-        ps._skipNextTurn = true;
-        engine.log('hand_of_death_skip_turn', {
-          player: ps.username, target: target.cardName,
-        });
-      }
-
-      engine.log('hand_of_death_resolved', {
-        player: ps.username, target: target.cardName, defeated,
-      });
-      engine.sync();
+      // standard hand → discard disposition (or Inya's Fantasy Buddy).
     },
   },
 };

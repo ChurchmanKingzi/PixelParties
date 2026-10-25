@@ -123,22 +123,20 @@ module.exports = {
     const sources = _availableDivinitySources(ps, engine, pi);
     if (sources.length === 0) return; // Defensive — reactionCondition gated this.
 
-    // Source pick — only prompt when both hand and deck have copies.
+    // Source pick — EIN Picker mit Herkunfts-Label (CARD_API „Mehrere Quellen = ein Picker"): die Divinity erscheint je Quelle (HAND / DECK, mit Anzahl) in einer Galerie;
+    // mit nur einer Quelle gibt es nichts zu wählen (kein Dialog).
     let pickedSource;
     if (sources.length === 1) {
       pickedSource = sources[0].source;
     } else {
       const sourceRes = await engine.promptGeneric(pi, {
-        type: 'optionPicker',
+        type: 'cardGallery',
+        cards: sources.map(s => ({ name: DIVINITY, source: s.source, count: s.count })),
         title: CARD_NAME,
-        description: 'Pick a "Divinity" from where?',
-        options: sources.map(s => ({
-          id: s.source,
-          label: `${s.source === 'hand' ? '✋' : '📚'}  From your ${s.source} (${s.count} available)`,
-        })),
+        description: 'Take "Divinity" from your hand or from your deck?',
         cancellable: false,
       });
-      pickedSource = sourceRes?.optionId || sources[0].source;
+      pickedSource = sources.some(s => s.source === sourceRes?.source) ? sourceRes.source : sources[0].source;
     }
 
     // Hero pick (W28a: alle vom Spieler KONTROLLIERTEN Helden, auch uebernommene Gegnerhelden).
@@ -147,6 +145,7 @@ module.exports = {
 
     let ziel = null;           // { phys, heroIdx }
     let explicitZone = -1;
+    let explicitSupport = -1;
     if (helden.length === 1) {
       ziel = helden[0];
     } else if (helden.every(h => h.phys === pi)) {
@@ -171,6 +170,7 @@ module.exports = {
         const hi = typeof pickRes.heroIdx === 'number' ? pickRes.heroIdx : helden[0].heroIdx;
         ziel = helden.find(h => h.heroIdx === hi) || helden[0];
         explicitZone = typeof pickRes.zoneSlot === 'number' ? pickRes.zoneSlot : -1;
+        explicitSupport = typeof pickRes.supportSlot === 'number' ? pickRes.supportSlot : -1;
       }
     } else {
       // Mit uebernommenem Gegnerhelden unter den Zielen: Heldenwahl ueber Brett-Klick (die Anlege-Maske
@@ -232,12 +232,12 @@ module.exports = {
     // when given, else stack onto an existing Divinity slot (cap 3) or
     // fall back to the first free slot. Same tie-breaker the standard
     // ability-attach path uses.
-    const abZones = hps.abilityZones[targetHeroIdx] || [[], [], []];
-    hps.abilityZones[targetHeroIdx] = abZones;
     // v1349: gewuenschter Platz und Rueckfall an EINER Stelle
-    // (`engine.abilityZielZone` — verwahrte Abilities, Madame Guillotine).
-    const targetZone = engine.abilityZielZone(feld, targetHeroIdx, DIVINITY, { wunschZone: explicitZone });
-    if (targetZone < 0) {
+    // (`engine.abilityZielOrt` — verwahrte Abilities, Madame Guillotine; 24.10.: auch Support Zonen — Xal).
+    const ort = engine.abilityZielOrt(feld, targetHeroIdx, DIVINITY, {
+      wunschZone: explicitZone, wunschSupport: explicitSupport, wunschArt: explicitSupport >= 0 ? 'support' : undefined,
+    });
+    if (!ort) {
       // Race: zones filled between the canAttach check and the splice.
       // Refund the Divinity back to its source pile so it isn't lost.
       if (pickedSource === 'hand') engine.handZugangSync(ps, DIVINITY, { von: 'rueckgabe', source: CARD_NAME, ohneInstanz: true });
@@ -249,10 +249,8 @@ module.exports = {
       return;
     }
 
-    if (!abZones[targetZone]) abZones[targetZone] = [];
-    abZones[targetZone].push(DIVINITY);
 
-    const inst = engine._trackCard(DIVINITY, feld, 'ability', targetHeroIdx, targetZone);
+    const inst = engine.abilityOrtBelegen(feld, targetHeroIdx, DIVINITY, ort);
     if (fremd) inst.originalOwner = pi;   // W28a: die Karte gehoert dem Spieler (wie `attachAbilityFromHand` bei geliehenem Helden)
 
     // Deck-source etiquette — reveal to opponent and reshuffle. Mirrors
@@ -270,17 +268,10 @@ module.exports = {
       });
     }
 
-    await engine.runHooks('onPlay', {
-      _onlyCard: inst, playedCard: inst, cardName: DIVINITY,
-      zone: 'ability', heroIdx: targetHeroIdx, _skipReactionCheck: true,
-    });
-    await engine.runHooks('onCardEnterZone', {
-      enteringCard: inst, toZone: 'ability', toHeroIdx: targetHeroIdx,
-      _skipReactionCheck: true,
-    });
+    await engine.abilityOrtHooks(inst, ort, { _skipReactionCheck: true });
 
     engine._broadcastEvent('ability_activated', {
-      owner: feld, heroIdx: targetHeroIdx, zoneIdx: targetZone,
+      owner: feld, heroIdx: targetHeroIdx, zoneIdx: ort.slot, zoneKind: ort.art,
       abilityName: DIVINITY,
     });
 
@@ -288,7 +279,7 @@ module.exports = {
       player: ps.username,
       from: pickedSource,
       to: hps.heroes[targetHeroIdx]?.name,
-      zone: targetZone,
+      zone: ort.slot,
     });
     engine.sync();
   },

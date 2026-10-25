@@ -78,11 +78,24 @@ module.exports = {
             }
           }
         }
-        return zones;
+        // ★ W62a: mit Alice-Teilung ist auch die Zone einer GLEICHNAMIGEN Creature ein Ziel (Slime in einen Slime-Stapel); W63a (Al): geteilte Zone zuerst.
+        if (forCardName) {
+          const { canShareInto } = require('./_alice-shared');
+          for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
+            if (!hero?.name || hero.hp <= 0) continue;
+            if (!engine.isCreatureSummonable(forCardName, physOwner, hi, { _bypassBeforeSummon: true })) continue;
+            for (let s = 0; s < 3; s++) {
+              if (!canShareInto(engine, pi, hi, s, forCardName, physOwner)) continue;
+              const tiefe = ((gs[physOwner]?.supportZones?.[hi] || [])[s] || []).length;
+              zones.push({ heroIdx: hi, slotIdx: s, owner: physOwner, shared: true, label: `${hero.name} — Support ${s + 1} (×${tiefe})` });
+            }
+          }
+        }
+        return require('./_alice-shared').geteiltZuerst(zones);   // W63a (Al, 22.10.2026): erst die geteilte Zone, DANN die erste leere
       };
 
-      // Fizzle if no free zones anywhere (sentinel — name-agnostic)
-      if (getFreeZones().length === 0) { await engine.summonEffektFizzelt(ctx.card, 'Cloudy Slime', { playerIdx: pi, grund: 'zone_taken' }); return; }
+      // Fizzle if no free zones anywhere (sentinel — name-agnostic; W62a: oder eine geteilte Zone fuer eine der Handkarten)
+      if (getFreeZones().length === 0 && !eligibleCards.some(c => getFreeZones(c.name).length > 0)) { await engine.summonEffektFizzelt(ctx.card, 'Cloudy Slime', { playerIdx: pi, grund: 'zone_taken' }); return; }
 
       // Step 1: Confirm
       const confirmed = await ctx.promptConfirmEffect({
@@ -160,9 +173,7 @@ module.exports = {
         const hi = zone.heroIdx;
         const si = zone.slotIdx;
         const feld = zone.owner;
-        const fps = gs[feld];
-        if (!fps.supportZones[hi]) fps.supportZones[hi] = [[], [], []];
-        fps.supportZones[hi][si] = [cardName];
+        engine.zoneEintragen(feld, hi, si, cardName, pi);   // W62a: gleichnamige Kreatur (Alice) → dazustapeln statt ueberschreiben
 
         // Track card instance with placement flag
         const inst = engine._trackCard(cardName, feld, 'support', hi, si);

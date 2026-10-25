@@ -97,6 +97,7 @@ module.exports = {
         await engine.addHeroStatus(physOwner, hi, STATUS, {
           expiresAtTurn,
           expiresForPlayer: pi,
+          fristBeginn: true,   // W68a: „until the beginning of your next turn"
           appliedBy: pi,
           source: CARD_NAME,
           animationType: 'dark_swarm',

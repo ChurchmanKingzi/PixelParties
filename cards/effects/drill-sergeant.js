@@ -69,8 +69,14 @@ function eligibleHandCards(engine, pi) {
 }
 
 /** Freie Support Zones (inkl. Insel) des Helden, unter dem der Sergeant liegt (Brettseite `seite`, Q74). */
-function targetZones(engine, seite, heroIdx) {
-  return engine.getFreeSupportZones(seite).filter(z => z.heroIdx === heroIdx);
+function targetZones(engine, seite, heroIdx, pi = seite, cardName = null) {
+  // W62a: mit `cardName` zaehlt — bei Alice-Teilung des Kontrolleurs `pi` — auch die Zone einer GLEICHNAMIGEN Creature (`beschwoerZonenFuer`).
+  return engine.beschwoerZonenFuer(pi, cardName, { seite, heroIdx });
+}
+
+/** Handkarten, fuer die der Held des Sergeants mindestens eine Zone hat (frei oder geteilt). */
+function platzierbareKarten(engine, pi, seite, heroIdx) {
+  return eligibleHandCards(engine, pi).filter(c => targetZones(engine, seite, heroIdx, pi, c.name).length > 0);
 }
 
 module.exports = {
@@ -82,8 +88,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const seite = engine.physicalSide(ctx.card) ?? pi;   // Q74: Brettseite des Helden, unter dem der Sergeant liegt
     if (engine.gs.players[pi]?.summonLocked) return false;
-    if (eligibleHandCards(engine, pi).length === 0) return false;
-    return targetZones(engine, seite, ctx.cardHeroIdx).length > 0;
+    return platzierbareKarten(engine, pi, seite, ctx.cardHeroIdx).length > 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -94,10 +99,8 @@ module.exports = {
     const ps      = gs.players[pi];
     const seite   = engine.physicalSide(ctx.card) ?? pi;   // Q74: Brettseite des Helden, unter dem der Sergeant liegt
 
-    const cards = eligibleHandCards(engine, pi);
+    const cards = platzierbareKarten(engine, pi, seite, heroIdx);   // W62a: nur Karten mit Zone (frei oder geteilt)
     if (cards.length === 0) return false;
-    const zones = targetZones(engine, seite, heroIdx);
-    if (zones.length === 0) return false;
 
     const picked = await ctx.promptCardGallery(cards, {
       title: CARD_NAME,
@@ -109,11 +112,13 @@ module.exports = {
     if (!picked || picked.cancelled || !picked.cardName) return false;
     const cardName = picked.cardName;
     if ((ps.hand || []).indexOf(cardName) < 0) return false;
+    const zones = targetZones(engine, seite, heroIdx, pi, cardName);   // W62a: Zonen der gewaehlten Karte
+    if (zones.length === 0) return false;
 
     let dest = zones[0];
     if (zones.length > 1) {
       const zonePick = await ctx.promptZonePick(
-        zones.map(z => ({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, ownerIdx: seite, owner: seite })),
+        zones.map(z => ({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, ownerIdx: seite, owner: seite, ...(z.shared ? { shared: true, stackDepth: z.stackDepth, label: z.label } : {}) })),   // W63a: geteilte Zone (Alice) vorn, mit Kennzeichen
         {
           title: CARD_NAME,
           description: `Choose a free Support Zone for ${cardName}.`,

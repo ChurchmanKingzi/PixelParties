@@ -52,7 +52,7 @@
 
 const { ownSupportCreatures } = require('./_deepsea-shared');
 const { isAreaImmuneInst } = require('./_diver-helmet-shared');
-const { _runMctsSlipperyLoop } = require('./_slippery-shared');
+const { _runMctsSlipperyLoop, teilbarZiel } = require('./_slippery-shared');
 
 const CARD_NAME = 'Slippery Ice';
 
@@ -80,9 +80,12 @@ function destinationsFor(engine, pi, inst) {
     const zones = ps.supportZones?.[hi] || [[], [], []];
     for (let zi = 0; zi < 3; zi++) {
       if ((zones[zi] || []).length === 0) out.push({ heroIdx: hi, slotIdx: zi });
+      // ★ W63a (Al, 22.10.2026: „Solange der Effekt aktiv ist, kann eine Creature in eine geteilte Zone bewegt werden"): mit Alice-Teilung des Kontrolleurs auch die
+      // Zone einer GLEICHNAMIGEN Creature (die Creatures teilen sich die Zone).
+      else if (teilbarZiel(engine, inst, hi, zi)) out.push({ heroIdx: hi, slotIdx: zi, shared: true, stackDepth: zones[zi].length });
     }
   }
-  return out;
+  return out.some(z => z.shared) ? [...out.filter(z => z.shared), ...out.filter(z => !z.shared)] : out;   // Al: erst die geteilte Zone, DANN die erste leere
 }
 
 /**
@@ -119,6 +122,8 @@ async function moveCreature(engine, pi, inst, destHeroIdx, destSlot) {
   const srcZone = (ps.supportZones?.[srcHeroIdx] || [])[srcSlot] || [];
   const idxInSlot = srcZone.indexOf(inst.name);
   if (idxInSlot < 0) return false;
+  // W71b (Al, 25.10.2026): Verschieben durch eine Karte ist ein Effekt auf die Kreatur — Schutzfenster (Cool Rescuer Monia & Co.), VOR der ersten Änderung; negiert = Kreatur bleibt stehen.
+  if (!(await engine.kreaturBetroffen(inst, 'move', { name: 'Slippery Ice', owner: pi }, { sourceOwner: pi, detail: 'slide' }))) return false;
 
   // Suppress stray damage-number overlays on the source slot while it's
   // about to visually empty out.
@@ -231,7 +236,7 @@ module.exports = {
         // auto-slide has already locked in this turn's archetype
         // moves), so stamping `_slipperyMovedTurn` here is a no-op —
         // skip it for parity with the existing Slippery Ice mover.
-        moveOpts: { skipSlipperyMovedMark: true },
+        moveOpts: { skipSlipperyMovedMark: true, fremd: true, fremdName: CARD_NAME },   // W71b: Slippery Ice versetzt Kreaturen = Effekt auf sie (Schutzfenster)
         onLiveMove: (inst) => { movedInstIds.add(inst.id); moved++; },
       });
       if (moved === 0) return false;
@@ -278,7 +283,8 @@ module.exports = {
         const hero = ps.heroes?.[z.heroIdx];
         return {
           heroIdx: z.heroIdx, slotIdx: z.slotIdx,
-          label: `${hero?.name || 'Hero'} — Slot ${z.slotIdx + 1}`,
+          label: `${hero?.name || 'Hero'} — Slot ${z.slotIdx + 1}${z.shared ? ` (×${z.stackDepth})` : ''}`,
+          ...(z.shared ? { shared: true, stackDepth: z.stackDepth } : {}),
         };
       });
       if (destZones.length === 0) {
@@ -305,7 +311,7 @@ module.exports = {
           || stillThere.zoneSlot !== chosenInst.zoneSlot) {
         continue;
       }
-      if (((ps.supportZones[dst.heroIdx] || [])[dst.slotIdx] || []).length > 0) continue;
+      if (((ps.supportZones[dst.heroIdx] || [])[dst.slotIdx] || []).length > 0 && !teilbarZiel(engine, stillThere, dst.heroIdx, dst.slotIdx)) continue;   // W63a: belegt nur ok, wenn geteilt (Alice)
 
       const ok = await moveCreature(engine, activator, stillThere, dst.heroIdx, dst.slotIdx);
       if (ok) {

@@ -148,12 +148,14 @@ async function _playEquip(engine, pi, cardName, cd, cost) {
     // Held der eigenen Spalte ist kein Ausruestungswirt.
     if (seite === pi && engine.heroSideOf(pi, hero) !== pi) continue;
     let firstFree = -1;
+    const _stapelDajan = engine.equipPflichtPlatz(seite, hi, cardName);   // Darion: der Equip-Stapel ist der einzige Platz
     for (let si = 0; si < 3; si++) {
-      if (((zps.supportZones[hi] || [])[si] || []).length === 0) {
+      if (_stapelDajan >= 0 ? si === _stapelDajan : ((zps.supportZones[hi] || [])[si] || []).length === 0) {
         if (firstFree === -1) firstFree = si;
         destTargets.push({
           id: `equip-${seite}-${hi}-${si}`, type: 'equip',
           owner: seite, heroIdx: hi, slotIdx: si, cardName: '',
+          _eigeneStapelWahl: true,   // Darion: ein Zielplatz, keine Karte — die Engine soll im Equip-Stapel nicht „welches Equip?" fragen
         });
       }
     }
@@ -196,7 +198,8 @@ async function _playEquip(engine, pi, cardName, cd, cost) {
     }
     if (destSlot === undefined) return false;
   }
-  if (((dps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0) return false;
+  if (engine.equipPflichtPlatz(destSeite, destHeroIdx, cardName) >= 0) destSlot = engine.equipPflichtPlatz(destSeite, destHeroIdx, cardName);   // Darion: Pflicht-Platz im Equip-Stapel
+  else if (((dps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0) return false;
 
   // Splice from deck right before the placement so a chain negate
   // routes the card to discard from a deck-pulled state.

@@ -80,17 +80,6 @@ function hatAndereLebende(engine, pi, hero, aufgeschobenZaehltMit = true) {
 
 // ─── Abilities anlegen ──────────────────────────────────────────────
 
-/** Erste freie, nicht versiegelte Support-Zone (wie `findAbilitySupportSlot`). */
-function freieSupportZone(engine, hs, heroIdx) {
-  const V = require('./_ability-verwahrung-shared');
-  const zonen = engine.gs.players[hs]?.supportZones?.[heroIdx] || [];
-  const anzahl = Math.max(3, zonen.length);
-  for (let z = 0; z < anzahl; z++) {
-    if ((zonen[z] || []).length === 0 && !V.versiegelt(engine.gs, hs, heroIdx, 'support', z)) return z;
-  }
-  return -1;
-}
-
 /**
  * WOHIN kaeme eine weitere Kopie dieser Ability? Rein lesend.
  * @returns {{kind:'ability'|'support', slot:number}|null} null = passt nicht
@@ -101,22 +90,9 @@ function entscheide(engine, pi, hs, heroIdx, name) {
   if (script.restrictedAttachment) return null;
   if (script.canAttachToHero && !script.canAttachToHero(engine.gs, pi, heroIdx, engine)) return null;
 
-  const stapel = engine.heroAbilityStackOf(hs, heroIdx, name);
-  if (stapel) {
-    if (stapel.level >= 3) return null;
-    if (stapel.zoneKind === 'ability') {
-      return engine.abilityZielZone(hs, heroIdx, name) === stapel.slotIdx
-        ? { kind: 'ability', slot: stapel.slotIdx } : null;
-    }
-    return { kind: 'support', slot: stapel.slotIdx };
-  }
-  const z = engine.abilityZielZone(hs, heroIdx, name);
-  if (z >= 0) return { kind: 'ability', slot: z };
-  if (engine.heroAcceptsAbilitiesInSupport(hs, heroIdx)) {
-    const s = freieSupportZone(engine, hs, heroIdx);
-    if (s >= 0) return { kind: 'support', slot: s };
-  }
-  return null;
+  // 24.10.: EINE Stelle fuer den Zielort (hoechstens ein Stapel je Ability ueber echte UND Support Zonen).
+  const ort = engine.abilityZielOrt(hs, heroIdx, name);
+  return ort ? { kind: ort.art, slot: ort.slot } : null;
 }
 
 /** Alle Abilities der Kartendatenbank, die ueberhaupt eine Skriptdatei haben. */
@@ -154,7 +130,10 @@ async function anlegen(engine, hs, heroIdx, name, ziel) {
   } else {
     if (!ps.supportZones[heroIdx][ziel.slot]) ps.supportZones[heroIdx][ziel.slot] = [];
     ps.supportZones[heroIdx][ziel.slot].push(name);
-    engine._trackCard(name, hs, 'support', heroIdx, ziel.slot);
+    const inst = engine._trackCard(name, hs, 'support', heroIdx, ziel.slot);
+    engine.sync();
+    // 24.10.: auch hier die Anlege-Hooks (Fighting-ATK …) — wie für eine echte Ability Zone.
+    await engine.abilityImSupportBetreten(inst, { _skipReactionCheck: true });
   }
   engine.log('ability_attached', {
     player: ps.username, card: name, hero: ps.heroes?.[heroIdx]?.name || CARD_NAME,

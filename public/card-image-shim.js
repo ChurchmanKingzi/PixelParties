@@ -215,6 +215,7 @@
       if (job.img.__cardTok !== job.tok) { stats.stale++; continue; }
       if (url) stats.applied++; else stats.fallback++;
       setReal(job.img, url || job.orig);                                  // ohne Kunst: ganz normal die Datei vom Server
+      if (url) waermeStufen(job.m);
       // Ein gemerkter Eintrag, der sich nicht dekodieren laesst (beschaedigt), wird verworfen und die Karte neu gezeichnet
       if (url && fromStore.has(url)) job.img.addEventListener('error', () => {
         if (protoDesc.get.call(job.img) !== url) return;                  // inzwischen ein anderes Bild
@@ -276,8 +277,15 @@
     if (!m || failed) { img.__cardOrig = null; return setReal(img, orig); }
     img.__cardOrig = orig;
     queueMicrotask(() => note(img, m));        // erst danach: React setzt `data-card-low` nach `src`
-    if (cache.has(m.id)) { const u = cache.get(m.id); cache.delete(m.id); cache.set(m.id, u); return setReal(img, u); }
+    if (cache.has(m.id)) { const u = cache.get(m.id); cache.delete(m.id); cache.set(m.id, u); img.__cardBase = m.kind + ':' + m.stem; return setReal(img, u); }
     const job = img.__cardJob = { img, m, tok, orig };
+    // ★ NUR EINE VARIANTE DERSELBEN KARTE (Stufe, Kosten, HP-Aufdruck — Fähigkeits-Level-Up, Handkarte wird billiger):
+    // das alte Bild bleibt stehen, bis das neue fertig ist, statt kurz zu verschwinden (Als Befund 23.10.: „die Stufen-Box
+    // hängt einen Moment"), und kommt SOFORT an die Reihe (Stufe 0) statt erst über IntersectionObserver und Leerlauf.
+    const basis = m.kind + ':' + m.stem;
+    const gleicheKarte = img.__cardBase === basis && img.isConnected && protoDesc.get.call(img).startsWith('blob:');
+    img.__cardBase = basis;
+    if (gleicheKarte) { job.low = false; setTimeout(() => { if (img.__cardTok === tok) enqueue(job, 0); }, 0); return; }
     // Eingebaute Bilder zeigen bis zum Rendern eine durchsichtige Fläche (kein Alt-Text-Flackern); `new Image()`
     // bleibt leer, damit onload erst mit der fertigen Karte feuert.
     if (!img.__viaCtor) setReal(img, PLACEHOLDER);
@@ -325,6 +333,24 @@
         }
       }
     }).observe(document, { childList: true, subtree: true });
+  }
+
+  // ★ STUFEN-VARIANTEN VORWÄRMEN (Als Befund 23.10.): Eine Fähigkeitskarte mit drei Textboxen (`skill3`) steht auf dem Brett als
+  // `?stufe=N`; steigt ihre Stufe, wechselt die URL. War die neue Variante noch nie gezeichnet, blieb die Karte (bzw. der Tooltip)
+  // einen Moment leer oder falsch. Darum werden, sobald eine solche Karte (mit oder ohne Stufe) gezeigt wird, die Stufen 1–3 im
+  // Hintergrund bereitgelegt (Blob-URL im Speicher + dekodiert) — der Wechsel ist dann ein Cache-Treffer. Als Handkarte ohne Stufe zählt das
+  // schon im Voraus: bis sie auf dem Brett liegt, sind alle drei Varianten fertig.
+  function waermeStufen(m) {
+    if (m.kind !== 'card' || m.ohne || m.lv != null || m.kost != null) return;
+    const r = resolve(m);
+    const c = r && r.card;
+    if (!c || c.cardType !== 'Ability' || !/^\s*1\)/m.test(c.effect || '') || !/^\s*2\)/m.test(c.effect || '') || !/^\s*3\)/m.test(c.effect || '')) return;
+    for (let st = 1; st <= 3; st++) {
+      const id = 'card:' + m.stem + variantKey({ stufe: st });
+      if (id === m.id || warming.has(id) || (cache.has(id) && pinned.has(id))) continue;
+      warming.add(id);
+      enqueue({ warm: true, m: fromId(id) }, m.stufe != null ? 1 : 3);
+    }
   }
 
   // ── Vorwaermen ──

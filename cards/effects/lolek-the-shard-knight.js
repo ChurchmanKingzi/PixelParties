@@ -24,6 +24,7 @@
 //  steht in `_lolek-shared.js`.
 // ═══════════════════════════════════════════
 
+const { equipZustandHooks } = require('./_hooks');   // W51b: Umhaengen (Fridge/Ceremony) als Verlassen+Betreten sehen
 const {
   BASE_LOLEK, TRIDENT_NAME, HELMET_NAME, halfCost, equippableEntries,
   hasDestination, chooseAndEquip, checkLolekAscension, hasEquipped,
@@ -142,7 +143,9 @@ module.exports = {
     return ok;
   },
 
-  hooks: {
+  hooks: equipZustandHooks({
+    // W51b: `equipZustandHooks` — Umhaengen (Slippery Fridge / Inheritance Ceremony) sendet Enter/Leave nur an die bewegte Karte; dieser Zustandslauscher bekommt es ueber
+    // `onEquipLost` / `onEquipGained` (isMove) mit denselben Handlern (siehe _hooks.js).
     // Styx 28.9.: Pruefung auf der Brettseite des Helden (`cardHeroOwner`).
     onGameStart: (ctx) => {
       checkLolekAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, null);
@@ -160,5 +163,5 @@ module.exports = {
       // `ctx.card` ist der Lauscher, die gehende Karte `ctx.leavingCard`.
       checkLolekAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, ctx.leavingCard?.id);
     },
-  },
+  }),
 };

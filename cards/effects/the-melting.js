@@ -119,7 +119,7 @@ module.exports = {
     for (const z of alleGefrorenen(engine)) {                       // erneut: wer jetzt noch gefroren ist
       const weg = z.type === 'hero'
         ? engine.cleanseHeroStatuses(z.obj, z.owner, z.heroIdx, [STATUS], CARD_NAME)
-        : engine.cleanseCreatureStatuses(z.obj, [STATUS], CARD_NAME);
+        : await engine.cleanseCreatureStatusesGefragt(z.obj, [STATUS], CARD_NAME);
       if (weg.includes(STATUS)) aufgetaut++;
     }
     engine.sync();

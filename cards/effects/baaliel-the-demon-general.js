@@ -48,6 +48,7 @@
 //  Beschwoerung.
 // ═══════════════════════════════════════════
 
+const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const { hasCardType } = require('./_hooks');
 const {
@@ -66,7 +67,7 @@ function freeSummonUsed(gs, pi, heroIdx) {
 
 /** Ist diese Karte ein „Horned Demon"-Creature? */
 function isHornedDemonCreature(cardData) {
-  return !!cardData && hasCardType(cardData, 'Creature') && isHornedDemonName(cardData.name);
+  return !!cardData && hasCardType(cardData, 'Creature') && anyName(cardData, (n) => isHornedDemonName(n));
 }
 
 /** Das besiegte Ziel als Wahrheit: Kreatur ODER Held — beide Hooks laufen hier zusammen. */

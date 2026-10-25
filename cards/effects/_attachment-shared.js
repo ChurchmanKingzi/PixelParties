@@ -305,8 +305,11 @@ async function placeAttachment(ctx, CARD_NAME, host, opts = {}) {
   hps.supportZones[host.heroIdx][slot].push(CARD_NAME);
   const oldInst = engine.cardInstances.find(c => c.owner === pi && c.zone === 'hand' && c.name === CARD_NAME);
   if (oldInst) engine._untrackCard(oldInst.id);
+  // W63c: die Spell-Instanz einer GESTOHLENEN Karte (Herkunft fremd) darf nicht als Geister-Handkarte zurueckbleiben - eine spaetere eigene Kopie
+  // gleichen Namens wuerde sonst ueber den Namens-Notnagel in die Ablage des fremden Besitzers laufen.
+  if (ctx.card && ctx.card !== oldInst && ctx.card.zone === 'hand' && Number.isInteger(ctx.card.originalOwner) && ctx.card.originalOwner !== ctx.card.owner) engine._untrackCard(ctx.card.id);
   const inst = engine._trackCard(CARD_NAME, host.owner, 'support', host.heroIdx, slot);
-  inst.originalOwner = pi;
+  inst.originalOwner = (ctx.card && Number.isInteger(ctx.card.originalOwner)) ? ctx.card.originalOwner : pi;   // W63c: gestohlene Handkarte bleibt Eigentum ihres Besitzers
   inst.turnPlayed = gs.turn || 0;
   gs._spellPlacedOnBoard = true;
   // v651 (Als Befund): die Karte verlaesst die Hand JETZT — nicht erst,

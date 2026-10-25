@@ -210,11 +210,11 @@ function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
             tutorialList.map((t) => (
               <button key={t.tutorialId} className="btn" disabled={t.locked}
                 onClick={() => { if (!t.locked) onStart(t); }}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginBottom: 4, borderColor: 'rgba(255,68,204,.25)', color: t.locked ? 'var(--text2)' : 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start', opacity: t.locked ? 0.55 : 1, cursor: t.locked ? 'not-allowed' : 'pointer' }}>
-                <span style={{ color: t.locked ? 'var(--text2)' : (t.completed ? '#33ff88' : 'var(--bg4)'), fontSize: 16, width: 20, textAlign: 'center' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginBottom: 4, borderColor: 'rgba(251,30,169,.25)', color: t.locked ? 'var(--text2)' : 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start', opacity: t.locked ? 0.55 : 1, cursor: t.locked ? 'not-allowed' : 'pointer' }}>
+                <span style={{ color: t.locked ? 'var(--text2)' : (t.completed ? '#4ceb70' : 'var(--bg4)'), fontSize: 16, width: 20, textAlign: 'center' }}>
                   {t.locked ? '🔒' : (t.completed ? '✓' : '○')}
                 </span>
-                <span style={{ color: t.locked ? 'var(--text2)' : '#ff44cc', fontSize: 11, width: 24, flexShrink: 0 }}>{t.num}.</span>
+                <span style={{ color: t.locked ? 'var(--text2)' : '#fb1ea9', fontSize: 11, width: 24, flexShrink: 0 }}>{t.num}.</span>
                 <span style={{ flex: 1 }}>{t.name}</span>
                 {t.locked
                   ? <span style={{ fontSize: 9, color: 'var(--text2)' }}>LOCKED</span>
@@ -224,8 +224,8 @@ function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
           )}
           {/* Always-available rules entry — bottom-most, never locked. */}
           <button className="btn" onClick={onViewRules}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginTop: 10, borderColor: 'rgba(255,68,204,.45)', color: 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start', cursor: 'pointer' }}>
-            <span style={{ color: '#ff44cc', fontSize: 16, width: 20, textAlign: 'center' }}>📜</span>
+            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginTop: 10, borderColor: 'rgba(251,30,169,.45)', color: 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start', cursor: 'pointer' }}>
+            <span style={{ color: '#fb1ea9', fontSize: 16, width: 20, textAlign: 'center' }}>📜</span>
             <span style={{ flex: 1, fontWeight: 700 }}>View Rules</span>
           </button>
         </div>
@@ -244,7 +244,7 @@ function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
 //  served from /data/animated_screen/layers2/. Purely cosmetic; sits behind
 //  the auth panel and is pointer-events:none.
 // ═══════════════════════════════════════════
-const ANIM_LAYERS_DIR = '/data/animated_screen/layers2/';
+const ANIM_LAYERS_DIR = window.PP_RETRO ? '/data/animated_screen/layers2-retro/' : '/data/animated_screen/layers2/';
 
 // ── ZUSCHNITT DER KULISSEN-EBENEN (v1265, Al 22.9.: „der Login-Screen
 // ruckelt") ─────────────────────────────────────────────────────────────
@@ -322,7 +322,7 @@ function animEbene(file, extra = {}, { versatzX } = {}) {
 function AnimatedTitleBackdrop() {
   // 46 randomized rising embers, generated once (see README §7).
   const embers = useMemo(() => {
-    const colors = ['#ffd36b', '#ff8a3d', '#ff5a4d', '#ffe9a8', '#ffffff'];
+    const colors = ['#ffd066', '#e37435', '#fe5154', '#f9ecb3', '#ffffff'];
     return Array.from({ length: 46 }, () => {
       const size = 2 + Math.random() * 5;
       return {
@@ -828,10 +828,10 @@ function AuthScreen() {
                     disabled={loading}
                   >
                     <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-                      <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/>
-                      <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/>
-                      <path fill="#FBBC05" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.05l3.01-2.33z"/>
-                      <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.47.89 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/>
+                      <path fill="#4580f6" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/>
+                      <path fill="#2ca058" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/>
+                      <path fill="#ffc61c" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.05l3.01-2.33z"/>
+                      <path fill="#e92f38" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.47.89 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/>
                     </svg>
                     {/* Wortgleich mit dem Knopf, den Google zeichnet — sonst
                         stehen im Desktop-Gehaeuse und im Browser zwei
@@ -1200,7 +1200,7 @@ function MenuLeaderboardPanel({ top, height }) {
                     + (p.rank <= 3 ? ' menu-lb-medal rank-' + p.rank : '')
                     + (p.username === user.username ? ' is-me' : '')}>
                   <span className={'menu-lb-rank' + (p.rank <= 3 ? ' top' : '')}>{p.rank}</span>
-                  <span className="menu-lb-name" style={{ color: p.color || 'var(--accent)', '--pp-umriss': ppUmrissFarbe(p.color || '#00f0ff') }}>{p.username}</span>
+                  <span className="menu-lb-name" style={{ color: p.color || 'var(--accent)', '--pp-umriss': ppUmrissFarbe(p.color || '#66b6ff') }}>{p.username}</span>
                   <span className="menu-lb-elo">{p.elo}</span>
                 </li>
               ))}
@@ -1408,7 +1408,7 @@ function PixelParticles({
         // Ueberwiegend Spielerfarbe, ein Drittel weiss fuer den Funkeleffekt.
         color: farben
           ? farben[Math.floor(Math.random() * farben.length)]
-          : (Math.random() < 0.34 ? '#ffffff' : 'var(--player-color, #00f0ff)'),
+          : (Math.random() < 0.34 ? '#ffffff' : 'var(--player-color, #66b6ff)'),
       });
     }
     return arr;
@@ -1452,7 +1452,7 @@ function LogoParticles() {
  * Die Form (Pixel-Kreuz) und der Takt stehen in style.css
  * (`.pp-sc-glitzer-teil`).
  */
-const SC_GLITZER_FARBEN = ['#fff6b0', '#ffd700', '#ffe766', '#ffffff'];
+const SC_GLITZER_FARBEN = ['#f7f7ad', '#fad54a', '#ffe469', '#ffffff'];
 // v1289: auch die SC-Plakette im Spielerprofil-Popup glitzert.
 window.ScGlitzer = ScGlitzer;
 function ScGlitzer() {
@@ -1972,10 +1972,10 @@ function MainMenu() {
            // The player's own colour, exposed as a custom property so the
            // ornate frames on the menu strip + side panels can all pick it
            // up via inheritance.
-           '--player-color': user.color || '#00f0ff',
+           '--player-color': user.color || '#66b6ff',
            // Konturfarbe fuer Spielername und Logo-Aussenkante: schwarz,
            // bei sehr dunkler Spielerfarbe weiss (ppUmrissFarbe).
-           '--pp-umriss': ppUmrissFarbe(user.color || '#00f0ff'),
+           '--pp-umriss': ppUmrissFarbe(user.color || '#66b6ff'),
            // Once the collapsed-state top is captured, anchor it via
            // `padding-top` + `flex-start` so submenu toggles only
            // grow the menu downward.
@@ -2028,10 +2028,10 @@ function MainMenu() {
               Beschriftung, Glanz und Schlagschatten (CSS .menu-stat-badge). */}
           {/* v1264 (Al 22.9.): dieselben inneren Pixel-Ecken wie die grossen
               Menuekaesten (`pp-eckzier`, eine Definition fuer beide). */}
-          <span className="badge menu-stat-badge pp-eckzier" style={{ background: 'color-mix(in srgb, var(--player-color, #00f0ff) 14%, var(--menu-surface))', color: 'var(--player-color, #00f0ff)' }}>
+          <span className="badge menu-stat-badge pp-eckzier" style={{ background: 'color-mix(in srgb, var(--player-color, #66b6ff) 14%, var(--menu-surface))', color: 'var(--player-color, #66b6ff)' }}>
             <span className="menu-stat-label">⚔ ELO</span><span className="menu-stat-value">{user.elo}</span>
           </span>
-          <span className="badge menu-stat-badge menu-stat-badge--sc pp-eckzier" style={{ background: 'color-mix(in srgb, #ffd700 12%, var(--menu-surface))', color: '#ffd700' }}>
+          <span className="badge menu-stat-badge menu-stat-badge--sc pp-eckzier" style={{ background: 'color-mix(in srgb, #fad54a 12%, var(--menu-surface))', color: '#fad54a' }}>
             <span className="menu-stat-coin-wrap"><img src="/data/sc.png" className="menu-stat-coin" /><ScGlitzer /></span><span className="menu-stat-label">SC</span><span className="menu-stat-value">{user.sc || 0}</span>
           </span>
         </div>
@@ -2183,11 +2183,11 @@ function MainMenu() {
                     const s = remainSec % 60;
                     const tStr = (h > 0 ? `${h}h ` : '') + `${m}m ${String(s).padStart(2, '0')}s`;
                     // Player colour normally; red once under an hour remains.
-                    const timerColor = remainSec < 3600 ? '#ff4444' : 'var(--player-color)';
+                    const timerColor = remainSec < 3600 ? '#f03232' : 'var(--player-color)';
                     return (
                       <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text2)' }}>
                         {daily.claimedBig ? (
-                          <div style={{ color: '#33ff88', marginBottom: 6 }}>
+                          <div style={{ color: '#4ceb70', marginBottom: 6 }}>
                             ✓ Big bonus claimed (+{daily.claimedBig} <CoinIcon size={12} />) — extra wins with 2+ Heroes now give <b>+{daily?.betraege?.wiederholung ?? 5} <CoinIcon size={12} /></b> each.
                           </div>
                         ) : (
@@ -2232,7 +2232,7 @@ function MainMenu() {
                 ['easy', 'medium', 'hard', 'impossible'].map(diff => {
                   const puzzles = puzzleList.filter(p => p.difficulty === diff);
                   if (puzzles.length === 0) return null;
-                  const diffColors = { easy: '#33ff88', medium: '#ffaa00', hard: '#ff4444', impossible: '#c455ff' };
+                  const diffColors = { easy: '#4ceb70', medium: '#f9ac20', hard: '#f03232', impossible: '#a952ff' };
                   // v1402: Betrag kommt vom Server (Anzeige = Auszahlung).
                   const scReward = { [diff]: puzzles[0]?.scBetrag ?? 0 };
                   return (
@@ -2244,7 +2244,7 @@ function MainMenu() {
                       {puzzles.map(p => (
                         <button key={p.puzzleId} className="btn" onClick={() => startPuzzleAttempt(p)}
                           style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginBottom: 4, borderColor: diffColors[diff] + '44', color: 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start' }}>
-                          <span style={{ color: p.completed ? '#33ff88' : 'var(--bg4)', fontSize: 16, width: 20, textAlign: 'center' }}>{p.completed ? '✓' : '○'}</span>
+                          <span style={{ color: p.completed ? '#4ceb70' : 'var(--bg4)', fontSize: 16, width: 20, textAlign: 'center' }}>{p.completed ? '✓' : '○'}</span>
                           <span style={{ flex: 1 }}>{p.name}</span>
                           {p.completed && <span style={{ fontSize: 9, color: 'var(--text2)' }}>CLEARED</span>}
                         </button>
@@ -2276,13 +2276,13 @@ function MainMenu() {
 // ═══════════════════════════════════════════
 
 const RANK_TIERS = [
-  { name: 'BRONZE',       min: 0,    color: '#cd7f32', glow: 'rgba(205,127,50,.5)',  icon: '⬡' },
-  { name: 'SILVER',       min: 1200, color: '#c0c0c0', glow: 'rgba(192,192,192,.5)', icon: '⬡' },
-  { name: 'GOLD',         min: 1400, color: '#ffd700', glow: 'rgba(255,215,0,.5)',    icon: '⬡' },
-  { name: 'PLATINUM',     min: 1600, color: '#a8e8f0', glow: 'rgba(168,232,240,.5)', icon: '◈' },
-  { name: 'DIAMOND',      min: 1800, color: '#b9f2ff', glow: 'rgba(185,242,255,.6)', icon: '◆' },
-  { name: 'MASTER',       min: 2000, color: '#ff44cc', glow: 'rgba(255,68,204,.5)',   icon: '✦' },
-  { name: 'GRANDMASTER',  min: 2200, color: '#ff8800', glow: 'rgba(255,136,0,.6)',    icon: '♛' },
+  { name: 'BRONZE',       min: 0,    color: '#be680e', glow: 'rgba(190,104,14,.5)',  icon: '⬡' },
+  { name: 'SILVER',       min: 1200, color: '#b9b9b9', glow: 'rgba(185,185,185,.5)', icon: '⬡' },
+  { name: 'GOLD',         min: 1400, color: '#fad54a', glow: 'rgba(250,213,74,.5)',    icon: '⬡' },
+  { name: 'PLATINUM',     min: 1600, color: '#b6eff7', glow: 'rgba(182,239,247,.5)', icon: '◈' },
+  { name: 'DIAMOND',      min: 1800, color: '#b6eff7', glow: 'rgba(182,239,247,.6)', icon: '◆' },
+  { name: 'MASTER',       min: 2000, color: '#fb1ea9', glow: 'rgba(251,30,169,.5)',   icon: '✦' },
+  { name: 'GRANDMASTER',  min: 2200, color: '#ff8b1a', glow: 'rgba(255,139,26,.6)',    icon: '♛' },
 ];
 
 function getRank(elo) {
@@ -2295,6 +2295,18 @@ function getRank(elo) {
 // v1464: Schalter in der Optik von „Play Animations" (Pille mit Knopf),
 // für alle Einstellungen im Profil. `gesperrt`: ausgegraut, nicht bedienbar
 // (Dynamic Heroes ohne Display Heroes). Erklärung als Hover-Tooltip.
+// Pixelart-Schalter: eingekerbter Block mit eckigem Knopf, der in ganzen Schritten springt; ON/OFF steht als Pixelschrift auf der freien Seite.
+function PixelSchalter({ an }) {
+  return (
+    <span className={'pp-schalter' + (an ? ' pp-schalter-an' : '')} aria-hidden="true">
+      <span className="pp-schalter-bahn">
+        <span className="pp-schalter-text">{an ? 'ON' : 'OFF'}</span>
+        <span className="pp-schalter-knopf" />
+      </span>
+    </span>
+  );
+}
+
 function ProfilSchalter({ an, gesperrt, onToggle, label, tipp, zeigeTipp, versteckeTipp }) {
   const klick = () => { if (!gesperrt) onToggle(); };
   return (
@@ -2302,16 +2314,7 @@ function ProfilSchalter({ an, gesperrt, onToggle, label, tipp, zeigeTipp, verste
       onMouseEnter={e => tipp && zeigeTipp && zeigeTipp(e, tipp)}
       onMouseLeave={() => versteckeTipp && versteckeTipp()}
       onClick={klick} role="switch" aria-checked={!!an} aria-disabled={!!gesperrt}>
-      <div style={{
-        width: 40, height: 22, borderRadius: 11, background: an ? 'var(--accent)' : 'var(--bg4)',
-        position: 'relative', transition: 'background 0.2s', flexShrink: 0,
-      }}>
-        <div style={{
-          width: 18, height: 18, borderRadius: '50%', background: '#fff',
-          position: 'absolute', top: 2, left: an ? 20 : 2,
-          transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,.4)',
-        }} />
-      </div>
+      <PixelSchalter an={!!an} />
       <span>{label}</span>
     </div>
   );
@@ -2600,14 +2603,14 @@ function DiscordLinkRow({ isGuest }) {
           <button className="btn" style={{ padding: '6px 14px', fontSize: 10, marginLeft: 'auto', whiteSpace: 'nowrap' }} onClick={makeCode} disabled={busy}>LINK DISCORD</button>
         </div>
       )}
-      {error && <div style={{ fontSize: 10, color: 'var(--danger, #e55)', marginTop: 6 }}>{error}</div>}
+      {error && <div style={{ fontSize: 10, color: 'var(--danger, #e94e53)', marginTop: 6 }}>{error}</div>}
     </div>
   );
 }
 
 function ProfileScreen() {
   const { user, setUser, setScreen, notify, setBgmMode } = useContext(AppContext);
-  const [color, setColor] = useState(user.color || '#00f0ff');
+  const [color, setColor] = useState(user.color || '#66b6ff');
   const [avatar, setAvatar] = useState(user.avatar);
   const [cardback, setCardback] = useState(user.cardback);
   const [victoryMsg, setVictoryMsg] = useState(user.victoryMsg || '');
@@ -2744,7 +2747,7 @@ function ProfileScreen() {
     (user.display_heroes == null ? true : !!user.display_heroes) && (user.dynamic_heroes == null ? true : !!user.dynamic_heroes));
 
   // Dirty tracking — compare against original user values
-  const isDirty = color !== (user.color || '#00f0ff')
+  const isDirty = color !== (user.color || '#66b6ff')
     || avatar !== user.avatar
     || cardback !== user.cardback
     || victoryMsg !== (user.victoryMsg || '')
@@ -2924,7 +2927,7 @@ function ProfileScreen() {
     setShowAvatarGallery(false);
     try {
       const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
-        color: user.color || '#00f0ff', avatar: newAvatar, cardback: user.cardback, bio: user.bio || ''
+        color: user.color || '#66b6ff', avatar: newAvatar, cardback: user.cardback, bio: user.bio || ''
       })});
       setUser(data.user);
     } catch (e) { notify(e.message, 'error'); }
@@ -2936,7 +2939,7 @@ function ProfileScreen() {
     setShowSleeveGallery(false);
     try {
       const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
-        color: user.color || '#00f0ff', avatar: user.avatar, cardback: newSleeve, bio: user.bio || ''
+        color: user.color || '#66b6ff', avatar: user.avatar, cardback: newSleeve, bio: user.bio || ''
       })});
       setUser(data.user);
     } catch (e) { notify(e.message, 'error'); }
@@ -2947,7 +2950,7 @@ function ProfileScreen() {
     setShowBoardGallery(false);
     try {
       const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
-        color: user.color || '#00f0ff', avatar: user.avatar, cardback: user.cardback, bio: user.bio || '', board: newBoard
+        color: user.color || '#66b6ff', avatar: user.avatar, cardback: user.cardback, bio: user.bio || '', board: newBoard
       })});
       setUser(data.user);
     } catch (e) { notify(e.message, 'error'); }
@@ -2998,7 +3001,7 @@ function ProfileScreen() {
   const displayCardback = cardback || '/cardback.png';
 
   return (
-    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #12101f 40%, #0a0a12 100%)' }}>
+    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #08060c 0%, #12101f 40%, #08060c 100%)' }}>
       <div className="top-bar">
         <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>PLAYER PROFILE</h2>
@@ -3085,7 +3088,7 @@ function ProfileScreen() {
                     <img src="/data/sc.png" style={{ width: 96, height: 96, imageRendering: 'pixelated' }} />
                   </div>
                 </div>
-                <span className="orbit-font" style={{ fontSize: 20, fontWeight: 700, color: '#ffd700' }}>{user.sc || 0}</span>
+                <span className="orbit-font" style={{ fontSize: 20, fontWeight: 700, color: '#fad54a' }}>{user.sc || 0}</span>
               </div>
             </div>
 
@@ -3188,7 +3191,7 @@ function ProfileScreen() {
                 <div style={{ paddingTop: 9, paddingBottom: 9, borderBottom: '1px solid var(--bg4)' }}>
                   <div className="profile-section-label">NAME COLOR</div>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                    <input type="color" value={color} onChange={e => setColor(e.target.value)}
+                    <input type="color" value={window.ppSnap ? window.ppSnap(color) : color} onChange={e => setColor(window.ppSnap ? window.ppSnap(e.target.value) : e.target.value)}
                       style={{ width: 44, height: 34, border: '1px solid var(--bg4)', cursor: 'pointer', background: 'none', padding: 0 }} />
                     <span style={{ color, fontWeight: 700, fontSize: 18 }}>{user.username}</span>
                     <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 4 }}>Preview</span>
@@ -3307,8 +3310,8 @@ function ProfileScreen() {
               return (
               <div key={id || 'default'} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px',
                 border: '1px solid ' + (playing ? 'var(--accent)' : (sel === id ? 'var(--text2)' : 'var(--bg4)')), borderRadius: 4,
-                background: playing ? 'rgba(0,240,255,.16)' : (sel === id ? 'rgba(255,255,255,.05)' : 'transparent'),
-                boxShadow: playing ? '0 0 12px rgba(0,240,255,.45), inset 3px 0 0 var(--accent)' : 'none',
+                background: playing ? 'rgba(102,182,255,.16)' : (sel === id ? 'rgba(255,255,255,.05)' : 'transparent'),
+                boxShadow: playing ? '0 0 12px rgba(102,182,255,.45), inset 3px 0 0 var(--accent)' : 'none',
                 opacity: locked ? 0.75 : 1, transition: 'background .15s, box-shadow .15s' }}>
                 <button className="btn" style={{ padding: '4px 10px', fontSize: 11, minWidth: 34 }}
                   title={playing ? 'Stop preview' : 'Preview'}
@@ -3616,7 +3619,7 @@ function PurchaseCelebration({ cx, cy, onDone }) {
     const ox = cx ?? canvas.width / 2;
     const oy = cy ?? canvas.height / 2;
     const particles = [];
-    const colors = ['#ffd700', '#ffaa00', '#fff8b0', '#ff00aa', '#00f0ff', '#aaff00', '#ff6600', '#ffffff'];
+    const colors = ['#fad54a', '#f9ac20', '#f7f7ad', '#fb1ea9', '#1aedff', '#b1ff1a', '#f87420', '#ffffff'];
     const shapes = ['star', 'circle', 'diamond', 'spark'];
     // Burst from item position
     for (let i = 0; i < 120; i++) {
@@ -3639,7 +3642,7 @@ function PurchaseCelebration({ cx, cy, onDone }) {
       particles.push({
         x: ox + Math.cos(angle) * dist, y: oy + Math.sin(angle) * dist,
         vx: Math.cos(angle) * 1.5, vy: Math.sin(angle) * 1.5,
-        size: 2 + Math.random() * 4, color: '#ffd700',
+        size: 2 + Math.random() * 4, color: '#fad54a',
         shape: 'spark', life: 1, decay: 0.015 + Math.random() * 0.01,
         rotation: 0, rotSpeed: 0, gravity: 0,
       });
@@ -3901,7 +3904,7 @@ function ShopScreen() {
     else return;
     try {
       const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
-        color: user.color || '#00f0ff', avatar, cardback, bio: user.bio || '', board,
+        color: user.color || '#66b6ff', avatar, cardback, bio: user.bio || '', board,
       })});
       setUser(data.user);
       if (window.playSFX) window.playSFX('ui_click');
@@ -4259,22 +4262,22 @@ function ShopScreen() {
                 <span className="shop-item-zier" aria-hidden="true" />
                 <img src={coverUrl} alt={d.name} draggable={false}
                   style={{ width: '100%', height: 148, objectFit: 'cover', objectPosition: 'center top', borderRadius: 4, opacity: d.owned ? 1 : 0.5 }} />
-                <div style={{ fontSize: 11, textAlign: 'center', padding: '6px 4px 2px', color: isCurrentDefault ? '#33ff88' : (d.owned ? '#ffd700' : 'var(--text2)'), fontWeight: 600 }}>
+                <div style={{ fontSize: 11, textAlign: 'center', padding: '6px 4px 2px', color: isCurrentDefault ? '#4ceb70' : (d.owned ? '#fad54a' : 'var(--text2)'), fontWeight: 600 }}>
                   {d.name}
                 </div>
                 {d.owned ? (
                   isCurrentDefault ? (
-                    <div className="shop-price" style={{ borderColor: '#33ff88', color: '#33ff88' }}>DEFAULT</div>
+                    <div className="shop-price" style={{ borderColor: '#4ceb70', color: '#4ceb70' }}>DEFAULT</div>
                   ) : (
                     <button className="btn" onClick={(e) => { e.stopPropagation(); pickStructureAsDefault(d.id); }}
-                      style={{ padding: '4px 10px', fontSize: 11, marginTop: 4, borderColor: '#ffd700', color: '#ffd700' }}>
+                      style={{ padding: '4px 10px', fontSize: 11, marginTop: 4, borderColor: '#fad54a', color: '#fad54a' }}>
                       SELECT
                     </button>
                   )
                 ) : (
                   <button className="btn" disabled={buying || !canAfford}
                     onClick={(e) => buyStructureDeck(d.structureId, e)}
-                    style={{ padding: '4px 10px', fontSize: 11, marginTop: 4, borderColor: '#ffd700', color: canAfford ? '#ffd700' : 'var(--text2)' }}>
+                    style={{ padding: '4px 10px', fontSize: 11, marginTop: 4, borderColor: '#fad54a', color: canAfford ? '#fad54a' : 'var(--text2)' }}>
                     🔒 {price ?? '?'} <CoinIcon size={13} />
                   </button>
                 )}
@@ -4302,7 +4305,7 @@ function ShopScreen() {
   ];
 
   return (
-    <div className="screen-full shop-screen" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #12101f 40%, #0a0a12 100%)' }}>
+    <div className="screen-full shop-screen" style={{ background: 'linear-gradient(180deg, #08060c 0%, #12101f 40%, #08060c 100%)' }}>
       {/* Shopkeep — pinned to the top-left corner at the same vertical
           level as the "Random X" buttons inside each sub-tab. The sprite
           bobs via a slow CSS float animation (see .shop-antonia-float);
@@ -4332,7 +4335,7 @@ function ShopScreen() {
             </div>
             {randomReveal.label && <div className="shop-reveal-label">{randomReveal.label}</div>}
             {randomReveal.subtitle && <div className="shop-reveal-subtitle">{randomReveal.subtitle}</div>}
-            <button className="btn" style={{ marginTop: 16, padding: '8px 32px', fontSize: 13, borderColor: '#ffd700', color: '#ffd700' }}
+            <button className="btn" style={{ marginTop: 16, padding: '8px 32px', fontSize: 13, borderColor: '#fad54a', color: '#fad54a' }}
               onClick={() => setRandomReveal(null)}>NICE!</button>
           </div>
         </div>
@@ -4341,7 +4344,7 @@ function ShopScreen() {
         <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>SHOP</h2>
         <div style={{ flex: 1 }} />
-        <div className="badge" style={{ background: 'rgba(255,215,0,.12)', color: '#ffd700', display: 'flex', alignItems: 'center', gap: 6, fontSize: 18, padding: '6px 14px' }}>
+        <div className="badge" style={{ background: 'rgba(250,213,74,.12)', color: '#fad54a', display: 'flex', alignItems: 'center', gap: 6, fontSize: 18, padding: '6px 14px' }}>
           <img src="/data/sc.png" style={{ width: 22, height: 22, imageRendering: 'pixelated' }} /> {user.sc || 0}
         </div>
         <VolumeControl />
@@ -4483,7 +4486,7 @@ function RulesScreen({ onBack }) {
   );
 
   return (
-    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #10101d 40%, #0a0a12 100%)' }}>
+    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #08060c 0%, #12101f 40%, #08060c 100%)' }}>
       <div className="top-bar">
         <button className="btn" onClick={goBack}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>RULES</h2>
@@ -4523,18 +4526,18 @@ function RulesScreen({ onBack }) {
           <div className="rules-divider" />
 
           {/* ── HEROES ── */}
-          <SectionTitle id="heroes"><span style={{ color: '#aa44ff' }}>Heroes</span></SectionTitle>
+          <SectionTitle id="heroes"><span style={{ color: '#a040ff' }}>Heroes</span></SectionTitle>
           <div className="rules-card-row">
             <Img src="hero.png" alt="Hero card example" className="rules-card-img" />
             <div className="rules-text-block">
               <p>Heroes are the backbone of your strategy! You start the game with three different ones and have to defeat all enemy Heroes to win.</p>
               <p>Your deck may contain Hero cards, but you can never play new Heroes from your hand to bolster your party!</p>
               <p>Each Hero brings a unique effect, two Starting Abilities, and its own stats to the table, so there's a lot to consider when choosing your perfect Party!</p>
-              <h3 className="rules-sub-title orbit-font" style={{ color: '#4488ff' }}>Starting Abilities</h3>
+              <h3 className="rules-sub-title orbit-font" style={{ color: '#4580f6' }}>Starting Abilities</h3>
               <p>The two Ability cards specified here are attached to that Hero before the start of the game. They do not come from or count as part of your main deck.</p>
-              <h3 className="rules-sub-title orbit-font" style={{ color: '#ff3366' }}>HP</h3>
+              <h3 className="rules-sub-title orbit-font" style={{ color: '#fc1c5f' }}>HP</h3>
               <p>If a Hero's HP drops to 0, it is defeated and grayed out on the board. Its Abilities stay attached to it, and there are ways to revive it, so it is not removed from the board.</p>
-              <h3 className="rules-sub-title orbit-font" style={{ color: '#c0c0c0' }}>Attack</h3>
+              <h3 className="rules-sub-title orbit-font" style={{ color: '#b9b9b9' }}>Attack</h3>
               <p>A Hero's Attack stat is used to determine the damage it deals with Attack cards. Heroes do <strong>NOT</strong> have the inherent ability to attack targets — an Attack card is always necessary!</p>
             </div>
           </div>
@@ -4542,7 +4545,7 @@ function RulesScreen({ onBack }) {
           <div className="rules-divider" />
 
           {/* ── ABILITIES ── */}
-          <SectionTitle id="abilities"><span style={{ color: '#4488ff' }}>Abilities</span></SectionTitle>
+          <SectionTitle id="abilities"><span style={{ color: '#4580f6' }}>Abilities</span></SectionTitle>
           <div className="rules-card-row">
             <Img src="ability.png" alt="Ability card example" className="rules-card-img" />
             <div className="rules-text-block">
@@ -4550,7 +4553,7 @@ function RulesScreen({ onBack }) {
               <p>Each Hero has <strong>three Ability Zones</strong> and can thus have up to three different Abilities attached to it. Additionally, copies of the same Ability on the same Hero are stacked on top of each other in the same Ability Zone, leveling that Ability up. All in all, a Hero can have up to <strong>9 Ability cards</strong> attached to it!</p>
               <p>A player can only attach <strong>one Ability to each of their Heroes every turn</strong>, and Abilities can be used the turn they are attached.</p>
               <p>When a Hero is defeated, its Abilities stay attached to it. They remain on the board, but are <strong>negated</strong> and cannot be activated in any way until that Hero is revived.</p>
-              <h3 className="rules-sub-title orbit-font" style={{ color: '#4488ff' }}>Effects per Level</h3>
+              <h3 className="rules-sub-title orbit-font" style={{ color: '#4580f6' }}>Effects per Level</h3>
               <p>What effect an Ability provides depends on its level, meaning the number of copies attached to that Hero. At one copy (level 1), the top effect applies. At two copies (level 2), it's the middle effect, and at three copies (level 3), it's the bottom.</p>
               <p>If an Ability has a once per turn effect that you can choose to activate during your turn, you can only activate that effect <strong>once during that turn</strong>, even if multiple Heroes have it!</p>
               <p className="rules-callout">You can not choose to use an Ability at a lower level than it has!</p>
@@ -4560,7 +4563,7 @@ function RulesScreen({ onBack }) {
           <div className="rules-divider" />
 
           {/* ── ATTACKS & SPELLS ── */}
-          <SectionTitle id="attacks-spells"><span style={{ color: '#ff3366' }}>Attacks, Spells and Creatures</span></SectionTitle>
+          <SectionTitle id="attacks-spells"><span style={{ color: '#fc1c5f' }}>Attacks, Spells and Creatures</span></SectionTitle>
           <div className="rules-card-row">
             <Img src="spell.png" alt="Spell card example" className="rules-card-img" />
             <div className="rules-text-block">
@@ -4571,27 +4574,27 @@ function RulesScreen({ onBack }) {
             </div>
           </div>
 
-          <h3 className="rules-sub-title orbit-font" style={{ color: '#ff3366' }}>Sub-Types</h3>
+          <h3 className="rules-sub-title orbit-font" style={{ color: '#fc1c5f' }}>Sub-Types</h3>
           <p style={{ marginBottom: 12, fontSize: 17, lineHeight: 1.7 }}>There are 5 total Sub-Types of Attacks, Spells and Creatures. If a card has no icon at the bottom left, it is a "Normal" type — resolved when played and sent to the discard pile.</p>
 
           <div className="rules-subtype-grid">
             <div className="rules-subtype-entry">
-              <div className="rules-school-header" style={{ color: '#ff3366' }}><img src="/rules/icon-attach.png" className="rules-school-icon" /> <span>Attachments</span></div>
+              <div className="rules-school-header" style={{ color: '#fc1c5f' }}><img src="/rules/icon-attach.png" className="rules-school-icon" /> <span>Attachments</span></div>
               <p>Attachments are not sent to the discard pile after use, instead getting attached to a target. Unless stated otherwise, an Attachment can be attached to any Hero, but some specify they can only go to one of your Heroes, an opponent's Hero, or just the user itself. When a Hero is defeated, any Attachments on it are sent to the discard pile.</p>
             </div>
             <div className="rules-subtype-entry">
-              <div className="rules-school-header" style={{ color: '#ff3366' }}><img src="/rules/icon-instant.png" className="rules-school-icon" /> <span>Reactions</span></div>
+              <div className="rules-school-header" style={{ color: '#fc1c5f' }}><img src="/rules/icon-instant.png" className="rules-school-icon" /> <span>Reactions</span></div>
               <p>Like Normal cards, Reactions go to the discard pile after resolving. The difference is that they can only be used in reaction to specific triggers. Reactions will always specify when they can be used — they are the <strong>only sub-type that can be played from your hand during an opponent's turn</strong>.</p>
             </div>
             <div className="rules-subtype-entry">
-              <div className="rules-school-header" style={{ color: '#ff3366' }}><img src="/rules/icon-trap.png" className="rules-school-icon" /> <span>Surprises</span></div>
+              <div className="rules-school-header" style={{ color: '#fc1c5f' }}><img src="/rules/icon-trap.png" className="rules-school-icon" /> <span>Surprises</span></div>
               <p>Surprises are prepared face-down on your side of the board during your turn and then activated once a specific condition is met by flipping them face-up.</p>
               <p>To prepare a Surprise, place it face-down into a Hero's Surprise Zone during your turn. Once prepared, you can activate it at any time — during either player's turn — as long as its condition is met and the preparing Hero is able to activate it.</p>
               <p>To activate a Surprise, the preparing Hero must have the Abilities necessary to activate it and cannot be defeated or otherwise unable to perform an Action (for example by being Stunned). On the other hand, you <strong>can</strong> prepare Surprises with a Hero, even if it does not have the Abilities necessary to activate them.</p>
               <p>After activation, a Surprise resolves and is then sent to the discard pile.</p>
             </div>
             <div className="rules-subtype-entry">
-              <div className="rules-school-header" style={{ color: '#ff3366' }}><img src="/rules/icon-area.png" className="rules-school-icon" /> <span>Areas</span></div>
+              <div className="rules-school-header" style={{ color: '#fc1c5f' }}><img src="/rules/icon-area.png" className="rules-school-icon" /> <span>Areas</span></div>
               <p>Areas provide global effects that either affect both players or that both players can activate. Each player has one Zone for an Area. The Area Zone is not directly associated with a Hero — you may play an Area with any of your Heroes (but you still need at least one Hero able to use it).</p>
               <p>Areas remain in play until they are removed by an effect. You cannot play an Area while you already control an Area.</p>
             </div>
@@ -4604,28 +4607,28 @@ function RulesScreen({ onBack }) {
 
           <div className="rules-schools-grid">
             <div className="rules-school-entry">
-              <div className="rules-school-header" style={{ color: '#c0c0c0' }}><img src="/rules/icon-sword.png" className="rules-school-icon" /> <span>Attacks (Fighting)</span></div>
+              <div className="rules-school-header" style={{ color: '#b9b9b9' }}><img src="/rules/icon-sword.png" className="rules-school-icon" /> <span>Attacks (Fighting)</span></div>
               <p>Attacks are the only type that isn't a Spell School. They specialize in dealing scaling damage, being the only card type that uses a Hero's Attack stat to determine its damage. As such, Attack-based strategies will excel in picking off individual targets.</p>
               <p>Attacks can also have a wide variety of secondary utility effects. The distinction between Attacks, Spells and Creatures is important, because many effects interact with specifically one or the other.</p>
             </div>
             <div className="rules-school-entry">
-              <div className="rules-school-header" style={{ color: '#ff3366' }}><img src="/rules/icon-destruction.png" className="rules-school-icon" /> <span>Destruction Spells</span></div>
+              <div className="rules-school-header" style={{ color: '#fc1c5f' }}><img src="/rules/icon-destruction.png" className="rules-school-icon" /> <span>Destruction Spells</span></div>
               <p>Destruction Spells deal a ton of damage. They often have downsides, such as dealing recoil damage to your own Heroes, giving your opponent ways to counteract the damage, or having conditions a target must fulfill before it takes damage. Where Attacks excel at quickly taking out individual targets, Destruction Spells have by far the best <strong>spread damage</strong> options in the game.</p>
             </div>
             <div className="rules-school-entry">
-              <div className="rules-school-header" style={{ color: '#aa44ff' }}><img src="/rules/icon-decay.png" className="rules-school-icon" /> <span>Decay Spells</span></div>
+              <div className="rules-school-header" style={{ color: '#a040ff' }}><img src="/rules/icon-decay.png" className="rules-school-icon" /> <span>Decay Spells</span></div>
               <p>Decay Spells make life harder for your opponent. Denying resources, applying debuffs, or inflicting status effects. Decks revolving around them will often rely on Poison and Burn to slowly melt away the opponent's HP over time. Decay Magic also has the best <strong>negation Spells</strong> in the game. It's a slower, more control-focused playstyle.</p>
             </div>
             <div className="rules-school-entry">
-              <div className="rules-school-header" style={{ color: '#ffdd44' }}><img src="/rules/icon-support.png" className="rules-school-icon" /> <span>Support Spells</span></div>
+              <div className="rules-school-header" style={{ color: '#ffe23d' }}><img src="/rules/icon-support.png" className="rules-school-icon" /> <span>Support Spells</span></div>
               <p>Support Spells excel in healing and buffing your own Heroes. They keep your Heroes alive, make them stronger, generate resources, and may hinder your opponent. Support Spells are particularly good at doing a lot of things in one turn, facilitating a more <strong>combo-oriented</strong> playstyle.</p>
             </div>
             <div className="rules-school-entry">
-              <div className="rules-school-header" style={{ color: '#4488ff' }}><img src="/rules/icon-arts.png" className="rules-school-icon" /> <span>Magic Arts Spells</span></div>
+              <div className="rules-school-header" style={{ color: '#4580f6' }}><img src="/rules/icon-arts.png" className="rules-school-icon" /> <span>Magic Arts Spells</span></div>
               <p>Magic Arts Spells focus on "changing the rules." Applying buffs or debuffs that affect players themselves, searching cards from the deck, generating resources, extending turns, and situational negation. Unlike other Spell Schools, Magic Arts is not meant to be played by itself — it's an <strong>auxiliary</strong> Spell School.</p>
             </div>
             <div className="rules-school-entry rules-school-entry-wide">
-              <div className="rules-school-header" style={{ color: '#44cc44' }}><img src="/rules/icon-summoning.png" className="rules-school-icon" /> <span>Summoning Spells and Creatures</span></div>
+              <div className="rules-school-header" style={{ color: '#3ddc57' }}><img src="/rules/icon-summoning.png" className="rules-school-icon" /> <span>Summoning Spells and Creatures</span></div>
               <div className="rules-card-row" style={{ marginTop: 10 }}>
                 <Img src="creature.png" alt="Creature card example" className="rules-card-img rules-card-img-sm" />
                 <div>
@@ -4641,7 +4644,7 @@ function RulesScreen({ onBack }) {
           <div className="rules-divider" />
 
           {/* ── ARTIFACTS ── */}
-          <SectionTitle id="artifacts"><span style={{ color: '#ffd700' }}>Artifacts</span></SectionTitle>
+          <SectionTitle id="artifacts"><span style={{ color: '#fad54a' }}>Artifacts</span></SectionTitle>
           <div className="rules-card-row">
             <Img src="artifact.png" alt="Artifact card example" className="rules-card-img" />
             <div className="rules-text-block">
@@ -4654,7 +4657,7 @@ function RulesScreen({ onBack }) {
           <div className="rules-divider" />
 
           {/* ── POTIONS ── */}
-          <SectionTitle id="potions"><span style={{ color: '#a0724a' }}>Potions</span></SectionTitle>
+          <SectionTitle id="potions"><span style={{ color: '#886c44' }}>Potions</span></SectionTitle>
           <div className="rules-card-row">
             <Img src="potion.png" alt="Potion card example" className="rules-card-img" />
             <div className="rules-text-block">
@@ -4667,25 +4670,25 @@ function RulesScreen({ onBack }) {
           <div className="rules-divider" />
 
           {/* ── ASCENDED HEROES ── */}
-          <SectionTitle id="ascended"><span style={{ color: '#aa44ff' }}>Ascended Heroes</span></SectionTitle>
+          <SectionTitle id="ascended"><span style={{ color: '#a040ff' }}>Ascended Heroes</span></SectionTitle>
           <div className="rules-card-row">
             <Img src="ascended.png" alt="Ascended Hero card example" className="rules-card-img" />
             <div className="rules-text-block">
               <p>Ascended Heroes are special, more powerful versions of Heroes. You play them in your deck and place them on top of a Hero to Ascend it once a certain condition has been fulfilled.</p>
               <p className="rules-callout">Ascending a Hero immediately ends your turn!</p>
               <p>When a Hero Ascends, it gains new stats, but keeps any damage it already had as well as status effects and any other effects that affected it.</p>
-              <h3 className="rules-sub-title orbit-font" style={{ color: '#aa44ff' }}>Ascension Bonus</h3>
-              <p>When a Hero Ascends, its Ascension Bonus is applied. If the bonus specifies Abilities, you may attach them from your hand, deck, or discard pile to the Ascended Hero immediately. You may choose to attach fewer copies than specified. Other Ascension Bonuses apply a different effect instead.</p>
+              <h3 className="rules-sub-title orbit-font" style={{ color: '#a040ff' }}>Ascension Bonus</h3>
+              <p>When a Hero Ascends, its Ascension Bonus is applied. If the bonus specifies Abilities, you may attach them from your hand, deck, or discard pile to the Ascended Hero immediately. If it lists more than one Ability, choose one of them ("or", not "and"). You may choose to attach fewer copies than specified. Other Ascension Bonuses apply a different effect instead.</p>
             </div>
           </div>
 
           <div className="rules-divider" />
 
           {/* ── ACTIONS ── */}
-          <SectionTitle id="actions"><span style={{ color: '#ff3366' }}>Actions</span></SectionTitle>
+          <SectionTitle id="actions"><span style={{ color: '#fc1c5f' }}>Actions</span></SectionTitle>
           <div className="rules-text-block">
             <p>Besides Gold, which you passively generate every turn and spend on Artifacts, <strong>Actions</strong> are the other important resource in Pixel Parties. You get a <strong>single Action</strong> every turn, and Attacks, Spells and Creatures cost an Action to use.</p>
-            <p style={{ color: '#ff3366', fontWeight: 700, fontStyle: 'italic' }}>Wait, so you can only use a single Attack/Spell/Creature per turn to advance the game?</p>
+            <p style={{ color: '#fc1c5f', fontWeight: 700, fontStyle: 'italic' }}>Wait, so you can only use a single Attack/Spell/Creature per turn to advance the game?</p>
             <p>Not exactly. <strong>Reactions</strong> and <strong>Surprises</strong> do not cost Actions to use. Additionally, there are Attacks, Spells and Creatures that can count as <strong>additional Actions</strong>, either inherently or if you fulfill specific conditions. Additional Actions do not consume your Action per turn.</p>
             <p>On the other hand, there are also effects on Abilities, Artifacts, and other cards that can cost an Action to activate. If you choose to spend your Action on such an effect, that means you cannot use an Attack/Spell/Creature that turn, unless it's an additional Action, a Reaction, or a Surprise.</p>
             <p>When a Creature is "placed" into a Support Zone, that always means that it is summoned without costing an Action and without requiring a Hero to actually be able to summon it.</p>
@@ -5007,7 +5010,7 @@ function HeroArtCrop({ heroName, width = 160, skinName = null }) {
     return (
       <div style={{
         width, height: width * (398 / 594),
-        background: '#1a1a28', display: 'flex',
+        background: '#1a1a2e', display: 'flex',
         alignItems: 'center', justifyContent: 'center',
         color: 'var(--text2)', fontSize: 10, letterSpacing: 2,
       }}>NO ART</div>
@@ -5020,7 +5023,7 @@ function HeroArtCrop({ heroName, width = 160, skinName = null }) {
       width, height,
       overflow: 'hidden',
       position: 'relative',
-      background: '#0a0a12',
+      background: '#08060c',
     }}>
       <img src={src} draggable={false}
         style={{
@@ -5385,7 +5388,7 @@ function SingleplayerScreen() {
   };
 
   return (
-    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #12101f 40%, #0a0a12 100%)', overflow: 'hidden' }}>
+    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #08060c 0%, #12101f 40%, #08060c 100%)', overflow: 'hidden' }}>
       {showRegister && <GuestRegisterModal starterDeckId={selectedDeck} onClose={() => setShowRegister(false)} />}
       {tutorialBrowserOpen && (
         <TutorialBrowserModal
@@ -5465,7 +5468,7 @@ function SingleplayerScreen() {
       <div className="vscpu-rahmen ornate-frame pp-menuekasten">
       <div className="vscpu-content" style={{ padding: '22px 22px 30px', boxSizing: 'border-box', width: '100%' }}>
         {!hasAnyLegal && (
-          <div style={{ color: '#ff7777', textAlign: 'center', padding: '12px 16px', marginBottom: 20, border: '1px solid #ff7777', borderRadius: 4, background: 'rgba(255,119,119,.08)', fontSize: 12 }}>
+          <div style={{ color: '#fe7476', textAlign: 'center', padding: '12px 16px', marginBottom: 20, border: '1px solid #fe7476', borderRadius: 4, background: 'rgba(254,116,118,.08)', fontSize: 12 }}>
             You need at least one legal deck to play. Edit a deck or pick a starter deck first.
           </div>
         )}
@@ -5477,7 +5480,7 @@ function SingleplayerScreen() {
           // from actual foes. Registered players don't see her.
           const showRaccoon = !!user?.isGuest && (!q || 'tutorial raccoon how to play smug mastermind antonia'.includes(q));
           const oppTiles = (opponents && visibleOpponents) ? visibleOpponents : [];
-          const racColor = '#ff44cc';
+          const racColor = '#fb1ea9';
           return (
           <>
           <div style={{
@@ -5532,7 +5535,7 @@ function SingleplayerScreen() {
             {!user?.isGuest && Array.isArray(opponents) && opponents.length > 0 && (() => {
               const aktiv = hasAnyLegal && !starting;
               return (
-                <VsCpuKachel key="__random_opponent" farbe="#ffcc33" zufall
+                <VsCpuKachel key="__random_opponent" farbe="#f8ca21" zufall
                   disabled={!aktiv}
                   onClick={() => {
                     const op = opponents[Math.floor(Math.random() * opponents.length)];
@@ -5547,7 +5550,7 @@ function SingleplayerScreen() {
             {oppTiles.map(op => {
               const total = (op.wins || 0) + (op.losses || 0);
               return (
-                <VsCpuKachel key={op.id} farbe="#ff4444"
+                <VsCpuKachel key={op.id} farbe="#f03232"
                   disabled={!hasAnyLegal || starting}
                   onClick={() => startBattle(op.id)}
                   bild={() => <HeroArtCrop heroName={op.middleHero} width={208} />}

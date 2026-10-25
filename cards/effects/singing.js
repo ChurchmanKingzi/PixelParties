@@ -127,9 +127,7 @@ function _getBorrowableCreatures(engine, gs, pi, level) {
       const slot = (ops.supportZones[hi] || [])[zi] || [];
       if (slot.length === 0) continue;
 
-      const inst = engine.cardInstances.find(c =>
-        c.zone === 'support' && c.owner === oi && c.heroIdx === hi && c.zoneSlot === zi
-      );
+      const inst = engine.kreaturImPlatz(oi, hi, zi).inst;   // Darion: eine Moana-Kreatur kann im Equip-Stapel auch weiter hinten liegen
       if (!inst || inst.faceDown) continue;
       if ((inst.controller ?? inst.owner) !== oi) continue; // skip charmed-back / stolen-back
 
@@ -200,9 +198,7 @@ function _getOwnSingableCreatures(engine, gs, pi, level) {
       const slot = (ps.supportZones[hi] || [])[zi] || [];
       if (slot.length === 0) continue;
 
-      const inst = engine.cardInstances.find(c =>
-        c.zone === 'support' && c.owner === pi && c.heroIdx === hi && c.zoneSlot === zi
-      );
+      const inst = engine.kreaturImPlatz(pi, hi, zi).inst;   // Darion: eine Moana-Kreatur kann im Equip-Stapel auch weiter hinten liegen
       if (!inst || inst.faceDown) continue;
       if ((inst.controller ?? inst.owner) !== pi) continue; // skip stolen-away
 

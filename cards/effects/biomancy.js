@@ -17,7 +17,7 @@
 // ═══════════════════════════════════════════
 
 const {
-  tokenStatsForLevel, freeSupportSlots, placeBiomancyToken,
+  tokenStatsForLevel, tokenZonePossible, placeBiomancyToken,
 } = require('./_biomancy-shared');
 
 module.exports = {
@@ -71,16 +71,16 @@ module.exports = {
         if (!hero?.name || hero.hp <= 0) continue;
         if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
 
-        // Must have a free support zone
-        if (freeSupportSlots(engine, feld, hi).length === 0) continue;
+        // Must have a free support zone — W64a (Al, 23.10.2026): bei aktiver Alice-Teilung zaehlt auch die Zone eines Biomancy Tokens GLEICHEN Namens
+        if (!tokenZonePossible(engine, pi, feld, hi, ctx.potionName)) continue;
 
         // Soft HOPT: check if this hero's Biomancy was already used this turn
         const hoptKey = `biomancy:${feld}:${hi}`;
         if (gs.hoptUsed?.[hoptKey] === gs.turn) continue;
 
         // Determine Biomancy level on this hero
-        const abZones = gs.players[feld]?.abilityZones?.[hi] || [];
-        const level = engine.countAbilitiesForSchool('Biomancy', abZones);
+        // 24.10.: echte Ability Zonen UND Support-Stapel (Xal).
+        const level = engine.countAbilitiesForSchool('Biomancy', engine.abilityStapelListe(feld, hi).map(e => e.namen));
         if (level <= 0) continue;
 
         eligible.push({ heroIdx: hi, level, hero, feld });

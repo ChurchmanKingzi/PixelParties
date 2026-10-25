@@ -89,7 +89,8 @@ function beschwoerbar(engine, pi, heroIdx, name, cd) {
   const zonen = ps?.supportZones?.[heroIdx] || [];
   let frei = false;
   for (let z = 0; z < 3; z++) if ((zonen[z] || []).length === 0) { frei = true; break; }
-  return frei;
+  // W62a: oder (Alice-Teilung) die Zone einer GLEICHNAMIGEN Creature — `engine.beschwoerZonenFuer`, dieselbe Auslegung wie der Hand-Weg
+  return frei || engine.hatBeschwoerZone(pi, name, { heroIdx, nurBasis: true });
 }
 
 /**
@@ -208,10 +209,11 @@ module.exports = {
     const ps = gs.players[pi];
     // Freier Platz wird hier noch einmal ermittelt: zwischen Pruefung
     // und Aufloesung kann die Kette das Brett veraendert haben.
+    // W62a/W63a (Al, 22.10.2026: „erst die geteilte Zone, sofern Alices Effekt aktiv ist, DANN die erste leere"): `beschwoerZonenFuer` — geteilte Zone
+    // einer gleichnamigen Creature (Alice) vorn, dahinter die freien; Old Couple waehlt die Zone nicht selbst, also `[0]`.
     let slot = -1;
-    for (let z = 0; z < 3; z++) {
-      if (((ps.supportZones?.[heroIdx] || [])[z] || []).length === 0) { slot = z; break; }
-    }
+    const zielZone = engine.beschwoerZonenFuer(pi, gewaehlt, { heroIdx, nurBasis: true })[0];
+    if (zielZone) slot = zielZone.slotIdx;
     if (slot < 0) return;
 
     const genommen = await engine.deckEntnahme(ps,  gewaehlt, { source: CARD_NAME, shuffle: true });

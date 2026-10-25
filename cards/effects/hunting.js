@@ -108,7 +108,7 @@ module.exports = {
       const stapel = engine.cardInstances.filter(c =>
         (feld === pi ? (c.controller ?? c.owner) === pi : c.owner === feld)   // Styx 28.9.
         && c.heroIdx === hi
-        && c.zone === 'ability'
+        && engine.istWirksameAbility(c)   // 24.10.: auch in einer Support Zone (Xal)
         && c.name === CARD_NAME
         && !c.faceDown);
       if (stapel.length === 0) return;
@@ -162,7 +162,9 @@ module.exports = {
       // ── Stufe 2/3: Uebernahme in die eigene Support Zone ─────────
       // Styx 28.9.: „this Hero's Support Zone" liegt auf der Brettseite
       // (`feld`); die Kreatur gehoert trotzdem `pi` (seitenfremd).
-      const zone = ersteFreieZone(gs.players[feld], hi);
+      // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Platzierungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): mit Alice-Teilung des
+      // Jaegers `pi` zaehlt auch die Zone einer GLEICHNAMIGEN Creature (die Beute teilt sich die Zone) — `engine.ersteBeschwoerZone`, geteilte zuerst.
+      const zone = engine.ersteBeschwoerZone(pi, tot.name, { seite: feld, heroIdx: hi, namedHeroesOnly: true })?.slotIdx ?? -1;
       if (zone < 0) return;                       // Als Ruling ③
 
       const negiert = stufe === 2;

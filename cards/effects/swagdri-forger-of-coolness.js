@@ -63,7 +63,7 @@ module.exports = {
         // (`canEquipToHero`, z. B. Crescent Moon: mind. 1 New Moon auf dem Brett) gilt weiter.
         if (!engine.canEquipCardToHero(top, pi, hi)) continue;
         const slots = ps.supportZones?.[hi] || [];
-        if (slots.some(s => !s || s.length === 0)) return true;
+        if (slots.some(s => !s || s.length === 0) || engine.equipPflichtPlatz(pi, hi, top) >= 0) return true;   // Darion: der Equip-Stapel zaehlt als Platz
       }
       return false;
     }
@@ -125,13 +125,15 @@ module.exports = {
         if (!engine.canEquipCardToHero(top, pi, hi)) continue;   // W16c (A04-04): Spielbedingung bleibt (nur Kosten entfallen)
         const slots = ps.supportZones?.[hi] || [];
         let leftmostFree = -1;
+        const _stapel = engine.equipPflichtPlatz(pi, hi, top);   // Darion: der Equip-Stapel ist der einzige Platz
         for (let si = 0; si < slots.length; si++) {
-          if (!slots[si] || slots[si].length === 0) {
+          if (_stapel >= 0 ? si === _stapel : (!slots[si] || slots[si].length === 0)) {
             if (leftmostFree < 0) leftmostFree = si;
             targets.push({
               id: `equip-${pi}-${hi}-${si}`,
               type: 'equip',
               owner: pi, heroIdx: hi, slotIdx: si, cardName: '',
+              ...(_stapel >= 0 ? { _eigeneStapelWahl: true } : {}),   // Darion: Platzwahl, keine Kartenwahl — keine Rueckfrage „welches Equip?"
             });
           }
         }

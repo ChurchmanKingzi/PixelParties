@@ -33,7 +33,7 @@
 
 const {
   addChangeCounters, removeChangeCounters, moveChangeCounters,
-  getChangeCounters, allBoardTargets, targetToPromptEntry,
+  getChangeCounters, allBoardTargets, targetToPromptEntry, geteilteSlotsBeiderSeiten,
 } = require('./_cosmic-shared');
 
 const CARD_NAME = 'Analyzer from the Cosmic Depths';
@@ -89,7 +89,8 @@ function allFreeSupportSlotsBothSides(engine) {
       }
     }
   }
-  return out;
+  // W64a (Al, 23.10.2026): bei aktiver Alice-Teilung stoesst ein Invader Token zur Zone eines Invader Tokens dazu — geteilte Zonen VORN.
+  return [...geteilteSlotsBeiderSeiten(engine, INVADER_TOKEN), ...out];
 }
 
 // ── ACTIVE 1: Move counters ────────────────────────────────────────
@@ -133,8 +134,12 @@ async function runMove(engine, inst, ctx) {
   if (!picked || picked.length === 0) return false;
   const tgt = allTargets.find(t => targetToPromptEntry(t).id === picked[0]);
   if (!tgt) return false;
+  // Darion: alle Equips eines Stapels teilen die Ziel-ID — `allTargets.find` trifft immer die erste Karte. Die Rueckfrage der Engine
+  // („welches Equip?") schreibt die Wahl auf den Eintrag der Zielliste (`targetEntries`); von dort kommt die gewaehlte Karte.
+  const eintrag = targetEntries.find(e => e.id === picked[0]);
+  const ziel = (eintrag && eintrag.type === 'equip' && eintrag.cardInstance) ? eintrag.cardInstance : tgt.ref;
 
-  moveChangeCounters(engine, inst, tgt.ref, n);
+  moveChangeCounters(engine, inst, ziel, n);
   if (!ctx._borrowedUse) stampHopt(gs, HOPT_MOVE, inst.id);   // W13 (Al, Rueckfrage 9): geliehene Verwendung verbraucht den Stempel NICHT
   ctx._skipCreatureEffectHopt = true; // engine HOPT bypassed; script-level wins
   return true;
@@ -154,7 +159,7 @@ async function runSpawn(engine, inst, ctx) {
   if (freeSlots.length === 0) return false;
 
   const maxByCounters = Math.min(have, 6);
-  const maxByTokens = Math.min(Math.floor(maxByCounters / 2), freeSlots.length);
+  const maxByTokens = freeSlots.some(sl => sl.shared) ? Math.floor(maxByCounters / 2) : Math.min(Math.floor(maxByCounters / 2), freeSlots.length);
   if (maxByTokens < 1) return false;
 
   const opts = [];
@@ -195,7 +200,8 @@ async function runSpawn(engine, inst, ctx) {
     } else {
       const zones = slots.map(s => ({
         owner: s.owner, heroIdx: s.heroIdx, slotIdx: s.slotIdx,
-        label: `${s.owner === pi ? '(You) ' : '(Opp) '}${s.heroName} — Slot ${s.slotIdx + 1}`,
+        label: `${s.owner === pi ? '(You) ' : '(Opp) '}${s.heroName} — Slot ${s.slotIdx + 1}${s.shared ? ` (×${s.stackDepth})` : ''}`,
+        ...(s.shared ? { shared: true, stackDepth: s.stackDepth } : {}),
       }));
       const zp = await promptCtx.promptZonePick(zones, {
         title: CARD_NAME,

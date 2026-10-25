@@ -38,14 +38,14 @@ function golemsBei(engine, pi, seite, heroIdx) {
     && engine.physicalSide(c) === seite && c.heroIdx === heroIdx);
 }
 
-/** Erster freier, nicht gesperrter Platz des Helden (oder -1). */
-function freierPlatz(engine, seite, heroIdx) {
-  for (let z = 0; z < 3; z++) {
-    if (engine.supportSlotBelegt(seite, heroIdx, z)) continue;
-    if (engine.isSupportZoneLocked(seite, heroIdx, { source: CARD_NAME, cardName: CARD_NAME, via: 'place' })) continue;
-    return z;
-  }
-  return -1;
+/**
+ * Platz fuer ein weiteres Golem am Helden (oder -1). W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Platzierungs-Effekte; „erst die geteilte Zone,
+ * DANN die erste leere"): mit Alice-Teilung des Kontrolleurs `pi` zuerst die Zone, in der schon Golems liegen (gleicher Name), sonst der erste freie,
+ * nicht gesperrte Platz (`engine.beschwoerZonenFuer`).
+ */
+function freierPlatz(engine, seite, heroIdx, pi = seite) {
+  const z = engine.beschwoerZonenFuer(pi, CARD_NAME, { seite, heroIdx, nurBasis: true, namedHeroesOnly: true, source: CARD_NAME })[0];
+  return z ? z.slotIdx : -1;
 }
 
 module.exports = {
@@ -86,7 +86,7 @@ module.exports = {
 
       // ① Nachlegen aus Hand oder Deck.
       if (ps._golemSummonTurn !== gs.turn && host?.name) {
-        const slot = freierPlatz(engine, seite, heroIdx);
+        const slot = freierPlatz(engine, seite, heroIdx, pi);
         const karten = [];
         const inHand = (ps.hand || []).filter(n => n === CARD_NAME).length;
         const imDeck = (ps.mainDeck || []).filter(n => n === CARD_NAME).length;
@@ -100,7 +100,7 @@ module.exports = {
           });
           if (wahl && !wahl.cancelled && (wahl.source === 'hand' || wahl.source === 'deck')
               && karten.some(k => k.source === wahl.source)) {
-            const platz = freierPlatz(engine, seite, heroIdx);
+            const platz = freierPlatz(engine, seite, heroIdx, pi);
             if (platz >= 0 && ps._golemSummonTurn !== gs.turn) {
               await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
               await engine.placeFromPile(pi, wahl.source, CARD_NAME, heroIdx, platz, {

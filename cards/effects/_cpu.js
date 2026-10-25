@@ -1003,8 +1003,12 @@ async function runActionPhase(engine, helpers) {
       if (cd.cardType === 'Creature') {
         const ps2 = engine.gs.players[cpuIdx];
         const zones = ps2.supportZones?.[heroIdx] || [[], [], []];
-        for (let z = 0; z < zones.length; z++) {
-          if ((zones[z] || []).length !== 0) continue;
+        // W62a: freie Zonen UND (Alice-Teilung) Zonen gleichnamiger Creatures — `beschwoerZonenFuer` (nur Basisplaetze, wie bisher)
+        const _geteilteZ = new Set(engine.beschwoerZonenFuer(cpuIdx, cardName, { heroIdx, nurBasis: true }).filter(zz => zz.shared).map(zz => zz.slotIdx));
+        // W63a (Al, 22.10.2026: „erst die geteilte Zone, DANN die erste leere"): geteilte Zonen stehen in der Kandidatenliste VOR den freien (Gleichstand → geteilt).
+        const _zonenReihe = [...Array(zones.length).keys()].sort((a, b) => (_geteilteZ.has(b) ? 1 : 0) - (_geteilteZ.has(a) ? 1 : 0));
+        for (const z of _zonenReihe) {
+          if ((zones[z] || []).length !== 0 && !_geteilteZ.has(z)) continue;
           candidates.push({
             cardName, handIdx, heroIdx, zoneSlot: z, fromCreation: ausVorrat,
             cardType: cd.cardType,
@@ -1039,9 +1043,10 @@ async function runActionPhase(engine, helpers) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
     if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
-    const zones = ps.abilityZones?.[hi] || [];
-    for (let zi = 0; zi < zones.length; zi++) {
-      const slot = zones[zi] || [];
+    // 24.10.: auch die Stapel in Support Zonen (Xal, Xalibur) — `zoneKind` geht mit bis zum Server.
+    for (const _e of engine._aktivierungsStapel(cpuIdx, hi)) {
+      const zi = _e.zi;
+      const slot = _e.slot || [];
       if (slot.length === 0) continue;
       const abilityName = slot[0];
       const script = loadCardEffect(abilityName);
@@ -1051,8 +1056,17 @@ async function runActionPhase(engine, helpers) {
       if (script.canActivateAction && !script.canActivateAction(gs, cpuIdx, hi, slot.length, engine)) continue;
       const prev = actionAbilityBest.get(abilityName);
       if (!prev || slot.length > prev.level) {
-        actionAbilityBest.set(abilityName, { heroIdx: hi, zoneIdx: zi, level: slot.length });
+        actionAbilityBest.set(abilityName, { heroIdx: hi, zoneIdx: zi, level: slot.length, zoneKind: _e.zoneKind });
       }
+    }
+  }
+  // 25.10.: auch fremde Stapel (kontrollierte Helden: Charme Lv3, Styx; geliehene: Lizbeth, Smugbeth) — die Engine-Liste hat HOPT und Sperren schon geprüft.
+  for (const e of fremdeAbilityEintraege(engine.getActivatableAbilities(cpuIdx))) {
+    const script = loadCardEffect(e.abilityName);
+    if (!script?.actionCost || !script?.onActivate) continue;
+    const prev = actionAbilityBest.get(e.abilityName);
+    if (!prev || e.level > prev.level) {
+      actionAbilityBest.set(e.abilityName, { heroIdx: e.heroIdx, zoneIdx: e.zoneIdx, level: e.level, zoneKind: e.zoneKind, charmedOwner: e.charmedOwner, borrowedFromOwner: e.borrowedFromOwner });
     }
   }
   for (const [abilityName, best] of actionAbilityBest) {
@@ -1062,6 +1076,9 @@ async function runActionPhase(engine, helpers) {
       abilityName,
       heroIdx: best.heroIdx,
       zoneIdx: best.zoneIdx,
+      zoneKind: best.zoneKind,
+      ...(best.charmedOwner != null ? { charmedOwner: best.charmedOwner } : {}),
+      ...(best.borrowedFromOwner != null ? { borrowedFromOwner: best.borrowedFromOwner } : {}),
       level: best.level,
       typeScore: 0,
     });
@@ -1252,10 +1269,7 @@ async function runActionPhase(engine, helpers) {
     let skipCreatureForNoSlot = false;
     const actionFn = async () => {
       if (pick.cardType === 'AbilityAction') {
-        await helpers.doActivateAbility(helpers.room, cpuIdx, {
-          heroIdx: pick.heroIdx,
-          zoneIdx: pick.zoneIdx,
-        });
+        await helpers.doActivateAbility(helpers.room, cpuIdx, abilityNutzlast(pick));
       } else if (pick.cardType === 'HeroEffectAction') {
         await helpers.doActivateHeroEffect(helpers.room, cpuIdx, {
           heroIdx: pick.heroIdx,
@@ -1384,9 +1398,9 @@ async function tryActionCostingAbility(engine, helpers) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
     if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
-    const zones = ps.abilityZones?.[hi] || [];
-    for (let zi = 0; zi < zones.length; zi++) {
-      const slot = zones[zi] || [];
+    for (const _e of engine._aktivierungsStapel(cpuIdx, hi)) {   // 24.10.: echte Zonen UND Support Zonen (Xal, Xalibur)
+      const zi = _e.zi;
+      const slot = _e.slot || [];
       if (slot.length === 0) continue;
       const abilityName = slot[0];
       const script = loadCardEffect(abilityName);
@@ -1395,9 +1409,17 @@ async function tryActionCostingAbility(engine, helpers) {
       if (gs.hoptUsed?.[hoptKey] === gs.turn) continue;
       if (script.canActivateAction && !script.canActivateAction(gs, cpuIdx, hi, slot.length, engine)) continue;
       cpuLog(`    → action-costing ability "${abilityName}" hero=${hi}`);
-      await helpers.doActivateAbility(helpers.room, cpuIdx, { heroIdx: hi, zoneIdx: zi });
+      await helpers.doActivateAbility(helpers.room, cpuIdx, { heroIdx: hi, zoneIdx: zi, ...(_e.zoneKind === 'support' ? { zoneKind: 'support' } : {}) });
       return true;
     }
+  }
+  // 25.10.: fremde Stapel (kontrolliert / geliehen) — die Engine-Liste hat Sperren und HOPT schon geprüft.
+  for (const e of fremdeAbilityEintraege(engine.getActivatableAbilities(cpuIdx))) {
+    const script = loadCardEffect(e.abilityName);
+    if (!script?.actionCost || !script?.onActivate) continue;
+    cpuLog(`    → action-costing ability "${e.abilityName}" (${e.charmedOwner != null ? 'kontrolliert' : 'geliehen'}) hero=${e.heroIdx}`);
+    await helpers.doActivateAbility(helpers.room, cpuIdx, abilityNutzlast(e));
+    return true;
   }
   return false;
 }
@@ -1835,6 +1857,7 @@ async function activateHeroEffects(engine, helpers) {
     pickCsHero = null;
     pickCsEvoBefore = null;
     pickCsHeroIdx = -1;
+    let pickHc = null;      // Held-als-Kreatur-Kanal (Form 9): die Entscheidung des gewaehlten Helden
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
@@ -1931,6 +1954,19 @@ async function activateHeroEffects(engine, helpers) {
           }
         } catch { available = false; }
       }
+      // ── Held-als-Kreatur-Kanal (Form 9, Hulijing; Karten-Vertrag `cpuMeta.heroCreature`) ──
+      // EINE Entscheidung je Held und Phase: verwandeln — und in WELCHE Kreatur — oder nicht. Sie kommt VOR dem Gate:
+      // gelernte Regel / Exploration (`mode: 'force'`) committen ohne Gate, ein Startwert (`mode: 'gate'`) prueft das Gate.
+      // Ohne Karten-Vertrag oder ohne Pool bleibt alles beim Alten.
+      let hcDec = null;
+      if (available && script?.cpuMeta?.heroCreature) {
+        hcDec = deckProfile.heroCreatureDecision(engine, cpuIdx, hi);
+        if (!hcDec || hcDec.none) {
+          swapDiag(engine, hcDec ? 'herocreature:nein' : 'herocreature:kein-pool');
+          available = false;
+          hcDec = null;
+        }
+      }
       // Also check equipped hero-effect providers (e.g. Mummy Token, treatAsEquip heroes).
       const hasEquippedEffect = engine.cardInstances.some(ci => {
         if (ci.owner !== cpuIdx || ci.zone !== 'support' || ci.heroIdx !== hi) return false;
@@ -1951,6 +1987,7 @@ async function activateHeroEffects(engine, helpers) {
       });
       if (available || hasEquippedEffect) {
         pickIdx = hi;
+        if (available && hcDec) pickHc = hcDec;
         if (available && csTags && csTags.length > 0) {
           pickCsTags = csTags;
           pickCsHero = hero.name;
@@ -1970,9 +2007,24 @@ async function activateHeroEffects(engine, helpers) {
     // Ifrit): kein Wert-Gate und keine Recon — die Entscheidung steht, es
     // gibt keinen Zielplan zu optimieren.
     const forceHero = (await cpuForcePlayHero(engine, cpuIdx, ps.heroes[pickIdx], pickIdx)) > 0;
-    const committed = await mctsGatedActivation(engine, helpers, `hero-effect h${pickIdx}`,
-      () => helpers.doActivateHeroEffect(helpers.room, cpuIdx, { heroIdx: pickIdx }),
-      forceHero ? { alwaysCommit: true, commitWithoutRecon: true } : {});
+    // Held-als-Kreatur: die vorgemerkte Wahl beantwortet die Galerie des Skripts (`cpuResponse`). Steht die Entscheidung fest
+    // (`mode: 'force'`), gibt es keinen Zielplan zu optimieren — ohne Gate und ohne Recon committen.
+    if (pickHc) engine._heroCreaturePick = { pi: cpuIdx, heroIdx: pickIdx, name: pickHc.name, pile: pickHc.pile, handIdx: pickHc.handIdx, turn: gs.turn };
+    let committed;
+    try {
+      committed = await mctsGatedActivation(engine, helpers, `hero-effect h${pickIdx}`,
+        () => helpers.doActivateHeroEffect(helpers.room, cpuIdx, { heroIdx: pickIdx }),
+        (forceHero || (pickHc && pickHc.mode === 'force')) ? { alwaysCommit: true, commitWithoutRecon: true } : {});
+    } finally {
+      if (pickHc) delete engine._heroCreaturePick;
+    }
+    if (pickHc) {
+      // Das TATSAECHLICHE Ergebnis in die aufgezeichnete Zeile (das Gate kann den Vorschlag verworfen haben); danach darf die
+      // aufliegende Kreatur SOFORT ihren aktiven Effekt benutzen (`activateCreatureEffects` kennt die Ueberlagerung).
+      const placed = deckProfile.heroCreatureOutcome(engine, cpuIdx, pickIdx, pickHc);
+      swapDiag(engine, placed ? 'herocreature:verwandelt' : 'herocreature:gate-nein');
+      if (committed && ps.heroes?.[pickIdx]?.heldKreatur) await activateCreatureEffects(engine, helpers);
+    }
     // Vorher wurde `JSON.stringify(gs.hoptUsed)` vor/nach verglichen —
     // ein Helden-Effekt mit MEHREREN Nutzungen pro Runde (Kassaran, 3×)
     // lässt die Sperre offen und sah damit aus wie "nicht gefeuert".
@@ -2174,6 +2226,22 @@ async function activatePermanents(engine, helpers) {
   }
 }
 
+// ★ 25.10.2026 (Xal-Runde 5): FREMDE Ability-Stapel der CPU — von ihr kontrollierte Helden (Charme Lv3, Styx, Controlled Attack: `charmedOwner`) und geliehene
+// (Lizbeth, Smugbeth: `borrowedFromOwner`), in echten Ability Zonen wie in Support Zonen (Xal, Xalibur). Die Engine-Listen (`getFreeActivatableAbilities`,
+// `getActivatableAbilities`) haben Sperren, HOPT und kartenseitige Bedingungen schon geprüft — es sind dieselben Listen, die der Mensch im Client sieht.
+function fremdeAbilityEintraege(liste) {
+  return (liste || []).filter(e => e && (e.charmedOwner != null || e.borrowedFromOwner != null));
+}
+/** Nutzlast für `doActivateAbility` / `doActivateFreeAbility`: Platz plus Herkunft (Zonenart, Kontrolle, Leihe). */
+function abilityNutzlast(e) {
+  return {
+    heroIdx: e.heroIdx, zoneIdx: e.zoneIdx,
+    ...(e.zoneKind === 'support' ? { zoneKind: 'support' } : {}),
+    ...(e.charmedOwner != null ? { charmedOwner: e.charmedOwner } : {}),
+    ...(e.borrowedFromOwner != null ? { borrowedFromOwner: e.borrowedFromOwner } : {}),
+  };
+}
+
 async function activateFreeAbilities(engine, helpers) {
   const cpuIdx = engine._cpuPlayerIdx;
   const gs = engine.gs;
@@ -2191,12 +2259,12 @@ async function activateFreeAbilities(engine, helpers) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
-      const zones = ps.abilityZones?.[hi] || [];
-      for (let zi = 0; zi < zones.length; zi++) {
-        const slot = zones[zi] || [];
+      for (const _e of engine._aktivierungsStapel(cpuIdx, hi)) {   // 24.10.: echte Zonen UND Support Zonen (Xal, Xalibur)
+        const zi = _e.zi;
+        const slot = _e.slot || [];
         if (slot.length === 0) continue;
         const abilityName = slot[0];
-        const key = `${abilityName}|${hi}|${zi}`;
+        const key = `${abilityName}|${hi}|${_e.zoneKind === 'support' ? 's' : ''}${zi}`;
         if (tried.has(key)) continue;
         const script = loadCardEffect(abilityName);
         if (!script?.freeActivation || !script.onFreeActivate) continue;
@@ -2231,7 +2299,7 @@ async function activateFreeAbilities(engine, helpers) {
         if (script.canFreeActivate) {
           try {
             const inst = engine.cardInstances.find(c =>
-              c.owner === cpuIdx && c.zone === 'ability'
+              c.owner === cpuIdx && c.zone === (_e.zoneKind === 'support' ? 'support' : 'ability')
               && c.heroIdx === hi && c.zoneSlot === zi);
             if (!inst) continue;
             const ctx = engine._createContext(inst, { event: 'canFreeActivateCheck' });
@@ -2273,7 +2341,7 @@ async function activateFreeAbilities(engine, helpers) {
         // ZWISCHEN verschiedenen Abilities bleibt wie gehabt (der erste
         // gefundene Name gewinnt) — nur innerhalb desselben Namens wird
         // aufgestuft.
-        const kandidat = { heroIdx: hi, zoneIdx: zi, abilityName, key, level: slot.length };
+        const kandidat = { heroIdx: hi, zoneIdx: zi, zoneKind: _e.zoneKind, abilityName, key, level: slot.length };
         if (!pick || (pick.abilityName === abilityName && kandidat.level > pick.level)) {
           pick = kandidat;
         }
@@ -2281,6 +2349,28 @@ async function activateFreeAbilities(engine, helpers) {
         // Namens geben kann; einen anderen Namen übernehmen wir nicht.
       }
       if (pick && pick.level >= 3) break;
+    }
+    // Fremde Stapel (kontrolliert / geliehen) — nur wenn die eigenen nichts Besseres desselben Namens haben (höchste Stufe je Name gewinnt).
+    for (const e of fremdeAbilityEintraege(engine.getFreeActivatableAbilities(cpuIdx))) {
+      if (!e.canActivate) continue;
+      const abilityName = e.abilityName;
+      const key = `${abilityName}|${e.charmedOwner != null ? 'c' + e.charmedOwner : 'b' + e.borrowedFromOwner}|${e.heroIdx}|${e.zoneKind === 'support' ? 's' : ''}${e.zoneIdx}`;
+      if (tried.has(key)) continue;
+      const script = loadCardEffect(abilityName);
+      if (!script?.freeActivation || !script.onFreeActivate) continue;
+      if (gs.players[cpuIdx]?.handLocked || gs.players[cpuIdx]?.drawLocked) {
+        const skip = script.cpuSkipActivationWhenDrawLocked;
+        let sperren = false;
+        try { sperren = typeof skip === 'function' ? !!skip(e.level) : !!skip; } catch { sperren = false; }
+        if (sperren) continue;
+      }
+      if (typeof script.cpuMeta?.shouldActivateNow === 'function') {
+        let shouldFire = true;
+        try { shouldFire = !!script.cpuMeta.shouldActivateNow(engine, cpuIdx); } catch { shouldFire = true; }
+        if (!shouldFire) { tried.add(key); continue; }
+      }
+      const kandidat = { ...abilityNutzlast(e), abilityName, key, level: e.level };
+      if (!pick || (pick.abilityName === abilityName && kandidat.level > pick.level)) pick = kandidat;
     }
     if (!pick) return;
     if (pick.level > 1) {
@@ -2301,7 +2391,7 @@ async function activateFreeAbilities(engine, helpers) {
       // kleinen Deck sollen genau die durchs reguläre Gate.
       !!pickAbilityScript?.blockedByHandLock || !!pickAbilityScript?.cpuMeta?.activationDraws);
     const committed = await mctsGatedActivation(engine, helpers, `free-ability ${pick.abilityName}`,
-      () => helpers.doActivateFreeAbility(helpers.room, cpuIdx, { heroIdx: pick.heroIdx, zoneIdx: pick.zoneIdx }),
+      () => helpers.doActivateFreeAbility(helpers.room, cpuIdx, abilityNutzlast(pick)),
       { alwaysCommit: pickAbilityAlwaysCommit });
     const nowClaimed = gs.hoptUsed?.[hoptKey] === gs.turn;
     // Karten, die den Engine-Schlüssel nach erfolgreicher Auflösung
@@ -2424,10 +2514,31 @@ async function activateCreatureEffects(engine, helpers) {
       }
       if (pick) break;
     }
+    // Spy in the Enemy's Camp: Kreaturen des Gegners mit MEINER Spionage-Marke (derselbe Sammler wie beim Menschen; „as if you control it" regelt `doActivateCreatureEffect`).
+    if (!pick) {
+      for (const e of (engine.getActivatableCreatures(cpuIdx) || [])) {
+        if (!e.spy || !e.canActivate) continue;
+        const key = `spy|${e.cardName}|${e.instId}`;
+        if (tried.has(key)) continue;
+        pick = { heroIdx: e.heroIdx, zoneSlot: e.zoneSlot, cardName: e.cardName, instId: e.instId, key, charmedOwner: e.charmedOwner };
+        break;
+      }
+    }
+    // Held als Kreatur (Hulijing): die AUFLIEGENDE Kreatur eines eigenen Helden (Zone `heroOverlay`, `zoneSlot` -1) darf sofort ihren
+    // aktiven Effekt benutzen — derselbe Sammler wie beim Menschen (`_hero-creature-shared.aktivierbareEintraege`).
+    if (!pick) {
+      for (const e of (require('./_hero-creature-shared').aktivierbareEintraege(engine, cpuIdx) || [])) {
+        if (!e.canActivate || e.owner !== cpuIdx || e.charmedOwner != null) continue;
+        const key = `heldKreatur|${e.cardName}|${e.heroIdx}|${e.instId}`;
+        if (tried.has(key)) continue;
+        pick = { heroIdx: e.heroIdx, zoneSlot: -1, cardName: e.cardName, instId: e.instId, key };
+        break;
+      }
+    }
     if (!pick) return;
 
     const hoptKey = `creature-effect:${pick.instId}`;
-    cpuLog(`      → activate creature effect "${pick.cardName}" hero=${pick.heroIdx} zone=${pick.zoneSlot}`);
+    cpuLog(`      → activate creature effect "${pick.cardName}" hero=${pick.heroIdx} zone=${pick.zoneSlot}${pick.charmedOwner != null ? ' (Spy)' : ''}`);
     const pickScript = loadCardEffect(pick.cardName);
     // alwaysCommit darf eine FUNKTION sein: (engine, cpuIdx) => bool.
     const pickAlwaysCommit = (typeof pickScript?.cpuMeta?.alwaysCommit === 'function'
@@ -2435,7 +2546,7 @@ async function activateCreatureEffects(engine, helpers) {
       : !!pickScript?.cpuMeta?.alwaysCommit);
     const pickEvalThroughTurnEnd = !!pickScript?.cpuMeta?.evaluateThroughTurnEnd;
     const committed = await mctsGatedActivation(engine, helpers, `creature-effect ${pick.cardName}`,
-      () => helpers.doActivateCreatureEffect(helpers.room, cpuIdx, { heroIdx: pick.heroIdx, zoneSlot: pick.zoneSlot }),
+      () => helpers.doActivateCreatureEffect(helpers.room, cpuIdx, { heroIdx: pick.heroIdx, zoneSlot: pick.zoneSlot, ...(pick.charmedOwner != null ? { charmedOwner: pick.charmedOwner, instId: pick.instId } : {}) }),
       { alwaysCommit: pickAlwaysCommit, evaluateThroughTurnEnd: pickEvalThroughTurnEnd });
     // Hat sie GEFEUERT? Das meldet der Server jetzt direkt, statt dass
     // wir es aus der Sperre ableiten. Karten mit mehreren Nutzungen pro
@@ -2984,6 +3095,8 @@ function pickHeroForEquip(engine, pi, cardName, cardData, nurHelden = null) {
     for (let z = 0; z < 3; z++) {
       if ((zones[z] || []).length === 0) { hasFree = true; break; }
     }
+    // Darion: der Equip-Stapel des Helden nimmt weitere Ausruestung auf, auch ohne freie Zone.
+    if (!hasFree && engine.equipPflichtPlatz(pi, hi, cardName) >= 0) hasFree = true;
     if (hasFree) eligible.push(hi);
   }
   if (!eligible.length) return -1;
@@ -3019,7 +3132,7 @@ function pickHeroForEquip(engine, pi, cardName, cardData, nurHelden = null) {
       }
       return pickHi;
     }
-    const teamMax = mctsTeamMaxSchoolLvl(gs, pi);
+    const teamMax = mctsTeamMaxSchoolLvl(gs, pi, engine);
     const scoreOf = (hi) => {
       _inEquipHeroValuation = true;
       try { return mctsEnemyHeroDynamicValue(engine, pi, hi, teamMax); }
@@ -3523,7 +3636,7 @@ function effectiveSpellSchoolLevel(engine, pi, hi, school) {
   const ps = engine.gs.players[pi];
   const hero = ps?.heroes?.[hi];
   if (!hero?.name) return 0;
-  const abZones = ps.abilityZones?.[hi] || [];
+  const abZones = alleAbilityStapel(engine, ps, hi);
   const real = engine.countAbilitiesForSchool(school, abZones);
   const heroScript = loadCardEffect(hero.name);
   const v = heroScript?.virtualSpellSchoolLevel;
@@ -4313,7 +4426,9 @@ function listEligibleHeroesForActionCard(engine, pi, cardData) {
       for (let z = 0; z < 3; z++) {
         if ((zones[z] || []).length === 0) freeCount++;
       }
-      if (freeCount === 0) {
+      // W62a: Alice-Teilung — die Zone einer GLEICHNAMIGEN Creature zaehlt als Landeplatz (wie beim Hand-Weg).
+      const _geteilt = freeCount === 0 && engine.hatBeschwoerZone(pi, cardData.name, { heroIdx: hi, nurBasis: true });
+      if (freeCount === 0 && !_geteilt) {
         // Bounce-Place-Vertrag: Karten mit canBypassFreeZoneRequirement
         // (Deepsea Bats, Horror Clown …) dürfen laut Engine auch bei
         // VOLLEN Zonen gespielt werden (Swap: Occupant → Hand, Karte in
@@ -4383,7 +4498,7 @@ function casterCastDrawCount(engine, pi, hi, cardData) {
   const ps = engine.gs?.players?.[pi];
   if (!ps) return 0;
   let draws = 0;
-  for (const slot of (ps.abilityZones?.[hi] || [])) {
+  for (const slot of alleAbilityStapel(engine, ps, hi)) {
     if (!slot || !slot.length) continue;
     const meta = loadCardEffect(slot[0])?.cpuMeta?.castTriggersDraw;
     if (!meta) continue;
@@ -4772,7 +4887,7 @@ function pickCreatureZoneSlot(engine, pi, heroIdx, cardName) {
     if (schools.length > 0 && lvl > 0) {
       let combined = 0;
       try {
-        for (const sc of schools) combined += engine.countAbilitiesForSchool(sc, ps.abilityZones?.[heroIdx]) || 0;
+        for (const sc of schools) combined += engine.countAbilitiesForSchool(sc, alleAbilityStapel(engine, ps, heroIdx)) || 0;
       } catch { combined = lvl; /* im Zweifel Altverhalten */ }
       const hero = ps.heroes?.[heroIdx];
       const heroBypass = hero?.bypassLevelReq && lvl <= hero.bypassLevelReq.maxLevel
@@ -4838,6 +4953,10 @@ function pickCreatureZoneSlot(engine, pi, heroIdx, cardName) {
   // Ohne laufenden Motor gilt weiter: freier Slot schlägt Bounce (der
   // reguläre Summon liefert denselben on-play-Trigger und behält den
   // Insassen auf dem Board).
+  // W62a/W63a: Alice-Teilung — die Zone einer gleichnamigen Creature kostet nichts (Al, 22.10.2026: „erst die geteilte Zone, DANN die erste leere"),
+  // also VOR dem freien Slot und erst recht vor dem Bounce.
+  const geteilt = engine.beschwoerZonenFuer(pi, cardName, { heroIdx, nurBasis: true }).filter(z => z.shared);
+  if (geteilt.length) { swapDiag(engine, 'pick:shared-slot'); return geteilt[0].slotIdx; }
   if (free.length) {
     swapDiag(engine, 'pick:free-slot');
     return free[Math.floor(Math.random() * free.length)];
@@ -5000,20 +5119,46 @@ function isAtkBoostEquip(cardData) {
 // randomly so the CPU doesn't deterministically funnel every ability into
 // Hero 0. Resolves around abilityGivenThisTurn (1 attach per hero per turn).
 
-function heroHasAbility(ps, hi, cardName) {
-  const abZones = ps.abilityZones?.[hi] || [];
-  for (const slot of abZones) {
-    if ((slot || []).length > 0 && slot[0] === cardName) return true;
+// 24.10.: ALLE Ability-Stapel eines Helden als Arrays — die echten Zonen UND die Stapel in Support Zonen (Xal, Xalibur, gewonnener Xal-Effekt).
+// Bewertungen, die Stufen und Schulen zaehlen, lesen hierueber statt `ps.abilityZones[hi]` (sonst sieht die CPU eine Support-Ability nicht).
+function alleAbilityStapel(engine, ps, hi) {
+  const out = [];
+  for (const slot of (ps?.abilityZones?.[hi] || [])) out.push(slot || []);
+  try {
+    // Vorabprüfung (billig, die Bewertung läuft in MCTS-Rollouts oft): nur wenn eine Support Zone überhaupt eine Ability-Karte trägt.
+    const db = engine?._getCardDB?.();
+    const sup = ps?.supportZones?.[hi] || [];
+    if (db && sup.some(slot => slot && slot.length > 0 && db[slot[0]]?.cardType === 'Ability')) {
+      const pi = engine.gs.players.indexOf(ps);
+      if (pi >= 0 && typeof engine.abilityStapelListe === 'function') {
+        for (const e of engine.abilityStapelListe(pi, hi)) if (e.art === 'support') out.push(e.namen);
+      }
+    }
+  } catch { /* ohne Engine-Helfer: nur die echten Zonen */ }
+  return out;
+}
+
+// 24.10.: ein Ability-Stapel kann auch in einer SUPPORT Zone liegen (Xal, Xalibur) — hoechstens einer je Ability und Held, ueber beide Zonenarten.
+function abilityStapelHoehe(ps, hi, cardName) {
+  for (const slot of (ps.abilityZones?.[hi] || [])) {
+    if ((slot || []).length > 0 && slot[0] === cardName) return slot.length;
   }
-  return false;
+  let istAbility = false;
+  try { istAbility = require('./_card-db').getCardDB()[cardName]?.cardType === 'Ability'; } catch { istAbility = false; }
+  if (istAbility) {
+    for (const slot of (ps.supportZones?.[hi] || [])) {
+      if ((slot || []).length > 0 && slot[0] === cardName) return slot.length;
+    }
+  }
+  return 0;
+}
+
+function heroHasAbility(ps, hi, cardName) {
+  return abilityStapelHoehe(ps, hi, cardName) > 0;
 }
 
 function heroHasAbilityAtMaxLevel(ps, hi, cardName) {
-  const abZones = ps.abilityZones?.[hi] || [];
-  for (const slot of abZones) {
-    if ((slot || []).length >= 3 && slot[0] === cardName) return true;
-  }
-  return false;
+  return abilityStapelHoehe(ps, hi, cardName) >= 3;
 }
 
 function anyLivingHeroHasAbility(ps, cardName) {
@@ -5100,8 +5245,8 @@ function scoreAbilityPlacement(engine, pi, heroIdx, cardName, _tiefe = 0) {
   // Spiel als TIE/no-result verbucht).
   if (_tiefe > 2) return 0;
   const ps = engine.gs.players[pi];
-  const abZones = ps?.abilityZones?.[heroIdx];
-  if (!abZones) return 0;
+  if (!ps?.abilityZones?.[heroIdx]) return 0;
+  const abZones = alleAbilityStapel(engine, ps, heroIdx);
   const cardDB = engine._getCardDB();
 
   // ── JOKER-ABILITIES (1.8., Als Report "die CPU tat nichts") ───────
@@ -5311,7 +5456,7 @@ function scoreAbilityPlacement(engine, pi, heroIdx, cardName, _tiefe = 0) {
   // (unlock×100) — wer die Schule WIRKLICH braucht, kriegt sie trotzdem.
   let attachDrawMalus = 0;
   if (deckIsDangerouslySmall(engine, pi)) {
-    for (const slot of (ps.abilityZones?.[heroIdx] || [])) {
+    for (const slot of alleAbilityStapel(engine, ps, heroIdx)) {
       if (!slot || !slot.length) continue;
       const meta = loadCardEffect(slot[0])?.cpuMeta?.attachTriggersDraw;
       if (!meta) continue;
@@ -5353,8 +5498,8 @@ function cd_anyDeckCardNeedsSchool(cardDB, ps, schoolName) {
 //     keep wanting more levels even past the cast threshold).
 function isAbilityStackSaturated(engine, pi, heroIdx, cardName) {
   const ps = engine.gs.players[pi];
-  const abZones = ps?.abilityZones?.[heroIdx];
-  if (!abZones) return false;
+  if (!ps?.abilityZones?.[heroIdx]) return false;
+  const abZones = alleAbilityStapel(engine, ps, heroIdx);
   const cardDB = engine._getCardDB();
   let currentLevel = 0;
   for (const slot of abZones) {
@@ -5414,7 +5559,7 @@ async function attachAbilities(engine, helpers) {
     // ability board state changes between attaches). Each Ability
     // opts in via `cpuMeta.cpuPlacementBias(engine, pi, helpers)`,
     // returning either null (no bias this pass) or
-    //   { allowedHeroes?: Set<heroIdx>, slotByHero?: Map<heroIdx, slotIdx> }
+    //   { allowedHeroes?: Set<heroIdx>, slotByHero?: Map<heroIdx, slotIdx>, supportSlotByHero?: Map<heroIdx, supportSlotIdx> }
     // When `allowedHeroes` is present, candidates whose heroIdx isn't
     // in the set are dropped from this pass. When `slotByHero` is
     // present and contains the candidate's heroIdx, it overrides the
@@ -5468,8 +5613,8 @@ async function attachAbilities(engine, helpers) {
         const bias = getBias(cardName);
         if (bias?.allowedHeroes && !bias.allowedHeroes.has(hi)) continue;
 
-        let slot = resolveAbilitySlot(engine, cpuIdx, hi, cardName);
-        if (slot === null) continue;
+        let place = resolveAbilityPlace(engine, cpuIdx, hi, cardName);
+        if (place === null) continue;
 
         // Spell-School saturation gate: if stacking this Ability would
         // exceed the deck's highest needed level for that school AND
@@ -5485,10 +5630,12 @@ async function attachAbilities(engine, helpers) {
         // Bias may override the auto-resolved slot for this hero
         // (Performance lands on the hero's Divinity zone specifically).
         if (bias?.slotByHero?.has(hi)) {
-          slot = bias.slotByHero.get(hi);
+          place = { zoneSlot: bias.slotByHero.get(hi), supportSlot: -1 };
+        } else if (bias?.supportSlotByHero?.has(hi)) {
+          place = { zoneSlot: -1, supportSlot: bias.supportSlotByHero.get(hi) };   // 24.10.: Stapel in einer Support Zone (Xal, Xalibur)
         }
 
-        const entry = { handIdx, cardName, fromCreation: ausVorrat, heroIdx: hi, zoneSlot: slot };
+        const entry = { handIdx, cardName, fromCreation: ausVorrat, heroIdx: hi, zoneSlot: place.zoneSlot, supportSlot: place.supportSlot };
         const thisHeroHasIt = heroHasAbility(ps, hi, cardName);
         if (thisHeroHasIt) {
           // Tier 1 (stack): always allowed — stacking improves an existing
@@ -5543,6 +5690,7 @@ async function attachAbilities(engine, helpers) {
       fromCreation: pick.fromCreation || undefined,
       heroIdx: pick.heroIdx,
       zoneSlot: pick.zoneSlot,
+      ...(pick.supportSlot >= 0 ? { supportSlot: pick.supportSlot } : {}),
     });
     cpuLog(`      ← ability "${pick.cardName}" done`);
     await pauseAction(engine);
@@ -5551,13 +5699,12 @@ async function attachAbilities(engine, helpers) {
 }
 
 /**
- * Returns a zoneSlot to use when calling doPlayAbility, or null if the Ability
- * cannot be attached to this Hero right now.
- *   >=0  : the specific zone to place into (required for customPlacement cards)
- *   -1   : let doPlayAbility auto-place (stack onto existing or first free zone)
- *   null : not attachable
+ * Wohin legt die CPU diese Ability? `{ zoneSlot, supportSlot }` für `doPlayAbility`, oder null, wenn sie nirgends passt.
+ *   zoneSlot >= 0     : eine bestimmte echte Ability Zone (Pflicht für customPlacement-Karten wie Performance)
+ *   supportSlot >= 0  : eine bestimmte Support Zone (Xal, Xalibur) — Performance auf einen Support-Stapel
+ *   zoneSlot === -1   : `doPlayAbility` wählt selbst (vorhandener Stapel, sonst erste freie Zone — echte vor Support Zonen)
  */
-function resolveAbilitySlot(engine, pi, hi, cardName) {
+function resolveAbilityPlace(engine, pi, hi, cardName) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   const hero = ps.heroes[hi];
@@ -5571,24 +5718,38 @@ function resolveAbilitySlot(engine, pi, hi, cardName) {
 
   if (script?.customPlacement) {
     // Custom placement cards (e.g. Performance) dictate which zones are legal.
+    // 24.10.: auch die Stapel in Support Zonen (Xal, Xalibur) — `abilitySupportZielZone` kennt `customPlacement`.
     const candidates = [];
     for (let z = 0; z < 3; z++) {
-      if (script.customPlacement.canPlace(abZones[z] || [])) candidates.push(z);
+      if (script.customPlacement.canPlace(abZones[z] || [])) candidates.push({ zoneSlot: z, supportSlot: -1 });
+    }
+    if (engine.heroAcceptsAbilitiesInSupport(pi, hi)) {
+      const anzahl = Math.max(3, (ps.supportZones?.[hi] || []).length);
+      for (let z = 0; z < anzahl; z++) {
+        if (engine.abilitySupportZielZone(pi, hi, cardName, z) === z) candidates.push({ zoneSlot: -1, supportSlot: z });
+      }
     }
     if (!candidates.length) return null;
     return candidates[Math.floor(Math.random() * candidates.length)];
   }
 
-  // Stack onto existing same-name zone (up to level 3)
-  for (let z = 0; z < 3; z++) {
-    const zone = abZones[z] || [];
-    if (zone.length > 0 && zone[0] === cardName && zone.length < 3) return -1;
-  }
-  // Otherwise need a free zone
-  for (let z = 0; z < 3; z++) {
-    if ((abZones[z] || []).length === 0) return -1;
-  }
-  return null;
+  // 24.10.: EINE Stelle fuer den Zielort — bestehender Stapel (echte ODER Support Zone, Xal), sonst freie echte Zone, sonst freie
+  // Support Zone. `doPlayAbility` platziert bei -1 selbst genauso.
+  return engine.abilityZielOrt(pi, hi, cardName) ? { zoneSlot: -1, supportSlot: -1 } : null;
+}
+
+/**
+ * Returns a zoneSlot to use when calling doPlayAbility, or null if the Ability
+ * cannot be attached to this Hero right now.
+ *   >=0  : the specific zone to place into (required for customPlacement cards)
+ *   -1   : let doPlayAbility auto-place (stack onto existing or first free zone)
+ *   null : not attachable
+ * (Nur für „passt es überhaupt?" — die CPU legt über `resolveAbilityPlace`, das auch Support Zonen kennt.)
+ */
+function resolveAbilitySlot(engine, pi, hi, cardName) {
+  const ort = resolveAbilityPlace(engine, pi, hi, cardName);
+  if (!ort) return null;
+  return ort.zoneSlot >= 0 ? ort.zoneSlot : -1;
 }
 
 // ═══════════════════════════════════════════
@@ -6257,6 +6418,8 @@ function mctsEnumerateGenericAlternatives(engine, promptData, cpuIdxForBias) {
         });
       }
     } catch { /* ignore — keep original ordering */ }
+    // W63a (Al): geteilte Zonen (Alice) zuerst erkunden, dann die freien (stabil).
+    if (zones.some(z => z.shared)) zones = [...zones.filter(z => z.shared), ...zones.filter(z => !z.shared)];
     return zones.map(z => ({
       value: { heroIdx: z.heroIdx, slotIdx: z.slotIdx, ...(z.owner != null ? { owner: z.owner } : {}) },
       label: `zone=h${z.heroIdx}s${z.slotIdx}`,
@@ -7218,10 +7381,17 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
     // then rank by eval delta, take top N for multi-select.
     const pool = [...ownTargets, ...enemyTargets].filter(t => !isTargetImmune(engine, t));
     if (pool.length > 0) {
+      // Maßstab „nichts passiert": `evaluateState` liegt in der Größenordnung von Tausend, ein Treffer ändert sie um Zehner. Ein
+      // eigenes Ziel zählt nur, wenn der Treffer die Stellung gegenüber diesem Ausgangswert VERBESSERT (Soul Shard in der Ablage
+      // …) — sonst wählte die CPU „das kleinste Übel" aus lauter Eigentreffern, sobald kein Gegner angreifbar war.
+      let baseline = null;
+      try { baseline = engine._cpuEvaluateState(cpuIdx); } catch { /* ohne Ausgangswert: alte Regel */ }
+      const ownIds = new Set(ownTargets.map(t => t.id));
       const scored = [];
       for (const t of pool) {
         const s = simulateDamageTargetScore(engine, t, damageAmount, cpuIdx);
         if (s == null) continue;
+        if (baseline != null && ownIds.has(t.id) && !(s > baseline)) continue;
         scored.push({ t, s });
       }
       if (scored.length > 0) {
@@ -7232,14 +7402,16 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
         // isn't perfectly predictable when scores tie.
         if (cap > 1) return scored.slice(0, cap).map(x => x.t.id);
         const top = scored[0].s;
-        const eps = Math.max(1, Math.abs(top) * 0.03);
+        // Gleichstand = nah beieinander im VERBESSERUNGS-Maß (Abstand zum Ausgangswert), nicht im Betrag der Bewertung: 3 % von ~2500
+        // (≈ 75) war größer als der ganze Unterschied zwischen einem Treffer auf den Gegner und einem auf die eigene Kreatur.
+        const eps = Math.max(1, Math.abs(baseline != null ? top - baseline : top) * 0.03);
         const tied = scored.filter(x => x.s >= top - eps).map(x => x.t);
         return [randomOf(tied).id];
       }
     }
-    // Pool was empty (everything immune) — fall through to enemy/ally
-    // logic below; the enemy branch will return [] for cancellable
-    // prompts, decline-friendly.
+    // Nichts Brauchbares im Pool (alles immun oder kein Eigentreffer lohnt) — weiter zur Gegner-/Verbündeten-Logik unten; eigene
+    // Ziele sind dort keine Option, solange es Gegnerziele gibt (wie im `else if`-Zweig darunter).
+    if (enemyTargets.length > 0) ownTargets.length = 0;
   } else if (isDamageCard && ownTargets.length > 0 && enemyTargets.length > 0
              && !config.allowOwnSide) {
     // Default: strip own targets so the existing enemy-only picker
@@ -7337,6 +7509,14 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
     // If it's not cancellable, fall through so we still pick SOMETHING.
     const allEnemyImmune = enemyTargets.every(t => isTargetImmune(engine, t));
     if (allEnemyImmune && config.cancellable !== false) return [];
+  }
+
+  // Eine abbrechbare ATTACK ohne jedes gegnerische Ziel (alles geschützt/ausgegraut) wird abgebrochen — der Verbündeten-Zweig unten
+  // würde sonst einen eigenen Helden oder eine eigene Kreatur angreifen (Quick Attack & Co.).
+  if (cd?.cardType === 'Attack' && enemyTargets.length === 0 && ownTargets.length > 0
+      && config.cancellable === true && !config.allowOwnSide
+      && config.side !== 'my' && config.side !== 'own') {
+    return [];
   }
 
   // Ally-only fallthrough (e.g. cards whose side is 'own' but don't look
@@ -7723,11 +7903,18 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   // (`_cpuAutoConfirm` — Aufstiegsbonus „Add X to Hero?"), nimmt die
   // CPU immer — VOR allen Karten-Overrides und Kosten-Heuristiken.
   if (type === 'confirm' && promptData._cpuAutoConfirm) return { confirmed: true };
+  // W71a: ein optionPicker kann der CPU seine Wahl selbst vorschlagen (`_cpuOptionId` - Aufstiegsbonus
+  // "Choose one": die Engine kennt die anlegbaren Kopien), VOR den Karten-Overrides.
+  if (type === 'optionPicker' && promptData._cpuOptionId != null
+      && (promptData.options || []).some(o => String(o.id) === String(promptData._cpuOptionId))) {
+    return { optionId: String(promptData._cpuOptionId) };
+  }
 
   // Per-card override wins over the generic brain. Card authors export
   // `cpuResponse(engine, promptKind, promptData)` to customize how the CPU
   // responds to prompts their card raises (Barker hero-ability, etc.).
-  const cardName = promptData._gerryOriginalTitle || promptData.title || promptData.source;
+  // W58a: `cpuDispatch` nennt die Karte, deren `cpuResponse` antworten soll, wenn der Prompt-Titel dekoriert ist (Cool Rescuer Monia: "<Heldenname> — Cool Rescue!").
+  const cardName = promptData.cpuDispatch || promptData._gerryOriginalTitle || promptData.title || promptData.source;
   if (cardName) {
     const script = loadCardEffect(cardName);
     if (script?.cpuResponse) {
@@ -8080,8 +8267,16 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     if (!cards.length) return null;
     const c = pickBestGalleryCard(engine, cpuIdx, cards,
       promptData.menuSource || promptData._gerryOriginalTitle || promptData.title || null);
-    _logGalleryPick(engine, promptData, cpuIdx, [c.name]);
-    return { cardName: c.name, source: c.source };
+    // Gleichnamige Einträge aus mehreren Quellen („Mehrere Quellen = ein Picker", CARD_API): die Karte nennt per `cpuSourceOrder` ihre Reihenfolge der Quellen
+    // (['deck', 'hand'] …); die Bewertung wählt den NAMEN, die Reihenfolge die Quelle. Ohne Angabe bleibt es beim ersten Eintrag wie bisher.
+    let wahl = c;
+    if (Array.isArray(promptData.cpuSourceOrder)) {
+      const rang = (e) => { const r = promptData.cpuSourceOrder.indexOf(e.source); return r < 0 ? 99 : r; };
+      const gleiche = cards.filter(e => e.name === c.name).sort((x, y) => rang(x) - rang(y));
+      if (gleiche.length) wahl = gleiche[0];
+    }
+    _logGalleryPick(engine, promptData, cpuIdx, [wahl.name]);
+    return { cardName: wahl.name, source: wahl.source };
   }
   if (type === 'cardGalleryMulti') {
     const cards = promptData.cards || [];
@@ -8100,6 +8295,42 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     // Crestina) und der offenen Poolwahl — genau die Formen 4 und 5.
     pickBestGalleryCard(engine, cpuIdx, cards,
       promptData.menuSource || promptData._gerryOriginalTitle || promptData.title || null); // stamps `_galleryScore`
+    // Quellenregeln („Mehrere Quellen = ein Picker", CARD_API): `exclusiveSources` + `sourceMax` — die Wahl bleibt in EINER Quelle, je Quelle höchstens `sourceMax[quelle]`
+    // verschiedene Karten (Stellan/Stellin: bis zu 3 aus der Hand ODER 1 aus dem Deck). Je Quelle zählen die besten Einträge nach Galerie-Wert; die Quelle mit dem höchsten
+    // Gesamtwert gewinnt. Die Antwort nennt Indizes UND Quellen (gleichnamige Karten aus zwei Quellen sind zwei Einträge — Namen allein wären zweideutig).
+    if (promptData.exclusiveSources && promptData.sourceMax && typeof promptData.sourceMax === 'object') {
+      const gruppen = {};
+      cards.forEach((c, i) => { (gruppen[c.source] = gruppen[c.source] || []).push({ i, name: c.name, quelle: c.source, wert: Number.isFinite(c._galleryScore) ? c._galleryScore : 0 }); });
+      let beste = null, besterWert = -Infinity;
+      for (const [quelle, liste] of Object.entries(gruppen)) {
+        const max = promptData.sourceMax[quelle] ?? 1;
+        const gewaehlt = [], namen = new Set();
+        for (const e of liste.slice().sort((a, b) => b.wert - a.wert)) {
+          if (gewaehlt.length >= max) break;
+          if (namen.has(e.name)) continue;
+          namen.add(e.name); gewaehlt.push(e);
+        }
+        const summe = gewaehlt.reduce((x, e) => x + e.wert, 0);
+        if (gewaehlt.length > 0 && summe > besterWert) { besterWert = summe; beste = gewaehlt; }
+      }
+      // `cpuSourceOrder` (['hand', 'deck'] …): die Karte nennt eine feste Vorliebe — die erste Quelle der Liste mit wählbaren Einträgen gewinnt, der Wert entscheidet nur innerhalb.
+      if (Array.isArray(promptData.cpuSourceOrder)) {
+        for (const q of promptData.cpuSourceOrder) {
+          if (!gruppen[q]?.length) continue;
+          const max = promptData.sourceMax[q] ?? 1;
+          const gewaehlt = [], namen = new Set();
+          for (const e of gruppen[q].slice().sort((a, b) => b.wert - a.wert)) {
+            if (gewaehlt.length >= max) break;
+            if (namen.has(e.name)) continue;
+            namen.add(e.name); gewaehlt.push(e);
+          }
+          if (gewaehlt.length) { beste = gewaehlt; break; }
+        }
+      }
+      const wahl = beste || [];
+      _logGalleryPick(engine, promptData, cpuIdx, wahl.map(e => e.name));
+      return { selectedCards: wahl.map(e => e.name), selectedIndices: wahl.map(e => e.i), selectedSources: wahl.map(e => e.quelle) };
+    }
     const plan = cpuGalleryMultiPlan(promptData);
     if (plan.hardCount) {
       // EXACT-count prompt (Timeless King Zi / Magic Lamp / Crestina).
@@ -8206,17 +8437,22 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   // peek at opp.hand / mainDeck / potionDeck and weight by likelihood. Log
   // of last turn's plays adds a pattern bonus for cards opp already cast.
   if (type === 'cardNamePicker') {
-    // User-spec'd Luck heuristic:
+    // User-spec'd Luck heuristic (Luck, Liquid Luck):
     //   1. If opp has played a particular card every / close-to-every
     //      turn so far → name that (the strongest predictor of "they'll
-    //      play it again next turn").
+    //      play it again next turn"). Activated Surprises and Reactions
+    //      count as plays (Al 23.10.), so they can win this step too.
     //   2. Else → random card in opp's hand (any one card — pure
     //      probabilistic guess at their next play).
     //   3. Else (hand empty / no playable hand cards) → random card
     //      from their main deck.
-    // All picks are filtered to "playable" cards (excluding Heroes /
-    // Ascended Heroes / Tokens, which can't be cast from hand and so
-    // can't trigger Luck).
+    //   4. Else → a Surprise the opp has face-down right now (it only
+    //      counts once it is ACTIVATED, so it ranks below a sure play).
+    //   5. Else → a Reaction/Surprise from opp's hand or deck.
+    // Steps 1-3 are filtered to cards that are played on the opp's own
+    // turn (excluding Heroes / Ascended Heroes / Tokens, which can't be
+    // cast from hand, and Reactions/Surprises, which only fire when
+    // the opp's own conditions are met).
     const allowed = promptData.cardNames;
     if (!Array.isArray(allowed) || allowed.length === 0) return null;
     const oppIdx = cpuIdx === 0 ? 1 : 0;
@@ -8231,19 +8467,19 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     // so skip Area-subtype cards entirely while opp's area zone is
     // occupied.
     const oppHasArea = ((engine.gs.areaZones?.[oppIdx]) || []).length > 0;
-    const isPlayable = (name) => {
+    const isPlayable = (name, mitReaktion = false) => {
       if (!allowedSet.has(name)) return false;
       const cd = cardDB[name];
       if (!cd) return false;
       const t = cd.cardType;
       if (t === 'Hero' || t === 'Ascended Hero' || t === 'Token') return false;
-      // Reaction and Surprise subtypes don't get "played on opp's own
-      // turn" — Reactions fire in chain windows, Surprises trigger
-      // from face-down zones — so declaring them is almost always a
-      // wasted Luck. Defense-in-depth: Luck's onFreeActivate also
-      // filters these out of the prompt's `cardNames` list.
+      // Reactions fire in chain windows and Surprises from face-down
+      // zones: they only count when the opp's own conditions are met, so
+      // steps 1-3 skip them (sure plays first); `mitReaktion` lets the
+      // pattern step (they were actually activated before) and the
+      // fallback steps take them.
       const sub = (cd.subtype || '').toLowerCase();
-      if (sub === 'reaction' || sub === 'surprise') return false;
+      if (!mitReaktion && (sub === 'reaction' || sub === 'surprise')) return false;
       // Areas are blocked from being cast while another Area occupies
       // the caster's area zone. If opp already has one in play, the
       // named Area can't be played next turn either.
@@ -8266,14 +8502,15 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     // Attacks), `creature_summoned` (Creatures), and `card_played`
     // (Potions + Artifacts). All three trigger Luck's hooks, so all
     // three count toward "what does opp tend to play".
-    const PLAY_TYPES = new Set(['spell_played', 'creature_summoned', 'card_played']);
+    // `surprise_activated` / `reaction_activated`: activated Surprises and Reactions count as plays too.
+    const PLAY_TYPES = new Set(['spell_played', 'creature_summoned', 'card_played', 'surprise_activated', 'reaction_activated']);
     for (const e of log) {
       if (e.turn == null) continue;
       if (e.player !== oppName) continue;
       oppTurnsSeen.add(e.turn);
       if (!e.card) continue;
       if (!PLAY_TYPES.has(e.type)) continue;
-      if (!isPlayable(e.card)) continue;
+      if (!isPlayable(e.card, true)) continue;
       let s = turnsByCard.get(e.card);
       if (!s) { s = new Set(); turnsByCard.set(e.card, s); }
       s.add(e.turn);
@@ -8291,22 +8528,33 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     }
 
     // ── 2. Random card from opp's hand ───────────────────────────────
-    const handCandidates = (opp.hand || []).filter(isPlayable);
+    const handCandidates = (opp.hand || []).filter(n => isPlayable(n));
     if (handCandidates.length > 0) {
       return { cardName: randomOf(handCandidates) };
     }
 
     // ── 3. Random card from opp's main deck ──────────────────────────
-    const deckCandidates = (opp.mainDeck || []).filter(isPlayable);
+    const deckCandidates = (opp.mainDeck || []).filter(n => isPlayable(n));
     if (deckCandidates.length > 0) {
       return { cardName: randomOf(deckCandidates) };
     }
+
+    // ── 4. A Surprise face-down on opp's side right now ──────────────
+    const verdeckt = [];
+    for (const zone of (opp.surpriseZones || [])) for (const n of (Array.isArray(zone) ? zone : [zone])) if (typeof n === 'string' && isPlayable(n, true)) verdeckt.push(n);
+    if (verdeckt.length > 0) return { cardName: randomOf(verdeckt) };
+
+    // ── 5. A Reaction/Surprise from opp's hand, then deck ────────────
+    const reaktionen = (opp.hand || []).filter(n => isPlayable(n, true));
+    if (reaktionen.length > 0) return { cardName: randomOf(reaktionen) };
+    const reaktionenDeck = (opp.mainDeck || []).filter(n => isPlayable(n, true));
+    if (reaktionenDeck.length > 0) return { cardName: randomOf(reaktionenDeck) };
 
     // ── Final fallback — declare ANY playable allowed name so Luck
     //    fires (free activation, no downside). Only reached when opp
     //    has no playable hand AND no playable deck (extremely rare —
     //    all-Hero / all-Token state).
-    const fallback = allowed.find(isPlayable);
+    const fallback = allowed.find(n => isPlayable(n, true));
     return fallback ? { cardName: fallback } : null;
   }
   if (type === 'zonePick') {
@@ -8327,6 +8575,9 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
         if (oppPool.length > 0) pool = oppPool;
       }
     } catch { /* ignore — fall through to uniform pick */ }
+    // W63a (Al, 22.10.2026: „erst die geteilte Zone, sofern Alices Effekt aktiv ist, DANN die erste leere"): die CPU nimmt eine geteilte Zone vor den freien.
+    const poolGeteilt = pool.filter(zz => zz.shared);
+    if (poolGeteilt.length > 0) pool = poolGeteilt;
     const z = pool[Math.floor(Math.random() * pool.length)];
     return { heroIdx: z.heroIdx, slotIdx: z.slotIdx, ...(z.owner != null ? { owner: z.owner } : {}) };
   }
@@ -8520,6 +8771,13 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
       ps.discardPile.pop();
       ps.hand.splice(idx, 0, removed);
       value += Math.max(0, baseScore - scoreWithout);
+      // ★ 25.10. (Explosion Toss): eine Hand-Reaktion, die genau auf den Effekt wartet, dessen KOSTE dieser Abwurf ist (Hot Skull Potato → Explosion Toss), nicht als Kosten verheizen.
+      // `cpuMeta.keepOnDiscardFor`: Namen der Quellen, bei denen die Karte auf der Hand bleiben soll.
+      try {
+        const keepFor = loadCardEffect(name)?.cpuMeta?.keepOnDiscardFor;
+        const quelle = promptData.costFor || promptData.source;
+        if (Array.isArray(keepFor) && quelle && keepFor.includes(quelle)) value += 150;
+      } catch { /* Beiwerk */ }
       return { idx, name, value };
     });
     scored.sort((a, b) => a.value - b.value);
@@ -8950,7 +9208,7 @@ function pickEnemyTargets(engine, enemyTargets, damage, maxSelect) {
   // system not knowing how much the creature was actually worth.
   const teamMaxSchoolLvls = {};
   const teamMax = (oppIdx) => {
-    if (teamMaxSchoolLvls[oppIdx] == null) teamMaxSchoolLvls[oppIdx] = mctsTeamMaxSchoolLvl(gs, oppIdx);
+    if (teamMaxSchoolLvls[oppIdx] == null) teamMaxSchoolLvls[oppIdx] = mctsTeamMaxSchoolLvl(gs, oppIdx, engine);
     return teamMaxSchoolLvls[oppIdx];
   };
   // When the prompt's targetingConfig forgets to declare `baseDamage`,
@@ -9214,7 +9472,7 @@ function scoreSelfStatusTarget(engine, target, statusName) {
     } catch { /* ignore card errors, treat as 0 */ }
   };
   applyScript(loadCardEffect(hero.name));
-  const abZones = ps.abilityZones?.[target.heroIdx] || [[], [], []];
+  const abZones = alleAbilityStapel(engine, ps, target.heroIdx);
   for (const slot of abZones) {
     for (const abName of (slot || [])) applyScript(loadCardEffect(abName));
   }
@@ -9955,7 +10213,7 @@ function attributeAggregateValue(engine, pi, kind, amount) {
     if (typeof heroScript?.supportYield === 'function') {
       try { apply(heroScript.supportYield(ctx)); } catch {}
     }
-    const abZones = ps.abilityZones?.[hi] || [];
+    const abZones = alleAbilityStapel(engine, ps, hi);
     for (const slot of abZones) {
       if (!slot || slot.length === 0) continue;
       const abScript = loadCardEffect(slot[0]);
@@ -10001,7 +10259,7 @@ function mctsHeroRoleTags(engine, oppIdx, hi) {
   // "caster-of-school" because the user explicitly mentioned that another
   // hero "capable of casting Spells of the same or even higher levels"
   // makes the original caster redundant.
-  const abZones = ps.abilityZones?.[hi] || [];
+  const abZones = alleAbilityStapel(engine, ps, hi);
   const schoolLevels = {};
   for (const slot of abZones) {
     if (!slot || slot.length === 0) continue;
@@ -10037,7 +10295,7 @@ function mctsCasterIsCovered(engine, oppIdx, hi) {
   const ps = engine.gs.players[oppIdx];
   const hero = ps?.heroes?.[hi];
   if (!hero?.name) return false;
-  const myAbZones = ps.abilityZones?.[hi] || [];
+  const myAbZones = alleAbilityStapel(engine, ps, hi);
   const mySchoolLevels = {};
   for (const slot of myAbZones) {
     if (!slot || slot.length === 0) continue;
@@ -10548,7 +10806,7 @@ function abilitySearchUnlockBonus(engine, pi, abilityName) {
     if (!hero?.name || hero.hp <= 0) return false;
     if (hero.statuses?.frozen || hero.statuses?.stunned) return false;
     if (typeof engine._testLevelReqForZones === 'function') {
-      const abZones = ps.abilityZones?.[hi] || [];
+      const abZones = alleAbilityStapel(engine, ps, hi);
       const simZones = abZones.map(slot => (slot ? slot.slice() : []));
       let placed = false;
       for (const slot of simZones) {
@@ -10564,7 +10822,7 @@ function abilitySearchUnlockBonus(engine, pi, abilityName) {
     }
     // Fallback ohne Engine-Helfer (ignoriert Reducer/Zweitschulen).
     let lvl = 0;
-    for (const slot of (ps.abilityZones?.[hi] || [])) {
+    for (const slot of alleAbilityStapel(engine, ps, hi)) {
       if (slot && slot[0] === abilityName) lvl = Math.max(lvl, slot.length);
     }
     return lvl + 1 >= (cd.level || 0);
@@ -10668,7 +10926,7 @@ function interferenceAoeDiscount(engine, pi, cardName) {
     // Schlag gar kein Flaechenschlag und „Interference" greift nicht.
     if (heroes.length + creatures.length < 2) return 0;
 
-    const teamMax = mctsTeamMaxSchoolLvl(engine.gs, opp);
+    const teamMax = mctsTeamMaxSchoolLvl(engine.gs, opp, engine);
     let gesamt = 0, blockiert = 0;
     for (const { hero, heroIdx, owner } of heroes) {
       const gewicht = 100 * mctsEnemyHeroDynamicValue(engine, owner, heroIdx, teamMax);
@@ -11010,7 +11268,7 @@ function mctsHeroSupportDetails(engine, pi, hi) {
     gold += y.goldPerTurn || 0;
     damage += y.damagePerTurn || 0;
   };
-  const abZones = ps.abilityZones?.[hi] || [];
+  const abZones = alleAbilityStapel(engine, ps, hi);
   for (const slot of abZones) {
     if (!slot || slot.length === 0) continue;
     const script = loadCardEffect(slot[0]);
@@ -11110,14 +11368,14 @@ function mctsValueGoldVsDraw(engine, pi, opts = {}) {
 // Highest Spell-School ability level on pi's live team. Used to identify
 // which hero is "the team's main spellcaster" — higher threat than a
 // secondary spellcaster with the same spell-school ability at the same level.
-function mctsTeamMaxSchoolLvl(gs, pi) {
+function mctsTeamMaxSchoolLvl(gs, pi, engine = null) {
   const ps = gs.players[pi];
   if (!ps) return 0;
   let topLvl = 0;
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
-    const abZones = ps.abilityZones?.[hi] || [];
+    const abZones = alleAbilityStapel(engine, ps, hi);
     for (const slot of abZones) {
       if (!slot || slot.length === 0) continue;
       if (SPELL_SCHOOL_ABILITIES.has(slot[0])) {
@@ -11142,7 +11400,7 @@ function mctsEnemyHeroThreat(engine, oppIdx, hi, teamMaxSchoolLvl) {
   const ps = gs.players[oppIdx];
   const hero = ps?.heroes?.[hi];
   if (!hero?.name || hero.hp <= 0) return 1.0;
-  const abZones = ps.abilityZones?.[hi] || [];
+  const abZones = alleAbilityStapel(engine, ps, hi);
   let myMaxSchoolLvl = 0;
   for (const slot of abZones) {
     if (!slot || slot.length === 0) continue;
@@ -11391,7 +11649,7 @@ function evaluateState(engine, cpuIdx) {
   let ownHp = 0;
   for (const h of (ps.heroes || [])) if (isAliveForEval(h)) ownHp += h.hp;
 
-  const oppTeamMaxSchoolLvl = mctsTeamMaxSchoolLvl(gs, oppIdx);
+  const oppTeamMaxSchoolLvl = mctsTeamMaxSchoolLvl(gs, oppIdx, engine);
   let oppWeightedHp = 0;
   let minOppHp = Infinity;
   for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
@@ -12003,10 +12261,8 @@ function evaluateState(engine, cpuIdx) {
     // Ability totals — cumulative stacked abilities matter more than fresh ones.
     let ownAb = 0, oppAb = 0;
     for (let hi = 0; hi < 3; hi++) {
-      for (let z = 0; z < 3; z++) {
-        ownAb += (ps.abilityZones?.[hi]?.[z] || []).length;
-        oppAb += (opp.abilityZones?.[hi]?.[z] || []).length;
-      }
+      for (const slot of alleAbilityStapel(engine, ps, hi)) ownAb += (slot || []).length;
+      for (const slot of alleAbilityStapel(engine, opp, hi)) oppAb += (slot || []).length;
     }
     score += 15 * (ownAb - oppAb);
     const sumEngineValue = (pl) => {
@@ -12564,9 +12820,7 @@ async function applyActionCandidate(engine, helpers, candidate) {
     // "did this fire" signal since hand won't shrink.
     const hoptKey = `ability-action:${candidate.abilityName}:${cpuIdx}`;
     const hoptBefore = engine.gs.hoptUsed?.[hoptKey];
-    await helpers.doActivateAbility(helpers.room, cpuIdx, {
-      heroIdx, zoneIdx: candidate.zoneIdx,
-    });
+    await helpers.doActivateAbility(helpers.room, cpuIdx, abilityNutzlast({ ...candidate, heroIdx }));
     return engine.gs.hoptUsed?.[hoptKey] === engine.gs.turn && hoptBefore !== engine.gs.turn;
   }
   if (cardType === 'HeroEffectAction') {
@@ -14384,4 +14638,4 @@ async function measureAreaValues(engine, helpers, cpuIdx) {
 // Gold-Bedarfsrechnung, die an zwei Stellen gepflegt wird, laeuft
 // garantiert auseinander. Rein additiv, kein Aufrufer geaendert.
 module.exports = { CPU_META_HELPERS, runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, mctsValueGoldVsDraw, mctsPickFromOptions, rolloutRestOfTurn, seedExploreAttempts, computeGoldDemand, mctsOpponentGoldEconomy,
-  _test: { heroCheatBonusByName, heroEffectGateCheatBonus, candidateCheatBonus, heuristicCandidateCmp, ACTION_CHEAT_BONUS } };
+  _test: { pickHeroForEquip, activateCreatureEffects, activateHeroEffects, cpuGenericChoice, heroCheatBonusByName, heroEffectGateCheatBonus, candidateCheatBonus, heuristicCandidateCmp, ACTION_CHEAT_BONUS, pickCreatureZoneSlot, listEligibleHeroesForActionCard, resolveAbilityPlace, alleAbilityStapel, scoreAbilityPlacement, isAbilityStackSaturated, activateFreeAbilities, tryActionCostingAbility } };

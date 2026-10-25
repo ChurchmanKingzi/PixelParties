@@ -57,13 +57,22 @@ function summonableHandIndices(engine, pi, heroIdx, feld) {
     if (!cd || !isSummonablePileCreature(cd, cn)) continue;
     if (engine.effectiveCardLevel(cd, pi, { handIdx: i }) !== 0) continue;   // „level 0"
     if (!heroCanHost(engine, pi, heroIdx, cd, cn, feld, i)) continue;
+    if (freeSlots(engine, feld, heroIdx, cn, pi).length === 0) continue;   // W63a: Zone je Karte (frei oder — Alice — geteilt)
     out.push(i);
   }
   return out;
 }
 
-/** Freie Support Zones des entsprechenden Helden. */
-function freeSlots(engine, feld, heroIdx) {
+/**
+ * Freie Support Zones des entsprechenden Helden.
+ * ★ W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): mit `name` (und dem Beschwoerer `pi`)
+ * zaehlt — bei Alice-Teilung — auch die Zone einer GLEICHNAMIGEN Creature, geteilte zuerst (`engine.beschwoerZonenFuer`).
+ */
+function freeSlots(engine, feld, heroIdx, name = null, pi = feld) {
+  if (name) {
+    return engine.beschwoerZonenFuer(pi, name, { seite: feld, heroIdx, nurBasis: true, namedHeroesOnly: true })
+      .map(z => ({ owner: feld, heroIdx, slotIdx: z.slotIdx, ...(z.shared ? { shared: true, stackDepth: z.stackDepth, label: z.label } : {}) }));
+  }
   const zones = engine.gs.players[feld]?.supportZones?.[heroIdx] || [];
   const out = [];
   for (let z = 0; z < 3; z++) if ((zones[z] || []).length === 0) out.push({ owner: feld, heroIdx, slotIdx: z });
@@ -78,7 +87,6 @@ module.exports = {
     const engine = ctx._engine;
     const feld = ctx.cardHeroOwner ?? ctx.cardOwner;   // Spalte der Kreatur
     const heroIdx = ctx.cardHeroIdx;
-    if (freeSlots(engine, feld, heroIdx).length === 0) return false;
     return summonableHandIndices(engine, ctx.cardOwner, heroIdx, feld).length > 0;
   },
 
@@ -122,7 +130,7 @@ module.exports = {
       chosenName = ps.hand[idx];
       if (!chosenName) return false;
 
-      const slots = freeSlots(engine, feld, heroIdx);
+      const slots = freeSlots(engine, feld, heroIdx, chosenName, pi);   // W63a: Zonen der gewaehlten Karte (geteilte zuerst)
       if (slots.length === 0) return false;
       if (slots.length === 1) { dest = slots[0]; break; }
       const pick = await ctx.promptZonePick(slots, {
@@ -142,17 +150,27 @@ module.exports = {
       dest = treffer;
     }
 
+    // ★ W65a: die Beschwoerungskosten der gewaehlten Kreatur (Opfer-/Tribut-Wahl, abbrechbar) kommen VOR dem Auftritt — solange der Spieler sie
+    // abbrechen kann, sieht der Gegner nichts (kein Banner, keine Zeile); HOPT bleibt bei einem Abbruch frei. Erst danach der Auftritt, dann die Landung.
     if (savedReveal) engine.gs._pendingCardReveal = savedReveal;
     if (savedPlayLog) engine.gs._pendingPlayLog = savedPlayLog;
-    engine._firePendingCardReveal();
 
     const handIdx = ps.hand.indexOf(chosenName);
     if (handIdx < 0) return false;
     engine.takeFromPileSync(ps, 'hand', handIdx);
-    const res = await engine.summonCreatureWithHooks(chosenName, dest.owner, dest.heroIdx, dest.slotIdx, {
+    const kernOpts = {
       source: CARD_NAME,
       ...(feld !== pi ? { controller: pi } : {}),   // Kontrolle statt Seite (Styx 28.9.)
-    });
+    };
+    if (!(await engine._beschwoerungKostenVorAuftritt(chosenName, dest.owner, dest.heroIdx, dest.slotIdx, kernOpts))) {
+      delete engine.gs._pendingCardReveal; delete engine.gs._pendingPlayLog;
+      engine.returnToPile(ps, 'hand', chosenName, handIdx);   // Kosten abgebrochen / Sperre: Karte zurueck
+      engine.sync();
+      return false;
+    }
+    kernOpts._sperrenGeprueft = true; kernOpts._kostenGezahlt = true;
+    engine._firePendingCardReveal();
+    const res = await engine.summonCreatureWithHooks(chosenName, dest.owner, dest.heroIdx, dest.slotIdx, kernOpts);
     if (!res?.inst) {
       engine.returnToPile(ps, 'hand', chosenName, handIdx);   // Beschwoerung abgelehnt: Karte zurueck
       return false;

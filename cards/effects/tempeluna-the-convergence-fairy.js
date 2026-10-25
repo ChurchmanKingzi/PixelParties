@@ -43,6 +43,7 @@
 //  angelegte Feen traegt ihre eigene Karte in der Support Zone.
 // ═══════════════════════════════════════════
 
+const { equipZustandHooks } = require('./_hooks');   // W51b: Umhaengen (Fridge/Ceremony) als Verlassen+Betreten sehen
 const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const { loadCardEffect } = require('./_loader');
 const { gainedNames } = require('./_gained-effects-shared');
@@ -388,6 +389,10 @@ module.exports = {
     // dem `heroIdx` des WIRTS. Genau das will der Kartentext.
     feeInst.counters.treatAsEquip = true;
     feeInst.counters._tempelunaAttached = true;
+    // ★ W52a (Al, 22.10.2026: „In ihrem Effekt steht nichts davon, dass die Fee als Equip zählt – das wäre ungewollt!"): die Fee ist ANGEHÄNGT, nicht ausgerüstet.
+    // `treatAsEquip` bleibt nur als TRÄGER-Marke (Hooks aus der Support Zone, Heldeneffekt-Stummschaltung, Aktivierung); `_keinEquip` nimmt ihr die Equip-/Artifact-Identität
+    // (`engine.isEquipInZone` -> false, `istUmhaengbaresEquip` -> false: Fridge kann sie nicht umhängen; Hook-Art `attachment`).
+    feeInst.counters._keinEquip = true;
 
     // DIESE Instanz ist der Traeger des gewonnenen Effekts — keine
     // zusaetzliche unsichtbare (sonst liefen die Hooks doppelt).
@@ -422,7 +427,9 @@ module.exports = {
     return false;   // eigener HOPT-Schluessel gesetzt (siehe CARD_API)
   },
 
-  hooks: {
+  hooks: equipZustandHooks({
+    // W51b: `equipZustandHooks` — Umhaengen (Slippery Fridge / Inheritance Ceremony) sendet Enter/Leave nur an die bewegte Karte; dieser Zustandslauscher bekommt es ueber
+    // `onEquipLost` / `onEquipGained` (isMove) mit denselben Handlern (siehe _hooks.js).
     // Anfangsroutinen der beiden Grundfeen nachholen — `onAscendSetup`
     // ist synchron und kann das nicht.
     onAscension: async (ctx) => {
@@ -457,7 +464,7 @@ module.exports = {
       await engine.revokeHeroEffect(pi, heroIdx, weg.name, 'attachmentLeft');
       engine.sync();
     },
-  },
+  }),
 
   // Die CPU beantwortet ihre eigenen Galerien und das Menue — sonst
   // bricht die Engine jeden abbrechbaren Prompt fuer sie ab (v828).

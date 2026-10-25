@@ -98,6 +98,27 @@ function freeSupportSlots(engine, pi, heroIdx) {
 }
 
 /**
+ * ★ W64a (Al, 23.10.2026: „Ja, sollen sie!"): Creature-Tokens GLEICHEN Namens teilen bei aktiver Alice-Teilung eine Zone wie echte Kreaturen.
+ * Indizes der BELEGTEN Basiszonen eines Helden (Brettseite `feld`), in die der Token `tokenName` des Beschwoerers `pi` dazustossen darf
+ * (`canShareInto`: dort liegen nur gleichnamige Kreaturen/Creature-Tokens und `pi` teilt).
+ */
+function teilbareSlots(engine, pi, feld, heroIdx, tokenName) {
+  if (!tokenName) return [];
+  const { canShareInto } = require('./_alice-shared');
+  const zones = engine?.gs?.players?.[feld]?.supportZones?.[heroIdx] || [];
+  const out = [];
+  for (let z = 0; z < SUPPORT_SLOTS; z++) {
+    if ((zones[z] || []).length > 0 && canShareInto(engine, pi, heroIdx, z, tokenName, feld)) out.push(z);
+  }
+  return out;
+}
+
+/** ★ W64a: hat der Held eine freie ODER (Alice-Teilung) eine geteilte Zone fuer diesen Token? */
+function tokenZonePossible(engine, pi, feld, heroIdx, tokenName) {
+  return freeSupportSlots(engine, feld, heroIdx).length > 0 || teilbareSlots(engine, pi, feld, heroIdx, tokenName).length > 0;
+}
+
+/**
  * Ist diese Karte eine Potion? Geprueft am ROHEN Datenbankeintrag, NICHT
  * an den effektiven Daten — genau darum geht es bei Kylis Klausel „a
  * Creature that is not a Potion": ein Biomancy-Token liegt als
@@ -174,6 +195,8 @@ module.exports = {
   biomancyTokenCounters,
   biomancyLevelOf,
   freeSupportSlots,
+  teilbareSlots,
+  tokenZonePossible,
   isPotionCardName,
   placeBiomancyToken,
 };

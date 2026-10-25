@@ -70,6 +70,15 @@ const HOOKS = {
   // Feuert NUR, wenn ein FREMDER Effekt die Hand anfasst — eigene Kosten
   // (byPi === targetPi) oeffnen kein Fenster.
   ON_HAND_INTERACTION: 'onHandInteraction',
+  // W72a: Feuert, NACHDEM ein Spieler per Effekt 1 oder mehr Karten aus SEINEM Deck oder SEINER Ablage auf die Hand genommen hat
+  // (Magnetic Potion, Gate to the Armory, Cute Dog, Boomerang … — nicht: Ziehen, Brett → Hand, fremde Stapel, Potion Deck). Genau EIN Aufruf je
+  // Effekt (nicht je Karte), am Ende der Wirkung (Nach-Ketten-Aktion) oder früher, wenn die Tutor-Karte `engine.meldeHandZugangAusStapel` selbst ruft.
+  // Kontext: { playerIdx (der Hinzufuegende), cardNames[], piles[] ('deck'|'discard' je Karte), sourceName }. Reaktionsfenster (Control Monitors).
+  ON_HAND_ADD_FROM_PILE: 'onHandAddFromPile',
+  // Ein Spieler hat Karten aus Hand/Deck AUFGEDECKT (Suchergebnis, gezeigte Handkarte, oberste Deckkarte) — NICHT durch den Effekt einer Ability.
+  // Gesammelt je Wirkung, EIN Aufruf am Ende der Wirkung (Nach-Ketten-Aktion). Kontext: { playerIdx, cardNames[], zone ('hand'|'deck'), sourceName }.
+  // Zuhoerer: Atta, Speaker of Desires. Siehe `engine.meldeAufgedeckt`.
+  ON_CARDS_REVEALED: 'onCardsRevealed',
   // Feuert, NACHDEM ein Doom Counter auf eine Doom Clock gelegt wurde.
   // Kontext: { clock, byPi, count, sourceName }. Zuhoerer sind Archer
   // of Teocuilatl (Schaden) und Swift Eagle Warrior (Karte ziehen).
@@ -85,10 +94,22 @@ const HOOKS = {
   // heroController, kind: 'equip'|'attachment', isMove, fromOwner?, fromHeroIdx?, source? }. `cardName` im Kontext ist der LAUSCHER, nicht die Karte.
   // BEWUSST nicht in HOOK_DESCRIPTIONS: kein generisches Hand-Reaktionsfenster (Reaktionen auf der Hand lauschen wie Anti Magic Enchantment per `hooks.onEquipGained`, `activeIn: ['hand']`).
   ON_EQUIP_GAINED: 'onEquipGained',
+  // W51b/W52a (Al, 22.10.2026): GEGENSTUECK zu `onEquipGained` — der Hook fuer JEDES Verlassen einer Ausruestung / eines Anhaengsels von ihrem Wirt: zerstoert, abgelegt,
+  // geloescht, zurueck auf die Hand/ins Deck, Wirtsheld besiegt/entfernt, UMGEHAENGT (Slippery Fridge / Inheritance Ceremony / `actionTransferAttachment`). W51b baute ihn nur
+  // fuers Umhaengen (dessen Leave per `_onlyCard` nur die bewegte Karte erreicht — Taio/Toras-Befund); W52a hat ihn verallgemeinert. Gefeuert von `engine.fireEquipLost` (eine
+  // Methode): zentral vom Verteiler in `runHooks` nach jedem `onCardLeaveZone` mit `fromZone: 'support'` einer Nicht-Kreatur (nicht Token/Ability); die Umhaeng-Wege rufen sie direkt.
+  // Das rohe `onCardLeaveZone` bleibt unveraendert (Zaehler/Aufraeum-Lauscher). Kontext wie ein echtes Leave-Ereignis (`leavingCard`, `fromZone: 'support'`, `fromOwner` = Brettseite
+  // des alten Wirts, `fromHeroIdx`, `fromZoneSlot`, `toZone`) PLUS `lostCard`/`lostName`, `toOwner`/`toHeroIdx`/`toZoneSlot` (nur Umhaengen), `equipOwner` (Umhaengen: der Ausfuehrende;
+  // sonst der Verursacher), `kind` ('equip'|'attachment'), `isMove` (true NUR beim Umhaengen), `reason` ('moved' | 'transferred' | 'destroyed' | 'discarded' | 'deleted' |
+  // 'returnedToHand' | 'returnedToDeck' | 'hostDefeated' | 'hostRemoved' | 'other'; siehe `engine._equipLostGrund`), `source`.
+  // Die Karte steht beim Ereignis noch am alten Platz (Leave-Semantik); beim Umhaengen stehen bereits gemeldete Mitbewegte schon 'unterwegs' (`zone` '_umhaengen').
+  // Vertrag fuer Zustandslauscher: `equipZustandHooks` (unten) verdrahtet `onEquipLost` (= der Leave-Handler, OHNE rohes `onCardLeaveZone`) + `onEquipGained` (nur `isMove`).
+  ON_EQUIP_LOST: 'onEquipLost',
 
   // ── Combat ──
   ON_ATTACK_DECLARE: 'onAttackDeclare',
   BEFORE_DAMAGE:     'beforeDamage',
+  BEFORE_TRUE_DAMAGE: 'beforeTrueDamage',   // W73b: nur ERHÖHUNGEN (`modifyAmount(+n)`) vor True Damage (Cheering Rabbit) — Senkungen/Negation gibt es hier nicht
   AFTER_DAMAGE:      'afterDamage',
   ON_HERO_KO:        'onHeroKO',
   ON_HERO_REVIVE:    'onHeroRevive',
@@ -205,6 +226,16 @@ const HOOKS = {
 
   // ── Ascension ──
   ON_ASCENSION: 'onAscension',  // Fires when a Hero ascends into an Ascended Hero (reaction window)
+  // W55a: JEDER Formwechsel (Aufstieg `performAscension`, Abstieg `performDescend`, auch Open-Invitation-/Throne-Robber-Wege und `notAnAscension`) — Zustandsmeldung, kein Reaktionsfenster.
+  // Feuert NACH der Zustandsuebertragung (Name, HP, ATK-Neuaufbau `_atkNachFormwechsel`, Instanz umgehaengt, `onAscendSetup`), VOR Animation und Aufstiegsbonus.
+  // Ctx: { kind: 'ascend'|'descend', hero, heroOwner (Brettseite), controllerIdx (Kontrolleur), playerIdx (wer den Wechsel ausfuehrt), heroIdx, oldHeroName, newHeroName,
+  //        oldBaseAtk / newBaseAtk (GEDRUCKTER ATK der alten / neuen Form; ohne ATK-Angabe der neuen Form = unveraendert), baseAtkReset (true: die Engine hat `hero.baseAtk`/`hero.atk` auf den
+  //        gedruckten Wert + fortbestehende Buchungen NEU aufgebaut — alles, was am alten Grundwert hing (Cykyran: Base-ATK x2), ist weg und muss neu gebucht werden) }
+  ON_FORM_CHANGED: 'onFormChanged',
+
+  // ── W73c: Zusatzname (Shroomasaur) ──
+  ON_BOARD_CARD_TO_HAND: 'onBoardCardToHand',  // W74c (Wendy): a card moved from a player's SIDE OF THE BOARD (Support/Ability/Surprise Zone) into a hand — by actionMoveCard AND by the special bounce paths (`handZugangSync` with `von: 'brett'`/`vonInst`: Deepsea bounce/swap …). Not for deleted/discarded cards (Ankhota). State notification, no reaction window. Context: { bewegtName (card name), bewegteKarte (instance or null), vonZone, vonSeite (board side it left), handSeite (whose hand it entered), quelleSeite (player whose effect moved it, undefined = unknown) }
+  ON_NAME_CHANGED: 'onNameChanged',  // Fires when a creature gains or loses an additional name (Shroomasaur; the engine drops it at the start of the next turn). Zustandsmeldung, kein Reaktionsfenster. Karten, die ihre Wirkung am Bestand einer Namensfamilie BUCHEN (Censpartan: Schirm, Cykyran: Base-ATK x2), buchen hier neu. Context: { inst, name (neuer Zusatzname oder null), oldName }
 
   // ── Control changes ──
   ON_TAKE_CONTROL: 'onTakeControl',  // Fires when a player gains control of an opponent's target (Hero or Creature). Covers permanent transfers (Dark Gear, Diplomacy), temporary creature steals (Aligning Goals, Treacherous Crystal, Deepsea Succubus), Charme Lv3 hero steals, and Controlled Attack's hero-control mark. Context: { controllerPi, originalOwnerPi, targetType: 'hero'|'creature', targetName, targetInst?, targetHero?, heroIdx, kind: 'steal'|'transfer'|'charm'|'controlled' }
@@ -241,6 +272,9 @@ const ZONES = {
   DISCARD:  'discard',
   DELETED:  'deleted',
   HERO:     'hero',
+  // ★ Held als Kreatur (Hulijing): die auf einem Helden liegende Kreatur — eigene Zone, damit KEINE fremde Schleife über `cardInstances` (`zone === 'support'`) sie als Kreatur in einer
+  // Support Zone sieht (Zielwahlen, Opfer, Rückgaben, Kontrollwechsel …). Eingebunden wird sie bewusst und ausdrücklich (`_hero-creature-shared.js`).
+  HERO_OVERLAY: 'heroOverlay',
   PERMANENT:'permanent',
   // Coolness Stack — face-up player-owned pile created by Wowhalla.
   // Cards on the Stack can be searched, played from the top, or moved
@@ -386,6 +420,21 @@ const STATUS_EFFECTS = {
   // routes ALL attached copies to their original owners' discard piles
   // when the status is cleansed (its `onStatusRemoved` hook).
   berserked: { negative: true, cleansable: true, label: 'Berserked', icon: '😡', immuneKey: 'berserk_immune' },
+  // `ordered` (23.10., „The Master's Orders"): der Held steht unter dem Befehl des Anhaengers — der darf in seinen Zuegen mit ihm handeln, als gehoerte er ihm (zeitweise Uebernahme am
+  // Zugbeginn, siehe the-master-s-orders.js). Der Status ist der Schalter und die Heilbarkeit der Karte („treated as a negative status effect"): geheilt (Juice, Beer, Cure …) faellt jede
+  // Orders-Kopie am Helden in die Ablage ihres Besitzers.
+  ordered: { negative: true, cleansable: true, label: 'Under Orders', icon: '📜', immuneKey: 'orders_immune' },
+  // `polymorphed` (24.10., „Polymorph"): der Held kann keine Spells wirken (dieselben Sperr-Stellen wie `magic_silenced`/`frightened`: `validateActionPlay`, Hand-Grau, Reaktions-/Surprise-Wirker,
+  // `heroKannZaubern`), bekommt aber +100 ATK (gebucht ueber die Karteninstanz, `actionSetAtkGrant`). Der Kartentext sagt ausdruecklich „This is treated as a negative status effect" — negativ und heilbar:
+  // geheilt (Juice, Beer, Cure …) faellt Polymorph in die Ablage seines Besitzers (`anhaengselStatusHooks`, `heilenWirftAb`) und der ATK-Bonus verschwindet mit.
+  polymorphed: { negative: true, cleansable: true, label: 'Polymorphed', icon: '🐱', immuneKey: 'polymorph_immune' },
+  // `shrunk` (24.10., „Shrink"): Schaden, den der Held mit Attacks macht, wird 1; Schaden, den er von Attacks erleidet, wird verdoppelt (Haken in shrink.js). Der Kartentext sagt ausdruecklich „This is treated
+  // as a negative status effect" — negativ und heilbar: geheilt (Juice, Beer, Cure …) faellt Shrink in die Ablage seines Besitzers (`anhaengselStatusHooks`, `heilenWirftAb`).
+  shrunk: { negative: true, cleansable: true, label: 'Shrunk', icon: '🤏', immuneKey: 'shrink_immune' },
+  // `pranked` (24.10., „Nasty Prank"): der Held darf einzelne Attacks/Spells NAMENTLICH nicht mehr ausführen. Ein Statuseintrag je Held; `names` = { [Kartenname]: { expiresAtTurn, expiresForPlayer,
+  // permanent, by } } — jeder Name läuft für sich ab (bis zum Ende des nächsten Zuges des Gegners bzw. für den Rest des Spiels, wenn der Nutzer Magic Arts ≥ 1 hat). Sperren: `engine.heroPranked(hero, name)`
+  // in `validateActionPlay`, den Hand-Grau-Schleifen und im Reaktions-/Surprise-Gate. Negativ und heilbar („This counts as a negative status effect"): geheilt fallen alle Namen weg.
+  pranked: { negative: true, cleansable: true, label: 'Pranked', icon: '🤡', immuneKey: 'prank_immune' },
   // `cursed` — applied by Curse Attachment Spell. The bearer's
   // Attack stat is suppressed to 0 while attached: the engine's
   // `actionGrantAtk` / `actionRevokeAtk` / `grantTempHeroAtk` /
@@ -404,6 +453,10 @@ const STATUS_EFFECTS = {
   // ihres urspruenglichen Besitzers. Die Sperre der uebrigen Status
   // nimmt ihn selbst aus („its OTHER status effects").
   aged:      { negative: true, cleansable: true, label: 'Aged',      icon: '⏳', immuneKey: 'aged_immune' },
+  // `mind_controlled` (23.10.) — angelegt von „Mind Control" und AUSSCHLIESSLICH an diese Karte gebunden (`attachmentStatus`): „This is treated as a negative status effect."
+  // Der Status ist der Griff für Heilen/Übertragen: wird er entfernt (Cure, Beer, Juice …), fällt die Karte in die Ablage ihres Besitzers und mit ihr die dauerhafte Kontrolle über den
+  // Wirtshelden (`cards/effects/mind-control.js`, `onCardLeaveZone`). Heilbar wie Cursed.
+  mind_controlled: { negative: true, cleansable: true, label: 'Mind Controlled', icon: '🧠', immuneKey: 'mind_control_immune' },
   // `soul_transmitted` (v1330, „Soul Transmigration Ritual"): Debuff am
   // wiederbelebten Helden. NICHT ENTFERNBAR (`unremovable` — gilt fuer
   // jede Entfernung, auch fuer Eintraege ohne `unhealable`, etwa aus dem
@@ -486,6 +539,8 @@ const BUFF_EFFECTS = {
   // Elixir of Strength — primed +150 unstoppable damage on the Hero's
   // next single-target Attack. Persists across turns until consumed.
   empowered_strike: { label: 'Empowered Strike', icon: '💪', tooltip: "The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 150 and cannot be reduced or negated." },
+  // Unreasonable Anger (24.10.): jeder Schaden, den der Held an EINEM einzelnen Ziel verursacht, +100 — bis zum Ende des nächsten Zuges des Wirkers (Engine `_applyAngerBonusIfApplicable`).
+  unreasonable_anger: { label: 'Unreasonable Anger', icon: '💢', tooltip: 'Any damage this Hero deals to single targets is increased by 100.' },
   // String of Fine — target takes 0 damage from any source for the
   // duration of the buff. `damageMultiplier: 0` is read by the
   // engine's standard buff-multiplier pass on hero & creature damage,
@@ -1136,7 +1191,48 @@ function selbstsenkungZaehlt(engine, inst, cardName, ownerIdx, opts = {}) {
   return kopien.map(c => c.id).sort()[0] === inst.id;
 }
 
+/**
+ * W51b/W52a — VERTRAGSSTUECK "WER BONI/ZUSTAND AN DEN EQUIP-ZUSTAND HAENGT".
+ *
+ * Eine Karte, die rechnet "+X je Artifact am Helden", "bereit zum Aufstieg, solange Equip Y liegt", "Effekt weg, wenn die Fee geht" … hat einen ZUSTAND, der am
+ * Ausgeruestet-/Angehaengt-SEIN einer Karte haengt. Fuer ihn gilt (W52a, Al: „ein allgemeiner Hook fuer *alle* Equip-Verluste"):
+ *
+ *   • VERLUST — der Hook `onEquipLost` feuert bei JEDEM Verlassen einer Ausruestung / eines Anhaengsels von seinem Wirt (zerstoert, abgelegt, geloescht, zurueck auf die Hand,
+ *     Wirtsheld besiegt/entfernt, UMGEHAENGT; `ctx.reason`/`ctx.isMove` unterscheiden), zentral gefeuert von `engine.fireEquipLost`. Der Handler ist der bisherige
+ *     `onCardLeaveZone`-Handler (gleiche Felder: `leavingCard`, `fromZone`, `fromOwner`, `fromHeroIdx`, `fromZoneSlot`).
+ *   • ANKUNFT — das rohe `onCardEnterZone` fuer normales Anlegen/Anhaengen; das UMHAENGEN (Slippery Fridge, Inheritance Ceremony, `actionTransferAttachment`) sendet Enter nur an
+ *     die bewegte Karte selbst (kein Spielen, keine Zaehler) und kommt ueber `onEquipGained` mit `isMove`.
+ *
+ * `equipZustandHooks(hooks)` verdrahtet beides in einem Zug: aus `{ onCardEnterZone, onCardLeaveZone, …uebrige Hooks }` wird
+ *   `onEquipLost`   = der `onCardLeaveZone`-Handler — und das rohe `onCardLeaveZone` wird ENTFERNT (W52a): derselbe Abgang darf nicht ein zweites Mal ueber das rohe Leave
+ *                     gebucht werden (der Zustandslauscher sah sonst jeden Abgang doppelt);
+ *   `onCardEnterZone` bleibt (normale Ankuenfte) und
+ *   `onEquipGained` = derselbe Enter-Handler, aber NUR bei `ctx.isMove` (Umhaengen; sonst doppelt gebucht), mit den Feldern `enteringCard` (= `equipCard`), `toZone` ('support'),
+ *                     `toHeroIdx` (= `equipHeroIdx`) nachgezogen.
+ * Vorhandene eigene `onEquipLost`/`onEquipGained` im uebergebenen Objekt gewinnen (dann bleibt ein uebergebenes `onCardLeaveZone` unangetastet). Zaehl-/"wurde gespielt"-Lauscher
+ * (Luck, Fiona-Aszension …) nutzen das NICHT — sie bleiben bei `onCardEnterZone`/`onCardLeaveZone`: fuer sie ist ein Umhaengen kein Ereignis (Ruling W51a).
+ */
+function equipZustandHooks(hooks) {
+  const out = { ...hooks };
+  const enter = hooks.onCardEnterZone, leave = hooks.onCardLeaveZone;
+  if (typeof leave === 'function' && !out.onEquipLost) {
+    out.onEquipLost = leave;
+    delete out.onCardLeaveZone;   // W52a: genau EINE Buchung je Abgang (jetzt meldet `onEquipLost` jeden Abgang)
+  }
+  if (typeof enter === 'function' && !out.onEquipGained) {
+    out.onEquipGained = function (ctx, ...rest) {
+      if (!ctx || !ctx.isMove) return undefined;
+      if (ctx.enteringCard == null) ctx.enteringCard = ctx.equipCard;
+      if (ctx.toZone == null) ctx.toZone = 'support';
+      if (ctx.toHeroIdx == null) ctx.toHeroIdx = ctx.equipHeroIdx;
+      return enter.call(this, ctx, ...rest);
+    };
+  }
+  return out;
+}
+
 module.exports = {
+  equipZustandHooks,
   heldSeite,
   selbstsenkungZaehlt,
   BLIND_STATUSES,

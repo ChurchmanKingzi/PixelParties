@@ -10,42 +10,26 @@
 //  Creature death, every Mill, every forced
 //  discard, every revival pulling a name back out.
 //
-//  Implementation
-//  ──────────────
-//  • Bonus is stored as `inst.counters.atkGranted`
-//    so the engine's standard `actionRevokeAtk`
-//    cleanly removes the full amount when the
-//    Equip leaves play. The recompute writes the
-//    NEW bonus and applies the delta to hero.atk
-//    directly — same shape as a Fighting bump,
-//    so the UI's `fighting_atk_change` broadcast
-//    flashes the change.
+//  Implementation (W58a)
+//  ─────────────────────
+//  • Das Skript liefert nur die RECHNUNG (`atkZiel`: 10 × Anzahl
+//    verschiedener Namen in der Ablage des Kontrolleurs). Gebucht wird
+//    ueber `engine.dynamischeAtkBuchen` → `actionSetAtkGrant`: Zielwert,
+//    nur am aktuellen Traeger, pro Instanz genau einmal (Stempel).
 //
-//  • The recompute hook fires on every event that
-//    can plausibly mutate the discard pile. The
-//    set is intentionally redundant: `onAny-
-//    ActionResolved` already covers most resolved
-//    actions, but the specific `onDiscard` /
-//    `onMill` / `onCreatureDeath` / `afterSpell-
-//    Resolved` hooks let the bonus update WITHIN
-//    a chain (e.g. mid-attack, after a creature
-//    dies, so the next damage instance reads the
-//    updated ATK). `onTurnStart` is a periodic
-//    safety net for any path that mutates the
-//    pile without firing any of the above.
+//  • Die Engine gleicht diese Karte bei JEDEM `sync()` und JEDEM
+//    `runHooks()` gegen die Ist-Ablage ab (`_dynamischeAtkNachrechnen`,
+//    keine Hooks, keine Reaktionsfenster). Damit stimmt der Bonus
+//    unabhaengig davon, WIE die Ablage sich aendert — Zauber, Mill,
+//    Zwangsabwurf, Kreaturentod, Zerstoerung, Rueckholung, aber auch das
+//    Todes-Aufraeumen eines Helden (legt die Ausruestung direkt in die
+//    Ablage, ohne `onDiscard`) und Direktzugriffe auf `discardPile`.
+//    Die Haken unten rufen dieselbe Buchung zusaetzlich (Anlegen, Zug-
+//    beginn, bekannte Ablage-Ereignisse) — alles idempotent.
 //
-//  • Recompute is O(N) on the discard size with a
-//    Set construction — cheap. The function early-
-//    returns when the delta is zero, so most of
-//    the hook fires are no-ops anyway and the
-//    `fighting_atk_change` floater only surfaces
-//    when something actually changed.
-//
-//  • Standard `onCardLeaveZone` revoke path: when
-//    the Equip itself leaves its support slot
-//    (destroyed / returned to hand / moved /
-//    etc.), the full atkGranted is subtracted off
-//    hero.atk via `ctx.revokeAtk()`.
+//  • Wird die Karte entfernt, nimmt `onCardLeaveZone` (`ctx.revokeAtk()`)
+//    EXAKT den gebuchten Betrag am Stempel-Traeger zurueck; der Held hat
+//    danach dieselbe ATK wie einer, an dem nie ein Core lag.
 // ═══════════════════════════════════════════
 
 // v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
@@ -55,44 +39,27 @@ const CARD_NAME = 'Ancient Tech Infinite Energy Core';
 const BONUS_PER_UNIQUE = 10;
 
 /**
- * Recompute the ATK bonus and apply the delta vs. the previously
- * granted amount. Idempotent — a no-op when nothing changed, so
- * it's safe to fire on every plausibly-related hook.
+ * W58a: die RECHNUNG (ohne Buchung). Die Engine bucht (`engine.dynamischeAtkBuchen` → `actionSetAtkGrant`) und gleicht diese Karte bei jedem `sync`/`runHooks` gegen die
+ * Ist-Ablage ab — auch nach Wegen, die die Ablage ohne Hook veraendern (Todes-Aufraeumung, Direktzugriffe).
+ * Kontrolle statt Seite (Styx 28.9.): „your discard pile" = Kontrolleur (`seiten.owner`).
  */
-function recomputeBonus(ctx) {
-  const engine = ctx._engine;
-  const inst = ctx.card;
-  if (!inst || inst.zone !== 'support') return;
-
-  // Kontrolle statt Seite (Styx 28.9.): „your discard pile" = Kontrolleur
-  // (`cardOwner`), der Held steht auf seiner Brettseite (`cardHeroOwner`).
-  const owner = ctx.cardOwner;
-  const feld = ctx.cardHeroOwner ?? owner;
-  const heroIdx = ctx.cardHeroIdx;
-  const hero = ctx.attachedHero;
-  if (!hero?.name) return;
-
-  const ps = engine.gs.players[owner];
+function atkZiel(engine, inst, seiten /* , hero */) {
+  const ps = engine.gs.players[seiten.owner];
   const uniqueCount = new Set((ps?.discardPile || []).map(baseCardName)).size;   // v876
   const newBonus = uniqueCount * BONUS_PER_UNIQUE;
+  return { betrag: newBonus, log: { typ: 'ancient_tech_atk', daten: { newBonus, uniqueCount } } };
+}
 
-  if (!inst.counters) inst.counters = {};
-  const currentBonus = inst.counters.atkGranted || 0;
-  const delta = newBonus - currentBonus;
-  if (delta === 0) return;
-
-  // Engine ATK helper routes through Curse's suppression accumulator
-  // when the host is cursed, otherwise mutates + broadcasts normally.
-  engine._applyHeroAtkDelta(hero, feld, heroIdx, delta);
-  inst.counters.atkGranted = newBonus;
-
-  engine.log('ancient_tech_atk', {
-    hero: hero.name, newBonus, uniqueCount, delta,
-  });
-  engine.sync();
+/** Haken-Einstieg: Zielwert neu rechnen und buchen (idempotent — ohne Aenderung ein No-op). */
+function recomputeBonus(ctx) {
+  const inst = ctx.card;
+  if (!inst || inst.zone !== 'support') return;
+  ctx._engine.dynamischeAtkBuchen(inst);
 }
 
 module.exports = {
+
+  atkZiel,   // W58a: Rechnung fuer `engine.dynamischeAtkBuchen` / den Abgleich der Engine
 
   /**
    * „Equip this card to a Hero you control." — Seitenbindung, siehe
@@ -130,10 +97,10 @@ module.exports = {
     // not for unrelated cards passing through onCardLeaveZone.
     onCardLeaveZone: (ctx) => {
       if (ctx.fromZone !== 'support') return;
-      // `fromOwner` ist die Brettseite (Styx 28.9.: bei Uebernahme != cardOwner).
-      if (ctx.fromOwner !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
-      if (ctx.fromHeroIdx !== ctx.card.heroIdx) return;
-      if (ctx.fromZoneSlot !== ctx.card.zoneSlot) return;
+      // W53a: Identitaet statt Seitenvergleich. Der strenge Vergleich `fromOwner === cardHeroOwner` scheiterte, sobald sich die Seitenlage seit dem Anlegen geaendert hatte
+      // (Charme am Wirt endet, Kontrolle wechselt): die Karte ging, der Bonus blieb am Ex-Traeger stehen. Abgezogen wird dort, wo die Buchung liegt (Stempel).
+      if (ctx.leavingCard) { if (ctx.leavingCard.id !== ctx.card.id) return; }
+      else if (ctx.fromHeroIdx !== ctx.card.heroIdx || ctx.fromZoneSlot !== ctx.card.zoneSlot) return;
       ctx.revokeAtk();
     },
   },

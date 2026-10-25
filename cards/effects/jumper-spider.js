@@ -42,7 +42,7 @@ const DRAW_COUNT = 2;
  * (no Hero present) are skipped — a free slot needs a living Hero (or
  * at least a placed Hero) to anchor the zone.
  */
-function getFreeSupportZones(gs, pi) {
+function getFreeSupportZones(gs, pi, engine = null) {
   const ps = gs.players[pi];
   if (!ps) return [];
   const freeZones = [];
@@ -54,6 +54,11 @@ function getFreeSupportZones(gs, pi) {
         freeZones.push({ heroIdx: hi, slotIdx: si });
       }
     }
+  }
+  // ★ W63a (Al, 22.10.2026: „Solange der Effekt aktiv ist, kann eine Creature in eine geteilte Zone bewegt werden"; „erst die geteilte Zone, DANN die erste leere"):
+  // mit Alice-Teilung der neuen Kontrolleurin zaehlt auch die Zone einer GLEICHNAMIGEN Jumper Spider — die Spinnen teilen sich die Zone.
+  if (engine) {
+    return require('./_alice-shared').mitGeteilten(engine, pi, CARD_NAME, freeZones, { nachKontrolle: false, livingHeroesOnly: false, namedHeroesOnly: true, nurBasis: true });
   }
   return freeZones;
 }
@@ -144,7 +149,7 @@ module.exports = {
       if (currentController === activePlayer) return;
 
       // Free-zone check on the NEW controller's side.
-      const freeZones = getFreeSupportZones(gs, activePlayer);
+      const freeZones = getFreeSupportZones(gs, activePlayer, engine);   // W63a: + geteilte Zone (Alice)
       if (freeZones.length === 0) {
         engine.log('jumper_spider_transfer_skipped', {
           reason: 'no_free_zone',

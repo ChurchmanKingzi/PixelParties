@@ -239,7 +239,7 @@ module.exports = {
     const gewaehlt = [];
     for (const id of pickedIds) {
       const t = equipTargets.find(q => q.id === id);
-      if (t && !gewaehlt.includes(t.cardInstance)) gewaehlt.push(t.cardInstance);
+      for (const inst of engine.gewaehlteInstanzen(t)) if (!gewaehlt.includes(inst)) gewaehlt.push(inst);   // Darion: Mehrfachwahl im Stapel
     }
     if (gewaehlt.length === 0) return true;
 
@@ -265,6 +265,7 @@ module.exports = {
             heroIdx: z.heroIdx,
             slotIdx: si,
             cardName: '',
+            _eigeneStapelWahl: true,   // Darion: Zielplatz (auch der Equip-Stapel) — keine Rueckfrage „welches Equip?"
           });
         }
         // Also allow clicking the hero directly (auto-picks first free slot)

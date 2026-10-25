@@ -53,7 +53,7 @@ function buildCreatureGallery(ps, cardDB, engine, pi) {
 module.exports = {
   isTargetingArtifact: true,
   manualGoldCost: true,
-  deferBroadcast: true,
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral (Auftritts-Puffer); `engine.commitAppearance()` markiert die Stelle, ab der es keinen Abbruch mehr gibt.
   activeIn: ['support', 'ability', 'hero', 'hand', 'discard'],
 
   canActivate(gs, pi, engine) {
@@ -80,26 +80,31 @@ module.exports = {
       h?.name && h.hp > 0 &&
       (ps.supportZones?.[hi] || []).some(slot => (slot || []).length === 0),
     );
-    return hasFreeZone;
+    if (hasFreeZone) return true;
+    // W62a: oder (Alice-Teilung) die Zone einer GLEICHNAMIGEN Creature fuer eine Karte aus Hand/Deck (grobe Vorpruefung; die Wahl prueft `resolve`)
+    if (!engine || !engine.heroesControlledBy) return false;
+    const { canShareInto } = require('./_alice-shared');
+    const namen = new Set([...(ps.hand || []), ...(ps.mainDeck || [])]);
+    return engine.heroesControlledBy(pi).some(({ physOwner, heroIdx: hi, hero: h }) => h?.name && [0, 1, 2].some(z => {
+      const nm = ((gs.players[physOwner]?.supportZones?.[hi] || [])[z] || [])[0];
+      return !!nm && namen.has(nm) && canShareInto(engine, pi, hi, z, nm, physOwner);
+    }));
   },
 
   async resolve(engine, pi) {
     const gs  = engine.gs;
     const ps  = gs.players[pi];
     const cardDB = engine._getCardDB();
+    const oppIdx = engine.opponentOf(pi);   // (unten: Rückkehr am Ende SEINES nächsten Zugs)
 
-    // Reveal the card to the opponent now
-    const oppIdx = engine.opponentOf(pi);
-    const oppSid = gs.players[oppIdx]?.socketId;
-    if (oppSid) engine.io.to(oppSid).emit('card_reveal', { cardName: CARD_NAME });
-    await engine._delay(100);
+    // (W64b: der Auftritt wird NICHT mehr hier gezeigt — die Galerie unten ist abbrechbar; er kommt mit `engine.commitAppearance()` hinter der letzten Wahl.)
 
     // ── Step 1: pick a Creature from deck or hand ────────────────────────
 
     let gallery = buildCreatureGallery(ps, cardDB, engine, pi);
     // G1 (A09-11): Goldsperre - nur Auswahlen mit Gesamtkosten 0 (Stufe 0) sind waehlbar
     if (ps.goldLocked) gallery = gallery.filter(e => e.level === 0);
-    if (gallery.length === 0) return { aborted: true };
+    if (gallery.length === 0) return { cancelled: true };
 
     const creaturePick = await engine.promptGeneric(pi, {
       type: 'cardGallery',
@@ -110,7 +115,7 @@ module.exports = {
       confirmClass: 'btn-info',
       cancellable: true,
     });
-    if (!creaturePick || creaturePick.cancelled || !creaturePick.cardName) return { aborted: true };
+    if (!creaturePick || creaturePick.cancelled || !creaturePick.cardName) return { cancelled: true };
 
     const chosenName = creaturePick.cardName;
     const chosenCd   = cardDB[chosenName];
@@ -120,7 +125,7 @@ module.exports = {
     const goldCost   = level * COST_PER_LEVEL;
 
     // Verify the player can afford it
-    if ((ps.gold || 0) < goldCost || (goldCost > 0 && ps.goldLocked)) return { aborted: true };   // G1 (A09-11): Goldsperre
+    if ((ps.gold || 0) < goldCost || (goldCost > 0 && ps.goldLocked)) return { cancelled: true };   // G1 (A09-11): Goldsperre
 
     // ── Step 2: pick a free support zone ────────────────────────────────
     // Place can target ANY of the player's Heroes' Support Zones —
@@ -136,7 +141,7 @@ module.exports = {
     // ★ W22a (Al, 20.10.2026, „Hero you control": „Nur der aktuelle Kontrolleur, inklusive eines temporaeren Kontrolleurs"): die Zonen der Helden, die `pi`
     // KONTROLLIERT (`heroesControlledBy`): ein abgegebener eigener Held (dauerhaft oder temporaer) wird dem Besitzer nicht angeboten, ein uebernommener Held der
     // Gegenspalte seinem Kontrolleur (Zone traegt `owner` = Brettseite; die Illusion steht dann seitenfremd, kontrolliert von `pi`).
-    const freeZones = [];
+    let freeZones = [];
     for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
       if (!h?.name) continue;
       if (!engine.isCreatureSummonable(chosenName, physOwner, hi, { _bypassBeforeSummon: true })) continue;
@@ -150,7 +155,18 @@ module.exports = {
         }
       }
     }
-    if (freeZones.length === 0) return { aborted: true };
+    // ★ W62a: + (Alice-Teilung) die Zone einer GLEICHNAMIGEN Creature (W63a: geteilte Zone zuerst, dann die freien; `beschwoerZonenFuer`).
+    for (const z of engine.beschwoerZonenFuer(pi, chosenName, { nachKontrolle: true })) {
+      if (!z.shared) continue;
+      if (!engine.isCreatureSummonable(chosenName, z.owner, z.heroIdx, { _bypassBeforeSummon: true })) continue;
+      freeZones.push({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, owner: z.owner, shared: true, label: z.label });
+    }
+    freeZones = require('./_alice-shared').geteiltZuerst(freeZones);   // W63a (Al, 22.10.2026): erst die geteilte Zone, DANN die erste leere
+    if (freeZones.length === 0) return { cancelled: true };
+
+    // W64b: Kreatur gewählt, bezahlbar, Zone vorhanden — ab hier gibt es keinen Abbruch mehr (die Zonenwahl unten ist Pflicht): der Auftritt kommt VOR dem Platzieren.
+    engine.commitAppearance();
+    await engine._delay(100);
 
     let destHeroIdx, destSlot, destSeite = pi;
     if (freeZones.length === 1) {
@@ -168,10 +184,10 @@ module.exports = {
         confirmLabel: '📍 Place here',
         cancellable: false,
       });
-      if (!zonePick) return { aborted: true };
+      if (!zonePick) return { cancelled: true };
       const zone = freeZones.find(z => z.heroIdx === zonePick.heroIdx && z.slotIdx === zonePick.slotIdx && z.owner === (zonePick.owner ?? pi))
         || (zonePick.owner == null ? freeZones.find(z => z.heroIdx === zonePick.heroIdx && z.slotIdx === zonePick.slotIdx) : null);
-      if (!zone) return { aborted: true };
+      if (!zone) return { cancelled: true };
       destHeroIdx = zone.heroIdx;
       destSlot    = zone.slotIdx;
       destSeite   = zone.owner;
@@ -192,8 +208,7 @@ module.exports = {
 
     // Place in support zone
     const dps = gs.players[destSeite];   // W22a: Brettseite der Zone (uebernommener Held der Gegenspalte)
-    if (!dps.supportZones[destHeroIdx]) dps.supportZones[destHeroIdx] = [[], [], []];
-    dps.supportZones[destHeroIdx][destSlot] = [chosenName];
+    engine.zoneEintragen(destSeite, destHeroIdx, destSlot, chosenName, pi);   // W62a: gleichnamige Kreatur (Alice) → dazustapeln statt ueberschreiben
 
     const inst     = engine._trackCard(chosenName, destSeite, 'support', destHeroIdx, destSlot);
     if (destSeite !== pi) engine.markiereSeitenfremd(inst, pi);

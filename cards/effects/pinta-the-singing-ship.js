@@ -44,7 +44,15 @@
 //     sie unmoeglich. Beschwoerungsarten, die danach fragen, tun es nicht
 //     mehr (Blue-Ice Dragon: `ctx._alsZusatzaktion`, bekommt Haste).
 //
-//     PLATZ: KEINE Zonenwahl — Pinta nimmt die ERSTE freie Zone. Einzige
+//     ★ W62a (Al: „Pintas Effekt erkennt Zonen mit bereits liegenden gleichnamigen Creatures nicht"): mit „Alice, the Transfer
+//     Student" (Alice-Teilung des Kontrolleurs: auch bei gefallener/negierter Alice, `_alice-shared.sharingActive`) ist auch eine
+//     BELEGTE Zone ein Landeplatz, in der schon nur Kreaturen GLEICHEN Namens liegen — die aufgedeckte Creature stapelt sich dazu,
+//     wie beim Hand-Weg. Die Zonenfrage ist EINE zentrale (`eligibleSummonZones` → `canShareInto`, dieselbe Auslegung wie
+//     `engine.beschwoerZonenFuer`): ★ W63a (Al, 22.10.2026: „erst die geteilte Zone, DANN die erste leere"): GETEILTE Zonen zuerst, dahinter
+//     die freien — wählt der Spieler selbst (Hand-Weg), bleiben beide wählbar; Pinta wählt nie und nimmt die erste Zone der Liste. Ohne Alice-Teilung oder ohne gleichnamige Kreatur bleibt es bei „keine Zone →
+//     nicht beschwörbar". Die Opfer-Zonen unten gelten nur, wenn WEDER eine freie NOCH eine geteilte Zone da ist.
+//
+//     PLATZ: KEINE Zonenwahl — Pinta nimmt die ERSTE geteilte Zone (W63a; Alice-Teilung), sonst die erste freie. Einzige
 //     Ausnahme: sind alle Zonen Pintas belegt und verlangt die aufgedeckte
 //     Creature Opfer (Blue-Ice Dragon), waehlt der Spieler NACH dem
 //     Aufdecken die Zone, in die sie soll — die Creature, die dort steht,
@@ -92,7 +100,10 @@ function beschwoerbareKarte(engine, pi, feld, heroIdx, name) {
   return engine.isCreatureSummonable(name, feld, heroIdx, { beschwoerer: pi });
 }
 
-/** Pintas eigene freie Zonen, auf die `name` JETZT beschwoert werden koennte („if possible"). */
+/**
+ * Pintas eigene Zonen, auf die `name` JETZT beschwoert werden koennte („if possible"): freie Zonen und — bei Alice-Teilung —
+ * die Zonen, in denen schon nur gleichnamige Kreaturen liegen (`shared: true`; freie vorn). Opfer-Zonen: `opferZonen`.
+ */
 function moeglicheZonen(engine, pi, feld, heroIdx, name) {
   const hero = engine.gs.players[feld]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0 || !name) return [];
@@ -237,7 +248,7 @@ module.exports = {
         },
         ...(feld !== pi ? { heldSeite: feld } : {}),
       });
-      engine.log('pinta_summon', { player: ps.username, card: oben, ok: !!inst });
+      engine.log('pinta_summon', { player: ps.username, card: oben, ok: !!inst, ...(ziel.shared ? { shared: true } : {}) });
     } else {
       engine.log('pinta_reveal_unsummonable', { player: ps.username, card: oben });
     }

@@ -7,7 +7,7 @@
 //  Works for starting abilities (onGameStart).
 // ═══════════════════════════════════════════
 
-const { abgangsBetrag } = require('./_stufenbonus-shared');
+const { abgangsBetrag, kopienIndex } = require('./_stufenbonus-shared');
 const ATK_PER_LEVEL = [10, 10, 20]; // Index 0 = 1st copy, etc.
 
 /** Apply ATK bonus to a hero and store it on the card instance. */
@@ -73,9 +73,8 @@ module.exports = {
 
       // Styx 28.9.: Zone und Held liegen auf der Brettseite (geliehener Held).
       const seite = ctx.cardHeroOwner ?? ctx.cardOwner;
-      const ps = ctx.players[seite];
-      const zone = (ps.abilityZones[ctx.cardHeroIdx] || [])[ctx.card.zoneSlot] || [];
-      const copyIndex = zone.length - 1;
+      // 25.10.: Platz = Zahl der Kopien dieses Stapels, die ihren Bonus schon tragen (nicht „Hoehe - 1": Aufstiegsbonus und Aufwachen legen mehrere Kopien auf einmal).
+      const copyIndex = kopienIndex(ctx._engine, ctx.card, 'atkGranted');
 
       applyBonus(ctx._engine, ctx.card, hero, seite, ctx.cardHeroIdx, copyIndex);
     },
@@ -90,7 +89,7 @@ module.exports = {
       const engine = ctx._engine;
       const seite = ctx.cardHeroOwner ?? ctx.cardOwner;   // Styx 28.9.: Brettseite
       const sameZone = engine.cardInstances.filter(c =>
-        c.owner === seite && c.zone === 'ability' &&
+        c.owner === seite && c.zone === ctx.card.zone &&
         c.heroIdx === ctx.cardHeroIdx && c.zoneSlot === ctx.card.zoneSlot &&
         c.name === 'Fighting'
       );
