@@ -42,19 +42,29 @@ function getDeadHeroes(gs, pi) {
   return result;
 }
 
-/** Get living heroes with at least 1 free base Support Zone. */
-function getLivingHeroesWithFreeZone(ps, pi) {
+/**
+ * Die Plaetze, in die der Gefallene `deadName` bei Held `hi` angelegt werden kann: freie Basis-Zonen — bei einem Held mit Equip-Stapel (Darion: „All Artifacts equipped
+ * to this Hero share 1 Support Zone") ausschliesslich der Stapel (der angelegte Held ist ein Equip-Artifact, braucht dort keine freie Zone).
+ */
+function freieZonen(ps, hi, engine, pi, deadName) {
+  const pflicht = engine && deadName ? engine.equipPflichtPlatz(pi, hi, deadName) : -1;
+  if (pflicht >= 0) return [pflicht];
+  const out = [];
+  for (let si = 0; si < 3; si++) {
+    if (((ps.supportZones[hi] || [])[si] || []).length === 0) out.push(si);
+  }
+  return out;
+}
+
+/** Get living heroes with at least 1 free base Support Zone (Darion: oder einem Equip-Stapel). */
+function getLivingHeroesWithFreeZone(ps, pi, engine = null, deadName = null) {
   const result = [];
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
     if (pi != null && !kontrolliertVon(hero, pi)) continue;   // W28a: abgegeben
-    for (let si = 0; si < 3; si++) {
-      if (((ps.supportZones[hi] || [])[si] || []).length === 0) {
-        result.push({ heroIdx: hi, heroName: hero.name, freeSlot: si });
-        break;
-      }
-    }
+    const frei = freieZonen(ps, hi, engine, pi, deadName);
+    if (frei.length > 0) result.push({ heroIdx: hi, heroName: hero.name, freeSlot: frei[0] });
   }
   return result;
 }
@@ -66,9 +76,11 @@ const { hasCardType } = require('./_hooks');
 module.exports = {
   isTargetingArtifact: true,
 
-  canActivate(gs, pi) {
-    if (getDeadHeroes(gs, pi).length === 0) return false;
-    return getLivingHeroesWithFreeZone(gs.players[pi], pi).length > 0;
+  canActivate(gs, pi, engine) {
+    const dead = getDeadHeroes(gs, pi);
+    if (dead.length === 0) return false;
+    const eng = engine || gs._engineRef || null;
+    return getLivingHeroesWithFreeZone(gs.players[pi], pi, eng, dead[0].heroName).length > 0;
   },
 
   getValidTargets(gs, pi) {
@@ -110,7 +122,7 @@ module.exports = {
     const deadHeroName = deadHero.name;
 
     // ── Select living hero with free zone ──
-    const livingOptions = getLivingHeroesWithFreeZone(ps, pi);
+    const livingOptions = getLivingHeroesWithFreeZone(ps, pi, engine, deadHeroName);
     if (livingOptions.length === 0) return { aborted: true };
 
     let livingHeroIdx, targetSlot;
@@ -121,14 +133,13 @@ module.exports = {
       // Build both hero and zone targets (like Gift of Coolness)
       const targets2 = [];
       for (const opt of livingOptions) {
-        for (let si = 0; si < 3; si++) {
-          if (((ps.supportZones[opt.heroIdx] || [])[si] || []).length === 0) {
-            targets2.push({
-              id: `equip-${pi}-${opt.heroIdx}-${si}`,
-              type: 'equip', owner: pi,
-              heroIdx: opt.heroIdx, slotIdx: si, cardName: '',
-            });
-          }
+        for (const si of freieZonen(ps, opt.heroIdx, engine, pi, deadHeroName)) {   // Darion: nur der Equip-Stapel
+          targets2.push({
+            id: `equip-${pi}-${opt.heroIdx}-${si}`,
+            type: 'equip', owner: pi,
+            heroIdx: opt.heroIdx, slotIdx: si, cardName: '',
+            _eigeneStapelWahl: true,   // Darion: Zielplatz (auch der Equip-Stapel) — keine Rueckfrage „welches Equip?"
+          });
         }
         targets2.push({
           id: `hero-${pi}-${opt.heroIdx}`,

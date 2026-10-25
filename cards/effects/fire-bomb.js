@@ -61,6 +61,8 @@ module.exports = {
         // kuenftige Sonderfaelle automatisch mitkommen (Als Ruling 5.8.).
         for (const t of (engine?.getAbilityTargets?.(pi) || [])) {
           if (t.zoneKind !== 'support') continue;
+          // Darion: liegt die Ability-Karte (Cloak of Edge) in einem Equip-Stapel, darf die Rückfrage „welches Equip?" nur die Ability-Karten anbieten.
+          if (t.cardInstance) t._erlaubteInstanzen = (engine.collectSupportZoneAbilities?.(pi, t.heroIdx) || []).filter(e => e.slotIdx === t.slotIdx && e.inst).map(e => e.inst.id);
           targets.push(t);
         }
       }

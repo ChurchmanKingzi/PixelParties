@@ -135,7 +135,8 @@ function zonenFuerAnhang(engine, pi, inst, art) {
       if (!istAusruestTraeger(engine, pi, hi, inst.name, pi, engine.ausruestOpts(inst).kartenBesitzer ?? pi)) continue;             // lebend, nicht Frozen, Basis-Zone frei, Kartenbeschränkung (W14b Q153: Besitzer der liegenden Karte)
     } else if (!engine.canEquipCardToHero(inst.name, pi, hi, engine.ausruestOpts(inst))) continue;         // Kartenbeschränkung gilt auch für Anhängsel
     if (engine.isSupportZoneLocked(pi, hi, { cardName: inst.name, via: 'move' })) continue;
-    for (const si of freieBasisZonen(ps, hi, engine, pi)) {
+    // Darion: eine Ausrüstung kommt bei einem Helden mit Equip-Stapel NUR in den Stapel (Pflicht-Platz).
+    for (const si of freieBasisZonen(ps, hi, engine, pi, art === 'equip' ? inst.name : null)) {
       out.push({ owner: pi, heroIdx: hi, slotIdx: si, label: `${hero.name} — Slot ${si + 1}` });
     }
   }
@@ -200,7 +201,8 @@ async function uebernimm(engine, pi, inst, ergebnis) {
         const r = await engine.actionTransferCreature(inst, auswahl.owner, auswahl.heroIdx, auswahl.slotIdx, { sourceName: CARD_NAME, sourceOwner: pi, controller: pi });
         ok = !!r?.success;
       }
-    } else if (!engine.supportSlotBelegt(auswahl.owner, auswahl.heroIdx, auswahl.slotIdx)) {
+    } else if (!engine.supportSlotBelegt(auswahl.owner, auswahl.heroIdx, auswahl.slotIdx)
+        || (art === 'equip' && engine.equipPflichtPlatz(auswahl.owner, auswahl.heroIdx, name) === auswahl.slotIdx)) {   // Darion: der Equip-Stapel ist „belegt" und nimmt trotzdem auf
       const r = await engine.actionTransferAttachment(inst, auswahl.owner, auswahl.heroIdx, auswahl.slotIdx, { sourceName: CARD_NAME, anleger: pi });
       ok = !!r?.success;
     }

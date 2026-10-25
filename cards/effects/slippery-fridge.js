@@ -265,6 +265,7 @@ module.exports = {
             heroIdx: z.heroIdx,
             slotIdx: si,
             cardName: '',
+            _eigeneStapelWahl: true,   // Darion: Zielplatz (auch der Equip-Stapel) — keine Rueckfrage „welches Equip?"
           });
         }
         // Also allow clicking the hero directly (auto-picks first free slot)

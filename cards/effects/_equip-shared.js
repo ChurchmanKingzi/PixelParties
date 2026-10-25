@@ -124,10 +124,9 @@ async function waehleAusruestPlatz(engine, pi, cardName, cfg = {}) {
   const ziele = [];
   for (const { seite, heroIdx: hi } of helden) {
     const sps = engine.gs.players[seite];
-    // Darion: ist der Stapelplatz der einzige Platz, ist das Ziel eine Platzwahl, keine Kartenwahl — keine Rueckfrage „welches Equip?" (`_eigeneStapelWahl`).
-    const stapelPlatz = engine.equipPflichtPlatz(seite, hi, cardName);
     for (const si of freieBasisZonen(sps, hi, engine, seite, cardName)) {
-      ziele.push({ id: `equip-${seite}-${hi}-${si}`, type: 'equip', owner: seite, heroIdx: hi, slotIdx: si, cardName: '', ...(si === stapelPlatz ? { _eigeneStapelWahl: true } : {}) });
+      // Darion: ein Zielplatz ist nur der PLATZ (auch der Equip-Stapel) — keine Rueckfrage „welches Equip meinst du?" (`_eigeneStapelWahl`).
+      ziele.push({ id: `equip-${seite}-${hi}-${si}`, type: 'equip', owner: seite, heroIdx: hi, slotIdx: si, cardName: '', _eigeneStapelWahl: true });
     }
     ziele.push({ id: `hero-${seite}-${hi}`, type: 'hero', owner: seite, heroIdx: hi, cardName: sps.heroes[hi].name });
   }
@@ -297,7 +296,15 @@ function umhaengFreieZonen(engine, seite, hi, opts = {}) {
   const out = [];
   // Darion: ein Equip kann nur in den Equip-Stapel des Zielhelden (Pflicht-Platz).
   const pflicht = opts.cardName ? engine.equipPflichtPlatz(seite, hi, opts.cardName) : -1;
-  if (pflicht >= 0) return (opts.reserviert && opts.reserviert.has(`${seite}:${hi}:${pflicht}`)) ? out : [pflicht];
+  // Mehrere Equips in EINER Wahl (Fridge „any number"): der schon fuer ein anderes Equip vergebene Stapelplatz ist KEIN Hindernis, sondern der Platz, den alle teilen.
+  if (pflicht >= 0) return [pflicht];
+  // Darion ohne liegenden Stapel: wurde in dieser Wahl schon ein Equip an den Helden eingeplant, ist dessen Platz der entstehende Stapel — weitere Equips kommen dazu.
+  if (opts.reserviert && opts.cardName && istEquipKartenname(opts.cardName) && require('./_equip-stack-shared').teilenAktiv(engine, seite, hi)) {
+    for (const k of opts.reserviert) {
+      const [s, h, z] = String(k).split(':').map(Number);
+      if (s === seite && h === hi) return [z];
+    }
+  }
   if (engine.isSupportZoneLocked?.(seite, hi, { cardName: opts.cardName, via: 'move', instId: opts.instId })) return out;
   for (let si = 0; si < 3; si++) {
     if (opts.reserviert && opts.reserviert.has(`${seite}:${hi}:${si}`)) continue;
