@@ -133,6 +133,7 @@ module.exports = {
               id: `equip-${pi}-${hi}-${si}`,
               type: 'equip',
               owner: pi, heroIdx: hi, slotIdx: si, cardName: '',
+              ...(_stapel >= 0 ? { _eigeneStapelWahl: true } : {}),   // Darion: Platzwahl, keine Kartenwahl — keine Rueckfrage „welches Equip?"
             });
           }
         }
