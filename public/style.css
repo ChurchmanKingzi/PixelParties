@@ -10724,6 +10724,25 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 }
 .hero-owned-badge.hero-owned-mine { opacity: .95; }
 
+/* Stufen-Hinweis beim Ziehen einer Karte mit heldenabhängiger Stufe (You are the Chosen One!!!) — PIXELART: harter Rahmen aus gestapelten Ringen, feste Farben, kein Schein. */
+.hero-level-hint {
+  position: absolute;
+  top: 4px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 7;
+  padding: 2px 8px;
+  font-size: 14px;
+  line-height: 16px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  pointer-events: none;
+  color: #fff8e8;
+  background: #141414;
+  box-shadow: 0 0 0 2px #fad54a, 0 0 0 4px #f29a3e, 0 0 0 6px #141414;
+  image-rendering: pixelated;
+}
+
 /* Shard of Chaos screen effect */
 @keyframes chaosScreenFlash {
   0%   { opacity: 0; background: rgba(248,33,227,.15); }

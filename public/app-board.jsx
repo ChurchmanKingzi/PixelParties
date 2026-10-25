@@ -8560,6 +8560,67 @@ function ppAbilityZoneOk(spieler, hi, z, name, kind = 'ability') {
 // ★★ v1347: Flugdauer AUS DEM SOG (Brettmitte → Stapel/Zone), geteilt
 // zwischen Flughandler und Zonenfreigabe.
 const SOG_FLUG_MS = 820;
+// YOU'RE ALIVE? (25.10.): Länge des Zickzack-Flugs `flightStyle: 'zickzack'` (Ablage → Support Zone; die Engine wartet dieselbe Zeit, `flugMs` in actionPlaceCreature).
+const ZICKZACK_FLUG_MS = 1500;
+/**
+ * Zickzack-Flug einer Karte (YOU'RE ALIVE?!, `flightStyle: 'zickzack'`) — PIXELART: die Karte (fester Ringrahmen, keine Drehung, keine Skalierung) bewegt sich in ganzen 3-Pixel-Schritten
+ * im Bildtakt (~30 Bilder/s) von ihrer Startstelle (Ablage) zum Ziel (`dx`/`dy` Mitte zu Mitte): sie hebt erst ein Stück ab, pendelt dann dreimal quer zur Flugrichtung hin und her
+ * (die Ausschläge klingen ab) und setzt am Ende genau auf dem Ziel auf. Hinter ihr bleiben kantige Funken zurück (`pt-glutpixel`). Wird vom Aufrufer nach `dauer` ms entfernt.
+ */
+function ppZickzackFlug(card, { dx, dy, dauer, start }) {
+  const PX = 3, TAKT = 33;
+  const laenge = Math.hypot(dx, dy) || 1;
+  const nx = -dy / laenge, ny = dx / laenge;
+  const FARBEN = ['#fffbd2', '#fad54a', '#f29a3e', '#ffffff'];
+  const t0 = performance.now() + (start || 0);
+  let letzte = -1;
+  const raster = (v) => Math.round(v / PX) * PX;
+  if (window.playSFX) {   // Klang: dunkles Raunen beim Aufsteigen, Wind bei jedem Schwung, helles „Zurück ins Leben" kurz vor der Landung
+    const s0 = start || 0;
+    window.playSFX('elem_dark', { rate: 0.8, volume: 0.5, delay: s0 + 20 });
+    [0.22, 0.5, 0.78].forEach(f => window.playSFX('elem_wind', { rate: 1.3, volume: 0.22, delay: s0 + Math.round(dauer * f), category: null, dedupe: 0 }));
+    window.playSFX('revive', { rate: 1.0, volume: 0.6, delay: s0 + dauer - 160, category: null, dedupe: 0 });
+  }
+  const schritt = (jetzt) => {
+    if (!card.isConnected && jetzt > t0 + 300) return;
+    const t = jetzt - t0;
+    if (t >= 0) {
+      const fr = Math.floor(t / TAKT);
+      if (fr !== letzte) {
+        letzte = fr;
+        const k = Math.min(1, t / dauer);
+        const e = k * k * (3 - 2 * k);
+        let x, y;
+        if (k >= 1) { x = dx; y = dy; }
+        else {
+          const amp = Math.min(66, 24 + laenge * 0.1) * (1 - e) * Math.min(1, k * 7);
+          const pend = Math.sin(k * Math.PI * 6) * amp;
+          const hub = -Math.sin(Math.min(1, k / 0.16) * Math.PI / 2) * 30 * (1 - e);      // erst ein Stück aus dem Stapel heraus
+          x = raster(dx * e + nx * pend); y = raster(dy * e + ny * pend + hub);
+        }
+        card.style.transform = `translate(${x}px, ${y}px)`;
+        if (fr % 2 === 0 && k < 0.97) {                                                   // Funken fallen im halben Takt
+          const r = card.getBoundingClientRect();
+          if (r.width > 0) {
+            const gr = (Math.random() < 0.5 ? 1 : 2) * PX;
+            const s = document.createElement('i');
+            s.className = 'pt-glutpixel';
+            s.style.cssText = [
+              `left:${Math.round(r.left + Math.random() * r.width)}px`, `top:${Math.round(r.top + Math.random() * r.height)}px`,
+              `width:${gr}px`, `height:${gr}px`, `background:${FARBEN[Math.floor(Math.random() * FARBEN.length)]}`,
+              `--gsx:${Math.round((Math.random() - 0.5) * 14)}px`, `--gsy:${Math.round(8 + Math.random() * 14)}px`,
+              `animation-duration:${Math.round(360 + Math.random() * 240)}ms`,
+            ].join(';');
+            document.body.appendChild(s);
+            setTimeout(() => s.remove(), 680);
+          }
+        }
+      }
+    }
+    if (t < dauer + 60) requestAnimationFrame(schritt);
+  };
+  requestAnimationFrame(schritt);
+}
 
 // ppFxN (Partikel-Deckel fuer Telefone) lebt seit v1410 in app-shared.jsx.
 
@@ -30782,6 +30843,228 @@ const ANIM_REGISTRY = {
       },
     });
   })(),
+  // ═════════════════════════════════════════════════════════════════
+  //  Patty, the Ninja of Revenge (25.10.) — PIXELART, schwarze Wurfsterne von Patty zum Ziel (`ppSalve`; `runde` = Zahl der Sterne = Zahl der geschickten Abilities)
+  //
+  //  Je Ability fliegt ein schwarzer Wurfstern (9×9, zwei Bilder im Wechsel: Kreuz und X, also ein drehender Stern in ganzen Pixeln) in sehr schneller Folge (alle 70 ms) von Patty
+  //  zum Ziel, leicht aufgefächert, mit dunklen Nachbildern. Jeder Einschlag blitzt weiss (Kreuzfunkel + Schnitt), der Stern steckt kurz im Ziel (zittert, dithert dann weg), rote
+  //  und weisse Funken spritzen. Feste Palette (Schwarz-/Grautöne + Dunkelrot), kein Schein.
+  // ═════════════════════════════════════════════════════════════════
+  patty_shuriken: (() => {
+    const K = ppHex('#000000'), D = ppHex('#323232'), M = ppHex('#535353'), L = ppHex('#929292'), W = ppHex('#e6e6e6'), WW = ppHex('#ffffff'), R = ppHex('#8f0000'), R2 = ppHex('#780000');
+    const PAL = { K, D: M, L, '.': null };
+    const KREUZ = ['....D....', '...DKD...', '...DKD...', '..DKKKD..', 'DKKKLKKKD', '..DKKKD..', '...DKD...', '...DKD...', '....D....'];
+    const DIAG = ['D.......D', 'KD.....DK', 'KKD...DKK', '.KKD.DKK.', '..KKLKK..', '.KKD.DKK.', 'KKD...DKK', 'KD.....DK', 'D.......D'];
+    const START = 80, ABSTAND = 70, FLUG = 280, STECKEN = 380, ENDE = 1700, FADE_AB = 1500;
+    const vorbereiten = (sz) => {
+      const n = Math.max(1, Math.min(12, Math.round(sz.runde) || 1));
+      return {
+        sterne: Array.from({ length: n }, (_, i) => ({
+          fa: (i - (n - 1) / 2) * 1.6,                                   // Auffächern am Start (quer zur Flugrichtung)
+          ax: (Math.random() - 0.5) * 12, ay: (Math.random() - 0.5) * 12,  // Landepunkt rund um die Zielmitte
+          bogen: 2 + Math.random() * 4,
+          funken: Array.from({ length: ppFxN(5) }, () => ({ w: Math.random() * Math.PI * 2, v: 16 + Math.random() * 30, leben: 220 + Math.random() * 180, rot: Math.random() < 0.5 })),
+        })),
+      };
+    };
+    const malen = (g, t, sz, teile) => {
+      const z = sz.ziele[0];
+      if (!z) return;
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const OX = sz.O.x, OY = sz.O.y, TX = OX + z.dx * z.len, TY = OY + z.dy * z.len;
+      const nx = -z.dy, ny = z.dx;
+      teile.sterne.forEach((s, i) => {
+        const t0 = START + i * ABSTAND, k = (t - t0) / FLUG;
+        const sx = OX + nx * s.fa, sy = OY + ny * s.fa, ex = TX + s.ax, ey = TY + s.ay;
+        const pos = (kk) => { const hub = Math.sin(kk * Math.PI) * s.bogen; return [sx + (ex - sx) * kk + nx * hub, sy + (ey - sy) * kk + ny * hub]; };
+        if (k < 0) return;
+        if (k < 1) {
+          // Nachbilder: drei dunkle Schatten hinter dem Stern
+          for (let n = 3; n >= 1; n--) {
+            const [px, py] = pos(Math.max(0, k - n * 0.085));
+            g.block(px - 1, py - 1, 3, 3, n === 1 ? D : K, aus * (0.7 - n * 0.16));
+          }
+          const [hx, hy] = pos(k);
+          ppSprite(g, hx, hy, Math.floor(t / 66) % 2 ? DIAG : KREUZ, PAL, aus);
+          return;
+        }
+        const al = t - (t0 + FLUG);
+        // Einschlag: weisser Blitz (Kreuz + Schnitt), dann steckt der Stern im Ziel
+        if (al < 130) {
+          const f = 1 - al / 130, arm = 2 + Math.round(f * 3);
+          for (let a = 1; a <= arm; a++) { g.put(ex + a, ey, a === arm ? W : WW, f * aus); g.put(ex - a, ey, a === arm ? W : WW, f * aus); g.put(ex, ey + a, a === arm ? W : WW, f * aus); g.put(ex, ey - a, a === arm ? W : WW, f * aus); }
+          for (let a = -5; a <= 5; a++) g.put(ex + a, ey + a * 0.7, a % 2 ? WW : W, f * aus * 0.9);
+        }
+        if (al < STECKEN + 140) {
+          const wackeln = al < 100 ? ((Math.floor(al / 33) % 2) ? 1 : -1) : 0;
+          const ab = al > STECKEN ? 1 - (al - STECKEN) / 140 : 1;
+          ppSprite(g, ex + wackeln, ey, KREUZ, PAL, ab * aus);
+          g.put(ex + wackeln, ey, R, ab * aus);
+        }
+        for (const fu of s.funken) {
+          const a2 = al - 20; if (a2 < 0 || a2 > fu.leben) continue;
+          const kk = a2 / fu.leben, sek = a2 / 1000;
+          g.put(ex + Math.cos(fu.w) * fu.v * sek, ey + Math.sin(fu.w) * fu.v * sek + 36 * sek * sek, fu.rot ? (kk < 0.5 ? R : R2) : (kk < 0.5 ? WW : L), (1 - kk) * aus);
+        }
+      });
+    };
+    return ppSalve(malen, ENDE, vorbereiten, { extra: 24 });
+  })(),
+  // ═════════════════════════════════════════════════════════════════
+  //  You are the Chosen One!!! (25.10.) — PIXELART, goldene „Super-Saiyajin"-Aura um den Helden (`ppPunktBild`, Mitte = Heldenkarte)
+  //
+  //  Eine zackige, flackernde Flammenhülle in Weiß-Gold, Gelb und Orange legt sich um die Heldenkarte (der Held selbst bleibt sichtbar) und wächst in 300 ms auf volle Größe; die Zacken züngeln
+  //  nach oben (Haarsträhnen), goldene Funken steigen auf, weiße Blitzlinien knistern am Rand. Ab ~1500 ms dithert die Aura weg. Feste Palette, Bayer-Dithering, kein Schein.
+  // ═════════════════════════════════════════════════════════════════
+  chosen_one_aura: (() => {
+    const AURA = ['#fffbd2', '#f7f7ad', '#fad54a', '#f29a3e'].map(ppHex);
+    const WEISS = ppHex('#ffffff'), ORANGE = ppHex('#e94e53');
+    const ANWACHS = 300, FADE_AB = 1500, ENDE = 1900;
+    const vorbereiten = () => ({
+      funken: Array.from({ length: ppFxN(26) }, () => ({ x: (Math.random() - 0.5) * 1.4, ph: Math.random(), v: 14 + Math.random() * 20, gross: Math.random() < 0.3 })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const k = Math.min(1, t / ANWACHS), kk = k * k * (3 - 2 * k);
+      const cx = sz.cx, cy = sz.cy, hw = sz.hw, hh = sz.hh;
+      const R0 = 7 * kk, tt = t / 55;
+      for (let Y = 0; Y < sz.gh; Y++) for (let X = 0; X < sz.gw; X++) {
+        const dx = Math.abs(X - cx) - hw, dy = Math.abs(Y - cy) - hh;
+        const dist = Math.hypot(Math.max(dx, 0), Math.max(dy, 0)) + Math.min(Math.max(dx, dy), 0);   // Abstand zur Kartenkante (innen < 0)
+        if (dist <= 0) continue;                                                             // der Held bleibt frei
+        const winkel = Math.atan2(Y - cy, X - cx);
+        const oben = Y < cy ? 1 : 0;
+        const zacke = 0.55 + 0.45 * Math.sin(winkel * 9 + tt) * Math.sin(winkel * 4 - tt * 0.7);   // zackige, wandernde Spitzen
+        const hoehe = oben * (5 + 4 * Math.sin(X * 0.9 + tt * 1.3)) * kk;                         // Haarsträhnen nach oben
+        const R = R0 * (0.6 + zacke) + hoehe;
+        if (dist > R) continue;
+        const r = dist / R;                                                                  // 0 = Kartenkante … 1 = Flammenspitze
+        const stufe = r < 0.25 ? 0 : r < 0.5 ? 1 : r < 0.78 ? 2 : 3;
+        const fl = ppBayer(X + Math.floor(tt) % 2, Y) < 0.5 ? 0 : 1;                           // Flackern: Schachbrett wechselt im Takt
+        g.put(X, Y, AURA[Math.min(3, stufe + (r > 0.5 ? fl : 0))], aus);
+      }
+      // Funken steigen links und rechts der Karte auf
+      for (const f of teile.funken) {
+        const lauf = ((t / 1000) * (f.v / 30) + f.ph) % 1;
+        const x = cx + f.x * (hw + 6), y = cy + hh - lauf * (2 * hh + 14);
+        g.block(x, y, f.gross ? 2 : 1, f.gross ? 2 : 1, lauf < 0.6 ? AURA[1] : AURA[2], aus * (1 - lauf * 0.5));
+      }
+      // Blitzlinien am Rand (kurz, knisternd)
+      for (let i = 0; i < 3; i++) {
+        const gate = Math.floor(t / 100) * 7 + i * 13;
+        if (ppHash(gate, i, 3) > 0.55) continue;
+        const seite = ppHash(gate, i, 5) < 0.5 ? -1 : 1, y0 = cy - hh + ppHash(gate, i, 7) * 2 * hh;
+        let x = cx + seite * (hw + 1), y = y0;
+        for (let s = 0; s < 6; s++) { g.put(x, y, s % 2 ? WEISS : AURA[0], aus); x += seite; y += ppHash(gate, s, i) < 0.5 ? -1 : 1; }
+      }
+      // Bodenring: ein flacher Ring aus Gold unter dem Helden
+      if (t < FADE_AB) for (let a = 0; a < 28; a++) {
+        const w = (a / 28) * Math.PI * 2 + tt * 0.1, rx = (hw + 6) * kk;
+        g.put(cx + Math.cos(w) * rx, cy + hh + 2 + Math.sin(w) * 2, a % 3 ? AURA[2] : ORANGE, 0.9 * aus);
+      }
+    };
+    return ppPunktBild(malen, ENDE + 40, 240, 270, (sz) => vorbereiten(sz));
+  })(),
+  // ═════════════════════════════════════════════════════════════════
+  //  Vengeful Attack (25.10.) — PIXELART, dunkler gezackter Doppelschnitt auf dem Ziel (`ppPunktBild`, Mitte = Zielkarte)
+  //
+  //  Zwei gezackte Schnitte kreuzen sich nacheinander über der Karte (erst von links oben nach rechts unten in ~140 ms, 110 ms später der zweite von rechts oben): schwarzer Kern,
+  //  blutrote Ränder, die Mitte glüht kurz weiß. Die Karte dunkelt gedithert ab, Risse bleiben stehen, schwarzer Rauch steigt auf; ab ~650 ms dithert alles weg. Feste Palette, kein Schein.
+  // ═════════════════════════════════════════════════════════════════
+  vengeful_slash: (() => {
+    const SCHWARZ = ppHex('#000000'), TIEF = ppHex('#08060c'), ROT1 = ppHex('#780000'), ROT2 = ppHex('#8f0000'), WEISS = ppHex('#e6e6e6'), DUNKEL = ppHex('#2e0a51'), LILA = ppHex('#19062d');
+    const ENDE = 1050, FADE_AB = 700, DAUER = 140;
+    const SCHNITTE = [{ t0: 0, a: [-1, -1], b: [1, 1] }, { t0: 250, a: [1, -0.9], b: [-1, 1] }];
+    const vorbereiten = () => ({
+      rauch: Array.from({ length: ppFxN(16) }, () => ({ x: (Math.random() - 0.5) * 1.6, ph: Math.random() * 0.4, v: 10 + Math.random() * 16, gross: Math.random() < 0.4 })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const cx = sz.cx, cy = sz.cy, hw = sz.hw + 5, hh = sz.hh + 5;
+      // die Karte dunkelt ab: Bayer-Schleier ab dem ersten Schnitt
+      if (t > 60) {
+        const dm = Math.min(0.42, (t - 60) / 400) * aus;
+        for (let y = -sz.hh; y <= sz.hh; y++) for (let x = -sz.hw; x <= sz.hw; x++) if (ppBayer(Math.round(cx + x), Math.round(cy + y)) < dm) g.put(cx + x, cy + y, TIEF, 1);
+      }
+      for (const sc of SCHNITTE) {
+        const al = t - sc.t0;
+        if (al < 0) continue;
+        const p = Math.min(1, al / DAUER);
+        const x0 = cx + sc.a[0] * hw, y0 = cy + sc.a[1] * hh, x1 = cx + sc.b[0] * hw, y1 = cy + sc.b[1] * hh;
+        const len = Math.hypot(x1 - x0, y1 - y0), n = Math.ceil(len * p);
+        const dx = (x1 - x0) / len, dy = (y1 - y0) / len, nx = -dy, ny = dx;
+        for (let i = 0; i <= n; i++) {
+          const k = i / len;
+          // gezackt: Dreieckswelle quer zur Schnittrichtung, dazu eine zweite, langsamere
+          const zack = (Math.abs(((i * 0.55) % 4) - 2) - 1) * 2.4 + (Math.abs(((i * 0.17) % 4) - 2) - 1) * 1.6;
+          const breite = 1.2 + 2.6 * Math.sin(Math.PI * Math.min(1, k * 1.05));                        // in der Mitte am dicksten, an den Enden spitz
+          const px = x0 + dx * i + nx * zack, py = y0 + dy * i + ny * zack;
+          for (let w = -breite - 1; w <= breite + 1; w += 1) {
+            const qx = px + nx * w, qy = py + ny * w;
+            const r = Math.abs(w);
+            g.put(qx, qy, r > breite ? ROT1 : r > breite * 0.55 ? ROT2 : SCHWARZ, aus);
+          }
+          if (al < DAUER + 110 && breite > 1.8) g.put(px, py, WEISS, aus);                           // die Mitte glüht kurz weiß
+        }
+        // Funken am Ende des Schnitts
+        if (p >= 1 && al < DAUER + 200) for (let a = 0; a < 5; a++) {
+          const w = ppHash(sc.t0, a, 9) * Math.PI * 2, d = 2 + (al - DAUER) / 18 + a;
+          g.put(x1 + Math.cos(w) * d, y1 + Math.sin(w) * d, a % 2 ? ROT2 : WEISS, (1 - (al - DAUER) / 200) * aus);
+        }
+      }
+      // schwarzer Rauch steigt auf
+      if (t > 140) for (const f of teile.rauch) {
+        const lauf = (((t - 140) / 1000) * (f.v / 30) + f.ph);
+        if (lauf > 1) continue;
+        const x = cx + f.x * hw, y = cy + hh * 0.6 - lauf * (hh * 2.2);
+        g.block(x, y, f.gross ? 3 : 2, f.gross ? 3 : 2, lauf < 0.5 ? DUNKEL : LILA, aus * (1 - lauf * 0.6));
+      }
+    };
+    return ppPunktBild(malen, ENDE + 40, 240, 270, (sz) => vorbereiten(sz));
+  })(),
+  // ═════════════════════════════════════════════════════════════════
+  //  Wise Village Elder (25.10.) — PIXELART, Sprechblasen über dem Ältesten (`ppSalve`, Ziel = Karte des Ältesten): er bringt dem Helden etwas bei
+  //
+  //  Drei weiße Sprechblasen mit schwarzem Rand poppen nacheinander links, rechts und mittig über der Karte auf (je ~330 ms später, höher gestaffelt): „!", „…" und ein goldenes Funkeln. Sie
+  //  erscheinen gedithert (drei Stufen), wippen im Takt um ein Pixel und verschwinden ab ~1200 ms gedithert. Feste Palette, kein Schein.
+  // ═════════════════════════════════════════════════════════════════
+  elder_teaching: (() => {
+    const K = ppHex('#141414'), W = ppHex('#ffffff'), S = ppHex('#d2d2db'), GOLD = ppHex('#fad54a'), ORANGE = ppHex('#f29a3e');
+    const BLASE = ['..KKKKKKKKKKKK..', '.KWWWWWWWWWWWWK.', 'KWWWWWWWWWWWWWWK', 'KWWWWWWWWWWWWWWK', 'KWWWWWWWWWWWWWWK', 'KWWWWWWWWWWWWWWK', '.KWWWWWWWWWWWWK.', '..KSSSSWKSSSSK..', '.....KWK........', '......K.........'];
+    const PAL = { K, W, S, '.': null };
+    const ENDE = 1560, FADE_AB = 1200, ABSTAND = 330, LEBEN = 1250;
+    const INH = [
+      (g, x0, y0, a) => { g.block(x0 + 7, y0 + 2, 2, 2, K, a); g.block(x0 + 7, y0 + 5, 2, 1, K, a); },                                  // „!"
+      (g, x0, y0, a) => { for (const dx of [3, 7, 11]) g.block(x0 + dx, y0 + 4, 2, 2, K, a); },                                          // „…"
+      (g, x0, y0, a) => {                                                                                                                 // Funkeln
+        g.block(x0 + 7, y0 + 3, 2, 2, GOLD, a);
+        for (const x of [5, 6, 9, 10]) for (const y of [3, 4]) g.put(x0 + x, y0 + y, ORANGE, a);
+        for (const x of [7, 8]) { g.put(x0 + x, y0 + 2, ORANGE, a); g.put(x0 + x, y0 + 5, ORANGE, a); }
+      },
+    ];
+    const ORT = [{ dx: -9, dy: 0 }, { dx: 10, dy: -9 }, { dx: 0, dy: -19 }];
+    const malen = (g, t, sz) => {
+      const z = sz.ziele[0];
+      if (!z) return;
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const cx = z.x, top = z.y - z.h / 2;
+      ORT.forEach((o, i) => {
+        const al = t - i * ABSTAND;
+        if (al < 0 || al > LEBEN + 300) return;
+        const auf = al < 100 ? 0.35 : al < 200 ? 0.7 : 1;                                 // Aufpoppen in drei gedithert Stufen
+        const wipp = (Math.floor(al / 130) + i) % 2 ? 0 : -1;
+        const a = auf * aus;
+        const x0 = Math.round(cx + o.dx - 8), y0 = Math.round(top - 14 + o.dy + wipp);
+        ppSprite(g, x0 + 8, y0 + 5, BLASE, PAL, a);
+        INH[i](g, x0, y0, a);
+      });
+    };
+    return ppSalve(malen, ENDE, undefined, { extra: 70 });
+  })(),
   // ═══════════════════════════════════════════════════════════════════
   //  Breakthrough (11.10.) — PIXELART, Brett-Animation auf der gewaehlten Surprise (Surprise Zone oder Support Zone; `targets`)
   //
@@ -40213,6 +40496,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
         }
 
+        // Stufen-Hinweis (You are the Chosen One!!!): welcher EIGENE Held liegt unter dem Zeiger — unabhängig davon, ob er die Karte wirken darf. Der Server liefert die Stufe, die
+        // die Karte für jeden Helden hätte (`heroPlayableCards.stufen`); auf dem Helden erscheint sie als Abzeichen (`.hero-level-hint`).
+        let hoverHero = -1;
+        if (gameState.heroPlayableCards?.stufen?.[cardName]) {
+          for (const el of document.querySelectorAll('[data-hero-zone][data-hero-owner="me"]')) {
+            const r = el.getBoundingClientRect();
+            if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) hoverHero = parseInt(el.dataset.heroIdx);
+          }
+        }
+
         // Check hero zones (all spells/attacks, including attachments for auto-place)
         if (targetHero < 0) {
         const heroEls2 = document.querySelectorAll('[data-hero-zone]');
@@ -40268,7 +40561,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
         }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, targetSlot: targetSlot, targetAttachOwner, creatureCasterSlot, creatureCasterInstId, isSpell: !surpriseTarget, isSurprise: surpriseTarget, surpriseOpp: surpriseTarget && surpriseOpp, charmedOwner: surpriseTarget ? undefined : targetCharmedOwner , fromCreation });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, hoverHero, targetSlot: targetSlot, targetAttachOwner, creatureCasterSlot, creatureCasterInstId, isSpell: !surpriseTarget, isSurprise: surpriseTarget, surpriseOpp: surpriseTarget && surpriseOpp, charmedOwner: surpriseTarget ? undefined : targetCharmedOwner , fromCreation });
       } else if (isAscensionPlayable) {
         // Ascended Hero drag — target hero zones with eligible base heroes
         let targetHero = -1;
@@ -47130,6 +47423,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // hand while new flies to support at the same time.
       if (to === 'support' && toHeroIdx != null && toSlotIdx != null) {
         const hideKey = `${tgtOwner}-${toHeroIdx}-${toSlotIdx}`;
+        const landeMs = flightStyle === 'zickzack' ? ZICKZACK_FLUG_MS : 720;   // YOU'RE ALIVE?!: der lange Zickzack-Flug verbirgt den Zielplatz bis zur Landung
         // ★ W62a: liegt dort schon mindestens eine Karte GLEICHEN Namens (geteilte Zone, Alice) und ist der Flug kein Umzug
         // innerhalb derselben Zone, bleiben die vorhandenen Karten sichtbar — nur die neue Kopie wird bis zur Landung verborgen.
         // Der Zustand kommt VOR dem Eintreffen des Flugs an (Engine: Flug, dann Zustand) oder knapp danach; gilt `vorhanden`
@@ -47144,7 +47438,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               if (!(hideKey in prev)) return prev;
               const next = { ...prev }; delete next[hideKey]; return next;
             });
-          }, 720);
+          }, landeMs);
         } else {
           setBounceOutgoingHidden(prev => {
             const next = new Set(prev);
@@ -47158,7 +47452,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               next.delete(hideKey);
               return next;
             });
-          }, 720);
+          }, landeMs);
         }
       }
 
@@ -47478,6 +47772,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const isToHand = (to === 'hand');
       const isToSupport = (to === 'support');
       const isWindstorm = (flightStyle === 'windstorm');
+      const isZickzack = (flightStyle === 'zickzack');   // YOU'RE ALIVE?!: Pixelart-Flug in ganzen Pixeln im Bildtakt (ppZickzackFlug)
       // Glow palette per flight style:
       //   • windstorm → cool cyan-white "wind sheen" (matches the
       //     swirling rotation + chaotic path).
@@ -47486,7 +47781,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       //   • default discard / deleted / area / deck → classic violet
       //     fade-out.
       let glow;
-      if (isWindstorm) {
+      if (isZickzack) {
+        glow = 'box-shadow:0 0 0 3px #fad54a,0 0 0 6px #f29a3e';       // harter Pixelrahmen (gestapelte Ringe), kein weicher Schein
+      } else if (isWindstorm) {
         glow = 'box-shadow:0 0 18px rgba(180,223,248,0.95),0 0 6px rgba(123,190,234,0.7)';
       } else if (isToHand || isToSupport) {
         glow = 'box-shadow:0 0 14px rgba(102,217,255,0.85),0 0 4px rgba(57,158,223,0.55)';
@@ -47502,7 +47799,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         : isWindstorm
           ? 'pileTransferWindstorm'
           : (isToHand || isToSupport ? 'pileTransferToHand' : 'pileTransfer');
-      const durationMs = _ausDemSog ? SOG_FLUG_MS : (isWindstorm ? 1200 : 700);
+      const durationMs = _ausDemSog ? SOG_FLUG_MS : (isZickzack ? ZICKZACK_FLUG_MS : (isWindstorm ? 1200 : 700));
       const easing = _ausDemSog ? 'cubic-bezier(.25,.6,.35,1)'
         : (isWindstorm ? 'cubic-bezier(.45,.05,.55,.95)' : 'ease-in-out');
 
@@ -47608,8 +47905,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const mZiel = STAPEL_ORTE[to] ? kartenMassAmBildschirm(tgtEl, 'stapel')
         : BRETT_ZIELE[to] ? kartenMassInZone(tgtEl)
         : massFuer(to);
-      const flugB = mQuelle.b, flugH = mQuelle.h;
-      const ptScale = mQuelle.b > 0 ? (mZiel.b / mQuelle.b) : 1;
+      // Zickzack-Flug: die Karte hebt gleich im Mass ihres Ziels ab (keine stufenlose Skalierung eines Kartenbildes).
+      const flugB = isZickzack ? mZiel.b : mQuelle.b, flugH = isZickzack ? mZiel.h : mQuelle.h;
+      const ptScale = (!isZickzack && mQuelle.b > 0) ? (mZiel.b / mQuelle.b) : 1;
       const ptMin = Math.min(1, ptScale);
       card.style.cssText = [
         'position:fixed',
@@ -47622,13 +47920,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         `animation:${anim} ${durationMs}ms ${easing} forwards`,
         'opacity:0',
       ].join(';');
+      if (isZickzack) {
+        card.style.animation = 'none';
+        ppZickzackFlug(card, { dx: Math.round(dx), dy: Math.round(dy), dauer: durationMs, start: laneDelay || 0 });
+      }
       // ── Neigung (Als Befund 19.8.) ───────────────────────────────
       // „Wenn Trial of Dominance Creatures vom Board zum Deleted Pile
       // schickt, werden diese komplett flach, sie verlieren ihre
       // Perspektive."
       // Entscheidungstabelle in `flightTiltFor`, Neigung der Ebene
       // gemessen statt geraten in `readBoardTiltDeg`.
-      const flightTilt = flightTiltFor(from, to, readBoardTiltDeg(document));
+      const flightTilt = isZickzack ? { startDeg: 0, endDeg: 0 } : flightTiltFor(from, to, readBoardTiltDeg(document));
       // Dieselbe Wartezeit wie die Flugbahn: bei Brett-Quellen haengt
       // der Knoten sofort im Dokument und nur der Start ist verschoben,
       // sonst wird der Knoten selbst spaeter eingehaengt (siehe unten).
@@ -52613,6 +52915,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const p = playerByName(entry.player);
         return <span className="log-status">🔥 {cName('Glasowt')} — {pName(p.name, p.color)} hurls a fireball at Burned {entry.target}: {entry.damage} damage that cannot be reduced, negated or redirected.</span>;
       }
+      if (t === 'vengeful_attack') {
+        const p = playerByName(entry.player);
+        return <span className="log-damage">🗡️ {cName('Vengeful Attack')} — {pName(p.name, p.color)}'s {entry.hero} takes revenge on {entry.target || 'the target'}{entry.damage != null ? <>: <span className="log-amount">{entry.damage}</span> damage</> : null}.</span>;
+      }
+      if (t === 'wise_village_elder') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">💬 {cName('Wise Village Elder')} — {pName(p.name, p.color)} attaches {cName(entry.card)} from their {entry.from === 'deck' ? 'deck' : 'hand'} to {entry.hero} as an additional attachment.</span>;
+      }
+      if (t === 'chosen_one') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">⭐ {cName('You are the Chosen One!!!')} — a golden aura surrounds {entry.hero}{entry.performed ? <>, who immediately performs {cName(entry.performed)} as an additional Action.</> : <>, but there is no card to perform — the Spell fizzles.</>} {pName(p.name, p.color)} cannot play any more cards this turn.</span>;
+      }
+      if (t === 'youre_alive') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">✨ {cName("YOU'RE ALIVE?!")} — {pName(p.name, p.color)} places {cName(entry.creature)} from their discard pile into one of {entry.hero}'s Support Zones{entry.onlyCopy ? <> (the only copy: additional Action)</> : null}.</span>;
+      }
+      if (t === 'patty') {
+        const p = playerByName(entry.player);
+        return <span className="log-damage">🥷 {cName('Patty, the Ninja of Revenge')} — {pName(p.name, p.color)} sends <span className="log-amount">{entry.sent}</span> Abilit{entry.sent === 1 ? 'y' : 'ies'} to the discard pile and throws shuriken{entry.target ? <> at {entry.target}: <span className="log-amount">{entry.damage}</span> damage</> : null}.</span>;
+      }
       if (t === 'buttap') {
         const p = playerByName(entry.player);
         return <span className="log-status">💥 {cName('Buttap')} — {pName(p.name, p.color)} reveals {cName(entry.revealed)}{entry.toHand ? <> and adds it to their hand.</> : <>{entry.target ? <>: {entry.damage} damage to {entry.target}, then it is shuffled back.</> : <>: no damage, then it is shuffled back.</>}</>}</span>;
@@ -53580,6 +53902,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     Rahmen allein sagt nur „hier stimmt etwas nicht" —
                     das Schild sagt, WEM der Held jetzt gehoert, und
                     steht auf beiden Seiten des Bretts. */}
+                {/* Stufen-Hinweis beim Ziehen einer Karte mit heldenabhängiger Stufe (You are the Chosen One!!!): die Stufe, die sie für DIESEN Helden hätte. */}
+                {!isOpp && playDrag && playDrag.hoverHero === i && gameState.heroPlayableCards?.stufen?.[playDrag.cardName]?.[i] != null && (
+                  <div className="hero-level-hint">Lv {gameState.heroPlayableCards.stufen[playDrag.cardName][i]}</div>
+                )}
                 {isPermaControlled && (
                   <div className={'hero-owned-badge' + (hero.permaControlBy === myIdx ? ' hero-owned-mine' : '')}>
                     {hero.permaControlBy === myIdx ? '⛓ Yours' : '⛓ ' + (opp?.username || 'Opponent') + "'s"}

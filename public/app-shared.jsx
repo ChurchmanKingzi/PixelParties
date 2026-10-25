@@ -3016,6 +3016,40 @@ const ZONE_ANIM_SFX = {
     { name: 'heavy_impact', opts: { rate: 1.2, volume: 0.5,  delay: 480, category: null, dedupe: 0 } },
     { name: 'ping',         opts: { rate: 2.8, volume: 0.4,  delay: 520, category: null, dedupe: 0 } },
   ],
+  // Patty (25.10.) — je Wurfstern ein Zischen beim Abwurf (alle 70 ms, die Tonhoehe wandert leicht) und ein heller Einschlag nach 280 ms Flug (`runde` = Zahl der Sterne; hoert nach 8 Sternen auf, damit
+  // der Klang nicht zum Rauschen wird). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  patty_shuriken: ({ runde }) => {
+    const n = Math.max(1, Math.min(8, Math.round(Number(runde)) || 1));
+    const teile = [];
+    for (let i = 0; i < n; i++) {
+      teile.push({ name: 'slash', opts: { rate: 1.7 + (i % 3) * 0.18, volume: 0.3, delay: 80 + i * 70, ...(i === 0 ? {} : { category: null, dedupe: 0 }) } });
+      teile.push({ name: i === n - 1 ? 'heavy_impact' : 'ping', opts: { rate: i === n - 1 ? 1.5 : 2.4 + (i % 2) * 0.3, volume: i === n - 1 ? 0.5 : 0.28, delay: 80 + i * 70 + 280, category: null, dedupe: 0 } });
+    }
+    return teile;
+  },
+  // Vengeful Attack (25.10.) — der dunkle Doppelschnitt: tiefer Schnitt (0 ms), dumpfer Treffer (~90 ms), Dunkelheit sickert (~140 ms), der zweite Schnitt (~250 ms). Nur der erste Teil übernimmt die
+  // Sammelkategorie 'effect'.
+  vengeful_slash: [
+    { name: 'slash',        opts: { rate: 0.7, volume: 0.7 } },
+    { name: 'heavy_impact', opts: { rate: 0.8, volume: 0.55, delay: 90,  category: null, dedupe: 0 } },
+    { name: 'elem_dark',    opts: { rate: 0.6, volume: 0.5,  delay: 140, category: null, dedupe: 0 } },
+    { name: 'slash',        opts: { rate: 0.85, volume: 0.6, delay: 250, category: null, dedupe: 0 } },
+  ],
+  // Wise Village Elder (25.10.) — drei Sprechblasen poppen auf (je ein helles Ping, die Tonhöhe steigt), zum Schluss ein weiches Stärkungsklingen. Nur der erste Teil übernimmt die Sammelkategorie 'effect'.
+  elder_teaching: [
+    { name: 'ping', opts: { rate: 1.6, volume: 0.32 } },
+    { name: 'ping', opts: { rate: 1.9, volume: 0.32, delay: 330, category: null, dedupe: 0 } },
+    { name: 'ping', opts: { rate: 2.3, volume: 0.32, delay: 660, category: null, dedupe: 0 } },
+    { name: 'buff', opts: { rate: 1.3, volume: 0.3,  delay: 900, category: null, dedupe: 0 } },
+  ],
+  // You are the Chosen One!!! (25.10.) — die goldene Aura lädt sich auf (Stärkung 0 ms, heiliges Summen ~120 ms), flammt bei ~300 ms auf (Aufstieg) und knistert bei ~700 ms (kritischer Treffer).
+  // Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  chosen_one_aura: [
+    { name: 'buff',            opts: { rate: 0.8, volume: 0.6 } },
+    { name: 'elem_holy',       opts: { rate: 0.7, volume: 0.45, delay: 120, category: null, dedupe: 0 } },
+    { name: 'ascension',       opts: { rate: 1.0, volume: 0.35, delay: 300, category: null, dedupe: 0 } },
+    { name: 'critical_strike', opts: { rate: 0.9, volume: 0.4,  delay: 700, category: null, dedupe: 0 } },
+  ],
   // Breakthrough (11.10.) — Risse knistern (Schnitt, 0 ms), die Scheibe birst bei ~460 ms (Schlag), Scherben klirren (~500 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   breakthrough_shatter: [
     { name: 'slash',              opts: { rate: 1.5, volume: 0.45 } },

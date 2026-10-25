@@ -4081,6 +4081,8 @@ class GameEngine {
     // `_untrackCard`, die Instanz ist also noch auffindbar.
     if (hookName === HOOKS.ON_CREATURE_DEATH && hookCtx.creature) {
       this._rewriteProtokoll(hookCtx);
+      this._besiegtProtokoll(hookCtx);
+      this._toetungsProtokoll({ creature: hookCtx.creature, source: hookCtx.source });
     }
     if (hookName === HOOKS.ON_CREATURE_DEATH && !hookCtx._skipPostDefeatReaction) {
       await this._checkCreatureDefeatedHandReactions(hookCtx.creature, hookCtx.source, hookCtx.type);   // W24a (N1-05): `type` nur bei Schadenstod gesetzt
@@ -5043,6 +5045,8 @@ class GameEngine {
           confirmClass: config.confirmClass || 'btn-danger',
           cancellable: config.cancellable !== false,
           condition: combinedCondition,
+          ...(config.dimUnmetCondition ? { dimUnmetCondition: true } : {}),   // Vengeful Attack: nicht wählbare Ziele ausgegraut statt weg
+          ...(config.markUnmetRed ? { markUnmetRed: true } : {}),
         });
 
         if (!target) return null; // Cancelled
@@ -10779,6 +10783,7 @@ class GameEngine {
     // WIEDERBELEBUNG: der Tod hat stattgefunden, deshalb feuert dieser Haken
     // VOR `_consumeExtraLife` (Mausoleum Worm).
     if (_ersterDurchlauf && target.hp <= 0) {
+      this._toetungsProtokoll({ hero: target, source, opferSeite: _koKontrolle });   // Vengeful Attack: wer hat wen besiegt
       await this.runHooks('onHeroDefeatFinal', {
         hero: target, source, killerOwner: _toeterBesitzer, _bypassDeadHeroFilter: true,
       });
@@ -23960,6 +23965,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ★ W16a (Frage 5): wirkt in der Hand ein Kopien-Rabatt (Divine Gift of Magic, Fiona … — Spell/Attack mit ≥ 2 Kopien, davon mindestens eine mit eigener Stufe), kommt zusätzlich die Liste
     // JE HANDINDEX: `kopien.own|charmed[handIdx] = [heroIdx …]`. Der Client nimmt für diese Handkarte NUR diese Liste (leuchtet nur die rabattierte Kopie); ohne Rabatt fehlt der Block,
     // und alles bleibt bei der Namensliste.
+    const stufen = nurKopie == null ? this.stufenHinweise(playerIdx) : null;   // Stufe je Held für den Client (Ziehen über einen Helden)
     if (nurKopie == null) {
       const sonder = this._kopienMitSonderstufe(playerIdx);
       if (sonder.length > 0) {
@@ -23969,10 +23975,10 @@ this._deathWatch = (this._deathWatchStack || []).length
           kopien.own[idx] = Object.keys(r.own).filter(h => (r.own[h] || []).includes(name)).map(Number);
           kopien.charmed[idx] = Object.keys(r.charmed).filter(h => (r.charmed[h] || []).includes(name)).map(Number);
         }
-        return { own, charmed, kopien };
+        return { own, charmed, kopien, ...(stufen ? { stufen } : {}) };
       }
     }
-    return { own, charmed };
+    return { own, charmed, ...(stufen ? { stufen } : {}) };
   }
 
   /**
@@ -25046,7 +25052,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       panelPlacement: 'oppSide',
       title: config.title || 'Immediate Action',
       description: config.description || `Use an action with ${hero.name}!`,
-      cancellable: true,
+      cancellable: config.cancellable !== false,   // `cancellable: false` = Pflichtaktion (You are the Chosen One!!!: „Immediately perform …" ist nicht optional)
       _bereitsVersucht,
     });
 
@@ -26501,6 +26507,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // discard pile.
         ps._discardNamesAtTurnStart = new Set(ps.discardPile || []);
         this._ablageVerfolgen(this.gs.activePlayer);   // Welle 12 (Q105): Zeitstempel je Ablage-Eintrag ab Zugbeginn
+        for (let p = 0; p < (this.gs.players || []).length; p++) if (p !== this.gs.activePlayer) this._ablageVerfolgen(p);   // YOU'RE ALIVE?!: auch die Ablage des Wartenden stempelt ab hier (sie füllt sich in fremden Zügen)
         delete this.gs._itemLockOffen;   // Welle 12 (Q92): keine verwaiste Vormerkung über den Zug hinaus
         delete ps._creationLockedNames;
         delete ps._revealedCardCounts;
@@ -30474,6 +30481,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           fromOwner: _pileOwner, toOwner: feld, owner: playerIdx, cardName,
           from: 'discard', to: 'support',
           toHeroIdx: heroIdx, toSlotIdx: slotIdx,
+          ...(opts.flugStil ? { flightStyle: opts.flugStil } : {}),   // YOU'RE ALIVE?!: eigener Flugstil ('zickzack')
         });
         _handFlug = true;
       }
@@ -30548,7 +30556,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Landung des Hand-Flugs abwarten (v700), bevor Poof und Hooks
     // laufen — sonst feuert z.B. Monamis Draw, waehrend die Karte noch
     // fliegt.
-    if (_handFlug) { this.sync(); await this._delay(720); }
+    if (_handFlug) { this.sync(); await this._delay(opts.flugMs ?? 720); }   // `flugMs`: ein längerer Sonderflug (YOU'RE ALIVE?!: Zickzack-Flug)
 
     const animType = opts.animationType || 'summon';
     if (animType === 'summon') {
@@ -38484,6 +38492,104 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
   }
 
+  /**
+   * YOU'RE ALIVE?! — „defeated before the beginning of your last turn": vermerkt JEDEN Kreaturentod (gleich, wer ihn verursacht hat) im Protokoll des Ablage-Besitzers
+   * (`ps._besiegtLog`, Eintrag = { name, turn }). Das Protokoll sagt nur „diese Karte wurde in Zug X BESIEGT" (eine Karte, die abgeworfen/gemillt wurde, steht nicht darin);
+   * welche Karten davon noch in der Ablage liegen und seit wann, beantwortet `besiegteInAblage` zusammen mit den Zeitstempeln der Ablage.
+   */
+  _besiegtProtokoll(hookCtx) {
+    try {
+      const c = hookCtx.creature;
+      const ablage = c.originalOwner ?? c.owner;
+      const ps = this.gs.players?.[ablage];
+      if (!ps || !c.name) return;
+      (ps._besiegtLog || (ps._besiegtLog = [])).push({ name: c.name, turn: this.gs.turn });
+    } catch (err) {
+      console.error('[besiegtProtokoll]', err.message);
+    }
+  }
+
+  /**
+   * ★ Kreaturen in der Ablage von `pi`, die BESIEGT wurden (nicht abgelegt): `[{ name, index, turn }]`, `turn` = Zug, in dem die Karte in die Ablage kam (= Zug des Besiegens;
+   * -1 = lag schon vor der Verfolgung, Puzzle-Vorgaben — gilt als besiegt und alt). Jeder Ablage-Eintrag wird mit einem Protokolleintrag desselben Namens und Zuges gepaart
+   * (`_besiegtProtokoll`): eine Karte, die in einem anderen Zug abgeworfen wurde, zählt nicht; verließ eine besiegte Karte die Ablage wieder (Wiederbelebung, Mischen),
+   * bleibt ihr Eintrag unbenutzt.
+   */
+  besiegteInAblage(pi) {
+    this._ablageVerfolgen(pi);
+    const ps = this.gs.players[pi];
+    if (!ps) return [];
+    const frei = new Map();
+    for (const e of (ps._besiegtLog || [])) { const k = `${e.name}|${e.turn}`; frei.set(k, (frei.get(k) || 0) + 1); }
+    const out = [];
+    (ps.discardPile || []).forEach((name, index) => {
+      const turn = ps._ablageStamps?.[index] ?? this.gs.turn;
+      if (turn === -1) { out.push({ name, index, turn }); return; }
+      const k = `${name}|${turn}`, n = frei.get(k) || 0;
+      if (n > 0) { frei.set(k, n - 1); out.push({ name, index, turn }); }
+    });
+    return out;
+  }
+
+  /**
+   * Vengeful Attack — „a target that has defeated a target you control with an Attack, Spell or effect": vermerkt, WER ein Ziel besiegt hat (`gs._toetungen`, Eintrag =
+   * { turn, aktiv, opferSeite, opferArt, taeter }). Täter = ein Ziel (Held oder Kreatur): die Quelle einer Kreatur-Wirkung löst `resolveSourceCreature` zur lebenden Kreatur auf
+   * (`taeter.instId`), jede andere Quelle mit Heldenindex ist der handelnde Held (Brettseite = `heroOwner ?? owner`). Quellen ohne Besitzer (Gift, Brand, Blutung) und solche ohne
+   * Täter-Ziel (Gegenstandseffekte ohne Held) haben keinen Täter und werden nicht vermerkt. Heldentode zählen nur ENDGÜLTIG (`_runHeroDefeatSequence`, vor Extra Life).
+   * Es bleiben nur die letzten Runden stehen.
+   */
+  _toetungsProtokoll({ creature, hero, source, opferSeite }) {
+    try {
+      if (!source || typeof source !== 'object') return;
+      const owner = source.owner ?? source.controller;
+      if (!isSeat(this, owner)) return;
+      let seite = opferSeite;
+      if (creature) seite = creature.controller ?? creature.owner;
+      if (!isSeat(this, seite)) return;
+      let taeter = null;
+      const hooks = require('./_hooks');
+      if (hooks.isCreatureSource(this, source)) {
+        const inst = hooks.resolveSourceCreature(this, source);
+        if (inst) taeter = { art: 'creature', instId: inst.id };
+      } else if (Number.isInteger(source.heroIdx) && source.heroIdx >= 0) {
+        taeter = { art: 'hero', seite: isSeat(this, source.heroOwner) ? source.heroOwner : owner, heroIdx: source.heroIdx };
+      }
+      if (!taeter) return;
+      const liste = this.gs._toetungen || (this.gs._toetungen = []);
+      liste.push({ turn: this.gs.turn, aktiv: this.gs.activePlayer, opferSeite: seite, opferArt: creature ? 'creature' : 'hero', taeter });
+      if (liste.length > 60) liste.splice(0, liste.length - 60);
+    } catch (err) {
+      console.error('[toetungsProtokoll]', err.message);
+    }
+  }
+
+  /**
+   * ★ Vengeful Attack — die Ziele, die im LETZTEN Zug eines Gegners ein Ziel von `pi` besiegt haben und noch auf dem Brett stehen: `[{ art:'hero', seite, heroIdx } | { art:'creature', instId }]`.
+   * „Letzter Zug des Gegners" = der jüngste Zug (`ps._rhAktuellerZug`) des Spielers, der beim Besiegen am Zug war und nicht `pi` ist; ohne diese Zugnummer (Puzzle) jeder frühere Gegnerzug.
+   */
+  rachezieleFuer(pi) {
+    const out = [];
+    const seen = new Set();
+    for (const e of (this.gs._toetungen || [])) {
+      if (e.opferSeite !== pi || e.aktiv === pi || !isSeat(this, e.aktiv)) continue;
+      const letzter = this.gs.players[e.aktiv]?._rhAktuellerZug;
+      if (letzter != null ? e.turn !== letzter : !(e.turn < this.gs.turn)) continue;
+      const t = e.taeter;
+      if (t.art === 'hero') {
+        const h = this.gs.players[t.seite]?.heroes?.[t.heroIdx];
+        if (!h?.name || h.hp <= 0) continue;
+        const k = `h${t.seite}-${t.heroIdx}`;
+        if (!seen.has(k)) { seen.add(k); out.push(t); }
+      } else {
+        const inst = this.cardInstances.find(c => c.id === t.instId);
+        if (!inst || inst.zone !== ZONES.SUPPORT || inst.faceDown) continue;
+        const k = `c${t.instId}`;
+        if (!seen.has(k)) { seen.add(k); out.push(t); }
+      }
+    }
+    return out;
+  }
+
   async _vermerkeNiederlage(hookCtx) {
     const c = hookCtx?.creature;
     if (!c) return;
@@ -46034,6 +46140,38 @@ this._deathWatch = (this._deathWatchStack || []).length
    * dieselbe Funktion und bekommt den Zuschlag damit automatisch dazu.
    * Aufrufer setzen den Eintrag mit `mitLevelZuschlag` (raeumt selbst ab).
    */
+  /**
+   * ★ STUFE JE NUTZER — Karten-Vertrag `levelOffsetForHero(gs, seite, heroIdx, engine, cardData) → ganze Zahl` (negativ senkt, positiv erhöht; die Stufe bleibt ≥ 0). Gelesen von
+   * `heroMeetsLevelReq` und `effectiveCardLevel` (beide mit Held): „This Spell's level is reduced by 1 for every Ability attached to the user" (You are the Chosen One!!!).
+   * `seite` = Brettseite des Helden. Ohne den Haken: 0.
+   */
+  _heldStufenOffset(seite, heroIdx, cardData) {
+    if (heroIdx == null || !cardData?.name) return 0;
+    const sc = loadCardEffect(cardData.name);
+    if (typeof sc?.levelOffsetForHero !== 'function') return 0;
+    try { return Math.trunc(Number(sc.levelOffsetForHero(this.gs, seite, heroIdx, this, cardData)) || 0); }
+    catch (err) { console.error(`[levelOffsetForHero] ${cardData.name}:`, err.message); return 0; }
+  }
+
+  /**
+   * ★ Stufen-Hinweise für den Client (`heroPlayableCards.stufen`): zu jeder Handkarte mit `levelOffsetForHero` die Stufe, die sie für JEDEN eigenen Helden hätte —
+   * `{ [Kartenname]: { [heroIdx]: Stufe } }`. Der Client zeigt sie, wenn man die Karte über einen Helden zieht. `null`, wenn die Hand keine solche Karte hält.
+   */
+  stufenHinweise(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps || !Array.isArray(ps.hand) || ps.hand.length === 0) return null;
+    const db = this._getCardDB();
+    const out = {};
+    for (const name of new Set(ps.hand)) {
+      const cd = db[name];
+      if (!cd || typeof loadCardEffect(name)?.levelOffsetForHero !== 'function') continue;
+      const map = {};
+      (ps.heroes || []).forEach((h, hi) => { if (h?.name) map[hi] = this.effectiveCardLevel(cd, playerIdx, { heroIdx: hi }); });
+      out[name] = map;
+    }
+    return Object.keys(out).length ? out : null;
+  }
+
   _levelZuschlag(pi, heroIdx, cardData) {
     const liste = this._levelZuschlaege;
     if (!liste || liste.length === 0 || !cardData) return 0;
@@ -51173,6 +51311,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       scan(transMap_lvr);
       if (bestOffset < 0) rawLevel = Math.max(0, rawLevel + bestOffset);
     }
+    // Karten-Skript `levelOffsetForHero` (You are the Chosen One!!!): die Stufe hängt vom NUTZER ab — Änderung JE Held, nie unter 0.
+    {
+      const _heldOff = this._heldStufenOffset(playerIdx, heroIdx, cardData);
+      if (_heldOff) rawLevel = Math.max(0, rawLevel + _heldOff);
+    }
     // Mana Absorbing Crystal: while a copy sits in the controller's
     // hand, every Spell in their hand has its level raised by +1.
     // Applied AFTER any per-card reductions so the +1 still bites
@@ -51655,6 +51798,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       scan(ps._handLevelOffsets);
       scan(ps._handLevelOffsetsTransient);
       if (best < 0) raw = Math.max(0, raw + best);
+    }
+
+    // (2b) Karten-Skript `levelOffsetForHero` — Stufe je NUTZER (You are the Chosen One!!!), nie unter 0.
+    if (heroIdx != null) {
+      const _heldOff = this._heldStufenOffset(playerIdx, heroIdx, cardData);
+      if (_heldOff) raw = Math.max(0, raw + _heldOff);
     }
 
     // (3) Mana Absorbing Crystal — Spell only, suppressible.
