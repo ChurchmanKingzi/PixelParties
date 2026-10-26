@@ -17203,6 +17203,7 @@ io.on('connection', (socket) => {
     }
 
     // Apply creature custom HP and statuses
+    const pzPythia = [];   // Infallible Oracle Pythia (W78): Plan-Ziele werden nach der Schleife aufgelöst (das Ziel kann eine später angelegte Instanz sein)
     for (let pi = 0; pi < 2; pi++) {
       const pz = puzzleData.players[pi];
       if (!pz) continue;
@@ -17400,6 +17401,11 @@ io.on('connection', (socket) => {
             if (typeof cs.skullCounter === 'number' && cs.skullCounter > 0) {
               inst.counters.skullCounter = cs.skullCounter;
             }
+            // Infallible Oracle Pythia (W78): Pythia Counter + vorgemerktes Ziel der GEGENSEITE aus dem Puzzle-Editor (`pythiaCounters`, `pythiaPlan: { kind: 'hero', heroIdx } | { kind: 'creature', hi, slot }`).
+            if (inst.name === 'Infallible Oracle Pythia') {
+              if (typeof cs.pythiaCounters === 'number' && cs.pythiaCounters > 0) inst.counters.pythiaCounters = cs.pythiaCounters;
+              if (cs.pythiaPlan && (cs.pythiaPlan.kind === 'hero' || cs.pythiaPlan.kind === 'creature')) pzPythia.push({ inst, pi, plan: cs.pythiaPlan });
+            }
             if (typeof cs.bunnyBombCounter === 'number' && cs.bunnyBombCounter > 0) {
               inst.counters.bunnyBombCounter = cs.bunnyBombCounter;
             }
@@ -17538,6 +17544,19 @@ io.on('connection', (socket) => {
           }
         }
       }
+    }
+
+    // Pythia: Plan-Ziele auflösen (Gegenseite von Pythias Besitzer); die Anzeige-Marke leitet `_pythia-shared.abgleichen` beim nächsten sync ab.
+    for (const { inst, pi, plan } of pzPythia) {
+      const seite = pi === 0 ? 1 : 0;
+      if (plan.kind === 'hero') {
+        const held = gs.players[seite]?.heroes?.[plan.heroIdx];
+        if (held?.name) inst.counters.pythiaPlan = { kind: 'hero', owner: seite, heroIdx: plan.heroIdx, cardName: held.name };
+      } else {
+        const ziel = room.engine.cardInstances.find(c => c.owner === seite && c.zone === 'support' && c.heroIdx === plan.hi && c.zoneSlot === plan.slot);
+        if (ziel) inst.counters.pythiaPlan = { kind: 'creature', instId: ziel.id, cardName: ziel.name };
+      }
+      if (!(inst.counters.pythiaCounters > 0)) inst.counters.pythiaCounters = 0;
     }
 
     // Cursed-hero ATK-snapshot fix-up. Two puzzle-authoring patterns

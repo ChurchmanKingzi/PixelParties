@@ -2894,6 +2894,9 @@ function PuzzleCreator() {
   // Demon Counter (v601): null = Abschnitt verborgen (keine Demon-Counter-Karte).
   const [editDemonCounter, setEditDemonCounter] = useState(null);
   const [editSkullCounter, setEditSkullCounter] = useState(null);   // Hot Skull Potato
+  // Infallible Oracle Pythia: Pythia Counter und das vorgemerkte Ziel der GEGENSEITE (`{ kind: 'hero', heroIdx } | { kind: 'creature', hi, slot }`), null für andere Karten.
+  const [editPythiaCounter, setEditPythiaCounter] = useState(null);
+  const [editPythiaPlan, setEditPythiaPlan] = useState(null);
   // Puppets (v707): null = Editor ausgeblendet, sonst true/false.
   const [editLuckCounter, setEditLuckCounter] = useState(null);
   const [editPreserveCounter, setEditPreserveCounter] = useState(null);
@@ -2999,6 +3002,8 @@ function PuzzleCreator() {
     setEditBunnyBombCounter(null);
     setEditDemonCounter(null);
     setEditSkullCounter(null);
+    setEditPythiaCounter(null);
+    setEditPythiaPlan(null);
     setEditSparkflyGifts(null);
     setEditAntiMagicLevel(null);
     setEditRegenerationLevel(null);
@@ -3144,6 +3149,8 @@ function PuzzleCreator() {
       // Bunny Bombs: Bomb Counter aus dem gespeicherten Zustand holen.
       setEditDemonCounter(cardUsesDemonCounters(c) ? (cs.demonCounter || 0) : null);
       setEditSkullCounter(c?.name === 'Hot Skull Potato' ? (cs.skullCounter || 0) : null);
+      setEditPythiaCounter(c?.name === 'Infallible Oracle Pythia' ? (cs.pythiaCounters || 0) : null);
+      setEditPythiaPlan(c?.name === 'Infallible Oracle Pythia' ? (cs.pythiaPlan || null) : null);
       // Puppets (v707): Luck/Preserve auf Creatures und Tokens.
       {
         const isCrOrToken = !!c && (String(c.cardType || '').includes('Creature') || c.cardType === 'Token');
@@ -3368,6 +3375,12 @@ function PuzzleCreator() {
       // Demon Counter (v601): Server legt sie auf `inst.counters.demonCounter`.
       delete merged.skullCounter;
       if (editSkullCounter != null && editSkullCounter > 0) merged.skullCounter = editSkullCounter;
+      // Infallible Oracle Pythia: Zähler und vorgemerktes Ziel (Server: `pythiaCounters` / `pythiaPlan`, aufgelöst nach dem Anlegen aller Karten).
+      delete merged.pythiaCounters; delete merged.pythiaPlan;
+      if (c?.name === 'Infallible Oracle Pythia') {
+        if (editPythiaCounter != null && editPythiaCounter > 0) merged.pythiaCounters = editPythiaCounter;
+        if (editPythiaPlan) merged.pythiaPlan = editPythiaPlan;
+      }
       delete merged.demonCounter;
       if (editDemonCounter != null && editDemonCounter > 0) {
         merged.demonCounter = editDemonCounter;
@@ -3405,7 +3418,7 @@ function PuzzleCreator() {
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editSkin, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editHeldKreatur, editDiamondLoss, editJeGetroffen, editBountyMark, editBalanceCounter, editApplause, editBunnyBombCounter, editDemonCounter, editSkullCounter, editSparkflyGifts, editAntiMagicLevel, editRegenerationLevel, updatePlayer, getCard, statusScopePasst]);
+  }, [editTarget, editSkin, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editHeldKreatur, editDiamondLoss, editJeGetroffen, editBountyMark, editBalanceCounter, editApplause, editBunnyBombCounter, editDemonCounter, editSkullCounter, editPythiaCounter, editPythiaPlan, editSparkflyGifts, editAntiMagicLevel, editRegenerationLevel, updatePlayer, getCard, statusScopePasst]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -5106,6 +5119,7 @@ function PuzzleCreator() {
         feld('bomb', '💣', 'Bomb', editBunnyBombCounter, setEditBunnyBombCounter, '#e37435', `Bunny Bombs: explodes for ${(editBunnyBombCounter || 0) * 20} damage to every target on the board when defeated (20 per Bomb Counter).`);
         feld('demon', '😈', 'Demon', editDemonCounter, setEditDemonCounter, '#c98aff', `Horned Demon's strike deals ${(editDemonCounter || 0) * 50} damage (50 per Demon Counter).`);
         feld('skull', '💀', 'Skull', editSkullCounter, setEditSkullCounter, '#b9b9b9', `Hot Skull Potato: when it explodes it deals ${50 + (editSkullCounter || 0) * 50} damage (50 + 50 per Skull Counter).`);
+        feld('pythia', '🔮', 'Pythia', editPythiaCounter, setEditPythiaCounter, '#68fdc1', 'Pythia Counters on this card at the start of the puzzle. The THIRD counter (placed at the start of its controller’s turn) defeats the foreseen target.');
         if (!isBiomancyTokenEdit && editTarget.zt === 'support' && _editCard?.name === 'Cute Hydra') {
           feld('head', '🐲', 'Heads', editHeadCounter, setEditHeadCounter, '#f7e0b5', "Head Counters: cap the number of different targets Hydra's once-per-turn strike can hit.");
         }
@@ -5323,6 +5337,42 @@ function PuzzleCreator() {
                 </div>
               </div>
             )}
+            {/* Infallible Oracle Pythia: das vorgemerkte Ziel („Death Foreseen by Pythia") — ein Held oder eine Kreatur der GEGENSEITE (von Pythias Besitzer aus). Ein Klick auf den aktiven Eintrag löscht die Wahl. */}
+            {!isBiomancyTokenEdit && editTarget.zt === 'support' && _editCard?.name === 'Infallible Oracle Pythia' && (() => {
+              const gegner = players[editTarget.si === 0 ? 1 : 0];
+              const eintraege = [];
+              (gegner?.heroes || []).forEach((h, hi) => { if (h?.name) eintraege.push({ key: 'h' + hi, plan: { kind: 'hero', heroIdx: hi }, label: `Hero — ${h.name}` }); });
+              (gegner?.supportZones || []).forEach((zonen, hi) => (zonen || []).forEach((karten, slot) => {
+                const n = (karten || [])[0];
+                const cd = n ? getCard(n) : null;
+                if (cd && String(cd.cardType || '').split('/').some(t => t.trim() === 'Creature')) eintraege.push({ key: `c${hi}-${slot}`, plan: { kind: 'creature', hi, slot }, label: `Creature — ${cd.name} (${(gegner.heroes?.[hi]?.name || 'Hero ' + (hi + 1))}, zone ${slot + 1})` });
+              }));
+              const gleich = (a, b) => !!a && !!b && a.kind === b.kind && (a.kind === 'hero' ? a.heroIdx === b.heroIdx : (a.hi === b.hi && a.slot === b.slot));
+              return (
+                <div style={{ marginBottom: 14 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                    🔮 Foreseen Target (opponent's side)
+                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+                    {eintraege.length === 0 && <div style={{ fontSize: 11, color: 'var(--text2)' }}>The opponent has no Heroes or Creatures yet.</div>}
+                    {eintraege.map(e => {
+                      const active = gleich(editPythiaPlan, e.plan);
+                      return (
+                        <button key={e.key}
+                          className={'btn ' + (active ? 'btn-success' : '')}
+                          style={{ width: '100%', padding: '8px 12px', fontSize: 12, textAlign: 'left', borderColor: active ? '#4ceb70' : 'var(--bg4)' }}
+                          onClick={() => setEditPythiaPlan(active ? null : e.plan)}>
+                          {active ? '✅ ' : '○ '}{e.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
+                    When the third Pythia Counter is placed, the foreseen target is defeated. Pick the Counters above (2 = it falls at the start of the next own turn).
+                  </div>
+                </div>
+              );
+            })()}
             {/* Sleeping Beauty linked-hero picker — visible only when the
                 edit target is a Sleeping Beauty in a support zone. The
                 link is per-SLOT (left/middle/right), so a hero swapped
