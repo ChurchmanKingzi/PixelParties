@@ -20,6 +20,14 @@ Sie liegen nur lokal beim Arbeitenden und sind per `.gitignore` ausgeschlossen. 
 
 ---
 
+## ★★★ ZIEL-PICKER GRAUEN ALLES NICHT WÄHLBARE AUS (Al, 26.10.2026 — MANDATORY)
+
+Bei jedem Target-Picker sieht man auf einen Blick, was wählbar ist: **ineligible Targets werden ausgegraut** (Mean Cute Cat: nur die tauglichen Lv-3+-Kreaturen leuchten, alles andere ist grau). Mittel:
+* `promptEffectTarget`: die echten Ziele plus `...ausgegrauteRestkarten(engine, ziele)` (`_target-dim-shared.js`, Helden beider Seiten und jede Karte der Support Zones, soweit nicht schon wählbar) hereinreichen.
+* `promptDamageTarget` / `promptMultiTarget`: `dimUnmetCondition: true` — was an `condition` scheitert, bleibt ausgegraut sichtbar (Betrayal, Capture).
+* Eigene Zielobjekte: `ineligible: true` statt aus der Liste nehmen; die Engine und die Serverprüfung behandeln sie überall gleich (nicht wählbar, zählen nicht als Ausweichziel).
+* Neue Karten mit Zielwahl prüfen: gibt es Karten auf dem Brett, die man anklicken könnte, aber nicht darf, müssen sie grau sein.
+
 ## ★★★ KARTEN GEHEN IMMER IN DIE STAPEL IHRES PERMANENTEN BESITZERS — OHNE AUSNAHMEN (Al, 23.10.2026 — MANDATORY, zentral + Wächter)
 
 > Al: „Karten gehen **IMMER** in die Stapel (Decks, Potion-Deck, Discard, Deleted-Pile) ihres **permanenten Besitzers**. IMMER. Da gibt es keine Ausnahmen."

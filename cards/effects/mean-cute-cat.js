@@ -72,6 +72,7 @@ const { eligibleSummonZones } = require('./_summon-eligibility');
 const { hasCardType } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
 
+const { ausgegrauteRestkarten } = require('./_target-dim-shared');
 const CARD_NAME = 'Mean Cute Cat';
 const MIN_LEVEL = 3;
 const REDIRECT_MARK = '_meanCatRedirected';
@@ -182,7 +183,8 @@ async function angebot(engine, pi, catInst, info) {
     owner: engine.physicalSide(k), heroIdx: k.heroIdx, slotIdx: k.zoneSlot,
     cardName: k.name, cardInstance: k,
   }));
-  const wahl = await engine.promptEffectTarget(pi, ziele, {
+  // Al 26.10.: Ziel-Picker graut alles Nicht-Wählbare aus (nur die tauglichen Lv-3+-Kreaturen leuchten; Helden und alle übrigen Karten sind grau).
+  const wahl = await engine.promptEffectTarget(pi, [...ziele, ...ausgegrauteRestkarten(engine, ziele)], {
     title: CARD_NAME, source: CARD_NAME,
     description: `Choose the level 3 or higher Creature that takes the ${info.amount} damage.`,
     confirmLabel: '🦇 Redirect!',
