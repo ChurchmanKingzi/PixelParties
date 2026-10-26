@@ -42445,7 +42445,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   }
                 }
               }
-              if (eligible.length === 1) {
+              // ★ W78 (Backstab): eine Karte OHNE Wirker-Helden (`playsWithoutHero`) fragt nie nach einem Helden — der Server bucht die Aktion selbst; es genügt, dass irgendein eigener Held sie spielen könnte.
+              const _herolos = !isHeroAction && eligible.length > 0 && (me.herolessHandCards || []).includes(cardName);
+              if (eligible.length === 1 || _herolos) {
                 // During heroAction, the play has to land via the
                 // effect prompt (hero-locked: Coffee; any-hero: Hu).
                 // `play_spell` would fail server-side because no
@@ -54179,7 +54181,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const chainPickValidIds = new Set();
   const chainPickSelectedIds = new Set(chainPickSelected.map(t => t.id));
   const chainPickDamages = chainPickData?.damages || [];
-  const chainPickMaxTargets = chainPickDamages.length;
+  // ★ W78 (Backstab): `steps` = GEORDNETE Wahl mit eigener Kandidatenliste je Klick ([{ ids, label, role }]) — dieselben nummerierten Marker, Rückgängig und Bestätigen; ohne `steps` bleibt alles wie bei Chain Lightning.
+  const chainPickSteps = Array.isArray(chainPickData?.steps) ? chainPickData.steps : null;
+  const chainPickMaxTargets = chainPickSteps ? chainPickSteps.length : chainPickDamages.length;
   const chainPickHeroesFirst = chainPickData?.heroesFirst || false;
   if (chainPickData) {
     const allTargets = chainPickData.targets || [];
@@ -54188,6 +54192,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (step < chainPickMaxTargets) {
       for (const t of allTargets) {
         if (chainPickSelectedIds.has(t.id)) continue;
+        if (chainPickSteps && !(chainPickSteps[step].ids || []).includes(t.id)) continue;
         // Heroes-first: if there are unselected heroes, only heroes are valid
         if (chainPickHeroesFirst) {
           const unselectedHeroes = allTargets.filter(x => x.type === 'hero' && !chainPickSelectedIds.has(x.id));
@@ -54210,6 +54215,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         e.stopImmediatePropagation();
         if (chainPickSelected.length > 0) {
           setChainPickSelected(prev => prev.slice(0, -1));
+        } else if (chainPickData.cancellable) {
+          respondToPrompt({ cancelled: true });   // W78: Abbruch (Backstab: Karte zurück auf die Hand)
         }
       } else if ((e.key === 'Enter' || e.code === 'Space') && chainPickCanConfirm) {
         e.preventDefault();
@@ -61178,16 +61185,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* ── Effect Prompt: Chain Target Pick (Chain Lightning / Qinglong / Bottled Lightning) ── */}
       {isMyEffectPrompt && ep.type === 'chainTargetPick' && (
         <DraggablePanel zielwahl className="first-choice-panel animate-in" style={{ borderColor: '#fad54a' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: '#fad54a', marginBottom: 8 }}>⚡ {ep.title || 'Chain Lightning'}</div>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#fad54a', marginBottom: 8 }}>{chainPickSteps ? '⚔️' : '⚡'} {ep.title || 'Chain Lightning'}</div>
+          {chainPickSteps && ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>{ep.description}</div>}
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>
             {chainPickSelected.length < chainPickMaxTargets && chainPickValidIds.size > 0
-              ? `Click target #${chainPickSelected.length + 1} (${chainPickDamages[chainPickSelected.length]} dmg).`
-              : 'Confirm the chain!'}
+              ? (chainPickSteps
+                ? `${chainPickSelected.length + 1}/${chainPickMaxTargets}: ${chainPickSteps[chainPickSelected.length].label || 'Click a target.'}`
+                : `Click target #${chainPickSelected.length + 1} (${chainPickDamages[chainPickSelected.length]} dmg).`)
+              : (chainPickSteps ? 'Confirm!' : 'Confirm the chain!')}
           </div>
           {chainPickSelected.length > 0 && (
             <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 8 }}>
               {chainPickSelected.map((t, i) => (
-                <span key={String(t.id)} style={{ display: 'block', color: '#fad54a' }}>#{i+1} {String(t.cardName || '?')} → {chainPickDamages[i] || 0} dmg</span>
+                <span key={String(t.id)} style={{ display: 'block', color: '#fad54a' }}>#{i+1} {String(t.cardName || '?')} {chainPickSteps ? (chainPickSteps[i].role ? '— ' + chainPickSteps[i].role : '') : '→ ' + (chainPickDamages[i] || 0) + ' dmg'}</span>
               ))}
             </div>
           )}
@@ -61198,7 +61208,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             )}
             {chainPickCanConfirm && (
               <button className="btn btn-danger" style={{ padding: '6px 16px', fontSize: 11 }}
-                onClick={() => { respondToPrompt({ selectedTargets: chainPickSelected }); setChainPickSelected([]); }}>⚡ Confirm Chain!</button>
+                onClick={() => { respondToPrompt({ selectedTargets: chainPickSelected }); setChainPickSelected([]); }}>{chainPickSteps ? (ep.confirmLabel || 'Confirm') : '⚡ Confirm Chain!'}</button>
+            )}
+            {chainPickSteps && ep.cancellable && (
+              <button className="btn" style={{ padding: '6px 14px', fontSize: 11 }}
+                onClick={() => { respondToPrompt({ cancelled: true }); setChainPickSelected([]); }}>{ep.cancelLabel || '← Cancel'}</button>
             )}
           </div>
         </DraggablePanel>
