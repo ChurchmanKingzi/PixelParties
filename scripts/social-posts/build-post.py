@@ -807,31 +807,63 @@ def main():
             out_img = sh
         return out_img
 
-    # ── Opener „Gewitterwolke“: das erste Bild ist eine große Gewitterwolke, in der es zuckt; ein Blitz schlägt ein, die Wolke zerreißt und gibt den Helden frei ──
+    # ── Opener „Gewitterwolke“: das erste Bild ist die vergrößerte Wolke aus dem Sprite des Helden (ohne ihn), in der es zuckt; ein Blitz schlägt ein,
+    #    die Wolke zerreißt und gibt den Helden frei ──
     T_STORM = 0.70                                                           # Sekunden bis zum Einschlag
-    STORM_PAL = [(14, 18, 32), (40, 46, 72), (80, 90, 124), (130, 142, 178), (190, 202, 232), (240, 246, 255)]    # Kontur … Licht (von oben rechts)
-    PUFFS = [(-44, 8, 17), (-24, 2, 22), (0, -4, 26), (25, 1, 22), (45, 8, 16), (-33, 16, 13), (-12, 15, 15), (13, 16, 15), (34, 15, 12),
-             (-14, -17, 14), (14, -19, 13), (-1, -26, 10)]                    # (dx, dy, Radius) in Zellen, von hinten nach vorn
+    CP = 12                                                                  # Pixelgröße der vergrößerten Wolke
     BOLT_C = [(110, 170, 255), (255, 244, 170), (255, 255, 255)]             # Glimmen, Mitte, Kern
     bolt_rng = np.random.default_rng(5)
 
-    def cloud_cells(t, flash):
-        lvl = np.full((chei, cwid), -1.0, dtype=np.float32)
-        out_ = np.zeros((chei, cwid), dtype=bool)
-        for i, (dx, dy, r_) in enumerate(PUFFS):
-            r_ = r_ * 1.12 + 0.9 * math.sin(t * 5 + i * 1.7)
-            ox, oy_ = dx * 1.12 + 1.2 * math.sin(t * 3 + i), dy * 1.12 + 0.8 * math.cos(t * 4 + i * 2.1)
-            nx, ny = (XX + 0.5 - hcx - ox) / r_, (YY + 0.5 - hcy - oy_) / r_
-            d = np.hypot(nx, ny)
-            inside = d < 1.0
-            v = 1.7 + 1.5 * (nx * 0.6 - ny * 0.8) - 0.5 * d * d                 # Licht von oben rechts
-            v = np.where(d > 1.0 - 2.4 / r_, 0.0, v)                              # dunkle Kontur um jede Wolkenwölbung
-            lvl = np.where(inside, v, lvl)
-            out_ |= inside
-        return out_, lvl + 2.0 * flash
+    def sprite_cloud(i):
+        """Nur die Wolke des Sprite-Frames i: Kopf über der Wolke entfernt, der Held und Blitze in der Wolke durch das Wolkengrau ersetzt."""
+        fr = np.asarray(spr.sheet.crop((i * spr.fw, 0, (i + 1) * spr.fw, spr.fh))).astype(np.int32)
+        op = fr[..., 3] > 20
+        sat = fr[..., :3].max(axis=2) - fr[..., :3].min(axis=2) > 20
+        top = int(np.argmax(op.sum(axis=1) >= 25))                          # erste breite Zeile = Oberkante der Wolke
+        out_ = np.zeros_like(fr)
+        for y in range(top, spr.fh):
+            gray = np.where(op[y] & ~sat[y])[0]
+            for x in np.where(op[y])[0]:
+                if not sat[y, x]:
+                    out_[y, x] = fr[y, x]
+                    continue
+                l_ = gray[gray < x]
+                r_ = gray[gray > x]
+                if len(l_) and len(r_) and x - l_[-1] <= 14 and r_[0] - x <= 14:
+                    out_[y, x, :3] = (fr[y, l_[-1], :3] + fr[y, r_[0], :3]) // 2
+                    out_[y, x, 3] = fr[y, x, 3]
+        hs = np.where(sat[max(0, top - 12):top + 10])                         # Grundfläche des Helden (Kopf, Hals, Spiegelung): durch ein Wolkenstück von links ersetzen
+        if len(hs[0]):
+            x0, x1, y1 = int(hs[1].min()) - 2, int(hs[1].max()) + 3, int(hs[0].max()) + max(0, top - 12) + 3
+            sh_ = x1 - x0 + 1
+            out_[top:y1, x0:x1] = fr[top:y1, x0 - sh_:x1 - sh_]
+        return out_.astype(np.uint8)
+
+    CLOUDS = [sprite_cloud(i) for i in range(spr.n)]
+    c_op = np.any([c[..., 3] > 20 for c in CLOUDS], axis=0)
+    cy_ix, cx_ix = np.where(c_op)
+    CB = (int(cx_ix.min()), int(cy_ix.min()), int(cx_ix.max()) + 1, int(cy_ix.max()) + 1)       # gemeinsamer Rahmen aller Frames
+    CL, CT = round(W / 2 - (CB[2] - CB[0]) * CP / 2), round(hcy * U - (CB[3] - CB[1]) * CP / 2)   # Wolke mittig auf Herz-/Kartenmitte
+    _cloud_cache = {}
+
+    def storm_cloud(i, flash=0.0):
+        if i not in _cloud_cache:
+            _cloud_cache[i] = Image.fromarray(CLOUDS[i][CB[1]:CB[3], CB[0]:CB[2]], 'RGBA').resize(((CB[2] - CB[0]) * CP, (CB[3] - CB[1]) * CP), Image.NEAREST)
+        im = _cloud_cache[i]
+        if flash:                                                             # Wetterleuchten: Wolke leuchtet bläulich-weiß auf
+            lit = Image.blend(im.convert('RGB'), Image.new('RGB', im.size, (205, 222, 255)), 0.5 * flash)
+            lit.putalpha(im.split()[3])
+            return lit
+        return im
+
+    def cloud_mask_cells(i):
+        a_ = Image.new('L', (W, H), 0)
+        a_.paste(storm_cloud(i).split()[3], (CL, CT))
+        m_ = np.asarray(a_)[U // 2::U, U // 2::U][:chei, :cwid] > 128
+        return np.pad(m_, ((0, chei - m_.shape[0]), (0, cwid - m_.shape[1])))
 
     def storm_bolt(seed, x0, y0, y1, fork=True):
-        """Gezackter Blitz als Zellenmaske (Kern, Mitte, Glimmen als Ebenen 2/1/0)."""
+        """Gezackter Blitz als Zellenmaske (Kern, Mitte, Glimmen)."""
         rng = np.random.default_rng(seed)
         core = np.zeros((chei, cwid), dtype=bool)
         def line(a, b, c, d_):
@@ -867,9 +899,10 @@ def main():
             glow = g2
         return core, mid, glow
 
-    BOLT_X, BOLT_Y1 = hcx + 3, max((feet_y + 4 * U) / U, hcy + 45)       # bis zu den Füßen des Helden, mindestens aber ein Stück unter die Wolke
-    BOLT = storm_bolt(11, BOLT_X, hcy + 6, BOLT_Y1)
-    LEAD = storm_bolt(12, BOLT_X + 1, hcy + 6, BOLT_Y1, fork=False)
+    BOLT_X, BOLT_Y0 = hcx + 3, (CT + (CB[3] - CB[1]) * CP * 0.6) / U                # Einschlag aus dem unteren Teil der Wolke …
+    BOLT_Y1 = max((feet_y + 4 * U) / U, BOLT_Y0 + 45)                              # … bis zu den Füßen des Helden
+    BOLT = storm_bolt(11, BOLT_X, BOLT_Y0, BOLT_Y1)
+    LEAD = storm_bolt(12, BOLT_X + 1, BOLT_Y0, BOLT_Y1, fork=False)
 
     def paint_bolt(img, bolt, glow_on=True, dither=None):
         core, mid, glow = bolt
@@ -884,38 +917,43 @@ def main():
             vis &= dither
         paint(img, vis, rgb)
 
-    storm_pre_mask, storm_pre_lvl = cloud_cells(0.0, 0.0)
-    storm_pre_rgb = pal_dither(STORM_PAL, storm_pre_lvl)
+    def put_cloud(img, i, flash=0.0):
+        rgba = img.convert('RGBA')
+        rgba.alpha_composite(storm_cloud(i, flash), (CL, CT))
+        return rgba.convert('RGB')
+
     STORM_CHUNKS = []
     schunk_rng = np.random.default_rng(78)
+    cl_full = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    cl_full.alpha_composite(storm_cloud(0), (CL, CT))
+    cl_arr = np.asarray(cl_full)
     for cy_ in range(0, chei - CHUNK, CHUNK):
         for cx_ in range(0, cwid - CHUNK, CHUNK):
-            if storm_pre_mask[cy_ + CHUNK // 2, cx_ + CHUNK // 2]:
+            yc, xc = (cy_ + CHUNK // 2) * U + U // 2, (cx_ + CHUNK // 2) * U + U // 2
+            if cl_arr[yc, xc, 3] > 128:
                 px_, py_ = cx_ + CHUNK / 2 - hcx, cy_ + CHUNK / 2 - hcy
                 n = max(1e-3, math.hypot(px_, py_))
                 sp = schunk_rng.uniform(45, 120)
-                STORM_CHUNKS.append((cx_, cy_, px_ / n * sp, py_ / n * sp - 10, schunk_rng.uniform(0.3, 0.85),
-                                     tuple(int(c) for c in storm_pre_rgb[cy_ + CHUNK // 2, cx_ + CHUNK // 2])))
+                STORM_CHUNKS.append((cx_, cy_, px_ / n * sp, py_ / n * sp - 10, schunk_rng.uniform(0.3, 0.85), tuple(int(c) for c in cl_arr[yc, xc, :3])))
 
     def storm_fx(img, f):
         ts = f / float(fps)
         if ts >= T_STORM + T_BOOM:
             return img
-        dark = Image.blend(img, Image.new('RGB', (W, H), (6, 8, 22)), 0.95)
+        dark = Image.blend(img, Image.new('RGB', (W, H), (6, 8, 22)), 0.985)
         shake_amp = 0
+        idx = (f // per) % spr.n
         if ts < T_STORM:
-            out_img = dark
             fl = 0.0
             for t0_ in (0.20, 0.43):                                           # Wetterleuchten in der Wolke
                 if 0 <= ts - t0_ < 0.07:
                     fl = 1.0
             if T_STORM - 0.09 <= ts < T_STORM:
                 fl = 0.8
-            m_, l_ = cloud_cells(ts, fl)
-            paint(out_img, m_, pal_dither(STORM_PAL, l_))
+            out_img = put_cloud(dark, idx, fl)
             if fl:                                                            # Äderchen im Inneren der Wolke
-                paint_bolt(out_img, storm_bolt(40 + int(ts * 30), hcx + bolt_rng.uniform(-30, 30), hcy - 8, hcy + 22, fork=False), glow_on=False,
-                           dither=m_)
+                vein = storm_bolt(40 + int(ts * 30), hcx + bolt_rng.uniform(-25, 25), hcy - 6, hcy + 8, fork=False)
+                paint_bolt(out_img, vein, glow_on=False, dither=cloud_mask_cells(idx))
             if T_STORM - 0.07 <= ts < T_STORM:                               # Vorentladung: dünner Leitblitz
                 paint_bolt(out_img, LEAD, glow_on=False)
             shake_amp = 1 if ts >= T_STORM - 0.07 else 0
