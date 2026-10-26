@@ -35,6 +35,7 @@
 // ═══════════════════════════════════════════
 
 const P = require('./_pythia-shared');
+const { ausgegrauteRestkarten } = require('./_target-dim-shared');
 
 const CARD_NAME = P.CARD_NAME;
 const ANIM = 'pythia_flames';
@@ -158,7 +159,7 @@ module.exports = {
     if (ziele.length === 0) return false;          // kein anderes Ziel: die Frage entfällt
     inst._pythiaRettet = true;                     // keine zweite Frage, solange die erste läuft
     try {
-      const wahl = await engine.promptEffectTarget(pi, ziele, {
+      const wahl = await engine.promptEffectTarget(pi, [...ziele, ...ausgegrauteRestkarten(engine, ziele)], {
         title: CARD_NAME, source: CARD_NAME,
         description: `${CARD_NAME} would be defeated! You may sacrifice another target you control to fully heal her instead.`,
         confirmLabel: '🔥 Sacrifice!', confirmClass: 'btn-danger', cancellable: true, redSelect: true,
