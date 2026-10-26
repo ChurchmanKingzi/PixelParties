@@ -9224,6 +9224,7 @@ class GameEngine {
     // auch wenn Monia selbst nie wieder am Zug ist (tot/gefroren: ihr `onTurnStart` räumt dann nicht mehr).
     if (this.gs && (this.gs._moniaShieldActive != null || this.gs._moniaAngebote)) { delete this.gs._moniaShieldActive; delete this.gs._moniaShieldSource; delete this.gs._moniaAngebote; }   // W58a: auch die Angebote der Aufloesung
     if (this.gs && this.gs._kreaturFenster) delete this.gs._kreaturFenster;   // W71b: die Fenster-Buchführung von `kreaturBetroffen` endet mit der Auflösung
+    this._gewaehlteZiele = null;   // W78a: die gemerkten Zielwahlen des Effekts (Monias CPU-Bilanz) ebenfalls (Engine-Feld, nicht im Spielstand: ein Abbruch hinterlässt keine Spur im Zustand)
     // W16f (H03-10): Monia Bots True-Damage-Stempel gilt für Schaden AUS dem umgeleiteten Effekt — er endet mit dessen Auflösung (macht der Effekt keinen Schaden, verfällt er).
     if (this.gs && this.gs._redirectedTrueDamage) delete this.gs._redirectedTrueDamage;
   }
@@ -9289,6 +9290,7 @@ class GameEngine {
       creature: inst, effectType: art, source: src, cancelled: false, _skipReactionCheck: true,
       ...(opts.statusName ? { statusName: opts.statusName } : {}),
       ...(opts.detail ? { detail: opts.detail } : {}),
+      ...(Array.isArray(opts.vorab) && opts.vorab.length ? { vorab: opts.vorab.filter(i => i && i !== inst) } : {}),   // W78a: weitere Kreaturen, die derselbe Effekt gleich trifft (für Monias CPU-Bilanz)
     };
     // Dieselbe Karte/derselbe Effekt fragt für dieselbe Kreatur und Art in EINER Auflösung nur einmal — das erledigt `runHooks` (Buchführung `gs._kreaturFenster`).
     await this.runHooks(HOOKS.BEFORE_CREATURE_AFFECTED, hookCtx);
@@ -9304,11 +9306,44 @@ class GameEngine {
    */
   async kreaturenVorab(insts, art, quelle, opts = {}) {
     const erlaubt = new Set();
-    for (const inst of insts || []) {
-      if (!inst) continue;
-      if (await this.kreaturBetroffen(inst, art, quelle, opts)) erlaubt.add(inst.id);
+    // ★ W78a: das ERSTE Fenster kennt die ganze Liste (`ctx.vorab`) — Monias CPU rechnet damit die Gesamtbilanz des Effekts, statt nur die erste Kreatur zu sehen.
+    const alle = (insts || []).filter(Boolean);
+    for (const inst of alle) {
+      if (await this.kreaturBetroffen(inst, art, quelle, { ...opts, vorab: alle })) erlaubt.add(inst.id);
     }
     return erlaubt;
+  }
+
+  /**
+   * ★ W78a (Al, 26.10.2026): gemeinsame Kreaturen-Wertung/-Bilanz der CPU (`_kreaturen-bilanz.js`) — Monia nutzt sie für „annehmen oder ablehnen",
+   * andere Flächen-/Kontroll-Bewerter können sie später ebenfalls rufen. `kreaturenBilanz(opfer, liste)`: Bilanz aus Sicht von `opfer`, wenn die Wirkung
+   * auf alle Listeneinträge negiert würde (Schaden an Eigenen/Nutzen für Gegnerische verhindert = Gewinn, Schaden an Gegnerischen/Nutzen für Eigene = Verlust).
+   * `absehbareKreaturen(k)`: erwartete Gesamtliste eines Effekts beim ersten Ereignis (angekündigte Liste, gewählte Ziele, Flächen-Eigenschaft/Kartentext).
+   */
+  kreaturWert(inst) { return require('./_kreaturen-bilanz').kreaturWert(this, inst); }
+  kreaturenBilanz(opfer, liste, opts) { return require('./_kreaturen-bilanz').kreaturenBilanz(this, opfer, liste, opts); }
+  absehbareKreaturen(k) { return require('./_kreaturen-bilanz').absehbareKreaturen(this, k); }
+
+  /** ★ W78a: gewählte Ziele einer abgeschlossenen Zielwahl für die Auflösung merken (nur Kreaturen-Ids; Engine-Feld `_gewaehlteZiele`, nicht im Spielstand; endet mit `endeEffektImmunitaeten`, Anfang/Ende einer Aktivierung [`armEffectAnnounce`/`clearEffectAnnounce`] und einer äußersten Kartenauflösung). */
+  _gewaehlteZieleMerken(playerIdx, validTargets, config, ergebnis) {
+    try {
+      if (!Array.isArray(ergebnis) || !ergebnis.length || !Array.isArray(validTargets)) return;
+      const ids = new Set(ergebnis.map(r => (r && typeof r === 'object') ? r.id : r));
+      const insts = [];
+      for (const t of validTargets) {
+        if (!t || !ids.has(t.id)) continue;
+        const inst = t.cardInstance || t._cardInstance;
+        if (inst && inst.zone === ZONES.SUPPORT && inst.id != null) insts.push(inst.id);
+      }
+      if (!insts.length) return;
+      const quellen = new Set();
+      const q = (v) => { const n = typeof v === 'string' ? v : (v && (v.cardName || v.name)); if (n) quellen.add(n); };
+      q(config?.sourceCard); q(config?.source); q(this._effectSourceName());
+      if (!quellen.size) return;
+      const liste = this._gewaehlteZiele || (this._gewaehlteZiele = []);
+      liste.push({ quellen: [...quellen], ids: insts, turn: this.gs.turn });
+      if (liste.length > 12) liste.splice(0, liste.length - 12);
+    } catch { /* Buchführung darf die Zielwahl nie stören */ }
   }
 
   async _actionDealDamageImpl(source, target, amount, type, opts) {
@@ -13061,11 +13096,13 @@ class GameEngine {
     this._activationSource = cardName
       ? { cardName, owner: ownerIdx ?? null, turn: this.gs?.turn, origin: origin === 'hand' ? 'hand' : 'board' }
       : null;
+    this._gewaehlteZiele = null;   // W78a: eine neue Aktivierung beginnt — keine gemerkten Zielwahlen einer abgebrochenen früheren
   }
 
   clearEffectAnnounce() {
     this._pendingEffectAnnounce = null;
     this._activationSource = null;
+    this._gewaehlteZiele = null;   // W78a
   }
 
   /**
@@ -33999,10 +34036,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     //   `applyRedirectWindows`, der einen Auslegung fuer alle drei
     //   Eingaenge (hier, `ctx.promptTarget`, `doConfirmPotion`).
     // W45a (Al, 22.10.2026): die Zielwahl einer auflösenden Surprise (Gold Trap, Jumpscare …) ohne eigene Quelle in der Konfiguration nennt die Surprise als Quelle — vor der Umgebungsquelle.
-    return await this.applyRedirectWindows(
+    const _ergebnis = await this.applyRedirectWindows(
       _pickedIds, validTargets, config,
       this._redirectSourceFor(playerIdx, config) || this._surpriseQuelleFuer(playerIdx) || _umgebung
     );
+    this._gewaehlteZieleMerken(playerIdx, validTargets, config, _ergebnis);   // W78a: „bereits gewählte Ziele" des Effekts für Monias CPU-Bilanz
+    return _ergebnis;
   }
 
   /**
