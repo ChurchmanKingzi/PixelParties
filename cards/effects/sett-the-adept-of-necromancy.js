@@ -146,15 +146,21 @@ module.exports = {
       if (alt.length === 0) return;
 
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi, source: `sett:${gs.turn}` });
+      // ★ W79a: `unaufhaltsam` (unten) uebergeht seit 1b88d01d JEDES Schutzfenster der Engine — also auch Cool Rescuer Monia. Setts Text sagt aber nur „send"
+      // (Zerstoerungsschutz greift nicht), nichts von „ignores negation": Monia darf den Zugende-Schlag weiter negieren (W71b). Darum das Fenster hier,
+      // EINMAL vorab fuer alle Opfer (Monia sieht die ganze Liste); negierte Kreaturen bleiben stehen und zaehlen nicht als Opfer (Pythia, Sammel-Fenster).
+      const erlaubt = await engine.kreaturenVorab(alt, 'destroy', { name: CARD_NAME, owner: pi, controller: pi }, { sourceOwner: pi, detail: 'send' });
+      const opferListe = alt.filter(inst => erlaubt.has(inst.id));
+      if (opferListe.length === 0) { engine.sync(); return; }
       // Ein Schlag: das Sammel-Fenster „one or more Creatures defeated"
       // (Zombified Assault …) oeffnet sich EINMAL mit allen Opfern.
-      await engine.mitTodgeweihten(alt, () => engine._mitNiederlagenSammler(async () => {
-        for (const inst of alt) {
+      await engine.mitTodgeweihten(opferListe, () => engine._mitNiederlagenSammler(async () => {
+        for (const inst of opferListe) {
           if (inst.zone !== 'support') continue;     // schon weg (Kettentod)
           await besiege(engine, pi, inst);
         }
       }));
-      engine.log('sett_cleanup', { player: gs.players[pi]?.username, count: alt.length });
+      engine.log('sett_cleanup', { player: gs.players[pi]?.username, count: opferListe.length });
       engine.sync();
     },
   },
