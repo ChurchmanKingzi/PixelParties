@@ -90,12 +90,13 @@ module.exports = {
         return !!cd && hasCardType(cd, 'Creature');
       });
       const quelle = { name: CARD_NAME, owner: pi, controller: pi, cardType: 'Creature', cardInstance: ich, heroIdx, heroOwner: seite };
-      await engine._mitNiederlagenSammler(async () => {
+      // Die Opfer stehen jetzt fest: keine von ihnen darf als Opfer einer Rettung dienen (Pythia).
+      await engine.mitTodgeweihten(opfer, () => engine._mitNiederlagenSammler(async () => {
         for (const c of opfer) {
           if (c.zone !== 'support') continue;                                // fiel inzwischen (anderer Schädel)
           await engine.actionDestroyCard(quelle, c, { sourceOwner: pi, sourceName: CARD_NAME, fireCreatureDeath: true });
         }
-      });
+      }));
       engine.log('cosmic_skull_blast', { player: engine.gs.players[pi]?.username, hero: heldName, defeated: opfer.length });
       engine.sync();
       await engine._delay(Math.max(0, BOOM_MS - VOR_MS));
