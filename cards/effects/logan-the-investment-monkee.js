@@ -315,6 +315,9 @@ module.exports = {
         title: CARD_NAME,
         description: `Choose a target for ${schaden} damage.`,
         confirmLabel: `💥 ${schaden} Damage!`,
+        // Als Ruling (Al 26.10.): Logan ist ein HELD — seine Schadens-Wege (Zielwahl, Helden- UND Kreaturenzweig) laufen als 'hero' mit Vorschau 5 × Invest Counter.
+        damageType: 'hero',
+        baseDamage: schaden,
         cancellable: true,
         // v338 (Als Befund): der Client liest `selectCount`, NICHT
         // `maxSelect`. Mit dem falschen Feld fiel er auf seinen Standard
@@ -351,7 +354,7 @@ module.exports = {
         }
       } else if (ziel.cardInstance) {
         await engine.actionDealCreatureDamage(
-          quelle, ziel.cardInstance, schaden, 'creature',
+          quelle, ziel.cardInstance, schaden, 'hero',   // Als Ruling (Al 26.10.): Heldeneffekt → 'hero' auch am Kreaturenziel
           { sourceOwner: pi, canBeNegated: true },
         );
       }

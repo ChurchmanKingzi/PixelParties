@@ -31,6 +31,8 @@
 //  re-stamp the taunt the same turn.
 // ═══════════════════════════════════════════
 
+const { slimeLevelUpHook } = require('./_slime-shared');
+
 module.exports = {
   // ★ W43a: Taunt nur für Attacks, Spells und Creature effects (s. Kopf; gelesen von `_applyForcesTargetingFilter`).
   tauntNurAttackSpellKreatur: true,
@@ -73,9 +75,7 @@ module.exports = {
       engine.sync();
     },
 
-    onTurnStart: async (ctx) => {
-      if (!ctx.isMyTurn) return;
-      await ctx.changeLevel(1);
-    },
+    // Als Ruling (Al 26.10.): „you may increase this Creature's level by 1" = Ja/Nein-Frage (Nein/Abbruch: Stufe bleibt) — `_slime-shared`.
+    onTurnStart: slimeLevelUpHook('Hardy Slime'),
   },
 };

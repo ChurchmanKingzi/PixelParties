@@ -155,7 +155,8 @@ module.exports = {
       // pattern Loyal Terrier's follow-up uses.
       // ★ W39a: die Quelle des Schlags ist der Held (nicht die Bamboo-Staff-Instanz in der Support Zone, die Leser für eine Kreatur-Quelle halten: Firewall/Toxic Trap/Mountain Tear River).
       const dmgSource = { name: hero.name, owner: pi, heroOwner: feld, heroIdx, treatedAsAttack: engine.heldenAngriffStempel(feld, heroIdx) };   // W30a: Stufe = Fighting-Level des Helden (war W27a: 0)
-      const target = await ctx.promptDamageTarget({
+      // ★ R-12 (Al 26.10.): `heldenEffektZielwahl` trennt Negierung im Zielfenster (Surprise, Hand-Reaktion, Schutz-/Redirect-Fenster) vom Abbruch des Spielers (W36a, wie Broghan & Co.).
+      const { target, negiert } = await engine.heldenEffektZielwahl(ctx, {
         attackerSourceOverride: dmgSource,
         side: 'any',
         types: ['hero', 'creature'],
@@ -167,6 +168,13 @@ module.exports = {
         confirmClass: 'btn-danger',
         cancellable: true,
       });
+      if (negiert) {
+        // R-12: negierter Schlag = verbraucht (Weich-Einmal-pro-Zug bleibt gestempelt) und zählt als gespielte Attack des Trägers.
+        delete gs._spellDamageLog;
+        await engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner: feld, name: CARD_NAME });
+        engine.sync();
+        return;
+      }
       if (!target) {
         if (!wdh) delete ctx.card.counters._bambooFiredOnTurn;
         delete gs._spellDamageLog;

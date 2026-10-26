@@ -55,6 +55,8 @@ module.exports = {
     // genau wie bei Inventing. Danach `actionDiscardHandCard` mit dem
     // gemeldeten Handindex und am Ende EIN `actionDrawCards`.
     let anzahl = 0;
+    const borisGate = engine.borisStapel(pi, { source: CARD_NAME, skipVoidsEffect: true });   // ★ W74c
+    let borisVerzichtet = false;
     for (let i = 0; i < maximum; i++) {
       if ((ps.hand || []).length === 0) break;
       const wahl = await engine.promptGeneric(pi, {
@@ -68,6 +70,9 @@ module.exports = {
       if (!wahl || wahl.cancelled) break;
       const { cardName, handIndex } = wahl;
       if (cardName === undefined || handIndex === undefined) break;
+      // ★ W74c: Boris darf den Abwurf ignorieren — einmal gefragt (vor dem ersten Abwurf), die Antwort gilt für den ganzen Stapel. Die Wirkung hängt an der
+      // ANZAHL der abgeworfenen Karten ("that many", "the same number"): bei Verzicht 0, der Effekt endet ohne Wirkung.
+      if (await borisGate(maximum)) { borisVerzichtet = true; break; }
       // `_noGlow`: `actionDiscardHandCard` laesst sonst ZUERST die
       // Quellkarte aufleuchten und wirft erst danach ab — zwischen
       // Klick und Abwurf lag dadurch eine spuerbare Pause (Als
@@ -80,7 +85,7 @@ module.exports = {
       anzahl++;
     }
 
-    if (anzahl === 0) return false;
+    if (anzahl === 0) return borisVerzichtet;   // W74c: bei Boris-Verzicht ist der Effekt aktiviert (mit 0 Karten)
 
     engine.sync();
     await engine._delay(350);   // Abwurf setzen lassen, dann ziehen

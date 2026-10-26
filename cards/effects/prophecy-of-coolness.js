@@ -21,7 +21,7 @@ module.exports = {
 
   inherentAction: true,
 
-  spellPlayCondition(gs, pi) {
+  spellPlayCondition(gs, pi, engine) {
     const ps = gs.players[pi];
     if (!ps) return false;
     // Per-turn limit — uses the engine's canonical `gs.hoptUsed[key:pi]`
@@ -29,7 +29,9 @@ module.exports = {
     // spell becomes castable again after a cancel-then-retry, falling
     // through to discard with no effect.
     if (isOnCooldown(gs, pi)) return false;
-    if (!Array.isArray(ps.coolnessStack) || ps.coolnessStack.length === 0) return false;
+    // Als Ruling (Al 26.10.): der Stack existiert, solange Wowhalla liegt — auch leer (`hasCoolnessStack`); Prophecy legt nur eine Karte DARAUF.
+    const eng = engine || gs._engineRef;
+    if (!(eng?.hasCoolnessStack ? eng.hasCoolnessStack(pi) : (Array.isArray(ps.coolnessStack) && ps.coolnessStack.length > 0))) return false;
     return Array.isArray(ps.mainDeck) && ps.mainDeck.length > 0;
   },
 

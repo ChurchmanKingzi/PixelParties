@@ -7,6 +7,14 @@
 //  Once per turn, when a card is removed from your
 //  Coolness Stack, you may add it to your hand and
 //  place the top of your deck on top of your Stack.
+//
+//  Als Ruling (Al 26.10.): Das Nachfuellen („if you do") gibt es nur,
+//  wenn Hipdalls EIGENES „add it to your hand" wirklich eine Karte auf
+//  die Hand bringt. Geht die Karte ohnehin schon auf die Hand (Cool
+//  Rescue) oder ist die Hand gesperrt, gibt es keine Frage und keinen
+//  Nachschub; der Einmal-Stempel bleibt unberuehrt. Bei liegender
+//  Wowhalla gilt der Stack auch leer als vorhanden (Nr. 55): holt
+//  Hipdall die LETZTE Karte, kommt die Deckkarte als Ersatz.
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Hipdall, Protector of Coolness';
@@ -74,6 +82,16 @@ module.exports = {
       // Swellpnir, Hipdall self-summon, Swagdri self-summon) — those
       // landings are deliberate placements.
       if (!toZone || toZone === 'support' || toZone === 'permanent') return;
+      // Als Ruling (Al 26.10.): „Hipdall legt nur die oberste Karte auf den Stack, wenn auch wirklich eine Karte auf der Hand ankommt."
+      // Landet die Karte ohnehin schon auf der Hand (Cool Rescue: „Add the top card of your Coolness Stack to your hand"), bringt Hipdalls
+      // „add it to your hand" nichts Neues -> weder Frage noch Nachfuellen. Dasselbe unter einer Hand-Sperre („cannot add cards to your hand").
+      if (toZone === 'hand') return;
+      if (engine.handZugangGesperrt(pi)) return;
+
+      // Die Karte muss noch dort liegen: hat ein anderer Hipdall sie in diesem Zug schon zurueckgeholt, gibt es nichts mehr zu fragen
+      // (die Frage waere umsonst und braeuchte den Einmal-Stempel dieses Hipdall auf).
+      if (toZone === 'discard' && !ps.discardPile.includes(cardName)) return;
+      if (toZone === 'deleted' && !ps.deletedPile.includes(cardName)) return;
 
       const confirmed = await engine.promptGeneric(pi, {
         type: 'confirm',
@@ -96,21 +114,16 @@ module.exports = {
         if (await engine.takeFromPile(ps, 'discard', cardName, { source: CARD_NAME, last: true, toHand: true, ohneZugangsFenster: true })) recovered = true;   // v820: Stapel-Schicht
       } else if (toZone === 'deleted') {
         if (await engine.takeFromPile(ps, 'deleted', cardName, { source: CARD_NAME, last: true })) recovered = true;   // v820: Stapel-Schicht
-      } else if (toZone === 'hand') {
-        // Already in hand — no-op.
-        recovered = true;
       }
       if (!recovered) return;
 
-      if (toZone !== 'hand') {
-        await engine.handZugang(ps, cardName, { von: 'ablage', source: CARD_NAME, ohneInstanz: true, ohneZugangsFenster: true });   // W72a: kommt aus dem Coolness Stack, nicht aus Deck/Ablage (Control Monitors)
-        // Move the leaving inst back to hand. ctx.card on a leave-zone
-        // hook is the LISTENING inst (Hipdall itself); the leaving
-        // inst is exposed differently — we lookup by name+toZone.
-        const inst = engine.cardInstances.find(c => c.owner === pi && c.name === cardName && c.zone === toZone);
-        if (inst) inst.zone = 'hand';
-        else engine._trackCard(cardName, pi, 'hand');
-      }
+      await engine.handZugang(ps, cardName, { von: 'ablage', source: CARD_NAME, ohneInstanz: true, ohneZugangsFenster: true });   // W72a: kommt aus dem Coolness Stack, nicht aus Deck/Ablage (Control Monitors)
+      // Move the leaving inst back to hand. ctx.card on a leave-zone
+      // hook is the LISTENING inst (Hipdall itself); the leaving
+      // inst is exposed differently — we lookup by name+toZone.
+      const inst = engine.cardInstances.find(c => c.owner === pi && c.name === cardName && c.zone === toZone);
+      if (inst) inst.zone = 'hand';
+      else engine._trackCard(cardName, pi, 'hand');
       engine.log('hipdall_recover', { player: ps.username, card: cardName });
 
       // Push top of deck onto the Stack.

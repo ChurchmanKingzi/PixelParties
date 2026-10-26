@@ -7,6 +7,8 @@
 //  but support/creature effects still active.
 // ═══════════════════════════════════════════
 
+const { slimeLevelUpHook } = require('./_slime-shared');
+
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -83,9 +85,7 @@ module.exports = {
       engine.log('negate', { target: target.cardName, by: 'Sparky Slime', type: target.type });
     },
 
-    onTurnStart: async (ctx) => {
-      if (!ctx.isMyTurn) return;
-      await ctx.changeLevel(1);
-    },
+    // Als Ruling (Al 26.10.): „you may increase this Creature's level by 1" = Ja/Nein-Frage (Nein/Abbruch: Stufe bleibt) — `_slime-shared`.
+    onTurnStart: slimeLevelUpHook('Sparky Slime'),
   },
 };

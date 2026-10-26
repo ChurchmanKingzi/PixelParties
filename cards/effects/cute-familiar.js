@@ -161,6 +161,8 @@ module.exports = {
 
   // ── 3. HOPT ADDITIONAL ACTION ──────────────────────────────────
   creatureEffect: true,
+  // Als Ruling (Al 26.10., Blinded): der aktive Effekt wählt einen eigenen Helden (Charme 2) — ein geblendeter Träger/Wirtsheld kann ihn nicht aktivieren.
+  requiresTarget: true,
 
   canActivateCreatureEffect(ctx) {
     return eligibleCharmeHeroes(ctx._engine, ctx.cardOwner).length > 0;

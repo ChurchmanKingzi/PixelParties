@@ -184,9 +184,12 @@ module.exports = {
     // W5a (Al 14.10.2026): ein Token ist ein legales Ziel, verschwindet aber vollstaendig (kommt nie auf die Hand); eine
     // echte Karte darunter (Biomancy-/Boulder-Token) wird gelöscht. W3: sonst bleibt die Karte Eigentum ihres permanenten Besitzers.
     if (casterPs && !engine.tokenAbgang(inst)) {
-      engine.handZugangSync(casterPs, inst.name, { source: CARD_NAME, ohneInstanz: true });
       const _besitzer = engine.kartenBesitzerVon(inst);
-      if (_besitzer !== pi) engine._tagHandCardOrigin(pi, inst.name, _besitzer);
+      // Ankhota: „Delete all Creatures that are moved from the board to anywhere else" — dieser Sonderweg umgeht den zentralen Move: gelöscht statt auf die Hand (Stapel des Besitzers).
+      if (!engine.ankhotaLoeschtSonderweg(inst, _besitzer, { source: CARD_NAME })) {
+        engine.handZugangSync(casterPs, inst.name, { source: CARD_NAME, ohneInstanz: true });
+        if (_besitzer !== pi) engine._tagHandCardOrigin(pi, inst.name, _besitzer);
+      }
     }
     engine._untrackCard(inst.id);
     engine.log('sculpture_theft', {

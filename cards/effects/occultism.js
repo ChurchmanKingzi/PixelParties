@@ -171,6 +171,9 @@ module.exports = {
       confirmLabel: `🔥 ${damage} Damage!`,
       confirmClass: 'btn-danger',
       cancellable: true,
+      // „sacrifice a Creature … to choose a target": der Tribut ist beim Wählen schon weg — er ist kein Ziel
+      // (die Frage steht nur wegen der Abbruchregel VOR dem Opfer; sonst verpuffte der Schaden am toten Tribut).
+      condition: (t) => !(t.cardInstance && t.cardInstance.id === sacInst.id),
     });
     if (!damageTarget) return false;
 

@@ -49,6 +49,13 @@
 //    noch — der Text verbietet nur das Umgekehrte.
 //    Die regulaere Zug-Aktion bleibt unberuehrt; gesperrt sind
 //    ausschliesslich ZUSATZaktionen.
+//
+//  • ★ Als Ruling (Al 26.10.): Duigno × Mission of the Light Brigade.
+//    Mission als erste Aktion + Duigno auf dem Brett = nur EINE
+//    Zusatzaktion. Duigno blockiert fremde Zusatzaktionen, Mission
+//    gewaehrt also keine, verbraucht nur die erste Aktion, und uebrig
+//    bleibt Duignos eigene zweite Aktion. Die Sperre nach der ersten
+//    Zusatzaktion (Missions zweite bleibt zu) ist GEWOLLT, kein Fehler.
 // ═══════════════════════════════════════════
 
 const { secondActionGrant, secondActionHooks, isSecondActionGrant } = require('./_second-action-shared');

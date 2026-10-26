@@ -110,8 +110,9 @@ module.exports = {
    * Engine reads `reduceCardLevel` to recompute the effective level
    * for gate-checks (hand level filter and board summon checks).
    */
-  reduceCardLevel(cardData, engine, ownerIdx /* , inst */) {
+  reduceCardLevel(cardData, engine, ownerIdx, inst) {
     if (cardData?.name !== CARD_NAME) return 0;
+    if (!require('./_hooks').selbstsenkungZaehlt(engine, inst, CARD_NAME, ownerIdx)) return 0;   // v1293: mehrere Kopien senken einander nicht doppelt (wie Phatnir)
     const size = engine.gs.players[ownerIdx]?.coolnessStack?.length || 0;
     return size;
   },

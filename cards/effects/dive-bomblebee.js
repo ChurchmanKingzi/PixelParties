@@ -28,11 +28,15 @@ const CARD_NAME   = 'Dive Bomblebee';
 const ANIM_TYPE   = 'bomblebee_dive';
 const HOPT_PREFIX = 'dive-bomblebee';
 
-// Every face-up non-Hero card on the opponent's side. Includes equips,
-// creatures, and ability cards. (Areas live in their own zone and don't
+// Every non-Hero card on the opponent's side. Includes equips,
+// creatures, ability cards (Pollution Tokens zählen als Karte) and — Als
+// Ruling (Al 26.10.: „Pollution Tokens und verdeckte Surprises sind bei
+// ‚card … that is not a Hero' WÄHLBAR") — verdeckte Surprises (Surprise Zone
+// und verdeckte Surprise-Creatures in Support Zones; der Name erscheint dem
+// Wähler maskiert, `potionTargetingFuer`). (Areas live in their own zone and don't
 // contribute to the per-hero support array, so they're naturally
 // excluded — text says "card on your opponent's side of the board",
-// which we read as the support+ability zones, the standard "board" set.)
+// which we read as the support+ability+surprise zones, the standard "board" set.)
 //
 // Cardinal Beasts and other `_omniImmune` creatures REMAIN TARGETABLE —
 // the picker offers them, the animation plays on them, but the actual
@@ -50,7 +54,7 @@ function pickableOppCards(engine, listenerOwner) {
   // Support zone instances (creatures + equips).
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
-    if (inst.faceDown) continue;
+    if (engine.zaehltAlsHeld && engine.zaehltAlsHeld(inst)) continue;   // W79 (White Sacrificial Bull): zählt auch als Hero
     // 25.10.2026 (Xal-Runde 4): eine Ability in einer Support Zone ist eine Ability — ein Stapel ist EIN Ziel (oberste Kopie), nicht eins je Karte.
     if (engine.istAbilityImSupport(inst) && engine.supportAbilitySpitze(inst) !== inst) continue;
     // W5a (Al 14.10.2026, A05-03; Praezisierung: „'Opponent's side of the board' ist einfach Nomenklatur fuer 'Creature, die der
@@ -68,6 +72,20 @@ function pickableOppCards(engine, listenerOwner) {
       owner: seite, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
       cardName: inst.name, cardInstance: inst,
       _zone: 'support',
+    });
+  }
+
+  // Als Ruling (Al 26.10.): verdeckte Surprises in der Surprise Zone. „Opponent's side" = der Kontrolleur des Helden (W5a), wie bei den übrigen Zonen nach KONTROLLE.
+  for (const inst of engine.cardInstances) {
+    if (inst.zone !== 'surprise') continue;
+    if (inst.counters?.immovable) continue;
+    if (engine.surpriseKontrolleur(inst.owner, inst.heroIdx) !== oi) continue;
+    out.push({
+      id: `surprise-${inst.owner}-${inst.heroIdx}`,
+      type: 'surprise',
+      owner: inst.owner, heroIdx: inst.heroIdx,
+      cardName: inst.name, cardInstance: inst,
+      _zone: 'surprise',
     });
   }
 
@@ -108,7 +126,7 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
     confirmClass: 'btn-info',
     cancellable: true,
     exclusiveTypes: false,
-    maxPerType: { equip: 1, ability: 1 },
+    maxPerType: { equip: 1, ability: 1, surprise: 1 },
   });
   if (!picked || picked.length === 0) return;
 
@@ -193,7 +211,7 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
     owner: feldSeite,
     heroIdx: fromHeroIdx,
     zoneSlot: fromZone === 'support' ? fromZoneSlot : -1,
-    zoneType: fromZone,
+    zoneType: fromZone,   // 'support' | 'ability' | 'surprise'
   });
 
   // Cardinal Beasts / `_omniImmune` creatures: the dive-bomb visual
@@ -247,7 +265,15 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
     const slotArr = (fps.abilityZones?.[fromHeroIdx] || [])[fromZoneSlot] || [];
     const idx = slotArr.indexOf(cardName);
     if (idx >= 0) slotArr.splice(idx, 1);
+  } else if (fromZone === 'surprise') {
+    // Als Ruling (Al 26.10.): verdeckte Surprise aus der Surprise Zone des Helden (`surpriseZones[heroIdx]`).
+    const slotArr = (fps.surpriseZones?.[fromHeroIdx]) || [];
+    const idx = slotArr.indexOf(cardName);
+    if (idx >= 0) slotArr.splice(idx, 1);
   }
+
+  // Ankhota: „Delete all Creatures that are moved from the board to anywhere else" — dieser Sonderweg umgeht den zentralen Move; vor dem Enttracken auswerten (Ankhota selbst zählt mit).
+  const ankhotaVorab = fromZone === 'support' && engine.ankhotaLoeschtVomBrett(targetInst);
 
   // Untrack the inst BEFORE pushing onto deck — the deck holds names
   // only, no instance tracking.
@@ -258,9 +284,12 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
   if (istToken) {
     engine.tokenAbgang(targetInst);
   } else {
-    const dps = gs.players[engine.kartenBesitzerVon(targetInst)] || ops;
-    if (!dps.mainDeck) dps.mainDeck = [];
-    dps.mainDeck.push(cardName);
+    const besitzerIdx = gs.players[engine.kartenBesitzerVon(targetInst)] ? engine.kartenBesitzerVon(targetInst) : oi;
+    const dps = gs.players[besitzerIdx];
+    if (!engine.ankhotaLoeschtSonderweg(targetInst, besitzerIdx, { source: CARD_NAME, vorab: ankhotaVorab })) {   // Ankhota: gelöscht statt unters Deck
+      if (!dps.mainDeck) dps.mainDeck = [];
+      dps.mainDeck.push(cardName);
+    }
   }
 
   engine.log('dive_bomblebee_strike', {

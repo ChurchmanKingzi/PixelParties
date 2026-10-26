@@ -127,6 +127,7 @@ module.exports = {
   activeIn: ['hand', 'support'],
 
   creatureEffect: true,
+  requiresTarget: true,   // Zielwahl-Effekt: Blinded sperrt ihn (siehe _hooks.js / getActivatableCreatures)
 
   cpuMeta: { dealsDamage: true },
 

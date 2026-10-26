@@ -148,12 +148,12 @@ module.exports = {
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi, source: `sett:${gs.turn}` });
       // Ein Schlag: das Sammel-Fenster „one or more Creatures defeated"
       // (Zombified Assault …) oeffnet sich EINMAL mit allen Opfern.
-      await engine._mitNiederlagenSammler(async () => {
+      await engine.mitTodgeweihten(alt, () => engine._mitNiederlagenSammler(async () => {
         for (const inst of alt) {
           if (inst.zone !== 'support') continue;     // schon weg (Kettentod)
           await besiege(engine, pi, inst);
         }
-      });
+      }));
       engine.log('sett_cleanup', { player: gs.players[pi]?.username, count: alt.length });
       engine.sync();
     },

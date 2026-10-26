@@ -63,8 +63,6 @@ module.exports = {
         confirmLabel: '♚ Summon!', cancelLabel: 'No', cancellable: true,
       });
       if (!yes) return;
-      if (!gs.hoptUsed) gs.hoptUsed = {};
-      gs.hoptUsed[key(pi, hi)] = gs.turn;
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi, source: death });
 
       const pick = await pickFromHandOrDeck(engine, pi, entries, {
@@ -74,7 +72,9 @@ module.exports = {
       if (!pick) return;
       const zone = await pickZone(engine, pi, summonZonesFor(engine, pi, engine._getCardDB()[pick.name], { alsAktion: true }),
         CARD_NAME, `Summon ${pick.name} with which Hero?`);
-      if (!zone) return;
+      if (!zone) return;   // Abbruch der Zonenwahl: Einmal-Stempel noch nicht verbraucht
+      if (!gs.hoptUsed) gs.hoptUsed = {};
+      gs.hoptUsed[key(pi, hi)] = gs.turn;   // Stempel erst hinter der letzten abbrechbaren Stelle
       const inst = await summonFromHandOrDeck(engine, pi, pick, zone.heroIdx, zone.slotIdx, CARD_NAME, {}, { alsZusatzaktion: true });
       engine.log('kasperov_w_summon', { player: gs.players[pi]?.username, summoned: pick.name, from: pick.source, ok: !!inst });
       if (inst) {

@@ -85,13 +85,13 @@ module.exports = {
       if (targetHero && targetHero.hp > 0) {
         await engine.actionDealDamage(
           { name: 'Biomancy Token', owner: pi, heroIdx: inst.heroIdx },
-          targetHero, damage, 'other'
+          targetHero, damage, 'creature'   // Kreatureneffekt (CARD_API Schadenstypen): 'other' umging Surprise-Fenster (Booby Trap …)
         );
       }
     } else if (picked.type === 'equip' && picked.cardInstance) {
       await engine.actionDealCreatureDamage(
         { name: 'Biomancy Token', owner: pi, heroIdx: inst.heroIdx },
-        picked.cardInstance, damage, 'other',
+        picked.cardInstance, damage, 'creature',
         { sourceOwner: pi },
       );
     }

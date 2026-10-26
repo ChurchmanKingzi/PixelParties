@@ -45,6 +45,9 @@ function countCreaturesInOwnDiscard(engine, ps) {
 }
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
   // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
@@ -53,6 +56,7 @@ module.exports = {
 
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js.
+  neverMultiTarget: true,   // W75b: „This Attack can never hit more than 1 target." (Text-Waechter `scripts/check-never-multi-target.js`)
 
   hooks: {
     onPlay: async (ctx) => {

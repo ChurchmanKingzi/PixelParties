@@ -12710,6 +12710,16 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   box-shadow: 0 0 8px rgba(255,198,28,.6);
   pointer-events: none;
 }
+/* ★ W78 (Backstab): geordnete Wahl in Pixelrahmen statt gelbem Schein. Schritt 0 (Angreifer) dunkelrot, Schritt 1 (Ziel) hellrot; Kandidaten blinken im Takt (`steps(1)`). */
+.chain-pick-valid.chain-pick-kandidat,
+.chain-pick-selected.chain-pick-fest { outline: none !important; border-radius: 0 !important; }
+.chain-pick-fest.chain-pick-schritt0 { box-shadow: 0 0 0 2px #3a0000, 0 0 0 6px #8f0000, 0 0 0 8px #3a0000 !important; animation: none !important; }
+.chain-pick-fest.chain-pick-schritt1 { box-shadow: 0 0 0 2px #b5171c, 0 0 0 6px #ff6666, 0 0 0 8px #b5171c !important; animation: none !important; }
+.chain-pick-kandidat { box-shadow: 0 0 0 2px var(--cp-a), 0 0 0 4px var(--cp-b) !important; }
+.chain-pick-kandidat.chain-pick-schritt0 { --cp-a: #3a0000; --cp-b: #8f0000; animation: chainPickKandidat0 .8s steps(1, end) infinite !important; }
+.chain-pick-kandidat.chain-pick-schritt1 { --cp-a: #b5171c; --cp-b: #ff6666; animation: chainPickKandidat1 .8s steps(1, end) infinite !important; }
+@keyframes chainPickKandidat0 { 50% { --cp-a: #8f0000; --cp-b: #3a0000; } }
+@keyframes chainPickKandidat1 { 50% { --cp-a: #ff6666; --cp-b: #b5171c; } }
 @keyframes chainPickPulse {
   0%, 100% { box-shadow: 0 0 10px 2px rgba(255,198,28,.4); }
   50%      { box-shadow: 0 0 18px 5px rgba(255,198,28,.8); }

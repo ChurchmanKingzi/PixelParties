@@ -60,7 +60,9 @@ module.exports = {
     if (evalOpts?.pileSide) return 0;
     // Nur eine Kopie zaehlt — gemeinsamer Helfer (v1293).
     if (!require('./_hooks').selbstsenkungZaehlt(engine, inst, CARD_NAME, ownerIdx)) return 0;
-    return Math.max(0, engine.gs.players[ownerIdx]?._creaturesSacrificedThisTurn || 0);
+    // Als Ruling (Al 26.10.): „Sie sollten zählen" — auch geopferte HELDEN sind „targets you've sacrificed" (Kreaturen- plus Helden-Opfer dieses Zuges).
+    const _ps = engine.gs.players[ownerIdx];
+    return Math.max(0, (_ps?._creaturesSacrificedThisTurn || 0) + (_ps?._heroesSacrificedThisTurn || 0));
   },
 
   hooks: {
@@ -76,54 +78,18 @@ module.exports = {
       // allowing a separate copy's sacrifice to trigger the burn.
       if (!isOwnSacrifice(ctx, pi)) return;
 
-      // Kappe von 4 Nutzungen je Ruin-Mourner-Instanz. Rundenstempel
-      // und Kappe stecken seit v417 im gemeinsamen Zaehler.
-      const freiRB = usesLeft(ctx.card, gs, { key: USE_KEY, max: MAX_BURNS });
-      if (freiRB <= 0) return;
+      await burn(ctx, pi, ctx.creature?.id);
+    },
 
-      const heroIdx = ctx.cardHeroIdx;
-      // The tribute that triggered this burn is already marked for death —
-      // `onCreatureSacrificed` fires BEFORE the destroy, so it still
-      // physically occupies its Support slot right now, but it must NOT be
-      // a valid burn target (it's leaving the board regardless). Exclude
-      // it from the picker via the prompt's `condition` filter.
-      const sacrificedId = ctx.creature?.id;
-      const target = await ctx.promptDamageTarget({
-        side: 'any',
-        types: ['hero', 'creature'],
-        damageType: 'creature',
-        baseDamage: 80,
-        title: CARD_NAME,
-        description: `You may deal 80 damage to a target. (${freiRB} use${freiRB !== 1 ? 's' : ''} left this turn.)`,
-        confirmLabel: '💀 80 Damage!',
-        confirmClass: 'btn-danger',
-        cancellable: true,
-        condition: (t) => !(sacrificedId != null && t.cardInstance?.id === sacrificedId),
-      });
-      if (!target) return; // declined — use not spent
-
-      spendUse(ctx.card, gs, { key: USE_KEY, max: MAX_BURNS });
-
-      const slot = target.type === 'hero' ? -1 : target.slotIdx;
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'explosion', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: slot ?? -1,
-      });
-      await engine._delay(400);
-
-      const source = { name: CARD_NAME, owner: pi, heroIdx };
-      if (target.type === 'hero') {
-        const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
-        if (tgtHero && tgtHero.hp > 0) await engine.actionDealDamage(source, tgtHero, 80, 'creature');
-      } else if (target.cardInstance) {
-        const live = engine.cardInstances.find(c2 => c2.id === target.cardInstance.id);
-        if (live && live.zone === 'support') {
-          await engine.actionDealCreatureDamage(source, live, 80, 'creature', { sourceOwner: pi, canBeNegated: true });
-        }
-      }
-      engine.log('ruin_mourner_burn', {
-        player: gs.players[pi]?.username, used: MAX_BURNS - usesLeft(ctx.card, gs, { key: USE_KEY, max: MAX_BURNS }), target: target.cardName || target.type,
-      });
-      engine.sync();
+    // Als Ruling (Al 26.10.): „Sie sollten zählen" — ein geopferter HELD ist ebenfalls „a target you sacrifice" (Divine Gift of Sacrifice, Teocuilatl, Pharaoh …; Hook
+    // `onHeroSacrificed` aus `actionDefeatHero` mit `isSacrifice`, wie bei Thuly/Sacrificial Dagger). Opferer = `source.owner`; ein Tod durch HP-Kosten ist kein Opfer (feuert nicht).
+    onHeroSacrificed: async (ctx) => {
+      if (ctx.cardZone !== 'support') return;
+      const engine = ctx._engine;
+      const pi = ctx.cardController ?? ctx.cardOwner;
+      const opferer = ctx.source?.owner ?? ctx.source?.controller ?? (ctx.hero ? engine.heroSideOf(ctx.heroOwner, ctx.hero) : null);
+      if (opferer !== pi) return;
+      await burn(ctx, pi, null);
     },
   },
 
@@ -141,3 +107,60 @@ module.exports = {
     },
   },
 };
+
+/**
+ * Der 80-Schaden-Auslöser („Up to 4 times per turn, when you sacrifice a target, choose a target and deal 80 damage to it") — EIN Körper für beide Wege:
+ * Kreaturen-Opfer (`onCreatureSacrificed`) und Helden-Opfer (`onHeroSacrificed`; Als Ruling Al 26.10.: „Sie sollten zählen"); die 4 Nutzungen je Zug gelten gemeinsam.
+ * `sacrificedId` = die gerade geopferte Kreatur (kein Brennziel, sie verlässt das Brett); bei einem Helden-Opfer `null`.
+ */
+async function burn(ctx, pi, sacrificedId) {
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  // Kappe von 4 Nutzungen je Ruin-Mourner-Instanz. Rundenstempel
+  // und Kappe stecken seit v417 im gemeinsamen Zaehler.
+  const freiRB = usesLeft(ctx.card, gs, { key: USE_KEY, max: MAX_BURNS });
+  if (freiRB <= 0) return;
+
+  const heroIdx = ctx.cardHeroIdx;
+  // The tribute that triggered this burn is already marked for death —
+  // `onCreatureSacrificed` fires BEFORE the destroy, so it still
+  // physically occupies its Support slot right now, but it must NOT be
+  // a valid burn target (it's leaving the board regardless). Exclude
+  // it from the picker via the prompt's `condition` filter (`sacrificedId`).
+  const target = await ctx.promptDamageTarget({
+    side: 'any',
+    types: ['hero', 'creature'],
+    damageType: 'creature',
+    baseDamage: 80,
+    title: CARD_NAME,
+    description: `You may deal 80 damage to a target. (${freiRB} use${freiRB !== 1 ? 's' : ''} left this turn.)`,
+    confirmLabel: '💀 80 Damage!',
+    confirmClass: 'btn-danger',
+    cancellable: true,
+    condition: (t) => !(sacrificedId != null && t.cardInstance?.id === sacrificedId),
+  });
+  if (!target) return; // declined — use not spent
+
+  spendUse(ctx.card, gs, { key: USE_KEY, max: MAX_BURNS });
+
+  const slot = target.type === 'hero' ? -1 : target.slotIdx;
+  engine._broadcastEvent('play_zone_animation', {
+    type: 'explosion', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: slot ?? -1,
+  });
+  await engine._delay(400);
+
+  const source = { name: CARD_NAME, owner: pi, heroIdx };
+  if (target.type === 'hero') {
+    const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
+    if (tgtHero && tgtHero.hp > 0) await engine.actionDealDamage(source, tgtHero, 80, 'creature');
+  } else if (target.cardInstance) {
+    const live = engine.cardInstances.find(c2 => c2.id === target.cardInstance.id);
+    if (live && live.zone === 'support') {
+      await engine.actionDealCreatureDamage(source, live, 80, 'creature', { sourceOwner: pi, canBeNegated: true });
+    }
+  }
+  engine.log('ruin_mourner_burn', {
+    player: gs.players[pi]?.username, used: MAX_BURNS - usesLeft(ctx.card, gs, { key: USE_KEY, max: MAX_BURNS }), target: target.cardName || target.type,
+  });
+  engine.sync();
+}

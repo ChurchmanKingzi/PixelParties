@@ -13,6 +13,17 @@
 //     deck for any 'Elven' Creature, except 'Elven
 //     Rider', reveal it and add it to your hand."
 //
+//  Als Ruling (Al 26.10.): „Jeder Abgang" — „leaves the board" gilt für JEDEN
+//  Abgang einer „Elven"-Kreatur vom Brett: Tod, Zerstören, Opfer, Löschen,
+//  Zurück auf die Hand (Bounce), Zurückmischen ins Deck. Ein KONTROLLWECHSEL
+//  (Diplomacy, Capture, Dark Gear …) und ein Umzug auf dem Brett zählen NICHT.
+//  Auslöser: `onCreatureDeath` (jeder Tod; der Platz ist dort schon frei),
+//  `onCardLeaveZone` (zentrale Abgangs-Schiene von `actionMoveCard`/Mass
+//  Routing/…; liegt der Platz im Hook noch belegt, läuft das Angebot per
+//  `engine.nachAbgang` erst nach dem Abgang) und `onCardsReturnedToHand` (der
+//  Deepsea-Bounce meldet keinen `leavingCard`). Doppelte Meldungen DESSELBEN
+//  Abgangs fängt `_elvenRiderAsked` (je Rider-Kopie × abgehende Instanz) ab.
+//
 //  Design notes:
 //    • No-summon-from-hand: the engine already
 //      blocks Reaction-subtype cards from proactive
@@ -77,6 +88,8 @@ const EXCLUDE_NAME = 'Elven Rider';
 // trigger the same physical hand card twice for overlapping events."
 // Scoped per-player (`_elvenRiderResolving[pi]`) and cleared in finally.
 const RESOLVING_KEY = '_elvenRiderResolving';
+// Je Rider-Kopie × abgehende Instanz nur EIN Angebot (derselbe Abgang kommt über mehrere Hooks).
+const ASKED_KEY = '_elvenRiderAsked';
 
 /** Brettseite der Zone, in die der Rider muss (= die Zone der gestorbenen Karte); sonst der Kontrolleur. */
 function riderSeite(deathInfo, ownerIdx) {
@@ -212,6 +225,122 @@ async function runRiderTutor(engine, pi) {
   engine.log('elven_rider_tutor', { player: ps.username, added: chosenName });
 }
 
+/**
+ * Gemeinsamer Rumpf aller Auslöser (Tod, Abgangs-Schiene, Bounce): bietet dem Spieler `pi` an, den Rider aus der Hand in den Platz der
+ * abgehenden Elven zu beschwören. `death` = Abgangsdatensatz { name, owner, controller, seite, heroIdx, zoneSlot, instId }.
+ * `riderId` = Instanz der lauschenden Rider-Kopie (mehrere Kopien fragen je eigener).
+ */
+async function riderAngebot(engine, pi, riderId, death) {
+  const gs      = engine.gs;
+  const ps      = gs.players[pi];
+  if (!ps) return;
+
+  if (!isValidRiderTrigger(engine, death, pi)) return;
+
+  // Re-entry guard: one Rider per trigger event. Without this, two
+  // Rider copies in hand could both be prompted for the same dying
+  // Elven — which is technically fine by rules, but the second
+  // would find the slot already filled by the first. Instead of
+  // letting the second fizzle, we gate on an event key so only
+  // ONE prompt per death.
+  gs._elvenRiderTriggered = gs._elvenRiderTriggered || {};
+  const evtKey = `${pi}:${death.heroIdx}:${death.zoneSlot}:${death.name}:${gs.turn}`;
+  if (gs._elvenRiderTriggered[evtKey]) return;
+
+  // Also a per-player in-flight guard against overlapping effects
+  if (gs[RESOLVING_KEY]?.[pi]) return;
+
+  // Als Playtest-Befund (Multi-Tod): Bei 2+ gleichzeitig sterbenden
+  // Elven läuft dieser Hand-Listener je Todesfall aus einer VOR dem
+  // ersten Replace eingesammelten Liste — nach dem ersten Summon
+  // ist der Rider nicht mehr auf der Hand, der Prompt kam trotzdem
+  // (und lief nach dem Confirm still in den handIdx<0-Gurt).
+  // Frische Prüfung VOR dem Prompt: kein Rider auf der Hand, kein
+  // Prompt. Mehrere Kopien prompten weiterhin je Tod (per Als
+  // Einordnung korrekt so).
+  if (!ps.hand.includes(CARD_NAME)) return;
+
+  // Als Ruling (Al 26.10.): derselbe Abgang kann über mehrere Hooks gemeldet werden (Tod + Abgangs-Schiene) — je Rider-Kopie und abgehende
+  // Instanz wird nur EINMAL gefragt.
+  const askKey = `${riderId}:${death.instId ?? evtKey}`;
+  if (!gs[ASKED_KEY]) gs[ASKED_KEY] = {};
+  if (gs[ASKED_KEY][askKey]) return;
+  gs[ASKED_KEY][askKey] = true;
+
+  // ── Prompt the player ──
+  const confirmed = await engine.promptGeneric(pi, {
+    type: 'confirm',
+    title: CARD_NAME,
+    message: `An Elven Creature you controlled (${death.name}) just left the board. Summon Elven Rider into its slot?`,
+    showCard: CARD_NAME,
+    confirmLabel: 'Summon!',
+    cancelLabel: 'No',
+    cancellable: true,
+  });
+  if (!confirmed) return;
+
+  // Still have a Rider in hand? (The player could, in theory, have
+  // lost it between the prompt and confirm via another effect.)
+  const handIdx = ps.hand.indexOf(CARD_NAME);
+  if (handIdx < 0) return;
+
+  // W22a: waehrend der Abfrage kann der Held Status/Schule verloren haben (Kettenreaktionen) — wie Doomed Town Guard neu pruefen.
+  if (!heldBeschwoertRider(engine, death, pi)) return;
+
+  // Re-verify the slot is empty (belt-and-suspenders)
+  const seite = riderSeite(death, pi);   // W4: Brettseite der Zone (bei gestohlener Elven die des Besitzers)
+  const slot = gs.players[seite]?.supportZones?.[death.heroIdx]?.[death.zoneSlot];
+  if (slot && slot.length > 0) {
+    engine.log('elven_rider_fizzle', { player: ps.username, reason: 'slot_occupied' });
+    await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });   // v1360
+    return;
+  }
+
+  // Claim the trigger + in-flight flag
+  gs._elvenRiderTriggered[evtKey] = true;
+  if (!gs[RESOLVING_KEY]) gs[RESOLVING_KEY] = {};
+  gs[RESOLVING_KEY][pi] = true;
+
+  try {
+    // Consume the hand copy NOW — before summonCreatureWithHooks
+    // can fire hooks that might inspect the hand.
+    engine.takeFromPileSync(ps, 'hand', handIdx);
+
+    engine._broadcastEvent('card_reveal', { cardName: CARD_NAME });
+
+    // Summon into the EXACT slot. `safePlaceInSupport` relocates
+    // on occupied — we've already verified empty, so it lands
+    // where requested.
+    const res = await engine.summonCreatureWithHooks(
+      CARD_NAME, seite, death.heroIdx, death.zoneSlot,
+      // `fromHandIdx`: Flug von der Hand in die Zone (v934). Ohne
+      // das erscheint die Kreatur ohne Bewegung im Slot — der
+      // HOOK-Weg sendet den Flug nicht von selbst, anders als der
+      // regulaere Spielweg im Server.
+      { source: `${CARD_NAME} reaction`, skipBeforeSummon: false, fromHandIdx: handIdx, summonWindow: true,
+        ...(seite !== pi ? { controller: pi } : {}) }   // W4: seitenfremd, vom Kontrolleur gefuehrt
+    );
+    if (res?.negated) return;   // Off Duty & co.: Karte ist schon geroutet
+    if (!res) {
+      // Extremely unlikely (no free slot after all). Put back.
+      engine.handZugangSync(ps, CARD_NAME, { source: CARD_NAME, ohneInstanz: true });
+      engine.log('elven_rider_fizzle', { player: ps.username, reason: 'place_refused' });
+      await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'place_refused' });   // v1360
+      return;
+    }
+
+    engine.log('elven_rider_summoned', {
+      player: ps.username,
+      triggered_by: death.name,
+      hero: death.heroIdx,
+      slot: death.zoneSlot,
+    });
+    engine.sync();
+  } finally {
+    gs[RESOLVING_KEY][pi] = false;
+  }
+}
+
 module.exports = {
   // Must listen while in hand AND act like a normal Elven while on the
   // board. Hook bodies gate on `ctx.cardZone` to split behaviour.
@@ -222,113 +351,56 @@ module.exports = {
   summonOnlyViaOwnEffect: true,
 
   hooks: {
-    // ── Reaction trigger: an Elven Creature we control dies ──
+    // ── Reaction trigger: an Elven Creature we control leaves the board ──
+    // Tod (Schaden, Zerstören, Opfer, Löschen): der Platz ist im Hook schon frei.
     onCreatureDeath: async (ctx) => {
       if (ctx.cardZone !== 'hand') return;
+      await riderAngebot(ctx._engine, ctx.cardOwner, ctx.card.id, ctx.creature);
+    },
 
-      const engine  = ctx._engine;
-      const gs      = engine.gs;
-      const pi      = ctx.cardOwner;
-      const ps      = gs.players[pi];
-      if (!ps) return;
-
-      const death = ctx.creature;
-      if (!isValidRiderTrigger(engine, death, pi)) return;
-
-      // Re-entry guard: one Rider per trigger event. Without this, two
-      // Rider copies in hand could both be prompted for the same dying
-      // Elven — which is technically fine by rules, but the second
-      // would find the slot already filled by the first. Instead of
-      // letting the second fizzle, we gate on an event key so only
-      // ONE prompt per death.
-      gs._elvenRiderTriggered = gs._elvenRiderTriggered || {};
-      const evtKey = `${pi}:${death.heroIdx}:${death.zoneSlot}:${death.name}:${gs.turn}`;
-      if (gs._elvenRiderTriggered[evtKey]) return;
-
-      // Also a per-player in-flight guard against overlapping effects
-      if (gs[RESOLVING_KEY]?.[pi]) return;
-
-      // Als Playtest-Befund (Multi-Tod): Bei 2+ gleichzeitig sterbenden
-      // Elven läuft dieser Hand-Listener je Todesfall aus einer VOR dem
-      // ersten Replace eingesammelten Liste — nach dem ersten Summon
-      // ist der Rider nicht mehr auf der Hand, der Prompt kam trotzdem
-      // (und lief nach dem Confirm still in den handIdx<0-Gurt).
-      // Frische Prüfung VOR dem Prompt: kein Rider auf der Hand, kein
-      // Prompt. Mehrere Kopien prompten weiterhin je Tod (per Als
-      // Einordnung korrekt so).
-      if (!ps.hand.includes(CARD_NAME)) return;
-
-      // ── Prompt the player ──
-      const confirmed = await engine.promptGeneric(pi, {
-        type: 'confirm',
-        title: CARD_NAME,
-        message: `An Elven Creature you controlled (${death.name}) just left the board. Summon Elven Rider into its slot?`,
-        showCard: CARD_NAME,
-        confirmLabel: 'Summon!',
-        cancelLabel: 'No',
-        cancellable: true,
-      });
-      if (!confirmed) return;
-
-      // Still have a Rider in hand? (The player could, in theory, have
-      // lost it between the prompt and confirm via another effect.)
-      const handIdx = ps.hand.indexOf(CARD_NAME);
-      if (handIdx < 0) return;
-
-      // W22a: waehrend der Abfrage kann der Held Status/Schule verloren haben (Kettenreaktionen) — wie Doomed Town Guard neu pruefen.
-      if (!heldBeschwoertRider(engine, death, pi)) return;
-
-      // Re-verify the slot is empty (belt-and-suspenders)
-      const seite = riderSeite(death, pi);   // W4: Brettseite der Zone (bei gestohlener Elven die des Besitzers)
-      const slot = gs.players[seite]?.supportZones?.[death.heroIdx]?.[death.zoneSlot];
+    // Zentrale Abgangs-Schiene: Bounce auf die Hand, Mischen ins Deck, Löschen/Zerstören über `actionMoveCard`, Mass Routing, Staff-Illusionen …
+    // (Als Ruling Al 26.10.: JEDER Abgang vom Brett; Kontrollwechsel/Umzug auf dem Brett NICHT.)
+    onCardLeaveZone: async (ctx) => {
+      if (ctx.cardZone !== 'hand') return;
+      if (ctx.fromZone !== 'support' || ctx.isTransfer || ctx._supportSchlaeft) return;
+      const inst = ctx.leavingCard;   // der Deepsea-Bounce meldet keinen `leavingCard` → `onCardsReturnedToHand` unten
+      if (!inst || inst.id == null || inst.id === ctx.card.id) return;
+      if (ctx.toZone === 'support' || ctx.toZone === 'surprise') return;   // Umzug auf dem Brett (Kontrollwechsel, Platzwechsel, verdeckt legen)
+      const engine = ctx._engine;
+      const pi = ctx.cardOwner;
+      const riderId = ctx.card.id;
+      const death = {
+        name: inst.name, owner: inst.owner, originalOwner: inst.originalOwner,
+        controller: inst.controller ?? inst.owner,
+        seite: ctx.fromOwner ?? engine.physicalSide(inst),
+        heroIdx: ctx.fromHeroIdx ?? inst.heroIdx, zoneSlot: ctx.fromZoneSlot ?? inst.zoneSlot,
+        instId: inst.id,
+      };
+      // Im Hook steht die Karte je nach Weg noch im Platz (`actionMoveCard`: Hook VOR dem Umbuchen) — dann erst NACH dem Abgang anbieten.
+      const slot = engine.gs.players[death.seite]?.supportZones?.[death.heroIdx]?.[death.zoneSlot];
       if (slot && slot.length > 0) {
-        engine.log('elven_rider_fizzle', { player: ps.username, reason: 'slot_occupied' });
-        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });   // v1360
+        engine.nachAbgang(inst, () => riderAngebot(engine, pi, riderId, death));
         return;
       }
+      await riderAngebot(engine, pi, riderId, death);
+    },
 
-      // Claim the trigger + in-flight flag
-      gs._elvenRiderTriggered[evtKey] = true;
-      if (!gs[RESOLVING_KEY]) gs[RESOLVING_KEY] = {};
-      gs[RESOLVING_KEY][pi] = true;
-
-      try {
-        // Consume the hand copy NOW — before summonCreatureWithHooks
-        // can fire hooks that might inspect the hand.
-        engine.takeFromPileSync(ps, 'hand', handIdx);
-
-        engine._broadcastEvent('card_reveal', { cardName: CARD_NAME });
-
-        // Summon into the EXACT slot. `safePlaceInSupport` relocates
-        // on occupied — we've already verified empty, so it lands
-        // where requested.
-        const res = await engine.summonCreatureWithHooks(
-          CARD_NAME, seite, death.heroIdx, death.zoneSlot,
-          // `fromHandIdx`: Flug von der Hand in die Zone (v934). Ohne
-          // das erscheint die Kreatur ohne Bewegung im Slot — der
-          // HOOK-Weg sendet den Flug nicht von selbst, anders als der
-          // regulaere Spielweg im Server.
-          { source: `${CARD_NAME} reaction`, skipBeforeSummon: false, fromHandIdx: handIdx, summonWindow: true,
-            ...(seite !== pi ? { controller: pi } : {}) }   // W4: seitenfremd, vom Kontrolleur gefuehrt
-        );
-        if (res?.negated) return;   // Off Duty & co.: Karte ist schon geroutet
-        if (!res) {
-          // Extremely unlikely (no free slot after all). Put back.
-          engine.handZugangSync(ps, CARD_NAME, { source: CARD_NAME, ohneInstanz: true });
-          engine.log('elven_rider_fizzle', { player: ps.username, reason: 'place_refused' });
-          await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'place_refused' });   // v1360
-          return;
-        }
-
-        engine.log('elven_rider_summoned', {
-          player: ps.username,
-          triggered_by: death.name,
-          hero: death.heroIdx,
-          slot: death.zoneSlot,
-        });
-        engine.sync();
-      } finally {
-        gs[RESOLVING_KEY][pi] = false;
+    // Deepsea-Bounce (Racket Arrow, Chasing the Legend, Deepsea-Karten …): kommt ohne `leavingCard`; der Platz ist schon frei.
+    onCardsReturnedToHand: async (ctx) => {
+      if (ctx.cardZone !== 'hand') return;
+      const engine = ctx._engine;
+      const insts = ctx.returnedInsts || [];
+      for (let i = 0; i < insts.length; i++) {
+        const inst = insts[i];
+        if (!inst || inst.id == null || inst.id === ctx.card.id) continue;
+        const death = {
+          name: inst.name, owner: inst.owner, originalOwner: inst.originalOwner,
+          controller: inst.controller ?? ctx.ownerIdx ?? inst.owner,
+          seite: ctx.fromOwners?.[i] ?? ctx.ownerIdx ?? inst.owner,
+          heroIdx: ctx.fromHeroIdxs?.[i] ?? inst.heroIdx, zoneSlot: ctx.fromZoneSlots?.[i] ?? inst.zoneSlot,
+          instId: inst.id,
+        };
+        await riderAngebot(engine, ctx.cardOwner, ctx.card.id, death);
       }
     },
 

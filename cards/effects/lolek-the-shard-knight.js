@@ -122,7 +122,10 @@ module.exports = {
       if (entry.source === 'hand') {
         const handIdx = ps.hand.indexOf(entry.name);
         if (handIdx < 0) return false;
-        await engine.actionDiscardHandCard(pi, entry.name, handIdx, { source: CARD_NAME, selfInflicted: true, _noGlow: true });
+        // ★ W74c: Boris darf diese Kosten („send … from your hand to your discard pile") ignorieren — die Karte bleibt, der Effekt (ziehen) läuft weiter.
+        if (!(await engine.borisVerzicht(pi, 1, { source: CARD_NAME }))) {
+          await engine.actionDiscardHandCard(pi, entry.name, handIdx, { source: CARD_NAME, selfInflicted: true, _noGlow: true });
+        }
       } else {
         if (!ps.mainDeck.includes(entry.name)) return false;
         await engine.actionMillCards(pi, 1, { targetCardName: entry.name, source: CARD_NAME, selfInflicted: true });

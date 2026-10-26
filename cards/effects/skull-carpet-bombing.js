@@ -96,6 +96,10 @@ module.exports = {
 
   isSurprise: true,
 
+  // ★ W75b: „You can only activate 1 "Skull Carpet Bombing" per turn." als Merkmal der Engine (`surpriseHartOPT`, Schluessel = `hoptUsed['skull_carpet_bombing:<Spieler>']`, wie bisher):
+  // `engine.surpriseAktivierbarJetzt` kennt die Sperre damit fuer ALLE Wege — Telekinesis, Baby Spider, Cute Spider, Sabrina aktivieren eine in diesem Zug gesperrte Kopie nicht mehr.
+  surpriseHartOPT: 'skull_carpet_bombing',
+
   surpriseTurnEndTrigger(gs, ownerIdx, heroIdx, info /*, engine */) {
     if (info.endingPlayer !== ownerIdx) return false;                  // „at the end of YOUR turn"
     if (info.dealtDamageAnyTarget) return false;                        // „dealt no damage to any target"

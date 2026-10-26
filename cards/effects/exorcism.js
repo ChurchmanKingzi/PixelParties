@@ -21,6 +21,8 @@
 //     beschlossen (das Ziel war nur wegen seiner Status wählbar), bricht ein Abbruch der Statuswahl den ganzen Zauber ab (Karte zurück auf die Hand); sonst heißt Abbruch „keiner".
 //     Entfernt wird über den heilenden Pfad der Engine (`cleanseHeroStatuses` / `cleanseCreatureStatuses`): Sperren wie „status effects cannot be removed" gelten weiter,
 //     ein geheilter Anhängsel-Status wirft sein Anhängsel ab (Berserk, Orders, Decisive Defeat …).
+//     Als Ruling (Al 26.10.): „any number" heißt auch 0 — auch bei genau EINEM Status (die Engine würde ihn sonst automatisch wählen): dann Ja/Nein „Remove / Keep it".
+//     Dasselbe gilt für die Anhängsel (Schritt 2): die Wahl ist immer offen, auch bei genau einem Anhängsel sind 0 wählbar (`minRequired: 0`).
 //
 //  ── DECAY MAGIC 2: UNVERHINDERBAR, UNNEGIERBAR, ZUSATZAKTION ────────────
 //  • Unnegierbar: die Zielwahl trägt `cannotBeNegated` — negierende Surprises und Brett-Wächter schweigen (Midnight-Assault-Muster).
@@ -233,20 +235,38 @@ module.exports = {
         }
         if (statusDerGewaehlten.size > 0) eintraege = eintraege.filter(e => !statusDerGewaehlten.has(e.key));
         if (eintraege.length > 0) {
-          const r = await engine.promptGeneric(pi, {
-            type: 'statusSelect',
+          // Als Ruling (Al 26.10.): „any number" heißt auch 0 — bei GENAU EINEM Status wählt die Engine die Statuswahl (`statusSelect`) sonst von selbst
+          // (`status_select_auto`): man könnte dann nur das Anhängsel entfernen wollen und der Status ginge trotzdem mit. Darum hier eine eigene Ja/Nein-Frage.
+          const einzeln = eintraege.length === 1;
+          const frageKopf = {
             targetName: ziel.cardName,
-            statuses: eintraege,
             title: `${CARD_NAME} — ${ziel.cardName}`,
-            description: `Choose any number of negative status effects to remove from ${ziel.cardName} (or none).`,
-            confirmLabel: '✨ Cleanse!',
             cancellable: true,
             cpuDispatch: CARD_NAME,        // der Titel trägt den Zielnamen — die CPU-Weiche findet die Karte darüber
             _exorcismPi: pi,               // der gefragte Spieler (die Weiche gibt ihn nicht mit)
-          });
+          };
+          const r = einzeln
+            ? await engine.promptGeneric(pi, {
+              ...frageKopf,
+              type: 'optionPicker',
+              description: `Remove the negative status effect from ${ziel.cardName}? (You may keep it.)`,
+              options: [
+                { id: 'remove', label: `✨ Remove ${eintraege[0].label}${eintraege[0].stacks > 1 ? ` (×${eintraege[0].stacks})` : ''}` },
+                { id: 'keep', label: 'Keep it' },
+              ],
+            })
+            : await engine.promptGeneric(pi, {
+              ...frageKopf,
+              type: 'statusSelect',
+              statuses: eintraege,
+              description: `Choose any number of negative status effects to remove from ${ziel.cardName} (or none).`,
+              confirmLabel: '✨ Cleanse!',
+            });
           const abgebrochen = r === null || r === undefined || r?.cancelled;
           if (abgebrochen) {
             if (!beschlossen) { gs._spellCancelled = true; return; }        // nur wegen der Status wählbar → alles zurück
+          } else if (einzeln) {
+            entfernen = r.optionId === 'remove' ? [eintraege[0].key] : [];
           } else {
             entfernen = (r.selectedStatuses || []).filter(k => eintraege.some(e => e.key === k));
           }
@@ -308,12 +328,13 @@ module.exports = {
     };
     const meins = (t) => (engine.zielSeite ? engine.zielSeite(t) : t.owner) === playerIdx;
 
-    if (kind === 'generic' && promptData?.type === 'statusSelect' && String(promptData.title || '').startsWith(CARD_NAME)) {
-      const alle = (promptData.statuses || []).map(s => s.key);
+    if (kind === 'generic' && (promptData?.type === 'statusSelect' || promptData?.type === 'optionPicker') && String(promptData.title || '').startsWith(CARD_NAME)) {
       const hero = promptData.targetName;
       const ich = promptData._exorcismPi ?? engine._cpuPlayerIdx;
       const eigener = engine.heroesControlledBy(ich).some(({ hero: h }) => h?.name === hero)
         || engine.cardInstances.some(c => c.zone === 'support' && c.name === hero && engine.kontrolleurVon(c) === ich);
+      if (promptData.type === 'optionPicker') return { optionId: eigener ? 'remove' : 'keep' };   // einzelner Status (Ruling Al 26.10.)
+      const alle = (promptData.statuses || []).map(s => s.key);
       return { selectedStatuses: eigener ? alle : [] };
     }
     if (kind !== 'effectTarget' || !Array.isArray(validTargets)) return undefined;

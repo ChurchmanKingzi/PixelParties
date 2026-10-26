@@ -4,10 +4,17 @@
 //
 //  Choose an Attack from your deck, reveal it
 //  and add it to your hand. Unless you double
-//  this Artifact's Cost (i.e. pay 4 MORE Gold
-//  on top of the 4 already spent), you cannot
-//  use Attacks with that name for the rest of
-//  this turn.
+//  this Artifact's Cost (i.e. pay the CURRENT
+//  Cost again on top of what you already spent),
+//  you cannot use Attacks with that name for the
+//  rest of this turn.
+//
+//  „double this Artifact's Cost" (Entscheidung Al):
+//  die AKTUELLEN Kosten (nach Kostenaenderungen —
+//  Rabatte, Rusting Crystal, Gratis-Spiel …, also
+//  `engine.artifactPlayCost`) werden nochmals bezahlt,
+//  nicht fest +4. Kosten 0 verdoppelt = 0 mehr:
+//  dann entfaellt die Sperre ohne Frage.
 //
 //  The "can't use this name" tag piggy-backs on
 //  the shared `_creationLockedNames` set that
@@ -21,7 +28,7 @@
 const { hasCardType, baseCardName } = require('./_hooks');
 const { getCardDB: _getCardDB } = require('./_card-db');
 
-const EXTRA_COST = 4; // Double of base cost — pay this much more to avoid the lock
+const BASE_COST = 4; // gedruckte Kosten — nur der Rueckfall, wenn die Karte nicht aus der Hand kommt (sonst zaehlen die AKTUELLEN Kosten)
 
 module.exports = {
   // ★ v1119 (Als Liste 15.9.: „VIELE davon haben Search als ihren
@@ -111,23 +118,27 @@ module.exports = {
     // W16e (F01-05): die Grundkosten werden vom Server erst NACH `resolve` abgebucht (`doConfirmPotion`/`doUseArtifactEffect`) — „double this
     // Artifact's Cost" ist nur zahlbar, wenn Grundkosten (noch offen) UND die Verdopplung zusammen aufgebracht werden koennen (Kreditrahmen
     // inklusive, `canAffordGold`). Sonst waere die Sperre gratis umgangen: `_payCardCost` klemmt bei 0.
+    // Entscheidung Al: verdoppelt werden die AKTUELLEN Kosten (`artifactPlayCost`: Rabatte, Rusting Crystal, Gratis-Spiel), nicht fest +4.
     const { getResolvingHandIndex } = require('./_hand-resolve');
     const aufHand = getResolvingHandIndex(ps);
     const offeneGrundkosten = aufHand >= 0 ? engine.artifactPlayCost(pi, 'Cool Cheese', aufHand).cost : 0;
-    if (engine.canAffordGold(pi, offeneGrundkosten + EXTRA_COST, 'Cool Cheese') && !engine.goldSpendBlocked(pi)) {   // G1 (A09-11): Goldsperre
+    const extraKosten = aufHand >= 0 ? offeneGrundkosten : (cardDB['Cool Cheese']?.cost ?? BASE_COST);   // „double": die aktuellen Kosten nochmals
+    if (extraKosten <= 0) {
+      paidExtra = true;   // Kosten 0 verdoppelt = 0 mehr zu zahlen: die Bedingung ist erfuellt, keine Sperre
+    } else if (engine.canAffordGold(pi, offeneGrundkosten + extraKosten, 'Cool Cheese') && !engine.goldSpendBlocked(pi)) {   // G1 (A09-11): Goldsperre
       const confirmed = await engine.promptGeneric(pi, {
         type: 'confirm',
         title: 'Cool Cheese',
-        message: `Pay ${EXTRA_COST} more Gold to avoid locking "${result.cardName}" for the rest of this turn?`,
-        confirmLabel: `💰 Pay ${EXTRA_COST}`,
+        message: `Pay ${extraKosten} more Gold to avoid locking "${result.cardName}" for the rest of this turn?`,
+        confirmLabel: `💰 Pay ${extraKosten}`,
         cancelLabel: 'Accept the lock',
         cancellable: true,
         gerrymanderEligible: true, // True "you may" — pay extra to skip lock.
       });
       if (confirmed && !confirmed.cancelled) {
-        await engine._payCardCost(pi, EXTRA_COST);
+        await engine._payCardCost(pi, extraKosten);
         paidExtra = true;
-        engine.log('cool_cheese_pay', { player: ps.username, card: result.cardName, amount: EXTRA_COST });
+        engine.log('cool_cheese_pay', { player: ps.username, card: result.cardName, amount: extraKosten });
       }
     }
 

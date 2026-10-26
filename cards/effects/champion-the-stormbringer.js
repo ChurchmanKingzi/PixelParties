@@ -20,11 +20,22 @@
 //    creatureActionCost / actionCost-Ability
 //    bookkeeping.
 //
-//  Resource cap: discard count = min(5, own hand,
-//  opp hand). The opponent must be able to also
-//  discard the same number — if either side has
-//  zero cards, the cap is zero and the activation
-//  is gated off entirely (canActivateHeroEffect).
+//  Resource cap (Ruling Al, Welle 2): Die Wahl ist NUR an die EIGENE
+//  Hand und das Maximum 5 gebunden: discard count = min(5, own hand).
+//  Die Gegnerhand begrenzt nichts — der Gegner wirft „the same number“
+//  ab, soweit er Karten hat (nur seine ganze Hand, falls weniger; bei
+//  leerer Hand nichts) und zieht dann N Karten (Annahme: „draw that
+//  many“ = die Zahl N, nicht die tatsächlich abgeworfene). Ist die
+//  eigene Hand leer, ist der Effekt nicht aktivierbar
+//  (canActivateHeroEffect).
+//
+//  ★ W74c — Boris, the Guardian of Blackport (Al):
+//    (a) Ist der CHAMPION-SPIELER Boris-Spieler, darf Boris den eigenen Abwurf (Kosten, „up to 5") ignorieren — gefragt wird nach der Wahl der
+//        Karten, vor dem Abwurf. Dann wird nichts abgeworfen, also nichts gezogen („draw that many"), und der Gegner muss nichts abwerfen und
+//        nichts ziehen („the same number" = 0): der Effekt ist faktisch wirkungslos — gewollt. Aktion und Einmal-pro-Zug-Sperre sind verbraucht
+//        (der Effekt wurde aktiviert), Boris' „einmal pro Zug" ebenfalls.
+//    (b) Ist der GEGNER Boris-Spieler, darf er den erzwungenen Abwurf („must discard the same number") ignorieren: er wirft nichts ab und zieht
+//        auch nichts („draw that many" = tatsächlich abgeworfene Anzahl 0 — Annahme, Rückfrage an Al). Der eigene Zug des Champion-Spielers bleibt.
 //
 //  Visual: each of the player's discarded cards
 //  flies hand → discard via the windstorm flight
@@ -42,18 +53,15 @@
 //  cancellation listener.
 // ═══════════════════════════════════════════
 
-const { opponentOfGs } = require('./_opp');
 const CARD_NAME    = 'Champion, the Stormbringer';
 const MAX_DISCARDS = 5;
 const STAGGER_MS   = 140; // gap between consecutive windstorm flights
 const WIND_TAIL_MS = 1200; // total client-side animation length for windstorm
 
-/** Min(5, own hand, opp hand). Caps the discard prompt's max. */
+/** Min(5, own hand). Caps the discard prompt's max (Gegnerhand zählt nicht, s. Kopfkommentar). */
 function _stormCap(gs, pi) {
-  const oi = opponentOfGs(gs, pi);
   const myHand = (gs.players[pi]?.hand || []).length;
-  const oppHand = (gs.players[oi]?.hand || []).length;
-  return Math.max(0, Math.min(MAX_DISCARDS, myHand, oppHand));
+  return Math.max(0, Math.min(MAX_DISCARDS, myHand));
 }
 
 module.exports = {
@@ -126,6 +134,16 @@ module.exports = {
     const picked = [...handPick.selectedCards].sort((a, b) => b.handIndex - a.handIndex);
     const N = picked.length;
 
+    // ── ★ W74c (Al): Boris darf den EIGENEN Abwurf (Kosten, „up to 5") ignorieren — gefragt wird nach der Wahl der Karten, vor dem Abwurf. ──
+    // Die ganze Wirkung hängt an der ANZAHL der abgeworfenen Karten („draw that many", „the same number"): wird nichts abgeworfen, zieht man nichts
+    // und der Gegner muss nichts abwerfen und nichts ziehen — der Effekt ist faktisch wirkungslos (ausdrücklich gewollt, Ausnahme zur Regel „Kosten
+    // überspringen negiert den Effekt nicht"). Aktion und Einmal-pro-Zug-Sperre des Champions sind verbraucht (der Effekt wurde aktiviert).
+    if (await engine.borisVerzicht(pi, N, { source: CARD_NAME, skipVoidsEffect: true })) {
+      engine.log('champion_storm', { player: ps.username, opponent: ops.username, discarded: [], n: 0, borisSkipped: true });
+      engine.sync();
+      return true;
+    }
+
     // ── Step 2: discard each picked card with a windstorm flight ──
     // Stagger the broadcasts so the cards visibly cascade off the hand
     // strip into the discard pile rather than launching as one
@@ -173,7 +191,9 @@ module.exports = {
     // per-card inside `actionPromptForceDiscard`, just before the sync
     // that propagates the splice — so the source hand-slot rect is
     // still in the client DOM when the animation captures it.
+    let gegnerBorisVerzicht = false;
     if ((ops.hand || []).length > 0) {
+      const stempelVor = engine._borisStempelHeute(oi);
       await engine.actionPromptForceDiscard(oi, N, {
         source:        CARD_NAME,
         selfInflicted: false,
@@ -181,6 +201,8 @@ module.exports = {
         description:   `${gs.players[pi].username} forces you to discard ${N} card${N === 1 ? '' : 's'}.`,
         flightStyle:   'windstorm',
       });
+      // ★ W74c (Al): ignoriert der Gegner den Zwangsabwurf per Boris, wurde nichts abgeworfen — „draw that many" ist dann 0 (Annahme, Rückfrage an Al).
+      gegnerBorisVerzicht = !stempelVor && engine._borisStempelHeute(oi);
       // Hold for the last opp-side gust to land before the draw begins,
       // identical pacing to the player's own discard → draw transition
       // above. Without this the opp's tutor flies in while their wind-
@@ -192,10 +214,12 @@ module.exports = {
     // `_unpreventable: true` bypasses handLocked + any BEFORE_DRAW
     // cancel listener — see actionDrawCards in _engine.js for the
     // bypass branches added alongside this card.
-    await engine.actionDrawCards(oi, N, {
-      source: CARD_NAME,
-      _unpreventable: true,
-    });
+    if (!gegnerBorisVerzicht) {
+      await engine.actionDrawCards(oi, N, {
+        source: CARD_NAME,
+        _unpreventable: true,
+      });
+    }
 
     engine.log('champion_storm', {
       player:    ps.username,

@@ -9,6 +9,8 @@
 //   that card or effect would have on that Area."
 //
 //  ── Part 1: summon-by-sacrifice as additional Action ──
+//  Als Ruling (Al 26.10.): Special (Opfer, Zusatzaktion) ODER Normal (Aktion, ohne Opfer) — der Spieler wählt, wenn eine reguläre Beschwörung per
+//  Action offensteht; sonst bleibt es zwangsweise Special (`_teocuilatl-shared`: `specialErzwungen`/`frageSpecial`, Wahl in `paySummonCost`).
 //  The Archer pattern: `inherentAction` is a function gated on an
 //  eligible tribute (a Creature NOT summoned this turn, OR a hand
 //  substitute like Chosen Sacrifice). While that holds, the engine
@@ -75,8 +77,10 @@ module.exports = {
   activeIn: ['hand', 'support'],
 
   // Part 1 — alt summon available while a tribute exists.
+  // Als Ruling (Al 26.10.): „Ja, natürlich nur, wenn reguläre Beschwörung via Action verfügbar ist" — Special (Opfer, Zusatzaktion) ODER Normal (Aktion, ohne Opfer):
+  // wahr nur dort, wo Special der EINZIGE Weg ist (Main Phase / keine freie Aktion); sonst wählt der Spieler in `paySummonCost` (Muster Blue-Ice Dragon).
   inherentAction(gs, pi, heroIdx, engine) {
-    return hasTribute(engine, pi);
+    return T.specialErzwungen(engine, pi, heroIdx, CARD_NAME, engine ? hasTribute(engine, pi) : false);
   },
 
   // ── Full-board sacrifice-summon hooks (Suspicious Monster pattern) ──
@@ -115,10 +119,16 @@ module.exports = {
     const ps = engine.gs.players[pi];
     if (ps?._requestedBouncePlaceSlot) {   // Marke bleibt gesetzt: `beforeSummon` räumt sie ab
       const d = await T.paySacrificeSwap(engine, pi, ps._requestedBouncePlaceSlot, CARD_NAME);
-      return d ? { kind: 'swap', ...d } : false;
+      return d ? { kind: 'swap', special: true, ...d } : false;   // der Tausch geht nur per Opfer = Special
     }
-    if (!ctx.isInherentAction) return { kind: 'none' };
-    return (await zahleOpfer(ctx)) ? { kind: 'sac' } : false;
+    if (ctx._alsZusatzaktion) return { kind: 'none' };   // fremder Effekt beschwört „as an additional Action" (Ushabti …): kein eigenes Opfer
+    // Special/Normal-Wahl (Als Ruling Al 26.10.): nur im Spieler-Weg, mit Opfer-Möglichkeit UND freier regulärer Beschwörung; sonst zwangsweise Special (`inherentAction`).
+    let special = !!ctx.isInherentAction;
+    if (!special && ctx._isNormalSummon === true && T.hasTribute(engine, pi)) {
+      special = await T.frageSpecial(engine, pi, CARD_NAME, '🗡️ Special (sacrifice a Creature, free Action)');
+    }
+    if (!special) return { kind: 'none' };
+    return (await zahleOpfer(ctx)) ? { kind: 'sac', special: true } : false;
   },
 
   async beforeSummon(ctx) {
@@ -130,7 +140,10 @@ module.exports = {
     if (pre) {
       if (ps?._requestedBouncePlaceSlot) delete ps._requestedBouncePlaceSlot;
       if (ps?._requestedNormalSummonSlot) delete ps._requestedNormalSummonSlot;
-      return pre.kind === 'swap' ? await T.placeAfterSacrificeSwap(engine, pi, pre, CARD_NAME) : true;
+      const gelandet = pre.kind === 'swap' ? await T.placeAfterSacrificeSwap(engine, pi, pre, CARD_NAME) : true;
+      // Special bei schon eingezogener Aktion: server.js erstattet sie (Muster Blue-Ice Dragon).
+      if (gelandet && pre.special && !ctx.isInherentAction) engine.gs._summonModeUpgradedToInherent = pi;
+      return gelandet;
     }
 
     // Drop onto an occupied slot → full-board sacrifice-summon: sacrifice

@@ -919,7 +919,7 @@ async function runActionPhase(engine, helpers) {
     // Enumerate one candidate per eligible hero — MCTS evaluates hero
     // assignment as a decision dimension instead of collapsing to the
     // heuristic-picked hero. If no hero is eligible, skip the card.
-    const eligible = listEligibleHeroesForActionCard(engine, cpuIdx, cd);
+    const eligible = listEligibleHeroesForActionCard(engine, cpuIdx, cd, ausVorrat ? undefined : handIdx);   // Als Ruling (Al 26.10.): je Handkopie
     if (!eligible.length) { if (_trace) cpuLog(`[trace] ${cardName}: FILTER keine eligible Heroes`); continue; }
     if (_trace) cpuLog(`[trace] ${cardName}: KANDIDAT (heroes=${eligible.map(e=>e.hi).join(',')})`);
 
@@ -931,7 +931,7 @@ async function runActionPhase(engine, helpers) {
     // drift onto a higher-level hero by accident.
     let heroPool;
     if (cd.cardType === 'Creature') {
-      const lowHi = pickHeroForActionCard(engine, cpuIdx, cd, cardName);
+      const lowHi = pickHeroForActionCard(engine, cpuIdx, cd, cardName, ausVorrat ? undefined : handIdx);
       heroPool = (lowHi >= 0) ? eligible.filter(e => e.hi === lowHi) : eligible;
     } else if (cd.cardType === 'Attack') {
       // Sort by current atk stat DESC. Most Attack cards scale damage
@@ -2671,7 +2671,7 @@ async function playDiscardSensitiveCreatures(engine, helpers) {
       if (!detectDiscardSensitiveSummon(script, engine, cpuIdx)) continue;
       if (!isFirstTurnSafe(engine, cpuIdx, cardName, cd)) continue;
 
-      const heroIdx = pickHeroForActionCard(engine, cpuIdx, cd, cardName);
+      const heroIdx = pickHeroForActionCard(engine, cpuIdx, cd, cardName, ausVorrat ? undefined : handIdx);
       if (heroIdx < 0) continue;
       const v = engine.validateActionPlay(cpuIdx, cardName, handIdx, heroIdx, [cd.cardType], { fromCreation: ausVorrat });
       if (!v) continue;
@@ -3913,10 +3913,10 @@ async function fireAdditionalActions(engine, helpers) {
       // und z. B. Friendships Frei-Zauber verfiel jede Runde. Jetzt:
       // Heuristik-Held zuerst (bester Caster gewinnt bei Deckung),
       // danach alle übrigen legalen Helden auf Deckung prüfen.
-      const prefHero = pickHeroForActionCard(engine, cpuIdx, cd, cardName);
+      const prefHero = pickHeroForActionCard(engine, cpuIdx, cd, cardName, handIdx);   // Als Ruling (Al 26.10.): je Handkopie
       if (prefHero < 0) { swapDiag(engine, `summon:kein-held:${cardName}`); continue; }
       const heroOrder = [prefHero];
-      for (const e of listEligibleHeroesForActionCard(engine, cpuIdx, cd)) {
+      for (const e of listEligibleHeroesForActionCard(engine, cpuIdx, cd, handIdx)) {
         if (e.hi !== prefHero) heroOrder.push(e.hi);
       }
       let heroIdx = -1;
@@ -4399,7 +4399,9 @@ function cardCanBouncePlaceAtHero(engine, pi, heroIdx, cardName) {
   } catch { return false; }
 }
 
-function listEligibleHeroesForActionCard(engine, pi, cardData) {
+// Als Ruling (Al 26.10.): „Rocky Slime reduziert nur das Level einer einzelnen Kopie!“ — `handIdx` (optional) = die konkrete Handkopie — dann gilt das Heldenstufen-Tor DIESER Kopie,
+// sonst „irgendeine Kopie genügt" (Namensliste). Aufrufer, die eine Kopie spielen wollen, geben ihren Index mit (nicht für Karten aus Crestinas Vorrat).
+function listEligibleHeroesForActionCard(engine, pi, cardData, handIdx) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   const eligible = [];
@@ -4417,7 +4419,7 @@ function listEligibleHeroesForActionCard(engine, pi, cardData) {
       if (engine.heroSideOf && engine.heroSideOf(pi, hero) !== pi) continue;
       if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
       if (hero.statuses?.negated && cardData.cardType === 'Spell') continue;
-      if (!engine.heroMeetsLevelReq(pi, hi, cardData)) continue;
+      if (!engine.heroMeetsLevelReq(pi, hi, cardData, Number.isInteger(handIdx) && handIdx >= 0 ? { handIdx } : undefined)) continue;
     }
 
     if (cardData.cardType === 'Creature') {
@@ -4526,10 +4528,10 @@ function deckIsDangerouslySmall(engine, pi) {
   return dl <= th;
 }
 
-function pickHeroForActionCard(engine, pi, cardData, cardName) {
+function pickHeroForActionCard(engine, pi, cardData, cardName, handIdx) {   // Als Ruling (Al 26.10.): `handIdx` = konkrete Handkopie (s. `listEligibleHeroesForActionCard`)
   const gs = engine.gs;
   const ps = gs.players[pi];
-  const eligible = listEligibleHeroesForActionCard(engine, pi, cardData);
+  const eligible = listEligibleHeroesForActionCard(engine, pi, cardData, handIdx);
   if (!eligible.length) return -1;
 
   // Ascension priority: if any eligible hero declares this card progresses
@@ -4656,14 +4658,15 @@ function findSpendableSummonGrantPlay(engine, cpuIdx) {
   if ((ps.bonusActions?.remaining || 0) > 0) return null;
   const cardDB = engine._getCardDB();
   let best = null;
-  const seen = new Set();
+  // Als Ruling (Al 26.10.): Heldenstufen-Tor je KOPIE — nicht mehr nur die ERSTE Kopie eines Namens prüfen — sonst bliebe eine spielbare (durch Rocky Slime gesenkte) zweite Kopie unentdeckt,
+  // wenn die erste am Tor scheitert. Je Name und Held reicht die erste LEGALE Kopie (`_legalFuer`).
+  const _legalFuer = new Set();
   for (let handIndex = 0; handIndex < (ps.hand || []).length; handIndex++) {
     const cardName = ps.hand[handIndex];
-    if (seen.has(cardName)) continue;
-    seen.add(cardName);
     const cd = cardDB[cardName];
     if (!cd || cd.cardType !== 'Creature') continue;
     for (let heroIdx = 0; heroIdx < (ps.heroes || []).length; heroIdx++) {
+      if (_legalFuer.has(cardName + '|' + heroIdx)) continue;
       const hero = ps.heroes[heroIdx];
       if (!hero || !hero.name) continue;
       // Swap-Ausnahme wie oben: ein grant-finanzierter Tausch auf den
@@ -4701,9 +4704,10 @@ function findSpendableSummonGrantPlay(engine, cpuIdx) {
         // Fallback auf den strikten Pfad, falls validateActionPlay in
         // dieser Stellung gar nicht greift (Phasen-Randfälle).
         let strict = false;
-        try { strict = !!engine.heroMeetsLevelReq(cpuIdx, heroIdx, cd); } catch { strict = false; }
+        try { strict = !!engine.heroMeetsLevelReq(cpuIdx, heroIdx, cd, { handIdx: handIndex }); } catch { strict = false; }   // Als Ruling (Al 26.10.): genau diese Kopie
         if (!strict) continue;
       }
+      _legalFuer.add(cardName + '|' + heroIdx);
       // ★ Stand bis v426 ohne `deckProfile.` — freier Bezeichner, also
       // ReferenceError, vom leeren `catch` verschluckt. `val` blieb
       // damit IMMER 0, und `val > best.val` war nie wahr: der Spender
@@ -6878,6 +6882,9 @@ function installCpuBrain(engine) {
 
   const origPromptEffectTarget = engine.promptEffectTarget.bind(engine);
   engine.promptEffectTarget = async function (playerIdx, validTargets, config = {}) {
+    // R-12 (Al 26.10.): Trockenlauf `config._waehlbarProbe` (Future Tech Fists „exakt N legale Ziele") fragt NICHTS und waehlt nichts — auch fuer die CPU geht er unveraendert an die Engine
+    // (sonst lief hier eine echte CPU-Wahl samt MCTS-Aufzeichnung, und `probe.ids` blieb leer). Der Aufruf der Engine geschieht synchron, `probe.ids` steht danach sofort bereit.
+    if (config && config._waehlbarProbe) return origPromptEffectTarget(playerIdx, validTargets, config);
     if (!validTargets || validTargets.length === 0) return [];
     throwIfAborted(engine, 'promptEffectTarget');
 
@@ -7121,6 +7128,7 @@ function installCpuBrain(engine) {
           wasScripted: !!scriptedPick,
         }, config.title, 'target', playerIdx);
       }
+      if (typeof engine._gewaehlteZieleMerken === 'function') engine._gewaehlteZieleMerken(playerIdx, validTargets, config, picked);   // W78a: auch die Wahl der CPU als Wirker gehört zum Vorab-Wissen von Monias Bilanz (sie läuft hier nicht über `_zielwahlAbschliessen`)
       return picked;
     }
     return origPromptEffectTarget(playerIdx, validTargets, config);

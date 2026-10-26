@@ -119,6 +119,8 @@ function equippedArtifactTargets(engine) {
 module.exports = {
   activeIn: ['hand', 'support'],
   creatureEffect: true,
+  // Als Ruling (Al 26.10., Blinded): der aktive Effekt wählt ein ausgerüstetes Artefakt auf dem Brett — ein geblendeter Träger/Wirtsheld kann ihn nicht aktivieren.
+  requiresTarget: true,
 
   reduceCardLevel(cardData, engine, ownerIdx, inst) {
     if (!cardData || cardData.name !== CARD_NAME) return 0;

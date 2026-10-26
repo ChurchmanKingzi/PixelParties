@@ -16,6 +16,9 @@ const { canPlayMagicGem, maybeKeepGemInHand } = require('./_magic-gem-shared');
 const CARD_NAME = 'Magic Amber';
 
 module.exports = {
+  // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
+  // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten/Einmal-Stempel; `engine.ersterZugGeschuetzt`).
+  blockedByFirstTurnProtection: true,
   // CPU: alwaysCommit — Sofort-Handdisruption (Gegner discardet) — der Immediate-Score gewichtet Gegner-Handverlust nicht, das Gate lehnte 100% ab.
   // planArtifactPlay filtert Bezahlbarkeit bereits; entspricht der
   // dokumentierten Artifact-Politik "played as soon as affordable".

@@ -2359,6 +2359,14 @@ function playSFXForLog(entry) {
     case 'hero_ascension':
       playSFX('ascension');
       return;
+    // True Form / Open Invitation / Tri Ad: eine Form wird nur GELEGT (kein Aufstieg) bzw. wieder abgelegt — der Morph braucht trotzdem Klang.
+    case 'hero_form_placed':
+      playSFX('ascension');
+      return;
+    case 'hero_form_returned':
+      playSFX('debuff');
+      setTimeout(() => playSFX('status_remove', { dedupe: 0 }), 260);
+      return;
     case 'reaction_activated':
       playSFX('chain_add');
       return;
@@ -2737,6 +2745,29 @@ const ZONE_ANIM_SFX = {
   level_down:              { name: 'debuff', opts: { rate: 0.9, volume: 0.7 } },   // Looming Threat: Stufe sinkt
   hand_level_down:         { name: 'debuff', opts: { rate: 1.0, volume: 0.6 } },   // Great Vanguard Demon: Stufe sinkt (Pixelart, die Karte bleibt sichtbar)
   mind_control_hex:        { name: 'elem_dark', opts: { rate: 0.8, volume: 0.6 } },   // Mind Control: Hypnose-Spirale über dem übernommenen Helden (Pixelart)
+  // Infallible Oracle Pythia (W78) — grüne Flammen. `mark`: Aufflackern (Aufdeck-Ton + leises Zischen); `tick`: ein Flämmchen auf Pythia (Ping); `doom`: die Flammen lodern
+  // auf (Feuerrauschen, tiefes Brummen) und schlagen über dem Ziel zusammen (~1100 ms, Schlag); `burn`: das Opfer verbrennt; `save`: Pythia wird von den Flammen geheilt (Heil-Ton).
+  pythia_flames: (p) => {
+    const ph = p && p.phase;
+    if (ph === 'tick') return [{ name: 'ping', opts: { rate: 1.5, volume: 0.4 } }];
+    if (ph === 'save') return [
+      { name: 'elem_fire', opts: { rate: 1.3, volume: 0.45 } },
+      { name: 'heal',      opts: { rate: 1.1, volume: 0.6, delay: 380, category: null, dedupe: 0 } },
+    ];
+    if (ph === 'burn') return [
+      { name: 'elem_fire', opts: { rate: 0.9, volume: 0.7 } },
+      { name: 'elem_dark', opts: { rate: 0.8, volume: 0.45, delay: 500, category: null, dedupe: 0 } },
+    ];
+    if (ph === 'doom') return [
+      { name: 'elem_fire',    opts: { rate: 0.8, volume: 0.7 } },
+      { name: 'elem_dark',    opts: { rate: 0.7, volume: 0.5, delay: 250, category: null, dedupe: 0 } },
+      { name: 'heavy_impact', opts: { rate: 0.7, volume: 0.6, delay: 1050, category: null, dedupe: 0 } },
+    ];
+    return [
+      { name: 'reveal',    opts: { rate: 0.9, volume: 0.45 } },
+      { name: 'elem_fire', opts: { rate: 1.6, volume: 0.3, delay: 150, category: null, dedupe: 0 } },
+    ];
+  },
   // Spy in the Enemy's Camp (23.10.) — das Auge öffnet sich (Aufdeck-Ton, 0 ms), beim Blinzeln ein Ping (~560 ms). Nur der erste Teil übernimmt die Sammelkategorie 'effect'.
   spy_mark: [
     { name: 'reveal', opts: { rate: 1.4, volume: 0.45 } },
@@ -3061,6 +3092,17 @@ const ZONE_ANIM_SFX = {
     { name: 'heavy_impact', opts: { rate: 1.2, volume: 0.5,  delay: 480, category: null, dedupe: 0 } },
     { name: 'ping',         opts: { rate: 2.8, volume: 0.4,  delay: 520, category: null, dedupe: 0 } },
   ],
+  // Mean Cute Cat (25.10.) — die Fledermäuse steigen flatternd auf (Wind, 0 ms), stürzen auf das Ziel (Schnitt ~300 ms), verschlucken den Schlag (Dunkelheit ~600 ms), tragen ihn davon (Wind ~780 ms) und
+  // schlagen bei der Kreatur ein (~1020 ms: Schlag, Kratzer, Pings). Nur der erste Teil übernimmt die Sammelkategorie 'effect'.
+  mean_cat_bats: [
+    { name: 'elem_wind',    opts: { rate: 1.9, volume: 0.3 } },
+    { name: 'slash',        opts: { rate: 1.7, volume: 0.32, delay: 300,  category: null, dedupe: 0 } },
+    { name: 'elem_dark',    opts: { rate: 0.8, volume: 0.45, delay: 600,  category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 2.3, volume: 0.28, delay: 780,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.15, volume: 0.55, delay: 1020, category: null, dedupe: 0 } },
+    { name: 'slash',        opts: { rate: 1.3, volume: 0.35, delay: 1040, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.6, volume: 0.28, delay: 1120, category: null, dedupe: 0 } },
+  ],
   // Patty (25.10.) — je Wurfstern ein Zischen beim Abwurf (alle 70 ms, die Tonhoehe wandert leicht) und ein heller Einschlag nach 280 ms Flug (`runde` = Zahl der Sterne; hoert nach 8 Sternen auf, damit
   // der Klang nicht zum Rauschen wird). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   patty_shuriken: ({ runde }) => {
@@ -3134,6 +3176,20 @@ const ZONE_ANIM_SFX = {
     { name: 'reveal', opts: { rate: 1.2, volume: 0.5, delay: 520, category: null, dedupe: 0 } },
     { name: 'ping',   opts: { rate: 2.5, volume: 0.45, delay: 560, category: null, dedupe: 0 } },
   ],
+  // Cell Escape (W78) — das Gitter faellt (Metallschleifen 0 ms, dumpfer Schlag beim Aufsetzen ~330 ms), das Schloss klickt (~760 ms, helles Klirren), die Staebe schwingen hoch (Wind, ~800 ms),
+  // beim Oeffnen ein Aufdeck-Ton. Zweiter Durchgang (`mode: 'more'`): zusaetzlich der Frost-Knack. Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  cell_escape: (p) => {
+    const mehr = !!(p && p.mode === 'more');
+    const teile = [
+      { name: 'slash',        opts: { rate: 0.6, volume: 0.3 } },
+      { name: 'heavy_impact', opts: { rate: 1.3, volume: 0.55, delay: 330, category: null, dedupe: 0 } },
+      { name: 'ping',         opts: { rate: 1.8, volume: 0.4,  delay: 760, category: null, dedupe: 0 } },
+      { name: 'elem_wind',    opts: { rate: 1.4, volume: 0.3,  delay: 800, category: null, dedupe: 0 } },
+      { name: 'reveal',       opts: { rate: 1.0, volume: 0.4,  delay: 860, category: null, dedupe: 0 } },
+    ];
+    if (mehr) teile.push({ name: 'elem_ice', opts: { rate: 1.3, volume: 0.45, delay: 120, category: null, dedupe: 0 } });
+    return teile;
+  },
   // Duel (12.10.) — die Helden rammen einander, Schlag auf Schlag; eine Animation je HIT (alle Zeiten sind animationsrelativ, `playSFXForZoneAnim` legt den Einbau-Versatz von 100 ms selbst dazu).
   // Hit 1 (`runde` 1): Ausholen und Anlauf (Schnitt ~80 / ~140 ms), Aufprall bei ~260 ms (Schlag, tiefer Schnitt, heller Klirr). Jeder weitere Hit: der Rückprall der Karten (leiser Schnitt, 0 ms),
   // Aufprall bei ~120 ms (Schlag, tiefer Schnitt, Klirr — etwas höher je Runde). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
@@ -3517,6 +3573,14 @@ const ZONE_ANIM_SFX = {
     { name: 'projectile', opts: { rate: 1.25, volume: 0.9 } },
     { name: 'slash', opts: { rate: 1.05, volume: 1, delay: 180 } },
   ],
+  // Backstab (25.10.) — der Stich: leises Schwertzischen beim Ausholen (~260 ms), Schnitt beim Vorstoßen (~300 ms), dumpfer Einschlag mit hellem Ping bei 330 ms. Nur der erste Teil
+  // übernimmt die Sammelkategorie 'effect'.
+  backstab_stab: [
+    { name: 'projectile',   opts: { rate: 1.7, volume: 0.4,  delay: 255 } },
+    { name: 'slash',        opts: { rate: 0.85, volume: 0.9, delay: 315, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.3, volume: 0.45, delay: 335, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.4, volume: 0.3,  delay: 345, category: null, dedupe: 0 } },
+  ],
   // v724 (Thicket): dasselbe Pflanzen-Timbre, etwas tiefer und laenger
   // gefahren — das Dickicht ist dichter als der Rankenkranz.
   thicket_cover:           { name: 'elem_biomancy', opts: { rate: 0.85, volume: 1, delay: 120 } },
@@ -3881,6 +3945,19 @@ const ZONE_ANIM_SFX = {
     { name: 'critical_strike',  opts: { rate: 0.6, volume: 0.6, delay: 180, category: null, dedupe: 0 } },
     { name: 'elem_dark',        opts: { rate: 0.3, volume: 0.9, delay: 420, category: null, dedupe: 0 } },
     { name: 'ping',             opts: { rate: 0.4, volume: 0.5, delay: 700, category: null, dedupe: 0 } },
+  ],
+  // Night Mare (26.10.): dunkles Raunen, die schwarzen Flammen fauchen, dumpfer Schlag beim Treffer.
+  black_flames: [
+    { name: 'elem_dark', opts: { rate: 0.55, volume: 1.0, delay: 1, category: null, dedupe: 0 } },
+    { name: 'burn',      opts: { rate: 0.7, volume: 0.7, delay: 120, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.6, volume: 0.8, delay: 640, category: null, dedupe: 0 } },
+  ],
+  // Little Lyta (26.10.): zarte Glöckchen, Heilton, Funkeln — die Herzen steigen auf.
+  pink_hearts: [
+    { name: 'ping', opts: { rate: 1.6, volume: 0.55, delay: 1, category: null, dedupe: 0 } },
+    { name: 'heal', opts: { rate: 1.3, volume: 0.45, delay: 120, category: null, dedupe: 0 } },
+    { name: 'ping', opts: { rate: 2.2, volume: 0.35, delay: 420, category: null, dedupe: 0 } },
+    { name: 'ping', opts: { rate: 2.6, volume: 0.3, delay: 760, category: null, dedupe: 0 } },
   ],
   // Feral (25.10.): Wasserexplosion — Platschen und dumpfer Schlag.
   water_burst: [
@@ -4295,6 +4372,12 @@ const ZONE_ANIM_SFX = {
   ev_gold_steal_burst: [
     { name: 'gold_gain', opts: { rate: 1.25, volume: 0.8, delay: 0, category: null, dedupe: 0 } },
     { name: 'gold_gain', opts: { rate: 1.0, volume: 0.65, delay: 520, category: null, dedupe: 0 } },
+  ],
+  // ★ Betrayal (25.10., Welle 78; `betrayal_coins`, Münzen von deiner Gold-Anzeige über die Kreatur zur Gold-Anzeige des Empfängers): ein Münzklang je Abflug (alle 130 ms)
+  //   und einer je Landung (Abflug + 960 ms) — die Zeiten decken sich mit `betrayal.js` (STEP_MS 130, LEG_MS 360, DWELL_MS 100). `category: null`: kein Verschlucken durch den Effektklang.
+  ev_betrayal_coins: [
+    ...[0, 1, 2, 3, 4].map(i => ({ name: 'gold_gain', opts: { rate: 1.3 - i * 0.04, volume: 0.6, delay: i * 130, category: null, dedupe: 0 } })),
+    ...[0, 1, 2, 3, 4].map(i => ({ name: 'gold_gain', opts: { rate: 0.95 + i * 0.05, volume: 0.55, delay: 820 + i * 130, category: null, dedupe: 0 } })),
   ],
   // Willy: Klee, Regenbogen, Muenzen um den Helden
   ev_willy_leprechaun: [
@@ -8163,6 +8246,13 @@ const TARGET_BLOCKER_BADGES = {
       + 'while its controller has another Hero that can be chosen by them. Can still be hit '
       + 'by effects that do not choose. Until the end of its controller\'s next turn.',
   },
+  // Perfect Disguise (Hero): Zielschutz als Eintrag am Helden (Regel im Skript, `blocksTargeting`)
+  'Perfect Disguise': {
+    icon: '🎭',
+    tooltip: 'Disguised: Cannot be chosen by the opponent\'s cards or effects during their next turn, '
+      + 'unless it is the only legal target of that card or effect on this side. Can still be hit '
+      + 'by effects that do not choose.',
+  },
 };
 
 // ★★ v1198 (Als Vorgabe 18.9.): „Sie muss einen GROSSEN Marker tragen."
@@ -8542,6 +8632,18 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
       tooltip: "Spying (Spy in the Enemy's Camp): this Creature is a spy — the player who played the Spy may activate its active effect during their own turn as if they controlled it. "
         + 'This is not a status effect and cannot be healed. It lasts until the Creature leaves the board.',
     });
+  }
+  // W78 („Infallible Oracle Pythia"): vorgemerkter Tod — Marke am Helden (`_pythiaMark`, per Spread durchgereicht) bzw. an der Kreatur (`counters._pythiaMark`); KEIN Status.
+  {
+    const pm = s._pythiaMark || c._pythiaMark;
+    if (pm) {
+      const n = pm.n || 1;
+      badges.push({
+        key: 'pythia_foreseen', icon: '🔮',
+        tooltip: `Death Foreseen by Pythia: ${n > 1 ? `${n} Infallible Oracle Pythias have` : 'Infallible Oracle Pythia has'} chosen this target. When the third Pythia Counter is placed on ${n > 1 ? 'one of them' : 'her'} (now ${pm.counters || 0} of 3), `
+          + `this ${isHero ? 'Hero' : 'Creature'} is immediately defeated. This is not a status effect and cannot be healed. It ends if ${n > 1 ? 'that Pythia' : 'Pythia'} or this target leaves the board.`,
+      });
+    }
   }
   // 23.10. („Mind Control"): der Wirtsheld gehört dem Besitzer der Karte, solange sie angelegt ist.
   if (s.mind_controlled) {

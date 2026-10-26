@@ -72,7 +72,7 @@ module.exports = {
       engine.sync();
 
       if (hero._timeCounters >= LOSE_AT) {
-        const winnerIdx = controller === 0 ? 1 : 0;
+        const winnerIdx = engine.opponentOf(controller);   // Gegner-Index nie hart verdrahten (CARD_API, N-Spieler)
         engine.log('carris_time_out', {
           loser: gs.players[controller]?.username,
           winner: gs.players[winnerIdx]?.username,

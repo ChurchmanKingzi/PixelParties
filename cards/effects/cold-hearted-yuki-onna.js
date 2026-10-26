@@ -92,6 +92,13 @@ module.exports = {
 
       // 1+: alles einfrieren
       let feinde = gegnerZiele(engine, oi);
+      // ★ Als Ruling (Al 26.10.): Gruppen-Status eines Kreatureneffekts öffnet das Reaktionsfenster der AoE-Prinzipien — „hit by"-Surprises der getroffenen Helden
+      // (Booby/Toxic Trap …) und die Post-Target-Reaktionen über ALLE Ziele (Rook of Kings [B], Divine Gift of Rain, Castling …) VOR dem Frost. Negiert eine
+      // Reaktion den Effekt, entfallen auch die Folgestufen (100 Schaden, Frost verlängern): „that effect" ist als Ganzes negiert.
+      if (feinde.length > 0) {
+        const sr = await engine.statusHitSurpriseWindow(ctx.card, feinde.filter(z => z.type === 'hero'), 'creature', { ziele: feinde });
+        if (sr?.effectNegated) { engine.sync(); return; }
+      }
       eisblockAnimation(engine, feinde);
       await engine._delay(300);
       await engine.batchStatusWindow('frozen', async () => {   // EIN Reaktionsfenster nach dem ganzen Effekt (The Melting)

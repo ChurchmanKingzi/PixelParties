@@ -19,6 +19,9 @@ module.exports = {
   // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
   // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; `engine.ersterZugGeschuetzt`).
   blockedByFirstTurnProtection: true,
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Am besten gleich die Karten ganz sperren statt den Schaden fizzeln zu lassen"): die Karte richtet NUR Schaden an Zielen des Gegners an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).
   // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
   onFizzledPlay: ({ engine, gs, pi }) => { engine.claimHOPT(`spell-played:${CARD_NAME}`, pi); },
@@ -109,6 +112,7 @@ module.exports = {
       const sparedIds = new Set();
       let discardsPaid = 0;
       const maxIter = Math.min(ops.hand?.length || 0, targets.length);
+      const borisGegner = engine.borisStapel(oi, { source: CARD_NAME, skipVoidsEffect: true });   // ★ W74c: Boris des Gegners, einmal für den ganzen Schonen-Stapel
 
       for (let iter = 0; iter < maxIter; iter++) {
         const remaining = targets.filter(t => !sparedIds.has(t.id));
@@ -125,6 +129,9 @@ module.exports = {
           cancelLabel: 'Done',
         });
         if (!dRes || dRes.cancelled || dRes.cardName == null) break;
+        // ★ W74c: Boris darf den Abwurf (Kosten, „may discard any number") ignorieren. Verschont wird „that many" = so viele Ziele, wie Karten
+        // abgeworfen wurden — bei Verzicht 0: es wird nichts verschont, die Wahl endet.
+        if (await borisGegner(1)) break;
 
         const ok = await engine.actionDiscardHandCard(oi, dRes.cardName, dRes.handIndex, {
           source: CARD_NAME,
@@ -264,6 +271,7 @@ module.exports = {
           .filter(t => !sparedIds.has(t.id) && t.kind === 'creature')
           .map(t => engine.cardInstances.find(c => c.id === t.instId))
           .filter(Boolean),
+        heroes: targets.filter(t => !sparedIds.has(t.id) && t.kind === 'hero').map(t => ({ owner: t.physOwner, heroIdx: t.heroIdx })),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
         source: { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
         amount: VOLLEY_DAMAGE, type: 'destruction_spell', sourceOwner: pi,
       });

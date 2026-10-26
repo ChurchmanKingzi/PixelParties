@@ -73,6 +73,7 @@ module.exports = {
   },
 
   creatureEffect: true,
+  requiresTarget: true,   // Zielwahl-Effekt: Blinded sperrt ihn (siehe _hooks.js / getActivatableCreatures)
 
   canActivateCreatureEffect(ctx) {
     // Immer aktivierbar: die Zielzahl faellt nie unter 1 (Als
@@ -130,6 +131,7 @@ module.exports = {
     // Ziele, 100 Schaden auf jedes" ist ein Schlag auf mehrere Ziele.
     await engine.beginAoeStrike(targets.length, {
       creatures: targets.filter(t => t.type !== 'hero').map(t => t.cardInstance).filter(Boolean),
+      heroes: targets.filter(t => t.type === 'hero'),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
       source: { name: CARD_NAME, owner: pi, heroIdx },
       amount: DAMAGE, type: 'creature', sourceOwner: pi,
     });

@@ -61,6 +61,7 @@ const schildAuf = (inst) => { if (inst?.counters) inst.counters._cardinalImmune 
 /** Die Karte in eine freie Zone des Gegners des Halters legen (Plant-Golem-Weg); Kontrolleur wechselt, Counter +1. */
 async function weiterreichen(engine, inst, holder, ziel) {
   const gs = engine.gs;
+  await engine.showTriggeredEffect(CARD_NAME, { playerIdx: holder, source: inst });   // Zugende-Trigger zeigt seine Karte (CARD_API, MANDATORY) — erst nach Ja + Zahlung
   const oppIdx = engine.opponentOf(holder);
   const altSeite = engine.physicalSide(inst);
   const alt = gs.players[altSeite];
@@ -100,6 +101,7 @@ async function weiterreichen(engine, inst, holder, ziel) {
 /** Besiegen und 50 + 50 × Counter an alle Ziele des Halters. */
 async function explodieren(engine, inst, holder) {
   const gs = engine.gs;
+  await engine.showTriggeredEffect(CARD_NAME, { playerIdx: holder, source: inst });   // Zugende-Trigger zeigt seine Karte (CARD_API, MANDATORY)
   const n = inst.counters[KEY] || 1;
   const schaden = GRUND + JE_COUNTER * n;
   const seite = engine.physicalSide(inst);
@@ -230,8 +232,9 @@ async function zugEnde(ctx) {
     });
     if (engine._confirmSaidYes(ja)) {
       const vor = (ps.hand || []).length;
-      await engine.actionPromptForceDiscard(holder, n, { costFor: CARD_NAME, costKind: 'disrupt', title: `${CARD_NAME} — Discard ${n}`, source: CARD_NAME, selfInflicted: true, skipSourceGlow: true });
-      if (vor - (ps.hand || []).length >= n) {
+      // ★ W74c: von Boris erlassene Kosten gelten als bezahlt — die Kartoffel wird trotzdem weitergereicht (sie explodiert nicht).
+      const kosten = await engine.zahleAbwurfKosten(holder, n, { costFor: CARD_NAME, costKind: 'disrupt', title: `${CARD_NAME} — Discard ${n}`, source: CARD_NAME, skipSourceGlow: true });
+      if (kosten.erlassen || vor - (ps.hand || []).length >= n) {
         let ziel = zonen[0];
         if (zonen.length > 1) {
           const wahl = await engine.promptGeneric(holder, {

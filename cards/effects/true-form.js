@@ -15,14 +15,14 @@
 //  ── FORMWECHSEL ─────────────────────────────────────────────────────────
 //  Läuft über `engine.performAscension(…, { plainHeroForm, notAnAscension, skipCondition, forceFormStack })` — dieselbe Zustandsübertragung wie
 //  Tri Ad/Open Invitation: neuer Name und Skript (damit die Effekte der neuen Form), gedruckte ATK und max HP der neuen Form
-//  (HP-Differenz der gedruckten Werte, Buffs/Ausrüstung/Abilities bleiben am Helden), die Form liegt auf dem Formstapel. Es ist KEIN Aufstieg:
+//  (max HP = Differenz der gedruckten Werte, die AKTUELLEN HP bleiben unberührt — auch über max HP; Buffs/Ausrüstung/Abilities bleiben am Helden), die Form liegt auf dem Formstapel. Es ist KEIN Aufstieg:
 //  kein Bonus, keine Aufstiegs-Trigger, kein Zugende. Auch ein bereits verwandelter Held darf erneut verwandelt werden — die Formen stapeln sich.
 //  `hero._trueForm` merkt sich die Stapeltiefe jeder True-Form-Schicht.
 //
 //  ── ZURÜCKVERWANDELN ────────────────────────────────────────────────────
 //  Ein Klick auf den Helden öffnet — wie bei jedem Held mit mehreren Effekten — das Effektmenü: „Transform back" und (falls vorhanden) der
 //  Effekt der Form. Ist das die einzige Option, geschieht sie direkt. `engine.performTrueFormRevert` (Server `doActivateHeroEffect`) nimmt
-//  nur die OBERSTE True-Form-Schicht: die Form geht in die Ablage, der Held wird zur Form darunter. Keine Aktion, keine Kette, beliebig oft im
+//  nur die OBERSTE True-Form-Schicht: die Form geht in die Ablage, der Held wird zur Form darunter; aktuelle HP bleiben, der Held stirbt nie daran. Keine Aktion, keine Kette, beliebig oft im
 //  eigenen Zug. Ist die Form darunter ein Name, den ein anderer eigener Held gerade trägt, geht es nicht (Doppelgänger ausgeschlossen).
 //
 //  ── Bild und Klang ──────────────────────────────────────────────────────
@@ -53,6 +53,9 @@ function waehlbareHelden(engine, pi) {
 
 module.exports = {
   cpuSkipProactive: true,
+
+  // Wählt genau EINEN Helden aus der Hand und legt ihn auf den Nutzer — nie mehr als ein Ziel (CARD_API ⑦, check-aoe-text).
+  neverMultiTarget: true,
 
   /** „If this is the first Spell you use this turn, this counts as an additional Action." */
   inherentAction(gs, pi) {
@@ -121,6 +124,7 @@ module.exports = {
         notAnAscension: true,       // kein Bonus, keine Aufstiegs-Trigger, kein Zugende
         skipCondition: true,        // Hero-Karten haben keine Aufstiegsbedingung
         forceFormStack: true,       // der Rückweg braucht die Form darunter
+        keepHp: true,               // aktuelle HP bleiben, nur max HP wechselt (aktuelle HP über max HP sind erlaubt)
       });
       if (!res?.success) { gs._spellCancelled = true; return; }
 

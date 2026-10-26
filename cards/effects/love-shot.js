@@ -79,7 +79,7 @@
 
 const CARD_NAME = 'Love Shot';
 
-const { takeTopFromOpponentDeck } = require('./_opponent-deck-shared');
+const { zieheAusGegnerDeck } = require('./_opponent-deck-shared');
 
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
@@ -151,7 +151,9 @@ module.exports = {
       // card from your opponent's deck". Damit feuert auch `onDraw`,
       // und „Cute Meanie Melissa" auf der Gegenseite antwortet
       // (Al 15.9.). „Infiltration" sagt dagegen „ADD" und laesst es.
-      await takeTopFromOpponentDeck(engine, pi, { source: CARD_NAME, asDraw: true });
+      // W78 (Al, Antwort 11): das Ziehen läuft durch dieselben Ziehfenster wie jedes Ziehen (Hand-/Zieh-Sperre, Cybug Centipede, Handlimit-Wächter) — wie Cell Escape.
+      // Die Karte bleibt spielbar (der Zug mit dem Gegnerhelden ist ihr eigentlicher Nutzen); unter einer Zieh-Sperre entfällt nur der Zug.
+      await zieheAusGegnerDeck(engine, pi, 1, { source: CARD_NAME });
 
       // ── Build opp-Hero target list ───────────────────
       // Per the card's intent, only Heroes that can actually

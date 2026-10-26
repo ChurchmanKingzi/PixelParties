@@ -1,16 +1,19 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Burning Finger"
 //  Spell (Destruction Magic Lv1) — Deal
-//  100/160/240 destruction damage to any
+//  100/150/200 destruction damage to any
 //  single target (Hero or Creature).
 //
 //  Damage scaling (Destruction Magic + Performance):
 //    Lv 1 → 100
-//    Lv 2 → 160
-//    Lv 3+ → 240
+//    Lv 2 → 150
+//    Lv 3+ → 200
 // ═══════════════════════════════════════════
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   hooks: {
@@ -26,7 +29,7 @@ module.exports = {
       // (Demon's Gate "as if Destruction Magic 3").
       const dmLevel = engine.effectiveSchoolLevelForCaster('Destruction Magic', pi, heroIdx);
 
-      const damage = dmLevel >= 3 ? 240 : dmLevel >= 2 ? 160 : 100;
+      const damage = dmLevel >= 3 ? 200 : dmLevel >= 2 ? 150 : 100;
 
       const target = await ctx.promptDamageTarget({
         side: 'any',

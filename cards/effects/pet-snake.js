@@ -142,6 +142,11 @@ module.exports = {
       const ps = gs.players[pi];
       if (!ps) return;
 
+      // Nur die Spieler-Beschwoerung aus der Hand zahlt die Heilung ("to summon this Creature as an
+      // additional Action"): per Effekt beschworen/platziert (Barker, Tamed Hell Fox, Living Illusion …)
+      // kostet nichts und stempelt den Alt-Beschwoerungs-Zaehler nicht.
+      if (!ctx._isNormalSummon) return;
+
       // Only fire the alt path on the fresh cast from hand. Skip if:
       //   • HOPT already claimed this turn.
       //   • No own hero is poisoned (could've changed mid-chain).

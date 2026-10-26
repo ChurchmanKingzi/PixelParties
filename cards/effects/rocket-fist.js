@@ -24,6 +24,9 @@
 const CARD_NAME = 'Rocket Fist';
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an (Rückkehr auf die Hand nur bei Besiegen durch diesen Schaden) —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   requiresTarget: true,
   // ^ W16f (M02-04): Blinded-Sperre (wie Quick Attack) - die Karte wählt Ziele ("Choose a target" / "Choose up to 2 Heroes").
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (siehe CARD_API): bei einer

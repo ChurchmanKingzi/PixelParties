@@ -89,6 +89,9 @@ module.exports = {
     inst.zoneSlot = 0;
     inst.faceDown = true;
     inst.knownToOpponent = true;
+    // Al (Ruling 26.10.): eine eingelagerte Kreatur ist keine Kreatur auf dem Feld mehr — Schaden und Status wandern NICHT mit, sie kommt frisch zurück (volle HP, keine Status),
+    // genau wie beim Zurücksetzen der Camel-/PACMAN-Kreaturen (`_resetCreatureForSurpriseZone`). VOR dem Setzen der Ushabti-Marken: der gemeinsame Reset räumt sie ab (B1/S5).
+    engine._resetCreatureForSurpriseZone(inst);
     inst.ushabtiPlaced = true;
     inst.ushabtiTurn = gs.turn || 0;
     // W16d (A08-17): die Surprise Zone gehört zur SEITE des Helden (`heroOwner`) – bei einer seitenfremd beschworenen Kreatur

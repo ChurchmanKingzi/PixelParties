@@ -19,8 +19,11 @@
 //     effective level reaches 0, summoning it
 //     becomes an additional Action. Implemented
 //     via `inherentAction(gs, pi, heroIdx,
-//     engine)` consulted by the play handler
-//     each cast.
+//     engine, opts)` consulted by the play handler
+//     each cast. Als Ruling (Al 26.10.): „Bear Rider
+//     und Slime sollen sich addieren" — die Stufe der
+//     jeweiligen Handkopie (`engine.effectiveCardLevel`)
+//     zählt, Frozen-Abzug + Rocky-Abzug als Summe.
 //
 //  3) HOPT CREATURE EFFECT — Once per turn per
 //     instance, choose a Frozen target on the
@@ -46,19 +49,37 @@ module.exports = {
   creatureEffect: true,
 
   /**
-   * Free-summon gate. The engine's `heroMeetsLevelReq` ALSO consults
-   * the `_handLevelOffsetsTransient` map our hooks maintain, so the
-   * level check naturally clears at 0 Frozen-aware level — but the
-   * Action-cost gate is independent, so we mirror the same arithmetic
-   * here. `engine` is passed by `validateActionPlay`; without it (CPU
-   * speculative gating during MCTS), we fall back to "not an inherent
-   * action" so the speculation doesn't over-count free actions.
+   * Free-summon gate: „While this Creature's level is 0, you may summon it as an additional Action."
+   *
+   * Als Ruling (Al 26.10.): „Bear Rider und Slime sollen sich addieren." Gefragt ist die TATSÄCHLICHE Stufe der jeweiligen Handkopie —
+   * `engine.effectiveCardLevel(cd, pi, { handIdx })`: Frozen-Abzug (`_handLevelOffsetsTransient`, den die Hooks dieser Karte pflegen) PLUS
+   * dauerhafter Abzug (`_handLevelOffsets`: Rocky Slime) plus alle weiteren Senker, nie unter 0. Vorher rechnete die Funktion mit fester
+   * Basis 2 (`2 − Frozen`) und kannte Rocky nicht: Rocky −1 + 1 Frozen = Stufe 0, aber keine Zusatzaktion; zwei Rocky ohne Frozen ebenso.
+   *
+   * `opts.handIndex` (von `validateActionPlay`, die geklickte/gezogene Kopie) wählt die Kopie. Ohne Index (Namenslisten wie
+   * `getHeroPlayableCards`/`inherentActionCards`): wahr, wenn IRGENDEINE Handkopie auf Stufe 0 steht — der Server prüft beim Spielen
+   * die konkrete Kopie. Liegt gar keine Kopie in der Hand (Prüfung für eine schon ausgespielte/negierte Karte), gilt die alte Rechnung
+   * aus gedruckter Stufe und Frozen-Zahl. `engine` fehlt nur bei spekulativen CPU-Prüfungen: dann „keine Zusatzaktion".
    */
-  inherentAction(gs, pi, heroIdx, engine) {
+  inherentAction(gs, pi, heroIdx, engine, opts) {
     if (!engine) return false;
-    const frozenCount = countFrozenTargets(engine);
-    const effLevel = Math.max(0, BASE_LEVEL - frozenCount);
-    return effLevel === 0;
+    const cd = engine._getCardDB()[BEAR_RIDER_NAME];
+    const hand = gs.players[pi]?.hand || [];
+    // Der Frozen-Abzug steht in der Handindex-Map; sie wird hier aufgefrischt (idempotent), damit die Entscheidung nie hinter einem
+    // Gefrierweg ohne Hook herhinkt (die alte Rechnung las die Frozen-Zahl live).
+    recomputeBearRiderHandLevel(engine, pi);
+    const idx = opts?.handIndex;
+    if (Number.isInteger(idx) && hand[idx] === BEAR_RIDER_NAME) {
+      return engine.effectiveCardLevel(cd, pi, { handIdx: idx }) === 0;
+    }
+    let kopien = 0;
+    for (let i = 0; i < hand.length; i++) {
+      if (hand[i] !== BEAR_RIDER_NAME) continue;
+      kopien++;
+      if (engine.effectiveCardLevel(cd, pi, { handIdx: i }) === 0) return true;
+    }
+    if (kopien > 0) return false;
+    return Math.max(0, (cd?.level ?? BASE_LEVEL) - countFrozenTargets(engine)) === 0;
   },
 
   canActivateCreatureEffect(ctx) {

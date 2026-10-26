@@ -41,6 +41,12 @@ const TRIGGER_TYPES = new Set([
   'spell', 'support_spell', 'creature_effect',
 ]);
 
+// „Spell" heisst JEDE Schule: Schaden von Decay-/Magic-Arts-Zaubern (`'decay_spell'`, `'magic_arts_spell'` — Butterfly Cloud, Zombified Assault …) stand
+// nicht in der Menge und loeste den Rueckstoss nie aus. Schadenstypen von Zaubern tragen das Suffix `_spell` (CARD_API „Schadenstypen").
+function istAusloeserTyp(type) {
+  return TRIGGER_TYPES.has(type) || (typeof type === 'string' && /_spell$/.test(type));
+}
+
 module.exports = {
   activeIn: ['support'],
   canSummon: gigantisaursCanSummon,
@@ -83,7 +89,7 @@ module.exports = {
         if (!anyName(target, (n) => isGigantisaurCreature(n, engine))) continue;
         // Damage type qualifies.
         const type = e.type || 'normal';
-        if (!TRIGGER_TYPES.has(type)) continue;
+        if (!istAusloeserTyp(type)) continue;
 
         const src = e.source;
         if (!src) continue;
@@ -134,15 +140,14 @@ module.exports = {
         if (!confirmed) return;
 
         // Pay the discard cost. If it fails (race), bail.
-        const handBefore = ps.hand.length;
-        await engine.actionPromptForceDiscard(pi, 1, {
+        // ★ W74c: von Boris erlassene Kosten gelten als bezahlt.
+        const kosten = await engine.zahleAbwurfKosten(pi, 1, {
       costFor: CARD_NAME,          // ★ v1041: Kosten-Abwurf-Lernkanal
       costKind: 'protect',
           title: CARD_NAME,
           source: CARD_NAME,
-          selfInflicted: true,
         });
-        if (ps.hand.length >= handBefore) return;
+        if (!kosten.bezahlt) return;
 
         // Claim the HOPT.
         if (!gs.hoptUsed) gs.hoptUsed = {};

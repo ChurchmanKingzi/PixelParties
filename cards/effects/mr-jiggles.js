@@ -11,6 +11,8 @@ const DAMAGE    = 100;
 
 module.exports = {
   creatureEffect: true,
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status): der Effekt WÄHLT Ziele.
 
   canActivateCreatureEffect() { return true; },
 
@@ -55,6 +57,7 @@ module.exports = {
     // 100 Schaden auf jedes" ist ein Schlag auf mehrere Ziele.
     await engine.beginAoeStrike(targets.length, {
       creatures: targets.filter(t => t.type !== 'hero').map(t => t.cardInstance).filter(Boolean),
+      heroes: targets.filter(t => t.type === 'hero'),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
       source: { name: CARD_NAME, owner: pi, heroIdx },
       amount: DAMAGE, type: 'creature', sourceOwner: pi,
     });

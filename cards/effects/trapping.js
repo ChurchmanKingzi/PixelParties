@@ -5,9 +5,15 @@
 //  Trapping level. Place it face-down in a
 //  free Surprise Zone (or Bakhm Support Zone).
 //  Opponent can see it (knownToOpponent).
+//
+//  Als Entscheidung (Al): LEVELLOSE Surprises (Level null, z. B. Shield of Wisdom — Artifact-Surprise)
+//  sind mit Trapping („lv 1 or lower Surprise") NICHT holbar: ohne Level gibt es kein „Level ≤ N".
 // ═══════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
+
+/** Hat die Karte ein gedrucktes Level? (Trapping holt nur Surprises mit Level ≤ Stufe; Level null = nicht holbar.) */
+const hatLevel = (cd) => cd?.level != null;
 
 module.exports = {
   activeIn: ['ability'],
@@ -38,6 +44,7 @@ module.exports = {
     for (const cn of (deckPs.mainDeck || [])) {
       const cd = cardDB[cn];
       if (!cd || (cd.subtype || '').toLowerCase() !== 'surprise') continue;
+      if (!hatLevel(cd)) continue;   // levellose Surprises (Shield of Wisdom) sind nicht holbar
       if (engine.effectiveCardLevel(cd, aktivierer) > level) continue;
       if (onlyCreatures && cd.cardType !== 'Creature') continue;
       return true; // At least one eligible surprise exists
@@ -75,6 +82,7 @@ module.exports = {
       if (seen.has(cn)) continue;
       const cd = cardDB[cn];
       if (!cd || (cd.subtype || '').toLowerCase() !== 'surprise') continue;
+      if (!hatLevel(cd)) continue;   // levellose Surprises (Shield of Wisdom) sind nicht holbar
       if (engine.effectiveCardLevel(cd, activator) > level) continue;
       if (onlyCreatures && cd.cardType !== 'Creature') continue;
       seen.add(cn);

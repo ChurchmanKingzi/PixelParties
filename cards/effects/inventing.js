@@ -14,6 +14,7 @@
 
 // v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
 const { baseCardName } = require('./_hooks');
+const { searchBlocked } = require('./_search-shared');
 
 const CARD_NAME = 'Inventing';
 
@@ -33,6 +34,7 @@ module.exports = {
     if (level >= 3) {
       const engine = ctx._engine;
       const pi     = ctx.cardOwner;
+      if (searchBlocked(engine, pi)) return false;   // Such-Template ②: unter der Deck-Such-Sperre nicht anbieten (der Abwurf waere umsonst)
       // W16f (M01-09): es muss eine Handkarte H (die abgeworfen wird) und eine Deckkarte D mit anderem Namen geben (D != H) -
       // vorher verlangte der Test eine Deckkarte, deren Name auf KEINER Handkarte steht (`|| cn !== cn` war immer falsch).
       const handNames = [...new Set(ps.hand)];
@@ -59,6 +61,8 @@ module.exports = {
       // taught to participate in `_batchDiscardCount` when inside a
       // `withDiscardBatch` wrapper; the wrapper fires
       // `onForcedDiscardBatchEnd` once with the aggregate count.
+      const borisGate = engine.borisStapel(pi, { source: CARD_NAME, skipVoidsEffect: maxDiscard > 1 });
+      let borisVerzichtet = false;
       const count = await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
         let n = 0;
         for (let i = 0; i < maxDiscard; i++) {
@@ -76,7 +80,15 @@ module.exports = {
           if (!result || result.cancelled) break;
           const { cardName, handIndex } = result;
           if (cardName === undefined || handIndex === undefined) break;
-          const ok = /* v1324: Boris darf auch Abwurf-KOSTEN ignorieren — der Effekt laeuft dann ohne Abwurf */ (await engine.borisVerzicht(pi, 1, { source: CARD_NAME })) || await engine.actionDiscardHandCard(pi, cardName, handIndex, {
+          // v1324: Boris darf auch Abwurf-KOSTEN ignorieren. ★ W74c: EINE Frage für den ganzen Stapel (`borisStapel`, vorher je Karte), und die
+          // Lv2-Zahl „draw THAT MANY" hängt an den tatsächlich abgeworfenen Karten: Verzicht → 0 (vorher zog der Verzicht-Abwurf trotzdem mit;
+          // Lv1 „discard a card to draw a card" hat feste Kosten — Boris macht sie gratis, der Zug bleibt).
+          if (await borisGate(1)) {
+            borisVerzichtet = true;
+            if (maxDiscard === 1) n++;
+            break;
+          }
+          const ok = await engine.actionDiscardHandCard(pi, cardName, handIndex, {
             source: CARD_NAME,
           });
           if (!ok) break;
@@ -85,7 +97,7 @@ module.exports = {
         return n;
       });
 
-      if (count === 0) return false;
+      if (count === 0) return borisVerzichtet;   // W74c: bei Boris-Verzicht (Lv2) ist die Fähigkeit aktiviert — mit 0 Karten
 
       engine.log('inventing_discard_draw', { player: ps.username, level, count });
       engine.sync();
@@ -96,6 +108,8 @@ module.exports = {
     }
 
     // ── Lv3: discard 1 → search for a different-named card ──────────────
+
+    if (searchBlocked(engine, pi)) return false;   // Such-Template ②: Kosten erst, wenn die Suche moeglich ist
 
     // Pick 1 card to discard (cancellable)
     const discardResult = await engine.promptGeneric(pi, {
@@ -111,7 +125,9 @@ module.exports = {
     if (discardName === undefined || handIndex === undefined) return false;
     // v1394: Abwurf über die zentrale Funktion (Flug, Log, onDiscard,
     // Instanz, Stapel-Besitzer) statt Splice + Hand-Hook.
-    if (!(await engine.actionDiscardHandCard(pi, discardName, handIndex, { source: 'Inventing', _noGlow: true }))) return false;
+    // ★ W74c: Lv3 hatte kein Boris-Fenster. Boris macht die festen Kosten gratis — die Suche läuft weiter (die Karte bleibt auf der Hand).
+    if (!(await engine.borisVerzicht(pi, 1, { source: CARD_NAME }))
+        && !(await engine.actionDiscardHandCard(pi, discardName, handIndex, { source: 'Inventing', _noGlow: true }))) return false;
 
     // Build gallery: deck cards whose name differs from the discarded card
     const cardDB = engine._getCardDB();

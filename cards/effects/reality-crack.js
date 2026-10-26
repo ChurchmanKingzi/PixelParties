@@ -11,6 +11,9 @@
 //  is higher than the user's Magic Arts level.
 //  This counts as an additional Action. You cannot
 //  play another Area for the rest of this turn.
+//
+//  Als Ruling (Al 26.10.): die Area-Wahl nach dem Abräumen ist Pflichtwahl (Galerie nicht abbrechbar), sobald mindestens eine passende Area
+//  in Hand oder Deck liegt.
 // ═══════════════════════════════════════════
 
 const { placePollutionTokens } = require('./_pollution-shared');
@@ -101,16 +104,17 @@ module.exports = {
       }
 
       // ── Step 3: pick the Area ──
+      // Als Ruling (Al 26.10.): „Pflichtwahl" — die Areas sind schon abgeräumt (Schritt 1), der Text sagt „choose": gibt es mindestens eine passende Area,
+      // ist die Galerie NICHT abbrechbar (kein Ablehnen der neuen Area). Ohne passende Area gibt es gar keine Frage (s. o.).
       const picked = await engine.promptGeneric(pi, {
         type: 'cardGallery',
         cards: gallery,
         title: 'Reality Crack',
         description: 'Choose a level 3 or lower Area from your hand or deck to bring into play.',
-        cancellable: true,
+        cancellable: false,
       });
-      if (!picked || picked.cancelled) {
-        // The wipe already happened; the player can still decline the bring-
-        // in. Additional Action still applies.
+      if (!picked || picked.cancelled || !picked.cardName) {
+        // Sicherheitsnetz (der Client kann nicht abbrechen; CPU/Zeitüberschreitung ohne Antwort): die Areas sind weg, die Zusatzaktion bleibt.
         gs._spellFreeAction = true;
         engine.sync();
         return;

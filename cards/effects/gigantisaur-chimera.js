@@ -170,12 +170,17 @@ module.exports = {
     // until every tribute is in the pile before resolving — matches
     // the engine-wide "discards first, reactors after" ordering.
     return await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
+      // ★ Abbruchregel (CARD_API „Auftritt/Kosten erst nach dem Commit"): erst ALLE drei Wahlen treffen (jede abbrechbar), dann erst abwerfen —
+      // vorher blieben bei „Back" in der 2./3. Wahl die schon abgeworfenen Gigantisaurs in der Ablage, ohne dass Chimera kam.
       const discardedNames = new Set();
-      let discarded = 0;
-      while (discarded < 3) {
+      const picks = [];   // { name, handIndex } — Handindizes gelten, solange noch nichts abgeworfen ist
+      while (picks.length < 3) {
         const eligibleIndices = [];
+        // ★ W77b (Al: „Eine Karte selbst zählt NIE als legales Abwurf-Material für ihre eigenen Kosten"): der Platz der aufzulösenden Chimera wird JE WAHL neu bestimmt —
+        // `resolvingIdx` (oben, einmal) wird nach dem ersten Tribut falsch (die Hand rückt zusammen) und ließ die Chimera als 2./3. Tribut sich selbst abwerfen.
+        const ohneAufl = new Set(engine._handIndizesOhneAufloesende(ps));
         for (let i = 0; i < (ps.hand || []).length; i++) {
-          if (i === resolvingIdx) continue;
+          if (!ohneAufl.has(i)) continue;
           const cn = ps.hand[i];
           if (!isGigantisaurCreature(cn, engine)) continue;
           if (discardedNames.has(cn)) continue;
@@ -183,7 +188,7 @@ module.exports = {
         }
         if (eligibleIndices.length === 0) return false;
 
-        const remaining = 3 - discarded;
+        const remaining = 3 - picks.length;
         const result = await engine.promptGeneric(pi, {
           type: 'forceDiscardCancellable',
           title: CARD_NAME,
@@ -195,12 +200,21 @@ module.exports = {
         });
         if (!result || result.cancelled || result.cardName == null) return false;
 
-        const ok = await engine.actionDiscardHandCard(pi, result.cardName, result.handIndex, {
+        // ★ W74c: Boris darf auch diese Abwurf-KOSTEN der Beschwörung („sending 3 Gigantisaur … to the discard pile") ignorieren — einmal nach der ersten
+        // Wahl, vor dem ersten Abwurf. Feste Kosten: Verzicht = die Beschwörung gilt als bezahlt, alle Karten bleiben auf der Hand.
+        if (picks.length === 0 && await engine.borisVerzicht(pi, 3, { source: CARD_NAME })) return true;
+
+        picks.push({ name: result.cardName, handIndex: result.handIndex });
+        discardedNames.add(result.cardName);
+      }
+
+      // Alle drei Wahlen stehen: jetzt zahlen (absteigende Handindizes, damit die übrigen Indizes gültig bleiben).
+      picks.sort((a, b) => (b.handIndex ?? -1) - (a.handIndex ?? -1));
+      for (const pick of picks) {
+        const ok = await engine.actionDiscardHandCard(pi, pick.name, pick.handIndex, {
           source: CARD_NAME,
         });
         if (!ok) return false;
-        discardedNames.add(result.cardName);
-        discarded++;
 
         // Bloodier dino-bite on the Chimera's arrival zone — same
         // jaw visual Spinor / Trex use, but in gore mode (deeper
@@ -257,6 +271,7 @@ module.exports = {
   },
 
   creatureEffect: true,
+  requiresTarget: true,   // Zielwahl-Effekt: Blinded sperrt ihn (siehe _hooks.js / getActivatableCreatures)
 
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;

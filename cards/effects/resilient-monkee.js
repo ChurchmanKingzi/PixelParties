@@ -60,6 +60,7 @@ module.exports = {
   // anderen drei nicht: die Zweitfaehigkeiten aus v343 waren deshalb
   // unausloesbar.
   creatureEffect: true,
+  requiresTarget: true,   // Zielwahl-Effekt („choose a Monkee Creature"): Blinded sperrt ihn (siehe _hooks.js / getActivatableCreatures)
 
   hooks: {
     afterResourceGain: async (ctx) => {

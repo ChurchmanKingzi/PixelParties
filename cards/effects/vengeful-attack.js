@@ -45,6 +45,9 @@ function istRacheziel(engine, pi, t) {
 }
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // „This counts as an additional Action." — immer.
   inherentAction: true,
   // Wie jede Attack, die einen Gegner trifft: gegen den durch die Erstrunden-Immunität geschützten Spieler gibt es nichts zu rächen (und nichts, was getroffen werden könnte).

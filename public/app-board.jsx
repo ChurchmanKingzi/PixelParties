@@ -9755,6 +9755,135 @@ const SpyMarkEffect = (() => {
   return ppPunktBild(malen, ENDE + 40, 200, 260);
 })();
 
+// ═════════════════════════════════════════════════════════════════
+//  Infallible Oracle Pythia: grüne Flammen (`pythia_flames`) — PIXELART, Hülle `ppPunktBild`; Vorlage: das Kartenbild (grünhaarige Seherin zwischen vier grünen Flammenschalen)
+//
+//  Vier Steinschalen mit spitzen grünen Flammen (hell-grüner Kern, grüne Mitte, dunkelgrüner Rand; je Schale drei Zungen, die in ganzen Pixeln flackern) umringen die Karte; Funken steigen auf.
+//  `phase` (Feld des Ereignisses; ohne Angabe = 'doom'):
+//   • 'doom' (~1500 ms, der Tod ist besiegelt): die Schalen erscheinen (Dither), die Flammen wachsen in Stufen, lodern, schlagen bei ~1150 ms über der Karte zusammen (Blitzkreuz, grüner Dither über der
+//     Karte) und fallen in sich zusammen — genau dann wird das Ziel besiegt;
+//   • 'burn' (~1100 ms, ein Opfer verbrennt): wie 'doom', ohne Schalen-Blitz, kürzer;
+//   • 'mark' (~900 ms, Ziel gewählt): vier kleine Flammen flackern kurz auf und dithern weg;
+//   • 'tick' (~650 ms, Pythia legt einen Counter): ein einzelnes Flämmchen über ihr;
+//   • 'save' (~1000 ms, Selbstheilung): die Flammen steigen um Pythia auf und ziehen in einem grünen Funkenkranz in sie hinein.
+//  Feste Palette (Grün aus den Flammenschalen, Grau der Schalen), Bayer-Dither statt Alpha, kein Leuchten, ~30 Bilder/s.
+// ═════════════════════════════════════════════════════════════════
+const PythiaFlamesEffect = (() => {
+  const FLAMME = ['#b3f9cf', '#75f091', '#4ceb70', '#20ac37', '#167927'].map(ppHex);
+  const FUNKE = ['#b3f9cf', '#4ceb70', '#20ac37'].map(ppHex);
+  const SCHALE = { k: ppHex('#282834'), d: ppHex('#59606e'), m: ppHex('#9aa3b6'), l: ppHex('#d2d2db') };
+  const WEISS = ppHex('#ffffff');
+  const ENDE = 1500;
+  const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  // Steinschale 12 × 5: heller Rand, dunkler Bauch, Standfuß
+  const BOWL = ['.kllllllllk.', 'kmmmmmmmmmmk', '.kdmmmmmmdk.', '..kdddddkk..', '...kkkkkk...'];
+  // Eine Flammenzunge: Fuß (bx, by) = Mitte unten, Höhe H, Breite W; Spitze schwankt, der Rand franst in ganzen Pixeln aus.
+  const zunge = (g, bx, by, H, W, t, seed, a, heiss) => {
+    if (H < 2 || a <= 0) return;
+    const fr = Math.floor(t / 66);
+    for (let r = 0; r < H; r++) {
+      const f = r / H;
+      const prof = f < 0.28 ? 0.72 + 0.28 * (f / 0.28) : Math.pow(Math.max(0, 1 - (f - 0.28) / 0.72), 0.9);
+      const sway = Math.round(Math.sin(t / 120 + seed * 2.3 + f * 3.4) * f * W * 0.24);
+      let hw = Math.round((W / 2) * prof);
+      if (ppHash(r, seed, fr) < 0.28) hw -= 1;                        // ausgefranster Rand
+      if (hw < 0) continue;
+      const y = Math.round(by - r);
+      for (let x = -hw; x <= hw; x++) {
+        const d = Math.abs(x) / (hw + 0.6);
+        const v = heiss - 0.35 + f * 1.3 + d * 2.5 + (ppHash(x + seed * 7, r, fr) - 0.5) * 0.55;
+        g.put(bx + x + sway, y, ppStufe(FLAMME, v, bx + x + sway, y), a);
+      }
+    }
+  };
+  // Eine Schale samt Flamme (drei Zungen: hoch in der Mitte, zwei kürzere an den Seiten)
+  const schale = (g, x, y, H, t, seed, a, mitSchale, heiss) => {
+    if (mitSchale) ppSprite(g, x, y - 2, BOWL, SCHALE, a);
+    const by = y - 4;
+    zunge(g, x, by, H, 7, t, seed, a, heiss);
+    zunge(g, x - 3, by, Math.round(H * 0.6), 4, t + 90, seed + 1, a, heiss + 0.3);
+    zunge(g, x + 3, by, Math.round(H * 0.72), 4, t + 40, seed + 2, a, heiss + 0.3);
+  };
+  const vorbereiten = (sz) => ({
+    funken: Array.from({ length: 16 }, (_, i) => ({
+      s: i % 4, dx: (Math.random() - 0.5) * 7, v: 20 + Math.random() * 22, start: Math.random() * 700, leben: 380 + Math.random() * 260,
+    })),
+  });
+  const malen = (g, t, sz, teile) => {
+    const ph = sz.phase || 'doom';
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy), hw = sz.hw, hh = sz.hh;
+    const hoch = Math.round(hh * 1.45);
+    // Standorte der vier Schalen: außen tief, innen vor dem unteren Kartenrand (wie auf dem Kartenbild)
+    const orte = [
+      { x: cx - Math.round(hw + 7), y: cy + Math.round(hh * 0.85) },
+      { x: cx + Math.round(hw + 7), y: cy + Math.round(hh * 0.85) },
+      { x: cx - Math.round(hw * 0.5 + 1), y: cy + Math.round(hh * 1.0) },
+      { x: cx + Math.round(hw * 0.5 + 1), y: cy + Math.round(hh * 1.0) },
+    ];
+    if (ph === 'tick') {
+      if (t > 650) return;
+      const aus = t > 400 ? 1 - (t - 400) / 250 : 1;
+      const grow = Math.floor(klemme(t / 200, 0, 1) * 4) / 4;
+      schale(g, cx, cy - Math.round(hh * 0.55), Math.round(11 * grow), t, 3, aus, false, 0);
+      return;
+    }
+    if (ph === 'mark') {
+      if (t > 900) return;
+      const aus = t > 520 ? 1 - (t - 520) / 380 : 1;
+      const grow = Math.floor(klemme(t / 220, 0, 1) * 5) / 5;
+      orte.forEach((o, i) => schale(g, o.x, o.y, Math.round(hoch * 0.5 * grow), t, i * 3, aus, false, 0.4));
+      return;
+    }
+    if (ph === 'save') {
+      if (t > 1000) return;
+      const grow = Math.floor(klemme(t / 300, 0, 1) * 6) / 6;
+      const zieh = t > 400 ? klemme((t - 400) / 260, 0, 1) : 0;          // ab 400 ms ziehen die Flammen zur Kartenmitte und schrumpfen
+      const aus = t > 700 ? 1 - (t - 700) / 300 : 1;
+      orte.forEach((o, i) => {
+        const x = Math.round(o.x + (cx - o.x) * zieh), y = Math.round(o.y + (cy + hh * 0.3 - o.y) * zieh);
+        schale(g, x, y, Math.round(hoch * grow * (1 - 0.7 * zieh)), t, i * 3, aus, false, 0.1);
+      });
+      if (t > 420 && t < 760) {                                          // grüner Funkenkranz um die Karte, kreist einwärts
+        for (let k = 0; k < 10; k++) {
+          const w = (k / 10) * Math.PI * 2 + t / 160, rr = (1 - klemme((t - 420) / 340, 0, 1)) * (hw + 9) + 2;
+          g.block(cx + Math.cos(w) * rr, cy + Math.sin(w) * rr * (hh / hw) * 0.8, 2, 2, FUNKE[k % 3], aus);
+        }
+        if (t > 560 && t < 680) ppKreuzfunkel(g, cx - 1, cy - 1, Math.floor((t - 560) / 40) + 1 > 3 ? 2 : Math.floor((t - 560) / 40) + 1, FUNKE.concat([FUNKE[2]]), 1);
+      }
+      return;
+    }
+    // 'doom' und 'burn'
+    const doom = ph !== 'burn';
+    const ende = doom ? 1500 : 1100, vorbei = doom ? 1150 : 700;          // ab `vorbei` fällt alles in sich zusammen
+    if (t > ende) return;
+    const ein = klemme(t / 200, 0, 1);
+    const grow = Math.floor(klemme((t - 100) / 330, 0, 1) * 6) / 6;
+    const zu = t > vorbei ? klemme((t - vorbei) / (ende - vorbei), 0, 1) : 0;
+    const aus = zu > 0 ? 1 - zu : 1;
+    const hf = grow * (1 - 0.8 * zu);
+    orte.forEach((o, i) => {
+      const x = Math.round(o.x + (cx - o.x) * zu * 0.5);
+      schale(g, x, o.y, Math.round(hoch * hf), t, i * 3 + 1, ein < 1 ? Math.floor(ein * 5) / 5 : aus, zu < 0.6, 0);
+    });
+    // Funken steigen von den Schalen auf
+    for (const f of teile.funken) {
+      const k = (t - f.start) / f.leben;
+      if (k < 0 || k >= 1 || t > vorbei + 100) continue;
+      const o = orte[f.s];
+      g.block(o.x + f.dx, o.y - 6 - f.v * (t - f.start) / 1000, 2, 2, FUNKE[Math.min(2, Math.floor(k * 3))], 1 - k);
+    }
+    if (doom && t >= vorbei - 40 && t < vorbei + 160) {                  // die Flammen schlagen über der Karte zusammen: Blitzkreuz + grüner Dither über dem Ziel
+      const f2 = Math.floor((t - (vorbei - 40)) / 33);
+      const w = Math.round(hw), h = Math.round(hh);
+      for (let y = -h; y <= h; y++) for (let x = -w; x <= w; x++) {
+        if ((x + y + f2) % 2 === 0) g.put(cx + x, cy + y, FLAMME[1 + (f2 % 2)], 0.45);
+      }
+      ppKreuzfunkel(g, cx - 1, cy - 1, f2 < 2 ? 4 : 6 - f2, FUNKE.concat([FUNKE[2]]), 1);
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 300, 340, vorbereiten);
+})();
+
 // ═══════════════════════════════════════════════════════════════════
 //  Glass Wall (12.10.) — PIXELART, Held-Animation (`glass_wall_up`, `glass_wall_shatter`; Ursprung = die Heldenzone, `x`/`y` Mitte, `w`/`h` Kartengrösse)
 //
@@ -11130,7 +11259,7 @@ const UncoolSmokeEffect = (() => {
 //     schnellt auf (200–330 ms, Überschwinger bis ~1,6 Kartenhöhen), schwingt gedämpft aus; gelbe Kreuzfunkel am Kopf, Fahrtlinien seitlich. Ab ~560 ms dithert alles weg.
 //  bounce_burst (560 ms, an der Startzone der Rückkehr): Staubring, zehn Fahrtstrahlen, Staubpixel.
 //  Flugstil `schleuder` (ppSchleuderFlug): die Karte holt kurz aus (rückwärts), wird mit viel Schwung zur Hand geschleudert (ease-out in ganzen 3-Pixel-Schritten) und federt am Ziel nach.
-//  cosmic_explosion (1000 ms, auf dem Totenkopf): weißer Blitz, ein schwarzes Dimensionsloch (gedithertes Violett am Rand, Sternenstaub darin) reißt auf und verschluckt die Karte, neun
+//  cosmic_explosion (1000 ms, auf dem Totenkopf): runder weißer Blitz (kein Kasten), ein schwarzes Dimensionsloch (gedithertes Violett am Rand, Sternenstaub darin) reißt auf und verschluckt die Karte, neun
 //     zackige Risse laufen quer über das Brett, drei Druckringe, Trümmer; ab ~720 ms schließt sich das Loch.
 //  water_burst (760 ms, auf dem Ziel): weißer Blitz, Wasserkuppel, Spritzkrone aus 22 Tropfen mit Schwerkraft, zwei Ringwellen, Schaumpixel.
 //  Wasserprojektil (`WasserGeschoss`): wabbelnde Wasserkugel mit Tropfenschweif, Wirbelpixel und Spritzern; die Explosion am Ziel ist `water_burst`.
@@ -11249,11 +11378,6 @@ const CosmicExplosionEffect = (() => {
     const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
     const aus = t > 880 ? Math.max(0, 1 - (t - 880) / 120) : 1;
     if (aus <= 0) return;
-    // Blitzraster über der ganzen Fläche
-    if (t < 130) {
-      const a = (1 - t / 130) * 0.55;
-      for (let Y = 0; Y < sz.gh; Y++) for (let X = 0; X < sz.gw; X++) if (ppBayer(X, Y) < a) g.put(X, Y, P[t < 50 ? 1 : 3], 1);
-    }
     // Druckringe
     for (let i = 0; i < 3; i++) {
       const s0 = 90 + i * 120, e = (t - s0) / 520;
@@ -11313,7 +11437,14 @@ const CosmicExplosionEffect = (() => {
       }
     }
     // Weißer Kern am Anfang
-    if (t < 160) g.block(cx - 7, cy - 7, 14, 14, t < 60 ? P[0] : P[1], 1 - t / 160);
+    if (t < 200) {                                                       // runder Blitz (kein Kasten): weißer Kern mit gedithertem Hof
+      const r = 4 + (t / 200) * 16;
+      for (let dy = -Math.ceil(r); dy <= Math.ceil(r); dy++) for (let dx = -Math.ceil(r); dx <= Math.ceil(r); dx++) {
+        const d = Math.hypot(dx, dy);
+        if (d <= r * 0.6) g.put(cx + dx, cy + dy, P[0], 1 - t / 220);
+        else if (d <= r) g.put(cx + dx, cy + dy, t < 90 ? P[1] : P[2], (1 - t / 200) * 0.6);
+      }
+    }
     // Trümmer
     if (t > 90) {
       const tt = (t - 90) / 1000;
@@ -11478,6 +11609,124 @@ function WasserGeschoss({ p }) {
     </div>
   );
 }
+
+// ═════════════════════════════════════════════════════════════════
+//  WELLE 79 (26.10.) — Night Mare (`black_flames`) und Little Lyta (`pink_hearts`) — PIXELART (ppPunktBild)
+//
+//  black_flames (1300 ms, auf dem Ziel): schwarze Flammen lodern rund um den Kartenrand — Körper schwarz, Kern dunkelviolett, die Spitzen violett glimmend (Bayer-Dither an den
+//     Stufen); die Karte verkohlt unter einem schwarzen Dither-Schleier; schwarz-violette Glut steigt auf. Der Schaden fällt, wenn sie am höchsten stehen (~650 ms).
+//  pink_hearts (1500 ms, auf dem Ziel): ein rosa Dither-Blitz über der Karte, dann steigen lauter pinke Herzchen in zwei Größen schwankend rund um das Ziel auf und
+//     lösen sich gedithert auf; zwischendurch poppen weiße Funkelkreuze.
+// ═════════════════════════════════════════════════════════════════
+const BlackFlamesEffect = (() => {
+  const P = ['#08060c', '#170b28', '#2e0a51', '#50008c', '#702db3', '#9544d5', '#d6b3f9'].map(ppHex);
+  const ENDE = 1300, FADE_AB = 950;
+  const vorbereiten = (sz) => {
+    const umfang = (sz.hw * 2 + sz.hh * 2) * 2;
+    return {
+      zungen: Array.from({ length: 30 }, (_, i) => ({ u: (i / 30) * umfang, h: 22 + Math.random() * 22, ph: Math.random() * 6.28, v: 0.8 + Math.random() * 1.1, br: 3 + Math.floor(Math.random() * 3) })),
+      glut: Array.from({ length: ppFxN(30) }, () => ({ x: (Math.random() - 0.5) * (sz.hw * 2 + 22), v: 16 + Math.random() * 30, start: Math.random() * 800, drift: (Math.random() - 0.5) * 10, gross: Math.random() < 0.3, hell: Math.random() < 0.3 })),
+    };
+  };
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy), hw = Math.ceil(sz.hw), hh = Math.ceil(sz.hh);
+    const wachs = Math.min(1, t / 520);
+    // Verkohlung: schwarzer Dither-Schleier über der Karte (wächst, hält, geht mit dem Ausblenden)
+    const dichte = 0.5 * Math.min(1, t / 600) * aus;
+    for (let Y = -hh; Y < hh; Y++) for (let X = -hw; X < hw; X++) if (ppBayer(X + 64, Y + 64) < dichte) g.put(cx + X, cy + Y, P[0], 1);
+    // Flammen am Kartenrand
+    const u2 = (sz.hw * 2 + sz.hh * 2) * 2;
+    for (const z of teile.zungen) {
+      const wob = Math.sin(t / 80 * z.v + z.ph);
+      const hoch = Math.round(z.h * (0.7 + 0.3 * wob) * wachs);
+      let u = z.u % u2, px, py;
+      if (u < sz.hw * 2) { px = cx - hw + u; py = cy + hh; }
+      else if ((u -= sz.hw * 2) < sz.hh * 2) { px = cx + hw; py = cy + hh - u; }
+      else if ((u -= sz.hh * 2) < sz.hw * 2) { px = cx + hw - u; py = cy - hh; }
+      else { u -= sz.hw * 2; px = cx - hw; py = cy - hh + u; }
+      for (let j = 0; j < hoch; j++) {
+        const k = j / Math.max(1, hoch);
+        const breite = Math.max(1, Math.round(z.br * Math.pow(1 - k, 0.8)) + (j < 3 ? 1 : 0));
+        const versatz = Math.round(Math.sin(j / 3.2 + t / 95 + z.ph) * (1 + k * 1.5));
+        for (let b = -Math.floor(breite / 2); b <= Math.floor(breite / 2); b++) {
+          const x = px + b + versatz, y = py - j;
+          const w = k + (ppBayer(x, y) - 0.5) * 0.4;
+          // Körper schwarz, Kern dunkelviolett, Spitze violett glimmend
+          let c;
+          if (w > 0.86) c = P[5];
+          else if (w > 0.72) c = P[4];
+          else if (w > 0.5) c = (Math.abs(b) <= breite / 3) ? P[2] : P[1];
+          else c = (Math.abs(b) <= breite / 4 && w < 0.3) ? P[2] : P[0];
+          g.put(x, y, c, aus);
+        }
+      }
+    }
+    // Glut (schwarz-violett, vereinzelt hell)
+    for (const e of teile.glut) {
+      const tt = (t - e.start) / 1000; if (tt < 0 || tt > 1.2) continue;
+      const x = cx + e.x + e.drift * tt, y = cy + hh - e.v * tt * 1.7;
+      g.block(x, y, e.gross ? 2 : 1, e.gross ? 2 : 1, e.hell ? P[6] : P[4], aus * (1 - tt / 1.2));
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 300, 340, vorbereiten);
+})();
+
+const PinkHeartsEffect = (() => {
+  const P = ['#ffffff', '#f3bad3', '#f8b4df', '#fc69c6', '#c80480', '#5a023a'].map(ppHex);
+  const ENDE = 1500, FADE_AB = 1100;
+  const KLEIN = ['.X.X.', 'XXXXX', 'XXXXX', '.XXX.', '..X..'];
+  const GROSS = ['.XX.XX.', 'XXXXXXX', 'XXXXXXX', 'XXXXXXX', '.XXXXX.', '..XXX..', '...X...'];
+  /** Herz in ganzen Pixeln: Körper rosa, Rand dunkel, Glanz oben links. */
+  const herz = (g, x0, y0, muster, a) => {
+    const h = muster.length, w = muster[0].length;
+    const voll = (i, j) => j >= 0 && j < h && i >= 0 && i < w && muster[j][i] === 'X';
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+      if (!voll(i, j)) continue;
+      const rand = !voll(i - 1, j) || !voll(i + 1, j) || !voll(i, j - 1) || !voll(i, j + 1);
+      let c = rand ? P[4] : P[3];
+      if (!rand && (i + j) <= 3 && j <= 1) c = P[1];
+      else if (!rand && (i + j) <= 4 && j <= 2) c = P[2];
+      g.put(x0 + i, y0 + j, c, a);
+    }
+  };
+  const vorbereiten = (sz) => ({
+    herzen: Array.from({ length: ppFxN(26) }, (_, i) => ({
+      x: (Math.random() - 0.5) * (sz.hw * 2 + 30), y0: (Math.random() - 0.3) * sz.hh * 1.4, v: 26 + Math.random() * 30, start: Math.random() * 700,
+      sw: 3 + Math.random() * 5, ph: Math.random() * 6.28, gross: Math.random() < 0.4, leben: 700 + Math.random() * 300,
+    })),
+    sterne: Array.from({ length: 8 }, () => ({ x: (Math.random() - 0.5) * (sz.hw * 2 + 40), y: (Math.random() - 0.5) * sz.hh * 2.2, start: 250 + Math.random() * 900, leben: 360 })),
+  });
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy), hw = Math.ceil(sz.hw), hh = Math.ceil(sz.hh);
+    // rosa Dither-Blitz über der Karte
+    if (t < 260) {
+      const dichte = (1 - t / 260) * 0.7;
+      for (let Y = -hh; Y < hh; Y++) for (let X = -hw; X < hw; X++) if (ppBayer(X + 32, Y + 32) < dichte) g.put(cx + X, cy + Y, t < 90 ? P[1] : P[2], 1);
+    }
+    // aufsteigende Herzen
+    for (const h of teile.herzen) {
+      const tt = t - h.start;
+      if (tt < 0 || tt > h.leben) continue;
+      const k = tt / h.leben;
+      const x = cx + h.x + Math.sin(h.ph + tt / 160) * h.sw;
+      const y = cy + h.y0 - (h.v * tt) / 1000 * 1.9;
+      const a = k > 0.6 ? Math.max(0, 1 - (k - 0.6) / 0.4) : 1;
+      const m = h.gross ? GROSS : KLEIN;
+      herz(g, Math.round(x - m[0].length / 2), Math.round(y - m.length / 2), m, a * aus);
+    }
+    // Funkelkreuze
+    for (const s of teile.sterne) {
+      const k = (t - s.start) / s.leben;
+      if (k < 0 || k >= 1) continue;
+      ppKreuzfunkel(g, cx + s.x, cy + s.y, [1, 2, 3, 2, 1][Math.min(4, Math.floor(k * 5))], [P[0], P[1], P[2], P[3]], aus);
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 300, 340, vorbereiten);
+})();
 
 // ═════════════════════════════════════════════════════════════════
 //  WELLE 77 (25.10.) — REVENGE!!! (`revenge_rage`) und Grand Feast (`grand_feast`) — PIXELART
@@ -20284,6 +20533,8 @@ const ANIM_REGISTRY = {
   bounce_burst: BounceBurstEffect,
   cosmic_explosion: CosmicExplosionEffect,
   water_burst: WaterBurstEffect,
+  black_flames: BlackFlamesEffect,
+  pink_hearts: PinkHeartsEffect,
   grand_feast: GrandFeastEffect,
   reverse_trap_ton: ReverseTrapTonEffect,
   deadly_poison_heal: DeadlyPoisonHealEffect,
@@ -20303,6 +20554,7 @@ const ANIM_REGISTRY = {
   hand_level_down: HandLevelDownEffect,
   mind_control_hex: MindControlHexEffect,
   spy_mark: SpyMarkEffect,
+  pythia_flames: PythiaFlamesEffect,
   // ── Circles of Hell (Animationen) ──────────────────────────────────
   // Farben aus den Pixelart-Hintergruenden der Kreise (Flammen #f8f8bd … #520a0c).
   // ★ The Sixth Circle: Hoellen-Charme — blutrote Siegelringe, aufsteigende Schlieren, dunkler Blitz.
@@ -27834,6 +28086,106 @@ const ANIM_REGISTRY = {
     };
   })(),
   // ═══════════════════════════════════════════════════════════════════
+  //  Backstab (25.10.) — PIXELART, der Stich eines Schwerts aus Richtung des ausführenden Helden ins Ziel (Brett-Animation, Hülle `ppSalve`; Vorlage: das Kartenbild — das
+  //  grüne Schlangenwesen sticht mit dem Schwert zu)
+  //
+  //  Ein Pixel-Schwert (Kontur, dreistufige Klinge, goldene Parierstange, brauner Griff) erscheint gedithert vor dem Ziel, die Spitze auf das Ziel gerichtet und aus der Richtung des
+  //  ausführenden Helden (Ursprung → Ziel). Es holt in Stufen aus (~100–260 ms, ein Glanzpunkt läuft über die Klinge), verharrt kurz und STÖSST in zwei Bildern vor (Windstreifen);
+  //  Einschlag bei 330 ms: Kreuzfunkel an der Spitze, Aufblitzen der Zielkarte (hartes Dither-Raster), Funken und rote Spritzer fliegen mit Schwerkraft zurück entlang der Stichbahn. Das
+  //  Schwert zittert kurz im Ziel, wird zurückgezogen und dithert ab ~740 ms weg; ENDE 900. Bewegung nur in ganzen Pixeln im Bildtakt (~30 Bilder/s), feste Palette, KEIN Schein,
+  //  KEINE Drehung eines Kartenbildes (die Klinge ist pro Bild als Linie in Treppenstufen gezeichnet).
+  // ═══════════════════════════════════════════════════════════════════
+  backstab_stab: (() => {
+    const KONTUR = ppHex('#1a1a2e');
+    const STAHL = { W: ppHex('#ffffff'), L: ppHex('#e5edfa'), M: ppHex('#b4cff8'), D: ppHex('#7e7d9b') };   // Glanzkante, hell, mittel, dunkel
+    const GOLD = ppHex('#f9ac20'), GOLD_D = ppHex('#c68206'), GRIFF = ppHex('#7d3911'), GRIFF_D = ppHex('#4a2a10');
+    const FUNKEN = ['#ffffff', '#f9ecb3', '#fbc86a', '#e37435'].map(ppHex);
+    const BLUT = ['#e92f38', '#b5171c', '#8b0d0d'].map(ppHex);
+    const ENDE = 900, EINSCHLAG = 330, FADE_AB = 740;
+    const KLINGE = 17;                                                   // Klingenlänge in Rasterpixeln; danach Parierstange (2), Griff (4), Knauf (2)
+    // Halbbreite der Silhouette an Stelle i (0 = Spitze, wächst Richtung Griff)
+    const halbbreite = (i) => i < 0 ? -1 : i <= 2 ? 0 : i <= KLINGE ? 1 : i <= KLINGE + 2 ? 4 : i <= KLINGE + 6 ? 0 : i <= KLINGE + 8 ? 1 : -1;
+    // Das Schwert: Spitze (tx, ty), Stossrichtung (dx, dy) = Einheitsvektor Richtung Ziel; der Körper liegt hinter der Spitze.
+    const schwert = (g, tx, ty, dx, dy, a) => {
+      const nx = -dy, ny = dx, ENDE_I = KLINGE + 8;
+      const pt = (i, k) => [tx - dx * i + nx * k, ty - dy * i + ny * k];
+      for (let i = -1; i <= ENDE_I + 1; i++) {                           // Kontur zuerst (eine Stufe breiter als die Silhouette)
+        const hb = Math.max(halbbreite(i - 1), halbbreite(i), halbbreite(i + 1)) + 1;
+        for (let k = -hb; k <= hb; k++) { const [x, y] = pt(i, k); g.put(x, y, KONTUR, a); }
+      }
+      for (let i = 0; i <= ENDE_I; i++) {
+        const hb = halbbreite(i);
+        if (hb < 0) continue;
+        for (let k = -hb; k <= hb; k++) {
+          let c;
+          if (i <= KLINGE) c = k > 0 ? STAHL.W : k < 0 ? STAHL.D : (i > KLINGE - 5 ? STAHL.M : STAHL.L);
+          else if (i <= KLINGE + 2) c = (i === KLINGE + 1) ? GOLD : GOLD_D;
+          else if (i <= KLINGE + 6) c = ((i + k) % 2 === 0) ? GRIFF : GRIFF_D;
+          else c = (i === KLINGE + 7) ? GOLD : GOLD_D;
+          const [x, y] = pt(i, k);
+          g.put(x, y, c, a);
+        }
+      }
+    };
+    const vorbereiten = (sz) => ({
+      funken: sz.ziele.map(() => Array.from({ length: ppFxN(18) }, () => ({ w: Math.random() - 0.5, v: 18 + Math.random() * 42, leben: 240 + Math.random() * 230 }))),
+      blut: sz.ziele.map(() => Array.from({ length: ppFxN(10) }, () => ({ w: Math.random() - 0.5, v: 14 + Math.random() * 34, leben: 380 + Math.random() * 280, gross: Math.random() < 0.4 }))),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const ein = Math.min(1, (Math.floor(t / 25) + 1) / 4);              // gestuftes Einblenden (Dithering)
+      const a = Math.min(ein, aus);
+      sz.ziele.forEach((z, zi) => {
+        const dx = z.dx, dy = z.dy, nx = -dy, ny = dx;
+        // Abstand Kartenmitte → Kartenkante entlang der Stossrichtung
+        const rK = Math.min(Math.abs(dx) > 0.001 ? (z.w / 2) / Math.abs(dx) : 999, Math.abs(dy) > 0.001 ? (z.h / 2) / Math.abs(dy) : 999);
+        const stand = rK + 6, tief = rK * 0.2;
+        // Abstand der Spitze von der Kartenmitte (positiv = Quellseite): Ausholen in Stufen, Stoss in zwei Bildern, Einschlag, Zurückziehen
+        let td;
+        if (t < 100) td = stand;
+        else if (t < 260) td = stand + Math.min(8, Math.floor((t - 100) / 33) * 2);
+        else if (t < 297) td = stand + 8;
+        else if (t < EINSCHLAG) td = stand - 4;
+        else if (t < 560) td = tief;
+        else td = tief + Math.floor((t - 560) / 33) * 2;
+        // seitliches Zittern im Ziel (1 Pixel, im Bildtakt)
+        const zitter = (t >= EINSCHLAG && t < 430) ? (Math.floor(t / 33) % 2 === 0 ? 1 : -1) : 0;
+        const sx = z.x - dx * td + nx * zitter, sy = z.y - dy * td + ny * zitter;
+        // Windstreifen hinter dem Griff beim Stoss
+        if (t >= 297 && t < 365) for (let s = -1; s <= 1; s++) for (let i = KLINGE + 2; i < KLINGE + 9; i++) if ((i + s) % 2 === 0) g.put(sx - dx * i + nx * s * 3, sy - dy * i + ny * s * 3, STAHL.M, a * 0.7);
+        schwert(g, sx, sy, dx, dy, a);
+        // Glanzpunkt läuft beim Ausholen über die Klinge
+        if (t >= 200 && t < 297) {
+          const i = 2 + Math.floor(((t - 200) / 97) * (KLINGE - 3)), gx = Math.round(sx - dx * i), gy = Math.round(sy - dy * i);
+          g.put(gx, gy, STAHL.W, a); g.put(gx + 1, gy, STAHL.W, a); g.put(gx - 1, gy, STAHL.W, a); g.put(gx, gy + 1, STAHL.W, a); g.put(gx, gy - 1, STAHL.W, a);
+        }
+        if (t < EINSCHLAG) return;
+        const al = t - EINSCHLAG, hx = z.x - dx * tief, hy = z.y - dy * tief;   // Einschlagstelle (Spitze im Ziel)
+        // Zielkarte blitzt im Einschlag auf (hartes Dither-Raster, keine Überblendung)
+        if (al < 66) g.block(z.x - z.w / 2, z.y - z.h / 2, Math.ceil(z.w), Math.ceil(z.h), STAHL.W, 0.34 * (1 - al / 66) * aus);
+        // Kreuzfunkel an der Spitze
+        if (al < 120) ppKreuzfunkel(g, hx - 1, hy - 1, [4, 4, 3, 2, 1][Math.floor(al / 24)] || 1, FUNKEN, aus);
+        // Funken: spritzen zurück entlang der Stichbahn (Kegel um die Gegenrichtung), mit Schwerkraft
+        const basis = Math.atan2(-dy, -dx);
+        for (const f of teile.funken[zi]) {
+          if (al > f.leben) continue;
+          const k = al / f.leben, sek = al / 1000, w = basis + f.w * 2.7;
+          g.put(hx + Math.cos(w) * f.v * sek, hy + Math.sin(w) * f.v * sek + 70 * sek * sek, FUNKEN[Math.min(3, Math.floor(k * 4))], (1 - k * k) * aus);
+        }
+        // rote Spritzer: schwerer, 1×1 oder 2×2, fallen und verblassen im Raster
+        for (const b of teile.blut[zi]) {
+          if (al > b.leben) continue;
+          const k = al / b.leben, sek = al / 1000, w = basis + b.w * 2.2;
+          const px = hx + Math.cos(w) * b.v * sek, py = hy + Math.sin(w) * b.v * sek + 90 * sek * sek;
+          if (b.gross) g.block(px, py, 2, 2, BLUT[Math.min(2, Math.floor(k * 3))], (1 - k * 0.8) * aus);
+          else g.put(px, py, BLUT[Math.min(2, Math.floor(k * 3))], (1 - k * 0.8) * aus);
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 50 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
   //  Opfer-Messer — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!")
   //
   //  Prozedural auf einem kleinen Raster (Canvas, `image-rendering: pixelated`, ~33 Bilder/s), feste Palette,
@@ -32137,6 +32489,145 @@ const ANIM_REGISTRY = {
     });
   })(),
   // ═════════════════════════════════════════════════════════════════
+  //  Mean Cute Cat (25.10.) — PIXELART, drei schwarze Fledermäuse fangen den Schaden ab und tragen ihn zur Umleitungs-Kreatur (`ppSalve`; Vorlage: das Kartenbild — drei schwarze
+  //  Fledermaus-/Katzenwesen mit roten Augen über blauem Wasser)
+  //
+  //  Ursprung = die Katze, `targets[0]` = das ursprüngliche Ziel (Held oder Kreatur), `targets[1]` = die Kreatur, die den Schaden bekommt. Ablauf (ENDE 1500):
+  //  0–240 ms die Fledermäuse steigen über der Katze auf (Flügelschlag in vier Bildern, rote Augen) · 240–560 flattern sie im Bogen zum Ziel · 560–760 umkreisen sie es; ein roter
+  //  Schlagfunke schrumpft, ein dunkler Dither-Fleck verschluckt ihn, aus ihm wird ein dunkelroter Ball · 760–1020 tragen sie den Ball (mit Schweif) zur Kreatur; blaue Wassertropfen
+  //  tropfen aus den Flügeln · 1020 Einschlag: drei rote Kratzer, Ringfunke, Funken, die Fledermäuse stieben auseinander · ab 1260 dithert alles weg.
+  //  Der Schaden fällt im Einschlag (Server wartet 1020 ms). Feste Palette (Schwarz-/Grautöne, Rot, Wasserblau), Bayer-Dithering statt Alpha, Bewegung in ganzen Pixeln, KEIN Schein.
+  // ═════════════════════════════════════════════════════════════════
+  mean_cat_bats: (() => {
+    const K = ppHex('#000000'), D = ppHex('#222222'), L = ppHex('#535353');
+    const R1 = ppHex('#ff1a1a'), R2 = ppHex('#c80000'), R3 = ppHex('#8f0000'), R4 = ppHex('#780000');
+    const W1 = ppHex('#ffffff'), W2 = ppHex('#e6e6e6');
+    const B1 = ppHex('#405f8c'), B2 = ppHex('#2d4362');
+    const T_AUF = 240, T_FLUG = 560, T_RING = 760, T_TRAGEN = 1020, ENDE = 1500, FADE_AB = 1260;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const glatt = (k) => k * k * (3 - 2 * k);
+    const mix = (a, b, k) => a + (b - a) * k;
+    // Aufstellung der drei Fledermäuse (Dreieck) rund um einen Mittelpunkt
+    const FORM = [[-11, 3], [0, -6], [11, 3]];
+    // Eine Fledermaus (Mitte cx/cy). bild 0..3: Flügelspitze hoch … runter.
+    const fledermaus = (g, cx, cy, bild, a) => {
+      cx = Math.round(cx); cy = Math.round(cy);
+      const spitze = [-5, -3, 0, 3][bild];
+      for (const s of [-1, 1]) {
+        for (let i = 2; i <= 6; i++) {
+          const oben = Math.round(-1 + (spitze + 1) * (i - 1) / 5);
+          const unten = oben + (i === 6 ? 0 : (i % 2 ? 2 : 3));
+          for (let y = oben; y <= unten; y++) g.put(cx + s * i, cy + y, y === oben ? L : (y === unten ? D : K), a);
+        }
+        g.put(cx + s, cy - 1, K, a);
+      }
+      g.block(cx - 1, cy - 2, 3, 4, K, a);                                  // Körper
+      g.put(cx - 1, cy - 3, K, a); g.put(cx + 1, cy - 3, K, a);              // Ohren
+      g.put(cx - 1, cy - 1, R1, a); g.put(cx + 1, cy - 1, R1, a);            // rote Augen
+      g.put(cx, cy + 2, K, a);                                               // Schwanzspitze
+    };
+    // Dunkelroter Ball (Radius 2) mit hellem Kern
+    const ball = (g, x, y, a) => {
+      g.disc(x, y, 2.2, R3, a); g.put(x, y, R1, a); g.put(x - 1, y - 1, R2, a);
+    };
+    const malen = (g, t, sz) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const O = sz.O;
+      const z0 = sz.ziele[0] || { x: O.x, y: O.y, w: 21, h: 30 };
+      const z1 = sz.ziele[sz.ziele.length - 1] || z0;
+      const fr = Math.floor(t / 66), bild = fr % 4;
+      const ringR = klemme(Math.min(z0.w, z0.h) * 0.6, 11, 16);
+      const bats = [];                                                       // [x, y, alpha, bildOffset]
+      let ballPos = null;
+      for (let i = 0; i < 3; i++) {
+        const fx = FORM[i][0], fy = FORM[i][1];
+        const wi = (bild + i) % 4;
+        const ang0 = (i / 3) * Math.PI * 2 - Math.PI / 2;
+        // Plätze rund um das ursprüngliche Ziel
+        const ringPos = (w, r) => [z0.x + Math.cos(w) * r, z0.y + Math.sin(w) * r * 0.7];
+        if (t < T_AUF) {                                                    // ① aufsteigen über der Katze
+          const k = glatt(klemme(t / T_AUF, 0, 1));
+          bats.push([O.x + fx, O.y - 4 + fy - k * 10, Math.min(aus, klemme(t / 150, 0, 1)), wi]);
+        } else if (t < T_FLUG) {                                            // ② im Bogen zum Ziel
+          const k = glatt((t - T_AUF) / (T_FLUG - T_AUF));
+          const [ex, ey] = ringPos(ang0, ringR);
+          const bogen = Math.sin(k * Math.PI) * -9 + Math.sin((fr + i * 2) * 1.3) * 1.2;
+          bats.push([mix(O.x + fx, ex, k), mix(O.y - 14 + fy, ey, k) + bogen, aus, wi]);
+        } else if (t < T_RING) {                                            // ③ umkreisen das Ziel und verschlucken den Schlag
+          const k = (t - T_FLUG) / (T_RING - T_FLUG);
+          const [px, py] = ringPos(ang0 + k * Math.PI * 1.5, mix(ringR, ringR * 0.6, k));
+          bats.push([px, py, aus, wi]);
+        } else if (t < T_TRAGEN) {                                          // ④ tragen den Ball zur Kreatur
+          const k = glatt((t - T_RING) / (T_TRAGEN - T_RING));
+          const hub = -Math.sin(k * Math.PI) * 9;
+          const mx = mix(z0.x, z1.x, k), my = mix(z0.y, z1.y, k) + hub;
+          ballPos = [mx, my];
+          bats.push([mx + fx, my + fy - 2, aus, wi]);
+        } else {                                                            // ⑤ stieben nach dem Einschlag auseinander
+          const al = t - T_TRAGEN;
+          const w = ang0 + 0.4, r = 5 + al / 28;
+          bats.push([z1.x + Math.cos(w) * r + fx * 0.4, z1.y + Math.sin(w) * r * 0.8 - al / 36, aus * (al > 220 ? Math.max(0, 1 - (al - 220) / 260) : 1), wi]);
+        }
+      }
+      // ── Schlagfunke am Ziel: schrumpft, wird verschluckt, wird zum Ball ──
+      if (t >= T_FLUG - 80 && t < T_RING) {
+        const k = klemme((t - (T_FLUG - 80)) / (T_RING - T_FLUG + 80), 0, 1);
+        const arm = Math.max(0, Math.round(5 * (1 - k)));
+        for (let a = 1; a <= arm; a++) {
+          const c = a === arm ? R2 : R1;
+          g.put(z0.x + a, z0.y, c, aus); g.put(z0.x - a, z0.y, c, aus); g.put(z0.x, z0.y + a, c, aus); g.put(z0.x, z0.y - a, c, aus);
+        }
+        g.disc(z0.x, z0.y, 2 + k * 7, K, 0.55 * aus);                          // dunkler Dither-Fleck verschluckt ihn
+        if (k > 0.55) ball(g, z0.x, z0.y, aus * klemme((k - 0.55) / 0.2, 0, 1));
+      }
+      // ── der Ball im Flug mit Schweif ──
+      if (ballPos) {
+        const k0 = (t - T_RING) / (T_TRAGEN - T_RING);
+        for (let n = 4; n >= 1; n--) {
+          const kk = glatt(klemme(k0 - n * 0.07, 0, 1));
+          g.block(mix(z0.x, z1.x, kk) - 1, mix(z0.y, z1.y, kk) - Math.sin(kk * Math.PI) * 9 - 1, 2, 2, n > 2 ? R4 : R3, aus * (1 - n * 0.2));
+        }
+        ball(g, ballPos[0], ballPos[1], aus);
+      }
+      // ── Einschlag: drei rote Kratzer + Ringfunke + Funken ──
+      if (t >= T_TRAGEN - 20) {
+        const al = t - (T_TRAGEN - 20);
+        for (let n = 0; n < 3; n++) {                                         // Kratzer (Krallen), nacheinander gezogen
+          const start = n * 36, laenge = klemme((al - start) / 90, 0, 1) * 12;
+          const ox = (n - 1) * 4;
+          for (let d = 0; d < laenge; d++) g.put(z1.x - 5 + ox + d * 0.7, z1.y - 6 + d, d % 5 === 4 ? R2 : R1, aus * (al > 300 ? Math.max(0, 1 - (al - 300) / 200) : 1));
+        }
+        if (al < 200) {
+          const arm = [1, 3, 5, 4, 3, 2, 1][Math.floor(al / 30)] || 1;
+          for (let a = 1; a <= arm; a++) {
+            const c = a === arm ? R3 : (a === 1 ? W1 : R1);
+            g.put(z1.x + a, z1.y, c, aus); g.put(z1.x - a, z1.y, c, aus); g.put(z1.x, z1.y + a, c, aus); g.put(z1.x, z1.y - a, c, aus);
+          }
+          g.block(z1.x - 1, z1.y - 1, 2, 2, W2, aus);
+        }
+        if (al < 300) {
+          const r = 3 + al / 24;
+          g.ring(z1.x, z1.y, r, r * 0.8, al < 120 ? R1 : R3, (1 - al / 300) * aus);
+        }
+        for (let n = 0; n < 9; n++) {                                         // Funken (Bogenflug, ganze Pixel)
+          const w = (n / 9) * Math.PI * 2 + 0.3, sek = Math.max(0, al - 20) / 1000;
+          if (al > 20 && al < 480) g.put(z1.x + Math.cos(w) * 40 * sek, z1.y + Math.sin(w) * 40 * sek + 30 * sek * sek, n % 2 ? R1 : R3, (1 - al / 480) * aus);
+        }
+      }
+      // ── Fledermäuse zuletzt (liegen über allem) + blaue Wassertropfen ──
+      bats.forEach(([x, y, a, wi], i) => {
+        if (a <= 0) return;
+        fledermaus(g, x, y, wi, a);
+        if (t > T_AUF && t < T_TRAGEN + 160) {
+          const dx = Math.round((ppHash(i, fr, 1) - 0.5) * 8), dy = 4 + Math.floor(ppHash(i, fr, 2) * 7);
+          if (ppHash(i, fr, 3) < 0.7) g.put(x + dx, y + dy, ppHash(i, fr, 4) < 0.5 ? B1 : B2, a);
+        }
+      });
+    };
+    return ppSalve(malen, ENDE, null, { extra: 40 });
+  })(),
+  // ═════════════════════════════════════════════════════════════════
   //  Patty, the Ninja of Revenge (25.10.) — PIXELART, schwarze Wurfsterne von Patty zum Ziel (`ppSalve`; `runde` = Zahl der Sterne = Zahl der geschickten Abilities)
   //
   //  Je Ability fliegt ein schwarzer Wurfstern (9×9, zwei Bilder im Wechsel: Kreuz und X, also ein drehender Stern in ganzen Pixeln) in sehr schneller Folge (alle 70 ms) von Patty
@@ -32753,6 +33244,116 @@ const ANIM_REGISTRY = {
       }
     };
     return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Cell Escape (W78) — PIXELART, Brett-Animation auf dem GEGNER-DECK (`originDeck`, Ziel `{ deck: true }`, Hülle `ppSalve`; Vorlage: das Kartenbild — Zelle aus Stein,
+  //  Eisengitter, ein schräger Lichtkegel, der Gefangene (gefroren) im Licht)
+  //
+  //  Ein Eisengitter fällt Stab für Stab vor das Deck (Querbalken oben und unten, Nieten, Staubwolke beim Aufsetzen), ein schräger Lichtkegel (gedithert, Staubkörner steigen darin
+  //  auf) fällt hinein, die Stäbe zittern ein paar Bildchen lang — dann schwingen sie nach oben, der untere Balken fällt ab, der obere zieht sich in die Höhe: die Zelle ist offen,
+  //  die Karten (`play_pile_transfer`, Gegnerdeck → Hand) fliegen davon. `mode: 'more'` (zweiter Durchgang, wenn ein Held Frozen/Stunned ist): Frostfunken wandern an den Stäben
+  //  hinab, die Kanten der Stäbe sind eisblau, beim Aufschließen blitzt ein weißes Kreuz am Schloss. Feste Palette, Bayer-Dithering statt Alpha, KEIN Schein, KEINE Unschärfe.
+  //  Zeiten (cell-escape.js wartet 480 ms bis zur ersten Karte): Fall 0–~500, Licht ab 250, Zittern 480–760, Öffnen 760–1160, Licht aus bis 1500 (`duration` 1500).
+  // ═══════════════════════════════════════════════════════════════════
+  cell_escape: (() => {
+    const EISEN = ['#222222', '#3e3e51', '#686868', '#929292'].map(ppHex);        // dunkel, Schatten/Balken, Lichtkante, Niete
+    const LICHT = ['#d2d2db', '#a8a8a8'].map(ppHex);
+    const STAUB = ['#e6e6e6', '#d2d2db', '#a8a8a8'].map(ppHex);
+    const FROST = ['#b6eff7', '#08d3ef', '#1788bd', '#ffffff'].map(ppHex);
+    const ENDE = 1500, FALL = 220, STAB_VERSATZ = 20, LICHT_AB = 250, LICHT_ZU = 1150, ZITTERN_AB = 480, OEFFNEN = 760, OEFFNEN_DAUER = 300, STAB_AUF = 12;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = () => ({
+      staub: Array.from({ length: ppFxN(14) }, () => ({ fx: Math.random(), phase: Math.random(), v: 5 + Math.random() * 9, farbe: Math.floor(Math.random() * STAUB.length) })),
+      wolke: Array.from({ length: ppFxN(10) }, () => ({ seite: Math.random() < 0.5 ? -1 : 1, v: 8 + Math.random() * 14, hoch: 1 + Math.random() * 3, farbe: Math.floor(Math.random() * STAUB.length) })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const z = sz.ziele[0];
+      if (!z) return;
+      const mehr = sz.mode === 'more';
+      const W = Math.max(14, Math.round(z.w)), H = Math.max(18, Math.round(z.h));
+      const X0 = Math.round(z.x - W / 2) - 1, CW = W + 2;                      // Käfig: ein Pixel Rand um das Deck
+      const Y0 = Math.round(z.y - H / 2) - 2, CH = H + 4;
+      const n = Math.floor((CW - 2) / 4) + 1;                                  // ein Stab alle 4 Pixel, 2 Pixel breit
+      const stabX = (i) => X0 + 1 + i * 4 + Math.floor((CW - 2 - (n - 1) * 4 - 2) / 2);
+      const lichtA = (t < LICHT_AB ? 0 : klemme((t - LICHT_AB) / 300, 0, 1)) * (t > LICHT_ZU ? 1 - klemme((t - LICHT_ZU) / (ENDE - LICHT_ZU - 80), 0, 1) : 1);
+      // ── Lichtkegel: schräges Band von links oben nach rechts unten (gedithert), unter den Stäben ──
+      if (lichtA > 0) {
+        const c = CW * 0.4, hw = CW * 0.3;
+        for (let y = Y0; y < Y0 + CH; y++) for (let x = X0; x < X0 + CW; x++) {
+          const d = Math.abs((x - X0) - (y - Y0) * 0.55 - c);
+          if (d >= hw) continue;
+          const kante = 1 - d / hw;
+          g.put(x, y, kante > 0.55 ? LICHT[0] : LICHT[1], lichtA * (0.16 + 0.5 * kante));
+        }
+        for (const s of teile.staub) {
+          const y = Y0 + CH - ((t / 1000 * s.v + s.phase * CH) % CH), x = X0 + s.fx * CW + Math.sin(t / 260 + s.phase * 9) * 1.2;
+          g.put(x, y, STAUB[s.farbe], lichtA * (Math.floor(t / 100 + s.phase * 7) % 3 === 0 ? 0.35 : 0.9));
+        }
+      }
+      // ── Querbalken oben: fällt zuerst, hebt sich beim Öffnen und löst sich gedithert auf ──
+      const oeffnen = (i) => klemme((t - OEFFNEN - i * STAB_AUF) / OEFFNEN_DAUER, 0, 1);
+      const balkenAus = t < OEFFNEN + 240 ? 1 : 1 - klemme((t - (OEFFNEN + 240)) / 200, 0, 1);
+      const balkenHub = t < OEFFNEN + 240 ? 0 : Math.round(klemme((t - (OEFFNEN + 240)) / 200, 0, 1) * 6);
+      const oben = Y0 - Math.round((1 - klemme(t / 120, 0, 1)) * 8) - balkenHub;
+      if (balkenAus > 0) {
+        for (let x = 0; x < CW; x++) {
+          g.put(X0 + x, oben, EISEN[2], balkenAus); g.put(X0 + x, oben + 1, EISEN[0], balkenAus);
+          if (mehr && ppHash(x, Math.floor(t / 66), 9) < 0.12) g.put(X0 + x, oben, FROST[1], balkenAus);
+        }
+      }
+      // ── Stäbe: fallen gestaffelt, zittern, schwingen nach oben ──
+      let letzteLandung = 0;
+      for (let i = 0; i < n; i++) {
+        const fall = klemme((t - i * STAB_VERSATZ) / FALL, 0, 1);
+        if (fall <= 0) continue;
+        const voll = CH - 2;
+        let laenge = Math.round(voll * fall * fall);
+        if (fall >= 1) letzteLandung = Math.max(letzteLandung, i * STAB_VERSATZ + FALL);
+        const hub = oeffnen(i);
+        if (hub > 0) laenge = Math.round(voll * (1 - hub * hub));
+        if (laenge <= 0) continue;
+        const zit = t >= ZITTERN_AB && t < OEFFNEN ? (ppHash(i, Math.floor(t / 66), 5) > 0.55 ? (ppHash(i, Math.floor(t / 66), 6) > 0.5 ? 1 : -1) : 0) : 0;
+        const bx = stabX(i) + zit;
+        for (let j = 0; j < laenge; j++) {
+          const y = oben + 2 + j;
+          g.put(bx, y, mehr ? FROST[2] : EISEN[2]);
+          g.put(bx + 1, y, (y - Y0) % 8 === 5 ? EISEN[1] : EISEN[0]);
+        }
+        const spitze = oben + 2 + laenge - 1;                                  // Spitze des Stabs: Niete / Eiszapfen
+        g.put(bx, spitze, mehr ? FROST[0] : EISEN[3]);
+      }
+      // ── Querbalken unten: setzt auf, sobald der letzte Stab unten ist; fällt beim Öffnen ab ──
+      const landT = (n - 1) * STAB_VERSATZ + FALL;
+      if (t >= landT - 40 && t < OEFFNEN + 200) {
+        const ab = t < OEFFNEN ? 0 : Math.round(klemme((t - OEFFNEN) / 200, 0, 1) * 5);
+        const a = t < OEFFNEN ? 1 : 1 - klemme((t - OEFFNEN) / 200, 0, 1);
+        const y = Y0 + CH - 2 + ab;
+        for (let x = 0; x < CW; x++) { g.put(X0 + x, y, EISEN[2], a); g.put(X0 + x, y + 1, EISEN[0], a); }
+        for (let i = 0; i < n; i++) g.put(stabX(i), y, EISEN[3], a);
+        // Staubwolke beim Aufsetzen
+        const dt = t - (landT - 40);
+        if (dt >= 0 && dt < 300) {
+          const k = dt / 300;
+          for (const s of teile.wolke) g.put((s.seite < 0 ? X0 : X0 + CW) + s.seite * (1 + k * s.v * 0.5), y - Math.floor(k * s.hoch), STAUB[s.farbe], 1 - k);
+        }
+        // Schloss-Blitz beim Öffnen
+        if (t >= OEFFNEN && t < OEFFNEN + 100) {
+          const cx = X0 + Math.floor(CW / 2), cy = y;
+          g.put(cx, cy, FROST[3]); g.put(cx - 1, cy, FROST[3]); g.put(cx + 1, cy, FROST[3]); g.put(cx, cy - 1, FROST[3]);
+          if (t < OEFFNEN + 50) { g.put(cx - 2, cy, FROST[3], 0.6); g.put(cx + 2, cy, FROST[3], 0.6); g.put(cx, cy - 2, FROST[3], 0.6); }
+        }
+      }
+      // ── zweiter Durchgang: Frostfunken wandern an den Stäben hinab ──
+      if (mehr && t >= 120 && t < OEFFNEN + 240) {
+        const aus = t > OEFFNEN ? 1 - klemme((t - OEFFNEN) / 240, 0, 1) : 1;
+        for (let i = 0; i < n; i++) {
+          const y = Y0 + 2 + Math.floor((t * 0.06 + i * 11) % (CH - 4));
+          const bx = stabX(i);
+          g.put(bx, y, FROST[3], aus); g.put(bx, y - 1, FROST[0], aus * 0.85); g.put(bx, y - 2, FROST[1], aus * 0.6); g.put(bx + 1, y - 3, FROST[2], aus * 0.45);
+        }
+      }
+    };
+    return ppSalve(malen, ENDE, vorbereiten, { extra: 24 });
   })(),
   // ═════════════════════════════════════════════════════════════════
   //  Kidnapping (23.10.) — PIXELART, Brett-Animation: ein Jutesack fällt auf die Kreatur (`targets: [{ owner, heroIdx, zoneSlot }]`, Ursprung = der wirkende Held)
@@ -36965,6 +37566,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // ist. Deshalb React-State und nicht textContent: ein sync() mitten im
   // Countdown würde eine DOM-Manipulation sofort überschreiben.
   const [goldCrash, setGoldCrash] = useState(null);
+  // Betrayal (W78): die Goldzahlen bleiben auf dem Stand VOR der Zahlung, bis die Münz-/Stehl-Animation sie zählt (`betrayal_gold_hold` / `_release`); { Sitz: angezeigter Wert }.
+  const [betrayalHold, setBetrayalHold] = useState(null);
   const goldCrashRaf = useRef(null);
   // 'crash' (rot) oder 'recover' (gruen) — steuert die Zaehler-Klasse.
   const [goldCrashTone, setGoldCrashTone] = useState('crash');
@@ -39611,19 +40214,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const ACTION_TYPES = ['Attack', 'Spell', 'Creature'];
 
   // Check if a creature can be played on ANY hero (level/spell school reqs + free zone)
-  const canCreatureBePlayed = (card) => {
+  // Als Ruling (Al 26.10.): `handIdx` = die konkrete Handkopie — Rocky Slime reduziert nur eine einzelne Kopie, also leuchtet/graut jede Kopie nach IHRER Stufe (ohne Index: irgendeine Kopie).
+  const canCreatureBePlayed = (card, handIdx) => {
     if (!card || card.cardType !== 'Creature') return false;
     // heroPlayableCards already includes free support zone check for creatures
-    if ([0,1,2].some(hi => canHeroPlayCard(me, hi, card))) return true;
+    if ([0,1,2].some(hi => canHeroPlayCard(me, hi, card, handIdx))) return true;
     // Styx 28.9.: auch ueber geliehene Helden (Server meldet sie in
     // `heroPlayableCards.charmed`) — sonst blieb die Handkarte gedimmt.
-    return (opp.heroes || []).some((h, hi) => h?.charmedBy === myIdx && canHeroPlayCard(opp, hi, card));
+    return (opp.heroes || []).some((h, hi) => h?.charmedBy === myIdx && canHeroPlayCard(opp, hi, card, handIdx));
   };
 
   // Check if a Spell or Attack can be used by ANY hero (level/spell school reqs, no zone needed)
   const canActionCardBePlayed = (card, handIdx) => {
     if (!card) return false;
-    if (card.cardType === 'Creature') return canCreatureBePlayed(card);
+    if (card.cardType === 'Creature') return canCreatureBePlayed(card, handIdx);
     // Spells and Attacks: just need a hero that meets spell school requirements
     if ([0,1,2].some(hi => canHeroPlayCard(me, hi, card, handIdx))) return true;
     // Also check charmed opponent heroes
@@ -39749,7 +40353,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (me.handLocked && card.cardType !== 'Ability' && (me.handLockBlockedCards || []).includes(cardName)) return true;
     if (me.drawLocked && card.cardType !== 'Ability' && (me.drawLockBlockedCards || []).includes(cardName)) return true;
     // v1069: reiner Such-Lock — Karten, die NUR suchen, sind tot.
-    if (me.searchLocked && card.cardType !== 'Ability' && (me.searchLockBlockedCards || []).includes(cardName)) return true;
+    // Als Ruling (Al 26.10., Flame Avalanche): dieselbe Liste graut unter der Schadenssperre die reinen Gegner-Schadenskarten aus (`blockedByDamageLock`).
+    if ((me.searchLocked || me.damageLocked) && card.cardType !== 'Ability' && (me.searchLockBlockedCards || []).includes(cardName)) return true;
 
     // Never-playable cards (e.g. Glass of Marbles, Mystery Box) — always dimmed
     if ((me.neverPlayableCards || []).includes(cardName)) return true;
@@ -40599,7 +41204,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     return -1;
   };
 
-  const canHeroNormalSummon = (playerData, heroIdx, card) => {
+  // Als Ruling (Al 26.10.): „Rocky Slime reduziert nur das Level einer einzelnen Kopie!" — `handIdx` (optional) = die gezogene/geklickte Handkopie: dann gilt NUR deren Stufe
+  // (Handstufen-Abzüge und gesetzte Stufe dieser einen Kopie), nicht die günstigste Kopie des Namens. Ohne Index (Namenslisten) gilt weiter „irgendeine Kopie".
+  const canHeroNormalSummon = (playerData, heroIdx, card, handIdx) => {
     if (!card || card.cardType !== 'Creature') return false;
     // Inherit the server's full eligibility pipeline (level/school,
     // free zone, summon lock, action economy, AND per-Hero canSummon
@@ -40612,7 +41219,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // "stricter sibling" level/school checks below stay in place
     // because they exclude card-side placement bypass paths
     // (Deepsea bounce-place) that canHeroPlayCard accepts.
-    if (!canHeroPlayCard(playerData, heroIdx, card)) return false;
+    if (!canHeroPlayCard(playerData, heroIdx, card, handIdx)) return false;
     const hero = playerData.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.bound) return false;
@@ -40629,11 +41236,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // meaningful for the own player — the charmed-summon path calls this
     // with `me` too, so the opponent's side does not need its own delta.
     let rawLevel = card.level || 0;
-    // 23.10.: absolut gesetzte Stufe einer Handkopie (Puzzle-Creator, Inconspicuous Lawn Gnome): „darf IRGENDEINE Kopie", also die niedrigste Basis unter den Kopien.
+    // Als Ruling (Al 26.10.): die EINE gezogene/geklickte Handkopie (nur eigene Hand; `me.hand[handIdx]` muss die Karte sein), sonst `null` = Namensliste („irgendeine Kopie").
+    const nurKopie = (playerData === me && Number.isInteger(handIdx) && handIdx >= 0 && (me.hand || [])[handIdx] === card.name) ? handIdx : null;
+    // 23.10.: absolut gesetzte Stufe einer Handkopie (Puzzle-Creator, Inconspicuous Lawn Gnome): ohne Index „darf IRGENDEINE Kopie", also die niedrigste Basis unter den Kopien; mit Index die dieser Kopie.
     if (playerData === me && card.name && me.handLevelSet && Object.keys(me.handLevelSet).length) {
       let beste = null;
       (me.hand || []).forEach((n, i) => {
-        if (n !== card.name) return;
+        if (n !== card.name || (nurKopie != null && i !== nurKopie)) return;
         const v = me.handLevelSet[i] ?? card.level ?? 0;
         if (beste == null || v < beste) beste = v;
       });
@@ -40655,16 +41264,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const filter     = me.handLevelOffsetHeroFilter || {};
       const handArr = me.hand || [];
       let bestOffset = 0;
-      const scan = (map) => {
-        for (const k of Object.keys(map)) {
-          if (handArr[+k] !== card.name) continue;
-          if (filter[k] != null && filter[k] !== heroIdx) continue;
-          const v = map[k] || 0;
-          if (v < bestOffset) bestOffset = v;
-        }
-      };
-      scan(offsets);
-      scan(transient);
+      // Als Ruling (Al 26.10.): dauerhafter + transienter Abzug EINER Kopie ADDIEREN sich (Spiegel von `_spielRohStufe`); über die Kopien gilt die am stärksten gesenkte.
+      for (const k of new Set([...Object.keys(offsets), ...Object.keys(transient)])) {
+        if (handArr[+k] !== card.name) continue;
+        if (nurKopie != null && +k !== nurKopie) continue;   // Als Ruling (Al 26.10.): nur die Abzüge DIESER Kopie (Rocky Slime reduziert nur eine einzelne Kopie)
+        // Der Heldenfilter (Sparkfly Queen, Sid) bindet nur den transienten Rabatt; ein dauerhafter Abzug (Rocky Slime, Tobi) gilt für jeden Helden.
+        const v = (offsets[k] || 0) + ((filter[k] != null && filter[k] !== heroIdx) ? 0 : (transient[k] || 0));
+        if (v < bestOffset) bestOffset = v;
+      }
       if (bestOffset < 0) level = Math.max(0, level + bestOffset);
     }
     if (level <= 0 && !card.spellSchool1) return true;
@@ -40786,11 +41393,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // least one free Support Zone for the engine's initial placement.
   // (The cross-side hint then relocates the Creature from that slot to
   // the user's chosen destination.) Returned in hero-index order.
-  const getEligibleSummoners = (cardName) => {
+  // Als Ruling (Al 26.10.): mit `handIdx` (die gezogene/geklickte Kopie) zählt die Liste JE KOPIE (`canHeroPlayCard`), ohne Index die Namensliste.
+  const getEligibleSummoners = (cardName, handIdx) => {
     const out = [];
     const ownPlayable = gameState.heroPlayableCards?.own || {};
+    const _kd = CARDS_BY_NAME[cardName];
     for (let hi = 0; hi < (me.heroes || []).length; hi++) {
-      if (!(ownPlayable[hi] || []).includes(cardName)) continue;
+      if (Number.isInteger(handIdx) && _kd ? !canHeroPlayCard(me, hi, _kd, handIdx) : !(ownPlayable[hi] || []).includes(cardName)) continue;
       const hero = me.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.bound) continue;
@@ -40806,8 +41415,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // the eventual placement through `destination` (own- or opp-side).
   // The cross-side hint relocates the Creature from the summoner's
   // initial slot to the destination after `onPlay` resolves.
-  const dispatchCrossSideSummon = (cardName, summonerHeroIdx, destination) => {
-    const currentIdx = hand.findIndex(c => c === cardName);
+  // Als Ruling (Al 26.10.): „Rocky Slime reduziert nur das Level einer einzelnen Kopie!“ — die zu spielende KOPIE bleibt die geklickte/gezogene (`handIndex`, solange sie noch dieselbe Karte ist);
+  // nur bei veraltetem Index (Hand hat sich verschoben) gilt die erste Kopie, die der Held wirklich spielen darf, zuletzt die erste nach Namen.
+  const resolveHandCopy = (cardName, handIndex, heroIdx) => {
+    if (Number.isInteger(handIndex) && handIndex >= 0 && hand[handIndex] === cardName) return handIndex;
+    const kd = CARDS_BY_NAME[cardName];
+    if (kd && heroIdx != null) {
+      const gut = hand.findIndex((c, i) => c === cardName && canHeroPlayCard(me, heroIdx, kd, i));
+      if (gut >= 0) return gut;
+    }
+    return hand.findIndex(c => c === cardName);
+  };
+  const dispatchCrossSideSummon = (cardName, summonerHeroIdx, destination, handIndex) => {
+    const currentIdx = resolveHandCopy(cardName, handIndex, summonerHeroIdx);
     if (currentIdx < 0) return;
     const summonerSlot = findFreeSupportSlot(me, summonerHeroIdx);
     if (summonerSlot < 0) return;
@@ -40852,10 +41472,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       ppSendePromptAntwort(gameState, { cardName, handIndex: aktuell, heroIdx: destination.heroIdx, zoneSlot: destination.slotIdx });
       return;
     }
-    const eligible = getEligibleSummoners(cardName);
+    const eligible = getEligibleSummoners(cardName, handIndex);
     if (eligible.length === 0) return;
     if (eligible.length === 1) {
-      dispatchCrossSideSummon(cardName, eligible[0], destination);
+      dispatchCrossSideSummon(cardName, eligible[0], destination, handIndex);
       return;
     }
     setSummonerPick({ cardName, handIndex, card, destination, eligibleSummoners: eligible });
@@ -41588,7 +42208,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       && geliehen?.charmedBy === myIdx && geliehen.hp > 0
                       && zielCards.length === 0
                       && si < ((opp.supportZones?.[hi] || []).length || 3)
-                      && (hasBounceTargets ? canHeroNormalSummon(opp, hi, card) : canHeroPlayCard(opp, hi, card))) {
+                      && (hasBounceTargets ? canHeroNormalSummon(opp, hi, card, fromCreation ? null : idx) : canHeroPlayCard(opp, hi, card, fromCreation ? null : idx))) {
                     targetHero = hi; targetSlot = si; dropCharmedOwner = oppIdx;
                     continue;
                   }
@@ -41631,7 +42251,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                          && canShareSupportSlot(me, hi, si, card.name)) {
                   const canPlayHere = isHeroAction
                     || (crossSidePlayable && me.heroes?.[hi]?.hp > 0)
-                    || canHeroNormalSummon(me, hi, card);
+                    || canHeroNormalSummon(me, hi, card, fromCreation ? null : idx);
                   if (canPlayHere && si < ((me.supportZones[hi] || []).length || 3)) {
                     targetHero = hi; targetSlot = si;
                   }
@@ -41642,7 +42262,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // is just an address per the card's text.
                 const canPlayHere = isHeroAction
                   || (crossSidePlayable && me.heroes?.[hi]?.hp > 0)
-                  || canHeroNormalSummon(me, hi, card);
+                  || canHeroNormalSummon(me, hi, card, fromCreation ? null : idx);
                 if (!canPlayHere) continue;
                 if (si >= ((me.supportZones[hi] || []).length || 3)) continue;
                 targetHero = hi; targetSlot = si;
@@ -41680,7 +42300,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   // counts as a valid host address.
                   const canPlayHere = isHeroAction
                     || (crossSidePlayable && me.heroes?.[hi]?.hp > 0)
-                    || canHeroNormalSummon(me, hi, card);
+                    || canHeroNormalSummon(me, hi, card, fromCreation ? null : idx);
                   if (!canPlayHere) continue;
                   const supZones = me.supportZones[hi] || [];
                   let leftmost = -1;
@@ -41869,6 +42489,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         let targetSlot = -1;
         let targetAttachOwner = undefined; // v651: Zielseite eines Cross-Side-Attachments
         let targetCharmedOwner = undefined;
+        let herolosAngreifer = undefined;   // W78 (Backstab): der unter dem Zeiger gewählte Gegnerheld
         let surpriseTarget = false;
         const heroActionHeroIdx2 = heroActionPrompt?.heroIdx;
         const isAttachmentCard = (card.subtype || '').toLowerCase() === 'attachment';
@@ -42038,6 +42659,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const r = el.getBoundingClientRect();
           if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
             const hi = parseInt(el.dataset.heroIdx);
+            // ★ W78 (Backstab, Al 26.10.): eine Karte OHNE Wirker-Helden lässt sich direkt auf den GEGNERHELDEN ziehen, der die Attack ausführen soll (Liste vom Server: `herolessAngreifer`).
+            const _hlAngreifer = (me.herolessAngreifer || {})[cardName];
+            if (_hlAngreifer) {
+              const _hlOwner = el.dataset.heroOwner === 'me' ? myIdx : (myIdx === 0 ? 1 : 0);
+              if (_hlAngreifer.some(a => a.owner === _hlOwner && a.heroIdx === hi)) {
+                targetHero = hi; targetAttachOwner = _hlOwner; herolosAngreifer = { owner: _hlOwner, heroIdx: hi };
+                break;
+              }
+            }
+            // Backstab & Co. lassen sich NUR auf die ausführenden GEGNERHELDEN ziehen — nie auf einen eigenen Helden (und nicht auf einen, der nicht in der Liste steht).
+            if ((me.herolessHandCards || []).includes(cardName)) continue;
             // v651: Cross-Side-Attachment auf einen GEGNERISCHEN Helden gezogen
             if (el.dataset.heroOwner !== 'me' && isAttachmentCard) {
               const oppIdx2 = myIdx === 0 ? 1 : 0;
@@ -42086,7 +42718,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
         }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, hoverHero, hoverHeroRect, targetSlot: targetSlot, targetAttachOwner, creatureCasterSlot, creatureCasterInstId, isSpell: !surpriseTarget, isSurprise: surpriseTarget, surpriseOpp: surpriseTarget && surpriseOpp, charmedOwner: surpriseTarget ? undefined : targetCharmedOwner , fromCreation });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, hoverHero, hoverHeroRect, targetSlot: targetSlot, targetAttachOwner, herolosAngreifer, creatureCasterSlot, creatureCasterInstId, isSpell: !surpriseTarget, isSurprise: surpriseTarget, surpriseOpp: surpriseTarget && surpriseOpp, charmedOwner: surpriseTarget ? undefined : targetCharmedOwner , fromCreation });
       } else if (isAscensionPlayable) {
         // Ascended Hero drag — target hero zones with eligible base heroes
         let targetHero = -1;
@@ -42183,7 +42815,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           let summonEligible = [];
           if (isPlayable && card?.cardType === 'Creature') {
             for (let hi = 0; hi < (me.heroes || []).length; hi++) {
-              if (!canHeroPlayCard(me, hi, card)) continue;
+              if (!canHeroPlayCard(me, hi, card, fromCreation ? null : idx)) continue;
               const slot = findFreeSupportSlot(me, hi);
               if (slot < 0) continue;
               summonEligible.push({ idx: hi, name: me.heroes[hi].name, zoneSlot: slot });
@@ -42336,7 +42968,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   }
                 }
               }
-              if (eligible.length === 1) {
+              // ★ W78 (Backstab): eine Karte OHNE Wirker-Helden (`playsWithoutHero`) fragt nie nach einem Helden — der Server bucht die Aktion selbst; es genügt, dass irgendein eigener Held sie spielen könnte.
+              const _herolos = !isHeroAction && eligible.length > 0 && (me.herolessHandCards || []).includes(cardName);
+              if (eligible.length === 1 || _herolos) {
                 // During heroAction, the play has to land via the
                 // effect prompt (hero-locked: Coffee; any-hero: Hu).
                 // `play_spell` would fail server-side because no
@@ -42478,7 +43112,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // low-level / dead heroes aren't offered as targets.
               const normalTargets = [];
               for (let hi = 0; hi < (me.heroes || []).length; hi++) {
-                if (!canHeroNormalSummon(me, hi, card)) continue;
+                if (!canHeroNormalSummon(me, hi, card, fromCreation ? null : idx)) continue;
                 // W64a: geteilte Zonen (Alice) vorn, danach ALLE freien Zonen des Helden.
                 for (const sl of allSummonSlots(me, hi, cardName)) normalTargets.push({ heroIdx: hi, slotIdx: sl.slotIdx, ...(sl.shared ? { shared: true } : {}) });
               }
@@ -42487,7 +43121,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
                 const g = opp.heroes[hi];
                 if (!g?.name || g.hp <= 0 || g.charmedBy !== myIdx) continue;
-                if (!canHeroNormalSummon(opp, hi, card)) continue;
+                if (!canHeroNormalSummon(opp, hi, card, fromCreation ? null : idx)) continue;
                 const slot = findFreeSupportSlot(opp, hi);
                 if (slot < 0) continue;
                 normalTargets.push({ heroIdx: hi, slotIdx: slot, owner: oppIdx });
@@ -42510,14 +43144,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // Kann NICHT geteilt werden, bleibt alles wie bisher.
               const shareTargets = [];
               for (let hi = 0; hi < (me.heroes || []).length; hi++) {
-                if (!canHeroNormalSummon(me, hi, card)) continue;
+                if (!canHeroNormalSummon(me, hi, card, fromCreation ? null : idx)) continue;
                 for (const sl of allSummonSlots(me, hi, cardName)) if (sl.shared) shareTargets.push({ heroIdx: hi, slotIdx: sl.slotIdx, shared: true });
               }
               if (shareTargets.length > 0) {
                 // W64a: ALLE freien Zonen bleiben waehlbar (nicht nur die erste je Held) — die geteilte Zone steht vorn, aber nichts wird erzwungen.
                 const freeTargets = [];
                 for (let hi = 0; hi < (me.heroes || []).length; hi++) {
-                  if (!canHeroNormalSummon(me, hi, card)) continue;
+                  if (!canHeroNormalSummon(me, hi, card, fromCreation ? null : idx)) continue;
                   for (const sl of allSummonSlots(me, hi, cardName)) if (!sl.shared) freeTargets.push({ heroIdx: hi, slotIdx: sl.slotIdx });
                 }
                 setPendingBouncePick({
@@ -42529,7 +43163,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               }
               const eligible = [];
               for (let hi = 0; hi < (me.heroes || []).length; hi++) {
-                if (!canHeroPlayCard(me, hi, card)) continue;
+                if (!canHeroPlayCard(me, hi, card, fromCreation ? null : idx)) continue;
                 // Kein freier Platz, aber ein teilbarer? Dann diesen
                 // nehmen — sonst faellt der Held hier ganz heraus.
                 let slot = findFreeSupportSlot(me, hi);
@@ -42545,7 +43179,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
                 const geliehen = opp.heroes[hi];
                 if (geliehen?.charmedBy !== myIdx || geliehen.hp <= 0) continue;
-                if (!canHeroPlayCard(opp, hi, card)) continue;
+                if (!canHeroPlayCard(opp, hi, card, fromCreation ? null : idx)) continue;
                 const frei = findFreeSupportSlot(opp, hi);
                 if (frei < 0) continue;
                 eligible.push({ idx: hi, name: geliehen.name, zoneSlot: frei, charmedOwner: oppIdx });
@@ -42886,7 +43520,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             _attachHeroIdx = prev.targetHero;
             _attachOwner = prev.targetAttachOwner;
             // Als Vorgabe 29.9.: ein geliehener Held als Wirker (Charme-Liste).
-            const _geliehenKannWirken = (hi) => opp.heroes?.[hi]?.charmedBy === myIdx && canHeroPlayCard(opp, hi, prev.card);
+            // Als Ruling (Al 26.10.): je Handkopie (`prev.idx`) — wie der Ziehweg; Vorrats-Karten (`fromCreation`) bleiben bei der Namensliste.
+            const _kopieIdx = prev.fromCreation ? null : prev.idx;
+            const _geliehenKannWirken = (hi) => opp.heroes?.[hi]?.charmedBy === myIdx && canHeroPlayCard(opp, hi, prev.card, _kopieIdx);
             // v651: liegt das Ziel beim Gegner, ist der Empfaenger kein
             // Caster — der Wirker ist der erste eigene Held, der die Karte
             // wirken darf. Als Vorgabe 29.9.: ist das Ziel ein GELIEHENER
@@ -42894,9 +43530,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // Nutzer"); sonst ein eigener, notfalls ein anderer geliehener.
             if (_attachOwner != null && _attachOwner !== myIdx) {
               if (_geliehenKannWirken(prev.targetHero)) { _casterIdx = prev.targetHero; _casterCharmedOwner = oppIdx; }
-              else _casterIdx = [0, 1, 2].find(hi => canHeroPlayCard(me, hi, prev.card));
-            } else if (!canHeroPlayCard(me, _casterIdx, prev.card)) {
-              _casterIdx = [0, 1, 2].find(hi => canHeroPlayCard(me, hi, prev.card));
+              else _casterIdx = [0, 1, 2].find(hi => canHeroPlayCard(me, hi, prev.card, _kopieIdx));
+            } else if (!canHeroPlayCard(me, _casterIdx, prev.card, _kopieIdx)) {
+              _casterIdx = [0, 1, 2].find(hi => canHeroPlayCard(me, hi, prev.card, _kopieIdx));
             }
             if (_casterIdx == null && prev.charmedOwner == null) {
               const g = [0, 1, 2].find(_geliehenKannWirken);
@@ -42916,6 +43552,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // ★ Herkunft: Hand oder Crestinas Vorrat. Der Server loest
             // `handIndex` damit in der richtigen Liste auf.
             fromCreation: prev.fromCreation || undefined,
+            herolosAngreifer: prev.herolosAngreifer || undefined,   // W78 (Backstab): auf diesen Gegnerhelden gezogen
           });
           return null;
         });
@@ -46537,6 +47174,91 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('gold_gift_flight', onGoldGiftFlight);
     socket.on('gold_steal_burst', onGoldStealBurst);
+    // ★★ BETRAYAL (25.10., Welle 78): fünf Goldmünzen fliegen im Takt von der EIGENEN Gold-Anzeige zur Ziel-Kreatur, verweilen dort kurz und fliegen zur Gold-Anzeige des
+    // Empfängers weiter (Vorlage: das Kartenbild — Münzen am Boden der Holzbrücke, die Schlangenfrau und der Ritter). PIXELART: das feste Münz-Sprite des Spielgestalters
+    // (`gold-muenze.png`, 12×12) ganzzahlig 2×, `image-rendering: pixelated`, Bewegung in ganzen 2-Pixel-Schritten im Bildtakt (~30 Bilder/s, Bogen aus Rasterstufen), harte
+    // Goldrahmen aus gestapelten `box-shadow`-Ringen (kein Weichzeichner), Blinken je Bild statt weichem Pulsieren. Die Zeiten kommen vom Server (`betrayal.js`: stepMs/legMs/dwellMs).
+    const onBetrayalCoins = ({ fromPlayer, toPlayer, targetOwner, targetHeroIdx, targetZoneSlot, coins, stepMs, legMs, dwellMs }) => {
+      if (window._playAnimations === false) { setBetrayalHold(null); return; }
+      const von = document.querySelector(`[data-gold-player="${fromPlayer}"]`);
+      const nach = document.querySelector(`[data-gold-player="${toPlayer}"]`);
+      const ziel = document.querySelector(`[data-support-zone][data-support-owner="${ownerLbl(targetOwner, myIdx)}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
+      if (!von || !nach || !ziel) { setBetrayalHold(null); return; }
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_betrayal_coins');
+      const N = Math.max(1, Math.min(8, Number(coins) || 5)), STEP = Number(stepMs) || 130, LEG = Number(legMs) || 360, DWELL = Number(dwellMs) || 100;
+      const TAKT = 33, RASTER = 2, MUENZE = 24, BOGEN = 44;
+      const mitte = (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, r }; };
+      const A = mitte(von), B = mitte(ziel), C = mitte(nach);
+      const raster = (v) => Math.round(v / RASTER) * RASTER;
+      const muenzen = Array.from({ length: N }, () => {
+        const m = document.createElement('div');
+        m.setAttribute('data-pp-px', 'aus');
+        m.style.cssText = `position:fixed;left:0;top:0;width:${MUENZE}px;height:${MUENZE}px;background:url('/gold-muenze.png') center/100% 100% no-repeat;image-rendering:pixelated;pointer-events:none;z-index:10250;display:none`;
+        document.body.appendChild(m);
+        return m;
+      });
+      // Harte Rahmen (gestapelte Ringe, keine Unschärfe): einer um die Kreatur (blinkt, solange Münzen dort sind), einer um die Zielanzeige (kurz nach jeder Landung).
+      const rahmen = (r, pad) => {
+        const d = document.createElement('div');
+        d.setAttribute('data-pp-px', 'aus');
+        d.style.cssText = `position:fixed;left:${Math.round(r.left - pad)}px;top:${Math.round(r.top - pad)}px;width:${Math.round(r.width + pad * 2)}px;height:${Math.round(r.height + pad * 2)}px;box-shadow:0 0 0 3px #fad54a,0 0 0 6px #b62600;pointer-events:none;z-index:10249;display:none`;
+        document.body.appendChild(d);
+        return d;
+      };
+      const rKreatur = rahmen(B.r, 3), rKonto = rahmen(C.r, 3);
+      const bahn = (p, q, k) => ({ x: p.x + (q.x - p.x) * k, y: p.y + (q.y - p.y) * k - Math.round(Math.sin(k * Math.PI) * BOGEN / RASTER) * RASTER });
+      const ENDE = (N - 1) * STEP + 2 * LEG + DWELL;
+      const t0 = performance.now();
+      let letzte = -1;
+      // Anzeige: je Abflug zählt die Zahl des Zahlers um 1 herunter, je Landung die des Empfängers um 1 hinauf (Stand vor der Zahlung hält `betrayalHold`).
+      const gestartet = new Set(), gelandet0 = new Set();
+      const zaehle = (sitz, d) => setBetrayalHold(h => (h && h[sitz] != null ? { ...h, [sitz]: h[sitz] + d } : h));
+      const schritt = (jetzt) => {
+        const t = jetzt - t0;
+        const fr = Math.floor(t / TAKT);
+        if (fr !== letzte) {
+          letzte = fr;
+          let aufKreatur = false, gelandet = false;
+          muenzen.forEach((m, i) => {
+            const lt = t - i * STEP;
+            let pos = null;
+            if (lt >= 0 && !gestartet.has(i)) { gestartet.add(i); zaehle(fromPlayer, -1); }
+            if (lt >= 2 * LEG + DWELL && !gelandet0.has(i)) { gelandet0.add(i); zaehle(toPlayer, 1); }
+            if (lt >= 0 && lt < LEG) pos = bahn(A, B, Math.min(1, lt / LEG));
+            else if (lt >= LEG && lt < LEG + DWELL) {
+              const hup = [0, -6, -8, -4][Math.floor((lt - LEG) / TAKT) % 4];            // die Münze hüpft auf der Karte
+              pos = { x: B.x, y: B.y + hup };
+              aufKreatur = true;
+            } else if (lt >= LEG + DWELL && lt < 2 * LEG + DWELL) pos = bahn(B, C, Math.min(1, (lt - LEG - DWELL) / LEG));
+            if (lt >= 2 * LEG + DWELL && lt < 2 * LEG + DWELL + 130) gelandet = true;
+            if (!pos) { m.style.display = 'none'; return; }
+            m.style.display = 'block';
+            m.style.transform = `translate(${raster(pos.x - MUENZE / 2)}px, ${raster(pos.y - MUENZE / 2)}px)`;
+          });
+          rKreatur.style.display = aufKreatur && (fr % 2 === 0) ? 'block' : 'none';       // blinkt im Bildtakt
+          rKonto.style.display = gelandet && (fr % 2 === 0) ? 'block' : 'none';
+        }
+        if (t < ENDE + 140) requestAnimationFrame(schritt);
+        else { muenzen.forEach(m => m.remove()); rKreatur.remove(); rKonto.remove(); setBetrayalHold(null); }
+      };
+      requestAnimationFrame(schritt);
+    };
+    socket.on('betrayal_coins', onBetrayalCoins);
+    // Hold: die Zahlung ist im Zustand schon gebucht — die Anzeige bleibt auf dem alten Stand, bis eine Animation sie zählt. Freigabe: `betrayal_gold_release` ({ seats? } = nur diese Sitze),
+    // der Münzflug selbst oder spätestens nach 25 s (Sicherung gegen eine Negierung ohne Bilder).
+    let holdTimer = null;
+    const onBetrayalHold = ({ seats }) => {
+      if (!seats || window._playAnimations === false) return;
+      setBetrayalHold({ ...seats });
+      clearTimeout(holdTimer);
+      holdTimer = setTimeout(() => setBetrayalHold(null), 25000);
+    };
+    const onBetrayalRelease = ({ seats }) => {
+      if (!Array.isArray(seats)) { setBetrayalHold(null); return; }
+      setBetrayalHold(h => { if (!h) return h; const n = { ...h }; seats.forEach(x => delete n[x]); return Object.keys(n).length ? n : null; });
+    };
+    socket.on('betrayal_gold_hold', onBetrayalHold);
+    socket.on('betrayal_gold_release', onBetrayalRelease);
     const onJumpscareBox = ({ owner, heroIdx }) => {
       if (window.playSFX) window.playSFX('jumpscare', { category: 'effect' });
       const ownerLabel = ownerLbl(owner, myIdx);
@@ -51334,10 +52056,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const zielLabel = ownerLbl((destOwner ?? owner), myIdx);
       // 'hand' source flies cards out of the player's hand instead of
       // their deck pile (used by Ascension bonus when deck supply is
-      // exhausted but hand still has copies).
+      // exhausted but hand still has copies); 'discard' (W77b) out of the discard pile.
       let srcSel;
       if (source === 'hand') {
         srcSel = ownerLabel === 'me' ? '.game-hand-me' : '.game-hand-opp';
+      } else if (source === 'discard') {
+        // W77b: die Ablage ist eine Quelle des Aufstiegsbonus.
+        srcSel = ownerLabel === 'me' ? '[data-my-discard]' : '[data-opp-discard]';
       } else {
         srcSel = ownerLabel === 'me' ? '[data-my-deck]' : '[data-opp-deck]';
       }
@@ -52154,6 +52879,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('card_effect_flash', onCardEffectFlash);
       socket.off('gold_gift_flight', onGoldGiftFlight);
       socket.off('gold_steal_burst', onGoldStealBurst);
+      socket.off('betrayal_coins', onBetrayalCoins);
+      socket.off('betrayal_gold_hold', onBetrayalHold);
+      socket.off('betrayal_gold_release', onBetrayalRelease);
+      clearTimeout(holdTimer);
       socket.off('jumpscare_box', onJumpscareBox);
       socket.off('anti_magic_bubble', onAntiMagicBubble);
       socket.off('fireshield_corona', onFireshieldCorona);
@@ -53981,7 +54710,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const chainPickValidIds = new Set();
   const chainPickSelectedIds = new Set(chainPickSelected.map(t => t.id));
   const chainPickDamages = chainPickData?.damages || [];
-  const chainPickMaxTargets = chainPickDamages.length;
+  // ★ W78 (Backstab): `steps` = GEORDNETE Wahl mit eigener Kandidatenliste je Klick ([{ ids, label, role }]) — dieselben nummerierten Marker, Rückgängig und Bestätigen; ohne `steps` bleibt alles wie bei Chain Lightning.
+  const chainPickSteps = Array.isArray(chainPickData?.steps) ? chainPickData.steps : null;
+  const chainPickMaxTargets = chainPickSteps ? chainPickSteps.length : chainPickDamages.length;
   const chainPickHeroesFirst = chainPickData?.heroesFirst || false;
   if (chainPickData) {
     const allTargets = chainPickData.targets || [];
@@ -53990,6 +54721,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (step < chainPickMaxTargets) {
       for (const t of allTargets) {
         if (chainPickSelectedIds.has(t.id)) continue;
+        if (chainPickSteps) {
+          // `byPrev` (Backstab: Ziel muss demselben Spieler gehören wie der Angreifer): die Liste dieses Schritts hängt vom Klick davor ab.
+          const sp = chainPickSteps[step];
+          const erlaubt = (sp.byPrev && step > 0) ? (sp.byPrev[chainPickSelected[step - 1]?.id] || []) : (sp.ids || []);
+          if (!erlaubt.includes(t.id)) continue;
+        }
         // Heroes-first: if there are unselected heroes, only heroes are valid
         if (chainPickHeroesFirst) {
           const unselectedHeroes = allTargets.filter(x => x.type === 'hero' && !chainPickSelectedIds.has(x.id));
@@ -54003,6 +54740,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     chainPickSelected.length >= chainPickMaxTargets || chainPickValidIds.size === 0
   ));
   const chainPickCanConfirm = chainPickIsFinal;
+  // ★ W78 (Backstab, Al 26.10.): bei der GEORDNETEN Wahl (`steps`) statt gelber Nummernmarken Pixelrahmen — Klick 1 (der Angreifer) dunkelrot, Klick 2 (das Ziel) hellrot;
+  // wählbare Kandidaten blinken in der Farbe des Schritts, der gerade gewählt wird (`steps(1)`, kein Schein).
+  // `preset` = schon feststehende Wahl (der auf den Helden gezogene Angreifer): sie zählt als Schritt 0, die Liste `steps` beginnt dahinter.
+  const chainPickPreset = Array.isArray(chainPickData?.preset) ? chainPickData.preset : [];
+  // Al 26.10. (API-Regel „Ziel-Picker graut Nicht-Wählbares aus"): jede vorhandene Heldenkarte/Kreatur, die im aktuellen Schritt nicht wählbar ist, wird ausgegraut (`vorhanden` = dort liegt eine Karte).
+  const chainPickRolle = (id, vorhanden = false) => {
+    if (!chainPickSteps) return '';
+    if (chainPickPreset.includes(id)) return ' chain-pick-fest chain-pick-schritt0';
+    const st = chainPickSelected.findIndex(t => t.id === id);
+    if (st >= 0) return ' chain-pick-fest chain-pick-schritt' + Math.min(st + chainPickPreset.length, 1);
+    if (chainPickValidIds.has(id)) return ' chain-pick-kandidat chain-pick-schritt' + Math.min(chainPickSelected.length + chainPickPreset.length, 1);
+    return vorhanden ? ' potion-target-ineligible' : '';
+  };
 
   // Escape removes last selection, Enter confirms chain
   useEffect(() => {
@@ -54012,6 +54762,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         e.stopImmediatePropagation();
         if (chainPickSelected.length > 0) {
           setChainPickSelected(prev => prev.slice(0, -1));
+        } else if (chainPickData.cancellable) {
+          respondToPrompt({ cancelled: true });   // W78: Abbruch (Backstab: Karte zurück auf die Hand)
         }
       } else if ((e.key === 'Enter' || e.code === 'Space') && chainPickCanConfirm) {
         e.preventDefault();
@@ -54286,6 +55038,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Breakthrough / Amazing Finding (breakthrough.js, amazing-finding.js)
       if (t === 'breakthrough') { const p = playerByName(entry.player); return <span className="log-status">💥 {pName(p.name, p.color)}'s {cName('Breakthrough')} sent {cName(entry.card)} to the discard pile!</span>; }
       if (t === 'amazing_finding') { const p = playerByName(entry.player); const a = entry.artifacts || []; return <span className="log-status">🔎 {pName(p.name, p.color)}'s {cName('Amazing Finding')} {a.length > 0 ? <>added {a.map((c, i) => <React.Fragment key={i}>{i > 0 ? ', ' : ''}{cName(c)}</React.Fragment>)} to their hand</> : <>found no Artifact</>}{entry.shuffled ? <> and shuffled {cName(entry.shuffled)} back into the deck</> : null}.</span>; }
+      // Cell Escape (cell-escape.js): Karten aus dem Gegnerdeck gezogen (keine Namen — der Gegner soll nicht sehen, was fehlt)
+      if (t === 'cell_escape') { const p = playerByName(entry.player); return <span className="log-status">🔓 {pName(p.name, p.color)}'s {cName('Cell Escape')} drew {entry.drawn} card{entry.drawn === 1 ? '' : 's'} from {entry.opponent}'s deck{entry.bonus ? ' (a Hero is Frozen or Stunned: 2 more!)' : ''}.</span>; }
       // Create Secret Room: Karte eingelegt / auf die Hand genommen / aktiviert (create-secret-room.js, _secret-room-shared.js)
       if (t === 'secret_room_set') { const p = playerByName(entry.player); return <span className="log-status">🚪 {pName(p.name, p.color)}'s {cName('Create Secret Room')} hid a card in {entry.hero}'s Surprise Zone.</span>; }
       if (t === 'secret_room_hand') { const p = playerByName(entry.player); return <span className="log-status">🚪 {pName(p.name, p.color)} took the hidden card out of the secret room into their hand ({entry.hero} was chosen by {cName(entry.by)}).</span>; }
@@ -54545,6 +55299,35 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const p = playerByName(entry.player);
         return <span className="log-damage">🗡️ {cName('Vengeful Attack')} — {pName(p.name, p.color)}'s {entry.hero} takes revenge on {entry.target || 'the target'}{entry.damage != null ? <>: <span className="log-amount">{entry.damage}</span> damage</> : null}.</span>;
       }
+      if (t === 'backstab') {
+        const p = playerByName(entry.player);
+        return <span className="log-damage">🗡️ {cName('Backstab')} — {pName(p.name, p.color)} stabs {entry.target || 'the target'} with {entry.hero}'s blade{entry.damage != null ? <>: <span className="log-amount">{entry.damage}</span> damage</> : null}.</span>;
+      }
+      if (t === 'backstab_blocked') {
+        return <span className="log-info">🗡️ {cName('Backstab')} — {entry.hero} can no longer attack: the stab fizzles.</span>;
+      }
+      if (t === 'pythia_foresee') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🔮 {cName('Infallible Oracle Pythia')} — {pName(p.name, p.color)} foresees the death of {entry.target}.</span>;
+      }
+      if (t === 'pythia_counter') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🔮 {cName('Infallible Oracle Pythia')} — {pName(p.name, p.color)} places a Pythia Counter ({entry.counters}).</span>;
+      }
+      if (t === 'pythia_defeat') {
+        const p = playerByName(entry.player);
+        return <span className="log-damage">🔥 {cName('Infallible Oracle Pythia')} — the third Pythia Counter: green flames defeat {entry.target} for {pName(p.name, p.color)}.</span>;
+      }
+      if (t === 'pythia_fizzle') {
+        return <span className="log-info">🔮 {cName('Infallible Oracle Pythia')} — the third Pythia Counter, but the chosen target is gone: nothing happens.</span>;
+      }
+      if (t === 'pythia_save') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🔥 {cName('Infallible Oracle Pythia')} — {pName(p.name, p.color)} sacrifices {entry.sacrificed}; Pythia is fully healed instead of being defeated.</span>;
+      }
+      if (t === 'pythia_save_failed') {
+        return <span className="log-info">🔥 {cName('Infallible Oracle Pythia')} — the sacrifice of {entry.sacrificed} did not go through; Pythia is defeated.</span>;
+      }
       if (t === 'wise_village_elder') {
         const p = playerByName(entry.player);
         return <span className="log-status">💬 {cName('Wise Village Elder')} — {pName(p.name, p.color)} attaches {cName(entry.card)} from their {entry.from === 'deck' ? 'deck' : 'hand'} to {entry.hero} as an additional attachment.</span>;
@@ -54634,6 +55417,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'capture_control') {
         const p = playerByName(entry.player);
         return <span className="log-status">🪢 {cName('Capture')} — {pName(p.name, p.color)}'s {entry.hero} takes permanent control of {cName(entry.creature)}{entry.from ? ` from ${entry.from}` : ''}!</span>;
+      }
+      if (t === 'betrayal_pay') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🗡️ {cName('Betrayal')} — {pName(p.name, p.color)} pays {entry.to} <span className="log-amount" style={{color:'#fad54a'}}>{entry.amount}</span> Gold for {cName(entry.creature)}.</span>;
+      }
+      if (t === 'betrayal_control') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🗡️ {cName('Betrayal')} — {pName(p.name, p.color)}'s {entry.hero} takes permanent control of {cName(entry.creature)}{entry.from ? ` from ${entry.from}` : ''}!</span>;
+      }
+      if (t === 'betrayal_fizzle') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🗡️ {cName('Betrayal')} — {pName(p.name, p.color)} could not take control of {entry.creature ? cName(entry.creature) : 'the Creature'}.</span>;
       }
       if (t === 'capture_fizzle') {
         const p = playerByName(entry.player);
@@ -55130,7 +55925,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 : ((gameState.effectPrompt.heroIndicesByCard || {})[playDrag.card.name] || []).includes(i));
           const creatureIneligible = !isOpp && playDrag && playDrag.card?.cardType === 'Creature' && !playDrag.isEquip && (() => {
             if (heroActionEligibleHere) return findFreeSupportSlot(p, i) < 0;
-            if (!canHeroPlayCard(p, i, playDrag.card)) return true;
+            if (!canHeroPlayCard(p, i, playDrag.card, playDrag.fromCreation ? null : playDrag.idx)) return true;
             if (findFreeSupportSlot(p, i) < 0) return true;
             return false;
           })();
@@ -55141,7 +55936,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             ? ((gameState.attachmentHostTargets || {})[playDrag.card.name] || null)
             : null;
           const _attHostsHeroOwn = _attHostsHero ? _attHostsHero.filter(h => (h.owner ?? myIdx) === myIdx) : null;
-          const spellAttackIneligible = _attHostsHeroOwn
+          // ★ W78 (Backstab): eine Karte OHNE Wirker-Helden grau alle Helden aus, die nicht in der Liste `herolessAngreifer` (ziehbare Gegnerhelden) stehen — eigene Helden nie.
+          const _hlDrag = !!(playDrag && !playDrag.isEquip && playDrag.card && (playDrag.card.cardType === 'Spell' || playDrag.card.cardType === 'Attack') && (me.herolessHandCards || []).includes(playDrag.card.name));
+          const _hlIneligible = _hlDrag && !((me.herolessAngreifer || {})[playDrag.card.name] || []).some(a => a.owner === (isOpp ? oppIdx : myIdx) && a.heroIdx === i);
+          const spellAttackIneligible = _hlDrag ? _hlIneligible : _attHostsHeroOwn
             ? !_attHostsHeroOwn.some(h => h.heroIdx === i)
             : ((!isOpp || isCharmedByMe) && playDrag && !playDrag.isEquip && (playDrag.card?.cardType === 'Spell' || playDrag.card?.cardType === 'Attack') && !heroActionEligibleHere && !canHeroPlayCard(p, i, playDrag.card, playDrag.fromCreation ? null : playDrag.idx));
           // Persistent "dragging a Surprise card" check (true throughout the
@@ -55519,11 +56317,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <div key={'lpad-'+s} className="board-zone-spacer" />
               ))}
               <div className="board-zone-spacer" />
-              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || pickHeroDropIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || pickHeroDropTarget || attachPickEligibleHero || isCsppHeroTarget || spellPickEntry) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isValidHeroTarget && accentGreenTargetIds.has(heroTargetId) ? ' potion-target-accent-green' : '') + (isIneligibleHeroTarget ? ' potion-target-ineligible' : '') + (isRedMarkedHeroTarget ? ' potion-target-marked-red' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (zielMarkeLeuchtet ? ' prompt-marked' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + ((isHeroEffectActive || klickHeilungOffen) ? ' zone-hero-effect-active' : '') + (isHeldKreaturActivatable ? ' zone-creature-activatable' : '') + (stReadyGlow && !stBonus ? ' st-actor-ready' : '') + (stBonus && !stActing ? ' st-actor-bonus' : '') + (stActing ? ' st-actor-acting' : '') + (stExhausted && !stBonus && !stActing && hero?.hp > 0 ? ' st-actor-exhausted' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '') + (isZonePickHero ? ' zone-pick-target' : '') + ((allianzHover && allianzHover.some(a => a.owner === (isOpp ? oppIdx : myIdx) && a.heroIdx === i)) ? ' zone-alliance-linked' : '')}
+              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || pickHeroDropIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || pickHeroDropTarget || attachPickEligibleHero || isCsppHeroTarget || spellPickEntry) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isValidHeroTarget && accentGreenTargetIds.has(heroTargetId) ? ' potion-target-accent-green' : '') + (isIneligibleHeroTarget ? ' potion-target-ineligible' : '') + (isRedMarkedHeroTarget ? ' potion-target-marked-red' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (zielMarkeLeuchtet ? ' prompt-marked' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + ((isHeroEffectActive || klickHeilungOffen) ? ' zone-hero-effect-active' : '') + (isHeldKreaturActivatable ? ' zone-creature-activatable' : '') + (stReadyGlow && !stBonus ? ' st-actor-ready' : '') + (stBonus && !stActing ? ' st-actor-bonus' : '') + (stActing ? ' st-actor-acting' : '') + (stExhausted && !stBonus && !stActing && hero?.hp > 0 ? ' st-actor-exhausted' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '') + chainPickRolle(heroTargetId, !!hero?.name) + (isZonePickHero ? ' zone-pick-target' : '') + ((allianzHover && allianzHover.some(a => a.owner === (isOpp ? oppIdx : myIdx) && a.heroIdx === i)) ? ' zone-alliance-linked' : '')}
                 data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
                 onClick={onHeroClick}
                 style={zsMerge('hero', { ...((isCsppHeroTarget || isHeroEffectActive || isHeldKreaturActivatable || isValidHeroTarget || isChainPickValid || attachPickEligibleHero || isZonePickHero || spellPickEntry) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#fc69c6' } : undefined) })}>
-                {isChainPickSelected && <div className="chain-pick-number">{chainPickStep + 1}</div>}
+                {isChainPickSelected && !chainPickSteps && <div className="chain-pick-number">{chainPickStep + 1}</div>}
                 {/* v718: dauerhaft uebernommener Held. Der pulsende
                     Rahmen allein sagt nur „hier stimmt etwas nicht" —
                     das Schild sagt, WEM der Held jetzt gehoert, und
@@ -55706,7 +56504,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     die Bedingung davor war eine zweite Liste aller Status, die
                     jeder neue Status verfehlen konnte (v1142: „Aged"; nie in
                     ihr standen auch Bleeding und Charmed). */}
-                {hero?.name && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife, _extraLifeStack: hero._extraLifeStack, _oneShotDmgShields: hero._oneShotDmgShields, _targetBlockers: hero._targetBlockers }} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} isOpponentSide={isOpp} />}
+                {hero?.name && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife, _extraLifeStack: hero._extraLifeStack, _oneShotDmgShields: hero._oneShotDmgShields, _targetBlockers: hero._targetBlockers, _pythiaMark: hero._pythiaMark }} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} isOpponentSide={isOpp} />}
                 {/* ★ v1342: Immune/Shielded sind STATUS — sie stehen jetzt auch beim
                     Helden in der linken Status-Spalte (wie bei Kreaturen), nicht
                     mehr als eigenes Schild oben rechts. */}
@@ -56736,7 +57534,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       // any alive own Hero's empty Support Zone, regardless
                       // of whether THAT hero could normally summon the card.
                       || (_isCrossSideCreatureDrag && me.heroes?.[i]?.hp > 0)
-                      || canHeroNormalSummon(me, i, playDrag.card)
+                      || canHeroNormalSummon(me, i, playDrag.card, playDrag.fromCreation ? null : playDrag.idx)
                     )
                   )
                 : canPlayHere;
@@ -56970,7 +57768,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 || brackleSourceHidden.has(`${pi}-${i}-${z}`)
                 || pusherFlungHidden.has(`${pi}-${i}-${z}`);
               return (
-                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + ((gameState.creatureCounters || {})[`${pi}-${i}-${z}`]?._zoneAura === 'necro_flicker' ? ' board-zone-aura' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && equipTargetIds.some(id => accentGreenTargetIds.has(id)) ? ' potion-target-accent-green' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isRedMarkedEquipTarget ? ' potion-target-marked-red' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + ((isAbilitySupportTarget || attachPickSupportValid) ? ' board-zone-play-target' : '') + (supportAbilityEntry && !supportAbilityFrei ? ' zone-ability-activatable' : '') + (supportAbilityEntry && supportAbilityFrei ? ' zone-ability-free-activatable' : '') + (isBorisBlockedSupportAbility ? ' zone-ability-boris-blocked' : '') + (abilityFlash && abilityFlash.zoneKind === 'support' && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z ? ' zone-ability-activated' : '') + (abilityBlockFlash && abilityBlockFlash.zoneKind === 'support' && abilityBlockFlash.owner === (isOpp ? oppIdx : myIdx) && abilityBlockFlash.heroIdx === i && abilityBlockFlash.zoneIdx === z ? ' zone-ability-blocked' : '') + (istSupportAbility && (isDead || isFrozenOrStunnedSup) ? ' board-zone-dead' : '') + ((isDragValidZoneAny || isCsppEmptySlot || isSummonPickZone) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + ((isHeroActionZoneDimmed && !isCsppEmptySlot) ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (equipStapelAnzeige ? ' board-zone-equipstack' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '') + stCreatureCls(pi, i, z)}
+                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + ((gameState.creatureCounters || {})[`${pi}-${i}-${z}`]?._zoneAura === 'necro_flicker' ? ' board-zone-aura' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && equipTargetIds.some(id => accentGreenTargetIds.has(id)) ? ' potion-target-accent-green' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isRedMarkedEquipTarget ? ' potion-target-marked-red' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + ((isAbilitySupportTarget || attachPickSupportValid) ? ' board-zone-play-target' : '') + (supportAbilityEntry && !supportAbilityFrei ? ' zone-ability-activatable' : '') + (supportAbilityEntry && supportAbilityFrei ? ' zone-ability-free-activatable' : '') + (isBorisBlockedSupportAbility ? ' zone-ability-boris-blocked' : '') + (abilityFlash && abilityFlash.zoneKind === 'support' && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z ? ' zone-ability-activated' : '') + (abilityBlockFlash && abilityBlockFlash.zoneKind === 'support' && abilityBlockFlash.owner === (isOpp ? oppIdx : myIdx) && abilityBlockFlash.heroIdx === i && abilityBlockFlash.zoneIdx === z ? ' zone-ability-blocked' : '') + (istSupportAbility && (isDead || isFrozenOrStunnedSup) ? ' board-zone-dead' : '') + ((isDragValidZoneAny || isCsppEmptySlot || isSummonPickZone) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + ((isHeroActionZoneDimmed && !isCsppEmptySlot) ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (equipStapelAnzeige ? ' board-zone-equipstack' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + chainPickRolle(creatureChainId, cards.length > 0) + (isStolen ? ' hero-charmed' : '') + stCreatureCls(pi, i, z)}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'} data-card-name={cards[0] || ''}
                   data-versiegelt={ppVerwahrung(gameState.players?.[pi], i, 'support', z).versiegelt ? '1' : undefined}
                   onClick={attachPickSupportValid ? () => {
@@ -57038,10 +57836,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     // placement. Clear the pick state so the highlights
                     // disappear. handIndex is stale after hand shifts
                     // (draws / returns) — resolve by name so the right
-                    // copy plays.
+                    // copy plays. Als Ruling (Al 26.10.): die GEKLICKTE Kopie bleibt gueltig, solange sie noch dieselbe Karte ist.
                     const ps = pendingBouncePick;
                     setPendingBouncePick(null);
-                    const currentIdx = hand.findIndex(c => c === ps.cardName);
+                    const currentIdx = ps.fromCreation ? hand.findIndex(c => c === ps.cardName) : resolveHandCopy(ps.cardName, ps.handIndex, i);
                     if (currentIdx < 0) return;
                     socket.emit('play_creature', {
                       roomId: gameState.roomId, cardName: ps.cardName,
@@ -57186,7 +57984,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     _activeLuckTooltipTarget = p.heroes[i]?._luckDeclared?.['s' + z]?.target || null;
                   } : undefined}
                   onMouseLeave={(cards || []).includes('Alliance') ? () => setAllianzHover(null) : (cards || [])[0] === 'Luck' ? () => { _activeLuckTooltipTarget = null; } : undefined}>
-                  {isChainPickCreatureSelected && <div className="chain-pick-number">{chainPickCreatureStep + 1}</div>}
+                  {isChainPickCreatureSelected && !chainPickSteps && <div className="chain-pick-number">{chainPickCreatureStep + 1}</div>}
                   {/* ★ W62a: Die Vorschau der noch nicht gelandeten Karte (Ziehen, Zusatzaktions-Wahl, Gegner setzt) ERSETZT den Platz
                       nur, wenn dort keine gleichnamige Kopie liegt. In einer geteilten Zone (Alice) bliebe sonst der vorhandene Stapel
                       fuer die Dauer der Vorschau unsichtbar — die Zone wirkte leer; dort bleibt der Stapel stehen, die neue Kopie kommt
@@ -57624,6 +58422,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         <span className="head-counter-num">×{cc.bombCounters}</span>
                       </div>
                     ) : null}
+                    {(cc?.pythiaCounters > 0 || cc?.pythiaPlan) ? (
+                      <div className="head-counter-badge"
+                        onMouseEnter={e => showGameTooltip(e, `Pythia Counters: ${cc.pythiaCounters || 0}. Pythia places 1 at the beginning of each of her controller's turns. When the third is placed, ${cc.pythiaPlan ? `the chosen target (${cc.pythiaPlan.cardName}) is immediately defeated` : 'nothing happens (the chosen target is gone)'}.`)}
+                        onMouseLeave={hideGameTooltip}
+                        style={{ background: '#3ddc57', borderColor: '#167927', color: '#0f2412' }}
+                      >
+                        <span className="head-counter-icon"><PxIcon z="🔮" /></span>
+                        <span className="head-counter-num">×{cc.pythiaCounters || 0}</span>
+                      </div>
+                    ) : null}
                     {cc?.changeCounter > 0 ? (
                       <div className="head-counter-badge"
                         onMouseEnter={e => showGameTooltip(e, `Change Counters: ${cc.changeCounter}. Cosmic Depths counters used by Analyzer, Gatherer, Argos and friends.`)}
@@ -58014,7 +58822,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             </div>
               <div className="game-gold-display">
                 <span className="game-gold-icon"></span>
-                <span className={'game-gold-value orbit-font' + (goldCrash ? (goldCrashTone === 'recover' ? ' gold-recovering' : ' gold-crashing') : '') + (goldIsNegative(goldCrash ? goldCrash[oppIdx] : opp.gold) ? ' gold-negative' : '')} data-gold-player={oppIdx}>{formatGold(goldCrash ? goldCrash[oppIdx] : opp.gold)}</span>
+                <span className={'game-gold-value orbit-font' + (goldCrash ? (goldCrashTone === 'recover' ? ' gold-recovering' : ' gold-crashing') : '') + (goldIsNegative(goldCrash ? goldCrash[oppIdx] : (betrayalHold && betrayalHold[oppIdx] != null ? betrayalHold[oppIdx] : opp.gold)) ? ' gold-negative' : '')} data-gold-player={oppIdx}>{formatGold(goldCrash ? goldCrash[oppIdx] : (betrayalHold && betrayalHold[oppIdx] != null ? betrayalHold[oppIdx] : opp.gold))}</span>
               </div>
           </div>
         </div>
@@ -58978,8 +59786,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 //     counting Skeletons in discard, etc.). Recomputed
                 //     each sendGameState; nothing is stored on the
                 //     player state.
-                // Lowest (most-negative) wins, matching the server's
-                // `heroMeetsLevelReq` aggregate. The hero-filter map
+                // Die Abzüge einer Kopie werden ADDIERT (s. u., Ruling Al 26.10.);
+                // über mehrere Kopien gilt serverseitig die am stärksten gesenkte
+                // (`heroMeetsLevelReq`). The hero-filter map
                 // tells us whether the rebate is restricted to one
                 // specific Hero (Queen's "corresponding Hero") so the
                 // badge can flag that limitation in dark green —
@@ -58988,7 +59797,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const persistent = (me.handLevelOffsets || {})[item.origIdx] || 0;
                 const transient  = (me.handLevelOffsetsTransient || {})[item.origIdx] || 0;
                 const dynamic    = (me.handLevelOffsetsDynamic || {})[item.origIdx] || 0;
-                const handLevelOffset = Math.min(persistent, transient, dynamic, 0);
+                // Als Ruling (Al 26.10.): „Bear Rider und Slime sollen sich addieren" — die drei Abzüge dieser Kopie zählen als SUMME (der Server
+                // rechnet `dynamic` schon auf der Stufe nach dem dauerhaften + transienten Abzug, Untergrenzen wie Biseria „minimum of 1" eingerechnet).
+                const handLevelOffset = Math.min(persistent + transient + dynamic, 0);
                 const handCardData = CARDS_BY_NAME[item.card];
                 // Mana Absorbing Crystal — while a copy is in our hand,
                 // every Spell's level reads +1. Hand-wide boost (not
@@ -59180,7 +59991,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             )}
             <div className="game-gold-display">
               <span className="game-gold-icon"></span>
-              <span className={'game-gold-value orbit-font' + (goldCrash ? (goldCrashTone === 'recover' ? ' gold-recovering' : ' gold-crashing') : '') + (goldIsNegative(goldCrash ? goldCrash[myIdx] : me.gold) ? ' gold-negative' : '')} data-gold-player={myIdx}>{formatGold(goldCrash ? goldCrash[myIdx] : me.gold)}</span>
+              <span className={'game-gold-value orbit-font' + (goldCrash ? (goldCrashTone === 'recover' ? ' gold-recovering' : ' gold-crashing') : '') + (goldIsNegative(goldCrash ? goldCrash[myIdx] : (betrayalHold && betrayalHold[myIdx] != null ? betrayalHold[myIdx] : me.gold)) ? ' gold-negative' : '')} data-gold-player={myIdx}>{formatGold(goldCrash ? goldCrash[myIdx] : (betrayalHold && betrayalHold[myIdx] != null ? betrayalHold[myIdx] : me.gold))}</span>
             </div>
           </div>
         </div>
@@ -60871,11 +61682,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           {/* Optional small card preview — server passes `previewCardName`
               to give the player a visual of what they're about to place.
               CardMini gives the full hover tooltip + foil treatment for free. */}
-          {ep.previewCardName && CARDS_BY_NAME[ep.previewCardName] && (
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-              <div className="panel-zielwahl-vorschau" style={{ width: 90 }}>
-                <CardMini card={CARDS_BY_NAME[ep.previewCardName]} inGallery />
-              </div>
+          {((ep.previewCardName && CARDS_BY_NAME[ep.previewCardName]) || (ep.showCardLeft && CARDS_BY_NAME[ep.showCardLeft])) && (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 10 }}>
+              {/* `showCardLeft`: die betroffene Karte LINKS (Enemy of my Enemy: die Creature), die Quellkarte rechts daneben */}
+              {ep.showCardLeft && CARDS_BY_NAME[ep.showCardLeft] && (
+                <div className="panel-zielwahl-vorschau" style={{ width: 90 }}>
+                  <CardMini card={CARDS_BY_NAME[ep.showCardLeft]} inGallery />
+                </div>
+              )}
+              {ep.previewCardName && CARDS_BY_NAME[ep.previewCardName] && (
+                <div className="panel-zielwahl-vorschau" style={{ width: 90 }}>
+                  <CardMini card={CARDS_BY_NAME[ep.previewCardName]} inGallery />
+                </div>
+              )}
             </div>
           )}
           <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7 }}>Click a highlighted zone on the board.</div>
@@ -60930,16 +61749,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* ── Effect Prompt: Chain Target Pick (Chain Lightning / Qinglong / Bottled Lightning) ── */}
       {isMyEffectPrompt && ep.type === 'chainTargetPick' && (
         <DraggablePanel zielwahl className="first-choice-panel animate-in" style={{ borderColor: '#fad54a' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: '#fad54a', marginBottom: 8 }}>⚡ {ep.title || 'Chain Lightning'}</div>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#fad54a', marginBottom: 8 }}>{chainPickSteps ? '⚔️' : '⚡'} {ep.title || 'Chain Lightning'}</div>
+          {chainPickSteps && ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>{ep.description}</div>}
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>
             {chainPickSelected.length < chainPickMaxTargets && chainPickValidIds.size > 0
-              ? `Click target #${chainPickSelected.length + 1} (${chainPickDamages[chainPickSelected.length]} dmg).`
-              : 'Confirm the chain!'}
+              ? (chainPickSteps
+                ? `${chainPickSelected.length + 1}/${chainPickMaxTargets}: ${chainPickSteps[chainPickSelected.length].label || 'Click a target.'}`
+                : `Click target #${chainPickSelected.length + 1} (${chainPickDamages[chainPickSelected.length]} dmg).`)
+              : (chainPickSteps ? 'Confirm!' : 'Confirm the chain!')}
           </div>
           {chainPickSelected.length > 0 && (
             <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 8 }}>
               {chainPickSelected.map((t, i) => (
-                <span key={String(t.id)} style={{ display: 'block', color: '#fad54a' }}>#{i+1} {String(t.cardName || '?')} → {chainPickDamages[i] || 0} dmg</span>
+                <span key={String(t.id)} style={{ display: 'block', color: '#fad54a' }}>#{i+1} {String(t.cardName || '?')} {chainPickSteps ? (chainPickSteps[i].role ? '— ' + chainPickSteps[i].role : '') : '→ ' + (chainPickDamages[i] || 0) + ' dmg'}</span>
               ))}
             </div>
           )}
@@ -60950,7 +61772,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             )}
             {chainPickCanConfirm && (
               <button className="btn btn-danger" style={{ padding: '6px 16px', fontSize: 11 }}
-                onClick={() => { respondToPrompt({ selectedTargets: chainPickSelected }); setChainPickSelected([]); }}>⚡ Confirm Chain!</button>
+                onClick={() => { respondToPrompt({ selectedTargets: chainPickSelected }); setChainPickSelected([]); }}>{chainPickSteps ? (ep.confirmLabel || 'Confirm') : '⚡ Confirm Chain!'}</button>
+            )}
+            {chainPickSteps && ep.cancellable && (
+              <button className="btn" style={{ padding: '6px 14px', fontSize: 11 }}
+                onClick={() => { respondToPrompt({ cancelled: true }); setChainPickSelected([]); }}>{ep.cancelLabel || '← Cancel'}</button>
             )}
           </div>
         </DraggablePanel>
@@ -61257,7 +62083,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   onClick={() => {
                     const pick = summonerPick;
                     setSummonerPick(null);
-                    dispatchCrossSideSummon(pick.cardName, hi, pick.destination);
+                    dispatchCrossSideSummon(pick.cardName, hi, pick.destination, pick.handIndex);
                   }}>
                   {h?.name || 'Hero ' + (hi + 1)}
                 </button>

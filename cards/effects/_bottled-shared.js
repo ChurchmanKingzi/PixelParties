@@ -33,8 +33,10 @@ async function runDiscardChain(engine, potionOwner, potionName) {
     const ps = gs.players[currentPlayer];
     const hand = ps?.hand || [];
 
-    // Auto-take if no cards left
-    if (hand.length === 0) return currentPlayer;
+    // Auto-take if no cards left. ★ W77b (Al: „Eine Karte selbst zählt NIE als legales Abwurf-Material"): die gerade aufgelöste Bottled-Karte liegt beim Besitzer noch in der Hand,
+    // zählt aber nicht mit — wer außer ihr nichts mehr hat, „cannot discard any more cards".
+    const erlaubt = engine._handIndizesOhneAufloesende(ps);
+    if (hand.length === 0 || erlaubt.length === 0) return currentPlayer;
 
     // ── BORIS, VOR DER ZIELWAHL (Als Praezisierung 5.8.) ──────────────
     // Frueher stand die Abfrage NACH dem Picker — man suchte erst eine
@@ -60,6 +62,7 @@ async function runDiscardChain(engine, potionOwner, potionName) {
     const result = await engine.promptGeneric(currentPlayer, {
       type: 'forceDiscardCancellable',
       title: potionName,
+      eligibleIndices: erlaubt,   // W77b: ohne die aufzulösende Karte (Z4)
       description: `Discard a card or take the ${potionName} effect!`,
       instruction: 'Click a card to discard it, or press "Take it!" to accept the effect.',
       cancelLabel: '🔥 Take it!',
@@ -104,7 +107,7 @@ async function runDiscardChain(engine, potionOwner, potionName) {
     }
 
 
-    if (handIndex >= 0 && handIndex < hand.length && hand[handIndex] === cardName) {
+    if (handIndex >= 0 && handIndex < hand.length && hand[handIndex] === cardName && erlaubt.includes(handIndex)) {
       engine.takeFromPileSync(currentPlayer, 'hand', handIndex);   // v1394: Stapel-Schicht
       const _ablagePs = engine.handKartenBesitzerPs(ps, cardName);   // W63c: Ablage des permanenten Besitzers (gestohlene Handkarte)
       _ablagePs.discardPile.push(cardName);

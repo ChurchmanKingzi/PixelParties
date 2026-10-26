@@ -143,7 +143,7 @@ module.exports = {
       const source = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Angreifers
       let defeated = 0;
       // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer.
-      engine.beginDestroyScope(creatures.length);
+      engine.beginDestroyScope(creatures.length, creatures);   // W78: die Opfer sind todgeweiht (Infallible Oracle Pythia darf keines opfern)
       try {
         for (const inst of creatures) {
           // Still a live support Creature? (an earlier death-trigger in

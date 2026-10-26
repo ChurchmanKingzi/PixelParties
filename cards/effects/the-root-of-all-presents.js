@@ -9,6 +9,7 @@
 //  • Aktiver Creature-Effekt (einmal pro Zug, Engine-Sperre je Instanz; `creatureEffect`). „You may": die Wahl ist abbrechbar, ein Abbruch verbraucht den Effekt nicht. „any number": EINE
 //    `handPick`-Auswahl aus der ganzen eigenen Hand, mindestens eine Karte (0 Karten wäre eine leere Aktivierung — dafür bricht man ab).
 //  • Spielbar nur, wenn es etwas zu tun gibt: der Spieler hat mindestens eine Handkarte, die Gegnerhand ist nicht tabu (Erstrunden-Schutz, Spreading Rumor „cannot interact with your opponent's hand").
+//    Als Ruling (Al 26.10.): auch unter einer Hand-/Suchsperre des Gegners (er kann keine Karten auf die Hand nehmen) ist die Aktivierung unmöglich — ausgegraut, die Einmal-Nutzung bleibt unverbraucht.
 //  • Das Verschenken ist eine Hand-Interaktion der Kategorie `insert` (Reaktionsfenster, Ambush the Scout): EIN Fenster für das ganze Geben; negiert → nichts geschieht, die Aktivierung ist verbraucht.
 //    Jede Karte wandert über `actionTransferCardToOppHand` (Hook `onCardTransferredToOppHand`, Herkunft bleibt beim Besitzer) — von hinten nach vorn (stabile Indizes), einzeln fliegend.
 //  • „to draw the same number of cards": Gezogen wird erst NACH dem Geben, so viele Karten, wie tatsächlich übergeben wurden (`actionDrawCards`, also mit Ziehsperren und Deck-Ende wie jeder Effekt-Zug).
@@ -28,6 +29,9 @@ function moeglich(engine, pi) {
   if ((ps.hand || []).length === 0) return false;
   if (gs.firstTurnProtectedPlayer === oi) return false;                    // Erstrunden-Schutz: die Hand ist tabu
   if (ps._oppHandInteractionLockedTurn === gs.turn) return false;          // Spreading Rumor
+  // Als Ruling (Al 26.10.): „Ja, unspielbar machen" — kann der GEGNER keine Karten auf die Hand nehmen (Hand-Sperre `handLocked`, Such-Sperre `searchLocked`/Siege …),
+  // ist die Aktivierung nicht möglich: ausgegraut, nichts verbraucht (dieselbe Prüfung wie `actionTransferCardToOppHand`).
+  if (engine._isSearchBlocked(oi, {}, 'deck')) return false;
   return true;
 }
 

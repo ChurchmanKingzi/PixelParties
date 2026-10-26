@@ -73,11 +73,12 @@ async function maybeKeepGemInHand(engine, pi, gemName) {
   // engine before resolve, so 0 means truly empty. Non-reaction gems:
   // the gem itself is still pinned in hand (the splice runs AFTER
   // resolve), so 1 means "only the gem", which is also unpayable.
-  // The client's forceDiscardCancellable prompt already filters the
-  // resolving card out of the eligible-indices list, so we don't
-  // need to send eligibleIndices here — the UI guard covers it.
+  // ★ W77b (Al: „Eine Karte selbst zählt NIE als legales Abwurf-Material für ihre eigenen Kosten"): die Wahl trägt die Plätze OHNE die aufzulösende Karte
+  // (`_handIndizesOhneAufloesende`) — vorher verließ sie sich auf die Sperre im Client; ein anderer Client / eine Antwort ohne Prüfung hätte das Juwel selbst abwerfen können.
   const minHand = gemName === 'Magic Topaz' ? 1 : 2;
   if ((ps.hand || []).length < minHand) return { keepInHand: false };
+  const erlaubt = engine._handIndizesOhneAufloesende(ps);
+  if (erlaubt.length === 0) return { keepInHand: false };
 
   const result = await engine.promptGeneric(pi, {
     type: 'forceDiscardCancellable',
@@ -90,12 +91,21 @@ async function maybeKeepGemInHand(engine, pi, gemName) {
     title: gemName,
     description: `You may discard a card to keep ${gemName} in your hand. Click a card to pay, or cancel to send ${gemName} to the discard pile.`,
     cancelLabel: 'Send to Discard',
+    eligibleIndices: erlaubt,
     cancellable: true,
   });
 
   if (!result || result.cancelled) return { keepInHand: false };
   const { cardName, handIndex } = result;
   if (cardName == null) return { keepInHand: false };
+  if (Number.isInteger(handIndex) && !erlaubt.includes(handIndex)) return { keepInHand: false };   // nie die eigene (aufzulösende) Karte
+
+  // ★ W74c: Boris darf auch diese Abwurf-KOSTEN ignorieren — der Edelstein bleibt trotzdem auf der Hand, es wird nichts abgeworfen.
+  if (await engine.borisVerzicht(pi, 1, { source: gemName })) {
+    engine.log('magic_gem_kept', { player: ps.username, gem: gemName, discarded: null, borisSkipped: true });
+    engine.sync();
+    return { keepInHand: true };
+  }
 
   // Splice the chosen card and push to discard. The handIndex from the
   // prompt is authoritative when it points at the requested card name;

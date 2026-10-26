@@ -4,8 +4,15 @@
 //
 //  Post-target reaction: fires AFTER an
 //  opponent's Attack or Spell selects exactly
-//  1 target the IC owner controls (not their
-//  last living hero).
+//  1 target the IC owner controls, except
+//  their last undefeated Hero.
+//  Als Ruling (Al, QA-Welle 1 Nr. 13): „Wörtlich
+//  nehmen. Cloak kann einen Hero wählen, solange
+//  andere eigene Heroes leben." Ist das gewählte
+//  Ziel ein Held, muss mindestens ein ANDERER
+//  unbesiegter eigener Held leben (Kreaturen als
+//  weitere Ziele zählen dafür NICHT). Eine Kreatur
+//  als Ziel ist immer schützbar.
 //
 //  Negates the Attack/Spell. The protected
 //  target is automatically the one that was
@@ -17,21 +24,15 @@
 const { hasCardType } = require('./_hooks');
 
 /**
- * Count all living targets a player controls (heroes + creatures).
+ * Lebt neben dem Helden (`seite`, `heroIdx`) noch ein anderer unbesiegter Held, den `pi` kontrolliert?
+ * (Kontrolle statt Seite, Styx 28.9.; Kreaturen zählen nicht — Al, Welle 1 Nr. 13.)
  */
-function countLivingTargets(gs, pi, engine) {
-  let count = 0;
-  const cardDB = engine._getCardDB();
-  // Kontrolle statt Seite (Styx 28.9.)
-  for (const { hero } of engine.heroesControlledBy(pi)) {
-    if (hero.hp > 0) count++;
+function anotherUndefeatedHero(engine, pi, seite, heroIdx) {
+  for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
+    if (physOwner === seite && hi === heroIdx) continue;
+    if (hero.hp > 0) return true;
   }
-  for (const inst of engine.cardInstances) {
-    if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support' || inst.faceDown) continue;
-    const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
-    if (cd && hasCardType(cd, 'Creature')) count++;
-  }
-  return count;
+  return false;
 }
 
 module.exports = {
@@ -44,7 +45,7 @@ module.exports = {
   /**
    * Post-target condition:
    * - Opponent's Attack or Spell targeting exactly 1 of IC owner's targets
-   * - IC owner has 2+ living targets (protecting one leaves others targetable)
+   * - A chosen Hero must not be the IC owner's last undefeated Hero (a Creature target is always fine)
    */
   postTargetCondition: (gs, pi, engine, targetedHeroes, sourceCard, opts) => {
     // Source must be from the opponent
@@ -91,8 +92,9 @@ module.exports = {
     }
     if (t0Seite !== pi) return false;
 
-    // Must have 2+ living targets (can't cloak last hero)
-    if (countLivingTargets(gs, pi, engine) < 2) return false;
+    // „except your last undefeated Hero": ein gewählter Held braucht einen ANDEREN lebenden eigenen Helden
+    // (Al, Welle 1 Nr. 13: wörtlich; Kreaturen zählen dafür nicht). Eine Kreatur als Ziel ist immer ok.
+    if (t0.type === 'hero' && !anotherUndefeatedHero(engine, pi, t0.owner, t0.heroIdx)) return false;
 
     return true;
   },

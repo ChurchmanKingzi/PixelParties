@@ -21,6 +21,13 @@
 //
 //  Jede Karte fliegt einzeln über `actionAddCardFromDeckToHand`
 //  (Bewegung zwischen Stapeln wird animiert, Als Regel 21.8.).
+//
+//  ── EXAKT N Karten (Al, QA-Welle 1 Nr. 19) ──
+//  „Choose as many … as there are …" = GENAU N (N = Databases in der Ablage),
+//  nicht „bis zu N". Liegen weniger als N Future-Tech-Karten mit VERSCHIEDENEN
+//  Namen (ohne Database) im Deck, ist die Karte nicht spielbar. Die N Namen
+//  werden erst alle gewählt, dann geholt: ein Abbruch an irgendeiner Stelle der
+//  Wahl heißt „nichts passiert" (Karte bleibt auf der Hand, Kosten erstattet).
 // ═══════════════════════════════════════════
 
 const { zaehleInAblage, istFutureTech, waehleAusNamen } = require('./_future-tech-shared');
@@ -38,14 +45,21 @@ function kandidaten(gs, pi, schonGewaehlt) {
     .filter(n => istFutureTech(n) && baseCardName(n) !== baseCardName(CARD_NAME) && !schonGewaehlt.some(g => baseCardName(g) === baseCardName(n)));
 }
 
+/** Wie viele VERSCHIEDENE (Basis-)Namen sind holbar? */
+function verschiedeneHolbare(gs, pi) {
+  return new Set(kandidaten(gs, pi, []).map(n => baseCardName(n))).size;
+}
+
 module.exports = {
   isTargetingArtifact: false,
   blockedByHandLock: true,
 
   // KEIN Gate auf die Ablage — siehe Kopf. Nur: es muss überhaupt etwas
-  // Holbares im Deck liegen, sonst wäre die Abfrage leer.
+  // Holbares im Deck liegen, sonst wäre die Abfrage leer. Exakt N (Al, QA-Welle 1 Nr. 19):
+  // weniger verschiedene holbare Namen als N → nicht spielbar.
   canActivate(gs, pi) {
-    return kandidaten(gs, pi, []).length > 0;
+    const holbar = verschiedeneHolbare(gs, pi);
+    return holbar > 0 && holbar >= zaehleInAblage(gs, pi, CARD_NAME);
   },
 
   async resolve(engine, pi) {
@@ -58,6 +72,7 @@ module.exports = {
 
     if (wieViele <= 0) { engine.sync(); return { ok: true }; }
 
+    // Erst ALLE N Namen waehlen (jede Wahl abbrechbar, noch nichts bewegt), dann holen.
     const gewaehlt = [];
     for (let i = 0; i < wieViele; i++) {
       const frei = kandidaten(gs, pi, gewaehlt);
@@ -65,17 +80,16 @@ module.exports = {
       const name = await waehleAusNamen(engine, pi, frei, {
         source: 'deck',
         title: CARD_NAME,
-        description: `Add a "Future Tech" card from your deck to your hand (${i + 1}/${wieViele}).`,
+        description: `Add a "Future Tech" card with a different name from your deck to your hand (${i + 1}/${wieViele}).`,
         cancellable: true,
       });
-      if (!name) {
-        // ★ W16b (A03-futuretech-17, CARD_API „Zielende Karten sind immer abbrechbar … Abbruch heißt: nichts ist passiert"): Abbruch der ERSTEN
-        // Wahl = nichts gewählt, nichts geholt → Karte zurück auf die Hand, Kosten erstattet (wie Blueprints / Mysterious Core). Ein Abbruch
-        // erst nach einer gewählten Karte beendet die Auswahl (die gewählte bleibt).
-        if (gewaehlt.length === 0) return { cancelled: true };
-        break;
-      }
+      // ★ W16b (A03-futuretech-17, CARD_API „Zielende Karten sind immer abbrechbar … Abbruch heißt: nichts ist passiert"): Abbruch der Wahl =
+      // nichts geholt → Karte zurück auf die Hand, Kosten erstattet (wie Blueprints / Mysterious Core). Exakt N (Al, QA-Welle 1 Nr. 19):
+      // auch ein Abbruch nach einer schon gewählten Karte nimmt die ganze Wahl zurück — bewegt wurde bis hierher nichts.
+      if (!name) return { cancelled: true };
       gewaehlt.push(name);
+    }
+    for (const name of gewaehlt) {
       await engine.actionAddCardFromDeckToHand(pi, name, {
         source: CARD_NAME, reveal: true,
         _noKrates: true,   // Mehrfach-Tutor: Krates greift nur bei Ein-Karten-Suchen

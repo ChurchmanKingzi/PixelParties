@@ -12,9 +12,11 @@
 //     to any target × the number of Creatures
 //     with DIFFERENT NAMES in the controller's
 //     discard pile. The damage is uncategorised
-//     ("other" type), so it bypasses fire /
-//     status / etc. resistances. Animation: a
-//     flame strike on the target.
+//     ("creature" type, Als Ruling Al 26.10.:
+//     Kreatureneffekt — Zielwahl und Schaden
+//     laufen beide als 'creature', NICHT 'other';
+//     vorher stand hier „bypasses resistances").
+//     Animation: a flame strike on the target.
 //
 //  3. SELF-REVIVE — if defeated by an
 //     opponent's card or effect (NOT by status
@@ -183,7 +185,7 @@ module.exports = {
     const target = await ctx.promptDamageTarget({
       side: 'any',
       types: ['hero', 'creature'],
-      damageType: 'other',
+      damageType: 'creature',   // Als Ruling (Al 26.10.): Kreatureneffekt → 'creature' (wie der gebuchte Schaden unten), nicht 'other'
       baseDamage: damage,
       title: CARD_NAME,
       description: `Deal ${damage} damage (50 × ${count} different-named Creature${count === 1 ? '' : 's'} in discard) to any target.`,

@@ -18,8 +18,14 @@
 //  Ein Ziel kann nur EINMAL gewaehlt werden, ueber beide Seiten hinweg.
 //  Schluss ist, sobald der naechste Waehler kein neues Ziel mehr hat.
 //
-//  Die Wahl ist NICHT abbrechbar — „take turns choosing … until a
-//  player CANNOT choose" kennt kein Aussteigen, nur „keine Ziele mehr".
+//  ★ Ruling Al (Welle 2): Die ERSTE Zielwahl des Spielers ist abbrechbar
+//  (Abbruch = Karte bleibt auf der Hand, nichts verbraucht, kein Auftritt);
+//  der Auftritt (card_reveal) kommt erst NACH der Bestätigung dieser ersten
+//  Wahl (`engine.commitAppearance()`), vor der Zielmarke und der Wahl des
+//  Gegners. Ab der bestätigten ersten Wahl gibt es keinen Rückweg mehr:
+//  Folgewahlen des Spielers und die Wahlen des Gegners sind NICHT abbrechbar —
+//  „take turns choosing … until a player CANNOT choose" kennt kein Aussteigen,
+//  nur „keine Ziele mehr".
 //
 //  ── ERST ALLES WAEHLEN, DANN SCHIESSEN ────────────────────────────
 //  Der Kartentext listet die Zielwahl vollstaendig auf, bevor er vom
@@ -94,6 +100,9 @@ function zieleAuf(engine, seite) {
 }
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (siehe CARD_API): bei einer
   // Negation spielt die Engine diese Bilder, damit der abgewehrte
   // Zauber sichtbar bleibt.
@@ -140,6 +149,8 @@ module.exports = {
       // gerade gewaehlte Ziel leuchtet rot auf.
       const gewaehlt = new Set();
       const kette = [];
+      // Toras: „This Hero can never hit more than 1 target with an Attack" — die Kette bricht nach dem ersten Ziel ab (heroFlags.singleTargetAttack, wie Whirlwind Strike).
+      const nurEinZiel = !!engine.heroFlagsLive(ctx.cardHeroOwner ?? pi, heroIdx)?.singleTargetAttack;
       let waehler = pi;                       // „You choose first."
       try {
         // Obergrenze nur als Gurt: jede Runde verbraucht ein Ziel, die
@@ -151,6 +162,7 @@ module.exports = {
           if (frei.length === 0) break;       // „cannot choose a new target"
 
           const nummer = kette.length + 1;
+          const erstesMal = kette.length === 0;   // „You choose first": die erste Wahl gehört dem Spieler selbst
           // ★★ v1151 (Al 17.9.): die CPU zielt bei JEDER Wahl wie bei einem
           // normalen Einzelziel-Angriff mit der AKTUELLEN Staerke dieser
           // Position. `baseDamage` + `damageType` schalten im Piloten
@@ -165,14 +177,16 @@ module.exports = {
             description: `Choose target #${nummer} for ${CARD_NAME} (${schadenHier} damage). Targets already chosen are marked with their number.`,
             confirmLabel: `🎯 #${nummer}`,
             maxSelect: 1, maxTotal: 1,
-            cancellable: false,
+            cancellable: erstesMal,            // nur die allererste Wahl des Spielers (s. Kopfkommentar)
             baseDamage: schadenHier,
             damageType: 'attack',
           });
           const zielId = Array.isArray(wahl) ? wahl[0] : wahl;
           const idText = (zielId && typeof zielId === 'object') ? zielId.id : zielId;
           const ziel = frei.find(t => t.id === idText);
-          if (!ziel) break;                    // keine gueltige Antwort
+          if (!ziel) break;                    // keine gueltige Antwort / Abbruch der ersten Wahl (kette leer → `_spellCancelled`)
+          // Auftritt erst HINTER der letzten Abbruchstelle: die erste Wahl ist bestätigt.
+          if (erstesMal) engine.commitAppearance();
 
           gewaehlt.add(zielSchluessel(ziel));
           kette.push(ziel);
@@ -186,6 +200,7 @@ module.exports = {
           if (engine.isCpuPlayer(waehler) && !engine._inMctsSim && !engine._fastMode) {
             await engine._delay(1100);   // v1151: laenger, passend zur deutlicheren Animation
           }
+          if (nurEinZiel) break;               // Toras: nur ein Ziel
           waehler = gegenseite;                // der Getroffene ist als Naechster dran
         }
       } catch (err) {
@@ -220,6 +235,8 @@ module.exports = {
             c.owner === z.owner && c.zone === 'support'
             && c.heroIdx === z.heroIdx && c.zoneSlot === z.slotIdx))
           .filter(Boolean),
+        // W78 (Pythia): Helden der Kette, die der Kopf (Betrag `atk`) faellt, sind todgeweiht; die Folgeglieder (halbierter Betrag) zaehlen erst, wenn sie dran sind
+        heroes: kette.slice(0, 1).filter(z => z.type === 'hero'),
         source: attackSource, amount: atk, type: 'attack', sourceOwner: pi,
         ersterTrefferEinzel: true,   // Welle 13 (Q138): Elixir of Strength feuert am ersten Treffer (initial genau ein Ziel)
       });

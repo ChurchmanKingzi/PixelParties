@@ -46,7 +46,7 @@ module.exports = {
     const cpuIdx = engine._cpuPlayerIdx;
     if (cpuIdx < 0) return undefined;
 
-    const hasNonHero = validTargets.some(t => t.type && t.type !== 'hero');
+    const hasNonHero = validTargets.some(t => t.type && t.type !== 'hero' && !engine.zaehltAlsHeld?.(t.cardInstance));   // W79: ein Bull (zählt als Hero) gehört zur ersten Wahl
 
     // ── Prompt 1: yeeter pick (own Hero takes 150 self-damage) ───────
     if (!hasNonHero) {
@@ -118,7 +118,14 @@ module.exports = {
   getValidTargets(gs, pi, engine) {
     // W31a (Al, 22.10.2026: „temporäre Heroes sind mögliche Ziele, auch wenn der Schaden verpufft"): auch ein temporär übernommener (Charme-)Gegnerheld ist Ziel/Kostenträger;
     // der Schaden verpufft dort (Charme Lv3), die Kosten sind bezahlt.
-    if (engine) return engine.getControlledHeroTargets(pi);
+    if (engine) {
+      // W79 (White Sacrificial Bull): eine Kreatur, die auch als Hero zählt, ist ein „Hero you control" (150 Schaden).
+      const bullen = (engine.heldKreaturen?.(pi) || []).map(b => {
+        const seite = engine.physicalSide(b);
+        return { id: `equip-${seite}-${b.heroIdx}-${b.zoneSlot}`, type: 'equip', owner: seite, heroIdx: b.heroIdx, slotIdx: b.zoneSlot, cardName: b.name, cardInstance: b };
+      });
+      return [...engine.getControlledHeroTargets(pi), ...bullen];
+    }
     const ps = gs.players[pi];
     const targets = [];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
@@ -156,12 +163,18 @@ module.exports = {
 
     // Parse selected hero
     const match = (selectedIds[0] || '').match(/^hero-(\d+)-(\d+)$/);
-    if (!match) return { cancelled: true };
-    const heroIdx = parseInt(match[2]);
-    const heroSeite = parseInt(match[1]);   // W28a: Brettseite des gewaehlten (kontrollierten) Helden
-    const hero = gs.players[heroSeite]?.heroes?.[heroIdx];
+    // W79 (White Sacrificial Bull): die „Hero you control" darf auch eine Kreatur sein, die als Hero zählt (`equip-<Seite>-<Held>-<Platz>`).
+    const bullMatch = !match ? (selectedIds[0] || '').match(/^equip-(\d+)-(\d+)-(\d+)$/) : null;
+    let bullInst = null;
+    if (bullMatch) {
+      bullInst = engine.heldKreaturen(pi).find(b => engine.physicalSide(b) === parseInt(bullMatch[1]) && b.heroIdx === parseInt(bullMatch[2]) && b.zoneSlot === parseInt(bullMatch[3])) || null;
+      if (!bullInst) return { cancelled: true };
+    } else if (!match) return { cancelled: true };
+    const heroIdx = bullInst ? bullInst.heroIdx : parseInt(match[2]);
+    const heroSeite = bullInst ? engine.physicalSide(bullInst) : parseInt(match[1]);   // W28a: Brettseite des gewaehlten (kontrollierten) Helden
+    const hero = bullInst ? { name: bullInst.name, hp: 1 } : gs.players[heroSeite]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return { cancelled: true };
-    if (engine.heroSideOf(heroSeite, hero) !== pi) return { cancelled: true };   // „a Hero you control": nur der aktuelle Kontrolleur
+    if (!bullInst && engine.heroSideOf(heroSeite, hero) !== pi) return { cancelled: true };   // „a Hero you control": nur der aktuelle Kontrolleur
 
     // ── Select non-Hero card from board (click-to-target) ──
     const boardTargets = _collectBoardTargets(gs, engine);
@@ -292,7 +305,8 @@ module.exports = {
     }
 
     // ── Deal 150 artifact damage to the Hero ──
-    await engine.actionDealDamage(dmgSource, hero, 150, 'artifact', { festesZiel: true });   // Selbstkosten des gewaehlten eigenen Helden (Als Ruling 9.10.)
+    if (bullInst) await engine.actionDealCreatureDamage(dmgSource, bullInst, 150, 'artifact', { sourceOwner: pi, festesZiel: true });   // W79: der Bull zahlt die 150 Schaden
+    else await engine.actionDealDamage(dmgSource, hero, 150, 'artifact', { festesZiel: true });   // Selbstkosten des gewaehlten eigenen Helden (Als Ruling 9.10.)
     engine.sync();
     await engine._delay(400);
 

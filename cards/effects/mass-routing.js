@@ -22,9 +22,14 @@
 //
 //  • ★ ZIEL IST DAS DECK DES URSPRUENGLICHEN BESITZERS
 //    (`originalOwner`), nicht des Kontrolleurs: eine uebernommene
-//    Kreatur geht nach Hause. Genau daran haengt auch das Ziehen —
-//    „their Creatures" meint die eigenen, egal wer sie zuletzt
-//    kontrollierte.
+//    Kreatur geht nach Hause (gemischt wird dort).
+//
+//  • ★ ZIEHEN TUT DER KONTROLLEUR (Al, QA-Welle 1 Nr. 22: „Kontrolleur"):
+//    „each of THEIR Creatures" = die Kreaturen, die der Spieler gerade
+//    kontrolliert. Fuer eine gestohlene/uebernommene Kreatur zieht also
+//    der, der sie zuletzt kontrollierte (CARD_API: Zaehler beziehen sich
+//    auf den Kontrolleur) — nicht ihr Besitzer, dessen Deck sie nur
+//    zurueckerhaelt.
 //
 //  • Gemischt wird EINMAL je betroffenem Deck, nachdem alle Karten
 //    drin sind — nicht nach jeder einzelnen.
@@ -65,11 +70,14 @@ function betroffene(engine, maxLevel) {
  * Eine Brettkreatur ins Deck ihres urspruenglichen Besitzers legen.
  * Bauform `returnSupportCreatureToHand` (_deepsea-shared), nur mit dem
  * Deck als Ziel. Gemischt wird NICHT hier — s. Kopf.
+ * Rueckgabe: `{ heim, ktrl }` (Deck-Besitzer / Kontrolleur = Zieher) oder `null` (blieb stehen bzw. wurde von Ankhota GELOESCHT statt zurueckgemischt).
+ * `ankhotaVorab` = Ankhotas Loeschung, schon VOR der ersten Bewegung des Zaubers ausgewertet (alle Kreaturen gehen zugleich — reihenfolgeunabhaengig).
  */
-async function insDeck(engine, inst, maxLevel, pi) {
+async function insDeck(engine, inst, maxLevel, pi, ankhotaVorab = null) {
   if (!inst || inst.zone !== 'support') return null;
   const gs = engine.gs;
   const kontrolleur = engine.physicalSide(inst);       // Brettseite (nicht der Kontrolleur): eine gestohlene Kreatur liegt weiter beim Besitzer (S03-04)
+  const ktrl = engine.kontrolleurVon(inst);            // ★ der KONTROLLEUR — er zieht (QA-Welle 1 Nr. 22)
   const heim = inst.originalOwner ?? inst.owner;      // ★ „original owners"
   const hps = gs.players[heim];
   const kps = gs.players[kontrolleur];
@@ -88,8 +96,18 @@ async function insDeck(engine, inst, maxLevel, pi) {
     return null;
   }
 
+  // Defending the Gate: ein Effekt des Gegners auf Karten in seiner Support Zone — das Tor wird hier gefragt (wie `actionMoveCard`/`actionTransferCreature`; `_triggerGateCheck` lässt eigene
+  // Effekte durch, ein Angebot je Zauber). Geschützte Kreaturen bleiben stehen und zählen nicht fürs Ziehen.
+  {
+    await engine._triggerGateCheck(ktrl, CARD_NAME, pi, cardName);
+    if (engine._isGateShielded(ktrl, pi)) {
+      engine.log('creature_effect_negated', { creature: cardName, effect: 'move', by: CARD_NAME, reason: 'defending_the_gate' });
+      return null;
+    }
+  }
+
   // W71b (Al, 25.10.2026): das Zurückmischen ist ein Effekt auf die Kreatur — Schutzfenster (Cool Rescuer Monia & Co.) NACH der Immunität, VOR der ersten Änderung. Ein Angebot je Zauber
-  // (Monias Buchführung `gs._moniaAngebote`): angenommen schützt es die Seite für alle weiteren Kreaturen dieses Zaubers, abgelehnt fragt nicht noch einmal.
+  // (Monias Buchführung `gs._moniaAngebote`): angenommen schützt es (W77a) ALLE weiteren Kreaturen dieses Zaubers beider Seiten, abgelehnt fragt nicht noch einmal.
   if (!(await engine.kreaturBetroffen(inst, 'move', { name: CARD_NAME, owner: pi }, { sourceOwner: pi, detail: 'to_deck' }))) return null;
 
   engine._broadcastEvent('play_pile_transfer', {
@@ -103,8 +121,13 @@ async function insDeck(engine, inst, maxLevel, pi) {
     const idx = slotArr.indexOf(cardName);
     if (idx >= 0) slotArr.splice(idx, 1);
   }
-  if (!hps.mainDeck) hps.mainDeck = [];
-  hps.mainDeck.push(cardName);
+  // Ankhota: „Delete all Creatures that are moved from the board to anywhere else" — dieser Sonderweg umgeht den zentralen Move: die Kreatur kommt in den Gelöscht-Stapel ihres Besitzers
+  // statt ins Deck. Annahme: eine so gelöschte Kreatur gilt NICHT als „shuffled back" (kein Nachziehen dafür, kein Mischen).
+  const geloescht = engine.ankhotaLoeschtSonderweg(inst, heim, { source: CARD_NAME, vorab: ankhotaVorab });
+  if (!geloescht) {
+    if (!hps.mainDeck) hps.mainDeck = [];
+    hps.mainDeck.push(cardName);
+  }
 
   await engine.runHooks('onCardLeaveZone', {
     card: inst, leavingCard: inst, fromZone: 'support',   // leavingCard: Vertrag fuer Selbst-Aufraeumer (A07-05, Dream Lander)
@@ -115,7 +138,7 @@ async function insDeck(engine, inst, maxLevel, pi) {
   engine._untrackCard(inst.id);
   engine.sync();
   await engine._delay(180);
-  return heim;
+  return geloescht ? null : { heim, ktrl };
 }
 
 module.exports = {
@@ -172,28 +195,33 @@ module.exports = {
       }
 
       // ── ① Alles ins Deck ────────────────────────────────────────
-      const proSpieler = [0, 0];
+      // proDeck[p] = Karten, die in das Deck von p zurueckgingen (mischen); proZieher[p] = Kreaturen, die p KONTROLLIERTE (ziehen).
+      const proDeck = {}, proZieher = {};
+      const ankhotaVorab = new Map(ziele.map(inst => [inst.id, engine.ankhotaLoeschtVomBrett(inst)]));   // Ankhota: einmal VOR der ersten Bewegung (auch sie selbst geht mit)
       for (const inst of ziele) {
-        const heim = await insDeck(engine, inst, maxLevel, pi);
-        if (heim != null) proSpieler[heim] = (proSpieler[heim] || 0) + 1;
+        const r = await insDeck(engine, inst, maxLevel, pi, ankhotaVorab.get(inst.id));
+        if (r != null) {
+          proDeck[r.heim] = (proDeck[r.heim] || 0) + 1;
+          proZieher[r.ktrl] = (proZieher[r.ktrl] || 0) + 1;
+        }
       }
 
       // ── ② Einmal je betroffenem Deck mischen (s. Kopf) ──────────
       for (let p = 0; p < engine.playerCount(); p++) {
-        if (proSpieler[p] > 0) engine.shuffleDeck(p);
+        if (proDeck[p] > 0) engine.shuffleDeck(p);
       }
       engine.log('mass_routing', {
         player: ps.username, maxLevel,
-        shuffled: proSpieler[0] + proSpieler[1],
-        mine: proSpieler[pi], theirs: proSpieler[engine.opponentOf(pi)],
+        shuffled: Object.values(proDeck).reduce((a, b) => a + b, 0),
+        mine: proZieher[pi] || 0, theirs: proZieher[engine.opponentOf(pi)] || 0,
       });
       engine.sync();
 
-      // ── ③ Je zurueckgemischter EIGENER Kreatur eine Karte ───────
+      // ── ③ Je zurueckgemischter Kreatur, die man KONTROLLIERTE, eine Karte ──
       // Reihenfolge: erst der Spieler dieser Karte, dann der Gegner.
       const reihenfolge = [pi, engine.opponentOf(pi)];
       for (const p of reihenfolge) {
-        if (proSpieler[p] > 0) await engine.actionDrawCards(p, proSpieler[p]);
+        if (proZieher[p] > 0) await engine.actionDrawCards(p, proZieher[p]);
       }
       engine.sync();
     },

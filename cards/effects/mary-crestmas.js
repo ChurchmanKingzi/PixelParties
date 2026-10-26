@@ -165,20 +165,32 @@ module.exports = {
       }
       if (reEligible.length === 0) return;
 
-      const dRes = await engine.promptGeneric(oi, {
-        type: 'forceDiscard',
-        title: CARD_NAME,
-        description: `${ops.username}, discard one of your opponent's originally-owned cards to negate ${ctx.amount} damage to ${myHero.name}.`,
-        instruction: 'Click a highlighted card in your hand to discard it.',
-        eligibleIndices: reEligible,
-        cancellable: false,
-      });
-      if (!dRes || dRes.cardName == null) return;
+      // ★ W74c: ERST Erstrunden-Schutz und Ambush the Scout (das Fenster fehlte hier), DANN Boris des Gegners. Ignoriert der Gegner den erzwungenen
+      // Abwurf per Boris, wird nichts abgeworfen — der Abwurf ist Marys Preis, die Schadens-Negation gilt trotzdem (Kosten überspringen negiert
+      // den Effekt nicht; Rückfrage an Al).
+      if (engine.gs.firstTurnProtectedPlayer === oi) return;
+      if (await engine.checkHandInteractionReaction(oi, 'discard', { byPi: pi, count: 1, sourceName: CARD_NAME })) return;
+      const borisIgnoriert = await engine.borisVerzicht(oi, 1, { source: CARD_NAME, sourceOwner: pi });
 
-      const ok = await engine.actionDiscardHandCard(oi, dRes.cardName, dRes.handIndex, {
-        source: CARD_NAME,
-      });
-      if (!ok) return;
+      let dRes = { cardName: null };
+      if (!borisIgnoriert) {
+        dRes = await engine.promptGeneric(oi, {
+          type: 'forceDiscard',
+          title: CARD_NAME,
+          description: `${ops.username}, discard one of your opponent's originally-owned cards to negate ${ctx.amount} damage to ${myHero.name}.`,
+          instruction: 'Click a highlighted card in your hand to discard it.',
+          eligibleIndices: reEligible,
+          cancellable: false,
+        });
+        if (!dRes || dRes.cardName == null) return;
+
+        const ok = await engine.actionDiscardHandCard(oi, dRes.cardName, dRes.handIndex, {
+          source: CARD_NAME,
+          sourceOwner: pi,   // W74c: fremder Zwangsabwurf (das Ambush-Fenster lief oben)
+          _skipHandInteractionCheck: true,
+        });
+        if (!ok) return;
+      }
 
       // Cost paid — claim Mary's HOPT and cancel the damage.
       engine.gs.players[pi]._maryNegateUsed = true;   // v1275: pro Spieler

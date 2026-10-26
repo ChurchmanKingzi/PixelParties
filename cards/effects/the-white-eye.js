@@ -83,6 +83,9 @@ module.exports = {
       });
       if (!confirmed) return;
 
+      // ★ W74c: erzwungener Abwurf des Gegners — ERST Erstrunden-Schutz und Ambush the Scout, DANN Boris (Verzicht: nichts wird abgeworfen).
+      if (await engine.fremdAbwurfEntfaellt(tgtOwner, 1, { source: CARD_NAME, sourceOwner: pi })) { engine.sync(); return; }
+
       // Discard a random card from the target's hand
       const hand = tgtPs.hand;
       if (hand.length === 0) return;
@@ -91,7 +94,7 @@ module.exports = {
       // v1394: fremder Abwurf über die zentrale Funktion — damit greifen
       // Erstrunden-Schutz, Hand-Interaktions-Fenster und onDiscard (bis
       // v1393 alle drei übersprungen).
-      if (!(await engine.actionDiscardHandCard(tgtOwner, discarded, randomIdx, { source: CARD_NAME, sourceOwner: pi }))) {
+      if (!(await engine.actionDiscardHandCard(tgtOwner, discarded, randomIdx, { source: CARD_NAME, sourceOwner: pi, _skipHandInteractionCheck: true }))) {
         engine.sync();
         return;
       }

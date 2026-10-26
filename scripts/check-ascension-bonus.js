@@ -29,6 +29,11 @@
 //       stehen als Liste in EINEM `performAscensionBonus`-Aufruf, der
 //       Spieler wählt eine. Zwei Aufrufe nacheinander wären UND.
 //
+//    4. „or" AUF DEM KARTENBILD (W77b, Al 26.10.2026) — zwei Ability-Boni stehen auf dem Kartenbild in EINER Zeile mit „or"
+//       („Fighting 3 or Destruction Magic 3"). Das Bild setzt `card-render.js` zusammen (`ascBonusOder`); ein handgesetzter
+//       Text in `data/card-render.json` (`sb`) muss das „or" selbst tragen. Gilt für ALLE Ascended Heroes mit zwei
+//       Ability-Boni, auch ohne Skript (Champion, Fern: bei Skript-Anlage gelten zusätzlich Regel 1-3).
+//
 //  Aufruf:  node scripts/check-ascension-bonus.js
 //  Rückgabe 0 = sauber, 1 = mindestens ein Ascended ohne Bonus.
 // ════════════════════════════════════════════════════════════════
@@ -57,8 +62,27 @@ function ohneKommentare(src) {
 const karten = JSON.parse(fs.readFileSync(KARTEN, 'utf8'));
 const abilities = new Set(karten.filter(k => k.cardType === 'Ability').map(k => k.name));
 
+const renderMeta = JSON.parse(fs.readFileSync(path.join(WURZEL, 'data', 'card-render.json'), 'utf8')).cards || {};
+const renderJs = fs.readFileSync(path.join(WURZEL, 'public', 'card-render.js'), 'utf8');
+
 const maengel = [];
 let geprueft = 0;
+let oderBilder = 0;
+
+// 4. „or" auf dem Kartenbild: der Zeichner muss die Zusammenfassung kennen ...
+if (!/function ascBonusOder\b/.test(renderJs) || !/ascBonusOder\(c\)/.test(renderJs)) {
+  maengel.push('public/card-render.js: `ascBonusOder` fehlt oder wird in `specFromCard` nicht benutzt (zwei Ability-Boni brauchen ein „or" auf dem Kartenbild)');
+}
+// ... und kein handgesetzter Text darf es unterdrücken
+for (const karte of karten) {
+  if (karte.cardType !== 'Ascended Hero') continue;
+  const felder = [karte.startingAbility1, karte.startingAbility2].map(t => String(t || '').replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const ab = felder.filter(t => { const m = t.match(/^(.+?) (\d+)$/); return m && abilities.has(m[1]); });
+  if (ab.length < 2) continue;
+  oderBilder++;
+  const sb = renderMeta[karte.name]?.sb;
+  if (sb != null && !/\bor\b/.test(sb)) maengel.push(`${karte.name}: zwei Ability-Boni (${ab.join(' / ')}), aber der Kartenbild-Text in data/card-render.json (\`sb\`) hat kein „or"`);
+}
 
 for (const karte of karten) {
   if (karte.cardType !== 'Ascended Hero') continue;
@@ -113,4 +137,4 @@ if (maengel.length) {
   for (const z of maengel) console.error('  ✗ ' + z);
   process.exit(1);
 }
-console.log(`[check-ascension-bonus] sauber — ${geprueft} Ascended Heroes mit Skript geprüft.`);
+console.log(`[check-ascension-bonus] sauber — ${geprueft} Ascended Heroes mit Skript geprüft, ${oderBilder} mit „or" auf dem Kartenbild.`);

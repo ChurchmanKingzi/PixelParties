@@ -12,10 +12,11 @@
 //  Übernahmen) lesen dieselbe Textklausel `Only 1 "X" can be on the board at a time`. Die Hydra selbst zählt bei einer Übernahme nicht mit (`ausser`).
 //
 //  ── SELBSTRETTUNG („WHEN THIS CREATURE WOULD BE DEFEATED, IT IS FULLY HEALED INSTEAD") ──
-//  Engine-Vertrag `creatureSelfRescue(engine, inst, source, amount, type, info)` (`_creatureSelfRescue`): läuft an beiden Todeswegen — tödlicher Schaden (Schadens-Batch) UND Zerstörung
-//  (`actionDestroyCard`) — VOR Extra Life und VOR allen Handreaktionen (kostet nichts, ist automatisch). Nicht für Opfer (Kosten sind kein „defeat"), nicht, wenn die Hydra ruht
-//  (Frozen/Stunned/Negated), nicht bei unaufhaltsamer Zerstörung (`_u`: dort gibt es kein Rettungsfenster). „Up to 3 times per turn": Zähler an der Instanz (`counters._hydraRettung = { turn, n }`),
-//  der auf die laufende Rundenzahl `gs.turn` lautet (jeder Zug, auch der des Gegners, zählt neu). Der 4. tödliche Treffer im selben Zug besiegt sie.
+//  Engine-Vertrag `selfPreDefeat(engine, inst, source, amount, type, info) → Promise<boolean>` (W78, Infallible Oracle Pythia; `_checkCreaturePreDefeatHandReactions`): läuft an beiden Todeswegen —
+//  tödlicher Schaden (Schadens-Batch) UND Zerstörung (`actionDestroyCard`) — VOR den Handreaktionen (kostet nichts, ist automatisch). Die Engine fragt nur, wenn die Hydra aufgedeckt in einer Support
+//  Zone liegt und nicht ruht (Frozen/Stunned/Negated); Opferkosten sind kein „defeat" (`info.isSacrifice` → false), unaufhaltsame Zerstörung kennt kein Rettungsfenster. Bekannte Kante: trägt
+//  die Hydra zugleich eine Extra-Life-Marke, wird im Schadens-Batch ZUERST diese verbraucht (Engine-Reihenfolge, wie bei Pythia). „Up to 3 times per turn": Zähler an der Instanz
+//  (`counters._hydraRettung = { turn, n }`, `gs.turn`: jeder Zug, auch der des Gegners, zählt neu). Der 4. tödliche Treffer im selben Zug besiegt sie.
 //  Ablauf: volle Heilung auf das AKTUELLE Maximum → Level +1 (`actionChangeLevel`) → Max-HP und aktuelle HP +50 (`increaseMaxHp`). Nach dem ersten Mal also: Lv1, 100/100; dann Lv2, 150/150 usw. Die
 //  Heilung setzt die HP direkt (Ersatz des Todes, kein Heil-Effekt: Gift-Heilsperre, Zauber-Immunität und Schutzhooks reden nicht hinein).
 //
@@ -56,14 +57,15 @@ module.exports = {
   canSummon(ctx) { return !andereHydraAufBrett(ctx._engine, ctx.card); },
 
   /**
-   * Engine-Vertrag `creatureSelfRescue`: tödlicher Treffer / Zerstörung → volle Heilung, Level +1, +50 Max-HP und aktuelle HP. Höchstens 3× je Zug.
-   * @returns {{saved: boolean}}
+   * Engine-Vertrag `selfPreDefeat` (W78, Infallible Oracle Pythia): tödlicher Treffer / Zerstörung → volle Heilung, Level +1, +50 Max-HP und aktuelle HP. Höchstens 3× je Zug.
+   * @returns {Promise<boolean>} true = gerettet (kein Tod)
    */
-  async creatureSelfRescue(engine, inst /*, source, amount, type, info */) {
+  async selfPreDefeat(engine, inst, source, amount, type, info) {
+    if (info?.isSacrifice) return false;                       // Opferkosten sind kein „defeat"
     const gs = engine.gs;
     const z = inst.counters._hydraRettung;
     const n = z && z.turn === gs.turn ? z.n : 0;
-    if (n >= RETTUNGEN_JE_ZUG) return { saved: false };
+    if (n >= RETTUNGEN_JE_ZUG) return false;
     inst.counters._hydraRettung = { turn: gs.turn, n: n + 1 };
 
     engine._broadcastEvent('play_zone_animation', {
@@ -83,7 +85,7 @@ module.exports = {
     });
     engine.sync();
     await engine._delay(NACH_MS);
-    return { saved: true };
+    return true;
   },
 
   hooks: {

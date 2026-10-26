@@ -4,7 +4,8 @@
 //
 //  Effect 1: Whenever ANY Surprise is activated,
 //  Bakhm chains: prompt owner to deal 100 damage
-//  to a single target.
+//  to a single target. Als Ruling (Al 26.10.): Schadenstyp
+//  'hero' (Heldeneffekt) — Zielwahl und beide Schadensaufrufe.
 //
 //  Effect 2: Bakhm's own Support Zones can also
 //  hold face-down Surprise Creatures (acting as
@@ -56,7 +57,7 @@ module.exports = {
       const target = await ctx.promptDamageTarget({
         side: 'any',
         types: ['hero', 'creature'],
-        damageType: 'attack',
+        damageType: 'hero',   // Als Ruling (Al 26.10.): „Auf Hero umstellen" — ein Heldeneffekt (CARD_API Schadenstypen), kein Angriff und kein 'other'
         baseDamage: 100,
         title: 'Bakhm, the Desert Digger',
         description: 'A Surprise was activated! Deal 100 damage to a target.',
@@ -86,7 +87,7 @@ module.exports = {
       if (target.type === 'hero') {
         const targetHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (targetHero && targetHero.hp > 0) {
-          await ctx.dealDamage(targetHero, 100, 'other');
+          await ctx.dealDamage(targetHero, 100, 'hero');
         }
       } else if (target.type === 'equip') {
         const inst = target.cardInstance || engine.cardInstances.find(c =>
@@ -96,7 +97,7 @@ module.exports = {
         if (inst) {
           await engine.actionDealCreatureDamage(
             { name: 'Bakhm, the Desert Digger', owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
-            inst, 100, 'other',
+            inst, 100, 'hero',
             { sourceOwner: pi, canBeNegated: true },
           );
         }

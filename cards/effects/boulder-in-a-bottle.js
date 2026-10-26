@@ -179,6 +179,9 @@ module.exports = {
     const platz = engine.safePlaceInSupport(CARD_NAME, oi, ziel.heroIdx, landeplatz(gs, oi, ziel.heroIdx));
     if (!platz?.inst) return;
     const inst = platz.inst;
+    // Besitzer-Regel: die Karte ist MEIN Potion — beim Abgang (Löschen) in MEINEN Stapel, nicht in den des Gegners, auf dessen Brett sie liegt
+    // (wie Cool Repair / Wise Village Elder: seitenfremd gelegte Karte trägt `originalOwner`).
+    if (oi !== pi) inst.originalOwner = pi;
     // M01-07: Biomancy (älteres `afterPotionUsed` als der Fels) darf die Potion nicht
     // ein zweites Mal auf das Brett legen — sie liegt schon, als Fels.
     gs._boulderSelbstPlatziert = inst.id;

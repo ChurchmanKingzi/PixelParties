@@ -53,7 +53,7 @@ module.exports = {
       const ps = engine.gs.players[pi];
       if (!ps || (ps.mainDeck || []).length === 0) return;
       // D1 (A03-24, Regel von Al): reiner Zug - unter Hand-/Zieh-Sperre wird er gar nicht erst angeboten (keine Ladung verbraucht).
-      if (drawBlockedFor(engine, pi)) return;
+      if (drawBlockedFor(engine, pi, treffer.steps)) return;   // mit Menge: Tuscan Artist negiert genau 2/3 (sonst Ladung fuer nichts)
 
       // BOOLEAN, kein Objekt — siehe Loan Shredder. Derselbe Fehler
       // hat hier den Zug verschluckt (Als Report: „der Tooltip kam, aber

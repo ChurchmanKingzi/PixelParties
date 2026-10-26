@@ -13,6 +13,11 @@
 //  from hand — not on voluntary plays).
 //  Welle 12 (Q93, Al): NUR Karteneffekte — der Regel-Abwurf
 //  des Handlimits am Zugende (`ctx._handLimitRegel`) löst nicht aus.
+//  QA-Welle 1 Nr. 17 (Al: „Der Abwerfende"): zieht der Spieler, aus
+//  dessen HAND die Karte abgeworfen/gelöscht wird (`ctx.playerIdx`)
+//  — auch bei einer gestohlenen Glass of Marbles (Secret Entrance
+//  o. ä.), nicht der permanente Besitzer. Das Einmal-pro-Zug-Limit
+//  gilt je ziehendem Spieler.
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Glass of Marbles';
@@ -37,11 +42,11 @@ module.exports = {
       // Welle 12 (Q93, Al: „NUR Karteneffekte, nicht das Hand-Size-Limit."): der Handlimit-Abwurf am Zugende ist kein Karteneffekt.
       if (ctx._handLimitRegel) return;
       if (ctx.discardedCardName !== CARD_NAME) return;
-      if (ctx.playerIdx !== ctx.cardOwner) return;
+      if (ctx.playerIdx == null) return;
 
       const engine = ctx._engine;
       const gs     = engine.gs;
-      const pi     = ctx.cardOwner;
+      const pi     = ctx.playerIdx;   // der Abwerfende (Hand, aus der die Karte kam)
 
       // HOPT shared across all copies (keyed by name + player)
       const hoptKey = `glass-of-marbles:${pi}`;
@@ -61,11 +66,11 @@ module.exports = {
       if (!ctx._fromHand) return;
       if (ctx._handLimitRegel) return;   // Welle 12 (Q93)
       if (ctx.discardedCardName !== CARD_NAME) return;
-      if (ctx.playerIdx !== ctx.cardOwner) return;
+      if (ctx.playerIdx == null) return;
 
       const engine = ctx._engine;
       const gs     = engine.gs;
-      const pi     = ctx.cardOwner;
+      const pi     = ctx.playerIdx;   // der Abwerfende (Hand, aus der die Karte kam)
 
       const hoptKey = `glass-of-marbles:${pi}`;
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;

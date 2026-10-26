@@ -143,7 +143,7 @@ module.exports = {
       if (besiegt && th?.name && th.hp > 0 && schaden > 0) {
         engine._broadcastEvent('play_zone_animation', { type: 'udp_land', owner: zSeite, heroIdx: zHero, zoneSlot: -1, duration: 700 });
         await engine._delay(180);
-        if (th.hp > 0) await engine.actionDealDamage(attackSource, th, schaden, 'attack');
+        if (th.hp > 0) await engine.actionDealDamage(attackSource, th, schaden, 'attack', { festesZiel: true });   // „the corresponding Hero": der Held steht durch die Zone fest (API Zielschutz: festes Ziel) - Submerged/Dive Down schuetzen ihn nicht
       }
 
       engine.log('ultimate_destroyer_punch', { player: ps.username, hero: hero.name, creature: name, defeated: besiegt, maxHp, damage: schaden, corresponding: th?.name || null });

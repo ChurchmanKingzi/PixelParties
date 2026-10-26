@@ -39,19 +39,26 @@
 //       resolution-end by `clearArmedArrows`.
 //
 //    3. `applyArrowsBeforeDamage(engine, source,
-//        target, hookCtx)` — invoked from
+//        target, hookCtx)` — STUFE 1, invoked from
 //       `_actionDealDamageImpl` right after the
 //       `beforeDamage` hook. Applies:
 //         • flat damage bumps (sum).
-//         • hard-zero from any arrow carrying
-//           `setAmount0: true` — wins over any
-//           flat bump, matching card text
-//           ("Reduce that Attack's damage to
-//           0").
-//         • stashes `preZeroDamage` on the
-//           arrow mod so `afterDamage` can
-//           compute poison-stacks-from-would-
-//           have-damage for Hydra Blood.
+//         • stashes a provisional `preZeroDamage`
+//           for the poison of Hydra Blood.
+//       `applyArrowsZero(engine, source, target,
+//        hookCtx)` — STUFE 2, die Null von Hydra
+//       Blood Arrow (`setAmount0: true`): erst NACH
+//       allen anderen Betragsänderungen (Als Ruling
+//       Al 26.10.: „Immer Hydra Blood Arrow nach
+//       ALLEN anderen Schadens-Modifikatoren!") —
+//       Heldenpfad nach Multiplikatoren/Niu/Darge,
+//       Kreaturenpfad am `_settleCreatureEntry`.
+//       Der Endbetrag wird je Ziel gemerkt
+//       (`_preZeroByTarget`) und ist die Basis der
+//       Giftstapel (1 je volle 30). Quellen-seitig
+//       unreduzierbarer Schaden (`_unreduzierbar`)
+//       wird nicht genullt; Ziel-seitiges „cannot
+//       be reduced" hält Hydra nicht auf.
 //
 //    4. `applyArrowsAfterDamage(engine, source,
 //        target, dealt, origAmount, type)` —
@@ -99,13 +106,17 @@ const { hasCardType } = require('./_hooks');
  * @param {boolean} [opts.requireSingleTarget] - Golden Arrow only. Currently
  *   a no-op because every PP Attack resolves with a single promptDamageTarget
  *   call, but the hook is in place for when multi-target Attacks ship.
+ * @param {boolean} [opts.anyHero] - Hydra Blood Arrow: auch auf die Attack eines GEGNERISCHEN Helden.
+ * @param {boolean} [opts.blockUnreducible] - Hydra Blood Arrow (Als Ruling Al 26.10.): nicht anbieten, wenn der Schaden der
+ *   Attack unreduzierbar ist (`engine._attackSchadenUnreduzierbar`: Surefire Shot, Elixir of Strength, Club of Gobbo …).
  */
 function arrowTriggerCondition(gs, pi, engine, chainCtx, _opts = {}) {
   if (!chainCtx?.chain || chainCtx.chain.length === 0) return false;
   const initial = chainCtx.chain.find(l => l.isInitialCard);
   if (!initial) return false;
   if (initial.cardType !== 'Attack') return false;
-  if (initial.owner !== pi) return false;
+  // Als Ruling (Al 26.10.): Hydra Blood Arrow („when a Hero hits …", ohne „you control") darf auf die Attack JEDES Helden auslösen (`opts.anyHero`).
+  if (initial.owner !== pi && !_opts.anyHero) return false;
 
   // Caster hero must exist and be alive. The INITIAL link uses `heroIdx`
   // (executeCardWithChain, see _engine.js:9042); the `casterHeroIdx`
@@ -114,8 +125,14 @@ function arrowTriggerCondition(gs, pi, engine, chainCtx, _opts = {}) {
   const hiIdx = initial.heroIdx ?? initial.casterHeroIdx;
   if (hiIdx == null || hiIdx < 0) return false;
   // Styx 28.9.: geliehener Angreifer steht auf der Brettseite `casterOwner`.
-  const hero = gs.players[initial.casterOwner ?? pi]?.heroes?.[hiIdx];
+  const hero = gs.players[initial.casterOwner ?? (_opts.anyHero ? initial.owner : pi)]?.heroes?.[hiIdx];
   if (!hero?.name || hero.hp <= 0) return false;
+
+  // Als Ruling (Al 26.10.): „Eine andere Regel, die dann für ALLE True-Damage-Sources gelten soll: Diese können Hydra Blood Arrow schlicht nicht aktivieren." — ein Pfeil, der den
+  // Schaden auf 0 SENKT (`opts.blockUnreducible`, Hydra Blood Arrow), wird nicht angeboten, wenn der Schaden der Attack QUELLEN-seitig unreduzierbar ist (Surefire Shot, Elixir of Strength,
+  // Club of Gobbo …; EIN Prädikat: `engine._attackSchadenUnreduzierbar`). Das Fenster öffnet VOR der Zielwahl; ein bereitstehender Elixir sperrt Hydra bei JEDER Attack (Ruling Al 26.10.: „die müssen sich ausschließen“);
+  // ZIEL-seitiges „cannot be reduced" (Tempeste, Brachion …) sperrt Hydra nicht.
+  if (_opts.blockUnreducible && engine?._attackSchadenUnreduzierbar?.({ link: initial })) return false;
 
   // Future multi-target gate for Golden Arrow. Left intentionally true —
   // see header comment.
@@ -153,11 +170,11 @@ function arrowTriggerCondition(gs, pi, engine, chainCtx, _opts = {}) {
  *   sourceCard    : string       — log label
  */
 function armAttackerWithArrow(engine, pi, chain, modifier) {
-  const hero = _findAttackerHero(engine, pi, chain);
+  const hero = _findAttackerHero(engine, pi, chain, !!modifier?.anyHero);
   if (!hero) return false;
   if (modifier) {
     if (!Array.isArray(hero._armedArrows)) hero._armedArrows = [];
-    hero._armedArrows.push({ ...modifier });
+    hero._armedArrows.push({ ...modifier, ownerPi: pi });   // `ownerPi` = Spieler des Pfeils (bei Hydra Blood auf eine gegnerische Attack ≠ Angreifer)
   }
   hero._arrowsChainedCount = _countArrowLinks(chain);
   return true;
@@ -173,15 +190,15 @@ function noteArrowActivated(engine, pi, chain) {
   return armAttackerWithArrow(engine, pi, chain, null);
 }
 
-function _findAttackerHero(engine, pi, chain) {
+function _findAttackerHero(engine, pi, chain, anyHero = false) {
   if (!Array.isArray(chain) || chain.length === 0) return null;
   const initial = chain.find(l => l.isInitialCard && l.cardType === 'Attack');
   if (!initial) return null;
-  if (initial.owner !== pi) return null;
+  if (initial.owner !== pi && !anyHero) return null;
   const hiIdx = initial.heroIdx ?? initial.casterHeroIdx;
   if (hiIdx == null || hiIdx < 0) return null;
   // Styx 28.9.: Held auf der Brettseite (`casterOwner`), „you" bleibt `pi`.
-  const hero = engine.gs.players[initial.casterOwner ?? pi]?.heroes?.[hiIdx];
+  const hero = engine.gs.players[initial.casterOwner ?? (anyHero ? initial.owner : pi)]?.heroes?.[hiIdx];
   return hero?.name ? hero : null;
 }
 
@@ -199,16 +216,17 @@ function _countArrowLinks(chain) {
 }
 
 /**
- * Apply armed-arrow damage modifiers. Runs immediately after the
+ * Apply armed-arrow damage modifiers, STUFE 1 (Erhöhungen). Runs immediately after the
  * `beforeDamage` hook. Mutates `hookCtx.amount`.
  *
- * Sum-then-zero ordering so Hydra Blood's zero wins absolutely:
- *   1. Add every arrow's `flatDamage` into a running total.
- *   2. If ANY arrow requested `setAmount0`, the result is 0.
+ *   • Addiert die `flatDamage` aller Pfeile (Angelfeather +60 …).
+ *   • Merkt einen VORLÄUFIGEN Betrag je Ziel für das Gift von Hydra Blood Arrow
+ *     (`_preZeroDamage` / `_preZeroByTarget`): Treffer, die nie durch Stufe 2 laufen
+ *     (True Damage), zahlen das Gift danach aus diesem Wert.
  *
- * Stashes `_preZeroDamage = amount-after-flat-bumps` on each arrow so
- * Hydra Blood's poison-stacks-per-30-would-have-damage computation has
- * the pre-zero value available at `afterDamage` time.
+ * Die Null von Hydra Blood Arrow setzt hier NICHT mehr: sie gehört in Stufe 2
+ * (`applyArrowsZero`) — NACH allen anderen Betragsänderungen (Als Ruling Al 26.10.:
+ * „Immer Hydra Blood Arrow nach ALLEN anderen Schadens-Modifikatoren!").
  */
 function applyArrowsBeforeDamage(engine, source, target, hookCtx) {
   if (!source) return;
@@ -217,10 +235,8 @@ function applyArrowsBeforeDamage(engine, source, target, hookCtx) {
   if (hookCtx.type !== 'attack') return; // Arrows only care about attack damage.
 
   let flat = 0;
-  let zero = false;
   for (const arrow of hero._armedArrows) {
     if (typeof arrow.flatDamage === 'number') flat += arrow.flatDamage;
-    if (arrow.setAmount0) zero = true;
   }
 
   // W49a (Ricochet, Folgetreffer): der Betrag steht fest („half as much as the previous one") — der Pfeil-Bonus steckt schon im Vorgaenger.
@@ -228,27 +244,61 @@ function applyArrowsBeforeDamage(engine, source, target, hookCtx) {
     hookCtx.amount = Math.max(0, hookCtx.amount + flat);
     if (hookCtx._kBase !== undefined) hookCtx._kBase += flat;   // W50a: Pfeil-Bonus gehoert zur Basis des Kettenbetrags (Ricochet-Kopf)
   }
-  const preZero = hookCtx.amount + (hookCtx._flatBonus || 0);
-  if (zero) {
-    hookCtx.amount = 0;
-    // Hydra Blood's "reduce damage to 0" is absolute — it takes
-    // everything, including any multiplier-immune flat bonuses that
-    // Darge or future cards stamped on the hookCtx before this arrow
-    // pass ran. The card-text exception for Darge is "unaffected by
-    // effects that double damage" — multipliers, not zeroing.
-    hookCtx._flatBonus = 0;
-    // v689 (Punkt vor Strich): auch die getrennt gesammelten
-    // Modifikatoren der Hook-Runde fallen — die Null ist absolut.
-    hookCtx._flat = 0;
-    hookCtx._mul = 1;
-    hookCtx._zeroedByArrow = true;
-  }
+  stashPreZero(hero, target, hookCtx.amount + (hookCtx._flatBonus || 0));
+}
 
-  // Stash the PRE-ZERO total (flat-bumps + any _flatBonus already
-  // written) on every arrow so Hydra Blood's poison-stacks-per-30-
-  // would-have-damage computation uses the full amount the Attack
-  // would have dealt had it not been zeroed.
-  for (const arrow of hero._armedArrows) arrow._preZeroDamage = preZero;
+/** Merkt den „would have dealt"-Betrag für Hydra Blood Arrow: je Ziel (Mehrzielangriffe) und als Rückfall am Pfeil. */
+function stashPreZero(hero, target, betrag) {
+  for (const arrow of hero._armedArrows) {
+    arrow._preZeroDamage = betrag;
+    if (target) (arrow._preZeroByTarget || (arrow._preZeroByTarget = new Map())).set(target, betrag);
+  }
+}
+
+/** Trägt dieser Held eine scharfe Hydra Blood Arrow (`setAmount0`, an der laufenden Attack gekettet)? Elixir of Strength nimmt ihn dann nicht als Ziel (gegenseitiger Ausschluss, Al 26.10.). */
+function heroHatScharfeHydra(hero) {
+  return !!hero?._armedArrows?.some(a => a.setAmount0);
+}
+
+/** Trägt der Angreifer eine scharfe Hydra Blood Arrow (`setAmount0`)? */
+function hydraScharf(engine, source) {
+  if (!source) return false;
+  return heroHatScharfeHydra(heroFromSource(engine, source));
+}
+
+/** Wird die scharfe Hydra Blood Arrow diesen Treffer auf 0 setzen? Für Fenster, die VOR der Null nichts mehr sehen sollen (Reaktionen am Ziel). */
+function hydraWirdNullen(engine, source, hookCtx) {
+  if (hookCtx?.type !== 'attack' || !hydraScharf(engine, source)) return false;
+  return !engine._attackSchadenUnreduzierbar?.({ hookCtx });
+}
+
+/**
+ * Apply armed-arrow damage modifiers, STUFE 2 (die Null von Hydra Blood Arrow).
+ *
+ * Als Ruling (Al 26.10.): „Immer Hydra Blood Arrow nach ALLEN anderen Schadens-Modifikatoren!" — der Engine-Pfad ruft diese Stufe, wenn der Betrag feststeht
+ * (Elixir/Anger/Pfeil-Boni, Hook-Boni, Buff-Multiplikatoren am Angreifer UND am Ziel, Niu/Darge-Boni; die Hand-Reaktionen, Einmal-Schilde und Deckel des Ziels folgen
+ * danach und sehen schon die 0). Der ENDBETRAG ist der „would have dealt"-Betrag für die Giftstapel (1 je volle 30, `applyArrowsAfterDamage`). Gesenkt wird nur,
+ * was reduzierbar ist: ein Treffer mit QUELLEN-seitig unreduzierbarem Schaden (`hookCtx._unreduzierbar`: Surefire Shot, Elixir of Strength, Club of Gobbo — siehe
+ * `engine._attackSchadenUnreduzierbar`) bleibt, das Gift nach dem Endbetrag auch. ZIEL-seitiges „cannot be reduced" (Tempeste, Prophecy of Tempeste, Gigantisaur
+ * Brachion, Monia Bot, Test Dummy …) hält Hydra nicht auf: die Null kommt VOR dem Treffer und umgeht Effekte am Ziel.
+ *
+ * @returns {boolean} true = der Betrag wurde auf 0 gesetzt
+ */
+function applyArrowsZero(engine, source, target, hookCtx) {
+  if (!source || hookCtx?.type !== 'attack') return false;
+  const hero = heroFromSource(engine, source);
+  if (!hero?._armedArrows?.some(a => a.setAmount0)) return false;
+  stashPreZero(hero, target, Math.max(0, hookCtx.amount || 0));
+  if (engine._attackSchadenUnreduzierbar?.({ hookCtx })) return false;
+  hookCtx.amount = 0;
+  // Hydra Blood's "reduce damage to 0" is absolute — it takes
+  // everything, including any multiplier-immune flat bonuses (Darge, Niu).
+  hookCtx._flatBonus = 0;
+  // v689 (Punkt vor Strich): auch die getrennt gesammelten Modifikatoren der Hook-Runde fallen — die Null ist absolut.
+  hookCtx._flat = 0;
+  hookCtx._mul = 1;
+  hookCtx._zeroedByArrow = true;
+  return true;
 }
 
 /**
@@ -287,10 +337,10 @@ async function applyArrowsAfterDamage(engine, source, target, dealt, _origAmount
     // pre-zero amount so the stacks are computed against what the
     // Attack WOULD have dealt before Hydra Blood zeroed it.
     if (typeof arrow.poisonStacksPer === 'number' && arrow.poisonStacksPer > 0) {
-      const basis = arrow._preZeroDamage || 0;
+      const basis = arrow._preZeroByTarget?.has(target) ? arrow._preZeroByTarget.get(target) : (arrow._preZeroDamage || 0);   // je Ziel (Mehrzielangriff), sonst der letzte Wert
       const stacks = Math.floor(basis / arrow.poisonStacksPer);
       if (stacks > 0) {
-        await applyPoisonStacksToTarget(engine, pi, targetLoc, stacks, arrow.sourceCard || 'Arrow');
+        await applyPoisonStacksToTarget(engine, arrow.ownerPi ?? pi, targetLoc, stacks, arrow.sourceCard || 'Arrow');   // Quelle = Spieler des Pfeils (Hydra Blood auf gegnerische Attack)
       }
     }
     // Gold gain per N damage dealt (Golden Arrow).
@@ -323,8 +373,9 @@ async function clearArmedArrows(engine, pi) {
     for (const arrow of hero._armedArrows) {
       if (!(arrow.goldRatio > 0) || !arrow._goldTreffer || arrow._goldTreffer.size !== 1) continue;
       const dealt = [...arrow._goldTreffer.values()][0];
-      if (!(dealt > 0)) continue;
-      const gold = Math.floor(dealt / arrow.goldRatio);
+      // Als Ruling (Al 26.10., Golden Arrow „Sperren"): die Gold-Sperre („You cannot gain or spend Gold for the rest of the turn afterwards") gilt auch bei
+      // 0 Schaden / 0 Gold — NICHT hinter `dealt > 0` verstecken; Gold gibt es nur für echten Schaden.
+      const gold = dealt > 0 ? Math.floor(dealt / arrow.goldRatio) : 0;
       if (gold > 0 && !ps.goldLocked) {
         await engine.actionGainGold(pi, gold);
         engine.log('arrow_gold_gain', { player: ps.username, gold, source: arrow.sourceCard || 'Arrow' });
@@ -445,6 +496,10 @@ module.exports = {
   armAttackerWithArrow,
   noteArrowActivated,
   applyArrowsBeforeDamage,
+  applyArrowsZero,
+  heroHatScharfeHydra,
+  hydraScharf,
+  hydraWirdNullen,
   applyArrowsAfterDamage,
   clearArmedArrows,
   pickLastUntriggeredArrowLink,

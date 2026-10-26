@@ -65,6 +65,7 @@ function reevalImmunity(engine, inst) {
 module.exports = {
   activeIn: ['support'],
   creatureEffect: true, // tier 1+ activated (free; engine HOPT = once/turn)
+  requiresTarget: true, // Zielwahl-Effekt: Blinded sperrt ihn (siehe _hooks.js / getActivatableCreatures)
 
   // The tier-2+ immunity is MAINTAINED by `reevalImmunity` running on
   // onGameStart/onTurnStart/onCardEnterZone/etc. Without this flag the
