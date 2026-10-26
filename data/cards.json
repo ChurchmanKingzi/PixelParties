@@ -2730,7 +2730,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Choose a target and deal 100/160/240 damage to it.",
+    "effect": "Choose a target and deal 100/150/200 damage to it.",
     "archetype": "",
     "setID": "PP SET01",
     "banned": "",
