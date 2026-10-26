@@ -41978,6 +41978,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         let targetSlot = -1;
         let targetAttachOwner = undefined; // v651: Zielseite eines Cross-Side-Attachments
         let targetCharmedOwner = undefined;
+        let herolosAngreifer = undefined;   // W78 (Backstab): der unter dem Zeiger gewählte Gegnerheld
         let surpriseTarget = false;
         const heroActionHeroIdx2 = heroActionPrompt?.heroIdx;
         const isAttachmentCard = (card.subtype || '').toLowerCase() === 'attachment';
@@ -42147,6 +42148,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const r = el.getBoundingClientRect();
           if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
             const hi = parseInt(el.dataset.heroIdx);
+            // ★ W78 (Backstab, Al 26.10.): eine Karte OHNE Wirker-Helden lässt sich direkt auf den GEGNERHELDEN ziehen, der die Attack ausführen soll (Liste vom Server: `herolessAngreifer`).
+            const _hlAngreifer = (gameState.herolessAngreifer || {})[cardName];
+            if (_hlAngreifer) {
+              const _hlOwner = el.dataset.heroOwner === 'me' ? myIdx : (myIdx === 0 ? 1 : 0);
+              if (_hlAngreifer.some(a => a.owner === _hlOwner && a.heroIdx === hi)) {
+                targetHero = hi; targetAttachOwner = _hlOwner; herolosAngreifer = { owner: _hlOwner, heroIdx: hi };
+                break;
+              }
+            }
             // v651: Cross-Side-Attachment auf einen GEGNERISCHEN Helden gezogen
             if (el.dataset.heroOwner !== 'me' && isAttachmentCard) {
               const oppIdx2 = myIdx === 0 ? 1 : 0;
@@ -42195,7 +42205,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
         }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, hoverHero, hoverHeroRect, targetSlot: targetSlot, targetAttachOwner, creatureCasterSlot, creatureCasterInstId, isSpell: !surpriseTarget, isSurprise: surpriseTarget, surpriseOpp: surpriseTarget && surpriseOpp, charmedOwner: surpriseTarget ? undefined : targetCharmedOwner , fromCreation });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, hoverHero, hoverHeroRect, targetSlot: targetSlot, targetAttachOwner, herolosAngreifer, creatureCasterSlot, creatureCasterInstId, isSpell: !surpriseTarget, isSurprise: surpriseTarget, surpriseOpp: surpriseTarget && surpriseOpp, charmedOwner: surpriseTarget ? undefined : targetCharmedOwner , fromCreation });
       } else if (isAscensionPlayable) {
         // Ascended Hero drag — target hero zones with eligible base heroes
         let targetHero = -1;
@@ -43027,6 +43037,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // ★ Herkunft: Hand oder Crestinas Vorrat. Der Server loest
             // `handIndex` damit in der richtigen Liste auf.
             fromCreation: prev.fromCreation || undefined,
+            herolosAngreifer: prev.herolosAngreifer || undefined,   // W78 (Backstab): auf diesen Gegnerhelden gezogen
           });
           return null;
         });

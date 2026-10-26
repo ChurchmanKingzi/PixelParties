@@ -5200,6 +5200,19 @@ function sendGameState(room, playerIdx, extra) {
       // Karte nur, wenn sie bei KEINEM spielbar waere.
       // ★ W78 (Backstab): Handkarten, die KEINEN Wirker-Helden fragen (`playsWithoutHero`) — der Client spielt sie per Klick/Ziehen ohne Heldenwahl (der Server bucht die Aktion selbst).
       herolessHandCards: pi === playerIdx ? [...new Set((ps.hand || []).filter(cn => { try { return !!loadCardEffect(cn)?.playsWithoutHero; } catch { return false; } }))] : [],
+      // ★ W78 (Backstab): Gegnerhelden, auf die man eine solche Karte ZIEHEN kann (sie führen die Attack aus): `{ Kartenname: [{ owner, heroIdx }] }`.
+      herolessAngreifer: (pi === playerIdx && room.engine && gs.activePlayer === pi) ? (() => {
+        const out = {};
+        for (const cn of new Set((ps.hand || []))) {
+          try {
+            const sc = loadCardEffect(cn);
+            if (!sc?.playsWithoutHero || typeof sc.herolosAusfuehrer !== 'function') continue;
+            const liste = sc.herolosAusfuehrer(room.engine, pi);
+            if (liste?.length) out[cn] = liste.map(a => ({ owner: a.owner, heroIdx: a.heroIdx }));
+          } catch { /* Anzeige-Hilfe */ }
+        }
+        return out;
+      })() : {},
       cardGateBlockedCards: pi === playerIdx ? (() => {
         const raus = new Set();
         // ★ v1308 (Als Vorgabe 23.9.): „You can only control 1 X" — liegt
@@ -8208,7 +8221,7 @@ function isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, cardName, engine) 
   return !!sc?.shufflesFromHandOrDiscardIntoDeck;
 }
 
-async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwner, attachmentZoneSlot, attachHeroIdx, attachOwner, viaCreatureInstId, fromCreation }) {
+async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwner, attachmentZoneSlot, attachHeroIdx, attachOwner, viaCreatureInstId, fromCreation, herolosAngreifer }) {
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
   // ── Warum ist der Play gescheitert? (Diagnose, 13.8.) ──────────────
@@ -8226,7 +8239,10 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   // ★ W78 (Backstab): Karten ohne Wirker-Helden (`playsWithoutHero`). Die Aktion bucht ein technischer Platzhalter (erster spielfähiger eigener Held, `engine.herolosPlatzhalter`); nach außen
   // (Karteninstanz, Kette, Zähler, Hooks, Klon-Aufnahme) tritt kein Held auf: `heroIdxPub` = -1. Kein geliehener Held, keine Kreatur als Wirker.
   const heroless = !!loadCardEffect(cardName)?.playsWithoutHero;
+  delete gs._herolosVorAngreifer;
   if (heroless) {
+    // auf einen Gegnerhelden gezogen: er ist als Angreifer vorgewählt (das Skript prüft ihn gegen seine Liste und fragt sonst normal)
+    if (herolosAngreifer && Number.isInteger(herolosAngreifer.owner) && Number.isInteger(herolosAngreifer.heroIdx)) gs._herolosVorAngreifer = { owner: herolosAngreifer.owner, heroIdx: herolosAngreifer.heroIdx };
     heroIdx = room.engine.herolosPlatzhalter(pi, cardName, handIndex, { fromCreation });
     charmedOwner = undefined; viaCreatureInstId = undefined;
     if (heroIdx < 0) return _bail('herolose Karte: kein eigener Held kann die Aktion buchen (Platzhalter)');
