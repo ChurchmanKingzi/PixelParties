@@ -810,7 +810,6 @@ def main():
     # ── Opener „Gewitterwolke“: das erste Bild ist die vergrößerte Wolke aus dem Sprite des Helden (ohne ihn), in der es zuckt; ein Blitz schlägt ein,
     #    die Wolke zerreißt und gibt den Helden frei ──
     T_STORM = 0.70                                                           # Sekunden bis zum Einschlag
-    CP = 12                                                                  # Pixelgröße der vergrößerten Wolke
     BOLT_C = [(110, 170, 255), (255, 244, 170), (255, 255, 255)]             # Glimmen, Mitte, Kern
     bolt_rng = np.random.default_rng(5)
 
@@ -836,19 +835,44 @@ def main():
         if len(hs[0]):
             x0, x1, y1 = int(hs[1].min()) - 2, int(hs[1].max()) + 3, int(hs[0].max()) + max(0, top - 12) + 3
             sh_ = x1 - x0 + 1
-            out_[top:y1, x0:x1] = fr[top:y1, x0 - sh_:x1 - sh_]
+            def top_of(a_, col):
+                rows = np.where(a_[top:, col, 3] > 20)[0]
+                return top + int(rows.min()) if len(rows) else top
+            tl, tr = top_of(out_, x0 - 1), top_of(out_, x1)
+            for x in range(x0, x1):
+                t_dst = round(tl + (tr - tl) * (x - x0 + 1) / (x1 - x0 + 1))        # Oberkante läuft ohne Knick von links nach rechts über die Lücke
+                t_src = top_of(fr, x - sh_)
+                out_[top:t_dst, x] = 0
+                for y in range(t_dst, y1):
+                    out_[y, x] = fr[min(spr.fh - 1, y - t_dst + t_src), x - sh_]
         return out_.astype(np.uint8)
 
     CLOUDS = [sprite_cloud(i) for i in range(spr.n)]
     c_op = np.any([c[..., 3] > 20 for c in CLOUDS], axis=0)
     cy_ix, cx_ix = np.where(c_op)
-    CB = (int(cx_ix.min()), int(cy_ix.min()), int(cx_ix.max()) + 1, int(cy_ix.max()) + 1)       # gemeinsamer Rahmen aller Frames
-    CL, CT = round(W / 2 - (CB[2] - CB[0]) * CP / 2), round(hcy * U - (CB[3] - CB[1]) * CP / 2)   # Wolke mittig auf Herz-/Kartenmitte
+    UB = (int(cx_ix.min()), int(cy_ix.min()), int(cx_ix.max()) + 1, int(cy_ix.max()) + 1)       # gemeinsamer Rahmen der Einzelwolke
+    # Große Wolke = Stapel aus Kopien der Sprite-Wolke (gleiche Pixelgröße wie der Sprite, gespiegelt, gegeneinander versetzt, aus
+    # verschiedenen Animationsframes; unten dunkler, oben heller) – kein Hochskalieren
+    CP = spr.px
+    uw, uh = UB[2] - UB[0], UB[3] - UB[1]
+    LAYERS = [(18, 0, False, 0, 1.18), (0, 9, True, 11, 1.05), (40, 9, False, 23, 1.05),
+              (8, 19, False, 5, 0.9), (40, 20, True, 31, 0.9), (22, 27, True, 17, 0.78)]       # (x, y, gespiegelt, Frame-Versatz, Helligkeit)
+    CW, CHH = max(l[0] for l in LAYERS) + uw, max(l[1] for l in LAYERS) + uh
+    CB = (0, 0, CW, CHH)
+    CL, CT = round(W / 2 - CW * CP / 2), round(hcy * U - CHH * CP / 2)                          # Wolke mittig auf Kartenmitte
     _cloud_cache = {}
 
     def storm_cloud(i, flash=0.0):
         if i not in _cloud_cache:
-            _cloud_cache[i] = Image.fromarray(CLOUDS[i][CB[1]:CB[3], CB[0]:CB[2]], 'RGBA').resize(((CB[2] - CB[0]) * CP, (CB[3] - CB[1]) * CP), Image.NEAREST)
+            big = Image.new('RGBA', (CW, CHH), (0, 0, 0, 0))
+            for lx, ly, mirror, dfr, br in LAYERS:
+                u_ = Image.fromarray(CLOUDS[(i + dfr) % spr.n][UB[1]:UB[3], UB[0]:UB[2]], 'RGBA')
+                if mirror:
+                    u_ = u_.transpose(Image.FLIP_LEFT_RIGHT)
+                arr = np.asarray(u_).astype(np.float32)
+                arr[..., :3] = np.clip(arr[..., :3] * br, 0, 255)
+                big.alpha_composite(Image.fromarray(arr.astype(np.uint8), 'RGBA'), (lx, ly))
+            _cloud_cache[i] = big.resize((CW * CP, CHH * CP), Image.NEAREST)
         im = _cloud_cache[i]
         if flash:                                                             # Wetterleuchten: Wolke leuchtet bläulich-weiß auf
             lit = Image.blend(im.convert('RGB'), Image.new('RGB', im.size, (205, 222, 255)), 0.5 * flash)
@@ -899,7 +923,7 @@ def main():
             glow = g2
         return core, mid, glow
 
-    BOLT_X, BOLT_Y0 = hcx + 3, (CT + (CB[3] - CB[1]) * CP * 0.6) / U                # Einschlag aus dem unteren Teil der Wolke …
+    BOLT_X, BOLT_Y0 = hcx + 3, (CT + (CB[3] - CB[1]) * CP * 0.75) / U                # Einschlag aus dem unteren Teil der Wolke …
     BOLT_Y1 = max((feet_y + 4 * U) / U, BOLT_Y0 + 45)                              # … bis zu den Füßen des Helden
     BOLT = storm_bolt(11, BOLT_X, BOLT_Y0, BOLT_Y1)
     LEAD = storm_bolt(12, BOLT_X + 1, BOLT_Y0, BOLT_Y1, fork=False)
