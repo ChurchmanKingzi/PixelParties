@@ -282,6 +282,7 @@ module.exports = {
     // Verify destination is still free (W63a: oder von einer GLEICHNAMIGEN Creature belegt und per Alice-Teilung geteilt)
     if (((ps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0
         && !require('./_alice-shared').canShareInto(engine, kontrolleur, destHeroIdx, destSlot, inst, pi)) return false;
+    if (engine.isSupportZoneLocked?.(pi, destHeroIdx, { source: CARD_NAME, cardName: inst.name, via: 'move', instId: inst.id })) return false;   // Zonensperre der Zielspalte (s. `_getAdjacentFreeZones`)
 
     // Fire the card reveal now
     if (savedReveal) {
@@ -412,7 +413,12 @@ function _getAdjacentFreeZones(ps, heroIdx, engine = null, creatures = null) {
   // / Skeleton tutor families.
   const result = [];
   const geteilt = [];
+  // Zonensperre der Spalte (Tri Fecta/Tri Ad, Bonded Companion): dorthin darf nichts gelegt werden — die Spalte wird nur angeboten, wenn mindestens eine der
+  // beweglichen Kreaturen hinein darf (sonst nimmt `_enforceSupportZoneLock` die Kreatur nach dem Zug auf die Hand zurueck).
+  const seite = engine ? engine.gs.players.indexOf(ps) : -1;
+  const gesperrt = (hi, c) => !!(engine && seite >= 0 && engine.isSupportZoneLocked?.(seite, hi, { source: CARD_NAME, cardName: c.name, via: 'move', instId: c.inst?.id }));
   for (const hi of adjacent) {
+    if (creatures && creatures.length > 0 && creatures.every(c => gesperrt(hi, c))) continue;
     for (let zi = 0; zi < 3; zi++) {
       if (((ps.supportZones[hi] || [])[zi] || []).length === 0) {
         result.push({ heroIdx: hi, slotIdx: zi });

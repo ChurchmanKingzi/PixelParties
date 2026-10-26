@@ -77,6 +77,9 @@ function destinationsFor(engine, pi, inst) {
   for (const hi of adjacentHeroIndices(inst.heroIdx)) {
     const hero = ps.heroes?.[hi];
     if (!hero?.name) continue;
+    // Zonensperre der Spalte (Tri Fecta/Tri Ad, Bonded Companion): dorthin darf nichts gelegt werden — sonst bietet Slippery Ice den Platz an und die Engine
+    // nimmt die Kreatur danach (`_enforceSupportZoneLock`) auf die Hand zurueck.
+    if (engine.isSupportZoneLocked?.(pi, hi, { source: CARD_NAME, cardName: inst.name, via: 'move', instId: inst.id })) continue;
     const zones = ps.supportZones?.[hi] || [[], [], []];
     for (let zi = 0; zi < 3; zi++) {
       if ((zones[zi] || []).length === 0) out.push({ heroIdx: hi, slotIdx: zi });
