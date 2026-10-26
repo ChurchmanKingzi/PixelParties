@@ -53,6 +53,8 @@ const { hasCardType } = require('./_hooks');
 
 const CARD_NAME = 'Heat Wave';
 const DAMAGE    = 150;
+/** CPU-Bilanz: Wert eines neu angebrannten Helden (Brettskala; die Brettbewertung rechnet einen Brand-Stapel mit 15, hier etwas mehr: der Brand ist dauerhaft). */
+const HELD_BRAND_WERT = 20;
 
 /**
  * Is a resolved target currently Burned?
@@ -156,6 +158,50 @@ module.exports = {
   async spellVisual(engine, info) {
     if (info.schonGezeigt?.zone?.has('heat_wave')) return;   // der Effekt hat es schon gespielt
     await heissWindBild(engine, info.heroOwner ?? info.owner ?? 0);
+  },
+
+  /**
+   * CPU (W80a, Al 26.10.2026: "Ja" — gemeinsame Kreaturen-Bilanz): Heat Wave brennt AUCH die eigenen Ziele an (alle ausser dem Wirker). Bilanz aus Sicht des Wirkers (Brettskala,
+   * Standard-Kreatur = 30): gegnerische getroffene Kreaturen MINUS eigene getroffene (`engine.kreaturenBilanz`: schon Brennende nehmen 150 Schaden anteilig an der Rest-HP, die anderen
+   * bekommen Burned [0,6 des Werts]; Burn-Immune zaehlen nicht) PLUS die Heldenwirkung des Kartentextes (gegnerische minus eigene Helden ausser dem Wirker: 150 Schaden an schon
+   * Brennenden [Tod = 500 + HP], neuer Brand 20 je Held). Gespielt wird nur bei klar positiver Bilanz, sonst Veto. Schadenssperre (Flame Avalanche) gilt wie im Effekt.
+   */
+  cpuPlayVeto(engine, pi, heroIdx) {
+    try {
+      const KB = require('./_kreaturen-bilanz');
+      const gs = engine.gs, ps = gs.players[pi];
+      if (!ps) return false;
+      const damageLocked = !!ps.damageLocked;
+      const targets = collectTargets(engine, pi, Number.isInteger(heroIdx) ? heroIdx : -1);
+      const liste = [];
+      let heldenWirk = 0, heldenGegner = 0;
+      const prot = gs.firstTurnProtectedPlayer;
+      for (const t of targets) {
+        const gegner = gegnerKontrolliert(engine, t, pi);
+        const vorBrand = targetIsBurned(engine, t);
+        const schaden = vorBrand && !(damageLocked && gegner);
+        if (t.type === 'creature') {
+          if (!t.inst) continue;
+          if (schaden) liste.push({ inst: t.inst, art: 'damage', amount: DAMAGE, sourceOwner: pi });
+          else if (!vorBrand && targetCanBeBurned(engine, t, pi)) liste.push({ inst: t.inst, art: 'status', statusName: 'burned', sourceOwner: pi });
+          continue;
+        }
+        const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
+        if (!h?.name || h.hp <= 0) continue;
+        if (prot != null && t.owner === prot && pi !== prot) continue;   // Erste-Runden-Immunitaet: unantastbar
+        let v = 0;
+        if (schaden && !h.statuses?.shielded) v = DAMAGE >= h.hp ? 500 + h.hp : DAMAGE;
+        else if (!vorBrand && targetCanBeBurned(engine, t, pi)) v = HELD_BRAND_WERT;
+        if (v <= 0) continue;
+        if (gegner) { heldenWirk += v; heldenGegner += v; } else heldenWirk -= v;
+      }
+      const rr = engine.kreaturenBilanz(pi, liste);   // Wirker-Sicht: `verloren` = was gegnerischen Kreaturen widerfaehrt, `geschuetzt` = was eigenen
+      const r = { wirk: (rr.verloren - rr.geschuetzt) * KB.BRETT_FAKTOR, gegner: rr.verloren * KB.BRETT_FAKTOR };
+      r.wirk += heldenWirk;
+      return KB.flaechenVeto(r, heldenGegner);
+    } catch {
+      return false;   // die Heuristik darf nie einen legalen Play verhindern
+    }
   },
 
   /**

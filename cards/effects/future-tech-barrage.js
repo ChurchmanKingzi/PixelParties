@@ -55,6 +55,8 @@ const BOLT_ABSTAND_MS = 90;
 const TREFFER_ABSTAND_MS = 420;
 
 module.exports = {
+  // W80a: erwartete Schlagzahl fuer die CPU-Bilanz (Monia: Mehrfachtreffer) — die Karte schlaegt so oft zu, wie Exemplare in der Ablage liegen.
+  cpuMeta: { erwarteteSchlaege: (engine, pi) => zaehleInAblage(engine.gs, pi, CARD_NAME) },
   // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an —
   // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
   blockedByDamageLock: true,

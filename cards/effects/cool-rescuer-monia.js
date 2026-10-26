@@ -22,6 +22,14 @@
 //      Negation gilt dann trotzdem (Kosten uebersprungen negiert den Effekt nicht).
 //   Bausteine in `_monia-shared.js` (`kostenWaehlen`/`kostenZahlen`, Buchfuehrung).
 //
+//  ★ W80a (Al, 26.10.2026): ZWEITWURF UND MEHRFACHTREFFER GEHOEREN ZUM SELBEN EFFEKT. Der Zweitwurf der Zusatzziel-Helden (Bartas, Grisgar, Andras: "you may choose a second target for
+//   the Spell to hit afterwards") ist derselbe Spell, der erneut schlaegt: ein beim Hauptwurf ANGENOMMENES Angebot negiert auch den Zweitwurf auf Kreaturen (keine neue Frage, keine zweite
+//   Zahlung; Helden/Nicht-Kreaturen werden weiter getroffen), ein ABGELEHNTES gilt auch fuer ihn (keine erneute Frage). Traf der Hauptwurf nur einen Helden, kommt das (erste) Angebot erst beim
+//   Zweitziel. Mehrfachtreffer ueber mehrere Schadensstapel (Future Tech Barrage, Kirin Firebreath) waren schon derselbe Effekt (W77a). Technisch: Monias `afterSpellResolved` raeumt die Angebote
+//   ab, kann dabei aber VOR dem Zusatzziel-Held laufen (Reihenfolge der Zuhoerer) — es legt den Stand fuer den Zweitwurf beiseite (`angeboteBeenden(gs, { fuerZweitwurf })`), der Zweitwurf holt
+//   ihn zurueck (`zweitwurfFortsetzen`, `_second-target-shared.js`). CPU: die Bilanz rechnet mit absehbaren weiteren Treffern (Mehrfachtreffer: Schaden × erwartete Schlagzahl, Zweitwurf: voraussichtliches
+//   Zweitziel anteilig, `_kreaturen-bilanz.js` `mitMehrfachtreffer`/`zweitwurfEintrag`).
+//
 //  ★ W58a (Al, 22.10.2026): die Einmal-pro-Zug-Klausel ist gestrichen
 //  („Whenever" statt „Once per turn, when"). JEDE Karte / JEDER Effekt,
 //  der mindestens eine Kreatur betreffen wuerde, oeffnet das Angebot
@@ -262,7 +270,10 @@ module.exports = {
         cpuDispatch: CARD_NAME,   // W58a: die CPU fragt `cpuResponse` dieser Karte (Titel traegt den Heldennamen/Zusatz)
         costFor: CARD_NAME, costKind: 'protect',   // Kosten-Abwurf-Lernkanal (v1041): die Annahme IST die Kostenentscheidung; die CPU antwortet ueber `cpuResponse`
         // W78a: die komplette Zielliste des Stapels (beide Seiten), Wirkung = Schaden je Eintrag (nicht negierbarer Schaden zaehlt nicht: Monia schuetzt dort nichts)
-        _moniaInfo: cpuInfo(engine, pi, promptable.map(e => ({ inst: e.inst, art: 'damage', amount: e.amount, sourceOwner: quelleOwner, canBeNegated: e.canBeNegated })), quelleOwner, 'damage'),
+        // W80a: dazu die erwarteten WEITEREN Treffer desselben Effekts — Mehrfachtreffer (Schaden × erwartete Schlagzahl) und der Zweitwurf der Zusatzziel-Helden (genau 1 Ziel + Bartas/Grisgar/Andras beim Wirker).
+        _moniaInfo: cpuInfo(engine, pi, KB.mitMehrfachtreffer(engine,
+          promptable.map(e => ({ inst: e.inst, amount: e.amount, sourceOwner: quelleOwner, canBeNegated: e.canBeNegated })),
+          { quelle: trigger || '', quelleOwner, heroOwner: srcEntry?.source?.heroOwner ?? srcEntry?.source?.owner, heroIdx: srcEntry?.source?.heroIdx }), quelleOwner, 'damage'),
       });
 
       // Abgelehnt: fuer diese Karte/diesen Effekt nicht noch einmal fragen (mehrere Stapel, Folgetreffer, andere Seite).
@@ -388,6 +399,8 @@ module.exports = {
       const erwartet = engine.absehbareKreaturen({
         erste: creature, art: ctx.effectType, detail: ctx.detail, statusName: ctx.statusName,
         quelle: key, quelleOwner, vorab: ctx.vorab,
+        heroOwner: ctx.source && typeof ctx.source === 'object' ? (ctx.source.heroOwner ?? ctx.source.owner) : undefined,   // W80a: Wirker-Held (Zweitwurf-Erwartung)
+        heroIdx: ctx.source && typeof ctx.source === 'object' ? ctx.source.heroIdx : undefined,
       });
       // W71b: die ausloesende Karte steht links im Panel („Triggered by"), der Text nennt sie und die Wirkung.
       const ausloeser = key || null;
@@ -449,7 +462,8 @@ module.exports = {
      * After spell resolves: clear the shield-active flag and the offers of this resolution.
      */
     afterSpellResolved: async (ctx) => {
-      angeboteBeenden(ctx._engine.gs);
+      // W80a: ein Zweitwurf (Bartas & Co.) folgt noch in dieser Runde der Zuhoerer und ist derselbe Effekt — der Stand wird fuer ihn beiseitegelegt (`zweitwurfFortsetzen`).
+      angeboteBeenden(ctx._engine.gs, { fuerZweitwurf: !ctx.isSecondCast });
     },
   },
 };
