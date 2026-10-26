@@ -123,7 +123,7 @@ module.exports = {
         description: `${ps.username}'s ${CARD_NAME}: choose one of these Creatures to give to ${ps.username}. The other one is shuffled back into its owner's deck.`,
         confirmLabel: '🤝 Give!',
         confirmClass: 'btn-warning',
-        cancellable: false,
+        cancellable: false,   // pflichtwahl: der GEGNER „must choose" eine der beiden Kreaturen — der Wirker hat die Karte schon verbindlich gespielt
         noSpellCancel: true,
         _skipRedirectCheck: true,
         _skipSurpriseCheck: true,

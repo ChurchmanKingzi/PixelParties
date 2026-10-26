@@ -39,6 +39,9 @@ function hatSchulAbility(engine, seite, heroIdx) {
 module.exports = {
   spellVisual: { impact: { type: 'cosmic_explosion' }, impactMs: 400 },
 
+  // „defeat all other Creatures on the board": trifft 2+ Ziele in EINEM Schlag, aber ohne Schaden (Besiegen) — von Hand als AoE deklarieren (CARD_API ⑦).
+  hitsMultipleTargets: true,
+
   activeIn: ['support'],
 
   cpuMeta: {
