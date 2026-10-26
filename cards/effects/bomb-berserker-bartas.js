@@ -16,6 +16,10 @@
 //  Ausnahmen am Spell-Skript (deklarativ gelesen):
 //    neverMultiTarget: true       — Karte darf nie mehr als 1 Ziel treffen (Basketskull)
 //    opponentChoosesTarget: true  — der GEGNER waehlt das Ziel (Big Oopsie)
+//    fixedTargetCount: true       — die Zahl der Ziele legt der Kartentext fest (Chain Lightning: 3 Ziele, auch wenn nur 1 getroffen wurde) (W75b)
+//
+//  W75b: das Angebot kommt nur, wenn der Spell im Zweitwurf mindestens ein LEGALES zweites Ziel haette
+//  (`engine.zweitwurfHatLegalesZiel`: Trockenlauf der Zielsammlung des Spells — z. B. Frost Breaker braucht ein zweites GEFRORENES Ziel).
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -82,6 +86,8 @@ module.exports = {
       // target they control …"), gibt es kein Ziel, das Bartas' Anwender waehlen koennte — kein Zweitwurf-Angebot. Deklarativ ueber
       // `opponentChoosesTarget: true` am Spell-Skript (kein Namens-Sonderfall).
       if (spellModul?.opponentChoosesTarget) return;
+      // ★ W75b (Al: „Nein, Bartas darf mit Chain Lightning keine Extra-Ziele treffen."): die Zielzahl steht im Kartentext — auch ein 1-Ziel-Treffer (Gegner hat nur 1 Ziel) bekommt keinen Zweitwurf.
+      if (spellModul?.fixedTargetCount) return;
 
       // Check spell level < Bartas's Destruction Magic level
       const spellLevel = spellData.level || 0;
@@ -105,6 +111,10 @@ module.exports = {
         }
       }
       if (!hasOtherTarget) return;
+      // ★ W75b (Al: „Angebot nur, wenn es ein legales (gefrorenes) zweites Ziel gibt!"): Vorabprüfung ohne Seiteneffekte — die Zielsammlung des Spells (seine eigene `condition`,
+      // `side`, `types`, Schutz/Stealth/Taunt …) liefert nach Ausschluss des ersten Ziels mindestens ein wählbares Ziel. `null` (Spell wählt nicht über einen Engine-Zielwähler):
+      // die Altprüfung oben (irgendein anderes Gegnerziel) bleibt allein maßgeblich.
+      if (await engine.zweitwurfHatLegalesZiel(firstTargetId) === false) return;
 
       // Re-verify Bartas is still alive and capable right before prompting
       // (covers edge cases where hero state changed during spell resolution)

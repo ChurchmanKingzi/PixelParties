@@ -5281,7 +5281,7 @@ class GameEngine {
         // is validated (alive, exists) before being returned; if it
         // no longer fits, falls through to the normal prompt.
         const forced = gs._forcedDamageTarget;
-        if (forced && forced.type) {
+        if (forced && forced.type && !config._sondeListe) {   // W75b: die Zielsonde (Bartas-Vorabprüfung) verbraucht den Einmal-Zwang nie
           delete gs._forcedDamageTarget;
           let valid = false;
           // Picker-types gate: an Attack/Spell that restricts to only
@@ -5319,6 +5319,7 @@ class GameEngine {
             // user-picked one.
             if (gs._spellDamageLog && !config._skipDamageLog) {
               gs._spellDamageLog.push({ ...forced });
+              engine._merkeZielSonde('damage', config, ctx);   // W75b
             }
             // ★ Clone (Welle 72): auch ein ERZWUNGENES Ziel (Niehts Bonusangriff) gehoert zur Aufzeichnung des Wurfs — sonst gaebe es fuer diese Attack keine Kopie.
             {
@@ -5819,7 +5820,9 @@ class GameEngine {
           appliesStatus: config.appliesStatus,
           allowOwnSide: config.allowOwnSide,
           selfDamage: config.selfDamage,
+          _sondeListe: config._sondeListe === true,   // W75b: nur die markierte Zielliste liefern, nichts fragen
         });
+        if (config._sondeListe) return { liste: Array.isArray(selectedIds) ? selectedIds : [] };   // W75b: Trockenlauf der Zielsammlung (siehe `zweitwurfHatLegalesZiel`)
 
         if (!selectedIds || selectedIds.length === 0) {
           // Mark spell as cancelled so the handler can return the card to hand
@@ -5831,6 +5834,7 @@ class GameEngine {
         // not damage time, so protected/shielded targets still count as "hit"
         if (selected && gs._spellDamageLog && !config._skipDamageLog) {
           gs._spellDamageLog.push({ ...selected });
+          engine._merkeZielSonde('damage', config, ctx);   // W75b: Bartas-Vorabprüfung des Zweitwurfs (`zweitwurfHatLegalesZiel`)
         }
 
         // ── Caller commit hook ──
@@ -6419,7 +6423,9 @@ class GameEngine {
           appliesStatus: config.appliesStatus,
           allowOwnSide: config.allowOwnSide,
           selfDamage: config.selfDamage,
+          _sondeListe: config._sondeListe === true,   // W75b: s. `promptDamageTarget`
         });
+        if (config._sondeListe) return Array.isArray(selectedIds) ? selectedIds : [];   // W75b: Trockenlauf der Zielsammlung
 
         if (!selectedIds || selectedIds.length === 0) {
           // `noSpellCancel` wie in `promptDamageTarget`: ein Abbruch ausserhalb eines Zaubers (Kreatureneffekt,
@@ -6443,6 +6449,7 @@ class GameEngine {
         const result = _gewaehlt.map(id => targets.find(t => t.id === id)).filter(Boolean);
         if (gs._spellDamageLog) {
           for (const t of result) gs._spellDamageLog.push({ ...t });
+          if (result.length > 0) engine._merkeZielSonde('multi', config, ctx);   // W75b
         }
 
         // ── Surprise window check ──
@@ -33207,6 +33214,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Hardy Slime gilt nur für Attack/Spell/Creature effect (`tauntGiltFuerQuelle`); ohne erkennbare Quelle bleibt er wie bisher.
       this.markiereTauntGesperrte(validTargets, playerIdx, this._tauntQuelleFuer(playerIdx, config));
     }
+    if (config._sondeListe) return validTargets;   // W75b: Trockenlauf — die fertig MARKIERTE Liste (ineligible), ohne Frage, ohne Klon-Wiedergabe, ohne Zustandsänderung
     const _waehlbar = validTargets.filter(t => !t.ineligible);
     if (_waehlbar.length === 0 && validTargets.some(t => t.ineligible)) return [];
 
@@ -43056,6 +43064,64 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ W75b — EINE Quelle für „darf `cardName` JETZT (Skript-Merkmale: harte Aktivierungsgrenze) von `spielerIdx` aktiviert werden?".
+   * Heute: `surpriseHartOPT` (Aquatic Spear: pro Spieler und Zug nur 1 Aktivierung). Eine in diesem Zug gesperrte Surprise ist für JEDE Aktivierung KEIN legales Ziel / keine legale Wahl:
+   * `_canHeroActivateSurprise` (alle Surprise-Fenster, Telekinesis, Baby Spider, Geheimraum …) und `_activateSurprise` fragen hier, und die erzwungenen Wege, die ihre Surprise
+   * aus Deck/Ablage holen (Sabrina, Cute Spider), bieten eine gesperrte Karte gar nicht erst an — statt sie zu wählen und zu fizzeln.
+   * Es prüft NUR diese Grenze (Held-Voraussetzungen, Kosten, Stufen usw. bleiben bei den bisherigen Prüfungen).
+   * @param {number} spielerIdx  der Steuerer der Aktivierung (Auslöser; bei Hand/Deck/Ablage der Besitzer)
+   * @param {string} cardName
+   * @returns {boolean}
+   */
+  surpriseAktivierbarJetzt(spielerIdx, cardName) {
+    const script = loadCardEffect(cardName);
+    return !this.surpriseHartOPTVerbraucht(script, cardName, spielerIdx);
+  }
+
+  /**
+   * ★ W75b — Zielsonde: der Zielwähler (`promptDamageTarget` / `promptMultiTarget`) merkt sich beim Eintragen des getroffenen Ziels ins Wurfprotokoll (`gs._spellDamageLog`),
+   * WIE er gewählt hat (Art, Konfiguration inkl. `condition`/`side`/`types`, den Kontext). Hängt am Protokoll-Array (WeakMap): verschwindet mit dem Wurf, nie im Spielstand.
+   */
+  _merkeZielSonde(art, config, ctx) {
+    const log = this.gs._spellDamageLog;
+    if (!log || !config) return;
+    const { _vorgewaehlt, _nurListe, _sondeListe, ...rest } = config;
+    (this._zielSonden || (this._zielSonden = new WeakMap())).set(log, { art, config: rest, ctx });
+  }
+
+  /**
+   * ★ W75b (Al: „Angebot nur, wenn es ein legales zweites Ziel gibt!") — Vorabprüfung für Bartas' Zweitwurf-Angebot, OHNE Seiteneffekte („Trockenlauf" der Zielsammlung):
+   * wiederholt die Zielsammlung des soeben aufgelösten Zaubers — seine eigene Konfiguration (`condition`, `side`, `types`, Flags) über dieselbe Kette wie der echte Wähler
+   * (Schutz/Untargetable, Stealth & Co. [`blocksTargeting`], Taunt, Erste-Runden-Schutz), mit dem ersten Ziel ausgeschlossen — und fragt, ob mindestens ein wählbares Ziel bleibt.
+   * Keine Frage, kein Fenster (Umleiter/Surprise/Reaktion), kein Wurfprotokoll, kein Zwangsziel (`_forcedDamageTarget` bleibt unberührt).
+   * @param {string} ersteZielId  Id des ersten Ziels (wird ausgeschlossen)
+   * @returns {Promise<boolean|null>} true/false = legales zweites Ziel ja/nein; `null` = unbekannt (der Zauber wählte nicht über einen Engine-Zielwähler) — der Aufrufer fällt dann auf seine Altprüfung zurück
+   */
+  async zweitwurfHatLegalesZiel(ersteZielId) {
+    const gs = this.gs;
+    const log = gs._spellDamageLog;
+    const sonde = log ? this._zielSonden?.get(log) : null;
+    if (!sonde?.ctx) return null;
+    const vorherAusschluss = gs._spellExcludeTargets;
+    const vorherZweit = gs._bartasSecondCast;
+    gs._spellExcludeTargets = [ersteZielId];
+    gs._bartasSecondCast = true;
+    try {
+      const cfg = { ...sonde.config, _sondeListe: true };
+      let liste;
+      if (sonde.art === 'damage') liste = (await sonde.ctx.promptDamageTarget(cfg))?.liste;
+      else liste = await sonde.ctx.promptMultiTarget(cfg);
+      return (liste || []).some(t => t && !t.ineligible && t.id !== ersteZielId);
+    } catch (err) {
+      console.error('[Engine] zweitwurfHatLegalesZiel:', err?.message);
+      return null;
+    } finally {
+      if (vorherAusschluss === undefined) delete gs._spellExcludeTargets; else gs._spellExcludeTargets = vorherAusschluss;
+      if (vorherZweit === undefined) delete gs._bartasSecondCast; else gs._bartasSecondCast = vorherZweit;
+    }
+  }
+
+  /**
    * Requires: hero alive, not frozen/stunned, meets spell school & level requirements.
    * For Creature surprises: also requires a free Support Zone.
    * `playerIdx` = Brettseite des Helden. `opts.reaktor` (Als Vorgabe 29.9.):
@@ -43107,7 +43173,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // ★ W75a (Aquatic Spear: „You can only activate 1 "Aquatic Spear" per turn."): HARTES Once-per-turn der AKTIVIERUNG — gesetzt werden darf beliebig oft, aber
       // pro Spieler und Zug loest nur EINE Kopie aus (`surpriseHartOPT`). Die Grenze gehoert dem Ausloeser (`reaktor`); gestempelt wird erst in `_activateSurprise`,
       // sobald die Aktivierung aufloesen darf — nach Wisdom, Kette und Negation, nie schon beim Anbieten. Alle Surprise-Fenster laufen ueber dieses Gate.
-      if (this.surpriseHartOPTVerbraucht(_opgScript, cardName, reaktor)) return false;
+      if (!this.surpriseAktivierbarJetzt(reaktor, cardName)) return false;   // W75b: EINE Quelle (`surpriseHartOPT`)
     }
 
     // ★ SPELL-SPERREN GELTEN AUCH HIER (v880, Als Befund) ─────────────
@@ -43416,7 +43482,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const _hartSteuerer = (opts.isBakhmSlot || opts.fromDiscard || opts.fromDeck)
         ? (Number.isInteger(opts.steuerer) ? opts.steuerer : playerIdx)
         : this.surpriseKontrolleur(playerIdx, heroIdx);
-      if (this.surpriseHartOPTVerbraucht(script, cardName, _hartSteuerer)) {
+      if (!this.surpriseAktivierbarJetzt(_hartSteuerer, cardName)) {
         this.log('surprise_blocked_hopt', { card: cardName });
         return null;
       }

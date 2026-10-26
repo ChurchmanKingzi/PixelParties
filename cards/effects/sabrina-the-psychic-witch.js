@@ -60,6 +60,8 @@ function deckSurpriseLevels(engine, pi) {
     const cd = cardDB[cn];
     if (!cd) continue;
     if ((cd.subtype || '').toLowerCase() !== 'surprise') continue;
+    // ★ W75b (Al): eine in diesem Zug gesperrte Surprise (Aquatic Spear, `surpriseHartOPT`) ist KEIN legales Ziel der Suche — weder fürs Gating noch für die Galerie.
+    if (!engine.surpriseAktivierbarJetzt(pi, cn)) continue;
     seen.add(cn);
     levels.push(cd.level || 0);
   }
@@ -176,6 +178,7 @@ module.exports = {
         if (!cd) continue;
         if ((cd.subtype || '').toLowerCase() !== 'surprise') continue;
         if ((cd.level || 0) > sacLevel) continue;
+        if (!engine.surpriseAktivierbarJetzt(pi, cn)) continue;   // W75b: gesperrte Surprise (Aquatic Spear) wird nicht angeboten
         const sScript = loadCardEffect(cn);
         if (!sScript?.onSurpriseActivate) continue;
         if (sScript.canTelekinesisActivate === false) continue;
