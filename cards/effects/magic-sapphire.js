@@ -62,14 +62,17 @@ module.exports = {
 
     const picked = await engine.promptGeneric(pi, {
       type: 'cardGallery',
-      searchToHand: true, searchPile: 'deck',   // v1121
+      searchToHand: true, searchPile: 'discard',   // v1121 — der Zauber kommt aus der ABLAGE (die schwache Such-Sperre, Cats of the Pharaoh, laesst sie offen)
       cards: gallery,
       title: CARD_NAME,
       description: 'Choose a Spell to recover from your discard pile.',
       cancellable: true,
     });
 
-    if (picked && !picked.cancelled && picked.cardName) {
+    // Abbruch der Wahl = nichts ist passiert: Karte bleibt auf der Hand, kein Einmal-Stempel, kein Gold (CARD_API „Zielende Karten sind abbrechbar", Boomerang-Muster).
+    if (!picked || picked.cancelled) return { cancelled: true };
+
+    if (picked.cardName) {
       const ps = engine.gs.players[pi];
       const _taken_idx = await engine.takeFromPile(ps, 'discard', picked.cardName, { source: CARD_NAME, toHand: true });   // v820: Stapel-Schicht
       if (_taken_idx) {

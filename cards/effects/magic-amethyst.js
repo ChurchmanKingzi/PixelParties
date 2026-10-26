@@ -83,6 +83,9 @@ function _buildAbilityGallery(ps, hi, engine, oi) {
 }
 
 module.exports = {
+  // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
+  // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten/Einmal-Stempel; `engine.ersterZugGeschuetzt`).
+  blockedByFirstTurnProtection: true,
   // Gelockertes Commit (Al-Design-Update): Auch schwache Abilities
   // (Toughness) sind es wert, entfernt zu werden — Amethyst kann
   // GELOOPT werden: Eine schwache Removal jetzt heißt nächste Runde

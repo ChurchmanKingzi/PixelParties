@@ -18,6 +18,9 @@ const CARD_NAME = 'Magic Emerald';
 const MILL_AMOUNT = 3;
 
 module.exports = {
+  // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
+  // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten/Einmal-Stempel; `engine.ersterZugGeschuetzt`).
+  blockedByFirstTurnProtection: true,
   // v826: NICHT "nur Stapel-Bewegung" (Gegner-Deck: eigene Bewegung des Wirkenden, nicht gesperrt); die Auto-Erkennung
   // des Loaders wuerde sonst unter Knight of Kings [B] die ganze Karte sperren.
   blockedByPileLock: false,
