@@ -28,9 +28,15 @@
 /**
  * Get heroes eligible for sacrifice: alive, originally owned by the player.
  */
-function getSacrificeTargets(gs, pi) {
+function getSacrificeTargets(gs, pi, engine) {
   const ps = gs.players[pi];
   const targets = [];
+  // W79 (White Sacrificial Bull): eine Kreatur, die auch als Hero zählt, ist ein zulässiges Opfer — kontrolliert UND ursprünglich vom Spieler (Besitzer).
+  for (const b of (engine?.heldKreaturen?.(pi) || [])) {
+    if (engine.kartenBesitzerVon(b) !== pi) continue;
+    const seite = engine.physicalSide(b);
+    targets.push({ id: `equip-${seite}-${b.heroIdx}-${b.zoneSlot}`, type: 'equip', owner: seite, heroIdx: b.heroIdx, slotIdx: b.zoneSlot, cardName: b.name, cardInstance: b });
+  }
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
@@ -50,8 +56,14 @@ function getSacrificeTargets(gs, pi) {
  * ein abgegebener eigener Held nein, ein uebernommener Gegnerheld ja; `owner` = Brettseite) ohne das Opfer (`opferIdx` = Index in der EIGENEN Spalte).
  * Das Opfer selbst („a Hero ORIGINALLY controlled by you") bleibt Besitz-/Spaltenregel des Kartentextes.
  */
-function empfaengerFuer(engine, pi, opferIdx) {
-  return engine.getControlledHeroTargets(pi).filter(t => !(t.owner === pi && t.heroIdx === opferIdx));
+function empfaengerFuer(engine, pi, opferIdx, opferInstId = null) {
+  const helden = engine.getControlledHeroTargets(pi).filter(t => !(opferIdx >= 0 && t.owner === pi && t.heroIdx === opferIdx));
+  // W79 (White Sacrificial Bull): auch eine Kreatur, die als Hero zählt, ist „another Hero you control" (außer dem geopferten Bull selbst).
+  const bullen = (engine.heldKreaturen?.(pi) || []).filter(b => b.id !== opferInstId).map(b => {
+    const seite = engine.physicalSide(b);
+    return { id: `equip-${seite}-${b.heroIdx}-${b.zoneSlot}`, type: 'equip', owner: seite, heroIdx: b.heroIdx, slotIdx: b.zoneSlot, cardName: b.name, cardInstance: b };
+  });
+  return [...helden, ...bullen];
 }
 
 /**
@@ -64,7 +76,7 @@ async function payOpferKosten(engine, pi, inst) {
   const gs = engine.gs;
   const ps = gs.players[pi];
 
-  const sacrificeTargets = getSacrificeTargets(gs, pi).filter(t => empfaengerFuer(engine, pi, t.heroIdx).length > 0);   // W28a: es braucht einen Empfaenger, den ich kontrolliere
+  const sacrificeTargets = getSacrificeTargets(gs, pi, engine).filter(t => empfaengerFuer(engine, pi, t.type === 'equip' ? -1 : t.heroIdx, t.type === 'equip' ? t.cardInstance.id : null).length > 0);   // W28a: es braucht einen Empfaenger, den ich kontrolliere
   if (sacrificeTargets.length < 1) return null;   // 1 Opfer + 1 anderer kontrollierter Held
 
   // Step 1: Pick hero to sacrifice
@@ -75,7 +87,7 @@ async function payOpferKosten(engine, pi, inst) {
     confirmClass: 'btn-danger',
     cancellable: true,   // W16g (S01-25): die Opferwahl ist die KOSTENwahl, noch nichts bezahlt -> Abbruch = Karte bleibt auf der Hand
     exclusiveTypes: true,
-    maxPerType: { hero: 1 },
+    maxPerType: { hero: 1, equip: 1 },
     maxTotal: 1,
   });
 
@@ -83,6 +95,18 @@ async function payOpferKosten(engine, pi, inst) {
   const sacTarget = sacrificeTargets.find(t => t.id === sacrificePick[0]);
   if (!sacTarget) return null;
 
+  // W79: das Opfer ist ein Bull (Kreatur, die auch als Hero zählt) — geopfert wie jede Kreatur, sein max HP zählt.
+  if (sacTarget.type === 'equip') {
+    const bull = sacTarget.cardInstance;
+    if (!bull || bull.zone !== 'support' || !engine.zaehltAlsHeld(bull)) return null;
+    const bullMaxHp = bull.counters?.maxHp ?? engine._getCardDB()[bull.name]?.hp ?? 0;
+    delete gs._kostenOpferWirker;
+    engine._broadcastEvent('play_zone_animation', { type: 'snake_devour', owner: sacTarget.owner, heroIdx: bull.heroIdx, zoneSlot: bull.zoneSlot });
+    await engine._delay(700);
+    const weg = await engine.opfereKreatur(bull, { name: 'Divine Gift of Sacrifice', owner: pi, heroIdx: -1 }, { animation: false });
+    if (!weg) return null;
+    return { heroIdx: -1, instId: bull.id, name: bull.name, maxHp: bullMaxHp };
+  }
   const sacHero = ps.heroes[sacTarget.heroIdx];
   if (!sacHero?.name || sacHero.hp <= 0) return null;
   const sacMaxHp = sacHero.maxHp || sacHero.hp;
@@ -139,7 +163,7 @@ async function doSacrifice(engine, pi, opfer) {
   if (gs.result) return true;
 
   // Step 2: Pick hero to receive the buff (exclude sacrificed hero)
-  const buffTargets = empfaengerFuer(engine, pi, opfer.heroIdx);   // W28a: „another Hero you control"
+  const buffTargets = empfaengerFuer(engine, pi, opfer.heroIdx, opfer.instId ?? null);   // W28a: „another Hero you control"
   if (buffTargets.length === 0) {
     // Kosten sind bezahlt (Z7c), aber es gibt keinen Empfänger mehr (in der Kette gefallen): verpufft.
     engine.log('divine_gift_sacrifice_no_target', { player: ps.username, sacrificed: opfer.name });
@@ -158,7 +182,7 @@ async function doSacrifice(engine, pi, opfer) {
       cancellable: false,   // W16g: Pflichtwahl NACH dem Zusagepunkt — das Opfer (Kosten) ist schon bezahlt
       greenSelect: true,
       exclusiveTypes: true,
-      maxPerType: { hero: 1 },
+      maxPerType: { hero: 1, equip: 1 },
       maxTotal: 1,
     });
 
@@ -167,6 +191,19 @@ async function doSacrifice(engine, pi, opfer) {
     if (!buffTarget) return true;
   }
 
+  // W79: der Empfänger ist ein Bull — max und aktuelle HP der Kreatur wachsen um das max HP des Opfers.
+  if (buffTarget.type === 'equip') {
+    const bull = buffTarget.cardInstance;
+    if (!bull || bull.zone !== 'support' || !engine.zaehltAlsHeld(bull)) return true;
+    engine._broadcastEvent('play_zone_animation', { type: 'gold_sparkle', owner: buffTarget.owner, heroIdx: bull.heroIdx, zoneSlot: bull.zoneSlot });
+    await engine._delay(400);
+    engine.increaseMaxHp(bull, opfer.maxHp, { source: { name: 'Divine Gift of Sacrifice', owner: pi } });
+    engine.log('divine_gift_sacrifice', { player: ps.username, sacrificed: opfer.name, sacMaxHp: opfer.maxHp, buffed: bull.name, newMaxHp: bull.counters?.maxHp });
+    if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
+    ps._oncePerGameUsed.add('divineGift');
+    engine.sync();
+    return true;
+  }
   const buffHero = gs.players[buffTarget.owner]?.heroes?.[buffTarget.heroIdx];
   if (!buffHero?.name || buffHero.hp <= 0) return true;
 
@@ -342,8 +379,8 @@ module.exports = {
    * one to receive the buff).
    */
   spellPlayCondition(gs, pi, engine) {
-    if (engine) return getSacrificeTargets(gs, pi).some(t => empfaengerFuer(engine, pi, t.heroIdx).length > 0);   // W28a
-    return getSacrificeTargets(gs, pi).length >= 2;
+    if (engine) return getSacrificeTargets(gs, pi, engine).some(t => empfaengerFuer(engine, pi, t.type === 'equip' ? -1 : t.heroIdx, t.type === 'equip' ? t.cardInstance.id : null).length > 0);   // W28a (+ W79: Bull)
+    return getSacrificeTargets(gs, pi, engine).length >= 2;
   },
 
   /**

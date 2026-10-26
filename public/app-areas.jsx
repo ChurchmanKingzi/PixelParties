@@ -78,6 +78,7 @@ const AREA_OVERLAYS = {
   'Spatial Crevice':              { tier: 'opaque',      C: () => <SpatialCreviceOverlay /> },   // v1440: Kartenstil
   'Tearing Mountain':             { tier: 'opaque',      C: () => <TearingMountainOverlay /> },   // 23.10.: Lavaberg mit Wasserfall und Lavafluss
   'The Golden Gate':              { tier: 'opaque',      C: () => <GoldenGateOverlay /> },   // W76: goldenes Tor im Abendlicht
+  'Tree of Golden Apples':        { tier: 'opaque',      C: () => <TreeOfGoldenApplesOverlay /> },   // W79: goldener Baum voller glitzernder Äpfel, im Wind schwankend
 };
 
 /** Faserige Diagonale: Punkte von links oben nach rechts unten, leicht gezackt. */
@@ -5899,6 +5900,63 @@ const GoldenGateOverlay = React.memo(function GoldenGateOverlay() {
         /* Goldstaub: ein Kunstpixel steigt in ganzen Pixeln, blinkt am Ende weg */
         .ggt-staub { position: absolute; width: var(--px); height: var(--px); opacity: 0; }
         @keyframes ggtSteig { 0% { opacity: 0; transform: translate(0, 0); } 4%, 88% { opacity: 1; } 96%, 100% { opacity: 0; transform: translate(var(--dx), var(--steig)); } }
+      `}</style>
+    </PixelScene>
+  );
+});
+
+// ═════════════════════════════════════════════════════════════════
+//  TREE OF GOLDEN APPLES — goldener Baum voller glitzernder Äpfel (W79)
+//
+//  Kartenmotiv: ein riesiger Baum mit goldener Krone, in der gelbe Äpfel hängen, auf einer grünen Wiese, Glitzerkreuze ringsum. Kunsthöhe 100.
+//  Ebenen (public/areas/tree-of-golden-apples/): sky (Kachel, Bayer-Verlauf), forest (Kachel, ferne Baumkronen), ground (Kachel, Wiese mit Blümchen),
+//  glow (2 Bilder, Heiligenschein „atmet"), crown_back (Krone, Versatzstück 160 breit), trunk (Stamm mit Wurzeln), crown_front (vordere Blätter + 16 Äpfel),
+//  twinkle (Funkelsprite, 3 Bilder). Der WIND: Krone hinten und vorn schwanken in ganzen Pixeln um den Stamm, mit versetzter Phase (wie Tiefe); dazu fallen
+//  goldene Blätter schräg zu Boden und Funkelkreuze blitzen an den Äpfeln auf.
+// ═════════════════════════════════════════════════════════════════
+const TGA = '/areas/tree-of-golden-apples/';
+const TGA_W = 160;
+const TGA_FUNKEL = [[34, 40], [52, 52], [70, 44], [88, 54], [108, 42], [124, 50], [46, 28], [64, 34], [84, 28], [102, 30], [122, 32], [28, 52], [98, 58], [60, 60], [78, 20], [112, 54], [14, 40], [146, 44]];
+const TreeOfGoldenApplesOverlay = React.memo(function TreeOfGoldenApplesOverlay() {
+  const funkel = useMemo(() => TGA_FUNKEL.slice(0, ppFxN(TGA_FUNKEL.length)).map(([x, y], i) => ({ x, y, dur: [3.4, 4.6, 5.8][i % 3], delay: -((i * 7) % 13) / 2 })), []);
+  const blaetter = useMemo(() => ppZufall(ppFxN(12), (i) => ({
+    x: Math.round(-60 + ((i * 41) % 121)), y: 30 + (i % 4) * 6, fall: 40 + (i * 9) % 22, drift: 16 + (i * 5) % 14,
+    dur: [7, 9, 11][i % 3], delay: -((i * 3) % 14), farbe: ['#fad54a', '#f29a3e', '#fff196'][i % 3],
+  })), []);
+  return (
+    <PixelScene artH={100} bg="#167927" className="tree-golden-apples-overlay">
+      <PixelBand src={TGA + 'sky.png'} />
+      <PixelBand src={TGA + 'forest.png'} />
+      <PixelBand src={TGA + 'ground.png'} />
+      <PixelPiece src={TGA + 'glow.png'} w={TGA_W} style={{ backgroundSize: '100% 200%', backgroundPosition: '50% 0%' }} />
+      <PixelPiece src={TGA + 'glow.png'} w={TGA_W} className="pp-area-dyn" style={{ backgroundSize: '100% 200%', animation: 'ppBand2 3.2s steps(1) infinite' }} />
+      <PixelPiece src={TGA + 'crown_back.png'} w={TGA_W} className="tga-wind-hinten" />
+      <PixelPiece src={TGA + 'trunk.png'} w={TGA_W} />
+      <PixelPiece src={TGA + 'crown_front.png'} w={TGA_W} className="tga-wind-vorn" />
+      {funkel.map((f, i) => (
+        <i key={'f' + i} className="pp-area-dyn tga-funkel" style={{ left: ppArtX(f.x - 2, 0), top: ppArt(f.y - 2), animation: `ppSprite3 .5s steps(1) infinite, tgaFunkel ${f.dur}s steps(1) ${f.delay}s infinite` }} />
+      ))}
+      {blaetter.map((f, i) => (
+        <i key={'b' + i} className="pp-area-dyn tga-blatt" style={{
+          left: ppArtX(f.x, 0), top: ppArt(f.y), background: f.farbe, '--dx': ppArt(f.drift), '--fall': ppArt(f.fall),
+          animation: `tgaFall ${f.dur}s steps(${f.fall}) ${f.delay}s infinite`,
+        }} />
+      ))}
+      <div className="pp-rand-dim" />
+      <style>{`
+        /* Wind: die Krone schwankt in ganzen Kunstpixeln (links – Mitte – rechts – Mitte), hinten und vorn mit versetzter Phase */
+        .tga-wind-hinten { animation: tgaWind 7s steps(1) infinite; }
+        .tga-wind-vorn { animation: tgaWind 7s steps(1) -1.2s infinite; }
+        @keyframes tgaWind {
+          0%, 100% { translate: 0 0; } 14% { translate: calc(var(--px)) 0; } 28% { translate: calc(2 * var(--px)) 0; } 42% { translate: calc(var(--px)) 0; }
+          57% { translate: 0 0; } 71% { translate: calc(-1 * var(--px)) 0; } 85% { translate: calc(-2 * var(--px)) 0; }
+        }
+        /* Funkeln: 5×5-Sprite (Punkt, kleines, grosses Kreuz) blitzt kurz auf, sonst unsichtbar */
+        .tga-funkel { position: absolute; width: calc(5 * var(--px)); height: calc(5 * var(--px)); background: url(${TGA}twinkle.png) 0 0 / 300% 100% no-repeat; opacity: 0; }
+        @keyframes tgaFunkel { 0%, 68% { opacity: 0; } 69%, 80% { opacity: 1; } 81%, 100% { opacity: 0; } }
+        /* Goldblatt: 2×1 Kunstpixel, treibt schräg zu Boden und blinkt am Ende weg */
+        .tga-blatt { position: absolute; width: calc(2 * var(--px)); height: var(--px); opacity: 0; }
+        @keyframes tgaFall { 0% { opacity: 0; transform: translate(0, 0); } 4%, 90% { opacity: 1; } 97%, 100% { opacity: 0; transform: translate(var(--dx), var(--fall)); } }
       `}</style>
     </PixelScene>
   );

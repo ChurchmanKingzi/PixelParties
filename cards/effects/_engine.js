@@ -10012,7 +10012,7 @@ class GameEngine {
     // unterscheidet die geliehene Kontrolle vom echten Charme Lv3.
     if (target?.hp !== undefined
         && this._charmBlocksFrom(target, source?.controller ?? source?.owner,
-          { loveShotOhneSchutz: true })) {
+          { loveShotOhneSchutz: true, schadenspfad: true })) {
       this.log('damage_blocked', { target: this._heroLabel(target), reason: 'charmed' });
       this._flashHeroDamageZero(target);   // v1146
       return { dealt: 0, cancelled: true };
@@ -19961,6 +19961,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Styx, the Opened Gate: reine Kontrolle, der Text verspricht keinen Schutz.
     if (ch.ohneSchutz) return false;
     if (ch._loveShot && opts.loveShotOhneSchutz) return false;
+    // W79 (Little Lyta): „takes no damage from any sources" — NUR der Schadenspfad prallt ab, Status und Kill-Effekte kommen durch.
+    if (ch.nurSchaden) return !!opts.schadenspfad;
     if (ch.onlyFromController) {
       const k = ch.controller;
       return k != null && quellenSeite != null && quellenSeite >= 0 && quellenSeite === k;
@@ -31125,6 +31127,21 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (cd && hasCardType(cd, 'Creature')) return true;
     if (!inst?.name) return false;
     return !!loadCardEffect(inst.counters?._effectOverride || inst.name)?.choosableAsCreature;
+  }
+
+  /**
+   * ★ W79 (White Sacrificial Bull): „While this Creature remains on the board, it is also treated as a Hero." Skript-Flagge `alsoTreatedAsHero`.
+   * Gilt, solange die Karte offen in einer Support Zone liegt. Wer „Hero" als Kartentyp liest (Opfer, „not a Hero"-Zielwahlen …), fragt hier; eine
+   * volle Gleichsetzung (Heldenspalte, Heldeneffekte) gibt es bewusst nicht — der Bull hat „no Ability or Support Zones" und sonst keinen Effekt.
+   */
+  zaehltAlsHeld(inst) {
+    if (!inst || inst.zone !== ZONES.SUPPORT || inst.faceDown) return false;
+    return !!loadCardEffect(inst.counters?._effectOverride || inst.name)?.alsoTreatedAsHero;
+  }
+
+  /** Brettkarten, die `pi` kontrolliert und die auch als Hero zählen (Instanzen). */
+  heldKreaturen(pi) {
+    return this.cardInstances.filter(c => this.zaehltAlsHeld(c) && (c.controller ?? c.owner) === pi);
   }
 
   /**

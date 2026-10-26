@@ -404,7 +404,9 @@ function loadCardEffect(cardName) {
         // wegwirft (siehe die Faelle darueber). Ohne den Eintrag wurde
         // sie geladen, verworfen und wirkte nie — und der einzige
         // Hinweis war eine Warnzeile in der Konsole.
-        || mod.blocksAbilityActivation === true;
+        || mod.blocksAbilityActivation === true
+        // W79: White Sacrificial Bull ist eine reine ZUSTANDS-Karte (zaehlt auch als Hero) - nur diese Flagge, keine Hooks.
+        || mod.alsoTreatedAsHero === true;
       // ★ v1100 („Ifrit"): drei weitere Vertraege einer REINEN
       // ZUSTANDS-KARTE. Ifrit hat keinen einzigen Hook — sie wirkt
       // ausschliesslich ueber Flaggen, die ANDERE Stellen lesen

@@ -165,6 +165,7 @@ function collectTargets(engine) {
     if (seen.has(inst.id)) continue;
     seen.add(inst.id);
     if (inst.zone === 'support') {
+      if (engine.zaehltAlsHeld && engine.zaehltAlsHeld(inst)) continue;   // W79 (White Sacrificial Bull): zählt auch als Hero → kein „Nicht-Held"-Ziel
       const sa = supportAbilityZiel(engine, inst);   // 25.10.: Ability in einer Support Zone = Ability-Stapel (ein Ziel, oberste Kopie)
       if (sa !== undefined) { if (sa) targets.push(sa); continue; }
       targets.push({ id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip',

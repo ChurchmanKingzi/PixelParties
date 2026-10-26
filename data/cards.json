@@ -13851,7 +13851,7 @@
     "hp": 300,
     "atk": 100,
     "cost": null,
-    "effect": "At the beginning of the game, choose a Hero your opponent controls. At the start of each of your turns, while you control this undefeated Hero, you may take control of that Hero for the duration of the turn. You cannot choose that Hero with your cards or effects while you control it. These effects cannot be negated.",
+    "effect": "At the beginning of the game, choose a Hero your opponent controls. At the start of each of your turns, while you control this undefeated Hero, you may take control of that Hero OR any Creature your opponent controls for the duration of the turn. A Hero controlled by this effect takes no damage from any sources. These effects cannot be negated.",
     "archetype": "",
     "setID": "PP MS1",
     "banned": "",
