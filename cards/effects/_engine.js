@@ -39128,7 +39128,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!inst) return false;
     if (this._todgeweiht && this._todgeweiht.has(inst.id)) return true;
     const c = inst.counters;
-    if (c?._dyingThisBatch) return true;
+    if (c?._dyingThisBatch && c._dyingThisBatch !== c._dyingStatusStapel) return true;   // Statusschaden-Stapel (Brand/Gift/Blutung) zählt nicht (Al 26.10.)
     return !!inst._deathResolved || (c?.currentHp != null && c.currentHp <= 0);   // HP schon auf 0: der Tod ist nur noch nicht abgewickelt (Flächenklammer)
   }
 
@@ -39212,19 +39212,21 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * Flaechenschlag meldet seine Ziele: Helden (`heroes`: `{hero, heroIdx?, owner?, amount?}` oder Heldenobjekte, Betrag `opts.amount`) mit `amount >= hp`, die nicht immun sind, und Kreaturen
-   * (`creatures`, ab zwei) mit abgewehrten Eintraegen ausgenommen, gelten bis zum Ende des Schlags als todgeweiht. Konservativ: Brutto-Betrag, aber Immunitaeten/Schilde/Negation zaehlen nicht mit.
+   * Flaechenschlag meldet seine Ziele. HELDEN (`heroes`: `{hero, heroIdx?, owner?, amount?}`, Picker-Ziele oder Heldenobjekte, Betrag `opts.amount`) gelten bis zum Ende des Schlags als
+   * todgeweiht, wenn ihr ECHTER Endschaden sie toetet (`projiziereHeldenSchaden`: dieselbe Rechnung wie der echte Heldenschadenspfad, im Schattenspiel; unsicher = nicht markiert).
+   * KREATUREN (`creatures`, ab zwei) gelten als todgeweiht, wenn ihr Betrag ihre HP deckt und der Eintrag nicht immun/abgewehrt ist; wer seinen Treffer ueberlebt, wird freigegeben.
    */
-  _schlagZieleMelden(opts, schatten, negiert) {
+  async _schlagZieleMelden(opts, schatten, negiert) {
     const ziele = [];
     const quelle = opts.source;
     const betrag = opts.amount ?? 0;
+    const heldenEintraege = [];
     for (const h of (opts.heroes || [])) {
       // Eintrag = Heldenobjekt | `{hero, heroIdx?, owner?, amount?}` | Picker-Ziel `{type:'hero', owner, heroIdx}`
       const hero = h?.hero || ((h?.type === 'hero' || (h?.hp === undefined && h?.owner != null)) ? this.gs.players[h.owner]?.heroes?.[h.heroIdx] : h);
       if (!hero?.name || !(hero.hp > 0)) continue;
       const amt = h?.amount ?? betrag;
-      if (!(amt > 0) || amt < hero.hp) continue;
+      if (!(amt > 0)) continue;
       let owner = h?.owner, heroIdx = h?.heroIdx;
       if (owner == null || heroIdx == null) {
         for (let p = 0; p < (this.gs.players || []).length && owner == null; p++) {
@@ -39232,9 +39234,11 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (i >= 0) { owner = p; heroIdx = i; }
         }
       }
-      if (hero.statuses?.shielded) continue;
-      if (owner != null && this._aoeHeldImmun(owner, heroIdx, hero, quelle, opts)) continue;
-      ziele.push({ hero });
+      heldenEintraege.push({ hero, owner, heroIdx, amount: amt });
+    }
+    if (heldenEintraege.length && this._hatRettungsEffekte()) {
+      const proj = await this.projiziereHeldenSchaden(quelle, heldenEintraege, opts.type, { ...(opts.heroOpts || {}) });
+      for (const e of heldenEintraege) if (proj.get(e.hero)?.toedlich === true) ziele.push({ hero: e.hero });
     }
     for (const e of (schatten || [])) {
       if (!e?.inst || e.cancelled || e._immuneCreature || negiert?.has(e.inst.id)) continue;
@@ -39242,6 +39246,91 @@ this._deathWatch = (this._deathWatchStack || []).length
       ziele.push({ inst: e.inst });
     }
     if (ziele.length) this._schlagTodgeweihtMerken(ziele);
+  }
+
+  /** Liegt auf dem Brett ein Ersatz-/Rettungseffekt, der auf "todgeweiht" hoert (Karten mit `selfPreDefeat`, z. B. Infallible Oracle Pythia)? Nur dann lohnt die Heldenprojektion. */
+  _hatRettungsEffekte() {
+    return this.cardInstances.some(i => i.zone === ZONES.SUPPORT && !i.faceDown && !!loadCardEffect(i.counters?._effectOverride || i.name)?.selfPreDefeat);
+  }
+
+  /**
+   * ★ W78 (Al 26.10.: „Unbedingt den ECHTEN Schaden berechnen!"): PROJEKTION DES HELDENSCHADENS — seiteneffektfrei.
+   *
+   * Der Heldenschadenspfad (`actionDealDamage`: Immunitaeten, Zielschutz, Schilde, Status-Schutz, `beforeDamage`-Hooks der ganzen Karte-/Heldenwelt, Multiplikator-Buffs, Deckel, Handreaktionen,
+   * Unsterblichkeit, KO-Hooks wie Guardian Angel/Extra-Leben …) ist zu gross und zu hakenbehaftet, um ihn nachzubauen. Deshalb laeuft DERSELBE Pfad in einem SCHATTENSPIEL: ein zweites Engine-Objekt
+   * mit einem Klon des Spielzustands (`snapshot()` → `restore()` in die Huelle), im Sandkasten-Modus (`_inMctsSim`, Fast Mode, kein Client, kein Warten). Das Live-Spiel bleibt unberuehrt
+   * (keine Objekt-Identitaeten, keine Ketten, keine Zaehler, kein Protokoll werden angefasst).
+   *
+   * Konservativ: jede Frage an einen Spieler (Handreaktion, Surprise, "you may redirect/negate", KO-Rettung), jeder Zufallsaufruf (`Math.random`) und jede Ausnahme machen das Ergebnis UNSICHER
+   * (`toedlich: null`) — unsicher gilt nie als todgeweiht. Gemeldet wird nur, was der echte Pfad sicher toetet.
+   *
+   * @param {object} quelle  Schadensquelle (wie fuer `actionDealDamage`; Karteninstanzen werden ins Schattenspiel uebersetzt)
+   * @param {Array<{hero,owner,heroIdx,amount}>} eintraege  die Helden mit ihrem Brutto-Betrag
+   * @param {string} typ  Schadensart · @param {object} [opts]  durchgereichte, serialisierbare Treffer-Optionen
+   * @returns {Promise<Map<object,{toedlich:(boolean|null),hpNachher?:number,grund?:string}>>} je Heldenobjekt
+   */
+  async projiziereHeldenSchaden(quelle, eintraege, typ, opts = {}) {
+    const out = new Map();
+    const liste = (Array.isArray(eintraege) ? eintraege : [eintraege]).filter(e => e && e.hero);
+    const unsicher = (grund) => { for (const e of liste) if (!out.has(e.hero)) out.set(e.hero, { toedlich: null, grund }); return out; };
+    if (liste.length === 0) return out;
+    if (this._istSchattenSpiel || this._inMctsSim) return unsicher('sandkasten');   // keine Schatten im Schatten, keine Projektion in CPU-Rollouts
+    let snap;
+    try { snap = this.snapshot(); } catch (err) { return unsicher('snapshot:' + (err && err.message || err)); }
+    for (const e of liste) {
+      try {
+        out.set(e.hero, await this._heldSchattenLauf(snap, quelle, e, typ, opts));
+      } catch (err) {
+        out.set(e.hero, { toedlich: null, grund: 'ausnahme:' + (err && err.message || err) });
+      }
+    }
+    return out;
+  }
+
+  /** Ein Schattenspiel aus dem Schnappschuss bauen (zweites Engine-Objekt mit Spielzustands-Klon). */
+  _neuesSchattenSpiel(snap) {
+    const GE = this.constructor;
+    const huelle = { players: this.gs.players.map(() => ({})) };
+    const stubIo = { to: () => ({ emit() {} }), sockets: { sockets: new Map() } };
+    const sh = new GE({ gameState: huelle, spectators: [], id: this.room?.id }, stubIo, () => {}, null, null);
+    sh._istSchattenSpiel = true;
+    sh.restore(snap);
+    sh._cpuPlayerIdx = this._cpuPlayerIdx; sh._isSelfPlay = this._isSelfPlay; sh.isPuzzle = this.isPuzzle;
+    sh._inMctsSim = true;
+    sh.enterFastMode();
+    sh._delay = () => Promise.resolve();
+    sh._schattenFragen = 0;
+    const frage = async () => { if (++sh._schattenFragen > 20) throw new Error('Schattenspiel: zu viele Fragen'); return null; };
+    for (const f of ['promptChainTargets', 'promptGeordneteWahl', 'promptDeckReorder', 'promptStartingHandYesNo', 'promptEffectTarget', 'promptGeneric', 'promptSpellAuswahl',
+      'promptChooseTarget', 'promptChooseCards', 'promptChooseOption', 'promptConfirm']) sh[f] = frage;
+    return sh;
+  }
+
+  /** Quelle ins Schattenspiel uebersetzen (Karteninstanzen ueber ihre Id). */
+  _schattenQuelle(sh, quelle) {
+    if (!quelle || typeof quelle !== 'object') return quelle;
+    const finde = (inst) => sh.cardInstances.find(c => c.id === inst.id);
+    if (quelle instanceof CardInstance) return finde(quelle) || { name: quelle.name, owner: quelle.owner, controller: quelle.controller, heroIdx: quelle.heroIdx };
+    const q = { ...quelle };
+    if (q.cardInstance instanceof CardInstance) q.cardInstance = finde(q.cardInstance) || undefined;
+    return q;
+  }
+
+  /** EIN Heldentreffer im Schattenspiel: wie ist der Held danach (`toedlich` = tot UND keine offene Frage/kein Zufall)? */
+  async _heldSchattenLauf(snap, quelle, e, typ, opts) {
+    const sh = this._neuesSchattenSpiel(snap);
+    const shHero = sh.gs.players[e.owner]?.heroes?.[e.heroIdx];
+    if (!shHero?.name) return { toedlich: null, grund: 'held' };
+    if (this._multiHitScope) sh._multiHitScope = { total: this._multiHitScope.total, tiefe: 1 };   // "hits other targets in addition" (Interference) wie im echten Schlag
+    const rnd = Math.random; let zufall = false;
+    Math.random = () => { zufall = true; return rnd(); };
+    try {
+      await sh.actionDealDamage(this._schattenQuelle(sh, quelle), shHero, e.amount, typ, { ...opts });
+    } finally { Math.random = rnd; }
+    const tot = !(shHero.hp > 0);
+    if (sh._schattenFragen > 0) return { toedlich: null, hpNachher: shHero.hp, grund: 'frage' };
+    if (zufall) return { toedlich: null, hpNachher: shHero.hp, grund: 'zufall' };
+    return { toedlich: tot, hpNachher: shHero.hp };
   }
 
   /**
@@ -47221,7 +47310,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   async beginAoeStrike(zielzahl, opts = {}) {
     const scope = this.beginMultiHit(zielzahl);
     // ★ W78 (Pythia): Helden, die dieser Schlag sicher faellt, gelten als todgeweiht (`istHeldTodgeweiht`) — `opts.heroes`: `{hero, heroIdx?, owner?, amount?}` bzw. Heldenobjekte (+ `opts.amount`).
-    if (opts.heroes?.length) this._schlagZieleMelden(opts, null, null);
+    if (opts.heroes?.length) await this._schlagZieleMelden(opts, null, null);
     if (opts.ersterTrefferEinzel) scope.ersterTrefferEinzel = true;   // Welle 13 (Q138): Kette beginnt mit genau einem Ziel (Ricochet)
     // `creatures` nimmt rohe Instanzen ODER `{inst, amount, type}` —
     // Karten mit abgestuftem Schaden (Chain Lightning) sollen nicht
@@ -47257,7 +47346,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (e.cancelled && e.inst?.id != null) negiert.add(e.inst.id);
     }
     scope._aoeNegiert = negiert;
-    this._schlagZieleMelden({ ...opts, heroes: [] }, schatten, negiert);   // ★ W78: die Kreaturen, die der Schlag nach Immunitaet/Idol sicher faellt, gelten als todgeweiht
+    await this._schlagZieleMelden({ ...opts, heroes: [] }, schatten, negiert);   // ★ W78: die Kreaturen, die der Schlag nach Immunitaet/Idol sicher faellt, gelten als todgeweiht
     return negiert;
   }
 
@@ -55367,7 +55456,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const _schadenKreaturen = creatureEntries.filter(e => e.amount > 0);
       await this.beginAoeStrike(_schadenHelden.length + _schadenKreaturen.length, {
         creatures: _schadenKreaturen.map(e => ({ inst: e.inst, amount: e.amount, type: e.type })),
-        heroes: _schadenHelden,   // W78 (Pythia): Helden, die dieser Schlag faellt, gelten als todgeweiht
+        heroes: _schadenHelden, heroOpts: trefferOpts,   // W78 (Pythia): Helden, die dieser Schlag faellt, gelten als todgeweiht
         source: quellObjekt, amount: damage, type: damageType, sourceOwner: pi,
         canBeNegated: opts.canBeNegated !== false,
       });
@@ -56198,6 +56287,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       if ((e.inst.counters.currentHp || 0) > 0
           && projected >= e.inst.counters.currentHp) {
         e.inst.counters._dyingThisBatch = _todStapelNr;
+        // ★ W78 (Al 26.10.): Statusschaden (Brand, Gift, Blutung) ist KEIN Flaechenschlag — wer daran stirbt, ist nicht "todgeweiht" im Sinne von `istTodgeweiht`
+        // (Pythia darf eine andere tödlich vergiftete Kreatur opfern). Der Stempel selbst bleibt für Loyal Shepherd/Terrier & Co. unverändert; nur diese Nummer trennt ihn ab.
+        if (e.isStatusDamage) e.inst.counters._dyingStatusStapel = _todStapelNr;
       }
     }
 
