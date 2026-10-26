@@ -64,6 +64,7 @@
 // ═══════════════════════════════════════════
 
 const { SPELL_SCHOOL_ABILITIES, spellSchoolAbilitiesOn } = require('./_hooks');
+const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Difficulty Lever';
 const MAX_LEVEL = 3;
@@ -98,6 +99,14 @@ function passendeZauber(engine, pi) {
     const schulen = [cd.spellSchool1, cd.spellSchool2].filter(Boolean);
     if (schulen.length === 0) continue;                 // ohne Schule kein Kandidat
     if (!schulen.some(s => !vorhanden.has(s))) continue;
+    // Aufgehoben wird die STUFE, nicht die Spielbedingung („Eine Karte, deren Effekt nicht wirken kann, ist nicht spielbar"): ein Zauber, dessen
+    // `spellPlayCondition` jetzt scheitert (Sacrifice to Divinity ohne opferbare Kreatur …), steht nicht zur Wahl — sonst bricht der Wurf ab und die Galerie öffnet sich neu.
+    const skript = loadCardEffect(name);
+    if (typeof skript?.spellPlayCondition === 'function') {
+      let ok = true;
+      try { ok = !!skript.spellPlayCondition(engine.gs, pi, engine); } catch { ok = true; }
+      if (!ok) continue;
+    }
     gesehen.add(name);
     out.push({ name, source: 'hand', level: cd.level || 0 });
   }
@@ -262,7 +271,11 @@ module.exports = {
       } finally {
         delete engine._promptCancelLabel;
       }
-      if (cast?.cancelled) { schritt = heldenZahl > 1 ? 'hero' : 'spell'; continue; }
+      if (cast?.cancelled) {
+        // CPU/Simulation: kein „Back" — dieselbe Antwort würde die Galerie endlos neu öffnen (MAX_HOOKS_PER_TURN). Der Mensch behält den Rückweg.
+        if (engine.isCpuPlayer(pi) || engine._inMctsSim || engine._fastMode) return { cancelled: true };
+        schritt = heldenZahl > 1 ? 'hero' : 'spell'; continue;
+      }
       break;
     }
 

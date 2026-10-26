@@ -136,6 +136,8 @@ function _countCursesOnHero(engine, ownerIdx, heroIdx, excludeInstId = null) {
 async function fluchAnlegen(engine, appliedBy, owner, heroIdx) {
   const targetHero = engine.gs.players[owner]?.heroes?.[heroIdx];
   if (!targetHero?.name || targetHero.hp <= 0 || targetHero.statuses?.cursed) return false;
+  // Wehrt der Wirt den Status ab (Light Ball, Immunität …), bleibt seine ATK unberührt — wie bei Polymorph/Shrink. Sonst stünde er ohne Status (nichts zum Heilen) auf ATK 0.
+  if (engine.heroBlocksStatusNow?.(owner, heroIdx, STATUS_NAME, { appliedBy, festesZiel: true })) return false;
   // Snapshot the live ATK so the cleanse path can restore it.
   // Subsequent grant/revoke/temp-atk while cursed will accumulate
   // into this same slot (see _isHeroAtkSuppressed in _engine.js).
@@ -153,7 +155,16 @@ async function fluchAnlegen(engine, appliedBy, owner, heroIdx) {
   if (dropAmount > 0) {
     engine._broadcastEvent('fighting_atk_change', { owner, heroIdx, amount: -dropAmount });
   }
-  await engine.addHeroStatus(owner, heroIdx, STATUS_NAME, { appliedBy, source: CARD_NAME, animationType: 'dark_swarm' });
+  // `festesZiel`: „the Hero this Spell is attached to" — der Wirt wurde schon gewählt (Als Ruling 9.10., wie Polymorph/Shrink/Berserk). Ohne die Option
+  // schluckt Submerged („Jump in the River") den Status, obwohl die ATK schon auf 0 steht.
+  await engine.addHeroStatus(owner, heroIdx, STATUS_NAME, { appliedBy, source: CARD_NAME, animationType: 'dark_swarm', festesZiel: true });
+  if (!targetHero.statuses?.[STATUS_NAME] && !schonGesperrt && targetHero._cursedAtkSuppressed !== undefined) {
+    // Der Status wurde doch abgewehrt (z. B. Effekt-Immunität): die gesicherte ATK zurückgeben (ohne `cursed` bucht der Trichter sichtbar).
+    const zurueck = targetHero._cursedAtkSuppressed;
+    delete targetHero._cursedAtkSuppressed;
+    engine._applyHeroAtkDelta(targetHero, owner, heroIdx, zurueck);
+    return false;
+  }
   return true;
 }
 
