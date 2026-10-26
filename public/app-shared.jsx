@@ -3901,6 +3901,19 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_dark',        opts: { rate: 0.3, volume: 0.9, delay: 420, category: null, dedupe: 0 } },
     { name: 'ping',             opts: { rate: 0.4, volume: 0.5, delay: 700, category: null, dedupe: 0 } },
   ],
+  // Night Mare (26.10.): dunkles Raunen, die schwarzen Flammen fauchen, dumpfer Schlag beim Treffer.
+  black_flames: [
+    { name: 'elem_dark', opts: { rate: 0.55, volume: 1.0, delay: 1, category: null, dedupe: 0 } },
+    { name: 'burn',      opts: { rate: 0.7, volume: 0.7, delay: 120, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.6, volume: 0.8, delay: 640, category: null, dedupe: 0 } },
+  ],
+  // Little Lyta (26.10.): zarte Glöckchen, Heilton, Funkeln — die Herzen steigen auf.
+  pink_hearts: [
+    { name: 'ping', opts: { rate: 1.6, volume: 0.55, delay: 1, category: null, dedupe: 0 } },
+    { name: 'heal', opts: { rate: 1.3, volume: 0.45, delay: 120, category: null, dedupe: 0 } },
+    { name: 'ping', opts: { rate: 2.2, volume: 0.35, delay: 420, category: null, dedupe: 0 } },
+    { name: 'ping', opts: { rate: 2.6, volume: 0.3, delay: 760, category: null, dedupe: 0 } },
+  ],
   // Feral (25.10.): Wasserexplosion — Platschen und dumpfer Schlag.
   water_burst: [
     { name: 'elem_water',   opts: { rate: 0.9, volume: 1.3, delay: 1, category: null, dedupe: 0 } },

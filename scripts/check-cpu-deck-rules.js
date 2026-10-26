@@ -244,9 +244,10 @@ console.log('Armageddon — sichtbare Schadensminderung (echte Engine, echte Tem
   // Die Fähigkeiten der umbenannten Helden stammen aus der Seed-Ziehung (jede neue Karte mit Bild verschiebt den Pool). Resistance,
   // Interference & Co. würden den Schlag im Trockenlauf schlucken — die Prüfung gilt Tempeste, nicht der Ziehung.
   gs.players[1].abilityZones = gs.players[1].abilityZones.map(() => [[], [], []]);
-  // auch Ausrüstung leeren: die Seed-Ziehung legt u. a. Smug Coin auf Held 0 (rettet Tempeste auf 1 HP, Log `smug_coin_save`) und verfälscht die Vorschau
-  for (let hi = 0; hi < gs.players[1].supportZones.length; hi++) gs.players[1].supportZones[hi] = [[], [], []];
-  for (let i = engine.cardInstances.length - 1; i >= 0; i--) { const c = engine.cardInstances[i]; if (c.owner === 1 && c.zone === 'support') engine.cardInstances.splice(i, 1); }
+  // Ebenso die Support Zonen der Seed-Ziehung (Schilde, Auren, Ausrüstung …): sie verschlucken den Schlag, sobald ein neues Bild den Pool verschiebt.
+  for (const c of [...engine.cardInstances]) if (c.owner === 1 && (c.zone === 'support' || c.zone === 'surprise')) engine._untrackCard(c.id);
+  gs.players[1].supportZones = gs.players[1].supportZones.map(z => z.map(() => []));
+  gs.players[1].surpriseZones = (gs.players[1].surpriseZones || []).map(() => []);
   gs.players[1].hand = ['Heal', 'Icebolt'];
   const hps = () => gs.players.map(p => p.heroes.map(h => h.hp).join('/')).join(' | ');
   const vorher = hps();

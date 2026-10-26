@@ -231,6 +231,7 @@ function collectNonHeroBoardTargets(gs, engine) {
     seen.add(inst.id);
 
     if (inst.zone === 'support') {
+      if (engine.zaehltAlsHeld && engine.zaehltAlsHeld(inst)) continue;   // W79 (White Sacrificial Bull): zählt auch als Hero → kein „Nicht-Held"-Ziel
       const sa = supportAbilityZiel(engine, inst);   // 25.10.: Ability in einer Support Zone = Ability-Stapel (ein Ziel, oberste Kopie)
       if (sa !== undefined) { if (sa) targets.push(sa); continue; }
       // ★ Darion: mehrere Equips im selben Platz = EIN Ziel je Platz (wie `_targeting-shared`); welche Karte gemeint ist, fragt `engine._disambiguateStackedTargets`.

@@ -11566,6 +11566,124 @@ function WasserGeschoss({ p }) {
 }
 
 // ═════════════════════════════════════════════════════════════════
+//  WELLE 79 (26.10.) — Night Mare (`black_flames`) und Little Lyta (`pink_hearts`) — PIXELART (ppPunktBild)
+//
+//  black_flames (1300 ms, auf dem Ziel): schwarze Flammen lodern rund um den Kartenrand — Körper schwarz, Kern dunkelviolett, die Spitzen violett glimmend (Bayer-Dither an den
+//     Stufen); die Karte verkohlt unter einem schwarzen Dither-Schleier; schwarz-violette Glut steigt auf. Der Schaden fällt, wenn sie am höchsten stehen (~650 ms).
+//  pink_hearts (1500 ms, auf dem Ziel): ein rosa Dither-Blitz über der Karte, dann steigen lauter pinke Herzchen in zwei Größen schwankend rund um das Ziel auf und
+//     lösen sich gedithert auf; zwischendurch poppen weiße Funkelkreuze.
+// ═════════════════════════════════════════════════════════════════
+const BlackFlamesEffect = (() => {
+  const P = ['#08060c', '#170b28', '#2e0a51', '#50008c', '#702db3', '#9544d5', '#d6b3f9'].map(ppHex);
+  const ENDE = 1300, FADE_AB = 950;
+  const vorbereiten = (sz) => {
+    const umfang = (sz.hw * 2 + sz.hh * 2) * 2;
+    return {
+      zungen: Array.from({ length: 30 }, (_, i) => ({ u: (i / 30) * umfang, h: 22 + Math.random() * 22, ph: Math.random() * 6.28, v: 0.8 + Math.random() * 1.1, br: 3 + Math.floor(Math.random() * 3) })),
+      glut: Array.from({ length: ppFxN(30) }, () => ({ x: (Math.random() - 0.5) * (sz.hw * 2 + 22), v: 16 + Math.random() * 30, start: Math.random() * 800, drift: (Math.random() - 0.5) * 10, gross: Math.random() < 0.3, hell: Math.random() < 0.3 })),
+    };
+  };
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy), hw = Math.ceil(sz.hw), hh = Math.ceil(sz.hh);
+    const wachs = Math.min(1, t / 520);
+    // Verkohlung: schwarzer Dither-Schleier über der Karte (wächst, hält, geht mit dem Ausblenden)
+    const dichte = 0.5 * Math.min(1, t / 600) * aus;
+    for (let Y = -hh; Y < hh; Y++) for (let X = -hw; X < hw; X++) if (ppBayer(X + 64, Y + 64) < dichte) g.put(cx + X, cy + Y, P[0], 1);
+    // Flammen am Kartenrand
+    const u2 = (sz.hw * 2 + sz.hh * 2) * 2;
+    for (const z of teile.zungen) {
+      const wob = Math.sin(t / 80 * z.v + z.ph);
+      const hoch = Math.round(z.h * (0.7 + 0.3 * wob) * wachs);
+      let u = z.u % u2, px, py;
+      if (u < sz.hw * 2) { px = cx - hw + u; py = cy + hh; }
+      else if ((u -= sz.hw * 2) < sz.hh * 2) { px = cx + hw; py = cy + hh - u; }
+      else if ((u -= sz.hh * 2) < sz.hw * 2) { px = cx + hw - u; py = cy - hh; }
+      else { u -= sz.hw * 2; px = cx - hw; py = cy - hh + u; }
+      for (let j = 0; j < hoch; j++) {
+        const k = j / Math.max(1, hoch);
+        const breite = Math.max(1, Math.round(z.br * Math.pow(1 - k, 0.8)) + (j < 3 ? 1 : 0));
+        const versatz = Math.round(Math.sin(j / 3.2 + t / 95 + z.ph) * (1 + k * 1.5));
+        for (let b = -Math.floor(breite / 2); b <= Math.floor(breite / 2); b++) {
+          const x = px + b + versatz, y = py - j;
+          const w = k + (ppBayer(x, y) - 0.5) * 0.4;
+          // Körper schwarz, Kern dunkelviolett, Spitze violett glimmend
+          let c;
+          if (w > 0.86) c = P[5];
+          else if (w > 0.72) c = P[4];
+          else if (w > 0.5) c = (Math.abs(b) <= breite / 3) ? P[2] : P[1];
+          else c = (Math.abs(b) <= breite / 4 && w < 0.3) ? P[2] : P[0];
+          g.put(x, y, c, aus);
+        }
+      }
+    }
+    // Glut (schwarz-violett, vereinzelt hell)
+    for (const e of teile.glut) {
+      const tt = (t - e.start) / 1000; if (tt < 0 || tt > 1.2) continue;
+      const x = cx + e.x + e.drift * tt, y = cy + hh - e.v * tt * 1.7;
+      g.block(x, y, e.gross ? 2 : 1, e.gross ? 2 : 1, e.hell ? P[6] : P[4], aus * (1 - tt / 1.2));
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 300, 340, vorbereiten);
+})();
+
+const PinkHeartsEffect = (() => {
+  const P = ['#ffffff', '#f3bad3', '#f8b4df', '#fc69c6', '#c80480', '#5a023a'].map(ppHex);
+  const ENDE = 1500, FADE_AB = 1100;
+  const KLEIN = ['.X.X.', 'XXXXX', 'XXXXX', '.XXX.', '..X..'];
+  const GROSS = ['.XX.XX.', 'XXXXXXX', 'XXXXXXX', 'XXXXXXX', '.XXXXX.', '..XXX..', '...X...'];
+  /** Herz in ganzen Pixeln: Körper rosa, Rand dunkel, Glanz oben links. */
+  const herz = (g, x0, y0, muster, a) => {
+    const h = muster.length, w = muster[0].length;
+    const voll = (i, j) => j >= 0 && j < h && i >= 0 && i < w && muster[j][i] === 'X';
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+      if (!voll(i, j)) continue;
+      const rand = !voll(i - 1, j) || !voll(i + 1, j) || !voll(i, j - 1) || !voll(i, j + 1);
+      let c = rand ? P[4] : P[3];
+      if (!rand && (i + j) <= 3 && j <= 1) c = P[1];
+      else if (!rand && (i + j) <= 4 && j <= 2) c = P[2];
+      g.put(x0 + i, y0 + j, c, a);
+    }
+  };
+  const vorbereiten = (sz) => ({
+    herzen: Array.from({ length: ppFxN(26) }, (_, i) => ({
+      x: (Math.random() - 0.5) * (sz.hw * 2 + 30), y0: (Math.random() - 0.3) * sz.hh * 1.4, v: 26 + Math.random() * 30, start: Math.random() * 700,
+      sw: 3 + Math.random() * 5, ph: Math.random() * 6.28, gross: Math.random() < 0.4, leben: 700 + Math.random() * 300,
+    })),
+    sterne: Array.from({ length: 8 }, () => ({ x: (Math.random() - 0.5) * (sz.hw * 2 + 40), y: (Math.random() - 0.5) * sz.hh * 2.2, start: 250 + Math.random() * 900, leben: 360 })),
+  });
+  const malen = (g, t, sz, teile) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy), hw = Math.ceil(sz.hw), hh = Math.ceil(sz.hh);
+    // rosa Dither-Blitz über der Karte
+    if (t < 260) {
+      const dichte = (1 - t / 260) * 0.7;
+      for (let Y = -hh; Y < hh; Y++) for (let X = -hw; X < hw; X++) if (ppBayer(X + 32, Y + 32) < dichte) g.put(cx + X, cy + Y, t < 90 ? P[1] : P[2], 1);
+    }
+    // aufsteigende Herzen
+    for (const h of teile.herzen) {
+      const tt = t - h.start;
+      if (tt < 0 || tt > h.leben) continue;
+      const k = tt / h.leben;
+      const x = cx + h.x + Math.sin(h.ph + tt / 160) * h.sw;
+      const y = cy + h.y0 - (h.v * tt) / 1000 * 1.9;
+      const a = k > 0.6 ? Math.max(0, 1 - (k - 0.6) / 0.4) : 1;
+      const m = h.gross ? GROSS : KLEIN;
+      herz(g, Math.round(x - m[0].length / 2), Math.round(y - m.length / 2), m, a * aus);
+    }
+    // Funkelkreuze
+    for (const s of teile.sterne) {
+      const k = (t - s.start) / s.leben;
+      if (k < 0 || k >= 1) continue;
+      ppKreuzfunkel(g, cx + s.x, cy + s.y, [1, 2, 3, 2, 1][Math.min(4, Math.floor(k * 5))], [P[0], P[1], P[2], P[3]], aus);
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 300, 340, vorbereiten);
+})();
+
+// ═════════════════════════════════════════════════════════════════
 //  WELLE 77 (25.10.) — REVENGE!!! (`revenge_rage`) und Grand Feast (`grand_feast`) — PIXELART
 //
 //  revenge_rage (2000 ms, auf dem Wirker-Helden): unbändige Wut. Ein rotes Dither-Raster blitzt über die Karte (0–150 ms) und über den ganzen Bildschirm (Checker-Raster, harte Blitze,
@@ -20370,6 +20488,8 @@ const ANIM_REGISTRY = {
   bounce_burst: BounceBurstEffect,
   cosmic_explosion: CosmicExplosionEffect,
   water_burst: WaterBurstEffect,
+  black_flames: BlackFlamesEffect,
+  pink_hearts: PinkHeartsEffect,
   grand_feast: GrandFeastEffect,
   reverse_trap_ton: ReverseTrapTonEffect,
   deadly_poison_heal: DeadlyPoisonHealEffect,

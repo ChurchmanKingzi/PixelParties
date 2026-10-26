@@ -32,6 +32,8 @@
 //     zurück (W19c, Al): der Bow darf im selben Zug erneut; die Kosten des
 //     Pfeils bleiben bezahlt, der Pfeil geht in die Ablage.
 //   • Nach der Suche wird das Deck gemischt (Such-Konvention).
+//   • W79 (Al): Once per turn ist PRO BOGEN - ein Held mit 3 Boegen bekommt bei EINEM Angriff bis zu 3 Arrows (jeder wird bezahlt); die Kette fragt nach jedem
+//     gespielten Pfeil erneut, jede Bow-Instanz traegt ihren eigenen Stempel (Test W79/e-01).
 // ═══════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');

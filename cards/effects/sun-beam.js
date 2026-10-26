@@ -60,6 +60,7 @@ module.exports = {
       let ownSupportAvailable = 0;
       for (const inst of engine.cardInstances) {
         if (seenInstIds.has(inst.id)) continue;
+        if (inst.zone === 'support' && engine.zaehltAlsHeld && engine.zaehltAlsHeld(inst)) continue;   // W79 (White Sacrificial Bull): zählt auch als Hero
         if (inst.counters?.immovable) continue; // can't be destroyed → don't offer
         // Als Ruling (Al 26.10.): Pollution Tokens und verdeckte Surprises sind wählbar (früher: `inst.faceDown` / Token ausgeschlossen).
 

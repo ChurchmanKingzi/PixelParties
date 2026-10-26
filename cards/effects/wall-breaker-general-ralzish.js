@@ -95,6 +95,7 @@ function collectTargets(engine, controllerIdx) {
     seen.add(inst.id);
 
     if (inst.zone === 'support') {
+      if (engine.zaehltAlsHeld && engine.zaehltAlsHeld(inst)) continue;   // W79 (White Sacrificial Bull): zählt auch als Hero → kein „Nicht-Held"-Ziel
       const sa = supportAbilityZiel(engine, inst);   // 25.10.: Ability in einer Support Zone = Ability-Stapel (ein Ziel, oberste Kopie)
       if (sa !== undefined) { if (sa) targets.push(sa); continue; }
       // "You cannot choose a Creature that was summoned since the end

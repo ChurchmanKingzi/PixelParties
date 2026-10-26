@@ -5638,5 +5638,25 @@
 "Bounce Trap": {
 "id": "Bounce_Trap",
 "kind": "a"
+},
+"White Sacrificial Bull": {
+"id": "White_Sacrificial_Bull",
+"kind": "a"
+},
+"Tree of Golden Apples": {
+"id": "Tree_of_Golden_Apples",
+"kind": "a"
+},
+"Night Mare": {
+"id": "Night_Mare",
+"kind": "a"
+},
+"Little Lyta, the Amazon Princess": {
+"id": "Little_Lyta_the_Amazon_Princess",
+"kind": "a"
+},
+"Bow of the Hunt Goddess": {
+"id": "Bow_of_the_Hunt_Goddess",
+"kind": "a"
 }
 }
