@@ -7,6 +7,8 @@
 //   opponent controls and deal damage equal to the Hero's Attack stat to it."
 //
 //  ── KEIN EIGENER HELD (Al, 26.10.): „kein eigener Hero performed diese Attack" ──
+//  AUF EINEN GEGNERHELDEN ZIEHEN (Al 26.10.): zieht man die Karte direkt auf den Gegnerhelden, der die Attack ausführen soll, ist er vorgewählt (`herolosAngreifer` → `gs._herolosVorAngreifer`;
+//  die ziehbaren Helden liefert `herolosAusfuehrer` → Zustandsfeld `herolessAngreifer`), und der Picker fragt nur noch das Ziel (ein Schritt). Ist er nicht (mehr) wählbar, läuft der normale Zwei-Klick-Picker.
 //  Die Karte hat KEINEN Wirker-Helden: sie wird per Klick auf die Handkarte gespielt, ohne Heldenwahl (`playsWithoutHero: true`; Client: `herolessHandCards`, Server: `doPlaySpell`).
 //  Sie zählt als Attack des SPIELERS (seine Aktion, `attacksPlayedThisTurn`, Reaktionsfenster des Gegners auf die gespielte Karte), ist aber an keine Schule/Stufe (Lv0), keinen Status
 //  und keine Aktion eines eigenen Helden gebunden, und kein eigener Held tritt als Wirker/Quelle auf (Karteninstanz, Kette, Zähler und Hooks tragen `heroIdx -1`). Technisch braucht das
@@ -125,6 +127,11 @@ async function zeigeStich(engine, ausfuehrender, z) {
 }
 
 module.exports = {
+  /** Gegnerhelden, auf die man die Karte ZIEHEN kann (sie führen den Stich aus): `[{ owner, heroIdx }]` — für die Ziehen-Hervorhebung des Clients (`herolessAngreifer`). */
+  herolosAusfuehrer(engine, pi) {
+    return ohneZielschutz(engine, pi, ausfuehrende(engine, pi)).map(a => ({ owner: a.owner, heroIdx: a.heroIdx }));
+  },
+
   // ★ Bilder eines NEGIERTEN Stichs (Zielschutz-Reaktion nach der Wahl): die Quelle ist der ausführende Held (`heroOwner`/`heroIdx`), die Ziele die gewählten. Nur Bilder, kein Zustand.
   spellVisual: async (engine, info) => {
     const z = (info.targets || []).filter(Boolean)[0];
@@ -176,19 +183,34 @@ module.exports = {
       const angreiferListe = ohneZielschutz(engine, pi, ausfuehrende(engine, pi)).filter(a => zieleFuer(a).length > 0);   // Klick 1 braucht ein Ziel für Klick 2
       if (angreiferListe.length === 0 || zielListe.length === 0) { gs._spellCancelled = true; return; }
 
+      // Auf einen Gegnerhelden gezogen (Al 26.10.): er ist der Angreifer, es bleibt die Wahl des Ziels. Ist er nicht (mehr) wählbar, läuft der normale Picker.
+      const vor = gs._herolosVorAngreifer;
+      delete gs._herolosVorAngreifer;
+      const vorAngreifer = vor ? angreiferListe.find(a => a.owner === vor.owner && a.heroIdx === vor.heroIdx) : null;
+
       // ── EIN Picker: Klick 1 = der angreifende Gegnerheld, Klick 2 = das Ziel (nur Ziele desselben Spielers) ──
-      const wahl = await engine.promptGeordneteWahl(pi, [
-        { targets: angreiferListe, label: 'Click the attacking Hero.', role: 'Attacker' },
-        { targets: zielListe, label: 'Click the target.', role: 'Target', abhaengig: zieleFuer },
-      ], {
-        title: CARD_NAME, source: CARD_NAME,
-        description: 'Choose the attacking Hero, then the target.',
-        confirmLabel: '⚔️ Stab!',
-        previewCardName: CARD_NAME,
-        cancellable: true,
-      });
+      const wahl = vorAngreifer
+        ? await engine.promptGeordneteWahl(pi, [
+          { targets: zieleFuer(vorAngreifer), label: 'Click the target.', role: 'Target' },
+        ], {
+          title: CARD_NAME, source: CARD_NAME,
+          description: `${vorAngreifer.cardName} stabs — choose the target.`,
+          confirmLabel: '⚔️ Stab!',
+          previewCardName: CARD_NAME,
+          cancellable: true,
+        })
+        : await engine.promptGeordneteWahl(pi, [
+          { targets: angreiferListe, label: 'Click the attacking Hero.', role: 'Attacker' },
+          { targets: zielListe, label: 'Click the target.', role: 'Target', abhaengig: zieleFuer },
+        ], {
+          title: CARD_NAME, source: CARD_NAME,
+          description: 'Choose the attacking Hero, then the target.',
+          confirmLabel: '⚔️ Stab!',
+          previewCardName: CARD_NAME,
+          cancellable: true,
+        });
       if (!wahl) { gs._spellCancelled = true; return; }   // Abbruch: Karte zurück auf die Hand
-      const [angreiferZiel, zielVorab] = wahl;
+      const [angreiferZiel, zielVorab] = vorAngreifer ? [vorAngreifer, wahl[0]] : wahl;
 
       // ── Fenster der Heldenwahl („chosen"): Umleiter, Surprises, Post-Target-Reaktionen mit der Karte als Quelle ──
       const heldIds = await engine._zielwahlAbschliessen(pi, angreiferListe, {
