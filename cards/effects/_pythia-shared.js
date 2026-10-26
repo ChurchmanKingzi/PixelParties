@@ -14,7 +14,7 @@
 //    • Held: `hero._pythiaMark`, Kreatur: `inst.counters._pythiaMark` = `{ n, counters }` (n = Zahl der Pythias, die dieses Ziel vorgemerkt haben,
 //      counters = höchster Pythia-Zählerstand unter ihnen). Sie wird NIE von Hand gesetzt, sondern bei jedem `engine.sync()` aus den Plänen der lebenden
 //      Pythias NEU ABGELEITET (`abgleichen`): verlässt Pythia das Brett (Tod, Hand, Deck, Löschen …), fällt die Marke von selbst; ebenso, wenn das Ziel das Brett verlässt
-//      oder ein Held besiegt wird (`heldFaellt`, aufgerufen vom Heldentod der Engine: eine spätere Wiederbelebung bringt den Plan nicht zurück).
+//      (Held: bleibt der Plan über Tod und Wiederbelebung bestehen — Al: Helden behalten den Effekt und die Marke; Kreaturen: eine wiederbelebte Kreatur ist eine neue Instanz, der Plan entfällt).
 //    • Ist der Plan verfallen, zählt Pythia weiter und nichts passiert beim dritten Zähler.
 //
 //  Die Wirkung der Karte liegt in `infallible-oracle-pythia.js`; hier nur, was die Engine selbst braucht (sync-Abgleich, Heldentod).
@@ -25,12 +25,16 @@ const PLAN = 'pythiaPlan';
 const ZAEHLER = 'pythiaCounters';
 const MARKE = '_pythiaMark';
 
-/** Ziel des Plans als lebendes Objekt: `{ kind:'hero', hero, owner, heroIdx }`, `{ kind:'creature', inst }` oder `null` (verfallen). */
-function zielVon(engine, plan) {
+/**
+ * Ziel des Plans als lebendes Objekt: `{ kind:'hero', hero, owner, heroIdx }`, `{ kind:'creature', inst }` oder `null` (verfallen).
+ * Ein HELD behält den Plan über Tod und Wiederbelebung (`opts.auchTot` = auch den gerade toten Helden liefern, mit `tot: true`); ohne `auchTot` zählt nur ein lebender.
+ */
+function zielVon(engine, plan, opts = {}) {
   if (!plan) return null;
   if (plan.kind === 'hero') {
     const hero = engine.gs.players?.[plan.owner]?.heroes?.[plan.heroIdx];
-    if (!hero?.name || !(hero.hp > 0)) return null;
+    if (!hero?.name || hero.name !== plan.cardName) return null;
+    if (!(hero.hp > 0)) return opts.auchTot ? { kind: 'hero', hero, owner: plan.owner, heroIdx: plan.heroIdx, tot: true } : null;
     return { kind: 'hero', hero, owner: plan.owner, heroIdx: plan.heroIdx };
   }
   if (plan.kind === 'creature') {
@@ -66,7 +70,7 @@ function abgleichen(engine) {
   const wunsch = new Map();   // Schlüssel → { n, counters }
   for (const p of insts) {
     if (p.name !== CARD_NAME || !p.counters || !p.counters[PLAN]) continue;
-    const ziel = istPythia(p) ? zielVon(engine, p.counters[PLAN]) : null;
+    const ziel = istPythia(p) ? zielVon(engine, p.counters[PLAN], { auchTot: true }) : null;
     if (!ziel) { delete p.counters[PLAN]; continue; }   // Pythia weg bzw. Ziel weg: der Plan verfällt (Pythia zählt weiter)
     const key = ziel.kind === 'hero' ? `h:${ziel.owner}:${ziel.heroIdx}` : `c:${ziel.inst.id}`;
     const e = wunsch.get(key) || { n: 0, counters: 0 };
@@ -92,15 +96,4 @@ function abgleichen(engine) {
   }
 }
 
-/** Ein Held wurde besiegt (Engine: Anfang des Heldentod-Ablaufs): jeder Plan, der auf ihn zielte, verfällt — auch bei späterer Wiederbelebung. */
-function heldFaellt(engine, hero) {
-  if (!hero) return;
-  for (const p of engine.cardInstances || []) {
-    const plan = p.name === CARD_NAME ? p.counters?.[PLAN] : null;
-    if (!plan || plan.kind !== 'hero') continue;
-    if (engine.gs.players?.[plan.owner]?.heroes?.[plan.heroIdx] === hero) delete p.counters[PLAN];
-  }
-  abgleichen(engine);
-}
-
-module.exports = { CARD_NAME, PLAN, ZAEHLER, MARKE, zielVon, istPythia, abgleichen, heldFaellt };
+module.exports = { CARD_NAME, PLAN, ZAEHLER, MARKE, zielVon, istPythia, abgleichen };

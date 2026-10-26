@@ -10814,7 +10814,6 @@ class GameEngine {
    */
   async _runHeroDefeatSequence(target, source, ownerIdx, opts = {}) {
     if (!target || target.hp > 0) return false;
-    require('./_pythia-shared').heldFaellt(this, target);   // Infallible Oracle Pythia: jeder Plan, der auf diesen Helden zielte, verfaellt (auch bei spaeterer Wiederbelebung)
     // SC (v1382, Double/Triple Kill): jeder Heldentod laeuft genau einmal
     // hier durch — `_koProcessed` verhindert Doppelzaehlung.
     if (!target._koProcessed && this.gs._scTracking) {
