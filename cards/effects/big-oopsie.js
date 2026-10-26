@@ -49,6 +49,10 @@ module.exports = {
   // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
   onFizzledPlay: ({ engine, gs, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },
 
+  // ★ W75a (Al: „Bartas kann bei Big Oopsie keinen zweiten Treffer forcieren!"): der GEGNER waehlt das Ziel — Bartas bietet keinen Zweitwurf an
+  // (Flag wird von `bomb-berserker-bartas.js` gelesen).
+  opponentChoosesTarget: true,
+
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   cpuMeta: { scalesWithSchool: 'Destruction Magic' },

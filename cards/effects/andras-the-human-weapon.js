@@ -18,10 +18,13 @@
 //  - Re-runs onPlay on a temporary instance with
 //    _bartasSecondCast = true and the first
 //    target excluded
+//
+//  W76a (Al): die Prüfungen (exakt 1 Ziel, Attack-Merkmale `neverMultiTarget` / `opponentChoosesTarget` / `fixedTargetCount`, Vorabprüfung
+//  „legales zweites Ziel", Ausschluss des ersten Ziels in ALLEN Zielwählern, Einzelziel-Zweitschlag) liegen im gemeinsamen Baustein
+//  `_second-target-shared.js` (wie Bartas und Grisgar).
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
-const { loadCardEffect } = require('./_loader');
+const { zweitzielAngebot } = require('./_second-target-shared');
 
 const CARD_NAME = 'Andras, the Human Weapon';
 
@@ -40,108 +43,10 @@ module.exports = {
   activeIn: ['hero'],
 
   hooks: {
-    afterSpellResolved: async (ctx) => {
-      const engine = ctx._engine;
-      const gs     = ctx.gameState;
-      const pi      = ctx.cardOwner;
-      const heroIdx = ctx.cardHeroIdx;
-      // Styx 28.9.: Held/Zonen auf der Brettseite `feld`, „du" = Kontrolleur `pi`.
-      const feld    = ctx.cardHeroOwner ?? pi;
-
-      // Only trigger for attacks cast BY this hero (Brettseite + Index)
-      if ((ctx.heroOwner ?? ctx.casterIdx) !== feld || ctx.heroIdx !== heroIdx) return;
-
-      // Prevent infinite loop on the second hit
-      if (ctx.isSecondCast) return;
-
-      // Don't trigger if the attack was negated
-      if (gs._spellNegatedByEffect) return;
-
-      // Andras must be alive and capable
-      const ps   = gs.players[pi];
-      const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
-      if (!hero?.name || hero.hp <= 0) return;
-      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
-
-      // Must be a Normal Attack (not a Reaction, Surprise, etc.)
-      const attackData = ctx.spellCardData;
-      if (!attackData) return;
-      if (!hasCardType(attackData, 'Attack')) return;
-      if ((attackData.subtype || '').toLowerCase() !== 'normal') return;
-
-      // Must have hit exactly 1 target
-      const targets = ctx.damageTargets || [];
-      if (targets.length !== 1) return;
-
-      // Attack's original level must be lower than Andras's Fighting level
-      const attackLevel  = attackData.level || 0;
-      const fightingLevel = engine.countAbilitiesForSchool('Fighting', gs.players[feld]?.abilityZones?.[heroIdx] || []);
-      if (attackLevel >= fightingLevel) return;
-
-      // Must be at least 1 other valid target on the opponent's side
-      const oppIdx = engine.opponentOf(pi);
-      const firstTargetId = targets[0].id;
-      let hasOtherTarget = false;
-
-      // Kontrolle statt Seite (Styx 28.9.); IDs bleiben physisch.
-      for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(oppIdx)) {
-        if (!h?.name || h.hp <= 0) continue;
-        if (`hero-${physOwner}-${hi}` !== firstTargetId) { hasOtherTarget = true; break; }
-      }
-      if (!hasOtherTarget) {
-        for (const inst of engine.cardInstances) {
-          if ((inst.controller ?? inst.owner) !== oppIdx || inst.zone !== 'support') continue;
-          const cId = `equip-${engine.physicalSide(inst)}-${inst.heroIdx}-${inst.zoneSlot}`;
-          if (cId !== firstTargetId) { hasOtherTarget = true; break; }
-        }
-      }
-      if (!hasOtherTarget) return;
-
-      // Re-verify Andras is still alive right before prompting
-      if (!hero?.name || hero.hp <= 0) return;
-      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
-
-      // Prompt: hit a second target?
-      const confirmed = await ctx.promptConfirmEffect({
-        title: CARD_NAME,
-        message: `Hit a second target with ${ctx.spellName}?`,
-      });
-      if (!confirmed) return;
-
-      engine.log('andras_second_hit', {
-        player: ps.username, hero: hero.name, attack: ctx.spellName,
-      });
-
-      // Set up second hit: exclude first target, flag as second cast
-      gs._spellDamageLog        = [];
-      gs._spellExcludeTargets   = [firstTargetId];
-      gs._bartasSecondCast      = true; // Shared flag — ctx.isSecondCast reads this
-
-      // Load the attack script and re-invoke onPlay
-      const attackScript = loadCardEffect(ctx.spellName);
-      if (!attackScript?.hooks?.onPlay) return;
-
-      // Create a temporary card instance for the second hit
-      const tempInst = engine._trackCard(ctx.spellName, pi, 'hand', heroIdx, -1);
-      if (feld !== pi) tempInst.heroOwner = feld;   // Styx 28.9.: wie der Server bei Uebernahme
-
-      try {
-        await engine.runHooks('onPlay', {
-          _onlyCard: tempInst, playedCard: tempInst,
-          cardName: ctx.spellName, zone: 'hand', heroIdx,
-          _skipReactionCheck: true,
-        });
-      } catch (err) {
-        console.error(`[Engine] Andras second hit error for "${ctx.spellName}":`, err.message);
-      }
-
-      // Clean up temp instance and tracking flags
-      engine._untrackCard(tempInst.id);
-      delete gs._spellDamageLog;
-      delete gs._spellExcludeTargets;
-      delete gs._bartasSecondCast;
-
-      engine.sync();
-    },
+    afterSpellResolved: (ctx) => zweitzielAngebot(ctx, {
+      heldName: CARD_NAME, kind: 'Attack',
+      faehigkeit: 'Fighting',
+      logTyp: 'andras_second_hit', logFeld: 'attack',
+    }),
   },
 };

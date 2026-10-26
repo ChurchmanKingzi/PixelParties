@@ -64,6 +64,7 @@ module.exports = {
       const batch = await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
         let n = 0;
         let slipperyTouched = false;
+        const borisGate = engine.borisStapel(pi, { source: CARD_NAME, skipVoidsEffect: true });   // ★ W74c
         while ((ps.hand?.length || 0) > 0) {
           const isFirst = n === 0;
           const result = await engine.promptGeneric(pi, {
@@ -78,6 +79,9 @@ module.exports = {
           });
           if (!result || result.cancelled || result.cardName == null) break;
           const cardName = result.cardName;
+          // ★ W74c: Boris darf den Abwurf ignorieren — einmal gefragt (vor dem ersten Abwurf), die Antwort gilt für den ganzen Stapel. Die Wirkung hängt an der
+          // ANZAHL der abgeworfenen Karten ("that many", "the same number"): bei Verzicht 0, der Effekt endet ohne Wirkung.
+          if (await borisGate(1)) break;
           const ok = await engine.actionDiscardHandCard(pi, cardName, result.handIndex, {
             source: CARD_NAME,
           });

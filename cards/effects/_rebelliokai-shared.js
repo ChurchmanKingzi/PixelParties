@@ -241,6 +241,9 @@ async function promptDiscardRebelliokaiFromHand(engine, playerIdx, opts = {}) {
   if (!isRebelliokaiCreature(result.cardName, engine)) return null;
   if ((ps.hand || []).indexOf(result.cardName) < 0) return null;
 
+  // ★ W74c: Boris darf diese Abwurf-KOSTEN ignorieren — die Karte bleibt auf der Hand, die Zahlung gilt als erfolgt.
+  if (await engine.borisVerzicht(playerIdx, 1, { source: opts.source || 'Rebelliokai' })) return result.cardName;
+
   const ok = await engine.actionDiscardHandCard(
     playerIdx,
     result.cardName,

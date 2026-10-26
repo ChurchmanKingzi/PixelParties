@@ -72,11 +72,11 @@ module.exports = {
     if (!ps || (ps.hand || []).length < 1) return {};
     if (!gs.hoptUsed) gs.hoptUsed = {};
     gs.hoptUsed[`cool-tech-jetpack:${inst?.id || `${pi}-${heroIdx}`}`] = gs.turn;   // Angebot angenommen = „erstes Mal" verbraucht
-    const vorher = ps.hand.length;
-    await engine.actionPromptForceDiscard(pi, 1, {
-      title: CARD_NAME, source: CARD_NAME, selfInflicted: true,
+    // ★ W74c: von Boris erlassene Kosten gelten als bezahlt — die Negation gilt trotzdem.
+    const kosten = await engine.zahleAbwurfKosten(pi, 1, {
+      title: CARD_NAME, source: CARD_NAME,
     });
-    if (ps.hand.length >= vorher) return {};          // nichts abgeworfen → keine Negation
+    if (!kosten.bezahlt) return {};                   // nichts abgeworfen → keine Negation
     if (!gs.hoptUsed) gs.hoptUsed = {};
     gs.hoptUsed[`cool-tech-jetpack:${inst?.id || `${pi}-${heroIdx}`}`] = gs.turn;
     engine._broadcastEvent('play_zone_animation', {

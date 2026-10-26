@@ -2121,6 +2121,17 @@ class GameEngine {
       const heroesFirst = promptData.heroesFirst || false;
 
       if (targets.length === 0) return { selectedTargets: [] };
+      // ★ W78: geordnete Wahl (`promptGeordneteWahl`): je Schritt das erste noch freie Ziel seiner Liste (die Karte kann es mit `cpuResponse` besser).
+      if (Array.isArray(promptData.steps)) {
+        const frei = [];
+        for (const st of promptData.steps) {
+          const liste = (st.byPrev && frei.length) ? (st.byPrev[frei[frei.length - 1]] || []) : (st.ids || []);
+          const id = liste.find(i => !frei.includes(i));
+          if (id == null) return { cancelled: true };
+          frei.push(id);
+        }
+        return { selectedTargets: frei.map(id => targets.find(t => t.id === id)).filter(Boolean) };
+      }
 
       const getHp = (t) => {
         if (t.type === 'hero') {
@@ -5271,7 +5282,7 @@ class GameEngine {
         // is validated (alive, exists) before being returned; if it
         // no longer fits, falls through to the normal prompt.
         const forced = gs._forcedDamageTarget;
-        if (forced && forced.type) {
+        if (forced && forced.type && !config._sondeListe) {   // W75b: die Zielsonde (Bartas-Vorabprüfung) verbraucht den Einmal-Zwang nie
           delete gs._forcedDamageTarget;
           let valid = false;
           // Picker-types gate: an Attack/Spell that restricts to only
@@ -5309,6 +5320,7 @@ class GameEngine {
             // user-picked one.
             if (gs._spellDamageLog && !config._skipDamageLog) {
               gs._spellDamageLog.push({ ...forced });
+              engine._merkeZielSonde('damage', config, ctx);   // W75b
             }
             // ★ Clone (Welle 72): auch ein ERZWUNGENES Ziel (Niehts Bonusangriff) gehoert zur Aufzeichnung des Wurfs — sonst gaebe es fuer diese Attack keine Kopie.
             {
@@ -5743,11 +5755,19 @@ class GameEngine {
         }
 
         // Filter out excluded targets (Bartas second-cast, etc.)
-        const excludeIds = config._truthSeeingEye ? [] : (gs._spellExcludeTargets || []);
-        const filteredTargets = excludeIds.length > 0 ? targets.filter(t => !excludeIds.includes(t.id)) : targets;
+        // ★ W76a (Al: „das zweite Ziel darf NIE das bereits getroffene sein"): beim Zweitzielwurf (`gs._zweitzielWurf`) gilt der Ausschluss ausnahmslos — auch das Truth-Seeing Eye
+        // hebt ihn nicht auf (es negiert Sperr-Listen wie die der Invisibility Cloak, nicht die Regel „ein ZWEITES Ziel").
+        const excludeIds = (config._truthSeeingEye && !gs._zweitzielWurf) ? [] : (gs._spellExcludeTargets || []);
+        let filteredTargets = excludeIds.length > 0 ? targets.filter(t => !excludeIds.includes(t.id)) : targets;
+        // ★ W76a: der Zweitwurf trifft EIN weiteres Ziel — wählt der Spell mehrmals (Kirin Firebreath: je Schlag ein Ziel), bleibt es nach der ersten Wahl beim selben zweiten Ziel.
+        if (gs._zweitzielWurf && gs._zweitzielId && !config._skipDamageLog && !config._sondeListe) filteredTargets = filteredTargets.filter(t => t.id === gs._zweitzielId);
         if (filteredTargets.length === 0) return null;
 
-        const selectedIds = await engine.promptEffectTarget(effectiveController, filteredTargets, {
+        // ★ W78 (Backstab: Ausführender und Ziel in EINEM Picker): `_nurListe` liefert die fertig gefilterte/markierte Zielliste, ohne zu fragen; `_vorgewaehlt` (Ziel-Id) nimmt eine schon
+        // getroffene Wahl und läuft ab hier durch ALLE Fenster (Umleiter, Surprises, Post-Target) — ist die Id nicht (mehr) wählbar, wird normal gefragt.
+        if (config._nurListe) return { liste: filteredTargets };
+        const _vorId = (config._vorgewaehlt && filteredTargets.some(t => t.id === config._vorgewaehlt && !t.ineligible)) ? config._vorgewaehlt : null;
+        const selectedIds = _vorId ? [_vorId] : await engine.promptEffectTarget(effectiveController, filteredTargets, {
           title: config.title || cardInstance.name,
           description: config.description || 'Select a target.',
           confirmLabel: config.confirmLabel || 'Attack!',
@@ -5805,7 +5825,9 @@ class GameEngine {
           appliesStatus: config.appliesStatus,
           allowOwnSide: config.allowOwnSide,
           selfDamage: config.selfDamage,
+          _sondeListe: config._sondeListe === true,   // W75b: nur die markierte Zielliste liefern, nichts fragen
         });
+        if (config._sondeListe) return { liste: Array.isArray(selectedIds) ? selectedIds : [] };   // W75b: Trockenlauf der Zielsammlung (siehe `zweitwurfHatLegalesZiel`)
 
         if (!selectedIds || selectedIds.length === 0) {
           // Mark spell as cancelled so the handler can return the card to hand
@@ -5817,6 +5839,8 @@ class GameEngine {
         // not damage time, so protected/shielded targets still count as "hit"
         if (selected && gs._spellDamageLog && !config._skipDamageLog) {
           gs._spellDamageLog.push({ ...selected });
+          engine._merkeZielSonde('damage', config, ctx);   // W75b: Bartas-Vorabprüfung des Zweitwurfs (`zweitwurfHatLegalesZiel`)
+          if (gs._zweitzielWurf && !gs._zweitzielId) gs._zweitzielId = selected.id;   // W76a: das EINE zweite Ziel (s. o.)
         }
 
         // ── Caller commit hook ──
@@ -6319,6 +6343,15 @@ class GameEngine {
           if (targets.length === 0) return [];
         }
 
+        // ★ W76a: Zweitwurf-/Wiederholungs-Ausschluss (Bartas, Grisgar, Andras, Idej Kunagi …): schon getroffene Ziele sind KEIN wählbares Ziel — wie in `promptDamageTarget`.
+        {
+          const _ausIds = (config._truthSeeingEye && !gs._zweitzielWurf) ? [] : (gs._spellExcludeTargets || []);
+          if (_ausIds.length > 0) {
+            for (let i = targets.length - 1; i >= 0; i--) if (_ausIds.includes(targets[i].id)) targets.splice(i, 1);
+            if (targets.length === 0) return [];
+          }
+        }
+
         // Performing-Hero target-count caps applied to the picker:
         //   • `singleTargetAttack` (Toras, Master of all Weapons) caps
         //     EVERY multi-pick the performing Hero opens to 1.
@@ -6358,11 +6391,13 @@ class GameEngine {
         // Idas Flagge bleibt auf Destruction Spells beschraenkt.
         const forceSingleAny = !!casterHeroFlag?.forcesSingleTargetAny;
         const forceSingleByToras = !!casterHeroFlag?.singleTargetAttack;
-        const maxCap = (forceSingleByToras || forceSingleByIda || forceSingleAny)
+        // ★ W76a (Al, Bartas & Co.): der Zweitzielwurf trifft EIN weiteres Ziel („you may choose a second target … to hit") — kein „up to N" (Fireball, Explosion, Magic Arrows,
+        // Pyroblast, Dance …). Und das schon getroffene Ziel ist ausgeschlossen (`gs._spellExcludeTargets`, siehe unten) — bisher ignorierte dieser Wähler die Liste.
+        const maxCap = (forceSingleByToras || forceSingleByIda || forceSingleAny || gs._zweitzielWurf)
           ? 1
           : (config.max || targets.length);
         const max = Math.min(maxCap, targets.length);
-        const min = config.min || 1;
+        const min = gs._zweitzielWurf ? Math.min(config.min || 1, Math.max(1, max)) : (config.min || 1);
 
         const selectedIds = await engine.promptEffectTarget(pi, targets, {
           title: config.title || cardInstance.name,
@@ -6405,7 +6440,9 @@ class GameEngine {
           appliesStatus: config.appliesStatus,
           allowOwnSide: config.allowOwnSide,
           selfDamage: config.selfDamage,
+          _sondeListe: config._sondeListe === true,   // W75b: s. `promptDamageTarget`
         });
+        if (config._sondeListe) return Array.isArray(selectedIds) ? selectedIds : [];   // W75b: Trockenlauf der Zielsammlung
 
         if (!selectedIds || selectedIds.length === 0) {
           // `noSpellCancel` wie in `promptDamageTarget`: ein Abbruch ausserhalb eines Zaubers (Kreatureneffekt,
@@ -6429,6 +6466,8 @@ class GameEngine {
         const result = _gewaehlt.map(id => targets.find(t => t.id === id)).filter(Boolean);
         if (gs._spellDamageLog) {
           for (const t of result) gs._spellDamageLog.push({ ...t });
+          if (result.length > 0) engine._merkeZielSonde('multi', config, ctx);   // W75b
+          if (gs._zweitzielWurf && !gs._zweitzielId && result.length > 0) gs._zweitzielId = result[0].id;   // W76a
         }
 
         // ── Surprise window check ──
@@ -9708,7 +9747,8 @@ class GameEngine {
     // they don't burn the resource on a piercing hit; this server-
     // side override is the universal safety net for cards that
     // forget the check.
-    if (hookCtx.cancelled && hookCtx.cannotBeNegated) {
+    // Mean Cute Cat: ein UMGELEITETER Treffer (`_umgeleitet`) ist keine Negierung — der Schaden ist schon beim neuen Ziel.
+    if (hookCtx.cancelled && hookCtx.cannotBeNegated && !hookCtx._umgeleitet) {
       this.log('piercing_override', {
         source: source?.name, target: this._heroLabel(target),
         reason: 'cannotBeNegated overrides beforeDamage cancellation',
@@ -10431,6 +10471,7 @@ class GameEngine {
         const hookCtx = { source: bq, target, amount, type, sourceHeroIdx: bq?.heroIdx ?? -1, trueDamage: true, cannotBeReduced: true, cannotBeNegated: true };
         hookCtx._kBase = amount; hookCtx._kMul = 1; hookCtx._kFlat = 0;
         await this.runHooks(HOOKS.BEFORE_TRUE_DAMAGE, hookCtx);
+        if (hookCtx.cancelled && hookCtx._umgeleitet) return { dealt: 0, cancelled: true };   // Mean Cute Cat: umgeleitet (der Schaden liegt schon beim neuen Ziel)
         const proj = this._projectedAmount(hookCtx);
         if (proj !== undefined && proj > amount) amount = proj;
       }
@@ -12161,6 +12202,56 @@ class GameEngine {
   }
 
   /**
+   * ★ W78 (Backstab, Al: „beide in einem einzigen Picker"): GEORDNETE Mehrfachwahl in EINEM Prompt — Klick 1, Klick 2 … mit je eigener Kandidatenliste (die Mechanik von `chainTargetPick`:
+   * nummerierte Marker, Rückgängig, Bestätigen; der Client liest `steps`). `schritte` = [{ targets: [Zielobjekte], label: 'Click …', role?: 'Attacker' }, …] — Schritt i darf nur aus `targets`
+   * gewählt werden, nie dasselbe Ziel zweimal. Optional `abhaengig: (vorigesZiel) => [Zielobjekte]` (Schritt i ≥ 1): die Liste hängt vom Klick davor ab (Backstab: Ziel und Angreifer
+   * gehören demselben Spieler) — der Client bekommt sie als `byPrev` je Vorgänger-Id, der Server prüft sie nach. Kein Zielschutz/Fenster hier: die Kandidatenlisten sind vom Aufrufer fertig gefiltert, Fenster (Umleiter, Surprises …) öffnet der Aufrufer danach.
+   * @param {object} opts  { title, description, confirmLabel, cancellable (Standard true), previewCardName, source }
+   * @returns {object[]|null} die gewählten Zielobjekte in Reihenfolge, `null` bei Abbruch (oder ungültiger Antwort)
+   */
+  async promptGeordneteWahl(playerIdx, schritte, opts = {}) {
+    if (!Array.isArray(schritte) || schritte.length === 0 || schritte.some(s => !s.targets || s.targets.length === 0)) return null;
+    const alle = new Map();
+    for (const st of schritte) for (const t of st.targets) if (!alle.has(t.id)) alle.set(t.id, t);
+    const vor = opts.vorgewaehlt || null;   // schon feststehende Wahl (Backstab: der auf den Helden gezogene Angreifer): wird nur markiert, nicht mehr gefragt
+    if (vor && !alle.has(vor.id)) alle.set(vor.id, vor);
+    const clientTargets = [...alle.values()].map(t => { const { cardInstance, ...rest } = t; return rest; });
+    const result = await this.promptGeneric(playerIdx, {
+      type: 'chainTargetPick',
+      title: opts.title || 'Choose targets',
+      ...(opts.source ? { source: opts.source } : {}),
+      description: opts.description,
+      confirmLabel: opts.confirmLabel,
+      previewCardName: opts.previewCardName,
+      targets: clientTargets,
+      damages: schritte.map(() => 0),
+      ...(vor ? { preset: [vor.id] } : {}),
+      _fuer: playerIdx,   // der gefragte Spieler (für `cpuResponse` der Karte)
+      steps: schritte.map((st, i) => {
+        const e = { ids: st.targets.map(t => t.id), label: st.label || '', role: st.role || '' };
+        if (i > 0 && typeof st.abhaengig === 'function') {
+          e.byPrev = {};
+          for (const vor of schritte[i - 1].targets) e.byPrev[vor.id] = (st.abhaengig(vor) || []).filter(t => st.targets.some(x => x.id === t.id)).map(t => t.id);
+        }
+        return e;
+      }),
+      cancellable: opts.cancellable !== false,
+    });
+    if (!result || result.cancelled) return null;
+    const wunsch = Array.isArray(result.selectedTargets) ? result.selectedTargets : [];
+    if (wunsch.length !== schritte.length) return null;
+    const gewaehlt = [];
+    for (let i = 0; i < schritte.length; i++) {
+      const id = wunsch[i] && typeof wunsch[i] === 'object' ? wunsch[i].id : wunsch[i];
+      const t = schritte[i].targets.find(x => x.id === id);
+      if (!t || gewaehlt.some(g => g.id === t.id)) return null;
+      if (i > 0 && typeof schritte[i].abhaengig === 'function' && !(schritte[i].abhaengig(gewaehlt[i - 1]) || []).some(x => x.id === t.id)) return null;   // Liste des Schritts hängt vom Klick davor ab   // der Server prüft nach: Schritt i nur aus seiner Liste, paarweise verschieden
+      gewaehlt.push(t);
+    }
+    return gewaehlt;
+  }
+
+  /**
    * Zeigt dem Gegner die gesuchten/aufgenommenen Karten und wartet auf sein OK.
    * `opts.together` (Meditation: „choose up to 2 …"): EIN gemeinsames Fenster für alle Karten
    * (`deckSearchReveal` mit `cardNames`) statt eines Fensters je Karte; die Flüge/Meldungen je Karte
@@ -13086,6 +13177,8 @@ class GameEngine {
     }
     const toDiscard = Math.min(count, ps.hand.length);
     if (toDiscard <= 0) return;
+    // ★ W74c: Boris auch beim blinden Mehrfach-Abwurf (Chaos Magic, künftig `ctx.discardCards`) — einmal für den ganzen Stapel.
+    if (!opts._borisGefragt && await this.borisVerzicht(playerIdx, toDiscard, { source: opts.source, sourceOwner: opts.sourceOwner })) return;
     if (opts.source) await this.effectSourceGlow(opts.sourceOwner ?? playerIdx, opts.source);
     await this._paceHandDiscard();   // v696: Abstand zum vorigen Hand-Abwurf
     const _abwurfOp = toDiscard > 1 ? this._neueAbwurfVorgangsId() : undefined;   // W16b (A03-futuretech-07): ein Vorgang
@@ -18614,14 +18707,25 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * Resolve deferred spell recoil (Fire Bolts, etc.).
-   * Called by the server after afterSpellResolved completes, so recoil
-   * happens after all spell casts (including Bartas second cast).
+   * Rueckstoss, der noch aufgeschoben im Zustand steht (`gs._deferredRecoil`). Seit W75a (Al: „je ein Recoil nach jedem Schaden",
+   * auch im Zweitwurf von Bartas) schiebt Fire Bolts nichts mehr auf — die Karte ruft `resolveRecoil` selbst direkt nach dem
+   * Schaden. Der Aufruf im Server bleibt als Sicherheitsnetz fuer kuenftige Karten, die weiterhin aufschieben wollen.
    */
   async resolveDeferredRecoil() {
     const recoil = this.gs._deferredRecoil;
     if (!recoil) return;
     delete this.gs._deferredRecoil;
+    await this.resolveRecoil(recoil);
+  }
+
+  /**
+   * ★ W75a — Rueckstoss einer Karte mit Zielwahl („choose a target you control and deal N damage to it", Fire Bolts):
+   * der Spieler waehlt EIN eigenes Ziel (Held oder Kreatur, nach Kontrolle), das N Schaden erleidet. Wird DIREKT NACH dem
+   * Schaden gerufen, auf den er folgt — bei einem Zweitwurf (Bartas, Saya, Grisgar …) also ein zweites Mal, mit neuer Zielwahl.
+   * @param {{cardName:string, ownerIdx:number, heroIdx:number, damage:number, enhanced?:boolean, damageType:string}} recoil
+   */
+  async resolveRecoil(recoil) {
+    if (!recoil) return;
 
     const { cardName, ownerIdx, heroIdx, damage, enhanced, damageType } = recoil;
 
@@ -24488,6 +24592,27 @@ this._deathWatch = (this._deathWatchStack || []).length
       out.add(cardName);
     }
     return Array.from(out);
+  }
+
+  /**
+   * ★ W78 (Backstab: „kein eigener Held performed diese Attack"): Karten mit `playsWithoutHero: true` fragen nach keinem Wirker-Helden. Das Aktionssystem (Aktion/Zähler je Held) braucht intern
+   * aber einen Platz: der ERSTE eigene Held, mit dem die Karte nach den normalen Regeln spielbar wäre (`validateActionPlay`), dient NUR als technischer Platzhalter für die Buchhaltung der
+   * Aktion (`heroesActedThisTurn`, Zusatzaktions-Geber, Heldenkosten) — Berserk/Aktions-Limit-Helden zuletzt. Nach außen (Kette, Hooks, Zähler, Karteninstanz) tritt kein Held auf (`heroIdx -1`).
+   * @returns {number} Heldenindex oder -1 (kein eigener Held kann die Karte spielen)
+   */
+  herolosPlatzhalter(pi, cardName, handIndex, opts = {}) {
+    const ps = this.gs.players[pi];
+    if (!ps) return -1;
+    const kand = [];
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const h = ps.heroes[hi];
+      if (h?.name && h.hp > 0) kand.push({ hi, spaet: (h.statuses?.berserked || h._maxActionsPerTurn) ? 1 : 0 });
+    }
+    kand.sort((a, b) => (a.spaet - b.spaet) || (a.hi - b.hi));
+    for (const { hi } of kand) {
+      if (this.validateActionPlay(pi, cardName, handIndex, hi, ['Spell', 'Attack'], { fromCreation: opts.fromCreation })) return hi;
+    }
+    return -1;
   }
 
   /**
@@ -33118,6 +33243,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Hardy Slime gilt nur für Attack/Spell/Creature effect (`tauntGiltFuerQuelle`); ohne erkennbare Quelle bleibt er wie bisher.
       this.markiereTauntGesperrte(validTargets, playerIdx, this._tauntQuelleFuer(playerIdx, config));
     }
+    if (config._sondeListe) return validTargets;   // W75b: Trockenlauf — die fertig MARKIERTE Liste (ineligible), ohne Frage, ohne Klon-Wiedergabe, ohne Zustandsänderung
     const _waehlbar = validTargets.filter(t => !t.ineligible);
     if (_waehlbar.length === 0 && validTargets.some(t => t.ineligible)) return [];
 
@@ -36311,6 +36437,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (h) {
       for (const k of Object.keys(h)) {
         if (!k.endsWith(suffix)) continue;
+        if (this._surpriseHoptStempel?.get(`${abzug.pi}|${k.slice(0, -suffix.length)}`) === this.gs.turn) continue;   // W75a: Stempel einer aufgeloesten Surprise-Aktivierung (Aquatic Spear) bleibt
         if (!(k in abzug.hopt)) delete h[k];
         else if (h[k] !== abzug.hopt[k]) h[k] = abzug.hopt[k];
       }
@@ -38509,6 +38636,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
     if (this._inCreaturePreDefeatReaction) return false;
     if (!creatureInst) return false;
+    // ★ W78 (Infallible Oracle Pythia): ERSATZ DER EIGENEN NIEDERLAGE — „When this Creature would be defeated, you may … instead". Skript-Vertrag
+    // `selfPreDefeat(engine, inst, source, amount, type, info) → Promise<boolean>` (true = gerettet, KEIN Tod, kein Todes-Trigger). Laeuft VOR den Hand-Reaktionen
+    // (die Karte ersetzt ihren eigenen Tod; nicht innerhalb einer laufenden Hand-Reaktion); ruht bei Frost/Betaeubung/Negation (Ersatzeffekt = laufendes Passiv) und beim unaufhaltsamen Besiegen (kommt hier nie an).
+    {
+      const _sp = loadCardEffect(creatureInst.counters?._effectOverride || creatureInst.name);
+      if (_sp?.selfPreDefeat && creatureInst.zone === ZONES.SUPPORT && !creatureInst.faceDown && !this.isCardPassiveDormant(creatureInst)) {
+        if (await _sp.selfPreDefeat(this, creatureInst, this._rewriteSourceForCreatureCaster(source), amount, type, info)) return true;
+      }
+    }
 
     // Demon's Gate-style creature-caster annotation.
     source = this._rewriteSourceForCreatureCaster(source);
@@ -42946,6 +43082,90 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ W75a — Skript-Merkmal `surpriseHartOPT: '<Schluessel>'` (Aquatic Spear): pro Spieler und Zug darf nur EINE Aktivierung dieser Surprise aufloesen.
+   * Stempel = `gs.hoptUsed['<Schluessel>:<Spieler>'] === gs.turn` (`claimHOPT`, wie Magic Ruby / Future Tech Lamp). Bei einer ganz negierten Aktivierung bleibt er unberuehrt.
+   * Nicht die Zweitwirkung „sent … to the discard pile" der Karte — die ist keine Aktivierung und fragt diese Grenze nie.
+   */
+  surpriseHartOPTVerbraucht(script, cardName, spielerIdx) {
+    const key = script?.isSurprise ? script.surpriseHartOPT : null;
+    if (!key) return false;
+    return this.gs.hoptUsed?.[`${key}:${spielerIdx}`] === this.gs.turn;
+  }
+
+  /**
+   * ★ W75b — EINE Quelle für „darf `cardName` JETZT (Skript-Merkmale: harte Aktivierungsgrenze) von `spielerIdx` aktiviert werden?".
+   * Heute: `surpriseHartOPT` (Aquatic Spear: pro Spieler und Zug nur 1 Aktivierung). Eine in diesem Zug gesperrte Surprise ist für JEDE Aktivierung KEIN legales Ziel / keine legale Wahl:
+   * `_canHeroActivateSurprise` (alle Surprise-Fenster, Telekinesis, Baby Spider, Geheimraum …) und `_activateSurprise` fragen hier, und die erzwungenen Wege, die ihre Surprise
+   * aus Deck/Ablage holen (Sabrina, Cute Spider), bieten eine gesperrte Karte gar nicht erst an — statt sie zu wählen und zu fizzeln.
+   * Es prüft NUR diese Grenze (Held-Voraussetzungen, Kosten, Stufen usw. bleiben bei den bisherigen Prüfungen).
+   * @param {number} spielerIdx  der Steuerer der Aktivierung (Auslöser; bei Hand/Deck/Ablage der Besitzer)
+   * @param {string} cardName
+   * @returns {boolean}
+   */
+  surpriseAktivierbarJetzt(spielerIdx, cardName) {
+    const script = loadCardEffect(cardName);
+    if (this.surpriseHartOPTVerbraucht(script, cardName, spielerIdx)) return false;
+    return !this.surpriseOncePerGameVerbraucht(script, cardName, spielerIdx);
+  }
+
+  /**
+   * ★ W76a (Al: „Ja, sperren!") — Pro-Spiel-Grenze einer Surprise („You can only play 1 "Tharxian Horse" per game", `oncePerGame` / `oncePerGameKey`).
+   * Dieselbe Quelle wie die Surprise-Fenster (`_canHeroActivateSurprise`: `ps._oncePerGameUsed` des Auslösers, Schlüssel `oncePerGameKey || cardName`) und
+   * `_activateSurprise` (stempelt bei der NICHT negierten Aktivierung, Z7c): „play 1" zählt die AKTIVIERTEN Exemplare, nicht das verdeckte Setzen.
+   * Ist die Grenze verbraucht, ist die Karte für Sabrina (Suche/Galerie, CPU), Cute Spider, Telekinesis & Co. KEIN legales Ziel (nicht angeboten, nicht gefizzelt).
+   */
+  surpriseOncePerGameVerbraucht(script, cardName, spielerIdx) {
+    if (!script?.isSurprise || !(script.oncePerGame || script.oncePerGameKey)) return false;
+    return !!this.gs.players?.[spielerIdx]?._oncePerGameUsed?.has(script.oncePerGameKey || cardName);
+  }
+
+  /**
+   * ★ W75b — Zielsonde: der Zielwähler (`promptDamageTarget` / `promptMultiTarget`) merkt sich beim Eintragen des getroffenen Ziels ins Wurfprotokoll (`gs._spellDamageLog`),
+   * WIE er gewählt hat (Art, Konfiguration inkl. `condition`/`side`/`types`, den Kontext). Hängt am Protokoll-Array (WeakMap): verschwindet mit dem Wurf, nie im Spielstand.
+   */
+  _merkeZielSonde(art, config, ctx) {
+    const log = this.gs._spellDamageLog;
+    if (!log || !config) return;
+    const { _vorgewaehlt, _nurListe, _sondeListe, ...rest } = config;
+    (this._zielSonden || (this._zielSonden = new WeakMap())).set(log, { art, config: rest, ctx });
+  }
+
+  /**
+   * ★ W75b (Al: „Angebot nur, wenn es ein legales zweites Ziel gibt!") — Vorabprüfung für Bartas' Zweitwurf-Angebot, OHNE Seiteneffekte („Trockenlauf" der Zielsammlung):
+   * wiederholt die Zielsammlung des soeben aufgelösten Zaubers — seine eigene Konfiguration (`condition`, `side`, `types`, Flags) über dieselbe Kette wie der echte Wähler
+   * (Schutz/Untargetable, Stealth & Co. [`blocksTargeting`], Taunt, Erste-Runden-Schutz), mit dem ersten Ziel ausgeschlossen — und fragt, ob mindestens ein wählbares Ziel bleibt.
+   * Keine Frage, kein Fenster (Umleiter/Surprise/Reaktion), kein Wurfprotokoll, kein Zwangsziel (`_forcedDamageTarget` bleibt unberührt).
+   * @param {string} ersteZielId  Id des ersten Ziels (wird ausgeschlossen)
+   * @returns {Promise<boolean|null>} true/false = legales zweites Ziel ja/nein; `null` = unbekannt (der Zauber wählte nicht über einen Engine-Zielwähler) — der Aufrufer fällt dann auf seine Altprüfung zurück
+   */
+  async zweitwurfHatLegalesZiel(ersteZielId) {
+    const gs = this.gs;
+    const log = gs._spellDamageLog;
+    const sonde = log ? this._zielSonden?.get(log) : null;
+    if (!sonde?.ctx) return null;
+    const vorherAusschluss = gs._spellExcludeTargets;
+    const vorherZweit = gs._bartasSecondCast;
+    const vorherZweitziel = gs._zweitzielWurf;
+    gs._spellExcludeTargets = [ersteZielId];
+    gs._bartasSecondCast = true;
+    gs._zweitzielWurf = true;   // W76a: dieselbe Ausschluss-/Einzelziel-Regel wie der echte Zweitwurf
+    try {
+      const cfg = { ...sonde.config, _sondeListe: true };
+      let liste;
+      if (sonde.art === 'damage') liste = (await sonde.ctx.promptDamageTarget(cfg))?.liste;
+      else liste = await sonde.ctx.promptMultiTarget(cfg);
+      return (liste || []).some(t => t && !t.ineligible && t.id !== ersteZielId);
+    } catch (err) {
+      console.error('[Engine] zweitwurfHatLegalesZiel:', err?.message);
+      return null;
+    } finally {
+      if (vorherAusschluss === undefined) delete gs._spellExcludeTargets; else gs._spellExcludeTargets = vorherAusschluss;
+      if (vorherZweit === undefined) delete gs._bartasSecondCast; else gs._bartasSecondCast = vorherZweit;
+      if (vorherZweitziel === undefined) delete gs._zweitzielWurf; else gs._zweitzielWurf = vorherZweitziel;
+    }
+  }
+
+  /**
    * Requires: hero alive, not frozen/stunned, meets spell school & level requirements.
    * For Creature surprises: also requires a free Support Zone.
    * `playerIdx` = Brettseite des Helden. `opts.reaktor` (Als Vorgabe 29.9.):
@@ -42994,6 +43214,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       const _opgScript = loadCardEffect(cardName);
       if (_opgScript?.isSurprise && (_opgScript.oncePerGame || _opgScript.oncePerGameKey)
           && this.gs.players[reaktor]?._oncePerGameUsed?.has(_opgScript.oncePerGameKey || cardName)) return false;
+      // ★ W75a (Aquatic Spear: „You can only activate 1 "Aquatic Spear" per turn."): HARTES Once-per-turn der AKTIVIERUNG — gesetzt werden darf beliebig oft, aber
+      // pro Spieler und Zug loest nur EINE Kopie aus (`surpriseHartOPT`). Die Grenze gehoert dem Ausloeser (`reaktor`); gestempelt wird erst in `_activateSurprise`,
+      // sobald die Aktivierung aufloesen darf — nach Wisdom, Kette und Negation, nie schon beim Anbieten. Alle Surprise-Fenster laufen ueber dieses Gate.
+      if (!this.surpriseAktivierbarJetzt(reaktor, cardName)) return false;   // W75b: EINE Quelle (`surpriseHartOPT`)
     }
 
     // ★ SPELL-SPERREN GELTEN AUCH HIER (v880, Als Befund) ─────────────
@@ -43297,6 +43521,17 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.log('surprise_blocked_arcane_eyes', { card: cardName });
       return null;
     }
+    // ★ W75a: auch die erzwungenen Wege (Cute Spider, Sabrina, Telekinesis …) respektieren das harte Once-per-turn der Aktivierung.
+    // ★ W76a: ebenso die Pro-Spiel-Grenze (`oncePerGame`: Tharxian Horse) — eine verbrauchte Surprise lässt sich auch aus Deck/Ablage nicht erzwingen.
+    if (script?.surpriseHartOPT || script?.oncePerGame || script?.oncePerGameKey) {
+      const _hartSteuerer = (opts.isBakhmSlot || opts.fromDiscard || opts.fromDeck)
+        ? (Number.isInteger(opts.steuerer) ? opts.steuerer : playerIdx)
+        : this.surpriseKontrolleur(playerIdx, heroIdx);
+      if (!this.surpriseAktivierbarJetzt(_hartSteuerer, cardName)) {
+        this.log('surprise_blocked_hopt', { card: cardName });
+        return null;
+      }
+    }
     this._surpriseResolutionDepth = (this._surpriseResolutionDepth || 0) + 1;
     this._inSurpriseResolution = true;
     // Per-hero re-entry guard (see _checkSurpriseWindow). Identifies the
@@ -43572,6 +43807,14 @@ this._deathWatch = (this._deathWatchStack || []).length
         _sps._oncePerGameUsed.add(_opgKey);
         (this._surpriseStempel || (this._surpriseStempel = new Set())).add(`${steuerer}|${_opgKey}`);
       }
+    }
+
+    // ★ W75a (Aquatic Spear): hartes Once-per-turn — die Aktivierung stempelt, sobald sie aufloesen darf (nicht negiert; Z7b/W66b: eine ganz negierte Karte stempelt nicht).
+    // Beim Ausloeser (`steuerer`). `_surpriseHoptStempel` schuetzt den Eintrag vor dem Z7b-Rueckgabe-Abzug (`_stempelZurueck`) des Zaubers, waehrend dessen Schaden er ausloeste.
+    // Der Stempel liegt VOR `onSurpriseActivate`: eine weitere Kopie im selben Fenster/Reaktionsfenster (auch durch den 80er-Treffer selbst ausgeloest) ist damit gesperrt.
+    if (!surpriseNegated && script.surpriseHartOPT) {
+      this.claimHOPT(script.surpriseHartOPT, steuerer);
+      (this._surpriseHoptStempel || (this._surpriseHoptStempel = new Map())).set(`${steuerer}|${script.surpriseHartOPT}`, this.gs.turn);
     }
 
     // Execute the surprise's effect (unless negated)
@@ -45820,6 +46063,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[ownerIdx];
     if (!ps) return;
     ScTracking.kartenName(this.gs._scTracking?.[ownerIdx], cardName);   // Card of the Day!: eine negierte Karte wurde trotzdem gespielt
+    // ★ W78 (Betrayal): optionaler Karten-Haken `onInitialNegated(engine, ownerIdx, cardName, chainResult)` — die Karte wurde in der KETTE negiert (`onPlay` lief nie): sie kann hier ihre
+    // schon bezahlten Kosten sichtbar machen (Betrayal: Stehl-Animation der 5 Gold). Nur Bilder/Aufräumen, der Fluss der Karte bleibt unberührt.
+    {
+      const _sc = loadCardEffect(cardName);
+      if (typeof _sc?.onInitialNegated === 'function') {
+        try { await _sc.onInitialNegated(this, ownerIdx, cardName, chainResult); }
+        catch (err) { console.error(`[onInitialNegated] ${cardName}:`, err.message); }
+      }
+    }
     // v691: gestohlen (Key) — in die Hand des Diebes, mit Flug von der
     // Hand des Spielers zur Hand des Diebes (Handplatz-Ziel wie beim
     // Kadaver-Anspruch, sonst landet der Flug in der Handmitte).
@@ -52647,6 +52899,72 @@ this._deathWatch = (this._deathWatchStack || []).length
     return false;
   }
 
+  // ═══════════════════════════════════════════════════════════════════════
+  //  ★ W74c — BORIS BEI EIGENBAU-ABWÜRFEN (Al: „Ich finde gerade eine Menge Interaktionen, bei denen Boris schlicht nicht funktioniert")
+  //
+  //  Regel (Vertrag, CARD_API „Welle 74 / W74c"): JEDER Abwurf von der HAND — erzwungen, als Kosten oder als eigener Teil des Effekts —
+  //  läuft über einen dieser Wege, damit Boris EINMAL PRO STAPEL gefragt wird (vor der Zahlung, nach der Wahl der Karten):
+  //    · `actionPromptForceDiscard`          (Standard, fragt selbst; Karten, die danach wissen müssen, ob bezahlt ODER erlassen wurde: `zahleAbwurfKosten`)
+  //    · `borisVerzicht(pi, n, opts)`        (Eigenbau mit eigener Kartenwahl: nach der Wahl, vor dem ersten `actionDiscardHandCard`)
+  //    · `borisStapel(pi, opts)`             (Eigenbau-Schleifen: fragt beim ersten Aufruf, die Antwort gilt für den ganzen Stapel)
+  //    · `fremdAbwurfEntfaellt(opfer, n, o)` (Eigenbau-ZWANGSabwurf gegen den Gegner: ERST Ambush the Scout, DANN Boris)
+  //    · `actionDiscardCardsAnimated`        (blinder Mehrfach-Abwurf, fragt selbst; `opts._borisGefragt` für Aufrufer, die schon gefragt haben)
+  //  Verzichtet Boris, bleibt die Karte auf der Hand; Kosten gelten als erlassen (der Effekt läuft weiter), außer die Wirkung hängt an der ANZAHL
+  //  der abgeworfenen Karten („draw that many", „the same number", „times the number discarded"): dann ist die Anzahl 0 (Champion, Al).
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /** Hat der Spieler `pi` Boris' „einmal pro Zug" in diesem Zug schon verbraucht? (Stempel `boris-discard`, gesetzt beim tatsächlichen Verzicht.) */
+  _borisStempelHeute(pi) {
+    return this.gs?.hoptUsed?.[`boris-discard:${pi}`] === this.gs?.turn;
+  }
+
+  /**
+   * Boris für einen Abwurf-STAPEL mit mehreren Einzelschritten (Schleifen aus „Karte anklicken → abwerfen"): beim ERSTEN Aufruf wird gefragt, die
+   * Antwort gilt für den ganzen Stapel (Verzicht → jede weitere Karte entfällt ohne neue Frage; kein Verzicht → es wird nicht noch einmal gefragt).
+   * @returns {(count?: number) => Promise<boolean>} `true` = Boris verzichtet (Abwurf entfällt)
+   */
+  borisStapel(pi, opts = {}) {
+    let antwort = null;
+    return async (count = 1) => {
+      if (antwort === null) antwort = !!(await this.borisVerzicht(pi, count, opts));
+      return antwort;
+    };
+  }
+
+  /**
+   * Abwurf-KOSTEN über den Standardweg (`actionPromptForceDiscard`, `selfInflicted`) — mit klarer Auskunft für Karten, die danach wissen müssen,
+   * ob die Kosten bezahlt wurden: `bezahlt` ist auch dann `true`, wenn Boris die Kosten erlassen hat (`erlassen`); `false` nur bei Abbruch / nicht bezahlbar.
+   * Ersatz für das Muster `const vor = hand.length; await fd(…); if (hand.length >= vor) return;` — das ließ den Effekt unter Boris zu Unrecht verfallen.
+   * @returns {Promise<{bezahlt: boolean, erlassen: boolean}>}
+   */
+  async zahleAbwurfKosten(pi, count, opts = {}) {
+    const ps = this.gs.players[pi];
+    if (!ps) return { bezahlt: false, erlassen: false };
+    const stempelVor = this._borisStempelHeute(pi);
+    const vor = (ps.hand || []).length;
+    await this.actionPromptForceDiscard(pi, count, { selfInflicted: true, ...opts });
+    const erlassen = !stempelVor && this._borisStempelHeute(pi);
+    return { bezahlt: erlassen || (ps.hand || []).length < vor, erlassen };
+  }
+
+  /**
+   * Eigenbau-ZWANGSabwurf gegen `opfer` (Fremdquelle `opts.sourceOwner`): Erstrunden-Schutz, dann ERST das Ambush-Fenster, DANN Boris (Als Ruling 5.8.).
+   * `true` = der Abwurf entfällt (geschützt / Ambush negiert / Boris verzichtet) — der Aufrufer wirft dann nichts ab. Wirft er danach selbst ab, setzt er an
+   * `actionDiscardHandCard` `_skipHandInteractionCheck: true` (das Fenster lief schon hier).
+   */
+  async fremdAbwurfEntfaellt(opfer, count, opts = {}) {
+    const ps = this.gs.players[opfer];
+    if (!ps || !(count > 0) || (ps.hand || []).length === 0) return true;
+    if (this.gs.firstTurnProtectedPlayer === opfer && !opts.selfInflicted) {
+      this.log('discard_blocked', { player: ps.username, reason: 'shielded' });
+      return true;
+    }
+    const quelle = opts.source || opts.sourceName;
+    const von = opts.sourceOwner != null ? opts.sourceOwner : this.opponentOf(opfer);
+    if (!opts._skipHandInteractionCheck && await this.checkHandInteractionReaction(opfer, 'discard', { byPi: von, count, sourceName: quelle })) return true;
+    return !!(await this.borisVerzicht(opfer, count, { source: quelle, sourceOwner: von }));
+  }
+
   /**
    * ★ v1288 — Wie viele Handkarten stehen als Abwurfmaterial fuer die
    * Kosten DIESER Karte bereit? Eine reine Handkarte verlaesst beim
@@ -57874,6 +58192,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     this._atkAurenAbgleichen();   // W58a: Rioting Village & Co. gelten fuer ALLE Helden (lebend, tot, frisch eingesetzt, aus der Abwesenheit zurueck)
     this._dynamischeAtkNachrechnen();   // W58a: Core/Gun folgen dem Ist-Zustand der Ablage (auch nach dem Todes-Aufraeumen und Direktzugriffen auf die Ablage)
     this._refreshAscensionReadiness();
+    require('./_pythia-shared').abgleichen(this);   // Infallible Oracle Pythia: Plaene/Marken („Death Foreseen") mit dem Brett abgleichen
     this._equipStapelAbgleichen();   // Darion: Effekt wieder frei → alle Equips in den groessten Stapel (nach der laufenden Wirkung)
     this._aufdeckenInHandAbgleichen();   // 23.10.: `revealAlwaysInHand` (Great Vanguard Demon) — aufgedeckt, sobald und solange die Karte auf der Hand liegt, egal wie sie dorthin kam
     // W18a (S01-04): die Sperre von Divine Gift of Skill hängt an der Magic-Arts-Stufe des NUTZERS (nicht des gesperrten Helden) und kann

@@ -286,8 +286,9 @@ async function doDeckSearch(engine, playerIdx, heroIdx, level, trainingOrt, feld
     if (discardName === undefined || handIndex === undefined) return false;
     if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== discardName) return false;
 
-    // v1394: Abwurf über die zentrale Funktion.
-    if (!(await engine.actionDiscardHandCard(playerIdx, discardName, handIndex, { source: 'Training', _noGlow: true }))) return false;
+    // v1394: Abwurf über die zentrale Funktion. ★ W74c: Boris darf diese Abwurf-Kosten ignorieren — die Karte bleibt, der Effekt läuft weiter.
+    if (!(await engine.borisVerzicht(playerIdx, 1, { source: 'Training' }))
+        && !(await engine.actionDiscardHandCard(playerIdx, discardName, handIndex, { source: 'Training', _noGlow: true }))) return false;
 
     // Lv2: Training resolves when discard cost is paid → flash Training zone now
     engine._broadcastEvent('ability_activated', {

@@ -174,9 +174,12 @@ module.exports = {
     // future cards) can attribute it to Rebelliokai. Backup Baku's
     // trigger also fires here when `searchedName` is a Rebelliokai
     // Creature — which is the intended chain.
-    await engine.actionDiscardHandCard(pi, searchedName, null, {
-      source: DISCARD_SOURCE_TAG,
-    });
+    // ★ W74c: Boris darf den erzwungenen Abwurf („immediately discard it afterwards") ignorieren — die gesuchte Karte bleibt dann auf der Hand.
+    if (!(await engine.borisVerzicht(pi, 1, { source: CARD_NAME }))) {
+      await engine.actionDiscardHandCard(pi, searchedName, null, {
+        source: DISCARD_SOURCE_TAG,
+      });
+    }
 
     engine.log('rebelliokai_camouflaged_kappa', {
       player:   ps.username,

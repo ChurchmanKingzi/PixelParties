@@ -68,9 +68,11 @@ module.exports = {
     // until every Gigantisaur the player picked is in the pile
     // before resolving — and Cute Bunny sees an N-card batch event
     // rather than N independent 1-card events.
+    let borisVerzichtet = false;
     const discarded = await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
       const discardedNames = new Set();
       let n = 0;
+      const borisGate = engine.borisStapel(pi, { source: CARD_NAME, skipVoidsEffect: true });   // ★ W74c
       while (true) {
         const eligibleIndices = [];
         for (let i = 0; i < (ps.hand || []).length; i++) {
@@ -101,6 +103,9 @@ module.exports = {
           if (isFirst) return 0; // mandatory pick declined → fizzle
           break;
         }
+        // ★ W74c: Boris darf den Abwurf ignorieren — einmal gefragt (vor dem ersten Abwurf), die Antwort gilt für den ganzen Stapel. Die Wirkung hängt an der
+        // ANZAHL der abgeworfenen Karten ("that many", "the same number"): bei Verzicht 0, der Effekt endet ohne Wirkung.
+        if (await borisGate(1)) { borisVerzichtet = true; if (isFirst) return 0; break; }
         const ok = await engine.actionDiscardHandCard(pi, result.cardName, result.handIndex, {
           source: CARD_NAME,
         });
@@ -114,7 +119,7 @@ module.exports = {
       return n;
     });
 
-    if (discarded === 0) return false;
+    if (discarded === 0) return borisVerzichtet;   // W74c: bei Boris-Verzicht ist der Effekt aktiviert (mit 0 Karten)
 
     // Brief beat so the discard syncs commit before the draws fire —
     // same "post-discard / pre-draw" timing fix used for Heinz /

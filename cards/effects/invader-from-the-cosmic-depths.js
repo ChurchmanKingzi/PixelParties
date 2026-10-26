@@ -361,7 +361,8 @@ module.exports = {
       : ps.hand.indexOf(discardName);
     // v1394: Abwurf über die zentrale Funktion — bis v1393 lief dieser
     // Kosten-Abwurf ohne onDiscard (Cute Dog, Cute Familiar & Co. sahen ihn nicht).
-    if (handIdx >= 0 && ps.hand[handIdx] === discardName) {
+    // ★ W74c: Boris darf diese Abwurf-KOSTEN ignorieren — wie bei Zira Racer bleibt die Karte auf der Hand, der Schaden richtet sich weiter nach ihrem Level.
+    if (handIdx >= 0 && ps.hand[handIdx] === discardName && !(await engine.borisVerzicht(pi, 1, { source: CARD_NAME }))) {
       await engine.actionDiscardHandCard(pi, discardName, handIdx, { source: CARD_NAME, _noGlow: true });
       engine.log('invader_discard', { player: ps.username, discarded: discardName, lvl });
     }

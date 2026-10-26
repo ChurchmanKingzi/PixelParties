@@ -176,6 +176,7 @@ module.exports = {
       gs._spellCasterCreature = inst;
       gs._klonWiedergabe = { pi, queue: eintraege.map(e => ({ title: e.title, ids: e.ids.slice() })) };
       const geloeschtVor = (gs.players[pi].deletedPile || []).filter(n => n === name).length;
+      const fireBoltsAlt = engine._fireBoltsEntscheid;   // W75a: Entscheidung 200/50 des äußeren Fire Bolts (Zweitwurf) — die Kopie entscheidet für sich
       try {
         await engine.runHooks('onPlay', {
           _onlyCard: synth, playedCard: synth, cardName: name, zone: 'hand', heroIdx: inst.heroIdx, _skipReactionCheck: true,
@@ -195,6 +196,7 @@ module.exports = {
         }
         if (!gs._spellPlacedOnBoard) engine._untrackCard(synth.id);
         for (const k of GS_MARKEN) { if (gesichert[k] === undefined) delete gs[k]; else gs[k] = gesichert[k]; }
+        if (fireBoltsAlt === undefined) delete engine._fireBoltsEntscheid; else engine._fireBoltsEntscheid = fireBoltsAlt;
         if (wirkerAlt === undefined) delete gs._wirkerSeite; else gs._wirkerSeite = wirkerAlt;
         if (aufnahmeAlt) gs._klonAufnahme = aufnahmeAlt;
         engine.sync();

@@ -117,6 +117,15 @@ module.exports = {
         }
       }
 
+      // ★ W76a: die Kreaturen in den Support Zones der gewählten Helden sind TREFFER dieser Attack (der Toras-Deckel oben zählt sie ebenso als zusätzliche Ziele). Sie kommen deshalb ins
+      // Wurfprotokoll, damit „hits exactly 1 target"-Leser (Andras, Nieht, Reiza …) die wahre Zahl der Ziele sehen — Held MIT Kreaturen = mehrere Ziele, kein Zweitschlag-Angebot.
+      if (Array.isArray(gs._spellDamageLog)) {
+        for (const e of allCreatureEntries) {
+          const z = engine.kreaturZiel(e.inst);
+          if (!gs._spellDamageLog.some(t => t.id === z.id)) gs._spellDamageLog.push({ ...z });
+        }
+      }
+
       // Pre-damage post-target hand-reaction window — ONE consolidated
       // prompt per source covering selected Heroes + all Creatures
       // they're hitting. Built BEFORE damage flows so reactions

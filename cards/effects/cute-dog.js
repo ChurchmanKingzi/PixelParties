@@ -166,6 +166,8 @@ module.exports = {
     // factoring in distinct deck names + hand size — so "Done" never
     // appears when a 2nd discard wouldn't actually help.
     let discarded = 0;
+    const borisGate = engine.borisStapel(pi, { source: CARD_NAME, skipVoidsEffect: true });   // ★ W74c
+    let borisVerzichtet = false;
     // W16c (A04-16): die Klick-Abwuerfe sind EIN Batch, damit Cute Bunny ("2 or more ... through an effect") reagiert.
     await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
     while (discarded < maxN && (ps.hand || []).length > 0) {
@@ -189,6 +191,9 @@ module.exports = {
 
       if (result?.cancelled) break;
       if (!result || result.cardName == null) break;
+      // ★ W74c: Boris darf den Abwurf ignorieren — einmal gefragt (vor dem ersten Abwurf), die Antwort gilt für den ganzen Stapel. Die Wirkung hängt an der
+      // ANZAHL der abgeworfenen Karten ("that many", "the same number"): bei Verzicht 0, der Effekt endet ohne Wirkung.
+      if (await borisGate(maxN)) { borisVerzichtet = true; break; }
 
       // Commit via the engine helper — see actionDiscardHandCard for
       // the load-bearing inst.zone update that lets discard-summon
@@ -203,7 +208,7 @@ module.exports = {
     }
     });   // end withDiscardBatch
 
-    if (discarded === 0) return false; // mandatory first iteration didn't resolve
+    if (discarded === 0) return borisVerzichtet; // mandatory first iteration didn't resolve (W74c: bei Boris-Verzicht ist der Effekt aktiviert — mit 0 Karten)
 
     // ── Step 2: build & show the gallery (cost is paid; commit) ──
     // Re-read state — onDiscard hooks may have shifted the deck.

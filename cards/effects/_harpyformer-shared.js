@@ -79,6 +79,11 @@ async function harpyformerDiscardCost(engine, pi, abilityName, opts = {}) {
   // client ever sends a different hand index.
   if (result.cardName !== abilityName) return false;
 
+  // ★ W74c: Boris darf auch diese Abwurf-KOSTEN ignorieren — die Karte bleibt auf der Hand, der Effekt läuft weiter.
+  // „…, and if you do, …" (Harpyformer Choir, Al 26.10.): die Folgewirkung gibt es NUR, wenn der Abwurf wirklich durchgeht — bei Verzicht liefert die Funktion `'entfallen'`
+  // (Aktivierung verbraucht, Wirkung entfällt); alle anderen Harpyformer haben feste Kosten („discard … to …"): Verzicht → Kosten gratis, Wirkung läuft (`true`).
+  if (await engine.borisVerzicht(pi, 1, { source: opts.source || abilityName })) return opts.nurWennAbgeworfen ? 'entfallen' : true;
+
   const ok = await engine.actionDiscardHandCard(pi, abilityName, result.handIndex, {
     source: opts.source || abilityName,
   });

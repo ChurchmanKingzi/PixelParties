@@ -45,6 +45,7 @@ const lesen = (p) => fs.readFileSync(p, 'utf8');
 /** Skripte, in denen ein Löschen UND ein Boris-Aufruf vorkommen dürfen — mit Begründung. */
 const ALLOWLIST = {
   'control-monitors.js': 'Boris wird nur für den ABWURF-Preis (N Handkarten abwerfen, `reactionKostenZahlen`) gefragt; das Löschen der hinzugefügten/anderen Karten (`deleteFromPile`) trifft die Hand des GEGNERS und fragt Boris nie.',
+  'cute-hydra.js': 'Boris wird nur für den ABWURF der Beschwörung (Batch, `borisVerzicht` nach dem Confirm) gefragt; „deleted from anywhere“ im Kartentext ist die Rettungsklausel, kein Löschen von der Hand.',
 };
 
 // Kartentext meint ein Löschen von der HAND (auch „from your hand or discard pile", „cards in your hand").

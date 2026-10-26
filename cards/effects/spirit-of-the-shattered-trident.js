@@ -226,13 +226,13 @@ module.exports = {
       });
       if (!engine._confirmSaidYes(ja)) return;
 
-      const handVorher = (ps.hand || []).length;
-      await engine.actionPromptForceDiscard(pi, 1, {
-        title: CARD_NAME, source: CARD_NAME, selfInflicted: true,
+      // ★ W74c: von Boris erlassene Kosten gelten als bezahlt (`zahleAbwurfKosten`).
+      const kosten = await engine.zahleAbwurfKosten(pi, 1, {
+        title: CARD_NAME, source: CARD_NAME,
         cancellable: true,
         description: `Discard 1 card to reclaim ${weg.name}.`,
       });
-      if ((ps.hand || []).length === handVorher) return;   // abgebrochen
+      if (!kosten.bezahlt) return;   // abgebrochen
 
       // Ab hier laeuft es: Umleitung setzen und Gold gutschreiben.
       weg._returnToHand = true;

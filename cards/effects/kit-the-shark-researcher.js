@@ -431,13 +431,15 @@ async function _runModeC(engine, pi, oppPi) {
     return;
   }
 
-  // v1324: Boris darf den erzwungenen Abwurf ignorieren.
-  if (await engine.borisVerzicht(oppPi, 1, { source: 'Kit, the Shark Researcher', sourceOwner: pi })) return;
+  // v1324: Boris darf den erzwungenen Abwurf ignorieren. ★ W74c: Reihenfolge ERST Ambush the Scout, DANN Boris (`fremdAbwurfEntfaellt`; vorher fragte
+  // Boris zuerst und das Ambush-Fenster folgte erst beim Abwurf).
+  if (await engine.fremdAbwurfEntfaellt(oppPi, 1, { source: 'Kit, the Shark Researcher', sourceOwner: pi })) return;
   const randomIdx = Math.floor(Math.random() * ops.hand.length);
   const discardedName = ops.hand[randomIdx];
   await engine.actionDiscardHandCard(oppPi, discardedName, randomIdx, {
     source: CARD_NAME,
     sourceOwner: pi,   // W16f (H02-29): fremde Quelle — Erstrunden-Schutz und Hand-Interaktions-Fenster greifen nur mit sourceOwner
+    _skipHandInteractionCheck: true,   // W74c: das Fenster lief schon in `fremdAbwurfEntfaellt`
   });
 
   engine.log('kit_mode_c', {
