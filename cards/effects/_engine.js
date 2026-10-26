@@ -22870,7 +22870,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
       return res?.inst || null;
     }
-    const taken = await this.takeFromPile(pi, pile, cardName, { ...opts, shuffle: pile === 'deck' });
+    // Als Ruling (Al 26.10.): `opts.handIdx` (nur Pile `hand`) benennt die KOPIE, die beschworen wird — das Heldenstufen-Tor gilt je Handkopie (Rocky Slime reduziert nur eine einzelne Kopie);
+    // ohne Index die erste Kopie wie bisher.
+    const _kopie = (pile === 'hand' && Number.isInteger(opts.handIdx) && this.gs.players[pi]?.hand?.[opts.handIdx] === cardName) ? opts.handIdx : cardName;
+    const taken = await this.takeFromPile(pi, pile, _kopie, { ...opts, shuffle: pile === 'deck' });
     if (!taken) return null;
     const flight = { toHeroIdx: heroIdx, toSlotIdx: slotIdx, ...(feld !== pi ? { toOwner: feld } : {}) };
     if (pile === 'hand') flight.fromHandIdx = taken.idx;
@@ -24251,7 +24254,8 @@ this._deathWatch = (this._deathWatchStack || []).length
             // Action` is the same facility in both phases (Main Phase or Action
             // Phase after the hero has acted), so the UI must honour it in both.
             // v601: Karten- UND Heldenvertrag an einer Stelle (Baaliel).
-            let isInherent = this.cardHasInherentAction(playerIdx, hi, cd);
+            // Als Ruling (Al 26.10.): in der Liste JE KOPIE (`nurKopie`) zählt die Zusatzaktion dieser einen Handkopie (Bear Rider: Stufe 0 nur an der gesenkten Kopie).
+            let isInherent = this.cardHasInherentAction(playerIdx, hi, cd, nurKopie != null ? { handIndex: nurKopie } : undefined);
             // Berserk's free-Attack grant — mirror of the override in
             // `getValidationContext`. While the charge is unspent, the
             // Berserked Hero's Attacks count as inherent (no action
@@ -24270,7 +24274,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Main Phase: action cards need inherent action or additional action coverage
         if (isMainPhase && !charmedFrei) {
           // v601: Karten- UND Heldenvertrag an einer Stelle (Baaliel).
-          let isInherent = this.cardHasInherentAction(playerIdx, hi, cd);
+          let isInherent = this.cardHasInherentAction(playerIdx, hi, cd, nurKopie != null ? { handIndex: nurKopie } : undefined);   // Als Ruling (Al 26.10.): je Kopie (s. o.)
           // Berserk's free-Attack grant — see the post-acted Action
           // Phase branch above for rationale. Mirror here so the
           // Berserked Hero can play Attacks in the Main Phase
@@ -24422,14 +24426,14 @@ this._deathWatch = (this._deathWatchStack || []).length
               const allowed = ps.bonusActions.allowedTypes || [];
               if (allowed.length > 0 && !allowed.includes(cd.cardType)) continue;
             } else if (!charmedFrei) {
-              let isInherent = this.cardHasInherentAction(playerIdx, hi, cd, { heroOwner: oppIdx, charmedOwner: oppIdx });
+              let isInherent = this.cardHasInherentAction(playerIdx, hi, cd, { heroOwner: oppIdx, charmedOwner: oppIdx, ...(nurKopie != null ? { handIndex: nurKopie } : {}) });   // Als Ruling (Al 26.10.): je Kopie
               if (!isInherent && cd.cardType === 'Attack' && hero.statuses?.berserked
                   && hero._berserkChargeUsedTurn !== gs.turn) isInherent = true;
               if (!isInherent && !this.findAdditionalActionForCard(playerIdx, cd.name, hi, oppIdx)) continue;
             }
           }
           if (isMainPhase && !charmedFrei) {
-            let isInherent = this.cardHasInherentAction(playerIdx, hi, cd, { heroOwner: oppIdx, charmedOwner: oppIdx });
+            let isInherent = this.cardHasInherentAction(playerIdx, hi, cd, { heroOwner: oppIdx, charmedOwner: oppIdx, ...(nurKopie != null ? { handIndex: nurKopie } : {}) });   // Als Ruling (Al 26.10.): je Kopie
             if (!isInherent && cd.cardType === 'Attack' && hero.statuses?.berserked
                 && hero._berserkChargeUsedTurn !== gs.turn) isInherent = true;
             if (!isInherent && !this.findAdditionalActionForCard(playerIdx, cd.name, hi, oppIdx)) continue;
@@ -24460,9 +24464,10 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * ★ W16a (Frage 5): Handkopien (Spell/Attack), deren Stufe NUR für diese Kopie gilt und von den Schwesterkopien gleichen Namens abweicht: Rabatt je Handindex
+   * ★ W16a (Frage 5): Handkopien (Spell/Attack; seit 26.10. auch Creature), deren Stufe NUR für diese Kopie gilt und von den Schwesterkopien gleichen Namens abweicht: Rabatt je Handindex
    * (`_handLevelOffsets`, `_handLevelOffsetsTransient`) oder Stufen-Setzung der Instanz (`levelSet`). Nur Namen mit ≥ 2 Kopien in der Hand zählen — bei einer einzigen Kopie
    * ist die Namensliste schon exakt. Liefert [{ name, idx }] für ALLE Kopien dieser Namen.
+   * Als Ruling (Al 26.10.): „Rocky Slime reduziert nur das Level einer einzelnen Kopie!" — auch Kreaturen leuchten/spielen je Kopie (`kopien`-Block des Clients).
    */
   _kopienMitSonderstufe(playerIdx) {
     const ps = this.gs.players[playerIdx];
@@ -24476,7 +24481,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const out = [];
     for (const [name, idxs] of Object.entries(proName)) {
       const cd = db[name];
-      if (idxs.length < 2 || (cd?.cardType !== 'Spell' && cd?.cardType !== 'Attack')) continue;
+      if (idxs.length < 2 || (cd?.cardType !== 'Spell' && cd?.cardType !== 'Attack' && cd?.cardType !== 'Creature')) continue;
       const sonder = idxs.some(i => (off && off[i]) || (trans && trans[i]) || this._handLevelSetFor(playerIdx, name, i) != null);
       if (sonder) for (const idx of idxs) out.push({ name, idx });
     }
@@ -41954,6 +41959,38 @@ this._deathWatch = (this._deathWatchStack || []).length
     });
   }
 
+  /**
+   * ★ Als Ruling (Al 26.10., Hydra Blood Arrow × alle True-Damage-Quellen: „Diese können Hydra Blood Arrow schlicht nicht aktivieren."): ist der Schaden dieser Attack
+   * NICHT reduzierbar („cannot be reduced", True Damage)? EIN Prädikat für beide Zeitpunkte — wer es braucht (`_arrows-shared`: Hydra Blood Arrow), fragt nur hier, nicht je Quelle:
+   *   • `ctx.link` (Kettenfenster, Initialglied der Attack): die Arrows-Fenster öffnen VOR der Zielwahl, also zählt, was schon vorher feststeht — das Skript der Attack
+   *     (`attackDamageCannotBeReduced: true`: Surefire Shot; Clash of Champions trägt es künftig ebenso), Ausrüstung des Angreifers mit `attackerDamageCannotBeReduced: true`
+   *     (Club of Gobbo; ruht nicht, solange `isCardPassiveDormant` verneint) und ein bereitstehender Elixir of Strength (`empowered_strike`) — der Elixir feuert nur bei GENAU
+   *     einem Ziel, bei Attacks, die mehrere treffen können (`hitsMultipleTargets`: Whirlwind Strike, Ricochet), bleibt es beim Treffer-Rückfall unten.
+   *   • `ctx.hookCtx` (der einzelne Treffer — Heldenzweig: hookCtx von `_actionDealDamageImpl`/`actionDealTrueDamage`, Kreaturenzweig: Proxy des Batch-Eintrags): `cannotBeReduced`,
+   *     `trueDamage` oder `_unreduzierbar`. Rückfall für alles, was erst NACH der Zielwahl feststeht (Tempeste/Prophecy of Tempeste als Ziel, Gigantisaur Brachion, Monia-Bot-Umleitung,
+   *     Elixir/Club im Mehrzielfall) und für eine schon scharfe Hydra (verschachtelte Treffer): ein unreduzierbarer Treffer wird nie auf 0 gesenkt, je Treffer (gemischte Ziele).
+   */
+  _attackSchadenUnreduzierbar(ctx = {}) {
+    const h = ctx?.hookCtx;
+    if (h && (h.cannotBeReduced || h.trueDamage || h._unreduzierbar)) return true;
+    const link = ctx?.link;
+    if (!link) return false;
+    const script = loadCardEffect(link.cardName);
+    if (script?.attackDamageCannotBeReduced) return true;
+    const seite = link.casterOwner ?? link.owner;
+    const hi = link.heroIdx;
+    if (!Number.isInteger(hi) || hi < 0) return false;
+    const hero = this.gs.players[seite]?.heroes?.[hi];
+    if (!hero?.name) return false;
+    for (const inst of this.cardInstances) {
+      if (inst.zone !== ZONES.SUPPORT || inst.faceDown || inst.heroIdx !== hi || this.physicalSide(inst) !== seite) continue;
+      if (!loadCardEffect(inst.counters?._effectOverride || inst.name)?.attackerDamageCannotBeReduced) continue;
+      if (this.isCardPassiveDormant(inst)) continue;
+      return true;
+    }
+    return !!hero.buffs?.empowered_strike && !script?.hitsMultipleTargets;
+  }
+
   /** True if a hero object is shielded. Convenience overload for targets passed by reference. */
   _isAmeShieldedHeroObj(hero) {
     if (!hero) return false;
@@ -51920,16 +51957,18 @@ this._deathWatch = (this._deathWatchStack || []).length
    * (wandert bei Hand-Splices mit, Verfallsstempel `_handLevelOffsetsExpireTurn`) und wird NICHT mehr auf die gespielte Kopie
    * umgehängt: wer eine andere Kopie gleichen Namens klickt, bekommt keinen Rabatt (ggf. ist sie dann nicht spielbar).
    * Liefert den Handindex, auf den sich Stufenprüfung/Wisdom-Kosten beschränken, oder `null` (= „günstigste Kopie nach Namen",
-   * die alte Lesart für Namenslisten/Kreaturen): nur bei Spell/Attack mit gültigem Index, dessen Handkarte der Name ist.
+   * die Lesart für reine Namenslisten ohne Handindex): nur bei Spell/Attack/Creature mit gültigem Index, dessen Handkarte der Name ist.
+   * Als Ruling (Al 26.10.): „Rocky Slime reduziert nur das Level einer einzelnen Kopie!" — das Heldenstufen-Tor gilt auch für KREATUREN je Kopie
+   * (vorher namensweit nach der günstigsten Kopie: die ungesenkte zweite Kopie kam am Tor mit durch, weil die gesenkte es bestand).
    */
   _kopieNurIndex(handArr, cardData, handIdx) {
     if (!Number.isInteger(handIdx) || handIdx < 0 || !Array.isArray(handArr)) return null;
-    if (cardData?.cardType !== 'Spell' && cardData?.cardType !== 'Attack') return null;
+    if (cardData?.cardType !== 'Spell' && cardData?.cardType !== 'Attack' && cardData?.cardType !== 'Creature') return null;
     return handArr[handIdx] === cardData.name ? handIdx : null;
   }
 
   /**
-   * ★ W15b (C2): darf GENAU diese Handkopie (Spell/Attack) die Stufenprüfung bestehen? Für Auswahlwege, die nur eine Namensliste
+   * ★ W15b (C2): darf GENAU diese Handkopie (Spell/Attack; seit 26.10. auch Creature) die Stufenprüfung bestehen? Für Auswahlwege, die nur eine Namensliste
    * kennen (Zusatzaktion `heroAction`, CPU-Wahl): ändert nichts, solange die Namensprüfung ohnehin scheitert oder die Karte
    * den Wirker-Bypass hat (Wolflesia/Heart-Shaped Bows) oder ein geliehener Held spielt — verweigert nur die Kopie, die allein
    * wegen des Rabatts einer ANDEREN Kopie durchkäme.
@@ -52036,6 +52075,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       let bestOffset = 0;
       // ★ W15b (Al, C2: „exakt die geklickte/ausgewählte Karte"): kommt `opts.handIdx` mit, zählt bei Spells/Attacks NUR der
       // Rabatt dieser einen Kopie (Divine Gift of Magic, Fiona); ohne Index bleibt es bei „günstigste Kopie nach Namen".
+      // Als Ruling (Al 26.10.): „Rocky Slime reduziert nur das Level einer einzelnen Kopie!" — dasselbe gilt jetzt auch für KREATUREN (`_kopieNurIndex`):
+      // die ungesenkte Zweitkopie kommt nicht mehr durch das Heldenstufen-Tor, nur weil die gesenkte es besteht.
       const _nurKopie_lvr = this._kopieNurIndex(handArr_lvr, cardData, opts.handIdx);
       // Als Ruling (Al 26.10.): „Bear Rider und Slime sollen sich addieren." Der dauerhafte Abzug (`_handLevelOffsets`: Rocky Slime, Tobi) und der
       // transiente (`_handLevelOffsetsTransient`: Bear Rider, Sparkfly Queen, Divine Gift of Magic …) DERSELBEN Handkopie zählen als SUMME (vorher
@@ -55537,7 +55578,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         const armiert = typeof e.multiplyAmount === 'function';
         // R-4 (Als Ruling Al 26.10., „Angleichen"): True Damage („cannot be reduced") wird von Hydra Blood Arrow auch auf Kreaturen NICHT auf 0 gesenkt — wie im Heldenzweig
         // (`actionDealTrueDamage`); der Gift-Zuschlag nach dem Treffer bleibt.
-        const proxy = { amount: armiert ? e._base : e.amount, type: e.type, cancelled: false, _kettenFolge: !!e.kettenFolge, _unreduzierbar: e.trueDamage === true };   // W49a: Ricochet-Folgetreffer ohne Pfeil-Bonus
+        // R5 (Als Ruling Al 26.10.): Hydra Blood Arrow senkt keinen unreduzierbaren Treffer (`engine._attackSchadenUnreduzierbar`) — auch nicht, was ein Hook am Eintrag als `cannotBeReduced` gestempelt hat (Club, Brachion, Dichotomy).
+        const proxy = { amount: armiert ? e._base : e.amount, type: e.type, cancelled: false, _kettenFolge: !!e.kettenFolge, _unreduzierbar: e.trueDamage === true || e.cannotBeReduced === true };   // W49a: Ricochet-Folgetreffer ohne Pfeil-Bonus
         const _pfeilVor = proxy.amount;
         applyArrowsBeforeDamage(this, e.source, e.inst, proxy);
         if (armiert) {

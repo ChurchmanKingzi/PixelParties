@@ -140,6 +140,32 @@ function eligibleSummonZones(engine, pi, cardName, opts = {}) {
 }
 
 /**
+ * Als Ruling (Al 26.10.): „Rocky Slime reduziert nur das Level einer einzelnen Kopie!" — die Handkopie von `name`, die der Held der Zone `ziel` (`{ heroIdx, owner? }`) wirklich
+ * spielen darf, und zwar die GÜNSTIGSTE (niedrigste Handstufe, bei Gleichstand die erste). Das Heldenstufen-Tor der Zonenliste (`canHeroSummon`) fragt namensweit („irgendeine
+ * Kopie genügt"); wer danach eine Kopie aus der Hand nimmt, nimmt diese und nicht die erste nach Namen.
+ * @returns {number} Handindex oder -1 (höchstens eine Kopie / keine besteht das Tor → der Aufrufer nimmt die erste Kopie wie bisher)
+ */
+function kopieFuerHeld(engine, pi, name, ziel) {
+  const ps = engine?.gs?.players?.[pi];
+  const cd = engine?._getCardDB?.()?.[name];
+  if (!ps || !cd || !ziel) return -1;
+  const idxs = [];
+  (ps.hand || []).forEach((n, i) => { if (n === name) idxs.push(i); });
+  if (idxs.length < 2) return -1;
+  const feld = ziel.owner ?? pi;
+  let beste = -1, besteStufe = Infinity;
+  for (const i of idxs) {
+    let ok = false;
+    try { ok = !!engine.heroMeetsLevelReq(feld, ziel.heroIdx, cd, { handIdx: i, ...(feld !== pi ? { levelSourcePi: pi } : {}) }); } catch { ok = false; }
+    if (!ok) continue;
+    let stufe = 0;
+    try { stufe = engine.effectiveCardLevel(cd, pi, { heroIdx: ziel.heroIdx, handIdx: i }); } catch { stufe = 0; }
+    if (stufe < besteStufe) { beste = i; besteStufe = stufe; }
+  }
+  return beste;
+}
+
+/**
  * „…you may immediately summon this Creature from your hand as an
  * additional Action": eine GANZ NORMALE Beschwoerung (Als Ruling 8.8.),
  * also tauglicher Caster Pflicht, Zone waehlbar, Entnahme ueber die
@@ -175,8 +201,12 @@ async function sofortAusHandBeschwoeren(engine, pi, name, opts = {}) {
     if (!ziel) return false;
   }
   if (typeof nachZonenwahl === 'function') await nachZonenwahl(ziel);
+  // Als Ruling (Al 26.10.): „Rocky Slime reduziert nur das Level einer einzelnen Kopie!" — `eligibleSummonZones` fragt namensweit („irgendeine Kopie genügt"), BESCHWOREN wird aber GENAU EINE Kopie:
+  // die günstigste (niedrigste Handstufe), die der gewählte Held wirklich spielen darf — nicht die erste nach Namen (sonst käme eine ungesenkte Kopie durch das Tor der gesenkten).
+  const _kopie = kopieFuerHeld(engine, pi, name, ziel);
   const inst = await engine.summonFromPile(pi, 'hand', name, ziel.heroIdx, ziel.slotIdx, {
     source: source || name, hookExtras: { _isNormalSummon: false },
+    ...(_kopie >= 0 ? { handIdx: _kopie } : {}),
     alsZusatzaktion: true,   // v1349: „as an additional Action" ist eine Aktion
     ...((ziel.owner ?? pi) !== pi ? { heldSeite: ziel.owner } : {}),
   });
@@ -277,4 +307,4 @@ function nurUnterBedingungBeschwoerbar(cd, cardName) {
   return NUR_UNTER_BEDINGUNG_TEXT.some(r => r.test(text));
 }
 
-module.exports = { nurUnterBedingungBeschwoerbar, hatOnSummonText, canHeroSummon, eligibleSummonZones, heroActionLocked, sofortAusHandBeschwoeren, heroAgiert, heroAbgegeben, beschwoerStufeOk };
+module.exports = { nurUnterBedingungBeschwoerbar, hatOnSummonText, canHeroSummon, eligibleSummonZones, heroActionLocked, sofortAusHandBeschwoeren, kopieFuerHeld, heroAgiert, heroAbgegeben, beschwoerStufeOk };

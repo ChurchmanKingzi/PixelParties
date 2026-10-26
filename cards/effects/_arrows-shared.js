@@ -99,6 +99,9 @@ const { hasCardType } = require('./_hooks');
  * @param {boolean} [opts.requireSingleTarget] - Golden Arrow only. Currently
  *   a no-op because every PP Attack resolves with a single promptDamageTarget
  *   call, but the hook is in place for when multi-target Attacks ship.
+ * @param {boolean} [opts.anyHero] - Hydra Blood Arrow: auch auf die Attack eines GEGNERISCHEN Helden.
+ * @param {boolean} [opts.blockUnreducible] - Hydra Blood Arrow (Als Ruling Al 26.10.): nicht anbieten, wenn der Schaden der
+ *   Attack unreduzierbar ist (`engine._attackSchadenUnreduzierbar`: Surefire Shot, Elixir of Strength, Club of Gobbo …).
  */
 function arrowTriggerCondition(gs, pi, engine, chainCtx, _opts = {}) {
   if (!chainCtx?.chain || chainCtx.chain.length === 0) return false;
@@ -120,6 +123,11 @@ function arrowTriggerCondition(gs, pi, engine, chainCtx, _opts = {}) {
   // Styx 28.9.: geliehener Angreifer steht auf der Brettseite `casterOwner`.
   const hero = gs.players[initial.casterOwner ?? (_opts.anyHero ? initial.owner : pi)]?.heroes?.[hiIdx];
   if (!hero?.name || hero.hp <= 0) return false;
+
+  // Als Ruling (Al 26.10.): „Eine andere Regel, die dann für ALLE True-Damage-Sources gelten soll: Diese können Hydra Blood Arrow schlicht nicht aktivieren." — ein Pfeil, der den
+  // Schaden auf 0 SENKT (`opts.blockUnreducible`, Hydra Blood Arrow), wird nicht angeboten, wenn der Schaden der Attack unreduzierbar ist (Surefire Shot, Elixir of Strength, Club of Gobbo …;
+  // EIN Prädikat: `engine._attackSchadenUnreduzierbar`). Das Fenster öffnet VOR der Zielwahl: was erst das Ziel unreduzierbar macht, fängt `applyArrowsBeforeDamage` je Treffer ab.
+  if (_opts.blockUnreducible && engine?._attackSchadenUnreduzierbar?.({ link: initial })) return false;
 
   // Future multi-target gate for Golden Arrow. Left intentionally true —
   // see header comment.
@@ -224,7 +232,9 @@ function applyArrowsBeforeDamage(engine, source, target, hookCtx) {
   let zero = false;
   for (const arrow of hero._armedArrows) {
     if (typeof arrow.flatDamage === 'number') flat += arrow.flatDamage;
-    if (arrow.setAmount0 && !hookCtx._unreduzierbar) zero = true;   // B2/E4: True Damage („cannot be reduced") wird nicht auf 0 gesenkt
+    // B2/E4 + R5 (Als Ruling Al 26.10.): ein unreduzierbarer Treffer („cannot be reduced": True Damage, Elixir, Club, Tempeste als Ziel …) wird nie auf 0 gesenkt (`engine._attackSchadenUnreduzierbar`).
+    // Rückfall je Treffer: das Angebot (`arrowTriggerCondition`, `blockUnreducible`) erkennt vor der Zielwahl nur, was am Angreifer/an der Karte hängt.
+    if (arrow.setAmount0 && !engine._attackSchadenUnreduzierbar?.({ hookCtx })) zero = true;
   }
 
   // W49a (Ricochet, Folgetreffer): der Betrag steht fest („half as much as the previous one") — der Pfeil-Bonus steckt schon im Vorgaenger.

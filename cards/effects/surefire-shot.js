@@ -35,6 +35,8 @@ module.exports = {
   // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an —
   // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
   blockedByDamageLock: true,
+  // ★ Als Ruling (Al 26.10.): True Damage kann Hydra Blood Arrow nicht aktivieren — der Schaden ist unreduzierbar (`engine._attackSchadenUnreduzierbar`, Arrows-Fenster).
+  attackDamageCannotBeReduced: true,
   requiresTarget: true,
   ignoresTargetingRestrictions: true,
   opponentCannotReact: true,

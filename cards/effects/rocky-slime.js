@@ -41,6 +41,13 @@
 //
 //  Hard once-per-turn so Reincarnation /
 //  Necromancy re-summons can't re-fire.
+//
+//  Als Ruling (Al 26.10.): „Rocky Slime reduziert nur das Level einer
+//  einzelnen Kopie!" — der Abzug hängt am Handindex GENAU der gewählten
+//  Kopie und gilt nur für sie. Hat man zwei Kopien derselben Kreatur auf
+//  der Hand, darf nur die gesenkte die niedrigere Stufe nutzen (Heldenstufen-
+//  Tor, Wisdom-/Divinity-Deckung und Zusatzaktion je Kopie: `engine._kopieNurIndex`);
+//  die ungesenkte Kopie braucht ihre eigene (höhere) Stufe.
 // ═══════════════════════════════════════════
 
 const { isPileCreature, hasCardType, hasNumericCreatureLevel } = require('./_hooks');

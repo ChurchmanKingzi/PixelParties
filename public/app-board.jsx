@@ -39720,19 +39720,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const ACTION_TYPES = ['Attack', 'Spell', 'Creature'];
 
   // Check if a creature can be played on ANY hero (level/spell school reqs + free zone)
-  const canCreatureBePlayed = (card) => {
+  // Als Ruling (Al 26.10.): `handIdx` = die konkrete Handkopie — Rocky Slime reduziert nur eine einzelne Kopie, also leuchtet/graut jede Kopie nach IHRER Stufe (ohne Index: irgendeine Kopie).
+  const canCreatureBePlayed = (card, handIdx) => {
     if (!card || card.cardType !== 'Creature') return false;
     // heroPlayableCards already includes free support zone check for creatures
-    if ([0,1,2].some(hi => canHeroPlayCard(me, hi, card))) return true;
+    if ([0,1,2].some(hi => canHeroPlayCard(me, hi, card, handIdx))) return true;
     // Styx 28.9.: auch ueber geliehene Helden (Server meldet sie in
     // `heroPlayableCards.charmed`) — sonst blieb die Handkarte gedimmt.
-    return (opp.heroes || []).some((h, hi) => h?.charmedBy === myIdx && canHeroPlayCard(opp, hi, card));
+    return (opp.heroes || []).some((h, hi) => h?.charmedBy === myIdx && canHeroPlayCard(opp, hi, card, handIdx));
   };
 
   // Check if a Spell or Attack can be used by ANY hero (level/spell school reqs, no zone needed)
   const canActionCardBePlayed = (card, handIdx) => {
     if (!card) return false;
-    if (card.cardType === 'Creature') return canCreatureBePlayed(card);
+    if (card.cardType === 'Creature') return canCreatureBePlayed(card, handIdx);
     // Spells and Attacks: just need a hero that meets spell school requirements
     if ([0,1,2].some(hi => canHeroPlayCard(me, hi, card, handIdx))) return true;
     // Also check charmed opponent heroes
@@ -40709,7 +40710,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     return -1;
   };
 
-  const canHeroNormalSummon = (playerData, heroIdx, card) => {
+  // Als Ruling (Al 26.10.): „Rocky Slime reduziert nur das Level einer einzelnen Kopie!" — `handIdx` (optional) = die gezogene/geklickte Handkopie: dann gilt NUR deren Stufe
+  // (Handstufen-Abzüge und gesetzte Stufe dieser einen Kopie), nicht die günstigste Kopie des Namens. Ohne Index (Namenslisten) gilt weiter „irgendeine Kopie".
+  const canHeroNormalSummon = (playerData, heroIdx, card, handIdx) => {
     if (!card || card.cardType !== 'Creature') return false;
     // Inherit the server's full eligibility pipeline (level/school,
     // free zone, summon lock, action economy, AND per-Hero canSummon
@@ -40722,7 +40725,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // "stricter sibling" level/school checks below stay in place
     // because they exclude card-side placement bypass paths
     // (Deepsea bounce-place) that canHeroPlayCard accepts.
-    if (!canHeroPlayCard(playerData, heroIdx, card)) return false;
+    if (!canHeroPlayCard(playerData, heroIdx, card, handIdx)) return false;
     const hero = playerData.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.bound) return false;
@@ -40739,11 +40742,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // meaningful for the own player — the charmed-summon path calls this
     // with `me` too, so the opponent's side does not need its own delta.
     let rawLevel = card.level || 0;
-    // 23.10.: absolut gesetzte Stufe einer Handkopie (Puzzle-Creator, Inconspicuous Lawn Gnome): „darf IRGENDEINE Kopie", also die niedrigste Basis unter den Kopien.
+    // Als Ruling (Al 26.10.): die EINE gezogene/geklickte Handkopie (nur eigene Hand; `me.hand[handIdx]` muss die Karte sein), sonst `null` = Namensliste („irgendeine Kopie").
+    const nurKopie = (playerData === me && Number.isInteger(handIdx) && handIdx >= 0 && (me.hand || [])[handIdx] === card.name) ? handIdx : null;
+    // 23.10.: absolut gesetzte Stufe einer Handkopie (Puzzle-Creator, Inconspicuous Lawn Gnome): ohne Index „darf IRGENDEINE Kopie", also die niedrigste Basis unter den Kopien; mit Index die dieser Kopie.
     if (playerData === me && card.name && me.handLevelSet && Object.keys(me.handLevelSet).length) {
       let beste = null;
       (me.hand || []).forEach((n, i) => {
-        if (n !== card.name) return;
+        if (n !== card.name || (nurKopie != null && i !== nurKopie)) return;
         const v = me.handLevelSet[i] ?? card.level ?? 0;
         if (beste == null || v < beste) beste = v;
       });
@@ -40768,6 +40773,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Als Ruling (Al 26.10.): dauerhafter + transienter Abzug EINER Kopie ADDIEREN sich (Spiegel von `_spielRohStufe`); über die Kopien gilt die am stärksten gesenkte.
       for (const k of new Set([...Object.keys(offsets), ...Object.keys(transient)])) {
         if (handArr[+k] !== card.name) continue;
+        if (nurKopie != null && +k !== nurKopie) continue;   // Als Ruling (Al 26.10.): nur die Abzüge DIESER Kopie (Rocky Slime reduziert nur eine einzelne Kopie)
         // Der Heldenfilter (Sparkfly Queen, Sid) bindet nur den transienten Rabatt; ein dauerhafter Abzug (Rocky Slime, Tobi) gilt für jeden Helden.
         const v = (offsets[k] || 0) + ((filter[k] != null && filter[k] !== heroIdx) ? 0 : (transient[k] || 0));
         if (v < bestOffset) bestOffset = v;
@@ -40893,11 +40899,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // least one free Support Zone for the engine's initial placement.
   // (The cross-side hint then relocates the Creature from that slot to
   // the user's chosen destination.) Returned in hero-index order.
-  const getEligibleSummoners = (cardName) => {
+  // Als Ruling (Al 26.10.): mit `handIdx` (die gezogene/geklickte Kopie) zählt die Liste JE KOPIE (`canHeroPlayCard`), ohne Index die Namensliste.
+  const getEligibleSummoners = (cardName, handIdx) => {
     const out = [];
     const ownPlayable = gameState.heroPlayableCards?.own || {};
+    const _kd = CARDS_BY_NAME[cardName];
     for (let hi = 0; hi < (me.heroes || []).length; hi++) {
-      if (!(ownPlayable[hi] || []).includes(cardName)) continue;
+      if (Number.isInteger(handIdx) && _kd ? !canHeroPlayCard(me, hi, _kd, handIdx) : !(ownPlayable[hi] || []).includes(cardName)) continue;
       const hero = me.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.bound) continue;
@@ -40913,8 +40921,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // the eventual placement through `destination` (own- or opp-side).
   // The cross-side hint relocates the Creature from the summoner's
   // initial slot to the destination after `onPlay` resolves.
-  const dispatchCrossSideSummon = (cardName, summonerHeroIdx, destination) => {
-    const currentIdx = hand.findIndex(c => c === cardName);
+  // Als Ruling (Al 26.10.): „Rocky Slime reduziert nur das Level einer einzelnen Kopie!“ — die zu spielende KOPIE bleibt die geklickte/gezogene (`handIndex`, solange sie noch dieselbe Karte ist);
+  // nur bei veraltetem Index (Hand hat sich verschoben) gilt die erste Kopie, die der Held wirklich spielen darf, zuletzt die erste nach Namen.
+  const resolveHandCopy = (cardName, handIndex, heroIdx) => {
+    if (Number.isInteger(handIndex) && handIndex >= 0 && hand[handIndex] === cardName) return handIndex;
+    const kd = CARDS_BY_NAME[cardName];
+    if (kd && heroIdx != null) {
+      const gut = hand.findIndex((c, i) => c === cardName && canHeroPlayCard(me, heroIdx, kd, i));
+      if (gut >= 0) return gut;
+    }
+    return hand.findIndex(c => c === cardName);
+  };
+  const dispatchCrossSideSummon = (cardName, summonerHeroIdx, destination, handIndex) => {
+    const currentIdx = resolveHandCopy(cardName, handIndex, summonerHeroIdx);
     if (currentIdx < 0) return;
     const summonerSlot = findFreeSupportSlot(me, summonerHeroIdx);
     if (summonerSlot < 0) return;
@@ -40959,10 +40978,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       ppSendePromptAntwort(gameState, { cardName, handIndex: aktuell, heroIdx: destination.heroIdx, zoneSlot: destination.slotIdx });
       return;
     }
-    const eligible = getEligibleSummoners(cardName);
+    const eligible = getEligibleSummoners(cardName, handIndex);
     if (eligible.length === 0) return;
     if (eligible.length === 1) {
-      dispatchCrossSideSummon(cardName, eligible[0], destination);
+      dispatchCrossSideSummon(cardName, eligible[0], destination, handIndex);
       return;
     }
     setSummonerPick({ cardName, handIndex, card, destination, eligibleSummoners: eligible });
@@ -41695,7 +41714,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       && geliehen?.charmedBy === myIdx && geliehen.hp > 0
                       && zielCards.length === 0
                       && si < ((opp.supportZones?.[hi] || []).length || 3)
-                      && (hasBounceTargets ? canHeroNormalSummon(opp, hi, card) : canHeroPlayCard(opp, hi, card))) {
+                      && (hasBounceTargets ? canHeroNormalSummon(opp, hi, card, fromCreation ? null : idx) : canHeroPlayCard(opp, hi, card, fromCreation ? null : idx))) {
                     targetHero = hi; targetSlot = si; dropCharmedOwner = oppIdx;
                     continue;
                   }
@@ -41738,7 +41757,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                          && canShareSupportSlot(me, hi, si, card.name)) {
                   const canPlayHere = isHeroAction
                     || (crossSidePlayable && me.heroes?.[hi]?.hp > 0)
-                    || canHeroNormalSummon(me, hi, card);
+                    || canHeroNormalSummon(me, hi, card, fromCreation ? null : idx);
                   if (canPlayHere && si < ((me.supportZones[hi] || []).length || 3)) {
                     targetHero = hi; targetSlot = si;
                   }
@@ -41749,7 +41768,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // is just an address per the card's text.
                 const canPlayHere = isHeroAction
                   || (crossSidePlayable && me.heroes?.[hi]?.hp > 0)
-                  || canHeroNormalSummon(me, hi, card);
+                  || canHeroNormalSummon(me, hi, card, fromCreation ? null : idx);
                 if (!canPlayHere) continue;
                 if (si >= ((me.supportZones[hi] || []).length || 3)) continue;
                 targetHero = hi; targetSlot = si;
@@ -41787,7 +41806,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   // counts as a valid host address.
                   const canPlayHere = isHeroAction
                     || (crossSidePlayable && me.heroes?.[hi]?.hp > 0)
-                    || canHeroNormalSummon(me, hi, card);
+                    || canHeroNormalSummon(me, hi, card, fromCreation ? null : idx);
                   if (!canPlayHere) continue;
                   const supZones = me.supportZones[hi] || [];
                   let leftmost = -1;
@@ -42290,7 +42309,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           let summonEligible = [];
           if (isPlayable && card?.cardType === 'Creature') {
             for (let hi = 0; hi < (me.heroes || []).length; hi++) {
-              if (!canHeroPlayCard(me, hi, card)) continue;
+              if (!canHeroPlayCard(me, hi, card, fromCreation ? null : idx)) continue;
               const slot = findFreeSupportSlot(me, hi);
               if (slot < 0) continue;
               summonEligible.push({ idx: hi, name: me.heroes[hi].name, zoneSlot: slot });
@@ -42585,7 +42604,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // low-level / dead heroes aren't offered as targets.
               const normalTargets = [];
               for (let hi = 0; hi < (me.heroes || []).length; hi++) {
-                if (!canHeroNormalSummon(me, hi, card)) continue;
+                if (!canHeroNormalSummon(me, hi, card, fromCreation ? null : idx)) continue;
                 // W64a: geteilte Zonen (Alice) vorn, danach ALLE freien Zonen des Helden.
                 for (const sl of allSummonSlots(me, hi, cardName)) normalTargets.push({ heroIdx: hi, slotIdx: sl.slotIdx, ...(sl.shared ? { shared: true } : {}) });
               }
@@ -42594,7 +42613,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
                 const g = opp.heroes[hi];
                 if (!g?.name || g.hp <= 0 || g.charmedBy !== myIdx) continue;
-                if (!canHeroNormalSummon(opp, hi, card)) continue;
+                if (!canHeroNormalSummon(opp, hi, card, fromCreation ? null : idx)) continue;
                 const slot = findFreeSupportSlot(opp, hi);
                 if (slot < 0) continue;
                 normalTargets.push({ heroIdx: hi, slotIdx: slot, owner: oppIdx });
@@ -42617,14 +42636,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // Kann NICHT geteilt werden, bleibt alles wie bisher.
               const shareTargets = [];
               for (let hi = 0; hi < (me.heroes || []).length; hi++) {
-                if (!canHeroNormalSummon(me, hi, card)) continue;
+                if (!canHeroNormalSummon(me, hi, card, fromCreation ? null : idx)) continue;
                 for (const sl of allSummonSlots(me, hi, cardName)) if (sl.shared) shareTargets.push({ heroIdx: hi, slotIdx: sl.slotIdx, shared: true });
               }
               if (shareTargets.length > 0) {
                 // W64a: ALLE freien Zonen bleiben waehlbar (nicht nur die erste je Held) — die geteilte Zone steht vorn, aber nichts wird erzwungen.
                 const freeTargets = [];
                 for (let hi = 0; hi < (me.heroes || []).length; hi++) {
-                  if (!canHeroNormalSummon(me, hi, card)) continue;
+                  if (!canHeroNormalSummon(me, hi, card, fromCreation ? null : idx)) continue;
                   for (const sl of allSummonSlots(me, hi, cardName)) if (!sl.shared) freeTargets.push({ heroIdx: hi, slotIdx: sl.slotIdx });
                 }
                 setPendingBouncePick({
@@ -42636,7 +42655,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               }
               const eligible = [];
               for (let hi = 0; hi < (me.heroes || []).length; hi++) {
-                if (!canHeroPlayCard(me, hi, card)) continue;
+                if (!canHeroPlayCard(me, hi, card, fromCreation ? null : idx)) continue;
                 // Kein freier Platz, aber ein teilbarer? Dann diesen
                 // nehmen — sonst faellt der Held hier ganz heraus.
                 let slot = findFreeSupportSlot(me, hi);
@@ -42652,7 +42671,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
                 const geliehen = opp.heroes[hi];
                 if (geliehen?.charmedBy !== myIdx || geliehen.hp <= 0) continue;
-                if (!canHeroPlayCard(opp, hi, card)) continue;
+                if (!canHeroPlayCard(opp, hi, card, fromCreation ? null : idx)) continue;
                 const frei = findFreeSupportSlot(opp, hi);
                 if (frei < 0) continue;
                 eligible.push({ idx: hi, name: geliehen.name, zoneSlot: frei, charmedOwner: oppIdx });
@@ -42993,7 +43012,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             _attachHeroIdx = prev.targetHero;
             _attachOwner = prev.targetAttachOwner;
             // Als Vorgabe 29.9.: ein geliehener Held als Wirker (Charme-Liste).
-            const _geliehenKannWirken = (hi) => opp.heroes?.[hi]?.charmedBy === myIdx && canHeroPlayCard(opp, hi, prev.card);
+            // Als Ruling (Al 26.10.): je Handkopie (`prev.idx`) — wie der Ziehweg; Vorrats-Karten (`fromCreation`) bleiben bei der Namensliste.
+            const _kopieIdx = prev.fromCreation ? null : prev.idx;
+            const _geliehenKannWirken = (hi) => opp.heroes?.[hi]?.charmedBy === myIdx && canHeroPlayCard(opp, hi, prev.card, _kopieIdx);
             // v651: liegt das Ziel beim Gegner, ist der Empfaenger kein
             // Caster — der Wirker ist der erste eigene Held, der die Karte
             // wirken darf. Als Vorgabe 29.9.: ist das Ziel ein GELIEHENER
@@ -43001,9 +43022,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // Nutzer"); sonst ein eigener, notfalls ein anderer geliehener.
             if (_attachOwner != null && _attachOwner !== myIdx) {
               if (_geliehenKannWirken(prev.targetHero)) { _casterIdx = prev.targetHero; _casterCharmedOwner = oppIdx; }
-              else _casterIdx = [0, 1, 2].find(hi => canHeroPlayCard(me, hi, prev.card));
-            } else if (!canHeroPlayCard(me, _casterIdx, prev.card)) {
-              _casterIdx = [0, 1, 2].find(hi => canHeroPlayCard(me, hi, prev.card));
+              else _casterIdx = [0, 1, 2].find(hi => canHeroPlayCard(me, hi, prev.card, _kopieIdx));
+            } else if (!canHeroPlayCard(me, _casterIdx, prev.card, _kopieIdx)) {
+              _casterIdx = [0, 1, 2].find(hi => canHeroPlayCard(me, hi, prev.card, _kopieIdx));
             }
             if (_casterIdx == null && prev.charmedOwner == null) {
               const g = [0, 1, 2].find(_geliehenKannWirken);
@@ -55369,7 +55390,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 : ((gameState.effectPrompt.heroIndicesByCard || {})[playDrag.card.name] || []).includes(i));
           const creatureIneligible = !isOpp && playDrag && playDrag.card?.cardType === 'Creature' && !playDrag.isEquip && (() => {
             if (heroActionEligibleHere) return findFreeSupportSlot(p, i) < 0;
-            if (!canHeroPlayCard(p, i, playDrag.card)) return true;
+            if (!canHeroPlayCard(p, i, playDrag.card, playDrag.fromCreation ? null : playDrag.idx)) return true;
             if (findFreeSupportSlot(p, i) < 0) return true;
             return false;
           })();
@@ -56975,7 +56996,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       // any alive own Hero's empty Support Zone, regardless
                       // of whether THAT hero could normally summon the card.
                       || (_isCrossSideCreatureDrag && me.heroes?.[i]?.hp > 0)
-                      || canHeroNormalSummon(me, i, playDrag.card)
+                      || canHeroNormalSummon(me, i, playDrag.card, playDrag.fromCreation ? null : playDrag.idx)
                     )
                   )
                 : canPlayHere;
@@ -57277,10 +57298,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     // placement. Clear the pick state so the highlights
                     // disappear. handIndex is stale after hand shifts
                     // (draws / returns) — resolve by name so the right
-                    // copy plays.
+                    // copy plays. Als Ruling (Al 26.10.): die GEKLICKTE Kopie bleibt gueltig, solange sie noch dieselbe Karte ist.
                     const ps = pendingBouncePick;
                     setPendingBouncePick(null);
-                    const currentIdx = hand.findIndex(c => c === ps.cardName);
+                    const currentIdx = ps.fromCreation ? hand.findIndex(c => c === ps.cardName) : resolveHandCopy(ps.cardName, ps.handIndex, i);
                     if (currentIdx < 0) return;
                     socket.emit('play_creature', {
                       roomId: gameState.roomId, cardName: ps.cardName,
@@ -61506,7 +61527,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   onClick={() => {
                     const pick = summonerPick;
                     setSummonerPick(null);
-                    dispatchCrossSideSummon(pick.cardName, hi, pick.destination);
+                    dispatchCrossSideSummon(pick.cardName, hi, pick.destination, pick.handIndex);
                   }}>
                   {h?.name || 'Hero ' + (hi + 1)}
                 </button>

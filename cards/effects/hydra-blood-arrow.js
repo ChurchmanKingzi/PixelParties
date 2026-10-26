@@ -14,6 +14,16 @@
 //  Helden ausgelöst werden (`anyHero`; Schaden 0, Gift am Ziel der Attack,
 //  Quelle des Gifts = Spieler des Pfeils).
 //
+//  Als Ruling (Al 26.10.): „Eine andere Regel, die dann für ALLE True-Damage-
+//  Sources gelten soll: Diese können Hydra Blood Arrow schlicht nicht aktivieren."
+//  Der Pfeil wird NICHT angeboten (auch nicht der CPU), wenn der Schaden der
+//  Attack unreduzierbar ist („cannot be reduced"): Surefire Shot, ein mit Elixir
+//  of Strength verstärkter Treffer, Club of Gobbo am Angreifer — EIN Prädikat,
+//  `engine._attackSchadenUnreduzierbar` (Option `blockUnreducible` der Bedingung).
+//  Das Fenster öffnet VOR der Zielwahl; was erst das Ziel unreduzierbar macht
+//  (Tempeste, Gigantisaur Brachion …), fängt `applyArrowsBeforeDamage` je Treffer ab:
+//  ein unreduzierbarer Treffer wird nie auf 0 gesenkt (der Pfeil ist dann verbraucht).
+//
 //  Implementation detail: the "would have dealt"
 //  amount is the post-flat-bump but pre-zero
 //  value — so if an Angelfeather Arrow chained
@@ -36,7 +46,7 @@ module.exports = {
   canActivate: () => false,
 
   reactionCondition: (gs, pi, engine, chainCtx) =>
-    arrowTriggerCondition(gs, pi, engine, chainCtx, { anyHero: true }),
+    arrowTriggerCondition(gs, pi, engine, chainCtx, { anyHero: true, blockUnreducible: true }),
 
   resolve: async (engine, pi, _sel, _val, chain, _idx) => {
     armAttackerWithArrow(engine, pi, chain, {

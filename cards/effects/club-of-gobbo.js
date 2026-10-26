@@ -45,6 +45,9 @@ function vomEigenenHelden(ctx, sourceOwner, sourceHeroIdx, quelle) {
 
 module.exports = {
   activeIn: ['support'],
+  // ★ Als Ruling (Al 26.10.): unreduzierbarer Attack-Schaden kann Hydra Blood Arrow nicht aktivieren — der Träger gilt schon im Arrows-Fenster (vor der Zielwahl) als Quelle
+  // (`engine._attackSchadenUnreduzierbar`); die Klammer selbst setzen weiter die Hooks unten gegen Ziele der Gegenseite.
+  attackerDamageCannotBeReduced: true,
 
   hooks: {
     /** Ausgeruestet: +30 ATK. */
