@@ -22,7 +22,9 @@
 //     (einmalig; danach nichts mehr, auch kein Reset).
 //  ③ „immediately defeat the chosen target": im selben Moment (Zugbeginn) über den Kill-Baustein `engine.actionDefeat(…, { wirkungsSchutz: true })` — Helden: normale Heldentod-
 //     Pipeline (Siegbedingung inklusive), Kreaturen: `actionDestroyCard` mit allen Todes-Triggern. Effekt-Schutz (Immunität, Resistance, Gate …) gilt, Schadens-Schutz nicht.
-//     Verfallener Plan (Ziel zwischendurch anders besiegt/vom Brett, Held besiegt, Pythia vom Brett): Pythia zählt weiter, am Ende passiert nichts.
+//     Verfallener Plan (Kreatur zwischendurch besiegt/vom Brett — eine wiederbelebte Kreatur ist eine neue Instanz —, Pythia vom Brett): Pythia zählt weiter, am Ende passiert nichts.
+//     HELDEN behalten Plan und Marke über Tod und Wiederbelebung (Al): beim dritten Zähler stirbt der Held, falls er dann nicht gerade tot ist; war er zwischendurch tot und
+//     wurde wiederbelebt, trifft es ihn trotzdem. Ist er beim dritten Zähler tot, passiert nichts (der Plan ist verbraucht).
 //  ④ „When this Creature would be defeated, you may sacrifice another target you control to fully heal its HP instead": Engine-Vertrag `selfPreDefeat` (siehe
 //     `_checkCreaturePreDefeatHandReactions`), gilt für Schaden, Zerstörung und Insta-Kill-Effekte; NICHT für ein Opfer als Kosten (dort entscheidet der Spieler selbst) und
 //     nicht für das unaufhaltsame Besiegen. „Target" wörtlich: Helden UND Kreaturen, die man kontrolliert, außer Pythia selbst (Annahme, Al entscheidet). Das Opfer wird WIRKLICH
@@ -92,8 +94,8 @@ function zielWert(engine, t) {
 async function urteil(engine, inst) {
   const plan = inst.counters?.[P.PLAN];
   const pi = inst.controller ?? inst.owner;
-  const z = P.zielVon(engine, plan);
-  if (!z) {                                  // Ziel zwischendurch weg: nichts passiert
+  const z = P.zielVon(engine, plan);          // nur ein LEBENDES Ziel: ist der Held jetzt gerade tot, passiert nichts (er behielt den Plan nur bis hierher)
+  if (!z) {                                  // Ziel zwischendurch weg bzw. gerade tot: nichts passiert
     delete inst.counters[P.PLAN];
     engine.log('pythia_fizzle', { player: engine.gs.players[pi]?.username, target: plan?.cardName || null });
     engine.sync();

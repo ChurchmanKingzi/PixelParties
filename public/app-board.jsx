@@ -54192,7 +54192,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (step < chainPickMaxTargets) {
       for (const t of allTargets) {
         if (chainPickSelectedIds.has(t.id)) continue;
-        if (chainPickSteps && !(chainPickSteps[step].ids || []).includes(t.id)) continue;
+        if (chainPickSteps) {
+          // `byPrev` (Backstab: Ziel muss demselben Spieler gehören wie der Angreifer): die Liste dieses Schritts hängt vom Klick davor ab.
+          const sp = chainPickSteps[step];
+          const erlaubt = (sp.byPrev && step > 0) ? (sp.byPrev[chainPickSelected[step - 1]?.id] || []) : (sp.ids || []);
+          if (!erlaubt.includes(t.id)) continue;
+        }
         // Heroes-first: if there are unselected heroes, only heroes are valid
         if (chainPickHeroesFirst) {
           const unselectedHeroes = allTargets.filter(x => x.type === 'hero' && !chainPickSelectedIds.has(x.id));
