@@ -7,13 +7,25 @@
 //  target for the Spell to hit afterwards.
 //
 //  The second cast skips costs but applies all
-//  effects including recoil. Works generically
-//  with all current and future Destruction Spells.
+//  effects including recoil (W75a: je ein Recoil nach
+//  JEDEM Schaden, also auch nach dem Zweitwurf — Fire
+//  Bolts ruft seinen Recoil selbst direkt nach dem
+//  Schaden). Works generically with all current and
+//  future Destruction Spells.
+//
+//  Ausnahmen am Spell-Skript (deklarativ gelesen):
+//    neverMultiTarget: true       — Karte darf nie mehr als 1 Ziel treffen (Basketskull)
+//    opponentChoosesTarget: true  — der GEGNER waehlt das Ziel (Big Oopsie)
+//    fixedTargetCount: true       — die Zahl der Ziele legt der Kartentext fest (Chain Lightning: 3 Ziele, auch wenn nur 1 getroffen wurde) (W75b)
+//
+//  W75b: das Angebot kommt nur, wenn der Spell im Zweitwurf mindestens ein LEGALES zweites Ziel haette
+//  (`engine.zweitwurfHatLegalesZiel`: Trockenlauf der Zielsammlung des Spells — z. B. Frost Breaker braucht ein zweites GEFRORENES Ziel).
+//
+//  W76a (Al): „exakt 1 Ziel" (Anzahl verschiedener getroffener Ziele laut Wurfprotokoll), das zweite Ziel ist NIE das erste (Ausschluss in ALLEN Zielwählern),
+//  der Zweitwurf trifft genau EIN weiteres Ziel. Die Logik liegt im gemeinsamen Baustein `_second-target-shared.js` (Bartas, Grisgar, Andras).
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
-
-const { loadCardEffect } = require('./_loader');
+const { zweitzielAngebot } = require('./_second-target-shared');
 
 module.exports = {
   // CPU: confirm this Hero's beneficial "you may" prompt — the default brain
@@ -30,137 +42,10 @@ module.exports = {
   activeIn: ['hero'],
 
   hooks: {
-    afterSpellResolved: async (ctx) => {
-      const engine = ctx._engine;
-      const gs = ctx.gameState;
-      const pi = ctx.cardOwner;
-      const heroIdx = ctx.cardHeroIdx;
-      // Styx 28.9.: Held/Zonen auf der Brettseite `feld`, „du" = Kontrolleur `pi`.
-      const feld = ctx.cardHeroOwner ?? pi;
-
-      // Only trigger for spells cast BY this hero (Brettseite + Index)
-      if ((ctx.heroOwner ?? ctx.casterIdx) !== feld || ctx.heroIdx !== heroIdx) return;
-
-      // Don't trigger on a second cast (prevent infinite loop)
-      if (ctx.isSecondCast) return;
-
-      // Don't trigger if the spell was negated by a surprise or post-target reaction
-      if (gs._spellNegatedByEffect) {
-        return;
-      }
-
-      // Check Bartas is still alive and capable
-      const ps = gs.players[pi];
-      const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
-      if (!hero?.name || hero.hp <= 0) return;
-      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
-
-      // Check spell is a Normal Destruction Magic Spell
-      const spellData = ctx.spellCardData;
-      if (!spellData) return;
-      if (!hasCardType(spellData, 'Spell')) return;
-      if ((spellData.subtype || '').toLowerCase() !== 'normal') return;
-      if (spellData.spellSchool1 !== 'Destruction Magic' && spellData.spellSchool2 !== 'Destruction Magic') return;
-
-      // Check exactly 1 opponent target was hit
-      const targets = ctx.damageTargets || [];
-      if (targets.length !== 1) return;
-      // Karten, die ausdruecklich nie mehr als 1 Ziel treffen duerfen
-      // (Basketskull), sind von Bartas' Zweitziel ausgenommen
-      // (Als Hinweis 5.8.). Deklarativ ueber ein Flag am Skript, nicht
-      // ueber eine Namensliste.
-      if (loadCardEffect(ctx.spellName)?.neverMultiTarget) return;
-
-      // Check spell level < Bartas's Destruction Magic level
-      const spellLevel = spellData.level || 0;
-      const dmLevel = engine.countAbilitiesForSchool('Destruction Magic', gs.players[feld]?.abilityZones?.[heroIdx] || []);
-      if (spellLevel >= dmLevel) return;
-
-      // Check there's at least 1 OTHER valid target on the opponent's side
-      const oppIdx = engine.opponentOf(pi);
-      const firstTargetId = targets[0].id;
-      let hasOtherTarget = false;
-      // Kontrolle statt Seite (Styx 28.9.); IDs bleiben physisch.
-      for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(oppIdx)) {
-        if (!h?.name || h.hp <= 0) continue;
-        if (`hero-${physOwner}-${hi}` !== firstTargetId) { hasOtherTarget = true; break; }
-      }
-      if (!hasOtherTarget) {
-        for (const inst of engine.cardInstances) {
-          if ((inst.controller ?? inst.owner) !== oppIdx || inst.zone !== 'support') continue;
-          const cId = `equip-${engine.physicalSide(inst)}-${inst.heroIdx}-${inst.zoneSlot}`;
-          if (cId !== firstTargetId) { hasOtherTarget = true; break; }
-        }
-      }
-      if (!hasOtherTarget) return;
-
-      // Re-verify Bartas is still alive and capable right before prompting
-      // (covers edge cases where hero state changed during spell resolution)
-      if (!hero?.name || hero.hp <= 0) return;
-      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
-
-      // Prompt: "Hit a second target with [Spell name]?"
-      const confirmed = await ctx.promptConfirmEffect({
-        title: 'Bomb Berserker Bartas',
-        message: `Hit a second target with ${ctx.spellName}?`,
-      });
-      if (!confirmed) return;
-
-      engine.log('bartas_second_cast', { player: ps.username, hero: hero.name, spell: ctx.spellName });
-
-      // Set up second cast: exclude first target, mark as second cast
-      gs._spellDamageLog = [];
-      gs._spellExcludeTargets = [firstTargetId];
-      gs._bartasSecondCast = true;
-
-      // Load spell script and re-invoke onPlay
-      const spellScript = loadCardEffect(ctx.spellName);
-      if (!spellScript?.hooks?.onPlay) return;
-
-      // Create a temporary card instance for the second cast
-      const tempInst = engine._trackCard(ctx.spellName, pi, 'hand', heroIdx, -1);
-      if (feld !== pi) tempInst.heroOwner = feld;   // Styx 28.9.: wie der Server bei Uebernahme
-      // „Re-cast skips costs" (wie Grisgar, W16f): die Kosten der Karte („to play this card", z. B. Kirin Firebreath) sind beim ersten Wurf bezahlt — der zweite Treffer zahlt nicht noch einmal und fizzelt nicht, wenn nichts mehr zu zahlen ist.
-      tempInst._kostenBezahlt = true;
-
-      // ★ v1277 (Als Befund 22.9.): der Zweitguss ist KEIN neues Ausspielen
-      // der Karte — er darf die Aktionsoekonomie nicht veraendern. Fire Bolts
-      // hielt sich im Zweitguss wieder fuer den „ersten Destruction-Zauber"
-      // (die Karte liegt dann noch auf dem Stapel der laufenden Zauber und
-      // wird bewusst uebersprungen), verstaerkte sich automatisch und setzte
-      // `_spellFreeAction` erneut. Der Server hatte das Flag da schon
-      // ausgewertet — es blieb liegen, und der NAECHSTE Zauber (Phoenix
-      // Tackle in der Action Phase) wurde zur Freiaktion. Beide Aktions-
-      // Flags werden VOR diesem Hook ausgewertet; was der Zweitguss an
-      // ihnen aendert, wird deshalb auf den Stand davor zurueckgesetzt.
-      const AKTIONS_FLAGS = ['_spellFreeAction', '_spellForcesActionConsume'];
-      const flagsVorher = {};
-      for (const k of AKTIONS_FLAGS) flagsVorher[k] = gs[k];
-
-      try {
-        await engine.runHooks('onPlay', {
-          _onlyCard: tempInst, playedCard: tempInst,
-          cardName: ctx.spellName, zone: 'hand', heroIdx,
-          _skipReactionCheck: true,
-        });
-      } catch (err) {
-        console.error(`[Engine] Bartas second cast error for "${ctx.spellName}":`, err.message);
-      } finally {
-        for (const k of AKTIONS_FLAGS) {
-          if (flagsVorher[k] === undefined) delete gs[k];
-          else gs[k] = flagsVorher[k];
-        }
-      }
-
-      // Clean up temp instance
-      engine._untrackCard(tempInst.id);
-
-      // Clean up tracking (may be cleaned again by handler, that's fine)
-      delete gs._spellDamageLog;
-      delete gs._spellExcludeTargets;
-      delete gs._bartasSecondCast;
-
-      engine.sync();
-    },
+    afterSpellResolved: (ctx) => zweitzielAngebot(ctx, {
+      heldName: 'Bomb Berserker Bartas', kind: 'Spell',
+      zauberSchule: 'Destruction Magic', faehigkeit: 'Destruction Magic',
+      logTyp: 'bartas_second_cast', logFeld: 'spell',
+    }),
   },
 };

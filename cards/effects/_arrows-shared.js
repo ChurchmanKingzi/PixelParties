@@ -117,9 +117,6 @@ function arrowTriggerCondition(gs, pi, engine, chainCtx, _opts = {}) {
   if (initial.cardType !== 'Attack') return false;
   // Als Ruling (Al 26.10.): Hydra Blood Arrow („when a Hero hits …", ohne „you control") darf auf die Attack JEDES Helden auslösen (`opts.anyHero`).
   if (initial.owner !== pi && !_opts.anyHero) return false;
-  // Backstab: die Attack führt ein Held des GEGNERS aus („a Hero you control performs an Attack" trifft nicht zu) — kein Pfeil des Spielers (der Pfeil würde den spielenden eigenen Helden
-  // scharf stellen, der Schaden kommt aber vom Gegnerhelden: er verpuffte). Skript-Flagge `attackPerformedByOpponentHero`.
-  if (require('./_loader').loadCardEffect(initial.cardName)?.attackPerformedByOpponentHero) return false;
 
   // Caster hero must exist and be alive. The INITIAL link uses `heroIdx`
   // (executeCardWithChain, see _engine.js:9042); the `casterHeroIdx`

@@ -93,7 +93,8 @@ module.exports = {
         return !!cd && hasCardType(cd, 'Creature');
       });
       const quelle = { name: CARD_NAME, owner: pi, controller: pi, cardType: 'Creature', cardInstance: ich, heroIdx, heroOwner: seite };
-      await engine._mitNiederlagenSammler(async () => {
+      // Die Opfer stehen jetzt fest: keine von ihnen darf als Opfer einer Rettung dienen (Pythia).
+      await engine.mitTodgeweihten(opfer, () => engine._mitNiederlagenSammler(async () => {
         // Zerstörungs-Klammer wie Giant Exploding Skull/Troop Annihilation: „all other Creatures" fallen in EINEM Schlag, nie als Einzelzerstörung
         // (Als Ruling Al 26.10.: The Nornstellar legt bei gleichzeitigem Tod keine Karte auf den Stack — er erkennt das an der Klammer).
         engine.beginDestroyScope(opfer.length);
@@ -103,7 +104,7 @@ module.exports = {
             await engine.actionDestroyCard(quelle, c, { sourceOwner: pi, sourceName: CARD_NAME, fireCreatureDeath: true });
           }
         } finally { engine.endDestroyScope(); }
-      });
+      }));
       engine.log('cosmic_skull_blast', { player: engine.gs.players[pi]?.username, hero: heldName, defeated: opfer.length });
       engine.sync();
       await engine._delay(Math.max(0, BOOM_MS - VOR_MS));

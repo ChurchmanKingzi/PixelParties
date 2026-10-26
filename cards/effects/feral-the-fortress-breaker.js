@@ -16,6 +16,7 @@
 //  die Ablage. Nur aktivierbar, wenn eine Area liegt; „You may" — Feral braucht keine Bestätigung, der Klick ist die Entscheidung.
 //
 //  ── Bild und Klang ──────────────────────────────────────────────────────
+//  Areas räumen: die riesige Welle `tidal_wave` (Whale Race Boat) überschwemmt das ganze Spielfeld, die Areas zerplatzen darin (`pressure_shatter`), dann gehen sie in die Ablage.
 //  Wasserprojektil von Feral zum Ziel (`projectileShape: 'water'`, Pixelart, Client `WasserGeschoss`), dort platzt es in eine
 //  Wasserexplosion (`water_burst` in ANIM_REGISTRY). Klänge: Start `elem_water`, Einschlag aus ZONE_ANIM_SFX.
 // ═══════════════════════════════════════════
@@ -23,6 +24,10 @@
 const CARD_NAME = 'Feral, the Fortress Breaker';
 const DAMAGE = 100;
 const FLUG_MS = 420;       // Flugzeit des Geschosses (deckt sich mit `WasserGeschoss` im Client)
+const WELLE_MS = 2400;     // Lebensdauer von `tidal_wave` (deckt sich mit Whale Race Boat)
+const WELLE_TREFFER_MS = 760;   // Front erreicht die Mitte des Bretts
+const ZERPLATZEN_MS = 330;      // bis die Area in `pressure_shatter` zerplatzt
+const NACH_WELLE_MS = 900;      // Rest der Welle nach dem Zerplatzen
 const BURST_MS = 760;      // Länge der Wasserexplosion (deckt sich mit `water_burst`)
 
 module.exports = {
@@ -101,7 +106,21 @@ module.exports = {
     if (!hero?.name || hero.hp <= 0) return false;
     if (engine.getAreas().length === 0) return false;
 
+    // Riesige Welle (`tidal_wave`, dieselbe wie Whale Race Boat) rollt von Feral über das ganze Brett; wo sie die Areas erreicht, zerplatzen sie (`pressure_shatter`).
+    const areas = engine.getAreas();
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'tidal_wave', zoneType: 'board', owner: feld, heroIdx: -1, zoneSlot: -1,
+      duration: WELLE_MS, regionAll: true, originOwner: feld, originHeroIdx: heroIdx,
+    });
+    await engine._delay(WELLE_TREFFER_MS);
+    for (const a of areas) {
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'pressure_shatter', owner: a.owner, heroIdx: -1, zoneSlot: -1, zoneType: 'area',
+      });
+    }
+    await engine._delay(ZERPLATZEN_MS);
     const removed = await engine.removeAllAreas(-2, CARD_NAME);
+    await engine._delay(NACH_WELLE_MS);   // die Welle läuft aus
     engine.log('feral_area_sweep', { player: gs.players[pi]?.username, removed });
     engine.sync();
     return removed > 0;

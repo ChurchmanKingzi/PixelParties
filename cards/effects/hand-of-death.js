@@ -203,6 +203,7 @@ async function nachholenOhneKarte(engine) {
 
 module.exports = {
   nachholenOhneKarte,
+  neverMultiTarget: true,   // W75b: „This effect can never affect more than 1 target." — Bartas bietet keinen Zweitwurf an (Text-Waechter `scripts/check-never-multi-target.js`)
   // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).
   // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
   onFizzledPlay: ({ engine, gs, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },

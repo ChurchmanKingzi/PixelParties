@@ -311,6 +311,7 @@ module.exports = {
             c.owner === t.owner && c.zone === 'support' &&
             c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx))
           .filter(Boolean),
+        heroes: chosen.filter(t => t.type === 'hero'),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
         source, amount: dmg, type: 'destruction_spell', sourceOwner: ownerIdx,
       });
       try {

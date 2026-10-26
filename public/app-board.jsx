@@ -11214,7 +11214,7 @@ const UncoolSmokeEffect = (() => {
 //     schnellt auf (200–330 ms, Überschwinger bis ~1,6 Kartenhöhen), schwingt gedämpft aus; gelbe Kreuzfunkel am Kopf, Fahrtlinien seitlich. Ab ~560 ms dithert alles weg.
 //  bounce_burst (560 ms, an der Startzone der Rückkehr): Staubring, zehn Fahrtstrahlen, Staubpixel.
 //  Flugstil `schleuder` (ppSchleuderFlug): die Karte holt kurz aus (rückwärts), wird mit viel Schwung zur Hand geschleudert (ease-out in ganzen 3-Pixel-Schritten) und federt am Ziel nach.
-//  cosmic_explosion (1000 ms, auf dem Totenkopf): weißer Blitz, ein schwarzes Dimensionsloch (gedithertes Violett am Rand, Sternenstaub darin) reißt auf und verschluckt die Karte, neun
+//  cosmic_explosion (1000 ms, auf dem Totenkopf): runder weißer Blitz (kein Kasten), ein schwarzes Dimensionsloch (gedithertes Violett am Rand, Sternenstaub darin) reißt auf und verschluckt die Karte, neun
 //     zackige Risse laufen quer über das Brett, drei Druckringe, Trümmer; ab ~720 ms schließt sich das Loch.
 //  water_burst (760 ms, auf dem Ziel): weißer Blitz, Wasserkuppel, Spritzkrone aus 22 Tropfen mit Schwerkraft, zwei Ringwellen, Schaumpixel.
 //  Wasserprojektil (`WasserGeschoss`): wabbelnde Wasserkugel mit Tropfenschweif, Wirbelpixel und Spritzern; die Explosion am Ziel ist `water_burst`.
@@ -11333,11 +11333,6 @@ const CosmicExplosionEffect = (() => {
     const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
     const aus = t > 880 ? Math.max(0, 1 - (t - 880) / 120) : 1;
     if (aus <= 0) return;
-    // Blitzraster über der ganzen Fläche
-    if (t < 130) {
-      const a = (1 - t / 130) * 0.55;
-      for (let Y = 0; Y < sz.gh; Y++) for (let X = 0; X < sz.gw; X++) if (ppBayer(X, Y) < a) g.put(X, Y, P[t < 50 ? 1 : 3], 1);
-    }
     // Druckringe
     for (let i = 0; i < 3; i++) {
       const s0 = 90 + i * 120, e = (t - s0) / 520;
@@ -11397,7 +11392,14 @@ const CosmicExplosionEffect = (() => {
       }
     }
     // Weißer Kern am Anfang
-    if (t < 160) g.block(cx - 7, cy - 7, 14, 14, t < 60 ? P[0] : P[1], 1 - t / 160);
+    if (t < 200) {                                                       // runder Blitz (kein Kasten): weißer Kern mit gedithertem Hof
+      const r = 4 + (t / 200) * 16;
+      for (let dy = -Math.ceil(r); dy <= Math.ceil(r); dy++) for (let dx = -Math.ceil(r); dx <= Math.ceil(r); dx++) {
+        const d = Math.hypot(dx, dy);
+        if (d <= r * 0.6) g.put(cx + dx, cy + dy, P[0], 1 - t / 220);
+        else if (d <= r) g.put(cx + dx, cy + dy, t < 90 ? P[1] : P[2], (1 - t / 200) * 0.6);
+      }
+    }
     // Trümmer
     if (t > 90) {
       const tt = (t - 90) / 1000;
@@ -41995,6 +41997,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         let targetSlot = -1;
         let targetAttachOwner = undefined; // v651: Zielseite eines Cross-Side-Attachments
         let targetCharmedOwner = undefined;
+        let herolosAngreifer = undefined;   // W78 (Backstab): der unter dem Zeiger gewählte Gegnerheld
         let surpriseTarget = false;
         const heroActionHeroIdx2 = heroActionPrompt?.heroIdx;
         const isAttachmentCard = (card.subtype || '').toLowerCase() === 'attachment';
@@ -42164,6 +42167,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const r = el.getBoundingClientRect();
           if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
             const hi = parseInt(el.dataset.heroIdx);
+            // ★ W78 (Backstab, Al 26.10.): eine Karte OHNE Wirker-Helden lässt sich direkt auf den GEGNERHELDEN ziehen, der die Attack ausführen soll (Liste vom Server: `herolessAngreifer`).
+            const _hlAngreifer = (me.herolessAngreifer || {})[cardName];
+            if (_hlAngreifer) {
+              const _hlOwner = el.dataset.heroOwner === 'me' ? myIdx : (myIdx === 0 ? 1 : 0);
+              if (_hlAngreifer.some(a => a.owner === _hlOwner && a.heroIdx === hi)) {
+                targetHero = hi; targetAttachOwner = _hlOwner; herolosAngreifer = { owner: _hlOwner, heroIdx: hi };
+                break;
+              }
+            }
+            // Backstab & Co. lassen sich NUR auf die ausführenden GEGNERHELDEN ziehen — nie auf einen eigenen Helden (und nicht auf einen, der nicht in der Liste steht).
+            if ((me.herolessHandCards || []).includes(cardName)) continue;
             // v651: Cross-Side-Attachment auf einen GEGNERISCHEN Helden gezogen
             if (el.dataset.heroOwner !== 'me' && isAttachmentCard) {
               const oppIdx2 = myIdx === 0 ? 1 : 0;
@@ -42212,7 +42226,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
         }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, hoverHero, hoverHeroRect, targetSlot: targetSlot, targetAttachOwner, creatureCasterSlot, creatureCasterInstId, isSpell: !surpriseTarget, isSurprise: surpriseTarget, surpriseOpp: surpriseTarget && surpriseOpp, charmedOwner: surpriseTarget ? undefined : targetCharmedOwner , fromCreation });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, hoverHero, hoverHeroRect, targetSlot: targetSlot, targetAttachOwner, herolosAngreifer, creatureCasterSlot, creatureCasterInstId, isSpell: !surpriseTarget, isSurprise: surpriseTarget, surpriseOpp: surpriseTarget && surpriseOpp, charmedOwner: surpriseTarget ? undefined : targetCharmedOwner , fromCreation });
       } else if (isAscensionPlayable) {
         // Ascended Hero drag — target hero zones with eligible base heroes
         let targetHero = -1;
@@ -42462,7 +42476,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   }
                 }
               }
-              if (eligible.length === 1) {
+              // ★ W78 (Backstab): eine Karte OHNE Wirker-Helden (`playsWithoutHero`) fragt nie nach einem Helden — der Server bucht die Aktion selbst; es genügt, dass irgendein eigener Held sie spielen könnte.
+              const _herolos = !isHeroAction && eligible.length > 0 && (me.herolessHandCards || []).includes(cardName);
+              if (eligible.length === 1 || _herolos) {
                 // During heroAction, the play has to land via the
                 // effect prompt (hero-locked: Coffee; any-hero: Hu).
                 // `play_spell` would fail server-side because no
@@ -43044,6 +43060,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // ★ Herkunft: Hand oder Crestinas Vorrat. Der Server loest
             // `handIndex` damit in der richtigen Liste auf.
             fromCreation: prev.fromCreation || undefined,
+            herolosAngreifer: prev.herolosAngreifer || undefined,   // W78 (Backstab): auf diesen Gegnerhelden gezogen
           });
           return null;
         });
@@ -51547,10 +51564,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const zielLabel = ownerLbl((destOwner ?? owner), myIdx);
       // 'hand' source flies cards out of the player's hand instead of
       // their deck pile (used by Ascension bonus when deck supply is
-      // exhausted but hand still has copies).
+      // exhausted but hand still has copies); 'discard' (W77b) out of the discard pile.
       let srcSel;
       if (source === 'hand') {
         srcSel = ownerLabel === 'me' ? '.game-hand-me' : '.game-hand-opp';
+      } else if (source === 'discard') {
+        // W77b: die Ablage ist eine Quelle des Aufstiegsbonus.
+        srcSel = ownerLabel === 'me' ? '[data-my-discard]' : '[data-opp-discard]';
       } else {
         srcSel = ownerLabel === 'me' ? '[data-my-deck]' : '[data-opp-deck]';
       }
@@ -54198,7 +54218,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const chainPickValidIds = new Set();
   const chainPickSelectedIds = new Set(chainPickSelected.map(t => t.id));
   const chainPickDamages = chainPickData?.damages || [];
-  const chainPickMaxTargets = chainPickDamages.length;
+  // ★ W78 (Backstab): `steps` = GEORDNETE Wahl mit eigener Kandidatenliste je Klick ([{ ids, label, role }]) — dieselben nummerierten Marker, Rückgängig und Bestätigen; ohne `steps` bleibt alles wie bei Chain Lightning.
+  const chainPickSteps = Array.isArray(chainPickData?.steps) ? chainPickData.steps : null;
+  const chainPickMaxTargets = chainPickSteps ? chainPickSteps.length : chainPickDamages.length;
   const chainPickHeroesFirst = chainPickData?.heroesFirst || false;
   if (chainPickData) {
     const allTargets = chainPickData.targets || [];
@@ -54207,6 +54229,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (step < chainPickMaxTargets) {
       for (const t of allTargets) {
         if (chainPickSelectedIds.has(t.id)) continue;
+        if (chainPickSteps) {
+          // `byPrev` (Backstab: Ziel muss demselben Spieler gehören wie der Angreifer): die Liste dieses Schritts hängt vom Klick davor ab.
+          const sp = chainPickSteps[step];
+          const erlaubt = (sp.byPrev && step > 0) ? (sp.byPrev[chainPickSelected[step - 1]?.id] || []) : (sp.ids || []);
+          if (!erlaubt.includes(t.id)) continue;
+        }
         // Heroes-first: if there are unselected heroes, only heroes are valid
         if (chainPickHeroesFirst) {
           const unselectedHeroes = allTargets.filter(x => x.type === 'hero' && !chainPickSelectedIds.has(x.id));
@@ -54220,6 +54248,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     chainPickSelected.length >= chainPickMaxTargets || chainPickValidIds.size === 0
   ));
   const chainPickCanConfirm = chainPickIsFinal;
+  // ★ W78 (Backstab, Al 26.10.): bei der GEORDNETEN Wahl (`steps`) statt gelber Nummernmarken Pixelrahmen — Klick 1 (der Angreifer) dunkelrot, Klick 2 (das Ziel) hellrot;
+  // wählbare Kandidaten blinken in der Farbe des Schritts, der gerade gewählt wird (`steps(1)`, kein Schein).
+  // `preset` = schon feststehende Wahl (der auf den Helden gezogene Angreifer): sie zählt als Schritt 0, die Liste `steps` beginnt dahinter.
+  const chainPickPreset = Array.isArray(chainPickData?.preset) ? chainPickData.preset : [];
+  // Al 26.10. (API-Regel „Ziel-Picker graut Nicht-Wählbares aus"): jede vorhandene Heldenkarte/Kreatur, die im aktuellen Schritt nicht wählbar ist, wird ausgegraut (`vorhanden` = dort liegt eine Karte).
+  const chainPickRolle = (id, vorhanden = false) => {
+    if (!chainPickSteps) return '';
+    if (chainPickPreset.includes(id)) return ' chain-pick-fest chain-pick-schritt0';
+    const st = chainPickSelected.findIndex(t => t.id === id);
+    if (st >= 0) return ' chain-pick-fest chain-pick-schritt' + Math.min(st + chainPickPreset.length, 1);
+    if (chainPickValidIds.has(id)) return ' chain-pick-kandidat chain-pick-schritt' + Math.min(chainPickSelected.length + chainPickPreset.length, 1);
+    return vorhanden ? ' potion-target-ineligible' : '';
+  };
 
   // Escape removes last selection, Enter confirms chain
   useEffect(() => {
@@ -54229,6 +54270,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         e.stopImmediatePropagation();
         if (chainPickSelected.length > 0) {
           setChainPickSelected(prev => prev.slice(0, -1));
+        } else if (chainPickData.cancellable) {
+          respondToPrompt({ cancelled: true });   // W78: Abbruch (Backstab: Karte zurück auf die Hand)
         }
       } else if ((e.key === 'Enter' || e.code === 'Space') && chainPickCanConfirm) {
         e.preventDefault();
@@ -55401,7 +55444,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             ? ((gameState.attachmentHostTargets || {})[playDrag.card.name] || null)
             : null;
           const _attHostsHeroOwn = _attHostsHero ? _attHostsHero.filter(h => (h.owner ?? myIdx) === myIdx) : null;
-          const spellAttackIneligible = _attHostsHeroOwn
+          // ★ W78 (Backstab): eine Karte OHNE Wirker-Helden grau alle Helden aus, die nicht in der Liste `herolessAngreifer` (ziehbare Gegnerhelden) stehen — eigene Helden nie.
+          const _hlDrag = !!(playDrag && !playDrag.isEquip && playDrag.card && (playDrag.card.cardType === 'Spell' || playDrag.card.cardType === 'Attack') && (me.herolessHandCards || []).includes(playDrag.card.name));
+          const _hlIneligible = _hlDrag && !((me.herolessAngreifer || {})[playDrag.card.name] || []).some(a => a.owner === (isOpp ? oppIdx : myIdx) && a.heroIdx === i);
+          const spellAttackIneligible = _hlDrag ? _hlIneligible : _attHostsHeroOwn
             ? !_attHostsHeroOwn.some(h => h.heroIdx === i)
             : ((!isOpp || isCharmedByMe) && playDrag && !playDrag.isEquip && (playDrag.card?.cardType === 'Spell' || playDrag.card?.cardType === 'Attack') && !heroActionEligibleHere && !canHeroPlayCard(p, i, playDrag.card, playDrag.fromCreation ? null : playDrag.idx));
           // Persistent "dragging a Surprise card" check (true throughout the
@@ -55779,11 +55825,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <div key={'lpad-'+s} className="board-zone-spacer" />
               ))}
               <div className="board-zone-spacer" />
-              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || pickHeroDropIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || pickHeroDropTarget || attachPickEligibleHero || isCsppHeroTarget || spellPickEntry) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isValidHeroTarget && accentGreenTargetIds.has(heroTargetId) ? ' potion-target-accent-green' : '') + (isIneligibleHeroTarget ? ' potion-target-ineligible' : '') + (isRedMarkedHeroTarget ? ' potion-target-marked-red' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (zielMarkeLeuchtet ? ' prompt-marked' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + ((isHeroEffectActive || klickHeilungOffen) ? ' zone-hero-effect-active' : '') + (isHeldKreaturActivatable ? ' zone-creature-activatable' : '') + (stReadyGlow && !stBonus ? ' st-actor-ready' : '') + (stBonus && !stActing ? ' st-actor-bonus' : '') + (stActing ? ' st-actor-acting' : '') + (stExhausted && !stBonus && !stActing && hero?.hp > 0 ? ' st-actor-exhausted' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '') + (isZonePickHero ? ' zone-pick-target' : '') + ((allianzHover && allianzHover.some(a => a.owner === (isOpp ? oppIdx : myIdx) && a.heroIdx === i)) ? ' zone-alliance-linked' : '')}
+              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || pickHeroDropIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || pickHeroDropTarget || attachPickEligibleHero || isCsppHeroTarget || spellPickEntry) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isValidHeroTarget && accentGreenTargetIds.has(heroTargetId) ? ' potion-target-accent-green' : '') + (isIneligibleHeroTarget ? ' potion-target-ineligible' : '') + (isRedMarkedHeroTarget ? ' potion-target-marked-red' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (zielMarkeLeuchtet ? ' prompt-marked' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + ((isHeroEffectActive || klickHeilungOffen) ? ' zone-hero-effect-active' : '') + (isHeldKreaturActivatable ? ' zone-creature-activatable' : '') + (stReadyGlow && !stBonus ? ' st-actor-ready' : '') + (stBonus && !stActing ? ' st-actor-bonus' : '') + (stActing ? ' st-actor-acting' : '') + (stExhausted && !stBonus && !stActing && hero?.hp > 0 ? ' st-actor-exhausted' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '') + chainPickRolle(heroTargetId, !!hero?.name) + (isZonePickHero ? ' zone-pick-target' : '') + ((allianzHover && allianzHover.some(a => a.owner === (isOpp ? oppIdx : myIdx) && a.heroIdx === i)) ? ' zone-alliance-linked' : '')}
                 data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
                 onClick={onHeroClick}
                 style={zsMerge('hero', { ...((isCsppHeroTarget || isHeroEffectActive || isHeldKreaturActivatable || isValidHeroTarget || isChainPickValid || attachPickEligibleHero || isZonePickHero || spellPickEntry) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#fc69c6' } : undefined) })}>
-                {isChainPickSelected && <div className="chain-pick-number">{chainPickStep + 1}</div>}
+                {isChainPickSelected && !chainPickSteps && <div className="chain-pick-number">{chainPickStep + 1}</div>}
                 {/* v718: dauerhaft uebernommener Held. Der pulsende
                     Rahmen allein sagt nur „hier stimmt etwas nicht" —
                     das Schild sagt, WEM der Held jetzt gehoert, und
@@ -57230,7 +57276,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 || brackleSourceHidden.has(`${pi}-${i}-${z}`)
                 || pusherFlungHidden.has(`${pi}-${i}-${z}`);
               return (
-                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + ((gameState.creatureCounters || {})[`${pi}-${i}-${z}`]?._zoneAura === 'necro_flicker' ? ' board-zone-aura' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && equipTargetIds.some(id => accentGreenTargetIds.has(id)) ? ' potion-target-accent-green' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isRedMarkedEquipTarget ? ' potion-target-marked-red' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + ((isAbilitySupportTarget || attachPickSupportValid) ? ' board-zone-play-target' : '') + (supportAbilityEntry && !supportAbilityFrei ? ' zone-ability-activatable' : '') + (supportAbilityEntry && supportAbilityFrei ? ' zone-ability-free-activatable' : '') + (isBorisBlockedSupportAbility ? ' zone-ability-boris-blocked' : '') + (abilityFlash && abilityFlash.zoneKind === 'support' && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z ? ' zone-ability-activated' : '') + (abilityBlockFlash && abilityBlockFlash.zoneKind === 'support' && abilityBlockFlash.owner === (isOpp ? oppIdx : myIdx) && abilityBlockFlash.heroIdx === i && abilityBlockFlash.zoneIdx === z ? ' zone-ability-blocked' : '') + (istSupportAbility && (isDead || isFrozenOrStunnedSup) ? ' board-zone-dead' : '') + ((isDragValidZoneAny || isCsppEmptySlot || isSummonPickZone) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + ((isHeroActionZoneDimmed && !isCsppEmptySlot) ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (equipStapelAnzeige ? ' board-zone-equipstack' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '') + stCreatureCls(pi, i, z)}
+                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + ((gameState.creatureCounters || {})[`${pi}-${i}-${z}`]?._zoneAura === 'necro_flicker' ? ' board-zone-aura' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && equipTargetIds.some(id => accentGreenTargetIds.has(id)) ? ' potion-target-accent-green' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isRedMarkedEquipTarget ? ' potion-target-marked-red' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + ((isAbilitySupportTarget || attachPickSupportValid) ? ' board-zone-play-target' : '') + (supportAbilityEntry && !supportAbilityFrei ? ' zone-ability-activatable' : '') + (supportAbilityEntry && supportAbilityFrei ? ' zone-ability-free-activatable' : '') + (isBorisBlockedSupportAbility ? ' zone-ability-boris-blocked' : '') + (abilityFlash && abilityFlash.zoneKind === 'support' && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z ? ' zone-ability-activated' : '') + (abilityBlockFlash && abilityBlockFlash.zoneKind === 'support' && abilityBlockFlash.owner === (isOpp ? oppIdx : myIdx) && abilityBlockFlash.heroIdx === i && abilityBlockFlash.zoneIdx === z ? ' zone-ability-blocked' : '') + (istSupportAbility && (isDead || isFrozenOrStunnedSup) ? ' board-zone-dead' : '') + ((isDragValidZoneAny || isCsppEmptySlot || isSummonPickZone) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + ((isHeroActionZoneDimmed && !isCsppEmptySlot) ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (equipStapelAnzeige ? ' board-zone-equipstack' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + chainPickRolle(creatureChainId, cards.length > 0) + (isStolen ? ' hero-charmed' : '') + stCreatureCls(pi, i, z)}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'} data-card-name={cards[0] || ''}
                   data-versiegelt={ppVerwahrung(gameState.players?.[pi], i, 'support', z).versiegelt ? '1' : undefined}
                   onClick={attachPickSupportValid ? () => {
@@ -57446,7 +57492,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     _activeLuckTooltipTarget = p.heroes[i]?._luckDeclared?.['s' + z]?.target || null;
                   } : undefined}
                   onMouseLeave={(cards || []).includes('Alliance') ? () => setAllianzHover(null) : (cards || [])[0] === 'Luck' ? () => { _activeLuckTooltipTarget = null; } : undefined}>
-                  {isChainPickCreatureSelected && <div className="chain-pick-number">{chainPickCreatureStep + 1}</div>}
+                  {isChainPickCreatureSelected && !chainPickSteps && <div className="chain-pick-number">{chainPickCreatureStep + 1}</div>}
                   {/* ★ W62a: Die Vorschau der noch nicht gelandeten Karte (Ziehen, Zusatzaktions-Wahl, Gegner setzt) ERSETZT den Platz
                       nur, wenn dort keine gleichnamige Kopie liegt. In einer geteilten Zone (Alice) bliebe sonst der vorhandene Stapel
                       fuer die Dauer der Vorschau unsichtbar — die Zone wirkte leer; dort bleibt der Stapel stehen, die neue Kopie kommt
@@ -61141,11 +61187,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           {/* Optional small card preview — server passes `previewCardName`
               to give the player a visual of what they're about to place.
               CardMini gives the full hover tooltip + foil treatment for free. */}
-          {ep.previewCardName && CARDS_BY_NAME[ep.previewCardName] && (
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-              <div className="panel-zielwahl-vorschau" style={{ width: 90 }}>
-                <CardMini card={CARDS_BY_NAME[ep.previewCardName]} inGallery />
-              </div>
+          {((ep.previewCardName && CARDS_BY_NAME[ep.previewCardName]) || (ep.showCardLeft && CARDS_BY_NAME[ep.showCardLeft])) && (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 10 }}>
+              {/* `showCardLeft`: die betroffene Karte LINKS (Enemy of my Enemy: die Creature), die Quellkarte rechts daneben */}
+              {ep.showCardLeft && CARDS_BY_NAME[ep.showCardLeft] && (
+                <div className="panel-zielwahl-vorschau" style={{ width: 90 }}>
+                  <CardMini card={CARDS_BY_NAME[ep.showCardLeft]} inGallery />
+                </div>
+              )}
+              {ep.previewCardName && CARDS_BY_NAME[ep.previewCardName] && (
+                <div className="panel-zielwahl-vorschau" style={{ width: 90 }}>
+                  <CardMini card={CARDS_BY_NAME[ep.previewCardName]} inGallery />
+                </div>
+              )}
             </div>
           )}
           <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7 }}>Click a highlighted zone on the board.</div>
@@ -61200,16 +61254,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* ── Effect Prompt: Chain Target Pick (Chain Lightning / Qinglong / Bottled Lightning) ── */}
       {isMyEffectPrompt && ep.type === 'chainTargetPick' && (
         <DraggablePanel zielwahl className="first-choice-panel animate-in" style={{ borderColor: '#fad54a' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: '#fad54a', marginBottom: 8 }}>⚡ {ep.title || 'Chain Lightning'}</div>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#fad54a', marginBottom: 8 }}>{chainPickSteps ? '⚔️' : '⚡'} {ep.title || 'Chain Lightning'}</div>
+          {chainPickSteps && ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>{ep.description}</div>}
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>
             {chainPickSelected.length < chainPickMaxTargets && chainPickValidIds.size > 0
-              ? `Click target #${chainPickSelected.length + 1} (${chainPickDamages[chainPickSelected.length]} dmg).`
-              : 'Confirm the chain!'}
+              ? (chainPickSteps
+                ? `${chainPickSelected.length + 1}/${chainPickMaxTargets}: ${chainPickSteps[chainPickSelected.length].label || 'Click a target.'}`
+                : `Click target #${chainPickSelected.length + 1} (${chainPickDamages[chainPickSelected.length]} dmg).`)
+              : (chainPickSteps ? 'Confirm!' : 'Confirm the chain!')}
           </div>
           {chainPickSelected.length > 0 && (
             <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 8 }}>
               {chainPickSelected.map((t, i) => (
-                <span key={String(t.id)} style={{ display: 'block', color: '#fad54a' }}>#{i+1} {String(t.cardName || '?')} → {chainPickDamages[i] || 0} dmg</span>
+                <span key={String(t.id)} style={{ display: 'block', color: '#fad54a' }}>#{i+1} {String(t.cardName || '?')} {chainPickSteps ? (chainPickSteps[i].role ? '— ' + chainPickSteps[i].role : '') : '→ ' + (chainPickDamages[i] || 0) + ' dmg'}</span>
               ))}
             </div>
           )}
@@ -61220,7 +61277,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             )}
             {chainPickCanConfirm && (
               <button className="btn btn-danger" style={{ padding: '6px 16px', fontSize: 11 }}
-                onClick={() => { respondToPrompt({ selectedTargets: chainPickSelected }); setChainPickSelected([]); }}>⚡ Confirm Chain!</button>
+                onClick={() => { respondToPrompt({ selectedTargets: chainPickSelected }); setChainPickSelected([]); }}>{chainPickSteps ? (ep.confirmLabel || 'Confirm') : '⚡ Confirm Chain!'}</button>
+            )}
+            {chainPickSteps && ep.cancellable && (
+              <button className="btn" style={{ padding: '6px 14px', fontSize: 11 }}
+                onClick={() => { respondToPrompt({ cancelled: true }); setChainPickSelected([]); }}>{ep.cancelLabel || '← Cancel'}</button>
             )}
           </div>
         </DraggablePanel>

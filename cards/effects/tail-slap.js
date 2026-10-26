@@ -80,13 +80,17 @@ module.exports = {
           cancellable: true, minRequired: 0, maxTotal: kandidaten.length,
         });
         const ids = Array.isArray(gewaehlt) ? gewaehlt : [];
-        for (const id of ids) {
-          const k = kandidaten.find(t => t.id === id);
-          const inst = k?.cardInstance;
-          if (!inst || inst.zone !== 'support') continue;
-          await engine.actionDestroyCard(quelleKarte, inst, { sourceOwner: pi, sourceName: CARD_NAME, fireCreatureDeath: true });
-          if (inst.zone !== 'support') besiegt++;
-        }
+        // W78 (Pythia): alle gewaehlten Creatures fallen im selben Zug des Effekts — keine davon darf als Opfer einer Rettung dienen.
+        const gewaehlteInsts = ids.map(id => kandidaten.find(t => t.id === id)?.cardInstance).filter(Boolean);
+        await engine.mitTodgeweihten(gewaehlteInsts, async () => {
+          for (const id of ids) {
+            const k = kandidaten.find(t => t.id === id);
+            const inst = k?.cardInstance;
+            if (!inst || inst.zone !== 'support') continue;
+            await engine.actionDestroyCard(quelleKarte, inst, { sourceOwner: pi, sourceName: CARD_NAME, fireCreatureDeath: true });
+            if (inst.zone !== 'support') besiegt++;
+          }
+        });
       }
 
       // ② Ziel — der Schaden steht schon mit der Zahl der VERBLEIBENDEN Creatures im Fenster.

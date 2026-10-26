@@ -18,6 +18,10 @@
 
 const { countFreeZones, placePollutionTokens } = require('./_pollution-shared');
 
+// ★ W76a (Al, Bartas-Zweitwurf): „Place the same number of Pollution Tokens into your free Support Zones" gilt auch im Zweitwurf — das ZWEITE Ziel kostet einen weiteren Token
+// (Zahl der in DIESEM Wurf getroffenen Ziele = 1), mit denselben Regeln wie der Hauptwurf (Zonenwahl, nur freie Zonen; ohne freie Zone gibt es keinen Zweitwurf).
+// Das Once-per-turn betrifft das SPIELEN der Karte; der Zweitwurf ist kein weiteres Spielen (Hauptwurf hat den Stempel schon gesetzt).
+
 module.exports = {
   // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).
   // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
@@ -31,6 +35,11 @@ module.exports = {
   },
 
   placesPollutionTokens: true,
+
+  // Bartas & Co.: der Zweitwurf braucht eine freie Support Zone für den Token (wie der Hauptwurf, der ohne freie Zone gar nicht wirkt).
+  zweitwurfMoeglich(engine, gs, pi) {
+    return countFreeZones(gs, pi) > 0;
+  },
 
   // "You can only play 1 Pyroblast per turn": die zweite Karte ist gar nicht
   // erst spielbar (sonst verpufft sie in der Ablage). Gleicher Stempel wie
@@ -49,7 +58,8 @@ module.exports = {
       // Pre-check HOPT without claiming — claim only after the
       // player commits at least one target so cancelling the picker
       // doesn't burn the once-per-turn slot.
-      if (engine.gs.hoptUsed?.[`pyroblast:${pi}`] === engine.gs.turn) return;
+      const zweitwurf = !!gs._zweitzielWurf;   // W76a: Bartas' Zweitwurf ist kein weiteres Spielen der Karte
+      if (!zweitwurf && engine.gs.hoptUsed?.[`pyroblast:${pi}`] === engine.gs.turn) return;
 
       // Count free support zones — this caps the number of targets
       const maxTargets = countFreeZones(gs, pi);
@@ -75,8 +85,8 @@ module.exports = {
 
       if (hitTargets.length === 0) return; // Cancelled
 
-      // Commit — claim HOPT now.
-      ctx.hardOncePerTurn('pyroblast');
+      // Commit — claim HOPT now (der Zweitwurf hat den Stempel vom Hauptwurf).
+      if (!zweitwurf) ctx.hardOncePerTurn('pyroblast');
 
       // ── Fire animations on all targets simultaneously ──
       // ★ v1392: Treffer über die EINE Stelle für Mehrfachtreffer.

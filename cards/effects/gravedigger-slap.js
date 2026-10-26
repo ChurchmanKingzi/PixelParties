@@ -56,6 +56,7 @@ module.exports = {
 
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js.
+  neverMultiTarget: true,   // W75b: „This Attack can never hit more than 1 target." (Text-Waechter `scripts/check-never-multi-target.js`)
 
   hooks: {
     onPlay: async (ctx) => {

@@ -271,6 +271,7 @@ module.exports = {
           .filter(t => !sparedIds.has(t.id) && t.kind === 'creature')
           .map(t => engine.cardInstances.find(c => c.id === t.instId))
           .filter(Boolean),
+        heroes: targets.filter(t => !sparedIds.has(t.id) && t.kind === 'hero').map(t => ({ owner: t.physOwner, heroIdx: t.heroIdx })),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
         source: { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
         amount: VOLLEY_DAMAGE, type: 'destruction_spell', sourceOwner: pi,
       });

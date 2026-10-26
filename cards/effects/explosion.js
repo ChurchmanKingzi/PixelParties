@@ -105,6 +105,7 @@ module.exports = {
         || engine.kreaturAnBrett(t.owner, t.heroIdx, t.slotIdx);   // Z1: Brettseite
       await engine.beginAoeStrike(targets.length, {
         creatures: targets.filter(t => t.type !== 'hero').map(aufloesen).filter(Boolean),
+        heroes: targets.filter(t => t.type === 'hero'),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
         source, amount: EXPLOSION_DAMAGE, type: 'destruction_spell', sourceOwner: pi,
       });
       try {

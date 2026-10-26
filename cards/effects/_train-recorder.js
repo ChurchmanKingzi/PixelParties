@@ -1063,7 +1063,7 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
       // Lage. Daraus fittet der Trainer `costDiscardRules`.
       const costDiscards = (engine._costDiscardLog || [])
         .filter(e => e.pi === pinnedIdx)
-        .map(({ c, t, paid, card, tags }) => ({ c, t, paid: paid ? 1 : 0, card: card || null, tags: tags || [] }));
+        .map(({ c, t, paid, card, cards, tags }) => ({ c, t, paid: paid ? 1 : 0, card: card || null, ...(cards ? { cards } : {}), tags: tags || [] }));   // W77b: `cards` = Stapel-Abwurf (Cute Hydra)
       // Surprise-Fire/Hold-Log der pinned Seite (Surprise-Lernkanal).
       const surpriseDecisions = (engine._surpriseLog || [])
         .filter(e => e.pi === pinnedIdx)

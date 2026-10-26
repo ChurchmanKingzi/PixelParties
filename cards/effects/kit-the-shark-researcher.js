@@ -391,6 +391,7 @@ async function _runModeB(engine, pi, oppPi, kitHeroIdx, kitSeite = pi) {
       .map(id => tgts.find(x => x.id === id))
       .filter(t => t && t.type !== 'hero')
       .map(t => t.cardInstance).filter(Boolean),
+    heroes: picked.map(id => tgts.find(x => x.id === id)).filter(t => t && t.type === 'hero'),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
     source, amount: MODE_B_DAMAGE, type: 'other', sourceOwner: pi,
   });
   try {

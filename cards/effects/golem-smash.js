@@ -33,6 +33,7 @@ module.exports = {
   spellVisual: { impact: { type: 'golem_smash_ice' }, impactMs: 300 },
 
   requiresTarget: true,
+  neverMultiTarget: true,   // W75b: „This Attack can never hit more than 1 target at once." (Text-Waechter `scripts/check-never-multi-target.js`)
 
   /** CPU: so viele Karten wie sinnvoll loeschen (Deck nicht unter 15 druecken). */
   cpuResponse(engine, kind, promptData) {

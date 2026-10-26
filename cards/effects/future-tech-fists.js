@@ -198,6 +198,7 @@ module.exports = {
       // an das Anti-AoE-Fenster (Deepsea Idol).
       await engine.beginAoeStrike(ziele.length, {
         creatures: ziele.filter(z => z && z.type !== 'hero').map(z => z.cardInstance).filter(Boolean),
+        heroes: ziele.filter(z => z && z.type === 'hero'),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
         source: quelle, amount: schaden, type: 'attack', sourceOwner: pi,
       });
       try {
