@@ -88,6 +88,17 @@ async function insDeck(engine, inst, maxLevel, pi) {
     return null;
   }
 
+  // Defending the Gate: ein Effekt des Gegners auf Karten in seiner Support Zone — das Tor wird hier gefragt (wie `actionMoveCard`/`actionTransferCreature`; `_triggerGateCheck` lässt eigene
+  // Effekte durch, ein Angebot je Zauber). Geschützte Kreaturen bleiben stehen und zählen nicht fürs Ziehen.
+  {
+    const ktrl = inst.controller ?? inst.owner;
+    await engine._triggerGateCheck(ktrl, CARD_NAME, pi, cardName);
+    if (engine._isGateShielded(ktrl, pi)) {
+      engine.log('creature_effect_negated', { creature: cardName, effect: 'move', by: CARD_NAME, reason: 'defending_the_gate' });
+      return null;
+    }
+  }
+
   // W71b (Al, 25.10.2026): das Zurückmischen ist ein Effekt auf die Kreatur — Schutzfenster (Cool Rescuer Monia & Co.) NACH der Immunität, VOR der ersten Änderung. Ein Angebot je Zauber
   // (Monias Buchführung `gs._moniaAngebote`): angenommen schützt es die Seite für alle weiteren Kreaturen dieses Zaubers, abgelehnt fragt nicht noch einmal.
   if (!(await engine.kreaturBetroffen(inst, 'move', { name: CARD_NAME, owner: pi }, { sourceOwner: pi, detail: 'to_deck' }))) return null;

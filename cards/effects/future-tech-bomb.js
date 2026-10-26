@@ -65,7 +65,7 @@ module.exports = {
 
     if (schaden <= 0) { engine.sync(); return; }
 
-    const ziele = [...engine.getHeroTargets(oi), ...engine.getCreatureTargets(oi)];
+    const ziele = [...engine.getControlledHeroTargets(oi), ...engine.getCreatureTargets(oi)];   // „targets your opponent controls" = nach KONTROLLE (übernommene Helden zählen zu ihrem Kontrolleur), nicht nach Spalte
     if (ziele.length === 0) { engine.sync(); return; }
 
     // ── Wuchtigere Explosion (Als Rueckmeldung 21.8.) ──
@@ -95,7 +95,7 @@ module.exports = {
     await engine.dealDamageToTargets(quelle, ziele.map(t => t.type === 'hero'
       ? { type: 'hero', owner: t.owner, heroIdx: t.heroIdx }
       : { type: 'creature', inst: t.cardInstance, owner: t.owner, heroIdx: t.heroIdx, slotIdx: t.slotIdx }), {
-      damage: schaden, damageType: 'other', sourceName: CARD_NAME, hitDelay: 0,
+      damage: schaden, damageType: 'potion', sourceName: CARD_NAME, hitDelay: 0,   // Potion-Schaden wie Acid Vial / Bottled Lightning — nicht 'other' (Schadenstypen, CARD_API)
     });
     engine.sync();
   },
