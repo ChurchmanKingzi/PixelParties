@@ -78,6 +78,9 @@ module.exports = {
         if (!opfer || opfer.zone !== 'support') continue;   // schon gefallen
         if (engine.isOmniImmune(opfer, inst)) continue;   // W17b: Golden Wings quellenbewusst
 
+        // CARD_API „Jeder getriggerte passive Effekt zeigt seine Karte": das Messer löst aus dem Hook heraus aus — Auftritt für beide Spieler, einmal je Angriff (`source`).
+        await engine.showTriggeredEffect(CARD_NAME, { source: q });
+
         // Welle 12 (Q101, Al: „Doch, das soll zählen."): ein Knife-Kill zählt als „der Held besiegt das Ziel (mit einem Angriff)" — `heldQuelle`
         // nennt die Angriffs-Quelle des Helden (Wanted Poster zieht 2, Skullmael's Greatsword löst aus); Schutzprüfungen laufen weiter gegen das Knife.
         await engine.actionDestroyCard(inst, opfer, { sourceName: CARD_NAME, heldQuelle: q });

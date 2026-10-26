@@ -159,6 +159,9 @@ module.exports = {
       if (!entries || entries.length === 0) return;
 
       const pi = ctx.cardOwner; // Effective controller (auto-resolved for charmed heroes)
+      // „Your opponent cannot react to this Attack" / „ignores any effect that would … prevent the target from being defeated" (Midnight Assault, Surefire Shot):
+      // Monias Rettung ist so ein Schutz — sie wird gar nicht erst angeboten (sonst zahlt der Spieler eine Handkarte für eine wirkungslose Rettung).
+      if (engine._reaktionGesperrt(pi)) return;
       const heroIdx = ctx.cardHeroIdx;
       const hero = gs.players[ctx.cardOriginalOwner]?.heroes?.[heroIdx];
       // Tot = kein Schutz — AUSSER Monia ist im laufenden Flaechenschlag
@@ -338,6 +341,7 @@ module.exports = {
       if (ctx.isSacrifice) return;
 
       const pi = ctx.cardOwner; // Effective controller (auto-resolved for charmed heroes)
+      if (engine._reaktionGesperrt(pi)) return;   // „cannot react" / „prevent the target from being defeated" (Midnight Assault, Surefire Shot): kein Angebot, s. oben
       const heroIdx = ctx.cardHeroIdx;
       const hero = gs.players[ctx.cardOriginalOwner]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
