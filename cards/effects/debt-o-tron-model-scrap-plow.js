@@ -13,9 +13,10 @@
 //  KARTENKOSTEN diesen Hook gar nicht, der Ausloeser haette also
 //  ausgerechnet bei „Debt-O-Tron Damage Fees" geschwiegen — der Karte,
 //  die den Archetyp ueberhaupt ins Minus bringt.
-//  Die Zaehlung „for every 10 Gold you spent in excess of your current
-//  Gold" macht `debtTriggerCheck` an EINER Stelle fuer alle drei
-//  Modelle, nach Als Formel `Betrag − max(0, GoldVorher)`.
+//  Als Ruling (Al 26.10.): „den wörtlich nehmen" — der Plow löst bei JEDER Überziehung nach einer Ausgabe aus (Gold danach < 0, Betrag > 0),
+//  nicht erst ab 10 Gold im Minus: sein Text hat KEINE „for every 10 Gold"-Klausel. Deshalb ruft er `debtTriggerCheck(…, { ohneStufen: true })`;
+//  Backup Duplicator / Money Printer zählen weiter nach Als Formel `Betrag − max(0, GoldVorher)` in Zehnerschritten (`debtTriggerCheck`,
+//  an EINER Stelle). Einmal pro Zug; die Kreatur, die er wegschickt, gilt als besiegt.
 //
 //  „Creatures sent this way count as being defeated" — deshalb
 //  `actionDestroyCard` mit Abwurf-Ziel statt eines stillen Verschiebens:
@@ -46,7 +47,7 @@ module.exports = {
     onPlay: async (ctx) => { await base.payHandCost(ctx); },
 
     afterResourceSpend: async (ctx) => {
-      const treffer = debtTriggerCheck(ctx, MAX_PER_TURN, CARD_NAME);
+      const treffer = debtTriggerCheck(ctx, MAX_PER_TURN, CARD_NAME, { ohneStufen: true });   // Als Ruling (Al 26.10.): JEDE Überziehung nach einer Ausgabe, keine 10er-Schwelle
       if (!treffer) return;
       const engine = ctx._engine;
       const gs = engine.gs;

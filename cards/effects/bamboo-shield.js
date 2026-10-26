@@ -9,6 +9,10 @@
 //  reveal it to make its Cost become 8. You can
 //  only play 1 'Bamboo Shield' per turn.
 //
+//  Als Ruling (Al 26.10.): Wortlaut „a Hero you control" — der Schild
+//  wirkt nur auf EIGENE (kontrollierte) Helden; der Kartentext in
+//  `data/cards.json` ist angepasst.
+//
 //  Wiring — two entry points, consolidated UX:
 //
 //   1. `isPostTargetReaction` (primary) — fires

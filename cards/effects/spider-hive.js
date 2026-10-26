@@ -9,10 +9,11 @@
 //  Mechanics
 //  ─────────
 //   • Self-place into the caster's Area zone on cast.
-//   • While Spider Hive sits in an Area zone, every Surprise-subtype
-//     card's effective level is reduced by `countSpiderCreaturesOnBoard`
-//     — for BOTH players. The reduction is read by the engine's
-//     centralised `_applyCardLevelReductions`, which is called from
+//   • While Spider Hive sits in an Area zone, every face-down Surprise
+//     ON THE BOARD has its effective level reduced by `countSpiderCreaturesOnBoard`
+//     — for BOTH players. Als Ruling (Al 26.10.): „nur die auf dem Board" —
+//     Surprises auf der Hand bleiben auf ihrer Stufe (`evalOpts.surpriseAufBrett`).
+//     The reduction is read by the engine's centralised `_applyCardLevelReductions`, which is called from
 //     `heroMeetsLevelReq` → `_canHeroActivateSurprise` — i.e. exactly
 //     when a player tries to flip a Surprise. Lifted automatically
 //     once a Surprise activates (the card leaves the Surprise Zone
@@ -38,19 +39,20 @@ module.exports = {
   globalReduceCardLevel: true,
 
   /**
-   * Reduce the effective level of any Surprise-subtype card by the
-   * count of Spider Creatures on the board. Reads the cardData's
-   * subtype directly, which avoids per-instance lookups. The reduction
-   * only matters at Surprise-activation time (the only moment a
-   * Surprise's level is gate-checked); UI-level surface that reads
-   * effective levels of Surprises in hand will show the reduction
-   * too, which is harmless.
+   * Reduce the effective level of a face-down Surprise ON THE BOARD by the
+   * count of Spider Creatures on the board.
+   * Als Ruling (Al 26.10.): „Ja, nur die auf dem Board" — die Senkung gilt
+   * NUR, wenn die Stufe einer verdeckt liegenden Surprise ausgewertet wird
+   * (`evalOpts.surpriseAufBrett`: `_canHeroActivateSurprise` = Aktivierungs-Gate
+   * und die Stufenanzeige der gesetzten Surprise im Gamestate), nie für die
+   * Kopie auf der Hand (Anzeige, Kreaturen-Stufenfilter wie „Lv 0 aus der Hand").
    */
-  reduceCardLevel(cardData, engine, ownerIdx, inst /*, heroIdx */) {
+  reduceCardLevel(cardData, engine, ownerIdx, inst, heroIdx, evalOpts) {
     if (!cardData) return 0;
     // W16c (A05-28): Dauereffekt der AUSLIEGENDEN Area - die Kopie auf der Hand ('hand' ist nur fuer das Selbstlegen) senkt nichts.
     if (inst && inst.zone !== 'area') return 0;
     if (cardData.subtype !== 'Surprise') return 0;
+    if (!evalOpts || evalOpts.surpriseAufBrett !== true) return 0;   // Als Ruling (Al 26.10.): nur verdeckte Surprises AUF DEM BRETT, nicht die Hand
     if (!engine) return 0;
     const spiderCount = countSpiderCreaturesOnBoard(engine);
     return spiderCount > 0 ? spiderCount : 0;

@@ -45,6 +45,8 @@
 
 const { isPileCreature, hasCardType, hasNumericCreatureLevel } = require('./_hooks');
 
+const { slimeLevelUpHook } = require('./_slime-shared');
+
 module.exports = {
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
@@ -154,9 +156,7 @@ module.exports = {
       }
     },
 
-    onTurnStart: async (ctx) => {
-      if (!ctx.isMyTurn) return;
-      await ctx.changeLevel(1);
-    },
+    // Als Ruling (Al 26.10.): „you may increase this Creature's level by 1" = Ja/Nein-Frage (Nein/Abbruch: Stufe bleibt) — `_slime-shared`.
+    onTurnStart: slimeLevelUpHook('Rocky Slime'),
   },
 };

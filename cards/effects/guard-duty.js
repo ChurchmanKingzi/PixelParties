@@ -9,6 +9,9 @@
 //  deck (their choice — they confirm via prompt).
 //  Counts as an additional Action.
 //
+//  Als Ruling (Al 26.10.): nur SPIELBAR, wenn die eigene Ablage ins eigene Deck gemischt werden darf
+//  (Hatusbal, Knight [B], Stab-Ablagesperre); Sperre beim Gegner lässt nur dessen Teil entfallen.
+//
 //  ONCE PER GAME — gated via `gs._guardDutyUsed[pi]`
 //  set on resolution. The hand-play `canPlay` gate
 //  short-circuits when the flag is set so the card
@@ -38,8 +41,18 @@ module.exports = {
   // detection.
   shufflesFromHandOrDiscardIntoDeck: true,
 
-  spellPlayCondition(gs, pi) {
-    return !gs[ONCE_PER_GAME_KEY]?.[pi];
+  // Als Ruling (Al 26.10.): „Die Karte soll nur spielbar sein, wenn der Discard Pile auch ins eigene Deck gemischt werden darf. Sperre beim Gegner ist
+  // egal." — unspielbar (ausgegraut, nichts verbraucht), solange die EIGENE Ablage nicht ins eigene Deck zurück darf: Zurückmisch-Sperre (Hatusbal,
+  // Distracting Crystal), Stapel-Ausgang (Knight of Kings [B]) oder harte Stab-Ablagesperre (der freikaufbare Eye of Ren zählt NICHT, wie bei
+  // Meditation). Eine Sperre beim Gegner lässt nur DESSEN Teil entfallen (`onPlay`), die Karte bleibt spielbar.
+  spellPlayCondition(gs, pi, engine) {
+    if (gs[ONCE_PER_GAME_KEY]?.[pi]) return false;
+    const eng = engine || gs._engineRef;
+    if (!eng) return true;
+    if (eng.shuffleBackIntoOwnDeckBlocked(pi, { fromHandOrDiscard: true })) return false;
+    if (!eng.pileOutAllowed(pi, 'discard', { sourceOwner: pi })) return false;
+    if (eng.isDiscardOutHardLocked?.(pi)) return false;
+    return true;
   },
 
   hooks: {

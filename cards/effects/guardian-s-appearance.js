@@ -12,6 +12,8 @@
 //  flag — placement IS the action grant). If you
 //  do, send the top 3 cards of either player's
 //  deck (caster's choice) to their discard pile.
+//  Als Ruling (Al 26.10.): kein „Skip the mill" —
+//  der Wirker MUSS eines der beiden Decks wählen.
 // ═══════════════════════════════════════════
 
 const {
@@ -122,8 +124,10 @@ module.exports = {
         return;
       }
 
-      // Step 4: optional mill — 3 from a chosen deck. The opponent's
-      // deck is also a valid target; "either player's deck" per text.
+      // Step 4: mill — 3 from a chosen deck. The opponent's deck is also a
+      // valid target; "either player's deck" per text.
+      // Als Ruling (Al 26.10.): „Skip streichen" — der Text kennt keine Option, die Karten NICHT zu mahlen: es wird immer ein Deck gewählt
+      // (gibt es nur ein Deck mit Karten, entfällt die Frage).
       const oi = engine.opponentOf(pi);
       const millOpts = [];
       if ((ps.mainDeck?.length || 0) > 0) millOpts.push({ id: 'self', label: 'Mill top 3 of YOUR deck' });
@@ -132,8 +136,7 @@ module.exports = {
         engine.sync();
         return;
       }
-      millOpts.push({ id: 'skip', label: 'Skip the mill' });
-      const millChoice = await engine.promptGeneric(pi, {
+      const millChoice = millOpts.length === 1 ? { optionId: millOpts[0].id } : await engine.promptGeneric(pi, {
         type: 'optionPicker',
         title: CARD_NAME,
         description: 'Send the top 3 cards of either deck to its discard pile.',

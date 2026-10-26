@@ -89,6 +89,7 @@ module.exports = {
 
   activeIn: ['support'],
   creatureEffect: true,
+  requiresTarget: true,   // Zielwahl-Effekt („choose a Creature your opponent controls"): Blinded sperrt ihn (siehe _hooks.js / getActivatableCreatures)
   // Holt Ziele auf die eigene Seite — dieselbe Marke, die Boris & Co.
   // lesen.
   takesControlOfTargets: true,

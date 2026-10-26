@@ -73,6 +73,7 @@ module.exports = {
   },
 
   creatureEffect: true,
+  requiresTarget: true,   // Zielwahl-Effekt: Blinded sperrt ihn (siehe _hooks.js / getActivatableCreatures)
 
   canActivateCreatureEffect(ctx) {
     // Immer aktivierbar: die Zielzahl faellt nie unter 1 (Als

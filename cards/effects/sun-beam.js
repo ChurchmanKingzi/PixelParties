@@ -92,8 +92,12 @@ module.exports = {
           // Only the top card of an ability stack is targetable.
           const slot = gs.players[inst.owner]?.abilityZones?.[inst.heroIdx]?.[inst.zoneSlot] || [];
           if (slot.length > 0 && slot[slot.length - 1] !== inst.name) continue;
+          // Ein Stapel gleichnamiger Karten (Ability Lv 2/3) hat mehrere Instanzen im selben Platz: EIN Ziel je Stapel (eindeutige ID), und zwar die letzte (= oberste) Kopie — wie `supportAbilitySpitze`.
+          const _abId = `ability-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`;
+          const _abErst = targets.find(x => x.id === _abId);
+          if (_abErst) { _abErst.cardInstance = inst; _abErst._cardInstance = inst; continue; }
           targets.push({
-            id: `ability-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
+            id: _abId,
             type: 'ability', owner: inst.owner, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
             cardName: inst.name, cardInstance: inst, _cardInstance: inst,
           });

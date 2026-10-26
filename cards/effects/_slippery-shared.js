@@ -57,10 +57,14 @@ function adjacentHeroIndices(heroIdx) {
 function destinationsFor(engine, pi, inst) {
   // Styx 28.9.: Nachbarspalten auf der BRETTSEITE der Kreatur
   // (seitenfremd beschworen: B), nicht beim Kontrolleur `pi`.
-  const ps = engine.gs.players[engine.physicalSide ? engine.physicalSide(inst) : pi];
+  const seite = engine.physicalSide ? engine.physicalSide(inst) : pi;
+  const ps = engine.gs.players[seite];
   if (!ps) return [];
   const out = [];
   for (const hi of adjacentHeroIndices(inst.heroIdx)) {
+    // Zonensperre der Spalte (Tri Fecta/Tri Ad, Bonded Companion): dorthin darf nichts gelegt werden — sonst rutscht die Kreatur hinein und die Engine nimmt sie
+    // danach (`_enforceSupportZoneLock`) auf die Hand zurück (wie in `slippery-ice.js`).
+    if (engine.isSupportZoneLocked?.(seite, hi, { source: 'Slippery', cardName: inst.name, via: 'move', instId: inst.id })) continue;
     const hero = ps.heroes?.[hi];
     const zones = ps.supportZones?.[hi] || [[], [], []];
     const heroLabel = hero?.name

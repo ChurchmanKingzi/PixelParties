@@ -70,9 +70,10 @@ function betroffene(engine, maxLevel) {
  * Eine Brettkreatur ins Deck ihres urspruenglichen Besitzers legen.
  * Bauform `returnSupportCreatureToHand` (_deepsea-shared), nur mit dem
  * Deck als Ziel. Gemischt wird NICHT hier — s. Kopf.
- * Rueckgabe: `{ heim, ktrl }` (Deck-Besitzer / Kontrolleur = Zieher) oder `null` (blieb stehen).
+ * Rueckgabe: `{ heim, ktrl }` (Deck-Besitzer / Kontrolleur = Zieher) oder `null` (blieb stehen bzw. wurde von Ankhota GELOESCHT statt zurueckgemischt).
+ * `ankhotaVorab` = Ankhotas Loeschung, schon VOR der ersten Bewegung des Zaubers ausgewertet (alle Kreaturen gehen zugleich — reihenfolgeunabhaengig).
  */
-async function insDeck(engine, inst, maxLevel, pi) {
+async function insDeck(engine, inst, maxLevel, pi, ankhotaVorab = null) {
   if (!inst || inst.zone !== 'support') return null;
   const gs = engine.gs;
   const kontrolleur = engine.physicalSide(inst);       // Brettseite (nicht der Kontrolleur): eine gestohlene Kreatur liegt weiter beim Besitzer (S03-04)
@@ -120,8 +121,13 @@ async function insDeck(engine, inst, maxLevel, pi) {
     const idx = slotArr.indexOf(cardName);
     if (idx >= 0) slotArr.splice(idx, 1);
   }
-  if (!hps.mainDeck) hps.mainDeck = [];
-  hps.mainDeck.push(cardName);
+  // Ankhota: „Delete all Creatures that are moved from the board to anywhere else" — dieser Sonderweg umgeht den zentralen Move: die Kreatur kommt in den Gelöscht-Stapel ihres Besitzers
+  // statt ins Deck. Annahme: eine so gelöschte Kreatur gilt NICHT als „shuffled back" (kein Nachziehen dafür, kein Mischen).
+  const geloescht = engine.ankhotaLoeschtSonderweg(inst, heim, { source: CARD_NAME, vorab: ankhotaVorab });
+  if (!geloescht) {
+    if (!hps.mainDeck) hps.mainDeck = [];
+    hps.mainDeck.push(cardName);
+  }
 
   await engine.runHooks('onCardLeaveZone', {
     card: inst, leavingCard: inst, fromZone: 'support',   // leavingCard: Vertrag fuer Selbst-Aufraeumer (A07-05, Dream Lander)
@@ -132,7 +138,7 @@ async function insDeck(engine, inst, maxLevel, pi) {
   engine._untrackCard(inst.id);
   engine.sync();
   await engine._delay(180);
-  return { heim, ktrl };
+  return geloescht ? null : { heim, ktrl };
 }
 
 module.exports = {
@@ -191,8 +197,9 @@ module.exports = {
       // ── ① Alles ins Deck ────────────────────────────────────────
       // proDeck[p] = Karten, die in das Deck von p zurueckgingen (mischen); proZieher[p] = Kreaturen, die p KONTROLLIERTE (ziehen).
       const proDeck = {}, proZieher = {};
+      const ankhotaVorab = new Map(ziele.map(inst => [inst.id, engine.ankhotaLoeschtVomBrett(inst)]));   // Ankhota: einmal VOR der ersten Bewegung (auch sie selbst geht mit)
       for (const inst of ziele) {
-        const r = await insDeck(engine, inst, maxLevel, pi);
+        const r = await insDeck(engine, inst, maxLevel, pi, ankhotaVorab.get(inst.id));
         if (r != null) {
           proDeck[r.heim] = (proDeck[r.heim] || 0) + 1;
           proZieher[r.ktrl] = (proZieher[r.ktrl] || 0) + 1;

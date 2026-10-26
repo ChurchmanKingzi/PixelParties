@@ -91,6 +91,7 @@ function getEligibleCreatures(engine, pi, maxCreatureLevel) {
     if (engine.isCreatureImmune(inst, 'targeting_immune')) continue;
     if (engine.isCreatureImmune(inst, 'control_immune')) continue;
     if (engine.controlIsLocked(inst)) continue;   // Als Ruling (Al 26.10.): „Control of this Creature cannot change" (Creepy Villager) — nicht waehlbar, kein Verbrauch
+    if (engine.mehrzonenPlatzFehlt(inst, pi)) continue;   // Mehrzonen-Kreatur (Land Sharks, Turtle): ohne Held mit genug freien Zonen nicht uebernehmbar — nicht waehlbar, kein Verbrauch
     const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     if (!hasNumericCreatureLevel(cd)) continue;   // Artifact Creatures haben kein Level (Als Ruling 9.10.)
@@ -186,7 +187,8 @@ module.exports = {
     if (!target) return false;
 
     // Step 2: Select a free support zone
-    const currentFreeZones = getFreeZones(ps, engine, pi, target.cardName);   // W63a: + Zone einer gleichnamigen Creature (Alice), geteilte zuerst
+    const currentFreeZones = getFreeZones(ps, engine, pi, target.cardName)   // W63a: + Zone einer gleichnamigen Creature (Alice), geteilte zuerst
+      .filter(z => !engine.mehrzonenPlatzFehlt(target.cardInstance, pi, pi, z.heroIdx));   // Mehrzonen-Kreatur: nur Helden mit genug freien Zonen
     if (currentFreeZones.length === 0) return false;
 
     let chosenZone;

@@ -31,6 +31,8 @@ function istZiel(engine, pi, inst) {
   const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];
   if (!cd || !hasCardType(cd, 'Creature') || !engine.isChoosableAsCreature(inst, cd)) return false;
   if (engine.isOmniImmune(inst, pi) || engine.controlIsLocked(inst) || engine.isCreatureImmune(inst, 'control_immune')) return false;
+  // Mehrzonen-Kreatur (Land Sharks, Turtle): der Gegner kann sie nur hergeben, wenn der Wirker einen Helden mit genug freien Zonen für ALLE ihre Zonen hat — beide Ziele müssen übernehmbar sein.
+  if (engine.mehrzonenPlatzFehlt(inst, pi)) return false;
   return true;
 }
 
@@ -139,7 +141,7 @@ module.exports = {
       const behalten = insts.find(i => i !== geben);
 
       // ── 3. Die gewählte geht an den Wirker ──
-      let frei = freieZonen(engine, pi);
+      let frei = freieZonen(engine, pi).filter(z => !engine.mehrzonenPlatzFehlt(geben, pi, pi, z.heroIdx));   // Mehrzonen-Kreatur: nur Helden mit genug freien Zonen
       let zone = frei[0];
       if (frei.length > 1) {
         const z = await ctx.promptZonePick(frei, {
@@ -188,9 +190,12 @@ module.exports = {
             const i = zoneArr[behalten.zoneSlot].indexOf(behalten.name);
             if (i >= 0) zoneArr[behalten.zoneSlot].splice(i, 1);
           }
-          gs.players[besitzer].mainDeck.push(behalten.name);
-          engine.shuffleDeck(besitzer);
-          await engine.noteShuffledBack(besitzer, 1, CARD_NAME);
+          // Ankhota: „Delete all Creatures that are moved from the board to anywhere else" — dieser Sonderweg umgeht den zentralen Move: gelöscht statt gemischt (kein Deck, kein „shuffled back").
+          if (!engine.ankhotaLoeschtSonderweg(behalten, besitzer, { source: CARD_NAME })) {
+            gs.players[besitzer].mainDeck.push(behalten.name);
+            engine.shuffleDeck(besitzer);
+            await engine.noteShuffledBack(besitzer, 1, CARD_NAME);
+          }
           engine._untrackCard(behalten.id);
           gemischt = true;
         }

@@ -19,6 +19,9 @@
 //       discard pile, you may delete it instead and draw 1 card.
 //       Implemented via the generic `_redirectToDeleted` flag on the
 //       leaving instance + a draw at `onCardLeaveZone` time.
+//       ★ D1 (Baustein-Phase): der SCHADENSTOD (Schaden, Brand, Gift) laeuft nicht ueber `actionMoveCard`, sondern durch den Schadens-Batch der
+//       Engine — der meldet vor dem Ablegen `onCreatureWouldBeDiscarded` (gleiche Felder wie das Leave-Ereignis, `toZone: 'discard'`); dort gilt
+//       dieselbe Klausel (gleicher Handler). Gefragt wird nur, was wirklich in die Ablage kaeme (nicht bei Ghazma/Ankhota/Root/Vacarn-Loeschung).
 // ═══════════════════════════════════════════
 
 const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
@@ -190,6 +193,9 @@ module.exports = {
       // future turns' reduceCardLevel calls).
       await engine.placeArea(pi, ctx.card);
     },
+
+    // D1: Schadenstod (Engine-Batch) — derselbe Handler wie fuer die Zerstoerungs-/Opfer-Wege (`onCardLeaveZone`, `toZone: 'discard'`).
+    onCreatureWouldBeDiscarded: (ctx) => module.exports.hooks.onCardLeaveZone(ctx),
 
     /**
      * Reactive draw — up to 5/turn, when an own Skeleton would be sent

@@ -8,6 +8,12 @@
 //  30 full damage the Attack would have dealt
 //  instead.
 //
+//  Als Ruling (Al 26.10.): „bei Hydra Blood Arrow passt es so, dass JEDER
+//  Hero es triggern kann" — der Kartentext sagt „when a Hero hits …" (ohne
+//  „you control"): der Pfeil darf auch auf die Attack eines GEGNERISCHEN
+//  Helden ausgelöst werden (`anyHero`; Schaden 0, Gift am Ziel der Attack,
+//  Quelle des Gifts = Spieler des Pfeils).
+//
 //  Implementation detail: the "would have dealt"
 //  amount is the post-flat-bump but pre-zero
 //  value — so if an Angelfeather Arrow chained
@@ -30,12 +36,13 @@ module.exports = {
   canActivate: () => false,
 
   reactionCondition: (gs, pi, engine, chainCtx) =>
-    arrowTriggerCondition(gs, pi, engine, chainCtx),
+    arrowTriggerCondition(gs, pi, engine, chainCtx, { anyHero: true }),
 
   resolve: async (engine, pi, _sel, _val, chain, _idx) => {
     armAttackerWithArrow(engine, pi, chain, {
       setAmount0: true,
       poisonStacksPer: 30,
+      anyHero: true,
       sourceCard: CARD_NAME,
     });
     engine.log('arrow_armed', { player: engine.gs.players[pi]?.username, arrow: CARD_NAME });

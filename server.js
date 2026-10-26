@@ -4896,7 +4896,7 @@ function sendGameState(room, playerIdx, extra) {
             c.owner === pi && c.zone === 'surprise' && c.heroIdx === hi && c.name === name);
           if (inst?.faceDown && !inst?.knownToOpponent && room.engine?._surpriseKontrolleurRoh?.(pi, hi) !== playerIdx) return null;   // W19b: der Kontrolleur sieht sie
         }
-        try { return room.engine.effectiveCardLevel(cd, pi); }
+        try { return room.engine.effectiveCardLevel(cd, pi, { surpriseAufBrett: true }); }   // Al 26.10.: verdeckt liegende Surprise AUF DEM BRETT (Spider Hive senkt nur diese)
         catch { return null; }
       }),
       supportZones: pi === playerIdx ? ps.supportZones : ps.supportZones.map((heroSlots, hi) => (heroSlots || []).map((slot, si) => {
@@ -6002,14 +6002,7 @@ function sendGameState(room, playerIdx, extra) {
         // Check abilities
         const cardData = getCardDB()[inst.name];
         if (!cardData) continue;
-        const level = cardData.level || 0;
-        if (level > 0 || cardData.spellSchool1) {
-          const abZones = ps2.abilityZones?.[hi] || [];
-          let ok = true;
-          if (cardData.spellSchool1 && room.engine.countAbilitiesForSchool(cardData.spellSchool1, abZones) < level) ok = false;
-          if (cardData.spellSchool2 && room.engine.countAbilitiesForSchool(cardData.spellSchool2, abZones) < level) ok = false;
-          if (!ok) continue;
-        }
+        if (!room.engine.heroMeetsLevelReq(playerIdx, hi, cardData, { noPlacementBypass: true })) continue;   // B1/S4: wie der Handler (Stufe samt Lücken-Abdeckung; kein Platzierungs-Bypass — hier wird nichts getauscht)
         // Check free support zone (W62a: oder, mit Alice-Teilung, die Zone einer GLEICHNAMIGEN Creature)
         if (!room.engine.hatBeschwoerZone(playerIdx, inst.name, { heroIdx: hi, nurBasis: true })) continue;
         // Check custom summon conditions
@@ -8626,10 +8619,9 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       const _wisdomOffen = wisdomDiscardCost > 0 ? {
         pi, bezahlt: false,
         bezahle: async () => {
-          const _rIdx0 = getResolvingHandIndex(ps);
-          const _pool0 = fromCreation ? ps.hand.map((_, i) => i) : ps.hand.map((_, i) => i).filter(i => i !== _rIdx0);
+          // Als FUNKTION: die Indizes rutschen nach jedem Abwurf (Lücke >= 2), ein starres Array ließ die auflösende Karte selbst wählbar werden.
           await room.engine.actionPromptForceDiscard(pi, wisdomDiscardCost, {
-            title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true, eligibleIndices: _pool0,
+            title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true, eligibleIndices: eligibleIndicesWithoutResolving(ps),
           });
         },
       } : null;
@@ -8826,10 +8818,9 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     let _wisdomBezahlt = _wisdomVorab;
     let _buddyTicket = null;   // W67a: Inyas Fantasy Buddy (gesetzt vor `afterSpellResolved`)
     if (wisdomDiscardCost > 0 && !_gefizzelt && !_wisdomBezahlt) {   // `_wisdomBezahlt` schon wahr: die Karte hat vorab gezahlt (`engine.zahleOffeneWisdom`)
-      const _rIdx = getResolvingHandIndex(ps);
-      const _pool = fromCreation ? ps.hand.map((_, i) => i) : ps.hand.map((_, i) => i).filter(i => i !== _rIdx);
+      // Als FUNKTION (je Abwurf neu ausgewertet): sonst wird die auflösende Karte nach dem ersten Abwurf selbst wählbar und zahlt ihre eigenen Kosten.
       await room.engine.actionPromptForceDiscard(pi, wisdomDiscardCost, {
-        title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true, eligibleIndices: _pool,
+        title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true, eligibleIndices: eligibleIndicesWithoutResolving(ps),
       });
       _wisdomBezahlt = true;
     }
@@ -9383,6 +9374,10 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   const effectName = inst.counters?._effectOverride || creatureName;
   const script = loadCardEffect(effectName);
   if (!script?.creatureEffect || !script?.onCreatureEffect) return false;
+  // B1/S3: Blinded auch serverseitig — dieselbe Prüfung wie in `getActivatableCreatures` (Kreatur ODER ihr Wirtsheld geblendet + Zielwahl-Effekt `requiresTarget`).
+  // Vorher sperrte nur die Angebotsliste: ein direkter Aufruf (veralteter Client, Skript) aktivierte den Effekt trotz Blendung. (`anyPlayer`: wie die Liste ohne Blendungsprüfung.)
+  if (!anyPlayer && script.requiresTarget === true
+      && (room.engine._isCreatureBlinded(inst) || room.engine._isHeroBlinded(heroOwner, heroIdx))) return false;
   // ★ EINMAL PRO SPIEL FUER DEN EFFEKT (v1030, Als Auftrag 12.9.).
   // Eigener Schluessel (`effect:…`), damit „1 Beschwoerung je Partie"
   // und „1 Aktivierung je Partie" nebeneinander stehen koennen.
@@ -12396,6 +12391,20 @@ function normalizeValidTargets(validTargets, casterPi, engine, config, cardName)
         a ? { ...basis, chooserHeroIdx: a.heroIdx, chooserHeroOwner: a.owner, source: { name: cardName, owner: casterPi, controller: casterPi, heroIdx: a.heroIdx, heroOwner: a.owner } } : basis))) geblockt.push(t);
     }
     for (const t of geblockt) t.ineligible = true;
+  }
+  // ★ B2/E7: der unbedingte Zielschutz am Helden (Stealthy Pursuit: „cannot be chosen by your opponent's cards or effects", Dive Down, Stealth …) gilt für JEDE gegnerische Karte —
+  // auch für Ziel-Artefakte und -Tränke (Magic Ruby, Snow Cannon, Arcane Lamp …), nicht nur für die als Attack geltenden oben. Welche Quellenart ein Schutz überhaupt abdeckt, entscheidet
+  // seine eigene Regel (`blocksTargeting`: Stealth/Dive Down lassen Artefakte frei, Stealthy Pursuit nicht). Markiert wird erst NACH der Schleife (kein Reihenfolgeeinfluss auf die Anti-Lock-Frage).
+  if (engine && cardName && typeof casterPi === 'number' && !config?.ignoreUntargetable && !config?._truthSeeingEye
+      && typeof engine.heroBlocksTargeting === 'function'
+      && !(typeof engine._heldenEffektStufe === 'function' && engine._heldenEffektStufe(cardName, config?.damageType) != null)) {
+    const opferListe2 = validTargets.filter(t => t && engine.zielSeite(t) !== casterPi);
+    const geblockt2 = [];
+    for (const t of opferListe2) {
+      if (t.type !== 'hero' || t.ineligible) continue;
+      if (engine.heroBlocksTargeting(t.owner, t.heroIdx, { sourceData: getCardDB()[cardName], cardName, damageType: config?.damageType, chooserIdx: casterPi, allTargets: opferListe2 })) geblockt2.push(t);
+    }
+    for (const t of geblockt2) t.ineligible = true;
   }
   return validTargets;
 }
@@ -15805,7 +15814,7 @@ io.on('connection', (socket) => {
   });
 
   // Summon a creature placed by Ushabti from surprise zone
-  socket.on('summon_ushabti', ({ roomId, heroIdx }) => {
+  socket.on('summon_ushabti', async ({ roomId, heroIdx }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.engine || !room.gameState) return;
@@ -15832,25 +15841,83 @@ io.on('connection', (socket) => {
     // Check abilities
     const cardData = getCardDB()[cardName];
     if (!cardData) return;
-    const level = cardData.level || 0;
-    if (level > 0 || cardData.spellSchool1) {
-      const abZones = ps.abilityZones?.[heroIdx] || [];
-      if (cardData.spellSchool1 && room.engine.countAbilitiesForSchool(cardData.spellSchool1, abZones) < level) return;
-      if (cardData.spellSchool2 && room.engine.countAbilitiesForSchool(cardData.spellSchool2, abZones) < level) return;
-    }
+    // B1/S4: Stufe wie beim Handspiel (`heroMeetsLevelReq`, auch die Lücken-Abdeckung z. B. durch Divinity) — vorher zählte hier nur die rohe Schulenzahl.
+    // `noPlacementBypass`: der Deepsea-Tausch-Bypass gilt nur für den Wurf auf einen belegten Platz — hier wird nichts getauscht (wie bei Wiederbelebungen).
+    if (!room.engine.heroMeetsLevelReq(pi, heroIdx, cardData, { noPlacementBypass: true })) return;
 
     // Find free support zone slot (W62a: `beschwoerZonenFuer` — freie Zonen zuerst, danach mit Alice-Teilung die Zone einer gleichnamigen Creature)
     const ushabtiZone = room.engine.beschwoerZonenFuer(pi, cardName, { heroIdx, nurBasis: true })[0];
-    const freeSlot = ushabtiZone ? ushabtiZone.slotIdx : -1;
+    let freeSlot = ushabtiZone ? ushabtiZone.slotIdx : -1;
     if (freeSlot < 0) return;
 
     // Check custom summon conditions
     const script = loadCardEffect(cardName);
     if (script?.canSummon && !script.canSummon({ _engine: room.engine, cardOwner: pi, cardHeroIdx: heroIdx })) return;
 
+    // ★ B1/S4: Beschwörungskosten und `beforeSummon` wie beim Handspiel (`doPlayCreature`) — Pflichtopfer (Black-Thorn/Blue-Ice Dragon), Tribute, Zusatzfragen.
+    // Vorher setzte dieser Weg die Kreatur kostenlos aufs Brett. Laut Ushabti-Text ist es eine Beschwörung „as an additional Action" eines FREMDEN Effekts
+    // (`_alsZusatzaktion`: Blue-Ice Dragon fragt dann nicht nach der Beschwörungsart; Karten, deren Opfer nur den Sonderweg „Zusatzaktion" bezahlen, zahlen nichts).
+    // Alles VOR dem Entnehmen aus der Surprise Zone: bricht der Spieler eine Frage ab, bleibt die Kreatur eingelagert und nichts ist verbraucht.
+    if (ps._ushabtiBeschwoert) return;   // Doppelklick, solange eine Kostenfrage offen ist
+    ps._ushabtiBeschwoert = true;
+    const _ushabtiExtras = { isInherentAction: false, viaDragDrop: false, _isNormalSummon: true, _alsZusatzaktion: true };
+    const _ushabtiMarke = { heroIdx, slotIdx: freeSlot, heroOwner: pi };   // wie `doPlayCreature`: „normale Beschwörung in diese Zone"
+    let _beschwoerungOk = false;
+    try {
+      delete ps._requestedBouncePlaceSlot;
+      ps._requestedNormalSummonSlot = _ushabtiMarke;
+      if (await room.engine._payCreatureSummonCost(cardName, pi, heroIdx, _ushabtiExtras, freeSlot)) {
+        _beschwoerungOk = await room.engine._runBeforeSummon(cardName, pi, heroIdx, _ushabtiExtras, freeSlot);
+      }
+    } catch (err) {
+      console.error('[summon_ushabti] Kosten/beforeSummon:', err.message);
+      _beschwoerungOk = false;
+    } finally {
+      if (ps._requestedNormalSummonSlot === _ushabtiMarke) delete ps._requestedNormalSummonSlot;
+      delete ps._ushabtiBeschwoert;
+    }
+    // Setzt sich die Kreatur in `beforeSummon` selbst (Waitress, Wurf auf belegten Platz …), steht schon eine NEUE Instanz auf dem Brett.
+    const _selbstPlatziert = ps._placementConsumedByCard === cardName;
+    if (_selbstPlatziert) delete ps._placementConsumedByCard;
+    const _ushabtiAbbruch = () => {
+      room.engine._verwerfeSummonKosten();
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
+    };
+    if (!_beschwoerungOk && !_selbstPlatziert) { _ushabtiAbbruch(); return; }
+    // Nach den Fragen neu prüfen: die Kreatur muss noch eingelagert, der Zug noch meiner sein.
+    if (gs.result || pi !== gs.activePlayer || inst.zone !== 'surprise' || !(ps.surpriseZones?.[heroIdx] || []).includes(cardName)) { _ushabtiAbbruch(); return; }
+    const _tribExtra = room.engine.takeTributeSummonExtras(cardName, pi);   // Tribut-Stempel einlösen (sonst schlägt er auf eine spätere Beschwörung durch)
+
+    if (_selbstPlatziert) {
+      // Die eingelagerte Instanz ist hinfällig: Karte aus der Surprise Zone nehmen. (`beforeSummon` hat die Kreatur samt Eintritts-Hooks selbst gesetzt.)
+      const _szS = ps.surpriseZones[heroIdx];
+      const _ixS = _szS.indexOf(cardName);
+      if (_ixS >= 0) _szS.splice(_ixS, 1);
+      room.engine._untrackCard(inst.id);
+      const _neu = room.engine.cardInstances.filter(c => c.id !== inst.id && c.name === cardName && c.zone === 'support' && room.engine.kontrolleurVon(c) === pi).slice(-1)[0] || null;
+      room.engine.notePlayedFromHand(pi);
+      ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
+      room.engine._trackTerrorResolvedEffect(pi, cardName);
+      try {
+        await room.engine.meldeBeschwoerungAlsAktion(pi, heroIdx, cardName, _neu);
+        await room.engine._flushSurpriseDrawChecks();
+        if (_neu) await room.engine._checkSurpriseOnSummon(pi, _neu);
+      } catch (err) {
+        console.error('[Engine] summon_ushabti (selbst gesetzt) hooks error:', err.message);
+      }
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
+      return;
+    }
+
+    // Die Kosten können Zonen verändert haben: den Platz neu bestimmen (bleibt keiner, sind die Kosten bezahlt, die Kreatur bleibt eingelagert).
+    const _zoneNach = room.engine.beschwoerZonenFuer(pi, cardName, { heroIdx, nurBasis: true })[0];
+    if (!_zoneNach) { _ushabtiAbbruch(); return; }
+    freeSlot = _zoneNach.slotIdx;
+
     // Remove from surprise zone
-    const szIdx = sz.indexOf(cardName);
-    if (szIdx >= 0) sz.splice(szIdx, 1);
+    const _szV = ps.surpriseZones?.[heroIdx] || [];
+    const szIdx = _szV.indexOf(cardName);
+    if (szIdx >= 0) _szV.splice(szIdx, 1);
 
     // Place in support zone
     room.engine.zoneEintragen(pi, heroIdx, freeSlot, cardName, pi);   // W62a: leere Zone → [name]; gleichnamige (Alice) → dazustapeln
@@ -15876,8 +15943,8 @@ io.on('connection', (socket) => {
 
     (async () => {
       try {
-        await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: freeSlot, _skipReactionCheck: true });
-        await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _skipReactionCheck: true });
+        await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: freeSlot, _skipReactionCheck: true, ..._tribExtra });
+        await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _skipReactionCheck: true, ..._tribExtra });
         // Fire Bakhm's onSurpriseCreaturePlaced for surprise creature summons
         await room.engine.runHooks('onSurpriseCreaturePlaced', {
           surpriseCardName: cardName, surpriseOwner: pi, heroIdx,
@@ -16058,6 +16125,9 @@ io.on('connection', (socket) => {
     if (!room?.gameState || !room.engine) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
+    // B1/S2: serverseitig wie der Client (`isMyTurn`): nur im EIGENEN Zug, Spiel nicht beendet, Phase 2-4 (Main 1, Action, Main 2) — vorher ließ sich Modnir & Co. im Gegnerzug ausspielen.
+    const _gsC = room.gameState;
+    if (_gsC.result || pi !== _gsC.activePlayer || _gsC.currentPhase < 2 || _gsC.currentPhase > 4) return;
     (async () => {
       try {
         await room.engine.actionPlayTopOfCoolnessStack(pi);

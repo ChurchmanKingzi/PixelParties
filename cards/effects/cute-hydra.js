@@ -445,6 +445,7 @@ module.exports = {
 
   // ── 3. HOPT MULTI-TARGET DAMAGE ────────────────────────────────
   creatureEffect: true,
+  requiresTarget: true,   // Zielwahl-Effekt: Blinded sperrt ihn (siehe _hooks.js / getActivatableCreatures)
 
   canActivateCreatureEffect(ctx) {
     const inst = ctx.card;

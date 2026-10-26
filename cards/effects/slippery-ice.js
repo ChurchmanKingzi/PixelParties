@@ -17,13 +17,19 @@
 //  no summoning. The Creature is picked up from
 //  one slot and dropped into a free adjacent one.
 //
+//  Als Ruling (Al 26.10.): „So viele wie möglich!" — der Effekt bewegt ALLE bewegbaren eigenen Kreaturen; nach der ersten Bewegung
+//  gibt es kein Abbrechen/Stoppen mehr (die Quellwahl ist dann nicht abbrechbar), er endet erst, wenn keine noch unbewegte Kreatur
+//  mehr ein freies Ziel hat. Die Reihenfolge und die Zielzone wählt der Spieler (eine Zielwahl darf zurück zur Quellwahl gehen).
+//  Die Zonensperre (Tri Fecta/Tri Ad, Bonded Companion) gilt: gesperrte Spalten sind kein Ziel (`destinationsFor`).
+//
 //  Flow, per activation:
 //    1. Loop:
 //       a. Collect every (creature → adjacent free
 //          zone) pair the controller currently has.
 //          If none, exit.
 //       b. Prompt "Pick a Creature to move" over
-//          every eligible source. Cancel stops.
+//          every eligible source. Cancel stops
+//          (nur VOR der ersten Bewegung).
 //       c. Prompt "Pick a destination" over that
 //          Creature's adjacent free zones. Cancel
 //          rewinds to the source prompt.
@@ -268,9 +274,11 @@ module.exports = {
       const src = await promptCtx.promptZonePick(sourceZones, {
         title: CARD_NAME,
         description: moved > 0
-          ? `Pick another Creature to move, or cancel to stop (${moved} moved so far).`
+          ? `Pick another Creature to move — as many as possible (${moved} moved so far).`
           : 'Pick a Creature to move onto an adjacent Hero.',
-        cancellable: true,
+        // Als Ruling (Al 26.10.): „So viele wie möglich!" — vor der ersten Bewegung ist die Aktivierung abbrechbar (nichts passiert, Einmal-Sperre frei);
+        // danach NICHT mehr: der Effekt bewegt alle Kreaturen, die sich noch bewegen lassen (kein Stoppen nach jeder Bewegung).
+        cancellable: moved === 0,
         // Es wird eine KARTE gewaehlt, nicht ein Platz: ein Klick auf den Helden
         // darf nicht stillschweigend dessen linkeste waehlen (s. promptZonePick).
         heroShortcut: false,

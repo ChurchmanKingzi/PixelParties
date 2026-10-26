@@ -5,6 +5,10 @@
 //  Inherent unconditional additional Action.
 //  Once per game (Divine Gift restriction).
 //
+//  Als Ruling (Al 26.10.): Wortlaut „Attach this card to a Hero you
+//  control" — der Wirt ist nur ein EIGENER (kontrollierter) Held; der
+//  Kartentext in `data/cards.json` ist angepasst.
+//
 //  Places itself in a Hero's free Support Zone.
 //  Player can click a Hero (first free zone)
 //  or directly click an empty zone.

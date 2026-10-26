@@ -304,10 +304,12 @@ async function sacrificeSwapAtomar(ctx) {
   //     (sacrifice is a sub-type of dying). The slot is already taken by
   //     Suspicious Monster, so a resummon-into-the-freed-slot reaction
   //     (Corpse Cannibal) correctly finds it occupied and skips.
+  const _ankhotaVorab = engine.ankhotaLoeschtVomBrett(occ);   // Ankhota: vor dem Zonenwechsel auswerten (Ankhota selbst zählt mit)
   occ.zone = 'discard'; occ.heroIdx = -1; occ.zoneSlot = -1;
   const _occPs = gs.players[engine.kartenBesitzerVon(occ)] || fps;   // W63c: Ablage des permanenten Besitzers des Geopferten
   if (!_occPs.discardPile) _occPs.discardPile = [];
-  _occPs.discardPile.push(occName);
+  // Ankhota: „Delete all Creatures that are moved from the board to anywhere else" — der Opfer-Tausch umgeht den zentralen Move: gelöscht statt abgelegt.
+  if (!engine.ankhotaLoeschtSonderweg(occ, gs.players[engine.kartenBesitzerVon(occ)] ? engine.kartenBesitzerVon(occ) : heroOwner, { source: CARD_NAME, vorab: _ankhotaVorab })) _occPs.discardPile.push(occName);
   await engine.runHooks('onCardLeaveZone', {
     card: occ, leavingCard: occ, fromZone: 'support',
     fromOwner: heroOwner, fromHeroIdx: heroIdx, fromZoneSlot: slotIdx,
@@ -427,10 +429,12 @@ module.exports = {
       const idx = slotArr.indexOf(occName);
       if (idx >= 0) slotArr.splice(idx, 1);
     }
+    const _ankhotaVorab = engine.ankhotaLoeschtVomBrett(occ);   // Ankhota: vor dem Zonenwechsel auswerten (Ankhota selbst zählt mit)
     occ.zone = 'discard'; occ.heroIdx = -1; occ.zoneSlot = -1;
     const _occPs = gs.players[engine.kartenBesitzerVon(occ)] || fps;   // W63c: Ablage des permanenten Besitzers des Geopferten
     if (!_occPs.discardPile) _occPs.discardPile = [];
-    _occPs.discardPile.push(occName);
+    // Ankhota: „Delete all Creatures that are moved from the board to anywhere else" — der Opfer-Tausch umgeht den zentralen Move: gelöscht statt abgelegt.
+    if (!engine.ankhotaLoeschtSonderweg(occ, gs.players[engine.kartenBesitzerVon(occ)] ? engine.kartenBesitzerVon(occ) : heroOwner, { source: CARD_NAME, vorab: _ankhotaVorab })) _occPs.discardPile.push(occName);
     engine.sync();
     await engine.runHooks('onCardLeaveZone', {
       card: occ, leavingCard: occ, fromZone: 'support',

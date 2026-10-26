@@ -116,6 +116,9 @@ module.exports = {
     // abgebrochene Entfernen gilt für dieses Opfer; der Namens-Riegel
     // verhindert den Neuversuch, und der Zugstempel `_cdMalfunctionSchild`
     // (oben) schützt die weiteren CD-Kreaturen desselben Effekts.
+    // ★ Ruling Al (26.10.2026): „ALLE Effekte" — nicht nur das Entfernen. Bis Zugende prallen ALLE Wirkungen der negierten Karte (gleicher
+    // Basisname, nur Quellen des Gegners) auf deine Cosmic-Depths-Kreaturen ab: Schaden, Status, Buffs, Heilen, Bounce, Zerstören … — die Engine liest den
+    // Zugstempel in `engine.cdMalfunctionSchutz` (u. a. `kreaturGegnerEffektImmun`, `kreaturBetroffen`, Statuspfad, Kreaturenheilung).
     return true; // Cancel the operation
   },
 };

@@ -93,6 +93,21 @@ module.exports = {
       });
     },
 
+    // True-Damage-Attack gegen einen Helden (Surefire Shot): „cannot be reduced" verbietet nur Senken — der Bonus erhöht (flat, verdoppelungsfest).
+    // Nur wenn die Engine den Angriff als Attack mit Zusaetzen fuehrt (`angriffsBoni`); Umleitungen (Johanna …) tragen es nicht.
+    beforeTrueDamage: (ctx) => {
+      if (!ctx.angriffsBoni || ctx.type !== 'attack') return;
+      if (!isOwnAttack(ctx, ctx.source)) return;
+      if (trifftMehrereZiele(ctx)) return;
+      const arrows = armedArrowCount(ctx);
+      if (arrows <= 0) return;
+      const bonus = BONUS_PER_ARROW * arrows;
+      ctx.modifyAmount(bonus);
+      ctx._engine.log('darge_arrow_bonus', {
+        hero: ctx.attachedHero?.name, arrows, bonus,
+      });
+    },
+
     // Creature-target attacks route through `processCreatureDamageBatch`,
     // which fires `beforeCreatureDamageBatch` once for the whole batch
     // with an `entries` array. Tag every entry that's this Darge's own

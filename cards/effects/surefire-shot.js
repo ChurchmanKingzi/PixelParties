@@ -81,9 +81,9 @@ module.exports = {
         let dealt = 0;
         if (target.type === 'hero') {
           const ziel = gs.players[target.owner]?.heroes?.[target.heroIdx];
-          if (ziel && ziel.hp > 0) ({ dealt } = await engine.actionDealTrueDamage(source, ziel, betrag, { type: 'attack' }));
+          if (ziel && ziel.hp > 0) ({ dealt } = await engine.actionDealTrueDamage(source, ziel, betrag, { type: 'attack', angriffsBoni: true }));   // Pfeile/Elixir/Darge erhöhen auch True Damage (Engine: `angriffsBoni`)
         } else if (target.cardInstance) {
-          ({ dealt } = await engine.actionDealTrueDamage(source, target.cardInstance, betrag, { type: 'attack' }));
+          ({ dealt } = await engine.actionDealTrueDamage(source, target.cardInstance, betrag, { type: 'attack', angriffsBoni: true }));
         }
         engine.log('surefire_shot', {
           player: gs.players[pi]?.username, target: target.cardName, damage: betrag, dealt,

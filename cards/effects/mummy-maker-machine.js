@@ -2,6 +2,18 @@
 //  CARD EFFECT: "Mummy Maker Machine"
 //  Creature (Surprise) — Summoning Magic Lv1
 //
+//  Kartentext (data/cards.json, Als Ruling (Al 26.10.)):
+//   „Activate this Surprise when your opponent activates a Hero's active effect. Place a Mummy Token into the free Support Zone of
+//    a Hero your opponent controls that does not have a Mummy Token in its Support Zones yet, then place this Creature into one
+//    of the user's free Support Zones. You may once per turn move this Creature you control into the corresponding Hero's Surprise
+//    Zone face-down."
+//
+//  Als Ruling (Al 26.10.): „Nur Gegnerhelden ist korrekt" — der Token geht NUR in die freie Support Zone eines Helden, den der
+//  GEGNER kontrolliert (der Text sagt „of a Hero your opponent controls"); eigene Helden sind nie Ziel. Das Skript bleibt.
+//
+//  Skript-Verhalten OHNE Textgrundlage (Rückfrage an Al, 26.10., unverändert gelassen): landet der Token auf dem aktivierenden
+//  Helden, wird dessen Effekt negiert (`negateEffect`) — das steht NICHT im Kartentext.
+//
 //  Activate when the opponent activates a
 //  Hero's active effect.
 //  Place a Mummy Token into a free Support

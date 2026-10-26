@@ -72,6 +72,8 @@ module.exports = {
         confirmLabel: `🔥 Fireball! (${FIREBALL_DAMAGE})`,
         confirmClass: 'btn-danger',
         cancellable: !forced,
+        // Als Ruling (Al 26.10., Chaorc Friendly Fireballer): die Kosten dieser Ausführung (Opfer) fallen erst mit der bestätigten Zielwahl an — `ctx._nachZielwahl` (vom Aufrufer).
+        ...(typeof ctx._nachZielwahl === 'function' ? { nachZielwahl: ctx._nachZielwahl } : {}),
       });
 
       // [] = cancelled or fully negated (promptMultiTarget already set

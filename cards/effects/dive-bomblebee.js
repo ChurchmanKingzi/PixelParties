@@ -271,6 +271,9 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
     if (idx >= 0) slotArr.splice(idx, 1);
   }
 
+  // Ankhota: „Delete all Creatures that are moved from the board to anywhere else" — dieser Sonderweg umgeht den zentralen Move; vor dem Enttracken auswerten (Ankhota selbst zählt mit).
+  const ankhotaVorab = fromZone === 'support' && engine.ankhotaLoeschtVomBrett(targetInst);
+
   // Untrack the inst BEFORE pushing onto deck — the deck holds names
   // only, no instance tracking.
   engine._untrackCard(targetInst.id);
@@ -280,9 +283,12 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
   if (istToken) {
     engine.tokenAbgang(targetInst);
   } else {
-    const dps = gs.players[engine.kartenBesitzerVon(targetInst)] || ops;
-    if (!dps.mainDeck) dps.mainDeck = [];
-    dps.mainDeck.push(cardName);
+    const besitzerIdx = gs.players[engine.kartenBesitzerVon(targetInst)] ? engine.kartenBesitzerVon(targetInst) : oi;
+    const dps = gs.players[besitzerIdx];
+    if (!engine.ankhotaLoeschtSonderweg(targetInst, besitzerIdx, { source: CARD_NAME, vorab: ankhotaVorab })) {   // Ankhota: gelöscht statt unters Deck
+      if (!dps.mainDeck) dps.mainDeck = [];
+      dps.mainDeck.push(cardName);
+    }
   }
 
   engine.log('dive_bomblebee_strike', {

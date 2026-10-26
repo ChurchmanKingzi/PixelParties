@@ -214,8 +214,18 @@ async function idejLordStartOfGame(ctx, caps) {
       confirmClass: 'btn-success',
       cancellable: true,
     });
-    const picked = (result && !result.cancelled && Array.isArray(result.selectedCards))
+    const rohPicked = (result && !result.cancelled && Array.isArray(result.selectedCards))
       ? result.selectedCards : [];
+    // B1/S6: die Typ-Grenzen (`typeLimits`: z. B. Nobunakin max. 2 Projections + 1 Blade) prüft sonst nur die Client-Galerie — serverseitig je Typ kappen
+    // (und insgesamt auf `selectCount`); Karten, die gar nicht angeboten waren (weder Projection noch Blade), zählen nicht.
+    const noch = { Projection: projCap, Blade: bladeCap };
+    const picked = [];
+    for (const n of rohPicked) {
+      const typ = n === PROJECTION_NAME ? 'Projection' : (isIdejBlade(n) ? 'Blade' : null);
+      if (!typ || noch[typ] <= 0 || picked.length >= selectCount) continue;
+      noch[typ]--;
+      picked.push(n);
+    }
 
     // Attach one at a time — each card flies from the deck into its
     // Support Zone slot, with a beat between so they land in sequence.

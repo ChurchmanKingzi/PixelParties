@@ -105,7 +105,8 @@ function arrowTriggerCondition(gs, pi, engine, chainCtx, _opts = {}) {
   const initial = chainCtx.chain.find(l => l.isInitialCard);
   if (!initial) return false;
   if (initial.cardType !== 'Attack') return false;
-  if (initial.owner !== pi) return false;
+  // Als Ruling (Al 26.10.): Hydra Blood Arrow („when a Hero hits …", ohne „you control") darf auf die Attack JEDES Helden auslösen (`opts.anyHero`).
+  if (initial.owner !== pi && !_opts.anyHero) return false;
   // Backstab: die Attack führt ein Held des GEGNERS aus („a Hero you control performs an Attack" trifft nicht zu) — kein Pfeil des Spielers (der Pfeil würde den spielenden eigenen Helden
   // scharf stellen, der Schaden kommt aber vom Gegnerhelden: er verpuffte). Skript-Flagge `attackPerformedByOpponentHero`.
   if (require('./_loader').loadCardEffect(initial.cardName)?.attackPerformedByOpponentHero) return false;
@@ -117,7 +118,7 @@ function arrowTriggerCondition(gs, pi, engine, chainCtx, _opts = {}) {
   const hiIdx = initial.heroIdx ?? initial.casterHeroIdx;
   if (hiIdx == null || hiIdx < 0) return false;
   // Styx 28.9.: geliehener Angreifer steht auf der Brettseite `casterOwner`.
-  const hero = gs.players[initial.casterOwner ?? pi]?.heroes?.[hiIdx];
+  const hero = gs.players[initial.casterOwner ?? (_opts.anyHero ? initial.owner : pi)]?.heroes?.[hiIdx];
   if (!hero?.name || hero.hp <= 0) return false;
 
   // Future multi-target gate for Golden Arrow. Left intentionally true —
@@ -156,11 +157,11 @@ function arrowTriggerCondition(gs, pi, engine, chainCtx, _opts = {}) {
  *   sourceCard    : string       — log label
  */
 function armAttackerWithArrow(engine, pi, chain, modifier) {
-  const hero = _findAttackerHero(engine, pi, chain);
+  const hero = _findAttackerHero(engine, pi, chain, !!modifier?.anyHero);
   if (!hero) return false;
   if (modifier) {
     if (!Array.isArray(hero._armedArrows)) hero._armedArrows = [];
-    hero._armedArrows.push({ ...modifier });
+    hero._armedArrows.push({ ...modifier, ownerPi: pi });   // `ownerPi` = Spieler des Pfeils (bei Hydra Blood auf eine gegnerische Attack ≠ Angreifer)
   }
   hero._arrowsChainedCount = _countArrowLinks(chain);
   return true;
@@ -176,15 +177,15 @@ function noteArrowActivated(engine, pi, chain) {
   return armAttackerWithArrow(engine, pi, chain, null);
 }
 
-function _findAttackerHero(engine, pi, chain) {
+function _findAttackerHero(engine, pi, chain, anyHero = false) {
   if (!Array.isArray(chain) || chain.length === 0) return null;
   const initial = chain.find(l => l.isInitialCard && l.cardType === 'Attack');
   if (!initial) return null;
-  if (initial.owner !== pi) return null;
+  if (initial.owner !== pi && !anyHero) return null;
   const hiIdx = initial.heroIdx ?? initial.casterHeroIdx;
   if (hiIdx == null || hiIdx < 0) return null;
   // Styx 28.9.: Held auf der Brettseite (`casterOwner`), „you" bleibt `pi`.
-  const hero = engine.gs.players[initial.casterOwner ?? pi]?.heroes?.[hiIdx];
+  const hero = engine.gs.players[initial.casterOwner ?? (anyHero ? initial.owner : pi)]?.heroes?.[hiIdx];
   return hero?.name ? hero : null;
 }
 
@@ -223,7 +224,7 @@ function applyArrowsBeforeDamage(engine, source, target, hookCtx) {
   let zero = false;
   for (const arrow of hero._armedArrows) {
     if (typeof arrow.flatDamage === 'number') flat += arrow.flatDamage;
-    if (arrow.setAmount0) zero = true;
+    if (arrow.setAmount0 && !hookCtx._unreduzierbar) zero = true;   // B2/E4: True Damage („cannot be reduced") wird nicht auf 0 gesenkt
   }
 
   // W49a (Ricochet, Folgetreffer): der Betrag steht fest („half as much as the previous one") — der Pfeil-Bonus steckt schon im Vorgaenger.
@@ -293,7 +294,7 @@ async function applyArrowsAfterDamage(engine, source, target, dealt, _origAmount
       const basis = arrow._preZeroDamage || 0;
       const stacks = Math.floor(basis / arrow.poisonStacksPer);
       if (stacks > 0) {
-        await applyPoisonStacksToTarget(engine, pi, targetLoc, stacks, arrow.sourceCard || 'Arrow');
+        await applyPoisonStacksToTarget(engine, arrow.ownerPi ?? pi, targetLoc, stacks, arrow.sourceCard || 'Arrow');   // Quelle = Spieler des Pfeils (Hydra Blood auf gegnerische Attack)
       }
     }
     // Gold gain per N damage dealt (Golden Arrow).
@@ -326,8 +327,9 @@ async function clearArmedArrows(engine, pi) {
     for (const arrow of hero._armedArrows) {
       if (!(arrow.goldRatio > 0) || !arrow._goldTreffer || arrow._goldTreffer.size !== 1) continue;
       const dealt = [...arrow._goldTreffer.values()][0];
-      if (!(dealt > 0)) continue;
-      const gold = Math.floor(dealt / arrow.goldRatio);
+      // Als Ruling (Al 26.10., Golden Arrow „Sperren"): die Gold-Sperre („You cannot gain or spend Gold for the rest of the turn afterwards") gilt auch bei
+      // 0 Schaden / 0 Gold — NICHT hinter `dealt > 0` verstecken; Gold gibt es nur für echten Schaden.
+      const gold = dealt > 0 ? Math.floor(dealt / arrow.goldRatio) : 0;
       if (gold > 0 && !ps.goldLocked) {
         await engine.actionGainGold(pi, gold);
         engine.log('arrow_gold_gain', { player: ps.username, gold, source: arrow.sourceCard || 'Arrow' });
