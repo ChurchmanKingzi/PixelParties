@@ -10,13 +10,12 @@
 //  every damage multiplier (Cloudy halving,
 //  future damage doublers).
 //
-//  The "exactly 1 target" clause: every PP
-//  Attack card currently resolves against a
-//  single promptDamageTarget pick, so the
-//  condition is always met in practice. If
-//  multi-target Attacks ship in the future, we
-//  can narrow the hook by checking the Attack's
-//  resolved-target count.
+//  The "exactly 1 target" clause: a multi-target
+//  Attack (Whirlwind Strike & Co.) gets no bonus.
+//  Both hooks read the multi-hit bracket
+//  (`engine._multiHitScope`, total >= 2) — the same
+//  rule as Elixir of Strength. A chain that begins
+//  with exactly 1 target (Ricochet) still counts.
 //
 //  Mechanism: Darge hooks both `beforeDamage`
 //  (hero target) and `beforeCreatureDamageBatch`
@@ -60,6 +59,16 @@ function armedArrowCount(ctx) {
   return ctx.attachedHero?._arrowsChainedCount || 0;
 }
 
+/**
+ * „If this Hero hits exactly 1 target": ein Flaechenschlag mit 2+ Zielen (Whirlwind Strike & Co.,
+ * Mehrziel-Klammer `_multiHitScope`) bekommt den Bonus nicht. Ketten, die mit genau einem Ziel
+ * beginnen (Ricochet: `ersterTrefferEinzel`), zaehlen wie bei Elixir of Strength (Welle 13, Q138).
+ */
+function trifftMehrereZiele(ctx) {
+  const mh = ctx._engine?._multiHitScope;
+  return (mh?.total || 0) >= 2 && !mh.ersterTrefferEinzel;
+}
+
 module.exports = {
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
@@ -74,6 +83,7 @@ module.exports = {
     beforeDamage: (ctx) => {
       if (ctx.type !== 'attack') return;
       if (!isOwnAttack(ctx, ctx.source)) return;
+      if (trifftMehrereZiele(ctx)) return;
       const arrows = armedArrowCount(ctx);
       if (arrows <= 0) return;
       const bonus = BONUS_PER_ARROW * arrows;
@@ -91,6 +101,7 @@ module.exports = {
     beforeCreatureDamageBatch: (ctx) => {
       const entries = ctx.entries;
       if (!Array.isArray(entries) || entries.length === 0) return;
+      if (trifftMehrereZiele(ctx)) return;
       const arrows = armedArrowCount(ctx);
       if (arrows <= 0) return;
       const bonus = BONUS_PER_ARROW * arrows;

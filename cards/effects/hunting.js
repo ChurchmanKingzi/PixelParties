@@ -97,6 +97,8 @@ module.exports = {
       // ── Hat DIESER Held die Creature besiegt? ────────────────────
       const quelle = ctx.source;
       if (!quelle || !engine.quelleIstHeld(quelle, feld, hi)) return;
+      // Kreatureneffekte zaehlen nicht als „dieser Held besiegt" (s. Kopfkommentar) — auch wenn sie ihre Quelle mit dem `heroIdx` der Spalte bauen (Haressassin, Mr. Jiggles, 3-Headed Giant …).
+      if (require('./_hooks').isCreatureSource(engine, quelle)) return;
 
       // ── War es eine GEGNERISCHE Creature? ────────────────────────
       // Ueber den Controller, damit eine per Cross-Side-Platzierung

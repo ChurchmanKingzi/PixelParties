@@ -187,7 +187,22 @@ module.exports = {
     }
     if (eligibleSurprises.length === 0) return false;
 
-    // ── 2. Sacrifice the Creature (knife animation + ON_CREATURE_SACRIFICED + destroy) ──
+    // ── 2. Player picks a Surprise from the deck (abbrechbar — NOCH VOR den Kosten) ──
+    // „Kosten erst nach dem letzten abbrechbaren Schritt" (CARD_API): die Opferung steht erst hinter der Wahl —
+    // wer die Galerie abbricht, behält seine Creature (früher: geopfert, Surprise nie aktiviert).
+    const selected = await engine.promptGeneric(pi, {
+      type: 'cardGallery',
+      cards: eligibleSurprises,
+      title: CARD_NAME,
+      description: `Choose a Surprise (Lv${sacLevel} or lower) from your deck to activate.`,
+      cancellable: true,
+    });
+    if (!selected || !selected.cardName) return false;
+    const surpriseName = selected.cardName;
+    const surpriseScript = loadCardEffect(surpriseName);
+    if (!surpriseScript?.onSurpriseActivate) return false;
+
+    // ── 3. Sacrifice the Creature (knife animation + ON_CREATURE_SACRIFICED + destroy) ──
     engine._broadcastEvent('play_zone_animation', {
       type: 'knife_sacrifice',
       owner: sacInst.owner,
@@ -210,19 +225,6 @@ module.exports = {
     });
     engine.sync();
     await engine._delay(200);
-
-    // ── 3. Player picks a Surprise from the deck ──
-    const selected = await engine.promptGeneric(pi, {
-      type: 'cardGallery',
-      cards: eligibleSurprises,
-      title: CARD_NAME,
-      description: `Choose a Surprise (Lv${sacLevel} or lower) from your deck to activate.`,
-      cancellable: true,
-    });
-    if (!selected || !selected.cardName) return false;
-    const surpriseName = selected.cardName;
-    const surpriseScript = loadCardEffect(surpriseName);
-    if (!surpriseScript?.onSurpriseActivate) return false;
 
     // ── 4. Build the canonical telekinesis-style sourceInfo ──
     // `telekinesis: true` opts the Surprise into its "player picks

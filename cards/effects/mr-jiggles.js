@@ -11,6 +11,8 @@ const DAMAGE    = 100;
 
 module.exports = {
   creatureEffect: true,
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status): der Effekt WÄHLT Ziele.
 
   canActivateCreatureEffect() { return true; },
 

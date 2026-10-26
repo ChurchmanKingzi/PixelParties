@@ -140,6 +140,8 @@ module.exports = {
       // gerade gewaehlte Ziel leuchtet rot auf.
       const gewaehlt = new Set();
       const kette = [];
+      // Toras: „This Hero can never hit more than 1 target with an Attack" — die Kette bricht nach dem ersten Ziel ab (heroFlags.singleTargetAttack, wie Whirlwind Strike).
+      const nurEinZiel = !!engine.heroFlagsLive(ctx.cardHeroOwner ?? pi, heroIdx)?.singleTargetAttack;
       let waehler = pi;                       // „You choose first."
       try {
         // Obergrenze nur als Gurt: jede Runde verbraucht ein Ziel, die
@@ -186,6 +188,7 @@ module.exports = {
           if (engine.isCpuPlayer(waehler) && !engine._inMctsSim && !engine._fastMode) {
             await engine._delay(1100);   // v1151: laenger, passend zur deutlicheren Animation
           }
+          if (nurEinZiel) break;               // Toras: nur ein Ziel
           waehler = gegenseite;                // der Getroffene ist als Naechster dran
         }
       } catch (err) {

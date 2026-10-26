@@ -124,6 +124,8 @@ module.exports = {
       // Create a temporary card instance for the second hit
       const tempInst = engine._trackCard(ctx.spellName, pi, 'hand', heroIdx, -1);
       if (feld !== pi) tempInst.heroOwner = feld;   // Styx 28.9.: wie der Server bei Uebernahme
+      // „Re-cast skips costs" (wie Grisgar, W16f): die Kosten der Karte („to play this card", z. B. Knife Throw) sind beim ersten Wurf bezahlt — der zweite Treffer zahlt nicht noch einmal und fizzelt nicht, wenn nichts mehr zu zahlen ist.
+      tempInst._kostenBezahlt = true;
 
       try {
         await engine.runHooks('onPlay', {
