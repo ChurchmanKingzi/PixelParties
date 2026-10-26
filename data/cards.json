@@ -9157,7 +9157,7 @@
     "hp": null,
     "atk": null,
     "cost": 20,
-    "effect": "Equip this card to a Hero you control. You may once per turn choose as many targets on the board as there are \"Future Tech Fists\" cards in your discard pile and deal damage equal to the equipped Hero's Base Attack stat to them. You can only activate the effect of \"Future Tech Fists\" once per turn.",
+    "effect": "Equip this card to a Hero you control. You may once per turn choose as many targets on the board as there are \"Future Tech Fists\" cards in your discard pile and deal damage equal to the equipped Hero's Base Attack stat to them. This counts as an Attack. You can only activate the effect of \"Future Tech Fists\" once per turn.",
     "archetype": "Future Tech",
     "setID": "PP GBT",
     "banned": "",
