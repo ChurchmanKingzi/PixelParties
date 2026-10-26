@@ -112,6 +112,20 @@ module.exports = {
       // laeuft ohne Zielwahl und ohne Kosten durch (Regel v736).
       await engine.showTriggeredEffect(CARD_NAME);
 
+      // ★ AoE-Prinzip (CARD_API „Schaden an mehreren Zielen", Schritt „Reagieren"): alle betroffenen Helden dürfen reagieren, BEVOR etwas
+      // abgeräumt wird (Surprises wie Booby Trap, Storm Ring/MOE Shield, Rook of Kings [B], Castling). Der Schlussschlag unten läuft ohne
+      // Fenster (`postTargetCheck: false`), weil sie hier schon gelaufen sind — nach dem Abräumen wäre es zu spät. Negiert: nichts passiert.
+      {
+        const ziele = betroffen.map(e => ({ type: 'hero', owner: e.pi, heroIdx: e.heroIdx, cardName: e.hero.name }));
+        const sr = await engine.preDamageMultiTargetWindow(ctx.card, ziele, { simultan: true, damageType: 'destruction_spell' });
+        if (sr?.effectNegated) return;
+        // Per Fenster-Immunität geschützte Helden („unaffected"): weder ihre Ausrüstung wird abgeräumt noch nehmen sie Schaden.
+        for (let i = betroffen.length - 1; i >= 0; i--) {
+          if (engine.hasEffectImmunity(betroffen[i].pi, betroffen[i].heroIdx, ctx.card)) betroffen.splice(i, 1);
+        }
+        if (betroffen.length === 0) return;
+      }
+
       // ── Welle 1: Stichflammen ueber der Ausruestung ──────────────
       let gestaffelt = 0;
       for (const eintrag of betroffen) {

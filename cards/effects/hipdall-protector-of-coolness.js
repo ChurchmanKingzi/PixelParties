@@ -75,6 +75,12 @@ module.exports = {
       // landings are deliberate placements.
       if (!toZone || toZone === 'support' || toZone === 'permanent') return;
 
+      // Die Karte muss noch dort liegen: hat ein anderer Hipdall sie in diesem Zug schon zurueckgeholt, gibt es nichts mehr zu fragen
+      // (die Frage waere umsonst und braeuchte den Einmal-Stempel dieses Hipdall auf).
+      if (toZone === 'discard' && !ps.discardPile.includes(cardName)) return;
+      if (toZone === 'deleted' && !ps.deletedPile.includes(cardName)) return;
+      if (toZone === 'hand' && !ps.hand.includes(cardName)) return;
+
       const confirmed = await engine.promptGeneric(pi, {
         type: 'confirm',
         title: CARD_NAME,

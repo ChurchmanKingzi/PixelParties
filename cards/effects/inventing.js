@@ -14,6 +14,7 @@
 
 // v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
 const { baseCardName } = require('./_hooks');
+const { searchBlocked } = require('./_search-shared');
 
 const CARD_NAME = 'Inventing';
 
@@ -33,6 +34,7 @@ module.exports = {
     if (level >= 3) {
       const engine = ctx._engine;
       const pi     = ctx.cardOwner;
+      if (searchBlocked(engine, pi)) return false;   // Such-Template ②: unter der Deck-Such-Sperre nicht anbieten (der Abwurf waere umsonst)
       // W16f (M01-09): es muss eine Handkarte H (die abgeworfen wird) und eine Deckkarte D mit anderem Namen geben (D != H) -
       // vorher verlangte der Test eine Deckkarte, deren Name auf KEINER Handkarte steht (`|| cn !== cn` war immer falsch).
       const handNames = [...new Set(ps.hand)];
@@ -106,6 +108,8 @@ module.exports = {
     }
 
     // ── Lv3: discard 1 → search for a different-named card ──────────────
+
+    if (searchBlocked(engine, pi)) return false;   // Such-Template ②: Kosten erst, wenn die Suche moeglich ist
 
     // Pick 1 card to discard (cancellable)
     const discardResult = await engine.promptGeneric(pi, {
