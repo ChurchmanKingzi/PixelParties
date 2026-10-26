@@ -174,8 +174,11 @@ module.exports = {
       let discarded = 0;
       while (discarded < 3) {
         const eligibleIndices = [];
+        // ★ W77b (Al: „Eine Karte selbst zählt NIE als legales Abwurf-Material für ihre eigenen Kosten"): der Platz der aufzulösenden Chimera wird JE WAHL neu bestimmt —
+        // `resolvingIdx` (oben, einmal) wird nach dem ersten Tribut falsch (die Hand rückt zusammen) und ließ die Chimera als 2./3. Tribut sich selbst abwerfen.
+        const ohneAufl = new Set(engine._handIndizesOhneAufloesende(ps));
         for (let i = 0; i < (ps.hand || []).length; i++) {
-          if (i === resolvingIdx) continue;
+          if (!ohneAufl.has(i)) continue;
           const cn = ps.hand[i];
           if (!isGigantisaurCreature(cn, engine)) continue;
           if (discardedNames.has(cn)) continue;

@@ -43,6 +43,7 @@
 // ═══════════════════════════════════════════
 
 const { zaehleInAblage } = require('./_future-tech-shared');
+const { zweitwurfSchlaege } = require('./_second-target-shared');
 
 const CARD_NAME = 'Future Tech Barrage';
 const DAMAGE = 180;
@@ -78,7 +79,7 @@ module.exports = {
       // ★ Z7 (A03-21): Rundensperre erst NACH der Zusage stempeln (Muster Iterative Testing) — ein
       // Abbruch der Zielwahl darf den Zug nicht verbrennen (Regel 23.9). Vorab nur prüfen.
       // ★ W76a: Bartas' Zweitwurf („you may choose a second target for the Spell to hit afterwards") ist kein weiteres SPIELEN der Karte — der Hauptwurf hat den Stempel schon
-      // gesetzt; der Zweitwurf zählt dieselbe Ablage (die Karte selbst liegt noch auf der Hand) und schlägt gleich oft zu.
+      // gesetzt. ★ W77b (Al: „der zweite Treffer soll nur EINMAL einschlagen"): der Zweitwurf auf das zweite Ziel schlägt genau EINMAL zu (`zweitwurfSchlaege`), nicht N-mal.
       if (!gs._zweitzielWurf && gs.hoptUsed?.[`future-tech-barrage:${pi}`] === gs.turn) {
         gs._spellCancelled = true;
         return;
@@ -86,7 +87,7 @@ module.exports = {
 
       // ★ Zählstand VOR dem eigenen Ablegen — die Karte ist jetzt noch
       //   in der Hand, zählt sich also nicht mit.
-      const treffer = zaehleInAblage(gs, pi, CARD_NAME);
+      const treffer = zweitwurfSchlaege(gs, zaehleInAblage(gs, pi, CARD_NAME));
 
       engine.log('ft_barrage', {
         player: ps.username, shots: treffer, damage: DAMAGE,

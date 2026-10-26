@@ -23,6 +23,12 @@
 //       (ALLE Wähler — `promptDamageTarget`, `promptMultiTarget` — nehmen das getroffene Ziel nie wieder). Kosten/Nebenwirkungen, die an die Zahl der getroffenen
 //       Ziele hängen („the same number of Pollution Tokens"), gelten für die im Zweitwurf getroffenen Ziele (1).
 //
+//    5. W77b (Al 26.10.2026, zu W76a-Frage 13: „… dann soll der zweite Treffer nur EINMAL einschlagen!"): der Zweitwurf schlägt auf das zweite Ziel genau EINMAL zu
+//       (ein einziger Schlag / Schaden-Vorgang), egal wie oft der Hauptwurf das erste Ziel traf. Das ANGEBOT bleibt: hat der Hauptwurf nur dieses eine Ziel getroffen
+//       (egal wie oft — Kirin Firebreath, Future Tech Barrage), darf Bartas & Co. auslösen. **Jeder Spell/jede Attack, der/die dasselbe Ziel mehrfach trifft** („N times",
+//       „as many times as", „Trigger this effect as many times as"), rechnet seine Schlagzahl über `zweitwurfSchlaege(gs, n)` — im Zweitwurf ist das 1. Wächter:
+//       `scripts/check-zweitwurf-schlaege.js` (auch in `npm test`). Nebenwirkungen skalieren mit den im Zweitwurf getroffenen Zielen (Pyroblast: 1 Ziel = 1 Token).
+//
 //  `gs._bartasSecondCast` bleibt der allgemeine Zweitwurf-Marker (Saya, Idej Kunagi, Fire Bolts lesen ihn); `gs._zweitzielWurf` ist die engere Marke
 //  „ZWEITES ZIEL" (nur diese Helden): Einzelziel-Deckel + Ausschluss ohne Ausnahme.
 // ═══════════════════════════════════════════
@@ -32,6 +38,17 @@ const { loadCardEffect } = require('./_loader');
 
 /** Beide Aktions-Flags werden VOR `afterSpellResolved` ausgewertet — was der Zweitwurf an ihnen ändert, wird zurückgesetzt (v1277). */
 const AKTIONS_FLAGS = ['_spellFreeAction', '_spellForcesActionConsume'];
+
+/**
+ * W77b: Schlagzahl eines Mehrfachtreffer-Spells („deal 50 damage to it as many times as …"). Im Zweitwurf auf das zweite Ziel (`gs._zweitzielWurf`) genau EIN Schlag;
+ * sonst die volle Zahl `n`. Der Aufrufer rechnet nur mit dem Rückgabewert (Schleife, Schadenssumme in Beschreibungen).
+ * @param {object} gs
+ * @param {number} n  Schlagzahl des Hauptwurfs
+ * @returns {number}
+ */
+function zweitwurfSchlaege(gs, n) {
+  return gs && gs._zweitzielWurf ? Math.min(1, n) : n;
+}
 
 /**
  * Das Merkmal-Gate: darf dieser Spell/diese Attack überhaupt einen Zweitwurf bekommen? (deklarativ gelesen)
@@ -179,4 +196,4 @@ async function zweitzielAngebot(ctx, cfg) {
   engine.sync();
 }
 
-module.exports = { zweitzielAngebot, spellErlaubtZweitziel };
+module.exports = { zweitzielAngebot, spellErlaubtZweitziel, zweitwurfSchlaege };
