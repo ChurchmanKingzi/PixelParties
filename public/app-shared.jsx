@@ -2359,6 +2359,14 @@ function playSFXForLog(entry) {
     case 'hero_ascension':
       playSFX('ascension');
       return;
+    // True Form / Open Invitation / Tri Ad: eine Form wird nur GELEGT (kein Aufstieg) bzw. wieder abgelegt — der Morph braucht trotzdem Klang.
+    case 'hero_form_placed':
+      playSFX('ascension');
+      return;
+    case 'hero_form_returned':
+      playSFX('debuff');
+      setTimeout(() => playSFX('status_remove', { dedupe: 0 }), 260);
+      return;
     case 'reaction_activated':
       playSFX('chain_add');
       return;
