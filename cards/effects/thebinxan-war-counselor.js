@@ -242,6 +242,7 @@ module.exports = {
     // Anti-AoE-Fenster (Deepsea Idol).
     await engine.beginAoeStrike(_lebendeHelden + _oppKreaturen.length, {
       creatures: _oppKreaturen,
+      heroes: _oppHelden().map(({ hero }) => hero),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
       source: { name: CARD_NAME, owner: pi, heroIdx: inst.heroIdx },
       amount: DAMAGE, type: 'creature', sourceOwner: pi,
     });

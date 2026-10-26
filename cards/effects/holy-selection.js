@@ -308,6 +308,7 @@ module.exports = {
           + lebendeKreaturen.length,
           {
             creatures: lebendeKreaturen.map(t => t.inst),
+            heroes: heroTargets,   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
             source, amount: DAMAGE, type: 'destruction_spell', sourceOwner: pi,
           });
       }

@@ -70,6 +70,7 @@ async function schlagen(ctx, targets, amount, source) {
   const pi = ctx.cardOwner;
   await engine.beginAoeStrike(targets.length, {
     creatures: targets.filter(t => t.type !== 'hero').map(t => t.cardInstance).filter(Boolean),
+    heroes: targets.filter(t => t.type === 'hero'),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
     source, amount, type: 'creature', sourceOwner: pi,
   });
   try {
