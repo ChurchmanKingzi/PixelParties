@@ -9900,8 +9900,10 @@ class GameEngine {
     // Die Karte legt ihren Multiplikator-Buff (Cloudy) sofort auf; der Durchgang darunter halbiert den Treffer dann wie jede andere Senkung (Kettenbetrag
     // inklusive). Wurde der Buff verhindert, liefert die Karte `multiplier` zurueck, den die Engine direkt in `_mul` rechnet. Nicht anbieten, wenn der Treffer
     // nicht senkbar ist (`cannotBeReduced`/`cannotBeNegated` lassen den Multiplikator-Durchgang ohnehin aus).
+    // R5 (Als Ruling Al 26.10.): wird Hydra Blood Arrow diesen Treffer gleich auf 0 setzen, sehen Reaktionen am Ziel schon die 0 — kein Angebot.
     if (target && target.hp !== undefined && target.hp > 0 && !hookCtx.cancelled
-        && !hookCtx.cannotBeReduced && !hookCtx.cannotBeNegated) {
+        && !hookCtx.cannotBeReduced && !hookCtx.cannotBeNegated
+        && (this.istKlonQuelle(source) || !require('./_arrows-shared').hydraWirdNullen(this, source, hookCtx))) {
       const _fruehBetrag = this._projectedAmount(hookCtx);
       if (_fruehBetrag > 0) {
         const _fr = await this._checkPreDamageHandReactions(target, source, _fruehBetrag, type, { early: true });
@@ -9982,6 +9984,10 @@ class GameEngine {
     if (hookCtx._flatBonus && !hookCtx._kettenFolge) hookCtx.amount += hookCtx._flatBonus;
     // `ctx.becomeAmount(n)` („damage becomes N", Shrink): auch Boni, die die Hook-Runde umgehen, koennen den Betrag nicht ueber N heben.
     if (hookCtx._becomesAmount != null && hookCtx.amount > hookCtx._becomesAmount) hookCtx.amount = hookCtx._becomesAmount;
+    // ★ R5 (Als Ruling Al 26.10.: „Immer Hydra Blood Arrow nach ALLEN anderen Schadens-Modifikatoren!"): erst jetzt steht der Endbetrag fest (Hook-Boni, Elixir, Anger, andere Pfeile,
+    // Buff-Multiplikatoren am Angreifer und am Ziel, Niu/Darge). Hydra setzt ihn auf 0 und rechnet das Gift aus diesem Betrag; Kettenbetrag, Schilde, Deckel und Hand-Reaktionen
+    // darunter sehen schon die 0. Nur QUELLEN-seitig unreduzierbarer Schaden bleibt (`_unreduzierbar`), ZIEL-seitiges „cannot be reduced" nicht (Tempeste, Brachion …).
+    if (!this.istKlonQuelle(source)) require('./_arrows-shared').applyArrowsZero(this, source, target, hookCtx);   // Pfeile gehören dem Helden, nicht dem Klon
     // W50a (Ricochet, Al 22.10.2026): Kettenbetrag = Schaden nach allen SENKUNGEN, vor Schilden/Blocks/Negation/Deckeln (Haltepunkt HIER; die
     // Schilde folgen unten). Senkungen NACH dem Haltepunkt (Interference-Halbierung, Halbierungs-Reaktionen) kuerzen ihn per `_kettenSenkung`.
     if (opts?.vollOut) {
@@ -10522,8 +10528,8 @@ class GameEngine {
         if (proj !== undefined && proj > amount) amount = proj;
         if (_atkBoni) {
           // B2/E4: Elixir of Strength (+150, der Buff wird verbraucht) und bewaffnete Pfeile (flat) wie im Normalweg; nur Erhöhungen zählen —
-          // `_unreduzierbar` hält das absolute „auf 0" von Hydra Blood Arrow heraus (der Gift-Zuschlag nach dem Treffer bleibt).
-          const pk = { source: bq, target, amount, type, _kBase: amount, _kMul: 1, _kFlat: 0, _unreduzierbar: true };
+          // die Null von Hydra Blood Arrow (Stufe 2, `applyArrowsZero`) läuft hier nie (True Damage ist QUELLEN-seitig unreduzierbar); der Gift-Zuschlag nach dem Treffer bleibt.
+          const pk = { source: bq, target, amount, type, _kBase: amount, _kMul: 1, _kFlat: 0 };
           this._applyEmpoweredStrikeIfApplicable(pk);
           require('./_arrows-shared').applyArrowsBeforeDamage(this, source, target, pk);
           if (pk.amount > amount) amount = pk.amount;
@@ -41946,6 +41952,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (hookCtx._kBase !== undefined) hookCtx._kBase += EMPOWERED_STRIKE_BONUS;   // W50a: Heldenpfad; der Kreaturenpfad (Proxy) rechnet den Zuwachs selbst nach
     hookCtx.cannotBeReduced = true;
     hookCtx.cannotBeNegated = true;
+    hookCtx._unreduzierbar = true;   // R5: QUELLEN-seitig unreduzierbar — Hydra Blood Arrow setzt diesen Treffer nicht auf 0 (`_attackSchadenUnreduzierbar`)
 
     // Consume the buff. Done synchronously to avoid double-firing on
     // multi-target attack splits — the second damage instance won't
@@ -41961,18 +41968,20 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /**
    * ★ Als Ruling (Al 26.10., Hydra Blood Arrow × alle True-Damage-Quellen: „Diese können Hydra Blood Arrow schlicht nicht aktivieren."): ist der Schaden dieser Attack
-   * NICHT reduzierbar („cannot be reduced", True Damage)? EIN Prädikat für beide Zeitpunkte — wer es braucht (`_arrows-shared`: Hydra Blood Arrow), fragt nur hier, nicht je Quelle:
+   * QUELLEN-seitig NICHT reduzierbar („cannot be reduced", True Damage — Surefire Shot, Elixir of Strength, Club of Gobbo)? EIN Prädikat für beide Zeitpunkte — wer es braucht
+   * (`_arrows-shared`: Hydra Blood Arrow), fragt nur hier, nicht je Quelle:
    *   • `ctx.link` (Kettenfenster, Initialglied der Attack): die Arrows-Fenster öffnen VOR der Zielwahl, also zählt, was schon vorher feststeht — das Skript der Attack
    *     (`attackDamageCannotBeReduced: true`: Surefire Shot; Clash of Champions trägt es künftig ebenso), Ausrüstung des Angreifers mit `attackerDamageCannotBeReduced: true`
    *     (Club of Gobbo; ruht nicht, solange `isCardPassiveDormant` verneint) und ein bereitstehender Elixir of Strength (`empowered_strike`) — der Elixir feuert nur bei GENAU
-   *     einem Ziel, bei Attacks, die mehrere treffen können (`hitsMultipleTargets`: Whirlwind Strike, Ricochet), bleibt es beim Treffer-Rückfall unten.
-   *   • `ctx.hookCtx` (der einzelne Treffer — Heldenzweig: hookCtx von `_actionDealDamageImpl`/`actionDealTrueDamage`, Kreaturenzweig: Proxy des Batch-Eintrags): `cannotBeReduced`,
-   *     `trueDamage` oder `_unreduzierbar`. Rückfall für alles, was erst NACH der Zielwahl feststeht (Tempeste/Prophecy of Tempeste als Ziel, Gigantisaur Brachion, Monia-Bot-Umleitung,
-   *     Elixir/Club im Mehrzielfall) und für eine schon scharfe Hydra (verschachtelte Treffer): ein unreduzierbarer Treffer wird nie auf 0 gesenkt, je Treffer (gemischte Ziele).
+   *     einem Ziel, bei Attacks, die mehrere treffen können (`hitsMultipleTargets`: Whirlwind Strike, Ricochet), entscheidet erst der Treffer (unten).
+   *   • `ctx.hookCtx` (der einzelne Treffer — Heldenzweig: hookCtx von `_actionDealDamageImpl`, Kreaturenzweig: Proxy des Batch-Eintrags): nur die QUELLEN-Marke `_unreduzierbar`
+   *     (gesetzt von Elixir of Strength, Club of Gobbo und dem True-Damage-Weg `trueDamage`). Bewusst NICHT `cannotBeReduced`: das tragen auch ZIEL-seitige Sperren
+   *     (Tempeste, Prophecy of Tempeste, Gigantisaur Brachion, Monia Bot, Test Dummy, Dichotomy …) — Als Ruling (Al 26.10.): „in dem Fall wird der Schaden ganz normal zu 0 und in Gift
+   *     konvertiert. Der Pfeil macht den Schaden zu 0, *bevor* er trifft, das umgeht Effekte am Ziel."
    */
   _attackSchadenUnreduzierbar(ctx = {}) {
     const h = ctx?.hookCtx;
-    if (h && (h.cannotBeReduced || h.trueDamage || h._unreduzierbar)) return true;
+    if (h && h._unreduzierbar) return true;
     const link = ctx?.link;
     if (!link) return false;
     const script = loadCardEffect(link.cardName);
@@ -55561,7 +55570,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (e._kBase !== undefined && Math.max(0, Math.ceil(e._kBase * (e._kMul ?? 1)) + (e._kFlat || 0)) > grenze) { e._kBase = grenze; e._kMul = 1; e._kFlat = 0; }
     }
 
-    // Armed-arrow attack modifiers (flat damage + Hydra Blood zero).
+    // Armed-arrow attack modifiers, STUFE 1 (flat damage). Die Null von Hydra Blood Arrow (Stufe 2, `applyArrowsZero`) kommt erst am Ende der
+    // Betragsänderungen (R5, siehe unten bei `_settleCreatureEntry`).
     // Same policy as the hero-damage path: applies AFTER the batch hook so
     // Diamond / Sacred Hammer etc. compose correctly, BEFORE the buff
     // multiplier + damageLocked pass below so Cloudy halves the arrow-
@@ -55576,16 +55586,12 @@ this._deathWatch = (this._deathWatchStack || []).length
         // `e.amount = …` waere absolut und backte die gesammelten flat
         // Modifikatoren in die Basis (Punkt vor Strich kaputt).
         const armiert = typeof e.multiplyAmount === 'function';
-        // R-4 (Als Ruling Al 26.10., „Angleichen"): True Damage („cannot be reduced") wird von Hydra Blood Arrow auch auf Kreaturen NICHT auf 0 gesenkt — wie im Heldenzweig
-        // (`actionDealTrueDamage`); der Gift-Zuschlag nach dem Treffer bleibt.
-        // R5 (Als Ruling Al 26.10.): Hydra Blood Arrow senkt keinen unreduzierbaren Treffer (`engine._attackSchadenUnreduzierbar`) — auch nicht, was ein Hook am Eintrag als `cannotBeReduced` gestempelt hat (Club, Brachion, Dichotomy).
-        const proxy = { amount: armiert ? e._base : e.amount, type: e.type, cancelled: false, _kettenFolge: !!e.kettenFolge, _unreduzierbar: e.trueDamage === true || e.cannotBeReduced === true };   // W49a: Ricochet-Folgetreffer ohne Pfeil-Bonus
+        const proxy = { amount: armiert ? e._base : e.amount, type: e.type, cancelled: false, _kettenFolge: !!e.kettenFolge };   // W49a: Ricochet-Folgetreffer ohne Pfeil-Bonus
         const _pfeilVor = proxy.amount;
         applyArrowsBeforeDamage(this, e.source, e.inst, proxy);
         if (armiert) {
           e._base = Math.max(0, proxy.amount || 0);
-          if (proxy._zeroedByArrow) { e._flat = 0; e._mul = 1; }   // Hydra Blood: absolut (fuer den Kettenbetrag Negation: bleibt unberuehrt)
-          else if (e._kBase !== undefined) e._kBase += e._base - _pfeilVor;   // W50a: Pfeil-Bonus gehoert zur Basis des Kettenbetrags
+          if (e._kBase !== undefined) e._kBase += e._base - _pfeilVor;   // W50a: Pfeil-Bonus gehoert zur Basis des Kettenbetrags
         } else e.amount = proxy.amount;
       }
     }
@@ -55604,6 +55610,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (armiert) { e._base = Math.max(0, proxy.amount || 0); if (e._kBase !== undefined) e._kBase += e._base - _elixirVor; } else e.amount = proxy.amount;   // Basis, s.o. (W50a: Zuwachs auch in den Kettenbetrag)
       if (proxy.cannotBeReduced) e.cannotBeReduced = true;
       if (proxy.cannotBeNegated) e.cannotBeNegated = true;
+      if (proxy._unreduzierbar) e._unreduzierbar = true;   // R5: QUELLEN-seitig unreduzierbar (Elixir) — Hydra Blood Arrow nullt diesen Treffer nicht
     }
 
     // Defending the Gate: check if any entries would hit an opponent's support zones
@@ -55640,7 +55647,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Halbierung vor Einmal-Schilden/Flat-Boni/HP-Boeden greift. Die Karte legt „Cloudy" auf; der Durchgang darunter halbiert dann. Nicht senkbarer Schaden
       // (`cannotBeReduced`, `canBeNegated === false`) bekommt kein Angebot; Zerstoeren/Opfer sind kein Schaden.
       if (e.inst && !e._immuneCreature && e.canBeNegated !== false && !e.cannotBeReduced && e.amount > 0
-          && e.type !== 'destroy' && e.inst.zone === 'support' && (e.inst.counters?.currentHp || 0) > 0) {
+          && e.type !== 'destroy' && e.inst.zone === 'support' && (e.inst.counters?.currentHp || 0) > 0
+          && !require('./_arrows-shared').hydraWirdNullen(this, e.source, { type: e.type, _unreduzierbar: e.trueDamage === true || e._unreduzierbar === true })) {   // R5: eine nullende Hydra — die Reaktion am Ziel sieht schon die 0
         const _fr = await this._checkCreaturePreDamageHandReactions(e.inst, e.source, e.amount, e.type, { early: true });
         if (_fr && typeof _fr.multiplier === 'number' && _fr.multiplier < 1) {
           if (typeof e.multiplyAmount === 'function') { e._mul = (e._mul ?? 1) * _fr.multiplier; e._kMul = (e._kMul ?? 1) * _fr.multiplier; }
@@ -55662,6 +55670,17 @@ this._deathWatch = (this._deathWatchStack || []).length
       const _eRef = (e._kBase !== undefined) ? Math.max(0, Math.ceil(e._kBase * (e._kMul ?? 1)) + (e._kFlat || 0)) : e.amount;
       // PUNKT VOR STRICH: jetzt einmal verrechnen, Eintrag wieder flach.
       this._settleCreatureEntry(e);
+      // ★ R5 (Als Ruling Al 26.10.: „Immer Hydra Blood Arrow nach ALLEN anderen Schadens-Modifikatoren!"), Zwilling des Heldenpfads: erst jetzt steht der Endbetrag fest (Hook-Boni, Elixir,
+      // Anger, andere Pfeile, Buff-Multiplikatoren am Angreifer und am Ziel) — dazu zählen Niu und Darge (`_flatBonus`), die unten erst NACH den Einmal-Schilden dazukämen: hier vorab
+      // eingelöst (der Buff ist danach weg, der spätere Aufruf liefert 0). Hydra setzt den Betrag auf 0 und rechnet das Gift aus dem Endbetrag; die Einmal-Schilde darunter sehen die 0.
+      // Nur QUELLEN-seitig unreduzierbarer Schaden bleibt (`_unreduzierbar`/`trueDamage`), ZIEL-seitiges „cannot be reduced" (Brachion, Dichotomy …) nicht.
+      if (e.type === 'attack' && e.inst && e.source?.owner != null && e.source?.heroIdx >= 0
+          && require('./_arrows-shared').hydraScharf(this, e.source)) {
+        const niuBonus = await this._niuBonusEinloesen(e.source);
+        if (niuBonus > 0) e._flatBonus = (e._flatBonus || 0) + niuBonus;
+        const _hz = { type: e.type, amount: e.amount + ((e._flatBonus && !e.kettenFolge) ? e._flatBonus : 0), _unreduzierbar: e.trueDamage === true || e._unreduzierbar === true };
+        if (require('./_arrows-shared').applyArrowsZero(this, e.source, e.inst, _hz)) { e.amount = 0; e._flatBonus = 0; }   // sonst: unreduzierbar — nur der Endbetrag fürs Gift wird gemerkt
+      }
       const _eNachSenkung = e.amount;   // W50a: Betrag nach Senkungen/Negations-Hooks, VOR den Einmal-Schilden
       // ── Einmal-Schadensschilde (v697) — Kreaturenziel, gleiche Regeln
       // wie im Heldenpfad (flat nach Multiplikatoren; cannotBeReduced

@@ -17,23 +17,30 @@
 //  Als Ruling (Al 26.10.): „Eine andere Regel, die dann für ALLE True-Damage-
 //  Sources gelten soll: Diese können Hydra Blood Arrow schlicht nicht aktivieren."
 //  Der Pfeil wird NICHT angeboten (auch nicht der CPU), wenn der Schaden der
-//  Attack unreduzierbar ist („cannot be reduced"): Surefire Shot, ein mit Elixir
-//  of Strength verstärkter Treffer, Club of Gobbo am Angreifer — EIN Prädikat,
-//  `engine._attackSchadenUnreduzierbar` (Option `blockUnreducible` der Bedingung).
-//  Das Fenster öffnet VOR der Zielwahl; was erst das Ziel unreduzierbar macht
-//  (Tempeste, Gigantisaur Brachion …), fängt `applyArrowsBeforeDamage` je Treffer ab:
-//  ein unreduzierbarer Treffer wird nie auf 0 gesenkt (der Pfeil ist dann verbraucht).
+//  Attack QUELLEN-seitig unreduzierbar ist („cannot be reduced"): Surefire Shot,
+//  ein mit Elixir of Strength verstärkter Treffer, Club of Gobbo am Angreifer
+//  (auch für dessen Träger: „Club of Gobbo macht Hydra Blood Arrow für seinen
+//  Träger unbenutzbar, ja") — EIN Prädikat, `engine._attackSchadenUnreduzierbar`
+//  (Option `blockUnreducible` der Bedingung). Das Fenster öffnet VOR der Zielwahl;
+//  ein Elixir bei Mehrziel-Attacks entscheidet erst der Treffer (`_unreduzierbar`).
 //
-//  Implementation detail: the "would have dealt"
-//  amount is the post-flat-bump but pre-zero
-//  value — so if an Angelfeather Arrow chained
-//  first (+60), Hydra Blood sees the boosted
-//  total and its poison-stacks count scales
-//  accordingly. `_arrows-shared.js` stashes that
-//  value on each armed arrow as
-//  `_preZeroDamage`; the afterDamage pass reads
-//  it and floor-divides by 30 for the stack
-//  count.
+//  Als Ruling (Al 26.10.): ZIEL-seitiges „cannot be reduced" (Tempeste, Prophecy of
+//  Tempeste, Gigantisaur Brachion, Monia Bot, Test Dummy …) hält Hydra NICHT auf:
+//  „in dem Fall wird der Schaden ganz normal zu 0 und in Gift konvertiert. Der Pfeil
+//  macht den Schaden zu 0, *bevor* er trifft, das umgeht Effekte am Ziel."
+//
+//  Als Ruling (Al 26.10.): „Immer Hydra Blood Arrow nach ALLEN anderen
+//  Schadens-Modifikatoren!" — die Null (`applyArrowsZero`, Stufe 2) setzt erst, wenn
+//  der Betrag feststeht (Elixir, andere Pfeile, Darge, Unreasonable Anger, Disruption
+//  Ray, Warhorse, Buffs/Boni am Angreifer und am Ziel); die Giftstapel kommen aus
+//  diesem ENDBETRAG (1 je volle 30). Schilde und Reaktionen am Ziel sehen schon die 0.
+//
+//  Implementation detail: the "would have dealt" amount is the FINAL amount of
+//  the hit (all modifiers applied) — so if an Angelfeather Arrow chained
+//  first (+60), Hydra Blood sees the boosted total and its poison-stacks
+//  count scales accordingly. `_arrows-shared.js` stashes that value per target
+//  on each armed arrow (`_preZeroByTarget`, `_preZeroDamage`); the afterDamage
+//  pass reads it and floor-divides by 30 for the stack count.
 // ═══════════════════════════════════════════
 
 const { arrowTriggerCondition, armAttackerWithArrow } = require('./_arrows-shared');
