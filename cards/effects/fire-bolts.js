@@ -112,6 +112,9 @@ function canEnhance(gs, engine, playerIdx, heroIdx) {
 // ─── CARD MODULE ─────────────────────────
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Am besten gleich die Karten ganz sperren statt den Schaden fizzeln zu lassen"): die Karte richtet NUR Schaden an Zielen des Gegners an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
@@ -263,6 +266,12 @@ module.exports = {
       if (enhanced && !zweitwurf) {
         gs._spellFreeAction = true;
       }
+
+      // ── Step 4b: Sofort-Guss (Chaos-Diamond, Overflowing Chalice, Zusatzaktion …) ──
+      // `resolveDeferredRecoil` ruft nur `doPlaySpell` auf — `_castSpellImmediately` nicht. Der Rückstoß fiel dort ersatzlos weg
+      // (bzw. blieb als `_deferredRecoil` stehen und traf beim nächsten gespielten Zauber). Im Sofort-Guss gleich hier auflösen
+      // (verschachtelt in einem `doPlaySpell`, z. B. Aurora Borealis, ist der spätere Aufruf dort dann ein No-op).
+      if (gs._immediateActionContext && !gs._bartasSecondCast) await engine.resolveDeferredRecoil();
 
       engine.log('fire_bolts', {
         player: gs.players[pi].username,

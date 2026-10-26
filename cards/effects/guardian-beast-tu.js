@@ -17,6 +17,7 @@ const {
   promptAndDeleteFromBothDiscards,
 } = require('./_guardian-beasts-shared');
 const { ablageLoeschKostenMoeglich } = require('./_guardian-beasts-shared');   // v1398
+const { drawBlockedFor } = require('./_draw-block-shared');   // Regel von Al (D1/Z6): ist das Ziehen der einzige Nutzen, graut die Sperre den Effekt aus
 
 const CARD_NAME = 'Guardian Beast Tu';
 
@@ -34,6 +35,7 @@ module.exports = {
     const total = (engine.gs.players[0]?.discardPile?.length || 0)
       + (engine.gs.players[1]?.discardPile?.length || 0);
     // Smallest valid cost is 3; below that the effect can't fire.
+    if (drawBlockedFor(engine, ctx.cardOwner)) return false;   // Hand-/Zieh-Sperre: die Kosten wären umsonst
     return total >= 3;
   },
 
@@ -45,7 +47,8 @@ module.exports = {
     if (total < 3) return false;
 
     const deleted = await promptAndDeleteFromBothDiscards(ctx, {
-      validCounts: [3, 6, 9],
+      // Tuscan Artist negiert ein Ziehen von genau 2 oder 3 Karten (= 6 bzw. 9 gelöschte Karten) — diese Kosten wären umsonst.
+      validCounts: [3, 6, 9].filter(n => !drawBlockedFor(engine, pi, n / 3)),
       title: CARD_NAME,
       description: 'Pick 3, 6 or 9 cards from the discard piles to delete. Draw 1 card per 3 deleted.',
       sourceName: CARD_NAME,

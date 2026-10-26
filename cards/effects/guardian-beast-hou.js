@@ -132,6 +132,7 @@ module.exports = {
         .map(id => refreshedTargets.find(t => t.id === id))
         .filter(t => t && t.type !== 'hero')
         .map(t => t.cardInstance).filter(Boolean),
+      heroes: tgtIds.map(id => refreshedTargets.find(t => t.id === id)).filter(t => t && t.type === 'hero'),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
       source, amount: DAMAGE_PER_HIT, type: 'creature', sourceOwner: pi,
     });
     try {

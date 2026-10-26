@@ -26,6 +26,9 @@ const MAX_TARGETS = 3;
 const FLUG_MS = 380;       // Flugzeit der Pfeile (Client: `ArkanPfeil`, Einschlag bei `dur`)
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // ENTKOPPELTE BILDER (CARD_API „spellVisual"): bei Negation läuft der
   // Effekt-Rumpf nie, die Engine spielt dann diese Pfeile — ohne Einschlag-Zonenbild,
   // der Pfeil bringt seinen eigenen Pixelstern mit.

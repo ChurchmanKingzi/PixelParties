@@ -109,7 +109,7 @@ async function placeCounter(engine, clock, byPi, opts = {}) {
     // Spiel noch läuft — die Niederlage durch die Uhr. Ein bereits entschiedenes Spiel (gs.result / _endGameLaeuft) bleibt unberührt.
     try { await engine.checkAllHeroesDead(); } catch (err) { console.error('[Doom Clock] checkAllHeroesDead:', err.message); }
     if (engine.gs.result || engine.gs._endGameLaeuft) return true;
-    const winnerIdx = byPi === 0 ? 1 : 0;
+    const winnerIdx = engine.opponentOf(byPi);   // Gegner-Index nie hart verdrahten (CARD_API, N-Spieler) — wie Carris/Quetzahuitl
     engine.log('doom_clock_loss', {
       loser: engine.gs.players[byPi]?.username,
       winner: engine.gs.players[winnerIdx]?.username,

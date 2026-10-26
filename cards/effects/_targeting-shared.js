@@ -159,8 +159,12 @@ function collectNonHeroBoardTargets(gs, engine) {
       // Only target the top card of each ability stack
       const slot = gs.players[inst.owner]?.abilityZones?.[inst.heroIdx]?.[inst.zoneSlot] || [];
       if (slot.length > 0 && slot[slot.length - 1] !== inst.name) continue;
+      // Ein Stapel gleichnamiger Karten (Ability Lv 2/3) hat mehrere Instanzen im selben Platz: EIN Ziel je Stapel (eindeutige ID), und zwar die letzte (= oberste) Kopie — wie `supportAbilitySpitze`.
+      const _abId = `ability-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`;
+      const _abErst = targets.find(x => x.id === _abId);
+      if (_abErst) { _abErst._cardInstance = inst; continue; }
       targets.push({
-        id: `ability-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
+        id: _abId,
         type: 'ability', owner: inst.owner, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
         cardName: inst.name, _cardInstance: inst,
       });
@@ -229,4 +233,44 @@ function istHeldOderKreatur(engine, t) {
   return engine.isChoosableAsCreature(inst, cd);
 }
 
-module.exports = { istHeldOderKreatur, isOppCreatureEffect, collectNonHeroBoardTargets, areaTargetId, coolnessSpitzeZiel, supportAbilityZiel };
+/**
+ * ★ Als Ruling (Al 26.10., Sun Beam / The Yeeting: „Verdeckte Surprises erscheinen im Zielwähler mit MASKIERTEM Namen"): ist die verdeckte Karte `inst` dem Spieler
+ * `viewer` unbekannt? Dieselbe Sichtregel wie der Zustandsversand (server.js `surpriseZones`/`supportZones`): sichtbar sind offene Karten, „bekannte" (`knownToOpponent`), die
+ * eigenen (`originalOwner`, bzw. die eigene Brettseite bei Support-Karten) und die verdeckten Surprises eines Helden, den `viewer` gerade kontrolliert (W19b).
+ */
+function istVerdecktFuer(engine, inst, viewer) {
+  if (!inst || !inst.faceDown || inst.knownToOpponent) return false;
+  if (inst.zone === 'surprise') {
+    if (inst.originalOwner === viewer) return false;
+    if (inst.originalOwner == null && inst.owner === viewer) return false;
+    if (typeof engine?._surpriseKontrolleurRoh === 'function' && engine._surpriseKontrolleurRoh(inst.owner, inst.heroIdx) === viewer) return false;
+    return true;
+  }
+  if (inst.zone === 'support') return (typeof engine?.physicalSide === 'function' ? engine.physicalSide(inst) : inst.owner) !== viewer;
+  return false;
+}
+
+/**
+ * Die Zielliste, die der WÄHLER (`viewer`) im Client sieht: Einträge, die auf eine für ihn verdeckte Karte zeigen, tragen weder `cardName` noch den Namen in der mitgeschickten
+ * Karteninstanz (`cardInstance`/`_cardInstance` — der Zustandsversand schickt sie komplett). Die Engine-Liste bleibt unberührt (Skripte, CPU und Antwortprüfung arbeiten mit echten Namen);
+ * der Aufruf ist die EINE Stelle für alle Zielwähler (server.js `potionTargetingFuer`).
+ */
+function zielAnzeigeFuer(engine, validTargets, viewer) {
+  if (!Array.isArray(validTargets) || viewer == null || viewer < 0) return validTargets;
+  return validTargets.map(t => {
+    if (!t) return t;
+    let inst = t.cardInstance || t._cardInstance || null;
+    if (!inst && t.type === 'surprise') {
+      inst = (engine?.cardInstances || []).find(c => c.zone === 'surprise' && c.owner === t.owner && c.heroIdx === t.heroIdx) || null;
+    }
+    if (!istVerdecktFuer(engine, inst, viewer)) return t;
+    const huelle = { id: inst.id, zone: inst.zone, faceDown: true, owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot };
+    const out = { ...t, cardName: '' };
+    if ('name' in out) out.name = '';
+    if (t.cardInstance) out.cardInstance = huelle;
+    if (t._cardInstance) out._cardInstance = huelle;
+    return out;
+  });
+}
+
+module.exports = { istHeldOderKreatur, isOppCreatureEffect, collectNonHeroBoardTargets, areaTargetId, coolnessSpitzeZiel, supportAbilityZiel, istVerdecktFuer, zielAnzeigeFuer };

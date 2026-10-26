@@ -113,6 +113,32 @@ function attachmentHostsFor(gs, pi, engine, opts = {}) {
  * kein Wirt, `_spellNegatedByEffect` gesetzt.
  */
 async function pickAttachmentHost(ctx, CARD_NAME, opts = {}) {
+  const host = await _pickAttachmentHostMitFenstern(ctx, CARD_NAME, opts);
+  if (host) wirtswahlProtokollieren(ctx, host);
+  return host;
+}
+
+/**
+ * Als Ruling (Al 26.10., Invisibility): die Wahl eines gegnerisch KONTROLLIERTEN Helden als Wirt eines Anhaengsel-Zaubers (Curse, Polymorph, Overheal Shock …) ist
+ * eine Zielwahl „a target your opponent controls with a Spell" — sie kommt wie die Ziele von Icy Grave/Heal in das Zielprotokoll des Zaubers (`gs._spellDamageLog`,
+ * Leser: `afterSpellResolved.damageTargets`, z. B. Invisibility des WIRKENDEN Helden). Eigene Wirte (auch mit Brettseite der Gegenseite, aber eigener Kontrolle) bleiben aussen vor.
+ * Nur wenn die Aufloesung ein Protokoll fuehrt (Zauber-Weg des Servers / Sofort-Guss); Dubletten raeumt der Leser ueber die Id ab.
+ */
+function wirtswahlProtokollieren(ctx, host) {
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  if (!Array.isArray(gs._spellDamageLog)) return;
+  const hero = gs.players[host.owner]?.heroes?.[host.heroIdx];
+  if (!hero?.name) return;
+  const pi = ctx.cardOwner;
+  const kontrolle = typeof engine.heroSideOf === 'function' ? engine.heroSideOf(host.owner, hero) : host.owner;
+  if (kontrolle === pi) return;
+  const id = `hero-${host.owner}-${host.heroIdx}`;
+  if (gs._spellDamageLog.some(t => t.id === id)) return;
+  gs._spellDamageLog.push({ id, type: 'hero', owner: host.owner, heroIdx: host.heroIdx, cardName: hero.name });
+}
+
+async function _pickAttachmentHostMitFenstern(ctx, CARD_NAME, opts = {}) {
   let host = await _pickAttachmentHostRaw(ctx, CARD_NAME, opts);
   if (!host || opts.skipHitWindows) return host;
   const engine = ctx._engine;

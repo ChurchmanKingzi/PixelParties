@@ -154,6 +154,9 @@ async function zeigeStich(engine, ausfuehrender, z) {
 }
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an (Quelle ist trotz geliehenem Gegnerhelden die Karte des Wirkers — die Sperre greift) —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   /** Gegnerhelden, auf die man die Karte ZIEHEN kann (sie führen den Stich aus): `[{ owner, heroIdx }]` — für die Ziehen-Hervorhebung des Clients (`herolessAngreifer`). */
   herolosAusfuehrer(engine, pi) {
     return ohneZielschutz(engine, pi, ausfuehrende(engine, pi)).map(a => ({ owner: a.owner, heroIdx: a.heroIdx }));

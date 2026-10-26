@@ -16,6 +16,8 @@
 //      this Creature perform a 'Fireball' Spell from your hand as an
 //      additional Action, ignoring its level, but if you do, DELETE
 //      that 'Fireball' Spell."
+//      Als Ruling (Al 26.10.): erst das Fireball-Ziel wählen und bestätigen, DANN Opfer und Fireball gemeinsam committen (Opfer bezahlt, Fireball
+//      gelöscht); Abbruch irgendwo davor verbraucht nichts (`nachZielwahl` an Fireballs `promptMultiTarget`).
 //      The sub-cast uses the canonical `runHooks('onPlay')` path
 //      (Timeless King Zi / Chaos Magic), which bypasses
 //      `validateActionPlay` → level & school requirements ignored.
@@ -71,29 +73,16 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     if (!ps || !(ps.hand || []).includes(FIREBALL)) return false;
 
-    // ── Pay the sacrifice (not summoned this turn; Cannon Fodder
-    //    exception via the shared filter). ──
-    const paid = await engine.resolveSacrificeCost(ctx, {
-      minCount: 1,
-      maxCount: 1,
-      title: `${CARD_NAME} — Sacrifice`,
-      description: 'Sacrifice 1 of your Creatures (not summoned this turn) to perform a Fireball, ignoring its level. The Fireball is deleted afterwards.',
-      confirmLabel: '🗡️ Sacrifice!',
-      confirmClass: 'btn-danger',
-      cancellable: true,
-      filter: chaorcSacrificeFilter(engine),
-    });
-    if (!paid) return false;
-
-    // A Fireball could in theory have left the hand during the
-    // sacrifice's reaction window — re-check.
-    if (!(ps.hand || []).includes(FIREBALL)) { engine.sync(); return true; }
+    // ★ Als Ruling (Al 26.10.): „Ja, zuerst Ziel wählen, Commit soll Opfer und Feuerball gleichzeitig committen." — erst Fireball-Ziel(e) wählen und bestätigen
+    // (abbrechbar), DANN das Opfer bezahlen (`nachZielwahl`, Fireballs `promptMultiTarget`) und den Fireball wirken/löschen. Ein Abbruch irgendwo davor
+    // (Zielwahl oder Opferwahl) verbraucht nichts: kein Opfer, der Fireball bleibt auf der Hand, die Einmal-Sperre bleibt frei.
     // Reuse the existing tracked hand instance (hand cards are tracked).
     // Crucially, KEEP the Fireball in hand (don't splice it yet) so it
     // stays visible while the player picks targets — it only flies to
     // the discard pile once it actually resolves (below). Splicing it
     // up-front made the card vanish the instant the effect activated.
     let subInst = engine.findCards({ owner: pi, zone: 'hand', name: FIREBALL })[0];
+    const subNeu = !subInst;
     if (!subInst) subInst = engine._trackCard(FIREBALL, pi, 'hand', -1, -1);
 
     // Stamp THIS Creature's board position onto the sub-instance for the
@@ -101,10 +90,31 @@ module.exports = {
     // itself: it reads the source Hero column from `ctx.cardHeroIdx`
     // (= instance heroIdx) and the source slot from `ctx.card.zoneSlot`.
     // A hand instance carries heroIdx/zoneSlot -1 (no on-board origin),
-    // so the projectiles wouldn't fly. The Creature is consumed by the
-    // perform either way, so no restore is needed.
+    // so the projectiles wouldn't fly. Wird die Ausführung abgebrochen, stellt der
+    // Abbruchzweig die alten Werte wieder her (die Handkarte bleibt unverändert).
+    const alteLage = { heroIdx: subInst.heroIdx, zoneSlot: subInst.zoneSlot };
     subInst.heroIdx = heroIdx;
     subInst.zoneSlot = ctx.card.zoneSlot;
+
+    // ── Kosten nach der bestätigten Zielwahl: das Opfer (not summoned this turn; Cannon Fodder exception via the shared filter). ──
+    let bezahlt = false;
+    const nachZielwahl = async () => {
+      const paid = await engine.resolveSacrificeCost(ctx, {
+        minCount: 1,
+        maxCount: 1,
+        title: `${CARD_NAME} — Sacrifice`,
+        description: 'Sacrifice 1 of your Creatures (not summoned this turn) to perform a Fireball, ignoring its level. The Fireball is deleted afterwards.',
+        confirmLabel: '🗡️ Sacrifice!',
+        confirmClass: 'btn-danger',
+        cancellable: true,
+        filter: chaorcSacrificeFilter(engine),
+      });
+      if (!paid) return false;                 // Abbruch der Opferwahl: nichts bezahlt
+      bezahlt = true;
+      // A Fireball could in theory have left the hand during the
+      // sacrifice's reaction window — dann ist das Opfer bezahlt, der Fireball aber nicht mehr zu wirken.
+      return (ps.hand || []).includes(FIREBALL);
+    };
 
     // ── Perform the Fireball from hand, ignoring its level. ──
     gs._spellDamageLog = [];
@@ -118,27 +128,47 @@ module.exports = {
         _onlyCard: subInst, playedCard: subInst,
         cardName: FIREBALL, zone: 'hand', heroIdx,
         _skipReactionCheck: true,
-        // No opt-out — the sacrifice is already paid, so Fireball's
-        // targeting is non-cancellable (see fireball.js).
-        _forcePerform: true,
+        // Kein `_forcePerform` mehr: bis zur Bestätigung (und der Opferwahl) ist die Zielwahl abbrechbar.
+        _nachZielwahl: nachZielwahl,
       });
-      const uniqueTargets = [];
-      const seenIds = new Set();
-      for (const t of (gs._spellDamageLog || [])) {
-        if (!seenIds.has(t.id)) { seenIds.add(t.id); uniqueTargets.push(t); }
-      }
-      await engine.runHooks('afterSpellResolved', {
-        spellName: FIREBALL, spellCardData: cardDB[FIREBALL],
-        heroIdx, casterIdx: pi, damageTargets: uniqueTargets,
-        isSecondCast: false, _skipReactionCheck: true,
-      });
-      // v1364: „as an additional Action" — als ausgefuehrte Aktion melden.
-      if (!gs._spellCancelled) {
-        await engine.zaehleAlsArt('spell', { pi, heroIdx, name: FIREBALL, karte: true });   // W36a (Al): der Fireball zaehlt als gespielter Spell
-        await engine.meldeGussAlsAktion(pi, heroIdx, FIREBALL);
+      if (bezahlt && (ps.hand || []).includes(FIREBALL)) {
+        const uniqueTargets = [];
+        const seenIds = new Set();
+        for (const t of (gs._spellDamageLog || [])) {
+          if (!seenIds.has(t.id)) { seenIds.add(t.id); uniqueTargets.push(t); }
+        }
+        await engine.runHooks('afterSpellResolved', {
+          spellName: FIREBALL, spellCardData: cardDB[FIREBALL],
+          heroIdx, casterIdx: pi, damageTargets: uniqueTargets,
+          isSecondCast: false, _skipReactionCheck: true,
+        });
+        // v1364: „as an additional Action" — als ausgefuehrte Aktion melden.
+        if (!gs._spellCancelled) {
+          await engine.zaehleAlsArt('spell', { pi, heroIdx, name: FIREBALL, karte: true });   // W36a (Al): der Fireball zaehlt als gespielter Spell
+          await engine.meldeGussAlsAktion(pi, heroIdx, FIREBALL);
+        }
       }
     } catch (err) {
       console.error(`[${CARD_NAME}] sub-Fireball error:`, err?.message || err);
+    }
+    if (!bezahlt) {
+      // Abbruch (Zielwahl oder Opferwahl) bzw. kein Ziel: NICHTS verbraucht — Fireball bleibt auf der Hand, kein Opfer, Einmal-Sperre bleibt frei (`return false`).
+      subInst.heroIdx = alteLage.heroIdx;
+      subInst.zoneSlot = alteLage.zoneSlot;
+      if (subNeu) engine._untrackCard(subInst.id);
+      delete gs._spellDamageLog;
+      delete gs._spellExcludeTargets;
+      delete gs._spellPlacedOnBoard;
+      delete gs._spellCancelled;
+      delete gs._spellNegatedByEffect;
+      engine.sync();
+      return false;
+    }
+    // Der Fireball verschwand während des Opfer-Fensters aus der Hand: Opfer bezahlt, nichts mehr zu wirken.
+    if (!(ps.hand || []).includes(FIREBALL)) {
+      delete gs._spellDamageLog; delete gs._spellExcludeTargets; delete gs._spellPlacedOnBoard; delete gs._spellCancelled; delete gs._spellNegatedByEffect;
+      engine.sync();
+      return true;
     }
     const placedOnBoard = !!gs._spellPlacedOnBoard;
     delete gs._spellDamageLog;

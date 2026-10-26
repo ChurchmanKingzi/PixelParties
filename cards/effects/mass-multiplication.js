@@ -9,6 +9,8 @@
 //  and add up to 3 copies of it from your deck to
 //  your hand.
 //
+//  Als Ruling (Al 26.10.): die Zahl der Kopien wählt der Spieler (0 bis höchstens 3, soweit im Deck) — nicht automatisch das Maximum.
+//
 //  The chosen card is sent to the Deleted pile
 //  (permanent) — it's not recoverable afterwards.
 //
@@ -81,6 +83,13 @@ module.exports = {
   // bei Ganz-Negierung bleibt er liegen. Danach ist die Kartenwahl nicht mehr abbrechbar (die Kosten sind gezahlt).
   async payActivationCost(ctx) {
     await payTokenCost(ctx, 1, 'Mass Multiplication');
+  },
+
+  // CPU: bei der Mengenwahl so viele Kopien wie möglich (die Optionen sind aufsteigend sortiert — die letzte ist das Maximum).
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic' || promptData?.type !== 'optionPicker' || promptData?.title !== 'Mass Multiplication') return undefined;
+    const opts = promptData.options || [];
+    return opts.length ? { optionId: opts[opts.length - 1].id } : undefined;
   },
 
   hooks: {
@@ -160,6 +169,29 @@ module.exports = {
         return;
       }
 
+      // ── Wie viele Kopien? ──
+      // Als Ruling (Al 26.10.): „up to 3 copies" — der Spieler WÄHLT die Zahl (0 bis zum Maximum: höchstens 3, soweit im Deck vorhanden), es wird nicht
+      // automatisch das Maximum genommen. Die Wahl liegt VOR den ersten Zustandsänderungen (Karte löschen / Kopien holen); ein Abbruch ist nur im Fallbackweg
+      // möglich (Kosten noch nicht bezahlt, `!_vorab`) — sonst ist die Wahl Pflicht (die Kosten sind gezahlt).
+      const maxKopien = Math.min(MAX_COPIES, deckCounts[chosenName] || 0);
+      let gewuenscht = maxKopien;
+      if (maxKopien > 0) {
+        const optionen = [];
+        for (let n = 0; n <= maxKopien; n++) {
+          optionen.push({ id: `n-${n}`, label: n === 0 ? 'No copies' : `${n} cop${n === 1 ? 'y' : 'ies'}` });
+        }
+        const anzahlWahl = await engine.promptGeneric(pi, {
+          type: 'optionPicker',
+          title: 'Mass Multiplication',
+          description: `Add how many copies of ${chosenName} from your deck to your hand? (up to ${maxKopien})`,
+          options: optionen,
+          cancellable: !_vorab,
+        });
+        if (anzahlWahl?.cancelled && !_vorab) { gs._spellCancelled = true; return; }
+        const treffer = String(anzahlWahl?.optionId || '').match(/^n-(\d+)$/);
+        if (treffer && Number(treffer[1]) <= maxKopien) gewuenscht = Number(treffer[1]);
+      }
+
       // ══════════════════════════════════════════════════════════════
       //  STAGGERED CLEANUP — visualize each move before the draws start.
       //  Auto-hand-to-pile animations fire only when the hand shrinks
@@ -220,7 +252,7 @@ module.exports = {
       // so we re-check per-iteration before each add. Matches the engine's
       // own actionDrawCards treatment of handLocked as a hard stop.
       const deck = ps.mainDeck || [];
-      const targetCount = Math.min(MAX_COPIES, deckCounts[chosenName] || 0);
+      const targetCount = Math.min(gewuenscht, deckCounts[chosenName] || 0);
       let added = 0;
       for (let k = 0; k < targetCount; k++) {
         if (ps.handLocked || engine._isSearchBlocked(pi, {}, 'deck') || !engine.pileOutAllowed(pi, 'deck', { sourceOwner: pi })) {   // Z6 (A01-35): Such-/Stapel-Sperre

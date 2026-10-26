@@ -98,6 +98,8 @@ function adjacentFreeUndefeatedZones(engine, pi, fromHeroIdx, inst = null) {
   for (const hi of adjacentHeroIndices(fromHeroIdx)) {
     const hero = ps.heroes?.[hi];
     if (!hero?.name || hero.hp <= 0) continue;
+    // Zonensperre der Spalte (Tri Fecta/Tri Ad, Bonded Companion): dorthin darf nichts gelegt werden (sonst Rueckholung auf die Hand durch `_enforceSupportZoneLock`).
+    if (inst && engine.isSupportZoneLocked?.(pi, hi, { source: CARD_NAME, cardName: inst.name, via: 'move', instId: inst.id })) continue;
     const zones = ps.supportZones?.[hi] || [[], [], []];
     for (let zi = 0; zi < 3; zi++) {
       if ((zones[zi] || []).length === 0) {

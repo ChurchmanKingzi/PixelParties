@@ -1,4 +1,5 @@
 const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
+const { aktionFrei } = require('./_extra-summon-shared');   // Nr. 82: „ist die Aktion des Helden noch frei?" (Action Phase)
 // ═══════════════════════════════════════════
 //  SHARED: Sacrifice-Summon der Teocuilatl-Creatures
 //
@@ -186,10 +187,12 @@ async function sacrificeSummonIntoSlot(engine, pi, req, CARD_NAME_ARG) {
 
   // (6) Route the sacrificed occupant to discard + fire ON_CREATURE_DEATH
   //     (sacrifice is a sub-type of dying). Slot already taken by Guardian.
+  const _ankhotaVorab = engine.ankhotaLoeschtVomBrett(occ);   // Ankhota: vor dem Zonenwechsel auswerten (Ankhota selbst zählt mit)
   occ.zone = 'discard'; occ.heroIdx = -1; occ.zoneSlot = -1;
   // W3/W5a (Al 14.10.2026): in die Ablage des PERMANENTEN Besitzers (nicht der Brettseite/des Kontrolleurs); ein Token verschwindet.
+  // Ankhota: „Delete all Creatures that are moved from the board to anywhere else" — der Opfer-Tausch umgeht den zentralen Move: gelöscht statt abgelegt.
   { const opfPs = gs.players[engine.kartenBesitzerVon(occ)] || fps;
-    if (!engine.tokenAbgang(occ)) { if (!opfPs.discardPile) opfPs.discardPile = []; opfPs.discardPile.push(occName); } }
+    if (!engine.tokenAbgang(occ) && !engine.ankhotaLoeschtSonderweg(occ, gs.players[engine.kartenBesitzerVon(occ)] ? engine.kartenBesitzerVon(occ) : heroOwner, { source: CARD_NAME_ARG, vorab: _ankhotaVorab })) { if (!opfPs.discardPile) opfPs.discardPile = []; opfPs.discardPile.push(occName); } }
   await engine.runHooks('onCardLeaveZone', {
     card: occ, leavingCard: occ, fromZone: 'support',
     fromOwner: heroOwner, fromHeroIdx: heroIdx, fromZoneSlot: slotIdx,
@@ -260,10 +263,12 @@ async function paySacrificeSwap(engine, pi, req, CARD_NAME_ARG) {
     const idx = slotArr.indexOf(occName);
     if (idx >= 0) slotArr.splice(idx, 1);
   }
+  const _ankhotaVorab = engine.ankhotaLoeschtVomBrett(occ);   // Ankhota: vor dem Zonenwechsel auswerten (Ankhota selbst zählt mit)
   occ.zone = 'discard'; occ.heroIdx = -1; occ.zoneSlot = -1;
   // W3/W5a (Al 14.10.2026): in die Ablage des PERMANENTEN Besitzers (nicht der Brettseite/des Kontrolleurs); ein Token verschwindet.
+  // Ankhota: „Delete all Creatures that are moved from the board to anywhere else" — der Opfer-Tausch umgeht den zentralen Move: gelöscht statt abgelegt.
   { const opfPs = gs.players[engine.kartenBesitzerVon(occ)] || fps;
-    if (!engine.tokenAbgang(occ)) { if (!opfPs.discardPile) opfPs.discardPile = []; opfPs.discardPile.push(occName); } }
+    if (!engine.tokenAbgang(occ) && !engine.ankhotaLoeschtSonderweg(occ, gs.players[engine.kartenBesitzerVon(occ)] ? engine.kartenBesitzerVon(occ) : heroOwner, { source: CARD_NAME_ARG, vorab: _ankhotaVorab })) { if (!opfPs.discardPile) opfPs.discardPile = []; opfPs.discardPile.push(occName); } }
   engine.sync();
   await engine.runHooks('onCardLeaveZone', {
     card: occ, leavingCard: occ, fromZone: 'support',
@@ -345,6 +350,45 @@ async function placeAfterSacrificeSwap(engine, pi, data, CARD_NAME_ARG) {
   return true; // placement consumed
 }
 
+// ═══════════════════════════════════════════
+//  Special/Normal-Wahl der fünf Teocuilatl-Kreaturen (Als Ruling (Al 26.10.), Nr. 82)
+//
+//  „Hat der Spieler Opfer bzw. einen Doom Counter für die ‚Special'-Beschwörung UND ist eine reguläre Beschwörung per Action verfügbar, wählt er
+//   Special/Normal (Muster Blue-Ice Dragon / `_extra-summon-shared`); ist keine reguläre Beschwörung verfügbar, bleibt es zwangsweise Special."
+//   Archer / Guardian / Warrior (Opfer) → `paySummonCost` (Kosten vor dem Reaktionsfenster); Jaguar / Eagle (Doom Counter) → `beforeSummon`.
+//   `inherentAction` ist deshalb nur dort wahr, wo Special der EINZIGE Weg ist; sonst zieht die Engine die Aktion ein, und „Special" erstattet sie über
+//   `gs._summonModeUpgradedToInherent` (server.js).
+// ═══════════════════════════════════════════
+
+/** Steht eine REGULÄRE Beschwörung per Action offen? Action Phase mit freier Aktion/Bonusaktion, oder eine passende Zusatzaktion (Zusatzaktions-Anbieter). */
+function regulaerOffen(engine, pi, heroIdx, cardName) {
+  if (aktionFrei(engine.gs, pi, heroIdx)) return true;
+  const hs = typeof engine.heldSeiteFuer === 'function' ? engine.heldSeiteFuer(pi, heroIdx) : pi;
+  return !!engine.findAdditionalActionForCard?.(pi, cardName, heroIdx, hs);
+}
+
+/** `inherentAction`: Special ist zwangsweise, wenn die Kosten bezahlbar sind (`bezahlbar`) und KEINE reguläre Beschwörung offensteht. */
+function specialErzwungen(engine, pi, heroIdx, cardName, bezahlbar) {
+  if (!engine || !bezahlbar) return false;
+  return !regulaerOffen(engine, pi, heroIdx, cardName);
+}
+
+/** Wahl-Dialog (Wortlaut/Knöpfe wie `_extra-summon-shared`). `true` = Special (Kosten zahlen, Aktion zurück), `false` = Normal. */
+async function frageSpecial(engine, pi, cardName, specialLabel) {
+  const wahl = await engine.promptGeneric(pi, {
+    type: 'confirm',
+    title: cardName,
+    message: `Choose how to summon ${cardName}:`,
+    showCard: cardName,
+    confirmLabel: specialLabel,
+    cancelLabel: '⚔️ Normal (use the Hero\'s Action)',
+    cancellable: true,
+    equalButtons: true,                     // zwei gleichwertige Wege: gleich breite Knöpfe
+    gerrymanderEligible: false,             // zwei Wege, kein „may" (Muster Potion Juggler / `_extra-summon-shared`)
+  });
+  return !!wahl && !wahl.cancelled;
+}
+
 /** Sacrifice a specific Guardian instance (hand or board): fire the
  *  sacrifice signal + per-turn tally/stamp, then route it to discard. */
 async function sacrificeSelf(engine, inst, pi) {
@@ -381,6 +425,9 @@ async function sacrificeSelf(engine, inst, pi) {
 
 
 module.exports = {
+  regulaerOffen,
+  specialErzwungen,
+  frageSpecial,
   hasTribute,
   heroCanSummon,
   findOccupant,

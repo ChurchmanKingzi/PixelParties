@@ -84,7 +84,7 @@ async function runSurge(ctx) {
     maxTotal: 1,
     minRequired: 1,
     baseDamage: SURGE_DAMAGE,
-    damageType: 'other',
+    damageType: 'hero',   // Schaden aus einem aktivierbaren HELDEN-Effekt (CARD_API „Schadenstyp 'hero'") — nicht 'other' (öffnet sonst weder Surprise-Fenster noch Zielschutz-Prüfung)
     redSelect: true,
   });
   if (!pick || pick.length === 0) return false;
@@ -108,7 +108,7 @@ async function runSurge(ctx) {
       const inst = sel.cardInstance;
       if (!inst || inst.zone !== 'support') break;
       // A08-15: Kreaturen laufen ueber den Kreaturen-Schadenspfad (`actionDealDamage` ist der Heldenpfad und laesst sie unberuehrt).
-      await engine.actionDealCreatureDamage(source, inst, SURGE_DAMAGE, 'other', { sourceOwner: pi, canBeNegated: true });
+      await engine.actionDealCreatureDamage(source, inst, SURGE_DAMAGE, 'hero', { sourceOwner: pi, canBeNegated: true });   // wie der Helden-Zweig oben: 'hero', nicht 'other'
     }
     engine.sync();
     await engine._delay(220);

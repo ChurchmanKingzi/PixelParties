@@ -19,6 +19,9 @@
 //       discard pile, you may delete it instead and draw 1 card.
 //       Implemented via the generic `_redirectToDeleted` flag on the
 //       leaving instance + a draw at `onCardLeaveZone` time.
+//       ★ D1 (Baustein-Phase): der SCHADENSTOD (Schaden, Brand, Gift) laeuft nicht ueber `actionMoveCard`, sondern durch den Schadens-Batch der
+//       Engine — der meldet vor dem Ablegen `onCreatureWouldBeDiscarded` (gleiche Felder wie das Leave-Ereignis, `toZone: 'discard'`); dort gilt
+//       dieselbe Klausel (gleicher Handler). Gefragt wird nur, was wirklich in die Ablage kaeme (nicht bei Ghazma/Ankhota/Root/Vacarn-Loeschung).
 // ═══════════════════════════════════════════
 
 const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
@@ -105,6 +108,11 @@ module.exports = {
       const ps = gs.players[pi];
       if (!ps) return;
 
+      // „Directly into play" durch eine ANDERE Karte (Planet in a Bottle, Reality Crack …): The Bonegrinder wird nicht GESPIELT, es gibt keine
+      // Aktion, die sie zur Zusatzaktion machen koennte - also auch keinen Skelett-Abwurf (Pflicht-Kosten der Haupt-Phase). Nur platzieren.
+      const _loest = ps._resolvingCard;
+      if (_loest && _loest.name && _loest.name !== CARD_NAME) { await engine.placeArea(pi, ctx.card); return; }
+
       // Decide which path this cast took:
       //   • Main Phase + Skeleton(s) in discard → INHERENT branch.
       //     server.js's `doPlaySpell` consulted `inherentAction()` and
@@ -185,6 +193,9 @@ module.exports = {
       // future turns' reduceCardLevel calls).
       await engine.placeArea(pi, ctx.card);
     },
+
+    // D1: Schadenstod (Engine-Batch) — derselbe Handler wie fuer die Zerstoerungs-/Opfer-Wege (`onCardLeaveZone`, `toZone: 'discard'`).
+    onCreatureWouldBeDiscarded: (ctx) => module.exports.hooks.onCardLeaveZone(ctx),
 
     /**
      * Reactive draw — up to 5/turn, when an own Skeleton would be sent
@@ -278,7 +289,9 @@ module.exports = {
       // this Bonegrinder. Cross-player discards (a future opp-
       // induced discard) don't qualify.
       if (ctx.playerIdx !== myController) return;
-      const cardName = ctx.cardName || ctx.discardedCardName;
+      // `ctx.cardName` ist im Listener-Kontext der Name der LAUSCHENDEN Karte (The Bonegrinder), nicht der der abgelegten -
+      // `discardedCardName` zuerst (sonst war die Hand-Ablage-Klausel nie ein Skelett und griff nie).
+      const cardName = ctx.discardedCardName || ctx.cardName;
       if (!cardName) return;
       if (!isSkeletonCreature(cardName, engine)) return;
 

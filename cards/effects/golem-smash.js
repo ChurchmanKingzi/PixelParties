@@ -27,6 +27,9 @@ const MAX_KARTEN = 10;
 const PRO_KARTE = 10;
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an (die Deck-Löschung ist nur Schadens-Zuschlag) —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   spellVisual: { impact: { type: 'golem_smash_ice' }, impactMs: 300 },
 
   requiresTarget: true,

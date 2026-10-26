@@ -8,6 +8,9 @@ const { v4: uuidv4 } = require('uuid');
 const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS, hasCardType, hasSpellSchool, isArtifactCreature, hasNumericCreatureLevel, POISON_BASE_DAMAGE, BURN_BASE_DAMAGE, baseCardName, BLIND_STATUSES, getCleansableStatuses, kontrollRechteVon, KONTROLL_RECHTE, heroCanBeEquipped } = require('./_hooks');
 const ANGER_BONUS = 100;   // Unreasonable Anger: +100 an einem einzelnen Ziel
 const EMPOWERED_STRIKE_BONUS = 150;   // W49a (Al, 22.10.2026): Elixir of Strength gewaehrt +150 (frueher +100); Kartentext/Tooltip/Skript-Kopf nachgezogen
+// R-6 (Als Ruling Al 26.10., „keine Counter"): Zähler einer Kreatur, die `_resetCreatureForSurpriseZone` beim Einlagern (Camel-Re-Set, Ushabti) zusätzlich löscht.
+const SURPRISE_RESET_BUCHFUEHRUNG = new Set(['_jeGetroffen', '_damageTakenTurn', '_damageTakenAmount', '_damagedOnTurn', 'poisonPermanent', 'burnPermanent', 'frozenUnhealable', 'negatedSourceBound']);
+const SURPRISE_RESET_SPIELZAEHLER = new Set(['headCounter', 'changeCounter', 'demonCounter', 'skullCounter', 'bombCounters', 'bunnyBombCounter', 'applause', 'balance', 'luck', 'preserve']);
 // v1443: Hooks, deren Kontext die ausloesende Karte mitbekommt
 // (`ausloeserName`, s. `runHooks`) — fuer Reaktionen, die zeigen, worauf
 // sie reagieren.
@@ -3194,6 +3197,11 @@ class GameEngine {
     // `triggerCardName` an ihren Prompt weiter.
     if (hookCtx && hookCtx.ausloeserName === undefined && AUSLOESER_HOOKS.has(hookName)) {
       hookCtx.ausloeserName = this._effectSourceName();
+      // Als Ruling (Al 26.10., Skeleton Demon): auch der KONTROLLEUR der auslösenden Karte/des Effekts — „with one of THEIR OWN effects" prüft, ob die Quelle dem
+      // Ziehenden/Aufnehmenden gehört. Gleiche Rangfolge wie `_effectSourceName` (innerster Effekt vor der Aktivierung); unbekannt = undefined.
+      hookCtx.ausloeserBesitzer = this._currentEffectSource?.cardName
+        ? this._currentEffectSource.owner
+        : (this._activationSource?.cardName && (this._activationSource.turn == null || this._activationSource.turn === this.gs?.turn) ? this._activationSource.owner : undefined);
     }
     if (hookName === HOOKS.ON_CARD_LEAVE_ZONE && hookCtx && hookCtx.entferntVon === undefined) {
       const q = hookCtx.source;
@@ -3288,7 +3296,8 @@ class GameEngine {
     // besiegte Kreaturen — hier, weil JEDES dieser Ereignisse (auch aus
     // Kartenmodulen gefeuert) durch diese Stelle laeuft. Logik in
     // `_sc-tracking.js`.
-    if (ScTracking.HOOKS_MIT_ZAEHLER.has(hookName) && this.gs._scTracking) {
+    // B2/E8: `onPlay` zählt erst NACH dem Lauf der Zuhörer (s. unten) — die Zielwahl eines Zaubers steckt im `onPlay` der Karte selbst, ein Abbruch dort hat die Karte nie gespielt.
+    if (ScTracking.HOOKS_MIT_ZAEHLER.has(hookName) && hookName !== 'onPlay' && this.gs._scTracking) {
       ScTracking.beiHook(this.gs._scTracking, hookName, hookCtx, {
         cardDB: this._getCardDB(),
         phase: this.gs.currentPhase, actionPhase: PHASES.ACTION,
@@ -3301,6 +3310,12 @@ class GameEngine {
     // (deren Schaden ist ein eigener Effekt).
     if (hookName === 'onAnyActionResolved' && !((this.gs?._spellResolutionDepth || 0) > 0)) this.endeEffektImmunitaeten();
     const result = await this._runHooksImpl(hookName, hookCtx);
+    // B2/E8: Card of the Day! — eine während der Auflösung ABGEBROCHENE Karte (`gs._spellCancelled`, wie `doPlaySpell` es auswertet; ein gerettetes Opfer `_opferFizzle` und eine
+    // Negation zählen als gespielt) gilt nicht als benutzt. Nur während einer laufenden Zauberauflösung auswerten: ein stehengebliebener Merker darf andere Karten nicht unterdrücken.
+    if (hookName === 'onPlay' && this.gs._scTracking
+        && !(this.gs._spellCancelled && !this.gs._spellNegatedByEffect && !this.gs._opferFizzle && (this.gs._spellResolutionDepth || 0) > 0)) {
+      ScTracking.beiHook(this.gs._scTracking, hookName, hookCtx, { cardDB: this._getCardDB() });
+    }
     // v712 (Bleed): nach JEDER aufgeloesten Handlung eines Helden — ein
     // einziger zentraler Punkt fuer alle Action-Pfade (Spell/Attack,
     // Creature, Ability, Heldeneffekt mit Action-Kosten, Immediate Actions).
@@ -4932,6 +4947,8 @@ class GameEngine {
           ...(config.searchToHand ? { searchToHand: true } : {}),
           ...(config.searchPile ? { searchPile: config.searchPile } : {}),
           gerrymanderEligible: config.gerrymanderEligible !== false,
+          // Al 26.10. (Slimes „may increase level"): reiner Vorteil — die CPU nimmt ihn immer (`_cpuAutoConfirm`, wie Aufstiegsbonus/Kassaran).
+          ...(config.cpuAutoConfirm ? { _cpuAutoConfirm: true } : {}),
           // General rule: show the source card's image on the confirm so
           // the player sees which card is asking (overridable).
           showCard: config.showCard || cardInstance.name,
@@ -5666,21 +5683,26 @@ class GameEngine {
 
         // ── Creature SOFT-untargetable-by-opponent filter (Perfect Disguise) ──
         // Soft variant of the strict filter above: per-side, drop tagged
-        // creatures only when at LEAST ONE non-tagged creature remains on
-        // that side as a legal target. If ALL creatures on the side are
-        // tagged, keep them — the card text "except if it is your only
-        // legal target" prevents the spell from fizzling on a fully-
-        // shielded board. Mirrors the per-side scope the hero
-        // `untargetable` filter uses.
+        // creatures only when at LEAST ONE other legal target remains on
+        // that side. If the tagged creature is the ONLY legal target of this
+        // source on its side, keep it — the card text "except if it is your
+        // only legal target" prevents the spell from fizzling.
+        // ★ Entscheidung Al (Perfect Disguise): „einziges LEGALES ZIEL fuer die
+        // gegnerische Karte" — Helden und Kreaturen zaehlen BEIDE als andere
+        // legale Ziele, soweit die Quelle sie anbietet (steht in `targets`;
+        // ausgegraute/geschuetzte Helden sind `ineligible` und zaehlen nicht).
+        // Kann die Quelle nur Kreaturen waehlen, gibt es keine Helden in der Liste.
         if (!config.ignoreUntargetable) {
           const softByOwner = new Map(); // owner -> { all: [], soft: [] }
           for (const t of targets) {
-            if (t.type !== 'equip' || !t.cardInstance) continue;
-            if (t.owner === pi) continue; // own creatures — soft doesn't block self-targeting
-            if (!softByOwner.has(t.owner)) softByOwner.set(t.owner, { all: [], soft: [] });
-            const entry = softByOwner.get(t.owner);
+            const istKreatur = t.type === 'equip' && !!t.cardInstance;
+            if (!istKreatur && !(t.type === 'hero' && !t.ineligible)) continue;
+            const seite = engine.zielSeite(t, t.owner);   // Kontrolle statt Brettseite
+            if (seite === pi) continue; // own side — soft doesn't block self-targeting
+            if (!softByOwner.has(seite)) softByOwner.set(seite, { all: [], soft: [] });
+            const entry = softByOwner.get(seite);
             entry.all.push(t);
-            const c = t.cardInstance.counters;
+            const c = istKreatur ? t.cardInstance.counters : null;
             if (c?.softUntargetable_by_opponent && c?.softUntargetable_by_opponent_pi === pi) {
               entry.soft.push(t);
             }
@@ -6037,6 +6059,8 @@ class GameEngine {
         let side = config.side || 'any';
         if (side === 'own') side = 'my';
         if (side === 'both') side = 'any';
+        // R-12 (Al 26.10.): Idej Sword - Kunagi — die Wiederholung einer Mehrfachwahl-Attack geht wie in `promptDamageTarget` „against a different target your opponent controls": nur Gegnerziele (`gs._kunagiWdh`).
+        if (engine.gs._kunagiWdh && engine.gs._kunagiWdh.pi === pi) side = 'enemy';
         const types = config.types || ['hero', 'creature'];
 
         // ── Truth-Seeing Eye ── (see promptDamageTarget for rationale)
@@ -6201,13 +6225,14 @@ class GameEngine {
                         ? engine._getCardDB()[cardInstance.name] : null,
                       damageType: config.damageType,
                       cardName: cardInstance?.name || null,
-                      source: cardInstance,   // W30a: Quellobjekt (Stempel / Traeger-Fighting-Level, s. `_heldenEffektStufe`)
+                      source: config.attackerSourceOverride || cardInstance,   // W30a: Quellobjekt (Stempel / Traeger-Fighting-Level, s. `_heldenEffektStufe`); R-12 (Al 26.10.): auch hier der Held der Quelle wie in `promptDamageTarget`
                       chooserIdx: pi,
                       // v870: WELCHER HELD waehlt. Gebraucht fuer
                       // Regeln zwischen zwei einzelnen Helden
                       // (Alliance) — der Spielerindex allein reicht
                       // dafuer nicht.
-                      chooserHeroIdx: cardInstance?.heroIdx ?? -1,
+                      chooserHeroIdx: config.attackerSourceOverride?.heroIdx ?? cardInstance?.heroIdx ?? -1,
+                      chooserHeroOwner: config.attackerSourceOverride?.heroOwner,   // R-12: wie `promptDamageTarget` (Alliance: Paarregel Held ↔ Held; uebernommener Held)
                       // v871 (Als Klarstellung): die LEGALEN Ziele
                       // dieser Quelle. Eine Regel der Bauart „nur,
                       // solange es andere moegliche Ziele gibt"
@@ -6277,18 +6302,19 @@ class GameEngine {
         }
 
         // ── Creature SOFT-untargetable-by-opponent filter (Perfect Disguise) ──
-        // Mirror of the soft filter in promptDamageTarget. Per-side scope
-        // with the "all-soft → keep" exception so Perfect Disguise doesn't
-        // break a multi-target spell that has nowhere else to land.
+        // Mirror of the soft filter in promptDamageTarget (dort die Begruendung:
+        // „einziges LEGALES Ziel" = Helden UND Kreaturen der Quelle zaehlen als Ausweichziel).
         if (!config.ignoreUntargetable) {
           const softByOwner = new Map();
           for (const t of targets) {
-            if (t.type !== 'equip' || !t.cardInstance) continue;
-            if (t.owner === pi) continue;
-            if (!softByOwner.has(t.owner)) softByOwner.set(t.owner, { all: [], soft: [] });
-            const entry = softByOwner.get(t.owner);
+            const istKreatur = t.type === 'equip' && !!t.cardInstance;
+            if (!istKreatur && !(t.type === 'hero' && !t.ineligible)) continue;
+            const seite = engine.zielSeite(t, t.owner);   // Kontrolle statt Brettseite
+            if (seite === pi) continue;
+            if (!softByOwner.has(seite)) softByOwner.set(seite, { all: [], soft: [] });
+            const entry = softByOwner.get(seite);
             entry.all.push(t);
-            const c = t.cardInstance.counters;
+            const c = istKreatur ? t.cardInstance.counters : null;
             if (c?.softUntargetable_by_opponent && c?.softUntargetable_by_opponent_pi === pi) {
               entry.soft.push(t);
             }
@@ -6421,7 +6447,8 @@ class GameEngine {
           // Forward intent fields — see promptDamageTarget for rationale.
           baseDamage: config.baseDamage,
           damageType: config.damageType,
-          _quellObjekt: cardInstance,   // W30a: s. promptDamageTarget
+          _quellObjekt: config.attackerSourceOverride || cardInstance,   // W30a: s. promptDamageTarget; R-12: der Held der Quelle (Future Tech Fists)
+          _waehlbarProbe: config._waehlbarProbe,   // R-12: Trockenlauf (`promptEffectTarget`) auch fuer die Mehrfachwahl — Future Tech Fists „exakt N legale Ziele"
           isBuff: config.isBuff,
           isHeal: config.isHeal,
           // ── v385: `isHealing` gehoert MIT weitergereicht ────────────
@@ -6452,6 +6479,18 @@ class GameEngine {
           return [];
         }
 
+        // ── Kosten NACH der bestätigten Zielwahl (Als Ruling Al 26.10., Chaorc Friendly Fireballer) ──
+        // „Zuerst Ziel wählen, Commit soll Opfer und Feuerball gleichzeitig committen": `config.nachZielwahl(selectedIds)` zahlt die Kosten der Karte
+        // (Opfer …) NACH der bestätigten Wahl und VOR den Umleitungs-/Reaktionsfenstern (der Gegner darf danach negieren, die Kosten bleiben bezahlt). `false`/Abbruch
+        // der Kostenwahl = wie ein Abbruch der Zielwahl: nichts bezahlt, die Karte bleibt unverbraucht (Zauber-Abbruchmarke wie oben).
+        if (typeof config.nachZielwahl === 'function') {
+          const _kostenOk = await config.nachZielwahl(selectedIds);
+          if (!_kostenOk) {
+            if (config.cancellable !== false && !config.noSpellCancel) gs._spellCancelled = true;
+            return [];
+          }
+        }
+
         // ── Umleitungs-/Negierungsfenster (Martyry, Challenge, Rolling Boulder …) ──
         // Z3 (R02-02): wie `promptDamageTarget` – der Dispatcher darueber kennt hier keine Quelle
         // (`_callerHandlesSurprise`), also oeffnet der Picker das Fenster selbst; `applyRedirectWindows`
@@ -6459,8 +6498,8 @@ class GameEngine {
         // „exactly 1 target"). Leere Rueckgabe = der Effekt ist negiert (kein Abbruch: keine Zaubermarke).
         let _gewaehlt = selectedIds;
         if (!config._skipRedirectCheck) {
-          _gewaehlt = await engine.applyRedirectWindows(selectedIds, targets, config, cardInstance);
-          if (!Array.isArray(_gewaehlt) || _gewaehlt.length === 0) return [];
+          _gewaehlt = await engine.applyRedirectWindows(selectedIds, targets, config, config.attackerSourceOverride || cardInstance);   // R-12: der Held der Quelle (`attackerSourceOverride`), wie `promptDamageTarget`
+          if (!Array.isArray(_gewaehlt) || _gewaehlt.length === 0) { gs._zielNegiertDurchSchutz = true; return []; }   // R-12: Negation durch Schutz-/Redirect-Fenster (kein Abbruch) — gelesen von `heldenEffektZielwahl`
         }
 
         // Map IDs to target objects and record for spell tracking
@@ -6477,10 +6516,10 @@ class GameEngine {
           const heroTargets = result.filter(t => t.type === 'hero' || t.type === 'creature'
             || (t.type === 'equip' && t.cardInstance && engine._istKreaturenInstanz(t.cardInstance)));   // Z3 (R02-01)
           if (heroTargets.length > 0) {
-            const surpriseResult = await engine._checkSurpriseWindow(heroTargets, cardInstance, { damageType: config.damageType });
+            const surpriseResult = await engine._checkSurpriseWindow(heroTargets, config.attackerSourceOverride || cardInstance, { damageType: config.damageType });   // R-12: Quelle = der Held (`attackerSourceOverride`), wie `promptDamageTarget`
             if (surpriseResult?.effectNegated) {
               gs._spellNegatedByEffect = true;
-              await engine.negationsBilder(cardInstance, heroTargets, surpriseResult);   // v1180
+              await engine.negationsBilder(config.attackerSourceOverride || cardInstance, heroTargets, surpriseResult);   // v1180
               // Clear damage log entries for negated targets
               if (gs._spellDamageLog) {
                 for (const t of result) {
@@ -6515,11 +6554,11 @@ class GameEngine {
             (!!config.damageType && config.damageType !== 'status' && config.damageType !== 'none')
           );
           const ptResult = await engine._checkPostTargetHandReactions(
-            result, cardInstance, { damageType: config.damageType, dealsDamage: _ptDealsDamage, heroChoiceIsCost: config.heroChoiceIsCost === true },
+            result, config.attackerSourceOverride || cardInstance, { damageType: config.damageType, dealsDamage: _ptDealsDamage, heroChoiceIsCost: config.heroChoiceIsCost === true },   // R-12: Quelle = der Held (`attackerSourceOverride`)
           );
           if (ptResult?.effectNegated) {
             gs._spellNegatedByEffect = true;
-            await engine.negationsBilder(cardInstance, result, ptResult);   // v1180
+            await engine.negationsBilder(config.attackerSourceOverride || cardInstance, result, ptResult);   // v1180
             // Clear damage log entries for negated targets
             if (gs._spellDamageLog) {
               for (const t of result) {
@@ -6939,6 +6978,7 @@ class GameEngine {
       // W50a (Ricochet, Al 22.10.2026): ein abgebrochener/negierter/immuner Treffer hat Kettenbetrag 0 — alle Folgetreffer sind dann 0
       // (treffen aber weiter, On-Hit-Effekte bleiben).
       if (opts?.vollOut && _res?.cancelled) opts.vollOut.wert = 0;
+      if (this._multiHitScope?._todgeweihte && target?.hp > 0) this._schlagTodgeweihtFreigeben(target);   // ★ W78: der Held hat seinen Treffer ueberstanden — nicht mehr todgeweiht
       return _res;
     } finally {
       this._actionRecursionDepth--;
@@ -7453,12 +7493,28 @@ class GameEngine {
   }
 
   /**
+   * ★ 26.10. — „RAGNAROCK": „Negate that Ability until the end of the turn and discard the top copy of it from the Hero that activated it."
+   * Als Ruling (Al 26.10.): Die Ability ist auf dem Helden, der sie aktiviert hat, bis zum Ende DIESES Zuges negiert — auch eine erneute Aktivierung im selben Zug ist unmöglich
+   * (auch nach Kopien-Verlust: die Sperre hängt an Held + Basisname, nicht an der Kopie); dieselbe Ability auf ANDEREN Helden bleibt nutzbar.
+   * Speicher: `gs.players[pi]._abilityHeroLocks['<heroIdx>:<Basisname>'] = gs.turn` (gesetzt von Ragnarock). Gelesen von `_abilityNegatedOnHero` (alle Aktivierungswege); nur AKTIVE Effekte.
+   */
+  abilityAmHeldenGesperrt(pi, heroIdx, abilityName) {
+    const l = this.gs.players?.[pi]?._abilityHeroLocks;
+    if (!l || !abilityName) return false;
+    const key = `${heroIdx}:${baseCardName(abilityName)}`;
+    if (l[key] == null) return false;
+    if (l[key] !== this.gs.turn) { delete l[key]; return false; }
+    return true;
+  }
+
+  /**
    * „… negate the effects of all «Charme» Abilities attached to it."
    *
    * Vertrag: `negatesHostAbilities: ['Charme', …]` am Anhaengsel.
    */
   _abilityNegatedOnHero(pi, heroIdx, abilityName) {
     if (!abilityName) return false;
+    if (this.abilityAmHeldenGesperrt(pi, heroIdx, abilityName)) return true;   // 26.10. (Ragnarock): bis Zugende am aktivierenden Helden negiert
     // ★ 25.10. (Uncool Malfunction): der Spieler, der den Helden KONTROLLIERT, darf aktive Effekte von Abilities dieses Namens nicht aktivieren.
     {
       const held = this.gs.players[pi]?.heroes?.[heroIdx];
@@ -9168,28 +9224,29 @@ class GameEngine {
     // auch wenn Monia selbst nie wieder am Zug ist (tot/gefroren: ihr `onTurnStart` räumt dann nicht mehr).
     if (this.gs && (this.gs._moniaShieldActive != null || this.gs._moniaAngebote)) { delete this.gs._moniaShieldActive; delete this.gs._moniaShieldSource; delete this.gs._moniaAngebote; }   // W58a: auch die Angebote der Aufloesung
     if (this.gs && this.gs._kreaturFenster) delete this.gs._kreaturFenster;   // W71b: die Fenster-Buchführung von `kreaturBetroffen` endet mit der Auflösung
+    this._gewaehlteZiele = null;   // W78a: die gemerkten Zielwahlen des Effekts (Monias CPU-Bilanz) ebenfalls (Engine-Feld, nicht im Spielstand: ein Abbruch hinterlässt keine Spur im Zustand)
     // W16f (H03-10): Monia Bots True-Damage-Stempel gilt für Schaden AUS dem umgeleiteten Effekt — er endet mit dessen Auflösung (macht der Effekt keinen Schaden, verfällt er).
     if (this.gs && this.gs._redirectedTrueDamage) delete this.gs._redirectedTrueDamage;
   }
 
   /**
    * W16f (H01-08): blockt Monias Schild einen Effekt auf `inst`? Der Schild gehört zu der Karte/dem Effekt, die ihn ausgelöst hat: eine ANDERE benannte
-   * Quelle (unabhängiger Effekt im selben Zug, z. B. eine Reaktion) wird nicht geblockt; ohne bekannte Quelle auf einer der beiden Seiten gilt der Schild wie bisher.
+   * Quelle (unabhängiger Effekt im selben Zug, z. B. eine Reaktion) wird nicht geblockt; ohne bekannte Quelle gilt der Schild wie bisher.
    * ★ W58a: ohne Einmal-pro-Zug-Sperre kann eine Auflösung mehrere angenommene Angebote tragen (`gs._moniaAngebote`: { key = Name der Karte/des Effekts, pi, seite }) —
-   * jedes schützt SEINE Seite vor SEINER Quelle; die einzelne Marke `_moniaShieldActive`/`_moniaShieldSource` bleibt als Spiegel des zuletzt angenommenen Angebots.
-   * `seite` = die Seite, unter der `inst` zählt (Aufrufer: Besitzer oder Kontrolleur; Standard Kontrolleur).
+   * jedes schützt vor SEINER Quelle; die einzelne Marke `_moniaShieldActive`/`_moniaShieldSource` bleibt als Spiegel des zuletzt angenommenen Angebots.
+   * ★ W77a (Al, 26.10.2026): ein angenommenes Angebot schützt ALLE Kreaturen BEIDER Seiten („negate any effects that card or effect has on all Creatures") —
+   * die Seite der Kreatur spielt keine Rolle mehr (`seite` bleibt als Parameter, wird ignoriert).
    */
-  moniaSchildBlockt(inst, source, seite) {
+  moniaSchildBlockt(inst, source, _seite) {
     if (!inst) return false;
-    if (seite == null) seite = inst.controller ?? inst.owner;
     const q = typeof source === 'string' ? source : (source?.name || source?.cardName);
     for (const a of (this.gs?._moniaAngebote || [])) {
-      if (a.seite == null || a.seite !== seite) continue;
+      if (a.seite == null) continue;
       if (a.key && q && a.key !== q) continue;
       return true;
     }
     const marke = this.gs?._moniaShieldActive;
-    if (marke == null || marke !== seite) return false;
+    if (marke == null) return false;
     const schildQuelle = this.gs._moniaShieldSource?.name;
     if (schildQuelle && q && q !== schildQuelle) return false;
     return true;
@@ -9224,10 +9281,16 @@ class GameEngine {
       : (quelle && typeof quelle === 'object') ? (quelle.controller ?? quelle.owner)
       : (this._currentEffectSource?.owner ?? this._activationSource?.owner);
     const src = (quelle && typeof quelle === 'object') ? quelle : { name, ...(typeof owner === 'number' ? { owner } : {}) };
+    // B2/E9: Cosmic Malfunction hat diese Karte/diesen Effekt für den Zug negiert — kein Schutzfenster, der Effekt prallt ab.
+    if (this.cdMalfunctionSchutz(inst, src, opts)) {
+      this.log('cd_malfunction_shield', { victim: inst.name, source: name || 'effect', effectType: art });
+      return false;
+    }
     const hookCtx = {
       creature: inst, effectType: art, source: src, cancelled: false, _skipReactionCheck: true,
       ...(opts.statusName ? { statusName: opts.statusName } : {}),
       ...(opts.detail ? { detail: opts.detail } : {}),
+      ...(Array.isArray(opts.vorab) && opts.vorab.length ? { vorab: opts.vorab.filter(i => i && i !== inst) } : {}),   // W78a: weitere Kreaturen, die derselbe Effekt gleich trifft (für Monias CPU-Bilanz)
     };
     // Dieselbe Karte/derselbe Effekt fragt für dieselbe Kreatur und Art in EINER Auflösung nur einmal — das erledigt `runHooks` (Buchführung `gs._kreaturFenster`).
     await this.runHooks(HOOKS.BEFORE_CREATURE_AFFECTED, hookCtx);
@@ -9243,11 +9306,44 @@ class GameEngine {
    */
   async kreaturenVorab(insts, art, quelle, opts = {}) {
     const erlaubt = new Set();
-    for (const inst of insts || []) {
-      if (!inst) continue;
-      if (await this.kreaturBetroffen(inst, art, quelle, opts)) erlaubt.add(inst.id);
+    // ★ W78a: das ERSTE Fenster kennt die ganze Liste (`ctx.vorab`) — Monias CPU rechnet damit die Gesamtbilanz des Effekts, statt nur die erste Kreatur zu sehen.
+    const alle = (insts || []).filter(Boolean);
+    for (const inst of alle) {
+      if (await this.kreaturBetroffen(inst, art, quelle, { ...opts, vorab: alle })) erlaubt.add(inst.id);
     }
     return erlaubt;
+  }
+
+  /**
+   * ★ W78a (Al, 26.10.2026): gemeinsame Kreaturen-Wertung/-Bilanz der CPU (`_kreaturen-bilanz.js`) — Monia nutzt sie für „annehmen oder ablehnen",
+   * andere Flächen-/Kontroll-Bewerter können sie später ebenfalls rufen. `kreaturenBilanz(opfer, liste)`: Bilanz aus Sicht von `opfer`, wenn die Wirkung
+   * auf alle Listeneinträge negiert würde (Schaden an Eigenen/Nutzen für Gegnerische verhindert = Gewinn, Schaden an Gegnerischen/Nutzen für Eigene = Verlust).
+   * `absehbareKreaturen(k)`: erwartete Gesamtliste eines Effekts beim ersten Ereignis (angekündigte Liste, gewählte Ziele, Flächen-Eigenschaft/Kartentext).
+   */
+  kreaturWert(inst) { return require('./_kreaturen-bilanz').kreaturWert(this, inst); }
+  kreaturenBilanz(opfer, liste, opts) { return require('./_kreaturen-bilanz').kreaturenBilanz(this, opfer, liste, opts); }
+  absehbareKreaturen(k) { return require('./_kreaturen-bilanz').absehbareKreaturen(this, k); }
+
+  /** ★ W78a: gewählte Ziele einer abgeschlossenen Zielwahl für die Auflösung merken (nur Kreaturen-Ids; Engine-Feld `_gewaehlteZiele`, nicht im Spielstand; endet mit `endeEffektImmunitaeten`, Anfang/Ende einer Aktivierung [`armEffectAnnounce`/`clearEffectAnnounce`] und einer äußersten Kartenauflösung). */
+  _gewaehlteZieleMerken(playerIdx, validTargets, config, ergebnis) {
+    try {
+      if (!Array.isArray(ergebnis) || !ergebnis.length || !Array.isArray(validTargets)) return;
+      const ids = new Set(ergebnis.map(r => (r && typeof r === 'object') ? r.id : r));
+      const insts = [];
+      for (const t of validTargets) {
+        if (!t || !ids.has(t.id)) continue;
+        const inst = t.cardInstance || t._cardInstance;
+        if (inst && inst.zone === ZONES.SUPPORT && inst.id != null) insts.push(inst.id);
+      }
+      if (!insts.length) return;
+      const quellen = new Set();
+      const q = (v) => { const n = typeof v === 'string' ? v : (v && (v.cardName || v.name)); if (n) quellen.add(n); };
+      q(config?.sourceCard); q(config?.source); q(this._effectSourceName());
+      if (!quellen.size) return;
+      const liste = this._gewaehlteZiele || (this._gewaehlteZiele = []);
+      liste.push({ quellen: [...quellen], ids: insts, turn: this.gs.turn });
+      if (liste.length > 12) liste.splice(0, liste.length - 12);
+    } catch { /* Buchführung darf die Zielwahl nie stören */ }
   }
 
   async _actionDealDamageImpl(source, target, amount, type, opts) {
@@ -9880,8 +9976,10 @@ class GameEngine {
     // Die Karte legt ihren Multiplikator-Buff (Cloudy) sofort auf; der Durchgang darunter halbiert den Treffer dann wie jede andere Senkung (Kettenbetrag
     // inklusive). Wurde der Buff verhindert, liefert die Karte `multiplier` zurueck, den die Engine direkt in `_mul` rechnet. Nicht anbieten, wenn der Treffer
     // nicht senkbar ist (`cannotBeReduced`/`cannotBeNegated` lassen den Multiplikator-Durchgang ohnehin aus).
+    // R5 (Als Ruling Al 26.10.): wird Hydra Blood Arrow diesen Treffer gleich auf 0 setzen, sehen Reaktionen am Ziel schon die 0 — kein Angebot.
     if (target && target.hp !== undefined && target.hp > 0 && !hookCtx.cancelled
-        && !hookCtx.cannotBeReduced && !hookCtx.cannotBeNegated) {
+        && !hookCtx.cannotBeReduced && !hookCtx.cannotBeNegated
+        && (this.istKlonQuelle(source) || !require('./_arrows-shared').hydraWirdNullen(this, source, hookCtx))) {
       const _fruehBetrag = this._projectedAmount(hookCtx);
       if (_fruehBetrag > 0) {
         const _fr = await this._checkPreDamageHandReactions(target, source, _fruehBetrag, type, { early: true });
@@ -9899,9 +9997,13 @@ class GameEngine {
     // the amount. Multipliers ≥ 1 (any future damage-amplifier buff)
     // still apply because the lock is only a floor, not a freeze.
     const _amountBeforeBuffMul = this._projectedAmount(hookCtx);
-    if (!hookCtx.cannotBeNegated && target?.buffs) {
+    // ★ Als Ruling (Al 26.10., Disruption Ray: „All damage that target receives … is doubled" gilt auch fuer True Damage): „cannot be reduced or negated"
+    // schuetzt vor SENKUNGEN, nicht vor Erhoehungen — bei unnegierbarem Schaden greifen deshalb nur Multiplikatoren > 1 (Disrupted), Senkungen/Immunitaeten
+    // (Cloudy, Petrified, Damage Immune) bleiben draussen.
+    if (target?.buffs) {
       for (const [, buffData] of Object.entries(target.buffs)) {
         if (buffData.damageMultiplier != null) {
+          if (hookCtx.cannotBeNegated && !(buffData.damageMultiplier > 1)) continue;
           if (hookCtx.cannotBeReduced && buffData.damageMultiplier < 1) continue;
           hookCtx._mul = (hookCtx._mul ?? 1) * buffData.damageMultiplier;
           hookCtx._kMul = (hookCtx._kMul ?? 1) * buffData.damageMultiplier;   // W50a: Buff-Senkung (Cloudy …) zaehlt fuer den Kettenbetrag
@@ -9947,16 +10049,9 @@ class GameEngine {
     // the next Attack damage event from that hero. Bypasses multipliers
     // by routing through `_flatBonus` (same channel as Darge's arrows).
     if ((type === 'attack') && source?.owner != null && source?.heroIdx >= 0 && !this.istKlonQuelle(source)) {
-      const sourceHero = this.gs.players[source.owner]?.heroes?.[source.heroIdx];
-      const niuBuff = sourceHero?.buffs?.niu_enhanced;
-      const niuBonus = niuBuff?.totalDamage || 0;
-      if (niuBonus > 0) {
-        hookCtx._flatBonus = (hookCtx._flatBonus || 0) + niuBonus;
-        await this.actionRemoveBuff(sourceHero, source.owner, source.heroIdx, 'niu_enhanced');
-        this.log('niu_enhanced_strike', {
-          hero: sourceHero.name, bonus: niuBonus, stacks: niuBuff.stacks || 1,
-        });
-      }
+      // Als Ruling (Al 26.10.): der Buff liegt auf allen eigenen Helden — die erste Attack irgendeines Helden löst ihn ein.
+      const niuBonus = await this._niuBonusEinloesen(source);
+      if (niuBonus > 0) hookCtx._flatBonus = (hookCtx._flatBonus || 0) + niuBonus;
     }
 
     // Flat bonus that bypasses buff multipliers (Bow Sniper Darge's
@@ -9965,6 +10060,10 @@ class GameEngine {
     if (hookCtx._flatBonus && !hookCtx._kettenFolge) hookCtx.amount += hookCtx._flatBonus;
     // `ctx.becomeAmount(n)` („damage becomes N", Shrink): auch Boni, die die Hook-Runde umgehen, koennen den Betrag nicht ueber N heben.
     if (hookCtx._becomesAmount != null && hookCtx.amount > hookCtx._becomesAmount) hookCtx.amount = hookCtx._becomesAmount;
+    // ★ R5 (Als Ruling Al 26.10.: „Immer Hydra Blood Arrow nach ALLEN anderen Schadens-Modifikatoren!"): erst jetzt steht der Endbetrag fest (Hook-Boni, Elixir, Anger, andere Pfeile,
+    // Buff-Multiplikatoren am Angreifer und am Ziel, Niu/Darge). Hydra setzt ihn auf 0 und rechnet das Gift aus diesem Betrag; Kettenbetrag, Schilde, Deckel und Hand-Reaktionen
+    // darunter sehen schon die 0. Nur QUELLEN-seitig unreduzierbarer Schaden bleibt (`_unreduzierbar`), ZIEL-seitiges „cannot be reduced" nicht (Tempeste, Brachion …).
+    if (!this.istKlonQuelle(source)) require('./_arrows-shared').applyArrowsZero(this, source, target, hookCtx);   // Pfeile gehören dem Helden, nicht dem Klon
     // W50a (Ricochet, Al 22.10.2026): Kettenbetrag = Schaden nach allen SENKUNGEN, vor Schilden/Blocks/Negation/Deckeln (Haltepunkt HIER; die
     // Schilde folgen unten). Senkungen NACH dem Haltepunkt (Interference-Halbierung, Halbierungs-Reaktionen) kuerzen ihn per `_kettenSenkung`.
     if (opts?.vollOut) {
@@ -10466,15 +10565,51 @@ class GameEngine {
       // der Kartentext nimmt „damage that could normally not be reduced
       // or negated" nicht mehr aus.)
 
+      // ★ Als Ruling (Al 26.10., Flame Avalanche: „You cannot deal any other damage to targets your opponent controls"): die Schadenssperre
+      // (`ps.damageLocked`) gilt AUCH fuer True Damage („cannot be reduced or negated" schuetzt vor Senkungen, nicht vor einem Verbot). Wie
+      // im Normalweg (`actionDealDamage`) nach aktuellem KONTROLLEUR: gesperrt ist, was der Gegner gerade kontrolliert, eigene Ziele
+      // bleiben treffbar. Ganz am Anfang — eine gesperrte Quelle loest auch keine Umlenkung/Aufschlaege (`beforeTrueDamage`) aus. Die
+      // Kreaturen-Seite sperrt `processCreatureDamageBatch` laengst fuer alle Eintraege (auch `canBeNegated: false`).
+      if (targetOwner >= 0 && sourceOwner >= 0 && this.gs.players[sourceOwner]?.damageLocked) {
+        const _lockHi = (this.gs.players[targetOwner]?.heroes || []).indexOf(target);
+        if (_lockHi >= 0 && this.kontrolleurVonHeld(targetOwner, _lockHi) !== sourceOwner) {
+          this.log('damage_blocked', { target: this._heroLabel(target), reason: 'damage_locked' });
+          this._flashHeroDamageZero(target);
+          return { dealt: 0 };
+        }
+      }
+
+      // ★ B2/E4: ein Angriff mit True Damage (Surefire Shot: `opts.angriffsBoni`) bekommt die ERHÖHUNGEN einer normalen Attack — Pfeile (+Schaden, Gift, Brand),
+      // Elixir of Strength (+150), Darge (+50 je Pfeil, Hook `beforeTrueDamage` liest `ctx.angriffsBoni`). „Cannot be reduced or negated" verbietet nur Senken/Negieren.
+      // Bewusst nur auf Anfrage des Aufrufers: Umleitungen (Johanna, Siren, Mean Cute Cat) reichen dieselbe Quelle weiter und duerfen die Pfeile nicht ein zweites Mal ziehen.
+      const _atkBoni = type === 'attack' && opts.angriffsBoni === true && !this.istKlonQuelle(source);
       // ★ W73b (Cheering Rabbit): „X additional damage" ERHÖHT auch True Damage („cannot be reduced or negated" schützt nur vor Senkungen). Die Hooks dürfen nur ERHÖHEN.
       {
         const bq = this._klonSicht(source);
-        const hookCtx = { source: bq, target, amount, type, sourceHeroIdx: bq?.heroIdx ?? -1, trueDamage: true, cannotBeReduced: true, cannotBeNegated: true };
+        const hookCtx = { source: bq, target, amount, type, sourceHeroIdx: bq?.heroIdx ?? -1, trueDamage: true, cannotBeReduced: true, cannotBeNegated: true, angriffsBoni: _atkBoni };
         hookCtx._kBase = amount; hookCtx._kMul = 1; hookCtx._kFlat = 0;
         await this.runHooks(HOOKS.BEFORE_TRUE_DAMAGE, hookCtx);
         if (hookCtx.cancelled && hookCtx._umgeleitet) return { dealt: 0, cancelled: true };   // Mean Cute Cat: umgeleitet (der Schaden liegt schon beim neuen Ziel)
+        // ★ R-4 (Als Ruling Al 26.10.): Unreasonable Anger („any damage the user deals to single targets is increased by 100") ERHÖHT auch True Damage gegen Helden — wie
+        // schon gegen Kreaturen (`processCreatureDamageBatch` rechnet es für jeden Eintrag, auch `trueDamage`). Erhöhen ist erlaubt („cannot be reduced or negated"); Teil der Basis
+        // (wird wie im Normalweg mitverdoppelt).
+        this._applyAngerBonusIfApplicable(hookCtx);
+        // ★ Als Ruling (Al 26.10., Disruption Ray): „All damage that target receives … is doubled" verdoppelt auch True Damage (Rockfall 200 → 400, Acid Vial 150 → 300) —
+        // Verdoppeln ist keine Senkung. Nur ERHOEHENDE Buff-Multiplikatoren (> 1); Senkungen/Immunitaeten (Cloudy, Petrified, Damage Immune) bleiben draussen. Wie im Normalweg
+        // „Basis × Multiplikatoren, dann flach" (PUNKT VOR STRICH).
+        for (const [, bd] of Object.entries(target.buffs || {})) {
+          if (bd && bd.damageMultiplier > 1) hookCtx._mul = (hookCtx._mul ?? 1) * bd.damageMultiplier;
+        }
         const proj = this._projectedAmount(hookCtx);
         if (proj !== undefined && proj > amount) amount = proj;
+        if (_atkBoni) {
+          // B2/E4: Elixir of Strength (+150, der Buff wird verbraucht) und bewaffnete Pfeile (flat) wie im Normalweg; nur Erhöhungen zählen —
+          // die Null von Hydra Blood Arrow (Stufe 2, `applyArrowsZero`) läuft hier nie (True Damage ist QUELLEN-seitig unreduzierbar); der Gift-Zuschlag nach dem Treffer bleibt.
+          const pk = { source: bq, target, amount, type, _kBase: amount, _kMul: 1, _kFlat: 0 };
+          this._applyEmpoweredStrikeIfApplicable(pk);
+          require('./_arrows-shared').applyArrowsBeforeDamage(this, source, target, pk);
+          if (pk.amount > amount) amount = pk.amount;
+        }
       }
 
       const hpBefore = target.hp;
@@ -10503,6 +10638,7 @@ class GameEngine {
 
       // Elixir of Cold rider — same as actionDealDamage.
       await this._applyColdStrikeFreezeIfApplicable(source, target, type, dealt);
+      if (_atkBoni) await require('./_arrows-shared').applyArrowsAfterDamage(this, source, target, dealt, amount, type);   // B2/E4: Pfeil-Zuschläge nach dem Treffer (Gift, Brand, Gold)
 
       // ── Nach-Schaden-Surprise-Fenster, auch hier ──
       // Als Befund 19.8.: Cybug ANTS reagierte nicht auf Acid Vial.
@@ -10569,6 +10705,7 @@ class GameEngine {
         source,
         sourceOwner,
         canBeNegated: false,
+        trueDamage: true,   // Johanna (Ruling Al, Welle 2): „cannot be reduced or negated" — Umleitung ZUSÄTZLICH statt Senkung
         isStatusDamage: false,
         animType: opts.animType || null,
       }]);
@@ -10642,6 +10779,7 @@ class GameEngine {
     // Creatures are defeated" sieht die ganze Liste auf einmal.
     await this._mitNiederlagenSammler(async () => {
       const handLimitAffectedOwners = new Set();
+      this._geloeschtVorabStempeln(a.liste.filter(t => t.art === 'kreatur').map(t => t.e));   // D2: Ersatz-Karten einmal vor dem ersten Tod auswerten
       for (const t of a.liste) {
         if (t.art === 'kreatur') {
           await this._kreaturTodAbwickeln(t.e, handLimitAffectedOwners);
@@ -11253,6 +11391,11 @@ class GameEngine {
     // Welle 12 (Al, Rueckfrage 4, Foresta): „Der Hero stirbt ja nicht, weil er durch einen Effekt 'sacrificed' wird, sondern durch HP-Verlust!" —
     // ein Tod durch HP-KOSTEN (`opts.hpKosten`, Foresta bei 1 HP) ist KEIN Opfer: weder dieser Hook (Thuly) noch Temple of Sacrifice feuern.
     if (opts.isSacrifice && !opts.hpKosten && !this.gs.result) {
+      // Als Ruling (Al 26.10., Chaorc Ruin Mourner): Helden-Opfer zählen als „sacrificed a target" — eigener Zug-Zähler des Opferers (getrennt von `_creaturesSacrificedThisTurn`,
+      // den Pyre Grill Master als „Kreaturen" liest); Ruin Mourner addiert beide für seine Stufensenkung.
+      const _opferer = source?.owner ?? source?.controller ?? this.heroSideOf(targetOwner, target);
+      const _opfPs = (_opferer != null) ? this.gs.players[_opferer] : null;
+      if (_opfPs) _opfPs._heroesSacrificedThisTurn = (_opfPs._heroesSacrificedThisTurn || 0) + 1;
       await this.runHooks('onHeroSacrificed', { hero: target, source, heroOwner: targetOwner, _skipReactionCheck: true });
     }
     return { defeated: true };
@@ -11612,6 +11755,10 @@ class GameEngine {
 
     // Monia-style creature protection
     if (hasCardType(cd, 'Creature')) {
+      if (this.cdMalfunctionSchutz(target, source)) {   // B2/E9: Cosmic Malfunction negiert auch das Heilen durch die negierte Karte
+        this.log('cd_malfunction_shield', { victim: target.name, source: source?.name || 'effect', effectType: 'heal' });
+        return;
+      }
       const hookCtx = { creature: target, effectType: 'heal', source, cancelled: false, _skipReactionCheck: true };
       await this.runHooks(HOOKS.BEFORE_CREATURE_AFFECTED, hookCtx);
       if (hookCtx.cancelled) return;
@@ -12479,6 +12626,11 @@ class GameEngine {
     // Welle 11 (Q66): derselbe Sperr-Stutzen (Server-Wege, Ausgrau-Liste, Sofort-Wege) trägt die Erste-Runden-Sperre — vor der Kreaturen-Ausnahme.
     if (script.blockedByFirstTurnProtection
         && this._cardBlockedByFirstTurn(script, (typeof playerIdx === 'number') ? playerIdx : this.gs.players.indexOf(ps))) return true;
+    // ★ Als Ruling (Al 26.10., Flame Avalanche: „Am besten gleich die Karten ganz sperren statt den Schaden fizzeln zu lassen"): Karten, deren EINZIGE Wirkung
+    // Schaden an Zielen des Gegners ist (`blockedByDamageLock: true`), sind unspielbar, solange der Spieler unter der Schadenssperre steht (`ps.damageLocked`:
+    // Flame Avalanche, Armageddon, Last Resort, Future Tech Organnon) — kein Verbrauch ohne Wirkung. Karten mit gemischter Wirkung tragen die Marke NICHT
+    // (dort sperrt nur der Schaden selbst, auch True Damage).
+    if (script.blockedByDamageLock && ps.damageLocked) return true;
     // Z6 (B-04): auch Artifact-Creatures (cardType 'Artifact', Subtyp Creature, z. B. Debt-O-Tron Backup Duplicator) haben einen
     // Koerper und sind ausgenommen - `hasCardType` kennt beide Formen.
     if (cardData && (cardData.cardType === 'Creature' || hasCardType(cardData, 'Creature'))) return false;
@@ -12944,11 +13096,13 @@ class GameEngine {
     this._activationSource = cardName
       ? { cardName, owner: ownerIdx ?? null, turn: this.gs?.turn, origin: origin === 'hand' ? 'hand' : 'board' }
       : null;
+    this._gewaehlteZiele = null;   // W78a: eine neue Aktivierung beginnt — keine gemerkten Zielwahlen einer abgebrochenen früheren
   }
 
   clearEffectAnnounce() {
     this._pendingEffectAnnounce = null;
     this._activationSource = null;
+    this._gewaehlteZiele = null;   // W78a
   }
 
   /**
@@ -13405,6 +13559,23 @@ class GameEngine {
       return true;
     }
     return false;
+  }
+
+  /**
+   * ★ Ankhota × Sonderweg „Brett → Deck/Hand" (Mass Routing, Enemy of my Enemy, Dive Bomblebee, Tengu Windstorm, Staff of Illusions, Sculpture Theft, Gold Trap, Rha'Bi …), der den zentralen Move
+   * umgeht (Gegenstück zu `handZugangSync` mit `vonInst`): löscht Ankhota die Kreatur (`ankhotaLoeschtVomBrett`), kommt sie in den GELÖSCHT-Stapel des Besitzers `besitzerIdx` (meldet die Löschung —
+   * Ankhotas Zuwachs — über den Stapel-Wächter) und die Methode liefert `true`: der Aufrufer legt sie dann NICHT ins Deck/auf die Hand und zählt sie nicht als „zurückgemischt". Aufrufen, solange `inst` noch
+   * als Brettkarte geführt wird (vor `_untrackCard`; Ankhota selbst zählt dann mit). `opts.vorab` = schon VOR einer Massenbewegung ausgewertetes Ergebnis (reihenfolgeunabhängig).
+   */
+  ankhotaLoeschtSonderweg(inst, besitzerIdx, opts = {}) {
+    if (!inst || !(opts.vorab != null ? opts.vorab : this.ankhotaLoeschtVomBrett(inst))) return false;
+    const bps = this.gs.players[besitzerIdx];
+    if (!bps) return false;
+    inst._ankhotaGeloescht = true;
+    this._geloeschtVerfolgen(besitzerIdx);
+    bps.deletedPile.push(inst.name);   // meldet die Löschung (Ankhotas Zuwachs) über den Stapel-Wächter
+    this.log('ankhota_delete', { player: bps.username, card: inst.name, by: opts.source || null });
+    return true;
   }
 
   handZugangSync(pi, cardName, opts = {}) {
@@ -14132,6 +14303,8 @@ class GameEngine {
     // mehr. Jetzt wieder: Sammler → Kern, danach die Nach-Abgang-Arbeit.
     const r = await this._mitNiederlagenSammler(() => this._actionDestroyCardKern(source, targetCard, opts));
     await this._nachAbgangAbarbeiten();   // v1365
+    // ★ W78: ein Opfer der Zerstoerungsschleife, das stehen blieb (Schutz, gerettet), ist nicht mehr todgeweiht.
+    if (this._destroyScope?._todgeweihte?.length && targetCard?.zone === ZONES.SUPPORT && this.cardInstances.includes(targetCard)) this._markeAusKlammerLoesen(this._destroyScope, targetCard);
     return r;
   }
 
@@ -14261,7 +14434,9 @@ class GameEngine {
           isSacrifice: !!opts.isSacrifice,
           _skipReactionCheck: true,
         };
-        await this.runHooks(HOOKS.BEFORE_CREATURE_AFFECTED, hookCtx);
+        // B2/E1: `unaufhaltsam` überspringt auch dieses Schutzfenster — der Listener (Elusive Hind, Warrior of Teocuilatl …) würde sonst
+        // Kosten fordern/zahlen lassen, obwohl sein Ergebnis ignoriert wird.
+        if (!_u) await this.runHooks(HOOKS.BEFORE_CREATURE_AFFECTED, hookCtx);
         if (hookCtx.cancelled && !_u) {
           this.log('destroy_blocked', { card: targetCard.name, reason: 'creature protection' });
           return;
@@ -14385,7 +14560,8 @@ class GameEngine {
       // dieselbe Karte, 26 ms auseinander.
       const _selbstLoeschend = !!loadCardEffect(targetCard.name)?.deletesSelfOnDeath && !this.isCardPassiveDormant(targetCard);   // W8: das Selbstlöschen ruht bei Frost/Betäubung/Negation (Hell Fox, Cute Hydra)
       // Ghazma: besiegte Kreaturen werden geloescht (Umleitung ueber `_redirectToDeleted`).
-      if (isCreatureTarget && !_selbstLoeschend && this._gefalleneKreaturenGeloescht()) {
+      // D2: in einer Zerstoerungsschleife (`beginDestroyScope`) einmal VOR der ersten Zerstoerung ausgewertet — die Ersatz-Karte (Ankhota, Root …) darf mitfallen, ohne die Rest-Reihenfolge zu aendern.
+      if (isCreatureTarget && !_selbstLoeschend && (typeof this._destroyScope?.geloeschtVorab === 'boolean' ? this._destroyScope.geloeschtVorab : this._gefalleneKreaturenGeloescht())) {
         targetCard._redirectToDeleted = true;
         if (this._wurzelAktiv() && isBoardZone && fromZone === ZONES.SUPPORT) this._wurzelNebel(targetCard.owner, targetCard.heroIdx, targetCard.zoneSlot);
       }
@@ -14425,6 +14601,8 @@ class GameEngine {
       _equipGrund: 'destroyed',   // W52a: Grund fuer `onEquipLost`
       deathHeldQuelle: opts.heldQuelle || null,   // Welle 12 (Q101): „zählt als: der Held besiegt das Ziel" (Super-Killing Knife)
       unaufhaltsam: _u,   // v1293
+      // B2/E3: Verursacher fuer das Area-Schutztor (Wowhalla, Pawn of Kings B) — nur dieses Tor liest den Schluessel.
+      _quellBesitzer: (typeof opts.sourceOwner === 'number' && opts.sourceOwner >= 0) ? opts.sourceOwner : undefined,
       // Das CD-Bewegungsfenster hat actionDestroyCard oben bereits
       // geöffnet — hier nicht erneut (sonst zwei Prompts je Destroy).
       _cdChecked: true,
@@ -14769,6 +14947,19 @@ class GameEngine {
       }
     }
     return false;
+  }
+
+  /**
+   * ★ D2 (Baustein-Phase, G17 E1): ZEITGLEICH besiegte/zerstoerte Kreaturen (Flaechenschaden, „defeat all") behandelt ein Ersatzeffekt, der selbst mitfaellt (Ankhota,
+   * The Root of all Evil, Spirit of the Super-Killing Knife), fuer ALLE gleich. Bisher fragte jede sterbende Kreatur `_gefalleneKreaturenGeloescht()` neu — war die Karte
+   * schon abgeraeumt, sah sie die Kreaturen DAHINTER nicht mehr (Ergebnis hing von der Reihenfolge ab). Der Wert wird darum EINMAL vor dem ersten Tod der Gruppe
+   * ausgewertet und an den Eintraegen vermerkt (`e._geloeschtVorab`, gelesen in `_kreaturTodAbwickeln`); Zerstoerungsschleifen halten ihn im Scope
+   * (`beginDestroyScope` → `_destroyScope.geloeschtVorab`, gelesen in `actionDestroyCard`).
+   */
+  _geloeschtVorabStempeln(eintraege) {
+    if (!eintraege?.length) return;
+    const v = this._gefalleneKreaturenGeloescht();
+    for (const e of eintraege) if (e) e._geloeschtVorab = v;
   }
 
   /**
@@ -15559,7 +15750,7 @@ class GameEngine {
         const _qName = opts.deathSource?.name || opts.source?.name
           || opts.source || opts.sourceName || 'an effect';
         const _q = opts.deathSource || opts.source || { name: _qName, owner: opts.sourceOwner };
-        const _qb = opts.sourceOwner != null ? opts.sourceOwner : this.gs.activePlayer;
+        const _qb = opts.sourceOwner != null ? opts.sourceOwner : (opts._quellBesitzer != null ? opts._quellBesitzer : this._areaQuellBesitzer(_q));   // B2/E3: Verursacher, nicht der aktive Spieler
         if (await this.tryAreaProtection(cardInstance, _q, _qb, { fromEngineGate: true })) {
           this.log('area_protected', {
             player: this.gs.players[cardInstance.owner]?.username,
@@ -18036,6 +18227,12 @@ this._deathWatch = (this._deathWatchStack || []).length
         return { success: false, ruleBlocked: _grund };
       }
     }
+    // ★ Mehrzonen-Kreatur (Land Sharks, Populated Island Turtle: „occupies 3 Support Zones"): sie wechselt mit ALLEN Zonen — fehlt dem Übernehmer der Platz, bleibt sie (statt auf EINE Zone zu schrumpfen).
+    // Die Wahlfenster der Übernahme-Karten blenden solche Ziele vorab aus (`mehrzonenPlatzFehlt`); das hier fängt die übrigen Wege ab.
+    if (this.mehrzonenPlatzFehlt(inst, neuerKtrl, toPlayerIdx, destHeroIdx)) {
+      this.log('transfer_fizzle', { creature: inst.name, reason: 'multizone_no_room', from: fromPs.username, to: toPs.username });
+      return { success: false, ruleBlocked: 'multizone_no_room' };
+    }
 
     // ★ W71b (Al, 25.10.2026): Kontrollwechsel/Versetzen durch eine Karte ist ein „Effekt auf die Kreatur" — Schutzfenster `beforeCreatureAffected` (Cool Rescuer Monia, Elusive Hind,
     // Winged Skeleton …) wie bei Zerstören/Heilen/Bewegen. NACH allen Verhinderungen (Immunität, Tor, Sperre, Regeln), VOR der ersten Änderung; Dark Gear/Diplomacy zahlen ihre Kosten
@@ -18057,6 +18254,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     const srcSlot = (fromZonenPs.supportZones[srcHeroIdx] || [])[srcSlotIdx] || [];
     const srcIdx = srcSlot.indexOf(cardName);
     if (srcIdx >= 0) srcSlot.splice(srcIdx, 1);
+    // Mehrzonen-Kreatur (Land Sharks …): die Platzhalter beim bisherigen Helden räumen (der Hook der Karte räumt beim Kontrollwechsel nicht).
+    const _mzBedarf = this.mehrzonenBedarf(inst);
+    if (_mzBedarf) require('./_multizone-shared').raeumePlatzhalter(fromZonenPs, srcHeroIdx, _mzBedarf - 1);
 
     this.sync();
 
@@ -18083,6 +18283,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!toPs.supportZones[destHeroIdx]) toPs.supportZones[destHeroIdx] = [[], [], []];
     if (!toPs.supportZones[destHeroIdx][destSlotIdx]) toPs.supportZones[destHeroIdx][destSlotIdx] = [];
     toPs.supportZones[destHeroIdx][destSlotIdx].push(cardName);
+    if (_mzBedarf) require('./_multizone-shared').besetzePlatzhalter(toPs, destHeroIdx, destSlotIdx, _mzBedarf - 1);   // Mehrzonen-Kreatur: ihre weiteren Zonen am Ziel-Helden belegen
 
     // Permanent steal — the creature physically relocates to the new
     // side. Field semantics:
@@ -19475,8 +19676,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       const toDiscard = Math.min(count, effektiveHand());
       for (let i = 0; i < toDiscard; i++) {
         if (effektiveHand() === 0) break;
+        if (typeof opts.eligibleIndices === 'function') { const _wahlJetzt = opts.eligibleIndices(); if (Array.isArray(_wahlJetzt) && _wahlJetzt.length === 0) break; }   // B1/S1: nichts Wählbares mehr (Wisdom-Lücke > andere Handkarten) — eine leere Auswahl hinge sonst; `undefined` (Wheels: keine Einschränkung) ist keine leere Auswahl
 
-        const standardListe = opts.eligibleIndices === undefined ? ohneAufl() : undefined;   // Z4: Auswahl, die die Engine selbst festlegt
+        const standardListe = opts.eligibleIndices === undefined ? ohneAufl()   // Z4: Auswahl, die die Engine selbst festlegt
+          : (typeof opts.eligibleIndices === 'function' ? opts.eligibleIndices() : undefined);   // B1/S1: eine Auswahl-FUNKTION (Wisdom, Item Lock …) gilt auch für die Antwort — außerhalb zahlt nicht
         // N3-18 (W24): `opts.cancelOnlyFirst` — Kosten „ganz oder gar nicht": nur die ERSTE Wahl ist abbrechbar (= „Nein"), danach ist die Zahlung Pflicht.
         const kannAbbrechen = !!opts.cancellable && !(opts.cancelOnlyFirst && i > 0);
         let result = await this.promptGeneric(playerIdx, {
@@ -19524,6 +19727,12 @@ this._deathWatch = (this._deathWatchStack || []).length
             : standardListe.find(i => ps.hand[i] === result.cardName);
           result = platz === undefined ? null : { ...result, handIndex: platz };
         }
+        // B1/S1: eine Antwort mit einer Karte, die gar nicht (mehr) auf der Hand liegt, zählt NICHT als bezahlt (vorher: `continue` weiter unten — der Abwurf galt als erledigt, ohne dass
+        // etwas abgeworfen wurde). Sie gilt wie eine Antwort ohne Karte: Notbremse (letzte wählbare Handkarte); bei freiwilligen Kosten ist sie ein Abbruch.
+        if (result && result.cardName != null && !ps.hand.includes(result.cardName)) {
+          if (kannAbbrechen) break;
+          result = null;
+        }
 
         let actuallyDiscarded = false;
         let rescuedFromDelete = false;
@@ -19540,7 +19749,8 @@ this._deathWatch = (this._deathWatchStack || []).length
           // Safety fallback: auto-pop the LAST hand slot. Index of the
           // popped slot (pre-pop) = post-pop length, captured BEFORE
           // the pop mutation.
-          const notfallListe = opts.eligibleIndices === undefined ? ohneAufl() : undefined;   // Z4: nie die aufloesende Karte
+          const notfallListe = opts.eligibleIndices === undefined ? ohneAufl()   // Z4: nie die aufloesende Karte
+            : (typeof opts.eligibleIndices === 'function' ? opts.eligibleIndices() : undefined);   // B1/S1: auch bei einer Auswahl-Funktion die letzte WÄHLBARE Karte, nie die auflösende
           resolvedHandIdx = notfallListe && notfallListe.length > 0 ? notfallListe[notfallListe.length - 1] : ps.hand.length - 1;
           const cardName = ps.hand.splice(resolvedHandIdx, 1)[0];   // per splice (nicht pop): Herkunft des Platzes wird so mitgefuehrt
           if (cardName) {
@@ -19963,6 +20173,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (ch._loveShot && opts.loveShotOhneSchutz) return false;
     // W79 (Little Lyta): „takes no damage from any sources" — NUR der Schadenspfad prallt ab, Status und Kill-Effekte kommen durch.
     if (ch.nurSchaden) return !!opts.schadenspfad;
+    // Deepsea Succubus (QA-Welle 1 Nr. 18, Al): „cannot take any damage and cannot be defeated" — NUR Schadens-/Besiegen-Schutz, KEIN Schutz vor
+    // negativen Status (`nurSchadenSchutz`; der Schadens-/Kill-Pfad fragt mit `loveShotOhneSchutz: true`, der Statuspfad ohne).
+    if (ch.nurSchadenSchutz && !opts.loveShotOhneSchutz) return false;
     if (ch.onlyFromController) {
       const k = ch.controller;
       return k != null && quellenSeite != null && quellenSeite >= 0 && quellenSeite === k;
@@ -20322,6 +20535,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (key === 'poisoned' && poisonLocked) continue;
       delete inst.counters[key];
       delete inst.counters[key + 'Stacks'];
+      if (key === 'poisoned') delete inst.counters.poisonStacks;   // B2/E2: die echte Gift-Zählung heißt `poisonStacks` (nicht `poisonedStacks`) — sonst addierte ein neues Gift auf den Rest
       delete inst.counters[key + 'AppliedBy'];
       delete inst.counters[key + 'AppliedTurn'];
       delete inst.counters[key + 'Duration'];
@@ -21896,6 +22110,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `canTargetForStatus` (which omits this check) so omni-immune
     // creatures appear in the picker; this helper stays as the
     // authoritative "would the status actually stick" gate.
+    if (this.cdMalfunctionSchutz(inst, source, { sourceOwner: opts.gwSourceOwner })) return false;   // B2/E9: Cosmic Malfunction — die Karte ist für den Zug negiert (Name aus der Quelle, nicht nur Besitzer-Index)
     if (this.isOmniImmune(inst, typeof opts.gwSourceOwner === 'number' ? opts.gwSourceOwner : source)) return false;   // W17b: Golden Wings – nur gegnerische Status
     if (this.kreaturSpellImmun(inst, source, opts)) return false;   // 23.10.: Spell-Immunität — `isOmniImmune` oben bekommt nur den Besitzer-Index, nicht die Quelle
     // Source-aware opp-effect immunity (Sparkfly Attendant gift, etc.):
@@ -22064,6 +22279,34 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ B2/E9 (Al, 26.10.2026 — Cosmic Malfunction): „Negate ALL effects that card or effect would have on "Cosmic Depths" Creatures you control this turn." Hat Cosmic Malfunction eine
+   * Karte/einen Effekt negiert (`_checkCdMovementHandReactions` → Skript stempelt `ps._cdMalfunctionSchild = { turn, namen }`), prallen bis Zugende ALLE Wirkungen dieser Karte (gleicher Basisname)
+   * auf die Cosmic-Depths-Kreaturen des Schild-Besitzers ab — Entfernen/Bounce, Schaden, Status, Buffs, Heilung, Kontrollwechsel …; gelesen von `kreaturGegnerEffektImmun` (Schaden, Zerstören,
+   * Bewegen, Buffs, Negieren, Status, Diebstahl, Stats), `kreaturBetroffen` und der Kreaturenheilung. NUR Quellen des Gegners des Kreaturen-Kontrolleurs (eigene Karten gleichen Namens wirken
+   * normal); ist weder Name noch Besitzer der Quelle bekannt, gilt der Schild nicht (anders als Golden Wings: lieber nichts sperren). Quelle wie in `kreaturBetroffen` aufgelöst.
+   */
+  cdMalfunctionSchutz(inst, quelle, opts = {}) {
+    if (!inst || inst.zone !== ZONES.SUPPORT || inst.faceDown) return false;
+    const ctrl = inst.controller ?? inst.owner;
+    const schild = this.gs?.players?.[ctrl]?._cdMalfunctionSchild;
+    if (!schild || schild.turn !== this.gs.turn || !Array.isArray(schild.namen) || schild.namen.length === 0) return false;
+    const objQuelle = (quelle && typeof quelle === 'object') ? quelle : (opts?.source && typeof opts.source === 'object') ? opts.source : null;
+    const name = (typeof quelle === 'string' ? quelle : (objQuelle ? (objQuelle.cardName || objQuelle.name) : null))
+      || (typeof opts?.source === 'string' ? opts.source : null) || opts?.sourceName || this._effectSourceName() || '';
+    if (!name || !schild.namen.includes(baseCardName(name))) return false;
+    const q = typeof opts?.sourceOwner === 'number' ? opts.sourceOwner
+      : typeof quelle === 'number' ? quelle
+      : objQuelle ? (objQuelle.controller ?? objQuelle.owner)
+      : this._currentEffectSource?.owner;
+    if (typeof q !== 'number' || q < 0 || q === ctrl) return false;
+    const cardDB = this._getCardDB();
+    const cd = inst.counters?._cardDataOverride || cardDB[inst.name];
+    if (!cd || !hasCardType(cd, 'Creature')) return false;
+    const zusatz = inst.counters?._zusatzName ? cardDB[inst.counters._zusatzName] : null;
+    return cd.archetype === 'Cosmic Depths' || zusatz?.archetype === 'Cosmic Depths';
+  }
+
+  /**
    * ★ W17b (A01-25, Al: „die restlichen Fälle"): Golden Wings — „unaffected by your OPPONENT'S cards and
    * effects until the end of this turn". Eigene Marke `counters._gwImmune` (nicht mehr `_cardinalImmune`, das
    * quellenblind ALLES sperrt und den Cardinal Beasts / Stowaway / Cute Conversion bleibt): sie schützt NUR gegen
@@ -22076,6 +22319,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Wer mit Quelle prüft, übergibt sie; Pfade ohne Quelle fragen ohne Argument (= geschützt).
    */
   kreaturGegnerEffektImmun(inst, quelle, opts = {}) {
+    if (this.cdMalfunctionSchutz(inst, quelle, opts)) return true;   // B2/E9: Cosmic Malfunction — alle Effekte der negierten Karte auf Cosmic-Depths-Kreaturen, bis Zugende
     if (this.kreaturSpellImmun(inst, quelle, opts)) return true;   // 23.10.: „unaffected by all Spells" (Black-Thorn Dragon) — dieselben Sperrstellen
     if (!inst?.counters?._gwImmune) return false;
     let q;
@@ -22774,7 +23018,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
       return res?.inst || null;
     }
-    const taken = await this.takeFromPile(pi, pile, cardName, { ...opts, shuffle: pile === 'deck' });
+    // Als Ruling (Al 26.10.): `opts.handIdx` (nur Pile `hand`) benennt die KOPIE, die beschworen wird — das Heldenstufen-Tor gilt je Handkopie (Rocky Slime reduziert nur eine einzelne Kopie);
+    // ohne Index die erste Kopie wie bisher.
+    const _kopie = (pile === 'hand' && Number.isInteger(opts.handIdx) && this.gs.players[pi]?.hand?.[opts.handIdx] === cardName) ? opts.handIdx : cardName;
+    const taken = await this.takeFromPile(pi, pile, _kopie, { ...opts, shuffle: pile === 'deck' });
     if (!taken) return null;
     const flight = { toHeroIdx: heroIdx, toSlotIdx: slotIdx, ...(feld !== pi ? { toOwner: feld } : {}) };
     if (pile === 'hand') flight.fromHandIdx = taken.idx;
@@ -23208,6 +23455,32 @@ this._deathWatch = (this._deathWatchStack || []).length
         try { await script.postTargetBoardResolve(this, pi, targetedHeroes, sourceCard, inst, info); }
         catch (err) { console.error(`[postTargetBoardResolve] ${inst.name}:`, err.message); }
       }
+    }
+  }
+
+  /**
+   * ★ Als Ruling (Al 26.10., Winged Skeleton): Nach-Ziel-Fenster für die GEWÄHLTEN KREATUREN einer Ziel-Sitzung am Zielwähler vorbei (Ziel-Tränke/-Artefakte:
+   * `gs.potionTargeting` → `doConfirmPotion`). Dort läuft keiner der drei Zielwähler — und damit nie das Fenster „Kreatur gewählt" (`postTargetKreaturWahl`: Winged Skeleton,
+   * Dream Dust). Nur gewählte Kreaturen gehen hinein (Helden nicht — für sie gilt dort weiter nur das Umleitungsfenster); Rückgabe wie `_checkPostTargetHandReactions`
+   * (`{ effectNegated: true }` = die Karte wirkt nicht), sonst null.
+   * @param {number} pi          Spieler der Ziel-Sitzung
+   * @param {string[]} selectedIds  gewählte Ziel-IDs
+   * @param {object[]} validTargets Zielliste der Sitzung
+   * @param {object} quelle      Quelle der Wahl ({ name, owner, controller, heroIdx })
+   */
+  async kreaturenWahlFenster(pi, selectedIds, validTargets, quelle) {
+    if (this._inPostTargetWindow || this._inPostTargetReaction) return null;
+    const ids = new Set(Array.isArray(selectedIds) ? selectedIds : []);
+    const kreaturen = (validTargets || []).filter(t => t && ids.has(t.id) && t.type === 'equip' && (t.cardInstance || t._cardInstance)
+      && this._istKreaturenInstanz?.(t.cardInstance || t._cardInstance));
+    if (kreaturen.length === 0 || !quelle) return null;
+    this._inPostTargetWindow = true;
+    try {
+      const pt = await this._checkPostTargetHandReactions(kreaturen, quelle, { ausZielwahl: true });
+      if (pt?.effectNegated) await this.negationsBilder(quelle, kreaturen, pt);
+      return pt;
+    } finally {
+      this._inPostTargetWindow = false;
     }
   }
 
@@ -24129,7 +24402,8 @@ this._deathWatch = (this._deathWatchStack || []).length
             // Action` is the same facility in both phases (Main Phase or Action
             // Phase after the hero has acted), so the UI must honour it in both.
             // v601: Karten- UND Heldenvertrag an einer Stelle (Baaliel).
-            let isInherent = this.cardHasInherentAction(playerIdx, hi, cd);
+            // Als Ruling (Al 26.10.): in der Liste JE KOPIE (`nurKopie`) zählt die Zusatzaktion dieser einen Handkopie (Bear Rider: Stufe 0 nur an der gesenkten Kopie).
+            let isInherent = this.cardHasInherentAction(playerIdx, hi, cd, nurKopie != null ? { handIndex: nurKopie } : undefined);
             // Berserk's free-Attack grant — mirror of the override in
             // `getValidationContext`. While the charge is unspent, the
             // Berserked Hero's Attacks count as inherent (no action
@@ -24148,7 +24422,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Main Phase: action cards need inherent action or additional action coverage
         if (isMainPhase && !charmedFrei) {
           // v601: Karten- UND Heldenvertrag an einer Stelle (Baaliel).
-          let isInherent = this.cardHasInherentAction(playerIdx, hi, cd);
+          let isInherent = this.cardHasInherentAction(playerIdx, hi, cd, nurKopie != null ? { handIndex: nurKopie } : undefined);   // Als Ruling (Al 26.10.): je Kopie (s. o.)
           // Berserk's free-Attack grant — see the post-acted Action
           // Phase branch above for rationale. Mirror here so the
           // Berserked Hero can play Attacks in the Main Phase
@@ -24300,14 +24574,14 @@ this._deathWatch = (this._deathWatchStack || []).length
               const allowed = ps.bonusActions.allowedTypes || [];
               if (allowed.length > 0 && !allowed.includes(cd.cardType)) continue;
             } else if (!charmedFrei) {
-              let isInherent = this.cardHasInherentAction(playerIdx, hi, cd, { heroOwner: oppIdx, charmedOwner: oppIdx });
+              let isInherent = this.cardHasInherentAction(playerIdx, hi, cd, { heroOwner: oppIdx, charmedOwner: oppIdx, ...(nurKopie != null ? { handIndex: nurKopie } : {}) });   // Als Ruling (Al 26.10.): je Kopie
               if (!isInherent && cd.cardType === 'Attack' && hero.statuses?.berserked
                   && hero._berserkChargeUsedTurn !== gs.turn) isInherent = true;
               if (!isInherent && !this.findAdditionalActionForCard(playerIdx, cd.name, hi, oppIdx)) continue;
             }
           }
           if (isMainPhase && !charmedFrei) {
-            let isInherent = this.cardHasInherentAction(playerIdx, hi, cd, { heroOwner: oppIdx, charmedOwner: oppIdx });
+            let isInherent = this.cardHasInherentAction(playerIdx, hi, cd, { heroOwner: oppIdx, charmedOwner: oppIdx, ...(nurKopie != null ? { handIndex: nurKopie } : {}) });   // Als Ruling (Al 26.10.): je Kopie
             if (!isInherent && cd.cardType === 'Attack' && hero.statuses?.berserked
                 && hero._berserkChargeUsedTurn !== gs.turn) isInherent = true;
             if (!isInherent && !this.findAdditionalActionForCard(playerIdx, cd.name, hi, oppIdx)) continue;
@@ -24338,9 +24612,10 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * ★ W16a (Frage 5): Handkopien (Spell/Attack), deren Stufe NUR für diese Kopie gilt und von den Schwesterkopien gleichen Namens abweicht: Rabatt je Handindex
+   * ★ W16a (Frage 5): Handkopien (Spell/Attack; seit 26.10. auch Creature), deren Stufe NUR für diese Kopie gilt und von den Schwesterkopien gleichen Namens abweicht: Rabatt je Handindex
    * (`_handLevelOffsets`, `_handLevelOffsetsTransient`) oder Stufen-Setzung der Instanz (`levelSet`). Nur Namen mit ≥ 2 Kopien in der Hand zählen — bei einer einzigen Kopie
    * ist die Namensliste schon exakt. Liefert [{ name, idx }] für ALLE Kopien dieser Namen.
+   * Als Ruling (Al 26.10.): „Rocky Slime reduziert nur das Level einer einzelnen Kopie!" — auch Kreaturen leuchten/spielen je Kopie (`kopien`-Block des Clients).
    */
   _kopienMitSonderstufe(playerIdx) {
     const ps = this.gs.players[playerIdx];
@@ -24354,7 +24629,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const out = [];
     for (const [name, idxs] of Object.entries(proName)) {
       const cd = db[name];
-      if (idxs.length < 2 || (cd?.cardType !== 'Spell' && cd?.cardType !== 'Attack')) continue;
+      if (idxs.length < 2 || (cd?.cardType !== 'Spell' && cd?.cardType !== 'Attack' && cd?.cardType !== 'Creature')) continue;
       const sonder = idxs.some(i => (off && off[i]) || (trans && trans[i]) || this._handLevelSetFor(playerIdx, name, i) != null);
       if (sonder) for (const idx of idxs) out.push({ name, idx });
     }
@@ -25108,6 +25383,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `zoneSlot` geht weiterhin an den Kartenvertrag.
     let isInherentAction = usingSilenceBonus
       || this.cardHasInherentAction(pi, heroIdx, cardData, { zoneSlot: opts.zoneSlot,
+           // Als Ruling (Al 26.10.): die konkrete Handkopie (Stufe „in der Hand" je Kopie, Bear Rider: „level 0 ⇒ Zusatzaktion").
+           ...(!opts.fromCreation && Number.isInteger(handIndex) && handIndex >= 0 ? { handIndex } : {}),
            // Styx 28.9.: Drop auf einen geliehenen Helden — Seite des Platzes.
            ...(opts.charmedOwner != null && opts.charmedOwner !== pi ? { charmedOwner: opts.charmedOwner, heroOwner: opts.charmedOwner } : {}) });
 
@@ -26523,8 +26800,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!(ps.hand || [])[idx]) { delete map[k]; continue; }
       map[k] = (map[k] || 0) + 1;
       if (!ps._handLevelOffsetsTransient) ps._handLevelOffsetsTransient = {};
+      // Als Ruling (Al 26.10.): Senkungen addieren sich — jede Zugende-Senkung kommt um 1 DAZU (vorher `min(cur, −Zähler)`: ein anderer transienter
+      // Abzug derselben Kopie, z. B. Great Vanguard Demons Reaction-Senkung, ging verloren).
       const cur = ps._handLevelOffsetsTransient[idx] || 0;
-      ps._handLevelOffsetsTransient[idx] = Math.min(cur, -map[k]);
+      ps._handLevelOffsetsTransient[idx] = cur - 1;
       geaendert = true;
       this.log('hand_level_countdown', { player: ps.username, card: ps.hand[idx], reductions: map[k] });
       // Animation auf der Handkarte: die Stufe sinkt.
@@ -26861,6 +27140,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Chaorcs: per-turn count of Creatures this player sacrificed
         // (reset symmetrically with the summon tally above).
         ps._creaturesSacrificedThisTurn = 0;
+        ps._heroesSacrificedThisTurn = 0;   // Helden-Opfer (Ruin Mourner, Nr. 87)
         // Guardian Beasts: cleared so the first Guardian Beast summon
         // of the new turn correctly grants the additional-Action grant.
         ps._guardianBeastSummonedThisTurn = false;
@@ -30304,7 +30584,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!source || typeof source !== 'object') return false;
     if (source._klonQuelle || this.istKlonQuelle(source)) return false;   // Clone: die Kopie führt der Klon aus, nicht der Held
     if (source.heroIdx !== heroIdx) return false;
-    return (source.heroOwner ?? source.owner ?? source.controller) === seite;
+    if ((source.heroOwner ?? source.owner ?? source.controller) !== seite) return false;
+    // B2/E5: Kreatureneffekte bauen ihre Quelle als `{ name: <Kreatur>, owner, heroIdx }` (Haressassin, Mr. Jiggles …) bzw. sind die Karteninstanz in der Support Zone
+    // des Helden — das ist NICHT der Held der Spalte („this Hero …"). Ausnahme: der Stempel „zählt als Attack des Helden" (`treatedAsAttack` / `_heroAttackSource`, wie
+    // in `_rewriteSourceForCreatureCaster`) — dann ist der Held der Angreifer.
+    if (!source.treatedAsAttack && !source._heroAttackSource && require('./_hooks').isCreatureSource(this, source)) return false;
+    return true;
   }
 
   /**
@@ -30371,6 +30656,29 @@ this._deathWatch = (this._deathWatchStack || []).length
   /** Kontrolleur des Helden in Spalte (`seite`, `heroIdx`) — sonst `seite`. */
   kontrolleurVonHeld(seite, heroIdx) {
     return this.heroSideOf(seite, this.gs.players[seite]?.heroes?.[heroIdx]);
+  }
+
+  /**
+   * Guardian Beast Niu (Als Ruling, Al 26.10.): „the next Attack one of your Heroes performs" — der Buff `niu_enhanced` liegt auf ALLEN
+   * Helden des Spielers; die erste Attack IRGENDEINES davon löst ihn ein, danach ist er bei allen eigenen Helden weg (nicht an einen
+   * vorab gewählten Helden gebunden). Liefert den Bonus (0 = keiner) und loggt den Einsatz.
+   * @param {{owner:number, heroIdx:number}} source  die angreifende Heldenquelle (physische Spalte + Index)
+   */
+  async _niuBonusEinloesen(source) {
+    const srcHero = this.gs.players[source?.owner]?.heroes?.[source?.heroIdx];
+    if (!srcHero) return 0;
+    const ctrl = this.kontrolleurVonHeld(source.owner, source.heroIdx);
+    const traeger = this.heroesControlledBy(ctrl).filter(e => e.hero?.buffs?.niu_enhanced);
+    if (srcHero.buffs?.niu_enhanced && !traeger.some(e => e.hero === srcHero)) traeger.push({ physOwner: source.owner, heroIdx: source.heroIdx, hero: srcHero });
+    let bonus = 0, stacks = 1;
+    for (const e of traeger) {
+      const b = e.hero.buffs.niu_enhanced;
+      if ((b.totalDamage || 0) > bonus) { bonus = b.totalDamage || 0; stacks = b.stacks || 1; }
+    }
+    if (bonus <= 0) return 0;
+    for (const e of traeger) await this.actionRemoveBuff(e.hero, e.physOwner, e.heroIdx, 'niu_enhanced');
+    this.log('niu_enhanced_strike', { hero: srcHero.name, bonus, stacks });
+    return bonus;
   }
 
   /** Support-Zonen-Sperren der dauerhaft uebernommenen Helden setzen. */
@@ -31767,13 +32075,17 @@ this._deathWatch = (this._deathWatchStack || []).length
       // W64c: Deck des permanenten BESITZERS der Karte (eine gestohlene Handkarte, die der Dieb per Staff/Create Illusion beschwor, gehoert nicht in sein Deck)
       const _deckBesitzer = this.kartenBesitzerVon(inst);
       const _deckIdx = gs.players[_deckBesitzer] ? _deckBesitzer : entry.owner;
-      gs.players[_deckIdx].mainDeck.push(inst.name);
-      this.shuffleDeck(_deckIdx);
-      await this.noteShuffledBack(_deckIdx, 1, entry.quelle || 'Staff of Illusions');
+      // Ankhota: „Delete all Creatures that are moved from the board to anywhere else" — gelöscht statt zurückgemischt (Annahme: dann auch kein Zieh-Angebot, Create Illusion: „and if you do").
+      const _ankhotaGeloescht = this.ankhotaLoeschtSonderweg(inst, _deckIdx, { source: entry.quelle || 'Staff of Illusions' });
+      if (!_ankhotaGeloescht) {
+        gs.players[_deckIdx].mainDeck.push(inst.name);
+        this.shuffleDeck(_deckIdx);
+        await this.noteShuffledBack(_deckIdx, 1, entry.quelle || 'Staff of Illusions');
+      }
       this._untrackCard(inst.id);
       this.log('staff_illusion_return', { player: ps.username, creature: inst.name });
       this.sync();
-      if (entry.oppDrawCount > 0 && !gs.result) {
+      if (!_ankhotaGeloescht && entry.oppDrawCount > 0 && !gs.result) {
         // ★ W14b (Q162, Al: „Ja, soll er ablehnen können"): „your opponent MAY draw as many cards as the Creature's level" — der Gegner
         // wird gefragt (Ja/Nein). Die CPU nimmt an, ausser ein Deck-Out droht (weniger Karten im Deck als zu ziehen sind;
         // Skript-`cpuResponse` von Create Illusion, Titel = Kartenname).
@@ -32470,7 +32782,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Protokoll; sie stecken jetzt beide IN `tryAreaProtection`.
     if (!opts.skipProtection) {
       const quelle = opts.source || { name: sourceName, owner: opts.sourceOwner };
-      const quellBesitzer = opts.sourceOwner != null ? opts.sourceOwner : this.gs.activePlayer;
+      const quellBesitzer = opts.sourceOwner != null ? opts.sourceOwner : this._areaQuellBesitzer(quelle);   // B2/E3
       if (await this.tryAreaProtection(cardInstance, quelle, quellBesitzer, { fromEngineGate: true })) {
         this.log('area_protected', { player: ps.username, area: cardName, by: sourceName });
         this.sync();
@@ -32537,7 +32849,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const cardName = cardInstance.name;
     if (!opts.skipProtection) {
       const quelle = opts.source || { name: sourceName, owner: opts.sourceOwner };
-      const quellBesitzer = opts.sourceOwner != null ? opts.sourceOwner : this.gs.activePlayer;
+      const quellBesitzer = opts.sourceOwner != null ? opts.sourceOwner : this._areaQuellBesitzer(quelle);   // B2/E3
       if (await this.tryAreaProtection(cardInstance, quelle, quellBesitzer, { fromEngineGate: true })) {
         this.log('area_protected', { player: ps.username, area: cardName, by: sourceName });
         this.sync();
@@ -32598,8 +32910,16 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /**
    * Ascension bonus: lets a freshly-Ascended Hero take up to 3 copies
-   * of an ability from the caster's deck/hand directly into its Ability
-   * Zone; fizzles silently if none are available.
+   * of an ability from the caster's deck, hand AND discard pile directly
+   * into its Ability Zone; fizzles silently if none are available.
+   *
+   * ★ W77b (Al, 26.10.2026: „Tooltip und Regeltext nennen die Ablage als Quelle des Bonus - die Ablage soll dazu"):
+   * Quellen sind DECK, HAND und ABLAGE des Kontrolleurs (`pi`; die Ablage des BESITZERS der Karten, auch bei geliehenem Helden).
+   *   • Reichen die vorhandenen Kopien (alle Quellen zusammen) nicht ueber die freien Plaetze hinaus, kommen ALLE Kopien (Reihenfolge Deck, Hand, Ablage), keine Frage.
+   *   • Gibt es MEHR Kopien als Plaetze UND liefern mindestens zwei Quellen welche, waehlt der Spieler JE KOPIE die Quelle (Galerie `pickAusQuellen`,
+   *     ein Eintrag je Quelle mit Herkunfts-Abzeichen DECK / HAND / DISCARD; CPU: `cpuSourceOrder` Ablage, Deck, Hand - die Ablage kostet nichts).
+   *   • Die Ablage ist ein Stapel-Ausgang wie jeder andere: `takeFromPile(pi, 'discard', …)` (Knight-of-Kings-Sperre `pileOutAllowed`, Lethe-Stempel, verwaiste Instanz
+   *     wird abgetragen); ist die Ablage fuer diesen Zug gesperrt (Stab-/Eye-of-Ren-Sperre), zaehlt sie nicht als Quelle (keine Freikauf-Frage mitten im Aufstieg).
    *
    * ★ W71a (Al, 25.10.2026: "Der Ascension-Bonus bei Abilities ist OR, nicht AND"):
    * `abilityChoices` ist eine Liste von ALTERNATIVEN (ODER) - der Spieler
@@ -32655,6 +32975,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       let handIdx = -1;
       if (source === 'deck') {
         if (ps.mainDeck.indexOf(name) < 0) return false;
+      } else if (source === 'discard') {
+        if (ps.discardPile.indexOf(name) < 0) return false;
       } else {
         handIdx = ps.hand.indexOf(name);
         if (handIdx < 0) return false;
@@ -32668,10 +32990,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         ...(heroOwner !== pi ? { destOwner: heroOwner } : {}),
       });
       await this._delay(LAND_AT_MS);
-      if (source === 'deck') {
-        const deckIdx = ps.mainDeck.indexOf(name);
-        if (deckIdx < 0) return false;
-        ps.mainDeck.splice(deckIdx, 1);
+      if (source === 'deck' || source === 'discard') {
+        // W77b: Deck UND Ablage verlassen den Stapel ueber den EINEN Ausgang (`takeFromPile`: Stapelsperren, Deckkopf-Pflege, verwaiste Ablage-Instanz untracken, Lethe-Stempel).
+        const taken = await this.takeFromPile(pi, source, name, { source: 'Ascension Bonus', sourceOwner: pi });
+        if (!taken) return false;
       } else {
         handIdx = ps.hand.indexOf(name);
         if (handIdx < 0) return false;
@@ -32701,10 +33023,22 @@ this._deathWatch = (this._deathWatchStack || []).length
     const alternativen = (Array.isArray(abilityChoices) ? abilityChoices : [abilityChoices])
       .map(a => (Array.isArray(a) ? a : [a]).filter(n => typeof n === 'string' && n))
       .filter(a => a.length > 0);
-    /** Wie viele Kopien liessen sich JETZT anlegen (Deck + Hand, Stapel hoechstens Stufe 3)? 0 = Alternative nicht machbar. */
+    /** W77b: Kopien je Quelle (Deck, Hand, Ablage), die JETZT angelegt werden duerften. Gesperrte Stapel (Knight of Kings, Ablage-Sperre des Zuges) liefern nichts. */
+    const quellenKopien = (name) => {
+      const v = {};
+      const deck = this.pileOutAllowed(pi, 'deck', { sourceOwner: pi }) ? ps.mainDeck.filter(n => n === name).length : 0;
+      const hand = ps.hand.filter(n => n === name).length;
+      const ablage = (this.pileOutAllowed(pi, 'discard', { sourceOwner: pi }) && ps._discardLockedTurn !== gs.turn)
+        ? (ps.discardPile || []).filter(n => n === name).length : 0;
+      if (deck > 0) v.deck = deck;
+      if (hand > 0) v.hand = hand;
+      if (ablage > 0) v.discard = ablage;
+      return v;
+    };
+    /** Wie viele Kopien liessen sich JETZT anlegen (Deck + Hand + Ablage, Stapel hoechstens Stufe 3)? 0 = Alternative nicht machbar. */
     const anlegbar = (name) => {
       if (!zielOrt(name)) return 0;
-      const verfuegbar = ps.mainDeck.filter(n => n === name).length + ps.hand.filter(n => n === name).length;
+      const verfuegbar = Object.values(quellenKopien(name)).reduce((a, b) => a + b, 0);
       const gelegt = abZones.flat().filter(n => n === name).length;
       return Math.max(0, Math.min(verfuegbar, 3 - gelegt));
     };
@@ -32721,7 +33055,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         vorhanden: alt.reduce((sum, n) => sum + abZones.flat().filter(x => x === n).length, 0),
         schule: alt.some(n => n === heroCd.spellSchool1 || n === heroCd.spellSchool2) ? 1 : 0,
       })).sort((a, b) => (b.kopien - a.kopien) || (b.vorhanden - a.vorhanden) || (b.schule - a.schule) || (a.i - b.i))[0].i;
-      const beschreibung = (alt) => `Attach up to 3 copies of ${alt.join(' and ')} from your deck or hand to ${heroName}.`;
+      const beschreibung = (alt) => `Attach up to 3 copies of ${alt.join(' and ')} from your deck, hand and/or discard pile to ${heroName}.`;
       const wahl = await this.promptGeneric(pi, {
         type: 'optionPicker', title: 'Ascension Bonus',
         description: `Choose one: ${machbar.map(alt => alt.join(' + ')).join(' or ')} - ${heroName}.`,
@@ -32741,7 +33075,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     for (const name of gewaehlt) {
       const ort = zielOrt(name);
       if (!ort) continue;
-      if (!ps.mainDeck.includes(name) && !ps.hand.includes(name)) continue;
+      if (anlegbar(name) <= 0) continue;
       // v670 (Al 30.8.): der Bonus ist OPTIONAL — je Ability ein Ja/Nein
       // („Add Resistance to Monia?"). Die CPU bejaht immer
       // (`_cpuAutoConfirm`, cpuGenericChoice), ein Mensch darf ablehnen,
@@ -32757,11 +33091,34 @@ this._deathWatch = (this._deathWatchStack || []).length
         this.log('ascension_bonus_declined', { player: ps.username, hero: heroName, ability: name });
         continue;
       }
+      // W77b: Quelle je Kopie. Genug Platz fuer ALLE vorhandenen Kopien (oder nur eine Quelle) -> feste Reihenfolge Deck, Hand, Ablage, keine Frage;
+      // mehr Kopien als Plaetze aus mindestens zwei Quellen -> der Spieler waehlt je Kopie die Quelle (Galerie mit Herkunfts-Abzeichen).
+      const ausgefallen = new Set();
       while (nochPlatz(name, ort)) {
-        if (!(await placeOne(name, ort, 'deck'))) break;
-      }
-      while (nochPlatz(name, ort)) {
-        if (!(await placeOne(name, ort, 'hand'))) break;
+        const verf = quellenKopien(name);
+        for (const q of ausgefallen) delete verf[q];
+        const quellen = Object.keys(verf);
+        if (quellen.length === 0) break;
+        const gelegt = abZones.flat().filter(n => n === name).length;
+        const frei = Math.max(0, 3 - gelegt);
+        const gesamt = quellen.reduce((sum, q) => sum + verf[q], 0);
+        let quelle = ['deck', 'hand', 'discard'].find(q => verf[q] > 0);
+        if (quellen.length > 1 && gesamt > frei) {
+          const { pickAusQuellen } = require('./_source-pick-shared');
+          const wahl = await pickAusQuellen(this, pi, {
+            cards: ['deck', 'hand', 'discard'].filter(q => verf[q] > 0).map(q => ({ name, source: q, ...(verf[q] > 1 ? { count: verf[q] } : {}) })),
+            maxJeQuelle: { deck: 1, hand: 1, discard: 1 },
+            title: 'Ascension Bonus',
+            description: `Choose where to take a copy of ${name} from (deck, hand or discard pile) - ${frei} more can be attached to ${heroName}.`,
+            confirmLabel: `✨ Attach ${name}!`,
+            confirmClass: 'btn-success',
+            cancellable: false,
+            gerrymanderEligible: false,
+            extra: { cpuSourceOrder: ['discard', 'deck', 'hand'] },
+          });
+          if (wahl && verf[wahl.source] > 0) quelle = wahl.source;
+        }
+        if (!(await placeOne(name, ort, quelle))) { ausgefallen.add(quelle); continue; }
       }
     }
 
@@ -33020,6 +33377,9 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   async promptEffectTarget(playerIdx, validTargets, config = {}) {
+    // Trockenlauf (Future Tech Fists „exakt N legale Ziele", QA-Welle 1 Nr. 19): `config._waehlbarProbe = { ids: null }` — liefert die WAEHLBAREN Ids (nach allen Schutz-/Taunt-/Erstzug-
+    // Markierungen unten) in `probe.ids` und fragt NICHTS. Alles bis dorthin laeuft ohne `await`, der Aufrufer kann `probe.ids` also gleich nach dem Aufruf synchron lesen.
+    if (config._waehlbarProbe) config._waehlbarProbe.ids = [];
     // Stillgelegte Engine (Puzzle-Reset): keine Abfragen mehr an
     // den Client — der sitzt inzwischen in einem anderen Spiel.
     // Sofort mit "abgebrochen" zurueck, damit die alte Kette schnell
@@ -33264,6 +33624,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (config._sondeListe) return validTargets;   // W75b: Trockenlauf — die fertig MARKIERTE Liste (ineligible), ohne Frage, ohne Klon-Wiedergabe, ohne Zustandsänderung
     const _waehlbar = validTargets.filter(t => !t.ineligible);
     if (_waehlbar.length === 0 && validTargets.some(t => t.ineligible)) return [];
+    if (config._waehlbarProbe) { config._waehlbarProbe.ids = _waehlbar.map(t => t.id); return []; }   // Trockenlauf (s. Kopf der Funktion)
 
     // ★ Clone (24.10., Welle 72): „an exact copy … against the same target(s)". Waehrend einer Kopie (`gs._klonWiedergabe`) beantwortet die Engine die Zielwahlen des Wirkers
     // mit der AUFGEZEICHNETEN Wahl des Originals (siehe `_zielwahlAbschliessen`, Aufnahme) — dieselbe Titelzeile, in Aufnahme-Reihenfolge. Nur die noch waehlbaren Ziele zaehlen;
@@ -33578,8 +33939,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       // ★ v1368 (Dream Dust): gewaehlte KREATUREN gehen mit — aber nur an
       // Reaktionen mit `postTargetKreaturWahl: true` (Hub-Option
       // `ausZielwahl`); alle anderen sehen weiter nur Helden.
-      const kreaturen = (validTargets || []).filter(t => t?.type === 'equip' && t.cardInstance && ids.has(t.id)
-        && this._istKreaturenInstanz?.(t.cardInstance));
+      // Als Ruling (Al 26.10., Winged Skeleton): auch Skripte, die ihre Kreaturen-Ziele nur als `_cardInstance` führen (Skeleton Archer, Hammer Skeleton, Kappa Sword Slash …),
+      // zählen als GEWÄHLT — wie an den übrigen Stellen der Engine (`t.cardInstance || t._cardInstance`).
+      const kreaturen = (validTargets || []).filter(t => t?.type === 'equip' && (t.cardInstance || t._cardInstance) && ids.has(t.id)
+        && this._istKreaturenInstanz?.(t.cardInstance || t._cardInstance));
       if (quelle && (helden.length > 0 || kreaturen.length > 0)) {
         // Z3: Merker fuer `preDamageMultiTargetWindow` – ein Skript, das dasselbe Fenster danach selbst
         // oeffnet (Guardian Beast Hou), soll es nicht ein zweites Mal ausloesen.
@@ -33690,10 +34053,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     //   `applyRedirectWindows`, der einen Auslegung fuer alle drei
     //   Eingaenge (hier, `ctx.promptTarget`, `doConfirmPotion`).
     // W45a (Al, 22.10.2026): die Zielwahl einer auflösenden Surprise (Gold Trap, Jumpscare …) ohne eigene Quelle in der Konfiguration nennt die Surprise als Quelle — vor der Umgebungsquelle.
-    return await this.applyRedirectWindows(
+    const _ergebnis = await this.applyRedirectWindows(
       _pickedIds, validTargets, config,
       this._redirectSourceFor(playerIdx, config) || this._surpriseQuelleFuer(playerIdx) || _umgebung
     );
+    this._gewaehlteZieleMerken(playerIdx, validTargets, config, _ergebnis);   // W78a: „bereits gewählte Ziele" des Effekts für Monias CPU-Bilanz
+    return _ergebnis;
   }
 
   /**
@@ -38808,16 +39173,220 @@ this._deathWatch = (this._deathWatchStack || []).length
    * besiegen („defeat all other Creatures"), melden ihre Opfer hier an — solange `fn` läuft, gelten sie als TODGEWEIHT (`istTodgeweiht`): Ersatz-/Rettungs-Effekte, die „ein anderes Ziel opfern"
    * (Infallible Oracle Pythia), dürfen sie nicht mehr als Opfer nehmen. Damage-Batches stempeln dasselbe schon über `counters._dyingThisBatch` (`istTodgeweiht` kennt beides).
    */
-  async mitTodgeweihten(insts, fn) {
-    if (!this._todgeweiht) this._todgeweiht = new Set();
-    const neu = (insts || []).filter(i => i && !this._todgeweiht.has(i.id));
-    for (const i of neu) this._todgeweiht.add(i.id);
-    try { return await fn(); } finally { for (const i of neu) this._todgeweiht.delete(i.id); }
+  async mitTodgeweihten(ziele, fn) {
+    // Mischliste: Kreatur-Instanzen UND Helden (Heldenobjekte bzw. Eintraege `{hero}` / `{type:'hero',owner,heroIdx}` / `{inst}`).
+    const neu = this._todgeweihtMarkieren(ziele);
+    try { return await fn(); } finally { this._todgeweihtLoesen(neu); }
   }
 
-  /** Steht diese Creature schon für den Tod fest (Wipe-Opfer oder im selben Schadens-Batch tödlich getroffen)? */
+  /** Steht diese Creature schon fuer den Tod fest (Wipe-Opfer, im selben Schadens-Batch/Schlag tödlich getroffen, Tod nur aufgeschoben)? */
   istTodgeweiht(inst) {
-    return !!inst && (!!(this._todgeweiht && this._todgeweiht.has(inst.id)) || !!inst.counters?._dyingThisBatch);
+    if (!inst) return false;
+    if (this._todgeweiht && this._todgeweiht.has(inst.id)) return true;
+    const c = inst.counters;
+    if (c?._dyingThisBatch && c._dyingThisBatch !== c._dyingStatusStapel) return true;   // Statusschaden-Stapel (Brand/Gift/Blutung) zählt nicht (Al 26.10.)
+    return !!inst._deathResolved || (c?.currentHp != null && c.currentHp <= 0);   // HP schon auf 0: der Tod ist nur noch nicht abgewickelt (Flächenklammer)
+  }
+
+  /**
+   * ★ W78 (Al 26.10.: „JEDE FORM von AoE …"): dasselbe fuer HELDEN. Todgeweiht = in einem laufenden Mehrziel-Effekt vorgemerkt (`mitTodgeweihten`, Flaechenklammer `beginAoeStrike`
+   * mit `heroes`), bereits auf 0 HP (Tod nur aufgeschoben, `heldTodAufgeschoben`) oder schon tot.
+   */
+  istHeldTodgeweiht(hero) {
+    if (!hero) return false;
+    if (this._todgeweihtHelden && this._todgeweihtHelden.has(hero)) return true;
+    if (hero.name && !(hero.hp > 0)) return true;
+    return this.heldTodAufgeschoben(hero);
+  }
+
+  /** Gemeinsame Frage fuer Ersatz-/Rettungseffekte: Kreatur-Instanz ODER Held (Objekt bzw. Picker-Eintrag `{type:'hero',owner,heroIdx}`) — faellt es im selben Effekt/Schlag ohnehin? */
+  istZielTodgeweiht(ziel) {
+    const z = this._todgeweihtZiel(ziel);
+    if (!z) return false;
+    return z.hero ? this.istHeldTodgeweiht(z.hero) : this.istTodgeweiht(z.inst);
+  }
+
+  /** Zielform normieren: `{ hero }` | `{ inst }` | null. */
+  _todgeweihtZiel(z) {
+    if (!z || typeof z !== 'object') return null;
+    if (z instanceof CardInstance) return { inst: z };
+    if (z.hero && typeof z.hero === 'object') return { hero: z.hero };
+    if (z.type === 'hero') { const h = this.gs?.players?.[z.owner]?.heroes?.[z.heroIdx]; return h ? { hero: h } : null; }
+    if (z.inst && typeof z.inst === 'object') return { inst: z.inst };
+    if (z.cardInstance && typeof z.cardInstance === 'object') return { inst: z.cardInstance };
+    if (z.zone === undefined && typeof z.hp === 'number') return { hero: z };
+    if (z.id != null) return { inst: z };
+    return null;
+  }
+
+  /** Ziele in die Todgeweihten-Mengen eintragen; gibt die NEU eingetragenen Schluessel zurueck (Aeusserer behaelt seine Eintraege). */
+  _todgeweihtMarkieren(ziele) {
+    if (!this._todgeweiht) this._todgeweiht = new Set();
+    if (!this._todgeweihtHelden) this._todgeweihtHelden = new Set();
+    const neu = [];
+    for (const raw of (ziele || [])) {
+      const z = this._todgeweihtZiel(raw);
+      if (!z) continue;
+      const menge = z.hero ? this._todgeweihtHelden : this._todgeweiht;
+      const key = z.hero || z.inst.id;
+      if (menge.has(key)) continue;
+      menge.add(key);
+      neu.push({ menge, key });
+    }
+    return neu;
+  }
+
+  _todgeweihtLoesen(liste) {
+    for (const { menge, key } of (liste || [])) menge.delete(key);
+  }
+
+  /**
+   * Fuer die Flaechenklammer: Ziele fuer die Dauer des AEUSSERSTEN Schlags vormerken (Aufraeumen in `endMultiHit`; die Merkliste haengt am Scope).
+   */
+  _schlagTodgeweihtMerken(ziele) {
+    const scope = this._multiHitScope;
+    if (!scope) return [];
+    const neu = this._todgeweihtMarkieren(ziele);
+    (scope._todgeweihte || (scope._todgeweihte = [])).push(...neu);
+    return neu;
+  }
+
+  /** Ein Ziel hat seinen Schlag ueberstanden (oder wurde abgewehrt): die Vormerkung dieses Schlags entfaellt wieder. */
+  _schlagTodgeweihtFreigeben(ziel) {
+    this._markeAusKlammerLoesen(this._multiHitScope, ziel);
+  }
+
+  /** Vormerkung eines Ziels aus der Merkliste einer Klammer (`_multiHitScope` / `_destroyScope`) nehmen. */
+  _markeAusKlammerLoesen(scope, ziel) {
+    const z = this._todgeweihtZiel(ziel);
+    if (!scope?._todgeweihte || !z) return;
+    const key = z.hero || z.inst.id;
+    for (let i = scope._todgeweihte.length - 1; i >= 0; i--) {
+      const m = scope._todgeweihte[i];
+      if (m.key === key) { m.menge.delete(m.key); scope._todgeweihte.splice(i, 1); }
+    }
+  }
+
+  /**
+   * Flaechenschlag meldet seine Ziele. HELDEN (`heroes`: `{hero, heroIdx?, owner?, amount?}`, Picker-Ziele oder Heldenobjekte, Betrag `opts.amount`) gelten bis zum Ende des Schlags als
+   * todgeweiht, wenn ihr ECHTER Endschaden sie toetet (`projiziereHeldenSchaden`: dieselbe Rechnung wie der echte Heldenschadenspfad, im Schattenspiel; unsicher = nicht markiert).
+   * KREATUREN (`creatures`, ab zwei) gelten als todgeweiht, wenn ihr Betrag ihre HP deckt und der Eintrag nicht immun/abgewehrt ist; wer seinen Treffer ueberlebt, wird freigegeben.
+   */
+  async _schlagZieleMelden(opts, schatten, negiert) {
+    const ziele = [];
+    const quelle = opts.source;
+    const betrag = opts.amount ?? 0;
+    const heldenEintraege = [];
+    for (const h of (opts.heroes || [])) {
+      // Eintrag = Heldenobjekt | `{hero, heroIdx?, owner?, amount?}` | Picker-Ziel `{type:'hero', owner, heroIdx}`
+      const hero = h?.hero || ((h?.type === 'hero' || (h?.hp === undefined && h?.owner != null)) ? this.gs.players[h.owner]?.heroes?.[h.heroIdx] : h);
+      if (!hero?.name || !(hero.hp > 0)) continue;
+      const amt = h?.amount ?? betrag;
+      if (!(amt > 0)) continue;
+      let owner = h?.owner, heroIdx = h?.heroIdx;
+      if (owner == null || heroIdx == null) {
+        for (let p = 0; p < (this.gs.players || []).length && owner == null; p++) {
+          const i = (this.gs.players[p]?.heroes || []).indexOf(hero);
+          if (i >= 0) { owner = p; heroIdx = i; }
+        }
+      }
+      heldenEintraege.push({ hero, owner, heroIdx, amount: amt });
+    }
+    if (heldenEintraege.length && this._hatRettungsEffekte()) {
+      const proj = await this.projiziereHeldenSchaden(quelle, heldenEintraege, opts.type, { ...(opts.heroOpts || {}) });
+      for (const e of heldenEintraege) if (proj.get(e.hero)?.toedlich === true) ziele.push({ hero: e.hero });
+    }
+    for (const e of (schatten || [])) {
+      if (!e?.inst || e.cancelled || e._immuneCreature || negiert?.has(e.inst.id)) continue;
+      if (!(e.amount > 0) || e.amount < this.creatureCurrentHp(e.inst)) continue;
+      ziele.push({ inst: e.inst });
+    }
+    if (ziele.length) this._schlagTodgeweihtMerken(ziele);
+  }
+
+  /** Liegt auf dem Brett ein Ersatz-/Rettungseffekt, der auf "todgeweiht" hoert (Karten mit `selfPreDefeat`, z. B. Infallible Oracle Pythia)? Nur dann lohnt die Heldenprojektion. */
+  _hatRettungsEffekte() {
+    return this.cardInstances.some(i => i.zone === ZONES.SUPPORT && !i.faceDown && !!loadCardEffect(i.counters?._effectOverride || i.name)?.selfPreDefeat);
+  }
+
+  /**
+   * ★ W78 (Al 26.10.: „Unbedingt den ECHTEN Schaden berechnen!"): PROJEKTION DES HELDENSCHADENS — seiteneffektfrei.
+   *
+   * Der Heldenschadenspfad (`actionDealDamage`: Immunitaeten, Zielschutz, Schilde, Status-Schutz, `beforeDamage`-Hooks der ganzen Karte-/Heldenwelt, Multiplikator-Buffs, Deckel, Handreaktionen,
+   * Unsterblichkeit, KO-Hooks wie Guardian Angel/Extra-Leben …) ist zu gross und zu hakenbehaftet, um ihn nachzubauen. Deshalb laeuft DERSELBE Pfad in einem SCHATTENSPIEL: ein zweites Engine-Objekt
+   * mit einem Klon des Spielzustands (`snapshot()` → `restore()` in die Huelle), im Sandkasten-Modus (`_inMctsSim`, Fast Mode, kein Client, kein Warten). Das Live-Spiel bleibt unberuehrt
+   * (keine Objekt-Identitaeten, keine Ketten, keine Zaehler, kein Protokoll werden angefasst).
+   *
+   * Konservativ: jede Frage an einen Spieler (Handreaktion, Surprise, "you may redirect/negate", KO-Rettung), jeder Zufallsaufruf (`Math.random`) und jede Ausnahme machen das Ergebnis UNSICHER
+   * (`toedlich: null`) — unsicher gilt nie als todgeweiht. Gemeldet wird nur, was der echte Pfad sicher toetet.
+   *
+   * @param {object} quelle  Schadensquelle (wie fuer `actionDealDamage`; Karteninstanzen werden ins Schattenspiel uebersetzt)
+   * @param {Array<{hero,owner,heroIdx,amount}>} eintraege  die Helden mit ihrem Brutto-Betrag
+   * @param {string} typ  Schadensart · @param {object} [opts]  durchgereichte, serialisierbare Treffer-Optionen
+   * @returns {Promise<Map<object,{toedlich:(boolean|null),hpNachher?:number,grund?:string}>>} je Heldenobjekt
+   */
+  async projiziereHeldenSchaden(quelle, eintraege, typ, opts = {}) {
+    const out = new Map();
+    const liste = (Array.isArray(eintraege) ? eintraege : [eintraege]).filter(e => e && e.hero);
+    const unsicher = (grund) => { for (const e of liste) if (!out.has(e.hero)) out.set(e.hero, { toedlich: null, grund }); return out; };
+    if (liste.length === 0) return out;
+    if (this._istSchattenSpiel || this._inMctsSim) return unsicher('sandkasten');   // keine Schatten im Schatten, keine Projektion in CPU-Rollouts
+    let snap;
+    try { snap = this.snapshot(); } catch (err) { return unsicher('snapshot:' + (err && err.message || err)); }
+    for (const e of liste) {
+      try {
+        out.set(e.hero, await this._heldSchattenLauf(snap, quelle, e, typ, opts));
+      } catch (err) {
+        out.set(e.hero, { toedlich: null, grund: 'ausnahme:' + (err && err.message || err) });
+      }
+    }
+    return out;
+  }
+
+  /** Ein Schattenspiel aus dem Schnappschuss bauen (zweites Engine-Objekt mit Spielzustands-Klon). */
+  _neuesSchattenSpiel(snap) {
+    const GE = this.constructor;
+    const huelle = { players: this.gs.players.map(() => ({})) };
+    const stubIo = { to: () => ({ emit() {} }), sockets: { sockets: new Map() } };
+    const sh = new GE({ gameState: huelle, spectators: [], id: this.room?.id }, stubIo, () => {}, null, null);
+    sh._istSchattenSpiel = true;
+    sh.restore(snap);
+    sh._cpuPlayerIdx = this._cpuPlayerIdx; sh._isSelfPlay = this._isSelfPlay; sh.isPuzzle = this.isPuzzle;
+    sh._inMctsSim = true;
+    sh.enterFastMode();
+    sh._delay = () => Promise.resolve();
+    sh._schattenFragen = 0;
+    const frage = async () => { if (++sh._schattenFragen > 20) throw new Error('Schattenspiel: zu viele Fragen'); return null; };
+    for (const f of ['promptChainTargets', 'promptGeordneteWahl', 'promptDeckReorder', 'promptStartingHandYesNo', 'promptEffectTarget', 'promptGeneric', 'promptSpellAuswahl',
+      'promptChooseTarget', 'promptChooseCards', 'promptChooseOption', 'promptConfirm']) sh[f] = frage;
+    return sh;
+  }
+
+  /** Quelle ins Schattenspiel uebersetzen (Karteninstanzen ueber ihre Id). */
+  _schattenQuelle(sh, quelle) {
+    if (!quelle || typeof quelle !== 'object') return quelle;
+    const finde = (inst) => sh.cardInstances.find(c => c.id === inst.id);
+    if (quelle instanceof CardInstance) return finde(quelle) || { name: quelle.name, owner: quelle.owner, controller: quelle.controller, heroIdx: quelle.heroIdx };
+    const q = { ...quelle };
+    if (q.cardInstance instanceof CardInstance) q.cardInstance = finde(q.cardInstance) || undefined;
+    return q;
+  }
+
+  /** EIN Heldentreffer im Schattenspiel: wie ist der Held danach (`toedlich` = tot UND keine offene Frage/kein Zufall)? */
+  async _heldSchattenLauf(snap, quelle, e, typ, opts) {
+    const sh = this._neuesSchattenSpiel(snap);
+    const shHero = sh.gs.players[e.owner]?.heroes?.[e.heroIdx];
+    if (!shHero?.name) return { toedlich: null, grund: 'held' };
+    if (this._multiHitScope) sh._multiHitScope = { total: this._multiHitScope.total, tiefe: 1 };   // "hits other targets in addition" (Interference) wie im echten Schlag
+    const rnd = Math.random; let zufall = false;
+    Math.random = () => { zufall = true; return rnd(); };
+    try {
+      await sh.actionDealDamage(this._schattenQuelle(sh, quelle), shHero, e.amount, typ, { ...opts });
+    } finally { Math.random = rnd; }
+    const tot = !(shHero.hp > 0);
+    if (sh._schattenFragen > 0) return { toedlich: null, hpNachher: shHero.hp, grund: 'frage' };
+    if (zufall) return { toedlich: null, hpNachher: shHero.hp, grund: 'zufall' };
+    return { toedlich: tot, hpNachher: shHero.hp };
   }
 
   /**
@@ -41834,6 +42403,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (hookCtx._kBase !== undefined) hookCtx._kBase += EMPOWERED_STRIKE_BONUS;   // W50a: Heldenpfad; der Kreaturenpfad (Proxy) rechnet den Zuwachs selbst nach
     hookCtx.cannotBeReduced = true;
     hookCtx.cannotBeNegated = true;
+    hookCtx._unreduzierbar = true;   // R5: QUELLEN-seitig unreduzierbar — Hydra Blood Arrow setzt diesen Treffer nicht auf 0 (`_attackSchadenUnreduzierbar`)
 
     // Consume the buff. Done synchronously to avoid double-firing on
     // multi-target attack splits — the second damage instance won't
@@ -41845,6 +42415,43 @@ this._deathWatch = (this._deathWatchStack || []).length
       hero: srcHero.name,
       target: hookCtx.target?.name,
     });
+  }
+
+  /**
+   * ★ Als Ruling (Al 26.10., Hydra Blood Arrow × alle True-Damage-Quellen: „Diese können Hydra Blood Arrow schlicht nicht aktivieren."): ist der Schaden dieser Attack
+   * QUELLEN-seitig NICHT reduzierbar („cannot be reduced", True Damage — Surefire Shot, Elixir of Strength, Club of Gobbo)? EIN Prädikat für beide Zeitpunkte — wer es braucht
+   * (`_arrows-shared`: Hydra Blood Arrow), fragt nur hier, nicht je Quelle:
+   *   • `ctx.link` (Kettenfenster, Initialglied der Attack): die Arrows-Fenster öffnen VOR der Zielwahl, also zählt, was schon vorher feststeht — das Skript der Attack
+   *     (`attackDamageCannotBeReduced: true`: Surefire Shot; Clash of Champions trägt es künftig ebenso), Ausrüstung des Angreifers mit `attackerDamageCannotBeReduced: true`
+   *     (Club of Gobbo; ruht nicht, solange `isCardPassiveDormant` verneint) und ein bereitstehender Elixir of Strength des Angreifers (`empowered_strike`) — für JEDE Attack, auch
+   *     Mehrziel-Attacks (Ruling Al 26.10.: Hydra und Elixir schließen sich gegenseitig aus, siehe unten).
+   *   • `ctx.hookCtx` (der einzelne Treffer — Heldenzweig: hookCtx von `_actionDealDamageImpl`, Kreaturenzweig: Proxy des Batch-Eintrags): nur die QUELLEN-Marke `_unreduzierbar`
+   *     (gesetzt von Elixir of Strength, Club of Gobbo und dem True-Damage-Weg `trueDamage`). Bewusst NICHT `cannotBeReduced`: das tragen auch ZIEL-seitige Sperren
+   *     (Tempeste, Prophecy of Tempeste, Gigantisaur Brachion, Monia Bot, Test Dummy, Dichotomy …) — Als Ruling (Al 26.10.): „in dem Fall wird der Schaden ganz normal zu 0 und in Gift
+   *     konvertiert. Der Pfeil macht den Schaden zu 0, *bevor* er trifft, das umgeht Effekte am Ziel."
+   */
+  _attackSchadenUnreduzierbar(ctx = {}) {
+    const h = ctx?.hookCtx;
+    if (h && h._unreduzierbar) return true;
+    const link = ctx?.link;
+    if (!link) return false;
+    const script = loadCardEffect(link.cardName);
+    if (script?.attackDamageCannotBeReduced) return true;
+    const seite = link.casterOwner ?? link.owner;
+    const hi = link.heroIdx;
+    if (!Number.isInteger(hi) || hi < 0) return false;
+    const hero = this.gs.players[seite]?.heroes?.[hi];
+    if (!hero?.name) return false;
+    for (const inst of this.cardInstances) {
+      if (inst.zone !== ZONES.SUPPORT || inst.faceDown || inst.heroIdx !== hi || this.physicalSide(inst) !== seite) continue;
+      if (!loadCardEffect(inst.counters?._effectOverride || inst.name)?.attackerDamageCannotBeReduced) continue;
+      if (this.isCardPassiveDormant(inst)) continue;
+      return true;
+    }
+    // Als Ruling (Al 26.10.): „Hydra Arrow *darf nicht* zusammen mit Elixir of Strength an irgendwas angekettet werden, die müssen sich ausschließen." — auch bei Attacks, die mehrere
+    // Ziele treffen können (Ricochet, Whirlwind Strike): ein bereitstehender Elixir des Angreifers sperrt Hydra Blood Arrow. Umgekehrt nimmt der Elixir keinen Helden mit scharfer Hydra
+    // als Ziel (`elixir-of-strength.js`: `heroHatScharfeHydra`).
+    return !!hero.buffs?.empowered_strike;
   }
 
   /** True if a hero object is shielded. Convenience overload for targets passed by reference. */
@@ -42155,7 +42762,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ★ v1368: `opts.ausZielwahl` — die Liste kann Kreaturen enthalten;
     // nur Reaktionen mit `postTargetKreaturWahl` sehen sie (siehe unten).
     let targetedHeroes = targetedHeroesAlle;
-    const _nurHelden = opts.ausZielwahl ? (targetedHeroesAlle || []).filter(t => t?.type === 'hero') : null;
+    let _nurHelden = opts.ausZielwahl ? (targetedHeroesAlle || []).filter(t => t?.type === 'hero') : null;
     const _gesammelt = [];   // v1368: Umlenkungen (`newTargets`) aller Reaktionen
     // Effekt-Immunitaeten gelten fuer GENAU EINE Aufloesung. Ein neues
     // Zielfenster heisst: die vorige ist vorbei.
@@ -42474,7 +43081,27 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (resolveResult?.effectNegated) return resolveResult;
         // v1368: Umlenkungen sammeln (Deepsea Encounter, Dream World
         // Switcheroo) — vorher gab der Hub sie NIE zurueck.
-        if (Array.isArray(resolveResult?.newTargets)) _gesammelt.push(...resolveResult.newTargets);
+        if (Array.isArray(resolveResult?.newTargets)) {
+          for (const nt of resolveResult.newTargets) {
+            if (!nt) continue;
+            const alt = nt._ersetzt ?? nt.id;
+            // B2/E6: das ersetzte Ziel verschwindet auch für die FOLGENDEN Reaktionen dieses Fensters (neue Listen, die Listen des Aufrufers bleiben unberührt) — sonst
+            // arbeitet eine zweite Deepsea Encounter auf dem schon zurückgegebenen Ziel und eine Kette Encounter → Encounter ist unmöglich.
+            const _tausche = (liste, nurHeld) => (Array.isArray(liste)
+              ? liste.flatMap(t => (t && t.id === alt) ? ((nurHeld && nt.type !== 'hero') ? [] : [nt]) : [t])
+              : liste);
+            targetedHeroesAlle = _tausche(targetedHeroesAlle, false);
+            if (_nurHelden) _nurHelden = _tausche(_nurHelden, true);
+            // Wurde eine frühere Umlenkung dieses Fensters erneut ersetzt, zählt für den Aufrufer nur das letzte Ziel (er liest ggf. nur `newTargets[0]`).
+            const gi = _gesammelt.findIndex(g => g && g.id === alt);
+            if (gi >= 0) {
+              const ursprung = _gesammelt[gi]._ersetzt ?? _gesammelt[gi].id;
+              const verkettet = { ...nt };
+              if (ursprung !== nt.id) verkettet._ersetzt = ursprung; else delete verkettet._ersetzt;
+              _gesammelt[gi] = verkettet;
+            } else _gesammelt.push(nt);
+          }
+        }
       }
       targetedHeroes = _nurHelden || targetedHeroesAlle;
 
@@ -42510,6 +43137,9 @@ this._deathWatch = (this._deathWatchStack || []).length
             // `loadCardEffect(cardName)` wurde sie nie angeboten.
             const script = rxInst ? loadCardEffect(rxInst.counters?._effectOverride || cardName) : this.supportCardScript(seite, hi, cardName);
             if (!script?.isEquippedPostTargetReaction) continue;
+            // Als Ruling (Al 26.10., Winged Skeleton): aus der allgemeinen Zielwahl (`ausZielwahl`) sehen auch ausgerüstete/Brett-Reaktionen die gewählten KREATUREN nur mit
+            // `postTargetKreaturWahl: true` (wie die Handreaktionen oben); alle übrigen sehen weiter nur Helden.
+            targetedHeroes = (_nurHelden && !script.postTargetKreaturWahl) ? _nurHelden : targetedHeroesAlle;
             const rxOpts = { damageType, dealsDamage, heroChoiceIsCost: opts.heroChoiceIsCost === true, inst: rxInst, heroIdx: hi, heroOwner: seite };
             if (script.postTargetCondition
                 && !script.postTargetCondition(this.gs, pi, this, targetedHeroes, sourceCard, rxOpts)) continue;
@@ -42521,7 +43151,9 @@ this._deathWatch = (this._deathWatchStack || []).length
             const confirmed = await this.promptGeneric(pi, {
               type: 'confirm',
               title: anzeigeName,
-              message: `${srcName2} is targeting your Hero! Activate ${anzeigeName}?`,
+              // Als Ruling (Al 26.10., Winged Skeleton): die Karte kann eine eigene Frage formulieren (`postTargetMessage`) — „your Hero" passt nicht, wenn eine KREATUR gewählt wurde.
+              message: (typeof script.postTargetMessage === 'function' ? script.postTargetMessage(this, srcName2, rxOpts, targetedHeroes) : null)
+                || `${srcName2} is targeting your Hero! Activate ${anzeigeName}?`,
               confirmLabel: '🛡️ Activate!',
               cancellable: true,
               _handReactionWindow: true,
@@ -43285,7 +43917,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _lvQuelle = reaktor !== playerIdx ? { levelSourcePi: reaktor } : undefined;
     // 24.10. (Reverse Trap): eine verdeckt gelegte Surprise mit Stufe-0-Marke („its level becomes 0 … on the board") braucht keine Stufe.
     const _stufeNullBrett = !opts.spellInHand && this.cardInstances.some(c => c.name === cardName && c.zone === ZONES.SURPRISE && c.heroIdx === heroIdx && this.physicalSide(c) === playerIdx && c.counters?._rtLevel0);
-    if (!_stufeNullBrett && !opts.stufeNull && !this.heroMeetsLevelReq(playerIdx, heroIdx, cardData, _lvQuelle)) return false;   // W78: `opts.stufeNull` = die Surprise verlangt für diesen Auslöser Stufe 0 (Bounce Trap)
+    // Als Ruling (Al 26.10., Spider Hive „nur die auf dem Board"): die Stufe einer VERDECKT LIEGENDEN Surprise wird mit `surpriseAufBrett` ausgewertet —
+    // nur dann senkt Spider Hive sie (nie die Handkopie). Hand-Reaktionsfenster (`spellInHand`) sind keine Brett-Surprises.
+    const _lvEval = !opts.spellInHand ? { surpriseAufBrett: true } : undefined;
+    const _lvOpts = (_lvQuelle || _lvEval) ? { ...(_lvQuelle || {}), ...(_lvEval || {}) } : undefined;
+    if (!_stufeNullBrett && !opts.stufeNull && !this.heroMeetsLevelReq(playerIdx, heroIdx, cardData, _lvOpts)) return false;   // W78: `opts.stufeNull` = die Surprise verlangt für diesen Auslöser Stufe 0 (Bounce Trap)
 
     // ★★ v1154 („Santa Klaus", Als Befund 17.9.): dieselben Helden-
     // Sperren wie im normalen Spielweg (`validateActionPlay`) — das
@@ -43323,7 +43959,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     //            another zone (Archibald's discard-trigger, etc.).
     //            The full hand counts.
     if (cardData.cardType === 'Spell') {
-      const wisdomCost = this.getWisdomDiscardCost(playerIdx, heroIdx, cardData, undefined, _lvQuelle?.levelSourcePi);
+      const wisdomCost = this.getWisdomDiscardCost(playerIdx, heroIdx, cardData, undefined, _lvQuelle?.levelSourcePi, _lvEval);
       if (wisdomCost > 0) {
         // Als Vorgabe 29.9.: abgeworfen wird aus der Hand des Ausloesers.
         const handLen = (this.gs.players[reaktor]?.hand || []).length;
@@ -43411,6 +44047,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       cleared.push(key);
       delete inst.counters[key];
       delete inst.counters[key + 'Stacks'];
+      if (key === 'poisoned') delete inst.counters.poisonStacks;   // B2/E2: gleiche Namensfalle wie in `cleanseCreatureStatuses`
       delete inst.counters[key + 'AppliedBy'];
       delete inst.counters[key + 'Duration'];
       delete inst.counters[key + 'Cleansable'];
@@ -43424,6 +44061,20 @@ this._deathWatch = (this._deathWatchStack || []).length
     delete inst.counters.maxHp;
     delete inst.counters._laynBonus;
     delete inst.counters._circleBonus;
+    // B1/S5: die Ushabti-Marken (`ushabtiPlaced/-Turn/-Side`, gesetzt von „Ushabti of the Great Pharaoh") gehören zur Einlagerung, nicht zur frischen Surprise —
+    // blieben sie nach Aktivierung + erneutem Verdecken stehen, bot `ushabtiSummonable` die Kreatur als Ushabti-Beschwörung an.
+    delete inst.ushabtiPlaced;
+    delete inst.ushabtiTurn;
+    delete inst.ushabtiSide;
+    // ★ R-6 (Als Ruling Al 26.10., „keine Counter" wörtlich): die Kreatur kommt als frische Karte zurück — auch OHNE die Buchführung ihrer Zeit auf dem Brett:
+    //   • Schadens-/Treffer-Historie (`_jeGetroffen` „has taken damage yet", `_damageTaken*`, `_damagedOnTurn`),
+    //   • die Herkunftsstempel der Status (`*AppliedBy…`, `*AppliedTurn`, `poisonAppliedBy`/`burnAppliedBy`) und Status-Begleiter (`poisonPermanent`, `burnPermanent`,
+    //     `frozenUnhealable`, `negatedSourceBound`),
+    //   • die Spiel-Counter auf der Karte (Head/Change/Demon/Skull/Bomb/Bunny-Bomb/Applause/Balance/Luck/Preserve).
+    // Nicht angefasst: Struktur-Zähler (`permId`, Overrides, Buffs, Kontroll-/Platzierungsmarken) und Einmal-Sperren des Zuges.
+    for (const k of Object.keys(inst.counters)) {
+      if (SURPRISE_RESET_BUCHFUEHRUNG.has(k) || SURPRISE_RESET_SPIELZAEHLER.has(k) || /AppliedBy|AppliedTurn$/.test(k)) delete inst.counters[k];
+    }
     if (cleared.length) {
       this.log('surprise_reset_cleared', { card: inst.name, statuses: cleared });
     }
@@ -44077,6 +44728,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         inst.zoneSlot = placed.actualSlot;
         inst.faceDown = false;
         inst.turnPlayed = this.gs.turn || 0; // Enforce summoning sickness
+        delete inst.ushabtiPlaced; delete inst.ushabtiTurn; delete inst.ushabtiSide;   // B1/S5: die Ushabti-Einlagerung endet mit der Aktivierung (kein Flag-Leck in spätere Surprise-Zone-Aufenthalte)
         // Als Vorgabe 29.9.: ueber einen geliehenen Helden ausgeloest — die
         // Kreatur steht auf der Brettseite, handelt fuer den Ausloeser
         // (wie eine seitenfremde Beschwoerung). Die KARTE gehoert weiter
@@ -44387,7 +45039,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   /**
    * ★ W32a (Al, 22.10.2026, Punkt 5: „Reactions wie Magic Topaz oder Arrows, die auf Attacks reagieren" reagieren auch auf Effekte, die als Attack ZÄHLEN): virtuelle
    * Attack-Kette um den Treffer eines Effekts, der als Attack EINES HELDEN zählt — Muster von Arthor, Inheritor of the Barbarian Sword, jetzt für alle (Broghan, Brackle,
-   * Heragas, Kohta, Crusader's ×4, Javelin Throw, Sword in a Bottle, Bamboo Staff, Sacrificial Dagger, Infected Greatmaw, Alluring Light). Aufruf NACH der Zielwahl, VOR dem
+   * Heragas, Kohta, Crusader's ×4, Javelin Throw, Sword in a Bottle, Bamboo Staff, Sacrificial Dagger, Infected Greatmaw, Alluring Light, Future Tech Fists [R-12: Mehrfachziel, `ziele` = alle gewählten Ziele]). Aufruf NACH der Zielwahl, VOR dem
    * Schaden: `resolve` ist der Schaden. Die Kette trägt Typ `Attack`, Besitzer `pi` (der Spieler, dessen Held zuschlägt) und den schlagenden Helden (`heroIdx` auf der Brettseite
    * `heroOwner`) — Arrows/Magic Topaz (`arrowTriggerCondition`), Attack-Reaktionen und Negierer sehen den Effekt wie eine Attack-Karte. Danach werden die Arrows abgeräumt
    * (`clearArmedArrows`, idempotent). Mitten in einem offenen Reaktionsfenster (`_inReactionCheck`) öffnet kein neues Fenster: der Treffer läuft direkt (Konvention von `runHooks`).
@@ -44607,12 +45259,15 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Flag) bleibt ein Abbruch. Liefert `{ target, negiert }`; die Flags werden zurückgesetzt (kein Rest für den nächsten Effekt). Der Aufrufer zählt/stempelt bei `negiert` selbst
    * (`zaehleAlsArt`, Rückgabe `true` aus `onHeroEffect`).
    */
-  async heldenEffektZielwahl(ctx, config) {
+  async heldenEffektZielwahl(ctx, config, opts = {}) {
     const gs = this.gs;
     const negVorher = gs._spellNegatedByEffect;
     delete gs._spellNegatedByEffect; delete gs._zielNegiertDurchSchutz;
-    const target = await ctx.promptDamageTarget(config);
-    const negiert = !target && (!!gs._spellNegatedByEffect || !!gs._zielNegiertDurchSchutz);
+    // R-12 (Al 26.10.): `opts.mehrfach` — ein als Attack zählender Effekt mit MEHREREN Zielen (Future Tech Fists) wählt über `ctx.promptMultiTarget` (Liste statt Einzelziel);
+    // dieselben Fenster (Umleitung, Surprise, Hand-Reaktionen) mit dem Helden als Quelle (`config.attackerSourceOverride`), dieselbe Unterscheidung Negierung ↔ Abbruch.
+    const target = opts.mehrfach ? await ctx.promptMultiTarget(config) : await ctx.promptDamageTarget(config);
+    const leer = opts.mehrfach ? (!Array.isArray(target) || target.length === 0) : !target;
+    const negiert = leer && (!!gs._spellNegatedByEffect || !!gs._zielNegiertDurchSchutz);
     if (negVorher) gs._spellNegatedByEffect = negVorher; else { delete gs._spellNegatedByEffect; if (negiert) delete gs._negationWhole; }
     delete gs._zielNegiertDurchSchutz;
     return { target, negiert };
@@ -46506,16 +47161,27 @@ this._deathWatch = (this._deathWatchStack || []).length
    * ein abgebrochener Effekt sie nicht stehen laesst — sonst blieben
    * alle folgenden Einzelzerstoerungen stumm.
    */
-  beginDestroyScope(anzahl) {
+  beginDestroyScope(anzahl, ziele) {
     if (!this._destroyScope) this._destroyScopeId = (this._destroyScopeId || 0) + 1;   // W16d (C02-03): Kennung des Sammel-Ereignisses
-    this._destroyScope = { total: anzahl || 0, tiefe: (this._destroyScope?.tiefe || 0) + 1 };
+    const alt = this._destroyScope;
+    // D2: Ersatz-Karten (Ankhota/Root/Spirit-SKK) EINMAL vor der ersten Zerstoerung der Schleife auswerten (geschachtelt: der aeusserste Wert gilt).
+    const _vorab = alt ? alt.geloeschtVorab : this._gefalleneKreaturenGeloescht();
+    this._destroyScope = { total: anzahl || 0, tiefe: (alt?.tiefe || 0) + 1, geloeschtVorab: _vorab, _todgeweihte: alt?._todgeweihte };
+    // ★ W78 (Pythia): `ziele` (Kreatur-Instanzen/Helden) = die Opfer dieser Schleife — sie gelten bis zum Ende der Klammer als todgeweiht (`istZielTodgeweiht`), damit kein Ersatz-/Rettungseffekt
+    // (Infallible Oracle Pythia) eines von ihnen als Opfer nimmt, obwohl es ohnehin gleich faellt.
+    if (ziele?.length) {
+      const neu = this._todgeweihtMarkieren(ziele);
+      if (neu.length) (this._destroyScope._todgeweihte || (this._destroyScope._todgeweihte = [])).push(...neu);
+    }
     return this._destroyScope;
   }
 
   endDestroyScope() {
     if (!this._destroyScope) return;
-    if ((this._destroyScope.tiefe || 1) <= 1) this._destroyScope = null;
-    else this._destroyScope.tiefe -= 1;
+    if ((this._destroyScope.tiefe || 1) <= 1) {
+      this._todgeweihtLoesen(this._destroyScope._todgeweihte);
+      this._destroyScope = null;
+    } else this._destroyScope.tiefe -= 1;
   }
 
   /**
@@ -46619,6 +47285,10 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   beginMultiHit(anzahl) {
     this._multiHitScope = { total: anzahl || 0, tiefe: (this._multiHitScope?.tiefe || 0) + 1 };
+    // Al 26.10. (Idej Sword - Onima „exactly 1 Hero und kein anderes Ziel"): `afterSpellResolved.damageTargets` kennt nur die GEWÄHLTEN Ziele
+    // (Whirlwind Strikes Kreaturen im Support fehlen); die Klammer ist dann schon zu. Die größte Zielzahl einer Mehrziel-Klammer dieses Gusses
+    // bleibt deshalb am Zielprotokoll (`gs._spellDamageLog._mehrziel`) lesbar, solange der Guss auflöst.
+    if (Array.isArray(this.gs?._spellDamageLog)) this.gs._spellDamageLog._mehrziel = Math.max(this.gs._spellDamageLog._mehrziel || 0, anzahl || 0);
     // Erst aller Schaden, dann alle Tode (Als Befund/Vorgabe 26.9.):
     // Helden- UND Kreaturentode innerhalb der Klammer werden nur
     // vorgemerkt (`_heldKoMelden`, `_kreaturTodMelden`).
@@ -46646,8 +47316,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this._todesAufschubAbschliessen();
     } finally {
       if (this._multiHitScope) {
-        if ((this._multiHitScope.tiefe || 1) <= 1) this._multiHitScope = null;
-        else this._multiHitScope.tiefe -= 1;
+        if ((this._multiHitScope.tiefe || 1) <= 1) {
+          this._todgeweihtLoesen(this._multiHitScope._todgeweihte);   // ★ W78: die Vormerkungen dieses Schlags enden mit ihm
+          this._multiHitScope = null;
+        } else this._multiHitScope.tiefe -= 1;
       }
     }
   }
@@ -46693,6 +47365,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async beginAoeStrike(zielzahl, opts = {}) {
     const scope = this.beginMultiHit(zielzahl);
+    // ★ W78 (Pythia): Helden, die dieser Schlag sicher faellt, gelten als todgeweiht (`istHeldTodgeweiht`) — `opts.heroes`: `{hero, heroIdx?, owner?, amount?}` bzw. Heldenobjekte (+ `opts.amount`).
+    if (opts.heroes?.length) await this._schlagZieleMelden(opts, null, null);
     if (opts.ersterTrefferEinzel) scope.ersterTrefferEinzel = true;   // Welle 13 (Q138): Kette beginnt mit genau einem Ziel (Ricochet)
     // `creatures` nimmt rohe Instanzen ODER `{inst, amount, type}` —
     // Karten mit abgestuftem Schaden (Chain Lightning) sollen nicht
@@ -46728,6 +47402,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (e.cancelled && e.inst?.id != null) negiert.add(e.inst.id);
     }
     scope._aoeNegiert = negiert;
+    await this._schlagZieleMelden({ ...opts, heroes: [] }, schatten, negiert);   // ★ W78: die Kreaturen, die der Schlag nach Immunitaet/Idol sicher faellt, gelten als todgeweiht
     return negiert;
   }
 
@@ -47010,6 +47685,34 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
     return null;
+  }
+
+  /**
+   * ★ Zonenbedarf einer MEHRZONEN-Kreatur (Land Sharks, Populated Island Turtle: „occupies 3 Support Zones"; Skript-Feld `multiZone`) — 0 für jede andere Kreatur.
+   */
+  mehrzonenBedarf(inst) {
+    if (!inst) return 0;
+    const n = Number(loadCardEffect(inst.counters?._effectOverride || inst.name)?.multiZone) || 0;
+    return n >= 2 ? n : 0;
+  }
+
+  /**
+   * ★ Dauerhafte ÜBERNAHME einer Mehrzonen-Kreatur (`actionTransferCreature`): sie wechselt mit ALLEN Zonen und braucht am Ziel EINEN Helden (Spalte) mit genug freien Zonen
+   * (die Zielzone eingerechnet; leere/tote Spalten zählen mit). Wahr, wenn dieser Platz FEHLT — mit `zielHeroIdx`: dieser Held hat zu wenige freie Zonen; ohne: kein Held der Seite
+   * `zielSeite ?? neuerKtrl` hat genug. Wahlfenster und Zonenlisten der Übernahme-Karten blenden solche Ziele/Zonen aus (wie `controlIsLocked`), `actionTransferCreature` prallt sonst
+   * ab. NICHT für zeitweilige Übernahmen (`actionStealCreature`): dort bleibt die Kreatur mit allen Zonen, wo sie ist.
+   */
+  mehrzonenPlatzFehlt(inst, neuerKtrl, zielSeite = null, zielHeroIdx = null) {
+    const bedarf = this.mehrzonenBedarf(inst);
+    if (!bedarf) return false;
+    const seite = zielSeite ?? neuerKtrl;
+    const ps = this.gs.players[seite];
+    if (!ps) return false;
+    const mz = require('./_multizone-shared');
+    // Umzug innerhalb desselben Helden (Paraseed Greenhouse …): die eigenen Zonen der Kreatur (Anker + Platzhalter) zählen als frei.
+    const hat = (hi) => mz.freieZonen(this, seite, hi, inst.name, (this.physicalSide(inst) === seite && inst.heroIdx === hi) ? inst.id : null).length >= bedarf;
+    if (zielHeroIdx != null && zielHeroIdx >= 0) return !hat(zielHeroIdx);
+    return !(ps.heroes || []).some((_, hi) => hat(hi));
   }
 
   /**
@@ -49973,7 +50676,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // (`markiereSeitenfremd`: Brettseite = Gegner, Controller = ich); vorher nur die gestohlenen (`inst.owner === oi && stolenBy`).
         if (this.physicalSide(inst) !== oi) continue;
         // Spy in the Enemy's Camp: eine Kreatur des Gegners mit meiner Spionage-Marke darf ich in MEINEM Zug benutzen, „as if I control it" (Kontrolle nur für die Dauer des Effekts).
-        const _spyZugriff = this.kontrolleurVon(inst) !== playerIdx && inst.stolenBy == null && SpyShared.spyHat(inst, playerIdx);
+        const _spyZugriff = this.kontrolleurVon(inst) !== playerIdx && inst.stolenBy == null && SpyShared.spyHat(inst, playerIdx, this.gs.turn);   // `turn`: befristete Leihe (Lovely Teddy)
         if (this.kontrolleurVon(inst) !== playerIdx && !_spyZugriff) continue;
         if (inst.faceDown) continue;
         // (Der frühere Ausschluss „Host-Held von uns verzaubert" entfällt: der Charme-Scan der Gegenseite ist seit v1197 weg, die Kreatur ginge sonst ganz verloren.)
@@ -51838,16 +52541,18 @@ this._deathWatch = (this._deathWatchStack || []).length
    * (wandert bei Hand-Splices mit, Verfallsstempel `_handLevelOffsetsExpireTurn`) und wird NICHT mehr auf die gespielte Kopie
    * umgehängt: wer eine andere Kopie gleichen Namens klickt, bekommt keinen Rabatt (ggf. ist sie dann nicht spielbar).
    * Liefert den Handindex, auf den sich Stufenprüfung/Wisdom-Kosten beschränken, oder `null` (= „günstigste Kopie nach Namen",
-   * die alte Lesart für Namenslisten/Kreaturen): nur bei Spell/Attack mit gültigem Index, dessen Handkarte der Name ist.
+   * die Lesart für reine Namenslisten ohne Handindex): nur bei Spell/Attack/Creature mit gültigem Index, dessen Handkarte der Name ist.
+   * Als Ruling (Al 26.10.): „Rocky Slime reduziert nur das Level einer einzelnen Kopie!" — das Heldenstufen-Tor gilt auch für KREATUREN je Kopie
+   * (vorher namensweit nach der günstigsten Kopie: die ungesenkte zweite Kopie kam am Tor mit durch, weil die gesenkte es bestand).
    */
   _kopieNurIndex(handArr, cardData, handIdx) {
     if (!Number.isInteger(handIdx) || handIdx < 0 || !Array.isArray(handArr)) return null;
-    if (cardData?.cardType !== 'Spell' && cardData?.cardType !== 'Attack') return null;
+    if (cardData?.cardType !== 'Spell' && cardData?.cardType !== 'Attack' && cardData?.cardType !== 'Creature') return null;
     return handArr[handIdx] === cardData.name ? handIdx : null;
   }
 
   /**
-   * ★ W15b (C2): darf GENAU diese Handkopie (Spell/Attack) die Stufenprüfung bestehen? Für Auswahlwege, die nur eine Namensliste
+   * ★ W15b (C2): darf GENAU diese Handkopie (Spell/Attack; seit 26.10. auch Creature) die Stufenprüfung bestehen? Für Auswahlwege, die nur eine Namensliste
    * kennen (Zusatzaktion `heroAction`, CPU-Wahl): ändert nichts, solange die Namensprüfung ohnehin scheitert oder die Karte
    * den Wirker-Bypass hat (Wolflesia/Heart-Shaped Bows) oder ein geliehener Held spielt — verweigert nur die Kopie, die allein
    * wegen des Rabatts einer ANDEREN Kopie durchkäme.
@@ -51954,24 +52659,24 @@ this._deathWatch = (this._deathWatchStack || []).length
       let bestOffset = 0;
       // ★ W15b (Al, C2: „exakt die geklickte/ausgewählte Karte"): kommt `opts.handIdx` mit, zählt bei Spells/Attacks NUR der
       // Rabatt dieser einen Kopie (Divine Gift of Magic, Fiona); ohne Index bleibt es bei „günstigste Kopie nach Namen".
+      // Als Ruling (Al 26.10.): „Rocky Slime reduziert nur das Level einer einzelnen Kopie!" — dasselbe gilt jetzt auch für KREATUREN (`_kopieNurIndex`):
+      // die ungesenkte Zweitkopie kommt nicht mehr durch das Heldenstufen-Tor, nur weil die gesenkte es besteht.
       const _nurKopie_lvr = this._kopieNurIndex(handArr_lvr, cardData, opts.handIdx);
-      // Helper closure: scan one map, picking the lowest (most-negative)
-      // offset across hand entries matching cardData.name. Hero filter
-      // is honored consistently for both maps.
-      const scan = (map) => {
-        if (!map) return;
-        for (const k of Object.keys(map)) {
-          const idx = +k;
-          if (_nurKopie_lvr != null && idx !== _nurKopie_lvr) continue;
-          if (handArr_lvr[idx] !== cardData.name) continue;
-          if (filterMap_lvr && filterMap_lvr[k] != null && filterMap_lvr[k] !== heroIdx) continue;
-          if (filterMap_lvr && filterMap_lvr[k] != null && this._heldHandOffsetsRuhen(playerIdx, heroIdx)) continue;   // W7a (H04-13)
-          const v = map[k] || 0;
-          if (v < bestOffset) bestOffset = v;
-        }
-      };
-      scan(offMap_lvr);
-      scan(transMap_lvr);
+      // Als Ruling (Al 26.10.): „Bear Rider und Slime sollen sich addieren." Der dauerhafte Abzug (`_handLevelOffsets`: Rocky Slime, Tobi) und der
+      // transiente (`_handLevelOffsetsTransient`: Bear Rider, Sparkfly Queen, Divine Gift of Magic …) DERSELBEN Handkopie zählen als SUMME (vorher
+      // galt nur der größere von beiden: Rocky −1 + 1 Frozen ergab Stufe 1 statt 0). Je Handindex summiert; über die Kopien des Namens gilt wie
+      // bisher die am stärksten gesenkte. Die Untergrenze 0 bleibt (s. u.).
+      const _idxSet_lvr = new Set([...Object.keys(offMap_lvr || {}), ...Object.keys(transMap_lvr || {})]);
+      for (const k of _idxSet_lvr) {
+        const idx = +k;
+        if (_nurKopie_lvr != null && idx !== _nurKopie_lvr) continue;
+        if (handArr_lvr[idx] !== cardData.name) continue;
+        // Der Heldenfilter (Sparkfly Queen, Sid) bindet nur den TRANSIENTEN Rabatt der Kopie an seinen Helden (bzw. lässt ihn mit dem Helden ruhen, W7a/H04-13);
+        // ein dauerhafter Abzug (Rocky Slime, Tobi) gilt für jeden Helden und fällt mit dem Filter nicht weg.
+        const _gebunden = filterMap_lvr && filterMap_lvr[k] != null && (filterMap_lvr[k] !== heroIdx || this._heldHandOffsetsRuhen(playerIdx, heroIdx));
+        const v = ((offMap_lvr && offMap_lvr[k]) || 0) + (_gebunden ? 0 : ((transMap_lvr && transMap_lvr[k]) || 0));
+        if (v < bestOffset) bestOffset = v;
+      }
       if (bestOffset < 0) rawLevel = Math.max(0, rawLevel + bestOffset);
     }
     // Karten-Skript `levelOffsetForHero` (You are the Chosen One!!!): die Stufe hängt vom NUTZER ab — Änderung JE Held, nie unter 0.
@@ -52404,6 +53109,13 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
     total += this._naechsterSpellRabattSumme(playerIdx, cardData);   // W74c (Wendy)
+    // Als Ruling (Al 26.10.): Karten mit „…, to a minimum of N" (Skript-Feld `minHandLevel`: Embodiment of Biseria = 1) behalten diese Untergrenze für die GESAMTE Handstufe —
+    // ein Rocky-Abzug (schon in `rawLevel`) darf sie nicht unterschreiten. Greift nur, wenn eine Senkung wirkt (`total > 0`: die Skripte melden 0 für Pile-/Brettkopien)
+    // und hebt nie über die Stufe an, die die Karte ohne Senkung hätte (`rawLevel`).
+    if (total > 0) {
+      const _min = loadCardEffect(cardData.name)?.minHandLevel;
+      if (typeof _min === 'number') return Math.max(0, rawLevel - total, Math.min(rawLevel, _min));
+    }
     return Math.max(0, rawLevel - total);
   }
 
@@ -52420,8 +53132,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    *      Sol Rym's "Chain Lightning is Lv0 for me" pattern. Only
    *      applied when `opts.heroIdx` is supplied.
    *   2. Per-hand-position offsets (`ps._handLevelOffsets[handIdx]` and
-   *      the transient sibling). The most-negative offset for the named
-   *      card wins, matching `heroMeetsLevelReq`'s scan. Only consulted
+   *      the transient sibling). Beide Abzüge DIESER Kopie werden ADDIERT
+   *      (Als Ruling Al 26.10.: Bear Rider + Rocky Slime), nie unter 0. Only consulted
    *      when `opts.handIdx` is supplied — for card pickers that don't
    *      know which hand slot a candidate came from, this contribution
    *      is conservatively skipped.
@@ -52492,18 +53204,13 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // (2) Per-hand-position offset (only when a specific slot is given).
     if (handIdx != null && ps?.hand && cardData.name) {
-      const offA = ps._handLevelOffsets?.[handIdx];
-      const offB = ps._handLevelOffsetsTransient?.[handIdx];
+      // Als Ruling (Al 26.10.): „Bear Rider und Slime sollen sich addieren." — dauerhafter (`_handLevelOffsets`) und transienter Abzug
+      // (`_handLevelOffsetsTransient`) dieser einen Handkopie zählen als SUMME (vorher: das Minimum beider), nie unter Stufe 0.
       let best = 0;
-      const scan = (map) => {
-        if (!map) return;
+      if (ps.hand[handIdx] === cardData.name) {
         const k = String(handIdx);
-        if (ps.hand[handIdx] !== cardData.name) return;
-        const v = map[k] || 0;
-        if (v < best) best = v;
-      };
-      scan(ps._handLevelOffsets);
-      scan(ps._handLevelOffsetsTransient);
+        best = ((ps._handLevelOffsets && ps._handLevelOffsets[k]) || 0) + ((ps._handLevelOffsetsTransient && ps._handLevelOffsetsTransient[k]) || 0);
+      }
       if (best < 0) raw = Math.max(0, raw + best);
     }
 
@@ -53033,7 +53740,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     return handIndicesWithoutResolving(ps);
   }
 
-  getWisdomDiscardCost(playerIdx, heroIdx, cardData, handIdx, levelSourcePi) {
+  getWisdomDiscardCost(playerIdx, heroIdx, cardData, handIdx, levelSourcePi, evalExtra) {
     if (cardData.cardType !== 'Spell') return 0;
     const ps = this.gs.players[playerIdx];
     const hero = ps?.heroes?.[heroIdx];
@@ -53059,7 +53766,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       : this._getCandidateAbilityZoneSets(playerIdx, heroIdx, _trotzNeg_w);
     let bestCost = -1; // -1 = not playable
     for (const abZones of candidates) {
-      const cost = this._wisdomCostForZones(cardData, hero, rawLevel, abZones, playerIdx, heroIdx, levelSourcePi);
+      const cost = this._wisdomCostForZones(cardData, hero, rawLevel, abZones, playerIdx, heroIdx, levelSourcePi, evalExtra);
       if (cost === 0) return 0;
       if (cost > 0 && (bestCost === -1 || cost < bestCost)) bestCost = cost;
     }
@@ -53067,13 +53774,13 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /** Per-zone-set Wisdom cost — extracted for the per-opponent walk. */
-  _wisdomCostForZones(cardData, hero, rawLevel, abZones, playerIdx, heroIdx, levelSourcePi) {
+  _wisdomCostForZones(cardData, hero, rawLevel, abZones, playerIdx, heroIdx, levelSourcePi, evalExtra) {
     const levelAfterAbility = this._applySpellLevelReductions(cardData, rawLevel, abZones);
     // W16a (Frage 6): Ermäßigungen des Kontrolleurs (wie `_testLevelReqForZones`: `lvrPi` + `castHeroSide`)
     // Exakt dieselben Argumente wie `_testLevelReqForZones` (auch `castHeroSide` ohne Seitenwechsel): sonst sähen heldengebundene Senker beider Rechnungen verschiedene Wirker.
     const level = this._applyCardLevelReductions(cardData, levelAfterAbility,
       typeof levelSourcePi === 'number' ? levelSourcePi : playerIdx, heroIdx,
-      { ...(typeof levelSourcePi === 'number' ? { levelSourcePi } : {}), castHeroSide: playerIdx });
+      { ...(typeof levelSourcePi === 'number' ? { levelSourcePi } : {}), ...(evalExtra || {}), castHeroSide: playerIdx });
 
     const gap = this._spellLevelGap(cardData, level, abZones);
     if (gap === 0) return 0;
@@ -54805,6 +55512,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const _schadenKreaturen = creatureEntries.filter(e => e.amount > 0);
       await this.beginAoeStrike(_schadenHelden.length + _schadenKreaturen.length, {
         creatures: _schadenKreaturen.map(e => ({ inst: e.inst, amount: e.amount, type: e.type })),
+        heroes: _schadenHelden, heroOpts: trefferOpts,   // W78 (Pythia): Helden, die dieser Schlag faellt, gelten als todgeweiht
         source: quellObjekt, amount: damage, type: damageType, sourceOwner: pi,
         canBeNegated: opts.canBeNegated !== false,
       });
@@ -55060,7 +55768,18 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Creatures are defeated" (siehe `_mitNiederlagenSammler`).
    */
   async processCreatureDamageBatch(entries) {
-    return this._mitNiederlagenSammler(() => this._processCreatureDamageBatchKern(entries));
+    try {
+      return await this._mitNiederlagenSammler(() => this._processCreatureDamageBatchKern(entries));
+    } finally {
+      // ★ W78: wer den Stapel ueberlebt hat, ist nicht (mehr) todgeweiht — Stempel des Stapels und Vormerkung des Schlags weg
+      // (Immune/abgewehrte/herabgesetzte/gerettete Eintraege liessen sonst einen stehen). Sterbende (HP <= 0, Tod aufgeschoben) behalten ihn.
+      for (const e of (entries || [])) {
+        const inst = e?.inst;
+        if (!inst?.counters || (inst.counters.currentHp ?? 1) <= 0 || inst._deathResolved) continue;
+        if (inst.counters._dyingThisBatch && inst.counters._dyingThisBatch === entries._todStapelNr) delete inst.counters._dyingThisBatch;
+        if (this._multiHitScope?._todgeweihte) this._schlagTodgeweihtFreigeben(inst);
+      }
+    }
   }
 
   async _processCreatureDamageBatchKern(entries) {
@@ -55438,7 +56157,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (e._kBase !== undefined && Math.max(0, Math.ceil(e._kBase * (e._kMul ?? 1)) + (e._kFlat || 0)) > grenze) { e._kBase = grenze; e._kMul = 1; e._kFlat = 0; }
     }
 
-    // Armed-arrow attack modifiers (flat damage + Hydra Blood zero).
+    // Armed-arrow attack modifiers, STUFE 1 (flat damage). Die Null von Hydra Blood Arrow (Stufe 2, `applyArrowsZero`) kommt erst am Ende der
+    // Betragsänderungen (R5, siehe unten bei `_settleCreatureEntry`).
     // Same policy as the hero-damage path: applies AFTER the batch hook so
     // Diamond / Sacred Hammer etc. compose correctly, BEFORE the buff
     // multiplier + damageLocked pass below so Cloudy halves the arrow-
@@ -55458,8 +56178,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         applyArrowsBeforeDamage(this, e.source, e.inst, proxy);
         if (armiert) {
           e._base = Math.max(0, proxy.amount || 0);
-          if (proxy._zeroedByArrow) { e._flat = 0; e._mul = 1; }   // Hydra Blood: absolut (fuer den Kettenbetrag Negation: bleibt unberuehrt)
-          else if (e._kBase !== undefined) e._kBase += e._base - _pfeilVor;   // W50a: Pfeil-Bonus gehoert zur Basis des Kettenbetrags
+          if (e._kBase !== undefined) e._kBase += e._base - _pfeilVor;   // W50a: Pfeil-Bonus gehoert zur Basis des Kettenbetrags
         } else e.amount = proxy.amount;
       }
     }
@@ -55478,6 +56197,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (armiert) { e._base = Math.max(0, proxy.amount || 0); if (e._kBase !== undefined) e._kBase += e._base - _elixirVor; } else e.amount = proxy.amount;   // Basis, s.o. (W50a: Zuwachs auch in den Kettenbetrag)
       if (proxy.cannotBeReduced) e.cannotBeReduced = true;
       if (proxy.cannotBeNegated) e.cannotBeNegated = true;
+      if (proxy._unreduzierbar) e._unreduzierbar = true;   // R5: QUELLEN-seitig unreduzierbar (Elixir) — Hydra Blood Arrow nullt diesen Treffer nicht
     }
 
     // Defending the Gate: check if any entries would hit an opponent's support zones
@@ -55514,7 +56234,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Halbierung vor Einmal-Schilden/Flat-Boni/HP-Boeden greift. Die Karte legt „Cloudy" auf; der Durchgang darunter halbiert dann. Nicht senkbarer Schaden
       // (`cannotBeReduced`, `canBeNegated === false`) bekommt kein Angebot; Zerstoeren/Opfer sind kein Schaden.
       if (e.inst && !e._immuneCreature && e.canBeNegated !== false && !e.cannotBeReduced && e.amount > 0
-          && e.type !== 'destroy' && e.inst.zone === 'support' && (e.inst.counters?.currentHp || 0) > 0) {
+          && e.type !== 'destroy' && e.inst.zone === 'support' && (e.inst.counters?.currentHp || 0) > 0
+          && !require('./_arrows-shared').hydraWirdNullen(this, e.source, { type: e.type, _unreduzierbar: e.trueDamage === true || e._unreduzierbar === true })) {   // R5: eine nullende Hydra — die Reaktion am Ziel sieht schon die 0
         const _fr = await this._checkCreaturePreDamageHandReactions(e.inst, e.source, e.amount, e.type, { early: true });
         if (_fr && typeof _fr.multiplier === 'number' && _fr.multiplier < 1) {
           if (typeof e.multiplyAmount === 'function') { e._mul = (e._mul ?? 1) * _fr.multiplier; e._kMul = (e._kMul ?? 1) * _fr.multiplier; }
@@ -55522,9 +56243,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
       }
       const _eAmountBeforeBuffMul = e.amount;
-      if (e.canBeNegated !== false && e.inst.counters?.buffs) {
+      if (e.inst.counters?.buffs) {
         for (const [, bd] of Object.entries(e.inst.counters.buffs)) {
           if (bd.damageMultiplier != null) {
+            if (e.canBeNegated === false && !(bd.damageMultiplier > 1)) continue;   // Als Ruling (Al 26.10., Disruption Ray): unnegierbarer/True Damage nimmt nur ERHOEHENDE Multiplikatoren mit (s. Heldenpfad)
             if (e.cannotBeReduced && bd.damageMultiplier < 1) continue;
             if (typeof e.multiplyAmount === 'function') { e._mul = (e._mul ?? 1) * bd.damageMultiplier; e._kMul = (e._kMul ?? 1) * bd.damageMultiplier; }   // W50a: Buff-Senkung zaehlt
             else e.amount = Math.ceil(e.amount * bd.damageMultiplier);
@@ -55535,6 +56257,17 @@ this._deathWatch = (this._deathWatchStack || []).length
       const _eRef = (e._kBase !== undefined) ? Math.max(0, Math.ceil(e._kBase * (e._kMul ?? 1)) + (e._kFlat || 0)) : e.amount;
       // PUNKT VOR STRICH: jetzt einmal verrechnen, Eintrag wieder flach.
       this._settleCreatureEntry(e);
+      // ★ R5 (Als Ruling Al 26.10.: „Immer Hydra Blood Arrow nach ALLEN anderen Schadens-Modifikatoren!"), Zwilling des Heldenpfads: erst jetzt steht der Endbetrag fest (Hook-Boni, Elixir,
+      // Anger, andere Pfeile, Buff-Multiplikatoren am Angreifer und am Ziel) — dazu zählen Niu und Darge (`_flatBonus`), die unten erst NACH den Einmal-Schilden dazukämen: hier vorab
+      // eingelöst (der Buff ist danach weg, der spätere Aufruf liefert 0). Hydra setzt den Betrag auf 0 und rechnet das Gift aus dem Endbetrag; die Einmal-Schilde darunter sehen die 0.
+      // Nur QUELLEN-seitig unreduzierbarer Schaden bleibt (`_unreduzierbar`/`trueDamage`), ZIEL-seitiges „cannot be reduced" (Brachion, Dichotomy …) nicht.
+      if (e.type === 'attack' && e.inst && e.source?.owner != null && e.source?.heroIdx >= 0
+          && require('./_arrows-shared').hydraScharf(this, e.source)) {
+        const niuBonus = await this._niuBonusEinloesen(e.source);
+        if (niuBonus > 0) e._flatBonus = (e._flatBonus || 0) + niuBonus;
+        const _hz = { type: e.type, amount: e.amount + ((e._flatBonus && !e.kettenFolge) ? e._flatBonus : 0), _unreduzierbar: e.trueDamage === true || e._unreduzierbar === true };
+        if (require('./_arrows-shared').applyArrowsZero(this, e.source, e.inst, _hz)) { e.amount = 0; e._flatBonus = 0; }   // sonst: unreduzierbar — nur der Endbetrag fürs Gift wird gemerkt
+      }
       const _eNachSenkung = e.amount;   // W50a: Betrag nach Senkungen/Negations-Hooks, VOR den Einmal-Schilden
       // ── Einmal-Schadensschilde (v697) — Kreaturenziel, gleiche Regeln
       // wie im Heldenpfad (flat nach Multiplikatoren; cannotBeReduced
@@ -55565,16 +56298,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       // and consumes the buff on the SOURCE hero (independent of Niu
       // being on the board).
       if (e.type === 'attack' && e.source?.owner != null && e.source?.heroIdx >= 0) {
-        const srcHero = this.gs.players[e.source.owner]?.heroes?.[e.source.heroIdx];
-        const niuBuff = srcHero?.buffs?.niu_enhanced;
-        const niuBonus = niuBuff?.totalDamage || 0;
-        if (niuBonus > 0) {
-          e._flatBonus = (e._flatBonus || 0) + niuBonus;
-          await this.actionRemoveBuff(srcHero, e.source.owner, e.source.heroIdx, 'niu_enhanced');
-          this.log('niu_enhanced_strike', {
-            hero: srcHero.name, bonus: niuBonus, stacks: niuBuff.stacks || 1,
-          });
-        }
+        const niuBonus = await this._niuBonusEinloesen(e.source);   // Als Ruling (Al 26.10.): irgendein eigener Held löst ihn ein
+        if (niuBonus > 0) e._flatBonus = (e._flatBonus || 0) + niuBonus;
       }
       // Flat bonus that bypasses multipliers (parity with the hero
       // damage path). Darge's beforeCreatureDamageBatch hook stamps
@@ -55609,13 +56334,18 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Die Nummer des Stapels (statt `true`) macht „im selben Schlag gestorben" nachpruefbar: Graveworm darf
     // nicht auf Tode reagieren, die GLEICHZEITIG mit seinem eigenen geschehen (siehe `deathInfo.todStapel`).
     const _todStapelNr = (this._todStapelNr = (this._todStapelNr || 0) + 1);
+    entries._todStapelNr = _todStapelNr;   // ★ W78: der Huellen-Aufraeumer loescht nur den EIGENEN Stempel
     for (const e of entries) {
       if (e.cancelled || !e.inst) continue;
+      if (e._immuneCreature) continue;       // ★ W78: immune Eintraege nehmen keinen Schaden — nicht als sterbend stempeln
       const projected = Math.max(0, e.amount);
       if (projected <= 0) continue;
       if ((e.inst.counters.currentHp || 0) > 0
           && projected >= e.inst.counters.currentHp) {
         e.inst.counters._dyingThisBatch = _todStapelNr;
+        // ★ W78 (Al 26.10.): Statusschaden (Brand, Gift, Blutung) ist KEIN Flaechenschlag — wer daran stirbt, ist nicht "todgeweiht" im Sinne von `istTodgeweiht`
+        // (Pythia darf eine andere tödlich vergiftete Kreatur opfern). Der Stempel selbst bleibt für Loyal Shepherd/Terrier & Co. unverändert; nur diese Nummer trennt ihn ab.
+        if (e.isStatusDamage) e.inst.counters._dyingStatusStapel = _todStapelNr;
       }
     }
 
@@ -55970,6 +56700,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     // ── Tode dieses Durchgangs (nach ALLEM Schaden) ──
+    // D2: Ersatz-Karten (Ankhota/Root/Spirit-SKK) EINMAL vor dem ersten Tod auswerten; in einer Flaechenklammer stempelt `_todesAufschubAbschliessen`.
+    if (!this._todesAufschub) this._geloeschtVorabStempeln(sterbende);
     for (const e of sterbende) {
       await this._kreaturTodMelden(e, handLimitAffectedOwners);
     }
@@ -56115,17 +56847,34 @@ this._deathWatch = (this._deathWatchStack || []).length
       //
       // Derselbe Fehler wie bei den acht Flugwegen (v1133): eine
       // Absicherung an EINER Stelle ist keine Absicherung.
-      const _ghazmaLoescht = this._gefalleneKreaturenGeloescht();
+      // D2: bei zeitgleichen Toden einmal VOR dem ersten Tod ausgewertet (`_geloeschtVorabStempeln`), sonst jetzt.
+      const _ghazmaLoescht = (typeof e._geloeschtVorab === 'boolean') ? e._geloeschtVorab : this._gefalleneKreaturenGeloescht();
+      delete e._geloeschtVorab;   // gilt nur fuer DIESEN Tod (ein wiederverwendeter Eintrag bekommt beim naechsten Durchgang einen frischen Wert)
       if (_ghazmaLoescht && this._wurzelAktiv()) this._wurzelNebel(e.inst.owner, e.inst.heroIdx, e.inst.zoneSlot);   // Root: schwarzer Nebel
-      const _selbstLoeschend = (!!loadCardEffect(e.inst.name)?.deletesSelfOnDeath && !this.isCardPassiveDormant(e.inst)) || _ghazmaLoescht;   // W8
+      const _eigenLoeschend = (!!loadCardEffect(e.inst.name)?.deletesSelfOnDeath && !this.isCardPassiveDormant(e.inst)) || _ghazmaLoescht;   // W8
+      // ★ D1 (Baustein-Phase, G12 E1): der Schadenstod IST ein „would be sent to the discard pile". Karten, die das ersetzen (The Bonegrinder: Skelett loeschen und 1 ziehen;
+      // Vacarn: besiegte Kreaturen seiner Support Zones werden geloescht), hoeren im Zerstoerungsweg auf `onCardLeaveZone` (`toZone: 'discard'`, setzen `_redirectToDeleted`);
+      // hier gibt es dafuer nur `_onlyCard`. Darum meldet der Tod vor dem Ablegen `onCreatureWouldBeDiscarded` (gleiche Felder wie dort) und liest die Marke aus.
+      // Nicht gemeldet wird, was ohnehin nie abgelegt wird (Ghazma/Ankhota/Root/Selbstloeschen/Token) oder gleich wiederbelebt wird (`_reviveAfterDeath`).
+      let _ersatzLoescht = false;
+      if (!_eigenLoeschend && !e.inst._reviveAfterDeath && !(effectiveCd && hasCardType(effectiveCd, 'Token'))) {
+        const _stempelVorher = !!e.inst._redirectToDeleted;
+        await this.runHooks('onCreatureWouldBeDiscarded', {
+          leavingCard: e.inst, fromZone: 'support', fromOwner: physicalSide, fromHeroIdx: e.inst.heroIdx, fromZoneSlot: e.inst.zoneSlot,
+          toZone: 'discard', ablageBesitzer: e.inst.originalOwner, source: e.source, damageType: e.type, _skipReactionCheck: true,
+        });
+        if (!_stempelVorher && e.inst._redirectToDeleted) { delete e.inst._redirectToDeleted; _ersatzLoescht = true; }
+      }
+      const _selbstLoeschend = _eigenLoeschend || _ersatzLoescht;
       // Loesch-Rettung („deleted from anywhere", Ash Worms) greift auch hier, wenn Ghazma
       // die Niederlage zu einem Loeschen macht (die Instanz ist schon aus dem Platz).
       let _gerettet = false;
-      if (_ghazmaLoescht && !(effectiveCd && hasCardType(effectiveCd, 'Token')) && loadCardEffect(e.inst.name)?.beforeDelete) {
+      if ((_ghazmaLoescht || _ersatzLoescht) && !(effectiveCd && hasCardType(effectiveCd, 'Token')) && loadCardEffect(e.inst.name)?.beforeDelete) {
+        const _loeschQuelle = _ghazmaLoescht ? 'Ghazma' : 'Vacarn / The Bonegrinder';
         _gerettet = await this._tryBeforeDelete(e.inst.name, e.inst.originalOwner, {
-          fromZone: 'support', fromInstance: null, source: 'Ghazma',
+          fromZone: 'support', fromInstance: null, source: _loeschQuelle,
         });
-        if (_gerettet) this.log('delete_rescued', { card: e.inst.name, from: 'support', source: 'Ghazma' });
+        if (_gerettet) this.log('delete_rescued', { card: e.inst.name, from: 'support', source: _loeschQuelle });
       }
       if (_gerettet) {
         _creatureDest = 'rescued';
@@ -56859,9 +57608,18 @@ this._deathWatch = (this._deathWatchStack || []).length
   // hooks AND broadcasts a `coolness_stack_change` event so the client
   // can animate the card flying between piles.
 
+  /**
+   * Als Ruling (Al 26.10.): „Der Coolness Stack existiert, solange Wowhalla in der eigenen Area liegt, auch wenn er leer ist" —
+   * `hasCoolnessStack` = Stack nicht leer ODER eigene Wowhalla in der eigenen Area. Wer nur „existiert ein Stack" braucht (Freshya, Lolki,
+   * Wowkyrie, Nornstellar, Hipdall-Nachfüllen, Prophecy: legen eine Karte AUF den Stack), fragt dies; wer eine KARTE aus dem Stack braucht
+   * (Cool Rescue, Ragnarock, Wowhallas Selbstschutz, Bifab …), prüft `getCoolnessStackSize(pi) > 0`. Liegt Wowhalla nicht mehr, gilt der
+   * Stack wie bisher als gelöscht/nicht vorhanden.
+   */
   hasCoolnessStack(playerIdx) {
     const ps = this.gs.players[playerIdx];
-    return Array.isArray(ps?.coolnessStack) && ps.coolnessStack.length > 0;
+    if (!Array.isArray(ps?.coolnessStack)) return false;
+    if (ps.coolnessStack.length > 0) return true;
+    return (this.gs.areaZones?.[playerIdx] || []).includes('Wowhalla, the Hall of the Cool');
   }
 
   getCoolnessStackTop(playerIdx) {
@@ -57115,6 +57873,15 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
     }
     return { cardName, inst };
+  }
+
+  /**
+   * B2/E3: Verursacher-Seite fuer das Area-Schutztor, wenn der Aufrufer keinen `sourceOwner` nennt: Kontrolleur/Besitzer der
+   * Quellkarte, erst dann der aktive Spieler (Reaktion des Gegners im eigenen Zug, eigene Reaktion im Gegnerzug).
+   */
+  _areaQuellBesitzer(quelle) {
+    const o = (quelle && typeof quelle === 'object') ? (quelle.controller ?? quelle.owner) : undefined;
+    return (typeof o === 'number' && o >= 0) ? o : this.gs.activePlayer;
   }
 
   /**

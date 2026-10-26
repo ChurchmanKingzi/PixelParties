@@ -88,7 +88,7 @@ function heldHatAuge(engine, hs, heroIdx) {
  * `mitSchutz`: auch die „kann nicht gewählt werden"-Schutzarten prüfen (Gating ohne Auge). Die Zielwahl selbst prüft die nicht —
  * dort filtert die Engine, und das Auge hebt sie auf.
  */
-function istZiel(engine, pi, inst, maxLv, mitSchutz) {
+function istZiel(engine, pi, inst, maxLv, mitSchutz, ziel = null) {
   if (!inst || inst.zone !== 'support' || inst.faceDown) return false;
   const ktrl = inst.controller ?? inst.owner;
   if (ktrl === pi || !engine.opponentsOf(pi).includes(ktrl)) return false;
@@ -98,6 +98,8 @@ function istZiel(engine, pi, inst, maxLv, mitSchutz) {
   if (engine.effectiveCardLevel(cd, ktrl, { heroIdx: inst.heroIdx, inst }) > maxLv) return false;
   // Kontrolle nicht wechselbar: Cardinal Beasts, „Control of this Creature cannot change", control_immune
   if (engine.isOmniImmune(inst, pi) || engine.controlIsLocked(inst) || engine.isCreatureImmune(inst, 'control_immune')) return false;
+  // Mehrzonen-Kreatur (Land Sharks, Turtle): braucht am Nutzer-Helden `ziel` (Seite `hs`, `heroIdx`) genug freie Zonen für ALLE ihre Zonen — sonst nicht wählbar.
+  if (ziel && engine.mehrzonenPlatzFehlt(inst, pi, ziel.hs, ziel.heroIdx)) return false;
   if (mitSchutz) {
     if (inst.counters?.untargetable_all || engine.isCreatureImmune(inst, 'targeting_immune')) return false;
     if (typeof engine._isSideNondamageShielded === 'function' && engine._isSideNondamageShielded(ktrl)) return false;
@@ -105,8 +107,8 @@ function istZiel(engine, pi, inst, maxLv, mitSchutz) {
   return true;
 }
 
-function ziele(engine, pi, maxLv, mitSchutz) {
-  return engine.cardInstances.filter(c => istZiel(engine, pi, c, maxLv, mitSchutz));
+function ziele(engine, pi, maxLv, mitSchutz, ziel = null) {
+  return engine.cardInstances.filter(c => istZiel(engine, pi, c, maxLv, mitSchutz, ziel));
 }
 
 /** Kann dieser Held die Karte jetzt sinnvoll wirken? (freie Zone + mindestens ein Ziel in seiner Stufe) */
@@ -116,7 +118,7 @@ function heldTauglich(engine, pi, heroIdx) {
   const hero = gs.players[hs]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
   const mitSchutz = !heldHatAuge(engine, hs, heroIdx);
-  const zs = ziele(engine, pi, maxLevelFuer(engine, hs, heroIdx), mitSchutz);
+  const zs = ziele(engine, pi, maxLevelFuer(engine, hs, heroIdx), mitSchutz, { hs, heroIdx });
   if (zs.length === 0) return false;
   if (freieZonen(gs, hs, heroIdx).length > 0) return true;
   // W63a: keine freie Zone — mit Alice-Teilung reicht die Zone einer GLEICHNAMIGEN Creature fuer ein Ziel
@@ -179,14 +181,14 @@ module.exports = {
         confirmClass: 'btn-warning',
         cancellable: true,
         dimUnmetCondition: true,           // zu hohe Stufe / nicht übernehmbar: ausgegraut statt weg
-        condition: (t) => istZiel(engine, pi, t.cardInstance, maxLv, false),
+        condition: (t) => istZiel(engine, pi, t.cardInstance, maxLv, false, { hs, heroIdx }),
       });
       if (!target) { gs._spellCancelled = true; return; }
 
       const inst = target.cardInstance || engine.cardInstances.find(c =>
         c.zone === 'support' && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
         && engine.physicalSide(c) === target.owner);
-      if (!inst || !istZiel(engine, pi, inst, maxLv, false)) { gs._spellCancelled = true; return; }
+      if (!inst || !istZiel(engine, pi, inst, maxLv, false, { hs, heroIdx })) { gs._spellCancelled = true; return; }
 
       // ── Platz: eine freie Zone DES NUTZERS ──
       const frei = freieZonen(gs, hs, heroIdx, engine, pi, inst.name);   // W63a: + Zone einer gleichnamigen Creature (Alice), geteilte zuerst

@@ -30,6 +30,9 @@ const EXPLOSION_DAMAGE = 100;
 const MAX_TARGETS = 3;
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Am besten gleich die Karten ganz sperren statt den Schaden fizzeln zu lassen"): die Karte richtet NUR Schaden an Zielen des Gegners an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
@@ -102,6 +105,7 @@ module.exports = {
         || engine.kreaturAnBrett(t.owner, t.heroIdx, t.slotIdx);   // Z1: Brettseite
       await engine.beginAoeStrike(targets.length, {
         creatures: targets.filter(t => t.type !== 'hero').map(aufloesen).filter(Boolean),
+        heroes: targets.filter(t => t.type === 'hero'),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
         source, amount: EXPLOSION_DAMAGE, type: 'destruction_spell', sourceOwner: pi,
       });
       try {

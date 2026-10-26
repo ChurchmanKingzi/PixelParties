@@ -3,8 +3,24 @@
 //  Hero (400 HP, 40 ATK, Charme + Fighting)
 //
 //  "Whenever 1 or more Creatures either player controls would be
-//   affected by a card or effect, you may discard 1 card to negate any
+//   affected by a card or effect, you may discard 2 cards to negate any
 //   effects that card or effect has on all Creatures."
+//
+//  ★ W77a (Al, 26.10.2026): zwei Entscheidungen.
+//   A) SCHUTZUMFANG: BEIDE SEITEN AUF EINMAL. Pro Karte/Effekt gibt es nur noch
+//      EIN Angebot an Monias Kontrolleur (nicht je Seite): Annahme negiert ALLE
+//      Wirkungen der Karte/des Effekts auf ALLE Kreaturen beider Spieler (auch auf
+//      Kreaturen, die der Effekt erst spaeter trifft); Ablehnung gilt fuer den
+//      ganzen Effekt (keine zweite Frage fuer die andere Seite). Das Angebot
+//      oeffnet beim ersten betroffenen Kreaturen-Ereignis des Effekts. Nicht-
+//      Kreaturen-Ziele (Helden, Karten, Gold ...) laufen unveraendert weiter.
+//   B) BALANCING: Kosten 2 Handkarten (vorher 1). Angebot nur, wenn Monias
+//      Kontrolleur mindestens 2 taugliche Handkarten hat (die aufloesende Karte
+//      zaehlt nie als Material). Gewaehlt wird NACH der Annahme (abbrechbarer
+//      `handPick` mit Bestaetigen, EIN Batzen; Abbruch = Angebot abgelehnt, nichts
+//      bezahlt), abgeworfen one by one. Boris darf den Abwurf ignorieren — die
+//      Negation gilt dann trotzdem (Kosten uebersprungen negiert den Effekt nicht).
+//   Bausteine in `_monia-shared.js` (`kostenWaehlen`/`kostenZahlen`, Buchfuehrung).
 //
 //  ★ W58a (Al, 22.10.2026): die Einmal-pro-Zug-Klausel ist gestrichen
 //  („Whenever" statt „Once per turn, when"). JEDE Karte / JEDER Effekt,
@@ -28,40 +44,53 @@
 //  Status entfernen (`cleanseCreatureStatusesGefragt`: Beer, Juice …), Verschieben (Guard Change, Slippery Ice/Skates, Ushabti, Missing People, Mass
 //  Routing), HP-/Marken-Schreiber einzelner Karten (Life Serum, Phoenix Bombardment, Voodoo Curse, Thicket …). Kein Fenster: Opfer/Tribut als Kosten,
 //  Selbst-Effekte, reines Anvisieren, natuerliches Auslaufen, dauerhafte Auren (CARD_API „Welle 71 / W71b").
-//  Neu im Angebot: die ausloesende Karte steht auch bei Nicht-Schaden links im Panel (`triggerCardName`), die Beschreibung nennt Karte und Wirkung,
-//  und ein ABGELEHNTES Einzelfenster gilt nur fuer die Seite der Kreatur (ein Flaecheneffekt fragt hoechstens einmal je Seite).
+//  Neu im Angebot: die ausloesende Karte steht auch bei Nicht-Schaden links im Panel (`triggerCardName`), die Beschreibung nennt Karte und Wirkung.
+//  (W77a: ein ABGELEHNTES Angebot gilt fuer den ganzen Effekt, nicht mehr je Seite.)
 //
-//  CPU (`cpuResponse`): nimmt das Angebot nur an, wenn die eigenen
-//  Kreaturen vom GEGNER bedroht sind (nie fuer die Kreaturen des Gegners,
-//  nie gegen den eigenen Effekt, nie gegen Heilung) und der Wert der
-//  bedrohten Kreaturen die Kosten der schwaechsten Handkarte klar
-//  uebersteigt — sonst wuerde sie ohne Zugsperre in jedem Fenster Karten
-//  wegwerfen.
+//  ★ W78a (Al, 26.10.2026): CPU-Bilanz ueber die GESAMTE Wirkung des Effekts + Rammstoss nur zu Kreaturen, die der Schutz wirklich betrifft.
+//   · CPU (`cpuResponse`): entscheidet EINMAL je Effekt anhand der ERWARTETEN Gesamtbilanz auf alle Kreaturen beider Seiten (gemeinsame Rechnung
+//     `engine.kreaturenBilanz`, `_kreaturen-bilanz.js`): Gewinn = Wert dessen, was EIGENEN Kreaturen schaden wuerde (bzw. gegnerischen nuetzen wuerde),
+//     Verlust = Wert dessen, was GEGNERISCHEN Kreaturen schaden wuerde (bzw. eigenen nuetzen wuerde — Heilung/positive Buffs auf Eigene werden NICHT negiert,
+//     auf Gegnerische ja). Schadensstapel: die komplette Zielliste. Einzelfenster: `engine.absehbareKreaturen` (angekuendigte Liste `kreaturenVorab`,
+//     schon gewaehlte Ziele `engine._gewaehlteZiele`, Flaechen-Eigenschaft/Kartentext der Quelle). Auch wenn eine gegnerische Kreatur zuerst kommt oder
+//     mit-geschuetzt wuerde, kann die Annahme sich lohnen — wenn der Gewinn Verlust UND Kosten (2 Handkarten) klar uebersteigt. Unveraendert abgelehnt:
+//     eigener Effekt, unbekannter Verursacher, keine EIGENE Kreatur wirklich bedroht, weniger als 2 taugliche Handkarten. Die Kartenwahl (`handPick`)
+//     trifft die CPU ueber den Abwurf-Bewerter.
+//   · ANIMATION: der Rammstoss (`play_ram_animation`) laeuft nur zu Kreaturen, die der Schutz WIRKLICH bewahrt, d.h. denen der Effekt etwas ANGETAN haette
+//     (Schadensstapel: alle negierten Eintraege mit Schaden > 0, je Kreatur einmal; Einzelfenster: die ausloesende Kreatur plus ausdruecklich angekuendigte/
+//     gewaehlte). Kein Rammstoss: nicht negierbarer Schaden, Schaden 0, Heilung/positive Buffs/Statusentfernung (der Schutz nimmt der Kreatur dort etwas),
+//     Kreaturen, die nur der Kartentext vermuten laesst.
 // ═══════════════════════════════════════════
 
-const { JETPACK_NAME, hasEquipped, checkMoniaAscension, quellName, angenommenesAngebot, angebotAbgelehnt, angebotMerken, angeboteBeenden } = require('./_monia-shared');
+const { JETPACK_NAME, hasEquipped, checkMoniaAscension, quellName, angenommenesAngebot, angebotAbgelehnt, angebotMerken, angeboteBeenden,
+  KOSTEN, ALLE_SEITEN, kostenPlaetze, kostenZahlbar, kostenWaehlen, kostenZahlen } = require('./_monia-shared');
+const KB = require('./_kreaturen-bilanz');
 const CARD_NAME = 'Cool Rescuer Monia';
 
 /**
- * CPU-Angaben fuer den Prompt: wer bedroht welche Kreaturen womit. `liste` = [{ inst, amount, nichtSchaden }].
+ * CPU-Angaben fuer den Prompt (W78a): die erwartete Gesamtbilanz des Effekts auf ALLE Kreaturen beider Seiten aus Sicht von Monias Kontrolleur `pi`
+ * (`engine.kreaturenBilanz`, gemeinsame Rechnung). `liste` = [{ inst, art, amount?, sourceOwner?, detail?, statusName?, sicher?, canBeNegated? }].
  * Nur Zahlen/Namen — der Prompt geht auch an den Client.
  */
 function cpuInfo(engine, pi, liste, quelleOwner, effektTyp) {
-  const schutz = {};
-  const cardDB = engine._getCardDB();
-  for (const { inst, amount, nichtSchaden } of liste) {
-    const seite = inst.controller ?? inst.owner;
-    const cd = engine.getEffectiveCardData?.(inst) || cardDB[inst.name] || {};
-    const lvl = (() => { try { return engine.kreaturLevelJetzt?.(inst); } catch { return undefined; } })();
-    (schutz[seite] = schutz[seite] || []).push({
-      name: inst.name,
-      hp: inst.counters?.currentHp ?? cd.hp ?? 0,
-      level: Number.isFinite(lvl) ? lvl : (cd.level || 0),
-      amount: amount || 0,
-      nichtSchaden: !!nichtSchaden,
-    });
+  let rechnung = { bilanz: 0, geschuetzt: 0, verloren: 0, eigeneBedroht: 0, posten: [] };
+  // Gerechnet wird nur fuer die CPU (auch im Rollout): ein Mensch entscheidet selbst und der Prompt geht an seinen Client.
+  const fuerCpu = (typeof engine.isCpuPlayer === 'function' && engine.isCpuPlayer(pi)) || engine._inMctsSim || engine._fastMode;
+  if (fuerCpu) { try { rechnung = engine.kreaturenBilanz(pi, liste) || rechnung; } catch { /* ohne Rechnung lehnt die CPU ab */ } }
+  return {
+    pi, quelleOwner: Number.isInteger(quelleOwner) ? quelleOwner : -1, effektTyp: effektTyp || null,
+    bilanz: Math.round(rechnung.bilanz * 10) / 10, geschuetzt: Math.round(rechnung.geschuetzt * 10) / 10, verloren: Math.round(rechnung.verloren * 10) / 10,
+    eigeneBedroht: rechnung.eigeneBedroht, posten: rechnung.posten,
+  };
+}
+
+/** Besitzer der Quelle eines Kreaturen-Ereignisses (Zahl) oder undefined (unbekannt). */
+function quelleBesitzer(src, fallbackZahl) {
+  if (src && typeof src === 'object') {
+    const o = src.owner ?? src.controller;
+    if (typeof o === 'number') return o;
   }
-  return { pi, quelleOwner: Number.isInteger(quelleOwner) ? quelleOwner : -1, effektTyp: effektTyp || null, schutz };
+  return typeof fallbackZahl === 'number' ? fallbackZahl : undefined;
 }
 
 module.exports = {
@@ -86,50 +115,60 @@ module.exports = {
     checkMoniaAscension(engine, pi, hi, null);
   },
 
-  // Gerrymander redirect — when opp's Monia opens the multi-side
-  // "save 0's vs save 1's" picker, our Gerrymander forces opp to
-  // save OUR creatures with their discard cost. The option ids are
-  // `save-${ownerIdx}` — we want save-${gerryOwnerPi}.
-  cpuGerrymanderResponse(_engine, gerryOwnerPi /*, promptData */) {
-    return { optionId: `save-${gerryOwnerPi}` };
-  },
+  // (W77a: das Angebot hat nur noch EINE Option — „beide Seiten auf einmal" —, die Seitenwahl `save-0`/`save-1` und damit die Gerrymander-Umlenkung
+  // dieser Wahl entfallen. Der Gerrymander-Schalter der Prompts steht aus: eine einzelne Option wird nie umgelenkt.)
 
   /**
-   * CPU-Entscheidung zum Angebot „Cool Rescue!" (`promptData._moniaInfo`, siehe `cpuInfo`). Ohne Zugsperre wuerde die generische CPU-Wahl
-   * („letzte Option") in JEDEM Fenster eine Karte opfern — und dabei sogar die Kreaturen des Gegners retten. Hier: annehmen NUR wenn
-   *   · die Option fuer die EIGENEN Kreaturen angeboten wird (`save-<eigener Sitz>`),
-   *   · der Effekt nicht von der eigenen Seite kommt (kein Selbstschutz gegen den eigenen Plan) und keine Heilung ist,
-   *   · der Wert der bedrohten Kreaturen die Kosten der schwaechsten Handkarte klar uebersteigt.
-   * Wert einer Kreatur: 20 + 15 × Level + min(40, HP/10); voll bei toedlichem Schaden, Zerstoeren oder Kontrollverlust (`control`), ×0,8 Bewegen/Bounce (`move`), ×0,6 Status/Buff/Werte/Sonstiges, sonst anteilig am Schaden (×0,7).
-   * Kosten: Handwert der schwaechsten Karte (`engine._cpuEstimateHandValue`, sonst 20) + 10; bei nur 1 Handkarte muss der Wert hoch sein (≥ 80).
+   * CPU-Entscheidung zum Angebot „Cool Rescue!" (`promptData._moniaInfo`, siehe `cpuInfo`) und zur Kartenwahl der Kosten (`handPick` mit `moniaKostenWahl`).
+   * Ohne Zugsperre wuerde die generische CPU-Wahl („letzte Option") in JEDEM Fenster Karten opfern. Hier: annehmen NUR wenn
+   *   · der Effekt vom GEGNER kommt (kein Selbstschutz gegen den eigenen Plan, Verursacher bekannt),
+   *   · der Effekt mindestens EINE EIGENE Kreatur wirklich bedroht (Schaden/Zerstoeren/Kontrollverlust/Bounce/Debuff — Heilung und positive Buffs auf Eigene sind keine Bedrohung),
+   *   · die erwartete GESAMTBILANZ stimmt (W78a, ein Angebot schuetzt BEIDE Seiten): Gewinn = Wert dessen, was Eigenen schaden bzw. Gegnerischen nuetzen wuerde, MINUS
+   *     Verlust = Wert dessen, was Gegnerischen schaden bzw. Eigenen nuetzen wuerde, uebersteigt die Kosten klar. Liste: Schadensstapel = alle Eintraege; Einzelfenster = die erste Kreatur
+   *     plus `engine.absehbareKreaturen` (angekuendigte Liste, gewaehlte Ziele, Flaechen-Eigenschaft/Kartentext; Vermutungen aus dem Text zaehlen anteilig),
+   *   · die Hand die Kosten traegt (mindestens 2 taugliche Handkarten).
+   * Wert/Wirkung je Kreatur: siehe `_kreaturen-bilanz.js` (Level, HP, Rest-HP, Schaden relativ zur Rest-HP [toedlich = voll], Buffs, Faehigkeiten, Stapel; Zerstoeren/Kontrollverlust voll, Bewegen/Bounce 0,8, Status/Buff/Werte 0,6).
+   * Kosten: Handwert der zwei schwaechsten Karten (`engine._cpuEstimateHandValue`, sonst je 20) + 10 (Faktor 1,25); bleibt genau die Kostenmenge in der Hand, muss die Bilanz hoch sein (≥ 80).
    */
   cpuResponse(engine, kind, promptData) {
-    if (kind !== 'generic' || promptData?.type !== 'optionPicker' || !promptData._moniaInfo) return undefined;
+    if (kind !== 'generic') return undefined;
+
+    // Kartenwahl der Kosten: die entbehrlichsten Karten (Abwurf-Bewerter wie Cute Hydra), genau `minSelect`.
+    if (promptData?.type === 'handPick' && promptData.moniaKostenWahl) {
+      const cpuIdx = promptData.controllerIdx ?? engine._cpuPlayerIdx;
+      const ps = engine.gs.players[cpuIdx];
+      const eligible = (promptData.eligibleIndices || []).filter(i => ps?.hand?.[i] != null);
+      const want = promptData.minSelect ?? KOSTEN;
+      if (!ps || eligible.length < want) return { selectedCards: [] };
+      const rest = eligible.slice();
+      const out = [];
+      while (out.length < want && rest.length > 0) {
+        const r = engine._getCpuGenericResponse(
+          { type: 'forceDiscard', title: CARD_NAME, eligibleIndices: rest.slice(), controllerIdx: cpuIdx }, cpuIdx);
+        const idx = r && Number.isInteger(r.handIndex) && rest.includes(r.handIndex) ? r.handIndex : rest[0];
+        out.push({ handIndex: idx, cardName: ps.hand[idx] });
+        rest.splice(rest.indexOf(idx), 1);
+      }
+      return { selectedCards: out };
+    }
+
+    if (promptData?.type !== 'optionPicker' || !promptData._moniaInfo) return undefined;
     const info = promptData._moniaInfo, pi = info.pi;
-    const eigene = `save-${pi}`;
-    if (!(promptData.options || []).some(o => o.id === eigene)) return null;     // nie die Kreaturen des Gegners retten
     if (info.quelleOwner === pi) return null;                                    // eigener Effekt
-    if (!(info.quelleOwner >= 0)) return null;                                   // W71b: Verursacher unbekannt (kein Besitzer) — nie eine Karte dafuer opfern
-    if (info.effektTyp === 'heal') return null;                                  // Heilung muss man nicht verhindern
-    const liste = info.schutz?.[pi] || [];
-    if (!liste.length) return null;
+    if (!(info.quelleOwner >= 0)) return null;                                   // W71b: Verursacher unbekannt (kein Besitzer) — nie Karten dafuer opfern
+    if (!(info.eigeneBedroht > 0)) return null;                                  // W78a: keine EIGENE Kreatur wirklich bedroht (Heilung/Buff auf Eigene, nur Gegnerische betroffen) — nie nur den Gegner retten
+    const plaetze = kostenPlaetze(engine, pi);
+    if (plaetze.length < KOSTEN) return null;
+    const bilanz = info.bilanz;                                                  // W78a: Gewinn (Eigene bewahrt, Gegnerischem Nutzen genommen) minus Verlust (Gegnerische mitgeschuetzt, Eigenem Nutzen genommen)
     const hand = engine.gs.players[pi]?.hand || [];
-    if (!hand.length) return null;
-    let wert = 0;
-    for (const c of liste) {
-      const voll = 20 + 15 * (c.level || 0) + Math.min(40, Math.round((c.hp || 0) / 10));
-      const nsGewicht = (info.effektTyp === 'destroy' || info.effektTyp === 'control') ? 1 : (info.effektTyp === 'move' ? 0.8 : 0.6);   // Zerstoeren/Kontrollverlust trifft am haertesten, Bewegen/Bounce weniger, Status/Buff/Werte noch weniger (W71b)
-      const anteil = c.nichtSchaden ? nsGewicht : (c.hp > 0 && c.amount >= c.hp ? 1 : Math.min(1, (c.amount || 0) / Math.max(1, c.hp || 1)) * 0.7);
-      wert += voll * anteil;
-    }
-    let guenstigste = 20;
+    let werte = plaetze.map(() => 20);
     if (typeof engine._cpuEstimateHandValue === 'function') {
-      try { guenstigste = Math.min(...hand.map(n => engine._cpuEstimateHandValue(pi, n))); } catch { guenstigste = 20; }
-      if (!Number.isFinite(guenstigste)) guenstigste = 20;
+      try { werte = plaetze.map(i => engine._cpuEstimateHandValue(pi, hand[i])); } catch { werte = plaetze.map(() => 20); }
+      werte = werte.map(w => (Number.isFinite(w) ? w : 20));
     }
-    const kosten = guenstigste + 10;
-    if (hand.length === 1 && wert < 80) return null;
-    return wert >= kosten * 1.25 ? { optionId: eigene } : null;
+    const kosten = werte.sort((a, b) => a - b).slice(0, KOSTEN).reduce((a, b) => a + b, 0) + 10;
+    if (plaetze.length <= KOSTEN && bilanz < 80) return null;                    // die letzte Hand nur fuer einen klar wertvollen Schutz
+    return bilanz >= kosten * 1.25 ? { optionId: 'save-all' } : null;
   },
 
   hooks: {
@@ -185,48 +224,27 @@ module.exports = {
       const key = trigger || '';
 
       // Steht fuer DIESE Karte/diesen Effekt schon ein Schild (angenommenes Angebot, ein frueherer Stapel desselben Effekts), gilt er ohne neue Frage:
-      // die Eintraege der geschuetzten Seite fallen weg. Gleiches gilt fuer Angebote anderer Kontrolleure derselben Aufloesung.
+      // die Eintraege ALLER Kreaturen (W77a: beide Seiten) fallen weg. Gleiches gilt fuer Angebote anderer Kontrolleure derselben Aufloesung.
       for (const e of entries) {
         if (e.cancelled || e.isStatusDamage || e.canBeNegated === false || !e.inst) continue;
         if (engine.moniaSchildBlockt(e.inst, e.source, e.inst.controller ?? e.inst.owner)) e.cancelled = true;
       }
-      // Pro Karte/Effekt nur EIN Angebot: angenommen (egal von wem) oder von mir abgelehnt → keine neue Frage.
+      // Pro Karte/Effekt nur EIN Angebot: angenommen (egal von wem) oder von mir abgelehnt (W77a: fuer den ganzen Effekt, beide Seiten) → keine neue Frage.
       if (angenommenesAngebot(gs, key)) return;
+      if (angebotAbgelehnt(gs, key, pi)) return;
 
-      // Must have 1+ cards in controller's hand
+      // Must have the cost in controller's hand (W77a: 2 Karten; die aufloesende Karte zaehlt nie als Material)
       const ps = gs.players[pi];
-      if (!ps || (ps.hand || []).length === 0) return;
+      if (!ps || !kostenZahlbar(engine, pi)) return;
 
       // Find all entries that affect creatures (not cancelled, not status damage)
       const promptable = entries.filter(e => !e.cancelled && !e.isStatusDamage);
       if (promptable.length === 0) return;
 
-      // Determine affected creature CONTROLLERS (gameplay-side, not
-      // raw owner — so a cross-side-placed Creature on opp's board
-      // counts under opp).
-      const affectedOwners = new Set(promptable.map(e => e.inst.controller ?? e.inst.owner));
-      // Abgelehnt (W58a): fuer diese Karte/diesen Effekt nicht noch einmal fragen — W71b: es sei denn, eine betroffene Seite wurde noch nicht abgelehnt (Einzelfenster einer Kreatur).
-      if ([...affectedOwners].every(s => angebotAbgelehnt(gs, key, pi, s))) return;
-
-      // Build prompt options (no "Cancel" — the panel has its own cancel button)
-      let options;
-      const ownerLabel = (idx) => idx === pi ? 'your' : (gs.players[idx]?.username || 'Player') + "'s";
-
-      if (affectedOwners.size === 2) {
-        options = [
-          { id: 'save-0', label: `🛡️ Save ${ownerLabel(0)} Creatures (discard 1)` },
-          { id: 'save-1', label: `🛡️ Save ${ownerLabel(1)} Creatures (discard 1)` },
-        ];
-      } else {
-        const ownerIdx = [...affectedOwners][0];
-        const singleCreature = promptable.length === 1;
-        const desc = singleCreature
-          ? `Protect ${promptable[0].inst.name}`
-          : `Save ${ownerLabel(ownerIdx)} Creatures`;
-        options = [
-          { id: `save-${ownerIdx}`, label: `🛡️ ${desc} (discard 1)` },
-        ];
-      }
+      // Build prompt options (no "Cancel" — the panel has its own cancel button). W77a: EINE Option — beide Seiten auf einmal.
+      const options = [
+        { id: 'save-all', label: `🛡️ Protect all Creatures (discard ${KOSTEN})` },
+      ];
 
       const srcEntry = promptable.find(e => e.source) || promptable[0];
       const quelleOwner = srcEntry ? (srcEntry.sourceOwner ?? srcEntry.source?.owner ?? srcEntry.source?.controller) : undefined;
@@ -236,58 +254,55 @@ module.exports = {
         type: 'optionPicker',
         title: `${hero.name} — Cool Rescue!`,
         description: trigger
-          ? `Creatures are in danger from ${trigger}! Discard 1 card to protect them.`
-          : 'Creatures are in danger! Discard 1 card to protect them.',
+          ? `Creatures are in danger from ${trigger}! Discard ${KOSTEN} cards to protect ALL Creatures.`
+          : `Creatures are in danger! Discard ${KOSTEN} cards to protect ALL Creatures.`,
         triggerCardName: trigger || undefined,
         options,
         cancellable: true,
-        // Gerrymander only redirects when 2+ options (the multi-side
-        // AOE branch where the player picks WHICH side to save).
-        // Single-option branches are auto-skipped by the engine's
-        // gerry gate (options.length >= 2 required).
-        gerrymanderEligible: true,
         cpuDispatch: CARD_NAME,   // W58a: die CPU fragt `cpuResponse` dieser Karte (Titel traegt den Heldennamen/Zusatz)
-        _moniaInfo: cpuInfo(engine, pi, promptable.map(e => ({ inst: e.inst, amount: e.amount })), quelleOwner, 'damage'),
+        costFor: CARD_NAME, costKind: 'protect',   // Kosten-Abwurf-Lernkanal (v1041): die Annahme IST die Kostenentscheidung; die CPU antwortet ueber `cpuResponse`
+        // W78a: die komplette Zielliste des Stapels (beide Seiten), Wirkung = Schaden je Eintrag (nicht negierbarer Schaden zaehlt nicht: Monia schuetzt dort nichts)
+        _moniaInfo: cpuInfo(engine, pi, promptable.map(e => ({ inst: e.inst, art: 'damage', amount: e.amount, sourceOwner: quelleOwner, canBeNegated: e.canBeNegated })), quelleOwner, 'damage'),
       });
 
-      // Abgelehnt: fuer diese Karte/diesen Effekt nicht noch einmal fragen (mehrere Stapel, Folgetreffer).
-      if (!result || !result.optionId || result.cancelled) { angebotMerken(gs, key, pi, null); return; }
+      // Abgelehnt: fuer diese Karte/diesen Effekt nicht noch einmal fragen (mehrere Stapel, Folgetreffer, andere Seite).
+      if (!result || !result.optionId || result.cancelled || result.optionId !== 'save-all') { angebotMerken(gs, key, pi, false); return; }
 
-      // Determine which owner to protect
-      const match = result.optionId.match(/^save-(\d+)$/);
-      if (!match) { angebotMerken(gs, key, pi, null); return; }
-      const protectOwner = parseInt(match[1]);
+      // W77a: die Kosten werden NACH der Annahme gewaehlt (abbrechbar: Abbruch = abgelehnt, nichts bezahlt).
+      const gewaehlt = await kostenWaehlen(engine, pi, hero.name, CARD_NAME);
+      if (!gewaehlt) { angebotMerken(gs, key, pi, false); return; }
 
-      angebotMerken(gs, key, pi, protectOwner);
+      angebotMerken(gs, key, pi, true);
 
-      // Set shield active for subsequent batches / status checks of this resolution
-      gs._moniaShieldActive = protectOwner;
+      // Set shield active for subsequent batches / status checks of this resolution (alle Kreaturen beider Seiten)
+      gs._moniaShieldActive = ALLE_SEITEN;
       gs._moniaShieldSource = trigger ? { name: trigger } : null;   // W16f (H01-08): der Schild gehört zu dieser Karte/diesem Effekt
 
-      // Cancel ONLY negatable entries for the protected controller.
+      // Cancel ONLY negatable entries — all Creatures, both sides (W77a).
       // Unnegatable damage (Acid Vial, Ida) still goes through — Monia "wastes" the effect.
-      const matchesProtect = (e) => (e.inst.controller ?? e.inst.owner) === protectOwner;
       for (const e of promptable) {
-        if (matchesProtect(e) && e.canBeNegated !== false) {
+        if (e.canBeNegated !== false) {
           e.cancelled = true;
         }
       }
 
       engine.log('monia_protect', {
         player: ps.username, hero: hero.name,
-        protectedOwner: gs.players[protectOwner]?.username,
-        creaturesProtected: promptable.filter(matchesProtect).map(e => e.inst.name),
+        protectedOwner: 'all',
+        creaturesProtected: promptable.filter(e => e.cancelled).map(e => e.inst.name),
       });
 
-      // ── Animation: Monia rams into each protected creature ──
-      // `targetOwner` uses physical side so the ram lands on the slot
-      // the player sees (cross-side-placed Creatures live on the
-      // controller's board).
-      const protectedCreatures = promptable.filter(matchesProtect);
-      for (const e of protectedCreatures) {
-        const physSide = e.inst.stolenBy != null
-          ? e.inst.owner
-          : (e.inst.controller ?? e.inst.owner);
+      // ── Animation: Monia rams into each creature she actually protects (W78a, Al 26.10.: "Monia muss nicht zu Creatures dashen, die sie nicht schützt") ──
+      // Das sind genau die Eintraege, die jetzt negiert sind UND denen der Schaden WIRKLICH etwas getan haette (Betrag > 0 nach Buff-Faktor); nicht
+      // negierbarer Schaden (laeuft trotzdem), Betrag 0 und tote/verdeckte Kreaturen bekommen keinen Rammstoss. Je Kreatur einmal — nicht je Eintrag.
+      // `targetOwner` uses physical side so the ram lands on the slot the player sees (cross-side-placed Creatures live on the controller's board).
+      const gerammt = new Set();
+      const geschuetzte = promptable.filter(e => e.cancelled && e.canBeNegated !== false && e.inst && e.inst.zone === 'support' && !e.inst.faceDown
+        && KB.schuetzt(engine, e.inst, { art: 'damage', amount: e.amount, sourceOwner: quelleOwner }));
+      for (const e of geschuetzte) {
+        if (gerammt.has(e.inst.id)) continue;
+        gerammt.add(e.inst.id);
+        const physSide = engine.physicalSide(e.inst);
         engine._broadcastEvent('play_ram_animation', {
           sourceOwner: ctx.cardOriginalOwner, sourceHeroIdx: heroIdx,
           targetOwner: physSide, targetHeroIdx: e.inst.heroIdx,
@@ -297,12 +312,10 @@ module.exports = {
         });
         await engine._delay(250);
       }
-      await engine._delay(400);
+      if (gerammt.size) await engine._delay(400);
 
-      // ── Discard 1 card (player chooses) ──
-      if (ps.hand.length > 0) {
-        await engine.actionPromptForceDiscard(pi, 1, { costFor: 'Cool Rescuer Monia', costKind: 'protect',   /* ★ v1041 Lernkanal */ title: `${hero.name} — Discard 1`, source: hero.name, selfInflicted: true });
-      }
+      // ── Discard 2 cards (W77a): als EIN Batzen gewaehlt, one by one abgeworfen; Boris darf ignorieren (die Negation gilt trotzdem) ──
+      await kostenZahlen(engine, pi, gewaehlt, CARD_NAME);
     },
 
     /**
@@ -354,45 +367,52 @@ module.exports = {
       // Karte/Effekt (Name wie im Schadenshook: Quelle des Effekts, sonst die laufende Wirkung)
       const key = quellName(ctx.source) || engine._effectSourceName() || '';
 
-      // Steht fuer DIESE Karte/diesen Effekt schon ein Schild (angenommenes Angebot, Kreatur davor), gilt er ohne neue Frage.
+      // Steht fuer DIESE Karte/diesen Effekt schon ein Schild (angenommenes Angebot, Kreatur davor — W77a: egal welche Seite), gilt er ohne neue Frage.
       if (engine.moniaSchildBlockt(creature, ctx.source, creatureSide)) { ctx.cancelled = true; return; }
-      // Pro Karte/Effekt nur EIN Angebot: angenommen (auch fuer die andere Seite) oder von mir abgelehnt → keine neue Frage.
+      // Pro Karte/Effekt nur EIN Angebot: angenommen (auch von einem anderen Kontrolleur) oder von mir abgelehnt (W77a: fuer den ganzen Effekt, beide Seiten) → keine neue Frage.
       if (angenommenesAngebot(gs, key)) return;
-      if (angebotAbgelehnt(gs, key, pi, creatureSide)) return;   // W71b: abgelehnt gilt fuer diese Seite (ein Effekt kann nacheinander beide Seiten treffen)
+      if (angebotAbgelehnt(gs, key, pi)) return;
 
       const ps = gs.players[pi];
-      if (!ps || (ps.hand || []).length === 0) return;
+      if (!ps || !kostenZahlbar(engine, pi)) return;   // W77a: 2 taugliche Handkarten
 
       const creatureName = creature.name || 'Creature';
       const ownerLabel = creatureSide === pi ? 'your' : (gs.players[creatureSide]?.username || 'Player') + "'s";
 
       const options = [
-        { id: `save-${creatureSide}`, label: `🛡️ Protect ${creatureName} (discard 1)` },
+        { id: 'save-all', label: `🛡️ Protect all Creatures (discard ${KOSTEN})` },
       ];
 
-      const quelleOwner = ctx.source && typeof ctx.source === 'object' ? (ctx.source.owner ?? ctx.source.controller) : undefined;
+      const quelleOwner = quelleBesitzer(ctx.source, ctx.sourceOwner);
+      // W78a: ERWARTETE Gesamtliste des Effekts (nicht nur die erste Kreatur): angekuendigte Liste (`kreaturenVorab`), schon gewaehlte Ziele, Flaechen-Eigenschaft/Kartentext der Quelle.
+      const erwartet = engine.absehbareKreaturen({
+        erste: creature, art: ctx.effectType, detail: ctx.detail, statusName: ctx.statusName,
+        quelle: key, quelleOwner, vorab: ctx.vorab,
+      });
       // W71b: die ausloesende Karte steht links im Panel („Triggered by"), der Text nennt sie und die Wirkung.
       const ausloeser = key || null;
       const wirkung = { destroy: 'destroy', heal: 'heal', status: 'afflict', move: 'move', control: 'take control of', buff: 'change', stats: 'change the stats of' }[ctx.effectType] || 'affect';
       const result = await engine.promptGeneric(pi, {
         type: 'optionPicker',
         title: `${hero.name} — Cool Rescue!`,
-        description: `${ownerLabel.charAt(0).toUpperCase() + ownerLabel.slice(1)} ${creatureName} is in danger${ausloeser ? ` — ${ausloeser} would ${wirkung} it` : ''}! Discard 1 card to protect it.`,
+        description: `${ownerLabel.charAt(0).toUpperCase() + ownerLabel.slice(1)} ${creatureName} is in danger${ausloeser ? ` — ${ausloeser} would ${wirkung} it` : ''}! Discard ${KOSTEN} cards to protect ALL Creatures.`,
         triggerCardName: ausloeser || undefined,
         options,
         cancellable: true,
         cpuDispatch: CARD_NAME,
-        _moniaInfo: cpuInfo(engine, pi, [{ inst: creature, amount: 0, nichtSchaden: true }], quelleOwner, ctx.effectType),
+        costFor: CARD_NAME, costKind: 'protect',   // Kosten-Abwurf-Lernkanal (v1041), siehe oben
+        _moniaInfo: cpuInfo(engine, pi, erwartet, quelleOwner, ctx.effectType),
       });
 
-      if (!result || !result.optionId || result.cancelled) { angebotMerken(gs, key, pi, null, creatureSide); return; }
+      // Abgelehnt: gilt fuer den ganzen Effekt (W77a) — keine zweite Frage fuer eine andere Kreatur / die andere Seite.
+      if (!result || !result.optionId || result.cancelled || result.optionId !== 'save-all') { angebotMerken(gs, key, pi, false); return; }
 
-      const match = result.optionId.match(/^save-(\d+)$/);
-      if (!match) { angebotMerken(gs, key, pi, null, creatureSide); return; }
-      const protectOwner = parseInt(match[1]);
+      // W77a: die Kosten werden NACH der Annahme gewaehlt (abbrechbar: Abbruch = abgelehnt, nichts bezahlt).
+      const gewaehlt = await kostenWaehlen(engine, pi, hero.name, CARD_NAME);
+      if (!gewaehlt) { angebotMerken(gs, key, pi, false); return; }
 
-      angebotMerken(gs, key, pi, protectOwner);
-      gs._moniaShieldActive = protectOwner;
+      angebotMerken(gs, key, pi, true);
+      gs._moniaShieldActive = ALLE_SEITEN;
       {   // W16f (H01-08): Quelle des geschützten Effekts merken (Schild gilt nur für sie)
         const qn = quellName(ctx.source);
         gs._moniaShieldSource = qn ? { name: qn } : null;
@@ -401,25 +421,28 @@ module.exports = {
 
       engine.log('monia_protect', {
         player: ps.username, hero: hero.name,
-        protectedCreature: creatureName, effectType: ctx.effectType,
+        protectedCreature: creatureName, effectType: ctx.effectType, protectedOwner: 'all',
       });
 
-      // Animation: Monia rams into creature. `targetOwner` is the
-      // PHYSICAL side (where the creature actually renders) so a
-      // cross-side-placed Creature gets the ram on opp's slot.
-      engine._broadcastEvent('play_ram_animation', {
-        sourceOwner: ctx.cardOriginalOwner, sourceHeroIdx: heroIdx,
-        targetOwner: creatureSide, targetHeroIdx: creature.heroIdx,
-        targetZoneSlot: creature.zoneSlot,
-        cardName: hero.name, duration: 600,
-        trailType: 'fire_stars',
-      });
-      await engine._delay(500);
-
-      // Discard 1 card (player chooses)
-      if (ps.hand.length > 0) {
-        await engine.actionPromptForceDiscard(pi, 1, { costFor: 'Cool Rescuer Monia', costKind: 'protect', title: `${hero.name} — Discard 1`, source: hero.name, selfInflicted: true });
+      // Animation (W78a: nur zu Kreaturen, die der Schutz WIRKLICH bewahrt): die ausloesende Kreatur — sofern der Effekt ihr wirklich etwas taete (Heilung bei vollen HP,
+      // Statusentfernung ohne Status … greifen nicht) — plus die ausdruecklich angekuendigten/gewaehlten Kreaturen dieses Effekts (`sicher` = 1). Vermutungen aus dem Kartentext
+      // bekommen KEINEN Rammstoss (sie werden still negiert, wenn der Effekt sie wirklich trifft). `targetOwner` is the PHYSICAL side (where the creature actually renders)
+      // so a cross-side-placed Creature gets the ram on opp's slot.
+      const rammen = erwartet.filter(x => x.sicher >= 1 && x.inst.zone === 'support' && !x.inst.faceDown && KB.schuetzt(engine, x.inst, x));
+      for (const x of rammen) {
+        engine._broadcastEvent('play_ram_animation', {
+          sourceOwner: ctx.cardOriginalOwner, sourceHeroIdx: heroIdx,
+          targetOwner: engine.physicalSide(x.inst), targetHeroIdx: x.inst.heroIdx,
+          targetZoneSlot: x.inst.zoneSlot,
+          cardName: hero.name, duration: 600,
+          trailType: 'fire_stars',
+        });
+        await engine._delay(rammen.length > 1 ? 250 : 500);
       }
+      if (rammen.length > 1) await engine._delay(400);
+
+      // Discard 2 cards (W77a): als EIN Batzen gewaehlt, one by one abgeworfen; Boris darf ignorieren (die Negation gilt trotzdem)
+      await kostenZahlen(engine, pi, gewaehlt, CARD_NAME);
     },
 
     /**

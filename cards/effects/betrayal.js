@@ -93,6 +93,7 @@ function freieZonen(engine, hs, heroIdx, pi = null, inst = null) {
     zonen = engine.beschwoerZonenFuer(pi, inst.name, { seite: hs, heroIdx, nurBasis: true, namedHeroesOnly: true })
       .map(z => ({ heroIdx, slotIdx: z.slotIdx, label: z.label, ...(z.shared ? { shared: true, stackDepth: z.stackDepth } : {}) }));
     if (engine.uebernahmeUnzulaessig(inst, pi, hs, heroIdx) === 'gigantisaur_per_hero') zonen = [];
+    if (engine.mehrzonenPlatzFehlt(inst, pi, hs, heroIdx)) zonen = [];   // Mehrzonen-Kreatur (Land Sharks, Turtle): der Nutzer-Held braucht genug freie Zonen für ALLE ihre Zonen
     return zonen;
   }
   const hero = gs.players[hs]?.heroes?.[heroIdx];
@@ -108,7 +109,7 @@ function freieZonen(engine, hs, heroIdx, pi = null, inst = null) {
  * Ist `inst` ein Ziel für `pi` bei Stufengrenze `maxLv`?
  * `mitSchutz`: auch die „kann nicht gewählt werden"-Schutzarten prüfen (Gating ohne Truth-Seeing Eye). Die Zielwahl selbst prüft die nicht — dort filtert die Engine.
  */
-function istZiel(engine, pi, inst, maxLv, mitSchutz) {
+function istZiel(engine, pi, inst, maxLv, mitSchutz, ziel = null) {
   if (!inst || inst.zone !== 'support' || inst.faceDown || inst.counters?._heldKreatur) return false;   // Held als Kreatur (Hulijing) wechselt nie die Kontrolle
   const ktrl = engine.kontrolleurVon(inst);
   if (ktrl === pi || ktrl !== engine.opponentOf(pi)) return false;      // nur Kreaturen DES Gegners („your opponent“), dem die 5 Gold gehören
@@ -119,6 +120,8 @@ function istZiel(engine, pi, inst, maxLv, mitSchutz) {
   // Kontrolle nicht wechselbar: Cardinal Beasts, „Control of this Creature cannot change", control_immune, „You can only control 1 …" des Wirkers
   if (engine.isOmniImmune(inst, pi) || engine.controlIsLocked(inst) || engine.isCreatureImmune(inst, 'control_immune')) return false;
   if (engine.uebernahmeUnzulaessig(inst, pi) === 'only_control_1') return false;
+  // Mehrzonen-Kreatur (Land Sharks, Turtle): braucht am Nutzer-Helden `ziel` (Seite `hs`, `heroIdx`) genug freie Zonen für ALLE ihre Zonen — sonst nicht wählbar.
+  if (ziel && engine.mehrzonenPlatzFehlt(inst, pi, ziel.hs, ziel.heroIdx)) return false;
   if (mitSchutz) {
     if (inst.counters?.untargetable_all || engine.isCreatureImmune(inst, 'targeting_immune')) return false;
     if (typeof engine._isSideNondamageShielded === 'function' && engine._isSideNondamageShielded(ktrl)) return false;
@@ -129,8 +132,8 @@ function istZiel(engine, pi, inst, maxLv, mitSchutz) {
   return true;
 }
 
-function ziele(engine, pi, maxLv, mitSchutz) {
-  return engine.cardInstances.filter(c => istZiel(engine, pi, c, maxLv, mitSchutz));
+function ziele(engine, pi, maxLv, mitSchutz, ziel = null) {
+  return engine.cardInstances.filter(c => istZiel(engine, pi, c, maxLv, mitSchutz, ziel));
 }
 
 /** Trägt der Wirker ein Truth-Seeing Eye (oder einen gleichwertigen „kann jedes Ziel wählen"-Effekt)? Dann zählen die Schutzarten nicht. */
@@ -145,7 +148,7 @@ function heldTauglich(engine, pi, heroIdx) {
   const hero = gs.players[hs]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
   if (!engine.canAffordGold(pi, GOLD_KOSTEN, CARD_NAME)) return false;
-  const zs = ziele(engine, pi, maxLevelFuer(engine, pi, hs, heroIdx), !ohneSchutz(engine, hs, heroIdx));
+  const zs = ziele(engine, pi, maxLevelFuer(engine, pi, hs, heroIdx), !ohneSchutz(engine, hs, heroIdx), { hs, heroIdx });
   if (zs.length === 0) return false;
   // keine freie Zone für das Ziel (auch Alice-Teilung und Gigantisaur-Riegel je Ziel)
   return zs.some(t => freieZonen(engine, hs, heroIdx, pi, t).length > 0);
@@ -275,7 +278,7 @@ module.exports = {
           cancellable: false,
           noSpellCancel: true,               // nie zurück auf die Hand: es ist bezahlt
           dimUnmetCondition: true,           // zu hohe Stufe / nicht übernehmbar: ausgegraut statt weg
-          condition: (t) => istZiel(engine, pi, t.cardInstance, maxLv, false),
+          condition: (t) => istZiel(engine, pi, t.cardInstance, maxLv, false, { hs, heroIdx }),
         });
 
         // Kein Ziel mehr / in der Zielwahl negiert: die Stehl-Animation (läuft nur, wenn `spellVisual` sie nicht schon gespielt hat).
@@ -290,7 +293,7 @@ module.exports = {
 
         // ── Zone: eine freie Zone DES NUTZERS (nicht abbrechbar) ──
         let zone = null;
-        if (inst && istZiel(engine, pi, inst, maxLv, false)) {
+        if (inst && istZiel(engine, pi, inst, maxLv, false, { hs, heroIdx })) {
           const frei = freieZonen(engine, hs, heroIdx, pi, inst);
           zone = frei[0] || null;
           if (frei.length > 1) {
@@ -321,7 +324,7 @@ module.exports = {
         const live = inst && engine.cardInstances.find(c => c.id === inst.id && c.zone === 'support');
         if (!live || engine.kontrolleurVon(live) !== zahlung.empf) { engine.log('betrayal_fizzle', { player: ps.username, creature: name, reason: 'gone' }); engine.sync(); return; }
         // Eine Umleitung der Zielwahl (Challenge, Anti-Magnet …) darf nicht auf eine Kreatur führen, die der Text nicht erlaubt (zu hohe Stufe, Cardinal …): Kosten sind bezahlt, die Übernahme entfällt.
-        if (!zone || !istZiel(engine, pi, live, maxLv, false)) { engine.log('betrayal_fizzle', { player: ps.username, creature: name, reason: zone ? 'illegal' : 'no_zone' }); engine.sync(); return; }
+        if (!zone || !istZiel(engine, pi, live, maxLv, false, { hs, heroIdx })) { engine.log('betrayal_fizzle', { player: ps.username, creature: name, reason: zone ? 'illegal' : 'no_zone' }); engine.sync(); return; }
         // Platz noch frei? (sonst neu bestimmen)
         const noch = freieZonen(engine, hs, heroIdx, pi, live);
         if (!noch.some(z => z.heroIdx === zone.heroIdx && z.slotIdx === zone.slotIdx)) {

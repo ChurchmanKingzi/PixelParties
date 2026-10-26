@@ -283,7 +283,9 @@ function makeCrusaderArtifact(spec) {
       // ★ W39a: die Quelle des Schlags ist der TRÄGER (Held), nicht die Ausrüstungs-Instanz in der Support Zone — sonst hält jeder Leser den Treffer für eine Kreatur-Quelle
       // (Firewall/Toxic Trap/Mountain Tear River trafen „Crusader's …" statt Cecilia; Explosivo's Sword, Big Gwen, Skullmael, Bazooka, Wavilion übersahen den Heldentreffer).
       const schlagQuelle = { name: cardName, owner: pi, controller: pi, heroOwner: feld, heroIdx };
-      const target = await ctx.promptDamageTarget({
+      // ★ R-12 (Al 26.10.): wie bei Broghan & Co. (W36a) — wird der Schlag im Zielfenster NEGIERT (Surprise wie Glass Wall, Invisibility Cloak, Schutz-/Redirect-Fenster), ist der Effekt
+      // für die Runde verbraucht (Einmal-Stempel bleibt, Rückgabe `true`) und zählt als gespielte Attack; ein Abbruch durch den Spieler bleibt ein Abbruch.
+      const { target, negiert } = await engine.heldenEffektZielwahl(ctx, {
         attackerSourceOverride: schlagQuelle,
         side: 'any',
         types: ['hero', 'creature'],
@@ -295,6 +297,11 @@ function makeCrusaderArtifact(spec) {
         confirmClass: 'btn-danger',
         cancellable: true,
       });
+      if (negiert) {
+        await engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner: feld, name: cardName });
+        engine.sync();
+        return true;
+      }
       if (!target) return false;   // Abbruch — Zug bleibt unverbraucht
 
       // Zustand VOR dem Schaden festhalten, damit die eigene Klausel

@@ -175,6 +175,8 @@ async function waehleBeide(engine, pi, kandidaten) {
 module.exports = {
   activeIn: ['support'],
   creatureEffect: true,
+  // Als Ruling (Al 26.10., Blinded): der Effekt wählt Kreaturen aufs Brett (deren Effekte er nutzt) — ein geblendeter Träger/Wirtsheld kann ihn nicht aktivieren.
+  requiresTarget: true,
 
   cpuMeta: { dealsDamage: true },
 

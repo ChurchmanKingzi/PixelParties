@@ -34,6 +34,15 @@
 //      of whether any chain-summon actually
 //      landed (the rule's "Immediately end your
 //      turn afterwards" reads as unconditional).
+//
+//  Als Ruling (Al 26.10.): „Nicht korrekt, auch bei 0
+//  endet der Zug" — „end your turn" hängt NICHT an
+//  der Anzahl der beschworenen Karten: wählt der
+//  Spieler 0 Karten (oder bricht die Galerie ab,
+//  oder keine Karte ist beschwörbar, oder nichts
+//  landet), endet der Zug trotzdem. Er endet immer,
+//  sobald der Effekt der Tengu ausgelöst wurde
+//  (nicht negiert).
 // ═══════════════════════════════════════════
 
 const {
@@ -180,14 +189,12 @@ module.exports = {
       const allDiscardNames = getDifferentRebelliokaiInDiscard(ps, engine);
       const discardNames = allDiscardNames.filter(n => _eligibleDestinations(engine, pi, n).length > 0);
       if (discardNames.length === 0) {
-        // No eligible summons — the chain-summon clause fizzles
-        // entirely. Per the rules text, the "Immediately end your
-        // turn afterwards" clause only triggers off the chain-summon
-        // happening. Skip the turn-end and just log the fizzle.
+        // No eligible summons. Als Ruling (Al 26.10.): „auch bei 0 endet der Zug" — der Zug endet trotzdem.
         engine.log('rebelliokai_terror_tengu_fizzle', {
           player: ps.username, reason: 'no_eligible_discard_summons',
         });
-        return engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
+        await engine.advanceToPhase(pi, PHASES.END);
+        return;
       }
 
       // Cap the multi-pick at min(3, eligible-creature-count, total
@@ -204,7 +211,8 @@ module.exports = {
         engine.log('rebelliokai_terror_tengu_fizzle', {
           player: ps.username, reason: 'no_free_summon_zones',
         });
-        return engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
+        await engine.advanceToPhase(pi, PHASES.END);   // Als Ruling (Al 26.10.): auch ohne Beschwörung endet der Zug
+        return;
       }
 
       const cardDB = engine._getCardDB();
@@ -299,19 +307,12 @@ module.exports = {
         player:     ps.username,
         summoned:   chosen,
         landed:     summonsLanded,
-        endingTurn: summonsLanded > 0,
+        endingTurn: true,
       });
 
-      // Conditional turn-end. The "Immediately end your turn
-      // afterwards" clause only triggers off a chain-summon actually
-      // happening — if the player cancelled the gallery, picked zero
-      // creatures, or every chosen summon failed mid-flight (board
-      // filled up, etc.), the turn proceeds normally.
-      if (summonsLanded > 0) {
-        await engine.advanceToPhase(pi, PHASES.END);
-      } else {
-        await engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: nichts gewählt/gelandet → Blob stumm
-      }
+      // Turn-end — UNBEDINGT. Als Ruling (Al 26.10.): „Nicht korrekt, auch bei 0 endet der Zug" — auch wenn der Spieler die Galerie abbrach,
+      // 0 Karten wählte oder jede gewählte Beschwörung scheiterte (Brett voll …), endet der Zug.
+      await engine.advanceToPhase(pi, PHASES.END);
     },
   },
 };

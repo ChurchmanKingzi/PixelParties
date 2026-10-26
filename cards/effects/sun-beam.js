@@ -9,15 +9,22 @@
 //  Support Zones.
 //
 //  Legal targets: anything in a Support, Ability,
-//  Permanent, or Area zone — EXCEPT Pollution
-//  Tokens (which are conceptually the spell's own
-//  ammunition) and face-down Surprise cards.
+//  Permanent, Area or Surprise zone.
+//
+//  Als Ruling (Al 26.10., „Diese Anwählbar machen; dasselbe gilt
+//  für andere ‚any card that is not a Hero'-Effekte wie The
+//  Yeeting"): Pollution Tokens und VERDECKTE Surprises sind
+//  wählbar („cards on the board that aren't Heroes"). Früher
+//  ausgeschlossen (Tokens als „Munition" der Karte). Verdeckte
+//  Karten erscheinen im Zielwähler mit maskiertem Namen
+//  (`potionTargetingFuer`, server.js); ein gewählter Token zählt
+//  wie jede Karte (je Ziel 1 Pollution Token in eine freie eigene
+//  Zone, wie bisher).
 // ═══════════════════════════════════════════
 
 const { placePollutionTokens, countFreeZones } = require('./_pollution-shared');
 const { areaTargetId, supportAbilityZiel } = require('./_targeting-shared');
 
-const POLLUTION_TOKEN = 'Pollution Token';
 const SUN_BEAM_MAX = 3;
 
 module.exports = {
@@ -53,10 +60,9 @@ module.exports = {
       let ownSupportAvailable = 0;
       for (const inst of engine.cardInstances) {
         if (seenInstIds.has(inst.id)) continue;
-        if (inst.faceDown) continue;
         if (inst.zone === 'support' && engine.zaehltAlsHeld && engine.zaehltAlsHeld(inst)) continue;   // W79 (White Sacrificial Bull): zählt auch als Hero
         if (inst.counters?.immovable) continue; // can't be destroyed → don't offer
-        if (inst.name === POLLUTION_TOKEN) continue; // explicit exclusion
+        // Als Ruling (Al 26.10.): Pollution Tokens und verdeckte Surprises sind wählbar (früher: `inst.faceDown` / Token ausgeschlossen).
 
         if (inst.zone === 'support') {
           // 25.10.2026 (Xal-Runde 4): eine Ability in einer Support Zone ist eine ABILITY — ein Stapel ist EIN Ziel, getroffen wird seine oberste Kopie
@@ -87,8 +93,12 @@ module.exports = {
           // Only the top card of an ability stack is targetable.
           const slot = gs.players[inst.owner]?.abilityZones?.[inst.heroIdx]?.[inst.zoneSlot] || [];
           if (slot.length > 0 && slot[slot.length - 1] !== inst.name) continue;
+          // Ein Stapel gleichnamiger Karten (Ability Lv 2/3) hat mehrere Instanzen im selben Platz: EIN Ziel je Stapel (eindeutige ID), und zwar die letzte (= oberste) Kopie — wie `supportAbilitySpitze`.
+          const _abId = `ability-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`;
+          const _abErst = targets.find(x => x.id === _abId);
+          if (_abErst) { _abErst.cardInstance = inst; _abErst._cardInstance = inst; continue; }
           targets.push({
-            id: `ability-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
+            id: _abId,
             type: 'ability', owner: inst.owner, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
             cardName: inst.name, cardInstance: inst, _cardInstance: inst,
           });
@@ -110,6 +120,14 @@ module.exports = {
           targets.push({
             id: areaTargetId(inst.owner, stapelPlatz),
             type: 'area', owner: inst.owner, heroIdx: -1,
+            cardName: inst.name, cardInstance: inst, _cardInstance: inst,
+          });
+        } else if (inst.zone === 'surprise') {
+          // Als Ruling (Al 26.10.): auch VERDECKTE Surprises (Client-ID wie die übrigen „not a Hero"-Sammler: `surprise-<Seite>-<Held>`); der Name wird dem
+          // Wähler maskiert (`potionTargetingFuer`). Eine Surprise belegt keine Support Zone — räumt also keinen Platz für ein Token frei.
+          targets.push({
+            id: `surprise-${inst.owner}-${inst.heroIdx}`,
+            type: 'surprise', owner: inst.owner, heroIdx: inst.heroIdx,
             cardName: inst.name, cardInstance: inst, _cardInstance: inst,
           });
         }
@@ -191,6 +209,10 @@ module.exports = {
           animEvent.heroIdx = t.heroIdx;
           animEvent.zoneSlot = t.slotIdx;
           animEvent.zoneType = 'ability';
+        } else if (t.type === 'surprise') {
+          animEvent.heroIdx = t.heroIdx;
+          animEvent.zoneSlot = -1;
+          animEvent.zoneType = 'surprise';
         } else {
           animEvent.heroIdx = t.heroIdx;
           animEvent.zoneSlot = t.slotIdx ?? -1;
@@ -205,7 +227,7 @@ module.exports = {
       // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer. Zaehlt die
       // GEWAEHLTEN Ziele — bei genau einem bleibt es eine
       // Einzelzerstoerung und der Dog darf feuern.
-      engine.beginDestroyScope(picked.length);
+      engine.beginDestroyScope(picked.length, picked.map(t => t._cardInstance));   // W78: die gewaehlten Ziele sind todgeweiht (Infallible Oracle Pythia darf keines opfern)
       try {
         for (const t of picked) {
           const inst = t._cardInstance;

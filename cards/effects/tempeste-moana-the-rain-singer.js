@@ -135,7 +135,7 @@ module.exports = {
     const target = await ctx.promptDamageTarget({
       side: 'any',
       types: ['hero', 'creature'],
-      damageType: 'other',
+      damageType: 'hero',   // Schaden aus einem aktivierbaren HELDEN-Effekt (CARD_API „Schadenstyp 'hero'", v905) — nicht 'other' (öffnet sonst weder Surprise-Fenster noch Zielschutz-Prüfung)
       baseDamage: schaden,
       title: CARD_NAME,
       description: `Deal ${schaden} damage (50 × ${n} Equipment/Attachment Creature${n === 1 ? '' : 's'}) to any target.`,
@@ -154,11 +154,11 @@ module.exports = {
     await engine._delay(1100);
 
     if (target.type === 'hero') {
-      if (tgtHero && tgtHero.hp > 0) await ctx.dealDamage(tgtHero, schaden, 'other');
+      if (tgtHero && tgtHero.hp > 0) await ctx.dealDamage(tgtHero, schaden, 'hero');
     } else if (target.cardInstance) {
       await engine.actionDealCreatureDamage(
         { name: CARD_NAME, owner: pi, heroIdx },
-        target.cardInstance, schaden, 'other',
+        target.cardInstance, schaden, 'hero',
         { sourceOwner: pi, canBeNegated: true },
       );
     }

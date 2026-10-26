@@ -27,6 +27,7 @@ module.exports = {
   canSummon: gigantisaursCanSummon,
 
   creatureEffect: true,
+  requiresTarget: true,   // Zielwahl-Effekt: Blinded sperrt ihn (siehe _hooks.js / getActivatableCreatures)
 
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;

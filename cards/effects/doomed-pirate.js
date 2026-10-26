@@ -35,6 +35,9 @@ const FLUG_MS = 900;          // Länge der Animation (deckt sich mit `doomed_pi
 const FLUG_WARTE_MS = 640;    // bis zum Aufprall (inkl. 100 ms Einbau-Versatz des Clients), dann greift die Sperre
 
 module.exports = {
+  // Die Sperre ist eine Boardbindung (s. Kopf): fällt der Pirat gefroren/betäubt/negiert vom Brett, MUSS `onCardLeaveZone` trotzdem laufen,
+  // sonst bliebe die ATK des Helden für immer auf 0 stehen (der Hook-Filter schweigt bei ruhenden Kreaturen).
+  bypassStatusFilter: true,
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],

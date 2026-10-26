@@ -124,7 +124,8 @@ module.exports = {
       await engine._delay(700);
       const wirker = Number.isInteger(ctx.card.originalOwner) ? ctx.card.originalOwner : ctx.card.owner;
       const quelle = { name: CARD_NAME, owner: wirker, controller: wirker, heroIdx: -1 };
-      await engine.actionDealDamage(quelle, host, schaden, 'decay_spell', { _skipReactionCheck: true });
+      // `festesZiel`: „that Hero" — der Wirt steht durch die Karte fest (Als Ruling 9.10.); Submerged/Dive Down schlucken den Tick nicht.
+      await engine.actionDealDamage(quelle, host, schaden, 'decay_spell', { _skipReactionCheck: true, festesZiel: true });
       engine.log('spell_shackle_tick', { hero: host.name, schools: anzahl, damage: schaden });
       engine.sync();
     },

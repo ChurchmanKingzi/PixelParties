@@ -343,6 +343,13 @@ async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) 
   // Encounter, Divine Gift of the Deepsea …) ist ein Effekt auf die Kreatur → Schutzfenster `beforeCreatureAffected` ('move', Feinart 'bounce'), NACH der Immunität, VOR der
   // ersten Änderung. Kein Fenster: das eigene Opfer/Tribut als Kosten (`opts.kosten` / `isSacrifice`, z. B. Dark Deepsea God) und Rückgabe der Kreatur durch ihren eigenen Text
   // (`opts.selbst`, Wendy, Moonlight Butterfly, Creepy Villager). Wird der Effekt negiert, bleibt die Kreatur stehen (`{ returned: false, negated: true }`).
+  // B2/E9: Cosmic Malfunction — „moved from your side of the board to anywhere else by an opponent's card or effect" gilt auch fürs Zurücknehmen auf die Hand (Racket Arrow, Bounce Trap, Deepsea-Karten …).
+  // Wie im Zerstörungsweg (`actionDestroyCard`) vor dem Schutzfenster darunter; der Helfer prüft Cosmic-Depths-Kreatur, Fremdquelle und Erste-Runden-Schutz selbst. Nicht bei Kosten/Opfer/eigenem Text.
+  if (typeof opts.sourceOwner === 'number' && !opts.kosten && !opts.isSacrifice && !opts.selbst
+      && await engine._checkCdMovementHandReactions(inst, { name: sourceName, owner: opts.sourceOwner }, 'move')) {
+    engine.log('bounce_blocked', { card: inst.name, by: sourceName, reason: 'cosmic-malfunction' });
+    return { returned: false, negated: true };
+  }
   if (!opts.kosten && !opts.isSacrifice && !opts.selbst && !opts._skipAffectedWindow) {
     const _erlaubt = await engine.kreaturBetroffen(inst, 'move', { name: sourceName || '', ...(typeof opts.sourceOwner === 'number' ? { owner: opts.sourceOwner } : {}) },
       { sourceOwner: opts.sourceOwner, detail: 'bounce' });

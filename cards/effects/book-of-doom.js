@@ -12,6 +12,9 @@ const CARD_NAME = 'Book of Doom';
 const DAMAGE_PER_TARGET = 50;
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   isTargetingArtifact: true,
   manualGoldCost: true,
   goldPerTarget: true,   // G1 (A09-11): Grundpreis gilt je Ziel - unter der Goldsperre nicht aktivierbar (server.js doUseArtifactEffect)

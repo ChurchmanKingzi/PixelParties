@@ -8201,6 +8201,13 @@ const TARGET_BLOCKER_BADGES = {
       + 'while its controller has another Hero that can be chosen by them. Can still be hit '
       + 'by effects that do not choose. Until the end of its controller\'s next turn.',
   },
+  // Perfect Disguise (Hero): Zielschutz als Eintrag am Helden (Regel im Skript, `blocksTargeting`)
+  'Perfect Disguise': {
+    icon: '🎭',
+    tooltip: 'Disguised: Cannot be chosen by the opponent\'s cards or effects during their next turn, '
+      + 'unless it is the only legal target of that card or effect on this side. Can still be hit '
+      + 'by effects that do not choose.',
+  },
 };
 
 // ★★ v1198 (Als Vorgabe 18.9.): „Sie muss einen GROSSEN Marker tragen."

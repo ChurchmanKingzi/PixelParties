@@ -70,6 +70,9 @@ function countAllValidTargets(engine) {
 }
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
   // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
@@ -160,6 +163,7 @@ module.exports = {
       // Saeulen fallen weiter nacheinander.
       await engine.beginAoeStrike(selected.length, {
         creatures: selected.filter(t => t.type !== 'hero').map(t => t.cardInstance).filter(Boolean),
+        heroes: selected.filter(t => t.type === 'hero'),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
         source: dmgSource, amount: PER_TARGET_DAMAGE,
         type: 'destruction_spell', sourceOwner: pi,
       });

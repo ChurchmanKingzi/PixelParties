@@ -13,6 +13,15 @@
 //  Cannot be played if the player already dealt
 //  damage to opponent's targets this turn.
 //
+//  Als Ruling (Al 26.10.): die Sperre gilt auch für True
+//  Damage / „cannot be reduced or negated"-Schaden (Acid
+//  Vial, Rockfall …; `actionDealTrueDamage`). Karten, die
+//  dann NUR Schaden an gegnerischen Zielen anrichten
+//  könnten, sind unspielbar (grau, kein Verbrauch) —
+//  Skript-Marke `blockedByDamageLock` (Sperr-Stutzen
+//  `engine._cardBlockedBySearchLock`); gemischte Karten
+//  bleiben spielbar, ihr Schaden an Gegnerzielen ist 0.
+//
 //  Uses generic ctx.aoeHit() for target collection,
 //  Ida override, animations, and damage.
 // ═══════════════════════════════════════════
@@ -21,6 +30,9 @@ module.exports = {
   // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
   // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; `engine.ersterZugGeschuetzt`).
   blockedByFirstTurnProtection: true,
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Am besten gleich die Karten ganz sperren statt den Schaden fizzeln zu lassen"): die Karte richtet NUR Schaden an Zielen des Gegners an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.

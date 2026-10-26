@@ -552,9 +552,14 @@ function instrumentiere(engine) {
         // die abgeworfene Karte (`cardName`); ein reiner JA/NEIN-Prompt
         // („eine Karte abwerfen, um …?") liefert nur die Zusage. Beide
         // sind dieselbe Entscheidung und gehoeren in denselben Kanal.
+        // ★ W77b (Cute Hydra, Super Fan & Co.): ein STAPEL-Abwurf (`handPick` mit `selectedCards: [{ handIndex, cardName }]`, minSelect >= 2) ist dieselbe Entscheidung —
+        // vorher las diese Zeile ihn als „nicht gezahlt" (keine `cardName`/`confirmed`-Antwort) und der Kanal sah nur Verweigerungen.
+        const stapel = (response && !response.cancelled && Array.isArray(response.selectedCards))
+          ? response.selectedCards.map(g => (g && typeof g === 'object') ? g.cardName : g).filter(n => typeof n === 'string')
+          : [];
         const zusage = response === true
           || !!(response && !response.cancelled
-            && (response.cardName != null || response.confirmed === true));
+            && (response.cardName != null || response.confirmed === true || stapel.length > 0));
         const gezahlt = !!zusage;
         const dp = require('./_deck-profile');
         if (!engine._costDiscardLog) engine._costDiscardLog = [];
@@ -563,7 +568,9 @@ function instrumentiere(engine) {
           t: engine.gs?.turn || 0,
           c: costFor,
           paid: gezahlt ? 1 : 0,
-          card: (gezahlt && response && response.cardName) ? response.cardName : null,
+          card: (gezahlt && response && response.cardName) ? response.cardName : (gezahlt && stapel.length ? stapel[0] : null),
+          // W77b: bei einem Stapel-Abwurf ALLE gezahlten Karten (der Trainer kann je Karte lernen, was nie/nur unter Bedingungen abgeworfen werden soll).
+          ...(gezahlt && stapel.length > 1 ? { cards: stapel } : {}),
           // ★ v1038: Die Sorte der Gegenleistung kommt vom Prompt
           // (`costKind`), damit die Lage-Tags zur Frage passen —
           // Goldstand beim Goldeffekt, gegnerische Restpunkte beim
@@ -610,6 +617,7 @@ function instrumentiere(engine) {
   // hierher.
   const origTarget = engine.promptEffectTarget.bind(engine);
   const huelleTarget = async function (playerIdx, validTargets, config = {}) {
+    if (config && config._waehlbarProbe) return origTarget(playerIdx, validTargets, config);   // R-12: Trockenlauf (Future Tech Fists) — keine Frage, kein Protokolleintrag
     if (engine._inMctsSim) { zaehle(engine, 'roll'); return origTarget(playerIdx, validTargets, config); }
     zaehle(engine, 'tgt');
     let angebot = null, karte = null, areaKontext = null;

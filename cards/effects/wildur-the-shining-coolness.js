@@ -58,9 +58,7 @@ const summonFromStack = hipdall._summonFromStack;
 function _stackExists(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return false;
-  if (Array.isArray(ps.coolnessStack) && ps.coolnessStack.length > 0) return true;
-  const areaList = engine.gs.areaZones?.[pi] || [];
-  return areaList.includes('Wowhalla, the Hall of the Cool');
+  return engine.hasCoolnessStack(pi);   // Als Ruling (Al 26.10.): derselbe Begriff wie bei allen Coolness-Karten (Stack nicht leer ODER eigene Wowhalla liegt)
 }
 
 /**

@@ -41,12 +41,24 @@ const CARD_NAME = 'Iterative Testing';
 const MAX_SENDS = 2;
 const MA_SCHWELLE = 2;
 
+/**
+ * Die Hand OHNE die Iterative Testing, die gerade gespielt wird (Konvention v1405: die auflösende Karte bleibt zwar bis zum Schluss in `ps.hand`
+ * liegen, ist aber keine „card from your hand" mehr — sonst bietet sich der Zauber selbst als Vorlage an und ist allein auf der Hand „spielbar").
+ * Beim Auflösen kennt die Engine die Karte (`_resolvingCard`); in der Spielbarkeitsprüfung (Hand-Ausgrauen) nimmt man eine Kopie heraus.
+ */
+function handOhneSelbst(engine, ps) {
+  const hand = ps?.hand || [];
+  if (ps?._resolvingCard?.name === CARD_NAME) return engine?._handOhneAufloesendeKarte ? engine._handOhneAufloesendeKarte(ps) : hand.slice();
+  const i = hand.indexOf(CARD_NAME);
+  return i < 0 ? hand.slice() : hand.filter((_, k) => k !== i);
+}
+
 /** Handkarten, von denen mindestens eine Kopie im Deck liegt. */
-function brauchbareHandkarten(gs, pi) {
+function brauchbareHandkarten(gs, pi, engine) {
   const ps = gs.players[pi];
   if (!ps) return [];
   const imDeck = new Set(ps.mainDeck || []);
-  return [...new Set(ps.hand || [])].filter(n => imDeck.has(n)
+  return [...new Set(handOhneSelbst(engine, ps))].filter(n => imDeck.has(n)
     || (ps.mainDeck || []).some(k => baseCardName(k) === baseCardName(n)));
 }
 
@@ -67,8 +79,8 @@ module.exports = {
   cpuResponse: (engine, promptType, promptData) => cpuAnzahlHoechstzahl(promptData),
 
   // Ohne Handkarte mit Deck-Kopie bewirkt der Zauber nichts.
-  spellPlayCondition(gs, pi) {
-    return brauchbareHandkarten(gs, pi).length > 0;
+  spellPlayCondition(gs, pi, engine) {
+    return brauchbareHandkarten(gs, pi, engine).length > 0;
   },
 
   // ③ Zusatzaktion ab Magic Arts 2 — je Held ausgewertet.
@@ -90,7 +102,7 @@ module.exports = {
         return;
       }
 
-      const kandidaten = brauchbareHandkarten(gs, pi);
+      const kandidaten = brauchbareHandkarten(gs, pi, engine);
       if (kandidaten.length === 0) { gs._spellCancelled = true; return; }
 
       const name = await waehleAusNamen(engine, pi, kandidaten, {

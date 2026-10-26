@@ -296,7 +296,8 @@ module.exports = {
      */
     onDiscard: async (ctx) => {
       if (ctx.playerIdx !== ctx.cardOwner) return;
-      const name = ctx.cardName || ctx.discardedCardName;
+      // `ctx.cardName` ist im Listener der Name der LAUSCHENDEN Karte (Time selbst, wird unten ausgefiltert) — der abgeworfene steht in `discardedCardName`.
+      const name = ctx.discardedCardName || ctx.cardName;
       if (!name) return;
       queueTimeRescue(ctx._engine, ctx.players[ctx.cardOwner], ctx.cardOwner, [name]);
     },
@@ -310,6 +311,9 @@ module.exports = {
     onCreatureDeath: async (ctx) => {
       const c = ctx.creature;
       if (!c) return;
+      // D1 (Baustein-Phase): wird der Kadaver GELOESCHT (Ghazma, Ankhota, Root, Vacarn, Bonegrinder …), beansprucht oder gerettet, kommt er nie in die Ablage —
+      // `ziel` nennt, wohin die Karte ging (fehlt es, wie bisher annehmen: Ablage). Sonst bot Time eine aeltere gleichnamige Karte aus der Ablage an.
+      if (c.ziel !== undefined && c.ziel !== 'discard') return;
       const corpseOwner = c.originalOwner ?? c.owner;
       if (corpseOwner !== ctx.cardOwner) return;
       const name = c.name || c.cardName;

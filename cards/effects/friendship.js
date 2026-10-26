@@ -6,9 +6,13 @@
 //  turn for Support Magic Spells. Hero-restricted
 //  (only the hero with Friendship can use it).
 //
-//  LEVEL 1: Can only be used if no Support Spells
-//  were used this turn. Using it applies a global
-//  "no more Support Spells" debuff for the turn.
+//  LEVEL 1: Using it (= a Support Spell actually
+//  played AS the additional Action) applies a global
+//  "no more Support Spells" debuff for the rest of the
+//  turn. Als Ruling (Al, Welle 2): Die Sperre greift NUR
+//  ab dem Einsatz der Zusatzaktion — ein vorher normal
+//  gespielter Support-Spell macht Friendship nicht
+//  unbenutzbar (keine rückwirkende Sperre).
 //
 //  LEVEL 2: No restriction. When this hero uses
 //  a Support Spell, draw 1 card (HOPT per hero).
@@ -52,12 +56,10 @@ function buildFilter(engine, pi, heroIdx, feld = pi) {
     // die Zauber-Sperren gehoeren dem Kontrolleur (`pi`).
     const hps = engine.gs.players[feld] || ps;
 
-    // Lv1 restriction: no Support Spells used yet this turn
-    const level = getFriendshipLevel(engine, feld, heroIdx);
-    if (level <= 1) {
-      if (ps.supportSpellUsedThisTurn || ps.supportSpellLocked) return false;
-    }
-
+    // Lv1: „If you do, you cannot use any other Support Magic Spells this turn“ —
+    // die Sperre (`supportSpellLocked`) setzt server.js erst, wenn die Zusatzaktion
+    // tatsächlich für einen Support-Spell verbraucht wurde (Ruling Al, Welle 2:
+    // kein rückwirkendes „vorher schon ein Support-Spell“).
     // Global lock check
     if (ps.supportSpellLocked) return false;
 

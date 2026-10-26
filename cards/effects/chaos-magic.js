@@ -151,10 +151,17 @@ module.exports = {
           return;   // ★ W15b (Al, C1): ein FIZZELNDER Zauber zählt nicht als „resolved" — nicht in der Liste, ein späteres Chaos Magic kann ihn wieder aufdecken.
         }
         // Record the copied Spell so a later Chaos Magic skips it (nur, wenn er wirklich aufgelöst wird; s. o.).
-        if (!resolved.includes(found)) resolved.push(found);
+        const _warSchonAufgeloest = resolved.includes(found);
+        if (!_warSchonAufgeloest) resolved.push(found);
         gs._spellDamageLog = [];
         gs._spellExcludeTargets = [];
         const subInst = engine._trackCard(found, pi, 'hand', heroIdx, -1);
+        // Die Zielwahl des gefundenen Zaubers ist abbrechbar und setzt dabei `gs._spellCancelled` — das würde die ÄUSSERE Karte (Chaos Magic)
+        // zurück auf die Hand legen, obwohl Mischen, Aufdecken und Löschen schon geschehen sind. Abbruch dort = der Zauber fizzelt (W15b):
+        // Chaos Magic ist beendet, der Zauber zählt nicht als aufgelöst.
+        const _cancelVorher = gs._spellCancelled;
+        gs._spellCancelled = false;
+        let _subAbgebrochen = false;
         try {
           const _kosten = loadCardEffect(found)?.payActivationCost;
           if (typeof _kosten === 'function') await _kosten.call(loadCardEffect(found), engine._createContext(subInst, {}));
@@ -163,6 +170,19 @@ module.exports = {
             cardName: found, zone: 'hand', heroIdx,
             _skipReactionCheck: true,
           });
+          _subAbgebrochen = !!gs._spellCancelled && !gs._spellNegatedByEffect;
+          gs._spellCancelled = _cancelVorher;
+          if (_subAbgebrochen) {
+            if (!_warSchonAufgeloest) { const _ri = resolved.lastIndexOf(found); if (_ri >= 0) resolved.splice(_ri, 1); }
+            engine.log('chaos_magic_fizzle', { player: ps.username, reason: 'found_spell_cancelled', spell: found });
+            await engine.zeigeFizzle(found, { playerIdx: pi, grund: 'cancelled' });
+            delete gs._spellDamageLog;
+            delete gs._spellExcludeTargets;
+            delete gs._bartasSecondCast;
+            engine._untrackCard(subInst.id);
+            engine.sync();
+            return;
+          }
           // ★ Z7 (S01-14): Chaos Magic IST jetzt der gefundene Zauber — „Einmal pro Spiel" (Divine Gift …)
           // wird verbraucht, wie bei jedem Sofort-Guss (`_castSpellImmediately`).
           {

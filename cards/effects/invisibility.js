@@ -26,6 +26,15 @@
 //    the protection collapses and all are
 //    choosable).
 //  • Anti Magic gate at cast time (Lv 1 Spell).
+//  • Als Ruling (Al 26.10.): auch ein Zauber, der als
+//    ANHÄNGSEL an einen gegnerischen Helden gelegt wird
+//    (Curse, Polymorph, Overheal Shock …), zählt als
+//    „chooses a target your opponent controls with a
+//    Spell" — wirkt der unsichtbare Held ihn, endet
+//    Invisibility. `pickAttachmentHost` trägt den
+//    gewählten Wirt ins Zielprotokoll des Zaubers
+//    (`gs._spellDamageLog`) ein, Trigger (2) liest es.
+//    Zauber eines ANDEREN eigenen Helden lassen sie liegen.
 //  • Self-discard triggers:
 //      (1) `onAttackDeclare` — Invisibility-Hero
 //          attacks any opp target.

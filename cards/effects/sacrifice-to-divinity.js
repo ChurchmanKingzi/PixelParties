@@ -38,6 +38,7 @@ const DIVINITY  = 'Divinity';
 function opferSpec() {
   return {
     minCount: 1,
+    maxCount: 1,   // „Sacrifice a Creature" — genau eine (ohne `maxCount` ließ der Picker beliebig viele Opfer zu)
     title: `${CARD_NAME} — Sacrifice`,
     description: 'Sacrifice 1 of your Creatures to play Sacrifice to Divinity.',
     confirmLabel: '🗡️ Sacrifice & Cast!',

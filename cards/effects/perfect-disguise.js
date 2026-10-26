@@ -7,29 +7,37 @@
 //  next turn, except if it is your only legal
 //  target.
 //
+//  ── Regel (Entscheidung Al) ───────────────────────────────────
+//  „Except if it is your only legal target" = das EINZIGE LEGALE ZIEL
+//  der gegnerischen Karte AUF DER EIGENEN SEITE. Massgeblich ist die
+//  Liste der legalen Ziele DIESER Quelle (`info.allTargets`):
+//    · kann sie NUR Heroes waehlen: der verkleidete Held ist waehlbar,
+//      wenn er der letzte eigene (waehlbare) Held ist;
+//    · kann sie Heroes ODER Creatures waehlen: er muss das einzige
+//      Ziel ueberhaupt sein (eine Kreatur schuetzt den Helden, ein
+//      Held schuetzt die Kreatur);
+//    · kann sie nur Frozen Heroes waehlen: es braucht einen zweiten
+//      Frozen Hero, um den verkleideten zu schuetzen.
+//  Ein anderer Held, der selbst nicht waehlbar ist (Butterfly Cloud,
+//  Invisibility, Stealth …), ist kein Ausweichziel.
+//
 //  Implementation
 //  ──────────────
-//  • Hero target: stamps `hero.statuses.untargetable
-//    = true` — the engine's hero targeting filter
-//    already implements the per-side "all-untar
-//    getable → keep" rule that matches the card's
-//    "only legal target" exception. Same flag
-//    Butterfly Cloud uses; cleared at the START
-//    phase of the caster's next turn (engine
-//    line ~13290). The opponent's whole turn sits
-//    between the stamp and the cleanup, which is
-//    exactly the "during their next turn" window.
-//  • Creature target: stamps the new soft-
-//    untargetable counter pair on the inst —
+//  • Hero target: haengt den Zielschutz per `engine.addHeroTargetBlocker`
+//    an den Helden (v1191, wie Dive Down/Stealthy Pursuit); die Regel
+//    steht im Vertrag `blocksTargeting` unten und liest `info.allTargets`.
+//    Frist: bis zum Beginn des naechsten eigenen Zuges des Wirkers
+//    (`untilTurn` = der Gegnerzug dazwischen; ein uebersprungener
+//    Gegnerzug verlaengert ueber `_zug-fristen.js`). Nur WAHL
+//    („cannot be chosen"), nicht „or hit": Flaecheneffekte treffen.
+//  • Creature target: stamps the soft-untargetable counter pair on the inst —
 //      inst.counters.softUntargetable_by_opponent = 1
 //      inst.counters.softUntargetable_by_opponent_pi = oppIdx
-//    The engine filters (promptDamageTarget +
-//    promptMultiTarget) drop tagged creatures
-//    when other non-tagged creatures remain on
-//    the same side, and keep them when they're
-//    the only options — same per-side semantics
-//    as the hero filter. Cleared at the same
-//    START-phase pass as hero untargetable.
+//    Die Engine-Zielwaehler (promptDamageTarget + promptMultiTarget)
+//    lassen markierte Kreaturen weg, solange auf derselben Seite ein
+//    anderes legales Ziel der Quelle (Held ODER Kreatur, soweit die
+//    Quelle es anbietet) bleibt. Cleared at the START phase of the
+//    caster's next turn (W68a: nur echte Gegnerzuege zaehlen).
 //  • AoE auto-targeting (Heat Wave, Cataclysm,
 //    Spawn Mother's board mode, …) is NOT
 //    blocked: those don't "choose" a target,
@@ -42,13 +50,98 @@
 // ═══════════════════════════════════════════
 
 const { istHeldOderKreatur } = require('./_targeting-shared');
+const { hasCardType } = require('./_hooks');
 const CARD_NAME = 'Perfect Disguise';
 const ONCE_PER_GAME_KEY = 'perfectDisguise';
+const INNEN = '_perfectDisguiseInnen';   // Riegel: beim Pruefen eines ANDEREN Helden fragt diese Karte sich nicht selbst
+
+/** Traegt dieser Held einen gueltigen Perfect-Disguise-Eintrag? */
+function istVerkleidet(gs, held) {
+  const liste = held?._targetBlockers;
+  if (!Array.isArray(liste)) return false;
+  return liste.some(b => b.card === CARD_NAME && (b.untilTurn == null || gs.turn <= b.untilTurn));
+}
+
+/** Chuck, the Crazy Veteran (`ignoresOppUntargetable`): hebt Zielverbote fuer die Helden seines Kontrolleurs auf (wie der Engine-Filter). */
+function chuckAktiv(engine, seite) {
+  for (const { hero: h, physOwner, heroIdx: hi } of engine.heroesControlledBy(seite)) {
+    if (!h?.name || h.hp <= 0) continue;
+    if (h.statuses?.frozen || h.statuses?.stunned || h.statuses?.webbed || h.statuses?.negated) continue;
+    if (engine._isHeroMummified?.(physOwner, hi)) continue;
+    if (engine.heroScript(h)?.ignoresOppUntargetable) return true;
+  }
+  return false;
+}
+
+/**
+ * Gibt es auf der Seite des Besitzers ein ANDERES legales Ziel dieser Quelle?
+ * Die Liste der legalen Ziele steht in `info.allTargets` (Helden und Kreaturen, soweit die Quelle sie
+ * anbietet; `ineligible` = vom Effekt ausgeschlossen zaehlt nicht). Ohne Liste (Dispatcher ohne Liste,
+ * Aufrufer ohne `allTargets`) entscheidet der Brett-Scan.
+ */
+function anderesLegalesZiel(engine, info, kontrolleur) {
+  const gs = engine.gs;
+  const liste = Array.isArray(info.allTargets) ? info.allTargets.filter(t => t && !t.ineligible) : null;
+  // Andere Helden des Kontrolleurs (Styx: Kontrolle statt Seite).
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(kontrolleur)) {
+    if (physOwner === info.heroOwner && hi === info.heroIdx) continue;
+    if (!h?.name || h.hp <= 0) continue;
+    if (h.statuses?.untargetable || h.statuses?.invisible) continue;   // selbst geschuetzt: kein Ausweichziel
+    if (istVerkleidet(gs, h)) continue;                                // gleich geschuetzt zaehlt nicht
+    if (liste && !liste.some(t => t.type === 'hero' && t.owner === physOwner && t.heroIdx === hi)) continue;
+    // Ist dieser andere Held fuer DIESE Quelle selbst gesperrt (Stealth, Dive Down …), ist er kein legales Ziel.
+    let geblockt = false;
+    try {
+      const { blocker, ...rest } = info;
+      geblockt = engine.heroBlocksTargeting(physOwner, hi, { ...rest, [INNEN]: true });
+    } catch { geblockt = false; }
+    if (geblockt) continue;
+    return true;
+  }
+  // Kreaturen des Kontrolleurs (nur, wenn die Quelle sie anbietet bzw. ohne Liste: Brett-Scan).
+  for (const inst of (engine.cardInstances || [])) {
+    if (inst.zone !== 'support' || inst.faceDown) continue;
+    if ((inst.controller ?? inst.owner) !== kontrolleur) continue;
+    if ((inst.counters?.currentHp ?? 1) <= 0) continue;
+    const c = inst.counters || {};
+    if (c.untargetable_all) continue;
+    if (c.untargetable_by_opponent && c.untargetable_by_opponent_pi === info.chooserIdx) continue;
+    if (c.softUntargetable_by_opponent && c.softUntargetable_by_opponent_pi === info.chooserIdx) continue;   // gleich geschuetzt zaehlt nicht
+    const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];
+    if (!cd || !(hasCardType(cd, 'Creature') || hasCardType(cd, 'Token'))) continue;
+    try { if (engine._boardGuardsCreatureChoice?.(inst, info.chooserIdx)) continue; } catch { /* ignorieren */ }
+    if (liste && !liste.some(t => (t.type === 'equip' || t.type === 'creature') && (t.cardInstance
+      ? t.cardInstance.id === inst.id
+      : (t.owner === engine.physicalSide(inst) && t.heroIdx === inst.heroIdx && t.slotIdx === inst.zoneSlot)))) continue;
+    return true;
+  }
+  return false;
+}
 
 module.exports = {
   isTargetingArtifact: true,
   oncePerGame: true,
   oncePerGameKey: ONCE_PER_GAME_KEY,
+
+  /**
+   * ★ DIE REGEL (Held). Gelesen von `heroBlocksTargeting` ueber den Eintrag am Helden (v1191-Zweig): in beiden
+   * Zielwaehlern, am Dispatcher (`promptEffectTarget`) und fuer Karten wie Sword in a Bottle. Im Schadenspfad
+   * (`info.hit`) steigt sie aus — „cannot be CHOSEN", kein „or hit".
+   */
+  blocksTargeting(gs, engine, info) {
+    if (info[INNEN]) return false;
+    if (info._truthSeeingEye || info.ignoreUntargetable) return false;   // Truth-Seeing Eye hebt jeden Zielschutz auf
+    if (info.hit) return false;
+    if (info.festesZiel) return false;   // Einzelziel-Quelle (Rueckstoss …): kein anderes legales Ziel
+    if (info.chooserIdx == null) return false;
+    const held = gs.players?.[info.heroOwner]?.heroes?.[info.heroIdx];
+    if (!istVerkleidet(gs, held)) return false;
+    // „by your opponent": gesperrt ist nur der GEGNER des Kontrolleurs (Styx: Kontrolle statt Seite).
+    const kontrolleur = engine.heroSideOf(info.heroOwner, held);
+    if (info.chooserIdx === kontrolleur) return false;
+    if (chuckAktiv(engine, kontrolleur)) return false;
+    return anderesLegalesZiel(engine, info, kontrolleur);
+  },
 
   // ── CPU-Gate-Bypass ──────────────────────────────────────────────
   // Als Verdachtsfall (Shadows over Blackport, 1360 Spiele): die Karte
@@ -170,14 +263,10 @@ module.exports = {
     if (target.type === 'hero') {
       const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (!hero?.name || hero.hp <= 0) return false;
-      if (!hero.statuses) hero.statuses = {};
-      // Reuse the existing hero-side untargetable flag — same per-side
-      // semantics, same start-phase cleanup. The "from this opponent
-      // specifically" detail isn't needed here because hero
-      // untargetable already filters opponent-side picks only (own-
-      // side picks bypass via the `if (owner === pi) continue` skip).
-      // W68a: „during their next turn" — zählt den nächsten ECHTEN Gegnerzug (`gegnerZug`; ein Skip des Gegners verlängert den Schutz, s. `_zug-fristen.js`).
-      hero.statuses.untargetable = { gegnerZug: true };
+      // Zielschutz am Helden (Vertrag `blocksTargeting`, s. oben). „during their next turn": Frist bis zum Beginn des naechsten eigenen
+      // Zuges des Wirkers — der Gegnerzug dazwischen ist der gemeinte (W68a: ein Skip des Gegners verlaengert `untilTurn` ueber `_zug-fristen.js`).
+      const bisZug = gs.activePlayer === pi ? gs.turn + 1 : gs.turn;
+      engine.addHeroTargetBlocker(target.owner, target.heroIdx, CARD_NAME, { untilTurn: bisZug, appliedBy: pi });
       engine.log('perfect_disguise', {
         player: ps.username, target: hero.name, type: 'hero',
       });
@@ -207,4 +296,7 @@ module.exports = {
     engine.sync();
     return true;
   },
+
+  // Fuer Tests und Nachbarkarten.
+  istVerkleidet,
 };

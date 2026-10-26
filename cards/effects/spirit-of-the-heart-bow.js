@@ -71,6 +71,7 @@ function beute(engine, pi) {
     const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     if (engine.isOmniImmune(inst, pi)) continue;      // Kardinalbestien (Golden Wings: nur gegen den Gegner, W17b)
+    if (engine.controlIsLocked(inst)) continue;       // Als Ruling (Al 26.10.): „Control of this Creature cannot change" (Creepy Villager) — nicht waehlbar
     out.push(inst);
   }
   return out;
@@ -88,6 +89,7 @@ module.exports = {
 
   activeIn: ['support'],
   creatureEffect: true,
+  requiresTarget: true,   // Zielwahl-Effekt („choose a Creature your opponent controls"): Blinded sperrt ihn (siehe _hooks.js / getActivatableCreatures)
   // Holt Ziele auf die eigene Seite — dieselbe Marke, die Boris & Co.
   // lesen.
   takesControlOfTargets: true,

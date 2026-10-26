@@ -39,6 +39,7 @@ function stealableTargets(engine, pi) {
     const cd = engine.getEffectiveCardData?.(c) || engine._getCardDB()[c.name];
     if (!cd || !engine.isChoosableAsCreature(c, cd)) continue;   // Tokens/Artifact Creatures sind Ziele (Als Sweep 9.10.)
     if (engine.isOmniImmune?.(c, pi)) continue;
+    if (engine.controlIsLocked(c)) continue;   // Als Ruling (Al 26.10.): „Control of this Creature cannot change" (Creepy Villager) — kein uebernehmbares Ziel
     n++;
   }
   return n;
@@ -78,6 +79,9 @@ module.exports = {
       confirmLabel: '💖 Charm!',
       confirmClass: 'btn-success',
       cancellable: true,
+      // Als Ruling (Al 26.10., Dark Gear × Creepy Villager): eine Kreatur, deren Kontrolle sich nicht aendern kann, ist ausgegraut (nicht waehlbar).
+      condition: (t) => !t.cardInstance || !engine.controlIsLocked(t.cardInstance),
+      dimUnmetCondition: true,
     });
     if (!target) return false;
 

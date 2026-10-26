@@ -54,6 +54,9 @@ function waehlbareHelden(engine, pi) {
 module.exports = {
   cpuSkipProactive: true,
 
+  // Wählt genau EINEN Helden aus der Hand und legt ihn auf den Nutzer — nie mehr als ein Ziel (CARD_API ⑦, check-aoe-text).
+  neverMultiTarget: true,
+
   /** „If this is the first Spell you use this turn, this counts as an additional Action." */
   inherentAction(gs, pi) {
     return (gs.players[pi]?.spellsPlayedThisTurn || 0) === 0;

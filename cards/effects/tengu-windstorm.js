@@ -129,8 +129,12 @@ function _collectBoardTargets(gs, engine) {
       // their slot's visible card is the top one).
       const slot = gs.players[inst.owner]?.abilityZones?.[inst.heroIdx]?.[inst.zoneSlot] || [];
       if (slot.length > 0 && slot[slot.length - 1] !== inst.name) continue;
+      // Ein Stapel gleichnamiger Karten (Ability Lv 2/3) hat mehrere Instanzen im selben Platz: EIN Ziel je Stapel (eindeutige ID), und zwar die letzte (= oberste) Kopie — wie `supportAbilitySpitze`.
+      const _abId = `ability-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`;
+      const _abErst = targets.find(x => x.id === _abId);
+      if (_abErst) { _abErst._cardInstance = inst; continue; }
       targets.push({
-        id:       `ability-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
+        id:       _abId,
         type:     'ability',
         owner:    inst.owner,
         heroIdx:  inst.heroIdx,
@@ -302,6 +306,8 @@ async function _bounceToDeck(engine, inst, position /* 'top' | 'bottom' */, sour
 
   // Remove from origin zone. Mirrors `actionMoveCard`'s state step but
   // routes the destination to the deck rather than discard / hand.
+  // Ankhota: „Delete all Creatures that are moved from the board to anywhere else" — dieser Sonderweg umgeht den zentralen Move; vor dem Enttracken auswerten (Ankhota selbst zählt mit).
+  const ankhotaVorab = fromZone === 'support' && engine.ankhotaLoeschtVomBrett(inst);
   engine._removeCardFromState(inst);
   engine._untrackCard(inst.id);
 
@@ -309,7 +315,7 @@ async function _bounceToDeck(engine, inst, position /* 'top' | 'bottom' */, sour
     // W5a (A06-23, Al 14.10.2026): ein Token ist ein legales Ziel, verschwindet aber vollstaendig (kommt nie ins Deck);
     // eine echte Karte darunter (Biomancy-/Boulder-Token) wird gelöscht.
     engine.tokenAbgang(inst);
-  } else {
+  } else if (!engine.ankhotaLoeschtSonderweg(inst, owner, { source: sourceName, vorab: ankhotaVorab })) {   // Ankhota: gelöscht statt oben/unten ins Deck
     if (!ownerPs.mainDeck) ownerPs.mainDeck = [];
     if (position === 'top') {
       ownerPs.mainDeck.unshift(inst.name);
@@ -549,6 +555,14 @@ module.exports = {
           engine.sync();
           return;
         }
+      }
+
+      // ── Cosmic Malfunction (B2/E9): „moved from your side of the board to anywhere else by an opponent's card or effect" gilt auch für das Deck.
+      // Wie beim Area-Schutz oben: die Kosten sind gezahlt, der Effekt verpufft. Der Helfer meldet nur Fremdeffekte gegen Cosmic-Depths-Kreaturen (eigene Karten: kein Fenster).
+      if (targetInst.zone === 'support' && await engine._checkCdMovementHandReactions(targetInst, { name: CARD_NAME, owner: pi }, 'move')) {
+        engine.log('tengu_windstorm_cd_negated', { player: ps.username, card: targetInst.name });
+        engine.sync();
+        return;
       }
 
       // ── Step 3: top or bottom of original owner's deck ──

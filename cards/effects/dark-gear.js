@@ -47,6 +47,8 @@ function getFreeZones(gs, playerIdx, uebernahmeInst = null, engine = null) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     // W16d (A07-31): „A Hero can only have 1 Gigantisaur" - Helden, die schon einen tragen, sind für einen Gigantisaurier kein Ziel.
     if (uebernahmeInst && eng && eng.uebernahmeUnzulaessig(uebernahmeInst, playerIdx, playerIdx, hi) === 'gigantisaur_per_hero') continue;
+    // Mehrzonen-Kreatur (Land Sharks, Turtle): nur Helden mit genug freien Zonen für ALLE ihre Zonen.
+    if (uebernahmeInst && eng && eng.mehrzonenPlatzFehlt(uebernahmeInst, playerIdx, playerIdx, hi)) continue;
     const hero = ps.heroes[hi];
     const heroLabel = hero?.name
       ? (hero.hp <= 0 ? `${hero.name} (KO)` : hero.name)
@@ -106,7 +108,10 @@ function getStealableCreatures(engine, playerIdx) {
     const inst = t.cardInstance;
     if (inst && engine.isCreatureImmune(inst, 'targeting_immune')) return false;
     if (inst && engine.isCreatureImmune(inst, 'control_immune')) return false;
+    // Als Ruling (Al 26.10., Dark Gear × Creepy Villager): „Control of this Creature cannot change" — ein Ziel, dessen Kontrolle feststeht, ist nicht waehlbar (statt Karte zu verbrauchen, ohne etwas zu uebernehmen).
+    if (inst && engine.controlIsLocked(inst)) return false;
     if (inst && engine.uebernahmeUnzulaessig(inst, playerIdx) === 'only_control_1') return false;   // W16d (A07-31): „You can only control 1" (Brachion)
+    if (inst && engine.mehrzonenPlatzFehlt(inst, playerIdx)) return false;   // Mehrzonen-Kreatur (Land Sharks, Turtle): ohne Held mit genug freien Zonen nicht uebernehmbar — nicht waehlbar, kein Verbrauch
     // Read the EFFECTIVE card data — instances may carry a per-instance
     // override (Biomancy Token: a Potion repurposed as a Creature/Token
     // with `_cardDataOverride.level = 0/1/2` based on its Biomancy

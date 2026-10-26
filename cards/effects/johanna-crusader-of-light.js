@@ -37,6 +37,17 @@
 //      re-redirect, and the HOPT lockout prevents
 //      double-trigger across instances even if
 //      somehow re-entered.
+//    • ★ Ruling Al (Welle 2, „Johanna × True Damage"): Auch unverhinderbarer / unreduzierbarer
+//      Schaden („cannot be reduced or negated": Pressure Projectile, Surefire Shot, Rockfall,
+//      Piercer of Heavens …) darf umgeleitet werden — ABER das ursprüngliche Ziel nimmt
+//      TROTZDEM den vollen Schaden; Johanna nimmt die Hälfte (aufgerundet) ZUSÄTZLICH (der
+//      angerichtete Schaden insgesamt steigt). Ihre Hälfte ist selbst True Damage (gleiche
+//      Quelle/Typ). Held-Ziele: Hook `beforeTrueDamage` (Engine, nur Erhöhungen — Johanna
+//      senkt hier nichts); Kreaturen-Ziele: `beforeCreatureDamageBatch` (Eintrag trägt
+//      `trueDamage`/`cannotBeReduced`, dann wird der Eintrag nicht gesenkt). Dasselbe gilt
+//      für Schaden, den ein anderer Effekt per `cannotBeReduced` schützt (Ida, Club of Gobbo).
+//      NICHT umleitbar: Quellen mit `cannotBeRedirected` (Acid Vial, Glasowt: „cannot be
+//      reduced, redirected or negated") — Konvention wie bei Mean Cute Cat.
 //    • HOPT key: `johanna_redirect:<ownerIdx>:<heroIdx>`.
 //      Per-instance (each Johanna copy is
 //      independent — multi-Johanna setups are rare
@@ -45,8 +56,27 @@
 
 const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const { getCleansableStatuses } = require('./_hooks');
+const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Johanna, Crusader of Light';
+
+/** Schaden, der laut Kartentext nicht umgeleitet werden darf (Acid Vial, Glasowt) — `cannotBeRedirected` an Quelle oder Quellskript (wie Mean Cute Cat). */
+function _nichtUmleitbar(source, extra) {
+  if (extra) return true;
+  if (!source) return false;
+  if (source.cannotBeRedirected) return true;
+  if (source.name) {
+    try { if (loadCardEffect(source.name)?.cannotBeRedirected) return true; } catch { /* unbekannte Quelle: normal */ }
+  }
+  return false;
+}
+
+/** Text der Bestätigung: normal = Umleitung der Hälfte; unreduzierbar = Ziel nimmt alles, Johanna ZUSÄTZLICH die Hälfte. */
+function _umleitungsText(redirected, amount, fromName, additiv) {
+  return additiv
+    ? `This damage cannot be reduced: ${fromName} still takes all ${amount}. Take an additional ${redirected} damage on ${CARD_NAME}? (Once per turn — accepting locks out further redirects this turn.)`
+    : `Redirect ${redirected} of ${amount} damage from ${fromName} to ${CARD_NAME}? (Once per turn — accepting locks out further redirects this turn.)`;
+}
 
 /**
  * True when Johanna is alive and not incapacitated by frozen / stunned
@@ -120,6 +150,86 @@ async function _cleanseAllies(engine, ctrlIdx, johannaHero) {
   }
 }
 
+/**
+ * Hero-target damage redirect. Half (rounded up) of the incoming
+ * damage to a sibling hero is rerouted to Johanna. The "split" is
+ * done by reducing `ctx.amount` and dealing a fresh damage call to
+ * Johanna for the redirected amount.
+ *
+ * `istTrue` (Hook `beforeTrueDamage`) bzw. `ctx.cannotBeReduced` (z. B. Ida, Club of Gobbo):
+ * unreduzierbarer Schaden — das Ziel nimmt ALLES, Johannas Hälfte kommt ZUSÄTZLICH
+ * (Ruling Al, Welle 2); bei True Damage ist ihre Hälfte selbst True Damage.
+ */
+async function _heldUmleitung(ctx, istTrue) {
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  const johannaInst = ctx.card;
+  if (!johannaInst || johannaInst.zone !== 'hero') return;
+  if (istTrue && ctx.cancelled) return;   // z. B. von Mean Cute Cat schon umgeleitet
+  const target = ctx.target;
+  if (!target || target.hp == null) return;
+  if (ctx.amount == null || ctx.amount <= 0) return;
+  if (_nichtUmleitbar(ctx.source, ctx.cannotBeRedirected)) return;   // Acid Vial: „cannot be … redirected"
+
+  const ownerIdx = johannaInst.owner;
+  const ownerPs = gs.players[ownerIdx];
+  if (!ownerPs) return;
+  const johannaHero = ownerPs.heroes?.[johannaInst.heroIdx];
+  if (!_johannaActive(johannaHero)) return;
+  if (johannaHero === target) return; // self-target — no redirect
+
+  // Target must be another Hero Johanna's CONTROLLER controls.
+  // Kontrolle statt Seite (Styx 28.9.): physische Seite des Ziels
+  // nur noch fuer Animation/Index.
+  const ctrl = engine.heroSideOf(ownerIdx, johannaHero);
+  const tgtOwner = engine._findHeroOwner(target);
+  if (tgtOwner < 0 || engine.heroSideOf(tgtOwner, target) !== ctrl) return;
+
+  const hoptKey = heldenSperreKey('johanna_redirect', ctrl);   // Styx 28.9.: Sperre beim Kontrolleur
+  if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
+
+  const redirected = Math.ceil(ctx.amount / 2);
+  if (redirected <= 0) return;
+  const additiv = !!(istTrue || ctx.trueDamage || ctx.cannotBeReduced);
+
+  // Prompt the controller. Decline → leave the damage intact and
+  // DON'T mark HOPT, so a later damage instance this turn can still
+  // be redirected.
+  const choice = await engine.promptGeneric(ctrl, {
+    type:        'confirm',
+    title:       CARD_NAME,
+    message:     _umleitungsText(redirected, ctx.amount, target.name || 'your Hero', additiv),
+    confirmLabel: additiv ? '✨ Yes, take it too!' : '✨ Yes, redirect!',
+    cancelLabel:  'No',
+    cancellable: true,
+    additiv,
+  });
+  if (!choice) return;
+  if (typeof choice === 'object' && (choice.cancelled || choice.confirmed === false)) return;
+
+  // Commit the redirect.
+  if (!gs.hoptUsed) gs.hoptUsed = {};
+  gs.hoptUsed[hoptKey] = gs.turn;
+  // `ctx.amount` is a COPY of `hookCtx.amount` (the engine spreads
+  // hookCtx into ctx, which clones primitives by value). Writing
+  // through `ctx.modifyAmount` is the canonical path — it updates
+  // `hookCtx.amount`, which is what the engine reads after the
+  // hook returns. The previous `ctx.amount -= redirected` only
+  // mutated the local copy, so the original target still took
+  // full damage AND Johanna ate the redirected half on top.
+  // (Bei `cannotBeReduced` ist `modifyAmount(-n)` ein No-op, bei True Damage senken wir gar nicht.)
+  if (!istTrue) ctx.modifyAmount(-redirected);
+  await _dashZumZiel(engine, ownerIdx, johannaInst.heroIdx,
+    gs.players[tgtOwner].heroes.indexOf(target), null, tgtOwner);
+
+  // Deal the redirected half to Johanna. The recursive damage call
+  // re-enters this hook, but target === johannaHero short-circuits
+  // immediately, and the HOPT lockout above is the belt-and-
+  // suspenders backstop.
+  if (istTrue) await engine.actionDealTrueDamage(ctx.source, johannaHero, redirected, { type: ctx.type || 'other' });
+  else await engine.actionDealDamage(ctx.source, johannaHero, redirected, ctx.type || 'normal');
+}
+
 module.exports = {
   // CPU: confirm Johanna's damage-redirect prompt — the default brain
   // declines cancellable confirms outside a card-cast (beforeDamage trigger),
@@ -136,6 +246,8 @@ module.exports = {
     // Immunitäts-Aura gleich mit). Features via protMeta vom
     // Engine-Hero-Redirect-Prompt; Teildeployment-Guard wie üblich.
     if (promptData?.type === 'confirm') {
+      // Zusatz-Angebot bei unreduzierbarem Schaden (Ziel nimmt trotzdem alles): bringt der CPU nichts, kostet nur HP.
+      if (promptData.additiv) return { confirmed: false };
       try {
         const { protectionDecision } = require('./_deck-profile');
         const meta = promptData.protMeta;
@@ -178,69 +290,14 @@ module.exports = {
      * done by reducing `ctx.amount` and dealing a fresh damage call to
      * Johanna for the redirected amount.
      */
-    beforeDamage: async (ctx) => {
-      const engine = ctx._engine;
-      const gs = engine.gs;
-      const johannaInst = ctx.card;
-      if (!johannaInst || johannaInst.zone !== 'hero') return;
-      const target = ctx.target;
-      if (!target || target.hp == null) return;
-      if (ctx.amount == null || ctx.amount <= 0) return;
+    beforeDamage: async (ctx) => _heldUmleitung(ctx, false),
 
-      const ownerIdx = johannaInst.owner;
-      const ownerPs = gs.players[ownerIdx];
-      if (!ownerPs) return;
-      const johannaHero = ownerPs.heroes?.[johannaInst.heroIdx];
-      if (!_johannaActive(johannaHero)) return;
-      if (johannaHero === target) return; // self-target — no redirect
-
-      // Target must be another Hero Johanna's CONTROLLER controls.
-      // Kontrolle statt Seite (Styx 28.9.): physische Seite des Ziels
-      // nur noch fuer Animation/Index.
-      const ctrl = engine.heroSideOf(ownerIdx, johannaHero);
-      const tgtOwner = engine._findHeroOwner(target);
-      if (tgtOwner < 0 || engine.heroSideOf(tgtOwner, target) !== ctrl) return;
-
-      const hoptKey = heldenSperreKey('johanna_redirect', ctrl);   // Styx 28.9.: Sperre beim Kontrolleur
-      if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
-
-      const redirected = Math.ceil(ctx.amount / 2);
-      if (redirected <= 0) return;
-
-      // Prompt the controller. Decline → leave the damage intact and
-      // DON'T mark HOPT, so a later damage instance this turn can still
-      // be redirected.
-      const choice = await engine.promptGeneric(ctrl, {
-        type:        'confirm',
-        title:       CARD_NAME,
-        message:     `Redirect ${redirected} of ${ctx.amount} damage from ${target.name || 'your Hero'} to ${CARD_NAME}? (Once per turn — accepting locks out further redirects this turn.)`,
-        confirmLabel: '✨ Yes, redirect!',
-        cancelLabel:  'No',
-        cancellable: true,
-      });
-      if (!choice) return;
-      if (typeof choice === 'object' && (choice.cancelled || choice.confirmed === false)) return;
-
-      // Commit the redirect.
-      if (!gs.hoptUsed) gs.hoptUsed = {};
-      gs.hoptUsed[hoptKey] = gs.turn;
-      // `ctx.amount` is a COPY of `hookCtx.amount` (the engine spreads
-      // hookCtx into ctx, which clones primitives by value). Writing
-      // through `ctx.modifyAmount` is the canonical path — it updates
-      // `hookCtx.amount`, which is what the engine reads after the
-      // hook returns. The previous `ctx.amount -= redirected` only
-      // mutated the local copy, so the original target still took
-      // full damage AND Johanna ate the redirected half on top.
-      ctx.modifyAmount(-redirected);
-      await _dashZumZiel(engine, ownerIdx, johannaInst.heroIdx,
-        gs.players[tgtOwner].heroes.indexOf(target), null, tgtOwner);
-
-      // Deal the redirected half to Johanna. The recursive damage call
-      // re-enters this hook, but target === johannaHero short-circuits
-      // immediately, and the HOPT lockout above is the belt-and-
-      // suspenders backstop.
-      await engine.actionDealDamage(ctx.source, johannaHero, redirected, ctx.type || 'normal');
-    },
+    /**
+     * ★ Ruling Al (Welle 2): auch True Damage („cannot be reduced or negated") ist umleitbar —
+     * das Ziel nimmt aber den vollen Betrag, Johanna ZUSÄTZLICH die Hälfte (s. Kopfkommentar).
+     * Die Engine ruft `beforeTrueDamage` nur für Held-Ziele (Kreaturen laufen über den Batch-Hook).
+     */
+    beforeTrueDamage: async (ctx) => _heldUmleitung(ctx, true),
 
     /**
      * Creature-target damage redirect. The damage path for Creatures is
@@ -274,28 +331,37 @@ module.exports = {
         if (e.amount == null || e.amount <= 0) continue;
         const targetCtrl = e.inst.controller ?? e.inst.owner;
         if (targetCtrl !== ctrl) continue;
+        if (_nichtUmleitbar(e.source, e.cannotBeRedirected)) continue;   // Acid Vial / Glasowt: „cannot be … redirected"
 
         const redirected = Math.ceil(e.amount / 2);
         if (redirected <= 0) continue;
+        // Ruling Al (Welle 2): unreduzierbarer Schaden (True Damage / `cannotBeReduced`) wird NICHT gesenkt — das Ziel nimmt alles,
+        // Johanna die Hälfte ZUSÄTZLICH (bei True Damage selbst als True Damage).
+        const istTrue = !!e.trueDamage;
+        const additiv = istTrue || !!e.cannotBeReduced;
 
         const choice = await engine.promptGeneric(ctrl, {
           type:        'confirm',
           title:       CARD_NAME,
-          message:     `Redirect ${redirected} of ${e.amount} damage from ${e.inst.name} to ${CARD_NAME}? (Once per turn — accepting locks out further redirects this turn.)`,
-          confirmLabel: '✨ Yes, redirect!',
+          message:     _umleitungsText(redirected, e.amount, e.inst.name, additiv),
+          confirmLabel: additiv ? '✨ Yes, take it too!' : '✨ Yes, redirect!',
           cancelLabel:  'No',
           cancellable: true,
+          additiv,
         });
         if (!choice) continue;
         if (typeof choice === 'object' && (choice.cancelled || choice.confirmed === false)) continue;
 
         if (!gs.hoptUsed) gs.hoptUsed = {};
         gs.hoptUsed[hoptKey] = gs.turn;
-        if (typeof e.setAmount === 'function') e.setAmount(e.amount - redirected, { kette: { flat: -redirected } }); else e.amount -= redirected;   // W50a: Umleitung der Haelfte = Senkung am Ursprungsziel (Ricochet-Kettenbetrag)
+        if (!additiv) {
+          if (typeof e.setAmount === 'function') e.setAmount(e.amount - redirected, { kette: { flat: -redirected } }); else e.amount -= redirected;   // W50a: Umleitung der Haelfte = Senkung am Ursprungsziel (Ricochet-Kettenbetrag)
+        }
         await _dashZumZiel(engine, ownerIdx, johannaInst.heroIdx, e.inst.heroIdx, e.inst.zoneSlot,
           engine.physicalSide(e.inst));   // Styx 28.9.: Zeichen-Seite, nicht Kontrolleur
 
-        await engine.actionDealDamage(e.source, johannaHero, redirected, e.type || 'normal');
+        if (istTrue) await engine.actionDealTrueDamage(e.source, johannaHero, redirected, { type: e.type || 'other' });
+        else await engine.actionDealDamage(e.source, johannaHero, redirected, e.type || 'normal');
         break;
       }
     },

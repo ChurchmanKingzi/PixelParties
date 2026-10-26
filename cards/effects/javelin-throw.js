@@ -85,6 +85,9 @@ function heroTargets(engine, pi) {
 }
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Am besten gleich die Karten ganz sperren statt den Schaden fizzeln zu lassen"): die Karte richtet NUR Schaden an Zielen des Gegners an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // W27a (Al, 21.10.2026): „treated as an Attack" — Leser der Quellstufe (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) fragen `_heldenEffektStufe`.
   // W32a (Al, 22.10.2026): „Sie nehmen trotzdem das Fighting-Level": die Quellstufe ist das FIGHTING-LEVEL des gewählten Helden (nicht mehr fix 0).
   treatedAsAttack: { ability: 'Fighting' },
@@ -198,6 +201,8 @@ module.exports = {
       engine.log('javelin_throw', {
         player: ps.username, hero: hero.name, artifact: thrownName, negated: true,
       });
+      // R-12 (Al 26.10.): ein im Zielfenster negierter Wurf zählt als gespielte Attack des Helden (W36a, wie Broghan & Co.) — auch bei der Kunagi-Wiederholung.
+      await engine.zaehleAlsArt('attack', { pi, heroIdx: hi, heroOwner, name: CARD_NAME });
       engine.sync();
       return true;
     }

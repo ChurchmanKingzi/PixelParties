@@ -10,23 +10,29 @@
 //  • Aktiver Kreatureneffekt (`creatureEffect`); das „once per turn" und
 //    die Ausgrauung stempelt die Engine selbst. Abbruch der Wahl gibt
 //    `false` zurueck — dann ist nichts verbraucht.
-//  • „as if you controlled it for the rest of the turn": derselbe Weg wie
-//    „Aligning Goals" („For the rest of the turn, you may use that
-//    Creature's active effect as if you controlled it"): die Kreatur
-//    wechselt bis zum Zugende die Kontrolle (`actionStealCreature`,
-//    faellt am Zugende zurueck). So steht jeder ihrer aktiven Effekte —
-//    auch mehrere — in diesem Zug im normalen Aktivierungsmenue, mit der
-//    Engine-Rundensperre je Kreatur (hat der Gegner sie schon benutzt,
-//    bleibt sie gesperrt).
+//  • „use that Creature's ACTIVE effects as if you controlled it for the rest of
+//    the turn" (Entscheidung Al: „nur actives leihen"): geliehen werden NUR die
+//    AKTIVEN Effekte — die Kontrolle wechselt NICHT, passive Teile bleiben beim
+//    Besitzer (ein geliehener Horned Demon bekommt am Zugende des Entleihers
+//    keinen Demon Counter; stirbt er, geht er in die Ablage des Besitzers).
+//    Technik wie „Spy in the Enemy's Camp" (`_spy-shared.js`): die Kreatur bekommt die
+//    befristete Marke `counters._teddyLeihe = { by, turn }`; solange sie gilt (genau dieser
+//    Zug), steht jeder aktive Effekt der Kreatur — auch mehrere — im normalen
+//    Aktivierungsmenue des Entleihers, und nur fuer die DAUER des jeweiligen Effekts
+//    gilt die Kreatur als seine (`_leiheKontrolle`: „you / your opponent / your deck"
+//    meinen ihn). Die Engine-Rundensperre je Kreatur bleibt (hat der Gegner sie in
+//    diesem Zug schon benutzt, bleibt sie gesperrt); kostet ein Effekt eine Aktion,
+//    zahlt sie ein EIGENER Held.
 //  • Ziele: offene gegnerische Kreaturen MIT aktivem Effekt, die nicht
-//    schon geliehen sind. Gegen Immunitaet (Cardinal Beasts) laeuft der
-//    Wechsel ins Leere. Auftritt: ein expandierendes, ausblendendes Herz
-//    (`heart_expand`) auf dem Ziel.
+//    schon geliehen sind. Gegen Immunitaet (Cardinal Beasts) und das
+//    Schutzfenster („control", Cool Rescuer Monia …) laeuft die Leihe ins Leere.
+//    Auftritt: ein expandierendes, ausblendendes Herz (`heart_expand`) auf dem Ziel.
 //  • Anders als bei Aligning Goals kostet das weder Gold noch gilt es als
 //    zusaetzliche Aktion — der Text sagt davon nichts.
 // ═══════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
+const { LEIHE } = require('./_spy-shared');
 
 const CARD_NAME = 'Lovely Teddy';
 
@@ -85,15 +91,25 @@ module.exports = {
         && c.heroIdx === target?.heroIdx && c.zoneSlot === target?.slotIdx);
     if (!inst || inst.zone !== 'support') return false;
 
-    const stolen = await engine.actionStealCreatureGefragt(pi, inst, {   // W71b: mit Schutzfenster ('control')
-      sourceName: CARD_NAME,
-      skipTakeControlHook: true,
-    });
-    if (!stolen) {
+    // Vorpruefung wie bei einer Uebernahme (Immunitaet, Schutzfenster 'control' — W71b), aber OHNE Kontrollwechsel:
+    // geliehen werden nur die aktiven Effekte (Entscheidung Al).
+    let moeglich = !inst.counters?._heldKreatur && inst.stolenBy == null && (inst.controller ?? inst.owner) !== pi
+      && !engine.isOmniImmune(inst, pi, { sourceName: CARD_NAME });
+    if (moeglich) {
+      moeglich = await engine.kreaturBetroffen(inst, 'control', { name: CARD_NAME, owner: pi }, { sourceOwner: pi, detail: 'steal' });
+    }
+    if (!moeglich) {
       engine.log('lovely_teddy_fizzle', { player: ps.username, target: inst.name, reason: 'immune' });
       engine.sync();
       return true;   // der Effekt lief (die Wahl war getroffen), das Ziel ist immun
     }
+    // Befristete Marke (nur dieser Zug): der Entleiher darf die aktiven Effekte der Kreatur benutzen. Veraltete Marken
+    // frueherer Zuege werden dabei mit abgeraeumt.
+    for (const c of engine.cardInstances) {
+      if (c.counters?.[LEIHE] && c.counters[LEIHE].turn !== gs.turn) delete c.counters[LEIHE];
+    }
+    if (!inst.counters) inst.counters = {};
+    inst.counters[LEIHE] = { by: pi, turn: gs.turn };
 
     // Ein HERZ auf dem Ziel, das sich ausdehnt und dabei durchsichtig wird.
     engine._broadcastEvent('play_zone_animation', {

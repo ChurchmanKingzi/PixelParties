@@ -17,7 +17,8 @@
 //    your hand"). Karte waehlen ueber das Handkarten-Protokoll (`pickHandCard`).
 //  • Stufensenkung: Handindex-Feld `_handLevelCountdown` (Wert = bisherige Senkungen), am
 //    Ende JEDES eigenen Zuges von der Engine (`_handStufenZaehler`, END-Phase) um 1
-//    erhoeht und als Handrabatt `_handLevelOffsetsTransient[idx] = -n` eingetragen —
+//    erhoeht und als Handrabatt in `_handLevelOffsetsTransient[idx]` um 1 gesenkt (Als Ruling
+//    Al 26.10.: addiert sich mit anderen Abzuegen derselben Kopie, z. B. Rocky Slime) —
 //    wirkt nur in der Hand (kein Uebertrag aufs Brett), der Client zeigt es als Stufen-
 //    Abzeichen. Der Zaehler haengt an der Kopie, nicht am Zauber: er laeuft weiter, auch
 //    wenn der Zauber laengst abgelegt ist.

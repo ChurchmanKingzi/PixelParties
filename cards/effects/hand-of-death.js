@@ -129,6 +129,9 @@ async function ausloesen(engine, ownerIdx) {
     }
 
     // ── Resolve the defeat ──
+    // „Jeder getriggerte passive Effekt zeigt seine Karte" (CARD_API, MANDATORY): der verzögerte Effekt feuert ohne Karte auf dem Brett — erst NACH der bindenden Wahl (Abbruch = nichts).
+    await engine.showTriggeredEffect(CARD_NAME, { playerIdx: ownerIdx });
+
     let defeated = false;
     if (target.type === 'hero') {
       const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];

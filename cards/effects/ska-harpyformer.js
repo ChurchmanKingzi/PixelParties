@@ -11,6 +11,10 @@
 //  ③ Once per turn: discard a Performance Ability
 //    from hand to attach any Ability from your
 //    deck to a Hero you control.
+//    Als Ruling (Al 26.10.): die Ability geht DIREKT
+//    vom Deck in die Ability Zone (kein Hand-Zwischen-
+//    schritt: gegnerische Analyzer/Gatherer und
+//    Reaktionen sehen keinen Handzugang).
 // ═══════════════════════════════════════════
 
 const { harpyformerInherentAction, harpyformerDiscardCost } = require('./_harpyformer-shared');
@@ -323,31 +327,28 @@ module.exports = {
 
     const chosenAbility = abilityPick.cardName;
 
-    // Verify still in deck, move to hand temporarily, then attach via
-    // engine. Route through the canonical helper so the brief hand-add
-    // fires ON_CARD_ADDED_TO_HAND (Cosmic Depths Analyzer / Gatherer
-    // key off this hook for any opponent search effect, including
-    // Ska's tutor-then-attach flow). Helper covers deck-search anim,
-    // tracking, log, hook, and opponent reveal.
-    if (ps.mainDeck.indexOf(chosenAbility) < 0) return true;
-    // W5b-B11 (Al, Welle 5): die Such-/Hand-Sperre gilt bewusst NICHT für diese Deck-Suche ohne Hand-Ziel (die Ability geht
-    // sofort an den Helden, die Hand ist nur Durchgang) – `_bypassHandLock`, sonst zahlt Ska die Kosten und erhält nichts.
-    await engine.actionAddCardFromDeckToHand(pi, chosenAbility, {
-      source: CARD_NAME,
-      reveal: true,
-      _bypassHandLock: true,
-    });
-
-    // v1356: KEIN `skipAbilityGivenCheck` — verbraucht das Anlegen des Helden.
-    const attachResult = await engine.attachAbilityFromHand(pi, chosenAbility, targetHeroIdx, {});
-
-    if (!attachResult?.success) {
-      // Attachment failed — card stays in hand (player keeps it).
+    // Als Ruling (Al 26.10.): „Ja" — die Ability kommt DIREKT vom Deck in die Ability Zone des Helden (Muster Muscle Training), nicht über die
+    // Hand: kein Hand-Zwischenschritt, den gegnerische Analyzer/Gatherer („adds cards to their hand via an effect") oder Such-Reveals sehen.
+    // Das Anlegen verbraucht wie bisher das Anlegen des Helden (v1356, kein „additional"); eine Such-/Hand-Sperre betrifft die Karte nie (W5b-B11).
+    const deckIdx = ps.mainDeck.indexOf(chosenAbility);
+    if (deckIdx < 0) return true;
+    const ort = engine.abilityZielOrt(pi, targetHeroIdx, chosenAbility);
+    if (!ort) {
       engine.log('ska_attach_failed', { player: ps.username, card: chosenAbility });
-    } else {
-      engine.log('ska_attach', { player: ps.username, ability: chosenAbility, hero: heroName });
-      engine.shuffleDeck(pi);
+      engine.sync();
+      return true;
     }
+    if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: CARD_NAME }))) { engine.sync(); return true; }   // Stapel-Schicht (Knight-[B]-Sperre …)
+    engine.verbraucheAbilityAnlegen(pi, targetHeroIdx);   // v1356: KEIN „additional" — verbraucht das Anlegen des Helden
+    const inst = engine.abilityOrtBelegen(pi, targetHeroIdx, chosenAbility, ort);
+    engine._broadcastEvent('deck_search_add', { cardName: chosenAbility, playerIdx: pi });
+    await engine.abilityOrtHooks(inst, ort, { _skipReactionCheck: true });
+    engine._broadcastEvent('ability_activated', {
+      owner: pi, heroIdx: targetHeroIdx, zoneIdx: ort.slot, zoneKind: ort.art, abilityName: chosenAbility,
+    });
+    engine.log('ability_attached', { player: ps.username, card: chosenAbility, hero: heroName });
+    engine.log('ska_attach', { player: ps.username, ability: chosenAbility, hero: heroName });
+    engine.shuffleDeck(pi);
 
     engine.sync();
     return true;

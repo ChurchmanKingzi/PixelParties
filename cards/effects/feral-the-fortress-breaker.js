@@ -7,8 +7,9 @@
 //  ── PASSIV: 100 SCHADEN BEI JEDER AREA ──────────────────────────────────
 //  `onCardEnterZone` mit `toZone: 'area'` — JEDE Area, egal wessen, egal ob gespielt oder per Effekt gelegt (die Engine meldet
 //  alles, was in der Area Zone landet). Der Schaden ist PFLICHT (nicht abbrechbar): der Kontrolleur Ferals wählt ein beliebiges
-//  Ziel auf dem Brett (Held, Kreatur, Token, der auch als Kreatur zählt — beide Seiten, auch eigene). Schadensart „other"
-//  (Heldeneffekt). Gibt es kein Ziel, passiert nichts.
+//  Ziel auf dem Brett (Held, Kreatur, Token, der auch als Kreatur zählt — beide Seiten, auch eigene). Schadensart „hero"
+//  (Heldeneffekt; Ruling Al, Welle 2: nicht „other“ — öffnet damit Surprise-/Reaktionsfenster und Zielschutz-Prüfung wie jeder
+//  Heldeneffekt). Gibt es kein Ziel, passiert nichts.
 //
 //  ── AKTIV: AREAS RÄUMEN ─────────────────────────────────────────────────
 //  Heldeneffekt, einmal pro Zug (Engine-HOPT): alle Areas beider Seiten gehen über `removeArea` (Schutzfenster, Leave-Hooks) in
@@ -51,7 +52,7 @@ module.exports = {
       const target = await ctx.promptDamageTarget({
         side: 'any',
         types: ['hero', 'creature'],
-        damageType: 'other',
+        damageType: 'hero',
         baseDamage: DAMAGE,
         title: CARD_NAME,
         description: `An Area was played: deal ${DAMAGE} damage to any target on the board.`,
@@ -77,9 +78,9 @@ module.exports = {
       const quelle = { name: CARD_NAME, owner: pi, controller: pi, heroIdx, heroOwner: feld, cardType: 'Hero' };
       if (target.type === 'hero') {
         const th = gs.players[target.owner]?.heroes?.[target.heroIdx];
-        if (th && th.hp > 0) await ctx.dealDamage(th, DAMAGE, 'other');
+        if (th && th.hp > 0) await ctx.dealDamage(th, DAMAGE, 'hero');
       } else if (target.cardInstance) {
-        await engine.actionDealCreatureDamage(quelle, target.cardInstance, DAMAGE, 'other', { sourceOwner: pi, canBeNegated: true });
+        await engine.actionDealCreatureDamage(quelle, target.cardInstance, DAMAGE, 'hero', { sourceOwner: pi, canBeNegated: true });
       }
       engine.log('feral_area_blast', { player: gs.players[pi]?.username, target: target.cardName, damage: DAMAGE });
       engine.sync();

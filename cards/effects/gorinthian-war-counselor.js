@@ -130,7 +130,9 @@ module.exports = {
       const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (!hero || !(hero.hp > 0)) return false;
       await engine.addHeroStatus(target.owner, target.heroIdx, 'stunned', {
-        duration: STUN_TURNS, appliedBy: pi,   // `appliedByCard` setzt die Engine aus der laufenden Effektquelle
+        // `appliedByCard` ausdruecklich: ausgeloest ueber War Council Gathering Place waere die laufende Effektquelle sonst die Area,
+        // und der Schutz „Schaden = 0" (`isShielded`) griffe nicht.
+        duration: STUN_TURNS, appliedBy: pi, appliedByCard: CARD_NAME,
       });
     } else if (target.cardInstance) {
       const applied = await engine.applyCreatureStatus(target.cardInstance, 'stunned', {

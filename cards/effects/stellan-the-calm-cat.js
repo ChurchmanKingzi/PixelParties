@@ -9,14 +9,33 @@
 //        does NOT require the damage to be from an
 //        opponent; self-inflicted status damage
 //        counts.)
-//    (b) An opponent applies a negative status to
-//        Stellan (proxy for "Stellan is affected by
-//        an opponent's card or effect"). Positive
-//        / self-applied statuses are filtered out
-//        because `onStatusApplied` doesn't carry a
-//        source-ownership field — negative is the
-//        best available heuristic for "opponent
-//        did this", matching Fiona's pattern.
+//    (b) Stellan is affected by an opponent's card
+//        or effect.
+//
+//  ★ Als Ruling (Al 26.10.): „Nein, Stellan soll auch
+//  auslösen, wenn *irgendeine* gegnerische Karte ihn
+//  beeinflusst, egal, ob Schaden, Status oder
+//  sonstwas." Früher zählte (b) nur einen vom Gegner
+//  gesetzten NEGATIVEN Status (Proxy). Jetzt, wie bei
+//  Charm of Balance / The Stormblade (`_affected-shared`:
+//  Quelle ist Pflicht), jeder Weg, auf dem eine
+//  GEGNER-Quelle erkennbar ist:
+//    • Schaden (jeder Quelle, s. (a));
+//    • Heilung (`afterHeal`) und Buff (`afterBuff`) des Gegners;
+//    • Status (`onStatusApplied`): jeder vom Gegner gesetzte
+//      Status — auch ein positiver; ohne erkennbare Quelle
+//      wie bisher nur ein negativer;
+//    • Anhängsel/Ausrüstung, die der Gegner an Stellan
+//      anlegt oder UMHÄNGT (`onEquipGained`, Anleger =
+//      Gegner: Curse, Overheal Shock, Future Tech Control
+//      Device …) bzw. ihm wegnimmt (`onEquipLost` mit
+//      bekanntem Gegner als Verursacher: Treasure Theft);
+//  NICHT abgedeckt (kein Engine-Signal mit Quelle): bloße
+//  Zielwahl ohne Wirkung, Fähigkeits-Entfernen/-Verschieben,
+//  Kontrollwechsel (er läuft über den neuen Kontrolleur),
+//  Statusentfernung/Reinigung durch den Gegner, vom Gegner
+//  gesetzte Stats (ATK/Max-HP), Kreaturen, die der Gegner in
+//  Stellans Zonen setzt (Elusive Hind, Plant Golem).
 //
 //  Effect — the controller picks ONE of:
 //    • "Up to 3 level-0 Creatures with DIFFERENT
@@ -40,10 +59,16 @@
 const { heldenSperreFrei, heldenSperreFreigeben, heldenSperreSetzen } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const { hasCardType, isSummonablePileCreature, STATUS_EFFECTS } = require('./_hooks');
 const { pickAusQuellen } = require('./_source-pick-shared');
+const { getroffenVon } = require('./_affected-shared');   // Als Ruling (Al 26.10.): „affected by an opponent's card or effect" — gemeinsamer Helfer (Quelle ist Pflicht)
 
 const CARD_NAME   = 'Stellan, the Calm Cat';
 const HOPT_KEY    = 'stellanTriggeredThisTurn';
 const MAX_FROM_HAND = 3;
+
+/** Hat ein GEGNER diesen Stellan über Heilung/Buff getroffen? (`_affected-shared.getroffenVon`, Kontrolleur = `cardOwner`, Brettseite = `cardOriginalOwner`.) */
+function vomGegnerGetroffen(art, ctx) {
+  return getroffenVon(art, ctx, ctx.cardOriginalOwner, ctx.card.heroIdx, ctx.cardOwner) != null;
+}
 
 /** The once-per-turn gate lives on Stellan's card-instance counters. */
 // ★ v1275 (Als Ruling 22.9.): die Einmal-Sperre haengt am SPIELER, nicht
@@ -364,10 +389,36 @@ module.exports = {
       // Kontrolle statt Seite (Styx 28.9.): „opponent" = Gegner des
       // KONTROLLEURS (ohne Uebernahme ist cardOwner === cardOriginalOwner).
       if (appliedBy === ctx.cardOwner) return;
-      // Only negative statuses count — self-applied buffs like `shielded`
-      // or `immune` shouldn't spend the trigger. (Matches Fiona.)
+      // Als Ruling (Al 26.10.): ein vom GEGNER gesetzter Status zaehlt immer (auch ein positiver); ohne erkennbare Quelle (`appliedBy` -1)
+      // bleibt es bei der alten Vorsicht — nur ein negativer zaehlt, damit Eigen-Buffs den Ausloeser nicht verbrauchen (wie Fiona).
+      const gegnerBekannt = typeof appliedBy === 'number' && appliedBy >= 0;
       const statusDef = STATUS_EFFECTS[ctx.statusName];
-      if (!statusDef?.negative) return;
+      if (!gegnerBekannt && !statusDef?.negative) return;
+      tryFire(ctx);
+    },
+
+    // ── Als Ruling (Al 26.10.): weitere Wege von „affected by an opponent's card or effect" ──
+    // Heilung und Buff des Gegners (Quelle ist Pflicht — `getroffenVon`).
+    afterHeal: async (ctx) => {
+      if (!vomGegnerGetroffen('afterHeal', ctx)) return;
+      tryFire(ctx);
+    },
+    afterBuff: async (ctx) => {
+      if (!vomGegnerGetroffen('afterBuff', ctx)) return;
+      tryFire(ctx);
+    },
+    // Der Gegner legt eine Ausruestung / ein Anhaengsel an Stellan an oder haengt eine um (`engine.fireEquipGained`; `equipOwner` = Anleger).
+    onEquipGained: async (ctx) => {
+      if (ctx.hostSide !== ctx.cardOriginalOwner || ctx.equipHeroIdx !== ctx.card.heroIdx) return;
+      if (typeof ctx.equipOwner !== 'number' || ctx.equipOwner < 0 || ctx.equipOwner === ctx.cardOwner) return;
+      tryFire(ctx);
+    },
+    // Der Gegner nimmt Stellan eine Ausruestung / ein Anhaengsel weg bzw. haengt sie um (`engine.fireEquipLost`; nur mit bekanntem gegnerischem Verursacher,
+    // nicht beim Aufraeumen nach dem Tod/Entfernen des Wirts).
+    onEquipLost: async (ctx) => {
+      if (ctx.fromOwner !== ctx.cardOriginalOwner || ctx.fromHeroIdx !== ctx.card.heroIdx) return;
+      if (ctx.reason === 'hostDefeated' || ctx.reason === 'hostRemoved') return;
+      if (typeof ctx.equipOwner !== 'number' || ctx.equipOwner < 0 || ctx.equipOwner === ctx.cardOwner) return;
       tryFire(ctx);
     },
   },

@@ -9,10 +9,11 @@
 //
 //  ── AUSLEGUNG ─────────────────────────────────────────────────────
 //  • Aktiver Held-Effekt, einmal pro Zug (Held-Effekt-Sperre der Engine); zwei Wege, einer pro Aktivierung.
-//    VORBEDINGUNG: schon mindestens eine eigene geloeschte Area (Level ≤ 3) — die Areas, die der Effekt selbst
-//    loescht, zaehlen NICHT mit; sonst ist Dante nicht aktivierbar (beide Wege).
+//    VORBEDINGUNG NUR FUER DEN AREA-WEG (Entscheidung Al): schon mindestens eine eigene geloeschte Area (Level ≤ 3) —
+//    die Areas, die der Effekt selbst loescht, zaehlen NICHT mit. Der Spell-Weg braucht sie NICHT; Dante ist aktivierbar,
+//    wenn ein loeschbarer Spell in der Hand liegt ODER eine solche geloeschte Area existiert.
 //    Mit loeschbarem Spell in der Hand geht es DIREKT in den Handwahl-Modus (`forceDiscardCancellable`, gueltige
-//    Spells leuchten, Escape = Abbruch ohne Verbrauch); gibt es auch Areas, bietet derselbe Modus einen Knopf
+//    Spells leuchten, Escape = Abbruch ohne Verbrauch); gibt es eine geloeschte Area (Area-Weg moeglich), bietet derselbe Modus einen Knopf
 //    „Delete Areas instead". Ohne loeschbaren Spell nur Weg 2 (mit kurzer Bestaetigung, abbrechbar).
 //  • Weg 1: Spell (Kartentyp Spell, KEINE Attack) mit WIRKSAMEM Level ≤ 3 aus der eigenen Hand waehlen und
 //    LOESCHEN (Loesch-Rettung moeglich; wird er gerettet, ist „if you do" nicht erfuellt). Dann so viele Karten
@@ -143,9 +144,9 @@ module.exports = {
     const feld = ctx.cardHeroOwner ?? pi;
     const hero = engine.gs.players[feld]?.heroes?.[ctx.cardHeroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
-    // Nur aktivierbar, wenn SCHON mindestens eine eigene Area (Level ≤ 3) im Geloescht-Stapel liegt — die Areas, die
-    // der Effekt selbst loescht, zaehlen nicht mit. Dann reicht fuer Weg 1 ein loeschbarer Spell oder fuer Weg 2 die Area.
-    return geloeschteAreas(engine, pi).length > 0;
+    // Weg 1 (Spell): ein loeschbarer Spell in der Hand genuegt. Weg 2 (Areas): nur, wenn SCHON mindestens eine eigene
+    // Area (Level ≤ 3) im Geloescht-Stapel liegt — die Areas, die der Effekt selbst loescht, zaehlen nicht mit.
+    return spellsInHand(engine, pi).length > 0 || geloeschteAreas(engine, pi).length > 0;
   },
 
   async onHeroEffect(ctx) {
@@ -153,8 +154,8 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = engine.gs.players[pi];
     const spells = spellsInHand(engine, pi);
-    const area = geloeschteAreas(engine, pi).length > 0;     // Vorbedingung des Effekts (siehe canActivateHeroEffect)
-    if (!area) return false;
+    const area = geloeschteAreas(engine, pi).length > 0;     // Vorbedingung NUR des Area-Wegs (siehe canActivateHeroEffect)
+    if (!area && spells.length === 0) return false;
 
     // Weg 2 allein (keine loeschbare Handkarte): kurze Bestaetigung, dann die Areas.
     if (spells.length === 0) {

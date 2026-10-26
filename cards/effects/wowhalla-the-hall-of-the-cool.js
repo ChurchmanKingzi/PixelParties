@@ -15,6 +15,16 @@
 //  ③ When this card is removed from the board, the
 //     entire Coolness Stack is deleted.
 //
+//  Als Ruling (Al 26.10.): Der Coolness Stack EXISTIERT, solange
+//  Wowhalla in der eigenen Area liegt — auch leer. Freshya,
+//  Lolki, Wowkyrie, Nornstellar, Hipdall (Nachfuellen) und
+//  Prophecy funktionieren dann auch bei leerem Stack
+//  (`engine.hasCoolnessStack` = Stack nicht leer ODER eigene
+//  Wowhalla in der eigenen Area). Wer eine KARTE aus dem Stack
+//  braucht (Cool Rescue, Ragnarock, der Selbstschutz ④), prueft
+//  `getCoolnessStackSize > 0`. Liegt Wowhalla nicht mehr, ist der
+//  Stack wie bisher geloescht/nicht vorhanden (③).
+//
 //  ④ When this card is the target of an opponent's
 //     effect, the controller may delete the top of
 //     their Coolness Stack to negate it. Hooks into
@@ -94,7 +104,7 @@ module.exports = {
       if (ctx.toZone !== 'area') return;
       if (ctx.enteringCard?.id !== ctx.card.id) return;
       const engine = ctx._engine;
-      if (engine.hasCoolnessStack(ctx.cardOwner)) return;
+      if (engine.getCoolnessStackSize(ctx.cardOwner) > 0) return;   // Als Ruling (Al 26.10.): „leer" heisst Karten zaehlen — `hasCoolnessStack` ist bei liegender Wowhalla auch leer wahr
       await ctx.pushDeckTopToCoolnessStack(ctx.cardOwner, { source: CARD_NAME });
     },
 
@@ -112,7 +122,7 @@ module.exports = {
     onGameStart: async (ctx) => {
       if (ctx.cardZone !== 'area') return;
       const engine = ctx._engine;
-      if (engine.hasCoolnessStack(ctx.cardOwner)) return;
+      if (engine.getCoolnessStackSize(ctx.cardOwner) > 0) return;   // Als Ruling (Al 26.10.): s. o.
       await ctx.pushDeckTopToCoolnessStack(ctx.cardOwner, { source: CARD_NAME });
     },
 
@@ -149,7 +159,7 @@ module.exports = {
     if (info.sourceOwner === ctx.cardOwner) return null;
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    if (!engine.hasCoolnessStack(pi)) return null;
+    if (!(engine.getCoolnessStackSize(pi) > 0)) return null;   // Als Ruling (Al 26.10.): der Stack kann bei liegender Wowhalla leer sein — dann gibt es nichts zu loeschen
 
     const sourceName = info.source?.name || 'an opposing effect';
     const confirmed = await engine.promptGeneric(pi, {

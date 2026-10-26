@@ -190,6 +190,9 @@ module.exports = {
       title: CARD_NAME,
       description: 'Choose a target for 80 damage.',
       confirmLabel: '💥 80 Damage!',
+      // Als Ruling (Al 26.10.): Cheeky Monkee ist eine Kreatur → 'creature' mit Vorschau 80 (wie die Gold-Zielwahl oben).
+      damageType: 'creature',
+      baseDamage: DAMAGE,
       cancellable: true,
       selectCount: 1,
       minSelect: 1,

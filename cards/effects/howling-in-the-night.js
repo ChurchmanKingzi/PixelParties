@@ -47,6 +47,10 @@ module.exports = {
 
   activeIn: ['hand'],
 
+  // AoE-Regel (CARD_API ⑦, Als Regel 18.9.): der Zauber legt auf ALLE gegnerischen Helden einen Status, teilt aber keinen Schaden aus — die
+  // Autoerkennung des Loaders (Schadensklammer) sieht ihn nicht, also von Hand deklarieren (wie Poisoned Well, Iceage, Medusa's Curse).
+  hitsMultipleTargets: true,
+
   /** Ohne einen erreichbaren gegnerischen Helden bewirkt die Karte nichts. */
   spellPlayCondition(gs, playerIdx, engine) {
     const oi = opponentOfGs(gs, playerIdx);
@@ -68,6 +72,16 @@ module.exports = {
 
       // Bis zum Beginn des naechsten eigenen Zuges (siehe Kopf).
       const expiresAtTurn = (gs.turn || 0) + 2;
+
+      // ★ W14b (Q156, Al: „Jeder Treffer zählt, auch reines Status-Zufügen") + W15a (R01-10): reine Status-Flächenzauber auf gegnerische Helden öffnen VOR dem Status
+      // die „hit by"-Surprises (Booby Trap, Toxic Trap …) und die Hand-Reaktionen (Post-Target: MOE Shield, Barrier of Faith, Storm Ring …) — wie Poisoned Well und Iceage.
+      const ziele = engine.heroesControlledBy(oi)
+        .filter(({ hero }) => hero?.name && hero.hp > 0)
+        .map(({ physOwner, heroIdx: hi, hero }) => ({ type: 'hero', owner: physOwner, heroIdx: hi, cardName: hero.name }));
+      if (ziele.length > 0) {
+        const sr = await engine.statusHitSurpriseWindow(ctx.card, ziele, 'decay_spell', { ziele });
+        if (sr?.effectNegated) return;
+      }
 
       // Bildschirmweite Blende (v880, Als Vorgabe): kurz abdunkeln und
       // verzerren, bevor der Status landet. `heroIdx: -1` routet die

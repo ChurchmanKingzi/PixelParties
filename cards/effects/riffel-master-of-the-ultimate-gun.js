@@ -22,6 +22,7 @@
 // ═══════════════════════════════════════════
 
 const { ASCEND_TARGET, riffelAscensionMet } = require('./_riffel-shared');
+const { searchBlocked } = require('./_search-shared');
 
 const CARD_NAME = ASCEND_TARGET;
 
@@ -56,6 +57,7 @@ module.exports = {
   canActivateHeroEffect(ctx) {
     const ps = ctx._engine.gs.players[ctx.cardOwner];
     if (!ps || ps.handLocked) return false;
+    if (searchBlocked(ctx._engine, ctx.cardOwner)) return false;   // Such-Template ②: Schritt 1 ist die Suche → unter der Sperre nicht anbieten
     return (ps.mainDeck || []).length > 0;
   },
 
@@ -63,7 +65,7 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const ps = engine.gs.players[pi];
-    if (!ps || ps.handLocked) return false;
+    if (!ps || ps.handLocked || searchBlocked(engine, pi)) return false;
     const names = deckNames(ps);
     if (names.length === 0) return false;
 
