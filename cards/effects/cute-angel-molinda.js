@@ -255,6 +255,7 @@ module.exports = {
         // control flip does not).
         if (engine._isSideNondamageShielded?.(tgtCtrl)) continue;
         if (engine.isCreatureImmune?.(inst, 'control_immune')) continue;
+        if (engine.controlIsLocked(inst)) continue;   // Als Ruling (Al 26.10.): „Control of this Creature cannot change" (Creepy Villager) — keine Uebernahme-Frage
         if (inst.counters?._cardinalImmune) continue;
         if (engine.kreaturGegnerEffektImmun(inst, ctx.cardOwner)) continue;   // W17b: Golden Wings
         if (inst.counters?._baihuPetrify || inst.counters?._petrified) continue;

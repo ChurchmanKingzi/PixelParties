@@ -90,6 +90,7 @@ function getEligibleCreatures(engine, pi, maxCreatureLevel) {
     if (inst.controller !== oppIdx || inst.zone !== 'support') continue;
     if (engine.isCreatureImmune(inst, 'targeting_immune')) continue;
     if (engine.isCreatureImmune(inst, 'control_immune')) continue;
+    if (engine.controlIsLocked(inst)) continue;   // Als Ruling (Al 26.10.): „Control of this Creature cannot change" (Creepy Villager) — nicht waehlbar, kein Verbrauch
     const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     if (!hasNumericCreatureLevel(cd)) continue;   // Artifact Creatures haben kein Level (Als Ruling 9.10.)

@@ -74,6 +74,9 @@ module.exports = {
         confirmLabel: '💋 Charm!',
         confirmClass: 'btn-success',
         cancellable: true,
+        // Als Ruling (Al 26.10., Dark Gear × Creepy Villager): eine Kreatur, deren Kontrolle sich nicht aendern kann, ist ausgegraut (nicht waehlbar).
+        condition: (t) => !t.cardInstance || !engine.controlIsLocked(t.cardInstance),
+        dimUnmetCondition: true,
       });
       if (!target) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 

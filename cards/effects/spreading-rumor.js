@@ -10,6 +10,11 @@
 //  interact with their opponent's hand for the
 //  rest of the turn afterwards.
 //
+//  Als Ruling (Al 26.10.): „you MAY make this count as an additional Action": bei ≥ 1 abgeworfener Karte fragt der Zauber Ja/Nein — aber NUR, wenn
+//  der Spieler danach überhaupt noch eine Aktion nutzen könnte (`hasPayableActionFor`: reguläre Aktion noch offen oder einlösbarer Zweitaktions-
+//  Zuschlag/Geber, Muster Pillar of Light). Ohne solche Aktion: keine Frage, normale Aktion, und die Sperre „cannot interact with your opponent's
+//  hand" greift NICHT (sie gilt nur, wenn man „if you do" die Zusatzaktion gewählt hat). „Nein" = normale Aktion, ebenfalls ohne Sperre.
+//
 //  CONDITIONAL INHERENT — defaults to inherent
 //  (no Action consumed) WHENEVER the casting
 //  Hero has Action capacity that would otherwise
@@ -45,6 +50,12 @@ const { baseCardName } = require('./_hooks');
 const CARD_NAME = 'Spreading Rumor';
 
 module.exports = {
+  // CPU: wie bisher immer als Zusatzaktion zählen lassen (mit Sperre) — die Frage kommt nur, wenn danach noch eine Aktion nutzbar wäre (Ruling Al 26.10.).
+  cpuResponse(engine, kind, promptData) {
+    if (kind === 'generic' && promptData?.type === 'confirm' && promptData?.title === CARD_NAME) return { confirmed: true };
+    return undefined;
+  },
+
   /**
    * Conditional inherent gate — true iff the casting Hero is alive,
    * not silenced, and the player has Action capacity that would
@@ -167,13 +178,46 @@ module.exports = {
       });
 
       if (discarded > 0) {
-        // Successful cast — inherent stays. Apply the opp-hand-
-        // interaction lock per card text. The engine's inherent
-        // path already consumed nothing, so no further action
-        // bookkeeping is needed.
-        ps._oppHandInteractionLockedTurn = gs.turn;
-        ps.oppHandLocked = true;   // W16g (S03-02): auch fuer Slow und Arthor (gleiche Regel, zweite Flagge)
-        engine.log('rumor_inherent', { player: ps.username });
+        // ★ Als Ruling (Al 26.10.): „you MAY make this count as an additional Action, but IF YOU DO, you cannot interact with your opponent's hand …"
+        // Bei ≥ 1 abgeworfener Karte kommt die Ja/Nein-Frage „als Zusatzaktion zählen lassen?" NUR, wenn der Spieler danach überhaupt noch eine Aktion nutzen
+        // könnte (Muster Pillar of Light: reguläre Aktion noch offen oder einlösbarer Zweitaktions-Zuschlag / passender Geber — `hasPayableActionFor`, am Ende der
+        // Auflösung gelesen: ein Zuschlag, der diesen Guss getragen hat, ist dann schon verbraucht). Ohne solche Aktion gibt es keine Frage: normale Aktion
+        // (Server zahlt sie über `gs._spellForcesActionConsume`, der Curse-Vertrag), und die Sperre greift dann NICHT — sie gilt nur, wenn man die Zusatzaktion gewählt hat.
+        // Sofort-Guss (`gs._immediateActionContext`, Chaos Diamond …): der Guss IST schon die Zusatzaktion — Sperre ohne Frage, nichts wird verbraucht.
+        const sofort = !!gs._immediateActionContext;
+        const inhaerent = !sofort && gs._spellWasInherent === true;      // von der Engine als Zusatzaktion gespielt (Skript `inherentAction`)
+        let zusatzaktion = true;
+        if (inhaerent) {
+          if (engine.hasPayableActionFor?.(pi, CARD_NAME, heroIdx)) {
+            const ja = await engine.promptGeneric(pi, {
+              type: 'confirm',
+              title: CARD_NAME,
+              message: `${discarded} card${discarded === 1 ? '' : 's'} discarded. Count ${CARD_NAME} as an additional Action? If you do, you cannot interact with your opponent's hand for the rest of the turn.`,
+              showCard: CARD_NAME,
+              confirmLabel: 'Additional Action',
+              cancelLabel: 'Normal Action',
+              cancellable: true,
+            });
+            zusatzaktion = typeof engine._confirmSaidYes === 'function' ? engine._confirmSaidYes(ja) : !!(ja && !ja.cancelled);
+          } else {
+            zusatzaktion = false;
+          }
+          if (!zusatzaktion) {
+            gs._spellForcesActionConsume = true;       // normale Aktion: die nächste verfügbare wird bezahlt (server.js, wie Curse / Forbidden Curse of Aging)
+            engine.log('rumor_normal_action', { player: ps.username });
+          }
+        } else if (!sofort) {
+          zusatzaktion = false;                          // schon als normale Aktion bezahlt (kein Zusatzaktions-Weg) — keine Sperre
+        }
+        if (zusatzaktion) {
+          // Zusatzaktion gewählt — inherent stays. Apply the opp-hand-
+          // interaction lock per card text. The engine's inherent
+          // path already consumed nothing, so no further action
+          // bookkeeping is needed.
+          ps._oppHandInteractionLockedTurn = gs.turn;
+          ps.oppHandLocked = true;   // W16g (S03-02): auch fuer Slow und Arthor (gleiche Regel, zweite Flagge)
+          engine.log('rumor_inherent', { player: ps.username });
+        }
       } else {
         // Fumble — revoke the inherent status. Server-side rider
         // (in doPlaySpell) consumes an additional-action provider

@@ -168,6 +168,8 @@ module.exports = {
       // Jaegers `pi` zaehlt auch die Zone einer GLEICHNAMIGEN Creature (die Beute teilt sich die Zone) — `engine.ersteBeschwoerZone`, geteilte zuerst.
       const zone = engine.ersteBeschwoerZone(pi, tot.name, { seite: feld, heroIdx: hi, namedHeroesOnly: true })?.slotIdx ?? -1;
       if (zone < 0) return;                       // Als Ruling ③
+      // Als Ruling (Al 26.10., Dark Gear × Creepy Villager): „Control of this Creature cannot change" — keine Uebernahme anbieten (die Kreatur stirbt ganz normal).
+      if (engine.controlIsLocked(inst)) return;
 
       const negiert = stufe === 2;
       const ja = await engine.promptGeneric(pi, {

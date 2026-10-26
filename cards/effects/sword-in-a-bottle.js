@@ -100,6 +100,9 @@ function angriffswert(engine, pi, heroIdx) {
 }
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Am besten gleich die Karten ganz sperren statt den Schaden fizzeln zu lassen"): die Karte richtet NUR Schaden an Zielen des Gegners an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // W27a (Al, 21.10.2026): „treated as an Attack" — Leser der Quellstufe (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) fragen `_heldenEffektStufe`.
   // W32a (Al, 22.10.2026): „Sie nehmen trotzdem das Fighting-Level": die Quellstufe ist das FIGHTING-LEVEL des gewählten eigenen Helden (nicht mehr fix 0). Der gewählte
   // Held ist der ANGREIFER (Punkt 6): die Quelle trägt Brettseite + Index — Crimson Web hängt sich an ihn, Tharxian Horse trifft ihn. Kann er nicht angreifen (Frozen …), blockt der Trank.

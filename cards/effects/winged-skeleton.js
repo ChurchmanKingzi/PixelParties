@@ -6,28 +6,26 @@
 //  an opponent's card or effect, you may return that Creature back to
 //  your hand to negate the card or effect.
 //
-//  Rule of thumb (per design): "If `_cardinalImmune` would block it,
-//  it's targeting, and it comes from the opponent — Winged Skeleton
-//  can chain to it." So we listen on the engine paths that respect
-//  `_cardinalImmune`:
+//  ★ Als Ruling (Al 26.10.): „Es soll der GANZE Effekt negiert werden, aber Winged Skeleton darf nur feuern, wenn ein Skelett GEWÄHLT wird, also z. B. nicht bei
+//  Flame Avalanche."
+//   • GEWÄHLT: die Karte hängt am Fenster NACH DER ZIELWAHL (`isEquippedPostTargetReaction`, dieselbe Bauform wie Cool Tech Jetpack / Future Tech Weathercock):
+//     `promptDamageTarget`, `promptMultiTarget` und der Dispatcher `promptEffectTarget` (nach der Bestätigung der Ziele) fragen sie, bevor irgendein Treffer fällt.
+//     Ein Flächenschlag („all targets": Flame Avalanche, Hole in the Sky, Heat Wave …) WÄHLT niemanden — er öffnet das Fenster nur mit `_isAoeCheck` bzw. ohne
+//     Auswahl-Ziele (kein `cardInstance`) und lässt die Karte schweigen (CARD_API „Ein Flächenschlag WÄHLT niemanden").
+//   • GANZER EFFEKT: die Rückgabe liefert `{ effectNegated: true }` — wie bei Anti Magic Shield & Co. bricht die auswählende Karte/der Effekt ab, auch die übrigen
+//     gewählten Ziele (Helden, andere Kreaturen) werden nicht mehr getroffen. `negatesWholeCard`: die gewirkte Karte löst nie auf (Einmal-Stempel zurück).
+//   • Bisher lauschte die Karte an `beforeCreatureAffected` / `beforeCreatureDamageBatch` und negierte nur den Treffer auf das Skelett (bei Mehrzielwahl blieben die
+//     anderen Ziele getroffen) — und feuerte bei einem Flächenschlag, der zufällig nur ein Skelett traf. Beide Hooks sind weg.
 //
-//    • beforeCreatureAffected  — destroy / move / status / heal
-//      (heal is INCLUDED — opp-targeted heals on your creatures are
-//      rare but legal targeting; the rule covers them).
-//    • beforeCreatureDamageBatch — direct damage (Attacks like Heavy
-//      Hit, single-target Spells like Alice's effect, etc.). We only
-//      react when the batch is a SINGLE-target hit on our Skeleton —
-//      AoE / multi-target damage isn't "choosing" any one creature.
+//  Umsetzung:
+//   • `postTargetCondition`: die Quelle gehört dem Gegner (`sourceOwner !== pi`), kein Flächenschlag (`_isAoeCheck`), diese Instanz ruht nicht (frozen/negated …),
+//     ihr Einmal-pro-Zug-Stempel (`counters.wingedSkeletonNegate`, je Instanz) ist frei, und unter den GEWÄHLTEN Zielen steht mindestens ein Skelett, das du kontrollierst.
+//   • `postTargetResolve`: sind mehrere deiner Skelette gewählt, wählst du, welches zurückgeht (genau eines je Einsatz); es geht in die Hand seines KONTROLLEURS
+//     (Herkunft bleibt gemerkt, W64c), der Stempel wird gesetzt, der Effekt negiert.
+//   • Die Rückfrage („Activate?") stellt die Engine (`postTargetMessage` formuliert sie für Kreaturen statt „your Hero").
 //
-//  Buff add / remove paths (`actionAddCreatureBuff` /
-//  `actionRemoveCreatureBuff`) have no firing hook today — covering
-//  them would need an engine extension. They're rare opp interactions
-//  on creatures (most buffs are own-side), so left for future work.
-//
-//  Per-turn cap: SOFT once-per-turn — each Winged Skeleton instance
-//  has its own per-turn negation slot, stored on
-//  `inst.counters.wingedSkeletonNegate`. Two Winged Skeletons each
-//  get their own activation per the default Creature HOPT semantics.
+//  Per-turn cap: SOFT once-per-turn — each Winged Skeleton instance has its own per-turn negation slot, stored on `inst.counters.wingedSkeletonNegate`. Two Winged
+//  Skeletons each get their own activation per the default Creature HOPT semantics.
 // ═══════════════════════════════════════════
 
 const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
@@ -80,113 +78,83 @@ function bounceSkeletonToHand(engine, targetInst) {
 }
 
 /**
- * Shared confirm + bounce flow. Returns true if the player accepted
- * the negation. Stamps HOPT only on a successful accept.
+ * Die GEWÄHLTEN Skelette, die `pi` kontrolliert. Nur echte Auswahl-Ziele zählen (Zielobjekt mit `cardInstance`, so liefern es die Zielwähler); die Ziele der
+ * Flächen-/Batch-Fenster der Engine („type: creature" ohne Instanz) sind keine Wahl.
  */
-async function offerNegation(ctx, targetInst, sourceCardName, descriptionVerb) {
-  const engine = ctx._engine;
-  const gs = engine.gs;
-  const myController = ctx.cardController ?? ctx.cardOwner;
-  // Per-instance soft HOPT — this specific Winged Skeleton's slot.
-  if (alreadyUsedThisTurn(gs, ctx.card)) return false;
-
-  const confirmed = await engine.promptGeneric(myController, {
-    type: 'confirm',
-    title: CARD_NAME,
-    message: `An opponent's ${sourceCardName || 'effect'} ${descriptionVerb} ${targetInst.name}. Return it to your hand and negate the effect?`,
-    showCard: CARD_NAME,
-    confirmLabel: '🪽 Negate!',
-    confirmClass: 'btn-success',
-    cancelLabel: 'Let it land',
-    cancellable: true,
-  });
-  if (!confirmed) return false;
-
-  stampUsed(gs, ctx.card);
-  bounceSkeletonToHand(engine, targetInst);
-  engine.log('winged_skeleton_negate', {
-    player: gs.players[myController]?.username,
-    rescued: targetInst.name,
-    sourceCard: sourceCardName || 'unknown',
-    verb: descriptionVerb,
-  });
-  engine.sync();
-  return true;
+function gewaehlteSkelette(engine, pi, targets) {
+  const out = [];
+  for (const t of (targets || [])) {
+    const inst = t?.cardInstance || t?._cardInstance;   // manche Skripte führen ihre Kreaturen-Ziele nur als `_cardInstance` (Skeleton Archer …)
+    if (!inst || inst.zone !== 'support' || inst.faceDown) continue;
+    if ((inst.controller ?? inst.owner) !== pi) continue;
+    if (!engine.cardInstances.includes(inst)) continue;
+    if (!anyName(inst, (n) => isSkeletonCreature(n, engine))) continue;
+    if (!out.includes(inst)) out.push(inst);
+  }
+  return out;
 }
 
 module.exports = {
+  // „negate the card or effect" = die gewirkte Karte löst NIE auf → ihre Einmal-Stempel werden zurückgegeben (Engine: `_merkeGanzeNegation`).
+  negatesWholeCard: true,
+
   activeIn: ['support'],
 
-  hooks: {
-    /**
-     * Fires from actionDestroyCard / actionMoveCard /
-     * actionApplyCreaturePoison / actionHealCreature with effectType
-     * 'destroy' / 'move' / 'status' / 'heal'. Cancellable via
-     * `ctx.cancel()` or by setting `ctx.cancelled = true`.
-     */
-    beforeCreatureAffected: async (ctx) => {
-      const targetInst = ctx.creature;
-      if (!targetInst) return;
-      if (ctx.cancelled) return;
+  isEquippedPostTargetReaction: true,
+  postTargetKreaturWahl: true,   // sieht auch die gewählten KREATUREN aus der allgemeinen Zielwahl (`promptEffectTarget`, Engine v1368)
 
-      const engine = ctx._engine;
-      const myController = ctx.cardController ?? ctx.cardOwner;
-      const sourceOwner = ctx.source?.owner ?? ctx.source?.controller;
-      if (sourceOwner == null) return;
-      if (sourceOwner === myController) return;
-      const targetController = targetInst.controller ?? targetInst.owner;
-      if (targetController !== myController) return;
-      if (!anyName(targetInst, (n) => isSkeletonCreature(n, engine))) return;
+  // CPU: die Rückkehr kostet nur ein Skelett-Handkarten-Replay, der Effekt des Gegners fällt ganz weg — immer annehmen.
+  cpuResponse(engine, kind, promptData) {
+    if (kind === 'generic' && promptData?.type === 'confirm' && (promptData?.title === CARD_NAME || promptData?.reactionCardName === CARD_NAME)) return { confirmed: true };
+    return undefined;
+  },
 
-      const verb = (ctx.effectType === 'destroy') ? 'targeted'
-                 : (ctx.effectType === 'move')    ? 'is moving'
-                 : (ctx.effectType === 'heal')    ? 'is healing'
-                 : (ctx.effectType === 'status')  ? 'is statusing'
-                 :                                  'chose';
-      const accepted = await offerNegation(ctx, targetInst, ctx.source?.name, verb);
-      if (accepted) {
-        if (typeof ctx.cancel === 'function') ctx.cancel();
-        else ctx.setFlag?.('cancelled', true);
-      }
-    },
+  postTargetCondition(gs, pi, engine, targets, sourceCard, opts) {
+    const inst = opts?.inst;
+    if (!inst || inst.zone !== 'support') return false;
+    if (sourceCard?._isAoeCheck) return false;                       // ein Flächenschlag wählt niemanden
+    const sourceOwner = sourceCard?.controller ?? sourceCard?.owner ?? -1;
+    if (sourceOwner === pi || sourceOwner < 0) return false;        // nur „an opponent's card or effect"
+    if (alreadyUsedThisTurn(gs, inst)) return false;
+    if (engine.isCardPassiveDormant?.(inst)) return false;           // gefroren / betäubt / negiert …
+    return gewaehlteSkelette(engine, pi, targets).length > 0;
+  },
 
-    /**
-     * Direct damage to creatures routes through this hook. We only
-     * react to TARGETING-style damage (single-entry batches): an
-     * Attack hitting one creature, a single-target damage spell
-     * (Alice etc.). Multi-entry batches (AoE / splash) are NOT
-     * "choosing" the Skeleton specifically and are skipped.
-     *
-     * Cancel mechanics: setting `entry._immuneCreature = true`
-     * marks the entry as immune so the damage step (line ~17170 in
-     * the engine) skips HP reduction. Pre-empting the bounce avoids
-     * a second-best outcome where the Skeleton takes damage AND is
-     * bounced.
-     */
-    beforeCreatureDamageBatch: async (ctx) => {
-      const entries = ctx.entries || [];
-      if (entries.length !== 1) return;
-      const entry = entries[0];
-      if (!entry || entry.cancelled || entry._immuneCreature) return;
-      const targetInst = entry.inst;
-      if (!targetInst) return;
+  /** Formuliert die Rückfrage der Engine für Kreaturen („is targeting your Hero!" passt hier nicht). */
+  postTargetMessage(engine, srcName, opts, targets) {
+    const inst = opts?.inst;
+    const pi = inst ? (inst.controller ?? inst.owner) : -1;
+    const namen = gewaehlteSkelette(engine, pi, targets).map(i => i.name);
+    return `${srcName} is choosing ${namen.join(', ')}! Return it to your hand to negate the card or effect?`;
+  },
 
-      const engine = ctx._engine;
-      const myController = ctx.cardController ?? ctx.cardOwner;
-      const sourceOwner = entry.sourceOwner ?? entry.source?.owner;
-      if (sourceOwner == null) return;
-      if (sourceOwner === myController) return;
-      const targetController = targetInst.controller ?? targetInst.owner;
-      if (targetController !== myController) return;
-      if (!anyName(targetInst, (n) => isSkeletonCreature(n, engine))) return;
-
-      const accepted = await offerNegation(ctx, targetInst, entry.source?.name, `targeted (${entry.amount} dmg)`);
-      if (accepted) {
-        // Mark the entry as fully cancelled so neither damage nor
-        // any post-hit rider (afterDamage, on-hit status, etc.) fires.
-        entry.cancelled = true;
-        entry._immuneCreature = true;
-      }
-    },
+  async postTargetResolve(engine, pi, targets, sourceCard, opts) {
+    const gs = engine.gs;
+    const inst = opts?.inst;
+    const kandidaten = gewaehlteSkelette(engine, pi, targets);
+    if (kandidaten.length === 0) return {};
+    let ziel = kandidaten[0];
+    if (kandidaten.length > 1) {
+      // Mehrere deiner Skelette sind gewählt: genau EINES geht zurück — du wählst (Pflichtwahl, der Rückgabepreis ist schon zugesagt).
+      const wahl = await engine.promptGeneric(pi, {
+        type: 'optionPicker',
+        title: CARD_NAME,
+        description: 'Which chosen Skeleton do you return to your hand?',
+        options: kandidaten.map((c, i) => ({ id: `n-${i}`, label: `${c.name}` })),
+        cancellable: false,
+      });
+      const m = String(wahl?.optionId || '').match(/^n-(\d+)$/);
+      if (m && kandidaten[Number(m[1])]) ziel = kandidaten[Number(m[1])];
+    }
+    stampUsed(gs, inst);
+    bounceSkeletonToHand(engine, ziel);
+    engine.log('winged_skeleton_negate', {
+      player: gs.players[pi]?.username,
+      rescued: ziel.name,
+      sourceCard: sourceCard?.name || 'unknown',
+      verb: 'chosen',
+    });
+    engine.sync();
+    return { effectNegated: true };
   },
 };

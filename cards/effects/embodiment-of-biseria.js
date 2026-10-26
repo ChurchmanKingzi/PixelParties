@@ -173,6 +173,16 @@ module.exports = {
 
     // ── Frost ──
     const ziele = gegnerKreaturen(engine, oi);
+    // ★ Als Ruling (Al 26.10.): Gruppenwirkungen auf Kreaturen OHNE Schaden durch einen Kreatureneffekt öffnen das Reaktionsfenster der AoE-Prinzipien
+    // (Flächenwirkung, CARD_API ⑦ „Reagieren"): Rook of Kings [B] („unaffected by effects that would affect more than 1 target"), Divine Gift of Rain,
+    // Castling u. a. greifen VOR dem Frost. Heldenliste leer (nur Kreaturen werden eingefroren: keine „hit by"-Surprises der Helden).
+    // Negiert eine Reaktion den Effekt, ist die Nutzung verbraucht (Auftritt/Wahl lagen davor) — wie bei Iceage/Snowstorm Mischief.
+    if (ziele.length > 0) {
+      const sr = await engine.statusHitSurpriseWindow(inst, [], 'creature', {
+        ziele: ziele.map(z => ({ type: 'creature', owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx, cardName: z.name })),
+      });
+      if (sr?.effectNegated) return true;
+    }
     engine._broadcastEvent('play_zone_animation', {
       type: 'biseria_blizzard', zoneType: 'board', owner: oi, heroIdx: -1, zoneSlot: -1,
       duration: BLIZZARD_MS, regionOwner: oi,

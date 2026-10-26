@@ -16,6 +16,10 @@
 //  endet mit der Aufloesung, die naechste Aktion fragt wieder).
 //  Die alte Sperre (`monia-protect` ueber `_hero-hopt-shared`) entfaellt.
 //
+//  ★ Als Ruling (Al 26.10., „wörtlich nehmen"): „… negate any effects that card or effect has on ALL Creatures" — EINE abgeworfene Karte negiert die Wirkung der
+//  auslösenden Karte/des Effekts auf ALLE Kreaturen (beide Seiten), nicht nur auf eine Seite. Die Seitenwahl (`save-0` / `save-1`) entfällt: ein Angebot (`save-all`),
+//  ein angenommenes Angebot schützt alle Seiten (`alleSeitenSchuetzen` → `gs._moniaAngebote` je Seite) für den Rest dieser Karte/dieses Effekts.
+//
 //  Hooks into beforeCreatureDamageBatch (Schaden) und
 //  beforeCreatureAffected (Zerstoeren, Status, Bewegen, Heilen,
 //  Kontrolle).
@@ -41,6 +45,15 @@
 
 const { JETPACK_NAME, hasEquipped, checkMoniaAscension, quellName, angenommenesAngebot, angebotAbgelehnt, angebotMerken, angeboteBeenden } = require('./_monia-shared');
 const CARD_NAME = 'Cool Rescuer Monia';
+const SAVE_ALL = 'save-all';   // Als Ruling (Al 26.10.): EINE Option — die abgeworfene Karte negiert die Wirkung auf ALLE Kreaturen (beide Seiten)
+
+/**
+ * Als Ruling (Al 26.10.): „… negate any effects that card or effect has on ALL Creatures" wörtlich — ein angenommenes Angebot schützt ALLE Kreaturen aller Seiten vor
+ * dieser Karte/diesem Effekt (nicht nur eine Seite): für jede Seite wird ein angenommenes Angebot gebucht (`moniaSchildBlockt` liest sie je Seite).
+ */
+function alleSeitenSchuetzen(engine, gs, key, pi) {
+  for (let seite = 0; seite < engine.playerCount(); seite++) angebotMerken(gs, key, pi, seite);
+}
 
 /**
  * CPU-Angaben fuer den Prompt: wer bedroht welche Kreaturen womit. `liste` = [{ inst, amount, nichtSchaden }].
@@ -86,42 +99,46 @@ module.exports = {
     checkMoniaAscension(engine, pi, hi, null);
   },
 
-  // Gerrymander redirect — when opp's Monia opens the multi-side
-  // "save 0's vs save 1's" picker, our Gerrymander forces opp to
-  // save OUR creatures with their discard cost. The option ids are
-  // `save-${ownerIdx}` — we want save-${gerryOwnerPi}.
-  cpuGerrymanderResponse(_engine, gerryOwnerPi /*, promptData */) {
-    return { optionId: `save-${gerryOwnerPi}` };
+  // Gerrymander redirect — früher wählte der Gegner im Zwei-Seiten-Fenster „save 0's vs save 1's"; seit dem Ruling (Al 26.10.) gibt es nur noch EINE Option
+  // (`save-all`: die abgeworfene Karte negiert die Wirkung auf ALLE Kreaturen) — die Weiche greift erst ab 2 Optionen und wird hier nur noch der Vollständigkeit halber bedient.
+  cpuGerrymanderResponse(_engine, _gerryOwnerPi /*, promptData */) {
+    return { optionId: 'save-all' };
   },
 
   /**
    * CPU-Entscheidung zum Angebot „Cool Rescue!" (`promptData._moniaInfo`, siehe `cpuInfo`). Ohne Zugsperre wuerde die generische CPU-Wahl
-   * („letzte Option") in JEDEM Fenster eine Karte opfern — und dabei sogar die Kreaturen des Gegners retten. Hier: annehmen NUR wenn
-   *   · die Option fuer die EIGENEN Kreaturen angeboten wird (`save-<eigener Sitz>`),
+   * („letzte Option") in JEDEM Fenster eine Karte opfern. Hier: annehmen NUR wenn
+   *   · die EIGENEN Kreaturen bedroht sind (`schutz[eigener Sitz]`) — die abgeworfene Karte negiert die Wirkung auf ALLE Kreaturen (Ruling Al 26.10.), also auch
+   *     auf die des Gegners: deren Wert wird vom Wert der eigenen abgezogen („Nettowert"),
    *   · der Effekt nicht von der eigenen Seite kommt (kein Selbstschutz gegen den eigenen Plan) und keine Heilung ist,
-   *   · der Wert der bedrohten Kreaturen die Kosten der schwaechsten Handkarte klar uebersteigt.
+   *   · der Nettowert die Kosten der schwaechsten Handkarte klar uebersteigt.
    * Wert einer Kreatur: 20 + 15 × Level + min(40, HP/10); voll bei toedlichem Schaden, Zerstoeren oder Kontrollverlust (`control`), ×0,8 Bewegen/Bounce (`move`), ×0,6 Status/Buff/Werte/Sonstiges, sonst anteilig am Schaden (×0,7).
-   * Kosten: Handwert der schwaechsten Karte (`engine._cpuEstimateHandValue`, sonst 20) + 10; bei nur 1 Handkarte muss der Wert hoch sein (≥ 80).
+   * Kosten: Handwert der schwaechsten Karte (`engine._cpuEstimateHandValue`, sonst 20) + 10; bei nur 1 Handkarte muss der Nettowert hoch sein (≥ 80).
    */
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'generic' || promptData?.type !== 'optionPicker' || !promptData._moniaInfo) return undefined;
     const info = promptData._moniaInfo, pi = info.pi;
-    const eigene = `save-${pi}`;
-    if (!(promptData.options || []).some(o => o.id === eigene)) return null;     // nie die Kreaturen des Gegners retten
+    if (!(promptData.options || []).some(o => o.id === SAVE_ALL)) return null;
     if (info.quelleOwner === pi) return null;                                    // eigener Effekt
     if (!(info.quelleOwner >= 0)) return null;                                   // W71b: Verursacher unbekannt (kein Besitzer) — nie eine Karte dafuer opfern
     if (info.effektTyp === 'heal') return null;                                  // Heilung muss man nicht verhindern
-    const liste = info.schutz?.[pi] || [];
-    if (!liste.length) return null;
+    const eigene = info.schutz?.[pi] || [];
+    if (!eigene.length) return null;                                             // nie nur die Kreaturen des Gegners retten
     const hand = engine.gs.players[pi]?.hand || [];
     if (!hand.length) return null;
-    let wert = 0;
-    for (const c of liste) {
-      const voll = 20 + 15 * (c.level || 0) + Math.min(40, Math.round((c.hp || 0) / 10));
-      const nsGewicht = (info.effektTyp === 'destroy' || info.effektTyp === 'control') ? 1 : (info.effektTyp === 'move' ? 0.8 : 0.6);   // Zerstoeren/Kontrollverlust trifft am haertesten, Bewegen/Bounce weniger, Status/Buff/Werte noch weniger (W71b)
-      const anteil = c.nichtSchaden ? nsGewicht : (c.hp > 0 && c.amount >= c.hp ? 1 : Math.min(1, (c.amount || 0) / Math.max(1, c.hp || 1)) * 0.7);
-      wert += voll * anteil;
-    }
+    const nsGewicht = (info.effektTyp === 'destroy' || info.effektTyp === 'control') ? 1 : (info.effektTyp === 'move' ? 0.8 : 0.6);   // Zerstoeren/Kontrollverlust trifft am haertesten, Bewegen/Bounce weniger, Status/Buff/Werte noch weniger (W71b)
+    const wertVon = (liste) => {
+      let w = 0;
+      for (const c of liste) {
+        const voll = 20 + 15 * (c.level || 0) + Math.min(40, Math.round((c.hp || 0) / 10));
+        const anteil = c.nichtSchaden ? nsGewicht : (c.hp > 0 && c.amount >= c.hp ? 1 : Math.min(1, (c.amount || 0) / Math.max(1, c.hp || 1)) * 0.7);
+        w += voll * anteil;
+      }
+      return w;
+    };
+    let fremd = 0;
+    for (const [seite, liste] of Object.entries(info.schutz || {})) if (Number(seite) !== pi) fremd += wertVon(liste);
+    const wert = wertVon(eigene) - fremd;
     let guenstigste = 20;
     if (typeof engine._cpuEstimateHandValue === 'function') {
       try { guenstigste = Math.min(...hand.map(n => engine._cpuEstimateHandValue(pi, n))); } catch { guenstigste = 20; }
@@ -129,7 +146,7 @@ module.exports = {
     }
     const kosten = guenstigste + 10;
     if (hand.length === 1 && wert < 80) return null;
-    return wert >= kosten * 1.25 ? { optionId: eigene } : null;
+    return wert >= kosten * 1.25 ? { optionId: SAVE_ALL } : null;
   },
 
   hooks: {
@@ -211,25 +228,14 @@ module.exports = {
       // Abgelehnt (W58a): fuer diese Karte/diesen Effekt nicht noch einmal fragen — W71b: es sei denn, eine betroffene Seite wurde noch nicht abgelehnt (Einzelfenster einer Kreatur).
       if ([...affectedOwners].every(s => angebotAbgelehnt(gs, key, pi, s))) return;
 
-      // Build prompt options (no "Cancel" — the panel has its own cancel button)
-      let options;
-      const ownerLabel = (idx) => idx === pi ? 'your' : (gs.players[idx]?.username || 'Player') + "'s";
-
-      if (affectedOwners.size === 2) {
-        options = [
-          { id: 'save-0', label: `🛡️ Save ${ownerLabel(0)} Creatures (discard 1)` },
-          { id: 'save-1', label: `🛡️ Save ${ownerLabel(1)} Creatures (discard 1)` },
-        ];
-      } else {
-        const ownerIdx = [...affectedOwners][0];
-        const singleCreature = promptable.length === 1;
-        const desc = singleCreature
-          ? `Protect ${promptable[0].inst.name}`
-          : `Save ${ownerLabel(ownerIdx)} Creatures`;
-        options = [
-          { id: `save-${ownerIdx}`, label: `🛡️ ${desc} (discard 1)` },
-        ];
-      }
+      // Als Ruling (Al 26.10., „wörtlich nehmen"): EINE Option — die abgeworfene Karte negiert die Wirkung der auslösenden Karte/des Effekts auf ALLE Kreaturen (beide
+      // Seiten), nicht nur auf eine; die frühere Seitenwahl (`save-0` / `save-1`) entfällt. Auch wenn dieser Stapel nur eine Seite trifft, gilt die Negation für alle
+      // weiteren Treffer derselben Karte auf jeder Seite (`alleSeitenSchuetzen`).
+      const singleCreature = promptable.length === 1;
+      const options = [{
+        id: SAVE_ALL,
+        label: `🛡️ ${singleCreature ? `Protect ${promptable[0].inst.name}` : 'Save all Creatures'} (discard 1)`,
+      }];
 
       const srcEntry = promptable.find(e => e.source) || promptable[0];
       const quelleOwner = srcEntry ? (srcEntry.sourceOwner ?? srcEntry.source?.owner ?? srcEntry.source?.controller) : undefined;
@@ -239,15 +245,12 @@ module.exports = {
         type: 'optionPicker',
         title: `${hero.name} — Cool Rescue!`,
         description: trigger
-          ? `Creatures are in danger from ${trigger}! Discard 1 card to protect them.`
-          : 'Creatures are in danger! Discard 1 card to protect them.',
+          ? `Creatures are in danger from ${trigger}! Discard 1 card to negate its effects on all Creatures.`
+          : 'Creatures are in danger! Discard 1 card to negate the effects on all Creatures.',
         triggerCardName: trigger || undefined,
         options,
         cancellable: true,
-        // Gerrymander only redirects when 2+ options (the multi-side
-        // AOE branch where the player picks WHICH side to save).
-        // Single-option branches are auto-skipped by the engine's
-        // gerry gate (options.length >= 2 required).
+        // Gerrymander redirects only with 2+ options — seit dem Ruling (Al 26.10.) gibt es hier nur noch die eine Option `save-all`.
         gerrymanderEligible: true,
         cpuDispatch: CARD_NAME,   // W58a: die CPU fragt `cpuResponse` dieser Karte (Titel traegt den Heldennamen/Zusatz)
         _moniaInfo: cpuInfo(engine, pi, promptable.map(e => ({ inst: e.inst, amount: e.amount })), quelleOwner, 'damage'),
@@ -256,29 +259,26 @@ module.exports = {
       // Abgelehnt: fuer diese Karte/diesen Effekt nicht noch einmal fragen (mehrere Stapel, Folgetreffer).
       if (!result || !result.optionId || result.cancelled) { angebotMerken(gs, key, pi, null); return; }
 
-      // Determine which owner to protect
-      const match = result.optionId.match(/^save-(\d+)$/);
-      if (!match) { angebotMerken(gs, key, pi, null); return; }
-      const protectOwner = parseInt(match[1]);
+      if (result.optionId !== SAVE_ALL) { angebotMerken(gs, key, pi, null); return; }
 
-      angebotMerken(gs, key, pi, protectOwner);
+      // Angenommen: ALLE Seiten sind vor dieser Karte/diesem Effekt geschützt (Ruling Al 26.10.); die Marke spiegelt die erste betroffene Seite.
+      const protectOwner = [...affectedOwners][0];
+      alleSeitenSchuetzen(engine, gs, key, pi);
 
       // Set shield active for subsequent batches / status checks of this resolution
       gs._moniaShieldActive = protectOwner;
       gs._moniaShieldSource = trigger ? { name: trigger } : null;   // W16f (H01-08): der Schild gehört zu dieser Karte/diesem Effekt
 
-      // Cancel ONLY negatable entries for the protected controller.
+      // Cancel ALL negatable entries of this batch (beide Seiten).
       // Unnegatable damage (Acid Vial, Ida) still goes through — Monia "wastes" the effect.
-      const matchesProtect = (e) => (e.inst.controller ?? e.inst.owner) === protectOwner;
+      const matchesProtect = (e) => e.canBeNegated !== false;
       for (const e of promptable) {
-        if (matchesProtect(e) && e.canBeNegated !== false) {
-          e.cancelled = true;
-        }
+        if (matchesProtect(e)) e.cancelled = true;
       }
 
       engine.log('monia_protect', {
         player: ps.username, hero: hero.name,
-        protectedOwner: gs.players[protectOwner]?.username,
+        protectedOwner: [...affectedOwners].map(o => gs.players[o]?.username).join(' & '),
         creaturesProtected: promptable.filter(matchesProtect).map(e => e.inst.name),
       });
 
@@ -370,8 +370,9 @@ module.exports = {
       const creatureName = creature.name || 'Creature';
       const ownerLabel = creatureSide === pi ? 'your' : (gs.players[creatureSide]?.username || 'Player') + "'s";
 
+      // Als Ruling (Al 26.10.): auch hier negiert die abgeworfene Karte die Wirkung auf ALLE Kreaturen (beide Seiten) — nicht nur auf diese eine.
       const options = [
-        { id: `save-${creatureSide}`, label: `🛡️ Protect ${creatureName} (discard 1)` },
+        { id: SAVE_ALL, label: `🛡️ Protect ${creatureName} (discard 1)` },
       ];
 
       const quelleOwner = ctx.source && typeof ctx.source === 'object' ? (ctx.source.owner ?? ctx.source.controller) : undefined;
@@ -381,7 +382,7 @@ module.exports = {
       const result = await engine.promptGeneric(pi, {
         type: 'optionPicker',
         title: `${hero.name} — Cool Rescue!`,
-        description: `${ownerLabel.charAt(0).toUpperCase() + ownerLabel.slice(1)} ${creatureName} is in danger${ausloeser ? ` — ${ausloeser} would ${wirkung} it` : ''}! Discard 1 card to protect it.`,
+        description: `${ownerLabel.charAt(0).toUpperCase() + ownerLabel.slice(1)} ${creatureName} is in danger${ausloeser ? ` — ${ausloeser} would ${wirkung} it` : ''}! Discard 1 card to negate its effects on all Creatures.`,
         triggerCardName: ausloeser || undefined,
         options,
         cancellable: true,
@@ -391,12 +392,10 @@ module.exports = {
 
       if (!result || !result.optionId || result.cancelled) { angebotMerken(gs, key, pi, null, creatureSide); return; }
 
-      const match = result.optionId.match(/^save-(\d+)$/);
-      if (!match) { angebotMerken(gs, key, pi, null, creatureSide); return; }
-      const protectOwner = parseInt(match[1]);
+      if (result.optionId !== SAVE_ALL) { angebotMerken(gs, key, pi, null, creatureSide); return; }
 
-      angebotMerken(gs, key, pi, protectOwner);
-      gs._moniaShieldActive = protectOwner;
+      alleSeitenSchuetzen(engine, gs, key, pi);   // Ruling Al 26.10.: alle Kreaturen aller Seiten vor dieser Karte/diesem Effekt
+      gs._moniaShieldActive = creatureSide;
       {   // W16f (H01-08): Quelle des geschützten Effekts merken (Schild gilt nur für sie)
         const qn = quellName(ctx.source);
         gs._moniaShieldSource = qn ? { name: qn } : null;

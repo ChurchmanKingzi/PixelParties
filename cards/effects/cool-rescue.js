@@ -18,7 +18,8 @@ module.exports = {
       if (ctx.cardZone !== 'hand') return;
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
-      if (!engine.hasCoolnessStack(pi)) {
+      // Als Ruling (Al 26.10.): `hasCoolnessStack` ist bei liegender Wowhalla auch fuer einen LEEREN Stack wahr — hier braucht es eine Karte.
+      if (!(engine.getCoolnessStackSize(pi) > 0)) {
         engine.gs._spellCancelled = true;
         return;
       }

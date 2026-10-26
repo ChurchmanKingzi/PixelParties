@@ -22,6 +22,9 @@ const CARD_NAME = 'Fireball';
 const FIREBALL_DAMAGE = 150;
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Am besten gleich die Karten ganz sperren statt den Schaden fizzeln zu lassen"): die Karte richtet NUR Schaden an Zielen des Gegners an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // ★★ v1179 — ENTKOPPELTE ZAUBERBILDER: ein Feuerball je Ziel vom
   // Wirker, dann die Flammenexplosion. Rein visuell — kein Zustand.
   spellVisual: {

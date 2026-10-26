@@ -132,6 +132,22 @@ module.exports = {
     await engine._delay(400);
 
     if (picked.type === 'hero') {
+      // ★ Als Ruling (Al 26.10.): „Burn all Creatures in its Support Zones as well" ist eine Gruppenwirkung (Held + Kreaturen = mehr als 1 Ziel) eines Kreatureneffekts
+      // ohne Schaden → Reaktionsfenster der AoE-Prinzipien (Rook of Kings [B], Divine Gift of Rain, Castling, „hit by"-Surprises) VOR dem Brennen. Ohne Kreaturen in
+      // den Support Zones des Helden bleibt es bei der Einzelwahl (kein zweites Fenster). Negiert eine Reaktion den Effekt, ist die Nutzung verbraucht.
+      const mitKreaturen = [];
+      for (const inst of engine.cardInstances) {
+        if (engine.physicalSide(inst) !== picked.owner || inst.zone !== 'support' || inst.heroIdx !== picked.heroIdx || inst.faceDown) continue;
+        const cd0 = inst.counters?._cardDataOverride || cardDB[inst.name];
+        if (!cd0 || !hasCardType(cd0, 'Creature')) continue;
+        mitKreaturen.push({ type: 'creature', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name });
+      }
+      if (mitKreaturen.length > 0) {
+        const sr = await engine.statusHitSurpriseWindow(ctx.card, [{ owner: picked.owner, heroIdx: picked.heroIdx }], 'creature', {
+          ziele: [{ type: 'hero', owner: picked.owner, heroIdx: picked.heroIdx, cardName: picked.cardName }, ...mitKreaturen],
+        });
+        if (sr?.effectNegated) { engine.sync(); return true; }
+      }
       const hero = gs.players[picked.owner]?.heroes?.[picked.heroIdx];
       if (hero && hero.hp > 0 && !hero.statuses?.burned) {
         await engine.addHeroStatus(picked.owner, picked.heroIdx, 'burned', { permanent: true, appliedBy: pi });

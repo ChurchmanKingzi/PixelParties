@@ -94,10 +94,15 @@ module.exports = {
       });
       const quelle = { name: CARD_NAME, owner: pi, controller: pi, cardType: 'Creature', cardInstance: ich, heroIdx, heroOwner: seite };
       await engine._mitNiederlagenSammler(async () => {
-        for (const c of opfer) {
-          if (c.zone !== 'support') continue;                                // fiel inzwischen (anderer Schädel)
-          await engine.actionDestroyCard(quelle, c, { sourceOwner: pi, sourceName: CARD_NAME, fireCreatureDeath: true });
-        }
+        // Zerstörungs-Klammer wie Giant Exploding Skull/Troop Annihilation: „all other Creatures" fallen in EINEM Schlag, nie als Einzelzerstörung
+        // (Als Ruling Al 26.10.: The Nornstellar legt bei gleichzeitigem Tod keine Karte auf den Stack — er erkennt das an der Klammer).
+        engine.beginDestroyScope(opfer.length);
+        try {
+          for (const c of opfer) {
+            if (c.zone !== 'support') continue;                                // fiel inzwischen (anderer Schädel)
+            await engine.actionDestroyCard(quelle, c, { sourceOwner: pi, sourceName: CARD_NAME, fireCreatureDeath: true });
+          }
+        } finally { engine.endDestroyScope(); }
       });
       engine.log('cosmic_skull_blast', { player: engine.gs.players[pi]?.username, hero: heldName, defeated: opfer.length });
       engine.sync();

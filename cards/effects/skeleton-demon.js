@@ -13,6 +13,10 @@
 //    • `onCardAddedToHand` / `onCardAddedFromDiscardToHand` — fire
 //      once per added card. Each triggers a separate 50-damage prompt.
 //
+//  Als Ruling (Al 26.10.): „with one of their own effects" — NUR wenn die Quelle des Effekts dem Ziehenden/Aufnehmenden gehört (`ctx.ausloeserBesitzer`,
+//  von der Engine vor der Zuhörer-Runde festgehalten). Zwingt der Demon-Besitzer den Gegner zu ziehen/aufzunehmen (The Sacred Jewel, Pillar of Light,
+//  Draw …), löst der Demon NICHT aus.
+//
 //  All prompts are cancellable ("you may"). The damage source is the
 //  Demon's coordinates so animations and source-aware reactions paint
 //  on the right side.
@@ -29,6 +33,16 @@ const PER_CARD = 50;
 function ausloeser(ctx) {
   if (ctx.ausloeserName) return ctx.ausloeserName;
   return typeof ctx.source === 'string' ? ctx.source : null;
+}
+
+/**
+ * Als Ruling (Al 26.10.): „… draws or adds cards to their hand with one of THEIR OWN effects" — der Demon löst nur aus, wenn die Quelle des Effekts dem Ziehenden /
+ * Aufnehmenden selbst gehört. Zieht oder nimmt der Gegner wegen eines Effekts des Demon-Besitzers auf (The Sacred Jewel, Pillar of Light, Draw …), schweigt er.
+ * `ctx.ausloeserBesitzer` hält die Engine VOR der Zuhörer-Runde fest (`runHooks`); fehlt die Angabe (kein ambienter Effekt), gilt es wie bisher als eigener Effekt.
+ */
+function eigenerEffektDesZiehenden(ctx) {
+  const besitzer = ctx.ausloeserBesitzer;
+  return typeof besitzer !== 'number' || besitzer === ctx.playerIdx;
 }
 
 async function offerDamage(ctx, multiplier) {
@@ -113,6 +127,7 @@ module.exports = {
       // perspective". Resource-phase auto-draws are excluded by the
       // engine gating and don't reach us.
       if (ctx.playerIdx === ctx.cardOwner) return;
+      if (!eigenerEffektDesZiehenden(ctx)) return;   // vom Demon-Besitzer erzwungen (Sacred Jewel …): kein Treffer
       // W16c (A05-21): "times the number of cards" = die tatsaechlich gezogenen Karten - die Ansage wird auf das Deck des Ziehenden gekappt
       // (kleines Deck / leeres Deck: weniger bzw. kein Schaden; der Hook feuert VOR dem Ziehen).
       const amount = Math.min(ctx.amount || 0, ctx._engine.gs.players[ctx.playerIdx]?.mainDeck?.length ?? 0);
@@ -121,10 +136,12 @@ module.exports = {
     },
     onCardAddedToHand: async (ctx) => {
       if (ctx.playerIdx === ctx.cardOwner) return;
+      if (!eigenerEffektDesZiehenden(ctx)) return;
       await offerDamage(ctx, 1);
     },
     onCardAddedFromDiscardToHand: async (ctx) => {
       if (ctx.playerIdx === ctx.cardOwner) return;
+      if (!eigenerEffektDesZiehenden(ctx)) return;
       await offerDamage(ctx, 1);
     },
   },

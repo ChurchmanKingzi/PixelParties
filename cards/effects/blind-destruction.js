@@ -22,6 +22,12 @@
 //    Ausruestung verschieben.
 //  • Der Schaden ist Effektschaden vom Zauber, kein Angriff — Rueckstoss
 //    und Angriffsreiter greifen nicht.
+//  • Als Ruling (Al 26.10.): Ein Held, der KOMPLETT immun gegen die Wirkung
+//    ist („unaffected": Rook of Kings [B], Castling „negate any effects on
+//    that Hero", Black-Thorn Dragon „unaffected by all Spells"), behaelt seine
+//    Ausruestung UND nimmt keinen Schaden. Reine Schadensimmunitaet (Shielded,
+//    Carris, Schadensnegation) schuetzt die Ausruestung NICHT: die Artefakte
+//    werden abgelegt, nur der Schaden faellt aus.
 //
 //  Auftritt (v738, Als Vorgabe 5.9.)
 //  ─────────────────────────────────
@@ -119,9 +125,12 @@ module.exports = {
         const ziele = betroffen.map(e => ({ type: 'hero', owner: e.pi, heroIdx: e.heroIdx, cardName: e.hero.name }));
         const sr = await engine.preDamageMultiTargetWindow(ctx.card, ziele, { simultan: true, damageType: 'destruction_spell' });
         if (sr?.effectNegated) return;
-        // Per Fenster-Immunität geschützte Helden („unaffected"): weder ihre Ausrüstung wird abgeräumt noch nehmen sie Schaden.
+        // Per Fenster-Immunität geschützte Helden („unaffected": Rook of Kings [B], Castling, Divine Gift of Rain …) und der Held mit „unaffected by all Spells"
+        // (Black-Thorn Dragon, `heroHasSpellImmunity`): weder ihre Ausrüstung wird abgeräumt noch nehmen sie Schaden.
+        // Als Ruling (Al 26.10.): komplett immun gegen die Wirkung = Ausrüstung bleibt UND kein Schaden. Reine SCHADENS-Immunität (Shielded, Carris, Schadensnegation)
+        // schützt die Ausrüstung NICHT — die Artefakte werden trotzdem abgelegt (der Schaden fällt dort aus).
         for (let i = betroffen.length - 1; i >= 0; i--) {
-          if (engine.hasEffectImmunity(betroffen[i].pi, betroffen[i].heroIdx, ctx.card)) betroffen.splice(i, 1);
+          if (engine.hasEffectImmunity(betroffen[i].pi, betroffen[i].heroIdx, ctx.card) || engine.heroHasSpellImmunity(betroffen[i].pi, betroffen[i].heroIdx)) betroffen.splice(i, 1);
         }
         if (betroffen.length === 0) return;
       }

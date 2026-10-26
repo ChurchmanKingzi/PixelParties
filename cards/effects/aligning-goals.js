@@ -49,6 +49,9 @@ function _getEligibleTargets(engine, pi) {
   return engine.getCreatureTargets(oppIdx).filter(t => {
     const inst = t.cardInstance;
     if (inst && inst.stolenBy != null) return false;
+    // Als Ruling (Al 26.10., Dark Gear × Creepy Villager): die Leihe laeuft mechanisch ueber einen Kontrollwechsel — „Control of this Creature cannot change" ist kein Ziel
+    // (sonst waeren die 5 Gold weg und nichts geschaehe).
+    if (inst && engine.controlIsLocked(inst)) return false;
     const effectName = inst?.counters?._effectOverride || t.cardName;
     const script = loadCardEffect(effectName);
     return !!script?.creatureEffect;

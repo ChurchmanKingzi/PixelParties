@@ -39858,7 +39858,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (me.handLocked && card.cardType !== 'Ability' && (me.handLockBlockedCards || []).includes(cardName)) return true;
     if (me.drawLocked && card.cardType !== 'Ability' && (me.drawLockBlockedCards || []).includes(cardName)) return true;
     // v1069: reiner Such-Lock — Karten, die NUR suchen, sind tot.
-    if (me.searchLocked && card.cardType !== 'Ability' && (me.searchLockBlockedCards || []).includes(cardName)) return true;
+    // Als Ruling (Al 26.10., Flame Avalanche): dieselbe Liste graut unter der Schadenssperre die reinen Gegner-Schadenskarten aus (`blockedByDamageLock`).
+    if ((me.searchLocked || me.damageLocked) && card.cardType !== 'Ability' && (me.searchLockBlockedCards || []).includes(cardName)) return true;
 
     // Never-playable cards (e.g. Glass of Marbles, Mystery Box) — always dimmed
     if ((me.neverPlayableCards || []).includes(cardName)) return true;

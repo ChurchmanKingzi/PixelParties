@@ -71,6 +71,7 @@ function beute(engine, pi) {
     const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     if (engine.isOmniImmune(inst, pi)) continue;      // Kardinalbestien (Golden Wings: nur gegen den Gegner, W17b)
+    if (engine.controlIsLocked(inst)) continue;       // Als Ruling (Al 26.10.): „Control of this Creature cannot change" (Creepy Villager) — nicht waehlbar
     out.push(inst);
   }
   return out;

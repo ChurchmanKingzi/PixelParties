@@ -2811,9 +2811,14 @@ function mainDeckSizeOk(main, side) {
  * hätten sonst schon VOR dem Commit verraten, welche Karte gespielt wird (ein Abbruch verriete verdeckte Information). Dem Client genügt
  * „jemand wählt gerade" (`ownerIdx`); der Besitzer bekommt alles wie bisher.
  */
-function potionTargetingFuer(pt, empfaengerIdx) {
+function potionTargetingFuer(pt, empfaengerIdx, engine) {
   if (!pt) return null;
-  if (pt.ownerIdx === empfaengerIdx) return pt;
+  // Als Ruling (Al 26.10., Sun Beam / The Yeeting): der Wähler sieht verdeckte, ihm unbekannte Karten in der Zielliste nur maskiert (Name und Karteninstanz entfallen).
+  if (pt.ownerIdx === empfaengerIdx) {
+    return (engine && Array.isArray(pt.validTargets))
+      ? { ...pt, validTargets: require('./cards/effects/_targeting-shared').zielAnzeigeFuer(engine, pt.validTargets, empfaengerIdx) }
+      : pt;
+  }
   return { ownerIdx: pt.ownerIdx, isEffectPrompt: !!pt.isEffectPrompt, hidden: true, config: {}, validTargets: [] };
 }
 
@@ -5158,6 +5163,7 @@ function sendGameState(room, playerIdx, extra) {
       searchLockBlockedCards: (((room.engine?.searchLockLevel?.(pi)?.deck
         || room.engine?.searchLockLevel?.(pi)?.discard
         || ps.searchLocked || ps.handLocked || room.engine?.isDiscardOutHardLocked?.(pi)
+        || ps.damageLocked   // Als Ruling (Al 26.10., Flame Avalanche): `blockedByDamageLock`
         || room.engine?.ersterZugGeschuetzt?.(room.engine.opponentOf(pi), pi))) && pi === playerIdx) ? (() => {   // Welle 11 (Q66): Erste-Runden-Sperre
         const blocked = new Set();
         const slDB = getCardDB();
@@ -5581,7 +5587,7 @@ function sendGameState(room, playerIdx, extra) {
     mulliganPending: gs.mulliganPending || false,
     handReturnToDeck: gs.handReturnToDeck || false,
     handReturnToOppCards: gs.handReturnToOppCards || [],
-    potionTargeting: potionTargetingFuer(gs.potionTargeting, playerIdx),   // W63d: der Gegner erfaehrt nicht, WELCHE Karte zielt
+    potionTargeting: potionTargetingFuer(gs.potionTargeting, playerIdx, room.engine),   // W63d: der Gegner erfaehrt nicht, WELCHE Karte zielt
     // v1150: Zielmarken (#1, #2 …) — siehe `engine.setzeZielMarke`.
     zielMarken: gs.zielMarken || [],
     effectPrompt: effectPromptFuer(gs.effectPrompt, playerIdx, gs),
@@ -11857,6 +11863,9 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
         await room.engine.gateVorZielen(pi, potionName, selectedIds, validTargets);
         // Darion: ein gewaehltes Equip-Ziel ist ein Platz mit mehreren Karten → nachfragen, welche gemeint ist (wie bei den Zaubern ueber `promptEffectTarget`).
         await room.engine._disambiguateStackedTargets(pi, validTargets, selectedIds, script.targetingConfig || null);
+        // Als Ruling (Al 26.10., Winged Skeleton): auch die GEWÄHLTEN KREATUREN eines Ziel-Tranks/-Artefakts öffnen das Wahl-Fenster der Kreaturen-Reaktionen (negiert: die Karte ist gespielt, wirkt aber nicht).
+        const _kreaturWahl = await room.engine.kreaturenWahlFenster(pi, selectedIds, validTargets, { name: potionName, owner: pi, controller: pi, heroIdx: -1, zone: 'hand' });
+        if (_kreaturWahl?.effectNegated) return {};
         return await script.resolve(room.engine, pi, selectedIds, validTargets, room.engine._takePaidArtifactCost(potionName, pi));
       } : null,
     });

@@ -14,6 +14,14 @@
 //
 //  Both branches no-op while the controller has no
 //  Stack (Wowhalla absent).
+//
+//  Als Ruling (Al 26.10.): Sterben Nornstellar und ein anderes Ziel
+//  GLEICHZEITIG (derselbe Schlag), feuert der „when another target you
+//  control is defeated"-Trigger nicht — es kommt keine Karte auf den
+//  Stack. Schadens-Batches stempeln das vorab (`currentHp`-Pruefung
+//  unten); ein Massen-Besiegen ohne Schaden (Zerstoerungsschleife) wird
+//  bis nach der Aufloesung zurueckgestellt (siehe Ally-Zweig). Bei
+//  liegender Wowhalla gilt der Stack auch leer als vorhanden (Nr. 55).
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'The Nornstellar, Foretellers of Coolness';
@@ -78,6 +86,19 @@ module.exports = {
       // already reflects whether it's slated to die this batch.
       if ((ctx.card?.counters?.currentHp ?? 1) <= 0) return;
       if (!engine.hasCoolnessStack(pi)) return;
+      // Als Ruling (Al 26.10.): auch ein Massen-Besiegen OHNE Schaden (Trial of Dominance, Cosmic/Giant Exploding Skull, Troop Annihilation …: eine
+      // Zerstörungsschleife `beginDestroyScope(≥2)`) ist EIN gleichzeitiger Tod: wird Nornstellar im selben Schlag besiegt, kommt keine Karte auf den
+      // Stack. Die Schleife besiegt nacheinander, der Verbündete kann also VOR Nornstellar fallen — deshalb wird der Nachschub bis nach der Auflösung
+      // (Nach-Ketten-Aktion) zurückgestellt und nur gelegt, wenn Nornstellar dann noch auf dem Brett steht.
+      if (engine._destroyScope?.total >= 2) {
+        const norn = ctx.card;
+        engine.queuePostChainAction(async () => {
+          if (norn.zone !== 'support' || (norn.counters?.currentHp ?? 1) <= 0) return;
+          if (!engine.hasCoolnessStack(pi)) return;
+          await engine.actionPushDeckTopToCoolnessStack(pi, { source: CARD_NAME, requireStack: true });
+        });
+        return;
+      }
       await ctx.pushDeckTopToCoolnessStack(pi, { source: CARD_NAME, requireStack: true });
     },
 

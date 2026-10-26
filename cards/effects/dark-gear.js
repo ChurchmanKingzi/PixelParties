@@ -106,6 +106,8 @@ function getStealableCreatures(engine, playerIdx) {
     const inst = t.cardInstance;
     if (inst && engine.isCreatureImmune(inst, 'targeting_immune')) return false;
     if (inst && engine.isCreatureImmune(inst, 'control_immune')) return false;
+    // Als Ruling (Al 26.10., Dark Gear × Creepy Villager): „Control of this Creature cannot change" — ein Ziel, dessen Kontrolle feststeht, ist nicht waehlbar (statt Karte zu verbrauchen, ohne etwas zu uebernehmen).
+    if (inst && engine.controlIsLocked(inst)) return false;
     if (inst && engine.uebernahmeUnzulaessig(inst, playerIdx) === 'only_control_1') return false;   // W16d (A07-31): „You can only control 1" (Brachion)
     // Read the EFFECTIVE card data — instances may carry a per-instance
     // override (Biomancy Token: a Potion repurposed as a Creature/Token

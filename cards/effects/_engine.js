@@ -3183,6 +3183,11 @@ class GameEngine {
     // `triggerCardName` an ihren Prompt weiter.
     if (hookCtx && hookCtx.ausloeserName === undefined && AUSLOESER_HOOKS.has(hookName)) {
       hookCtx.ausloeserName = this._effectSourceName();
+      // Als Ruling (Al 26.10., Skeleton Demon): auch der KONTROLLEUR der auslösenden Karte/des Effekts — „with one of THEIR OWN effects" prüft, ob die Quelle dem
+      // Ziehenden/Aufnehmenden gehört. Gleiche Rangfolge wie `_effectSourceName` (innerster Effekt vor der Aktivierung); unbekannt = undefined.
+      hookCtx.ausloeserBesitzer = this._currentEffectSource?.cardName
+        ? this._currentEffectSource.owner
+        : (this._activationSource?.cardName && (this._activationSource.turn == null || this._activationSource.turn === this.gs?.turn) ? this._activationSource.owner : undefined);
     }
     if (hookName === HOOKS.ON_CARD_LEAVE_ZONE && hookCtx && hookCtx.entferntVon === undefined) {
       const q = hookCtx.source;
@@ -7419,12 +7424,28 @@ class GameEngine {
   }
 
   /**
+   * ★ 26.10. — „RAGNAROCK": „Negate that Ability until the end of the turn and discard the top copy of it from the Hero that activated it."
+   * Als Ruling (Al 26.10.): Die Ability ist auf dem Helden, der sie aktiviert hat, bis zum Ende DIESES Zuges negiert — auch eine erneute Aktivierung im selben Zug ist unmöglich
+   * (auch nach Kopien-Verlust: die Sperre hängt an Held + Basisname, nicht an der Kopie); dieselbe Ability auf ANDEREN Helden bleibt nutzbar.
+   * Speicher: `gs.players[pi]._abilityHeroLocks['<heroIdx>:<Basisname>'] = gs.turn` (gesetzt von Ragnarock). Gelesen von `_abilityNegatedOnHero` (alle Aktivierungswege); nur AKTIVE Effekte.
+   */
+  abilityAmHeldenGesperrt(pi, heroIdx, abilityName) {
+    const l = this.gs.players?.[pi]?._abilityHeroLocks;
+    if (!l || !abilityName) return false;
+    const key = `${heroIdx}:${baseCardName(abilityName)}`;
+    if (l[key] == null) return false;
+    if (l[key] !== this.gs.turn) { delete l[key]; return false; }
+    return true;
+  }
+
+  /**
    * „… negate the effects of all «Charme» Abilities attached to it."
    *
    * Vertrag: `negatesHostAbilities: ['Charme', …]` am Anhaengsel.
    */
   _abilityNegatedOnHero(pi, heroIdx, abilityName) {
     if (!abilityName) return false;
+    if (this.abilityAmHeldenGesperrt(pi, heroIdx, abilityName)) return true;   // 26.10. (Ragnarock): bis Zugende am aktivierenden Helden negiert
     // ★ 25.10. (Uncool Malfunction): der Spieler, der den Helden KONTROLLIERT, darf aktive Effekte von Abilities dieses Namens nicht aktivieren.
     {
       const held = this.gs.players[pi]?.heroes?.[heroIdx];
@@ -9865,9 +9886,13 @@ class GameEngine {
     // the amount. Multipliers ≥ 1 (any future damage-amplifier buff)
     // still apply because the lock is only a floor, not a freeze.
     const _amountBeforeBuffMul = this._projectedAmount(hookCtx);
-    if (!hookCtx.cannotBeNegated && target?.buffs) {
+    // ★ Als Ruling (Al 26.10., Disruption Ray: „All damage that target receives … is doubled" gilt auch fuer True Damage): „cannot be reduced or negated"
+    // schuetzt vor SENKUNGEN, nicht vor Erhoehungen — bei unnegierbarem Schaden greifen deshalb nur Multiplikatoren > 1 (Disrupted), Senkungen/Immunitaeten
+    // (Cloudy, Petrified, Damage Immune) bleiben draussen.
+    if (target?.buffs) {
       for (const [, buffData] of Object.entries(target.buffs)) {
         if (buffData.damageMultiplier != null) {
+          if (hookCtx.cannotBeNegated && !(buffData.damageMultiplier > 1)) continue;
           if (hookCtx.cannotBeReduced && buffData.damageMultiplier < 1) continue;
           hookCtx._mul = (hookCtx._mul ?? 1) * buffData.damageMultiplier;
           hookCtx._kMul = (hookCtx._kMul ?? 1) * buffData.damageMultiplier;   // W50a: Buff-Senkung (Cloudy …) zaehlt fuer den Kettenbetrag
@@ -10432,6 +10457,20 @@ class GameEngine {
       // der Kartentext nimmt „damage that could normally not be reduced
       // or negated" nicht mehr aus.)
 
+      // ★ Als Ruling (Al 26.10., Flame Avalanche: „You cannot deal any other damage to targets your opponent controls"): die Schadenssperre
+      // (`ps.damageLocked`) gilt AUCH fuer True Damage („cannot be reduced or negated" schuetzt vor Senkungen, nicht vor einem Verbot). Wie
+      // im Normalweg (`actionDealDamage`) nach aktuellem KONTROLLEUR: gesperrt ist, was der Gegner gerade kontrolliert, eigene Ziele
+      // bleiben treffbar. Ganz am Anfang — eine gesperrte Quelle loest auch keine Umlenkung/Aufschlaege (`beforeTrueDamage`) aus. Die
+      // Kreaturen-Seite sperrt `processCreatureDamageBatch` laengst fuer alle Eintraege (auch `canBeNegated: false`).
+      if (targetOwner >= 0 && sourceOwner >= 0 && this.gs.players[sourceOwner]?.damageLocked) {
+        const _lockHi = (this.gs.players[targetOwner]?.heroes || []).indexOf(target);
+        if (_lockHi >= 0 && this.kontrolleurVonHeld(targetOwner, _lockHi) !== sourceOwner) {
+          this.log('damage_blocked', { target: this._heroLabel(target), reason: 'damage_locked' });
+          this._flashHeroDamageZero(target);
+          return { dealt: 0 };
+        }
+      }
+
       // ★ W73b (Cheering Rabbit): „X additional damage" ERHÖHT auch True Damage („cannot be reduced or negated" schützt nur vor Senkungen). Die Hooks dürfen nur ERHÖHEN.
       {
         const bq = this._klonSicht(source);
@@ -10439,6 +10478,12 @@ class GameEngine {
         hookCtx._kBase = amount; hookCtx._kMul = 1; hookCtx._kFlat = 0;
         await this.runHooks(HOOKS.BEFORE_TRUE_DAMAGE, hookCtx);
         if (hookCtx.cancelled && hookCtx._umgeleitet) return { dealt: 0, cancelled: true };   // Mean Cute Cat: umgeleitet (der Schaden liegt schon beim neuen Ziel)
+        // ★ Als Ruling (Al 26.10., Disruption Ray): „All damage that target receives … is doubled" verdoppelt auch True Damage (Rockfall 200 → 400, Acid Vial 150 → 300) —
+        // Verdoppeln ist keine Senkung. Nur ERHOEHENDE Buff-Multiplikatoren (> 1); Senkungen/Immunitaeten (Cloudy, Petrified, Damage Immune) bleiben draussen. Wie im Normalweg
+        // „Basis × Multiplikatoren, dann flach" (PUNKT VOR STRICH).
+        for (const [, bd] of Object.entries(target.buffs || {})) {
+          if (bd && bd.damageMultiplier > 1) hookCtx._mul = (hookCtx._mul ?? 1) * bd.damageMultiplier;
+        }
         const proj = this._projectedAmount(hookCtx);
         if (proj !== undefined && proj > amount) amount = proj;
       }
@@ -12397,6 +12442,11 @@ class GameEngine {
     // Welle 11 (Q66): derselbe Sperr-Stutzen (Server-Wege, Ausgrau-Liste, Sofort-Wege) trägt die Erste-Runden-Sperre — vor der Kreaturen-Ausnahme.
     if (script.blockedByFirstTurnProtection
         && this._cardBlockedByFirstTurn(script, (typeof playerIdx === 'number') ? playerIdx : this.gs.players.indexOf(ps))) return true;
+    // ★ Als Ruling (Al 26.10., Flame Avalanche: „Am besten gleich die Karten ganz sperren statt den Schaden fizzeln zu lassen"): Karten, deren EINZIGE Wirkung
+    // Schaden an Zielen des Gegners ist (`blockedByDamageLock: true`), sind unspielbar, solange der Spieler unter der Schadenssperre steht (`ps.damageLocked`:
+    // Flame Avalanche, Armageddon, Last Resort, Future Tech Organnon) — kein Verbrauch ohne Wirkung. Karten mit gemischter Wirkung tragen die Marke NICHT
+    // (dort sperrt nur der Schaden selbst, auch True Damage).
+    if (script.blockedByDamageLock && ps.damageLocked) return true;
     // Z6 (B-04): auch Artifact-Creatures (cardType 'Artifact', Subtyp Creature, z. B. Debt-O-Tron Backup Duplicator) haben einen
     // Koerper und sind ausgenommen - `hasCardType` kennt beide Formen.
     if (cardData && (cardData.cardType === 'Creature' || hasCardType(cardData, 'Creature'))) return false;
@@ -23120,6 +23170,32 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ Als Ruling (Al 26.10., Winged Skeleton): Nach-Ziel-Fenster für die GEWÄHLTEN KREATUREN einer Ziel-Sitzung am Zielwähler vorbei (Ziel-Tränke/-Artefakte:
+   * `gs.potionTargeting` → `doConfirmPotion`). Dort läuft keiner der drei Zielwähler — und damit nie das Fenster „Kreatur gewählt" (`postTargetKreaturWahl`: Winged Skeleton,
+   * Dream Dust). Nur gewählte Kreaturen gehen hinein (Helden nicht — für sie gilt dort weiter nur das Umleitungsfenster); Rückgabe wie `_checkPostTargetHandReactions`
+   * (`{ effectNegated: true }` = die Karte wirkt nicht), sonst null.
+   * @param {number} pi          Spieler der Ziel-Sitzung
+   * @param {string[]} selectedIds  gewählte Ziel-IDs
+   * @param {object[]} validTargets Zielliste der Sitzung
+   * @param {object} quelle      Quelle der Wahl ({ name, owner, controller, heroIdx })
+   */
+  async kreaturenWahlFenster(pi, selectedIds, validTargets, quelle) {
+    if (this._inPostTargetWindow || this._inPostTargetReaction) return null;
+    const ids = new Set(Array.isArray(selectedIds) ? selectedIds : []);
+    const kreaturen = (validTargets || []).filter(t => t && ids.has(t.id) && t.type === 'equip' && (t.cardInstance || t._cardInstance)
+      && this._istKreaturenInstanz?.(t.cardInstance || t._cardInstance));
+    if (kreaturen.length === 0 || !quelle) return null;
+    this._inPostTargetWindow = true;
+    try {
+      const pt = await this._checkPostTargetHandReactions(kreaturen, quelle, { ausZielwahl: true });
+      if (pt?.effectNegated) await this.negationsBilder(quelle, kreaturen, pt);
+      return pt;
+    } finally {
+      this._inPostTargetWindow = false;
+    }
+  }
+
+  /**
    * TARGETING-side gate for status-applying effects. Mirrors
    * `canApplyCreatureStatus` but DELIBERATELY OMITS the omni-immune
    * check so omni-immune creatures (Cardinal Beasts, etc.) stay in
@@ -33453,8 +33529,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       // ★ v1368 (Dream Dust): gewaehlte KREATUREN gehen mit — aber nur an
       // Reaktionen mit `postTargetKreaturWahl: true` (Hub-Option
       // `ausZielwahl`); alle anderen sehen weiter nur Helden.
-      const kreaturen = (validTargets || []).filter(t => t?.type === 'equip' && t.cardInstance && ids.has(t.id)
-        && this._istKreaturenInstanz?.(t.cardInstance));
+      // Als Ruling (Al 26.10., Winged Skeleton): auch Skripte, die ihre Kreaturen-Ziele nur als `_cardInstance` führen (Skeleton Archer, Hammer Skeleton, Kappa Sword Slash …),
+      // zählen als GEWÄHLT — wie an den übrigen Stellen der Engine (`t.cardInstance || t._cardInstance`).
+      const kreaturen = (validTargets || []).filter(t => t?.type === 'equip' && (t.cardInstance || t._cardInstance) && ids.has(t.id)
+        && this._istKreaturenInstanz?.(t.cardInstance || t._cardInstance));
       if (quelle && (helden.length > 0 || kreaturen.length > 0)) {
         // Z3: Merker fuer `preDamageMultiTargetWindow` – ein Skript, das dasselbe Fenster danach selbst
         // oeffnet (Guardian Beast Hou), soll es nicht ein zweites Mal ausloesen.
@@ -42364,6 +42442,9 @@ this._deathWatch = (this._deathWatchStack || []).length
             // `loadCardEffect(cardName)` wurde sie nie angeboten.
             const script = rxInst ? loadCardEffect(rxInst.counters?._effectOverride || cardName) : this.supportCardScript(seite, hi, cardName);
             if (!script?.isEquippedPostTargetReaction) continue;
+            // Als Ruling (Al 26.10., Winged Skeleton): aus der allgemeinen Zielwahl (`ausZielwahl`) sehen auch ausgerüstete/Brett-Reaktionen die gewählten KREATUREN nur mit
+            // `postTargetKreaturWahl: true` (wie die Handreaktionen oben); alle übrigen sehen weiter nur Helden.
+            targetedHeroes = (_nurHelden && !script.postTargetKreaturWahl) ? _nurHelden : targetedHeroesAlle;
             const rxOpts = { damageType, dealsDamage, heroChoiceIsCost: opts.heroChoiceIsCost === true, inst: rxInst, heroIdx: hi, heroOwner: seite };
             if (script.postTargetCondition
                 && !script.postTargetCondition(this.gs, pi, this, targetedHeroes, sourceCard, rxOpts)) continue;
@@ -42375,7 +42456,9 @@ this._deathWatch = (this._deathWatchStack || []).length
             const confirmed = await this.promptGeneric(pi, {
               type: 'confirm',
               title: anzeigeName,
-              message: `${srcName2} is targeting your Hero! Activate ${anzeigeName}?`,
+              // Als Ruling (Al 26.10., Winged Skeleton): die Karte kann eine eigene Frage formulieren (`postTargetMessage`) — „your Hero" passt nicht, wenn eine KREATUR gewählt wurde.
+              message: (typeof script.postTargetMessage === 'function' ? script.postTargetMessage(this, srcName2, rxOpts, targetedHeroes) : null)
+                || `${srcName2} is targeting your Hero! Activate ${anzeigeName}?`,
               confirmLabel: '🛡️ Activate!',
               cancellable: true,
               _handReactionWindow: true,
@@ -55269,9 +55352,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
       }
       const _eAmountBeforeBuffMul = e.amount;
-      if (e.canBeNegated !== false && e.inst.counters?.buffs) {
+      if (e.inst.counters?.buffs) {
         for (const [, bd] of Object.entries(e.inst.counters.buffs)) {
           if (bd.damageMultiplier != null) {
+            if (e.canBeNegated === false && !(bd.damageMultiplier > 1)) continue;   // Als Ruling (Al 26.10., Disruption Ray): unnegierbarer/True Damage nimmt nur ERHOEHENDE Multiplikatoren mit (s. Heldenpfad)
             if (e.cannotBeReduced && bd.damageMultiplier < 1) continue;
             if (typeof e.multiplyAmount === 'function') { e._mul = (e._mul ?? 1) * bd.damageMultiplier; e._kMul = (e._kMul ?? 1) * bd.damageMultiplier; }   // W50a: Buff-Senkung zaehlt
             else e.amount = Math.ceil(e.amount * bd.damageMultiplier);
@@ -56606,9 +56690,18 @@ this._deathWatch = (this._deathWatchStack || []).length
   // hooks AND broadcasts a `coolness_stack_change` event so the client
   // can animate the card flying between piles.
 
+  /**
+   * Als Ruling (Al 26.10.): „Der Coolness Stack existiert, solange Wowhalla in der eigenen Area liegt, auch wenn er leer ist" —
+   * `hasCoolnessStack` = Stack nicht leer ODER eigene Wowhalla in der eigenen Area. Wer nur „existiert ein Stack" braucht (Freshya, Lolki,
+   * Wowkyrie, Nornstellar, Hipdall-Nachfüllen, Prophecy: legen eine Karte AUF den Stack), fragt dies; wer eine KARTE aus dem Stack braucht
+   * (Cool Rescue, Ragnarock, Wowhallas Selbstschutz, Bifab …), prüft `getCoolnessStackSize(pi) > 0`. Liegt Wowhalla nicht mehr, gilt der
+   * Stack wie bisher als gelöscht/nicht vorhanden.
+   */
   hasCoolnessStack(playerIdx) {
     const ps = this.gs.players[playerIdx];
-    return Array.isArray(ps?.coolnessStack) && ps.coolnessStack.length > 0;
+    if (!Array.isArray(ps?.coolnessStack)) return false;
+    if (ps.coolnessStack.length > 0) return true;
+    return (this.gs.areaZones?.[playerIdx] || []).includes('Wowhalla, the Hall of the Cool');
   }
 
   getCoolnessStackTop(playerIdx) {
