@@ -37,6 +37,9 @@ const CARD_NAME = 'Deepsea Encounter';
 
 function _isCreatureTarget(t, engine) {
   if (!(t?.type === 'equip' && t.cardInstance)) return false;
+  // Zweite Encounter im selben Zielfenster: der Hub reicht nach der ersten Umlenkung noch das ALTE Ziel weiter (die schon zurückgegebene Kreatur).
+  // Ohne diese Prüfung gäbe die zweite Karte dieselbe Kreatur ein zweites Mal auf die Hand (Karte doppelt).
+  if (t.cardInstance.zone !== 'support' || !engine?.cardInstances?.includes?.(t.cardInstance)) return false;
   // „level up to 1 higher than the returned Creature's": Artifact Creatures
   // haben kein Level (Als Ruling 9.10.) — sie sind hier kein Ziel.
   const cd = engine?.getEffectiveCardData?.(t.cardInstance) || engine?._getCardDB?.()[t.cardInstance.name];

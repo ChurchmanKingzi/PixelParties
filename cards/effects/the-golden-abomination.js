@@ -54,7 +54,7 @@ function goldWuerdeUmgeleitet(engine, gewinner) {
     if (c.name !== CARD_NAME || c.zone !== 'support') return false;
     const ctrl = c.controller ?? c.owner;
     if (ctrl === gewinner) return false;
-    if (!engine.gs?.skillTest && ctrl !== (gewinner === 0 ? 1 : 0)) return false;
+    if (!engine.gs?.skillTest && ctrl !== opponentOfGs(engine.gs, gewinner)) return false;
     return engine.isCardEffectActive(c) && stiehltGoldVon(engine, ctrl, gewinner, c);
   });
 }
