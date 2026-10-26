@@ -54226,11 +54226,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const chainPickCanConfirm = chainPickIsFinal;
   // ★ W78 (Backstab, Al 26.10.): bei der GEORDNETEN Wahl (`steps`) statt gelber Nummernmarken Pixelrahmen — Klick 1 (der Angreifer) dunkelrot, Klick 2 (das Ziel) hellrot;
   // wählbare Kandidaten blinken in der Farbe des Schritts, der gerade gewählt wird (`steps(1)`, kein Schein).
+  // `preset` = schon feststehende Wahl (der auf den Helden gezogene Angreifer): sie zählt als Schritt 0, die Liste `steps` beginnt dahinter.
+  const chainPickPreset = Array.isArray(chainPickData?.preset) ? chainPickData.preset : [];
   const chainPickRolle = (id) => {
     if (!chainPickSteps) return '';
+    if (chainPickPreset.includes(id)) return ' chain-pick-fest chain-pick-schritt0';
     const st = chainPickSelected.findIndex(t => t.id === id);
-    if (st >= 0) return ' chain-pick-fest chain-pick-schritt' + Math.min(st, 1);
-    if (chainPickValidIds.has(id)) return ' chain-pick-kandidat chain-pick-schritt' + Math.min(chainPickSelected.length, 1);
+    if (st >= 0) return ' chain-pick-fest chain-pick-schritt' + Math.min(st + chainPickPreset.length, 1);
+    if (chainPickValidIds.has(id)) return ' chain-pick-kandidat chain-pick-schritt' + Math.min(chainPickSelected.length + chainPickPreset.length, 1);
     return '';
   };
 
