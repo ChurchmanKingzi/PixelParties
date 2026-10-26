@@ -49,7 +49,8 @@ async function dolchSchlag(ctx, pi, wdh) {
   const atk = Math.max(0, hero.atk || 0);
 
   // "you may choose a target" — optional; cancel = decline.
-  const target = await ctx.promptDamageTarget({
+  // ★ R-12 (Al 26.10.): `heldenEffektZielwahl` trennt Negierung im Zielfenster (Surprise, Hand-Reaktion, Schutz-/Redirect-Fenster) vom Abbruch des Spielers (W36a, wie Broghan & Co.).
+  const { target, negiert } = await engine.heldenEffektZielwahl(ctx, {
     side: 'any',
     types: ['hero', 'creature'],
     damageType: 'attack',
@@ -67,6 +68,14 @@ async function dolchSchlag(ctx, pi, wdh) {
       treatedAsAttack: engine.heldenAngriffStempel(ctx.cardHeroOwner ?? pi, heroIdx),   // W30a: Stufe = Fighting-Level des Helden (war W27a: 0)
     },
   });
+  if (negiert) {
+    // R-12: negierter Schlag = verbraucht (Einmal-pro-Zug des Daggers gestempelt, „you may" war zugesagt) und zählt als gespielte Attack des Trägers.
+    await engine.announceHookActivation('Sacrificial Dagger', pi);
+    if (!wdh) engine.claimHOPT(hoptKey, pi);
+    await engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi, name: CARD_NAME });
+    engine.sync();
+    return;
+  }
   if (!target) return; // declined — HOPT untouched
 
   // Auftritt links am Feld (Als Regel 21.8.: beim Opfern). Erst

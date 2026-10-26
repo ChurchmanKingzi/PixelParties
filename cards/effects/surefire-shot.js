@@ -32,6 +32,9 @@ const FLUG_MS = 170;       // Flugzeit des Pfeils
 const EINSCHLAG_MS = 90;   // Nachlauf bis der Blitz sitzt, dann fällt der Schaden
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   requiresTarget: true,
   ignoresTargetingRestrictions: true,
   opponentCannotReact: true,

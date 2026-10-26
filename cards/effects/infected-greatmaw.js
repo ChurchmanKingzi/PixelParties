@@ -152,7 +152,8 @@ module.exports = {
     if (wdh && !engine.canSatisfySacrifice(pi, spec, ctx.card?.id)) return false;   // W40a: kein weiteres Opfer → keine Wiederholung, nichts bezahlt
     let paid = false;
     const atkPreview = Math.max(0, attacker.hero.atk || 0);
-    const target = await ctx.promptDamageTarget({
+    // ★ R-12 (Al 26.10.): `heldenEffektZielwahl` trennt Negierung im Zielfenster (Surprise, Hand-Reaktion, Schutz-/Redirect-Fenster) vom Abbruch des Spielers (W36a, wie Broghan & Co.).
+    const { target, negiert } = await engine.heldenEffektZielwahl(ctx, {
       side: 'any',
       types: ['hero', 'creature'],
       damageType: 'attack',
@@ -183,6 +184,8 @@ module.exports = {
       // post-sacrifice reaction (Booby Trap killed the attacker, etc.).
       // If the sacrifice was already paid, the use IS spent (claim HOPT
       // by returning true); a pre-sacrifice cancel returns false.
+      // R-12 (Al 26.10.): ein NEGIERTER Treffer (Opfer bezahlt) zählt als gespielte Attack des gewählten Helden (W36a, wie Broghan & Co.).
+      if (negiert && paid) await engine.zaehleAlsArt('attack', { pi, heroIdx: attackerHeroIdx, heroOwner: attackerOwner, name: CARD_NAME });
       return paid;
     }
 

@@ -90,6 +90,9 @@ module.exports = {
       title: CARD_NAME,
       description: `Deal ${schaden} damage to any target. (${debt(ps)} debt × ${PER_GOLD})`,
       confirmLabel: `💥 ${schaden} Damage!`,
+      // Als Ruling (Al 26.10.): Missing Parts ist eine Artifact Creature (Subtyp Creature) → Schadensart 'creature', Vorschau 10 × Schulden.
+      damageType: 'creature',
+      baseDamage: schaden,
       cancellable: true,
       // `selectCount`, nicht `maxSelect` — der Client faellt sonst auf
       // seinen Standard von DREI zurueck (v338, Als Befund an Logan).

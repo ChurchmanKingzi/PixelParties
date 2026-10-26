@@ -54,6 +54,9 @@ const BOLT_ABSTAND_MS = 90;
 const TREFFER_ABSTAND_MS = 420;
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).
   // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
   onFizzledPlay: ({ engine, gs, pi }) => { engine.claimHOPT('future-tech-barrage', pi); },

@@ -8,6 +8,9 @@ const { v4: uuidv4 } = require('uuid');
 const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS, hasCardType, hasSpellSchool, isArtifactCreature, hasNumericCreatureLevel, POISON_BASE_DAMAGE, BURN_BASE_DAMAGE, baseCardName, BLIND_STATUSES, getCleansableStatuses, kontrollRechteVon, KONTROLL_RECHTE, heroCanBeEquipped } = require('./_hooks');
 const ANGER_BONUS = 100;   // Unreasonable Anger: +100 an einem einzelnen Ziel
 const EMPOWERED_STRIKE_BONUS = 150;   // W49a (Al, 22.10.2026): Elixir of Strength gewaehrt +150 (frueher +100); Kartentext/Tooltip/Skript-Kopf nachgezogen
+// R-6 (Als Ruling Al 26.10., „keine Counter"): Zähler einer Kreatur, die `_resetCreatureForSurpriseZone` beim Einlagern (Camel-Re-Set, Ushabti) zusätzlich löscht.
+const SURPRISE_RESET_BUCHFUEHRUNG = new Set(['_jeGetroffen', '_damageTakenTurn', '_damageTakenAmount', '_damagedOnTurn', 'poisonPermanent', 'burnPermanent', 'frozenUnhealable', 'negatedSourceBound']);
+const SURPRISE_RESET_SPIELZAEHLER = new Set(['headCounter', 'changeCounter', 'demonCounter', 'skullCounter', 'bombCounters', 'bunnyBombCounter', 'applause', 'balance', 'luck', 'preserve']);
 // v1443: Hooks, deren Kontext die ausloesende Karte mitbekommt
 // (`ausloeserName`, s. `runHooks`) — fuer Reaktionen, die zeigen, worauf
 // sie reagieren.
@@ -6031,6 +6034,8 @@ class GameEngine {
         let side = config.side || 'any';
         if (side === 'own') side = 'my';
         if (side === 'both') side = 'any';
+        // R-12 (Al 26.10.): Idej Sword - Kunagi — die Wiederholung einer Mehrfachwahl-Attack geht wie in `promptDamageTarget` „against a different target your opponent controls": nur Gegnerziele (`gs._kunagiWdh`).
+        if (engine.gs._kunagiWdh && engine.gs._kunagiWdh.pi === pi) side = 'enemy';
         const types = config.types || ['hero', 'creature'];
 
         // ── Truth-Seeing Eye ── (see promptDamageTarget for rationale)
@@ -6195,13 +6200,14 @@ class GameEngine {
                         ? engine._getCardDB()[cardInstance.name] : null,
                       damageType: config.damageType,
                       cardName: cardInstance?.name || null,
-                      source: cardInstance,   // W30a: Quellobjekt (Stempel / Traeger-Fighting-Level, s. `_heldenEffektStufe`)
+                      source: config.attackerSourceOverride || cardInstance,   // W30a: Quellobjekt (Stempel / Traeger-Fighting-Level, s. `_heldenEffektStufe`); R-12 (Al 26.10.): auch hier der Held der Quelle wie in `promptDamageTarget`
                       chooserIdx: pi,
                       // v870: WELCHER HELD waehlt. Gebraucht fuer
                       // Regeln zwischen zwei einzelnen Helden
                       // (Alliance) — der Spielerindex allein reicht
                       // dafuer nicht.
-                      chooserHeroIdx: cardInstance?.heroIdx ?? -1,
+                      chooserHeroIdx: config.attackerSourceOverride?.heroIdx ?? cardInstance?.heroIdx ?? -1,
+                      chooserHeroOwner: config.attackerSourceOverride?.heroOwner,   // R-12: wie `promptDamageTarget` (Alliance: Paarregel Held ↔ Held; uebernommener Held)
                       // v871 (Als Klarstellung): die LEGALEN Ziele
                       // dieser Quelle. Eine Regel der Bauart „nur,
                       // solange es andere moegliche Ziele gibt"
@@ -6405,7 +6411,8 @@ class GameEngine {
           // Forward intent fields — see promptDamageTarget for rationale.
           baseDamage: config.baseDamage,
           damageType: config.damageType,
-          _quellObjekt: cardInstance,   // W30a: s. promptDamageTarget
+          _quellObjekt: config.attackerSourceOverride || cardInstance,   // W30a: s. promptDamageTarget; R-12: der Held der Quelle (Future Tech Fists)
+          _waehlbarProbe: config._waehlbarProbe,   // R-12: Trockenlauf (`promptEffectTarget`) auch fuer die Mehrfachwahl — Future Tech Fists „exakt N legale Ziele"
           isBuff: config.isBuff,
           isHeal: config.isHeal,
           // ── v385: `isHealing` gehoert MIT weitergereicht ────────────
@@ -6453,8 +6460,8 @@ class GameEngine {
         // „exactly 1 target"). Leere Rueckgabe = der Effekt ist negiert (kein Abbruch: keine Zaubermarke).
         let _gewaehlt = selectedIds;
         if (!config._skipRedirectCheck) {
-          _gewaehlt = await engine.applyRedirectWindows(selectedIds, targets, config, cardInstance);
-          if (!Array.isArray(_gewaehlt) || _gewaehlt.length === 0) return [];
+          _gewaehlt = await engine.applyRedirectWindows(selectedIds, targets, config, config.attackerSourceOverride || cardInstance);   // R-12: der Held der Quelle (`attackerSourceOverride`), wie `promptDamageTarget`
+          if (!Array.isArray(_gewaehlt) || _gewaehlt.length === 0) { gs._zielNegiertDurchSchutz = true; return []; }   // R-12: Negation durch Schutz-/Redirect-Fenster (kein Abbruch) — gelesen von `heldenEffektZielwahl`
         }
 
         // Map IDs to target objects and record for spell tracking
@@ -6469,10 +6476,10 @@ class GameEngine {
           const heroTargets = result.filter(t => t.type === 'hero' || t.type === 'creature'
             || (t.type === 'equip' && t.cardInstance && engine._istKreaturenInstanz(t.cardInstance)));   // Z3 (R02-01)
           if (heroTargets.length > 0) {
-            const surpriseResult = await engine._checkSurpriseWindow(heroTargets, cardInstance, { damageType: config.damageType });
+            const surpriseResult = await engine._checkSurpriseWindow(heroTargets, config.attackerSourceOverride || cardInstance, { damageType: config.damageType });   // R-12: Quelle = der Held (`attackerSourceOverride`), wie `promptDamageTarget`
             if (surpriseResult?.effectNegated) {
               gs._spellNegatedByEffect = true;
-              await engine.negationsBilder(cardInstance, heroTargets, surpriseResult);   // v1180
+              await engine.negationsBilder(config.attackerSourceOverride || cardInstance, heroTargets, surpriseResult);   // v1180
               // Clear damage log entries for negated targets
               if (gs._spellDamageLog) {
                 for (const t of result) {
@@ -6507,11 +6514,11 @@ class GameEngine {
             (!!config.damageType && config.damageType !== 'status' && config.damageType !== 'none')
           );
           const ptResult = await engine._checkPostTargetHandReactions(
-            result, cardInstance, { damageType: config.damageType, dealsDamage: _ptDealsDamage, heroChoiceIsCost: config.heroChoiceIsCost === true },
+            result, config.attackerSourceOverride || cardInstance, { damageType: config.damageType, dealsDamage: _ptDealsDamage, heroChoiceIsCost: config.heroChoiceIsCost === true },   // R-12: Quelle = der Held (`attackerSourceOverride`)
           );
           if (ptResult?.effectNegated) {
             gs._spellNegatedByEffect = true;
-            await engine.negationsBilder(cardInstance, result, ptResult);   // v1180
+            await engine.negationsBilder(config.attackerSourceOverride || cardInstance, result, ptResult);   // v1180
             // Clear damage log entries for negated targets
             if (gs._spellDamageLog) {
               for (const t of result) {
@@ -10501,6 +10508,10 @@ class GameEngine {
         hookCtx._kBase = amount; hookCtx._kMul = 1; hookCtx._kFlat = 0;
         await this.runHooks(HOOKS.BEFORE_TRUE_DAMAGE, hookCtx);
         if (hookCtx.cancelled && hookCtx._umgeleitet) return { dealt: 0, cancelled: true };   // Mean Cute Cat: umgeleitet (der Schaden liegt schon beim neuen Ziel)
+        // ★ R-4 (Als Ruling Al 26.10.): Unreasonable Anger („any damage the user deals to single targets is increased by 100") ERHÖHT auch True Damage gegen Helden — wie
+        // schon gegen Kreaturen (`processCreatureDamageBatch` rechnet es für jeden Eintrag, auch `trueDamage`). Erhöhen ist erlaubt („cannot be reduced or negated"); Teil der Basis
+        // (wird wie im Normalweg mitverdoppelt).
+        this._applyAngerBonusIfApplicable(hookCtx);
         // ★ Als Ruling (Al 26.10., Disruption Ray): „All damage that target receives … is doubled" verdoppelt auch True Damage (Rockfall 200 → 400, Acid Vial 150 → 300) —
         // Verdoppeln ist keine Senkung. Nur ERHOEHENDE Buff-Multiplikatoren (> 1); Senkungen/Immunitaeten (Cloudy, Petrified, Damage Immune) bleiben draussen. Wie im Normalweg
         // „Basis × Multiplikatoren, dann flach" (PUNKT VOR STRICH).
@@ -25198,6 +25209,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `zoneSlot` geht weiterhin an den Kartenvertrag.
     let isInherentAction = usingSilenceBonus
       || this.cardHasInherentAction(pi, heroIdx, cardData, { zoneSlot: opts.zoneSlot,
+           // Als Ruling (Al 26.10.): die konkrete Handkopie (Stufe „in der Hand" je Kopie, Bear Rider: „level 0 ⇒ Zusatzaktion").
+           ...(!opts.fromCreation && Number.isInteger(handIndex) && handIndex >= 0 ? { handIndex } : {}),
            // Styx 28.9.: Drop auf einen geliehenen Helden — Seite des Platzes.
            ...(opts.charmedOwner != null && opts.charmedOwner !== pi ? { charmedOwner: opts.charmedOwner, heroOwner: opts.charmedOwner } : {}) });
 
@@ -26613,8 +26626,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!(ps.hand || [])[idx]) { delete map[k]; continue; }
       map[k] = (map[k] || 0) + 1;
       if (!ps._handLevelOffsetsTransient) ps._handLevelOffsetsTransient = {};
+      // Als Ruling (Al 26.10.): Senkungen addieren sich — jede Zugende-Senkung kommt um 1 DAZU (vorher `min(cur, −Zähler)`: ein anderer transienter
+      // Abzug derselben Kopie, z. B. Great Vanguard Demons Reaction-Senkung, ging verloren).
       const cur = ps._handLevelOffsetsTransient[idx] || 0;
-      ps._handLevelOffsetsTransient[idx] = Math.min(cur, -map[k]);
+      ps._handLevelOffsetsTransient[idx] = cur - 1;
       geaendert = true;
       this.log('hand_level_countdown', { player: ps.username, card: ps.hand[idx], reductions: map[k] });
       // Animation auf der Handkarte: die Stufe sinkt.
@@ -43463,6 +43478,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     delete inst.ushabtiPlaced;
     delete inst.ushabtiTurn;
     delete inst.ushabtiSide;
+    // ★ R-6 (Als Ruling Al 26.10., „keine Counter" wörtlich): die Kreatur kommt als frische Karte zurück — auch OHNE die Buchführung ihrer Zeit auf dem Brett:
+    //   • Schadens-/Treffer-Historie (`_jeGetroffen` „has taken damage yet", `_damageTaken*`, `_damagedOnTurn`),
+    //   • die Herkunftsstempel der Status (`*AppliedBy…`, `*AppliedTurn`, `poisonAppliedBy`/`burnAppliedBy`) und Status-Begleiter (`poisonPermanent`, `burnPermanent`,
+    //     `frozenUnhealable`, `negatedSourceBound`),
+    //   • die Spiel-Counter auf der Karte (Head/Change/Demon/Skull/Bomb/Bunny-Bomb/Applause/Balance/Luck/Preserve).
+    // Nicht angefasst: Struktur-Zähler (`permId`, Overrides, Buffs, Kontroll-/Platzierungsmarken) und Einmal-Sperren des Zuges.
+    for (const k of Object.keys(inst.counters)) {
+      if (SURPRISE_RESET_BUCHFUEHRUNG.has(k) || SURPRISE_RESET_SPIELZAEHLER.has(k) || /AppliedBy|AppliedTurn$/.test(k)) delete inst.counters[k];
+    }
     if (cleared.length) {
       this.log('surprise_reset_cleared', { card: inst.name, statuses: cleared });
     }
@@ -44408,7 +44432,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   /**
    * ★ W32a (Al, 22.10.2026, Punkt 5: „Reactions wie Magic Topaz oder Arrows, die auf Attacks reagieren" reagieren auch auf Effekte, die als Attack ZÄHLEN): virtuelle
    * Attack-Kette um den Treffer eines Effekts, der als Attack EINES HELDEN zählt — Muster von Arthor, Inheritor of the Barbarian Sword, jetzt für alle (Broghan, Brackle,
-   * Heragas, Kohta, Crusader's ×4, Javelin Throw, Sword in a Bottle, Bamboo Staff, Sacrificial Dagger, Infected Greatmaw, Alluring Light). Aufruf NACH der Zielwahl, VOR dem
+   * Heragas, Kohta, Crusader's ×4, Javelin Throw, Sword in a Bottle, Bamboo Staff, Sacrificial Dagger, Infected Greatmaw, Alluring Light, Future Tech Fists [R-12: Mehrfachziel, `ziele` = alle gewählten Ziele]). Aufruf NACH der Zielwahl, VOR dem
    * Schaden: `resolve` ist der Schaden. Die Kette trägt Typ `Attack`, Besitzer `pi` (der Spieler, dessen Held zuschlägt) und den schlagenden Helden (`heroIdx` auf der Brettseite
    * `heroOwner`) — Arrows/Magic Topaz (`arrowTriggerCondition`), Attack-Reaktionen und Negierer sehen den Effekt wie eine Attack-Karte. Danach werden die Arrows abgeräumt
    * (`clearArmedArrows`, idempotent). Mitten in einem offenen Reaktionsfenster (`_inReactionCheck`) öffnet kein neues Fenster: der Treffer läuft direkt (Konvention von `runHooks`).
@@ -44628,12 +44652,15 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Flag) bleibt ein Abbruch. Liefert `{ target, negiert }`; die Flags werden zurückgesetzt (kein Rest für den nächsten Effekt). Der Aufrufer zählt/stempelt bei `negiert` selbst
    * (`zaehleAlsArt`, Rückgabe `true` aus `onHeroEffect`).
    */
-  async heldenEffektZielwahl(ctx, config) {
+  async heldenEffektZielwahl(ctx, config, opts = {}) {
     const gs = this.gs;
     const negVorher = gs._spellNegatedByEffect;
     delete gs._spellNegatedByEffect; delete gs._zielNegiertDurchSchutz;
-    const target = await ctx.promptDamageTarget(config);
-    const negiert = !target && (!!gs._spellNegatedByEffect || !!gs._zielNegiertDurchSchutz);
+    // R-12 (Al 26.10.): `opts.mehrfach` — ein als Attack zählender Effekt mit MEHREREN Zielen (Future Tech Fists) wählt über `ctx.promptMultiTarget` (Liste statt Einzelziel);
+    // dieselben Fenster (Umleitung, Surprise, Hand-Reaktionen) mit dem Helden als Quelle (`config.attackerSourceOverride`), dieselbe Unterscheidung Negierung ↔ Abbruch.
+    const target = opts.mehrfach ? await ctx.promptMultiTarget(config) : await ctx.promptDamageTarget(config);
+    const leer = opts.mehrfach ? (!Array.isArray(target) || target.length === 0) : !target;
+    const negiert = leer && (!!gs._spellNegatedByEffect || !!gs._zielNegiertDurchSchutz);
     if (negVorher) gs._spellNegatedByEffect = negVorher; else { delete gs._spellNegatedByEffect; if (negiert) delete gs._negationWhole; }
     delete gs._zielNegiertDurchSchutz;
     return { target, negiert };
@@ -52010,23 +52037,21 @@ this._deathWatch = (this._deathWatchStack || []).length
       // ★ W15b (Al, C2: „exakt die geklickte/ausgewählte Karte"): kommt `opts.handIdx` mit, zählt bei Spells/Attacks NUR der
       // Rabatt dieser einen Kopie (Divine Gift of Magic, Fiona); ohne Index bleibt es bei „günstigste Kopie nach Namen".
       const _nurKopie_lvr = this._kopieNurIndex(handArr_lvr, cardData, opts.handIdx);
-      // Helper closure: scan one map, picking the lowest (most-negative)
-      // offset across hand entries matching cardData.name. Hero filter
-      // is honored consistently for both maps.
-      const scan = (map) => {
-        if (!map) return;
-        for (const k of Object.keys(map)) {
-          const idx = +k;
-          if (_nurKopie_lvr != null && idx !== _nurKopie_lvr) continue;
-          if (handArr_lvr[idx] !== cardData.name) continue;
-          if (filterMap_lvr && filterMap_lvr[k] != null && filterMap_lvr[k] !== heroIdx) continue;
-          if (filterMap_lvr && filterMap_lvr[k] != null && this._heldHandOffsetsRuhen(playerIdx, heroIdx)) continue;   // W7a (H04-13)
-          const v = map[k] || 0;
-          if (v < bestOffset) bestOffset = v;
-        }
-      };
-      scan(offMap_lvr);
-      scan(transMap_lvr);
+      // Als Ruling (Al 26.10.): „Bear Rider und Slime sollen sich addieren." Der dauerhafte Abzug (`_handLevelOffsets`: Rocky Slime, Tobi) und der
+      // transiente (`_handLevelOffsetsTransient`: Bear Rider, Sparkfly Queen, Divine Gift of Magic …) DERSELBEN Handkopie zählen als SUMME (vorher
+      // galt nur der größere von beiden: Rocky −1 + 1 Frozen ergab Stufe 1 statt 0). Je Handindex summiert; über die Kopien des Namens gilt wie
+      // bisher die am stärksten gesenkte. Die Untergrenze 0 bleibt (s. u.).
+      const _idxSet_lvr = new Set([...Object.keys(offMap_lvr || {}), ...Object.keys(transMap_lvr || {})]);
+      for (const k of _idxSet_lvr) {
+        const idx = +k;
+        if (_nurKopie_lvr != null && idx !== _nurKopie_lvr) continue;
+        if (handArr_lvr[idx] !== cardData.name) continue;
+        // Der Heldenfilter (Sparkfly Queen, Sid) bindet nur den TRANSIENTEN Rabatt der Kopie an seinen Helden (bzw. lässt ihn mit dem Helden ruhen, W7a/H04-13);
+        // ein dauerhafter Abzug (Rocky Slime, Tobi) gilt für jeden Helden und fällt mit dem Filter nicht weg.
+        const _gebunden = filterMap_lvr && filterMap_lvr[k] != null && (filterMap_lvr[k] !== heroIdx || this._heldHandOffsetsRuhen(playerIdx, heroIdx));
+        const v = ((offMap_lvr && offMap_lvr[k]) || 0) + (_gebunden ? 0 : ((transMap_lvr && transMap_lvr[k]) || 0));
+        if (v < bestOffset) bestOffset = v;
+      }
       if (bestOffset < 0) rawLevel = Math.max(0, rawLevel + bestOffset);
     }
     // Karten-Skript `levelOffsetForHero` (You are the Chosen One!!!): die Stufe hängt vom NUTZER ab — Änderung JE Held, nie unter 0.
@@ -52459,6 +52484,13 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
     total += this._naechsterSpellRabattSumme(playerIdx, cardData);   // W74c (Wendy)
+    // Als Ruling (Al 26.10.): Karten mit „…, to a minimum of N" (Skript-Feld `minHandLevel`: Embodiment of Biseria = 1) behalten diese Untergrenze für die GESAMTE Handstufe —
+    // ein Rocky-Abzug (schon in `rawLevel`) darf sie nicht unterschreiten. Greift nur, wenn eine Senkung wirkt (`total > 0`: die Skripte melden 0 für Pile-/Brettkopien)
+    // und hebt nie über die Stufe an, die die Karte ohne Senkung hätte (`rawLevel`).
+    if (total > 0) {
+      const _min = loadCardEffect(cardData.name)?.minHandLevel;
+      if (typeof _min === 'number') return Math.max(0, rawLevel - total, Math.min(rawLevel, _min));
+    }
     return Math.max(0, rawLevel - total);
   }
 
@@ -52475,8 +52507,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    *      Sol Rym's "Chain Lightning is Lv0 for me" pattern. Only
    *      applied when `opts.heroIdx` is supplied.
    *   2. Per-hand-position offsets (`ps._handLevelOffsets[handIdx]` and
-   *      the transient sibling). The most-negative offset for the named
-   *      card wins, matching `heroMeetsLevelReq`'s scan. Only consulted
+   *      the transient sibling). Beide Abzüge DIESER Kopie werden ADDIERT
+   *      (Als Ruling Al 26.10.: Bear Rider + Rocky Slime), nie unter 0. Only consulted
    *      when `opts.handIdx` is supplied — for card pickers that don't
    *      know which hand slot a candidate came from, this contribution
    *      is conservatively skipped.
@@ -52547,18 +52579,13 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // (2) Per-hand-position offset (only when a specific slot is given).
     if (handIdx != null && ps?.hand && cardData.name) {
-      const offA = ps._handLevelOffsets?.[handIdx];
-      const offB = ps._handLevelOffsetsTransient?.[handIdx];
+      // Als Ruling (Al 26.10.): „Bear Rider und Slime sollen sich addieren." — dauerhafter (`_handLevelOffsets`) und transienter Abzug
+      // (`_handLevelOffsetsTransient`) dieser einen Handkopie zählen als SUMME (vorher: das Minimum beider), nie unter Stufe 0.
       let best = 0;
-      const scan = (map) => {
-        if (!map) return;
+      if (ps.hand[handIdx] === cardData.name) {
         const k = String(handIdx);
-        if (ps.hand[handIdx] !== cardData.name) return;
-        const v = map[k] || 0;
-        if (v < best) best = v;
-      };
-      scan(ps._handLevelOffsets);
-      scan(ps._handLevelOffsetsTransient);
+        best = ((ps._handLevelOffsets && ps._handLevelOffsets[k]) || 0) + ((ps._handLevelOffsetsTransient && ps._handLevelOffsetsTransient[k]) || 0);
+      }
       if (best < 0) raw = Math.max(0, raw + best);
     }
 
@@ -55508,7 +55535,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         // `e.amount = …` waere absolut und backte die gesammelten flat
         // Modifikatoren in die Basis (Punkt vor Strich kaputt).
         const armiert = typeof e.multiplyAmount === 'function';
-        const proxy = { amount: armiert ? e._base : e.amount, type: e.type, cancelled: false, _kettenFolge: !!e.kettenFolge };   // W49a: Ricochet-Folgetreffer ohne Pfeil-Bonus
+        // R-4 (Als Ruling Al 26.10., „Angleichen"): True Damage („cannot be reduced") wird von Hydra Blood Arrow auch auf Kreaturen NICHT auf 0 gesenkt — wie im Heldenzweig
+        // (`actionDealTrueDamage`); der Gift-Zuschlag nach dem Treffer bleibt.
+        const proxy = { amount: armiert ? e._base : e.amount, type: e.type, cancelled: false, _kettenFolge: !!e.kettenFolge, _unreduzierbar: e.trueDamage === true };   // W49a: Ricochet-Folgetreffer ohne Pfeil-Bonus
         const _pfeilVor = proxy.amount;
         applyArrowsBeforeDamage(this, e.source, e.inst, proxy);
         if (armiert) {

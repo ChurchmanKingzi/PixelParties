@@ -318,6 +318,8 @@ module.exports = {
     }
     if (negiert || (opferZ.type === 'hero' && !(gs.players[opferZ.owner]?.heroes?.[opferZ.heroIdx]?.hp > 0))) {
       engine.log('sword_in_a_bottle', { player: gs.players[pi]?.username, attacker: angreiferHeld.name, target: opferZ.cardName, negated: true });
+      // R-12 (Al 26.10.): ein im Zielfenster NEGIERTER Schlag zählt als gespielte Attack des gewählten Helden (W36a, wie Broghan & Co.); der Trank ist verbraucht, der Einmal-Stempel steht.
+      if (negiert) await engine.zaehleAlsArt('attack', { pi, heroIdx: held.heroIdx, heroOwner: held.owner, name: CARD_NAME });
       engine.sync();
       return;
     }

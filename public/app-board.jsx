@@ -40765,16 +40765,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const filter     = me.handLevelOffsetHeroFilter || {};
       const handArr = me.hand || [];
       let bestOffset = 0;
-      const scan = (map) => {
-        for (const k of Object.keys(map)) {
-          if (handArr[+k] !== card.name) continue;
-          if (filter[k] != null && filter[k] !== heroIdx) continue;
-          const v = map[k] || 0;
-          if (v < bestOffset) bestOffset = v;
-        }
-      };
-      scan(offsets);
-      scan(transient);
+      // Als Ruling (Al 26.10.): dauerhafter + transienter Abzug EINER Kopie ADDIEREN sich (Spiegel von `_spielRohStufe`); über die Kopien gilt die am stärksten gesenkte.
+      for (const k of new Set([...Object.keys(offsets), ...Object.keys(transient)])) {
+        if (handArr[+k] !== card.name) continue;
+        // Der Heldenfilter (Sparkfly Queen, Sid) bindet nur den transienten Rabatt; ein dauerhafter Abzug (Rocky Slime, Tobi) gilt für jeden Helden.
+        const v = (offsets[k] || 0) + ((filter[k] != null && filter[k] !== heroIdx) ? 0 : (transient[k] || 0));
+        if (v < bestOffset) bestOffset = v;
+      }
       if (bestOffset < 0) level = Math.max(0, level + bestOffset);
     }
     if (level <= 0 && !card.spellSchool1) return true;
@@ -59227,8 +59224,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 //     counting Skeletons in discard, etc.). Recomputed
                 //     each sendGameState; nothing is stored on the
                 //     player state.
-                // Lowest (most-negative) wins, matching the server's
-                // `heroMeetsLevelReq` aggregate. The hero-filter map
+                // Die Abzüge einer Kopie werden ADDIERT (s. u., Ruling Al 26.10.);
+                // über mehrere Kopien gilt serverseitig die am stärksten gesenkte
+                // (`heroMeetsLevelReq`). The hero-filter map
                 // tells us whether the rebate is restricted to one
                 // specific Hero (Queen's "corresponding Hero") so the
                 // badge can flag that limitation in dark green —
@@ -59237,7 +59235,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const persistent = (me.handLevelOffsets || {})[item.origIdx] || 0;
                 const transient  = (me.handLevelOffsetsTransient || {})[item.origIdx] || 0;
                 const dynamic    = (me.handLevelOffsetsDynamic || {})[item.origIdx] || 0;
-                const handLevelOffset = Math.min(persistent, transient, dynamic, 0);
+                // Als Ruling (Al 26.10.): „Bear Rider und Slime sollen sich addieren" — die drei Abzüge dieser Kopie zählen als SUMME (der Server
+                // rechnet `dynamic` schon auf der Stufe nach dem dauerhaften + transienten Abzug, Untergrenzen wie Biseria „minimum of 1" eingerechnet).
+                const handLevelOffset = Math.min(persistent + transient + dynamic, 0);
                 const handCardData = CARDS_BY_NAME[item.card];
                 // Mana Absorbing Crystal — while a copy is in our hand,
                 // every Spell's level reads +1. Hand-wide boost (not

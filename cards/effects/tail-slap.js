@@ -38,6 +38,9 @@ function kreaturenVon(engine, pi) {
 }
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an (die Option des Gegners, eigene Kreaturen zu besiegen, ist nur Schadens-Zuschnitt) —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   spellVisual: { impact: { type: 'tail_slap_hit' }, impactMs: 360 },
 
   requiresTarget: true,

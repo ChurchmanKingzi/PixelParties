@@ -201,6 +201,8 @@ module.exports = {
       engine.log('javelin_throw', {
         player: ps.username, hero: hero.name, artifact: thrownName, negated: true,
       });
+      // R-12 (Al 26.10.): ein im Zielfenster negierter Wurf zählt als gespielte Attack des Helden (W36a, wie Broghan & Co.) — auch bei der Kunagi-Wiederholung.
+      await engine.zaehleAlsArt('attack', { pi, heroIdx: hi, heroOwner, name: CARD_NAME });
       engine.sync();
       return true;
     }

@@ -120,11 +120,17 @@ module.exports = {
       // Cute Cats still observe the death normally; only this Cat's
       // controller is gated.
       engine.gs._cuteCatSelfDiscardSkipOwner = pi;
+      // R-15 (Als Ruling Al 26.10.): „sent to the discard pile" — landet die Katze NICHT in der Ablage (Ghazma/Vacarn/Ankhota/The Root of all Evil löschen sie stattdessen),
+      // gibt es nichts zu mahlen. Prüfung: Zahl der Cute Cats in der Ablage ihres Besitzers vorher/nachher.
+      const ablagePs = engine.gs.players[inst.originalOwner ?? inst.owner ?? pi];
+      const zaehleKatzen = () => (ablagePs?.discardPile || []).filter(n => n === CARD_NAME).length;
+      const katzenVorher = zaehleKatzen();
       try {
         await ctx.destroyCard(inst);
       } finally {
         delete engine.gs._cuteCatSelfDiscardSkipOwner;
       }
+      if (zaehleKatzen() <= katzenVorher) return;
 
       // Cat is now in the discard pile — fire the controller's mill.
       await tryMillCuteCat(engine, pi);
@@ -143,6 +149,9 @@ module.exports = {
     onCreatureDeath: async (ctx) => {
       const death = ctx.creature;
       if (!death || death.name !== CARD_NAME) return;
+      // R-15 (Als Ruling Al 26.10.): nur, wenn die Katze wirklich in der Ablage landet — gelöscht (Ghazma, Vacarn, Ankhota, The Root of all Evil), beansprucht
+      // oder gerettet zählt nicht als „sent to the discard pile" (`ziel`: 'discard' | 'deleted' | 'rescued' | null; fehlt es: wie bisher Ablage).
+      if (death.ziel !== undefined && death.ziel !== 'discard') return;
       const millOwner = death.originalOwner ?? death.owner;
       if (millOwner == null) return;
       // Skip during the self-discard-on-summon path — onPlay handles
@@ -163,6 +172,7 @@ module.exports = {
       if (!ctx._fromHand && !ctx._fromCoolnessStack) return;   // W16c (A04-07): "from anywhere" - auch von der Stack-Spitze
       if (ctx.discardedCardName !== CARD_NAME) return;
       if (ctx.playerIdx == null) return;
+      if (ctx._engine._wurzelAktiv?.()) return;   // R-15: The Root of all Evil löscht die Katze statt sie abzulegen — nicht „sent to the discard pile"
       await tryMillCuteCat(ctx._engine, ctx.playerIdx);
     },
 
@@ -173,6 +183,7 @@ module.exports = {
     onMill: async (ctx) => {
       if (!Array.isArray(ctx.milledCards) || !ctx.milledCards.includes(CARD_NAME)) return;
       if (ctx.playerIdx == null) return;
+      if (ctx._engine._wurzelAktiv?.()) return;   // R-15: The Root of all Evil löscht die gemillte Katze statt sie abzulegen — nicht „sent to the discard pile"
       await tryMillCuteCat(ctx._engine, ctx.playerIdx);
     },
   },

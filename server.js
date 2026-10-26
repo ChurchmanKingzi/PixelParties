@@ -4681,7 +4681,8 @@ function revealedMitStufe(ps, liste, engine, pi) {
   return liste.map(e => {
     const cd = db[e.name];
     if (!cd || cd.level == null) return e;
-    const off = Math.min(0, (ps._handLevelOffsets || {})[e.index] || 0, (ps._handLevelOffsetsTransient || {})[e.index] || 0);
+    // Als Ruling (Al 26.10.): dauerhafter + transienter Abzug einer Kopie ADDIEREN sich (wie `effectiveCardLevel`).
+    const off = Math.min(0, ((ps._handLevelOffsets || {})[e.index] || 0) + ((ps._handLevelOffsetsTransient || {})[e.index] || 0));
     // 23.10.: absolut gesetzte Stufe der Kopie (Puzzle-Creator, Inconspicuous Lawn Gnome) — die Senkungen wirken darauf weiter.
     const gesetzt = engine?._handLevelSetFor?.(pi, e.name, e.index);
     const basis = typeof gesetzt === 'number' ? gesetzt : cd.level;
@@ -5303,10 +5304,16 @@ function sendGameState(room, playerIdx, extra) {
         for (let i = 0; i < (ps.hand || []).length; i++) {
           const cd = cardDB[ps.hand[i]];
           if (!cd || !cd.level) continue;
+          // Als Ruling (Al 26.10.): Hand-Abzüge ADDIEREN sich — die Senker-Hooks (`reduceCardLevel`) rechnen wie in der Engine AUF der Stufe nach dem
+          // dauerhaften + transienten Handabzug dieser Kopie (Rocky Slime, Bear Rider …); der Client addiert die drei Maps nur noch.
+          const _gesetzt = room.engine._handLevelSetFor?.(pi, ps.hand[i], i);
+          const _basis = typeof _gesetzt === 'number' ? _gesetzt : cd.level;
+          const _vorher = Math.max(0, _basis + Math.min(0, ((ps._handLevelOffsets || {})[i] || 0) + ((ps._handLevelOffsetsTransient || {})[i] || 0)));
+          if (_vorher <= 0) continue;
           let reduced;
-          try { reduced = room.engine._applyCardLevelReductions(cd, cd.level, pi); }
+          try { reduced = room.engine._applyCardLevelReductions(cd, _vorher, pi); }
           catch { continue; }
-          if (reduced < cd.level) out[i] = reduced - cd.level; // negative offset
+          if (reduced < _vorher) out[i] = reduced - _vorher; // negative offset
         }
         return out;
       })() : {},
@@ -15863,11 +15870,21 @@ io.on('connection', (socket) => {
     const _ushabtiExtras = { isInherentAction: false, viaDragDrop: false, _isNormalSummon: true, _alsZusatzaktion: true };
     const _ushabtiMarke = { heroIdx, slotIdx: freeSlot, heroOwner: pi };   // wie `doPlayCreature`: „normale Beschwörung in diese Zone"
     let _beschwoerungOk = false;
+    let _ushabtiNegiert = null;   // R-7: Ergebnis der Kette, wenn der Gegner die Beschwörung negiert hat
+    let _ushabtiBleibt = false;   // R-7: die Kette hat die Beschwörung zurückgenommen, ohne die Kreatur zu entsorgen (`negatedKeepInHand`: nichts bezahlt)
     try {
       delete ps._requestedBouncePlaceSlot;
       ps._requestedNormalSummonSlot = _ushabtiMarke;
       if (await room.engine._payCreatureSummonCost(cardName, pi, heroIdx, _ushabtiExtras, freeSlot)) {
-        _beschwoerungOk = await room.engine._runBeforeSummon(cardName, pi, heroIdx, _ushabtiExtras, freeSlot);
+        // ★ R-7 (Als Ruling Al 26.10.): auch die Ushabti-Beschwörung ist negierbar wie eine Handbeschwörung — das Kettenfenster des Gegners (Off Duty & Co.) öffnet sich NACH der Kostenzahlung
+        // (`doPlayCreature`: die Opfer bleiben auch bei einer Negierung tot) und VOR `beforeSummon` und der Platzierung. Die Beschwörung ist eine Zusatzaktion eines fremden Effekts, die weder
+        // Aktion noch Zusatzaktions-Ladung verbraucht — deshalb gibt es hier nichts zu buchen oder zurückzugeben. Herkunft ist die SURPRISE ZONE, nicht die Hand: dieselbe Kette wie bei der
+        // Aktivierung einer Creature-Surprise und beim Aufdecken im Bakhm-Slot (Ruling 3.10., `_activateSurprise`: `fromBoard` + `isPlacement`) — Off Duty / Spy in the Enemy's Camp
+        // reagieren, die Hand-Reaktionen („plays any card from their hand": Master's Plan, Lunar Eclipse, Key) nicht; ohne „Ersatzaktion" (Platzierung ist keine Aktion).
+        const _kette = await room.engine.executeCardWithChain({ cardName, owner: pi, heroIdx, cardType: 'Creature', goldCost: 0, resolve: null, fromBoard: true, isPlacement: true });
+        if (_kette.negated && _kette.negatedKeepInHand) _ushabtiBleibt = true;
+        else if (_kette.negated) _ushabtiNegiert = _kette;
+        else _beschwoerungOk = await room.engine._runBeforeSummon(cardName, pi, heroIdx, _ushabtiExtras, freeSlot);
       }
     } catch (err) {
       console.error('[summon_ushabti] Kosten/beforeSummon:', err.message);
@@ -15883,6 +15900,21 @@ io.on('connection', (socket) => {
       room.engine._verwerfeSummonKosten();
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
     };
+    if (_ushabtiBleibt) { _ushabtiAbbruch(); return; }   // R-7: zurückgenommen (No Retreat!) — nichts bezahlt, die Kreatur bleibt eingelagert
+    if (_ushabtiNegiert) {
+      // ★ R-7: negiert — die Kreatur geht wie eine negierte Handbeschwörung (Off Duty: ins Deck gemischt, Lunar Eclipse: gelöscht, sonst Ablage) in die Stapel ihres BESITZERS (Besitzer-Regel:
+      // `originalOwner`, nicht der Beschwörer) und fliegt von der Surprise Zone ab (`_negatedPlacementRoute`, wie bei der negierten Surprise-Creature); die Kosten bleiben bezahlt.
+      // Hat die Kette sie inzwischen schon weggeräumt, ist nichts mehr zu entsorgen.
+      room.engine._verwerfeSummonKosten();
+      const _szNeg = ps.surpriseZones?.[heroIdx] || [];
+      if (!gs.result && inst.zone === 'surprise' && _szNeg.includes(cardName)) {
+        const _negBesitzer = Number.isInteger(inst.originalOwner) ? inst.originalOwner : (Number.isInteger(inst.owner) ? inst.owner : pi);
+        await room.engine._negatedPlacementRoute(cardName, _negBesitzer, 'surprise', { zoneOwner: pi, hostHeroIdx: heroIdx, instId: inst.id }, _ushabtiNegiert);
+        room.engine.log('creature_negated', { card: cardName, player: ps.username });
+      }
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
+      return;
+    }
     if (!_beschwoerungOk && !_selbstPlatziert) { _ushabtiAbbruch(); return; }
     // Nach den Fragen neu prüfen: die Kreatur muss noch eingelagert, der Zug noch meiner sein.
     if (gs.result || pi !== gs.activePlayer || inst.zone !== 'surprise' || !(ps.surpriseZones?.[heroIdx] || []).includes(cardName)) { _ushabtiAbbruch(); return; }

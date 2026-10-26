@@ -74,6 +74,9 @@ function seitenWert(engine, p) {
 }
 
 module.exports = {
+  // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an (alle Kreaturen beider Seiten) —
+  // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
+  blockedByDamageLock: true,
   // Negierter Guss: ein kleiner Riss auf jedem Ziel statt des ganzen Himmels.
   spellVisual: {
     impact: { type: 'sky_crack' }, impactMs: 420,

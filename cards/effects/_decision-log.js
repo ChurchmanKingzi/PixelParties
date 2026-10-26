@@ -610,6 +610,7 @@ function instrumentiere(engine) {
   // hierher.
   const origTarget = engine.promptEffectTarget.bind(engine);
   const huelleTarget = async function (playerIdx, validTargets, config = {}) {
+    if (config && config._waehlbarProbe) return origTarget(playerIdx, validTargets, config);   // R-12: Trockenlauf (Future Tech Fists) — keine Frage, kein Protokolleintrag
     if (engine._inMctsSim) { zaehle(engine, 'roll'); return origTarget(playerIdx, validTargets, config); }
     zaehle(engine, 'tgt');
     let angebot = null, karte = null, areaKontext = null;

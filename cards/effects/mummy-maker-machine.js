@@ -11,8 +11,12 @@
 //  Als Ruling (Al 26.10.): „Nur Gegnerhelden ist korrekt" — der Token geht NUR in die freie Support Zone eines Helden, den der
 //  GEGNER kontrolliert (der Text sagt „of a Hero your opponent controls"); eigene Helden sind nie Ziel. Das Skript bleibt.
 //
-//  Skript-Verhalten OHNE Textgrundlage (Rückfrage an Al, 26.10., unverändert gelassen): landet der Token auf dem aktivierenden
-//  Helden, wird dessen Effekt negiert (`negateEffect`) — das steht NICHT im Kartentext.
+//  Als Ruling (Al 26.10.): „Jeder Held, der einen Mummy Token hat, wird durch dessen Effekt negiert, auch der mit der Machine.
+//  Die Machine wird dadurch nicht negiert." Grundlage ist der Text des Mummy Tokens („The effect of the corresponding Hero is
+//  replaced by this effect …"): landet der Token auf dem AKTIVIERENDEN Helden, ist dessen Effekt ersetzt — die laufende Aktivierung
+//  wird abgebrochen (`negateEffect`, Rundensperre bleibt frei); künftig nutzt dieser Held den Effekt des Tokens. Negiert wird
+//  ausschließlich der HELDEN-Effekt des Helden mit Token — nie die Machine selbst (eine Kreatur, die danach normal in der Support
+//  Zone steht und ihren Re-Set-Effekt nutzen kann). Landet der Token auf einem anderen Helden, läuft der Effekt des Aktivierers normal.
 //
 //  Activate when the opponent activates a
 //  Hero's active effect.

@@ -6878,6 +6878,9 @@ function installCpuBrain(engine) {
 
   const origPromptEffectTarget = engine.promptEffectTarget.bind(engine);
   engine.promptEffectTarget = async function (playerIdx, validTargets, config = {}) {
+    // R-12 (Al 26.10.): Trockenlauf `config._waehlbarProbe` (Future Tech Fists „exakt N legale Ziele") fragt NICHTS und waehlt nichts — auch fuer die CPU geht er unveraendert an die Engine
+    // (sonst lief hier eine echte CPU-Wahl samt MCTS-Aufzeichnung, und `probe.ids` blieb leer). Der Aufruf der Engine geschieht synchron, `probe.ids` steht danach sofort bereit.
+    if (config && config._waehlbarProbe) return origPromptEffectTarget(playerIdx, validTargets, config);
     if (!validTargets || validTargets.length === 0) return [];
     throwIfAborted(engine, 'promptEffectTarget');
 

@@ -69,6 +69,10 @@ module.exports = {
 
   cpuMeta: { onDeathBenefit: 0 },
 
+  // Als Ruling (Al 26.10.): „to a minimum of 1" gilt für die GESAMTE Handstufe — ein Rocky-Abzug (oder anderer Handabzug) addiert sich zur
+  // Brettsenkung, darf die 1 aber nicht unterschreiten (`_applyCardLevelReductions` liest `minHandLevel` hinter der Summe aller Senker).
+  minHandLevel: 1,
+
   /** „level in your hand is reduced by …, to a minimum of 1" */
   reduceCardLevel(cardData, engine, ownerIdx, inst, _heroIdx, evalOpts) {
     if (!cardData || cardData.name !== CARD_NAME) return 0;
