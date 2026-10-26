@@ -8904,11 +8904,16 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       });
       delete gs._spellFruehAbgelegt;
       // ★ 25.10. (Nasty Prank): Hand-Fenster „ein Held hat eine Attack/einen Spell ausgeführt" — erst jetzt, wo nichts mehr verhindert werden kann (nicht negiert, nicht abgebrochen, nicht verpufft).
-      if (!_gefizzelt && !gs._bartasSecondCast && Number.isInteger(heroIdxPub) && heroIdxPub >= 0 && (cardData.cardType === 'Spell' || cardData.cardType === 'Attack')) {
+      // ★ W78 (Backstab): eine Karte ohne Wirker-Helden meldet den Helden, der die Attack AUSGEFÜHRT hat (`gs._herolosAusfuehrer`, vom Skript gesetzt: der Gegnerheld und sein Kontrolleur).
+      const _ausf = heroless ? gs._herolosAusfuehrer : null;
+      if (!_gefizzelt && !gs._bartasSecondCast && (cardData.cardType === 'Spell' || cardData.cardType === 'Attack')
+          && (_ausf || (Number.isInteger(heroIdxPub) && heroIdxPub >= 0))) {
         await room.engine._checkSpellPerformedHandReactions({
-          spellName: cardName, cardType: cardData.cardType, cardData, performerOwner: pi, heroOwner, heroIdx: heroIdxPub,
+          spellName: cardName, cardType: cardData.cardType, cardData,
+          performerOwner: _ausf ? _ausf.controller : pi, heroOwner: _ausf ? _ausf.heroOwner : heroOwner, heroIdx: _ausf ? _ausf.heroIdx : heroIdxPub,
         });
       }
+      delete gs._herolosAusfuehrer;
     }
 
     // Clean up any armed-arrow modifiers that chained onto THIS attack —
