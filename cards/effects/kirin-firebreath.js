@@ -54,6 +54,7 @@ const {
   countDifferentRebelliokaiInDiscard,
   payRebelliokaiCost,
 } = require('./_rebelliokai-shared');
+const { zweitwurfSchlaege } = require('./_second-target-shared');
 
 const CARD_NAME    = 'Kirin Firebreath';
 const COST_NAME    = 'Rebelliokai Courtly Kirin';
@@ -111,7 +112,9 @@ module.exports = {
         damageType:  'destruction_spell',
         baseDamage:  STRIKE_DMG,
         title:       CARD_NAME,
-        description: `Choose your first target. You will deal ${STRIKE_DMG} damage as many times as you have "Rebelliokai" Creatures with different names in your discard pile (after paying the cost).`,
+        description: gs._zweitzielWurf
+          ? `Choose the second target. It takes ${STRIKE_DMG} damage once.`
+          : `Choose your first target. You will deal ${STRIKE_DMG} damage as many times as you have "Rebelliokai" Creatures with different names in your discard pile (after paying the cost).`,
         confirmLabel: `🔥 Strike #1 (${STRIKE_DMG})`,
         confirmClass: 'btn-danger',
         cancellable: !vorab,   // W4b: Kosten schon gezahlt → nicht mehr abbrechbar
@@ -136,8 +139,10 @@ module.exports = {
       }
 
       // ── Step 3: snap N AFTER cost (deleted Kirin doesn't count) ──
-      const N = countDifferentRebelliokaiInDiscard(ps, engine);
-      if (N <= 0) {
+      // ★ W77b (Al, zu W76a-Frage 13): im Zweitwurf auf das zweite Ziel (Bartas, Grisgar, Andras) schlägt der Spell genau EINMAL zu, nicht N-mal (`zweitwurfSchlaege`).
+      const nVoll = countDifferentRebelliokaiInDiscard(ps, engine);
+      const N = zweitwurfSchlaege(gs, nVoll);
+      if (nVoll <= 0) {
         // Cost paid, no strikes. Spell resolves silently.
         engine.log('kirin_firebreath_fizzle', {
           player: ps.username, reason: 'no_rebelliokai_in_discard',

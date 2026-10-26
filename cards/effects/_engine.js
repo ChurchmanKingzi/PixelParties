@@ -32581,8 +32581,16 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /**
    * Ascension bonus: lets a freshly-Ascended Hero take up to 3 copies
-   * of an ability from the caster's deck/hand directly into its Ability
-   * Zone; fizzles silently if none are available.
+   * of an ability from the caster's deck, hand AND discard pile directly
+   * into its Ability Zone; fizzles silently if none are available.
+   *
+   * ★ W77b (Al, 26.10.2026: „Tooltip und Regeltext nennen die Ablage als Quelle des Bonus - die Ablage soll dazu"):
+   * Quellen sind DECK, HAND und ABLAGE des Kontrolleurs (`pi`; die Ablage des BESITZERS der Karten, auch bei geliehenem Helden).
+   *   • Reichen die vorhandenen Kopien (alle Quellen zusammen) nicht ueber die freien Plaetze hinaus, kommen ALLE Kopien (Reihenfolge Deck, Hand, Ablage), keine Frage.
+   *   • Gibt es MEHR Kopien als Plaetze UND liefern mindestens zwei Quellen welche, waehlt der Spieler JE KOPIE die Quelle (Galerie `pickAusQuellen`,
+   *     ein Eintrag je Quelle mit Herkunfts-Abzeichen DECK / HAND / DISCARD; CPU: `cpuSourceOrder` Ablage, Deck, Hand - die Ablage kostet nichts).
+   *   • Die Ablage ist ein Stapel-Ausgang wie jeder andere: `takeFromPile(pi, 'discard', …)` (Knight-of-Kings-Sperre `pileOutAllowed`, Lethe-Stempel, verwaiste Instanz
+   *     wird abgetragen); ist die Ablage fuer diesen Zug gesperrt (Stab-/Eye-of-Ren-Sperre), zaehlt sie nicht als Quelle (keine Freikauf-Frage mitten im Aufstieg).
    *
    * ★ W71a (Al, 25.10.2026: "Der Ascension-Bonus bei Abilities ist OR, nicht AND"):
    * `abilityChoices` ist eine Liste von ALTERNATIVEN (ODER) - der Spieler
@@ -32638,6 +32646,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       let handIdx = -1;
       if (source === 'deck') {
         if (ps.mainDeck.indexOf(name) < 0) return false;
+      } else if (source === 'discard') {
+        if (ps.discardPile.indexOf(name) < 0) return false;
       } else {
         handIdx = ps.hand.indexOf(name);
         if (handIdx < 0) return false;
@@ -32651,10 +32661,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         ...(heroOwner !== pi ? { destOwner: heroOwner } : {}),
       });
       await this._delay(LAND_AT_MS);
-      if (source === 'deck') {
-        const deckIdx = ps.mainDeck.indexOf(name);
-        if (deckIdx < 0) return false;
-        ps.mainDeck.splice(deckIdx, 1);
+      if (source === 'deck' || source === 'discard') {
+        // W77b: Deck UND Ablage verlassen den Stapel ueber den EINEN Ausgang (`takeFromPile`: Stapelsperren, Deckkopf-Pflege, verwaiste Ablage-Instanz untracken, Lethe-Stempel).
+        const taken = await this.takeFromPile(pi, source, name, { source: 'Ascension Bonus', sourceOwner: pi });
+        if (!taken) return false;
       } else {
         handIdx = ps.hand.indexOf(name);
         if (handIdx < 0) return false;
@@ -32684,10 +32694,22 @@ this._deathWatch = (this._deathWatchStack || []).length
     const alternativen = (Array.isArray(abilityChoices) ? abilityChoices : [abilityChoices])
       .map(a => (Array.isArray(a) ? a : [a]).filter(n => typeof n === 'string' && n))
       .filter(a => a.length > 0);
-    /** Wie viele Kopien liessen sich JETZT anlegen (Deck + Hand, Stapel hoechstens Stufe 3)? 0 = Alternative nicht machbar. */
+    /** W77b: Kopien je Quelle (Deck, Hand, Ablage), die JETZT angelegt werden duerften. Gesperrte Stapel (Knight of Kings, Ablage-Sperre des Zuges) liefern nichts. */
+    const quellenKopien = (name) => {
+      const v = {};
+      const deck = this.pileOutAllowed(pi, 'deck', { sourceOwner: pi }) ? ps.mainDeck.filter(n => n === name).length : 0;
+      const hand = ps.hand.filter(n => n === name).length;
+      const ablage = (this.pileOutAllowed(pi, 'discard', { sourceOwner: pi }) && ps._discardLockedTurn !== gs.turn)
+        ? (ps.discardPile || []).filter(n => n === name).length : 0;
+      if (deck > 0) v.deck = deck;
+      if (hand > 0) v.hand = hand;
+      if (ablage > 0) v.discard = ablage;
+      return v;
+    };
+    /** Wie viele Kopien liessen sich JETZT anlegen (Deck + Hand + Ablage, Stapel hoechstens Stufe 3)? 0 = Alternative nicht machbar. */
     const anlegbar = (name) => {
       if (!zielOrt(name)) return 0;
-      const verfuegbar = ps.mainDeck.filter(n => n === name).length + ps.hand.filter(n => n === name).length;
+      const verfuegbar = Object.values(quellenKopien(name)).reduce((a, b) => a + b, 0);
       const gelegt = abZones.flat().filter(n => n === name).length;
       return Math.max(0, Math.min(verfuegbar, 3 - gelegt));
     };
@@ -32704,7 +32726,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         vorhanden: alt.reduce((sum, n) => sum + abZones.flat().filter(x => x === n).length, 0),
         schule: alt.some(n => n === heroCd.spellSchool1 || n === heroCd.spellSchool2) ? 1 : 0,
       })).sort((a, b) => (b.kopien - a.kopien) || (b.vorhanden - a.vorhanden) || (b.schule - a.schule) || (a.i - b.i))[0].i;
-      const beschreibung = (alt) => `Attach up to 3 copies of ${alt.join(' and ')} from your deck or hand to ${heroName}.`;
+      const beschreibung = (alt) => `Attach up to 3 copies of ${alt.join(' and ')} from your deck, hand and/or discard pile to ${heroName}.`;
       const wahl = await this.promptGeneric(pi, {
         type: 'optionPicker', title: 'Ascension Bonus',
         description: `Choose one: ${machbar.map(alt => alt.join(' + ')).join(' or ')} - ${heroName}.`,
@@ -32724,7 +32746,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     for (const name of gewaehlt) {
       const ort = zielOrt(name);
       if (!ort) continue;
-      if (!ps.mainDeck.includes(name) && !ps.hand.includes(name)) continue;
+      if (anlegbar(name) <= 0) continue;
       // v670 (Al 30.8.): der Bonus ist OPTIONAL — je Ability ein Ja/Nein
       // („Add Resistance to Monia?"). Die CPU bejaht immer
       // (`_cpuAutoConfirm`, cpuGenericChoice), ein Mensch darf ablehnen,
@@ -32740,11 +32762,34 @@ this._deathWatch = (this._deathWatchStack || []).length
         this.log('ascension_bonus_declined', { player: ps.username, hero: heroName, ability: name });
         continue;
       }
+      // W77b: Quelle je Kopie. Genug Platz fuer ALLE vorhandenen Kopien (oder nur eine Quelle) -> feste Reihenfolge Deck, Hand, Ablage, keine Frage;
+      // mehr Kopien als Plaetze aus mindestens zwei Quellen -> der Spieler waehlt je Kopie die Quelle (Galerie mit Herkunfts-Abzeichen).
+      const ausgefallen = new Set();
       while (nochPlatz(name, ort)) {
-        if (!(await placeOne(name, ort, 'deck'))) break;
-      }
-      while (nochPlatz(name, ort)) {
-        if (!(await placeOne(name, ort, 'hand'))) break;
+        const verf = quellenKopien(name);
+        for (const q of ausgefallen) delete verf[q];
+        const quellen = Object.keys(verf);
+        if (quellen.length === 0) break;
+        const gelegt = abZones.flat().filter(n => n === name).length;
+        const frei = Math.max(0, 3 - gelegt);
+        const gesamt = quellen.reduce((sum, q) => sum + verf[q], 0);
+        let quelle = ['deck', 'hand', 'discard'].find(q => verf[q] > 0);
+        if (quellen.length > 1 && gesamt > frei) {
+          const { pickAusQuellen } = require('./_source-pick-shared');
+          const wahl = await pickAusQuellen(this, pi, {
+            cards: ['deck', 'hand', 'discard'].filter(q => verf[q] > 0).map(q => ({ name, source: q, ...(verf[q] > 1 ? { count: verf[q] } : {}) })),
+            maxJeQuelle: { deck: 1, hand: 1, discard: 1 },
+            title: 'Ascension Bonus',
+            description: `Choose where to take a copy of ${name} from (deck, hand or discard pile) - ${frei} more can be attached to ${heroName}.`,
+            confirmLabel: `✨ Attach ${name}!`,
+            confirmClass: 'btn-success',
+            cancellable: false,
+            gerrymanderEligible: false,
+            extra: { cpuSourceOrder: ['discard', 'deck', 'hand'] },
+          });
+          if (wahl && verf[wahl.source] > 0) quelle = wahl.source;
+        }
+        if (!(await placeOne(name, ort, quelle))) { ausgefallen.add(quelle); continue; }
       }
     }
 

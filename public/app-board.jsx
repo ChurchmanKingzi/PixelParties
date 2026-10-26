@@ -51545,10 +51545,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const zielLabel = ownerLbl((destOwner ?? owner), myIdx);
       // 'hand' source flies cards out of the player's hand instead of
       // their deck pile (used by Ascension bonus when deck supply is
-      // exhausted but hand still has copies).
+      // exhausted but hand still has copies); 'discard' (W77b) out of the discard pile.
       let srcSel;
       if (source === 'hand') {
         srcSel = ownerLabel === 'me' ? '.game-hand-me' : '.game-hand-opp';
+      } else if (source === 'discard') {
+        // W77b: die Ablage ist eine Quelle des Aufstiegsbonus.
+        srcSel = ownerLabel === 'me' ? '[data-my-discard]' : '[data-opp-discard]';
       } else {
         srcSel = ownerLabel === 'me' ? '[data-my-deck]' : '[data-opp-deck]';
       }

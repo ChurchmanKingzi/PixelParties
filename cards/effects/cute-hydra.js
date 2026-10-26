@@ -107,8 +107,8 @@ function getHostHeroes(engine, pi) {
  * W74b: wie viele Karten die CPU abwirft (X): so viele, dass die Head Counter (X + HEAD_BONUS) die brauchbaren gegnerischen Ziele
  * decken - aber nie weniger als die Pflicht (SUMMON_DISCARD_MIN). Dieselbe Rechnung wie vorher je Klick ("Done" sobald Counter >= Ziele).
  */
-function cpuZielzahlAbwurf(engine, cpuIdx) {
-  const opp = engine.gs.players[engine.opponentOf(cpuIdx)];
+function zaehleGegnerZiele(engine, pi) {
+  const opp = engine.gs.players[engine.opponentOf(pi)];
   let viableTargets = 0;
   if (opp) {
     for (const h of (opp.heroes || [])) if (h?.name && h.hp > 0) viableTargets++;
@@ -116,7 +116,33 @@ function cpuZielzahlAbwurf(engine, cpuIdx) {
       for (let z = 0; z < 3; z++) if ((opp.supportZones?.[hi]?.[z] || []).length > 0) viableTargets++;
     }
   }
-  return Math.max(SUMMON_DISCARD_MIN, viableTargets - HEAD_BONUS);
+  return viableTargets;
+}
+
+function cpuZielzahlAbwurf(engine, cpuIdx) {
+  return Math.max(SUMMON_DISCARD_MIN, zaehleGegnerZiele(engine, cpuIdx) - HEAD_BONUS);
+}
+
+// ── W77b (Al, zu W74b-Frage 11): Kosten-Abwurf-Lernkanal ──────────────────────────────────────────────────────────────
+// Grundversion bleibt; die CPU soll im TRAINING lernen, welche Karten sie nie oder nur unter Voraussetzungen abwerfen sollte und welche Ziele (Low-Worth Creatures) den
+// Extra-Counter nicht wert sind. Dafuer traegt der Batch-Prompt die Kanal-Marken (`costFor` / `costKind` / `costTags`, siehe `_deck-profile.costDiscardTags`,
+// `_decision-log` „Kosten-Abwurf-Lernkanal"), und nach dem Abwurf haengt `noteCostDiscardOutcome` die Groesse des Stapels an die Zeile. Keine eigene Lernlogik hier.
+/** Lage-Tags VOR der Wahl: wie viele brauchbare gegnerische Ziele (Helden + Kreaturen) gibt es, wie viele davon sind Low-Worth (Kreaturen bis Stufe 1)? */
+function lageTags(engine, pi) {
+  const ziele = zaehleGegnerZiele(engine, pi);
+  const tags = [ziele <= 1 ? 'hydraTargets0-1' : ziele <= 3 ? 'hydraTargets2-3' : ziele <= 5 ? 'hydraTargets4-5' : 'hydraTargets6+'];
+  try {
+    const oi = engine.opponentOf(pi);
+    const kreaturen = engine.cardInstances.filter(c => (c.controller ?? c.owner) === oi && c.zone === 'support' && !c.faceDown && engine._getCardDB()[c.name]?.cardType === 'Creature');
+    const billig = kreaturen.filter(c => (engine._getCardDB()[c.name]?.level || 0) <= 1).length;
+    tags.push(kreaturen.length === 0 ? 'hydraNoCreatures' : billig === kreaturen.length ? 'hydraOnlyLowWorth' : billig > 0 ? 'hydraSomeLowWorth' : 'hydraNoLowWorth');
+  } catch { /* ohne Tag */ }
+  return tags;
+}
+/** Ausgangs-Tags NACH der Wahl: Stapelgroesse und ob die Counter (X + 1) mehr sind, als es brauchbare Ziele gibt (verschenkter Counter). */
+function ausgangsTags(engine, pi, x) {
+  const ziele = zaehleGegnerZiele(engine, pi);
+  return [x <= 2 ? 'hydraX2' : x === 3 ? 'hydraX3' : 'hydraX4+', x + HEAD_BONUS > ziele ? 'hydraOverkill' : 'hydraNoOverkill'];
 }
 
 /**
@@ -366,9 +392,15 @@ module.exports = {
           cancellable: false,
           hydraBatchDiscard: true,   // fuer cpuResponse (CPU-Batch)
           controllerIdx: pi,
+          // W77b: Kosten-Abwurf-Lernkanal (`_decision-log` -> `_costDiscardLog`): der Abwurf ist die KOSTE fuer Counter = kuenftiger Schaden.
+          costFor: CARD_NAME,
+          costKind: 'damage',
+          costTags: lageTags(engine, pi),
         });
         const chosen = pruefeAbwurfWahl(res, ps.hand || [], minPick);
         batchSize = chosen.length;
+        // W77b: Ausgangs-Tags an die Zeile des Lernkanals (juengste Zeile dieser Quelle im Zug) — Stapelgroesse und Overkill.
+        if (batchSize > 0) engine.noteCostDiscardOutcome(pi, CARD_NAME, ausgangsTags(engine, pi, batchSize));
 
         if (batchSize > 0) {
           // Boris, the Guardian of Blackport: EIN Abwurf-Stapel = EINE Frage (nur fuer den Kontrolleur; verbraucht/unwirksam = keine Frage).
