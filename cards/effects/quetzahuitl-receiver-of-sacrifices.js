@@ -445,7 +445,7 @@ async function handleLossOnDefeat(ctx) {
     await engine.checkAllHeroesDead();
     return;
   }
-  const winnerIdx = pi === 0 ? 1 : 0;
+  const winnerIdx = engine.opponentOf(pi);
   engine.log('quetzahuitl_defeated', {
     loser: gs.players[pi]?.username,
     winner: gs.players[winnerIdx]?.username,
