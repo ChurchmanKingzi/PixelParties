@@ -5282,7 +5282,7 @@ class GameEngine {
         // is validated (alive, exists) before being returned; if it
         // no longer fits, falls through to the normal prompt.
         const forced = gs._forcedDamageTarget;
-        if (forced && forced.type) {
+        if (forced && forced.type && !config._sondeListe) {   // W75b: die Zielsonde (Bartas-Vorabprüfung) verbraucht den Einmal-Zwang nie
           delete gs._forcedDamageTarget;
           let valid = false;
           // Picker-types gate: an Attack/Spell that restricts to only
@@ -5320,6 +5320,7 @@ class GameEngine {
             // user-picked one.
             if (gs._spellDamageLog && !config._skipDamageLog) {
               gs._spellDamageLog.push({ ...forced });
+              engine._merkeZielSonde('damage', config, ctx);   // W75b
             }
             // ★ Clone (Welle 72): auch ein ERZWUNGENES Ziel (Niehts Bonusangriff) gehoert zur Aufzeichnung des Wurfs — sonst gaebe es fuer diese Attack keine Kopie.
             {
@@ -5754,8 +5755,12 @@ class GameEngine {
         }
 
         // Filter out excluded targets (Bartas second-cast, etc.)
-        const excludeIds = config._truthSeeingEye ? [] : (gs._spellExcludeTargets || []);
-        const filteredTargets = excludeIds.length > 0 ? targets.filter(t => !excludeIds.includes(t.id)) : targets;
+        // ★ W76a (Al: „das zweite Ziel darf NIE das bereits getroffene sein"): beim Zweitzielwurf (`gs._zweitzielWurf`) gilt der Ausschluss ausnahmslos — auch das Truth-Seeing Eye
+        // hebt ihn nicht auf (es negiert Sperr-Listen wie die der Invisibility Cloak, nicht die Regel „ein ZWEITES Ziel").
+        const excludeIds = (config._truthSeeingEye && !gs._zweitzielWurf) ? [] : (gs._spellExcludeTargets || []);
+        let filteredTargets = excludeIds.length > 0 ? targets.filter(t => !excludeIds.includes(t.id)) : targets;
+        // ★ W76a: der Zweitwurf trifft EIN weiteres Ziel — wählt der Spell mehrmals (Kirin Firebreath: je Schlag ein Ziel), bleibt es nach der ersten Wahl beim selben zweiten Ziel.
+        if (gs._zweitzielWurf && gs._zweitzielId && !config._skipDamageLog && !config._sondeListe) filteredTargets = filteredTargets.filter(t => t.id === gs._zweitzielId);
         if (filteredTargets.length === 0) return null;
 
         // ★ W78 (Backstab: Ausführender und Ziel in EINEM Picker): `_nurListe` liefert die fertig gefilterte/markierte Zielliste, ohne zu fragen; `_vorgewaehlt` (Ziel-Id) nimmt eine schon
@@ -5820,7 +5825,9 @@ class GameEngine {
           appliesStatus: config.appliesStatus,
           allowOwnSide: config.allowOwnSide,
           selfDamage: config.selfDamage,
+          _sondeListe: config._sondeListe === true,   // W75b: nur die markierte Zielliste liefern, nichts fragen
         });
+        if (config._sondeListe) return { liste: Array.isArray(selectedIds) ? selectedIds : [] };   // W75b: Trockenlauf der Zielsammlung (siehe `zweitwurfHatLegalesZiel`)
 
         if (!selectedIds || selectedIds.length === 0) {
           // Mark spell as cancelled so the handler can return the card to hand
@@ -5832,6 +5839,8 @@ class GameEngine {
         // not damage time, so protected/shielded targets still count as "hit"
         if (selected && gs._spellDamageLog && !config._skipDamageLog) {
           gs._spellDamageLog.push({ ...selected });
+          engine._merkeZielSonde('damage', config, ctx);   // W75b: Bartas-Vorabprüfung des Zweitwurfs (`zweitwurfHatLegalesZiel`)
+          if (gs._zweitzielWurf && !gs._zweitzielId) gs._zweitzielId = selected.id;   // W76a: das EINE zweite Ziel (s. o.)
         }
 
         // ── Caller commit hook ──
@@ -6334,6 +6343,15 @@ class GameEngine {
           if (targets.length === 0) return [];
         }
 
+        // ★ W76a: Zweitwurf-/Wiederholungs-Ausschluss (Bartas, Grisgar, Andras, Idej Kunagi …): schon getroffene Ziele sind KEIN wählbares Ziel — wie in `promptDamageTarget`.
+        {
+          const _ausIds = (config._truthSeeingEye && !gs._zweitzielWurf) ? [] : (gs._spellExcludeTargets || []);
+          if (_ausIds.length > 0) {
+            for (let i = targets.length - 1; i >= 0; i--) if (_ausIds.includes(targets[i].id)) targets.splice(i, 1);
+            if (targets.length === 0) return [];
+          }
+        }
+
         // Performing-Hero target-count caps applied to the picker:
         //   • `singleTargetAttack` (Toras, Master of all Weapons) caps
         //     EVERY multi-pick the performing Hero opens to 1.
@@ -6373,11 +6391,13 @@ class GameEngine {
         // Idas Flagge bleibt auf Destruction Spells beschraenkt.
         const forceSingleAny = !!casterHeroFlag?.forcesSingleTargetAny;
         const forceSingleByToras = !!casterHeroFlag?.singleTargetAttack;
-        const maxCap = (forceSingleByToras || forceSingleByIda || forceSingleAny)
+        // ★ W76a (Al, Bartas & Co.): der Zweitzielwurf trifft EIN weiteres Ziel („you may choose a second target … to hit") — kein „up to N" (Fireball, Explosion, Magic Arrows,
+        // Pyroblast, Dance …). Und das schon getroffene Ziel ist ausgeschlossen (`gs._spellExcludeTargets`, siehe unten) — bisher ignorierte dieser Wähler die Liste.
+        const maxCap = (forceSingleByToras || forceSingleByIda || forceSingleAny || gs._zweitzielWurf)
           ? 1
           : (config.max || targets.length);
         const max = Math.min(maxCap, targets.length);
-        const min = config.min || 1;
+        const min = gs._zweitzielWurf ? Math.min(config.min || 1, Math.max(1, max)) : (config.min || 1);
 
         const selectedIds = await engine.promptEffectTarget(pi, targets, {
           title: config.title || cardInstance.name,
@@ -6420,7 +6440,9 @@ class GameEngine {
           appliesStatus: config.appliesStatus,
           allowOwnSide: config.allowOwnSide,
           selfDamage: config.selfDamage,
+          _sondeListe: config._sondeListe === true,   // W75b: s. `promptDamageTarget`
         });
+        if (config._sondeListe) return Array.isArray(selectedIds) ? selectedIds : [];   // W75b: Trockenlauf der Zielsammlung
 
         if (!selectedIds || selectedIds.length === 0) {
           // `noSpellCancel` wie in `promptDamageTarget`: ein Abbruch ausserhalb eines Zaubers (Kreatureneffekt,
@@ -6444,6 +6466,8 @@ class GameEngine {
         const result = _gewaehlt.map(id => targets.find(t => t.id === id)).filter(Boolean);
         if (gs._spellDamageLog) {
           for (const t of result) gs._spellDamageLog.push({ ...t });
+          if (result.length > 0) engine._merkeZielSonde('multi', config, ctx);   // W75b
+          if (gs._zweitzielWurf && !gs._zweitzielId && result.length > 0) gs._zweitzielId = result[0].id;   // W76a
         }
 
         // ── Surprise window check ──
@@ -6914,6 +6938,7 @@ class GameEngine {
       // W50a (Ricochet, Al 22.10.2026): ein abgebrochener/negierter/immuner Treffer hat Kettenbetrag 0 — alle Folgetreffer sind dann 0
       // (treffen aber weiter, On-Hit-Effekte bleiben).
       if (opts?.vollOut && _res?.cancelled) opts.vollOut.wert = 0;
+      if (this._multiHitScope?._todgeweihte && target?.hp > 0) this._schlagTodgeweihtFreigeben(target);   // ★ W78: der Held hat seinen Treffer ueberstanden — nicht mehr todgeweiht
       return _res;
     } finally {
       this._actionRecursionDepth--;
@@ -13153,6 +13178,8 @@ class GameEngine {
     }
     const toDiscard = Math.min(count, ps.hand.length);
     if (toDiscard <= 0) return;
+    // ★ W74c: Boris auch beim blinden Mehrfach-Abwurf (Chaos Magic, künftig `ctx.discardCards`) — einmal für den ganzen Stapel.
+    if (!opts._borisGefragt && await this.borisVerzicht(playerIdx, toDiscard, { source: opts.source, sourceOwner: opts.sourceOwner })) return;
     if (opts.source) await this.effectSourceGlow(opts.sourceOwner ?? playerIdx, opts.source);
     await this._paceHandDiscard();   // v696: Abstand zum vorigen Hand-Abwurf
     const _abwurfOp = toDiscard > 1 ? this._neueAbwurfVorgangsId() : undefined;   // W16b (A03-futuretech-07): ein Vorgang
@@ -14105,6 +14132,8 @@ class GameEngine {
     // mehr. Jetzt wieder: Sammler → Kern, danach die Nach-Abgang-Arbeit.
     const r = await this._mitNiederlagenSammler(() => this._actionDestroyCardKern(source, targetCard, opts));
     await this._nachAbgangAbarbeiten();   // v1365
+    // ★ W78: ein Opfer der Zerstoerungsschleife, das stehen blieb (Schutz, gerettet), ist nicht mehr todgeweiht.
+    if (this._destroyScope?._todgeweihte?.length && targetCard?.zone === ZONES.SUPPORT && this.cardInstances.includes(targetCard)) this._markeAusKlammerLoesen(this._destroyScope, targetCard);
     return r;
   }
 
@@ -18681,14 +18710,25 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * Resolve deferred spell recoil (Fire Bolts, etc.).
-   * Called by the server after afterSpellResolved completes, so recoil
-   * happens after all spell casts (including Bartas second cast).
+   * Rueckstoss, der noch aufgeschoben im Zustand steht (`gs._deferredRecoil`). Seit W75a (Al: „je ein Recoil nach jedem Schaden",
+   * auch im Zweitwurf von Bartas) schiebt Fire Bolts nichts mehr auf — die Karte ruft `resolveRecoil` selbst direkt nach dem
+   * Schaden. Der Aufruf im Server bleibt als Sicherheitsnetz fuer kuenftige Karten, die weiterhin aufschieben wollen.
    */
   async resolveDeferredRecoil() {
     const recoil = this.gs._deferredRecoil;
     if (!recoil) return;
     delete this.gs._deferredRecoil;
+    await this.resolveRecoil(recoil);
+  }
+
+  /**
+   * ★ W75a — Rueckstoss einer Karte mit Zielwahl („choose a target you control and deal N damage to it", Fire Bolts):
+   * der Spieler waehlt EIN eigenes Ziel (Held oder Kreatur, nach Kontrolle), das N Schaden erleidet. Wird DIREKT NACH dem
+   * Schaden gerufen, auf den er folgt — bei einem Zweitwurf (Bartas, Saya, Grisgar …) also ein zweites Mal, mit neuer Zielwahl.
+   * @param {{cardName:string, ownerIdx:number, heroIdx:number, damage:number, enhanced?:boolean, damageType:string}} recoil
+   */
+  async resolveRecoil(recoil) {
+    if (!recoil) return;
 
     const { cardName, ownerIdx, heroIdx, damage, enhanced, damageType } = recoil;
 
@@ -33206,6 +33246,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Hardy Slime gilt nur für Attack/Spell/Creature effect (`tauntGiltFuerQuelle`); ohne erkennbare Quelle bleibt er wie bisher.
       this.markiereTauntGesperrte(validTargets, playerIdx, this._tauntQuelleFuer(playerIdx, config));
     }
+    if (config._sondeListe) return validTargets;   // W75b: Trockenlauf — die fertig MARKIERTE Liste (ineligible), ohne Frage, ohne Klon-Wiedergabe, ohne Zustandsänderung
     const _waehlbar = validTargets.filter(t => !t.ineligible);
     if (_waehlbar.length === 0 && validTargets.some(t => t.ineligible)) return [];
 
@@ -36402,6 +36443,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (h) {
       for (const k of Object.keys(h)) {
         if (!k.endsWith(suffix)) continue;
+        if (this._surpriseHoptStempel?.get(`${abzug.pi}|${k.slice(0, -suffix.length)}`) === this.gs.turn) continue;   // W75a: Stempel einer aufgeloesten Surprise-Aktivierung (Aquatic Spear) bleibt
         if (!(k in abzug.hopt)) delete h[k];
         else if (h[k] !== abzug.hopt[k]) h[k] = abzug.hopt[k];
       }
@@ -38751,16 +38793,131 @@ this._deathWatch = (this._deathWatchStack || []).length
    * besiegen („defeat all other Creatures"), melden ihre Opfer hier an — solange `fn` läuft, gelten sie als TODGEWEIHT (`istTodgeweiht`): Ersatz-/Rettungs-Effekte, die „ein anderes Ziel opfern"
    * (Infallible Oracle Pythia), dürfen sie nicht mehr als Opfer nehmen. Damage-Batches stempeln dasselbe schon über `counters._dyingThisBatch` (`istTodgeweiht` kennt beides).
    */
-  async mitTodgeweihten(insts, fn) {
-    if (!this._todgeweiht) this._todgeweiht = new Set();
-    const neu = (insts || []).filter(i => i && !this._todgeweiht.has(i.id));
-    for (const i of neu) this._todgeweiht.add(i.id);
-    try { return await fn(); } finally { for (const i of neu) this._todgeweiht.delete(i.id); }
+  async mitTodgeweihten(ziele, fn) {
+    // Mischliste: Kreatur-Instanzen UND Helden (Heldenobjekte bzw. Eintraege `{hero}` / `{type:'hero',owner,heroIdx}` / `{inst}`).
+    const neu = this._todgeweihtMarkieren(ziele);
+    try { return await fn(); } finally { this._todgeweihtLoesen(neu); }
   }
 
-  /** Steht diese Creature schon für den Tod fest (Wipe-Opfer oder im selben Schadens-Batch tödlich getroffen)? */
+  /** Steht diese Creature schon fuer den Tod fest (Wipe-Opfer, im selben Schadens-Batch/Schlag tödlich getroffen, Tod nur aufgeschoben)? */
   istTodgeweiht(inst) {
-    return !!inst && (!!(this._todgeweiht && this._todgeweiht.has(inst.id)) || !!inst.counters?._dyingThisBatch);
+    if (!inst) return false;
+    if (this._todgeweiht && this._todgeweiht.has(inst.id)) return true;
+    const c = inst.counters;
+    if (c?._dyingThisBatch) return true;
+    return !!inst._deathResolved || (c?.currentHp != null && c.currentHp <= 0);   // HP schon auf 0: der Tod ist nur noch nicht abgewickelt (Flächenklammer)
+  }
+
+  /**
+   * ★ W78 (Al 26.10.: „JEDE FORM von AoE …"): dasselbe fuer HELDEN. Todgeweiht = in einem laufenden Mehrziel-Effekt vorgemerkt (`mitTodgeweihten`, Flaechenklammer `beginAoeStrike`
+   * mit `heroes`), bereits auf 0 HP (Tod nur aufgeschoben, `heldTodAufgeschoben`) oder schon tot.
+   */
+  istHeldTodgeweiht(hero) {
+    if (!hero) return false;
+    if (this._todgeweihtHelden && this._todgeweihtHelden.has(hero)) return true;
+    if (hero.name && !(hero.hp > 0)) return true;
+    return this.heldTodAufgeschoben(hero);
+  }
+
+  /** Gemeinsame Frage fuer Ersatz-/Rettungseffekte: Kreatur-Instanz ODER Held (Objekt bzw. Picker-Eintrag `{type:'hero',owner,heroIdx}`) — faellt es im selben Effekt/Schlag ohnehin? */
+  istZielTodgeweiht(ziel) {
+    const z = this._todgeweihtZiel(ziel);
+    if (!z) return false;
+    return z.hero ? this.istHeldTodgeweiht(z.hero) : this.istTodgeweiht(z.inst);
+  }
+
+  /** Zielform normieren: `{ hero }` | `{ inst }` | null. */
+  _todgeweihtZiel(z) {
+    if (!z || typeof z !== 'object') return null;
+    if (z instanceof CardInstance) return { inst: z };
+    if (z.hero && typeof z.hero === 'object') return { hero: z.hero };
+    if (z.type === 'hero') { const h = this.gs?.players?.[z.owner]?.heroes?.[z.heroIdx]; return h ? { hero: h } : null; }
+    if (z.inst && typeof z.inst === 'object') return { inst: z.inst };
+    if (z.cardInstance && typeof z.cardInstance === 'object') return { inst: z.cardInstance };
+    if (z.zone === undefined && typeof z.hp === 'number') return { hero: z };
+    if (z.id != null) return { inst: z };
+    return null;
+  }
+
+  /** Ziele in die Todgeweihten-Mengen eintragen; gibt die NEU eingetragenen Schluessel zurueck (Aeusserer behaelt seine Eintraege). */
+  _todgeweihtMarkieren(ziele) {
+    if (!this._todgeweiht) this._todgeweiht = new Set();
+    if (!this._todgeweihtHelden) this._todgeweihtHelden = new Set();
+    const neu = [];
+    for (const raw of (ziele || [])) {
+      const z = this._todgeweihtZiel(raw);
+      if (!z) continue;
+      const menge = z.hero ? this._todgeweihtHelden : this._todgeweiht;
+      const key = z.hero || z.inst.id;
+      if (menge.has(key)) continue;
+      menge.add(key);
+      neu.push({ menge, key });
+    }
+    return neu;
+  }
+
+  _todgeweihtLoesen(liste) {
+    for (const { menge, key } of (liste || [])) menge.delete(key);
+  }
+
+  /**
+   * Fuer die Flaechenklammer: Ziele fuer die Dauer des AEUSSERSTEN Schlags vormerken (Aufraeumen in `endMultiHit`; die Merkliste haengt am Scope).
+   */
+  _schlagTodgeweihtMerken(ziele) {
+    const scope = this._multiHitScope;
+    if (!scope) return [];
+    const neu = this._todgeweihtMarkieren(ziele);
+    (scope._todgeweihte || (scope._todgeweihte = [])).push(...neu);
+    return neu;
+  }
+
+  /** Ein Ziel hat seinen Schlag ueberstanden (oder wurde abgewehrt): die Vormerkung dieses Schlags entfaellt wieder. */
+  _schlagTodgeweihtFreigeben(ziel) {
+    this._markeAusKlammerLoesen(this._multiHitScope, ziel);
+  }
+
+  /** Vormerkung eines Ziels aus der Merkliste einer Klammer (`_multiHitScope` / `_destroyScope`) nehmen. */
+  _markeAusKlammerLoesen(scope, ziel) {
+    const z = this._todgeweihtZiel(ziel);
+    if (!scope?._todgeweihte || !z) return;
+    const key = z.hero || z.inst.id;
+    for (let i = scope._todgeweihte.length - 1; i >= 0; i--) {
+      const m = scope._todgeweihte[i];
+      if (m.key === key) { m.menge.delete(m.key); scope._todgeweihte.splice(i, 1); }
+    }
+  }
+
+  /**
+   * Flaechenschlag meldet seine Ziele: Helden (`heroes`: `{hero, heroIdx?, owner?, amount?}` oder Heldenobjekte, Betrag `opts.amount`) mit `amount >= hp`, die nicht immun sind, und Kreaturen
+   * (`creatures`, ab zwei) mit abgewehrten Eintraegen ausgenommen, gelten bis zum Ende des Schlags als todgeweiht. Konservativ: Brutto-Betrag, aber Immunitaeten/Schilde/Negation zaehlen nicht mit.
+   */
+  _schlagZieleMelden(opts, schatten, negiert) {
+    const ziele = [];
+    const quelle = opts.source;
+    const betrag = opts.amount ?? 0;
+    for (const h of (opts.heroes || [])) {
+      // Eintrag = Heldenobjekt | `{hero, heroIdx?, owner?, amount?}` | Picker-Ziel `{type:'hero', owner, heroIdx}`
+      const hero = h?.hero || ((h?.type === 'hero' || (h?.hp === undefined && h?.owner != null)) ? this.gs.players[h.owner]?.heroes?.[h.heroIdx] : h);
+      if (!hero?.name || !(hero.hp > 0)) continue;
+      const amt = h?.amount ?? betrag;
+      if (!(amt > 0) || amt < hero.hp) continue;
+      let owner = h?.owner, heroIdx = h?.heroIdx;
+      if (owner == null || heroIdx == null) {
+        for (let p = 0; p < (this.gs.players || []).length && owner == null; p++) {
+          const i = (this.gs.players[p]?.heroes || []).indexOf(hero);
+          if (i >= 0) { owner = p; heroIdx = i; }
+        }
+      }
+      if (hero.statuses?.shielded) continue;
+      if (owner != null && this._aoeHeldImmun(owner, heroIdx, hero, quelle, opts)) continue;
+      ziele.push({ hero });
+    }
+    for (const e of (schatten || [])) {
+      if (!e?.inst || e.cancelled || e._immuneCreature || negiert?.has(e.inst.id)) continue;
+      if (!(e.amount > 0) || e.amount < this.creatureCurrentHp(e.inst)) continue;
+      ziele.push({ inst: e.inst });
+    }
+    if (ziele.length) this._schlagTodgeweihtMerken(ziele);
   }
 
   /**
@@ -43063,6 +43220,90 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ W75a — Skript-Merkmal `surpriseHartOPT: '<Schluessel>'` (Aquatic Spear): pro Spieler und Zug darf nur EINE Aktivierung dieser Surprise aufloesen.
+   * Stempel = `gs.hoptUsed['<Schluessel>:<Spieler>'] === gs.turn` (`claimHOPT`, wie Magic Ruby / Future Tech Lamp). Bei einer ganz negierten Aktivierung bleibt er unberuehrt.
+   * Nicht die Zweitwirkung „sent … to the discard pile" der Karte — die ist keine Aktivierung und fragt diese Grenze nie.
+   */
+  surpriseHartOPTVerbraucht(script, cardName, spielerIdx) {
+    const key = script?.isSurprise ? script.surpriseHartOPT : null;
+    if (!key) return false;
+    return this.gs.hoptUsed?.[`${key}:${spielerIdx}`] === this.gs.turn;
+  }
+
+  /**
+   * ★ W75b — EINE Quelle für „darf `cardName` JETZT (Skript-Merkmale: harte Aktivierungsgrenze) von `spielerIdx` aktiviert werden?".
+   * Heute: `surpriseHartOPT` (Aquatic Spear: pro Spieler und Zug nur 1 Aktivierung). Eine in diesem Zug gesperrte Surprise ist für JEDE Aktivierung KEIN legales Ziel / keine legale Wahl:
+   * `_canHeroActivateSurprise` (alle Surprise-Fenster, Telekinesis, Baby Spider, Geheimraum …) und `_activateSurprise` fragen hier, und die erzwungenen Wege, die ihre Surprise
+   * aus Deck/Ablage holen (Sabrina, Cute Spider), bieten eine gesperrte Karte gar nicht erst an — statt sie zu wählen und zu fizzeln.
+   * Es prüft NUR diese Grenze (Held-Voraussetzungen, Kosten, Stufen usw. bleiben bei den bisherigen Prüfungen).
+   * @param {number} spielerIdx  der Steuerer der Aktivierung (Auslöser; bei Hand/Deck/Ablage der Besitzer)
+   * @param {string} cardName
+   * @returns {boolean}
+   */
+  surpriseAktivierbarJetzt(spielerIdx, cardName) {
+    const script = loadCardEffect(cardName);
+    if (this.surpriseHartOPTVerbraucht(script, cardName, spielerIdx)) return false;
+    return !this.surpriseOncePerGameVerbraucht(script, cardName, spielerIdx);
+  }
+
+  /**
+   * ★ W76a (Al: „Ja, sperren!") — Pro-Spiel-Grenze einer Surprise („You can only play 1 "Tharxian Horse" per game", `oncePerGame` / `oncePerGameKey`).
+   * Dieselbe Quelle wie die Surprise-Fenster (`_canHeroActivateSurprise`: `ps._oncePerGameUsed` des Auslösers, Schlüssel `oncePerGameKey || cardName`) und
+   * `_activateSurprise` (stempelt bei der NICHT negierten Aktivierung, Z7c): „play 1" zählt die AKTIVIERTEN Exemplare, nicht das verdeckte Setzen.
+   * Ist die Grenze verbraucht, ist die Karte für Sabrina (Suche/Galerie, CPU), Cute Spider, Telekinesis & Co. KEIN legales Ziel (nicht angeboten, nicht gefizzelt).
+   */
+  surpriseOncePerGameVerbraucht(script, cardName, spielerIdx) {
+    if (!script?.isSurprise || !(script.oncePerGame || script.oncePerGameKey)) return false;
+    return !!this.gs.players?.[spielerIdx]?._oncePerGameUsed?.has(script.oncePerGameKey || cardName);
+  }
+
+  /**
+   * ★ W75b — Zielsonde: der Zielwähler (`promptDamageTarget` / `promptMultiTarget`) merkt sich beim Eintragen des getroffenen Ziels ins Wurfprotokoll (`gs._spellDamageLog`),
+   * WIE er gewählt hat (Art, Konfiguration inkl. `condition`/`side`/`types`, den Kontext). Hängt am Protokoll-Array (WeakMap): verschwindet mit dem Wurf, nie im Spielstand.
+   */
+  _merkeZielSonde(art, config, ctx) {
+    const log = this.gs._spellDamageLog;
+    if (!log || !config) return;
+    const { _vorgewaehlt, _nurListe, _sondeListe, ...rest } = config;
+    (this._zielSonden || (this._zielSonden = new WeakMap())).set(log, { art, config: rest, ctx });
+  }
+
+  /**
+   * ★ W75b (Al: „Angebot nur, wenn es ein legales zweites Ziel gibt!") — Vorabprüfung für Bartas' Zweitwurf-Angebot, OHNE Seiteneffekte („Trockenlauf" der Zielsammlung):
+   * wiederholt die Zielsammlung des soeben aufgelösten Zaubers — seine eigene Konfiguration (`condition`, `side`, `types`, Flags) über dieselbe Kette wie der echte Wähler
+   * (Schutz/Untargetable, Stealth & Co. [`blocksTargeting`], Taunt, Erste-Runden-Schutz), mit dem ersten Ziel ausgeschlossen — und fragt, ob mindestens ein wählbares Ziel bleibt.
+   * Keine Frage, kein Fenster (Umleiter/Surprise/Reaktion), kein Wurfprotokoll, kein Zwangsziel (`_forcedDamageTarget` bleibt unberührt).
+   * @param {string} ersteZielId  Id des ersten Ziels (wird ausgeschlossen)
+   * @returns {Promise<boolean|null>} true/false = legales zweites Ziel ja/nein; `null` = unbekannt (der Zauber wählte nicht über einen Engine-Zielwähler) — der Aufrufer fällt dann auf seine Altprüfung zurück
+   */
+  async zweitwurfHatLegalesZiel(ersteZielId) {
+    const gs = this.gs;
+    const log = gs._spellDamageLog;
+    const sonde = log ? this._zielSonden?.get(log) : null;
+    if (!sonde?.ctx) return null;
+    const vorherAusschluss = gs._spellExcludeTargets;
+    const vorherZweit = gs._bartasSecondCast;
+    const vorherZweitziel = gs._zweitzielWurf;
+    gs._spellExcludeTargets = [ersteZielId];
+    gs._bartasSecondCast = true;
+    gs._zweitzielWurf = true;   // W76a: dieselbe Ausschluss-/Einzelziel-Regel wie der echte Zweitwurf
+    try {
+      const cfg = { ...sonde.config, _sondeListe: true };
+      let liste;
+      if (sonde.art === 'damage') liste = (await sonde.ctx.promptDamageTarget(cfg))?.liste;
+      else liste = await sonde.ctx.promptMultiTarget(cfg);
+      return (liste || []).some(t => t && !t.ineligible && t.id !== ersteZielId);
+    } catch (err) {
+      console.error('[Engine] zweitwurfHatLegalesZiel:', err?.message);
+      return null;
+    } finally {
+      if (vorherAusschluss === undefined) delete gs._spellExcludeTargets; else gs._spellExcludeTargets = vorherAusschluss;
+      if (vorherZweit === undefined) delete gs._bartasSecondCast; else gs._bartasSecondCast = vorherZweit;
+      if (vorherZweitziel === undefined) delete gs._zweitzielWurf; else gs._zweitzielWurf = vorherZweitziel;
+    }
+  }
+
+  /**
    * Requires: hero alive, not frozen/stunned, meets spell school & level requirements.
    * For Creature surprises: also requires a free Support Zone.
    * `playerIdx` = Brettseite des Helden. `opts.reaktor` (Als Vorgabe 29.9.):
@@ -43111,6 +43352,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       const _opgScript = loadCardEffect(cardName);
       if (_opgScript?.isSurprise && (_opgScript.oncePerGame || _opgScript.oncePerGameKey)
           && this.gs.players[reaktor]?._oncePerGameUsed?.has(_opgScript.oncePerGameKey || cardName)) return false;
+      // ★ W75a (Aquatic Spear: „You can only activate 1 "Aquatic Spear" per turn."): HARTES Once-per-turn der AKTIVIERUNG — gesetzt werden darf beliebig oft, aber
+      // pro Spieler und Zug loest nur EINE Kopie aus (`surpriseHartOPT`). Die Grenze gehoert dem Ausloeser (`reaktor`); gestempelt wird erst in `_activateSurprise`,
+      // sobald die Aktivierung aufloesen darf — nach Wisdom, Kette und Negation, nie schon beim Anbieten. Alle Surprise-Fenster laufen ueber dieses Gate.
+      if (!this.surpriseAktivierbarJetzt(reaktor, cardName)) return false;   // W75b: EINE Quelle (`surpriseHartOPT`)
     }
 
     // ★ SPELL-SPERREN GELTEN AUCH HIER (v880, Als Befund) ─────────────
@@ -43414,6 +43659,17 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.log('surprise_blocked_arcane_eyes', { card: cardName });
       return null;
     }
+    // ★ W75a: auch die erzwungenen Wege (Cute Spider, Sabrina, Telekinesis …) respektieren das harte Once-per-turn der Aktivierung.
+    // ★ W76a: ebenso die Pro-Spiel-Grenze (`oncePerGame`: Tharxian Horse) — eine verbrauchte Surprise lässt sich auch aus Deck/Ablage nicht erzwingen.
+    if (script?.surpriseHartOPT || script?.oncePerGame || script?.oncePerGameKey) {
+      const _hartSteuerer = (opts.isBakhmSlot || opts.fromDiscard || opts.fromDeck)
+        ? (Number.isInteger(opts.steuerer) ? opts.steuerer : playerIdx)
+        : this.surpriseKontrolleur(playerIdx, heroIdx);
+      if (!this.surpriseAktivierbarJetzt(_hartSteuerer, cardName)) {
+        this.log('surprise_blocked_hopt', { card: cardName });
+        return null;
+      }
+    }
     this._surpriseResolutionDepth = (this._surpriseResolutionDepth || 0) + 1;
     this._inSurpriseResolution = true;
     // Per-hero re-entry guard (see _checkSurpriseWindow). Identifies the
@@ -43689,6 +43945,14 @@ this._deathWatch = (this._deathWatchStack || []).length
         _sps._oncePerGameUsed.add(_opgKey);
         (this._surpriseStempel || (this._surpriseStempel = new Set())).add(`${steuerer}|${_opgKey}`);
       }
+    }
+
+    // ★ W75a (Aquatic Spear): hartes Once-per-turn — die Aktivierung stempelt, sobald sie aufloesen darf (nicht negiert; Z7b/W66b: eine ganz negierte Karte stempelt nicht).
+    // Beim Ausloeser (`steuerer`). `_surpriseHoptStempel` schuetzt den Eintrag vor dem Z7b-Rueckgabe-Abzug (`_stempelZurueck`) des Zaubers, waehrend dessen Schaden er ausloeste.
+    // Der Stempel liegt VOR `onSurpriseActivate`: eine weitere Kopie im selben Fenster/Reaktionsfenster (auch durch den 80er-Treffer selbst ausgeloest) ist damit gesperrt.
+    if (!surpriseNegated && script.surpriseHartOPT) {
+      this.claimHOPT(script.surpriseHartOPT, steuerer);
+      (this._surpriseHoptStempel || (this._surpriseHoptStempel = new Map())).set(`${steuerer}|${script.surpriseHartOPT}`, this.gs.turn);
     }
 
     // Execute the surprise's effect (unless negated)
@@ -46342,16 +46606,25 @@ this._deathWatch = (this._deathWatchStack || []).length
    * ein abgebrochener Effekt sie nicht stehen laesst — sonst blieben
    * alle folgenden Einzelzerstoerungen stumm.
    */
-  beginDestroyScope(anzahl) {
+  beginDestroyScope(anzahl, ziele) {
     if (!this._destroyScope) this._destroyScopeId = (this._destroyScopeId || 0) + 1;   // W16d (C02-03): Kennung des Sammel-Ereignisses
-    this._destroyScope = { total: anzahl || 0, tiefe: (this._destroyScope?.tiefe || 0) + 1 };
+    const alt = this._destroyScope;
+    this._destroyScope = { total: anzahl || 0, tiefe: (alt?.tiefe || 0) + 1, _todgeweihte: alt?._todgeweihte };
+    // ★ W78 (Pythia): `ziele` (Kreatur-Instanzen/Helden) = die Opfer dieser Schleife — sie gelten bis zum Ende der Klammer als todgeweiht (`istZielTodgeweiht`), damit kein Ersatz-/Rettungseffekt
+    // (Infallible Oracle Pythia) eines von ihnen als Opfer nimmt, obwohl es ohnehin gleich faellt.
+    if (ziele?.length) {
+      const neu = this._todgeweihtMarkieren(ziele);
+      if (neu.length) (this._destroyScope._todgeweihte || (this._destroyScope._todgeweihte = [])).push(...neu);
+    }
     return this._destroyScope;
   }
 
   endDestroyScope() {
     if (!this._destroyScope) return;
-    if ((this._destroyScope.tiefe || 1) <= 1) this._destroyScope = null;
-    else this._destroyScope.tiefe -= 1;
+    if ((this._destroyScope.tiefe || 1) <= 1) {
+      this._todgeweihtLoesen(this._destroyScope._todgeweihte);
+      this._destroyScope = null;
+    } else this._destroyScope.tiefe -= 1;
   }
 
   /**
@@ -46482,8 +46755,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this._todesAufschubAbschliessen();
     } finally {
       if (this._multiHitScope) {
-        if ((this._multiHitScope.tiefe || 1) <= 1) this._multiHitScope = null;
-        else this._multiHitScope.tiefe -= 1;
+        if ((this._multiHitScope.tiefe || 1) <= 1) {
+          this._todgeweihtLoesen(this._multiHitScope._todgeweihte);   // ★ W78: die Vormerkungen dieses Schlags enden mit ihm
+          this._multiHitScope = null;
+        } else this._multiHitScope.tiefe -= 1;
       }
     }
   }
@@ -46529,6 +46804,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async beginAoeStrike(zielzahl, opts = {}) {
     const scope = this.beginMultiHit(zielzahl);
+    // ★ W78 (Pythia): Helden, die dieser Schlag sicher faellt, gelten als todgeweiht (`istHeldTodgeweiht`) — `opts.heroes`: `{hero, heroIdx?, owner?, amount?}` bzw. Heldenobjekte (+ `opts.amount`).
+    if (opts.heroes?.length) this._schlagZieleMelden(opts, null, null);
     if (opts.ersterTrefferEinzel) scope.ersterTrefferEinzel = true;   // Welle 13 (Q138): Kette beginnt mit genau einem Ziel (Ricochet)
     // `creatures` nimmt rohe Instanzen ODER `{inst, amount, type}` —
     // Karten mit abgestuftem Schaden (Chain Lightning) sollen nicht
@@ -46564,6 +46841,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (e.cancelled && e.inst?.id != null) negiert.add(e.inst.id);
     }
     scope._aoeNegiert = negiert;
+    this._schlagZieleMelden({ ...opts, heroes: [] }, schatten, negiert);   // ★ W78: die Kreaturen, die der Schlag nach Immunitaet/Idol sicher faellt, gelten als todgeweiht
     return negiert;
   }
 
@@ -52773,6 +53051,72 @@ this._deathWatch = (this._deathWatchStack || []).length
     return false;
   }
 
+  // ═══════════════════════════════════════════════════════════════════════
+  //  ★ W74c — BORIS BEI EIGENBAU-ABWÜRFEN (Al: „Ich finde gerade eine Menge Interaktionen, bei denen Boris schlicht nicht funktioniert")
+  //
+  //  Regel (Vertrag, CARD_API „Welle 74 / W74c"): JEDER Abwurf von der HAND — erzwungen, als Kosten oder als eigener Teil des Effekts —
+  //  läuft über einen dieser Wege, damit Boris EINMAL PRO STAPEL gefragt wird (vor der Zahlung, nach der Wahl der Karten):
+  //    · `actionPromptForceDiscard`          (Standard, fragt selbst; Karten, die danach wissen müssen, ob bezahlt ODER erlassen wurde: `zahleAbwurfKosten`)
+  //    · `borisVerzicht(pi, n, opts)`        (Eigenbau mit eigener Kartenwahl: nach der Wahl, vor dem ersten `actionDiscardHandCard`)
+  //    · `borisStapel(pi, opts)`             (Eigenbau-Schleifen: fragt beim ersten Aufruf, die Antwort gilt für den ganzen Stapel)
+  //    · `fremdAbwurfEntfaellt(opfer, n, o)` (Eigenbau-ZWANGSabwurf gegen den Gegner: ERST Ambush the Scout, DANN Boris)
+  //    · `actionDiscardCardsAnimated`        (blinder Mehrfach-Abwurf, fragt selbst; `opts._borisGefragt` für Aufrufer, die schon gefragt haben)
+  //  Verzichtet Boris, bleibt die Karte auf der Hand; Kosten gelten als erlassen (der Effekt läuft weiter), außer die Wirkung hängt an der ANZAHL
+  //  der abgeworfenen Karten („draw that many", „the same number", „times the number discarded"): dann ist die Anzahl 0 (Champion, Al).
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /** Hat der Spieler `pi` Boris' „einmal pro Zug" in diesem Zug schon verbraucht? (Stempel `boris-discard`, gesetzt beim tatsächlichen Verzicht.) */
+  _borisStempelHeute(pi) {
+    return this.gs?.hoptUsed?.[`boris-discard:${pi}`] === this.gs?.turn;
+  }
+
+  /**
+   * Boris für einen Abwurf-STAPEL mit mehreren Einzelschritten (Schleifen aus „Karte anklicken → abwerfen"): beim ERSTEN Aufruf wird gefragt, die
+   * Antwort gilt für den ganzen Stapel (Verzicht → jede weitere Karte entfällt ohne neue Frage; kein Verzicht → es wird nicht noch einmal gefragt).
+   * @returns {(count?: number) => Promise<boolean>} `true` = Boris verzichtet (Abwurf entfällt)
+   */
+  borisStapel(pi, opts = {}) {
+    let antwort = null;
+    return async (count = 1) => {
+      if (antwort === null) antwort = !!(await this.borisVerzicht(pi, count, opts));
+      return antwort;
+    };
+  }
+
+  /**
+   * Abwurf-KOSTEN über den Standardweg (`actionPromptForceDiscard`, `selfInflicted`) — mit klarer Auskunft für Karten, die danach wissen müssen,
+   * ob die Kosten bezahlt wurden: `bezahlt` ist auch dann `true`, wenn Boris die Kosten erlassen hat (`erlassen`); `false` nur bei Abbruch / nicht bezahlbar.
+   * Ersatz für das Muster `const vor = hand.length; await fd(…); if (hand.length >= vor) return;` — das ließ den Effekt unter Boris zu Unrecht verfallen.
+   * @returns {Promise<{bezahlt: boolean, erlassen: boolean}>}
+   */
+  async zahleAbwurfKosten(pi, count, opts = {}) {
+    const ps = this.gs.players[pi];
+    if (!ps) return { bezahlt: false, erlassen: false };
+    const stempelVor = this._borisStempelHeute(pi);
+    const vor = (ps.hand || []).length;
+    await this.actionPromptForceDiscard(pi, count, { selfInflicted: true, ...opts });
+    const erlassen = !stempelVor && this._borisStempelHeute(pi);
+    return { bezahlt: erlassen || (ps.hand || []).length < vor, erlassen };
+  }
+
+  /**
+   * Eigenbau-ZWANGSabwurf gegen `opfer` (Fremdquelle `opts.sourceOwner`): Erstrunden-Schutz, dann ERST das Ambush-Fenster, DANN Boris (Als Ruling 5.8.).
+   * `true` = der Abwurf entfällt (geschützt / Ambush negiert / Boris verzichtet) — der Aufrufer wirft dann nichts ab. Wirft er danach selbst ab, setzt er an
+   * `actionDiscardHandCard` `_skipHandInteractionCheck: true` (das Fenster lief schon hier).
+   */
+  async fremdAbwurfEntfaellt(opfer, count, opts = {}) {
+    const ps = this.gs.players[opfer];
+    if (!ps || !(count > 0) || (ps.hand || []).length === 0) return true;
+    if (this.gs.firstTurnProtectedPlayer === opfer && !opts.selfInflicted) {
+      this.log('discard_blocked', { player: ps.username, reason: 'shielded' });
+      return true;
+    }
+    const quelle = opts.source || opts.sourceName;
+    const von = opts.sourceOwner != null ? opts.sourceOwner : this.opponentOf(opfer);
+    if (!opts._skipHandInteractionCheck && await this.checkHandInteractionReaction(opfer, 'discard', { byPi: von, count, sourceName: quelle })) return true;
+    return !!(await this.borisVerzicht(opfer, count, { source: quelle, sourceOwner: von }));
+  }
+
   /**
    * ★ v1288 — Wie viele Handkarten stehen als Abwurfmaterial fuer die
    * Kosten DIESER Karte bereit? Eine reine Handkarte verlaesst beim
@@ -54575,6 +54919,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const _schadenKreaturen = creatureEntries.filter(e => e.amount > 0);
       await this.beginAoeStrike(_schadenHelden.length + _schadenKreaturen.length, {
         creatures: _schadenKreaturen.map(e => ({ inst: e.inst, amount: e.amount, type: e.type })),
+        heroes: _schadenHelden,   // W78 (Pythia): Helden, die dieser Schlag faellt, gelten als todgeweiht
         source: quellObjekt, amount: damage, type: damageType, sourceOwner: pi,
         canBeNegated: opts.canBeNegated !== false,
       });
@@ -54830,7 +55175,18 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Creatures are defeated" (siehe `_mitNiederlagenSammler`).
    */
   async processCreatureDamageBatch(entries) {
-    return this._mitNiederlagenSammler(() => this._processCreatureDamageBatchKern(entries));
+    try {
+      return await this._mitNiederlagenSammler(() => this._processCreatureDamageBatchKern(entries));
+    } finally {
+      // ★ W78: wer den Stapel ueberlebt hat, ist nicht (mehr) todgeweiht — Stempel des Stapels und Vormerkung des Schlags weg
+      // (Immune/abgewehrte/herabgesetzte/gerettete Eintraege liessen sonst einen stehen). Sterbende (HP <= 0, Tod aufgeschoben) behalten ihn.
+      for (const e of (entries || [])) {
+        const inst = e?.inst;
+        if (!inst?.counters || (inst.counters.currentHp ?? 1) <= 0 || inst._deathResolved) continue;
+        if (inst.counters._dyingThisBatch && inst.counters._dyingThisBatch === entries._todStapelNr) delete inst.counters._dyingThisBatch;
+        if (this._multiHitScope?._todgeweihte) this._schlagTodgeweihtFreigeben(inst);
+      }
+    }
   }
 
   async _processCreatureDamageBatchKern(entries) {
@@ -55379,8 +55735,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Die Nummer des Stapels (statt `true`) macht „im selben Schlag gestorben" nachpruefbar: Graveworm darf
     // nicht auf Tode reagieren, die GLEICHZEITIG mit seinem eigenen geschehen (siehe `deathInfo.todStapel`).
     const _todStapelNr = (this._todStapelNr = (this._todStapelNr || 0) + 1);
+    entries._todStapelNr = _todStapelNr;   // ★ W78: der Huellen-Aufraeumer loescht nur den EIGENEN Stempel
     for (const e of entries) {
       if (e.cancelled || !e.inst) continue;
+      if (e._immuneCreature) continue;       // ★ W78: immune Eintraege nehmen keinen Schaden — nicht als sterbend stempeln
       const projected = Math.max(0, e.amount);
       if (projected <= 0) continue;
       if ((e.inst.counters.currentHp || 0) > 0

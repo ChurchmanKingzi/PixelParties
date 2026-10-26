@@ -54,13 +54,14 @@ async function bezahlen(engine, inst, ctrl, was) {
   const ps = engine.gs.players[ctrl];
   if (!ps || (ps.hand || []).length < DISCARD_COST) return false;
   const vorher = ps.hand.length;
-  await engine.actionPromptForceDiscard(ctrl, DISCARD_COST, {
+  const kosten = await engine.zahleAbwurfKosten(ctrl, DISCARD_COST, {
     costFor: CARD_NAME, costKind: 'protect',
-    title: CARD_NAME, source: CARD_NAME, selfInflicted: true, cancellable: true,
+    title: CARD_NAME, source: CARD_NAME, cancellable: true,
     cancelOnlyFirst: true,   // N3-18 (W24): nach der ersten Karte kein Abbruch mehr (Kosten ganz oder gar nicht)
     description: `Discard ${DISCARD_COST} cards to negate ${was} on ${CARD_NAME}?`,
   });
-  return ps.hand.length === vorher - DISCARD_COST;
+  // ★ W74c: von Boris erlassene Kosten gelten als bezahlt — die Wirkung wird trotzdem negiert.
+  return kosten.erlassen || ps.hand.length === vorher - DISCARD_COST;
 }
 
 module.exports = {

@@ -230,8 +230,9 @@ async function zugEnde(ctx) {
     });
     if (engine._confirmSaidYes(ja)) {
       const vor = (ps.hand || []).length;
-      await engine.actionPromptForceDiscard(holder, n, { costFor: CARD_NAME, costKind: 'disrupt', title: `${CARD_NAME} — Discard ${n}`, source: CARD_NAME, selfInflicted: true, skipSourceGlow: true });
-      if (vor - (ps.hand || []).length >= n) {
+      // ★ W74c: von Boris erlassene Kosten gelten als bezahlt — die Kartoffel wird trotzdem weitergereicht (sie explodiert nicht).
+      const kosten = await engine.zahleAbwurfKosten(holder, n, { costFor: CARD_NAME, costKind: 'disrupt', title: `${CARD_NAME} — Discard ${n}`, source: CARD_NAME, skipSourceGlow: true });
+      if (kosten.erlassen || vor - (ps.hand || []).length >= n) {
         let ziel = zonen[0];
         if (zonen.length > 1) {
           const wahl = await engine.promptGeneric(holder, {

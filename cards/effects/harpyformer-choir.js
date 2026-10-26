@@ -101,8 +101,10 @@ module.exports = {
       description: `Discard "${ABILITY_NAME}" to reduce the next damage a Creature you control takes by 100 until your next turn.`,
       source: CARD_NAME,
       logType: 'choir_discard',
+      nurWennAbgeworfen: true,   // „…, and if you do, …": Boris-Verzicht → kein Abwurf, also auch kein Schutz (Al 26.10.)
     });
     if (!ok) return false;
+    if (ok === 'entfallen') return true;   // Aktivierung verbraucht, Wirkung entfällt
 
     // Schutz am SPIELER vergeben (überlebt den Choir; Engine `_kreaturenSchadenSchilde`)
     (ps._kreaturenSchild = ps._kreaturenSchild || []).push({ by: CARD_NAME, reduce: 100, turn: gs.turn });

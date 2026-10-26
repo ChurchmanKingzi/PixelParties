@@ -13,7 +13,7 @@
 //     state requirements are bypassed (the Creature is the caster).
 //
 //   • The Spell scales as if its school is Lv3. Phoenix Tackle → 300
-//     damage, Burning Finger → 240, Draw → "you 6 / opp 3", Slow →
+//     damage, Burning Finger → 200, Draw → "you 6 / opp 3", Slow →
 //     4 forced discards, Venom Infusion → unhealable Poison, The
 //     Warlord's Bite → 4 Poison stacks, Fire Bolts → enhanced mode
 //     auto-eligible. Implemented engine-side via

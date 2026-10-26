@@ -307,17 +307,17 @@ module.exports = {
 
     // Kosten. Ein Abbruch hier beendet den Effekt, ohne ihn zu
     // verbrauchen — Standard fuer Abwurf-Kosten ab v718.
-    const handVorher = (ps.hand || []).length;
-    await engine.actionPromptForceDiscard(pi, 1, {
+    // ★ W74c: von Boris erlassene Kosten gelten als bezahlt (`zahleAbwurfKosten`).
+    const kosten = await engine.zahleAbwurfKosten(pi, 1, {
       costFor: CARD_NAME,          // ★ v1041: Kosten-Abwurf-Lernkanal
       costKind: 'tutor',
-      title: CARD_NAME, source: CARD_NAME, selfInflicted: true,
+      title: CARD_NAME, source: CARD_NAME,
       cancellable: true,
       description: modus === 'plant'
         ? 'Discard 1 card to search your deck for a "Paraseed".'
         : 'Discard 1 card to move "Paraseeds" to other Heroes.',
     });
-    if ((ps.hand || []).length === handVorher) return false;   // abgebrochen
+    if (!kosten.bezahlt) return false;   // abgebrochen
 
     return modus === 'move' ? umziehen(engine, pi) : pflanzen(engine, pi);
   },

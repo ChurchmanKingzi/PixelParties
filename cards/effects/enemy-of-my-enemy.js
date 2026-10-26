@@ -22,6 +22,8 @@
 const { hasCardType } = require('./_hooks');
 
 const CARD_NAME = 'Enemy of my Enemy';
+const FLUG_MS = 650;      // Flug der Kreatur ins Deck
+const MISCH_MS = 800;     // Länge der Misch-Animation (`deck_shuffle`)
 
 /** Ist `inst` eine gegnerische, übernehmbare Kreatur für `pi`? */
 function istZiel(engine, pi, inst) {
@@ -178,6 +180,7 @@ module.exports = {
             fromHeroIdx: behalten.heroIdx, fromSlotIdx: behalten.zoneSlot,
             ...(seite !== besitzer ? { fromOwner: seite, toOwner: besitzer } : {}),
           });
+          await engine._delay(FLUG_MS);                    // die Karte fliegt ins Deck, erst DANN wird gemischt
           await engine.runHooks('onCardLeaveZone', {
             card: behalten, leavingCard: behalten, fromZone: 'support',
             fromHeroIdx: behalten.heroIdx, fromZoneSlot: behalten.zoneSlot, fromOwner: seite,
@@ -189,7 +192,9 @@ module.exports = {
             if (i >= 0) zoneArr[behalten.zoneSlot].splice(i, 1);
           }
           gs.players[besitzer].mainDeck.push(behalten.name);
-          engine.shuffleDeck(besitzer);
+          engine.shuffleDeck(besitzer);                     // `deck_shuffle`: Rütteln + Klang auf dem Stapel des Besitzers
+          engine.sync();
+          await engine._delay(MISCH_MS);
           await engine.noteShuffledBack(besitzer, 1, CARD_NAME);
           engine._untrackCard(behalten.id);
           gemischt = true;

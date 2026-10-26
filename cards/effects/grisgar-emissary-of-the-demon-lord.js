@@ -26,9 +26,13 @@
 //      spell "don't re-pick this target" list, also
 //      shared with Bartas / Andras.
 // ═══════════════════════════════════════════
+//
+//  W76a (Al): die Prüfungen (exakt 1 Ziel, Spell-Merkmale `neverMultiTarget` / `opponentChoosesTarget` / `fixedTargetCount`, Vorabprüfung
+//  „legales zweites Ziel", Ausschluss des ersten Ziels in ALLEN Zielwählern, Einzelziel-Zweitwurf) liegen im gemeinsamen Baustein
+//  `_second-target-shared.js` (wie Bartas und Andras).
+// ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
-const { loadCardEffect } = require('./_loader');
+const { zweitzielAngebot } = require('./_second-target-shared');
 
 const CARD_NAME = 'Grisgar, Emissary of the Demon Lord';
 
@@ -47,123 +51,10 @@ module.exports = {
   activeIn: ['hero'],
 
   hooks: {
-    afterSpellResolved: async (ctx) => {
-      const engine = ctx._engine;
-      const gs = ctx.gameState;
-      const pi = ctx.cardOwner;
-      const heroIdx = ctx.cardHeroIdx;
-      // Styx 28.9.: Held/Zonen auf der Brettseite `feld`, „du" = Kontrolleur `pi`.
-      const feld = ctx.cardHeroOwner ?? pi;
-
-      // Trigger only on Spells cast BY this Hero (Brettseite + Index).
-      if ((ctx.heroOwner ?? ctx.casterIdx) !== feld || ctx.heroIdx !== heroIdx) return;
-
-      // Guard against recursion — never re-fire on a re-cast.
-      if (ctx.isSecondCast) return;
-
-      // Negated Spells (Anti Magic Shield / Master's Plan / counter-
-      // spells) don't qualify — the original cast didn't "hit".
-      if (gs._spellNegatedByEffect) return;
-
-      const ps = gs.players[pi];
-      const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
-      if (!hero?.name || hero.hp <= 0) return;
-      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
-
-      // Spell must be a Normal Decay Magic Spell (subtype 'Normal'
-      // excludes Reactions / Surprises). Match either school slot in
-      // case a future card lists Decay Magic as spellSchool2.
-      const spellData = ctx.spellCardData;
-      if (!spellData) return;
-      if (!hasCardType(spellData, 'Spell')) return;
-      if ((spellData.subtype || '').toLowerCase() !== 'normal') return;
-      if (spellData.spellSchool1 !== 'Decay Magic' && spellData.spellSchool2 !== 'Decay Magic') return;
-
-      // Exactly 1 damage target. `damageTargets` is the deduplicated
-      // selected-target list the engine populates per Spell.
-      const targets = ctx.damageTargets || [];
-      if (targets.length !== 1) return;
-
-      // Spell level must be strictly LESS than Grisgar's Decay Magic
-      // level. `countAbilitiesForSchool` already folds in stacked
-      // wildcards (Performance, etc.) so this is the canonical level
-      // measurement Bartas uses too.
-      const spellLevel = spellData.level || 0;
-      const dmLevel = engine.countAbilitiesForSchool('Decay Magic', gs.players[feld]?.abilityZones?.[heroIdx] || []);
-      if (spellLevel >= dmLevel) return;
-
-      // At least 1 OTHER opponent-side target must exist — otherwise
-      // the prompt has no answer and we'd just spin the recast for
-      // nothing. Mirror Bartas's check exactly.
-      const oppIdx = engine.opponentOf(pi);
-      const firstTargetId = targets[0].id;
-      let hasOtherTarget = false;
-      // Kontrolle statt Seite (Styx 28.9.); IDs bleiben physisch.
-      for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(oppIdx)) {
-        if (!h?.name || h.hp <= 0) continue;
-        if (`hero-${physOwner}-${hi}` !== firstTargetId) { hasOtherTarget = true; break; }
-      }
-      if (!hasOtherTarget) {
-        for (const inst of engine.cardInstances) {
-          if ((inst.controller ?? inst.owner) !== oppIdx || inst.zone !== 'support') continue;
-          const cId = `equip-${engine.physicalSide(inst)}-${inst.heroIdx}-${inst.zoneSlot}`;
-          if (cId !== firstTargetId) { hasOtherTarget = true; break; }
-        }
-      }
-      if (!hasOtherTarget) return;
-
-      // Re-verify Grisgar is still up before prompting — same belt-
-      // and-suspenders re-check Bartas does, since Spell resolution
-      // can mutate hero state between the entry guard and here
-      // (e.g. self-recoil into a Surprise that freezes her).
-      if (hero.hp <= 0) return;
-      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
-
-      const confirmed = await ctx.promptConfirmEffect({
-        title: CARD_NAME,
-        message: `Hit a second target with ${ctx.spellName}?`,
-      });
-      if (!confirmed) return;
-
-      engine.log('grisgar_second_cast', {
-        player: ps.username, hero: hero.name, spell: ctx.spellName,
-      });
-
-      // Re-cast plumbing — fresh damage log, target exclusion list,
-      // shared second-cast flag (see header comment).
-      gs._spellDamageLog = [];
-      gs._spellExcludeTargets = [firstTargetId];
-      gs._bartasSecondCast = true;
-
-      const spellScript = loadCardEffect(ctx.spellName);
-      if (!spellScript?.hooks?.onPlay) return;
-
-      const tempInst = engine._trackCard(ctx.spellName, pi, 'hand', heroIdx, -1);
-      if (feld !== pi) tempInst.heroOwner = feld;   // Styx 28.9.: wie der Server bei Uebernahme
-      // W16f (H02-08): „Re-cast skips costs" — Token-Kosten im `onPlay` (Goldify: `kostenSchonBezahlt`) gelten als schon bezahlt.
-      tempInst._kostenBezahlt = true;
-
-      try {
-        await engine.runHooks('onPlay', {
-          _onlyCard: tempInst, playedCard: tempInst,
-          cardName: ctx.spellName, zone: 'hand', heroIdx,
-          _skipReactionCheck: true,
-        });
-      } catch (err) {
-        console.error(`[Engine] Grisgar second cast error for "${ctx.spellName}":`, err.message);
-      }
-
-      engine._untrackCard(tempInst.id);
-
-      // Defensive cleanup — most paths through the engine and the
-      // shared cards (Victory Phoenix Cannon, Andras) clear these
-      // already, but a re-cast that throws or returns early before
-      // hitting those cleanup sites would otherwise leak.
-      delete gs._spellDamageLog;
-      delete gs._spellExcludeTargets;
-      delete gs._bartasSecondCast;
-
-      engine.sync();
-    },
+    afterSpellResolved: (ctx) => zweitzielAngebot(ctx, {
+      heldName: CARD_NAME, kind: 'Spell',
+      zauberSchule: 'Decay Magic', faehigkeit: 'Decay Magic',
+      logTyp: 'grisgar_second_cast', logFeld: 'spell',
+    }),
   },
 };

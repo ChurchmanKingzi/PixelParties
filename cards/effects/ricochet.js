@@ -220,6 +220,8 @@ module.exports = {
             c.owner === z.owner && c.zone === 'support'
             && c.heroIdx === z.heroIdx && c.zoneSlot === z.slotIdx))
           .filter(Boolean),
+        // W78 (Pythia): Helden der Kette, die der Kopf (Betrag `atk`) faellt, sind todgeweiht; die Folgeglieder (halbierter Betrag) zaehlen erst, wenn sie dran sind
+        heroes: kette.slice(0, 1).filter(z => z.type === 'hero'),
         source: attackSource, amount: atk, type: 'attack', sourceOwner: pi,
         ersterTrefferEinzel: true,   // Welle 13 (Q138): Elixir of Strength feuert am ersten Treffer (initial genau ein Ziel)
       });

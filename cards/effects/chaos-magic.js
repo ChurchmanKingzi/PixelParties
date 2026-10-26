@@ -202,7 +202,8 @@ module.exports = {
       if (revealedCount >= MAX_REVEALS) {
         // Failure clause: discard the entire hand.
         const handCount = (ps.hand || []).length;
-        if (handCount > 0) await engine.actionDiscardCardsAnimated(pi, handCount);
+        // ★ W74c: Boris wird von `actionDiscardCardsAnimated` selbst gefragt (einmal für den ganzen Stapel).
+        if (handCount > 0) await engine.actionDiscardCardsAnimated(pi, handCount, { source: 'Chaos Magic' });
         engine.log('chaos_magic_fizzle', {
           player: ps.username, reason: 'no_spell_in_5', discarded: handCount,
         });

@@ -115,6 +115,10 @@ module.exports = {
       // W24d (N4-03): der Regel-Abwurf des Handlimits ist kein Karteneffekt („through an effect", Ruling Q93).
       if (ctx._handLimitRegel) return;
 
+      // ★ W75b (Al: „Die Karte soll für diese Effekte dann kein legales Ziel sein, statt dass die Effekte sie zwar wählen können, dann aber fizzeln"): eine in diesem Zug
+      // gesperrte Surprise (Aquatic Spear, `surpriseHartOPT`) löst Cute Spider nicht aus — keine Frage, kein verbrauchtes Once-per-turn der Spinne.
+      if (!engine.surpriseAktivierbarJetzt(owner, discardedCardName)) return;
+
       // Soft HOPT per Cute Spider instance.
       if (!gs.hoptUsed) gs.hoptUsed = {};
       const hoptKey = `cute_spider_used:${spiderInst.id}`;

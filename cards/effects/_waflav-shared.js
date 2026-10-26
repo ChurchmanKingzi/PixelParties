@@ -700,6 +700,8 @@ async function discardFromHand(engine, pi, cardName, handIndex, source) {
   const idx = (typeof handIndex === 'number' && ps.hand[handIndex] === cardName)
     ? handIndex : ps.hand.indexOf(cardName);
   if (idx < 0) return false;
+  // ★ W74c: Boris darf diese Abwurf-KOSTEN ignorieren — die Karte bleibt auf der Hand, der Effekt läuft weiter (Rückgabe true = bezahlt/erlassen).
+  if (await engine.borisVerzicht(pi, 1, { source: source || cardName })) return true;
   await engine.actionDiscardHandCard(pi, cardName, idx, { source: source || cardName });
   return true;
 }

@@ -68,15 +68,14 @@ module.exports = {
     // Pay the discard cost first so the drawn cards can't accidentally
     // be discarded by the same prompt (otherwise the player could
     // discard a freshly-drawn card and the cost loses its bite).
-    const handBefore = ps.hand.length;
-    await engine.actionPromptForceDiscard(pi, 1, {
+    // ★ W74c: von Boris erlassene Kosten gelten als bezahlt (der Zug von 3 Karten läuft weiter).
+    const kosten = await engine.zahleAbwurfKosten(pi, 1, {
       costFor: CARD_NAME,          // ★ v1041: Kosten-Abwurf-Lernkanal
       costKind: 'draw',
       title: CARD_NAME,
       source: CARD_NAME,
-      selfInflicted: true,
     });
-    if (ps.hand.length >= handBefore) {
+    if (!kosten.bezahlt) {
       // Discard didn't actually shrink the hand — fizzle without
       // drawing (defensive: the prompt should always succeed when
       // hand-len >= 1, but if a hook intercepted it, we don't want

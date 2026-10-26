@@ -14,6 +14,10 @@ module.exports = {
   blockedByFirstTurnProtection: true,
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
+  // ★ W75b (Al: „Nein, Bartas darf mit Chain Lightning keine Extra-Ziele treffen."): die Zahl der Ziele legt der Kartentext fest („3 targets … consecutively, or as many as possible"),
+  // auch wenn der Gegner nur 1 Ziel hat und deshalb nur 1 getroffen wird. Bartas bietet daher keinen Zweitwurf an (generisches Merkmal `fixedTargetCount`, kein Namens-Sonderfall).
+  // NICHT `neverMultiTarget`: die Karte trifft bis zu 3 Ziele, nur eben nie mehr als vom Text vorgegeben.
+  fixedTargetCount: true,
   // Turn-1 shielded opponent makes every bolt fizzle (opponent picks the
   // targets and they're all immune). The CPU has no `getValidTargets` to
   // reason about, so flag it explicitly here.

@@ -53,18 +53,17 @@ module.exports = {
       const decayLevel  = engine.effectiveSchoolLevelForCaster('Decay Magic', pi, heroIdx);
       const discardCount = DISCARD_BY_LEVEL[Math.min(decayLevel, 3)] ?? DISCARD_BY_LEVEL[1];
 
-      // Discard one card at a time, playing the dark-magic animation on each
-      for (let i = 0; i < discardCount; i++) {
-        if ((oppPs.hand || []).length === 0) break;
-
+      // ★ W74c: EIN Abwurf-Stapel statt einer Einzelabfrage je Karte — Ambush the Scout und Boris werden einmal gefragt (vorher je Karte: Boris fragte
+      // zweimal, ein Ambush-Fenster je Karte). Das violette Dunkelmagie-Aufblitzen läuft einmal zu Beginn.
+      if ((oppPs.hand || []).length > 0) {
         // Purple dark-magic burst over the opponent's hand
         engine._broadcastEvent('slow_dark_magic', { ownerIdx: oppIdx });
         await engine._delay(300);
 
-        await engine.actionPromptForceDiscard(oppIdx, 1, {
+        await engine.actionPromptForceDiscard(oppIdx, discardCount, {
           title: CARD_NAME,
           source: CARD_NAME,
-          description: `Slow — discard ${discardCount - i} more card${discardCount - i > 1 ? 's' : ''}.`,
+          description: `Slow — discard ${discardCount} card${discardCount > 1 ? 's' : ''}.`,
         });
 
         await engine._delay(200);

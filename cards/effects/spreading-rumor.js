@@ -141,7 +141,8 @@ module.exports = {
       // has hit the pile, matching the engine-wide ordering.
       // v1324: Boris darf den erzwungenen Abwurf ignorieren.
       const _anzahl = (ops.hand || []).filter(trifft).length;
-      const _boris = _anzahl > 0 && await engine.borisVerzicht(oi, _anzahl, { source: CARD_NAME, sourceOwner: pi });
+      // ★ W74c: ERST das Ambush-Fenster, DANN Boris (`fremdAbwurfEntfaellt`; vorher fragte Boris zuerst, das Fenster kam je Karte danach).
+      const _boris = _anzahl > 0 && await engine.fremdAbwurfEntfaellt(oi, _anzahl, { source: CARD_NAME, sourceOwner: pi });
       const discarded = _boris ? 0 : await engine.withDiscardBatch(oi, { source: CARD_NAME }, async () => {
         let n = 0;
         while (true) {
@@ -152,6 +153,7 @@ module.exports = {
           const ok = await engine.actionDiscardHandCard(oi, ops.hand[idx], idx, {
             source: CARD_NAME,
             sourceOwner: pi,   // v860: fremder Zwangsabwurf (Erstrunden-Schutz)
+            _skipHandInteractionCheck: true,   // W74c: das Fenster lief schon oben
           });
           if (!ok) break;
           n++;

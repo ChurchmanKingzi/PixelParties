@@ -8954,6 +8954,8 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     delete gs._spellExcludeTargets;
     delete gs._klonAufnahme;
     delete gs._bartasSecondCast;
+    delete gs._zweitzielWurf;   // W76a
+    delete gs._zweitzielId;
     delete gs._spellNegatedByEffect;
     delete gs._negationWhole;
     // v1277: beide Aktions-Flags sind oben ausgewertet — was danach noch
@@ -8962,6 +8964,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     delete gs._spellForcesActionConsume;
     delete gs._surpriseCheckedHeroes;
     delete gs._deferredRecoil;
+    delete room.engine._fireBoltsEntscheid;   // W75a: Entscheidung 200/50 fuer den Zweitwurf (Fire Bolts)
     delete gs._ameShieldedHeroes;
     delete gs._ameDeclinedHeroes;
 

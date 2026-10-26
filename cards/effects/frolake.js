@@ -98,6 +98,7 @@ module.exports = {
       // Skull Necklace, …) wait for the entire pre-refill dump
       // before resolving.
       await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
+        const borisGate = engine.borisStapel(pi, { source: CARD_NAME });   // ★ W74c: Boris, einmal für den ganzen Stapel
         while ((ps.hand?.length || 0) > 0) {
           const eligible = (ps.hand || []).map((_, i) => i);
           const result = await engine.promptGeneric(pi, {
@@ -110,6 +111,7 @@ module.exports = {
             cancelLabel: 'Done',
           });
           if (!result || result.cancelled || result.cardName == null) break;
+          if (await borisGate(1)) break;   // W74c: Verzicht → nichts abgeworfen, danach wird bis 4 aufgefüllt
           const ok = await engine.actionDiscardHandCard(pi, result.cardName, result.handIndex, {
             source: CARD_NAME,
           });

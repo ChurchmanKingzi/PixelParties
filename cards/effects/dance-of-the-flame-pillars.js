@@ -95,7 +95,10 @@ module.exports = {
       const ps     = gs.players[pi];
       if (!ps) { gs._spellCancelled = true; return; }
 
-      const N = distinctDMSpellsInDiscard(engine, ps);
+      // ★ W76a (Al: „Falls Dance exakt ein Ziel trifft, greift Bartas, sonst nicht"): Bartas' Zweitwurf ist ein Einzelziel-Zweitschlag auf EIN weiteres Ziel — die Zahl der
+      // Ziele ist dort 1 (nicht neu aus der Ablage gezählt: das zweite Ziel ist ein EINZELziel) und nie die Vollfläche (die träfe das erste Ziel nochmal).
+      const zweitwurf = !!gs._zweitzielWurf;
+      const N = zweitwurf ? 1 : distinctDMSpellsInDiscard(engine, ps);
       if (N <= 0) { gs._spellCancelled = true; return; }
 
       const totalTargets = countAllValidTargets(engine);
@@ -103,7 +106,7 @@ module.exports = {
       // strict inequality. With distinct === total, we still go for
       // the multi-target mode (the spec wording is "if there are
       // MORE different…").
-      const fullBoardMode = N > totalTargets;
+      const fullBoardMode = !zweitwurf && N > totalTargets;
 
       const dmgSource = { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Wirkers
 
@@ -157,6 +160,7 @@ module.exports = {
       // Saeulen fallen weiter nacheinander.
       await engine.beginAoeStrike(selected.length, {
         creatures: selected.filter(t => t.type !== 'hero').map(t => t.cardInstance).filter(Boolean),
+        heroes: selected.filter(t => t.type === 'hero'),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
         source: dmgSource, amount: PER_TARGET_DAMAGE,
         type: 'destruction_spell', sourceOwner: pi,
       });

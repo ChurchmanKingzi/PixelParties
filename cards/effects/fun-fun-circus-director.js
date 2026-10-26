@@ -58,6 +58,8 @@ async function abwurfWaehlen(engine, pi, beschreibung, ausser = -1) {
 
 /** Wirft die gewaehlte Karte ab (`opts`: `_noGlow`/`_noPace` fuer die zweite). */
 async function abwerfen(engine, pi, wahl, opts = {}) {
+  // ★ W74c: Boris darf diese Abwurf-KOSTEN ignorieren (je Stufe ein eigener Abwurf; sein „einmal pro Zug" gilt ohnehin nur für eine) — die Karte bleibt, die Stufe gilt als bezahlt.
+  if (await engine.borisVerzicht(pi, 1, { source: CARD_NAME })) return true;
   return !!(await engine.actionDiscardHandCard(pi, wahl.cardName, wahl.handIndex, { source: CARD_NAME, ...opts }));
 }
 

@@ -11214,7 +11214,7 @@ const UncoolSmokeEffect = (() => {
 //     schnellt auf (200–330 ms, Überschwinger bis ~1,6 Kartenhöhen), schwingt gedämpft aus; gelbe Kreuzfunkel am Kopf, Fahrtlinien seitlich. Ab ~560 ms dithert alles weg.
 //  bounce_burst (560 ms, an der Startzone der Rückkehr): Staubring, zehn Fahrtstrahlen, Staubpixel.
 //  Flugstil `schleuder` (ppSchleuderFlug): die Karte holt kurz aus (rückwärts), wird mit viel Schwung zur Hand geschleudert (ease-out in ganzen 3-Pixel-Schritten) und federt am Ziel nach.
-//  cosmic_explosion (1000 ms, auf dem Totenkopf): weißer Blitz, ein schwarzes Dimensionsloch (gedithertes Violett am Rand, Sternenstaub darin) reißt auf und verschluckt die Karte, neun
+//  cosmic_explosion (1000 ms, auf dem Totenkopf): runder weißer Blitz (kein Kasten), ein schwarzes Dimensionsloch (gedithertes Violett am Rand, Sternenstaub darin) reißt auf und verschluckt die Karte, neun
 //     zackige Risse laufen quer über das Brett, drei Druckringe, Trümmer; ab ~720 ms schließt sich das Loch.
 //  water_burst (760 ms, auf dem Ziel): weißer Blitz, Wasserkuppel, Spritzkrone aus 22 Tropfen mit Schwerkraft, zwei Ringwellen, Schaumpixel.
 //  Wasserprojektil (`WasserGeschoss`): wabbelnde Wasserkugel mit Tropfenschweif, Wirbelpixel und Spritzern; die Explosion am Ziel ist `water_burst`.
@@ -11333,11 +11333,6 @@ const CosmicExplosionEffect = (() => {
     const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
     const aus = t > 880 ? Math.max(0, 1 - (t - 880) / 120) : 1;
     if (aus <= 0) return;
-    // Blitzraster über der ganzen Fläche
-    if (t < 130) {
-      const a = (1 - t / 130) * 0.55;
-      for (let Y = 0; Y < sz.gh; Y++) for (let X = 0; X < sz.gw; X++) if (ppBayer(X, Y) < a) g.put(X, Y, P[t < 50 ? 1 : 3], 1);
-    }
     // Druckringe
     for (let i = 0; i < 3; i++) {
       const s0 = 90 + i * 120, e = (t - s0) / 520;
@@ -11397,7 +11392,14 @@ const CosmicExplosionEffect = (() => {
       }
     }
     // Weißer Kern am Anfang
-    if (t < 160) g.block(cx - 7, cy - 7, 14, 14, t < 60 ? P[0] : P[1], 1 - t / 160);
+    if (t < 200) {                                                       // runder Blitz (kein Kasten): weißer Kern mit gedithertem Hof
+      const r = 4 + (t / 200) * 16;
+      for (let dy = -Math.ceil(r); dy <= Math.ceil(r); dy++) for (let dx = -Math.ceil(r); dx <= Math.ceil(r); dx++) {
+        const d = Math.hypot(dx, dy);
+        if (d <= r * 0.6) g.put(cx + dx, cy + dy, P[0], 1 - t / 220);
+        else if (d <= r) g.put(cx + dx, cy + dy, t < 90 ? P[1] : P[2], (1 - t / 200) * 0.6);
+      }
+    }
     // Trümmer
     if (t > 90) {
       const tt = (t - 90) / 1000;

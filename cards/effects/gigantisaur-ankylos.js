@@ -62,15 +62,14 @@ module.exports = {
     // Pay the discard cost FIRST — same pattern as Triceras: keeps a
     // freshly-drawn / freshly-revealed card from being chosen as the
     // pitched card later in the same activation flow.
-    const handBefore = ps.hand.length;
-    await engine.actionPromptForceDiscard(pi, 1, {
+    // ★ W74c: `zahleAbwurfKosten` — von Boris erlassene Kosten gelten als bezahlt (der Effekt läuft weiter).
+    const kosten = await engine.zahleAbwurfKosten(pi, 1, {
       costFor: CARD_NAME,          // ★ v1041: Kosten-Abwurf-Lernkanal
       costKind: 'disrupt',
       title: CARD_NAME,
       source: CARD_NAME,
-      selfInflicted: true,
     });
-    if (ps.hand.length >= handBefore) {
+    if (!kosten.bezahlt) {
       engine.log('ankylos_fizzle', { player: ps.username });
       engine.sync();
       return false;
