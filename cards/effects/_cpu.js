@@ -7121,6 +7121,7 @@ function installCpuBrain(engine) {
           wasScripted: !!scriptedPick,
         }, config.title, 'target', playerIdx);
       }
+      if (typeof engine._gewaehlteZieleMerken === 'function') engine._gewaehlteZieleMerken(playerIdx, validTargets, config, picked);   // W78a: auch die Wahl der CPU als Wirker gehört zum Vorab-Wissen von Monias Bilanz (sie läuft hier nicht über `_zielwahlAbschliessen`)
       return picked;
     }
     return origPromptEffectTarget(playerIdx, validTargets, config);
