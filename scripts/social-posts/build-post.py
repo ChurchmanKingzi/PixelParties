@@ -510,7 +510,7 @@ def main():
     ap.add_argument('--head-top', type=int, default=None, help='Sprite so setzen, dass seine Oberkante bei y (px ab Bildoberkante) liegt, überschreibt feet/eyeAt')
     ap.add_argument('--px', type=int, default=None, help='Maßstab des Sprites (px je Sprite-Pixel), überschreibt hero-themes.json')
     ap.add_argument('--punch', action='store_true', help='Kraftvoller Start: die erste halbe Sekunde mit Bildschirmwackeln, Druckwelle und Blitz, Musik ohne Einblenden und auf einen Schlag der Musik geschnitten')
-    ap.add_argument('--opener', choices=['none', 'heart'], default=None, help='Eigener Start-Effekt statt der Standard-Druckwelle: heart = großes Flammenherz, das detoniert und den Helden freigibt (überschreibt opener aus hero-themes.json)')
+    ap.add_argument('--opener', choices=['none', 'heart', 'storm'], default=None, help='Eigener Start-Effekt statt der Standard-Druckwelle: heart = großes Flammenherz, das detoniert; storm = Gewitterwolke, in die ein Blitz einschlägt; beide geben den Helden frei (überschreibt opener aus hero-themes.json)')
     args = ap.parse_args()
     reel = args.format == 'reel'
     tag = args.format
@@ -524,7 +524,8 @@ def main():
     card_name = spr.meta['hero']
     hero_cfg = json.loads((HERE / 'hero-themes.json').read_text(encoding='utf-8')).get(card_name, {})
     opener = args.opener or hero_cfg.get('opener') or 'none'
-    opener_on = opener == 'heart'
+    args_opener = opener
+    opener_on = opener in ('heart', 'storm')
     if opener_on:
         punch_on = False                   # der Opener ersetzt die Standard-Druckwelle
     first_on = intro_on or punch_on or opener_on        # die erste Schleife wird gesondert gerendert (Einblenden und/oder Start-Effekt)
@@ -806,6 +807,151 @@ def main():
             out_img = sh
         return out_img
 
+    # ── Opener „Gewitterwolke“: das erste Bild ist eine große Gewitterwolke, in der es zuckt; ein Blitz schlägt ein, die Wolke zerreißt und gibt den Helden frei ──
+    T_STORM = 0.70                                                           # Sekunden bis zum Einschlag
+    STORM_PAL = [(14, 18, 32), (40, 46, 72), (80, 90, 124), (130, 142, 178), (190, 202, 232), (240, 246, 255)]    # Kontur … Licht (von oben rechts)
+    PUFFS = [(-44, 8, 17), (-24, 2, 22), (0, -4, 26), (25, 1, 22), (45, 8, 16), (-33, 16, 13), (-12, 15, 15), (13, 16, 15), (34, 15, 12),
+             (-14, -17, 14), (14, -19, 13), (-1, -26, 10)]                    # (dx, dy, Radius) in Zellen, von hinten nach vorn
+    BOLT_C = [(110, 170, 255), (255, 244, 170), (255, 255, 255)]             # Glimmen, Mitte, Kern
+    bolt_rng = np.random.default_rng(5)
+
+    def cloud_cells(t, flash):
+        lvl = np.full((chei, cwid), -1.0, dtype=np.float32)
+        out_ = np.zeros((chei, cwid), dtype=bool)
+        for i, (dx, dy, r_) in enumerate(PUFFS):
+            r_ = r_ * 1.12 + 0.9 * math.sin(t * 5 + i * 1.7)
+            ox, oy_ = dx * 1.12 + 1.2 * math.sin(t * 3 + i), dy * 1.12 + 0.8 * math.cos(t * 4 + i * 2.1)
+            nx, ny = (XX + 0.5 - hcx - ox) / r_, (YY + 0.5 - hcy - oy_) / r_
+            d = np.hypot(nx, ny)
+            inside = d < 1.0
+            v = 1.7 + 1.5 * (nx * 0.6 - ny * 0.8) - 0.5 * d * d                 # Licht von oben rechts
+            v = np.where(d > 1.0 - 2.4 / r_, 0.0, v)                              # dunkle Kontur um jede Wolkenwölbung
+            lvl = np.where(inside, v, lvl)
+            out_ |= inside
+        return out_, lvl + 2.0 * flash
+
+    def storm_bolt(seed, x0, y0, y1, fork=True):
+        """Gezackter Blitz als Zellenmaske (Kern, Mitte, Glimmen als Ebenen 2/1/0)."""
+        rng = np.random.default_rng(seed)
+        core = np.zeros((chei, cwid), dtype=bool)
+        def line(a, b, c, d_):
+            n_ = int(max(abs(c - a), abs(d_ - b))) + 1
+            for k in range(n_ + 1):
+                xx, yy = int(round(a + (c - a) * k / n_)), int(round(b + (d_ - b) * k / n_))
+                if 1 <= xx < cwid - 2 and 1 <= yy < chei - 2:
+                    core[yy, xx:xx + 2] = True
+        x, y = x0, y0
+        pts = [(x, y)]
+        while y < y1:
+            y += rng.uniform(5, 9)
+            x += rng.uniform(-7, 7) + (x0 - x) * 0.15
+            pts.append((x, min(y, y1)))
+        for (a, b), (c, d_) in zip(pts[:-1], pts[1:]):
+            line(a, b, c, d_)
+        if fork and len(pts) > 3:
+            for k in rng.choice(np.arange(1, len(pts) - 1), size=min(3, len(pts) - 2), replace=False):
+                fx_, fy_ = pts[k]
+                dirx = rng.choice([-1, 1])
+                for _ in range(3):
+                    nx_, ny_ = fx_ + dirx * rng.uniform(4, 8), fy_ + rng.uniform(4, 8)
+                    line(fx_, fy_, nx_, ny_)
+                    fx_, fy_ = nx_, ny_
+        mid = core.copy()
+        for dy_, dx_ in ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)):
+            mid |= np.roll(np.roll(core, dy_, 0), dx_, 1)
+        glow = mid.copy()
+        for _ in range(2):
+            g2 = glow.copy()
+            for dy_, dx_ in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                g2 |= np.roll(np.roll(glow, dy_, 0), dx_, 1)
+            glow = g2
+        return core, mid, glow
+
+    BOLT_X, BOLT_Y1 = hcx + 3, max((feet_y + 4 * U) / U, hcy + 45)       # bis zu den Füßen des Helden, mindestens aber ein Stück unter die Wolke
+    BOLT = storm_bolt(11, BOLT_X, hcy + 6, BOLT_Y1)
+    LEAD = storm_bolt(12, BOLT_X + 1, hcy + 6, BOLT_Y1, fork=False)
+
+    def paint_bolt(img, bolt, glow_on=True, dither=None):
+        core, mid, glow = bolt
+        rgb = np.zeros((chei, cwid, 3), dtype=np.uint8)
+        vis = np.zeros((chei, cwid), dtype=bool)
+        if glow_on:
+            g = glow & ~mid & (BAY < 0.55)
+            rgb[g] = BOLT_C[0]; vis |= g
+        rgb[mid] = BOLT_C[1]; vis |= mid
+        rgb[core] = BOLT_C[2]; vis |= core
+        if dither is not None:
+            vis &= dither
+        paint(img, vis, rgb)
+
+    storm_pre_mask, storm_pre_lvl = cloud_cells(0.0, 0.0)
+    storm_pre_rgb = pal_dither(STORM_PAL, storm_pre_lvl)
+    STORM_CHUNKS = []
+    schunk_rng = np.random.default_rng(78)
+    for cy_ in range(0, chei - CHUNK, CHUNK):
+        for cx_ in range(0, cwid - CHUNK, CHUNK):
+            if storm_pre_mask[cy_ + CHUNK // 2, cx_ + CHUNK // 2]:
+                px_, py_ = cx_ + CHUNK / 2 - hcx, cy_ + CHUNK / 2 - hcy
+                n = max(1e-3, math.hypot(px_, py_))
+                sp = schunk_rng.uniform(45, 120)
+                STORM_CHUNKS.append((cx_, cy_, px_ / n * sp, py_ / n * sp - 10, schunk_rng.uniform(0.3, 0.85),
+                                     tuple(int(c) for c in storm_pre_rgb[cy_ + CHUNK // 2, cx_ + CHUNK // 2])))
+
+    def storm_fx(img, f):
+        ts = f / float(fps)
+        if ts >= T_STORM + T_BOOM:
+            return img
+        dark = Image.blend(img, Image.new('RGB', (W, H), (6, 8, 22)), 0.95)
+        shake_amp = 0
+        if ts < T_STORM:
+            out_img = dark
+            fl = 0.0
+            for t0_ in (0.20, 0.43):                                           # Wetterleuchten in der Wolke
+                if 0 <= ts - t0_ < 0.07:
+                    fl = 1.0
+            if T_STORM - 0.09 <= ts < T_STORM:
+                fl = 0.8
+            m_, l_ = cloud_cells(ts, fl)
+            paint(out_img, m_, pal_dither(STORM_PAL, l_))
+            if fl:                                                            # Äderchen im Inneren der Wolke
+                paint_bolt(out_img, storm_bolt(40 + int(ts * 30), hcx + bolt_rng.uniform(-30, 30), hcy - 8, hcy + 22, fork=False), glow_on=False,
+                           dither=m_)
+            if T_STORM - 0.07 <= ts < T_STORM:                               # Vorentladung: dünner Leitblitz
+                paint_bolt(out_img, LEAD, glow_on=False)
+            shake_amp = 1 if ts >= T_STORM - 0.07 else 0
+        else:
+            q = (ts - T_STORM) / T_BOOM
+            r = 10 + 185 * min(q / 0.9, 1.0) ** 0.55
+            dist = np.hypot(XX + 0.5 - hcx, YY + 0.5 - hcy)
+            out_img = img.copy()
+            keep_dark = np.repeat(np.repeat((dist >= r).astype(np.uint8) * 255, U, axis=0), U, axis=1)[:H, :W]
+            out_img.paste(dark, (0, 0), Image.fromarray(keep_dark, 'L'))
+            dr = ImageDraw.Draw(out_img)
+            tt = ts - T_STORM
+            for cx_, cy_, vx, vy, life, col in STORM_CHUNKS:                  # Wolkenstücke fliegen auseinander
+                if q > life or ((1.0 - q / life) < 0.5 * BAY[cy_ % chei, cx_ % cwid] + 0.15 and q > 0.25):
+                    continue
+                a, b = int(round(cx_ + vx * tt)), int(round(cy_ + vy * tt + 20 * tt * tt))
+                dr.rectangle([a * U, b * U, (a + CHUNK) * U - 1, (b + CHUNK) * U - 1], fill=col)
+            if q < 0.4:                                                       # der Blitz bleibt kurz stehen und verlöscht gedithert
+                paint_bolt(out_img, BOLT, dither=(1.0 - q / 0.4) > BAY)
+            k = 1.0 - q
+            ring = (np.abs(dist - r) < 2.2) & (k > BAY)
+            paint(out_img, ring, np.full((chei, cwid, 3), (235, 244, 255), dtype=np.uint8))
+            a_fl = 0.85 * max(0.0, 1.0 - tt / 0.13) ** 1.5                    # grelles Blitzlicht …
+            if 0.20 <= tt < 0.27:
+                a_fl = max(a_fl, 0.35)                                        # … und ein zweites Nachzucken
+            if a_fl > 0:
+                out_img = Image.blend(out_img, Image.new('RGB', (W, H), (240, 246, 255)), a_fl)
+            shake_amp = int(round(4 * k ** 1.5))
+        if shake_amp:
+            rng = np.random.default_rng(500 + f)
+            dx, dy = int(rng.integers(-shake_amp, shake_amp + 1)) * U, int(rng.integers(-shake_amp, shake_amp + 1)) * U
+            sh = out_img.copy()
+            sh.paste(out_img, (dx, dy))
+            out_img = sh
+        return out_img
+
     def render(f, intro, punch=False, opener=False):
         ts = f / float(fps)
         canvas = bg.frame(f / loop)
@@ -857,7 +1003,7 @@ def main():
                 canvas.alpha_composite(l2)
         out_img = canvas.convert('RGB')
         if opener:
-            return opener_fx(out_img, f)
+            return (storm_fx if args_opener == 'storm' else opener_fx)(out_img, f)
         return punch_fx(out_img, f) if punch else out_img
 
     if args.cover_only is not None:
@@ -900,8 +1046,9 @@ def main():
         if (punch_on or opener_on) and args.music_start is None:
             m_start = snap_to_onset(music, m_start)
             if opener_on:                                               # der Schlag soll auf die Detonation fallen, nicht auf Sekunde 0
-                m_start = max(0.0, m_start - T_HEART)
-            print(f'Musik: Start auf den Schlag bei {m_start:.2f} s' + (f' (Schlag bei Detonation, t = {T_HEART} s)' if opener_on else ''))
+                t_hit = T_STORM if args_opener == 'storm' else T_HEART
+                m_start = max(0.0, m_start - t_hit)
+            print(f'Musik: Start auf den Schlag bei {m_start:.2f} s' + (f' (Schlag bei Einschlag/Detonation, t = {t_hit} s)' if opener_on else ''))
         cmd += ['-ss', str(m_start), '-i', str(music)]
         fade_in = '' if (punch_on or opener_on) else 'afade=t=in:st=0:d=0.4,'
         amap = ['-map', f'{n_in}:a', '-af', f'{fade_in}afade=t=out:st={dur - 1.2:.2f}:d=1.2,loudnorm=I=-14:TP=-1.5:LRA=11', '-c:a', 'aac', '-b:a', '192k']
