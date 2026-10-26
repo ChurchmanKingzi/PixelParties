@@ -2940,6 +2940,51 @@ const ZONE_ANIM_SFX = {
     { name: 'ping',       opts: { rate: 2.2, volume: 0.5,  delay: 700, category: null, dedupe: 0 } },
     { name: 'debuff',     opts: { rate: 1.7, volume: 0.35, delay: 720, category: null, dedupe: 0 } },
   ],
+  // Reflection (26.10.) — der Spiegel erscheint (Zauberton, 0 ms), die Wirbel werden hineingezogen (Wind ~140 ms), bei ~470 ms der Blitz im Glas (Ping), der Strahl faehrt ab (~520 ms, Zischen) und
+  // zerplatzt bei ~780 ms (Klirren, Schwaechungston). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  reflection_mirror: [
+    { name: 'spell_cast',         opts: { rate: 1.4, volume: 0.45 } },
+    { name: 'elem_wind',          opts: { rate: 1.3, volume: 0.35, delay: 140, category: null, dedupe: 0 } },
+    { name: 'ping',               opts: { rate: 2.6, volume: 0.45, delay: 470, category: null, dedupe: 0 } },
+    { name: 'slash',              opts: { rate: 2.0, volume: 0.35, delay: 520, category: null, dedupe: 0 } },
+    { name: 'creature_destroyed', opts: { rate: 1.9, volume: 0.4,  delay: 780, category: null, dedupe: 0 } },
+    { name: 'debuff',             opts: { rate: 1.3, volume: 0.4,  delay: 800, category: null, dedupe: 0 } },
+  ],
+  // Man-Eater Birds (26.10.) — der Schwarm fliegt an (Wind, 0 ms), ab ~700 ms Hacken und Schnitte (Schlag, Schnitt), die Creature wird gefressen (Zerstoerung ~1250 ms). Nur der erste Teil uebernimmt
+  // die Sammelkategorie 'effect'.
+  man_eater_swarm: [
+    { name: 'elem_wind',          opts: { rate: 1.9, volume: 0.4 } },
+    { name: 'elem_wind',          opts: { rate: 2.3, volume: 0.3,  delay: 280, category: null, dedupe: 0 } },
+    { name: 'slash',              opts: { rate: 1.5, volume: 0.4,  delay: 720, category: null, dedupe: 0 } },
+    { name: 'slash',              opts: { rate: 1.8, volume: 0.35, delay: 880, category: null, dedupe: 0 } },
+    { name: 'heavy_impact',       opts: { rate: 1.1, volume: 0.45, delay: 1000, category: null, dedupe: 0 } },
+    { name: 'creature_destroyed', opts: { rate: 0.9, volume: 0.5,  delay: 1250, category: null, dedupe: 0 } },
+  ],
+  // Man-Eater Birds, Zugende (26.10.) — der Schwarm kreist (Wind), drei Bisse bei ~650/850/1050 ms (Schnitt, dumpfer Treffer).
+  man_eater_bite: [
+    { name: 'elem_wind',    opts: { rate: 1.9, volume: 0.4 } },
+    { name: 'slash',        opts: { rate: 1.6, volume: 0.4,  delay: 650,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.3, volume: 0.35, delay: 670,  category: null, dedupe: 0 } },
+    { name: 'slash',        opts: { rate: 1.8, volume: 0.4,  delay: 850,  category: null, dedupe: 0 } },
+    { name: 'slash',        opts: { rate: 2.0, volume: 0.4,  delay: 1050, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.1, volume: 0.4,  delay: 1070, category: null, dedupe: 0 } },
+  ],
+  // Great Immortal Hydra, Selbstheilung (26.10.) — der Tod wird abgewendet: dunkles Flackern (Biomantie-Ton, 0 ms), die Ringe ziehen sich zusammen (Wind ~150 ms), Blitz bei ~560 ms (Wiederbelebung, Heilton),
+  // die Koepfe wachsen (Aufwertung ~640 ms, Biomantie ~700 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  hydra_regrow: [
+    { name: 'elem_biomancy', opts: { rate: 0.8, volume: 0.45 } },
+    { name: 'elem_wind',     opts: { rate: 1.4, volume: 0.3,  delay: 150, category: null, dedupe: 0 } },
+    { name: 'revive',        opts: { rate: 1.0, volume: 0.5,  delay: 560, category: null, dedupe: 0 } },
+    { name: 'heal',          opts: { rate: 0.9, volume: 0.55, delay: 580, category: null, dedupe: 0 } },
+    { name: 'buff',          opts: { rate: 0.8, volume: 0.45, delay: 660, category: null, dedupe: 0 } },
+    { name: 'elem_biomancy', opts: { rate: 1.2, volume: 0.35, delay: 740, category: null, dedupe: 0 } },
+  ],
+  // Great Immortal Hydra, Zugende (26.10.) — das Gift sickert in den Helden (Gift, 0 ms), der Schleier pulsiert (Schwaechung ~330 ms), der Verlust faellt bei ~650 ms.
+  hydra_drain: [
+    { name: 'poison',        opts: { rate: 0.9, volume: 0.45 } },
+    { name: 'debuff',        opts: { rate: 0.8, volume: 0.4,  delay: 330, category: null, dedupe: 0 } },
+    { name: 'damage',        opts: { rate: 0.9, volume: 0.4,  delay: 650, category: null, dedupe: 0 } },
+  ],
   // Exorcism (24.10.) — das Licht faellt (Zauberton, 0 ms), dunkle Schwaden steigen (Wind), bei ~560 ms der Schlag (Heilton, Glitzern). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   exorcism_light: [
     { name: 'spell_cast',    opts: { rate: 0.9, volume: 0.5 } },

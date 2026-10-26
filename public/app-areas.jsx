@@ -79,6 +79,8 @@ const AREA_OVERLAYS = {
   'Tearing Mountain':             { tier: 'opaque',      C: () => <TearingMountainOverlay /> },   // 23.10.: Lavaberg mit Wasserfall und Lavafluss
   'The Golden Gate':              { tier: 'opaque',      C: () => <GoldenGateOverlay /> },   // W76: goldenes Tor im Abendlicht
   'Tree of Golden Apples':        { tier: 'opaque',      C: () => <TreeOfGoldenApplesOverlay /> },   // W79: goldener Baum voller glitzernder Äpfel, im Wind schwankend
+  'Gigalopolis, the Mega-City':   { tier: 'opaque',      C: () => <GigalopolisOverlay /> },   // Welle 6b: antike Riesenstadt aus großer Höhe, winzige Menschen
+  'Barrel Home':                  { tier: 'opaque',      C: () => <BarrelHomeOverlay /> },   // Welle 6b: riesiges Fass auf der Seite, Abenddämmerung
 };
 
 /** Faserige Diagonale: Punkte von links oben nach rechts unten, leicht gezackt. */
@@ -5957,6 +5959,136 @@ const TreeOfGoldenApplesOverlay = React.memo(function TreeOfGoldenApplesOverlay(
         /* Goldblatt: 2×1 Kunstpixel, treibt schräg zu Boden und blinkt am Ende weg */
         .tga-blatt { position: absolute; width: calc(2 * var(--px)); height: var(--px); opacity: 0; }
         @keyframes tgaFall { 0% { opacity: 0; transform: translate(0, 0); } 4%, 90% { opacity: 1; } 97%, 100% { opacity: 0; transform: translate(var(--dx), var(--fall)); } }
+      `}</style>
+    </PixelScene>
+  );
+});
+
+// ═════════════════════════════════════════════════════════════════
+//  GIGALOPOLIS, THE MEGA-CITY — antike griechische Riesenstadt aus großer Höhe (Welle 6b, 26.10.)
+//
+//  Al: „eine riesige antike griechische Stadt, die man aus großer Höhe sieht; winzige Menschen als sich bewegende Punkte." Kunsthöhe 100, Blick senkrecht von oben.
+//  Ebenen (public/areas/gigalopolis/, Generator scratchpad gen/gigalopolis.py, nicht im Projekt): tile.png — Kachel 128, nahtlos (Strassenraster mit Häuserblöcken: Terrakotta-,
+//  Marmor- und Lehmdächer, Innenhöfe, Haine, kleine Plätze); acropolis.png — Burgbezirk 160 breit, mittig, mit Alpha (Mauerring mit Türmen, Parthenon-artiger Tempel mit
+//  Säulenkranz, Altar, Theater, Agora mit Stoa, Rundtempel, Prozessionsweg); clouds.png — Wolken (gedithert, nahtlos, treiben); smoke.png — Altarrauch (4 Bilder).
+//  Bewegung (CSS, ganze Pixel, `steps()`): winzige Menschen (1 Kunstpixel, weiß/rot/blau/dunkel) wandern auf den Strassen der Kachel und den Prozessionsweg hinauf; Rauch steigt
+//  vom Altar; Wolken ziehen über die Stadt.
+// ═════════════════════════════════════════════════════════════════
+const GIG = '/areas/gigalopolis/';
+const GIG_W = 160;                       // Burgbezirk (Versatzstück)
+const GIG_ALTAR_Y = 40;                  // Altar im Burgbezirk (Kunstpixel von oben); x = Mitte
+const GIG_ZEILEN = [1, 26, 51, 76];      // Strassenmitten der Kachel (y)
+const GIG_SPALTEN = [1, 33, 65, 97];     // Strassenmitten der Kachel (x; Kachelmitte = 64)
+const GIG_FARBEN = ['#ffffff', '#e94e53', '#4e77ca', '#323232', '#fff196', '#4ceb70'];
+/** Liegt der Punkt (x neben der Mitte, y von oben) AUSSERHALB des Burgbezirks (Ellipse 77 × 47 um die Mitte)? */
+const gigAusserhalb = (x, y) => (x / 80) ** 2 + ((y - 50) / 49) ** 2 > 1.12;
+const GigalopolisOverlay = React.memo(function GigalopolisOverlay() {
+  const leute = useMemo(() => {
+    const r = tmtZufall(2610);
+    const aus = [];
+    const N = ppFxN(46);
+    for (let versuch = 0; aus.length < N && versuch < 600; versuch++) {
+      const waag = r() < 0.5;
+      const farbe = GIG_FARBEN[Math.floor(r() * GIG_FARBEN.length)];
+      if (waag) {
+        const y = GIG_ZEILEN[Math.floor(r() * GIG_ZEILEN.length)], len = 14 + Math.round(r() * 40), x = Math.round(-190 + r() * 380 - len / 2);
+        if (![x, x + len / 2, x + len].every(px => gigAusserhalb(px, y))) continue;
+        const tempo = 2.5 + r() * 3, dur = len / tempo;
+        aus.push({ waag, x, y, len, dur, delay: -r() * dur * 2, farbe });
+      } else {
+        const sp = GIG_SPALTEN[Math.floor(r() * GIG_SPALTEN.length)], x = sp - 64 + 128 * (Math.floor(r() * 4) - 2), len = 12 + Math.round(r() * 30), y = Math.round(r() * (98 - len));
+        if (![y, y + len / 2, y + len].every(py => gigAusserhalb(x, py))) continue;
+        const tempo = 2.5 + r() * 3, dur = len / tempo;
+        aus.push({ waag, x, y, len, dur, delay: -r() * dur * 2, farbe });
+      }
+    }
+    // Pilger auf dem Prozessionsweg (Burgbezirk): gehen langsam zum Tempel hinauf
+    ppZufall(ppFxN(6), (i) => {
+      const len = 38 + (i % 3) * 3, dur = 16 + i * 2.5;
+      aus.push({ waag: false, x: -3 + (i % 4) * 2, y: 94 - len, len, dur, delay: -(i * 3.1), farbe: GIG_FARBEN[(i + 1) % GIG_FARBEN.length], rueck: i % 2 === 1 });
+    });
+    return aus;
+  }, []);
+  const rauch = useMemo(() => ppZufall(ppFxN(3), (i) => ({ delay: -i * 3 })), []);
+  return (
+    <PixelScene artH={100} bg="#b29466" className="gigalopolis-overlay">
+      <PixelBand src={GIG + 'tile.png'} />
+      <PixelPiece src={GIG + 'acropolis.png'} w={GIG_W} />
+      {leute.map((m, i) => (
+        <i key={'m' + i} className="pp-area-dyn gig-mensch" style={{
+          left: ppArtX(m.x, 0), top: ppArt(m.y), background: m.farbe, '--len': ppArt(m.len),
+          animation: `${m.waag ? 'gigGehH' : 'gigGehV'} ${m.dur}s steps(${m.len}) ${m.delay}s infinite alternate${m.rueck ? '-reverse' : ''}`,
+        }} />
+      ))}
+      {rauch.map((r, i) => (
+        <i key={'r' + i} className="pp-area-dyn gig-rauch" style={{ left: ppArtX(-4.5, 0), top: ppArt(GIG_ALTAR_Y - 11), animation: `gigRauch 9s steps(24) ${r.delay}s infinite, gigRauchBild 9s steps(1) ${r.delay}s infinite` }} />
+      ))}
+      <PixelBand src={GIG + 'clouds.png'} className="pp-area-dyn gig-wolken" />
+      <div className="pp-rand-dim" />
+      <style>{`
+        .gig-mensch { position: absolute; width: var(--px); height: var(--px); }
+        @keyframes gigGehH { from { translate: 0 0; } to { translate: var(--len) 0; } }
+        @keyframes gigGehV { from { translate: 0 0; } to { translate: 0 var(--len); } }
+        .gig-rauch { position: absolute; width: calc(9 * var(--px)); height: calc(11 * var(--px)); background: url(${GIG}smoke.png) 0 0 / 400% 100% no-repeat; }
+        @keyframes gigRauch { from { transform: translate(0, 0); } to { transform: translate(calc(10 * var(--px)), calc(-16 * var(--px))); } }
+        @keyframes gigRauchBild { 0% { background-position: 0 0; } 20% { background-position: 33.33% 0; } 55% { background-position: 66.67% 0; } 82% { background-position: 100% 0; } }
+        /* Wolken: eine Kachel (128 Kunstpixel) pro Umlauf, ganze Pixel */
+        .gig-wolken { animation: gigWolken 220s steps(128) infinite; }
+        @keyframes gigWolken { from { background-position: 0 0; } to { background-position: calc(128 * var(--px)) 0; } }
+      `}</style>
+    </PixelScene>
+  );
+});
+
+// ═════════════════════════════════════════════════════════════════
+//  BARREL HOME — ein riesiges hölzernes Fass auf der Seite (Welle 6b, 26.10.)
+//
+//  Al: „ein großes hölzernes Fass, das auf der Seite liegt." Kunsthöhe 100, Abenddämmerung: das Fass als Wohnhaus — Rundbogentür im Boden mit warmem Licht, Fenster mit grünen
+//  Läden, Ofenrohr mit Rauch, Eisenreifen, Holzkeile, Stufen. Ebenen (public/areas/barrel-home/, Generator scratchpad gen/barrel-home.py, nicht im Projekt): sky.png (Kachel,
+//  Bayer-Verlauf), hills.png (Kachel, Hügel und Tannen), ground.png (Kachel, Wiese und Pfad), barrel.png (Versatzstück 160 breit), glow.png (2 Bilder: flackerndes Türlicht),
+//  smoke.png (Rauch, 4 Bilder). Bewegung: Türlicht flackert, Rauch steigt, Sterne funkeln, Glühwürmchen schweben über der Wiese.
+// ═════════════════════════════════════════════════════════════════
+const BRH = '/areas/barrel-home/';
+const BRH_W = 160;
+const BRH_STERNE = [[-70, 6], [-52, 14], [-30, 5], [-8, 12], [18, 4], [40, 10], [62, 18], [78, 7], [-84, 20], [88, 26], [-20, 22], [30, 24], [-60, 26], [70, 2]];
+const BarrelHomeOverlay = React.memo(function BarrelHomeOverlay() {
+  const sterne = useMemo(() => BRH_STERNE.slice(0, ppFxN(BRH_STERNE.length)).map(([x, y], i) => ({ x, y, dur: [2.4, 3.6, 4.8][i % 3], delay: -((i * 5) % 9) / 2 })), []);
+  const fliegen = useMemo(() => ppZufall(ppFxN(10), (i) => ({
+    x: Math.round(-90 + ((i * 37) % 181)), y: 70 + ((i * 11) % 24), dx: ((i * 7) % 15) - 7, dy: -(4 + (i * 5) % 9),
+    dur: [6, 8, 10][i % 3], delay: -((i * 3) % 10) / 2,
+  })), []);
+  const rauch = useMemo(() => ppZufall(ppFxN(3), (i) => ({ delay: -i * 3 })), []);
+  return (
+    <PixelScene artH={100} bg="#170b28" className="barrel-home-overlay">
+      <PixelBand src={BRH + 'sky.png'} />
+      {sterne.map((s, i) => (
+        <i key={'s' + i} className="pp-area-dyn brh-stern" style={{ left: ppArtX(s.x, 0), top: ppArt(s.y), animation: `brhStern ${s.dur}s steps(1) ${s.delay}s infinite` }} />
+      ))}
+      <PixelBand src={BRH + 'hills.png'} />
+      <PixelBand src={BRH + 'ground.png'} />
+      <PixelPiece src={BRH + 'barrel.png'} w={BRH_W} />
+      {/* erstes Bild bleibt stehen (Play Animations: aus), das flackernde Licht liegt darauf */}
+      <PixelPiece src={BRH + 'glow.png'} w={BRH_W} style={{ backgroundSize: '100% 200%', backgroundPosition: '50% 0%' }} />
+      <PixelPiece src={BRH + 'glow.png'} w={BRH_W} className="pp-area-dyn" style={{ backgroundSize: '100% 200%', animation: 'ppBand2 1.1s steps(1) infinite' }} />
+      {rauch.map((r, i) => (
+        <i key={'r' + i} className="pp-area-dyn brh-rauch" style={{ left: ppArtX(96, BRH_W), top: ppArt(-4), animation: `brhRauch 9s steps(20) ${r.delay}s infinite, brhRauchBild 9s steps(1) ${r.delay}s infinite` }} />
+      ))}
+      {fliegen.map((f, i) => (
+        <i key={'f' + i} className="pp-area-dyn brh-fliege" style={{
+          left: ppArtX(f.x, 0), top: ppArt(f.y), '--dx': ppArt(f.dx), '--dy': ppArt(f.dy),
+          animation: `brhFliege ${f.dur}s steps(${Math.abs(f.dy) + 4}) ${f.delay}s infinite alternate, brhBlink ${f.dur / 2}s steps(1) ${f.delay}s infinite`,
+        }} />
+      ))}
+      <div className="pp-rand-dim" />
+      <style>{`
+        .brh-stern { position: absolute; width: var(--px); height: var(--px); background: #ffffff; opacity: 0; }
+        @keyframes brhStern { 0%, 55% { opacity: 1; } 60%, 70% { opacity: 0; } 75%, 100% { opacity: 1; } }
+        .brh-rauch { position: absolute; width: calc(9 * var(--px)); height: calc(11 * var(--px)); background: url(${BRH}smoke.png) 0 0 / 400% 100% no-repeat; }
+        @keyframes brhRauch { from { transform: translate(0, 0); } to { transform: translate(calc(14 * var(--px)), calc(-6 * var(--px))); } }
+        @keyframes brhRauchBild { 0% { background-position: 0 0; } 20% { background-position: 33.33% 0; } 55% { background-position: 66.67% 0; } 82% { background-position: 100% 0; } }
+        .brh-fliege { position: absolute; width: var(--px); height: var(--px); background: #fff196; }
+        @keyframes brhFliege { from { translate: 0 0; } to { translate: var(--dx) var(--dy); } }
+        @keyframes brhBlink { 0%, 45% { opacity: 1; } 50%, 70% { opacity: 0; } 75%, 100% { opacity: 1; } }
       `}</style>
     </PixelScene>
   );

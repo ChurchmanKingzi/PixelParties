@@ -267,6 +267,10 @@
 "id": "Barker_the_Monster_Tamer",
 "kind": "a"
 },
+"Barrel Home": {
+"id": "Barrel_Home",
+"kind": "a"
+},
 "Barrier of Faith": {
 "id": "Barrier_of_Faith",
 "kind": "a"
@@ -1847,6 +1851,10 @@
 "id": "Giga_Steroids",
 "kind": "a"
 },
+"Gigalopolis, the Mega-City": {
+"id": "Gigalopolis_the_Mega_City",
+"kind": "a"
+},
 "Gigantisaur Ankylos": {
 "id": "Gigantisaur_Ankylos",
 "kind": "a"
@@ -2859,6 +2867,10 @@
 "id": "Maho_the_Cute_Magical_Girl",
 "kind": "a"
 },
+"Man-Eater Birds": {
+"id": "Man_Eater_Birds",
+"kind": "a"
+},
 "Mana Absorbing Crystal": {
 "id": "Mana_Absorbing_Crystal",
 "kind": "a"
@@ -3525,6 +3537,10 @@
 },
 "Redirecting Aura": {
 "id": "Redirecting_Aura",
+"kind": "a"
+},
+"Reflection": {
+"id": "Reflection",
 "kind": "a"
 },
 "Refreshing Night": {
@@ -5585,6 +5601,10 @@
 },
 "Grand Feast": {
 "id": "Grand_Feast",
+"kind": "a"
+},
+"Great Immortal Hydra": {
+"id": "Great_Immortal_Hydra",
 "kind": "a"
 },
 "Fake Legendary Sword": {

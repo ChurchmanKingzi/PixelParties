@@ -7693,7 +7693,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
   const columnLayout = [0, 1, 2].map(hi => {
     const counts = [0, 1].map(pi => {
       const ic = (gameState.players[pi].islandZoneCount || [0,0,0])[hi] || 0;
-      return { left: Math.floor(ic / 2), right: ic - Math.floor(ic / 2) };
+      return { left: Math.ceil(ic / 2), right: ic - Math.ceil(ic / 2) };   // 26.10. (Gigalopolis): bei ungerader Inselzahl liegt die Extra-Zone LINKS (1 → links; 3 → 2 links, 1 rechts)
     });
     const maxLeft = Math.max(counts[0].left, counts[1].left);
     const maxRight = Math.max(counts[0].right, counts[1].right);
@@ -7911,7 +7911,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
           const actualZoneCount = (supZones[i] || []).length || 3;
           const islandCount = islandCounts[i] || 0;
           const baseCount = actualZoneCount - islandCount;
-          const myLeft = Math.floor(islandCount / 2);
+          const myLeft = Math.ceil(islandCount / 2);   // 26.10. (Gigalopolis): Extra-Zone bei ungerader Zahl links
           const myRight = islandCount - myLeft;
           const { maxLeft, maxRight } = columnLayout[i];
 

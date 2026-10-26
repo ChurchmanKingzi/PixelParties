@@ -3704,7 +3704,7 @@ function PuzzleCreator() {
   const columnLayout = useMemo(() => [0, 1, 2].map(hi => {
     const counts = [0, 1].map(pi => {
       const ic = (players[pi].islandZoneCount || [0,0,0])[hi] || 0;
-      return { left: Math.floor(ic / 2), right: ic - Math.floor(ic / 2) };
+      return { left: Math.ceil(ic / 2), right: ic - Math.ceil(ic / 2) };   // 26.10. (Gigalopolis): bei ungerader Inselzahl liegt die Extra-Zone LINKS (1 → links; 3 → 2 links, 1 rechts)
     });
     return { maxLeft: Math.max(counts[0].left, counts[1].left), maxRight: Math.max(counts[0].right, counts[1].right) };
   }), [players]);
@@ -4157,7 +4157,7 @@ function PuzzleCreator() {
           const allSlots = p.supportZones[hi] || [[], [], []];
           const islandCount = (p.islandZoneCount || [0,0,0])[hi] || 0;
           const baseCount = allSlots.length - islandCount;
-          const myLeft = Math.floor(islandCount / 2);
+          const myLeft = Math.ceil(islandCount / 2);   // 26.10. (Gigalopolis): Extra-Zone bei ungerader Zahl links
           const myRight = islandCount - myLeft;
           const { maxLeft, maxRight } = columnLayout[hi];
 

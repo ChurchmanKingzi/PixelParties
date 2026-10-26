@@ -8858,10 +8858,55 @@ function ppStufe(pal, s, X, Y) {
   const n = pal.length - 1, v = Math.max(0, Math.min(n, s)), i = Math.min(n - 1, Math.floor(v));
   return (v - i) > ppBayer(X, Y) ? pal[i + 1] : pal[i];
 }
+/**
+ * Versiegelte Zone (Barrel Home, 26.10.): dunkle Holzbretter (harte Streifen) mit einem Fass-Sprite, 14×19 Pixel, ×3 vergrößert. Palettenfarben.
+ * Zeichen: k Kontur · d/m/l/h Holz dunkel → hell · n/i/j Eisen dunkel → hell.
+ */
+const ZONE_FASS_ZEILEN = [
+  '...kkkkkkkk...', '..khhhhhhhhk..', '.kjjjjjjjjjjk.', '.kmllhhhhllmk.', 'kmlhhhllhhhlmk', 'kmlhhhllhhhlmk', 'knnnnnnnnnnnnk',
+  'kjjjjjjjjjjjjk', 'kmlhhhllhhhlmk', 'kmlhhhllhhhlmk', 'kmlhhhllhhhlmk', 'kmlhhhllhhhlmk', 'kjjjjjjjjjjjjk', 'knnnnnnnnnnnnk',
+  'kmlhhhllhhhlmk', '.kmlhhllhhlmk.', '.kjjjjjjjjjjk.', '..knnnnnnnnk..', '...kkkkkkkk...',
+];
+const ZONE_FASS_FARBEN = { k: '#1f0f04', d: '#5a341a', m: '#8e503a', l: '#b06746', h: '#ca874e', n: '#323232', i: '#686868', j: '#a8a8a8' };
+const ZoneFassMarke = React.memo(function ZoneFassMarke() {
+  const S = 3, w = ZONE_FASS_ZEILEN[0].length, h = ZONE_FASS_ZEILEN.length;
+  return (
+    <div data-pp-px="aus" title="Barrel Home: this Support Zone is closed" style={{
+      position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
+      background: 'repeating-linear-gradient(90deg, #3a2412 0 6px, #5a341a 6px 12px)', border: '3px solid #1f0f04', boxSizing: 'border-box',
+    }}>
+      <svg width={w * S} height={h * S} viewBox={`0 0 ${w} ${h}`} shapeRendering="crispEdges" style={{ imageRendering: 'pixelated', display: 'block' }}>
+        {ZONE_FASS_ZEILEN.flatMap((zeile, y) => Array.from(zeile).map((c, x) => (ZONE_FASS_FARBEN[c] ? <rect key={x + '-' + y} x={x} y={y} width="1" height="1" fill={ZONE_FASS_FARBEN[c]} /> : null)))}
+      </svg>
+    </div>
+  );
+});
 /** Linie in ganzen Rasterpixeln (Treppenstufen, kein Anti-Aliasing). */
 function ppLinie(g, x0, y0, x1, y1, c, a) {
   const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
   for (let i = 0; i <= n; i++) g.put(x0 + (x1 - x0) * (i / n), y0 + (y1 - y0) * (i / n), c, a);
+}
+
+/**
+ * Schwarze Raben (Man-Eater Birds, 26.10.): zwei Flügelbilder (oben/unten), 15 breit, blicken nach LINKS; `rechts` spiegelt sie in ganzen Pixeln.
+ * Farben nur aus der Palette (Schwarz, zwei Grautöne, hellgelbes Auge, weißer Schnabel).
+ */
+const PP_RABE_PAL = { K: ppHex('#000000'), D: ppHex('#323232'), M: ppHex('#535353'), Y: ppHex('#fff196'), W: ppHex('#ffffff') };
+const PP_RABE_OBEN = [
+  '.........KK....', '........KDDK...', '.......KDDDK...', '......KDDMDK...', '.....KDDMDK....', 'WYKKKKDDDDKKKK.',
+  'WKKDDDDDDDDDDKK', '..KKDDDDDDDKKKK', '....KKKDDKKK...', '......KK.K.....', '...............',
+];
+const PP_RABE_UNTEN = [
+  '...............', '...............', 'WYKKKKKK.......', 'WKKDDDDDKKKK...', '..KDDDDDDDDKKK.', '..KKDDDDDDDDDKK',
+  '....KKDMDDKKKK.', '....KDDMDK.....', '...KDDMDK......', '..KDDDDK.......', '...KKKK........',
+];
+function ppRabe(g, cx, cy, fluegel, rechts, deckung) {
+  const rows = fluegel ? PP_RABE_OBEN : PP_RABE_UNTEN;
+  const h = rows.length, w = rows[0].length, x0 = Math.round(cx - w / 2), y0 = Math.round(cy - h / 2);
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+    const c = PP_RABE_PAL[rows[j][i]];
+    if (c) g.put(x0 + (rechts ? w - 1 - i : i), y0 + j, c, deckung);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -31698,6 +31743,333 @@ const ANIM_REGISTRY = {
     return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
   })(),
   // ═══════════════════════════════════════════════════════════════════
+  //  Reflection (26.10., Welle 6b) — PIXELART, Zonen-Animation vom Nutzer (Ursprung) zum neuen Ziel
+  //
+  //  Ein ovaler Handspiegel (Goldrahmen, Glas in drei Blautönen, Glanzstreifen oben rechts) erscheint gedithert vor dem Nutzer, dunkle Violett-Wirbel werden hineingezogen (kreisen eng, die
+  //  Bahn schrumpft in ganzen Pixeln); bei ~470 ms blitzt das Glas weiß auf (Kreuzfunkel), dann schießt ein weiß-hellblauer Strahl samt Scherben (kleine Rauten) auf das neue Ziel und zerplatzt
+  //  dort in Ring und Scherbenfächer. Der Status landet bei `HIT_MS` (reflection.js). Feste Palette, Licht oben rechts, kein Schein.
+  // ═══════════════════════════════════════════════════════════════════
+  reflection_mirror: (() => {
+    const BLAU = ['#b3e8f9', '#66d9ff', '#4e77ca', '#02398c'].map(ppHex);
+    const VIOLETT = ['#d9c0ec', '#c98aff', '#9544d5', '#58238c'].map(ppHex);
+    const GOLD = ['#f7f7ad', '#fad54a', '#f29a3e'].map(ppHex);
+    const WEISS = ppHex('#ffffff'), SCHWARZ = ppHex('#000000');
+    const ENDE = 1150, FADE_AB = 980, BLITZ = 470, ABFLUG = 520, EINSCHLAG = 780;
+    const RX = 7, RY = 10;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = (sz) => ({
+      wirbel: Array.from({ length: ppFxN(12) }, (_, i) => ({ w0: (i / 12) * Math.PI * 2, r0: 20 + Math.random() * 8, ab: Math.random() * 120, dreh: 1.6 + Math.random() * 0.8 })),
+      scherben: sz.ziele.map(() => Array.from({ length: ppFxN(10) }, () => ({ w: Math.random() * Math.PI * 2, v: 12 + Math.random() * 26, leben: 280 + Math.random() * 240 }))),
+    });
+    // Der Spiegel: Rahmen (Gold, innen orange), Glas mit Stufen nach Licht von oben rechts, zwei feste Glanzstreifen
+    const spiegel = (g, cx, cy, deckung, blitz) => {
+      for (let dy = -RY - 1; dy <= RY + 1; dy++) for (let dx = -RX - 1; dx <= RX + 1; dx++) {
+        const e = (dx * dx) / (RX * RX) + (dy * dy) / (RY * RY);
+        if (e > 1.22) continue;
+        let col;
+        if (e > 1.0) col = SCHWARZ;                                               // schwarze Kontur
+        else if (e > 0.8) col = (dx - dy) > 2 ? GOLD[0] : (dx - dy) < -2 ? GOLD[2] : GOLD[1];   // Rahmen: hell oben rechts, dunkel unten links
+        else {
+          const licht = (dx * 0.7 - dy * 0.55) / 8;                              // −1 … +1, oben rechts hell
+          if (blitz) col = ppBayer(cx + dx, cy + dy) < 0.5 ? WEISS : BLAU[0];
+          else {
+            col = licht > 0.35 ? BLAU[0] : licht > -0.1 ? BLAU[1] : licht > -0.55 ? BLAU[2] : BLAU[3];
+            if (Math.abs(dx + dy * 0.8 - 2) < 1 || Math.abs(dx + dy * 0.8 + 3.2) < 0.6) col = WEISS;   // Glanzstreifen
+          }
+        }
+        g.put(cx + dx, cy + dy, col, deckung);
+      }
+    };
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const OX = Math.round(sz.O.x), OY = Math.round(sz.O.y);
+      // ── Spiegel (ab 0 gedithert herein, nach dem Abschuss gedithert weg) ──
+      const da = klemme(t / 200, 0, 1) * (t > ABFLUG + 220 ? klemme(1 - (t - ABFLUG - 220) / 240, 0, 1) : 1);
+      if (da > 0) spiegel(g, OX, OY, da * aus, t >= BLITZ && t < BLITZ + 90);
+      // ── Wirbel: kreisen enger, werden hineingezogen ──
+      for (const w of teile.wirbel) {
+        const k = (t - 100 - w.ab) / 340;
+        if (k < 0 || k > 1) continue;
+        const r = w.r0 * (1 - k * k) , a = w.w0 + k * Math.PI * 2 * w.dreh;
+        g.put(OX + Math.cos(a) * r, OY + Math.sin(a) * r * 1.1, k < 0.5 ? VIOLETT[2] : VIOLETT[1], aus);
+        g.put(OX + Math.cos(a - 0.35) * r, OY + Math.sin(a - 0.35) * r * 1.1, VIOLETT[3], aus * (1 - k) * 0.9);
+      }
+      // ── Blitz im Glas: Kreuzfunkel ──
+      if (t >= BLITZ && t < BLITZ + 150) {
+        const f = 1 - (t - BLITZ) / 150, arm = 2 + Math.round(f * 5);
+        for (let a = 1; a <= arm; a++) {
+          const c = a === arm ? BLAU[1] : WEISS;
+          g.put(OX + a, OY, c, f * aus); g.put(OX - a, OY, c, f * aus); g.put(OX, OY + a, c, f * aus); g.put(OX, OY - a, c, f * aus);
+        }
+      }
+      sz.ziele.forEach((z, zi) => {
+        const tx = OX + z.dx * z.len, ty = OY + z.dy * z.len;
+        // ── Strahl: der Kopf rast vom Spiegel zum Ziel, dahinter eine breite Spur und Scherben ──
+        if (!z.selbst && t >= ABFLUG && t < EINSCHLAG + 40) {
+          const k = klemme((t - ABFLUG) / (EINSCHLAG - ABFLUG), 0, 1), e = k * k * (3 - 2 * k);
+          const nx = -z.dy, ny = z.dx;
+          const laenge = Math.max(1, Math.floor(z.len * e));
+          for (let d = 0; d < laenge; d += 1) {
+            const kk = d / Math.max(1, z.len), hinter = laenge - d;
+            if (hinter > 26) continue;                                             // die Spur ist 26 Pixel lang
+            const px = OX + z.dx * d, py = OY + z.dy * d;
+            const breite = hinter < 8 ? 1 : 0;
+            g.put(px, py, hinter < 4 ? WEISS : BLAU[0], aus);
+            if (breite) { g.put(px + nx, py + ny, BLAU[1], aus); g.put(px - nx, py - ny, BLAU[1], aus); }
+            else if (hinter % 3 === 0) g.put(px + nx * (hinter % 2 ? 1 : -1), py + ny * (hinter % 2 ? 1 : -1), BLAU[2], aus * 0.8);
+            if (hinter % 7 === 0 && hinter > 6) {                                  // Scherben (Rauten) in der Spur
+              const v = (hinter % 2 ? 1 : -1) * (2 + (hinter % 4));
+              const sx = px + nx * v, sy = py + ny * v;
+              g.put(sx, sy, BLAU[0], aus); g.put(sx + 1, sy, BLAU[2], aus); g.put(sx - 1, sy, BLAU[2], aus); g.put(sx, sy + 1, BLAU[2], aus); g.put(sx, sy - 1, BLAU[2], aus);
+            }
+          }
+          const hx = OX + z.dx * z.len * e, hy = OY + z.dy * z.len * e;
+          g.block(hx - 1, hy - 1, 3, 3, WEISS, aus);
+        }
+        // ── Einschlag: Ring, Kern, Scherbenfächer ──
+        if (t >= EINSCHLAG - 20) {
+          const al = t - (EINSCHLAG - 20);
+          if (al < 240) {
+            const f = 1 - al / 240, r = 3 + al / 7;
+            g.ring(tx, ty, r, r, WEISS, f * aus);
+            g.ring(tx, ty, r * 0.6, r * 0.6, BLAU[1], f * aus);
+            g.disc(tx, ty, 3 * f + 1, WEISS, f * aus);
+          }
+          for (const fu of teile.scherben[zi]) {
+            if (al > fu.leben) continue;
+            const kk = al / fu.leben, sek = al / 1000, px = tx + Math.cos(fu.w) * fu.v * sek, py = ty + Math.sin(fu.w) * fu.v * sek + 30 * sek * sek;
+            const c = kk < 0.5 ? BLAU[0] : BLAU[2];
+            g.put(px, py, c, (1 - kk) * aus); g.put(px + 1, py, c, (1 - kk) * aus * 0.8); g.put(px, py + 1, c, (1 - kk) * aus * 0.8);
+          }
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Man-Eater Birds (26.10., Welle 6b) — PIXELART, Schwarm schwarzer Raben auf der Creature (`ppPunktBild`, Mitte = Karte der Creature): sie fressen sie auf
+  //
+  //  Neun schwarze Raben (gelbes Auge, weißer Schnabel, zwei Flügelbilder im Wechsel) kreisen in einer Ellipse um die Karte, die Bahn zieht sich zusammen; ab ~700 ms stürzen sie sich auf sie,
+  //  hacken im Wechsel (die Karte dunkelt gedithert ab, Blutspritzer in drei Rottönen und weiße Knochensplitter fliegen); ab ~1250 ms steigen sie auf, zum Schluss dithert alles weg.
+  //  Feste Palette, Bayer-Dithering, kein Schein. Die Creature wird bei `FRESS_MS` (man-eater-birds.js) besiegt.
+  // ═══════════════════════════════════════════════════════════════════
+  man_eater_swarm: (() => {
+    const BLUT = ['#780000', '#8f0000', '#e94e53'].map(ppHex);
+    const KNOCHEN = ppHex('#e6e6e6'), SCHWARZ = ppHex('#000000');
+    const ENDE = 1900, FADE_AB = 1600, ANFLUG = 700, FRESSEN_BIS = 1250;
+    const vorbereiten = () => ({
+      voegel: Array.from({ length: ppFxN(9) }, (_, i) => ({
+        w0: (i / 9) * Math.PI * 2, rx: 17 + Math.random() * 7, ry: 21 + Math.random() * 8, dreh: 1.1 + Math.random() * 0.5, takt: Math.random() * 100,
+        hx: (Math.random() - 0.5) * 1.4, hy: (Math.random() - 0.5) * 1.5, hack: Math.random() * 240,
+      })),
+      blut: Array.from({ length: ppFxN(34) }, () => ({
+        x: (Math.random() - 0.5) * 1.5, y: (Math.random() - 0.5) * 1.6, w: Math.random() * Math.PI * 2, v: 10 + Math.random() * 30,
+        ab: ANFLUG + Math.random() * (FRESSEN_BIS - ANFLUG), leben: 320 + Math.random() * 260, knochen: Math.random() < 0.18,
+      })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const cx = sz.cx, cy = sz.cy, hw = sz.hw, hh = sz.hh;
+      // Die Karte dunkelt ab (Bayer-Schleier in dunklem Rot), je mehr sie gefressen wird
+      if (t > ANFLUG) {
+        const dm = Math.min(0.78, (t - ANFLUG) / 600) * aus;
+        for (let y = -hh; y <= hh; y++) for (let x = -hw; x <= hw; x++) if (ppBayer(Math.round(cx + x), Math.round(cy + y)) < dm) g.put(cx + x, cy + y, ((x + y) & 3) === 0 ? BLUT[0] : SCHWARZ, 1);
+      }
+      for (const b of teile.voegel) {
+        const sek = t / 1000;
+        let x, y, vx;
+        if (t < ANFLUG) {
+          const k = t / ANFLUG, r = 1.15 - 0.6 * k * k;                              // die Bahn schrumpft
+          const a = b.w0 + sek * b.dreh * Math.PI * 2;
+          x = cx + Math.cos(a) * (hw + b.rx) * r; y = cy + Math.sin(a) * (hh + b.ry) * r * 0.85;
+          vx = -Math.sin(a) * b.dreh;
+        } else if (t < FRESSEN_BIS) {
+          const hack = Math.floor((t - ANFLUG + b.hack) / 120) % 2;                    // im Wechsel zustoßen und zurückziehen
+          x = cx + b.hx * hw * (hack ? 0.55 : 0.9); y = cy + b.hy * hh * (hack ? 0.55 : 0.9);
+          vx = b.hx;
+        } else {
+          const k = (t - FRESSEN_BIS) / 650;                                           // steigen auf und fliegen davon
+          x = cx + b.hx * hw + (b.hx < 0 ? -1 : 1) * k * 40; y = cy + b.hy * hh - k * k * 60;
+          vx = b.hx < 0 ? -1 : 1;
+        }
+        ppRabe(g, x, y, Math.floor((t + b.takt) / 130) % 2 === 0, vx > 0, aus);
+      }
+      for (const f of teile.blut) {
+        const a2 = t - f.ab; if (a2 < 0 || a2 > f.leben) continue;
+        const kk = a2 / f.leben, sek = a2 / 1000;
+        const px = cx + f.x * hw + Math.cos(f.w) * f.v * sek, py = cy + f.y * hh + Math.sin(f.w) * f.v * sek + 46 * sek * sek;
+        g.put(px, py, f.knochen ? KNOCHEN : (kk < 0.3 ? BLUT[2] : kk < 0.65 ? BLUT[1] : BLUT[0]), (1 - kk) * aus);
+        if (!f.knochen && kk < 0.5) g.put(px + 1, py, BLUT[1], (1 - kk) * aus * 0.8);
+      }
+    };
+    return ppPunktBild(malen, ENDE + 40, 330, 360, (sz) => vorbereiten(sz));
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Man-Eater Birds, Zugende (26.10., Welle 6b) — PIXELART, derselbe Schwarm kreist um den Helden und beißt ihn (`ppPunktBild`, Mitte = Heldenkarte)
+  //
+  //  Sechs Raben kreisen um die Heldenkarte (außen herum, ~1,3 Umläufe); ab ~650 ms beißen sie dreimal zu (650, 850, 1050 ms): je ein Rabe pro Biss stößt an den Kartenrand, dort bleibt ein rotes X
+  //  (Bissmarke, 5×5) stehen und Blut spritzt. Der Schaden fällt bei `BEISS_MS` (man-eater-birds.js). Ab ~1250 ms steigen sie auf, alles dithert weg. Feste Palette, kein Schein.
+  // ═══════════════════════════════════════════════════════════════════
+  man_eater_bite: (() => {
+    const BLUT = ['#780000', '#8f0000', '#e94e53'].map(ppHex);
+    const ENDE = 1700, FADE_AB = 1400, BISSE = [650, 850, 1050], WEG = 1250;
+    const KREUZ = ['X...X', '.X.X.', '..X..', '.X.X.', 'X...X'];
+    const klemme01 = (v) => Math.max(0, Math.min(1, v));
+    const vorbereiten = () => ({
+      voegel: Array.from({ length: ppFxN(6) }, (_, i) => ({ w0: (i / 6) * Math.PI * 2, takt: Math.random() * 100, dreh: 0.95 + Math.random() * 0.25 })),
+      bisse: BISSE.map((ab, i) => ({
+        ab, x: i === 1 ? 0.55 : i === 0 ? -0.6 : 0.1, y: i === 2 ? 0.55 : i === 0 ? -0.35 : 0.2,
+        funken: Array.from({ length: ppFxN(9) }, () => ({ w: Math.random() * Math.PI * 2, v: 12 + Math.random() * 26, leben: 260 + Math.random() * 200 })),
+      })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const cx = sz.cx, cy = sz.cy, hw = sz.hw, hh = sz.hh;
+      // Bissmarken bleiben stehen, das Blut spritzt
+      for (const b of teile.bisse) {
+        if (t < b.ab) continue;
+        const bx = Math.round(cx + b.x * hw), by = Math.round(cy + b.y * hh);
+        for (let j = 0; j < 5; j++) for (let i = 0; i < 5; i++) if (KREUZ[j][i] === 'X') g.put(bx - 2 + i, by - 2 + j, BLUT[t - b.ab < 120 ? 2 : 0], aus);
+        const al = t - b.ab;
+        for (const f of b.funken) {
+          if (al > f.leben) continue;
+          const kk = al / f.leben, sek = al / 1000;
+          g.put(bx + Math.cos(f.w) * f.v * sek, by + Math.sin(f.w) * f.v * sek + 42 * sek * sek, kk < 0.35 ? BLUT[2] : kk < 0.7 ? BLUT[1] : BLUT[0], (1 - kk) * aus);
+        }
+      }
+      // Raben: außen herum, dann zustoßen (je Rabe an „seinem" Biss), dann aufsteigen
+      teile.voegel.forEach((b, i) => {
+        const sek = t / 1000;
+        const a = b.w0 + sek * b.dreh * Math.PI * 2;
+        const bahnX = cx + Math.cos(a) * (hw + 9), bahnY = cy + Math.sin(a) * (hh + 9) * 0.9;
+        let x = bahnX, y = bahnY, vx = -Math.sin(a);
+        if (t >= BISSE[0] - 150 && t < WEG) {
+          const biss = teile.bisse[i % 3], zielX = cx + biss.x * hw, zielY = cy + biss.y * hh;
+          const k = t >= biss.ab - 140 && t <= biss.ab + 130 ? klemme01((t - (biss.ab - 140)) / 140) * (t > biss.ab ? klemme01(1 - (t - biss.ab) / 130) : 1) : 0;
+          x = bahnX + (zielX - bahnX) * k; y = bahnY + (zielY - bahnY) * k; vx = k > 0 ? zielX - bahnX : vx;
+        } else if (t >= WEG) {
+          const k = (t - WEG) / 420;
+          x = bahnX + (b.w0 < Math.PI ? -1 : 1) * k * 24; y = bahnY - k * k * 50; vx = b.w0 < Math.PI ? -1 : 1;
+        }
+        ppRabe(g, x, y, Math.floor((t + b.takt) / 120) % 2 === 0, vx > 0, aus);
+      });
+    };
+    return ppPunktBild(malen, ENDE + 40, 330, 360, (sz) => vorbereiten(sz));
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Great Immortal Hydra, Selbstheilung (26.10., Welle 6b) — PIXELART, grüne Regeneration auf der Creature (`ppPunktBild`, Mitte = Karte der Hydra)
+  //
+  //  Der Tod wird abgewendet: ein dunkelgrüner Dither-Schleier flackert über der Karte (0–330 ms), drei quadratische Ringe ziehen sich auf sie zusammen (150–560 ms), bei ~560 ms der Blitz
+  //  (gedithertes Weiß-Grün über der ganzen Karte, 2 Bilder). Danach wachsen drei Hydra-Köpfe an Hälsen aus dem oberen Kartenrand (Hälse schlängeln sich, Köpfe mit roten Augen), grüne
+  //  Heilkreuze und Sporen steigen auf. Ab ~1150 ms dithert alles weg, bei 1500 ms ist es fort. Feste Palette (Heil-Grün + dunkle Grüntöne), kein Schein. Die HP springen bei `HEIL_MS`
+  //  (great-immortal-hydra.js) auf das neue Maximum.
+  // ═══════════════════════════════════════════════════════════════════
+  hydra_regrow: (() => {
+    const HELL = ['#b3f9cf', '#75f091', '#4ceb70', '#00cc50'].map(ppHex);
+    const DUNKEL = ['#20ac37', '#167927', '#29663f', '#18300a'].map(ppHex);
+    const ROT = ppHex('#e94e53'), WEISS = ppHex('#ffffff');
+    const ENDE = 1500, FADE_AB = 1150, BLITZ = 560;
+    const KOPF = ['.ddd.', 'dgggd', 'dwgwd', 'drgrd', 'dgggd', '.ggg.'];
+    const KOPF_PAL = { d: DUNKEL[1], g: HELL[2], w: WEISS, r: ROT };
+    const vorbereiten = () => ({
+      koepfe: [-0.5, 0.05, 0.55].map((x, i) => ({ x, lang: [13, 19, 15][i], start: 600 + i * 90, phase: Math.random() * 6 })),
+      sporen: Array.from({ length: ppFxN(22) }, () => ({ x: (Math.random() - 0.5) * 1.7, y: (Math.random() - 0.1) * 1.3, v: 10 + Math.random() * 26, start: 560 + Math.random() * 480, leben: 380 + Math.random() * 280 })),
+      kreuze: Array.from({ length: ppFxN(5) }, (_, i) => ({ x: (i / 4 - 0.5) * 1.6 + (Math.random() - 0.5) * 0.2, v: 16 + Math.random() * 12, start: 640 + i * 110 })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const cx = sz.cx, cy = sz.cy, hw = sz.hw, hh = sz.hh;
+      // 1. dunkler Schleier flackert (die Hydra stirbt fast)
+      if (t < 330) {
+        const flacker = ((Math.floor(t / 66)) % 2 === 0) ? 0.55 : 0.3;
+        for (let y = -hh; y <= hh; y++) for (let x = -hw; x <= hw; x++) if (ppBayer(Math.round(cx + x), Math.round(cy + y)) < flacker) g.put(cx + x, cy + y, ((x + y) & 3) === 0 ? DUNKEL[2] : DUNKEL[3], 1);
+      }
+      // 2. drei quadratische Ringe ziehen sich auf die Karte zusammen
+      for (let r = 0; r < 3; r++) {
+        const a0 = 150 + r * 110, k = (t - a0) / 300;
+        if (k < 0 || k > 1) continue;
+        const rx = Math.round(hw + 16 - k * 14), ry = Math.round(hh + 16 - k * 14), col = k < 0.5 ? HELL[1] : HELL[2];
+        for (let x = -rx; x <= rx; x++) { g.put(cx + x, cy - ry, col, 1); g.put(cx + x, cy + ry, col, 1); }
+        for (let y = -ry; y <= ry; y++) { g.put(cx - rx, cy + y, col, 1); g.put(cx + rx, cy + y, col, 1); }
+      }
+      // 3. Blitz
+      if (t >= BLITZ && t < BLITZ + 66) {
+        const dm = t < BLITZ + 33 ? 0.9 : 0.5;
+        for (let y = -hh; y <= hh; y++) for (let x = -hw; x <= hw; x++) if (ppBayer(Math.round(cx + x), Math.round(cy + y)) < dm) g.put(cx + x, cy + y, ((x + y) & 1) === 0 ? WEISS : HELL[0], 1);
+      }
+      // 4. Sporen steigen
+      for (const s of teile.sporen) {
+        const al = t - s.start; if (al < 0 || al > s.leben) continue;
+        const kk = al / s.leben, px = cx + s.x * hw, py = cy + s.y * hh - s.v * al / 1000;
+        g.block(Math.round(px), Math.round(py), 2, 2, kk < 0.5 ? HELL[2] : DUNKEL[0], (1 - kk * 0.6) * aus);
+        g.put(px, py, HELL[0], (1 - kk) * aus);
+      }
+      // 5. Hälse und Köpfe wachsen aus dem oberen Kartenrand
+      for (const k of teile.koepfe) {
+        const al = t - k.start; if (al < 0) continue;
+        const wachs = Math.min(1, al / 320), len = Math.round(k.lang * (1 - (1 - wachs) * (1 - wachs)));
+        const basisX = cx + k.x * hw, obenY = cy - hh;
+        let kx = basisX, ky = obenY;
+        for (let j = 0; j <= len; j++) {
+          const wx = Math.round(Math.sin(j * 0.55 + t * 0.008 + k.phase) * Math.min(2.4, j * 0.25));
+          const px = Math.round(basisX + wx), py = Math.round(obenY - j);
+          g.put(px - 1, py, DUNKEL[1], aus); g.put(px, py, HELL[2], aus); g.put(px + 1, py, DUNKEL[1], aus);
+          if ((j & 3) === 1) g.put(px, py, HELL[1], aus);
+          kx = px; ky = py;
+        }
+        ppSprite(g, kx, ky - 3, KOPF, KOPF_PAL, aus);
+        if (wachs >= 1 && Math.floor((t + k.phase * 90) / 220) % 2 === 0) { g.put(kx - 1, ky - 6, WEISS, aus); g.put(kx + 1, ky - 6, WEISS, aus); }   // Zähne blitzen
+      }
+      // 6. Heilkreuze
+      for (const c of teile.kreuze) {
+        const al = t - c.start; if (al < 0 || al > 620) continue;
+        ppHeilKreuz(g, Math.round(cx + c.x * hw), Math.round(cy + hh * 0.4 - c.v * al / 1000 * 2.4), (1 - al / 620) * aus);
+      }
+    };
+    return ppPunktBild(malen, ENDE + 40, 330, 400, (sz) => vorbereiten(sz));
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Great Immortal Hydra, Zugende (26.10., Welle 6b) — PIXELART, die Lebenskraft sickert aus dem Helden (`ppPunktBild`, Mitte = Heldenkarte)
+  //
+  //  Ein grüner Dither-Schleier legt sich zweimal über die Karte (pulsierend, 0–660 ms), grüne Tropfen lösen sich vom Kartenrand und fallen, rote Minus-Zeichen (5×1) steigen auf. Ab ~800 ms
+  //  dithert alles weg, bei 1100 ms ist es fort. Feste Palette. Der HP-Verlust fällt bei `SAUG_MS` (great-immortal-hydra.js).
+  // ═══════════════════════════════════════════════════════════════════
+  hydra_drain: (() => {
+    const HELL = ['#b3f9cf', '#75f091', '#4ceb70', '#00cc50'].map(ppHex);
+    const DUNKEL = ['#20ac37', '#167927', '#29663f', '#18300a'].map(ppHex);
+    const ROT = ['#780000', '#8f0000', '#e94e53'].map(ppHex);
+    const ENDE = 1100, FADE_AB = 800;
+    const vorbereiten = () => ({
+      tropfen: Array.from({ length: ppFxN(14) }, () => ({ x: (Math.random() - 0.5) * 1.9, start: Math.random() * 520, leben: 420 + Math.random() * 260, v: 18 + Math.random() * 20 })),
+      minus: [-0.45, 0.4, 0].map((x, i) => ({ x, start: 120 + i * 190 })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const cx = sz.cx, cy = sz.cy, hw = sz.hw, hh = sz.hh;
+      if (t < 660) {
+        const puls = (Math.floor(t / 330) % 2 === 0) ? Math.min(0.6, t % 330 / 330 * 0.9) : Math.max(0, 0.6 - (t % 330) / 330 * 0.9);
+        for (let y = -hh; y <= hh; y++) for (let x = -hw; x <= hw; x++) if (ppBayer(Math.round(cx + x), Math.round(cy + y)) < puls) g.put(cx + x, cy + y, ((x + y) & 3) === 0 ? DUNKEL[0] : DUNKEL[2], 1);
+      }
+      for (const d of teile.tropfen) {
+        const al = t - d.start; if (al < 0 || al > d.leben) continue;
+        const kk = al / d.leben, px = Math.round(cx + d.x * hw), py = Math.round(cy + hh * 0.8 + d.v * al / 1000 + 40 * (al / 1000) * (al / 1000));
+        g.block(px, py, 2, 2, kk < 0.5 ? HELL[2] : DUNKEL[0], (1 - kk * 0.5) * aus);
+        g.put(px, py, HELL[0], (1 - kk) * aus);
+      }
+      for (const m of teile.minus) {
+        const al = t - m.start; if (al < 0 || al > 560) continue;
+        const px = Math.round(cx + m.x * hw), py = Math.round(cy - 2 - al / 1000 * 26), a = (1 - al / 560) * aus;
+        g.block(px - 2, py, 5, 1, ROT[2], a); g.block(px - 2, py + 1, 5, 1, ROT[0], a);
+      }
+    };
+    return ppPunktBild(malen, ENDE + 40, 300, 340, (sz) => vorbereiten(sz));
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
   //  Exorcism (24.10.) — PIXELART, Zonen-Animation auf dem Ziel (Held oder Kreatur)
   //
   //  Eine Lichtsäule (Dither-Rand, weisser Kern, goldene Kante) fällt von oben auf das Ziel, dunkle Schwaden steigen aus ihm auf und lösen sich im Licht auf; bei ~560 ms schlägt ein
@@ -54519,7 +54891,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const columnLayout = [0, 1, 2].map(hi => {
     const counts = [0, 1].map(pi => {
       const ic = (gameState.players[pi].islandZoneCount || [0,0,0])[hi] || 0;
-      return { left: Math.floor(ic / 2), right: ic - Math.floor(ic / 2) };
+      return { left: Math.ceil(ic / 2), right: ic - Math.ceil(ic / 2) };   // 26.10. (Gigalopolis): bei ungerader Inselzahl liegt die Extra-Zone LINKS (1 → links; 3 → 2 links, 1 rechts)
     });
     const maxLeft = Math.max(counts[0].left, counts[1].left);
     const maxRight = Math.max(counts[0].right, counts[1].right);
@@ -56901,7 +57273,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const actualZoneCount = (supZones[i] || []).length || 3;
           const islandCount = islandCounts[i] || 0;
           const baseCount = actualZoneCount - islandCount;
-          const myLeft = Math.floor(islandCount / 2);
+          const myLeft = Math.ceil(islandCount / 2);   // 26.10. (Gigalopolis): Extra-Zone bei ungerader Zahl links
           const myRight = islandCount - myLeft;
           const { maxLeft, maxRight } = columnLayout[i];
 
@@ -57648,6 +58020,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     // lookups. Render: dimmed black-red wash with a
                     // big red ✕ so the player sees the slot is
                     // unusable for the duration.
+                    // Barrel Home (26.10., Welle 6b): eine versiegelte Grundzone (`_ZoneBarrel`, `_zonen-welt-shared.js`) — belegt, nimmt nichts auf. Pixelart: Holzbretter in harten Streifen
+                    // und ein Fass als Sprite (SVG, `crispEdges`, ganzzahlig ×3), keine Verläufe, kein Schein.
+                    if (cards[0] === '_ZoneBarrel') return <ZoneFassMarke />;
                     if (cards[0] === '_ZoneBlocked') {
                       return (
                         <div style={{
