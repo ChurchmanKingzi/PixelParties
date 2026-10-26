@@ -18472,7 +18472,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Place 2 Pollution Tokens into your free Support Zones to use this Spell. Choose a defeated Hero and revive it, fully healing its HP, OR choose a level 4 or lower Creature from your discard pile and place it into the free Support Zone of a Hero you control. You can only revive a Hero with \"Reincarnation\" once per game.",
+    "effect": "Place 2 Pollution Tokens into your free Support Zones to use this Spell. Choose a defeated Hero and revive it, fully healing its HP, OR choose a level 4 or lower Creature from your discard pile and place it into the free Support Zone of a Hero you control. You can only revive each Hero with \"Reincarnation\" once per game.",
     "archetype": "Pollution",
     "setID": "PP MSGB",
     "banned": "",
