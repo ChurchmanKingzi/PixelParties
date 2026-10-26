@@ -4139,7 +4139,7 @@
     "hp": 400,
     "atk": 40,
     "cost": null,
-    "effect": "Whenever 1 or more Creatures either player controls would be affected by a card or effect, you may discard 1 card to negate any effects that card or effect has on all Creatures.",
+    "effect": "Whenever 1 or more Creatures either player controls would be affected by a card or effect, you may discard 2 cards to negate any effects that card or effect has on all Creatures.",
     "archetype": "",
     "setID": "PP MOE",
     "banned": "",
