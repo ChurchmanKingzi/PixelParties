@@ -35,6 +35,12 @@
 //  Angreifers). Wird der Angreifer umgeleitet und ist das gewählte Ziel dann derselbe Held, oder ist das Ziel mit DIESEM Angreifer als Quelle nicht mehr wählbar (Alliance, Auge …), fragt die
 //  Karte das Ziel noch einmal einzeln.
 //
+//  ── ★ TRUTH-SEEING EYE DES ANGREIFERS (Al 26.10.) ───────────────────────
+//  Trägt der designierte Angreifer (Klick 1 oder per Ziehen vorgewählt) ein Truth-Seeing Eye, gilt es für SEINEN Stich: Ziele mit Zielschutz (Butterfly Cloud/`untargetable`, Invisibility,
+//  Stealth, Taunt, Great Wall …) sind wählbar, und in den Fenstern danach ist der Stich nicht umlenkbar. Die Zielliste wird darum JE ANGREIFER mit dessen Quelle berechnet
+//  (`quelleVon` → `attackerSourceOverride` mit `truthSeeingEye`, `listeFuer[a.id]` = `byPrev`); Schritt 2 trägt die Vereinigung. Die WAHL des Angreifers selbst bleibt geschützt (kein Auge des
+//  Spielers); ein Auge an einem anderen Gegnerhelden, an einem Helden des Spielers der Karte oder ein negiertes/verdecktes Auge hilft nicht. Server-Nachprüfung und CPU lesen dieselbe Liste.
+//
 //  ── ★ DER ANGREIFER FÜHRT DIE ATTACK AUS (Al 26.10., Nr. 15: „Die Lücke schließen") ─────────────
 //  Der Stich läuft in einer virtuellen Attack-Kette des schlagenden Gegnerhelden (`engine.alsAttackKette`, Muster Alluring Light: Besitzer der Kette = sein Kontrolleur, Held = der Angreifer):
 //   • Reaktionen seines Kontrolleurs auf „a Hero you control performs an Attack" (Arrows, Magic Topaz, Bow of the Hunt Goddess, Arrow Slit …) werden IHM angeboten und wirken auf den Treffer;
@@ -106,6 +112,27 @@ function ohneZielschutz(engine, pi, liste) {
   return liste.filter(t => !geschuetzt.has(t.id));
 }
 
+/**
+ * ★ Truth-Seeing Eye des ANGREIFENDEN Helden (Al 26.10.: „Ist der designierte Angreifer mit Truth-Seeing Eye ausgerüstet, gilt dieses und erlaubt auch versteckte/unangreifbare Ziele!").
+ * Die Engine sucht das Auge über `controller` + `heroIdx` der Quelle — hier ist `controller` der Spieler der Karte, der Angreifer ein Gegnerheld: darum prüft die Karte die Ausrüstung
+ * des Ausführenden selbst (Brettseite + Platz, aufgedeckt, nicht negiert) und sagt es der Quelle (`truthSeeingEye`, Vertrag in `_sourceHasTruthSeeingEye`). Gilt nur für den Stich dieses
+ * Angreifers, nie für die Wahl des Angreifers selbst; ein Auge am Spieler der Karte oder an einem anderen Gegnerhelden hilft nicht.
+ */
+function hatAuge(engine, a) {
+  for (const inst of engine.cardInstances) {
+    if (inst.name !== 'Truth-Seeing Eye' || inst.zone !== 'support' || inst.faceDown) continue;
+    if (engine.physicalSide(inst) !== a.owner || inst.heroIdx !== a.heroIdx) continue;
+    if (inst.counters?.negated && !engine._creatureNegationProof(inst)) continue;
+    return true;
+  }
+  return false;
+}
+
+/** Quelle des Stichs für den Angreifer `a`: der Gegnerheld schlägt zu (Platz/Spalte), der Spieler der Karte ist der Verursacher. */
+function quelleVon(engine, pi, a) {
+  return { name: CARD_NAME, owner: pi, heroIdx: a.heroIdx, controller: pi, heroOwner: a.owner, usesHeroAtk: true, truthSeeingEye: hatAuge(engine, a) };
+}
+
 /** Alle Ziele (Helden und Kreaturen), die `oppIdx` kontrolliert — für die Spielbarkeitsprüfung („another target"). */
 function gegnerZiele(engine, oppIdx) {
   const helden = engine.heroesControlledBy(oppIdx)
@@ -171,16 +198,22 @@ module.exports = {
       // ── Kandidatenlisten für den EINEN Picker ───────────────────────────
       const ctrl = (t) => kontrolleurVonZiel(engine, t);
       const gegnerKontrolliert = (t, eng) => gegnerSeiten.includes(kontrolleurVonZiel(eng, t));
-      const maxAtk = Math.max(0, ...gegnerSeiten.flatMap(o => engine.heroesControlledBy(o)).map(({ hero }) => hero?.hp > 0 ? (hero.atk || 0) : 0));
-      // Zielliste: fertig gefiltert (Zielschutz, Taunt, Board of Kings, Great Wall …), noch ohne den Angreifer (der hängt vom ersten Klick ab).
-      const zielWahl = await ctx.promptDamageTarget({
-        side: 'any', types: ['hero', 'creature'], damageType: 'attack', baseDamage: maxAtk,
-        title: CARD_NAME, condition: (t, eng) => gegnerKontrolliert(t, eng), _nurListe: true,
-      });
-      const zielListe = ((zielWahl && zielWahl.liste) || []).filter(t => !t.ineligible);
-      // Ziel für den Angreifer `a`: ein ANDERES Ziel, das DERSELBE Spieler kontrolliert (Al 26.10.: Angreifer und Ziel gehören immer demselben Spieler).
-      const zieleFuer = (a) => zielListe.filter(t => t.id !== a.id && ctrl(t) === (a.kontr ?? ctrl(a)));
-      const angreiferListe = ohneZielschutz(engine, pi, ausfuehrende(engine, pi)).filter(a => zieleFuer(a).length > 0);   // Klick 1 braucht ein Ziel für Klick 2
+      // Zielliste JE ANGREIFER, mit SEINER Quelle (Truth-Seeing Eye des Angreifers: Zielschutz/Taunt/Great Wall … gelten für seinen Stich nicht): fertig gefiltert, ein ANDERES Ziel, das
+      // DERSELBE Spieler kontrolliert (Al 26.10.: Angreifer und Ziel gehören immer demselben Spieler). Die Wahl des Angreifers selbst bleibt geschützt (kein Auge des Spielers).
+      const kandidaten = ohneZielschutz(engine, pi, ausfuehrende(engine, pi));
+      const listeFuer = {};
+      for (const a of kandidaten) {
+        const w = await ctx.promptDamageTarget({
+          side: 'any', types: ['hero', 'creature'], damageType: 'attack', baseDamage: Math.max(0, engine.gs.players[a.owner]?.heroes?.[a.heroIdx]?.atk || 0),
+          attackerSourceOverride: quelleVon(engine, pi, a),
+          title: CARD_NAME, condition: (t, eng) => gegnerKontrolliert(t, eng) && ctrl(t) === a.kontr, _nurListe: true,   // der Angreifer bleibt in der Schutzrechnung (W41a), fällt erst danach heraus
+        });
+        listeFuer[a.id] = ((w && w.liste) || []).filter(t => !t.ineligible && t.id !== a.id && ctrl(t) === a.kontr);
+      }
+      const zieleFuer = (a) => listeFuer[a.id] || [];
+      const angreiferListe = kandidaten.filter(a => zieleFuer(a).length > 0);   // Klick 1 braucht ein Ziel für Klick 2
+      const zielListe = [];   // Schritt 2 = die Vereinigung der Listen (die Auswahl selbst hängt vom Angreifer ab: `abhaengig`/`byPrev`)
+      for (const a of angreiferListe) for (const t of zieleFuer(a)) if (!zielListe.some(z => z.id === t.id)) zielListe.push(t);
       if (angreiferListe.length === 0 || zielListe.length === 0) { gs._spellCancelled = true; return; }
 
       // Auf einen Gegnerhelden gezogen (Al 26.10.): er ist der Angreifer, es bleibt die Wahl des Ziels. Ist er nicht (mehr) wählbar, läuft der normale Picker.
@@ -224,9 +257,7 @@ module.exports = {
       const kontr = ausZiel.kontr ?? engine.heroSideOf(ausZiel.owner, held);   // der Spieler, dem der Angreifer gehört (= wem auch das Ziel gehören muss)
 
       // Quelle des Treffers: der gegnerische Held als Angreifer (Platz/Spalte), der Spieler der Karte als Verursacher.
-      const attackSource = {
-        name: CARD_NAME, owner: pi, heroIdx: ausZiel.heroIdx, controller: pi, heroOwner: ausZiel.owner, usesHeroAtk: true,
-      };
+      const attackSource = quelleVon(engine, pi, ausZiel);   // trägt `truthSeeingEye` des Angreifers: gilt in den Fenstern nach der Wahl (nicht umlenkbar …)
 
       // ── Fenster der Zielwahl mit dem AUSFÜHRENDEN als Quelle ─────────────
       const istAusfuehrender = (t) => t.type === 'hero' && t.owner === ausZiel.owner && t.heroIdx === ausZiel.heroIdx;
