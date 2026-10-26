@@ -8941,6 +8941,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     delete gs._spellForcesActionConsume;
     delete gs._surpriseCheckedHeroes;
     delete gs._deferredRecoil;
+    delete room.engine._fireBoltsEntscheid;   // W75a: Entscheidung 200/50 fuer den Zweitwurf (Fire Bolts)
     delete gs._ameShieldedHeroes;
     delete gs._ameDeclinedHeroes;
 
