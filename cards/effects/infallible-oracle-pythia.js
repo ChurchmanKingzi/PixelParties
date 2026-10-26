@@ -70,6 +70,7 @@ function opferZiele(engine, pi, selbst) {
   for (const c of engine.getSacrificableCreatures(pi)) {
     const inst = c.inst;
     if (!inst || inst.id === selbst.id || inst.zone !== 'support') continue;
+    if (engine.istTodgeweiht(inst)) continue;   // schon für den Tod bestimmt (Flächen-Besiegen, tödlicher Schaden im selben Schlag): kein Opfer (Al 26.10.)
     const seite = engine.physicalSide(inst);
     out.push({ id: `equip-${seite}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip', owner: seite, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst });
   }

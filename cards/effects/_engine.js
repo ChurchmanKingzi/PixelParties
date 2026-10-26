@@ -38783,6 +38783,23 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @param {object} source - Verursacher, falls bekannt
    */
   /**
+   * ★ W78 (Pythia, Al 26.10.: „Cosmic Exploding Skull … kann eine andere, dadurch bereits eigentlich für den Tod reservierte Creature opfern"): Karten, die mehrere Creatures der Reihe nach
+   * besiegen („defeat all other Creatures"), melden ihre Opfer hier an — solange `fn` läuft, gelten sie als TODGEWEIHT (`istTodgeweiht`): Ersatz-/Rettungs-Effekte, die „ein anderes Ziel opfern"
+   * (Infallible Oracle Pythia), dürfen sie nicht mehr als Opfer nehmen. Damage-Batches stempeln dasselbe schon über `counters._dyingThisBatch` (`istTodgeweiht` kennt beides).
+   */
+  async mitTodgeweihten(insts, fn) {
+    if (!this._todgeweiht) this._todgeweiht = new Set();
+    const neu = (insts || []).filter(i => i && !this._todgeweiht.has(i.id));
+    for (const i of neu) this._todgeweiht.add(i.id);
+    try { return await fn(); } finally { for (const i of neu) this._todgeweiht.delete(i.id); }
+  }
+
+  /** Steht diese Creature schon für den Tod fest (Wipe-Opfer oder im selben Schadens-Batch tödlich getroffen)? */
+  istTodgeweiht(inst) {
+    return !!inst && (!!(this._todgeweiht && this._todgeweiht.has(inst.id)) || !!inst.counters?._dyingThisBatch);
+  }
+
+  /**
    * Eine Karte AUS DEM DECK verdeckt in die Surprise Zone eines
    * Helden setzen.
    *
