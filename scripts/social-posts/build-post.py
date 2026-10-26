@@ -510,18 +510,24 @@ def main():
     ap.add_argument('--head-top', type=int, default=None, help='Sprite so setzen, dass seine Oberkante bei y (px ab Bildoberkante) liegt, überschreibt feet/eyeAt')
     ap.add_argument('--px', type=int, default=None, help='Maßstab des Sprites (px je Sprite-Pixel), überschreibt hero-themes.json')
     ap.add_argument('--punch', action='store_true', help='Kraftvoller Start: die erste halbe Sekunde mit Bildschirmwackeln, Druckwelle und Blitz, Musik ohne Einblenden und auf einen Schlag der Musik geschnitten')
+    ap.add_argument('--opener', choices=['none', 'heart'], default=None, help='Eigener Start-Effekt statt der Standard-Druckwelle: heart = großes Flammenherz, das detoniert und den Helden freigibt (überschreibt opener aus hero-themes.json)')
     args = ap.parse_args()
     reel = args.format == 'reel'
     tag = args.format
     intro_on = (args.intro == 'on') if args.intro else reel
     punch_on = args.punch
-    first_on = intro_on or punch_on        # die erste Schleife wird gesondert gerendert (Einblenden und/oder Start-Effekt)
+    first_on = None                        # wird unten gesetzt, sobald hero_cfg (und damit opener) bekannt ist
     duration = args.duration if args.duration else (15.0 if reel else 30.0)
     oy = 180 if reel else 0                  # Reel: Inhalt höher, unten bleibt Platz für die Oberfläche (Beschreibung, Knöpfe)
 
     spr = Sprite(args.slug)
     card_name = spr.meta['hero']
     hero_cfg = json.loads((HERE / 'hero-themes.json').read_text(encoding='utf-8')).get(card_name, {})
+    opener = args.opener or hero_cfg.get('opener') or 'none'
+    opener_on = opener == 'heart'
+    if opener_on:
+        punch_on = False                   # der Opener ersetzt die Standard-Druckwelle
+    first_on = intro_on or punch_on or opener_on        # die erste Schleife wird gesondert gerendert (Einblenden und/oder Start-Effekt)
     if args.px:
         hero_cfg['px'] = args.px
     if args.shadow_dy is not None:
@@ -663,7 +669,143 @@ def main():
             img = out
         return img
 
-    def render(f, intro, punch=False):
+    # ── Opener „Flammenherz“: ein großes Herz mit Flammen füllt den dunklen Bildschirm, schlägt zweimal, detoniert (Druckwelle gibt das Bild frei) ──
+    T_HEART, T_BOOM = 0.62, 0.55                                             # Sekunden: Herz-Phase, Detonation
+    cwid, chei = -(-W // U), -(-H // U)
+    YY, XX = np.mgrid[0:chei, 0:cwid]
+    BAY = np.tile(BAYER4, (chei // 4 + 1, cwid // 4 + 1))[:chei, :cwid]
+    hcx, hcy = (card_x + CARD_W / 2) / U, (card_y + CARD_H * 0.47) / U
+    HEART_PAL = [(84, 4, 34), (176, 20, 64), (232, 66, 106), (255, 140, 172), (255, 226, 236)]
+    FIRE_PAL = fx.PAL['fire'] + [(255, 250, 214)]
+    ember_rng = np.random.default_rng(31)
+    EMBERS = [(ember_rng.uniform(-62, 62), ember_rng.uniform(25, 70), ember_rng.uniform(0, 1)) for _ in range(34)]
+
+    def dist_to_border(mask):
+        """Abstand (Zellen) jeder Zelle zum Rand von mask (ungefähr, zum nächsten Randpunkt)."""
+        e = mask.copy()
+        e[1:, :] &= mask[:-1, :]; e[:-1, :] &= mask[1:, :]; e[:, 1:] &= mask[:, :-1]; e[:, :-1] &= mask[:, 1:]
+        d_ = mask.copy()
+        d_[1:, :] |= mask[:-1, :]; d_[:-1, :] |= mask[1:, :]; d_[:, 1:] |= mask[:, :-1]; d_[:, :-1] |= mask[:, 1:]
+        pts = np.argwhere(d_ & ~e)
+        best = np.full(mask.shape, 1e9, dtype=np.float32)
+        for py, px_ in pts[::2]:
+            np.minimum(best, (YY - py) ** 2 + (XX - px_) ** 2, out=best)
+        return np.sqrt(best)
+
+    def pal_dither(pal, v):
+        """Kontinuierlicher Wert v (0 … len−1) je Zelle → Palettenfarbe, zwischen zwei Stufen gedithert."""
+        v = np.clip(v, 0, len(pal) - 1e-4)
+        lo = np.floor(v).astype(int)
+        idx = lo + ((v - lo) > BAY)
+        return np.asarray(pal, dtype=np.uint8)[np.minimum(idx, len(pal) - 1)]
+
+    def heart_cells(s, glow):
+        """Herz-Maske, Farben und Hilfsfelder (x, y) bei Skalierung s."""
+        S = 46.0 * s
+        x = (XX + 0.5 - hcx) / S
+        y = -(YY + 0.5 - hcy) / S + 0.10
+        mask = (x * x + y * y - 1) ** 3 - x * x * y ** 3 <= 0
+        dd = dist_to_border(mask)
+        light = 1.55 - 0.9 * x + 1.0 * y                                     # Licht von links oben
+        v = light * 0.95 + glow * 1.6
+        v = np.where(dd < 2.6, 0.0, np.where(dd < 6.0, v - 0.7, v))           # dunkle Kontur, leichte Kante nach innen
+        u_, w_ = (x + 0.55) * 0.82 + (y - 0.72) * 0.57, -(x + 0.55) * 0.57 + (y - 0.72) * 0.82
+        shine = ((u_ / 0.30) ** 2 + (w_ / 0.075) ** 2 < 1) & mask               # Glanzlicht auf dem linken Lappen
+        v = np.where(shine, 4.0, v)
+        return mask, pal_dither(HEART_PAL, v), dd
+
+    def flame_cells(mask, t, glow, burst=0.0):
+        d = dist_to_border(mask)
+        ang = np.arctan2(-(YY + 0.5 - hcy), XX + 0.5 - hcx)
+        g = 0.52 + 0.26 * np.sin(ang * 9 + t * 17) + 0.20 * np.sin(ang * 17 - t * 23 + 1.3) + 0.12 * np.sin(XX * 0.45 - t * 29)
+        up = np.clip(0.55 + 0.65 * np.sin(ang), 0.35, 1.2)                     # nach oben länger
+        L = 24.0 * up * np.clip(g, 0.12, 1.0) * (1 + 0.7 * glow + 5.0 * burst)
+        vis = ~mask & (d < L)
+        v = 4.6 * np.clip(1 - d / np.maximum(L, 1e-3), 0, 1) ** 0.9
+        return vis, pal_dither(FIRE_PAL, v)
+
+    def paint(img, vis, rgb, extra_mask=None):
+        m = vis if extra_mask is None else vis & extra_mask
+        lay = Image.fromarray(rgb).resize((cwid * U, chei * U), Image.NEAREST).crop((0, 0, W, H))
+        mk = Image.fromarray(np.repeat(np.repeat(m.astype(np.uint8) * 255, U, axis=0), U, axis=1)[:H, :W], 'L')
+        img.paste(lay, (0, 0), mk)
+
+    pre_mask, pre_rgb, _ = heart_cells(1.12, 1.0)                              # Zustand beim Zerplatzen: die Stücke fliegen von hier aus
+    CHUNK = 4
+    chunk_rng = np.random.default_rng(77)
+    CHUNKS = []
+    for cy_ in range(0, chei - CHUNK, CHUNK):
+        for cx_ in range(0, cwid - CHUNK, CHUNK):
+            if pre_mask[cy_ + CHUNK // 2, cx_ + CHUNK // 2]:
+                px_, py_ = cx_ + CHUNK / 2 - hcx, cy_ + CHUNK / 2 - hcy
+                n = max(1e-3, math.hypot(px_, py_))
+                sp = chunk_rng.uniform(70, 170)
+                CHUNKS.append((cx_, cy_, px_ / n * sp, py_ / n * sp - 18, chunk_rng.uniform(0.3, 0.85),
+                               tuple(int(c) for c in pre_rgb[cy_ + CHUNK // 2, cx_ + CHUNK // 2])))
+
+    def opener_fx(img, f):
+        ts = f / float(fps)
+        if ts >= T_HEART + T_BOOM:
+            return img
+        dark = Image.blend(img, Image.new('RGB', (W, H), (16, 6, 20)), 0.95)
+        shake_amp = 0
+        if ts < T_HEART:
+            out_img = dark
+            pop = 0.78 + 0.22 * min(1.0, ts / 0.10) ** 0.6
+            beat = 0.07 * math.exp(-((ts - 0.34) / 0.05) ** 2)
+            glow = max(0.0, (ts - (T_HEART - 0.20)) / 0.20)
+            s = (pop + beat + 0.10 * glow) * 0.96 + 0.0
+            mask, hrgb, _ = heart_cells(s, glow)
+            fvis, frgb = flame_cells(mask, ts, glow)
+            paint(out_img, fvis, frgb)
+            for ex, ey, ph in EMBERS:                                         # aufsteigende Funken
+                yy = hcy + 12 - ((ts * (42 + 30 * ph) + ph * 90) % 90)
+                xx = hcx + ex + 4 * math.sin(ts * 9 + ph * 20)
+                a, b = int(xx), int(yy)
+                if 0 <= a < cwid - 2 and 0 <= b < chei - 2:
+                    ImageDraw.Draw(out_img).rectangle([a * U, b * U, (a + 2) * U - 1, (b + 2) * U - 1], fill=FIRE_PAL[3 if ph > 0.5 else 2])
+            paint(out_img, mask, hrgb)
+            shake_amp = 1 if glow > 0.45 else 0
+        else:
+            q = (ts - T_HEART) / T_BOOM
+            r = 10 + 185 * min(q / 0.9, 1.0) ** 0.55                              # Radius der Druckwelle in Zellen
+            dist = np.hypot(XX + 0.5 - hcx, YY + 0.5 - hcy)
+            out_img = img.copy()
+            keep_dark = np.repeat(np.repeat((dist >= r).astype(np.uint8) * 255, U, axis=0), U, axis=1)[:H, :W]
+            out_img.paste(dark, (0, 0), Image.fromarray(keep_dark, 'L'))
+            # Feuerball: die Flammen schwellen an und verlöschen gedithert
+            if q < 0.5:
+                mask = pre_mask
+                fvis, frgb = flame_cells(mask, ts, 1.0, burst=min(1.0, q * 3.0) * 0.3)
+                paint(out_img, fvis & (1.0 - q / 0.5 > BAY), frgb)
+            # Herzstücke fliegen nach außen und verlöschen gedithert
+            dr = ImageDraw.Draw(out_img)
+            for cx_, cy_, vx, vy, life, col in CHUNKS:
+                if q > life:
+                    continue
+                if (1.0 - q / life) < 0.5 * BAY[cy_ % chei, cx_ % cwid] + 0.15 and q > 0.25:
+                    continue
+                tt = ts - T_HEART
+                a, b = int(round(cx_ + vx * tt)), int(round(cy_ + vy * tt + 45 * tt * tt))
+                dr.rectangle([a * U, b * U, (a + CHUNK) * U - 1, (b + CHUNK) * U - 1], fill=(60, 4, 24))
+                dr.rectangle([a * U + U, b * U + U, (a + CHUNK - 1) * U - 1, (b + CHUNK - 1) * U - 1], fill=col)
+            # Ring der Druckwelle
+            k = 1.0 - q
+            ring = (np.abs(dist - r) < 2.2) & (k > BAY)
+            paint(out_img, ring, np.full((chei, cwid, 3), (255, 244, 204), dtype=np.uint8))
+            a_fl = 0.55 * max(0.0, 1.0 - (ts - T_HEART) / 0.12) ** 1.5           # Blitz
+            if a_fl > 0:
+                out_img = Image.blend(out_img, Image.new('RGB', (W, H), WHITE), a_fl)
+            shake_amp = int(round(4 * k ** 1.5))
+        if shake_amp:
+            rng = np.random.default_rng(300 + f)
+            dx, dy = int(rng.integers(-shake_amp, shake_amp + 1)) * U, int(rng.integers(-shake_amp, shake_amp + 1)) * U
+            sh = out_img.copy()
+            sh.paste(out_img, (dx, dy))
+            out_img = sh
+        return out_img
+
+    def render(f, intro, punch=False, opener=False):
         ts = f / float(fps)
         canvas = bg.frame(f / loop)
         layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
@@ -713,6 +855,8 @@ def main():
             if l2 is not None:
                 canvas.alpha_composite(l2)
         out_img = canvas.convert('RGB')
+        if opener:
+            return opener_fx(out_img, f)
         return punch_fx(out_img, f) if punch else out_img
 
     if args.cover_only is not None:
@@ -724,7 +868,7 @@ def main():
         render(f, False).save(fdir / f'f{f:03d}.png')
     if first_on:
         for f in range(loop):
-            render(f, intro_on, punch_on).save(fdir / f'i{f:03d}.png')
+            render(f, intro_on, punch_on, opener_on).save(fdir / f'i{f:03d}.png')
     cover = Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
     cover_path = out / ('reel-cover.png' if reel else 'post.png')
     cover.save(cover_path)
@@ -752,11 +896,13 @@ def main():
         if m_start is None:
             m_start = pick_music_start(music, dur)
             print(f'Musik: energiereichstes Fenster ab {m_start:.1f} s')
-        if punch_on and args.music_start is None:
+        if (punch_on or opener_on) and args.music_start is None:
             m_start = snap_to_onset(music, m_start)
-            print(f'Musik: Start auf den Schlag bei {m_start:.2f} s')
+            if opener_on:                                               # der Schlag soll auf die Detonation fallen, nicht auf Sekunde 0
+                m_start = max(0.0, m_start - T_HEART)
+            print(f'Musik: Start auf den Schlag bei {m_start:.2f} s' + (f' (Schlag bei Detonation, t = {T_HEART} s)' if opener_on else ''))
         cmd += ['-ss', str(m_start), '-i', str(music)]
-        fade_in = '' if punch_on else 'afade=t=in:st=0:d=0.4,'
+        fade_in = '' if (punch_on or opener_on) else 'afade=t=in:st=0:d=0.4,'
         amap = ['-map', f'{n_in}:a', '-af', f'{fade_in}afade=t=out:st={dur - 1.2:.2f}:d=1.2,loudnorm=I=-14:TP=-1.5:LRA=11', '-c:a', 'aac', '-b:a', '192k']
         if not vfilter:
             vfilter = ['-map', '0:v']
