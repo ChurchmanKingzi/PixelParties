@@ -7,8 +7,15 @@
 //  target for the Spell to hit afterwards.
 //
 //  The second cast skips costs but applies all
-//  effects including recoil. Works generically
-//  with all current and future Destruction Spells.
+//  effects including recoil (W75a: je ein Recoil nach
+//  JEDEM Schaden, also auch nach dem Zweitwurf — Fire
+//  Bolts ruft seinen Recoil selbst direkt nach dem
+//  Schaden). Works generically with all current and
+//  future Destruction Spells.
+//
+//  Ausnahmen am Spell-Skript (deklarativ gelesen):
+//    neverMultiTarget: true       — Karte darf nie mehr als 1 Ziel treffen (Basketskull)
+//    opponentChoosesTarget: true  — der GEGNER waehlt das Ziel (Big Oopsie)
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -69,7 +76,12 @@ module.exports = {
       // (Basketskull), sind von Bartas' Zweitziel ausgenommen
       // (Als Hinweis 5.8.). Deklarativ ueber ein Flag am Skript, nicht
       // ueber eine Namensliste.
-      if (loadCardEffect(ctx.spellName)?.neverMultiTarget) return;
+      const spellModul = loadCardEffect(ctx.spellName);
+      if (spellModul?.neverMultiTarget) return;
+      // ★ W75a (Al: „Bartas kann bei Big Oopsie keinen zweiten Treffer forcieren!"): waehlt der GEGNER das Ziel („Your opponent chooses a
+      // target they control …"), gibt es kein Ziel, das Bartas' Anwender waehlen koennte — kein Zweitwurf-Angebot. Deklarativ ueber
+      // `opponentChoosesTarget: true` am Spell-Skript (kein Namens-Sonderfall).
+      if (spellModul?.opponentChoosesTarget) return;
 
       // Check spell level < Bartas's Destruction Magic level
       const spellLevel = spellData.level || 0;

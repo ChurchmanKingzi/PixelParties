@@ -18619,14 +18619,25 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * Resolve deferred spell recoil (Fire Bolts, etc.).
-   * Called by the server after afterSpellResolved completes, so recoil
-   * happens after all spell casts (including Bartas second cast).
+   * Rueckstoss, der noch aufgeschoben im Zustand steht (`gs._deferredRecoil`). Seit W75a (Al: „je ein Recoil nach jedem Schaden",
+   * auch im Zweitwurf von Bartas) schiebt Fire Bolts nichts mehr auf — die Karte ruft `resolveRecoil` selbst direkt nach dem
+   * Schaden. Der Aufruf im Server bleibt als Sicherheitsnetz fuer kuenftige Karten, die weiterhin aufschieben wollen.
    */
   async resolveDeferredRecoil() {
     const recoil = this.gs._deferredRecoil;
     if (!recoil) return;
     delete this.gs._deferredRecoil;
+    await this.resolveRecoil(recoil);
+  }
+
+  /**
+   * ★ W75a — Rueckstoss einer Karte mit Zielwahl („choose a target you control and deal N damage to it", Fire Bolts):
+   * der Spieler waehlt EIN eigenes Ziel (Held oder Kreatur, nach Kontrolle), das N Schaden erleidet. Wird DIREKT NACH dem
+   * Schaden gerufen, auf den er folgt — bei einem Zweitwurf (Bartas, Saya, Grisgar …) also ein zweites Mal, mit neuer Zielwahl.
+   * @param {{cardName:string, ownerIdx:number, heroIdx:number, damage:number, enhanced?:boolean, damageType:string}} recoil
+   */
+  async resolveRecoil(recoil) {
+    if (!recoil) return;
 
     const { cardName, ownerIdx, heroIdx, damage, enhanced, damageType } = recoil;
 
@@ -36316,6 +36327,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (h) {
       for (const k of Object.keys(h)) {
         if (!k.endsWith(suffix)) continue;
+        if (this._surpriseHoptStempel?.get(`${abzug.pi}|${k.slice(0, -suffix.length)}`) === this.gs.turn) continue;   // W75a: Stempel einer aufgeloesten Surprise-Aktivierung (Aquatic Spear) bleibt
         if (!(k in abzug.hopt)) delete h[k];
         else if (h[k] !== abzug.hopt[k]) h[k] = abzug.hopt[k];
       }
@@ -42960,6 +42972,17 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ W75a — Skript-Merkmal `surpriseHartOPT: '<Schluessel>'` (Aquatic Spear): pro Spieler und Zug darf nur EINE Aktivierung dieser Surprise aufloesen.
+   * Stempel = `gs.hoptUsed['<Schluessel>:<Spieler>'] === gs.turn` (`claimHOPT`, wie Magic Ruby / Future Tech Lamp). Bei einer ganz negierten Aktivierung bleibt er unberuehrt.
+   * Nicht die Zweitwirkung „sent … to the discard pile" der Karte — die ist keine Aktivierung und fragt diese Grenze nie.
+   */
+  surpriseHartOPTVerbraucht(script, cardName, spielerIdx) {
+    const key = script?.isSurprise ? script.surpriseHartOPT : null;
+    if (!key) return false;
+    return this.gs.hoptUsed?.[`${key}:${spielerIdx}`] === this.gs.turn;
+  }
+
+  /**
    * Requires: hero alive, not frozen/stunned, meets spell school & level requirements.
    * For Creature surprises: also requires a free Support Zone.
    * `playerIdx` = Brettseite des Helden. `opts.reaktor` (Als Vorgabe 29.9.):
@@ -43008,6 +43031,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       const _opgScript = loadCardEffect(cardName);
       if (_opgScript?.isSurprise && (_opgScript.oncePerGame || _opgScript.oncePerGameKey)
           && this.gs.players[reaktor]?._oncePerGameUsed?.has(_opgScript.oncePerGameKey || cardName)) return false;
+      // ★ W75a (Aquatic Spear: „You can only activate 1 "Aquatic Spear" per turn."): HARTES Once-per-turn der AKTIVIERUNG — gesetzt werden darf beliebig oft, aber
+      // pro Spieler und Zug loest nur EINE Kopie aus (`surpriseHartOPT`). Die Grenze gehoert dem Ausloeser (`reaktor`); gestempelt wird erst in `_activateSurprise`,
+      // sobald die Aktivierung aufloesen darf — nach Wisdom, Kette und Negation, nie schon beim Anbieten. Alle Surprise-Fenster laufen ueber dieses Gate.
+      if (this.surpriseHartOPTVerbraucht(_opgScript, cardName, reaktor)) return false;
     }
 
     // ★ SPELL-SPERREN GELTEN AUCH HIER (v880, Als Befund) ─────────────
@@ -43311,6 +43338,16 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.log('surprise_blocked_arcane_eyes', { card: cardName });
       return null;
     }
+    // ★ W75a: auch die erzwungenen Wege (Cute Spider, Sabrina, Telekinesis …) respektieren das harte Once-per-turn der Aktivierung.
+    if (script?.surpriseHartOPT) {
+      const _hartSteuerer = (opts.isBakhmSlot || opts.fromDiscard || opts.fromDeck)
+        ? (Number.isInteger(opts.steuerer) ? opts.steuerer : playerIdx)
+        : this.surpriseKontrolleur(playerIdx, heroIdx);
+      if (this.surpriseHartOPTVerbraucht(script, cardName, _hartSteuerer)) {
+        this.log('surprise_blocked_hopt', { card: cardName });
+        return null;
+      }
+    }
     this._surpriseResolutionDepth = (this._surpriseResolutionDepth || 0) + 1;
     this._inSurpriseResolution = true;
     // Per-hero re-entry guard (see _checkSurpriseWindow). Identifies the
@@ -43586,6 +43623,14 @@ this._deathWatch = (this._deathWatchStack || []).length
         _sps._oncePerGameUsed.add(_opgKey);
         (this._surpriseStempel || (this._surpriseStempel = new Set())).add(`${steuerer}|${_opgKey}`);
       }
+    }
+
+    // ★ W75a (Aquatic Spear): hartes Once-per-turn — die Aktivierung stempelt, sobald sie aufloesen darf (nicht negiert; Z7b/W66b: eine ganz negierte Karte stempelt nicht).
+    // Beim Ausloeser (`steuerer`). `_surpriseHoptStempel` schuetzt den Eintrag vor dem Z7b-Rueckgabe-Abzug (`_stempelZurueck`) des Zaubers, waehrend dessen Schaden er ausloeste.
+    // Der Stempel liegt VOR `onSurpriseActivate`: eine weitere Kopie im selben Fenster/Reaktionsfenster (auch durch den 80er-Treffer selbst ausgeloest) ist damit gesperrt.
+    if (!surpriseNegated && script.surpriseHartOPT) {
+      this.claimHOPT(script.surpriseHartOPT, steuerer);
+      (this._surpriseHoptStempel || (this._surpriseHoptStempel = new Map())).set(`${steuerer}|${script.surpriseHartOPT}`, this.gs.turn);
     }
 
     // Execute the surprise's effect (unless negated)
