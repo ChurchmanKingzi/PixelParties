@@ -91,13 +91,18 @@ module.exports = {
     // discard reactors (Glass of Marbles, Skull Necklace, …) wait
     // until every card has hit the pile before resolving — matches
     // the engine-wide "discards first, reactors after" ordering.
-    await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
-      for (const { idx, name } of toDiscard) {
-        await engine.actionDiscardHandCard(pi, name, idx, { source: CARD_NAME });
-      }
-    });
+    // ★ W74c: Boris darf den Abwurf der ganzen Hand ignorieren (einmal für den Stapel, vor dem ersten Abwurf). Ziehen: „the same number of cards +1" —
+    // die Anzahl ist die der ABGEWORFENEN Karten (0 bei Verzicht), das „+1" bleibt.
+    const borisVerzicht = count > 0 && await engine.borisVerzicht(pi, count, { source: CARD_NAME });
+    if (!borisVerzicht) {
+      await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
+        for (const { idx, name } of toDiscard) {
+          await engine.actionDiscardHandCard(pi, name, idx, { source: CARD_NAME });
+        }
+      });
+    }
 
-    const drawCount = count + 1;
+    const drawCount = (borisVerzicht ? 0 : count) + 1;
     if (drawCount > 0) {
       await engine.actionDrawCards(pi, drawCount, { source: CARD_NAME });
     }

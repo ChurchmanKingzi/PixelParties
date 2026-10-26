@@ -88,6 +88,10 @@ module.exports = {
         cancellable: false,
       });
 
+      // ★ W74c: Boris darf den Abwurf (Kosten, „discard N copies") ignorieren — gefragt wird einmal, nach der ersten Wahl, vor dem ersten Abwurf. Die Kosten
+      // sind fest: Verzicht = alle Kopien bleiben auf der Hand, die Suche (und die Hand-Sperre) laufen wie sonst.
+      if (i === 0 && await engine.borisVerzicht(pi, requiredCopies, { source: 'Navigation' })) break;
+
       if (!result || result.cardName == null) {
         // Safety fallback — pick first eligible
         const fallbackIdx = eligibleIndices[0];

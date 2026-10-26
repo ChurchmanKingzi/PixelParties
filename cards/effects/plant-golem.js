@@ -87,8 +87,9 @@ module.exports = {
     const before = ps.hand.length;
     // `skipSourceGlow`: freiwillige Kosten direkt nach dem eigenen Klick —
     // der 500-ms-Quellen-Glow vor der Abfrage waere nur Wartezeit (v642).
-    await engine.actionPromptForceDiscard(ctrl, 1, { costFor: 'Plant Golem', costKind: 'disrupt',   /* ★ v1041 Lernkanal */ title: `${CARD_NAME} — Discard 1`, source: CARD_NAME, selfInflicted: true, skipSourceGlow: true });
-    if (ps.hand.length !== before - 1) return false; // Kosten nicht bezahlt → nichts verbraucht
+    // ★ W74c: von Boris erlassene Kosten gelten als bezahlt (`zahleAbwurfKosten`).
+    const kosten = await engine.zahleAbwurfKosten(ctrl, 1, { costFor: 'Plant Golem', costKind: 'disrupt',   /* ★ v1041 Lernkanal */ title: `${CARD_NAME} — Discard 1`, source: CARD_NAME, skipSourceGlow: true });
+    if (!kosten.erlassen && ps.hand.length !== before - 1) return false; // Kosten nicht bezahlt → nichts verbraucht
     await engine.actionDestroyCard({ name: CARD_NAME, owner: ctrl, heroIdx: inst.heroIdx }, inst, { source: CARD_NAME });
     engine.log('plant_golem_uprooted', { player: ps.username });
     engine.sync();

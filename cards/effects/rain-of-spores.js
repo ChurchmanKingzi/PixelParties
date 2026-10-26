@@ -53,6 +53,7 @@ module.exports = {
       const oppHandSizeAtStart = ops.hand?.length || 0;
       const maxOwnDiscard = Math.max(0, oppHandSizeAtStart - 1);
       let ownDiscarded = 0;
+      const borisEigen = engine.borisStapel(pi, { source: CARD_NAME, skipVoidsEffect: true });   // ★ W74c: Boris einmal für den eigenen Abwurf-Stapel
       // ★ Z4 (S03-23): die gerade aufloesende Rain of Spores liegt noch in `ps.hand`, ist aber keine Handkarte
       // mehr — nicht als eigener Abwurf waehlbar (sonst gaebe es den „+1"-Abwurf des Gegners gratis dazu).
       while (engine._handIndizesOhneAufloesende(ps).length > 0 && ownDiscarded < maxOwnDiscard) {
@@ -69,6 +70,9 @@ module.exports = {
         });
         if (!result || result.cancelled || result.cardName == null) break;
         if (!eligible.includes(result.handIndex)) break;   // Z4: Antwort ausserhalb der Auswahl (aufloesende Karte) zaehlt nicht
+        // ★ W74c: Boris darf den eigenen Abwurf ignorieren (vor dem ersten Abwurf, einmal für den Stapel). „The same number + 1" hängt an der
+        // ANZAHL der abgeworfenen Karten: bei Verzicht 0 (der Gegner wirft dann 0 + 1 = 1 Karte ab).
+        if (await borisEigen(remaining)) break;
         const ok = await engine.actionDiscardHandCard(pi, result.cardName, result.handIndex, {
           source: CARD_NAME,
         });
@@ -88,7 +92,9 @@ module.exports = {
       // the opp hand contents) — so no separate per-card reveal
       // stream. Picks are mandatory (`cancellable: false`).
       const oppHandSize = ops.hand?.length || 0;
-      const cap = Math.min(oppToDiscard, oppHandSize);
+      // ★ W74c: Boris des GEGNERS darf den erzwungenen Abwurf ignorieren — ERST Ambush the Scout, DANN Boris (einmal für den ganzen Stapel).
+      const cap = (await engine.fremdAbwurfEntfaellt(oi, Math.min(oppToDiscard, oppHandSize), { source: CARD_NAME, sourceOwner: pi }))
+        ? 0 : Math.min(oppToDiscard, oppHandSize);
       if (cap > 0) {
         // Iterate cardGallery so the caster sees each remaining card
         // and picks one at a time (matches the reveal pacing).
@@ -116,6 +122,7 @@ module.exports = {
           await engine.actionDiscardHandCard(oi, pick.cardName, idx, {
             source: CARD_NAME,
             sourceOwner: pi,   // v860: fremder Zwangsabwurf (Erstrunden-Schutz)
+            _skipHandInteractionCheck: true,   // W74c: das Ambush-Fenster lief schon oben (`fremdAbwurfEntfaellt`), nicht je Karte noch einmal
           });
         }
       }

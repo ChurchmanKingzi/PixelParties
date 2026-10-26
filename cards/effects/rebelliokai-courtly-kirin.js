@@ -239,7 +239,8 @@ module.exports = {
     // Pay the cost — discard the chosen Rebelliokai with the standard
     // archetype source tag so Kind Kitsune's hook + Backup Bakus's
     // recur trigger fire correctly off this discard.
-    const discarded = await engine.actionDiscardHandCard(pi, costName, null, {
+    // ★ W74c: Boris darf diese Abwurf-KOSTEN ignorieren — die Karte bleibt, Kirin wird trotzdem beschworen und der Effekt negiert.
+    const discarded = (await engine.borisVerzicht(pi, 1, { source: CARD_NAME })) || await engine.actionDiscardHandCard(pi, costName, null, {
       source: DISCARD_SOURCE_TAG,
     });
     if (!discarded) {

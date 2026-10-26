@@ -109,6 +109,7 @@ module.exports = {
       const sparedIds = new Set();
       let discardsPaid = 0;
       const maxIter = Math.min(ops.hand?.length || 0, targets.length);
+      const borisGegner = engine.borisStapel(oi, { source: CARD_NAME, skipVoidsEffect: true });   // ★ W74c: Boris des Gegners, einmal für den ganzen Schonen-Stapel
 
       for (let iter = 0; iter < maxIter; iter++) {
         const remaining = targets.filter(t => !sparedIds.has(t.id));
@@ -125,6 +126,9 @@ module.exports = {
           cancelLabel: 'Done',
         });
         if (!dRes || dRes.cancelled || dRes.cardName == null) break;
+        // ★ W74c: Boris darf den Abwurf (Kosten, „may discard any number") ignorieren. Verschont wird „that many" = so viele Ziele, wie Karten
+        // abgeworfen wurden — bei Verzicht 0: es wird nichts verschont, die Wahl endet.
+        if (await borisGegner(1)) break;
 
         const ok = await engine.actionDiscardHandCard(oi, dRes.cardName, dRes.handIndex, {
           source: CARD_NAME,

@@ -79,6 +79,9 @@ async function harpyformerDiscardCost(engine, pi, abilityName, opts = {}) {
   // client ever sends a different hand index.
   if (result.cardName !== abilityName) return false;
 
+  // ★ W74c: Boris darf auch diese Abwurf-KOSTEN ignorieren — die Karte bleibt auf der Hand, der Effekt läuft weiter.
+  if (await engine.borisVerzicht(pi, 1, { source: opts.source || abilityName })) return true;
+
   const ok = await engine.actionDiscardHandCard(pi, abilityName, result.handIndex, {
     source: opts.source || abilityName,
   });

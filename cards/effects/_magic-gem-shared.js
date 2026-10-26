@@ -97,6 +97,13 @@ async function maybeKeepGemInHand(engine, pi, gemName) {
   const { cardName, handIndex } = result;
   if (cardName == null) return { keepInHand: false };
 
+  // ★ W74c: Boris darf auch diese Abwurf-KOSTEN ignorieren — der Edelstein bleibt trotzdem auf der Hand, es wird nichts abgeworfen.
+  if (await engine.borisVerzicht(pi, 1, { source: gemName })) {
+    engine.log('magic_gem_kept', { player: ps.username, gem: gemName, discarded: null, borisSkipped: true });
+    engine.sync();
+    return { keepInHand: true };
+  }
+
   // Splice the chosen card and push to discard. The handIndex from the
   // prompt is authoritative when it points at the requested card name;
   // fall back to indexOf if the indices have shifted.
