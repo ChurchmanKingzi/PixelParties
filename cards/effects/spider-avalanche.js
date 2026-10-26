@@ -22,6 +22,10 @@ module.exports = {
 
   isSurprise: true,
 
+  // ★ W75b: „You can only activate 1 "Spider Avalanche" per turn." als Merkmal der Engine (`surpriseHartOPT`, Schluessel = `hoptUsed['spider_avalanche:<Spieler>']`, wie bisher):
+  // `engine.surpriseAktivierbarJetzt` kennt die Sperre damit fuer ALLE Wege — auch die erzwungenen (Cute Spider holt die Karte aus der Ablage, Sabrina aus dem Deck).
+  surpriseHartOPT: 'spider_avalanche',
+
   canTelekinesisActivate(engine, ownerIdx) {
     // Hard once per turn
     const hoptKey = `spider_avalanche:${ownerIdx}`;

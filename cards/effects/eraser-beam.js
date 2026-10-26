@@ -56,6 +56,8 @@ const CARD_NAME = 'Eraser Beam';
 module.exports = {
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
+  // ★ W75b (Al: „Unbedingt Flag setzen, Bartas darf damit nicht 2 Ziele treffen!"): „This Spell can never hit more than 1 target." — Bartas bietet keinen Zweitwurf an.
+  neverMultiTarget: true,
   placesPollutionTokens: true,
   oncePerGame: true,
   oncePerGameKey: 'eraserBeam',
