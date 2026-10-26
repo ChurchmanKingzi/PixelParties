@@ -855,8 +855,11 @@ def main():
     # verschiedenen Animationsframes; unten dunkler, oben heller) – kein Hochskalieren
     CP = spr.px
     uw, uh = UB[2] - UB[0], UB[3] - UB[1]
-    LAYERS = [(18, 0, False, 0, 1.18), (0, 9, True, 11, 1.05), (40, 9, False, 23, 1.05),
-              (8, 19, False, 5, 0.9), (40, 20, True, 31, 0.9), (22, 27, True, 17, 0.78)]       # (x, y, gespiegelt, Frame-Versatz, Helligkeit)
+    if (uw + 40) * CP <= 1000:                                                # breit genug Platz: zwei Reihen nebeneinander
+        LAYERS = [(18, 0, False, 0, 1.18), (0, 9, True, 11, 1.05), (40, 9, False, 23, 1.05),
+                  (8, 19, False, 5, 0.9), (40, 20, True, 31, 0.9), (22, 27, True, 17, 0.78)]   # (x, y, gespiegelt, Frame-Versatz, Helligkeit)
+    else:                                                                     # große Pixel: nur übereinander gestapelt, in der Breite kaum versetzt
+        LAYERS = [(2, 0, False, 0, 1.18), (0, 8, True, 11, 1.05), (3, 16, False, 5, 0.9), (1, 23, True, 31, 0.78)]
     CW, CHH = max(l[0] for l in LAYERS) + uw, max(l[1] for l in LAYERS) + uh
     CB = (0, 0, CW, CHH)
     CL, CT = round(W / 2 - CW * CP / 2), round(hcy * U - CHH * CP / 2)                          # Wolke mittig auf Kartenmitte
