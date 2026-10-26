@@ -42149,7 +42149,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
             const hi = parseInt(el.dataset.heroIdx);
             // ★ W78 (Backstab, Al 26.10.): eine Karte OHNE Wirker-Helden lässt sich direkt auf den GEGNERHELDEN ziehen, der die Attack ausführen soll (Liste vom Server: `herolessAngreifer`).
-            const _hlAngreifer = (gameState.herolessAngreifer || {})[cardName];
+            const _hlAngreifer = (me.herolessAngreifer || {})[cardName];
             if (_hlAngreifer) {
               const _hlOwner = el.dataset.heroOwner === 'me' ? myIdx : (myIdx === 0 ? 1 : 0);
               if (_hlAngreifer.some(a => a.owner === _hlOwner && a.heroIdx === hi)) {
@@ -55416,7 +55416,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             ? ((gameState.attachmentHostTargets || {})[playDrag.card.name] || null)
             : null;
           const _attHostsHeroOwn = _attHostsHero ? _attHostsHero.filter(h => (h.owner ?? myIdx) === myIdx) : null;
-          const spellAttackIneligible = _attHostsHeroOwn
+          // ★ W78 (Backstab): eine Karte OHNE Wirker-Helden grau alle Helden aus, die nicht in der Liste `herolessAngreifer` (ziehbare Gegnerhelden) stehen — eigene Helden nie.
+          const _hlDrag = !!(playDrag && !playDrag.isEquip && playDrag.card && (playDrag.card.cardType === 'Spell' || playDrag.card.cardType === 'Attack') && (me.herolessHandCards || []).includes(playDrag.card.name));
+          const _hlIneligible = _hlDrag && !((me.herolessAngreifer || {})[playDrag.card.name] || []).some(a => a.owner === (isOpp ? oppIdx : myIdx) && a.heroIdx === i);
+          const spellAttackIneligible = _hlDrag ? _hlIneligible : _attHostsHeroOwn
             ? !_attHostsHeroOwn.some(h => h.heroIdx === i)
             : ((!isOpp || isCharmedByMe) && playDrag && !playDrag.isEquip && (playDrag.card?.cardType === 'Spell' || playDrag.card?.cardType === 'Attack') && !heroActionEligibleHere && !canHeroPlayCard(p, i, playDrag.card, playDrag.fromCreation ? null : playDrag.idx));
           // Persistent "dragging a Surprise card" check (true throughout the
