@@ -860,22 +860,67 @@ def main():
                   (8, 19, False, 5, 0.9), (40, 20, True, 31, 0.9), (22, 27, True, 17, 0.78)]   # (x, y, gespiegelt, Frame-Versatz, Helligkeit)
     else:                                                                     # große Pixel: nur übereinander gestapelt, in der Breite kaum versetzt
         LAYERS = [(2, 0, False, 0, 1.18), (0, 8, True, 11, 1.05), (3, 16, False, 5, 0.9), (1, 23, True, 31, 0.78)]
-    CW, CHH = max(l[0] for l in LAYERS) + uw, max(l[1] for l in LAYERS) + uh
+    PAD = 8                                                                   # Rand um die Wolke, damit das Verschmelzen und die Kontur nicht am Bildrand abgeschnitten werden
+    CW, CHH = max(l[0] for l in LAYERS) + uw + 2 * PAD, max(l[1] for l in LAYERS) + uh + 2 * PAD
     CB = (0, 0, CW, CHH)
     CL, CT = round(W / 2 - CW * CP / 2), round(hcy * U - CHH * CP / 2)                          # Wolke mittig auf Kartenmitte
     _cloud_cache = {}
+
+    def _shift(m, dy, dx):
+        o = np.zeros_like(m)
+        h_, w_ = m.shape
+        o[max(0, dy):h_ + min(0, dy), max(0, dx):w_ + min(0, dx)] = m[max(0, -dy):h_ + min(0, -dy), max(0, -dx):w_ + min(0, -dx)]
+        return o
+
+    def erode(m, n=1):
+        for _ in range(n):
+            m = m & _shift(m, 1, 0) & _shift(m, -1, 0) & _shift(m, 0, 1) & _shift(m, 0, -1)
+        return m
+
+    def dilate(m, n=1):
+        for _ in range(n):
+            m = m | _shift(m, 1, 0) | _shift(m, -1, 0) | _shift(m, 0, 1) | _shift(m, 0, -1)
+        return m
 
     def storm_cloud(i, flash=0.0):
         if i not in _cloud_cache:
             big = Image.new('RGBA', (CW, CHH), (0, 0, 0, 0))
             for lx, ly, mirror, dfr, br in LAYERS:
-                u_ = Image.fromarray(CLOUDS[(i + dfr) % spr.n][UB[1]:UB[3], UB[0]:UB[2]], 'RGBA')
+                arr = CLOUDS[(i + dfr) % spr.n][UB[1]:UB[3], UB[0]:UB[2]].copy()
+                arr[~erode(arr[..., 3] > 20, 2), 3] = 0                          # Kontur und dunklen Rand der Einzelwolke weg: innen soll keine Kante bleiben
+                u_ = Image.fromarray(arr, 'RGBA')
                 if mirror:
                     u_ = u_.transpose(Image.FLIP_LEFT_RIGHT)
-                arr = np.asarray(u_).astype(np.float32)
-                arr[..., :3] = np.clip(arr[..., :3] * br, 0, 255)
-                big.alpha_composite(Image.fromarray(arr.astype(np.uint8), 'RGBA'), (lx, ly))
-            _cloud_cache[i] = big.resize((CW * CP, CHH * CP), Image.NEAREST)
+                big.alpha_composite(u_, (lx + PAD, ly + PAD))
+            ba = np.asarray(big).copy()
+            sil = erode(dilate(ba[..., 3] > 20, 5), 5)                           # Lücken zwischen den Kopien schließen → eine Silhouette
+            sil = dilate(erode(sil, 2), 2)                                       # dünne Spitzen der Einzelwolken abrunden
+            op0 = ba[..., 3] > 20
+            ys_, xs_ = np.where(sil)
+            yy_, xx_ = np.mgrid[0:CHH, 0:CW]
+            for frac, rb in ((0.20, 8), (0.38, 11), (0.57, 12), (0.76, 9)):         # Wölbungen oben, damit die Silhouette wolkiger wird
+                bcx = xs_.min() + frac * (xs_.max() - xs_.min())
+                bcy = ys_.min() + rb - 4
+                sil = sil | ((xx_ - bcx) ** 2 + (yy_ - bcy) ** 2 <= rb * rb)
+            fill = sil & ~op0
+            solid = ba[..., :3].astype(np.float32)
+            below = np.roll(solid, -10, axis=0)                                  # neue Randzellen übernehmen die Textur von 10 Zeilen darunter
+            ok = np.roll(op0, -10, axis=0)
+            solid[fill & ok] = below[fill & ok]
+            solid[fill & ~ok] = solid[op0].mean(axis=0)                          # Rest mit mittlerem Wolkengrau füllen
+            pad_ = np.pad(solid, ((2, 2), (2, 2), (0, 0)), mode='edge')
+            mean5 = sum(pad_[dy:dy + CHH, dx:dx + CW] for dy in range(5) for dx in range(5)) / 25.0
+            dent = solid.mean(axis=2) < mean5.mean(axis=2) - 14                  # dunkle Reste der Einzelkonturen im Inneren glätten
+            ba[..., :3] = np.where(dent[..., None], mean5, solid).astype(np.uint8)
+            ba[sil, 3] = 255
+            grad = np.linspace(1.18, 0.8, CHH)[:, None, None]                    # oben heller, unten dunkler (Licht von oben rechts)
+            ba[..., :3] = np.clip(ba[..., :3].astype(np.float32) * grad, 0, 255).astype(np.uint8)
+            inner = erode(sil, 1)
+            deep = erode(sil, 3)
+            ba[inner & ~deep, :3] = (ba[inner & ~deep, :3] * 0.8).astype(np.uint8)  # weicher dunkler Rand wie beim Sprite
+            ba[sil & ~inner, :3] = (8, 8, 12)                                     # eine Kontur um die ganze Wolke
+            ba[~sil, 3] = 0
+            _cloud_cache[i] = Image.fromarray(ba, 'RGBA').resize((CW * CP, CHH * CP), Image.NEAREST)
         im = _cloud_cache[i]
         if flash:                                                             # Wetterleuchten: Wolke leuchtet bläulich-weiß auf
             lit = Image.blend(im.convert('RGB'), Image.new('RGB', im.size, (205, 222, 255)), 0.5 * flash)
