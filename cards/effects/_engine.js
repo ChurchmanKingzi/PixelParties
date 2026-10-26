@@ -12189,6 +12189,8 @@ class GameEngine {
     if (!Array.isArray(schritte) || schritte.length === 0 || schritte.some(s => !s.targets || s.targets.length === 0)) return null;
     const alle = new Map();
     for (const st of schritte) for (const t of st.targets) if (!alle.has(t.id)) alle.set(t.id, t);
+    const vor = opts.vorgewaehlt || null;   // schon feststehende Wahl (Backstab: der auf den Helden gezogene Angreifer): wird nur markiert, nicht mehr gefragt
+    if (vor && !alle.has(vor.id)) alle.set(vor.id, vor);
     const clientTargets = [...alle.values()].map(t => { const { cardInstance, ...rest } = t; return rest; });
     const result = await this.promptGeneric(playerIdx, {
       type: 'chainTargetPick',
@@ -12199,6 +12201,7 @@ class GameEngine {
       previewCardName: opts.previewCardName,
       targets: clientTargets,
       damages: schritte.map(() => 0),
+      ...(vor ? { preset: [vor.id] } : {}),
       _fuer: playerIdx,   // der gefragte Spieler (für `cpuResponse` der Karte)
       steps: schritte.map((st, i) => {
         const e = { ids: st.targets.map(t => t.id), label: st.label || '', role: st.role || '' };

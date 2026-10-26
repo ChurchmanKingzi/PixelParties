@@ -195,6 +195,7 @@ module.exports = {
         ], {
           title: CARD_NAME, source: CARD_NAME,
           description: `${vorAngreifer.cardName} stabs — choose the target.`,
+          vorgewaehlt: vorAngreifer,   // der Angreifer wird dunkelrot markiert
           confirmLabel: '⚔️ Stab!',
           previewCardName: CARD_NAME,
           cancellable: true,
