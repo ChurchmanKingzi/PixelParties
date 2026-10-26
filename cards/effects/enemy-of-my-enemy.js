@@ -147,6 +147,8 @@ module.exports = {
         const z = await ctx.promptZonePick(frei, {
           title: CARD_NAME,
           description: `Place ${geben.name} into one of your free Support Zones.`,
+          showCardLeft: geben.name,          // Creature links, Enemy of my Enemy rechts
+          previewCardName: CARD_NAME,
           cancellable: false,
           heroShortcut: false,
         });

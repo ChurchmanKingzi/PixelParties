@@ -61162,11 +61162,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           {/* Optional small card preview — server passes `previewCardName`
               to give the player a visual of what they're about to place.
               CardMini gives the full hover tooltip + foil treatment for free. */}
-          {ep.previewCardName && CARDS_BY_NAME[ep.previewCardName] && (
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-              <div className="panel-zielwahl-vorschau" style={{ width: 90 }}>
-                <CardMini card={CARDS_BY_NAME[ep.previewCardName]} inGallery />
-              </div>
+          {((ep.previewCardName && CARDS_BY_NAME[ep.previewCardName]) || (ep.showCardLeft && CARDS_BY_NAME[ep.showCardLeft])) && (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 10 }}>
+              {/* `showCardLeft`: die betroffene Karte LINKS (Enemy of my Enemy: die Creature), die Quellkarte rechts daneben */}
+              {ep.showCardLeft && CARDS_BY_NAME[ep.showCardLeft] && (
+                <div className="panel-zielwahl-vorschau" style={{ width: 90 }}>
+                  <CardMini card={CARDS_BY_NAME[ep.showCardLeft]} inGallery />
+                </div>
+              )}
+              {ep.previewCardName && CARDS_BY_NAME[ep.previewCardName] && (
+                <div className="panel-zielwahl-vorschau" style={{ width: 90 }}>
+                  <CardMini card={CARDS_BY_NAME[ep.previewCardName]} inGallery />
+                </div>
+              )}
             </div>
           )}
           <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7 }}>Click a highlighted zone on the board.</div>

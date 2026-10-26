@@ -5029,6 +5029,7 @@ class GameEngine {
           // Ausruestung. Solche Prompts setzen `heroShortcut: false`.
           heroShortcut: config.heroShortcut !== false,
           previewCardName: config.previewCardName || cardInstance.name,
+          ...(config.showCardLeft ? { showCardLeft: config.showCardLeft } : {}),   // zweites Kartenbild LINKS (Enemy of my Enemy: die übernommene Kreatur)
         });
       },
 
