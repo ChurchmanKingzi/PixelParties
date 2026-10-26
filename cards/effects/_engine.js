@@ -34451,6 +34451,9 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   _sourceHasTruthSeeingEye(sourceCard) {
     if (!sourceCard) return false;
+    // ★ W78 (Backstab): eine Attack, deren Kontrolleur (`controller`) NICHT der Spieler des ausführenden Helden ist (der Spieler der Karte lässt einen GEGNERHELDEN zuschlagen), kann das Auge
+    // nicht über `controller` + `heroIdx` finden (das wäre ein Held des Spielers). Die Quelle sagt es selbst: `truthSeeingEye: true|false` (der Aufrufer prüft die Ausrüstung des Ausführenden).
+    if (typeof sourceCard.truthSeeingEye === 'boolean') return sourceCard.truthSeeingEye;
     const owner = sourceCard.controller ?? sourceCard.owner ?? -1;
     const heroIdx = sourceCard.heroIdx ?? -1;
     if (owner < 0 || heroIdx < 0) return false;
