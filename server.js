@@ -8954,6 +8954,8 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     delete gs._spellExcludeTargets;
     delete gs._klonAufnahme;
     delete gs._bartasSecondCast;
+    delete gs._zweitzielWurf;   // W76a
+    delete gs._zweitzielId;
     delete gs._spellNegatedByEffect;
     delete gs._negationWhole;
     // v1277: beide Aktions-Flags sind oben ausgewertet — was danach noch

@@ -5755,8 +5755,12 @@ class GameEngine {
         }
 
         // Filter out excluded targets (Bartas second-cast, etc.)
-        const excludeIds = config._truthSeeingEye ? [] : (gs._spellExcludeTargets || []);
-        const filteredTargets = excludeIds.length > 0 ? targets.filter(t => !excludeIds.includes(t.id)) : targets;
+        // ★ W76a (Al: „das zweite Ziel darf NIE das bereits getroffene sein"): beim Zweitzielwurf (`gs._zweitzielWurf`) gilt der Ausschluss ausnahmslos — auch das Truth-Seeing Eye
+        // hebt ihn nicht auf (es negiert Sperr-Listen wie die der Invisibility Cloak, nicht die Regel „ein ZWEITES Ziel").
+        const excludeIds = (config._truthSeeingEye && !gs._zweitzielWurf) ? [] : (gs._spellExcludeTargets || []);
+        let filteredTargets = excludeIds.length > 0 ? targets.filter(t => !excludeIds.includes(t.id)) : targets;
+        // ★ W76a: der Zweitwurf trifft EIN weiteres Ziel — wählt der Spell mehrmals (Kirin Firebreath: je Schlag ein Ziel), bleibt es nach der ersten Wahl beim selben zweiten Ziel.
+        if (gs._zweitzielWurf && gs._zweitzielId && !config._skipDamageLog && !config._sondeListe) filteredTargets = filteredTargets.filter(t => t.id === gs._zweitzielId);
         if (filteredTargets.length === 0) return null;
 
         // ★ W78 (Backstab: Ausführender und Ziel in EINEM Picker): `_nurListe` liefert die fertig gefilterte/markierte Zielliste, ohne zu fragen; `_vorgewaehlt` (Ziel-Id) nimmt eine schon
@@ -5836,6 +5840,7 @@ class GameEngine {
         if (selected && gs._spellDamageLog && !config._skipDamageLog) {
           gs._spellDamageLog.push({ ...selected });
           engine._merkeZielSonde('damage', config, ctx);   // W75b: Bartas-Vorabprüfung des Zweitwurfs (`zweitwurfHatLegalesZiel`)
+          if (gs._zweitzielWurf && !gs._zweitzielId) gs._zweitzielId = selected.id;   // W76a: das EINE zweite Ziel (s. o.)
         }
 
         // ── Caller commit hook ──
@@ -6338,6 +6343,15 @@ class GameEngine {
           if (targets.length === 0) return [];
         }
 
+        // ★ W76a: Zweitwurf-/Wiederholungs-Ausschluss (Bartas, Grisgar, Andras, Idej Kunagi …): schon getroffene Ziele sind KEIN wählbares Ziel — wie in `promptDamageTarget`.
+        {
+          const _ausIds = (config._truthSeeingEye && !gs._zweitzielWurf) ? [] : (gs._spellExcludeTargets || []);
+          if (_ausIds.length > 0) {
+            for (let i = targets.length - 1; i >= 0; i--) if (_ausIds.includes(targets[i].id)) targets.splice(i, 1);
+            if (targets.length === 0) return [];
+          }
+        }
+
         // Performing-Hero target-count caps applied to the picker:
         //   • `singleTargetAttack` (Toras, Master of all Weapons) caps
         //     EVERY multi-pick the performing Hero opens to 1.
@@ -6377,11 +6391,13 @@ class GameEngine {
         // Idas Flagge bleibt auf Destruction Spells beschraenkt.
         const forceSingleAny = !!casterHeroFlag?.forcesSingleTargetAny;
         const forceSingleByToras = !!casterHeroFlag?.singleTargetAttack;
-        const maxCap = (forceSingleByToras || forceSingleByIda || forceSingleAny)
+        // ★ W76a (Al, Bartas & Co.): der Zweitzielwurf trifft EIN weiteres Ziel („you may choose a second target … to hit") — kein „up to N" (Fireball, Explosion, Magic Arrows,
+        // Pyroblast, Dance …). Und das schon getroffene Ziel ist ausgeschlossen (`gs._spellExcludeTargets`, siehe unten) — bisher ignorierte dieser Wähler die Liste.
+        const maxCap = (forceSingleByToras || forceSingleByIda || forceSingleAny || gs._zweitzielWurf)
           ? 1
           : (config.max || targets.length);
         const max = Math.min(maxCap, targets.length);
-        const min = config.min || 1;
+        const min = gs._zweitzielWurf ? Math.min(config.min || 1, Math.max(1, max)) : (config.min || 1);
 
         const selectedIds = await engine.promptEffectTarget(pi, targets, {
           title: config.title || cardInstance.name,
@@ -6451,6 +6467,7 @@ class GameEngine {
         if (gs._spellDamageLog) {
           for (const t of result) gs._spellDamageLog.push({ ...t });
           if (result.length > 0) engine._merkeZielSonde('multi', config, ctx);   // W75b
+          if (gs._zweitzielWurf && !gs._zweitzielId && result.length > 0) gs._zweitzielId = result[0].id;   // W76a
         }
 
         // ── Surprise window check ──
@@ -43087,7 +43104,19 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   surpriseAktivierbarJetzt(spielerIdx, cardName) {
     const script = loadCardEffect(cardName);
-    return !this.surpriseHartOPTVerbraucht(script, cardName, spielerIdx);
+    if (this.surpriseHartOPTVerbraucht(script, cardName, spielerIdx)) return false;
+    return !this.surpriseOncePerGameVerbraucht(script, cardName, spielerIdx);
+  }
+
+  /**
+   * ★ W76a (Al: „Ja, sperren!") — Pro-Spiel-Grenze einer Surprise („You can only play 1 "Tharxian Horse" per game", `oncePerGame` / `oncePerGameKey`).
+   * Dieselbe Quelle wie die Surprise-Fenster (`_canHeroActivateSurprise`: `ps._oncePerGameUsed` des Auslösers, Schlüssel `oncePerGameKey || cardName`) und
+   * `_activateSurprise` (stempelt bei der NICHT negierten Aktivierung, Z7c): „play 1" zählt die AKTIVIERTEN Exemplare, nicht das verdeckte Setzen.
+   * Ist die Grenze verbraucht, ist die Karte für Sabrina (Suche/Galerie, CPU), Cute Spider, Telekinesis & Co. KEIN legales Ziel (nicht angeboten, nicht gefizzelt).
+   */
+  surpriseOncePerGameVerbraucht(script, cardName, spielerIdx) {
+    if (!script?.isSurprise || !(script.oncePerGame || script.oncePerGameKey)) return false;
+    return !!this.gs.players?.[spielerIdx]?._oncePerGameUsed?.has(script.oncePerGameKey || cardName);
   }
 
   /**
@@ -43116,8 +43145,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!sonde?.ctx) return null;
     const vorherAusschluss = gs._spellExcludeTargets;
     const vorherZweit = gs._bartasSecondCast;
+    const vorherZweitziel = gs._zweitzielWurf;
     gs._spellExcludeTargets = [ersteZielId];
     gs._bartasSecondCast = true;
+    gs._zweitzielWurf = true;   // W76a: dieselbe Ausschluss-/Einzelziel-Regel wie der echte Zweitwurf
     try {
       const cfg = { ...sonde.config, _sondeListe: true };
       let liste;
@@ -43130,6 +43161,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     } finally {
       if (vorherAusschluss === undefined) delete gs._spellExcludeTargets; else gs._spellExcludeTargets = vorherAusschluss;
       if (vorherZweit === undefined) delete gs._bartasSecondCast; else gs._bartasSecondCast = vorherZweit;
+      if (vorherZweitziel === undefined) delete gs._zweitzielWurf; else gs._zweitzielWurf = vorherZweitziel;
     }
   }
 
@@ -43490,7 +43522,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       return null;
     }
     // ★ W75a: auch die erzwungenen Wege (Cute Spider, Sabrina, Telekinesis …) respektieren das harte Once-per-turn der Aktivierung.
-    if (script?.surpriseHartOPT) {
+    // ★ W76a: ebenso die Pro-Spiel-Grenze (`oncePerGame`: Tharxian Horse) — eine verbrauchte Surprise lässt sich auch aus Deck/Ablage nicht erzwingen.
+    if (script?.surpriseHartOPT || script?.oncePerGame || script?.oncePerGameKey) {
       const _hartSteuerer = (opts.isBakhmSlot || opts.fromDiscard || opts.fromDeck)
         ? (Number.isInteger(opts.steuerer) ? opts.steuerer : playerIdx)
         : this.surpriseKontrolleur(playerIdx, heroIdx);

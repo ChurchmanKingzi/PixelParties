@@ -49,6 +49,22 @@ const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Sabrina, the Psychic Witch';
 
+/**
+ * ★ W76a: EINE Eignungsprüfung für Gating UND Galerie — kann Sabrina diese Deck-Surprise überhaupt aktivieren?
+ *  • `surpriseAktivierbarJetzt` (W75b/W76a, Al: „Ja, sperren!"): harte Grenzen der Aktivierung — Once-per-turn (Aquatic Spear, `surpriseHartOPT`) und
+ *    Pro-Spiel-Grenze („You can only play 1 "Tharxian Horse" per game", `oncePerGame`) — eine verbrauchte Surprise ist KEIN legales Ziel der Suche.
+ *  • `canTelekinesisActivate: false` / Funktion: Surprises, die unter einem frei gewählten Auslöser nicht sinnvoll auflösen, bietet die Galerie nie an. Das Gating
+ *    (Heldeneffekt nutzbar? Opfer-Kandidaten?) rechnete sie bisher mit — der Effekt galt als nutzbar, obwohl die Galerie leer geblieben wäre.
+ */
+function sabrinaKannAktivieren(engine, pi, cn) {
+  if (!engine.surpriseAktivierbarJetzt(pi, cn)) return false;
+  const sScript = loadCardEffect(cn);
+  if (!sScript?.onSurpriseActivate) return false;
+  if (sScript.canTelekinesisActivate === false) return false;
+  if (typeof sScript.canTelekinesisActivate === 'function' && !sScript.canTelekinesisActivate(engine, pi)) return false;
+  return true;
+}
+
 /** Distinct Surprise levels present in `pi`'s main deck. */
 function deckSurpriseLevels(engine, pi) {
   const ps = engine.gs.players[pi];
@@ -61,7 +77,8 @@ function deckSurpriseLevels(engine, pi) {
     if (!cd) continue;
     if ((cd.subtype || '').toLowerCase() !== 'surprise') continue;
     // ★ W75b (Al): eine in diesem Zug gesperrte Surprise (Aquatic Spear, `surpriseHartOPT`) ist KEIN legales Ziel der Suche — weder fürs Gating noch für die Galerie.
-    if (!engine.surpriseAktivierbarJetzt(pi, cn)) continue;
+    // ★ W76a: ebenso eine Surprise mit verbrauchter Pro-Spiel-Grenze (Tharxian Horse) und eine, die unter frei gewähltem Auslöser nicht auflöst.
+    if (!sabrinaKannAktivieren(engine, pi, cn)) continue;
     seen.add(cn);
     levels.push(cd.level || 0);
   }
@@ -178,12 +195,7 @@ module.exports = {
         if (!cd) continue;
         if ((cd.subtype || '').toLowerCase() !== 'surprise') continue;
         if ((cd.level || 0) > sacLevel) continue;
-        if (!engine.surpriseAktivierbarJetzt(pi, cn)) continue;   // W75b: gesperrte Surprise (Aquatic Spear) wird nicht angeboten
-        const sScript = loadCardEffect(cn);
-        if (!sScript?.onSurpriseActivate) continue;
-        if (sScript.canTelekinesisActivate === false) continue;
-        if (typeof sScript.canTelekinesisActivate === 'function'
-            && !sScript.canTelekinesisActivate(engine, pi)) continue;
+        if (!sabrinaKannAktivieren(engine, pi, cn)) continue;   // W75b/W76a: gesperrte (Aquatic Spear) bzw. verbrauchte (Tharxian Horse) Surprise wird nicht angeboten
         seen.add(cn);
         eligibleSurprises.push({ name: cn, source: 'deck' });
       }
