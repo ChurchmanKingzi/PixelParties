@@ -105,6 +105,11 @@ module.exports = {
       const ps = gs.players[pi];
       if (!ps) return;
 
+      // „Directly into play" durch eine ANDERE Karte (Planet in a Bottle, Reality Crack …): The Bonegrinder wird nicht GESPIELT, es gibt keine
+      // Aktion, die sie zur Zusatzaktion machen koennte - also auch keinen Skelett-Abwurf (Pflicht-Kosten der Haupt-Phase). Nur platzieren.
+      const _loest = ps._resolvingCard;
+      if (_loest && _loest.name && _loest.name !== CARD_NAME) { await engine.placeArea(pi, ctx.card); return; }
+
       // Decide which path this cast took:
       //   • Main Phase + Skeleton(s) in discard → INHERENT branch.
       //     server.js's `doPlaySpell` consulted `inherentAction()` and
@@ -278,7 +283,9 @@ module.exports = {
       // this Bonegrinder. Cross-player discards (a future opp-
       // induced discard) don't qualify.
       if (ctx.playerIdx !== myController) return;
-      const cardName = ctx.cardName || ctx.discardedCardName;
+      // `ctx.cardName` ist im Listener-Kontext der Name der LAUSCHENDEN Karte (The Bonegrinder), nicht der der abgelegten -
+      // `discardedCardName` zuerst (sonst war die Hand-Ablage-Klausel nie ein Skelett und griff nie).
+      const cardName = ctx.discardedCardName || ctx.cardName;
       if (!cardName) return;
       if (!isSkeletonCreature(cardName, engine)) return;
 
