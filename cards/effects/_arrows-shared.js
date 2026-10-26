@@ -133,7 +133,7 @@ function arrowTriggerCondition(gs, pi, engine, chainCtx, _opts = {}) {
 
   // Als Ruling (Al 26.10.): „Eine andere Regel, die dann für ALLE True-Damage-Sources gelten soll: Diese können Hydra Blood Arrow schlicht nicht aktivieren." — ein Pfeil, der den
   // Schaden auf 0 SENKT (`opts.blockUnreducible`, Hydra Blood Arrow), wird nicht angeboten, wenn der Schaden der Attack QUELLEN-seitig unreduzierbar ist (Surefire Shot, Elixir of Strength,
-  // Club of Gobbo …; EIN Prädikat: `engine._attackSchadenUnreduzierbar`). Das Fenster öffnet VOR der Zielwahl: ein Elixir bei Mehrziel-Attacks entscheidet erst der Treffer (`applyArrowsZero`);
+  // Club of Gobbo …; EIN Prädikat: `engine._attackSchadenUnreduzierbar`). Das Fenster öffnet VOR der Zielwahl; ein bereitstehender Elixir sperrt Hydra bei JEDER Attack (Ruling Al 26.10.: „die müssen sich ausschließen“);
   // ZIEL-seitiges „cannot be reduced" (Tempeste, Brachion …) sperrt Hydra nicht.
   if (_opts.blockUnreducible && engine?._attackSchadenUnreduzierbar?.({ link: initial })) return false;
 
@@ -258,11 +258,15 @@ function stashPreZero(hero, target, betrag) {
   }
 }
 
+/** Trägt dieser Held eine scharfe Hydra Blood Arrow (`setAmount0`, an der laufenden Attack gekettet)? Elixir of Strength nimmt ihn dann nicht als Ziel (gegenseitiger Ausschluss, Al 26.10.). */
+function heroHatScharfeHydra(hero) {
+  return !!hero?._armedArrows?.some(a => a.setAmount0);
+}
+
 /** Trägt der Angreifer eine scharfe Hydra Blood Arrow (`setAmount0`)? */
 function hydraScharf(engine, source) {
   if (!source) return false;
-  const hero = heroFromSource(engine, source);
-  return !!hero?._armedArrows?.some(a => a.setAmount0);
+  return heroHatScharfeHydra(heroFromSource(engine, source));
 }
 
 /** Wird die scharfe Hydra Blood Arrow diesen Treffer auf 0 setzen? Für Fenster, die VOR der Null nichts mehr sehen sollen (Reaktionen am Ziel). */
@@ -496,6 +500,7 @@ module.exports = {
   noteArrowActivated,
   applyArrowsBeforeDamage,
   applyArrowsZero,
+  heroHatScharfeHydra,
   hydraScharf,
   hydraWirdNullen,
   applyArrowsAfterDamage,

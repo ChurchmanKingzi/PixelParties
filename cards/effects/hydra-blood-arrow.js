@@ -21,8 +21,14 @@
 //  ein mit Elixir of Strength verstärkter Treffer, Club of Gobbo am Angreifer
 //  (auch für dessen Träger: „Club of Gobbo macht Hydra Blood Arrow für seinen
 //  Träger unbenutzbar, ja") — EIN Prädikat, `engine._attackSchadenUnreduzierbar`
-//  (Option `blockUnreducible` der Bedingung). Das Fenster öffnet VOR der Zielwahl;
-//  ein Elixir bei Mehrziel-Attacks entscheidet erst der Treffer (`_unreduzierbar`).
+//  (Option `blockUnreducible` der Bedingung). Das Fenster öffnet VOR der Zielwahl.
+//
+//  Als Ruling (Al 26.10.): „Hydra Arrow *darf nicht* zusammen mit Elixir of Strength an
+//  irgendwas angekettet werden, die müssen sich ausschließen." Ein bereitstehender
+//  Elixir of Strength (Buff `empowered_strike`) des angreifenden Helden sperrt die Hydra
+//  bei JEDER Attack — auch bei Mehrziel-Attacks (Ricochet, Whirlwind Strike) und
+//  virtuellen Attack-Ketten (Bamboo Staff & Co.); umgekehrt nimmt der Elixir keinen
+//  Helden mit scharfer Hydra als Ziel (`elixir-of-strength.js`).
 //
 //  Als Ruling (Al 26.10.): ZIEL-seitiges „cannot be reduced" (Tempeste, Prophecy of
 //  Tempeste, Gigantisaur Brachion, Monia Bot, Test Dummy …) hält Hydra NICHT auf:

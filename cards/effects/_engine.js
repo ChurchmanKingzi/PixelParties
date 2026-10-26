@@ -41972,8 +41972,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    * (`_arrows-shared`: Hydra Blood Arrow), fragt nur hier, nicht je Quelle:
    *   • `ctx.link` (Kettenfenster, Initialglied der Attack): die Arrows-Fenster öffnen VOR der Zielwahl, also zählt, was schon vorher feststeht — das Skript der Attack
    *     (`attackDamageCannotBeReduced: true`: Surefire Shot; Clash of Champions trägt es künftig ebenso), Ausrüstung des Angreifers mit `attackerDamageCannotBeReduced: true`
-   *     (Club of Gobbo; ruht nicht, solange `isCardPassiveDormant` verneint) und ein bereitstehender Elixir of Strength (`empowered_strike`) — der Elixir feuert nur bei GENAU
-   *     einem Ziel, bei Attacks, die mehrere treffen können (`hitsMultipleTargets`: Whirlwind Strike, Ricochet), entscheidet erst der Treffer (unten).
+   *     (Club of Gobbo; ruht nicht, solange `isCardPassiveDormant` verneint) und ein bereitstehender Elixir of Strength des Angreifers (`empowered_strike`) — für JEDE Attack, auch
+   *     Mehrziel-Attacks (Ruling Al 26.10.: Hydra und Elixir schließen sich gegenseitig aus, siehe unten).
    *   • `ctx.hookCtx` (der einzelne Treffer — Heldenzweig: hookCtx von `_actionDealDamageImpl`, Kreaturenzweig: Proxy des Batch-Eintrags): nur die QUELLEN-Marke `_unreduzierbar`
    *     (gesetzt von Elixir of Strength, Club of Gobbo und dem True-Damage-Weg `trueDamage`). Bewusst NICHT `cannotBeReduced`: das tragen auch ZIEL-seitige Sperren
    *     (Tempeste, Prophecy of Tempeste, Gigantisaur Brachion, Monia Bot, Test Dummy, Dichotomy …) — Als Ruling (Al 26.10.): „in dem Fall wird der Schaden ganz normal zu 0 und in Gift
@@ -41997,7 +41997,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this.isCardPassiveDormant(inst)) continue;
       return true;
     }
-    return !!hero.buffs?.empowered_strike && !script?.hitsMultipleTargets;
+    // Als Ruling (Al 26.10.): „Hydra Arrow *darf nicht* zusammen mit Elixir of Strength an irgendwas angekettet werden, die müssen sich ausschließen." — auch bei Attacks, die mehrere
+    // Ziele treffen können (Ricochet, Whirlwind Strike): ein bereitstehender Elixir des Angreifers sperrt Hydra Blood Arrow. Umgekehrt nimmt der Elixir keinen Helden mit scharfer Hydra
+    // als Ziel (`elixir-of-strength.js`: `heroHatScharfeHydra`).
+    return !!hero.buffs?.empowered_strike;
   }
 
   /** True if a hero object is shielded. Convenience overload for targets passed by reference. */
