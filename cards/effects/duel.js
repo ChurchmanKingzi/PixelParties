@@ -103,6 +103,10 @@ async function waehle(engine, chooser, liste, beschreibung, markierung) {
 }
 
 module.exports = {
+  // ★ W76a: die Zahl der Beteiligten legt der Kartentext fest („Both players choose a Hero …", ein Zweikampf zweier Duellanten) — Zusatzziel-Helden (Andras mit Fighting 4) bieten keinen
+  // Zweitschlag an: eine Wiederholung ließe dieselben Duellanten ein zweites Mal gegeneinander antreten (statt „ein zweites Ziel zu treffen").
+  fixedTargetCount: true,
+
   // Ohne zwei Duellanten und bei Erstrunden-Schutz des Gegners ausgegraut.
   spellPlayCondition(gs, pi, engine) {
     if (!engine) return true;

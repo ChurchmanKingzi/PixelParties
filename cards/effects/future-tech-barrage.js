@@ -77,7 +77,9 @@ module.exports = {
 
       // ★ Z7 (A03-21): Rundensperre erst NACH der Zusage stempeln (Muster Iterative Testing) — ein
       // Abbruch der Zielwahl darf den Zug nicht verbrennen (Regel 23.9). Vorab nur prüfen.
-      if (gs.hoptUsed?.[`future-tech-barrage:${pi}`] === gs.turn) {
+      // ★ W76a: Bartas' Zweitwurf („you may choose a second target for the Spell to hit afterwards") ist kein weiteres SPIELEN der Karte — der Hauptwurf hat den Stempel schon
+      // gesetzt; der Zweitwurf zählt dieselbe Ablage (die Karte selbst liegt noch auf der Hand) und schlägt gleich oft zu.
+      if (!gs._zweitzielWurf && gs.hoptUsed?.[`future-tech-barrage:${pi}`] === gs.turn) {
         gs._spellCancelled = true;
         return;
       }
