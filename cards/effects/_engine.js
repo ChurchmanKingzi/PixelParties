@@ -15458,6 +15458,11 @@ class GameEngine {
     // routes here as area→discard). The manual `removeArea` discard path
     // fires the same window separately. No-op when nothing listens.
     if (fromZone === 'area' && toZone !== 'area') {
+      // ★ Welle 6b (Gigalopolis): „cannot be removed from the board in any way" — auch ohne Schutztor (`skipProtection`) und für eigene Abgänge.
+      if (this.areaUnentfernbar(cardInstance)) {
+        this.log('area_protected', { player: this.gs.players[cardInstance.owner]?.username, area: cardInstance.name, by: 'unremovable' });
+        return;
+      }
       // EIN Schutztor — beide Protokolle stecken darin (siehe
       // `tryAreaProtection`). Vorher standen hier zwei Bloecke
       // hintereinander.
@@ -15772,7 +15777,10 @@ class GameEngine {
     // additive: a defense for paths that don't.
     let _sofortWiederbelebt = false;   // Welle 10 (Q38): Bone Dog hat schon VOR den Todes-Triggern wiederbelebt
     let shouldFireDeath = !!opts.fireCreatureDeath;
+    // ★ Welle 6b (Barrel Home): `opts.ohneNiederlage` — „Creatures sent that way do not count as being defeated": die Karte geht Support → Ablage OHNE Todes-Hooks
+    // (kein `onCreatureDeath`, kein Kadaver-Anspruch); `onCardLeaveZone` & Co. laufen wie bei jeder Karte, die das Brett verlässt.
     if (!shouldFireDeath
+        && !opts.ohneNiederlage
         && fromZone === ZONES.SUPPORT
         && (toZone === ZONES.DISCARD || toZone === ZONES.DELETED)) {
       const cd = this.getEffectiveCardData(cardInstance) || this._getCardDB()[cardInstance.name];   // wirksame Kartendaten: Tokens liegen unter dem Namen einer Potion (Als Sweep 9.10.)
@@ -32168,6 +32176,16 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ Welle 6b (Gigalopolis, the Mega-City): „This card on the board is unaffected by all other cards and effects and cannot be removed from the board in any way."
+   * Ein Area-Skript exportiert `areaUnremovable: true`. Solange die Area in einer Area-Zone liegt, verlässt sie das Brett nie: `removeArea`, `deleteArea`, der Area-Zweig von
+   * `actionMoveCard` (Rückhand, Deck, Zerstörung) und `enforceAreaLimit` (Wahl bei zu vielen Areas) fragen diese Methode — auch Abgänge mit `skipProtection`. „Unaffected" deckt
+   * `tryAreaProtection` ab (jedes Schutztor, das eine Area als Ziel nennt, lehnt ab).
+   */
+  areaUnentfernbar(inst) {
+    return !!inst && inst.zone === 'area' && !!loadCardEffect(inst.name)?.areaUnremovable;
+  }
+
+  /**
    * ═══ AREA-LIMIT (v1050, „Spatial Crevice") ═══════════════════════════
    * Wie viele Areas darf `playerIdx` gleichzeitig kontrollieren?
    *
@@ -32232,16 +32250,19 @@ this._deathWatch = (this._deathWatchStack || []).length
       const limit = this.areaLimitFor(playerIdx);
       if (namen.length <= limit) return;
 
-      let wahl = namen[namen.length - 1];   // Rueckfall: die zuletzt gelegte
-      if (namen.length > 1 && !this._inMctsSim && !this._fastMode) {
+      // ★ Welle 6b (Gigalopolis): eine unentfernbare Area ist nie die Wahl; bleibt keine entfernbare übrig, bleibt der Überhang stehen.
+      const waehlbar = namen.filter(n => !loadCardEffect(n)?.areaUnremovable);
+      if (waehlbar.length === 0) return;
+      let wahl = waehlbar[waehlbar.length - 1];   // Rueckfall: die zuletzt gelegte
+      if (waehlbar.length > 1 && !this._inMctsSim && !this._fastMode) {
         const antwort = await this.promptGeneric(playerIdx, {
           type: 'cardGallery',
-          cards: namen.map(n => ({ name: n, source: 'area' })),
+          cards: waehlbar.map(n => ({ name: n, source: 'area' })),
           title: 'Too many Areas',
           description: `You may only control ${limit} Area${limit === 1 ? '' : 's'}. Choose one to send to the discard pile.`,
           cancellable: false,
         });
-        if (antwort?.cardName && namen.includes(antwort.cardName)) wahl = antwort.cardName;
+        if (antwort?.cardName && waehlbar.includes(antwort.cardName)) wahl = antwort.cardName;
       }
       const inst = this.cardInstances.find(c =>
         c.name === wahl && c.zone === 'area' && c.owner === playerIdx);
@@ -32311,6 +32332,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = gs.players[ownerIdx];
     if (!ps) return;
     const cardName = cardInstance.name;
+
+    // ★ Welle 6b (Gigalopolis): unentfernbar — vor jedem Schutztor, gilt auch für eigene Abgänge (`skipProtection`) und `removeAllAreas`.
+    if (this.areaUnentfernbar(cardInstance)) {
+      this.log('area_protected', { player: ps.username, area: cardName, by: 'unremovable' });
+      return;
+    }
 
     // ── Area-protection window ──
     // "When an Area would be affected by a card or effect" (Guardian of
@@ -32389,6 +32416,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = gs.players[ownerIdx];
     if (!ps || cardInstance.zone !== 'area') return false;
     const cardName = cardInstance.name;
+    if (this.areaUnentfernbar(cardInstance)) {   // ★ Welle 6b (Gigalopolis): auch nicht löschbar
+      this.log('area_protected', { player: ps.username, area: cardName, by: 'unremovable' });
+      return false;
+    }
     if (!opts.skipProtection) {
       const quelle = opts.source || { name: sourceName, owner: opts.sourceOwner };
       const quellBesitzer = opts.sourceOwner != null ? opts.sourceOwner : this.gs.activePlayer;
@@ -32437,6 +32468,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // (z. B. von `enforceAreaLimit` nach dem Entfernen von Spatial Crevice
       // abgelegt), darf nicht ein zweites Mal in die Ablage (A01-pollution-12).
       if (inst.zone !== 'area') continue;
+      if (this.areaUnentfernbar(inst)) continue;   // ★ Welle 6b (Gigalopolis): bleibt liegen und zählt nicht als entfernt („für jede entfernte Area …")
       await this.removeArea(inst, sourceName);
       removed++;
     }
@@ -38479,6 +38511,28 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ Welle 6b (Great Immortal Hydra) — SELBSTRETTUNG einer Kreatur vor dem Besiegen: „when this Creature would be defeated, it is fully healed instead".
+   * Ein Skript exportiert `creatureSelfRescue(engine, inst, source, amount, type, info) → { saved?: bool } | Promise<…>`; `type` ist die Todesart
+   * ('attack'/'spell'/'creature'/… beim Schadenstod, 'destroy' bei Zerstörung). Das Skript heilt/setzt die HP selbst, `saved: true` bricht das Besiegen ab
+   * (Schadens-Batch: Eintrag überspringen; `actionDestroyCard`: kein Besiegen). Läuft an beiden Todeswegen (Schadens-Batch, Zerstörung) VOR Extra Life und
+   * VOR den Handreaktionen. Nicht für Opfer (`info.isSacrifice`: Kosten sind kein „defeat"), nicht für verdeckte Karten; eine ruhende Kreatur
+   * (Frozen/Stunned/Negated, Aura-Negation) rettet sich nicht.
+   */
+  async _creatureSelfRescue(inst, source, amount, type, info = {}) {
+    if (!inst || inst.zone !== ZONES.SUPPORT || inst.faceDown || info.isSacrifice) return false;
+    const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
+    if (typeof script?.creatureSelfRescue !== 'function') return false;
+    if (this.isCardPassiveDormant(inst)) return false;
+    try {
+      const res = await script.creatureSelfRescue(this, inst, source, amount, type, info);
+      return !!res?.saved;
+    } catch (err) {
+      console.error(`[creatureSelfRescue] ${inst.name} threw:`, err.message);
+      return false;
+    }
+  }
+
+  /**
    * Creature pre-defeat hand-reaction window. Mirrors
    * `_checkPreDamageHandReactions` but for the CREATURE damage path —
    * fires once per lethal entry inside `actionApplyDamageBatch`,
@@ -38506,6 +38560,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
     if (this._inCreaturePreDefeatReaction) return false;
     if (!creatureInst) return false;
+    // ★ Welle 6b (Great Immortal Hydra): die Kreatur rettet sich selbst, noch vor jeder Handkarte (kostet nichts, ist automatisch).
+    if (!info.selbstRettungGeprueft && await this._creatureSelfRescue(creatureInst, source, amount, type, info)) return true;
 
     // Demon's Gate-style creature-caster annotation.
     source = this._rewriteSourceForCreatureCaster(source);
@@ -46686,14 +46742,18 @@ this._deathWatch = (this._deathWatchStack || []).length
       && c.name !== cardName && this.zusatzNameVon(c) === cardName);
   }
 
-  nurEinerSchonKontrolliert(pi, cardName) {
+  nurEinerSchonKontrolliert(pi, cardName, ausser = null) {
     const cd = this._getCardDB()[cardName];
     if (!cd || cd.cardType !== 'Creature') return false;
+    // ★ Welle 6b (Great Immortal Hydra): „Only 1 "X" can be on the board at a time" — BRETTWEIT (beide Seiten, jede Kontrolle), nicht je Spieler.
+    if ((cd.effect || '').includes(`Only 1 "${cardName}" can be on the board at a time`)) {
+      return this.cardInstances.some(c => c !== ausser && this.instHatName(c, cardName) && c.zone === 'support' && !c.faceDown);
+    }
     // Welle 12 (Al, Rueckfrage 12): „You can only play 1 'X' per turn" (Mausoleum Worm) sperrt dieselben Wege wie „You can only control 1": Platzier-Effekte
     // (Glorious Rebirth …) und das Ausgrauen der Handkopien - der erste Eintritt dieses Zuges zaehlt (`playLimitKey`, `_eintrittsLimitErreicht`).
     if (this._eintrittsLimitErreicht(cardName, pi)) return true;
     if (!(cd.effect || '').includes(`You can only control 1 "${cardName}"`)) return false;
-    return this.cardInstances.some(c => this.instHatName(c, cardName) && c.zone === 'support' && !c.faceDown
+    return this.cardInstances.some(c => c !== ausser && this.instHatName(c, cardName) && c.zone === 'support' && !c.faceDown
       && (c.controller ?? c.owner) === pi);
   }
 
@@ -46707,7 +46767,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   uebernahmeUnzulaessig(inst, neuerKtrl, zielSeite = null, zielHeroIdx = null) {
     if (!inst || neuerKtrl == null) return null;
-    if ((inst.controller ?? inst.owner) !== neuerKtrl && this.nurEinerSchonKontrolliert(neuerKtrl, inst.name)) return 'only_control_1';
+    if ((inst.controller ?? inst.owner) !== neuerKtrl && this.nurEinerSchonKontrolliert(neuerKtrl, inst.name, inst)) return 'only_control_1';
     if (zielSeite != null && zielHeroIdx != null && zielHeroIdx >= 0) {
       const { isGigantisaurCreature } = require('./_gigantisaurs-shared');
       if (isGigantisaurCreature(inst.name, this)) {
@@ -55475,6 +55535,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       // continues unaffected, just like `negated: true` does in the
       // hero pre-damage path.
       if (e.inst.counters.currentHp > 0 && actualAmount >= e.inst.counters.currentHp) {
+        // ★ Welle 6b (Great Immortal Hydra): Selbstrettung VOR Extra Life und Handreaktionen (`_creatureSelfRescue`).
+        if (await this._creatureSelfRescue(e.inst, e.source, actualAmount, e.type, {})) {
+          delete e.inst.counters._dyingThisBatch;
+          this.log('creature_pre_defeat_save', { creature: e.inst.name, by: e.inst.name });
+          this.sync();
+          await this._delay(150);
+          continue; // skip HP subtraction + death branch
+        }
         // Generic "extra life" mark consumer (Trial of Coolness, etc.).
         // Distinct from Bone Dog: this is a true die-and-revive — we
         // stamp `_reviveAfterDeath.fireHooks` and let the death branch
@@ -55507,7 +55575,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         } else {
           // ★ Welle 14 (Al, Q10, Cloud in a Bottle): eine Reaktion kann den TÖDLICHEN Betrag herabsetzen, ohne die Kreatur zu retten
           // (`info.amountOverride`, die Reaktion setzt ihn in `creaturePreDefeatResolve`): reicht der neue Betrag weiter, stirbt sie trotzdem.
-          const _pdInfo = {};
+          const _pdInfo = { selbstRettungGeprueft: true };
           const saved = await this._checkCreaturePreDefeatHandReactions(e.inst, e.source, actualAmount, e.type, _pdInfo);
           if (!saved && Number.isFinite(_pdInfo.amountOverride) && _pdInfo.amountOverride >= 0 && _pdInfo.amountOverride < actualAmount) {
             this.log('creature_pre_defeat_amount_override', { creature: e.inst.name, original: actualAmount, override: _pdInfo.amountOverride });
@@ -56774,6 +56842,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async tryAreaProtection(targetInst, source, sourceOwnerIdx, opts = {}) {
     if (!targetInst) return false;
+    // ★ Welle 6b (Gigalopolis): „unaffected by all other cards and effects" — kein Zugriff gelingt (Skripte mit `areaUnremovable`).
+    if (this.areaUnentfernbar(targetInst)) return true;
 
     // ── EINMAL-MERKER ───────────────────────────────────────────────
     // Vier Karten (The Yeeting, Hammer Skeleton, Coolness Overcharge,
