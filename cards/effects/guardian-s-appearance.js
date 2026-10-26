@@ -66,9 +66,10 @@ module.exports = {
         cards: gallery,
         title: CARD_NAME,
         description: 'Choose a Guardian Beast Creature in your hand to place onto any of your Heroes (ignores summoning restrictions).',
-        cancellable: false,
+        cancellable: true,   // Wahlstufen vor dem Zusagepunkt sind abbrechbar (CARD_API „Zielende Karten sind immer abbrechbar")
       });
-      if (!pickHand?.cardName) return;
+      if (!pickHand || pickHand.cancelled) { gs._spellCancelled = true; return; }
+      if (!pickHand.cardName) return;
       const beastName = pickHand.cardName;
 
       // Step 2: pick a free zone on one of the caster's alive heroes.
@@ -80,9 +81,9 @@ module.exports = {
       const slotPick = await promptCtx.promptZonePick(zones, {
         title: CARD_NAME,
         description: `Place ${beastName} into which zone?`,
-        cancellable: false,
+        cancellable: true,
       });
-      if (!slotPick) return;
+      if (!slotPick || slotPick.cancelled) { gs._spellCancelled = true; return; }
       const feld = slotPick.owner ?? pi;
 
       // Step 3: remove from hand & place. Use isPlacement+skipBeforeSummon

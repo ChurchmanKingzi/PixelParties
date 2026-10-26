@@ -18,6 +18,16 @@
 const ONCE_PER_GAME_KEY = '_guardDutyUsed';
 const CARD_NAME = 'Guard Duty';
 
+/**
+ * Darf `p` seine Ablage jetzt ins eigene Deck zurückmischen? Zurückmisch-Sperre (Hatusbal; Distracting Crystal in `p`s Hand) UND die
+ * Ablage-Ausgangssperren (Knight of Kings [B], Stab-Sperre, Freikauf des Eye of Ren) — die Karte schob die Ablage sonst an allen vorbei.
+ * Ist es gesperrt, entfällt NUR dieser Teil (wie bei Meditation); der Teil des Gegners bleibt davon unberührt.
+ */
+async function ablageMischenErlaubt(engine, p) {
+  if (engine.shuffleBackIntoOwnDeckBlocked(p, { fromHandOrDiscard: true })) return false;
+  return engine._discardOutAllowed(p, { sourceOwner: p });
+}
+
 module.exports = {
   // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).
   // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
@@ -50,7 +60,7 @@ module.exports = {
 
       // Step 1: caster's discard → caster's main deck, then shuffle.
       const myDp = ps.discardPile || [];
-      if (myDp.length > 0) {
+      if (myDp.length > 0 && await ablageMischenErlaubt(engine, pi)) {
         const moved = myDp.length;
         ps.mainDeck.push(...myDp);
         // In place leeren, das Array nicht ersetzen: sonst geht ein
@@ -66,7 +76,7 @@ module.exports = {
 
       // Step 2: prompt opponent (yes/no). Fizzle silently if opp's
       // discard is empty — no choice to offer.
-      if (ops?.discardPile?.length > 0) {
+      if (ops?.discardPile?.length > 0 && await ablageMischenErlaubt(engine, oi)) {
         const choice = await engine.promptGeneric(oi, {
           type: 'optionPicker',
           title: CARD_NAME,
@@ -83,6 +93,7 @@ module.exports = {
           ops.discardPile.length = 0;   // in place (A04-cute-08)
           engine.shuffleDeck(oi, 'main');
           engine.log('guard_duty_shuffle_opp', { player: ops.username, moved });
+          await engine.noteShuffledBack(oi, moved, CARD_NAME);   // Hatusbal/Leadership des Gegners zählen sein Zurückmischen
         }
       }
 
