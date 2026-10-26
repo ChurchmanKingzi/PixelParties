@@ -49,6 +49,13 @@
 //    noch — der Text verbietet nur das Umgekehrte.
 //    Die regulaere Zug-Aktion bleibt unberuehrt; gesperrt sind
 //    ausschliesslich ZUSATZaktionen.
+//
+//  • ★ Als Ruling (Al 26.10.): Duigno × Mission of the Light Brigade.
+//    Mission als erste Aktion + Duigno auf dem Brett = nur EINE
+//    Zusatzaktion. Duigno blockiert fremde Zusatzaktionen, Mission
+//    gewaehrt also keine, verbraucht nur die erste Aktion, und uebrig
+//    bleibt Duignos eigene zweite Aktion. Die Sperre nach der ersten
+//    Zusatzaktion (Missions zweite bleibt zu) ist GEWOLLT, kein Fehler.
 // ═══════════════════════════════════════════
 
 const { secondActionGrant, secondActionHooks, isSecondActionGrant } = require('./_second-action-shared');
@@ -119,12 +126,7 @@ module.exports = {
       // gemeinsame Hook die Phase offenhaelt.
       if (ps && (ps._actionsPlayedThisTurn || 0) >= 1 && isSecondActionGrant(engine, inst)) {
         for (const [tid, n] of Object.entries(inst.counters?.aaGrants || {})) {
-          if (n > 0 && tid.startsWith('second_action')) {
-            engine.expireAdditionalActionType(inst, tid);
-            // Der Zuschlag verfaellt UNBENUTZT (die zweite Aktion bezahlte eine fremde Zusatzaktion, z. B. Mission of the Light Brigade) —
-            // dann gilt Duignos Preis („cannot perform any other additional Actions") nicht (s. `onAdditionalActionUsed`).
-            inst.counters._duignoVerfallen = engine.gs.turn;
-          }
+          if (n > 0 && tid.startsWith('second_action')) engine.expireAdditionalActionType(inst, tid);
         }
         engine.log('duigno_grant_fizzle', { player: ps.username });
         engine.sync();
@@ -141,8 +143,6 @@ module.exports = {
       await secondActionHooks.onAdditionalActionUsed(ctx);
       if (!inst || inst.name !== CARD_NAME) return;
       if (!isSecondActionGrant(engine, inst)) return;
-      // Duignos Zuschlag ist unbenutzt verfallen (fremde Zusatzaktion bezahlt): kein Preis, die uebrigen Zusatzaktionen bleiben offen.
-      if (inst.counters?._duignoVerfallen === engine.gs.turn) return;
       // Noch offene Zuschlaege an DIESER Instanz? Dann war es nicht der
       // ihre, die gerade verbraucht wurde.
       const offen = Object.entries(inst.counters?.aaGrants || {})
