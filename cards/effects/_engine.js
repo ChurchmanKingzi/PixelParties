@@ -9174,22 +9174,22 @@ class GameEngine {
 
   /**
    * W16f (H01-08): blockt Monias Schild einen Effekt auf `inst`? Der Schild gehört zu der Karte/dem Effekt, die ihn ausgelöst hat: eine ANDERE benannte
-   * Quelle (unabhängiger Effekt im selben Zug, z. B. eine Reaktion) wird nicht geblockt; ohne bekannte Quelle auf einer der beiden Seiten gilt der Schild wie bisher.
+   * Quelle (unabhängiger Effekt im selben Zug, z. B. eine Reaktion) wird nicht geblockt; ohne bekannte Quelle gilt der Schild wie bisher.
    * ★ W58a: ohne Einmal-pro-Zug-Sperre kann eine Auflösung mehrere angenommene Angebote tragen (`gs._moniaAngebote`: { key = Name der Karte/des Effekts, pi, seite }) —
-   * jedes schützt SEINE Seite vor SEINER Quelle; die einzelne Marke `_moniaShieldActive`/`_moniaShieldSource` bleibt als Spiegel des zuletzt angenommenen Angebots.
-   * `seite` = die Seite, unter der `inst` zählt (Aufrufer: Besitzer oder Kontrolleur; Standard Kontrolleur).
+   * jedes schützt vor SEINER Quelle; die einzelne Marke `_moniaShieldActive`/`_moniaShieldSource` bleibt als Spiegel des zuletzt angenommenen Angebots.
+   * ★ W77a (Al, 26.10.2026): ein angenommenes Angebot schützt ALLE Kreaturen BEIDER Seiten („negate any effects that card or effect has on all Creatures") —
+   * die Seite der Kreatur spielt keine Rolle mehr (`seite` bleibt als Parameter, wird ignoriert).
    */
-  moniaSchildBlockt(inst, source, seite) {
+  moniaSchildBlockt(inst, source, _seite) {
     if (!inst) return false;
-    if (seite == null) seite = inst.controller ?? inst.owner;
     const q = typeof source === 'string' ? source : (source?.name || source?.cardName);
     for (const a of (this.gs?._moniaAngebote || [])) {
-      if (a.seite == null || a.seite !== seite) continue;
+      if (a.seite == null) continue;
       if (a.key && q && a.key !== q) continue;
       return true;
     }
     const marke = this.gs?._moniaShieldActive;
-    if (marke == null || marke !== seite) return false;
+    if (marke == null) return false;
     const schildQuelle = this.gs._moniaShieldSource?.name;
     if (schildQuelle && q && q !== schildQuelle) return false;
     return true;
