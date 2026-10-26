@@ -170,9 +170,11 @@ module.exports = {
     // until every tribute is in the pile before resolving — matches
     // the engine-wide "discards first, reactors after" ordering.
     return await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
+      // ★ Abbruchregel (CARD_API „Auftritt/Kosten erst nach dem Commit"): erst ALLE drei Wahlen treffen (jede abbrechbar), dann erst abwerfen —
+      // vorher blieben bei „Back" in der 2./3. Wahl die schon abgeworfenen Gigantisaurs in der Ablage, ohne dass Chimera kam.
       const discardedNames = new Set();
-      let discarded = 0;
-      while (discarded < 3) {
+      const picks = [];   // { name, handIndex } — Handindizes gelten, solange noch nichts abgeworfen ist
+      while (picks.length < 3) {
         const eligibleIndices = [];
         for (let i = 0; i < (ps.hand || []).length; i++) {
           if (i === resolvingIdx) continue;
@@ -183,7 +185,7 @@ module.exports = {
         }
         if (eligibleIndices.length === 0) return false;
 
-        const remaining = 3 - discarded;
+        const remaining = 3 - picks.length;
         const result = await engine.promptGeneric(pi, {
           type: 'forceDiscardCancellable',
           title: CARD_NAME,
@@ -197,14 +199,19 @@ module.exports = {
 
         // ★ W74c: Boris darf auch diese Abwurf-KOSTEN der Beschwörung („sending 3 Gigantisaur … to the discard pile") ignorieren — einmal nach der ersten
         // Wahl, vor dem ersten Abwurf. Feste Kosten: Verzicht = die Beschwörung gilt als bezahlt, alle Karten bleiben auf der Hand.
-        if (discarded === 0 && await engine.borisVerzicht(pi, 3, { source: CARD_NAME })) return true;
+        if (picks.length === 0 && await engine.borisVerzicht(pi, 3, { source: CARD_NAME })) return true;
 
-        const ok = await engine.actionDiscardHandCard(pi, result.cardName, result.handIndex, {
+        picks.push({ name: result.cardName, handIndex: result.handIndex });
+        discardedNames.add(result.cardName);
+      }
+
+      // Alle drei Wahlen stehen: jetzt zahlen (absteigende Handindizes, damit die übrigen Indizes gültig bleiben).
+      picks.sort((a, b) => (b.handIndex ?? -1) - (a.handIndex ?? -1));
+      for (const pick of picks) {
+        const ok = await engine.actionDiscardHandCard(pi, pick.name, pick.handIndex, {
           source: CARD_NAME,
         });
         if (!ok) return false;
-        discardedNames.add(result.cardName);
-        discarded++;
 
         // Bloodier dino-bite on the Chimera's arrival zone — same
         // jaw visual Spinor / Trex use, but in gore mode (deeper
