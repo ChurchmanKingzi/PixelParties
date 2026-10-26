@@ -9223,6 +9223,7 @@ class GameEngine {
     // W16f (H01-08): Monias Schild („negate any effects that card or effect has") gilt nur für DIESE Auflösung — er endet mit ihr,
     // auch wenn Monia selbst nie wieder am Zug ist (tot/gefroren: ihr `onTurnStart` räumt dann nicht mehr).
     if (this.gs && (this.gs._moniaShieldActive != null || this.gs._moniaAngebote)) { delete this.gs._moniaShieldActive; delete this.gs._moniaShieldSource; delete this.gs._moniaAngebote; }   // W58a: auch die Angebote der Aufloesung
+    if (this.gs && this.gs._moniaZweitwurf) delete this.gs._moniaZweitwurf;   // W80a: der fuer einen Zweitwurf beiseitegelegte Stand endet ebenfalls mit der Aufloesung
     if (this.gs && this.gs._kreaturFenster) delete this.gs._kreaturFenster;   // W71b: die Fenster-Buchführung von `kreaturBetroffen` endet mit der Auflösung
     this._gewaehlteZiele = null;   // W78a: die gemerkten Zielwahlen des Effekts (Monias CPU-Bilanz) ebenfalls (Engine-Feld, nicht im Spielstand: ein Abbruch hinterlässt keine Spur im Zustand)
     // W16f (H03-10): Monia Bots True-Damage-Stempel gilt für Schaden AUS dem umgeleiteten Effekt — er endet mit dessen Auflösung (macht der Effekt keinen Schaden, verfällt er).

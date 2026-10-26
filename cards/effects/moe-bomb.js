@@ -12,6 +12,19 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  /**
+   * CPU (W80a, Al 26.10.2026: "Ja"): wie Hole in the Sky die gemeinsame Kreaturen-Bilanz (`_kreaturen-bilanz.js` `flaechenWirkung`) — 999 Schaden auf ALLE Kreaturen beider Seiten:
+   * gegnerische getroffene MINUS eigene getroffene Kreaturen (Level, HP, Rest-HP, Buffs, Faehigkeiten). Gespielt wird nur bei klar positiver Bilanz, sonst Veto.
+   * (Bisher kein Veto: flacher Rollout, der Level/HP/Rest-HP der Kreaturen nicht sah.)
+   */
+  cpuPlayVeto(engine, pi) {
+    try {
+      const KB = require('./_kreaturen-bilanz');
+      return KB.flaechenVeto(KB.flaechenWirkung(engine, pi, { art: 'damage', amount: 999 }));
+    } catch {
+      return false;   // die Heuristik darf nie einen legalen Play verhindern
+    }
+  },
   // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an (alle Kreaturen beider Seiten) —
   // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
   blockedByDamageLock: true,

@@ -110,13 +110,39 @@ function angebotMerken(gs, key, pi, angenommen) {
   gs._moniaAngebote.push({ key, pi, seite: angenommen ? ALLE_SEITEN : null });
 }
 
-/** Ende der Aufloesung: Schildmarke und Angebote fallen. */
-function angeboteBeenden(gs) {
+/**
+ * Ende der Aufloesung: Schildmarke und Angebote fallen.
+ * ★ W80a (Al, 26.10.2026): ein Zweitwurf der Zusatzziel-Helden (Bartas, Grisgar, Andras: "you may choose a second target for the Spell to hit afterwards") ist derselbe Spell,
+ * der erneut schlaegt — also derselbe Effekt. Monias `afterSpellResolved` (Reihenfolge der Zuhoerer ist nicht festgelegt) raeumt die Angebote noch VOR dem Zweitwurf ab; mit
+ * `fuerZweitwurf` legt es den Stand vorher beiseite (`gs._moniaZweitwurf`), und der Zweitwurf holt ihn mit `zweitwurfFortsetzen` zurueck: ein angenommenes Angebot negiert auch den
+ * Zweitwurf (keine zweite Zahlung), ein abgelehntes gilt auch fuer ihn (keine neue Frage). Das Beiseitegelegte endet mit der Aufloesung (`engine.endeEffektImmunitaeten`).
+ */
+function angeboteBeenden(gs, opts = {}) {
   if (!gs) return;
+  if (opts.fuerZweitwurf && (gs._moniaAngebote?.length || gs._moniaShieldActive != null)) {
+    gs._moniaZweitwurf = {
+      angebote: gs._moniaAngebote ? gs._moniaAngebote.map(a => ({ ...a })) : undefined,
+      schild: gs._moniaShieldActive, schildQuelle: gs._moniaShieldSource,
+      fenster: gs._kreaturFenster ? { ...gs._kreaturFenster } : undefined,
+    };
+  }
+  else if (!opts.fuerZweitwurf) delete gs._moniaZweitwurf;
   delete gs._moniaShieldActive;
   delete gs._moniaShieldSource;
   delete gs._moniaAngebote;
   delete gs._kreaturFenster;   // W71b: Fenster-Buchführung von `engine.kreaturBetroffen`
+}
+
+/** Zweitwurf beginnt: die beiseitegelegten Angebote des Hauptwurfs gelten weiter (derselbe Effekt). Ohne beiseitegelegten Stand oder bei schon lebenden Angeboten tut es nichts. */
+function zweitwurfFortsetzen(gs) {
+  const z = gs?._moniaZweitwurf;
+  if (!z) return;
+  if (!gs._moniaAngebote && gs._moniaShieldActive == null) {
+    if (z.angebote) gs._moniaAngebote = z.angebote.map(a => ({ ...a }));
+    if (z.schild != null) gs._moniaShieldActive = z.schild;
+    if (z.schildQuelle !== undefined) gs._moniaShieldSource = z.schildQuelle;
+    if (z.fenster) gs._kreaturFenster = { ...z.fenster, ...(gs._kreaturFenster || {}) };
+  }
 }
 
 // ── Kosten (W77a): 2 Handkarten ──────────────────────────────────────────
@@ -193,6 +219,6 @@ async function kostenZahlen(engine, pi, gewaehlt, cardName) {
 
 module.exports = {
   BASE_MONIA, ASCEND_TARGET, JETPACK_NAME, hasEquipped, moniaAscensionMet, checkMoniaAscension,
-  quellName, angenommenesAngebot, angebotAbgelehnt, angebotMerken, angeboteBeenden,
+  quellName, angenommenesAngebot, angebotAbgelehnt, angebotMerken, angeboteBeenden, zweitwurfFortsetzen,
   KOSTEN, ALLE_SEITEN, kostenPlaetze, kostenZahlbar, kostenWaehlen, kostenZahlen,
 };

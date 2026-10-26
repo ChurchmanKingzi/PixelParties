@@ -20507,6 +20507,9 @@ async function runHeadlessTrainingGame(pinnedDeck, oppDeck, pinnedIdx, gameOpts 
     startGameEngine(room, roomId, firstPlayer, (engine) => {
       engine._isSelfPlay = true;
       engine._cpuPlayerIdx = firstPlayer;
+      // W80a: Messlauf "neue gegen alte Brettbewertung" (PP_CPU_BRETT_AB=1, Spiegel mit PP_TRAIN_AB): nur die designierte Seite rechnet Kreaturen nach Level/HP/Rest-HP
+      // (`_cpu.js` OPT_KREATUR_BRETTWERT), die andere mit dem alten flachen Wert 30.
+      if (process.env.PP_CPU_BRETT_AB === '1') engine._brettwertNeuSeite = pinnedIdx;
       // Sonden-Sink so früh wie möglich anhängen — der Burst kann schon
       // in den ersten Sekunden zuschlagen (gemessen: Spiel 2 starb, bevor
       // der zeitgesteuerte Sampler überhaupt geschrieben hatte).

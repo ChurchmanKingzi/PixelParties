@@ -35,6 +35,7 @@
 
 const { hasCardType } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
+const { zweitwurfFortsetzen } = require('./_monia-shared');
 
 /** Beide Aktions-Flags werden VOR `afterSpellResolved` ausgewertet — was der Zweitwurf an ihnen ändert, wird zurückgesetzt (v1277). */
 const AKTIONS_FLAGS = ['_spellFreeAction', '_spellForcesActionConsume'];
@@ -146,6 +147,10 @@ async function zweitzielAngebot(ctx, cfg) {
   if (!confirmed) return;
 
   engine.log(cfg.logTyp, { player: ps.username, hero: hero.name, [cfg.logFeld]: ctx.spellName });
+
+  // ★ W80a (Al, 26.10.2026): der Zweitwurf ist DERSELBE Effekt wie der Hauptwurf ("the Spell … hit afterwards"): Cool Rescuer Monia — angenommenes Angebot negiert auch ihn, abgelehntes gilt
+  // auch für ihn. Monias `afterSpellResolved` kann vor diesem Held laufen und die Angebote schon abgeräumt haben: ihr beiseitegelegter Stand wird zurückgeholt.
+  zweitwurfFortsetzen(gs);
 
   // Zweitwurf vorbereiten: frisches Protokoll, erstes Ziel ausgeschlossen, Zweitwurf-Marker
   gs._spellDamageLog = [];

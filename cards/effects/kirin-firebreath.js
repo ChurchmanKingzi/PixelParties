@@ -62,6 +62,8 @@ const STRIKE_DMG   = 50;
 const STRIKE_DELAY = 280; // ms between strikes — readable but snappy
 
 module.exports = {
+  // W80a: erwartete Schlagzahl fuer die CPU-Bilanz (Monia: Mehrfachtreffer). Die Kosten sind beim Angebot schon bezahlt, der Zaehler also der echte.
+  cpuMeta: { erwarteteSchlaege: (engine, pi) => countDifferentRebelliokaiInDiscard(engine.gs.players[pi], engine) },
   // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an (das Löschen ist nur Kostenpunkt) —
   // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
   blockedByDamageLock: true,

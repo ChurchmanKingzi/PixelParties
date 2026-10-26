@@ -59,20 +59,6 @@ function kreaturenVon(engine, p) {
   return n;
 }
 
-/** Grober Wert einer Seite fuer die CPU (Baseline von `mctsEnemyCreatureValue`). */
-function seitenWert(engine, p) {
-  const db = engine._getCardDB();
-  let wert = 0;
-  for (const inst of (engine.cardInstances || [])) {
-    if (inst.zone !== 'support' || inst.faceDown) continue;
-    if ((inst.controller ?? inst.owner) !== p) continue;
-    const cd = engine.getEffectiveCardData?.(inst) || db[inst.name];
-    if (!cd || !hasCardType(cd, 'Creature')) continue;
-    wert += 1 + (cd.level || 0) * 0.4;
-  }
-  return wert;
-}
-
 module.exports = {
   // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an (alle Kreaturen beider Seiten) —
   // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
@@ -89,16 +75,16 @@ module.exports = {
   },
 
   /**
-   * CPU: der Wipe trifft die EIGENE Seite mit. Nur spielen, wenn auf der
-   * Gegenseite mehr (und angreifbarer) Wert liegt als auf der eigenen.
-   * In der Erst-Runden-Immunitaet zaehlt die Gegenseite nicht.
+   * CPU (W80a, Al 26.10.2026: "Ja" — die gemeinsame Kreaturen-Bilanz statt der Level-Summe): der Wipe trifft die EIGENE Seite mit. Gerechnet wird mit `engine.kreaturenBilanz`
+   * (`_kreaturen-bilanz.js` `flaechenWirkung`): Wert jeder getroffenen Kreatur nach Level, HP, Rest-HP, Buffs, Faehigkeiten — gegnerische getroffene MINUS eigene getroffene
+   * (999 Schaden = tödlich = voller Wert). Gespielt wird nur bei klar positiver Bilanz (mindestens 20 Punkte und ein Fuenftel des Gegnerwerts); sonst Veto. Kreaturen des durch die
+   * Erste-Runden-Immunitaet geschuetzten Spielers zaehlen nicht. (Karte trifft nur Kreaturen: keine Heldenwirkung, kein Auslöschungs-/Selbstmord-Fall.)
    */
   cpuPlayVeto(engine, pi) {
     try {
-      const opp = engine.opponentOf(pi);
-      const gegner = engine.gs?.firstTurnProtectedPlayer === opp ? 0 : seitenWert(engine, opp);
-      const eigen = seitenWert(engine, pi);
-      return gegner <= 0 || gegner <= eigen;
+      const KB = require('./_kreaturen-bilanz');
+      const r = KB.flaechenWirkung(engine, pi, { art: 'damage', amount: SCHADEN });
+      return KB.flaechenVeto(r);
     } catch {
       return false;   // die Heuristik darf nie einen legalen Play verhindern
     }
