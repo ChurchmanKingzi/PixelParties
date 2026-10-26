@@ -9320,7 +9320,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   // ★ „SPY IN THE ENEMY'S CAMP": eine Kreatur des Gegners mit MEINER Spionage-Marke darf ich in meinem Zug aktivieren, „as if you control it". Sie bleibt beim Gegner (Brettseite wie
   // Kontrolle); nur für die Dauer dieser Aktivierung gilt sie als meine (`_leiheKontrolle`, unten). Die Aktion (falls der Effekt eine kostet) zahlt ein EIGENER Held — wie bei `anyPlayer`.
   const _spyZugriff = charmedOwner != null && charmedOwner !== pi && inst.stolenBy == null
-    && (inst.controller ?? inst.owner) !== pi && spyHat(inst, pi);
+    && (inst.controller ?? inst.owner) !== pi && spyHat(inst, pi, gs.turn);   // `gs.turn`: die befristete Leihe von Lovely Teddy gilt nur in ihrem Zug
   const anyPlayer = _spyZugriff || (charmedOwner != null && charmedOwner !== pi
     && !!loadCardEffect(inst.counters?._effectOverride || creatureName)?.activatableByAnyPlayer
     && inst.stolenBy !== pi && (inst.controller ?? inst.owner) !== pi);

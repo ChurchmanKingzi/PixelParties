@@ -49,6 +49,9 @@ function hostHasWhiteEye(engine, ownerIdx, heroIdx) {
 }
 
 module.exports = {
+  // Legt sich an „the user" (den wirkenden HELDEN) an: Demon's Gate (Kreatur als Wirker) darf diesen Spell nicht wirken (Ruling Al, QA-Welle 1 Nr. 34).
+  attachesToUser: true,
+
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.

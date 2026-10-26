@@ -14,11 +14,16 @@
 // ═══════════════════════════════════════════
 
 const MARKE = '_spyMask';
+// Lovely Teddy (Entscheidung Al): „use that Creature's active effects as if you controlled it for the rest of the turn" — dieselbe Benutzung wie bei der Spionage-Marke
+// (Klickweg + Kontrolle nur fuer die Dauer des Effekts, `_leiheKontrolle`), aber befristet: `counters._teddyLeihe = { by: Sitz, turn: Zugnummer }` gilt nur in genau diesem Zug.
+const LEIHE = '_teddyLeihe';
 
-/** Hat `pi` Spionagezugriff auf diese Kreatur? */
-function spyHat(inst, pi) {
+/** Hat `pi` Spionagezugriff auf diese Kreatur? `turn` = laufende Zugnummer (fuer die befristete Teddy-Leihe; ohne Angabe zaehlt nur die Spionage-Marke). */
+function spyHat(inst, pi, turn) {
   if (!inst || !Number.isInteger(pi)) return false;
-  return (((inst.counters && inst.counters[MARKE]) || 0) & (1 << pi)) !== 0;
+  if ((((inst.counters && inst.counters[MARKE]) || 0) & (1 << pi)) !== 0) return true;
+  const leihe = inst.counters && inst.counters[LEIHE];
+  return !!leihe && leihe.by === pi && turn != null && leihe.turn === turn;
 }
 
 /** Sitze mit Spionagezugriff (für Anzeige/Protokoll). */
@@ -81,4 +86,4 @@ function spyLandung(engine, enteringCard, summoningPi) {
   return neu;
 }
 
-module.exports = { MARKE, spyHat, spySitze, spyVormerken, spyKetteBeendet, spyLandung };
+module.exports = { MARKE, LEIHE, spyHat, spySitze, spyVormerken, spyKetteBeendet, spyLandung };

@@ -22,9 +22,14 @@
 //
 //  • ★ ZIEL IST DAS DECK DES URSPRUENGLICHEN BESITZERS
 //    (`originalOwner`), nicht des Kontrolleurs: eine uebernommene
-//    Kreatur geht nach Hause. Genau daran haengt auch das Ziehen —
-//    „their Creatures" meint die eigenen, egal wer sie zuletzt
-//    kontrollierte.
+//    Kreatur geht nach Hause (gemischt wird dort).
+//
+//  • ★ ZIEHEN TUT DER KONTROLLEUR (Al, QA-Welle 1 Nr. 22: „Kontrolleur"):
+//    „each of THEIR Creatures" = die Kreaturen, die der Spieler gerade
+//    kontrolliert. Fuer eine gestohlene/uebernommene Kreatur zieht also
+//    der, der sie zuletzt kontrollierte (CARD_API: Zaehler beziehen sich
+//    auf den Kontrolleur) — nicht ihr Besitzer, dessen Deck sie nur
+//    zurueckerhaelt.
 //
 //  • Gemischt wird EINMAL je betroffenem Deck, nachdem alle Karten
 //    drin sind — nicht nach jeder einzelnen.
@@ -65,11 +70,13 @@ function betroffene(engine, maxLevel) {
  * Eine Brettkreatur ins Deck ihres urspruenglichen Besitzers legen.
  * Bauform `returnSupportCreatureToHand` (_deepsea-shared), nur mit dem
  * Deck als Ziel. Gemischt wird NICHT hier — s. Kopf.
+ * Rueckgabe: `{ heim, ktrl }` (Deck-Besitzer / Kontrolleur = Zieher) oder `null` (blieb stehen).
  */
 async function insDeck(engine, inst, maxLevel, pi) {
   if (!inst || inst.zone !== 'support') return null;
   const gs = engine.gs;
   const kontrolleur = engine.physicalSide(inst);       // Brettseite (nicht der Kontrolleur): eine gestohlene Kreatur liegt weiter beim Besitzer (S03-04)
+  const ktrl = engine.kontrolleurVon(inst);            // ★ der KONTROLLEUR — er zieht (QA-Welle 1 Nr. 22)
   const heim = inst.originalOwner ?? inst.owner;      // ★ „original owners"
   const hps = gs.players[heim];
   const kps = gs.players[kontrolleur];
@@ -91,7 +98,6 @@ async function insDeck(engine, inst, maxLevel, pi) {
   // Defending the Gate: ein Effekt des Gegners auf Karten in seiner Support Zone — das Tor wird hier gefragt (wie `actionMoveCard`/`actionTransferCreature`; `_triggerGateCheck` lässt eigene
   // Effekte durch, ein Angebot je Zauber). Geschützte Kreaturen bleiben stehen und zählen nicht fürs Ziehen.
   {
-    const ktrl = inst.controller ?? inst.owner;
     await engine._triggerGateCheck(ktrl, CARD_NAME, pi, cardName);
     if (engine._isGateShielded(ktrl, pi)) {
       engine.log('creature_effect_negated', { creature: cardName, effect: 'move', by: CARD_NAME, reason: 'defending_the_gate' });
@@ -126,7 +132,7 @@ async function insDeck(engine, inst, maxLevel, pi) {
   engine._untrackCard(inst.id);
   engine.sync();
   await engine._delay(180);
-  return heim;
+  return { heim, ktrl };
 }
 
 module.exports = {
@@ -183,28 +189,32 @@ module.exports = {
       }
 
       // ── ① Alles ins Deck ────────────────────────────────────────
-      const proSpieler = [0, 0];
+      // proDeck[p] = Karten, die in das Deck von p zurueckgingen (mischen); proZieher[p] = Kreaturen, die p KONTROLLIERTE (ziehen).
+      const proDeck = {}, proZieher = {};
       for (const inst of ziele) {
-        const heim = await insDeck(engine, inst, maxLevel, pi);
-        if (heim != null) proSpieler[heim] = (proSpieler[heim] || 0) + 1;
+        const r = await insDeck(engine, inst, maxLevel, pi);
+        if (r != null) {
+          proDeck[r.heim] = (proDeck[r.heim] || 0) + 1;
+          proZieher[r.ktrl] = (proZieher[r.ktrl] || 0) + 1;
+        }
       }
 
       // ── ② Einmal je betroffenem Deck mischen (s. Kopf) ──────────
       for (let p = 0; p < engine.playerCount(); p++) {
-        if (proSpieler[p] > 0) engine.shuffleDeck(p);
+        if (proDeck[p] > 0) engine.shuffleDeck(p);
       }
       engine.log('mass_routing', {
         player: ps.username, maxLevel,
-        shuffled: proSpieler[0] + proSpieler[1],
-        mine: proSpieler[pi], theirs: proSpieler[engine.opponentOf(pi)],
+        shuffled: Object.values(proDeck).reduce((a, b) => a + b, 0),
+        mine: proZieher[pi] || 0, theirs: proZieher[engine.opponentOf(pi)] || 0,
       });
       engine.sync();
 
-      // ── ③ Je zurueckgemischter EIGENER Kreatur eine Karte ───────
+      // ── ③ Je zurueckgemischter Kreatur, die man KONTROLLIERTE, eine Karte ──
       // Reihenfolge: erst der Spieler dieser Karte, dann der Gegner.
       const reihenfolge = [pi, engine.opponentOf(pi)];
       for (const p of reihenfolge) {
-        if (proSpieler[p] > 0) await engine.actionDrawCards(p, proSpieler[p]);
+        if (proZieher[p] > 0) await engine.actionDrawCards(p, proZieher[p]);
       }
       engine.sync();
     },

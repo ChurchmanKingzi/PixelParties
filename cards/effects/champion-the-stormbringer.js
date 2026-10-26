@@ -20,11 +20,14 @@
 //    creatureActionCost / actionCost-Ability
 //    bookkeeping.
 //
-//  Resource cap: discard count = min(5, own hand,
-//  opp hand). The opponent must be able to also
-//  discard the same number — if either side has
-//  zero cards, the cap is zero and the activation
-//  is gated off entirely (canActivateHeroEffect).
+//  Resource cap (Ruling Al, Welle 2): Die Wahl ist NUR an die EIGENE
+//  Hand und das Maximum 5 gebunden: discard count = min(5, own hand).
+//  Die Gegnerhand begrenzt nichts — der Gegner wirft „the same number“
+//  ab, soweit er Karten hat (nur seine ganze Hand, falls weniger; bei
+//  leerer Hand nichts) und zieht dann N Karten (Annahme: „draw that
+//  many“ = die Zahl N, nicht die tatsächlich abgeworfene). Ist die
+//  eigene Hand leer, ist der Effekt nicht aktivierbar
+//  (canActivateHeroEffect).
 //
 //  ★ W74c — Boris, the Guardian of Blackport (Al):
 //    (a) Ist der CHAMPION-SPIELER Boris-Spieler, darf Boris den eigenen Abwurf (Kosten, „up to 5") ignorieren — gefragt wird nach der Wahl der
@@ -50,18 +53,15 @@
 //  cancellation listener.
 // ═══════════════════════════════════════════
 
-const { opponentOfGs } = require('./_opp');
 const CARD_NAME    = 'Champion, the Stormbringer';
 const MAX_DISCARDS = 5;
 const STAGGER_MS   = 140; // gap between consecutive windstorm flights
 const WIND_TAIL_MS = 1200; // total client-side animation length for windstorm
 
-/** Min(5, own hand, opp hand). Caps the discard prompt's max. */
+/** Min(5, own hand). Caps the discard prompt's max (Gegnerhand zählt nicht, s. Kopfkommentar). */
 function _stormCap(gs, pi) {
-  const oi = opponentOfGs(gs, pi);
   const myHand = (gs.players[pi]?.hand || []).length;
-  const oppHand = (gs.players[oi]?.hand || []).length;
-  return Math.max(0, Math.min(MAX_DISCARDS, myHand, oppHand));
+  return Math.max(0, Math.min(MAX_DISCARDS, myHand));
 }
 
 module.exports = {

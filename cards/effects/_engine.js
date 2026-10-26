@@ -5653,21 +5653,26 @@ class GameEngine {
 
         // ── Creature SOFT-untargetable-by-opponent filter (Perfect Disguise) ──
         // Soft variant of the strict filter above: per-side, drop tagged
-        // creatures only when at LEAST ONE non-tagged creature remains on
-        // that side as a legal target. If ALL creatures on the side are
-        // tagged, keep them — the card text "except if it is your only
-        // legal target" prevents the spell from fizzling on a fully-
-        // shielded board. Mirrors the per-side scope the hero
-        // `untargetable` filter uses.
+        // creatures only when at LEAST ONE other legal target remains on
+        // that side. If the tagged creature is the ONLY legal target of this
+        // source on its side, keep it — the card text "except if it is your
+        // only legal target" prevents the spell from fizzling.
+        // ★ Entscheidung Al (Perfect Disguise): „einziges LEGALES ZIEL fuer die
+        // gegnerische Karte" — Helden und Kreaturen zaehlen BEIDE als andere
+        // legale Ziele, soweit die Quelle sie anbietet (steht in `targets`;
+        // ausgegraute/geschuetzte Helden sind `ineligible` und zaehlen nicht).
+        // Kann die Quelle nur Kreaturen waehlen, gibt es keine Helden in der Liste.
         if (!config.ignoreUntargetable) {
           const softByOwner = new Map(); // owner -> { all: [], soft: [] }
           for (const t of targets) {
-            if (t.type !== 'equip' || !t.cardInstance) continue;
-            if (t.owner === pi) continue; // own creatures — soft doesn't block self-targeting
-            if (!softByOwner.has(t.owner)) softByOwner.set(t.owner, { all: [], soft: [] });
-            const entry = softByOwner.get(t.owner);
+            const istKreatur = t.type === 'equip' && !!t.cardInstance;
+            if (!istKreatur && !(t.type === 'hero' && !t.ineligible)) continue;
+            const seite = engine.zielSeite(t, t.owner);   // Kontrolle statt Brettseite
+            if (seite === pi) continue; // own side — soft doesn't block self-targeting
+            if (!softByOwner.has(seite)) softByOwner.set(seite, { all: [], soft: [] });
+            const entry = softByOwner.get(seite);
             entry.all.push(t);
-            const c = t.cardInstance.counters;
+            const c = istKreatur ? t.cardInstance.counters : null;
             if (c?.softUntargetable_by_opponent && c?.softUntargetable_by_opponent_pi === pi) {
               entry.soft.push(t);
             }
@@ -6252,18 +6257,19 @@ class GameEngine {
         }
 
         // ── Creature SOFT-untargetable-by-opponent filter (Perfect Disguise) ──
-        // Mirror of the soft filter in promptDamageTarget. Per-side scope
-        // with the "all-soft → keep" exception so Perfect Disguise doesn't
-        // break a multi-target spell that has nowhere else to land.
+        // Mirror of the soft filter in promptDamageTarget (dort die Begruendung:
+        // „einziges LEGALES Ziel" = Helden UND Kreaturen der Quelle zaehlen als Ausweichziel).
         if (!config.ignoreUntargetable) {
           const softByOwner = new Map();
           for (const t of targets) {
-            if (t.type !== 'equip' || !t.cardInstance) continue;
-            if (t.owner === pi) continue;
-            if (!softByOwner.has(t.owner)) softByOwner.set(t.owner, { all: [], soft: [] });
-            const entry = softByOwner.get(t.owner);
+            const istKreatur = t.type === 'equip' && !!t.cardInstance;
+            if (!istKreatur && !(t.type === 'hero' && !t.ineligible)) continue;
+            const seite = engine.zielSeite(t, t.owner);   // Kontrolle statt Brettseite
+            if (seite === pi) continue;
+            if (!softByOwner.has(seite)) softByOwner.set(seite, { all: [], soft: [] });
+            const entry = softByOwner.get(seite);
             entry.all.push(t);
-            const c = t.cardInstance.counters;
+            const c = istKreatur ? t.cardInstance.counters : null;
             if (c?.softUntargetable_by_opponent && c?.softUntargetable_by_opponent_pi === pi) {
               entry.soft.push(t);
             }
@@ -10529,6 +10535,7 @@ class GameEngine {
         source,
         sourceOwner,
         canBeNegated: false,
+        trueDamage: true,   // Johanna (Ruling Al, Welle 2): „cannot be reduced or negated" — Umleitung ZUSÄTZLICH statt Senkung
         isStatusDamage: false,
         animType: opts.animType || null,
       }]);
@@ -19861,6 +19868,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Styx, the Opened Gate: reine Kontrolle, der Text verspricht keinen Schutz.
     if (ch.ohneSchutz) return false;
     if (ch._loveShot && opts.loveShotOhneSchutz) return false;
+    // Deepsea Succubus (QA-Welle 1 Nr. 18, Al): „cannot take any damage and cannot be defeated" — NUR Schadens-/Besiegen-Schutz, KEIN Schutz vor
+    // negativen Status (`nurSchadenSchutz`; der Schadens-/Kill-Pfad fragt mit `loveShotOhneSchutz: true`, der Statuspfad ohne).
+    if (ch.nurSchadenSchutz && !opts.loveShotOhneSchutz) return false;
     if (ch.onlyFromController) {
       const k = ch.controller;
       return k != null && quellenSeite != null && quellenSeite >= 0 && quellenSeite === k;
@@ -32882,6 +32892,9 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   async promptEffectTarget(playerIdx, validTargets, config = {}) {
+    // Trockenlauf (Future Tech Fists „exakt N legale Ziele", QA-Welle 1 Nr. 19): `config._waehlbarProbe = { ids: null }` — liefert die WAEHLBAREN Ids (nach allen Schutz-/Taunt-/Erstzug-
+    // Markierungen unten) in `probe.ids` und fragt NICHTS. Alles bis dorthin laeuft ohne `await`, der Aufrufer kann `probe.ids` also gleich nach dem Aufruf synchron lesen.
+    if (config._waehlbarProbe) config._waehlbarProbe.ids = [];
     // Stillgelegte Engine (Puzzle-Reset): keine Abfragen mehr an
     // den Client — der sitzt inzwischen in einem anderen Spiel.
     // Sofort mit "abgebrochen" zurueck, damit die alte Kette schnell
@@ -33125,6 +33138,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     const _waehlbar = validTargets.filter(t => !t.ineligible);
     if (_waehlbar.length === 0 && validTargets.some(t => t.ineligible)) return [];
+    if (config._waehlbarProbe) { config._waehlbarProbe.ids = _waehlbar.map(t => t.id); return []; }   // Trockenlauf (s. Kopf der Funktion)
 
     // ★ Clone (24.10., Welle 72): „an exact copy … against the same target(s)". Waehrend einer Kopie (`gs._klonWiedergabe`) beantwortet die Engine die Zielwahlen des Wirkers
     // mit der AUFGEZEICHNETEN Wahl des Originals (siehe `_zielwahlAbschliessen`, Aufnahme) — dieselbe Titelzeile, in Aufnahme-Reihenfolge. Nur die noch waehlbaren Ziele zaehlen;
@@ -49706,7 +49720,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // (`markiereSeitenfremd`: Brettseite = Gegner, Controller = ich); vorher nur die gestohlenen (`inst.owner === oi && stolenBy`).
         if (this.physicalSide(inst) !== oi) continue;
         // Spy in the Enemy's Camp: eine Kreatur des Gegners mit meiner Spionage-Marke darf ich in MEINEM Zug benutzen, „as if I control it" (Kontrolle nur für die Dauer des Effekts).
-        const _spyZugriff = this.kontrolleurVon(inst) !== playerIdx && inst.stolenBy == null && SpyShared.spyHat(inst, playerIdx);
+        const _spyZugriff = this.kontrolleurVon(inst) !== playerIdx && inst.stolenBy == null && SpyShared.spyHat(inst, playerIdx, this.gs.turn);   // `turn`: befristete Leihe (Lovely Teddy)
         if (this.kontrolleurVon(inst) !== playerIdx && !_spyZugriff) continue;
         if (inst.faceDown) continue;
         // (Der frühere Ausschluss „Host-Held von uns verzaubert" entfällt: der Charme-Scan der Gegenseite ist seit v1197 weg, die Kreatur ginge sonst ganz verloren.)

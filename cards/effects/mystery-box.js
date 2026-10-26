@@ -7,6 +7,13 @@
 //  is sent to the discard pile OR deleted
 //  from your DECK, draw 2 cards.
 //
+//  SPIELEN (Entscheidung Al): die Karte ist von der HAND
+//  spielbar (Kosten 0) und tut dann schlicht NICHTS — sie
+//  geht in die Ablage, kein Effekt (`resolve` ist leer, kein
+//  `neverPlayable`). Das Ziehen kommt weiterhin NUR ueber den
+//  Deck-Weg (`onMill`, s. u.); das Spielen aus der Hand loest
+//  es nicht aus.
+//
 //  "From your deck" = milled, NOT discarded
 //  from hand — Als Ruling bestaetigt: diese
 //  Karte ist deck-only, im Gegensatz zu den
@@ -33,7 +40,9 @@ module.exports = {
   // card (the milled copy) is in the deck, not this instance.
   // activeIn broadly so the hook registers for the player.
   activeIn: ['hand', 'deck', 'discard', 'deleted', 'support', 'ability'],
-  neverPlayable: true, // 'No effect when played' — never usable from hand directly
+
+  // „This card has no effect when you play it." — spielbar, aber wirkungslos (Entscheidung Al).
+  resolve: async () => true,
 
   cpuMeta: {
     /**

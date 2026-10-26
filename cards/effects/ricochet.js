@@ -18,8 +18,14 @@
 //  Ein Ziel kann nur EINMAL gewaehlt werden, ueber beide Seiten hinweg.
 //  Schluss ist, sobald der naechste Waehler kein neues Ziel mehr hat.
 //
-//  Die Wahl ist NICHT abbrechbar — „take turns choosing … until a
-//  player CANNOT choose" kennt kein Aussteigen, nur „keine Ziele mehr".
+//  ★ Ruling Al (Welle 2): Die ERSTE Zielwahl des Spielers ist abbrechbar
+//  (Abbruch = Karte bleibt auf der Hand, nichts verbraucht, kein Auftritt);
+//  der Auftritt (card_reveal) kommt erst NACH der Bestätigung dieser ersten
+//  Wahl (`engine.commitAppearance()`), vor der Zielmarke und der Wahl des
+//  Gegners. Ab der bestätigten ersten Wahl gibt es keinen Rückweg mehr:
+//  Folgewahlen des Spielers und die Wahlen des Gegners sind NICHT abbrechbar —
+//  „take turns choosing … until a player CANNOT choose" kennt kein Aussteigen,
+//  nur „keine Ziele mehr".
 //
 //  ── ERST ALLES WAEHLEN, DANN SCHIESSEN ────────────────────────────
 //  Der Kartentext listet die Zielwahl vollstaendig auf, bevor er vom
@@ -153,6 +159,7 @@ module.exports = {
           if (frei.length === 0) break;       // „cannot choose a new target"
 
           const nummer = kette.length + 1;
+          const erstesMal = kette.length === 0;   // „You choose first": die erste Wahl gehört dem Spieler selbst
           // ★★ v1151 (Al 17.9.): die CPU zielt bei JEDER Wahl wie bei einem
           // normalen Einzelziel-Angriff mit der AKTUELLEN Staerke dieser
           // Position. `baseDamage` + `damageType` schalten im Piloten
@@ -167,14 +174,16 @@ module.exports = {
             description: `Choose target #${nummer} for ${CARD_NAME} (${schadenHier} damage). Targets already chosen are marked with their number.`,
             confirmLabel: `🎯 #${nummer}`,
             maxSelect: 1, maxTotal: 1,
-            cancellable: false,
+            cancellable: erstesMal,            // nur die allererste Wahl des Spielers (s. Kopfkommentar)
             baseDamage: schadenHier,
             damageType: 'attack',
           });
           const zielId = Array.isArray(wahl) ? wahl[0] : wahl;
           const idText = (zielId && typeof zielId === 'object') ? zielId.id : zielId;
           const ziel = frei.find(t => t.id === idText);
-          if (!ziel) break;                    // keine gueltige Antwort
+          if (!ziel) break;                    // keine gueltige Antwort / Abbruch der ersten Wahl (kette leer → `_spellCancelled`)
+          // Auftritt erst HINTER der letzten Abbruchstelle: die erste Wahl ist bestätigt.
+          if (erstesMal) engine.commitAppearance();
 
           gewaehlt.add(zielSchluessel(ziel));
           kette.push(ziel);

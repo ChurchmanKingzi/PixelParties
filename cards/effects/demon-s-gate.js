@@ -39,9 +39,20 @@
 //     commit (the player can pick a different Spell, or wait until
 //     next turn).
 //
-//   • Reaction subtype is excluded (Reactions can't be played
-//     proactively); Surprise / Area subtypes are excluded too — only
-//     Normal-subtype Spells are eligible per design.
+//   • ★ Ruling Al (QA-Welle 1, Nr. 34): Wählbar sind Destruction- UND Decay-
+//     Magic-Spells der Untertypen Normal, ATTACHMENT und AREA (wie bisher
+//     keine Reaction/Surprise). AUSGENOMMEN sind Attachments, die an „the
+//     user" angelegt werden (Skript-Marke `attachesToUser: true` — Gathering
+//     Storm, Intrude): sie brauchen einen Helden als Wirker, hier wäre es eine
+//     Kreatur. Alle anderen Attachments suchen sich ihren Wirt selbst (Zielwahl
+//     wie bei jedem Spell, `attachToHero`), Areas legen sich per `placeArea`.
+//     Legt sich der Spell selbst aufs Brett (`gs._spellPlacedOnBoard`), verlässt
+//     die Handkarte nur die Hand — sie geht NICHT zusätzlich in die Ablage.
+//     Karten ohne Skript (noch nicht umgesetzte Areas/Attachments) sind für die
+//     neuen Untertypen nicht wählbar (sie würden nichts bewirken und den Spell
+//     verbrauchen).
+//   • Reaction and Surprise subtypes stay excluded (Reactions can't be
+//     played proactively; Surprises are set face-down, not cast).
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -49,6 +60,22 @@ const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = "Demon's Gate";
 const AS_IF_SCHOOL_LEVEL = 3;
+
+/** Untertypen, die das Tor wirken darf (Ruling Al, Nr. 34): Normal + Attachment + Area; Reaction/Surprise nie. */
+const ERLAUBTE_UNTERTYPEN = new Set(['normal', 'attachment', 'area']);
+
+/**
+ * Darf das Tor diesen Spell (Kartendaten `cd`) wirken? Untertyp + Zusatzregeln der neuen Untertypen:
+ * Attachments an „the user" (`attachesToUser`) scheiden aus; Attachments/Areas brauchen ein Skript mit `onPlay`.
+ */
+function untertypErlaubt(cd, script) {
+  const sub = (cd.subtype || '').toLowerCase();
+  if (!ERLAUBTE_UNTERTYPEN.has(sub)) return false;
+  if (sub === 'normal') return true;
+  if (typeof script?.hooks?.onPlay !== 'function') return false;
+  if (sub === 'attachment' && script.attachesToUser) return false;
+  return true;
+}
 
 /** Spells in this player's hand eligible for Demon's Gate's cast.
  *
@@ -68,7 +95,8 @@ function eligibleHandIndices(engine, ps, pi) {
     const cd = cardDB[name];
     if (!cd) continue;
     if (cd.cardType !== 'Spell') continue;
-    if ((cd.subtype || '').toLowerCase() !== 'normal') continue;
+    const script = loadCardEffect(name);
+    if (!untertypErlaubt(cd, script)) continue;
     const isDestructionOrDecay =
       cd.spellSchool1 === 'Destruction Magic' || cd.spellSchool2 === 'Destruction Magic'
       || cd.spellSchool1 === 'Decay Magic'     || cd.spellSchool2 === 'Decay Magic';
@@ -77,7 +105,6 @@ function eligibleHandIndices(engine, ps, pi) {
     // Disruption Ray opp-must-have-targets, Cold Coffin pollution
     // pre-cost, etc.). Defensive try/catch — a buggy condition shouldn't
     // crash the picker; we just treat it as ineligible.
-    const script = loadCardEffect(name);
     if (typeof script?.spellPlayCondition === 'function') {
       let ok = false;
       try { ok = !!script.spellPlayCondition(engine.gs, pi, engine); }
@@ -153,7 +180,7 @@ module.exports = {
     const cardDB = engine._getCardDB();
     const cd = cardDB[spellName];
     if (!cd || cd.cardType !== 'Spell') return false;
-    if ((cd.subtype || '').toLowerCase() !== 'normal') return false;
+    if (!untertypErlaubt(cd, loadCardEffect(spellName))) return false;
     const school = (cd.spellSchool1 === 'Destruction Magic' || cd.spellSchool2 === 'Destruction Magic')
       ? 'Destruction Magic'
       : (cd.spellSchool1 === 'Decay Magic' || cd.spellSchool2 === 'Decay Magic')
@@ -188,6 +215,8 @@ module.exports = {
     const spellInst = engine._trackCard(spellName, pi, 'hand', heroIdx, -1);
     spellInst.turnPlayed = gs.turn || 0;
     if (feld !== pi) spellInst.heroOwner = feld;
+    // Gestohlene Handkarte: Area/Attachment bleibt Eigentum ihres Besitzers (Ablage dort) — wie `doPlaySpell` (W63c).
+    { const _hk = engine._handCardPileOwner(pi, spellName, handIndex); if (_hk !== pi) spellInst.originalOwner = _hk; }
 
     // Build the cast ctx and patch self-targeting helpers so anything
     // the Spell would do to "the casting hero" (Phoenix Tackle's
@@ -231,6 +260,15 @@ module.exports = {
     // inside this nested cast (Phoenix Tackle's target prompt etc.).
     const prevCancelled = gs._spellCancelled;
     gs._spellCancelled = false;
+    // Legt sich der Spell selbst aufs Brett (Area: `placeArea`, Attachment: `placeAttachment`), stempelt er `gs._spellPlacedOnBoard` —
+    // der Stempel gehört DIESEM Guss (Muster `_castSpellImmediately`): äußeren Stand retten, eigenen auswerten.
+    const placedVorher = gs._spellPlacedOnBoard;
+    delete gs._spellPlacedOnBoard;
+    // Ein Attachment, das das Tor wirkt, ist ein Sofort-Guss („as an additional Action"): kein Drop-Hinweis, der Wirker (die Kreatur) ist nicht der Wirt —
+    // `_immediateActionContext` lässt den Spieler den Wirt wählen (`preferCaster` entfällt) und gibt Curse die weite Zielliste (Muster `_castSpellImmediately`).
+    // Nur für Attachments gesetzt: die Normal-Spells des Tors (Fire Bolts …) laufen unverändert.
+    const sofortVorher = gs._immediateActionContext;
+    if ((cd.subtype || '').toLowerCase() === 'attachment') gs._immediateActionContext = true;
 
     let castError = null;
     try {
@@ -244,6 +282,9 @@ module.exports = {
     }
 
     const cancelled = gs._spellCancelled === true;
+    if (sofortVorher === undefined) delete gs._immediateActionContext; else gs._immediateActionContext = sofortVorher;
+    const aufsBrett = !!gs._spellPlacedOnBoard && !cancelled && !castError;
+    if (placedVorher) gs._spellPlacedOnBoard = true; else delete gs._spellPlacedOnBoard;
     // Restore flags so we don't leak this cast's state into any outer
     // flow / next spell.
     gs._spellCancelled = prevCancelled;
@@ -253,7 +294,8 @@ module.exports = {
     else gs._spellCasterCreature = prevCasterCreature;
     if (prevSchoolOverride === undefined) delete gs._castSchoolOverride;
     else gs._castSchoolOverride = prevSchoolOverride;
-    engine._untrackCard(spellInst.id);
+    // Eine Area ist die Spell-Instanz selbst (zone 'area') — nicht abräumen, wenn sie aufs Brett gegangen ist.
+    if (!(aufsBrett && spellInst.zone === 'area')) engine._untrackCard(spellInst.id);
 
     // Cancelled prompt or thrown cast → no cost paid, no HOPT burned.
     // Spell stays in hand at its original index (we never spliced it).
@@ -266,7 +308,11 @@ module.exports = {
     // Re-find the actual index (downstream listeners might have
     // shifted the hand — paranoid lookup mirrors Skeleton Priest).
     const finalIdx = ps.hand.indexOf(spellName);
-    if (finalIdx >= 0) {
+    if (finalIdx >= 0 && aufsBrett) {
+      // Area/Attachment hat sich selbst aufs Brett gelegt: die Karte verlässt nur die Hand (Flug/Landung zeigt das Brett), KEIN Ablagestapel.
+      engine.takeFromPileSync(ps, 'hand', finalIdx);
+      engine.handKartenBesitzerPs(ps, spellName);   // Herkunftsbuch der gestohlenen Handkarte abschließen
+    } else if (finalIdx >= 0) {
       // Hand→discard flight (zone-anchored play_pile_transfer before
       // the splice, per the project's "Removing a chosen board card"
       // rule applied to hand→pile movement — the diff animator would

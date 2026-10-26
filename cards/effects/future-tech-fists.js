@@ -8,6 +8,16 @@
 //   Base Attack stat to them. You can only activate the effect of
 //   \"Future Tech Fists\" once per turn."
 //
+//  ── EXAKT N Ziele (Al, QA-Welle 1 Nr. 19) ──
+//  „choose as many targets on the board as there are …" = GENAU N (N = Fists
+//  in der eigenen Ablage), nicht „bis zu N". Gibt es weniger WAEHLBARE Ziele
+//  als N (Zielschutz, Erstzug-Schutz, leeres Brett …), ist der Effekt nicht
+//  aktivierbar (`canActivateEquipEffect` → grau). Die Waehlbarkeit liest der
+//  Trockenlauf von `promptEffectTarget` (`_waehlbarProbe`) — exakt dieselbe
+//  Pruefung wie in der echten Wahl.
+//  „This counts as an Attack." (Al, QA-Welle 1 Nr. 20): der Schlag ist ein
+//  Attack-Schaden (Typ 'attack') des ausgeruesteten HELDEN (Quelle = Held).
+//
 //  ── Der Streuschlag, jetzt aktiv ──
 //  [Als Neufassung 21.8.: die erste Version hing an „trifft genau ein
 //   Ziel mit einer Attacke" und war dadurch zu schwach — sie brauchte
@@ -47,6 +57,33 @@ function alleZiele(engine) {
   ];
 }
 
+/** Konfiguration der Zielwahl: EXAKT `grenze` Ziele (maxTotal = minRequired). */
+function zielKonfig(grenze, atk) {
+  return {
+    title: CARD_NAME,
+    description: `Choose ${grenze} target${grenze !== 1 ? 's' : ''} — each takes ${atk} damage.`,
+    confirmLabel: '👊 Strike!',
+    confirmClass: 'btn-danger',
+    maxTotal: grenze,
+    minRequired: grenze,
+    cancellable: true,
+    _skipPostTargetReactions: true,
+  };
+}
+
+/**
+ * Wie viele Ziele sind gerade WAEHLBAR? Trockenlauf der echten Zielwahl (`_waehlbarProbe`, ohne Frage, synchron):
+ * Zielschutz, Taunt, Erstzug-Schutz usw. zaehlen genau wie dort. Ohne Probe-Ergebnis (Engine ohne Option): Zahl der Kandidaten.
+ */
+function waehlbareZiele(engine, pi, grenze, atk) {
+  const kandidaten = alleZiele(engine);
+  if (kandidaten.length === 0) return 0;
+  const probe = { ids: null };
+  const p = engine.promptEffectTarget(pi, kandidaten, { ...zielKonfig(grenze, atk), _waehlbarProbe: probe });
+  if (p && typeof p.catch === 'function') p.catch(() => {});
+  return Array.isArray(probe.ids) ? probe.ids.length : kandidaten.length;
+}
+
 module.exports = {
 
   /**
@@ -66,11 +103,14 @@ module.exports = {
     const gs = engine.gs;
     // Styx 28.9.: Ablage = Kontrolleur (`cardOwner`), Held = Brettseite.
     const pi = ctx.cardOwner ?? (inst.controller ?? inst.owner);
-    if (zaehleInAblage(gs, pi, CARD_NAME) <= 0) return false;
+    const grenze = zaehleInAblage(gs, pi, CARD_NAME);
+    if (grenze <= 0) return false;
     // W13 (Al, Rueckfrage 8): „You can only activate the effect of "Future Tech Fists" once per turn" = hard once per turn, ein Stempel je Spieler fuer alle Kopien.
     if (gs.hoptUsed?.[`${HARD_KEY}:${pi}`] === gs.turn) return false;
     const hero = gs.players[inst.controller ?? inst.owner]?.heroes?.[inst.heroIdx];
-    return !!hero?.name && hero.hp > 0 && (hero.baseAtk || 0) > 0;
+    if (!(!!hero?.name && hero.hp > 0 && (hero.baseAtk || 0) > 0)) return false;
+    // Al, QA-Welle 1 Nr. 19: EXAKT N Ziele — weniger waehlbare Ziele als N → nicht aktivierbar (grau).
+    return waehlbareZiele(engine, pi, grenze, hero.baseAtk || 0) >= grenze;
   },
 
   async onEquipEffect(ctx) {
@@ -92,18 +132,13 @@ module.exports = {
 
     const kandidaten = alleZiele(engine);
     if (kandidaten.length === 0) return false;
+    // Exakt N (Al, QA-Welle 1 Nr. 19): gibt es weniger waehlbare Ziele als N, wirkt der Effekt nicht (Sperre bleibt frei).
+    if (waehlbareZiele(engine, pi, grenze, atk) < grenze) return false;
 
-    const wahl = await engine.promptEffectTarget(pi, kandidaten, {
-      title: CARD_NAME,
-      description: `Choose up to ${grenze} target${grenze !== 1 ? 's' : ''} — each takes ${atk} damage.`,
-      confirmLabel: '👊 Strike!',
-      confirmClass: 'btn-danger',
-      maxTotal: grenze,
-      cancellable: true,
-      _skipPostTargetReactions: true,
-    });
+    const wahl = await engine.promptEffectTarget(pi, kandidaten, zielKonfig(grenze, atk));
     const ids = Array.isArray(wahl) ? wahl : (wahl ? [wahl] : []);
     if (ids.length === 0) return false;            // Abbruch gibt die Sperre frei
+    if (ids.length !== grenze) return false;       // exakt N — alles andere gilt als nicht gewaehlt (die Engine fuellt bzw. bricht ab)
     if (!engine.claimHOPT(HARD_KEY, pi)) return false;   // W13 (Rueckfrage 8): Hard-Stempel erst nach der Zusage
 
     // EIN Quellobjekt fuer alle Treffer — Reaktionen und die

@@ -10,9 +10,11 @@
 //  ── Umsetzung ─────────────────────────────────────────────────
 //  · Targeting-Artefakt: Zielliste = alle Kreaturen BEIDER Seiten
 //    ueber `getCreatureTargets`, minus Targeting-Immunitaet (deckt
-//    auch den Erstzug-Schutz) und minus die vom Gegner-Boris
-//    verborgene Seite (Capture-Net-Muster). Great Wall of Deri greift
-//    NICHT — sie schuetzt nur vor Nicht-Schadens-Effekten.
+//    auch den Erstzug-Schutz). KEINE Boris-Sperre (Al, QA-Welle 1
+//    Nr. 15: „Ja" — Poisoned Meat nimmt nichts auf die Hand und
+//    uebernimmt keine Kontrolle; die Kreaturen eines Gegner-Boris
+//    bleiben waehlbar). Great Wall of Deri greift NICHT — sie
+//    schuetzt nur vor Nicht-Schadens-Effekten.
 //  · Reihenfolge wie im Text: erst 20 Schaden (Typ 'artifact',
 //    ueber `actionDealCreatureDamage`, damit Reduktionen, Immunitaeten
 //    und Tod normal laufen), dann — falls die Kreatur noch liegt —
@@ -28,9 +30,8 @@ const ANIM = 'poison_skulls';
 
 function meatTargets(engine, pi) {
   const oppIdx = engine.opponentOf(pi);
-  const sides = engine.borisHidesOpponentSide?.(pi) ? [pi] : [pi, oppIdx];
   const out = [];
-  for (const side of sides) {
+  for (const side of [pi, oppIdx]) {
     for (const t of (engine.getCreatureTargets(side) || [])) {
       const inst = t.cardInstance;
       if (!inst) continue;

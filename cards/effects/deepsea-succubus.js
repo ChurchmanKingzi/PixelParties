@@ -11,7 +11,11 @@
 //
 //  Heroes: uses stealHero (same mechanism as
 //  Charme Lv3 — charm status, support-zone
-//  lock, revert at turn-start).
+//  lock, revert at turn-start). Ruling (Al, QA-Welle 1
+//  Nr. 18): der übernommene Held ist nur gegen Schaden
+//  und Besiegen geschützt (Text), NICHT zusätzlich gegen
+//  negative Status (Marke `statuses.charmed.nurSchadenSchutz`,
+//  `engine._charmBlocksFrom`).
 //
 //  Creatures: uses stealCreature — the
 //  creature STAYS in its original Support Zone
@@ -76,6 +80,10 @@ module.exports = {
       if (target.type === 'hero') {
         const ok = engine.actionStealHero(pi, target.owner, target.heroIdx, { sourceName: CARD_NAME });
         if (ok) {
+          // Al, QA-Welle 1 Nr. 18: Succubus schützt vor Schaden/Besiegen (Text), NICHT vor negativen Status
+          // (der `charmed`-Status trug bisher die Status-Immunität von Charme Lv3 mit) — Marke `nurSchadenSchutz`.
+          const stolen = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
+          if (stolen?.statuses?.charmed) stolen.statuses.charmed.nurSchadenSchutz = true;
           engine._broadcastEvent('play_zone_animation', {
             type: 'heal_sparkle', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: -1,
           });
