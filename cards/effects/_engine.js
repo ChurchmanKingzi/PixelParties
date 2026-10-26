@@ -2121,6 +2121,16 @@ class GameEngine {
       const heroesFirst = promptData.heroesFirst || false;
 
       if (targets.length === 0) return { selectedTargets: [] };
+      // ★ W78: geordnete Wahl (`promptGeordneteWahl`): je Schritt das erste noch freie Ziel seiner Liste (die Karte kann es mit `cpuResponse` besser).
+      if (Array.isArray(promptData.steps)) {
+        const frei = [];
+        for (const st of promptData.steps) {
+          const id = (st.ids || []).find(i => !frei.includes(i));
+          if (id == null) return { cancelled: true };
+          frei.push(id);
+        }
+        return { selectedTargets: frei.map(id => targets.find(t => t.id === id)).filter(Boolean) };
+      }
 
       const getHp = (t) => {
         if (t.type === 'hero') {
@@ -5747,7 +5757,11 @@ class GameEngine {
         const filteredTargets = excludeIds.length > 0 ? targets.filter(t => !excludeIds.includes(t.id)) : targets;
         if (filteredTargets.length === 0) return null;
 
-        const selectedIds = await engine.promptEffectTarget(effectiveController, filteredTargets, {
+        // ★ W78 (Backstab: Ausführender und Ziel in EINEM Picker): `_nurListe` liefert die fertig gefilterte/markierte Zielliste, ohne zu fragen; `_vorgewaehlt` (Ziel-Id) nimmt eine schon
+        // getroffene Wahl und läuft ab hier durch ALLE Fenster (Umleiter, Surprises, Post-Target) — ist die Id nicht (mehr) wählbar, wird normal gefragt.
+        if (config._nurListe) return { liste: filteredTargets };
+        const _vorId = (config._vorgewaehlt && filteredTargets.some(t => t.id === config._vorgewaehlt && !t.ineligible)) ? config._vorgewaehlt : null;
+        const selectedIds = _vorId ? [_vorId] : await engine.promptEffectTarget(effectiveController, filteredTargets, {
           title: config.title || cardInstance.name,
           description: config.description || 'Select a target.',
           confirmLabel: config.confirmLabel || 'Attack!',
@@ -12160,6 +12174,44 @@ class GameEngine {
       this.log?.('chain_pick_corrected', { title: opts.title || 'Chain Lightning', requested: wunsch.length, applied: gewaehlt.length });
     }
     // Re-match targets by id to get full data (cardInstance etc.)
+    return gewaehlt;
+  }
+
+  /**
+   * ★ W78 (Backstab, Al: „beide in einem einzigen Picker"): GEORDNETE Mehrfachwahl in EINEM Prompt — Klick 1, Klick 2 … mit je eigener Kandidatenliste (die Mechanik von `chainTargetPick`:
+   * nummerierte Marker, Rückgängig, Bestätigen; der Client liest `steps`). `schritte` = [{ targets: [Zielobjekte], label: 'Click …', role?: 'Attacker' }, …] — Schritt i darf nur aus `targets`
+   * gewählt werden, nie dasselbe Ziel zweimal. Kein Zielschutz/Fenster hier: die Kandidatenlisten sind vom Aufrufer fertig gefiltert, Fenster (Umleiter, Surprises …) öffnet der Aufrufer danach.
+   * @param {object} opts  { title, description, confirmLabel, cancellable (Standard true), previewCardName, source }
+   * @returns {object[]|null} die gewählten Zielobjekte in Reihenfolge, `null` bei Abbruch (oder ungültiger Antwort)
+   */
+  async promptGeordneteWahl(playerIdx, schritte, opts = {}) {
+    if (!Array.isArray(schritte) || schritte.length === 0 || schritte.some(s => !s.targets || s.targets.length === 0)) return null;
+    const alle = new Map();
+    for (const st of schritte) for (const t of st.targets) if (!alle.has(t.id)) alle.set(t.id, t);
+    const clientTargets = [...alle.values()].map(t => { const { cardInstance, ...rest } = t; return rest; });
+    const result = await this.promptGeneric(playerIdx, {
+      type: 'chainTargetPick',
+      title: opts.title || 'Choose targets',
+      ...(opts.source ? { source: opts.source } : {}),
+      description: opts.description,
+      confirmLabel: opts.confirmLabel,
+      previewCardName: opts.previewCardName,
+      targets: clientTargets,
+      damages: schritte.map(() => 0),
+      _fuer: playerIdx,   // der gefragte Spieler (für `cpuResponse` der Karte)
+      steps: schritte.map(st => ({ ids: st.targets.map(t => t.id), label: st.label || '', role: st.role || '' })),
+      cancellable: opts.cancellable !== false,
+    });
+    if (!result || result.cancelled) return null;
+    const wunsch = Array.isArray(result.selectedTargets) ? result.selectedTargets : [];
+    if (wunsch.length !== schritte.length) return null;
+    const gewaehlt = [];
+    for (let i = 0; i < schritte.length; i++) {
+      const id = wunsch[i] && typeof wunsch[i] === 'object' ? wunsch[i].id : wunsch[i];
+      const t = schritte[i].targets.find(x => x.id === id);
+      if (!t || gewaehlt.some(g => g.id === t.id)) return null;   // der Server prüft nach: Schritt i nur aus seiner Liste, paarweise verschieden
+      gewaehlt.push(t);
+    }
     return gewaehlt;
   }
 
@@ -24491,6 +24543,27 @@ this._deathWatch = (this._deathWatchStack || []).length
       out.add(cardName);
     }
     return Array.from(out);
+  }
+
+  /**
+   * ★ W78 (Backstab: „kein eigener Held performed diese Attack"): Karten mit `playsWithoutHero: true` fragen nach keinem Wirker-Helden. Das Aktionssystem (Aktion/Zähler je Held) braucht intern
+   * aber einen Platz: der ERSTE eigene Held, mit dem die Karte nach den normalen Regeln spielbar wäre (`validateActionPlay`), dient NUR als technischer Platzhalter für die Buchhaltung der
+   * Aktion (`heroesActedThisTurn`, Zusatzaktions-Geber, Heldenkosten) — Berserk/Aktions-Limit-Helden zuletzt. Nach außen (Kette, Hooks, Zähler, Karteninstanz) tritt kein Held auf (`heroIdx -1`).
+   * @returns {number} Heldenindex oder -1 (kein eigener Held kann die Karte spielen)
+   */
+  herolosPlatzhalter(pi, cardName, handIndex, opts = {}) {
+    const ps = this.gs.players[pi];
+    if (!ps) return -1;
+    const kand = [];
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const h = ps.heroes[hi];
+      if (h?.name && h.hp > 0) kand.push({ hi, spaet: (h.statuses?.berserked || h._maxActionsPerTurn) ? 1 : 0 });
+    }
+    kand.sort((a, b) => (a.spaet - b.spaet) || (a.hi - b.hi));
+    for (const { hi } of kand) {
+      if (this.validateActionPlay(pi, cardName, handIndex, hi, ['Spell', 'Attack'], { fromCreation: opts.fromCreation })) return hi;
+    }
+    return -1;
   }
 
   /**
