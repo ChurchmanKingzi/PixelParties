@@ -65,7 +65,7 @@ function effectAvailable(engine, id, pi, heroIdx, hs = pi) {
   if (id === 'deck') return W.attachableAbilitiesIn(engine, pi, heroIdx, ps.mainDeck, hs).length > 0;
   if (id === 'hand') return W.attachableAbilitiesIn(engine, pi, heroIdx, ps.hand, hs).length > 0;
   if (id === 'attach') return ATTACH_QUELLEN.some(q => effectAvailable(engine, q, pi, heroIdx, hs));
-  return !drawBlockedFor(engine, pi);   // 'draw' - D1 (Regel von Al): reiner Zug, unter Hand-/Zieh-Sperre keine Wahl (Counter nicht fuer nichts)
+  return !drawBlockedFor(engine, pi, DRAW_COUNT);   // 'draw' - D1 (Regel von Al): reiner Zug, unter Hand-/Zieh-Sperre keine Wahl (Counter nicht fuer nichts); mit Menge, damit auch Tuscan Artist (genau 2/3) sperrt
 }
 
 function stampEffect(engine, id, pi, heroIdx) {
