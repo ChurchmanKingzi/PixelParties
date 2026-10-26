@@ -2125,7 +2125,8 @@ class GameEngine {
       if (Array.isArray(promptData.steps)) {
         const frei = [];
         for (const st of promptData.steps) {
-          const id = (st.ids || []).find(i => !frei.includes(i));
+          const liste = (st.byPrev && frei.length) ? (st.byPrev[frei[frei.length - 1]] || []) : (st.ids || []);
+          const id = liste.find(i => !frei.includes(i));
           if (id == null) return { cancelled: true };
           frei.push(id);
         }
@@ -12179,7 +12180,8 @@ class GameEngine {
   /**
    * ★ W78 (Backstab, Al: „beide in einem einzigen Picker"): GEORDNETE Mehrfachwahl in EINEM Prompt — Klick 1, Klick 2 … mit je eigener Kandidatenliste (die Mechanik von `chainTargetPick`:
    * nummerierte Marker, Rückgängig, Bestätigen; der Client liest `steps`). `schritte` = [{ targets: [Zielobjekte], label: 'Click …', role?: 'Attacker' }, …] — Schritt i darf nur aus `targets`
-   * gewählt werden, nie dasselbe Ziel zweimal. Kein Zielschutz/Fenster hier: die Kandidatenlisten sind vom Aufrufer fertig gefiltert, Fenster (Umleiter, Surprises …) öffnet der Aufrufer danach.
+   * gewählt werden, nie dasselbe Ziel zweimal. Optional `abhaengig: (vorigesZiel) => [Zielobjekte]` (Schritt i ≥ 1): die Liste hängt vom Klick davor ab (Backstab: Ziel und Angreifer
+   * gehören demselben Spieler) — der Client bekommt sie als `byPrev` je Vorgänger-Id, der Server prüft sie nach. Kein Zielschutz/Fenster hier: die Kandidatenlisten sind vom Aufrufer fertig gefiltert, Fenster (Umleiter, Surprises …) öffnet der Aufrufer danach.
    * @param {object} opts  { title, description, confirmLabel, cancellable (Standard true), previewCardName, source }
    * @returns {object[]|null} die gewählten Zielobjekte in Reihenfolge, `null` bei Abbruch (oder ungültiger Antwort)
    */
@@ -12198,7 +12200,14 @@ class GameEngine {
       targets: clientTargets,
       damages: schritte.map(() => 0),
       _fuer: playerIdx,   // der gefragte Spieler (für `cpuResponse` der Karte)
-      steps: schritte.map(st => ({ ids: st.targets.map(t => t.id), label: st.label || '', role: st.role || '' })),
+      steps: schritte.map((st, i) => {
+        const e = { ids: st.targets.map(t => t.id), label: st.label || '', role: st.role || '' };
+        if (i > 0 && typeof st.abhaengig === 'function') {
+          e.byPrev = {};
+          for (const vor of schritte[i - 1].targets) e.byPrev[vor.id] = (st.abhaengig(vor) || []).filter(t => st.targets.some(x => x.id === t.id)).map(t => t.id);
+        }
+        return e;
+      }),
       cancellable: opts.cancellable !== false,
     });
     if (!result || result.cancelled) return null;
@@ -12208,7 +12217,8 @@ class GameEngine {
     for (let i = 0; i < schritte.length; i++) {
       const id = wunsch[i] && typeof wunsch[i] === 'object' ? wunsch[i].id : wunsch[i];
       const t = schritte[i].targets.find(x => x.id === id);
-      if (!t || gewaehlt.some(g => g.id === t.id)) return null;   // der Server prüft nach: Schritt i nur aus seiner Liste, paarweise verschieden
+      if (!t || gewaehlt.some(g => g.id === t.id)) return null;
+      if (i > 0 && typeof schritte[i].abhaengig === 'function' && !(schritte[i].abhaengig(gewaehlt[i - 1]) || []).some(x => x.id === t.id)) return null;   // Liste des Schritts hängt vom Klick davor ab   // der Server prüft nach: Schritt i nur aus seiner Liste, paarweise verschieden
       gewaehlt.push(t);
     }
     return gewaehlt;
