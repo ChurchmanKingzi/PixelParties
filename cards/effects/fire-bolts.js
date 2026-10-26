@@ -254,6 +254,12 @@ module.exports = {
         gs._spellFreeAction = true;
       }
 
+      // ── Step 4b: Sofort-Guss (Chaos-Diamond, Overflowing Chalice, Zusatzaktion …) ──
+      // `resolveDeferredRecoil` ruft nur `doPlaySpell` auf — `_castSpellImmediately` nicht. Der Rückstoß fiel dort ersatzlos weg
+      // (bzw. blieb als `_deferredRecoil` stehen und traf beim nächsten gespielten Zauber). Im Sofort-Guss gleich hier auflösen
+      // (verschachtelt in einem `doPlaySpell`, z. B. Aurora Borealis, ist der spätere Aufruf dort dann ein No-op).
+      if (gs._immediateActionContext && !gs._bartasSecondCast) await engine.resolveDeferredRecoil();
+
       engine.log('fire_bolts', {
         player: gs.players[pi].username,
         hero: (ctx.attachedHero || gs.players[pi].heroes[heroIdx])?.name,   // Als Befund 29.9.: Brettseite des Wirkers
