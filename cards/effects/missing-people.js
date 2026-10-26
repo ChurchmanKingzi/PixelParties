@@ -153,6 +153,12 @@ module.exports = {
       // ANS ENDE — „at the bottom of their deck".
       if (istToken) {
         engine.tokenAbgang(inst);
+      } else if (engine.ankhotaLoeschtVomBrett(inst)) {
+        // Ankhota: „Delete all Creatures that are moved from the board to anywhere else" — dieser Sonderweg umgeht den zentralen Move, also hier selbst
+        // in den Gelöscht-Stapel des Besitzers (meldet die Löschung über den Stapel-Wächter, Ankhotas Zuwachs).
+        inst._ankhotaGeloescht = true;
+        bPs.deletedPile.push(inst.name);
+        engine.log('ankhota_delete', { player: bPs.username, card: inst.name, by: CARD_NAME });
       } else {
         bPs.mainDeck.push(inst.name);
       }

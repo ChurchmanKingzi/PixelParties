@@ -119,7 +119,12 @@ module.exports = {
       // gemeinsame Hook die Phase offenhaelt.
       if (ps && (ps._actionsPlayedThisTurn || 0) >= 1 && isSecondActionGrant(engine, inst)) {
         for (const [tid, n] of Object.entries(inst.counters?.aaGrants || {})) {
-          if (n > 0 && tid.startsWith('second_action')) engine.expireAdditionalActionType(inst, tid);
+          if (n > 0 && tid.startsWith('second_action')) {
+            engine.expireAdditionalActionType(inst, tid);
+            // Der Zuschlag verfaellt UNBENUTZT (die zweite Aktion bezahlte eine fremde Zusatzaktion, z. B. Mission of the Light Brigade) —
+            // dann gilt Duignos Preis („cannot perform any other additional Actions") nicht (s. `onAdditionalActionUsed`).
+            inst.counters._duignoVerfallen = engine.gs.turn;
+          }
         }
         engine.log('duigno_grant_fizzle', { player: ps.username });
         engine.sync();
@@ -136,6 +141,8 @@ module.exports = {
       await secondActionHooks.onAdditionalActionUsed(ctx);
       if (!inst || inst.name !== CARD_NAME) return;
       if (!isSecondActionGrant(engine, inst)) return;
+      // Duignos Zuschlag ist unbenutzt verfallen (fremde Zusatzaktion bezahlt): kein Preis, die uebrigen Zusatzaktionen bleiben offen.
+      if (inst.counters?._duignoVerfallen === engine.gs.turn) return;
       // Noch offene Zuschlaege an DIESER Instanz? Dann war es nicht der
       // ihre, die gerade verbraucht wurde.
       const offen = Object.entries(inst.counters?.aaGrants || {})
