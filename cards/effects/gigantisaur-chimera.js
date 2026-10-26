@@ -195,6 +195,10 @@ module.exports = {
         });
         if (!result || result.cancelled || result.cardName == null) return false;
 
+        // ★ W74c: Boris darf auch diese Abwurf-KOSTEN der Beschwörung („sending 3 Gigantisaur … to the discard pile") ignorieren — einmal nach der ersten
+        // Wahl, vor dem ersten Abwurf. Feste Kosten: Verzicht = die Beschwörung gilt als bezahlt, alle Karten bleiben auf der Hand.
+        if (discarded === 0 && await engine.borisVerzicht(pi, 3, { source: CARD_NAME })) return true;
+
         const ok = await engine.actionDiscardHandCard(pi, result.cardName, result.handIndex, {
           source: CARD_NAME,
         });

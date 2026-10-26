@@ -13070,6 +13070,8 @@ class GameEngine {
     }
     const toDiscard = Math.min(count, ps.hand.length);
     if (toDiscard <= 0) return;
+    // ★ W74c: Boris auch beim blinden Mehrfach-Abwurf (Chaos Magic, künftig `ctx.discardCards`) — einmal für den ganzen Stapel.
+    if (!opts._borisGefragt && await this.borisVerzicht(playerIdx, toDiscard, { source: opts.source, sourceOwner: opts.sourceOwner })) return;
     if (opts.source) await this.effectSourceGlow(opts.sourceOwner ?? playerIdx, opts.source);
     await this._paceHandDiscard();   // v696: Abstand zum vorigen Hand-Abwurf
     const _abwurfOp = toDiscard > 1 ? this._neueAbwurfVorgangsId() : undefined;   // W16b (A03-futuretech-07): ein Vorgang
@@ -52588,6 +52590,72 @@ this._deathWatch = (this._deathWatchStack || []).length
       try { if (script.waivesDiscardCosts(this, playerIdx)) return true; } catch { /* eine Karte darf die Liste nicht kippen */ }
     }
     return false;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  ★ W74c — BORIS BEI EIGENBAU-ABWÜRFEN (Al: „Ich finde gerade eine Menge Interaktionen, bei denen Boris schlicht nicht funktioniert")
+  //
+  //  Regel (Vertrag, CARD_API „Welle 74 / W74c"): JEDER Abwurf von der HAND — erzwungen, als Kosten oder als eigener Teil des Effekts —
+  //  läuft über einen dieser Wege, damit Boris EINMAL PRO STAPEL gefragt wird (vor der Zahlung, nach der Wahl der Karten):
+  //    · `actionPromptForceDiscard`          (Standard, fragt selbst; Karten, die danach wissen müssen, ob bezahlt ODER erlassen wurde: `zahleAbwurfKosten`)
+  //    · `borisVerzicht(pi, n, opts)`        (Eigenbau mit eigener Kartenwahl: nach der Wahl, vor dem ersten `actionDiscardHandCard`)
+  //    · `borisStapel(pi, opts)`             (Eigenbau-Schleifen: fragt beim ersten Aufruf, die Antwort gilt für den ganzen Stapel)
+  //    · `fremdAbwurfEntfaellt(opfer, n, o)` (Eigenbau-ZWANGSabwurf gegen den Gegner: ERST Ambush the Scout, DANN Boris)
+  //    · `actionDiscardCardsAnimated`        (blinder Mehrfach-Abwurf, fragt selbst; `opts._borisGefragt` für Aufrufer, die schon gefragt haben)
+  //  Verzichtet Boris, bleibt die Karte auf der Hand; Kosten gelten als erlassen (der Effekt läuft weiter), außer die Wirkung hängt an der ANZAHL
+  //  der abgeworfenen Karten („draw that many", „the same number", „times the number discarded"): dann ist die Anzahl 0 (Champion, Al).
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /** Hat der Spieler `pi` Boris' „einmal pro Zug" in diesem Zug schon verbraucht? (Stempel `boris-discard`, gesetzt beim tatsächlichen Verzicht.) */
+  _borisStempelHeute(pi) {
+    return this.gs?.hoptUsed?.[`boris-discard:${pi}`] === this.gs?.turn;
+  }
+
+  /**
+   * Boris für einen Abwurf-STAPEL mit mehreren Einzelschritten (Schleifen aus „Karte anklicken → abwerfen"): beim ERSTEN Aufruf wird gefragt, die
+   * Antwort gilt für den ganzen Stapel (Verzicht → jede weitere Karte entfällt ohne neue Frage; kein Verzicht → es wird nicht noch einmal gefragt).
+   * @returns {(count?: number) => Promise<boolean>} `true` = Boris verzichtet (Abwurf entfällt)
+   */
+  borisStapel(pi, opts = {}) {
+    let antwort = null;
+    return async (count = 1) => {
+      if (antwort === null) antwort = !!(await this.borisVerzicht(pi, count, opts));
+      return antwort;
+    };
+  }
+
+  /**
+   * Abwurf-KOSTEN über den Standardweg (`actionPromptForceDiscard`, `selfInflicted`) — mit klarer Auskunft für Karten, die danach wissen müssen,
+   * ob die Kosten bezahlt wurden: `bezahlt` ist auch dann `true`, wenn Boris die Kosten erlassen hat (`erlassen`); `false` nur bei Abbruch / nicht bezahlbar.
+   * Ersatz für das Muster `const vor = hand.length; await fd(…); if (hand.length >= vor) return;` — das ließ den Effekt unter Boris zu Unrecht verfallen.
+   * @returns {Promise<{bezahlt: boolean, erlassen: boolean}>}
+   */
+  async zahleAbwurfKosten(pi, count, opts = {}) {
+    const ps = this.gs.players[pi];
+    if (!ps) return { bezahlt: false, erlassen: false };
+    const stempelVor = this._borisStempelHeute(pi);
+    const vor = (ps.hand || []).length;
+    await this.actionPromptForceDiscard(pi, count, { selfInflicted: true, ...opts });
+    const erlassen = !stempelVor && this._borisStempelHeute(pi);
+    return { bezahlt: erlassen || (ps.hand || []).length < vor, erlassen };
+  }
+
+  /**
+   * Eigenbau-ZWANGSabwurf gegen `opfer` (Fremdquelle `opts.sourceOwner`): Erstrunden-Schutz, dann ERST das Ambush-Fenster, DANN Boris (Als Ruling 5.8.).
+   * `true` = der Abwurf entfällt (geschützt / Ambush negiert / Boris verzichtet) — der Aufrufer wirft dann nichts ab. Wirft er danach selbst ab, setzt er an
+   * `actionDiscardHandCard` `_skipHandInteractionCheck: true` (das Fenster lief schon hier).
+   */
+  async fremdAbwurfEntfaellt(opfer, count, opts = {}) {
+    const ps = this.gs.players[opfer];
+    if (!ps || !(count > 0) || (ps.hand || []).length === 0) return true;
+    if (this.gs.firstTurnProtectedPlayer === opfer && !opts.selfInflicted) {
+      this.log('discard_blocked', { player: ps.username, reason: 'shielded' });
+      return true;
+    }
+    const quelle = opts.source || opts.sourceName;
+    const von = opts.sourceOwner != null ? opts.sourceOwner : this.opponentOf(opfer);
+    if (!opts._skipHandInteractionCheck && await this.checkHandInteractionReaction(opfer, 'discard', { byPi: von, count, sourceName: quelle })) return true;
+    return !!(await this.borisVerzicht(opfer, count, { source: quelle, sourceOwner: von }));
   }
 
   /**

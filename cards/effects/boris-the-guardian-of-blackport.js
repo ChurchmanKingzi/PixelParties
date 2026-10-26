@@ -146,6 +146,8 @@ module.exports = {
       confirmLabel: '🛡️ Skip this discard!',
       cancelLabel: 'Discard normally',
       cancellable: true,
+      // W74c: der Verzicht macht die Wirkung wertlos (sie hängt an der ANZAHL der abgeworfenen Karten: Champion, Heinz, Pteranos …) — nur ein Hinweis für die CPU.
+      ...(opts.skipVoidsEffect ? { skipVoidsEffect: true } : {}),
     });
     if (!skipped || skipped.cancelled || skipped.confirmed === false) return false;
 
@@ -169,6 +171,7 @@ module.exports = {
   cpuResponse(engine, promptType, promptData) {
     if (promptType !== 'generic') return undefined;
     if (promptData?.type !== 'confirm') return undefined;
+    if (promptData?.skipVoidsEffect) return { confirmed: false };   // W74c: wer verzichtet, bekommt nichts — die CPU wirft dann lieber ab
     return { confirmed: true };
   },
 

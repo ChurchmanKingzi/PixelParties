@@ -94,7 +94,7 @@ async function dumpHandsTogether(engine, pi, oppIdx, gegnerUnberuehrt, ichUnberu
         // und faellt unter den Erstrunden-Riegel (v860).
         if (oppCard != null
             && await engine.actionDiscardHandCard(oppIdx, oppCard, 0,
-                 { ...lockstep, sourceOwner: pi })) opp++;
+                 { ...lockstep, sourceOwner: pi, _skipHandInteractionCheck: true })) opp++;   // W74c: das Fenster lief schon in `fremdAbwurfEntfaellt`
 
         engine.sync();
         const more = meineIdx().length > 0 || (op?.hand?.length || 0) > 0;
@@ -132,8 +132,10 @@ module.exports = {
       const _meineHand = (gs.players[pi]?.hand || []).length - 1;   // Draw selbst liegt noch drin
       const ichBoris = _meineHand > 0 && await engine.borisVerzicht(pi, _meineHand, { source: CARD_NAME, sourceOwner: pi });
       const _gegnerHand = (gs.players[oppIdx]?.hand || []).length;
+      // ★ W74c: Reihenfolge wie bei jedem fremden Zwangsabwurf — ERST das Ambush-Fenster, DANN Boris (`fremdAbwurfEntfaellt`); vorher fragte Boris zuerst
+      // und das Fenster ging erst beim Abwurf jeder einzelnen Karte auf.
       const gegnerBoris = gs.firstTurnProtectedPlayer !== oppIdx && _gegnerHand > 0
-        && await engine.borisVerzicht(oppIdx, _gegnerHand, { source: CARD_NAME, sourceOwner: pi });
+        && await engine.fremdAbwurfEntfaellt(oppIdx, _gegnerHand, { source: CARD_NAME, sourceOwner: pi });
       const gegnerUnberuehrt = gs.firstTurnProtectedPlayer === oppIdx || gegnerBoris;
 
       // ── Both players discard their entire hands, card by card, in
