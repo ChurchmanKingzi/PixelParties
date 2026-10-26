@@ -76,6 +76,7 @@ function opferZiele(engine, pi, selbst) {
   }
   for (const { physOwner, heroIdx, hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name || !(hero.hp > 0)) continue;
+    if (engine.istHeldTodgeweiht(hero)) continue;   // fällt im selben Flächenschlag ohnehin (todgeweiht): kein Opfer (Al 26.10.)
     out.push({ id: `hero-${physOwner}-${heroIdx}`, type: 'hero', owner: physOwner, heroIdx, cardName: hero.name });
   }
   return out;

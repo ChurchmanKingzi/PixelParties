@@ -518,6 +518,7 @@ module.exports = {
     // mehrere Ziele; die Koepfe schlagen weiter nacheinander zu.
     await engine.beginAoeStrike(selected.length, {
       creatures: selected.filter(t => t.type !== 'hero').map(t => t.cardInstance).filter(Boolean),
+      heroes: selected.filter(t => t.type === 'hero'),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
       source: dmgSource, amount: HOPT_DAMAGE, type: 'creature', sourceOwner: pi,
     });
     try {

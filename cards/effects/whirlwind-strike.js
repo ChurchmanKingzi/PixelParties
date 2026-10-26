@@ -157,6 +157,7 @@ module.exports = {
       // roher Klammer — öffnet auch das Idol-Fenster für die Kreaturen.
       await engine.beginAoeStrike(heroDamageTargets.length + allCreatureEntries.length, {
         creatures: allCreatureEntries, source: attackSource, type: 'attack', sourceOwner: ctx.cardOwner,
+        heroes: heroDamageTargets.map(({ hero: h }) => ({ hero: h, amount: finalAtk })),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
       });
       try {
       // ── NACHEINANDER: je Held erst er selbst (Surprise-Fenster an GENAU diesem Treffer), dann ──

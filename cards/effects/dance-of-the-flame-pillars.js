@@ -160,6 +160,7 @@ module.exports = {
       // Saeulen fallen weiter nacheinander.
       await engine.beginAoeStrike(selected.length, {
         creatures: selected.filter(t => t.type !== 'hero').map(t => t.cardInstance).filter(Boolean),
+        heroes: selected.filter(t => t.type === 'hero'),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
         source: dmgSource, amount: PER_TARGET_DAMAGE,
         type: 'destruction_spell', sourceOwner: pi,
       });

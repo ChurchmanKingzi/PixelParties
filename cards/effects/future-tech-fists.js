@@ -121,6 +121,7 @@ module.exports = {
         .filter(z => z && z.type !== 'hero')
         .map(z => z.cardInstance)
         .filter(Boolean),
+      heroes: ids.map(id => kandidaten.find(t => t.id === id)).filter(z => z && z.type === 'hero'),   // W78 (Pythia): Helden, die dieser Schlag faellt, sind todgeweiht
       source: quelle, amount: atk, type: 'attack', sourceOwner: pi,
     });
     try {

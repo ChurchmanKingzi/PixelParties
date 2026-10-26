@@ -99,7 +99,7 @@ async function runEffect(engine, pi) {
   // (Q29b): gewollt, sie ueberlebt und behaelt den frisch erhaltenen Counter.
   const source = { name: CARD_NAME, owner: pi };
   // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer.
-  engine.beginDestroyScope(targets.length);
+  engine.beginDestroyScope(targets.length, targets);   // W78: die Opfer sind todgeweiht (Infallible Oracle Pythia darf keines opfern)
   try {
     for (const inst of targets) {
       if (inst.zone !== 'support') continue;

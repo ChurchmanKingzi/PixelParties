@@ -6939,6 +6939,7 @@ class GameEngine {
       // W50a (Ricochet, Al 22.10.2026): ein abgebrochener/negierter/immuner Treffer hat Kettenbetrag 0 — alle Folgetreffer sind dann 0
       // (treffen aber weiter, On-Hit-Effekte bleiben).
       if (opts?.vollOut && _res?.cancelled) opts.vollOut.wert = 0;
+      if (this._multiHitScope?._todgeweihte && target?.hp > 0) this._schlagTodgeweihtFreigeben(target);   // ★ W78: der Held hat seinen Treffer ueberstanden — nicht mehr todgeweiht
       return _res;
     } finally {
       this._actionRecursionDepth--;
@@ -14132,6 +14133,8 @@ class GameEngine {
     // mehr. Jetzt wieder: Sammler → Kern, danach die Nach-Abgang-Arbeit.
     const r = await this._mitNiederlagenSammler(() => this._actionDestroyCardKern(source, targetCard, opts));
     await this._nachAbgangAbarbeiten();   // v1365
+    // ★ W78: ein Opfer der Zerstoerungsschleife, das stehen blieb (Schutz, gerettet), ist nicht mehr todgeweiht.
+    if (this._destroyScope?._todgeweihte?.length && targetCard?.zone === ZONES.SUPPORT && this.cardInstances.includes(targetCard)) this._markeAusKlammerLoesen(this._destroyScope, targetCard);
     return r;
   }
 
@@ -38836,16 +38839,131 @@ this._deathWatch = (this._deathWatchStack || []).length
    * besiegen („defeat all other Creatures"), melden ihre Opfer hier an — solange `fn` läuft, gelten sie als TODGEWEIHT (`istTodgeweiht`): Ersatz-/Rettungs-Effekte, die „ein anderes Ziel opfern"
    * (Infallible Oracle Pythia), dürfen sie nicht mehr als Opfer nehmen. Damage-Batches stempeln dasselbe schon über `counters._dyingThisBatch` (`istTodgeweiht` kennt beides).
    */
-  async mitTodgeweihten(insts, fn) {
-    if (!this._todgeweiht) this._todgeweiht = new Set();
-    const neu = (insts || []).filter(i => i && !this._todgeweiht.has(i.id));
-    for (const i of neu) this._todgeweiht.add(i.id);
-    try { return await fn(); } finally { for (const i of neu) this._todgeweiht.delete(i.id); }
+  async mitTodgeweihten(ziele, fn) {
+    // Mischliste: Kreatur-Instanzen UND Helden (Heldenobjekte bzw. Eintraege `{hero}` / `{type:'hero',owner,heroIdx}` / `{inst}`).
+    const neu = this._todgeweihtMarkieren(ziele);
+    try { return await fn(); } finally { this._todgeweihtLoesen(neu); }
   }
 
-  /** Steht diese Creature schon für den Tod fest (Wipe-Opfer oder im selben Schadens-Batch tödlich getroffen)? */
+  /** Steht diese Creature schon fuer den Tod fest (Wipe-Opfer, im selben Schadens-Batch/Schlag tödlich getroffen, Tod nur aufgeschoben)? */
   istTodgeweiht(inst) {
-    return !!inst && (!!(this._todgeweiht && this._todgeweiht.has(inst.id)) || !!inst.counters?._dyingThisBatch);
+    if (!inst) return false;
+    if (this._todgeweiht && this._todgeweiht.has(inst.id)) return true;
+    const c = inst.counters;
+    if (c?._dyingThisBatch) return true;
+    return !!inst._deathResolved || (c?.currentHp != null && c.currentHp <= 0);   // HP schon auf 0: der Tod ist nur noch nicht abgewickelt (Flächenklammer)
+  }
+
+  /**
+   * ★ W78 (Al 26.10.: „JEDE FORM von AoE …"): dasselbe fuer HELDEN. Todgeweiht = in einem laufenden Mehrziel-Effekt vorgemerkt (`mitTodgeweihten`, Flaechenklammer `beginAoeStrike`
+   * mit `heroes`), bereits auf 0 HP (Tod nur aufgeschoben, `heldTodAufgeschoben`) oder schon tot.
+   */
+  istHeldTodgeweiht(hero) {
+    if (!hero) return false;
+    if (this._todgeweihtHelden && this._todgeweihtHelden.has(hero)) return true;
+    if (hero.name && !(hero.hp > 0)) return true;
+    return this.heldTodAufgeschoben(hero);
+  }
+
+  /** Gemeinsame Frage fuer Ersatz-/Rettungseffekte: Kreatur-Instanz ODER Held (Objekt bzw. Picker-Eintrag `{type:'hero',owner,heroIdx}`) — faellt es im selben Effekt/Schlag ohnehin? */
+  istZielTodgeweiht(ziel) {
+    const z = this._todgeweihtZiel(ziel);
+    if (!z) return false;
+    return z.hero ? this.istHeldTodgeweiht(z.hero) : this.istTodgeweiht(z.inst);
+  }
+
+  /** Zielform normieren: `{ hero }` | `{ inst }` | null. */
+  _todgeweihtZiel(z) {
+    if (!z || typeof z !== 'object') return null;
+    if (z instanceof CardInstance) return { inst: z };
+    if (z.hero && typeof z.hero === 'object') return { hero: z.hero };
+    if (z.type === 'hero') { const h = this.gs?.players?.[z.owner]?.heroes?.[z.heroIdx]; return h ? { hero: h } : null; }
+    if (z.inst && typeof z.inst === 'object') return { inst: z.inst };
+    if (z.cardInstance && typeof z.cardInstance === 'object') return { inst: z.cardInstance };
+    if (z.zone === undefined && typeof z.hp === 'number') return { hero: z };
+    if (z.id != null) return { inst: z };
+    return null;
+  }
+
+  /** Ziele in die Todgeweihten-Mengen eintragen; gibt die NEU eingetragenen Schluessel zurueck (Aeusserer behaelt seine Eintraege). */
+  _todgeweihtMarkieren(ziele) {
+    if (!this._todgeweiht) this._todgeweiht = new Set();
+    if (!this._todgeweihtHelden) this._todgeweihtHelden = new Set();
+    const neu = [];
+    for (const raw of (ziele || [])) {
+      const z = this._todgeweihtZiel(raw);
+      if (!z) continue;
+      const menge = z.hero ? this._todgeweihtHelden : this._todgeweiht;
+      const key = z.hero || z.inst.id;
+      if (menge.has(key)) continue;
+      menge.add(key);
+      neu.push({ menge, key });
+    }
+    return neu;
+  }
+
+  _todgeweihtLoesen(liste) {
+    for (const { menge, key } of (liste || [])) menge.delete(key);
+  }
+
+  /**
+   * Fuer die Flaechenklammer: Ziele fuer die Dauer des AEUSSERSTEN Schlags vormerken (Aufraeumen in `endMultiHit`; die Merkliste haengt am Scope).
+   */
+  _schlagTodgeweihtMerken(ziele) {
+    const scope = this._multiHitScope;
+    if (!scope) return [];
+    const neu = this._todgeweihtMarkieren(ziele);
+    (scope._todgeweihte || (scope._todgeweihte = [])).push(...neu);
+    return neu;
+  }
+
+  /** Ein Ziel hat seinen Schlag ueberstanden (oder wurde abgewehrt): die Vormerkung dieses Schlags entfaellt wieder. */
+  _schlagTodgeweihtFreigeben(ziel) {
+    this._markeAusKlammerLoesen(this._multiHitScope, ziel);
+  }
+
+  /** Vormerkung eines Ziels aus der Merkliste einer Klammer (`_multiHitScope` / `_destroyScope`) nehmen. */
+  _markeAusKlammerLoesen(scope, ziel) {
+    const z = this._todgeweihtZiel(ziel);
+    if (!scope?._todgeweihte || !z) return;
+    const key = z.hero || z.inst.id;
+    for (let i = scope._todgeweihte.length - 1; i >= 0; i--) {
+      const m = scope._todgeweihte[i];
+      if (m.key === key) { m.menge.delete(m.key); scope._todgeweihte.splice(i, 1); }
+    }
+  }
+
+  /**
+   * Flaechenschlag meldet seine Ziele: Helden (`heroes`: `{hero, heroIdx?, owner?, amount?}` oder Heldenobjekte, Betrag `opts.amount`) mit `amount >= hp`, die nicht immun sind, und Kreaturen
+   * (`creatures`, ab zwei) mit abgewehrten Eintraegen ausgenommen, gelten bis zum Ende des Schlags als todgeweiht. Konservativ: Brutto-Betrag, aber Immunitaeten/Schilde/Negation zaehlen nicht mit.
+   */
+  _schlagZieleMelden(opts, schatten, negiert) {
+    const ziele = [];
+    const quelle = opts.source;
+    const betrag = opts.amount ?? 0;
+    for (const h of (opts.heroes || [])) {
+      // Eintrag = Heldenobjekt | `{hero, heroIdx?, owner?, amount?}` | Picker-Ziel `{type:'hero', owner, heroIdx}`
+      const hero = h?.hero || ((h?.type === 'hero' || (h?.hp === undefined && h?.owner != null)) ? this.gs.players[h.owner]?.heroes?.[h.heroIdx] : h);
+      if (!hero?.name || !(hero.hp > 0)) continue;
+      const amt = h?.amount ?? betrag;
+      if (!(amt > 0) || amt < hero.hp) continue;
+      let owner = h?.owner, heroIdx = h?.heroIdx;
+      if (owner == null || heroIdx == null) {
+        for (let p = 0; p < (this.gs.players || []).length && owner == null; p++) {
+          const i = (this.gs.players[p]?.heroes || []).indexOf(hero);
+          if (i >= 0) { owner = p; heroIdx = i; }
+        }
+      }
+      if (hero.statuses?.shielded) continue;
+      if (owner != null && this._aoeHeldImmun(owner, heroIdx, hero, quelle, opts)) continue;
+      ziele.push({ hero });
+    }
+    for (const e of (schatten || [])) {
+      if (!e?.inst || e.cancelled || e._immuneCreature || negiert?.has(e.inst.id)) continue;
+      if (!(e.amount > 0) || e.amount < this.creatureCurrentHp(e.inst)) continue;
+      ziele.push({ inst: e.inst });
+    }
+    if (ziele.length) this._schlagTodgeweihtMerken(ziele);
   }
 
   /**
@@ -46534,16 +46652,25 @@ this._deathWatch = (this._deathWatchStack || []).length
    * ein abgebrochener Effekt sie nicht stehen laesst — sonst blieben
    * alle folgenden Einzelzerstoerungen stumm.
    */
-  beginDestroyScope(anzahl) {
+  beginDestroyScope(anzahl, ziele) {
     if (!this._destroyScope) this._destroyScopeId = (this._destroyScopeId || 0) + 1;   // W16d (C02-03): Kennung des Sammel-Ereignisses
-    this._destroyScope = { total: anzahl || 0, tiefe: (this._destroyScope?.tiefe || 0) + 1 };
+    const alt = this._destroyScope;
+    this._destroyScope = { total: anzahl || 0, tiefe: (alt?.tiefe || 0) + 1, _todgeweihte: alt?._todgeweihte };
+    // ★ W78 (Pythia): `ziele` (Kreatur-Instanzen/Helden) = die Opfer dieser Schleife — sie gelten bis zum Ende der Klammer als todgeweiht (`istZielTodgeweiht`), damit kein Ersatz-/Rettungseffekt
+    // (Infallible Oracle Pythia) eines von ihnen als Opfer nimmt, obwohl es ohnehin gleich faellt.
+    if (ziele?.length) {
+      const neu = this._todgeweihtMarkieren(ziele);
+      if (neu.length) (this._destroyScope._todgeweihte || (this._destroyScope._todgeweihte = [])).push(...neu);
+    }
     return this._destroyScope;
   }
 
   endDestroyScope() {
     if (!this._destroyScope) return;
-    if ((this._destroyScope.tiefe || 1) <= 1) this._destroyScope = null;
-    else this._destroyScope.tiefe -= 1;
+    if ((this._destroyScope.tiefe || 1) <= 1) {
+      this._todgeweihtLoesen(this._destroyScope._todgeweihte);
+      this._destroyScope = null;
+    } else this._destroyScope.tiefe -= 1;
   }
 
   /**
@@ -46674,8 +46801,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this._todesAufschubAbschliessen();
     } finally {
       if (this._multiHitScope) {
-        if ((this._multiHitScope.tiefe || 1) <= 1) this._multiHitScope = null;
-        else this._multiHitScope.tiefe -= 1;
+        if ((this._multiHitScope.tiefe || 1) <= 1) {
+          this._todgeweihtLoesen(this._multiHitScope._todgeweihte);   // ★ W78: die Vormerkungen dieses Schlags enden mit ihm
+          this._multiHitScope = null;
+        } else this._multiHitScope.tiefe -= 1;
       }
     }
   }
@@ -46721,6 +46850,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async beginAoeStrike(zielzahl, opts = {}) {
     const scope = this.beginMultiHit(zielzahl);
+    // ★ W78 (Pythia): Helden, die dieser Schlag sicher faellt, gelten als todgeweiht (`istHeldTodgeweiht`) — `opts.heroes`: `{hero, heroIdx?, owner?, amount?}` bzw. Heldenobjekte (+ `opts.amount`).
+    if (opts.heroes?.length) this._schlagZieleMelden(opts, null, null);
     if (opts.ersterTrefferEinzel) scope.ersterTrefferEinzel = true;   // Welle 13 (Q138): Kette beginnt mit genau einem Ziel (Ricochet)
     // `creatures` nimmt rohe Instanzen ODER `{inst, amount, type}` —
     // Karten mit abgestuftem Schaden (Chain Lightning) sollen nicht
@@ -46756,6 +46887,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (e.cancelled && e.inst?.id != null) negiert.add(e.inst.id);
     }
     scope._aoeNegiert = negiert;
+    this._schlagZieleMelden({ ...opts, heroes: [] }, schatten, negiert);   // ★ W78: die Kreaturen, die der Schlag nach Immunitaet/Idol sicher faellt, gelten als todgeweiht
     return negiert;
   }
 
@@ -54833,6 +54965,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const _schadenKreaturen = creatureEntries.filter(e => e.amount > 0);
       await this.beginAoeStrike(_schadenHelden.length + _schadenKreaturen.length, {
         creatures: _schadenKreaturen.map(e => ({ inst: e.inst, amount: e.amount, type: e.type })),
+        heroes: _schadenHelden,   // W78 (Pythia): Helden, die dieser Schlag faellt, gelten als todgeweiht
         source: quellObjekt, amount: damage, type: damageType, sourceOwner: pi,
         canBeNegated: opts.canBeNegated !== false,
       });
@@ -55088,7 +55221,18 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Creatures are defeated" (siehe `_mitNiederlagenSammler`).
    */
   async processCreatureDamageBatch(entries) {
-    return this._mitNiederlagenSammler(() => this._processCreatureDamageBatchKern(entries));
+    try {
+      return await this._mitNiederlagenSammler(() => this._processCreatureDamageBatchKern(entries));
+    } finally {
+      // ★ W78: wer den Stapel ueberlebt hat, ist nicht (mehr) todgeweiht — Stempel des Stapels und Vormerkung des Schlags weg
+      // (Immune/abgewehrte/herabgesetzte/gerettete Eintraege liessen sonst einen stehen). Sterbende (HP <= 0, Tod aufgeschoben) behalten ihn.
+      for (const e of (entries || [])) {
+        const inst = e?.inst;
+        if (!inst?.counters || (inst.counters.currentHp ?? 1) <= 0 || inst._deathResolved) continue;
+        if (inst.counters._dyingThisBatch && inst.counters._dyingThisBatch === entries._todStapelNr) delete inst.counters._dyingThisBatch;
+        if (this._multiHitScope?._todgeweihte) this._schlagTodgeweihtFreigeben(inst);
+      }
+    }
   }
 
   async _processCreatureDamageBatchKern(entries) {
@@ -55637,8 +55781,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Die Nummer des Stapels (statt `true`) macht „im selben Schlag gestorben" nachpruefbar: Graveworm darf
     // nicht auf Tode reagieren, die GLEICHZEITIG mit seinem eigenen geschehen (siehe `deathInfo.todStapel`).
     const _todStapelNr = (this._todStapelNr = (this._todStapelNr || 0) + 1);
+    entries._todStapelNr = _todStapelNr;   // ★ W78: der Huellen-Aufraeumer loescht nur den EIGENEN Stempel
     for (const e of entries) {
       if (e.cancelled || !e.inst) continue;
+      if (e._immuneCreature) continue;       // ★ W78: immune Eintraege nehmen keinen Schaden — nicht als sterbend stempeln
       const projected = Math.max(0, e.amount);
       if (projected <= 0) continue;
       if ((e.inst.counters.currentHp || 0) > 0

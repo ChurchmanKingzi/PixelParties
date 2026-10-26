@@ -204,7 +204,7 @@ module.exports = {
       // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer. Zaehlt die
       // GEWAEHLTEN Ziele — bei genau einem bleibt es eine
       // Einzelzerstoerung und der Dog darf feuern.
-      engine.beginDestroyScope(picked.length);
+      engine.beginDestroyScope(picked.length, picked.map(t => t._cardInstance));   // W78: die gewaehlten Ziele sind todgeweiht (Infallible Oracle Pythia darf keines opfern)
       try {
         for (const t of picked) {
           const inst = t._cardInstance;
