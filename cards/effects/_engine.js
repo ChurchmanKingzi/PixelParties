@@ -19519,7 +19519,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const toDiscard = Math.min(count, effektiveHand());
       for (let i = 0; i < toDiscard; i++) {
         if (effektiveHand() === 0) break;
-        if (typeof opts.eligibleIndices === 'function' && opts.eligibleIndices().length === 0) break;   // B1/S1: nichts Wählbares mehr (Wisdom-Lücke > andere Handkarten) — eine leere Auswahl hinge sonst
+        if (typeof opts.eligibleIndices === 'function') { const _wahlJetzt = opts.eligibleIndices(); if (Array.isArray(_wahlJetzt) && _wahlJetzt.length === 0) break; }   // B1/S1: nichts Wählbares mehr (Wisdom-Lücke > andere Handkarten) — eine leere Auswahl hinge sonst; `undefined` (Wheels: keine Einschränkung) ist keine leere Auswahl
 
         const standardListe = opts.eligibleIndices === undefined ? ohneAufl()   // Z4: Auswahl, die die Engine selbst festlegt
           : (typeof opts.eligibleIndices === 'function' ? opts.eligibleIndices() : undefined);   // B1/S1: eine Auswahl-FUNKTION (Wisdom, Item Lock …) gilt auch für die Antwort — außerhalb zahlt nicht
