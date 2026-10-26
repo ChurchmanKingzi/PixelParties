@@ -34490,6 +34490,9 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   _sourceHasTruthSeeingEye(sourceCard) {
     if (!sourceCard) return false;
+    // ★ W78 (Backstab): eine Attack, deren Kontrolleur (`controller`) NICHT der Spieler des ausführenden Helden ist (der Spieler der Karte lässt einen GEGNERHELDEN zuschlagen), kann das Auge
+    // nicht über `controller` + `heroIdx` finden (das wäre ein Held des Spielers). Die Quelle sagt es selbst: `truthSeeingEye: true|false` (der Aufrufer prüft die Ausrüstung des Ausführenden).
+    if (typeof sourceCard.truthSeeingEye === 'boolean') return sourceCard.truthSeeingEye;
     const owner = sourceCard.controller ?? sourceCard.owner ?? -1;
     const heroIdx = sourceCard.heroIdx ?? -1;
     if (owner < 0 || heroIdx < 0) return false;
@@ -38783,6 +38786,23 @@ this._deathWatch = (this._deathWatchStack || []).length
    *   zoneSlot, instId }`, wie ihn der Todes-Hook traegt
    * @param {object} source - Verursacher, falls bekannt
    */
+  /**
+   * ★ W78 (Pythia, Al 26.10.: „Cosmic Exploding Skull … kann eine andere, dadurch bereits eigentlich für den Tod reservierte Creature opfern"): Karten, die mehrere Creatures der Reihe nach
+   * besiegen („defeat all other Creatures"), melden ihre Opfer hier an — solange `fn` läuft, gelten sie als TODGEWEIHT (`istTodgeweiht`): Ersatz-/Rettungs-Effekte, die „ein anderes Ziel opfern"
+   * (Infallible Oracle Pythia), dürfen sie nicht mehr als Opfer nehmen. Damage-Batches stempeln dasselbe schon über `counters._dyingThisBatch` (`istTodgeweiht` kennt beides).
+   */
+  async mitTodgeweihten(insts, fn) {
+    if (!this._todgeweiht) this._todgeweiht = new Set();
+    const neu = (insts || []).filter(i => i && !this._todgeweiht.has(i.id));
+    for (const i of neu) this._todgeweiht.add(i.id);
+    try { return await fn(); } finally { for (const i of neu) this._todgeweiht.delete(i.id); }
+  }
+
+  /** Steht diese Creature schon für den Tod fest (Wipe-Opfer oder im selben Schadens-Batch tödlich getroffen)? */
+  istTodgeweiht(inst) {
+    return !!inst && (!!(this._todgeweiht && this._todgeweiht.has(inst.id)) || !!inst.counters?._dyingThisBatch);
+  }
+
   /**
    * Eine Karte AUS DEM DECK verdeckt in die Surprise Zone eines
    * Helden setzen.
