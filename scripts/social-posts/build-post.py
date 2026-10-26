@@ -676,7 +676,7 @@ def main():
     BAY = np.tile(BAYER4, (chei // 4 + 1, cwid // 4 + 1))[:chei, :cwid]
     hcx, hcy = (card_x + CARD_W / 2) / U, (card_y + CARD_H * 0.47) / U
     HEART_PAL = [(84, 4, 34), (176, 20, 64), (232, 66, 106), (255, 140, 172), (255, 226, 236)]
-    FIRE_PAL = fx.PAL['fire'] + [(255, 250, 214)]
+    FIRE_PAL = [(88, 31, 0), (202, 44, 41), (244, 123, 34), (246, 231, 14), (247, 245, 184)]       # Feuerpalette des Flammen-Sprites
     ember_rng = np.random.default_rng(31)
     EMBERS = [(ember_rng.uniform(-62, 62), ember_rng.uniform(25, 70), ember_rng.uniform(0, 1)) for _ in range(34)]
 
@@ -706,11 +706,12 @@ def main():
         y = -(YY + 0.5 - hcy) / S + 0.10
         mask = (x * x + y * y - 1) ** 3 - x * x * y ** 3 <= 0
         dd = dist_to_border(mask)
-        light = 1.55 - 0.9 * x + 1.0 * y                                     # Licht von links oben
+        light = 1.0 + 0.9 * x + 1.0 * y                                      # Licht immer von oben rechts
         v = light * 0.95 + glow * 1.6
         v = np.where(dd < 2.6, 0.0, np.where(dd < 6.0, v - 0.7, v))           # dunkle Kontur, leichte Kante nach innen
-        u_, w_ = (x + 0.55) * 0.82 + (y - 0.72) * 0.57, -(x + 0.55) * 0.57 + (y - 0.72) * 0.82
-        shine = ((u_ / 0.30) ** 2 + (w_ / 0.075) ** 2 < 1) & mask               # Glanzlicht auf dem linken Lappen
+        xm = -x                                                                # gespiegelt: Glanzlicht auf dem rechten Lappen
+        u_, w_ = (xm + 0.55) * 0.82 + (y - 0.72) * 0.57, -(xm + 0.55) * 0.57 + (y - 0.72) * 0.82
+        shine = ((u_ / 0.30) ** 2 + (w_ / 0.075) ** 2 < 1) & mask
         v = np.where(shine, 4.0, v)
         return mask, pal_dither(HEART_PAL, v), dd
 
