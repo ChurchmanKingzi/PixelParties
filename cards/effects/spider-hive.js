@@ -54,6 +54,7 @@ module.exports = {
     if (cardData.subtype !== 'Surprise') return 0;
     if (!evalOpts || evalOpts.surpriseAufBrett !== true) return 0;   // Als Ruling (Al 26.10.): nur verdeckte Surprises AUF DEM BRETT, nicht die Hand
     if (!engine) return 0;
+    if (engine.spielerIstVonAreasAusgenommen?.(ownerIdx)) return 0;   // W82 (Shipwrecked): seine Surprises sind von Areas ausgenommen
     const spiderCount = countSpiderCreaturesOnBoard(engine);
     return spiderCount > 0 ? spiderCount : 0;
   },

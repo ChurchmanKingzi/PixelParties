@@ -115,6 +115,7 @@ module.exports = {
       // Per-turn guard: first qualifying Spell each turn only.
       if (ctx.card.counters.triggeredOnTurn === gs.turn) return;
       ctx.card.counters.triggeredOnTurn = gs.turn;
+      if (engine.spielerIstVonAreasAusgenommen(turnPlayer)) return;   // W82 (Shipwrecked): „you … are unaffected by Areas" — keine Strafe
 
       const turnPs = gs.players[turnPlayer];
       if (!turnPs) return;

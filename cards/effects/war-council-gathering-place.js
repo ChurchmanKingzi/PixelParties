@@ -106,6 +106,7 @@ module.exports = {
       const pi = summoned.controller ?? summoned.owner;
       const ps = gs.players[pi];
       if (!ps) return;
+      if (engine.spielerIstVonAreasAusgenommen(pi)) return;   // W82 (Shipwrecked): Area-Effekte aktivieren ist gesperrt
       if ((ps.gold || 0) < GOLD_COST || engine.goldSpendBlocked(pi)) return;   // G1 (A09-11): Goldsperre
 
       const script = loadCardEffect(summoned.name);

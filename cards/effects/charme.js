@@ -378,6 +378,30 @@ async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops, feld = pi) {
     : (script.onFreeActivate || script.onActivate);
   if (!activateFn) return false;
 
+  // ★ W82 (Sinister Idol, Al): die geliehene Ability wird AKTIVIERT — dabei geht ein Kettenfenster auf (Idol und andere Reaktionen auf Ability-Aktivierungen, dann das Surprise-Fenster
+  // `_checkSurpriseOnAbilityActivation`), wie bei `doActivateFreeAbility`/`doActivateAbility`. Identität: die geliehene Ability mit der Stufe IHRES Stapels (`abLevel`, „use it as if it was
+  // attached to this Hero" ändert die Stufe nicht); der Stapel (Brettseite `oi`, Held, Zone) steht in `abilityZone`, „the user" einer Idol-Wirkung ist der Held, auf dem die Kopie liegt.
+  // Die Kette trägt als `heroIdx` den Charme-Held (Aktivierer). Wird die Aktivierung negiert, hat Charme trotzdem gewirkt (Sperre bleibt), die geliehene Ability nicht (kein Stempel).
+  const stapelArt = (selectedAb.fromSupport || selectedAb.inSupportZone) ? 'support' : 'ability';
+  const kette = await engine.executeCardWithChain({
+    cardName: selectedAb.abName, owner: pi, heroIdx, cardType: 'Ability', goldCost: 0, resolve: null, fromBoard: true,
+    abilityZone: { heroOwner: oi, heroIdx: selectedAb.ownerHeroIdx, zoneIdx: selectedAb.zoneIdx, zoneKind: stapelArt, level: selectedAb.abLevel },
+  });
+  const surpriseNeg = kette.negated ? null
+    : await engine._checkSurpriseOnAbilityActivation(pi, selectedAb.ownerHeroIdx, selectedAb.zoneIdx, selectedAb.abName, oi, stapelArt);
+  if (kette.negated || surpriseNeg?.negateEffect) {
+    engine.log('charme_copy_negated', { player: gs.players[pi].username, ability: selectedAb.abName });
+    engine.sync();
+    return true;
+  }
+  // Stufe NACH der Kette (Idol nimmt die oberste Kopie weg): die Wirkung folgt der gesenkten Stufe, die Kosten bleiben die der Stufe beim Aktivieren (`ctx.kostenStufe`).
+  let abLevel = selectedAb.abLevel;
+  if (!selectedAb.fromSupport) {
+    const st = engine.abilityStapelAn(oi, selectedAb.ownerHeroIdx, stapelArt, selectedAb.zoneIdx);
+    if (st && st.length > 0 && st[0] === selectedAb.abName) abLevel = st.length;
+  }
+  const idolPflicht = abLevel < selectedAb.abLevel;   // gesenkte Auflösung = Pflicht, kein Abbrechen (Al)
+
   // Create a fake context as if the ability were on this Hero
   const fakeInst = {
     id: 'charme-copy-' + Date.now(),
@@ -395,6 +419,7 @@ async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops, feld = pi) {
   };
 
   const fakeCtx = engine._createContext(fakeInst, {});
+  fakeCtx.kostenStufe = selectedAb.abLevel;   // W82: Kosten bleiben die der Stufe beim Aktivieren
 
   engine.log('charme_copy', {
     player: gs.players[pi].username, hero: hero.name,
@@ -410,7 +435,9 @@ async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops, feld = pi) {
   // Charme), no `ability_activated` flash on Charme's slot. Anything
   // truthy / undefined / void counts as "Charme committed" — matches
   // the server's `resolved !== false` convention.
-  const result = await activateFn(fakeCtx, selectedAb.abLevel);
+  let result = await engine.mitPflichtAufloesung(pi, idolPflicht, () => activateFn(fakeCtx, abLevel));
+  // W82: bei einer durch Idol gesenkten Pflicht-Auflösung bleibt die Aktivierung verbraucht, auch wenn die Ability nichts tut („no" / keine Wahl möglich).
+  if (result === false && idolPflicht) { result = true; engine.log('sinister_idol_declined', { player: gs.players[pi].username, ability: selectedAb.abName }); }
 
   // On commit, stamp the BORROWER's HOPT key for this ability name.
   // Charme's borrow runs the script function directly — it never goes

@@ -105,6 +105,9 @@ module.exports = {
     // Hard gate: one Area per player. No replace option — if the player
     // already controls an Area, Planet in a Bottle is grayed out.
     if (playerControlsArea(gs, pi, engine)) return false;
+    // Als Ruling (Al 27.10.): Reality Crack („You cannot play another Area for the rest of the turn") sperrt auch „bring directly into play" — der Trank ist dann ausgegraut.
+    // Shipwrecked sperrt ihn nicht (`direkt`, CARD_API W82).
+    if (engine?.areaSpielGesperrt?.(pi, { direkt: true })) return false;
 
     const cardDB = engine ? engine._getCardDB() : null;
     if (!cardDB) return true; // Fallback: let resolve() re-check.
@@ -120,6 +123,7 @@ module.exports = {
     // Re-check the one-Area gate: game state can change between canActivate
     // and resolve (reaction chains, etc.).
     if (playerControlsArea(gs, pi, engine)) return { cancelled: true };
+    if (engine.areaSpielGesperrt(pi, { direkt: true })) return { cancelled: true };   // Als Ruling (Al 27.10.): Reality-Crack-Sperre (s. `canActivate`)
 
     const cardDB = engine._getCardDB();
     const gallery = buildAreaGallery(ps, cardDB, engine, pi);

@@ -64,7 +64,9 @@ function scan() {
 
 module.exports = { scan, MUSTER, EIGENE };
 if (require.main === module) {
-  const liste = scan();
+  // `zusatz.json`: Zeichen, die das Spiel (noch) nicht als Text zeigt, die aber fertig in der Schrift stehen sollen (Vorrat für neue Karten/Animationen).
+  const zusatz = fs.existsSync(path.join(__dirname, 'zusatz.json')) ? JSON.parse(fs.readFileSync(path.join(__dirname, 'zusatz.json'), 'utf8')) : [];
+  const liste = [...new Set([...scan(), ...zusatz])];
   fs.writeFileSync(path.join(__dirname, 'zeichen.json'), JSON.stringify(liste, null, 0) + '\n', 'utf8');
   console.log(liste.length + ' Zeichen → scripts/pixel-emoji/zeichen.json');
 }

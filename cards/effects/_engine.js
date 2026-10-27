@@ -824,6 +824,13 @@ class GameEngine {
     // Looming Threat: Handkopie mit „am Zugende Stufe -1" — Wert = bisherige Senkungen. Folgt der
     // physischen Kopie, faellt weg, sobald sie die Hand verlaesst (`_handStufenZaehler`).
     this.registerHandIndexedField('_handLevelCountdown', { kind: 'value' });
+    // Ancient Guardian Statue: die gesuchte, dauerhaft aufgedeckte Handkopie hängt an GENAU DIESER Statue — Wert = `inst.id` der Statue. Folgt der physischen
+    // Kopie durch Hand-Splices und fällt weg, sobald sie die Hand verlässt (Identität der Karte, nie der Name).
+    this.registerHandIndexedField('_handStatueLink', { kind: 'value' });
+    // Zusatzaktions-Marke JE HANDKOPIE (Ancient Guardian Statue: „you may use it as an additional Action" solange die Stufe 0 durch die Statue erreicht wurde und sie wirkt). Wert =
+    // { source: Kartenname, instId } — ob die Marke JETZT gilt, entscheidet das Skript `source` (`handCopyAdditionalAction(engine, pi, idx, marke)`), gelesen über `handKopieZusatzaktion`.
+    // Folgt der physischen Kopie durch Splices, fällt mit ihr aus der Hand.
+    this.registerHandIndexedField('_handZusatzaktion', { kind: 'value' });
     // Rocky Slime's per-instance level reductions. The captured offset
     // is consumed by safePlaceInSupport when the same card lands on
     // the board — `inst.counters.level` keeps the reduction post-summon
@@ -1489,6 +1496,8 @@ class GameEngine {
       cardInstances: instSnaps,
       // Laenge der Nach-Ketten-Warteschlange: was danach eingereiht wird, gehoert zur Simulation (siehe restore).
       postChainLen: (this._postChainActions || []).length,
+      // W84a: die Loesch-Warteschlange (Circles of Hell) liegt AUSSERHALB von `gs` — ein Rollout, der eine Karte loescht, darf sie nicht verschmutzen.
+      loeschQ: (this._loeschWarteschlange || []).map(e => ({ ...e })),
       eventId: this.eventId,
       chain: _clone(this.chain),
       chainDepth: this.chainDepth,
@@ -1672,6 +1681,9 @@ class GameEngine {
         && this._postChainActions.length > snap.postChainLen) {
       this._postChainActions.length = snap.postChainLen;
     }
+    // W84a: Loesch-Warteschlange (Circles of Hell) auf den Stand des Schnappschusses zurueck: Eintraege eines Rollouts gehoeren nicht ins echte Spiel,
+    // und die Abholung (`_loeschAbholungAnmelden`) meldet sich beim naechsten Entleeren bzw. der naechsten Loeschung selbst neu an.
+    this._loeschWarteschlange = Array.isArray(snap.loeschQ) ? snap.loeschQ.map(e => ({ ...e })) : [];
     this.cardInstances = snap.cardInstances.map(data => {
       const inst = new CardInstance(data.name, data.owner, data.zone, data.heroIdx ?? -1, data.zoneSlot ?? -1);
       for (const key of Object.keys(data)) {
@@ -3170,6 +3182,14 @@ class GameEngine {
       // wollen (Ellie), entprellen darueber statt ueber den Kartennamen/-daten.
       hookCtx._spellRound = this._spellRoundSeq = (this._spellRoundSeq || 0) + 1;
     }
+    // ★ W83a (Al 28.10.2026 — Cool Rescuer Monia × zweiter Cast): „Monia fragt bei einem zweiten Cast ein weiteres Mal separat, beide gelten als je eine Instanz, die einzeln geschützt werden
+    // muss." Die Auflösung des ersten Casts endet HIER, vor allen Zuhörern von `afterSpellResolved` — nicht erst in Monias eigenem Zuhörer (die Reihenfolge der Zuhörer ist nicht festgelegt: lief
+    // Sayas/Idejs/… Zweitguss VOR Monias Zuhörer, erbte er das Angebot [Annahme UND Ablehnung] und den Schild des ersten Gusses). Der Zweitwurf der Zusatzziel-Helden (Bartas, Grisgar, Andras) ist
+    // derselbe Effekt (W80a): der Stand wird beiseitegelegt und von `zweitwurfFortsetzen` zurückgeholt.
+    if (hookName === 'afterSpellResolved' && hookCtx && !hookCtx._moniaAufgeraeumt) {
+      hookCtx._moniaAufgeraeumt = true;
+      require('./_monia-shared').angeboteBeenden(this.gs, { fuerZweitwurf: !hookCtx.isSecondCast });
+    }
     // ★ W8 (Al, 15.10.2026): Bonded-Companion-Pool beim Ende des Ruhens neu verknüpfen (Statuswechsel, Phasen-/Zugbeginn).
     if (hookName === 'onStatusApplied' || hookName === 'onStatusRemoved' || hookName === 'onPhaseStart' || hookName === 'onTurnStart') {
       // (synchron prüfen, nur bei Arbeit `await`en - ein unbedingtes `await` verschöbe die Hook-Zeitpunkte, auf die sich z. B. der
@@ -3741,6 +3761,23 @@ class GameEngine {
       if (a.controller !== activePlayer && b.controller === activePlayer) return 1;
       return 0;
     });
+    // ★ W83a (Al 27.10.2026 — Cool Rescuer Monia): Haben BEIDE Spieler eine solche Reaktion, wird IMMER ZUERST der Gegner des Zugspielers (= wer NICHT am Zug ist) gefragt, dann erst der
+    // Zugspieler; nimmt der Zuerst-Gefragte an, entfaellt die zweite Frage (die Buchfuehrung des Skripts kennt das Ergebnis). Kartenvertrag `hookGegnerZuerst: { [hookName]: true }`:
+    // NUR die Zuhoerer mit dieser Marke tauschen untereinander ihre Plaetze (stabil); alle anderen Zuhoerer behalten ihre Reihenfolge (Zugspieler zuerst) und ihre Plaetze.
+    {
+      const plaetze = [];
+      for (let i = 0; i < listeners.length; i++) {
+        let sc = null;
+        try { const ov = listeners[i].counters?._effectOverride; sc = ov ? loadCardEffect(ov) : listeners[i].loadScript(); } catch { sc = null; }
+        if (sc?.hookGegnerZuerst?.[hookName]) plaetze.push(i);
+      }
+      if (plaetze.length > 1) {
+        const ktrl = (c) => { try { return this.effektiveSeiten(c).controller; } catch { return c.controller ?? c.owner; } };
+        const gruppe = plaetze.map(i => listeners[i]);
+        gruppe.sort((a, b) => (ktrl(a) === activePlayer ? 1 : 0) - (ktrl(b) === activePlayer ? 1 : 0));
+        plaetze.forEach((i, k) => { listeners[i] = gruppe[k]; });
+      }
+    }
 
     // Execute each listener
     for (const card of listeners) {
@@ -14743,6 +14780,8 @@ class GameEngine {
     // „exactly 1 target" — der Stempel bleibt stehen (A01-pollution-21).
     if ((this._multiHitScope?.total || 0) >= 2) return;
     if (!((ziel.amount || 0) > 0)) return;
+    // ★ W82: „unaffected by Areas" (Diver Helmet, Shipwrecked) — die Area verdoppelt den Schaden dieses Ziels nicht (der Stempel bleibt für das nächste Ziel).
+    if ((ziel.target && this._isDiverHelmetProtectedTarget(ziel.target)) || (ziel.inst && this._isDiverHelmetProtectedTarget(ziel.inst))) return;
     if (typeof ziel.multiplyAmount === 'function') ziel.multiplyAmount(2);
     else ziel._mul = (ziel._mul ?? 1) * 2;
     delete this.gs._naechsterEinzelschadenX2;
@@ -14801,30 +14840,49 @@ class GameEngine {
       // alles, was ein Vorrang-Angebot selbst ausloest; innerhalb des Vorrangs bleibt die Reihenfolge.
       const vorrang = name === 'The Third Circle of Hell' || !!this._laufenderVorrang;
       const q = this._loeschWarteschlange || (this._loeschWarteschlange = []);
+      // W84a: `folge` = diese Loeschung entstand WAEHREND ein Angebot lief (ein Circle loescht den anderen) - dann kein Hinweis 'schon genutzt' (nur Dantes & Co. Loeschungen).
+      const folge = !!this._laufenderEintrag;
       if (vorrang) {
         let ix = 0;
         while (ix < q.length && q[ix].vorrang) ix++;
-        q.splice(ix, 0, { pi, name, vorrang: true });
-      } else q.push({ pi, name });
+        q.splice(ix, 0, { pi, name, vorrang: true, folge });
+      } else q.push({ pi, name, folge });
     }
-    if (!this._loeschWarteschlange?.length || this._loeschAbholungAngemeldet) return;
-    this._loeschAbholungAngemeldet = true;
+    this._loeschAbholungAnmelden();
+  }
+
+  /**
+   * ★ W84a: die Abholung der Loesch-Warteschlange (`_geloeschtMeldung`) als EINE Nach-Ketten-Aktion anmelden — wenn keine mehr wartet oder laeuft.
+   * Vorher stand dafuer ein Merker (`_loeschAbholungAngemeldet`), der nur der Abholung selbst zurueckgesetzt wurde: ging die Aktion verloren, ohne zu laufen
+   * (CPU-Rollout: `restore()` kappt die Warteschlange der Nach-Ketten-Aktionen, `_runPostChainActions` verwirft Simulations-Reste), blieb er fuer den Rest der
+   * Partie gesetzt und KEIN Circle of Hell wurde je wieder angeboten (Dante loescht den Circle, nichts passiert). Jetzt zaehlt nur, was wirklich da ist:
+   * laeuft die Abholung oder liegt ihre Aktion in der Warteschlange, ist alles gut; sonst wird sie (erneut) angemeldet.
+   */
+  _loeschAbholungAnmelden() {
+    if (!this._loeschWarteschlange?.length) return;
+    if (this._loeschAbholungLaeuft) return;
+    if (this._loeschAbholungFn && (this._postChainActions || []).includes(this._loeschAbholungFn)) return;
     // EINE Nach-Ketten-Aktion arbeitet die ganze Warteschlange ab — auch Loeschungen, die
     // waehrend der Abarbeitung entstehen (Kreis A loescht Kreis B …). Obergrenze gegen Endlosketten.
-    this.queuePostChainAction(async () => {
+    const fn = async () => {
+      this._loeschAbholungLaeuft = true;
       try {
         for (let n = 0; this._loeschWarteschlange.length > 0 && n < 24; n++) {
           const e = this._loeschWarteschlange.shift();
           this._laufenderVorrang = !!e.vorrang;
+          this._laufenderEintrag = e;
           try { await loadCardEffect(e.name)?.onDeletedFromAnywhere?.(this, e.pi, e.name); }
           catch (err) { console.error(`[onDeletedFromAnywhere] ${e.name}:`, err.message); }
-          finally { this._laufenderVorrang = false; }
+          finally { this._laufenderVorrang = false; this._laufenderEintrag = null; }
         }
       } finally {
         this._loeschWarteschlange.length = 0;
-        this._loeschAbholungAngemeldet = false;
+        this._loeschAbholungLaeuft = false;
+        if (this._loeschAbholungFn === fn) this._loeschAbholungFn = null;
       }
-    });
+    };
+    this._loeschAbholungFn = fn;
+    this.queuePostChainAction(fn);
   }
 
   /**
@@ -24002,7 +24060,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (cd.cardType === 'Spell' && this.gs.players[playerIdx]._spellLockTurn === this.gs.turn
           && this.gs.players[playerIdx]._silenceBonusSpell !== this.gs.turn) continue;
       if (cd.cardType === 'Spell' && this.thaliaSupportSperre(playerIdx, cd)) continue;   // W49a (Thalia): 1 Kopie je Support Spell pro Zug
-      if ((cd.subtype || '').toLowerCase() === 'area' && this.gs.players[playerIdx]._cantPlayAreaThisTurn === this.gs.turn) continue;
+      if (this.areaKarteGesperrt(cd, playerIdx)) continue;   // Als Ruling (Al 27.10.): Reality Crack („cannot play another Area") und W82 (Shipwrecked) — EINE Frage
       // Per-Hero-Gate der KARTE (Lesson in the Arts, Living Illusion) gilt auch fuer geschenkte Zusatzaktionen.
       if (script?.canPlayWithHero && !this._mitWirker(playerIdx, heroIdx, fremd ? hs : null,
           () => script.canPlayWithHero(this.gs, playerIdx, heroIdx, cd, this))) continue;
@@ -24356,10 +24414,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         // `areaLimit`-Vertrag (v1050). Mirrors the play-time gate.
         if ((cd.subtype || '').toLowerCase() === 'area'
             && !this.canPlaceAnotherArea(playerIdx, cd.name)) continue;
-        // Reality Crack set _cantPlayAreaThisTurn — any Area card is locked
-        // for the rest of the turn.
-        if ((cd.subtype || '').toLowerCase() === 'area'
-            && ps._cantPlayAreaThisTurn === gs.turn) continue;
+        // Reality Crack („You cannot play another Area for the rest of the turn") und W82 (Shipwrecked: „you cannot … play Areas"):
+        // jede Area-Karte ist gesperrt — Als Ruling (Al 27.10.): EINE Frage `areaSpielGesperrt`.
+        if (this.areaKarteGesperrt(cd, playerIdx)) continue;
         // Level/school requirements (handles levelOverrideCards, bypassLevelReq, negation, Performance, Wisdom).
         // Note: Wolflesia-style Creature spell-cast bypass is NOT
         // honoured here — the host Hero must NOT appear as an eligible
@@ -25256,12 +25313,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // W49a (Thalia, Al 22.10.2026): „You can only activate 1 copy of each Support Spell per turn."
     if (cardData.cardType === 'Spell' && this.thaliaSupportSperre(pi, cardData)) return null;
 
-    // Area-play lock (Reality Crack): once set, no further Area Spells
-    // may be cast this turn by this player. Flag is cleared at turn end.
-    if (ps._cantPlayAreaThisTurn === gs.turn &&
-        (cardData.subtype || '').toLowerCase() === 'area') {
-      return null;
-    }
+    // Area-play lock (Reality Crack: „You cannot play another Area for the rest of the turn"; W82 Shipwrecked: „you cannot … play Areas"):
+    // solange gesperrt, ist jede Area-Karte nicht spielbar (auch die Server-Pruefung). Als Ruling (Al 27.10.): EINE Frage `areaSpielGesperrt`.
+    if (this.areaKarteGesperrt(cardData, pi)) return null;
 
     // Generic Area rule: a player can only play an Area card (any type
     // with subtype "Area") while their OWN Area zone still has room.
@@ -25576,9 +25630,18 @@ this._deathWatch = (this._deathWatchStack || []).length
     kandidaten.sort((a, b) => (db[b]?.level || 0) - (db[a]?.level || 0));
     const name = kandidaten[0];
     let handIndex = (ps.hand || []).indexOf(name);
+    // W82: die Zusatzaktion für JEDEN Helden (`performImmediateActionAnyHero`, Prompt OHNE `heroIdx`) braucht in der Antwort einen Helden — vorher fehlte er,
+    // und die CPU verfiel jede solche Zusatzaktion (`played: false`). Gewählt wird der erste Held aus `heroIndicesByCard`, dessen Kopie die Stufenprüfung besteht.
+    let _wahlHeld = promptData.heroIdx;
+    if (_wahlHeld == null && promptData.heroIndicesByCard) {
+      const _liste = promptData.heroIndicesByCard[name] || [];
+      const _cd0 = db[name];
+      _wahlHeld = _liste.find(h => (ps.hand || []).some((c, i) => c === name && this._kopieStufeOk(pi, h, _cd0, i, pi))) ?? _liste[0];
+      if (_wahlHeld == null) return { cancelled: true };
+    }
     {   // ★ W15b (C2): die Kopie wählen, die die Stufenprüfung wirklich besteht (Rabatt hängt an EINER Kopie)
       const _cd = db[name], _hs = isSeat(this, promptData.heroOwner) ? promptData.heroOwner : pi;
-      const _gut = (ps.hand || []).findIndex((c, i) => c === name && this._kopieStufeOk(pi, promptData.heroIdx, _cd, i, _hs));
+      const _gut = (ps.hand || []).findIndex((c, i) => c === name && this._kopieStufeOk(pi, _wahlHeld, _cd, i, _hs));
       if (_gut >= 0) handIndex = _gut;
     }
     let fromCreation = false;
@@ -25588,8 +25651,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     if (handIndex < 0) return { cancelled: true };
     const antwort = { cardName: name, handIndex, fromCreation };
+    if (promptData.heroIdx == null && _wahlHeld != null) antwort.heroIdx = _wahlHeld;   // Zusatzaktion für jeden Helden: der gewählte Held steht in der Antwort
     if (db[name] && hasCardType(db[name], 'Creature')) {
-      const zonen = ps.supportZones?.[promptData.heroIdx] || [];
+      const zonen = ps.supportZones?.[_wahlHeld] || [];
       let frei = -1;
       for (let z = 0; z < 3; z++) { if ((zonen[z] || []).length === 0) { frei = z; break; } }
       if (frei < 0) return { cancelled: true };
@@ -26156,6 +26220,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hero = this.gs.players[wirkerSeite]?.heroes?.[heroIdx];
     const cardData = this._getCardDB()[cardName];
     if (!ps || !hero || !cardData) return { cancelled: true };
+    // Als Ruling (Al 27.10.): Reality Crack („You cannot play another Area for the rest of the turn") / Shipwrecked — eine Area darf auch als Sofort-Guss (Zusatzaktion, aus Hand/Deck/Ablage/Geloescht)
+    // nicht gespielt werden. Letzte Sicherung hinter den Listen der Aufrufer (`getHeroEligibleActionCards`, `kannSofortWirken` …): nichts wird bewegt, die Karte bleibt, wo sie ist.
+    if (this.areaKarteGesperrt(cardData, playerIdx)) {
+      this.log('immediate_cast_fizzled', { player: ps.username, hero: hero.name, card: cardName, by: opts.by || null, reason: 'area_play_locked' });
+      return { cancelled: true };
+    }
     // Atta: Spells, die dieser Held wirkt und die in die Ablage gingen, werden stattdessen geloescht — beim Wirken festgestellt.
     const _attaLoescht = cardData.cardType === 'Spell' && this.spellGoesToDeletedInstead(wirkerSeite, heroIdx);
     // W36a: ein unter Silence-Sperre zugelassener Guss (Bonus-Spell) verbraucht den Bonus — der Stand VOR dem Guss zaehlt (Silence kann im Guss selbst keinen neuen Bonus gewaehren, `_skipReactionCheck`).
@@ -26422,7 +26492,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // v1364: die Karte liegt jetzt auf dem Brett (Attachment) — sie
       // verlaesst die Hand ohne Ablage und ohne Stapelflug.
       if (fromZone !== 'deck') {
-        const _brettIdx = pool.indexOf(cardName);
+        const _brettIdx = (pool[poolIndex] === cardName) ? poolIndex : pool.indexOf(cardName);   // Ancient Guardian Statue: die GEWÄHLTE Kopie verlässt die Hand, nicht die erste gleichen Namens
         if (_brettIdx >= 0) {
           // W63c: gestohlene Handkarte legt sich aufs Brett (Anhaengsel/Area per Sofort-Guss): die Brettinstanz gehoert dem BESITZER
           const _brettBesitzer = (pool === ps.hand) ? this._consumeHandCardOrigin(playerIdx, cardName, _brettIdx) : playerIdx;
@@ -26452,7 +26522,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
       if (_attaLoescht) ps.deletedPile.push(cardName); else ps.discardPile.push(cardName);
     } else {
-      const _endIdx = pool.indexOf(cardName);
+      const _endIdx = (pool[poolIndex] === cardName) ? poolIndex : pool.indexOf(cardName);   // Ancient Guardian Statue: die GEWÄHLTE Kopie verlässt die Hand (Handindex-Felder hängen an der Kopie), nicht die erste gleichen Namens
       if (_endIdx >= 0) {
         // W63c: gestohlene Handkarte (Sofort-Guss: Hu, Coffee, Learning …) → Ablage des permanenten Besitzers; Herkunft VOR dem Splice
         const _ablageBesitzer = (pool === ps.hand) ? this._consumeHandCardOrigin(playerIdx, cardName, _endIdx) : playerIdx;
@@ -28673,6 +28743,11 @@ this._deathWatch = (this._deathWatchStack || []).length
           blocked.push(cardName);
           continue;
         }
+      }
+      // ★ W82 (Shipwrecked): Area-Karten sind ausgegraut, solange einer meiner Helden Shipwrecked traegt.
+      if (this.areaKarteGesperrt(allCards[cardName], playerIdx)) {   // Als Ruling (Al 27.10.): auch die Reality-Crack-Sperre graut Areas aus
+        blocked.push(cardName);
+        continue;
       }
       // Generic Attack/Spell lock (Trial of Coolness, etc.)
       if (ps._attackSpellLockedTurn === this.gs.turn) {
@@ -32650,7 +32725,51 @@ this._deathWatch = (this._deathWatchStack || []).length
    * (Rioting-Village-Rueckstoss) fragen NUR hier.
    */
   heldIstVonAreasAusgenommen(ownerIdx, heroIdx) {
-    return require('./_diver-helmet-shared').heroHasDiverHelmet(this, ownerIdx, heroIdx);
+    if (require('./_diver-helmet-shared').heroHasDiverHelmet(this, ownerIdx, heroIdx)) return true;
+    // ★ W82 (Shipwrecked): „you and all targets you control are unaffected by Areas" — der KONTROLLEUR des Helden zaehlt, nicht die Brettseite.
+    return this.spielerIstVonAreasAusgenommen(this.kontrolleurVonHeld(ownerIdx, heroIdx));
+  }
+
+  /**
+   * ★ W82 (Shipwrecked, Spell/Attachment Lv3): „While one of your Heroes has this Spell attached to it, you and all targets you control are unaffected by Areas and you cannot activate the effects
+   * of or play Areas." — EINE Frage fuer die Spieler-Seite: ist `pi` von Areas ausgenommen (und darf damit keine Areas spielen und keine Area-Effekte aktivieren)?
+   * Wahr, solange irgendein Held, den `pi` KONTROLLIERT (`heroSideOf`, auch ein uebernommener oder an den Gegner abgegebener Held; die Karte darf auch am Gegnerhelden liegen), eine aufgedeckte
+   * Shipwrecked in seinen Support Zones traegt. Angehaengte Karten ruhen nie mit dem Wirt (wie Diver Helmet). Kein Stapeln: eine Karte genuegt.
+   * `opts.ausser`: eine Shipwrecked-Instanz, die gerade geht (ihr Abgangs-Hook feuert vor dem Zonenwechsel) und nicht mehr zaehlt.
+   * Heldenfrage: `heldIstVonAreasAusgenommen`, Kartenfrage: `karteIstVonAreasAusgenommen` (beide schliessen diese Frage ein).
+   */
+  spielerIstVonAreasAusgenommen(pi, opts = {}) {
+    if (pi == null || pi < 0) return false;
+    const ausser = opts.ausser || this._shipwreckedAusser || null;
+    for (const inst of this.cardInstances || []) {
+      if (!inst || inst.name !== 'Shipwrecked' || inst.zone !== 'support' || inst.faceDown || inst === ausser) continue;
+      if (inst.heroIdx == null || inst.heroIdx < 0) continue;
+      const seite = this.physicalSide(inst);
+      const hero = this.gs.players[seite]?.heroes?.[inst.heroIdx];
+      if (!hero?.name || hero.hp <= 0) continue;
+      if (this.heroSideOf(seite, hero) === pi) return true;
+    }
+    return false;
+  }
+
+  /**
+   * ★ Als Ruling (Al 27.10.): EINE Frage „darf `pi` JETZT keine Area spielen?" — alle Wege, auf denen eine Area ins Spiel kommen kann, fragen NUR hier (nie `_cantPlayAreaThisTurn` selbst).
+   * Zwei Quellen: (1) Reality Crack — „You cannot play another Area for the rest of the turn": der Stempel `ps._cantPlayAreaThisTurn` traegt den Zug, in dem Reality Crack wirkte (veraltet
+   * von selbst; gilt fuer ALLES, was eine Area legt, auch „bring directly into play"); (2) Shipwrecked (`spielerIstVonAreasAusgenommen`, „you cannot … play Areas").
+   * `opts.direkt`: der Weg ist ein Karteneffekt „bring directly into play" / „place into your Area Zone" (Planet in a Bottle, Orkallion, Spirit of the Barbarian Sword, Dante, Doom Prophecy):
+   * Shipwrecked sperrt ihn NICHT (CARD_API W82), Reality Crack schon. Gilt nicht fuer das AKTIVIEREN von Area-Effekten (dort fragt man `spielerIstVonAreasAusgenommen`).
+   */
+  areaSpielGesperrt(pi, opts = {}) {
+    if (pi == null || pi < 0) return false;
+    const ps = this.gs.players?.[pi];
+    if (ps && ps._cantPlayAreaThisTurn === this.gs.turn) return true;
+    if (!opts.direkt && this.spielerIstVonAreasAusgenommen(pi)) return true;
+    return false;
+  }
+
+  /** Kartenfrage zu `areaSpielGesperrt`: `cd` ist eine Area-Karte (Untertyp Area, egal ob Spell, Attack oder Artifact) UND `pi` darf sie jetzt nicht spielen. */
+  areaKarteGesperrt(cd, pi, opts = {}) {
+    return (cd?.subtype || '').toLowerCase() === 'area' && this.areaSpielGesperrt(pi, opts);
   }
 
   /**
@@ -32662,7 +32781,10 @@ this._deathWatch = (this._deathWatchStack || []).length
   karteIstVonAreasAusgenommen(inst) {
     if (!inst || inst.zone !== 'support') return false;
     if (inst.heroIdx == null || inst.heroIdx < 0) return false;
-    return this.heldIstVonAreasAusgenommen(inst.owner, inst.heroIdx);
+    // Diver Helmet: der Held, in dessen Zonen die Karte PHYSISCH liegt.
+    if (require('./_diver-helmet-shared').heroHasDiverHelmet(this, inst.owner, inst.heroIdx)) return true;
+    // ★ W82 (Shipwrecked): „all targets you control" — der KONTROLLEUR der Karte (eine uebernommene Kreatur im Gegnerhelden zaehlt fuer den, der sie kontrolliert).
+    return this.spielerIstVonAreasAusgenommen(inst.controller ?? inst.owner);
   }
 
   _isDiverHelmetProtectedTarget(target) {
@@ -35041,7 +35163,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async trefferAlsWahl(ziel, validTargets, sourceCard, config = {}) {
     if (!ziel || !sourceCard) return ziel;
-    const ids = await this.applyRedirectWindows([ziel.id], validTargets, config, sourceCard);
+    // `_mehrTreffer`: dieser Einzeltreffer gehört zu einem Effekt mit MEHREREN Zielen (Kettenblitz) — Umleiter mit „exactly one target" (Winged Haressassin) bieten dann nichts an.
+    const ids = await this.applyRedirectWindows([ziel.id], validTargets, { ...config, _mehrTreffer: true }, sourceCard);
     if (!Array.isArray(ids) || ids.length === 0) return null;
     if (ids[0] === ziel.id) return ziel;
     return (validTargets || []).find(t => t && t.id === ids[0]) || ziel;
@@ -35632,6 +35755,28 @@ this._deathWatch = (this._deathWatchStack || []).length
   _promptsForceCommit(playerIdx) {
     return this.gs._learningCasting === playerIdx
       || this.gs._forcedCommitPlayer === playerIdx;
+  }
+
+  /** ★ W82 (Sinister Idol): führt `fn` als PFLICHT-Auflösung für `pi` aus (`aktiv`): alle Wahlen von `pi` sind ohne Abbruch (Zwangs-Kontext `gs._forcedCommitPlayer`, s. `_promptsForceCommit`). Verschachtelbar. */
+  async mitPflichtAufloesung(pi, aktiv, fn) {
+    if (!aktiv) return fn();
+    const gs = this.gs;
+    const vorher = gs._forcedCommitPlayer;
+    gs._forcedCommitPlayer = pi;
+    try { return await fn(); }
+    finally { if (vorher != null) gs._forcedCommitPlayer = vorher; else delete gs._forcedCommitPlayer; }
+  }
+
+  /**
+   * ★ W82 (Sinister Idol): ist die offene Frage von `pi` eine PFLICHTwahl im Zwangs-Kontext (`_promptsForceCommit`, `cancellable: false`)? Dann weist der Server einen Abbruch ab
+   * (`cancel_potion`, `effect_prompt_response` mit `cancelled`) und die Frage bleibt offen. Ja/Nein-Fragen (`confirm`) bleiben echte Entscheidungen — „No" ist keine Abbruch-Wahl.
+   */
+  _abbruchGesperrt(pi) {
+    if (!this._promptsForceCommit(pi)) return false;
+    const pt = this.gs.potionTargeting, ep = this.gs.effectPrompt;
+    if (pt && pt.ownerIdx === pi) return pt.config?.cancellable === false;
+    if (ep && ep.ownerIdx === pi) return ep.cancellable === false && ep.type !== 'confirm';
+    return false;
   }
 
   /**
@@ -36816,6 +36961,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   darkOceanBlocksReaction(pi, chain) {
     if (!this.isDarkOceanActive()) return false;
+    if (this.spielerIstVonAreasAusgenommen(pi)) return false;   // ★ W82 (Shipwrecked): „you … are unaffected by Areas" — Dark Ocean sperrt ihn nicht
     // Bevorzugt das oberste Kettenglied. Ist die Kette leer (hook-
     // getriebenes Fenster), zaehlt die gerade aufloesende Karte.
     let top = chain?.[chain.length - 1] || this._currentEffectSource;
@@ -39119,6 +39265,30 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Todesart (`isSacrifice`, `istZerstoerung`) an Bedingung/Aufloesung.
     if (await this._preDefeatFensterSeite(herr, false, creatureInst, source, amount, type, info)) return true;
     return this._preDefeatFensterSeite(this.opponentOf(herr), true, creatureInst, source, amount, type, info);
+  }
+
+  /**
+   * ★ W82 (Animal Training): ERSATZ DER NIEDERLAGE DURCH DIE QUELLE — „If this Attack would defeat a Creature your opponent controls, you may … instead".
+   * Gegenstück zu `selfPreDefeat` (dort ersetzt die Kreatur ihren eigenen Tod, hier die schlagende Karte). Skript-Vertrag am Skript der QUELLE (`source.name`):
+   *   `async quelleErsetztNiederlage(engine, inst, source, amount, type, info) → boolean` — `true` = ersetzt (die Karte hat die Kreatur selbst versorgt: Heilung, Kontrollwechsel …;
+   *   kein Tod, keine Todes-Trigger, kein Schaden), `false` = nichts passiert, die Kreatur wird normal besiegt. Die Karte prüft selbst, ob sie anwendbar ist, und fragt ihr „you may".
+   * Nur für Attack-Schaden (`type === 'attack'`) einer Heldenquelle (`usesHeroAtk`); läuft NACH den Hand-Reaktionen des Kontrolleurs (die Kreatur wird dort ggf. schon gerettet) und der
+   * Betragsminderung, also nur bei einem weiterhin tödlichen Treffer; nicht verschachtelt (`_inQuelleErsatz`). Wo ein Extra-Life-Stempel den Tod ohnehin umkehrt, kommt sie nicht an.
+   */
+  async _quelleErsetztNiederlage(inst, source, amount, type, info = {}) {
+    if (!inst || type !== 'attack' || !source?.usesHeroAtk || !source.name || this._inQuelleErsatz) return false;
+    if (inst.zone !== ZONES.SUPPORT || inst.faceDown) return false;
+    const _sc = loadCardEffect(source.name);
+    if (!_sc?.quelleErsetztNiederlage) return false;
+    this._inQuelleErsatz = true;
+    try {
+      return !!(await _sc.quelleErsetztNiederlage(this, inst, source, amount, type, info));
+    } catch (err) {
+      console.error(`[quelleErsetztNiederlage] ${source.name} threw:`, err.message);
+      return false;
+    } finally {
+      this._inQuelleErsatz = false;
+    }
   }
 
   async _preDefeatFensterSeite(ownerIdx, nurAnySide, creatureInst, source, amount, type, info = {}) {
@@ -45011,6 +45181,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       surpriseHost: cardInfo.surpriseHost || null,
       // W5b-Z1b: Beschwörung als inhärente Zusatzaktion (Priests: die Kosten sind das Zurückmischen, `beforeSummon` NACH dem Fenster).
       isInherentAction: !!cardInfo.isInherentAction,
+      // ★ W82 (Sinister Idol): bei der AKTIVIERUNG einer Ability (`fromBoard`, Typ `Ability`) der Stapel, der aktiviert wird: `{ heroOwner (Brettseite), heroIdx, zoneIdx, zoneKind: 'ability'|'support', level (Stapelhöhe beim Aktivieren) }`.
+      abilityZone: cardInfo.abilityZone || null,
       // ★ W74b (Flesh-Eating Swarm Trap): der Held, den die Karte BEIM SPIELEN waehlt (Ausruestung, Attachment, Ability-Anlegen, Trank): `{ owner (Brettseite), heroIdx }`.
       chosenHero: cardInfo.chosenHero || null,
       // ★ W34a: virtuelle Kette eines Effekts, der als Attack/Spell ZÄHLT (`alsAttackKette` / `alsSpellKette`): `'attack' | 'spell'`. Leser, die ein echtes Kartenspiel
@@ -45038,7 +45210,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Dieser Merker schliesst die Luecke; Vorgaenger gesichert, damit
     // verschachtelte Aufloesungen sich nicht ueberschreiben.
     const prevEffectSource = this._currentEffectSource;
-    this._currentEffectSource = { cardName, owner, cardType, heroIdx: heroIdx ?? -1, fromBoard: !!fromBoard, isPlacement: !!cardInfo.isPlacement };   // Z3: heroIdx fuer `_umgebungsQuelle`; W74b: Herkunft fuer die Hand-Reaktionen auf gewaehlte Helden
+    this._currentEffectSource = { cardName, owner, cardType, heroIdx: heroIdx ?? -1, fromBoard: !!fromBoard, isPlacement: !!cardInfo.isPlacement, abilityZone: cardInfo.abilityZone || null };   // Z3: heroIdx fuer `_umgebungsQuelle`; W74b: Herkunft fuer die Hand-Reaktionen auf gewaehlte Helden
     this._inReactionCheck = true;
     try {
       const eventDesc = `${cardName} was activated`;
@@ -46954,6 +47126,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    *  re-enter / double-run. No-op when empty or already draining. */
   async _runPostChainActions() {
     if (this._runningPostChain) return;
+    if (!this._inMctsSim) this._loeschAbholungAnmelden();   // W84a: wartende Loeschungen ohne Abholung (z. B. nach einem Rollout-Rueckspulen) wieder anmelden
     if (!this._postChainActions || this._postChainActions.length === 0) return;
     // Board-idle gate. A deferred action (e.g. Lunar Eclipse's
     // replacement-Action prompt) must only run when the triggering
@@ -46979,6 +47152,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       const batch = this._inMctsSim
         ? this._postChainActions
         : this._postChainActions.filter(fn => !fn._ausSimulation);   // Rollout-Reste nie im echten Spiel ausfuehren
+      // W84a: war die Abholung der Loesch-Warteschlange ein solcher Rollout-Rest, sind auch ihre Eintraege Simulation — verwerfen.
+      if (!this._inMctsSim && this._loeschAbholungFn && !batch.includes(this._loeschAbholungFn) && this._postChainActions.includes(this._loeschAbholungFn)) {
+        this._loeschWarteschlange = []; this._loeschAbholungFn = null;
+      }
       this._postChainActions = [];
       for (const fn of batch) {
         try { await fn(); }
@@ -50919,7 +51096,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!inst) continue;
         const hoptKey = `area-effect:${areaName}:${playerIdx}`;
         const exhausted = this.gs.hoptUsed?.[hoptKey] === this.gs.turn;
-        let canActivate = !exhausted;
+        // ★ W82 (Shipwrecked): „you cannot activate the effects of … Areas" — die Area bleibt sichtbar, ist aber ausgegraut.
+        let canActivate = !exhausted && !this.spielerIstVonAreasAusgenommen(playerIdx);
         if (canActivate && typeof script.canActivateAreaEffect === 'function') {
           try {
             const ctx = this._createContext(inst, { _activator: playerIdx });
@@ -50946,6 +51124,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (gs.activePlayer !== activatorPi) return false;
     const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
     if (!isMainPhase) return false;
+    if (this.spielerIstVonAreasAusgenommen(activatorPi)) return false;   // ★ W82 (Shipwrecked): Area-Effekte aktivieren ist gesperrt
     const hoptKey = `area-effect:${areaName}:${activatorPi}`;
     if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) return false;
 
@@ -52654,6 +52833,23 @@ this._deathWatch = (this._deathWatchStack || []).length
     finally { if (vorher === undefined) delete this.gs._wirkerSeite; else this.gs._wirkerSeite = vorher; }
   }
 
+  /**
+   * Hat die Handkopie `idx` von `playerIdx` JETZT eine Zusatzaktions-Marke (`_handZusatzaktion`)? Nur Spells, nie Reaction/Surprise. Die Marke gilt nur, solange ihr Quellskript
+   * (`handCopyAdditionalAction`) es bejaht (Statue lebt und wirkt, Stufe noch 0 …); sonst ist die Karte wieder ein normaler Spell.
+   */
+  handKopieZusatzaktion(playerIdx, idx) {
+    const ps = this.gs?.players?.[playerIdx];
+    const marke = ps?._handZusatzaktion?.[idx];
+    const name = ps?.hand?.[idx];
+    if (!marke || !name) return false;
+    const cd = this._getCardDB()[name];
+    if (!cd || cd.cardType !== 'Spell') return false;
+    const sub = String(cd.subtype || '').toLowerCase();
+    if (sub.includes('reaction') || sub.includes('surprise')) return false;
+    try { return !!loadCardEffect(marke.source)?.handCopyAdditionalAction?.(this, playerIdx, idx, marke); }
+    catch (err) { console.error('[handCopyAdditionalAction]', marke.source, err.message); return false; }
+  }
+
   cardHasInherentAction(playerIdx, heroIdx, cardData, opts) {
     if (!cardData?.name) return false;
     const gs = this.gs;
@@ -52665,6 +52861,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Mission-Ladung. Ohne Ladung ist sie schlicht nicht mehr
     // durchfuehrbar.
     if (this.missionLockActive(playerIdx) && this.missionChargesLeft(playerIdx) <= 0) return false;
+    // Zusatzaktions-Marke der Handkopie (Ancient Guardian Statue): mit `opts.handIndex` zählt genau diese Kopie, ohne Index (Namenslisten) irgendeine Kopie dieses Namens.
+    if (cardData.cardType === 'Spell' && !opts?.fromCreation) {
+      const hand = gs.players[playerIdx]?.hand || [];
+      if (Number.isInteger(opts?.handIndex)) {
+        if (hand[opts.handIndex] === cardData.name && this.handKopieZusatzaktion(playerIdx, opts.handIndex)) return true;
+      } else if (gs.players[playerIdx]?._handZusatzaktion) {
+        for (let i = 0; i < hand.length; i++) if (hand[i] === cardData.name && this.handKopieZusatzaktion(playerIdx, i)) return true;
+      }
+    }
     const script = loadCardEffect(cardData.name);
     if (script?.inherentAction === true) return true;
     if (typeof script?.inherentAction === 'function') {
@@ -55107,7 +55312,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         for (const { inst, cd } of this.collectAoeCreatureTargets(targetPlayers, config, types)) {
           if (cd?.hp == null) continue;
           const hp = Math.max(0, cd.hp - (inst.counters?.damageTaken || 0));
-          if (hp > 0) targets.push({ kind: 'creature', hp, owner: this.physicalSide(inst) });
+          if (hp > 0) targets.push({ kind: 'creature', hp, owner: this.physicalSide(inst), inst });   // W83a: `inst` fuer die Schutz-Pruefung der CPU-Bewerter (`_kreaturen-bilanz.js` `schutzAnteil`)
         }
       }
     } catch { /* defensiv: Projektion darf nie werfen */ }
@@ -56697,6 +56902,16 @@ this._deathWatch = (this._deathWatchStack || []).length
             this.sync();
             await this._delay(150);
             continue; // skip HP subtraction + death branch
+          }
+          // ★ W82 (Animal Training): „If this Attack would defeat a Creature your opponent controls, … instead" — Ersatz der Niederlage durch die QUELLE (nach Hand-Reaktionen und
+          // Betragsminderung: nur ein weiterhin tödlicher Treffer zählt). Vertrag: `_quelleErsetztNiederlage`. Ersetzt = wie `saved` oben (kein Tod, kein Schaden, weiter mit dem nächsten Eintrag).
+          // Al (27.10.): der Besitzer rettet ZUERST — hat seine Hand-Reaktion die Creature schon zur Wiederbelebung nach dem Tod vorgemerkt (`_reviveAfterDeath`, Bone Dog), gibt es nichts zu übernehmen.
+          if (actualAmount >= e.inst.counters.currentHp && !e.inst._reviveAfterDeath && await this._quelleErsetztNiederlage(e.inst, e.source, actualAmount, e.type, _pdInfo)) {
+            delete e.inst.counters._dyingThisBatch;
+            this.log('creature_pre_defeat_source_replace', { creature: e.inst.name, by: e.source?.name || e.type });
+            this.sync();
+            await this._delay(150);
+            continue;
           }
         }
       }

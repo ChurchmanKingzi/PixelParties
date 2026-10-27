@@ -7524,10 +7524,17 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
     let heldZusatz = null;
     try {
       if (cardName && loadCardEffect(cardName)?.cpuMeta?.trifftKreaturenAmHelden && damage > 0) {
-        heldZusatz = (t) => KreaturenBilanz.heldKreaturenWirkung(engine, cpuIdx, t.owner, t.heroIdx, damage);
+        const _wq = { name: cardName, owner: cpuIdx, controller: cpuIdx, heroIdx: -1 };
+        heldZusatz = (t) => KreaturenBilanz.heldKreaturenWirkung(engine, cpuIdx, t.owner, t.heroIdx, damage, _wq);
       }
     } catch { heldZusatz = null; }
-    const picks = pickEnemyTargets(engine, enemyTargets, damage, maxSelect, heldZusatz);
+    // W83a: gemeinsame AoE-Regel (Geschuetzte nicht einbeziehen, Ueberlebende ×0,7) — Quelle/Schadensart fuer den Schutz-Check.
+    const _aoeOpts = {
+      quelle: cardName ? { name: cardName, owner: cpuIdx, controller: cpuIdx, heroIdx: -1 } : null,
+      damageType: config.damageType || (cd?.cardType === 'Attack' ? 'attack' : 'destruction_spell'),
+      cancellable: config.cancellable !== false,
+    };
+    const picks = pickEnemyTargets(engine, enemyTargets, damage, maxSelect, heldZusatz, _aoeOpts);
     if (picks.length) return picks.map(p => p.id);
     // All enemy targets are immune. If the prompt is cancellable, decline
     // to avoid wasting the Attack/Spell/effect; the card stays in hand.
@@ -9210,14 +9217,31 @@ async function cpuForcePlayHero(engine, pi, hero, heroIdx) {
   return best;
 }
 
-function pickEnemyTargets(engine, enemyTargets, damage, maxSelect, heldZusatz = null) {
+function pickEnemyTargets(engine, enemyTargets, damage, maxSelect, heldZusatz = null, aoeOpts = {}) {
   const gs = engine.gs;
   // Drop fully immune targets up front — hitting them does nothing useful
   // and the user explicitly wants to avoid wasting effects on them. If this
   // empties the pool, the caller (cpuPickTargets) will decline cancellable
   // prompts, which cancels the spell and leaves the card in hand.
-  const viable = enemyTargets.filter(t => !isTargetImmune(engine, t));
+  let viable = enemyTargets.filter(t => !isTargetImmune(engine, t));
   if (viable.length === 0) return [];
+  // ★ W83a (Al 27.10.2026: "Geschuetzte, die bereits zum Zeitpunkt der Evaluation geschuetzt sind, sollen ueberall nicht einbezogen werden"): Kreaturen, die die Wirkung nachweislich nicht
+  // nehmen (SICHERER Schutz laut `engine.kreaturGeschuetztVor`: Schadensimmunitaet, Anti Magic, Erstrunden-Schutz, Zielschutz …), fallen als Ziel heraus; WEICH Geschuetzte (bereite
+  // Reaktion des Gegners, z. B. Monia) zaehlen unten anteilig (`WEICH_FAKTOR`). Sind ALLE verbleibenden Ziele so geschuetzt: abbrechbar → nichts waehlen (die Karte bleibt auf der Hand),
+  // sonst wie bisher aus allen waehlen.
+  const schutzVon = new Map();
+  if (aoeOpts.quelle && damage > 0) {
+    for (const t of viable) {
+      if (t.type !== 'creature' && t.type !== 'equip') continue;
+      const inst = t.cardInstance || findSupportInstance(engine, t);
+      if (!inst) continue;
+      const sa = KreaturenBilanz.schutzAnteil(engine, aoeOpts.quelle, inst, 'damage', { amount: damage, damageType: aoeOpts.damageType, sourceOwner: aoeOpts.quelle.owner, gerichtet: true, nurSicher: !!engine._inMctsSim });   // im Rollout nur der billige sichere Teil
+      if (sa.geschuetzt) schutzVon.set(t, sa);
+    }
+    const ungeschuetzt = viable.filter(t => !(schutzVon.get(t)?.faktor === 0));
+    if (ungeschuetzt.length === 0 && viable.length > 0 && aoeOpts.cancellable) return [];
+    if (ungeschuetzt.length > 0) viable = ungeschuetzt;
+  }
 
   // Score each viable target by *expected value of the hit*, combining:
   //   • the unit's dynamic value (hero: spell history, recent damage,
@@ -9278,10 +9302,11 @@ function pickEnemyTargets(engine, enemyTargets, damage, maxSelect, heldZusatz = 
       const immortal = !!inst?.counters?.buffs?.immortal;
       if (immortal && hp <= 1 && damage > 0) return -Infinity;
       const value = mctsEnemyCreatureValue(engine, inst);
+      const anteil = schutzVon.get(t)?.faktor ?? 1;   // W83a: weich geschuetzt = anteilig (sicher geschuetzte sind oben schon heraus)
       if (!damageKnown) {
         // Unknown damage — value-only fallback, with the same
         // hero/creature gap (creatures rank below heroes).
-        return 50 * value - 30;
+        return 50 * value * anteil - 30;
       }
       const effDamage = Math.min(damage, immortal ? Math.max(0, hp - 1) : hp);
       const killable = !immortal && damage > 0 && damage >= hp;
@@ -9289,7 +9314,9 @@ function pickEnemyTargets(engine, enemyTargets, damage, maxSelect, heldZusatz = 
       // Creatures generally rank below heroes — same effective damage on
       // an equally-valued creature should not beat an equally-valued
       // hero. The kill-shot multiplier is also smaller (80 vs 250).
-      return effDamage * value + killBonus - 30;
+      // ★ W83a: wer den Schaden ueberlebt, zaehlt mit `UEBERLEBER_FAKTOR` (0,7); Toedliches voll mit Kill-Bonus.
+      const gewinn = killable ? effDamage * value + killBonus : effDamage * value * KreaturenBilanz.UEBERLEBER_FAKTOR;
+      return gewinn * anteil - 30;
     }
     return 0;
   };
@@ -10670,6 +10697,8 @@ function pickBestGalleryCard(engine, pi, cards, quelle = null) {
     const seen = handCounts[c.name] || 0;
     let score = estimateHandCardValueFor(engine, pi, c.name, seen);
     if (quelle) {
+      // Ancient Guardian Statue (W82): die Karte, die die Galerie öffnet, kann einen eigenen Zuschlag je Eintrag liefern (`cpuMeta.galleryValue(engine, pi, eintrag)`).
+      try { const gv = loadCardEffect(quelle)?.cpuMeta?.galleryValue; if (typeof gv === 'function') score += Number(gv(engine, pi, c)) || 0; } catch { /* Zuschlag ist Kür */ }
       try {
         score += deckProfile.setOfferValue(engine, pi, quelle, c.name);
         if (grosserPool) score += deckProfile.poolFeatureValue(engine, pi, quelle, c.name);
@@ -10963,8 +10992,16 @@ function interferenceAoeDiscount(engine, pi, cardName) {
       const anteil = engine.interferenceShare(owner, hero) || 0;
       blockiert += gewicht * Math.max(0, Math.min(1, anteil));
     }
+    // ★ W83a (Al 27.10.2026: Geschuetzte nie einbeziehen): eine Kreatur, die den Flaechenschlag ohnehin nicht nimmt (sicherer Schutz), steht nicht im Nenner; weich Geschuetzte anteilig.
+    const _cd = engine._getCardDB()[cardName];
+    const _quelle = { name: cardName, owner: pi, controller: pi, heroIdx: -1 };
     for (const { inst } of creatures) {
-      const gewicht = Math.max(0, 50 * mctsEnemyCreatureValue(engine, inst) - 30);
+      let anteil = 1;
+      if (inst?.zone === 'support') {
+        const sa = KreaturenBilanz.schutzAnteil(engine, _quelle, inst, 'damage', { amount: 1, damageType: _cd?.cardType === 'Attack' ? 'attack' : 'destruction_spell', sourceOwner: pi, nurSicher: !!engine._inMctsSim });
+        anteil = sa.faktor;
+      }
+      const gewicht = Math.max(0, 50 * mctsEnemyCreatureValue(engine, inst) - 30) * anteil;
       gesamt += gewicht;
     }
     if (!(gesamt > 0)) return 0;

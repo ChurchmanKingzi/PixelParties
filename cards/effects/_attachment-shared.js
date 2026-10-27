@@ -279,7 +279,9 @@ async function _pickAttachmentHostRaw(ctx, CARD_NAME, opts = {}) {
     for (const h of list) targets.push({ id: `equip-${side}-${heroIdx}-${h.slotIdx}`, type: 'equip', owner: side, heroIdx, slotIdx: h.slotIdx, cardName: '', ...zusatz });
     targets.push({ id: `hero-${side}-${heroIdx}`, type: 'hero', owner: side, heroIdx, cardName: gs.players[side].heroes[heroIdx].name, _autoSlot: list[0].slotIdx, ...zusatz });
   }
-  const result = await engine.promptEffectTarget(pi, targets, {
+  // ★ W82 (Pflichtregel „Ziel-Picker graut alles Nicht-Wählbare aus"): `opts.dimRest` reicht alle übrigen Helden und Support-Zonen-Karten ausgegraut hinein (Shipwrecked).
+  const alleZiele = opts.dimRest ? [...targets, ...require('./_target-dim-shared').ausgegrauteRestkarten(engine, targets)] : targets;
+  const result = await engine.promptEffectTarget(pi, alleZiele, {
     title: CARD_NAME,
     description: opts.description || `Choose a Hero (leftmost free Support Zone) or a specific empty Support Zone to attach ${CARD_NAME} to.`,
     confirmLabel: opts.confirmLabel || '📎 Attach!', confirmClass: opts.confirmClass || 'btn-success',

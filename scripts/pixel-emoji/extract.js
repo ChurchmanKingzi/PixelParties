@@ -225,6 +225,7 @@ async function alle(page, stilisiere) {
   try {
     const ctx = await browser.newContext({ viewport: { width: 1200, height: 800 } });
     const toolsDir = process.env.PE_REACT_DIR || '/tmp/st-tools/node_modules';
+    if (!fs.existsSync(path.join(toolsDir, 'react/umd'))) console.warn('Hinweis: ' + toolsDir + '/react/umd fehlt — ohne Netz (unpkg.com) läuft der Seitenaufbau in ein Timeout. PE_REACT_DIR=<Ordner mit react/umd und react-dom/umd> setzen.');
     if (fs.existsSync(path.join(toolsDir, 'react/umd'))) {
       await ctx.route(/unpkg\.com\/react@18\/umd\/react\.production\.min\.js/, r => r.fulfill({ contentType: 'application/javascript', body: fs.readFileSync(path.join(toolsDir, 'react/umd/react.production.min.js')) }));
       await ctx.route(/unpkg\.com\/react-dom@18\/umd\/react-dom\.production\.min\.js/, r => r.fulfill({ contentType: 'application/javascript', body: fs.readFileSync(path.join(toolsDir, 'react-dom/umd/react-dom.production.min.js')) }));

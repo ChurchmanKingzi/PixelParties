@@ -15,24 +15,30 @@ const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 //    ist die Karte, Besitzer der Kreis-Besitzer). Ohne Ziel passiert nichts.
 //  • Abgang vom Brett: der BESITZER der Karte waehlt (Pflicht) ein beliebiges Ziel — Helden oder
 //    Creatures beider Seiten — und verursacht 150 Schaden.
+//  • ★ Als Ruling (Al 27.10.): der Text endet „This effect can only occur once per turn" — der
+//    150-Schaden-Effekt ist HARD once per turn (je Besitzer, `claimHOPT`): verlaesst im selben Zug eine
+//    weitere Kopie (oder dieselbe nach dem Wieder-Wirken aus dem Geloescht-Stapel) das Brett, feuert er nicht
+//    noch einmal. Gestempelt wird VOR der Zielwahl (kein zweites Fenster, solange die erste Wahl offen ist);
+//    gibt es gar kein waehlbares Ziel, ist nichts „passiert" und der Stempel wird wieder freigegeben.
 // ═══════════════════════════════════════════
 
 const {
   verlaesstBrett, loeschenUndSpielen, cpuBejahen,
 } = require('./_hell-circles-shared');
 
-const { heroHasDiverHelmet, isAreaImmuneInst } = require('./_diver-helmet-shared');
+const { isAreaImmuneHero, isAreaImmuneInst } = require('./_diver-helmet-shared');   // Diver Helmet + W82 Shipwrecked
 
 const CARD_NAME = 'The Seventh Circle of Hell';
 const ENDE = 100;
 const ABGANG = 150;
+const HOPT_ABGANG = 'seventh-circle-of-hell-abgang';   // hard once per turn (je Besitzer)
 
 // W16e (F01-18): Diver Helmet — „unaffected by Areas" (CARD_API „Areas — respect Diver Helmet"): der Helm-Held und seine Support-Zonen-Karten
 // werden von dieser Area nie zur Wahl angeboten. `t` = Zielobjekt des Pickers (Brettseite in `owner`).
 function helmGeschuetzt(engine, t) {
   if (!t) return false;
-  if (t.type === 'hero') return heroHasDiverHelmet(engine, t.owner, t.heroIdx);
-  return t.cardInstance ? isAreaImmuneInst(engine, t.cardInstance) : heroHasDiverHelmet(engine, t.owner, t.heroIdx);
+  if (t.type === 'hero') return isAreaImmuneHero(engine, t.owner, t.heroIdx);
+  return t.cardInstance ? isAreaImmuneInst(engine, t.cardInstance) : isAreaImmuneHero(engine, t.owner, t.heroIdx);
 }
 
 // `festesZiel`: der Zugspieler waehlt SEINE eigenen Ziele selbst (Zugende-Zweig) — Submerged/Stealth
@@ -69,6 +75,7 @@ module.exports = {
       const engine = ctx._engine;
       const tp = ctx.activePlayer;
       if (!isSeat(engine, tp)) return;
+      if (engine.spielerIstVonAreasAusgenommen(tp)) return;   // W82 (Shipwrecked): der Zugspieler ist von Areas ausgenommen
       const ziele = [...engine.getHeroTargets(tp), ...engine.getCreatureTargets(tp)].filter(t => !helmGeschuetzt(engine, t));
       if (ziele.length === 0) return;
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: ctx.cardOwner });
@@ -94,6 +101,9 @@ module.exports = {
       if (!verlaesstBrett(ctx)) return;
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
+      if (engine.spielerIstVonAreasAusgenommen(pi)) return;   // W82 (Shipwrecked): Area-Effekte aktivieren ist gesperrt
+      // Als Ruling (Al 27.10.): „This effect can only occur once per turn" = hard once per turn (s. Kopf).
+      if (!engine.claimHOPT(HOPT_ABGANG, pi)) return;
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
       // pflichtwahl: „choose a target and deal 150 damage" ist keine Option, sondern Pflicht
       const ziel = await ctx.promptDamageTarget({
@@ -108,7 +118,7 @@ module.exports = {
         cancellable: false,
         condition: (t, eng) => !helmGeschuetzt(eng || engine, t),
       });
-      if (!ziel) return;
+      if (!ziel) { delete engine.gs.hoptUsed?.[`${HOPT_ABGANG}:${pi}`]; return; }   // kein waehlbares Ziel: der Effekt ist nicht eingetreten
       const quelle = { name: CARD_NAME, owner: pi, controller: pi, heroIdx: -1 };
       await schadenAuf(engine, quelle, ziel, ABGANG);
       engine.log('seventh_circle_leave', { player: engine.gs.players[pi]?.username, target: ziel.cardName, damage: ABGANG });

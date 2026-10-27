@@ -23,7 +23,7 @@
 
 const { hasCardType } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
-const { alleEigenenAreasLoeschen, cpuBejahen } = require('./_hell-circles-shared');
+const { alleEigenenAreasLoeschen, cpuBejahen, sperreHinweis } = require('./_hell-circles-shared');
 
 const CARD_NAME = 'The Third Circle of Hell';
 const ANZAHL = 6;
@@ -57,7 +57,9 @@ module.exports = {
   onDeletedFromAnywhere: async (engine, pi) => {
     const gs = engine.gs;
     const ps = gs.players[pi];
-    if (!ps || ps._thirdCircleTurn === gs.turn) return;
+    if (!ps) return;
+    if (ps._thirdCircleTurn === gs.turn) { await sperreHinweis(engine, pi, CARD_NAME, 'once_per_turn'); return; }   // W84a: nicht stumm - only once per turn sichtbar machen
+    if (engine.spielerIstVonAreasAusgenommen(pi)) return;   // W82 (Shipwrecked): Area-Effekte aktivieren und Areas spielen ist gesperrt
     if (!(ps.mainDeck || []).length) return;
     await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
     const antwort = await engine.promptGeneric(pi, {
@@ -108,7 +110,8 @@ module.exports = {
     await alleEigenenAreasLoeschen(engine, pi, CARD_NAME);
 
     // ③ Area-Zauber waehlen und als Zusatzaktion spielen.
-    const kandidaten = [...new Set(gezeigt.filter(n => istAreaZauber(db[n])))];
+    // Als Ruling (Al 27.10.): „play it … if possible" — unter der Reality-Crack-Sperre („You cannot play another Area for the rest of the turn") ist es nicht möglich: keine Wahl, die Karten fallen in den Rest (④).
+    const kandidaten = engine.areaSpielGesperrt(pi) ? [] : [...new Set(gezeigt.filter(n => istAreaZauber(db[n])))];
     let gespielt = null;
     if (kandidaten.length > 0) {
       let wahl = kandidaten[0];

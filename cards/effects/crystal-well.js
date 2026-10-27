@@ -137,6 +137,7 @@ module.exports = {
     const oi = engine.opponentOf(pi);
     const ops = engine.gs.players[oi];
     if (!ops || ops.handLocked) return false;
+    if (engine.spielerIstVonAreasAusgenommen(oi)) return false;   // W82 (Shipwrecked): die Karte kaeme in die Hand eines Spielers, der von Areas ausgenommen ist
     // D1 (Antwort von Al): Karte-geben ist eigenstaendig - unter Zieh-/Hand-Sperre bleibt die Aktivierung moeglich, nur das Ziehen verpufft
     // (Z6 A08-24 d hatte sie gesperrt).
     return _hasOriginallyOwnedHandCard(engine, pi);
