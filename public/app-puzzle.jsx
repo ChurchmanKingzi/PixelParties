@@ -3757,8 +3757,13 @@ function PuzzleCreator() {
       && si !== allianceLink.si && !!p.heroes[hi];
     const allianzQuelle = !!allianceLink && zt === 'support'
       && si === allianceLink.si && hi === allianceLink.hi && slot === allianceLink.slot;
+    // ★ Die Karte, die gerade aus dieser Zone gezogen wird, ist in der Zone unsichtbar (style.css `[data-pz-gezogen]`) — das Ziehbild
+    // (`#pz-drag-ghost`) ist dann die einzige Karte, wie bei der Hand (`ziehLaeuft`: erst im Tick NACH `dragstart`, sonst bricht der
+    // Browser den Zug ab). Bei Abbruch/Ablegen setzt `onDragEnd`/`handleDrop` `dragSource` bzw. `ziehLaeuft` zurueck.
+    const wirdGezogen = ziehLaeuft && !!dragSource && dragSource.zt === zt && dragSource.si === si && dragSource.hi === hi && dragSource.slot === slot;
     return {
       'data-pz-zone': `${si}-${zt}-${hi}-${slot}`,
+      'data-pz-gezogen': wirdGezogen ? 'true' : undefined,
       'data-alliance-target': allianzZiel ? 'true' : undefined,
       'data-alliance-source': allianzQuelle ? 'true' : undefined,
       draggable: !!hasCard && !isTouchDevice,
@@ -4775,6 +4780,7 @@ function PuzzleCreator() {
                             <div key={nm + ':' + ai} className="board-area-stack-card"
                               style={{ top: `calc(var(--area-stack-offset) * ${ai})`, cursor: nm === 'Doom Clock' ? 'pointer' : undefined }}
                               data-pz-zone={g['data-pz-zone']}
+                              data-pz-gezogen={g['data-pz-gezogen']}
                               draggable={g.draggable}
                               onDragStart={g.onDragStart}
                               onDragEnd={g.onDragEnd}
