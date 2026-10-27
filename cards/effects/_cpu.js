@@ -6588,6 +6588,15 @@ function installCpuBrain(engine) {
   // voller learnedCardValue-Stack (Cluster/Standing/Timing/Caster-
   // Deltas des bewerteten Spielers) statt Level-Proxys.
   engine._cpuEstimateHandValue = (pi, cardName) => estimateHandCardValueFor(engine, pi, cardName);
+  // W82b (Al): Goldwert fuer die Ressourcenrechnung der Flaechenkarten — was kostet es, `betrag` Gold auszugeben? Differenz der Goldbewertung der Brettbewertung
+  // (gedeckter Bedarf 2 je Gold, Ueberschuss 0,2) vor und nach der Ausgabe; Bedarf = `computeGoldDemand` (Artefakte in der Hand, Gold-Aktivierungen).
+  engine._cpuEstimateGoldValue = (pi, betrag) => {
+    const gold = engine.gs.players[pi]?.gold || 0;
+    const n = Math.max(0, Math.min(gold, betrag || 0));
+    if (n <= 0) return 0;
+    const demand = computeGoldDemand(engine, pi);
+    return goldWertFuer(gold, demand) - goldWertFuer(gold - n, demand);
+  };
 
   const origTarget = engine._getCpuTargetResponse.bind(engine);
   const origGeneric = engine._getCpuGenericResponse.bind(engine);
@@ -11446,6 +11455,16 @@ function mctsEnemyHeroThreat(engine, oppIdx, hi, teamMaxSchoolLvl) {
   return threat;
 }
 
+/**
+ * Wert von `gold` Gold bei `demand` Goldbedarf (Brettbewertungs-Skala von `evaluateState`): der gedeckte Bedarf zaehlt 2 je Gold, der Ueberschuss 0,2.
+ * (W82b: aus `evaluateState` herausgeholt, damit auch der Ressourcenwert der Flaechenkarten [`engine._cpuEstimateGoldValue`] dieselbe Rechnung benutzt.)
+ */
+function goldWertFuer(gold, demand) {
+  const met = Math.min(gold, demand);
+  const excess = Math.max(0, gold - demand);
+  return met * 2 + excess * 0.2;
+}
+
 // How much gold could this player productively spend RIGHT NOW on plays
 // that are otherwise ready to go? Sums:
 //   • Artifact cards in hand that would be playable if gold weren't a
@@ -12586,11 +12605,7 @@ function evaluateState(engine, cpuIdx) {
 
   const ownGoldDemand = computeGoldDemand(engine, cpuIdx);
   const oppGoldDemand = computeGoldDemand(engine, oppIdx);
-  const goldValue = (gold, demand) => {
-    const met = Math.min(gold, demand);
-    const excess = Math.max(0, gold - demand);
-    return met * 2 + excess * 0.2;
-  };
+  const goldValue = goldWertFuer;
   score += goldValue(ps.gold || 0, ownGoldDemand) - goldValue(opp.gold || 0, oppGoldDemand);
 
   // Opponent-turn lookahead via status damage anticipation. Burn/poison

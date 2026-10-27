@@ -161,29 +161,30 @@ module.exports = {
   },
 
   /**
-   * CPU (W80a, Al 26.10.2026: "Ja" — gemeinsame Kreaturen-Bilanz): Heat Wave brennt AUCH die eigenen Ziele an (alle ausser dem Wirker). Bilanz aus Sicht des Wirkers (Brettskala,
-   * Standard-Kreatur = 30): gegnerische getroffene Kreaturen MINUS eigene getroffene (`engine.kreaturenBilanz`: schon Brennende nehmen 150 Schaden anteilig an der Rest-HP, die anderen
-   * bekommen Burned [0,6 des Werts]; Burn-Immune zaehlen nicht) PLUS die Heldenwirkung des Kartentextes (gegnerische minus eigene Helden ausser dem Wirker: 150 Schaden an schon
-   * Brennenden [Tod = 500 + HP], neuer Brand 20 je Held). Gespielt wird nur bei klar positiver Bilanz, sonst Veto. Schadenssperre (Flame Avalanche) gilt wie im Effekt.
+   * CPU (W82b, Al 27.10.2026 — ersetzt die Schwelle von W80a): Heat Wave brennt AUCH die eigenen Ziele an (alle ausser dem Wirker). Gespielt wird genau dann, wenn
+   *   Gewinn = Σ Wert der gegnerischen Kreaturen, die an den 150 Schaden (nur schon Brennende) WIRKLICH sterben und NICHT geschuetzt sind
+   *            + Heldenwirkung des Kartentextes (gegnerische Helden: 150 Schaden an schon Brennenden, Tod = 500 + HP, neuer Brand 20 je Held)
+   *   > Verbrauch = Σ Wert der verbrauchten Ressourcen (diese Karte, die Hauptaktion — nicht als Zusatzaktion) + Σ Wert der EIGENEN Kreaturen, die sterben und nicht geschuetzt sind
+   *            + Heldenwirkung auf die eigene Seite (eigene Helden ausser dem Wirker, wie oben).
+   * Neu angebrannte Kreaturen und Teilschaden an Ueberlebenden zaehlen NICHT (nur Toetungen). Geschuetzt/Burn-Immune/Schadenssperre wie im Effekt; Erste-Runden-Geschuetzter unantastbar
+   * (`_kreaturen-bilanz.js` `flaechenEntscheidung`, `engine.kreaturGeschuetztVor`).
    */
-  cpuPlayVeto(engine, pi, heroIdx) {
+  cpuPlayVeto(engine, pi, heroIdx, opts) {
     try {
       const KB = require('./_kreaturen-bilanz');
       const gs = engine.gs, ps = gs.players[pi];
       if (!ps) return false;
       const damageLocked = !!ps.damageLocked;
       const targets = collectTargets(engine, pi, Number.isInteger(heroIdx) ? heroIdx : -1);
-      const liste = [];
-      let heldenWirk = 0, heldenGegner = 0;
+      const ziele = [];
+      let heldenGewinn = 0, heldenVerlust = 0;
       const prot = gs.firstTurnProtectedPlayer;
       for (const t of targets) {
         const gegner = gegnerKontrolliert(engine, t, pi);
         const vorBrand = targetIsBurned(engine, t);
         const schaden = vorBrand && !(damageLocked && gegner);
         if (t.type === 'creature') {
-          if (!t.inst) continue;
-          if (schaden) liste.push({ inst: t.inst, art: 'damage', amount: DAMAGE, sourceOwner: pi });
-          else if (!vorBrand && targetCanBeBurned(engine, t, pi)) liste.push({ inst: t.inst, art: 'status', statusName: 'burned', sourceOwner: pi });
+          if (t.inst && schaden) ziele.push({ inst: t.inst, art: 'damage', amount: DAMAGE });   // nur Schaden kann toeten; ein neuer Brand zaehlt nicht
           continue;
         }
         const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
@@ -193,12 +194,14 @@ module.exports = {
         if (schaden && !h.statuses?.shielded) v = DAMAGE >= h.hp ? 500 + h.hp : DAMAGE;
         else if (!vorBrand && targetCanBeBurned(engine, t, pi)) v = HELD_BRAND_WERT;
         if (v <= 0) continue;
-        if (gegner) { heldenWirk += v; heldenGegner += v; } else heldenWirk -= v;
+        if (gegner) heldenGewinn += v; else heldenVerlust += v;
       }
-      const rr = engine.kreaturenBilanz(pi, liste);   // Wirker-Sicht: `verloren` = was gegnerischen Kreaturen widerfaehrt, `geschuetzt` = was eigenen
-      const r = { wirk: (rr.verloren - rr.geschuetzt) * KB.BRETT_FAKTOR, gegner: rr.verloren * KB.BRETT_FAKTOR };
-      r.wirk += heldenWirk;
-      return KB.flaechenVeto(r, heldenGegner);
+      const r = KB.flaechenEntscheidung(engine, pi, {
+        kartenName: CARD_NAME, quelle: { name: CARD_NAME, owner: pi, controller: pi, heroIdx: Number.isInteger(heroIdx) ? heroIdx : -1 },
+        additional: KB.alsZusatzaktion(engine, module.exports, pi, heroIdx, opts),
+        ziele, damageType: 'destruction_spell', heldenGewinn, heldenVerlust,
+      });
+      return !r.spielen;
     } catch {
       return false;   // die Heuristik darf nie einen legalen Play verhindern
     }
