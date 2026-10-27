@@ -13,8 +13,8 @@
 //  • Zugstart (`onTurnStart`, nur eigene Züge): solange der Spieler Lyta kontrolliert und sie nicht besiegt ist, darf er (abbrechbar) EINES der Ziele übernehmen: den gemerkten Helden
 //    (falls er lebt und nicht schon übernommen ist) ODER eine beliebige Kreatur (Token mit Kreatur-Untertyp eingeschlossen), die sein Gegner kontrolliert — für die Dauer des Zuges.
 //  • Kreaturen bleiben in ihren Zonen (nur der Kontrolleur wechselt, Rückgabe zu Beginn des nächsten Zuges); sie sind NICHT unantastbar (der Text nennt nur den Helden).
-//  • Der übernommene Held nimmt für die Dauer der Kontrolle KEINEN Schaden aus irgendeiner Quelle (`statuses.charmed.nurSchaden`: nur der Schadenspfad prallt ab; Status und Kill-Effekte
-//    nicht — der Text sagt „takes no damage"). Die Immunität endet mit der Kontrolle (Rückgabe am Zugwechsel).
+//  • Der übernommene Held nimmt für die Dauer der Kontrolle KEINEN Schaden aus irgendeiner Quelle und kann nicht besiegt werden - auch nicht
+//    durch ein Opfer (`statuses.charmed.nurSchadenSchutz`, wie Deepsea Succubus; `engine.heldNichtBesiegbar`); negative Status kommen durch. Die Immunität endet mit der Kontrolle (Rückgabe am Zugwechsel).
 //  • „These effects cannot be negated": `bypassStatusFilter` — Lyta wirkt auch frozen/stunned/negated; besiegt ruht sie (Text: „undefeated").
 //  • Boris, the Guardian of Blackport: der Zugstart-Effekt läuft ins Leere (kein Angebot).
 //
@@ -117,7 +117,7 @@ module.exports = {
       if (!ziel) return;
 
       const erg = await uebernehmen(engine, pi, ziel, {
-        sourceName: CARD_NAME, heroMarker: 'nurSchaden', kreaturImmun: false,
+        sourceName: CARD_NAME, heroMarker: 'nurSchadenSchutz', kreaturImmun: false,
         anim: 'pink_hearts', animMs: HERZ_MS, trefferMs: Math.round(HERZ_MS * 0.6),
       });
       engine.log(erg.ok ? 'lyta_control' : 'lyta_fizzle', { player: gs.players[pi]?.username, target: ziel.cardName });

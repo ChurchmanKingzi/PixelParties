@@ -3,7 +3,7 @@
 //
 //  „Take control of a target your opponent controls until the end of your turn" — Held ODER Kreatur, die Ziele BLEIBEN IN IHREN ZONEN (nur der Kontrolleur wechselt):
 //    • Held: `temporaereKontrolle` (`_charm-shared.js`, die Rückgabe am Zugwechsel ist generisch). Schutz je Karte über den `marker` am `charmed`-Status:
-//      null = „unaffected by ALL other cards and effects" (Tree), 'nurSchaden' = nur Schaden prallt ab (Lyta: „takes no damage from any sources").
+//      null = „unaffected by ALL other cards and effects" (Tree), 'nurSchadenSchutz' = kein Schaden, nicht besiegbar (auch kein Opfer), Status kommen durch (Lyta, wie Deepsea Succubus).
 //    • Kreatur: `actionStealCreatureGefragt` (Schutzfenster, Rückgabe zu Beginn des nächsten Zuges über `_revertStolenCreatures`), `omniImmune` für „unaffected by all …" (Tree).
 //    • Boris, the Guardian of Blackport: „cannot activate effects that would take control of any targets you control" — der Effekt läuft ins Leere (`borisBlockt`).
 // ═══════════════════════════════════════════
@@ -57,7 +57,7 @@ function ziele(engine, pi, { helden = true, kreaturen = true, nurHeld = null } =
 
 /**
  * Das gewählte Ziel für den Rest des Zuges übernehmen.
- * @param {object} cfg  { sourceName, heroMarker: null|'nurSchaden', kreaturImmun: bool, anim: 'golden_apple_burst'|…, animMs, trefferMs }
+ * @param {object} cfg  { sourceName, heroMarker: null|'nurSchadenSchutz', kreaturImmun: bool, anim: 'golden_apple_burst'|…, animMs, trefferMs }
  * @returns {Promise<{ok: boolean}>}
  */
 async function uebernehmen(engine, pi, ziel, cfg) {
