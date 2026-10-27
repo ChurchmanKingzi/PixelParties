@@ -38,7 +38,9 @@ const CARD_NAME = 'Cleansing of the Land';
 function einsetzbar(engine, pi, cd) {
   if (!cd) return false;
   if (!engine.canPlaceAnotherArea(pi, cd.name)) return false;
-  if (engine.spielerIstVonAreasAusgenommen(pi)) return false;   // W82 (Shipwrecked): „you cannot … play Areas"
+  // Als Ruling (Al 27.10.): „immediately use it as an additional Action" ist ein SPIELEN der Area — Reality Crack („You cannot play another Area for the rest of the turn") und
+  // W82 (Shipwrecked: „you cannot … play Areas") sperren Schritt ②: die Area darf per ① auf die Hand geholt, aber nicht sofort gelegt werden.
+  if (engine.areaSpielGesperrt(pi)) return false;
   // Kontrolle statt Seite (Styx 28.9.) — „one of your Heroes"
   for (const { physOwner, heroIdx, hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name || hero.hp <= 0) continue;

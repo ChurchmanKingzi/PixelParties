@@ -117,6 +117,8 @@ module.exports = {
       // Eine Area je Spieler — dasselbe Tor wie beim Ausspielen aus der
       // Hand. Wer schon eine kontrolliert, bekommt keine Suche.
       if ((gs.areaZones?.[pi] || []).length > 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
+      // Als Ruling (Al 27.10.): Reality Crack („You cannot play another Area for the rest of the turn") sperrt auch „bring it into play" — keine Suche; die Beschwoerung selbst bleibt gueltig.
+      if (engine.areaSpielGesperrt(pi, { direkt: true })) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });
 
       const cardDB = engine._getCardDB();
       const gezaehlt = {};

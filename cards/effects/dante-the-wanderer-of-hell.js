@@ -51,6 +51,8 @@ function spellsInHand(engine, pi) {
 }
 
 function geloeschteAreas(engine, pi) {
+  // Als Ruling (Al 27.10.): Reality Crack („You cannot play another Area for the rest of the turn") sperrt auch „bring directly into play" — Weg 2 entfaellt dann ganz (kein Loeschen der Areas, keine Wahl).
+  if (engine.areaSpielGesperrt(pi, { direkt: true })) return [];
   const ps = engine.gs.players[pi];
   const db = engine._getCardDB();
   return [...new Set((ps?.deletedPile || []).filter(n => isTutorableArea(db[n], engine, pi)))];

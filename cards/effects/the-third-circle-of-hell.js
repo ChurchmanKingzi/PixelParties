@@ -110,7 +110,8 @@ module.exports = {
     await alleEigenenAreasLoeschen(engine, pi, CARD_NAME);
 
     // ③ Area-Zauber waehlen und als Zusatzaktion spielen.
-    const kandidaten = [...new Set(gezeigt.filter(n => istAreaZauber(db[n])))];
+    // Als Ruling (Al 27.10.): „play it … if possible" — unter der Reality-Crack-Sperre („You cannot play another Area for the rest of the turn") ist es nicht möglich: keine Wahl, die Karten fallen in den Rest (④).
+    const kandidaten = engine.areaSpielGesperrt(pi) ? [] : [...new Set(gezeigt.filter(n => istAreaZauber(db[n])))];
     let gespielt = null;
     if (kandidaten.length > 0) {
       let wahl = kandidaten[0];

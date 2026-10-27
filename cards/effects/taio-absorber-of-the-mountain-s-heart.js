@@ -200,6 +200,7 @@ function _collectCandidates(engine, pi, heroIdx, kind, feld = pi) {
     const cd = cardDB[name];
     if (!cd) continue;
     if (!_matchesKind(cd, kind)) continue;
+    if (engine.areaKarteGesperrt(cd, pi)) continue;   // Als Ruling (Al 27.10.): Reality Crack („cannot play another Area") / Shipwrecked — die Hand-Seite filtert `getHeroEligibleActionCards`, das Deck hier
     const script = loadCardEffect(name);
     // Reaction subtype is not proactively castable unless opted in.
     if ((cd.subtype || '').toLowerCase() === 'reaction'

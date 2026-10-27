@@ -14,6 +14,12 @@
 //
 //  Als Ruling (Al 26.10.): die Area-Wahl nach dem Abräumen ist Pflichtwahl (Galerie nicht abbrechbar), sobald mindestens eine passende Area
 //  in Hand oder Deck liegt.
+//
+//  Als Ruling (Al 27.10.): „You cannot play another Area for the rest of the turn" gilt für JEDEN Weg, auf dem der Nutzer eine Area spielt oder ins Spiel bringt —
+//  Handspiel, Zusatzaktionen (Circles-of-Hell-Wiederholung, Third Circle, Learning, Rubin, Taio, Time Distortion, Cleansing of the Land …), Cooldin, Dante, Planet in a Bottle,
+//  Orkallion, Spirit of the Barbarian Sword, Doom Prophecy. EINE Frage: `engine.areaSpielGesperrt(pi)` / `areaKarteGesperrt(cd, pi)` (Stempel `ps._cantPlayAreaThisTurn` = Zug).
+//  Der Stempel steht VOR dem Abräumen (Abgangs-Effekte der abgeräumten Areas laufen schon unter der Sperre); die EINE Area dieser Karte bringt Reality Crack selbst ins Spiel
+//  (kein „play" über die Spielwege — „another" = alle weiteren). Auch ohne passende Area (leere Galerie) steht die Sperre.
 // ═══════════════════════════════════════════
 
 const { placePollutionTokens } = require('./_pollution-shared');
@@ -53,6 +59,10 @@ module.exports = {
 
       const cardDB = engine._getCardDB();
 
+      // Als Ruling (Al 27.10.): die Sperre gilt ab hier (Karte ist gespielt, kein Abbruch mehr) — VOR dem Abräumen, damit auch Abgangs-Effekte der abgeräumten
+      // Areas (Circles of Hell …) keine weitere Area spielen können. Die Area dieser Karte kommt unten über `runHooks('onPlay')` ins Spiel, nicht über einen Spielweg.
+      ps._cantPlayAreaThisTurn = gs.turn;
+
       // ── Step 1: wipe all Areas currently on the board ──
       const wipedCount = await engine.removeAllAreas(-2, 'Reality Crack');
       engine.log('reality_crack_wipe', {
@@ -89,8 +99,7 @@ module.exports = {
       }
       gallery.sort((a, b) => (a.level - b.level) || a.name.localeCompare(b.name));
 
-      // Lock further Area plays this turn (takes effect immediately)
-      ps._cantPlayAreaThisTurn = gs.turn;
+      // (Die Sperre für weitere Area-Plays steht schon oben, vor dem Abräumen.)
 
       // Even with no eligible Area, the spell still consumes (wiped all areas)
       if (gallery.length === 0) {
