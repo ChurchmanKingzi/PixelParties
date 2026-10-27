@@ -3721,8 +3721,8 @@ function CardRevealOverlay({ reveals, onRemove }) {
 }
 
 // ★ v1359 — `fizzled`: dieselbe Bildsprache wie ein negiertes Kettenglied
-// (Glitch, entsaettigt, 🚫) plus das Wort „FIZZLED" — der Effekt wurde
-// ausgeloest, konnte aber nichts mehr tun (`engine.zeigeFizzle`).
+// (Glitch, entsaettigt, 🚫 gross AUF der Karte, KEIN Schriftzug — Al 27.10.) —
+// der Effekt wurde ausgeloest, konnte aber nichts mehr tun (`engine.zeigeFizzle`).
 const FIZZLE_ANZEIGE_MS = 1400;
 function CardRevealEntry({ cardName, onDone, fizzled }) {
   const card = CARDS_BY_NAME[cardName];
@@ -3749,7 +3749,6 @@ function CardRevealEntry({ cardName, onDone, fizzled }) {
       onMouseLeave={() => { gehovert.current = false; setBoardTooltip(null); }}>
       <div className={'card-reveal-card' + (fizzled ? ' card-reveal-fizzled' : '')}>
         {fizzled && <div className="chain-negate-symbol">🚫</div>}
-        {fizzled && <div className="card-reveal-fizzle-label orbit-font">FIZZLED</div>}
         {imgUrl ? (
           <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6,
             border: foilType === 'diamond_rare' ? '3px solid rgba(104,198,253,.7)' : foilType === 'secret_rare' ? '3px solid rgba(250,213,74,.6)' : '2px solid var(--bg4)' }} draggable={false} />

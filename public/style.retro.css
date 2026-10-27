@@ -11532,13 +11532,7 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 .card-reveal-card.card-reveal-fizzled { position: relative; }
 .card-reveal-card.card-reveal-fizzled > img,
 .card-reveal-card.card-reveal-fizzled > div:last-child { animation: chainGlitch .15s steps(4, end) 6, chainShake .1s steps(2, end) 9; filter: saturate(0.3) brightness(0.7); }
-.card-reveal-card.card-reveal-fizzled .chain-negate-symbol { z-index: 2; pointer-events: none; }
-.card-reveal-fizzle-label { position: absolute; left: 50%; bottom: 10%; transform: translateX(-50%) rotate(-8deg); z-index: 3; pointer-events: none; padding: 3px 10px; border-radius: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect x='0' y='0' width='2' height='2' fill='%233a2412'/%3E%3Crect x='2' y='0' width='2' height='2' fill='%233a2412'/%3E%3Crect x='0' y='2' width='2' height='2' fill='%233a2412'/%3E%3C/svg%3E") 0 0 / 4px 4px; border: 2px solid var(--danger, #fe5154); color: #e5edfa; font-size: 15px; font-weight: 700; letter-spacing: 2px; text-shadow: 1px 1px 0 #3a2412; animation: fizzleStempel .35s steps(8, end) both; }
-@keyframes fizzleStempel {
-  0%   { opacity: 0; transform: translateX(-50%) rotate(-8deg) scale(1.8); }
-  100% { opacity: 1; transform: translateX(-50%) rotate(-8deg) scale(1); }
-}
-
+.card-reveal-card.card-reveal-fizzled .chain-negate-symbol { z-index: 2; pointer-events: none; font-size: calc(var(--reveal-card-w, 340px) * 0.62); }
 /* ★ v1360 — Fizzeln ist eine kurze Meldung: eigener, kurzer Ablauf statt
    der 3,5 s der normalen Aufdeck-Anzeige (Als Befund: „das graue
    Fizzled-Frame bleibt zu lange bestehen"). Die Dauer kommt aus

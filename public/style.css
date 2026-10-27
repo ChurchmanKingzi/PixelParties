@@ -22886,28 +22886,14 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 }
 
 /* ★ v1359 — Aufdeck-Anzeige eines fizzelnden Effekts (engine.zeigeFizzle):
-   dasselbe Bild wie ein negiertes Kettenglied, plus Schriftzug. */
+   dasselbe Bild wie ein negiertes Kettenglied (kein Schriftzug mehr, Al 27.10.). */
 .card-reveal-card.card-reveal-fizzled { position: relative; }
 .card-reveal-card.card-reveal-fizzled > img,
 .card-reveal-card.card-reveal-fizzled > div:last-child {
   animation: chainGlitch .15s linear 6, chainShake .1s linear 9;
   filter: saturate(0.3) brightness(0.7);
 }
-.card-reveal-card.card-reveal-fizzled .chain-negate-symbol { z-index: 2; pointer-events: none; }
-.card-reveal-fizzle-label {
-  position: absolute; left: 50%; bottom: 10%; transform: translateX(-50%) rotate(-8deg);
-  z-index: 3; pointer-events: none;
-  padding: 3px 10px; border-radius: 4px;
-  background: rgba(42,4,4,.78); border: 2px solid var(--danger, #e94e53);
-  color: #fae5eb; font-size: 15px; font-weight: 700; letter-spacing: 2px;
-  text-shadow: 0 0 6px rgba(240,50,50,.8);
-  animation: fizzleStempel .35s cubic-bezier(.2, 1.6, .5, 1) both;
-}
-@keyframes fizzleStempel {
-  0%   { opacity: 0; transform: translateX(-50%) rotate(-8deg) scale(1.8); }
-  100% { opacity: 1; transform: translateX(-50%) rotate(-8deg) scale(1); }
-}
-
+.card-reveal-card.card-reveal-fizzled .chain-negate-symbol { z-index: 2; pointer-events: none; font-size: calc(var(--reveal-card-w, 340px) * 0.62); }   /* Al 27.10.: der rote durchgestrichene Kreis liegt gross AUF der Karte, ohne Schriftzug */
 /* ★ v1360 — Fizzeln ist eine kurze Meldung: eigener, kurzer Ablauf statt
    der 3,5 s der normalen Aufdeck-Anzeige (Als Befund: „das graue
    Fizzled-Frame bleibt zu lange bestehen"). Die Dauer kommt aus
