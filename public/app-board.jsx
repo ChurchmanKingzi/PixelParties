@@ -28186,6 +28186,157 @@ const ANIM_REGISTRY = {
     return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 50 });
   })(),
   // ═══════════════════════════════════════════════════════════════════
+  //  Animal Training (W82) — PIXELART, der Peitschenschlag der Dompteurin (Brett-Animation, Hülle `ppSalve`; Vorlage: das Kartenbild — die Frau mit der dünnen schwarzen Peitsche
+  //  vor brennenden Schatten-Tieren) und die Schlinge der Zähmung
+  //
+  //  animal_training_whip: eine Peitschenschnur (1 Rasterpixel dünn, dunkle Kontur, grauer Glanz, brauner Griff) vom ausführenden Helden zum Ziel. Sie holt in Stufen hinter dem Griff aus
+  //  (S-Kurve, ~0–250 ms), knallt in drei Sprüngen nach vorn (Schlaufe läuft zur Spitze, 250–330 ms) und schlägt bei 330 ms hart ein: Kreuzfunkel, Schlagstriche und ein Hartring, die
+  //  Zielkarte blitzt im Dither-Raster auf und zuckt (Geisterrahmen ±2 Pixel im Bildtakt), Funken (orange/gelb) und rote Glutpunkte fliegen mit Schwerkraft zurück. Danach schnellt die
+  //  Schnur in drei Stufen zurück (420–600 ms) und dithert weg; ENDE 960. Bewegung nur in ganzen Pixeln im Bildtakt (~30 Bilder/s), feste Palette, KEIN Schein, KEINE Drehung eines Kartenbildes.
+  //  animal_training_tame: nach der Übernahme am neuen Platz der Kreatur: eine braune Schlinge schließt sich in drei Stufen um die Karte (1.3× → 1.15× → Kartenrand), ein Knoten sitzt oben,
+  //  dann blinkt ein gelber Rahmen dreimal (hart, `steps(1)`-Takt) und Flammenfunken steigen auf; ENDE 720.
+  // ═══════════════════════════════════════════════════════════════════
+  animal_training_whip: (() => {
+    const KONTUR = ppHex('#1a1a2e'), SCHNUR = ppHex('#323232'), GLANZ = ppHex('#535353'), HELL = ppHex('#a8a8a8');
+    const GRIFF = ppHex('#7d3911'), GRIFF_D = ppHex('#4a2a10');
+    const FUNKEN = ['#ffffff', '#f9ecb3', '#fbc86a', '#e37435'].map(ppHex);
+    const GLUT = ['#e92f38', '#b5171c', '#8b0d0d'].map(ppHex);
+    const ENDE = 960, EINSCHLAG = 330, FADE_AB = 640;
+    /** Schnur von (hx,hy) nach (tx,ty): Sinuswelle quer zur Richtung (feste Enden), in Treppenstufen gezeichnet. */
+    const schnur = (g, hx, hy, tx, ty, nx, ny, amp, wellen, ph, a) => {
+      const N = Math.max(10, Math.ceil(Math.hypot(tx - hx, ty - hy) / 2.5));
+      let px = hx, py = hy;
+      for (let i = 1; i <= N; i++) {
+        const s = i / N, hub = amp * Math.sin(s * Math.PI * wellen + ph) * Math.sin(s * Math.PI);
+        const x = hx + (tx - hx) * s + nx * hub, y = hy + (ty - hy) * s + ny * hub;
+        ppLinie(g, px - nx, py - ny, x - nx, y - ny, (i % 3 === 0) ? HELL : KONTUR, a);   // Kontur: eine Spur daneben, ab und zu hell (lesbar auf dunklem wie hellem Brett)
+        px = x; py = y;
+      }
+      px = hx; py = hy;
+      for (let i = 1; i <= N; i++) {
+        const s = i / N, hub = amp * Math.sin(s * Math.PI * wellen + ph) * Math.sin(s * Math.PI);
+        const x = hx + (tx - hx) * s + nx * hub, y = hy + (ty - hy) * s + ny * hub;
+        ppLinie(g, px, py, x, y, (i % 4 === 0) ? GLANZ : SCHNUR, a);
+        px = x; py = y;
+      }
+    };
+    /** Griff: vier Pixel hinter dem Ansatz der Schnur. */
+    const griff = (g, hx, hy, dx, dy, a) => {
+      for (let i = 0; i < 5; i++) {
+        const x = hx - dx * i, y = hy - dy * i, c = (i % 2 === 0) ? GRIFF : GRIFF_D;
+        g.block(x - 1, y - 1, 2, 2, KONTUR, a); g.put(x, y, c, a); g.put(x - 1, y, c, a);
+      }
+    };
+    const vorbereiten = (sz) => ({
+      funken: sz.ziele.map(() => Array.from({ length: ppFxN(20) }, () => ({ w: (Math.random() - 0.5) * 2, v: 20 + Math.random() * 46, leben: 260 + Math.random() * 240 }))),
+      glut: sz.ziele.map(() => Array.from({ length: ppFxN(10) }, () => ({ w: (Math.random() - 0.5) * 2.4, v: 10 + Math.random() * 30, leben: 420 + Math.random() * 300, gross: Math.random() < 0.35 }))),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const ein = Math.min(1, (Math.floor(t / 25) + 1) / 3);              // gestuftes Einblenden (Dithering)
+      const a = Math.min(ein, aus);
+      sz.ziele.forEach((z, zi) => {
+        const dx = z.dx, dy = z.dy, nx = -dy, ny = dx;
+        const rK = Math.min(Math.abs(dx) > 0.001 ? (z.w / 2) / Math.abs(dx) : 999, Math.abs(dy) > 0.001 ? (z.h / 2) / Math.abs(dy) : 999);
+        // Ansatz der Schnur (Griff) knapp vor dem Angreifer; Spitze im Einschlag etwas im Ziel
+        const hOff = Math.min(z.len * 0.3, 16), hx = sz.O.x + dx * hOff, hy = sz.O.y + dy * hOff;
+        const tx = z.x - dx * rK * 0.25, ty = z.y - dy * rK * 0.25;
+        const L = Math.max(8, Math.hypot(tx - hx, ty - hy));
+        const bei = (k) => [hx + dx * L * k, hy + dy * L * k];            // Punkt auf der Achse bei k·L (k < 0 = hinter dem Griff)
+        const takt = Math.floor(t / 33);
+        let sp, amp, wellen, ph;
+        if (t < 110) { sp = bei(-0.42); amp = 5 + 2 * (takt % 2); wellen = 2; ph = 0.6; }                    // hängt, pendelt leicht
+        else if (t < 190) { sp = bei(-0.55); amp = 9; wellen = 2; ph = 0.2 + (takt % 2) * 0.3; }             // holt aus
+        else if (t < 250) { sp = bei(-0.62); amp = 11; wellen = 3; ph = 0.4; }                               // Rückstand, Schlaufe
+        else if (t < 281) { sp = bei(0.1); amp = 10; wellen = 2; ph = 1.1; }                                 // beginnt den Schlag
+        else if (t < 306) { sp = bei(0.5); amp = 7; wellen = 2; ph = 0.8; }                                  // Schlaufe läuft nach vorn
+        else if (t < EINSCHLAG) { sp = bei(0.85); amp = 3; wellen = 1.5; ph = 0.4; }
+        else if (t < 420) { sp = [tx, ty]; amp = (t < 363) ? 2 : 0; wellen = 1; ph = 0; }                    // Spitze sitzt im Ziel
+        else if (t < 470) { sp = bei(0.78); amp = 4; wellen = 2; ph = 0.7; }                                  // schnellt zurück
+        else if (t < 520) { sp = bei(0.38); amp = 8; wellen = 2; ph = 1.2; }
+        else { sp = bei(-0.3); amp = 10; wellen = 3; ph = 0.5 + (takt % 2) * 0.3; }
+        schnur(g, hx, hy, sp[0], sp[1], nx, ny, amp, wellen, ph, a);
+        griff(g, hx, hy, dx, dy, a);
+        // Windstreifen beim Vorschnellen
+        if (t >= 250 && t < 330) for (let s = -1; s <= 1; s += 2) for (let i = 0; i < 6; i++) if ((i + takt) % 2 === 0) g.put(hx + dx * (6 + i * 4) + nx * s * (5 + i), hy + dy * (6 + i * 4) + ny * s * (5 + i), GLANZ, a * 0.7);
+        if (t < EINSCHLAG) return;
+        const al = t - EINSCHLAG, hxp = tx, hyp = ty;
+        // Zielkarte blitzt im Einschlag auf (hartes Dither-Raster) und zuckt: Geisterrahmen ±2 Pixel im Bildtakt
+        if (al < 66) g.block(z.x - z.w / 2, z.y - z.h / 2, Math.ceil(z.w), Math.ceil(z.h), FUNKEN[0], 0.38 * (1 - al / 66) * aus);
+        if (al < 230) {
+          const v = (takt % 2 === 0 ? 2 : -2) * (al < 120 ? 1 : 0.5), bx = Math.round(z.x - z.w / 2 + v), by = Math.round(z.y - z.h / 2);
+          const w = Math.ceil(z.w), h = Math.ceil(z.h), fa = 0.55 * (1 - al / 230) * aus;
+          g.block(bx, by, w, 1, FUNKEN[1], fa); g.block(bx, by + h - 1, w, 1, FUNKEN[1], fa); g.block(bx, by, 1, h, FUNKEN[1], fa); g.block(bx + w - 1, by, 1, h, FUNKEN[1], fa);
+        }
+        // Kreuzfunkel an der Spitze, Schlagstriche (acht Richtungen) und ein Hartring
+        if (al < 132) ppKreuzfunkel(g, hxp - 1, hyp - 1, [5, 5, 4, 3, 2][Math.floor(al / 27)] || 1, FUNKEN, aus);
+        if (al < 165) {
+          const r0 = 5 + Math.floor(al / 33) * 2, len = Math.max(1, 5 - Math.floor(al / 33));
+          for (let k = 0; k < 8; k++) {
+            const w = k * Math.PI / 4 + Math.PI / 8;
+            for (let j = 0; j < len; j++) g.put(hxp + Math.cos(w) * (r0 + j), hyp + Math.sin(w) * (r0 + j), j === len - 1 ? FUNKEN[3] : FUNKEN[2], aus);
+          }
+        }
+        if (al < 100) g.ring(hxp, hyp, 3 + al / 14, 3 + al / 14, FUNKEN[1], 0.8 * aus);
+        // Funken: spritzen vom Einschlag zurück (Kegel um die Gegenrichtung) mit Schwerkraft
+        const basis = Math.atan2(-dy, -dx);
+        for (const f of teile.funken[zi]) {
+          if (al > f.leben) continue;
+          const k = al / f.leben, sek = al / 1000, w = basis + f.w * 2.4;
+          g.put(hxp + Math.cos(w) * f.v * sek, hyp + Math.sin(w) * f.v * sek + 70 * sek * sek, FUNKEN[Math.min(3, Math.floor(k * 4))], (1 - k * k) * aus);
+        }
+        // Glutpunkte: schwerer, steigen leicht (Flammen der Vorlage), 1×1 oder 2×2
+        for (const b of teile.glut[zi]) {
+          if (al > b.leben) continue;
+          const k = al / b.leben, sek = al / 1000, w = basis + b.w * 2.2;
+          const px = hxp + Math.cos(w) * b.v * sek, py = hyp + Math.sin(w) * b.v * sek - 12 * sek + 40 * sek * sek;
+          if (b.gross) g.block(px, py, 2, 2, GLUT[Math.min(2, Math.floor(k * 3))], (1 - k * 0.8) * aus);
+          else g.put(px, py, GLUT[Math.min(2, Math.floor(k * 3))], (1 - k * 0.8) * aus);
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 50 });
+  })(),
+  animal_training_tame: (() => {
+    const SEIL = ppHex('#7d3911'), SEIL_D = ppHex('#4a2a10'), KONTUR = ppHex('#1a1a2e');
+    const FUNKEN = ['#ffffff', '#f9ecb3', '#fbc86a', '#e37435'].map(ppHex);
+    const GLUT = ['#e92f38', '#b5171c', '#8b0d0d'].map(ppHex);
+    const ENDE = 720;
+    /** Rechteckrand (Dicke `d`, ganze Pixel) um die Karte, um `m` Pixel nach außen versetzt. */
+    const rand = (g, z, m, d, c, a) => {
+      const x = Math.round(z.x - z.w / 2 - m), y = Math.round(z.y - z.h / 2 - m), w = Math.ceil(z.w + 2 * m), h = Math.ceil(z.h + 2 * m);
+      g.block(x, y, w, d, c, a); g.block(x, y + h - d, w, d, c, a); g.block(x, y, d, h, c, a); g.block(x + w - d, y, d, h, c, a);
+    };
+    const vorbereiten = (sz) => ({
+      glut: sz.ziele.map((z) => Array.from({ length: ppFxN(14) }, () => ({ x: (Math.random() - 0.5) * z.w, ab: 260 + Math.random() * 260, v: 14 + Math.random() * 26, leben: 360 + Math.random() * 240, gross: Math.random() < 0.3, f: Math.floor(Math.random() * 3) }))),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > 560 ? Math.max(0, 1 - (t - 560) / (ENDE - 560)) : 1;
+      if (aus <= 0) return;
+      sz.ziele.forEach((z, zi) => {
+        // Schlinge: schließt sich in drei Stufen um den Kartenrand
+        if (t < 400) {
+          const m = t < 100 ? 9 : t < 200 ? 5 : 2;
+          const a = Math.min(1, (Math.floor(t / 25) + 1) / 3) * aus;
+          rand(g, z, m + 1, 1, KONTUR, a); rand(g, z, m, 1, SEIL, a); rand(g, z, m - 1 < 0 ? 0 : m - 1, 1, SEIL_D, a);
+          const kx = Math.round(z.x), ky = Math.round(z.y - z.h / 2 - m - 1);          // Knoten oben
+          g.block(kx - 2, ky - 2, 5, 4, KONTUR, a); g.block(kx - 1, ky - 1, 3, 2, SEIL, a);
+        }
+        // gelber Rahmen blinkt dreimal (hart)
+        if ((t >= 300 && t < 370) || (t >= 420 && t < 490) || (t >= 540 && t < 610)) { rand(g, z, 1, 2, FUNKEN[1], aus); rand(g, z, 3, 1, FUNKEN[3], aus); }
+        // Flammenfunken steigen vom unteren Kartenrand auf
+        for (const b of teile.glut[zi]) {
+          const al = t - b.ab; if (al < 0 || al > b.leben) continue;
+          const k = al / b.leben, sek = al / 1000;
+          const px = z.x + b.x, py = z.y + z.h / 2 - b.v * sek * 2.2, c = (k < 0.5 ? FUNKEN[2 + (b.f % 2)] : GLUT[Math.min(2, Math.floor(k * 3))]);
+          if (b.gross) g.block(px, py, 2, 2, c, (1 - k * 0.7) * aus); else g.put(px, py, c, (1 - k * 0.7) * aus);
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 30 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
   //  Opfer-Messer — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!")
   //
   //  Prozedural auf einem kleinen Raster (Canvas, `image-rendering: pixelated`, ~33 Bilder/s), feste Palette,

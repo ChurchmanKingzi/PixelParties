@@ -28,7 +28,7 @@ const NACH_SLUG = new Map(KARTEN.map(k => [slug(k.name), k]));
 // Geprüfte Skripte mit Zugnummern-Frist (Audit CARD_API „Welle 68 / W68a"). Neue Datei ⇒ Kartentext lesen, Frist als ENDE/BEGINN einordnen, hier eintragen.
 const GEPRUEFT = new Set([
   // „this turn" / „for the rest of the turn" (gezählt wird der laufende, echte Zug — nie von einem Skip betroffen)
-  'cloud-in-a-bottle', 'dark-gear', 'diplomacy', 'dirty-smuggler', 'elixir-of-cold', 'ghuanjun-the-undead-martial-artist', 'golden-wings', 'greatmaw-shark',
+  'animal-training', 'cloud-in-a-bottle', 'dark-gear', 'diplomacy', 'dirty-smuggler', 'elixir-of-cold', 'ghuanjun-the-undead-martial-artist', 'golden-wings', 'greatmaw-shark',
   'guardian-beast-niu', 'hockey-genie', 'jump-in-the-river', 'soul-shard-ka', 'the-cosmic-depths', 'the-master-s-key', 'unwanted-audience',
   // ENDE eines fremden/eigenen nächsten Zuges
   'anti-magic-zone', 'disruption-ray', 'forbidden-zone', 'medusa-s-curse', 'null-the-mage-slayer', 'null-zone', 'pink-sky', 'rool-the-troll-guard',
