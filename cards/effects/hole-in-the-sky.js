@@ -75,16 +75,22 @@ module.exports = {
   },
 
   /**
-   * CPU (W80a, Al 26.10.2026: "Ja" — die gemeinsame Kreaturen-Bilanz statt der Level-Summe): der Wipe trifft die EIGENE Seite mit. Gerechnet wird mit `engine.kreaturenBilanz`
-   * (`_kreaturen-bilanz.js` `flaechenWirkung`): Wert jeder getroffenen Kreatur nach Level, HP, Rest-HP, Buffs, Faehigkeiten — gegnerische getroffene MINUS eigene getroffene
-   * (999 Schaden = tödlich = voller Wert). Gespielt wird nur bei klar positiver Bilanz (mindestens 20 Punkte und ein Fuenftel des Gegnerwerts); sonst Veto. Kreaturen des durch die
-   * Erste-Runden-Immunitaet geschuetzten Spielers zaehlen nicht. (Karte trifft nur Kreaturen: keine Heldenwirkung, kein Auslöschungs-/Selbstmord-Fall.)
+   * CPU (W82b, Al 27.10.2026 — ersetzt die Schwelle von W80a): „Wert aller zu tötenden Gegner-Creatures höher als Wert der verbrauchten Ressourcen inklusive eigener Creatures,
+   * aber NUR die zählen, die nicht geschützt sind." Gespielt wird genau dann, wenn
+   *   Σ Wert der gegnerischen Kreaturen, die durch die 999 Schaden TATSAECHLICH sterben UND NICHT geschuetzt sind
+   *   > Σ Wert der verbrauchten Ressourcen (diese Karte als Handkarte, die Hauptaktion — nicht wenn sie als Zusatzaktion laeuft) + Σ Wert der EIGENEN Kreaturen, die sterben UND NICHT geschuetzt sind.
+   * Geschuetzt = `engine.kreaturGeschuetztVor` (Erstrunden-Schutz, Unaffected-/Schadensimmunitaet, Damage Immune, Anti Magic …, bereite Reaktionen des Gegners wie Cool Rescuer Monia mit zwei
+   * Handkarten). Alle Posten in Punkten der Brettbewertung (`_kreaturen-bilanz.js` `flaechenEntscheidung`/`ressourcenWert`). Die Karte trifft nur Kreaturen: keine Heldenwirkung.
    */
-  cpuPlayVeto(engine, pi) {
+  cpuPlayVeto(engine, pi, heroIdx, opts) {
     try {
       const KB = require('./_kreaturen-bilanz');
-      const r = KB.flaechenWirkung(engine, pi, { art: 'damage', amount: SCHADEN });
-      return KB.flaechenVeto(r);
+      const r = KB.flaechenEntscheidung(engine, pi, {
+        kartenName: CARD_NAME, quelle: { name: CARD_NAME, owner: pi, controller: pi, heroIdx: Number.isInteger(heroIdx) ? heroIdx : -1 },
+        additional: KB.alsZusatzaktion(engine, module.exports, pi, heroIdx, opts),
+        art: 'damage', amount: SCHADEN, damageType: 'destruction_spell',
+      });
+      return !r.spielen;
     } catch {
       return false;   // die Heuristik darf nie einen legalen Play verhindern
     }

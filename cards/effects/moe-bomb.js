@@ -13,14 +13,19 @@
 
 module.exports = {
   /**
-   * CPU (W80a, Al 26.10.2026: "Ja"): wie Hole in the Sky die gemeinsame Kreaturen-Bilanz (`_kreaturen-bilanz.js` `flaechenWirkung`) — 999 Schaden auf ALLE Kreaturen beider Seiten:
-   * gegnerische getroffene MINUS eigene getroffene Kreaturen (Level, HP, Rest-HP, Buffs, Faehigkeiten). Gespielt wird nur bei klar positiver Bilanz, sonst Veto.
-   * (Bisher kein Veto: flacher Rollout, der Level/HP/Rest-HP der Kreaturen nicht sah.)
+   * CPU (W82b, Al 27.10.2026 — ersetzt die Schwelle von W80a): wie Hole in the Sky. Gespielt wird genau dann, wenn Σ Wert der gegnerischen Kreaturen, die durch die 999 Schaden WIRKLICH sterben und
+   * NICHT geschuetzt sind, > Σ Wert der verbrauchten Ressourcen (diese Karte, 20 Gold nach Rabatten, die Hauptaktion) + Σ Wert der eigenen Kreaturen, die sterben und nicht geschuetzt sind
+   * (`_kreaturen-bilanz.js` `flaechenEntscheidung`). Schadensart 'other': Dark Ocean schuetzt alle Kreaturen vor der Bombe.
    */
-  cpuPlayVeto(engine, pi) {
+  cpuPlayVeto(engine, pi, heroIdx, opts) {
     try {
       const KB = require('./_kreaturen-bilanz');
-      return KB.flaechenVeto(KB.flaechenWirkung(engine, pi, { art: 'damage', amount: 999 }));
+      const r = KB.flaechenEntscheidung(engine, pi, {
+        kartenName: 'MOE Bomb', quelle: { name: 'MOE Bomb', owner: pi, controller: pi, heroIdx: -1 },
+        additional: KB.alsZusatzaktion(engine, module.exports, pi, heroIdx, opts),
+        art: 'damage', amount: 999, damageType: 'other',
+      });
+      return !r.spielen;
     } catch {
       return false;   // die Heuristik darf nie einen legalen Play verhindern
     }

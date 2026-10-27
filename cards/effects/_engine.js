@@ -9324,6 +9324,13 @@ class GameEngine {
   kreaturWert(inst) { return require('./_kreaturen-bilanz').kreaturWert(this, inst); }
   kreaturenBilanz(opfer, liste, opts) { return require('./_kreaturen-bilanz').kreaturenBilanz(this, opfer, liste, opts); }
   absehbareKreaturen(k) { return require('./_kreaturen-bilanz').absehbareKreaturen(this, k); }
+  /**
+   * ★ W82b (Al, 27.10.2026): ist diese Kreatur vor der Wirkung der Quelle GESCHUETZT (nimmt sie die Wirkung nachweislich nicht)? Gemeinsame Vorabpruefung der CPU-Bewerter
+   * (`_kreaturen-bilanz.js` `kreaturGeschuetztVor`): sicher (Erstrunden-Schutz, Unaffected-/Schadensimmunitaet [`_markCreatureDamageImmunity`], Damage Immune, Anti Magic, Dark Ocean,
+   * Statusschutz, bei gerichteten Wirkungen Zielschutz) und moeglich (bereite Reaktionen des Gegners ueber den Skript-Vertrag `cpuSchuetzt`, z. B. Cool Rescuer Monia mit 2 Handkarten).
+   * Liefert `{ geschuetzt, grund, weich }`; rein lesend (keine Hooks, keine Prompts, kein Log).
+   */
+  kreaturGeschuetztVor(quelle, inst, art, opts) { return require('./_kreaturen-bilanz').kreaturGeschuetztVor(this, quelle, inst, art, opts); }
 
   /** ★ W78a: gewählte Ziele einer abgeschlossenen Zielwahl für die Auflösung merken (nur Kreaturen-Ids; Engine-Feld `_gewaehlteZiele`, nicht im Spielstand; endet mit `endeEffektImmunitaeten`, Anfang/Ende einer Aktivierung [`armEffectAnnounce`/`clearEffectAnnounce`] und einer äußersten Kartenauflösung). */
   _gewaehlteZieleMerken(playerIdx, validTargets, config, ergebnis) {
