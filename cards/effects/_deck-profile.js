@@ -1527,11 +1527,22 @@ function projectImpactFeatures(engine, pi, cardName) {
       return Math.ceil(proj.amount * (1 - anteil));
     };
     let dmg = 0, hk = 0, ck = 0;
+    // ★ W83a (Al 27.10.2026: gemeinsame AoE-Regel): eine Kreatur, die den Schlag ohnehin nicht nimmt (SICHERER Schutz laut `engine.kreaturGeschuetztVor`), zählt nicht; weich
+    // Geschützte (bereite Reaktion des Gegners, z. B. Monia) anteilig (0,5); wer den Schaden ÜBERLEBT, zählt mit 0,7 (`_kreaturen-bilanz.js` `UEBERLEBER_FAKTOR`).
+    const KB = require('./_kreaturen-bilanz');
     for (const t of proj.targets) {
       if (!t || !(t.hp > 0)) continue;
       const betrag = geminderterSchaden(t);
-      dmg += Math.min(betrag, t.hp);   // Overkill zählt nicht als Schaden
-      if (betrag >= t.hp) { if (t.kind === 'hero') hk++; else ck++; }
+      let schutz = 1;   // Anteil, mit dem das Ziel noch gewertet wird (0 = sicher geschützt, 0,5 = weich geschützt)
+      if (t.kind === 'creature' && t.inst) {
+        schutz = KB.schutzAnteil(engine, { name: cardName, owner: pi, controller: pi, heroIdx: -1 }, t.inst, 'damage',
+          { amount: betrag, damageType: 'destruction_spell', sourceOwner: pi, nurSicher: !!engine._inMctsSim }).faktor;
+      }
+      if (!(schutz > 0)) continue;
+      const toedlich = betrag >= t.hp;
+      const ueberlebt = t.kind === 'creature' && !toedlich ? KB.UEBERLEBER_FAKTOR : 1;
+      dmg += Math.min(betrag, t.hp) * schutz * ueberlebt;   // Overkill zählt nicht als Schaden
+      if (toedlich) { if (t.kind === 'hero') hk++; else ck += schutz; }
     }
     return { dmg, hk, ck };
   } catch { return null; }

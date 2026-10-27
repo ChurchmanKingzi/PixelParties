@@ -81,6 +81,7 @@ module.exports = {
       engine.log('saya_second_cast', { player: ps.username, hero: hero.name, spell: ctx.spellName });
       await engine.announceHookActivation(CARD_NAME, pi);
       gs._spellDamageLog = [];
+      require('./_monia-shared').neuerGuss(gs);   // W83a (Al 28.10.): der Zweitguss ist für Cool Rescuer Monia ein EIGENER Effekt (eigenes Angebot, 2 Karten)
       gs._bartasSecondCast = true;
       const tempInst = engine._trackCard(ctx.spellName, pi, 'hand', heroIdx, -1);
       if (feld !== pi) tempInst.heroOwner = feld;   // Styx 28.9.: wie der Server bei Uebernahme

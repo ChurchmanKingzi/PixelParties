@@ -131,6 +131,7 @@ module.exports = {
         const prevCancelled = gs._spellCancelled;
         gs._spellDamageLog = [];
         gs._spellExcludeTargets = excludeId ? [excludeId] : [];
+        require('./_monia-shared').neuerGuss(gs);   // W83a (Al 28.10.): jede Wiederholung ist für Cool Rescuer Monia ein EIGENER Effekt (eigenes Angebot)
         gs._bartasSecondCast = true;
         gs._spellCancelled = false;
         const tempInst = engine._trackCard(attackName, pi, 'hand', heroIdx, -1);

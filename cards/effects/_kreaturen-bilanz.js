@@ -124,6 +124,18 @@ function brettWert(engine, inst) {
 
 const GEWICHT_SCHADEN = { destroy: 1, control: 1, move: 0.8 };   // sonst 0,6 (Status/Buff/Werte/Sonstiges)
 
+/**
+ * ★ W83a (Al 27.10.2026: "Faktor 0,7 für Geschädigte ist gut, das kann bei allen AoE-Sources angewandt werden"): eine Kreatur, die den Schaden ÜBERLEBT, zählt mit
+ * 0,7 × (anteiliger Schaden an der Rest-HP) × Wert. EINE Konstante für alle CPU-Bewerter von Flächen-/Mehrziel-Effekten (`wirkungAuf`, `aoeWert`, `flaechenEntscheidung`, `pickEnemyTargets`).
+ */
+const UEBERLEBER_FAKTOR = 0.7;
+/**
+ * ★ W83a (Al 27.10.2026: die gegnerische Monia ist KEIN sicherer Schutz — die CPU weiss vorab nicht, ob der Gegner zahlt): eine nur WEICH geschützte Kreatur (bereite Reaktion des Gegners
+ * des Wirkers, `cpuSchuetzt`: Cool Rescuer Monia, Winged Skeleton, Elusive Hind, Warrior of Teocuilatl) zählt anteilig — weder als sicher geschützt noch als sicher getroffen. 0,5 =
+ * Münzwurf: Monia schützt BEIDE Seiten auf einmal, Gewinn UND eigener Verlust werden gleich gewichtet (Erwartungswert bei Zahlungswahrscheinlichkeit 1/2).
+ */
+const WEICH_FAKTOR = 0.5;
+
 /** Schadensfaktor der Buffs (Cloudy 0,5, Damage Immune 0, Disrupted 2 …). */
 function schadensFaktor(inst) {
   let m = 1;
@@ -151,7 +163,7 @@ function wirkungAuf(engine, inst, e) {
     const dmg = Math.round(num(e.amount) * schadensFaktor(inst));
     if (dmg <= 0) return { richtung: null, staerke: 0 };
     const tot = hp > 0 && dmg >= hp;
-    return { richtung: 'schaden', staerke: tot ? 1 : Math.min(1, dmg / Math.max(1, hp)) * 0.7 };
+    return { richtung: 'schaden', staerke: tot ? 1 : Math.min(1, dmg / Math.max(1, hp)) * UEBERLEBER_FAKTOR };
   }
   if (art === 'destroy') return { richtung: 'schaden', staerke: 1 };
   if (art === 'heal') {
@@ -209,21 +221,66 @@ function kreaturenBilanz(engine, opfer, liste, opts = {}) {
     const dop = `${inst.id}|${e.art}`;
     if (gesehen.has(dop)) continue;
     gesehen.add(dop);
-    if (e.canBeNegated === false) continue;   // nicht negierbar: Monia schuetzt/verschont hier nichts
-    // W82b (Opt-in `opts.schutz`): wer die Wirkung ohnehin nicht nimmt (sicherer Schutz: Immunitaet, Erstrunden-Schutz, Zielschutz …), gewinnt/verliert nichts durch die Negation.
-    // Standardmaessig AUS — Monias CPU und Whirlwind Strike rechnen unveraendert (Frage an Al im CARD_API-Abschnitt W82b).
-    if (opts.schutz && kreaturGeschuetztVor(engine, opts.schutz.quelle ?? e.source ?? e.sourceOwner, inst, e.art, { amount: e.amount, damageType: e.type ?? opts.schutz.damageType, sourceOwner: e.sourceOwner, gerichtet: opts.schutz.gerichtet, statusName: e.statusName, nurSicher: true }).geschuetzt) continue;
+    // Nicht negierbar: Monia schuetzt/verschont hier nichts (Monia-Sicht). Die Wirker-Sicht (`aoeWert`, `opts.ohneNegierung`) zaehlt die Wirkung trotzdem.
+    if (e.canBeNegated === false && !opts.ohneNegierung) continue;
+    // W82b/W83a (`opts.schutz`): wer die Wirkung ohnehin nicht nimmt (SICHERER Schutz: Immunitaet, Erstrunden-Schutz, Zielschutz …), gewinnt/verliert nichts — er faellt heraus;
+    // WEICH Geschuetzte (bereite Reaktion des Gegners des Wirkers) zaehlen anteilig (`WEICH_FAKTOR`). Standard AUS (Monias Rechnung gibt `schutz` selbst mit; `aoeWert` schaltet es ein).
+    let schutzFaktor = 1;
+    if (opts.schutz) {
+      const sch = opts.schutz === true ? {} : opts.schutz;
+      const sp = kreaturGeschuetztVor(engine, sch.quelle ?? e.source ?? e.sourceOwner, inst, e.art, {
+        amount: e.amount, damageType: e.type ?? sch.damageType, sourceOwner: e.sourceOwner, gerichtet: sch.gerichtet, statusName: e.statusName,
+        canBeNegated: e.canBeNegated, ohne: sch.ohne,
+      });
+      if (sp.geschuetzt) { if (!sp.weich) continue; schutzFaktor = WEICH_FAKTOR; }
+    }
     const w = wirkungAuf(engine, inst, e);
     if (!w.richtung || !(w.staerke > 0)) continue;
     const eigen = seiteVon(engine, inst) === opfer;
     const sicher = Math.max(0, Math.min(1, e.sicher == null ? 1 : e.sicher));
-    const wert = kreaturWert(engine, inst) * w.staerke * sicher;
+    const wert = kreaturWert(engine, inst) * w.staerke * sicher * schutzFaktor;
     const nuetztUns = (w.richtung === 'schaden') === eigen;   // Negieren hilft uns: Schaden an Eigenen / Nutzen an Gegnerischen verhindert
-    posten.push({ name: inst.name, eigen, richtung: w.richtung, wert: Math.round(wert * 10) / 10, sicher, gewinn: nuetztUns ? wert : -wert });
+    posten.push({ name: inst.name, eigen, richtung: w.richtung, wert: Math.round(wert * 10) / 10, sicher, ...(schutzFaktor < 1 ? { weich: true } : {}), gewinn: nuetztUns ? wert : -wert });
     if (nuetztUns) geschuetzt += wert; else verloren += wert;
     if (eigen && w.richtung === 'schaden' && sicher >= 0.5) eigeneBedroht++;
   }
   return { bilanz: geschuetzt - verloren, geschuetzt, verloren, eigeneBedroht, posten };
+}
+
+// ── Gemeinsame Bewertung fuer Flaechen-/Mehrziel-Effekte (W83a, Al 27.10.2026) ────────────────────────
+
+/**
+ * Anteil (0 … 1), mit dem eine Kreatur in die Wertung eines Flaechen-/Mehrziel-Effekts der CPU eingeht — EINE Regel fuer alle Bewerter (Al: "Geschuetzte, die bereits zum Zeitpunkt der
+ * Evaluation geschuetzt sind, sollen ueberall nicht einbezogen werden"): 0 = SICHER geschuetzt (Immunitaet, Erstrunden-Schutz, Zielschutz …: weder Gewinn noch Verlust), `WEICH_FAKTOR` =
+ * weich geschuetzt (bereite Reaktion des Gegners des Wirkers, z. B. Monia: anteilig), sonst 1.
+ * quelle/art/opts wie `kreaturGeschuetztVor`. @returns {{ faktor:number, geschuetzt:boolean, weich:boolean, grund:string|null }}
+ */
+function schutzAnteil(engine, quelle, inst, art, opts = {}) {
+  const sp = kreaturGeschuetztVor(engine, quelle, inst, art, opts);
+  if (!sp.geschuetzt) return { faktor: 1, geschuetzt: false, weich: false, grund: null };
+  return { faktor: sp.weich ? WEICH_FAKTOR : 0, geschuetzt: true, weich: !!sp.weich, grund: sp.grund };
+}
+
+/**
+ * ★ W83a (Al): DIE gemeinsame Rechnung fuer die CPU-Bewerter von Flaechen-/Mehrziel-Effekten aus Sicht des WIRKERS.
+ *   quelle: Name der Karte | { name, owner, heroIdx } (Besitzer = Wirker) · liste: [{ inst, art, amount?, detail?, statusName?, type? (Schadensart), sicher?, canBeNegated? }]
+ *   opts:   { wirker (Standard: Besitzer der Quelle), gerichtet (die Wirkung WAEHLT ihre Ziele), damageType (Standard fuer Eintraege ohne `type`) }
+ * Regeln (alle Bewerter einheitlich): (i) bereits SICHER geschuetzte Kreaturen zaehlen weder als Gewinn noch als Verlust, WEICH geschuetzte anteilig (`WEICH_FAKTOR`); (ii) Ueberlebende
+ * eines Schadens zaehlen mit `UEBERLEBER_FAKTOR` (0,7) × Anteil an der Rest-HP × Wert, Toedliches voll (`wirkungAuf`). Skala: `kreaturWert` (nicht Brettskala — Umrechnung × `BRETT_FAKTOR`).
+ * @returns {{ wirkung:number, gewinn:number, verlust:number, eigeneBetroffen:number, posten:object[] }}  gewinn = Wert dessen, was GEGNERISCHEN schadet (bzw. Eigenen nuetzt),
+ *          verlust = Wert dessen, was EIGENEN schadet; wirkung = gewinn − verlust.
+ */
+function aoeWert(engine, quelle, liste, opts = {}) {
+  const q = normQuelle(quelle, opts);
+  const wirker = typeof opts.wirker === 'number' ? opts.wirker : (typeof q.owner === 'number' ? q.owner : engine.gs.activePlayer);
+  const mitOwner = typeof q.owner === 'number' ? quelle : { ...q.obj, owner: wirker, controller: wirker };
+  const mitSender = (liste || []).map(e => (typeof e?.sourceOwner === 'number' ? e : { ...e, sourceOwner: wirker }));
+  const r = kreaturenBilanz(engine, wirker, mitSender, {
+    ohneNegierung: true,
+    schutz: { quelle: mitOwner, gerichtet: opts.gerichtet, damageType: opts.damageType },
+  });
+  // kreaturenBilanz rechnet aus Sicht des Opfers von "Negation hilft": fuer den Wirker ist `verloren` (Schaden an Gegnerischen) der Gewinn, `geschuetzt` (Schaden an Eigenen) der Verlust.
+  return { wirkung: r.verloren - r.geschuetzt, gewinn: r.verloren, verlust: r.geschuetzt, eigeneBetroffen: r.eigeneBedroht, posten: r.posten };
 }
 
 // ── Vorab-Wissen ueber weitere Kreaturen-Ereignisse desselben Effekts ───────────────────────────────
@@ -444,7 +501,8 @@ function leise(engine, f) {
 }
 
 /** Sieht ein Traeger-Skript einen Schutz fuer `ziel` vor (Vertrag `cpuSchuetzt`)? Traeger: Brettkarte (Instanz) oder Held ({ hero, owner, heroIdx }). */
-function reaktiverSchutz(engine, ziel, e) {
+function reaktiverSchutz(engine, ziel, e, ohne) {
+  const aus = new Set(Array.isArray(ohne) ? ohne : []);   // W83a: Traeger, die die aufrufende Rechnung selbst IST (Monias eigene Entscheidung) — nicht mitrechnen
   const frage = (script, traeger, aktiv) => {
     if (typeof script?.cpuSchuetzt !== 'function' || !aktiv) return null;
     try { return script.cpuSchuetzt(engine, traeger, ziel, e) ? script : null; } catch { return null; }
@@ -454,7 +512,7 @@ function reaktiverSchutz(engine, ziel, e) {
     const heroes = engine.gs.players[p]?.heroes || [];
     for (let hi = 0; hi < heroes.length; hi++) {
       const hero = heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
+      if (!hero?.name || hero.hp <= 0 || aus.has(hero.name)) continue;
       let silenced = false;
       try { silenced = !!engine._isHeroEffectSilenced?.(p, hi); } catch { silenced = false; }
       const sc = frage(engine.heroScript?.(hero), { hero, owner: p, heroIdx: hi, heroName: hero.name }, !silenced);
@@ -462,7 +520,7 @@ function reaktiverSchutz(engine, ziel, e) {
     }
   }
   for (const c of engine.cardInstances || []) {
-    if (c.zone !== 'support' || c.faceDown) continue;
+    if (c.zone !== 'support' || c.faceDown || aus.has(c.name)) continue;
     let dormant = false;
     try { dormant = !!engine.isCardPassiveDormant?.(c); } catch { dormant = false; }
     if (frage(loadCardEffect(c.counters?._effectOverride || c.name), c, !dormant)) return c.name;
@@ -475,13 +533,15 @@ function reaktiverSchutz(engine, ziel, e) {
  * ★ W82b (Al, 27.10.2026): gemeinsame Vorabpruefung fuer die CPU-Bewerter (Flaechenkarten, `kreaturenBilanz`).
  *   quelle: Name der Karte | { name, owner|controller, heroIdx } | Besitzer-Index · inst: Kreatur auf dem Brett
  *   art:    damage | destroy | status | control | move | buff | counter | stats …  (wie `engine.kreaturBetroffen`)
- *   opts:   { amount, damageType, sourceOwner, canBeNegated (false = durchbricht Negation), statusName, gerichtet (Wirkung WAEHLT ihr Ziel), nurSicher (keine Reaktionen), heroIdx }
+ *   opts:   { amount, damageType, sourceOwner, canBeNegated (false = durchbricht Negation), statusName, gerichtet (Wirkung WAEHLT ihr Ziel), nurSicher (keine Reaktionen), heroIdx,
+ *           ohne (W83a: Kartennamen, deren Reaktion NICHT mitzaehlt — Monias eigene Entscheidung rechnet nicht mit Monia) }
  * Zwei Stufen:
  *   1) SICHER (`weich: false`) — Zustand des Brettes, den die Engine selbst liest: Erstrunden-Schutz, Unaffected-/Immun-Marken (Cardinal Beasts, Golden Wings, Spell-Immunitaet,
  *      Time Bomblebee …), `_markCreatureDamageImmunity` (DIESELBE Wahrheit wie der Schadensstapel: Guardian, Ifrit, Damus, Egg of God, Sparkfly, Of-Kings-Waechter …), Schadens-Buffs mit
  *      Faktor 0 (Damage Immune), Anti-Magic, Dark Ocean, Statusschutz (`canApplyCreatureStatus`); bei gerichteten Wirkungen zusaetzlich Zielschutz (Thicket, Censpartan, Board of Kings).
  *   2) MOEGLICH (`weich: true`) — Reaktionen, die der Gegner des Wirkers nachweislich BEREIT hat: Skripte mit dem Vertrag `cpuSchuetzt(engine, traeger, ziel, e) → boolean` (Cool Rescuer
- *      Monia mit zwei Handkarten, Winged Skeleton, Elusive Hind, Warrior of Teocuilatl …). Nicht negierbare Wirkung (`canBeNegated: false`) und `nurSicher` lassen diese Stufe aus.
+ *      Monia mit zwei Handkarten, Winged Skeleton, Elusive Hind, Warrior of Teocuilatl). ★ W83a: das ist ein WEICHER Schutz — die CPU weiss vorab nicht, ob der Gegner zahlt; die Bewerter
+ *      rechnen solche Kreaturen mit `WEICH_FAKTOR` (0,5) anteilig, nicht als sicher geschuetzt und nicht als sicher getroffen). Nicht negierbare Wirkung (`canBeNegated: false`) und `nurSicher` lassen diese Stufe aus.
  *      Verdeckte Gegnerhand (Reaktionskarten) wird NICHT eingesehen.
  * @returns {{ geschuetzt:boolean, grund:string|null, weich:boolean }}
  */
@@ -542,7 +602,7 @@ function kreaturGeschuetztVor(engine, quelle, inst, art, opts = {}) {
 
     // 2) MOEGLICH — Reaktionen des Gegners ──────────────────────────────────────────────────
     if (!opts.nurSicher && !piercing) {
-      const von = reaktiverSchutz(engine, inst, { art, quelleName: q.name, quelleOwner: q.owner, gerichtet: !!opts.gerichtet, canBeNegated: !piercing, damageType: opts.damageType, amount: opts.amount });
+      const von = reaktiverSchutz(engine, inst, { art, quelleName: q.name, quelleOwner: q.owner, gerichtet: !!opts.gerichtet, canBeNegated: !piercing, damageType: opts.damageType, amount: opts.amount }, opts.ohne);
       if (von) return ja(`Reaktion: ${von}`, true);
     }
     return nein;
@@ -634,7 +694,10 @@ function flaechenEntscheidung(engine, pi, k = {}) {
     const eigen = seiteVon(engine, inst) === pi;
     const art = z.art || 'damage';
     const sp = kreaturGeschuetztVor(engine, quelle, inst, art, { amount: z.amount, damageType: k.damageType, canBeNegated: k.canBeNegated, statusName: z.statusName, gerichtet: k.gerichtet, sourceOwner: pi });
-    if (sp.geschuetzt) { geschuetzt.push({ name: inst.name, eigen, grund: sp.grund, weich: sp.weich }); continue; }
+    // ★ W83a: SICHER geschuetzt = gar nicht einbeziehen; WEICH geschuetzt (bereite Reaktion des Gegners, z. B. Monia) = anteilig (`WEICH_FAKTOR`).
+    if (sp.geschuetzt) geschuetzt.push({ name: inst.name, eigen, grund: sp.grund, weich: sp.weich });
+    if (sp.geschuetzt && !sp.weich) continue;
+    const faktor = sp.geschuetzt ? WEICH_FAKTOR : 1;
     // Stirbt sie WIRKLICH? Schaden ≥ Rest-HP (nach Buff-Faktor), Zerstoeren immer; alles andere (Status, Teilschaden) ist keine Toetung.
     let stirbt = false;
     if (art === 'destroy') stirbt = true;
@@ -642,9 +705,21 @@ function flaechenEntscheidung(engine, pi, k = {}) {
       const hp = num(inst.counters?.currentHp ?? engine.getEffectiveCardData?.(inst)?.hp);
       stirbt = hp > 0 && Math.round(num(z.amount) * schadensFaktor(inst)) >= hp;
     }
-    if (!stirbt) { teilwirkung++; continue; }
-    const wert = kreaturWert(engine, inst) * BRETT_FAKTOR;
-    const eintrag = { name: inst.name, wert: Math.round(wert * 10) / 10 };
+    const brett = kreaturWert(engine, inst) * BRETT_FAKTOR;
+    if (!stirbt) {
+      // ★ W83a (Al: Teilschaden an Ueberlebenden als Nebenposten gutgeheissen): Schaden, der die Kreatur nicht toetet, zaehlt mit `UEBERLEBER_FAKTOR` (0,7) × Anteil an der Rest-HP × Wert
+      // (`wirkungAuf`). Status/Brand ohne Schaden zaehlt weiter nicht (nur Zaehler).
+      teilwirkung++;
+      if (art !== 'damage') continue;
+      const w = wirkungAuf(engine, inst, { art, amount: z.amount, sourceOwner: pi });
+      if (w.richtung !== 'schaden' || !(w.staerke > 0)) continue;
+      const teil = brett * w.staerke * faktor;
+      const eintragT = { name: inst.name, wert: Math.round(teil * 10) / 10, teil: true, ...(faktor < 1 ? { weich: true } : {}) };
+      if (eigen) { verlust += teil; verlustPosten.push(eintragT); } else { gewinn += teil; gewinnPosten.push(eintragT); }
+      continue;
+    }
+    const wert = brett * faktor;
+    const eintrag = { name: inst.name, wert: Math.round(wert * 10) / 10, ...(faktor < 1 ? { weich: true } : {}) };
     if (eigen) { verlust += wert; verlustPosten.push(eintrag); } else { gewinn += wert; gewinnPosten.push(eintrag); }
   }
   const kosten = ressourcenWert(engine, pi, { kartenName: k.kartenName, additional: k.additional, kosten: k.kosten });
@@ -666,14 +741,15 @@ function alsZusatzaktion(engine, script, pi, heroIdx, opts) {
  * Wirkung von Whirlwind Strike & Co. auf die KREATUREN in den Support Zones eines Helden (Brettskala, aus Sicht des Wirkers `pi`): getroffene gegnerische Kreaturen zaehlen
  * positiv, getroffene eigene negativ (die Wahl `side: 'enemy'` laesst keinen eigenen Helden zu, eine geliehene/uebernommene Kreatur in der Zone kann aber eigen sein).
  */
-function heldKreaturenWirkung(engine, pi, physOwner, heroIdx, amount) {
+function heldKreaturenWirkung(engine, pi, physOwner, heroIdx, amount, quelle) {
   const liste = kreaturenAnHelden(engine, physOwner, heroIdx).map(inst => ({ inst, art: 'damage', amount, sourceOwner: pi }));
   if (!liste.length) return 0;
-  const r = kreaturenBilanz(engine, pi, liste);
-  return (r.verloren - r.geschuetzt) * BRETT_FAKTOR;
+  // ★ W83a: gemeinsame Rechnung (`aoeWert`): sicher Geschuetzte fallen heraus, weich Geschuetzte zaehlen anteilig, Ueberlebende mit Faktor 0,7.
+  const r = aoeWert(engine, quelle || { name: '', owner: pi, controller: pi, heroIdx: -1 }, liste, { wirker: pi, gerichtet: false, damageType: 'attack' });   // die Kreaturen in der Zone werden NICHT gewaehlt (Zielschutz greift nicht)
+  return r.wirkung * BRETT_FAKTOR;
 }
 
-module.exports = { kreaturWert, brettWert, BRETT_BASIS, BRETT_MIN, BRETT_MAX, wirkungAuf, greift, schuetzt, kreaturenBilanz, absehbareKreaturen, flaechenBereichAusText, schadensFaktor,
+module.exports = { UEBERLEBER_FAKTOR, WEICH_FAKTOR, schutzAnteil, aoeWert, kreaturWert, brettWert, BRETT_BASIS, BRETT_MIN, BRETT_MAX, wirkungAuf, greift, schuetzt, kreaturenBilanz, absehbareKreaturen, flaechenBereichAusText, schadensFaktor,
   erwarteteSchlaege, zweitwurfChance, zweitwurfEintrag, mitMehrfachtreffer, kreaturenAnHelden,
   BRETT_FAKTOR, heldKreaturenWirkung,
   kreaturGeschuetztVor, ressourcenWert, flaechenEntscheidung, alsZusatzaktion, AKTION_WERT };
