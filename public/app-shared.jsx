@@ -3103,6 +3103,24 @@ const ZONE_ANIM_SFX = {
     { name: 'slash',        opts: { rate: 1.3, volume: 0.35, delay: 1040, category: null, dedupe: 0 } },
     { name: 'ping',         opts: { rate: 2.6, volume: 0.28, delay: 1120, category: null, dedupe: 0 } },
   ],
+  // Winged Haressassin (27.10.) — Umleitung: die Federn stieben auf (Wind, 0 ms), flattern zur Kreatur (Wind ~260 ms), Ankunft mit hellen Pings (~520/600 ms), Flügelschlag (Wind ~560 ms). Nur der erste
+  // Teil übernimmt die Sammelkategorie 'effect'.
+  winged_haress_feathers: [
+    { name: 'elem_wind', opts: { rate: 2.2, volume: 0.3 } },
+    { name: 'elem_wind', opts: { rate: 2.6, volume: 0.25, delay: 260, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 2.4, volume: 0.3,  delay: 520, category: null, dedupe: 0 } },
+    { name: 'elem_wind', opts: { rate: 1.8, volume: 0.25, delay: 560, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 2.9, volume: 0.28, delay: 600, category: null, dedupe: 0 } },
+  ],
+  // Winged Haressassin (27.10.) — 150 Schaden: Flügelschlag (Wind, 0 ms), der Schnitt zischt (~200 ms), Einschlag bei ~330 ms (zweiter Schnitt, heller Ping), Federn gleiten nach (Wind ~560 ms). Nur der erste
+  // Teil übernimmt die Sammelkategorie 'effect'.
+  winged_haress_slash: [
+    { name: 'elem_wind', opts: { rate: 2.0, volume: 0.3 } },
+    { name: 'slash',     opts: { rate: 2.2, volume: 0.45, delay: 200, category: null, dedupe: 0 } },
+    { name: 'slash',     opts: { rate: 1.6, volume: 0.3,  delay: 330, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 2.8, volume: 0.25, delay: 360, category: null, dedupe: 0 } },
+    { name: 'elem_wind', opts: { rate: 2.6, volume: 0.2,  delay: 560, category: null, dedupe: 0 } },
+  ],
   // Patty (25.10.) — je Wurfstern ein Zischen beim Abwurf (alle 70 ms, die Tonhoehe wandert leicht) und ein heller Einschlag nach 280 ms Flug (`runde` = Zahl der Sterne; hoert nach 8 Sternen auf, damit
   // der Klang nicht zum Rauschen wird). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   patty_shuriken: ({ runde }) => {

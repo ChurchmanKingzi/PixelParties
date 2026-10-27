@@ -8909,6 +8909,30 @@ function ppRabe(g, cx, cy, fluegel, rechts, deckung) {
   }
 }
 
+/**
+ * Winged Haressassin (27.10.): kleine Pixel-Feder (3×5, drei Haltungen: aufrecht / nach rechts / nach links geneigt) und ein Flügel aus vier Federstrahlen (Haltung 0..3 = Spitze hoch … tief).
+ * Farben nur aus der Palette (Weiß, Hellgrau, Eisblau, Graublau — die Flügel des Kartenbilds); Bewegung wählt der Aufrufer in ganzen Pixeln, nichts wird gedreht oder skaliert.
+ */
+const PP_FEDER_PAL = { W: ppHex('#ffffff'), L: ppHex('#e5edfa'), M: ppHex('#b4cff8'), D: ppHex('#7e7d9b') };
+const PP_FEDER_HALTUNG = [
+  ['..W.', '.WLW', '.WLM', 'WLMD', 'WMD.', 'D...'],
+  ['.W..', 'WLW.', 'MLW.', 'DMLW', '.DMW', '...D'],
+  ['.W.', 'WL.', 'WM.', 'LM.', 'MD.', 'D..'],
+];
+function ppFeder(g, cx, cy, haltung, deckung) { ppSprite(g, cx, cy, PP_FEDER_HALTUNG[((haltung % 3) + 3) % 3], PP_FEDER_PAL, deckung); }
+// Flügel: gefüllter Federfächer (Oberkante Weiß, Mitte Hellgrau, Unterkante Eisblau mit gezackten Federspitzen), von der Schulter (sx, sy) nach außen in Richtung `dir`.
+function ppFluegel(g, sx, sy, dir, haltung, deckung) {
+  const L = 11, spitze = [-8, -4, 0, 4][((haltung % 4) + 4) % 4];
+  for (let i = 0; i <= L; i++) {
+    const k = i / L, oben = Math.round(spitze * k), unten = Math.round(5 - (5 - spitze - 3) * k) + (i % 3 === 0 ? 1 : 0);
+    const lo = Math.min(oben, unten), hi = Math.max(oben, unten);
+    for (let y = lo; y <= hi; y++) {
+      const f = hi === lo ? 0 : (y - lo) / (hi - lo);
+      g.put(sx + dir * i, sy + y, f < 0.2 ? PP_FEDER_PAL.W : f < 0.6 ? PP_FEDER_PAL.L : f < 1 ? PP_FEDER_PAL.M : PP_FEDER_PAL.D, deckung);
+    }
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  PIXELART-BILDER AN EINEM PUNKT (23.10., Shimmering Dragonegg, Liquid Luck) — Vorlage: das jeweilige Kartenbild
 //  ACHTUNG Reihenfolge: die Paletten laufen beim Laden der Datei (`ppHex`, eine `const` weiter oben in dieser Datei) — dieser Block muss NACH `ppHex` stehen,
@@ -32628,6 +32652,156 @@ const ANIM_REGISTRY = {
     return ppSalve(malen, ENDE, null, { extra: 40 });
   })(),
   // ═════════════════════════════════════════════════════════════════
+  //  Winged Haressassin — Umleitung (27.10.) — PIXELART, Federn stieben vom gewählten Ziel und flattern zur Kreatur (`ppSalve`; Vorlage: das Kartenbild — der weiß geflügelte Hasen-Assassine
+  //  mit den roten Augen über dem Wald)
+  //
+  //  Ursprung = das ursprünglich gewählte Ziel (Held oder Kreatur), `targets[0]` = die Winged Haressassin. Ablauf (ENDE 900): 0–150 ms stieben zwölf kleine Federn aus dem Ziel (ein weißer
+  //  Ring weitet sich in Stufen) · 150–~620 flattern sie im Bogen zur Kreatur (Zickzack in ganzen Pixeln, die Federn kippen im Bildtakt, eisblaue Schweifpunkte) · bei der Ankunft (~480–640)
+  //  verpufft jede Feder in einem kleinen Funkenkreuz, die Karte blitzt im harten Dither-Raster auf · ab ~560 schlägt die Kreatur zweimal mit den Flügeln (Flügelschlag aus Federstrahlen) · ab ~720
+  //  dithert alles weg. Der Server lässt den Effekt nach `FLUG_MS` (620 ms) auf der Kreatur auflösen. Feste Palette, Bayer-Dithering statt Alpha, Bewegung in ganzen Pixeln, KEIN Schein.
+  // ═════════════════════════════════════════════════════════════════
+  winged_haress_feathers: (() => {
+    const FUNKEN = ['#ffffff', '#e5edfa', '#b4cff8', '#7e7d9b'].map(ppHex);
+    const ENDE = 900, T_STIEB = 150, FADE_AB = 720;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const glatt = (k) => k * k * (3 - 2 * k);
+    const mix = (a, b, k) => a + (b - a) * k;
+    const vorbereiten = (sz) => ({
+      federn: sz.ziele.map(() => Array.from({ length: ppFxN(12) }, (_, i) => ({
+        w: (i / Math.max(1, ppFxN(12))) * Math.PI * 2 + Math.random() * 0.5, r: 8 + Math.random() * 8,
+        an: 460 + Math.random() * 200, ph: Math.floor(Math.random() * 3), bogen: 6 + Math.random() * 14, zick: 1 + Math.floor(Math.random() * 2),
+      }))),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const O = sz.O, fr = Math.floor(t / 33);
+      sz.ziele.forEach((z, zi) => {
+        // Federn aus dem gewählten Ziel: ein weißer Ring weitet sich in Stufen
+        if (t < T_STIEB + 60) {
+          const k = klemme(t / (T_STIEB + 60), 0, 1), r = 2 + Math.floor(k * 4) * 2;
+          g.ring(O.x, O.y, r, r * 0.8, PP_FEDER_PAL.W, (1 - k) * aus);
+        }
+        for (const f of teile.federn[zi]) {
+          if (t < f.an + 40) {
+            let x, y;
+            if (t < T_STIEB) {                                                  // ① stieben aus dem Ziel
+              const k = klemme(t / T_STIEB, 0, 1);
+              x = O.x + Math.cos(f.w) * f.r * k; y = O.y + Math.sin(f.w) * f.r * k * 0.8;
+            } else {                                                            // ② flattern im Bogen zur Kreatur
+              const k = glatt(klemme((t - T_STIEB) / (f.an - T_STIEB), 0, 1));
+              const sx = O.x + Math.cos(f.w) * f.r, sy = O.y + Math.sin(f.w) * f.r * 0.8;
+              const zickzack = (Math.floor(t / 66 + f.ph) % 2 ? 1 : -1) * f.zick * Math.sin(k * Math.PI);
+              x = mix(sx, z.x, k) + zickzack; y = mix(sy, z.y, k) - Math.sin(k * Math.PI) * f.bogen;
+              for (let n = 2; n >= 1; n--) {                                    // eisblaue Schweifpunkte
+                const kk = glatt(klemme((t - T_STIEB) / (f.an - T_STIEB) - n * 0.07, 0, 1));
+                g.put(mix(sx, z.x, kk), mix(sy, z.y, kk) - Math.sin(kk * Math.PI) * f.bogen, n === 1 ? PP_FEDER_PAL.M : PP_FEDER_PAL.D, aus * (1 - n * 0.3));
+              }
+            }
+            if (t < f.an) ppFeder(g, x, y, f.ph + fr, aus);
+          }
+          if (t >= f.an - 20) {                                                  // ③ Ankunft: kleines Funkenkreuz
+            const al = t - (f.an - 20);
+            if (al < 130) {
+              const arm = [1, 2, 3, 2, 1][Math.floor(al / 27)] || 1;
+              ppKreuzfunkel(g, z.x - 1 + Math.cos(f.w) * 2, z.y - 1 + Math.sin(f.w) * 2, arm, FUNKEN, aus * (1 - al / 160));
+            }
+          }
+        }
+        // Karte blitzt bei der ersten Ankunft (hartes Dither-Raster)
+        const erste = Math.min(...teile.federn[zi].map(f => f.an)) - 20;
+        if (t >= erste && t < erste + 66) g.block(z.x - z.w / 2, z.y - z.h / 2, Math.ceil(z.w), Math.ceil(z.h), PP_FEDER_PAL.W, 0.3 * (1 - (t - erste) / 66) * aus);
+        // Flügelschlag der Kreatur
+        if (t >= 560 && t < 820) {
+          const h = [1, 2, 3, 1, 0, 1][Math.floor((t - 560) / 44) % 6];
+          ppFluegel(g, z.x - 8, z.y - 2, -1, h, aus);
+          ppFluegel(g, z.x + 8, z.y - 2, 1, h, aus);
+        }
+      });
+    };
+    return ppSalve(malen, ENDE, vorbereiten, { extra: 40 });
+  })(),
+  // ═════════════════════════════════════════════════════════════════
+  //  Winged Haressassin — 150 Schaden (27.10.) — PIXELART, ein schneller, gerader Schnitt, hinter dem kleine Federn fallen (`ppSalve`; Vorlage: das Kartenbild — weiße Flügel, rote Augen)
+  //
+  //  Ursprung = die fallende Winged Haressassin, `targets[0]` = das Ziel. Ablauf (ENDE 1200): 0–200 ms Flügelschlag der Kreatur (zwei Flügel aus Federstrahlen, vier Haltungen im Bildtakt) ·
+  //  200–330 der GERADE Schnitt zieht in ~4 Bildern über das Ziel (schräg zur Anflugrichtung, weißer Kern, eisblaue Flanken, dunkle Kontur, Funkenkreuz an der Spitze; Spitze rast, der Strich bleibt
+  //  stehen) · 330 Einschlag: Aufblitzen der Zielkarte (hartes Dither-Raster), Kreuzfunkel, Funken mit Schwerkraft · 430–600 zieht sich der Strich vom Schwanz her wieder ein · hinter dem Schnitt
+  //  lösen sich zehn kleine Federn von der Schnittlinie (je dort, wo die Spitze vorbeikam) und FALLEN mit leichtem Zickzack (ganze Pixel, Federn kippen im Bildtakt), ab ~700 dithern sie weg.
+  //  Der Schaden fällt im Einschlag (Server wartet 330 ms). Feste Palette, Bayer-Dithering statt Alpha, Bewegung in ganzen Pixeln, KEINE Drehung eines Kartenbildes, KEIN Schein.
+  // ═════════════════════════════════════════════════════════════════
+  winged_haress_slash: (() => {
+    const KONTUR = ppHex('#1a1a2e'), ROT = ppHex('#e92f38');
+    const FUNKEN = ['#ffffff', '#e5edfa', '#b4cff8', '#7e7d9b'].map(ppHex);
+    const T_FLUEGEL = 200, T_AB = 200, T_EIN = 330, T_HALT = 430, T_WEG = 600, ENDE = 1200, FADE_AB = 1000;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = (sz) => ({
+      federn: sz.ziele.map(() => Array.from({ length: ppFxN(10) }, (_, i) => ({
+        s: (i + 0.5 + (Math.random() - 0.5) * 0.7) / Math.max(1, ppFxN(10)), drift: (Math.random() - 0.5) * 2, leben: 620 + Math.random() * 280,
+        ph: Math.floor(Math.random() * 3), swing: 1 + Math.floor(Math.random() * 2), fall: 16 + Math.random() * 14,
+      }))),
+      funken: sz.ziele.map(() => Array.from({ length: ppFxN(8) }, () => ({ w: Math.random() * Math.PI * 2, v: 16 + Math.random() * 30, leben: 240 + Math.random() * 200 }))),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const O = sz.O;
+      // ① Flügelschlag der Kreatur (nur im ersten Teil)
+      if (t < T_FLUEGEL + 33) {
+        const h = [0, 1, 2, 3, 2, 1][Math.floor(t / 33) % 6], a = Math.min(aus, (Math.floor(t / 33) + 1) / 3);
+        ppFluegel(g, O.x - 8, O.y - 2, -1, h, a);
+        ppFluegel(g, O.x + 8, O.y - 2, 1, h, a);
+      }
+      sz.ziele.forEach((z, zi) => {
+        // Schnittrichtung: eine saubere 45°-Diagonale (Treppenstufen, nichts wird gedreht) — die der beiden, die zur Anflugrichtung senkrechter steht; immer von oben nach unten gezogen
+        const R2 = 0.7071;
+        const ux = (z.selbst || Math.abs(z.dx * R2 + z.dy * R2) < Math.abs(-z.dx * R2 + z.dy * R2)) ? R2 : -R2, uy = R2;
+        const lh = Math.max(z.w, z.h) * 0.62, nx = -uy, ny = ux;
+        const P = (s) => [z.x + ux * lh * (2 * s - 1), z.y + uy * lh * (2 * s - 1)];
+        // ② der gerade Schnitt: Spitze rast in 4 Bildern, der Strich bleibt stehen, zieht sich dann vom Schwanz her ein
+        if (t >= T_AB && t < T_WEG + 40) {
+          const kopf = klemme((t - T_AB) / (T_EIN - T_AB), 0, 1);
+          const schwanz = t < T_HALT ? 0 : klemme((t - T_HALT) / (T_WEG - T_HALT), 0, 1);
+          const n = Math.ceil(lh * 2.4);
+          for (let i = 0; i <= n; i++) {
+            const s = i / n;
+            if (s < schwanz || s > kopf) continue;
+            const prof = Math.sin(Math.PI * s);                                   // Strichstärke: spitz an den Enden, dick in der Mitte
+            const [px, py] = P(s);
+            if (prof > 0.55) { g.put(px + nx * 2, py + ny * 2, KONTUR, aus); g.put(px - nx * 2, py - ny * 2, KONTUR, aus); }
+            if (prof > 0.3) { g.put(px + nx, py + ny, PP_FEDER_PAL.M, aus); g.put(px - nx, py - ny, PP_FEDER_PAL.M, aus); }
+            g.put(px, py, PP_FEDER_PAL.W, aus);
+          }
+          if (t < T_EIN + 20) {                                                   // Funkenkreuz an der rasenden Spitze
+            const [hx, hy] = P(kopf);
+            ppKreuzfunkel(g, hx - 1, hy - 1, t < T_EIN ? 2 : 1, FUNKEN, aus);
+          }
+          if (t >= T_AB && t < T_AB + 66) { const [sx, sy] = P(0); g.put(sx, sy, ROT, aus); g.put(sx + 2, sy, ROT, aus); }   // die roten Augen blitzen am Anfang des Strichs
+        }
+        // ③ Einschlag
+        if (t >= T_EIN) {
+          const al = t - T_EIN, [mx, my] = P(0.5);
+          if (al < 66) g.block(z.x - z.w / 2, z.y - z.h / 2, Math.ceil(z.w), Math.ceil(z.h), PP_FEDER_PAL.W, 0.34 * (1 - al / 66) * aus);
+          if (al < 120) ppKreuzfunkel(g, mx - 1, my - 1, [4, 4, 3, 2, 1][Math.floor(al / 24)] || 1, FUNKEN, aus);
+          for (const f of teile.funken[zi]) {
+            if (al > f.leben) continue;
+            const k = al / f.leben, sek = al / 1000;
+            g.put(mx + Math.cos(f.w) * f.v * sek, my + Math.sin(f.w) * f.v * sek + 60 * sek * sek, FUNKEN[Math.min(3, Math.floor(k * 4))], (1 - k * k) * aus);
+          }
+        }
+        // ④ Federn fallen hinter dem Schnitt (jede löst sich dort, wo die Spitze vorbeikam)
+        for (const f of teile.federn[zi]) {
+          const ts = T_AB + (T_EIN - T_AB) * f.s, age = t - ts;
+          if (age < 0 || age > f.leben) continue;
+          const k = age / f.leben, sek = age / 1000, [px, py] = P(f.s);
+          const x = px + f.drift * sek * 8 + (Math.floor(age / 130 + f.ph) % 2 ? 1 : -1) * f.swing, y = py + f.fall * sek + 22 * sek * sek;
+          ppFeder(g, x, y, f.ph + Math.floor(age / 99), (k > 0.7 ? 1 - (k - 0.7) / 0.3 : 1) * aus);
+        }
+      });
+    };
+    return ppSalve(malen, ENDE, vorbereiten, { extra: 40 });
+  })(),
+  // ═════════════════════════════════════════════════════════════════
   //  Patty, the Ninja of Revenge (25.10.) — PIXELART, schwarze Wurfsterne von Patty zum Ziel (`ppSalve`; `runde` = Zahl der Sterne = Zahl der geschickten Abilities)
   //
   //  Je Ability fliegt ein schwarzer Wurfstern (9×9, zwei Bilder im Wechsel: Kreuz und X, also ein drehender Stern in ganzen Pixeln) in sehr schneller Folge (alle 70 ms) von Patty
@@ -55255,6 +55429,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'redirecting_aura_attached') {
         const p = playerByName(entry.player);
         return <span className="log-status">↪️ {cName('Redirecting Aura')} — {pName(p.name, p.color)} attaches it to {entry.hero}.</span>;
+      }
+      if (t === 'winged_haressassin_redirect') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">↪️ {cName('Winged Haressassin')} — {pName(p.name, p.color)} discards a card and redirects {entry.source ? <>{cName(entry.source)}</> : 'the effect'} from {entry.from} to it.</span>;
+      }
+      if (t === 'winged_haressassin_revenge') {
+        const p = playerByName(entry.player);
+        return <span className="log-damage">🗡️ {cName('Winged Haressassin')} — defeated by the redirected effect, it deals <span className="log-amount">150</span> damage to {entry.target} ({pName(p.name, p.color)}).</span>;
       }
       if (t === 'exorcism') {
         const p = playerByName(entry.player);
