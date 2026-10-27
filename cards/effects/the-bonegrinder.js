@@ -223,6 +223,7 @@ module.exports = {
       if (leaving._redirectToDeleted) return;
       const myController = ctx.cardController ?? ctx.cardOwner;
       const engine = ctx._engine;
+      if (engine.spielerIstVonAreasAusgenommen(myController)) return;   // W82 (Shipwrecked): Area-Effekte aktivieren ist gesperrt
       // W16c (A05-17): "YOUR discard pile" - gemeint ist die Ablage, in die das Skelett geht: die seines (permanenten) BESITZERS
       // (Ruling "Gestohlene Karten gehen in die Ablage ihres Besitzers"), nicht die seines Kontrolleurs.
       const targetController = engine.kartenBesitzerVon(leaving);
@@ -285,6 +286,7 @@ module.exports = {
       if (ctx.cardZone !== 'area') return;   // W16c (A05-16): nur die ausliegende Area, nicht die Handkopie
       const engine = ctx._engine;
       const myController = ctx.cardController ?? ctx.cardOwner;
+      if (engine.spielerIstVonAreasAusgenommen(myController)) return;   // W82 (Shipwrecked): Area-Effekte aktivieren ist gesperrt
       // Only react when the discard happened on the SAME side as
       // this Bonegrinder. Cross-player discards (a future opp-
       // induced discard) don't qualify.
@@ -377,6 +379,7 @@ module.exports = {
       const engine = ctx._engine;
       const myController = ctx.cardController ?? ctx.cardOwner;
       if (ctx.playerIdx !== myController) return;
+      if (engine.spielerIstVonAreasAusgenommen(myController)) return;   // W82 (Shipwrecked): Area-Effekte aktivieren ist gesperrt
 
       const milled = Array.isArray(ctx.milledCards) ? ctx.milledCards : [];
       if (milled.length === 0) return;

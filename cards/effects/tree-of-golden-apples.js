@@ -64,8 +64,10 @@ module.exports = {
       const pi = gs.activePlayer;
       if (pi == null || !gs.players[pi]) return;
       if (borisBlockt(engine, pi)) return;                         // Boris: der Effekt läuft ins Leere
+      if (engine.spielerIstVonAreasAusgenommen(pi)) return;        // W82 (Shipwrecked): Area-Effekte aktivieren ist gesperrt
 
-      const liste = ziele(engine, pi);
+      // Ziele des Gegners, die von Areas ausgenommen sind (Diver Helmet, Shipwrecked), sind kein Ziel.
+      const liste = ziele(engine, pi).filter(t => (t.type === 'hero' ? !engine.heldIstVonAreasAusgenommen(t.owner, t.heroIdx) : !engine.karteIstVonAreasAusgenommen(t.cardInstance)));
       if (liste.length === 0) return;
 
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi, source: `${CARD_NAME}#${ctx.card.id}@${gs.turn}`, sfx: 'ability_activate' });

@@ -5380,6 +5380,20 @@ need no event handling — the aura is re-derived from the actual board on
 every `sync()` and before every hook dispatch (`runHooks`). See
 "Welle 59 / W59a".
 
+**★ W82 — Shipwrecked: „you and all targets you control are unaffected by Areas and you cannot activate the effects of or play Areas."**
+Zweite Quelle von „unaffected by Areas", an den SPIELER gebunden (der Kontrolleur des Helden, an dem die Karte liegt — auch ein Gegnerheld, Al). Zentrale Fragen
+(alle schließen Diver Helmet UND Shipwrecked ein — nie selbst suchen):
+* **Spieler:** `engine.spielerIstVonAreasAusgenommen(pi)` — gilt für „that player may / must …"-Wirkungen einer Area (Zugbeginn-/Zugende-Pflichten, „you may"-Angebote,
+  Gold/Ziehen für den Spieler, Handgrenzen …): ist `pi` ausgenommen, entfällt die Wirkung für ihn (Kommentar „W82" in acid-rain, doom-clock, den Circles, golden-gate, tarleinn,
+  temple, bonegrinder, wowhalla, tree-of-golden-apples, war-council, spatial-crevice, big-gwen, spider-hive, crystal-well, rioting-village (Attack-Limit)).
+* **Held:** `engine.heldIstVonAreasAusgenommen(Brettseite, Index)` (Kontrolleur des Helden); **Karte in einer Zone:** `engine.karteIstVonAreasAusgenommen(inst)` bzw.
+  `isAreaImmuneInst` / `isAreaImmuneHero` / `_isDiverHelmetProtectedTarget` (Kontrolleur der Karte). `heroHasDiverHelmet` allein gilt nur noch für den Helm selbst.
+* **Gesperrt:** `getActivatableAreas` (ausgegraut) / `activateAreaEffect` (verweigert) für aktive Area-Effekte; Area-Karten aus der Hand (`getHeroPlayableCards`,
+  `validateActionPlay`, `getBlockedSpells`, Zusatzaktions-Wege inkl. Cooldin / Cleansing of the Land / Circle-Wiederholung). „Direkt ins Spiel bringen" (Planet in a Bottle,
+  Reality Crack, Orkallion, Dante …) ist KEIN „play" und bleibt erlaubt.
+* **Neue Area mit Wirkung auf Spieler/Ziele:** immer die Frage oben stellen (Hook-Effekte pro Skript; Zielfilter über die Helden-/Kartenfrage). Zustandsbasierte Areas (Barrel Home / Gigalopolis,
+  `_zonen-welt-shared.js`) gleichen pro Held ab (`heldAbgleichen`); `shipwrecked.js` stößt den Abgleich beim Kommen/Gehen der Karte an.
+
 ---
 
 ### Targeting / redirect effects — respect "Truth-Seeing Eye" (MANDATORY)

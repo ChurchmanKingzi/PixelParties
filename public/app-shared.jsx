@@ -2933,6 +2933,14 @@ const ZONE_ANIM_SFX = {
     { name: 'placement',    opts: { rate: 1.0, volume: 0.9, delay: 420, category: null, dedupe: 0 } },
     { name: 'ping',         opts: { rate: 1.7, volume: 0.5, delay: 430, category: null, dedupe: 0 } },
   ],
+  // Shipwrecked (W82) — die Welle rollt heran (Wasser, 0 ms), Planken und Fass schlagen an (~300 ms: Holz-Plätschern), die Welle läuft zurück (Wasser ~760 ms). Nur der erste Teil
+  // uebernimmt die Sammelkategorie 'effect'.
+  shipwrecked_attach: [
+    { name: 'elem_water', opts: { rate: 0.8, volume: 0.6 } },
+    { name: 'placement',  opts: { rate: 0.7, volume: 0.5, delay: 300, category: null, dedupe: 0 } },
+    { name: 'elem_water', opts: { rate: 1.2, volume: 0.4, delay: 340, category: null, dedupe: 0 } },
+    { name: 'elem_water', opts: { rate: 0.7, volume: 0.4, delay: 760, category: null, dedupe: 0 } },
+  ],
   // Cute Crown (10.10.) — die Flügel schlagen (Wind, 0 / ~110 / ~220 ms), das Juwel klingt hell (~300 ms), Herzen steigen auf (~520 ms). Nur der erste Teil uebernimmt die
   // Sammelkategorie 'effect'.
   crown_flutter: [
@@ -8901,6 +8909,8 @@ function BuffColumn({ buffs, cardName, statuses }) {
   if (st._stoneskin) statusBuffs.push(['stoneskin', { icon: '🪨', tooltip: 'Stoneskin: Attacks deal 100 less damage to this Hero, and it cannot be Poisoned, Burned or Stunned.' }]);
   // 24.10.: Regeneration (Anhängsel) — vom Brett abgeleitet (`_regeneration` = Anzahl der Karten), kein Zähler; die Menge steht auf der Karte (60/120/180 je nach Support Magic des Wirkers).
   if (st._regeneration) statusBuffs.push(['regeneration', { icon: '🌱', tooltip: 'Regeneration: This Hero is healed at the start of each of its owner\'s turns (60/120/180 HP, depending on the caster\'s Support Magic level when the Spell was used).' + (st._regeneration > 1 ? ` (${st._regeneration}× attached)` : '') }]);
+  // W82: Shipwrecked (Anhängsel) — vom Brett abgeleitet (`_shipwrecked`), kein Zähler. Wirkt für den KONTROLLEUR des Helden (auch wenn ein Gegner die Karte angelegt hat).
+  if (st._shipwrecked) statusBuffs.push(['shipwrecked', { icon: '🌊', tooltip: 'Shipwrecked: This Hero\'s controller and all targets they control are unaffected by Areas, and they cannot activate the effects of or play Areas.' }]);
   if (st.untargetable) statusBuffs.push(['untargetable', { icon: '🦋', tooltip: 'Untargetable: Your opponent can\'t choose this Hero with Attacks, Spells or Creature effects while you control other Heroes that can be chosen. Wears off at the start of its owner\'s turn.' }]);
   if ((!buffs || Object.keys(buffs).length === 0) && statusBuffs.length === 0) return null;
   buffs = buffs || {};

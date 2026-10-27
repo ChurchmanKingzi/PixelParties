@@ -86,6 +86,7 @@ module.exports = {
       const pi = engine.gs.activePlayer;
       const ps = engine.gs.players[pi];
       if (!ps) return;
+      if (engine.spielerIstVonAreasAusgenommen(pi)) return;   // W82 (Shipwrecked): Area-Effekte aktivieren ist gesperrt
       if (engine._isSearchBlocked(pi, {}, 'deck')) return;   // Z6 (R02-14): Hand-, Such-Sperre und Siege - gar nicht erst fragen
 
       const cardDB = engine._getCardDB();

@@ -37,6 +37,7 @@ module.exports = {
       if (!verlaesstBrett(ctx)) return;
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
+      if (engine.spielerIstVonAreasAusgenommen(pi)) return;   // W82 (Shipwrecked): Area-Effekte aktivieren ist gesperrt
       const ps = engine.gs.players[pi];
       const namen = [...new Set(ps?.deletedPile || [])];
       if (namen.length === 0) return;
