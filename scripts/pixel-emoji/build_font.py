@@ -14,6 +14,10 @@ Jedes Pixel ist ein Rechteck; Farben stehen als Ebenen (COLR). Einfarbige Symbol
 (Palettenindex 0xFFFF), folgen also `color`. Voraussetzung: pip install fonttools brotli
 """
 import io, json, os, re, sys
+try:
+    import fontTools  # noqa: F401
+except ImportError:
+    sys.exit('fontTools fehlt — pip install fonttools brotli')
 from fontTools.fontBuilder import FontBuilder
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.colorLib.builder import buildCOLR, buildCPAL

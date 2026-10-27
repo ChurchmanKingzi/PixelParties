@@ -52,9 +52,4 @@ Das Spiel hat eine feste Palette (`data/palette.json`, 8 Bit = höchstens 256 Fa
 
 ## Offene Baustellen (für andere Instanzen; erledigte Einträge löschen)
 
-* **Emoji 🪞 fehlt in der Pixel-Emoji-Schrift.** `cards/effects/reflection.js` nutzt vorläufig `'🔄 Reflect!'` als `confirmLabel`, weil sich die Schrift in der Cloud-Umgebung nicht neu bauen ließ.
-  Zu tun: `confirmLabel` auf `'🪞 Reflect!'` zurückstellen und die Schrift bauen (`node scripts/pixel-emoji/scan.js && node scripts/pixel-emoji/extract.js && python3 scripts/pixel-emoji/build_font.py`), danach `npm test`.
-  Zwei Stolpersteine, die dabei auftraten (beide umgehbar, aber die Skripte sagen es nicht deutlich):
-  1. `extract.js` läuft in ein 30-s-Timeout (`page.waitForFunction`), wenn unpkg.com nicht erreichbar ist. Es liest React dann aus `PE_REACT_DIR` (Vorgabe `/tmp/st-tools/node_modules`) — dort müssen `react/umd` und `react-dom/umd` liegen, sonst `PE_REACT_DIR=<Ordner mit react/umd>` setzen (hat in der Cloud-Umgebung funktioniert).
-  2. `build_font.py` bricht mit `ModuleNotFoundError: fontTools` ab → `pip install fonttools` (PyPI ist über den Proxy erreichbar).
-  Mögliche Patches: `extract.js` bei fehlendem React-Ordner früh mit klarer Meldung abbrechen statt nach 30 s zu timen; `build_font.py` bei fehlendem `fontTools` den `pip`-Hinweis ausgeben.
+* Derzeit keine.
