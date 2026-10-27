@@ -31317,6 +31317,89 @@ const ANIM_REGISTRY = {
     return ppPunktBild(malen, ENDE, 300, 300, vorbereiten);
   })(),
   // ═══════════════════════════════════════════════════════════════════
+  //  Shipwrecked — PIXELART, Zonen-Animation am Helden (Hülle `ppPunktBild`; Vorlage: das Kartenbild — Schiffbrüchiger am Strand, blaue Wasserkante, Treibholz-Planken, Fässer)
+  //
+  //  Eine Welle läuft in ganzen Pixeln von links über die Füße des Helden (Schaumkante aus Weiß/Hellblau, darunter vier Blaustufen mit Bayer-Dither, die Kante wogt in
+  //  Pixelstufen); sie lässt zwei Planken und ein Fass zurück, die im Wasser auf und ab schaukeln (ganze Pixel, ~7 Bilder je Hub), und zieht sich dann zurück. Ab ~980 ms dithert alles
+  //  weg; ENDE 1300 (`duration` 1340). Feste Palette, KEINE Unschärfe, KEIN Leuchten, keine Drehung (Planken als zwei fertige Sprites).
+  // ═══════════════════════════════════════════════════════════════════
+  shipwrecked_attach: (() => {
+    const WASSER = ['#e5edfa', '#66b6ff', '#399edf', '#3866f0', '#0351c9', '#02398c'].map(ppHex);   // Schaum, hell, mittel, Welle, tief, Grund
+    const WEISS = ppHex('#ffffff');
+    const PAL = {
+      k: ppHex('#311402'), d: ppHex('#6e4421'), m: ppHex('#b06746'), h: ppHex('#ca874e'),          // Planke: Kontur, dunkel, Holz, Lichtkante
+      t: ppHex('#e0c085'), T: ppHex('#fbc86a'), s: ppHex('#b29466'), i: ppHex('#929292'), I: ppHex('#b9b9b9'),   // Fass: Holz, Licht, Schatten, Reifen dunkel/hell
+    };
+    const PLANKE_FLACH = ['.kkkkkkkkk.', 'kdmmhmmmdk', '.kkkkkkkkk.'];
+    const PLANKE_SCHRAEG = ['kk.......', 'kdkk.....', '.kmmkk...', '..kmhmkk.', '...kkmdk.', '.....kkk.'];
+    const FASS = [
+      '..kkkkkk..', '.kttTTttk.', 'kttTTtttsk', 'kIiiiiiiik', 'ktTtttttsk', 'ktTtttttsk', 'kIiiiiiiik', 'kttTtttssk', '.kttttssk.', '..kkkkkk..',
+    ];
+    const ENDE = 1300, FADE_AB = 980, VOR = 420, STEHT = 760, ZURUECK = 980;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = () => ({
+      schaum: Array.from({ length: ppFxN(18) }, () => ({ u: Math.random(), v: Math.random(), ab: Math.floor(Math.random() * 600), leben: 140 + Math.random() * 140 })),
+      glanz: Array.from({ length: ppFxN(6) }, (_, i) => ({ u: (i + 0.5) / 6 + (Math.random() - 0.5) * 0.1, ab: 380 + i * 70 + Math.random() * 60 })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const cx = Math.round(sz.cx), cy = Math.round(sz.cy), hw = Math.round(sz.hw), hh = Math.round(sz.hh);
+      const xl = cx - hw - 20, xr = cx + hw + 20, breite = xr - xl;
+      const yo = cy + Math.round(hh * 0.3), yu = cy + hh + 6;                            // Wasserband: über den Füßen des Helden
+      // Vorderkante der Welle: läuft in Stufen nach rechts (ease-out), zieht sich später wieder nach links zurück
+      const vorn = t < VOR ? xl + Math.floor(breite * (1 - Math.pow(1 - klemme(t / VOR, 0, 1), 2.2))) : xr;
+      const hinten = t < STEHT ? xl : xl + Math.floor(breite * Math.pow(klemme((t - STEHT) / (ZURUECK - STEHT + 120), 0, 1), 1.6));
+      // ── Wasser: Spalte für Spalte, Kante wogt (ganze Pixel) ──
+      for (let x = hinten; x <= vorn; x++) {
+        const rand = Math.min(x - hinten, vorn - x);                                    // zur Wellenfront hin steigt die Kante an (Schaumkamm)
+        const kamm = rand < 5 ? Math.round((5 - rand) * 0.7) : 0;
+        const top = yo + Math.round(Math.sin(x * 0.55 + t / 90) * 1.4) - kamm;
+        for (let y = top; y <= yu; y++) {
+          const tiefe = y - top;
+          let s = tiefe === 0 ? 0 : tiefe === 1 ? 1 : 2 + Math.min(3, (tiefe - 2) * 0.55);   // Schaum → hell → mittel … tief (Dither zwischen den Stufen)
+          if (y > yu - 2) s = Math.max(s, 4.4);
+          g.put(x, y, ppStufe(WASSER, s, x, y), aus);
+        }
+        if (rand < 4 && (x + Math.floor(t / 66)) % 3 === 0) g.put(x, top - 1, WASSER[0], aus * 0.7);   // Gischt über dem Kamm
+      }
+      // ── Schaumflocken auf dem Wasser ──
+      for (const f of teile.schaum) {
+        const al = t - f.ab;
+        if (al < 0 || al > f.leben) continue;
+        const x = Math.round(xl + (vorn - xl) * f.u), y = Math.round(yo + 2 + f.v * (yu - yo - 3));
+        if (x < hinten || x > vorn) continue;
+        g.put(x, y, WASSER[0], aus * (1 - al / f.leben)); g.put(x + 1, y, WASSER[1], aus * (1 - al / f.leben));
+      }
+      // ── Treibgut: kommt mit der Welle, schaukelt in ganzen Pixeln, bleibt liegen ──
+      const ankunft = (u0) => klemme((t - VOR * u0) / 300, 0, 1);
+      const treibgut = [
+        { x: cx - hw + 1, y: yo + 4, bild: PLANKE_FLACH, u: 0.35, ph: 0 },
+        { x: cx + 1, y: yo + 8, bild: PLANKE_SCHRAEG, u: 0.6, ph: 1.7 },
+        { x: cx + hw - 3, y: yo + 6, bild: FASS, u: 0.85, ph: 3.1 },
+      ];
+      for (const d of treibgut) {
+        const k = ankunft(d.u);
+        if (k <= 0) continue;
+        const ex = d.x - Math.round(Math.pow(1 - k, 2) * 16);                              // schwimmt von links heran
+        const hub = Math.round(Math.sin(t / 150 + d.ph) * 1.2);
+        // verschwindet mit dem Wasser, wenn die Welle zurückläuft: nur solange die Welle hier steht
+        if (ex < hinten - 2) continue;
+        ppSprite(g, ex, d.y + hub, d.bild, PAL, aus * (k < 1 ? Math.floor(k * 4) / 4 : 1));
+      }
+      // ── Glanzpunkte auf der Wasserfläche ──
+      for (const gl of teile.glanz) {
+        const al = t - gl.ab;
+        if (al < 0 || al > 160) continue;
+        const x = Math.round(xl + breite * gl.u), y = yo + 3 + (Math.floor(al / 33) % 2);
+        if (x < hinten || x > vorn) continue;
+        const arm = al < 80 ? 1 : 0;
+        g.put(x, y, WEISS, aus); if (arm) { g.put(x - 1, y, WASSER[0], aus); g.put(x + 1, y, WASSER[0], aus); g.put(x, y - 1, WASSER[0], aus); g.put(x, y + 1, WASSER[0], aus); }
+      }
+    };
+    return ppPunktBild(malen, ENDE, 300, 300, vorbereiten);
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
   //  Super Fan — PIXELART auf dem DECK (Als Vorgabe 10.10.; Vorlage: das Kartenbild — der Fan mit dem Leuchtstab, rosa und grüne Herzen)
   //
   //  Ein türkisfarbener Leuchtstab schwingt über dem Deck hin und her (Nachzieh-Schweif, gelbe Funkenstrahlen an der Spitze),
@@ -56078,6 +56161,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // 24.10. Stoneskin: trägt der Held die Karte, wird NUR sein animierter Sprite versteinert (Karte bleibt unverändert; Sprite läuft weiter) — keine Betäubung, nur Optik.
           const hatSteinhaut = (p.supportZones?.[i] || []).some(z => (z || []).includes('Stoneskin'));
           const regenAnzahl = (p.supportZones?.[i] || []).filter(z => (z || []).includes('Regeneration')).length;   // 24.10. Regeneration: nur Abzeichen (die Heilung rechnet der Server)
+          const hatSchiffbruch = (p.supportZones?.[i] || []).some(z => (z || []).includes('Shipwrecked'));   // W82 Shipwrecked: nur Abzeichen (die Wirkung rechnet der Server)
           const isImmune = hero?.statuses?.immune;
           const isNegated = hero?.statuses?.negated;
           const isNulled = hero?.statuses?.nulled;
@@ -56618,7 +56702,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     <PxIcon z="🚫" />
                   </div>
                 )}
-                {hero?.name && <BuffColumn buffs={hero.buffs} statuses={(p.spellImmuneHeroes?.[i] || hatSteinhaut || regenAnzahl) ? { ...(hero.statuses || {}), ...(p.spellImmuneHeroes?.[i] ? { _spellImmune: true } : null), ...(hatSteinhaut ? { _stoneskin: true } : null), ...(regenAnzahl ? { _regeneration: regenAnzahl } : null) } : hero.statuses} cardName={hero.name} />}
+                {hero?.name && <BuffColumn buffs={hero.buffs} statuses={(p.spellImmuneHeroes?.[i] || hatSteinhaut || regenAnzahl || hatSchiffbruch) ? { ...(hero.statuses || {}), ...(p.spellImmuneHeroes?.[i] ? { _spellImmune: true } : null), ...(hatSteinhaut ? { _stoneskin: true } : null), ...(regenAnzahl ? { _regeneration: regenAnzahl } : null), ...(hatSchiffbruch ? { _shipwrecked: true } : null) } : hero.statuses} cardName={hero.name} />}
                 {/* ── Deepsea Counter badge (Siphem) ── */}
                 {/* ★ v1472: hier und an den Nachbar-Abzeichen stand
                     `cursor: 'help'` — der native Pfeil mit Fragezeichen

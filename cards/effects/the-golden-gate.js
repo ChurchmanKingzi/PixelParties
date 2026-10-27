@@ -50,6 +50,7 @@ module.exports = {
       const hero = engine.gs.players[seite]?.heroes?.[entering.heroIdx];
       const empfaenger = hero?.name ? engine.heroSideOf(seite, hero) : (entering.controller ?? entering.owner);
       if (!Number.isInteger(empfaenger) || !engine.gs.players[empfaenger]) return;
+      if (engine.spielerIstVonAreasAusgenommen(empfaenger)) return;   // W82 (Shipwrecked): der Empfaenger ist von Areas ausgenommen
 
       engine._broadcastEvent('play_zone_animation', { type: 'golden_gate_gold', owner: seite, heroIdx: entering.heroIdx, zoneSlot: entering.zoneSlot, duration: 900 });
       await engine.actionGainGold(empfaenger, GOLD, { source: CARD_NAME });

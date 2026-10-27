@@ -33,6 +33,7 @@ module.exports = {
       if (!weg) return;
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
+      if (engine.spielerIstVonAreasAusgenommen(pi)) return;   // W82 (Shipwrecked): Area-Effekte aktivieren ist gesperrt
       const ps = engine.gs.players[pi];
       const anzahl = (ps?.deletedPile || []).length + (weg.nachZone === 'deleted' ? 1 : 0);
       if (anzahl <= 0) return;

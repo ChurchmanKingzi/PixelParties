@@ -202,8 +202,10 @@ async function heldAbgleichen(engine, pi, hi, G, B) {
   const hero = ps?.heroes?.[hi];
   if (!hero?.name || !Array.isArray(ps.supportZones?.[hi])) return;
   const st = zustand(ps, hi);
-  const wunschGiga = Math.max(0, G - B);
-  const wunschSiegel = Math.min(BASIS, Math.max(0, B - G));
+  // ★ W82 (Shipwrecked, Diver Helmet): ein Held, der „unaffected by Areas" ist, hat weder die Extra-Zone von Gigalopolis noch das Fass von Barrel Home.
+  const ausgenommen = engine.heldIstVonAreasAusgenommen(pi, hi);
+  const wunschGiga = ausgenommen ? 0 : Math.max(0, G - B);
+  const wunschSiegel = ausgenommen ? 0 : Math.min(BASIS, Math.max(0, B - G));
 
   // Siegel prüfen (eine Zone, die nicht mehr den Platzhalter trägt, ist keins mehr)
   st.siegel = st.siegel.filter(z => (ps.supportZones[hi][z] || [])[0] === SIEGEL);
@@ -230,11 +232,12 @@ async function heldAbgleichen(engine, pi, hi, G, B) {
 
 /**
  * Gleicht die Support Zonen aller Helden mit den liegenden Areas ab. Idempotent.
- * @param {object} [opts] `ausser`: die Area-Instanz, die gerade das Brett verlässt (sie zählt nicht mehr mit)
+ * @param {object} [opts] `ausser`: die Area-Instanz, die gerade das Brett verlässt (sie zählt nicht mehr mit); `ausserSchiff`: die Shipwrecked-Instanz, die gerade geht (W82)
  */
 async function abgleichen(engine, opts = {}) {
   if (!engine?.gs?.players) return;
   if (opts.ausser) engine._weltZonenAusser = opts.ausser;
+  if (opts.ausserSchiff) engine._shipwreckedAusser = opts.ausserSchiff;   // W82: eine Shipwrecked, die gerade geht, zaehlt fuer die Ausnahme nicht mehr
   if (engine._weltZonenLaeuft) { engine._weltZonenNochmal = true; return; }
   engine._weltZonenLaeuft = true;
   try {
@@ -251,6 +254,7 @@ async function abgleichen(engine, opts = {}) {
   } finally {
     engine._weltZonenLaeuft = false;
     engine._weltZonenAusser = null;
+    engine._shipwreckedAusser = null;
   }
   engine.sync();
 }

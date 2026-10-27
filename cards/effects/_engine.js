@@ -14699,6 +14699,8 @@ class GameEngine {
     // „exactly 1 target" — der Stempel bleibt stehen (A01-pollution-21).
     if ((this._multiHitScope?.total || 0) >= 2) return;
     if (!((ziel.amount || 0) > 0)) return;
+    // ★ W82: „unaffected by Areas" (Diver Helmet, Shipwrecked) — die Area verdoppelt den Schaden dieses Ziels nicht (der Stempel bleibt für das nächste Ziel).
+    if ((ziel.target && this._isDiverHelmetProtectedTarget(ziel.target)) || (ziel.inst && this._isDiverHelmetProtectedTarget(ziel.inst))) return;
     if (typeof ziel.multiplyAmount === 'function') ziel.multiplyAmount(2);
     else ziel._mul = (ziel._mul ?? 1) * 2;
     delete this.gs._naechsterEinzelschadenX2;
@@ -23960,7 +23962,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (cd.cardType === 'Spell' && this.gs.players[playerIdx]._spellLockTurn === this.gs.turn
           && this.gs.players[playerIdx]._silenceBonusSpell !== this.gs.turn) continue;
       if (cd.cardType === 'Spell' && this.thaliaSupportSperre(playerIdx, cd)) continue;   // W49a (Thalia): 1 Kopie je Support Spell pro Zug
-      if ((cd.subtype || '').toLowerCase() === 'area' && this.gs.players[playerIdx]._cantPlayAreaThisTurn === this.gs.turn) continue;
+      if ((cd.subtype || '').toLowerCase() === 'area' && (this.gs.players[playerIdx]._cantPlayAreaThisTurn === this.gs.turn || this.spielerIstVonAreasAusgenommen(playerIdx))) continue;   // W82: Shipwrecked = „cannot … play Areas"
       // Per-Hero-Gate der KARTE (Lesson in the Arts, Living Illusion) gilt auch fuer geschenkte Zusatzaktionen.
       if (script?.canPlayWithHero && !this._mitWirker(playerIdx, heroIdx, fremd ? hs : null,
           () => script.canPlayWithHero(this.gs, playerIdx, heroIdx, cd, this))) continue;
@@ -24317,7 +24319,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Reality Crack set _cantPlayAreaThisTurn — any Area card is locked
         // for the rest of the turn.
         if ((cd.subtype || '').toLowerCase() === 'area'
-            && ps._cantPlayAreaThisTurn === gs.turn) continue;
+            && (ps._cantPlayAreaThisTurn === gs.turn
+              || this.spielerIstVonAreasAusgenommen(playerIdx))) continue;   // W82 (Shipwrecked): „you cannot … play Areas"
         // Level/school requirements (handles levelOverrideCards, bypassLevelReq, negation, Performance, Wisdom).
         // Note: Wolflesia-style Creature spell-cast bypass is NOT
         // honoured here — the host Hero must NOT appear as an eligible
@@ -25220,6 +25223,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         (cardData.subtype || '').toLowerCase() === 'area') {
       return null;
     }
+    // ★ W82 (Shipwrecked): „you cannot … play Areas" — solange einer deiner Helden Shipwrecked traegt, ist jede Area-Karte aus der Hand gesperrt (auch die Server-Pruefung).
+    if ((cardData.subtype || '').toLowerCase() === 'area' && this.spielerIstVonAreasAusgenommen(pi)) return null;
 
     // Generic Area rule: a player can only play an Area card (any type
     // with subtype "Area") while their OWN Area zone still has room.
@@ -28631,6 +28636,11 @@ this._deathWatch = (this._deathWatchStack || []).length
           blocked.push(cardName);
           continue;
         }
+      }
+      // ★ W82 (Shipwrecked): Area-Karten sind ausgegraut, solange einer meiner Helden Shipwrecked traegt.
+      if ((allCards[cardName]?.subtype || '').toLowerCase() === 'area' && this.spielerIstVonAreasAusgenommen(playerIdx)) {
+        blocked.push(cardName);
+        continue;
       }
       // Generic Attack/Spell lock (Trial of Coolness, etc.)
       if (ps._attackSpellLockedTurn === this.gs.turn) {
@@ -32608,7 +32618,31 @@ this._deathWatch = (this._deathWatchStack || []).length
    * (Rioting-Village-Rueckstoss) fragen NUR hier.
    */
   heldIstVonAreasAusgenommen(ownerIdx, heroIdx) {
-    return require('./_diver-helmet-shared').heroHasDiverHelmet(this, ownerIdx, heroIdx);
+    if (require('./_diver-helmet-shared').heroHasDiverHelmet(this, ownerIdx, heroIdx)) return true;
+    // ★ W82 (Shipwrecked): „you and all targets you control are unaffected by Areas" — der KONTROLLEUR des Helden zaehlt, nicht die Brettseite.
+    return this.spielerIstVonAreasAusgenommen(this.kontrolleurVonHeld(ownerIdx, heroIdx));
+  }
+
+  /**
+   * ★ W82 (Shipwrecked, Spell/Attachment Lv3): „While one of your Heroes has this Spell attached to it, you and all targets you control are unaffected by Areas and you cannot activate the effects
+   * of or play Areas." — EINE Frage fuer die Spieler-Seite: ist `pi` von Areas ausgenommen (und darf damit keine Areas spielen und keine Area-Effekte aktivieren)?
+   * Wahr, solange irgendein Held, den `pi` KONTROLLIERT (`heroSideOf`, auch ein uebernommener oder an den Gegner abgegebener Held; die Karte darf auch am Gegnerhelden liegen), eine aufgedeckte
+   * Shipwrecked in seinen Support Zones traegt. Angehaengte Karten ruhen nie mit dem Wirt (wie Diver Helmet). Kein Stapeln: eine Karte genuegt.
+   * `opts.ausser`: eine Shipwrecked-Instanz, die gerade geht (ihr Abgangs-Hook feuert vor dem Zonenwechsel) und nicht mehr zaehlt.
+   * Heldenfrage: `heldIstVonAreasAusgenommen`, Kartenfrage: `karteIstVonAreasAusgenommen` (beide schliessen diese Frage ein).
+   */
+  spielerIstVonAreasAusgenommen(pi, opts = {}) {
+    if (pi == null || pi < 0) return false;
+    const ausser = opts.ausser || this._shipwreckedAusser || null;
+    for (const inst of this.cardInstances || []) {
+      if (!inst || inst.name !== 'Shipwrecked' || inst.zone !== 'support' || inst.faceDown || inst === ausser) continue;
+      if (inst.heroIdx == null || inst.heroIdx < 0) continue;
+      const seite = this.physicalSide(inst);
+      const hero = this.gs.players[seite]?.heroes?.[inst.heroIdx];
+      if (!hero?.name || hero.hp <= 0) continue;
+      if (this.heroSideOf(seite, hero) === pi) return true;
+    }
+    return false;
   }
 
   /**
@@ -32620,7 +32654,10 @@ this._deathWatch = (this._deathWatchStack || []).length
   karteIstVonAreasAusgenommen(inst) {
     if (!inst || inst.zone !== 'support') return false;
     if (inst.heroIdx == null || inst.heroIdx < 0) return false;
-    return this.heldIstVonAreasAusgenommen(inst.owner, inst.heroIdx);
+    // Diver Helmet: der Held, in dessen Zonen die Karte PHYSISCH liegt.
+    if (require('./_diver-helmet-shared').heroHasDiverHelmet(this, inst.owner, inst.heroIdx)) return true;
+    // ★ W82 (Shipwrecked): „all targets you control" — der KONTROLLEUR der Karte (eine uebernommene Kreatur im Gegnerhelden zaehlt fuer den, der sie kontrolliert).
+    return this.spielerIstVonAreasAusgenommen(inst.controller ?? inst.owner);
   }
 
   _isDiverHelmetProtectedTarget(target) {
@@ -36774,6 +36811,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   darkOceanBlocksReaction(pi, chain) {
     if (!this.isDarkOceanActive()) return false;
+    if (this.spielerIstVonAreasAusgenommen(pi)) return false;   // ★ W82 (Shipwrecked): „you … are unaffected by Areas" — Dark Ocean sperrt ihn nicht
     // Bevorzugt das oberste Kettenglied. Ist die Kette leer (hook-
     // getriebenes Fenster), zaehlt die gerade aufloesende Karte.
     let top = chain?.[chain.length - 1] || this._currentEffectSource;
@@ -50877,7 +50915,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!inst) continue;
         const hoptKey = `area-effect:${areaName}:${playerIdx}`;
         const exhausted = this.gs.hoptUsed?.[hoptKey] === this.gs.turn;
-        let canActivate = !exhausted;
+        // ★ W82 (Shipwrecked): „you cannot activate the effects of … Areas" — die Area bleibt sichtbar, ist aber ausgegraut.
+        let canActivate = !exhausted && !this.spielerIstVonAreasAusgenommen(playerIdx);
         if (canActivate && typeof script.canActivateAreaEffect === 'function') {
           try {
             const ctx = this._createContext(inst, { _activator: playerIdx });
@@ -50904,6 +50943,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (gs.activePlayer !== activatorPi) return false;
     const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
     if (!isMainPhase) return false;
+    if (this.spielerIstVonAreasAusgenommen(activatorPi)) return false;   // ★ W82 (Shipwrecked): Area-Effekte aktivieren ist gesperrt
     const hoptKey = `area-effect:${areaName}:${activatorPi}`;
     if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) return false;
 

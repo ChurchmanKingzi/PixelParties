@@ -141,8 +141,9 @@ module.exports = {
    * Karte GESPERRT ist. Gilt fuer BEIDE Seiten — die Karte sagt „no
    * player", nicht „your opponent".
    */
-  blocksCardPlay(gs, pi, cardData) {
+  blocksCardPlay(gs, pi, cardData, engine) {
     if (cardData?.cardType !== 'Attack') return false;
+    if (engine?.spielerIstVonAreasAusgenommen?.(pi)) return false;   // W82 (Shipwrecked): der Spieler ist von Areas ausgenommen — das Attack-Limit gilt nicht fuer ihn
     return (gs.players[pi]?.attacksPlayedThisTurn || 0) >= 1;
   },
 

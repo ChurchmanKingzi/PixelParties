@@ -49,6 +49,7 @@ async function offerDraw(engine, pi, n) {
   if (pi == null || pi < 0) return;
   const ps = engine.gs.players[pi];
   if (!ps) return;
+  if (engine.spielerIstVonAreasAusgenommen(pi)) return;   // W82 (Shipwrecked): Area-Effekte aktivieren ist gesperrt
   const ok = await engine.promptGeneric(pi, {
     type: 'confirm',
     title: CARD_NAME,

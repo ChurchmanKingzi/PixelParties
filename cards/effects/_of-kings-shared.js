@@ -192,6 +192,7 @@ function coveredByBoardOfKings(engine, inst, sourceOwner, source) {
   const controller = inst.controller ?? inst.owner;
   if (sourceOwner == null || sourceOwner === controller) return false;
   if (!boardOfKingsOnBoard(engine)) return false;
+  if (engine.karteIstVonAreasAusgenommen?.(inst)) return false;   // W82 (Shipwrecked): ein von Areas ausgenommenes Ziel bekommt die Deckung der Area nicht
   // „a lower level": Artifact Creatures haben kein Level (Als Ruling 9.10.) — weder
   // koennen sie geschuetzt sein noch als Schuetzer mit niedrigerer Stufe dienen.
   if (isArtifactCreature(_cd(engine, inst))) return false;

@@ -75,6 +75,7 @@ module.exports = {
     onTurnEnd: async (ctx) => {
       if (ctx.cardZone !== 'area') return;
       if (ctx.activePlayer !== ctx.cardOwner) return;
+      if (ctx._engine.spielerIstVonAreasAusgenommen(ctx.cardOwner)) return;   // W82 (Shipwrecked): von Areas ausgenommen — der Stack wächst nicht
       // Defensive: skip if Wowhalla has already left the Area zone
       // this turn (race with onCardLeaveZone — the engine gates the
       // listener on inst.zone but a stale ctx can still fire).
@@ -159,6 +160,7 @@ module.exports = {
     if (info.sourceOwner === ctx.cardOwner) return null;
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
+    if (engine.spielerIstVonAreasAusgenommen(pi)) return null;   // W82 (Shipwrecked): Area-Effekte aktivieren ist gesperrt
     if (!(engine.getCoolnessStackSize(pi) > 0)) return null;   // Als Ruling (Al 26.10.): der Stack kann bei liegender Wowhalla leer sein — dann gibt es nichts zu loeschen
 
     const sourceName = info.source?.name || 'an opposing effect';
