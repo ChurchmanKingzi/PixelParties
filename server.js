@@ -9870,6 +9870,13 @@ function abilityInstNachKette(engine, inst, heroOwner, heroIdx, zoneKind, zoneId
   return engine.cardInstances.find(c => c.owner === heroOwner && c.zone === zone && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx && c.name === inst?.name) || inst;
 }
 
+/**
+ * W82 (Sinister Idol, Al): ist die Auflösung durch Idol gesenkt worden, darf der Aktivierer sie nicht mehr abbrechen. Zentral über den vorhandenen Zwangs-Kontext `gs._forcedCommitPlayer`
+ * (Learning / Copy Device): jede Wahl des Aktivierers in dieser Auflösung ist ohne Abbruch (Ziel-Picker, Galerien, Zonen-/Kartenwahl; die CPU nimmt die Pflichtantwort; der Server weist einen
+ * Abbruch ab, `_abbruchGesperrt`). „you may"-Fragen (Ja/Nein) bleiben echte Entscheidungen — ein „No" lässt die Ability wirkungslos, die Aktivierung bleibt verbraucht. Reaktionen des Gegners behalten ihren Abbruch.
+ */
+function mitIdolPflicht(engine, pi, aktiv, fn) { return engine.mitPflichtAufloesung(pi, aktiv, fn); }
+
 function abilityStufeNachKette(engine, heroOwner, heroIdx, zoneKind, zoneIdx, abilityName, level) {
   try {
     const st = engine.abilityStapelAn(heroOwner, heroIdx, zoneKind === 'support' ? 'support' : 'ability', zoneIdx);
@@ -10060,7 +10067,9 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
 
     const ctx = room.engine._createContext(inst, {});
     ctx.kostenStufe = level;   // W82 (Sinister Idol): Kosten bleiben die der Stufe beim Aktivieren, auch wenn die Kette die Stufe gesenkt hat
-    const resolved = await room.engine._alsAkteur(ctx, () => script.onFreeActivate(ctx, abilityStufeNachKette(room.engine, heroOwner, heroIdx, zoneKind, zoneIdx, abilityName, level)));
+    const aufLevel = abilityStufeNachKette(room.engine, heroOwner, heroIdx, zoneKind, zoneIdx, abilityName, level);
+    const idolPflicht = aufLevel < level;   // W82 (Sinister Idol, Al): die Kette hat die Stufe gesenkt → die Auflösung ist Pflicht (kein Abbrechen)
+    const resolved = await mitIdolPflicht(room.engine, pi, idolPflicht, () => room.engine._alsAkteur(ctx, () => script.onFreeActivate(ctx, aufLevel)));
     // ── AUFTRITT ERST HIER (12.8., Als Befund an "Trade") ────────────
     // Vorher stand der Auftritt direkt hinter dem Chain-Fenster, also
     // VOR `onFreeActivate` und damit vor jeder Abfrage der Karte. Bei
@@ -10132,6 +10141,11 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
         room.engine._lastPromptGerryDeclined = false;
         hoptReserved = false; // keep HOPT consumed
         room.engine.log('gerrymander_veto', { player: gs.players[pi].username, ability: abilityName });
+      } else if (idolPflicht) {
+        // W82 (Sinister Idol): die gesenkte Auflösung ist Pflicht — „no" auf eine „you may"-Frage / keine Wahl möglich = die Ability wirkt nicht, aber die Aktivierung ist geschehen (Sperre bleibt verbraucht).
+        hoptReserved = false;
+        if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
+        room.engine.log('sinister_idol_declined', { player: gs.players[pi].username, ability: abilityName });
       } else {
         releaseHopt();
       }
@@ -11036,7 +11050,9 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     room.engine.maybeFireCpuRevealEarly();
     const ctx = room.engine._createContext(inst, {});
     ctx.kostenStufe = level;   // W82 (Sinister Idol): Kosten bleiben die der Stufe beim Aktivieren
-    let result = await room.engine._alsAkteur(ctx, () => script.onActivate(ctx, abilityStufeNachKette(room.engine, heroOwner, heroIdx, zoneKind, zoneIdx, abilityName, level)));
+    const aufLevel = abilityStufeNachKette(room.engine, heroOwner, heroIdx, zoneKind, zoneIdx, abilityName, level);
+    const idolPflicht = aufLevel < level;   // W82 (Sinister Idol, Al): gesenkte Auflösung = Pflicht, kein Abbrechen
+    let result = await mitIdolPflicht(room.engine, pi, idolPflicht, () => room.engine._alsAkteur(ctx, () => script.onActivate(ctx, aufLevel)));
     if (room.engine.nimmOpferFizzle()) result = true;   // v1313: fizzelt, aber verbraucht
     // Auftritt NACH dem Handler (siehe doActivateFreeAbility) — eine
     // abgebrochene Aktivierung darf keine Karte einblenden.
@@ -11062,13 +11078,17 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
       // Standard cancel rolls HOPT back. Gerrymander-vetoed "may"
       // confirms keep HOPT consumed — the activator committed; opp's
       // Gerrymander declined for them, the slot is spent.
-      if (room.engine._lastPromptGerryDeclined) {
+      if (room.engine._lastPromptGerryDeclined || idolPflicht) {
         // Gerrymander veto — Saint Nicolas Potion still goes (the
-        // activator committed). Commit the cost.
+        // activator committed). Commit the cost. W82: dito, wenn Sinister Idol die Stufe gesenkt hat (Pflicht-Auflösung: die Aktivierung ist verbraucht).
         await room.engine.commitHeroActionCost(heroOwner, heroIdx);
         _heroCostFinalized = true;
+        if (room.engine._lastPromptGerryDeclined) {
+          room.engine.log('gerrymander_veto', { player: gs.players[pi].username, ability: abilityName });
+        } else {
+          room.engine.log('sinister_idol_declined', { player: gs.players[pi].username, ability: abilityName });
+        }
         room.engine._lastPromptGerryDeclined = false;
-        room.engine.log('gerrymander_veto', { player: gs.players[pi].username, ability: abilityName });
       } else {
         // Player cancelled — refund Hero pre-action cost.
         await room.engine.refundHeroActionCost(heroOwner, heroIdx);
@@ -16522,6 +16542,7 @@ io.on('connection', (socket) => {
     if (!room?.gameState?.potionTargeting) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi !== room.gameState.potionTargeting.ownerIdx) return;
+    if (room.engine?._abbruchGesperrt?.(pi)) return;   // W82: Pflichtwahl (Zwangs-Kontext, `cancellable: false`) — der Abbruch wird abgewiesen, die Frage bleibt offen
     room.gameState.potionTargeting = null;
     // Resolve the engine's pending prompt so the play_spell handler can reach its cancel path
     if (room.engine) room.engine.resolveEffectPrompt(null, { cancelled: true });
@@ -16549,6 +16570,7 @@ io.on('connection', (socket) => {
       const ps = room.gameState.players[pi];
       if (ps._resolvingCard && response.handIndex === getResolvingHandIndex(ps)) return;
     }
+    if (response?.cancelled && room.engine._abbruchGesperrt?.(pi)) return;   // W82: Pflichtwahl — Abbruch abgewiesen, die Frage bleibt offen
     room.engine.resolveGenericPrompt(response, promptId);
   });
 

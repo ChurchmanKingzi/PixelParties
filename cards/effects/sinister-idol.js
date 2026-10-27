@@ -3,14 +3,17 @@
 //  CARD EFFECT: "Sinister Idol"
 //  Artifact (Reaction, Cost 2)
 //
-//  „Play this card immediately when your opponent activates the once per turn effect of a level 3 Ability.
+//  „Play this card immediately when your opponent activates the active effect of a level 3 Ability.
 //   Before the Ability resolves, remove the top copy of it from the user. The Ability then resolves at the lowered level."
 //
 //  ── AUSLEGUNG (W82, Vorgaben von Al) ─────────────────────────────
 //  • KETTENFENSTER auf die AKTIVIERUNG einer Ability (wie Ragnarock): die Initialkarte der Kette ist eine Ability (`cardType 'Ability'`, `fromBoard` — beide Aktivierungswege
 //    `doActivateFreeAbility` und `doActivateAbility`; das Anlegen aus der Hand ist keine Aktivierung). Das Glied trägt `abilityZone` ({ heroOwner, heroIdx, zoneIdx, zoneKind, level }) —
 //    der Stapel, der aktiviert wird. „Level 3" = dieser Stapel hat beim Öffnen des Fensters genau 3 Karten (Stufe = Stapelhöhe; Support-Zonen-Stapel von Xal/Xalibur zählen mit).
-//    „Once per turn effect" = jede Aktivierung einer Ability am Brett (alle haben eine Einmal-pro-Zug-Sperre; passive/Dauerwirkungen öffnen kein Fenster).
+//    „Active effect" (Al: statt des früheren „once per turn effect"): JEDE Aktivierung des aktiven Effekts einer Ability am Brett — freie und Aktions-Aktivierung, auch Abilities, die
+//    mehrfach pro Zug nutzbar sind; passive/Dauerwirkungen öffnen kein Fenster. Das Fenster hängt an der Aktivierung, nicht an der Einmal-pro-Zug-Sperre. Aktivierungswege mit Fenster:
+//    `doActivateFreeAbility`, `doActivateAbility` und die geliehene Ability von Charme Lv 1 (s. u.); ohne Fenster bleiben die Zusatznutzung der Secret Lab Entrance (ausdrücklich keine neue
+//    Aktivierung) und die Aktivierung als Sofort-Zusatzaktion (`performImmediateAction`, z. B. Guardian Beast Hu) — Frage an Al.
 //  • „your opponent activates": der Aktivierer ist ein Gegner des Idol-Spielers (2–4 Sitze). Bezauberte/geliehene Abilities (Charme Lv 3, Lizbeth/Smugbeth): das Glied
 //    trägt den Stapel, der aktiviert wird — die Kopie fällt von DIESEM Stapel („the user" = der Held, auf dem sie liegt), auch wenn er dem Idol-Spieler gehört.
 //  • Wirkung: BEVOR die Ability auflöst (die Kette löst rückwärts auf, die Initialkarte zuletzt) wird die OBERSTE Kopie des Stapels in die ABLAGE ihres Besitzers geschickt
@@ -21,8 +24,13 @@
 //  • KOSTEN der Ability (Al): sie bleiben die der Stufe BEIM Aktivieren — der Aktivierer zahlt nie rückwirkend nach der gesenkten Stufe (Alchemy Lv 3: gratis, auch wenn Idol auf
 //    Stufe 2 senkt; Diplomacy Lv 3: 5 Gold). Technik: `ctx.kostenStufe` (server.js setzt sie auf die Stufe beim Aktivieren); nur Skripte mit stufenabhängigem GOLD-Preis
 //    (Alchemy, Diplomacy) lesen sie. Abwurf-/Zugmengen (Inventing, Leadership, Navigation, Trade …) sind Teil der Wirkung und folgen der gesenkten Stufe.
-//  • Einmal pro Zug bleibt verbraucht (die Aktivierung ist geschehen): die Sperre der Ability wird gesetzt wie immer; bricht der Aktivierer die Auflösung selbst ab,
-//    gilt die übliche Konvention (Abbruch = nichts passiert, Sperre zurück) — die Kopie bleibt dann trotzdem abgeworfen.
+//  • PFLICHT-AUFLÖSUNG (Al): hat Idol die Stufe gesenkt, darf der Aktivierer die Auflösung nicht mehr abbrechen. Zentral: `engine.mitPflichtAufloesung` setzt den vorhandenen Zwangs-Kontext
+//    `gs._forcedCommitPlayer` (Learning/Copy Device) um die Auflösung — jede Wahl des Aktivierers (Ziel-, Karten-, Zonen-, Optionswahl) hat keinen Abbrechen-Knopf, die CPU nimmt die Pflichtantwort, der
+//    Server weist einen Abbruch ab (`_abbruchGesperrt`: `cancel_potion`/`effect_prompt_response`). „You may"-Fragen (Ja/Nein) bleiben echte Entscheidungen: ein „No" (oder keine mögliche Wahl) lässt die
+//    Ability wirkungslos, die Aktivierung und die Einmal-pro-Zug-Sperre bleiben VERBRAUCHT (Log `sinister_idol_declined`). Abilities ohne Wahl sind unberührt; Reaktionen/Fragen an den Gegner behalten ihren Abbruch.
+//  • Charme Lv 1 (Al: Lücke geschlossen): die geliehene Ability wird aktiviert — Charme öffnet dafür ein Kettenfenster (`executeCardWithChain` + Surprise-Fenster, `charme.js` `_activateLv1`). Identität:
+//    die geliehene Ability mit der Stufe IHRES Stapels (Charme ändert die Stufe nicht); die Kopie fällt vom Stapel des Gegners, „the user" = der Held, auf dem sie liegt (wie bei Lizbeth/Smugbeth).
+//    Das trifft den Idol-Spieler selbst (es ist sein Stapel) — die CPU spielt das nie. Alternative Lesart (nicht gebaut): keine Kopie entfernen, nur die Stufe dieser Auflösung senken.
 //  • Mehrere Idols: ein zweites Idol wird auf dieselbe Aktivierung nicht mehr angeboten, solange eins in der Kette liegt; löst es trotzdem auf (zwei Sitze), sieht es Stufe 2 und
 //    verpufft („Level 3" nicht mehr erfüllt). Wird die Aktivierung selbst negiert (Ragnarock, Master's Plan …) bevor Idol auflöst, passiert nichts.
 //  • Kosten 2 Gold: die Kettenmaschine zahlt beim Einsetzen (`_rxPay`); bei fehlendem Gold wird die Karte nicht angeboten.
