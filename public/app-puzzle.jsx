@@ -3785,7 +3785,15 @@ function PuzzleCreator() {
             dragEntityData.current = null;
           }
           onDragStart(e, zoneCardName, null, { zt, si, hi, slot });
-        } else e.preventDefault();
+        } else {
+          // Eine Karte INNERHALB dieser Zone mit eigenen Griffen (Area-Stapel: jede Karte hat ihre eigene `data-pz-zone`) lost
+          // `dragstart` aus, der hierher blubbert. Die Huelle selbst traegt dort den LEEREN Platz am Stapelende (`hasCard` falsch, damit
+          // Ablegen anhaengt) — ihr `preventDefault` brach den Zug der Karte ab: die Area blieb liegen, das gerade gebaute Ziehbild
+          // (`#pz-drag-ghost`) blieb mangels `dragend` als kleinere Kopie davor stehen. Abgewiesen wird nur, was HIER beginnt
+          // (ein Bild oder Text in einer leeren Zone), nicht, was eine innere Karte beginnt.
+          const innereKarte = e.target !== e.currentTarget && e.target.closest?.('[data-pz-zone]') !== e.currentTarget;
+          if (!innereKarte) e.preventDefault();
+        }
       },
       onDragEnd,
       // ★ v1452: Ablegen laeuft nicht mehr ueber die Zone selbst, sondern
