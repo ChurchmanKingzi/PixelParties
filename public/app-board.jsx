@@ -10673,7 +10673,7 @@ const HotPotatoThrowEffect = (() => {
 
 // Lebensdauer (ms) von Zonen-Animationen, die der Server OHNE `duration` schickt und die länger als die Standard-Sekunde laufen
 // (`onZoneAnim`: sonst wird das Bild nach 1000 ms abgeräumt). Ein `duration` im Ereignis geht vor.
-const ZONEN_ANIM_DAUER = { ghostly_warning: 1260, atta_books: 1400, darion_equip: 1060 };
+const ZONEN_ANIM_DAUER = { ghostly_warning: 1260, atta_books: 1400, darion_equip: 1060, sinister_idol: 1360 };
 
 // ═════════════════════════════════════════════════════════════════
 //  Unreasonable Anger: Dampf (`unreasonable_steam`) — PIXELART; cartoonhafte Wut: Dampf steigt aus dem Helden, dazu die rote Zornader
@@ -31312,6 +31312,107 @@ const ANIM_REGISTRY = {
           const sek = sa / 1000, k = sa / f.leben;
           g.put(cx + Math.cos(f.w) * f.v * sek, cy + Math.sin(f.w) * f.v * sek + 40 * sek * sek, GOLD[Math.min(4, Math.floor(k * 4) + 1)], (1 - k) * aus);
         }
+      }
+    };
+    return ppPunktBild(malen, ENDE, 300, 300, vorbereiten);
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Sinister Idol — PIXELART, Zonen-Animation auf einer ABILITY (Hülle `ppPunktBild`; Vorlage: das Kartenbild — das goldene Götzenbild mit roten Augen und weißem Zahngrinsen,
+  //  grauer Körper mit weißem Fragezeichen)
+  //
+  //  Der Götze (12 × 18) erscheint gedithert über der Ability und sinkt in drei Stufen herab; seine Augen blinken rot. Ab ~300 ms spannt sich der Fluch: ein violetter Rahmen schnappt
+  //  in drei Stufen um die Ability (danach blinkt er), zwei gestrichelte Fluchstrahlen laufen vom Götzen auf sie, drei Schädel steigen aus ihr auf. Bei ~760 ms blitzt die Ability auf
+  //  (Kreuzfunkel, Dither-Blitz) — dann löst sich die oberste Kopie (der Server schickt sie zur selben Zeit in die Ablage: Flug Brett → Ablage, ~500 ms) und violette Fetzen steigen
+  //  aus der Ability auf. Ab ~1050 ms dithert alles weg; ENDE 1300 (Standard-Dauer 1360 über ZONEN_ANIM_DAUER). Feste Palette, KEINE Unschärfe, KEIN Leuchten.
+  // ═══════════════════════════════════════════════════════════════════
+  sinister_idol: (() => {
+    const IDOL = {
+      k: ppHex('#141414'), Y: ppHex('#fff196'), y: ppHex('#ffd61a'), o: ppHex('#f9ac20'), r: ppHex('#e73b41'), f: ppHex('#ff6666'),
+      w: ppHex('#ffffff'), g: ppHex('#b9b9b9'), G: ppHex('#929292'), d: ppHex('#686868'), q: ppHex('#535353'),
+    };
+    // Götze 12 × 18: Kopf (Zeile 0–8) mit roten Augen und Zahngrinsen, Körper (9–17) mit dem weißen Fragezeichen
+    const KOPF_UND_KOERPER = [
+      '...kkkkkk...',
+      '..kYYyyyyk..',
+      '.kYyyyyyyok.',
+      '.kYyyyyyyok.',
+      '.kyrryyrryk.',
+      '.koyyyyyyok.',
+      '.kwkwkwkwwk.',
+      '..kwkwkwkk..',
+      '...kkkkkk...',
+      '..kGGGGGGk..',
+      '.kgGwwwGGdk.',
+      '.kgGGGwGGdk.',
+      '.kgGGwGGGdk.',
+      '.kgGGGGGGdk.',
+      '.kgGGwGGGdk.',
+      '.kddddddddk.',
+      '..kqqqqqqk..',
+      '...kkkkkk...',
+    ];
+    const AUGEN_HELL = KOPF_UND_KOERPER.map(z => z.replace(/r/g, 'f'));
+    const PU = ['#f1e5fa', '#c98aff', '#9544d5', '#47117e', '#2b0b47'].map(ppHex);
+    const SCHAEDEL_PAL = { k: ppHex('#2b0b47'), b: ppHex('#d6bbf1') };
+    const SCHAEDEL = ['.kbbbk.', 'kbbbbbk', 'kbkbkbk', 'kbbbbbk', '.kbkbk.', '..kkk..'];
+    const ENDE = 1300, FADE_AB = 1050, FLUCH = 300, BLITZ = 760;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = () => ({
+      fetzen: Array.from({ length: ppFxN(16) }, () => ({
+        x: (Math.random() - 0.5) * 1.8, ab: BLITZ + Math.random() * 220, v: 14 + Math.random() * 24, leben: 340 + Math.random() * 260, gross: Math.random() < 0.3, p: Math.random() * 6,
+      })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const cx = Math.round(sz.cx), cy = Math.round(sz.cy), hw = Math.round(sz.hw), hh = Math.round(sz.hh);
+      // ── der Götze: gestuftes Einblenden (Dithering), sinkt in drei Stufen, wippt in ganzen Pixeln ──
+      const ein = klemme(t / 260, 0, 1);
+      const ia = Math.min(Math.floor(ein * 5) / 5, aus);
+      const sinken = ein < 1 ? [5, 3, 1][Math.min(2, Math.floor(ein * 3))] : 0;
+      const ix = cx, iy = cy - hh - 11 - sinken + (t > FLUCH ? Math.round(Math.sin(t / 130)) : 0);
+      if (ia > 0) ppSprite(g, ix, iy, (t > 160 && Math.floor(t / 100) % 2 === 1) ? AUGEN_HELL : KOPF_UND_KOERPER, IDOL, ia);
+      // ── Fluchstrahlen (gestrichelt, laufen mit) vom Götzen auf die Ability ──
+      if (t >= FLUCH && t < BLITZ + 60) {
+        const ab = klemme((t - FLUCH) / 120, 0, 1);
+        for (const [sx, tx] of [[-3, -0.45], [2, 0.45]]) {
+          const x0 = ix + sx, y0 = iy + 5, x1 = cx + tx * hw, y1 = cy - hh * 0.5;
+          const n = Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))), kopf = Math.floor(n * ab);
+          for (let s = 0; s <= kopf; s++) if ((s + Math.floor(t / 66)) % 3 !== 0) g.put(x0 + (x1 - x0) * (s / n), y0 + (y1 - y0) * (s / n), s % 2 ? PU[1] : PU[2], aus);
+        }
+      }
+      // ── der Fluchrahmen schnappt um die Ability (drei Stufen), blinkt, bleibt bis zum Blitz ──
+      const fa = t - FLUCH;
+      if (fa >= 0 && t < BLITZ + 100) {
+        const m = fa < 132 ? [8, 4, 1][Math.floor(fa / 44)] : 0;
+        const rw = hw * 2 + 2 * m, rh = hh * 2 + 2 * m, x0 = cx - hw - m, y0 = cy - hh - m;
+        const hell = fa < 132 || Math.floor(t / 99) % 2 === 0;
+        for (let i = 0; i < rw; i++) for (const w of [0, 1]) { const c = w ? PU[3] : (hell ? PU[1] : PU[2]); g.put(x0 + i, y0 + w, c, aus); g.put(x0 + i, y0 + rh - 1 - w, c, aus); }
+        for (let j = 0; j < rh; j++) for (const w of [0, 1]) { const c = w ? PU[3] : (hell ? PU[1] : PU[2]); g.put(x0 + w, y0 + j, c, aus); g.put(x0 + rw - 1 - w, y0 + j, c, aus); }
+        if (fa < 132) for (const [ex, ey] of [[x0, y0], [x0 + rw - 1, y0], [x0, y0 + rh - 1], [x0 + rw - 1, y0 + rh - 1]]) g.block(ex - 1, ey - 1, 3, 3, PU[0], aus);
+      }
+      // ── Schädel steigen aus der Ability auf ──
+      for (let s = 0; s < 3; s++) {
+        const al = t - (FLUCH + 40 + s * 130);
+        if (al < 0 || al > 540) continue;
+        const k = al / 540, sek = al / 1000;
+        const x = cx + (s - 1) * hw * 0.7 + Math.round(Math.sin(sek * 7 + s)), y = cy + hh * 0.3 - 34 * sek - k * 6;
+        ppSprite(g, x, y, SCHAEDEL, SCHAEDEL_PAL, (1 - k * k) * aus);
+      }
+      // ── Blitz: die Ability flackert auf, Kreuzfunkel in der Mitte ──
+      const ba = t - BLITZ;
+      if (ba >= 0 && ba < 100) {
+        if (ba < 34) g.block(cx - hw, cy - hh, hw * 2, hh * 2, PU[0], aus);
+        else if (ba < 67) g.block(cx - hw, cy - hh, hw * 2, hh * 2, PU[1], 0.5 * aus);
+        else g.block(cx - hw, cy - hh, hw * 2, hh * 2, PU[2], 0.25 * aus);
+      }
+      if (ba >= 0 && ba < 260) ppKreuzfunkel(g, cx - 1, cy - 1, [2, 4, 5, 5, 4, 3, 2, 1][Math.floor(ba / 33)] || 1, PU, aus);
+      // ── Fetzen: die Kopie löst sich, violette Fetzen steigen auf ──
+      for (const f of teile.fetzen) {
+        const al = t - f.ab; if (al < 0 || al > f.leben) continue;
+        const k = al / f.leben, sek = al / 1000;
+        const x = cx + f.x * hw + Math.round(Math.sin(sek * 6 + f.p) * 2), y = cy + hh * 0.6 - f.v * sek * 1.6;
+        g.block(x, y, f.gross ? 2 : 1, f.gross ? 2 : 1, PU[Math.min(3, Math.floor(k * 4))], (1 - k) * aus);
       }
     };
     return ppPunktBild(malen, ENDE, 300, 300, vorbereiten);
@@ -55190,6 +55291,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'destroy') { return <span className="log-damage">{cName(entry.target)} was destroyed!</span>; }
       if (t === 'all_heroes_dead') { return <span className="log-damage" style={{fontWeight:700}}>All heroes defeated!</span>; }
       if (t === 'reaction_activated') { return <span className="log-status">{cName(entry.card)} activated as a Reaction!</span>; }
+      if (t === 'sinister_idol') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {cName('Sinister Idol')} removed the top copy of {cName(entry.ability)} from {cName(entry.hero)} — it resolves at level {entry.level}.</span>; }
       // v1328: Wirker waehrend der Kette handlungsunfaehig → Attack/Spell fizzelt.
       if (t === 'chain_link_fizzled') { const p = playerByName(entry.player); const warum = { defeated: 'was defeated', frozen: 'is Frozen', stunned: 'is Stunned', negated: 'is Negated' }[entry.reason] || 'can no longer act'; return <span className="log-info">💨 {cName(entry.card)} fizzled — {pName(p.name, p.color)}'s {entry.hero || 'Hero'} {warum}.</span>; }
       // v1327: Stealthy Pursuit — und die bisher unsichtbaren Dive-Down-Zeilen.

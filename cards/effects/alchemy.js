@@ -86,7 +86,9 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const ps = ctx.players[pi];
-    const goldCost = level >= 3 ? 0 : level >= 2 ? 4 : 8;
+    // W82 (Sinister Idol, Al): die Kosten bleiben die der Stufe BEIM Aktivieren — senkt Idol die Stufe vor der Auflösung, ändert das die Kosten nicht (`ctx.kostenStufe`).
+    const kostenLevel = ctx.kostenStufe ?? level;
+    const goldCost = kostenLevel >= 3 ? 0 : kostenLevel >= 2 ? 4 : 8;
 
     // Confirmation prompt
     const confirmed = await ctx.promptConfirmEffect({
