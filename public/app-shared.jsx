@@ -2744,6 +2744,24 @@ const ZONE_ANIM_SFX = {
   modifier_sparkle:        { name: 'buff', opts: { rate: 1.25, volume: 0.5 } },
   level_down:              { name: 'debuff', opts: { rate: 0.9, volume: 0.7 } },   // Looming Threat: Stufe sinkt
   hand_level_down:         { name: 'debuff', opts: { rate: 1.0, volume: 0.6 } },   // Great Vanguard Demon: Stufe sinkt (Pixelart, die Karte bleibt sichtbar)
+  // Ancient Guardian Statue — Magie-Partikel auf der aufgedeckten Handkarte. `reveal` (Standard): Aufdeck-Ton + helles Ping; `tick`: Zugende, ein Ping + leises Absinken (Stufe −1);
+  // `free`: Stufe 0 — Buff-Klang, zwei Pings. Nur der erste Teil übernimmt die Sammelkategorie 'effect'.
+  statue_magic: (p) => {
+    const ph = p && p.phase;
+    if (ph === 'tick') return [
+      { name: 'ping',   opts: { rate: 1.3, volume: 0.4 } },
+      { name: 'debuff', opts: { rate: 1.3, volume: 0.3, delay: 160, category: null, dedupe: 0 } },
+    ];
+    if (ph === 'free') return [
+      { name: 'buff', opts: { rate: 1.05, volume: 0.7 } },
+      { name: 'ping', opts: { rate: 1.7, volume: 0.4, delay: 520, category: null, dedupe: 0 } },
+      { name: 'ping', opts: { rate: 2.2, volume: 0.3, delay: 700, category: null, dedupe: 0 } },
+    ];
+    return [
+      { name: 'reveal', opts: { rate: 0.85, volume: 0.5 } },
+      { name: 'ping',   opts: { rate: 1.6, volume: 0.3, delay: 260, category: null, dedupe: 0 } },
+    ];
+  },
   mind_control_hex:        { name: 'elem_dark', opts: { rate: 0.8, volume: 0.6 } },   // Mind Control: Hypnose-Spirale über dem übernommenen Helden (Pixelart)
   // Infallible Oracle Pythia (W78) — grüne Flammen. `mark`: Aufflackern (Aufdeck-Ton + leises Zischen); `tick`: ein Flämmchen auf Pythia (Ping); `doom`: die Flammen lodern
   // auf (Feuerrauschen, tiefes Brummen) und schlagen über dem Ziel zusammen (~1100 ms, Schlag); `burn`: das Opfer verbrennt; `save`: Pythia wird von den Flammen geheilt (Heil-Ton).

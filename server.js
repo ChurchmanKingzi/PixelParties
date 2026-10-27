@@ -17343,6 +17343,7 @@ io.on('connection', (socket) => {
 
     // Apply creature custom HP and statuses
     const pzPythia = [];   // Infallible Oracle Pythia (W78): Plan-Ziele werden nach der Schleife aufgelöst (das Ziel kann eine später angelegte Instanz sein)
+    const pzStatue = [];   // Ancient Guardian Statue (W82): Handplatz der gesuchten Karte (`statueHandSlot`, 1-basiert) — wird nach der Schleife verknüpft
     for (let pi = 0; pi < 2; pi++) {
       const pz = puzzleData.players[pi];
       if (!pz) continue;
@@ -17545,6 +17546,7 @@ io.on('connection', (socket) => {
               if (typeof cs.pythiaCounters === 'number' && cs.pythiaCounters > 0) inst.counters.pythiaCounters = cs.pythiaCounters;
               if (cs.pythiaPlan && (cs.pythiaPlan.kind === 'hero' || cs.pythiaPlan.kind === 'creature')) pzPythia.push({ inst, pi, plan: cs.pythiaPlan });
             }
+            if (inst.name === 'Ancient Guardian Statue' && Number.isInteger(cs.statueHandSlot) && cs.statueHandSlot > 0) pzStatue.push({ inst, pi, slot: cs.statueHandSlot });
             if (typeof cs.bunnyBombCounter === 'number' && cs.bunnyBombCounter > 0) {
               inst.counters.bunnyBombCounter = cs.bunnyBombCounter;
             }
@@ -17683,6 +17685,17 @@ io.on('connection', (socket) => {
           }
         }
       }
+    }
+
+    // Ancient Guardian Statue: die Handkarte an dem gewählten Platz (1-basiert, Hand des Statuen-Kontrolleurs) gilt als von DIESER Statue gesucht — verknüpft (`_handStatueLink`) und dauerhaft aufgedeckt.
+    // Nur ein Spell zählt; ein leerer Platz oder eine andere Kartenart wird ignoriert. Ihre Stufe stellt der Editor wie bei jeder Handkarte ein (`handLevels`).
+    for (const { inst, pi, slot } of pzStatue) {
+      const ps = gs.players[pi];
+      const name = ps?.hand?.[slot - 1];
+      if (!name || getCardDB()[name]?.cardType !== 'Spell') continue;
+      if (!ps._handStatueLink) ps._handStatueLink = {};
+      ps._handStatueLink[slot - 1] = inst.id;
+      room.engine.revealHandCopy(pi, name, slot - 1);
     }
 
     // Pythia: Plan-Ziele auflösen (Gegenseite von Pythias Besitzer); die Anzeige-Marke leitet `_pythia-shared.abgleichen` beim nächsten sync ab.
