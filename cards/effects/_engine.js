@@ -11229,11 +11229,8 @@ class GameEngine {
   }
 
   /** „cannot be defeated while you control it“ (Deepsea Succubus, Little Lyta): trägt der Held eine Kontrolle mit Schutzmarke `nurSchadenSchutz`? */
-  heldNichtBesiegbar(hero, quellenSeite = null, besitzerSeite = null) {
-    if (!hero?.statuses?.charmed?.nurSchadenSchutz) return false;
-    // Ruling (Al, 27.10.): der eigentliche BESITZER ist nicht gesperrt (er opfert/besiegt seinen eigenen, gerade gestohlenen Helden ungehindert); der Schutz
-    // gilt nur solange die Kontrolle aktiv ist (der `charmed`-Status endet mit der Rueckgabe) und gegen alle anderen Quellen.
-    return !(quellenSeite != null && besitzerSeite != null && besitzerSeite >= 0 && quellenSeite === besitzerSeite);
+  heldNichtBesiegbar(hero) {
+    return !!hero?.statuses?.charmed?.nurSchadenSchutz;
   }
 
   async actionDefeatHero(source, target, opts = {}) {
@@ -11247,8 +11244,8 @@ class GameEngine {
     const targetOwner = this._findHeroOwner(target);
 
     // „cannot be defeated“ (Deepsea Succubus, Little Lyta): ein Held unter solcher Kontrolle wird auf KEINEM Weg besiegt — auch nicht durch ein Opfer
-    // (`isSacrifice`) oder `unaufhaltsam` — AUSSER durch den eigentlichen Besitzer. Nur die Buchführung am eigenen Helden (`eigenerAbgang`) bleibt davon unberührt.
-    if (!opts.eigenerAbgang && this.heldNichtBesiegbar(target, source?.owner ?? source?.controller, targetOwner)) {
+    // (`isSacrifice`) oder `unaufhaltsam`. Nur die Buchführung am eigenen Helden (`eigenerAbgang`) bleibt davon unberührt.
+    if (!opts.eigenerAbgang && this.heldNichtBesiegbar(target)) {
       this.log('defeat_negated', { hero: this._heroLabel(target), source: source?.name || opts.reason || 'defeat', reason: 'cannot_be_defeated' });
       return { defeated: false, blocked: true };
     }

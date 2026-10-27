@@ -42,6 +42,7 @@ function getSacrificeTargets(gs, pi, engine) {
     if (!hero?.name || hero.hp <= 0) continue;
     // Must be originally owned (not temporarily controlled)
     if (hero._originalOwner !== undefined && hero._originalOwner !== pi) continue;
+    if (engine?.heldNichtBesiegbar?.(hero)) continue;   // Lyta/Succubus: „cannot be defeated“ — kein zahlbares Opfer
     targets.push({
       id: `hero-${pi}-${hi}`,
       type: 'hero', owner: pi, heroIdx: hi,
