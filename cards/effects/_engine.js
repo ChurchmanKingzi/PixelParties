@@ -1496,6 +1496,8 @@ class GameEngine {
       cardInstances: instSnaps,
       // Laenge der Nach-Ketten-Warteschlange: was danach eingereiht wird, gehoert zur Simulation (siehe restore).
       postChainLen: (this._postChainActions || []).length,
+      // W84a: die Loesch-Warteschlange (Circles of Hell) liegt AUSSERHALB von `gs` — ein Rollout, der eine Karte loescht, darf sie nicht verschmutzen.
+      loeschQ: (this._loeschWarteschlange || []).map(e => ({ ...e })),
       eventId: this.eventId,
       chain: _clone(this.chain),
       chainDepth: this.chainDepth,
@@ -1679,6 +1681,9 @@ class GameEngine {
         && this._postChainActions.length > snap.postChainLen) {
       this._postChainActions.length = snap.postChainLen;
     }
+    // W84a: Loesch-Warteschlange (Circles of Hell) auf den Stand des Schnappschusses zurueck: Eintraege eines Rollouts gehoeren nicht ins echte Spiel,
+    // und die Abholung (`_loeschAbholungAnmelden`) meldet sich beim naechsten Entleeren bzw. der naechsten Loeschung selbst neu an.
+    this._loeschWarteschlange = Array.isArray(snap.loeschQ) ? snap.loeschQ.map(e => ({ ...e })) : [];
     this.cardInstances = snap.cardInstances.map(data => {
       const inst = new CardInstance(data.name, data.owner, data.zone, data.heroIdx ?? -1, data.zoneSlot ?? -1);
       for (const key of Object.keys(data)) {
@@ -14835,30 +14840,49 @@ class GameEngine {
       // alles, was ein Vorrang-Angebot selbst ausloest; innerhalb des Vorrangs bleibt die Reihenfolge.
       const vorrang = name === 'The Third Circle of Hell' || !!this._laufenderVorrang;
       const q = this._loeschWarteschlange || (this._loeschWarteschlange = []);
+      // W84a: `folge` = diese Loeschung entstand WAEHREND ein Angebot lief (ein Circle loescht den anderen) - dann kein Hinweis 'schon genutzt' (nur Dantes & Co. Loeschungen).
+      const folge = !!this._laufenderEintrag;
       if (vorrang) {
         let ix = 0;
         while (ix < q.length && q[ix].vorrang) ix++;
-        q.splice(ix, 0, { pi, name, vorrang: true });
-      } else q.push({ pi, name });
+        q.splice(ix, 0, { pi, name, vorrang: true, folge });
+      } else q.push({ pi, name, folge });
     }
-    if (!this._loeschWarteschlange?.length || this._loeschAbholungAngemeldet) return;
-    this._loeschAbholungAngemeldet = true;
+    this._loeschAbholungAnmelden();
+  }
+
+  /**
+   * ★ W84a: die Abholung der Loesch-Warteschlange (`_geloeschtMeldung`) als EINE Nach-Ketten-Aktion anmelden — wenn keine mehr wartet oder laeuft.
+   * Vorher stand dafuer ein Merker (`_loeschAbholungAngemeldet`), der nur der Abholung selbst zurueckgesetzt wurde: ging die Aktion verloren, ohne zu laufen
+   * (CPU-Rollout: `restore()` kappt die Warteschlange der Nach-Ketten-Aktionen, `_runPostChainActions` verwirft Simulations-Reste), blieb er fuer den Rest der
+   * Partie gesetzt und KEIN Circle of Hell wurde je wieder angeboten (Dante loescht den Circle, nichts passiert). Jetzt zaehlt nur, was wirklich da ist:
+   * laeuft die Abholung oder liegt ihre Aktion in der Warteschlange, ist alles gut; sonst wird sie (erneut) angemeldet.
+   */
+  _loeschAbholungAnmelden() {
+    if (!this._loeschWarteschlange?.length) return;
+    if (this._loeschAbholungLaeuft) return;
+    if (this._loeschAbholungFn && (this._postChainActions || []).includes(this._loeschAbholungFn)) return;
     // EINE Nach-Ketten-Aktion arbeitet die ganze Warteschlange ab — auch Loeschungen, die
     // waehrend der Abarbeitung entstehen (Kreis A loescht Kreis B …). Obergrenze gegen Endlosketten.
-    this.queuePostChainAction(async () => {
+    const fn = async () => {
+      this._loeschAbholungLaeuft = true;
       try {
         for (let n = 0; this._loeschWarteschlange.length > 0 && n < 24; n++) {
           const e = this._loeschWarteschlange.shift();
           this._laufenderVorrang = !!e.vorrang;
+          this._laufenderEintrag = e;
           try { await loadCardEffect(e.name)?.onDeletedFromAnywhere?.(this, e.pi, e.name); }
           catch (err) { console.error(`[onDeletedFromAnywhere] ${e.name}:`, err.message); }
-          finally { this._laufenderVorrang = false; }
+          finally { this._laufenderVorrang = false; this._laufenderEintrag = null; }
         }
       } finally {
         this._loeschWarteschlange.length = 0;
-        this._loeschAbholungAngemeldet = false;
+        this._loeschAbholungLaeuft = false;
+        if (this._loeschAbholungFn === fn) this._loeschAbholungFn = null;
       }
-    });
+    };
+    this._loeschAbholungFn = fn;
+    this.queuePostChainAction(fn);
   }
 
   /**
@@ -47083,6 +47107,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    *  re-enter / double-run. No-op when empty or already draining. */
   async _runPostChainActions() {
     if (this._runningPostChain) return;
+    if (!this._inMctsSim) this._loeschAbholungAnmelden();   // W84a: wartende Loeschungen ohne Abholung (z. B. nach einem Rollout-Rueckspulen) wieder anmelden
     if (!this._postChainActions || this._postChainActions.length === 0) return;
     // Board-idle gate. A deferred action (e.g. Lunar Eclipse's
     // replacement-Action prompt) must only run when the triggering
@@ -47108,6 +47133,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       const batch = this._inMctsSim
         ? this._postChainActions
         : this._postChainActions.filter(fn => !fn._ausSimulation);   // Rollout-Reste nie im echten Spiel ausfuehren
+      // W84a: war die Abholung der Loesch-Warteschlange ein solcher Rollout-Rest, sind auch ihre Eintraege Simulation — verwerfen.
+      if (!this._inMctsSim && this._loeschAbholungFn && !batch.includes(this._loeschAbholungFn) && this._postChainActions.includes(this._loeschAbholungFn)) {
+        this._loeschWarteschlange = []; this._loeschAbholungFn = null;
+      }
       this._postChainActions = [];
       for (const fn of batch) {
         try { await fn(); }
