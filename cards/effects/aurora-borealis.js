@@ -184,6 +184,7 @@ module.exports = {
       const wirkbar = geholt.filter(n => {
         const cd = engine._getCardDB()[n];
         if (!cd) return false;
+        if (engine.areaKarteGesperrt(cd, pi)) return false;   // Als Ruling (Al 27.10.): Reality Crack („cannot play another Area") / Shipwrecked — eine Area ist nicht wirkbar
         // „Only 1 per game" (Divine Gift …): der Sofort-Guss prueft das nicht selbst (S01-11)
         const sc = loadCardEffect(n);
         if ((sc?.oncePerGame || sc?.oncePerGameKey) && ps._oncePerGameUsed?.has(sc.oncePerGameKey || n)) return false;

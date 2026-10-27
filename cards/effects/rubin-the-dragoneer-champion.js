@@ -87,6 +87,7 @@ function eligibleHandIndices(engine, pi, heroIdx, feld = pi) {
         const script = loadCardEffect(name);
         ok = true;
         if (script?.isReaction || script?.isSurprise || script?.neverPlayable) ok = false;
+        if (ok && engine.areaKarteGesperrt(cd, pi)) ok = false;   // Als Ruling (Al 27.10.): Reality Crack („cannot play another Area") / Shipwrecked — eine Area ist als Zusatzaktion nicht waehlbar
         if (ok && !engine.heroMeetsLevelReq(feld, heroIdx, cd, feld !== pi ? { levelSourcePi: pi } : {})) ok = false;
         if (ok) {
           const wisdomCost = engine.getWisdomDiscardCost(feld, heroIdx, cd);

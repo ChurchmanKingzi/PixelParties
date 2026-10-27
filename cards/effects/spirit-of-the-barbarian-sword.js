@@ -124,6 +124,8 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     if (areaCount(engine.gs) < 1) return false;
+    // Als Ruling (Al 27.10.): Reality Crack („You cannot play another Area for the rest of the turn") sperrt auch „bring … directly into play" — die Aktivierung ist dann ausgegraut (nichts wird abgeraeumt).
+    if (engine.areaSpielGesperrt(pi, { direkt: true })) return false;
     const cardDB = engine._getCardDB();
     return (engine.gs.players[pi]?.mainDeck || [])
       .some(n => isTutorableArea(cardDB[n], engine, pi));
@@ -136,6 +138,7 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
     if (areaCount(gs) < 1) return false;              // Kosten nicht zahlbar
+    if (engine.areaSpielGesperrt(pi, { direkt: true })) return false;   // Als Ruling (Al 27.10.): Reality-Crack-Sperre (s. `canActivateCreatureEffect`)
 
     const cardDB = engine._getCardDB();
     const zaehler = {};

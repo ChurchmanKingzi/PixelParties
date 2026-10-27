@@ -217,9 +217,8 @@ module.exports = {
     // here too so Cooldin's button grays out when the zone is occupied.
     // W16c (A04-21): Limit statt "Zone leer": mit Spatial Crevice (bis zu 3 verschiedene Areas) ist noch Platz.
     if (!engine.canPlaceAnotherArea(pi)) return false;
-    // Reality Crack's turn-long area lock also blocks Cooldin.
-    if (ps._cantPlayAreaThisTurn === gs.turn) return false;
-    if (engine.spielerIstVonAreasAusgenommen(pi)) return false;   // W82 (Shipwrecked): „you cannot … play Areas"
+    // Reality Crack's turn-long area lock (und W82 Shipwrecked: „you cannot … play Areas") also blocks Cooldin — Als Ruling (Al 27.10.): EINE Frage `areaSpielGesperrt`.
+    if (engine.areaSpielGesperrt(pi)) return false;
 
     const cardDB = engine._getCardDB();
     const fromHand = collectAreasFromSource(ps.hand || [], cardDB, 'hand', engine, pi);

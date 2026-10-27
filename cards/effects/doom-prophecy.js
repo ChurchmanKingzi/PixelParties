@@ -35,7 +35,9 @@ module.exports = {
       const oi = engine.opponentOf(pi);
       const ps = gs.players[pi];
 
-      const idx = (ps.mainDeck || []).indexOf(D.CLOCK_NAME);
+      // Als Ruling (Al 27.10.): Reality Crack („You cannot play another Area for the rest of the turn") sperrt auch „place it into your Area Zone" — wie ohne Doom Clock im Deck
+      // fizzelt die Karte komplett (nichts wird gelegt, der Zug endet nicht).
+      const idx = engine.areaSpielGesperrt(pi, { direkt: true }) ? -1 : (ps.mainDeck || []).indexOf(D.CLOCK_NAME);
       if (idx < 0) {
         // Kein Ziel im Deck -> die Karte fizzelt komplett, der Zug
         // laeuft normal weiter (Als Ruling).

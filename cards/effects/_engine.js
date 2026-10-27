@@ -24036,7 +24036,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (cd.cardType === 'Spell' && this.gs.players[playerIdx]._spellLockTurn === this.gs.turn
           && this.gs.players[playerIdx]._silenceBonusSpell !== this.gs.turn) continue;
       if (cd.cardType === 'Spell' && this.thaliaSupportSperre(playerIdx, cd)) continue;   // W49a (Thalia): 1 Kopie je Support Spell pro Zug
-      if ((cd.subtype || '').toLowerCase() === 'area' && (this.gs.players[playerIdx]._cantPlayAreaThisTurn === this.gs.turn || this.spielerIstVonAreasAusgenommen(playerIdx))) continue;   // W82: Shipwrecked = „cannot … play Areas"
+      if (this.areaKarteGesperrt(cd, playerIdx)) continue;   // Als Ruling (Al 27.10.): Reality Crack („cannot play another Area") und W82 (Shipwrecked) — EINE Frage
       // Per-Hero-Gate der KARTE (Lesson in the Arts, Living Illusion) gilt auch fuer geschenkte Zusatzaktionen.
       if (script?.canPlayWithHero && !this._mitWirker(playerIdx, heroIdx, fremd ? hs : null,
           () => script.canPlayWithHero(this.gs, playerIdx, heroIdx, cd, this))) continue;
@@ -24390,11 +24390,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         // `areaLimit`-Vertrag (v1050). Mirrors the play-time gate.
         if ((cd.subtype || '').toLowerCase() === 'area'
             && !this.canPlaceAnotherArea(playerIdx, cd.name)) continue;
-        // Reality Crack set _cantPlayAreaThisTurn — any Area card is locked
-        // for the rest of the turn.
-        if ((cd.subtype || '').toLowerCase() === 'area'
-            && (ps._cantPlayAreaThisTurn === gs.turn
-              || this.spielerIstVonAreasAusgenommen(playerIdx))) continue;   // W82 (Shipwrecked): „you cannot … play Areas"
+        // Reality Crack („You cannot play another Area for the rest of the turn") und W82 (Shipwrecked: „you cannot … play Areas"):
+        // jede Area-Karte ist gesperrt — Als Ruling (Al 27.10.): EINE Frage `areaSpielGesperrt`.
+        if (this.areaKarteGesperrt(cd, playerIdx)) continue;
         // Level/school requirements (handles levelOverrideCards, bypassLevelReq, negation, Performance, Wisdom).
         // Note: Wolflesia-style Creature spell-cast bypass is NOT
         // honoured here — the host Hero must NOT appear as an eligible
@@ -25291,14 +25289,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // W49a (Thalia, Al 22.10.2026): „You can only activate 1 copy of each Support Spell per turn."
     if (cardData.cardType === 'Spell' && this.thaliaSupportSperre(pi, cardData)) return null;
 
-    // Area-play lock (Reality Crack): once set, no further Area Spells
-    // may be cast this turn by this player. Flag is cleared at turn end.
-    if (ps._cantPlayAreaThisTurn === gs.turn &&
-        (cardData.subtype || '').toLowerCase() === 'area') {
-      return null;
-    }
-    // ★ W82 (Shipwrecked): „you cannot … play Areas" — solange einer deiner Helden Shipwrecked traegt, ist jede Area-Karte aus der Hand gesperrt (auch die Server-Pruefung).
-    if ((cardData.subtype || '').toLowerCase() === 'area' && this.spielerIstVonAreasAusgenommen(pi)) return null;
+    // Area-play lock (Reality Crack: „You cannot play another Area for the rest of the turn"; W82 Shipwrecked: „you cannot … play Areas"):
+    // solange gesperrt, ist jede Area-Karte nicht spielbar (auch die Server-Pruefung). Als Ruling (Al 27.10.): EINE Frage `areaSpielGesperrt`.
+    if (this.areaKarteGesperrt(cardData, pi)) return null;
 
     // Generic Area rule: a player can only play an Area card (any type
     // with subtype "Area") while their OWN Area zone still has room.
@@ -26203,6 +26196,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hero = this.gs.players[wirkerSeite]?.heroes?.[heroIdx];
     const cardData = this._getCardDB()[cardName];
     if (!ps || !hero || !cardData) return { cancelled: true };
+    // Als Ruling (Al 27.10.): Reality Crack („You cannot play another Area for the rest of the turn") / Shipwrecked — eine Area darf auch als Sofort-Guss (Zusatzaktion, aus Hand/Deck/Ablage/Geloescht)
+    // nicht gespielt werden. Letzte Sicherung hinter den Listen der Aufrufer (`getHeroEligibleActionCards`, `kannSofortWirken` …): nichts wird bewegt, die Karte bleibt, wo sie ist.
+    if (this.areaKarteGesperrt(cardData, playerIdx)) {
+      this.log('immediate_cast_fizzled', { player: ps.username, hero: hero.name, card: cardName, by: opts.by || null, reason: 'area_play_locked' });
+      return { cancelled: true };
+    }
     // Atta: Spells, die dieser Held wirkt und die in die Ablage gingen, werden stattdessen geloescht — beim Wirken festgestellt.
     const _attaLoescht = cardData.cardType === 'Spell' && this.spellGoesToDeletedInstead(wirkerSeite, heroIdx);
     // W36a: ein unter Silence-Sperre zugelassener Guss (Bonus-Spell) verbraucht den Bonus — der Stand VOR dem Guss zaehlt (Silence kann im Guss selbst keinen neuen Bonus gewaehren, `_skipReactionCheck`).
@@ -28722,7 +28721,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
       }
       // ★ W82 (Shipwrecked): Area-Karten sind ausgegraut, solange einer meiner Helden Shipwrecked traegt.
-      if ((allCards[cardName]?.subtype || '').toLowerCase() === 'area' && this.spielerIstVonAreasAusgenommen(playerIdx)) {
+      if (this.areaKarteGesperrt(allCards[cardName], playerIdx)) {   // Als Ruling (Al 27.10.): auch die Reality-Crack-Sperre graut Areas aus
         blocked.push(cardName);
         continue;
       }
@@ -32727,6 +32726,26 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this.heroSideOf(seite, hero) === pi) return true;
     }
     return false;
+  }
+
+  /**
+   * ★ Als Ruling (Al 27.10.): EINE Frage „darf `pi` JETZT keine Area spielen?" — alle Wege, auf denen eine Area ins Spiel kommen kann, fragen NUR hier (nie `_cantPlayAreaThisTurn` selbst).
+   * Zwei Quellen: (1) Reality Crack — „You cannot play another Area for the rest of the turn": der Stempel `ps._cantPlayAreaThisTurn` traegt den Zug, in dem Reality Crack wirkte (veraltet
+   * von selbst; gilt fuer ALLES, was eine Area legt, auch „bring directly into play"); (2) Shipwrecked (`spielerIstVonAreasAusgenommen`, „you cannot … play Areas").
+   * `opts.direkt`: der Weg ist ein Karteneffekt „bring directly into play" / „place into your Area Zone" (Planet in a Bottle, Orkallion, Spirit of the Barbarian Sword, Dante, Doom Prophecy):
+   * Shipwrecked sperrt ihn NICHT (CARD_API W82), Reality Crack schon. Gilt nicht fuer das AKTIVIEREN von Area-Effekten (dort fragt man `spielerIstVonAreasAusgenommen`).
+   */
+  areaSpielGesperrt(pi, opts = {}) {
+    if (pi == null || pi < 0) return false;
+    const ps = this.gs.players?.[pi];
+    if (ps && ps._cantPlayAreaThisTurn === this.gs.turn) return true;
+    if (!opts.direkt && this.spielerIstVonAreasAusgenommen(pi)) return true;
+    return false;
+  }
+
+  /** Kartenfrage zu `areaSpielGesperrt`: `cd` ist eine Area-Karte (Untertyp Area, egal ob Spell, Attack oder Artifact) UND `pi` darf sie jetzt nicht spielen. */
+  areaKarteGesperrt(cd, pi, opts = {}) {
+    return (cd?.subtype || '').toLowerCase() === 'area' && this.areaSpielGesperrt(pi, opts);
   }
 
   /**

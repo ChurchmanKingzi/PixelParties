@@ -159,6 +159,7 @@ function isNameEligibleForLearning(engine, ps, pi, heroIdx, name, requireMagicAr
 
   const script = loadCardEffect(name);
   if (!isProactivelyCastable(cd, script)) return false;
+  if (engine.areaKarteGesperrt(cd, pi)) return false;   // Als Ruling (Al 27.10.): Reality Crack („cannot play another Area") / Shipwrecked — eine Area ist als Nachguss nicht waehlbar
 
   if (!engine.heroMeetsLevelReq(hs, heroIdx, cd, hs !== pi ? { levelSourcePi: pi } : {})) return false;
 

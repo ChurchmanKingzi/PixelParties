@@ -5390,7 +5390,7 @@ Zweite Quelle von „unaffected by Areas", an den SPIELER gebunden (der Kontroll
   `isAreaImmuneInst` / `isAreaImmuneHero` / `_isDiverHelmetProtectedTarget` (Kontrolleur der Karte). `heroHasDiverHelmet` allein gilt nur noch für den Helm selbst.
 * **Gesperrt:** `getActivatableAreas` (ausgegraut) / `activateAreaEffect` (verweigert) für aktive Area-Effekte; Area-Karten aus der Hand (`getHeroPlayableCards`,
   `validateActionPlay`, `getBlockedSpells`, Zusatzaktions-Wege inkl. Cooldin / Cleansing of the Land / Circle-Wiederholung). „Direkt ins Spiel bringen" (Planet in a Bottle,
-  Reality Crack, Orkallion, Dante …) ist KEIN „play" und bleibt erlaubt.
+  Reality Crack, Orkallion, Dante …) ist KEIN „play" und bleibt unter SHIPWRECKED erlaubt (die Reality-Crack-Sperre dagegen sperrt auch das — `areaSpielGesperrt`, ganz unten).
 * **Neue Area mit Wirkung auf Spieler/Ziele:** immer die Frage oben stellen (Hook-Effekte pro Skript; Zielfilter über die Helden-/Kartenfrage). Zustandsbasierte Areas (Barrel Home / Gigalopolis,
   `_zonen-welt-shared.js`) gleichen pro Held ab (`heldAbgleichen`); `shipwrecked.js` stößt den Abgleich beim Kommen/Gehen der Karte an.
 
@@ -26429,3 +26429,9 @@ Antworten von Al zu W82b/W80a. Regeländerung nur bei Cool Rescuer Monia (Reihen
 3. Soll der weiche Schutz **asymmetrisch** gerechnet werden (Gewinn ×0,5, eigener Verlust voll — vorsichtiger), statt symmetrisch ×0,5 für beide?
 
 Repros (lokal, `docs/niche-tests/repro/W83/`): `a-01` (Reihenfolge, Mensch/CPU-Kombinationen, beide Sitze × beide Wirker × beide Schutzwege), `a-02` (CPU-Zahlungsregel, geschützte, 0,7, zweite Frage), `a-03` (alle AoE-Bewerter), `a-04` (Warrior), `a-05` (Saya × Monia). Angepasst: `W82/b-02` (gegnerische Monia jetzt weich), `W82/b-03` (Teilschaden mit 0,7, Monia weich).
+
+## Al 27.10. — Reality Crack sperrt ALLE Area-Wege (R7)
+
+* **`engine.areaSpielGesperrt(pi, { direkt })` / `engine.areaKarteGesperrt(cd, pi, { direkt })`** sind die EINE Frage „darf `pi` jetzt keine Area spielen?" — Reality Crack („You cannot play another Area for the rest of the turn", Stempel `ps._cantPlayAreaThisTurn` = Zug, veraltet von selbst) UND Shipwrecked (W82). Kein Skript liest `_cantPlayAreaThisTurn` selbst. `direkt: true` = Karteneffekt „bring directly into play"/„place into your Area Zone" (Planet in a Bottle, Orkallion, Spirit of the Barbarian Sword, Dante Weg 2, Doom Prophecy): Shipwrecked sperrt ihn nicht, Reality Crack schon. Nicht gemeint: das AKTIVIEREN von Area-Effekten (dort `spielerIstVonAreasAusgenommen`).
+* **Wer Areas wählbar macht, fragt hier:** `getHeroEligibleActionCards` (alle Zusatzaktionen, Circles-Replay), `getHeroPlayableCards`, `validateActionPlay`, `getBlockedSpells` (Ausgrauen; Friedhelms Deck-Liste), `_castSpellImmediately` (letzte Sicherung: Area unter Sperre → `{ cancelled: true }`, nichts bewegt) und die EIGENEN Listen: Learning, Rubin, Taio (Deck), Aurora Borealis, Difficulty Lever, Cleansing of the Land (Schritt ②), Cooldin, Dante, Planet, Orkallion, Spirit, Doom Prophecy (fizzelt wie ohne Doom Clock), Smuggler's Pier (`canActivate`, Artifact-Area). Eine NEUE Karte, die eine Area spielt oder legt, fragt die Frage in ihrer Auswahlliste/ihrem `canActivate` — sonst ist sie ein Leck.
+* **Reality Crack selbst:** der Stempel steht VOR dem Abräumen und auch bei leerer Galerie; seine EINE Area kommt über `runHooks('onPlay')` ins Spiel (kein Spielweg, keine Selbstblockade).

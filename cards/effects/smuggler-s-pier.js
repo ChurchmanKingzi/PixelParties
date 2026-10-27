@@ -85,7 +85,9 @@ module.exports = {
    * route through that gate. Boomerang's Artifact-lockout is checked
    * upstream and doesn't need to be duplicated here.
    */
-  canActivate(gs, pi /*, engine */) {
+  canActivate(gs, pi, engine) {
+    // Als Ruling (Al 27.10.): auch der Artifact-Area ist ein SPIELEN einer Area — Reality Crack („You cannot play another Area for the rest of the turn") und W82 (Shipwrecked) sperren sie.
+    if (engine?.areaSpielGesperrt?.(pi)) return false;
     if (!gs?.areaZones) return true;
     return (gs.areaZones[pi] || []).length === 0;
   },
@@ -108,6 +110,7 @@ module.exports = {
     // theory have placed an Area. Bail cleanly without a partial
     // commit.
     if ((gs.areaZones?.[pi] || []).length > 0) return { cancelled: true };
+    if (engine.areaSpielGesperrt(pi)) return { cancelled: true };   // Als Ruling (Al 27.10.): Reality-Crack-/Shipwrecked-Sperre (s. `canActivate`)
 
     // Find the resolving inst — the card currently held at the
     // resolving hand-index. `getResolvingHandIndex` returns the
