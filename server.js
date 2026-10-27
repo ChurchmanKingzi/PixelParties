@@ -5295,6 +5295,9 @@ function sendGameState(room, playerIdx, extra) {
       // by 3" rebate). Same hand-index keying; the offset evaporates
       // when the card leaves the hand.
       handLevelOffsetsTransient: pi === playerIdx ? { ...(ps._handLevelOffsetsTransient || {}) } : {},
+      // Ancient Guardian Statue: Handplätze, deren Spell JETZT als zusätzliche Aktion zählt (Marke gilt: Statue wirkt, Stufe 0) — nur für die eigene Hand (Tooltip-Hinweis).
+      handZusatzaktion: pi === playerIdx && room.engine && ps._handZusatzaktion
+        ? Object.fromEntries(Object.keys(ps._handZusatzaktion).filter(k => room.engine.handKopieZusatzaktion(pi, +k)).map(k => [k, true])) : {},
       // Per-hand-index hero filter (Sparkfly Queen). When an entry
       // exists for a slot, the corresponding offset only applies to
       // the named hero; the client repaints that slot's level badge
@@ -6292,6 +6295,7 @@ function sendSpectatorGameState(room) {
       handLevelSet: {},
       handApplause: {},
       handLevelOffsetsTransient: {},
+      handZusatzaktion: {},
       handLevelOffsetHeroFilter: {},
       handLevelOffsetsDynamic: {},
       handCostReductions: {},
@@ -9855,6 +9859,25 @@ async function doTriggerTreacherousCrystal(room, pi) {   // W71b: async — das 
   return true;
 }
 
+/**
+ * W82 (Sinister Idol): die Stufe, auf der die aktivierte Ability AUFLÖST — gelesen NACH dem Ketten-/Surprise-Fenster (Idol nimmt die oberste Kopie vor der Auflösung weg:
+ * „The Ability then resolves at the lowered level"). Ohne Änderung am Stapel (Normalfall) ist es `level`. Die Kosten richten sich weiter nach `level` (`ctx.kostenStufe`).
+ */
+/** W82 (Sinister Idol): die Instanz, mit der die Aktivierung auflöst. Hat die Kette genau die Kopie abgeworfen, die beim Aktivieren gefunden wurde (alle Kopien eines Stapels heißen gleich), nimmt die Auflösung eine verbliebene Kopie desselben Platzes. */
+function abilityInstNachKette(engine, inst, heroOwner, heroIdx, zoneKind, zoneIdx) {
+  const zone = zoneKind === 'support' ? 'support' : 'ability';
+  if (inst && inst.zone === zone && inst.owner === heroOwner && inst.heroIdx === heroIdx && inst.zoneSlot === zoneIdx) return inst;
+  return engine.cardInstances.find(c => c.owner === heroOwner && c.zone === zone && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx && c.name === inst?.name) || inst;
+}
+
+function abilityStufeNachKette(engine, heroOwner, heroIdx, zoneKind, zoneIdx, abilityName, level) {
+  try {
+    const st = engine.abilityStapelAn(heroOwner, heroIdx, zoneKind === 'support' ? 'support' : 'ability', zoneIdx);
+    if (st && st.length > 0 && st[0] === abilityName) return st.length;
+  } catch { /* Standard: die Stufe beim Aktivieren */ }
+  return level;
+}
+
 async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmedOwner, borrowedFromOwner }) {
   if (!room?.engine || !room.gameState) return false;
   // v1073 („The Thing in the Ship"): harte Sperre. Die Listen in der
@@ -9937,7 +9960,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
   room.engine.noteActivationOutcome(hoptKey, false);
 
   // 24.10.: eine Ability in einer SUPPORT Zone (Xal, Xalibur) ist eine Instanz mit zone 'support' (vorher fand diese Suche sie nie).
-  const inst = room.engine.cardInstances.find(c =>
+  let inst = room.engine.cardInstances.find(c =>
     c.owner === heroOwner && c.zone === (zoneKind === 'support' ? 'support' : 'ability') && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
   );
   if (!inst) return false;
@@ -9980,6 +10003,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
     const chainResult = await room.engine.executeCardWithChain({
       cardName: abilityName, owner: pi, heroIdx, cardType: 'Ability', goldCost: 0,
       resolve: null, fromBoard: true,
+      abilityZone: { heroOwner, heroIdx, zoneIdx, zoneKind: zoneKind === 'support' ? 'support' : 'ability', level },   // W82 (Sinister Idol)
     });
 
     // Surprise-Fenster auf die AKTIVIERUNG — Zwilling der Stelle in
@@ -10003,6 +10027,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
       return true;
     }
 
+    inst = abilityInstNachKette(room.engine, inst, heroOwner, heroIdx, zoneKind, zoneIdx);   // W82 (Sinister Idol): die Kette kann DIESE Kopie abgeworfen haben — mit einer verbliebenen Kopie weiterarbeiten
     const origController = inst.controller;
     const origOwner = inst.owner;
     const origHeroIdx = inst.heroIdx;
@@ -10034,7 +10059,8 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
     }
 
     const ctx = room.engine._createContext(inst, {});
-    const resolved = await room.engine._alsAkteur(ctx, () => script.onFreeActivate(ctx, level));
+    ctx.kostenStufe = level;   // W82 (Sinister Idol): Kosten bleiben die der Stufe beim Aktivieren, auch wenn die Kette die Stufe gesenkt hat
+    const resolved = await room.engine._alsAkteur(ctx, () => script.onFreeActivate(ctx, abilityStufeNachKette(room.engine, heroOwner, heroIdx, zoneKind, zoneIdx, abilityName, level)));
     // ── AUFTRITT ERST HIER (12.8., Als Befund an "Trade") ────────────
     // Vorher stand der Auftritt direkt hinter dem Chain-Fenster, also
     // VOR `onFreeActivate` und damit vor jeder Abfrage der Karte. Bei
@@ -10936,7 +10962,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
 
   try {
     // 24.10.: auch Abilities in Support Zonen (Xal, Xalibur) — Instanz mit zone 'support'.
-    const inst = room.engine.cardInstances.find(c =>
+    let inst = room.engine.cardInstances.find(c =>
       c.owner === heroOwner && c.zone === (zoneKind === 'support' ? 'support' : 'ability') && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
     );
     if (!inst) return false;
@@ -10953,6 +10979,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     const chainResult = await room.engine.executeCardWithChain({
       cardName: abilityName, owner: pi, heroIdx, cardType: 'Ability', goldCost: 0, resolve: null,
       fromBoard: true,
+      abilityZone: { heroOwner, heroIdx, zoneIdx, zoneKind: zoneKind === 'support' ? 'support' : 'ability', level },   // W82 (Sinister Idol)
     });
 
     // Surprise-Fenster auf die AKTIVIERUNG (Cybug LADYBUG). Reihenfolge
@@ -10981,6 +11008,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
       return true;
     }
 
+    inst = abilityInstNachKette(room.engine, inst, heroOwner, heroIdx, zoneKind, zoneIdx);   // W82 (Sinister Idol): die Kette kann DIESE Kopie abgeworfen haben — mit einer verbliebenen Kopie weiterarbeiten
     const origController = inst.controller;
     const origOwner = inst.owner;
     const origHeroIdx = inst.heroIdx;
@@ -11007,7 +11035,8 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     // (no-op for humans / PvP / MCTS sim; idempotent below).
     room.engine.maybeFireCpuRevealEarly();
     const ctx = room.engine._createContext(inst, {});
-    let result = await room.engine._alsAkteur(ctx, () => script.onActivate(ctx, level));
+    ctx.kostenStufe = level;   // W82 (Sinister Idol): Kosten bleiben die der Stufe beim Aktivieren
+    let result = await room.engine._alsAkteur(ctx, () => script.onActivate(ctx, abilityStufeNachKette(room.engine, heroOwner, heroIdx, zoneKind, zoneIdx, abilityName, level)));
     if (room.engine.nimmOpferFizzle()) result = true;   // v1313: fizzelt, aber verbraucht
     // Auftritt NACH dem Handler (siehe doActivateFreeAbility) — eine
     // abgebrochene Aktivierung darf keine Karte einblenden.
@@ -17318,6 +17347,7 @@ io.on('connection', (socket) => {
 
     // Apply creature custom HP and statuses
     const pzPythia = [];   // Infallible Oracle Pythia (W78): Plan-Ziele werden nach der Schleife aufgelöst (das Ziel kann eine später angelegte Instanz sein)
+    const pzStatue = [];   // Ancient Guardian Statue (W82): Handplatz der gesuchten Karte (`statueHandSlot`, 1-basiert) — wird nach der Schleife verknüpft
     for (let pi = 0; pi < 2; pi++) {
       const pz = puzzleData.players[pi];
       if (!pz) continue;
@@ -17520,6 +17550,7 @@ io.on('connection', (socket) => {
               if (typeof cs.pythiaCounters === 'number' && cs.pythiaCounters > 0) inst.counters.pythiaCounters = cs.pythiaCounters;
               if (cs.pythiaPlan && (cs.pythiaPlan.kind === 'hero' || cs.pythiaPlan.kind === 'creature')) pzPythia.push({ inst, pi, plan: cs.pythiaPlan });
             }
+            if (inst.name === 'Ancient Guardian Statue' && Number.isInteger(cs.statueHandSlot) && cs.statueHandSlot > 0) pzStatue.push({ inst, pi, slot: cs.statueHandSlot });
             if (typeof cs.bunnyBombCounter === 'number' && cs.bunnyBombCounter > 0) {
               inst.counters.bunnyBombCounter = cs.bunnyBombCounter;
             }
@@ -17657,6 +17688,22 @@ io.on('connection', (socket) => {
             }
           }
         }
+      }
+    }
+
+    // Ancient Guardian Statue: die Handkarte an dem gewählten Platz (1-basiert, Hand des Statuen-Kontrolleurs) gilt als von DIESER Statue gesucht — verknüpft (`_handStatueLink`) und dauerhaft aufgedeckt.
+    // Nur ein Spell zählt; ein leerer Platz oder eine andere Kartenart wird ignoriert. Ihre Stufe stellt der Editor wie bei jeder Handkarte ein (`handLevels`).
+    for (const { inst, pi, slot } of pzStatue) {
+      const ps = gs.players[pi];
+      const name = ps?.hand?.[slot - 1];
+      if (!name || getCardDB()[name]?.cardType !== 'Spell') continue;
+      if (!ps._handStatueLink) ps._handStatueLink = {};
+      ps._handStatueLink[slot - 1] = inst.id;
+      room.engine.revealHandCopy(pi, name, slot - 1);
+      // Startstufe 0 im Editor (`counters.levelSet` = 0, gedruckte Stufe > 0) heißt „durch die Statue auf 0 gesenkt": die Kopie trägt die Zusatzaktions-Marke.
+      if (room.engine._handLevelSetFor(pi, name, slot - 1) === 0 && (getCardDB()[name].level || 0) > 0) {
+        if (!ps._handZusatzaktion) ps._handZusatzaktion = {};
+        ps._handZusatzaktion[slot - 1] = { source: 'Ancient Guardian Statue', instId: inst.id };
       }
     }
 

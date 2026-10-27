@@ -219,6 +219,7 @@ module.exports = {
     if (!engine.canPlaceAnotherArea(pi)) return false;
     // Reality Crack's turn-long area lock also blocks Cooldin.
     if (ps._cantPlayAreaThisTurn === gs.turn) return false;
+    if (engine.spielerIstVonAreasAusgenommen(pi)) return false;   // W82 (Shipwrecked): „you cannot … play Areas"
 
     const cardDB = engine._getCardDB();
     const fromHand = collectAreasFromSource(ps.hand || [], cardDB, 'hand', engine, pi);

@@ -90,6 +90,7 @@ module.exports = {
       const healed = ctx.healedAmount || 0;
       if (!target || targetOwner == null || targetOwner < 0) return;
       if (healed <= 0) return;
+      if (engine.spielerIstVonAreasAusgenommen(targetOwner)) return;   // W82 (Shipwrecked): er darf Area-Effekte nicht aktivieren (und ist von Areas ausgenommen)
 
       // Ensure target is alive (it is, we just healed it — defensive)
       if (target.hp !== undefined && target.hp <= 0) return;

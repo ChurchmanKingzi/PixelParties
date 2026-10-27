@@ -37,7 +37,7 @@ const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zähl
 const {
   isParaseedCreature, heroHasParaseed, syncParaseedPoison,
 } = require('./_paraseed-shared');
-const { heroHasDiverHelmet, isAreaImmuneInst } = require('./_diver-helmet-shared');
+const { isAreaImmuneHero, isAreaImmuneInst } = require('./_diver-helmet-shared');   // Diver Helmet + W82 Shipwrecked
 
 const CARD_NAME = 'Paraseed Greenhouse';
 
@@ -59,7 +59,7 @@ function pflanzZiele(engine, pi) {
   // uebernommene Helden der Gegenspalte; `owner` = physische Seite.
   for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name) continue;
-    if (heroHasDiverHelmet(engine, physOwner, hi)) continue;
+    if (isAreaImmuneHero(engine, physOwner, hi)) continue;
     if (heroHasParaseed(engine, physOwner, hi)) continue;
     for (const si of freieZonen(engine, physOwner, hi)) {
       ziele.push({
@@ -93,7 +93,7 @@ function umzugsZiele(engine, ausserHost, inst = null) {
       const hero = ps.heroes[hi];
       if (!hero?.name) continue;
       if (ausserHost && ausserHost.owner === pi && ausserHost.heroIdx === hi) continue;
-      if (heroHasDiverHelmet(engine, pi, hi)) continue;
+      if (isAreaImmuneHero(engine, pi, hi)) continue;
       for (const si of freieZonen(engine, pi, hi)) {
         ziele.push({
           owner: pi, heroIdx: hi, slotIdx: si,

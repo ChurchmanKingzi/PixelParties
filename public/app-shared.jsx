@@ -2744,6 +2744,24 @@ const ZONE_ANIM_SFX = {
   modifier_sparkle:        { name: 'buff', opts: { rate: 1.25, volume: 0.5 } },
   level_down:              { name: 'debuff', opts: { rate: 0.9, volume: 0.7 } },   // Looming Threat: Stufe sinkt
   hand_level_down:         { name: 'debuff', opts: { rate: 1.0, volume: 0.6 } },   // Great Vanguard Demon: Stufe sinkt (Pixelart, die Karte bleibt sichtbar)
+  // Ancient Guardian Statue — Magie-Partikel auf der aufgedeckten Handkarte. `reveal` (Standard): Aufdeck-Ton + helles Ping; `tick`: Zugende, ein Ping + leises Absinken (Stufe −1);
+  // `free`: Stufe 0 — Buff-Klang, zwei Pings. Nur der erste Teil übernimmt die Sammelkategorie 'effect'.
+  statue_magic: (p) => {
+    const ph = p && p.phase;
+    if (ph === 'tick') return [
+      { name: 'ping',   opts: { rate: 1.3, volume: 0.4 } },
+      { name: 'debuff', opts: { rate: 1.3, volume: 0.3, delay: 160, category: null, dedupe: 0 } },
+    ];
+    if (ph === 'free') return [
+      { name: 'buff', opts: { rate: 1.05, volume: 0.7 } },
+      { name: 'ping', opts: { rate: 1.7, volume: 0.4, delay: 520, category: null, dedupe: 0 } },
+      { name: 'ping', opts: { rate: 2.2, volume: 0.3, delay: 700, category: null, dedupe: 0 } },
+    ];
+    return [
+      { name: 'reveal', opts: { rate: 0.85, volume: 0.5 } },
+      { name: 'ping',   opts: { rate: 1.6, volume: 0.3, delay: 260, category: null, dedupe: 0 } },
+    ];
+  },
   mind_control_hex:        { name: 'elem_dark', opts: { rate: 0.8, volume: 0.6 } },   // Mind Control: Hypnose-Spirale über dem übernommenen Helden (Pixelart)
   // Infallible Oracle Pythia (W78) — grüne Flammen. `mark`: Aufflackern (Aufdeck-Ton + leises Zischen); `tick`: ein Flämmchen auf Pythia (Ping); `doom`: die Flammen lodern
   // auf (Feuerrauschen, tiefes Brummen) und schlagen über dem Ziel zusammen (~1100 ms, Schlag); `burn`: das Opfer verbrennt; `save`: Pythia wird von den Flammen geheilt (Heil-Ton).
@@ -2897,6 +2915,15 @@ const ZONE_ANIM_SFX = {
     { name: 'placement', opts: { rate: 0.8, volume: 0.9, delay: 600, category: null, dedupe: 0 } },
     { name: 'elem_dark', opts: { rate: 1.1, volume: 0.5, delay: 620, category: null, dedupe: 0 } },
   ],
+  // Sinister Idol (W82) — der Götze erscheint (dunkles Raunen, 0 ms), der Fluchrahmen schnappt zu (~300 ms: Schwächungs-Klang), die Ability blitzt (~760 ms: Verneinungs-Ton,
+  // Abwurf-Klang) und die oberste Kopie fliegt in die Ablage. Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  sinister_idol: [
+    { name: 'elem_dark', opts: { rate: 0.7, volume: 0.6 } },
+    { name: 'debuff',    opts: { rate: 0.8, volume: 0.5, delay: 300, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 0.7, volume: 0.4, delay: 420, category: null, dedupe: 0 } },
+    { name: 'negate',    opts: { rate: 1.1, volume: 0.6, delay: 760, category: null, dedupe: 0 } },
+    { name: 'discard',   opts: { rate: 0.8, volume: 0.6, delay: 800, category: null, dedupe: 0 } },
+  ],
   // Darion, the Blood-Crazy Groundskeeper (24.10.) — Kettensäge: Hieb (Schnitt, 0 und ~110 ms), Blutspritzer (Schlag ~140 ms), das Equip rastet ein (~420 ms: Schlag, heller Ping).
   // Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   darion_equip: [
@@ -2905,6 +2932,14 @@ const ZONE_ANIM_SFX = {
     { name: 'heavy_impact', opts: { rate: 1.3, volume: 0.45, delay: 150, category: null, dedupe: 0 } },
     { name: 'placement',    opts: { rate: 1.0, volume: 0.9, delay: 420, category: null, dedupe: 0 } },
     { name: 'ping',         opts: { rate: 1.7, volume: 0.5, delay: 430, category: null, dedupe: 0 } },
+  ],
+  // Shipwrecked (W82) — die Welle rollt heran (Wasser, 0 ms), Planken und Fass schlagen an (~300 ms: Holz-Plätschern), die Welle läuft zurück (Wasser ~760 ms). Nur der erste Teil
+  // uebernimmt die Sammelkategorie 'effect'.
+  shipwrecked_attach: [
+    { name: 'elem_water', opts: { rate: 0.8, volume: 0.6 } },
+    { name: 'placement',  opts: { rate: 0.7, volume: 0.5, delay: 300, category: null, dedupe: 0 } },
+    { name: 'elem_water', opts: { rate: 1.2, volume: 0.4, delay: 340, category: null, dedupe: 0 } },
+    { name: 'elem_water', opts: { rate: 0.7, volume: 0.4, delay: 760, category: null, dedupe: 0 } },
   ],
   // Cute Crown (10.10.) — die Flügel schlagen (Wind, 0 / ~110 / ~220 ms), das Juwel klingt hell (~300 ms), Herzen steigen auf (~520 ms). Nur der erste Teil uebernimmt die
   // Sammelkategorie 'effect'.
@@ -3102,6 +3137,24 @@ const ZONE_ANIM_SFX = {
     { name: 'heavy_impact', opts: { rate: 1.15, volume: 0.55, delay: 1020, category: null, dedupe: 0 } },
     { name: 'slash',        opts: { rate: 1.3, volume: 0.35, delay: 1040, category: null, dedupe: 0 } },
     { name: 'ping',         opts: { rate: 2.6, volume: 0.28, delay: 1120, category: null, dedupe: 0 } },
+  ],
+  // Winged Haressassin (27.10.) — Umleitung: die Federn stieben auf (Wind, 0 ms), flattern zur Kreatur (Wind ~260 ms), Ankunft mit hellen Pings (~520/600 ms), Flügelschlag (Wind ~560 ms). Nur der erste
+  // Teil übernimmt die Sammelkategorie 'effect'.
+  winged_haress_feathers: [
+    { name: 'elem_wind', opts: { rate: 2.2, volume: 0.3 } },
+    { name: 'elem_wind', opts: { rate: 2.6, volume: 0.25, delay: 260, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 2.4, volume: 0.3,  delay: 520, category: null, dedupe: 0 } },
+    { name: 'elem_wind', opts: { rate: 1.8, volume: 0.25, delay: 560, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 2.9, volume: 0.28, delay: 600, category: null, dedupe: 0 } },
+  ],
+  // Winged Haressassin (27.10.) — 150 Schaden: Flügelschlag (Wind, 0 ms), der Schnitt zischt (~200 ms), Einschlag bei ~330 ms (zweiter Schnitt, heller Ping), Federn gleiten nach (Wind ~560 ms). Nur der erste
+  // Teil übernimmt die Sammelkategorie 'effect'.
+  winged_haress_slash: [
+    { name: 'elem_wind', opts: { rate: 2.0, volume: 0.3 } },
+    { name: 'slash',     opts: { rate: 2.2, volume: 0.45, delay: 200, category: null, dedupe: 0 } },
+    { name: 'slash',     opts: { rate: 1.6, volume: 0.3,  delay: 330, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 2.8, volume: 0.25, delay: 360, category: null, dedupe: 0 } },
+    { name: 'elem_wind', opts: { rate: 2.6, volume: 0.2,  delay: 560, category: null, dedupe: 0 } },
   ],
   // Patty (25.10.) — je Wurfstern ein Zischen beim Abwurf (alle 70 ms, die Tonhoehe wandert leicht) und ein heller Einschlag nach 280 ms Flug (`runde` = Zahl der Sterne; hoert nach 8 Sternen auf, damit
   // der Klang nicht zum Rauschen wird). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
@@ -3580,6 +3633,21 @@ const ZONE_ANIM_SFX = {
     { name: 'slash',        opts: { rate: 0.85, volume: 0.9, delay: 315, category: null, dedupe: 0 } },
     { name: 'heavy_impact', opts: { rate: 1.3, volume: 0.45, delay: 335, category: null, dedupe: 0 } },
     { name: 'ping',         opts: { rate: 2.4, volume: 0.3,  delay: 345, category: null, dedupe: 0 } },
+  ],
+  // Animal Training (W82) — Peitsche: leises Zischen beim Ausholen (~120 ms), heller Knall beim Vorschnellen (~290 ms, hoher `slash`), harter Einschlag mit Ping bei 330 ms, Rückzug ~430 ms.
+  animal_training_whip: [
+    { name: 'projectile',   opts: { rate: 2.0, volume: 0.35, delay: 110 } },
+    { name: 'slash',        opts: { rate: 1.9, volume: 0.8,  delay: 285, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.5, volume: 0.5,  delay: 335, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.8, volume: 0.3,  delay: 345, category: null, dedupe: 0 } },
+    { name: 'slash',        opts: { rate: 1.3, volume: 0.35, delay: 440, category: null, dedupe: 0 } },
+  ],
+  // Animal Training: die Schlinge der Zähmung — Zug und Zuschnappen, dann ein heller Bestätigungston je Blinken.
+  animal_training_tame: [
+    { name: 'projectile',   opts: { rate: 0.9, volume: 0.4,  delay: 40 } },
+    { name: 'placement',    opts: { rate: 1.1, volume: 0.7,  delay: 220, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 1.8, volume: 0.35, delay: 310, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.2, volume: 0.3,  delay: 430, category: null, dedupe: 0 } },
   ],
   // v724 (Thicket): dasselbe Pflanzen-Timbre, etwas tiefer und laenger
   // gefahren — das Dickicht ist dichter als der Rankenkranz.
@@ -8841,6 +8909,8 @@ function BuffColumn({ buffs, cardName, statuses }) {
   if (st._stoneskin) statusBuffs.push(['stoneskin', { icon: '🪨', tooltip: 'Stoneskin: Attacks deal 100 less damage to this Hero, and it cannot be Poisoned, Burned or Stunned.' }]);
   // 24.10.: Regeneration (Anhängsel) — vom Brett abgeleitet (`_regeneration` = Anzahl der Karten), kein Zähler; die Menge steht auf der Karte (60/120/180 je nach Support Magic des Wirkers).
   if (st._regeneration) statusBuffs.push(['regeneration', { icon: '🌱', tooltip: 'Regeneration: This Hero is healed at the start of each of its owner\'s turns (60/120/180 HP, depending on the caster\'s Support Magic level when the Spell was used).' + (st._regeneration > 1 ? ` (${st._regeneration}× attached)` : '') }]);
+  // W82: Shipwrecked (Anhängsel) — vom Brett abgeleitet (`_shipwrecked`), kein Zähler. Wirkt für den KONTROLLEUR des Helden (auch wenn ein Gegner die Karte angelegt hat).
+  if (st._shipwrecked) statusBuffs.push(['shipwrecked', { icon: '🌊', tooltip: 'Shipwrecked: This Hero\'s controller and all targets they control are unaffected by Areas, and they cannot activate the effects of or play Areas.' }]);
   if (st.untargetable) statusBuffs.push(['untargetable', { icon: '🦋', tooltip: 'Untargetable: Your opponent can\'t choose this Hero with Attacks, Spells or Creature effects while you control other Heroes that can be chosen. Wears off at the start of its owner\'s turn.' }]);
   if ((!buffs || Object.keys(buffs).length === 0) && statusBuffs.length === 0) return null;
   buffs = buffs || {};
@@ -8852,7 +8922,7 @@ function BuffColumn({ buffs, cardName, statuses }) {
     let txt = `Blessed: This Hero can have up to ${remaining} more additional Abilities attached to it this turn!`;
     if (data?.locked) txt += ' But it cannot act this turn.';
     return txt;
-  } }, cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, doomed: { icon: '☠️', tooltip: 'Doomed: This Hero\'s Attack stat is 0 and cannot be increased in any way (Doomed Pirate).' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, mao_negated: { icon: '🐈', tooltip: 'Mao-negated: This Creature\'s effects were re-fired by Mao and are now suppressed until the start of the activator\'s next turn.' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' }, forcesTargeting_creaturesOnly: { icon: '🛡️', tooltip: "Guarding: Your opponent cannot choose your other Creatures while this Creature stands. Your Heroes can still be chosen." }, niu_enhanced: { icon: '🐃', tooltip: (data) => `This Hero's next Attack will deal ${data?.totalDamage || 0} additional damage.` }, gou_protected: { icon: '🐕', tooltip: (data) => `Protected by Guardian Beast Gou — takes no damage from any source until the start of the activator's next turn.${(data?.grants?.length || 0) > 1 ? ` (${data.grants.length}× layered)` : ''}` }, calm: { icon: '🌙', tooltip: 'Calm: Next turn, this Hero may perform a second Action during its controller\'s Action Phase (counts as an additional Action). Stays even if the Hero is defeated.' }, calm_ready: { icon: '🕊️', tooltip: 'Calm: This Hero may perform a second Action during THIS Action Phase (counts as an additional Action). Fades at the end of the Action Phase if unused — even if the Hero is defeated.' }, second_action_grant: { icon: '🌑', tooltip: 'Second Action: This Hero may perform a second Action during the Action Phase this turn. The bonus is wasted if a different Hero performs the second Action first.' }, cold_strike: { icon: '❄️', tooltip: "Cold Strike: This Hero's Attacks and Spells Freeze each target they hit for 1 turn. Wears off at the end of this turn." }, empowered_strike: { icon: '💪', tooltip: "Empowered Strike: The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 150 and cannot be reduced or negated." }, unreasonable_anger: { icon: '💢', tooltip: 'Unreasonable Anger: Any damage this Hero deals to single targets is increased by 100. Lasts until the end of its controller\'s next turn.' }, sparkfly_gift_architect: { icon: '📐', tooltip: "Architect's Gift: You may once per turn draw cards until you have the same number of cards in your hand as your opponent." }, sparkfly_gift_attendant: { icon: '🪶', tooltip: "Attendant's Gift: This Creature is unaffected by your opponent's cards and effects, except damage." }, sparkfly_gift_worker: { icon: '🪲', tooltip: "Worker's Gift: You may once per turn make your opponent choose any card on their side of the board that is not a Hero and add it to your hand." }, damage_immune: { icon: '💠', tooltip: 'Takes no damage from any sources.' }, disrupted: { icon: '☢️', tooltip: 'Disrupted: Takes double damage from all sources.' }, magic_immune: { icon: '🛡️', tooltip: (data) => `The Hero is immune to Spells up to level ${data?.level ?? '?'}.` }, // v886 (Summoning Instructions): zeigt das beim Ausruesten gewaehlte X.
+  } }, cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, doomed: { icon: '☠️', tooltip: 'Doomed: This Hero\'s Attack stat is 0 and cannot be increased in any way (Doomed Pirate).' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, animal_training_negated: { icon: '🪢', tooltip: 'Effects negated due to Animal Training until the end of the turn!' }, mao_negated: { icon: '🐈', tooltip: 'Mao-negated: This Creature\'s effects were re-fired by Mao and are now suppressed until the start of the activator\'s next turn.' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' }, forcesTargeting_creaturesOnly: { icon: '🛡️', tooltip: "Guarding: Your opponent cannot choose your other Creatures while this Creature stands. Your Heroes can still be chosen." }, niu_enhanced: { icon: '🐃', tooltip: (data) => `This Hero's next Attack will deal ${data?.totalDamage || 0} additional damage.` }, gou_protected: { icon: '🐕', tooltip: (data) => `Protected by Guardian Beast Gou — takes no damage from any source until the start of the activator's next turn.${(data?.grants?.length || 0) > 1 ? ` (${data.grants.length}× layered)` : ''}` }, calm: { icon: '🌙', tooltip: 'Calm: Next turn, this Hero may perform a second Action during its controller\'s Action Phase (counts as an additional Action). Stays even if the Hero is defeated.' }, calm_ready: { icon: '🕊️', tooltip: 'Calm: This Hero may perform a second Action during THIS Action Phase (counts as an additional Action). Fades at the end of the Action Phase if unused — even if the Hero is defeated.' }, second_action_grant: { icon: '🌑', tooltip: 'Second Action: This Hero may perform a second Action during the Action Phase this turn. The bonus is wasted if a different Hero performs the second Action first.' }, cold_strike: { icon: '❄️', tooltip: "Cold Strike: This Hero's Attacks and Spells Freeze each target they hit for 1 turn. Wears off at the end of this turn." }, empowered_strike: { icon: '💪', tooltip: "Empowered Strike: The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 150 and cannot be reduced or negated." }, unreasonable_anger: { icon: '💢', tooltip: 'Unreasonable Anger: Any damage this Hero deals to single targets is increased by 100. Lasts until the end of its controller\'s next turn.' }, sparkfly_gift_architect: { icon: '📐', tooltip: "Architect's Gift: You may once per turn draw cards until you have the same number of cards in your hand as your opponent." }, sparkfly_gift_attendant: { icon: '🪶', tooltip: "Attendant's Gift: This Creature is unaffected by your opponent's cards and effects, except damage." }, sparkfly_gift_worker: { icon: '🪲', tooltip: "Worker's Gift: You may once per turn make your opponent choose any card on their side of the board that is not a Hero and add it to your hand." }, damage_immune: { icon: '💠', tooltip: 'Takes no damage from any sources.' }, disrupted: { icon: '☢️', tooltip: 'Disrupted: Takes double damage from all sources.' }, magic_immune: { icon: '🛡️', tooltip: (data) => `The Hero is immune to Spells up to level ${data?.level ?? '?'}.` }, // v886 (Summoning Instructions): zeigt das beim Ausruesten gewaehlte X.
   summoningInstructionsX: { icon: '📘', tooltip: (data) => `Summoning Instructions: X = ${data?.level ?? '?'} — the equipped Hero may summon Creatures up to ${data?.level ?? '?'} levels above its Summoning Magic level (level 3 Creatures at most).` } };
   // medusa_petrified is surfaced through the Stunned status badge (as the
   // "Petrified" variant), so don't also render it as a separate buff icon —

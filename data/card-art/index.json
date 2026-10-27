@@ -5678,5 +5678,25 @@
 "Bow of the Hunt Goddess": {
 "id": "Bow_of_the_Hunt_Goddess",
 "kind": "a"
+},
+"Animal Training": {
+"id": "Animal_Training",
+"kind": "a"
+},
+"Winged Haressassin": {
+"id": "Winged_Haressassin",
+"kind": "a"
+},
+"Ancient Guardian Statue": {
+"id": "Ancient_Guardian_Statue",
+"kind": "a"
+},
+"Sinister Idol": {
+"id": "Sinister_Idol",
+"kind": "a"
+},
+"Shipwrecked": {
+"id": "Shipwrecked",
+"kind": "a"
 }
 }

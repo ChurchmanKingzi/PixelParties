@@ -110,6 +110,7 @@ module.exports = {
     // Abwurf aus ("don't have to delete immediately"). Der reguläre
     // Rundenende-Check bleibt bestehen — dort niemals bypassen.
     if (context === 'endOfTurn') return false;
+    if (engine.spielerIstVonAreasAusgenommen?.(playerIdx)) return false;   // W82 (Shipwrecked): er ist von Areas ausgenommen
     // Only applies to this Area's owner (not to both players)
     // — we look up the enchantment's active card instance.
     const ownAreas = engine.cardInstances.filter(c =>

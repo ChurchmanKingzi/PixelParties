@@ -2897,6 +2897,8 @@ function PuzzleCreator() {
   // Infallible Oracle Pythia: Pythia Counter und das vorgemerkte Ziel der GEGENSEITE (`{ kind: 'hero', heroIdx } | { kind: 'creature', hi, slot }`), null für andere Karten.
   const [editPythiaCounter, setEditPythiaCounter] = useState(null);
   const [editPythiaPlan, setEditPythiaPlan] = useState(null);
+  // Ancient Guardian Statue: 1-basierter Platz der von ihr gesuchten Handkarte in der Hand des Besitzers (0 = keine), null für andere Karten.
+  const [editStatueSlot, setEditStatueSlot] = useState(null);
   // Puppets (v707): null = Editor ausgeblendet, sonst true/false.
   const [editLuckCounter, setEditLuckCounter] = useState(null);
   const [editPreserveCounter, setEditPreserveCounter] = useState(null);
@@ -3004,6 +3006,7 @@ function PuzzleCreator() {
     setEditSkullCounter(null);
     setEditPythiaCounter(null);
     setEditPythiaPlan(null);
+    setEditStatueSlot(null);
     setEditSparkflyGifts(null);
     setEditAntiMagicLevel(null);
     setEditRegenerationLevel(null);
@@ -3151,6 +3154,7 @@ function PuzzleCreator() {
       setEditSkullCounter(c?.name === 'Hot Skull Potato' ? (cs.skullCounter || 0) : null);
       setEditPythiaCounter(c?.name === 'Infallible Oracle Pythia' ? (cs.pythiaCounters || 0) : null);
       setEditPythiaPlan(c?.name === 'Infallible Oracle Pythia' ? (cs.pythiaPlan || null) : null);
+      setEditStatueSlot(c?.name === 'Ancient Guardian Statue' ? (cs.statueHandSlot || 0) : null);
       // Puppets (v707): Luck/Preserve auf Creatures und Tokens.
       {
         const isCrOrToken = !!c && (String(c.cardType || '').includes('Creature') || c.cardType === 'Token');
@@ -3381,6 +3385,9 @@ function PuzzleCreator() {
         if (editPythiaCounter != null && editPythiaCounter > 0) merged.pythiaCounters = editPythiaCounter;
         if (editPythiaPlan) merged.pythiaPlan = editPythiaPlan;
       }
+      // Ancient Guardian Statue: Handplatz der gesuchten Karte (Server: `statueHandSlot` → Verknüpfung + dauerhaft aufgedeckt).
+      delete merged.statueHandSlot;
+      if (c?.name === 'Ancient Guardian Statue' && editStatueSlot != null && editStatueSlot > 0) merged.statueHandSlot = editStatueSlot;
       delete merged.demonCounter;
       if (editDemonCounter != null && editDemonCounter > 0) {
         merged.demonCounter = editDemonCounter;
@@ -3418,7 +3425,7 @@ function PuzzleCreator() {
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editSkin, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editHeldKreatur, editDiamondLoss, editJeGetroffen, editBountyMark, editBalanceCounter, editApplause, editBunnyBombCounter, editDemonCounter, editSkullCounter, editPythiaCounter, editPythiaPlan, editSparkflyGifts, editAntiMagicLevel, editRegenerationLevel, updatePlayer, getCard, statusScopePasst]);
+  }, [editTarget, editSkin, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editHeldKreatur, editDiamondLoss, editJeGetroffen, editBountyMark, editBalanceCounter, editApplause, editBunnyBombCounter, editDemonCounter, editSkullCounter, editPythiaCounter, editPythiaPlan, editStatueSlot, editSparkflyGifts, editAntiMagicLevel, editRegenerationLevel, updatePlayer, getCard, statusScopePasst]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -5119,6 +5126,7 @@ function PuzzleCreator() {
         feld('bomb', '💣', 'Bomb', editBunnyBombCounter, setEditBunnyBombCounter, '#e37435', `Bunny Bombs: explodes for ${(editBunnyBombCounter || 0) * 20} damage to every target on the board when defeated (20 per Bomb Counter).`);
         feld('demon', '😈', 'Demon', editDemonCounter, setEditDemonCounter, '#c98aff', `Horned Demon's strike deals ${(editDemonCounter || 0) * 50} damage (50 per Demon Counter).`);
         feld('skull', '💀', 'Skull', editSkullCounter, setEditSkullCounter, '#b9b9b9', `Hot Skull Potato: when it explodes it deals ${50 + (editSkullCounter || 0) * 50} damage (50 + 50 per Skull Counter).`);
+        feld('statue', '🗿', 'Hand slot', editStatueSlot, setEditStatueSlot, '#75f091', 'Ancient Guardian Statue: the hand slot (1 = leftmost, 0 = none) of the Spell it searched. That card starts the puzzle permanently revealed and tied to this Statue (its level is reduced at the end of each of its owner’s turns); set its starting level by clicking the hand card — starting level 0 means “already lowered to 0 by the Statue”: it counts as an additional Action while the Statue works.');
         feld('pythia', '🔮', 'Pythia', editPythiaCounter, setEditPythiaCounter, '#68fdc1', 'Pythia Counters on this card at the start of the puzzle. The THIRD counter (placed at the start of its controller’s turn) defeats the foreseen target.');
         if (!isBiomancyTokenEdit && editTarget.zt === 'support' && _editCard?.name === 'Cute Hydra') {
           feld('head', '🐲', 'Heads', editHeadCounter, setEditHeadCounter, '#f7e0b5', "Head Counters: cap the number of different targets Hydra's once-per-turn strike can hit.");

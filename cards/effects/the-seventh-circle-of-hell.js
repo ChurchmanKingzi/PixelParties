@@ -21,7 +21,7 @@ const {
   verlaesstBrett, loeschenUndSpielen, cpuBejahen,
 } = require('./_hell-circles-shared');
 
-const { heroHasDiverHelmet, isAreaImmuneInst } = require('./_diver-helmet-shared');
+const { isAreaImmuneHero, isAreaImmuneInst } = require('./_diver-helmet-shared');   // Diver Helmet + W82 Shipwrecked
 
 const CARD_NAME = 'The Seventh Circle of Hell';
 const ENDE = 100;
@@ -31,8 +31,8 @@ const ABGANG = 150;
 // werden von dieser Area nie zur Wahl angeboten. `t` = Zielobjekt des Pickers (Brettseite in `owner`).
 function helmGeschuetzt(engine, t) {
   if (!t) return false;
-  if (t.type === 'hero') return heroHasDiverHelmet(engine, t.owner, t.heroIdx);
-  return t.cardInstance ? isAreaImmuneInst(engine, t.cardInstance) : heroHasDiverHelmet(engine, t.owner, t.heroIdx);
+  if (t.type === 'hero') return isAreaImmuneHero(engine, t.owner, t.heroIdx);
+  return t.cardInstance ? isAreaImmuneInst(engine, t.cardInstance) : isAreaImmuneHero(engine, t.owner, t.heroIdx);
 }
 
 // `festesZiel`: der Zugspieler waehlt SEINE eigenen Ziele selbst (Zugende-Zweig) — Submerged/Stealth
@@ -69,6 +69,7 @@ module.exports = {
       const engine = ctx._engine;
       const tp = ctx.activePlayer;
       if (!isSeat(engine, tp)) return;
+      if (engine.spielerIstVonAreasAusgenommen(tp)) return;   // W82 (Shipwrecked): der Zugspieler ist von Areas ausgenommen
       const ziele = [...engine.getHeroTargets(tp), ...engine.getCreatureTargets(tp)].filter(t => !helmGeschuetzt(engine, t));
       if (ziele.length === 0) return;
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: ctx.cardOwner });
@@ -94,6 +95,7 @@ module.exports = {
       if (!verlaesstBrett(ctx)) return;
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
+      if (engine.spielerIstVonAreasAusgenommen(pi)) return;   // W82 (Shipwrecked): Area-Effekte aktivieren ist gesperrt
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
       // pflichtwahl: „choose a target and deal 150 damage" ist keine Option, sondern Pflicht
       const ziel = await ctx.promptDamageTarget({

@@ -8909,6 +8909,30 @@ function ppRabe(g, cx, cy, fluegel, rechts, deckung) {
   }
 }
 
+/**
+ * Winged Haressassin (27.10.): kleine Pixel-Feder (3×5, drei Haltungen: aufrecht / nach rechts / nach links geneigt) und ein Flügel aus vier Federstrahlen (Haltung 0..3 = Spitze hoch … tief).
+ * Farben nur aus der Palette (Weiß, Hellgrau, Eisblau, Graublau — die Flügel des Kartenbilds); Bewegung wählt der Aufrufer in ganzen Pixeln, nichts wird gedreht oder skaliert.
+ */
+const PP_FEDER_PAL = { W: ppHex('#ffffff'), L: ppHex('#e5edfa'), M: ppHex('#b4cff8'), D: ppHex('#7e7d9b') };
+const PP_FEDER_HALTUNG = [
+  ['..W.', '.WLW', '.WLM', 'WLMD', 'WMD.', 'D...'],
+  ['.W..', 'WLW.', 'MLW.', 'DMLW', '.DMW', '...D'],
+  ['.W.', 'WL.', 'WM.', 'LM.', 'MD.', 'D..'],
+];
+function ppFeder(g, cx, cy, haltung, deckung) { ppSprite(g, cx, cy, PP_FEDER_HALTUNG[((haltung % 3) + 3) % 3], PP_FEDER_PAL, deckung); }
+// Flügel: gefüllter Federfächer (Oberkante Weiß, Mitte Hellgrau, Unterkante Eisblau mit gezackten Federspitzen), von der Schulter (sx, sy) nach außen in Richtung `dir`.
+function ppFluegel(g, sx, sy, dir, haltung, deckung) {
+  const L = 11, spitze = [-8, -4, 0, 4][((haltung % 4) + 4) % 4];
+  for (let i = 0; i <= L; i++) {
+    const k = i / L, oben = Math.round(spitze * k), unten = Math.round(5 - (5 - spitze - 3) * k) + (i % 3 === 0 ? 1 : 0);
+    const lo = Math.min(oben, unten), hi = Math.max(oben, unten);
+    for (let y = lo; y <= hi; y++) {
+      const f = hi === lo ? 0 : (y - lo) / (hi - lo);
+      g.put(sx + dir * i, sy + y, f < 0.2 ? PP_FEDER_PAL.W : f < 0.6 ? PP_FEDER_PAL.L : f < 1 ? PP_FEDER_PAL.M : PP_FEDER_PAL.D, deckung);
+    }
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  PIXELART-BILDER AN EINEM PUNKT (23.10., Shimmering Dragonegg, Liquid Luck) — Vorlage: das jeweilige Kartenbild
 //  ACHTUNG Reihenfolge: die Paletten laufen beim Laden der Datei (`ppHex`, eine `const` weiter oben in dieser Datei) — dieser Block muss NACH `ppHex` stehen,
@@ -9655,6 +9679,91 @@ const HandLevelDownEffect = (() => {
     }
   };
   return ppPunktBild(malen, ENDE + 40, 150, 210, vorbereiten);
+})();
+
+// ═════════════════════════════════════════════════════════════════
+//  Ancient Guardian Statue: Magie-Partikel auf der aufgedeckten Handkarte (`statue_magic`) — PIXELART, Hülle `ppPunktBild`; läuft über der Handkarte (beide Seiten sehen sie)
+//
+//  Vorlage: das Kartenbild (zwei goldene Steinwächter in einer grün leuchtenden Halle). Ein Runenring aus vierzehn kleinen Zeichen (3×3 Pixel) umgibt die Karte und wandert in
+//  ganzen Schritten (~8 Bilder/s) im Kreis; grüne und goldene Funken (2×2 mit hellem Kern) steigen in einer Spirale auf, vier Kreuzfunkel blitzen an den Ecken. Die Karte bleibt
+//  lesbar (nur Ring, Funken, Ecken). `phase`: 'reveal' (die Statue deckt den Zauber auf, ~1300 ms), 'tick' (Zugende: Stufe −1 — Steinstaub rieselt, der Ring zieht sich
+//  einmal um einen Pixel zusammen, ~850 ms), 'free' (Stufe 0: der Ring schließt sich in vier ganzen Schritten, goldene Kreuzfunkel brechen auf, ~1500 ms). Feste Palette, kein Leuchten.
+// ═════════════════════════════════════════════════════════════════
+const StatueMagicEffect = (() => {
+  const GRUEN = ['#ffffff', '#e5fae7', '#75f091', '#00cc50', '#167927'].map(ppHex);
+  const GOLD = ['#ffffff', '#fff196', '#f8ca21', '#cf5f00'].map(ppHex);
+  const STAUB = ['#c5b7a0', '#7f7f7f', '#393123'].map(ppHex);
+  const RUNEN = [['010', '111', '010'], ['101', '010', '101'], ['110', '011', '110'], ['111', '101', '111']];
+  const ARM = [1, 2, 3, 2, 1];
+  const DAUER = { reveal: 1300, tick: 850, free: 1500 };
+  const FADE = { reveal: 880, tick: 520, free: 1100 };
+  const vorbereiten = (sz) => ({
+    funken: Array.from({ length: ppFxN(18) }, () => ({
+      w: Math.random() * Math.PI * 2, r: sz.hw * (0.45 + Math.random() * 0.75), start: Math.random() * 650, leben: 560 + Math.random() * 320,
+      v: 16 + Math.random() * 22, gold: Math.random() < 0.4, drehung: Math.random() < 0.5 ? 1 : -1,
+    })),
+    staub: Array.from({ length: ppFxN(14) }, () => ({ x: (Math.random() * 2 - 1) * sz.hw * 0.95, start: Math.random() * 380, leben: 380 + Math.random() * 200, v: 22 + Math.random() * 20, farbe: Math.floor(Math.random() * 3) })),
+    ecken: [[-1, -1, 60], [1, -1, 220], [1, 1, 380], [-1, 1, 540]].map(([sx, sy, start]) => ({ sx, sy, start, gold: sx > 0 })),
+  });
+  const malen = (g, t, sz, teile) => {
+    const ph = sz.phase === 'tick' || sz.phase === 'free' ? sz.phase : 'reveal';
+    const ende = DAUER[ph], fadeAb = FADE[ph];
+    const aus = t > fadeAb ? Math.max(0, 1 - (t - fadeAb) / (ende - fadeAb)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
+    const ein = Math.min(1, t / 240);
+    // ── Runenring ─────────────────────────────────────────────────
+    let ra = sz.hw + 7, rb = sz.hh + 6;
+    if (ph === 'tick') { const s2 = t > 200 && t < 480 ? 1 : 0; ra -= s2; rb -= s2; }
+    if (ph === 'free') { const s4 = Math.min(4, Math.floor(Math.max(0, t - 120) / 110)); ra -= s4 * 2; rb -= s4 * 2; }
+    const schritt = Math.floor(t / 120);
+    const N = 14;
+    for (let i = 0; i < N; i++) {
+      const w = ((i + schritt * (ph === 'tick' ? -1 : 1)) / N) * Math.PI * 2;
+      const rx = cx + Math.round(Math.cos(w) * ra), ry = cy + Math.round(Math.sin(w) * rb);
+      const glyph = RUNEN[(i * 3 + 1) % RUNEN.length];
+      const hell = ((i + schritt) % 4) === 0;
+      const farbe = ph === 'free' && t > 560 ? GOLD[hell ? 1 : 2] : ph === 'tick' ? STAUB[hell ? 0 : 1] : GRUEN[hell ? 1 : 2];
+      const a = Math.min(ein, aus) * (hell ? 1 : 0.8);
+      for (let j = 0; j < 3; j++) for (let k = 0; k < 3; k++) if (glyph[j][k] === '1') g.put(rx - 1 + k, ry - 1 + j, farbe, a);
+      if (!hell) g.put(rx, ry, ph === 'tick' ? STAUB[2] : GRUEN[4], Math.min(ein, aus));
+    }
+    // ── Funken in der Spirale (nur 'reveal' und 'free') ───────────
+    if (ph !== 'tick') {
+      for (const f of teile.funken) {
+        const a2 = t - f.start; if (a2 < 0 || a2 > f.leben) continue;
+        const kk = a2 / f.leben, sek = a2 / 1000;
+        const w = f.w + sek * 2.2 * f.drehung;
+        const px = Math.round(cx + Math.cos(w) * f.r * (1 - kk * 0.35)), py = Math.round(cy + sz.hh * 0.75 - f.v * sek * 1.8 + Math.sin(w) * 3);
+        const pal = (f.gold || ph === 'free') ? GOLD : GRUEN;
+        g.block(px, py, 2, 2, pal[kk < 0.6 ? 2 : 3], aus * (1 - kk * 0.5));
+        g.put(px, py, pal[kk < 0.5 ? 0 : 1], aus);
+      }
+    }
+    // ── Steinstaub (nur 'tick') ───────────────────────────────────
+    if (ph === 'tick') {
+      for (const d of teile.staub) {
+        const a2 = t - d.start; if (a2 < 0 || a2 > d.leben) continue;
+        const kk = a2 / d.leben, sek = a2 / 1000;
+        const px = Math.round(cx + d.x), py = Math.round(cy - sz.hh * 0.85 + d.v * sek * 2.4 + sek * sek * 30);
+        g.block(px, py, 2, 2, STAUB[d.farbe], aus * (1 - kk * 0.5));
+        g.put(px, py, STAUB[0], aus * (1 - kk * 0.4));
+      }
+    }
+    // ── Kreuzfunkel an den Ecken ──────────────────────────────────
+    const nEcken = ph === 'tick' ? 0 : 4;
+    for (let i = 0; i < nEcken; i++) {
+      const e = teile.ecken[i], k = (t - (ph === 'free' ? 560 + e.start * 0.5 : e.start)) / 420;
+      if (k < 0 || k >= 1) continue;
+      ppKreuzfunkel(g, cx + e.sx * (sz.hw + 2) - 1, cy + e.sy * (sz.hh + 2) - 1, ARM[Math.floor(k * ARM.length)], (ph === 'free' || e.gold) ? GOLD : GRUEN, aus);
+    }
+    // ── 'free': der Ring ist zu — goldener Blitz in der Mitte ─────
+    if (ph === 'free' && t > 560 && t < 1020) {
+      const k = (t - 560) / 460;
+      ppKreuzfunkel(g, cx - 1, cy - 1, ARM[Math.min(ARM.length - 1, Math.floor(k * ARM.length))] + 1, GOLD, aus);
+    }
+  };
+  return ppPunktBild(malen, 1540, 230, 290, vorbereiten);
 })();
 
 // ═════════════════════════════════════════════════════════════════
@@ -10673,7 +10782,7 @@ const HotPotatoThrowEffect = (() => {
 
 // Lebensdauer (ms) von Zonen-Animationen, die der Server OHNE `duration` schickt und die länger als die Standard-Sekunde laufen
 // (`onZoneAnim`: sonst wird das Bild nach 1000 ms abgeräumt). Ein `duration` im Ereignis geht vor.
-const ZONEN_ANIM_DAUER = { ghostly_warning: 1260, atta_books: 1400, darion_equip: 1060 };
+const ZONEN_ANIM_DAUER = { ghostly_warning: 1260, atta_books: 1400, darion_equip: 1060, sinister_idol: 1360 };
 
 // ═════════════════════════════════════════════════════════════════
 //  Unreasonable Anger: Dampf (`unreasonable_steam`) — PIXELART; cartoonhafte Wut: Dampf steigt aus dem Helden, dazu die rote Zornader
@@ -20552,6 +20661,7 @@ const ANIM_REGISTRY = {
   arnold_flex: ArnoldFlexEffect,
   liquid_rainbow: LiquidRainbowEffect,
   hand_level_down: HandLevelDownEffect,
+  statue_magic: StatueMagicEffect,
   mind_control_hex: MindControlHexEffect,
   spy_mark: SpyMarkEffect,
   pythia_flames: PythiaFlamesEffect,
@@ -28186,6 +28296,157 @@ const ANIM_REGISTRY = {
     return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 50 });
   })(),
   // ═══════════════════════════════════════════════════════════════════
+  //  Animal Training (W82) — PIXELART, der Peitschenschlag der Dompteurin (Brett-Animation, Hülle `ppSalve`; Vorlage: das Kartenbild — die Frau mit der dünnen schwarzen Peitsche
+  //  vor brennenden Schatten-Tieren) und die Schlinge der Zähmung
+  //
+  //  animal_training_whip: eine Peitschenschnur (1 Rasterpixel dünn, dunkle Kontur, grauer Glanz, brauner Griff) vom ausführenden Helden zum Ziel. Sie holt in Stufen hinter dem Griff aus
+  //  (S-Kurve, ~0–250 ms), knallt in drei Sprüngen nach vorn (Schlaufe läuft zur Spitze, 250–330 ms) und schlägt bei 330 ms hart ein: Kreuzfunkel, Schlagstriche und ein Hartring, die
+  //  Zielkarte blitzt im Dither-Raster auf und zuckt (Geisterrahmen ±2 Pixel im Bildtakt), Funken (orange/gelb) und rote Glutpunkte fliegen mit Schwerkraft zurück. Danach schnellt die
+  //  Schnur in drei Stufen zurück (420–600 ms) und dithert weg; ENDE 960. Bewegung nur in ganzen Pixeln im Bildtakt (~30 Bilder/s), feste Palette, KEIN Schein, KEINE Drehung eines Kartenbildes.
+  //  animal_training_tame: nach der Übernahme am neuen Platz der Kreatur: eine braune Schlinge schließt sich in drei Stufen um die Karte (1.3× → 1.15× → Kartenrand), ein Knoten sitzt oben,
+  //  dann blinkt ein gelber Rahmen dreimal (hart, `steps(1)`-Takt) und Flammenfunken steigen auf; ENDE 720.
+  // ═══════════════════════════════════════════════════════════════════
+  animal_training_whip: (() => {
+    const KONTUR = ppHex('#1a1a2e'), SCHNUR = ppHex('#323232'), GLANZ = ppHex('#535353'), HELL = ppHex('#a8a8a8');
+    const GRIFF = ppHex('#7d3911'), GRIFF_D = ppHex('#4a2a10');
+    const FUNKEN = ['#ffffff', '#f9ecb3', '#fbc86a', '#e37435'].map(ppHex);
+    const GLUT = ['#e92f38', '#b5171c', '#8b0d0d'].map(ppHex);
+    const ENDE = 960, EINSCHLAG = 330, FADE_AB = 640;
+    /** Schnur von (hx,hy) nach (tx,ty): Sinuswelle quer zur Richtung (feste Enden), in Treppenstufen gezeichnet. */
+    const schnur = (g, hx, hy, tx, ty, nx, ny, amp, wellen, ph, a) => {
+      const N = Math.max(10, Math.ceil(Math.hypot(tx - hx, ty - hy) / 2.5));
+      let px = hx, py = hy;
+      for (let i = 1; i <= N; i++) {
+        const s = i / N, hub = amp * Math.sin(s * Math.PI * wellen + ph) * Math.sin(s * Math.PI);
+        const x = hx + (tx - hx) * s + nx * hub, y = hy + (ty - hy) * s + ny * hub;
+        ppLinie(g, px - nx, py - ny, x - nx, y - ny, (i % 3 === 0) ? HELL : KONTUR, a);   // Kontur: eine Spur daneben, ab und zu hell (lesbar auf dunklem wie hellem Brett)
+        px = x; py = y;
+      }
+      px = hx; py = hy;
+      for (let i = 1; i <= N; i++) {
+        const s = i / N, hub = amp * Math.sin(s * Math.PI * wellen + ph) * Math.sin(s * Math.PI);
+        const x = hx + (tx - hx) * s + nx * hub, y = hy + (ty - hy) * s + ny * hub;
+        ppLinie(g, px, py, x, y, (i % 4 === 0) ? GLANZ : SCHNUR, a);
+        px = x; py = y;
+      }
+    };
+    /** Griff: vier Pixel hinter dem Ansatz der Schnur. */
+    const griff = (g, hx, hy, dx, dy, a) => {
+      for (let i = 0; i < 5; i++) {
+        const x = hx - dx * i, y = hy - dy * i, c = (i % 2 === 0) ? GRIFF : GRIFF_D;
+        g.block(x - 1, y - 1, 2, 2, KONTUR, a); g.put(x, y, c, a); g.put(x - 1, y, c, a);
+      }
+    };
+    const vorbereiten = (sz) => ({
+      funken: sz.ziele.map(() => Array.from({ length: ppFxN(20) }, () => ({ w: (Math.random() - 0.5) * 2, v: 20 + Math.random() * 46, leben: 260 + Math.random() * 240 }))),
+      glut: sz.ziele.map(() => Array.from({ length: ppFxN(10) }, () => ({ w: (Math.random() - 0.5) * 2.4, v: 10 + Math.random() * 30, leben: 420 + Math.random() * 300, gross: Math.random() < 0.35 }))),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const ein = Math.min(1, (Math.floor(t / 25) + 1) / 3);              // gestuftes Einblenden (Dithering)
+      const a = Math.min(ein, aus);
+      sz.ziele.forEach((z, zi) => {
+        const dx = z.dx, dy = z.dy, nx = -dy, ny = dx;
+        const rK = Math.min(Math.abs(dx) > 0.001 ? (z.w / 2) / Math.abs(dx) : 999, Math.abs(dy) > 0.001 ? (z.h / 2) / Math.abs(dy) : 999);
+        // Ansatz der Schnur (Griff) knapp vor dem Angreifer; Spitze im Einschlag etwas im Ziel
+        const hOff = Math.min(z.len * 0.3, 16), hx = sz.O.x + dx * hOff, hy = sz.O.y + dy * hOff;
+        const tx = z.x - dx * rK * 0.25, ty = z.y - dy * rK * 0.25;
+        const L = Math.max(8, Math.hypot(tx - hx, ty - hy));
+        const bei = (k) => [hx + dx * L * k, hy + dy * L * k];            // Punkt auf der Achse bei k·L (k < 0 = hinter dem Griff)
+        const takt = Math.floor(t / 33);
+        let sp, amp, wellen, ph;
+        if (t < 110) { sp = bei(-0.42); amp = 5 + 2 * (takt % 2); wellen = 2; ph = 0.6; }                    // hängt, pendelt leicht
+        else if (t < 190) { sp = bei(-0.55); amp = 9; wellen = 2; ph = 0.2 + (takt % 2) * 0.3; }             // holt aus
+        else if (t < 250) { sp = bei(-0.62); amp = 11; wellen = 3; ph = 0.4; }                               // Rückstand, Schlaufe
+        else if (t < 281) { sp = bei(0.1); amp = 10; wellen = 2; ph = 1.1; }                                 // beginnt den Schlag
+        else if (t < 306) { sp = bei(0.5); amp = 7; wellen = 2; ph = 0.8; }                                  // Schlaufe läuft nach vorn
+        else if (t < EINSCHLAG) { sp = bei(0.85); amp = 3; wellen = 1.5; ph = 0.4; }
+        else if (t < 420) { sp = [tx, ty]; amp = (t < 363) ? 2 : 0; wellen = 1; ph = 0; }                    // Spitze sitzt im Ziel
+        else if (t < 470) { sp = bei(0.78); amp = 4; wellen = 2; ph = 0.7; }                                  // schnellt zurück
+        else if (t < 520) { sp = bei(0.38); amp = 8; wellen = 2; ph = 1.2; }
+        else { sp = bei(-0.3); amp = 10; wellen = 3; ph = 0.5 + (takt % 2) * 0.3; }
+        schnur(g, hx, hy, sp[0], sp[1], nx, ny, amp, wellen, ph, a);
+        griff(g, hx, hy, dx, dy, a);
+        // Windstreifen beim Vorschnellen
+        if (t >= 250 && t < 330) for (let s = -1; s <= 1; s += 2) for (let i = 0; i < 6; i++) if ((i + takt) % 2 === 0) g.put(hx + dx * (6 + i * 4) + nx * s * (5 + i), hy + dy * (6 + i * 4) + ny * s * (5 + i), GLANZ, a * 0.7);
+        if (t < EINSCHLAG) return;
+        const al = t - EINSCHLAG, hxp = tx, hyp = ty;
+        // Zielkarte blitzt im Einschlag auf (hartes Dither-Raster) und zuckt: Geisterrahmen ±2 Pixel im Bildtakt
+        if (al < 66) g.block(z.x - z.w / 2, z.y - z.h / 2, Math.ceil(z.w), Math.ceil(z.h), FUNKEN[0], 0.38 * (1 - al / 66) * aus);
+        if (al < 230) {
+          const v = (takt % 2 === 0 ? 2 : -2) * (al < 120 ? 1 : 0.5), bx = Math.round(z.x - z.w / 2 + v), by = Math.round(z.y - z.h / 2);
+          const w = Math.ceil(z.w), h = Math.ceil(z.h), fa = 0.55 * (1 - al / 230) * aus;
+          g.block(bx, by, w, 1, FUNKEN[1], fa); g.block(bx, by + h - 1, w, 1, FUNKEN[1], fa); g.block(bx, by, 1, h, FUNKEN[1], fa); g.block(bx + w - 1, by, 1, h, FUNKEN[1], fa);
+        }
+        // Kreuzfunkel an der Spitze, Schlagstriche (acht Richtungen) und ein Hartring
+        if (al < 132) ppKreuzfunkel(g, hxp - 1, hyp - 1, [5, 5, 4, 3, 2][Math.floor(al / 27)] || 1, FUNKEN, aus);
+        if (al < 165) {
+          const r0 = 5 + Math.floor(al / 33) * 2, len = Math.max(1, 5 - Math.floor(al / 33));
+          for (let k = 0; k < 8; k++) {
+            const w = k * Math.PI / 4 + Math.PI / 8;
+            for (let j = 0; j < len; j++) g.put(hxp + Math.cos(w) * (r0 + j), hyp + Math.sin(w) * (r0 + j), j === len - 1 ? FUNKEN[3] : FUNKEN[2], aus);
+          }
+        }
+        if (al < 100) g.ring(hxp, hyp, 3 + al / 14, 3 + al / 14, FUNKEN[1], 0.8 * aus);
+        // Funken: spritzen vom Einschlag zurück (Kegel um die Gegenrichtung) mit Schwerkraft
+        const basis = Math.atan2(-dy, -dx);
+        for (const f of teile.funken[zi]) {
+          if (al > f.leben) continue;
+          const k = al / f.leben, sek = al / 1000, w = basis + f.w * 2.4;
+          g.put(hxp + Math.cos(w) * f.v * sek, hyp + Math.sin(w) * f.v * sek + 70 * sek * sek, FUNKEN[Math.min(3, Math.floor(k * 4))], (1 - k * k) * aus);
+        }
+        // Glutpunkte: schwerer, steigen leicht (Flammen der Vorlage), 1×1 oder 2×2
+        for (const b of teile.glut[zi]) {
+          if (al > b.leben) continue;
+          const k = al / b.leben, sek = al / 1000, w = basis + b.w * 2.2;
+          const px = hxp + Math.cos(w) * b.v * sek, py = hyp + Math.sin(w) * b.v * sek - 12 * sek + 40 * sek * sek;
+          if (b.gross) g.block(px, py, 2, 2, GLUT[Math.min(2, Math.floor(k * 3))], (1 - k * 0.8) * aus);
+          else g.put(px, py, GLUT[Math.min(2, Math.floor(k * 3))], (1 - k * 0.8) * aus);
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 50 });
+  })(),
+  animal_training_tame: (() => {
+    const SEIL = ppHex('#7d3911'), SEIL_D = ppHex('#4a2a10'), KONTUR = ppHex('#1a1a2e');
+    const FUNKEN = ['#ffffff', '#f9ecb3', '#fbc86a', '#e37435'].map(ppHex);
+    const GLUT = ['#e92f38', '#b5171c', '#8b0d0d'].map(ppHex);
+    const ENDE = 720;
+    /** Rechteckrand (Dicke `d`, ganze Pixel) um die Karte, um `m` Pixel nach außen versetzt. */
+    const rand = (g, z, m, d, c, a) => {
+      const x = Math.round(z.x - z.w / 2 - m), y = Math.round(z.y - z.h / 2 - m), w = Math.ceil(z.w + 2 * m), h = Math.ceil(z.h + 2 * m);
+      g.block(x, y, w, d, c, a); g.block(x, y + h - d, w, d, c, a); g.block(x, y, d, h, c, a); g.block(x + w - d, y, d, h, c, a);
+    };
+    const vorbereiten = (sz) => ({
+      glut: sz.ziele.map((z) => Array.from({ length: ppFxN(14) }, () => ({ x: (Math.random() - 0.5) * z.w, ab: 260 + Math.random() * 260, v: 14 + Math.random() * 26, leben: 360 + Math.random() * 240, gross: Math.random() < 0.3, f: Math.floor(Math.random() * 3) }))),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > 560 ? Math.max(0, 1 - (t - 560) / (ENDE - 560)) : 1;
+      if (aus <= 0) return;
+      sz.ziele.forEach((z, zi) => {
+        // Schlinge: schließt sich in drei Stufen um den Kartenrand
+        if (t < 400) {
+          const m = t < 100 ? 9 : t < 200 ? 5 : 2;
+          const a = Math.min(1, (Math.floor(t / 25) + 1) / 3) * aus;
+          rand(g, z, m + 1, 1, KONTUR, a); rand(g, z, m, 1, SEIL, a); rand(g, z, m - 1 < 0 ? 0 : m - 1, 1, SEIL_D, a);
+          const kx = Math.round(z.x), ky = Math.round(z.y - z.h / 2 - m - 1);          // Knoten oben
+          g.block(kx - 2, ky - 2, 5, 4, KONTUR, a); g.block(kx - 1, ky - 1, 3, 2, SEIL, a);
+        }
+        // gelber Rahmen blinkt dreimal (hart)
+        if ((t >= 300 && t < 370) || (t >= 420 && t < 490) || (t >= 540 && t < 610)) { rand(g, z, 1, 2, FUNKEN[1], aus); rand(g, z, 3, 1, FUNKEN[3], aus); }
+        // Flammenfunken steigen vom unteren Kartenrand auf
+        for (const b of teile.glut[zi]) {
+          const al = t - b.ab; if (al < 0 || al > b.leben) continue;
+          const k = al / b.leben, sek = al / 1000;
+          const px = z.x + b.x, py = z.y + z.h / 2 - b.v * sek * 2.2, c = (k < 0.5 ? FUNKEN[2 + (b.f % 2)] : GLUT[Math.min(2, Math.floor(k * 3))]);
+          if (b.gross) g.block(px, py, 2, 2, c, (1 - k * 0.7) * aus); else g.put(px, py, c, (1 - k * 0.7) * aus);
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 30 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
   //  Opfer-Messer — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!")
   //
   //  Prozedural auf einem kleinen Raster (Canvas, `image-rendering: pixelated`, ~33 Bilder/s), feste Palette,
@@ -31317,6 +31578,190 @@ const ANIM_REGISTRY = {
     return ppPunktBild(malen, ENDE, 300, 300, vorbereiten);
   })(),
   // ═══════════════════════════════════════════════════════════════════
+  //  Sinister Idol — PIXELART, Zonen-Animation auf einer ABILITY (Hülle `ppPunktBild`; Vorlage: das Kartenbild — das goldene Götzenbild mit roten Augen und weißem Zahngrinsen,
+  //  grauer Körper mit weißem Fragezeichen)
+  //
+  //  Der Götze (12 × 18) erscheint gedithert über der Ability und sinkt in drei Stufen herab; seine Augen blinken rot. Ab ~300 ms spannt sich der Fluch: ein violetter Rahmen schnappt
+  //  in drei Stufen um die Ability (danach blinkt er), zwei gestrichelte Fluchstrahlen laufen vom Götzen auf sie, drei Schädel steigen aus ihr auf. Bei ~760 ms blitzt die Ability auf
+  //  (Kreuzfunkel, Dither-Blitz) — dann löst sich die oberste Kopie (der Server schickt sie zur selben Zeit in die Ablage: Flug Brett → Ablage, ~500 ms) und violette Fetzen steigen
+  //  aus der Ability auf. Ab ~1050 ms dithert alles weg; ENDE 1300 (Standard-Dauer 1360 über ZONEN_ANIM_DAUER). Feste Palette, KEINE Unschärfe, KEIN Leuchten.
+  // ═══════════════════════════════════════════════════════════════════
+  sinister_idol: (() => {
+    const IDOL = {
+      k: ppHex('#141414'), Y: ppHex('#fff196'), y: ppHex('#ffd61a'), o: ppHex('#f9ac20'), r: ppHex('#e73b41'), f: ppHex('#ff6666'),
+      w: ppHex('#ffffff'), g: ppHex('#b9b9b9'), G: ppHex('#929292'), d: ppHex('#686868'), q: ppHex('#535353'),
+    };
+    // Götze 12 × 18: Kopf (Zeile 0–8) mit roten Augen und Zahngrinsen, Körper (9–17) mit dem weißen Fragezeichen
+    const KOPF_UND_KOERPER = [
+      '...kkkkkk...',
+      '..kYYyyyyk..',
+      '.kYyyyyyyok.',
+      '.kYyyyyyyok.',
+      '.kyrryyrryk.',
+      '.koyyyyyyok.',
+      '.kwkwkwkwwk.',
+      '..kwkwkwkk..',
+      '...kkkkkk...',
+      '..kGGGGGGk..',
+      '.kgGwwwGGdk.',
+      '.kgGGGwGGdk.',
+      '.kgGGwGGGdk.',
+      '.kgGGGGGGdk.',
+      '.kgGGwGGGdk.',
+      '.kddddddddk.',
+      '..kqqqqqqk..',
+      '...kkkkkk...',
+    ];
+    const AUGEN_HELL = KOPF_UND_KOERPER.map(z => z.replace(/r/g, 'f'));
+    const PU = ['#f1e5fa', '#c98aff', '#9544d5', '#47117e', '#2b0b47'].map(ppHex);
+    const SCHAEDEL_PAL = { k: ppHex('#2b0b47'), b: ppHex('#d6bbf1') };
+    const SCHAEDEL = ['.kbbbk.', 'kbbbbbk', 'kbkbkbk', 'kbbbbbk', '.kbkbk.', '..kkk..'];
+    const ENDE = 1300, FADE_AB = 1050, FLUCH = 300, BLITZ = 760;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = () => ({
+      fetzen: Array.from({ length: ppFxN(16) }, () => ({
+        x: (Math.random() - 0.5) * 1.8, ab: BLITZ + Math.random() * 220, v: 14 + Math.random() * 24, leben: 340 + Math.random() * 260, gross: Math.random() < 0.3, p: Math.random() * 6,
+      })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const cx = Math.round(sz.cx), cy = Math.round(sz.cy), hw = Math.round(sz.hw), hh = Math.round(sz.hh);
+      // ── der Götze: gestuftes Einblenden (Dithering), sinkt in drei Stufen, wippt in ganzen Pixeln ──
+      const ein = klemme(t / 260, 0, 1);
+      const ia = Math.min(Math.floor(ein * 5) / 5, aus);
+      const sinken = ein < 1 ? [5, 3, 1][Math.min(2, Math.floor(ein * 3))] : 0;
+      const ix = cx, iy = cy - hh - 11 - sinken + (t > FLUCH ? Math.round(Math.sin(t / 130)) : 0);
+      if (ia > 0) ppSprite(g, ix, iy, (t > 160 && Math.floor(t / 100) % 2 === 1) ? AUGEN_HELL : KOPF_UND_KOERPER, IDOL, ia);
+      // ── Fluchstrahlen (gestrichelt, laufen mit) vom Götzen auf die Ability ──
+      if (t >= FLUCH && t < BLITZ + 60) {
+        const ab = klemme((t - FLUCH) / 120, 0, 1);
+        for (const [sx, tx] of [[-3, -0.45], [2, 0.45]]) {
+          const x0 = ix + sx, y0 = iy + 5, x1 = cx + tx * hw, y1 = cy - hh * 0.5;
+          const n = Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))), kopf = Math.floor(n * ab);
+          for (let s = 0; s <= kopf; s++) if ((s + Math.floor(t / 66)) % 3 !== 0) g.put(x0 + (x1 - x0) * (s / n), y0 + (y1 - y0) * (s / n), s % 2 ? PU[1] : PU[2], aus);
+        }
+      }
+      // ── der Fluchrahmen schnappt um die Ability (drei Stufen), blinkt, bleibt bis zum Blitz ──
+      const fa = t - FLUCH;
+      if (fa >= 0 && t < BLITZ + 100) {
+        const m = fa < 132 ? [8, 4, 1][Math.floor(fa / 44)] : 0;
+        const rw = hw * 2 + 2 * m, rh = hh * 2 + 2 * m, x0 = cx - hw - m, y0 = cy - hh - m;
+        const hell = fa < 132 || Math.floor(t / 99) % 2 === 0;
+        for (let i = 0; i < rw; i++) for (const w of [0, 1]) { const c = w ? PU[3] : (hell ? PU[1] : PU[2]); g.put(x0 + i, y0 + w, c, aus); g.put(x0 + i, y0 + rh - 1 - w, c, aus); }
+        for (let j = 0; j < rh; j++) for (const w of [0, 1]) { const c = w ? PU[3] : (hell ? PU[1] : PU[2]); g.put(x0 + w, y0 + j, c, aus); g.put(x0 + rw - 1 - w, y0 + j, c, aus); }
+        if (fa < 132) for (const [ex, ey] of [[x0, y0], [x0 + rw - 1, y0], [x0, y0 + rh - 1], [x0 + rw - 1, y0 + rh - 1]]) g.block(ex - 1, ey - 1, 3, 3, PU[0], aus);
+      }
+      // ── Schädel steigen aus der Ability auf ──
+      for (let s = 0; s < 3; s++) {
+        const al = t - (FLUCH + 40 + s * 130);
+        if (al < 0 || al > 540) continue;
+        const k = al / 540, sek = al / 1000;
+        const x = cx + (s - 1) * hw * 0.7 + Math.round(Math.sin(sek * 7 + s)), y = cy + hh * 0.3 - 34 * sek - k * 6;
+        ppSprite(g, x, y, SCHAEDEL, SCHAEDEL_PAL, (1 - k * k) * aus);
+      }
+      // ── Blitz: die Ability flackert auf, Kreuzfunkel in der Mitte ──
+      const ba = t - BLITZ;
+      if (ba >= 0 && ba < 100) {
+        if (ba < 34) g.block(cx - hw, cy - hh, hw * 2, hh * 2, PU[0], aus);
+        else if (ba < 67) g.block(cx - hw, cy - hh, hw * 2, hh * 2, PU[1], 0.5 * aus);
+        else g.block(cx - hw, cy - hh, hw * 2, hh * 2, PU[2], 0.25 * aus);
+      }
+      if (ba >= 0 && ba < 260) ppKreuzfunkel(g, cx - 1, cy - 1, [2, 4, 5, 5, 4, 3, 2, 1][Math.floor(ba / 33)] || 1, PU, aus);
+      // ── Fetzen: die Kopie löst sich, violette Fetzen steigen auf ──
+      for (const f of teile.fetzen) {
+        const al = t - f.ab; if (al < 0 || al > f.leben) continue;
+        const k = al / f.leben, sek = al / 1000;
+        const x = cx + f.x * hw + Math.round(Math.sin(sek * 6 + f.p) * 2), y = cy + hh * 0.6 - f.v * sek * 1.6;
+        g.block(x, y, f.gross ? 2 : 1, f.gross ? 2 : 1, PU[Math.min(3, Math.floor(k * 4))], (1 - k) * aus);
+      }
+    };
+    return ppPunktBild(malen, ENDE, 300, 300, vorbereiten);
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Shipwrecked — PIXELART, Zonen-Animation am Helden (Hülle `ppPunktBild`; Vorlage: das Kartenbild — Schiffbrüchiger am Strand, blaue Wasserkante, Treibholz-Planken, Fässer)
+  //
+  //  Eine Welle läuft in ganzen Pixeln von links über die Füße des Helden (Schaumkante aus Weiß/Hellblau, darunter vier Blaustufen mit Bayer-Dither, die Kante wogt in
+  //  Pixelstufen); sie lässt zwei Planken und ein Fass zurück, die im Wasser auf und ab schaukeln (ganze Pixel, ~7 Bilder je Hub), und zieht sich dann zurück. Ab ~980 ms dithert alles
+  //  weg; ENDE 1300 (`duration` 1340). Feste Palette, KEINE Unschärfe, KEIN Leuchten, keine Drehung (Planken als zwei fertige Sprites).
+  // ═══════════════════════════════════════════════════════════════════
+  shipwrecked_attach: (() => {
+    const WASSER = ['#e5edfa', '#66b6ff', '#399edf', '#3866f0', '#0351c9', '#02398c'].map(ppHex);   // Schaum, hell, mittel, Welle, tief, Grund
+    const WEISS = ppHex('#ffffff');
+    const PAL = {
+      k: ppHex('#311402'), d: ppHex('#6e4421'), m: ppHex('#b06746'), h: ppHex('#ca874e'),          // Planke: Kontur, dunkel, Holz, Lichtkante
+      t: ppHex('#e0c085'), T: ppHex('#fbc86a'), s: ppHex('#b29466'), i: ppHex('#929292'), I: ppHex('#b9b9b9'),   // Fass: Holz, Licht, Schatten, Reifen dunkel/hell
+    };
+    const PLANKE_FLACH = ['.kkkkkkkkk.', 'kdmmhmmmdk', '.kkkkkkkkk.'];
+    const PLANKE_SCHRAEG = ['kk.......', 'kdkk.....', '.kmmkk...', '..kmhmkk.', '...kkmdk.', '.....kkk.'];
+    const FASS = [
+      '..kkkkkk..', '.kttTTttk.', 'kttTTtttsk', 'kIiiiiiiik', 'ktTtttttsk', 'ktTtttttsk', 'kIiiiiiiik', 'kttTtttssk', '.kttttssk.', '..kkkkkk..',
+    ];
+    const ENDE = 1300, FADE_AB = 980, VOR = 420, STEHT = 760, ZURUECK = 980;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = () => ({
+      schaum: Array.from({ length: ppFxN(18) }, () => ({ u: Math.random(), v: Math.random(), ab: Math.floor(Math.random() * 600), leben: 140 + Math.random() * 140 })),
+      glanz: Array.from({ length: ppFxN(6) }, (_, i) => ({ u: (i + 0.5) / 6 + (Math.random() - 0.5) * 0.1, ab: 380 + i * 70 + Math.random() * 60 })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const cx = Math.round(sz.cx), cy = Math.round(sz.cy), hw = Math.round(sz.hw), hh = Math.round(sz.hh);
+      const xl = cx - hw - 20, xr = cx + hw + 20, breite = xr - xl;
+      const yo = cy + Math.round(hh * 0.3), yu = cy + hh + 6;                            // Wasserband: über den Füßen des Helden
+      // Vorderkante der Welle: läuft in Stufen nach rechts (ease-out), zieht sich später wieder nach links zurück
+      const vorn = t < VOR ? xl + Math.floor(breite * (1 - Math.pow(1 - klemme(t / VOR, 0, 1), 2.2))) : xr;
+      const hinten = t < STEHT ? xl : xl + Math.floor(breite * Math.pow(klemme((t - STEHT) / (ZURUECK - STEHT + 120), 0, 1), 1.6));
+      // ── Wasser: Spalte für Spalte, Kante wogt (ganze Pixel) ──
+      for (let x = hinten; x <= vorn; x++) {
+        const rand = Math.min(x - hinten, vorn - x);                                    // zur Wellenfront hin steigt die Kante an (Schaumkamm)
+        const kamm = rand < 5 ? Math.round((5 - rand) * 0.7) : 0;
+        const top = yo + Math.round(Math.sin(x * 0.55 + t / 90) * 1.4) - kamm;
+        for (let y = top; y <= yu; y++) {
+          const tiefe = y - top;
+          let s = tiefe === 0 ? 0 : tiefe === 1 ? 1 : 2 + Math.min(3, (tiefe - 2) * 0.55);   // Schaum → hell → mittel … tief (Dither zwischen den Stufen)
+          if (y > yu - 2) s = Math.max(s, 4.4);
+          g.put(x, y, ppStufe(WASSER, s, x, y), aus);
+        }
+        if (rand < 4 && (x + Math.floor(t / 66)) % 3 === 0) g.put(x, top - 1, WASSER[0], aus * 0.7);   // Gischt über dem Kamm
+      }
+      // ── Schaumflocken auf dem Wasser ──
+      for (const f of teile.schaum) {
+        const al = t - f.ab;
+        if (al < 0 || al > f.leben) continue;
+        const x = Math.round(xl + (vorn - xl) * f.u), y = Math.round(yo + 2 + f.v * (yu - yo - 3));
+        if (x < hinten || x > vorn) continue;
+        g.put(x, y, WASSER[0], aus * (1 - al / f.leben)); g.put(x + 1, y, WASSER[1], aus * (1 - al / f.leben));
+      }
+      // ── Treibgut: kommt mit der Welle, schaukelt in ganzen Pixeln, bleibt liegen ──
+      const ankunft = (u0) => klemme((t - VOR * u0) / 300, 0, 1);
+      const treibgut = [
+        { x: cx - hw + 1, y: yo + 4, bild: PLANKE_FLACH, u: 0.35, ph: 0 },
+        { x: cx + 1, y: yo + 8, bild: PLANKE_SCHRAEG, u: 0.6, ph: 1.7 },
+        { x: cx + hw - 3, y: yo + 6, bild: FASS, u: 0.85, ph: 3.1 },
+      ];
+      for (const d of treibgut) {
+        const k = ankunft(d.u);
+        if (k <= 0) continue;
+        const ex = d.x - Math.round(Math.pow(1 - k, 2) * 16);                              // schwimmt von links heran
+        const hub = Math.round(Math.sin(t / 150 + d.ph) * 1.2);
+        // verschwindet mit dem Wasser, wenn die Welle zurückläuft: nur solange die Welle hier steht
+        if (ex < hinten - 2) continue;
+        ppSprite(g, ex, d.y + hub, d.bild, PAL, aus * (k < 1 ? Math.floor(k * 4) / 4 : 1));
+      }
+      // ── Glanzpunkte auf der Wasserfläche ──
+      for (const gl of teile.glanz) {
+        const al = t - gl.ab;
+        if (al < 0 || al > 160) continue;
+        const x = Math.round(xl + breite * gl.u), y = yo + 3 + (Math.floor(al / 33) % 2);
+        if (x < hinten || x > vorn) continue;
+        const arm = al < 80 ? 1 : 0;
+        g.put(x, y, WEISS, aus); if (arm) { g.put(x - 1, y, WASSER[0], aus); g.put(x + 1, y, WASSER[0], aus); g.put(x, y - 1, WASSER[0], aus); g.put(x, y + 1, WASSER[0], aus); }
+      }
+    };
+    return ppPunktBild(malen, ENDE, 300, 300, vorbereiten);
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
   //  Super Fan — PIXELART auf dem DECK (Als Vorgabe 10.10.; Vorlage: das Kartenbild — der Fan mit dem Leuchtstab, rosa und grüne Herzen)
   //
   //  Ein türkisfarbener Leuchtstab schwingt über dem Deck hin und her (Nachzieh-Schweif, gelbe Funkenstrahlen an der Spitze),
@@ -32626,6 +33071,156 @@ const ANIM_REGISTRY = {
       });
     };
     return ppSalve(malen, ENDE, null, { extra: 40 });
+  })(),
+  // ═════════════════════════════════════════════════════════════════
+  //  Winged Haressassin — Umleitung (27.10.) — PIXELART, Federn stieben vom gewählten Ziel und flattern zur Kreatur (`ppSalve`; Vorlage: das Kartenbild — der weiß geflügelte Hasen-Assassine
+  //  mit den roten Augen über dem Wald)
+  //
+  //  Ursprung = das ursprünglich gewählte Ziel (Held oder Kreatur), `targets[0]` = die Winged Haressassin. Ablauf (ENDE 900): 0–150 ms stieben zwölf kleine Federn aus dem Ziel (ein weißer
+  //  Ring weitet sich in Stufen) · 150–~620 flattern sie im Bogen zur Kreatur (Zickzack in ganzen Pixeln, die Federn kippen im Bildtakt, eisblaue Schweifpunkte) · bei der Ankunft (~480–640)
+  //  verpufft jede Feder in einem kleinen Funkenkreuz, die Karte blitzt im harten Dither-Raster auf · ab ~560 schlägt die Kreatur zweimal mit den Flügeln (Flügelschlag aus Federstrahlen) · ab ~720
+  //  dithert alles weg. Der Server lässt den Effekt nach `FLUG_MS` (620 ms) auf der Kreatur auflösen. Feste Palette, Bayer-Dithering statt Alpha, Bewegung in ganzen Pixeln, KEIN Schein.
+  // ═════════════════════════════════════════════════════════════════
+  winged_haress_feathers: (() => {
+    const FUNKEN = ['#ffffff', '#e5edfa', '#b4cff8', '#7e7d9b'].map(ppHex);
+    const ENDE = 900, T_STIEB = 150, FADE_AB = 720;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const glatt = (k) => k * k * (3 - 2 * k);
+    const mix = (a, b, k) => a + (b - a) * k;
+    const vorbereiten = (sz) => ({
+      federn: sz.ziele.map(() => Array.from({ length: ppFxN(12) }, (_, i) => ({
+        w: (i / Math.max(1, ppFxN(12))) * Math.PI * 2 + Math.random() * 0.5, r: 8 + Math.random() * 8,
+        an: 460 + Math.random() * 200, ph: Math.floor(Math.random() * 3), bogen: 6 + Math.random() * 14, zick: 1 + Math.floor(Math.random() * 2),
+      }))),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const O = sz.O, fr = Math.floor(t / 33);
+      sz.ziele.forEach((z, zi) => {
+        // Federn aus dem gewählten Ziel: ein weißer Ring weitet sich in Stufen
+        if (t < T_STIEB + 60) {
+          const k = klemme(t / (T_STIEB + 60), 0, 1), r = 2 + Math.floor(k * 4) * 2;
+          g.ring(O.x, O.y, r, r * 0.8, PP_FEDER_PAL.W, (1 - k) * aus);
+        }
+        for (const f of teile.federn[zi]) {
+          if (t < f.an + 40) {
+            let x, y;
+            if (t < T_STIEB) {                                                  // ① stieben aus dem Ziel
+              const k = klemme(t / T_STIEB, 0, 1);
+              x = O.x + Math.cos(f.w) * f.r * k; y = O.y + Math.sin(f.w) * f.r * k * 0.8;
+            } else {                                                            // ② flattern im Bogen zur Kreatur
+              const k = glatt(klemme((t - T_STIEB) / (f.an - T_STIEB), 0, 1));
+              const sx = O.x + Math.cos(f.w) * f.r, sy = O.y + Math.sin(f.w) * f.r * 0.8;
+              const zickzack = (Math.floor(t / 66 + f.ph) % 2 ? 1 : -1) * f.zick * Math.sin(k * Math.PI);
+              x = mix(sx, z.x, k) + zickzack; y = mix(sy, z.y, k) - Math.sin(k * Math.PI) * f.bogen;
+              for (let n = 2; n >= 1; n--) {                                    // eisblaue Schweifpunkte
+                const kk = glatt(klemme((t - T_STIEB) / (f.an - T_STIEB) - n * 0.07, 0, 1));
+                g.put(mix(sx, z.x, kk), mix(sy, z.y, kk) - Math.sin(kk * Math.PI) * f.bogen, n === 1 ? PP_FEDER_PAL.M : PP_FEDER_PAL.D, aus * (1 - n * 0.3));
+              }
+            }
+            if (t < f.an) ppFeder(g, x, y, f.ph + fr, aus);
+          }
+          if (t >= f.an - 20) {                                                  // ③ Ankunft: kleines Funkenkreuz
+            const al = t - (f.an - 20);
+            if (al < 130) {
+              const arm = [1, 2, 3, 2, 1][Math.floor(al / 27)] || 1;
+              ppKreuzfunkel(g, z.x - 1 + Math.cos(f.w) * 2, z.y - 1 + Math.sin(f.w) * 2, arm, FUNKEN, aus * (1 - al / 160));
+            }
+          }
+        }
+        // Karte blitzt bei der ersten Ankunft (hartes Dither-Raster)
+        const erste = Math.min(...teile.federn[zi].map(f => f.an)) - 20;
+        if (t >= erste && t < erste + 66) g.block(z.x - z.w / 2, z.y - z.h / 2, Math.ceil(z.w), Math.ceil(z.h), PP_FEDER_PAL.W, 0.3 * (1 - (t - erste) / 66) * aus);
+        // Flügelschlag der Kreatur
+        if (t >= 560 && t < 820) {
+          const h = [1, 2, 3, 1, 0, 1][Math.floor((t - 560) / 44) % 6];
+          ppFluegel(g, z.x - 8, z.y - 2, -1, h, aus);
+          ppFluegel(g, z.x + 8, z.y - 2, 1, h, aus);
+        }
+      });
+    };
+    return ppSalve(malen, ENDE, vorbereiten, { extra: 40 });
+  })(),
+  // ═════════════════════════════════════════════════════════════════
+  //  Winged Haressassin — 150 Schaden (27.10.) — PIXELART, ein schneller, gerader Schnitt, hinter dem kleine Federn fallen (`ppSalve`; Vorlage: das Kartenbild — weiße Flügel, rote Augen)
+  //
+  //  Ursprung = die fallende Winged Haressassin, `targets[0]` = das Ziel. Ablauf (ENDE 1200): 0–200 ms Flügelschlag der Kreatur (zwei Flügel aus Federstrahlen, vier Haltungen im Bildtakt) ·
+  //  200–330 der GERADE Schnitt zieht in ~4 Bildern über das Ziel (schräg zur Anflugrichtung, weißer Kern, eisblaue Flanken, dunkle Kontur, Funkenkreuz an der Spitze; Spitze rast, der Strich bleibt
+  //  stehen) · 330 Einschlag: Aufblitzen der Zielkarte (hartes Dither-Raster), Kreuzfunkel, Funken mit Schwerkraft · 430–600 zieht sich der Strich vom Schwanz her wieder ein · hinter dem Schnitt
+  //  lösen sich zehn kleine Federn von der Schnittlinie (je dort, wo die Spitze vorbeikam) und FALLEN mit leichtem Zickzack (ganze Pixel, Federn kippen im Bildtakt), ab ~700 dithern sie weg.
+  //  Der Schaden fällt im Einschlag (Server wartet 330 ms). Feste Palette, Bayer-Dithering statt Alpha, Bewegung in ganzen Pixeln, KEINE Drehung eines Kartenbildes, KEIN Schein.
+  // ═════════════════════════════════════════════════════════════════
+  winged_haress_slash: (() => {
+    const KONTUR = ppHex('#1a1a2e'), ROT = ppHex('#e92f38');
+    const FUNKEN = ['#ffffff', '#e5edfa', '#b4cff8', '#7e7d9b'].map(ppHex);
+    const T_FLUEGEL = 200, T_AB = 200, T_EIN = 330, T_HALT = 430, T_WEG = 600, ENDE = 1200, FADE_AB = 1000;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = (sz) => ({
+      federn: sz.ziele.map(() => Array.from({ length: ppFxN(10) }, (_, i) => ({
+        s: (i + 0.5 + (Math.random() - 0.5) * 0.7) / Math.max(1, ppFxN(10)), drift: (Math.random() - 0.5) * 2, leben: 620 + Math.random() * 280,
+        ph: Math.floor(Math.random() * 3), swing: 1 + Math.floor(Math.random() * 2), fall: 16 + Math.random() * 14,
+      }))),
+      funken: sz.ziele.map(() => Array.from({ length: ppFxN(8) }, () => ({ w: Math.random() * Math.PI * 2, v: 16 + Math.random() * 30, leben: 240 + Math.random() * 200 }))),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const O = sz.O;
+      // ① Flügelschlag der Kreatur (nur im ersten Teil)
+      if (t < T_FLUEGEL + 33) {
+        const h = [0, 1, 2, 3, 2, 1][Math.floor(t / 33) % 6], a = Math.min(aus, (Math.floor(t / 33) + 1) / 3);
+        ppFluegel(g, O.x - 8, O.y - 2, -1, h, a);
+        ppFluegel(g, O.x + 8, O.y - 2, 1, h, a);
+      }
+      sz.ziele.forEach((z, zi) => {
+        // Schnittrichtung: eine saubere 45°-Diagonale (Treppenstufen, nichts wird gedreht) — die der beiden, die zur Anflugrichtung senkrechter steht; immer von oben nach unten gezogen
+        const R2 = 0.7071;
+        const ux = (z.selbst || Math.abs(z.dx * R2 + z.dy * R2) < Math.abs(-z.dx * R2 + z.dy * R2)) ? R2 : -R2, uy = R2;
+        const lh = Math.max(z.w, z.h) * 0.62, nx = -uy, ny = ux;
+        const P = (s) => [z.x + ux * lh * (2 * s - 1), z.y + uy * lh * (2 * s - 1)];
+        // ② der gerade Schnitt: Spitze rast in 4 Bildern, der Strich bleibt stehen, zieht sich dann vom Schwanz her ein
+        if (t >= T_AB && t < T_WEG + 40) {
+          const kopf = klemme((t - T_AB) / (T_EIN - T_AB), 0, 1);
+          const schwanz = t < T_HALT ? 0 : klemme((t - T_HALT) / (T_WEG - T_HALT), 0, 1);
+          const n = Math.ceil(lh * 2.4);
+          for (let i = 0; i <= n; i++) {
+            const s = i / n;
+            if (s < schwanz || s > kopf) continue;
+            const prof = Math.sin(Math.PI * s);                                   // Strichstärke: spitz an den Enden, dick in der Mitte
+            const [px, py] = P(s);
+            if (prof > 0.55) { g.put(px + nx * 2, py + ny * 2, KONTUR, aus); g.put(px - nx * 2, py - ny * 2, KONTUR, aus); }
+            if (prof > 0.3) { g.put(px + nx, py + ny, PP_FEDER_PAL.M, aus); g.put(px - nx, py - ny, PP_FEDER_PAL.M, aus); }
+            g.put(px, py, PP_FEDER_PAL.W, aus);
+          }
+          if (t < T_EIN + 20) {                                                   // Funkenkreuz an der rasenden Spitze
+            const [hx, hy] = P(kopf);
+            ppKreuzfunkel(g, hx - 1, hy - 1, t < T_EIN ? 2 : 1, FUNKEN, aus);
+          }
+          if (t >= T_AB && t < T_AB + 66) { const [sx, sy] = P(0); g.put(sx, sy, ROT, aus); g.put(sx + 2, sy, ROT, aus); }   // die roten Augen blitzen am Anfang des Strichs
+        }
+        // ③ Einschlag
+        if (t >= T_EIN) {
+          const al = t - T_EIN, [mx, my] = P(0.5);
+          if (al < 66) g.block(z.x - z.w / 2, z.y - z.h / 2, Math.ceil(z.w), Math.ceil(z.h), PP_FEDER_PAL.W, 0.34 * (1 - al / 66) * aus);
+          if (al < 120) ppKreuzfunkel(g, mx - 1, my - 1, [4, 4, 3, 2, 1][Math.floor(al / 24)] || 1, FUNKEN, aus);
+          for (const f of teile.funken[zi]) {
+            if (al > f.leben) continue;
+            const k = al / f.leben, sek = al / 1000;
+            g.put(mx + Math.cos(f.w) * f.v * sek, my + Math.sin(f.w) * f.v * sek + 60 * sek * sek, FUNKEN[Math.min(3, Math.floor(k * 4))], (1 - k * k) * aus);
+          }
+        }
+        // ④ Federn fallen hinter dem Schnitt (jede löst sich dort, wo die Spitze vorbeikam)
+        for (const f of teile.federn[zi]) {
+          const ts = T_AB + (T_EIN - T_AB) * f.s, age = t - ts;
+          if (age < 0 || age > f.leben) continue;
+          const k = age / f.leben, sek = age / 1000, [px, py] = P(f.s);
+          const x = px + f.drift * sek * 8 + (Math.floor(age / 130 + f.ph) % 2 ? 1 : -1) * f.swing, y = py + f.fall * sek + 22 * sek * sek;
+          ppFeder(g, x, y, f.ph + Math.floor(age / 99), (k > 0.7 ? 1 - (k - 0.7) / 0.3 : 1) * aus);
+        }
+      });
+    };
+    return ppSalve(malen, ENDE, vorbereiten, { extra: 40 });
   })(),
   // ═════════════════════════════════════════════════════════════════
   //  Patty, the Ninja of Revenge (25.10.) — PIXELART, schwarze Wurfsterne von Patty zum Ziel (`ppSalve`; `runde` = Zahl der Sterne = Zahl der geschickten Abilities)
@@ -50979,7 +51574,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // spielt die Animation ueber dem echten Handslot. `count` reicht
     // die Partikelmenge durch (Battery/Magic Modifier skalieren damit
     // ihre Staerke).
-    const onHandCardAnim = ({ owner, handIdx, animType, count, duration, cardName }) => {
+    const onHandCardAnim = ({ owner, handIdx, animType, count, duration, cardName, phase }) => {
       const isMe = owner === myIdx;
       const base = isMe ? '.game-hand-me' : '.game-hand-opp';
       // 23.10.: mit `cardName` sucht der Client den Slot über den KARTENNAMEN (der Index der Engine kann dem Stand der Handanzeige voraus sein — eine Reaction
@@ -50994,8 +51589,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         || document.querySelector(`${base} [data-hand-idx="${handIdx}"]`)
         || document.querySelector(base);
       if (!el) return;
-      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(animType, { count, duration });
-      playAnimation(animType, el, { duration: duration || 900, count: count || 1 });
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(animType, { count, duration, ...(phase ? { phase } : {}) });
+      playAnimation(animType, el, { duration: duration || 900, count: count || 1, ...(phase ? { phase } : {}) });
     };
     socket.on('play_hand_card_animation', onHandCardAnim);
 
@@ -55190,6 +55785,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'destroy') { return <span className="log-damage">{cName(entry.target)} was destroyed!</span>; }
       if (t === 'all_heroes_dead') { return <span className="log-damage" style={{fontWeight:700}}>All heroes defeated!</span>; }
       if (t === 'reaction_activated') { return <span className="log-status">{cName(entry.card)} activated as a Reaction!</span>; }
+      if (t === 'sinister_idol') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {cName('Sinister Idol')} removed the top copy of {cName(entry.ability)} from {cName(entry.hero)} — it resolves at level {entry.level}.</span>; }
       // v1328: Wirker waehrend der Kette handlungsunfaehig → Attack/Spell fizzelt.
       if (t === 'chain_link_fizzled') { const p = playerByName(entry.player); const warum = { defeated: 'was defeated', frozen: 'is Frozen', stunned: 'is Stunned', negated: 'is Negated' }[entry.reason] || 'can no longer act'; return <span className="log-info">💨 {cName(entry.card)} fizzled — {pName(p.name, p.color)}'s {entry.hero || 'Hero'} {warum}.</span>; }
       // v1327: Stealthy Pursuit — und die bisher unsichtbaren Dive-Down-Zeilen.
@@ -55255,6 +55851,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'redirecting_aura_attached') {
         const p = playerByName(entry.player);
         return <span className="log-status">↪️ {cName('Redirecting Aura')} — {pName(p.name, p.color)} attaches it to {entry.hero}.</span>;
+      }
+      if (t === 'winged_haressassin_redirect') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">↪️ {cName('Winged Haressassin')} — {pName(p.name, p.color)} discards a card and redirects {entry.source ? <>{cName(entry.source)}</> : 'the effect'} from {entry.from} to it.</span>;
+      }
+      if (t === 'winged_haressassin_revenge') {
+        const p = playerByName(entry.player);
+        return <span className="log-damage">🗡️ {cName('Winged Haressassin')} — defeated by the redirected effect, it deals <span className="log-amount">150</span> damage to {entry.target} ({pName(p.name, p.color)}).</span>;
       }
       if (t === 'exorcism') {
         const p = playerByName(entry.player);
@@ -56078,6 +56682,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // 24.10. Stoneskin: trägt der Held die Karte, wird NUR sein animierter Sprite versteinert (Karte bleibt unverändert; Sprite läuft weiter) — keine Betäubung, nur Optik.
           const hatSteinhaut = (p.supportZones?.[i] || []).some(z => (z || []).includes('Stoneskin'));
           const regenAnzahl = (p.supportZones?.[i] || []).filter(z => (z || []).includes('Regeneration')).length;   // 24.10. Regeneration: nur Abzeichen (die Heilung rechnet der Server)
+          const hatSchiffbruch = (p.supportZones?.[i] || []).some(z => (z || []).includes('Shipwrecked'));   // W82 Shipwrecked: nur Abzeichen (die Wirkung rechnet der Server)
           const isImmune = hero?.statuses?.immune;
           const isNegated = hero?.statuses?.negated;
           const isNulled = hero?.statuses?.nulled;
@@ -56618,7 +57223,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     <PxIcon z="🚫" />
                   </div>
                 )}
-                {hero?.name && <BuffColumn buffs={hero.buffs} statuses={(p.spellImmuneHeroes?.[i] || hatSteinhaut || regenAnzahl) ? { ...(hero.statuses || {}), ...(p.spellImmuneHeroes?.[i] ? { _spellImmune: true } : null), ...(hatSteinhaut ? { _stoneskin: true } : null), ...(regenAnzahl ? { _regeneration: regenAnzahl } : null) } : hero.statuses} cardName={hero.name} />}
+                {hero?.name && <BuffColumn buffs={hero.buffs} statuses={(p.spellImmuneHeroes?.[i] || hatSteinhaut || regenAnzahl || hatSchiffbruch) ? { ...(hero.statuses || {}), ...(p.spellImmuneHeroes?.[i] ? { _spellImmune: true } : null), ...(hatSteinhaut ? { _stoneskin: true } : null), ...(regenAnzahl ? { _regeneration: regenAnzahl } : null), ...(hatSchiffbruch ? { _shipwrecked: true } : null) } : hero.statuses} cardName={hero.name} />}
                 {/* ── Deepsea Counter badge (Siphem) ── */}
                 {/* ★ v1472: hier und an den Nachbar-Abzeichen stand
                     `cursor: 'help'` — der native Pfeil mit Fragezeichen
@@ -59864,6 +60469,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   if (handLevelIsHeroFiltered) handNotes.push({ color: lvFarbe, text: `Reduced level only applies when ${me.heroes?.[handLevelHostHeroIdx]?.name || 'the corresponding Hero'} plays this card.` });
                   if (manaCrystalBoost) handNotes.push({ color: '#fe5154', text: 'Mana Absorbing Crystal in your hand: Spells read +1 level.' });
                 }
+                // Ancient Guardian Statue: die Karte zählt als zusätzliche Aktion, solange die Statue wirkt und die Stufe 0 ist.
+                if ((me.handZusatzaktion || {})[item.origIdx]) handNotes.push({ color: '#75f091', text: 'Counts as an additional Action while Ancient Guardian Statue stays on the board (Level 0).' });
                 if (handEffectiveCost != null) {
                   const kFarbe = handEffectiveCost > handCardData.cost ? '#fe5154' : '#75f091';
                   const teile = [];

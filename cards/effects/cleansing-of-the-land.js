@@ -38,6 +38,7 @@ const CARD_NAME = 'Cleansing of the Land';
 function einsetzbar(engine, pi, cd) {
   if (!cd) return false;
   if (!engine.canPlaceAnotherArea(pi, cd.name)) return false;
+  if (engine.spielerIstVonAreasAusgenommen(pi)) return false;   // W82 (Shipwrecked): „you cannot … play Areas"
   // Kontrolle statt Seite (Styx 28.9.) — „one of your Heroes"
   for (const { physOwner, heroIdx, hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name || hero.hp <= 0) continue;

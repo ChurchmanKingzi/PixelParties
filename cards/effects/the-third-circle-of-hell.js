@@ -58,6 +58,7 @@ module.exports = {
     const gs = engine.gs;
     const ps = gs.players[pi];
     if (!ps || ps._thirdCircleTurn === gs.turn) return;
+    if (engine.spielerIstVonAreasAusgenommen(pi)) return;   // W82 (Shipwrecked): Area-Effekte aktivieren und Areas spielen ist gesperrt
     if (!(ps.mainDeck || []).length) return;
     await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
     const antwort = await engine.promptGeneric(pi, {

@@ -58,6 +58,7 @@ module.exports = {
       if (uhren[0]?.id !== ctx.card?.id) return;   // nur einmal je Zug
 
       const zugspieler = engine.gs.activePlayer;
+      if (engine.spielerIstVonAreasAusgenommen(zugspieler)) return;   // W82 (Shipwrecked): der Zugspieler ist von Areas ausgenommen — kein Counter
       for (const uhr of uhren) {
         const ende = await D.placeCounter(engine, uhr, zugspieler, {
           sourceName: `${CARD_NAME} (Zugende)`,
@@ -107,6 +108,7 @@ module.exports = {
         if (verluste[k] > meiste) { verlierer = Number(k); meiste = verluste[k]; }
       }
 
+      if (engine.spielerIstVonAreasAusgenommen(verlierer)) return;   // W82 (Shipwrecked): dessen Kontrolleur ist von Areas ausgenommen — kein Counter
       for (const uhr of uhren) {
         const ende = await D.placeCounter(engine, uhr, verlierer, {
           sourceName: `${CARD_NAME} (Besiegung ${gs._doomDefeatTriggers}/${D.DEFEAT_TRIGGERS_PER_TURN})`,
