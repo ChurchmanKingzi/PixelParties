@@ -46781,11 +46781,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // ── Area card placement: big flashy descend + shockwave ──
     const onAreaDescend = ({ owner, cardName, fromPile }) => {
       const ownerLabel = ownerLbl(owner, myIdx);
-      const tgtEl = document.querySelector(`[data-area-zone][data-area-owner="${ownerLabel}"]`);
+      const zonenSel = `[data-area-zone][data-area-owner="${ownerLabel}"]`;
+      const tgtEl = document.querySelector(zonenSel);
       if (!tgtEl) return;
       const tr = tgtEl.getBoundingClientRect();
-      const cx = tr.left + tr.width / 2;
-      const cy = tr.top + tr.height / 2;
+      // ★ DAS ZIEL WANDERT: das Event trifft VOR dem Zustand ein, und Areas, die das Layout aendern (Gigalopolis legt eine Zone an,
+      // Barrel Home nimmt sie wieder weg; Scrollmodus, Mittelversatz, Area-Positionen), verschieben die Zone danach um ~125 px — die
+      // Karte fiel an die Stelle von VORHER. Deshalb wird die Zone waehrend der ganzen Animation live nachgemessen: die fallende Karte
+      // folgt ihr, und der Aufprall (Ring, Blitz, Staub) sitzt dort, wo sie JETZT steht. (`letzt` bleibt stehen, falls die Zone
+      // kurz fehlt, z. B. waehrend eines Neuaufbaus.)
+      let letzt = { cx: tr.left + tr.width / 2, cy: tr.top + tr.height / 2, w: tr.width };
+      const zielJetzt = () => {
+        const el = tgtEl.isConnected ? tgtEl : document.querySelector(zonenSel);
+        if (el) {
+          const q = el.getBoundingClientRect();
+          if (q.width > 0) letzt = { cx: q.left + q.width / 2, cy: q.top + q.height / 2, w: q.width };
+        }
+        return letzt;
+      };
+      const cx = letzt.cx;
+      const cy = letzt.cy;
 
       // Inject keyframes once
       if (!document.getElementById('area-descend-kf')) {
@@ -46850,15 +46865,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         `animation:areaCardFall 1.1s cubic-bezier(0.6, -0.05, 0.4, 1.2) forwards`,
       ].join(';');
       // Kommt die Area von einem Stapel (Geloescht/Ablage/Deck), fliegt sie von dort ins Feld, statt herabzufallen.
+      // Der Startpunkt liegt am Stapel, der Zielpunkt wandert (s. o.): `--fdx/--fdy` ist der Abstand Stapel → Zone und wird mit nachgefuehrt.
+      let pileEl = null;
+      let fdxAlt = NaN, fdyAlt = NaN;
+      const pileAbstand = () => {
+        const pr = pileEl.getBoundingClientRect();
+        const z = zielJetzt();
+        const fdx = Math.round(pr.left + pr.width / 2 - z.cx), fdy = Math.round(pr.top + pr.height / 2 - z.cy);
+        // Nur schreiben, wenn sich der Abstand aendert: jede Aenderung stoesst die Schluesselbilder der Animation neu an.
+        if (fdx !== fdxAlt) { fdxAlt = fdx; cardEl.style.setProperty('--fdx', fdx + 'px'); }
+        if (fdy !== fdyAlt) { fdyAlt = fdy; cardEl.style.setProperty('--fdy', fdy + 'px'); }
+        return pr;
+      };
       if (fromPile) {
         const pileSel = fromPile === 'deleted' ? (owner === myIdx ? '[data-my-deleted]' : '[data-opp-deleted]')
           : fromPile === 'discard' ? (owner === myIdx ? '[data-my-discard]' : '[data-opp-discard]')
           : (owner === myIdx ? '[data-my-deck]' : '[data-opp-deck]');
-        const pileEl = document.querySelector(pileSel);
+        pileEl = document.querySelector(pileSel);
         if (pileEl) {
-          const pr = pileEl.getBoundingClientRect();
-          cardEl.style.setProperty('--fdx', (pr.left + pr.width / 2 - cx) + 'px');
-          cardEl.style.setProperty('--fdy', (pr.top + pr.height / 2 - cy) + 'px');
+          const pr = pileAbstand();
           cardEl.style.setProperty('--fsc', String(Math.max(0.25, pr.width / cardW)));
           cardEl.style.animation = 'areaPileFly 1.1s cubic-bezier(0.45, 0, 0.35, 1) forwards';
         }
@@ -46876,14 +46901,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       document.body.appendChild(cardEl);
       setTimeout(() => cardEl.remove(), 1300);
+      // Die Karte folgt der Zone Bild fuer Bild (ganze Pixel), bis sie entfernt wird.
+      const folgeBild = () => {
+        if (!cardEl.isConnected) return;
+        const z = zielJetzt();
+        cardEl.style.left = Math.round(z.cx) + 'px';
+        cardEl.style.top = Math.round(z.cy - cardH / 2) + 'px';
+        if (pileEl && pileEl.isConnected) pileAbstand();
+        requestAnimationFrame(folgeBild);
+      };
+      requestAnimationFrame(folgeBild);
 
       // Impact ring + flash at landing point — fires right before the
-      // card fully settles (~75% into the fall).
+      // card fully settles (~75% into the fall). Ziel und Breite dort, wo die Zone zu diesem Zeitpunkt steht.
       setTimeout(() => {
+        const { cx, cy, w: zoneW } = zielJetzt();
         const ring = document.createElement('div');
         ring.style.cssText = [
           `position:fixed`, `left:${cx}px`, `top:${cy}px`,
-          `width:${tr.width * 1.2}px`, `height:${tr.width * 1.2}px`,
+          `width:${zoneW * 1.2}px`, `height:${zoneW * 1.2}px`,
           `border:4px solid rgba(255,228,105,.95)`, `border-radius:50%`,
           `box-shadow:0 0 40px rgba(251,225,129,.8), inset 0 0 30px rgba(255,208,102,.4)`,
           `pointer-events:none`, `z-index:10005`,
@@ -46895,7 +46931,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const flash = document.createElement('div');
         flash.style.cssText = [
           `position:fixed`, `left:${cx}px`, `top:${cy}px`,
-          `width:${tr.width * 1.6}px`, `height:${tr.width * 1.6}px`,
+          `width:${zoneW * 1.6}px`, `height:${zoneW * 1.6}px`,
           `background:radial-gradient(circle, rgba(255,251,210,.95) 0%, rgba(255,208,102,.55) 35%, transparent 75%)`,
           `border-radius:50%`,
           `pointer-events:none`, `z-index:10004`,
