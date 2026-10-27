@@ -37,6 +37,8 @@ const { zweitzielAngebot } = require('./_second-target-shared');
 const CARD_NAME = 'Grisgar, Emissary of the Demon Lord';
 
 module.exports = {
+  // W80a: deklarativ fuer die CPU-Bilanz (Monia): dieser Held darf nach einem Treffer auf genau 1 Ziel einen Zweitwurf anbieten (`_kreaturen-bilanz.js` `zweitwurfChance`).
+  zusatzziel: { kind: 'Spell', zauberSchule: 'Decay Magic', faehigkeit: 'Decay Magic' },
   // CPU: confirm this Hero's beneficial "you may" prompt — the default brain
   // declines cancellable confirms raised outside a card-cast (afterSpell
   // trigger), which would otherwise make the second-cast a no-op for the CPU.

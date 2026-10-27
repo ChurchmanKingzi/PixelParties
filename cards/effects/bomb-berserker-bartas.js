@@ -28,6 +28,8 @@
 const { zweitzielAngebot } = require('./_second-target-shared');
 
 module.exports = {
+  // W80a: deklarativ fuer die CPU-Bilanz (Monia): dieser Held darf nach einem Treffer auf genau 1 Ziel einen Zweitwurf anbieten (`_kreaturen-bilanz.js` `zweitwurfChance`).
+  zusatzziel: { kind: 'Spell', zauberSchule: 'Destruction Magic', faehigkeit: 'Destruction Magic' },
   // CPU: confirm this Hero's beneficial "you may" prompt — the default brain
   // declines cancellable confirms raised outside a card-cast (afterSpell
   // trigger), which would otherwise make the second-cast a no-op for the CPU.

@@ -21,9 +21,14 @@
 //                         (1) ausdruecklich angekuendigte Liste (`kreaturenVorab`), (2) schon gewaehlte Ziele des Effekts (`engine._gewaehlteZiele`),
 //                         (3) Flaechen-Eigenschaft der Quelle (`hitsMultipleTargets` + Kartentext "all/every/each ... Creatures/targets ...").
 //                         Jeder Eintrag traegt `sicher` (1 = bekannt, <1 = Vermutung aus dem Kartentext).
+//  · `brettWert`          (W80a) Wert einer Kreatur fuer die BRETTBEWERTUNG der CPU (`evaluateState`): Level, HP, Rest-HP, Buffs — 30 fuer die Standard-Kreatur
+//                         (Level 0, 60 HP), proportional mehr fuer staerkere (Grenzen BRETT_MIN/BRETT_MAX). Ohne Skriptwissen (das rechnet `evaluateState` selbst).
+//  · `mitMehrfachtreffer` / `zweitwurfEintrag` (W80a) erwartete weitere Treffer desselben Effekts: Mehrfachtreffer-Spells (`cpuMeta.erwarteteSchlaege`: Kirin Firebreath,
+//                         Future Tech Barrage) und der Zweitwurf der Zusatzziel-Helden (Bartas, Grisgar, Andras; `zusatzziel` am Heldenskript).
+//  · `kreaturenAnHelden`  (W80a) Kreaturen in den Support Zones eines Helden (Whirlwind Strike).
 // ═══════════════════════════════════════════
 
-const { STATUS_EFFECTS, BUFF_EFFECTS } = require('./_hooks');
+const { STATUS_EFFECTS, BUFF_EFFECTS, hasCardType } = require('./_hooks');
 
 /** Zahl oder Rueckfall. */
 const num = (v, d = 0) => (Number.isFinite(v) ? v : d);
@@ -32,16 +37,19 @@ function seiteVon(engine, inst) {
   return inst.controller ?? inst.owner;
 }
 
+const NEGATIVE_STATUS = Object.keys(STATUS_EFFECTS).filter(k => STATUS_EFFECTS[k].negative);   // einmal berechnet (Brettbewertung ruft oft)
+
 function negativeStatusAn(inst) {
-  return Object.keys(STATUS_EFFECTS).some(k => STATUS_EFFECTS[k].negative && inst.counters?.[k]);
+  return NEGATIVE_STATUS.some(k => inst.counters?.[k]);
 }
 
 /**
  * Relativer Wert einer Kreatur (Skala der Monia-CPU: Level-0 ~60, Level-3/300 HP ~95).
  * Basis: 20 + 15 × Level + min(40, HP/10) — dazu Rest-HP-Anteil, Buffs/Zaehler, Faehigkeiten, Stapel, Todes-Nutzen.
  */
-function kreaturWert(engine, inst) {
+function kreaturWert(engine, inst, opts = {}) {
   if (!inst) return 0;
+  const roh = !!opts.roh;   // W80a: Brettwert — ohne Skriptwissen (cpuMeta) und ohne Stapel; die Brettbewertung rechnet `onDeathBenefit`, `cpuInstBonus` und Ketten selbst
   let cd = null;
   try { cd = engine.getEffectiveCardData?.(inst) || engine._getCardDB?.()[inst.name]; } catch { cd = null; }
   cd = cd || {};
@@ -51,20 +59,23 @@ function kreaturWert(engine, inst) {
   const hp = num(inst.counters?.currentHp ?? cd.hp);
   let w = 20 + 15 * lvl + Math.min(40, Math.round(hp / 10));
   // Rest-HP: eine angeschlagene Kreatur ist weniger wert als eine frische (Anteil, nie unter 70 %).
-  if (maxHp > 0 && hp < maxHp) w *= 0.7 + 0.3 * Math.max(0, Math.min(1, hp / maxHp));
+  const restFaktor = (maxHp > 0 && hp < maxHp) ? 0.7 + 0.3 * Math.max(0, Math.min(1, hp / maxHp)) : 1;
+  if (!opts.ohneRestHp) w *= restFaktor;   // W80a: der Brettwert wendet den Rest-HP-Anteil NACH seiner Obergrenze an (sonst verschluckt sie Teilschaden an starken Kreaturen)
 
   // Buffs: positive Buffs erhoehen (max. +16), negative Status/Debuffs senken (max. -9). (Spiel-Zaehler einzelner Karten kennt nur ihr Skript: cpuMeta.cpuInstBonus.)
   let plus = 0, minus = 0;
-  for (const b of Object.keys(inst.counters?.buffs || {})) {
+  const buffs = inst.counters?.buffs;
+  if (buffs) for (const b in buffs) {
     if (BUFF_EFFECTS[b]?.debuff) minus += 3; else plus += 4;
   }
-  for (const k of Object.keys(STATUS_EFFECTS)) {
-    if (STATUS_EFFECTS[k].negative && inst.counters?.[k]) minus += 3;
+  const zaehler = inst.counters;
+  if (zaehler) for (const k of NEGATIVE_STATUS) {
+    if (zaehler[k]) minus += 3;
   }
   w +=Math.min(16, plus) - Math.min(9, minus);
 
   // Faehigkeiten/Skriptwissen: Kettenquellen, Sonderwert (cpuMeta), Todesnutzen fuer den Besitzer (Futter ist weniger wert).
-  try {
+  if (!roh) try {
     const { loadCardEffect } = require('./_loader');
     const meta = loadCardEffect(inst.name)?.cpuMeta;
     if (meta) {
@@ -80,12 +91,33 @@ function kreaturWert(engine, inst) {
   } catch { /* Skriptwissen ist Zugabe */ }
 
   // Stapel: weitere Karten im Slot der Kreatur (Anhaengsel/Ausruestung) sind mit ihr verloren.
-  try {
+  if (!roh) try {
     const slot = engine.gs.players[engine.physicalSide(inst)]?.supportZones?.[inst.heroIdx]?.[inst.zoneSlot];
     if (Array.isArray(slot) && slot.length > 1) w += Math.min(18, 6 * (slot.length - 1));
   } catch { /* kein Stapel bekannt */ }
 
+  if (opts.restOut) opts.restOut.faktor = restFaktor;
   return Math.max(10, Math.round(w));
+}
+
+// ── Brettwert (W80a, Al 26.10.2026: "evaluateState gewichtet Kreaturen nach Level und Rest-HP statt flach 30") ─────────────────────
+/** Die Standard-Kreatur der Brettbewertung zaehlte bisher flach 30; Level 0 mit 60 HP ist die Referenz (roher Wert 26). */
+const BRETT_BASIS = 30;
+const BRETT_REFERENZ = 26;
+const BRETT_MIN = 15;
+const BRETT_MAX = 75;
+/** 1 = proportional zum rohen Wert (Vorgabe Al); kleiner = flachere Kurve (nur fuer Messlaeufe: `PP_CPU_BRETT_STEIGUNG`). */
+const BRETT_STEIGUNG = Number.isFinite(Number(process.env.PP_CPU_BRETT_STEIGUNG)) && process.env.PP_CPU_BRETT_STEIGUNG ? Number(process.env.PP_CPU_BRETT_STEIGUNG) : 1;
+
+/**
+ * Wert einer Kreatur fuer die Brettbewertung der CPU: BRETT_BASIS × roher Wert / Referenz, auf [BRETT_MIN, BRETT_MAX] begrenzt.
+ * Roh = Level, HP, Rest-HP-Anteil, Buffs/Debuffs (`kreaturWert(.., { roh: true })`); Fertigkeiten, Todesnutzen und Ketten bleiben bei der Brettbewertung selbst.
+ */
+function brettWert(engine, inst) {
+  const rest = { faktor: 1 };
+  const w = kreaturWert(engine, inst, { roh: true, ohneRestHp: true, restOut: rest });
+  const voll = Math.max(BRETT_MIN, Math.min(BRETT_MAX, BRETT_BASIS * (1 + BRETT_STEIGUNG * (w / BRETT_REFERENZ - 1))));
+  return Math.round(voll * rest.faktor);   // Rest-HP-Anteil (0,7 … 1) NACH der Begrenzung: Teilschaden bleibt auch bei starken Kreaturen sichtbar
 }
 
 const GEWICHT_SCHADEN = { destroy: 1, control: 1, move: 0.8 };   // sonst 0,6 (Status/Buff/Werte/Sonstiges)
@@ -211,8 +243,8 @@ function flaechenBereichAusText(text) {
 
 /**
  * Erwartete Gesamtliste der Kreaturen-Ereignisse EINES Effekts, beim ersten Ereignis.
- * k: { erste (Instanz), art, detail?, statusName?, quelle (Name), quelleOwner, vorab?: [Instanzen] }
- * @returns {Array<{ inst, art, detail, statusName, sourceOwner, sicher, herkunft: 'erste'|'vorab'|'gewaehlt'|'flaeche' }>}
+ * k: { erste (Instanz), art, detail?, statusName?, quelle (Name), quelleOwner, vorab?: [Instanzen], heroIdx?/heroOwner? (Wirker-Held, wenn bekannt) }
+ * @returns {Array<{ inst, art, detail, statusName, sourceOwner, sicher, herkunft: 'erste'|'vorab'|'gewaehlt'|'flaeche'|'zweitwurf' }>}
  */
 function absehbareKreaturen(engine, k) {
   const out = [];
@@ -263,7 +295,176 @@ function absehbareKreaturen(engine, k) {
       for (const { inst } of ziele) nimm(inst, bereich.sicher, 'flaeche');
     }
   }
+
+  // (4) W80a: Zweitwurf (Bartas, Grisgar, Andras): trifft der Hauptwurf genau EIN Ziel und steht ein Zusatzziel-Held beim Wirker, folgt voraussichtlich ein zweites Ziel desselben Effekts.
+  if (k.erste && out.length === 1 && out[0].herkunft === 'erste') {
+    const z = zweitwurfEintrag(engine, { quelle: k.quelle, quelleOwner: k.quelleOwner, heroIdx: k.heroIdx, heroOwner: k.heroOwner }, basis, gesehen);
+    if (z) out.push(z);
+  }
   return out;
 }
 
-module.exports = { kreaturWert, wirkungAuf, greift, schuetzt, kreaturenBilanz, absehbareKreaturen, flaechenBereichAusText, schadensFaktor };
+// ── Erwartete weitere Treffer desselben Effekts (W80a) ───────────────────────────────────────────────────
+
+/**
+ * Wie oft schlaegt der Spell voraussichtlich auf dasselbe Ziel zu (Mehrfachtreffer)? Das Skript sagt es ueber `cpuMeta.erwarteteSchlaege(engine, besitzer)`
+ * (Kirin Firebreath: Rebelliokai-Namen in der Ablage, Future Tech Barrage: Exemplare in der Ablage); sonst 1. Im Zweitwurf der Zusatzziel-Helden schlaegt er nur EINMAL.
+ */
+function erwarteteSchlaege(engine, quelle, quelleOwner) {
+  try {
+    if (engine.gs?._zweitzielWurf) return 1;
+    const { loadCardEffect } = require('./_loader');
+    const f = loadCardEffect(quelle)?.cpuMeta?.erwarteteSchlaege;
+    if (typeof f !== 'function') return 1;
+    const n = Math.floor(Number(f(engine, quelleOwner)));
+    return Number.isFinite(n) && n >= 1 ? Math.min(n, 12) : 1;
+  } catch { return 1; }
+}
+
+/**
+ * Wahrscheinlichkeit (0..1), dass der Wirker dieses Effekts ein ZWEITES Ziel treffen darf (Bartas/Grisgar/Andras): ein handlungsfaehiger Zusatzziel-Held (Skript-Merkmal
+ * `zusatzziel` = { kind, zauberSchule?, faehigkeit }) steht auf der Seite des Wirkers, der Spell/die Attack ist NORMAL, passt zur Schule, hat Originalstufe < Faehigkeitsstufe
+ * und darf ein Zweitziel haben (`spellErlaubtZweitziel`). Der Wirker-Held ist bekannt (`heroOwner`/`heroIdx`): 0,85 wenn er der Zusatzziel-Held ist, sonst 0; unbekannt: 0,5.
+ */
+function zweitwurfChance(engine, k) {
+  try {
+    const { loadCardEffect } = require('./_loader');
+    const { spellErlaubtZweitziel } = require('./_second-target-shared');
+    if (!k.quelle || typeof k.quelleOwner !== 'number' || engine.gs?._zweitzielWurf) return 0;
+    const data = engine._getCardDB()[k.quelle];
+    if (!data || String(data.subtype || '').toLowerCase() !== 'normal') return 0;
+    const typ = hasCardType(data, 'Spell') ? 'Spell' : hasCardType(data, 'Attack') ? 'Attack' : null;
+    if (!typ) return 0;
+    if (!spellErlaubtZweitziel(loadCardEffect(k.quelle))) return 0;
+    let best = 0;
+    for (const { physOwner, heroIdx, hero } of engine.heroesControlledBy(k.quelleOwner)) {
+      if (!hero?.name || hero.hp <= 0 || hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+      const z = loadCardEffect(hero.name)?.zusatzziel;
+      if (!z || z.kind !== typ) continue;
+      if (typ === 'Spell' && data.spellSchool1 !== z.zauberSchule && data.spellSchool2 !== z.zauberSchule) continue;
+      const stufe = engine.countAbilitiesForSchool(z.faehigkeit, engine.gs.players[physOwner]?.abilityZones?.[heroIdx] || []);
+      if ((data.level || 0) >= stufe) continue;
+      const wirkerBekannt = Number.isInteger(k.heroIdx) && k.heroIdx >= 0 && typeof k.heroOwner === 'number';
+      const w = wirkerBekannt ? ((physOwner === k.heroOwner && heroIdx === k.heroIdx) ? 0.85 : 0) : 0.5;
+      best = Math.max(best, w);
+    }
+    return best;
+  } catch { return 0; }
+}
+
+/** Anteil, mit dem das erwartete Zweitziel gewertet wird (der Wirker darf wollen/waehlen: nicht jede Chance wird genutzt, das Ziel ist seine Wahl). */
+const ZWEITWURF_ANTEIL = 0.6;
+
+/**
+ * Das voraussichtliche ZWEITZIEL des Zweitwurfs als Listeneintrag: bei genau EINEM bekannten Ziel des Hauptwurfs und einem Zusatzziel-Helden beim Wirker die wertvollste noch nicht
+ * erfasste Kreatur eines GEGNERS des Wirkers (der Wirker trifft nicht die eigene Seite). `basis` = Eintrag-Vorlage ({ art, amount, detail, statusName, sourceOwner }); `bekannte` =
+ * Ids, die schon in der Liste stehen. @returns {object|null} Eintrag mit `sicher` < 1 und `herkunft: 'zweitwurf'`
+ */
+function zweitwurfEintrag(engine, k, basis, bekannte) {
+  const chance = zweitwurfChance(engine, k);
+  if (!(chance > 0)) return null;
+  let best = null, bestW = -1;
+  for (const inst of engine.cardInstances || []) {
+    if (inst.zone !== 'support' || inst.faceDown || bekannte.has(inst.id)) continue;
+    const ctrl = seiteVon(engine, inst);
+    if (ctrl === k.quelleOwner) continue;
+    let cd = null;
+    try { cd = engine.getEffectiveCardData?.(inst) || engine._getCardDB()[inst.name]; } catch { cd = null; }
+    if (!cd || !hasCardType(cd, 'Creature')) continue;
+    const w = wirkungAuf(engine, inst, basis);
+    if (!w.richtung || !(w.staerke > 0)) continue;
+    const wert = kreaturWert(engine, inst) * w.staerke;
+    if (wert > bestW) { bestW = wert; best = inst; }
+  }
+  if (!best) return null;
+  return { inst: best, ...basis, sicher: Math.round(chance * ZWEITWURF_ANTEIL * 100) / 100, herkunft: 'zweitwurf' };
+}
+
+/**
+ * Schadensstapel eines Effekts → Liste fuer `kreaturenBilanz` MIT den erwarteten weiteren Treffern (W80a): Mehrfachtreffer (Schaden × erwartete Schlagzahl, solange der Spell
+ * dasselbe Ziel trifft) und Zweitwurf (genau EIN bekanntes Ziel → voraussichtliches Zweitziel mit dem Schaden EINES Schlags).
+ * eintraege: [{ inst, amount, sourceOwner?, canBeNegated?, source? }] · k: { quelle, quelleOwner, heroOwner?, heroIdx? }
+ */
+function mitMehrfachtreffer(engine, eintraege, k) {
+  const liste = [];
+  const ids = new Set();
+  const n = (eintraege || []).some(e => e?.inst) ? erwarteteSchlaege(engine, k.quelle, k.quelleOwner) : 1;
+  for (const e of eintraege || []) {
+    if (!e?.inst) continue;
+    ids.add(e.inst.id);
+    liste.push({ ...e, art: 'damage', amount: num(e.amount) * (n > 1 && eintraege.length === 1 ? n : 1) });
+  }
+  if (ids.size === 1) {
+    const e0 = eintraege.find(e => e?.inst);
+    const z = zweitwurfEintrag(engine, k, { art: 'damage', amount: num(e0.amount), sourceOwner: k.quelleOwner }, ids);
+    if (z) liste.push(z);
+  }
+  return liste;
+}
+
+/** Die Kreaturen in den Support Zones eines Helden (Whirlwind Strike: "… and all Creatures in their Support Zones"), offen, Kontrolle egal. */
+function kreaturenAnHelden(engine, physOwner, heroIdx) {
+  const out = [];
+  for (const inst of engine.cardInstances || []) {
+    if (inst.zone !== 'support' || inst.faceDown) continue;
+    if (inst.owner !== physOwner || inst.heroIdx !== heroIdx) continue;   // wie Whirlwind Strike selbst (Besitzer, nicht Kontrolle)
+    let cd = null;
+    try { cd = inst.counters?._cardDataOverride || engine.getEffectiveCardData?.(inst) || engine._getCardDB()[inst.name]; } catch { cd = null; }
+    if (!cd || !hasCardType(cd, 'Creature')) continue;
+    out.push(inst);
+  }
+  return out;
+}
+
+// ── Flaechen-/Mehrziel-Bewertung fuer den WIRKER (W80a) ──────────────────────────────────────────────────
+
+/** Ab dieser Wirkbilanz (Brettwert-Skala, Standard-Kreatur = 30) gilt ein Flaechenschlag als klar positiv. */
+const FLAECHEN_SCHWELLE = 20;
+/** Umrechnung `kreaturWert`-Skala → Brettskala (Standard-Kreatur Level 0/60 HP: 26 → 30). */
+const BRETT_FAKTOR = BRETT_BASIS / BRETT_REFERENZ;
+
+/**
+ * Wirkbilanz eines Flaechenschlags aus Sicht des WIRKERS `pi` auf KREATUREN (Brettskala): Wert der getroffenen GEGNERISCHEN Kreaturen MINUS Wert der getroffenen EIGENEN,
+ * jeweils nach der echten Wirkung je Kreatur (`kreaturenBilanz`: Schaden anteilig an der Rest-HP, toedlich = voll; Status 0,6 …). Kreaturen des durch die Erste-Runden-Immunitaet
+ * geschuetzten Spielers zaehlen nicht.
+ * k: { art ('damage' | 'status' …), amount?, statusName?, nurSitze?: [Spielerindizes] (Standard: alle), filter?(inst) → boolean }
+ * @returns {{ wirk:number, gegner:number, eigen:number, posten:object[] }} wirk = gegner − eigen (Brettskala)
+ */
+function flaechenWirkung(engine, pi, k = {}) {
+  const n = typeof engine.playerCount === 'function' ? engine.playerCount() : 2;
+  const sitze = k.nurSitze || Array.from({ length: n }, (_, i) => i);
+  let ziele = [];
+  try { ziele = engine.collectAoeCreatureTargets(sitze, {}, ['creature']); } catch { ziele = []; }
+  const prot = engine.gs?.firstTurnProtectedPlayer;
+  const liste = [];
+  for (const { inst } of ziele) {
+    if (k.filter && !k.filter(inst)) continue;
+    const seite = seiteVon(engine, inst);
+    if (prot != null && seite === prot && pi !== prot) continue;
+    if (inst.counters?._cardinalImmune) continue;
+    liste.push({ inst, art: k.art || 'damage', amount: k.amount, statusName: k.statusName, detail: k.detail, sourceOwner: pi });
+  }
+  const r = kreaturenBilanz(engine, pi, liste);
+  // `kreaturenBilanz(opfer = pi)`: `verloren` = Wert dessen, was GEGNERISCHEN Kreaturen widerfaehrt, `geschuetzt` = was EIGENEN widerfaehrt (Schaden) — fuer den Wirker umgekehrt gelesen.
+  return { wirk: (r.verloren - r.geschuetzt) * BRETT_FAKTOR, gegner: r.verloren * BRETT_FAKTOR, eigen: r.geschuetzt * BRETT_FAKTOR, posten: r.posten };
+}
+
+/** Veto-Entscheidung zu einer Wirkbilanz: spielen nur bei klar positiver Bilanz (mindestens FLAECHEN_SCHWELLE UND ein Fuenftel der Gegnerseite). */
+function flaechenVeto(r, extraGegner = 0) {
+  return !(r.wirk >= FLAECHEN_SCHWELLE && r.wirk >= 0.2 * (r.gegner + Math.max(0, extraGegner)));
+}
+
+/**
+ * Wirkung von Whirlwind Strike & Co. auf die KREATUREN in den Support Zones eines Helden (Brettskala, aus Sicht des Wirkers `pi`): getroffene gegnerische Kreaturen zaehlen
+ * positiv, getroffene eigene negativ (die Wahl `side: 'enemy'` laesst keinen eigenen Helden zu, eine geliehene/uebernommene Kreatur in der Zone kann aber eigen sein).
+ */
+function heldKreaturenWirkung(engine, pi, physOwner, heroIdx, amount) {
+  const liste = kreaturenAnHelden(engine, physOwner, heroIdx).map(inst => ({ inst, art: 'damage', amount, sourceOwner: pi }));
+  if (!liste.length) return 0;
+  const r = kreaturenBilanz(engine, pi, liste);
+  return (r.verloren - r.geschuetzt) * BRETT_FAKTOR;
+}
+
+module.exports = { kreaturWert, brettWert, BRETT_BASIS, BRETT_MIN, BRETT_MAX, wirkungAuf, greift, schuetzt, kreaturenBilanz, absehbareKreaturen, flaechenBereichAusText, schadensFaktor,
+  erwarteteSchlaege, zweitwurfChance, zweitwurfEintrag, mitMehrfachtreffer, kreaturenAnHelden,
+  FLAECHEN_SCHWELLE, BRETT_FAKTOR, flaechenWirkung, flaechenVeto, heldKreaturenWirkung };

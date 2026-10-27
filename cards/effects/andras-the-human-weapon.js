@@ -29,6 +29,8 @@ const { zweitzielAngebot } = require('./_second-target-shared');
 const CARD_NAME = 'Andras, the Human Weapon';
 
 module.exports = {
+  // W80a: deklarativ fuer die CPU-Bilanz (Monia): dieser Held darf nach einem Treffer auf genau 1 Ziel einen Zweitwurf anbieten (`_kreaturen-bilanz.js` `zweitwurfChance`).
+  zusatzziel: { kind: 'Attack', faehigkeit: 'Fighting' },
   // CPU: confirm this Hero's beneficial "you may" prompt — the default brain
   // declines cancellable confirms raised outside a card-cast (afterSpell
   // trigger), which would otherwise make the second-hit a no-op for the CPU.

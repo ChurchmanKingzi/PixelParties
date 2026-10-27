@@ -22,6 +22,7 @@ const { PHASES, getCleansableStatuses, hasCardType, baseCardName } = require('./
 // No-ops when no profile matches the piloted lineup or when
 // PP_DISABLE_PROFILES=1 (training data collection).
 const deckProfile = require('./_deck-profile');
+const KreaturenBilanz = require('./_kreaturen-bilanz');
 
 // Small pauses between CPU actions / phase advances so a human spectator
 // can actually follow the sequence. Kept deliberately modest — longer
@@ -7510,7 +7511,14 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
   // Enemy-side damage targeting (or ambiguous — default to enemy side).
   if (enemyTargets.length > 0) {
     const damage = inferDamage(config);
-    const picks = pickEnemyTargets(engine, enemyTargets, damage, maxSelect);
+    // W80a: Karten, die zu jedem gewaehlten Helden auch die Kreaturen in seinen Support Zones treffen (Whirlwind Strike), melden das ueber `cpuMeta.trifftKreaturenAmHelden`.
+    let heldZusatz = null;
+    try {
+      if (cardName && loadCardEffect(cardName)?.cpuMeta?.trifftKreaturenAmHelden && damage > 0) {
+        heldZusatz = (t) => KreaturenBilanz.heldKreaturenWirkung(engine, cpuIdx, t.owner, t.heroIdx, damage);
+      }
+    } catch { heldZusatz = null; }
+    const picks = pickEnemyTargets(engine, enemyTargets, damage, maxSelect, heldZusatz);
     if (picks.length) return picks.map(p => p.id);
     // All enemy targets are immune. If the prompt is cancellable, decline
     // to avoid wasting the Attack/Spell/effect; the card stays in hand.
@@ -9193,7 +9201,7 @@ async function cpuForcePlayHero(engine, pi, hero, heroIdx) {
   return best;
 }
 
-function pickEnemyTargets(engine, enemyTargets, damage, maxSelect) {
+function pickEnemyTargets(engine, enemyTargets, damage, maxSelect, heldZusatz = null) {
   const gs = engine.gs;
   // Drop fully immune targets up front — hitting them does nothing useful
   // and the user explicitly wants to avoid wasting effects on them. If this
@@ -9249,7 +9257,10 @@ function pickEnemyTargets(engine, enemyTargets, damage, maxSelect) {
       // Low-HP focus tiebreaker: small bonus for hitting a hero already
       // close to dying (consistent focus-fire across turns).
       const focusBonus = Math.max(0, 40 - h.hp * 0.3);
-      return effDamage * value + killBonus + focusBonus;
+      // W80a: mitgetroffene Kreaturen in den Support Zones dieses Helden (Whirlwind Strike): Bilanz gegnerische minus eigene.
+      let zusatz = 0;
+      if (heldZusatz) { try { zusatz = heldZusatz(t) || 0; } catch { zusatz = 0; } }
+      return effDamage * value + killBonus + focusBonus + zusatz;
     }
     if (t.type === 'creature' || t.type === 'equip') {
       const inst = t.cardInstance || findSupportInstance(engine, t);
@@ -11595,6 +11606,17 @@ function statusStacks(entity, key) {
   return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
+// ★ W80a (Al, 26.10.2026: "evaluateState gewichtet Kreaturen nach Level und Rest-HP statt flach 30" — Ja): Schalter fuer den Kreaturen-Term der Brettbewertung.
+// AN (Standard): jede Kreatur zaehlt `KreaturenBilanz.brettWert` (Level, HP, Rest-HP-Anteil, Buffs; Standard-Kreatur Level 0/60 HP = 30, staerkere proportional mehr, 15..75);
+// AUS (`PP_CPU_KREATUR_BRETTWERT=0`): der alte flache Wert 30 je Kreatur. Fuer Selbstspiel-Messungen kann ein Sitz einzeln umgeschaltet werden:
+// `engine._brettwertNeuSeite = <Sitz>` (nur dieser Sitz rechnet mit dem neuen Wert, der andere mit dem alten; gesetzt von `server.js` im Messlauf `PP_CPU_BRETT_AB=1`).
+const OPT_KREATUR_BRETTWERT = process.env.PP_CPU_KREATUR_BRETTWERT !== '0';
+
+function brettwertNeuFuer(engine, cpuIdx) {
+  const nur = engine._brettwertNeuSeite;
+  return nur == null ? OPT_KREATUR_BRETTWERT : nur === cpuIdx;
+}
+
 function evaluateState(engine, cpuIdx) {
   const gs = engine.gs;
   const ps = gs.players[cpuIdx];
@@ -11824,6 +11846,21 @@ function evaluateState(engine, cpuIdx) {
   const slotCountsForOwner = (slot) =>
     (slot || []).some(cn => !isHostileAttachment(cn));
   let ownSupVal = 0, oppSupVal = 0;
+  // W80a: Wert der Kreatur im Slot — Level/HP/Rest-HP/Buffs statt flach SLOT_BASE (siehe `OPT_KREATUR_BRETTWERT`). Kein Creature-Eintrag (Ausruestung …) bleibt bei SLOT_BASE.
+  const brettNeu = brettwertNeuFuer(engine, cpuIdx);
+  const brettWerte = new Map();   // `${Besitzer}|${Held}|${Zone}` → Brettwert der Kreatur im Slot (Ausruestung/Anhaengsel im selben Slot zaehlen nicht als Kreatur)
+  if (brettNeu) {
+    for (const inst of engine.cardInstances) {
+      if (inst.zone !== 'support' || (inst.owner !== cpuIdx && inst.owner !== oppIdx)) continue;
+      const key = `${inst.owner}|${inst.heroIdx}|${inst.zoneSlot}`;
+      if (brettWerte.has(key)) continue;
+      try {
+        const cd = engine.getEffectiveCardData?.(inst) || engine._getCardDB()[inst.name];
+        if (cd && hasCardType(cd, 'Creature')) brettWerte.set(key, KreaturenBilanz.brettWert(engine, inst));
+      } catch { /* Standardwert */ }
+    }
+  }
+  const slotBasis = (owner, hi, z) => (brettNeu && brettWerte.get(`${owner}|${hi}|${z}`)) || SLOT_BASE;
   for (let hi = 0; hi < 3; hi++) {
     for (let z = 0; z < 3; z++) {
       const ownSlot = slotCountsForOwner(ps.supportZones?.[hi]?.[z]) ? (ps.supportZones[hi][z] || []) : [];
@@ -11834,7 +11871,7 @@ function evaluateState(engine, cpuIdx) {
           && c.heroIdx === hi && c.zoneSlot === z
         );
         const onDeath = effectiveOnDeathValue(inst, cpuIdx);
-        ownSupVal += Math.max(SLOT_FLOOR, SLOT_BASE - onDeath);
+        ownSupVal += Math.max(SLOT_FLOOR, slotBasis(cpuIdx, hi, z) - onDeath);
       }
       if (oppSlot.length > 0) {
         const inst = engine.cardInstances.find(c =>
@@ -11842,7 +11879,7 @@ function evaluateState(engine, cpuIdx) {
           && c.heroIdx === hi && c.zoneSlot === z
         );
         const onDeath = effectiveOnDeathValue(inst, oppIdx);
-        oppSupVal += Math.max(SLOT_FLOOR, SLOT_BASE - onDeath);
+        oppSupVal += Math.max(SLOT_FLOOR, slotBasis(oppIdx, hi, z) - onDeath);
       }
     }
   }
@@ -14646,4 +14683,4 @@ async function measureAreaValues(engine, helpers, cpuIdx) {
 // Gold-Bedarfsrechnung, die an zwei Stellen gepflegt wird, laeuft
 // garantiert auseinander. Rein additiv, kein Aufrufer geaendert.
 module.exports = { CPU_META_HELPERS, runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, mctsValueGoldVsDraw, mctsPickFromOptions, rolloutRestOfTurn, seedExploreAttempts, computeGoldDemand, mctsOpponentGoldEconomy,
-  _test: { pickHeroForEquip, activateCreatureEffects, activateHeroEffects, cpuGenericChoice, heroCheatBonusByName, heroEffectGateCheatBonus, candidateCheatBonus, heuristicCandidateCmp, ACTION_CHEAT_BONUS, pickCreatureZoneSlot, listEligibleHeroesForActionCard, resolveAbilityPlace, alleAbilityStapel, scoreAbilityPlacement, isAbilityStackSaturated, activateFreeAbilities, tryActionCostingAbility } };
+  _test: { evaluateState, pickEnemyTargets, pickHeroForEquip, activateCreatureEffects, activateHeroEffects, cpuGenericChoice, heroCheatBonusByName, heroEffectGateCheatBonus, candidateCheatBonus, heuristicCandidateCmp, ACTION_CHEAT_BONUS, pickCreatureZoneSlot, listEligibleHeroesForActionCard, resolveAbilityPlace, alleAbilityStapel, scoreAbilityPlacement, isAbilityStackSaturated, activateFreeAbilities, tryActionCostingAbility } };

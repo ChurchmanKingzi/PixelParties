@@ -9,6 +9,10 @@
 const { hasCardType } = require('./_hooks');
 
 module.exports = {
+  // W80a (Al 26.10.2026: "Ja"): die CPU-Heldenwahl rechnet die mitgetroffenen Kreaturen in den Support Zones des Helden in die Bilanz ein (`_cpu.js` `pickEnemyTargets`,
+  // `_kreaturen-bilanz.js` `heldKreaturenWirkung`: Wert der getroffenen gegnerischen minus eigener Kreaturen nach Level, HP, Rest-HP). Die Wahl `side: 'enemy'` laesst nur
+  // gegnerische Helden zu — eigene Treffer sind nur moeglich, wenn eine uebernommene eigene Kreatur in der Zone des gegnerischen Helden steht.
+  cpuMeta: { trifftKreaturenAmHelden: true },
   // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
   // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten/Einmal-Stempel; `engine.ersterZugGeschuetzt`).
   blockedByFirstTurnProtection: true,
