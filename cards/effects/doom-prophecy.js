@@ -19,6 +19,32 @@
 //    (`gs._terrorForceEndTurn`): der Server wartet in
 //    sendGameState, bis Prompt, Effekt und Kette
 //    durch sind, und faehrt dann die End Phase.
+//
+//  Als Ruling (Al 27.10.): GAR NICHT ERST SPIELBAR
+//  ───────────────────────────────────────────────
+//  • Kann der Wirker KEINE Doom Clock legen, ist die
+//    Karte ausgegraut (wie eine reine Zieh-Karte unter
+//    Draw-Lock) — sie fizzelt nicht und verbraucht
+//    nichts. Nicht legbar heisst: Reality Crack („You
+//    cannot play another Area for the rest of the
+//    turn"), oder KEINE der erlaubten Zonen nimmt eine
+//    Uhr auf. Erlaubt ist die eigene Zone, mit Decay
+//    Magic 2 des Wirkers auch die gegnerische; eine
+//    Zone nimmt keine Uhr auf, wenn dort schon eine
+//    liegt (zwei Kopien derselben Area gibt es nie) oder
+//    eine unentfernbare Area (Gigalopolis) das Limit
+//    besetzt haelt. Mit Decay 2 genuegt EINE freie Zone;
+//    es wird dann nur sie angeboten (kein Wahldialog).
+//  • Eine andere, entfernbare Area stoert nicht: der
+//    Zonen-Besitzer legt sie wie bisher als Ueberhang ab
+//    (`enforceAreaLimit`).
+//  • Unveraendert: liegt KEINE Uhr im Deck, ist die Karte
+//    spielbar und fizzelt (Ruling 5.8.) — die Suche darf
+//    leer ausgehen.
+//  • `spellPlayCondition` = irgendein eigener Held kann
+//    die Uhr legen; `canPlayWithHero` = DIESER Held
+//    (seine Decay-Stufe entscheidet, ob die Gegnerzone
+//    zur Wahl steht).
 // ═══════════════════════════════════════════
 
 const D = require('./_doom-clock-shared');
@@ -26,7 +52,37 @@ const D = require('./_doom-clock-shared');
 const CARD_NAME = 'Doom Prophecy';
 const START_COUNTERS = 3;
 
+/** Nimmt die Area Zone von `z` eine (weitere) Doom Clock auf? Keine Dublette; eine unentfernbare Area (Gigalopolis) darf das Limit nicht besetzt halten. */
+function zoneNimmtUhrAuf(engine, z) {
+  if ((engine.gs.areaZones?.[z] || []).includes(D.CLOCK_NAME)) return false;
+  return engine.areaPlatzNachAbraeumen(z, D.CLOCK_NAME);
+}
+
+/** Zonen, in die ein Wirker (Brettseite `seite`, Held `heroIdx`) die Uhr legen duerfte — Reihenfolge: eigene, dann gegnerische (nur mit Decay Magic 2). */
+function zonenFuerWirker(engine, pi, seite, heroIdx) {
+  if (engine.areaSpielGesperrt(pi, { direkt: true })) return [];
+  const zonen = [pi];
+  if (engine.heroSchoolLevel('Decay Magic', seite, heroIdx) >= 2) zonen.push(engine.opponentOf(pi));   // W4a: harte Negierung -> Stufe 0
+  return zonen.filter(z => zoneNimmtUhrAuf(engine, z));
+}
+
 module.exports = {
+  /** Grau, solange KEIN eigener Held eine Uhr legen kann (Reality Crack, Dublette, kein Platz). */
+  spellPlayCondition(gs, pi, engine) {
+    if (!engine) return true;
+    for (const { physOwner, heroIdx, hero } of engine.heroesControlledBy(pi)) {
+      if (!hero?.name || hero.hp <= 0) continue;
+      if (zonenFuerWirker(engine, pi, physOwner, heroIdx).length > 0) return true;
+    }
+    return false;
+  },
+
+  /** Je Wirker: seine Decay-Stufe entscheidet, ob die Gegnerzone zur Wahl steht. */
+  canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
+    if (!engine) return true;
+    return zonenFuerWirker(engine, pi, engine.heldSeiteFuer(pi, heroIdx), heroIdx).length > 0;
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
@@ -35,9 +91,10 @@ module.exports = {
       const oi = engine.opponentOf(pi);
       const ps = gs.players[pi];
 
-      // Als Ruling (Al 27.10.): Reality Crack („You cannot play another Area for the rest of the turn") sperrt auch „place it into your Area Zone" — wie ohne Doom Clock im Deck
-      // fizzelt die Karte komplett (nichts wird gelegt, der Zug endet nicht).
-      const idx = engine.areaSpielGesperrt(pi, { direkt: true }) ? -1 : (ps.mainDeck || []).indexOf(D.CLOCK_NAME);
+      // Als Ruling (Al 27.10.): ohne legbare Zone (Reality Crack, Dublette, kein Platz) ist die Karte gar nicht spielbar (`spellPlayCondition`/`canPlayWithHero`); kippt der Zustand
+      // zwischen Wahl und Wirkung (Kette), fizzelt sie hier wie ohne Doom Clock im Deck (nichts wird gelegt, der Zug endet nicht).
+      const zonen = zonenFuerWirker(engine, pi, ctx.cardHeroOwner ?? pi, ctx.cardHeroIdx);   // Als Befund 29.9.: Zonen des Wirkers auf seiner Brettseite
+      const idx = zonen.length === 0 ? -1 : (ps.mainDeck || []).indexOf(D.CLOCK_NAME);
       if (idx < 0) {
         // Kein Ziel im Deck -> die Karte fizzelt komplett, der Zug
         // laeuft normal weiter (Als Ruling).
@@ -46,12 +103,10 @@ module.exports = {
         return;
       }
 
-      // Gegnerische Area-Zone nur mit Decay Magic 2 auf dem Anwender.
-      let ziel = pi;
-      const decayLv = engine.heroSchoolLevel(
-        'Decay Magic', ctx.cardHeroOwner ?? pi, ctx.cardHeroIdx,   // Als Befund 29.9.: Zonen des Wirkers auf seiner Brettseite; W4a: harte Negierung -> Stufe 0
-      );
-      if (decayLv >= 2) {
+      // Gegnerische Area-Zone nur mit Decay Magic 2 auf dem Anwender — und nur, wenn sie die Uhr aufnimmt; bleibt nur EINE Zone, gibt es nichts zu wählen.
+      let ziel = zonen[0];
+      const decayLv = engine.heroSchoolLevel('Decay Magic', ctx.cardHeroOwner ?? pi, ctx.cardHeroIdx);   // W4a: harte Negierung -> Stufe 0
+      if (zonen.length > 1) {
         const wahl = await engine.promptGeneric(pi, {
           type: 'optionPicker',
           title: CARD_NAME,
