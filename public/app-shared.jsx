@@ -7677,19 +7677,18 @@ function handFanCardBox(el) {
 //  Hoehe mit `placement` (1 x 1 x 0,33 = 0,33), dem Klang, gegen den
 //  sie sich behaupten muessen.
 const CARD_DRAG_SFX = {
-  // ★ v1213: im KAMPF gibt es kein `pickup` (Als Befund 18.9.) — siehe onMove im Kampfbrett: dort hebt man staendig Karten an, ein Ton
-  // bei jedem Griff meldet ein Ereignis, das keines ist. Der Eintrag unten gilt NUR dem Puzzle-Editor (Als Vorgabe 27.10.: „Lässt man
-  // eine gedraggte Karte los oder hebt eine an, fehlt noch ein Sound"); der Kampf ruft ihn nicht. Tiefer als `release` (gleicher Klang,
-  // heruntergestimmt), gleicher Pegel.
-  pickup:  { name: 'ui_click',  opts: { volume: 1.6, rate: 0.82, dedupe: 50 } },  // → .264
+  // ★ v1213: `pickup` ENTFAELLT (Als Befund 18.9.) — siehe onMove
+  // im Kampfbrett. Kein toter Eintrag hier, damit ihn niemand
+  // versehentlich wieder anschliesst. (27.10.: auch im Puzzle-Editor
+  // wieder gestrichen — „der Sound beim Aufnehmen ist lästig".)
   reorder: { name: 'draw',      opts: { volume: 1.1, rate: 1.12, dedupe: 50 } },  // → .363
   release: { name: 'ui_click',  opts: { volume: 1.6, rate: 1.30, dedupe: 50 } },  // → .264
   cancel:  { name: 'ui_cancel', opts: { volume: 1.0, dedupe: 60 } },              // → .330
 };
 function playCardDragSFX(art) {
   const e = CARD_DRAG_SFX[art];
-  // Zeitpunkt des letzten Umsortier-Klangs: der Puzzle-Editor spielt beim Loslassen sonst zusaetzlich `release` — beim Umsortieren
-  // der Hand ist `reorder` schon der Klang des Ablegens.
+  // Zeitpunkt des letzten Umsortier-Klangs: der Puzzle-Editor spielt beim Loslassen JEDES Zuges den Klang der Handkarten (`reorder`) —
+  // beim Umsortieren der Hand ist er schon gespielt, dann entfaellt der zweite.
   if (art === 'reorder') window._ppReorderT = performance.now();
   if (e && window.playSFX) window.playSFX(e.name, e.opts);
 }
