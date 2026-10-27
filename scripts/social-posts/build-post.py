@@ -510,6 +510,7 @@ def main():
     ap.add_argument('--head-top', type=int, default=None, help='Sprite so setzen, dass seine Oberkante bei y (px ab Bildoberkante) liegt, überschreibt feet/eyeAt')
     ap.add_argument('--px', type=int, default=None, help='Maßstab des Sprites (px je Sprite-Pixel), überschreibt hero-themes.json')
     ap.add_argument('--punch', action='store_true', help='Kraftvoller Start: die erste halbe Sekunde mit Bildschirmwackeln, Druckwelle und Blitz, Musik ohne Einblenden und auf einen Schlag der Musik geschnitten')
+    ap.add_argument('--heart-time', type=float, default=None, help='Dauer der Herz-Phase des Openers in Sekunden bis zur Detonation (Standard 0,62; kürzer = der Held kommt früher ins Bild), überschreibt heartTime aus hero-themes.json')
     ap.add_argument('--opener', choices=['none', 'heart', 'storm'], default=None, help='Eigener Start-Effekt statt der Standard-Druckwelle: heart = großes Flammenherz, das detoniert; storm = Gewitterwolke, in die ein Blitz einschlägt; beide geben den Helden frei (überschreibt opener aus hero-themes.json)')
     args = ap.parse_args()
     reel = args.format == 'reel'
@@ -671,7 +672,8 @@ def main():
         return img
 
     # ── Opener „Flammenherz“: ein großes Herz mit Flammen füllt den dunklen Bildschirm, schlägt zweimal, detoniert (Druckwelle gibt das Bild frei) ──
-    T_HEART, T_BOOM = 0.62, 0.55                                             # Sekunden: Herz-Phase, Detonation
+    T_HEART = args.heart_time or hero_cfg.get('heartTime', 0.62)             # Sekunden bis zur Detonation
+    T_BOOM = 0.55 if T_HEART >= 0.4 else 0.42                                # Dauer der Detonation (bei kurzer Herz-Phase auch kürzer)
     cwid, chei = -(-W // U), -(-H // U)
     YY, XX = np.mgrid[0:chei, 0:cwid]
     BAY = np.tile(BAYER4, (chei // 4 + 1, cwid // 4 + 1))[:chei, :cwid]
@@ -753,9 +755,9 @@ def main():
         shake_amp = 0
         if ts < T_HEART:
             out_img = dark
-            pop = 0.78 + 0.22 * min(1.0, ts / 0.10) ** 0.6
-            beat = 0.07 * math.exp(-((ts - 0.34) / 0.05) ** 2)
-            glow = max(0.0, (ts - (T_HEART - 0.20)) / 0.20)
+            pop = 0.78 + 0.22 * min(1.0, ts / (0.16 * T_HEART)) ** 0.6           # Zeiten relativ zur Herz-Phase, damit sie sich mit --heart-time mitstrecken
+            beat = 0.07 * math.exp(-((ts - 0.55 * T_HEART) / (0.08 * T_HEART)) ** 2)
+            glow = max(0.0, (ts - (T_HEART - 0.32 * T_HEART)) / (0.32 * T_HEART))
             s = (pop + beat + 0.10 * glow) * 0.96 + 0.0
             mask, hrgb, _ = heart_cells(s, glow)
             fvis, frgb = flame_cells(mask, ts, glow)
@@ -807,260 +809,261 @@ def main():
             out_img = sh
         return out_img
 
-    # ── Opener „Gewitterwolke“: das erste Bild ist die vergrößerte Wolke aus dem Sprite des Helden (ohne ihn), in der es zuckt; ein Blitz schlägt ein,
-    #    die Wolke zerreißt und gibt den Helden frei ──
-    T_STORM = 0.70                                                           # Sekunden bis zum Einschlag
-    BOLT_C = [(110, 170, 255), (255, 244, 170), (255, 255, 255)]             # Glimmen, Mitte, Kern
-    bolt_rng = np.random.default_rng(5)
+    if args_opener == 'storm':                                               # nur aufbauen, wenn gebraucht (die Vorberechnung der Wolke passt nicht zu jedem Sprite)
+        # ── Opener „Gewitterwolke“: das erste Bild ist die vergrößerte Wolke aus dem Sprite des Helden (ohne ihn), in der es zuckt; ein Blitz schlägt ein,
+        #    die Wolke zerreißt und gibt den Helden frei ──
+        T_STORM = 0.70                                                           # Sekunden bis zum Einschlag
+        BOLT_C = [(110, 170, 255), (255, 244, 170), (255, 255, 255)]             # Glimmen, Mitte, Kern
+        bolt_rng = np.random.default_rng(5)
 
-    def sprite_cloud(i):
-        """Nur die Wolke des Sprite-Frames i: Kopf über der Wolke entfernt, der Held und Blitze in der Wolke durch das Wolkengrau ersetzt."""
-        fr = np.asarray(spr.sheet.crop((i * spr.fw, 0, (i + 1) * spr.fw, spr.fh))).astype(np.int32)
-        op = fr[..., 3] > 20
-        sat = fr[..., :3].max(axis=2) - fr[..., :3].min(axis=2) > 20
-        top = int(np.argmax(op.sum(axis=1) >= 25))                          # erste breite Zeile = Oberkante der Wolke
-        out_ = np.zeros_like(fr)
-        for y in range(top, spr.fh):
-            gray = np.where(op[y] & ~sat[y])[0]
-            for x in np.where(op[y])[0]:
-                if not sat[y, x]:
-                    out_[y, x] = fr[y, x]
-                    continue
-                l_ = gray[gray < x]
-                r_ = gray[gray > x]
-                if len(l_) and len(r_) and x - l_[-1] <= 14 and r_[0] - x <= 14:
-                    out_[y, x, :3] = (fr[y, l_[-1], :3] + fr[y, r_[0], :3]) // 2
-                    out_[y, x, 3] = fr[y, x, 3]
-        hs = np.where(sat[max(0, top - 12):top + 10])                         # Grundfläche des Helden (Kopf, Hals, Spiegelung): durch ein Wolkenstück von links ersetzen
-        if len(hs[0]):
-            x0, x1, y1 = int(hs[1].min()) - 2, int(hs[1].max()) + 3, int(hs[0].max()) + max(0, top - 12) + 3
-            sh_ = x1 - x0 + 1
-            def top_of(a_, col):
-                rows = np.where(a_[top:, col, 3] > 20)[0]
-                return top + int(rows.min()) if len(rows) else top
-            tl, tr = top_of(out_, x0 - 1), top_of(out_, x1)
-            for x in range(x0, x1):
-                t_dst = round(tl + (tr - tl) * (x - x0 + 1) / (x1 - x0 + 1))        # Oberkante läuft ohne Knick von links nach rechts über die Lücke
-                t_src = top_of(fr, x - sh_)
-                out_[top:t_dst, x] = 0
-                for y in range(t_dst, y1):
-                    out_[y, x] = fr[min(spr.fh - 1, y - t_dst + t_src), x - sh_]
-        return out_.astype(np.uint8)
+        def sprite_cloud(i):
+            """Nur die Wolke des Sprite-Frames i: Kopf über der Wolke entfernt, der Held und Blitze in der Wolke durch das Wolkengrau ersetzt."""
+            fr = np.asarray(spr.sheet.crop((i * spr.fw, 0, (i + 1) * spr.fw, spr.fh))).astype(np.int32)
+            op = fr[..., 3] > 20
+            sat = fr[..., :3].max(axis=2) - fr[..., :3].min(axis=2) > 20
+            top = int(np.argmax(op.sum(axis=1) >= 25))                          # erste breite Zeile = Oberkante der Wolke
+            out_ = np.zeros_like(fr)
+            for y in range(top, spr.fh):
+                gray = np.where(op[y] & ~sat[y])[0]
+                for x in np.where(op[y])[0]:
+                    if not sat[y, x]:
+                        out_[y, x] = fr[y, x]
+                        continue
+                    l_ = gray[gray < x]
+                    r_ = gray[gray > x]
+                    if len(l_) and len(r_) and x - l_[-1] <= 14 and r_[0] - x <= 14:
+                        out_[y, x, :3] = (fr[y, l_[-1], :3] + fr[y, r_[0], :3]) // 2
+                        out_[y, x, 3] = fr[y, x, 3]
+            hs = np.where(sat[max(0, top - 12):top + 10])                         # Grundfläche des Helden (Kopf, Hals, Spiegelung): durch ein Wolkenstück von links ersetzen
+            if len(hs[0]):
+                x0, x1, y1 = int(hs[1].min()) - 2, int(hs[1].max()) + 3, int(hs[0].max()) + max(0, top - 12) + 3
+                sh_ = x1 - x0 + 1
+                def top_of(a_, col):
+                    rows = np.where(a_[top:, col, 3] > 20)[0]
+                    return top + int(rows.min()) if len(rows) else top
+                tl, tr = top_of(out_, x0 - 1), top_of(out_, x1)
+                for x in range(x0, x1):
+                    t_dst = round(tl + (tr - tl) * (x - x0 + 1) / (x1 - x0 + 1))        # Oberkante läuft ohne Knick von links nach rechts über die Lücke
+                    t_src = top_of(fr, x - sh_)
+                    out_[top:t_dst, x] = 0
+                    for y in range(t_dst, y1):
+                        out_[y, x] = fr[min(spr.fh - 1, y - t_dst + t_src), x - sh_]
+            return out_.astype(np.uint8)
 
-    CLOUDS = [sprite_cloud(i) for i in range(spr.n)]
-    c_op = np.any([c[..., 3] > 20 for c in CLOUDS], axis=0)
-    cy_ix, cx_ix = np.where(c_op)
-    UB = (int(cx_ix.min()), int(cy_ix.min()), int(cx_ix.max()) + 1, int(cy_ix.max()) + 1)       # gemeinsamer Rahmen der Einzelwolke
-    # Große Wolke = Stapel aus Kopien der Sprite-Wolke (gleiche Pixelgröße wie der Sprite, gespiegelt, gegeneinander versetzt, aus
-    # verschiedenen Animationsframes; unten dunkler, oben heller) – kein Hochskalieren
-    CP = spr.px
-    uw, uh = UB[2] - UB[0], UB[3] - UB[1]
-    if (uw + 40) * CP <= 1000:                                                # breit genug Platz: zwei Reihen nebeneinander
-        LAYERS = [(18, 0, False, 0, 1.18), (0, 9, True, 11, 1.05), (40, 9, False, 23, 1.05),
-                  (8, 19, False, 5, 0.9), (40, 20, True, 31, 0.9), (22, 27, True, 17, 0.78)]   # (x, y, gespiegelt, Frame-Versatz, Helligkeit)
-    else:                                                                     # große Pixel: nur übereinander gestapelt, in der Breite kaum versetzt
-        LAYERS = [(2, 0, False, 0, 1.18), (0, 8, True, 11, 1.05), (3, 16, False, 5, 0.9), (1, 23, True, 31, 0.78)]
-    PAD = 8                                                                   # Rand um die Wolke, damit das Verschmelzen und die Kontur nicht am Bildrand abgeschnitten werden
-    CW, CHH = max(l[0] for l in LAYERS) + uw + 2 * PAD, max(l[1] for l in LAYERS) + uh + 2 * PAD
-    CB = (0, 0, CW, CHH)
-    CL, CT = round(W / 2 - CW * CP / 2), round(hcy * U - CHH * CP / 2)                          # Wolke mittig auf Kartenmitte
-    _cloud_cache = {}
+        CLOUDS = [sprite_cloud(i) for i in range(spr.n)]
+        c_op = np.any([c[..., 3] > 20 for c in CLOUDS], axis=0)
+        cy_ix, cx_ix = np.where(c_op)
+        UB = (int(cx_ix.min()), int(cy_ix.min()), int(cx_ix.max()) + 1, int(cy_ix.max()) + 1)       # gemeinsamer Rahmen der Einzelwolke
+        # Große Wolke = Stapel aus Kopien der Sprite-Wolke (gleiche Pixelgröße wie der Sprite, gespiegelt, gegeneinander versetzt, aus
+        # verschiedenen Animationsframes; unten dunkler, oben heller) – kein Hochskalieren
+        CP = spr.px
+        uw, uh = UB[2] - UB[0], UB[3] - UB[1]
+        if (uw + 40) * CP <= 1000:                                                # breit genug Platz: zwei Reihen nebeneinander
+            LAYERS = [(18, 0, False, 0, 1.18), (0, 9, True, 11, 1.05), (40, 9, False, 23, 1.05),
+                      (8, 19, False, 5, 0.9), (40, 20, True, 31, 0.9), (22, 27, True, 17, 0.78)]   # (x, y, gespiegelt, Frame-Versatz, Helligkeit)
+        else:                                                                     # große Pixel: nur übereinander gestapelt, in der Breite kaum versetzt
+            LAYERS = [(2, 0, False, 0, 1.18), (0, 8, True, 11, 1.05), (3, 16, False, 5, 0.9), (1, 23, True, 31, 0.78)]
+        PAD = 8                                                                   # Rand um die Wolke, damit das Verschmelzen und die Kontur nicht am Bildrand abgeschnitten werden
+        CW, CHH = max(l[0] for l in LAYERS) + uw + 2 * PAD, max(l[1] for l in LAYERS) + uh + 2 * PAD
+        CB = (0, 0, CW, CHH)
+        CL, CT = round(W / 2 - CW * CP / 2), round(hcy * U - CHH * CP / 2)                          # Wolke mittig auf Kartenmitte
+        _cloud_cache = {}
 
-    def _shift(m, dy, dx):
-        o = np.zeros_like(m)
-        h_, w_ = m.shape
-        o[max(0, dy):h_ + min(0, dy), max(0, dx):w_ + min(0, dx)] = m[max(0, -dy):h_ + min(0, -dy), max(0, -dx):w_ + min(0, -dx)]
-        return o
+        def _shift(m, dy, dx):
+            o = np.zeros_like(m)
+            h_, w_ = m.shape
+            o[max(0, dy):h_ + min(0, dy), max(0, dx):w_ + min(0, dx)] = m[max(0, -dy):h_ + min(0, -dy), max(0, -dx):w_ + min(0, -dx)]
+            return o
 
-    def erode(m, n=1):
-        for _ in range(n):
-            m = m & _shift(m, 1, 0) & _shift(m, -1, 0) & _shift(m, 0, 1) & _shift(m, 0, -1)
-        return m
+        def erode(m, n=1):
+            for _ in range(n):
+                m = m & _shift(m, 1, 0) & _shift(m, -1, 0) & _shift(m, 0, 1) & _shift(m, 0, -1)
+            return m
 
-    def dilate(m, n=1):
-        for _ in range(n):
-            m = m | _shift(m, 1, 0) | _shift(m, -1, 0) | _shift(m, 0, 1) | _shift(m, 0, -1)
-        return m
+        def dilate(m, n=1):
+            for _ in range(n):
+                m = m | _shift(m, 1, 0) | _shift(m, -1, 0) | _shift(m, 0, 1) | _shift(m, 0, -1)
+            return m
 
-    def storm_cloud(i, flash=0.0):
-        if i not in _cloud_cache:
-            big = Image.new('RGBA', (CW, CHH), (0, 0, 0, 0))
-            for lx, ly, mirror, dfr, br in LAYERS:
-                arr = CLOUDS[(i + dfr) % spr.n][UB[1]:UB[3], UB[0]:UB[2]].copy()
-                arr[~erode(arr[..., 3] > 20, 2), 3] = 0                          # Kontur und dunklen Rand der Einzelwolke weg: innen soll keine Kante bleiben
-                u_ = Image.fromarray(arr, 'RGBA')
-                if mirror:
-                    u_ = u_.transpose(Image.FLIP_LEFT_RIGHT)
-                big.alpha_composite(u_, (lx + PAD, ly + PAD))
-            ba = np.asarray(big).copy()
-            sil = erode(dilate(ba[..., 3] > 20, 5), 5)                           # Lücken zwischen den Kopien schließen → eine Silhouette
-            sil = dilate(erode(sil, 2), 2)                                       # dünne Spitzen der Einzelwolken abrunden
-            op0 = ba[..., 3] > 20
-            ys_, xs_ = np.where(sil)
-            yy_, xx_ = np.mgrid[0:CHH, 0:CW]
-            for frac, rb in ((0.20, 8), (0.38, 11), (0.57, 12), (0.76, 9)):         # Wölbungen oben, damit die Silhouette wolkiger wird
-                bcx = xs_.min() + frac * (xs_.max() - xs_.min())
-                bcy = ys_.min() + rb - 4
-                sil = sil | ((xx_ - bcx) ** 2 + (yy_ - bcy) ** 2 <= rb * rb)
-            fill = sil & ~op0
-            solid = ba[..., :3].astype(np.float32)
-            below = np.roll(solid, -10, axis=0)                                  # neue Randzellen übernehmen die Textur von 10 Zeilen darunter
-            ok = np.roll(op0, -10, axis=0)
-            solid[fill & ok] = below[fill & ok]
-            solid[fill & ~ok] = solid[op0].mean(axis=0)                          # Rest mit mittlerem Wolkengrau füllen
-            pad_ = np.pad(solid, ((2, 2), (2, 2), (0, 0)), mode='edge')
-            mean5 = sum(pad_[dy:dy + CHH, dx:dx + CW] for dy in range(5) for dx in range(5)) / 25.0
-            dent = solid.mean(axis=2) < mean5.mean(axis=2) - 14                  # dunkle Reste der Einzelkonturen im Inneren glätten
-            ba[..., :3] = np.where(dent[..., None], mean5, solid).astype(np.uint8)
-            ba[sil, 3] = 255
-            grad = np.linspace(1.18, 0.8, CHH)[:, None, None]                    # oben heller, unten dunkler (Licht von oben rechts)
-            ba[..., :3] = np.clip(ba[..., :3].astype(np.float32) * grad, 0, 255).astype(np.uint8)
-            inner = erode(sil, 1)
-            deep = erode(sil, 3)
-            ba[inner & ~deep, :3] = (ba[inner & ~deep, :3] * 0.8).astype(np.uint8)  # weicher dunkler Rand wie beim Sprite
-            ba[sil & ~inner, :3] = (8, 8, 12)                                     # eine Kontur um die ganze Wolke
-            ba[~sil, 3] = 0
-            _cloud_cache[i] = Image.fromarray(ba, 'RGBA').resize((CW * CP, CHH * CP), Image.NEAREST)
-        im = _cloud_cache[i]
-        if flash:                                                             # Wetterleuchten: Wolke leuchtet bläulich-weiß auf
-            lit = Image.blend(im.convert('RGB'), Image.new('RGB', im.size, (205, 222, 255)), 0.5 * flash)
-            lit.putalpha(im.split()[3])
-            return lit
-        return im
+        def storm_cloud(i, flash=0.0):
+            if i not in _cloud_cache:
+                big = Image.new('RGBA', (CW, CHH), (0, 0, 0, 0))
+                for lx, ly, mirror, dfr, br in LAYERS:
+                    arr = CLOUDS[(i + dfr) % spr.n][UB[1]:UB[3], UB[0]:UB[2]].copy()
+                    arr[~erode(arr[..., 3] > 20, 2), 3] = 0                          # Kontur und dunklen Rand der Einzelwolke weg: innen soll keine Kante bleiben
+                    u_ = Image.fromarray(arr, 'RGBA')
+                    if mirror:
+                        u_ = u_.transpose(Image.FLIP_LEFT_RIGHT)
+                    big.alpha_composite(u_, (lx + PAD, ly + PAD))
+                ba = np.asarray(big).copy()
+                sil = erode(dilate(ba[..., 3] > 20, 5), 5)                           # Lücken zwischen den Kopien schließen → eine Silhouette
+                sil = dilate(erode(sil, 2), 2)                                       # dünne Spitzen der Einzelwolken abrunden
+                op0 = ba[..., 3] > 20
+                ys_, xs_ = np.where(sil)
+                yy_, xx_ = np.mgrid[0:CHH, 0:CW]
+                for frac, rb in ((0.20, 8), (0.38, 11), (0.57, 12), (0.76, 9)):         # Wölbungen oben, damit die Silhouette wolkiger wird
+                    bcx = xs_.min() + frac * (xs_.max() - xs_.min())
+                    bcy = ys_.min() + rb - 4
+                    sil = sil | ((xx_ - bcx) ** 2 + (yy_ - bcy) ** 2 <= rb * rb)
+                fill = sil & ~op0
+                solid = ba[..., :3].astype(np.float32)
+                below = np.roll(solid, -10, axis=0)                                  # neue Randzellen übernehmen die Textur von 10 Zeilen darunter
+                ok = np.roll(op0, -10, axis=0)
+                solid[fill & ok] = below[fill & ok]
+                solid[fill & ~ok] = solid[op0].mean(axis=0)                          # Rest mit mittlerem Wolkengrau füllen
+                pad_ = np.pad(solid, ((2, 2), (2, 2), (0, 0)), mode='edge')
+                mean5 = sum(pad_[dy:dy + CHH, dx:dx + CW] for dy in range(5) for dx in range(5)) / 25.0
+                dent = solid.mean(axis=2) < mean5.mean(axis=2) - 14                  # dunkle Reste der Einzelkonturen im Inneren glätten
+                ba[..., :3] = np.where(dent[..., None], mean5, solid).astype(np.uint8)
+                ba[sil, 3] = 255
+                grad = np.linspace(1.18, 0.8, CHH)[:, None, None]                    # oben heller, unten dunkler (Licht von oben rechts)
+                ba[..., :3] = np.clip(ba[..., :3].astype(np.float32) * grad, 0, 255).astype(np.uint8)
+                inner = erode(sil, 1)
+                deep = erode(sil, 3)
+                ba[inner & ~deep, :3] = (ba[inner & ~deep, :3] * 0.8).astype(np.uint8)  # weicher dunkler Rand wie beim Sprite
+                ba[sil & ~inner, :3] = (8, 8, 12)                                     # eine Kontur um die ganze Wolke
+                ba[~sil, 3] = 0
+                _cloud_cache[i] = Image.fromarray(ba, 'RGBA').resize((CW * CP, CHH * CP), Image.NEAREST)
+            im = _cloud_cache[i]
+            if flash:                                                             # Wetterleuchten: Wolke leuchtet bläulich-weiß auf
+                lit = Image.blend(im.convert('RGB'), Image.new('RGB', im.size, (205, 222, 255)), 0.5 * flash)
+                lit.putalpha(im.split()[3])
+                return lit
+            return im
 
-    def cloud_mask_cells(i):
-        a_ = Image.new('L', (W, H), 0)
-        a_.paste(storm_cloud(i).split()[3], (CL, CT))
-        m_ = np.asarray(a_)[U // 2::U, U // 2::U][:chei, :cwid] > 128
-        return np.pad(m_, ((0, chei - m_.shape[0]), (0, cwid - m_.shape[1])))
+        def cloud_mask_cells(i):
+            a_ = Image.new('L', (W, H), 0)
+            a_.paste(storm_cloud(i).split()[3], (CL, CT))
+            m_ = np.asarray(a_)[U // 2::U, U // 2::U][:chei, :cwid] > 128
+            return np.pad(m_, ((0, chei - m_.shape[0]), (0, cwid - m_.shape[1])))
 
-    def storm_bolt(seed, x0, y0, y1, fork=True):
-        """Gezackter Blitz als Zellenmaske (Kern, Mitte, Glimmen)."""
-        rng = np.random.default_rng(seed)
-        core = np.zeros((chei, cwid), dtype=bool)
-        def line(a, b, c, d_):
-            n_ = int(max(abs(c - a), abs(d_ - b))) + 1
-            for k in range(n_ + 1):
-                xx, yy = int(round(a + (c - a) * k / n_)), int(round(b + (d_ - b) * k / n_))
-                if 1 <= xx < cwid - 2 and 1 <= yy < chei - 2:
-                    core[yy, xx:xx + 2] = True
-        x, y = x0, y0
-        pts = [(x, y)]
-        while y < y1:
-            y += rng.uniform(5, 9)
-            x += rng.uniform(-7, 7) + (x0 - x) * 0.15
-            pts.append((x, min(y, y1)))
-        for (a, b), (c, d_) in zip(pts[:-1], pts[1:]):
-            line(a, b, c, d_)
-        if fork and len(pts) > 3:
-            for k in rng.choice(np.arange(1, len(pts) - 1), size=min(3, len(pts) - 2), replace=False):
-                fx_, fy_ = pts[k]
-                dirx = rng.choice([-1, 1])
-                for _ in range(3):
-                    nx_, ny_ = fx_ + dirx * rng.uniform(4, 8), fy_ + rng.uniform(4, 8)
-                    line(fx_, fy_, nx_, ny_)
-                    fx_, fy_ = nx_, ny_
-        mid = core.copy()
-        for dy_, dx_ in ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)):
-            mid |= np.roll(np.roll(core, dy_, 0), dx_, 1)
-        glow = mid.copy()
-        for _ in range(2):
-            g2 = glow.copy()
-            for dy_, dx_ in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                g2 |= np.roll(np.roll(glow, dy_, 0), dx_, 1)
-            glow = g2
-        return core, mid, glow
+        def storm_bolt(seed, x0, y0, y1, fork=True):
+            """Gezackter Blitz als Zellenmaske (Kern, Mitte, Glimmen)."""
+            rng = np.random.default_rng(seed)
+            core = np.zeros((chei, cwid), dtype=bool)
+            def line(a, b, c, d_):
+                n_ = int(max(abs(c - a), abs(d_ - b))) + 1
+                for k in range(n_ + 1):
+                    xx, yy = int(round(a + (c - a) * k / n_)), int(round(b + (d_ - b) * k / n_))
+                    if 1 <= xx < cwid - 2 and 1 <= yy < chei - 2:
+                        core[yy, xx:xx + 2] = True
+            x, y = x0, y0
+            pts = [(x, y)]
+            while y < y1:
+                y += rng.uniform(5, 9)
+                x += rng.uniform(-7, 7) + (x0 - x) * 0.15
+                pts.append((x, min(y, y1)))
+            for (a, b), (c, d_) in zip(pts[:-1], pts[1:]):
+                line(a, b, c, d_)
+            if fork and len(pts) > 3:
+                for k in rng.choice(np.arange(1, len(pts) - 1), size=min(3, len(pts) - 2), replace=False):
+                    fx_, fy_ = pts[k]
+                    dirx = rng.choice([-1, 1])
+                    for _ in range(3):
+                        nx_, ny_ = fx_ + dirx * rng.uniform(4, 8), fy_ + rng.uniform(4, 8)
+                        line(fx_, fy_, nx_, ny_)
+                        fx_, fy_ = nx_, ny_
+            mid = core.copy()
+            for dy_, dx_ in ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)):
+                mid |= np.roll(np.roll(core, dy_, 0), dx_, 1)
+            glow = mid.copy()
+            for _ in range(2):
+                g2 = glow.copy()
+                for dy_, dx_ in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    g2 |= np.roll(np.roll(glow, dy_, 0), dx_, 1)
+                glow = g2
+            return core, mid, glow
 
-    BOLT_X, BOLT_Y0 = hcx + 3, (CT + (CB[3] - CB[1]) * CP * 0.75) / U                # Einschlag aus dem unteren Teil der Wolke …
-    BOLT_Y1 = max((feet_y + 4 * U) / U, BOLT_Y0 + 45)                              # … bis zu den Füßen des Helden
-    BOLT = storm_bolt(11, BOLT_X, BOLT_Y0, BOLT_Y1)
-    LEAD = storm_bolt(12, BOLT_X + 1, BOLT_Y0, BOLT_Y1, fork=False)
+        BOLT_X, BOLT_Y0 = hcx + 3, (CT + (CB[3] - CB[1]) * CP * 0.75) / U                # Einschlag aus dem unteren Teil der Wolke …
+        BOLT_Y1 = max((feet_y + 4 * U) / U, BOLT_Y0 + 45)                              # … bis zu den Füßen des Helden
+        BOLT = storm_bolt(11, BOLT_X, BOLT_Y0, BOLT_Y1)
+        LEAD = storm_bolt(12, BOLT_X + 1, BOLT_Y0, BOLT_Y1, fork=False)
 
-    def paint_bolt(img, bolt, glow_on=True, dither=None):
-        core, mid, glow = bolt
-        rgb = np.zeros((chei, cwid, 3), dtype=np.uint8)
-        vis = np.zeros((chei, cwid), dtype=bool)
-        if glow_on:
-            g = glow & ~mid & (BAY < 0.55)
-            rgb[g] = BOLT_C[0]; vis |= g
-        rgb[mid] = BOLT_C[1]; vis |= mid
-        rgb[core] = BOLT_C[2]; vis |= core
-        if dither is not None:
-            vis &= dither
-        paint(img, vis, rgb)
+        def paint_bolt(img, bolt, glow_on=True, dither=None):
+            core, mid, glow = bolt
+            rgb = np.zeros((chei, cwid, 3), dtype=np.uint8)
+            vis = np.zeros((chei, cwid), dtype=bool)
+            if glow_on:
+                g = glow & ~mid & (BAY < 0.55)
+                rgb[g] = BOLT_C[0]; vis |= g
+            rgb[mid] = BOLT_C[1]; vis |= mid
+            rgb[core] = BOLT_C[2]; vis |= core
+            if dither is not None:
+                vis &= dither
+            paint(img, vis, rgb)
 
-    def put_cloud(img, i, flash=0.0):
-        rgba = img.convert('RGBA')
-        rgba.alpha_composite(storm_cloud(i, flash), (CL, CT))
-        return rgba.convert('RGB')
+        def put_cloud(img, i, flash=0.0):
+            rgba = img.convert('RGBA')
+            rgba.alpha_composite(storm_cloud(i, flash), (CL, CT))
+            return rgba.convert('RGB')
 
-    STORM_CHUNKS = []
-    schunk_rng = np.random.default_rng(78)
-    cl_full = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-    cl_full.alpha_composite(storm_cloud(0), (CL, CT))
-    cl_arr = np.asarray(cl_full)
-    for cy_ in range(0, chei - CHUNK, CHUNK):
-        for cx_ in range(0, cwid - CHUNK, CHUNK):
-            yc, xc = (cy_ + CHUNK // 2) * U + U // 2, (cx_ + CHUNK // 2) * U + U // 2
-            if cl_arr[yc, xc, 3] > 128:
-                px_, py_ = cx_ + CHUNK / 2 - hcx, cy_ + CHUNK / 2 - hcy
-                n = max(1e-3, math.hypot(px_, py_))
-                sp = schunk_rng.uniform(45, 120)
-                STORM_CHUNKS.append((cx_, cy_, px_ / n * sp, py_ / n * sp - 10, schunk_rng.uniform(0.3, 0.85), tuple(int(c) for c in cl_arr[yc, xc, :3])))
+        STORM_CHUNKS = []
+        schunk_rng = np.random.default_rng(78)
+        cl_full = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+        cl_full.alpha_composite(storm_cloud(0), (CL, CT))
+        cl_arr = np.asarray(cl_full)
+        for cy_ in range(0, chei - CHUNK, CHUNK):
+            for cx_ in range(0, cwid - CHUNK, CHUNK):
+                yc, xc = (cy_ + CHUNK // 2) * U + U // 2, (cx_ + CHUNK // 2) * U + U // 2
+                if cl_arr[yc, xc, 3] > 128:
+                    px_, py_ = cx_ + CHUNK / 2 - hcx, cy_ + CHUNK / 2 - hcy
+                    n = max(1e-3, math.hypot(px_, py_))
+                    sp = schunk_rng.uniform(45, 120)
+                    STORM_CHUNKS.append((cx_, cy_, px_ / n * sp, py_ / n * sp - 10, schunk_rng.uniform(0.3, 0.85), tuple(int(c) for c in cl_arr[yc, xc, :3])))
 
-    def storm_fx(img, f):
-        ts = f / float(fps)
-        if ts >= T_STORM + T_BOOM:
-            return img
-        dark = Image.blend(img, Image.new('RGB', (W, H), (6, 8, 22)), 0.985)
-        shake_amp = 0
-        idx = (f // per) % spr.n
-        if ts < T_STORM:
-            fl = 0.0
-            for t0_ in (0.20, 0.43):                                           # Wetterleuchten in der Wolke
-                if 0 <= ts - t0_ < 0.07:
-                    fl = 1.0
-            if T_STORM - 0.09 <= ts < T_STORM:
-                fl = 0.8
-            out_img = put_cloud(dark, idx, fl)
-            if fl:                                                            # Äderchen im Inneren der Wolke
-                vein = storm_bolt(40 + int(ts * 30), hcx + bolt_rng.uniform(-25, 25), hcy - 6, hcy + 8, fork=False)
-                paint_bolt(out_img, vein, glow_on=False, dither=cloud_mask_cells(idx))
-            if T_STORM - 0.07 <= ts < T_STORM:                               # Vorentladung: dünner Leitblitz
-                paint_bolt(out_img, LEAD, glow_on=False)
-            shake_amp = 1 if ts >= T_STORM - 0.07 else 0
-        else:
-            q = (ts - T_STORM) / T_BOOM
-            r = 10 + 185 * min(q / 0.9, 1.0) ** 0.55
-            dist = np.hypot(XX + 0.5 - hcx, YY + 0.5 - hcy)
-            out_img = img.copy()
-            keep_dark = np.repeat(np.repeat((dist >= r).astype(np.uint8) * 255, U, axis=0), U, axis=1)[:H, :W]
-            out_img.paste(dark, (0, 0), Image.fromarray(keep_dark, 'L'))
-            dr = ImageDraw.Draw(out_img)
-            tt = ts - T_STORM
-            for cx_, cy_, vx, vy, life, col in STORM_CHUNKS:                  # Wolkenstücke fliegen auseinander
-                if q > life or ((1.0 - q / life) < 0.5 * BAY[cy_ % chei, cx_ % cwid] + 0.15 and q > 0.25):
-                    continue
-                a, b = int(round(cx_ + vx * tt)), int(round(cy_ + vy * tt + 20 * tt * tt))
-                dr.rectangle([a * U, b * U, (a + CHUNK) * U - 1, (b + CHUNK) * U - 1], fill=col)
-            if q < 0.4:                                                       # der Blitz bleibt kurz stehen und verlöscht gedithert
-                paint_bolt(out_img, BOLT, dither=(1.0 - q / 0.4) > BAY)
-            k = 1.0 - q
-            ring = (np.abs(dist - r) < 2.2) & (k > BAY)
-            paint(out_img, ring, np.full((chei, cwid, 3), (235, 244, 255), dtype=np.uint8))
-            a_fl = 0.85 * max(0.0, 1.0 - tt / 0.13) ** 1.5                    # grelles Blitzlicht …
-            if 0.20 <= tt < 0.27:
-                a_fl = max(a_fl, 0.35)                                        # … und ein zweites Nachzucken
-            if a_fl > 0:
-                out_img = Image.blend(out_img, Image.new('RGB', (W, H), (240, 246, 255)), a_fl)
-            shake_amp = int(round(4 * k ** 1.5))
-        if shake_amp:
-            rng = np.random.default_rng(500 + f)
-            dx, dy = int(rng.integers(-shake_amp, shake_amp + 1)) * U, int(rng.integers(-shake_amp, shake_amp + 1)) * U
-            sh = out_img.copy()
-            sh.paste(out_img, (dx, dy))
-            out_img = sh
-        return out_img
+        def storm_fx(img, f):
+            ts = f / float(fps)
+            if ts >= T_STORM + T_BOOM:
+                return img
+            dark = Image.blend(img, Image.new('RGB', (W, H), (6, 8, 22)), 0.985)
+            shake_amp = 0
+            idx = (f // per) % spr.n
+            if ts < T_STORM:
+                fl = 0.0
+                for t0_ in (0.20, 0.43):                                           # Wetterleuchten in der Wolke
+                    if 0 <= ts - t0_ < 0.07:
+                        fl = 1.0
+                if T_STORM - 0.09 <= ts < T_STORM:
+                    fl = 0.8
+                out_img = put_cloud(dark, idx, fl)
+                if fl:                                                            # Äderchen im Inneren der Wolke
+                    vein = storm_bolt(40 + int(ts * 30), hcx + bolt_rng.uniform(-25, 25), hcy - 6, hcy + 8, fork=False)
+                    paint_bolt(out_img, vein, glow_on=False, dither=cloud_mask_cells(idx))
+                if T_STORM - 0.07 <= ts < T_STORM:                               # Vorentladung: dünner Leitblitz
+                    paint_bolt(out_img, LEAD, glow_on=False)
+                shake_amp = 1 if ts >= T_STORM - 0.07 else 0
+            else:
+                q = (ts - T_STORM) / T_BOOM
+                r = 10 + 185 * min(q / 0.9, 1.0) ** 0.55
+                dist = np.hypot(XX + 0.5 - hcx, YY + 0.5 - hcy)
+                out_img = img.copy()
+                keep_dark = np.repeat(np.repeat((dist >= r).astype(np.uint8) * 255, U, axis=0), U, axis=1)[:H, :W]
+                out_img.paste(dark, (0, 0), Image.fromarray(keep_dark, 'L'))
+                dr = ImageDraw.Draw(out_img)
+                tt = ts - T_STORM
+                for cx_, cy_, vx, vy, life, col in STORM_CHUNKS:                  # Wolkenstücke fliegen auseinander
+                    if q > life or ((1.0 - q / life) < 0.5 * BAY[cy_ % chei, cx_ % cwid] + 0.15 and q > 0.25):
+                        continue
+                    a, b = int(round(cx_ + vx * tt)), int(round(cy_ + vy * tt + 20 * tt * tt))
+                    dr.rectangle([a * U, b * U, (a + CHUNK) * U - 1, (b + CHUNK) * U - 1], fill=col)
+                if q < 0.4:                                                       # der Blitz bleibt kurz stehen und verlöscht gedithert
+                    paint_bolt(out_img, BOLT, dither=(1.0 - q / 0.4) > BAY)
+                k = 1.0 - q
+                ring = (np.abs(dist - r) < 2.2) & (k > BAY)
+                paint(out_img, ring, np.full((chei, cwid, 3), (235, 244, 255), dtype=np.uint8))
+                a_fl = 0.85 * max(0.0, 1.0 - tt / 0.13) ** 1.5                    # grelles Blitzlicht …
+                if 0.20 <= tt < 0.27:
+                    a_fl = max(a_fl, 0.35)                                        # … und ein zweites Nachzucken
+                if a_fl > 0:
+                    out_img = Image.blend(out_img, Image.new('RGB', (W, H), (240, 246, 255)), a_fl)
+                shake_amp = int(round(4 * k ** 1.5))
+            if shake_amp:
+                rng = np.random.default_rng(500 + f)
+                dx, dy = int(rng.integers(-shake_amp, shake_amp + 1)) * U, int(rng.integers(-shake_amp, shake_amp + 1)) * U
+                sh = out_img.copy()
+                sh.paste(out_img, (dx, dy))
+                out_img = sh
+            return out_img
 
     def render(f, intro, punch=False, opener=False):
         ts = f / float(fps)
