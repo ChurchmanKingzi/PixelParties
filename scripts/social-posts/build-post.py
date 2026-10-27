@@ -507,6 +507,7 @@ def main():
     ap.add_argument('--feet', type=int, default=None, help='Standlinie des Sprites, px ab Kartenoberkante')
     ap.add_argument('--shadow-dy', type=int, default=None, help='Schatten um so viele px tiefer setzen (überschreibt shadowDy aus hero-themes.json)')
     ap.add_argument('--logo-px', type=int, default=None, help='Pixelgröße des Logos (px je Logo-Pixel, Standard 2), überschreibt logoPx aus hero-themes.json')
+    ap.add_argument('--logo-dy', type=int, default=None, help='Logo um so viele px tiefer setzen (z. B. damit es im 3:4-Ausschnitt des Instagram-Rasters voll sichtbar ist), überschreibt logoDy aus hero-themes.json')
     ap.add_argument('--head-top', type=int, default=None, help='Sprite so setzen, dass seine Oberkante bei y (px ab Bildoberkante) liegt, überschreibt feet/eyeAt')
     ap.add_argument('--px', type=int, default=None, help='Maßstab des Sprites (px je Sprite-Pixel), überschreibt hero-themes.json')
     ap.add_argument('--punch', action='store_true', help='Kraftvoller Start: die erste halbe Sekunde mit Bildschirmwackeln, Druckwelle und Blitz, Musik ohne Einblenden und auf einen Schlag der Musik geschnitten')
@@ -573,7 +574,7 @@ def main():
     name_front = bool(hero_cfg.get('nameFront'))            # Name/Beiname/Link-Schild vor dem Sprite (bei sehr großen, tiefen Sprites)
     logo_front = bool(hero_cfg.get('logoFront'))            # Logo vor dem Sprite (bei Helden, die es überragen)
     logo_layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-    logo_layer.alpha_composite(logo, ((W - logo.width) // 2, 40 + oy))
+    logo_layer.alpha_composite(logo, ((W - logo.width) // 2, 40 + oy + (args.logo_dy if args.logo_dy is not None else hero_cfg.get('logoDy', 0))))
     if not logo_front:
         mid_a.alpha_composite(logo_layer)
     mid_b = Image.new('RGBA', (W, H), (0, 0, 0, 0))
