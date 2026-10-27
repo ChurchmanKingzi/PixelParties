@@ -10670,6 +10670,8 @@ function pickBestGalleryCard(engine, pi, cards, quelle = null) {
     const seen = handCounts[c.name] || 0;
     let score = estimateHandCardValueFor(engine, pi, c.name, seen);
     if (quelle) {
+      // Ancient Guardian Statue (W82): die Karte, die die Galerie öffnet, kann einen eigenen Zuschlag je Eintrag liefern (`cpuMeta.galleryValue(engine, pi, eintrag)`).
+      try { const gv = loadCardEffect(quelle)?.cpuMeta?.galleryValue; if (typeof gv === 'function') score += Number(gv(engine, pi, c)) || 0; } catch { /* Zuschlag ist Kür */ }
       try {
         score += deckProfile.setOfferValue(engine, pi, quelle, c.name);
         if (grosserPool) score += deckProfile.poolFeatureValue(engine, pi, quelle, c.name);

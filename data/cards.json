@@ -524,7 +524,7 @@
     "archetype": "",
     "setID": "PP MSAZ",
     "banned": "",
-    "skilltestLegal": true,
+    "skilltestLegal": false,
     "spellSchool1": "Summoning Magic",
     "spellSchool2": "",
     "startingAbility1": "",

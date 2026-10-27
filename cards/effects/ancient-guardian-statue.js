@@ -16,22 +16,29 @@
 //     samt gesenkter Stufe, solange sie auf DER Hand liegt.
 //  ② IDENTITÄT STATT NAME: die gesuchte Handkopie trägt die Instanz-ID DIESER Statue im Handindex-Feld `_handStatueLink` (`_engine._registerBuiltinHandIndexedFields`; folgt der
 //     physischen Kopie durch Hand-Splices und Umsortieren, fällt mit ihr aus der Hand). Mehrere Statuen = je Statue ihre eigene Kopie; eine gleichnamige andere Kopie wird
-//     nie gesenkt und nie als Zusatzaktion angeboten. Verlässt die Kopie die Hand (gespielt, abgeworfen, gelöscht, zurückgemischt), tut die Statue nichts mehr — auch wenn
+//     nie gesenkt und bekommt nie die Zusatzaktions-Marke. Verlässt die Kopie die Hand (gespielt, abgeworfen, gelöscht, zurückgemischt), tut die Statue nichts mehr — auch wenn
 //     später wieder eine Kopie auf die Hand kommt.
-//  ③ Zugende (`onTurnEnd`, nur im Zug des KONTROLLEURS, nur solange die Statue aufgedeckt auf dem Brett liegt und nicht ruht — Frost/Betäubung/Negation filtert `runHooks`,
-//     zusätzlich `isCardEffectActive`): die Stufe der verknüpften Kopie sinkt um 1 (Handrabatt `_handLevelOffsetsTransient`, wie Looming Threat: summiert sich mit anderen
-//     Senkungen derselben Kopie, wirkt nur in der Hand, nie unter 0). Ein Spell, der schon Stufe 0 hat (gedruckt oder durch andere Effekte), wird nicht weiter gesenkt:
-//     „reduced to 0 BY THIS EFFECT" gilt nur für den Schritt 1 → 0. Verlässt die Statue das Brett, bleibt der gesenkte Stand der Kopie, es wird nur nicht mehr weiter gesenkt.
-//  ④ „you may use it as an additional Action" — AUSLEGUNG: ein einmaliges Angebot im Moment, in dem DIESER Effekt die Stufe auf 0 bringt (engere Lesart; die weitere —
-//     „solange die Kopie auf Stufe 0 liegt, kostet sie keine Aktion" — ist NICHT umgesetzt, Rückfrage an Al). Das Angebot ist die Standard-Zusatzaktion mit einem beliebigen
-//     Helden (`performImmediateActionAnyHero`, abbrechbar = „may"; Helden/Ressourcen/Sperren prüft die Engine) und beschränkt sich auf GENAU diese Handkopie
-//     (`eligibleHandIndices`: der Client graut gleichnamige andere Kopien aus, der Server lehnt sie ab). Kann kein Held die Kopie wirken, gibt es keine Frage. Nicht gespielt
-//     = das Angebot verfällt; die Kopie bleibt auf Stufe 0 in der Hand.
+//  ③ Zugende (`onTurnEnd`): die Statue liest die VERKNÜPFUNG, nicht ihren Kontrolleur (Al, W82-Antwort 3): sie senkt am Ende JEDES Zuges des Spielers, in dessen Hand die verknüpfte
+//     Kopie liegt (= der Suchende, „each of YOUR turns" bleibt der Spieler, dem der Spell gehört) — auch wenn die Statue gestohlen/übernommen wurde und noch auf dem Brett steht.
+//     Sie senkt nur, solange sie aufgedeckt auf dem Brett liegt und nicht ruht (Frost/Betäubung/Negation: `isCardEffectActive`). Senkung = Handrabatt `_handLevelOffsetsTransient`
+//     (wie Looming Threat: summiert sich mit anderen Senkungen derselben Kopie, wirkt nur in der Hand, nie unter 0). Ein Spell, der schon Stufe 0 hat (gedruckt oder durch andere
+//     Effekte), wird nicht weiter gesenkt. Verlässt die Statue das Brett, bleibt der gesenkte Stand der Kopie, es wird nur nicht mehr weiter gesenkt.
+//  ④ „you may use it as an additional Action" (Al, W82-Antwort 1 + 5): KEIN Angebot und KEINE Zusatzaktions-Abfrage — die Statue gibt der Kopie nur den vorhandenen Status
+//     „inherent additional Action": erreicht ihr Zugende-Schritt die Stufe 0 (der LETZTE Schritt 1 → 0 kommt von der Statue; Stufe 0 durch einen anderen Effekt allein genügt nicht,
+//     auch eine vorher beschleunigt gesenkte Kopie zählt, wenn der letzte Schritt von der Statue kam), setzt sie die Marke `_handZusatzaktion[idx] = { source, instId }`
+//     (Handindex-Feld, `_engine`). `engine.cardHasInherentAction` (die EINE Stelle der Aktionsprüfung: `validateActionPlay`, `doPlaySpell`, Spielbarkeitslisten, Aktionsverbrauch)
+//     fragt `handKopieZusatzaktion` → dieses Skript (`handCopyAdditionalAction`): die Marke GILT, solange die Statue auf dem Brett liegt und wirkt (nicht frozen/stunned/negiert),
+//     die Kopie noch an ihr hängt und ihre Stufe 0 ist; fällt eine Bedingung weg, ist der Spell wieder ein normaler Spell (Stufe bleibt 0, kostet aber eine Aktion). Nur Spells,
+//     nie Reaction/Surprise (`handKopieZusatzaktion`). Die Marke gehört der Kopie, nicht dem Namen. Die übrigen Spielbarkeitsregeln (Held/Schule/Ressourcen) gelten normal;
+//     der Spell wird wie jeder andere gespielt (Klick/Ziehen) und verbraucht keine Aktion. Der Handkarten-Tooltip erklärt es („Counts as an additional Action").
 //  ⑤ Animation `statue_magic` (Pixelart, `public/app-board.jsx`): Magie-Partikel auf der Handkarte (`play_hand_card_animation`, beide Seiten sehen die aufgedeckte
-//     Karte) — Phase 'reveal' beim Aufdecken, 'tick' beim Senken, 'free' bei Stufe 0.
+//     Karte) — Phase 'reveal' beim Aufdecken, 'tick' beim Senken, 'free' beim Erreichen von Stufe 0 (goldener Hervorhebungs-Beat).
 //  ⑥ Puzzle-Editor: Die Statue trägt Zustand (welche Handkarte). Im Statistik-Fenster der Statue (`app-puzzle.jsx`, Feld „Hand slot", 1-basiert) wird der Handplatz der gesuchten
-//     Karte eingestellt (`statueHandSlot` in `_creatureStatuses`); `createPuzzleGame` (`server.js`, `pzStatue`) knüpft die Handkopie dort an die Statue (`_handStatueLink`) und deckt
-//     sie dauerhaft auf. Die Stufe der Kopie stellt der Editor wie bei jeder Handkarte ein (Linksklick, `handLv` → `counters.levelSet`) — die Zugende-Senkung rechnet darauf weiter.
+//     Karte eingestellt (`statueHandSlot` in `_creatureStatuses`); `createPuzzleGame` (`server.js`, `pzStatue`) knüpft die Handkopie dort an die Statue (`_handStatueLink`), deckt
+//     sie dauerhaft auf und setzt die Zusatzaktions-Marke, wenn der Editor der Karte die Startstufe 0 gibt (Linksklick, `handLv` → `counters.levelSet`; = „durch die Statue auf 0").
+//  ⑦ CPU: Die Spell-Wahl läuft über den Standardweg der Galerie-Wahl der CPU (`pickBestGalleryCard`: Handwert + gelernter Quelle→Karte-Wert `setOfferValue` [Titel = Kartenname] +
+//     Merkmalswert `poolFeatureValue`; die MCTS-Äste werden mit denselben Werten geordnet). Dazu steuert `cpuMeta.galleryValue` den Statuen-spezifischen Zuschlag bei (Erreichbarkeit
+//     für die eigenen Helden, früher Stufe 0, Stufe-0-Spells sinnlos) — die Funktion ist klar austauschbar.
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Ancient Guardian Statue';
@@ -82,24 +89,54 @@ function animiere(engine, pi, idx, name, phase, duration) {
   engine._broadcastEvent('play_hand_card_animation', { owner: pi, handIdx: idx, cardName: name, animType: ANIM, phase, count: 1, duration });
 }
 
-/** Kann irgendein Held diese eine Handkopie jetzt als Zusatzaktion wirken? (Gleiche Prüfungen wie das Angebot selbst.) */
-function kannWirken(engine, pi, name, idx) {
-  const cd = engine._getCardDB()[name];
-  if (!cd) return false;
-  if (engine.additionalActionsLocked(pi) || engine.missionLockActive(pi)) return false;
-  return engine._zusatzaktionsHelden(pi).some(({ seite, heroIdx }) =>
-    heldKannHandeln(engine, seite, heroIdx)
-    && engine.getHeroEligibleActionCards(pi, heroIdx, seite !== pi ? seite : null).includes(name)
-    && engine._kopieStufeOk(pi, heroIdx, cd, idx, seite));
-}
 
-/** Ein gefrorener/betäubter/verwebter Held (oder einer, dem eine Karte/ein Heldenskript Aktionen verbietet) kann keine Zusatzaktion ausführen (Ruling Q137). */
-function heldKannHandeln(engine, seite, heroIdx) {
-  return engine.canHeroPerformAction(seite, heroIdx);
+/** Stufe der Spells im Deck-Angebot für die CPU: wie früh kann ein eigener Held sie wirken (Zugenden bis zur Spielbarkeit)? Unerreichbar = Infinity. */
+function zugendenBisSpielbar(engine, pi, cd) {
+  const ps = engine.gs.players[pi];
+  let k = Infinity;
+  (ps?.heroes || []).forEach((h, hi) => {
+    if (!h?.name || h.hp <= 0) return;
+    for (let senk = 0; senk <= (cd.level || 0) && senk < k; senk++) {
+      let ok = false;
+      try { ok = engine.heroMeetsLevelReq(pi, hi, { ...cd, level: Math.max(0, (cd.level || 0) - senk) }); } catch { ok = false; }
+      if (ok) { k = senk; break; }
+    }
+  });
+  return k;
 }
 
 module.exports = {
   activeIn: ['support'],
+
+  /**
+   * CPU-Zuschlag für die Spell-Wahl der Galerie (`_cpu.pickBestGalleryCard` addiert ihn zum Handwert und zu den gelernten Werten — `setOfferValue`/`poolFeatureValue` unter dem
+   * Titel „Ancient Guardian Statue"). Austauschbar: nur diese Funktion kennt die Statuen-Lage. Ein Spell, den kein eigener Held erreicht, liegt weit hinten; je früher spielbar und je
+   * früher Stufe 0 (= Zusatzaktion), desto besser; ein Spell der Stufe 0 gewinnt nichts durch die Statue.
+   */
+  cpuMeta: {
+    galleryValue(engine, pi, eintrag) {
+      const cd = engine._getCardDB()[eintrag?.name];
+      if (!cd) return 0;
+      const stufe = cd.level || 0;
+      if (stufe <= 0) return -25;
+      const k = zugendenBisSpielbar(engine, pi, cd);
+      if (k === Infinity) return -40;
+      return 8 - 3 * stufe - 5 * k;
+    },
+  },
+
+  /**
+   * Engine-Vertrag der Zusatzaktions-Marke (`engine.handKopieZusatzaktion`): gilt die Marke der Handkopie `idx` JETZT? Statue lebt (auf dem Brett, aufgedeckt), wirkt (nicht
+   * frozen/stunned/negiert — auch eine gestohlene Statue zählt), die Kopie hängt noch an ihr und ihre Stufe in der Hand ist 0.
+   */
+  handCopyAdditionalAction(engine, pi, idx, marke) {
+    const inst = engine.cardInstances.find(c => c.id === marke?.instId);
+    if (!inst || inst.zone !== 'support' || inst.faceDown || !engine.isCardEffectActive(inst)) return false;
+    const ps = engine.gs.players[pi];
+    const name = ps?.hand?.[idx];
+    if (!name || (ps._handStatueLink || {})[idx] !== inst.id) return false;
+    return handStufe(engine, pi, name, idx) === 0;
+  },
 
   hooks: {
     // ① Beschwörung: Spell der Stufe ≤ 4 aus dem Deck suchen, auf die Hand, dauerhaft aufgedeckt, an diese Statue knüpfen.
@@ -150,75 +187,36 @@ module.exports = {
       await engine._delay(1000);
     },
 
-    // ③ Zugende des Kontrolleurs: Stufe der verknüpften Kopie −1; bei Stufe 0 (durch DIESEN Effekt) das Angebot ④.
+    // ③ Zugende des Spielers, dem die verknüpfte Kopie gehört (nicht des Kontrolleurs der Statue): Stufe −1; Schritt 1 → 0 setzt die Zusatzaktions-Marke (④).
     onTurnEnd: async (ctx) => {
-      if (!ctx.isMyTurn) return;
       const inst = ctx.card;
       if (!inst || inst.zone !== 'support' || inst.faceDown) return;
       const engine = ctx._engine;
       if (!engine.isCardEffectActive(inst)) return;
-      const pi = ctx.cardOwner;
+      const pi = ctx.activePlayer;                          // der Spieler, dessen Zug endet
       const ps = engine.gs.players[pi];
       if (!ps) return;
       const idx = verknuepfteKopie(ps, inst.id);
-      if (idx < 0) return;                                  // die Kopie ist nicht mehr auf der Hand: der Effekt tut nichts mehr
+      if (idx < 0) return;                                  // keine verknüpfte Kopie in der Hand dieses Spielers (oder sie ist weg): der Effekt tut nichts
       const name = ps.hand[idx];
       const cd = engine._getCardDB()[name];
       if (!cd || cd.cardType !== 'Spell') return;
       const vorher = handStufe(engine, pi, name, idx);
-      if (vorher <= 0) return;                              // schon Stufe 0: nichts zu senken, „reduced to 0 by this effect" kann nicht eintreten
+      if (vorher <= 0) return;                              // schon Stufe 0 (durch anderes): nichts zu senken, keine Marke
 
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
       if (!ps._handLevelOffsetsTransient) ps._handLevelOffsetsTransient = {};
       ps._handLevelOffsetsTransient[idx] = (ps._handLevelOffsetsTransient[idx] || 0) - 1;
       const nachher = handStufe(engine, pi, name, idx);
+      if (ps._handZusatzaktion) delete ps._handZusatzaktion[idx];   // eine alte Marke endet, sobald die Stufe wieder über 0 lag
+      if (nachher === 0) {                                  // der LETZTE Schritt auf 0 kam von der Statue → die Kopie zählt als zusätzliche Aktion
+        if (!ps._handZusatzaktion) ps._handZusatzaktion = {};
+        ps._handZusatzaktion[idx] = { source: CARD_NAME, instId: inst.id };
+      }
       engine.log('ancient_guardian_statue', { player: ps.username, card: name, text: `level reduced to ${nachher}` });
       engine.sync();
       animiere(engine, pi, idx, name, nachher === 0 ? 'free' : 'tick', nachher === 0 ? 1500 : 850);
       await engine._delay(nachher === 0 ? 1200 : 700);
-      if (nachher !== 0) return;
-
-      // ④ Stufe 0 durch diesen Effekt: „you may use it as an additional Action" — nur diese Kopie, nur wenn ein Held sie wirken kann.
-      const jetzt = verknuepfteKopie(ps, inst.id);          // während der Animation kann sich die Hand bewegt haben: die Kopie neu über ihre Verknüpfung finden
-      if (jetzt < 0 || ps.hand[jetzt] !== name || !kannWirken(engine, pi, name, jetzt)) return;
-      await engine.performImmediateActionAnyHero(pi, {
-        title: CARD_NAME,
-        description: `"${name}" is now level 0 — you may use it as an additional Action with any Hero (or skip).`,
-        cardNameFilter: (n) => n === name,
-        heldenFilter: (seite, heroIdx) => heldKannHandeln(engine, seite, heroIdx),   // frostige/betäubte Helden bieten die Zusatzaktion nicht an
-        eligibleHandIndices: [jetzt],
-        cancellable: true,
-      });
-      engine.sync();
     },
-  },
-
-  /**
-   * CPU: Spell-Wahl — der Spell der Stufe ≤ 4, den ein eigener Held am frühesten (und am stärksten) wirken kann: Punktzahl = Stufe × 10 − 12 × (Zugenden bis zur Spielbarkeit);
-   * unspielbar (kein Held erreicht ihn auch bei Stufe 0) liegt weit hinten. Ohne Treffer greift die Standardwahl der CPU.
-   */
-  cpuResponse(engine, kind, promptData) {
-    if (kind !== 'generic' || promptData?.title !== CARD_NAME || promptData?.type !== 'cardGallery') return undefined;
-    const pi = engine._cpuPlayerIdx;
-    const ps = engine.gs.players[pi];
-    const db = engine._getCardDB();
-    if (!ps || !Array.isArray(promptData.cards) || promptData.cards.length === 0) return undefined;
-    let best = null, bestScore = -Infinity;
-    for (const e of promptData.cards) {
-      const cd = db[e.name];
-      if (!cd) continue;
-      let k = Infinity;
-      (ps.heroes || []).forEach((h, hi) => {
-        if (!h?.name || h.hp <= 0) return;
-        for (let senk = 0; senk <= (cd.level || 0) && senk < k; senk++) {
-          let ok = false;
-          try { ok = engine.heroMeetsLevelReq(pi, hi, { ...cd, level: Math.max(0, (cd.level || 0) - senk) }); } catch { ok = false; }
-          if (ok) { k = senk; break; }
-        }
-      });
-      const score = k === Infinity ? -500 + (cd.level || 0) : (cd.level || 0) * 10 - k * 12;
-      if (score > bestScore) { bestScore = score; best = e; }
-    }
-    return best ? { cardName: best.name, source: best.source || 'deck' } : undefined;
   },
 };
