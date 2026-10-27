@@ -15402,6 +15402,13 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   padding: 0 !important;
   margin: 0 !important;
 }
+/* ★ Puzzle-Editor: die Karte, die aus einer BRETTZONE gezogen wird, ist dort unsichtbar, solange der Zug laeuft (das Ziehbild
+   `#pz-drag-ghost` zeigt sie). Nur die Deckkraft — die Zone, ihr Rahmen und das Layout bleiben stehen, damit nichts springt.
+   Area-Stapel: die einzelne Karte traegt das Attribut selbst; alle anderen Zonen: ihr Inhalt (Karte, Werte, Marken), nicht die Huelle. */
+.board-area-stack-card[data-pz-gezogen],
+[data-pz-gezogen]:not(.board-area-stack-card) > * {
+  opacity: 0;
+}
 .pz-hand-gap {
   /* Maße der Handkarten (★ v1236: `--hand-card-w/h`, wie die Karten
      daneben) — sonst passt die Lücke nur bei einem Zoom.
