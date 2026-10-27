@@ -4,7 +4,7 @@
 //  Creature (Normal, Summoning Magic Lv0) — 50 HP
 //
 //  „Only 1 "Great Immortal Hydra" can be on the board at a time. Up to 3 times per turn, when this Creature would be defeated, it is fully healed instead. Then its level is increased by 1
-//   and its current and max HP by 50. At the end of each of your turns, all Heroes you control lose 50 HP times this Creature's current level."
+//   and its current and max HP by 50. At the end of each of your turns, all Heroes you control take damage equal to 50 times this Creature's current level."
 //
 //  ── „ONLY 1 … ON THE BOARD AT A TIME" ───────────────────────────────────
 //  BRETTWEIT, nicht je Spieler: solange irgendwo (beide Seiten, jede Kontrolle) eine aufgedeckte Hydra in einer Support Zone liegt, ist keine zweite beschwörbar. `canSummon` (Spielbarkeit),
@@ -20,10 +20,10 @@
 //  Ablauf: volle Heilung auf das AKTUELLE Maximum → Level +1 (`actionChangeLevel`) → Max-HP und aktuelle HP +50 (`increaseMaxHp`). Nach dem ersten Mal also: Lv1, 100/100; dann Lv2, 150/150 usw. Die
 //  Heilung setzt die HP direkt (Ersatz des Todes, kein Heil-Effekt: Gift-Heilsperre, Zauber-Immunität und Schutzhooks reden nicht hinein).
 //
-//  ── ZUGENDE („ALL HEROES YOU CONTROL LOSE 50 HP TIMES THIS CREATURE'S CURRENT LEVEL") ──
-//  Am Ende jedes Zuges ihres KONTROLLEURS verliert JEDER Held unter seiner Kontrolle (`getControlledHeroTargets`, auch geliehene; lebende) 50 × aktuelles Level der Hydra HP. Verlust ist KEIN Schaden
-//  (Gobbo-/Foresta-Konvention): kein Schild, keine Schadenshooks, kein Immortal-Deckel; stirbt der Held daran, läuft `actionDefeatHero` mit `eigenerAbgang` (Pre-Defeat-Fenster ja — Escape Device & Co. —,
-//  Resistance nein) und kein Opfer-Hook. Level 0 (die Hydra war noch nie in Not) kostet nichts. Ruht die Karte (Frozen/Stunned/Negated), ruht auch dieser Effekt (Engine-Standard der Kreaturen-Hooks).
+//  ── ZUGENDE („ALL HEROES YOU CONTROL TAKE DAMAGE EQUAL TO 50 TIMES THIS CREATURE'S CURRENT LEVEL") ──
+//  Am Ende jedes Zuges ihres KONTROLLEURS trifft die Hydra JEDEN Held unter seiner Kontrolle (auch geliehene; lebende) mit 50 × aktuellem Level als NORMALEN CREATURE-SCHADEN (`ctx.aoeHit`,
+//  `damageType: 'creature'`, Quelle = die Hydra): Schilde, Schadenshooks, Immortal, Surprise-/Reaktionsfenster (auch Man-Eater Birds am eigenen Helden) und die Anti-AoE-Klammer (Interference)
+//  gelten wie bei jedem Creature-Schaden. Level 0 (die Hydra war noch nie in Not) kostet nichts. Ruht die Karte (Frozen/Stunned/Negated), ruht auch dieser Effekt (Engine-Standard der Kreaturen-Hooks).
 //
 //  ── Bild und Klang ──────────────────────────────────────────────────────
 //  `hydra_regrow` (grüne Regeneration, Hälse und Köpfe wachsen aus der Karte; Pixelart) bei der Rettung, `hydra_drain` (grünes Sickern + rote Minuszeichen) auf jedem Helden zum Zugende —
@@ -32,11 +32,11 @@
 
 const CARD_NAME = 'Great Immortal Hydra';
 const RETTUNGEN_JE_ZUG = 3;
-const HP_JE_STUFE = 50;
+const DMG_JE_STUFE = 50;
 const WACHS_HP = 50;
 const HEIL_MS = 600;      // bis zum Blitz von `hydra_regrow` (deckt sich mit BLITZ im Client) — dann springen die HP
 const NACH_MS = 800;      // Nachlauf der Regeneration (Köpfe wachsen, Kreuze steigen)
-const SAUG_MS = 650;      // bis zum Verlust der HP (deckt sich mit `hydra_drain`)
+const SAUG_MS = 650;      // bis der Schaden fällt (deckt sich mit `hydra_drain`)
 const SAUG_REST_MS = 450;
 
 /** Liegt außer `inst` irgendwo eine aufgedeckte Hydra in einer Support Zone? (brettweit) */
@@ -49,8 +49,6 @@ module.exports = {
   spellVisual: { impact: { type: 'hydra_regrow' }, impactMs: 700 },
 
   activeIn: ['support'],
-  // „all Heroes you control lose …": trifft am Zugende ALLE eigenen Helden (AoE-Erkennbarkeit, `check-aoe-text`; HP-Verlust ist kein Schaden, daher von Hand).
-  hitsMultipleTargets: true,
 
   /** „Only 1 … on the board at a time": jede Beschwörung prüft es. */
   async beforeSummon(ctx) { return !andereHydraAufBrett(ctx._engine, ctx.card); },
@@ -89,7 +87,7 @@ module.exports = {
   },
 
   hooks: {
-    /** Am Ende jedes Zuges des Kontrolleurs: alle Helden unter seiner Kontrolle verlieren 50 × Level HP. */
+    /** Am Ende jedes Zuges des Kontrolleurs: alle Helden unter seiner Kontrolle nehmen 50 × Level Creature-Schaden. */
     async onTurnEnd(ctx) {
       const inst = ctx.card;
       if (!inst || inst.zone !== 'support' || inst.faceDown) return;
@@ -98,24 +96,12 @@ module.exports = {
       if (engine.gs.activePlayer !== controller) return;                  // „each of YOUR turns"
       const level = engine.kreaturLevelJetzt(inst);
       if (level <= 0) return;
-      const verlust = HP_JE_STUFE * level;
-      const ziele = engine.getControlledHeroTargets(controller);
-      if (ziele.length === 0) return;
-
-      for (const t of ziele) {
-        engine._broadcastEvent('play_zone_animation', { type: 'hydra_drain', owner: t.owner, heroIdx: t.heroIdx, zoneSlot: -1, duration: 1100 });
-      }
-      await engine._delay(SAUG_MS);
-
-      const source = { name: CARD_NAME, owner: inst.originalOwner ?? inst.owner, heroIdx: inst.heroIdx, cardInstance: inst };
-      for (const t of ziele) {
-        const hero = engine.gs.players[t.owner]?.heroes?.[t.heroIdx];
-        if (!hero?.name || hero.hp <= 0) continue;
-        const ziel = hero.hp - verlust;
-        hero.hp = Math.max(1, ziel);                                      // Gobbo-Muster: erst auf ≥1, dann ggf. der kanonische Todesweg
-        engine.log('hydra_drain', { hero: hero.name, lost: verlust, level, hp: Math.max(0, ziel) });
-        if (ziel <= 0) await engine.actionDefeatHero(source, hero, { reason: CARD_NAME, eigenerAbgang: true });
-      }
+      const schaden = DMG_JE_STUFE * level;
+      await ctx.aoeHit({
+        side: 'own', types: ['hero'], damage: schaden, damageType: 'creature', sourceName: CARD_NAME,
+        animationType: 'hydra_drain', animDelay: SAUG_MS,
+      });
+      engine.log('hydra_drain', { player: engine.gs.players[controller]?.username, damage: schaden, level });
       engine.sync();
       await engine._delay(SAUG_REST_MS);
     },

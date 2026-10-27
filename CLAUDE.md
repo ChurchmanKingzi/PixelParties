@@ -49,3 +49,12 @@ Das Spiel hat eine feste Palette (`data/palette.json`, 8 Bit = höchstens 256 Fa
 * Farben, die erst **zur Laufzeit** entstehen (Spielerfarbe, Zufallspartikel, `hsl(${hue})`, Farben aus Kartenskripten), rastet `public/palette.js` ein (Stile, Canvas, SVG-Attribute). Die **Spielerfarbe** wird beim Speichern serverseitig auf die nächste Palettenfarbe gesetzt (`palette.js` im Wurzelverzeichnis, `snapHex`) und im Farbfeld des Profils live eingerastet.
 * Die Palette selbst ändert man nur bewusst: `python3 scripts/palette/build_palette.py` (Gewichte der Oberfläche: `data/palette-ui-gewichte.json`), danach `node scripts/palette/anwenden.js` und `python3 scripts/pixel-emoji/build_font.py` (die Emoji-Schrift nutzt dieselben 256 Farben).
 * **Feste Farben des Spielgestalters** stehen in `data/palette-fest.json` (z. B. die Farben der Gold-Münze). Sie kommen **exakt** in die Palette (`build_palette.py`, nie auf Nachbarfarben gerastet) und werden dort, wofür sie gedacht sind, unverändert verwendet — Gold im Spiel (Münze, Goldzahl, Gold-Zahlen im Duell) nutzt genau diese fünf Farben. Gibt der Gestalter ein Icon oder Farben vor, werden sie dort eingetragen und das Icon pixelgenau übernommen (die 🪙-Münze der Emoji-Schrift ist sein 12×12-Sprite).
+
+## Offene Baustellen (für andere Instanzen; erledigte Einträge löschen)
+
+* **Emoji 🪞 fehlt in der Pixel-Emoji-Schrift.** `cards/effects/reflection.js` nutzt vorläufig `'🔄 Reflect!'` als `confirmLabel`, weil sich die Schrift in der Cloud-Umgebung nicht neu bauen ließ.
+  Zu tun: `confirmLabel` auf `'🪞 Reflect!'` zurückstellen und die Schrift bauen (`node scripts/pixel-emoji/scan.js && node scripts/pixel-emoji/extract.js && python3 scripts/pixel-emoji/build_font.py`), danach `npm test`.
+  Zwei Stolpersteine, die dabei auftraten (beide umgehbar, aber die Skripte sagen es nicht deutlich):
+  1. `extract.js` läuft in ein 30-s-Timeout (`page.waitForFunction`), wenn unpkg.com nicht erreichbar ist. Es liest React dann aus `PE_REACT_DIR` (Vorgabe `/tmp/st-tools/node_modules`) — dort müssen `react/umd` und `react-dom/umd` liegen, sonst `PE_REACT_DIR=<Ordner mit react/umd>` setzen (hat in der Cloud-Umgebung funktioniert).
+  2. `build_font.py` bricht mit `ModuleNotFoundError: fontTools` ab → `pip install fonttools` (PyPI ist über den Proxy erreichbar).
+  Mögliche Patches: `extract.js` bei fehlendem React-Ordner früh mit klarer Meldung abbrechen statt nach 30 s zu timen; `build_font.py` bei fehlendem `fontTools` den `pip`-Hinweis ausgeben.
