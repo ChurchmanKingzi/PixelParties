@@ -9164,11 +9164,31 @@ class GameEngine {
    * Konsumiert an zwei Stellen: `_actionDealDamageImpl` (Schaden) und
    * `addHeroStatus` (Status und alles, was darueber laeuft).
    */
-  grantEffectImmunity(playerIdx, heroIdx, sourceObj) {
+  grantEffectImmunity(playerIdx, heroIdx, sourceObj, opts = {}) {
     if (!sourceObj || typeof sourceObj !== 'object') return false;
     if (!this.gs._effectImmunities) this.gs._effectImmunities = [];
-    this.gs._effectImmunities.push({ owner: playerIdx, heroIdx, src: sourceObj });
+    const eintrag = { owner: playerIdx, heroIdx, src: sourceObj };
+    // ★ Welle 6b (Man-Eater Birds, „Negate any effects that effect would have on the corresponding Hero"): eine Surprise greift im Ziel-Fenster, VOR dem
+    // Nach-Ziel-Fenster, das die Liste leert. `opts.ueberFenster` übersteht diese Leerung (nicht das Ende der Auflösung, `endeEffektImmunitaeten`);
+    // `opts.nurQuelle` bindet die Immunität an die Quelle (Instanz-ID oder Name), damit sie nicht fremde Effekte auf denselben Helden schluckt.
+    if (opts.ueberFenster) eintrag.ueberFenster = true;
+    if (opts.nurQuelle) {
+      const inst = sourceObj.cardInstance || sourceObj.inst || (sourceObj.zone ? sourceObj : null);
+      eintrag.quelle = { instId: inst?.id ?? sourceObj.instId ?? null, name: sourceObj.cardName || sourceObj.name || inst?.name || null };
+    }
+    this.gs._effectImmunities.push(eintrag);
     return true;
+  }
+
+  /** ★ Welle 6b: trifft eine quellgebundene Immunität (`opts.nurQuelle`) diese Quelle? Ohne erkennbare Quelle gilt sie (die Liste lebt nur eine Auflösung lang). */
+  _immunQuelleTrifft(q, src) {
+    if (!src) return true;
+    const name = typeof src === 'string' ? src : (src.cardName || src.name);
+    const inst = typeof src === 'object' ? (src.cardInstance || src.inst || (src.zone ? src : null)) : null;
+    const instId = inst?.id ?? null;
+    if (q.instId != null && instId != null) return q.instId === instId;
+    if (!name) return true;
+    return !!q.name && q.name === name;
   }
 
   /**
@@ -9184,7 +9204,7 @@ class GameEngine {
    * Zielfensters geleert, der Kulanzbereich ist also genau die
    * laufende Aufloesung.
    */
-  hasEffectImmunity(playerIdx, heroIdx /*, sourceObj */) {
+  hasEffectImmunity(playerIdx, heroIdx, sourceObj) {
     const liste = this.gs._effectImmunities;
     if (!liste || liste.length === 0) return false;
     // ★ NUR Besitzer + Heldenindex (Als Befund 21.8.: „Quick Attack geht
@@ -9203,7 +9223,7 @@ class GameEngine {
     //   `_checkPostTargetHandReactions` leert sie zu Beginn jedes neuen
     //   Zielfensters, der Schutz gilt also genau fuer die laufende
     //   Aufloesung — das war schon vorher der eigentliche Riegel.
-    return liste.some(e => e.owner === playerIdx && e.heroIdx === heroIdx);
+    return liste.some(e => e.owner === playerIdx && e.heroIdx === heroIdx && (!e.quelle || this._immunQuelleTrifft(e.quelle, sourceObj)));
   }
 
   /**
@@ -9628,6 +9648,11 @@ class GameEngine {
             // Sperre oben jeden weiteren Schaden dieser Aufloesung.
             if ((this.gs._spellResolutionDepth || 0) > 0) this.gs._spellNegatedByEffect = true;
             return { dealt: 0, cancelled: true, surpriseNegated: true };
+          }
+          // ★ Welle 6b (Man-Eater Birds): die Surprise hat nur DIESEN Helden gegen die Quelle immun gemacht (kein `effectNegated`) — der Treffer entfällt, andere Ziele bleiben.
+          if (this.hasEffectImmunity(tgtOwner, tgtHeroIdx, source)) {
+            this.log('effect_immunity', { hero: target?.name, source: source?.name || null });
+            return { dealt: 0, cancelled: true, effectImmune: true };
           }
           }
         }
@@ -42816,7 +42841,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _gesammelt = [];   // v1368: Umlenkungen (`newTargets`) aller Reaktionen
     // Effekt-Immunitaeten gelten fuer GENAU EINE Aufloesung. Ein neues
     // Zielfenster heisst: die vorige ist vorbei.
-    if (this.gs._effectImmunities?.length) this.gs._effectImmunities.length = 0;
+    if (this.gs._effectImmunities?.length) this.gs._effectImmunities = this.gs._effectImmunities.filter(e => e.ueberFenster);   // Welle 6b: Surprise-Immunitäten (`ueberFenster`) bleiben
     if (!targetedHeroes || targetedHeroes.length === 0) return null;
     if (this._inPostTargetReaction) return null;
 
@@ -57606,7 +57631,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // wanderten sonst als Zeichenkette in den Ablagestapel. Nach
         // dem Umschichten oben koennen hier ohnehin nur noch
         // verwaiste uebrig sein.
-        if (cardName === '_ZoneBlocked') continue;
+        if (cardName === '_ZoneBlocked' || cardName === '_ZoneBarrel') continue;   // Welle 6b: auch das Fass-Siegel (Barrel Home) ist keine Karte
         // Fire death hooks for the creature
         const hero = ps.heroes[heroIdx];
         this.log('island_zone_defeat', { card: cardName, hero: hero?.name });
@@ -57643,6 +57668,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Remove the island zones from the array (rightmost block)
     ps.supportZones[heroIdx].splice(firstRemoveIdx, removeCount);
     ps.islandZoneCount[heroIdx] = Math.max(0, islandCount - removeCount);
+    // ★ Welle 6b (Barrel Home): eine versiegelte Inselzone ging mit ihrer Insel unter — die Zonen-Welt gleicht die Siegel neu ab (No-op ohne Gigalopolis/Barrel Home).
+    await require('./_zonen-welt-shared').abgleichen(this);
   }
 
   // ─── COOLNESS STACK ──────────────────────

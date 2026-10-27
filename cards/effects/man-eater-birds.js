@@ -14,8 +14,10 @@
 //  ── WIRKUNG ─────────────────────────────────────────────────────────────
 //  1. Der Schwarm fällt über die Quell-Creature her (`man_eater_swarm`) und die Creature wird BESIEGT (`actionDestroyCard`, Todes-Hooks, Schutzeffekte gelten: eine Creature, die nicht sterben darf,
 //     bleibt stehen). Stammt der Effekt von einer noch nicht gelegten Creature-Surprise, gibt es nichts zu besiegen.
-//  2. „Negate any effects that effect would have on the corresponding Hero" = `effectNegated`: wie bei allen Surprises der Engine wird der ganze Effekt negiert (bei einem Effekt auf mehrere Ziele
-//     gilt das für alle Ziele — Konvention aller Negierer, keine Teilnegierung je Held).
+//  2. „Negate any effects that effect would have on the corresponding Hero" = NUR AM HELDEN, nicht der ganze Effekt (Al, 27.10.): die Surprise liefert KEIN `effectNegated`, sondern macht den Helden
+//     für diese Auflösung gegen die Quelle immun (`engine.grantEffectImmunity(…, { ueberFenster: true, nurQuelle: true })`): Schaden, Status und alles, was über `addHeroStatus` läuft, prallen am
+//     Helden ab — alle ANDEREN Ziele desselben Effekts werden normal getroffen. `ueberFenster`: die Immunität übersteht das Nach-Ziel-Fenster, das die Liste sonst leert; `nurQuelle`: gebunden an die
+//     Quell-Creature (Instanz oder Name), fremde Effekte auf denselben Helden bleiben unberührt. Endet mit der Auflösung (`endeEffektImmunitaeten`) bzw. am Zugbeginn.
 //  3. Die Engine legt die Karte danach in die freie Support Zone des Helden (Creature-Surprise; keine Action, W31a) — „as an additional Action" ist damit erfüllt.
 //
 //  ── ZUGENDE ─────────────────────────────────────────────────────────────
@@ -24,7 +26,7 @@
 //
 //  ── Bild und Klang ──────────────────────────────────────────────────────
 //  `man_eater_swarm` (Raben fressen die Creature, Pixelart) und `man_eater_bite` (derselbe Schwarm kreist um den Helden und beißt, Pixelart) — `ppPunktBild`, Klänge in ZONE_ANIM_SFX. Logs
-//  `man_eater_defeat`, `man_eater_bite`.
+//  `man_eater_defeat`, `man_eater_immune`, `man_eater_bite`.
 // ═══════════════════════════════════════════
 
 const { isCreatureSource, resolveSourceCreature, istUngelegteCreatureSurprise } = require('./_hooks');
@@ -63,11 +65,14 @@ module.exports = {
   async onSurpriseActivate(ctx, sourceInfo) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
+    const seite = ctx.cardHeroOwner ?? pi;                  // Brettseite des entsprechenden Helden
     const inst = istUngelegteCreatureSurprise(engine, sourceInfo) ? null : resolveSourceCreature(engine, sourceInfo);
+    // Die Quelle für die Immunität: die Creature selbst (Instanz-ID) bzw. — bei einer noch nicht gelegten Creature-Surprise — ihr Name.
+    const quelle = inst || { name: sourceInfo.cardName, cardName: sourceInfo.cardName, instId: sourceInfo.cardInstance?.id ?? null };
     if (inst) {
-      const seite = engine.physicalSide(inst);
+      const swarmSeite = engine.physicalSide(inst);
       engine._broadcastEvent('play_zone_animation', {
-        type: 'man_eater_swarm', owner: seite, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot, duration: 1900,
+        type: 'man_eater_swarm', owner: swarmSeite, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot, duration: 1900,
       });
       await engine._delay(FRESS_MS);
       let besiegt = false;
@@ -86,7 +91,10 @@ module.exports = {
       engine.sync();
       await engine._delay(NACH_MS);
     }
-    return { effectNegated: true };
+    // „Negate any effects … on the corresponding Hero": nur dieser Held ist für diese Auflösung gegen die Quelle immun (kein `effectNegated`: die anderen Ziele bleiben betroffen).
+    engine.grantEffectImmunity(seite, ctx.cardHeroIdx, quelle, { ueberFenster: true, nurQuelle: true });
+    engine.log('man_eater_immune', { player: engine.gs.players[pi]?.username, hero: engine.gs.players[seite]?.heroes?.[ctx.cardHeroIdx]?.name, source: sourceInfo.cardName });
+    return null;
   },
 
   hooks: {

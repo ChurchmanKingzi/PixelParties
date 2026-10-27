@@ -118,7 +118,7 @@ module.exports = {
       const ids = await engine.promptEffectTarget(pi, ziele, {
         title: CARD_NAME, source: CARD_NAME,
         description: `Choose a target your opponent controls. It is ${statusLabel} instead.`,
-        confirmLabel: '🔄 Reflect!', confirmClass: 'btn-success',
+        confirmLabel: '🔄 Reflect!', confirmClass: 'btn-success',   // BAUSTELLE: '🪞 Reflect!', sobald die Emoji-Schrift 🪞 kennt (siehe CLAUDE.md „Offene Baustellen")
         cancellable: false, allowNonCreatureEquips: true, maxTotal: 1,   // pflichtwahl: die Aktivierung der Surprise war die Entscheidung
       });
       const id = Array.isArray(ids) ? ids[0] : ids;

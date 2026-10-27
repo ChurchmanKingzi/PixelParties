@@ -10544,7 +10544,7 @@
     "hp": 50,
     "atk": null,
     "cost": null,
-    "effect": "Only 1 \"Great Immortal Hydra\" can be on the board at a time. Up to 3 times per turn, when this Creature would be defeated, it is fully healed instead. Then its level is increased by 1 and its current and max HP by 50. At the end of each of your turns, all Heroes you control lose 50 HP times this Creature's current level.",
+    "effect": "Only 1 \"Great Immortal Hydra\" can be on the board at a time. Up to 3 times per turn, when this Creature would be defeated, it is fully healed instead. Then its level is increased by 1 and its current and max HP by 50. At the end of each of your turns, all Heroes you control take damage equal to 50 times this Creature's current level.",
     "archetype": "",
     "setID": "PP MS1",
     "banned": "Banned",

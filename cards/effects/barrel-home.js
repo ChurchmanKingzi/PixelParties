@@ -10,8 +10,9 @@
 //  Je Barrel Home hat JEDER Held beider Seiten eine Support Zone weniger. Welche, regelt `_zonen-welt-shared.js` (ausführlich dort):
 //    1. die Zone von Gigalopolis, the Mega-City wird zuerst entzogen (sie verschwindet, solange das Fass liegt, und kommt zurück, wenn es geht);
 //    2. weitere Fässer versiegeln eine GRUNDZONE (Platzhalter `_ZoneBarrel`: belegt, nimmt nichts auf, im Client ein Fass); eine freie bevorzugt, rechts zuerst;
-//    3. Flying-Island-Zonen werden nie bevorzugt entzogen (sie werden nie versiegelt; mehr als 3 Fässer ohne Gigalopolis schließen nicht weiter).
-//  Verlässt das Fass das Brett, kehrt die Zone zurück (Siegel gelöst bzw. Gigalopolis-Zone neu angelegt).
+//    3. Flying-Island-Zonen werden nie ZUERST entzogen — sind aber alle Grundzonen versiegelt und kommt noch ein Fass, werden auch sie versiegelt (rechts zuerst; Al, 27.10.). Mehr Fässer als
+//       Zonen schließen nichts weiter.
+//  Verlässt das Fass das Brett, kehrt die Zone zurück (Siegel gelöst bzw. Gigalopolis-Zone neu angelegt); geht eine versiegelte Inselzone mit ihrer Flying Island unter, schrumpfen die Siegel mit.
 //
 //  ── ZU VIELE KARTEN ─────────────────────────────────────────────────────
 //  Passt der Inhalt nicht mehr, zieht eine Kreatur zuerst in eine freie Zone um (Inselzonen zuerst). Bleibt keine, MUSS der Kontrolleur des Helden (Pflichtwahl, nicht abbrechbar)

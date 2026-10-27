@@ -10,7 +10,9 @@
 //      LINKS (Client: `left = ceil(ic / 2)`; mit einer Zone: 1 | 2 | 3 | 4, die Ability Zones 1-3 über den Support Zonen 2-4).
 //    • Barrel Home: „1 fewer Support Zone". Die ERSTE Fass-Wirkung hebt die Gigalopolis-Zone auf (wird entfernt, solange ein Fass liegt — „der Gigalopolis-Zone wird immer zuerst
 //      entzogen"); jedes weitere Fass versiegelt eine GRUNDZONE (Platzhalter `_ZoneBarrel`: zählt für jede Frei-Prüfung als belegt, nimmt nichts auf, der Client zeichnet ein Fass).
-//      Flying-Island-Zonen werden nie bevorzugt entzogen (es gibt keinen Weg, sie zu versiegeln). Gezählt wird also: Inseln = max(0, G − B); Siegel = min(3, max(0, B − G)).
+//      Flying-Island-Zonen werden nie ZUERST entzogen — sind aber alle Grundzonen versiegelt und kommt noch ein Fass, werden auch sie versiegelt (rechts zuerst; Al, 27.10.). Gezählt wird also:
+//      Inseln (Gigalopolis) = max(0, G − B); Siegel = min(Zahl aller Zonen des Helden, max(0, B − G)); Reihenfolge der Siegel: Grundzonen 3-2-1, dann Inselzonen von rechts. Fällt eine
+//      versiegelte Inselzone mit ihrer Flying Island weg (`removeIslandZones` → Abgleich), schrumpft die Zahl der Siegel von selbst.
 //
 //  ── WAS GESCHIEHT MIT KARTEN IN EINER ZU SCHLIESSENDEN ZONE? ──────────────
 //  Eine Kreatur zieht in eine freie Zone um (Inselzonen zuerst, damit Grundzonen für Ausrüstung frei bleiben). Gibt es keine, MUSS der Kontrolleur des Helden eine Karte aus seinen
@@ -163,33 +165,40 @@ async function gigaZoneSchliessen(engine, pi, hi) {
   return true;
 }
 
-/** Versiegelt EINE Grundzone (Fass-Platzhalter). Liefert den Index oder null. */
+/**
+ * Versiegelt EINE Zone (Fass-Platzhalter). Liefert den Index oder null.
+ * Reihenfolge: erst die GRUNDZONEN (rechts zuerst), erst wenn alle versiegelt sind die INSELZONEN (Flying Island in the Sky; rechts zuerst) — Inselzonen werden nie
+ * bevorzugt versiegelt, aber auch sie schließen, wenn nichts anderes mehr übrig ist (Al, 27.10.).
+ */
 async function siegelSetzen(engine, pi, hi) {
   const ps = engine.gs.players[pi];
   for (let versuch = 0; versuch < KAPUTT_MAX; versuch++) {
     const sup = ps.supportZones[hi];
-    const kand = [2, 1, 0].filter(z => z < sup.length && (sup[z] || [])[0] !== SIEGEL);
+    const offen = (z) => (sup[z] || [])[0] !== SIEGEL;
+    let kand = [2, 1, 0].filter(z => z < sup.length && offen(z));
+    const inselRunde = kand.length === 0;
+    if (inselRunde) for (let z = sup.length - 1; z >= BASIS; z--) if (offen(z)) kand.push(z);
     if (kand.length === 0) return null;
     const leer = kand.find(z => (sup[z] || []).length === 0);
     if (leer != null) {
       sup[leer] = [SIEGEL];
-      engine.log('zonen_welt_siegel', { hero: ps.heroes?.[hi]?.name, zone: leer });
+      engine.log('zonen_welt_siegel', { hero: ps.heroes?.[hi]?.name, zone: leer, insel: leer >= BASIS });
       return leer;
     }
-    // Alle Kandidaten belegt: eine Kreatur in eine freie Inselzone umsetzen …
+    // Alle Kandidaten belegt (Grundrunde): eine Kreatur in eine freie Inselzone umsetzen …
     let frei = null;
-    for (let z = BASIS; z < sup.length; z++) if ((sup[z] || []).length === 0) { frei = z; break; }
+    if (!inselRunde) for (let z = BASIS; z < sup.length; z++) if (offen(z) && (sup[z] || []).length === 0) { frei = z; break; }
     if (frei != null) {
       const quelle = kand.find(z => umziehbar(engine, pi, hi, z));
       if (quelle != null) {
         zoneVerschieben(engine, pi, hi, quelle, frei);
         sup[quelle] = [SIEGEL];
-        engine.log('zonen_welt_siegel', { hero: ps.heroes?.[hi]?.name, zone: quelle });
+        engine.log('zonen_welt_siegel', { hero: ps.heroes?.[hi]?.name, zone: quelle, insel: false });
         engine.sync();
         return quelle;
       }
     }
-    // … sonst MUSS eine Karte gehen. Ohne umziehbare Kreatur hilft nur eine Karte aus den Kandidatenzonen selbst.
+    // … sonst MUSS eine Karte gehen. Ohne umziehbare Kreatur hilft nur eine Karte aus den Kandidatenzonen selbst (in der Inselrunde sind das alle Karten des Helden).
     const hilft = frei != null && kand.some(z => umziehbar(engine, pi, hi, z));
     const gesendet = await karteSenden(engine, pi, hi, hilft ? null : new Set(kand));
     if (!gesendet) return null;
@@ -203,7 +212,7 @@ async function heldAbgleichen(engine, pi, hi, G, B) {
   if (!hero?.name || !Array.isArray(ps.supportZones?.[hi])) return;
   const st = zustand(ps, hi);
   const wunschGiga = Math.max(0, G - B);
-  const wunschSiegel = Math.min(BASIS, Math.max(0, B - G));
+  const wunschSiegel = Math.min(ps.supportZones[hi].length, Math.max(0, B - G));   // Grundzonen zuerst, dann Inselzonen (Flying Island)
 
   // Siegel prüfen (eine Zone, die nicht mehr den Platzhalter trägt, ist keins mehr)
   st.siegel = st.siegel.filter(z => (ps.supportZones[hi][z] || [])[0] === SIEGEL);
@@ -234,6 +243,9 @@ async function heldAbgleichen(engine, pi, hi, G, B) {
  */
 async function abgleichen(engine, opts = {}) {
   if (!engine?.gs?.players) return;
+  // Ohne Gigalopolis, Barrel Home und ohne Altzustand gibt es nichts abzugleichen (z. B. wenn eine Flying Island das Brett verlässt).
+  if (!zaehle(engine, GIGA, opts.ausser) && !zaehle(engine, FASS, opts.ausser)
+      && !engine.gs.players.some(p => (p?._weltZonen || []).some(z => z && (z.giga || (z.siegel || []).length)))) return;
   if (opts.ausser) engine._weltZonenAusser = opts.ausser;
   if (engine._weltZonenLaeuft) { engine._weltZonenNochmal = true; return; }
   engine._weltZonenLaeuft = true;
