@@ -2,23 +2,26 @@
 //  CARD EFFECT: "Winged Haressassin"
 //  Creature (Normal, Lv 0, 50 HP, Summoning Magic)
 //
-//  „Once per turn, when an opponent's card or effect chooses another target
-//   you control, you may discard a card to redirect it to this Creature.
+//  „Once per turn, when an opponent's card or effect chooses exactly one other
+//   target you control, you may discard a card to redirect it to this Creature.
 //   When this Creature is defeated by a card or effect redirected by this
 //   effect, deal 150 damage to any target."
 //
 //  ── ① UMLEITUNG (Brett-Wächter `isBoardRedirect`, Muster Empty Armor / Anti-Magnetic Armor) ──
 //  Die Engine öffnet nach JEDER Zielwahl ein Umleitungsfenster (`applyRedirectWindows`, je gewähltem Ziel einzeln; auch der Einzeltreffer
-//  `trefferAlsWahl`, z. B. Chain Lightning); der Wächter sitzt im vierten Scan von `_checkTargetRedirectOnce`.
+//  `trefferAlsWahl`); der Wächter sitzt im vierten Scan von `_checkTargetRedirectOnce`.
 //  • „an opponent's card or effect": die Quelle gehört dem GEGNER (Kontrolle). Jede Art von Quelle zählt (Attack, Spell, Creature-Effekt, Heldeneffekt, Artefakt,
 //    Potion, Ability, Surprise — „card or effect", wie Anti-Magnetic Armor). „Cannot be redirected"-Quellen (Truth-Seeing Eye, `cannotBeRedirected`) sperren
 //    die Umleitung zentral (die Engine ruft den Wächter dann gar nicht), ebenso der Erste-Runden-Schutz.
 //  • „chooses another target you control": das GEWÄHLTE Ziel ist ein Held oder eine Kreatur, die der Besitzer der Winged Haressassin KONTROLLIERT (Kontrolle,
 //    nicht Brettseite) und NICHT diese Kreatur selbst. Flächeneffekte („all targets") wählen niemanden und lösen nichts aus; Ausrüstung/Anhängsel/Surprises/
 //    Areas/Abilities und Spielerziele sind keine „targets you control" in diesem Sinn (nur Held/Kreatur).
+//  • „chooses EXACTLY ONE … target" (Al 27.10.): das Angebot kommt nur, wenn die GESAMTWAHL des Effekts genau ein Ziel ist (`genauEinZiel`). KEIN Angebot — für keines der
+//    Ziele —, wenn der Effekt mehrere Ziele wählt: Fireball mit zwei Zielen (`_redirectPickCount` > 1), Chain Lightning und andere Mehrfachketten (`_mehrTreffer`, von
+//    `engine.trefferAlsWahl` gesetzt), Mehrfachwähler (`maxTotal`/`selectCount`/`max`/`maxTargets` > 1) auch dann, wenn nur ein Ziel gültig ist/gewählt wurde. Macht ein
+//    Effekt nacheinander mehrere EINZELwahlen (jede eine eigene Zielwahl, z. B. „trigger this effect as many times"), gilt jede Einzelwahl als eigene Wahl.
 //  • „redirect it to this Creature": die Kreatur muss in der Zielliste des Effekts stehen und wählbar sein (nicht `ineligible`: Zielschutz, Typ-/Level-Filter,
-//    „cannot be chosen"). Sonst gibt es kein Angebot (kein Leerlauf). Ist die Kreatur schon unter den gewählten Zielen, wird nichts angeboten (sonst träfe der Effekt sie
-//    doppelt — engere Lesart, Frage an Al).
+//    „cannot be chosen"). Sonst gibt es kein Angebot (kein Leerlauf). (Mehrere Ziele ⇒ ohnehin kein Angebot, damit kann die Kreatur nie doppelt getroffen werden.)
 //  • „you may discard a card": Rückfrage („Ja/Nein", Engine-Standard des Brett-Wächters, CPU über `cpuResponse`), danach der Handabwurf als Kosten
 //    (`zahleAbwurfKosten`, Abwurf-Konvention des Bestands: Boris erlässt die Kosten, Abbruch der Kartenwahl = keine Umleitung, nichts verbraucht; Kosten-Lernkanal
 //    `costFor`). Ohne wählbare Handkarte (leere Hand, die auflösende Karte zählt nicht) kein Angebot.
@@ -85,6 +88,23 @@ function passendesZiel(engine, ownerIdx, inst, selected) {
   if (!engine._istKreaturenInstanz(ci)) return false;               // Ausrüstung/Anhängsel sind keine „targets" in diesem Sinn
   if (!((ci.counters?.currentHp ?? 1) > 0)) return false;
   return (ci.controller ?? ci.owner) === ownerIdx;
+}
+
+/**
+ * „chooses EXACTLY ONE other target": hat der Effekt insgesamt genau ein Ziel gewählt (Al 27.10.)? Nein, wenn
+ *  • das Fenster mehrere gewählte Ziele sieht (`_redirectPickCount` > 1: Fireball mit zwei Zielen, Mehrfachwahlen),
+ *  • der Wähler MEHRERE Ziele erlaubt, auch wenn nur eines gewählt wurde (Obergrenze `maxTotal`/`selectCount`/`max`/`maxTargets` > 1, Untergrenze > 1 —
+ *    „Mehrfachziel-Karte mit nur einem gültigen Ziel": der Effekt wählt trotzdem mehrere),
+ *  • der Treffer ein Einzelglied einer Mehrfachkette ist (`_mehrTreffer`, `engine.trefferAlsWahl`: Chain Lightning & Co.).
+ * Effekte, die nacheinander mehrere EINZELwahlen machen (jede eine eigene Zielwahl), gelten je Wahl als eigener Fall.
+ */
+function genauEinZiel(config) {
+  const c = config || {};
+  if ((c._redirectPickCount ?? 1) !== 1) return false;
+  if (c._mehrTreffer) return false;
+  for (const k of ['maxTotal', 'selectCount', 'max', 'maxTargets']) if (typeof c[k] === 'number' && c[k] > 1) return false;
+  if ((c.minRequired ?? c.minSelect ?? 0) > 1) return false;
+  return true;
 }
 
 /** Bildschirmanker (physische Brettseite) eines gewählten Ziels. */
@@ -188,11 +208,11 @@ module.exports = {
     // „another target you control" (Held oder Kreatur, nicht diese Kreatur).
     if (!passendesZiel(engine, ownerIdx, inst, selected)) return false;
     if (usesLeft(inst, gs, ZAEHLER) <= 0) return false;
+    // „chooses exactly one other target": die GESAMTWAHL des Effekts ist genau ein Ziel.
+    if (!genauEinZiel(config)) return false;
     // „redirect it to this Creature": muss ein wählbares Ziel DIESES Effekts sein.
     const ziel = eigenerEintrag(inst, validTargets);
     if (!ziel) return false;
-    // Schon gewählt? Dann träfe der Effekt sie doppelt — kein Angebot (engere Lesart).
-    if ((config?._redirectPickedIds || []).includes(ziel.id)) return false;
     // „you may discard a card": es muss eine Handkarte als Kosten da sein.
     if (engine.handSizeWithoutResolving(ownerIdx) < 1) return false;
     return true;
