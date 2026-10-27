@@ -10119,7 +10119,7 @@ class GameEngine {
     // unterscheidet die geliehene Kontrolle vom echten Charme Lv3.
     if (target?.hp !== undefined
         && this._charmBlocksFrom(target, source?.controller ?? source?.owner,
-          { loveShotOhneSchutz: true, schadenspfad: true })) {
+          { loveShotOhneSchutz: true })) {
       this.log('damage_blocked', { target: this._heroLabel(target), reason: 'charmed' });
       this._flashHeroDamageZero(target);   // v1146
       return { dealt: 0, cancelled: true };
@@ -11228,6 +11228,11 @@ class GameEngine {
     return true;
   }
 
+  /** „cannot be defeated while you control it“ (Deepsea Succubus, Little Lyta): trägt der Held eine Kontrolle mit Schutzmarke `nurSchadenSchutz`? */
+  heldNichtBesiegbar(hero) {
+    return !!hero?.statuses?.charmed?.nurSchadenSchutz;
+  }
+
   async actionDefeatHero(source, target, opts = {}) {
     if (!target || target.hp === undefined || target.hp <= 0) return { defeated: false };
     // ★ v1293 — `opts.unaufhaltsam` (Midnight Assault): keine Immunitaet,
@@ -11237,6 +11242,13 @@ class GameEngine {
     const _u = !!opts.unaufhaltsam;
 
     const targetOwner = this._findHeroOwner(target);
+
+    // „cannot be defeated“ (Deepsea Succubus, Little Lyta): ein Held unter solcher Kontrolle wird auf KEINEM Weg besiegt — auch nicht durch ein Opfer
+    // (`isSacrifice`) oder `unaufhaltsam`. Nur die Buchführung am eigenen Helden (`eigenerAbgang`) bleibt davon unberührt.
+    if (!opts.eigenerAbgang && this.heldNichtBesiegbar(target)) {
+      this.log('defeat_negated', { hero: this._heroLabel(target), source: source?.name || opts.reason || 'defeat', reason: 'cannot_be_defeated' });
+      return { defeated: false, blocked: true };
+    }
 
     // The game-start grace shield blocks EVERYTHING — defeat included —
     // for offensive insta-kills. A voluntary self-sacrifice opts out
@@ -20187,8 +20199,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Styx, the Opened Gate: reine Kontrolle, der Text verspricht keinen Schutz.
     if (ch.ohneSchutz) return false;
     if (ch._loveShot && opts.loveShotOhneSchutz) return false;
-    // W79 (Little Lyta): „takes no damage from any sources" — NUR der Schadenspfad prallt ab, Status und Kill-Effekte kommen durch.
-    if (ch.nurSchaden) return !!opts.schadenspfad;
     // Deepsea Succubus (QA-Welle 1 Nr. 18, Al): „cannot take any damage and cannot be defeated" — NUR Schadens-/Besiegen-Schutz, KEIN Schutz vor
     // negativen Status (`nurSchadenSchutz`; der Schadens-/Kill-Pfad fragt mit `loveShotOhneSchutz: true`, der Statuspfad ohne).
     if (ch.nurSchadenSchutz && !opts.loveShotOhneSchutz) return false;
