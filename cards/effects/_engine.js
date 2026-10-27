@@ -56835,9 +56835,9 @@ this._deathWatch = (this._deathWatchStack || []).length
           }
           // ★ W82 (Animal Training): „If this Attack would defeat a Creature your opponent controls, … instead" — Ersatz der Niederlage durch die QUELLE (nach Hand-Reaktionen und
           // Betragsminderung: nur ein weiterhin tödlicher Treffer zählt). Vertrag: `_quelleErsetztNiederlage`. Ersetzt = wie `saved` oben (kein Tod, kein Schaden, weiter mit dem nächsten Eintrag).
-          if (actualAmount >= e.inst.counters.currentHp && await this._quelleErsetztNiederlage(e.inst, e.source, actualAmount, e.type, _pdInfo)) {
+          // Al (27.10.): der Besitzer rettet ZUERST — hat seine Hand-Reaktion die Creature schon zur Wiederbelebung nach dem Tod vorgemerkt (`_reviveAfterDeath`, Bone Dog), gibt es nichts zu übernehmen.
+          if (actualAmount >= e.inst.counters.currentHp && !e.inst._reviveAfterDeath && await this._quelleErsetztNiederlage(e.inst, e.source, actualAmount, e.type, _pdInfo)) {
             delete e.inst.counters._dyingThisBatch;
-            delete e.inst._reviveAfterDeath;   // eine „nach dem Tod wiederbeleben"-Marke (Bone Dog, Cute Phoenix) gilt für einen Tod, der nicht mehr stattfindet
             this.log('creature_pre_defeat_source_replace', { creature: e.inst.name, by: e.source?.name || e.type });
             this.sync();
             await this._delay(150);
