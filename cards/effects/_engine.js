@@ -39096,6 +39096,30 @@ this._deathWatch = (this._deathWatchStack || []).length
     return this._preDefeatFensterSeite(this.opponentOf(herr), true, creatureInst, source, amount, type, info);
   }
 
+  /**
+   * ★ W82 (Animal Training): ERSATZ DER NIEDERLAGE DURCH DIE QUELLE — „If this Attack would defeat a Creature your opponent controls, you may … instead".
+   * Gegenstück zu `selfPreDefeat` (dort ersetzt die Kreatur ihren eigenen Tod, hier die schlagende Karte). Skript-Vertrag am Skript der QUELLE (`source.name`):
+   *   `async quelleErsetztNiederlage(engine, inst, source, amount, type, info) → boolean` — `true` = ersetzt (die Karte hat die Kreatur selbst versorgt: Heilung, Kontrollwechsel …;
+   *   kein Tod, keine Todes-Trigger, kein Schaden), `false` = nichts passiert, die Kreatur wird normal besiegt. Die Karte prüft selbst, ob sie anwendbar ist, und fragt ihr „you may".
+   * Nur für Attack-Schaden (`type === 'attack'`) einer Heldenquelle (`usesHeroAtk`); läuft NACH den Hand-Reaktionen des Kontrolleurs (die Kreatur wird dort ggf. schon gerettet) und der
+   * Betragsminderung, also nur bei einem weiterhin tödlichen Treffer; nicht verschachtelt (`_inQuelleErsatz`). Wo ein Extra-Life-Stempel den Tod ohnehin umkehrt, kommt sie nicht an.
+   */
+  async _quelleErsetztNiederlage(inst, source, amount, type, info = {}) {
+    if (!inst || type !== 'attack' || !source?.usesHeroAtk || !source.name || this._inQuelleErsatz) return false;
+    if (inst.zone !== ZONES.SUPPORT || inst.faceDown) return false;
+    const _sc = loadCardEffect(source.name);
+    if (!_sc?.quelleErsetztNiederlage) return false;
+    this._inQuelleErsatz = true;
+    try {
+      return !!(await _sc.quelleErsetztNiederlage(this, inst, source, amount, type, info));
+    } catch (err) {
+      console.error(`[quelleErsetztNiederlage] ${source.name} threw:`, err.message);
+      return false;
+    } finally {
+      this._inQuelleErsatz = false;
+    }
+  }
+
   async _preDefeatFensterSeite(ownerIdx, nurAnySide, creatureInst, source, amount, type, info = {}) {
     const ps = this.gs.players[ownerIdx];
     if (!ps) return false;
@@ -56672,6 +56696,16 @@ this._deathWatch = (this._deathWatchStack || []).length
             this.sync();
             await this._delay(150);
             continue; // skip HP subtraction + death branch
+          }
+          // ★ W82 (Animal Training): „If this Attack would defeat a Creature your opponent controls, … instead" — Ersatz der Niederlage durch die QUELLE (nach Hand-Reaktionen und
+          // Betragsminderung: nur ein weiterhin tödlicher Treffer zählt). Vertrag: `_quelleErsetztNiederlage`. Ersetzt = wie `saved` oben (kein Tod, kein Schaden, weiter mit dem nächsten Eintrag).
+          if (actualAmount >= e.inst.counters.currentHp && await this._quelleErsetztNiederlage(e.inst, e.source, actualAmount, e.type, _pdInfo)) {
+            delete e.inst.counters._dyingThisBatch;
+            delete e.inst._reviveAfterDeath;   // eine „nach dem Tod wiederbeleben"-Marke (Bone Dog, Cute Phoenix) gilt für einen Tod, der nicht mehr stattfindet
+            this.log('creature_pre_defeat_source_replace', { creature: e.inst.name, by: e.source?.name || e.type });
+            this.sync();
+            await this._delay(150);
+            continue;
           }
         }
       }
