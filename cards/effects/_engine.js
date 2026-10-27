@@ -45010,6 +45010,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       surpriseHost: cardInfo.surpriseHost || null,
       // W5b-Z1b: Beschwörung als inhärente Zusatzaktion (Priests: die Kosten sind das Zurückmischen, `beforeSummon` NACH dem Fenster).
       isInherentAction: !!cardInfo.isInherentAction,
+      // ★ W82 (Sinister Idol): bei der AKTIVIERUNG einer Ability (`fromBoard`, Typ `Ability`) der Stapel, der aktiviert wird: `{ heroOwner (Brettseite), heroIdx, zoneIdx, zoneKind: 'ability'|'support', level (Stapelhöhe beim Aktivieren) }`.
+      abilityZone: cardInfo.abilityZone || null,
       // ★ W74b (Flesh-Eating Swarm Trap): der Held, den die Karte BEIM SPIELEN waehlt (Ausruestung, Attachment, Ability-Anlegen, Trank): `{ owner (Brettseite), heroIdx }`.
       chosenHero: cardInfo.chosenHero || null,
       // ★ W34a: virtuelle Kette eines Effekts, der als Attack/Spell ZÄHLT (`alsAttackKette` / `alsSpellKette`): `'attack' | 'spell'`. Leser, die ein echtes Kartenspiel
@@ -45037,7 +45039,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Dieser Merker schliesst die Luecke; Vorgaenger gesichert, damit
     // verschachtelte Aufloesungen sich nicht ueberschreiben.
     const prevEffectSource = this._currentEffectSource;
-    this._currentEffectSource = { cardName, owner, cardType, heroIdx: heroIdx ?? -1, fromBoard: !!fromBoard, isPlacement: !!cardInfo.isPlacement };   // Z3: heroIdx fuer `_umgebungsQuelle`; W74b: Herkunft fuer die Hand-Reaktionen auf gewaehlte Helden
+    this._currentEffectSource = { cardName, owner, cardType, heroIdx: heroIdx ?? -1, fromBoard: !!fromBoard, isPlacement: !!cardInfo.isPlacement, abilityZone: cardInfo.abilityZone || null };   // Z3: heroIdx fuer `_umgebungsQuelle`; W74b: Herkunft fuer die Hand-Reaktionen auf gewaehlte Helden
     this._inReactionCheck = true;
     try {
       const eventDesc = `${cardName} was activated`;

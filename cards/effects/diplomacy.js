@@ -160,7 +160,7 @@ module.exports = {
     const ps = gs.players[pi];
     const oppIdx = engine.opponentOf(pi);
 
-    const cost = getCost(level);
+    const cost = getCost(ctx.kostenStufe ?? level);   // W82 (Sinister Idol, Al): die Kosten bleiben die der Stufe beim Aktivieren; die Wirkung (Zielstufe) folgt der gesenkten Stufe
     const maxLv = getMaxCreatureLevel(level);
 
     // Build eligible targets
