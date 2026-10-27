@@ -827,6 +827,10 @@ class GameEngine {
     // Ancient Guardian Statue: die gesuchte, dauerhaft aufgedeckte Handkopie hängt an GENAU DIESER Statue — Wert = `inst.id` der Statue. Folgt der physischen
     // Kopie durch Hand-Splices und fällt weg, sobald sie die Hand verlässt (Identität der Karte, nie der Name).
     this.registerHandIndexedField('_handStatueLink', { kind: 'value' });
+    // Zusatzaktions-Marke JE HANDKOPIE (Ancient Guardian Statue: „you may use it as an additional Action" solange die Stufe 0 durch die Statue erreicht wurde und sie wirkt). Wert =
+    // { source: Kartenname, instId } — ob die Marke JETZT gilt, entscheidet das Skript `source` (`handCopyAdditionalAction(engine, pi, idx, marke)`), gelesen über `handKopieZusatzaktion`.
+    // Folgt der physischen Kopie durch Splices, fällt mit ihr aus der Hand.
+    this.registerHandIndexedField('_handZusatzaktion', { kind: 'value' });
     // Rocky Slime's per-instance level reductions. The captured offset
     // is consumed by safePlaceInSupport when the same card lands on
     // the board — `inst.counters.level` keeps the reduction post-summon
@@ -25558,20 +25562,19 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (kandidaten.length === 0) return { cancelled: true };
     kandidaten.sort((a, b) => (db[b]?.level || 0) - (db[a]?.level || 0));
     const name = kandidaten[0];
-    const _nurIdx = Array.isArray(promptData.eligibleHandIndices) ? promptData.eligibleHandIndices : null;   // Ancient Guardian Statue: nur diese Handkopien
-    let handIndex = (ps.hand || []).findIndex((c, i) => c === name && (!_nurIdx || _nurIdx.includes(i)));
-    // Ancient Guardian Statue: die Zusatzaktion für JEDEN Helden (`performImmediateActionAnyHero`, Prompt OHNE `heroIdx`) braucht in der Antwort einen Helden — vorher fehlte er,
+    let handIndex = (ps.hand || []).indexOf(name);
+    // W82: die Zusatzaktion für JEDEN Helden (`performImmediateActionAnyHero`, Prompt OHNE `heroIdx`) braucht in der Antwort einen Helden — vorher fehlte er,
     // und die CPU verfiel jede solche Zusatzaktion (`played: false`). Gewählt wird der erste Held aus `heroIndicesByCard`, dessen Kopie die Stufenprüfung besteht.
     let _wahlHeld = promptData.heroIdx;
     if (_wahlHeld == null && promptData.heroIndicesByCard) {
       const _liste = promptData.heroIndicesByCard[name] || [];
       const _cd0 = db[name];
-      _wahlHeld = _liste.find(h => (ps.hand || []).some((c, i) => c === name && (!_nurIdx || _nurIdx.includes(i)) && this._kopieStufeOk(pi, h, _cd0, i, pi))) ?? _liste[0];
+      _wahlHeld = _liste.find(h => (ps.hand || []).some((c, i) => c === name && this._kopieStufeOk(pi, h, _cd0, i, pi))) ?? _liste[0];
       if (_wahlHeld == null) return { cancelled: true };
     }
     {   // ★ W15b (C2): die Kopie wählen, die die Stufenprüfung wirklich besteht (Rabatt hängt an EINER Kopie)
       const _cd = db[name], _hs = isSeat(this, promptData.heroOwner) ? promptData.heroOwner : pi;
-      const _gut = (ps.hand || []).findIndex((c, i) => c === name && (!_nurIdx || _nurIdx.includes(i)) && this._kopieStufeOk(pi, _wahlHeld, _cd, i, _hs));
+      const _gut = (ps.hand || []).findIndex((c, i) => c === name && this._kopieStufeOk(pi, _wahlHeld, _cd, i, _hs));
       if (_gut >= 0) handIndex = _gut;
     }
     let fromCreation = false;
@@ -25936,8 +25939,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     const quelle = this.handSourceList(playerIdx, fromCreation);
     if (!quelle) return { retry: true };
     if (handIndex < 0 || handIndex >= quelle.length || quelle[handIndex] !== cardName) return { retry: true };
-    // Ancient Guardian Statue: `config.eligibleHandIndices` = NUR diese Handkopien (Identität der Karte, nicht der Name) — andere Kopien gleichen Namens zählen nicht.
-    if (Array.isArray(config.eligibleHandIndices) && !fromCreation && !config.eligibleHandIndices.includes(handIndex)) return { retry: true };
     // ★ v1405: nie die gerade auflösende Karte selbst — auf eine andere
     // Kopie umlenken, sonst neu wählen lassen.
     if (this._istAufloesendeHandkarte(ps, handIndex, !!fromCreation)) {
@@ -26564,7 +26565,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ★ W34a (Al, 22.10.2026, Guardian Beast Hu): „any Hero you control" = nach AKTUELLER Kontrolle — `_zusatzaktionsHelden` (eigene Spalte ohne abgegebene Helden + uebernommene
     // der Gegenspalte). Ein uebernommener Held (`seite !== playerIdx`) bietet Attack-/Spell-/Kreatur-Karten aus der Hand; Abilities und Heldeneffekte nur mit `config.mitUebernommenenAktionen` (Hu, W35a).
     for (const { seite, heroIdx: hi } of this._zusatzaktionsHelden(playerIdx)) {
-      if (typeof config.heldenFilter === 'function' && !config.heldenFilter(seite, hi)) continue;   // Ancient Guardian Statue: nur Helden, die jetzt handeln können
       const fremd = seite !== playerIdx;
       let karten = this.getHeroEligibleActionCards(playerIdx, hi, fremd ? seite : null);
       if (config.allowedCardTypes) karten = karten.filter(n => cardDB[n] && config.allowedCardTypes.includes(cardDB[n].cardType));
@@ -26645,7 +26645,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Aktionstraeger angeboten (`fremdeHelden`: Hand-Karten Attack/Spell/Kreatur; Abilities/Heldeneffekte mit Aktionskosten nur mit `config.mitUebernommenenAktionen` [Hu, W35a]), ein abgegebener eigener Held nicht.
     const fremdeHelden = {};
     for (const { seite: heldSeite, heroIdx: hi, hero } of this._zusatzaktionsHelden(playerIdx)) {
-      if (typeof config.heldenFilter === 'function' && !config.heldenFilter(heldSeite, hi)) continue;   // Ancient Guardian Statue: nur Helden, die jetzt handeln können
       const fremdHeld = heldSeite !== playerIdx;
 
       let heroEligible = this.getHeroEligibleActionCards(playerIdx, hi, fremdHeld ? heldSeite : null);
@@ -26701,7 +26700,6 @@ this._deathWatch = (this._deathWatchStack || []).length
       type: 'heroAction',
       // heroIdx intentionally omitted — allows all heroes
       eligibleCards: eligible,
-      ...(Array.isArray(config.eligibleHandIndices) ? { eligibleHandIndices: config.eligibleHandIndices } : {}),   // Ancient Guardian Statue: nur diese Handkopien
       heroIndicesByCard,
       ...(Object.keys(fremdeHelden).length > 0 ? { fremdeHelden } : {}),   // W34a: uebernommene Helden je Karte `[{ heroOwner, heroIdx }]`
       activatableAbilities,
@@ -26752,7 +26750,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     const heldObjekt = (antwortSeite != null ? this.gs.players[antwortSeite] : ps).heroes[handelnderHeld];
     if (!heldObjekt?.name || heldObjekt.hp <= 0) return { played: false };
-    if (typeof config.heldenFilter === 'function' && !config.heldenFilter(antwortSeite ?? playerIdx, handelnderHeld)) continue;   // Ancient Guardian Statue: ein Held, der nicht handeln darf, wird abgelehnt (zurück zur Auswahl)
 
     const ergebnis = await this._resolveImmediateActionPick(
       playerIdx, handelnderHeld, heldObjekt, actionResult, antwortSeite != null ? { ...config, heroOwner: antwortSeite } : config,
@@ -52715,6 +52712,23 @@ this._deathWatch = (this._deathWatchStack || []).length
     finally { if (vorher === undefined) delete this.gs._wirkerSeite; else this.gs._wirkerSeite = vorher; }
   }
 
+  /**
+   * Hat die Handkopie `idx` von `playerIdx` JETZT eine Zusatzaktions-Marke (`_handZusatzaktion`)? Nur Spells, nie Reaction/Surprise. Die Marke gilt nur, solange ihr Quellskript
+   * (`handCopyAdditionalAction`) es bejaht (Statue lebt und wirkt, Stufe noch 0 …); sonst ist die Karte wieder ein normaler Spell.
+   */
+  handKopieZusatzaktion(playerIdx, idx) {
+    const ps = this.gs?.players?.[playerIdx];
+    const marke = ps?._handZusatzaktion?.[idx];
+    const name = ps?.hand?.[idx];
+    if (!marke || !name) return false;
+    const cd = this._getCardDB()[name];
+    if (!cd || cd.cardType !== 'Spell') return false;
+    const sub = String(cd.subtype || '').toLowerCase();
+    if (sub.includes('reaction') || sub.includes('surprise')) return false;
+    try { return !!loadCardEffect(marke.source)?.handCopyAdditionalAction?.(this, playerIdx, idx, marke); }
+    catch (err) { console.error('[handCopyAdditionalAction]', marke.source, err.message); return false; }
+  }
+
   cardHasInherentAction(playerIdx, heroIdx, cardData, opts) {
     if (!cardData?.name) return false;
     const gs = this.gs;
@@ -52726,6 +52740,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Mission-Ladung. Ohne Ladung ist sie schlicht nicht mehr
     // durchfuehrbar.
     if (this.missionLockActive(playerIdx) && this.missionChargesLeft(playerIdx) <= 0) return false;
+    // Zusatzaktions-Marke der Handkopie (Ancient Guardian Statue): mit `opts.handIndex` zählt genau diese Kopie, ohne Index (Namenslisten) irgendeine Kopie dieses Namens.
+    if (cardData.cardType === 'Spell' && !opts?.fromCreation) {
+      const hand = gs.players[playerIdx]?.hand || [];
+      if (Number.isInteger(opts?.handIndex)) {
+        if (hand[opts.handIndex] === cardData.name && this.handKopieZusatzaktion(playerIdx, opts.handIndex)) return true;
+      } else if (gs.players[playerIdx]?._handZusatzaktion) {
+        for (let i = 0; i < hand.length; i++) if (hand[i] === cardData.name && this.handKopieZusatzaktion(playerIdx, i)) return true;
+      }
+    }
     const script = loadCardEffect(cardData.name);
     if (script?.inherentAction === true) return true;
     if (typeof script?.inherentAction === 'function') {

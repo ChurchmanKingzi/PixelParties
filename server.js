@@ -5295,6 +5295,9 @@ function sendGameState(room, playerIdx, extra) {
       // by 3" rebate). Same hand-index keying; the offset evaporates
       // when the card leaves the hand.
       handLevelOffsetsTransient: pi === playerIdx ? { ...(ps._handLevelOffsetsTransient || {}) } : {},
+      // Ancient Guardian Statue: Handplätze, deren Spell JETZT als zusätzliche Aktion zählt (Marke gilt: Statue wirkt, Stufe 0) — nur für die eigene Hand (Tooltip-Hinweis).
+      handZusatzaktion: pi === playerIdx && room.engine && ps._handZusatzaktion
+        ? Object.fromEntries(Object.keys(ps._handZusatzaktion).filter(k => room.engine.handKopieZusatzaktion(pi, +k)).map(k => [k, true])) : {},
       // Per-hand-index hero filter (Sparkfly Queen). When an entry
       // exists for a slot, the corresponding offset only applies to
       // the named hero; the client repaints that slot's level badge
@@ -6292,6 +6295,7 @@ function sendSpectatorGameState(room) {
       handLevelSet: {},
       handApplause: {},
       handLevelOffsetsTransient: {},
+      handZusatzaktion: {},
       handLevelOffsetHeroFilter: {},
       handLevelOffsetsDynamic: {},
       handCostReductions: {},
@@ -17696,6 +17700,11 @@ io.on('connection', (socket) => {
       if (!ps._handStatueLink) ps._handStatueLink = {};
       ps._handStatueLink[slot - 1] = inst.id;
       room.engine.revealHandCopy(pi, name, slot - 1);
+      // Startstufe 0 im Editor (`counters.levelSet` = 0, gedruckte Stufe > 0) heißt „durch die Statue auf 0 gesenkt": die Kopie trägt die Zusatzaktions-Marke.
+      if (room.engine._handLevelSetFor(pi, name, slot - 1) === 0 && (getCardDB()[name].level || 0) > 0) {
+        if (!ps._handZusatzaktion) ps._handZusatzaktion = {};
+        ps._handZusatzaktion[slot - 1] = { source: 'Ancient Guardian Statue', instId: inst.id };
+      }
     }
 
     // Pythia: Plan-Ziele auflösen (Gegenseite von Pythias Besitzer); die Anzeige-Marke leitet `_pythia-shared.abgleichen` beim nächsten sync ab.

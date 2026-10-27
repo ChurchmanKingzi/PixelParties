@@ -40867,8 +40867,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // fragt `dimmed` nicht, deshalb ging der).
     {
       const _hap = gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt.ownerIdx === myIdx ? gameState.effectPrompt : null;
-      // Ancient Guardian Statue: `eligibleHandIndices` = nur DIESE Handkopie ist die Zusatzaktion (andere Kopien gleichen Namens bleiben ausgegraut).
-      if (_hap && Array.isArray(_hap.eligibleHandIndices) && handIdx != null && !fromCreation && !_hap.eligibleHandIndices.includes(handIdx)) return true;
       if (_hap && (_hap.eligibleCards || []).includes(cardName)) return false;
     }
 
@@ -40890,7 +40888,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Hero Action mode (Coffee) — only eligible cards are playable
     const heroActionPrompt = gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt.ownerIdx === myIdx ? gameState.effectPrompt : null;
     if (heroActionPrompt) {
-      if (Array.isArray(heroActionPrompt.eligibleHandIndices) && handIdx != null && !fromCreation && !heroActionPrompt.eligibleHandIndices.includes(handIdx)) return true;
       return !(heroActionPrompt.eligibleCards || []).includes(cardName);
     }
 
@@ -60472,6 +60469,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   if (handLevelIsHeroFiltered) handNotes.push({ color: lvFarbe, text: `Reduced level only applies when ${me.heroes?.[handLevelHostHeroIdx]?.name || 'the corresponding Hero'} plays this card.` });
                   if (manaCrystalBoost) handNotes.push({ color: '#fe5154', text: 'Mana Absorbing Crystal in your hand: Spells read +1 level.' });
                 }
+                // Ancient Guardian Statue: die Karte zählt als zusätzliche Aktion, solange die Statue wirkt und die Stufe 0 ist.
+                if ((me.handZusatzaktion || {})[item.origIdx]) handNotes.push({ color: '#75f091', text: 'Counts as an additional Action while Ancient Guardian Statue stays on the board (Level 0).' });
                 if (handEffectiveCost != null) {
                   const kFarbe = handEffectiveCost > handCardData.cost ? '#fe5154' : '#75f091';
                   const teile = [];
