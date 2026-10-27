@@ -435,7 +435,11 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
 
   // ── Step 4: splice + discard (or keep on board), then pay Wisdom. ──
   const cancelled = !!gs._spellCancelled;
-  const placed = !!gs._spellPlacedOnBoard;
+  // Als Fix (Al 27.10.): legt sich eine AREA aus dem Nachguss aufs Brett, setzt `placeArea` `_spellPlacedOnBoard` nur für die gerade AUFLÖSENDE Karte (hier: der äußere Zauber, der Learning
+  // auslöst) — der Stempel fehlte, die Area galt als „nicht platziert", ihre Instanz wurde ausgetragen (Geisterkarte: Name in `areaZones` ohne Instanz) und die Karte zusätzlich in die Ablage
+  // gelegt. Zusätzlich zählt deshalb: die Instanz der gewählten Karte hat die Hand verlassen (`zone` ≠ 'hand', z. B. 'area') — sie gehört dann dem Brett.
+  const selbstPlatziert = !!handInst && handInst.zone !== 'hand';
+  const placed = !!gs._spellPlacedOnBoard || selbstPlatziert;
   delete gs._spellCancelled;
   delete gs._spellPlacedOnBoard;
 
@@ -458,8 +462,9 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
     // Spell placed itself (Areas, Forbidden Zone, …). Whatever zone it
     // moved to owns the instance now — leave it tracked. The hand copy
     // is gone; the placed instance was retracked by the spell's own
-    // onPlay handler.
-    if (handInst) engine._untrackCard(handInst.id);
+    // onPlay handler. Hat sich DIESE Instanz selbst platziert (Area: `placeArea` setzt sie in die
+    // Area-Zone), bleibt sie getrackt — nur eine unbewegte Hand-Instanz wird ausgetragen.
+    if (handInst && !selbstPlatziert) engine._untrackCard(handInst.id);
   } else if (!cancelled) {
     engine.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);   // W3/W5a: Stapel des permanenten Besitzers
     if (handInst) engine._untrackCard(handInst.id);
