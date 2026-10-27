@@ -26241,6 +26241,34 @@ Die Wächter-Sweeps `W71/b-08 … b-11` („keine Kreaturen-Primitive ohne Monia
 * **Regel für künftige Skripte:** `unaufhaltsam` nur setzen, wenn der Kartentext Negation/Schutz ausdrücklich übergeht (Midnight Assault). Wer nur Zerstörungsschutz umgehen will (Sett), ruft zusätzlich `engine.kreaturBetroffen`/`kreaturenVorab` selbst, wenn Monia reagieren darf.
 
 Repros: `W71/b-08 … b-14` grün; neu `W79/a-01` (Goldify × Winged Skeleton, Midnight Assault, Sett — beide Sitze, Monia ja/nein).
+
+## Welle 81 / W81a — Triage nach dem Merge von origin/main (Rulings 25./26.10., Testlauf G03–G17, Welle 79/6b) (26.10.2026)
+
+Nach dem Merge der parallelen Sessions (Rulings „Entscheidungen des Spieldesigners zu den Testlauf-Fragen 1–96", „Rückfragen-Runde", Testlauf G03–G17, Neue Karten Welle 79/6b) waren 20 bisher grüne Repros rot. Methode: `git bisect` je Repro zwischen `29085531` (W77a, zuletzt grün) und dem Merge-Stand, dann Commit-Nachricht/Diff und die zugehörige CARD_API-Notiz lesen. **A** = bewusste Regeländerung (Erwartung des Repros war veraltet → Repro angepasst), **B** = echte Regression (Spielcode repariert), **C** = unklar (Frage an Al, Repro unverändert).
+
+| Repro | Ursache-Commit | Klasse | Maßnahme |
+|---|---|---|---|
+| A04-cute/09 Hipdall-Rückholung | 4d98db99 (Welle 2 Nr. 58) | A | „Add it to your hand, and if you do …": kommt die Karte durch die auslösende Karte auf die Hand (Cool Rescue, Ziel `hand`), kein Nachfüllen — Erwartung für `hand` umgestellt |
+| A07-guardianbeasts/21, D1-ziehsperre/02 Guardian Beast Tu | c125732d (Testlauf G13) | **B** | G13 sperrte Tu unter Hand-/Zieh-Sperre (`drawBlockedFor` im Gate) und berief sich dabei auf D1; D1 (CARD_API „Zieh-Sperre und Aktivierungen", Al) nennt Tu ausdrücklich unter „Aktivierbar bleibt" (Löschen aus den Ablagen ist etwas Eigenständiges). Gate entfernt; die Tuscan-Artist-Filter der Wahlmengen (6/9 gelöscht = Ziehen von 2/3) bleiben (`drawWouldBeBlocked`) |
+| C03/04 Monster Nest, C03/14, C03/17, W11/c-q82, W44/a-01 (Lovely Teddy) | 431fb3b5 (Al: „nur aktive Effekte leihen") | A | kein Kontrollwechsel mehr, Marke `counters._teddyLeihe`; Horned Demon bekommt am Zugende des Entleihers keinen Zähler (ersetzt Q82 für den Teddy); Monster Nest räumt erst am Zugende seines Besitzers auf. Erwartungen in allen fünf Repros umgestellt |
+| M01-attacks…/06, W13/a-q136 Friendship Lv1 | 431fb3b5 | **C** | WIDERSPRUCH zweier Antworten von Al: Q136 (15.10.) „Nein" (Lv1 darf die Zusatzaktion nach einem normalen Support-Spell NICHT nutzen) gegen die Welle-1-Umsetzung (26.10.: Sperre erst ab Einsatz der Zusatzaktion, keine rückwirkende Sperre). Repros unverändert rot, Frage an Al offen |
+| W16/a-5 Spielbarkeit nur rabattierte Kopie | 66686611 (Rocky Slime, Handstufen je Kopie) | A | Client-Funktion heißt jetzt `canCreatureBePlayed = (card, handIdx)` — Quelltext-Anker im Repro nachgezogen |
+| W16/a-3 Resistance/Einmal-Einsatz (Waflav) | 9da934fb („ein Picker für Hand/Deck/Ablage") | A | Waflav fragt erst `optionPicker` (draw/attach), dann EINE `cardGalleryMulti` mit Herkunft — Skriptantworten angepasst (war schon vor dem Merge rot) |
+| W27/a-03 Gegenstandseffekte als Attack = Level 0 | 5b75b6d8 (R-12: alle „treated as an Attack"-Effekte, Future Tech Fists) | A | Future Tech Fists zählt jetzt als Attack-Effekt: `_heldenEffektStufe` = 0 statt keine Stufe |
+| W31/a-02 „one of your Heroes" nach Kontrolle (Ellie) | 93ab06b4 (neue Karte Cell Escape mit Skript) | A | Die Wirkungsprobe nutzte Cell Escape als Double Spell; seit der Karte hat sie eigene Bedingungen (Erste-Runden-Schutz, Gegnerdeck, einmal pro Spiel) — Probe auf Icebolt umgestellt (war schon vor dem Merge rot) |
+| W48/a-06 Pfeile nur für Angriffe eigener Helden | 1b88d01d (Hydra Blood Arrow „when a Hero hits …", `anyHero`) | A | Hydra Blood Arrow darf auf die Attack JEDES Helden ausgelöst werden (Text ohne „you control") — für die „nur eigene Angriffe"-Regel zählen die übrigen Pfeile und Magic Topaz, Hydra wird gesondert geprüft |
+| W50/a-01 Ricochet-Kette | 5b75b6d8 (`blockedByDamageLock` für alle reinen Schadenskarten) | A | Ricochet ist unter Flame Avalanche unspielbar; die zwei Negations-Szenarien schalten nur das Spielbarkeits-Tor im Test aus |
+| W64/c-04 Bounce an den Kontrolleur | 4d98db99 (Winged Skeleton: nur bei GEWÄHLTEM Skelett, ganzer Effekt) | A | Auslöser ist jetzt ein Kreatureneffekt mit Zielwahl (Burning Skeleton des Besitzers) statt eines direkten `actionDealCreatureDamage` |
+| W68/a-01 Fristen/Zähler nur echte Züge | 431fb3b5 (Perfect Disguise: Zielschutz statt Status `untargetable`) | A | Sonde liest `hero._targetBlockers` (`untilTurn`) |
+| W73/b-02 Rabbit-Sweep | 40605e61 (neue Karte Backstab) | A | Backstab hat keinen eigenen Helden (Angreifer ist ein Gegnerheld) — der Cheering Rabbit des Spielers gilt dort nicht; als dokumentierte Ausnahme im Sweep (war schon vor dem Merge rot) |
+| W74/c-boris-09 Rain of Spores | 4d98db99 (Nr. 41: kein Deckel durch die Gegnerhand) | A | Gegner wirft N+1 ab, höchstens seine Hand |
+| W76/a-05 Zusatzziel-Inventur | 923e82e0 (`neverMultiTarget` an True Form nur als AoE-Kennzeichnung) | A | True Form ist als reine Metadaten-Ausnahme eingetragen |
+| W71/b-08, b-09 (Monia-Sweep) Barrel Home | 41db3b74 (neue Karte Barrel Home) | **C** | Barrel Home schickt Kreaturen (Überhang → Ablage, Umzug in freie Zone) ohne Monia-Fenster. Offene Regelfrage an Al (siehe unten); keine Allowlist, Sweep bleibt rot |
+| `check-target-cancel` Night Mare | 56a047ae (neue Karte) | — | Pflichtwahl des Zugspielers laut Text („must choose"), ausgelöster Kreatureneffekt: mit `// pflichtwahl:` begründet |
+| W66/a-03, W67/a-01 (Inya-Token) | vor 77a | — | Altlast, nicht angefasst (W67/a-01 listet nun zusätzlich Barrel Home als Board-Karte) |
+
+**Offene Fragen an Al:** (1) Friendship Lv1 — darf die Zusatzaktion nach einem schon normal gewirkten Support-Spell genutzt werden? (Q136 sagte Nein, die 26.10.-Umsetzung sagt Ja; Code: Ja.) (2) Barrel Home — ist das Umziehen/Abgeben einer Kreatur ein „Effekt auf die Kreatur", gegen den Cool Rescuer Monia ein Fenster bekommt? Falls ja: was soll mit dem Überhang passieren, wenn Monia annimmt (Karte bleibt, Kontrolleur muss eine andere abgeben)?
+
 ## Welle 80 / W80a — gemeinsame Kreaturen-Bilanz für Hole in the Sky / MOE Bomb / Heat Wave / Whirlwind Strike · Brettwert nach Level/HP/Rest-HP · Monia × Zweitwurf und Mehrfachtreffer (26.10.2026)
 
 Antworten von Al auf die W78a-Rückfragen. **Nur CPU-Entscheidungen**, außer Punkt 3 unten (Monia × Zweitwurf = Regelklarstellung).

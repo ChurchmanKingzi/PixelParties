@@ -64,6 +64,7 @@ module.exports = {
         description: `${CARD_NAME}: choose a target you control (except ${CARD_NAME}). It takes ${DAMAGE} damage.`,
         confirmLabel: `🌑 ${DAMAGE} Damage!`,
         confirmClass: 'btn-danger',
+        // pflichtwahl: der Text zwingt den ZUGSPIELER zur Wahl („must choose“); es ist ein ausgelöster Kreatureneffekt, keine gespielte Karte – ein Abbruch würde den Nachteil der Karte aufheben
         cancellable: false,                 // Pflichtwahl: „must choose"
         noSpellCancel: true,
         condition: (t) => !(t.cardInstance && t.cardInstance.id === ich.id),
