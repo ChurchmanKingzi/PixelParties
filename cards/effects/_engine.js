@@ -824,6 +824,9 @@ class GameEngine {
     // Looming Threat: Handkopie mit „am Zugende Stufe -1" — Wert = bisherige Senkungen. Folgt der
     // physischen Kopie, faellt weg, sobald sie die Hand verlaesst (`_handStufenZaehler`).
     this.registerHandIndexedField('_handLevelCountdown', { kind: 'value' });
+    // Ancient Guardian Statue: die gesuchte, dauerhaft aufgedeckte Handkopie hängt an GENAU DIESER Statue — Wert = `inst.id` der Statue. Folgt der physischen
+    // Kopie durch Hand-Splices und fällt weg, sobald sie die Hand verlässt (Identität der Karte, nie der Name).
+    this.registerHandIndexedField('_handStatueLink', { kind: 'value' });
     // Rocky Slime's per-instance level reductions. The captured offset
     // is consumed by safePlaceInSupport when the same card lands on
     // the board — `inst.counters.level` keeps the reduction post-summon
@@ -25533,10 +25536,20 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (kandidaten.length === 0) return { cancelled: true };
     kandidaten.sort((a, b) => (db[b]?.level || 0) - (db[a]?.level || 0));
     const name = kandidaten[0];
-    let handIndex = (ps.hand || []).indexOf(name);
+    const _nurIdx = Array.isArray(promptData.eligibleHandIndices) ? promptData.eligibleHandIndices : null;   // Ancient Guardian Statue: nur diese Handkopien
+    let handIndex = (ps.hand || []).findIndex((c, i) => c === name && (!_nurIdx || _nurIdx.includes(i)));
+    // Ancient Guardian Statue: die Zusatzaktion für JEDEN Helden (`performImmediateActionAnyHero`, Prompt OHNE `heroIdx`) braucht in der Antwort einen Helden — vorher fehlte er,
+    // und die CPU verfiel jede solche Zusatzaktion (`played: false`). Gewählt wird der erste Held aus `heroIndicesByCard`, dessen Kopie die Stufenprüfung besteht.
+    let _wahlHeld = promptData.heroIdx;
+    if (_wahlHeld == null && promptData.heroIndicesByCard) {
+      const _liste = promptData.heroIndicesByCard[name] || [];
+      const _cd0 = db[name];
+      _wahlHeld = _liste.find(h => (ps.hand || []).some((c, i) => c === name && (!_nurIdx || _nurIdx.includes(i)) && this._kopieStufeOk(pi, h, _cd0, i, pi))) ?? _liste[0];
+      if (_wahlHeld == null) return { cancelled: true };
+    }
     {   // ★ W15b (C2): die Kopie wählen, die die Stufenprüfung wirklich besteht (Rabatt hängt an EINER Kopie)
       const _cd = db[name], _hs = isSeat(this, promptData.heroOwner) ? promptData.heroOwner : pi;
-      const _gut = (ps.hand || []).findIndex((c, i) => c === name && this._kopieStufeOk(pi, promptData.heroIdx, _cd, i, _hs));
+      const _gut = (ps.hand || []).findIndex((c, i) => c === name && (!_nurIdx || _nurIdx.includes(i)) && this._kopieStufeOk(pi, _wahlHeld, _cd, i, _hs));
       if (_gut >= 0) handIndex = _gut;
     }
     let fromCreation = false;
@@ -25546,8 +25559,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     if (handIndex < 0) return { cancelled: true };
     const antwort = { cardName: name, handIndex, fromCreation };
+    if (promptData.heroIdx == null && _wahlHeld != null) antwort.heroIdx = _wahlHeld;   // Zusatzaktion für jeden Helden: der gewählte Held steht in der Antwort
     if (db[name] && hasCardType(db[name], 'Creature')) {
-      const zonen = ps.supportZones?.[promptData.heroIdx] || [];
+      const zonen = ps.supportZones?.[_wahlHeld] || [];
       let frei = -1;
       for (let z = 0; z < 3; z++) { if ((zonen[z] || []).length === 0) { frei = z; break; } }
       if (frei < 0) return { cancelled: true };
@@ -25900,6 +25914,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const quelle = this.handSourceList(playerIdx, fromCreation);
     if (!quelle) return { retry: true };
     if (handIndex < 0 || handIndex >= quelle.length || quelle[handIndex] !== cardName) return { retry: true };
+    // Ancient Guardian Statue: `config.eligibleHandIndices` = NUR diese Handkopien (Identität der Karte, nicht der Name) — andere Kopien gleichen Namens zählen nicht.
+    if (Array.isArray(config.eligibleHandIndices) && !fromCreation && !config.eligibleHandIndices.includes(handIndex)) return { retry: true };
     // ★ v1405: nie die gerade auflösende Karte selbst — auf eine andere
     // Kopie umlenken, sonst neu wählen lassen.
     if (this._istAufloesendeHandkarte(ps, handIndex, !!fromCreation)) {
@@ -26380,7 +26396,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // v1364: die Karte liegt jetzt auf dem Brett (Attachment) — sie
       // verlaesst die Hand ohne Ablage und ohne Stapelflug.
       if (fromZone !== 'deck') {
-        const _brettIdx = pool.indexOf(cardName);
+        const _brettIdx = (pool[poolIndex] === cardName) ? poolIndex : pool.indexOf(cardName);   // Ancient Guardian Statue: die GEWÄHLTE Kopie verlässt die Hand, nicht die erste gleichen Namens
         if (_brettIdx >= 0) {
           // W63c: gestohlene Handkarte legt sich aufs Brett (Anhaengsel/Area per Sofort-Guss): die Brettinstanz gehoert dem BESITZER
           const _brettBesitzer = (pool === ps.hand) ? this._consumeHandCardOrigin(playerIdx, cardName, _brettIdx) : playerIdx;
@@ -26410,7 +26426,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
       if (_attaLoescht) ps.deletedPile.push(cardName); else ps.discardPile.push(cardName);
     } else {
-      const _endIdx = pool.indexOf(cardName);
+      const _endIdx = (pool[poolIndex] === cardName) ? poolIndex : pool.indexOf(cardName);   // Ancient Guardian Statue: die GEWÄHLTE Kopie verlässt die Hand (Handindex-Felder hängen an der Kopie), nicht die erste gleichen Namens
       if (_endIdx >= 0) {
         // W63c: gestohlene Handkarte (Sofort-Guss: Hu, Coffee, Learning …) → Ablage des permanenten Besitzers; Herkunft VOR dem Splice
         const _ablageBesitzer = (pool === ps.hand) ? this._consumeHandCardOrigin(playerIdx, cardName, _endIdx) : playerIdx;
@@ -26526,6 +26542,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ★ W34a (Al, 22.10.2026, Guardian Beast Hu): „any Hero you control" = nach AKTUELLER Kontrolle — `_zusatzaktionsHelden` (eigene Spalte ohne abgegebene Helden + uebernommene
     // der Gegenspalte). Ein uebernommener Held (`seite !== playerIdx`) bietet Attack-/Spell-/Kreatur-Karten aus der Hand; Abilities und Heldeneffekte nur mit `config.mitUebernommenenAktionen` (Hu, W35a).
     for (const { seite, heroIdx: hi } of this._zusatzaktionsHelden(playerIdx)) {
+      if (typeof config.heldenFilter === 'function' && !config.heldenFilter(seite, hi)) continue;   // Ancient Guardian Statue: nur Helden, die jetzt handeln können
       const fremd = seite !== playerIdx;
       let karten = this.getHeroEligibleActionCards(playerIdx, hi, fremd ? seite : null);
       if (config.allowedCardTypes) karten = karten.filter(n => cardDB[n] && config.allowedCardTypes.includes(cardDB[n].cardType));
@@ -26606,6 +26623,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Aktionstraeger angeboten (`fremdeHelden`: Hand-Karten Attack/Spell/Kreatur; Abilities/Heldeneffekte mit Aktionskosten nur mit `config.mitUebernommenenAktionen` [Hu, W35a]), ein abgegebener eigener Held nicht.
     const fremdeHelden = {};
     for (const { seite: heldSeite, heroIdx: hi, hero } of this._zusatzaktionsHelden(playerIdx)) {
+      if (typeof config.heldenFilter === 'function' && !config.heldenFilter(heldSeite, hi)) continue;   // Ancient Guardian Statue: nur Helden, die jetzt handeln können
       const fremdHeld = heldSeite !== playerIdx;
 
       let heroEligible = this.getHeroEligibleActionCards(playerIdx, hi, fremdHeld ? heldSeite : null);
@@ -26661,6 +26679,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       type: 'heroAction',
       // heroIdx intentionally omitted — allows all heroes
       eligibleCards: eligible,
+      ...(Array.isArray(config.eligibleHandIndices) ? { eligibleHandIndices: config.eligibleHandIndices } : {}),   // Ancient Guardian Statue: nur diese Handkopien
       heroIndicesByCard,
       ...(Object.keys(fremdeHelden).length > 0 ? { fremdeHelden } : {}),   // W34a: uebernommene Helden je Karte `[{ heroOwner, heroIdx }]`
       activatableAbilities,
@@ -26711,6 +26730,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     const heldObjekt = (antwortSeite != null ? this.gs.players[antwortSeite] : ps).heroes[handelnderHeld];
     if (!heldObjekt?.name || heldObjekt.hp <= 0) return { played: false };
+    if (typeof config.heldenFilter === 'function' && !config.heldenFilter(antwortSeite ?? playerIdx, handelnderHeld)) continue;   // Ancient Guardian Statue: ein Held, der nicht handeln darf, wird abgelehnt (zurück zur Auswahl)
 
     const ergebnis = await this._resolveImmediateActionPick(
       playerIdx, handelnderHeld, heldObjekt, actionResult, antwortSeite != null ? { ...config, heroOwner: antwortSeite } : config,

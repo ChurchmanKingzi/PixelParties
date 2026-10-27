@@ -9658,6 +9658,91 @@ const HandLevelDownEffect = (() => {
 })();
 
 // ═════════════════════════════════════════════════════════════════
+//  Ancient Guardian Statue: Magie-Partikel auf der aufgedeckten Handkarte (`statue_magic`) — PIXELART, Hülle `ppPunktBild`; läuft über der Handkarte (beide Seiten sehen sie)
+//
+//  Vorlage: das Kartenbild (zwei goldene Steinwächter in einer grün leuchtenden Halle). Ein Runenring aus vierzehn kleinen Zeichen (3×3 Pixel) umgibt die Karte und wandert in
+//  ganzen Schritten (~8 Bilder/s) im Kreis; grüne und goldene Funken (2×2 mit hellem Kern) steigen in einer Spirale auf, vier Kreuzfunkel blitzen an den Ecken. Die Karte bleibt
+//  lesbar (nur Ring, Funken, Ecken). `phase`: 'reveal' (die Statue deckt den Zauber auf, ~1300 ms), 'tick' (Zugende: Stufe −1 — Steinstaub rieselt, der Ring zieht sich
+//  einmal um einen Pixel zusammen, ~850 ms), 'free' (Stufe 0: der Ring schließt sich in vier ganzen Schritten, goldene Kreuzfunkel brechen auf, ~1500 ms). Feste Palette, kein Leuchten.
+// ═════════════════════════════════════════════════════════════════
+const StatueMagicEffect = (() => {
+  const GRUEN = ['#ffffff', '#e5fae7', '#75f091', '#00cc50', '#167927'].map(ppHex);
+  const GOLD = ['#ffffff', '#fff196', '#f8ca21', '#cf5f00'].map(ppHex);
+  const STAUB = ['#c5b7a0', '#7f7f7f', '#393123'].map(ppHex);
+  const RUNEN = [['010', '111', '010'], ['101', '010', '101'], ['110', '011', '110'], ['111', '101', '111']];
+  const ARM = [1, 2, 3, 2, 1];
+  const DAUER = { reveal: 1300, tick: 850, free: 1500 };
+  const FADE = { reveal: 880, tick: 520, free: 1100 };
+  const vorbereiten = (sz) => ({
+    funken: Array.from({ length: ppFxN(18) }, () => ({
+      w: Math.random() * Math.PI * 2, r: sz.hw * (0.45 + Math.random() * 0.75), start: Math.random() * 650, leben: 560 + Math.random() * 320,
+      v: 16 + Math.random() * 22, gold: Math.random() < 0.4, drehung: Math.random() < 0.5 ? 1 : -1,
+    })),
+    staub: Array.from({ length: ppFxN(14) }, () => ({ x: (Math.random() * 2 - 1) * sz.hw * 0.95, start: Math.random() * 380, leben: 380 + Math.random() * 200, v: 22 + Math.random() * 20, farbe: Math.floor(Math.random() * 3) })),
+    ecken: [[-1, -1, 60], [1, -1, 220], [1, 1, 380], [-1, 1, 540]].map(([sx, sy, start]) => ({ sx, sy, start, gold: sx > 0 })),
+  });
+  const malen = (g, t, sz, teile) => {
+    const ph = sz.phase === 'tick' || sz.phase === 'free' ? sz.phase : 'reveal';
+    const ende = DAUER[ph], fadeAb = FADE[ph];
+    const aus = t > fadeAb ? Math.max(0, 1 - (t - fadeAb) / (ende - fadeAb)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
+    const ein = Math.min(1, t / 240);
+    // ── Runenring ─────────────────────────────────────────────────
+    let ra = sz.hw + 7, rb = sz.hh + 6;
+    if (ph === 'tick') { const s2 = t > 200 && t < 480 ? 1 : 0; ra -= s2; rb -= s2; }
+    if (ph === 'free') { const s4 = Math.min(4, Math.floor(Math.max(0, t - 120) / 110)); ra -= s4 * 2; rb -= s4 * 2; }
+    const schritt = Math.floor(t / 120);
+    const N = 14;
+    for (let i = 0; i < N; i++) {
+      const w = ((i + schritt * (ph === 'tick' ? -1 : 1)) / N) * Math.PI * 2;
+      const rx = cx + Math.round(Math.cos(w) * ra), ry = cy + Math.round(Math.sin(w) * rb);
+      const glyph = RUNEN[(i * 3 + 1) % RUNEN.length];
+      const hell = ((i + schritt) % 4) === 0;
+      const farbe = ph === 'free' && t > 560 ? GOLD[hell ? 1 : 2] : ph === 'tick' ? STAUB[hell ? 0 : 1] : GRUEN[hell ? 1 : 2];
+      const a = Math.min(ein, aus) * (hell ? 1 : 0.8);
+      for (let j = 0; j < 3; j++) for (let k = 0; k < 3; k++) if (glyph[j][k] === '1') g.put(rx - 1 + k, ry - 1 + j, farbe, a);
+      if (!hell) g.put(rx, ry, ph === 'tick' ? STAUB[2] : GRUEN[4], Math.min(ein, aus));
+    }
+    // ── Funken in der Spirale (nur 'reveal' und 'free') ───────────
+    if (ph !== 'tick') {
+      for (const f of teile.funken) {
+        const a2 = t - f.start; if (a2 < 0 || a2 > f.leben) continue;
+        const kk = a2 / f.leben, sek = a2 / 1000;
+        const w = f.w + sek * 2.2 * f.drehung;
+        const px = Math.round(cx + Math.cos(w) * f.r * (1 - kk * 0.35)), py = Math.round(cy + sz.hh * 0.75 - f.v * sek * 1.8 + Math.sin(w) * 3);
+        const pal = (f.gold || ph === 'free') ? GOLD : GRUEN;
+        g.block(px, py, 2, 2, pal[kk < 0.6 ? 2 : 3], aus * (1 - kk * 0.5));
+        g.put(px, py, pal[kk < 0.5 ? 0 : 1], aus);
+      }
+    }
+    // ── Steinstaub (nur 'tick') ───────────────────────────────────
+    if (ph === 'tick') {
+      for (const d of teile.staub) {
+        const a2 = t - d.start; if (a2 < 0 || a2 > d.leben) continue;
+        const kk = a2 / d.leben, sek = a2 / 1000;
+        const px = Math.round(cx + d.x), py = Math.round(cy - sz.hh * 0.85 + d.v * sek * 2.4 + sek * sek * 30);
+        g.block(px, py, 2, 2, STAUB[d.farbe], aus * (1 - kk * 0.5));
+        g.put(px, py, STAUB[0], aus * (1 - kk * 0.4));
+      }
+    }
+    // ── Kreuzfunkel an den Ecken ──────────────────────────────────
+    const nEcken = ph === 'tick' ? 0 : 4;
+    for (let i = 0; i < nEcken; i++) {
+      const e = teile.ecken[i], k = (t - (ph === 'free' ? 560 + e.start * 0.5 : e.start)) / 420;
+      if (k < 0 || k >= 1) continue;
+      ppKreuzfunkel(g, cx + e.sx * (sz.hw + 2) - 1, cy + e.sy * (sz.hh + 2) - 1, ARM[Math.floor(k * ARM.length)], (ph === 'free' || e.gold) ? GOLD : GRUEN, aus);
+    }
+    // ── 'free': der Ring ist zu — goldener Blitz in der Mitte ─────
+    if (ph === 'free' && t > 560 && t < 1020) {
+      const k = (t - 560) / 460;
+      ppKreuzfunkel(g, cx - 1, cy - 1, ARM[Math.min(ARM.length - 1, Math.floor(k * ARM.length))] + 1, GOLD, aus);
+    }
+  };
+  return ppPunktBild(malen, 1540, 230, 290, vorbereiten);
+})();
+
+// ═════════════════════════════════════════════════════════════════
 //  Mind Control: Hypnose-Spirale (`mind_control_hex`) — PIXELART, Hülle `ppPunktBild`; läuft über dem übernommenen Helden
 //
 //  Eine Spirale in fünf Violett-Tönen (Bänder, die in ganzen Schritten — ~10 Bilder/s — gegen den Uhrzeigersinn weiterdrehen) legt sich über die Karte: sie dithert
@@ -20552,6 +20637,7 @@ const ANIM_REGISTRY = {
   arnold_flex: ArnoldFlexEffect,
   liquid_rainbow: LiquidRainbowEffect,
   hand_level_down: HandLevelDownEffect,
+  statue_magic: StatueMagicEffect,
   mind_control_hex: MindControlHexEffect,
   spy_mark: SpyMarkEffect,
   pythia_flames: PythiaFlamesEffect,
@@ -40272,6 +40358,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // fragt `dimmed` nicht, deshalb ging der).
     {
       const _hap = gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt.ownerIdx === myIdx ? gameState.effectPrompt : null;
+      // Ancient Guardian Statue: `eligibleHandIndices` = nur DIESE Handkopie ist die Zusatzaktion (andere Kopien gleichen Namens bleiben ausgegraut).
+      if (_hap && Array.isArray(_hap.eligibleHandIndices) && handIdx != null && !fromCreation && !_hap.eligibleHandIndices.includes(handIdx)) return true;
       if (_hap && (_hap.eligibleCards || []).includes(cardName)) return false;
     }
 
@@ -40293,6 +40381,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Hero Action mode (Coffee) — only eligible cards are playable
     const heroActionPrompt = gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt.ownerIdx === myIdx ? gameState.effectPrompt : null;
     if (heroActionPrompt) {
+      if (Array.isArray(heroActionPrompt.eligibleHandIndices) && handIdx != null && !fromCreation && !heroActionPrompt.eligibleHandIndices.includes(handIdx)) return true;
       return !(heroActionPrompt.eligibleCards || []).includes(cardName);
     }
 
@@ -50979,7 +51068,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // spielt die Animation ueber dem echten Handslot. `count` reicht
     // die Partikelmenge durch (Battery/Magic Modifier skalieren damit
     // ihre Staerke).
-    const onHandCardAnim = ({ owner, handIdx, animType, count, duration, cardName }) => {
+    const onHandCardAnim = ({ owner, handIdx, animType, count, duration, cardName, phase }) => {
       const isMe = owner === myIdx;
       const base = isMe ? '.game-hand-me' : '.game-hand-opp';
       // 23.10.: mit `cardName` sucht der Client den Slot über den KARTENNAMEN (der Index der Engine kann dem Stand der Handanzeige voraus sein — eine Reaction
@@ -50994,8 +51083,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         || document.querySelector(`${base} [data-hand-idx="${handIdx}"]`)
         || document.querySelector(base);
       if (!el) return;
-      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(animType, { count, duration });
-      playAnimation(animType, el, { duration: duration || 900, count: count || 1 });
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(animType, { count, duration, ...(phase ? { phase } : {}) });
+      playAnimation(animType, el, { duration: duration || 900, count: count || 1, ...(phase ? { phase } : {}) });
     };
     socket.on('play_hand_card_animation', onHandCardAnim);
 
