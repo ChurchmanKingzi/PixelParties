@@ -940,9 +940,8 @@ function PuzzleCreator() {
       document.body.appendChild(ghost);
       td.ghost = ghost;
       setDragCardName(td.cardName);
-      // Wie beim Ziehen mit der Maus: die Quellkarte in ihrer Zone ist unsichtbar (`data-pz-gezogen`), und das Anheben klingt.
+      // Wie beim Ziehen mit der Maus: die Quellkarte in ihrer Zone ist unsichtbar (`data-pz-gezogen`). Kein Klang beim Anheben.
       if (td.sourceZone) { setDragSource(td.sourceZone); setZiehLaeuft(true); }
-      window.playCardDragSFX?.('pickup');
     }
     if (td.dragging) {
       e.preventDefault(); // prevent scroll while dragging
@@ -974,8 +973,8 @@ function PuzzleCreator() {
     const t = e.changedTouches[0];
     const el = document.elementFromPoint(t.clientX, t.clientY);
     const handEl = el?.closest('[data-pz-hand]');
-    // Loslassen klingt — ausser beim Ablegen in eine Hand, die ihren eigenen Klang spielt (`draw`, siehe unten).
-    if (!(handEl && !(td.handSource === handEl.dataset.pzHand && td.handIdx != null))) window.playCardDragSFX?.('release');
+    // Loslassen klingt wie bei den Handkarten (`reorder`) — ausser beim Ablegen in eine Hand, die ihren eigenen Klang spielt (`draw`, siehe unten).
+    if (!(handEl && !(td.handSource === handEl.dataset.pzHand && td.handIdx != null))) window.playCardDragSFX?.('reorder');
     // ★ v1452: die Zone kommt aus der magnetischen Suche — sie liefert
     // nur Zonen, die die Karte annehmen (mit dem AKTUELLEN Brett; der
     // Callback hier sieht wegen seiner Abhaengigkeiten sonst nur einen
@@ -2165,12 +2164,12 @@ function PuzzleCreator() {
     setTimeout(() => setZiehLaeuft(true), 0);
     hideTooltip(); // dismiss tooltip during drag
     e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', '');
-    // ★ KLAENGE (Als Vorgabe 27.10.: „Lässt man eine gedraggte Karte los oder hebt eine an, fehlt noch ein Sound"): Anheben jetzt, Loslassen
-    // am Ende des Zuges — EIN Klang je Zug. Beendet wird er durch das erste `drop` (ein Ziel hat angenommen) oder `dragend` (nirgends
-    // gelandet, Escape); `drop` kommt auch dann an, wenn die Quelle beim Ablegen aus dem DOM faellt (dann bleibt `dragend` aus). Ausgewertet
-    // erst im naechsten Tick: das Umsortieren der Hand spielt dabei seinen eigenen Klang (`reorder`), dann entfaellt der Tick; eine frische
-    // Karte aus der Box, die nirgends landet, bekommt weiter nur ihr `discard` (siehe unten).
-    window.playCardDragSFX?.('pickup');
+    // ★ KLANG BEIM LOSLASSEN (Als Vorgabe 27.10.: „Lässt man eine gedraggte Karte los, fehlt noch ein Sound" — und: er soll derselbe sein
+    // wie bei den Handkarten, also `reorder`; ein Klang beim ANHEBEN ist ausdruecklich nicht gewollt, „lästig"): EIN Klang je Zug. Beendet
+    // wird er durch das erste `drop` (ein Ziel hat angenommen) oder `dragend` (nirgends gelandet, Escape); `drop` kommt auch dann an, wenn die
+    // Quelle beim Ablegen aus dem DOM faellt (dann bleibt `dragend` aus). Ausgewertet erst im naechsten Tick: das Umsortieren der Hand hat
+    // seinen Klang (`reorder`) dann schon gespielt, der zweite entfaellt; eine frische Karte aus der Box, die nirgends landet, bekommt weiter
+    // nur ihr `discard` (siehe unten).
     if (loslassKlangRef.current) loslassKlangRef.current();
     {
       const frischAusBox = handIdx == null && !source && !handSource;
@@ -2185,20 +2184,13 @@ function PuzzleCreator() {
         setTimeout(() => {
           if (!gelandet && frischAusBox) return;
           if (performance.now() - (window._ppReorderT || 0) < 300) return;
-          window.playCardDragSFX?.('release');
+          window.playCardDragSFX?.('reorder');
         }, 0);
       }
       document.addEventListener('drop', loslassen, true);
       document.addEventListener('dragend', loslassen, true);
       loslassKlangRef.current = abraeumen;
     }
-    // ★ Als Vorgabe 6.10.: eine FRISCHE Karte aus der Box (Galerie), die
-    // beim Loslassen nirgends landet, verschwand lautlos. Hand- und
-    // Brettkarten bleiben dann einfach liegen, die Box-Karte dagegen geht
-    // zurueck ins Nichts — das bekommt denselben Klang wie das Entfernen
-    // per Rechtsklick (`discard`). „Landet nirgends" heisst: es kam kein
-    // `drop` an (der feuert nur, wenn ein Ziel den Zug angenommen hat);
-    // Escape zaehlt ebenso. Beide Horcher gehen am Zugende wieder ab.
     if (boxKlangRef.current) boxKlangRef.current();
     if (handIdx == null && !source && !handSource) {
       let gelandet = false;
