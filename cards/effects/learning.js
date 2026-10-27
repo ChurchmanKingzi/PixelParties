@@ -159,7 +159,7 @@ function isNameEligibleForLearning(engine, ps, pi, heroIdx, name, requireMagicAr
 
   const script = loadCardEffect(name);
   if (!isProactivelyCastable(cd, script)) return false;
-  if (engine.areaKarteGesperrt(cd, pi)) return false;   // Als Ruling (Al 27.10.): Reality Crack („cannot play another Area") / Shipwrecked — eine Area ist als Nachguss nicht waehlbar
+  if (engine.areaKarteGesperrt(cd, pi, { kapazitaet: true })) return false;   // Als Ruling (Al 27.10.): Reality Crack („cannot play another Area") / Shipwrecked — eine Area ist als Nachguss nicht waehlbar; Als Fix (Al 27.10.): auch ohne Platz in der Area Zone (Limit 1, Spatial Crevice 3 VERSCHIEDENE) bzw. als Dublette nicht
 
   if (!engine.heroMeetsLevelReq(hs, heroIdx, cd, hs !== pi ? { levelSourcePi: pi } : {})) return false;
 
@@ -313,6 +313,9 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
       break;
     }
   }
+  // Als Fix (Al 27.10.): fehlt die getrackte Hand-Instanz (kein Zugang ueber `handZugang`, Rollout-Zustand), ein Ersatz anlegen — sonst liefe `runHooks('onPlay', { _onlyCard: null })` ungefiltert und feuerte
+  // den onPlay JEDER Hand-Karte (eine Spatial Crevice auf der Hand legte sich dabei selbst aufs Brett), waehrend der gewaehlte Zauber selbst nie wirkte.
+  if (!handInst) handInst = engine._trackCard(cardName, pi, 'hand', heroIdx, -1);
   // Anchor the chosen copy to the casting hero. Without this, Spells
   // that read `ctx.cardHeroIdx` short-circuit on
   // `ps.heroes[-1] = undefined` and silently fizzle while still

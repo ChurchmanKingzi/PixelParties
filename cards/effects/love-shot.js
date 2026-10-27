@@ -491,8 +491,12 @@ module.exports = {
           engine.handZugangRueckgabe(ps, chosenName, { source: CARD_NAME, ohneInstanz: true });   // W63c: Herkunft (gestohlene Handkarte) bleibt
           engine._untrackCard(inst.id);
         } else {
-          engine.handKartenBesitzerPs(ps, chosenName).discardPile.push(chosenName);   // W63c: Ablage des permanenten Besitzers
-          engine._untrackCard(inst.id);
+          // Als Fix (Al 27.10.): legt sich eine AREA aus diesem Nachguss selbst aufs Brett, hat ihre Instanz die Hand verlassen (`zone` ≠ 'hand'; `placeArea` stempelt `_spellPlacedOnBoard` nur fuer die gerade
+          // AUFLOESENDE Karte, hier Love Shot). Sie gehoert dann dem Brett: nicht zusaetzlich in die Ablage (Dublette) und die Instanz nicht austragen (Geisterkarte: Name in `areaZones` ohne Instanz).
+          if (inst.zone === 'hand') {
+            engine.handKartenBesitzerPs(ps, chosenName).discardPile.push(chosenName);   // W63c: Ablage des permanenten Besitzers
+            engine._untrackCard(inst.id);
+          }
           engine.log('love_shot_action', {
             player: ps.username, target: targetHero.name,
             card: chosenName, cardType: chosenCd.cardType,

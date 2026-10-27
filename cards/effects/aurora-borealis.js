@@ -184,7 +184,7 @@ module.exports = {
       const wirkbar = geholt.filter(n => {
         const cd = engine._getCardDB()[n];
         if (!cd) return false;
-        if (engine.areaKarteGesperrt(cd, pi)) return false;   // Als Ruling (Al 27.10.): Reality Crack („cannot play another Area") / Shipwrecked — eine Area ist nicht wirkbar
+        if (engine.areaKarteGesperrt(cd, pi, { kapazitaet: true })) return false;   // Als Ruling (Al 27.10.): Reality Crack („cannot play another Area") / Shipwrecked — eine Area ist nicht wirkbar; Als Fix (Al 27.10.): auch ohne Platz in der Area Zone (Limit 1, Spatial Crevice 3 VERSCHIEDENE) bzw. als Dublette nicht
         // „Only 1 per game" (Divine Gift …): der Sofort-Guss prueft das nicht selbst (S01-11)
         const sc = loadCardEffect(n);
         if ((sc?.oncePerGame || sc?.oncePerGameKey) && ps._oncePerGameUsed?.has(sc.oncePerGameKey || n)) return false;

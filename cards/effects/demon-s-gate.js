@@ -95,6 +95,9 @@ function eligibleHandIndices(engine, ps, pi) {
     const cd = cardDB[name];
     if (!cd) continue;
     if (cd.cardType !== 'Spell') continue;
+    // Als Fix (Al 27.10.): eine Area als Zusatzaktion ist ein SPIELEN einer Area — Reality Crack („cannot play another Area") / Shipwrecked UND Area-Fassungsvermoegen (Limit 1, Spatial Crevice 3 VERSCHIEDENE,
+    // keine Dublette): das Tor raeumt nichts ab. Bisher fragte es weder das eine noch das andere — eine zweite Area lag danach neben der ersten.
+    if (engine.areaKarteGesperrt(cd, pi, { kapazitaet: true })) continue;
     const script = loadCardEffect(name);
     if (!untertypErlaubt(cd, script)) continue;
     const isDestructionOrDecay =

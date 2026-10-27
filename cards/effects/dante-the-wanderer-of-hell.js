@@ -55,7 +55,7 @@ function geloeschteAreas(engine, pi) {
   if (engine.areaSpielGesperrt(pi, { direkt: true })) return [];
   const ps = engine.gs.players[pi];
   const db = engine._getCardDB();
-  return [...new Set((ps?.deletedPile || []).filter(n => isTutorableArea(db[n], engine, pi)))];
+  return [...new Set((ps?.deletedPile || []).filter(n => isTutorableArea(db[n], engine, pi) && engine.areaPlatzNachAbraeumen(pi, n)))];   // Als Fix (Al 27.10.): nur Areas, fuer die nach dem Abraeumen Platz ist (Gigalopolis bleibt liegen)
 }
 
 /** Eine Handkarte gezielt loeschen (Loesch-Rettung, Flug). true = wirklich geloescht. */
@@ -102,7 +102,7 @@ async function weg2(engine, pi) {
   const vorher = geloeschteAreas(engine, pi);
   const areas = engine.getAreas(pi).slice();
   for (const inst of areas) await engine.deleteArea(inst, CARD_NAME, { _skipLimitEnforce: true });
-  const kandidaten = vorher.filter(n => (ps.deletedPile || []).includes(n));
+  const kandidaten = vorher.filter(n => (ps.deletedPile || []).includes(n) && engine.canPlaceAnotherArea(pi, n));   // Als Fix (Al 27.10.): nach dem Loeschen bleibt eine unentfernbare Area (Gigalopolis) liegen — dort ist kein Platz
   let gebracht = null;
   if (kandidaten.length > 0) {
     const db = engine._getCardDB();
