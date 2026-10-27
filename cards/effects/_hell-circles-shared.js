@@ -34,6 +34,16 @@ const { hasCardType } = require('./_hooks');
 
 const HELL_AREA_COMMON = 'delete_play';
 
+/**
+ * W84a: sichtbare Rueckmeldung statt stillem Nichts, wenn eine gerade geloeschte Circle ihr Angebot NICHT machen darf, weil die Einmal-pro-Zug-Sperre schon verbraucht ist
+ * (not played a deleted Area yet this turn / Third: only once per turn). Zeigt die Karte als FIZZLED (wie jeder Effekt, der nach dem Ausloesen nichts tun kann) mit Logzeile;
+ * kein Dialog, kein Warten auf eine Antwort. Nicht bei Loeschungen, die ein anderes Circle-Angebot selbst ausgeloest hat (Kreis A loescht Kreis B) - das waere Rauschen.
+ */
+async function sperreHinweis(engine, pi, name, grund) {
+  if (engine._laufenderEintrag?.folge) return;
+  await engine.zeigeFizzle?.(name, { playerIdx: pi, grund, log: true });
+}
+
 /** Verlaesst GENAU DIESE Karte gerade ihre Area-Zone? */
 function verlaesstBrett(ctx) {
   if (ctx.fromZone !== 'area') return null;
@@ -104,7 +114,7 @@ async function loeschenUndSpielen(engine, pi, name, opts = {}) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   if (!ps) return false;
-  if (ps._deletedAreaPlayedTurn === gs.turn) return false;
+  if (ps._deletedAreaPlayedTurn === gs.turn) { await sperreHinweis(engine, pi, name, 'deleted_area_already_played_this_turn'); return false; }
   if (!(ps.deletedPile || []).includes(name)) return false;          // inzwischen weg (z. B. zurueckgeholt)
   let wirker = moeglicheWirker(engine, pi, name);
   if (wirker.length === 0) return false;                             // kein Wirker → Angebot entfaellt still
@@ -180,6 +190,6 @@ const cpuBejahen = {
 };
 
 module.exports = {
-  HELL_AREA_COMMON, verlaesstBrett, alleEigenenAreasLoeschen,
+  HELL_AREA_COMMON, verlaesstBrett, alleEigenenAreasLoeschen, sperreHinweis,
   loeschenUndSpielen, moeglicheWirker, ausGeloeschtEntnehmen, inGeloeschtZurueck, cpuBejahen, hasCardType,
 };
