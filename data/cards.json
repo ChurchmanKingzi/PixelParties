@@ -3719,7 +3719,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "While there is at least 1 Area on the board, this Spell can be used as an additional Action. Send all Areas on the board to the discard pile. You may then choose an Area from your deck and openly add it to your hand. If one of your Heroes can use that Area, you may immediately use it as an additional Action.",
+    "effect": "While there is at least 1 Area on the board, this Spell can be used as an additional Action. Send all Areas on the board to the discard pile. You may then choose an Area from your deck and openly add it to your hand. If one of your Heroes can use that Area, you may immediately use it as an additional Action. You can only play 1 \"Cleansing of the Land\" per turn.",
     "archetype": "",
     "setID": "PP DD",
     "banned": "",
