@@ -35120,7 +35120,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async trefferAlsWahl(ziel, validTargets, sourceCard, config = {}) {
     if (!ziel || !sourceCard) return ziel;
-    const ids = await this.applyRedirectWindows([ziel.id], validTargets, config, sourceCard);
+    // `_mehrTreffer`: dieser Einzeltreffer gehört zu einem Effekt mit MEHREREN Zielen (Kettenblitz) — Umleiter mit „exactly one target" (Winged Haressassin) bieten dann nichts an.
+    const ids = await this.applyRedirectWindows([ziel.id], validTargets, { ...config, _mehrTreffer: true }, sourceCard);
     if (!Array.isArray(ids) || ids.length === 0) return null;
     if (ids[0] === ziel.id) return ziel;
     return (validTargets || []).find(t => t && t.id === ids[0]) || ziel;

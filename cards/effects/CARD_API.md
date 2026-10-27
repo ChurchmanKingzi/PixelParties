@@ -25774,6 +25774,13 @@ Fünf Karten, Kunst im echten Raster 76×51 (aus Screenshots zurückgerechnet: B
 * **CPU (Lernkanal):** die Spell-Wahl läuft über den Standardweg der Galerie-Wahl (`_cpu.pickBestGalleryCard`: Handwert + gelernter Quelle→Karte-Wert `setOfferValue` [Quelle = Titel = Kartenname] + `poolFeatureValue` [situativ über `decisionStateTags`]; die MCTS-Äste ordnet dasselbe `_galleryScore` samt `tutorPickRules`). Neu: der Galerie-Haken `cpuMeta.galleryValue(engine, pi, eintrag)` (Zuschlag der öffnenden Karte, hier Erreichbarkeit/früher Stufe 0; austauschbar). Gelernt wird also über die vorhandenen Tutor-Kanäle, sobald das Training Statuen-Wahlen protokolliert — ein eigenes Lernsystem gibt es nicht.
 * **Skill Test:** `skilltestLegal: false` (die Statue braucht ein Deck, das der Skill Test nicht hat).
 
+## Welle 82 — Winged Haressassin (Creature, `winged-haressassin.js`) · „exactly one target" für Umleiter (27.10.2026)
+
+* **Brett-Wächter `isBoardRedirect`** (Muster Empty Armor): Umleitung eines gegnerischen Effekts, der **genau ein** anderes Ziel (Held/Kreatur, Kontrolle) wählt; Kosten = Handabwurf (Ja/Nein, dann abbrechbarer `zahleAbwurfKosten`, Abbruch = nichts verbraucht); einmal pro Zug je Exemplar (`_charges`). Danach, wenn die Kreatur durch den umgeleiteten Effekt fällt: 150 Schaden auf ein beliebiges Ziel (Pflichtwahl).
+* **„Exactly one" für künftige Umleiter** (`genauEinZiel(config)` im Skript): `config._redirectPickCount === 1`, kein Mehrfachwähler (`maxTotal`/`selectCount`/`max`/`maxTargets` > 1, `minRequired` > 1) und **neu** `config._mehrTreffer` (von `engine.trefferAlsWahl` gesetzt: der Einzeltreffer gehört zu einer Mehrfachkette wie Chain Lightning). Mehrere Ziele ⇒ für keines ein Angebot; mehrere nacheinander gestellte Einzelwahlen gelten je Wahl als eigener Fall.
+* **„Redirected by this effect":** `gs._wingedHaressRedirects` (Quelle: Name/Kontrolleur/Instanz, nur im Zug der Umleitung); Schaden bindet über `beforeCreatureDamageBatch` + Marke `_wingedHaressHit`, Zerstören über einen offenen Eintrag am Todes-Hook.
+* Animationen `winged_haress_feathers` (Umleitung) und `winged_haress_slash` (150 Schaden), Pixelart (`ppSalve`).
+
 ## Welle 5 — Patty, YOU'RE ALIVE?!, You are the Chosen One!!!, Wise Village Elder, Vengeful Attack (25.10.2026)
 
 Fünf Karten, Kunst im echten Raster 76×51 (Bilder 74–78). Tests liegen nicht im Repo (Scratchpad des Auftrags). Neue Engine-Bausteine sind unten je Karte aufgeführt und gelten für künftige Karten weiter.
