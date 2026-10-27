@@ -133,6 +133,20 @@ function angeboteBeenden(gs, opts = {}) {
   delete gs._kreaturFenster;   // W71b: Fenster-Buchführung von `engine.kreaturBetroffen`
 }
 
+/**
+ * ★ W83a (Al 28.10.2026 — Monia × zweiter Cast): „Monia fragt bei einem zweiten Cast ein weiteres Mal separat, beide gelten als je eine Instanz, die einzeln geschützt werden muss."
+ * Eine Wiederholung als EIGENER Cast (Saya, Idej Kunagi, Timeless King Zi, Chaos Magic, Love Shot; `_bartasSecondCast`/„cast a second time") ist für Monia ein neuer Effekt mit eigenem
+ * Angebot (je 2 Karten): Angebote, Schild und Fenster-Buchführung des ersten Gusses fallen weg, bevor der zweite beginnt. Der Zweitwurf der Zusatzziel-Helden (Bartas, Grisgar, Andras)
+ * ist dagegen derselbe Spell (W80a, `zweitwurfFortsetzen`) und ruft das hier NICHT. Wer einen Spell/eine Attack in einem eigenen Durchlauf (`onPlay`) wiederholt, ruft es VOR dem Wiederholungslauf.
+ */
+function neuerGuss(gs) {
+  if (!gs) return;
+  delete gs._moniaShieldActive;
+  delete gs._moniaShieldSource;
+  delete gs._moniaAngebote;
+  delete gs._kreaturFenster;
+}
+
 /** Zweitwurf beginnt: die beiseitegelegten Angebote des Hauptwurfs gelten weiter (derselbe Effekt). Ohne beiseitegelegten Stand oder bei schon lebenden Angeboten tut es nichts. */
 function zweitwurfFortsetzen(gs) {
   const z = gs?._moniaZweitwurf;
@@ -219,6 +233,6 @@ async function kostenZahlen(engine, pi, gewaehlt, cardName) {
 
 module.exports = {
   BASE_MONIA, ASCEND_TARGET, JETPACK_NAME, hasEquipped, moniaAscensionMet, checkMoniaAscension,
-  quellName, angenommenesAngebot, angebotAbgelehnt, angebotMerken, angeboteBeenden, zweitwurfFortsetzen,
+  quellName, angenommenesAngebot, angebotAbgelehnt, angebotMerken, angeboteBeenden, neuerGuss, zweitwurfFortsetzen,
   KOSTEN, ALLE_SEITEN, kostenPlaetze, kostenZahlbar, kostenWaehlen, kostenZahlen,
 };

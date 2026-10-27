@@ -379,6 +379,7 @@ module.exports = {
         // Der Zwang gilt nur für die Auflösung des Zauberkörpers (`onPlay`), nicht für die Nachwirkungs-Haken (`afterSpellResolved`: Heldenpassive mit eigenen "may"-Abfragen).
         gs._forcedCommitPlayer = pi;
         try {
+          require('./_monia-shared').neuerGuss(gs);   // W83a (Al 28.10.): der gewirkte Spell ist für Cool Rescuer Monia ein EIGENER Effekt (eigenes Angebot)
           await engine.runHooks('onPlay', {
             _onlyCard: subInst, playedCard: subInst,
             cardName: oppChoice, zone: 'hand', heroIdx,

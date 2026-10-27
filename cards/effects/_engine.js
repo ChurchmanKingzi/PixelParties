@@ -3170,6 +3170,14 @@ class GameEngine {
       // wollen (Ellie), entprellen darueber statt ueber den Kartennamen/-daten.
       hookCtx._spellRound = this._spellRoundSeq = (this._spellRoundSeq || 0) + 1;
     }
+    // ★ W83a (Al 28.10.2026 — Cool Rescuer Monia × zweiter Cast): „Monia fragt bei einem zweiten Cast ein weiteres Mal separat, beide gelten als je eine Instanz, die einzeln geschützt werden
+    // muss." Die Auflösung des ersten Casts endet HIER, vor allen Zuhörern von `afterSpellResolved` — nicht erst in Monias eigenem Zuhörer (die Reihenfolge der Zuhörer ist nicht festgelegt: lief
+    // Sayas/Idejs/… Zweitguss VOR Monias Zuhörer, erbte er das Angebot [Annahme UND Ablehnung] und den Schild des ersten Gusses). Der Zweitwurf der Zusatzziel-Helden (Bartas, Grisgar, Andras) ist
+    // derselbe Effekt (W80a): der Stand wird beiseitegelegt und von `zweitwurfFortsetzen` zurückgeholt.
+    if (hookName === 'afterSpellResolved' && hookCtx && !hookCtx._moniaAufgeraeumt) {
+      hookCtx._moniaAufgeraeumt = true;
+      require('./_monia-shared').angeboteBeenden(this.gs, { fuerZweitwurf: !hookCtx.isSecondCast });
+    }
     // ★ W8 (Al, 15.10.2026): Bonded-Companion-Pool beim Ende des Ruhens neu verknüpfen (Statuswechsel, Phasen-/Zugbeginn).
     if (hookName === 'onStatusApplied' || hookName === 'onStatusRemoved' || hookName === 'onPhaseStart' || hookName === 'onTurnStart') {
       // (synchron prüfen, nur bei Arbeit `await`en - ein unbedingtes `await` verschöbe die Hook-Zeitpunkte, auf die sich z. B. der
@@ -3741,6 +3749,23 @@ class GameEngine {
       if (a.controller !== activePlayer && b.controller === activePlayer) return 1;
       return 0;
     });
+    // ★ W83a (Al 27.10.2026 — Cool Rescuer Monia): Haben BEIDE Spieler eine solche Reaktion, wird IMMER ZUERST der Gegner des Zugspielers (= wer NICHT am Zug ist) gefragt, dann erst der
+    // Zugspieler; nimmt der Zuerst-Gefragte an, entfaellt die zweite Frage (die Buchfuehrung des Skripts kennt das Ergebnis). Kartenvertrag `hookGegnerZuerst: { [hookName]: true }`:
+    // NUR die Zuhoerer mit dieser Marke tauschen untereinander ihre Plaetze (stabil); alle anderen Zuhoerer behalten ihre Reihenfolge (Zugspieler zuerst) und ihre Plaetze.
+    {
+      const plaetze = [];
+      for (let i = 0; i < listeners.length; i++) {
+        let sc = null;
+        try { const ov = listeners[i].counters?._effectOverride; sc = ov ? loadCardEffect(ov) : listeners[i].loadScript(); } catch { sc = null; }
+        if (sc?.hookGegnerZuerst?.[hookName]) plaetze.push(i);
+      }
+      if (plaetze.length > 1) {
+        const ktrl = (c) => { try { return this.effektiveSeiten(c).controller; } catch { return c.controller ?? c.owner; } };
+        const gruppe = plaetze.map(i => listeners[i]);
+        gruppe.sort((a, b) => (ktrl(a) === activePlayer ? 1 : 0) - (ktrl(b) === activePlayer ? 1 : 0));
+        plaetze.forEach((i, k) => { listeners[i] = gruppe[k]; });
+      }
+    }
 
     // Execute each listener
     for (const card of listeners) {
@@ -55072,7 +55097,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         for (const { inst, cd } of this.collectAoeCreatureTargets(targetPlayers, config, types)) {
           if (cd?.hp == null) continue;
           const hp = Math.max(0, cd.hp - (inst.counters?.damageTaken || 0));
-          if (hp > 0) targets.push({ kind: 'creature', hp, owner: this.physicalSide(inst) });
+          if (hp > 0) targets.push({ kind: 'creature', hp, owner: this.physicalSide(inst), inst });   // W83a: `inst` fuer die Schutz-Pruefung der CPU-Bewerter (`_kreaturen-bilanz.js` `schutzAnteil`)
         }
       }
     } catch { /* defensiv: Projektion darf nie werfen */ }

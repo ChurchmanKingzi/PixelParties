@@ -30,6 +30,11 @@
 //   ihn zurueck (`zweitwurfFortsetzen`, `_second-target-shared.js`). CPU: die Bilanz rechnet mit absehbaren weiteren Treffern (Mehrfachtreffer: Schaden × erwartete Schlagzahl, Zweitwurf: voraussichtliches
 //   Zweitziel anteilig, `_kreaturen-bilanz.js` `mitMehrfachtreffer`/`zweitwurfEintrag`).
 //
+//  ★ W83a (Al, 27./28.10.2026): (1) haben BEIDE Spieler eine Monia, wird ZUERST der Gegner des Zugspielers gefragt, dann der Zugspieler (`hookGegnerZuerst`, Engine `runHooks`); nimmt der Erste
+//   an, entfaellt die zweite Frage. (2) CPU: dieselbe Bilanz, aber ohne bereits geschuetzte Kreaturen (sicherer Schutz), Ueberlebende ×0,7, weich Geschuetzte ×0,5 (`cpuInfo`, `ohne: [Monia]`).
+//   (3) Ein zweiter CAST (Saya, Idej Kunagi, Chaos Magic, Timeless King Zi, Love Shot) ist ein EIGENER Effekt mit eigenem Angebot (`neuerGuss`); der Zweitwurf von Bartas/Grisgar/Andras bleibt
+//   derselbe Effekt. Siehe CARD_API „Welle 83 / W83a".
+//
 //  ★ W58a (Al, 22.10.2026): die Einmal-pro-Zug-Klausel ist gestrichen
 //  („Whenever" statt „Once per turn, when"). JEDE Karte / JEDER Effekt,
 //  der mindestens eine Kreatur betreffen wuerde, oeffnet das Angebot
@@ -80,13 +85,23 @@ const CARD_NAME = 'Cool Rescuer Monia';
  * (`engine.kreaturenBilanz`, gemeinsame Rechnung). `liste` = [{ inst, art, amount?, sourceOwner?, detail?, statusName?, sicher?, canBeNegated? }].
  * Nur Zahlen/Namen — der Prompt geht auch an den Client.
  */
-function cpuInfo(engine, pi, liste, quelleOwner, effektTyp) {
+function cpuInfo(engine, pi, liste, quelleOwner, effektTyp, key) {
   let rechnung = { bilanz: 0, geschuetzt: 0, verloren: 0, eigeneBedroht: 0, posten: [] };
   // Gerechnet wird nur fuer die CPU (auch im Rollout): ein Mensch entscheidet selbst und der Prompt geht an seinen Client.
   const fuerCpu = (typeof engine.isCpuPlayer === 'function' && engine.isCpuPlayer(pi)) || engine._inMctsSim || engine._fastMode;
-  if (fuerCpu) { try { rechnung = engine.kreaturenBilanz(pi, liste) || rechnung; } catch { /* ohne Rechnung lehnt die CPU ab */ } }
+  // ★ W83a (Al 27.10.2026): dieselbe gemeinsame Rechnung wie alle AoE-Bewerter — Kreaturen, die zum Zeitpunkt der Entscheidung ohnehin geschuetzt sind (sicherer Schutz: Immunitaet,
+  // Erstrunden-Schutz …), zaehlen weder als Gewinn noch als Verlust; Ueberlebende eines Schadens mit 0,7 × Anteil an der Rest-HP. Monias EIGENE Entscheidung rechnet nicht mit Monia
+  // (`ohne`): weder die eigene noch die des Gegners (die CPU spekuliert nicht auf dessen Zahlung).
+  if (fuerCpu) {
+    try { rechnung = engine.kreaturenBilanz(pi, liste, { schutz: { quelle: key || undefined, ohne: [CARD_NAME] } }) || rechnung; } catch { /* ohne Rechnung lehnt die CPU ab */ }
+  }
+  // ★ W83a: Reihenfolge der Fragen (Engine: `hookGegnerZuerst`) — wer NICHT am Zug ist, wird zuerst gefragt. Hat der ZUERST Gefragte abgelehnt, steht das hier fuer den Zweiten (`vorentscheidung`);
+  // hat er angenommen, wird der Zweite gar nicht mehr gefragt. Die CPU rechnet trotzdem nur nach der Bilanzregel (kein Spekulieren auf die Entscheidung des anderen).
+  const gs = engine.gs;
+  const davor = (gs?._moniaAngebote || []).find(a => a.key === (key || '') && a.pi !== pi);
   return {
     pi, quelleOwner: Number.isInteger(quelleOwner) ? quelleOwner : -1, effektTyp: effektTyp || null,
+    zugspieler: gs?.activePlayer, zuerstGefragt: pi !== gs?.activePlayer, vorentscheidung: davor ? (davor.seite == null ? 'abgelehnt' : 'angenommen') : null,
     bilanz: Math.round(rechnung.bilanz * 10) / 10, geschuetzt: Math.round(rechnung.geschuetzt * 10) / 10, verloren: Math.round(rechnung.verloren * 10) / 10,
     eigeneBedroht: rechnung.eigeneBedroht, posten: rechnung.posten,
   };
@@ -104,6 +119,10 @@ function quelleBesitzer(src, fallbackZahl) {
 module.exports = {
   heroEffect: true,
   activeIn: ['hero'],
+
+  // ★ W83a (Al 27.10.2026): haben BEIDE Spieler eine Monia, fragt die Engine (`runHooks`) IMMER ZUERST den Gegner des Zugspielers (wer NICHT am Zug ist), dann erst den Zugspieler.
+  // Nimmt der Zuerst-Gefragte an, entfaellt die zweite Frage (`angenommenesAngebot`); lehnt er ab, wird die zweite Monia gefragt. Vorher: Zugspieler zuerst (Standardreihenfolge der Zuhoerer).
+  hookGegnerZuerst: { beforeCreatureAffected: true, beforeCreatureDamageBatch: true },
 
   // ── Aufstieg (v668) zu „Monia Bot, the Foretold Rescuer of Coolness"
   // mit Cool Tech Jetpack. Bedingung in `_monia-shared.js`; Bereit-
@@ -288,8 +307,8 @@ module.exports = {
         // W78a: die komplette Zielliste des Stapels (beide Seiten), Wirkung = Schaden je Eintrag (nicht negierbarer Schaden zaehlt nicht: Monia schuetzt dort nichts)
         // W80a: dazu die erwarteten WEITEREN Treffer desselben Effekts — Mehrfachtreffer (Schaden × erwartete Schlagzahl) und der Zweitwurf der Zusatzziel-Helden (genau 1 Ziel + Bartas/Grisgar/Andras beim Wirker).
         _moniaInfo: cpuInfo(engine, pi, KB.mitMehrfachtreffer(engine,
-          promptable.map(e => ({ inst: e.inst, amount: e.amount, sourceOwner: quelleOwner, canBeNegated: e.canBeNegated })),
-          { quelle: trigger || '', quelleOwner, heroOwner: srcEntry?.source?.heroOwner ?? srcEntry?.source?.owner, heroIdx: srcEntry?.source?.heroIdx }), quelleOwner, 'damage'),
+          promptable.map(e => ({ inst: e.inst, amount: e.amount, sourceOwner: quelleOwner, canBeNegated: e.canBeNegated, type: e.type })),
+          { quelle: trigger || '', quelleOwner, heroOwner: srcEntry?.source?.heroOwner ?? srcEntry?.source?.owner, heroIdx: srcEntry?.source?.heroIdx }), quelleOwner, 'damage', key),
       });
 
       // Abgelehnt: fuer diese Karte/diesen Effekt nicht noch einmal fragen (mehrere Stapel, Folgetreffer, andere Seite).
@@ -430,7 +449,7 @@ module.exports = {
         cancellable: true,
         cpuDispatch: CARD_NAME,
         costFor: CARD_NAME, costKind: 'protect',   // Kosten-Abwurf-Lernkanal (v1041), siehe oben
-        _moniaInfo: cpuInfo(engine, pi, erwartet, quelleOwner, ctx.effectType),
+        _moniaInfo: cpuInfo(engine, pi, erwartet, quelleOwner, ctx.effectType, key),
       });
 
       // Abgelehnt: gilt fuer den ganzen Effekt (W77a) — keine zweite Frage fuer eine andere Kreatur / die andere Seite.

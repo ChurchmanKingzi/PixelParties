@@ -147,6 +147,19 @@ module.exports = {
     return undefined;
   },
 
+  /**
+   * CPU-Vorabpruefung (W83a, Al 27.10.2026: "Ja, das ist gut."; Vertrag `cpuSchuetzt`, gelesen von `engine.kreaturGeschuetztVor`): dieser Warrior negiert die Wirkung auf JEDE Kreatur
+   * beider Seiten ("a Creature either player controls"), solange mindestens EIN Doom Counter auf einer Doom Clock liegt (konservativ: jede Kreatur kostet einen Counter, in einer
+   * Flaechenkarte waere der Schutz auf die Zahl der Counter begrenzt — das sieht die Vorabpruefung je Kreatur nicht; die Heuristik rechnet ihn ohnehin nur WEICH, anteilig).
+   * Gilt nicht, wenn der Warrior ruht (gefroren/betaeubt/negiert), der Wirker sein eigener Kontrolleur ist (die CPU negiert nie den eigenen Effekt) oder die Wirkung nicht negierbar ist.
+   */
+  cpuSchuetzt(engine, traeger, _ziel, e) {
+    if (!traeger || traeger.zone !== 'support' || traeger.faceDown || e?.canBeNegated === false) return false;
+    const ktrl = traeger.controller ?? traeger.owner;
+    if (ktrl === e?.quelleOwner) return false;
+    return D.clocksWithCounters(engine).length > 0;
+  },
+
   hooks: {
     /**
      * Schutzschirm fuer eine Creature — beliebiger Seite.

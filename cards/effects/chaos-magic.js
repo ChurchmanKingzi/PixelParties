@@ -165,6 +165,7 @@ module.exports = {
         try {
           const _kosten = loadCardEffect(found)?.payActivationCost;
           if (typeof _kosten === 'function') await _kosten.call(loadCardEffect(found), engine._createContext(subInst, {}));
+          require('./_monia-shared').neuerGuss(gs);   // W83a (Al 28.10.): der gewirkte Spell ist für Cool Rescuer Monia ein EIGENER Effekt (eigenes Angebot)
           await engine.runHooks('onPlay', {
             _onlyCard: subInst, playedCard: subInst,
             cardName: found, zone: 'hand', heroIdx,
