@@ -35120,7 +35120,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async trefferAlsWahl(ziel, validTargets, sourceCard, config = {}) {
     if (!ziel || !sourceCard) return ziel;
-    const ids = await this.applyRedirectWindows([ziel.id], validTargets, config, sourceCard);
+    // `_mehrTreffer`: dieser Einzeltreffer gehört zu einem Effekt mit MEHREREN Zielen (Kettenblitz) — Umleiter mit „exactly one target" (Winged Haressassin) bieten dann nichts an.
+    const ids = await this.applyRedirectWindows([ziel.id], validTargets, { ...config, _mehrTreffer: true }, sourceCard);
     if (!Array.isArray(ids) || ids.length === 0) return null;
     if (ids[0] === ziel.id) return ziel;
     return (validTargets || []).find(t => t && t.id === ids[0]) || ziel;
@@ -35711,6 +35712,28 @@ this._deathWatch = (this._deathWatchStack || []).length
   _promptsForceCommit(playerIdx) {
     return this.gs._learningCasting === playerIdx
       || this.gs._forcedCommitPlayer === playerIdx;
+  }
+
+  /** ★ W82 (Sinister Idol): führt `fn` als PFLICHT-Auflösung für `pi` aus (`aktiv`): alle Wahlen von `pi` sind ohne Abbruch (Zwangs-Kontext `gs._forcedCommitPlayer`, s. `_promptsForceCommit`). Verschachtelbar. */
+  async mitPflichtAufloesung(pi, aktiv, fn) {
+    if (!aktiv) return fn();
+    const gs = this.gs;
+    const vorher = gs._forcedCommitPlayer;
+    gs._forcedCommitPlayer = pi;
+    try { return await fn(); }
+    finally { if (vorher != null) gs._forcedCommitPlayer = vorher; else delete gs._forcedCommitPlayer; }
+  }
+
+  /**
+   * ★ W82 (Sinister Idol): ist die offene Frage von `pi` eine PFLICHTwahl im Zwangs-Kontext (`_promptsForceCommit`, `cancellable: false`)? Dann weist der Server einen Abbruch ab
+   * (`cancel_potion`, `effect_prompt_response` mit `cancelled`) und die Frage bleibt offen. Ja/Nein-Fragen (`confirm`) bleiben echte Entscheidungen — „No" ist keine Abbruch-Wahl.
+   */
+  _abbruchGesperrt(pi) {
+    if (!this._promptsForceCommit(pi)) return false;
+    const pt = this.gs.potionTargeting, ep = this.gs.effectPrompt;
+    if (pt && pt.ownerIdx === pi) return pt.config?.cancellable === false;
+    if (ep && ep.ownerIdx === pi) return ep.cancellable === false && ep.type !== 'confirm';
+    return false;
   }
 
   /**
@@ -56834,9 +56857,9 @@ this._deathWatch = (this._deathWatchStack || []).length
           }
           // ★ W82 (Animal Training): „If this Attack would defeat a Creature your opponent controls, … instead" — Ersatz der Niederlage durch die QUELLE (nach Hand-Reaktionen und
           // Betragsminderung: nur ein weiterhin tödlicher Treffer zählt). Vertrag: `_quelleErsetztNiederlage`. Ersetzt = wie `saved` oben (kein Tod, kein Schaden, weiter mit dem nächsten Eintrag).
-          if (actualAmount >= e.inst.counters.currentHp && await this._quelleErsetztNiederlage(e.inst, e.source, actualAmount, e.type, _pdInfo)) {
+          // Al (27.10.): der Besitzer rettet ZUERST — hat seine Hand-Reaktion die Creature schon zur Wiederbelebung nach dem Tod vorgemerkt (`_reviveAfterDeath`, Bone Dog), gibt es nichts zu übernehmen.
+          if (actualAmount >= e.inst.counters.currentHp && !e.inst._reviveAfterDeath && await this._quelleErsetztNiederlage(e.inst, e.source, actualAmount, e.type, _pdInfo)) {
             delete e.inst.counters._dyingThisBatch;
-            delete e.inst._reviveAfterDeath;   // eine „nach dem Tod wiederbeleben"-Marke (Bone Dog, Cute Phoenix) gilt für einen Tod, der nicht mehr stattfindet
             this.log('creature_pre_defeat_source_replace', { creature: e.inst.name, by: e.source?.name || e.type });
             this.sync();
             await this._delay(150);
