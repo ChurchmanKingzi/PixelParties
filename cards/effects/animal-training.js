@@ -23,6 +23,11 @@
 //       4. negiert ihre Effekte bis zum Ende dieses Zuges (`actionNegateCreature`, Muster Dark Gear/Diplomacy: unverhinderbar, `selfInflicted`, Ablauf zu Beginn des nächsten Zuges).
 //     Es gibt keinen Tod: keine Todes-Trigger, kein „defeated by", kein Kadaver; Zähler, Anhängsel und Status der Creature wandern mit (wie bei Betrayal/Capture). `originalOwner`
 //     bleibt der Gegner (ihre Karte geht später in dessen Ablage).
+//  ── REIHENFOLGE (Al, 27.10.) ────────────────────────────────────────────
+//  Der BESITZER der Creature rettet zuerst: Selbst-Ersatz (Pythia/Hydra `selfPreDefeat`), JEDES Reaktionsfenster der Hand, Extra Life, eine schon vorgemerkte Wiederbelebung (Bone Dog: `_reviveAfterDeath`)
+//  gehen dem Ersatz vor; nur ein dann noch tödlicher Endbetrag (nach allen Minderungen) wird ersetzt. Gate und Monia wirken noch VOR dem Schaden: schützen sie die Creature, hat die Attack an ihr GAR KEINEN
+//  Effekt (kein Schaden, kein Tod, keine Übernahme). Lehnt der Gegner ab, läuft die Übernahme ohne zweites Fenster durch (die Fenster fragen einmal je Wirkung). Cute Phoenix fragt erst nach dem Tod — ihre
+//  Wiederbelebung kommt nicht zum Zug, weil die Creature nicht stirbt.
 //  • Keine Ersatzwirkung bei: Helden als Ziel, eigenen/übernommenen Creatures des Nutzers, Cardinal Beasts & Co. (kein Kontrollwechsel möglich), Creatures, die nicht sterben (Schaden zu gering
 //    oder verhindert), einem wirksamen gegnerischen Boris („cannot activate effects that would take control …": die Übernahme ist dann gesperrt, die Creature stirbt normal).
 //  • Der Ersatz gilt nur für Attack-Schaden dieser Karte (der Vertrag prüft `type === 'attack'`, `usesHeroAtk`, Kartenname).
