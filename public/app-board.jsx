@@ -52987,6 +52987,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Bild (s. dort): vorher lief jeder Folgedurchgang in einem eigenen
   // Animationsbild, das Feld rutschte beim Betreten ueber drei, vier
   // Zwischenstaende (-4, -128, -89 px) auf seinen Platz.
+  // ★ PERF-VERTRAG: `--center-offset`, `--board-anchor-x` und `--board-overhang-l/r` sind in style.css als NICHT vererbend registriert
+  // (`@property`) und werden nur entlang der Kette Clip → Ebene → Heldenzeilen / Sprite-Huelle ausdruecklich weitergereicht. Jede Aenderung
+  // dieser Werte (unten mehrfach je Durchlauf, jeweils mit anschliessendem Lesen) kostete sonst die Stilberechnung des ganzen Bretts
+  // (15-19 ms; Gigalopolis/Barrel Home: ~870 ms am Stueck). Wer sie in einem NEUEN Element braucht, traegt es in dieser `inherit`-Kette ein.
   useLayoutEffect(() => {
     const el = boardCenterRef.current;
     if (!el) return;
@@ -53033,6 +53037,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // which reads as constant interface jitter. Once latched, stay
       // latched until the layout is clearly under the line.
       const wasScrollMode = el.classList.contains('can-scroll');
+      // Projizierte Zonen-Ausdehnung (links/rechts) — fuer Mittelkorrektur, Tooltip-Platz und den Scroll-Riegel.
+      const zonenRand = () => {
+        let l = Infinity, r = -Infinity;
+        el.querySelectorAll('.board-plane .board-zone').forEach(z => {
+          const q = z.getBoundingClientRect();
+          if (!q.width) return;
+          if (q.left < l) l = q.left;
+          if (q.right > r) r = q.right;
+        });
+        return r > l ? { l, r } : null;
+      };
+      // ★ Die projizierte Breite GLEICH ZU BEGINN lesen (noch im echten Zustand, vor dem Messfenster): der Riegel unten entschied vorher
+      // an dem Wert, den der VORIGE Durchlauf am Ende gemessen hat — kam eine Zone dazu (Gigalopolis) oder ging eine (Barrel Home),
+      // war der Wert veraltet und der Scrollmodus rastete erst einen Durchlauf spaeter ein bzw. aus. Jeder Durchlauf kostet viele
+      // erzwungene Stilberechnungen (hunderte laufende Animationen), das Brett ruckelte hunderte Millisekunden.
+      const mStart = zonenRand();
+      const projStart = mStart ? Math.round(mStart.r - mStart.l) : (el._ppProjW || 0);
       // Neutralize the pseudo-3D tilt for the measurement: the enlarged
       // near edge of the tilted plane inflates scrollWidth by ~10% and
       // would otherwise latch can-scroll on, which in turn disables the
@@ -53081,7 +53102,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // nach links (s. u.) auch einen Rand hat. KEINE Haltezone fuer dieses Mass: die projizierte Zonenbreite aendert sich beim
       // Moduswechsel nicht, ein Flattern ist also ausgeschlossen — und eine Haltezone hielte ein Brett im Scrollmodus fest, das nach
       // dem ersten Massstab-Durchgang laengst passt.
-      const projRiegel = (el._ppProjW || 0) > 0 && (el._ppProjW || 0) + 16 > el.clientWidth;
+      const projRiegel = projStart > 0 && projStart + 16 > el.clientWidth;
       if (window.ppHScrollRiegel(inhaltW, el.clientWidth, wasScrollMode) || projRiegel) {
         el.classList.add('can-scroll');
         // In scroll mode, disable centering transform to avoid layout confusion
@@ -53110,9 +53131,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // padding-left to the LEFT of the hero (the v18 symptom with
         // islands: "straight point somewhere left, heroes still lean").
         // Read the live value from the CSS var (unaffected by the flat
-        // toggle); it lags one pass behind the overhang update below,
-        // which the every-render re-run + deadband settles.
-        const padLLive = parseFloat(el.style.getPropertyValue('--board-overhang-l')) || 0;
+        // toggle). The overhang update below writes the anchor together
+        // with the new padding, so the two never lag behind each other.
+        // Nur im Scrollmodus: ausserhalb setzt dieser Durchlauf das Polster am Ende auf 0 zurueck. Ein altes Polster (Barrel Home nimmt die
+        // Gigalopolis-Zone, das Brett rastet aus) verschob den Anker sonst um dessen Wert, und es brauchte einen Durchlauf mehr, ihn zurueckzuholen.
+        const padLLive = el.classList.contains('can-scroll') ? (parseFloat(el.style.getPropertyValue('--board-overhang-l')) || 0) : 0;
         const anchorX = hrFlat.left + hrFlat.width / 2 - plFlat.left + padLLive;
         ankerFlach = anchorX;
         const prevAnchor = parseFloat(el.style.getPropertyValue('--board-anchor-x')) || -1;
@@ -53121,17 +53144,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
       }
       el.classList.remove('board-flat-measure');
-      // Projizierte Zonen-Ausdehnung (links/rechts) — fuer Mittelkorrektur, Tooltip-Platz und den Scroll-Riegel.
-      const zonenRand = () => {
-        let l = Infinity, r = -Infinity;
-        el.querySelectorAll('.board-plane .board-zone').forEach(z => {
-          const q = z.getBoundingClientRect();
-          if (!q.width) return;
-          if (q.left < l) l = q.left;
-          if (q.right > r) r = q.right;
-        });
-        return r > l ? { l, r } : null;
-      };
       // ── Middle-hero anchoring (v17, Al) ──────────────────────────
       // The MIDDLE hero zones are the battlefield's true midpoint —
       // with asymmetrically placed Flying Islands the board box's
@@ -53213,12 +53225,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const padL = parseFloat(cs.paddingLeft) || 0;
           const padR = parseFloat(cs.paddingRight) || 0;
           const contentW = Math.max(1, plane.offsetWidth - padL - padR);
+          // Rechte Referenz = Layout-Rand der EBENE, nicht des Clips: die Ebene umschliesst ihren Inhalt im Scrollmodus knapp (style.css,
+          // `width: min-content`), der Clip bleibt mindestens so breit wie der Kasten. Gegen den Clip-Rand gemessen waere die Luecke rechts
+          // solange konstant, wie die Ebene schmaler als der Kasten ist, und das Polster wuchse Durchlauf fuer Durchlauf (Gigalopolis: ~9 Messungen).
+          const ebeneRechts = cr.left + plane.offsetWidth;
           const newL = Math.min(contentW, Math.max(0, padL + (cr.left - pLf)));
-          const newR = Math.min(contentW, Math.max(0, padR + (pRt - cr.right)));
+          const newR = Math.min(contentW, Math.max(0, padR + (pRt - ebeneRechts)));
           const prevL = parseFloat(el.style.getPropertyValue('--board-overhang-l')) || 0;
           const prevR = parseFloat(el.style.getPropertyValue('--board-overhang-r')) || 0;
-          if (Math.abs(newL - prevL) > 0.5) el.style.setProperty('--board-overhang-l', newL.toFixed(1) + 'px');
-          if (Math.abs(newR - prevR) > 0.5) el.style.setProperty('--board-overhang-r', newR.toFixed(1) + 'px');
+          // 1 px Totband (statt 0.5): `offsetWidth` ist ganzzahlig, die rechte Referenz wackelt sonst um einen halben Pixel hin und her.
+          if (Math.abs(newL - prevL) > 1) {
+            el.style.setProperty('--board-overhang-l', newL.toFixed(1) + 'px');
+            // Der Anker (Mittelheld in Ebenenkoordinaten) hat das linke Polster eingerechnet. Mit dem NEUEN Polster zugleich schreiben: Die Ebene
+            // umschliesst ihren Inhalt knapp, das Polster verschiebt ihn also 1:1 — Brett und Perspektive wandern starr mit. Nachgezogen erst im
+            // naechsten Durchlauf, waere dieser nur zur Bestaetigung noetig (vorher zogen Anker und Polster einander ueber Durchlaeufe nach).
+            if (ankerFlach != null) el.style.setProperty('--board-anchor-x', (ankerFlach - prevL + newL).toFixed(1) + 'px');
+          }
+          if (Math.abs(newR - prevR) > 1) el.style.setProperty('--board-overhang-r', newR.toFixed(1) + 'px');
         }
       } else {
         el.style.setProperty('--board-overhang-l', '0px');
