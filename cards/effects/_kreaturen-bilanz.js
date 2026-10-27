@@ -104,6 +104,8 @@ function kreaturWert(engine, inst, opts = {}) {
 /** Die Standard-Kreatur der Brettbewertung zaehlte bisher flach 30; Level 0 mit 60 HP ist die Referenz (roher Wert 26). */
 const BRETT_BASIS = 30;
 const BRETT_REFERENZ = 26;
+/** Umrechnung `kreaturWert`-Skala → Brettskala (Standard-Kreatur Level 0/60 HP: 26 → 30). */
+const BRETT_FAKTOR = BRETT_BASIS / BRETT_REFERENZ;
 const BRETT_MIN = 15;
 const BRETT_MAX = 75;
 /** 1 = proportional zum rohen Wert (Vorgabe Al); kleiner = flachere Kurve (nur fuer Messlaeufe: `PP_CPU_BRETT_STEIGUNG`). */
@@ -208,6 +210,9 @@ function kreaturenBilanz(engine, opfer, liste, opts = {}) {
     if (gesehen.has(dop)) continue;
     gesehen.add(dop);
     if (e.canBeNegated === false) continue;   // nicht negierbar: Monia schuetzt/verschont hier nichts
+    // W82b (Opt-in `opts.schutz`): wer die Wirkung ohnehin nicht nimmt (sicherer Schutz: Immunitaet, Erstrunden-Schutz, Zielschutz …), gewinnt/verliert nichts durch die Negation.
+    // Standardmaessig AUS — Monias CPU und Whirlwind Strike rechnen unveraendert (Frage an Al im CARD_API-Abschnitt W82b).
+    if (opts.schutz && kreaturGeschuetztVor(engine, opts.schutz.quelle ?? e.source ?? e.sourceOwner, inst, e.art, { amount: e.amount, damageType: e.type ?? opts.schutz.damageType, sourceOwner: e.sourceOwner, gerichtet: opts.schutz.gerichtet, statusName: e.statusName, nurSicher: true }).geschuetzt) continue;
     const w = wirkungAuf(engine, inst, e);
     if (!w.richtung || !(w.staerke > 0)) continue;
     const eigen = seiteVon(engine, inst) === opfer;
@@ -416,42 +421,245 @@ function kreaturenAnHelden(engine, physOwner, heroIdx) {
   return out;
 }
 
-// ── Flaechen-/Mehrziel-Bewertung fuer den WIRKER (W80a) ──────────────────────────────────────────────────
+// ── Schutz einer Kreatur vor einer Wirkung (W82b) ────────────────────────────────────────────────────────
 
-/** Ab dieser Wirkbilanz (Brettwert-Skala, Standard-Kreatur = 30) gilt ein Flaechenschlag als klar positiv. */
-const FLAECHEN_SCHWELLE = 20;
-/** Umrechnung `kreaturWert`-Skala → Brettskala (Standard-Kreatur Level 0/60 HP: 26 → 30). */
-const BRETT_FAKTOR = BRETT_BASIS / BRETT_REFERENZ;
-
-/**
- * Wirkbilanz eines Flaechenschlags aus Sicht des WIRKERS `pi` auf KREATUREN (Brettskala): Wert der getroffenen GEGNERISCHEN Kreaturen MINUS Wert der getroffenen EIGENEN,
- * jeweils nach der echten Wirkung je Kreatur (`kreaturenBilanz`: Schaden anteilig an der Rest-HP, toedlich = voll; Status 0,6 …). Kreaturen des durch die Erste-Runden-Immunitaet
- * geschuetzten Spielers zaehlen nicht.
- * k: { art ('damage' | 'status' …), amount?, statusName?, nurSitze?: [Spielerindizes] (Standard: alle), filter?(inst) → boolean }
- * @returns {{ wirk:number, gegner:number, eigen:number, posten:object[] }} wirk = gegner − eigen (Brettskala)
- */
-function flaechenWirkung(engine, pi, k = {}) {
-  const n = typeof engine.playerCount === 'function' ? engine.playerCount() : 2;
-  const sitze = k.nurSitze || Array.from({ length: n }, (_, i) => i);
-  let ziele = [];
-  try { ziele = engine.collectAoeCreatureTargets(sitze, {}, ['creature']); } catch { ziele = []; }
-  const prot = engine.gs?.firstTurnProtectedPlayer;
-  const liste = [];
-  for (const { inst } of ziele) {
-    if (k.filter && !k.filter(inst)) continue;
-    const seite = seiteVon(engine, inst);
-    if (prot != null && seite === prot && pi !== prot) continue;
-    if (inst.counters?._cardinalImmune) continue;
-    liste.push({ inst, art: k.art || 'damage', amount: k.amount, statusName: k.statusName, detail: k.detail, sourceOwner: pi });
-  }
-  const r = kreaturenBilanz(engine, pi, liste);
-  // `kreaturenBilanz(opfer = pi)`: `verloren` = Wert dessen, was GEGNERISCHEN Kreaturen widerfaehrt, `geschuetzt` = was EIGENEN widerfaehrt (Schaden) — fuer den Wirker umgekehrt gelesen.
-  return { wirk: (r.verloren - r.geschuetzt) * BRETT_FAKTOR, gegner: r.verloren * BRETT_FAKTOR, eigen: r.geschuetzt * BRETT_FAKTOR, posten: r.posten };
+/** Quelle normalisieren: Name, Besitzer (Wirker) und ein Quellobjekt im Format der Schadenspfade. */
+function normQuelle(quelle, opts = {}) {
+  let name = '', owner;
+  if (typeof quelle === 'string') name = quelle;
+  else if (typeof quelle === 'number') owner = quelle;
+  else if (quelle && typeof quelle === 'object') { name = quelle.cardName || quelle.name || ''; owner = quelle.heroOwner ?? quelle.controller ?? quelle.owner; }
+  if (!name && opts.sourceName) name = opts.sourceName;
+  if (typeof opts.sourceOwner === 'number') owner = opts.sourceOwner;
+  const obj = { name, ...(typeof owner === 'number' ? { owner, controller: owner } : {}), heroIdx: Number.isInteger(opts.heroIdx) ? opts.heroIdx : (quelle && typeof quelle === 'object' && Number.isInteger(quelle.heroIdx) ? quelle.heroIdx : -1) };
+  return { name, owner: typeof owner === 'number' ? owner : undefined, obj };
 }
 
-/** Veto-Entscheidung zu einer Wirkbilanz: spielen nur bei klar positiver Bilanz (mindestens FLAECHEN_SCHWELLE UND ein Fuenftel der Gegnerseite). */
-function flaechenVeto(r, extraGegner = 0) {
-  return !(r.wirk >= FLAECHEN_SCHWELLE && r.wirk >= 0.2 * (r.gegner + Math.max(0, extraGegner)));
+/** Ohne Log-Ausgabe rechnen (die Engine-Pruefungen protokollieren sonst jeden Fehlschlag). */
+function leise(engine, f) {
+  const eigen = Object.prototype.hasOwnProperty.call(engine, 'log');
+  const orig = engine.log;
+  engine.log = () => {};
+  try { return f(); } finally { if (eigen) engine.log = orig; else delete engine.log; }
+}
+
+/** Sieht ein Traeger-Skript einen Schutz fuer `ziel` vor (Vertrag `cpuSchuetzt`)? Traeger: Brettkarte (Instanz) oder Held ({ hero, owner, heroIdx }). */
+function reaktiverSchutz(engine, ziel, e) {
+  const frage = (script, traeger, aktiv) => {
+    if (typeof script?.cpuSchuetzt !== 'function' || !aktiv) return null;
+    try { return script.cpuSchuetzt(engine, traeger, ziel, e) ? script : null; } catch { return null; }
+  };
+  const { loadCardEffect } = require('./_loader');
+  for (let p = 0; p < (engine.gs.players || []).length; p++) {
+    const heroes = engine.gs.players[p]?.heroes || [];
+    for (let hi = 0; hi < heroes.length; hi++) {
+      const hero = heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      let silenced = false;
+      try { silenced = !!engine._isHeroEffectSilenced?.(p, hi); } catch { silenced = false; }
+      const sc = frage(engine.heroScript?.(hero), { hero, owner: p, heroIdx: hi, heroName: hero.name }, !silenced);
+      if (sc) return hero.name;
+    }
+  }
+  for (const c of engine.cardInstances || []) {
+    if (c.zone !== 'support' || c.faceDown) continue;
+    let dormant = false;
+    try { dormant = !!engine.isCardPassiveDormant?.(c); } catch { dormant = false; }
+    if (frage(loadCardEffect(c.counters?._effectOverride || c.name), c, !dormant)) return c.name;
+  }
+  return null;
+}
+
+/**
+ * Ist diese Kreatur vor der Wirkung `art` der Quelle GESCHUETZT — nimmt sie die Wirkung nachweislich nicht?
+ * ★ W82b (Al, 27.10.2026): gemeinsame Vorabpruefung fuer die CPU-Bewerter (Flaechenkarten, `kreaturenBilanz`).
+ *   quelle: Name der Karte | { name, owner|controller, heroIdx } | Besitzer-Index · inst: Kreatur auf dem Brett
+ *   art:    damage | destroy | status | control | move | buff | counter | stats …  (wie `engine.kreaturBetroffen`)
+ *   opts:   { amount, damageType, sourceOwner, canBeNegated (false = durchbricht Negation), statusName, gerichtet (Wirkung WAEHLT ihr Ziel), nurSicher (keine Reaktionen), heroIdx }
+ * Zwei Stufen:
+ *   1) SICHER (`weich: false`) — Zustand des Brettes, den die Engine selbst liest: Erstrunden-Schutz, Unaffected-/Immun-Marken (Cardinal Beasts, Golden Wings, Spell-Immunitaet,
+ *      Time Bomblebee …), `_markCreatureDamageImmunity` (DIESELBE Wahrheit wie der Schadensstapel: Guardian, Ifrit, Damus, Egg of God, Sparkfly, Of-Kings-Waechter …), Schadens-Buffs mit
+ *      Faktor 0 (Damage Immune), Anti-Magic, Dark Ocean, Statusschutz (`canApplyCreatureStatus`); bei gerichteten Wirkungen zusaetzlich Zielschutz (Thicket, Censpartan, Board of Kings).
+ *   2) MOEGLICH (`weich: true`) — Reaktionen, die der Gegner des Wirkers nachweislich BEREIT hat: Skripte mit dem Vertrag `cpuSchuetzt(engine, traeger, ziel, e) → boolean` (Cool Rescuer
+ *      Monia mit zwei Handkarten, Winged Skeleton, Elusive Hind, Warrior of Teocuilatl …). Nicht negierbare Wirkung (`canBeNegated: false`) und `nurSicher` lassen diese Stufe aus.
+ *      Verdeckte Gegnerhand (Reaktionskarten) wird NICHT eingesehen.
+ * @returns {{ geschuetzt:boolean, grund:string|null, weich:boolean }}
+ */
+function kreaturGeschuetztVor(engine, quelle, inst, art, opts = {}) {
+  const nein = { geschuetzt: false, grund: null, weich: false };
+  if (!inst) return nein;
+  const ja = (grund, weich = false) => ({ geschuetzt: true, grund, weich });
+  try {
+    const gs = engine.gs;
+    const q = normQuelle(quelle, opts);
+    const seite = inst.controller ?? inst.owner;
+    const verursacher = typeof q.owner === 'number' ? q.owner : gs.activePlayer;
+    const piercing = opts.canBeNegated === false;
+    const schaden = art === 'damage';
+    const zerstoeren = art === 'destroy';
+    if (inst.zone !== 'support') return nein;
+    if (inst.faceDown) return ja('verdeckt');
+
+    // 1) SICHER ───────────────────────────────────────────────────────────────────────────
+    const prot = gs.firstTurnProtectedPlayer;
+    if (prot != null && seite === prot && verursacher !== prot) return ja('Erstrunden-Schutz');
+    if (engine.isOmniImmune?.(inst, q.obj, { sourceOwner: q.owner, damageType: opts.damageType, piercing })) return ja('unaffected');
+    if ((schaden || zerstoeren) && !engine.isCardPassiveDormant?.(inst) && inst.counters?._damageDestroyImmune) return ja('Schaden-/Zerstoeren-Immunitaet');
+    if ((schaden || zerstoeren) && inst.counters?._stealImmortal) return ja('gestohlen (unverwundbar)');
+    if (zerstoeren && inst.counters?.immovable) return ja('unzerstoerbar');
+    if (typeof q.owner === 'number' && q.owner !== seite && art !== 'damage' && engine.isOppEffectImmuneFrom?.(inst, q.obj)) return ja('immun gegen gegnerische Effekte');
+    if (schaden) {
+      const ee = { inst, amount: opts.amount ?? 1, type: opts.damageType || 'other', source: q.obj, sourceOwner: q.owner ?? -1, canBeNegated: !piercing };
+      leise(engine, () => engine._markCreatureDamageImmunity([ee]));
+      if (ee._immuneCreature) return ja('Schadensimmunitaet');
+      if (schadensFaktor(inst) === 0) return ja('Schaden wirkungslos (Buff)');
+      const dt = String(opts.damageType || '');
+      const istZauber = /spell/.test(dt) || dt === 'spell';
+      const am = inst.counters?.buffs?.magic_immune;
+      if (am && istZauber && !piercing) {
+        let lvl = null, bypass = false;
+        try { lvl = engine._getCardDB()?.[q.name]?.level ?? null; bypass = !!require('./_loader').loadCardEffect(q.name)?.bypassesMagicImmune; } catch { /* unbekannt */ }
+        if (!bypass && (lvl == null || (am.level ?? 99) >= lvl)) return ja('Anti Magic');
+      }
+      if (engine.isDarkOceanActive?.() && !piercing) {
+        const durch = dt === 'attack' || dt === 'spell' || dt.endsWith('_spell');
+        let helm = false;
+        try { helm = !!engine._isDiverHelmetProtectedTarget?.(inst); } catch { helm = false; }
+        if (!durch && !helm) return ja('Dark Ocean');
+      }
+    }
+    if (art === 'status' && opts.statusName) {
+      let ok = true;
+      try { ok = engine.canApplyCreatureStatus(inst, opts.statusName, q.obj, { sourceOwner: q.owner, gwSourceOwner: q.owner }); } catch { ok = true; }
+      if (!ok) return ja('Statusschutz');
+    }
+    if (opts.gerichtet) {
+      if (inst.counters?.untargetable_all) return ja('unwaehlbar');
+      if (inst.counters?.untargetable_by_opponent && inst.counters.untargetable_by_opponent_pi === q.owner) return ja('unwaehlbar fuer den Gegner');
+      if (engine.isCreatureImmune?.(inst, 'targeting_immune')) return ja('Zielschutz');
+      if (typeof q.owner === 'number' && engine._boardGuardsCreatureChoice?.(inst, q.owner)) return ja('Board of Kings');
+    }
+
+    // 2) MOEGLICH — Reaktionen des Gegners ──────────────────────────────────────────────────
+    if (!opts.nurSicher && !piercing) {
+      const von = reaktiverSchutz(engine, inst, { art, quelleName: q.name, quelleOwner: q.owner, gerichtet: !!opts.gerichtet, canBeNegated: !piercing, damageType: opts.damageType, amount: opts.amount });
+      if (von) return ja(`Reaktion: ${von}`, true);
+    }
+    return nein;
+  } catch {
+    return nein;   // die Heuristik darf nie stoeren
+  }
+}
+
+// ── Kriterium der Flaechenkarten (W82b, Al 27.10.2026) ──────────────────────────────────────────────────
+
+/**
+ * ★ W82b (Al): „Wert aller zu tötenden Gegner-Creatures höher als Wert der verbrauchten Ressourcen inklusive eigener Creatures, aber NUR die zählen, die nicht geschützt sind."
+ * Alle Posten in PUNKTEN DER BRETTBEWERTUNG (`evaluateState`: Held-HP 1:1, Standard-Kreatur Level 0/60 HP = 30, Handkarte 5–25, Gold 2 je gebrauchtem Gold):
+ *   · Kreaturen: `kreaturWert × BRETT_FAKTOR` (Level 0/60 HP = 30, Level 3/300 HP ≈ 110) — nach dem ganzen Wert, nicht anteilig: nur wer WIRKLICH stirbt zaehlt.
+ *   · Karte: `engine._cpuEstimateHandValue` (die gespielte Karte selbst = Opportunitaetskosten der Hand), Rueckfall 20.
+ *   · Gold: `engine._cpuEstimateGoldValue` (Goldbewertung der Brettbewertung vor/nach der Ausgabe), Rueckfall 1,5 je Gold.
+ *   · Aktion: `AKTION_WERT` = 15 (halbe Standard-Kreatur: die Hauptaktion haette sonst eine Karte ausgespielt), nur wenn die Karte die Hauptaktion kostet (nicht als Zusatzaktion).
+ *   · Weitere Kosten (abgeworfene/geopferte Karten, Tokens …): `kosten.karten` (Namen → Handwert), `kosten.extra` (Punkte).
+ */
+const AKTION_WERT = 15;
+const KARTE_RUECKFALL = 20;
+const GOLD_RUECKFALL = 1.5;
+
+/** Wert der verbrauchten Ressourcen. k: { kartenName, additional, kosten?: { gold, karten: [Namen], extra } } → { summe, karte, gold, aktion, extra, posten[] } */
+function ressourcenWert(engine, pi, k = {}) {
+  const posten = [];
+  const buche = (was, wert) => { if (wert > 0) posten.push({ was, wert: Math.round(wert * 10) / 10 }); return Math.max(0, wert); };
+  let karte = 0, gold = 0, aktion = 0, extra = 0;
+  const name = k.kartenName;
+  if (name) {
+    let w = KARTE_RUECKFALL;
+    try { const v = engine._cpuEstimateHandValue?.(pi, name); if (Number.isFinite(v)) w = v; } catch { /* Rueckfall */ }
+    karte = buche(`Karte ${name}`, w);
+  }
+  // Gold: ausdruecklich angegeben, sonst der Preis eines Artefakts (nach Rabatten, guenstigste Kopie in der Hand).
+  let preis = k.kosten?.gold;
+  if (preis == null && name) {
+    try {
+      const cd = engine._getCardDB()[name];
+      if (cd && cd.cardType === 'Artifact') {
+        const hand = engine.gs.players[pi]?.hand || [];
+        let best = null;
+        for (let i = 0; i < hand.length; i++) { if (hand[i] !== name) continue; const c = engine.artifactPlayCost(pi, name, i).cost; if (best == null || c < best) best = c; }
+        preis = best ?? cd.cost ?? 0;
+      }
+    } catch { preis = null; }
+  }
+  if (preis > 0) {
+    let w = preis * GOLD_RUECKFALL;
+    try { const v = engine._cpuEstimateGoldValue?.(pi, preis); if (Number.isFinite(v)) w = v; } catch { /* Rueckfall */ }
+    gold = buche(`${preis} Gold`, w);
+  }
+  if (!k.additional) aktion = buche('Hauptaktion', AKTION_WERT);
+  for (const kn of k.kosten?.karten || []) {
+    let w = KARTE_RUECKFALL;
+    try { const v = engine._cpuEstimateHandValue?.(pi, kn); if (Number.isFinite(v)) w = v; } catch { /* Rueckfall */ }
+    extra += buche(`Kosten: ${kn}`, w);
+  }
+  if (k.kosten?.extra > 0) extra += buche('weitere Kosten', k.kosten.extra);
+  return { summe: karte + gold + aktion + extra, karte, gold, aktion, extra, posten };
+}
+
+/**
+ * Entscheidung „spielen oder nicht" fuer eine Flaechenkarte, aus Sicht des Wirkers `pi`.
+ *   Gewinn   (A) = Σ Wert der gegnerischen Kreaturen, die durch die Karte TATSAECHLICH sterben UND NICHT geschuetzt sind (+ `heldenGewinn`)
+ *   Verbrauch (B) = Σ Wert der verbrauchten Ressourcen (Karte, Gold, Aktion, Kosten) + Σ Wert der EIGENEN Kreaturen, die sterben UND NICHT geschuetzt sind (+ `heldenVerlust`)
+ *   spielen genau dann, wenn A > B (strikt). Teilschaden an Ueberlebenden und Status zaehlen NICHT (nur als Hinweis in `teilwirkung`).
+ * k: { kartenName, quelle?, additional?, kosten?, ziele?: [{ inst, art, amount, statusName? }] (Standard: alle Kreaturen beider Seiten mit art/amount),
+ *      art?, amount?, damageType?, canBeNegated?, nurSitze?, filter?(inst), heldenGewinn?, heldenVerlust?, gerichtet? }
+ * @returns {{ spielen:boolean, gewinn:number, verbrauch:number, gewinnPosten:object[], verlustPosten:object[], kosten:object, geschuetzt:object[], teilwirkung:number }}
+ */
+function flaechenEntscheidung(engine, pi, k = {}) {
+  const quelle = k.quelle || { name: k.kartenName, owner: pi, controller: pi, heroIdx: -1 };
+  let liste = k.ziele;
+  if (!liste) {
+    const n = typeof engine.playerCount === 'function' ? engine.playerCount() : 2;
+    const sitze = k.nurSitze || Array.from({ length: n }, (_, i) => i);
+    let ziele = [];
+    try { ziele = engine.collectAoeCreatureTargets(sitze, {}, ['creature']); } catch { ziele = []; }
+    liste = ziele.filter(z => !k.filter || k.filter(z.inst)).map(z => ({ inst: z.inst, art: k.art || 'damage', amount: k.amount, statusName: k.statusName }));
+  }
+  const gewinnPosten = [], verlustPosten = [], geschuetzt = [];
+  let gewinn = num(k.heldenGewinn), verlust = num(k.heldenVerlust), teilwirkung = 0;
+  const gesehen = new Set();
+  for (const z of liste) {
+    const inst = z?.inst;
+    if (!inst || inst.zone !== 'support' || inst.faceDown || gesehen.has(inst.id)) continue;
+    gesehen.add(inst.id);
+    const eigen = seiteVon(engine, inst) === pi;
+    const art = z.art || 'damage';
+    const sp = kreaturGeschuetztVor(engine, quelle, inst, art, { amount: z.amount, damageType: k.damageType, canBeNegated: k.canBeNegated, statusName: z.statusName, gerichtet: k.gerichtet, sourceOwner: pi });
+    if (sp.geschuetzt) { geschuetzt.push({ name: inst.name, eigen, grund: sp.grund, weich: sp.weich }); continue; }
+    // Stirbt sie WIRKLICH? Schaden ≥ Rest-HP (nach Buff-Faktor), Zerstoeren immer; alles andere (Status, Teilschaden) ist keine Toetung.
+    let stirbt = false;
+    if (art === 'destroy') stirbt = true;
+    else if (art === 'damage') {
+      const hp = num(inst.counters?.currentHp ?? engine.getEffectiveCardData?.(inst)?.hp);
+      stirbt = hp > 0 && Math.round(num(z.amount) * schadensFaktor(inst)) >= hp;
+    }
+    if (!stirbt) { teilwirkung++; continue; }
+    const wert = kreaturWert(engine, inst) * BRETT_FAKTOR;
+    const eintrag = { name: inst.name, wert: Math.round(wert * 10) / 10 };
+    if (eigen) { verlust += wert; verlustPosten.push(eintrag); } else { gewinn += wert; gewinnPosten.push(eintrag); }
+  }
+  const kosten = ressourcenWert(engine, pi, { kartenName: k.kartenName, additional: k.additional, kosten: k.kosten });
+  const verbrauch = kosten.summe + verlust;
+  return { spielen: gewinn > verbrauch, gewinn, verbrauch, gewinnPosten, verlustPosten, kosten, geschuetzt, teilwirkung };
+}
+
+/** Hat die Karte gerade eine Zusatzaktion (Vertrag `inherentAction`, Funktion oder Wahrheitswert)? Dann kostet sie die Hauptaktion nicht. */
+function alsZusatzaktion(engine, script, pi, heroIdx, opts) {
+  if (opts && opts.additional) return true;
+  try {
+    const f = script?.inherentAction;
+    if (typeof f === 'function') return !!f(engine.gs, pi, heroIdx, engine);
+    return f === true;
+  } catch { return false; }
 }
 
 /**
@@ -467,4 +675,5 @@ function heldKreaturenWirkung(engine, pi, physOwner, heroIdx, amount) {
 
 module.exports = { kreaturWert, brettWert, BRETT_BASIS, BRETT_MIN, BRETT_MAX, wirkungAuf, greift, schuetzt, kreaturenBilanz, absehbareKreaturen, flaechenBereichAusText, schadensFaktor,
   erwarteteSchlaege, zweitwurfChance, zweitwurfEintrag, mitMehrfachtreffer, kreaturenAnHelden,
-  FLAECHEN_SCHWELLE, BRETT_FAKTOR, flaechenWirkung, flaechenVeto, heldKreaturenWirkung };
+  BRETT_FAKTOR, heldKreaturenWirkung,
+  kreaturGeschuetztVor, ressourcenWert, flaechenEntscheidung, alsZusatzaktion, AKTION_WERT };

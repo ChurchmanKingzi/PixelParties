@@ -179,6 +179,22 @@ module.exports = {
     return bilanz >= kosten * 1.25 ? { optionId: 'save-all' } : null;
   },
 
+  /**
+   * CPU-Vorabpruefung (W82b, Vertrag `cpuSchuetzt(engine, traeger, ziel, e) → boolean`, gelesen von `engine.kreaturGeschuetztVor`): wuerde diese Monia die Wirkung `e` auf `ziel` voraussichtlich
+   * negieren? Ja, wenn sie lebt und nicht gefroren/betaeubt/negiert ist, ihr Kontrolleur NICHT der Wirker ist (die CPU schuetzt nie gegen den eigenen Effekt), die Wirkung negierbar ist und
+   * ihr Kontrolleur die 2 Handkarten zahlen kann. Monia schuetzt ALLE Kreaturen beider Seiten (ein Angebot je Effekt), also gilt dies fuer jedes `ziel`. Nur Hand-ANZAHL, keine Kartennamen.
+   */
+  cpuSchuetzt(engine, traeger, _ziel, e) {
+    const { hero, owner, heroIdx } = traeger || {};
+    if (!hero?.name || hero.hp <= 0 || hero.name !== CARD_NAME) return false;
+    if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return false;
+    if (!engine.gs.heroFlags?.[`${owner}-${heroIdx}`]?.moniaProtection) return false;
+    if (e?.canBeNegated === false) return false;
+    const ktrl = engine.kontrolleurVonHeld(owner, heroIdx);
+    if (ktrl === e?.quelleOwner) return false;
+    return kostenZahlbar(engine, ktrl);
+  },
+
   hooks: {
     onGameStart: async (ctx) => {
       const engine = ctx._engine;

@@ -109,6 +109,20 @@ module.exports = {
     return undefined;
   },
 
+  /**
+   * CPU-Vorabpruefung (W82b, Vertrag `cpuSchuetzt`, gelesen von `engine.kreaturGeschuetztVor`): dieses Winged Skeleton negiert die Wirkung, wenn sie ein Skelett seines Kontrolleurs WAEHLT
+   * (`e.gerichtet`; ein Flaechenschlag waehlt niemanden), von einem Gegner kommt, negierbar ist, das Skelett nicht ruht und sein Einmal-Stempel dieses Zuges frei ist.
+   */
+  cpuSchuetzt(engine, traeger, ziel, e) {
+    if (!e?.gerichtet || e.canBeNegated === false) return false;
+    const gs = engine.gs;
+    const pi = traeger.controller ?? traeger.owner;
+    if (!(e.quelleOwner >= 0) || e.quelleOwner === pi) return false;
+    if (alreadyUsedThisTurn(gs, traeger)) return false;
+    if ((ziel.controller ?? ziel.owner) !== pi) return false;
+    return anyName(ziel, (n) => isSkeletonCreature(n, engine));
+  },
+
   postTargetCondition(gs, pi, engine, targets, sourceCard, opts) {
     const inst = opts?.inst;
     if (!inst || inst.zone !== 'support') return false;

@@ -75,6 +75,17 @@ module.exports = {
 
   canSummon: (ctx) => oppFreeZones(ctx._engine, ctx.cardOwner).length > 0,
 
+  /**
+   * CPU-Vorabpruefung (W82b, Vertrag `cpuSchuetzt`, gelesen von `engine.kreaturGeschuetztVor`): der KONTROLLEUR der Hirschkuh kann 2 Handkarten zahlen und so jede (negierbare) Wirkung
+   * eines ANDEREN Spielers auf sie negieren — nur fuer die Hirschkuh selbst. Nur die Hand-ANZAHL, keine Kartennamen.
+   */
+  cpuSchuetzt(engine, traeger, ziel, e) {
+    if (!traeger || !ziel || traeger.id !== ziel.id || e?.canBeNegated === false) return false;
+    const ctrl = traeger.controller ?? traeger.owner;
+    if (ctrl === e?.quelleOwner) return false;
+    return (engine.gs.players[ctrl]?.hand || []).length >= DISCARD_COST;
+  },
+
   cpuMeta: {
     onDeathBenefit: 8,
     preferOpponentSupportZone: true,
