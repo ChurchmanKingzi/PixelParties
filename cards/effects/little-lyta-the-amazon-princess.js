@@ -14,7 +14,7 @@
 //    (falls er lebt und nicht schon übernommen ist) ODER eine beliebige Kreatur (Token mit Kreatur-Untertyp eingeschlossen), die sein Gegner kontrolliert — für die Dauer des Zuges.
 //  • Kreaturen bleiben in ihren Zonen (nur der Kontrolleur wechselt, Rückgabe zu Beginn des nächsten Zuges); sie sind NICHT unantastbar (der Text nennt nur den Helden).
 //  • Der übernommene Held nimmt für die Dauer der Kontrolle KEINEN Schaden aus irgendeiner Quelle und kann nicht besiegt werden - auch nicht
-//    durch ein Opfer, AUSSER durch den eigentlichen Besitzer (`statuses.charmed.nurSchadenSchutz`, wie Deepsea Succubus; `engine.heldNichtBesiegbar`); negative Status kommen durch. Die Immunität endet mit der Kontrolle (Rückgabe am Zugwechsel).
+//    durch ein Opfer - auch nicht durch den eigentlichen Besitzer, SOLANGE die Kontrolle besteht (`statuses.charmed.nurSchadenSchutz`, wie Deepsea Succubus; `engine.heldNichtBesiegbar`); negative Status kommen durch. Die Immunität endet mit der Kontrolle (Rückgabe am Zugwechsel): im Zug des Gegners gehört der Held wieder ihm (er kann ihn opfern), und Lytas Spieler kann ihm wieder Schaden zufügen.
 //  • „These effects cannot be negated": `bypassStatusFilter` — Lyta wirkt auch frozen/stunned/negated; besiegt ruht sie (Text: „undefeated").
 //  • Boris, the Guardian of Blackport: der Zugstart-Effekt läuft ins Leere (kein Angebot).
 //
