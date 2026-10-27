@@ -35713,6 +35713,28 @@ this._deathWatch = (this._deathWatchStack || []).length
       || this.gs._forcedCommitPlayer === playerIdx;
   }
 
+  /** ★ W82 (Sinister Idol): führt `fn` als PFLICHT-Auflösung für `pi` aus (`aktiv`): alle Wahlen von `pi` sind ohne Abbruch (Zwangs-Kontext `gs._forcedCommitPlayer`, s. `_promptsForceCommit`). Verschachtelbar. */
+  async mitPflichtAufloesung(pi, aktiv, fn) {
+    if (!aktiv) return fn();
+    const gs = this.gs;
+    const vorher = gs._forcedCommitPlayer;
+    gs._forcedCommitPlayer = pi;
+    try { return await fn(); }
+    finally { if (vorher != null) gs._forcedCommitPlayer = vorher; else delete gs._forcedCommitPlayer; }
+  }
+
+  /**
+   * ★ W82 (Sinister Idol): ist die offene Frage von `pi` eine PFLICHTwahl im Zwangs-Kontext (`_promptsForceCommit`, `cancellable: false`)? Dann weist der Server einen Abbruch ab
+   * (`cancel_potion`, `effect_prompt_response` mit `cancelled`) und die Frage bleibt offen. Ja/Nein-Fragen (`confirm`) bleiben echte Entscheidungen — „No" ist keine Abbruch-Wahl.
+   */
+  _abbruchGesperrt(pi) {
+    if (!this._promptsForceCommit(pi)) return false;
+    const pt = this.gs.potionTargeting, ep = this.gs.effectPrompt;
+    if (pt && pt.ownerIdx === pi) return pt.config?.cancellable === false;
+    if (ep && ep.ownerIdx === pi) return ep.cancellable === false && ep.type !== 'confirm';
+    return false;
+  }
+
   /**
    * ★ ABLAUF GELIEHENER IDENTITAETEN (v573).
    *
