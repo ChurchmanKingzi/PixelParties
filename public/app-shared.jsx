@@ -7679,13 +7679,17 @@ function handFanCardBox(el) {
 const CARD_DRAG_SFX = {
   // ★ v1213: `pickup` ENTFAELLT (Als Befund 18.9.) — siehe onMove
   // im Kampfbrett. Kein toter Eintrag hier, damit ihn niemand
-  // versehentlich wieder anschliesst.
+  // versehentlich wieder anschliesst. (27.10.: auch im Puzzle-Editor
+  // wieder gestrichen — „der Sound beim Aufnehmen ist lästig".)
   reorder: { name: 'draw',      opts: { volume: 1.1, rate: 1.12, dedupe: 50 } },  // → .363
   release: { name: 'ui_click',  opts: { volume: 1.6, rate: 1.30, dedupe: 50 } },  // → .264
   cancel:  { name: 'ui_cancel', opts: { volume: 1.0, dedupe: 60 } },              // → .330
 };
 function playCardDragSFX(art) {
   const e = CARD_DRAG_SFX[art];
+  // Zeitpunkt des letzten Umsortier-Klangs: der Puzzle-Editor spielt beim Loslassen JEDES Zuges den Klang der Handkarten (`reorder`) —
+  // beim Umsortieren der Hand ist er schon gespielt, dann entfaellt der zweite.
+  if (art === 'reorder') window._ppReorderT = performance.now();
   if (e && window.playSFX) window.playSFX(e.name, e.opts);
 }
 

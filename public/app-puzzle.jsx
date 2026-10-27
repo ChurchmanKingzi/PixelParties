@@ -940,6 +940,8 @@ function PuzzleCreator() {
       document.body.appendChild(ghost);
       td.ghost = ghost;
       setDragCardName(td.cardName);
+      // Wie beim Ziehen mit der Maus: die Quellkarte in ihrer Zone ist unsichtbar (`data-pz-gezogen`). Kein Klang beim Anheben.
+      if (td.sourceZone) { setDragSource(td.sourceZone); setZiehLaeuft(true); }
     }
     if (td.dragging) {
       e.preventDefault(); // prevent scroll while dragging
@@ -967,9 +969,12 @@ function PuzzleCreator() {
     if (td.ghost) { td.ghost.remove(); td.ghost = null; }
     setDragCardName(null);
     setDragOverZone(null);
+    if (td.sourceZone) { setDragSource(null); setZiehLaeuft(false); }
     const t = e.changedTouches[0];
     const el = document.elementFromPoint(t.clientX, t.clientY);
     const handEl = el?.closest('[data-pz-hand]');
+    // Loslassen klingt wie bei den Handkarten (`reorder`) — ausser beim Ablegen in eine Hand, die ihren eigenen Klang spielt (`draw`, siehe unten).
+    if (!(handEl && !(td.handSource === handEl.dataset.pzHand && td.handIdx != null))) window.playCardDragSFX?.('reorder');
     // ★ v1452: die Zone kommt aus der magnetischen Suche — sie liefert
     // nur Zonen, die die Karte annehmen (mit dem AKTUELLEN Brett; der
     // Callback hier sieht wegen seiner Abhaengigkeiten sonst nur einen
@@ -2110,7 +2115,12 @@ function PuzzleCreator() {
       || c.cardType === 'Creature/Token'
       || (c.subtype || '').split('/').some(t => t.trim() === 'Creature');
     if (zt === 'hero') return c.cardType === 'Hero' || c.cardType === 'Ascended Hero';
-    if (zt === 'ability') return c.cardType === 'Ability' && !!p.heroes[hi];
+    if (zt === 'ability') {
+      // Eine Zone auf Stufe 3 nimmt keine vierte Kopie mehr an: `placeAbility` wuerde sie abweisen, nachdem die Quelle schon geleert ist
+      // (eine gezogene Kopie ginge verloren).
+      const ziel = p.abilityZones[hi]?.[slot] || [];
+      return c.cardType === 'Ability' && !!p.heroes[hi] && !(ziel.length >= 3 && ziel[0] === cardName);
+    }
     if (zt === 'support') {
       const islandCount = (p.islandZoneCount || [0,0,0])[hi] || 0;
       const baseCount = (p.supportZones[hi] || []).length - islandCount;
@@ -2141,6 +2151,8 @@ function PuzzleCreator() {
   // ── Drag ──
   // Aufraeumer fuer den Box-Klang des laufenden Zuges (siehe `onDragStart`).
   const boxKlangRef = useRef(null);
+  // Aufraeumer fuer den Loslass-Klang des laufenden Zuges (siehe `onDragStart`).
+  const loslassKlangRef = useRef(null);
   const onDragStart = useCallback((e, cardName, handIdx, source, handSource) => {
     // ★★ v1215: Hover-Riegel fruehzeitig, nicht erst ueber den Effekt
     // (siehe app-board, derselbe Befund) — aber NICHT mehr im
@@ -2152,13 +2164,33 @@ function PuzzleCreator() {
     setTimeout(() => setZiehLaeuft(true), 0);
     hideTooltip(); // dismiss tooltip during drag
     e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', '');
-    // ★ Als Vorgabe 6.10.: eine FRISCHE Karte aus der Box (Galerie), die
-    // beim Loslassen nirgends landet, verschwand lautlos. Hand- und
-    // Brettkarten bleiben dann einfach liegen, die Box-Karte dagegen geht
-    // zurueck ins Nichts — das bekommt denselben Klang wie das Entfernen
-    // per Rechtsklick (`discard`). „Landet nirgends" heisst: es kam kein
-    // `drop` an (der feuert nur, wenn ein Ziel den Zug angenommen hat);
-    // Escape zaehlt ebenso. Beide Horcher gehen am Zugende wieder ab.
+    // ★ KLANG BEIM LOSLASSEN (Als Vorgabe 27.10.: „Lässt man eine gedraggte Karte los, fehlt noch ein Sound" — und: er soll derselbe sein
+    // wie bei den Handkarten, also `reorder`; ein Klang beim ANHEBEN ist ausdruecklich nicht gewollt, „lästig"): EIN Klang je Zug. Beendet
+    // wird er durch das erste `drop` (ein Ziel hat angenommen) oder `dragend` (nirgends gelandet, Escape); `drop` kommt auch dann an, wenn die
+    // Quelle beim Ablegen aus dem DOM faellt (dann bleibt `dragend` aus). Ausgewertet erst im naechsten Tick: das Umsortieren der Hand hat
+    // seinen Klang (`reorder`) dann schon gespielt, der zweite entfaellt; eine frische Karte aus der Box, die nirgends landet, bekommt weiter
+    // nur ihr `discard` (siehe unten).
+    if (loslassKlangRef.current) loslassKlangRef.current();
+    {
+      const frischAusBox = handIdx == null && !source && !handSource;
+      const abraeumen = () => {
+        document.removeEventListener('drop', loslassen, true);
+        document.removeEventListener('dragend', loslassen, true);
+        loslassKlangRef.current = null;
+      };
+      function loslassen(ev) {
+        abraeumen();
+        const gelandet = ev.type === 'drop';
+        setTimeout(() => {
+          if (!gelandet && frischAusBox) return;
+          if (performance.now() - (window._ppReorderT || 0) < 300) return;
+          window.playCardDragSFX?.('reorder');
+        }, 0);
+      }
+      document.addEventListener('drop', loslassen, true);
+      document.addEventListener('dragend', loslassen, true);
+      loslassKlangRef.current = abraeumen;
+    }
     if (boxKlangRef.current) boxKlangRef.current();
     if (handIdx == null && !source && !handSource) {
       let gelandet = false;
@@ -2334,8 +2366,12 @@ function PuzzleCreator() {
   // Silently clear a zone (no return to hand — used when moving between zones)
   const clearZone = useCallback((zt, si, hi, slot) => {
     if (zt === 'hero') updatePlayer(si, (p) => { p.heroes[hi] = null; p.abilityZones[hi] = [[], [], []]; p.supportZones[hi] = [[], [], []]; p.surpriseZones[hi] = []; if (p.islandZoneCount) p.islandZoneCount[hi] = 0; return p; });
-    else if (zt === 'ability') updatePlayer(si, (p) => { p.abilityZones[hi][slot] = []; return p; });
+    // ★ Als Vorgabe 27.10.: beim Zonenwechsel einer Ability wandert nur die OBERSTE Kopie (Stufe − 1), nicht der ganze Stapel.
+    else if (zt === 'ability') updatePlayer(si, (p) => { const z = p.abilityZones[hi][slot] || []; p.abilityZones[hi][slot] = z.length > 1 ? z.slice(0, -1) : []; return p; });
     else if (zt === 'support') updatePlayer(si, (p) => {
+      // Ability-Stapel in einer Support Zone (Xal, Xalibur): ebenso nur die oberste Kopie.
+      const stapel = p.supportZones[hi][slot] || [];
+      if (stapel.length > 1 && stapel.every(n => getCard(n)?.cardType === 'Ability')) { p.supportZones[hi][slot] = stapel.slice(0, -1); return p; }
       const removedCard = p.supportZones[hi][slot]?.[0];
       p.supportZones[hi][slot] = [];
       // Clear creature metadata for this slot
@@ -2355,7 +2391,7 @@ function PuzzleCreator() {
     // anderen beiden mitgeloescht.
     else if (zt === 'area') updateArea(si, (prev) => prev.filter((_, i) => i !== slot));
     else if (zt === 'permanent') updatePlayer(si, (p) => { p.permanents.splice(slot, 1); return p; });
-  }, [updatePlayer, updateArea]);
+  }, [updatePlayer, updateArea, getCard]);
 
   const handleDrop = useCallback((zt, si, hi, slot) => {
     if (dragCardName == null) return;
@@ -3734,6 +3770,22 @@ function PuzzleCreator() {
     setDoomEdit(null);
   };
 
+  // ── Ability-Stapel: gezogen wird nur die OBERSTE Kopie (Als Vorgabe 27.10.) ──
+  // Eine Ability-Zone (und ein Ability-Stapel in einer Support Zone: Xal, Xalibur) ist ein Stapel gleicher Karten; seine Stufe ist die
+  // Kopienzahl. `clearZone` nimmt beim Zonenwechsel nur die oberste Kopie mit, und waehrend des Zuges zeigt die Quellzone EINE KOPIE
+  // WENIGER (diese Funktion sagt es dem Zeichnen) — die letzte Kopie (Stufe 0) macht die Zone unsichtbar wie jede andere Karte.
+  const abilityStapelLaenge = (zt, si, hi, slot) => {
+    if (zt === 'ability') return (players[si]?.abilityZones?.[hi]?.[slot] || []).length;
+    if (zt === 'support') {
+      const z = players[si]?.supportZones?.[hi]?.[slot] || [];
+      return z.length > 0 && z.every(n => getCard(n)?.cardType === 'Ability') ? z.length : 0;
+    }
+    return 0;
+  };
+  const abilityKopieWeg = (zt, si, hi, slot) => ziehLaeuft && !!dragSource
+    && dragSource.zt === zt && dragSource.si === si && dragSource.hi === hi && dragSource.slot === slot
+    && abilityStapelLaenge(zt, si, hi, slot) > 1;
+
   // ── Zone drag/drop/click handlers applied directly on board-zone elements (no wrapper divs) ──
   const zh = (zt, si, hi, slot) => {
     const p = players[si];
@@ -3757,8 +3809,16 @@ function PuzzleCreator() {
       && si !== allianceLink.si && !!p.heroes[hi];
     const allianzQuelle = !!allianceLink && zt === 'support'
       && si === allianceLink.si && hi === allianceLink.hi && slot === allianceLink.slot;
+    // ★ Die Karte, die gerade aus dieser Zone gezogen wird, ist in der Zone unsichtbar (style.css `[data-pz-gezogen]`) — das Ziehbild
+    // (`#pz-drag-ghost`) ist dann die einzige Karte, wie bei der Hand (`ziehLaeuft`: erst im Tick NACH `dragstart`, sonst bricht der
+    // Browser den Zug ab). Bei Abbruch/Ablegen setzt `onDragEnd`/`handleDrop` `dragSource` bzw. `ziehLaeuft` zurueck.
+    // AUSNAHME Ability (Als Vorgabe 27.10.): gezogen wird nur die OBERSTE Kopie. Die Zone bleibt sichtbar und zeigt eine Stufe weniger
+    // (`abilityKopieWeg`, beim Zeichnen der Zone) — nur bei Stufe 0, also der letzten Kopie, verschwindet sie.
+    const wirdGezogen = ziehLaeuft && !!dragSource && dragSource.zt === zt && dragSource.si === si && dragSource.hi === hi && dragSource.slot === slot
+      && !abilityKopieWeg(zt, si, hi, slot);
     return {
       'data-pz-zone': `${si}-${zt}-${hi}-${slot}`,
+      'data-pz-gezogen': wirdGezogen ? 'true' : undefined,
       'data-alliance-target': allianzZiel ? 'true' : undefined,
       'data-alliance-source': allianzQuelle ? 'true' : undefined,
       draggable: !!hasCard && !isTouchDevice,
@@ -4153,7 +4213,13 @@ function PuzzleCreator() {
                   style={{ ...zs('ability'), ...hl('ability', si, hi, slot) }}
                   data-ability-zone="1" data-ability-owner={isOpp ? 'opp' : 'me'}
                   {...zh('ability', si, hi, slot)}>
-                  {(p.abilityZones[hi]?.[slot]||[]).length > 0 ? <BoardCard cardName={p.abilityZones[hi][slot][0]} abilityLevel={Math.min(3, p.abilityZones[hi][slot].length)} label={p.abilityZones[hi][slot].length > 1 ? String(p.abilityZones[hi][slot].length) : undefined} /> : <div className="board-zone-empty">Ability</div>}
+                  {(() => {
+                    // Beim Ziehen einer Kopie zeigt die Zone eine weniger (Stufe − 1); die letzte Kopie blendet `data-pz-gezogen` aus.
+                    const kopien = (p.abilityZones[hi]?.[slot] || []).length - (abilityKopieWeg('ability', si, hi, slot) ? 1 : 0);
+                    return kopien > 0
+                      ? <BoardCard cardName={p.abilityZones[hi][slot][0]} abilityLevel={Math.min(3, kopien)} label={kopien > 1 ? String(kopien) : undefined} />
+                      : <div className="board-zone-empty">Ability</div>;
+                  })()}
                 </div>
               ))}
               {maxRight > 0 && Array.from({ length: maxRight }).map((_, s) => <div key={'rp'+s} className="board-zone-spacer" />)}
@@ -4200,14 +4266,16 @@ function PuzzleCreator() {
                       // Xalibur) wie in einer Ability-Zone zeichnen —
                       // versetzt und mit Stufenzahl.
                       if (c?.cardType === 'Ability') {
+                        // Beim Ziehen einer Kopie fehlt die oberste im Stapel (Stufe − 1).
+                        const sichtbar = abilityKopieWeg('support', si, hi, slot) ? cards.slice(0, -1) : cards;
                         return (
                           <div className="board-ability-stack">
-                            {cards.map((cn, ci) => (
+                            {sichtbar.map((cn, ci) => (
                               <div key={ci} className="board-ability-stack-card" style={{ top: ci * 5 }}>
-                                <BoardCard cardName={cn} abilityLevel={Math.min(3, cards.length)} />
+                                <BoardCard cardName={cn} abilityLevel={Math.min(3, sichtbar.length)} />
                               </div>
                             ))}
-                            {cards.length > 1 && <div className="board-card-label">{cards.length}</div>}
+                            {sichtbar.length > 1 && <div className="board-card-label">{sichtbar.length}</div>}
                           </div>
                         );
                       }
@@ -4775,10 +4843,21 @@ function PuzzleCreator() {
                             <div key={nm + ':' + ai} className="board-area-stack-card"
                               style={{ top: `calc(var(--area-stack-offset) * ${ai})`, cursor: nm === 'Doom Clock' ? 'pointer' : undefined }}
                               data-pz-zone={g['data-pz-zone']}
+                              data-pz-gezogen={g['data-pz-gezogen']}
                               draggable={g.draggable}
                               onDragStart={g.onDragStart}
                               onDragEnd={g.onDragEnd}
                               onContextMenu={g.onContextMenu}
+                              // ★ Als Vorgabe 27.10.: TOUCH-Ziehen fuer die Karten im Area-Stapel (Ziehen, Tippen = Doom-Clock-Editor,
+                              // Doppeltipp = entfernen) — dieselben Griffe wie jede andere Zonenkarte (`zh`). Laeuft gerade ein Platzieren per
+                              // Antippen oder die Alliance-Wahl, soll der Tipp wie bisher als Klick zur Zonen-Huelle durch (dort liegt das
+                              // Ablegen): dann nur das Ziehen-Ende, kein `preventDefault` auf den Klick.
+                              onTouchStart={g.onTouchStart}
+                              onTouchMove={g.onTouchMove}
+                              onTouchEnd={(e) => {
+                                if (mobileSelected || allianceLink) { touchDragEnd(e); return; }
+                                g.onTouchEnd?.(e);
+                              }}
                               // ★ v1422 (Als Befund 25.9.): der Linksklick
                               // lief bisher nur ueber die Zonen-Huelle, und
                               // die zeigt auf den LEEREN Platz am Stapelende
