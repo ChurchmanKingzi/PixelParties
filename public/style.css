@@ -17911,6 +17911,31 @@ body:has(.textbox-overlay) .tooltip {
 .board-mid-row {
   transform: translateX(var(--center-offset, 0px));
 }
+/* ★ PERF (Gigalopolis / Barrel Home: „gewaltiger Lag" beim Layoutwechsel): Die Messschleife des Bretts (`check()` in app-board.jsx) schreibt
+   `--center-offset`, `--board-anchor-x` und `--board-overhang-l/r` an `.board-center` und liest danach sofort wieder Rechtecke. Als normale
+   Custom Properties werden sie VERERBT — jede Aenderung stoesst die Stilberechnung des ganzen Bretts an (~600 Elemente, rund 200 laufende
+   Animationen: 15-19 ms je Schreib-/Lese-Paar, ein Durchlauf hat mehrere). Verbraucher sind nur Clip, Ebene, Heldenzeilen und Sprite-Huelle:
+   die Eigenschaften sind deshalb NICHT vererbend registriert und werden entlang der Verbraucherkette ausdruecklich mit `inherit` weitergereicht.
+   Der Wert gilt unveraendert (die Fallbacks der `var()`-Aufrufe entsprechen den Anfangswerten), kostet aber nur noch eine Handvoll Elemente.
+   Browser ohne `@property` ignorieren die Regeln: dort bleiben es gewoehnliche, vererbte Variablen (alter Zustand, nur langsamer). */
+@property --center-offset { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --board-anchor-x { syntax: '<length-percentage>'; inherits: false; initial-value: 50%; }
+@property --board-overhang-l { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --board-overhang-r { syntax: '<length>'; inherits: false; initial-value: 0px; }
+.board-center > .board-plane-clip,
+.board-center > .board-plane-clip > .board-plane {
+  --center-offset: inherit;
+  --board-anchor-x: inherit;
+  --board-overhang-l: inherit;
+  --board-overhang-r: inherit;
+}
+.board-center > .board-plane-clip > .board-plane > .board-player-side,
+.board-center > .board-plane-clip > .board-plane > .board-mid-row {
+  --center-offset: inherit;
+}
+.board-center > .hero-sprite-huelle {
+  --board-anchor-x: inherit;
+}
 
 /* ═══ Pseudo-3D battlefield (YGO-style perspective tilt) ═══════════════
    .board-plane wraps both player sides + area zones + mid row (see JSX)
@@ -18067,6 +18092,7 @@ body:has(.textbox-overlay) .tooltip {
    with its content so the scrollbar exposes all zones. */
 .board-center.can-scroll .board-plane {
   min-width: min-content;
+  width: min-content;
   /* v18: separate sides — with the off-center anchor the projection
      spills asymmetrically; check() measures each side from the
      projected zone union. */
@@ -22886,28 +22912,14 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 }
 
 /* ★ v1359 — Aufdeck-Anzeige eines fizzelnden Effekts (engine.zeigeFizzle):
-   dasselbe Bild wie ein negiertes Kettenglied, plus Schriftzug. */
+   dasselbe Bild wie ein negiertes Kettenglied (kein Schriftzug mehr, Al 27.10.). */
 .card-reveal-card.card-reveal-fizzled { position: relative; }
 .card-reveal-card.card-reveal-fizzled > img,
 .card-reveal-card.card-reveal-fizzled > div:last-child {
   animation: chainGlitch .15s linear 6, chainShake .1s linear 9;
   filter: saturate(0.3) brightness(0.7);
 }
-.card-reveal-card.card-reveal-fizzled .chain-negate-symbol { z-index: 2; pointer-events: none; }
-.card-reveal-fizzle-label {
-  position: absolute; left: 50%; bottom: 10%; transform: translateX(-50%) rotate(-8deg);
-  z-index: 3; pointer-events: none;
-  padding: 3px 10px; border-radius: 4px;
-  background: rgba(42,4,4,.78); border: 2px solid var(--danger, #e94e53);
-  color: #fae5eb; font-size: 15px; font-weight: 700; letter-spacing: 2px;
-  text-shadow: 0 0 6px rgba(240,50,50,.8);
-  animation: fizzleStempel .35s cubic-bezier(.2, 1.6, .5, 1) both;
-}
-@keyframes fizzleStempel {
-  0%   { opacity: 0; transform: translateX(-50%) rotate(-8deg) scale(1.8); }
-  100% { opacity: 1; transform: translateX(-50%) rotate(-8deg) scale(1); }
-}
-
+.card-reveal-card.card-reveal-fizzled .chain-negate-symbol { z-index: 2; pointer-events: none; font-size: calc(var(--reveal-card-w, 340px) * 0.62); }   /* Al 27.10.: der rote durchgestrichene Kreis liegt gross AUF der Karte, ohne Schriftzug */
 /* ★ v1360 — Fizzeln ist eine kurze Meldung: eigener, kurzer Ablauf statt
    der 3,5 s der normalen Aufdeck-Anzeige (Als Befund: „das graue
    Fizzled-Frame bleibt zu lange bestehen"). Die Dauer kommt aus

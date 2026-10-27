@@ -3721,8 +3721,8 @@ function CardRevealOverlay({ reveals, onRemove }) {
 }
 
 // ★ v1359 — `fizzled`: dieselbe Bildsprache wie ein negiertes Kettenglied
-// (Glitch, entsaettigt, 🚫) plus das Wort „FIZZLED" — der Effekt wurde
-// ausgeloest, konnte aber nichts mehr tun (`engine.zeigeFizzle`).
+// (Glitch, entsaettigt, 🚫 gross AUF der Karte, KEIN Schriftzug — Al 27.10.) —
+// der Effekt wurde ausgeloest, konnte aber nichts mehr tun (`engine.zeigeFizzle`).
 const FIZZLE_ANZEIGE_MS = 1400;
 function CardRevealEntry({ cardName, onDone, fizzled }) {
   const card = CARDS_BY_NAME[cardName];
@@ -3749,7 +3749,6 @@ function CardRevealEntry({ cardName, onDone, fizzled }) {
       onMouseLeave={() => { gehovert.current = false; setBoardTooltip(null); }}>
       <div className={'card-reveal-card' + (fizzled ? ' card-reveal-fizzled' : '')}>
         {fizzled && <div className="chain-negate-symbol">🚫</div>}
-        {fizzled && <div className="card-reveal-fizzle-label orbit-font">FIZZLED</div>}
         {imgUrl ? (
           <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6,
             border: foilType === 'diamond_rare' ? '3px solid rgba(104,198,253,.7)' : foilType === 'secret_rare' ? '3px solid rgba(250,213,74,.6)' : '2px solid var(--bg4)' }} draggable={false} />
@@ -46782,11 +46781,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // ── Area card placement: big flashy descend + shockwave ──
     const onAreaDescend = ({ owner, cardName, fromPile }) => {
       const ownerLabel = ownerLbl(owner, myIdx);
-      const tgtEl = document.querySelector(`[data-area-zone][data-area-owner="${ownerLabel}"]`);
+      const zonenSel = `[data-area-zone][data-area-owner="${ownerLabel}"]`;
+      const tgtEl = document.querySelector(zonenSel);
       if (!tgtEl) return;
       const tr = tgtEl.getBoundingClientRect();
-      const cx = tr.left + tr.width / 2;
-      const cy = tr.top + tr.height / 2;
+      // ★ DAS ZIEL WANDERT: das Event trifft VOR dem Zustand ein, und Areas, die das Layout aendern (Gigalopolis legt eine Zone an,
+      // Barrel Home nimmt sie wieder weg; Scrollmodus, Mittelversatz, Area-Positionen), verschieben die Zone danach um ~125 px — die
+      // Karte fiel an die Stelle von VORHER. Deshalb wird die Zone waehrend der ganzen Animation live nachgemessen: die fallende Karte
+      // folgt ihr, und der Aufprall (Ring, Blitz, Staub) sitzt dort, wo sie JETZT steht. (`letzt` bleibt stehen, falls die Zone
+      // kurz fehlt, z. B. waehrend eines Neuaufbaus.)
+      let letzt = { cx: tr.left + tr.width / 2, cy: tr.top + tr.height / 2, w: tr.width };
+      const zielJetzt = () => {
+        const el = tgtEl.isConnected ? tgtEl : document.querySelector(zonenSel);
+        if (el) {
+          const q = el.getBoundingClientRect();
+          if (q.width > 0) letzt = { cx: q.left + q.width / 2, cy: q.top + q.height / 2, w: q.width };
+        }
+        return letzt;
+      };
+      const cx = letzt.cx;
+      const cy = letzt.cy;
 
       // Inject keyframes once
       if (!document.getElementById('area-descend-kf')) {
@@ -46851,15 +46865,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         `animation:areaCardFall 1.1s cubic-bezier(0.6, -0.05, 0.4, 1.2) forwards`,
       ].join(';');
       // Kommt die Area von einem Stapel (Geloescht/Ablage/Deck), fliegt sie von dort ins Feld, statt herabzufallen.
+      // Der Startpunkt liegt am Stapel, der Zielpunkt wandert (s. o.): `--fdx/--fdy` ist der Abstand Stapel → Zone und wird mit nachgefuehrt.
+      let pileEl = null;
+      let fdxAlt = NaN, fdyAlt = NaN;
+      const pileAbstand = () => {
+        const pr = pileEl.getBoundingClientRect();
+        const z = zielJetzt();
+        const fdx = Math.round(pr.left + pr.width / 2 - z.cx), fdy = Math.round(pr.top + pr.height / 2 - z.cy);
+        // Nur schreiben, wenn sich der Abstand aendert: jede Aenderung stoesst die Schluesselbilder der Animation neu an.
+        if (fdx !== fdxAlt) { fdxAlt = fdx; cardEl.style.setProperty('--fdx', fdx + 'px'); }
+        if (fdy !== fdyAlt) { fdyAlt = fdy; cardEl.style.setProperty('--fdy', fdy + 'px'); }
+        return pr;
+      };
       if (fromPile) {
         const pileSel = fromPile === 'deleted' ? (owner === myIdx ? '[data-my-deleted]' : '[data-opp-deleted]')
           : fromPile === 'discard' ? (owner === myIdx ? '[data-my-discard]' : '[data-opp-discard]')
           : (owner === myIdx ? '[data-my-deck]' : '[data-opp-deck]');
-        const pileEl = document.querySelector(pileSel);
+        pileEl = document.querySelector(pileSel);
         if (pileEl) {
-          const pr = pileEl.getBoundingClientRect();
-          cardEl.style.setProperty('--fdx', (pr.left + pr.width / 2 - cx) + 'px');
-          cardEl.style.setProperty('--fdy', (pr.top + pr.height / 2 - cy) + 'px');
+          const pr = pileAbstand();
           cardEl.style.setProperty('--fsc', String(Math.max(0.25, pr.width / cardW)));
           cardEl.style.animation = 'areaPileFly 1.1s cubic-bezier(0.45, 0, 0.35, 1) forwards';
         }
@@ -46877,14 +46901,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       document.body.appendChild(cardEl);
       setTimeout(() => cardEl.remove(), 1300);
+      // Die Karte folgt der Zone Bild fuer Bild (ganze Pixel), bis sie entfernt wird.
+      const folgeBild = () => {
+        if (!cardEl.isConnected) return;
+        const z = zielJetzt();
+        cardEl.style.left = Math.round(z.cx) + 'px';
+        cardEl.style.top = Math.round(z.cy - cardH / 2) + 'px';
+        if (pileEl && pileEl.isConnected) pileAbstand();
+        requestAnimationFrame(folgeBild);
+      };
+      requestAnimationFrame(folgeBild);
 
       // Impact ring + flash at landing point — fires right before the
-      // card fully settles (~75% into the fall).
+      // card fully settles (~75% into the fall). Ziel und Breite dort, wo die Zone zu diesem Zeitpunkt steht.
       setTimeout(() => {
+        const { cx, cy, w: zoneW } = zielJetzt();
         const ring = document.createElement('div');
         ring.style.cssText = [
           `position:fixed`, `left:${cx}px`, `top:${cy}px`,
-          `width:${tr.width * 1.2}px`, `height:${tr.width * 1.2}px`,
+          `width:${zoneW * 1.2}px`, `height:${zoneW * 1.2}px`,
           `border:4px solid rgba(255,228,105,.95)`, `border-radius:50%`,
           `box-shadow:0 0 40px rgba(251,225,129,.8), inset 0 0 30px rgba(255,208,102,.4)`,
           `pointer-events:none`, `z-index:10005`,
@@ -46896,7 +46931,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const flash = document.createElement('div');
         flash.style.cssText = [
           `position:fixed`, `left:${cx}px`, `top:${cy}px`,
-          `width:${tr.width * 1.6}px`, `height:${tr.width * 1.6}px`,
+          `width:${zoneW * 1.6}px`, `height:${zoneW * 1.6}px`,
           `background:radial-gradient(circle, rgba(255,251,210,.95) 0%, rgba(255,208,102,.55) 35%, transparent 75%)`,
           `border-radius:50%`,
           `pointer-events:none`, `z-index:10004`,
@@ -53582,6 +53617,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Bild (s. dort): vorher lief jeder Folgedurchgang in einem eigenen
   // Animationsbild, das Feld rutschte beim Betreten ueber drei, vier
   // Zwischenstaende (-4, -128, -89 px) auf seinen Platz.
+  // ★ PERF-VERTRAG: `--center-offset`, `--board-anchor-x` und `--board-overhang-l/r` sind in style.css als NICHT vererbend registriert
+  // (`@property`) und werden nur entlang der Kette Clip → Ebene → Heldenzeilen / Sprite-Huelle ausdruecklich weitergereicht. Jede Aenderung
+  // dieser Werte (unten mehrfach je Durchlauf, jeweils mit anschliessendem Lesen) kostete sonst die Stilberechnung des ganzen Bretts
+  // (15-19 ms; Gigalopolis/Barrel Home: ~870 ms am Stueck). Wer sie in einem NEUEN Element braucht, traegt es in dieser `inherit`-Kette ein.
   useLayoutEffect(() => {
     const el = boardCenterRef.current;
     if (!el) return;
@@ -53628,6 +53667,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // which reads as constant interface jitter. Once latched, stay
       // latched until the layout is clearly under the line.
       const wasScrollMode = el.classList.contains('can-scroll');
+      // Projizierte Zonen-Ausdehnung (links/rechts) — fuer Mittelkorrektur, Tooltip-Platz und den Scroll-Riegel.
+      const zonenRand = () => {
+        let l = Infinity, r = -Infinity;
+        el.querySelectorAll('.board-plane .board-zone').forEach(z => {
+          const q = z.getBoundingClientRect();
+          if (!q.width) return;
+          if (q.left < l) l = q.left;
+          if (q.right > r) r = q.right;
+        });
+        return r > l ? { l, r } : null;
+      };
+      // ★ Die projizierte Breite GLEICH ZU BEGINN lesen (noch im echten Zustand, vor dem Messfenster): der Riegel unten entschied vorher
+      // an dem Wert, den der VORIGE Durchlauf am Ende gemessen hat — kam eine Zone dazu (Gigalopolis) oder ging eine (Barrel Home),
+      // war der Wert veraltet und der Scrollmodus rastete erst einen Durchlauf spaeter ein bzw. aus. Jeder Durchlauf kostet viele
+      // erzwungene Stilberechnungen (hunderte laufende Animationen), das Brett ruckelte hunderte Millisekunden.
+      const mStart = zonenRand();
+      const projStart = mStart ? Math.round(mStart.r - mStart.l) : (el._ppProjW || 0);
       // Neutralize the pseudo-3D tilt for the measurement: the enlarged
       // near edge of the tilted plane inflates scrollWidth by ~10% and
       // would otherwise latch can-scroll on, which in turn disables the
@@ -53676,7 +53732,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // nach links (s. u.) auch einen Rand hat. KEINE Haltezone fuer dieses Mass: die projizierte Zonenbreite aendert sich beim
       // Moduswechsel nicht, ein Flattern ist also ausgeschlossen — und eine Haltezone hielte ein Brett im Scrollmodus fest, das nach
       // dem ersten Massstab-Durchgang laengst passt.
-      const projRiegel = (el._ppProjW || 0) > 0 && (el._ppProjW || 0) + 16 > el.clientWidth;
+      const projRiegel = projStart > 0 && projStart + 16 > el.clientWidth;
       if (window.ppHScrollRiegel(inhaltW, el.clientWidth, wasScrollMode) || projRiegel) {
         el.classList.add('can-scroll');
         // In scroll mode, disable centering transform to avoid layout confusion
@@ -53705,9 +53761,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // padding-left to the LEFT of the hero (the v18 symptom with
         // islands: "straight point somewhere left, heroes still lean").
         // Read the live value from the CSS var (unaffected by the flat
-        // toggle); it lags one pass behind the overhang update below,
-        // which the every-render re-run + deadband settles.
-        const padLLive = parseFloat(el.style.getPropertyValue('--board-overhang-l')) || 0;
+        // toggle). The overhang update below writes the anchor together
+        // with the new padding, so the two never lag behind each other.
+        // Nur im Scrollmodus: ausserhalb setzt dieser Durchlauf das Polster am Ende auf 0 zurueck. Ein altes Polster (Barrel Home nimmt die
+        // Gigalopolis-Zone, das Brett rastet aus) verschob den Anker sonst um dessen Wert, und es brauchte einen Durchlauf mehr, ihn zurueckzuholen.
+        const padLLive = el.classList.contains('can-scroll') ? (parseFloat(el.style.getPropertyValue('--board-overhang-l')) || 0) : 0;
         const anchorX = hrFlat.left + hrFlat.width / 2 - plFlat.left + padLLive;
         ankerFlach = anchorX;
         const prevAnchor = parseFloat(el.style.getPropertyValue('--board-anchor-x')) || -1;
@@ -53716,17 +53774,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
       }
       el.classList.remove('board-flat-measure');
-      // Projizierte Zonen-Ausdehnung (links/rechts) — fuer Mittelkorrektur, Tooltip-Platz und den Scroll-Riegel.
-      const zonenRand = () => {
-        let l = Infinity, r = -Infinity;
-        el.querySelectorAll('.board-plane .board-zone').forEach(z => {
-          const q = z.getBoundingClientRect();
-          if (!q.width) return;
-          if (q.left < l) l = q.left;
-          if (q.right > r) r = q.right;
-        });
-        return r > l ? { l, r } : null;
-      };
       // ── Middle-hero anchoring (v17, Al) ──────────────────────────
       // The MIDDLE hero zones are the battlefield's true midpoint —
       // with asymmetrically placed Flying Islands the board box's
@@ -53808,12 +53855,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const padL = parseFloat(cs.paddingLeft) || 0;
           const padR = parseFloat(cs.paddingRight) || 0;
           const contentW = Math.max(1, plane.offsetWidth - padL - padR);
+          // Rechte Referenz = Layout-Rand der EBENE, nicht des Clips: die Ebene umschliesst ihren Inhalt im Scrollmodus knapp (style.css,
+          // `width: min-content`), der Clip bleibt mindestens so breit wie der Kasten. Gegen den Clip-Rand gemessen waere die Luecke rechts
+          // solange konstant, wie die Ebene schmaler als der Kasten ist, und das Polster wuchse Durchlauf fuer Durchlauf (Gigalopolis: ~9 Messungen).
+          const ebeneRechts = cr.left + plane.offsetWidth;
           const newL = Math.min(contentW, Math.max(0, padL + (cr.left - pLf)));
-          const newR = Math.min(contentW, Math.max(0, padR + (pRt - cr.right)));
+          const newR = Math.min(contentW, Math.max(0, padR + (pRt - ebeneRechts)));
           const prevL = parseFloat(el.style.getPropertyValue('--board-overhang-l')) || 0;
           const prevR = parseFloat(el.style.getPropertyValue('--board-overhang-r')) || 0;
-          if (Math.abs(newL - prevL) > 0.5) el.style.setProperty('--board-overhang-l', newL.toFixed(1) + 'px');
-          if (Math.abs(newR - prevR) > 0.5) el.style.setProperty('--board-overhang-r', newR.toFixed(1) + 'px');
+          // 1 px Totband (statt 0.5): `offsetWidth` ist ganzzahlig, die rechte Referenz wackelt sonst um einen halben Pixel hin und her.
+          if (Math.abs(newL - prevL) > 1) {
+            el.style.setProperty('--board-overhang-l', newL.toFixed(1) + 'px');
+            // Der Anker (Mittelheld in Ebenenkoordinaten) hat das linke Polster eingerechnet. Mit dem NEUEN Polster zugleich schreiben: Die Ebene
+            // umschliesst ihren Inhalt knapp, das Polster verschiebt ihn also 1:1 — Brett und Perspektive wandern starr mit. Nachgezogen erst im
+            // naechsten Durchlauf, waere dieser nur zur Bestaetigung noetig (vorher zogen Anker und Polster einander ueber Durchlaeufe nach).
+            if (ankerFlach != null) el.style.setProperty('--board-anchor-x', (ankerFlach - prevL + newL).toFixed(1) + 'px');
+          }
+          if (Math.abs(newR - prevR) > 1) el.style.setProperty('--board-overhang-r', newR.toFixed(1) + 'px');
         }
       } else {
         el.style.setProperty('--board-overhang-l', '0px');
