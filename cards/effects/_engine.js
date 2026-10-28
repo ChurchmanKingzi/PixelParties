@@ -32946,6 +32946,20 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this.removeAllAreas(playerIdx, opts.replacedBy || cardInstance.name);
     }
 
+    // ★ W82 (Shipwrecked, Al 27.10.): „you cannot … play Areas" gilt für JEDEN Weg, eine Area aufs Brett zu bringen (Hand, „bring directly into play", Deck/Ablage/Gelöscht-Stapel, Kopieren/Übernehmen).
+    // Zentraler Wächter: der AKTEUR (`opts.actor`, sonst der Besitzer der Zone) darf keine Area platzieren, wenn er von Areas ausgenommen ist. Die Skripte prüfen schon VOR dem Entnehmen der Karte
+    // (kein Verlust); das hier ist das Sicherheitsnetz — eine verwaiste Handinstanz geht in die Ablage ihres Besitzers.
+    if (!opts._ohneAreaSperre && this.spielerIstVonAreasAusgenommen(opts.actor ?? playerIdx)) {
+      this.log('area_place_refused', { player: ps.username, area: cardInstance.name, reason: 'shipwrecked' });
+      if (cardInstance.zone === 'hand' && !(ps.hand || []).includes(cardInstance.name)) {
+        const besitzer = this.gs.players[this.kartenBesitzerVon(cardInstance)] || ps;
+        this._untrackCard(cardInstance.id);
+        besitzer.discardPile.push(cardInstance.name);
+      }
+      this.sync();
+      return false;
+    }
+
     const cardName = cardInstance.name;
     gs.areaZones[playerIdx].push(cardName);
     cardInstance.zone = 'area';
@@ -32983,6 +32997,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     this.syncAlleAtkAuren();   // v1166: Multiplikator-Auren gelten ab jetzt
     this.sync();
     await this._delay(1300);
+    return true;
   }
 
   /** Remove a specific Area card from the board to its owner's discard. */

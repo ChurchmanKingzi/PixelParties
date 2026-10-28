@@ -2936,13 +2936,14 @@ const ZONE_ANIM_SFX = {
     { name: 'placement',    opts: { rate: 1.0, volume: 0.9, delay: 420, category: null, dedupe: 0 } },
     { name: 'ping',         opts: { rate: 1.7, volume: 0.5, delay: 430, category: null, dedupe: 0 } },
   ],
-  // Shipwrecked (W82) — die Welle rollt heran (Wasser, 0 ms), Planken und Fass schlagen an (~300 ms: Holz-Plätschern), die Welle läuft zurück (Wasser ~760 ms). Nur der erste Teil
-  // uebernimmt die Sammelkategorie 'effect'.
+  // Shipwrecked (W82) — die Dünung rollt heran (Wasser, 0 ms), die vordere Welle bricht (Wasser + Gischt ~220 ms), Planken und Fass schlagen an (~560 ms: Holz-Plätschern), die Welle zieht ab (Wasser ~950 ms).
+  // Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   shipwrecked_attach: [
     { name: 'elem_water', opts: { rate: 0.8, volume: 0.6 } },
-    { name: 'placement',  opts: { rate: 0.7, volume: 0.5, delay: 300, category: null, dedupe: 0 } },
-    { name: 'elem_water', opts: { rate: 1.2, volume: 0.4, delay: 340, category: null, dedupe: 0 } },
-    { name: 'elem_water', opts: { rate: 0.7, volume: 0.4, delay: 760, category: null, dedupe: 0 } },
+    { name: 'elem_water', opts: { rate: 1.1, volume: 0.5, delay: 220, category: null, dedupe: 0 } },
+    { name: 'placement',  opts: { rate: 0.7, volume: 0.5, delay: 560, category: null, dedupe: 0 } },
+    { name: 'elem_water', opts: { rate: 1.3, volume: 0.35, delay: 600, category: null, dedupe: 0 } },
+    { name: 'elem_water', opts: { rate: 0.7, volume: 0.4, delay: 950, category: null, dedupe: 0 } },
   ],
   // Cute Crown (10.10.) — die Flügel schlagen (Wind, 0 / ~110 / ~220 ms), das Juwel klingt hell (~300 ms), Herzen steigen auf (~520 ms). Nur der erste Teil uebernimmt die
   // Sammelkategorie 'effect'.

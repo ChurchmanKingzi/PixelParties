@@ -53,6 +53,7 @@ function spellsInHand(engine, pi) {
 function geloeschteAreas(engine, pi) {
   // Als Ruling (Al 27.10.): Reality Crack („You cannot play another Area for the rest of the turn") sperrt auch „bring directly into play" — Weg 2 entfaellt dann ganz (kein Loeschen der Areas, keine Wahl).
   if (engine.areaSpielGesperrt(pi, { direkt: true })) return [];
+  if (engine.spielerIstVonAreasAusgenommen(pi)) return [];   // W82 (Shipwrecked): keine Area ins Spiel bringen — der Area-Weg entfaellt
   const ps = engine.gs.players[pi];
   const db = engine._getCardDB();
   return [...new Set((ps?.deletedPile || []).filter(n => isTutorableArea(db[n], engine, pi) && engine.areaPlatzNachAbraeumen(pi, n)))];   // Als Fix (Al 27.10.): nur Areas, fuer die nach dem Abraeumen Platz ist (Gigalopolis bleibt liegen)
