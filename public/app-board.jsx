@@ -41360,11 +41360,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // globally via a body class. The custom JS drag moves the pointer off the
   // source slot, so :active alone can't hold the cursor — without this it
   // flickers back to the arrow the moment you move.
+  // PERF-CONTRACT: haengt NUR am Wahrheitswert, nicht an den Zug-Objekten. `handDrag`/`playDrag`/`abilityDrag` tragen die
+  // Mausposition und sind in JEDEM Bewegungsbild ein neues Objekt; mit ihnen als Abhaengigkeit liefen Aufraeumen (Klasse weg) und
+  // Setzen (Klasse da) je Mausbewegung. `body.pp-dragging-card *` trifft jedes Element: das war je Bewegung ein Stilneuaufbau des
+  // ganzen Dokuments (gemessen: 4,5 s Stilberechnung in 12 s Zug, 897 Neuberechnungen) und meldete der Sprite-Ebene (HeroIdleAnims
+  // `beobachteEbene` sieht `body@class`) jedes Mal "schmutzig" (`ebeneAbgleichen` im 20-ms-Takt = ~10 % Hauptthread).
+  const kartenZug = !!(handDrag || playDrag || abilityDrag);
   useEffect(() => {
-    const dragging = !!(handDrag || playDrag || abilityDrag);
-    document.body.classList.toggle('pp-dragging-card', dragging);
+    document.body.classList.toggle('pp-dragging-card', kartenZug);
     return () => document.body.classList.remove('pp-dragging-card');
-  }, [handDrag, playDrag, abilityDrag]);
+  }, [kartenZug]);
 
   // Surprise drag state (Main Phases — dragging Surprise card to hero's surprise zone)
   // surpriseDrag merged into playDrag (with isSurprise: true flag)
