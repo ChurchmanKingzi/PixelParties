@@ -108,6 +108,7 @@ module.exports = {
     // Als Ruling (Al 27.10.): Reality Crack („You cannot play another Area for the rest of the turn") sperrt auch „bring directly into play" — der Trank ist dann ausgegraut.
     // Shipwrecked sperrt ihn nicht (`direkt`, CARD_API W82).
     if (engine?.areaSpielGesperrt?.(pi, { direkt: true })) return false;
+    if (engine?.spielerIstVonAreasAusgenommen?.(pi)) return false;   // W82 (Shipwrecked): keine Area ins Spiel bringen (Tranke ausgegraut)
 
     const cardDB = engine ? engine._getCardDB() : null;
     if (!cardDB) return true; // Fallback: let resolve() re-check.
@@ -124,6 +125,7 @@ module.exports = {
     // and resolve (reaction chains, etc.).
     if (playerControlsArea(gs, pi, engine)) return { cancelled: true };
     if (engine.areaSpielGesperrt(pi, { direkt: true })) return { cancelled: true };   // Als Ruling (Al 27.10.): Reality-Crack-Sperre (s. `canActivate`)
+    if (engine.spielerIstVonAreasAusgenommen(pi)) return { cancelled: true };   // W82 (Shipwrecked): Server-Pruefung
 
     const cardDB = engine._getCardDB();
     const gallery = buildAreaGallery(ps, cardDB, engine, pi);

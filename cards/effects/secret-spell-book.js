@@ -171,6 +171,7 @@ async function uebernimm(engine, pi, inst, ergebnis) {
   const name = inst.name;
   if (!istBetroffen(engine, pi, inst)) return;                                  // während der Abfragen kann sich das Brett geändert haben
   if (inst.zone === 'area') {
+    if (engine.spielerIstVonAreasAusgenommen(pi)) return;   // W82 (Shipwrecked): keine Area auf mein Brett bringen
     if (!engine.gs.areaZones) engine.gs.areaZones = [];
     if (!engine.gs.areaZones[pi]) engine.gs.areaZones[pi] = [];
     // Als Fix (Al 27.10.): auch keine Dublette — „up to 3 DIFFERENT Areas" (Spatial Crevice): liegt dieselbe Area schon in meiner Zone, bleibt die fremde liegen (`canPlaceAnotherArea` = Platz UND keine Dublette).

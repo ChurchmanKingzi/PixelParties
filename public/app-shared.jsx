@@ -2747,22 +2747,29 @@ const ZONE_ANIM_SFX = {
   modifier_sparkle:        { name: 'buff', opts: { rate: 1.25, volume: 0.5 } },
   level_down:              { name: 'debuff', opts: { rate: 0.9, volume: 0.7 } },   // Looming Threat: Stufe sinkt
   hand_level_down:         { name: 'debuff', opts: { rate: 1.0, volume: 0.6 } },   // Great Vanguard Demon: Stufe sinkt (Pixelart, die Karte bleibt sichtbar)
-  // Ancient Guardian Statue — Magie-Partikel auf der aufgedeckten Handkarte. `reveal` (Standard): Aufdeck-Ton + helles Ping; `tick`: Zugende, ein Ping + leises Absinken (Stufe −1);
-  // `free`: Stufe 0 — Buff-Klang, zwei Pings. Nur der erste Teil übernimmt die Sammelkategorie 'effect'.
+  // Ancient Guardian Statue — Magiefaden von der Statue zur aufgedeckten Handkarte; `mode` 'reveal' | 'tick' (Senkung) | 'free' (Stufe 0: kräftiger Beat).
   statue_magic: (p) => {
-    const ph = p && p.phase;
-    if (ph === 'tick') return [
-      { name: 'ping',   opts: { rate: 1.3, volume: 0.4 } },
-      { name: 'debuff', opts: { rate: 1.3, volume: 0.3, delay: 160, category: null, dedupe: 0 } },
-    ];
+    // Zeiten animationsrelativ (Einbau-Versatz legt `playSFXForZoneAnim` selbst dazu): Faden schießt los (0), trifft die Karte (560), alte Zahl bricht (~830), neue Zahl klickt ein (~1010).
+    const ph = p && (p.mode || p.phase);
+    const tail = { category: null, dedupe: 0 };
     if (ph === 'free') return [
-      { name: 'buff', opts: { rate: 1.05, volume: 0.7 } },
-      { name: 'ping', opts: { rate: 1.7, volume: 0.4, delay: 520, category: null, dedupe: 0 } },
-      { name: 'ping', opts: { rate: 2.2, volume: 0.3, delay: 700, category: null, dedupe: 0 } },
+      { name: 'spell_cast', opts: { rate: 1.3, volume: 0.5 } },
+      { name: 'ping',   opts: { rate: 1.5, volume: 0.45, delay: 560, ...tail } },
+      { name: 'debuff', opts: { rate: 1.4, volume: 0.3, delay: 830, ...tail } },
+      { name: 'buff',   opts: { rate: 1.0, volume: 0.85, delay: 1000, ...tail } },
+      { name: 'ping',   opts: { rate: 2.2, volume: 0.45, delay: 1010, ...tail } },
+      { name: 'ping',   opts: { rate: 2.7, volume: 0.35, delay: 1250, ...tail } },
+    ];
+    if (ph === 'tick') return [
+      { name: 'spell_cast', opts: { rate: 1.3, volume: 0.45 } },
+      { name: 'ping',   opts: { rate: 1.5, volume: 0.45, delay: 560, ...tail } },
+      { name: 'debuff', opts: { rate: 1.4, volume: 0.35, delay: 830, ...tail } },
+      { name: 'ping',   opts: { rate: 2.0, volume: 0.35, delay: 1010, ...tail } },
     ];
     return [
-      { name: 'reveal', opts: { rate: 0.85, volume: 0.5 } },
-      { name: 'ping',   opts: { rate: 1.6, volume: 0.3, delay: 260, category: null, dedupe: 0 } },
+      { name: 'spell_cast', opts: { rate: 1.15, volume: 0.45 } },
+      { name: 'reveal', opts: { rate: 0.9, volume: 0.5, delay: 560, ...tail } },
+      { name: 'ping',   opts: { rate: 1.6, volume: 0.35, delay: 800, ...tail } },
     ];
   },
   mind_control_hex:        { name: 'elem_dark', opts: { rate: 0.8, volume: 0.6 } },   // Mind Control: Hypnose-Spirale über dem übernommenen Helden (Pixelart)
@@ -2918,14 +2925,18 @@ const ZONE_ANIM_SFX = {
     { name: 'placement', opts: { rate: 0.8, volume: 0.9, delay: 600, category: null, dedupe: 0 } },
     { name: 'elem_dark', opts: { rate: 1.1, volume: 0.5, delay: 620, category: null, dedupe: 0 } },
   ],
-  // Sinister Idol (W82) — der Götze erscheint (dunkles Raunen, 0 ms), der Fluchrahmen schnappt zu (~300 ms: Schwächungs-Klang), die Ability blitzt (~760 ms: Verneinungs-Ton,
-  // Abwurf-Klang) und die oberste Kopie fliegt in die Ablage. Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  // Sinister Idol (W82) — Siegel und Nebel (dunkles Raunen, 0 ms), der Götze erscheint (Wind, ~160 ms), Runen zucken (hohe Pings, ~560 ms), die Ranken wachsen (Schwächungs-Klang, ~430 ms),
+  // Beat (~880 ms: Schlag, Verneinungs-Ton, Abwurf-Klang), Aufprall auf dem Ablagestapel (~1400 ms: Schlag, Platzieren). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   sinister_idol: [
-    { name: 'elem_dark', opts: { rate: 0.7, volume: 0.6 } },
-    { name: 'debuff',    opts: { rate: 0.8, volume: 0.5, delay: 300, category: null, dedupe: 0 } },
-    { name: 'ping',      opts: { rate: 0.7, volume: 0.4, delay: 420, category: null, dedupe: 0 } },
-    { name: 'negate',    opts: { rate: 1.1, volume: 0.6, delay: 760, category: null, dedupe: 0 } },
-    { name: 'discard',   opts: { rate: 0.8, volume: 0.6, delay: 800, category: null, dedupe: 0 } },
+    { name: 'elem_dark',    opts: { rate: 0.7, volume: 0.6 } },
+    { name: 'elem_wind',    opts: { rate: 0.8, volume: 0.35, delay: 160, category: null, dedupe: 0 } },
+    { name: 'debuff',       opts: { rate: 0.8, volume: 0.5, delay: 430, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 0.7, volume: 0.4, delay: 560, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 0.9, volume: 0.35, delay: 700, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.7, volume: 0.6, delay: 880, category: null, dedupe: 0 } },
+    { name: 'negate',       opts: { rate: 1.1, volume: 0.6, delay: 890, category: null, dedupe: 0 } },
+    { name: 'discard',      opts: { rate: 0.8, volume: 0.6, delay: 920, category: null, dedupe: 0 } },
+    { name: 'placement',    opts: { rate: 0.7, volume: 0.6, delay: 1400, category: null, dedupe: 0 } },
   ],
   // Darion, the Blood-Crazy Groundskeeper (24.10.) — Kettensäge: Hieb (Schnitt, 0 und ~110 ms), Blutspritzer (Schlag ~140 ms), das Equip rastet ein (~420 ms: Schlag, heller Ping).
   // Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
@@ -2936,13 +2947,14 @@ const ZONE_ANIM_SFX = {
     { name: 'placement',    opts: { rate: 1.0, volume: 0.9, delay: 420, category: null, dedupe: 0 } },
     { name: 'ping',         opts: { rate: 1.7, volume: 0.5, delay: 430, category: null, dedupe: 0 } },
   ],
-  // Shipwrecked (W82) — die Welle rollt heran (Wasser, 0 ms), Planken und Fass schlagen an (~300 ms: Holz-Plätschern), die Welle läuft zurück (Wasser ~760 ms). Nur der erste Teil
-  // uebernimmt die Sammelkategorie 'effect'.
+  // Shipwrecked (W82) — die Dünung rollt heran (Wasser, 0 ms), die vordere Welle bricht (Wasser + Gischt ~220 ms), Planken und Fass schlagen an (~560 ms: Holz-Plätschern), die Welle zieht ab (Wasser ~950 ms).
+  // Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   shipwrecked_attach: [
     { name: 'elem_water', opts: { rate: 0.8, volume: 0.6 } },
-    { name: 'placement',  opts: { rate: 0.7, volume: 0.5, delay: 300, category: null, dedupe: 0 } },
-    { name: 'elem_water', opts: { rate: 1.2, volume: 0.4, delay: 340, category: null, dedupe: 0 } },
-    { name: 'elem_water', opts: { rate: 0.7, volume: 0.4, delay: 760, category: null, dedupe: 0 } },
+    { name: 'elem_water', opts: { rate: 1.1, volume: 0.5, delay: 220, category: null, dedupe: 0 } },
+    { name: 'placement',  opts: { rate: 0.7, volume: 0.5, delay: 560, category: null, dedupe: 0 } },
+    { name: 'elem_water', opts: { rate: 1.3, volume: 0.35, delay: 600, category: null, dedupe: 0 } },
+    { name: 'elem_water', opts: { rate: 0.7, volume: 0.4, delay: 950, category: null, dedupe: 0 } },
   ],
   // Cute Crown (10.10.) — die Flügel schlagen (Wind, 0 / ~110 / ~220 ms), das Juwel klingt hell (~300 ms), Herzen steigen auf (~520 ms). Nur der erste Teil uebernimmt die
   // Sammelkategorie 'effect'.

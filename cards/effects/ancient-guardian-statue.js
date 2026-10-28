@@ -31,8 +31,10 @@
 //     die Kopie noch an ihr hängt und ihre Stufe 0 ist; fällt eine Bedingung weg, ist der Spell wieder ein normaler Spell (Stufe bleibt 0, kostet aber eine Aktion). Nur Spells,
 //     nie Reaction/Surprise (`handKopieZusatzaktion`). Die Marke gehört der Kopie, nicht dem Namen. Die übrigen Spielbarkeitsregeln (Held/Schule/Ressourcen) gelten normal;
 //     der Spell wird wie jeder andere gespielt (Klick/Ziehen) und verbraucht keine Aktion. Der Handkarten-Tooltip erklärt es („Counts as an additional Action").
-//  ⑤ Animation `statue_magic` (Pixelart, `public/app-board.jsx`): Magie-Partikel auf der Handkarte (`play_hand_card_animation`, beide Seiten sehen die aufgedeckte
-//     Karte) — Phase 'reveal' beim Aufdecken, 'tick' beim Senken, 'free' beim Erreichen von Stufe 0 (goldener Hervorhebungs-Beat).
+//  ⑤ Animation `statue_magic` (Pixelart, `public/app-board.jsx`, `ppSalve`): `play_zone_animation` (zoneType 'board') mit Ursprung = Zone der Statue (Augen glühen) und Ziel = die
+//     aufgedeckte Handkarte (`targets[0].handIdx`): ein Magiefaden aus gedithertem Licht, Siegelringe, Partikel auf der Ellipse und die Stufenzahl, die auf einer Platte „herunterklickt"
+//     (alte Zahl bricht in Splitter, neue fällt ein). `mode`: 'reveal' (Aufdecken, 1,5 s), 'tick' (Senkung, 1,5 s), 'free' (Stufe 0 erreicht: Aufleuchten, Ringe, Funkenregen, 2,1 s).
+//     Beide Seiten sehen sie (die Karte ist aufgedeckt). Der Spielfluss wartet nur 1,0 s (tick/reveal) bzw. 1,5 s (free).
 //  ⑥ Puzzle-Editor: Die Statue trägt Zustand (welche Handkarte). Im Statistik-Fenster der Statue (`app-puzzle.jsx`, Feld „Hand slot", 1-basiert) wird der Handplatz der gesuchten
 //     Karte eingestellt (`statueHandSlot` in `_creatureStatuses`); `createPuzzleGame` (`server.js`, `pzStatue`) knüpft die Handkopie dort an die Statue (`_handStatueLink`), deckt
 //     sie dauerhaft auf und setzt die Zusatzaktions-Marke, wenn der Editor der Karte die Startstufe 0 gibt (Linksklick, `handLv` → `counters.levelSet`; = „durch die Statue auf 0").
@@ -84,9 +86,19 @@ function handStufe(engine, pi, name, idx) {
   return Math.max(0, basis + abzug);
 }
 
-/** Ein Hand-Animationsereignis auf der Karte (`phase`: 'reveal' | 'tick' | 'free'). */
-function animiere(engine, pi, idx, name, phase, duration) {
-  engine._broadcastEvent('play_hand_card_animation', { owner: pi, handIdx: idx, cardName: name, animType: ANIM, phase, count: 1, duration });
+/**
+ * Die Animation `statue_magic` (Zonen-Animation über dem Brett): ein Magiefaden von der Zone der Statue zur aufgedeckten Handkarte (`targets[0]` = Handplatz `handIdx`), Siegel, Partikel und die
+ * Stufenzahl, die „herunterklickt" (`runde` = angezeigte Stufe + 1; `ppSalve` macht aus 0 eine 1). `mode`: 'reveal' | 'tick' | 'free'. Beide Seiten sehen sie (die Karte ist aufgedeckt).
+ */
+function animiere(engine, pi, idx, name, mode, stufe, statue, duration) {
+  engine._broadcastEvent('play_zone_animation', {
+    type: ANIM, zoneType: 'board', owner: statue.owner, mode, runde: stufe + 1, duration,
+    originOwner: statue.owner, originHeroIdx: statue.heroIdx, originZoneSlot: statue.zoneSlot, originFallback: true,
+    targets: [
+      { owner: pi, hand: true, handIdx: idx, cardName: name },
+      { owner: statue.owner, heroIdx: statue.heroIdx, zoneSlot: statue.zoneSlot },
+    ],
+  });
 }
 
 
@@ -183,7 +195,7 @@ module.exports = {
       if (typeof engine.noteKnownCard === 'function') engine.noteKnownCard(oi, name, 'hand');   // Gedächtnis der CPU
       engine.log('ancient_guardian_statue', { player: ps.username, card: name, text: `searched ${name} (permanently revealed)` });
       engine.sync();
-      animiere(engine, pi, idx, name, 'reveal', 1300);
+      animiere(engine, pi, idx, name, 'reveal', handStufe(engine, pi, name, idx), inst, 1500);
       await engine._delay(1000);
     },
 
@@ -215,8 +227,8 @@ module.exports = {
       }
       engine.log('ancient_guardian_statue', { player: ps.username, card: name, text: `level reduced to ${nachher}` });
       engine.sync();
-      animiere(engine, pi, idx, name, nachher === 0 ? 'free' : 'tick', nachher === 0 ? 1500 : 850);
-      await engine._delay(nachher === 0 ? 1200 : 700);
+      animiere(engine, pi, idx, name, nachher === 0 ? 'free' : 'tick', vorher, inst, nachher === 0 ? 2100 : 1500);   // ≤ 1,6 s für die Senkung, ≤ 2,2 s bei Stufe 0
+      await engine._delay(nachher === 0 ? 1500 : 1000);   // der Spielfluss wartet nur auf den Einschlag, der Rest läuft über dem Brett aus
     },
   },
 };

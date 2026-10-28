@@ -19,7 +19,9 @@
 //    Aktivierung: die Tagessperre der Ability (`free-ability:…`) wird nicht
 //    angefasst, es gibt keine Kettenfenster und keinen zweiten Reveal; sie
 //    laeuft ueber denselben `onFreeActivate`-Weg (Kosten und Abbruch der
-//    Ability gelten wie gewohnt). Bricht der Spieler die Zusatznutzung
+//    Ability gelten wie gewohnt). W82 (Sinister Idol, Al): die Zusatznutzung
+//    oeffnet dennoch ein Kettenfenster fuer Ability-Aktivierungen (Idol, Ragnarock …) und das
+//    Surprise-Fenster, die Stufe wird danach neu gelesen (`engine.abilityAktivierungsFenster`). Bricht der Spieler die Zusatznutzung
 //    ab (Abwurf abgebrochen), bleibt der Lab-Stempel frei.
 //    Nur der Traeger selbst: geliehene Abilities (Lizbeth/Smugbeth) und
 //    uebernommene Helden zaehlen nicht ("that Hero's Inventing Ability").
@@ -87,9 +89,23 @@ module.exports = {
       if (!engine._confirmSaidYes(ja)) return;
 
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
-      const ergebnis = await engine._alsAkteur(abCtx, () => script.onFreeActivate(abCtx, level));
-      if (ergebnis === false) return;                          // abgebrochen: Stempel bleibt frei
+      // ★ W82 (Sinister Idol, Al): auch die Zusatznutzung öffnet das Kettenfenster für Ability-Aktivierungen (Idol, Ragnarock & Co.) samt Surprise-Fenster — sie ist laut Text keine NEUE
+      // Aktivierung (die Tagessperre der Ability bleibt unberührt), wird aber „use it an additional time": ein Aktivierungsereignis, auf das Reaktionen antworten dürfen. Stufe danach neu gelesen,
+      // Kosten = Stufe beim Aktivieren (`kostenStufe`), gesenkte Stufe = Pflicht-Auflösung. Negiert: die Zusatznutzung ist geschehen (Lab-Stempel gesetzt), die Ability wirkt nicht.
+      const fenster = await engine.abilityAktivierungsFenster({ pi, heroIdx: lab.heroIdx, heroOwner: pi, slotHeroIdx: lab.heroIdx, zoneIdx: ctx.zoneIdx, zoneKind, abilityName: ABILITY, level, inst: abInst });
       if (!gs.hoptUsed) gs.hoptUsed = {};
+      if (fenster.negated) {
+        gs.hoptUsed[`${hoptKey}:${pi}`] = gs.turn;
+        engine.log('secret_lab_extra_use_negated', { player: gs.players[pi]?.username });
+        engine.sync();
+        return;
+      }
+      const abCtx2 = fenster.inst && fenster.inst !== abInst ? engine._createContext(fenster.inst, {}) : abCtx;
+      abCtx2._labZweitnutzung = true;
+      abCtx2.kostenStufe = level;
+      let ergebnis = await engine.mitPflichtAufloesung(pi, fenster.pflicht, () => engine._alsAkteur(abCtx2, () => script.onFreeActivate(abCtx2, fenster.stufe)));
+      if (ergebnis === false && fenster.pflicht) { ergebnis = true; engine.log('sinister_idol_declined', { player: gs.players[pi]?.username, ability: ABILITY }); }
+      if (ergebnis === false) return;                          // abgebrochen: Stempel bleibt frei
       gs.hoptUsed[`${hoptKey}:${pi}`] = gs.turn;
       engine.log('secret_lab_extra_use', { player: gs.players[pi]?.username, hero: gs.players[feld]?.heroes?.[lab.heroIdx]?.name });
       engine.sync();
