@@ -4,7 +4,7 @@
 //  prompts, and the main GameBoard component
 // ═══════════════════════════════════════════
 const { useState, useEffect, useRef, useCallback, useMemo, useContext, useLayoutEffect } = React;
-const { api, emitSocket, socket, AppContext, CardMini, CardFoil,
+const { api, emitSocket, socket, AppContext, CardMini, CardFoil, FoilBrettContext,
         cardImageUrl, skinImageUrl, typeColor, typeClass, CARDS_BY_NAME, SKINS_DB,
         useStickyHoverFlag } = window;
 
@@ -42080,17 +42080,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Setzen (Klasse da) je Mausbewegung. `body.pp-dragging-card *` trifft jedes Element: das war je Bewegung ein Stilneuaufbau des
   // ganzen Dokuments (gemessen: 4,5 s Stilberechnung in 12 s Zug, 897 Neuberechnungen) und meldete der Sprite-Ebene (HeroIdleAnims
   // `beobachteEbene` sieht `body@class`) jedes Mal "schmutzig" (`ebeneAbgleichen` im 20-ms-Takt = ~10 % Hauptthread).
-  // Dazu: waehrend des Zuges ruhen die DEKORATIVEN Endlos-Animationen (Foil-Schichten, Partikel, Area-Szenen; `animationenAnhalten`),
-  // denn mit jeder Mausbewegung kommt ein Hauptthread-Frame, und jeder wertet alle laufenden Animationen neu aus. Spielrelevantes
-  // (Zielmarken, Status-Schimmer ...) laeuft weiter; beim Loslassen stehen die Animationen wieder in der Phase ohne Pause.
   const kartenZug = !!(handDrag || playDrag || abilityDrag);
   useEffect(() => {
     document.body.classList.toggle('pp-dragging-card', kartenZug);
-    if (kartenZug) window.animationenAnhalten?.(true, true);
-    return () => {
-      document.body.classList.remove('pp-dragging-card');
-      window.animationenAnhalten?.(false);
-    };
+    return () => document.body.classList.remove('pp-dragging-card');
   }, [kartenZug]);
 
   // Surprise drag state (Main Phases — dragging Surprise card to hero's surprise zone)
@@ -60549,6 +60542,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               return hasTempeste ? <TempesteRainOverlay /> : null;
             })()}
             <div className="board-plane">
+            <FoilBrettContext.Provider value={true}>
             <div className="board-player-side board-side-opp">{renderPlayerSide(opp, true)}</div>
             <div className="board-area-zones-center">
               {(() => {
@@ -60719,6 +60713,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               )}
             </div>
             <div className="board-player-side board-side-me">{renderPlayerSide(me, false)}</div>
+            </FoilBrettContext.Provider>
             </div>{/* /board-plane */}
             {/* (Die Sprite-Ebene der Helden-Idle-Animationen steht seit 10.10. NACH dem Clip, direkt in `.board-center` —
                 siehe `<HeroSpriteEbene ueber />` unten.) */}

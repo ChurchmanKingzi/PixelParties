@@ -6313,9 +6313,11 @@ function makeFoilMotes(isDiamond, rnd = Math.random) {
 }
 
 /** Reiner Zeichner — bekommt alles Gewuerfelte von CardFoil gereicht. */
-function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein, fkey }) {
+function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein, fkey, teilchen }) {
   const isDiamond = foilType === 'diamond_rare';
   const posn = isDiamond ? DIAMOND_SPARKLE_POSITIONS : SPARKLE_POSITIONS;
+  // Brett mit vielen Foil-Karten: nur so viele Funken + Staubkoerner, wie `teilchen` erlaubt (siehe `foilBrettTeilchen`).
+  const { funken: nFunken, staub: nStaub } = foilTeilchenAnteil(posn.length, (motes || []).length, teilchen);
   return (
     <div className={'foil-shine-overlay' + (isDiamond ? ' foil-shine-diamond' : '') + (klein ? ' foil-klein' : '')} data-foil-key={fkey}>
       {/* 1) Die Praegung der Folie. Fuer sich genommen kaum zu sehen —
@@ -6343,6 +6345,7 @@ function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein, f
       {/* 4) Glanzpunkte und Staub. */}
       {posn.map((sp, i) => {
         if (klein && i % FOIL_KLEIN_FUNKEN_JEDER !== 0) return null;   // v1298
+        if (!foilBehalten(i, posn.length, nFunken)) return null;
         const f = (sparkles && sparkles[i]) || null;
         return (
           <div key={'s' + i} className="foil-sparkle"
@@ -6354,7 +6357,7 @@ function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein, f
             }} />
         );
       })}
-      {(motes || []).map((m, i) => (
+      {(motes || []).map((m, i) => i >= nStaub ? null : (
         <div key={'m' + i} className="foil-mote" style={{
           left: m.x + '%', top: m.y + '%', color: m.color,
           '--mote-size': m.size.toFixed(1) + 'px',
@@ -6399,6 +6402,51 @@ function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein, f
 // dann eine leichte Foil-Schicht: 2 Baender (Diamond 1), ein Drittel der
 // Funken, kein Staub, und nur Animationen, die der Compositor allein
 // schafft (transform/opacity). Die grosse Ansicht (Tooltip) bleibt voll.
+// ═══════════════════════════════════════════════════════════════
+//  ★ FOIL-DICHTE AUF DEM BRETT (Kampf-Stresstest 28.10.: „das ganze Board voller Foil-Karten")
+//
+//  Jede Foil-Karte traegt ~22 laufende CSS-Animationen (Funken, Staub, Schimmer, Rahmen-Ringe); mit 36 Foil-Karten auf dem Brett sind das
+//  rund 800 — und jeder Hauptthread-Frame wertet ALLE erneut aus. Statt einer harten Schwelle teilen sich die Foil-Karten AUF DEM BRETT
+//  ein festes Teilchen-Budget (`FOIL_BRETT_BUDGET` Funken + Staubkoerner zusammen): bis ~16 Karten bleibt alles wie es ist, danach bekommt
+//  jede Karte stetig etwas weniger Teilchen (mindestens `FOIL_BRETT_MIN`). Schimmer, Rahmen-Ringe und alles Uebrige bleiben unberuehrt.
+//  Nur Karten im `FoilBrettContext` (Kampfbrett-Ebene, Editor-Brett) zaehlen und werden ausgeduennt; Tooltip, Hand und Galerien nie.
+// ═══════════════════════════════════════════════════════════════
+const FoilBrettContext = React.createContext(false);
+window.FoilBrettContext = FoilBrettContext;
+const FOIL_BRETT_BUDGET = 300;
+const FOIL_BRETT_MIN = 5;
+const foilBrettKarten = new Set();
+const foilBrettHoerer = new Set();
+/** Erlaubte Teilchen je Karte bei `n` Foil-Karten auf dem Brett (Infinity = alles). */
+function foilBrettTeilchen(n) {
+  return n > 0 ? Math.max(FOIL_BRETT_MIN, Math.floor(FOIL_BRETT_BUDGET / n)) : Infinity;
+}
+const foilBrettAbo = (f) => { foilBrettHoerer.add(f); return () => { foilBrettHoerer.delete(f); }; };
+const foilBrettStand = () => foilBrettTeilchen(foilBrettKarten.size);
+/** Melden sich Karten an/ab, wird nur neu gezeichnet, wenn sich die erlaubte Teilchenzahl wirklich aendert (Schnappschuss = Zahl). */
+function useFoilBrettTeilchen(aktiv) {
+  const ich = useRef(null);
+  if (!ich.current) ich.current = {};
+  useEffect(() => {
+    if (!aktiv) return undefined;
+    const marke = ich.current;
+    foilBrettKarten.add(marke);
+    foilBrettHoerer.forEach(f => f());
+    return () => { foilBrettKarten.delete(marke); foilBrettHoerer.forEach(f => f()); };
+  }, [aktiv]);
+  const erlaubt = React.useSyncExternalStore(foilBrettAbo, foilBrettStand, () => Infinity);
+  return aktiv ? erlaubt : undefined;
+}
+/** Wie viele Funken / Staubkoerner von `funken` + `staub` bei `max` Teilchen bleiben (im Verhaeltnis, Funken mindestens 1). */
+function foilTeilchenAnteil(funken, staub, max) {
+  const gesamt = funken + staub;
+  if (max === undefined || max >= gesamt) return { funken, staub };
+  const f = Math.min(funken, Math.max(1, Math.round(max * funken / gesamt)));
+  return { funken: f, staub: Math.max(0, Math.min(staub, max - f)) };
+}
+/** Gleichmaessig verteilte Auswahl: bleibt Element `i` von `gesamt`, wenn nur `k` bleiben? */
+const foilBehalten = (i, gesamt, k) => k >= gesamt || Math.floor((i + 1) * k / gesamt) > Math.floor(i * k / gesamt);
+
 const FoilKleinContext = React.createContext(false);
 window.FoilKleinContext = FoilKleinContext;
 const FOIL_KLEIN_BAENDER = { secret: 2, diamond: 1 };
@@ -6439,50 +6487,6 @@ function HintergrundPause() {
 }
 window.HintergrundPause = HintergrundPause;
 
-/**
- * ★ Als Befund 27.10. (Puzzle-Editor „mitunter ziemlich laggy"): ENDLOS-ANIMATIONEN WAEHREND EINES ZUGES ANHALTEN.
- * Jeder Hauptthread-Frame verarbeitet ALLE laufenden CSS-Animationen erneut (gemessen: 300 Animationen + ein unabhaengiger 30-Hz-Tick =
- * 33-41 % Hauptthread, ohne Animationen 5 %). Auf einem vollen Editor-Brett laufen rund 450-700 (Foil-Funken, Schimmer, Rahmen, Partikel),
- * und waehrend eines Zuges kommt mit jeder Mausbewegung ein Frame. `animationenAnhalten(true)` haelt alle gerade laufenden ENDLOSEN
- * CSS-Animationen an, `false` laesst sie weiterlaufen. Ueber die Web-Animations-API statt einer Klasse am Body (`pp-dialog-offen`): das
- * Umschalten der Klasse kostete 70-130 ms (Neuberechnung ueber alle Foil-Nachfahren), der API-Weg rund 15 ms zum Anhalten und 1 ms zum
- * Freigeben. Beim Freigeben wird die ALTE Startzeit zurueckgeschrieben: die Animationen stehen dann genau dort, wo sie ohne Pause waeren
- * (die Foil-Uhr, `foilUhrStellen`, bleibt gueltig — gleiche Karte = gleiche Phase, ohne sie neu stellen zu muessen). Einmalige
- * Animationen und Uebergaenge laufen weiter. Idempotent.
- */
-let _animAngehalten = null;
-// Rein dekorative Endlos-Animationen: Foil-Huellen, Partikel (Brett, Hand, Hintergrund), Area-Szenen. `nurDekor` haelt NUR diese an
-// (Kampf: Zielmarken und Status-Schimmer sind Spielinformation und bleiben in Bewegung).
-const ANIM_DEKOR = '[data-foil-key], .pp-area-dyn, .pp-pixel-scene, .pp-pixel-layer, .board-mote, .hand-mote, .hand-bloom, .pp-bg-particles';
-function animationenAnhalten(an, nurDekor) {
-  if (typeof CSSAnimation === 'undefined' || typeof document.getAnimations !== 'function') return;
-  if (an) {
-    if (_animAngehalten) return;
-    const liste = [];
-    for (const a of document.getAnimations()) {
-      if (!(a instanceof CSSAnimation) || a.playState !== 'running') continue;
-      const w = a.effect;
-      if (!w || w.getComputedTiming().iterations !== Infinity) continue;
-      if (nurDekor) { const z = w.target; if (!z || !z.closest || !z.closest(ANIM_DEKOR)) continue; }
-      liste.push([a, a.startTime]);
-    }
-    for (const [a] of liste) a.pause();
-    _animAngehalten = liste;
-  } else {
-    const liste = _animAngehalten;
-    if (!liste) return;
-    _animAngehalten = null;
-    for (const [a, start] of liste) {
-      try {
-        const ziel = a.effect && a.effect.target;
-        if (!ziel || !ziel.isConnected) continue;     // in der Zwischenzeit entfernt
-        a.play();
-        if (start != null) a.startTime = start;       // statt um die Standzeit verschoben: genau wie ohne Pause
-      } catch (e) { /* abgebrochene Animation: nichts zu tun */ }
-    }
-  }
-}
-window.animationenAnhalten = animationenAnhalten;
 const FOIL_KLEIN_FUNKEN_JEDER = 3;   // jeder dritte Funke bleibt
 
 // ═══════════════════════════════════════════════════════════════
@@ -6700,6 +6704,8 @@ function CardFoil({ card, foilType, skin, werte }) {
   const type = foilType || card?.foil || null;
   const isFoil = type === 'secret_rare' || type === 'diamond_rare';
   const klein = useContext(FoilKleinContext);
+  const aufDemBrett = useContext(FoilBrettContext);
+  const teilchen = useFoilBrettTeilchen(aufDemBrett && isFoil && !klein);
   // Je KARTE (nicht je Kopie) gewuerfelt: Baender, Staub, Schimmerphase und der Versatz der Funken kommen aus einem Zufallsstrom,
   // der vom Schluessel der Karte abhaengt — alle Exemplare derselben Karte (Hand, Deck-Editor, Tooltip ...) sehen gleich aus und
   // laufen auf der gemeinsamen Foil-Uhr (siehe `foilUhrStellen`); verschiedene Karten unterscheiden sich weiterhin. `klein` aendert
@@ -6751,7 +6757,7 @@ function CardFoil({ card, foilType, skin, werte }) {
       )}
       {foilSchicht && (
         <FoilOverlay foilType={type} bands={meta.bands} motes={meta.motes}
-          sparkles={meta.sparkles} shimmerOffset={meta.shimmerOffset} klein={klein} fkey={fkey} />
+          sparkles={meta.sparkles} shimmerOffset={meta.shimmerOffset} klein={klein} fkey={fkey} teilchen={teilchen} />
       )}
       {foilSchicht && !klein && skinHoloAktiv() && <FoilName card={card} tone={type === 'diamond_rare' ? 'diamond' : 'gold'} fkey={fkey} werte={werte} />}
       {holoSkin && <SkinHolo skin={skin} fkey={fkey} />}

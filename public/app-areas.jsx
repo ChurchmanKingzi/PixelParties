@@ -35,6 +35,28 @@ const { useState, useEffect, useLayoutEffect, useRef, useMemo } = React;
 //  nicht gerendert.
 // ═══════════════════════════════════════════════════════════════════
 
+// ★ Perf (Kampf-Stresstest 28.10.: jede Area-Szene traegt 30-120 laufende Animationen, und jeder Hauptthread-Frame wertet alle neu
+// aus; zwei deckende Areas = zwei volle Szenen). Die Zahl der bewegten Elemente laeuft ueber `ppAreaN` statt `ppFxN` (das bleibt dem
+// Kampfbrett): Telefon wie bisher 40 %, am Desktop `PP_AREA_FAKTOR`. Liegen ZWEI verschiedene deckende Areas, sieht man von jeder nur
+// ihre Haelfte (diagonaler Schnitt, `AreaBackgrounds`) — die Teilchen der verdeckten Haelfte liefen trotzdem; darum bekommt dann jede
+// Szene nur noch `PP_AREA_ZWEI` ihrer Teilchen, ohne dass die sichtbare Dichte spuerbar sinkt. Die Bewegung selbst (Takt, steps(),
+// Dauer) bleibt unangetastet: es sind weniger Elemente, keine ruckelnden. Gezaehlt wird beim Einhaengen der Szene (useMemo); wechselt der
+// Zustand ein/zwei Szenen, haengen sich die Szenen deshalb neu ein (Schluessel in `AreaBackgrounds`).
+const PP_AREA_FAKTOR = 0.75;
+const PP_AREA_ZWEI = 0.7;
+let ppAreaDichte = 1;
+function ppAreaN(n) {
+  const telefon = !!(window.ppIsPhone && window.ppIsPhone());
+  const basis = window.ppFxN ? window.ppFxN(n) : n;          // Telefon: 40 %, mindestens 2
+  return Math.max(Math.min(n, 2), Math.round(basis * (telefon ? 1 : PP_AREA_FAKTOR) * ppAreaDichte));
+}
+/** Teilchen-Array gleichmaessig ausduennen: bleibt `ppAreaN(Laenge)` Elemente, gleichmaessig ueber die Reihe verteilt (Verteilung, Dauern und Phasen bleiben so wie gemalt). */
+function ppDuenn(arr) {
+  const n = arr.length, k = ppAreaN(n);
+  return k >= n ? arr : arr.filter((_, i) => Math.floor((i + 1) * k / n) > Math.floor(i * k / n));
+}
+const ppDuennVon = (spec, f) => ppDuenn(Array.from(spec, f));
+
 const AREA_TIER_ORDER = ['opaque', 'translucent', 'partial'];
 const AREA_OVERLAYS = {
   'Board of Kings':               { tier: 'opaque',      C: () => <BoardOfKingsOverlay /> },   // v1438: Kartenstil
@@ -107,6 +129,9 @@ function AreaBackgrounds({ areaZones, myIdx, oppIdx, spielstand }) {
   // kleiner Auszug, vom Aufrufer gefuellt: Kampfbrett aus gameState,
   // Puzzle-Creator aus seinem Editorzustand).
   const seam = useMemo(() => buildFrayedSeam(), []);
+  // Die Teilchenzahl wird beim Einhaengen der Szenen gelesen (waehrend dieses Durchlaufs); danach zurueck auf 1, damit nichts daran haengen bleibt.
+  ppAreaDichte = 1;
+  useLayoutEffect(() => { ppAreaDichte = 1; });
   const mine = areaZones?.[myIdx] || [];
   const theirs = areaZones?.[oppIdx] || [];
   const besitzerVon = (n) => [myIdx, oppIdx].filter(i => (areaZones?.[i] || []).includes(n));
@@ -119,13 +144,15 @@ function AreaBackgrounds({ areaZones, myIdx, oppIdx, spielstand }) {
       // Je Seite zählt die zuletzt gelegte opaque-Area.
       const a = mineT[mineT.length - 1];
       const b = theirsT[theirsT.length - 1];
-      if (a && b && a !== b) {
+      const zwei = !!(a && b && a !== b);
+      ppAreaDichte = zwei ? PP_AREA_ZWEI : 1;     // wird von den Szenen beim Einhaengen gelesen (`ppAreaN`)
+      if (zwei) {
         const diag = seam.map(p => `${p.x.toFixed(2)}% ${p.y.toFixed(2)}%`).join(', ');
         const clipMine = `polygon(${diag}, 0% 100%)`;          // links/unten
         const clipTheirs = `polygon(${diag}, 100% 0%)`;        // rechts/oben
         layers.push(
-          <div key={`op-${b}`} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', isolation: 'isolate', clipPath: clipTheirs }}>{szene(b)}</div>,
-          <div key={`op-${a}`} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', isolation: 'isolate', clipPath: clipMine }}>{szene(a)}</div>,
+          <div key={`op-${b}-zwei`} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', isolation: 'isolate', clipPath: clipTheirs }}>{szene(b)}</div>,
+          <div key={`op-${a}-zwei`} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', isolation: 'isolate', clipPath: clipMine }}>{szene(a)}</div>,
           <svg key="op-seam" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
             viewBox="0 0 100 100" preserveAspectRatio="none">
             <polyline points={seam.map(p => `${p.x},${p.y}`).join(' ')} fill="none"
@@ -179,7 +206,7 @@ function AreaBackgrounds({ areaZones, myIdx, oppIdx, spielstand }) {
 //  ANIMATIONEN nur per CSS-Keyframes: „Play Animations: aus" friert sie
 //  dann ein (globale Regel), bewegte Einzelelemente tragen zusaetzlich
 //  `pp-area-dyn` und werden dort ganz ausgeblendet. Anzahl bewegter
-//  Elemente immer ueber `ppFxN` (Telefon-Deckel).
+//  Elemente immer ueber `ppAreaN` (Telefon-Deckel, Desktop-Faktor, zwei Szenen).
 // ═══════════════════════════════════════════════════════════════════
 const ppArt = (n) => `calc(${n} * var(--px))`;
 const ppArtX = (x, bezugsbreite) => `calc(50% + ${x - bezugsbreite / 2} * var(--px))`;
@@ -341,18 +368,18 @@ const brKachelX = (x, rand = 4) => {
 };
 
 const BloodRockOverlay = React.memo(function BloodRockOverlay() {
-  const bats = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+  const bats = useMemo(() => ppZufall(ppAreaN(4), (i) => ({
     y: 3 + Math.random() * 22, dur: 18 + Math.random() * 14, delay: -Math.random() * 30,
     bob: 1 + Math.round(Math.random() * 2), bobDur: 1.4 + Math.random() * 1.2, flap: .3 + Math.random() * .12, rtl: i % 2 === 1,
   })), []);
-  const batsFern = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const batsFern = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     y: 2 + Math.random() * 14, dur: 34 + Math.random() * 16, delay: -Math.random() * 40,
     flap: .26 + Math.random() * .1, rtl: i % 2 === 0,
   })), []);
   const ripples = useMemo(() => {
     const out = [...BR_TORBAU_FUESSE];
     for (const [x, y] of BR_KACHEL_FUESSE) for (const xx of brKachelX(x)) out.push([xx, y]);
-    return out.slice(0, ppFxN(30)).map(([x, y]) => ({ x, y, dur: .6 + Math.random() * .5, delay: -Math.random() * 2 }));
+    return out.slice(0, ppAreaN(30)).map(([x, y]) => ({ x, y, dur: .6 + Math.random() * .5, delay: -Math.random() * 2 }));
   }, []);
   const kaefige = useMemo(() => brKachelX(BR_KAEFIG[0], 8).map((x) => ({
     x, dur: 3.2 + Math.random() * .8, delay: -Math.random() * 4,
@@ -360,15 +387,15 @@ const BloodRockOverlay = React.memo(function BloodRockOverlay() {
   const haende = useMemo(() => {
     const out = BR_HAENDE_TORBAU.map(([x, y]) => ({ left: ppArtX(x - 2, BR_KEEP_W), y }));
     for (const [x, y] of BR_HAENDE_KACHEL) for (const xx of brKachelX(x)) out.push({ left: ppArtX(xx - 2, 0), y });
-    return out.slice(0, ppFxN(6)).map((h) => ({ ...h, dur: 9 + Math.random() * 9, delay: -Math.random() * 18 }));
+    return out.slice(0, ppAreaN(6)).map((h) => ({ ...h, dur: 9 + Math.random() * 9, delay: -Math.random() * 18 }));
   }, []);
   const tropfen = useMemo(() => {
     const out = BR_GALERIE_TROPFEN.map((x) => ({ left: ppArtX(x, BR_KEEP_W), y0: 30, y1: 33 }));
     for (const [x, y] of BR_TROPFSTEINE) for (const xx of brKachelX(x)) out.push({ left: ppArtX(xx, 0), y0: y, y1: 29 });
     for (const k of kaefige) out.push({ left: ppArtX(k.x + 1, 0), y0: BR_KAEFIG[1] + 25, y1: 78 });
-    return out.slice(0, ppFxN(12)).map((d) => ({ ...d, dur: 3.2 + Math.random() * 2.6, delay: -Math.random() * 6 }));
+    return out.slice(0, ppAreaN(12)).map((d) => ({ ...d, dur: 3.2 + Math.random() * 2.6, delay: -Math.random() * 6 }));
   }, [kaefige]);
-  const ratten = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+  const ratten = useMemo(() => ppZufall(ppAreaN(2), (i) => ({
     y: 86 + i * 7 + Math.random() * 3, dur: 26 + Math.random() * 14, delay: -Math.random() * 30 - i * 11, rtl: i === 1,
   })), []);
   const wand = BR_KEEP_W;
@@ -592,18 +619,18 @@ function pgnGang(name, plan) {
 }
 
 const PangaiaOverlay = React.memo(function PangaiaOverlay() {
-  const dinos = useMemo(() => PGN_DINOS.slice(0, Math.max(4, ppFxN(PGN_DINOS.length))).map((d, i) => {
+  const dinos = useMemo(() => PGN_DINOS.slice(0, Math.max(4, ppAreaN(PGN_DINOS.length))).map((d, i) => {
     const g = pgnGang('pgnGang' + i, d.plan);
     const dur = g.n * d.takt;
     return { ...d, css: g.css, name: 'pgnGang' + i, dur, delay: d.verz !== undefined ? d.verz : -Math.random() * dur };
   }), []);
-  const flieger = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const flieger = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     y: [6, 52, 30][i] + Math.random() * 8, dur: 20 + Math.random() * 10, delay: -Math.random() * 30, rtl: i % 2 === 1,
   })), []);
-  const rauch = useMemo(() => ppZufall(ppFxN(6), (i) => ({ dur: 5.5 + Math.random() * 2.5, delay: -i * 1.25 - Math.random(), dx: Math.round(Math.random() * 4) })), []);
-  const dampf = useMemo(() => ppZufall(ppFxN(3), (i) => ({ dur: 2.6 + Math.random(), delay: -i * 1.0, dx: i - 1 })), []);
-  const blasen = useMemo(() => PGN_KRATER.slice(0, ppFxN(PGN_KRATER.length)).map(([x, y]) => ({ x, y, dur: 2.2 + Math.random() * 2.2, delay: -Math.random() * 4 })), []);
-  const kraeusel = useMemo(() => PGN_SEE.slice(0, ppFxN(PGN_SEE.length)).map(([x, y]) => ({ x, y, dur: 4 + Math.random() * 4, delay: -Math.random() * 8 })), []);
+  const rauch = useMemo(() => ppZufall(ppAreaN(6), (i) => ({ dur: 5.5 + Math.random() * 2.5, delay: -i * 1.25 - Math.random(), dx: Math.round(Math.random() * 4) })), []);
+  const dampf = useMemo(() => ppZufall(ppAreaN(3), (i) => ({ dur: 2.6 + Math.random(), delay: -i * 1.0, dx: i - 1 })), []);
+  const blasen = useMemo(() => PGN_KRATER.slice(0, ppAreaN(PGN_KRATER.length)).map(([x, y]) => ({ x, y, dur: 2.2 + Math.random() * 2.2, delay: -Math.random() * 4 })), []);
+  const kraeusel = useMemo(() => PGN_SEE.slice(0, ppAreaN(PGN_SEE.length)).map(([x, y]) => ({ x, y, dur: 4 + Math.random() * 4, delay: -Math.random() * 8 })), []);
   const mitte = { left: `calc(50% - ${PGN_W / 2} * var(--px))`, width: ppArt(PGN_W), right: 'auto' };
   return (
     <PixelScene artH={100} bg="#02398c" className="pangaia-overlay">
@@ -748,36 +775,36 @@ const BOK_HECKEN_X = BOK_HECKEN.flatMap(([t, ks]) => ks.map(k => bokKachel(t, k)
   .filter(x => Math.abs(x) > 80).sort((a, b) => Math.abs(a) - Math.abs(b));
 
 const BoardOfKingsOverlay = React.memo(function BoardOfKingsOverlay() {
-  const glanz = useMemo(() => ppZufall(ppFxN(6), () => {
+  const glanz = useMemo(() => ppZufall(ppAreaN(6), () => {
     const col = Math.floor(Math.random() * BOK_BRETT.spalten), row = 1 + Math.floor(Math.random() * 7);
     return {
       x: -BOK_BRETT.feld * BOK_BRETT.spalten / 2 + col * BOK_BRETT.feld + 1, y: BOK_BRETT.oy + row * BOK_BRETT.feld + 1,
       dunkel: (col + row) % 2 === 1, dur: 6 + Math.random() * 6, delay: -Math.random() * 12,
     };
   }), []);
-  const funkeln = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+  const funkeln = useMemo(() => ppZufall(ppAreaN(4), (i) => ({
     x: i % 2 ? 61 : -62, y: BOK_BRETT.oy + BOK_BRETT.feld * (1 + Math.floor(Math.random() * 8)),
     dur: 5 + Math.random() * 5, delay: -Math.random() * 10,
   })), []);
-  const blaetter = useMemo(() => ppZufall(ppFxN(8), (i) => ({
+  const blaetter = useMemo(() => ppZufall(ppAreaN(8), (i) => ({
     y: 4 + Math.random() * 86, dur: 16 + Math.random() * 12, delay: -Math.random() * 28, rtl: i % 2 === 1,
     farbe: i % 3, bob: 2 + Math.floor(Math.random() * 4), tumble: .5 + Math.random() * .5,
   })), []);
-  const falter = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+  const falter = useMemo(() => ppZufall(ppAreaN(4), (i) => ({
     x: BOK_HECKEN_X[i % BOK_HECKEN_X.length] + (Math.random() - .5) * 8, y: 12 + Math.random() * 70,
     farbe: i % 3, dur: 7 + Math.random() * 5, delay: -Math.random() * 12, b: i % 2 === 1,
   })), []);
-  const quer = useMemo(() => ppZufall(ppFxN(1), () => ({
+  const quer = useMemo(() => ppZufall(ppAreaN(1), () => ({
     y: 20 + Math.random() * 50, dur: 34 + Math.random() * 10, delay: -Math.random() * 30, rtl: Math.random() < .5,
   })), []);
-  const bienen = useMemo(() => ppZufall(ppFxN(6), (i) => ({
+  const bienen = useMemo(() => ppZufall(ppAreaN(6), (i) => ({
     x: BOK_HECKEN_X[i % 4] + (Math.random() - .5) * 12, y: 8 + Math.random() * 82,
     dur: 1.4 + Math.random() * 1.2, delay: -Math.random() * 3, b: i % 2 === 1, drift: 2 + Math.floor(Math.random() * 3),
   })), []);
-  const tauben = useMemo(() => ppZufall(ppFxN(1), () => ({
+  const tauben = useMemo(() => ppZufall(ppAreaN(1), () => ({
     y: 14 + Math.random() * 50, dur: 46 + Math.random() * 14, delay: -Math.random() * 20, rtl: Math.random() < .5,
   })), []);
-  const kaefer = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+  const kaefer = useMemo(() => ppZufall(ppAreaN(2), (i) => ({
     x: i ? 68 : -71, dur: 70 + Math.random() * 30, delay: -Math.random() * 80, ab: i === 1,
   })), []);
   return (
@@ -981,7 +1008,7 @@ const SharedBloodTanksOverlay = React.memo(function SharedBloodTanksOverlay() {
   // Blasen: Tanks bei 64·k neben der Brettmitte (k = 0 steht hinter der Pumpe)
   const blasen = useMemo(() => {
     const tanks = [-1, 1, -2, 2, -3, 3, -4, 4, -5, 5];
-    return ppZufall(ppFxN(24), (i) => ({
+    return ppZufall(ppAreaN(24), (i) => ({
       x: tanks[i % tanks.length] * 64 - 17 + Math.floor(Math.random() * 35),
       dur: 3 + Math.random() * 3, delay: -Math.random() * 6, gross: Math.random() < .3,
     }));
@@ -992,14 +1019,14 @@ const SharedBloodTanksOverlay = React.memo(function SharedBloodTanksOverlay() {
     { x: 96, y0: 47, y1: 86, dur: 5.1 }, { x: -96, y0: 47, y1: 85, dur: 3.9 },
     { x: 160, y0: 47, y1: 86, dur: 4.7 }, { x: -160, y0: 47, y1: 85, dur: 5.5 },
     { x: -37, y0: 10, y1: 37, dur: 6.2 }, { x: 37, y0: 10, y1: 37, dur: 5.8 }, { x: 91, y0: 10, y1: 37, dur: 6.8 },
-  ].slice(0, ppFxN(9)).map(d => ({ ...d, delay: -Math.random() * d.dur })), []);
+  ].slice(0, ppAreaN(9)).map(d => ({ ...d, delay: -Math.random() * d.dur })), []);
   const laternen = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
     x: 32 + 64 * (i - 6), dur: 1.6 + Math.random() * 1.4, delay: -Math.random() * 3,
   })), []);
-  const ratten = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+  const ratten = useMemo(() => ppZufall(ppAreaN(2), (i) => ({
     y: 94 + i * 3, dur: 26 + Math.random() * 12, delay: -Math.random() * 30, rtl: i % 2 === 1,
   })), []);
-  const dampf = useMemo(() => ppZufall(ppFxN(3), (i) => ({ dur: 3.2, delay: -i * 1.07 })), []);
+  const dampf = useMemo(() => ppZufall(ppAreaN(3), (i) => ({ dur: 3.2, delay: -i * 1.07 })), []);
   return (
     <PixelScene artH={100} bg="#141414" className="shared-blood-tanks-overlay">
       <PixelBand src={SBT + 'tile.png'} />
@@ -1229,24 +1256,24 @@ const AR_BANNER = [81, 135];                        // linke Kante (Stück-x), h
 const arHofHalb = (y) => 36 + (y - 56) * (72 / 44);
 
 const AcidRainOverlay = React.memo(function AcidRainOverlay() {
-  const spritzer = useMemo(() => ppZufall(ppFxN(16), () => {
+  const spritzer = useMemo(() => ppZufall(ppAreaN(16), () => {
     const y = 60 + Math.random() * 38;
     const hw = arHofHalb(y) - 4;
     return { x: (Math.random() * 2 - 1) * hw, y, dur: 0.8 + Math.random() * 1.3, delay: -Math.random() * 2 };
   }), []);
-  const ringe = useMemo(() => ppZufall(ppFxN(16), () => {
+  const ringe = useMemo(() => ppZufall(ppAreaN(16), () => {
     const y = 57 + Math.random() * 41;
     const rand = arHofHalb(y) + 5;
     const x = (Math.random() < 0.5 ? -1 : 1) * (rand + Math.random() * (200 - rand));
     return { x, y, dur: 1.1 + Math.random() * 1.4, delay: -Math.random() * 2.5 };
   }), []);
-  const dampf = useMemo(() => AR_PFUETZEN.slice(0, ppFxN(AR_PFUETZEN.length)).map(([x, y, w]) => ({
+  const dampf = useMemo(() => AR_PFUETZEN.slice(0, ppAreaN(AR_PFUETZEN.length)).map(([x, y, w]) => ({
     x: x + (Math.random() * 2 - 1) * (w - 2), y, dur: 2.6 + Math.random() * 1.8, delay: -Math.random() * 4,
   })), []);
-  const blasen = useMemo(() => AR_PFUETZEN.slice(0, ppFxN(AR_PFUETZEN.length)).map(([x, y, w]) => ({
+  const blasen = useMemo(() => AR_PFUETZEN.slice(0, ppAreaN(AR_PFUETZEN.length)).map(([x, y, w]) => ({
     x: x + (Math.random() * 2 - 1) * (w - 2), y, dur: 1.2 + Math.random() * 1.2, delay: -Math.random() * 2,
   })), []);
-  const speier = useMemo(() => AR_SPEIER.slice(0, ppFxN(AR_SPEIER.length)).map(() => ({
+  const speier = useMemo(() => AR_SPEIER.slice(0, ppAreaN(AR_SPEIER.length)).map(() => ({
     dur: 0.3 + Math.random() * 0.12,
   })), []);
   return (
@@ -1449,15 +1476,15 @@ const COT = '/areas/cottage/';
 const COT_W = 184;                         // Hüttenstück; Stück-x 92 = Brettmitte
 const COT_KAMIN = [143, 6];                // Schornsteinmündung (Stück-x, y)
 const CottageOverlay = React.memo(function CottageOverlay() {
-  const falter = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const falter = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     y: 40 + Math.random() * 46, dur: 22 + Math.random() * 14, delay: -Math.random() * 30,
     bob: 2 + Math.random() * 3, rtl: i % 2 === 1, farbe: i === 1 ? 'hue-rotate(160deg) saturate(.6) brightness(1.3)' : undefined,
   })), []);
-  const blaetter = useMemo(() => ppZufall(ppFxN(6), () => ({
+  const blaetter = useMemo(() => ppZufall(ppAreaN(6), () => ({
     x: Math.random() * 100, dur: 9 + Math.random() * 7, delay: -Math.random() * 14,
   })), []);
   // Glühwürmchen am Waldrand links und rechts der Hütte (und ein paar vorn in der Wiese)
-  const gluehw = useMemo(() => ppZufall(ppFxN(14), (i) => {
+  const gluehw = useMemo(() => ppZufall(ppAreaN(14), (i) => {
     const seite = i % 2 ? 1 : -1;
     const vorn = i >= 10;
     return {
@@ -1467,7 +1494,7 @@ const CottageOverlay = React.memo(function CottageOverlay() {
       wdur: 6 + Math.random() * 6, wdelay: -Math.random() * 10,
     };
   }), []);
-  const rauch = useMemo(() => ppZufall(ppFxN(4), (i) => ({ delay: -i * 1.6 })), []);
+  const rauch = useMemo(() => ppZufall(ppAreaN(4), (i) => ({ delay: -i * 1.6 })), []);
   return (
     <PixelScene artH={100} bg="#1a4128" className="cottage-overlay">
       <PixelBand src={COT + 'far.png'} />
@@ -1624,7 +1651,7 @@ const cwlKachel = (t, k) => t - 64 + 128 * k;
 const CWL_DRUSEN = [[104, 28], [101, 32], [107, 31], [40, 86], [74, 24]];
 
 const CrystalWellOverlay = React.memo(function CrystalWellOverlay() {
-  const funken = useMemo(() => ppZufall(ppFxN(22), (i) => {
+  const funken = useMemo(() => ppZufall(ppAreaN(22), (i) => {
     const a = Math.random() * Math.PI * 2;
     if (i < 10) return { x: Math.cos(a) * 58, y: 50 + Math.sin(a) * 22, dur: 1.8 + Math.random() * 2, delay: -Math.random() * 4 };
     if (i < 13) return { x: (Math.random() - .5) * 50, y: 47 + Math.random() * 9, dur: 1.4 + Math.random() * 1.6, delay: -Math.random() * 3 };
@@ -1632,17 +1659,17 @@ const CrystalWellOverlay = React.memo(function CrystalWellOverlay() {
     const k = [-2, -1, 1, 2][Math.floor(Math.random() * 4)];
     return { x: cwlKachel(t, k) + Math.round((Math.random() - .5) * 4), y: y + Math.round(Math.random() * 5), dur: 2.4 + Math.random() * 2, delay: -Math.random() * 5 };
   }), []);
-  const ringe = useMemo(() => ppZufall(ppFxN(4), () => ({
+  const ringe = useMemo(() => ppZufall(ppAreaN(4), () => ({
     x: Math.round((Math.random() - .5) * 40), y: 49 + Math.round(Math.random() * 5), dur: 3.2 + Math.random() * 2.4, delay: -Math.random() * 6,
   })), []);
-  const steigen = useMemo(() => ppZufall(ppFxN(8), () => ({
+  const steigen = useMemo(() => ppZufall(ppAreaN(8), () => ({
     x: Math.round((Math.random() - .5) * 52), y: 50 + Math.round(Math.random() * 6), dur: 3.5 + Math.random() * 3, delay: -Math.random() * 7,
   })), []);
-  const gluehen = useMemo(() => ppZufall(ppFxN(14), () => ({
+  const gluehen = useMemo(() => ppZufall(ppAreaN(14), () => ({
     x: Math.round((Math.random() - .5) * 420), y: 26 + Math.round(Math.random() * 70),
     dur: 5 + Math.random() * 5, delay: -Math.random() * 10, b: Math.random() < .5,
   })).filter(g => !(Math.abs(g.x) < 70 && g.y > 18 && g.y < 94)), []);
-  const falter = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+  const falter = useMemo(() => ppZufall(ppAreaN(2), (i) => ({
     y: 30 + Math.random() * 50, dur: 24 + Math.random() * 12, delay: -Math.random() * 30, rtl: i % 2 === 1, bob: 2 + Math.random() * 2,
   })), []);
   return (
@@ -1774,21 +1801,21 @@ const CrystalWellOverlay = React.memo(function CrystalWellOverlay() {
 const DOC = '/areas/dark-ocean/';
 const DOC_TREIBGUT = [0, 1, 2, 3];                  // Zeilen in debris.png (26×10 je Bild)
 const DarkOceanOverlay = React.memo(function DarkOceanOverlay() {
-  const kronen = useMemo(() => ppZufall(ppFxN(11), (i) => {
+  const kronen = useMemo(() => ppZufall(ppAreaN(11), (i) => {
     const y = 18 + Math.random() * 78;
     return { x: 3 + Math.random() * 94, y, gross: y > 46, dur: 5 + Math.random() * 6, delay: -Math.random() * 11 };
   }), []);
-  const tropfen = useMemo(() => ppZufall(ppFxN(18), () => ({
+  const tropfen = useMemo(() => ppZufall(ppAreaN(18), () => ({
     x: Math.random() * 100, y: 4 + Math.random() * 93, dur: 1.3 + Math.random() * 1.6, delay: -Math.random() * 3,
   })), []);
   const treibgut = useMemo(() => {
     const start = Math.floor(Math.random() * 4);          // jedes Stück nur einmal
-    return ppZufall(ppFxN(3), (i) => ({
+    return ppZufall(ppAreaN(3), (i) => ({
     art: DOC_TREIBGUT[(start + i) % 4], y: 20 + i * 24 + Math.random() * 12,
     dur: 120 + Math.random() * 60, delay: -Math.random() * 180, bob: 1.7 + Math.random() * 1.2,
     }));
   }, []);
-  const fische = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+  const fische = useMemo(() => ppZufall(ppAreaN(2), (i) => ({
     y: 25 + Math.random() * 55, dur: 26 + Math.random() * 12, delay: -Math.random() * 40, rtl: i === 0,
   })), []);
   return (
@@ -1946,21 +1973,21 @@ const DSC_WIMPEL = [[53, 19], [123, 19]];            // Mastspitzen (Stück-x, y
 const DSC_GLANZ = [[87, 1], [36, 1], [138, 1], [20, 35], [154, 35], [69, 89], [73, 89]];
 const DSC_TRUHE = [70, 88];                          // Blasen aus dem Truhenspalt
 const DeepseaCastleOverlay = React.memo(function DeepseaCastleOverlay() {
-  const blasen = useMemo(() => ppZufall(ppFxN(12), () => ({
+  const blasen = useMemo(() => ppZufall(ppAreaN(12), () => ({
     x: Math.random() * 100, dur: 6 + Math.random() * 5, delay: -Math.random() * 11, gross: Math.random() < .3,
   })), []);
-  const truhe = useMemo(() => ppZufall(ppFxN(3), (i) => ({ dur: 5.5 + i * .7, delay: -i * 2.1 - Math.random() })), []);
-  const schnee = useMemo(() => ppZufall(ppFxN(18), () => ({
+  const truhe = useMemo(() => ppZufall(ppAreaN(3), (i) => ({ dur: 5.5 + i * .7, delay: -i * 2.1 - Math.random() })), []);
+  const schnee = useMemo(() => ppZufall(ppAreaN(18), () => ({
     x: Math.random() * 100, dur: 16 + Math.random() * 12, delay: -Math.random() * 28, hell: Math.random() < .4,
   })), []);
-  const fische = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+  const fische = useMemo(() => ppZufall(ppAreaN(4), (i) => ({
     y: 34 + Math.random() * 40, dur: 22 + Math.random() * 16, delay: -Math.random() * 36, rtl: i % 2 === 0,
     art: i % 2, vorne: i >= 2,
   })), []);
-  const quallen = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const quallen = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     x: [14, 81, 58][i] + Math.random() * 8, dur: 46 + Math.random() * 20, delay: -Math.random() * 60, puls: 1.5 + Math.random() * .5,
   })), []);
-  const glanz = useMemo(() => DSC_GLANZ.slice(0, ppFxN(DSC_GLANZ.length)).map(() => ({
+  const glanz = useMemo(() => DSC_GLANZ.slice(0, ppAreaN(DSC_GLANZ.length)).map(() => ({
     dur: 3 + Math.random() * 3, delay: -Math.random() * 6,
   })), []);
   return (
@@ -2123,17 +2150,17 @@ const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], s
   const winkelMin = 360 * t;               // 0 → :00, 20 → einmal herum
   const winkelStd = 330 + 30 * t;          // 11 Uhr → 12 Uhr
   const sek = useMemo(() => -new Date().getSeconds(), []);
-  const asche = useMemo(() => ppZufall(ppFxN(18), () => ({
+  const asche = useMemo(() => ppZufall(ppAreaN(18), () => ({
     x: Math.random() * 100, dur: 6 + Math.random() * 6, delay: -Math.random() * 12, glut: Math.random() < .5,
   })), []);
-  const raeder = useMemo(() => DC_RAEDER.slice(0, ppFxN(6)).map(([x, y, gross], i) => ({
+  const raeder = useMemo(() => DC_RAEDER.slice(0, ppAreaN(6)).map(([x, y, gross], i) => ({
     x, y, gross, dreh: (gross ? 1.8 : 1.1) + Math.random() * .8, bob: 3 + Math.random() * 2.5,
     delay: -Math.random() * 6, rueck: i % 2 === 1,
   })), []);
-  const blitze = useMemo(() => DC_BLITZE.slice(0, ppFxN(6)).map((x, i) => ({
+  const blitze = useMemo(() => DC_BLITZE.slice(0, ppAreaN(6)).map((x, i) => ({
     x, y: 18 + Math.random() * 8, bild: i % 3, dur: 7 + Math.random() * 9, delay: -Math.random() * 16,
   })), []);
-  const kraehen = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const kraehen = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     y: 6 + Math.random() * 26, dur: 22 + Math.random() * 16, delay: -Math.random() * 30, rtl: i % 2 === 0,
   })), []);
   const zeiger = (cls, stil) => {
@@ -2283,12 +2310,12 @@ const gydX = (x, k) => x - 64 + k * 128;
 const GYD_LATERNE = { x: GYD_TREE_X - GYD_TREE_W / 2 + 27, y: 26 };   // Mitte, Oberkante
 const GYD_KRAEHE = { x: GYD_TREE_X - GYD_TREE_W / 2 + 74, y: 6 };     // Mitte, Oberkante
 const GraveyardOfLimitedPowerOverlay = React.memo(function GraveyardOfLimitedPowerOverlay() {
-  const seelen = useMemo(() => ppZufall(ppFxN(9), () => {
+  const seelen = useMemo(() => ppZufall(ppAreaN(9), () => {
     const [gx, , gb] = GYD_GRAEBER[Math.floor(Math.random() * GYD_GRAEBER.length)];
     const k = Math.floor(Math.random() * 3) - 1;
     return { x: gydX(gx, k), y: gb - 12, dur: 6 + Math.random() * 4, delay: -Math.random() * 10, bild: .5 + Math.random() * .3 };
   }), []);
-  const funken = useMemo(() => ppZufall(ppFxN(14), () => {
+  const funken = useMemo(() => ppZufall(ppAreaN(14), () => {
     const [gx, gt, gb] = GYD_GRAEBER[Math.floor(Math.random() * GYD_GRAEBER.length)];
     const k = Math.floor(Math.random() * 5) - 2;
     return {
@@ -2296,11 +2323,11 @@ const GraveyardOfLimitedPowerOverlay = React.memo(function GraveyardOfLimitedPow
       dx: Math.round((Math.random() - .5) * 4), dur: 3 + Math.random() * 3, delay: -Math.random() * 6,
     };
   }), []);
-  const blaetter = useMemo(() => ppZufall(ppFxN(3), () => ({
+  const blaetter = useMemo(() => ppZufall(ppAreaN(3), () => ({
     x: GYD_TREE_X - 40 + Math.round(Math.random() * 80), y: 4 + Math.round(Math.random() * 18),
     dur: 9 + Math.random() * 6, delay: -Math.random() * 15, rot: Math.random() < .5,
   })), []);
-  const motten = useMemo(() => ppZufall(ppFxN(2), (i) => ({ dur: 1.6 + i * .5, delay: -Math.random() * 2, rev: i % 2 === 1 })), []);
+  const motten = useMemo(() => ppZufall(ppAreaN(2), (i) => ({ dur: 1.6 + i * .5, delay: -Math.random() * 2, rev: i % 2 === 1 })), []);
   return (
     <PixelScene artH={100} bg="#323232" className="graveyard-overlay">
       <PixelBand src={GYD + 'tile.png'} />
@@ -2501,7 +2528,7 @@ const ParaseedGreenhouseOverlay = React.memo(function ParaseedGreenhouseOverlay(
     }
     return out;
   }, []);
-  const tropfen = useMemo(() => ppZufall(ppFxN(8), () => {
+  const tropfen = useMemo(() => ppZufall(ppAreaN(8), () => {
     const [a, e] = PSG_SCHEIBEN[Math.floor(Math.random() * 4)];
     const [r0, r1] = PSG_REIHEN[Math.floor(Math.random() * 3)];
     const k = Math.floor(Math.random() * 5) - 2;
@@ -2514,16 +2541,16 @@ const ParaseedGreenhouseOverlay = React.memo(function ParaseedGreenhouseOverlay(
   const duesen = useMemo(() => {
     const out = [];
     for (let k = -2; k <= 2; k++) PSG_DUESEN.forEach((x) => out.push({ x: x - PSG_KACHEL / 2 + k * PSG_KACHEL, dur: 2.6 + Math.random() * 2.4, delay: -Math.random() * 4 }));
-    return out.slice(0, ppFxN(out.length));
+    return out.slice(0, ppAreaN(out.length));
   }, []);
-  const fliegen = useMemo(() => ppZufall(ppFxN(4), () => ({
+  const fliegen = useMemo(() => ppZufall(ppAreaN(4), () => ({
     x: Math.round((Math.random() - .5) * 220), y: 58 + Math.round(Math.random() * 10),
     dur: 3.5 + Math.random() * 3, delay: -Math.random() * 6, rtl: Math.random() < .5,
   })), []);
-  const schnecke = useMemo(() => ppZufall(Math.min(1, ppFxN(1)), () => ({
+  const schnecke = useMemo(() => ppZufall(Math.min(1, ppAreaN(1)), () => ({
     y: 55 + Math.floor(Math.random() * 4), dur: 260 + Math.random() * 80, delay: -Math.random() * 260,
   })), []);
-  const sporen = useMemo(() => ppZufall(ppFxN(14), () => ({
+  const sporen = useMemo(() => ppZufall(ppAreaN(14), () => ({
     x: Math.random() * 100, y: 66 + Math.round(Math.random() * 8), dur: 7 + Math.random() * 6, delay: -Math.random() * 12,
     farbe: Math.random() < .5 ? '#b1ff1a' : '#fc69c6',
   })), []);
@@ -2736,7 +2763,7 @@ const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
   const feuer = useMemo(() => {
     // Bodenfeuer: zufällig verteilt, mit Mindestabstand, drei Größen
     const out = [];
-    const n = ppFxN(7);
+    const n = ppAreaN(7);
     for (let tries = 0; out.length < n && tries < 300; tries++) {
       const x = (Math.random() - .5) * 300, fuss = 72 + Math.random() * 25;
       if (Math.abs(x) < 26 && fuss < 76) continue;                         // nicht auf die Stufen
@@ -2761,15 +2788,15 @@ const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
   }, [feuer]);
   const funken = useMemo(() => {
     const quellen = [...feuer.map(f => ({ x: f.x, y: f.fuss - f.h + 3 })), ...kachel.dach.map(d => ({ x: d.x, y: d.y - 14 }))];
-    return ppZufall(ppFxN(20), () => {
+    return ppZufall(ppAreaN(20), () => {
       const q = quellen[Math.floor(Math.random() * quellen.length)];
       return { x: Math.round(q.x + (Math.random() - .5) * 6), y: Math.round(q.y), dur: 1.8 + Math.random() * 1.8, delay: -Math.random() * 3.6, hell: Math.random() < .4 };
     });
   }, [feuer, kachel]);
-  const asche = useMemo(() => ppZufall(ppFxN(14), () => ({
+  const asche = useMemo(() => ppZufall(ppAreaN(14), () => ({
     x: Math.random() * 100, y: Math.round(Math.random() * 40), dur: 7 + Math.random() * 6, delay: -Math.random() * 12,
   })), []);
-  const aufruehrer = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+  const aufruehrer = useMemo(() => ppZufall(ppAreaN(2), (i) => ({
     rtl: i === 1, figur: i, dur: 42 + Math.random() * 18, delay: -Math.random() * 50 - i * 20,
   })), []);
   return (
@@ -2955,7 +2982,7 @@ const SLI_BAHNEN = [
 const SLI_SCHOLLEN = [-170, -40, 5, 105, 160];
 const SLI_FISCHE = [[-150, 90], [-30, 93], [100, 89], [175, 92]];   // Sprungstellen (x neben der Mitte, y)
 const SlipperyIceOverlay = React.memo(function SlipperyIceOverlay() {
-  const bahnen = useMemo(() => SLI_BAHNEN.slice(0, Math.max(2, ppFxN(SLI_BAHNEN.length))), []);
+  const bahnen = useMemo(() => SLI_BAHNEN.slice(0, Math.max(2, ppAreaN(SLI_BAHNEN.length))), []);
   // v1435 (Al 25.9.): Richtungen fest — der zweite Pinguin rutscht nach
   // links, die anderen nach rechts; der Block startet nach links.
   const pinguine = useMemo(() => bahnen.filter(b => b.art === 'pinguin').map((b, i) => ({
@@ -2966,17 +2993,17 @@ const SlipperyIceOverlay = React.memo(function SlipperyIceOverlay() {
     y: b.y, von: 50 + Math.random() * 60, bis: -120 + Math.random() * 40,
     dur: 7 + Math.random() * 5, delay: 0,
   })), [bahnen]);
-  const schollen = useMemo(() => SLI_SCHOLLEN.slice(0, ppFxN(SLI_SCHOLLEN.length)).map((x, i) => ({
+  const schollen = useMemo(() => SLI_SCHOLLEN.slice(0, ppAreaN(SLI_SCHOLLEN.length)).map((x, i) => ({
     x: x + (Math.random() - .5) * 10, y: 86 + Math.random() * 8, v: i % 3,
     dur: 9 + Math.random() * 6, delay: -Math.random() * 10,
   })), []);
-  const schwimmer = useMemo(() => ppZufall(ppFxN(1), () => ({
+  const schwimmer = useMemo(() => ppZufall(ppAreaN(1), () => ({
     y: 92 + Math.random() * 2, dur: 55 + Math.random() * 20, delay: -Math.random() * 50, rtl: Math.random() < .5,
   })), []);
-  const fische = useMemo(() => SLI_FISCHE.slice(0, ppFxN(SLI_FISCHE.length)).map(() => ({
+  const fische = useMemo(() => SLI_FISCHE.slice(0, ppAreaN(SLI_FISCHE.length)).map(() => ({
     dur: 7 + Math.random() * 6, delay: -Math.random() * 12,
   })), []);
-  const funken = useMemo(() => ppZufall(ppFxN(10), () => ({
+  const funken = useMemo(() => ppZufall(ppAreaN(10), () => ({
     x: Math.random() * 100, y: 3 + Math.random() * 54, dur: 1.8 + Math.random() * 2, delay: -Math.random() * 4,
   })), []);
   return (
@@ -3118,18 +3145,18 @@ const SMP_GLITZER = [               // Wasserstellen (x neben der Mitte, y)
   [78, 48], [104, 26], [120, 62], [132, 44], [150, 18], [166, 70], [110, 92], [170, 34],
 ];
 const SmugglersPierOverlay = React.memo(function SmugglersPierOverlay() {
-  const moewen = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const moewen = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     // eigene Höhe je Möwe (13 hoch, 12er-Abstand) — sie fliegen nie übereinander
     y: [1, 13, 25][i] + Math.random() * 2, dur: 14 + Math.random() * 10, delay: -Math.random() * 25, rtl: i % 2 === 1,
     schlag: .55 + Math.random() * .25,
   })), []);
-  const fische = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const fische = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     y: [8, 58, 84][i] + Math.random() * 6, dur: 40 + Math.random() * 20, delay: -Math.random() * 60, rtl: i % 2 === 0,
   })), []);
-  const wolken = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+  const wolken = useMemo(() => ppZufall(ppAreaN(2), (i) => ({
     y: [-6, 44][i] + Math.random() * 10, dur: 90 + Math.random() * 40, delay: -Math.random() * 130,
   })), []);
-  const glitzer = useMemo(() => SMP_GLITZER.slice(0, ppFxN(16)).map(([x, y]) => ({
+  const glitzer = useMemo(() => SMP_GLITZER.slice(0, ppAreaN(16)).map(([x, y]) => ({
     x, y, dur: 3 + Math.random() * 4, delay: -Math.random() * 7,
   })), []);
   return (
@@ -3256,7 +3283,7 @@ const SC_GLOW_W = 240;
 const SC_RX = 38, SC_RY = 34, SC_CY = 48;
 const SpatialCreviceOverlay = React.memo(function SpatialCreviceOverlay() {
   // Glut: startet am Rand des Risses, treibt nach außen/oben ins Wasser, erlischt
-  const glut = useMemo(() => ppZufall(ppFxN(16), () => {
+  const glut = useMemo(() => ppZufall(ppAreaN(16), () => {
     const a = Math.random() * Math.PI * 2;
     const r = .75 + Math.random() * .2;
     const weg = 10 + Math.random() * 18;
@@ -3266,20 +3293,20 @@ const SpatialCreviceOverlay = React.memo(function SpatialCreviceOverlay() {
       dur: 3 + Math.random() * 3, delay: -Math.random() * 6,
     };
   }), []);
-  const blasen = useMemo(() => ppZufall(ppFxN(12), () => ({
+  const blasen = useMemo(() => ppZufall(ppAreaN(12), () => ({
     x: Math.random() * 100, dur: 6 + Math.random() * 5, delay: -Math.random() * 11, gross: Math.random() < .3,
   })), []);
-  const schnee = useMemo(() => ppZufall(ppFxN(16), () => ({
+  const schnee = useMemo(() => ppZufall(ppAreaN(16), () => ({
     x: Math.random() * 100, dur: 16 + Math.random() * 12, delay: -Math.random() * 28,
   })), []);
-  const fische = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+  const fische = useMemo(() => ppZufall(ppAreaN(2), (i) => ({
     y: 22 + Math.random() * 50, dur: 34 + Math.random() * 16, delay: -Math.random() * 40, rtl: i % 2 === 1,
   })), []);
-  const quallen = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const quallen = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     y: 14 + Math.random() * 40, dur: 70 + Math.random() * 40, delay: -Math.random() * 100, rtl: i % 2 === 0,
     bob: 3 + Math.random() * 4,
   })), []);
-  const flieger = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+  const flieger = useMemo(() => ppZufall(ppAreaN(2), (i) => ({
     y: 16 + Math.random() * 22, dur: 11 + Math.random() * 6, delay: -Math.random() * 16, rtl: i % 2 === 1,
   })), []);
   return (
@@ -3429,16 +3456,16 @@ const SH_STAUB = [[-52,21,50],[52,24,46],[76,21,50],[-76,24,46],[-88,69,79],[90,
 const SH_BEUTE = [[-92, 61], [164, 61], [33, 12], [-220, 61]];
 
 const SpiderHiveOverlay = React.memo(function SpiderHiveOverlay() {
-  const lider = useMemo(() => SH_LIDER.slice(0, ppFxN(SH_LIDER.length)).map(([x, y]) => ({
+  const lider = useMemo(() => SH_LIDER.slice(0, ppAreaN(SH_LIDER.length)).map(([x, y]) => ({
     x, y, weg: Math.random() < .25, dur: 3 + Math.random() * 7, delay: -Math.random() * 10,
   })), []);
-  const funkeln = useMemo(() => ppZufall(ppFxN(16), () => {
+  const funkeln = useMemo(() => ppZufall(ppAreaN(16), () => {
     const [x, y, r] = SH_NETZE[Math.floor(Math.random() * SH_NETZE.length)];
     const [dx, dy] = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]][Math.floor(Math.random() * 8)];
     const d = 1 + Math.floor(Math.random() * (r - 1));
     return { x: x + dx * d, y: y + dy * d, dur: 2.2 + Math.random() * 2.6, delay: -Math.random() * 5 };
   }), []);
-  const krabbler = useMemo(() => ppZufall(ppFxN(8), () => {
+  const krabbler = useMemo(() => ppZufall(ppAreaN(8), () => {
     let x, y, weg;
     do {                                                          // ganze Strecke nicht im schwarzen Schlund
       x = Math.round((Math.random() - .5) * 340); y = Math.round(18 + Math.random() * 72);
@@ -3446,16 +3473,16 @@ const SpiderHiveOverlay = React.memo(function SpiderHiveOverlay() {
     } while (Math.min(x, x + weg) < 28 && Math.max(x, x + weg) + 13 > -28 && y > 34 && y < 82);
     return { x, y, weg, dur: Math.abs(weg) * (.22 + Math.random() * .15), delay: -Math.random() * 10 };
   }), []);
-  const junge = useMemo(() => ppZufall(ppFxN(6), (i) => {
+  const junge = useMemo(() => ppZufall(ppAreaN(6), (i) => {
     const gx = Math.round((Math.random() - .5) * 320), gy = Math.round(78 + Math.random() * 16);
     const weg = Math.round((i % 2 ? -1 : 1) * (10 + Math.random() * 14));
     return { x: gx + (i % 3) * 4, y: gy - (i % 2) * 3, weg, dur: Math.abs(weg) * .09, delay: -Math.random() * 6 };
   }), []);
-  const seiler = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+  const seiler = useMemo(() => ppZufall(ppAreaN(4), (i) => ({
     x: Math.round((i - 1.5) * 84 + (Math.random() - .5) * 40), tief: Math.round(14 + Math.random() * 26),
     dur: 11 + Math.random() * 8, delay: -Math.random() * 18,
   })), []);
-  const staub = useMemo(() => ppZufall(ppFxN(10), () => {
+  const staub = useMemo(() => ppZufall(ppAreaN(10), () => {
     const [x, y0, y1] = SH_STAUB[Math.floor(Math.random() * SH_STAUB.length)];
     return { x: x + Math.round((Math.random() - .5) * 6), y0, fall: Math.min(10, y1 - y0), dur: 5 + Math.random() * 5, delay: -Math.random() * 10 };
   }), []);
@@ -3598,15 +3625,15 @@ const SS_RITZEN = [41, 97];                   // Dachritzen (Kachel-x), Strahl f
 const StinkyStablesOverlay = React.memo(function StinkyStablesOverlay() {
   const schwaden = useMemo(() => {
     const quellen = [...SS_GIPFEL.slice(0, 7), ...SS_GIPFEL.slice(7).sort(() => Math.random() - .5)];
-    return quellen.slice(0, ppFxN(12)).map(([x, y]) => ({
+    return quellen.slice(0, ppAreaN(12)).map(([x, y]) => ({
       x: x + (Math.random() - .5) * 8, y, dur: 4.5 + Math.random() * 3, delay: -Math.random() * 8,
     }));
   }, []);
-  const wolken = useMemo(() => ppZufall(ppFxN(7), (i) => {
+  const wolken = useMemo(() => ppZufall(ppAreaN(7), (i) => {
     const [x, y] = i < 3 ? SS_GIPFEL[[0, 3, 4][i]] : SS_GIPFEL[7 + Math.floor(Math.random() * (SS_GIPFEL.length - 7))];
     return { x: x + (Math.random() - .5) * 14, y: y + 2 + Math.random() * 6, dur: 6 + Math.random() * 3, delay: -Math.random() * 9 };
   }), []);
-  const fliegen = useMemo(() => ppZufall(ppFxN(12), (i) => {
+  const fliegen = useMemo(() => ppZufall(ppAreaN(12), (i) => {
     const [x, y] = SS_GIPFEL[i % SS_GIPFEL.length];
     return {
       x: x + (Math.random() - .5) * 10, y: y - 4 - Math.random() * 5,
@@ -3614,15 +3641,15 @@ const StinkyStablesOverlay = React.memo(function StinkyStablesOverlay() {
       drift: 3 + Math.random() * 3,
     };
   }), []);
-  const staub = useMemo(() => ppZufall(ppFxN(14), () => {
+  const staub = useMemo(() => ppZufall(ppAreaN(14), () => {
     const t = SS_RITZEN[Math.floor(Math.random() * 2)] + Math.random() * 3;
     const k = Math.floor(Math.random() * 5) - 2;
     return { x: ssKachel(t, k), y: 4 + Math.random() * 6, dur: 11 + Math.random() * 8, delay: -Math.random() * 19 };
   }), []);
-  const blasen = useMemo(() => SS_BLASEN.slice(0, ppFxN(SS_BLASEN.length)).map(([x, y]) => ({
+  const blasen = useMemo(() => SS_BLASEN.slice(0, ppAreaN(SS_BLASEN.length)).map(([x, y]) => ({
     x, y, dur: 4 + Math.random() * 4, delay: -Math.random() * 8,
   })), []);
-  const schwalben = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+  const schwalben = useMemo(() => ppZufall(ppAreaN(2), (i) => ({
     y: 16 + Math.random() * 16, dur: 9 + Math.random() * 6, delay: -Math.random() * 15, rtl: i % 2 === 1,
   })), []);
   return (
@@ -3795,25 +3822,25 @@ const FI_INSELN = [
 const FI_FALTER = [[92, 30], [140, 40], [48, 40]];
 
 const FloatingIslandOverlay = React.memo(function FloatingIslandOverlay() {
-  const voegel = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const voegel = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     y: [6, 22, 40][i] + Math.random() * 4, dur: 20 + Math.random() * 12, delay: -Math.random() * 30,
     rtl: i % 2 === 1, schlag: .45 + Math.random() * .2,
   })), []);
-  const falter = useMemo(() => FI_FALTER.slice(0, ppFxN(3)).map(([x, y], i) => ({
+  const falter = useMemo(() => FI_FALTER.slice(0, ppAreaN(3)).map(([x, y], i) => ({
     x, y, dur: 9 + Math.random() * 5, delay: -Math.random() * 10, flip: i % 2 === 1,
   })), []);
-  const kruemel = useMemo(() => ppZufall(ppFxN(8), (i) => {
+  const kruemel = useMemo(() => ppZufall(ppAreaN(8), (i) => {
     const [x, y] = FI_ZACKEN[i % FI_ZACKEN.length];
     return { x: x + Math.round(Math.random() * 2 - 1), y, fall: 10 + Math.random() * 14, dur: 3 + Math.random() * 3, delay: -Math.random() * 6 };
   }), []);
-  const tropfen = useMemo(() => ppZufall(ppFxN(8), () => ({
+  const tropfen = useMemo(() => ppZufall(ppAreaN(8), () => ({
     x: FI_FALL.x + (Math.random() < .5 ? -1 : 1) * (4 + Math.random() * 3), y: 64 + Math.random() * 10,
     fall: 14 + Math.random() * 10, dur: 1 + Math.random() * .8, delay: -Math.random() * 2,
   })), []);
-  const gischt = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+  const gischt = useMemo(() => ppZufall(ppAreaN(4), (i) => ({
     x: FI_FALL.x - 6 + i * 3 + Math.random() * 2, dur: 3 + Math.random() * 2, delay: -Math.random() * 5,
   })), []);
-  const glanz = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+  const glanz = useMemo(() => ppZufall(ppAreaN(4), (i) => ({
     x: [60, 58, 61, 63][i], y: [10, 30, 46, 70][i], dur: 2 + Math.random() * 2, delay: -Math.random() * 4,
   })), []);
   return (
@@ -3953,16 +3980,16 @@ const TempleOfSacrificeOverlay = React.memo(function TempleOfSacrificeOverlay() 
   // Rauch: von den Schalen und aus dem Altar
   const rauch = useMemo(() => {
     const quellen = [...TS_FEUER.map(f => ({ x: f.x, y: f.y })), { x: 0, y: 30 }];
-    return ppZufall(ppFxN(7), (i) => {
+    return ppZufall(ppAreaN(7), (i) => {
       const q = quellen[i % quellen.length];
       return { x: q.x, y: q.y, dur: 4 + Math.random() * 3, delay: -Math.random() * 7 };
     });
   }, []);
-  const funken = useMemo(() => ppZufall(ppFxN(8), (i) => {
+  const funken = useMemo(() => ppZufall(ppAreaN(8), (i) => {
     const f = TS_FEUER[i % TS_FEUER.length];
     return { x: f.x + Math.round((Math.random() - .5) * 4), y: f.y + 2, dur: 1.6 + Math.random() * 1.4, delay: -Math.random() * 3 };
   }), []);
-  const gluehen = useMemo(() => ppZufall(ppFxN(14), () => {
+  const gluehen = useMemo(() => ppZufall(ppAreaN(14), () => {
     const seite = Math.random() < .5 ? -1 : 1;
     return {
       x: seite * (40 + Math.random() * 150), y: 50 + Math.random() * 46,
@@ -3970,7 +3997,7 @@ const TempleOfSacrificeOverlay = React.memo(function TempleOfSacrificeOverlay() 
       dx: Math.round((Math.random() - .5) * 10), dy: -Math.round(2 + Math.random() * 6),
     };
   }), []);
-  const flieger = useMemo(() => ppZufall(Math.min(1, ppFxN(1)), () => ({
+  const flieger = useMemo(() => ppZufall(Math.min(1, ppAreaN(1)), () => ({
     y: 6 + Math.random() * 14, dur: 34 + Math.random() * 12, delay: -Math.random() * 30, rtl: Math.random() < .5,
   })), []);
   return (
@@ -4125,15 +4152,15 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
     x: -BGR_KACHEL / 2 + (i - 2) * BGR_KACHEL,
     dur: .5 + Math.random() * .25, delay: -Math.random(), glut: 1.3 + Math.random() * .8,
   })), []);
-  const knochen = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const knochen = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     x: -6 + Math.random() * 12, dur: 3.2 + Math.random() * 1.6, delay: -i * 1.4 - Math.random(),
     dreh: .3 + Math.random() * .2,
   })), []);
-  const staubwolken = useMemo(() => ppZufall(ppFxN(6), () => ({
+  const staubwolken = useMemo(() => ppZufall(ppAreaN(6), () => ({
     x: -9 + Math.random() * 18, dur: 1.6 + Math.random() * 1.4, delay: -Math.random() * 3,
     dx: (Math.random() - .5) * 8,
   })), []);
-  const staub = useMemo(() => ppZufall(ppFxN(14), () => ({
+  const staub = useMemo(() => ppZufall(ppAreaN(14), () => ({
     x: Math.random() * 100, y: 10 + Math.random() * 80, dur: 10 + Math.random() * 10, delay: -Math.random() * 20,
   })), []);
   const ratte = useMemo(() => ({ dur: 9 + Math.random() * 4, delay: -Math.random() * 30, rtl: Math.random() < .5 }), []);
@@ -4305,20 +4332,20 @@ const CD_AUGE = { x: 40, y: 58, w: 23, h: 45 };                      // Mitte vo
 const CD_KOERPER = { w: 76, h: 98 };                                 // Schattenkörper, um das Auge zentriert
 
 const CosmicDepthsOverlay = React.memo(function CosmicDepthsOverlay() {
-  const funkeln = useMemo(() => ppZufall(ppFxN(10), () => ({
+  const funkeln = useMemo(() => ppZufall(ppAreaN(10), () => ({
     x: Math.random() * 100, y: 2 + Math.random() * 94, dur: 2.6 + Math.random() * 3, delay: -Math.random() * 6,
   })), []);
-  const schnuppen = useMemo(() => ppZufall(ppFxN(3), () => ({
+  const schnuppen = useMemo(() => ppZufall(ppAreaN(3), () => ({
     x: 15 + Math.random() * 85, y: 2 + Math.random() * 45, dur: 8 + Math.random() * 10, delay: -Math.random() * 18,
   })), []);
-  const brocken = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const brocken = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     gross: i === 0, y: 12 + i * 29 + Math.random() * 12, dur: 80 + Math.random() * 50,
     delay: -Math.random() * 120, rtl: i % 2 === 1, dreh: 2.4 + Math.random() * 2.4, bob: 1 + Math.random() * 2,
   })), []);
-  const schwaerme = useMemo(() => ppZufall(Math.min(1, ppFxN(1)), () => ({
+  const schwaerme = useMemo(() => ppZufall(Math.min(1, ppAreaN(1)), () => ({
     y: 80 + Math.random() * 8, dur: 44 + Math.random() * 14, delay: -Math.random() * 50, rtl: Math.random() < .5,
   })), []);
-  const funken = useMemo(() => ppZufall(ppFxN(8), () => {
+  const funken = useMemo(() => ppZufall(ppAreaN(8), () => {
     const a = Math.random() * Math.PI * 2, d = 10 + Math.random() * 14;
     return { dx: Math.cos(a) * d, dy: Math.sin(a) * d * 1.3, dur: 2.2 + Math.random() * 2.2, delay: -Math.random() * 4.4 };
   }), []);
@@ -4492,7 +4519,7 @@ const FC_STEHER = [{ x: -62, y: 74, v: 1, dur: 7 }, { x: 88, y: 86, v: 0, dur: 9
 const FirstCircleOfHellOverlay = React.memo(function FirstCircleOfHellOverlay() {
   const seelen = useMemo(() => {
     const plaetze = FC_STEHER.map(s => [s.x, s.y]);
-    return ppZufall(ppFxN(10), (i) => {
+    return ppZufall(ppAreaN(10), (i) => {
       // ein Drittel weiter hinten (klein), die Haelfte nahe der Mitte, der Rest weit verstreut
       const mitte = i % 3 === 2;
       let x, y, n = 0;
@@ -4509,12 +4536,12 @@ const FirstCircleOfHellOverlay = React.memo(function FirstCircleOfHellOverlay() 
       };
     });
   }, []);
-  const ferne = useMemo(() => ppZufall(ppFxN(9), () => ({
+  const ferne = useMemo(() => ppZufall(ppAreaN(9), () => ({
     x: (Math.random() - .5) * 360, y: FC_HORIZONT + 1 + Math.random() * 6,
     dur: 18 + Math.random() * 18, delay: -Math.random() * 36, weg: 3 + Math.floor(Math.random() * 5),
     links: Math.random() < .5,
   })), []);
-  const asche = useMemo(() => ppZufall(ppFxN(16), () => ({
+  const asche = useMemo(() => ppZufall(ppAreaN(16), () => ({
     y: Math.random() * 90, dur: 30 + Math.random() * 30, delay: -Math.random() * 60,
     art: Math.random() < .3 ? ' dunkel' : Math.random() < .2 ? ' gross' : '',
   })), []);
@@ -4703,19 +4730,19 @@ const BigGwenOverlay = React.memo(function BigGwenOverlay() {
       }
     }
     out.sort(() => Math.random() - .5);
-    return out.slice(0, ppFxN(22)).map(r => ({
+    return out.slice(0, ppAreaN(22)).map(r => ({
       ...r, dur: (r.gross ? 5 : 3.6) + Math.random() * 2.5, delay: -Math.random() * 7,
     }));
   }, []);
-  const gluehen = useMemo(() => ppZufall(ppFxN(12), () => ({
+  const gluehen = useMemo(() => ppZufall(ppAreaN(12), () => ({
     x: (Math.random() - .5) * 300, y: 70 + Math.random() * 9,
     dur: 5 + Math.random() * 4, delay: -Math.random() * 9, blink: 1.6 + Math.random() * 1.8,
   })), []);
-  const dohlen = useMemo(() => ppZufall(ppFxN(4), () => ({
+  const dohlen = useMemo(() => ppZufall(ppAreaN(4), () => ({
     rx: 12 + Math.random() * 16, ry: 2 + Math.random() * 4, cy: 7 + Math.random() * 12,
     dur: 3.5 + Math.random() * 3, delay: -Math.random() * 12, flap: .22 + Math.random() * .12,
   })), []);
-  const zieher = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+  const zieher = useMemo(() => ppZufall(ppAreaN(2), (i) => ({
     y: 4 + Math.random() * 22, dur: 26 + Math.random() * 14, delay: -Math.random() * 30, rtl: i % 2 === 1,
   })), []);
   const zeiger = (bild, anim) => (
@@ -4877,21 +4904,21 @@ const WarCouncilOverlay = React.memo(function WarCouncilOverlay() {
     }
     return out.map(s => ({ ...s, dur: .5 + Math.random() * .25, delay: -Math.random() }));
   }, []);
-  const funken = useMemo(() => ppZufall(ppFxN(10), (i) => {
+  const funken = useMemo(() => ppZufall(ppAreaN(10), (i) => {
     const s = schalen[i % schalen.length];
     return { x: s.x + Math.round((Math.random() - .5) * 4), y: s.fuss - 16, dur: 1.4 + Math.random() * 1.2, delay: -Math.random() * 3 };
   }), [schalen]);
-  const rauch = useMemo(() => ppZufall(ppFxN(6), (i) => {
+  const rauch = useMemo(() => ppZufall(ppAreaN(6), (i) => {
     const s = schalen[i % schalen.length];
     return { x: s.x, y: s.fuss - 22, dur: 4 + Math.random() * 2, delay: -Math.random() * 6 };
   }), [schalen]);
-  const wolken = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+  const wolken = useMemo(() => ppZufall(ppAreaN(4), (i) => ({
     y: -1 + Math.random() * 9, dur: 70 + Math.random() * 50, delay: -Math.random() * 120, art: i % 2,
   })), []);
-  const voegel = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+  const voegel = useMemo(() => ppZufall(ppAreaN(3), (i) => ({
     y: 3 + Math.random() * 10, dur: 26 + Math.random() * 14, delay: -Math.random() * 40, bob: 1 + Math.random() * 2, rtl: i === 2,
   })), []);
-  const laub = useMemo(() => ppZufall(ppFxN(6), () => ({
+  const laub = useMemo(() => ppZufall(ppAreaN(6), () => ({
     y: 44 + Math.random() * 36, dur: 9 + Math.random() * 7, delay: -Math.random() * 16, bob: 2 + Math.random() * 3,
   })), []);
   return (
@@ -5030,10 +5057,10 @@ const WH_GLITZER = [[98, 99], [87, 93], [91, 96], [89, 96], [80, 92], [98, 93]];
 // </gen>
 const WH_TAKT = 0.9;                 // Sekunden je Zahnteilung (für ALLE Räder gleich)
 const WowhallaOverlay = React.memo(function WowhallaOverlay() {
-  const dampf = useMemo(() => WH_DAMPF.slice(0, ppFxN(WH_DAMPF.length)).map(() => ({
+  const dampf = useMemo(() => WH_DAMPF.slice(0, ppAreaN(WH_DAMPF.length)).map(() => ({
     dur: 3.2 + Math.random() * 3, delay: -Math.random() * 6,
   })), []);
-  const glitzer = useMemo(() => ppZufall(ppFxN(12), (i) => i < WH_GLITZER.length
+  const glitzer = useMemo(() => ppZufall(ppAreaN(12), (i) => i < WH_GLITZER.length
     ? { x: WH_GLITZER[i][0] - WH_W / 2, y: WH_GLITZER[i][1], dur: 2 + Math.random() * 2.5, delay: -Math.random() * 4 }
     : { x: (Math.random() - .5) * 340, y: 74 + Math.random() * 24, dur: 2.4 + Math.random() * 2.5, delay: -Math.random() * 5 }), []);
   const rad = (g, i) => (
@@ -5127,10 +5154,10 @@ const SecondCircleOfHellOverlay = React.memo(function SecondCircleOfHellOverlay(
   }, []);
   // Jede Frau schickt DREI Herzen (4 s / 6 s / 12 s, gegeneinander versetzt); alle Dauern teilen die Periode
   // 12 s, damit alles nahtlos schleift.
-  const herzen = useMemo(() => frauen.flatMap((f, i) => [4, 6, 12].map((dur, k) => ({
+  const herzen = useMemo(() => ppDuenn(frauen.flatMap((f, i) => [4, 6, 12].map((dur, k) => ({
     x: f.x + ((i * 7 + k * 3) % 7 - 3), y: f.feet - f.h + 2, dur, delay: -(((i * 1.9 + k * 2.3) % dur)),
     f: (i + k) % 2, dx: ((i + k) % 3 - 1) * 2,
-  }))), [frauen]);
+  })))), [frauen]);
   return (
     <PixelScene artH={100} bg="#19062d" className="second-circle-overlay">
       <PixelBand src={LC + 'tile.png'} className="lc-wand" style={{ backgroundSize: 'auto 200%', backgroundPosition: '0 0' }} />
@@ -5295,11 +5322,11 @@ const FourthCircleOfHellOverlay = React.memo(function FourthCircleOfHellOverlay(
   const helden = useMemo(() => Array.from({ length: 6 }, (_, i) => ({
     x: (i % 2 ? 104 : 40) + 128 * Math.floor(i / 2), v: i % 2, delay: -((i * 1.7) % 6),
   })), []);
-  const hagel = useMemo(() => Array.from({ length: 30 }, (_, i) => {
+  const hagel = useMemo(() => ppDuennVon({ length: 30 }, (_, i) => {
     const dur = [3, 4, 6][i % 3];
     return { x: -10 + ((i * 13.7) % 380), k: (i * 5) % 3, dur, delay: -((i * 0.83) % dur), flackern: -((i * 0.13) % 0.4) };
   }), []);
-  const glitzer = useMemo(() => Array.from({ length: 22 }, (_, i) => {
+  const glitzer = useMemo(() => ppDuennVon({ length: 22 }, (_, i) => {
     const dur = [3, 4, 6, 12][i % 4];
     return { x: (i * 53 + 7) % 380, y: i < 15 ? 3 + (i * 29) % 40 : 52 + (i * 17) % 38, dur, delay: -((i * 1.1) % dur) };
   }), []);
@@ -5411,11 +5438,11 @@ const FifthCircleOfHellOverlay = React.memo(function FifthCircleOfHellOverlay() 
   const helden = useMemo(() => Array.from({ length: Math.ceil(FI_BREITE / 64) }, (_, k) => ({
     x: 48 + 64 * k, v: k % 2, delay: -((k * 1.7) % 6), flamme: -((k * 0.35) % 1.2),
   })), []);
-  const funken = useMemo(() => Array.from({ length: 34 }, (_, i) => {
+  const funken = useMemo(() => ppDuennVon({ length: 34 }, (_, i) => {
     const dur = [3, 4, 6][i % 3];
     return { x: 16 + 64 * (i % 6) + ((i * 7) % 24) - 12, y0: 62 - (i % 5) * 4, dur, k: i % 3, delay: -((i * 0.77) % dur), drift: ((i % 5) - 2) * 3 };
   }), []);
-  const asche = useMemo(() => Array.from({ length: 26 }, (_, i) => {
+  const asche = useMemo(() => ppDuennVon({ length: 26 }, (_, i) => {
     const dur = [6, 12][i % 2];
     return { x: ((i * 29) % FI_BREITE), k: i % 3, dur, delay: -((i * 1.9) % dur), drift: 8 + (i % 4) * 4 };
   }), []);
@@ -5512,11 +5539,11 @@ const sxReihe = (n) => Array.from({ length: n }, (_, b) => `${(b * 100 / n).toFi
 const SX_PAN = 256;                                       // Breite des Panoramas (Kunstpixel), mittig; links/rechts setzt die Wand (back.png) fort
 const SX = (x) => ppArtX(x, SX_PAN);                     // Kunstpixel-x im Panorama → Position
 const SixthCircleOfHellOverlay = React.memo(function SixthCircleOfHellOverlay() {
-  const funken = useMemo(() => Array.from({ length: 36 }, (_, i) => {
+  const funken = useMemo(() => ppDuennVon({ length: 36 }, (_, i) => {
     const dur = [3, 4, 6][i % 3];
     return { x: -240 + ((i * 53) % 480), y0: 84 - (i % 4) * 6, dur, k: i % 3, delay: -((i * 0.83) % dur), drift: ((i % 5) - 2) * 3 };
   }), []);
-  const tropfen = useMemo(() => Array.from({ length: 16 }, (_, i) => {
+  const tropfen = useMemo(() => ppDuennVon({ length: 16 }, (_, i) => {
     const dur = [3, 4][i % 2];
     return { x: -240 + ((i * 61 + 9) % 480), dur, k: i % 3, delay: -((i * 0.61) % dur) };
   }), []);
@@ -5605,10 +5632,10 @@ const SV_BLASE = [null,null,null,null,null,null,null,null,null,null,null,null,nu
 const SV_BLASE_KF = SV_BLASE.map((b, i) => `${(i * 100 / SV_BLASE.length).toFixed(3)}% { ${b === null ? 'opacity: 0;' : `opacity: 1; background-position-x: ${(b * 100 / 5).toFixed(3)}%;`} }`).join(' ');
 const SeventhCircleOfHellOverlay = React.memo(function SeventhCircleOfHellOverlay() {
   const see = useMemo(() => Array.from({ length: 12 }, (_, k) => k - 6), []);
-  const blasen = useMemo(() => Array.from({ length: 16 }, (_, i) => ({
+  const blasen = useMemo(() => ppDuennVon({ length: 16 }, (_, i) => ({
     x: -230 + ((i * 71 + 13) % 460), y: SV_LAVA + 4 + ((i * 5) % 17), delay: -((i * 1.37) % 6),
   })), []);
-  const funken = useMemo(() => Array.from({ length: 30 }, (_, i) => {
+  const funken = useMemo(() => ppDuennVon({ length: 30 }, (_, i) => {
     const dur = [3, 4, 6][i % 3];
     return { x: -230 + ((i * 59 + 7) % 460), y0: SV_LAVA + 6 + (i % 4) * 4, dur, k: i % 3, delay: -((i * 0.79) % dur), drift: ((i % 5) - 2) * 3 };
   }), []);
@@ -5690,7 +5717,7 @@ const EG = (x) => ppArtX(x, EG_PAN);
 const EG_DAEMON = [0,0,1,1,0,2,3,4,5,5,6,7,7,8,9,9,10,11,12,12,13,14,15,0,0,1,1,0,16,17,17,16,0,18,0,0,2,3,4,5,5,6,7,19,19,19,11,12,20,21,21,20,22,23,23,22,15,0,1,0];   // 60 Schritte in 6 s (0,1 s je Schritt), 24 Bilder inkl. Zwischenstellungen des Arms
 const EG_REISE = [0,0,1,1,0,2,2,0,3,3,0,4,4,5,5,4,0,6,6,7,7,6,0,8,8,0,9,9,0,10,10,0,11,11,0,1,1,0,0,0];
 const EighthCircleOfHellOverlay = React.memo(function EighthCircleOfHellOverlay() {
-  const funken = useMemo(() => Array.from({ length: 28 }, (_, i) => {
+  const funken = useMemo(() => ppDuennVon({ length: 28 }, (_, i) => {
     const dur = [3, 4, 6][i % 3];
     const links = i % 2 === 0;
     return { x: (links ? -126 + ((i * 13) % 34) : 82 + ((i * 11) % 40)), y0: 84 - (i % 4) * 8, dur, k: i % 3, delay: -((i * 0.83) % dur), drift: ((i % 5) - 2) * 3 };
@@ -5783,7 +5810,7 @@ function tmtZufall(seed) {
 const TearingMountainOverlay = React.memo(function TearingMountainOverlay() {
   const funken = useMemo(() => {
     const r = tmtZufall(2310);
-    const aus = ppZufall(ppFxN(18), (i) => {
+    const aus = ppZufall(ppAreaN(18), (i) => {
       const krater = i % 6 === 5;
       return {
         x: krater ? Math.round(-6 + r() * 12) : Math.round(-120 + r() * 240),
@@ -5795,8 +5822,8 @@ const TearingMountainOverlay = React.memo(function TearingMountainOverlay() {
     });
     return aus;
   }, []);
-  const blasen = useMemo(() => TMT_BLASEN.slice(0, ppFxN(TMT_BLASEN.length)).map(([x, y], i) => ({ x, y, dur: [4, 6, 3][i % 3], delay: -((i * 7) % 12) / 2 })), []);
-  const rauch = useMemo(() => ppZufall(ppFxN(3), (i) => ({ delay: -i * 4, dy: i % 2 })), []);
+  const blasen = useMemo(() => TMT_BLASEN.slice(0, ppAreaN(TMT_BLASEN.length)).map(([x, y], i) => ({ x, y, dur: [4, 6, 3][i % 3], delay: -((i * 7) % 12) / 2 })), []);
+  const rauch = useMemo(() => ppZufall(ppAreaN(3), (i) => ({ delay: -i * 4, dy: i % 2 })), []);
   const mitte = { left: `calc(50% - ${TMT_W / 2} * var(--px))`, width: ppArt(TMT_W), right: 'auto' };
   return (
     <PixelScene artH={100} bg="#1f0f04" className="tearing-mountain-overlay">
@@ -5868,8 +5895,8 @@ const GGT_W = 160;
 const GGT_FUNKEN = [[-70, 20], [-52, 52], [-30, 14], [-12, 36], [14, 24], [34, 58], [56, 18], [72, 44], [-86, 66], [88, 70], [0, 8], [-40, 70]];
 const GGT_FARBEN = ['#fad54a', '#f7f7ad', '#f29a3e'];
 const GoldenGateOverlay = React.memo(function GoldenGateOverlay() {
-  const funkel = useMemo(() => GGT_FUNKEN.slice(0, ppFxN(GGT_FUNKEN.length)).map(([x, y], i) => ({ x, y, dur: [3.6, 4.8, 6][i % 3], delay: -((i * 5) % 11) / 2 })), []);
-  const staub = useMemo(() => ppZufall(ppFxN(14), (i) => ({
+  const funkel = useMemo(() => GGT_FUNKEN.slice(0, ppAreaN(GGT_FUNKEN.length)).map(([x, y], i) => ({ x, y, dur: [3.6, 4.8, 6][i % 3], delay: -((i * 5) % 11) / 2 })), []);
+  const staub = useMemo(() => ppZufall(ppAreaN(14), (i) => ({
     x: Math.round(-30 + ((i * 53) % 61)), y: 76 + (i % 3) * 3, steig: 22 + (i * 7) % 26, dx: ((i * 5) % 7) - 3,
     dur: [5, 7, 9][i % 3], delay: -((i * 3) % 14) / 2, farbe: GGT_FARBEN[i % 3],
   })), []);
@@ -5920,8 +5947,8 @@ const TGA = '/areas/tree-of-golden-apples/';
 const TGA_W = 160;
 const TGA_FUNKEL = [[34, 40], [52, 52], [70, 44], [88, 54], [108, 42], [124, 50], [46, 28], [64, 34], [84, 28], [102, 30], [122, 32], [28, 52], [98, 58], [60, 60], [78, 20], [112, 54], [14, 40], [146, 44]];
 const TreeOfGoldenApplesOverlay = React.memo(function TreeOfGoldenApplesOverlay() {
-  const funkel = useMemo(() => TGA_FUNKEL.slice(0, ppFxN(TGA_FUNKEL.length)).map(([x, y], i) => ({ x, y, dur: [3.4, 4.6, 5.8][i % 3], delay: -((i * 7) % 13) / 2 })), []);
-  const blaetter = useMemo(() => ppZufall(ppFxN(12), (i) => ({
+  const funkel = useMemo(() => TGA_FUNKEL.slice(0, ppAreaN(TGA_FUNKEL.length)).map(([x, y], i) => ({ x, y, dur: [3.4, 4.6, 5.8][i % 3], delay: -((i * 7) % 13) / 2 })), []);
+  const blaetter = useMemo(() => ppZufall(ppAreaN(12), (i) => ({
     x: Math.round(-60 + ((i * 41) % 121)), y: 30 + (i % 4) * 6, fall: 40 + (i * 9) % 22, drift: 16 + (i * 5) % 14,
     dur: [7, 9, 11][i % 3], delay: -((i * 3) % 14), farbe: ['#fad54a', '#f29a3e', '#fff196'][i % 3],
   })), []);
@@ -5986,7 +6013,7 @@ const GigalopolisOverlay = React.memo(function GigalopolisOverlay() {
   const leute = useMemo(() => {
     const r = tmtZufall(2610);
     const aus = [];
-    const N = ppFxN(46);
+    const N = ppAreaN(46);
     for (let versuch = 0; aus.length < N && versuch < 600; versuch++) {
       const waag = r() < 0.5;
       const farbe = GIG_FARBEN[Math.floor(r() * GIG_FARBEN.length)];
@@ -6003,13 +6030,13 @@ const GigalopolisOverlay = React.memo(function GigalopolisOverlay() {
       }
     }
     // Pilger auf dem Prozessionsweg (Burgbezirk): gehen langsam zum Tempel hinauf
-    ppZufall(ppFxN(6), (i) => {
+    ppZufall(ppAreaN(6), (i) => {
       const len = 38 + (i % 3) * 3, dur = 16 + i * 2.5;
       aus.push({ waag: false, x: -3 + (i % 4) * 2, y: 94 - len, len, dur, delay: -(i * 3.1), farbe: GIG_FARBEN[(i + 1) % GIG_FARBEN.length], rueck: i % 2 === 1 });
     });
     return aus;
   }, []);
-  const rauch = useMemo(() => ppZufall(ppFxN(3), (i) => ({ delay: -i * 3 })), []);
+  const rauch = useMemo(() => ppZufall(ppAreaN(3), (i) => ({ delay: -i * 3 })), []);
   return (
     <PixelScene artH={100} bg="#b29466" className="gigalopolis-overlay">
       <PixelBand src={GIG + 'tile.png'} />
@@ -6052,12 +6079,12 @@ const BRH = '/areas/barrel-home/';
 const BRH_W = 160;
 const BRH_STERNE = [[-70, 6], [-52, 14], [-30, 5], [-8, 12], [18, 4], [40, 10], [62, 18], [78, 7], [-84, 20], [88, 26], [-20, 22], [30, 24], [-60, 26], [70, 2]];
 const BarrelHomeOverlay = React.memo(function BarrelHomeOverlay() {
-  const sterne = useMemo(() => BRH_STERNE.slice(0, ppFxN(BRH_STERNE.length)).map(([x, y], i) => ({ x, y, dur: [2.4, 3.6, 4.8][i % 3], delay: -((i * 5) % 9) / 2 })), []);
-  const fliegen = useMemo(() => ppZufall(ppFxN(10), (i) => ({
+  const sterne = useMemo(() => BRH_STERNE.slice(0, ppAreaN(BRH_STERNE.length)).map(([x, y], i) => ({ x, y, dur: [2.4, 3.6, 4.8][i % 3], delay: -((i * 5) % 9) / 2 })), []);
+  const fliegen = useMemo(() => ppZufall(ppAreaN(10), (i) => ({
     x: Math.round(-90 + ((i * 37) % 181)), y: 70 + ((i * 11) % 24), dx: ((i * 7) % 15) - 7, dy: -(4 + (i * 5) % 9),
     dur: [6, 8, 10][i % 3], delay: -((i * 3) % 10) / 2,
   })), []);
-  const rauch = useMemo(() => ppZufall(ppFxN(3), (i) => ({ delay: -i * 3 })), []);
+  const rauch = useMemo(() => ppZufall(ppAreaN(3), (i) => ({ delay: -i * 3 })), []);
   return (
     <PixelScene artH={100} bg="#170b28" className="barrel-home-overlay">
       <PixelBand src={BRH + 'sky.png'} />
