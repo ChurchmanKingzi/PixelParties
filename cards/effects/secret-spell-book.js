@@ -171,6 +171,7 @@ async function uebernimm(engine, pi, inst, ergebnis) {
   const name = inst.name;
   if (!istBetroffen(engine, pi, inst)) return;                                  // während der Abfragen kann sich das Brett geändert haben
   if (inst.zone === 'area') {
+    if (engine.spielerIstVonAreasAusgenommen(pi)) return;   // W82 (Shipwrecked): keine Area auf mein Brett bringen
     if (!engine.gs.areaZones) engine.gs.areaZones = [];
     if (!engine.gs.areaZones[pi]) engine.gs.areaZones[pi] = [];
     const meine = engine.gs.areaZones[pi];

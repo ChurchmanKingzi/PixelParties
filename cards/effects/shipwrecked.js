@@ -22,7 +22,10 @@
 //       Bonegrinder, Clock Tower, Spider Hive, Wowhalla, Barrel Home / Gigalopolis …) fragen `spielerIstVonAreasAusgenommen` im jeweiligen Skript (Kommentar „W82").
 //   (2) „cannot activate the effects of Areas": `getActivatableAreas` (ausgegraut) / `activateAreaEffect` (verweigert) und die Hook-Effekte der Areas, die ein Spieler auslöst.
 //   (3) „cannot play Areas": Hand-Spiel (`getHeroPlayableCards`, `validateActionPlay`, `getBlockedSpells`: Area-Karten ausgegraut), Zusatzaktions-Wege (Circles-Wiederholung, Cooldin,
-//       Cleansing of the Land). „Direkt ins Spiel bringen" ohne „play" (Planet in a Bottle, Reality Crack, Orkallion, Dante, Spirit of the Barbarian Sword) bleibt erlaubt (engere Lesart).
+//       Cleansing of the Land). Auch „direkt ins Spiel bringen" ist gesperrt (Al 27.10.: „auf KEINEM Weg"): `engine.placeArea` verweigert dem ausgenommenen AKTEUR (`opts.actor`, sonst Zonenbesitzer) als zentraler Wächter; die Skripte prüfen
+//       vorher, damit keine Karte verloren geht: Planet in a Bottle (Trank ausgegraut), Aquanian Orkallion (Beschwörung ohne Suche), Dante (Area-Weg entfällt), Spirit of the Barbarian Sword (Effekt gesperrt, da Wegsenden = Kosten
+//       der Platzierung), Doom Prophecy (nicht spielbar), Secret Spell Book (Area wird nicht übernommen), Reality Crack (Auslegung: Wegsenden aller Areas läuft, die Hereinbringung und damit der Pollution-Teil entfallen).
+//       Der Gegner des Ausgenommenen legt Areas normal (auch in die Zone des Ausgenommenen, Doom Prophecy).
 //   Eigene Areas auf dem Brett bleiben liegen; sie wirken nur nicht auf den Ausgenommenen (und er nutzt sie nicht) und wirken auf Nicht-Ausgenommene weiter.
 //
 //  ── ABGLEICH ─────────────────────────────────────────────────────────────────────────────
@@ -30,8 +33,8 @@
 //  ihre Zone zurück bzw. verlieren die Zusatzzone). Die ATK-Aura (Rioting Village) und alle Abfragen zur Laufzeit lesen den Ist-Zustand des Bretts.
 //
 //  ── Bild und Klang ───────────────────────────────────────────────────────────────────────
-//  Pixelart-Animation `shipwrecked_attach` (Vorlage: das Kartenbild — Strand, Wellenkante, Treibholz, Fass): eine Welle (Schaumkante) läuft in ganzen Pixeln über die Füße des Helden, lässt
-//  Planken und ein Fass zurück; Abzeichen 🌊 in der Buff-Spalte des Wirts (Tooltip nennt den Kontrolleur).
+//  Pixelart-Animation `shipwrecked_attach` (Vorlage: das Kartenbild — Strand, Wellenkante, Treibholz, Fass): eine Welle (Schaumkamm, vier Ebenen, Dithering) läuft in ganzen Pixeln über die Füße des Helden, lässt
+//  Planken, Fass, Treibholz und Tang am Strand zurück; Abzeichen 🌊 in der Buff-Spalte des Wirts (Tooltip nennt den Kontrolleur).
 // ═══════════════════════════════════════════
 
 const { candidateHosts, attachToHero } = require('./_attachment-shared');
@@ -216,8 +219,8 @@ module.exports = {
       const hostHero = gs.players[host.owner]?.heroes?.[host.heroIdx];
 
       // Anlege-Bild (Pixelart): Welle über den Füßen des Wirts.
-      engine._broadcastEvent('play_zone_animation', { type: ANIM, owner: host.owner, heroIdx: host.heroIdx, zoneSlot: -1, duration: 1340 });
-      await engine._delay(900);
+      engine._broadcastEvent('play_zone_animation', { type: ANIM, owner: host.owner, heroIdx: host.heroIdx, zoneSlot: -1, duration: 1940 });
+      await engine._delay(1100);
 
       await engine.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: 'support', toHeroIdx: host.heroIdx,

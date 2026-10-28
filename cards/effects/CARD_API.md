@@ -5389,8 +5389,9 @@ Zweite Quelle von „unaffected by Areas", an den SPIELER gebunden (der Kontroll
 * **Held:** `engine.heldIstVonAreasAusgenommen(Brettseite, Index)` (Kontrolleur des Helden); **Karte in einer Zone:** `engine.karteIstVonAreasAusgenommen(inst)` bzw.
   `isAreaImmuneInst` / `isAreaImmuneHero` / `_isDiverHelmetProtectedTarget` (Kontrolleur der Karte). `heroHasDiverHelmet` allein gilt nur noch für den Helm selbst.
 * **Gesperrt:** `getActivatableAreas` (ausgegraut) / `activateAreaEffect` (verweigert) für aktive Area-Effekte; Area-Karten aus der Hand (`getHeroPlayableCards`,
-  `validateActionPlay`, `getBlockedSpells`, Zusatzaktions-Wege inkl. Cooldin / Cleansing of the Land / Circle-Wiederholung). „Direkt ins Spiel bringen" (Planet in a Bottle,
-  Reality Crack, Orkallion, Dante …) ist KEIN „play" und bleibt erlaubt.
+  `validateActionPlay`, `getBlockedSpells`, Zusatzaktions-Wege inkl. Cooldin / Cleansing of the Land / Circle-Wiederholung). **Auch „direkt ins Spiel bringen" ist gesperrt (Al 27.10.):** `engine.placeArea(zone, inst, { actor })`
+  verweigert dem ausgenommenen Akteur (Sicherheitsnetz, gibt `false`); Planet in a Bottle, Orkallion, Dante, Spirit of the Barbarian Sword, Doom Prophecy, Secret Spell Book prüfen vorher (Reality Crack:
+  Wegsenden läuft, Hereinbringen/Pollution entfällt). **Neuer Weg, der eine Area aufs Brett bringt: `spielerIstVonAreasAusgenommen(pi)` vor dem Entnehmen der Karte prüfen.**
 * **Neue Area mit Wirkung auf Spieler/Ziele:** immer die Frage oben stellen (Hook-Effekte pro Skript; Zielfilter über die Helden-/Kartenfrage). Zustandsbasierte Areas (Barrel Home / Gigalopolis,
   `_zonen-welt-shared.js`) gleichen pro Held ab (`heldAbgleichen`); `shipwrecked.js` stößt den Abgleich beim Kommen/Gehen der Karte an.
 

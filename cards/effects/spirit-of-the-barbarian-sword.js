@@ -124,6 +124,7 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     if (areaCount(engine.gs) < 1) return false;
+    if (engine.spielerIstVonAreasAusgenommen(pi)) return false;   // W82 (Shipwrecked): keine Area ins Spiel bringen
     const cardDB = engine._getCardDB();
     return (engine.gs.players[pi]?.mainDeck || [])
       .some(n => isTutorableArea(cardDB[n], engine, pi));
@@ -136,6 +137,7 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
     if (areaCount(gs) < 1) return false;              // Kosten nicht zahlbar
+    if (engine.spielerIstVonAreasAusgenommen(pi)) return false;   // W82 (Shipwrecked): keine Area ins Spiel bringen
 
     const cardDB = engine._getCardDB();
     const zaehler = {};

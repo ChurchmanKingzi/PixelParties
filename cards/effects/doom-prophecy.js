@@ -27,6 +27,11 @@ const CARD_NAME = 'Doom Prophecy';
 const START_COUNTERS = 3;
 
 module.exports = {
+  // W82 (Shipwrecked):: die Karte legt eine Area (Doom Clock) ins Spiel — fuer den Ausgenommenen nicht spielbar.
+  spellPlayCondition(gs, pi, engine) {
+    return !(engine && engine.spielerIstVonAreasAusgenommen(pi));
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
@@ -74,7 +79,7 @@ module.exports = {
       // auf dem Brett") und Doom Prophecy kaeme nie in die Ablage. Die Uhr ist
       // aber nicht der Zauber: den Stempel wie vorher belassen.
       const placedVorher = gs._spellPlacedOnBoard;
-      await engine.placeArea(ziel, inst);
+      await engine.placeArea(ziel, inst, { actor: pi });   // W82: der AKTEUR zaehlt (die Uhr darf auch in die Zone eines Ausgenommenen)
       if (ziel !== pi) {
         if (placedVorher) gs._spellPlacedOnBoard = placedVorher;
         else delete gs._spellPlacedOnBoard;

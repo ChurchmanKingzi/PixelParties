@@ -105,6 +105,7 @@ module.exports = {
     // Hard gate: one Area per player. No replace option — if the player
     // already controls an Area, Planet in a Bottle is grayed out.
     if (playerControlsArea(gs, pi, engine)) return false;
+    if (engine?.spielerIstVonAreasAusgenommen?.(pi)) return false;   // W82 (Shipwrecked): keine Area ins Spiel bringen (Tranke ausgegraut)
 
     const cardDB = engine ? engine._getCardDB() : null;
     if (!cardDB) return true; // Fallback: let resolve() re-check.
@@ -120,6 +121,7 @@ module.exports = {
     // Re-check the one-Area gate: game state can change between canActivate
     // and resolve (reaction chains, etc.).
     if (playerControlsArea(gs, pi, engine)) return { cancelled: true };
+    if (engine.spielerIstVonAreasAusgenommen(pi)) return { cancelled: true };   // W82 (Shipwrecked): Server-Pruefung
 
     const cardDB = engine._getCardDB();
     const gallery = buildAreaGallery(ps, cardDB, engine, pi);

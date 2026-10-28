@@ -51,6 +51,7 @@ function spellsInHand(engine, pi) {
 }
 
 function geloeschteAreas(engine, pi) {
+  if (engine.spielerIstVonAreasAusgenommen(pi)) return [];   // W82 (Shipwrecked): keine Area ins Spiel bringen — der Area-Weg entfaellt
   const ps = engine.gs.players[pi];
   const db = engine._getCardDB();
   return [...new Set((ps?.deletedPile || []).filter(n => isTutorableArea(db[n], engine, pi)))];

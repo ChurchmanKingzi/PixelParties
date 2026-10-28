@@ -118,6 +118,9 @@ module.exports = {
       // Hand. Wer schon eine kontrolliert, bekommt keine Suche.
       if ((gs.areaZones?.[pi] || []).length > 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
+      // W82 (Shipwrecked):: keine Area ins Spiel bringen
+      if (engine.spielerIstVonAreasAusgenommen(pi)) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });
+
       const cardDB = engine._getCardDB();
       const gezaehlt = {};
       for (const n of (ps.mainDeck || [])) {

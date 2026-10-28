@@ -89,6 +89,9 @@ module.exports = {
       }
       gallery.sort((a, b) => (a.level - b.level) || a.name.localeCompare(b.name));
 
+      // W82 (Shipwrecked):: der Ausgenommene darf keine Area ins Spiel bringen — die Areas sind schon abgeraeumt (Schritt 1), es gibt nichts zu waehlen (kein Pollution-Teil).
+      if (engine.spielerIstVonAreasAusgenommen(pi)) gallery.length = 0;
+
       // Lock further Area plays this turn (takes effect immediately)
       ps._cantPlayAreaThisTurn = gs.turn;
 

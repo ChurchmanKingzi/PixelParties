@@ -10782,7 +10782,7 @@ const HotPotatoThrowEffect = (() => {
 
 // Lebensdauer (ms) von Zonen-Animationen, die der Server OHNE `duration` schickt und die länger als die Standard-Sekunde laufen
 // (`onZoneAnim`: sonst wird das Bild nach 1000 ms abgeräumt). Ein `duration` im Ereignis geht vor.
-const ZONEN_ANIM_DAUER = { ghostly_warning: 1260, atta_books: 1400, darion_equip: 1060, sinister_idol: 1360 };
+const ZONEN_ANIM_DAUER = { shipwrecked_attach: 1940, ghostly_warning: 1260, atta_books: 1400, darion_equip: 1060, sinister_idol: 1360 };
 
 // ═════════════════════════════════════════════════════════════════
 //  Unreasonable Anger: Dampf (`unreasonable_steam`) — PIXELART; cartoonhafte Wut: Dampf steigt aus dem Helden, dazu die rote Zornader
@@ -31679,87 +31679,187 @@ const ANIM_REGISTRY = {
     return ppPunktBild(malen, ENDE, 300, 300, vorbereiten);
   })(),
   // ═══════════════════════════════════════════════════════════════════
-  //  Shipwrecked — PIXELART, Zonen-Animation am Helden (Hülle `ppPunktBild`; Vorlage: das Kartenbild — Schiffbrüchiger am Strand, blaue Wasserkante, Treibholz-Planken, Fässer)
+  //  Shipwrecked — PIXELART, Zonen-Animation am Helden (Hülle `ppPunktBild`; Vorlage: das Kartenbild — Schiffbrüchiger am Strand, tiefblaue Wasserkante mit Schaum, Planken, Fässer, Tang)
   //
-  //  Eine Welle läuft in ganzen Pixeln von links über die Füße des Helden (Schaumkante aus Weiß/Hellblau, darunter vier Blaustufen mit Bayer-Dither, die Kante wogt in
-  //  Pixelstufen); sie lässt zwei Planken und ein Fass zurück, die im Wasser auf und ab schaukeln (ganze Pixel, ~7 Bilder je Hub), und zieht sich dann zurück. Ab ~980 ms dithert alles
-  //  weg; ENDE 1300 (`duration` 1340). Feste Palette, KEINE Unschärfe, KEIN Leuchten, keine Drehung (Planken als zwei fertige Sprites).
+  //  Vier Ebenen, alles in ganzen Pixeln im Bildtakt (~30 Bilder/s), Farben nur aus der Palette, Dithering (Bayer) statt Alpha, KEINE Unschärfe, KEIN Leuchten, keine Drehung (Neigung = fertige Sprites):
+  //   ① hintere Dünung (dunkle Töne, wogende Kante), ② Treibgut — zwei Planken (Maserung, Nagel, Splitterenden), ein Fass (Reifen, Licht-/Schattenseite, Glanzpunkt), Mastbruchstück, Tang —
+  //   mit Schatten im Wasser und Wellenringen, ③ vordere Welle: rollt als Schaumkamm (Lippe, Gischtfetzen) von links über die Füße des Helden, sieben Tonstufen mit Tiefenverlauf und wandernden
+  //   Lichtbändern, ④ Partikel: Gischt (3 Stufen, Schwerkraft), Glanzpunkte, zwei Möwen im Zweibildflug. Ab ~900 ms zieht sich die Welle zurück, ab ~1500 ms dithert alles weg; ENDE 1900 (`duration` 1940); die Welle zieht ab, das Treibgut bleibt liegen und dithert weg.
   // ═══════════════════════════════════════════════════════════════════
   shipwrecked_attach: (() => {
-    const WASSER = ['#e5edfa', '#66b6ff', '#399edf', '#3866f0', '#0351c9', '#02398c'].map(ppHex);   // Schaum, hell, mittel, Welle, tief, Grund
+    // Wasser: 0 Schaum · 1 hell · 2 Licht · 3 mittel · 4 Welle · 5 tief · 6 Grund
+    const WA = ['#e5edfa', '#66b6ff', '#399edf', '#4580f6', '#3866f0', '#0351c9', '#02398c'].map(ppHex);
     const WEISS = ppHex('#ffffff');
     const PAL = {
-      k: ppHex('#311402'), d: ppHex('#6e4421'), m: ppHex('#b06746'), h: ppHex('#ca874e'),          // Planke: Kontur, dunkel, Holz, Lichtkante
-      t: ppHex('#e0c085'), T: ppHex('#fbc86a'), s: ppHex('#b29466'), i: ppHex('#929292'), I: ppHex('#b9b9b9'),   // Fass: Holz, Licht, Schatten, Reifen dunkel/hell
+      k: ppHex('#311402'), a: ppHex('#4a2a10'), b: ppHex('#6e4421'), c: ppHex('#b06746'), d: ppHex('#ca874e'), e: ppHex('#e0c085'),   // Holz: Kontur, dunkel, Maserung, Holz, hell, Kante
+      t: ppHex('#e0c085'), T: ppHex('#fbc86a'), s: ppHex('#b29466'), S: ppHex('#6b4a2a'), i: ppHex('#929292'), I: ppHex('#b9b9b9'), J: ppHex('#535353'),   // Fass: Holz, Licht, Schatten, Tiefschatten, Reifen
+      g: ppHex('#167927'), G: ppHex('#20ac37'), h: ppHex('#5b9438'), z: ppHex('#2f4e1d'),                                                       // Tang
+      W: ppHex('#ffffff'), Y: ppHex('#d2d2db'), X: ppHex('#9aa3b6'), K: ppHex('#535353'), B: ppHex('#f9ac20'),                                     // Möwe
     };
-    const PLANKE_FLACH = ['.kkkkkkkkk.', 'kdmmhmmmdk', '.kkkkkkkkk.'];
-    const PLANKE_SCHRAEG = ['kk.......', 'kdkk.....', '.kmmkk...', '..kmhmkk.', '...kkmdk.', '.....kkk.'];
-    const FASS = [
-      '..kkkkkk..', '.kttTTttk.', 'kttTTtttsk', 'kIiiiiiiik', 'ktTtttttsk', 'ktTtttttsk', 'kIiiiiiiik', 'kttTtttssk', '.kttttssk.', '..kkkkkk..',
-    ];
-    const ENDE = 1300, FADE_AB = 980, VOR = 420, STEHT = 760, ZURUECK = 980;
+    // Planke aus Maserung gebaut: w × h, `jag` = Splitterende rechts (Zickzack), deterministisch
+    const planke = (w, h, saat, jag) => {
+      const zeilen = [];
+      for (let j = 0; j < h; j++) {
+        let z = '';
+        for (let i = 0; i < w; i++) {
+          const kante = j === 0 || j === h - 1 || i === 0;
+          const ende = jag ? Math.floor(ppHash(saat, j, 1) * 3) : 0;
+          if (i >= w - ende) { z += '.'; continue; }
+          if (kante || (jag && i === w - ende - 1)) { z += 'k'; continue; }
+          const innen = j - 1, tiefe = h - 3;
+          let c = innen === 0 ? 'e' : innen === tiefe ? 'a' : innen === tiefe - 1 && h > 4 ? 'b' : 'c';
+          if (innen === 0 && ppHash(saat, i, 2) < 0.4) c = 'd';
+          if (c === 'c' && ppHash(saat, i + j * 7, 3) < 0.22) c = ppHash(saat, i, j) < 0.5 ? 'b' : 'd';   // Maserung
+          if (i === 2 && j === 1 + Math.floor((h - 2) / 2)) c = 'I';                                       // Nagel
+          z += c;
+        }
+        zeilen.push(z);
+      }
+      return zeilen;
+    };
+    const PL_A = planke(26, 6, 3, true), PL_B = planke(19, 5, 9, true), PL_C = planke(14, 5, 5, true);
+    // Treibholzstamm: Planke mit Stirnholz (Jahresringe) links
+    const stamm = (w, h, saat) => planke(w, h, saat, true).map((z, j) => {
+      const r = z.split('');
+      for (let i = 1; i <= 3; i++) if (r[i] && r[i] !== '.') r[i] = (j + i) % 2 === 0 ? 'e' : (i === 2 ? 'b' : 'd');
+      return r.join('');
+    });
+    const MAST = stamm(21, 7, 11);
+    // Fass: w × h, Bauch (Ellipse), Reifen oben/unten/Mitte, Licht von links (T), Schatten rechts (s, S), senkrechte Dauben-Fugen
+    const fass = (w, h) => {
+      const zeilen = [];
+      for (let j = 0; j < h; j++) {
+        const v = (j + 0.5) / h * 2 - 1, halb = Math.max(2, Math.round((w / 2) * Math.sqrt(1 - v * v * 0.55)));
+        const reifen = j === 2 || j === h - 3 || j === Math.floor(h / 2);
+        let z = '';
+        for (let i = 0; i < w; i++) {
+          const dx = i - (w - 1) / 2;
+          if (Math.abs(dx) > halb - 0.5) { z += '.'; continue; }
+          const rand = Math.abs(dx) > halb - 1.5 || j === 0 || j === h - 1;
+          if (rand) { z += 'k'; continue; }
+          const p = (dx + halb) / (2 * halb);                         // 0 links … 1 rechts
+          if (reifen) { z += p < 0.35 ? 'I' : p < 0.7 ? 'i' : 'J'; continue; }
+          let c = p < 0.22 ? 'T' : p < 0.6 ? 't' : p < 0.85 ? 's' : 'S';
+          if ((i + 1) % 4 === 0 && p > 0.1 && p < 0.9) c = p < 0.6 ? 's' : 'S';   // Fugen
+          if (j === 3 && i === 3) c = 'W';                                       // Glanzpunkt
+          z += c;
+        }
+        zeilen.push(z);
+      }
+      return zeilen;
+    };
+    const FASS = fass(16, 19);
+    const TANG = ['..G...h...G..', '.gG..gG..gG..', '.gGg.gGg.gGg.', 'zgGgzGGgzGGgz', '.zgGgGgzgGgz.', '..zgGGgGGgz..', '...zgGgGgz...', '....zgggz....', '.....zgz.....', '......z......'];
+    const MOEWE_OBEN = ['K...........K', 'WK.........KW', '.WWK..W..KWW.', '..WWWWWWWWW..', '....XWWWX....', '.....XBX.....'];
+    const MOEWE_UNTEN = ['.............', '..WWK...KWW..', '.WWWWWWWWWWW.', 'K.WWWWWWWWW.K', 'KK..XWWWX..KK', '.....XXX.....'];
+    const ENDE = 1900, FADE_AB = 1500, VOR = 520, STEHT = 900, ZURUECK = 1450;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const vorbereiten = () => ({
-      schaum: Array.from({ length: ppFxN(18) }, () => ({ u: Math.random(), v: Math.random(), ab: Math.floor(Math.random() * 600), leben: 140 + Math.random() * 140 })),
-      glanz: Array.from({ length: ppFxN(6) }, (_, i) => ({ u: (i + 0.5) / 6 + (Math.random() - 0.5) * 0.1, ab: 380 + i * 70 + Math.random() * 60 })),
+      schaum: Array.from({ length: ppFxN(26) }, () => ({ u: Math.random(), v: Math.random(), ab: Math.floor(Math.random() * 900), leben: 160 + Math.random() * 200, br: 1 + Math.floor(Math.random() * 3) })),
+      gischt: Array.from({ length: ppFxN(46) }, (_, i) => ({ ab: 180 + Math.random() * 380, u: Math.random(), vx: 6 + Math.random() * 30, vy: -(18 + Math.random() * 46), leben: 380 + Math.random() * 300, gross: Math.random() < 0.3 })),
+      glanz: Array.from({ length: ppFxN(9) }, (_, i) => ({ u: (i + 0.5) / 9 + (Math.random() - 0.5) * 0.08, v: Math.random(), ab: 520 + i * 90 + Math.random() * 70 })),
+      moewen: [{ y: -11, t0: 380, v: 52, ph: 0 }, { y: -4, t0: 650, v: 44, ph: 1 }],
     });
     const malen = (g, t, sz, teile) => {
       const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
       if (aus <= 0) return;
       const cx = Math.round(sz.cx), cy = Math.round(sz.cy), hw = Math.round(sz.hw), hh = Math.round(sz.hh);
-      const xl = cx - hw - 20, xr = cx + hw + 20, breite = xr - xl;
-      const yo = cy + Math.round(hh * 0.3), yu = cy + hh + 6;                            // Wasserband: über den Füßen des Helden
-      // Vorderkante der Welle: läuft in Stufen nach rechts (ease-out), zieht sich später wieder nach links zurück
-      const vorn = t < VOR ? xl + Math.floor(breite * (1 - Math.pow(1 - klemme(t / VOR, 0, 1), 2.2))) : xr;
-      const hinten = t < STEHT ? xl : xl + Math.floor(breite * Math.pow(klemme((t - STEHT) / (ZURUECK - STEHT + 120), 0, 1), 1.6));
-      // ── Wasser: Spalte für Spalte, Kante wogt (ganze Pixel) ──
-      for (let x = hinten; x <= vorn; x++) {
-        const rand = Math.min(x - hinten, vorn - x);                                    // zur Wellenfront hin steigt die Kante an (Schaumkamm)
-        const kamm = rand < 5 ? Math.round((5 - rand) * 0.7) : 0;
-        const top = yo + Math.round(Math.sin(x * 0.55 + t / 90) * 1.4) - kamm;
-        for (let y = top; y <= yu; y++) {
-          const tiefe = y - top;
-          let s = tiefe === 0 ? 0 : tiefe === 1 ? 1 : 2 + Math.min(3, (tiefe - 2) * 0.55);   // Schaum → hell → mittel … tief (Dither zwischen den Stufen)
-          if (y > yu - 2) s = Math.max(s, 4.4);
-          g.put(x, y, ppStufe(WASSER, s, x, y), aus);
+      const xl = cx - hw - 26, xr = cx + hw + 26, breite = xr - xl;
+      const yHint = cy + Math.round(hh * 0.05), yVorn = cy + Math.round(hh * 0.78), yu = cy + hh + 11;
+      // Frontlinie der beiden Wellen (ease-out), Rückzug nach links
+      const front = (verz, dauer) => xl + Math.floor(breite * (1 - Math.pow(1 - klemme((t - verz) / dauer, 0, 1), 2.4)));
+      const rueck = (verz) => t < STEHT + verz ? xl : xl + Math.floor(breite * Math.pow(klemme((t - STEHT - verz) / (ZURUECK - STEHT), 0, 1), 1.7));
+      const vH = front(0, VOR), hH = rueck(0), vV = front(220, VOR), hV = rueck(60);
+      // ── Wasser, Spalte für Spalte ──
+      const wasser = (x0, x1, yBasis, tonVers, saat, lippe, schwung) => {
+        for (let x = x0; x <= x1; x++) {
+          const rand = Math.min(x - x0, x1 - x);
+          const welle = Math.sin(x * 0.36 + t / 130 + saat) * 1.5 + Math.sin(x * 0.17 - t / 210 + saat * 2) * 1.2;
+          let kamm = 0;
+          if (lippe && x1 - x < 9) kamm = Math.round((9 - (x1 - x)) * 0.8);                // anrollende Lippe an der Frontkante
+          if (rand < 3) kamm += 1 - Math.floor(rand / 2);                                    // abgerundete Enden
+          const top = Math.round(yBasis + welle + schwung - kamm);
+          const yEnde = yu - Math.max(lippe ? Math.round((12 - (x1 - x)) * 0.8) : Math.round((9 - (x1 - x)) * 0.9), Math.round((9 - (x - x0)) * 0.9), 0);   // schräge Kanten (Front steiler)
+          for (let y = top; y <= yEnde; y++) {
+            const tiefe = y - top;
+            let s = tiefe === 0 ? 0.2 : tiefe === 1 ? 1 : 1.6 + Math.min(3.6, (tiefe - 1) * 0.34);
+            if (tiefe > 2) s += Math.sin((x * 0.8 + y * 1.4) * 0.5 + t / 120 + saat) * 0.38;      // Kräuselung
+            if (tiefe > 2 && (y + Math.floor(t / 100) + saat) % 6 === 0) s -= 0.9;                // wandernde Lichtbänder
+            if (lippe && x1 - x < 7 && tiefe < 4) s = Math.min(s, 0.6 + tiefe * 0.35);          // Schaum an der Lippe
+            if (y > yu - 2) s = Math.max(s, 5.2);
+            g.put(x, y, ppStufe(WA, s + tonVers, x, y), aus);
+          }
+          if (ppHash(x, Math.floor(t / 66), saat) < 0.45) g.put(x, top - 1, WA[ppHash(x, saat, 2) < 0.5 ? 0 : 1], aus * 0.85);   // Gischt über dem Kamm
+          if (lippe && x1 - x < 6 && ppHash(x, Math.floor(t / 66), 7) < 0.6) g.put(x, top - 2 - Math.floor(ppHash(x, 3, 1) * 3), WA[0], aus * 0.7);
         }
-        if (rand < 4 && (x + Math.floor(t / 66)) % 3 === 0) g.put(x, top - 1, WASSER[0], aus * 0.7);   // Gischt über dem Kamm
-      }
-      // ── Schaumflocken auf dem Wasser ──
+      };
+      // ① hintere Dünung
+      if (vH - hH >= 8) wasser(hH, vH, yHint, 1.1, 1, false, 0);
+      // Schaumflocken / Schaumstriche im hinteren Wasser
       for (const f of teile.schaum) {
         const al = t - f.ab;
         if (al < 0 || al > f.leben) continue;
-        const x = Math.round(xl + (vorn - xl) * f.u), y = Math.round(yo + 2 + f.v * (yu - yo - 3));
-        if (x < hinten || x > vorn) continue;
-        g.put(x, y, WASSER[0], aus * (1 - al / f.leben)); g.put(x + 1, y, WASSER[1], aus * (1 - al / f.leben));
+        const x = Math.round(xl + (vH - xl) * f.u), y = Math.round(yHint + 3 + f.v * (yu - yHint - 6));
+        if (x < hH || x > vH) continue;
+        const a2 = aus * (1 - al / f.leben);
+        for (let q = 0; q < f.br; q++) g.put(x + q, y, WA[q === 0 ? 1 : 0], a2);
       }
-      // ── Treibgut: kommt mit der Welle, schaukelt in ganzen Pixeln, bleibt liegen ──
-      const ankunft = (u0) => klemme((t - VOR * u0) / 300, 0, 1);
+      // ② Treibgut (schwimmt von links heran, Schatten + Ringe im Wasser)
+      const ankunft = (u0) => klemme((t - 120 - VOR * u0) / 340, 0, 1);
       const treibgut = [
-        { x: cx - hw + 1, y: yo + 4, bild: PLANKE_FLACH, u: 0.35, ph: 0 },
-        { x: cx + 1, y: yo + 8, bild: PLANKE_SCHRAEG, u: 0.6, ph: 1.7 },
-        { x: cx + hw - 3, y: yo + 6, bild: FASS, u: 0.85, ph: 3.1 },
+        { x: cx - hw - 4, y: yHint + 8, bild: PL_A, u: 0.30, ph: 0 },
+        { x: cx + 6, y: yHint + 15, bild: PL_B, u: 0.45, ph: 1.7 },
+        { x: cx + hw + 6, y: yHint + 9, bild: FASS, u: 0.62, ph: 3.1 },
+        { x: cx - 4, y: yHint + 5, bild: MAST, u: 0.38, ph: 2.2 },
+        { x: cx - hw + 6, y: yHint + 18, bild: TANG, u: 0.75, ph: 0.8 },
+        { x: cx + hw - 2, y: yHint + 19, bild: PL_C, u: 0.85, ph: 2.6 },
       ];
       for (const d of treibgut) {
         const k = ankunft(d.u);
         if (k <= 0) continue;
-        const ex = d.x - Math.round(Math.pow(1 - k, 2) * 16);                              // schwimmt von links heran
-        const hub = Math.round(Math.sin(t / 150 + d.ph) * 1.2);
-        // verschwindet mit dem Wasser, wenn die Welle zurückläuft: nur solange die Welle hier steht
-        if (ex < hinten - 2) continue;
-        ppSprite(g, ex, d.y + hub, d.bild, PAL, aus * (k < 1 ? Math.floor(k * 4) / 4 : 1));
+        const ex = d.x - Math.round(Math.pow(1 - k, 2) * 22);
+        const imWasser = ex + d.bild[0].length / 2 >= hH;                             // die Welle zieht ab: das Treibgut bleibt am Strand liegen
+        const hub = imWasser ? Math.round(Math.sin(t / 160 + d.ph) * 1.4) : 0;
+        const bw = d.bild[0].length, bh = d.bild.length, a3 = aus * (k < 1 ? Math.floor(k * 4) / 4 : 1);
+        // Schatten (im Wasser dunkelblau, am Strand Sandschatten) + Wellenringe
+        for (let q = 0; q < bw; q++) g.put(ex - Math.floor(bw / 2) + q, d.y + hub + Math.ceil(bh / 2) + 1, imWasser ? WA[6] : PAL.S, a3 * 0.6);
+        const ring = (t / 55 + d.ph * 3) % 10;
+        if (imWasser && k >= 1 && ring < 8) { const rr = 2 + ring; for (let q = -rr; q <= rr; q += 2) { g.put(ex + q, d.y + hub + Math.ceil(bh / 2) + 2 + Math.floor((q * q) / (rr * 2 + 1) / 1.6), WA[1], a3 * (1 - ring / 8) * 0.8); } }
+        ppSprite(g, ex, d.y + hub, d.bild, PAL, a3);
+        // Glanzpunkt auf dem Fass
+        if (d.bild === FASS && Math.floor(t / 90) % 5 === 0) { g.put(ex - 3, d.y + hub - 3, WEISS, a3); g.put(ex - 3, d.y + hub - 2, PAL.T, a3); }
       }
-      // ── Glanzpunkte auf der Wasserfläche ──
+      // ③ vordere Welle (überdeckt den Fuß des Treibguts)
+      if (vV - hV >= 8) wasser(hV, vV, yVorn, -0.2, 3, true, Math.sin(t / 240) * 1.2);
+      // ④ Gischt, Glanzpunkte, Möwen
+      for (const p of teile.gischt) {
+        const al = t - p.ab;
+        if (al < 0 || al > p.leben) continue;
+        const sek = al / 1000, k = al / p.leben;
+        const x0 = xl + (vV - xl) * Math.min(1, p.u * 0.6 + 0.4 * klemme((t - 220) / VOR, 0, 1));
+        const px = x0 + p.vx * sek, py = yVorn - 2 + p.vy * sek + 0.5 * 120 * sek * sek;
+        if (px > xr + 4) continue;
+        const c = WA[k < 0.35 ? 0 : k < 0.7 ? 1 : 2];
+        g.put(px, py, c, aus * (1 - k * 0.5));
+        if (p.gross && k < 0.6) { g.put(px + 1, py, c, aus); g.put(px, py + 1, WA[1], aus); }
+      }
       for (const gl of teile.glanz) {
         const al = t - gl.ab;
-        if (al < 0 || al > 160) continue;
-        const x = Math.round(xl + breite * gl.u), y = yo + 3 + (Math.floor(al / 33) % 2);
-        if (x < hinten || x > vorn) continue;
-        const arm = al < 80 ? 1 : 0;
-        g.put(x, y, WEISS, aus); if (arm) { g.put(x - 1, y, WASSER[0], aus); g.put(x + 1, y, WASSER[0], aus); g.put(x, y - 1, WASSER[0], aus); g.put(x, y + 1, WASSER[0], aus); }
+        if (al < 0 || al > 180) continue;
+        const x = Math.round(xl + breite * gl.u), y = Math.round(yHint + 4 + gl.v * (yVorn - yHint));
+        if (x < hH || x > vH) continue;
+        g.put(x, y, WEISS, aus);
+        if (al < 100) { g.put(x - 1, y, WA[0], aus); g.put(x + 1, y, WA[0], aus); g.put(x, y - 1, WA[0], aus); g.put(x, y + 1, WA[0], aus); }
+      }
+      for (const m of teile.moewen) {
+        const al = t - m.t0;
+        if (al < 0) continue;
+        const x = Math.round(xr + 8 - (m.v * al) / 1000 * 3.2), y = cy - hh + m.y + Math.round(Math.sin(al / 230 + m.ph) * 2);
+        if (x < xl - 10) continue;
+        ppSprite(g, x, y, Math.floor(al / 130) % 2 === 0 ? MOEWE_OBEN : MOEWE_UNTEN, PAL, aus);
       }
     };
-    return ppPunktBild(malen, ENDE, 300, 300, vorbereiten);
+    return ppPunktBild(malen, ENDE, 360, 330, vorbereiten);
   })(),
   // ═══════════════════════════════════════════════════════════════════
   //  Super Fan — PIXELART auf dem DECK (Als Vorgabe 10.10.; Vorlage: das Kartenbild — der Fan mit dem Leuchtstab, rosa und grüne Herzen)
