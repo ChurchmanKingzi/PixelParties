@@ -64,7 +64,7 @@ function PzAmbiance({ variant }) {
     </div>
   );
 }
-const { GameBoard, CardFoil } = window;
+const { GameBoard, CardFoil, FoilBrettContext } = window;
 
 // ★ v1202: Schluessel der Ansichtsvorliebe „Area-Hintergruende". Steht
 // hier oben neben den uebrigen Modulkonstanten, damit es genau EINEN
@@ -915,19 +915,6 @@ function PuzzleCreator() {
     };
   }, [isTouchDevice]);
 
-  // ★ ZIEHEN HAELT DIE HINTERGRUND-ANIMATIONEN AN (Als Befund 27.10.: „der Puzzle-Editor fuehlt sich mit vielen Karten auf dem Board und in
-  // den Haenden mitunter ziemlich laggy"). Jeder Hauptthread-Frame verarbeitet ALLE laufenden CSS-Animationen (Foil-Funken, Schimmer,
-  // Rahmen, Partikel — auf einem vollen Brett rund 700) erneut; waehrend eines Zuges kommt bei jeder Mausbewegung ein Frame. Die Pause ist die
-  // `animationenAnhalten` (app-shared: Web-Animations-API, ~15 ms an / ~1 ms aus; beim Freigeben stehen die Animationen wieder in ihrer
-  // Phase ohne Pause). Idempotent: das Ziehen kann auf mehreren Wegen enden (drop, dragend, touchend, Abbau), freigegeben wird genau einmal.
-  const zugPauseRef = useRef(false);
-  const zugPauseSetzen = useCallback((an) => {
-    if (zugPauseRef.current === an) return;
-    zugPauseRef.current = an;
-    window.animationenAnhalten?.(an);
-  }, []);
-  useEffect(() => () => zugPauseSetzen(false), [zugPauseSetzen]);
-
   // ── Touch drag system (mobile) ──
   const touchDragRef = useRef(null); // { cardName, handIdx, handSource, source, ghost }
   const touchDragStart = useCallback((cardName, handIdx, handSource, sourceZone, e) => {
@@ -957,7 +944,6 @@ function PuzzleCreator() {
       setDragCardName(td.cardName);
       // Wie beim Ziehen mit der Maus: die Quellkarte in ihrer Zone ist unsichtbar (`data-pz-gezogen`). Kein Klang beim Anheben.
       if (td.sourceZone) { setDragSource(td.sourceZone); setZiehLaeuft(true); }
-      zugPauseSetzen(true);
     }
     if (td.dragging) {
       e.preventDefault(); // prevent scroll while dragging
@@ -976,7 +962,7 @@ function PuzzleCreator() {
         : magnetZielRef.current?.(t.clientX, t.clientY, td.cardName, el);
       setDragOverZone(zoneKey || null);
     }
-  }, [zugPauseSetzen]);
+  }, []);
 
   const touchDragEnd = useCallback((e) => {
     const td = touchDragRef.current;
@@ -986,7 +972,6 @@ function PuzzleCreator() {
     setDragCardName(null);
     setDragOverZone(null);
     if (td.sourceZone) { setDragSource(null); setZiehLaeuft(false); }
-    zugPauseSetzen(false);
     const t = e.changedTouches[0];
     const el = document.elementFromPoint(t.clientX, t.clientY);
     const handEl = el?.closest('[data-pz-hand]');
@@ -1024,7 +1009,7 @@ function PuzzleCreator() {
       else if (handType === 'oppHand') addToOppHand({ name: td.cardName });
       if (window.playSFX) window.playSFX('draw');
     }
-  }, [canDrop, clearZone, removeFromHand, removeFromOppHand, placeHero, placeAbility, placeSupport, placeSurprise, placeArea, placePermanent, addToHand, addToOppHand, zugPauseSetzen]);
+  }, [canDrop, clearZone, removeFromHand, removeFromOppHand, placeHero, placeAbility, placeSupport, placeSurprise, placeArea, placePermanent, addToHand, addToOppHand]);
 
   // ── Puzzle Battle State ──
   const [puzzleGameState, setPuzzleGameState] = useState(null);
@@ -2178,10 +2163,7 @@ function PuzzleCreator() {
     setDragCardName(cardName); setDragHandIdx(handIdx); setDragSource(source || null); setDragHandSource(handSource || null);
     // Erst im naechsten Tick verstecken — siehe `ziehLaeuft`.
     setZiehLaeuft(false);
-    setTimeout(() => {
-      setZiehLaeuft(true);
-      if (loslassKlangRef.current) zugPauseSetzen(true);   // nur, wenn der Zug noch laeuft (sonst bliebe die Pause haengen)
-    }, 0);
+    setTimeout(() => setZiehLaeuft(true), 0);
     hideTooltip(); // dismiss tooltip during drag
     e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', '');
     // ★ KLANG BEIM LOSLASSEN (Als Vorgabe 27.10.: „Lässt man eine gedraggte Karte los, fehlt noch ein Sound" — und: er soll derselbe sein
@@ -2197,7 +2179,6 @@ function PuzzleCreator() {
         document.removeEventListener('drop', loslassen, true);
         document.removeEventListener('dragend', loslassen, true);
         loslassKlangRef.current = null;
-        zugPauseSetzen(false);
       };
       function loslassen(ev) {
         abraeumen();
@@ -2234,7 +2215,7 @@ function PuzzleCreator() {
         boxKlangRef.current = null;
       };
     }
-  }, [riegelSpaeter, zugPauseSetzen]);
+  }, [riegelSpaeter]);
   /**
    * Override the native HTML5 drag image with a fixed-size card preview.
    * Without this, the browser auto-generates the drag ghost from the
@@ -2380,12 +2361,12 @@ function PuzzleCreator() {
     document.addEventListener('dragend', ende, true);
     document.addEventListener('drop', ende, true);
   }, []);
-  const onDragEnd = useCallback(() => { ziehRiegelLoesen(); zugPauseSetzen(false); setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); setDragOverZone(null); setDropGap(null); setZiehLaeuft(false); dragEntityData.current = null;
+  const onDragEnd = useCallback(() => { ziehRiegelLoesen(); setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); setDragOverZone(null); setDropGap(null); setZiehLaeuft(false); dragEntityData.current = null;
     // ★ v1210: Neigung zuruecknehmen. Am Ziehende UND nicht erst beim
     // Ablegen — ein abgebrochener Zug (Escape, Ablegen ins Leere) laeuft
     // nur hier durch, und die Hand bliebe sonst schief stehen.
     window.clearHandTilt?.(document.querySelectorAll('.pz-hand-card'));
-  }, [ziehRiegelLoesen, zugPauseSetzen]);
+  }, [ziehRiegelLoesen]);
   // Silently clear a zone (no return to hand — used when moving between zones)
   const clearZone = useCallback((zt, si, hi, slot) => {
     if (zt === 'hero') updatePlayer(si, (p) => { p.heroes[hi] = null; p.abilityZones[hi] = [[], [], []]; p.supportZones[hi] = [[], [], []]; p.surpriseZones[hi] = []; if (p.islandZoneCount) p.islandZoneCount[hi] = 0; return p; });
@@ -4803,6 +4784,7 @@ function PuzzleCreator() {
               beim Bauen soll man sie abschalten koennen. */}
           {showAreaBgs && <AreaBackgrounds areaZones={areaZones} myIdx={0} oppIdx={1} spielstand={{ doomCounters }} />}
           <div className="pz-board-plane">
+          <FoilBrettContext.Provider value={true}>
           {renderSide(1, true)}
 
             {/* Mid-row → zero-height fold (battle parity): area zones
@@ -4909,6 +4891,7 @@ function PuzzleCreator() {
             </div>
 
             {renderSide(0, false)}
+          </FoilBrettContext.Provider>
           </div>{/* /pz-board-plane */}
           </div>{/* /pz-plane-clip */}
           <div className="pz-side-label orbit-font">YOU</div>
