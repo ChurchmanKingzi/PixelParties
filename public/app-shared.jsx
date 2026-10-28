@@ -2915,14 +2915,18 @@ const ZONE_ANIM_SFX = {
     { name: 'placement', opts: { rate: 0.8, volume: 0.9, delay: 600, category: null, dedupe: 0 } },
     { name: 'elem_dark', opts: { rate: 1.1, volume: 0.5, delay: 620, category: null, dedupe: 0 } },
   ],
-  // Sinister Idol (W82) — der Götze erscheint (dunkles Raunen, 0 ms), der Fluchrahmen schnappt zu (~300 ms: Schwächungs-Klang), die Ability blitzt (~760 ms: Verneinungs-Ton,
-  // Abwurf-Klang) und die oberste Kopie fliegt in die Ablage. Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  // Sinister Idol (W82) — Siegel und Nebel (dunkles Raunen, 0 ms), der Götze erscheint (Wind, ~160 ms), Runen zucken (hohe Pings, ~560 ms), die Ranken wachsen (Schwächungs-Klang, ~430 ms),
+  // Beat (~880 ms: Schlag, Verneinungs-Ton, Abwurf-Klang), Aufprall auf dem Ablagestapel (~1400 ms: Schlag, Platzieren). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   sinister_idol: [
-    { name: 'elem_dark', opts: { rate: 0.7, volume: 0.6 } },
-    { name: 'debuff',    opts: { rate: 0.8, volume: 0.5, delay: 300, category: null, dedupe: 0 } },
-    { name: 'ping',      opts: { rate: 0.7, volume: 0.4, delay: 420, category: null, dedupe: 0 } },
-    { name: 'negate',    opts: { rate: 1.1, volume: 0.6, delay: 760, category: null, dedupe: 0 } },
-    { name: 'discard',   opts: { rate: 0.8, volume: 0.6, delay: 800, category: null, dedupe: 0 } },
+    { name: 'elem_dark',    opts: { rate: 0.7, volume: 0.6 } },
+    { name: 'elem_wind',    opts: { rate: 0.8, volume: 0.35, delay: 160, category: null, dedupe: 0 } },
+    { name: 'debuff',       opts: { rate: 0.8, volume: 0.5, delay: 430, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 0.7, volume: 0.4, delay: 560, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 0.9, volume: 0.35, delay: 700, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.7, volume: 0.6, delay: 880, category: null, dedupe: 0 } },
+    { name: 'negate',       opts: { rate: 1.1, volume: 0.6, delay: 890, category: null, dedupe: 0 } },
+    { name: 'discard',      opts: { rate: 0.8, volume: 0.6, delay: 920, category: null, dedupe: 0 } },
+    { name: 'placement',    opts: { rate: 0.7, volume: 0.6, delay: 1400, category: null, dedupe: 0 } },
   ],
   // Darion, the Blood-Crazy Groundskeeper (24.10.) — Kettensäge: Hieb (Schnitt, 0 und ~110 ms), Blutspritzer (Schlag ~140 ms), das Equip rastet ein (~420 ms: Schlag, heller Ping).
   // Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.

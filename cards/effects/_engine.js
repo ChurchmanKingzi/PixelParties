@@ -25923,16 +25923,31 @@ this._deathWatch = (this._deathWatchStack || []).length
         return { retry: true };
       }
 
+      // ★ W82 (Sinister Idol, Al): auch die Aktivierung als Sofort-Zusatzaktion öffnet das Kettenfenster (Idol, Ragnarock & Co.) und das Surprise-Fenster; Stufe danach neu lesen,
+      // Kosten = Stufe beim Aktivieren, gesenkte Stufe = Pflicht-Auflösung. Negiert = nie aufgelöst: Einmal-Stempel frei (Z7b), die Zusatzaktion ist verbraucht.
+      const fenster = await this.abilityAktivierungsFenster({ pi: playerIdx, heroIdx, heroOwner: abSeite, slotHeroIdx: heroIdx, zoneIdx, zoneKind, abilityName, level, inst });
+      if (fenster.negated) {
+        delete this.gs.hoptUsed[hoptKey];
+        this._broadcastEvent('ability_activated', { owner: abSeite, heroIdx, zoneIdx, zoneKind, abilityName });
+        this.sync();
+        return { played: true, cardName: abilityName, cardType: 'Ability' };
+      }
+      const _fInst = fenster.inst || inst;
       this._broadcastEvent('ability_activated', { owner: abSeite, heroIdx, zoneIdx, zoneKind, abilityName });
       // W35a: uebernommener Held — die Instanz gehoert waehrend der Aktivierung dem Kontrolleur, `heroOwner` = Brettseite (Muster `doActivateAbility`); danach wiederhergestellt.
-      const _abOrig = _leihSeite != null ? { controller: inst.controller, owner: inst.owner } : null;
-      if (_abOrig) { inst.controller = playerIdx; inst.owner = playerIdx; inst.heroOwner = _leihSeite; }
+      const _abOrig = _leihSeite != null ? { controller: _fInst.controller, owner: _fInst.owner } : null;
+      if (_abOrig) { _fInst.controller = playerIdx; _fInst.owner = playerIdx; _fInst.heroOwner = _leihSeite; }
       let abErgebnis;
       try {
-        const ctx = this._createContext(inst, {});
-        abErgebnis = await this._alsAkteur(ctx, () => script.onActivate(ctx, level));
+        const ctx = this._createContext(_fInst, {});
+        ctx.kostenStufe = level;   // W82: Kosten bleiben die der Stufe beim Aktivieren
+        abErgebnis = await this.mitPflichtAufloesung(playerIdx, fenster.pflicht, () => this._alsAkteur(ctx, () => script.onActivate(ctx, fenster.stufe)));
       } finally {
-        if (_abOrig) { inst.controller = _abOrig.controller; inst.owner = _abOrig.owner; delete inst.heroOwner; }
+        if (_abOrig) { _fInst.controller = _abOrig.controller; _fInst.owner = _abOrig.owner; delete _fInst.heroOwner; }
+      }
+      if (abErgebnis === false && fenster.pflicht) {   // W82: gesenkte Pflicht-Auflösung — „No"/keine Wahl: wirkungslos, aber verbraucht
+        abErgebnis = true;
+        this.log('sinister_idol_declined', { player: ps.username, ability: abilityName });
       }
       // ── Abbruch (Als Vorgabe 28.8.) ────────────────────────────
       // `onActivate` liefert `false`, wenn der Spieler die eigene
@@ -35712,6 +35727,36 @@ this._deathWatch = (this._deathWatchStack || []).length
   _promptsForceCommit(playerIdx) {
     return this.gs._learningCasting === playerIdx
       || this.gs._forcedCommitPlayer === playerIdx;
+  }
+
+  /**
+   * ★ W82 (Sinister Idol, Al): das KETTENFENSTER einer Ability-AKTIVIERUNG für Wege außerhalb von `doActivateFreeAbility`/`doActivateAbility` (Sofort-Zusatzaktion, Secret Lab Entrance, …).
+   * Initialglied der Kette (`cardType 'Ability'`, `fromBoard`, `abilityZone`), danach das Surprise-Fenster `_checkSurpriseOnAbilityActivation`, danach wird die Stufe NEU gelesen
+   * (Idol nimmt die oberste Kopie weg). Der Aufrufer löst auf `stufe` auf, setzt `ctx.kostenStufe = level` (Kosten bleiben die der Stufe beim Aktivieren) und führt die Auflösung bei
+   * `pflicht` über `mitPflichtAufloesung` aus. Mitten in einem offenen Reaktionsfenster (`_inReactionCheck`) geht kein neues auf (Konvention von `alsAttackKette`).
+   * @param {object} o  { pi (Aktivierer), heroIdx (aktivierender Held, Kette), heroOwner (Brettseite des Stapels), slotHeroIdx (Held mit dem Stapel), zoneIdx, zoneKind, abilityName, level, inst }
+   * @returns {Promise<{ negated: boolean, stufe: number, pflicht: boolean, inst: object|null }>}
+   */
+  async abilityAktivierungsFenster(o) {
+    const art = o.zoneKind === 'support' ? 'support' : 'ability';
+    const slotHeroIdx = o.slotHeroIdx ?? o.heroIdx;
+    const heroOwner = o.heroOwner ?? o.pi;
+    if (this._inReactionCheck) return { negated: false, stufe: o.level, pflicht: false, inst: o.inst || null };
+    const kette = await this.executeCardWithChain({
+      cardName: o.abilityName, owner: o.pi, heroIdx: o.heroIdx, cardType: 'Ability', goldCost: 0, resolve: null, fromBoard: true,
+      abilityZone: { heroOwner, heroIdx: slotHeroIdx, zoneIdx: o.zoneIdx, zoneKind: art, level: o.level },
+    });
+    const sup = kette.negated ? null : await this._checkSurpriseOnAbilityActivation(o.pi, slotHeroIdx, o.zoneIdx, o.abilityName, heroOwner, art);
+    const negated = !!(kette.negated || sup?.negateEffect);
+    let stufe = o.level;
+    const st = this.abilityStapelAn(heroOwner, slotHeroIdx, art, o.zoneIdx);
+    if (st && st.length > 0 && st[0] === o.abilityName) stufe = st.length;
+    // hat die Kette genau die Kopie abgeworfen, mit der aktiviert wurde (alle Kopien heißen gleich), arbeitet die Auflösung mit einer verbliebenen weiter
+    let inst = o.inst || null;
+    if (inst && !(inst.zone === art && inst.owner === heroOwner && inst.heroIdx === slotHeroIdx && inst.zoneSlot === o.zoneIdx)) {
+      inst = this.cardInstances.find(c => c.owner === heroOwner && c.zone === art && c.heroIdx === slotHeroIdx && c.zoneSlot === o.zoneIdx && c.name === inst.name) || inst;
+    }
+    return { negated, stufe, pflicht: stufe < o.level, inst };
   }
 
   /** ★ W82 (Sinister Idol): führt `fn` als PFLICHT-Auflösung für `pi` aus (`aktiv`): alle Wahlen von `pi` sind ohne Abbruch (Zwangs-Kontext `gs._forcedCommitPlayer`, s. `_promptsForceCommit`). Verschachtelbar. */

@@ -12,8 +12,9 @@
 //    der Stapel, der aktiviert wird. „Level 3" = dieser Stapel hat beim Öffnen des Fensters genau 3 Karten (Stufe = Stapelhöhe; Support-Zonen-Stapel von Xal/Xalibur zählen mit).
 //    „Active effect" (Al: statt des früheren „once per turn effect"): JEDE Aktivierung des aktiven Effekts einer Ability am Brett — freie und Aktions-Aktivierung, auch Abilities, die
 //    mehrfach pro Zug nutzbar sind; passive/Dauerwirkungen öffnen kein Fenster. Das Fenster hängt an der Aktivierung, nicht an der Einmal-pro-Zug-Sperre. Aktivierungswege mit Fenster:
-//    `doActivateFreeAbility`, `doActivateAbility` und die geliehene Ability von Charme Lv 1 (s. u.); ohne Fenster bleiben die Zusatznutzung der Secret Lab Entrance (ausdrücklich keine neue
-//    Aktivierung) und die Aktivierung als Sofort-Zusatzaktion (`performImmediateAction`, z. B. Guardian Beast Hu) — Frage an Al.
+//    `doActivateFreeAbility`, `doActivateAbility` (auch Lizbeth/Smugbeth-Leihe, Charme Lv 3, Support-Zonen-Stapel), die geliehene Ability von Charme Lv 1, die Aktivierung als Sofort-Zusatzaktion
+//    (`_resolveImmediateActionPick`: Guardian Beast Hu, Celia …) und die Zusatznutzung der Secret Lab Entrance (Al: ja) — die drei letzten über `engine.abilityAktivierungsFenster`
+//    (Initialglied mit `abilityZone`, Surprise-Fenster, Stufe danach neu gelesen). Vollständige Wegeliste: CARD_API, Abschnitt „Welle 82 — Sinister Idol".
 //  • „your opponent activates": der Aktivierer ist ein Gegner des Idol-Spielers (2–4 Sitze). Bezauberte/geliehene Abilities (Charme Lv 3, Lizbeth/Smugbeth): das Glied
 //    trägt den Stapel, der aktiviert wird — die Kopie fällt von DIESEM Stapel („the user" = der Held, auf dem sie liegt), auch wenn er dem Idol-Spieler gehört.
 //  • Wirkung: BEVOR die Ability auflöst (die Kette löst rückwärts auf, die Initialkarte zuletzt) wird die OBERSTE Kopie des Stapels in die ABLAGE ihres Besitzers geschickt
@@ -36,8 +37,9 @@
 //  • Kosten 2 Gold: die Kettenmaschine zahlt beim Einsetzen (`_rxPay`); bei fehlendem Gold wird die Karte nicht angeboten.
 //
 //  ── Bild und Klang ─────────────────────────────────────────────────
-//  Zonen-Animation `sinister_idol` (Client, Pixelart) AUF der Ability: der Götze aus dem Kartenbild erscheint, ein violetter Fluchrahmen schnappt um die Zone, Schädel steigen auf;
-//  zur selben Zeit fliegt die oberste Kopie sichtbar vom Brett in die Ablage (`ability_zone_to_discard`).
+//  Zonen-Animation `sinister_idol` (Client, Pixelart, ~2 s) AUF der Ability: Runensiegel und Nebel, der Götze aus dem Kartenbild (Gold/Stein mit Shading und Dithering, glühende Augen) löst
+//  sich aus dem Nebel, Fluchranken und Schädel; beim Beat (~1 s) fliegt die oberste Kopie sichtbar vom Brett in die Ablage (`ability_zone_to_discard`), ein Schweif aus Fluchstaub begleitet sie
+//  (`ablageBesitzer`) und schlägt auf dem Ablagestapel auf.
 //
 //  ── CPU ────────────────────────────────────────────────────────────
 //  `cpuMeta.reactionHeuristic`: nur gegen Level-3-Abilities des Gegners, deren Stufe-2-Wirkung spürbar schwächer ist (Charme, Singing, Occultism, Trade, Training …); nie gegen
@@ -47,8 +49,8 @@
 const { baseCardName } = require('./_hooks');
 
 const CARD_NAME = 'Sinister Idol';
-const ANIM_VOR_MS = 700;   // Fluch spannt sich, bis die Kopie fliegt (deckt sich mit `sinister_idol` im Client)
-const FLUG_MS = 560;       // Flug der Kopie Brett → Ablage (+ Nachlauf der Animation)
+const ANIM_VOR_MS = 1000;  // Siegel, Götze und Ranken bauen sich auf, dann Beat: die Kopie fliegt (deckt sich mit `sinister_idol`/`FLUG_AB` im Client, Einbau-Versatz 100 ms)
+const FLUG_MS = 900;       // Flug der Kopie Brett → Ablage (500 ms) + Aufprall und Nachlauf der Animation
 
 /** Abilities, deren Stufe-2-Wirkung gegenüber Stufe 3 deutlich schwächer ist (für die CPU). */
 const CPU_STARK = new Set([
@@ -102,6 +104,7 @@ module.exports = {
     engine._broadcastEvent('play_zone_animation', {
       type: 'sinister_idol', owner: az.heroOwner, heroIdx: az.heroIdx,
       ...(az.zoneKind === 'support' ? { zoneSlot: az.zoneIdx } : { zoneType: 'ability', zoneSlot: az.zoneIdx }),
+      ablageBesitzer: az.heroOwner,   // der Client zeichnet Schweif und Aufprall bis zu dieser Ablage (der Flug der Kopie geht dorthin)
     });
     await engine._delay(ANIM_VOR_MS);
 
