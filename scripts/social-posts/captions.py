@@ -316,6 +316,8 @@ TIKTOK = {
                                  "His Support Zones double as Surprise Zones, and every activated Surprise lets you deal 100 damage to a target."),
     "Andras, the Human Weapon": ("Hit one target. Then hit another. 🔥",
                                  "Andras hits exactly one target with a normal Attack of a level below his Fighting level? You may choose a second target for it to hit afterwards."),
+    "Reiza, the Chief Tormentor": ("Stun. Poison. Double action. 🦇",
+                                   "Every single-target hit Stuns and Poisons. Once all of your opponent's targets are Poisoned, Reiza gets a second Action every turn."),
     "Cute Annoyance Mini": ("Discard a card, find a cute friend. 🐾",
                             "Once per turn, discard 1 card to search your deck for a \"Cute\" Creature. Discard 1 more and Mini summons it as an extra Action."),
 }
