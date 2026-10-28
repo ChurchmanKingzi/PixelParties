@@ -70,6 +70,7 @@ module.exports = {
   /** Grau, solange KEIN eigener Held eine Uhr legen kann (Reality Crack, Dublette, kein Platz). */
   spellPlayCondition(gs, pi, engine) {
     if (!engine) return true;
+    if (engine.spielerIstVonAreasAusgenommen(pi)) return false;   // W82 (Shipwrecked): die Karte legt eine Area (Doom Clock) ins Spiel — fuer den Ausgenommenen nicht spielbar
     for (const { physOwner, heroIdx, hero } of engine.heroesControlledBy(pi)) {
       if (!hero?.name || hero.hp <= 0) continue;
       if (zonenFuerWirker(engine, pi, physOwner, heroIdx).length > 0) return true;
@@ -131,7 +132,7 @@ module.exports = {
       // auf dem Brett") und Doom Prophecy kaeme nie in die Ablage. Die Uhr ist
       // aber nicht der Zauber: den Stempel wie vorher belassen.
       const placedVorher = gs._spellPlacedOnBoard;
-      await engine.placeArea(ziel, inst);
+      await engine.placeArea(ziel, inst, { actor: pi });   // W82: der AKTEUR zaehlt (die Uhr darf auch in die Zone eines Ausgenommenen)
       if (ziel !== pi) {
         if (placedVorher) gs._spellPlacedOnBoard = placedVorher;
         else delete gs._spellPlacedOnBoard;

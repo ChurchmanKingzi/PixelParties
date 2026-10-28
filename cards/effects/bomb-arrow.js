@@ -18,7 +18,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
-const { arrowTriggerCondition, armAttackerWithArrow } = require('./_arrows-shared');
+const { arrowTriggerCondition, armAttackerWithArrow, attackDealsNoDamage } = require('./_arrows-shared');
 
 const CARD_NAME = 'Bomb Arrow';
 const BOMB_DAMAGE = 100;
@@ -50,8 +50,11 @@ module.exports = {
   isArrow: true,
   canActivate: () => false,
 
+  // Als Ruling (Al 28.10.): an einer Attack OHNE Schaden (Alliance) taugt nur der 100-Schaden-Teil — dann muss es eine Gegnerkreatur als Ziel geben (wie bei Racket Arrow),
+  // sonst hätte die Karte nichts zu tun und ist nicht ankettbar.
   reactionCondition: (gs, pi, engine, chainCtx) =>
-    arrowTriggerCondition(gs, pi, engine, chainCtx),
+    arrowTriggerCondition(gs, pi, engine, chainCtx, { effektOhneAngriffsschaden: true })
+    && (!attackDealsNoDamage(chainCtx) || opponentCreatureTargets(engine, pi).length > 0),
 
   resolve: async (engine, pi, _sel, _val, chain, _idx) => {
     armAttackerWithArrow(engine, pi, chain, {

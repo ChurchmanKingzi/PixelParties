@@ -41,6 +41,11 @@
 //  solange der Zeiger auf der Alliance-Karte steht — auch wenn einer
 //  der beiden inzwischen besiegt ist.
 //
+//  ── BILD & KLANG (Als Fix Al 28.10.) ──────────────────────────────
+//  Nach der Wahl des Verbündeten läuft `alliance_pact` (Client `ANIM_REGISTRY`, Pixelart, Klang in `ZONE_ANIM_SFX`): ein verdrilltes blau-rotes Seil verbindet
+//  Nutzer und Verbündeten, in der Mitte rollt sich ein Pergament aus, ein Band zieht sich zu, ein goldenes Siegel stempelt auf (~760 ms) — beide Heldenkarten blinken
+//  golden. Vorher gab es nur ein stummes `gold_sparkle`.
+//
 //  ── ABWURF ────────────────────────────────────────────────────────
 //  „At the end of your turn, you may send this card … to the discard
 //   pile." — Rueckfrage am eigenen Zugende, freiwillig.
@@ -52,6 +57,8 @@ const { opponentOfGs } = require('./_opp');
 const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Alliance';
+const PACT_MS = 1700;          // Länge des Bildes `alliance_pact` (Client: ENDE)
+const PACT_STEMPEL_MS = 860;   // bis zum Siegel-Stempel (Client: STEMPEL 760 ms + 100 ms Einbau-Versatz)
 
 /** Die Verbindung dieser Instanz: { owner, heroIdx } des Verbuendeten. */
 function verbuendeter(inst) {
@@ -146,6 +153,9 @@ function nutzerHatAndereWaehlbare(engine, nutzer) {
 }
 
 module.exports = {
+  // Als Ruling (Al 28.10.): diese Attack richtet nie Schaden an — Schadens-Pfeile und Magic Topaz sind an ihr nicht ankettbar (`_arrows-shared`: `arrowTriggerCondition`).
+  dealsNoAttackDamage: true,
+
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
@@ -222,7 +232,7 @@ module.exports = {
       const res = await attachToHero(ctx, CARD_NAME, {
         preferCaster: true, heroFilter: (h, hi, side) => hi === ctx.cardHeroIdx && side === (ctx.cardHeroOwner ?? ctx.cardOwner),   // Als Vorgabe 29.9.: Seite des Nutzers
         description: 'Attach Alliance to the Hero that used it.',
-        confirmLabel: '🤝 Attach!', animationType: 'gold_sparkle',
+        confirmLabel: '🤝 Attach!',   // Als Fix (Al 28.10.): kein `gold_sparkle` mehr beim Anhängen — das Bündnis-Bild (`alliance_pact`) läuft nach der Wahl des Verbündeten
       });
       if (!res) return;
       const { host, inst } = res;
@@ -261,9 +271,14 @@ module.exports = {
         user: gs.players[host.owner]?.heroes?.[host.heroIdx]?.name,
         ally: wahl.cardName, allyOwner: gs.players[wahl.owner]?.username,
       });
+      // ★ Als Fix (Al 28.10.: „sehr unscheinbare Animation und noch keinen Sound"): Bündnisvertrag (`alliance_pact`, Pixelart + Klang `ZONE_ANIM_SFX`) vom Nutzer zum Verbündeten —
+      // blau-rotes Seil, Pergament mit Band, Siegel-Stempel bei ~760 ms (Client). Das Abzeichen „Allied with …" erscheint erst, wenn das Siegel aufschlägt.
       engine._broadcastEvent('play_zone_animation', {
-        type: 'gold_sparkle', owner: wahl.owner, heroIdx: wahl.heroIdx, zoneSlot: -1,
+        type: 'alliance_pact', zoneType: 'board', owner: host.owner, heroIdx: -1, zoneSlot: -1, duration: PACT_MS,
+        targets: [{ owner: wahl.owner, heroIdx: wahl.heroIdx, zoneSlot: -1, cardName: wahl.cardName }],
+        originOwner: host.owner, originHeroIdx: host.heroIdx, originZoneSlot: -1,
       });
+      await engine._delay(PACT_STEMPEL_MS);
       engine.sync();
     },
 

@@ -52,7 +52,7 @@ module.exports = {
   canActivate: () => false,
 
   reactionCondition: (gs, pi, engine, chainCtx) => {
-    if (!arrowTriggerCondition(gs, pi, engine, chainCtx)) return false;
+    if (!arrowTriggerCondition(gs, pi, engine, chainCtx, { effektOhneAngriffsschaden: true })) return false;   // Als Ruling (Al 28.10.): der Rückholteil hängt nicht am Attack-Schaden
     // Also need at least one bounceable opponent Creature — otherwise
     // the reaction has literally nothing to do.
     return opponentCreatureTargets(engine, pi).length > 0;

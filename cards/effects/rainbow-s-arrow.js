@@ -23,8 +23,9 @@ module.exports = {
   isArrow: true,
   canActivate: () => false,
 
+  // Als Ruling (Al 28.10.): die zwei Karten, die man zieht, hängen nicht am Attack-Schaden — auch an einer Attack ohne Schaden (Alliance) ankettbar (Rückfrage an Al).
   reactionCondition: (gs, pi, engine, chainCtx) =>
-    arrowTriggerCondition(gs, pi, engine, chainCtx),
+    arrowTriggerCondition(gs, pi, engine, chainCtx, { effektOhneAngriffsschaden: true }),
 
   resolve: async (engine, pi, _sel, _val, chain, _idx) => {
     armAttackerWithArrow(engine, pi, chain, {

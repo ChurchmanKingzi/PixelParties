@@ -64,7 +64,7 @@ module.exports = {
         if (e.canBeNegated === false) continue;
 
         const before = e.amount || 0;
-        e.modifyAmount(-Math.min(reduction, before));   // flat (Punkt vor Strich)
+        e.modifyAmount(-reduction);   // flat (Punkt vor Strich), UNGEKÜRZT: die Projektion klemmt am Ende bei 0 — ein Pfeil-Bonus (kommt nach der Hook-Runde) darf die Senkung nicht umgehen (Al 28.10.)
         e._labradoodleReduced = true;
         appliedSomewhere = true;
         if (before > e.amount) {
