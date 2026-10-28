@@ -9681,88 +9681,238 @@ const HandLevelDownEffect = (() => {
 })();
 
 // ═════════════════════════════════════════════════════════════════
-//  Ancient Guardian Statue: Magie-Partikel auf der aufgedeckten Handkarte (`statue_magic`) — PIXELART, Hülle `ppPunktBild`; läuft über der Handkarte (beide Seiten sehen sie)
+//  Ancient Guardian Statue: Magiefaden von der Statue zur aufgedeckten Handkarte (`statue_magic`) — PIXELART, Hülle `ppSalve` (Ursprung = Zone der Statue, Ziel 0 = die Handkarte,
+//  Ziel 1 = die Statuen-Zone selbst für Maß und Augen); beide Seiten sehen sie (die Karte ist aufgedeckt)
 //
-//  Vorlage: das Kartenbild (zwei goldene Steinwächter in einer grün leuchtenden Halle). Ein Runenring aus vierzehn kleinen Zeichen (3×3 Pixel) umgibt die Karte und wandert in
-//  ganzen Schritten (~8 Bilder/s) im Kreis; grüne und goldene Funken (2×2 mit hellem Kern) steigen in einer Spirale auf, vier Kreuzfunkel blitzen an den Ecken. Die Karte bleibt
-//  lesbar (nur Ring, Funken, Ecken). `phase`: 'reveal' (die Statue deckt den Zauber auf, ~1300 ms), 'tick' (Zugende: Stufe −1 — Steinstaub rieselt, der Ring zieht sich
-//  einmal um einen Pixel zusammen, ~850 ms), 'free' (Stufe 0: der Ring schließt sich in vier ganzen Schritten, goldene Kreuzfunkel brechen auf, ~1500 ms). Feste Palette, kein Leuchten.
+//  Vorlage: das Kartenbild (zwei Steinwächter mit gelben Augen vor grünem Moos). `mode`: 'tick' (Zugende, Stufe −1, ~1500 ms), 'free' (Stufe 0 erreicht = die Karte zählt als zusätzliche
+//  Aktion, ~2100 ms), 'reveal' (Statue deckt den gesuchten Spell auf, ~1500 ms); `runde` = Stufe + 1 (die Stufe VOR der Senkung; bei 'reveal' die angezeigte Stufe; +1, weil `ppSalve` 0 zu 1 macht). Ebenen, von hinten nach vorn:
+//   ① Statue: die Augen glühen auf (weiß → gelb → orange, an den vier Augenplätzen des Kartenmotivs), ein harter Rahmen blinkt zweimal, goldene Funken steigen auf.
+//   ② Faden: ein Strahl aus gedithertem Licht (Kern weiß/hellgrün, Mantel grün, Rand violett in vier Tonstufen, Welle in ganzen Pixeln) schießt von der Statue zur Handkarte, goldene
+//      Perlen laufen darauf; nach dem Einschlag löst er sich vom Ursprung her (Dither) auf.
+//   ③ Siegel: beim Einschlag weitet sich ein weißer Stoßring, dann kreisen zwei gegenläufige Strichringe (violett/grün) und zwölf 3×3-Runen um die Karte (ganze Schritte, ~8 Bilder/s).
+//   ④ Partikel: zwölf Funken umkreisen die Karte auf einer Ellipse; vorn groß und hell, hinten klein und dunkel (vier Tonstufen), mit zwei Spurpunkten.
+//   ⑤ Zahl: auf einer dunklen Platte über der Karte steht die alte Stufe, zittert, bricht in Pixel-Splitter (fliegen mit Schwerkraft, dithern weg), die neue Zahl fällt in drei Sprüngen
+//      ein und „klickt" ein (kleiner Stoßring). Bei 'free' wird es eine goldene 0 mit Aufleuchten (Dither-Blitz über der Karte), drei Ringen, Kreuzfunkeln und Funkenregen.
+//  Alles in ganzen Rasterpixeln (1 = 3 Bildschirmpixel, ~30 Bilder/s), Bayer-Dither statt Alpha, feste Palette, kein Weichzeichner, keine Drehung. Ohne gefundenen Ursprung (3–4 Sitze)
+//  fällt der Ursprung auf die Karte selbst (`originFallback`): dann läuft nur das Siegel samt Zahl.
 // ═════════════════════════════════════════════════════════════════
 const StatueMagicEffect = (() => {
-  const GRUEN = ['#ffffff', '#e5fae7', '#75f091', '#00cc50', '#167927'].map(ppHex);
-  const GOLD = ['#ffffff', '#fff196', '#f8ca21', '#cf5f00'].map(ppHex);
-  const STAUB = ['#c5b7a0', '#7f7f7f', '#393123'].map(ppHex);
+  const VI = ['#f1e5fa', '#d6b3f9', '#ba74ff', '#7a2bd0', '#401a66'].map(ppHex);
+  const GR = ['#ffffff', '#e5fae7', '#75f091', '#00cc50', '#167927', '#1a4128'].map(ppHex);
+  const GO = ['#ffffff', '#fff196', '#f8ca21', '#cf5f00', '#8e503a'].map(ppHex);
+  const DUNKEL = ppHex('#1f0f04');
+  const ZIF = {
+    0: ['111', '101', '101', '101', '111'], 1: ['010', '110', '010', '010', '111'], 2: ['111', '001', '111', '100', '111'], 3: ['111', '001', '111', '001', '111'],
+    4: ['101', '101', '111', '001', '001'], 5: ['111', '100', '111', '001', '111'], 6: ['111', '100', '111', '101', '111'], 7: ['111', '001', '010', '010', '010'],
+    8: ['111', '101', '111', '101', '111'], 9: ['111', '101', '111', '001', '111'],
+  };
   const RUNEN = [['010', '111', '010'], ['101', '010', '101'], ['110', '011', '110'], ['111', '101', '111']];
+  const AUGEN = [[0.168, 0.401], [0.248, 0.401], [0.741, 0.401], [0.827, 0.401]];    // Augen im Kartenmotiv (Kunstfeld 70/170, 610×400 von 750×1050; Auge bei Pixel 7/14,5/60,5/68,5 · 32 von 76×51)
   const ARM = [1, 2, 3, 2, 1];
-  const DAUER = { reveal: 1300, tick: 850, free: 1500 };
-  const FADE = { reveal: 880, tick: 520, free: 1100 };
+  const ZEIT = { tick: { ende: 1500, aus: 1180 }, free: { ende: 2100, aus: 1700 }, reveal: { ende: 1500, aus: 1180 } };
+  const AN = 560;                                   // der Faden trifft die Karte
+  const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  /** Zahl als 3×5-Pixelziffern (Skalierung `s`), Mittelpunkt (cx, cy); `rand` = Konturfarbe. Liefert die Punktliste (für den Zerfall). */
+  const zahlPunkte = (zahl, cx, cy, s) => {
+    const ziffern = String(zahl).split(''), breite = ziffern.length * 4 * s - s, pts = [];
+    ziffern.forEach((z, k) => {
+      const bm = ZIF[z] || ZIF[0];
+      for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) if (bm[j][i] === '1') pts.push([Math.round(cx - breite / 2 + k * 4 * s + i * s), Math.round(cy - 5 * s / 2 + j * s)]);
+    });
+    return { pts, breite };
+  };
+  const zahlMalen = (g, zahl, cx, cy, s, farbe, rand, a) => {
+    const { pts } = zahlPunkte(zahl, cx, cy, s);
+    if (rand) for (const [x, y] of pts) for (const [dx, dy] of [[-1, 0], [s, 0], [0, -1], [0, s], [-1, -1], [s, s], [-1, s], [s, -1]]) g.put(x + dx, y + dy, rand, a);
+    for (const [x, y] of pts) g.block(x, y, s, s, farbe, a);
+  };
+  const platte = (g, cx, cy, breite, hoehe, rand, fuell, a) => {
+    const x0 = Math.round(cx - breite / 2), y0 = Math.round(cy - hoehe / 2);
+    g.block(x0 - 1, y0 - 1, breite + 2, hoehe + 2, rand, a);
+    g.block(x0, y0, breite, hoehe, fuell, a);
+  };
+  const stossring = (g, cx, cy, r, farben, a) => {          // dünner Ring (ganze Pixel), zwei Tonstufen
+    const n = Math.max(12, Math.ceil(r * 7));
+    for (let k = 0; k < n; k++) { const w = k / n * Math.PI * 2; g.put(cx + Math.cos(w) * r, cy + Math.sin(w) * r * 0.9, farben[0], a); g.put(cx + Math.cos(w) * (r - 1), cy + Math.sin(w) * (r - 1) * 0.9, farben[1], a * 0.6); }
+  };
   const vorbereiten = (sz) => ({
-    funken: Array.from({ length: ppFxN(18) }, () => ({
-      w: Math.random() * Math.PI * 2, r: sz.hw * (0.45 + Math.random() * 0.75), start: Math.random() * 650, leben: 560 + Math.random() * 320,
-      v: 16 + Math.random() * 22, gold: Math.random() < 0.4, drehung: Math.random() < 0.5 ? 1 : -1,
-    })),
-    staub: Array.from({ length: ppFxN(14) }, () => ({ x: (Math.random() * 2 - 1) * sz.hw * 0.95, start: Math.random() * 380, leben: 380 + Math.random() * 200, v: 22 + Math.random() * 20, farbe: Math.floor(Math.random() * 3) })),
-    ecken: [[-1, -1, 60], [1, -1, 220], [1, 1, 380], [-1, 1, 540]].map(([sx, sy, start]) => ({ sx, sy, start, gold: sx > 0 })),
+    funken: Array.from({ length: ppFxN(16) }, (_, i) => ({ w0: i / 16 * Math.PI * 2 + Math.random() * 0.4, v: (0.9 + Math.random() * 0.5) * (i % 2 ? 1 : -1), farbe: i % 3, rx: 1.0 + Math.random() * 0.18, start: Math.random() * 120 })),
+    regen: Array.from({ length: ppFxN(34) }, () => ({ x: (Math.random() * 2 - 1) * (sz.ziele[0].w * 0.7), start: 1000 + Math.random() * 700, leben: 500 + Math.random() * 420, v: 26 + Math.random() * 40, farbe: Math.floor(Math.random() * 3), auf: Math.random() < 0.5 })),
+    statueFunken: Array.from({ length: ppFxN(10) }, () => ({ x: (Math.random() * 2 - 1) * 0.45, start: Math.random() * 420, leben: 420 + Math.random() * 200, v: 18 + Math.random() * 24 })),
   });
   const malen = (g, t, sz, teile) => {
-    const ph = sz.phase === 'tick' || sz.phase === 'free' ? sz.phase : 'reveal';
-    const ende = DAUER[ph], fadeAb = FADE[ph];
+    const mode = sz.mode === 'free' || sz.mode === 'reveal' ? sz.mode : 'tick';
+    const { ende, aus: fadeAb } = ZEIT[mode];
     const aus = t > fadeAb ? Math.max(0, 1 - (t - fadeAb) / (ende - fadeAb)) : 1;
     if (aus <= 0) return;
-    const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
-    const ein = Math.min(1, t / 240);
-    // ── Runenring ─────────────────────────────────────────────────
-    let ra = sz.hw + 7, rb = sz.hh + 6;
-    if (ph === 'tick') { const s2 = t > 200 && t < 480 ? 1 : 0; ra -= s2; rb -= s2; }
-    if (ph === 'free') { const s4 = Math.min(4, Math.floor(Math.max(0, t - 120) / 110)); ra -= s4 * 2; rb -= s4 * 2; }
+    const Z = sz.ziele[0], St = sz.ziele[1] || null;
+    const ox = Math.round(sz.O.x), oy = Math.round(sz.O.y);
+    const tx = Math.round(Z.x), ty = Math.round(Z.y), hw = Z.w / 2, hh = Z.h / 2;
+    const dx = tx - ox, dy = ty - oy, laenge = Math.hypot(dx, dy);
+    const mitFaden = laenge > 8;
+    const ux = mitFaden ? dx / laenge : 0, uy = mitFaden ? dy / laenge : -1, nx = -uy, ny = ux;
+    const alt = Math.max(0, Math.round((sz.runde || 1) - 1)), neu = mode === 'reveal' ? alt : Math.max(0, alt - 1);
     const schritt = Math.floor(t / 120);
-    const N = 14;
-    for (let i = 0; i < N; i++) {
-      const w = ((i + schritt * (ph === 'tick' ? -1 : 1)) / N) * Math.PI * 2;
-      const rx = cx + Math.round(Math.cos(w) * ra), ry = cy + Math.round(Math.sin(w) * rb);
-      const glyph = RUNEN[(i * 3 + 1) % RUNEN.length];
-      const hell = ((i + schritt) % 4) === 0;
-      const farbe = ph === 'free' && t > 560 ? GOLD[hell ? 1 : 2] : ph === 'tick' ? STAUB[hell ? 0 : 1] : GRUEN[hell ? 1 : 2];
-      const a = Math.min(ein, aus) * (hell ? 1 : 0.8);
-      for (let j = 0; j < 3; j++) for (let k = 0; k < 3; k++) if (glyph[j][k] === '1') g.put(rx - 1 + k, ry - 1 + j, farbe, a);
-      if (!hell) g.put(rx, ry, ph === 'tick' ? STAUB[2] : GRUEN[4], Math.min(ein, aus));
+    const ab = (v) => Math.min(aus, v);
+
+    // ── ① Statue: Augenglühen, Rahmen, Funken ──────────────────────
+    if (mitFaden && t < 1000) {
+      const sw = St ? St.w : 21, sh = St ? St.h : 30;
+      const st = t < 80 ? 0 : t < 200 ? 1 : t < 620 ? 2 : t < 800 ? 1 : 0;           // aus · gelb · weißglühend · abklingend
+      const pal = st === 2 ? [GO[0], GO[1]] : [GO[2], GO[3]];
+      if (st > 0) for (const [fx, fy] of AUGEN) {
+        const ex = Math.round(ox + (fx - 0.5) * sw), ey = Math.round(oy + (fy - 0.5) * sh);
+        for (let j = -2; j <= 2; j++) for (let i = -3; i <= 3; i++) if (Math.abs(i) + Math.abs(j) * 2 > 2 && Math.abs(i) + Math.abs(j) * 2 <= (st === 2 ? 6 : 4)) g.put(ex + i, ey + j, GO[3], aus * (st === 2 ? 0.45 : 0.3));
+        g.block(ex - 1, ey, 3, 1, pal[0], aus); g.put(ex, ey - 1, pal[1], aus * 0.8); g.put(ex - 2, ey, pal[1], 0.7 * aus); g.put(ex + 2, ey, pal[1], 0.7 * aus); g.put(ex, ey + 1, pal[1], 0.6 * aus);
+      }
+      if (t > 80 && t < 620 && Math.floor((t - 80) / 135) % 2 === 0) {                  // Rahmen blinkt zweimal (steps)
+        const x0 = Math.round(ox - sw / 2), y0 = Math.round(oy - sh / 2);
+        g.block(x0, y0, sw, 1, GO[2], aus); g.block(x0, y0 + sh - 1, sw, 1, GO[2], aus); g.block(x0, y0, 1, sh, GO[2], aus); g.block(x0 + sw - 1, y0, 1, sh, GO[2], aus);
+      }
+      for (const f of teile.statueFunken) {
+        const a2 = t - 100 - f.start; if (a2 < 0 || a2 > f.leben) continue;
+        const kk = a2 / f.leben, px = Math.round(ox + f.x * sw), py = Math.round(oy + sh * 0.3 - f.v * a2 / 1000 * 2.2);
+        g.block(px, py, 2, 2, GO[kk < 0.5 ? 2 : 3], aus * (1 - kk * 0.6)); g.put(px, py, GO[kk < 0.4 ? 0 : 1], aus);
+      }
     }
-    // ── Funken in der Spirale (nur 'reveal' und 'free') ───────────
-    if (ph !== 'tick') {
-      for (const f of teile.funken) {
+
+    // ── ② Faden: Strahl Statue → Karte ──────────────────────────────
+    if (mitFaden && t >= 100 && t < 1200) {
+      const k = klemme((t - 100) / (AN - 100 - 40), 0, 1), kopf = laenge * (k * k * (3 - 2 * k));
+      const loesch = t > 820 ? (t - 820) / 360 * laenge : 0;                           // löst sich vom Ursprung her (Dither-Front)
+      for (let p = 0; p <= kopf; p++) {
+        if (p < loesch - 4) continue;
+        const front = p < loesch ? (p - (loesch - 4)) / 4 : 1;                        // 4 Pixel Dither-Saum an der Auflösefront
+        const welle = Math.round(Math.sin(p * 0.2 - t * 0.014) * 1.2);
+        const bx = ox + ux * p + nx * welle, by = oy + uy * p + ny * welle;
+        const puls = ((p - t * 0.22) % 17 + 17) % 17 < 4;                              // helle Energiepakete wandern zur Karte
+        const a = aus * front;
+        g.put(bx, by, puls ? GR[0] : GR[1], a); g.put(bx + nx, by + ny, puls ? GR[1] : GR[2], a); g.put(bx - nx, by - ny, puls ? GR[1] : GR[2], a);
+        g.put(bx + nx * 2, by + ny * 2, GR[3], a * 0.8); g.put(bx - nx * 2, by - ny * 2, GR[3], a * 0.8);
+        g.put(bx + nx * 3, by + ny * 3, VI[2], a * 0.65); g.put(bx - nx * 3, by - ny * 3, VI[2], a * 0.65);
+        if ((p + schritt) % 2 === 0) { g.put(bx + nx * 4, by + ny * 4, VI[3], a * 0.4); g.put(bx - nx * 4, by - ny * 4, VI[3], a * 0.4); }
+      }
+      for (let j = 0; j < 5; j++) {                                                    // goldene Perlen auf dem Faden
+        const p = (t * 0.16 + j * laenge / 5) % laenge;
+        if (p > kopf || p < loesch) continue;
+        const bx = Math.round(ox + ux * p), by = Math.round(oy + uy * p);
+        g.block(bx - 1, by - 1, 2, 2, GO[2], aus); g.put(bx - 1, by - 1, GO[0], aus); g.put(bx, by, GO[3], aus);
+      }
+      if (k >= 1 && t < AN + 140) g.block(tx - 2, ty - 2, 4, 4, GR[0], ab(1 - (t - AN) / 140));   // Einschlagblitz
+    }
+
+    // ── ③ Siegel: Stoßring, Strichringe, Runen (ab Einschlag; bei fehlendem Ursprung schon ab Beginn) ──
+    const t0 = mitFaden ? AN : 80;
+    if (t >= t0) {
+      const tt = t - t0;
+      if (tt < 280) stossring(g, tx, ty, Math.round(4 + tt / 280 * (Math.max(hw, hh) + 16)), [GR[0], VI[1]], aus * (1 - tt / 280));
+      const ein = klemme(tt / 220, 0, 1), rx = hw + 7 + Math.round((1 - ein) * 8), ry = hh + 6 + Math.round((1 - ein) * 8);
+      const nA = 64, nB = 48;
+      for (let i = 0; i < nA; i++) {                                                   // äußerer Strichring (violett, 2 Pixel dick), dreht links herum
+        if ((i + schritt) % 4 === 0) continue;
+        const w = ((i - schritt * 0.5) / nA) * Math.PI * 2;
+        g.block(Math.round(tx + Math.cos(w) * (rx + 3)), Math.round(ty + Math.sin(w) * (ry + 3)), 2, 2, (i + schritt) % 8 < 4 ? VI[2] : VI[3], ab(ein));
+        g.put(tx + Math.cos(w) * (rx + 3), ty + Math.sin(w) * (ry + 3), VI[1], ab(ein) * 0.6);
+      }
+      for (let i = 0; i < nB; i++) {                                                   // innerer Strichring (grün), dreht rechts herum
+        if ((i + schritt) % 3 === 0) continue;
+        const w = ((i + schritt * 0.5) / nB) * Math.PI * 2;
+        g.block(Math.round(tx + Math.cos(w) * (rx - 2)), Math.round(ty + Math.sin(w) * (ry - 2)), 2, 1, i % 4 === 0 ? GR[1] : i % 2 ? GR[2] : GR[3], ab(ein));
+      }
+      for (let i = 0; i < 12; i++) {                                                   // zwölf Runen auf dem Mittelring
+        const w = ((i + schritt * 0.34) / 12) * Math.PI * 2, glyph = RUNEN[(i * 3 + 1) % 4], heller = (i + schritt) % 4 === 0;
+        const rxp = Math.round(tx + Math.cos(w) * rx), ryp = Math.round(ty + Math.sin(w) * ry);
+        const f = mode === 'free' && t > 1000 ? GO[heller ? 1 : 2] : GR[heller ? 1 : 2];
+        for (let j = 0; j < 3; j++) for (let kk = 0; kk < 3; kk++) if (glyph[j][kk] === '1') g.put(rxp - 1 + kk, ryp - 1 + j, f, ab(ein) * (heller ? 1 : 0.85));
+      }
+    }
+
+    // Halo: harte doppelte Umrandung der Handkarte, blinkt beim Einschlag und klingt in Dither-Stufen ab
+    if (t >= t0 && t < t0 + 520) {
+      const tt = t - t0, st = tt < 120 ? 1 : tt < 260 ? 0.7 : tt < 400 ? 0.45 : 0.25, c1 = tt % 80 < 40 ? VI[1] : VI[2];
+      const x0 = Math.round(tx - hw) - 2, y0 = Math.round(ty - hh) - 2, w2 = Math.round(Z.w) + 4, h2 = Math.round(Z.h) + 4;
+      g.block(x0, y0, w2, 1, c1, aus * st); g.block(x0, y0 + h2 - 1, w2, 1, c1, aus * st); g.block(x0, y0, 1, h2, c1, aus * st); g.block(x0 + w2 - 1, y0, 1, h2, c1, aus * st);
+      g.block(x0 - 1, y0 - 1, w2 + 2, 1, VI[3], aus * st * 0.7); g.block(x0 - 1, y0 + h2, w2 + 2, 1, VI[3], aus * st * 0.7); g.block(x0 - 1, y0 - 1, 1, h2 + 2, VI[3], aus * st * 0.7); g.block(x0 + w2, y0 - 1, 1, h2 + 2, VI[3], aus * st * 0.7);
+    }
+
+    // ── ④ Partikel auf der Ellipse (vorn groß/hell, hinten klein/dunkel, mit Spur) ──
+    if (t >= t0) {
+      const ein = klemme((t - t0) / 260, 0, 1);
+      teile.funken.forEach((f, idx) => {
+        const a2 = t - t0 - f.start; if (a2 < 0) return;
+        for (let sp = 2; sp >= 0; sp--) {
+          const w = f.w0 + (a2 - sp * 36) * 0.0042 * f.v * 2.0;
+          const z = Math.sin(w), px = Math.round(tx + Math.cos(w) * (hw + 4) * f.rx), py = Math.round(ty + z * (hh + 3) * 0.55 - (mode === 'free' && t > 1000 ? (t - 1000) * 0.01 : 0));
+          const pal = f.farbe === 0 ? GR : f.farbe === 1 ? GO : VI;
+          const ton = z > 0.35 ? 0 : z > -0.2 ? 1 : z > -0.6 ? 2 : 3;                    // 4 Tonstufen nach Tiefe
+          const farbe = pal[Math.min(pal.length - 1, ton + (sp ? 1 : 0))];
+          if (sp === 0 && z > 0.35) { g.block(px - 1, py, 3, 1, farbe, aus * ein); g.block(px, py - 1, 1, 3, farbe, aus * ein); g.put(px, py, pal[0], aus * ein); }
+          else if (sp === 0 && z > -0.2) { g.block(px, py, 2, 2, farbe, aus * ein); g.put(px, py, pal[1], aus * ein); }
+          else g.put(px, py, farbe, aus * ein * (sp ? 0.55 : 0.9));
+        }
+      });
+    }
+
+    // ── ⑤ Zahl auf der Platte über der Karte ─────────────────────────
+    {
+      const stellen = Math.max(String(alt).length, String(neu).length), sk = mode === 'free' ? 4 : 3;
+      const pb = stellen * (4 * sk) + 5, ph = 5 * sk + 6;
+      const py = Math.round(ty - hh - ph / 2 - 3), px = tx;
+      const tz = mode === 'reveal' ? 640 : AN + 90, tz2 = tz + 220;                     // alte Zahl erscheint · Splitter-Beginn
+      const rand = mode === 'free' && t > tz2 + 120 ? GO[3] : VI[2];
+      if (t >= tz) {
+        const pa = ab(klemme((t - tz) / 100, 0, 1));
+        platte(g, px, py, pb, ph, rand, VI[4], pa);
+        if (mode !== 'reveal' && t < tz2) {                                           // alte Zahl, zittert zuletzt
+          const zit = t > tz2 - 90 ? (Math.floor(t / 33) % 2 ? 1 : -1) : 0;
+          zahlMalen(g, alt, px + zit, py, 3, VI[0], DUNKEL, pa);
+        } else if (mode !== 'reveal') {                                               // Splitter der alten Zahl
+          const { pts } = zahlPunkte(alt, px, py, 3), a2 = t - tz2;
+          pts.forEach(([x, y], i) => {
+            const h1 = ppHash(i, alt, 3), h2 = ppHash(i, alt, 9);
+            const leben = 340 + h1 * 160; if (a2 > leben) return;
+            const sek = a2 / 1000, kk = a2 / leben;
+            const sx = x + (h1 - 0.5) * 46 * sek * 2, sy = y + (h2 - 0.7) * 26 * sek * 2 + 110 * sek * sek;
+            g.block(sx, sy, 3, 3, VI[kk < 0.3 ? 0 : kk < 0.65 ? 2 : 3], aus * (1 - kk * 0.7)); g.put(sx, sy, VI[0], aus * (1 - kk));
+          });
+        }
+        const tn = mode === 'reveal' ? tz + 140 : tz2 + 150;                          // neue Zahl fällt ein: −12, −8, −3, 0, −1, 0
+        if (t >= tn) {
+          const f = Math.floor((t - tn) / 40), hoehe = [-12, -8, -3, 0, -1, 0][Math.min(5, f)];
+          if (mode === 'free') {
+            const gold = t > tn + 240 ? (Math.floor((t - tn) / 90) % 2 ? GO[0] : GO[1]) : GO[1];
+            zahlMalen(g, neu, px, py + hoehe, 4, gold, GO[4], ab(1));
+          } else zahlMalen(g, neu, px, py + hoehe, 3, GR[1], DUNKEL, ab(1));
+          const lan = t - (tn + 40 * 3);                                              // Aufprall: „klick"
+          if (lan > 0 && lan < 200) stossring(g, px, py, 5 + Math.round(lan / 200 * 9), [GR[0], GR[2]], aus * (1 - lan / 200));
+        }
+      }
+    }
+
+    // ── 'free': kräftiger Beat — Aufleuchten, Ringe, Kreuzfunkel, Funkenregen ──
+    if (mode === 'free') {
+      if (t >= 1000 && t < 1160) {                                                    // Dither-Blitz über der Karte
+        const a = t < 1060 ? 0.55 : 0.3;
+        for (let j = -Math.round(hh); j <= Math.round(hh); j++) for (let i = -Math.round(hw); i <= Math.round(hw); i++) g.put(tx + i, ty + j, GO[0], a * aus);
+      }
+      [[1000, GO], [1120, GR], [1240, VI]].forEach(([s, pal]) => {
+        const a2 = t - s; if (a2 < 0 || a2 > 420) return;
+        stossring(g, tx, ty, Math.round(6 + a2 / 420 * (Math.max(hw, hh) + 26)), [pal[0], pal[2]], aus * (1 - a2 / 420));
+      });
+      [[-1, -1, 1020], [1, -1, 1080], [1, 1, 1140], [-1, 1, 1200], [0, -1, 1260], [0, 1, 1300]].forEach(([sx, sy, s]) => {
+        const kk = (t - s) / 520; if (kk < 0 || kk >= 1) return;
+        ppKreuzfunkel(g, tx + sx * (hw + 7) - 1, ty + sy * (hh + 7) - 1, ARM[Math.floor(kk * ARM.length)] + 1, (sx + sy) % 2 ? GO : GR, aus);
+      });
+      for (const f of teile.regen) {
         const a2 = t - f.start; if (a2 < 0 || a2 > f.leben) continue;
         const kk = a2 / f.leben, sek = a2 / 1000;
-        const w = f.w + sek * 2.2 * f.drehung;
-        const px = Math.round(cx + Math.cos(w) * f.r * (1 - kk * 0.35)), py = Math.round(cy + sz.hh * 0.75 - f.v * sek * 1.8 + Math.sin(w) * 3);
-        const pal = (f.gold || ph === 'free') ? GOLD : GRUEN;
-        g.block(px, py, 2, 2, pal[kk < 0.6 ? 2 : 3], aus * (1 - kk * 0.5));
-        g.put(px, py, pal[kk < 0.5 ? 0 : 1], aus);
+        const px = Math.round(tx + f.x), py = Math.round(ty + (f.auf ? -hh * 0.4 - f.v * sek : -hh - 4 + f.v * sek * 1.6 + 40 * sek * sek));
+        const pal = f.farbe === 0 ? GO : f.farbe === 1 ? GR : VI;
+        g.block(px, py, 2, 2, pal[kk < 0.4 ? 1 : kk < 0.75 ? 2 : 3], aus * (1 - kk * 0.5)); g.put(px, py, pal[0], aus * (1 - kk));
       }
-    }
-    // ── Steinstaub (nur 'tick') ───────────────────────────────────
-    if (ph === 'tick') {
-      for (const d of teile.staub) {
-        const a2 = t - d.start; if (a2 < 0 || a2 > d.leben) continue;
-        const kk = a2 / d.leben, sek = a2 / 1000;
-        const px = Math.round(cx + d.x), py = Math.round(cy - sz.hh * 0.85 + d.v * sek * 2.4 + sek * sek * 30);
-        g.block(px, py, 2, 2, STAUB[d.farbe], aus * (1 - kk * 0.5));
-        g.put(px, py, STAUB[0], aus * (1 - kk * 0.4));
-      }
-    }
-    // ── Kreuzfunkel an den Ecken ──────────────────────────────────
-    const nEcken = ph === 'tick' ? 0 : 4;
-    for (let i = 0; i < nEcken; i++) {
-      const e = teile.ecken[i], k = (t - (ph === 'free' ? 560 + e.start * 0.5 : e.start)) / 420;
-      if (k < 0 || k >= 1) continue;
-      ppKreuzfunkel(g, cx + e.sx * (sz.hw + 2) - 1, cy + e.sy * (sz.hh + 2) - 1, ARM[Math.floor(k * ARM.length)], (ph === 'free' || e.gold) ? GOLD : GRUEN, aus);
-    }
-    // ── 'free': der Ring ist zu — goldener Blitz in der Mitte ─────
-    if (ph === 'free' && t > 560 && t < 1020) {
-      const k = (t - 560) / 460;
-      ppKreuzfunkel(g, cx - 1, cy - 1, ARM[Math.min(ARM.length - 1, Math.floor(k * ARM.length))] + 1, GOLD, aus);
     }
   };
-  return ppPunktBild(malen, 1540, 230, 290, vorbereiten);
+  return ppSalve(malen, 2120, vorbereiten, { extra: 40, z: 10130 });
 })();
 
 // ═════════════════════════════════════════════════════════════════
@@ -44995,7 +45145,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             const punkte = [];
             for (const t of rest.targets) {
               const lbl2 = ownerLbl(t.owner, myIdx);
-              const sel2 = t.hand === true                                         // ★ 12.10. (Gather Intel): die HAND (Kartenreihe) eines Spielers ist das Ziel
+              const sel2 = t.hand === true && Number.isInteger(t.handIdx)         // ★ W82 (Ancient Guardian Statue): EINE Handkarte (Platz `handIdx`) ist das Ziel
+                ? (lbl2 === 'me' ? '.game-hand-me' : '.game-hand-opp') + ` [data-hand-idx="${t.handIdx}"]`
+                : t.hand === true                                                   // ★ 12.10. (Gather Intel): die HAND (Kartenreihe) eines Spielers ist das Ziel
                 ? (lbl2 === 'me' ? '.game-hand-me .game-hand-cards' : '.game-hand-opp .game-hand-cards')
                 : t.deck === true
                 ? (lbl2 === 'me' ? '[data-my-deck]' : '[data-opp-deck]')           // ★ 10.10.: das Deck selbst ist das Ziel
@@ -45010,7 +45162,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               if (!el2) continue;
               let q2 = el2.getBoundingClientRect();
               // ★ 12.10. (Gather Intel): bei der HAND zaehlt der Kasten der KARTEN, nicht der (viel breitere) Behaelter der Reihe.
-              if (t.hand === true) {
+              if (t.hand === true && !Number.isInteger(t.handIdx)) {
                 const rs = [...el2.querySelectorAll('.hand-card, [data-hand-idx]')].map(c => c.getBoundingClientRect()).filter(r => r.width > 0);
                 if (rs.length) {
                   const l = Math.min(...rs.map(r => r.left)), o = Math.min(...rs.map(r => r.top)), rr = Math.max(...rs.map(r => r.right)), u = Math.max(...rs.map(r => r.bottom));
@@ -45028,6 +45180,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               });
             }
             if (punkte.length) extra.targetPoints = punkte;
+            // ★ W82 (Ancient Guardian Statue): `originFallback` — findet sich der Ursprung nicht (Sitz > 2), beginnt die Animation am ersten Ziel (nur das Siegel am Ziel läuft).
+            if (rest.originFallback === true && typeof extra.ox !== 'number' && punkte.length) { extra.ox = punkte[0].x; extra.oy = punkte[0].y; }
           }
           playAnimation(type, brett, { duration: 2000, ...rest, ...extra });
         }, window.ZONE_ANIM_MOUNT_DELAY_MS ?? 100);
@@ -51721,7 +51875,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // spielt die Animation ueber dem echten Handslot. `count` reicht
     // die Partikelmenge durch (Battery/Magic Modifier skalieren damit
     // ihre Staerke).
-    const onHandCardAnim = ({ owner, handIdx, animType, count, duration, cardName, phase }) => {
+    const onHandCardAnim = ({ owner, handIdx, animType, count, duration, cardName }) => {
       const isMe = owner === myIdx;
       const base = isMe ? '.game-hand-me' : '.game-hand-opp';
       // 23.10.: mit `cardName` sucht der Client den Slot über den KARTENNAMEN (der Index der Engine kann dem Stand der Handanzeige voraus sein — eine Reaction
@@ -51736,8 +51890,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         || document.querySelector(`${base} [data-hand-idx="${handIdx}"]`)
         || document.querySelector(base);
       if (!el) return;
-      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(animType, { count, duration, ...(phase ? { phase } : {}) });
-      playAnimation(animType, el, { duration: duration || 900, count: count || 1, ...(phase ? { phase } : {}) });
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(animType, { count, duration });
+      playAnimation(animType, el, { duration: duration || 900, count: count || 1 });
     };
     socket.on('play_hand_card_animation', onHandCardAnim);
 
