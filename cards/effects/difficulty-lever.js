@@ -95,7 +95,7 @@ function passendeZauber(engine, pi) {
     if (gesehen.has(name)) continue;
     const cd = cardDB[name];
     if (!cd || cd.cardType !== 'Spell') continue;
-    if (engine.areaKarteGesperrt(cd, pi)) continue;     // Als Ruling (Al 27.10.): Reality Crack („cannot play another Area") / Shipwrecked — eine Area ist nicht spielbar
+    if (engine.areaKarteGesperrt(cd, pi, { kapazitaet: true })) continue;     // Als Ruling (Al 27.10.): Reality Crack („cannot play another Area") / Shipwrecked — eine Area ist nicht spielbar; Als Fix (Al 27.10.): auch ohne Platz in der Area Zone (Limit 1, Spatial Crevice 3 VERSCHIEDENE) bzw. als Dublette nicht
     if ((cd.level || 0) > MAX_LEVEL) continue;          // GEDRUCKTES Level
     const schulen = [cd.spellSchool1, cd.spellSchool2].filter(Boolean);
     if (schulen.length === 0) continue;                 // ohne Schule kein Kandidat

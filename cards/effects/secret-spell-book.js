@@ -173,8 +173,8 @@ async function uebernimm(engine, pi, inst, ergebnis) {
   if (inst.zone === 'area') {
     if (!engine.gs.areaZones) engine.gs.areaZones = [];
     if (!engine.gs.areaZones[pi]) engine.gs.areaZones[pi] = [];
-    const meine = engine.gs.areaZones[pi];
-    if (meine.length < engine.areaLimitFor(pi)) {
+    // Als Fix (Al 27.10.): auch keine Dublette — „up to 3 DIFFERENT Areas" (Spatial Crevice): liegt dieselbe Area schon in meiner Zone, bleibt die fremde liegen (`canPlaceAnotherArea` = Platz UND keine Dublette).
+    if (engine.canPlaceAnotherArea(pi, name)) {
       const von = inst.owner;
       const arr = engine.gs.areaZones?.[von] || [];
       const i = arr.indexOf(name);

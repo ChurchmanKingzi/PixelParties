@@ -128,7 +128,7 @@ module.exports = {
     if (engine.areaSpielGesperrt(pi, { direkt: true })) return false;
     const cardDB = engine._getCardDB();
     return (engine.gs.players[pi]?.mainDeck || [])
-      .some(n => isTutorableArea(cardDB[n], engine, pi));
+      .some(n => isTutorableArea(cardDB[n], engine, pi) && engine.areaPlatzNachAbraeumen(pi, n));   // Als Fix (Al 27.10.): nur eine Area, fuer die nach dem Abraeumen Platz ist (Gigalopolis bleibt liegen)
   },
 
   async onCreatureEffect(ctx) {
@@ -144,6 +144,7 @@ module.exports = {
     const zaehler = {};
     for (const n of (ps.mainDeck || [])) {
       if (!isTutorableArea(cardDB[n], engine, pi)) continue;
+      if (!engine.areaPlatzNachAbraeumen(pi, n)) continue;   // Als Fix (Al 27.10.): s. `canActivateCreatureEffect` — mit liegender Gigalopolis (unentfernbar) kein Platz, nichts wird abgeraeumt
       zaehler[n] = (zaehler[n] || 0) + 1;
     }
     const galerie = Object.entries(zaehler)

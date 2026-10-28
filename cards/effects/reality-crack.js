@@ -83,10 +83,12 @@ module.exports = {
       for (const n of (ps.hand || [])) {
         if (n === ctx.cardName) continue; // Exclude the Reality Crack being played
         if (!isTutorableArea(cardDB[n], engine, pi)) continue;
+        if (!engine.canPlaceAnotherArea(pi, n)) continue;   // Als Fix (Al 27.10.): bleibt nach dem Abraeumen eine Area liegen (Gigalopolis, unentfernbar), ist dort kein Platz — nicht waehlbar
         areaFromHand[n] = (areaFromHand[n] || 0) + 1;
       }
       for (const n of (ps.mainDeck || [])) {
         if (!isTutorableArea(cardDB[n], engine, pi)) continue;
+        if (!engine.canPlaceAnotherArea(pi, n)) continue;   // Als Fix (Al 27.10.): s. o.
         areaFromDeck[n] = (areaFromDeck[n] || 0) + 1;
       }
 

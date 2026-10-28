@@ -23950,7 +23950,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     return true;
   }
 
-  getHeroEligibleActionCards(playerIdx, heroIdx, heroOwner = null) {
+  getHeroEligibleActionCards(playerIdx, heroIdx, heroOwner = null, opts = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
     // Als Vorgabe 29.9.: `heroOwner` = Brettseite eines GELIEHENEN Helden.
@@ -24055,12 +24055,13 @@ this._deathWatch = (this._deathWatchStack || []).length
       // ★ Z7 (A01-32): Spiegel der Rundensperren aus `getHeroPlayableCards`/`validateActionPlay` —
       // „This must be the only Spell you play this turn" (Eraser Beam; Silence-Bonus ausgenommen)
       // und „You cannot play another Area for the rest of the turn" (Reality Crack) gelten auch für
-      // geschenkte Zusatzaktionen (Circle-of-Hell-Replay u. a.). Das Area-FASSUNGSVERMÖGEN prüft
-      // bewusst nur der Spielweg: die Circles löschen ihre Areas erst NACH der Wirkerwahl.
+      // geschenkte Zusatzaktionen (Circle-of-Hell-Replay u. a.). Das Area-FASSUNGSVERMÖGEN prüfte hier bis 27.10. bewusst nur der Spielweg (die Circles löschen ihre Areas erst NACH der Wirkerwahl) —
+      // Als Fix (Al 27.10.): jetzt gilt es auch hier (Standard; Learning-Verwandte, Coffee, Furious Anger, Hu, Junshi, Yukana, Taio-Hand … räumen nichts ab und legten sonst eine zweite Area);
+      // nur die Circle-Replays fragen ihre Wirker VOR dem Löschen und lassen es per `opts.ohneAreaKapazitaet` aus.
       if (cd.cardType === 'Spell' && this.gs.players[playerIdx]._spellLockTurn === this.gs.turn
           && this.gs.players[playerIdx]._silenceBonusSpell !== this.gs.turn) continue;
       if (cd.cardType === 'Spell' && this.thaliaSupportSperre(playerIdx, cd)) continue;   // W49a (Thalia): 1 Kopie je Support Spell pro Zug
-      if (this.areaKarteGesperrt(cd, playerIdx)) continue;   // Als Ruling (Al 27.10.): Reality Crack („cannot play another Area") und W82 (Shipwrecked) — EINE Frage
+      if (this.areaKarteGesperrt(cd, playerIdx, { kapazitaet: !opts.ohneAreaKapazitaet })) continue;   // Als Ruling (Al 27.10.): Reality Crack („cannot play another Area") und W82 (Shipwrecked) — EINE Frage; Als Fix (Al 27.10.): plus Fassungsvermögen/Dublette
       // Per-Hero-Gate der KARTE (Lesson in the Arts, Living Illusion) gilt auch fuer geschenkte Zusatzaktionen.
       if (script?.canPlayWithHero && !this._mitWirker(playerIdx, heroIdx, fremd ? hs : null,
           () => script.canPlayWithHero(this.gs, playerIdx, heroIdx, cd, this))) continue;
@@ -24609,6 +24610,9 @@ this._deathWatch = (this._deathWatchStack || []).length
               && ps._spellLockTurn === gs.turn
               && ps._silenceBonusSpell !== gs.turn) continue;
           if (cd.cardType === 'Spell' && this.thaliaSupportSperre(playerIdx, cd)) continue;   // W49a (Thalia)
+          // Als Fix (Al 27.10.): auch fuer geliehene Helden — Reality-Crack-/Shipwrecked-Sperre UND Area-Fassungsvermoegen der Zone des SPIELERS (dort legt sich die Area hin, wie im eigenen Zweig oben).
+          // Diese Liste speist auch Love Shot (spielt die Karte ohne `validateActionPlay`): sonst legte es eine zweite Area / eine Dublette.
+          if (this.areaKarteGesperrt(cd, playerIdx, { kapazitaet: true })) continue;
           // Level/school check uses opponent's ability zones (where the
           // charmed hero lives).
           //
@@ -25324,8 +25328,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Zone lebt auf gs.areaZones[playerIdx]; heroOwner ist die Seite des
     // Wirkers (gleich pi, ausser der Spell laeuft ueber einen gecharmten
     // gegnerischen Helden).
+    // Als Fix (Al 27.10.): geprueft wird die Zone von `pi` (der Karte), NICHT die des Wirkers — die Area legt sich per `placeArea(ctx.cardOwner)` in die Zone des SPIELERS. Ueber einen gecharmten
+    // Gegnerhelden (`charmedOwner`) pruefte das Tor bisher die Zone des Helden: bei voller eigener Zone kam eine zweite Area ins Spiel, bei voller Gegnerzone wurde eine passende abgelehnt.
     if ((cardData.subtype || '').toLowerCase() === 'area'
-        && !this.canPlaceAnotherArea(heroOwner, cardName)) {
+        && !this.canPlaceAnotherArea(pi, cardName)) {
       return null;
     }
 
@@ -26222,8 +26228,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!ps || !hero || !cardData) return { cancelled: true };
     // Als Ruling (Al 27.10.): Reality Crack („You cannot play another Area for the rest of the turn") / Shipwrecked — eine Area darf auch als Sofort-Guss (Zusatzaktion, aus Hand/Deck/Ablage/Geloescht)
     // nicht gespielt werden. Letzte Sicherung hinter den Listen der Aufrufer (`getHeroEligibleActionCards`, `kannSofortWirken` …): nichts wird bewegt, die Karte bleibt, wo sie ist.
-    if (this.areaKarteGesperrt(cardData, playerIdx)) {
-      this.log('immediate_cast_fizzled', { player: ps.username, hero: hero.name, card: cardName, by: opts.by || null, reason: 'area_play_locked' });
+    // Als Fix (Al 27.10.): dazu das Area-Fassungsvermögen (`kapazitaet`) — der Sofort-Guss räumt nichts ab: ohne Platz bzw. mit einer Dublette in der eigenen Area Zone kommt keine zweite Area aufs Brett
+    // (Limit 1, mit Spatial Crevice 3 VERSCHIEDENE). Wer seine Areas VOR dem Guss räumt (Circle-Replays, Third Circle, Dante Weg 2), hat danach Platz und wird nicht blockiert.
+    if (this.areaKarteGesperrt(cardData, playerIdx, { kapazitaet: true })) {
+      this.log('immediate_cast_fizzled', { player: ps.username, hero: hero.name, card: cardName, by: opts.by || null, reason: this.areaSpielGesperrt(playerIdx) ? 'area_play_locked' : 'area_zone_full' });
       return { cancelled: true };
     }
     // Atta: Spells, die dieser Held wirkt und die in die Ablage gingen, werden stattdessen geloescht — beim Wirken festgestellt.
@@ -26415,7 +26423,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (_aeussererLog === undefined) delete this.gs._spellDamageLog;
       else this.gs._spellDamageLog = _aeussererLog;
       // v1364: eigener Brett-Stempel auswerten, aeusseren wiederherstellen.
-      _aufsBrett = !!this.gs._spellPlacedOnBoard || !!_buddyTicket?.token;   // W67a: Inyas Token ersetzt die Ablage (Karte liegt als Buddy auf dem Brett)
+      // Als Fix (Al 27.10.): `placeArea` stempelt `_spellPlacedOnBoard` nur, wenn die Area die gerade AUFLÖSENDE Karte ist (`ps._resolvingCard`) — im Sofort-Guss lösen aber meist ein anderer Zauber/ein Artefakt
+      // auf (Aurora Borealis, Difficulty Lever, Time Distortion …): der Stempel fehlte, die Area lag danach zugleich auf dem Brett UND in der Ablage (Dublette, übrige Hand-Instanz). Zählt auch: die Instanz dieses
+      // Gusses ist selbst in der Area Zone gelandet.
+      _aufsBrett = !!this.gs._spellPlacedOnBoard || !!_buddyTicket?.token || inst.zone === ZONES.AREA;   // W67a: Inyas Token ersetzt die Ablage (Karte liegt als Buddy auf dem Brett)
       if (_placedVorher) this.gs._spellPlacedOnBoard = true;
       else delete this.gs._spellPlacedOnBoard;
       this.gs._spellResolutionDepth = Math.max(0, (this.gs._spellResolutionDepth || 1) - 1);
@@ -32767,9 +32778,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     return false;
   }
 
-  /** Kartenfrage zu `areaSpielGesperrt`: `cd` ist eine Area-Karte (Untertyp Area, egal ob Spell, Attack oder Artifact) UND `pi` darf sie jetzt nicht spielen. */
+  /**
+   * Kartenfrage zu `areaSpielGesperrt`: `cd` ist eine Area-Karte (Untertyp Area, egal ob Spell, Attack oder Artifact) UND `pi` darf sie jetzt nicht spielen.
+   * Als Fix (Al 27.10.): `opts.kapazitaet: true` fragt zusätzlich das Area-Fassungsvermögen (`canPlaceAnotherArea(pi, cd.name)`: Limit 1, mit Spatial Crevice 3 VERSCHIEDENE Areas, keine Dublette).
+   * Pflicht für jede Auswahlliste, die eine Area als Nachguss/Zusatzaktion SPIELT, ohne vorher die eigenen Areas zu räumen (Learning, Rubin, Taio, Aurora Borealis, Difficulty Lever, Friedhelm …) —
+   * der Handspiel-Weg (`getHeroPlayableCards`/`validateActionPlay`) und `getHeroEligibleActionCards` prüfen das schon selbst. NICHT für Wege, die ihre Areas VOR dem Legen räumen (Circle-Replays,
+   * Third Circle, Dante Weg 2, Reality Crack, Spirit des Barbarenschwerts, Cleansing of the Land): dort ist hinterher Platz.
+   */
   areaKarteGesperrt(cd, pi, opts = {}) {
-    return (cd?.subtype || '').toLowerCase() === 'area' && this.areaSpielGesperrt(pi, opts);
+    if ((cd?.subtype || '').toLowerCase() !== 'area') return false;
+    if (this.areaSpielGesperrt(pi, opts)) return true;
+    return !!opts.kapazitaet && !this.canPlaceAnotherArea(pi, cd.name);
   }
 
   /**
@@ -32852,6 +32871,19 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * Als Fix (Al 27.10.): Platz fuer `cardName` in `playerIdx`s Zone, NACHDEM alle entfernbaren Areas abgeraeumt sind (Spirit des Barbarenschwerts: „send all Areas …", Circle-Replays: „delete all Areas you
+   * control"). Liegt eine UNENTFERNBARE eigene Area (Gigalopolis, `areaUnremovable`) in der Zone, bleibt sie liegen und haelt das Limit besetzt; ohne sie ist nach dem Abraeumen immer Platz (Normalfall).
+   * Fuer Wege, die VOR dem Abraeumen auswaehlen (Angebot/Galerie); wer erst abraeumt und dann waehlt (Reality Crack, Dante), fragt danach einfach `canPlaceAnotherArea`.
+   */
+  areaPlatzNachAbraeumen(playerIdx, cardName = null) {
+    const rest = (this.gs.areaZones?.[playerIdx] || []).filter(n => loadCardEffect(n)?.areaUnremovable);
+    if (rest.length === 0) return true;
+    let limit = 1;
+    for (const n of rest) { const l = loadCardEffect(n)?.areaLimit; if (typeof l === 'number' && l > limit) limit = l; }
+    return rest.length < limit && !(cardName && rest.includes(cardName));
+  }
+
+  /**
    * ★ NACHTRAEGLICHE DURCHSETZUNG (Als Ruling 14.9.: „Wenn Crevice das
    * Board verlaesst und man mehr als eine weitere Area hat, muss man
    * waehlen, welche abgelegt wird, bis nur noch eine da ist").
@@ -32871,13 +32903,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     for (let schutz = 0; schutz < 8; schutz++) {
       const namen = this.gs.areaZones?.[playerIdx] || [];
       const limit = this.areaLimitFor(playerIdx);
-      if (namen.length <= limit) return;
+      // Als Fix (Al 27.10.): auch zwei Kopien DERSELBEN Area sind Überhang („up to 3 DIFFERENT Areas" — z. B. eine zweite Doom Clock per Doom Prophecy mit Spatial Crevice): ohne diese Prüfung
+      // blieb das Paar bei Limit > 1 liegen. Passt die Zahl, kommt nur ein doppelter Name als Wahl in Frage (er geht wie beim Limit 1: die zuerst gefundene Kopie).
+      const doppelt = namen.filter((n, i) => namen.indexOf(n) !== i);
+      if (namen.length <= limit && doppelt.length === 0) return;
 
       // ★ Welle 6b (Gigalopolis): eine unentfernbare Area ist nie die Wahl; bleibt keine entfernbare übrig, bleibt der Überhang stehen.
-      const waehlbar = namen.filter(n => !loadCardEffect(n)?.areaUnremovable);
+      let waehlbar = namen.filter(n => !loadCardEffect(n)?.areaUnremovable);
+      if (namen.length <= limit) waehlbar = waehlbar.filter(n => doppelt.includes(n));
       if (waehlbar.length === 0) return;
       let wahl = waehlbar[waehlbar.length - 1];   // Rueckfall: die zuletzt gelegte
-      if (waehlbar.length > 1 && !this._inMctsSim && !this._fastMode) {
+      if (new Set(waehlbar).size > 1 && !this._inMctsSim && !this._fastMode) {
         const antwort = await this.promptGeneric(playerIdx, {
           type: 'cardGallery',
           cards: waehlbar.map(n => ({ name: n, source: 'area' })),

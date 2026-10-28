@@ -89,6 +89,8 @@ module.exports = {
     // Als Ruling (Al 27.10.): auch der Artifact-Area ist ein SPIELEN einer Area — Reality Crack („You cannot play another Area for the rest of the turn") und W82 (Shipwrecked) sperren sie.
     if (engine?.areaSpielGesperrt?.(pi)) return false;
     if (!gs?.areaZones) return true;
+    // Als Fix (Al 27.10.): Area-Fassungsvermoegen statt „Zone leer" — mit Spatial Crevice (Limit 3 VERSCHIEDENE Areas) ist die Pier auch bei liegenden Areas spielbar.
+    if (engine?.canPlaceAnotherArea) return engine.canPlaceAnotherArea(pi, CARD_NAME);
     return (gs.areaZones[pi] || []).length === 0;
   },
 
@@ -109,7 +111,7 @@ module.exports = {
     // an interleaved effect between play-time and resolve could in
     // theory have placed an Area. Bail cleanly without a partial
     // commit.
-    if ((gs.areaZones?.[pi] || []).length > 0) return { cancelled: true };
+    if (!engine.canPlaceAnotherArea(pi, CARD_NAME)) return { cancelled: true };   // Als Fix (Al 27.10.): Fassungsvermoegen/Dublette statt „Zone leer" (s. `canActivate`)
     if (engine.areaSpielGesperrt(pi)) return { cancelled: true };   // Als Ruling (Al 27.10.): Reality-Crack-/Shipwrecked-Sperre (s. `canActivate`)
 
     // Find the resolving inst — the card currently held at the

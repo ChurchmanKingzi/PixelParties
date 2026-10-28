@@ -200,7 +200,7 @@ function _collectCandidates(engine, pi, heroIdx, kind, feld = pi) {
     const cd = cardDB[name];
     if (!cd) continue;
     if (!_matchesKind(cd, kind)) continue;
-    if (engine.areaKarteGesperrt(cd, pi)) continue;   // Als Ruling (Al 27.10.): Reality Crack („cannot play another Area") / Shipwrecked — die Hand-Seite filtert `getHeroEligibleActionCards`, das Deck hier
+    if (engine.areaKarteGesperrt(cd, pi, { kapazitaet: true })) continue;   // Als Ruling (Al 27.10.): Reality Crack („cannot play another Area") / Shipwrecked — die Hand-Seite filtert `getHeroEligibleActionCards`, das Deck hier; Als Fix (Al 27.10.): auch ohne Platz/als Dublette nicht
     const script = loadCardEffect(name);
     // Reaction subtype is not proactively castable unless opted in.
     if ((cd.subtype || '').toLowerCase() === 'reaction'
@@ -352,15 +352,18 @@ async function _castAsAdditionalAction(engine, pi, heroIdx, picked, feld = pi) {
   }
 
   // Aufgeloest (oder ganz negiert): die Karte wandert jetzt in die Ablage.
+  // Als Fix (Al 27.10.): legt sich eine AREA (Blood Rock …) aus dem Nachguss selbst aufs Brett, hat ihre Instanz die Hand verlassen (`zone` ≠ 'hand'); `placeArea` stempelt `_spellPlacedOnBoard` nur fuer die
+  // gerade AUFLOESENDE Karte (hier der aeussere Zauber). Sie gehoert dann dem Brett: nicht zusaetzlich in die Ablage (Dublette) und die Instanz nicht austragen (Geisterkarte: Name in `areaZones` ohne Instanz).
+  const selbstPlatziert = inst.zone !== 'hand';
   if (fromDeck && deckGenommen) engine.shuffleDeck(pi, 'main');   // Suche aus dem Deck: nach dem Guss mischen
   if (!fromDeck) {
     const idx = ps.hand.indexOf(cardName);
     if (idx >= 0) {
-      engine._pileFlight?.(pi, cardName, 'hand', 'discard', { fromHandIdx: idx });
+      if (!selbstPlatziert) engine._pileFlight?.(pi, cardName, 'hand', 'discard', { fromHandIdx: idx });
       engine.takeFromPileSync(ps, 'hand', idx);
     }
   }
-  (fromDeck ? ps : engine.handKartenBesitzerPs(ps, cardName)).discardPile.push(cardName);   // W63c: Ablage des permanenten Besitzers (gestohlene Handkarte)
+  if (!selbstPlatziert) (fromDeck ? ps : engine.handKartenBesitzerPs(ps, cardName)).discardPile.push(cardName);   // W63c: Ablage des permanenten Besitzers (gestohlene Handkarte)
   // ★ v1323 (Tester-Befund 23.9.): Wisdom NACH dem Guss — der Zauber
   // liegt dann schon in der Ablage (kein Selbst-Abwurf), und ein Abbruch
   // kostet nichts.
@@ -372,7 +375,7 @@ async function _castAsAdditionalAction(engine, pi, heroIdx, picked, feld = pi) {
       });
     }
   }
-  engine._untrackCard(inst.id);
+  if (!selbstPlatziert) engine._untrackCard(inst.id);
   engine.log('taio_mountains_heart_followup', {
     player: ps.username, card: cardName, source: picked.source,
   });

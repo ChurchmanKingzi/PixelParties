@@ -64,6 +64,9 @@ function spielbareDeckkarten(engine, pi, heroIdx, feld = pi) {
     if (!cd) continue;
     if (cd.cardType !== 'Attack' && cd.cardType !== 'Spell') continue;
     if (gesperrt.has(name)) continue;
+    // Als Fix (Al 27.10.): „as if you played it from your hand" gilt auch fuers Area-Limit — ohne Platz in der Area Zone (Limit 1, Spatial Crevice 3 VERSCHIEDENE) bzw. als Dublette ist eine Area
+    // aus dem Deck nicht waehlbar (der Sofort-Guss raeumt nichts ab).
+    if (engine.areaKarteGesperrt(cd, pi, { kapazitaet: true })) continue;
     const skript = loadCardEffect(name);
     // Karten mit Pro-Kopie-Gate (canPlayFromHandIdx) sind nur von der Hand spielbar.
     if (typeof skript?.canPlayFromHandIdx === 'function') continue;
