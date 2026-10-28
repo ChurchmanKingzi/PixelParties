@@ -2744,22 +2744,29 @@ const ZONE_ANIM_SFX = {
   modifier_sparkle:        { name: 'buff', opts: { rate: 1.25, volume: 0.5 } },
   level_down:              { name: 'debuff', opts: { rate: 0.9, volume: 0.7 } },   // Looming Threat: Stufe sinkt
   hand_level_down:         { name: 'debuff', opts: { rate: 1.0, volume: 0.6 } },   // Great Vanguard Demon: Stufe sinkt (Pixelart, die Karte bleibt sichtbar)
-  // Ancient Guardian Statue — Magie-Partikel auf der aufgedeckten Handkarte. `reveal` (Standard): Aufdeck-Ton + helles Ping; `tick`: Zugende, ein Ping + leises Absinken (Stufe −1);
-  // `free`: Stufe 0 — Buff-Klang, zwei Pings. Nur der erste Teil übernimmt die Sammelkategorie 'effect'.
+  // Ancient Guardian Statue — Magiefaden von der Statue zur aufgedeckten Handkarte; `mode` 'reveal' | 'tick' (Senkung) | 'free' (Stufe 0: kräftiger Beat).
   statue_magic: (p) => {
-    const ph = p && p.phase;
-    if (ph === 'tick') return [
-      { name: 'ping',   opts: { rate: 1.3, volume: 0.4 } },
-      { name: 'debuff', opts: { rate: 1.3, volume: 0.3, delay: 160, category: null, dedupe: 0 } },
-    ];
+    // Zeiten animationsrelativ (Einbau-Versatz legt `playSFXForZoneAnim` selbst dazu): Faden schießt los (0), trifft die Karte (560), alte Zahl bricht (~830), neue Zahl klickt ein (~1010).
+    const ph = p && (p.mode || p.phase);
+    const tail = { category: null, dedupe: 0 };
     if (ph === 'free') return [
-      { name: 'buff', opts: { rate: 1.05, volume: 0.7 } },
-      { name: 'ping', opts: { rate: 1.7, volume: 0.4, delay: 520, category: null, dedupe: 0 } },
-      { name: 'ping', opts: { rate: 2.2, volume: 0.3, delay: 700, category: null, dedupe: 0 } },
+      { name: 'spell_cast', opts: { rate: 1.3, volume: 0.5 } },
+      { name: 'ping',   opts: { rate: 1.5, volume: 0.45, delay: 560, ...tail } },
+      { name: 'debuff', opts: { rate: 1.4, volume: 0.3, delay: 830, ...tail } },
+      { name: 'buff',   opts: { rate: 1.0, volume: 0.85, delay: 1000, ...tail } },
+      { name: 'ping',   opts: { rate: 2.2, volume: 0.45, delay: 1010, ...tail } },
+      { name: 'ping',   opts: { rate: 2.7, volume: 0.35, delay: 1250, ...tail } },
+    ];
+    if (ph === 'tick') return [
+      { name: 'spell_cast', opts: { rate: 1.3, volume: 0.45 } },
+      { name: 'ping',   opts: { rate: 1.5, volume: 0.45, delay: 560, ...tail } },
+      { name: 'debuff', opts: { rate: 1.4, volume: 0.35, delay: 830, ...tail } },
+      { name: 'ping',   opts: { rate: 2.0, volume: 0.35, delay: 1010, ...tail } },
     ];
     return [
-      { name: 'reveal', opts: { rate: 0.85, volume: 0.5 } },
-      { name: 'ping',   opts: { rate: 1.6, volume: 0.3, delay: 260, category: null, dedupe: 0 } },
+      { name: 'spell_cast', opts: { rate: 1.15, volume: 0.45 } },
+      { name: 'reveal', opts: { rate: 0.9, volume: 0.5, delay: 560, ...tail } },
+      { name: 'ping',   opts: { rate: 1.6, volume: 0.35, delay: 800, ...tail } },
     ];
   },
   mind_control_hex:        { name: 'elem_dark', opts: { rate: 0.8, volume: 0.6 } },   // Mind Control: Hypnose-Spirale über dem übernommenen Helden (Pixelart)
