@@ -2580,6 +2580,9 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
    Hintergrundplatte) liegt vollstaendig darueber, die 160 Teilchen waren
    dort unsichtbar und liefen trotzdem mit. */
 body:has(.anim-backdrop) .pp-bg-particles { display: none; }
+/* Puzzle-Editor ebenso: die Karten, Platten und Haende decken die Schicht fast vollstaendig ab (gemessen: 6 von 268 Teilchen im Bild
+   waren nicht verdeckt), die 160 Animationen kosteten aber jeden Frame. */
+body:has(.pz-layout) .pp-bg-particles { display: none; }
 
 /* Partikel IM Hauptmenue: absolut im Bildschirm statt fest im Fenster,
    damit sie zwischen die Kartenwand (z-Ebene 0, davor im Baum) und den
