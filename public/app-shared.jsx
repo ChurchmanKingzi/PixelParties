@@ -6131,6 +6131,10 @@ const foilVersatz = key => foilSamen('uhr|' + key) % FOIL_VERSATZ_MS;
  * sucht jedes Mal alle Animationen des Dokuments = 365 ms zusammen), EIN `document.getAnimations()` rund 30 ms, das Schreiben
  * aller 982 Startzeiten 2 ms. Darum: einmal alles holen und nach Huelle filtern, erst danach schreiben (ein Schreiben macht die
  * Animation fuer die naechste Lesung "schmutzig" — Lesen und Schreiben im Wechsel wird quadratisch).
+ * Im Kampf-Stresstest (28.10., Brett mit ~1 500 Animationen) steht `foilUhrStellen` bei jedem Hover ueber eine Foil-Karte mit ~25 ms im
+ * Profil — das ist aber der erzwungene Stilabgleich, den `getAnimations()` anstoesst und der im selben Bild ohnehin faellig waere; die
+ * Suche selbst kostet bei sauberem Stil ~3 ms (gemessen). Der Weg ueber einzelne Huellen ist ab zwei Huellen LANGSAMER (je Aufruf
+ * wieder ~3 ms) und wurde deshalb wieder verworfen.
  */
 function foilUhrStellen(huellen) {
   const versatz = new Map(), liste = [];
@@ -6422,7 +6426,10 @@ window.HintergrundPause = HintergrundPause;
  * Animationen und Uebergaenge laufen weiter. Idempotent.
  */
 let _animAngehalten = null;
-function animationenAnhalten(an) {
+// Rein dekorative Endlos-Animationen: Foil-Huellen, Partikel (Brett, Hand, Hintergrund), Area-Szenen. `nurDekor` haelt NUR diese an
+// (Kampf: Zielmarken und Status-Schimmer sind Spielinformation und bleiben in Bewegung).
+const ANIM_DEKOR = '[data-foil-key], .pp-area-dyn, .pp-pixel-scene, .pp-pixel-layer, .board-mote, .hand-mote, .hand-bloom, .pp-bg-particles';
+function animationenAnhalten(an, nurDekor) {
   if (typeof CSSAnimation === 'undefined' || typeof document.getAnimations !== 'function') return;
   if (an) {
     if (_animAngehalten) return;
@@ -6431,6 +6438,7 @@ function animationenAnhalten(an) {
       if (!(a instanceof CSSAnimation) || a.playState !== 'running') continue;
       const w = a.effect;
       if (!w || w.getComputedTiming().iterations !== Infinity) continue;
+      if (nurDekor) { const z = w.target; if (!z || !z.closest || !z.closest(ANIM_DEKOR)) continue; }
       liste.push([a, a.startTime]);
     }
     for (const [a] of liste) a.pause();
