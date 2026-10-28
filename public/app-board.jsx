@@ -10931,7 +10931,7 @@ const HotPotatoThrowEffect = (() => {
 
 // Lebensdauer (ms) von Zonen-Animationen, die der Server OHNE `duration` schickt und die länger als die Standard-Sekunde laufen
 // (`onZoneAnim`: sonst wird das Bild nach 1000 ms abgeräumt). Ein `duration` im Ereignis geht vor.
-const ZONEN_ANIM_DAUER = { shipwrecked_attach: 1940, ghostly_warning: 1260, atta_books: 1400, darion_equip: 1060, sinister_idol: 1360 };
+const ZONEN_ANIM_DAUER = { shipwrecked_attach: 1940, ghostly_warning: 1260, atta_books: 1400, darion_equip: 1060, sinister_idol: 2060 };
 
 // ═════════════════════════════════════════════════════════════════
 //  Unreasonable Anger: Dampf (`unreasonable_steam`) — PIXELART; cartoonhafte Wut: Dampf steigt aus dem Helden, dazu die rote Zornader
@@ -31727,105 +31727,403 @@ const ANIM_REGISTRY = {
     return ppPunktBild(malen, ENDE, 300, 300, vorbereiten);
   })(),
   // ═══════════════════════════════════════════════════════════════════
-  //  Sinister Idol — PIXELART, Zonen-Animation auf einer ABILITY (Hülle `ppPunktBild`; Vorlage: das Kartenbild — das goldene Götzenbild mit roten Augen und weißem Zahngrinsen,
-  //  grauer Körper mit weißem Fragezeichen)
+  //  Sinister Idol — PIXELART, Zonen-Animation auf einer ABILITY (eigene Hülle; Vorlage: das Kartenbild — der goldene Götze mit glühenden roten Augen und weißem Zahngrinsen,
+  //  grauer Steinkörper mit weißem Fragezeichen, Gürtel). Mehrere Ebenen, alles in ganzen Rasterpixeln (1 Pixel = 3 Bildschirmpixel), feste Palette, Bayer-Dithering statt Alpha, ~30 Bilder/s,
+  //  KEINE Unschärfe, KEIN Leuchten, KEINE Drehung.
   //
-  //  Der Götze (12 × 18) erscheint gedithert über der Ability und sinkt in drei Stufen herab; seine Augen blinken rot. Ab ~300 ms spannt sich der Fluch: ein violetter Rahmen schnappt
-  //  in drei Stufen um die Ability (danach blinkt er), zwei gestrichelte Fluchstrahlen laufen vom Götzen auf sie, drei Schädel steigen aus ihr auf. Bei ~760 ms blitzt die Ability auf
-  //  (Kreuzfunkel, Dither-Blitz) — dann löst sich die oberste Kopie (der Server schickt sie zur selben Zeit in die Ablage: Flug Brett → Ablage, ~500 ms) und violette Fetzen steigen
-  //  aus der Ability auf. Ab ~1050 ms dithert alles weg; ENDE 1300 (Standard-Dauer 1360 über ZONEN_ANIM_DAUER). Feste Palette, KEINE Unschärfe, KEIN Leuchten.
+  //  Ablauf (ms, ab Einhängen; der Server lässt die Kopie bei ~1000 ms los, Einbau-Versatz 100 ms → `FLUG_AB` 900):
+  //    0–600     Fluchsiegel: ein Ring aus 14 kreisenden Runen legt sich (gedithert) um die Ability, violetter Nebel (Rauschfeld, per Bayer-Raster verteilt) quillt am Boden auf
+  //    120–560   der Götze löst sich von unten nach oben aus dem Nebel (Dither-Wischer); echtes Shading: Gold 7 Töne mit Glanzstreifen, Stein 7 Töne mit Maserung, Rissen, Gürtel; die Augen glühen
+  //              (Dither-Halo, pulsierend), die Zähne blitzen
+  //    420–880   zwei Fluchstrahlen (Wellen in ganzen Pixeln, wandernde Impulse) laufen aus den Augen auf die Ability; der Ring zieht sich in drei Stufen zum Rahmen mit Rune an jeder Seite zusammen;
+  //              drei schattierte Schädel steigen mit violetten Flammenfahnen auf
+  //    880–1000  Beat: Augen weiß, Rahmen springt auf, drei Schockringe, Dither-Blitz auf der Zone; die Runen stieben ab
+  //    900–1400  die oberste Kopie fliegt sichtbar Brett → Ablage (Client-Flug, `ability_zone_to_discard`); parallel zieht ein Schweif aus gedithertem Fluchstaub dieselbe Bahn; Aufprall auf dem
+  //              Ablagestapel (Ringe, Funken, Staubwolke). Ab ~1550 löst sich der Götze von oben nach unten auf; ENDE 2000 (Standard-Dauer 2060 über ZONEN_ANIM_DAUER).
+  //  Der Server schickt `ablageBesitzer` (Seite der Ablage), der Client rechnet daraus `ablageDx/Dy/W/H` (Abstand zur Zone) — ohne Ablage entfallen Schweif und Aufprall.
   // ═══════════════════════════════════════════════════════════════════
   sinister_idol: (() => {
-    const IDOL = {
-      k: ppHex('#141414'), Y: ppHex('#fff196'), y: ppHex('#ffd61a'), o: ppHex('#f9ac20'), r: ppHex('#e73b41'), f: ppHex('#ff6666'),
-      w: ppHex('#ffffff'), g: ppHex('#b9b9b9'), G: ppHex('#929292'), d: ppHex('#686868'), q: ppHex('#535353'),
-    };
-    // Götze 12 × 18: Kopf (Zeile 0–8) mit roten Augen und Zahngrinsen, Körper (9–17) mit dem weißen Fragezeichen
-    const KOPF_UND_KOERPER = [
-      '...kkkkkk...',
-      '..kYYyyyyk..',
-      '.kYyyyyyyok.',
-      '.kYyyyyyyok.',
-      '.kyrryyrryk.',
-      '.koyyyyyyok.',
-      '.kwkwkwkwwk.',
-      '..kwkwkwkk..',
-      '...kkkkkk...',
-      '..kGGGGGGk..',
-      '.kgGwwwGGdk.',
-      '.kgGGGwGGdk.',
-      '.kgGGwGGGdk.',
-      '.kgGGGGGGdk.',
-      '.kgGGwGGGdk.',
-      '.kddddddddk.',
-      '..kqqqqqqk..',
-      '...kkkkkk...',
-    ];
-    const AUGEN_HELL = KOPF_UND_KOERPER.map(z => z.replace(/r/g, 'f'));
-    const PU = ['#f1e5fa', '#c98aff', '#9544d5', '#47117e', '#2b0b47'].map(ppHex);
-    const SCHAEDEL_PAL = { k: ppHex('#2b0b47'), b: ppHex('#d6bbf1') };
-    const SCHAEDEL = ['.kbbbk.', 'kbbbbbk', 'kbkbkbk', 'kbbbbbk', '.kbkbk.', '..kkk..'];
-    const ENDE = 1300, FADE_AB = 1050, FLUCH = 300, BLITZ = 760;
+    const S = 3, TAKT = 33;
+    const ENDE = 2000, FLUG_AB = 900, FLUG_MS = 500, BEAT = 880, FADE_AB = 1550;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-    const vorbereiten = () => ({
-      fetzen: Array.from({ length: ppFxN(16) }, () => ({
-        x: (Math.random() - 0.5) * 1.8, ab: BLITZ + Math.random() * 220, v: 14 + Math.random() * 24, leben: 340 + Math.random() * 260, gross: Math.random() < 0.3, p: Math.random() * 6,
-      })),
+    const GOLD = ['#fffbd2', '#ffe23d', '#ffd61a', '#f9ac20', '#c68206', '#8b5b04', '#5a3c14'].map(ppHex);
+    const STEIN = ['#e6e6e6', '#b9b9b9', '#929292', '#686868', '#535353', '#323232', '#141414'].map(ppHex);
+    const ROT = ['#fe7476', '#f03232', '#c80000', '#780000', '#3a0000'].map(ppHex);
+    const ZAHN = ['#fff8e8', '#d2d2db', '#9aa3b6'].map(ppHex);
+    const VI = ['#f1e5fa', '#d6b3f9', '#c98aff', '#9544d5', '#6618b4', '#47117e', '#2b0b47', '#19062d'].map(ppHex);
+    const WEISS = ppHex('#ffffff'), SCHWARZ = ppHex('#141414');
+    const IW = 24, IH = 38;
+    const norm = (a, b, c) => { const n = Math.hypot(a, b, c); return [a / n, b / n, c / n]; };
+    const LICHT = norm(-0.5, -0.62, 0.6);
+    const lam = (nx, ny, nz) => { const n = Math.hypot(nx, ny, nz) || 1; return (nx * LICHT[0] + ny * LICHT[1] + nz * LICHT[2]) / n; };
+    const ton = (lm, rausch) => klemme((1 - lm) * 3.7 + rausch, 0, 5.98);
+    const wert = (x, y, k) => { const fx = Math.floor(x), fy = Math.floor(y), tx = x - fx, ty = y - fy;     // glattes Wertrauschen (Gitterhash, bilineare Mischung)
+      const a = ppHash(fx, fy, k), b = ppHash(fx + 1, fy, k), c = ppHash(fx, fy + 1, k), d = ppHash(fx + 1, fy + 1, k);
+      const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+      return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy; };
+
+    // ── Götze backen: 24 × 38, Material je Pixel, Beleuchtung von links oben ──
+    const goetzeBacken = () => {
+      const g = Array.from({ length: IH }, () => Array(IW).fill(null));
+      const setze = (x, y, c) => { if (x >= 0 && y >= 0 && x < IW && y < IH) g[y][x] = c; };
+      // Kopf (Superellipse): Gold, Glanzstreifen oben links, dunkle Rundung unten rechts
+      const HX = 12, HY = 10.5, RX = 10.6, RY = 10.1;
+      for (let y = 0; y < 21; y++) for (let x = 0; x < IW; x++) {
+        const u = (x + 0.5 - HX) / RX, v = (y + 0.5 - HY) / RY;
+        const r = Math.pow(Math.pow(Math.abs(u), 3.2) + Math.pow(Math.abs(v), 3.2), 1 / 3.2);
+        if (r > 1) continue;
+        const z = Math.sqrt(Math.max(0.04, 1 - r * r));
+        let s = ton(lam(u * 0.8, v * 0.8, z), (wert(x * 0.9, y * 0.9, 1) - 0.5) * 0.9);
+        const diag = x * 0.9 + y * 0.6;
+        if (((diag % 7) + 7) % 7 < 1.6 && u + v < 0.18 && r < 0.9) s = Math.max(0, s - 1.6);          // Glanzstreifen
+        if (r > 0.9) s = Math.min(5.98, s + 1.1 + (r - 0.9) * 8);                                      // Rand dunkelt
+        setze(x, y, ppStufe(GOLD, s, x, y));
+      }
+      // Riss im Gold (rechts oben)
+      for (const [x, y] of [[17, 3], [17, 4], [18, 5], [18, 6], [19, 7]]) if (g[y][x]) { g[y][x] = GOLD[6]; if (g[y][x - 1]) g[y][x - 1] = GOLD[1]; }
+      // Brauen und Augenhöhlen
+      const augen = [[7.2, 9.6, 1], [16.8, 9.6, -1]];
+      for (const [ex, ey, sg] of augen) {
+        for (let y = 4; y < 15; y++) for (let x = 2; x < 22; x++) {
+          const dx = x + 0.5 - ex, dy = y + 0.5 - (ey + dx * 0.26 * sg);
+          const d = Math.sqrt((dx / 2.5) * (dx / 2.5) + (dy / 1.55) * (dy / 1.55));
+          if (!g[y][x]) continue;
+          if (d < 1) g[y][x] = d < 0.3 ? ROT[0] : d < 0.62 ? ROT[1] : d < 0.85 ? ROT[2] : ROT[3];
+          else if (d < 1.3) g[y][x] = ppStufe([g[y][x], GOLD[5], ROT[3]], 0.6 + (1.3 - d) * 1.4, x, y);   // Höhle: Gold geht in Dunkelrot über
+        }
+        for (let k = -3; k <= 3; k++) { const x = Math.round(ex + k), y = Math.round(ey - 3.2 + k * 0.26 * sg); if (g[y] && g[y][x]) g[y][x] = k === 3 || k === -3 ? GOLD[4] : GOLD[6]; }
+      }
+      // Mund und Zähne
+      for (let y = 14; y <= 19; y++) for (let x = 4; x <= 19; x++) {
+        const rand = Math.abs(x + 0.5 - 11.5) > 6.3 ? 1 : 0;
+        if (y === 14 && (rand || Math.abs(x + 0.5 - 11.5) > 5)) continue;
+        if (y === 19 && Math.abs(x + 0.5 - 11.5) > 5) continue;
+        if (g[y][x]) g[y][x] = SCHWARZ;
+      }
+      for (let k = 0; k < 4; k++) {
+        const x0 = 6 + k * 3;
+        for (const [dx, dy, c] of [[0, 0, 0], [1, 0, 1], [0, 1, 1], [1, 1, 2]]) setze(x0 + dx, 15 + dy, ZAHN[c]);                    // obere Zähne
+        const x1 = 7 + k * 3;
+        if (k < 3) for (const [dx, dy, c] of [[0, 0, 0], [1, 0, 1], [0, 1, 1], [1, 1, 2]]) setze(x1 + dx, 17 + dy, ZAHN[c]);        // untere Zähne, halbversetzt
+      }
+      // Körper: Stein, Zylinder-Shading, Maserung
+      for (let y = 20; y < 34; y++) {
+        const hb = y < 22 ? 6.4 + (y - 20) * 0.9 : 8.2 - (y - 22) * 0.05;
+        for (let x = 0; x < IW; x++) {
+          const nx = (x + 0.5 - 12) / hb;
+          if (Math.abs(nx) > 1) continue;
+          const nz = Math.sqrt(Math.max(0.05, 1 - nx * nx * 0.92));
+          let s = ton(lam(nx * 0.9, -0.15, nz), (wert(x * 0.7, y * 0.7, 2) - 0.5) * 1.5 + (wert(x * 1.9, y * 1.9, 5) - 0.5) * 0.7);
+          if (y < 22) s = Math.max(0, s - 0.4);
+          setze(x, y, ppStufe(STEIN, s, x, y));
+        }
+      }
+      for (const riss of [[[7, 22], [8, 23], [8, 24], [7, 25], [7, 26], [8, 27]], [[17, 23], [16, 24], [17, 25], [16, 26], [16, 27]]])
+        for (const [x, y] of riss) { if (g[y][x]) g[y][x] = STEIN[6]; if (g[y][x + 1]) g[y][x + 1] = STEIN[1]; }
+      // Fragezeichen mit Schatten
+      const Q = ['.###.', '#...#', '....#', '...#.', '..#..', '..#..', '.....', '..#..', '..#..'];
+      for (let j = 0; j < Q.length; j++) for (let i = 0; i < 5; i++) if (Q[j][i] === '#') setze(10 + i + 1, 21 + j + 1, STEIN[5]);
+      for (let j = 0; j < Q.length; j++) for (let i = 0; i < 5; i++) if (Q[j][i] === '#') setze(10 + i, 21 + j, j > 5 ? ZAHN[1] : (j > 3 ? ZAHN[0] : WEISS));
+      // Gürtel (Gold, Zylinder) mit Schnalle
+      for (let y = 31; y <= 32; y++) for (let x = 0; x < IW; x++) {
+        const hb = 8.2 - (y - 22) * 0.05, nx = (x + 0.5 - 12) / hb;
+        if (Math.abs(nx) > 1) continue;
+        setze(x, y, ppStufe(GOLD, ton(lam(nx * 0.9, y === 31 ? -0.5 : 0.3, Math.sqrt(1 - nx * nx * 0.9)), 0), x, y));
+      }
+      for (const [x, y, c] of [[11, 31, GOLD[1]], [12, 31, GOLD[1]], [11, 32, GOLD[3]], [12, 32, GOLD[3]], [10, 31, GOLD[6]], [13, 31, GOLD[6]], [10, 32, GOLD[6]], [13, 32, GOLD[6]]]) setze(x, y, c);
+      // Sockel: Kegel, Stein
+      for (let y = 34; y < IH; y++) {
+        const hb = 8.6 + (y - 34) * 0.85;
+        for (let x = 0; x < IW; x++) {
+          const nx = (x + 0.5 - 12) / hb;
+          if (Math.abs(nx) > 1) continue;
+          const s = ton(lam(nx * 0.9, 0.2, Math.sqrt(Math.max(0.05, 1 - nx * nx * 0.9))), (wert(x * 0.8, y * 0.8, 7) - 0.5) * 1.2) + (y - 34) * 0.35;
+          setze(x, y, ppStufe(STEIN, klemme(s, 0, 5.98), x, y));
+        }
+      }
+      // Umriss: jedes Randpixel (ein Nachbar leer) wird dunkel, Gold bekommt einen dunkelgoldenen Rand
+      const roh = g.map(z => z.slice());
+      for (let y = 0; y < IH; y++) for (let x = 0; x < IW; x++) {
+        if (!roh[y][x]) continue;
+        const leer = (a, b) => !roh[b] || !roh[b][a];
+        if (leer(x - 1, y) || leer(x + 1, y) || leer(x, y - 1) || leer(x, y + 1)) g[y][x] = y < 20 ? ppHex('#332300') : SCHWARZ;
+      }
+      return g;
+    };
+
+    // ── Schädel 11 × 11, 4 Tonstufen: B hell, b mittel, M Schatten, k Kontur, g rosa Glimmen ──
+    const SCHAEDEL = ['...kkkkk...', '..kBBBBbk..', '.kBBBBBbbk.', 'kBBBBBBbbMk', 'kBBkkBkkbMk', 'kBBkgBkgbMk', 'kBBBBBBbbMk', '.kBBBkBbMk.', '..kBkBkbk..', '..kMBMBMk..', '...kkkkk...'];
+    const SK_PAL = { k: VI[6], B: VI[0], b: VI[1], M: VI[3], g: ppHex('#f821e3') };
+    const RUNEN = [['#.#', '#.#', '###', '.#.', '.#.'], ['##.', '.##', '#..', '.##', '##.'], ['.#.', '###', '.#.', '###', '.#.'], ['#..', '###', '#.#', '#.#', '#..'],
+      ['###', '#.#', '.#.', '#.#', '###'], ['.##', '#..', '.#.', '..#', '##.'], ['#.#', '.#.', '###', '.#.', '#.#'], ['##.', '#.#', '.##', '#.#', '#..']];
+    const NRUNEN = 14;
+
+    // ── Geometrie: Canvas deckt Zone, Götze, Strahlen UND (falls vorhanden) die Ablage ab ──
+    const geometrie = (p) => {
+      const w = p.w || 64, h = p.h || 90;
+      const hatAblage = typeof p.ablageDx === 'number' && typeof p.ablageDy === 'number';
+      const aw = p.ablageW || 64, ah = p.ablageH || 90;
+      const minX = Math.min(-(w / 2 + 70), hatAblage ? p.ablageDx - aw / 2 - 50 : 0), maxX = Math.max(w / 2 + 70, hatAblage ? p.ablageDx + aw / 2 + 50 : 0);
+      const minY = Math.min(-(h / 2 + 150), hatAblage ? p.ablageDy - ah / 2 - 50 : 0), maxY = Math.max(h / 2 + 60, hatAblage ? p.ablageDy + ah / 2 + 50 : 0);
+      const gw = Math.ceil((maxX - minX) / S), gh = Math.ceil((maxY - minY) / S);
+      return {
+        gw, gh, links: Math.round(minX), oben: Math.round(minY),
+        cx: -minX / S, cy: -minY / S, hw: Math.max(8, Math.round(w / S / 2)), hh: Math.max(10, Math.round(h / S / 2)),
+        pile: hatAblage ? { x: -minX / S + p.ablageDx / S, y: -minY / S + p.ablageDy / S, w: aw / S, h: ah / S } : null,
+      };
+    };
+    const vorbereiten = (sz) => ({
+      goetze: goetzeBacken(),
+      funken: Array.from({ length: ppFxN(14) }, (_, i) => ({ w: (i / 14) * Math.PI * 2 + Math.random() * 0.4, v: 26 + Math.random() * 30, leben: 360 + Math.random() * 260 })),
+      fetzen: Array.from({ length: ppFxN(18) }, () => ({ x: (Math.random() - 0.5) * 1.8, ab: BEAT + Math.random() * 260, v: 12 + Math.random() * 22, leben: 420 + Math.random() * 300, gross: Math.random() < 0.3, p: Math.random() * 6 })),
+      staub: Array.from({ length: ppFxN(26) }, () => ({ d: Math.random() * 0.9, q: (Math.random() - 0.5) * 2, v: Math.random(), leben: 300 + Math.random() * 300 })),
     });
+
     const malen = (g, t, sz, teile) => {
       const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
       if (aus <= 0) return;
-      const cx = Math.round(sz.cx), cy = Math.round(sz.cy), hw = Math.round(sz.hw), hh = Math.round(sz.hh);
-      // ── der Götze: gestuftes Einblenden (Dithering), sinkt in drei Stufen, wippt in ganzen Pixeln ──
-      const ein = klemme(t / 260, 0, 1);
-      const ia = Math.min(Math.floor(ein * 5) / 5, aus);
-      const sinken = ein < 1 ? [5, 3, 1][Math.min(2, Math.floor(ein * 3))] : 0;
-      const ix = cx, iy = cy - hh - 11 - sinken + (t > FLUCH ? Math.round(Math.sin(t / 130)) : 0);
-      if (ia > 0) ppSprite(g, ix, iy, (t > 160 && Math.floor(t / 100) % 2 === 1) ? AUGEN_HELL : KOPF_UND_KOERPER, IDOL, ia);
-      // ── Fluchstrahlen (gestrichelt, laufen mit) vom Götzen auf die Ability ──
-      if (t >= FLUCH && t < BLITZ + 60) {
-        const ab = klemme((t - FLUCH) / 120, 0, 1);
-        for (const [sx, tx] of [[-3, -0.45], [2, 0.45]]) {
-          const x0 = ix + sx, y0 = iy + 5, x1 = cx + tx * hw, y1 = cy - hh * 0.5;
-          const n = Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))), kopf = Math.floor(n * ab);
-          for (let s = 0; s <= kopf; s++) if ((s + Math.floor(t / 66)) % 3 !== 0) g.put(x0 + (x1 - x0) * (s / n), y0 + (y1 - y0) * (s / n), s % 2 ? PU[1] : PU[2], aus);
+      const cx = Math.round(sz.cx), cy = Math.round(sz.cy), hw = sz.hw, hh = sz.hh;
+      const bay = (x, y) => ppBayer(Math.round(x), Math.round(y));
+      // Dither-Deckung als Funktion: Pixel erscheint, wenn `anteil` > Bayer-Schwelle
+      const da = (x, y, anteil) => anteil > bay(x, y);
+      const ix = cx, ibasis = cy - hh + 9 - (t < 560 ? 0 : 0);
+      const bob = Math.round(Math.sin(t / 190) * 0.9);
+      const iy0 = ibasis - IH + bob;                                         // oberste Zeile des Götzen
+      const augenPos = [[ix - 12 + 7.2, iy0 + 9.6], [ix - 12 + 16.8, iy0 + 9.6]];
+
+      // ═ Ebene 1: Nebel (Rauschfeld, gedithert) ═
+      {
+        const einblend = klemme(t / 500, 0, 1), ausblend = t > 1300 ? Math.max(0, 1 - (t - 1300) / 600) : 1;
+        const amp = einblend * ausblend * aus;
+        if (amp > 0) {
+          const x0 = cx - hw - 20, x1 = cx + hw + 20, y0 = cy - hh - 6, y1 = cy + hh + 8;
+          for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+            const ex = (x - cx) / (hw + 20), ey = (y - (cy + 4)) / (hh + 12);
+            const umriss = 1 - (ex * ex + ey * ey);
+            if (umriss <= 0) continue;
+            const f = wert(x * 0.16, y * 0.2 + t * 0.012, 11) * 0.62 + wert(x * 0.37, y * 0.42 + t * 0.021, 12) * 0.38;
+            const dichte = f * umriss * 1.5 * amp * (0.5 + 0.5 * (y - y0) / (y1 - y0));          // unten dichter, steigt nach oben auf
+            if (dichte > 0.2 + bay(x, y) * 0.55) g.put(x, y, ppStufe([VI[3], VI[4], VI[5], VI[6], VI[7]], klemme(4.2 - dichte * 3.4 + (ppHash(x, y, 4) - 0.5) * 0.8, 0, 4), x, y));
+          }
         }
       }
-      // ── der Fluchrahmen schnappt um die Ability (drei Stufen), blinkt, bleibt bis zum Blitz ──
-      const fa = t - FLUCH;
-      if (fa >= 0 && t < BLITZ + 100) {
-        const m = fa < 132 ? [8, 4, 1][Math.floor(fa / 44)] : 0;
-        const rw = hw * 2 + 2 * m, rh = hh * 2 + 2 * m, x0 = cx - hw - m, y0 = cy - hh - m;
-        const hell = fa < 132 || Math.floor(t / 99) % 2 === 0;
-        for (let i = 0; i < rw; i++) for (const w of [0, 1]) { const c = w ? PU[3] : (hell ? PU[1] : PU[2]); g.put(x0 + i, y0 + w, c, aus); g.put(x0 + i, y0 + rh - 1 - w, c, aus); }
-        for (let j = 0; j < rh; j++) for (const w of [0, 1]) { const c = w ? PU[3] : (hell ? PU[1] : PU[2]); g.put(x0 + w, y0 + j, c, aus); g.put(x0 + rw - 1 - w, y0 + j, c, aus); }
-        if (fa < 132) for (const [ex, ey] of [[x0, y0], [x0 + rw - 1, y0], [x0, y0 + rh - 1], [x0 + rw - 1, y0 + rh - 1]]) g.block(ex - 1, ey - 1, 3, 3, PU[0], aus);
+
+      // ═ Ebene 2: Fluchsiegel (Runenring → Rahmen) ═
+      {
+        const ein = klemme((t - 40) / 520, 0, 1) * (t < BEAT + 60 ? 1 : Math.max(0, 1 - (t - BEAT - 60) / 240)) * aus;
+        if (ein > 0) {
+          let RXr = hw + 11, RYr = hh + 11, p = 2;
+          if (t >= 560) { const st = Math.min(3, Math.floor((t - 560) / 90)); RXr = hw + [11, 7, 4, 2][st]; RYr = hh + [11, 7, 4, 2][st]; p = [2, 3.2, 5, 8][st]; }
+          if (t >= BEAT) { const k = Math.floor((t - BEAT) / 40); RXr += k * 3; RYr += k * 3; p = Math.max(2, p - k); }
+          const punkt = (a) => { const c = Math.cos(a), s = Math.sin(a); return [cx + Math.sign(c) * Math.pow(Math.abs(c), 2 / p) * RXr, cy + Math.sign(s) * Math.pow(Math.abs(s), 2 / p) * RYr]; };
+          const nlinie = Math.round((RXr + RYr) * 4.2);
+          for (let k = 0; k < nlinie; k++) {                                   // Ring: 2 Pixel dick, innen hell, außen dunkel, gestrichelt
+            const a = (k / nlinie) * Math.PI * 2, [px, py] = punkt(a);
+            if (!da(px, py, ein)) continue;
+            if ((k + Math.floor(t / 66)) % 6 < 4) { g.put(px, py, VI[3]); g.put(px + (px < cx ? -1 : 1), py, VI[6]); }
+            else g.put(px, py, VI[5]);
+          }
+          const rot = Math.floor(t / 100) * (Math.PI * 2 / (NRUNEN * 3));
+          for (let i = 0; i < NRUNEN; i++) {                                    // Runen auf dem Ring
+            const a = (i / NRUNEN) * Math.PI * 2 + (t < 560 ? rot : 0), [px, py] = punkt(a);
+            if (!da(px + 1, py + 2, ein * 1.1)) continue;
+            const R = RUNEN[(i * 3 + (t >= 560 ? 0 : Math.floor(t / 400))) % RUNEN.length], rx = Math.round(px) - 1, ry = Math.round(py) - 2;
+            const hell = t >= 560 && t < BEAT && (i + Math.floor(t / 60)) % NRUNEN === 0;
+            for (let j = 0; j < 5; j++) for (let k2 = 0; k2 < 3; k2++) if (R[j][k2] === '#') {
+              g.put(rx + k2 + 1, ry + j + 1, VI[7]);
+              g.put(rx + k2, ry + j, hell ? WEISS : (j === 0 && k2 === 0 ? VI[0] : VI[2]));
+            }
+          }
+        }
       }
-      // ── Schädel steigen aus der Ability auf ──
+
+      // ═ Ebene 3: Götze (Dither-Wischer von unten nach oben, später von oben nach unten weg) ═
+      {
+        const rev = (t - 120) / 440 * (IH + 6);
+        const weg = t > FADE_AB ? (t - FADE_AB) / (ENDE - FADE_AB) * (IH + 6) : -1;
+        const gold = teile.goetze;
+        const blitzAugen = t >= BEAT - 20 && t < BEAT + 90;
+        for (let y = 0; y < IH; y++) for (let x = 0; x < IW; x++) {
+          let c = gold[y][x];
+          if (!c) continue;
+          const px = ix - 12 + x, py = iy0 + y;
+          if (!da(px, py, (rev - (IH - 1 - y)) / 6)) continue;                 // von unten herauf
+          if (weg >= 0 && da(px, py, (weg - y) / 6)) continue;                 // von oben herunter weg
+          if (blitzAugen && (c === ROT[0] || c === ROT[1] || c === ROT[2])) c = WEISS;
+          g.put(px, py, c);
+        }
+        // Glut der Augen: Dither-Halo, pulsierend, beim Beat weiß
+        if (t > 300 && aus > 0) {
+          const puls = 0.55 + 0.45 * Math.sin(t / 110), staerke = klemme((t - 300) / 300, 0, 1) * (t >= BEAT - 20 && t < BEAT + 90 ? 1.6 : puls) * aus;
+          for (const [ex, ey] of augenPos) for (let y = Math.floor(ey - 6); y <= ey + 6; y++) for (let x = Math.floor(ex - 6); x <= ex + 6; x++) {
+            const d = Math.hypot(x + 0.5 - ex, (y + 0.5 - ey) * 1.2);
+            if (d < 3.4 || d > 6) continue;
+            const inten = Math.pow(1 - d / 6, 1.7) * staerke * 0.8;
+            if (inten > bay(x, y) * 0.9 + 0.1) g.put(x, y, d < 4.4 ? ROT[1] : d < 5.2 ? ROT[2] : ROT[3]);
+          }
+        }
+      }
+
+      // ═ Ebene 4: Fluchranken — wellige Bänder wachsen vom Sockel des Götzen über die Ability (Köpfe mit hellem Impuls) ═
+      if (t >= 420 && t < BEAT + 40) {
+        const ab = klemme((t - 420) / 300, 0, 1);
+        for (let e = 0; e < 7; e++) {
+          const f = e - 3, x0 = ix + f * 2.6, y0 = ibasis - 1, x1 = cx + f * hw * 0.3, y1 = cy + hh * 0.85;
+          const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0)), kopf = Math.floor(n * klemme(ab * 1.15 - Math.abs(f) * 0.05, 0, 1));
+          for (let s2 = 0; s2 <= kopf; s2++) {
+            const k = s2 / (n || 1), w = Math.round(Math.sin(s2 * 0.5 - t / 55 + e * 1.7) * (1 + k * 2.4));
+            const px = x0 + (x1 - x0) * k + w, py = y0 + (y1 - y0) * k;
+            const impuls = (((s2 - t / 16) % 12) + 12) % 12 < 3;
+            const c = impuls ? VI[0] : VI[2 + (s2 % 3 === 0 ? 1 : 0)];
+            g.put(px, py, c); g.put(px + 1, py, impuls ? VI[1] : VI[4]); g.put(px, py + 1, VI[6]);
+            if (s2 === kopf && ab < 1) g.block(px - 1, py - 1, 3, 3, VI[0]);
+          }
+        }
+      }
+
+      // ═ Ebene 5: Schädel mit Flammenfahne ═
       for (let s = 0; s < 3; s++) {
-        const al = t - (FLUCH + 40 + s * 130);
-        if (al < 0 || al > 540) continue;
-        const k = al / 540, sek = al / 1000;
-        const x = cx + (s - 1) * hw * 0.7 + Math.round(Math.sin(sek * 7 + s)), y = cy + hh * 0.3 - 34 * sek - k * 6;
-        ppSprite(g, x, y, SCHAEDEL, SCHAEDEL_PAL, (1 - k * k) * aus);
+        const al = t - (520 + s * 130);
+        if (al < 0 || al > 760) continue;
+        const k = al / 760, sek = al / 1000;
+        const x = cx + (s - 1) * (hw * 0.65) + Math.round(Math.sin(sek * 7 + s * 2) * 1.5), y = cy + hh * 0.35 - 30 * sek - k * 8;
+        for (let f = 0; f < 9; f++) {                                           // Flammenfahne unter dem Schädel (Dither, dunkel → hell)
+          const fy = y + 7 + f * 1.4, fx = x + Math.round(Math.sin(f * 0.9 + t / 70 + s) * (1 + f * 0.25)), breite = Math.max(0, 3.2 - f * 0.32);
+          for (let dx = -Math.floor(breite); dx <= Math.floor(breite); dx++) if (da(fx + dx, fy, (1 - f / 9) * (1 - k * 0.7))) g.put(fx + dx, fy, ppStufe([VI[1], VI[3], VI[5], VI[6]], f * 0.4 + Math.abs(dx) * 0.5, fx + dx, fy));
+        }
+        const hh2 = 5, ww2 = 5;
+        for (let j = 0; j < 11; j++) for (let i = 0; i < 11; i++) {
+          const c = SK_PAL[SCHAEDEL[j][i]];
+          if (c && da(x - ww2 + i, y - hh2 + j, (1 - k * k) * aus * 1.15)) g.put(x - ww2 + i, y - hh2 + j, c);
+        }
       }
-      // ── Blitz: die Ability flackert auf, Kreuzfunkel in der Mitte ──
-      const ba = t - BLITZ;
-      if (ba >= 0 && ba < 100) {
-        if (ba < 34) g.block(cx - hw, cy - hh, hw * 2, hh * 2, PU[0], aus);
-        else if (ba < 67) g.block(cx - hw, cy - hh, hw * 2, hh * 2, PU[1], 0.5 * aus);
-        else g.block(cx - hw, cy - hh, hw * 2, hh * 2, PU[2], 0.25 * aus);
+
+      // ═ Ebene 6: Beat — Schockringe, Dither-Blitz, abstiebende Funken ═
+      {
+        const ba = t - BEAT;
+        if (ba >= 0 && ba < 130) {
+          const f = Math.floor(ba / 33);
+          const fl = [WEISS, VI[0], VI[1], VI[3]][Math.min(3, f)];
+          for (let y = cy - hh; y < cy + hh; y++) for (let x = cx - hw; x < cx + hw; x++) if (da(x, y, [1, 0.8, 0.55, 0.3][Math.min(3, f)])) g.put(x, y, fl);
+        }
+        for (let k = 0; k < 3; k++) {
+          const a2 = ba - k * 70;
+          if (a2 < 0 || a2 > 520) continue;
+          const r = a2 * 0.045, RXs = hw + 3 + r * 1.2, RYs = hh + 3 + r, alt = a2 / 520, n = Math.round((RXs + RYs) * 4);
+          for (let q = 0; q < n; q++) {
+            const a = (q / n) * Math.PI * 2, px = cx + Math.cos(a) * RXs, py = cy + Math.sin(a) * RYs;
+            if (!da(px, py, (1 - alt) * 1.1 * aus)) continue;
+            g.put(px, py, VI[Math.min(5, Math.floor(alt * 5.5))]);
+            if (alt < 0.45) g.put(px + (px < cx ? -1 : 1), py, VI[Math.min(6, Math.floor(alt * 5.5) + 2)]);
+          }
+        }
+        if (ba >= 0 && ba < 280) ppKreuzfunkel(g, cx - 1, cy - 1, [2, 4, 5, 6, 6, 5, 4, 3, 2][Math.floor(ba / 31)] || 1, [WEISS, VI[0], VI[2], VI[4]], aus);
+        for (const f of teile.funken) {
+          const al = t - BEAT; if (al < 0 || al > f.leben) continue;
+          const k = al / f.leben, sek = al / 1000;
+          g.put(cx + Math.cos(f.w) * f.v * sek * 1.2, cy + Math.sin(f.w) * f.v * sek + 38 * sek * sek, VI[Math.min(5, Math.floor(k * 6))], (1 - k) * aus);
+        }
       }
-      if (ba >= 0 && ba < 260) ppKreuzfunkel(g, cx - 1, cy - 1, [2, 4, 5, 5, 4, 3, 2, 1][Math.floor(ba / 33)] || 1, PU, aus);
-      // ── Fetzen: die Kopie löst sich, violette Fetzen steigen auf ──
+
+      // ═ Ebene 7: aufsteigende Fluchfetzen aus der Zone (die Kopie löst sich) ═
       for (const f of teile.fetzen) {
         const al = t - f.ab; if (al < 0 || al > f.leben) continue;
         const k = al / f.leben, sek = al / 1000;
         const x = cx + f.x * hw + Math.round(Math.sin(sek * 6 + f.p) * 2), y = cy + hh * 0.6 - f.v * sek * 1.6;
-        g.block(x, y, f.gross ? 2 : 1, f.gross ? 2 : 1, PU[Math.min(3, Math.floor(k * 4))], (1 - k) * aus);
+        g.block(x, y, f.gross ? 2 : 1, f.gross ? 2 : 1, VI[Math.min(6, Math.floor(k * 6.5))], (1 - k) * aus);
+      }
+
+      // ═ Ebene 8: Schweif der fliegenden Kopie und Aufprall auf dem Ablagestapel ═
+      if (sz.pile) {
+        const P = sz.pile;
+        const bahn = (kk) => { const e = kk * kk * (3 - 2 * kk); return [cx + (P.x - cx) * e, cy + (P.y - cy) * e]; };
+        const k = klemme((t - FLUG_AB) / FLUG_MS, 0, 1);
+        if (t >= FLUG_AB - 40 && t < FLUG_AB + FLUG_MS + 260) {
+          const nx = -(P.y - cy), ny = (P.x - cx), nl = Math.hypot(nx, ny) || 1;
+          for (let i = 0; i < 34; i++) {
+            const kk = k - i * 0.019; if (kk <= 0) continue;
+            const [px, py] = bahn(kk), wob = Math.round((ppHash(i, Math.floor(t / 66), 3) - 0.5) * (1.5 + i * 0.22));
+            const sx = px + (nx / nl) * wob, sy = py + (ny / nl) * wob;
+            if (!da(sx, sy, (1 - i / 34) * 1.25 * aus)) continue;
+            const c = VI[Math.min(6, Math.floor(i / 5))];
+            if (i < 4) { g.block(sx - 2, sy - 2, 4, 4, i < 2 ? VI[0] : VI[1]); if (i === 0) g.block(sx - 1, sy - 1, 2, 2, WEISS); g.put(sx - 3, sy, VI[3]); g.put(sx + 2, sy, VI[3]); g.put(sx, sy - 3, VI[3]); g.put(sx, sy + 2, VI[3]); }
+            else if (i < 12) g.block(sx - 1, sy - 1, 3, 3, c);
+            else if (i < 22) g.block(sx - 1, sy - 1, 2, 2, c); else g.put(sx, sy, c);
+            if (i % 3 === 0 && ppHash(i, Math.floor(t / 33), 8) > 0.45) g.put(sx + (ppHash(i, 2, Math.floor(t / 33)) - 0.5) * 7, sy + (ppHash(i, 3, Math.floor(t / 33)) - 0.5) * 7, VI[Math.min(4, 1 + Math.floor(i / 8))]);   // Funken neben dem Schweif
+          }
+          for (const s of teile.staub) {                                         // Staubkörner entlang der Bahn, fallen leicht
+            const kk = k - s.d * 0.5; if (kk <= 0 || kk >= 1 || t > FLUG_AB + FLUG_MS) continue;
+            const [px, py] = bahn(kk);
+            if (da(px, py, 0.6)) g.put(px + s.q * 4, py + s.v * 5 * (1 - kk) + (1 - kk) * 3, VI[2 + Math.floor(s.v * 3)]);
+          }
+        }
+        const ia = t - (FLUG_AB + FLUG_MS);
+        if (ia >= 0 && ia < 600) {
+          const pw = P.w / 2, ph = P.h / 2;
+          if (ia < 100) { const f = Math.floor(ia / 33); for (let y = Math.round(P.y - ph * 0.7); y < P.y + ph * 0.7; y++) for (let x = Math.round(P.x - pw * 0.7); x < P.x + pw * 0.7; x++) if (da(x, y, [0.8, 0.55, 0.3][Math.min(2, f)])) g.put(x, y, [VI[0], VI[1], VI[3]][Math.min(2, f)]); }
+          for (let r = 0; r < 3; r++) {
+            const a2 = ia - r * 60; if (a2 < 0 || a2 > 460) continue;
+            const alt = a2 / 460, RXs = pw * 0.5 + a2 * 0.05, RYs = ph * 0.5 + a2 * 0.045, n = Math.round((RXs + RYs) * 4);
+            for (let q = 0; q < n; q++) {
+              const a = (q / n) * Math.PI * 2, px = P.x + Math.cos(a) * RXs, py = P.y + Math.sin(a) * RYs;
+              if (da(px, py, (1 - alt) * 1.1)) g.put(px, py, VI[Math.min(6, Math.floor(alt * 6))]);
+            }
+          }
+          for (let q = 0; q < teile.funken.length; q++) {                         // Funken stieben aus dem Stapel
+            const f = teile.funken[q], al = ia - 20; if (al < 0 || al > f.leben) continue;
+            const kk = al / f.leben, sek = al / 1000;
+            g.put(P.x + Math.cos(f.w) * f.v * 0.8 * sek, P.y + Math.sin(f.w) * f.v * 0.8 * sek + 60 * sek * sek, VI[Math.min(5, Math.floor(kk * 6))], 1 - kk);
+          }
+          // Staubwolke über dem Stapel (Nebel-Rauschen)
+          const dauer = klemme(1 - ia / 600, 0, 1);
+          for (let y = Math.round(P.y - ph - 8); y <= P.y + ph * 0.4; y++) for (let x = Math.round(P.x - pw - 4); x <= P.x + pw + 4; x++) {
+            const ex = (x - P.x) / (pw + 4), ey = (y - (P.y - ph * 0.3)) / (ph * 0.9);
+            const u2 = 1 - (ex * ex + ey * ey); if (u2 <= 0) continue;
+            const f = wert(x * 0.25, y * 0.3 - ia * 0.02, 21);
+            if (f * u2 * 1.6 * dauer > 0.3 + bay(x, y) * 0.5) g.put(x, y, ppStufe([VI[3], VI[5], VI[6]], 2 - f * 2, x, y));
+          }
+        }
       }
     };
-    return ppPunktBild(malen, ENDE, 300, 300, vorbereiten);
+
+    // ── Komponente: wie `ppPunktBild`, aber der Canvas wächst bis zur Ablage ──
+    const Komponente = function SinisterIdolEffekt(props) {
+      const cvs = useRef(null);
+      const sz = useMemo(() => geometrie(props), []);
+      const teile = useMemo(() => vorbereiten(sz), []);
+      useEffect(() => {
+        const el = cvs.current;
+        if (!el || window._playAnimations === false) return undefined;
+        const ctx = el.getContext('2d');
+        const img = ctx.createImageData(sz.gw, sz.gh);
+        const buf = img.data, gw = sz.gw, gh = sz.gh;
+        const put = (px, py, c, a = 1) => {
+          const X = Math.round(px), Y = Math.round(py);
+          if (X < 0 || Y < 0 || X >= gw || Y >= gh || a <= 0) return;
+          if (a < 1 && ppBayer(X, Y) >= a) return;
+          const i = (Y * gw + X) * 4;
+          buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
+        };
+        const g = { put, block(px, py, bw, bh, c, a = 1) { for (let j = 0; j < bh; j++) for (let i = 0; i < bw; i++) put(px + i, py + j, c, a); } };
+        const t0 = performance.now();
+        let raf = 0, letzte = -1;
+        const schritt = (jetzt) => {
+          const t = jetzt - t0, fr = Math.floor(t / TAKT);
+          if (fr !== letzte) { letzte = fr; buf.fill(0); malen(g, t, sz, teile); ctx.putImageData(img, 0, 0); }
+          if (t < ENDE) raf = requestAnimationFrame(schritt);
+          else { buf.fill(0); ctx.putImageData(img, 0, 0); }
+        };
+        raf = requestAnimationFrame(schritt);
+        return () => cancelAnimationFrame(raf);
+      }, []);
+      return (
+        <div aria-hidden="true" data-pp-px="aus" style={{ position: 'fixed', left: props.x + sz.links, top: props.y + sz.oben, pointerEvents: 'none', zIndex: 10100 }}>
+          <canvas ref={cvs} width={sz.gw} height={sz.gh} style={{ width: sz.gw * S, height: sz.gh * S, imageRendering: 'pixelated', display: 'block' }} />
+        </div>
+      );
+    };
+    Komponente.fx = { ENDE, FLUG_AB, FLUG_MS, geometrie, vorbereiten, malen };   // Vorschau/Tests (offline gerendert)
+    return Komponente;
   })(),
   // ═══════════════════════════════════════════════════════════════════
   //  Shipwrecked — PIXELART, Zonen-Animation am Helden (Hülle `ppPunktBild`; Vorlage: das Kartenbild — Schiffbrüchiger am Strand, tiefblaue Wasserkante mit Schaum, Planken, Fässer, Tang)
@@ -45279,7 +45577,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // (Telekinesis verdeckt die echte Karte, waehrend ihre Kopie
         // schwebt), finden sie darueber wieder. `eigeneSeite`: gehoert die
         // Zone dem Betrachter? (Eigene verdeckte Karten sieht er offen.)
-        playAnimation(type, sel, { duration: ZONEN_ANIM_DAUER[type] || 1000, ...rest, ...(vonDaten || {}), ankerSel: sel, eigeneSeite: owner === myIdx });
+        // ★ W82 (Sinister Idol): `ablageBesitzer` = Seite der Ablage, in die eine Kopie fliegt — der Client rechnet Abstand und Maß des Stapels aus (`ablageDx/Dy/W/H`, wie `von`), damit die Animation ihren Schweif und den Aufprall dorthin zeichnen kann.
+        const ablageDaten = (() => {
+          if (rest.ablageBesitzer == null) return null;
+          const ankerEl = document.querySelector(sel);
+          const pileEl = document.querySelector(`[data-${rest.ablageBesitzer === myIdx ? 'my' : 'opp'}-discard]`);
+          if (!ankerEl || !pileEl) return null;
+          const q1 = ankerEl.getBoundingClientRect(), q2 = pileEl.getBoundingClientRect();
+          if (!q2.width) return null;
+          return { ablageDx: (q2.left + q2.width / 2) - (q1.left + q1.width / 2), ablageDy: (q2.top + q2.height / 2) - (q1.top + q1.height / 2), ablageW: q2.width, ablageH: q2.height };
+        })();
+        playAnimation(type, sel, { duration: ZONEN_ANIM_DAUER[type] || 1000, ...rest, ...(vonDaten || {}), ...(ablageDaten || {}), ankerSel: sel, eigeneSeite: owner === myIdx });
       }, window.ZONE_ANIM_MOUNT_DELAY_MS ?? 100);
     };
     // Applause Counter gestiegen: Klang + Abzeichen leuchtet kurz auf.
