@@ -85,6 +85,9 @@ function hoechstesKreaturLevel(engine, pi) {
 }
 
 module.exports = {
+  // Als Ruling (Al 28.10.): diese Attack richtet nie Schaden an (besiegt statt Schaden) — Schadens-Pfeile und Magic Topaz sind an ihr nicht ankettbar (`_arrows-shared`: `arrowTriggerCondition`).
+  dealsNoAttackDamage: true,
+
   activeIn: ['hand'],
   requiresTarget: true,
   opponentCannotReact: true,   // Kettenfenster der Karte selbst (Engine)

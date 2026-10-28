@@ -191,7 +191,7 @@ module.exports = {
         const entryOwner = e.inst?.controller ?? e.inst?.owner;   // „your level 0 Creatures" (Kontrolle)
         if (entryOwner !== pi) continue;
         if (e.originalLevel !== 0) continue;                       // wie Diamond: Original-Level
-        if (e.amount > 0) e.modifyAmount(-Math.min(DAMAGE_REDUCTION, e.amount));   // flat (Punkt vor Strich)
+        e.modifyAmount(-DAMAGE_REDUCTION);   // flat (Punkt vor Strich), UNGEKÜRZT: die Projektion klemmt am Ende bei 0 — ein Pfeil-Bonus (kommt nach der Hook-Runde) darf die Senkung nicht umgehen (Al 28.10.)
       }
     },
   },

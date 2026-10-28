@@ -86,6 +86,16 @@
 //  `applyPoison1` / `applyBurn`. Golden Arrow
 //  uses `goldRatio: 10` and `goldLockAfter:
 //  true`.
+//
+//  Als Ruling (Al 28.10.): ATTACKS OHNE SCHADEN
+//  ─────────────────────────────────────────────
+//  „Schadensstärkende Karten wie Magic Topaz oder die Arrows ließen sich an Alliance und andere Attacks anketten, die keinen Schaden
+//  zufügen, und verpufften. Sie sollen schlicht nicht ankettbar sein, wenn die Attack mit ihnen nichts machen würde."
+//  Eine Attack, die nie Schaden anrichtet (Alliance, Amazing Finding, Capture, Muscle Training …), sagt es im Skript: `dealsNoAttackDamage: true`.
+//  `arrowTriggerCondition` bietet dann jeden Pfeil NICHT an, dessen Wirkung am Schaden/Treffer der Attack hängt (Standard: Angelfeather,
+//  Magic Topaz, Flame, Poisoned, Golden, Hydra Blood). Ein Pfeil, dessen Wirkung auch ohne Attack-Schaden etwas tut (Rainbow's: zieht 2 Karten;
+//  Bomb: 100 Schaden auf eine Gegnerkreatur; Racket: Gegnerkreatur zurück auf die Hand), setzt `opts.effektOhneAngriffsschaden` und
+//  prüft selbst, ob sein eigener Teil ein Ziel hat. Neue Pfeile sind damit standardmäßig richtig.
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -109,7 +119,18 @@ const { hasCardType } = require('./_hooks');
  * @param {boolean} [opts.anyHero] - Hydra Blood Arrow: auch auf die Attack eines GEGNERISCHEN Helden.
  * @param {boolean} [opts.blockUnreducible] - Hydra Blood Arrow (Als Ruling Al 26.10.): nicht anbieten, wenn der Schaden der
  *   Attack unreduzierbar ist (`engine._attackSchadenUnreduzierbar`: Surefire Shot, Elixir of Strength, Club of Gobbo …).
+ * @param {boolean} [opts.effektOhneAngriffsschaden] - Rainbow's/Bomb/Racket Arrow (Als Ruling Al 28.10.): die Karte tut auch an einer Attack
+ *   ohne Schaden etwas (Karten ziehen, Gegnerkreatur treffen/zurückgeben) — sie darf dann auch an `dealsNoAttackDamage`-Attacks. Standard:
+ *   an einer Attack ohne Schaden nicht ankettbar.
  */
+/** Ist die auslösende Attack dieser Kette eine, die nie Schaden anrichtet (`dealsNoAttackDamage` im Skript, z. B. Alliance)? */
+function attackDealsNoDamage(chainCtx) {
+  const initial = chainCtx?.chain?.find(l => l.isInitialCard);
+  if (!initial?.cardName) return false;
+  const { loadCardEffect } = require('./_loader');
+  return !!loadCardEffect(initial.cardName)?.dealsNoAttackDamage;
+}
+
 function arrowTriggerCondition(gs, pi, engine, chainCtx, _opts = {}) {
   if (!chainCtx?.chain || chainCtx.chain.length === 0) return false;
   const initial = chainCtx.chain.find(l => l.isInitialCard);
@@ -133,6 +154,9 @@ function arrowTriggerCondition(gs, pi, engine, chainCtx, _opts = {}) {
   // Club of Gobbo …; EIN Prädikat: `engine._attackSchadenUnreduzierbar`). Das Fenster öffnet VOR der Zielwahl; ein bereitstehender Elixir sperrt Hydra bei JEDER Attack (Ruling Al 26.10.: „die müssen sich ausschließen“);
   // ZIEL-seitiges „cannot be reduced" (Tempeste, Brachion …) sperrt Hydra nicht.
   if (_opts.blockUnreducible && engine?._attackSchadenUnreduzierbar?.({ link: initial })) return false;
+
+  // Als Ruling (Al 28.10.): Attack ohne Schaden (Alliance & Co.) — ein Pfeil, dessen Wirkung am Schaden hängt, hätte dort nichts zu tun: nicht ankettbar.
+  if (!_opts.effektOhneAngriffsschaden && attackDealsNoDamage(chainCtx)) return false;
 
   // Future multi-target gate for Golden Arrow. Left intentionally true —
   // see header comment.
@@ -493,6 +517,7 @@ function pickLastUntriggeredArrowLink(pi, chain, stopIdx = null) {
 
 module.exports = {
   arrowTriggerCondition,
+  attackDealsNoDamage,
   armAttackerWithArrow,
   noteArrowActivated,
   applyArrowsBeforeDamage,

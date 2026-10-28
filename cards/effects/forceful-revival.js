@@ -86,6 +86,9 @@ function _userHasSlotFor(engine, ps, pi, hs, heroIdx, namen) {
 }
 
 module.exports = {
+  // Als Ruling (Al 28.10.): diese Attack richtet nie Schaden an (der Eigenschaden an den Nutzer ist kein Treffer der Attack — ein Pfeil würde ihn nur erhöhen) — Schadens-Pfeile und Magic Topaz sind an ihr nicht ankettbar (`_arrows-shared`: `arrowTriggerCondition`).
+  dealsNoAttackDamage: true,
+
   // Effective max-revivable-level scales with the caster's Fighting
   // count — flag for the CPU's ability-stacking scoring so a deck with
   // Forceful Revival keeps Fighting worth stacking past Lv1.

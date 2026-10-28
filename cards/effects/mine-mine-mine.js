@@ -79,6 +79,9 @@ function artefaktWert(engine, inst) {
 }
 
 module.exports = {
+  // Als Ruling (Al 28.10.): diese Attack richtet nie Schaden an — Schadens-Pfeile und Magic Topaz sind an ihr nicht ankettbar (`_arrows-shared`: `arrowTriggerCondition`).
+  dealsNoAttackDamage: true,
+
   // „If the user has at least Charme 1, this counts as an additional Action": Funktion je Held, Stand beim Ausspielen.
   inherentAction(gs, pi, heroIdx, engine) {
     const eng = engine || gs._engineRef;

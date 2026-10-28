@@ -98,6 +98,9 @@ function aktionBezahlen(engine, pi, heroIdx) {
 }
 
 module.exports = {
+  // Als Ruling (Al 28.10.): diese Attack richtet nie Schaden an — Schadens-Pfeile und Magic Topaz sind an ihr nicht ankettbar (`_arrows-shared`: `arrowTriggerCondition`).
+  dealsNoAttackDamage: true,
+
   cpuMeta: { scalesWithSchool: SCHOOL },
 
   // „Only copy → additional Action" — die Version der Attack, die als Zusatzaktion zählt, existiert nur mit einer einzigen Kopie als Ziel (je Held ausgewertet).
