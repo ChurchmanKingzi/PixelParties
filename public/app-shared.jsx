@@ -1979,6 +1979,9 @@ function playSFX(name, opts = {}) {
     return;
   }
   const now = performance.now();
+  // Zeitpunkt des letzten `draw` (auch eines abgewiesenen Aufrufs): der Puzzle-Editor spielt beim Loslassen einer gezogenen Karte den Klang der
+  // Handkarten (`draw`) — hat die Ablage (Hand, Stapel, Umsortieren) waehrenddessen schon eines gespielt, entfaellt er (sonst zweimal).
+  if (name === 'draw') window._ppDrawT = now;
   // Apply an auto-dedupe default for known UI sounds when the caller
   // didn't pass an explicit `dedupe`. Explicit `dedupe: 0` from a
   // caller still wins (treated as "I really do want every call to
@@ -6406,6 +6409,47 @@ function HintergrundPause() {
   return null;
 }
 window.HintergrundPause = HintergrundPause;
+
+/**
+ * ★ Als Befund 27.10. (Puzzle-Editor „mitunter ziemlich laggy"): ENDLOS-ANIMATIONEN WAEHREND EINES ZUGES ANHALTEN.
+ * Jeder Hauptthread-Frame verarbeitet ALLE laufenden CSS-Animationen erneut (gemessen: 300 Animationen + ein unabhaengiger 30-Hz-Tick =
+ * 33-41 % Hauptthread, ohne Animationen 5 %). Auf einem vollen Editor-Brett laufen rund 450-700 (Foil-Funken, Schimmer, Rahmen, Partikel),
+ * und waehrend eines Zuges kommt mit jeder Mausbewegung ein Frame. `animationenAnhalten(true)` haelt alle gerade laufenden ENDLOSEN
+ * CSS-Animationen an, `false` laesst sie weiterlaufen. Ueber die Web-Animations-API statt einer Klasse am Body (`pp-dialog-offen`): das
+ * Umschalten der Klasse kostete 70-130 ms (Neuberechnung ueber alle Foil-Nachfahren), der API-Weg rund 15 ms zum Anhalten und 1 ms zum
+ * Freigeben. Beim Freigeben wird die ALTE Startzeit zurueckgeschrieben: die Animationen stehen dann genau dort, wo sie ohne Pause waeren
+ * (die Foil-Uhr, `foilUhrStellen`, bleibt gueltig — gleiche Karte = gleiche Phase, ohne sie neu stellen zu muessen). Einmalige
+ * Animationen und Uebergaenge laufen weiter. Idempotent.
+ */
+let _animAngehalten = null;
+function animationenAnhalten(an) {
+  if (typeof CSSAnimation === 'undefined' || typeof document.getAnimations !== 'function') return;
+  if (an) {
+    if (_animAngehalten) return;
+    const liste = [];
+    for (const a of document.getAnimations()) {
+      if (!(a instanceof CSSAnimation) || a.playState !== 'running') continue;
+      const w = a.effect;
+      if (!w || w.getComputedTiming().iterations !== Infinity) continue;
+      liste.push([a, a.startTime]);
+    }
+    for (const [a] of liste) a.pause();
+    _animAngehalten = liste;
+  } else {
+    const liste = _animAngehalten;
+    if (!liste) return;
+    _animAngehalten = null;
+    for (const [a, start] of liste) {
+      try {
+        const ziel = a.effect && a.effect.target;
+        if (!ziel || !ziel.isConnected) continue;     // in der Zwischenzeit entfernt
+        a.play();
+        if (start != null) a.startTime = start;       // statt um die Standzeit verschoben: genau wie ohne Pause
+      } catch (e) { /* abgebrochene Animation: nichts zu tun */ }
+    }
+  }
+}
+window.animationenAnhalten = animationenAnhalten;
 const FOIL_KLEIN_FUNKEN_JEDER = 3;   // jeder dritte Funke bleibt
 
 // ═══════════════════════════════════════════════════════════════
@@ -7687,9 +7731,6 @@ const CARD_DRAG_SFX = {
 };
 function playCardDragSFX(art) {
   const e = CARD_DRAG_SFX[art];
-  // Zeitpunkt des letzten Umsortier-Klangs: der Puzzle-Editor spielt beim Loslassen JEDES Zuges den Klang der Handkarten (`reorder`) —
-  // beim Umsortieren der Hand ist er schon gespielt, dann entfaellt der zweite.
-  if (art === 'reorder') window._ppReorderT = performance.now();
   if (e && window.playSFX) window.playSFX(e.name, e.opts);
 }
 
