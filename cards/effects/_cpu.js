@@ -1864,6 +1864,20 @@ async function activateHeroEffects(engine, helpers) {
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
       if (tried.has(hi)) continue;
+      // Mumie (Al, 28.10.): der Mummy-Token ersetzt den Effekt JEDES Helden — die CPU bewertet dann seinen Effekt statt des eigenen
+      // (Gegenstueck zu `getActiveHeroEffects` / `doActivateHeroEffect`).
+      const mumieInst = engine.cardInstances.find(c => c.owner === cpuIdx && c.zone === 'support' && c.heroIdx === hi && c.name === 'Mummy Token');
+      if (mumieInst) {
+        const ms = loadCardEffect('Mummy Token');
+        let ok = !!(ms?.heroEffect && ms?.onHeroEffect) && gs.hoptUsed?.[`hero-effect:MummyToken:${cpuIdx}:${hi}`] !== gs.turn
+          && !engine.isHeroEffectBlockedByGraceShield(ms, cpuIdx);
+        if (ok && hero.statuses && ['blinded', 'blinded_hit'].some(n => hero.statuses[n]) && ms.requiresTarget === true) ok = false;
+        if (ok && ms.canActivateHeroEffect) {
+          try { ok = !!ms.canActivateHeroEffect(engine._createContext(mumieInst, { event: 'canHeroEffectCheck' })); } catch { ok = false; }
+        }
+        if (ok) { pickIdx = hi; break; }
+        continue;
+      }
       // Check if hero has ANY available hero-effect we haven't claimed
       // HOPT on AND whose `canActivateHeroEffect` (when defined) returns
       // true. The canActivate pre-check prevents the gate from firing on

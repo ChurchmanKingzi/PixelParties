@@ -125,6 +125,8 @@ module.exports = {
     onSacrificeBatch: async (ctx) => {
       if (ctx.cardZone !== 'area') return;
       await offerDraw(ctx._engine, ctx.playerIdx, 1);
+      // W79 (White Sacrificial Bull): ein geopferter Bull ist AUCH ein Hero -> zusaetzlich die Helden-Karten.
+      if (ctx.heldCount > 0) await offerDraw(ctx._engine, ctx.playerIdx, 3);
     },
 
     // Creatures — single sacrifices outside a batched cost.
@@ -133,6 +135,7 @@ module.exports = {
       if (ctx._inSacrificeBatch) return; // batch handled above — no double-draw
       const drawPlayer = ctx.source?.owner ?? ctx.creature?.controller ?? ctx.creature?.owner;
       await offerDraw(ctx._engine, drawPlayer, 1);
+      if (ctx._engine.zaehltAlsHeld?.(ctx.creature)) await offerDraw(ctx._engine, drawPlayer, 3);   // W79: Bull zaehlt auch als geopferter Hero
     },
 
     // Heroes — draw 3 per sacrificed Hero (flagged via isSacrifice).

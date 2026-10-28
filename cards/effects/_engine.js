@@ -7468,7 +7468,7 @@ class GameEngine {
     if (hero.statuses?.frozen && !this._isChillyDogActiveFor(pi)) return true;
     const ng = hero.statuses?.negated;
     if (ng && (!(ng._byWeakeningCrystal || ng._fromAttachment || ng.effectOnly) || this.heroAbilitiesNegated(pi, heroIdx))) return true;
-    if (this._isHeroMummified(pi, heroIdx)) return true;
+    // Mumie (Al, 28.10.): ersetzt NUR den Effekt des Helden (passiv + aktiv) — seine Abilities (Creativity bei Elana …) laufen weiter.
     return false;
   }
 
@@ -32563,6 +32563,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // level reduction; the stamp lets post-destroy reactions like
         // Corpse Cannibal recognise the sacrifice). Don't touch them here
         // — doing so would double-count the tally.
+        if (this.zaehltAlsHeld(t.cardInstance)) t._heldOpfer = true;   // W79 (White Sacrificial Bull): dieses Opfer ist auch ein Helden-Opfer (Temple of Sacrifice: +3)
         await this.runHooks(HOOKS.ON_CREATURE_SACRIFICED, {
           creature: t.cardInstance,
           cardName: t.cardInstance?.name,
@@ -32658,7 +32659,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // elsewhere (Garius, Brackle, treatAsSacrificed, …) don't fire this
     // and are caught per-tribute via the unflagged ON_CREATURE_SACRIFICED.
     await this.runHooks('onSacrificeBatch', {
-      playerIdx: pi, creatureCount: picked.length, _skipReactionCheck: true,
+      playerIdx: pi, creatureCount: picked.length, heldCount: picked.filter(t => t._heldOpfer).length, _skipReactionCheck: true,
     });
     return true;
     } finally {
@@ -34909,12 +34910,12 @@ this._deathWatch = (this._deathWatchStack || []).length
    * True if the given (playerIdx, heroIdx) has any Support-Zone card
    * whose script opts in via `mummifiesHost: true`. Mummy Token is the
    * canonical user — its card text is "Replaces the corresponding
-   * Hero's active effect," but gameplay-wise it fully silences the
-   * Hero: active effect (handled in server.js doActivateHeroEffect,
-   * which prefers the mummifier's own heroEffect) AND all passives
-   * (handled here via the runHooks filter and direct-poll sites like
-   * _hasActiveNomu). Behaves like `statuses.negated` for the Hero +
-   * its ability zones. Support-zone creatures remain unaffected.
+   * Hero's active effect," and it silences the Hero's EFFECT: active (the
+   * mummifier's own heroEffect takes over, see `getActiveHeroEffects` /
+   * server.js doActivateHeroEffect) AND passive (runHooks filter, direct-poll
+   * sites like _hasActiveNomu). The Hero's Abilities keep working (Al 28.10.:
+   * `_isHeroAbilityPassiveSilenced` ignores the Mummy). Support-zone
+   * creatures remain unaffected.
    */
   _isHeroMummified(playerIdx, heroIdx) {
     const ps = this.gs.players[playerIdx];
@@ -50399,6 +50400,30 @@ this._deathWatch = (this._deathWatchStack || []).length
       // play (its aura keeps own-side Frozen Heroes' effects usable).
       if ((hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated) continue;
       if (hero.statuses?.frozen && !chillyDogOwnSideHE) continue;
+
+      // ★ Mumie (Al, 28.10.): „The effect of the corresponding Hero is replaced by this effect" — gilt fuer JEDEN Helden, auch fuer
+      // reine Passiv-Helden (Bartas, Tempeste …): der Mummy-Token gibt ihm seinen aktiven Effekt (frei, Main Phase, einmal pro Zug;
+      // Gegenstueck zum Mumien-Zweig in `doActivateHeroEffect`). Der eigene Effekt des Helden steht dann nicht im Menue.
+      const mumieInst = this.cardInstances.find(c => c.owner === hs && c.zone === 'support' && c.heroIdx === hi && c.name === 'Mummy Token');
+      if (mumieInst) {
+        const mScript = loadCardEffect('Mummy Token');
+        if (!mScript?.heroEffect || typeof mScript.onHeroEffect !== 'function') continue;
+        if (granted || !isMainPhase) continue;                       // freier Effekt: nur Main Phase, nie als gewaehrte Aktion
+        if (BLIND_STATUSES.some(n => hero.statuses?.[n]) && mScript.requiresTarget === true) continue;
+        if (this.isHeroEffectBlockedByGraceShield(mScript, playerIdx)) continue;
+        if (this.gs.hoptUsed?.[`hero-effect:MummyToken:${playerIdx}:${hi}`] === this.gs.turn) continue;
+        if (this.oncePerGameEffectUsed(playerIdx, mScript, 'Mummy Token')) continue;
+        if (mScript.canActivateHeroEffect) {
+          try {
+            if (!mScript.canActivateHeroEffect(this._createContext(mumieInst, { event: 'canHeroEffectCheck' }))) continue;
+          } catch (err) {
+            console.error('[Engine] canActivateHeroEffect failed for "Mummy Token":', err.message);
+            continue;
+          }
+        }
+        result.push({ heroIdx: hi, heroName: hero.name, effectName: 'Mummy Token', actionCost: false, ...(hs !== playerIdx ? { charmedOwner: hs } : {}) });
+        continue;
+      }
 
       // ★ v1286: dieser Zweig meint NUR den gedruckten Effekt des Helden.
       // Gewonnene Aktiveffekte stehen ueber ihre Traegerinstanzen im

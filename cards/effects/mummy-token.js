@@ -14,8 +14,9 @@ module.exports = {
   activeIn: ['support'],
   // Opt-in honoured by `engine._isHeroMummified`: while a Support-Zone
   // card carrying this flag is attached to a Hero, that Hero's
-  // passives + active effect are silenced (Mummy Token's own
-  // heroEffect replaces it via server.js doActivateHeroEffect).
+  // EFFECT (passive + active) is silenced — NOT its Abilities (Al 28.10.).
+  // Mummy Token's own heroEffect replaces it for EVERY Hero, also pure
+  // passive ones (`getActiveHeroEffects`, server.js doActivateHeroEffect).
   mummifiesHost: true,
   heroEffect: 'Place a Mummy Token into the free Support Zone of a Hero your opponent controls that has no Mummy Tokens in its Support Zones yet.',
   // Rein schaedlich: platziert einen Mummy Token in der Zone des GEGNERS.
