@@ -32563,6 +32563,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // level reduction; the stamp lets post-destroy reactions like
         // Corpse Cannibal recognise the sacrifice). Don't touch them here
         // — doing so would double-count the tally.
+        if (this.zaehltAlsHeld(t.cardInstance)) t._heldOpfer = true;   // W79 (White Sacrificial Bull): dieses Opfer ist auch ein Helden-Opfer (Temple of Sacrifice: +3)
         await this.runHooks(HOOKS.ON_CREATURE_SACRIFICED, {
           creature: t.cardInstance,
           cardName: t.cardInstance?.name,
@@ -32658,7 +32659,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // elsewhere (Garius, Brackle, treatAsSacrificed, …) don't fire this
     // and are caught per-tribute via the unflagged ON_CREATURE_SACRIFICED.
     await this.runHooks('onSacrificeBatch', {
-      playerIdx: pi, creatureCount: picked.length, _skipReactionCheck: true,
+      playerIdx: pi, creatureCount: picked.length, heldCount: picked.filter(t => t._heldOpfer).length, _skipReactionCheck: true,
     });
     return true;
     } finally {
