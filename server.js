@@ -791,13 +791,13 @@ app.use((req, res, next) => {
 //  og:/twitter: URLs in the served HTML. index.html ships with the
 //  production base hard-coded as a safe default; here we swap it for
 //  the host that actually served the request, so link previews
-//  resolve from both the live Render site and a local test build.
+//  resolve from both the live site (pixelpartiestcg.com) and a local test build.
 //  PUBLIC_BASE_URL overrides everything (e.g. a future custom domain).
 //  Registered before express.static so it wins for "/" and
 //  "/index.html"; the SPA catch-all reuses it too.
 // ───────────────────────────────────────────────────────────────
 const INDEX_HTML_PATH = path.join(__dirname, 'public', 'index.html');
-const SHARE_BASE_DEFAULT = 'https://pixelparties.onrender.com';
+const SHARE_BASE_DEFAULT = 'https://pixelpartiestcg.com';
 let _indexCache = { mtimeMs: -1, html: '' };
 
 function resolveOrigin(req) {
@@ -3608,7 +3608,7 @@ function getCpuMessages(deckId) {
 //  CPU OPPONENT UNLOCK SYSTEM
 //  Accounts start with only the starter-deck opponents unlocked.
 //  More unlock as the player hits win milestones (endCpuBattle):
-//    • the first win vs each of the initial opponents → +1 random unlock
+//    • the first win vs EVERY opponent (starter or structure deck) → +1 random unlock
 //    • reaching THREE_WIN_MILESTONE wins vs ANY opponent → +1 random unlock
 //  Gaeste haben eine eigene, grosszuegigere Regel (jeder erste Sieg gegen
 //  eine CPU) — alles in `unlock-rules.js`.
@@ -6963,17 +6963,7 @@ function endCpuBattle(room, winnerIdx, reason) {
         const guestRow = await db.get('SELECT is_guest FROM users WHERE id = ?', [humanUserId]);
         if (humanWon) {
           const isGuest = !!guestRow?.is_guest;
-          // Das Startaufgebot interessiert nur registrierte Konten; die
-          // Abfrage entfaellt fuer Gaeste.
-          let isInitial = false;
-          if (!isGuest) {
-            const initRow = await db.get(
-              'SELECT is_initial FROM unlocked_opponents WHERE user_id = ? AND opponent_deck_id = ?',
-              [humanUserId, opponentDeckId]
-            );
-            isInitial = !!(initRow && initRow.is_initial);
-          }
-          const unlockCount = cpuUnlockCount({ isGuest, isInitial, preWins });
+          const unlockCount = cpuUnlockCount({ isGuest, preWins });
 
           const newlyUnlocked = [];
           for (let k = 0; k < unlockCount; k++) {
