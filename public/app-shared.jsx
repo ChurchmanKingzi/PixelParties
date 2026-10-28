@@ -3869,6 +3869,19 @@ const ZONE_ANIM_SFX = {
   field_standard_rally:    { name: 'buff' },
   // Silent — redundant with a log or purely decorative
   gold_sparkle:            null,
+  // Alliance (28.10.): Bündnisvertrag — Seil zischt von Held zu Held (~0–520 ms), Pergament rollt sich aus (~300 ms), Band zieht sich zu (~560 ms), beim Stempeln (~760 ms)
+  // dumpfer Schlag + heller Siegel-Ton, danach goldener Dreiklang. Nur der erste Teil übernimmt die Sammelkategorie 'effect'.
+  alliance_pact: [
+    { name: 'spell_cast',   opts: { rate: 1.35, volume: 0.55 } },
+    { name: 'elem_wind',    opts: { rate: 1.7,  volume: 0.45, delay: 90,  category: null, dedupe: 0 } },
+    { name: 'shuffle',      opts: { rate: 1.8,  volume: 0.5,  delay: 300, category: null, dedupe: 0 } },
+    { name: 'placement',    opts: { rate: 1.5,  volume: 0.55, delay: 570, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.15, volume: 0.85, delay: 770, category: null, dedupe: 0 } },
+    { name: 'buff',         opts: { rate: 1.0,  volume: 0.7,  delay: 790, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 1.5,  volume: 0.55, delay: 840, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 1.9,  volume: 0.5,  delay: 960, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.4,  volume: 0.45, delay: 1080, category: null, dedupe: 0 } },
+  ],
   // Shimmering Dragonegg (23.10.): Kreuzfunkel blitzen um das goldene Ei — helle Pings, versetzt; Liquid Luck: der Regenbogen wächst (Buff-Klang), Goldmünzen klingeln.
   dragonegg_shimmer: [
     { name: 'ping', opts: { rate: 1.5, volume: 0.5, category: null, dedupe: 0 } },

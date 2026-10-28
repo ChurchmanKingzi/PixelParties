@@ -29693,6 +29693,173 @@ const ANIM_REGISTRY = {
     return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 110 });
   })(),
   // ═════════════════════════════════════════════════════════════════
+  //  Alliance: Bündnis — PIXELART (Al 28.10.: „Alliance hat eine sehr unscheinbare Animation und noch keinen Sound"; Vorlage: ein Bündnisvertrag mit Siegel —
+  //  der Nutzer in Blau, der verbündete Gegnerheld in Rot)
+  //
+  //  Brett-Animation (`zoneType: 'board'`, Hülle `ppSalve`) vom Nutzer (Ursprung, `originOwner`/`originHeroIdx`) zum verbündeten Gegnerhelden (`targets[0]`):
+  //  ① Um den Nutzer springen drei blaue Pixelrahmen nach außen; ein verdrilltes BLAU-ROTES Seil (zwei Stränge, goldene Perlen) schießt von Kartenkante zu Kartenkante
+  //  (~0–520 ms), beim Gegner springen rote Rahmen auf. ② In der Mitte des Seils rollt sich ein Pergament aus (~300–560 ms, in ganzen Pixelstufen, Schriftzeilen,
+  //  Rollen links und rechts). ③ Ein Band — links blau, rechts rot — zieht sich darüber (~560–720 ms), zwei Bandenden hängen darunter und pendeln. ④ Bei ~760 ms stempelt
+  //  ein goldenes Siegel auf: weißer Kreuzblitz, goldene Ringe, das Seil blitzt weiß, beide Heldenkarten blinken in Gold, Kreuzfunkel kreisen um den Vertrag.
+  //  Ab ~1350 ms dithert alles weg, bei 1700 ms ist es fort. Feste Palette, KEIN Weichzeichner, KEIN Leuchten, nichts gedreht oder stufenlos skaliert; die Wurzel
+  //  trägt `data-pp-px="aus"`. Klang: `ZONE_ANIM_SFX.alliance_pact` (Seilzischen, Papierrascheln, Banddruck, Stempel-Schlag, goldener Dreiklang).
+  // ═════════════════════════════════════════════════════════════════
+  alliance_pact: (() => {
+    const BLAU = ['#7fdfff', '#1ca9fd', '#2f539d', '#14285a'].map(ppHex);        // Glanz, Blau, Schatten, Dunkel
+    const ROT = ['#ec7f79', '#e73b41', '#b21a29', '#780000'].map(ppHex);
+    const GOLD = ['#ffffff', '#f7f7ad', '#fad54a', '#f29a3e', '#cf5f00'].map(ppHex);   // Glanz, Hell, Gold, Orange, Dunkel
+    const PERG = ['#e2d8cb', '#ccb799', '#b29466', '#886c44'].map(ppHex);        // Pergament hell, Schatten, dunkel, Schrift
+    const KONTUR = ppHex('#282834');
+    const ENDE = 1700, FADE_AB = 1350;
+    const SEIL_T = 520, ROLL_AB = 300, ROLL_T = 260, BAND_AB = 560, BAND_T = 160, STEMPEL = 760;
+    const HALB = 20;                                                             // halbe Pergamentbreite (Rasterpixel)
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = () => ({
+      funken: Array.from({ length: ppFxN(10) }, (_, i) => ({ w: (i / 10) * Math.PI * 2 + Math.random() * 0.4, r: 30 + Math.random() * 14, start: STEMPEL + 40 + Math.random() * 260, leben: 360 + Math.random() * 180 })),
+      staub: Array.from({ length: ppFxN(10) }, (_, i) => ({ w: (i / 10) * Math.PI * 2 + Math.random() * 0.5, v: 22 + Math.random() * 20, leben: 240 + Math.random() * 160 })),
+    });
+    /** Rechteckring (1 Pixel) um (cx, cy) mit Halbbreite hw/-höhe hh. */
+    const rahmen = (g, cx, cy, hw, hh, c, a) => {
+      for (let x = -hw; x <= hw; x++) { g.put(cx + x, cy - hh, c, a); g.put(cx + x, cy + hh, c, a); }
+      for (let y = -hh + 1; y < hh; y++) { g.put(cx - hw, cy + y, c, a); g.put(cx + hw, cy + y, c, a); }
+    };
+    /** Pergamentrolle (5 breit, 20 hoch) an der Kante: `x0` = innere Spalte, `sg` = Richtung nach außen. */
+    const rolle = (g, x0, cy, sg, a) => {
+      const COL = [PERG[2], PERG[0], PERG[0], PERG[1], KONTUR];
+      for (let i = 0; i < 5; i++) for (let y = -10; y <= 9; y++) {
+        if ((i === 0 || i === 4) && (y === -10 || y === 9)) continue;              // abgerundete Ecken
+        g.put(x0 + sg * i, cy + y, (y === -10 || y === 9 || i === 4) ? KONTUR : COL[i], a);
+      }
+      for (const [i, y] of [[1, -4], [2, -3], [3, -3], [2, -2], [1, -1], [2, 0], [3, 0]]) g.put(x0 + sg * i, cy + y, PERG[3], a);   // der Spiralrand der Rolle
+    };
+    /** Pergament mit halber Breite `hw`: Körper (16 hoch), Schriftzeilen, Rollen. */
+    const pergament = (g, cx, cy, hw, a) => {
+      for (let x = -hw; x <= hw; x++) for (let y = -8; y <= 7; y++) g.put(cx + x, cy + y, (y === -8 || y === 7) ? KONTUR : (y >= 5 ? PERG[1] : PERG[0]), a);
+      for (const zy of [-5, -3, -1, 1, 3]) for (let x = -hw + 3; x <= hw - 3; x++) {
+        if (((x * 7 + zy * 13) & 7) === 0 || ((x * 3 + zy) & 15) === 5) continue;      // Wortlücken
+        g.put(cx + x, cy + zy, PERG[3], a);
+      }
+      rolle(g, cx - hw - 1, cy, -1, a); rolle(g, cx + hw + 1, cy, 1, a);
+    };
+    /** Band über dem Pergament (links blau, rechts rot, 6 breit), zieht sich von oben bis `bis` Zeilen herunter. */
+    const band = (g, cx, cy, bis, a) => {
+      for (let j = 0; j < bis; j++) {
+        const y = cy - 10 + j, gl = j % 4 === 0;
+        g.put(cx - 4, y, KONTUR, a); g.put(cx + 3, y, KONTUR, a);
+        g.put(cx - 3, y, BLAU[2], a); g.put(cx - 2, y, gl ? BLAU[0] : BLAU[1], a); g.put(cx - 1, y, BLAU[1], a);
+        g.put(cx, y, gl ? ROT[0] : ROT[1], a); g.put(cx + 1, y, ROT[1], a); g.put(cx + 2, y, ROT[2], a);
+      }
+    };
+    /** Zwei Bandenden unter dem Pergament, pendeln im Takt (`sw` 0/1). */
+    const enden = (g, cx, cy, sw, a) => {
+      for (let j = 0; j < 9; j++) {
+        const y = cy + 10 + j, ver = (j >> 1) + sw, kerb = j >= 7;                // Schwalbenschwanz: die letzten Zeilen schmal
+        g.put(cx - 4 - ver, y, KONTUR, a); g.put(cx - 3 - ver, y, BLAU[kerb ? 3 : 2], a); g.put(cx - 2 - ver, y, BLAU[1], a); if (!kerb) g.put(cx - 1 - ver, y, BLAU[1], a);
+        g.put(cx + 3 + ver, y, KONTUR, a); g.put(cx + 2 + ver, y, ROT[kerb ? 3 : 2], a); g.put(cx + 1 + ver, y, ROT[1], a); if (!kerb) g.put(cx + ver, y, ROT[1], a);
+      }
+    };
+    /** Goldenes Siegel (Radius 6, dunkler Rand, Glanz oben links) mit Kreuzstern. */
+    const siegel = (g, cx, cy, a) => {
+      for (let j = -7; j <= 7; j++) for (let i = -7; i <= 7; i++) {
+        const d = Math.hypot(i, j);
+        if (d > 7.2) continue;
+        if (d > 6.2) { g.put(cx + i, cy + j, KONTUR, a); continue; }
+        if (d > 4.7) { g.put(cx + i, cy + j, GOLD[4], a); continue; }
+        const licht = i + j;
+        g.put(cx + i, cy + j, licht < -3 ? GOLD[1] : licht > 3 ? GOLD[3] : GOLD[2], a);
+      }
+      for (let k = 1; k <= 3; k++) { const c = k === 1 ? GOLD[1] : GOLD[0]; g.put(cx - k, cy, c, a); g.put(cx + k, cy, c, a); g.put(cx, cy - k, c, a); g.put(cx, cy + k, c, a); }
+      g.put(cx, cy, GOLD[0], a);
+    };
+    /** Seil von Kartenkante zu Kartenkante: zwei Stränge (blau/rot) verdrillt, goldene Perlen; `blitz` = alles weiß-golden. */
+    const seil = (g, O, z, t, a, blitz) => {
+      const dx = z.dx, dy = z.dy;
+      const ex = Math.abs(dx) > 0.001 ? (z.w / 2 + 3) / Math.abs(dx) : 1e9, ey = Math.abs(dy) > 0.001 ? (z.h / 2 + 3) / Math.abs(dy) : 1e9;
+      const s0 = Math.min(ex, ey), s1 = z.len - s0;
+      if (s1 - s0 < 8) return;
+      const k = klemme(t / SEIL_T, 0, 1), kopf = s0 + (s1 - s0) * (1 - (1 - k) * (1 - k));
+      const nx = -dy, ny = dx;
+      const strang = (s, off, F, vorn) => {
+        const x = O.x + dx * s + nx * off, y = O.y + dy * s + ny * off;
+        const c = blitz ? (vorn ? GOLD[0] : GOLD[1]) : (vorn ? F[1] : F[2]);
+        g.put(x, y, c, a); g.put(x + 1, y, c, a); g.put(x, y + 1, c, a); g.put(x + 1, y + 1, blitz ? GOLD[2] : F[3], a);
+        if (vorn && !blitz) g.put(x, y, F[0], a);
+      };
+      for (let s = s0; s <= kopf; s += 1) {
+        const ph = s * 0.5 - t * 0.012, o = Math.sin(ph) * 2.2, vornBlau = Math.cos(ph) > 0;
+        if (vornBlau) { strang(s, -o, ROT, false); strang(s, o, BLAU, true); } else { strang(s, o, BLAU, false); strang(s, -o, ROT, true); }
+      }
+      for (let s = s0 + 9; s <= kopf; s += 18) {                                 // Perlen
+        const x = Math.round(O.x + dx * s), y = Math.round(O.y + dy * s);
+        g.put(x, y - 1, GOLD[4], a); g.put(x - 1, y, GOLD[4], a); g.put(x + 2, y, GOLD[4], a); g.put(x, y + 2, GOLD[4], a);
+        g.block(x, y, 2, 2, blitz ? GOLD[0] : GOLD[2], a); g.put(x, y, GOLD[1], a);
+      }
+      if (k < 1) ppKreuzfunkel(g, O.x + dx * kopf - 1, O.y + dy * kopf - 1, 2 + (Math.floor(t / 66) % 2), GOLD, a);   // Funke an der Seilspitze
+    };
+    const malen = (g, t, sz, teile) => {
+      const z = sz.ziele[0], O = sz.O;
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const OX = Math.round(O.x), OY = Math.round(O.y), TX = Math.round(z.x), TY = Math.round(z.y);
+      const HW = Math.floor(z.w / 2), HH = Math.floor(z.h / 2);
+      const MX = Math.round((OX + TX) / 2), MY = Math.round((OY + TY) / 2);
+      const nachStempel = t - STEMPEL;
+      const blitz = nachStempel >= 0 && nachStempel < 100 && Math.floor(nachStempel / 33) % 2 === 0;
+
+      // ── Rahmen um die beiden Helden: Sprung nach außen (blau am Nutzer, rot am Verbündeten), dann stehen leise Rahmen bis zum Ausblenden ──
+      const sprung = (cx, cy, ab, F) => {
+        const al = t - ab;
+        if (al < 0) return;
+        if (al < 280) { const st = Math.floor(al / 70); rahmen(g, cx, cy, HW + 2 + st * 2, HH + 2 + st * 2, F[1], aus * (1 - st * 0.22)); rahmen(g, cx, cy, HW + 1 + st * 2, HH + 1 + st * 2, F[0], aus * (1 - st * 0.3)); }
+        rahmen(g, cx, cy, HW + 1, HH + 1, F[2], aus); rahmen(g, cx, cy, HW + 2, HH + 2, KONTUR, aus);
+      };
+      sprung(OX, OY, 0, BLAU); sprung(TX, TY, SEIL_T - 80, ROT);
+      if (nachStempel >= 0 && nachStempel < 330 && Math.floor(nachStempel / 66) % 2 === 0) {                   // beide Karten blinken golden
+        for (const [cx, cy] of [[OX, OY], [TX, TY]]) { rahmen(g, cx, cy, HW + 1, HH + 1, GOLD[2], aus); rahmen(g, cx, cy, HW + 2, HH + 2, GOLD[0], aus); rahmen(g, cx, cy, HW, HH, GOLD[1], aus); }
+      }
+
+      // ── Seil ──
+      seil(g, O, z, t, aus, blitz);
+
+      // ── Pergament in der Mitte: rollt sich aus ──
+      if (t >= ROLL_AB) {
+        const k = klemme((t - ROLL_AB) / ROLL_T, 0, 1), hw = Math.round(HALB * k);
+        const wipp = nachStempel > 100 && nachStempel < 700 ? (Math.floor(nachStempel / 132) % 2 ? 0 : -1) : 0;   // leichtes Wippen nach dem Stempeln (ganze Pixel)
+        const cy = MY + wipp;
+        pergament(g, MX, cy, hw, aus);
+        if (k >= 1 || t >= BAND_AB) {
+          const bk = klemme((t - BAND_AB) / BAND_T, 0, 1);
+          if (bk > 0) band(g, MX, cy, Math.round(20 * bk), aus);
+          if (bk >= 1) enden(g, MX, cy, Math.floor(t / 132) % 2, aus);
+        }
+        // ── Siegel: fällt in drei Stufen, schlägt bei STEMPEL ein ──
+        if (t >= STEMPEL - 120) {
+          const fall = t < STEMPEL - 80 ? -20 : t < STEMPEL - 40 ? -10 : t < STEMPEL ? -3 : 0;
+          siegel(g, MX, cy + fall, aus);
+          if (nachStempel >= 0 && nachStempel < 140) ppKreuzfunkel(g, MX - 1, cy - 1, 4 + Math.floor(nachStempel / 25), GOLD, aus);   // weißer Kreuzblitz beim Aufschlag
+        }
+        // ── Ringe und Staub beim Aufschlag ──
+        if (nachStempel >= 0 && nachStempel < 360) {
+          const st = Math.floor(nachStempel / 60);
+          g.ring(MX, cy, 10 + st * 7, 6 + st * 4, GOLD[st < 2 ? 0 : 1], aus * (st < 3 ? 1 : 1 - (st - 2) * 0.3));
+          g.ring(MX, cy, 11 + st * 7, 7 + st * 4, GOLD[st < 2 ? 2 : 3], aus * (st < 3 ? 1 : 1 - (st - 2) * 0.3));
+          for (const s of teile.staub) {
+            const al = nachStempel; if (al > s.leben) continue;
+            g.put(MX + Math.cos(s.w) * (8 + s.v * al / 1000 * 2.4), cy + Math.sin(s.w) * (5 + s.v * al / 1000 * 1.2), PERG[0], aus * (1 - al / s.leben));
+          }
+        }
+        // ── Kreuzfunkel kreisen um den Vertrag ──
+        for (const f of teile.funken) {
+          const al = t - f.start; if (al < 0 || al > f.leben) continue;
+          const arm = [1, 2, 3, 3, 2, 1][Math.min(5, Math.floor(al / f.leben * 6))];
+          const w = f.w + al * 0.0021;
+          ppKreuzfunkel(g, MX + Math.cos(w) * f.r - 1, cy + Math.sin(w) * f.r * 0.7 - 1, arm, GOLD, aus);
+        }
+      }
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+  })(),
+  // ═════════════════════════════════════════════════════════════════
   //  Sky Archeologist: Grabung — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!"; Vorlage: das Kartenbild — der Archäologe
   //  mit der Spitzhacke auf der schwebenden Insel)
   //
