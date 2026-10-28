@@ -25950,10 +25950,13 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Kosten = Stufe beim Aktivieren, gesenkte Stufe = Pflicht-Auflösung. Negiert = nie aufgelöst: Einmal-Stempel frei (Z7b), die Zusatzaktion ist verbraucht.
       const fenster = await this.abilityAktivierungsFenster({ pi: playerIdx, heroIdx, heroOwner: abSeite, slotHeroIdx: heroIdx, zoneIdx, zoneKind, abilityName, level, inst });
       if (fenster.negated) {
+        // Al (28.10.): die Zusatzaktion bleibt UNVERBRAUCHT — zurück zur Auswahl (`retry`). Die Listen werden neu erhoben: bleibt nichts, wofür man sie ausgeben kann (Pflicht-Sofortaktion ohne
+        // weitere Option), verwirft die Schleife oben die Aktion (`return { played: false }`). Die negierte Ability: Aktivierung gewirkt, Einmal-Stempel nach Z7b frei (Ragnarock sperrt sie zusätzlich
+        // für den Zug über `_abilityHeroLocks` — dann wird sie nicht mehr angeboten).
         delete this.gs.hoptUsed[hoptKey];
         this._broadcastEvent('ability_activated', { owner: abSeite, heroIdx, zoneIdx, zoneKind, abilityName });
         this.sync();
-        return { played: true, cardName: abilityName, cardType: 'Ability' };
+        return { retry: true };
       }
       const _fInst = fenster.inst || inst;
       this._broadcastEvent('ability_activated', { owner: abSeite, heroIdx, zoneIdx, zoneKind, abilityName });

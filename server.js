@@ -11015,9 +11015,13 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
       // keeps the marked Potion).
       await room.engine.refundHeroActionCost(heroOwner, heroIdx);
       _heroCostFinalized = true;
-      if (isActionPhase) await room.engine.advanceToPhase(pi, 4);
-      // (additional-action providers were already consumed upfront before
-      // activation, so no manual consume is needed here on negation.)
+      if (consumedAdditionalInst) {
+        // ★ W82 (Sinister Idol, Al): wird die Aktivierung im Kettenfenster NEGIERT, bleibt eine ZUSATZaktion UNVERBRAUCHT — der Anbieter wird zurückgegeben und die Aktionszähler zurückgedreht
+        // (wie beim Abbruch); die Hauptaktion einer normalen Aktivierung bleibt, wie bei jeder negierten Karte, verbraucht.
+        room.engine.restoreAdditionalAction(consumedAdditionalInst);
+        if (actionCounterIncrementedHere) actingPs._actionsPlayedThisPhase = Math.max(0, (actingPs._actionsPlayedThisPhase || 0) - 1);
+        if (bonusMainActionsConsumedHere) actingPs._bonusMainActions = 1;
+      } else if (isActionPhase) await room.engine.advanceToPhase(pi, 4);
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
