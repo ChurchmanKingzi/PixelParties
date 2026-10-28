@@ -3483,14 +3483,14 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       st.zuletzt = now;
       st.schritte++;
       const z = zustand.current;
-      // ★ Perf (Kampf-Stresstest 28.10.): Bildwechsel im ABSOLUTEN Takt (`floor(now / ms)`) statt je Figur ab ihrem Einhaengezeitpunkt.
-      // Jeder Bildwechsel malt eine Leinwand und erzwingt damit einen Hauptthread-Frame, in dem der Browser ALLE laufenden CSS-Animationen
-      // des Bretts neu auswertet (Foil, Motes, Area-Szenen: je ~20 us und Animation). Mit eigener Phase je Figur kamen die Wechsel
-      // verstreut (bis zu N x 11 Frames/s); im gemeinsamen Takt fallen die Figuren mit gleichem `frameMs` (277 von 323 Sheets: 90 ms)
-      // in denselben Frame. Der ZUFAELLIGE STARTFRAME bleibt — die Figuren stehen weiter in verschiedenen Posen, nur wechseln sie gemeinsam.
-      const takt = Math.floor(now / ms);
-      if (st.takt == null || z.angehalten) st.takt = takt;
-      else if (takt !== st.takt) { st.frame = (st.frame + (takt - st.takt)) % frames; st.takt = takt; }
+      if (!z.angehalten) {
+        st.rest += dt;
+        if (st.rest >= ms) {
+          const n = Math.floor(st.rest / ms);
+          st.rest -= n * ms;
+          st.frame = (st.frame + n) % frames;
+        }
+      }
       if (z.versteinert) { if (st.stein < 1) st.stein = Math.min(1, st.stein + dt / 900); }
       else st.stein = 0;
       // Zonenlage/Hover nur bei „schmutz" (Beobachter, Hover-Ereignis,
