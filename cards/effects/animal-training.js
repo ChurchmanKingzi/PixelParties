@@ -187,8 +187,11 @@ module.exports = {
     // ── Volle Heilung ──
     const maxHp = maxHpVon(engine, inst);
     if (maxHp > 0) {
-      await engine.actionHealCreature({ name: CARD_NAME, owner: pi, controller: pi }, inst, maxHp);
-      if ((inst.counters.currentHp ?? 0) < maxHp) inst.counters.currentHp = maxHp;   // „instead": sie ist danach voll geheilt, auch wenn der Heilweg gesperrt war
+      // Nur heilen, wenn wirklich HP fehlen: eine unversehrte Creature bekäme sonst eine grüne „+0" (Al 28.10.); der Zustand „voll" ist dann schon erreicht.
+      if ((inst.counters.currentHp ?? 0) < maxHp) {
+        await engine.actionHealCreature({ name: CARD_NAME, owner: pi, controller: pi }, inst, maxHp);
+        if ((inst.counters.currentHp ?? 0) < maxHp) inst.counters.currentHp = maxHp;   // „instead": sie ist danach voll geheilt, auch wenn der Heilweg gesperrt war
+      }
     }
 
     // ── Negierung bis zum Ende dieses Zuges (Dark Gear/Diplomacy: unverhinderbar, eigene Kosten) ──

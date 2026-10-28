@@ -62343,26 +62343,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // ★ v1477: `zielwahl` wie das Zielwahl-Panel (siehe DraggablePanel).
         <DraggablePanel zielwahl className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Select a Zone'}</div>
-          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
           {/* Optional small card preview — server passes `previewCardName`
               to give the player a visual of what they're about to place.
-              CardMini gives the full hover tooltip + foil treatment for free. */}
-          {((ep.previewCardName && CARDS_BY_NAME[ep.previewCardName]) || (ep.showCardLeft && CARDS_BY_NAME[ep.showCardLeft])) && (
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 10 }}>
-              {/* `showCardLeft`: die betroffene Karte LINKS (Enemy of my Enemy: die Creature), die Quellkarte rechts daneben */}
-              {ep.showCardLeft && CARDS_BY_NAME[ep.showCardLeft] && (
-                <div className="panel-zielwahl-vorschau" style={{ width: 90 }}>
-                  <CardMini card={CARDS_BY_NAME[ep.showCardLeft]} inGallery />
-                </div>
-              )}
-              {ep.previewCardName && CARDS_BY_NAME[ep.previewCardName] && (
-                <div className="panel-zielwahl-vorschau" style={{ width: 90 }}>
-                  <CardMini card={CARDS_BY_NAME[ep.previewCardName]} inGallery />
-                </div>
-              )}
-            </div>
-          )}
-          <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7 }}>Click a highlighted zone on the board.</div>
+              CardMini gives the full hover tooltip + foil treatment for free.
+              `showCardLeft`: die betroffene Karte LINKS (Enemy of my Enemy, Animal Training: die Creature), die Quellkarte RECHTS.
+              Zeigt das Fenster BEIDE, stehen sie links und rechts NEBEN dem Text (Al 28.10.); mit nur einer Karte bleibt sie unter dem Text. */}
+          {(() => {
+            const links = ep.showCardLeft && CARDS_BY_NAME[ep.showCardLeft] ? CARDS_BY_NAME[ep.showCardLeft] : null;
+            const rechts = ep.previewCardName && CARDS_BY_NAME[ep.previewCardName] ? CARDS_BY_NAME[ep.previewCardName] : null;
+            const karte = (c) => (<div className="panel-zielwahl-vorschau" style={{ width: 90, flex: '0 0 auto' }}><CardMini card={c} inGallery /></div>);
+            const text = (<div style={{ flex: '1 1 auto', minWidth: 0 }}>
+              <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
+              <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7 }}>Click a highlighted zone on the board.</div>
+            </div>);
+            if (links && rechts) {
+              return (<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 4 }}>{karte(links)}{text}{karte(rechts)}</div>);
+            }
+            return (<>
+              <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
+              {(links || rechts) && (<div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 10 }}>{links && karte(links)}{rechts && karte(rechts)}</div>)}
+              <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7 }}>Click a highlighted zone on the board.</div>
+            </>);
+          })()}
           {ep.cancellable !== false && (
             <button className="btn" style={{ marginTop: 10, padding: '6px 16px', fontSize: 11 }}
               onClick={() => respondToPrompt({ cancelled: true })}>{ep.cancelLabel || '← Back'}</button>
