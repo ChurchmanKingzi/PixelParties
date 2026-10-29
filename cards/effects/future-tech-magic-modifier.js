@@ -98,6 +98,7 @@ module.exports = {
 
     // Aufdecken gehoert zum Text und passiert auch ohne Reduktion.
     engine._broadcastEvent('card_reveal', { cardName: name, playerIdx: pi });
+    await engine.aufdeckEreignis(pi, [name], { zone: 'hand', source: CARD_NAME });   // W85c (Atta, Al 29.10.): aufgedeckt = EIN Ereignis, sofort (in Textreihenfolge); ein Zuhörer (Atta) darf die Karte löschen
     await engine._delay(560);
 
     if (abzug > 0) {

@@ -69,34 +69,56 @@ window.addEventListener('touchstart', function onFirstTouch() {
 // Geste), scharft sich der Griff nach 1,5 s wieder: die naechste
 // Beruehrung holt es zurueck. Das ist das uebliche Verhalten von
 // Browserspielen im Querformat.
-function _ppRequestFullscreen() {
+// Ergebnis: Promise<{ fs, locked }> — fs: Vollbild aktiv, locked: Querformat gesperrt (Android/Chrome). Gleichzeitige Aufrufe
+// (globaler Tipp-Griff + Klick auf dem Dreh-Bildschirm) teilen sich dieselbe Anfrage.
+let _ppFsPending = null;
+function _ppLockSupported() { try { return !!(screen.orientation && typeof screen.orientation.lock === 'function'); } catch { return false; } }
+function _ppRequestFullscreen(force) {
   const el = document.documentElement;
-  if (document.fullscreenElement || !el.requestFullscreen) return;
-  if (window.innerWidth <= window.innerHeight) return;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  const isFs = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  if (_ppFsPending) return _ppFsPending;
+  if (isFs() || !req) return Promise.resolve({ fs: isFs(), locked: false });
+  if (!force && window.innerWidth <= window.innerHeight) return Promise.resolve({ fs: false, locked: false });   // nur im Querformat (force: Antippen auf dem Hochformat-Bildschirm)
+  const lock = () => {
+    try { return screen.orientation.lock('landscape').then(() => true, () => false); } catch { return Promise.resolve(false); }
+  };
   try {
-    const p = el.requestFullscreen({ navigationUI: 'hide' });
-    if (p && p.then) p.then(() => {
-      try {
-        const o = screen.orientation;
-        if (o && o.lock) o.lock('landscape').catch(() => {});
-      } catch {}
-    }).catch(() => {});
-  } catch {}
+    const r = req.call(el, { navigationUI: 'hide' });
+    window._ppFsLast = null;
+    _ppFsPending = Promise.resolve(r).then(() => lock()).then(
+      locked => { window._ppFsLast = { fs: isFs(), locked, err: locked ? null : 'orientation.lock refused' }; return { fs: isFs(), locked }; },
+      err => { window._ppFsLast = { fs: false, locked: false, err: (err && (err.name || err.message)) || 'rejected' }; return { fs: false, locked: false }; });
+  } catch { return Promise.resolve({ fs: false, locked: false }); }
+  _ppFsPending.then(() => { _ppFsPending = null; });
+  return _ppFsPending;
 }
 window._ppRequestFullscreen = _ppRequestFullscreen;
-function _ppArmFullscreenOnTouch() {
-  window.addEventListener('touchend', function onTouch() {
-    window._isTouchDevice = true;
-    window.removeEventListener('touchend', onTouch);
-    _ppRequestFullscreen();
-  }, { passive: true });
+window._ppFullscreenSupported = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+window._ppLandscapeLockSupported = _ppLockSupported();
+// Ausloeser ist `click`, NICHT touchend/pointerup: nur `click` (und tastatur/maus) gilt auf Android-Browsern zuverlaessig als
+// Nutzeraktivierung fuer requestFullscreen — der Knopf-Klick des Vorgaengers (React onClick) hat auf dem Samsung-Handy Vollbild
+// + Querformat geschafft, der Griff auf touchend/pointerup dagegen nicht.
+// Jedes Antippen holt das Vollbild, solange es nicht aktiv ist — im Querformat direkt, im Hochformat samt
+// Querformat-Sperre (das Geraet dreht sich dann von selbst; nur wo `screen.orientation.lock` existiert). Dauerhaft angehaengt:
+// frueher war der Griff einmalig — eine erste Beruehrung im Hochformat verbrauchte ihn, danach kam das Vollbild nie
+// mehr von allein. Nach einem Verlassen (Zurueck-Geste) ruht er 1,5 s.
+let _ppFsCooldownUntil = 0;
+function _ppFullscreenOnTap(e) {
+  if (!window.matchMedia || !window.matchMedia('(pointer: coarse)').matches) return;   // Touch-Notebooks/Maus: kein Zwangs-Vollbild
+  window._isTouchDevice = true;
+  if (e.target && e.target.closest && e.target.closest('.rotate-panel-pc')) return;   // Link kopieren / Discord auf dem Hochformat-Bildschirm
+  if (Date.now() < _ppFsCooldownUntil) return;
+  const portrait = window.innerWidth <= window.innerHeight;
+  if (portrait && !(window._ppFullscreenSupported && window._ppLandscapeLockSupported)) return;   // ohne Sperre hilft Vollbild im Hochformat nicht
+  _ppRequestFullscreen(portrait);
 }
-_ppArmFullscreenOnTouch();
-document.addEventListener('fullscreenchange', () => {
-  if (!document.fullscreenElement && window._isTouchDevice) setTimeout(_ppArmFullscreenOnTouch, 1500);
-});
+window.addEventListener('click', _ppFullscreenOnTap, { capture: true });
+const _ppOnFullscreenChange = () => { if (!document.fullscreenElement && !document.webkitFullscreenElement) _ppFsCooldownUntil = Date.now() + 1500; };
+document.addEventListener('fullscreenchange', _ppOnFullscreenChange);
+document.addEventListener('webkitfullscreenchange', _ppOnFullscreenChange);
 
-// Re-request fullscreen when rotating to landscape (if previously granted)
+// Beim Drehen ins Querformat gleich versuchen (klappt, solange die letzte Beruehrung noch zaehlt)
 window.addEventListener('orientationchange', () => {
   if (!window._isTouchDevice) return;
   setTimeout(_ppRequestFullscreen, 300);
@@ -118,14 +140,39 @@ function setTapTooltip(cardName) {
 }
 function clearTapTooltip() { setTapTooltip(null); }
 
-// Dismiss tooltip on any touch end (after long-press)
+// Zeitpunkt der letzten Beruehrung: ein Tooltip, der kurz danach erscheint (auch ueber die nachgeschobenen Maus-Ereignisse eines Tipps), gilt als
+// per Touch geoeffnet und bleibt (`_ppTipTouch`) — Maus-Verlassen-Ereignisse und der Sicherheits-Takt raeumen ihn dann nicht mehr ab.
+document.addEventListener('touchstart', () => { window._ppTouchAt = performance.now(); }, { capture: true, passive: true });
+document.addEventListener('touchend', () => { window._ppTouchAt = performance.now(); }, { capture: true, passive: true });
+// Tooltip schliessen, auch wenn er per Touch festgehalten wird.
+window._ppTipSchliessen = () => {
+  window._ppTipTouch = false;
+  window._ppTipForce = true;
+  try { if (window._boardTooltipSetter) window._boardTooltipSetter(null); } finally { window._ppTipForce = false; }
+};
+// Tipp-Waechter: ein TIPP (kaum Bewegung) auf eine Stelle, die weder Karte noch Tooltip ist, schliesst den festgehaltenen Tooltip.
+(function () {
+  const BEHALTEN = '.board-tooltip, .board-card, .card-mini, .hand-slot, .hand-card, .status-badge, .buff-icon, .card-reveal-entry, [data-card-name]';
+  let d = null;
+  document.addEventListener('touchstart', (e) => {
+    const t = e.touches && e.touches[0];
+    d = (t && e.touches.length === 1) ? { x: t.clientX, y: t.clientY, aussen: !(e.target && e.target.closest && e.target.closest(BEHALTEN)) } : null;
+  }, { capture: true, passive: true });
+  document.addEventListener('touchmove', (e) => {
+    const t = e.touches && e.touches[0];
+    if (d && t && Math.abs(t.clientX - d.x) + Math.abs(t.clientY - d.y) > 12) d = null;
+  }, { capture: true, passive: true });
+  document.addEventListener('touchend', () => {
+    const s0 = d; d = null;
+    if (s0 && s0.aussen && window._ppTipTouch) window._ppTipSchliessen();
+  }, { capture: true, passive: true });
+})();
+
+// ★ Mobil: Der Karten-Tooltip BLEIBT nach dem Loslassen stehen (sonst laesst sich ein langer Tooltip nie scrollen) und verschwindet erst, wenn man
+// ins Leere tippt (siehe `_ppTipSchliessen` / der Tipp-Waechter unten). Frueher raeumte das Loslassen nach einem Langdruck ihn nach 50 ms weg.
 document.addEventListener('touchend', () => {
   clearTimeout(window._longPressTimer);
-  if (window._longPressFired) {
-    // Small delay so the tooltip is visible before dismissing
-    setTimeout(clearTapTooltip, 50);
-    window._longPressFired = false;
-  }
+  window._longPressFired = false;
 }, { passive: true });
 document.addEventListener('touchmove', () => {
   // Cancel long-press if finger moves
@@ -1490,6 +1537,7 @@ function ppPixelieren(wurzel) {
     }
     const scheine = _ppScheine(cs.boxShadow).concat(_ppScheine((cs.filter || '').match(/drop-shadow\(.*\)/)?.[0] || ''));
     if (scheine.length) a.schein = scheine.sort((p, q) => q.blur - p.blur)[0];
+    if (a.schein) a.position = cs.position;   // schon HIER lesen: ein Lesen nach den Schreibzugriffen (s. unten) erzwang je Element eine volle Stilberechnung (Layout-Thrashing, ~95 % der Pixelierzeit)
     if (cs.boxShadow && cs.boxShadow !== 'none') a.ohneSchatten = true;
     if (/drop-shadow|blur\(/.test(cs.filter || '')) a.filter = _ppFilterOhneSchein(cs.filter);
     // Emoji/Glyphe: genau ein Textkind, das eine Sprite-Entsprechung hat.
@@ -1579,7 +1627,7 @@ function ppPixelieren(wurzel) {
         halo.style.cssText = `position:absolute;left:${-rand}px;top:${-rand}px;width:${a.w + 2 * rand}px;height:${a.h + 2 * rand}px;`
           + `background:url(${u}) center/100% 100% no-repeat;image-rendering:pixelated;pointer-events:none;z-index:-1;`;
         _ppPxErledigt.add(halo);
-        if (getComputedStyle(el).position === 'static') st.position = 'relative';
+        if (a.position === 'static') st.position = 'relative';
         el.insertBefore(halo, el.firstChild);
       }
     }
@@ -2078,22 +2126,53 @@ function _playBuffer(ctx, buf, opts, intrinsic, delaySec) {
   try { src.start(delaySec > 0 ? ctx.currentTime + delaySec : 0); } catch {}
 }
 
-// Resume AudioContext on first user gesture (Chrome/Safari autoplay policy).
-// Also kick off decoding of any SFX bytes fetched before the context existed.
+// ═══ AUDIO ENTSPERREN (Mobil-Befund: Tap-Screen und Login ohne Musik, Textbox-Klang verzoegert) ═══════
+// Chrome/Samsung Internet/Safari lassen einen AudioContext nur aus einer ECHTEN Aktivierungsgeste heraus laufen: `click`, `pointerup`,
+// `touchend`, `keydown`. `touchstart` zaehlt NICHT. Der alte Entsperrer hing an `touchstart`, rief dort `resume()` (wirkungslos) und
+// entfernte sich danach selbst — der Kontext blieb auf dem Handy `suspended`, bis irgendein spaeterer Klick zufaellig ein `playSFX` ausloeste.
+// Folge: Tap-Screen und Login ohne Musik, erste Klaenge verspaetet. Jetzt: die Entsperr-Horcher bleiben, bis der Kontext TATSAECHLICH laeuft
+// (und kommen zurueck, wenn er wieder haengt, z.B. nach Tab-Wechsel / Anruf), und melden den Lauf per `pp-audio-running`.
+// Ausserdem haelt ein unhoerbarer Dauerton den Audio-Ausgang des Handys wach (sonst braucht der erste Klang nach Stille spuerbar laenger).
 if (typeof window !== 'undefined') {
-  const _unlockSfx = () => {
-    const ctx = _getSfxCtx();
-    if (ctx && ctx.state === 'suspended') { try { ctx.resume(); } catch {} }
-    for (const name of SFX_NAMES) {
-      if (_sfxBytes[name] && !_sfxBuffers[name]) _decodeSfxBytes(name);
-    }
-    window.removeEventListener('click', _unlockSfx);
-    window.removeEventListener('keydown', _unlockSfx);
-    window.removeEventListener('touchstart', _unlockSfx);
+  const GESTEN = ['pointerup', 'touchend', 'click', 'keydown', 'mousedown'];
+  let _wach = false;
+  const _haltWach = (ctx) => {
+    if (_wach) return; _wach = true;
+    try {
+      const buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);   // 1 s, kaum messbares Rauschen (-90 dB), laeuft in Schleife
+      const d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() - 0.5) * 6e-5;
+      const q = ctx.createBufferSource(); q.buffer = buf; q.loop = true; q.connect(ctx.destination); q.start(0);
+    } catch {}
   };
-  window.addEventListener('click', _unlockSfx);
-  window.addEventListener('keydown', _unlockSfx);
-  window.addEventListener('touchstart', _unlockSfx);
+  const _laeuft = () => { const c = _sfxCtx; return !!(c && c.state === 'running'); };
+  const _gemeldet = () => {
+    const ctx = _sfxCtx; if (!ctx || ctx.state !== 'running') return;
+    for (const name of SFX_NAMES) { if (_sfxBytes[name] && !_sfxBuffers[name]) _decodeSfxBytes(name); }
+    _haltWach(ctx);
+    GESTEN.forEach(t => window.removeEventListener(t, _entsperren, true));
+    try { window.dispatchEvent(new Event('pp-audio-running')); } catch {}
+  };
+  const _scharf = () => GESTEN.forEach(t => window.addEventListener(t, _entsperren, { capture: true, passive: true }));
+  function _entsperren() {
+    const ctx = _getSfxCtx();
+    if (!ctx) return;
+    if (ctx.state === 'running') { _gemeldet(); return; }
+    let p; try { p = ctx.resume(); } catch {}
+    Promise.resolve(p).then(_gemeldet, () => {});
+  }
+  window.ppAudioEntsperren = _entsperren;
+  window.ppAudioLaeuft = _laeuft;
+  _scharf();
+  // Sofortversuch beim Laden: Browser, die Ton ohne Geste erlauben (hohes Medien-Engagement, Seiteneinstellung „Ton zulassen“), starten die Musik
+  // gleich; alle anderen lassen `resume()` offen, bis die erste Geste kommt (die Horcher oben).
+  try { _entsperren(); } catch {}
+  // Kontext schon beim Laden anlegen (startet suspendiert, ohne Warnung): so kann `statechange` beobachtet werden, und der erste Tipp
+  // muss nur noch `resume()` rufen. Faellt der Kontext spaeter zurueck (iOS „interrupted", Tab-Wechsel), werden die Horcher neu gescharft.
+  try {
+    const c = _getSfxCtx();
+    if (c) c.addEventListener('statechange', () => { if (c.state === 'running') _gemeldet(); else _scharf(); });
+  } catch {}
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !_laeuft()) _scharf(); });
   _initSoundManager();
 }
 
@@ -2222,6 +2301,12 @@ function playSFXForLog(entry) {
     case 'mana_beacon_discard':
     case 'inventing_discard_draw':
       playSFX('discard', { dedupe: 40 });
+      return;
+    // Elixir of Immortality & Co. („Place openly"-Potions): der Klang haengt NICHT mehr allein an der Permanent-Animation (die ihn wegen der
+    // 400-ms-Effekt-Sperre schlucken konnte — Befund: Elixir stumm). Das Log liefert ihn zusaetzlich; die gemeinsame Dedupe-Zeit (900 ms auf
+    // `revive`) verhindert doppelte Wiedergabe.
+    case 'potion_placed_open':
+      playSFX('revive', { dedupe: 900, category: null });
       return;
     case 'shuffle_back':
       playSFX('shuffle');
@@ -4970,8 +5055,45 @@ window.addDragListeners = addDragListeners;
 // ===== API HELPER =====
 window.AUTH_TOKEN = null;
 
+// ===== SPIELER-TRICHTER (anonyme Zaehler, siehe funnel.js) =====
+// KEINE Besucher-ID, kein Cookie, nichts Eindeutiges. Nur zwei grobe Etiketten liegen in sessionStorage (Tab-Sitzung) und gehen als
+// Header mit: Quelle (utm_source oder Referrer-Host) und Geraeteklasse (phone | tablet | desktop). Aus: ?nostats=1 (merkt sich der
+// Browser als Einstellung, ?nostats=0 hebt auf), Do-Not-Track, Global Privacy Control. Dann geht nur `x-pp-off: 1` raus.
+const ppFunnel = (() => {
+  const OFF = 'pp_nostats';
+  try { localStorage.removeItem('pp_vid'); } catch {}   // Rest aus einem frueheren Stand dieser Statistik (Besucher-ID): entfernen
+  try { const q = new URLSearchParams(location.search).get('nostats'); if (q === '1') localStorage.setItem(OFF, '1'); else if (q === '0') localStorage.removeItem(OFF); } catch {}
+  const off = () => { try { if (localStorage.getItem(OFF) === '1') return true; } catch {} return navigator.doNotTrack === '1' || window.doNotTrack === '1' || navigator.globalPrivacyControl === true; };
+  const label = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, 24);
+  const labels = () => {
+    try {
+      let src = sessionStorage.getItem('pp_src'), dev = sessionStorage.getItem('pp_dev');
+      if (src === null || dev === null) {
+        const q = new URLSearchParams(location.search); let ref = '';
+        try { const h = document.referrer ? new URL(document.referrer).hostname.replace(/^www\./, '') : ''; ref = h && h !== location.hostname ? h : ''; } catch {}
+        src = label(q.get('utm_source')) || label(ref) || '(direkt)';
+        const coarse = matchMedia('(pointer: coarse)').matches, small = Math.min(screen.width, screen.height) <= 700;
+        dev = coarse && small ? 'phone' : coarse ? 'tablet' : 'desktop';
+        sessionStorage.setItem('pp_src', src); sessionStorage.setItem('pp_dev', dev);
+      }
+      return { src, dev };
+    } catch { return { src: '(direkt)', dev: 'desktop' }; }
+  };
+  function headers() { if (off()) return { 'x-pp-off': '1' }; const l = labels(); return { 'x-pp-src': l.src, 'x-pp-dev': l.dev }; }
+  function hit() {
+    try {
+      if (off() || sessionStorage.getItem('pp_hit')) return; sessionStorage.setItem('pp_hit', '1');
+      const l = labels();
+      fetch('/api/funnel/hit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ src: l.src, device: l.dev }), keepalive: true }).catch(() => {});
+    } catch {}
+  }
+  return { headers, hit };
+})();
+window.ppFunnel = ppFunnel;
+ppFunnel.hit();
+
 async function api(path, opts = {}) {
-  const headers = { 'Content-Type': 'application/json' };
+  const headers = { 'Content-Type': 'application/json', ...ppFunnel.headers() };
   if (window.AUTH_TOKEN) headers['x-auth-token'] = window.AUTH_TOKEN;
   const res = await fetch('/api' + path, { ...opts, headers: { ...headers, ...opts.headers } });
   const data = await res.json();
@@ -9757,16 +9879,20 @@ function useCardTooltip(opts) {
   // Wire global setter so BoardCard / CardMini components trigger this tooltip
   useEffect(() => {
     window._boardTooltipSetter = (card) => {
+      // Per Touch geoeffnet → festhalten: Verlassen-Ereignisse (Maus-Emulation) schliessen ihn nicht, nur `_ppTipSchliessen`.
+      if (!card && window._isTouchDevice && window._ppTipTouch && !window._ppTipForce) return;
+      if (card && window._isTouchDevice && performance.now() - (window._ppTouchAt || 0) < 900) window._ppTipTouch = true;
+      if (!card) window._ppTipTouch = false;
       setTooltipCard(card || null);
       if (card) setTooltipSide(defaultSide); // BoardCard hover → always use defaultSide
     };
-    return () => { window._boardTooltipSetter = null; };
+    return () => { window._boardTooltipSetter = null; window._ppTipTouch = false; };
   }, [defaultSide]);
 
   // Touch: sync with global tap-tooltip state
   useEffect(() => {
     if (!window._isTouchDevice) return;
-    const sync = (activeCard) => { if (!activeCard) setTooltipCard(null); };
+    const sync = (activeCard) => { if (!activeCard && !window._ppTipTouch) setTooltipCard(null); };
     if (window._tapTooltipSetters) window._tapTooltipSetters.add(sync);
     return () => { if (window._tapTooltipSetters) window._tapTooltipSetters.delete(sync); };
   }, []);
@@ -10224,6 +10350,42 @@ function measureHighlight(el) {
 const TACKLE_FLUG_MS = 700;
 const TACKLE_VORLAUF_MS = 1300;
 
+// ★ Tipp auf eine KARTE waehrend einer Textbox (Mobil): zeigt ihren Tooltip und blaettert die Textbox NICHT weiter. Die Karten legen ihre
+// Tooltip-Daten am Element ab (`el._ppTip`, app-board.jsx: BoardCard und aufgedeckte Gegnerhandkarten). Die gesperrten Brettbereiche der
+// Tutorials schlucken die Beruehrung (touchstart/touchend, preventDefault) — der Tooltip wird deshalb hier gesetzt, nicht von der Karte.
+// Gilt nur fuer Beruehrungen; Mausklicks blaettern wie bisher (am Desktop gibt es den Hover-Tooltip).
+const _tbKarte = { tip: null, x: 0, y: 0 };
+function _tbKartenTipp(t) {
+  const k = t && t.closest && t.closest('.board-card, .hand-slot, .hand-card');
+  if (!k) return null;
+  const el = k.matches('.hand-slot') ? k.querySelector(':scope > .board-card') : k;
+  return (el && el._ppTip) || null;
+}
+function _tbKarteHinweisWeg() {
+  if (window._tbTipAn) { window._tbTipAn = false; if (window._boardTooltipSetter) window._boardTooltipSetter(null); }
+}
+/** true = die Beruehrung gehoert einer Karte (kein Weiterblaettern). */
+function tbKartenTippEreignis(e) {
+  if (e.type === 'touchstart') {
+    const tip = _tbKartenTipp(e.target);
+    if (!tip) { _tbKarte.tip = null; return false; }
+    const t = e.touches && e.touches[0];
+    _tbKarte.tip = tip; _tbKarte.x = t ? t.clientX : 0; _tbKarte.y = t ? t.clientY : 0;
+    window._ppTbTouchAt = Date.now();
+    return true;
+  }
+  if (e.type === 'touchend') {
+    const tip = _tbKarte.tip;
+    if (!tip) return false;
+    _tbKarte.tip = null;
+    const t = e.changedTouches && e.changedTouches[0];
+    if (t && Math.abs(t.clientX - _tbKarte.x) + Math.abs(t.clientY - _tbKarte.y) > 12) return true;   // Wisch: nichts zeigen
+    if (window._boardTooltipSetter) { window._boardTooltipSetter(tip); window._tbTipAn = true; }
+    return true;
+  }
+  return false;
+}
+
 function TextBox() {
   const [opts, setOpts] = useState(null);
   const [pages, setPages] = useState([]);
@@ -10455,93 +10617,111 @@ function TextBox() {
     const page = pages[pageIdx];
     const hl = page?.highlights;
     if (!hl || !hl.length) { setHighlightRects([]); return; }
-    // Solange ein Highlight steht, zoomt die echte Zone unter dem Schleier nicht
-    // mehr beim Hovern (CSS `body[data-tb-hl]`): das Highlight ist ein Klon in
-    // Ruhegroesse, ein daneben hochgezoomtes Original waere ein Doppelbild.
-    // VOR dem Messen setzen, damit ein laufender Hover-Zoom schon abklingt.
-    document.body.setAttribute('data-tb-hl', '1');
     const rects = [];
     const aufraeumen = [];
-    for (const h of hl) {
-      const sel = typeof h === 'string' ? h : h.selector;
-      // Gehighlightete Karten pulsieren immer leicht; `pulse: false` schaltet das ab.
-      const pulse = typeof h === 'object' ? h.pulse !== false : true;
-      if (!sel) continue;
-      document.querySelectorAll(sel).forEach(treffer => {
-        // Die Klone der Vorseite tragen dieselben data-Attribute und stehen
-        // noch im Overlay, wenn die neue Seite misst — ohne diesen Filter
-        // sammelten sich bei gleichem Selektor auf Folgeseiten immer mehr
-        // Highlights an (Seite 6: 3 statt 2, Seite 10: 5 statt 2).
-        if (treffer.closest('.textbox-overlay')) return;
-        const el = highlightZiel(treffer);
-        const m = measureHighlight(el);
-        const box = m.flat ? m.rect : m.local;
-        // Handkarten: die Stapelfolge des Faechers (linke Karte ueber der
-        // rechten, `--fan-z`) gilt auch fuer ihre Highlights.
-        const z = parseInt(getComputedStyle(el).zIndex, 10);
-        // Massstab des Originals mitnehmen. Der Klon steht im Overlay, nicht
-        // mehr in seinem Umfeld: Die Phasenspalte setzt ein eigenes
-        // `--board-scale` (.85 des Brettmassstabs), im Overlay gilt das
-        // globale — der Klon der Phasenleiste bekam dadurch groessere
-        // Schrift und Abstaende als sein Original und lag verzerrt darueber.
-        // Nur abweichende Werte werden gesetzt, alles andere bleibt wie es war.
-        const vars = {};
-        const ovStil = getComputedStyle(document.querySelector('.textbox-overlay') || document.body);
-        const elStil = getComputedStyle(el);
-        for (const n of ['--board-scale', '--board-font']) {
-          const eigen = elStil.getPropertyValue(n).trim();
-          if (eigen && eigen !== ovStil.getPropertyValue(n).trim()) vars[n] = eigen;
-        }
-        if (!(box.width > 0 && box.height > 0)) return;
-        // `an: [Selektoren]`: Teile INNERHALB des Ziels, die im Klon „an" bleiben
-        // (`data-tb-an`, CSS) — der Rest wird ausgegraut. So liegt die ganze
-        // Phasenleiste ueber dem Schleier und nur die genannten Kaesten leuchten.
-        let html = el.outerHTML;
-        const an = typeof h === 'object' && Array.isArray(h.an) ? h.an : null;
-        if (an && an.length) {
-          const kopie = el.cloneNode(true);
-          an.forEach(a => kopie.querySelectorAll(a).forEach(n => n.setAttribute('data-tb-an', '1')));
-          html = kopie.outerHTML;
-        }
-        const basis = { pulse, vars, handkarte: el !== treffer, stapel: Number.isFinite(z) ? z : 0, html, ziel: el };
-        rects.push({ ...m, ...basis });
-        // ── Hover auf einer gehighlighteten HANDKARTE ──
-        // Hebt sich die echte Karte unter dem Zeiger, soll die Highlight-
-        // Version selbst gross werden — nicht darunter noch eine zweite,
-        // normal vergroesserte Karte auftauchen. Die echte Karte bleibt
-        // deshalb beim Hover unsichtbar (`data-tb-hover`, CSS) und der
-        // Klon folgt ihrer Lage und Groesse Bild fuer Bild, auch im
-        // Uebergang beim Heben und Absenken.
-        if (basis.handkarte) {
-          let raf = 0, drauf = false, bis = 0;
-          const folgen = () => {
-            raf = 0;
-            const m2 = measureHighlight(el);
-            setHighlightRects(prev => prev.map(r => (r.ziel === el ? { ...m2, ...basis, hover: drauf } : r)));
-            if (drauf || performance.now() < bis) raf = requestAnimationFrame(folgen);
-            else el.removeAttribute('data-tb-hover');
-          };
-          const rein = () => { drauf = true; el.setAttribute('data-tb-hover', '1'); if (!raf) raf = requestAnimationFrame(folgen); };
-          // Nach dem Verlassen noch kurz nachfuehren (Absenk-Uebergang .16 s).
-          const raus = () => { drauf = false; bis = performance.now() + 300; if (!raf) raf = requestAnimationFrame(folgen); };
-          el.addEventListener('mouseenter', rein);
-          el.addEventListener('mouseleave', raus);
-          aufraeumen.push(() => {
-            el.removeEventListener('mouseenter', rein);
-            el.removeEventListener('mouseleave', raus);
-            if (raf) cancelAnimationFrame(raf);
-            el.removeAttribute('data-tb-hover');
-          });
-        }
-      });
+    let abgebrochen = false;
+    // ★ Tutorial auf dem Handy: gehighlightete Karten, die das Brett nicht im Ausschnitt hat, holt die Kamera erst ins Bild
+    // (app-board.jsx, ppTutorialCamFokus); die Highlight-Klone werden erst NACH der Fahrt vermessen. Waehrenddessen stehen keine
+    // Klone der Vorseite mehr da (sie wuerden an alter Stelle haengen). Ohne Fahrt (Desktop, schon sichtbar) misst es sofort wie bisher.
+    const messen = () => {
+      // Solange ein Highlight steht, zoomt die echte Zone unter dem Schleier nicht
+      // mehr beim Hovern (CSS `body[data-tb-hl]`): das Highlight ist ein Klon in
+      // Ruhegroesse, ein daneben hochgezoomtes Original waere ein Doppelbild.
+      // VOR dem Messen setzen, damit ein laufender Hover-Zoom schon abklingt.
+      document.body.setAttribute('data-tb-hl', '1');
+      for (const h of hl) {
+        const sel = typeof h === 'string' ? h : h.selector;
+        // Gehighlightete Karten pulsieren immer leicht; `pulse: false` schaltet das ab.
+        const pulse = typeof h === 'object' ? h.pulse !== false : true;
+        if (!sel) continue;
+        document.querySelectorAll(sel).forEach(treffer => {
+          // Die Klone der Vorseite tragen dieselben data-Attribute und stehen
+          // noch im Overlay, wenn die neue Seite misst — ohne diesen Filter
+          // sammelten sich bei gleichem Selektor auf Folgeseiten immer mehr
+          // Highlights an (Seite 6: 3 statt 2, Seite 10: 5 statt 2).
+          if (treffer.closest('.textbox-overlay')) return;
+          const el = highlightZiel(treffer);
+          const m = measureHighlight(el);
+          const box = m.flat ? m.rect : m.local;
+          // Handkarten: die Stapelfolge des Faechers (linke Karte ueber der
+          // rechten, `--fan-z`) gilt auch fuer ihre Highlights.
+          const z = parseInt(getComputedStyle(el).zIndex, 10);
+          // Massstab des Originals mitnehmen. Der Klon steht im Overlay, nicht
+          // mehr in seinem Umfeld: Die Phasenspalte setzt ein eigenes
+          // `--board-scale` (.85 des Brettmassstabs), im Overlay gilt das
+          // globale — der Klon der Phasenleiste bekam dadurch groessere
+          // Schrift und Abstaende als sein Original und lag verzerrt darueber.
+          // Nur abweichende Werte werden gesetzt, alles andere bleibt wie es war.
+          const vars = {};
+          const ovStil = getComputedStyle(document.querySelector('.textbox-overlay') || document.body);
+          const elStil = getComputedStyle(el);
+          for (const n of ['--board-scale', '--board-font']) {
+            const eigen = elStil.getPropertyValue(n).trim();
+            if (eigen && eigen !== ovStil.getPropertyValue(n).trim()) vars[n] = eigen;
+          }
+          if (!(box.width > 0 && box.height > 0)) return;
+          // `an: [Selektoren]`: Teile INNERHALB des Ziels, die im Klon „an" bleiben
+          // (`data-tb-an`, CSS) — der Rest wird ausgegraut. So liegt die ganze
+          // Phasenleiste ueber dem Schleier und nur die genannten Kaesten leuchten.
+          let html = el.outerHTML;
+          const an = typeof h === 'object' && Array.isArray(h.an) ? h.an : null;
+          if (an && an.length) {
+            const kopie = el.cloneNode(true);
+            an.forEach(a => kopie.querySelectorAll(a).forEach(n => n.setAttribute('data-tb-an', '1')));
+            html = kopie.outerHTML;
+          }
+          const basis = { pulse, vars, handkarte: el !== treffer, stapel: Number.isFinite(z) ? z : 0, html, ziel: el };
+          rects.push({ ...m, ...basis });
+          // ── Hover auf einer gehighlighteten HANDKARTE ──
+          // Hebt sich die echte Karte unter dem Zeiger, soll die Highlight-
+          // Version selbst gross werden — nicht darunter noch eine zweite,
+          // normal vergroesserte Karte auftauchen. Die echte Karte bleibt
+          // deshalb beim Hover unsichtbar (`data-tb-hover`, CSS) und der
+          // Klon folgt ihrer Lage und Groesse Bild fuer Bild, auch im
+          // Uebergang beim Heben und Absenken.
+          if (basis.handkarte) {
+            let raf = 0, drauf = false, bis = 0;
+            const folgen = () => {
+              raf = 0;
+              const m2 = measureHighlight(el);
+              setHighlightRects(prev => prev.map(r => (r.ziel === el ? { ...m2, ...basis, hover: drauf } : r)));
+              if (drauf || performance.now() < bis) raf = requestAnimationFrame(folgen);
+              else el.removeAttribute('data-tb-hover');
+            };
+            const rein = () => { drauf = true; el.setAttribute('data-tb-hover', '1'); if (!raf) raf = requestAnimationFrame(folgen); };
+            // Nach dem Verlassen noch kurz nachfuehren (Absenk-Uebergang .16 s).
+            const raus = () => { drauf = false; bis = performance.now() + 300; if (!raf) raf = requestAnimationFrame(folgen); };
+            el.addEventListener('mouseenter', rein);
+            el.addEventListener('mouseleave', raus);
+            aufraeumen.push(() => {
+              el.removeEventListener('mouseenter', rein);
+              el.removeEventListener('mouseleave', raus);
+              if (raf) cancelAnimationFrame(raf);
+              el.removeAttribute('data-tb-hover');
+            });
+          }
+        });
+      }
+      setHighlightRects(rects);
+    };
+    let fahrt = null;
+    if (window._currentTutorialNum && window.ppTutorialCamFokus) {
+      const ziele = [];
+      for (const h of hl) {
+        const sel = typeof h === 'string' ? h : h.selector;
+        if (sel) document.querySelectorAll(sel).forEach(tr => { if (!tr.closest('.textbox-overlay')) ziele.push(tr); });
+      }
+      fahrt = window.ppTutorialCamFokus(ziele);
     }
-    setHighlightRects(rects);
-    return () => { aufraeumen.forEach(f => f()); document.body.removeAttribute('data-tb-hl'); };
+    if (fahrt) { setHighlightRects([]); fahrt.then(() => { if (!abgebrochen) messen(); }); }
+    else messen();
+    return () => { abgebrochen = true; aufraeumen.forEach(f => f()); document.body.removeAttribute('data-tb-hl'); };
   }, [pages, pageIdx]);
 
   const handleAdvance = useCallback(() => {
     if (!opts || fading || vorlaufRef.current) return;
     if (window.playSFX) window.playSFX('ui_click', { dedupe: 80, volume: 0.5 });
+    _tbKarteHinweisWeg();
     if (!done) {
       clearInterval(timerRef.current);
       setCharCount(parsedRef.current.plainText.length);
@@ -10645,7 +10825,10 @@ function TextBox() {
       e.stopPropagation();
       if (e.stopImmediatePropagation) e.stopImmediatePropagation();
       if (e.cancelable) e.preventDefault();
-      if (e.type === 'mousedown' || e.type === 'touchstart') handleAdvance();
+      if (e.type === 'touchstart' || e.type === 'touchend') { if (tbKartenTippEreignis(e)) return; }   // Tipp auf eine Karte: Tooltip, kein Weiterblaettern
+      if (e.type === 'touchstart') window._ppTbTouchAt = Date.now();
+      // Ein Fingertipp erzeugt `touchstart` UND danach ein nachgeschobenes `mousedown` (Kompatibilitaets-Ereignis): nur das erste blaettert
+      if (e.type === 'touchstart' || (e.type === 'mousedown' && Date.now() - (window._ppTbTouchAt || 0) > 1000)) handleAdvance();
     };
     const TYPEN = ['mousedown', 'mouseup', 'click', 'dblclick', 'pointerdown', 'pointerup', 'touchstart', 'touchend', 'dragstart', 'contextmenu'];
     TYPEN.forEach(t => window.addEventListener(t, sperren, { capture: true, passive: false }));
@@ -10655,13 +10838,18 @@ function TextBox() {
   useEffect(() => {
     if (!opts) return;
     const onClick = (e) => {
+      if ((e.type === 'touchstart' || e.type === 'touchend') && tbKartenTippEreignis(e)) return;   // Tipp auf eine Karte: Tooltip, kein Weiterblaettern
+      if (e.type === 'touchend') return;
+      if (e.type === 'touchstart') window._ppTbTouchAt = Date.now();
+      else if (Date.now() - (window._ppTbTouchAt || 0) < 1000) return;   // nachgeschobenes mousedown eines Fingertipps: schon behandelt
       if (e.target.closest('.textbox-back')) return;
       if (fensterDarueber()) return;
       handleAdvance();
     };
     window.addEventListener('mousedown', onClick);
     window.addEventListener('touchstart', onClick, { passive: true });
-    return () => { window.removeEventListener('mousedown', onClick); window.removeEventListener('touchstart', onClick); };
+    window.addEventListener('touchend', onClick, { passive: true });
+    return () => { window.removeEventListener('mousedown', onClick); window.removeEventListener('touchstart', onClick); window.removeEventListener('touchend', onClick); _tbKarteHinweisWeg(); };
   }, [opts, handleAdvance]);
 
   if (!opts) return null;
@@ -10717,7 +10905,7 @@ function TextBox() {
   if (rechtsFarbe) farbStil['--tb-rechts'] = rechtsFarbe;
 
   return (
-    <div className={'textbox-overlay' + (fading ? ' textbox-fading' : '')}>
+    <div className={'textbox-overlay' + (fading ? ' textbox-fading' : '') + (highlightRects.some(h => h.pulse) ? ' textbox-puls' : '')}>
       {highlightRects.map((h, i) => {
         const gedreht = h.flat && (h.drehung != null || h.handkarte);
         const inner = (
@@ -11375,6 +11563,52 @@ window.handFanCardBox = handFanCardBox;
 window.playCardDragSFX = playCardDragSFX;
 window.zoneLandStyle = zoneLandStyle;
 window.VolumeControl = VolumeControl;
+
+// Eigenes Dropdown statt `<select>`: das native Auswahlfenster malt das Betriebssystem — auf Android holt es im Vollbild die Systemleiste
+// („Programme anzeigen / Zurueck") nach oben, und seine Eintraege nutzen nicht die Pixel-Emoji-Schrift (📋 blieb System-Emoji).
+// `options`: [{ value, label, disabled? }] (disabled = Trennzeile), `onChange(value)`.
+function PPDropdown({ value, options, onChange, style, className = 'select', minWidth }) {
+  const [offen, setOffen] = useState(false);
+  const [pos, setPos] = useState(null);
+  const knopf = useRef(null);
+  const liste = useRef(null);
+  const aktuell = (options || []).find(o => o.value === value);
+  useEffect(() => {
+    if (!offen) return;
+    const zu = (e) => { if (knopf.current && knopf.current.contains(e.target)) return; if (liste.current && liste.current.contains(e.target)) return; setOffen(false); };
+    const esc = (e) => { if (e.key === 'Escape') setOffen(false); };
+    document.addEventListener('pointerdown', zu, true); window.addEventListener('keydown', esc, true); window.addEventListener('resize', () => setOffen(false), { once: true });
+    return () => { document.removeEventListener('pointerdown', zu, true); window.removeEventListener('keydown', esc, true); };
+  }, [offen]);
+  const auf = () => {
+    if (offen) { setOffen(false); return; }
+    const r = knopf.current.getBoundingClientRect();
+    const platzUnten = window.innerHeight - r.bottom - 8;
+    const hoch = Math.max(120, Math.min(window.innerHeight - 16, 320));
+    const nachUnten = platzUnten >= Math.min(hoch, 200) || r.top < platzUnten;
+    const rechts = r.left > window.innerWidth / 2;
+    setPos({ left: rechts ? undefined : Math.max(4, r.left), right: rechts ? Math.max(4, window.innerWidth - r.right) : undefined, width: r.width, top: nachUnten ? r.bottom + 2 : undefined, bottom: nachUnten ? undefined : window.innerHeight - r.top + 2, maxHeight: Math.max(100, (nachUnten ? platzUnten : r.top - 8)) });
+    setOffen(true);
+  };
+  return (
+    <>
+      <button type="button" ref={knopf} className={className} onClick={auf} aria-haspopup="listbox" aria-expanded={offen}
+        style={{ textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth, ...style }}>
+        {aktuell ? aktuell.label : ''}
+      </button>
+      {offen && pos && ReactDOM.createPortal(
+        <div ref={liste} role="listbox" style={{ position: 'fixed', left: pos.left, right: pos.right, top: pos.top, bottom: pos.bottom, minWidth: Math.max(pos.width, 160), maxHeight: pos.maxHeight, overflowY: 'auto', zIndex: 100001, background: 'var(--bg2)', border: '2px solid var(--player-color)', boxSizing: 'border-box' }}>
+          {(options || []).map((o, i) => o.disabled
+            ? <div key={'t' + i} style={{ padding: '4px 10px', fontSize: 11, color: 'var(--text2)', whiteSpace: 'nowrap' }}>{o.label}</div>
+            : <button type="button" key={o.value} role="option" aria-selected={o.value === value} onClick={() => { setOffen(false); if (o.value !== value) onChange(o.value); }}
+                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', fontSize: 12, whiteSpace: 'nowrap', border: 'none', borderBottom: '1px solid var(--bg4)', background: o.value === value ? 'var(--bg4)' : 'transparent', color: o.value === value ? 'var(--player-color)' : 'var(--text)', cursor: 'pointer', fontFamily: 'inherit' }}>
+                {o.label}
+              </button>)}
+        </div>, document.body)}
+    </>
+  );
+}
+window.PPDropdown = PPDropdown;
 window.CardTooltipContent = CardTooltipContent;
 window.useCardTooltip = useCardTooltip;
 window.useStickyHoverFlag = useStickyHoverFlag;

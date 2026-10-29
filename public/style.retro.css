@@ -1197,7 +1197,7 @@ select optgroup { background: var(--bg); color: var(--text); }
    (z-index:0; panel is z-index:2). Motion knobs mirror the reference:
    --pf parallax, --shake shake amount, --ef explosion light, --tH/--tV
    tether amplitudes, --sAmp core-scale amplitude. */
-.anim-backdrop { zoom: calc(1 / var(--ui-scale, 1)); position: absolute; inset: 0; overflow: hidden; background: #12101f; z-index: 0; pointer-events: none; --pf: 1; --shake: 1; --ef: 1; --tH: 0.469vw; --tV: 0.37vh; --sAmp: 0.021; }
+.anim-backdrop { zoom: calc(1 / var(--ui-scale, 1)); position: absolute; inset: 0; overflow: hidden; background: #12101f; z-index: 0; pointer-events: none; --pf: 1; --shake: 1; --ef: 1; --tH: calc(var(--abw,1vw) * 0.469); --tV: calc(var(--abh,1vh) * 0.37); --sAmp: 0.021; }
 .anim-shake { position: absolute; inset: 0; animation: ab-shake 10s steps(1, end) infinite; will-change: transform; }
 /* Front cats overlay — a separate layer ABOVE the auth panel (z-index:2) so
    the cats fly over the login form. pointer-events:none keeps the form
@@ -1255,32 +1255,32 @@ select optgroup { background: var(--bg); color: var(--text); }
 }
 @keyframes ab-floaty {
   0%   { transform: translate(0,0) rotate(0deg); }
-  50%  { transform: translate(calc(var(--mx,0vw) * var(--pf,1)), calc(var(--my,-0.926vh) * var(--pf,1))) rotate(calc(var(--mr,0deg) * var(--pf,1))); }
+  50%  { transform: translate(calc(var(--mx,calc(var(--abw,1vw) * 0)) * var(--pf,1)), calc(var(--my,calc(var(--abh,1vh) * -0.926)) * var(--pf,1))) rotate(calc(var(--mr,0deg) * var(--pf,1))); }
   100% { transform: translate(0,0) rotate(0deg); }
 }
 @keyframes ab-jiggleTether {
   0%, 100% { transform: translate(0, 0); }
-  50%  { transform: translate(calc(var(--tH,0.469vw) * var(--pf,1)), calc(var(--tV,0.37vh) * var(--pf,1))); }
+  50%  { transform: translate(calc(var(--tH,calc(var(--abw,1vw) * 0.469)) * var(--pf,1)), calc(var(--tV,calc(var(--abh,1vh) * 0.37)) * var(--pf,1))); }
 }
 @keyframes ab-broghanTether {
   0%, 100% { transform: translate(0, 0); }
-  50%  { transform: translate(calc(var(--tH,0.469vw) * -1 * var(--pf,1)), calc(var(--tV,0.37vh) * var(--pf,1))); }
+  50%  { transform: translate(calc(var(--tH,calc(var(--abw,1vw) * 0.469)) * -1 * var(--pf,1)), calc(var(--tV,calc(var(--abh,1vh) * 0.37)) * var(--pf,1))); }
 }
 @keyframes ab-coreTether {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  50%  { transform: translate(0, calc(var(--tV,0.37vh) * var(--pf,1))) scale(calc(1 - var(--sAmp,0.021) * var(--pf,1))); }
+  50%  { transform: translate(0, calc(var(--tV,calc(var(--abh,1vh) * 0.37)) * var(--pf,1))) scale(calc(1 - var(--sAmp,0.021) * var(--pf,1))); }
 }
 @keyframes ab-shake {
   0%, 6%, 49%, 56%, 100% { transform: translate(0, 0); }
-  1%  { transform: translate(calc(-0.417vw * var(--shake,1)), calc(0.463vh * var(--shake,1))); }
-  2%  { transform: translate(calc(0.365vw * var(--shake,1)), calc(-0.556vh * var(--shake,1))); }
-  3%  { transform: translate(calc(-0.26vw * var(--shake,1)), calc(0.37vh * var(--shake,1))); }
-  4%  { transform: translate(calc(0.156vw * var(--shake,1)), calc(-0.278vh * var(--shake,1))); }
-  50% { transform: translate(calc(0.469vw * var(--shake,1)), calc(-0.556vh * var(--shake,1))); }
-  51% { transform: translate(calc(-0.417vw * var(--shake,1)), calc(0.556vh * var(--shake,1))); }
-  52% { transform: translate(calc(0.313vw * var(--shake,1)), calc(-0.37vh * var(--shake,1))); }
-  53% { transform: translate(calc(-0.208vw * var(--shake,1)), calc(0.278vh * var(--shake,1))); }
-  54% { transform: translate(calc(0.104vw * var(--shake,1)), calc(-0.185vh * var(--shake,1))); }
+  1%  { transform: translate(calc(calc(var(--abw,1vw) * -0.417) * var(--shake,1)), calc(calc(var(--abh,1vh) * 0.463) * var(--shake,1))); }
+  2%  { transform: translate(calc(calc(var(--abw,1vw) * 0.365) * var(--shake,1)), calc(calc(var(--abh,1vh) * -0.556) * var(--shake,1))); }
+  3%  { transform: translate(calc(calc(var(--abw,1vw) * -0.26) * var(--shake,1)), calc(calc(var(--abh,1vh) * 0.37) * var(--shake,1))); }
+  4%  { transform: translate(calc(calc(var(--abw,1vw) * 0.156) * var(--shake,1)), calc(calc(var(--abh,1vh) * -0.278) * var(--shake,1))); }
+  50% { transform: translate(calc(calc(var(--abw,1vw) * 0.469) * var(--shake,1)), calc(calc(var(--abh,1vh) * -0.556) * var(--shake,1))); }
+  51% { transform: translate(calc(calc(var(--abw,1vw) * -0.417) * var(--shake,1)), calc(calc(var(--abh,1vh) * 0.556) * var(--shake,1))); }
+  52% { transform: translate(calc(calc(var(--abw,1vw) * 0.313) * var(--shake,1)), calc(calc(var(--abh,1vh) * -0.37) * var(--shake,1))); }
+  53% { transform: translate(calc(calc(var(--abw,1vw) * -0.208) * var(--shake,1)), calc(calc(var(--abh,1vh) * 0.278) * var(--shake,1))); }
+  54% { transform: translate(calc(calc(var(--abw,1vw) * 0.104) * var(--shake,1)), calc(calc(var(--abh,1vh) * -0.185) * var(--shake,1))); }
 }
 @keyframes ab-glowpulse {
   0%   { opacity: .6; transform: translate(-50%,-50%) scale(1.02); }
@@ -1303,10 +1303,10 @@ select optgroup { background: var(--bg); color: var(--text); }
   50%      { opacity: .72; }
 }
 @keyframes ab-emberrise {
-  0%   { transform: translateY(1.852vh) translateX(0); opacity: 0; }
+  0%   { transform: translateY(calc(var(--abh,1vh) * 1.852)) translateX(0); opacity: 0; }
   8%   { opacity: .95; }
   78%  { opacity: .7; }
-  100% { transform: translateY(-112vh) translateX(var(--drift, 0vw)); opacity: 0; }
+  100% { transform: translateY(calc(var(--abh,1vh) * -112)) translateX(var(--drift, calc(var(--abw,1vw) * 0))); opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .anim-shake, .anim-shake > *, .anim-shake > * > *,
@@ -3381,7 +3381,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * { cursor: url("/cursor
 .board-zone-spacer { width: var(--spacer-w); flex-shrink: 0; }
 .board-mid-row { display: flex; align-items: center; gap: calc(12px * var(--board-scale)); padding: calc(4px * var(--board-scale)) 0; flex-shrink: 0; }
 .board-phase-tracker { display: flex; gap: 2px; flex-shrink: 0; padding: calc(4px * var(--board-scale)) calc(6px * var(--board-scale)); }
-.board-phase-item { font-family: var(--font-display), sans-serif; font-size: var(--board-font); font-weight: 700; color: #59606e; padding: calc(5px * var(--board-scale)) calc(10px * var(--board-scale)); background: transparent; border: 2px solid #08060c; white-space: nowrap; transition: all .2s steps(5, end); }
+.board-phase-item { font-family: var(--font-display), sans-serif; font-size: var(--board-font); font-weight: 700; color: #59606e; padding: calc(5px * var(--board-scale)) calc(10px * var(--board-scale)); background: transparent; border: 2px solid #08060c; white-space: nowrap; transition: all .2s steps(5, end); display: flex; align-items: center; justify-content: center; text-align: center; }
 .board-phase-item.active { color: #ffffff; background: transparent; text-shadow: 1px 1px 0 #3e3e51; }
 .board-phase-item.clickable { cursor: pointer; color: #d2d2db; border-style: dashed; }
 /* Tutorial 1: sobald die Action Phase freigeschaltet ist, leuchtet und
@@ -5879,24 +5879,24 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   100% { transform: rotate(3600deg) scale(1); }
 }
 
-/* ===== ICE PROJECTILE TRAIL ===== */
+/* ===== ICE PROJECTILE TRAIL ===== (Pixelart: harte 4-px-Zellen, zwei Bilder im Wechsel per steps(1), kein Weichzeichner) */
 
-.projectile-ice-trail { position: absolute; inset: -24px; border-radius: 0; background: radial-gradient(ellipse at 30% 40%, transparent 0% 40%),
-    radial-gradient(ellipse at 70% 60%, transparent 0% 35%),
-    radial-gradient(ellipse at 50% 50%, transparent 0% 50%); box-shadow: -4px -2px 0 0 #3e3e51, -4px -1px 0 0 #1a1a2e, -4px -3px 0 0 #3e3e51, -4px 4px 0 0 #3e3e51; animation: iceTrailPulse 80ms steps(2, end) infinite alternate; pointer-events: none; }
+.projectile-ice-trail { position: absolute; inset: -24px; pointer-events: none; }
+.projectile-ice-trail::before { content: ''; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; background: #66b6ff; box-shadow: -12px -4px 0 0 #bddcef, -24px 4px 0 0 #66b6ff, -16px 8px 0 0 #ffffff, -32px 0 0 0 #66b6ff, 12px -12px 0 0 #66b6ff, -24px -12px 0 0 #ffffff, 16px 12px 0 0 #bddcef, -8px 16px 0 0 #66b6ff, 4px -20px 0 0 #bddcef; animation: iceTrailPixel 160ms steps(1) infinite; }
 
-@keyframes iceTrailPulse {
-  0%   { opacity: .6; transform: scale(1); }
-  100% { opacity: .9; transform: scale(1.15); }
+@keyframes iceTrailPixel {
+  0%   { box-shadow: -12px -4px 0 0 #bddcef, -24px 4px 0 0 #66b6ff, -16px 8px 0 0 #ffffff, -32px 0 0 0 #66b6ff, 12px -12px 0 0 #66b6ff, -24px -12px 0 0 #ffffff, 16px 12px 0 0 #bddcef, -8px 16px 0 0 #66b6ff, 4px -20px 0 0 #bddcef; }
+  50%  { box-shadow: -16px 4px 0 0 #ffffff, -28px -4px 0 0 #bddcef, -12px -8px 0 0 #66b6ff, -36px 4px 0 0 #66b6ff, 8px -16px 0 0 #ffffff, -20px 12px 0 0 #66b6ff, 12px 12px 0 0 #66b6ff, -4px 16px 0 0 #bddcef, 8px -20px 0 0 #66b6ff; }
 }
 
-/* ===== ICE BOLT PROJECTILE ===== */
+/* ===== ICE BOLT PROJECTILE ===== (Pixelart-Eissplitter, spitz nach Osten; die Rotation zum Ziel kommt vom Wrapper) */
 
-.projectile-ice-bolt { display: block; width: 20px; height: 20px; border-radius: 0; background: radial-gradient(circle at 35% 35%, #ffffff 0% 12.5%, #bddcef 12.5% 55%, #66b6ff 55% 100%); box-shadow: 0 0 0 2px #66b6ff, 0 0 0 3px #2f539d, 9px -5px 0 3px #59606e, -7px 7px 0 2px #59606e, 13px 4px 0 2px #59606e, -11px -9px 0 3px #59606e, 5px 11px 0 2px #3e3e51, -4px -13px 0 2px #59606e; animation: iceBoltPulse 90ms steps(2, end) infinite alternate; }
+.projectile-ice-bolt { display: block; position: relative; width: 20px; height: 20px; image-rendering: pixelated; }
+.projectile-ice-bolt::before { content: ''; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; background: #bddcef; box-shadow: -16px 0 0 0 #2f539d, -12px -4px 0 0 #2f539d, -12px 0 0 0 #66b6ff, -12px 4px 0 0 #2f539d, -8px -8px 0 0 #2f539d, -8px -4px 0 0 #66b6ff, -8px 0 0 0 #66b6ff, -8px 4px 0 0 #66b6ff, -8px 8px 0 0 #2f539d, -4px -12px 0 0 #2f539d, -4px -8px 0 0 #66b6ff, -4px -4px 0 0 #66b6ff, -4px 0 0 0 #bddcef, -4px 4px 0 0 #66b6ff, -4px 8px 0 0 #66b6ff, -4px 12px 0 0 #2f539d, 0 -12px 0 0 #2f539d, 0 -8px 0 0 #66b6ff, 0 -4px 0 0 #bddcef, 0 4px 0 0 #bddcef, 0 8px 0 0 #66b6ff, 0 12px 0 0 #2f539d, 4px -8px 0 0 #2f539d, 4px -4px 0 0 #bddcef, 4px 0 0 0 #ffffff, 4px 4px 0 0 #bddcef, 4px 8px 0 0 #2f539d, 8px -4px 0 0 #2f539d, 8px 0 0 0 #ffffff, 8px 4px 0 0 #2f539d, 12px -4px 0 0 #2f539d, 12px 0 0 0 #ffffff, 12px 4px 0 0 #2f539d, 16px 0 0 0 #2f539d; animation: iceBoltPulse 120ms steps(1) infinite; }
 
 @keyframes iceBoltPulse {
-  0%   { transform: scale(1); filter: brightness(1); }
-  100% { transform: scale(1.15); filter: brightness(1.2); }
+  0%   { background: #bddcef; box-shadow: -16px 0 0 0 #2f539d, -12px -4px 0 0 #2f539d, -12px 0 0 0 #66b6ff, -12px 4px 0 0 #2f539d, -8px -8px 0 0 #2f539d, -8px -4px 0 0 #66b6ff, -8px 0 0 0 #66b6ff, -8px 4px 0 0 #66b6ff, -8px 8px 0 0 #2f539d, -4px -12px 0 0 #2f539d, -4px -8px 0 0 #66b6ff, -4px -4px 0 0 #66b6ff, -4px 0 0 0 #bddcef, -4px 4px 0 0 #66b6ff, -4px 8px 0 0 #66b6ff, -4px 12px 0 0 #2f539d, 0 -12px 0 0 #2f539d, 0 -8px 0 0 #66b6ff, 0 -4px 0 0 #bddcef, 0 4px 0 0 #bddcef, 0 8px 0 0 #66b6ff, 0 12px 0 0 #2f539d, 4px -8px 0 0 #2f539d, 4px -4px 0 0 #bddcef, 4px 0 0 0 #ffffff, 4px 4px 0 0 #bddcef, 4px 8px 0 0 #2f539d, 8px -4px 0 0 #2f539d, 8px 0 0 0 #ffffff, 8px 4px 0 0 #2f539d, 12px -4px 0 0 #2f539d, 12px 0 0 0 #ffffff, 12px 4px 0 0 #2f539d, 16px 0 0 0 #2f539d; }
+  50%  { background: #ffffff; box-shadow: -16px 0 0 0 #2f539d, -12px -4px 0 0 #2f539d, -12px 0 0 0 #66b6ff, -12px 4px 0 0 #2f539d, -8px -8px 0 0 #2f539d, -8px -4px 0 0 #66b6ff, -8px 0 0 0 #66b6ff, -8px 4px 0 0 #66b6ff, -8px 8px 0 0 #2f539d, -4px -12px 0 0 #2f539d, -4px -8px 0 0 #66b6ff, -4px -4px 0 0 #66b6ff, -4px 0 0 0 #ffffff, -4px 4px 0 0 #66b6ff, -4px 8px 0 0 #66b6ff, -4px 12px 0 0 #2f539d, 0 -12px 0 0 #2f539d, 0 -8px 0 0 #66b6ff, 0 -4px 0 0 #ffffff, 0 4px 0 0 #ffffff, 0 8px 0 0 #66b6ff, 0 12px 0 0 #2f539d, 4px -8px 0 0 #2f539d, 4px -4px 0 0 #ffffff, 4px 0 0 0 #bddcef, 4px 4px 0 0 #ffffff, 4px 8px 0 0 #2f539d, 8px -4px 0 0 #2f539d, 8px 0 0 0 #bddcef, 8px 4px 0 0 #2f539d, 12px -4px 0 0 #2f539d, 12px 0 0 0 #bddcef, 12px 4px 0 0 #2f539d, 16px 0 0 0 #2f539d; }
 }
 
 /* ===== LOVE SHOT HEART PROJECTILE =====
@@ -6988,11 +6988,16 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
    tragen selbst keinen Rahmen mehr. */
 .phase-plate-a { left: calc(var(--phase-plate-a-x, 0px) - 2px); top: calc(var(--phase-plate-a-y, 0px) - 2px); width: calc(var(--phase-plate-a-w, 0px) + 4px); height: calc(var(--phase-plate-a-h, 0px) + 4px); opacity: var(--phase-plate-a-op, 0); }
 .phase-plate-b { left: calc(var(--phase-plate-b-x, 0px) - 2px); top: calc(var(--phase-plate-b-y, 0px) - 2px); width: calc(var(--phase-plate-b-w, 0px) + 4px); height: calc(var(--phase-plate-b-h, 0px) + 4px); opacity: var(--phase-plate-b-op, 0); }
-.phase-btn { padding: calc(3px * var(--board-scale)) calc(10px * var(--board-scale)) !important; font-size: calc(9px * var(--board-scale)) !important; white-space: nowrap; }
+.phase-btn { padding: calc(3px * var(--board-scale)) calc(10px * var(--board-scale)) !important; font-size: calc(9px * var(--board-scale)) !important; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; text-align: center; }
 .phase-end-check { display: flex; align-items: center; gap: calc(4px * var(--board-scale)); font-size: calc(9px * var(--board-scale)); color: var(--text2); cursor: pointer; margin-left: calc(4px * var(--board-scale)); white-space: nowrap; user-select: none; }
 .phase-end-check input { width: calc(12px * var(--board-scale)); height: calc(12px * var(--board-scale)); accent-color: var(--accent); cursor: pointer; }
 .phase-column { --phase-scale-factor: .85; --board-scale: calc(var(--board-scale-live, 1) * var(--phase-scale-factor)); position: absolute; left: var(--phase-col-x, var(--sidebar-w)); top: var(--phase-mid-y, 50%); transform: translateY(calc(var(--phase-tracker-h, 0px) / -2)); display: flex; flex-direction: column; align-items: flex-start; z-index: 50; }
 .phase-debuffs { position: absolute; top: 4px; left: var(--sidebar-w); display: flex; flex-direction: column; gap: 2px; max-width: calc(280px * var(--board-scale)); z-index: 100; pointer-events: none; }
+/* Handy: die Hinweise lagen links oben ueber dem Gegnernamen/-Avatar in der oberen Handleiste und bei Textboxen darunter — jetzt unter die Leiste
+   und rechts neben die Turnzahl-/Phasenspalte, so verdecken sie weder Name noch Avatar. */
+@media (pointer: coarse) and (max-height: 600px) {
+  .phase-debuffs { top: calc(var(--mob-opphand-h, 54px) + 4px); left: calc(var(--sidebar-w, 0px) + 150px); max-width: calc(300px * var(--board-scale)); }
+}
 .phase-debuff-item { font-size: calc(13px * var(--board-scale)); font-weight: 700; text-shadow: 1px 1px 0 #55011a, 1px 1px 0 #000000; line-height: 1.3; animation: summonLockPulse 2s steps(24, end) infinite; }
 
 /* ===== TOKEN TOOLTIP (left of main tooltip) =====
@@ -7514,9 +7519,12 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   0%, 100% { --tb-puls: 0; }
   50%      { --tb-puls: 1; }
 }
-.textbox-overlay { position: fixed; inset: 0; z-index: 90000; display: flex; align-items: flex-start; justify-content: center; padding-top: 18px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect x='2' y='0' width='2' height='2' fill='%23000000'/%3E%3Crect x='0' y='2' width='2' height='2' fill='%23000000'/%3E%3C/svg%3E") 0 0 / 4px 4px; pointer-events: none; animation: textbox-fade-in .25s steps(6, end), textbox-puls-takt 1.4s steps(24, end) infinite; }
+.textbox-overlay { position: fixed; inset: 0; z-index: 90000; display: flex; align-items: flex-start; justify-content: center; padding-top: 18px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect x='2' y='0' width='2' height='2' fill='%23000000'/%3E%3Crect x='0' y='2' width='2' height='2' fill='%23000000'/%3E%3C/svg%3E") 0 0 / 4px 4px; pointer-events: none; animation: textbox-fade-in .25s steps(6, end); }
+/* Pulstakt nur, solange Highlights stehen (Klasse vom TextBox-Render): eine dauernd animierte, vererbte Eigenschaft rechnet sonst JEDES Bild den Stil
+   der ganzen Overlay-Ebene neu — auf schwachen Handys fast die halbe Rechenzeit im Tutorial (Kontrolllauf). */
+.textbox-overlay.textbox-puls { animation: textbox-fade-in .25s steps(6, end), textbox-puls-takt 1.4s steps(24, end) infinite; }
 @keyframes textbox-fade-in { from { opacity: 0; } to { opacity: 1; } }
-.textbox-fading { animation: textbox-fade-out 1s steps(24, end) forwards, textbox-puls-takt 1.4s steps(24, end) infinite; pointer-events: none !important; }
+.textbox-fading { animation: textbox-fade-out 1s steps(24, end) forwards; pointer-events: none !important; }
 @keyframes textbox-fade-out { from { opacity: 1; } to { opacity: 0; } }
 
 /* UI-Fenster, die ueber ALLEM liegen muessen — auch ueber der Textbox
@@ -7748,16 +7756,70 @@ body:has(.textbox-overlay) .tooltip { z-index: 90003 !important; }
    MOBILE & RESPONSIVE
    ═══════════════════════════════════════════════════════════════ */
 
-/* Portrait orientation blocker — game requires landscape */
-.rotate-device-overlay { display: none; position: fixed; inset: 0; z-index: 999999; background: var(--bg); color: var(--text); flex-direction: column; align-items: center; justify-content: center; gap: 16px; font-family: var(--font-display), sans-serif; text-align: center; padding: 24px; }
-.rotate-device-overlay .rotate-icon { font-size: 64px; animation: rotateHint 2s steps(24, end) infinite; }
-.rotate-device-overlay .rotate-text { font-size: 14px; color: var(--accent); font-weight: 700; }
-.rotate-device-overlay .rotate-sub { font-size: 11px; color: var(--text2); max-width: 280px; }
-@keyframes rotateHint {
-  0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(-15deg); }
-  75% { transform: rotate(15deg); }
+/* Portrait orientation blocker — game requires landscape.
+   Pixel-Look: Titelbild mit 2x2-Dithering abgedunkelt, Logo, ein Handy-Sprite (SVG, harte Kanten), das sich per
+   steps(1) quer legt, und Tafeln mit gestapelten Ringen statt weicher Schatten. */
+.rotate-device-overlay { display: none; position: fixed; inset: 0; z-index: 999999; background: var(--bg); color: var(--text); flex-direction: column; align-items: center; justify-content: center; font-family: var(--font-display), sans-serif; text-align: center; overflow: hidden; }
+/* Kamerafahrt ueber das animierte Titelbild (gleiche Buehne, gleiche Effekte wie der Titelbildschirm): die 1920x1080-Kulisse
+   wird per --rs aufs Fenster skaliert; --abw/--abh machen aus den Fensterprozenten der Kulisse Buehnenpixel. */
+.rotate-device-overlay .rotate-cam { position: absolute; inset: 0; overflow: hidden; background: #12101f; }
+.rotate-device-overlay .rotate-cam::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 46%, transparent 40% 100%); }
+.rotate-device-overlay .tap-backdrop-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.rotate-device-overlay.rotate-gate { display: flex !important; }
+.rotate-device-overlay .rotate-content { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; width: 100%; max-height: 100%; padding: 16px 22px calc(16px + env(safe-area-inset-bottom, 0px)); box-sizing: border-box; }
+.rotate-device-overlay .rotate-logo { width: 100vw; max-width: none; flex: none; }
+.rotate-device-overlay .rotate-logo .pp-logo-img { width: 100%; height: auto; max-height: none; }
+.rotate-device-overlay .rotate-phone { position: relative; width: 132px; height: 132px; flex: none; }
+.rotate-device-overlay .rotate-phone svg { position: absolute; left: 50%; top: 50%; image-rendering: pixelated; }
+.rotate-device-overlay .rot-phone-p { width: 84px; height: 132px; margin: -66px 0 0 -42px; animation: rotPhoneP 1.8s steps(1, end) infinite; }
+.rotate-device-overlay .rot-phone-l { width: 132px; height: 84px; margin: -42px 0 0 -66px; animation: rotPhoneL 1.8s steps(1, end) infinite; }
+.rotate-device-overlay .ph-edge { fill: #12101f; }
+.rotate-device-overlay .ph-body { fill: var(--text2); }
+.rotate-device-overlay .ph-screen { fill: #ba74ff; }
+.rotate-device-overlay .ph-spark { fill: #ffd61a; }
+@keyframes rotPhoneP { 0% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes rotPhoneL { 0% { opacity: 0; } 50% { opacity: 1; } }
+.rotate-device-overlay .rotate-panel { background: var(--bg); box-shadow: 0 0 0 4px #12101f, 0 0 0 8px var(--accent), 0 0 0 12px #12101f; padding: 14px 16px; margin: 12px; width: min(80vw, 330px); box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.rotate-device-overlay .rotate-text { font-size: 14px; color: var(--accent); font-weight: 700; line-height: 1.3; }
+.rotate-device-overlay .rotate-sub { font-size: 11px; color: var(--text); line-height: 1.5; }
+.rotate-device-overlay .rotate-url { font-size: 13px; color: #ffd61a; font-weight: 700; }
+.rotate-device-overlay .rotate-actions { display: flex; gap: 14px; align-items: center; justify-content: center; margin-top: 2px; }
+.rotate-device-overlay .rotate-copy { font: inherit; font-size: 11px; font-weight: 700; letter-spacing: 1px; color: var(--text); background: #12101f; border: 0; padding: 9px 12px; box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px #12101f; cursor: pointer; }
+.rotate-device-overlay .rotate-copy:active { background: var(--accent); color: #12101f; }
+@media (prefers-reduced-motion: reduce) {
+  .rotate-device-overlay .rot-phone-p { animation: none; opacity: 0; }
+  .rotate-device-overlay .rot-phone-l { animation: none; opacity: 1; }
 }
+
+.rotate-device-overlay .rotate-tap-text { font-size: 18px; letter-spacing: 2px; animation: rotTapBlink 1.2s steps(1, end) infinite; }
+@keyframes rotTapBlink { 0% { color: var(--accent); } 50% { color: #ffd61a; } }
+.rotate-device-overlay .rotate-diag { font-size: 8px; color: var(--text2); }
+.rotate-device-overlay .rotate-play { width: 112px; height: 112px; flex: none; animation: rotPlayBlink 1.2s steps(1, end) infinite; }
+.rotate-device-overlay .rotate-play svg { width: 100%; height: 100%; image-rendering: pixelated; }
+.rotate-device-overlay .pl-edge { fill: #12101f; }
+.rotate-device-overlay .pl-body { fill: #ba74ff; }
+.rotate-device-overlay .pl-tri { fill: #ffd61a; }
+@keyframes rotPlayBlink { 0% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+.ios-fs-hint { position: fixed; left: 50%; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 99990; display: flex; align-items: center; gap: 14px; max-width: 88vw; padding: 9px 14px; background: var(--bg); color: var(--text); font-family: var(--font-display), sans-serif; font-size: 10px; line-height: 1.4; box-shadow: 0 0 0 3px #12101f, 0 0 0 6px var(--accent), 0 0 0 9px #12101f; }
+.ios-fs-hint .rotate-copy { font: inherit; font-size: 10px; font-weight: 700; letter-spacing: 1px; color: var(--text); background: #12101f; border: 0; padding: 7px 10px; box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px #12101f; cursor: pointer; flex: none; }
+
+@media (orientation: landscape) and (max-height: 600px) {
+  .rotate-device-overlay .rotate-content { flex-direction: column; flex-wrap: nowrap; justify-content: flex-start; gap: 10px; padding: 8px 16px; height: 100%; }
+  .rotate-device-overlay .rotate-logo { width: min(80vw, 660px); margin-top: 0; }
+  .rotate-device-overlay .rotate-play, .rotate-device-overlay .rotate-phone { display: none; }
+  .rotate-device-overlay .rotate-panel { margin: 4px; padding: 10px 14px; width: min(60vw, 420px); }
+  .rotate-device-overlay .rotate-panel-pc { display: none; }
+}
+}
+
+/* Solange der Tap-/Dreh-Bildschirm steht, laufen die Animationen der Bildschirme dahinter (Login-Kulisse mit 46 Glutpunkten,
+   150 Logo-Partikeln, Blitzen ...) unsichtbar weiter und kosten auf dem Handy Takt. Hier angehalten. */
+@media (orientation: portrait) and (max-width: 900px) { 
+  .screen-full *, .screen-center *, .pp-bg-particles * { animation: none !important; }
+ }
+body:has(.rotate-device-overlay.rotate-gate) .screen-full *,
+body:has(.rotate-device-overlay.rotate-gate) .screen-center *,
+body:has(.rotate-device-overlay.rotate-gate) .pp-bg-particles * { animation: none !important; }
 
 /* Show overlay + hide ALL screens in portrait on small devices */
 @media (orientation: portrait) and (max-width: 900px) {
@@ -12486,13 +12548,19 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
   .first-choice-panel.panel-zielwahl { --zw-polster-y: 5px; --zw-polster-x: 20px; max-width: min(620px, calc(94 * var(--vw))); }
   .panel-zielwahl .panel-zielwahl-vorschau { display: none; }
   .panel-zielwahl .btn { min-height: 0; padding: 4px 10px !important; font-size: 10px !important; }
-  /* Knöpfe NEBEN den Text statt darunter: eine Zeile weniger Höhe
-     (hier ohne Mittellücke — die Box ist ohnehin so breit wie das Brett). */
-  .panel-zielwahl .panel-zielwahl-knoepfe { display: flex !important; column-gap: 8px !important; }
-  .panel-zielwahl .panel-zielwahl-spalte { display: grid !important; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; align-items: center; }
-  .panel-zielwahl .panel-zielwahl-spalte > * { grid-column: 1; }
-  .panel-zielwahl .panel-zielwahl-spalte > .panel-zielwahl-knoepfe { grid-column: 2; grid-row: 1 / span 6; }
-  .panel-zielwahl .panel-zielwahl-spalte > .panel-zielwahl-text { margin-bottom: 0 !important; }
+  /* Als Vorgabe: Text OBEN, Knöpfe DARUNTER (nicht in einer langen Zeile) — mittig, ohne Mittellücke für die Helden (die Box steht fest und wird
+     bei Bedarf weggescrollt/-geschoben, siehe unten). */
+  .panel-zielwahl .panel-zielwahl-knoepfe { display: flex !important; column-gap: 8px !important; justify-content: center; margin-top: 4px; }
+  .panel-zielwahl .panel-zielwahl-spalte { display: flex !important; flex-direction: column !important; align-items: center; text-align: center; }
+  .panel-zielwahl .panel-zielwahl-spalte > .panel-zielwahl-text { margin-bottom: 6px !important; }
+  .panel-zielwahl .panel-zielwahl-spalte > * { margin-bottom: 4px; }
+  .panel-zielwahl .panel-zielwahl-spalte > .panel-zielwahl-knoepfe { margin-bottom: 0; }
+}
+/* HANDY: Duell-Fenster stehen fest auf dem Schirm, nehmen Tipps an (Körper nicht mehr durchklickbar — man scrollt/verschiebt sie weg) und lassen sich
+   per Wischen/Halten verschieben (DraggablePanel); Panels mit scrollbarem Inhalt (Galerie) behalten ihr natives Scrollen. Pixel-Rahmen als Zieh-Rückmeldung. */
+@media (pointer: coarse) and (max-height: 600px) {
+  .first-choice-panel, .first-choice-panel.panel-zielwahl { pointer-events: auto; }
+  .first-choice-panel[data-zieht] { outline: 3px solid var(--player-color, var(--accent)); outline-offset: 2px; }
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -13866,6 +13934,34 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 /* ─── The Root of all Presents (25.10.): Lichterkette am fliegenden Geschenk — Birnchen blinken hart zwischen zwei Tönen, die Lichtpixel fallen in Schritten ─────────────── */
 @keyframes ptLichterBlink { 0% { background: var(--c1); } 50% { background: var(--c2); } }
 @keyframes ptLichterSpur { from { transform: translate(0, 0); } to { transform: translate(var(--gsx, 0), var(--gsy, 12px)); } }
+
+/* Handy: die zentrierte Ueberschrift (absolut, Mitte) wuerde von der Gegnersuche ueberdeckt, sobald diese nach links reicht —
+   „CHOOSE OPPONENT!" steht stattdessen im Zeilenfluss und fuellt die Luecke zwischen REGISTER NOW und der Suche (mittig dazwischen). */
+@media (max-height: 600px) {
+  .top-bar > h2.titel-links { position: static; left: auto; transform: none; transform-origin: center; margin: 0 8px; flex: 1 1 0; min-width: 0; text-align: center; white-space: nowrap; }
+  .top-bar > .top-bar-abstand { display: none; }
+}
+
+/* ★ HANDY: Phasenleiste EINZEILIG in einem Abstand zwischen den beiden Spielerseiten.
+   Das Brett scrollt auf dem Handy ohnehin senkrecht; zwischen Gegner- und eigener Seite entsteht deshalb ein Streifen (`.board-mid-row`), in dem die
+   Leiste (Phasen + Knoepfe in EINER Zeile) mittig auf der Naht sitzt und mit dem Brett mitscrollt (`--phase-mid-y`, app-board.jsx). Sie verdeckt damit
+   keine Heldenzone mehr; die Area-Zonen (an derselben Naht aufgehaengt) werden nur in einem schmalen Band gekreuzt. */
+@media (pointer: coarse) and (max-height: 600px) {
+  .board-mid-row { min-height: 44px !important; }
+  /* Rundenzahl: wieder exakt mittig zwischen den beiden Gelöscht-Stapeln (die Phasenleiste liegt nicht mehr in dieser Spalte, der frühere Ausweich nach oben entfällt). */
+  .board-round-counter { top: 50% !important; bottom: auto !important; transform: translate(-50%, -50%) !important; }
+  /* Die Spalte liegt (Portal) IM scrollenden `.board-center` und scrollt damit nativ; `--phase-mid-y` ist die Mitte in Inhaltskoordinaten. */
+  .board-center > .phase-column { position: absolute; }
+  .phase-column { zoom: 1 !important; left: 50% !important; top: var(--phase-mid-y, 50%) !important; transform: translate(-50%, -50%) !important; flex-direction: row !important; align-items: center !important; gap: 4px; width: auto; }
+  .phase-buttons-row { margin-top: 0 !important; }
+}
+
+/* Aufdeck-Fenster „Gegner hat die Karte gesucht" (deckSearchReveal): auf niedrigen Bildschirmen (Handy quer) passt die 308-px-Karte samt Text und OK-Knopf nicht
+   ins Bild — der Knopf lag unterhalb des Schirms, das Spiel wartete scheinbar endlos. Karte kleiner, Abstaende enger; ein Tipp irgendwo schliesst es. */
+@media (max-height: 600px) {
+  .pp-aufdeck-fenster { gap: 6px !important; max-height: 96vh; }
+  .pp-aufdeck-karte { width: calc(min(52vh, 308px) * 220 / 308) !important; height: min(52vh, 308px) !important; }
+}
 
 
 /* ── RETRO-ZUSATZ (scripts/retro/retro-extra.css) ── */

@@ -87,6 +87,13 @@ module.exports = {
     // Stream the card NOW (after player decisions finalized; W64b: zentral, auch für Zuschauer)
     engine.commitAppearance();
     await engine._delay(100);
+    // W85c (Atta, Al 29.10.: „löschen STATT auf die Hand"): die 3 gewählten Karten sind EIN Aufdeck-Ereignis VOR dem Verschieben; eine von Atta gelöschte Karte kommt nie auf eine Hand
+    // (der Gegner wählt dann unter den übrigen).
+    const _ereignis = await engine.aufdeckEreignis(pi, chosenNames, { source: 'Magic Lamp', zone: 'deck' });
+    if (_ereignis.geloescht.length) {
+      for (const g of _ereignis.geloescht) { const k = chosenNames.indexOf(g); if (k >= 0) chosenNames.splice(k, 1); }
+      if (chosenNames.length === 0) return { cancelled: true };
+    }
 
     // Step 2: Opponent picks 1 of the 3
     const oppResult = await engine.promptGeneric(oppIdx, {

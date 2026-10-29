@@ -10,7 +10,10 @@
 //
 //  ── Bausteine ─────────────────────────────────────────────────────
 //  • Aufdecken: Hook `onCardsRevealed` (`engine.meldeAufgedeckt`, gesammelt je Wirkung, EIN Aufruf am Ende der Wirkung). Aufdecken durch den Effekt einer
-//    ABILITY (Premonition, Inventing, Navigation …) meldet die Engine gar nicht erst.
+//    ABILITY (Premonition, Inventing, Navigation …) meldet die Engine gar nicht erst. Quellen: Such-Fenster (`deckSearchReveal`), `revealToOpponent`, Deck-Aufdecker (`_deck-top-shared`)
+//    und Tutoren, die ihr Aufdecken VOR dem Verschieben melden (`engine.aufdeckEreignis`, Welle 85c; Tabelle in CARD_API.md). „Löschen STATT auf die Hand" (Al 29.10.): bei diesen Wegen löscht Atta
+//    die Karte, solange sie noch im Deck liegt — sie kommt nie auf die Hand (keine Hand-Zugangs-Wirkungen), der Hook füllt dafür `ctx.geloescht`. Die übrigen Wege (Deck-Aufdecker, deren Spell
+//    im Deck bleibt) werten weiter NACH der Wirkung aus. Potion Deck und Side Deck zählen als „your deck“ (W85d, `ctx.zone` 'potionDeck'/'sideDeck'). Selbst-entsorgende Aufdecker (Chaos Magic, Third Circle, Heart of Cards/Oracle bei Fehlschlag …) lösen Atta nicht aus.
 //  • Verzoegertes Wirken: gemeinsamer Baustein mit Ghostly Warning (`_verzoegert-zauber-shared.js`) — Pflicht, ohne Stufen-/Status-/Wisdom-Pruefung.
 //  • Loeschen statt Ablage: Hero-Flag `deletesOwnSpellsInsteadOfDiscard`, gelesen von `engine.spellGoesToDeletedInstead` (doPlaySpell, Sofort-Guesse,
 //    Reaktionsketten).
@@ -43,6 +46,7 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       if (ctx.playerIdx !== pi) return;                       // „you reveal"
+      if (ctx.sourceName === 'Chaos Magic') return;           // W85c (Al): die von Chaos Magic aufgedeckten/reservierten Karten sind für Atta tabu
       const heroIdx = ctx.cardHeroIdx;
       const feld = ctx.cardHeroOwner ?? pi;                   // Brettseite des Helden
       const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
@@ -63,8 +67,9 @@ module.exports = {
       // „Once per turn"
       if (!heldenSperreFrei(gs, HOPT, pi)) return;
       // Wo liegt die Karte jetzt? (Suchergebnis: auf der Hand; oberste Deckkarte: im Deck.)
-      const liegt = (zone) => zone === 'hand' ? (ps.hand || []).includes(name) : (ps.mainDeck || []).includes(name);
-      const reihenfolge = ctx.zone === 'deck' ? ['deck', 'hand'] : ['hand', 'deck'];
+      const liegt = (zone) => zone === 'hand' ? (ps.hand || []).includes(name) : zone === 'potionDeck' ? (ps.potionDeck || []).includes(name) : zone === 'sideDeck' ? (ps.sideDeck || []).includes(name) : (ps.mainDeck || []).includes(name);
+      // W85d (Al): Potion Deck und Side Deck zählen als „your deck" — dort aufgedeckt, wird dort gelöscht (vor dem Hand-Zugang).
+      const reihenfolge = (ctx.zone === 'potionDeck' || ctx.zone === 'sideDeck') ? [ctx.zone] : ctx.zone === 'deck' ? ['deck', 'hand'] : ['hand', 'deck'];
       const wo = reihenfolge.find(liegt) || null;
       if (!wo) return;
 
@@ -89,6 +94,7 @@ module.exports = {
         heldenSperreFreigeben(gs, HOPT, pi);
         return;
       }
+      if (Array.isArray(ctx.geloescht)) ctx.geloescht.push(name);   // W85c: Aufdeck-Ereignis VOR dem Verschieben — der Tutor nimmt diese Karte nicht auf die Hand
       engine._broadcastEvent('play_zone_animation', { type: 'atta_books', owner: feld, heroIdx, zoneSlot: -1, phase: 'delete' });
       await engine._delay(700);
       vormerken(engine, {

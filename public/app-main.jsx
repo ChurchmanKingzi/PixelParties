@@ -1982,10 +1982,9 @@ function PlayScreen() {
         <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>ONLINE LOBBY</h2>
         <div style={{ flex: 1 }} />
-        <label style={{ fontSize: 12, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
+        <div style={{ fontSize: 12, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
           🃏 Deck:
-          <select className="select" value={selectedDeck} onChange={async e => {
-              const id = e.target.value;
+          <PPDropdown value={selectedDeck} onChange={async id => {
               setSelectedDeck(id);
               // Auto-save as default deck. Custom decks use the per-deck
               // endpoint; starter / structure decks use the sample-default
@@ -2003,12 +2002,13 @@ function PlayScreen() {
                   setUser(u => u ? { ...u, defaultSampleDeckId: id } : u);
                 }
               } catch (err) { notify('Could not save your default deck: ' + (err?.message || 'unknown error'), 'error'); }
-            }} style={{ fontSize: 12, minWidth: 180, padding: '4px 8px', borderColor: 'var(--accent)', color: 'var(--text)' }}>
-            {decks.filter(d => !isCubeDeck(d) && d.mode !== 'drafted').map(d => <option key={d.id} value={d.id}>{d.name} {isDeckLegal(d).legal ? '✓' : '✗'}{d.isDefault ? ' ★' : ''}</option>)}
-            {sampleDecks.filter(d => isDeckLegal(d).legal).length > 0 && <option disabled>── Sample Decks ──</option>}
-            {sampleDecks.filter(d => isDeckLegal(d).legal).map(d => <option key={d.id} value={d.id}>📋 {d.name}{user?.defaultSampleDeckId === d.id ? ' ★' : ''}</option>)}
-          </select>
-        </label>
+            }} style={{ fontSize: 12, minWidth: 180, padding: '4px 8px', borderColor: 'var(--accent)', color: 'var(--text)' }}
+            options={[
+              ...decks.filter(d => !isCubeDeck(d) && d.mode !== 'drafted').map(d => ({ value: d.id, label: `${d.name} ${isDeckLegal(d).legal ? '✓' : '✗'}${d.isDefault ? ' ★' : ''}` })),
+              ...(sampleDecks.filter(d => isDeckLegal(d).legal).length > 0 ? [{ value: '__sample_kopf', disabled: true, label: '── Sample Decks ──' }] : []),
+              ...sampleDecks.filter(d => isDeckLegal(d).legal).map(d => ({ value: d.id, label: `📋 ${d.name}${user?.defaultSampleDeckId === d.id ? ' ★' : ''}` })),
+            ]} />
+        </div>
         <button className="btn" onClick={() => setCreating(true)} style={{ borderColor: 'var(--player-color)', color: 'var(--player-color)', background: 'color-mix(in srgb, var(--player-color) 8%, transparent)' }}>+ CREATE GAME</button>
         <VolumeControl />
       </div>
@@ -3001,21 +3001,33 @@ function MusicManager({ bgmMode }) {
 
   // Unlock audio on first user interaction
   // Chromium/Opera require a direct user gesture to unlock each Audio element.
-  // We "touch" every track (play → immediate pause) to unlock them, then start the real track.
+  // ★ Mit Web Audio (GaplessBgm) entsperrt ein einziger laufender Kontext alles: app-shared.jsx horcht auf echte Gesten (click / touchend /
+  // pointerup / keydown — NICHT touchstart, das zaehlt auf Android nicht) und meldet `pp-audio-running`. Erst dann startet die Musik; so
+  // kommt sie auf dem Handy schon auf Tap-Screen und Login. Die Zielmusik wird ueber einen Ref nachgefuehrt (der Modus kann sich bis zur
+  // ersten Geste mehrfach aendern).
+  const bgmRef = useRef(bgmMode);
+  bgmRef.current = bgmMode;
   useEffect(() => {
     if (unlocked.current) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) {
+      const start = () => {
+        if (unlocked.current) return;
+        unlocked.current = true;
+        for (const audio of Object.values(_bgmTracks)) { if (audio && typeof audio.unlock === 'function') audio.unlock(); }
+        switchTrack(bgmRef.current || 'menu');
+      };
+      window.addEventListener('pp-audio-running', start);
+      if (window.ppAudioLaeuft && window.ppAudioLaeuft()) start();
+      return () => window.removeEventListener('pp-audio-running', start);
+    }
+    // Rueckfall ohne AudioContext: <audio>-Elemente per Play/Pause entsperren (alter Weg).
     const unlock = () => {
       if (unlocked.current) return;
       unlocked.current = true;
       const touchAndUnlock = async () => {
         for (const audio of Object.values(_bgmTracks)) {
           if (!audio) continue;
-          // ★ v1257: Der Web-Audio-Looper braucht keinen Play/Pause-
-          // Tastendruck je Element — EIN ctx.resume() entsperrt den
-          // Kontext fuer alle. (audio.play() wuerde hier ausserdem
-          // 13 Fetch+Decodes anstossen — genau das soll die
-          // Lazy-Ladung ja vermeiden.)
-          if (typeof audio.unlock === 'function') { audio.unlock(); continue; }
           try {
             audio.volume = 0;
             await audio.play();
@@ -3023,22 +3035,22 @@ function MusicManager({ bgmMode }) {
             audio.currentTime = 0;
           } catch {}
         }
-        switchTrack(bgmMode || 'menu');
+        switchTrack(bgmRef.current || 'menu');
       };
       touchAndUnlock();
       window.removeEventListener('click', unlock);
       window.removeEventListener('keydown', unlock);
-      window.removeEventListener('touchstart', unlock);
+      window.removeEventListener('touchend', unlock);
     };
     window.addEventListener('click', unlock);
     window.addEventListener('keydown', unlock);
-    window.addEventListener('touchstart', unlock);
+    window.addEventListener('touchend', unlock);
     return () => {
       window.removeEventListener('click', unlock);
       window.removeEventListener('keydown', unlock);
-      window.removeEventListener('touchstart', unlock);
+      window.removeEventListener('touchend', unlock);
     };
-  }, [bgmMode]);
+  }, []);
 
   // Switch tracks when bgmMode changes
   useEffect(() => {
@@ -3101,6 +3113,7 @@ function OpponentUnlockPopup() {
   useEffect(() => {
     if (!current) return;
     if (window.playSFX) window.playSFX('ascension');
+    if (current.deckAdded && window.playSFX) window.playSFX('shop_purchase', { delay: 650, dedupe: 0 });   // Deck-Geschenk: zweiter Klang hinterher
     const onKey = (e) => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); dismiss(); } };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
@@ -3132,23 +3145,49 @@ function OpponentUnlockPopup() {
           0%,100% { box-shadow: 0 0 28px rgba(255,198,28,.55), 0 0 70px rgba(255,154,26,.35), inset 0 0 24px rgba(255,198,28,.18); }
           50% { box-shadow: 0 0 44px rgba(251,225,129,.85), 0 0 110px rgba(249,172,32,.55), inset 0 0 34px rgba(255,217,102,.3); }
         }
+        @keyframes ppUnlockKonfetti { from { transform: translateY(-24px); } to { transform: translateY(calc(100vh + 24px)); } }
+        /* Handy quer (niedrige Hoehe): Bild links, Text rechts — sonst sprengt der Dialog den Bildschirm */
+        @media (max-height: 600px) {
+          .pp-unlock-rahmen { display: grid !important; grid-template-columns: auto 1fr; column-gap: 16px; align-items: center; width: min(94vw, 620px) !important; padding: 12px 18px 12px !important; }
+          .pp-unlock-rahmen > .pp-unlock-titel { grid-column: 1 / -1; margin-bottom: 8px !important; font-size: 12px !important; letter-spacing: 2px !important; }
+          .pp-unlock-rahmen > .pp-unlock-bild { grid-row: 2 / span 3; margin-bottom: 0 !important; }
+          .pp-unlock-rahmen > .pp-unlock-satz { font-size: 13px !important; margin-bottom: 8px !important; text-align: left; }
+          .pp-unlock-rahmen > .pp-unlock-deck { margin: 0 0 8px !important; font-size: 11px !important; text-align: left; padding: 6px 8px !important; }
+          .pp-unlock-rahmen > .pp-unlock-deck > div { font-size: 11px !important; }
+          .pp-unlock-rahmen > .pp-unlock-weiter { justify-self: start; padding: 6px 22px !important; font-size: 12px !important; }
+          .pp-unlock-ring { width: min(620px, 92vh) !important; height: min(620px, 92vh) !important; }
+        }
         @keyframes ppUnlockTitle {
           0%,100% { text-shadow: 0 0 10px rgba(255,217,102,.8), 0 0 22px rgba(255,154,26,.5); }
           50% { text-shadow: 0 0 18px rgba(255,241,150,1), 0 0 40px rgba(249,172,32,.8); }
         }
       `}</style>
 
+      {/* Tam-Tam: Pixel-Konfetti (harte Quadrate, ganze Pixel pro Schritt) fuer freigeschaltete Gegner — fest verteilt, damit nichts neu gewuerfelt wird */}
+      {current.kind !== 'skin' && (
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+          {Array.from({ length: 36 }, (_, i) => {
+            const farben = ['#fad54a', '#fc1c5f', '#4ceb70', '#1ca9fd', '#ff8b1a', '#a952ff'];
+            const gr = 4 + (i % 3) * 2;
+            return <div key={i} style={{
+              position: 'absolute', top: 0, left: ((i * 37 + 11) % 100) + '%', width: gr, height: gr, background: farben[i % farben.length],
+              animation: `ppUnlockKonfetti ${2.6 + (i % 5) * 0.45}s steps(${24 + (i % 4) * 6}) ${(i % 9) * 0.22}s infinite`,
+            }} />;
+          })}
+        </div>
+      )}
+
       {/* Rotating shimmer ring behind the card */}
       <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
            onClick={e => e.stopPropagation()}>
-        <div style={{
+        <div className="pp-unlock-ring" style={{
           position: 'absolute', width: 620, height: 620, borderRadius: '50%',
           background: 'conic-gradient(from 0deg, rgba(255,198,28,0) 0deg, rgba(255,217,102,.32) 60deg, rgba(255,198,28,0) 120deg, rgba(255,217,102,.32) 180deg, rgba(255,198,28,0) 240deg, rgba(255,217,102,.32) 300deg, rgba(255,198,28,0) 360deg)',
           filter: 'blur(6px)', animation: 'ppUnlockSpin 14s linear infinite', pointerEvents: 'none',
         }} />
 
         {/* Ornate frame */}
-        <div style={{
+        <div className="pp-unlock-rahmen" style={{
           position: 'relative',
           width: 'min(90vw, 460px)',
           padding: '34px 36px 30px',
@@ -3168,23 +3207,23 @@ function OpponentUnlockPopup() {
             }}>✦</div>
           ))}
 
-          <div className="orbit-font" style={{
+          <div className="orbit-font pp-unlock-titel" style={{
             fontSize: 15, fontWeight: 800, letterSpacing: 3, color: '#ffd966',
             marginBottom: 18, animation: 'ppUnlockTitle 2.2s ease-in-out infinite',
           }}>{current.kind === 'skin' ? '✦ NEW SKIN UNLOCKED ✦' : '✦ NEW OPPONENT UNLOCKED ✦'}</div>
 
           {/* Hero portrait in a gold frame */}
-          <div style={{
+          <div className="pp-unlock-bild" style={{
             display: 'inline-block', padding: 4, borderRadius: 10,
             border: '2px solid #fad54a', background: '#08060c',
             boxShadow: '0 0 18px rgba(255,185,26,.5)', marginBottom: 18,
           }}>
             {heroArt
-              ? <HeroArtCrop heroName={current.kind === 'skin' ? current.heroName : current.middleHero} skinName={current.kind === 'skin' ? current.skinName : null} width={300} />
+              ? <HeroArtCrop heroName={current.kind === 'skin' ? current.heroName : current.middleHero} skinName={current.kind === 'skin' ? current.skinName : null} width={(window.ppIsPhone && window.ppIsPhone()) ? 190 : 300} />
               : <div style={{ width: 300, height: 200, background: '#1a1a2e' }} />}
           </div>
 
-          <div style={{ fontSize: 16, color: 'var(--text)', lineHeight: 1.5, marginBottom: 22 }}>
+          <div className="pp-unlock-satz" style={{ fontSize: 16, color: 'var(--text)', lineHeight: 1.5, marginBottom: 22 }}>
             You unlocked{' '}
             <span className="orbit-font" style={{
               color: '#fbe181', fontWeight: 800, fontSize: 20,
@@ -3193,9 +3232,16 @@ function OpponentUnlockPopup() {
             {current.kind === 'skin' ? <>as a new skin for <b>{current.heroName}</b>!</> : 'as a new opponent!'}
           </div>
 
+          {current.deckAdded && (
+            <div className="pp-unlock-deck" style={{ margin: '-8px 0 22px', padding: '10px 12px', border: '2px solid #4ceb70', background: '#08060c', color: '#4ceb70', fontSize: 14, lineHeight: 1.5 }}>
+              <div className="orbit-font" style={{ fontSize: 13, fontWeight: 800, letterSpacing: 2, marginBottom: 4 }}>🃏 DECK ADDED TO YOUR DECKS!</div>
+              <span style={{ color: 'var(--text)' }}>You can now play the <b>{current.name}</b> deck yourself — find it in your deck list.{current.guest ? ' Register to keep it!' : ''}</span>
+            </div>
+          )}
+
           <button
             onClick={dismiss}
-            className="orbit-font"
+            className="orbit-font pp-unlock-weiter"
             style={{
               padding: '10px 34px', fontSize: 14, fontWeight: 800, letterSpacing: 2,
               color: '#332300', cursor: 'pointer', borderRadius: 8, border: 'none',
@@ -3264,6 +3310,128 @@ function applyPixelHoverCursor(hex) {
   // A cached image often won't fire `onload`, so draw immediately when it's
   // already available; otherwise the onload above handles the first paint.
   if (_cursorImg.complete && _cursorImg.naturalWidth) _drawHoverCursor();
+}
+
+// Hochkant-Sperre: das Spiel laeuft nur quer. Wer ueber einen Social-Link (TikTok/Instagram/Shorts) aufs Handy kommt, sieht
+// zuerst diesen Bildschirm — deshalb mit Titelbild, Logo, einem Handy-Sprite, das sich quer legt, und einem Hinweis zum
+// Weitergeben des Links (am PC/Tablet spielen). Sichtbar nur im Hochformat (CSS `.rotate-device-overlay`).
+function RotateOverlay() {
+  const [copied, setCopied] = useState(false);
+  // Standard (Android/Chrome u. a.): ein Antippen irgendwo startet Vollbild + Querformat-Sperre, das Geraet dreht sich von
+  // selbst — der Bildschirm sagt nur „Tap to play". Wo das nicht geht (iPhone-Safari, Sperre verweigert): die Dreh-Anweisung.
+  const [failed, setFailed] = useState(false);
+  const [tapped, setTapped] = useState(!!window._ppTapStarted);
+  const camRef = useRef(null);
+  const canAuto = !!(window._ppFullscreenSupported && window._ppLandscapeLockSupported);
+  const auto = canAuto && !failed;
+  // Tap-Schranke: auf Telefonen (grober Zeiger, kurze Seite <= 700 px) bleibt der Bildschirm in JEDER Ausrichtung stehen, bis
+  // getippt wurde — wer das Handy von Hand kippt, kommt NICHT am Tippen vorbei (das Tippen startet Vollbild + Querformat).
+  const phoneLike = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches && Math.min(window.screen.width, window.screen.height) <= 700);
+  const gate = canAuto && phoneLike && !tapped;
+  const enter = () => {
+    if (!auto) return;
+    window._ppTapStarted = true; setTapped(true);
+    window._ppRequestFullscreen(true).then(r => { if (!r.locked) setFailed(true); });
+  };
+
+  const copyLink = () => {
+    const url = window.location.origin;
+    const done = () => { setCopied(true); setTimeout(() => setCopied(false), 2200); };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(url).then(done, done); return; }
+    } catch (e) { /* weiter mit dem Notweg */ }
+    try {
+      const ta = document.createElement('textarea'); ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    } catch (e) { /* nichts zu tun */ }
+    done();
+  };
+  return (
+    <div className={'rotate-device-overlay' + (gate ? ' rotate-gate' : '')} id="rotate-overlay" onClick={enter}>
+      <div className="rotate-cam" ref={camRef} aria-hidden="true"><TapBackdropCanvas hostRef={camRef} /></div>
+      <div className="rotate-content">
+        <div className="pp-logo-stack rotate-logo">
+          <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
+          <div className="pp-logo-tint" aria-hidden="true"></div>
+          <div className="pp-logo-licht" aria-hidden="true"></div>
+          <div className="pp-logo-umriss" aria-hidden="true"></div>
+        </div>
+        {auto ? (
+          <div className="rotate-play" aria-hidden="true">
+            <svg viewBox="0 0 14 14" shapeRendering="crispEdges">
+              <rect x="0" y="0" width="14" height="14" className="pl-edge" />
+              <rect x="1" y="1" width="12" height="12" className="pl-body" />
+              <rect x="4" y="3" width="2" height="8" className="pl-tri" />
+              <rect x="6" y="4" width="2" height="6" className="pl-tri" />
+              <rect x="8" y="5" width="2" height="4" className="pl-tri" />
+              <rect x="10" y="6" width="1" height="2" className="pl-tri" />
+            </svg>
+          </div>
+        ) : (
+          <div className="rotate-phone" aria-hidden="true">
+            <svg className="rot-phone-p" viewBox="0 0 14 22" shapeRendering="crispEdges">
+              <rect x="0" y="0" width="14" height="22" className="ph-edge" />
+              <rect x="1" y="1" width="12" height="20" className="ph-body" />
+              <rect x="2" y="3" width="10" height="15" className="ph-screen" />
+              <rect x="5" y="1" width="4" height="1" className="ph-edge" />
+              <rect x="6" y="19" width="2" height="1" className="ph-edge" />
+              <rect x="4" y="6" width="2" height="2" className="ph-spark" />
+              <rect x="8" y="11" width="2" height="2" className="ph-spark" />
+              <rect x="5" y="14" width="1" height="1" className="ph-spark" />
+            </svg>
+            <svg className="rot-phone-l" viewBox="0 0 22 14" shapeRendering="crispEdges">
+              <rect x="0" y="0" width="22" height="14" className="ph-edge" />
+              <rect x="1" y="1" width="20" height="12" className="ph-body" />
+              <rect x="3" y="2" width="15" height="10" className="ph-screen" />
+              <rect x="20" y="5" width="1" height="4" className="ph-edge" />
+              <rect x="1" y="6" width="1" height="2" className="ph-edge" />
+              <rect x="6" y="4" width="2" height="2" className="ph-spark" />
+              <rect x="11" y="8" width="2" height="2" className="ph-spark" />
+              <rect x="14" y="5" width="1" height="1" className="ph-spark" />
+            </svg>
+          </div>
+        )}
+        {auto ? (
+          <div className="rotate-panel rotate-panel-tap">
+            <div className="rotate-text rotate-tap-text">TAP TO PLAY</div>
+            <div className="rotate-sub">Tap anywhere to start the battle.</div>
+          </div>
+        ) : (
+          <div className="rotate-panel">
+            <div className="rotate-text">Turn your phone sideways!</div>
+            <div className="rotate-sub">Pixel Parties is played in landscape. Rotate your device and the battle begins.</div>
+            {window._ppFsLast && window._ppFsLast.err && <div className="rotate-diag">Auto-rotate failed: {String(window._ppFsLast.err)}</div>}
+          </div>
+        )}
+        <div className="rotate-panel rotate-panel-pc" onClick={(e) => e.stopPropagation()}>
+          <div className="rotate-sub">Rather play on a PC or tablet? It is free in your browser:</div>
+          <div className="rotate-url">pixelpartiestcg.com</div>
+          <div className="rotate-actions">
+            <button type="button" className="rotate-copy" onClick={(e) => { e.stopPropagation(); copyLink(); }}>{copied ? 'COPIED!' : 'COPY LINK'}</button>
+            <DiscordButton size={22} label="Discord" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// iPhone/iPad-Safari kennen kein Vollbild fuer Webseiten (keine Fullscreen-API) — die Browserleiste bleibt. Einziger Weg:
+// „Zum Home-Bildschirm" (manifest.json: display fullscreen, orientation landscape). Ein einmaliger, wegklickbarer Hinweis.
+function IosFullscreenHint() {
+  const KEY = 'pp_ios_fs_hint';
+  const [hidden, setHidden] = useState(() => { try { return !!localStorage.getItem(KEY); } catch { return false; } });
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = window.navigator.standalone === true || (window.matchMedia && (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches));
+  const hide = () => { setHidden(true); try { localStorage.setItem(KEY, '1'); } catch {} };
+  useEffect(() => { if (!ios || standalone || hidden) return; const t = setTimeout(hide, 20000); return () => clearTimeout(t); }, [ios, standalone, hidden]);
+  if (!ios || standalone || hidden) return null;
+  return (
+    <div className="ios-fs-hint" role="status">
+      <div className="ios-fs-text">Want true fullscreen? Tap Share, then Add to Home Screen.</div>
+      <button type="button" className="rotate-copy" onClick={hide}>OK</button>
+    </div>
+  );
 }
 
 function App() {
@@ -3468,11 +3636,8 @@ function App() {
   return (
     <AppContext.Provider value={ctx}>
       {/* Global portrait rotation lock — all screens need landscape */}
-      <div className="rotate-device-overlay" id="rotate-overlay">
-        <div className="rotate-icon">📱</div>
-        <div className="rotate-text">Please rotate your device</div>
-        <div className="rotate-sub">Pixel Parties requires landscape orientation for the best experience</div>
-      </div>
+      <RotateOverlay />
+      <IosFullscreenHint />
       <MusicManager bgmMode={user ? bgmMode : 'login'} />
       <TextBox />
       <OpponentUnlockPopup />

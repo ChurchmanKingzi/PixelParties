@@ -210,14 +210,20 @@ module.exports = {
         gewaehlt.push(n);
         if (gewaehlt.length >= 2) break;
       }
+      // W85c (Atta, Al 29.10.): „reveal them" ist EIN Aufdeck-Ereignis VOR dem Verschieben; eine von Atta gelöschte Karte kommt nie auf die Hand.
+      const _ereignis = await engine.aufdeckEreignis(pi, gewaehlt, {
+        source: CARD_NAME, zone: 'deck',
+        fenster: () => engine.revealSearchedCards(pi, gewaehlt, CARD_NAME, { _aufdeckGemeldet: true }),
+      });
       const geholt = [];
       for (const n of gewaehlt) {
+        if (_ereignis.geloescht.includes(n)) { geholt.push(n); continue; }
         const ok = await engine.actionAddCardFromDeckToHand(pi, n, {
           source: CARD_NAME, reveal: false, _noKrates: true,   // Mehrfach-Tutor
         });
         if (ok) geholt.push(n);
       }
-      if (geholt.length > 0) await engine.revealSearchedCards(pi, geholt, CARD_NAME);
+      if (geholt.length > 0 && !_ereignis.fensterGezeigt) await engine.revealSearchedCards(pi, geholt, CARD_NAME);
       engine.shuffleDeck(pi);
       engine.log('elusive_hind_search', { player: ps.username, cards: geholt });
       engine.sync();

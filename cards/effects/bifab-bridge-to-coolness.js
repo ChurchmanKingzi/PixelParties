@@ -110,7 +110,15 @@ module.exports = {
     }
 
     // Move chosen card from deck to hand.
-    const _taken_deckIdx = kratesUmgebaut ? null
+    // W85c (Atta, Al 29.10.): das Aufdecken ist ein Ereignis VOR dem Verschieben — löscht Atta die Karte, kommt sie nie auf die Hand (Deck wird trotzdem gemischt).
+    // W85d (Al): „reveal it" — der Gegner MUSS die gesuchte Karte sehen (Such-Fenster wie bei allen Tutoren, VOR Attas Entscheidung). Bisher zeigte Bifab sie nie.
+    if (!kratesUmgebaut && (ps.mainDeck || []).includes(choice.cardName)) await engine.revealSearchedCards(pi, [choice.cardName], CARD_NAME, { _aufdeckGemeldet: true });
+    const _ereignis = kratesUmgebaut ? { geloescht: [] } : await engine.aufdeckEreignis(pi, [choice.cardName], { source: CARD_NAME, zone: 'deck' });
+    if (_ereignis.geloescht.includes(choice.cardName)) {
+      engine.shuffleDeck(pi, 'main');
+      engine.log('bifab_search', { player: ps.username, card: choice.cardName, deleted: true });
+    }
+    const _taken_deckIdx = (kratesUmgebaut || _ereignis.geloescht.includes(choice.cardName)) ? null
       : await engine.takeFromPile(ps, 'deck', choice.cardName, { source: CARD_NAME, toHand: true });   // v820: Stapel-Schicht
     if (_taken_deckIdx) {
       await engine.handZugang(ps, choice.cardName, { von: 'deck', source: CARD_NAME });

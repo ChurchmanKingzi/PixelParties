@@ -364,7 +364,7 @@ function AnimatedTitleBackdrop() {
             frames only the background and leaves every sprite at its true colour. */}
         <div className="anim-vignette" />
         {/* 1 — hammer girl */}
-        <div style={layer('hammer.png', { transformOrigin: '72% 28%', '--mx': '0.469vw', '--my': '-1.389vh', '--mr': '2deg', animation: 'ab-floaty 4.2s ease-in-out -0.6s infinite' })} />
+        <div style={layer('hammer.png', { transformOrigin: '72% 28%', '--mx': 'calc(var(--abw,1vw) * 0.469)', '--my': 'calc(var(--abh,1vh) * -1.389)', '--mr': '2deg', animation: 'ab-floaty 4.2s ease-in-out -0.6s infinite' })} />
         {/* 2 — Explosionskern. ★ v1266 (Al 22.9.: „das Login-Menue ist
             nicht schoen"): wieder HIER, in der Kulisse, statt im Kasten ueber
             dessen Flaeche. Dort lag der gelb-rote Kern direkt hinter den
@@ -376,22 +376,22 @@ function AnimatedTitleBackdrop() {
         {/* 3 — central bloom */}
         <div className="anim-bloom" />
         {/* 4 — Broghan (right shooter), nudged flush to the right edge */}
-        <div style={{ position: 'absolute', inset: 0, transform: 'translate(5.781vw, 0.278vh)' }}>
+        <div style={{ position: 'absolute', inset: 0, transform: 'translate(calc(var(--abw,1vw) * 5.781), calc(var(--abh,1vh) * 0.278))' }}>
           <div style={layer('golem.png', { animation: 'ab-broghanTether 4.8s ease-in-out infinite' })} />
         </div>
         {/* 5 — Kyli (tree girl), shifted down */}
-        <div style={{ position: 'absolute', inset: 0, transform: 'translateY(14.907vh)' }}>
-          <div style={layer('horned.png', { transformOrigin: '80% 100%', '--mx': '-0.573vw', '--my': '-1.389vh', '--mr': '2.6deg', animation: 'ab-floaty 6s ease-in-out -2s infinite' })} />
+        <div style={{ position: 'absolute', inset: 0, transform: 'translateY(calc(var(--abh,1vh) * 14.907))' }}>
+          <div style={layer('horned.png', { transformOrigin: '80% 100%', '--mx': 'calc(var(--abw,1vw) * -0.573)', '--my': 'calc(var(--abh,1vh) * -1.389)', '--mr': '2.6deg', animation: 'ab-floaty 6s ease-in-out -2s infinite' })} />
         </div>
         {/* 6 — angel girl */}
-        <div style={layer('angel.png', { transformOrigin: '20% 30%', '--mx': '0vw', '--my': '-1.111vh', '--mr': '-1.4deg', animation: 'ab-floaty 5s ease-in-out infinite' })} />
+        <div style={layer('angel.png', { transformOrigin: '20% 30%', '--mx': 'calc(var(--abw,1vw) * 0)', '--my': 'calc(var(--abh,1vh) * -1.111)', '--mr': '-1.4deg', animation: 'ab-floaty 5s ease-in-out infinite' })} />
         {/* 7 — blonde girl */}
-        <div style={layer('blonde.png', { transformOrigin: '20% 50%', '--mx': '0.208vw', '--my': '-0.833vh', '--mr': '1deg', animation: 'ab-floaty 6.5s ease-in-out -1.5s infinite' })} />
+        <div style={layer('blonde.png', { transformOrigin: '20% 50%', '--mx': 'calc(var(--abw,1vw) * 0.208)', '--my': 'calc(var(--abh,1vh) * -0.833)', '--mr': '1deg', animation: 'ab-floaty 6.5s ease-in-out -1.5s infinite' })} />
         {/* 8 — Jiggles (left shooter) */}
         <div style={layer('rabbit.png', { animation: 'ab-jiggleTether 4.8s ease-in-out infinite' })} />
         {/* 9 — Champion (swordsman), shifted down */}
-        <div style={{ position: 'absolute', inset: 0, transform: 'translateY(19.907vh)' }}>
-          <div style={layer('ninja.png', { transformOrigin: '16% 80%', '--mx': '0.417vw', '--my': '-1.296vh', '--mr': '-2deg', animation: 'ab-floaty 5.5s ease-in-out -2.5s infinite' })} />
+        <div style={{ position: 'absolute', inset: 0, transform: 'translateY(calc(var(--abh,1vh) * 19.907))' }}>
+          <div style={layer('ninja.png', { transformOrigin: '16% 80%', '--mx': 'calc(var(--abw,1vw) * 0.417)', '--my': 'calc(var(--abh,1vh) * -1.296)', '--mr': '-2deg', animation: 'ab-floaty 5.5s ease-in-out -2.5s infinite' })} />
         </div>
         {/* 10-12 — flying cats live in <AnimatedTitleCatsOverlay/> instead, so
             they render ABOVE the login panel (can't rise above it from inside
@@ -415,7 +415,7 @@ function AnimatedTitleBackdrop() {
         <div className="anim-embers" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
           {embers.map((e, i) => (
             <span key={i} style={{
-              position: 'absolute', bottom: '-1.296vh', left: e.left.toFixed(2) + '%',
+              position: 'absolute', bottom: 'calc(var(--abh,1vh) * -1.296)', left: e.left.toFixed(2) + '%',
               width: e.size.toFixed(1) + 'px', height: e.size.toFixed(1) + 'px', borderRadius: '50%',
               background: e.color, boxShadow: '0 0 ' + (e.size * 2.4).toFixed(1) + 'px ' + e.color,
               opacity: 0, animation: 'ab-emberrise ' + e.dur.toFixed(1) + 's linear ' + e.delay.toFixed(1) + 's infinite',
@@ -434,16 +434,16 @@ function AnimatedTitleBackdrop() {
 // — in sync because both mount together. pointer-events:none so clicks still
 // reach the form beneath.
 // Wie weit `cat_mid` nach links rueckt, damit sie den Login-Kasten
-// freigibt. 8vw sind bei 1900px Breite gut 150px — der Kasten ist mit
+// freigibt. calc(var(--abw,1vw) * 8) sind bei 1900px Breite gut 150px — der Kasten ist mit
 // dem v466-Zoom rund 460px breit und beginnt damit bei etwa 38 %.
-const KATZE_LINKS = '8vw';
+const KATZE_LINKS = 'calc(var(--abw,1vw) * 8)';
 
 function AnimatedTitleCatsOverlay() {
   const layer = animEbene;   // v1265: zugeschnittene Ebenen, siehe oben
   return (
     <div className="anim-cats-front" aria-hidden="true">
       <div className="anim-shake">
-        <div style={layer('cat_top.png', { transformOrigin: '23% 5%', '--mx': '0.729vw', '--my': '-0.833vh', '--mr': '3deg', animation: 'ab-floaty 3.4s ease-in-out -0.5s infinite' })} />
+        <div style={layer('cat_top.png', { transformOrigin: '23% 5%', '--mx': 'calc(var(--abw,1vw) * 0.729)', '--my': 'calc(var(--abh,1vh) * -0.833)', '--mr': '3deg', animation: 'ab-floaty 3.4s ease-in-out -0.5s infinite' })} />
         {/* cat_mid sass mit ihrem Bildmittelpunkt bei 37 % genau auf der
             linken Kante des Login-Kastens und lag als Vordergrundebene
             darueber — seit dem groesseren Zoom (v466) zu dominant.
@@ -460,12 +460,117 @@ function AnimatedTitleCatsOverlay() {
 
             KATZE_LINKS ist die einzige Stellschraube: groesser =
             weiter weg vom Kasten. */}
-        <div style={layer('cat_mid.png', { transformOrigin: '37% 30%', '--mx': '-0.573vw', '--my': '0.833vh', '--mr': '-3deg', animation: 'ab-floaty 2.9s ease-in-out -0.8s infinite' }, { versatzX: `-${KATZE_LINKS}` })} />
-        <div style={layer('cat_bottom.png', { transformOrigin: '5% 48%', '--mx': '0.833vw', '--my': '-1.111vh', '--mr': '4deg', animation: 'ab-floaty 3.0s ease-in-out -1.7s infinite' })} />
+        <div style={layer('cat_mid.png', { transformOrigin: '37% 30%', '--mx': 'calc(var(--abw,1vw) * -0.573)', '--my': 'calc(var(--abh,1vh) * 0.833)', '--mr': '-3deg', animation: 'ab-floaty 2.9s ease-in-out -0.8s infinite' }, { versatzX: `calc(-1 * ${KATZE_LINKS})` })} />
+        <div style={layer('cat_bottom.png', { transformOrigin: '5% 48%', '--mx': 'calc(var(--abw,1vw) * 0.833)', '--my': 'calc(var(--abh,1vh) * -1.111)', '--mr': '4deg', animation: 'ab-floaty 3.0s ease-in-out -1.7s infinite' })} />
       </div>
     </div>
   );
 }
+
+// ═══ KULISSE FUER DEN TAP-BILDSCHIRM (Handy): ein einziges Canvas statt ~25 gestapelter, animierter DOM-Ebenen ═══
+// Die DOM-Kulisse (AnimatedTitleBackdrop) legt 1920x1080-Ebenen mit Blend-Modi, Filtern und Dutzenden CSS-Animationen
+// uebereinander; auf Handys ruckelte das im Hochformat deutlich. Hier werden dieselben Ebenen (data/animated_screen/layers2)
+// einmal auf Handy-Groesse vorskaliert und pro Bild in EIN Canvas gezeichnet (mit der Bildwiederholrate des Geraets, Dithering-frei, ohne Blend-Modi):
+// Schweben, Klammer-Rigs, Beben, Blitze, Glut und die langsame Kamerafahrt wie im Titelbildschirm. Laeuft nur, solange der
+// Bildschirm sichtbar ist, und gibt die Bilder nach 5 s Unsichtbarkeit wieder frei.
+function TapBackdropCanvas({ hostRef }) {
+  const cvRef = useRef(null);
+  useEffect(() => {
+    const cv = cvRef.current; if (!cv) return;
+    const DIR = ANIM_LAYERS_DIR, NAMES = ['background', 'hammer', 'explosion', 'golem', 'horned', 'angel', 'blonde', 'rabbit', 'ninja', 'cat_top', 'cat_mid', 'cat_bottom'];
+    const FRAME = 1000 / 60;
+    let imgs = null, loading = false, disposed = false, raf = 0, timer = 0, hiddenSince = 0, lastDraw = 0, W = 0, H = 0, S = 0, q = 1, ema = 0, frameGap = FRAME, lastAdapt = 0;
+    const lerp = (a, b, u) => a + (b - a) * u;
+    const kfLin = (pts, x) => { for (let i = 0; i + 1 < pts.length; i++) if (x >= pts[i][0] && x <= pts[i + 1][0]) { const u = (x - pts[i][0]) / ((pts[i + 1][0] - pts[i][0]) || 1); return lerp(pts[i][1], pts[i + 1][1], u); } return 0; };
+    const KF_STRIKE = [[0, 0], [0.6, 0], [1, 1], [1.8, 0.12], [2.6, 0.85], [4, 0], [49.5, 0], [50, 1], [50.8, 0.18], [51.6, 0.8], [53, 0], [100, 0]];
+    const KF_AMB = [[0, 0], [29.6, 0], [30, 0.9], [30.7, 0.12], [31.5, 0.72], [32.6, 0], [70.8, 0], [71.2, 0.68], [72.2, 0], [100, 0]];
+    const KF_SHAKE = [[0, 0, 0], [1, -0.417, 0.463], [2, 0.365, -0.556], [3, -0.26, 0.37], [4, 0.156, -0.278], [6, 0, 0], [49, 0, 0], [50, 0.469, -0.556], [51, -0.417, 0.556], [52, 0.313, -0.37], [53, -0.208, 0.278], [54, 0.104, -0.185], [56, 0, 0]];
+    const shakeAt = pc => { let v = [0, 0]; for (const k of KF_SHAKE) if (pc >= k[0]) v = [k[1] * 19.2, k[2] * 10.8]; return v; };
+    const floaty = (tau, dur, delay) => { const c = (((tau - delay) / dur) % 1 + 1) % 1, u = c < 0.5 ? c * 2 : (1 - c) * 2; return u * u * (3 - 2 * u); };
+    const rnd = (n) => { let a = 5000 + n * 7919; a = (a ^ 61) ^ (a >>> 16); a = (a + (a << 3)) | 0; a ^= a >>> 4; a = Math.imul(a, 0x27d4eb2d); a ^= a >>> 15; return (a >>> 0) / 4294967296; };
+    const EMB = Array.from({ length: 46 }, (_, i) => ({ size: 2 + rnd(i * 6) * 5, dur: 7 + rnd(i * 6 + 1) * 9, delay: -rnd(i * 6 + 2) * 16, left: rnd(i * 6 + 3) * 1920, drift: (rnd(i * 6 + 4) * 2 - 1) * 50, col: ['#ffd066', '#e37435', '#fe5154', '#f9ecb3', '#ffffff'][Math.floor(rnd(i * 6 + 5) * 5)] }));
+    const BOLTS = [[288, 173, 'S', [[52, 0], [40, 70], [62, 80], [38, 150], [60, 165], [34, 240], [58, 255], [30, 340], [50, 360], [42, 400]]], [1402, 154, 'S', [[48, 0], [62, 75], [38, 88], [60, 160], [36, 175], [58, 250], [34, 265], [56, 345], [40, 375], [50, 400]]], [1018, 154, 'A', [[50, 0], [58, 80], [40, 92], [60, 175], [38, 190], [56, 270], [36, 285], [52, 370], [46, 400]]]];
+    const load = () => {
+      if (loading || imgs || disposed) return; loading = true;
+      Promise.all(NAMES.map(n => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = DIR + n + '.png'; }))).then(list => {
+        loading = false; if (disposed || list.some(x => !x)) return;
+        // vorskalieren: Bildschirmmass der Buehne (S = Pixel je Buehnenpixel), spart jedem Bild das Herunterrechnen von 1920x1080
+        const sc = Math.min(1, S * 1.25); imgs = {};
+        list.forEach((im, i) => {
+          const n = NAMES[i], rf = ANIM_SPRITE_RAHMEN[n + '.png'];
+          // Figuren auf ihren sichtbaren Kasten zuschneiden (wie die DOM-Kulisse): nur dieser Teil wird pro Bild gezeichnet
+          const x0 = rf ? Math.max(0, rf[0] - 2) : 0, y0 = rf ? Math.max(0, rf[1] - 2) : 0, x1 = rf ? Math.min(1920, rf[2] + 2) : 1920, y1 = rf ? Math.min(1080, rf[3] + 2) : 1080;
+          const c = document.createElement('canvas'); c.width = Math.max(1, Math.round((x1 - x0) * sc)); c.height = Math.max(1, Math.round((y1 - y0) * sc));
+          const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(im, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);
+          imgs[n] = { c, x0, y0, w: x1 - x0, h: y1 - y0 };
+        });
+        imgs._sc = sc;
+      });
+    };
+    const resize = () => {
+      const w = window.innerWidth, h = window.innerHeight, dpr = Math.min(window.devicePixelRatio || 1, 1.5) * q;
+      W = Math.max(1, Math.round(w * dpr)); H = Math.max(1, Math.round(h * dpr)); cv.width = W; cv.height = H; S = Math.max(W / 1920, H / 1080);
+    };
+    const draw = (now) => {
+      if (!imgs) return; const g = cv.getContext('2d'), t = now / 1000, tau = t + 0.1, pc = (tau % 10) / 10 * 100, sc = imgs._sc, k = S / sc;
+      // Kamera: 80 s Hin- und Rueckfahrt, leichter Zoom
+      const ph = (t % 80) / 80, e = 0.5 - 0.5 * Math.cos(ph * Math.PI * 2), zoom = 1.04;   // fester Zoom: ein sich staendig aenderndes Mass skaliert jede Ebene in jedem Bild neu (Flimmern)
+      const viewW = W / S, ramp = Math.max(0, (1920 - viewW / zoom) / 2 - 10), camX = lerp(ramp, -ramp, e), camY = lerp(-14, 14, e), sh = shakeAt(pc);
+      g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#12101f'; g.fillRect(0, 0, W, H);
+      g.setTransform(S * zoom, 0, 0, S * zoom, W / 2 - 960 * S * zoom + camX * S * zoom + sh[0] * S * zoom, H / 2 - 540 * S * zoom + camY * S * zoom + sh[1] * S * zoom);
+      g.drawImage(imgs.background.c, -38.4, -21.6, 1996.8, 1123.2);
+      const aI = kfLin(KF_STRIKE, pc), aA = kfLin(KF_AMB, ((tau % 13) / 13) * 100);
+      const glow = (cx, cy, R, a, col) => { if (a < 0.02) return; const gr = g.createRadialGradient(cx, cy, 0, cx, cy, R); gr.addColorStop(0, col + 'ff'); gr.addColorStop(0.45, col + '55'); gr.addColorStop(1, col + '00'); g.globalAlpha = Math.min(1, a); g.globalCompositeOperation = 'screen'; g.fillStyle = gr; g.fillRect(cx - R, cy - R, 2 * R, 2 * R); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; };
+      glow(883, 281, 900, aI * 0.7, '#66b6ff'); glow(1190, 238, 900, aA * 0.6, '#66b6ff');
+      if ((pc >= 1 && pc < 5) || (pc >= 50 && pc < 54)) glow(1075, 443, 700, pc < 5 ? 0.45 : 0.4, '#fffbd2');
+      const fl2 = (dur, delay, mx, my, mr) => { const f = floaty(tau, dur, delay); return [mx * f, my * f, mr * f]; }, tp = floaty(tau, 4.8, 0);
+      const lay = (name, ox, oy, tx, ty, rot, sca, wx, wy) => { g.save(); g.translate(ox * 1920 + tx + (wx || 0), oy * 1080 + ty + (wy || 0)); g.rotate(rot * Math.PI / 180); if (sca && sca !== 1) g.scale(sca, sca); const I = imgs[name]; g.drawImage(I.c, I.x0 - ox * 1920, I.y0 - oy * 1080, I.w, I.h); g.restore(); };
+      let a = fl2(4.2, -0.6, 9, -15, 2); lay('hammer', 0.72, 0.28, a[0], a[1], a[2], 1);
+      lay('explosion', 0.52, 0.42, 0, 4 * tp, 0, 1 - 0.021 * tp);
+      lay('golem', 0.5, 0.5, -9 * tp, 4 * tp, 0, 1, 111, 3);
+      a = fl2(6, -2, -11, -15, 2.6); lay('horned', 0.8, 1, a[0], a[1], a[2], 1, 0, 161);
+      a = fl2(5, 0, 0, -12, -1.4); lay('angel', 0.2, 0.3, a[0], a[1], a[2], 1);
+      a = fl2(6.5, -1.5, 4, -9, 1); lay('blonde', 0.2, 0.5, a[0], a[1], a[2], 1);
+      lay('rabbit', 0.5, 0.5, 9 * tp, 4 * tp, 0, 1);
+      a = fl2(5.5, -2.5, 8, -14, -2); lay('ninja', 0.16, 0.8, a[0], a[1], a[2], 1, 0, 215);
+      for (const [bx, bw, kind, pts] of BOLTS) { const al = kind === 'S' ? aI : aA; if (al < 0.1) continue; const P = pts.map(([px, py]) => [bx + px / 100 * bw, -21.6 + py / 400 * 670]);
+        g.lineJoin = 'round'; g.lineCap = 'round'; for (const [col, lw] of al > 0.5 ? [['#66b6ff', 11], ['#bddcef', 6], ['#e5f5fa', 3]] : [['#66b6ff', 5], ['#e5f5fa', 2]]) { g.strokeStyle = col; g.lineWidth = lw; g.beginPath(); P.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke(); } }
+      for (const m of EMB) { const c = (((tau - m.delay) / m.dur) % 1 + 1) % 1, y = 1080 + 14 - m.size + lerp(20, -1210, c), x = m.left + m.drift * c, op = c < 0.08 ? 0.95 * c / 0.08 : (c < 0.78 ? lerp(0.95, 0.7, (c - 0.08) / 0.7) : lerp(0.7, 0, (c - 0.78) / 0.22)); if (y < -12 || y > 1090 || op < 0.05) continue; g.globalAlpha = op; g.fillStyle = m.col; const z = Math.max(4, Math.round(m.size / 2) * 2); g.fillRect(Math.round(x), Math.round(y), z, z); }
+      g.globalAlpha = 1;
+      a = fl2(3.4, -0.5, 14, -9, 3); lay('cat_top', 0.23, 0.05, a[0], a[1], a[2], 1);
+      a = fl2(2.9, -0.8, -11, 9, -3); lay('cat_mid', 0.37, 0.3, a[0], a[1], a[2], 1);
+      a = fl2(3.0, -1.7, 16, -12, 4); lay('cat_bottom', 0.05, 0.48, a[0], a[1], a[2], 1);
+    };
+    const visible = () => { const host = hostRef && hostRef.current; return !!(host && host.offsetParent !== null && !document.hidden); };
+    const tick = (now) => {
+      raf = 0;
+      if (disposed) return;
+      if (!visible()) {
+        if (!hiddenSince) hiddenSince = now;
+        if (imgs && now - hiddenSince > 5000) imgs = null;   // Speicher zurueckgeben
+        timer = setTimeout(() => { timer = 0; raf = requestAnimationFrame(tick); }, 500); return;
+      }
+      hiddenSince = 0; if (!imgs) { resize(); load(); }
+      if (frameGap <= FRAME + 1 || now - lastDraw >= frameGap - 4) {
+        lastDraw = now; const t0 = performance.now(); draw(now); const dt = performance.now() - t0; ema = ema ? ema * 0.9 + dt * 0.1 : dt;
+        // Adaptive Qualitaet: ist ein Bild teurer als ein Drittel des Bildabstands, erst Aufloesung senken (bis 0,5x), dann auf 20/15 Bilder/s gehen
+        if (now - lastAdapt > 1200 && ema > 7) { lastAdapt = now; ema = 0;
+          if (q > 0.55) { q = Math.max(0.5, q - 0.25); imgs = null; resize(); }
+          else if (frameGap < 30) frameGap = 1000 / 30; }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    resize(); raf = requestAnimationFrame(tick);
+    const onResize = () => { resize(); if (imgs) { imgs = null; } };
+    window.addEventListener('resize', onResize); window.addEventListener('orientationchange', onResize);
+    return () => { disposed = true; if (raf) cancelAnimationFrame(raf); if (timer) clearTimeout(timer); window.removeEventListener('resize', onResize); window.removeEventListener('orientationchange', onResize); imgs = null; };
+  }, []);
+  return <canvas ref={cvRef} className="tap-backdrop-canvas" aria-hidden="true" />;
+}
+window.TapBackdropCanvas = TapBackdropCanvas;
+
+window.AnimatedTitleBackdrop = AnimatedTitleBackdrop;
+window.AnimatedTitleCatsOverlay = AnimatedTitleCatsOverlay;
 
 function AuthScreen() {
   const { setUser } = useContext(AppContext);
@@ -5111,6 +5216,26 @@ function SingleplayerScreen() {
   // Antonia-Praesenz auch hier, fuer den Tutorial-Zweig weiter unten.
   const antoniaHere2 = useAntoniaPresent();
   const { user, setUser, setScreen, notify, setBgmMode } = useContext(AppContext);
+  // ★ TUTORIAL VORLADEN (Befund: der Start von Mission 1 ruckelte auf dem Handy, ebenso der erste Treffer): Karten und Heldenfiguren, die die
+  // Missionen zeigen, werden schon hier im Leerlauf bereitgelegt — Kartenbilder gerendert und dekodiert, Heldenfiguren geladen
+  // (inkl. der Umriss-Berechnung, die sonst beim ersten Auftritt im Spiel laeuft). Nichts davon blockiert das Menue: Leerlauf, eine Figur nach der anderen.
+  useEffect(() => {
+    let weg = false; const timers = [];
+    const idle = (fn, ms) => { const t = setTimeout(() => { if (weg) return; if (window.requestIdleCallback) requestIdleCallback(fn, { timeout: 2500 }); else fn(); }, ms); timers.push(t); };
+    idle(async () => {
+      try {
+        const r = await fetch('/api/tutorial-assets', { headers: window.AUTH_TOKEN ? { 'x-auth-token': window.AUTH_TOKEN } : {} });
+        if (!r.ok || weg) return;
+        const a = await r.json();
+        if (window.CardImageShim && window.CardImageShim.warmCards) window.CardImageShim.warmCards(a.cards, { heroes: a.heroes, abilities: a.abilities });
+        // Pixelbilder der grossen Zauber-Animation (kostet kalt Sekunden auf schwachen Handys, s. app-board.jsx).
+        idle(() => { if (window.ppAnimVorwaermen) window.ppAnimVorwaermen('cataclysm'); }, 3500);
+        const H = window.HeroIdleAnims;
+        if (H && H.hole && H.slug) (a.heroes || []).forEach((n, i) => timers.push(setTimeout(() => { if (!weg) idle(() => { try { H.hole(H.slug(n)); } catch (e) { /* Vorladen ist optional */ } }, 0); }, 400 + i * 350)));
+      } catch (e) { /* Vorladen ist optional */ }
+    }, 800);
+    return () => { weg = true; timers.forEach(clearTimeout); };
+  }, []);
   const [opponents, setOpponents] = useState(null);          // null = loading
   const [personalDecks, setPersonalDecks] = useState([]);
   const [sampleDecks, setSampleDecks] = useState([]);
@@ -5314,6 +5439,43 @@ function SingleplayerScreen() {
     setTimeout(() => setStarting(false), 3000);
   }, [personalDecks, sampleDecks, selectedDeck, starting, notify]);
 
+  // ★ Frisch freigeschaltetes Deck SOFORT waehlbar (Befund: im Victory-Screen fehlte es in der Deckauswahl): schaltet ein Sieg einen Gegner frei und schenkt dem Gast
+  // dessen Deck (`deckAdded`), laedt die Liste der eigenen Decks neu — der Victory-Screen bekommt sie als `sampleDecks`.
+  useEffect(() => {
+    const onUnlocked = async (data) => {
+      if (!data || !(data.opponents || []).some(o => o && o.deckAdded)) return;
+      try { const r = await api('/sample-decks/owned'); if (r && r.decks) setSampleDecks(r.decks); } catch (e) { /* bleibt die alte Liste */ }
+    };
+    socket.on('opponents_unlocked', onUnlocked);
+    return () => socket.off('opponents_unlocked', onUnlocked);
+  }, []);
+
+  // ★ DECK VORLADEN (Befund: Starthand und Mulligan ruckeln auf dem Handy): Beim Ziehen werden die Kartenbilder erst gezeichnet (Canvas, mehrere
+  // Karten gleichzeitig) — Zeit, die das Ziehen kostet. Darum werden die Karten des GEWAEHLTEN Decks sowie die Figuren seiner Helden schon hier im
+  // Leerlauf bereitgelegt (gerendert, im dauerhaften Cache gespeichert, dekodiert); beim Spielstart sind sie nur noch ein Speicher-Treffer.
+  useEffect(() => {
+    const d = personalDecks.find(x => x.id === selectedDeck) || sampleDecks.find(x => x.id === selectedDeck);
+    if (!d) return undefined;
+    let weg = false; const timers = [];
+    const nm = (x) => (typeof x === 'string' ? x : (x && x.name) || null);
+    const t = setTimeout(() => {
+      if (weg) return;
+      const run = () => {
+        if (weg) return;
+        try {
+          const heroes = (d.heroes || []).map(h => h && h.hero).filter(Boolean);
+          const abilities = (d.heroes || []).flatMap(h => h ? [h.ability1, h.ability2] : []).filter(Boolean);
+          const names = Array.from(new Set([...(d.mainDeck || []), ...(d.potionDeck || []), ...heroes, ...abilities].map(nm).filter(Boolean)));
+          if (window.CardImageShim && window.CardImageShim.warmCards) window.CardImageShim.warmCards(names, { heroes, abilities });
+          const H = window.HeroIdleAnims;
+          if (H && H.hole && H.slug) heroes.forEach((n, i) => timers.push(setTimeout(() => { if (!weg) { try { H.hole(H.slug(n)); } catch (e) { /* optional */ } } }, 600 + i * 400)));
+        } catch (e) { /* Vorladen ist optional */ }
+      };
+      if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 2500 }); else run();
+    }, 1500);
+    return () => { weg = true; clearTimeout(t); timers.forEach(clearTimeout); };
+  }, [personalDecks, sampleDecks, selectedDeck]);
+
   const onBattleLeave = useCallback(() => {
     const roomId = cpuBattleRoom.current;
     if (roomId) socket.emit('leave_game', { roomId });
@@ -5413,8 +5575,8 @@ function SingleplayerScreen() {
           // (5/16 px) ist raus, beide nehmen das `.btn`-Grundmass (v1260).
           <button className="btn" onClick={() => setShowRegister(true)}>★ REGISTER NOW!</button>
         )}
-        <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>CHOOSE OPPONENT!</h2>
-        <div style={{ flex: 1 }} />
+        <h2 className="orbit-font titel-links" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>CHOOSE OPPONENT!</h2>
+        <div className="top-bar-abstand" style={{ flex: 1 }} />
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
           <input
             className="select"
@@ -5432,10 +5594,9 @@ function SingleplayerScreen() {
             >×</button>
           )}
         </div>
-        <label style={{ fontSize: 12, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
+        <div style={{ fontSize: 12, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
           🃏 Deck:
-          <select className="select" value={selectedDeck} onChange={async e => {
-              const id = e.target.value;
+          <PPDropdown value={selectedDeck} onChange={async id => {
               setSelectedDeck(id);
               // Mirror the Find Player dropdown: save the picked deck as
               // the user's default. Custom decks go through /decks/:id/
@@ -5453,12 +5614,13 @@ function SingleplayerScreen() {
                   setUser(u => u ? { ...u, defaultSampleDeckId: id } : u);
                 }
               } catch (err) { notify('Could not save your default deck: ' + (err?.message || 'unknown error'), 'error'); }
-            }} style={{ fontSize: 12, minWidth: 180, padding: '4px 8px', borderColor: 'var(--player-color)', color: 'var(--text)' }}>
-            {personalDecks.map(d => <option key={d.id} value={d.id}>{d.name} {isDeckLegal(d).legal ? '✓' : '✗'}{d.isDefault ? ' ★' : ''}</option>)}
-            {sampleDecks.filter(d => isDeckLegal(d).legal).length > 0 && <option disabled>── Sample Decks ──</option>}
-            {sampleDecks.filter(d => isDeckLegal(d).legal).map(d => <option key={d.id} value={d.id}>📋 {d.name}{user?.defaultSampleDeckId === d.id ? ' ★' : ''}</option>)}
-          </select>
-        </label>
+            }} style={{ fontSize: 12, minWidth: 180, padding: '4px 8px', borderColor: 'var(--player-color)', color: 'var(--text)' }}
+            options={[
+              ...personalDecks.map(d => ({ value: d.id, label: `${d.name} ${isDeckLegal(d).legal ? '✓' : '✗'}${d.isDefault ? ' ★' : ''}` })),
+              ...(sampleDecks.filter(d => isDeckLegal(d).legal).length > 0 ? [{ value: '__sample_kopf', disabled: true, label: '── Sample Decks ──' }] : []),
+              ...sampleDecks.filter(d => isDeckLegal(d).legal).map(d => ({ value: d.id, label: `📋 ${d.name}${user?.defaultSampleDeckId === d.id ? ' ★' : ''}` })),
+            ]} />
+        </div>
         <VolumeControl />
       </div>
       {/* Gerahmter Kasten wie im Hauptmenue (`ornate-frame pp-menuekasten`).

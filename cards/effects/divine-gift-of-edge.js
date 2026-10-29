@@ -68,6 +68,20 @@ async function doSideDeckPick(engine, pi, { cancellable }) {
   if (!picked || picked.cancelled || !picked.cardName) return false;
   const chosen = picked.cardName;
 
+  // W85d (Atta, Al: das Side Deck zählt als „your deck"): das Aufdecken ist ein Ereignis VOR dem Verschieben — Such-Fenster für den Gegner zuerst, dann Atta; löscht Atta die Karte,
+  // kommt sie nie auf die Hand (die Karte ist verbraucht, „Divine Gift" gilt als aktiviert).
+  const _ereignis = await engine.aufdeckEreignis(pi, [chosen], {
+    source: CARD_NAME, zone: 'sideDeck',
+    fenster: () => engine.promptGeneric(engine.opponentOf(pi), { type: 'deckSearchReveal', cardName: chosen, searcherName: ps?.username || 'Opponent', title: CARD_NAME, cancellable: false, _aufdeckGemeldet: true }),
+  });
+  if (_ereignis.geloescht.includes(chosen)) {
+    if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
+    ps._oncePerGameUsed.add('divineGift');
+    engine.log('divine_gift_edge', { player: ps.username, card: chosen, deleted: true });
+    engine.sync();
+    return true;
+  }
+
   // Pop the chosen name from the side deck (one copy).
   const idx = sideDeck.indexOf(chosen);
   if (idx < 0) return false;
@@ -103,7 +117,7 @@ async function doSideDeckPick(engine, pi, { cancellable }) {
   // closes the modal and the card is no longer face-up to the
   // opponent (no permanent reveal flag is set).
   const oi = engine.opponentOf(pi);
-  await engine.promptGeneric(oi, {
+  if (!_ereignis.fensterGezeigt) await engine.promptGeneric(oi, {
     type: 'deckSearchReveal',
     cardName: chosen,
     searcherName: ps?.username || 'Opponent',

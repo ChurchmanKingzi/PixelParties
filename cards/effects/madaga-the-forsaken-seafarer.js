@@ -91,6 +91,8 @@ module.exports = {
     ps._revealedCardExpiry = Date.now() + 2000;
     engine.sync();
     await engine._delay(1200);
+    // W85c (Atta, Al 29.10.): ZWEI getrennte Aufdeck-Ereignisse in Textreihenfolge: (1) die aufgedeckte Handkarte, (2) die gesuchte Kopie (unten, VOR dem Verschieben).
+    await engine.aufdeckEreignis(pi, [chosenCard], { zone: 'hand', source: 'Madaga, the Forsaken Seafarer' });
 
     // ── Step 3: Search deck for copy, add to hand ──
     // Route through the canonical helper so ON_CARD_ADDED_TO_HAND

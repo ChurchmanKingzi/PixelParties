@@ -20,19 +20,18 @@
        below is the production default; the server rewrites it to whatever
        host actually served the page (see serveIndexHtml in server.js), so
        previews resolve from both the live site and local test builds. -->
-  <link rel="canonical" href="https://pixelparties.onrender.com/">
+  <link rel="canonical" href="https://pixelpartiestcg.com/">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://pixelparties.onrender.com/">
+  <meta property="og:url" content="https://pixelpartiestcg.com/">
   <meta property="og:title" content="Pixel Parties TCG">
   <meta property="og:description" content="Assemble your party of Heroes, shape their Abilities and powers - and eliminate the competition!">
-  <meta property="og:image" content="https://pixelparties.onrender.com/title.png">
+  <meta property="og:image" content="https://pixelpartiestcg.com/title.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Pixel Parties TCG">
   <meta name="twitter:description" content="Assemble your party of Heroes, shape their Abilities and powers - and eliminate the competition!">
-  <meta name="twitter:image" content="https://pixelparties.onrender.com/title.png">
+  <meta name="twitter:image" content="https://pixelpartiestcg.com/title.png">
 
   <!-- Warm up the connections the first paint depends on -->
-  <link rel="preconnect" href="https://unpkg.com" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" href="/data/cards.json" as="fetch" crossorigin>
@@ -57,8 +56,8 @@
     "@type": "VideoGame",
     "name": "Pixel Parties TCG",
     "alternateName": "Pixel Parties",
-    "url": "https://pixelparties.onrender.com/",
-    "image": "https://pixelparties.onrender.com/title.png",
+    "url": "https://pixelpartiestcg.com/",
+    "image": "https://pixelpartiestcg.com/title.png",
     "description": "Pixel Parties is a free online trading card game simulator. Build decks from over 1400 cards, duel live opponents in your browser, and climb the ranks.",
     "genre": ["Trading Card Game", "Strategy"],
     "gamePlatform": "Web browser",
@@ -141,11 +140,11 @@
     window.GOOGLE_CLIENT_ID = "__GOOGLE_CLIENT_ID__";
   </script>
 
-  <!-- React runtime (deferred so the splash paints first). -->
+  <!-- React 18.3.1 runtime, selbst gehostet (public/vendor) — kein CDN (deferred so the splash paints first). -->
   <!-- Spiel-Palette (256 Farben): rastet Farben, die erst zur Laufzeit entstehen, auf die Palette ein (scripts/palette). Synchron, vor allem anderen. -->
   <script src="/palette.js"></script>
-  <script defer src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script defer src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script defer src="/vendor/react.production.min.js"></script>
+  <script defer src="/vendor/react-dom.production.min.js"></script>
   <script defer src="/socket.io/socket.io.js"></script>
 
   <!-- Pre-compiled app bundles (built from public/*.jsx by scripts/build.js).

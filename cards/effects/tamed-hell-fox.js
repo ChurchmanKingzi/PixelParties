@@ -85,10 +85,16 @@ module.exports = {
 
       const first = await pickOne(engine, pi, ps.mainDeck || [], null);
       if (!first) return;
-      if (!(await engine.actionAddCardFromDeckToHand(pi, first, { reveal: true, source: CARD_NAME, sourceOwner: pi, _noKrates: true }))) return;
+      // W85c (Atta, Al 29.10.): „reveal them" — beide Wahlen sind EIN Aufdeck-Ereignis VOR dem Verschieben; eine von Atta gelöschte Karte kommt nie auf die Hand. Darum werden
+      // beide Karten zuerst gewählt (die zweite Wahl schließt den Namen der ersten aus) und erst dann aufgenommen.
       const second = await pickOne(engine, pi, ps.mainDeck || [], first);
+      const gewaehlt = second ? [first, second] : [first];
+      const _ereignis = await engine.aufdeckTutorEreignis(pi, gewaehlt, CARD_NAME);
+      for (const n of gewaehlt) {
+        if (_ereignis.geloescht.includes(n)) continue;
+        if (!(await engine.actionAddCardFromDeckToHand(pi, n, { reveal: !_ereignis.fensterGezeigt, source: CARD_NAME, sourceOwner: pi, _noKrates: true }))) return;
+      }
       if (!second) { engine.log('tamed_hell_fox', { player: ps.username, searched: [first] }); engine.sync(); return; }
-      if (!(await engine.actionAddCardFromDeckToHand(pi, second, { reveal: true, source: CARD_NAME, sourceOwner: pi, _noKrates: true }))) return;
 
       // Zwei gesucht: Namenssperre + Selbstloeschung.
       if (!ps._creationLockedNames) ps._creationLockedNames = new Set();

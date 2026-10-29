@@ -162,11 +162,18 @@ module.exports = {
 
       // ── Aus dem Deck auf die Hand ───────────────────────────────
       const geholt = [];
+      // W85c (Atta, Al 29.10.: „löschen STATT auf die Hand"): die gewählten Zauber werden als EIN Aufdeck-Ereignis gemeldet, solange sie noch im Deck liegen; eine von Atta gelöschte
+      // Karte kommt nie auf die Hand (und fehlt dem dritten Zauber unten — er braucht alle drei gewählten Karten auf der Hand).
+      const _ereignis = await engine.aufdeckEreignis(pi, namen.filter(n => (ps.mainDeck || []).includes(n)), {
+        source: CARD_NAME, zone: 'deck',
+        fenster: async () => { for (const n of namen) engine._broadcastEvent('card_reveal', { cardName: n }); await engine._delay(320); },
+      });
       for (const name of namen) {
+        if (_ereignis.geloescht.includes(name)) continue;
         const idx = (ps.mainDeck || []).indexOf(name);
         if (idx < 0) continue;
         if (!(await engine.takeFromPile(ps, 'deck', idx, { source: CARD_NAME, shuffle: true, toHand: true }))) continue;
-        engine._broadcastEvent('card_reveal', { cardName: name });
+        if (!_ereignis.fensterGezeigt) engine._broadcastEvent('card_reveal', { cardName: name });
         engine._broadcastEvent('deck_search_add', { cardName: name, playerIdx: pi });
         await engine.handZugang(ps, name, { von: 'deck', source: CARD_NAME });
         geholt.push(name);

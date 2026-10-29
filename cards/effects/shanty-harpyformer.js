@@ -126,6 +126,8 @@ module.exports = {
 
     // Broadcast the reveal to the opponent
     engine._broadcastEvent('deck_search_add', { cardName: revealedName, playerIdx: pi });
+    // W85c (Atta, Al 29.10.): ZWEI getrennte Aufdeck-Ereignisse in Textreihenfolge: (1) die aufgedeckte Handkarte, (2) die gesuchte Kopie (`searchDeckForNamedCard`, VOR dem Verschieben).
+    await engine.aufdeckEreignis(pi, [revealedName], { zone: 'hand', source: CARD_NAME });
     engine.sync();
     await engine._delay(400);
 

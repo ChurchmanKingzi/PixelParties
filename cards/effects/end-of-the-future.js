@@ -79,6 +79,7 @@ module.exports = {
       ps._selfRevealedHandIndices[jetzt] = true;
       if (!ps._permanentlyRevealedHandIndices) ps._permanentlyRevealedHandIndices = {};
       ps._permanentlyRevealedHandIndices[jetzt] = true;
+      await engine.aufdeckEreignis(pi, [CARD_NAME], { zone: 'hand', source: CARD_NAME });   // W85c (Atta, Al 29.10.): aufgedeckt = EIN Ereignis, sofort (in Textreihenfolge); ein Zuhörer (Atta) darf die Karte löschen
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
       engine.log('end_of_the_future_reveal', { player: ps.username });
       engine.sync();

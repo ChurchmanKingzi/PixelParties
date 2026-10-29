@@ -169,6 +169,56 @@ function setBoardTooltip(card) {
   window._boardTooltipSetter?.(card);
 }
 
+// ★ Mobil: EIN TIPP auf eine Handkarte zeigt ihren Tooltip (Als Vorgabe: „wie das Tappen auf eine Board-Karte") — die eigene Hand und die
+// aufgedeckten (face-up) Karten der gegnerischen Hand. Die Hand haengt am Zieh-Griff (touchstart wird dort abgefangen), darum entstehen
+// hier keine Mausereignisse nachtraeglich wie bei Brettkarten; ein Langdruck (>= LONG_PRESS_MS) zeigt ihn ohnehin schon, ein Wisch/Zug nicht.
+// Die Karten legen ihre Tooltip-Daten selbst am Element ab (`el._ppTip`, mit Handstufe/-kosten-Hinweisen). Der naechste Tipp ausserhalb
+// raeumt den Tooltip wieder weg. Die Klick-Aktion der Karte (Spielen, Potion …) bleibt davon unberuehrt.
+if (typeof document !== 'undefined' && !window._ppHandTippAktiv_installiert) {
+  window._ppHandTippAktiv_installiert = true;
+  let start = null, aktiv = null;
+  const handKarte = (t) => {
+    const slot = t && t.closest && t.closest('.game-hand-me .hand-slot, .game-hand-opp .hand-card');
+    if (!slot) return null;
+    return slot._ppTip !== undefined ? slot : (slot.querySelector(':scope > .board-card') || null);
+  };
+  document.addEventListener('touchstart', (e) => {
+    const t = e.touches && e.touches[0];
+    const el = handKarte(e.target);
+    start = t ? { x: t.clientX, y: t.clientY, at: performance.now(), el, kartenEl: e.target && e.target.closest && e.target.closest('.board-card'), lang: false } : null;
+    if (start && start.kartenEl && start.kartenEl._ppTip) {
+      const s1 = start;
+      setTimeout(() => {
+        if (start !== s1) return;
+        s1.lang = true;
+        // Langdruck auf einer HANDkarte: ihr Tooltip (die Hand faengt die Beruehrung ab, `BoardCard.onTouchStart` bekommt sie nie) — nur ohne Zug/Wisch.
+        if (s1.el && !s1.bewegt && !window.activeDragData && !_isDraggingCard && s1.el._ppTip) { aktiv = s1.el; setBoardTooltip(s1.el._ppTip); }
+      }, window.LONG_PRESS_MS || 400);
+    }
+    // (Der Tooltip bleibt jetzt stehen, bis man ins Leere tippt — der Tipp-Waechter in app-shared schliesst ihn.)
+  }, { capture: true, passive: true });
+  document.addEventListener('touchmove', (e) => {
+    const t = e.touches && e.touches[0];
+    if (start && t && Math.abs(t.clientX - start.x) + Math.abs(t.clientY - start.y) > 12) start.bewegt = true;
+  }, { capture: true, passive: true });
+  document.addEventListener('touchend', (e) => {
+    const s0 = start; start = null;
+    // Langdruck auf einer Brettkarte: nur der Tooltip — das nachgeschobene Klick-/Mausereignis (ab ~400 ms moeglich) wird abgesagt.
+    if (window._isTouchDevice && s0 && s0.lang && e.cancelable) {
+      const q = e.changedTouches && e.changedTouches[0];
+      if (q && Math.abs(q.clientX - s0.x) + Math.abs(q.clientY - s0.y) <= 12) e.preventDefault();
+    }
+    if (!window._isTouchDevice || !s0 || !s0.el || window.activeDragData || _isDraggingCard) return;
+    const t = e.changedTouches && e.changedTouches[0];
+    if (!t || Math.abs(t.clientX - s0.x) + Math.abs(t.clientY - s0.y) > 12) return;   // Wisch / Zug
+    if (performance.now() - s0.at >= (window.LONG_PRESS_MS || 400)) return;           // Langdruck zeigt den Tooltip selbst
+    const tip = s0.el._ppTip;
+    if (!tip) return;
+    aktiv = s0.el;
+    setBoardTooltip(tip);
+  }, { capture: true, passive: false });
+}
+
 // ★ v1478 (Als Vorgabe 28.9.: „Die Karte(n) in der Pop-Up-Box sind jetzt
 // deutlich kleiner als vorher" → Variante C: „bis direkt an den Rahmen oder
 // sogar über den Rahmen hinaus zum Rand der Box selbst" — „den (hier roten)
@@ -438,6 +488,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   return (
     <div className={'board-card' + (faceDown ? ' face-down' : '') + (flipped ? ' flipped' : '') + (foilClass ? ' ' + foilClass : '')}
       style={style}
+      ref={(el) => { if (el) el._ppTip = (noTooltip || (faceDown && !revealTooltipWhenFaceDown)) ? null : tooltipTarget; }}   // fuer ppHandTipp (Tipp auf Handkarten)
       onMouseEnter={() => !noTooltip && (revealTooltipWhenFaceDown || !faceDown) && tooltipTarget && setBoardTooltip(tooltipTarget)}
       onMouseLeave={() => setBoardTooltip(null)}
       onTouchStart={() => {
@@ -1990,6 +2041,112 @@ function ppBattleCamFocus(el) {
 }
 window.ppBattleCamFocus = ppBattleCamFocus;
 
+// ★ TUTORIAL-KAMERA (Als Vorgabe: „Auf Mobile sieht man im Kampf nicht das ganze Spielfeld. Wenn das Tutorial Karten erwaehnt und
+// highlightet, soll die Kamera hoch und runter fahren, um sie zu fokussieren.")
+// `ppTutorialCamFokus(elemente)` scrollt das Brett (`.board-center`) so, dass die Elemente im FREIEN Band stehen: zwischen den
+// Overlay-Leisten der Haende und der Textbox (sie sitzt oben und verdeckt sonst die Gegnerreihe). Passt alles schon ins Band, bleibt die
+// Kamera stehen. Rueckgabe: Promise, das nach der Fahrt aufloest — oder null, wenn nichts zu tun ist (Desktop, Ziele ausserhalb des Bretts,
+// schon sichtbar). Die Textbox misst ihre Highlights erst NACH der Fahrt (sie sind feste Klone an der gemessenen Stelle).
+function ppTutorialCamFokus(elemente, opts) {
+  try {
+    if (!(window.ppIsPhone && window.ppIsPhone())) return null;
+    const sc = document.querySelector('.board-center');
+    if (!sc) return null;
+    const scr = sc.getBoundingClientRect();
+    let bandOben = _ppCamVarPx('--mob-opphand-h'), bandUnten = _ppCamVarPx('--mob-mehand-h');
+    const tb = document.querySelector('.textbox');
+    if (tb) {
+      const q = tb.getBoundingClientRect();
+      if (q.height > 0) {
+        if (q.top + q.height / 2 < window.innerHeight / 2) bandOben = Math.max(bandOben, q.bottom - scr.top + 6);
+        else bandUnten = Math.max(bandUnten, scr.bottom - q.top + 6);
+      }
+    }
+    const bandT = bandOben, bandB = Math.max(bandOben + 40, sc.clientHeight - bandUnten);
+    const nurFehlende = !!(opts && opts.nurFehlende);   // nur Ziele, die noch NICHT im freien Band stehen (Aufmerksamkeitskamera)
+    let l = Infinity, t = Infinity, rr = -Infinity, b = -Infinity;
+    for (const e of Array.from(elemente || [])) {
+      if (!e || !e.getBoundingClientRect || !(sc.contains(e) || (e.closest && e.closest('.phase-column')))) continue;   // die Phasenleiste scrollt auf dem Handy mit dem Brett
+      const r = e.getBoundingClientRect();
+      if (!r.width && !r.height) continue;
+      if (nurFehlende && r.top - scr.top >= bandT - 2 && r.bottom - scr.top <= bandB + 2) continue;
+      l = Math.min(l, r.left); t = Math.min(t, r.top); rr = Math.max(rr, r.right); b = Math.max(b, r.bottom);
+    }
+    if (!isFinite(l)) return null;
+    const rt = t - scr.top, rb = b - scr.top, rl = l - scr.left, rre = rr - scr.left;
+    const maxY = Math.max(0, sc.scrollHeight - sc.clientHeight), maxX = Math.max(0, sc.scrollWidth - sc.clientWidth);
+    let zielY = sc.scrollTop, zielX = sc.scrollLeft;
+    if (rt < bandT - 2 || rb > bandB + 2) {
+      zielY = (rb - rt > bandB - bandT) ? sc.scrollTop + (rt - bandT) : sc.scrollTop + (rt + rb) / 2 - (bandT + bandB) / 2;
+    }
+    if (rl < -2 || rre > sc.clientWidth + 2) zielX = sc.scrollLeft + (rl + rre) / 2 - sc.clientWidth / 2;
+    zielY = Math.max(0, Math.min(maxY, zielY)); zielX = Math.max(0, Math.min(maxX, zielX));
+    const vonX = sc.scrollLeft, vonY = sc.scrollTop;
+    if (Math.abs(zielX - vonX) < 4 && Math.abs(zielY - vonY) < 4) return null;
+    if (_ppCam.raf) { cancelAnimationFrame(_ppCam.raf); _ppCam.raf = 0; }
+    return new Promise((fertig) => {
+      const start = performance.now(), DAUER = 520;
+      const ease = (p) => p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;   // sanft an- und auslaufend
+      const schritt = (jetzt) => {
+        const p = Math.min(1, (jetzt - start) / DAUER), e = ease(p);
+        sc.scrollLeft = vonX + (zielX - vonX) * e;
+        sc.scrollTop = vonY + (zielY - vonY) * e;
+        if (p < 1) _ppCam.raf = requestAnimationFrame(schritt); else { _ppCam.raf = 0; fertig(); }
+      };
+      _ppCam.raf = requestAnimationFrame(schritt);
+    });
+  } catch { return null; }
+}
+window.ppTutorialCamFokus = ppTutorialCamFokus;
+
+// ★ AUFMERKSAMKEITSKAMERA (Tutorial, Handy): Nach dem Intro blieb die Kamera auf der Gegnerseite stehen — die eigene Kreaturen-/Support-Reihe
+// liegt dort hinter der Handleiste, der Spieler sah weder die anklickbare Kreatur noch die Zielfelder (Befund Kontrolllauf Tutorial 2/3/6/7).
+// Alle ~450 ms schaut der Beobachter nach markierten, bedienbaren Zielen (aktivierbare Kreaturen/Faehigkeiten/Areas, Zielfelder, waehlbare Helden);
+// aendert sich diese Menge und steht etwas davon nicht im freien Band, faehrt die Kamera hin (nur Ziele, die fehlen). Nicht waehrend einer
+// Textbox (deren Highlight-Kamera hat Vorrang), nicht waehrend ein Finger auf dem Schirm liegt oder eine Karte gezogen wird.
+const PP_AUFMERKSAMKEIT_SEL = '.zone-creature-activatable, .zone-bounce-place-target, .zone-pick-target, .zone-ability-activatable, .area-stack-activatable, .zone-equip-activatable, .potion-target-valid, .board-zone-play-target';
+let _ppAufmerkSchluessel = '';
+function ppTutorialAufmerksamkeit() {
+  try {
+    if (!window._currentTutorialNum || !(window.ppIsPhone && window.ppIsPhone())) return;
+    if (document.querySelector('.textbox-overlay')) { _ppAufmerkSchluessel = ''; return; }   // nach der Textbox neu bewerten
+    if (window._touchActive || window.activeDragData) return;
+    const sc = document.querySelector('.board-center');
+    if (!sc) return;
+    const els = Array.from(sc.querySelectorAll(PP_AUFMERKSAMKEIT_SEL));
+    const schluessel = els.map(e => (e.getAttribute('data-support-owner') || e.getAttribute('data-hero-owner') || e.getAttribute('data-ability-owner') || '?') + ':' + (e.getAttribute('data-support-hero') || e.getAttribute('data-hero-idx') || '') + ':' + (e.getAttribute('data-support-slot') || '') + ':' + e.className.split(' ').filter(c => PP_AUFMERKSAMKEIT_SEL.includes('.' + c)).join('.')).join('|');
+    if (schluessel === _ppAufmerkSchluessel) return;
+    _ppAufmerkSchluessel = schluessel;
+    if (els.length) ppTutorialCamFokus(els, { nurFehlende: true });
+  } catch {}
+}
+window.ppTutorialAufmerksamkeit = ppTutorialAufmerksamkeit;
+
+// ★ PLATZIERUNGSKAMERA (Handy, jedes Spiel): Soll der Spieler Karten in Support Zonen legen (Pollution Tokens, Bounce-Platzierung, Zonenwahl),
+// faehrt die Kamera nach unten zu diesen Zonen, falls sie nicht im freien Band stehen. Gleiche Fahrt wie die Tutorial-Kamera; sie meldet sich
+// nur bei einer NEUEN Zielmenge (damit der Spieler danach frei scrollen kann) und nie gegen einen Finger oder eine gezogene Karte.
+let _ppPlatzSchluessel = '';
+function ppPlatzierungsKamera() {
+  try {
+    if (!(window.ppIsPhone && window.ppIsPhone())) return;
+    if (window._touchActive || window.activeDragData) return;
+    const sc = document.querySelector('.board-center');
+    if (!sc) return;
+    // Support-Zonen-Wahl (Pollution Tokens …) UND „waehle einen Nutzer": sind meine Helden als Ziel markiert (Spell/Attack/Creature per Tipp, mehrere moegliche Wirker),
+    // fahren die Kamera zu ihnen.
+    const els = Array.from(sc.querySelectorAll('[data-support-zone].zone-pick-target, [data-support-zone].zone-bounce-place-target, [data-hero-zone][data-hero-owner="me"].board-zone-play-target, [data-hero-zone][data-hero-owner="me"].attach-pick-target'));
+    if (!els.length) { _ppPlatzSchluessel = ''; return; }
+    if (document.querySelector('.textbox-overlay')) return;   // im Tutorial hat die Textbox-Kamera Vorrang
+    const schluessel = els.map(e => e.hasAttribute('data-hero-zone')
+      ? 'h:' + e.getAttribute('data-hero-idx')
+      : (e.getAttribute('data-support-owner') || '?') + ':' + e.getAttribute('data-support-hero') + ':' + e.getAttribute('data-support-slot')).join('|');
+    if (schluessel === _ppPlatzSchluessel) return;
+    _ppPlatzSchluessel = schluessel;
+    ppTutorialCamFokus(els, { nurFehlende: true });
+  } catch {}
+}
+window.ppPlatzierungsKamera = ppPlatzierungsKamera;
+
 // ★ v1258 — HAT DIESES PANEL SCROLLBAREN INHALT? (Als Befund 19.9.:
 // „Panels ohne Scrolling, z.B. ‚Mulligan? Yes/No', sollten definitiv
 // noch dragbar sein, damit man sie aus dem Weg schieben kann.")
@@ -2180,7 +2337,13 @@ function DraggablePanel({ children, className, style, zielwahl }) {
       el.style.left = pos.x + 'px'; el.style.top = pos.y + 'px';
       setAutoPos(prev => (prev && Math.abs(prev.x - pos.x) < 1 && Math.abs(prev.y - pos.y) < 1 && prev.luecke === pos.luecke) ? prev : { x: pos.x, y: pos.y, luecke: pos.luecke });
     };
-    const plane = () => { if (!raf) raf = requestAnimationFrame(setze); };
+    // ★ HANDY (Als Befund: „Pop-ups laggen beim Scrollen hinterher … sollen FIX auf dem Screen sein, damit man durch Scrollen offenlegen kann, was
+    // sie verdecken"): Auf dem Telefon wird die Lage nur EINMAL bestimmt (bis sie steht) und danach eingefroren — kein Nachfuehren beim Scrollen,
+    // kein Sekundentakt. Nur eine Fenstergroessen-Aenderung (Drehen) misst neu.
+    const phone = !!(window.ppIsPhone && window.ppIsPhone());
+    let eingefroren = false;
+    const plane = () => { if (phone && eingefroren) return; if (!raf) raf = requestAnimationFrame(setze); };
+    const planeNeu = () => { eingefroren = false; plane(); };
     setze();
     // ★ Als Befund 29.9. (Strongman-Zielwahl „blendet von links ein"): die
     // Box aendert ihre Breite noch NACH der ersten Messung (Schrift/Inhalt
@@ -2201,17 +2364,17 @@ function DraggablePanel({ children, className, style, zielwahl }) {
         if (s2 === sig) stabil++; else { stabil = 0; sig = s2; }
       }
       bilder++;
-      if (stabil >= 3 || bilder > 30 || hasCustomPosRef.current) { fertig = true; setBereit(true); return; }
+      if (stabil >= 3 || bilder > 30 || hasCustomPosRef.current) { fertig = true; eingefroren = true; setBereit(true); return; }
       stabilRaf = requestAnimationFrame(pruefeStabil);
     };
     stabilRaf = requestAnimationFrame(pruefeStabil);
-    window.addEventListener('resize', plane);
-    window.addEventListener('scroll', plane, true);
+    window.addEventListener('resize', planeNeu);
+    if (!phone) window.addEventListener('scroll', plane, true);
     const ro = (typeof ResizeObserver !== 'undefined' && panelRef.current) ? new ResizeObserver(plane) : null;
     if (ro) ro.observe(panelRef.current);
     const takt = setInterval(plane, 1000);
     return () => {
-      window.removeEventListener('resize', plane);
+      window.removeEventListener('resize', planeNeu);
       window.removeEventListener('scroll', plane, true);
       if (ro) ro.disconnect();
       clearInterval(takt);
@@ -2301,6 +2464,45 @@ function DraggablePanel({ children, className, style, zielwahl }) {
       panelRef.current?.removeAttribute('data-greifbar');
     };
   }, [zielwahl]);
+  // ★ HANDY: Wisch (ab ~6 px) oder Halten (~0,35 s) auf dem Fenster verschiebt es; das Brett darunter scrollt dabei nie mit (das Fenster steht fest auf
+  // dem Schirm und deckt sonst Ziele ab — wer sie sehen will, wischt daneben oder schiebt das Fenster weg). Knoepfe/Formularfelder behalten ihren Tipp.
+  const phoneP = !!(window.ppIsPhone && window.ppIsPhone());
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el || !phoneP) return undefined;
+    let st = null;
+    const ende = () => { if (st && st.timer) clearTimeout(st.timer); st = null; };
+    const zieheLos = () => {
+      if (!st || st.mode === 'zieht') return;
+      if (st.timer) clearTimeout(st.timer);
+      st.mode = 'zieht';
+      try { if (navigator.vibrate) navigator.vibrate(12); } catch {}
+      const r = el.getBoundingClientRect();
+      offsetRef.current = { x: st.x - r.left, y: st.y - r.top };   // vom BERUEHRPUNKT aus — das Fenster springt nicht
+      setDragging(true);
+    };
+    const start = (e) => {
+      if (e.touches.length !== 1) { ende(); return; }
+      const tg = e.target;
+      if (tg && tg.closest && tg.closest(ZW_KNOPF_SEL + ', .panel-zielwahl-aktiv')) return;
+      if (_ppPanelHatScrollbaresKind(el)) return;
+      const t = e.touches[0];
+      st = { x: t.clientX, y: t.clientY, mode: 'warte', timer: 0 };
+      st.timer = setTimeout(zieheLos, 350);   // Halten allein genuegt (Rueckmeldung per Vibration + Rahmen)
+    };
+    // Jede Bewegung ab ~6 px auf dem Fenster verschiebt es — der Wisch landet NIE im Brett darunter (das Fenster steht fest, das Brett scrollt man daneben).
+    const bewegt = (e) => {
+      if (!st) return;
+      const t = e.touches[0]; if (!t) return;
+      if (st.mode === 'warte' && Math.hypot(t.clientX - st.x, t.clientY - st.y) > 6) zieheLos();
+      if (e.cancelable) e.preventDefault();
+    };
+    el.addEventListener('touchstart', start, { passive: true });
+    el.addEventListener('touchmove', bewegt, { passive: false });
+    el.addEventListener('touchend', ende, { passive: true });
+    el.addEventListener('touchcancel', ende, { passive: true });
+    return () => { ende(); el.removeEventListener('touchstart', start); el.removeEventListener('touchmove', bewegt); el.removeEventListener('touchend', ende); el.removeEventListener('touchcancel', ende); };
+  }, [phoneP]);
   const onDown = (e) => {
     // ★ v1258: Auf Touch ist nur noch das Panel unbeweglich, das
     // scrollbaren Inhalt hat (Kartengalerie, lange Listen) — dort gewann
@@ -2343,7 +2545,8 @@ function DraggablePanel({ children, className, style, zielwahl }) {
   const lueckeStyle = (zielwahl && autoPos) ? { '--zielwahl-luecke': autoPos.luecke + 'px' } : {};
   return (
     <div ref={panelRef} className={className + (zielwahl ? ' panel-zielwahl' : '')} style={{ ...style, ...lueckeStyle, ...posStyle, ...(bereit ? null : { visibility: 'hidden' }), cursor: dragging ? 'grabbing' : 'grab' }}
-      onMouseDown={onDown} onTouchStart={onDown} onClick={e => e.stopPropagation()}>
+      data-zieht={dragging ? '1' : undefined}
+      onMouseDown={onDown} onTouchStart={phoneP ? undefined : onDown} onClick={e => e.stopPropagation()}>
       {children}
       {zielwahl && <div className="panel-zielwahl-griff panel-zielwahl-griff-l" />}
       {zielwahl && <div className="panel-zielwahl-griff panel-zielwahl-griff-r" />}
@@ -2833,6 +3036,7 @@ const HeroIdleAnims = (() => {
     },
   };
 })();
+window.HeroIdleAnims = HeroIdleAnims;   // fuer das Vorladen der Tutorial-Helden (app-screens.jsx)
 
 // Die Sprite-Ebene selbst. Ohne `ueber` (Skill Test) letztes Kind von `.board-plane-clip`, direkt hinter `.board-plane` (siehe
 // Kopfkommentar). Mit `ueber` (Gefecht) in einer Huelle als Geschwister des Clips direkt in `.board-center`: `.board-center`
@@ -3413,7 +3617,10 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
           platz.style.display = 'none';
         }
       }
-      const hover = !!(l && zone.classList.contains('zone-has-card') && zone.matches(':hover')
+      // ★ Touch (Befund: „die eigenen Helden verschwinden in ihren Karten, bis ich irgendwo hintippe"): nach einem Tipp bleibt `:hover` am angetippten
+      // Element haengen (Phasenleiste, Heldenkarte) — das Einfahren der Figur gilt nur fuer eine echte Maus.
+      const beruehrung = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+      const hover = !beruehrung && !!(l && zone.classList.contains('zone-has-card') && zone.matches(':hover')
         && !l.plane.hasAttribute('data-pp-dragging'));
       // v1463 (Dynamic Heroes): während eines Zielwahl-Dialogs klappt die
       // Figur ein wie beim Hover — aber ohne die Hover-Vergrößerung, die
@@ -3425,7 +3632,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       // Phasenleiste unter dem Zeiger UND diese Figur ragt darueber: einfahren. Verglichen wird mit dem Kasten des `Stehers` — er
       // bleibt beim Einfahren stehen (die Bewegung steckt in `.hero-idle-holo`), damit die Antwort nicht hin- und herspringt.
       let phasenHover = false;
-      if (l && !l.plane.hasAttribute('data-pp-dragging')) {
+      if (!beruehrung && l && !l.plane.hasAttribute('data-pp-dragging')) {
         const leiste = document.querySelector('.phase-column');
         if (leiste && leiste.matches(':hover')) {
           const steher = platz.querySelector('.hero-idle-steher');
@@ -19745,8 +19952,22 @@ const ANIM_REGISTRY = {
     // GESAMTZAHL bleibt: bei acht Zielen waeren es sonst ueber 200
     // Geschosse mit je drei Knoten, und die Animation wuerde das Brett
     // fuer eine Sekunde ausbremsen. Bis sechs Ziele greift sie nicht.
-    const GESCHOSSE_JE_ZIEL = 26;
-    const GESCHOSSE_GESAMT_MAX = 170;
+    // ★ HANDY-LAG-FIX + PIXELART (Als Befund: „Flame Avalanche ist EXTREM laggy"): vorher bis zu 170 Geschosse mit je drei Knoten (Kopf, Schweif mit
+    // Weichzeichner, Einschlag), `mix-blend-mode: screen` und Radialverlaeufen — beim Einhaengen allein ~2 s Hauptthread auf einem schwachen Handy. Jetzt:
+    // EIN Knoten je Geschoss (Pixel-Funke aus harten Zellen per `box-shadow`, ohne Drehung/Unschaerfe/Mischmodus), Flug im Bildtakt (`steps()`),
+    // Einschlaege nur je Ziel (drei versetzte Pixel-Sterne) und deutlich weniger Geschosse. Rote/gelbe Palette, harte Kanten.
+    const GESCHOSSE_JE_ZIEL = 9;
+    const GESCHOSSE_GESAMT_MAX = 66;
+    const ZELLE = [4, 6];                   // Zellgroesse der zwei Geschoss-Groessen
+    const funke = (z) => `${0}px ${0}px 0 0 #fffbd2, ${z}px 0 0 0 #ffd066, ${-z}px 0 0 0 #ffd066, 0 ${z}px 0 0 #ffd066, 0 ${-z}px 0 0 #ffd066, ${z}px ${z}px 0 0 #ff491a, ${-z}px ${z}px 0 0 #ff491a, ${z}px ${-z}px 0 0 #ff491a, ${-z}px ${-z}px 0 0 #ff491a, ${2 * z}px 0 0 0 #8f0000, ${-2 * z}px 0 0 0 #8f0000, 0 ${2 * z}px 0 0 #8f0000, 0 ${-2 * z}px 0 0 #8f0000`;
+    const stern = (z, k) => {   // Einschlag in drei Bildern: kleines Kreuz, grosser Stern, verstreute Reste
+      const c = [];
+      const add = (x, y, f) => c.push(`${x * z}px ${y * z}px 0 0 ${f}`);
+      if (k === 0) { add(0, 0, '#fffbd2'); add(1, 0, '#ffd066'); add(-1, 0, '#ffd066'); add(0, 1, '#ffd066'); add(0, -1, '#ffd066'); }
+      else if (k === 1) { add(0, 0, '#ffd066'); [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([x, y]) => { add(x, y, '#ff9a1a'); add(2 * x, 2 * y, '#ff491a'); }); [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([x, y]) => add(x, y, '#ff491a')); }
+      else { [[2, 1], [-2, 1], [1, -2], [-1, 2], [3, 0], [-3, 0], [0, 3], [0, -3]].forEach(([x, y]) => add(x, y, '#8f0000')); add(0, 0, '#ff491a'); }
+      return c.join(', ');
+    };
     return function FlameAvalancheEffect({ x, y, w, h, ox, oy, duration, targetPoints }) {
       const W = Math.max(w || 900, 320), H = Math.max(h || 560, 240);
       const links = x - W / 2, oben = y - H / 2;
@@ -19755,10 +19976,8 @@ const ANIM_REGISTRY = {
       const dauer = duration || 1600;
       const flug = 520;                       // Flugzeit eines Geschosses
 
-      const bahnen = useMemo(() => {
+      const { bahnen, treffer } = useMemo(() => {
         const r = zufall(Math.round(W * 11 + H * 7 + oX * 3 + oY));
-        // Ziele in Kastenkoordinaten. Fehlt die Liste, faechert der Strom
-        // nach vorn (weg von der eigenen Bretthaelfte).
         let ziele = Array.isArray(targetPoints) && targetPoints.length
           ? targetPoints.map(p => ({ zx: p.x - links, zy: p.y - oben }))
           : null;
@@ -19768,99 +19987,74 @@ const ANIM_REGISTRY = {
             zx: W * (0.15 + i * 0.175), zy: oY + vor * H * 0.55,
           }));
         }
-        const aus = [];
-        const jeZiel = Math.max(10, Math.min(GESCHOSSE_JE_ZIEL,
-          Math.floor(GESCHOSSE_GESAMT_MAX / ziele.length)));
-        // Die Streuung waechst mit der Strecke: nah am Ziel eng, weit weg
-        // breit — sonst sammelt sich alles auf einem Punkt.
+        const aus = [], tr = [];
+        const jeZiel = Math.max(4, Math.min(GESCHOSSE_JE_ZIEL, Math.floor(GESCHOSSE_GESAMT_MAX / ziele.length)));
         ziele.forEach((z, zi) => {
           const spanne = Math.hypot(z.zx - oX, z.zy - oY);
           for (let i = 0; i < jeZiel; i++) {
             const streuX = (r() - 0.5) * Math.max(48, spanne * 0.26);
             const streuY = (r() - 0.5) * Math.max(34, spanne * 0.17);
             const zx = z.zx + streuX, zy = z.zy + streuY;
-            // Bogenmitte seitlich versetzt — die Seite wechselt mit dem
-            // Geschoss, damit sich der Strom aufblaettert.
             const mx = (oX + zx) / 2 + (r() - 0.5) * spanne * 0.22;
             const my = (oY + zy) / 2 + (r() - 0.5) * spanne * 0.18 - spanne * 0.06;
             aus.push({
-              zx, zy, mx, my,
-              winkel: Math.atan2(zy - oY, zx - oX) * 180 / Math.PI,
-              groesse: 13 + r() * 20,
-              verzug: Math.round(zi * 20 + i * (r() * 22 + 9)),
+              zx, zy, mx, my, gross: r() > 0.55 ? 1 : 0,
+              verzug: Math.round(zi * 20 + i * (r() * 40 + 18)),
               laenge: Math.round(flug * (0.75 + r() * 0.55)),
             });
           }
+          // Drei versetzte Einschlag-Sterne je Ziel (statt eines Feuerballs je Geschoss).
+          for (let k = 0; k < 3; k++) tr.push({ zx: z.zx + (r() - 0.5) * 22, zy: z.zy + (r() - 0.5) * 22, at: Math.round(flug * 0.9 + zi * 20 + k * (jeZiel * 11)) });
         });
-        return aus;
+        return { bahnen: aus, treffer: tr };
       }, [W, H, oX, oY, links, oben, targetPoints, flug]);
 
       return (
-        <div aria-hidden="true" style={{
+        <div aria-hidden="true" data-pp-px="aus" style={{
           position: 'fixed', left: links, top: oben, width: W, height: H,
-          pointerEvents: 'none', zIndex: 10100, overflow: 'hidden',
-          animation: `faBeben ${Math.round(dauer * 0.5)}ms linear 60ms both`,
+          pointerEvents: 'none', zIndex: 10100, overflow: 'hidden', contain: 'layout paint',
+          animation: `faBeben ${Math.round(dauer * 0.5)}ms steps(1) 60ms both`,
         }}>
-          {/* Muendungsfeuer beim Wirker: hier setzt der Strom an. */}
+          {/* Muendungsfeuer beim Wirker: gestapelte harte Quadrat-Ringe, die im Bildtakt aufgehen. */}
           <div style={{
-            position: 'absolute', left: oX - 80, top: oY - 80, width: 160, height: 160,
-            borderRadius: '50%', mixBlendMode: 'screen',
-            background: 'radial-gradient(circle, rgba(255,251,210,.95) 0%, rgba(255,154,26,.75) 34%, rgba(204,43,0,.35) 66%, transparent 80%)',
-            animation: `faMuendung ${Math.round(dauer * 0.8)}ms ease-out forwards`,
+            position: 'absolute', left: oX - 8, top: oY - 8, width: 16, height: 16, background: '#fffbd2',
+            animation: `faMuendung ${Math.round(dauer * 0.6)}ms steps(1) forwards`,
           }} />
           {bahnen.map((b, i) => (
             <div key={'fap' + i} style={{
-              position: 'absolute', left: oX, top: oY, width: 0, height: 0,
-              '--fa-mx': (b.mx - oX).toFixed(1) + 'px', '--fa-my': (b.my - oY).toFixed(1) + 'px',
-              '--fa-zx': (b.zx - oX).toFixed(1) + 'px', '--fa-zy': (b.zy - oY).toFixed(1) + 'px',
-              animation: `faFlug ${b.laenge}ms cubic-bezier(.30,.55,.55,1) ${b.verzug}ms both`,
-            }}>
-              {/* Schweif — laeuft der Flugrichtung hinterher */}
-              <div style={{
-                position: 'absolute', left: -b.groesse * 2.4, top: -b.groesse * 0.34,
-                width: b.groesse * 2.6, height: b.groesse * 0.68,
-                transformOrigin: '100% 50%', transform: `rotate(${b.winkel}deg)`,
-                borderRadius: '50%', mixBlendMode: 'screen', filter: 'blur(2px)',
-                background: `linear-gradient(to right, transparent 0%, rgba(255,73,26,.5) 55%, rgba(251,200,106,.85) 100%)`,
-              }} />
-              {/* Kopf */}
-              <div style={{
-                position: 'absolute', left: -b.groesse / 2, top: -b.groesse / 2,
-                width: b.groesse, height: b.groesse * 0.82,
-                borderRadius: '48% 52% 56% 44% / 54% 46% 54% 46%',
-                background: 'radial-gradient(circle at 42% 38%, #fffbd2 0%, #ffd066 30%, #ff491a 62%, #8f0000 100%)',
-                boxShadow: '0 0 14px rgba(255,125,0,.95)', mixBlendMode: 'screen',
-              }} />
-            </div>
+              position: 'absolute', left: oX, top: oY, width: ZELLE[b.gross], height: ZELLE[b.gross], marginLeft: -ZELLE[b.gross] / 2, marginTop: -ZELLE[b.gross] / 2,
+              background: '#fffbd2', boxShadow: funke(ZELLE[b.gross]),
+              '--fa-mx': Math.round(b.mx - oX) + 'px', '--fa-my': Math.round(b.my - oY) + 'px',
+              '--fa-zx': Math.round(b.zx - oX) + 'px', '--fa-zy': Math.round(b.zy - oY) + 'px',
+              opacity: 0, willChange: 'transform',
+              animation: `faFlug ${b.laenge}ms steps(9, end) ${b.verzug}ms both`,
+            }} />
           ))}
-          {/* Einschlaege: ein Feuerball je Geschoss, sobald es ankommt */}
-          {bahnen.map((b, i) => (
+          {treffer.map((t, i) => (
             <div key={'fae' + i} style={{
-              position: 'absolute', left: b.zx - b.groesse, top: b.zy - b.groesse,
-              width: b.groesse * 2, height: b.groesse * 2, borderRadius: '50%',
-              mixBlendMode: 'screen', opacity: 0,
-              background: 'radial-gradient(circle, rgba(255,251,210,.95) 0%, rgba(255,154,26,.7) 40%, transparent 72%)',
-              animation: `faTreffer ${Math.round(320 + b.groesse * 6)}ms ease-out ${b.verzug + b.laenge}ms forwards`,
+              position: 'absolute', left: t.zx - 3, top: t.zy - 3, width: 6, height: 6, background: '#fffbd2', opacity: 0,
+              animation: `faTreffer 360ms steps(1) ${t.at}ms both`,
+              '--fa-s0': stern(6, 0), '--fa-s1': stern(6, 1), '--fa-s2': stern(6, 2),
             }} />
           ))}
           <style>{`
             @keyframes faFlug {
-              0%   { transform: translate(0, 0) scale(.45); opacity: 0; }
-              12%  { opacity: 1; }
-              50%  { transform: translate(var(--fa-mx), var(--fa-my)) scale(1); }
-              88%  { opacity: 1; }
-              100% { transform: translate(var(--fa-zx), var(--fa-zy)) scale(.85); opacity: 0; }
+              0%   { transform: translate(0, 0); opacity: 1; }
+              50%  { transform: translate(var(--fa-mx), var(--fa-my)); }
+              100% { transform: translate(var(--fa-zx), var(--fa-zy)); opacity: 0; }
             }
             @keyframes faTreffer {
-              0%   { opacity: 0; transform: scale(.35); }
-              30%  { opacity: 1; transform: scale(1); }
-              100% { opacity: 0; transform: scale(1.5); }
+              0%   { opacity: 1; box-shadow: var(--fa-s0); }
+              34%  { box-shadow: var(--fa-s1); }
+              68%  { box-shadow: var(--fa-s2); }
+              100% { opacity: 0; }
             }
             @keyframes faMuendung {
-              0%   { opacity: 0; transform: scale(.35); }
-              14%  { opacity: 1; transform: scale(1.05); }
-              70%  { opacity: .7; transform: scale(.95); }
-              100% { opacity: 0; transform: scale(1.2); }
+              0%   { opacity: 1; box-shadow: 0 0 0 8px #ff9a1a, 0 0 0 16px #cc2b00; }
+              25%  { box-shadow: 0 0 0 16px #ff9a1a, 0 0 0 28px #cc2b00; }
+              55%  { box-shadow: 0 0 0 12px #ff9a1a, 0 0 0 20px #8f0000; }
+              85%  { box-shadow: 0 0 0 4px #ff491a; }
+              100% { opacity: 0; }
             }
             @keyframes faBeben {
               0%, 100% { transform: translate(0, 0); }
@@ -36531,6 +36725,24 @@ function ZielMarkenEbene({ marken, blitze, myIdx }) {
   );
 }
 
+// ★ Vorwaermen ausserhalb des Kampfs: haengt die Animation einmal unsichtbar in einen eigenen React-Baum, damit der Pixelierer ihre
+// Pixelbilder erzeugt (Zwischenspeicher `_ppPxCache`, Schluessel nach Groesse) — bevor ein Kampf, vor allem ein Tutorial, startet.
+// Auf schwachen Handys kostet dieses erste Pixelieren Sekunden; im Menue stoert es niemanden, in Mission 1 verzoegerte es die erste Textbox.
+window._ppAnimWarm = window._ppAnimWarm || {};
+window.ppAnimVorwaermen = function (type, mass) {
+  try {
+    if (window._playAnimations === false || window._ppAnimWarm[type] || !ANIM_REGISTRY[type] || !ReactDOM.createRoot) return;
+    window._ppAnimWarm[type] = true;
+    const host = document.createElement('div');
+    host.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(host);
+    const root = ReactDOM.createRoot(host);
+    const fertig = () => setTimeout(() => { try { root.unmount(); host.remove(); } catch {} }, 300);
+    root.render(<GameAnimationRenderer type={type} x={window.innerWidth / 2} y={window.innerHeight / 2} w={(mass && mass.w) || 100} h={(mass && mass.h) || 100} welt={false} prewarm _gemountet={fertig} />);
+    setTimeout(() => { try { root.unmount(); host.remove(); } catch {} }, 8000);   // Netz
+  } catch (e) { /* Vorwaermen ist optional */ }
+};
+
 function GameAnimationRenderer({ type, x, y, w, h, _gemountet, prewarm, ...rest }) {
   const Component = ANIM_REGISTRY[type];
   // Lebensdauer-Uhr erst NACH dem Pixelieren starten (s. playAnimation).
@@ -37005,16 +37217,13 @@ function OptionPickerDropdown({ ep, respondToPrompt }) {
   };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <select value={selectedId} onChange={e => setSelectedId(e.target.value)} autoFocus
+      <PPDropdown value={selectedId} onChange={setSelectedId} className=""
         style={{
           width: '100%', padding: '8px 12px', fontSize: 13,
           background: 'var(--bg2)', border: '1px solid var(--accent)', borderRadius: 6,
           color: 'var(--text1)', outline: 'none', boxSizing: 'border-box', cursor: 'pointer',
-        }}>
-        {options.map(opt => (
-          <option key={opt.id} value={opt.id}>{opt.label}</option>
-        ))}
-      </select>
+        }}
+        options={options.map(opt => ({ value: opt.id, label: opt.label }))} />
       <div style={{ display: 'flex', gap: 8 }}>
         <button className="btn" style={{ flex: 1, padding: '10px 18px', fontSize: 12, borderColor: 'var(--accent)', color: 'var(--accent)' }}
           onClick={confirm}>{ep.confirmLabel || 'Confirm'}</button>
@@ -38478,6 +38687,13 @@ function ppSendePromptAntwort(gameState, response) {
     if (_ppPromptLetzte.id === pid && jetzt - _ppPromptLetzte.t < 600) return false;
     _ppPromptLetzte = { id: pid, t: jetzt };
   }
+  // ★ Handy-Befund (Sounds ~0,5 s verspaetet): der Server schickt `ability_activated` (Aufblitzen + Klang) erst NACH der Aufloesung der Faehigkeit —
+  // bei Alchemy & Co. also nach Bestaetigen, Zahlen, Ziehen. Bestaetigt der Spieler die Frage einer gerade angetippten Ability, klingt sie deshalb
+  // sofort; der spaete Klang vom Server faellt in die Dedupe-Zeit (800 ms) und bleibt stumm.
+  if (response && response.confirmed === true && window._ppAbilTipp && performance.now() - window._ppAbilTipp < 30000) {
+    window._ppAbilTipp = 0;
+    if (window.playSFX) window.playSFX('ability_activate', { dedupe: 800 });
+  }
   socket.emit('effect_prompt_response', { roomId: gameState.roomId, response, promptId: pid });
   return true;
 }
@@ -38826,6 +39042,9 @@ function ppKartenWurf({ mode, cardUrl, A, B, dauer }) {
   return abraeumen;
 }
 
+// Haengt die Phasenspalte (Handy) per Portal in das scrollende Brett; ohne `host` bleibt sie an ihrer gewohnten Stelle.
+function PhasenHuelle({ host, children }) { return host ? ReactDOM.createPortal(children, host) : children; }
+
 function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck, setSelectedDeck, cubeMatchInfo }) {
   useHoverDurchSchleier();   // v1270: Tooltips durch den Dialog-Schleier
   const { user, setUser, notify, setBgmMode } = useContext(AppContext);
@@ -39057,6 +39276,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // (`setTutorialGegner` in app-shared). Nur im Tutorial ausgewertet.
   const tutorialGegnerDaten = (window.useTutorialGegner || (() => null))();
   const tutorialGegner = gameState?.isTutorial ? tutorialGegnerDaten : null;
+  // Aufmerksamkeitskamera im Tutorial (Handy): holt bedienbare Ziele ins Bild, s. ppTutorialAufmerksamkeit.
+  useEffect(() => {
+    if (!gameState?.isTutorial) return undefined;
+    const id = setInterval(() => { if (window.ppTutorialAufmerksamkeit) window.ppTutorialAufmerksamkeit(); }, 450);
+    return () => clearInterval(id);
+  }, [gameState?.isTutorial]);
+  // Platzierungskamera (Handy): bei Support-Zonen-Wahl nach unten fahren, s. ppPlatzierungsKamera.
+  useEffect(() => {
+    const id = setInterval(() => { if (window.ppPlatzierungsKamera) window.ppPlatzierungsKamera(); }, 350);
+    return () => clearInterval(id);
+  }, []);
+  // Anzeigename eines Spielers wie in der Handleiste: Tutorial-Gegner → Monia Bot / Antonia, CPU → Kurzname seines mittleren Helden (nicht „CPU"),
+  // sonst der Benutzername. Fuer Statushinweise, Log und Auswahlfenster.
+  const anzeigeName = (pl) => {
+    if (!pl) return '';
+    if (pl === opp && tutorialGegner) return tutorialGegner.name;
+    if (gameState.isCpuBattle && pl.username === 'CPU') return heroDisplayName(portraetHeld(pl) || pl.username);
+    return pl.username;
+  };
 
   // ── Tutorial: Helden-Figuren erst nach dem Gespraech ──
   // Solange die Einleitung laeuft, stehen die animierten Figuren noch nicht
@@ -39306,6 +39544,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Faltlinie, Zeilenhoehe und Inhaltskante nur im VOLLEN Lauf.
       let y = null;
       if (nurPlatte) { messePlatte(col); return; }
+      // Handy: die Leiste liegt im scrollenden Brett (Portal) und sitzt GENAU mittig zwischen der untersten gegnerischen und der obersten eigenen Heldenzeile.
+      // Die Hoehe wird in Inhaltskoordinaten (plus `scrollTop`) angegeben — sie aendert sich beim Scrollen nicht, also braucht es dort keinen Nachzieh-Lauf.
+      if (window.ppIsPhone && window.ppIsPhone() && parent.classList && parent.classList.contains('board-center')) {
+        let oppUnten = -Infinity, meOben = Infinity;
+        document.querySelectorAll('[data-hero-zone][data-hero-owner="opp"]').forEach(e => { const r = e.getBoundingClientRect(); if (r.height > 0) oppUnten = Math.max(oppUnten, r.bottom); });
+        document.querySelectorAll('[data-hero-zone][data-hero-owner="me"]').forEach(e => { const r = e.getBoundingClientRect(); if (r.height > 0) meOben = Math.min(meOben, r.top); });
+        if (isFinite(oppUnten) && isFinite(meOben)) {
+          setzeVar(document.documentElement.style, '--phase-mid-y', ((oppUnten + meOben) / 2 - parent.getBoundingClientRect().top + parent.scrollTop) + 'px');
+          messePlatte(col); return;
+        }
+      }
       // ERSTE WAHL: `.board-area-zones-center`. Das ist die Faltlinie, an
       // der das ganze Brett haengt — `position: absolute; top: 50%;
       // translateY(-50%); height: 0`, und die Area-Zonen sind daran
@@ -39515,6 +39764,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   // Area zone positioning — measure hero zones to find midpoints between columns
   const boardCenterRef = useRef(null);
+  // Handy: die Phasenleiste haengt INNERHALB des scrollenden Bretts (Portal in `.board-center`), damit sie beim Scrollen nativ mitlaeuft — die frueher
+  // per Skript nachgezogene Position hing beim Hoch-/Runterwischen sichtbar hinterher. Desktop: unveraendert ausserhalb (siehe PhasenHuelle).
+  const [phaseHost, setPhaseHost] = useState(null);
+  useEffect(() => {
+    const mq = window.matchMedia ? window.matchMedia('(pointer: coarse) and (max-height: 600px)') : null;
+    const ziel = (mq && mq.matches) ? boardCenterRef.current : null;
+    if (ziel !== phaseHost) setPhaseHost(ziel);
+  });
   // Ebene UNTER den animierten Heldenfiguren (Sprite-Hülle, z-index 51), aber über Brett und Karten: Animationen mit `unterFiguren: true` (You are the Chosen One!!!: die Aura steht
   // HINTER dem Helden) werden per Portal hierher gehängt. Ein State statt Ref, damit der Render nach dem Einhängen des Knotens neu läuft.
   const [unterFigurenEl, setUnterFigurenEl] = useState(null);
@@ -39805,6 +40062,41 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     window._ppOppActing = isSpectator || (!isMyTurn && !result);
     return () => { window._ppOppActing = false; };
   }, [isMyTurn, result, isSpectator]);
+
+  // ★ GEGNERZUG-KAMERA (Handy): Sobald der Zug des Gegners beginnt, faehrt die Kamera auf SEINE Brettseite (ganz nach oben); legt er eine Karte in eine
+  // Ability- oder Support-Zone, faehrt sie so, dass diese Zone gut im Bild steht (`ppBattleCamFocus`, nur waehrend der Gegner handelt, nie gegen den Finger).
+  const oppZonenRef = useRef(null);
+  useEffect(() => {
+    if (!(window.ppIsPhone && window.ppIsPhone()) || isSpectator || isMyTurn || result) return undefined;
+    const t = setTimeout(() => {
+      const sc = document.querySelector('.board-center');
+      if (sc && !window._touchActive) _ppCamFahre(sc, sc.scrollLeft, 0);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [isMyTurn, result, isSpectator, gameState.turn]);
+  useEffect(() => {
+    if (!(window.ppIsPhone && window.ppIsPhone())) return undefined;
+    const ps = gameState.players && gameState.players[oppIdx];
+    if (!ps) return undefined;
+    const jetzt = {};
+    (ps.abilityZones || []).forEach((zonen, hi) => (zonen || []).forEach((slot, si) => { jetzt[`a:${hi}:${si}`] = (slot || []).length; }));
+    (ps.supportZones || []).forEach((zonen, hi) => (zonen || []).forEach((slot, si) => { jetzt[`s:${hi}:${si}`] = (slot || []).length; }));
+    const vorher = oppZonenRef.current;
+    oppZonenRef.current = jetzt;
+    if (!vorher) return undefined;
+    const neu = Object.keys(jetzt).filter(k => jetzt[k] > (vorher[k] || 0));
+    if (!neu.length) return undefined;
+    setTimeout(() => {
+      for (const k of neu) {
+        const [art, hi, si] = k.split(':');
+        const el = document.querySelector(art === 'a'
+          ? `[data-ability-zone][data-ability-owner="opp"][data-ability-hero="${hi}"][data-ability-slot="${si}"]`
+          : `[data-support-zone][data-support-owner="opp"][data-support-hero="${hi}"][data-support-slot="${si}"]`);
+        if (el && window.ppBattleCamFocus) window.ppBattleCamFocus(el);
+      }
+    }, 120);   // bewusst ohne Aufraeumen: der naechste Zustand soll die geplante Fahrt nicht kippen
+    return undefined;
+  }, [gameState]);
 
   // Local hand state for reordering
   const [hand, setHand] = useState(me.hand || []);
@@ -42859,7 +43151,42 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
    *   (Als Ruling: kein Ziel fuer Loot the Leftovers & Co.). Danach
    *   laeuft sie durch dieselbe Spielbarkeits- und Ziehmaschine.
    */
+  // ★ Mobil: Ein TIPP spielt/aktiviert die Handkarte wie bisher (und zeigt den Tooltip, s. ppHandTipp), ein LANGES Halten zeigt NUR den Tooltip
+  // und loest nichts aus. Dafuer startet die eigentliche Handlung (`onHandMouseDownJetzt`) auf Touch erst beim Loslassen eines kurzen Tipps —
+  // oder sofort, sobald der Finger zieht (Drag aus der Hand; die ersten 5 px Bewegung entscheiden). Maus: unveraendert sofort.
   const onHandMouseDown = (e, idx, fromCreation = false) => {
+    const t0 = e.type === 'touchstart' && e.touches && e.touches[0];
+    if (!t0) return onHandMouseDownJetzt(e, idx, fromCreation);
+    const x0 = t0.clientX, y0 = t0.clientY;
+    const ersatz = {   // die echte Ereignis-Huelle ist nach dem Handler nicht mehr nutzbar (currentTarget = null)
+      type: 'touchstart', button: 0, cancelable: false, currentTarget: e.currentTarget, target: e.target,
+      touches: [{ clientX: x0, clientY: y0 }], changedTouches: [{ clientX: x0, clientY: y0 }],
+      preventDefault() {}, stopPropagation() {},
+    };
+    let lang = false, erledigt = false;
+    const timer = setTimeout(() => { lang = true; }, window.LONG_PRESS_MS || 400);
+    const bewegt = (ev) => {
+      const q = ev.touches && ev.touches[0];
+      if (erledigt || !q || Math.abs(q.clientX - x0) + Math.abs(q.clientY - y0) <= 5) return;
+      erledigt = true; abbau();
+      onHandMouseDownJetzt(ersatz, idx, fromCreation);   // Zug: Drag beginnt (auch nach langem Halten)
+    };
+    const ende = (ev) => {
+      if (erledigt) return;
+      erledigt = true; abbau();
+      if (ev.type === 'touchend' && !lang) onHandMouseDownJetzt(ersatz, idx, fromCreation);   // kurzer Tipp
+    };
+    function abbau() {
+      clearTimeout(timer);
+      document.removeEventListener('touchmove', bewegt, true);
+      document.removeEventListener('touchend', ende, true);
+      document.removeEventListener('touchcancel', ende, true);
+    }
+    document.addEventListener('touchmove', bewegt, { capture: true, passive: true });
+    document.addEventListener('touchend', ende, { capture: true, passive: true });
+    document.addEventListener('touchcancel', ende, { capture: true, passive: true });
+  };
+  const onHandMouseDownJetzt = (e, idx, fromCreation = false) => {
     if (e.type === 'mousedown' && e.button !== 0) return;
     if (isSpectator) return; // Spectators can't interact with cards
     const cardName = fromCreation ? (me.creationZone || [])[idx] : hand[idx];
@@ -49068,7 +49395,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // leise `ability_activate`; die Zonen-Klangtabelle (holy_revival →
       // `revive`) galt nur fuer Zonen-Animationen. Jetzt derselbe Klang
       // wie in der Zone, der leise Auftakt bleibt als Fallback.
-      if (window.playSFX) window.playSFX(type === 'holy_revival' ? 'revive' : 'ability_activate', { category: 'effect' });
+      if (window.playSFX) window.playSFX(type === 'holy_revival' ? 'revive' : 'ability_activate', type === 'holy_revival' ? { dedupe: 900, category: null } : { category: 'effect' });
       const ownerLabel = ownerLbl(owner, myIdx);
       const el = document.querySelector(`[data-perm-id="${permId}"][data-perm-owner="${ownerLabel}"]`);
       if (el) playAnimation(type || 'holy_revival', el, { duration: 1200 });
@@ -54828,6 +55155,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (window._playAnimations === false) return undefined;
     const t = setTimeout(() => {
       for (const type of ['cataclysm']) {
+        // Schon ausserhalb des Kampfs vorgewaermt (Gast-Menue, ppAnimVorwaermen)? Dann liegen die Pixelbilder im Zwischenspeicher.
+        if (window._ppAnimWarm && window._ppAnimWarm[type]) continue;
         const id = Date.now() + Math.random();
         setGameAnims(prev => [...prev, {
           id, type, x: window.innerWidth / 2, y: window.innerHeight / 2, w: 100, h: 100, welt: false, prewarm: true,
@@ -56324,8 +56653,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const cName = (name) => <span className="log-card-name" style={{ color: logCardColor(name) }}>{name}</span>;
     const p0 = gameState.players[0], p1 = gameState.players[1];
     const getPlayer = (username) => {
-      if (username === p0.username) return { name: p0.username, color: p0.color };
-      if (username === p1.username) return { name: p1.username, color: p1.color };
+      if (username === p0.username) return { name: anzeigeName(p0), color: p0.color };
+      if (username === p1.username) return { name: anzeigeName(p1), color: p1.color };
       return { name: username || '?', color: '#a8a8a8' };
     };
     const playerByName = (n) => getPlayer(n);
@@ -57725,7 +58054,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     steht auf beiden Seiten des Bretts. */}
                 {isPermaControlled && (
                   <div className={'hero-owned-badge' + (hero.permaControlBy === myIdx ? ' hero-owned-mine' : '')}>
-                    {hero.permaControlBy === myIdx ? '⛓ Yours' : '⛓ ' + (opp?.username || 'Opponent') + "'s"}
+                    {hero.permaControlBy === myIdx ? '⛓ Yours' : '⛓ ' + (anzeigeName(opp) || 'Opponent') + "'s"}
                   </div>
                 )}
                 {hero?.name && !isRamming ? (
@@ -58567,6 +58896,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   // die Prompt-Sperre am Klickpfad ausdruecklich oeffnen
                   // — Anbieten und Anklicken sind zwei Bedingungen.
                   : (canActivate && (!isEffectLocked || isHeroActionActivatable)) ? () => {
+                      window._ppAbilTipp = performance.now();   // siehe ppSendePromptAntwort: Bestaetigung der Ability-Frage klingt sofort
                       if (isFreeActivatable) {
                         // Free activation — no confirmation needed, activate directly
                         socket.emit('activate_free_ability', { roomId: gameState.roomId, heroIdx: i, zoneIdx: z, zoneKind: freeAbilityEntry?.zoneKind, charmedOwner: freeAbilityEntry?.charmedOwner, borrowedFromOwner: freeAbilityEntry?.borrowedFromOwner });
@@ -60090,6 +60420,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 })();
               return (
                 <div key={i}
+                  ref={(el) => {
+                    if (!el) return;
+                    const c = revealEntry && CARDS_BY_NAME[revealEntry.name];
+                    el._ppTip = c ? (revealEntry.handLevel != null ? { ...c, _handNotes: [{ color: '#75f091', text: `Level ${revealEntry.handLevel} in their hand (printed ${c.level}).` }] } : c) : null;   // fuer ppHandTipp
+                  }}
                   className={'board-card hand-card'
                     + (revealEntry ? ' revealed-hand-card' : ' face-down')
                     + (isPermaRevealed ? ' hand-card-perma-revealed' : '')
@@ -60229,30 +60564,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           {(() => {
             const debuffs = [];
             if (me.actionLocked) debuffs.push({ key: 'action-me', icon: '⛔', text: 'You cannot perform any more Actions this turn! (Placing Creatures still works.)', color: '#ec2d62' });
-            if (opp.actionLocked) debuffs.push({ key: 'action-opp', icon: '⛔', text: `${opp.username} cannot perform any more Actions this turn!`, color: '#ae264c' });
+            if (opp.actionLocked) debuffs.push({ key: 'action-opp', icon: '⛔', text: `${anzeigeName(opp)} cannot perform any more Actions this turn!`, color: '#ae264c' });
             if (me.summonLocked) debuffs.push({ key: 'summon-me', text: 'You cannot summon any more Creatures this turn!', color: '#e92f38' });
-            if (opp.summonLocked) debuffs.push({ key: 'summon-opp', text: `${opp.username} cannot summon any more Creatures this turn!`, color: '#c68206' });
+            if (opp.summonLocked) debuffs.push({ key: 'summon-opp', text: `${anzeigeName(opp)} cannot summon any more Creatures this turn!`, color: '#c68206' });
             if (me.damageLocked) debuffs.push({ key: 'damage-me', icon: '🔥', text: 'You cannot deal any more damage to your opponent this turn!', color: '#f03232' });
-            if (opp.damageLocked) debuffs.push({ key: 'damage-opp', icon: '🛡️', text: `${opp.username} cannot deal any more damage to your targets this turn!`, color: '#e37435' });
+            if (opp.damageLocked) debuffs.push({ key: 'damage-opp', icon: '🛡️', text: `${anzeigeName(opp)} cannot deal any more damage to your targets this turn!`, color: '#e37435' });
             if (me.oppHandLocked) debuffs.push({ key: 'opphand-me', icon: '🫲', text: 'You cannot interact with your opponent\'s hand for the rest of this turn!', color: '#a040ff' });
-            if (opp.oppHandLocked) debuffs.push({ key: 'opphand-opp', icon: '🫲', text: `${opp.username} cannot interact with your hand for the rest of this turn!`, color: '#9544d5' });
+            if (opp.oppHandLocked) debuffs.push({ key: 'opphand-opp', icon: '🫲', text: `${anzeigeName(opp)} cannot interact with your hand for the rest of this turn!`, color: '#9544d5' });
             if (me.potionLocked) debuffs.push({ key: 'potion-me', icon: '🧪', text: 'You cannot play any more Potions this turn!', color: '#a040ff' });
-            if (opp.potionLocked) debuffs.push({ key: 'potion-opp', icon: '🧪', text: `${opp.username} cannot play any more Potions this turn!`, color: '#9544d5' });
+            if (opp.potionLocked) debuffs.push({ key: 'potion-opp', icon: '🧪', text: `${anzeigeName(opp)} cannot play any more Potions this turn!`, color: '#9544d5' });
             if (me.supportSpellLocked) debuffs.push({ key: 'support-me', icon: '💚', text: 'You cannot use another Support Spell this turn.', color: '#f03232' });
             if (opp.supportSpellLocked) debuffs.push({ key: 'support-opp', icon: '💚', text: `Your opponent cannot use another Support Spell this turn.`, color: '#e37435' });
             if (me.itemLocked) debuffs.push({ key: 'item-me', icon: '🔨', text: 'You must delete 1 card from your hand to use an Artifact!', color: '#f87420' });
-            if (opp.itemLocked) debuffs.push({ key: 'item-opp', icon: '🔨', text: `${opp.username} must delete 1 card from their hand to use an Artifact!`, color: '#e37435' });
+            if (opp.itemLocked) debuffs.push({ key: 'item-opp', icon: '🔨', text: `${anzeigeName(opp)} must delete 1 card from their hand to use an Artifact!`, color: '#e37435' });
             // Boomerang's "no Artifacts for the rest of this turn"
             // lockout. Distinct icon (🪃) from the 🔨 itemLocked
             // badge — different mechanic, different message.
             if (me.artifactLocked) debuffs.push({ key: 'artifact-me', icon: '🪃', text: 'You cannot use any more Artifacts this turn!', color: '#ff8566' });
-            if (opp.artifactLocked) debuffs.push({ key: 'artifact-opp', icon: '🪃', text: `${opp.username} cannot use any more Artifacts this turn!`, color: '#b06746' });
+            if (opp.artifactLocked) debuffs.push({ key: 'artifact-opp', icon: '🪃', text: `${anzeigeName(opp)} cannot use any more Artifacts this turn!`, color: '#b06746' });
             if (me.forsaken) debuffs.push({ key: 'forsaken-me', icon: '🏴‍☠️', text: 'All cards that would go to your discard pile are deleted for the rest of the turn.', color: '#7e7d9b' });
-            if (opp.forsaken) debuffs.push({ key: 'forsaken-opp', icon: '🏴‍☠️', text: `All cards that would go to ${opp.username}'s discard pile are deleted for the rest of the turn.`, color: '#8066b2' });
+            if (opp.forsaken) debuffs.push({ key: 'forsaken-opp', icon: '🏴‍☠️', text: `All cards that would go to ${anzeigeName(opp)}'s discard pile are deleted for the rest of the turn.`, color: '#8066b2' });
             if (me.handLocked) debuffs.push({ key: 'hand-me', icon: '🔒', text: 'You cannot draw or search any more cards this turn!', color: '#e92f38' });
-            if (opp.handLocked) debuffs.push({ key: 'hand-opp', icon: '🔒', text: `${opp.username} cannot draw or search any more cards this turn!`, color: '#c68206' });
+            if (opp.handLocked) debuffs.push({ key: 'hand-opp', icon: '🔒', text: `${anzeigeName(opp)} cannot draw or search any more cards this turn!`, color: '#c68206' });
             if (me.drawLocked && !me.handLocked) debuffs.push({ key: 'draw-me', icon: '💎', text: 'You cannot draw any more cards this turn (searches still work)!', color: '#e92f38' });
-            if (opp.drawLocked && !opp.handLocked) debuffs.push({ key: 'draw-opp', icon: '💎', text: `${opp.username} cannot draw any more cards this turn (searches still work)!`, color: '#c68206' });
+            if (opp.drawLocked && !opp.handLocked) debuffs.push({ key: 'draw-opp', icon: '💎', text: `${anzeigeName(opp)} cannot draw any more cards this turn (searches still work)!`, color: '#c68206' });
             // v1068: Gegenstueck zum Zieh-Lock — Suchen gesperrt, Ziehen frei.
             // Der Zusatz nennt ausdruecklich, ob der Ablagestapel mitgesperrt
             // ist, weil das der einzige Unterschied der starken Stufe ist.
@@ -60270,18 +60605,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 text: 'You cannot activate any Ability effects while "The Thing in the Ship" is on the board!',
                 color: '#e92f38' });
               debuffs.push({ key: 'abil-opp', icon: '⛔',
-                text: `${opp.username} cannot activate any Ability effects either — the lock hits both players!`,
+                text: `${anzeigeName(opp)} cannot activate any Ability effects either — the lock hits both players!`,
                 color: '#c68206' });
             }
             if (me.searchLocked && !me.handLocked) debuffs.push({ key: 'search-me', icon: '🔒', text: `You cannot search or add cards to your hand this turn${me.searchLockedIncludesDiscard ? ', not even from your discard pile' : ' (your discard pile still works)'} — but you can still draw!`, color: '#e92f38' });
-            if (opp.searchLocked && !opp.handLocked) debuffs.push({ key: 'search-opp', icon: '🔒', text: `${opp.username} cannot search or add cards to their hand this turn${opp.searchLockedIncludesDiscard ? ', not even from their discard pile' : ''} (they can still draw)!`, color: '#c68206' });
+            if (opp.searchLocked && !opp.handLocked) debuffs.push({ key: 'search-opp', icon: '🔒', text: `${anzeigeName(opp)} cannot search or add cards to their hand this turn${opp.searchLockedIncludesDiscard ? ', not even from their discard pile' : ''} (they can still draw)!`, color: '#c68206' });
             // v828: Hand-Spielsperre (Knight of Kings [W]) — zwei Modi.
             if (me.handPlayLock === 'all') debuffs.push({ key: 'handplay-me', icon: '♞', text: 'You cannot play any more cards from your hand this turn!', color: '#e92f38' });
             if (me.handPlayLock === 'of-kings') debuffs.push({ key: 'handplay-me', icon: '♞', text: 'You cannot play any more cards from your hand this turn — except "of Kings" cards (Board of Kings)!', color: '#ff9b3a' });
-            if (opp.handPlayLock === 'all') debuffs.push({ key: 'handplay-opp', icon: '♞', text: `${opp.username} cannot play any more cards from their hand this turn!`, color: '#c68206' });
-            if (opp.handPlayLock === 'of-kings') debuffs.push({ key: 'handplay-opp', icon: '♞', text: `${opp.username} cannot play any more cards from their hand this turn — except "of Kings" cards!`, color: '#c68206' });
+            if (opp.handPlayLock === 'all') debuffs.push({ key: 'handplay-opp', icon: '♞', text: `${anzeigeName(opp)} cannot play any more cards from their hand this turn!`, color: '#c68206' });
+            if (opp.handPlayLock === 'of-kings') debuffs.push({ key: 'handplay-opp', icon: '♞', text: `${anzeigeName(opp)} cannot play any more cards from their hand this turn — except "of Kings" cards!`, color: '#c68206' });
             if (me.flashbanged) debuffs.push({ key: 'flashbanged-me', icon: '⚪', text: 'Flashbanged — your turn will end after your first Action!', color: '#ffffff' });
-            if (opp.flashbanged) debuffs.push({ key: 'flashbanged-opp', icon: '⚪', text: `Flashbanged — ${opp.username}'s turn will end after their first Action!`, color: '#e6e6e6' });
+            if (opp.flashbanged) debuffs.push({ key: 'flashbanged-opp', icon: '⚪', text: `Flashbanged — ${anzeigeName(opp)}'s turn will end after their first Action!`, color: '#e6e6e6' });
             // Giga Steroids — owner-wide second-Action grant for
             // effect activations. Set on resolve, cleared on consume
             // / fizzle / expire by Giga Steroids' hooks.
@@ -60291,7 +60626,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // Ladungen stehen in derselben Leiste. Sie sind Segen und
             // Fluch zugleich: zwei Zusatzaktionen, aber KEINE anderen.
             if (me.missionActions > 0) debuffs.push({ key: 'mission-me', icon: '🎺', text: `Light Brigade — ${me.missionActions} additional Action${me.missionActions === 1 ? '' : 's'} left (no other additional Actions this turn).`, color: '#fad54a' });
-            if (opp.missionActions > 0) debuffs.push({ key: 'mission-opp', icon: '🎺', text: `${opp.username} has ${opp.missionActions} Light Brigade Action${opp.missionActions === 1 ? '' : 's'} left.`, color: '#c79e05' });
+            if (opp.missionActions > 0) debuffs.push({ key: 'mission-opp', icon: '🎺', text: `${anzeigeName(opp)} has ${opp.missionActions} Light Brigade Action${opp.missionActions === 1 ? '' : 's'} left.`, color: '#c79e05' });
             if (debuffs.length === 0) return null;
             return (
               <div className="phase-debuffs">
@@ -60354,6 +60689,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           {/* Phase tracker — positioned absolutely, left edge */}
           {/* Tutorial (nurActionPhase): Phasenwechsel gesperrt, nur die Action Phase
               ist erlaubt — siehe `tutorialPhaseErlaubt`. */}
+          <PhasenHuelle host={phaseHost}>
           <div className="phase-column">
             {gameState.skillTest && window.StTurnPanel ? <window.StTurnPanel gameState={gameState} myIdx={myIdx} isSpectator={isSpectator} focusSeat={stMulti ? oppIdx : null} onFocus={stMulti ? setStFocusPin : null} /> : <>
             <div className="board-phase-tracker">
@@ -60408,6 +60744,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             })()}
             </>}
           </div>
+          </PhasenHuelle>
 
           {/* v788 (Als Befund 5.9.): der `board-center-spacer` ist HIER
               ENTFERNT. Er war ein reiner Symmetrie-Platzhalter fuer die
@@ -61702,7 +62039,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               flöge er mit und stünde nicht hinter ihr. Eigene Ebene. */}
           {r.trailType === 'fire' && <MoniaJetTrail r={r} />}
           <div className={'ram-anim-card' + (r.trailType === 'fire_stars' ? ' ram-fire-stars' : '') + (r.trailType === 'fire' ? ' ram-jet' : '') + (r.rueckwaerts ? ' ram-back' : '')} style={{
-            left: r.srcX - 34, top: r.srcY - 48,
+            // Mittig auf der Quellzone: die Karte ist `--zone-w` x `--zone-h` gross (68x96 nur beim Brettmassstab 1) — mit festen -34/-48 begann der Dash auf
+            // dem Handy (Massstab < 1, z.B. Haressassin in Tutorial 2) um die Differenz nach links oben versetzt.
+            left: `calc(${r.srcX}px - var(--zone-w) / 2)`, top: `calc(${r.srcY}px - var(--zone-h) / 2)`,
             '--ramDx': (r.tgtX - r.srcX) + 'px',
             '--ramDy': (r.tgtY - r.srcY) + 'px',
             '--ramAngle': (r.angle || 0) + 'deg',
@@ -62677,9 +63016,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <button key={pIdx} className={'btn' + (stGezeigt ? ' st-picker-viewed' : '')} style={{ padding: '12px 18px', fontSize: 13, borderColor: clr, color: clr, display: 'flex', alignItems: 'center', gap: 12 }}
                   onMouseEnter={stMulti && !isMe ? () => setStFocusPin(pIdx) : undefined}
                   onClick={() => respondToPrompt({ playerIdx: pIdx })}>
-                  {p.avatar && <img src={p.avatar} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />}
+                  {/* Name und Bild wie oben links in der Handleiste: CPU-Gegner → Kurzname + Heldenbild (statt „CPU" ohne Bild), Tutorial → Monia Bot / Antonia */}
+                  {(() => {
+                    const tg = !isMe && tutorialGegner ? tutorialGegner : null;
+                    const bild = tg ? tg.avatar : p.avatar;
+                    const held = portraetHeld(p);
+                    if (bild) return <img src={bild} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />;
+                    if (held && HeroArtCrop) return <HeroArtCrop heroName={held} width={56} />;
+                    return null;
+                  })()}
                   <div>
-                    <div style={{ fontWeight: 700 }}>{p.username}{isMe ? ' (you)' : ''}</div>
+                    <div style={{ fontWeight: 700 }}>{isMe ? p.username : anzeigeName(p)}{isMe ? ' (you)' : ''}</div>
                   </div>
                   {stGezeigt && <span className="st-picker-badge" title="This player's board is on screen">ON SCREEN</span>}
                 </button>
@@ -63456,6 +63803,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               onClick={() => {
                 const pa = pendingAbilityActivation;
                 setPendingAbilityActivation(null);
+                if (window.playSFX) window.playSFX('ability_activate', { dedupe: 800 });   // sofort statt erst nach der Server-Aufloesung
                 if (pa.isHeroAction) {
                   ppSendePromptAntwort(gameState, { abilityActivation: true, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx, ...(pa.zoneKind === 'support' ? { zoneKind: 'support' } : {}), ...(pa.heroActionOwner != null ? { heroOwner: pa.heroActionOwner } : {}) });   // W35a: uebernommener Gegnerheld (Hu)
                 } else {
@@ -63710,7 +64058,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         return (
           <div className="modal-overlay" style={{ zIndex: 10070, background: 'rgba(0,0,0,.55)' }}
             onClick={() => respondToPrompt({ confirmed: true })}>
-            <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }} onClick={e => e.stopPropagation()}>
+            <div className="animate-in pp-aufdeck-fenster" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
               <div className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', textShadow: '0 2px 8px rgba(0,0,0,.8)' }}>
                 {ep.title || 'Card Searched'}
               </div>
@@ -63721,7 +64069,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     boxShadow: '0 0 50px rgba(0,0,0,.9), 0 0 100px rgba(255,255,255,.08)',
                     borderRadius: 8,
                   }}>
-                    <BoardCard cardName={cn} style={{ width: 220, height: 308, borderRadius: 8 }} />
+                    <div className="pp-aufdeck-karte" style={{ width: 220, height: 308 }}><BoardCard cardName={cn} style={{ width: '100%', height: '100%', borderRadius: 8 }} /></div>
                   </div>
                 ))}
               </div>
@@ -63978,15 +64326,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {!isSpectator && ((decks && decks.length > 0) || (sampleDecks || []).some(d => isDeckLegal(d).legal)) && (
               <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
                 <label style={{ fontSize: 14, color: 'var(--text2)', fontWeight: 600 }}>🃏 Deck:</label>
-                <select className="select" value={selectedDeck || ''} onChange={e => {
-                  const id = e.target.value;
+                {/* Eigenes Dropdown statt `<select>` (Android: das System-Auswahlfenster holt im Vollbild die Systemleiste; Pixel-Emoji). */}
+                <PPDropdown value={selectedDeck || ''} onChange={id => {
                   setSelectedDeck(id);
                   socket.emit('change_deck', { roomId: gameState.roomId, deckId: id });
-                }} style={{ fontSize: 14, minWidth: 240, padding: '8px 14px', borderColor: 'var(--accent)', color: 'var(--text)' }}>
-                  {(decks||[]).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  {(sampleDecks||[]).filter(d => isDeckLegal(d).legal).length > 0 && <option disabled>── Sample Decks ──</option>}
-                  {(sampleDecks||[]).filter(d => isDeckLegal(d).legal).map(d => <option key={d.id} value={d.id}>📋 {d.name}</option>)}
-                </select>
+                }} style={{ fontSize: 14, minWidth: 240, padding: '8px 14px', borderColor: 'var(--accent)', color: 'var(--text)' }}
+                  options={[
+                    ...(decks || []).map(d => ({ value: d.id, label: d.name })),
+                    ...((sampleDecks || []).filter(d => isDeckLegal(d).legal).length > 0 ? [{ value: '__sample_kopf', disabled: true, label: '── Sample Decks ──' }] : []),
+                    ...(sampleDecks || []).filter(d => isDeckLegal(d).legal).map(d => ({ value: d.id, label: '📋 ' + d.name })),
+                  ]} />
               </div>
             )}
             <div className="ergebnis-knoepfe" style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
@@ -64130,15 +64479,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {!stRes && !isSpectator && ((decks && decks.length > 0) || (sampleDecks || []).some(d => isDeckLegal(d).legal)) && (
               <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
                 <label style={{ fontSize: 14, color: 'var(--text2)', fontWeight: 600 }}>🃏 Deck:</label>
-                <select className="select" value={selectedDeck || ''} onChange={e => {
-                  const id = e.target.value;
+                {/* Eigenes Dropdown statt `<select>` (Android: das System-Auswahlfenster holt im Vollbild die Systemleiste; Pixel-Emoji). */}
+                <PPDropdown value={selectedDeck || ''} onChange={id => {
                   setSelectedDeck(id);
                   socket.emit('change_deck', { roomId: gameState.roomId, deckId: id });
-                }} style={{ fontSize: 14, minWidth: 240, padding: '8px 14px', borderColor: 'var(--accent)', color: 'var(--text)' }}>
-                  {(decks||[]).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  {(sampleDecks||[]).filter(d => isDeckLegal(d).legal).length > 0 && <option disabled>── Sample Decks ──</option>}
-                  {(sampleDecks||[]).filter(d => isDeckLegal(d).legal).map(d => <option key={d.id} value={d.id}>📋 {d.name}</option>)}
-                </select>
+                }} style={{ fontSize: 14, minWidth: 240, padding: '8px 14px', borderColor: 'var(--accent)', color: 'var(--text)' }}
+                  options={[
+                    ...(decks || []).map(d => ({ value: d.id, label: d.name })),
+                    ...((sampleDecks || []).filter(d => isDeckLegal(d).legal).length > 0 ? [{ value: '__sample_kopf', disabled: true, label: '── Sample Decks ──' }] : []),
+                    ...(sampleDecks || []).filter(d => isDeckLegal(d).legal).map(d => ({ value: d.id, label: '📋 ' + d.name })),
+                  ]} />
               </div>
             )}
             {/* ★ v1472 (Als Befund 28.9.: „Sind die Buttons für ‚Rematch‘

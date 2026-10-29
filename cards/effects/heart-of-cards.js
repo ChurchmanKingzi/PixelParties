@@ -109,7 +109,10 @@ module.exports = {
     await engine._delay(SCHAU_MS);
 
     if (treffer) {
-      await engine.actionAddCardFromDeckToHand(pi, oben, {
+      // W85c (Atta, Al 29.10.): Treffer = die Karte kommt auf die Hand → das Aufdecken ist ein Ereignis VOR dem Verschieben; löscht Atta sie, kommt sie nie auf die Hand (die 2 Karten
+      // werden trotzdem gezogen). Beim Fehlschlag entsorgt der Effekt die Karte selbst — dort greift Atta nicht.
+      const _ereignis = await engine.aufdeckEreignis(pi, [oben], { source: CARD_NAME, zone: 'deck' });
+      if (!_ereignis.geloescht.includes(oben)) await engine.actionAddCardFromDeckToHand(pi, oben, {
         source: CARD_NAME, reveal: false, _skipFlight: true,
       });
       engine.sync();

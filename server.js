@@ -46,6 +46,15 @@ const db = require('./db');
 // Als Vorgabe 26.9.: rot statt des Spieler-Standards Cyan.
 const NICHT_MENSCH_FARBE = '#ff4444';
 const bcrypt = require('bcryptjs');
+// bcryptjs rechnet auf dem Haupt-Thread: hashSync/compareSync blockieren den Event-Loop pro Aufruf ~80 ms
+// (bei Gast-Login-Spitzen stand dadurch der ganze Server). Deshalb: async-Varianten (geben dem Loop zwischen den
+// Runden Luft) und fuer Konten ohne Passwort-Login EINEN gemeinsamen, nie bekannten Hash statt eines Hashes je Konto.
+// Niemand kennt das Klartext-Passwort dahinter, ein Passwort-Login ist damit weiterhin unmoeglich.
+let _unusablePasswordHash = null;
+function unusablePasswordHash() {
+  if (!_unusablePasswordHash) _unusablePasswordHash = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 10);
+  return _unusablePasswordHash;
+}
 // const multer = require('multer'); // Replaced by base64 uploads
 const cookieParser = require('cookie-parser');
 const { v4: uuidv4 } = require('uuid');
@@ -70,7 +79,8 @@ const { sendMail } = require('./mailer');
 // v1289: oeffentliches Spielerprofil (Top-Players-Popup) — Schema, Deck-
 // Identitaet in game_history und die Route leben komplett in diesem Modul.
 const playerProfile = require('./player-profile');
-const botApi = require('./bot-api');   // MoniaBot (Discord): Konto-Verknüpfung + Bot-Routen
+const botApi = require('./bot-api');
+const funnelModule = require('./funnel');   // Spieler-Trichter (Besucher -> Gast -> Tutorial -> Konto), Auswertung nur mit FUNNEL_TOKEN   // MoniaBot (Discord): Konto-Verknüpfung + Bot-Routen
 const skillTest = require('./skilltest');   // Modus „Skill Test" (Lobby, Vorbereitung, Rounds)
 const { K: ELO_K, placementDelta } = require('./placement-elo');   // Ranked-Elo nach Platzierung (Draft + Skill Test)
 const { isSeat, opponentOfGs, playerCountGs, emitToOpponentsGs } = require('./cards/effects/_opp');
@@ -791,13 +801,13 @@ app.use((req, res, next) => {
 //  og:/twitter: URLs in the served HTML. index.html ships with the
 //  production base hard-coded as a safe default; here we swap it for
 //  the host that actually served the request, so link previews
-//  resolve from both the live Render site and a local test build.
+//  resolve from both the live site (pixelpartiestcg.com) and a local test build.
 //  PUBLIC_BASE_URL overrides everything (e.g. a future custom domain).
 //  Registered before express.static so it wins for "/" and
 //  "/index.html"; the SPA catch-all reuses it too.
 // ───────────────────────────────────────────────────────────────
 const INDEX_HTML_PATH = path.join(__dirname, 'public', 'index.html');
-const SHARE_BASE_DEFAULT = 'https://pixelparties.onrender.com';
+const SHARE_BASE_DEFAULT = 'https://pixelpartiestcg.com';
 let _indexCache = { mtimeMs: -1, html: '' };
 
 function resolveOrigin(req) {
@@ -1288,6 +1298,7 @@ async function initDatabase() {
   // Private Chats, Herausforderungen, Blockierungen (social.js)
   await social.init();
   await botApi.ensureSchema(db);   // users.discord_id (MoniaBot)
+  await funnelModule.ensureSchema(db);   // funnel_events / funnel_visitors / funnel_users
 
   // Spiel-Palette (256 Farben): gespeicherte Spielerfarben auf die naechste Palettenfarbe setzen (einmalig je Farbe; idempotent)
   try {
@@ -1674,7 +1685,7 @@ app.post('/api/auth/signup', async (req, res) => {
   await db.run('DELETE FROM pending_signups WHERE username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE', [uname, email]);
   await db.run(
     'INSERT INTO pending_signups (id, username, email, password_hash, color, avatar, code_hash, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [uuidv4(), uname, email, bcrypt.hashSync(password, 10), getRandomDefaultColor(), getRandomDefaultAvatar(), hashCode(code), Date.now() + CODE_TTL_MS],
+    [uuidv4(), uname, email, await bcrypt.hash(password, 10), getRandomDefaultColor(), getRandomDefaultAvatar(), hashCode(code), Date.now() + CODE_TTL_MS],
   );
   const { subject, text, html } = codeEmail('signup', code);
   try {
@@ -1684,6 +1695,7 @@ app.post('/api/auth/signup', async (req, res) => {
     return res.status(502).json({ error: 'Could not send the verification email. Please try again later.' });
   }
   recordEmailSend(email);
+  funnel.record('signup_submit', { req });
   res.json({ needsVerification: true, email, username: uname });
 });
 
@@ -1730,6 +1742,15 @@ app.post('/api/auth/verify-email', async (req, res) => {
 
   const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
   const token = await startSession(res, user);
+  {   // Statistik (nur Zaehler): Weg der Anmeldung; kam sie aus einer laufenden Gast-Sitzung, und hatte der Gast gespielt?
+    try {
+      const tok = req.cookies?.pp_token || req.headers['x-auth-token'], sess = tok ? sessions.get(tok) : null;
+      const gst = sess ? await db.get('SELECT is_guest FROM users WHERE id = ?', [sess.userId]) : null;
+      const played = gst && gst.is_guest ? await db.get('SELECT 1 AS x FROM npc_stats WHERE user_id = ? LIMIT 1', [sess.userId]) : null;
+      funnel.record('signup_done', { req }); funnel.record(req.body.starterDeckId ? 'signup_m_guest_modal' : 'signup_m_form', { req });
+      funnel.record(gst && gst.is_guest ? (played ? 'signup_via_guest_played' : 'signup_via_guest_only') : 'signup_direct', { req });
+    } catch (e) { console.error('[funnel] signup:', e.message); }
+  }
   res.json({ token, user: sanitizeUser(user), isNewAccount: true });
 });
 
@@ -1783,7 +1804,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
   if (!result.ok) return res.status(400).json({ error: result.error });
   const user = await db.get('SELECT * FROM users WHERE email = ? COLLATE NOCASE AND email_verified = 1', [email]);
   if (!user) return res.status(400).json({ error: 'No account found for this email.' });
-  await db.run('UPDATE users SET password_hash = ? WHERE id = ?', [bcrypt.hashSync(newPassword, 10), user.id]);
+  await db.run('UPDATE users SET password_hash = ? WHERE id = ?', [await bcrypt.hash(newPassword, 10), user.id]);
   // Invalidate any live sessions for this account after a reset.
   for (const [tok, sess] of sessions) if (sess.userId === user.id) sessions.delete(tok);
   try { db.run('DELETE FROM sessions WHERE user_id = ?', [user.id]).catch(() => {}); } catch (_) {}
@@ -1801,7 +1822,7 @@ app.post('/api/auth/login', async (req, res) => {
   const user = looksEmail
     ? await db.get('SELECT * FROM users WHERE email = ? COLLATE NOCASE', [identifier])
     : await db.get('SELECT * FROM users WHERE username = ? COLLATE NOCASE', [identifier]);
-  if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+  if (!user || !(await bcrypt.compare(password, user.password_hash))) {
     return res.status(401).json({ error: 'Invalid username/email or password' });
   }
 
@@ -1814,6 +1835,7 @@ app.post('/api/auth/login', async (req, res) => {
       user.avatar = defaultAvatar;
     }
   }
+  funnel.remember(user.id, req);   // Statistik: Aufzeichnung aus (eigene Tests) bzw. Quelle der Sitzung
   res.json({ token, user: sanitizeUser(user) });
 });
 
@@ -1860,7 +1882,7 @@ app.post('/api/auth/google', async (req, res) => {
     const username = await uniqueUsernameFrom(payload.name || (payload.given_name) || email.split('@')[0]);
     // Random unusable password so the NOT NULL column holds; password login
     // can never match it (the user authenticates via Google).
-    const unusable = bcrypt.hashSync(uuidv4() + uuidv4(), 10);
+    const unusable = unusablePasswordHash();
     try {
       await db.run(
         'INSERT INTO users (id, username, password_hash, avatar, color, email, email_verified, google_id) VALUES (?, ?, ?, ?, ?, ?, 1, ?)',
@@ -1884,6 +1906,7 @@ app.post('/api/auth/google', async (req, res) => {
   }
 
   const token = await startSession(res, user);
+  if (isNew) { funnel.record('signup_done', { req }); funnel.record('signup_m_google', { req }); funnel.record('signup_direct', { req }); }
   res.json({ token, user: sanitizeUser(user), isNewAccount: isNew });
 });
 
@@ -1954,6 +1977,7 @@ app.delete('/api/auth/remember', async (req, res) => {
 // Delete a guest account and all of its rows. No-op for real (non-guest)
 // accounts — the `is_guest = 1` guard makes this safe to call with any id.
 async function purgeGuest(userId) {
+  funnel.forget(userId);
   if (!userId) return;
   const row = await db.get('SELECT is_guest FROM users WHERE id = ?', [userId]);
   if (!row || !row.is_guest) return;
@@ -1982,7 +2006,7 @@ app.post('/api/auth/guest', async (req, res) => {
   try {
     const id = uuidv4();
     const username = 'Guest-' + id.slice(0, 8);
-    const passwordHash = bcrypt.hashSync(uuidv4(), 10); // random; guests can't log in by password
+    const passwordHash = unusablePasswordHash(); // nie bekanntes Passwort dahinter: Gaeste koennen sich nicht per Passwort anmelden
     await db.run(
       // Fixed default blue (the login-screen accent, `--accent` in style.css) so the guest UI doesn't flicker a
       // new random colour every session.
@@ -2001,6 +2025,7 @@ app.post('/api/auth/guest', async (req, res) => {
 
     const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
     const token = await startSession(res, user);
+    funnel.remember(id, req); funnel.record('guest_start', { userId: id });
     res.json({ token, user: sanitizeUser(user), isGuest: true });
   } catch (err) {
     console.error('[guest] creation failed:', err.message);
@@ -2009,6 +2034,7 @@ app.post('/api/auth/guest', async (req, res) => {
 });
 
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
+  funnel.remember(req.user.userId, req);   // Statistik: Quelle/Aufzeichnung-aus dieser Sitzung merken (nur Arbeitsspeicher)
   const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   if (!user) return res.status(404).json({ error: 'User not found' });
   // Assign a random default avatar if the user doesn't have one
@@ -2439,10 +2465,10 @@ app.post('/api/profile/password', authMiddleware, async (req, res) => {
   if (newPassword.length < 3) return res.status(400).json({ error: 'New password must be 3+ characters' });
   const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   if (!user) return res.status(404).json({ error: 'User not found' });
-  if (!bcrypt.compareSync(oldPassword, user.password_hash)) {
+  if (!(await bcrypt.compare(oldPassword, user.password_hash))) {
     return res.status(401).json({ error: 'Current password is incorrect' });
   }
-  const hash = bcrypt.hashSync(newPassword, 10);
+  const hash = await bcrypt.hash(newPassword, 10);
   await db.run('UPDATE users SET password_hash = ? WHERE id = ?', [hash, user.id]);
   res.json({ success: true });
 });
@@ -2660,6 +2686,7 @@ app.post('/api/daily/start', authMiddleware, async (req, res) => {
 // ===== MONIABOT (Discord) =====
 // Spieler-Routen für die Verknüpfung und die Bot-Routen unter /api/bot (nur mit BOT_SECRET, nur lokal). Siehe bot-api.js.
 const { berlinDate, cardOfDay } = require('./card-of-day');
+const funnel = funnelModule.mount({ app, db });   // POST /api/funnel/hit (Landing-Beacon), GET /api/funnel/report (Token)
 botApi.mount({ app, db, authMiddleware, getActiveDaily, rollDailyHeroes, nextNoonCETAfter, mostRecentNoonCETSec, uuidv4, getCardOfDay: (nowMs) => getCardOfDayInfo(nowMs) });
 
 // ===== AVAILABLE CARDS (based on ./cards folder) =====
@@ -3607,16 +3634,15 @@ function getCpuMessages(deckId) {
 // ═══════════════════════════════════════════════════════════════════
 //  CPU OPPONENT UNLOCK SYSTEM
 //  Accounts start with only the starter-deck opponents unlocked.
-//  More unlock as the player hits win milestones (endCpuBattle):
-//    • the first win vs each of the initial opponents → +1 random unlock
-//    • reaching THREE_WIN_MILESTONE wins vs ANY opponent → +1 random unlock
-//  Gaeste haben eine eigene, grosszuegigere Regel (jeder erste Sieg gegen
-//  eine CPU) — alles in `unlock-rules.js`.
+//  More unlock through wins (endCpuBattle):
+//    • the first win vs EVERY opponent (starter or structure deck) → +1 random unlock
+//  Guests follow the same rule (for the running session only) — everything
+//  lives in `unlock-rules.js`.
 //  The gallery and the structure-deck shop are both filtered to a user's
 //  unlocked set. Preexisting accounts are re-gated to this same starting
 //  point by a one-time migration (see initDatabase).
 // ═══════════════════════════════════════════════════════════════════
-const { THREE_WIN_MILESTONE, cpuUnlockCount } = require('./unlock-rules');
+const { cpuUnlockCount } = require('./unlock-rules');
 
 // Seed an account with its initial opponent roster — the starter-deck
 // (non-structure) opponents — flagged is_initial=1, and mark the account
@@ -3659,7 +3685,7 @@ async function unlockRandomOpponent(userId) {
     'INSERT OR IGNORE INTO unlocked_opponents (user_id, opponent_deck_id, is_initial) VALUES (?, ?, 0)',
     [userId, pick.id]
   );
-  return { id: pick.id, name: pick.name, middleHero: pick.heroes?.[1]?.hero || null };
+  return { id: pick.id, name: pick.name, middleHero: pick.heroes?.[1]?.hero || null, structureId: pick.structureId || null };
 }
 
 // Only the starter (non-structure) sample decks are returned to every
@@ -3804,6 +3830,28 @@ app.get('/api/render-version', (req, res) => {
 // Aufruf je Seitenaufbau, und neue Animationen gelten sofort (siehe
 // die maxAge-Vorgabe bei den statischen Routen).
 const HERO_ANIM_DIR = path.join(__dirname, 'data', 'hero-animations');
+// Alles, was die Tutorial-Missionen an Karten zeigen (Namen aus den Puzzle-Dateien, Helden getrennt). Der Client laedt das im Gast-Menue
+// im Leerlauf vor (Kartenbilder rendern, Heldenfiguren laden), damit der Start einer Mission nicht ruckelt. Einmal berechnet, dann gemerkt.
+let _tutorialAssets = null;
+app.get('/api/tutorial-assets', authMiddleware, (req, res) => {
+  try {
+    if (!_tutorialAssets) {
+      const db = getCardDB(), dir = path.join(__dirname, 'data', 'puzzles', 'tutorial');
+      const names = new Set();
+      for (const f of fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => f.endsWith('.json')).sort() : []) {
+        try {
+          const puzzle = decryptPuzzle(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8')).data);
+          (function walk(o) { if (typeof o === 'string') { if (db[o]) names.add(o); } else if (Array.isArray(o)) o.forEach(walk); else if (o && typeof o === 'object') Object.values(o).forEach(walk); })(puzzle);
+        } catch (e) { console.error('[tutorial-assets]', f, e.message); }
+      }
+      const all = [...names];
+      _tutorialAssets = { cards: all, heroes: all.filter(n => db[n].cardType === 'Hero'), abilities: all.filter(n => db[n].cardType === 'Ability') };
+    }
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.json(_tutorialAssets);
+  } catch (e) { console.error('[tutorial-assets]', e.message); res.json({ cards: [], heroes: [], abilities: [] }); }
+});
+
 app.get('/api/hero-animations', async (req, res) => {
   const animations = {};
   try {
@@ -6873,6 +6921,7 @@ async function puzzleEndGame(room, winnerIdx, reason) {
             [userId, puzzleId]
           );
           console.log(`[Tutorial] ${winner.username} cleared ${puzzleId}`);
+          { const tn = String(puzzleId).match(/tutorial(\d+)/i); funnel.record('tutorial_complete', { userId, n: tn ? parseInt(tn[1], 10) : 0 }); }   // Statistik: erste Loesung je Konto
         }
         // Alle Stufen geschafft? Der Tutorial-Skin wird NICHT hier freigeschaltet:
         // sein Popup wuerde mitten im Epilog erscheinen. Der Client meldet nach
@@ -6958,27 +7007,32 @@ function endCpuBattle(room, winnerIdx, reason) {
 
         // Freischaltungen — nur bei einem Sieg. Die Regel selbst steht in
         // `unlock-rules.js`; hier wird nur der Zustand zusammengetragen.
-        // GAESTE schalten seit 8.8. ebenfalls frei: jeder erste Sieg gegen
-        // eine CPU bringt eine zufaellige neue — fuer die laufende Sitzung.
+        // Gaeste (seit 8.8.) und registrierte Konten gleich: jeder erste Sieg
+        // gegen eine CPU bringt eine zufaellige neue.
         const guestRow = await db.get('SELECT is_guest FROM users WHERE id = ?', [humanUserId]);
+        if (guestRow && guestRow.is_guest) { funnel.record('cpu_guest_end', { userId: humanUserId }); if (humanWon) funnel.record('cpu_guest_win', { userId: humanUserId }); }
         if (humanWon) {
-          const isGuest = !!guestRow?.is_guest;
-          // Das Startaufgebot interessiert nur registrierte Konten; die
-          // Abfrage entfaellt fuer Gaeste.
-          let isInitial = false;
-          if (!isGuest) {
-            const initRow = await db.get(
-              'SELECT is_initial FROM unlocked_opponents WHERE user_id = ? AND opponent_deck_id = ?',
-              [humanUserId, opponentDeckId]
-            );
-            isInitial = !!(initRow && initRow.is_initial);
-          }
-          const unlockCount = cpuUnlockCount({ isGuest, isInitial, preWins });
+          const unlockCount = cpuUnlockCount({ preWins });
 
           const newlyUnlocked = [];
           for (let k = 0; k < unlockCount; k++) {
             const u = await unlockRandomOpponent(humanUserId);
             if (u) newlyUnlocked.push(u);
+          }
+          // Das Deck der freigeschalteten CPU kommt zu den eigenen Decks (Structure Deck im Besitz). Bei Gaesten nur fuer die laufende Sitzung —
+          // `purgeGuest` raeumt `user_shop_items` mit weg. (Fuer alle Konten, nicht nur Gaeste: Als Rueckmeldung bot es das Deck sonst nirgends an.)
+          {
+            for (const u of newlyUnlocked) {
+              u.guest = !!(guestRow && guestRow.is_guest);
+              if (!u.structureId) continue;
+              try {
+                await db.run(
+                  "INSERT INTO user_shop_items (id, user_id, item_type, item_id) SELECT ?, ?, 'structure_deck', ? WHERE NOT EXISTS (SELECT 1 FROM user_shop_items WHERE user_id = ? AND item_type = 'structure_deck' AND item_id = ?)",
+                  [uuidv4(), humanUserId, u.structureId, humanUserId, u.structureId]
+                );
+                u.deckAdded = true;
+              } catch (err) { console.error('[CPU battle] Gast-Deck-Geschenk fehlgeschlagen:', err.message); }
+            }
           }
           if (newlyUnlocked.length && humanSid) {
             io.to(humanSid).emit('opponents_unlocked', { opponents: newlyUnlocked });
@@ -8619,6 +8673,9 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       if (!isInherentAction && !additionalConsumed && !isReactionSubtype && !ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
       if (!heroless && hero._maxActionsPerTurn) hero._actionsThisTurn = (hero._actionsThisTurn || 0) + 1;
       if (isActionPhase && !additionalConsumed && !isInherentAction) {
+        // Die Aufloesung ist zu Ende (der Zauber wurde in der Kette negiert): erst die Tiefe freigeben, sonst weist `advanceToPhase` den Wechsel ab
+        // (`_spellResolutionDepth > 0`) und der Spieler bleibt nach Shamanic Curse / Silence / MOE Shield … in der Action Phase haengen (Tester 29.10.).
+        _releaseSpellDepth();
         await room.engine.advanceToPhase(pi, 4);
       }
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
@@ -11017,9 +11074,13 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
       // keeps the marked Potion).
       await room.engine.refundHeroActionCost(heroOwner, heroIdx);
       _heroCostFinalized = true;
-      if (isActionPhase) await room.engine.advanceToPhase(pi, 4);
-      // (additional-action providers were already consumed upfront before
-      // activation, so no manual consume is needed here on negation.)
+      if (consumedAdditionalInst) {
+        // ★ W82 (Sinister Idol, Al): wird die Aktivierung im Kettenfenster NEGIERT, bleibt eine ZUSATZaktion UNVERBRAUCHT — der Anbieter wird zurückgegeben und die Aktionszähler zurückgedreht
+        // (wie beim Abbruch); die Hauptaktion einer normalen Aktivierung bleibt, wie bei jeder negierten Karte, verbraucht.
+        room.engine.restoreAdditionalAction(consumedAdditionalInst);
+        if (actionCounterIncrementedHere) actingPs._actionsPlayedThisPhase = Math.max(0, (actingPs._actionsPlayedThisPhase || 0) - 1);
+        if (bonusMainActionsConsumedHere) actingPs._bonusMainActions = 1;
+      } else if (isActionPhase) await room.engine.advanceToPhase(pi, 4);
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
@@ -19846,6 +19907,7 @@ io.on('connection', (socket) => {
 
   socket.on('start_cpu_battle', ({ playerDeckId, cpuDeckId }) => {
     if (!currentUser) return;
+    db.get('SELECT is_guest FROM users WHERE id = ?', [currentUser.userId]).then(u => { if (u && u.is_guest) funnel.record('cpu_guest_start', { userId: currentUser.userId, once: true }); }).catch(() => {});
     createCpuBattle({ playerDeckId, cpuDeckId }).catch(err => {
       console.error('[CPU battle] creation error:', err.message, err.stack);
       socket.emit('cpu_battle_error', 'Failed to start: ' + (err.message || 'unknown'));
@@ -19968,6 +20030,7 @@ io.on('connection', (socket) => {
           }
         }
 
+        funnel.record('tutorial_start', { userId: currentUser.userId, n: num, once: true });
         const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
         const puzzleData = decryptPuzzle(raw.data);
 

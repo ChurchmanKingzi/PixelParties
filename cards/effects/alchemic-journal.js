@@ -88,20 +88,30 @@ module.exports = {
       if (!result || !result.cardName) return;
       const chosenName = result.cardName;
 
-      // Remove from potion deck
-      const idx = ps.potionDeck.indexOf(chosenName);
-      if (idx < 0) return;
-      ps.potionDeck.splice(idx, 1);
-      engine.handZugangSync(ps, chosenName, { ohneInstanz: true });
-      // W72b (Al): das Potion Deck zählt als „their deck" — die SUCHE (+5 Gold) löst Control Monitors aus; das bloße Ziehen (Modus „draw") ist ein Draw und nicht.
-      engine.noteHandZugangAusStapel(pi, chosenName, { pile: 'potionDeck', source: 'Alchemic Journal' });
+      if (ps.potionDeck.indexOf(chosenName) < 0) return;
+      // W85d (Atta, Al: das Potion Deck zählt als „your deck"): das Aufdecken ist ein Ereignis VOR dem Verschieben — Such-Fenster für den Gegner zuerst, dann Atta; löscht Atta die Karte,
+      // kommt sie nie auf die Hand (die Namenssperre gilt trotzdem: gesucht ist gesucht).
+      const _ereignis = await engine.aufdeckEreignis(pi, [chosenName], {
+        source: 'Alchemic Journal', zone: 'potionDeck',
+        fenster: () => engine.revealSearchedCards(pi, [chosenName], 'Alchemic Journal', { _aufdeckGemeldet: true }),
+      });
+      const _geloescht = _ereignis.geloescht.includes(chosenName);
+      if (!_geloescht) {
+        // Remove from potion deck
+        const idx = ps.potionDeck.indexOf(chosenName);
+        if (idx < 0) return;
+        ps.potionDeck.splice(idx, 1);
+        engine.handZugangSync(ps, chosenName, { ohneInstanz: true });
+        // W72b (Al): das Potion Deck zählt als „their deck" — die SUCHE (+5 Gold) löst Control Monitors aus; das bloße Ziehen (Modus „draw") ist ein Draw und nicht.
+        engine.noteHandZugangAusStapel(pi, chosenName, { pile: 'potionDeck', source: 'Alchemic Journal' });
+      }
 
       // Lock chosen potion name for the turn
       if (!ps._creationLockedNames) ps._creationLockedNames = new Set();
       ps._creationLockedNames.add(baseCardName(chosenName));   // v876: Basisname
 
       // Reveal to opponent (opponent confirms)
-      await engine.revealSearchedCards(pi, [chosenName], 'Alchemic Journal');
+      if (!_ereignis.fensterGezeigt) await engine.revealSearchedCards(pi, [chosenName], 'Alchemic Journal');
       engine.log('alchemic_journal_choose', { player: ps.username, card: chosenName });
     } else {
       // Draw 1 potion from top of deck
