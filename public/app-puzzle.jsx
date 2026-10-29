@@ -4439,20 +4439,20 @@ function PuzzleCreator() {
             <input className="db-filter-input" placeholder="Search effect text..."
               value={puzzleFilters.effect}
               onChange={e => setPuzzleFilters(p => ({ ...p, effect: e.target.value }))} />
-            <select className="db-filter-select"
+            <PPSelect className="db-filter-select"
               value={puzzleFilters.cardType}
               onChange={e => setPuzzleFilters(p => ({ ...p, cardType: e.target.value }))}>
               <option value="">All Types</option>
               {(window.CARD_TYPES || []).map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <select className="db-filter-select"
+            </PPSelect>
+            <PPSelect className="db-filter-select"
               value={puzzleFilters.subtype}
               onChange={e => setPuzzleFilters(p => ({ ...p, subtype: e.target.value }))}>
               <option value="">All Subtypes</option>
               {(window.SUBTYPES || []).map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
+            </PPSelect>
             {/* ★ v1166: Doppelschulen — nur Attacks/Spells/Creatures mit zwei Spell Schools */}
-            <select className="db-filter-select"
+            <PPSelect className="db-filter-select"
               value={puzzleFilters.doubles}
               disabled={!doppelMoeglich}
               title={doppelMoeglich
@@ -4462,37 +4462,37 @@ function PuzzleCreator() {
               onChange={e => setPuzzleFilters(p => ({ ...p, doubles: e.target.value }))}>
               <option value="">Spell Schools: Show all</option>
               <option value="double">Spell Schools: Double only</option>
-            </select>
-            <select className="db-filter-select"
+            </PPSelect>
+            <PPSelect className="db-filter-select"
               value={puzzleFilters.archetype}
               onChange={e => setPuzzleFilters(p => ({ ...p, archetype: e.target.value }))}>
               <option value="">All Archetypes</option>
               {(window.ARCHETYPES || []).map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <select className="db-filter-select"
+            </PPSelect>
+            <PPSelect className="db-filter-select"
               value={puzzleFilters.ss1}
               onChange={e => setPuzzleFilters(p => ({ ...p, ss1: e.target.value }))}>
               <option value="">Spell School 1</option>
               {(window.SPELL_SCHOOLS || []).map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <select className="db-filter-select"
+            </PPSelect>
+            <PPSelect className="db-filter-select"
               value={puzzleFilters.ss2}
               onChange={e => setPuzzleFilters(p => ({ ...p, ss2: e.target.value }))}>
               <option value="">Spell School 2</option>
               {(window.SPELL_SCHOOLS || []).map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <select className="db-filter-select"
+            </PPSelect>
+            <PPSelect className="db-filter-select"
               value={puzzleFilters.sa1}
               onChange={e => setPuzzleFilters(p => ({ ...p, sa1: e.target.value }))}>
               <option value="">Starting Ability 1</option>
               {(window.STARTING_ABILITIES || []).map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <select className="db-filter-select"
+            </PPSelect>
+            <PPSelect className="db-filter-select"
               value={puzzleFilters.sa2}
               onChange={e => setPuzzleFilters(p => ({ ...p, sa2: e.target.value }))}>
               <option value="">Starting Ability 2</option>
               {(window.STARTING_ABILITIES || []).map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
+            </PPSelect>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
               <input className="db-filter-input" type="number" placeholder="Level"
                 value={puzzleFilters.level}
@@ -5411,12 +5411,12 @@ function PuzzleCreator() {
                   <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
                     🦊 Creature on this Hero
                   </span>
-                  <select value={editHeldKreatur} onChange={(e) => setEditHeldKreatur(e.target.value)}
+                  <PPSelect value={editHeldKreatur} onChange={(e) => setEditHeldKreatur(e.target.value)}
                     data-pz-held-kreatur="1"
                     style={{ display: 'block', width: '100%', marginTop: 6, fontSize: 12, padding: '4px 6px', background: 'var(--bg2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4 }}>
                     <option value="">— none —</option>
                     {kreaturen.map(c => <option key={c.name} value={c.name}>{`Lv ${c.level ?? 0} · ${c.name}`}</option>)}
-                  </select>
+                  </PPSelect>
                   <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 4 }}>
                     "Hulijing, the Foxdemon" is treated as this Creature for the rest of the turn (HP unchanged, still a Hero) and the card is deleted at the end of the turn. It is placed without its "when you play" effect.
                   </div>
@@ -5558,11 +5558,11 @@ function PuzzleCreator() {
               return (
                 <label style={{ display: 'block', marginBottom: 14 }}>
                   <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700 }}>SKIN</span>
-                  <select className="input" value={editSkin} onChange={(e) => setEditSkin(e.target.value)}
+                  <PPSelect className="input" value={editSkin} onChange={(e) => setEditSkin(e.target.value)}
                     style={{ width: '100%', marginTop: 4 }}>
                     <option value="">Base</option>
                     {opts.map(sk => <option key={sk} value={sk}>{sk}</option>)}
-                  </select>
+                  </PPSelect>
                 </label>
               );
             })()}

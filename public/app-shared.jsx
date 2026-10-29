@@ -11567,7 +11567,7 @@ window.VolumeControl = VolumeControl;
 // Eigenes Dropdown statt `<select>`: das native Auswahlfenster malt das Betriebssystem — auf Android holt es im Vollbild die Systemleiste
 // („Programme anzeigen / Zurueck") nach oben, und seine Eintraege nutzen nicht die Pixel-Emoji-Schrift (📋 blieb System-Emoji).
 // `options`: [{ value, label, disabled? }] (disabled = Trennzeile), `onChange(value)`.
-function PPDropdown({ value, options, onChange, style, className = 'select', minWidth }) {
+function PPDropdown({ value, options, onChange, style, className = 'select', minWidth, disabled, title }) {
   const [offen, setOffen] = useState(false);
   const [pos, setPos] = useState(null);
   const knopf = useRef(null);
@@ -11581,6 +11581,7 @@ function PPDropdown({ value, options, onChange, style, className = 'select', min
     return () => { document.removeEventListener('pointerdown', zu, true); window.removeEventListener('keydown', esc, true); };
   }, [offen]);
   const auf = () => {
+    if (disabled) return;
     if (offen) { setOffen(false); return; }
     const r = knopf.current.getBoundingClientRect();
     const platzUnten = window.innerHeight - r.bottom - 8;
@@ -11592,7 +11593,7 @@ function PPDropdown({ value, options, onChange, style, className = 'select', min
   };
   return (
     <>
-      <button type="button" ref={knopf} className={className} onClick={auf} aria-haspopup="listbox" aria-expanded={offen}
+      <button type="button" ref={knopf} className={className} onClick={auf} aria-haspopup="listbox" aria-expanded={offen} disabled={disabled} title={title}
         style={{ textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth, ...style }}>
         {aktuell ? aktuell.label : ''}
       </button>
@@ -11609,6 +11610,35 @@ function PPDropdown({ value, options, onChange, style, className = 'select', min
   );
 }
 window.PPDropdown = PPDropdown;
+
+// Drop-in-Ersatz fuer `<select>` MIT `<option>`-Kindern (und `<optgroup>`): gleiche Props (`value`, `onChange(e)` mit `e.target.value`, `className`, `style`,
+// `disabled`, `title`), aber das eigene Pixel-Auswahlfenster statt des nativen — kein Android-Systemfenster im Vollbild, Pixel-Emoji in den Eintraegen.
+function _ppSelectText(n) {
+  if (n == null || n === false || n === true) return '';
+  if (Array.isArray(n)) return n.map(_ppSelectText).join('');
+  if (typeof n === 'object' && n.props) return _ppSelectText(n.props.children);
+  return String(n);
+}
+function _ppSelectOptionen(children, aus) {
+  React.Children.forEach(children, (c) => {
+    if (!c || typeof c !== 'object') return;
+    if (c.type === React.Fragment) { _ppSelectOptionen(c.props.children, aus); return; }
+    if (c.type === 'optgroup') { aus.push({ value: '__gruppe' + aus.length, disabled: true, label: c.props.label || '' }); _ppSelectOptionen(c.props.children, aus); return; }
+    if (c.type === 'option') {
+      const label = _ppSelectText(c.props.children);
+      aus.push({ value: String(c.props.value != null ? c.props.value : label), disabled: !!c.props.disabled, label });
+    }
+  });
+  return aus;
+}
+function PPSelect({ value, onChange, children, className, style, disabled, title }) {
+  const options = _ppSelectOptionen(children, []);
+  return (
+    <PPDropdown value={value == null ? '' : String(value)} options={options} className={className} style={style} disabled={disabled} title={title}
+      onChange={(v) => { if (onChange) onChange({ target: { value: v }, currentTarget: { value: v } }); }} />
+  );
+}
+window.PPSelect = PPSelect;
 window.CardTooltipContent = CardTooltipContent;
 window.useCardTooltip = useCardTooltip;
 window.useStickyHoverFlag = useStickyHoverFlag;

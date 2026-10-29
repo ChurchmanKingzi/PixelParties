@@ -2178,9 +2178,9 @@ function PlayScreen() {
                         You have no legal Cube (exactly 512 cards). Build one in the Deck Editor before hosting a draft.
                       </div>
                     ) : (
-                      <select className="input" value={draftCubeId} onChange={e => setDraftCubeId(e.target.value)} style={{ width: '100%' }}>
+                      <PPSelect className="input" value={draftCubeId} onChange={e => setDraftCubeId(e.target.value)} style={{ width: '100%' }}>
                         {legalCubes.map(c => <option key={c.id} value={c.id}>🧊 {c.name}</option>)}
-                      </select>
+                      </PPSelect>
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
