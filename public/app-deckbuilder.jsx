@@ -347,7 +347,7 @@ function DeckBuilder() {
 
   const saveAs = async () => {
     if (!currentDeck) return;
-    const newName = prompt('New deck name:', currentDeck.name + ' (Copy)');
+    const newName = await window.ppPrompt('New deck name:', currentDeck.name + ' (Copy)', { okText: 'Save' });
     if (!newName) return;
     try {
       if (isSampleMode) {
@@ -373,7 +373,7 @@ function DeckBuilder() {
 
   const deleteDeck = async () => {
     if (isSampleMode || decks.length <= 1) return;
-    if (!confirm('Delete "' + currentDeck.name + '"?')) return;
+    if (!(await window.ppConfirm('Delete "' + currentDeck.name + '"?', { okText: 'Delete', gefahr: true }))) return;
     try {
       await api('/decks/' + currentDeck.id, { method: 'DELETE' });
       const id = currentDeck.id;

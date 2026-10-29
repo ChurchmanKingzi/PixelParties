@@ -11639,6 +11639,87 @@ function PPSelect({ value, onChange, children, className, style, disabled, title
   );
 }
 window.PPSelect = PPSelect;
+
+// Farbwahl aus der Spielpalette statt `<input type="color">` (das System-Farbfenster: auf Android ausserhalb des Spiels, nicht Pixelart, freie Farben).
+// Es gibt nur die 256 Palettenfarben — genau die, auf die das Profil die Namensfarbe ohnehin einrastet (`ppSnap`).
+function PPColorPicker({ value, onChange, style }) {
+  const [offen, setOffen] = useState(false);
+  const [pos, setPos] = useState(null);
+  const knopf = useRef(null);
+  const feld = useRef(null);
+  const palette = window.PP_PALETTE || [];
+  const aktuell = String(value || '').toLowerCase();
+  useEffect(() => {
+    if (!offen) return undefined;
+    const zu = (e) => { if (knopf.current && knopf.current.contains(e.target)) return; if (feld.current && feld.current.contains(e.target)) return; setOffen(false); };
+    const esc = (e) => { if (e.key === 'Escape') setOffen(false); };
+    document.addEventListener('pointerdown', zu, true); window.addEventListener('keydown', esc, true);
+    return () => { document.removeEventListener('pointerdown', zu, true); window.removeEventListener('keydown', esc, true); };
+  }, [offen]);
+  const auf = () => {
+    if (offen) { setOffen(false); return; }
+    const r = knopf.current.getBoundingClientRect();
+    const untenPlatz = window.innerHeight - r.bottom - 8;
+    const nachUnten = untenPlatz >= 260 || r.top < untenPlatz;
+    setPos({ left: Math.max(4, Math.min(r.left, window.innerWidth - 300)), top: nachUnten ? r.bottom + 2 : undefined, bottom: nachUnten ? undefined : window.innerHeight - r.top + 2, maxHeight: Math.max(120, nachUnten ? untenPlatz : r.top - 8) });
+    setOffen(true);
+  };
+  return (
+    <>
+      <button type="button" ref={knopf} onClick={auf} aria-haspopup="dialog" aria-expanded={offen} title="Pick a colour"
+        style={{ width: 44, height: 34, border: '2px solid var(--bg4)', padding: 3, cursor: 'pointer', background: 'var(--bg)', ...style }}>
+        <span style={{ display: 'block', width: '100%', height: '100%', background: value || '#000000' }} />
+      </button>
+      {offen && pos && ReactDOM.createPortal(
+        <div ref={feld} role="dialog" style={{ position: 'fixed', left: pos.left, top: pos.top, bottom: pos.bottom, maxHeight: pos.maxHeight, overflowY: 'auto', zIndex: 100001, background: 'var(--bg2)', border: '2px solid var(--player-color)', padding: 6, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: 'repeat(16, 18px)', gap: 2 }}>
+          {palette.map((c) => (
+            <button type="button" key={c} onClick={() => { setOffen(false); if (c.toLowerCase() !== aktuell && onChange) onChange(c); }} title={c}
+              style={{ width: 18, height: 18, padding: 0, cursor: 'pointer', background: c, border: 'none', boxShadow: c.toLowerCase() === aktuell ? '0 0 0 2px #ffffff, 0 0 0 4px #000000' : 'none', position: 'relative', zIndex: c.toLowerCase() === aktuell ? 1 : 0 }} />
+          ))}
+        </div>, document.body)}
+    </>
+  );
+}
+window.PPColorPicker = PPColorPicker;
+
+// Eigene Rueckfrage-/Eingabefenster statt `window.confirm` / `window.prompt` (System-Dialoge verlassen auf Android das Vollbild). Beide liefern ein Promise:
+// `ppConfirm(text, opts)` → true/false, `ppPrompt(text, vorgabe, opts)` → Text oder null (Abbrechen).
+function PPDialogBox({ text, eingabe, vorgabe, okText, abbruchText, gefahr, fertig }) {
+  const [wert, setWert] = useState(vorgabe || '');
+  const eingabeRef = useRef(null);
+  useEffect(() => { if (eingabe && eingabeRef.current) { eingabeRef.current.focus(); eingabeRef.current.select(); } }, [eingabe]);
+  const ok = () => fertig(eingabe ? wert : true);
+  const nein = () => fertig(eingabe ? null : false);
+  useEffect(() => {
+    const k = (e) => { if (e.key === 'Escape') { e.preventDefault(); nein(); } else if (e.key === 'Enter') { e.preventDefault(); ok(); } };
+    window.addEventListener('keydown', k, true);
+    return () => window.removeEventListener('keydown', k, true);
+  });
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 100002, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(8,6,12,.8)' }} onClick={nein}>
+      <div onClick={(e) => e.stopPropagation()} style={{ minWidth: 260, maxWidth: 'min(92vw, 420px)', padding: '16px 18px', background: 'var(--bg2)', border: '3px solid ' + (gefahr ? 'var(--danger)' : 'var(--accent)'), textAlign: 'center' }}>
+        <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5, marginBottom: 12, whiteSpace: 'pre-wrap' }}>{text}</div>
+        {eingabe && <input ref={eingabeRef} className="input" value={wert} onChange={(e) => setWert(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', marginBottom: 12, fontSize: 13 }} />}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+          <button className={'btn' + (gefahr ? ' btn-danger' : ' btn-success')} style={{ padding: '8px 22px', fontSize: 12 }} onClick={ok}>{okText || 'OK'}</button>
+          <button className="btn" style={{ padding: '8px 22px', fontSize: 12 }} onClick={nein}>{abbruchText || 'Cancel'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+function _ppDialogOeffnen(props) {
+  return new Promise((aufloesen) => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root = null;
+    const zu = (v) => { try { if (root && root.unmount) root.unmount(); else ReactDOM.unmountComponentAtNode(host); } catch (e) {} host.remove(); aufloesen(v); };
+    const el = React.createElement(PPDialogBox, { ...props, fertig: zu });
+    if (ReactDOM.createRoot) { root = ReactDOM.createRoot(host); root.render(el); } else ReactDOM.render(el, host);
+  });
+}
+window.ppConfirm = (text, opts) => _ppDialogOeffnen({ text, ...(opts || {}) });
+window.ppPrompt = (text, vorgabe, opts) => _ppDialogOeffnen({ text, eingabe: true, vorgabe, ...(opts || {}) });
 window.CardTooltipContent = CardTooltipContent;
 window.useCardTooltip = useCardTooltip;
 window.useStickyHoverFlag = useStickyHoverFlag;

@@ -3296,8 +3296,7 @@ function ProfileScreen() {
                 <div style={{ paddingTop: 9, paddingBottom: 9, borderBottom: '1px solid var(--bg4)' }}>
                   <div className="profile-section-label">NAME COLOR</div>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                    <input type="color" value={window.ppSnap ? window.ppSnap(color) : color} onChange={e => setColor(window.ppSnap ? window.ppSnap(e.target.value) : e.target.value)}
-                      style={{ width: 44, height: 34, border: '1px solid var(--bg4)', cursor: 'pointer', background: 'none', padding: 0 }} />
+                    <PPColorPicker value={window.ppSnap ? window.ppSnap(color) : color} onChange={c => setColor(window.ppSnap ? window.ppSnap(c) : c)} />
                     <span style={{ color, fontWeight: 700, fontSize: 18 }}>{user.username}</span>
                     <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 4 }}>Preview</span>
                   </div>
