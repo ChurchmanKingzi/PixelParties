@@ -1695,7 +1695,7 @@ app.post('/api/auth/signup', async (req, res) => {
     return res.status(502).json({ error: 'Could not send the verification email. Please try again later.' });
   }
   recordEmailSend(email);
-  funnel.record('signup_submit', { vid: funnel.vidOf(req) });
+  funnel.record('signup_submit', { req });
   res.json({ needsVerification: true, email, username: uname });
 });
 
@@ -1742,7 +1742,15 @@ app.post('/api/auth/verify-email', async (req, res) => {
 
   const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
   const token = await startSession(res, user);
-  { const vid = funnel.vidOf(req); await funnel.mapUser(id, vid); funnel.record('signup_done', { userId: id, vid, meta: { m: req.body.starterDeckId ? 'guest_modal' : 'form' } }); }
+  {   // Statistik (nur Zaehler): Weg der Anmeldung; kam sie aus einer laufenden Gast-Sitzung, und hatte der Gast gespielt?
+    try {
+      const tok = req.cookies?.pp_token || req.headers['x-auth-token'], sess = tok ? sessions.get(tok) : null;
+      const gst = sess ? await db.get('SELECT is_guest FROM users WHERE id = ?', [sess.userId]) : null;
+      const played = gst && gst.is_guest ? await db.get('SELECT 1 AS x FROM npc_stats WHERE user_id = ? LIMIT 1', [sess.userId]) : null;
+      funnel.record('signup_done', { req }); funnel.record(req.body.starterDeckId ? 'signup_m_guest_modal' : 'signup_m_form', { req });
+      funnel.record(gst && gst.is_guest ? (played ? 'signup_via_guest_played' : 'signup_via_guest_only') : 'signup_direct', { req });
+    } catch (e) { console.error('[funnel] signup:', e.message); }
+  }
   res.json({ token, user: sanitizeUser(user), isNewAccount: true });
 });
 
@@ -1827,7 +1835,7 @@ app.post('/api/auth/login', async (req, res) => {
       user.avatar = defaultAvatar;
     }
   }
-  funnel.mapUser(user.id, funnel.vidOf(req));   // Konto <-> Besucher (auch 'skip' fuer eigene Tests)
+  funnel.remember(user.id, req);   // Statistik: Aufzeichnung aus (eigene Tests) bzw. Quelle der Sitzung
   res.json({ token, user: sanitizeUser(user) });
 });
 
@@ -1898,7 +1906,7 @@ app.post('/api/auth/google', async (req, res) => {
   }
 
   const token = await startSession(res, user);
-  { const vid = funnel.vidOf(req); await funnel.mapUser(user.id, vid); if (isNew) funnel.record('signup_done', { userId: user.id, vid, meta: { m: 'google' } }); }
+  if (isNew) { funnel.record('signup_done', { req }); funnel.record('signup_m_google', { req }); funnel.record('signup_direct', { req }); }
   res.json({ token, user: sanitizeUser(user), isNewAccount: isNew });
 });
 
@@ -1969,6 +1977,7 @@ app.delete('/api/auth/remember', async (req, res) => {
 // Delete a guest account and all of its rows. No-op for real (non-guest)
 // accounts — the `is_guest = 1` guard makes this safe to call with any id.
 async function purgeGuest(userId) {
+  funnel.forget(userId);
   if (!userId) return;
   const row = await db.get('SELECT is_guest FROM users WHERE id = ?', [userId]);
   if (!row || !row.is_guest) return;
@@ -2016,7 +2025,7 @@ app.post('/api/auth/guest', async (req, res) => {
 
     const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
     const token = await startSession(res, user);
-    const vid = funnel.vidOf(req); await funnel.mapUser(id, vid); funnel.record('guest_start', { userId: id, vid });
+    funnel.remember(id, req); funnel.record('guest_start', { userId: id });
     res.json({ token, user: sanitizeUser(user), isGuest: true });
   } catch (err) {
     console.error('[guest] creation failed:', err.message);
@@ -2025,6 +2034,7 @@ app.post('/api/auth/guest', async (req, res) => {
 });
 
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
+  funnel.remember(req.user.userId, req);   // Statistik: Quelle/Aufzeichnung-aus dieser Sitzung merken (nur Arbeitsspeicher)
   const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   if (!user) return res.status(404).json({ error: 'User not found' });
   // Assign a random default avatar if the user doesn't have one
@@ -6889,8 +6899,8 @@ async function puzzleEndGame(room, winnerIdx, reason) {
             [userId, puzzleId]
           );
           console.log(`[Tutorial] ${winner.username} cleared ${puzzleId}`);
+          { const tn = String(puzzleId).match(/tutorial(\d+)/i); funnel.record('tutorial_complete', { userId, n: tn ? parseInt(tn[1], 10) : 0 }); }   // Statistik: erste Loesung je Konto
         }
-        { const tn = String(puzzleId).match(/tutorial(\d+)/i); funnel.record('tutorial_complete', { userId, n: tn ? parseInt(tn[1], 10) : null }); }
         // Alle Stufen geschafft? Der Tutorial-Skin wird NICHT hier freigeschaltet:
         // sein Popup wuerde mitten im Epilog erscheinen. Der Client meldet nach
         // Feuerwerk und Ausblenden `tutorial_finale_done` (unten); wer vorher
@@ -6978,7 +6988,7 @@ function endCpuBattle(room, winnerIdx, reason) {
         // Gaeste (seit 8.8.) und registrierte Konten gleich: jeder erste Sieg
         // gegen eine CPU bringt eine zufaellige neue.
         const guestRow = await db.get('SELECT is_guest FROM users WHERE id = ?', [humanUserId]);
-        funnel.record('cpu_end', { userId: humanUserId, g: guestRow && guestRow.is_guest ? 1 : 0, n: humanWon ? 1 : 0 });
+        if (guestRow && guestRow.is_guest) { funnel.record('cpu_guest_end', { userId: humanUserId }); if (humanWon) funnel.record('cpu_guest_win', { userId: humanUserId }); }
         if (humanWon) {
           const unlockCount = cpuUnlockCount({ preWins });
 
@@ -19855,7 +19865,7 @@ io.on('connection', (socket) => {
 
   socket.on('start_cpu_battle', ({ playerDeckId, cpuDeckId }) => {
     if (!currentUser) return;
-    db.get('SELECT is_guest FROM users WHERE id = ?', [currentUser.userId]).then(u => funnel.record('cpu_start', { userId: currentUser.userId, g: u && u.is_guest ? 1 : 0 })).catch(() => {});
+    db.get('SELECT is_guest FROM users WHERE id = ?', [currentUser.userId]).then(u => { if (u && u.is_guest) funnel.record('cpu_guest_start', { userId: currentUser.userId, once: true }); }).catch(() => {});
     createCpuBattle({ playerDeckId, cpuDeckId }).catch(err => {
       console.error('[CPU battle] creation error:', err.message, err.stack);
       socket.emit('cpu_battle_error', 'Failed to start: ' + (err.message || 'unknown'));
@@ -19978,7 +19988,7 @@ io.on('connection', (socket) => {
           }
         }
 
-        funnel.record('tutorial_start', { userId: currentUser.userId, n: num });
+        funnel.record('tutorial_start', { userId: currentUser.userId, n: num, once: true });
         const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
         const puzzleData = decryptPuzzle(raw.data);
 
