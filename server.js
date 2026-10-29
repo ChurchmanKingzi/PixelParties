@@ -79,7 +79,8 @@ const { sendMail } = require('./mailer');
 // v1289: oeffentliches Spielerprofil (Top-Players-Popup) — Schema, Deck-
 // Identitaet in game_history und die Route leben komplett in diesem Modul.
 const playerProfile = require('./player-profile');
-const botApi = require('./bot-api');   // MoniaBot (Discord): Konto-Verknüpfung + Bot-Routen
+const botApi = require('./bot-api');
+const funnelModule = require('./funnel');   // Spieler-Trichter (Besucher -> Gast -> Tutorial -> Konto), Auswertung nur mit FUNNEL_TOKEN   // MoniaBot (Discord): Konto-Verknüpfung + Bot-Routen
 const skillTest = require('./skilltest');   // Modus „Skill Test" (Lobby, Vorbereitung, Rounds)
 const { K: ELO_K, placementDelta } = require('./placement-elo');   // Ranked-Elo nach Platzierung (Draft + Skill Test)
 const { isSeat, opponentOfGs, playerCountGs, emitToOpponentsGs } = require('./cards/effects/_opp');
@@ -1297,6 +1298,7 @@ async function initDatabase() {
   // Private Chats, Herausforderungen, Blockierungen (social.js)
   await social.init();
   await botApi.ensureSchema(db);   // users.discord_id (MoniaBot)
+  await funnelModule.ensureSchema(db);   // funnel_events / funnel_visitors / funnel_users
 
   // Spiel-Palette (256 Farben): gespeicherte Spielerfarben auf die naechste Palettenfarbe setzen (einmalig je Farbe; idempotent)
   try {
@@ -1693,6 +1695,7 @@ app.post('/api/auth/signup', async (req, res) => {
     return res.status(502).json({ error: 'Could not send the verification email. Please try again later.' });
   }
   recordEmailSend(email);
+  funnel.record('signup_submit', { vid: funnel.vidOf(req) });
   res.json({ needsVerification: true, email, username: uname });
 });
 
@@ -1739,6 +1742,7 @@ app.post('/api/auth/verify-email', async (req, res) => {
 
   const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
   const token = await startSession(res, user);
+  { const vid = funnel.vidOf(req); await funnel.mapUser(id, vid); funnel.record('signup_done', { userId: id, vid, meta: { m: req.body.starterDeckId ? 'guest_modal' : 'form' } }); }
   res.json({ token, user: sanitizeUser(user), isNewAccount: true });
 });
 
@@ -1823,6 +1827,7 @@ app.post('/api/auth/login', async (req, res) => {
       user.avatar = defaultAvatar;
     }
   }
+  funnel.mapUser(user.id, funnel.vidOf(req));   // Konto <-> Besucher (auch 'skip' fuer eigene Tests)
   res.json({ token, user: sanitizeUser(user) });
 });
 
@@ -1893,6 +1898,7 @@ app.post('/api/auth/google', async (req, res) => {
   }
 
   const token = await startSession(res, user);
+  { const vid = funnel.vidOf(req); await funnel.mapUser(user.id, vid); if (isNew) funnel.record('signup_done', { userId: user.id, vid, meta: { m: 'google' } }); }
   res.json({ token, user: sanitizeUser(user), isNewAccount: isNew });
 });
 
@@ -2010,6 +2016,7 @@ app.post('/api/auth/guest', async (req, res) => {
 
     const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
     const token = await startSession(res, user);
+    const vid = funnel.vidOf(req); await funnel.mapUser(id, vid); funnel.record('guest_start', { userId: id, vid });
     res.json({ token, user: sanitizeUser(user), isGuest: true });
   } catch (err) {
     console.error('[guest] creation failed:', err.message);
@@ -2669,6 +2676,7 @@ app.post('/api/daily/start', authMiddleware, async (req, res) => {
 // ===== MONIABOT (Discord) =====
 // Spieler-Routen für die Verknüpfung und die Bot-Routen unter /api/bot (nur mit BOT_SECRET, nur lokal). Siehe bot-api.js.
 const { berlinDate, cardOfDay } = require('./card-of-day');
+const funnel = funnelModule.mount({ app, db });   // POST /api/funnel/hit (Landing-Beacon), GET /api/funnel/report (Token)
 botApi.mount({ app, db, authMiddleware, getActiveDaily, rollDailyHeroes, nextNoonCETAfter, mostRecentNoonCETSec, uuidv4, getCardOfDay: (nowMs) => getCardOfDayInfo(nowMs) });
 
 // ===== AVAILABLE CARDS (based on ./cards folder) =====
@@ -6882,6 +6890,7 @@ async function puzzleEndGame(room, winnerIdx, reason) {
           );
           console.log(`[Tutorial] ${winner.username} cleared ${puzzleId}`);
         }
+        { const tn = String(puzzleId).match(/tutorial(\d+)/i); funnel.record('tutorial_complete', { userId, n: tn ? parseInt(tn[1], 10) : null }); }
         // Alle Stufen geschafft? Der Tutorial-Skin wird NICHT hier freigeschaltet:
         // sein Popup wuerde mitten im Epilog erscheinen. Der Client meldet nach
         // Feuerwerk und Ausblenden `tutorial_finale_done` (unten); wer vorher
@@ -6969,6 +6978,7 @@ function endCpuBattle(room, winnerIdx, reason) {
         // Gaeste (seit 8.8.) und registrierte Konten gleich: jeder erste Sieg
         // gegen eine CPU bringt eine zufaellige neue.
         const guestRow = await db.get('SELECT is_guest FROM users WHERE id = ?', [humanUserId]);
+        funnel.record('cpu_end', { userId: humanUserId, g: guestRow && guestRow.is_guest ? 1 : 0, n: humanWon ? 1 : 0 });
         if (humanWon) {
           const unlockCount = cpuUnlockCount({ preWins });
 
@@ -19845,6 +19855,7 @@ io.on('connection', (socket) => {
 
   socket.on('start_cpu_battle', ({ playerDeckId, cpuDeckId }) => {
     if (!currentUser) return;
+    db.get('SELECT is_guest FROM users WHERE id = ?', [currentUser.userId]).then(u => funnel.record('cpu_start', { userId: currentUser.userId, g: u && u.is_guest ? 1 : 0 })).catch(() => {});
     createCpuBattle({ playerDeckId, cpuDeckId }).catch(err => {
       console.error('[CPU battle] creation error:', err.message, err.stack);
       socket.emit('cpu_battle_error', 'Failed to start: ' + (err.message || 'unknown'));
@@ -19967,6 +19978,7 @@ io.on('connection', (socket) => {
           }
         }
 
+        funnel.record('tutorial_start', { userId: currentUser.userId, n: num });
         const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
         const puzzleData = decryptPuzzle(raw.data);
 
