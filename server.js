@@ -3685,7 +3685,7 @@ async function unlockRandomOpponent(userId) {
     'INSERT OR IGNORE INTO unlocked_opponents (user_id, opponent_deck_id, is_initial) VALUES (?, ?, 0)',
     [userId, pick.id]
   );
-  return { id: pick.id, name: pick.name, middleHero: pick.heroes?.[1]?.hero || null };
+  return { id: pick.id, name: pick.name, middleHero: pick.heroes?.[1]?.hero || null, structureId: pick.structureId || null };
 }
 
 // Only the starter (non-structure) sample decks are returned to every
@@ -7018,6 +7018,20 @@ function endCpuBattle(room, winnerIdx, reason) {
           for (let k = 0; k < unlockCount; k++) {
             const u = await unlockRandomOpponent(humanUserId);
             if (u) newlyUnlocked.push(u);
+          }
+          // Gaeste: das Deck der freigeschalteten CPU kommt zu den eigenen Decks (Structure Deck im Besitz, nur fuer die laufende Sitzung —
+          // `purgeGuest` raeumt `user_shop_items` mit weg). Registrierte Konten kaufen Structure Decks weiter im Shop.
+          if (guestRow && guestRow.is_guest) {
+            for (const u of newlyUnlocked) {
+              if (!u.structureId) continue;
+              try {
+                await db.run(
+                  "INSERT INTO user_shop_items (id, user_id, item_type, item_id) SELECT ?, ?, 'structure_deck', ? WHERE NOT EXISTS (SELECT 1 FROM user_shop_items WHERE user_id = ? AND item_type = 'structure_deck' AND item_id = ?)",
+                  [uuidv4(), humanUserId, u.structureId, humanUserId, u.structureId]
+                );
+                u.deckAdded = true;
+              } catch (err) { console.error('[CPU battle] Gast-Deck-Geschenk fehlgeschlagen:', err.message); }
+            }
           }
           if (newlyUnlocked.length && humanSid) {
             io.to(humanSid).emit('opponents_unlocked', { opponents: newlyUnlocked });

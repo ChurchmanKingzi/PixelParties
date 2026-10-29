@@ -3113,6 +3113,7 @@ function OpponentUnlockPopup() {
   useEffect(() => {
     if (!current) return;
     if (window.playSFX) window.playSFX('ascension');
+    if (current.deckAdded && window.playSFX) window.playSFX('shop_purchase', { delay: 650, dedupe: 0 });   // Deck-Geschenk: zweiter Klang hinterher
     const onKey = (e) => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); dismiss(); } };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
@@ -3144,23 +3145,49 @@ function OpponentUnlockPopup() {
           0%,100% { box-shadow: 0 0 28px rgba(255,198,28,.55), 0 0 70px rgba(255,154,26,.35), inset 0 0 24px rgba(255,198,28,.18); }
           50% { box-shadow: 0 0 44px rgba(251,225,129,.85), 0 0 110px rgba(249,172,32,.55), inset 0 0 34px rgba(255,217,102,.3); }
         }
+        @keyframes ppUnlockKonfetti { from { transform: translateY(-24px); } to { transform: translateY(calc(100vh + 24px)); } }
+        /* Handy quer (niedrige Hoehe): Bild links, Text rechts — sonst sprengt der Dialog den Bildschirm */
+        @media (max-height: 600px) {
+          .pp-unlock-rahmen { display: grid !important; grid-template-columns: auto 1fr; column-gap: 16px; align-items: center; width: min(94vw, 620px) !important; padding: 12px 18px 12px !important; }
+          .pp-unlock-rahmen > .pp-unlock-titel { grid-column: 1 / -1; margin-bottom: 8px !important; font-size: 12px !important; letter-spacing: 2px !important; }
+          .pp-unlock-rahmen > .pp-unlock-bild { grid-row: 2 / span 3; margin-bottom: 0 !important; }
+          .pp-unlock-rahmen > .pp-unlock-satz { font-size: 13px !important; margin-bottom: 8px !important; text-align: left; }
+          .pp-unlock-rahmen > .pp-unlock-deck { margin: 0 0 8px !important; font-size: 11px !important; text-align: left; padding: 6px 8px !important; }
+          .pp-unlock-rahmen > .pp-unlock-deck > div { font-size: 11px !important; }
+          .pp-unlock-rahmen > .pp-unlock-weiter { justify-self: start; padding: 6px 22px !important; font-size: 12px !important; }
+          .pp-unlock-ring { width: min(620px, 92vh) !important; height: min(620px, 92vh) !important; }
+        }
         @keyframes ppUnlockTitle {
           0%,100% { text-shadow: 0 0 10px rgba(255,217,102,.8), 0 0 22px rgba(255,154,26,.5); }
           50% { text-shadow: 0 0 18px rgba(255,241,150,1), 0 0 40px rgba(249,172,32,.8); }
         }
       `}</style>
 
+      {/* Tam-Tam: Pixel-Konfetti (harte Quadrate, ganze Pixel pro Schritt) fuer freigeschaltete Gegner — fest verteilt, damit nichts neu gewuerfelt wird */}
+      {current.kind !== 'skin' && (
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+          {Array.from({ length: 36 }, (_, i) => {
+            const farben = ['#fad54a', '#fc1c5f', '#4ceb70', '#1ca9fd', '#ff8b1a', '#a952ff'];
+            const gr = 4 + (i % 3) * 2;
+            return <div key={i} style={{
+              position: 'absolute', top: 0, left: ((i * 37 + 11) % 100) + '%', width: gr, height: gr, background: farben[i % farben.length],
+              animation: `ppUnlockKonfetti ${2.6 + (i % 5) * 0.45}s steps(${24 + (i % 4) * 6}) ${(i % 9) * 0.22}s infinite`,
+            }} />;
+          })}
+        </div>
+      )}
+
       {/* Rotating shimmer ring behind the card */}
       <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
            onClick={e => e.stopPropagation()}>
-        <div style={{
+        <div className="pp-unlock-ring" style={{
           position: 'absolute', width: 620, height: 620, borderRadius: '50%',
           background: 'conic-gradient(from 0deg, rgba(255,198,28,0) 0deg, rgba(255,217,102,.32) 60deg, rgba(255,198,28,0) 120deg, rgba(255,217,102,.32) 180deg, rgba(255,198,28,0) 240deg, rgba(255,217,102,.32) 300deg, rgba(255,198,28,0) 360deg)',
           filter: 'blur(6px)', animation: 'ppUnlockSpin 14s linear infinite', pointerEvents: 'none',
         }} />
 
         {/* Ornate frame */}
-        <div style={{
+        <div className="pp-unlock-rahmen" style={{
           position: 'relative',
           width: 'min(90vw, 460px)',
           padding: '34px 36px 30px',
@@ -3180,23 +3207,23 @@ function OpponentUnlockPopup() {
             }}>✦</div>
           ))}
 
-          <div className="orbit-font" style={{
+          <div className="orbit-font pp-unlock-titel" style={{
             fontSize: 15, fontWeight: 800, letterSpacing: 3, color: '#ffd966',
             marginBottom: 18, animation: 'ppUnlockTitle 2.2s ease-in-out infinite',
           }}>{current.kind === 'skin' ? '✦ NEW SKIN UNLOCKED ✦' : '✦ NEW OPPONENT UNLOCKED ✦'}</div>
 
           {/* Hero portrait in a gold frame */}
-          <div style={{
+          <div className="pp-unlock-bild" style={{
             display: 'inline-block', padding: 4, borderRadius: 10,
             border: '2px solid #fad54a', background: '#08060c',
             boxShadow: '0 0 18px rgba(255,185,26,.5)', marginBottom: 18,
           }}>
             {heroArt
-              ? <HeroArtCrop heroName={current.kind === 'skin' ? current.heroName : current.middleHero} skinName={current.kind === 'skin' ? current.skinName : null} width={300} />
+              ? <HeroArtCrop heroName={current.kind === 'skin' ? current.heroName : current.middleHero} skinName={current.kind === 'skin' ? current.skinName : null} width={(window.ppIsPhone && window.ppIsPhone()) ? 190 : 300} />
               : <div style={{ width: 300, height: 200, background: '#1a1a2e' }} />}
           </div>
 
-          <div style={{ fontSize: 16, color: 'var(--text)', lineHeight: 1.5, marginBottom: 22 }}>
+          <div className="pp-unlock-satz" style={{ fontSize: 16, color: 'var(--text)', lineHeight: 1.5, marginBottom: 22 }}>
             You unlocked{' '}
             <span className="orbit-font" style={{
               color: '#fbe181', fontWeight: 800, fontSize: 20,
@@ -3205,9 +3232,16 @@ function OpponentUnlockPopup() {
             {current.kind === 'skin' ? <>as a new skin for <b>{current.heroName}</b>!</> : 'as a new opponent!'}
           </div>
 
+          {current.deckAdded && (
+            <div className="pp-unlock-deck" style={{ margin: '-8px 0 22px', padding: '10px 12px', border: '2px solid #4ceb70', background: '#08060c', color: '#4ceb70', fontSize: 14, lineHeight: 1.5 }}>
+              <div className="orbit-font" style={{ fontSize: 13, fontWeight: 800, letterSpacing: 2, marginBottom: 4 }}>🃏 DECK ADDED TO YOUR DECKS!</div>
+              <span style={{ color: 'var(--text)' }}>Play <b>{current.name}</b>'s deck yourself — find it in your deck list. Register to keep it!</span>
+            </div>
+          )}
+
           <button
             onClick={dismiss}
-            className="orbit-font"
+            className="orbit-font pp-unlock-weiter"
             style={{
               padding: '10px 34px', fontSize: 14, fontWeight: 800, letterSpacing: 2,
               color: '#332300', cursor: 'pointer', borderRadius: 8, border: 'none',
