@@ -38621,6 +38621,13 @@ function ppSendePromptAntwort(gameState, response) {
     if (_ppPromptLetzte.id === pid && jetzt - _ppPromptLetzte.t < 600) return false;
     _ppPromptLetzte = { id: pid, t: jetzt };
   }
+  // ★ Handy-Befund (Sounds ~0,5 s verspaetet): der Server schickt `ability_activated` (Aufblitzen + Klang) erst NACH der Aufloesung der Faehigkeit —
+  // bei Alchemy & Co. also nach Bestaetigen, Zahlen, Ziehen. Bestaetigt der Spieler die Frage einer gerade angetippten Ability, klingt sie deshalb
+  // sofort; der spaete Klang vom Server faellt in die Dedupe-Zeit (800 ms) und bleibt stumm.
+  if (response && response.confirmed === true && window._ppAbilTipp && performance.now() - window._ppAbilTipp < 30000) {
+    window._ppAbilTipp = 0;
+    if (window.playSFX) window.playSFX('ability_activate', { dedupe: 800 });
+  }
   socket.emit('effect_prompt_response', { roomId: gameState.roomId, response, promptId: pid });
   return true;
 }
@@ -58769,6 +58776,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   // die Prompt-Sperre am Klickpfad ausdruecklich oeffnen
                   // — Anbieten und Anklicken sind zwei Bedingungen.
                   : (canActivate && (!isEffectLocked || isHeroActionActivatable)) ? () => {
+                      window._ppAbilTipp = performance.now();   // siehe ppSendePromptAntwort: Bestaetigung der Ability-Frage klingt sofort
                       if (isFreeActivatable) {
                         // Free activation — no confirmation needed, activate directly
                         socket.emit('activate_free_ability', { roomId: gameState.roomId, heroIdx: i, zoneIdx: z, zoneKind: freeAbilityEntry?.zoneKind, charmedOwner: freeAbilityEntry?.charmedOwner, borrowedFromOwner: freeAbilityEntry?.borrowedFromOwner });
@@ -63673,6 +63681,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               onClick={() => {
                 const pa = pendingAbilityActivation;
                 setPendingAbilityActivation(null);
+                if (window.playSFX) window.playSFX('ability_activate', { dedupe: 800 });   // sofort statt erst nach der Server-Aufloesung
                 if (pa.isHeroAction) {
                   ppSendePromptAntwort(gameState, { abilityActivation: true, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx, ...(pa.zoneKind === 'support' ? { zoneKind: 'support' } : {}), ...(pa.heroActionOwner != null ? { heroOwner: pa.heroActionOwner } : {}) });   // W35a: uebernommener Gegnerheld (Hu)
                 } else {
