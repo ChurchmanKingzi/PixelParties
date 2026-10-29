@@ -45633,6 +45633,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // (Phase schon erreicht), wird still verworfen — und der Verwerfungs-
   // Waechter meldet es nach 2 s als Fehler, obwohl alles geklappt hat.
   // Derselbe Wunsch innerhalb von 1 s wird deshalb gar nicht erst gesendet.
+  // ★ Mobil: Oeffnet sich ein Untermenue (Kartenauswahl wie bei Magic Lamp, Zielwahl, Bestaetigung, Heldenwahl …), verschwindet der festgehaltene Karten-Tooltip.
+  // Er bleibt sonst bis zum Tipp ins Leere stehen und verdeckt das neue Fenster. Tooltips, die der Spieler IM Fenster oeffnet, entstehen danach und bleiben.
+  const dialogSchluessel = [
+    gameState.effectPrompt ? (gameState.effectPrompt.promptId != null ? gameState.effectPrompt.promptId : gameState.effectPrompt.type) : '',
+    gameState.potionTargeting ? 'pt' : '', gameState.mulliganPending ? 'mu' : '', showSurrender ? 'su' : '', showEndTurnConfirm ? 'et' : '',
+    spellHeroPick ? 'sh' : '', pendingAbilityActivation ? 'pa' : '', summonerPick ? 'sm' : '', abilityAttachPick ? 'aa' : '', pendingBouncePick ? 'bp' : '', crossSidePlayPick ? 'cs' : '',
+  ].join('|');
+  useEffect(() => { if (window._isTouchDevice && window._ppTipSchliessen) window._ppTipSchliessen(); }, [dialogSchluessel]);
+
   const letzterPhasenWunsch = useRef({ ziel: -1, zeit: 0 });
   const phasenWunschDoppelt = (ziel) => {
     const jetzt = Date.now();
