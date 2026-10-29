@@ -22945,6 +22945,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // v1361 (Philosopher's Stone): das Potion Deck — der Name ist derselbe,
     // den der Client fuer Fluege kennt (`from: 'potionDeck'`).
     if (pile === 'potionDeck') return ps.potionDeck || (ps.potionDeck = []);
+    if (pile === 'sideDeck') return ps.sideDeck || (ps.sideDeck = []);   // W85d (Atta löscht aus dem Side Deck statt Hand-Zugang)
     return null;
   }
 
@@ -23389,7 +23390,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!_loeschPs.deletedPile) _loeschPs.deletedPile = [];
     _loeschPs.deletedPile.push(taken.name);
     this._trackCard(taken.name, _loeschIdx >= 0 ? _loeschIdx : pi, ZONES.DELETED);
-    this._pileFlight(pi, taken.name, pile, 'deleted', handIdx >= 0
+    this._pileFlight(pi, taken.name, pile === 'sideDeck' ? 'boardCenter' : pile, 'deleted', handIdx >= 0
       ? { fromHandIdx: handIdx, ...(_loeschIdx >= 0 && _loeschIdx !== pi ? { fromOwner: pi, toOwner: _loeschIdx } : {}) } : {});
     this.log('card_deleted', { player: ps.username, card: taken.name, from: pile, by: opts.source || null });
     this.sync();

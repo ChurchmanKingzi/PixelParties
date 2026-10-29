@@ -13,7 +13,7 @@
 //    ABILITY (Premonition, Inventing, Navigation …) meldet die Engine gar nicht erst. Quellen: Such-Fenster (`deckSearchReveal`), `revealToOpponent`, Deck-Aufdecker (`_deck-top-shared`)
 //    und Tutoren, die ihr Aufdecken VOR dem Verschieben melden (`engine.aufdeckEreignis`, Welle 85c; Tabelle in CARD_API.md). „Löschen STATT auf die Hand" (Al 29.10.): bei diesen Wegen löscht Atta
 //    die Karte, solange sie noch im Deck liegt — sie kommt nie auf die Hand (keine Hand-Zugangs-Wirkungen), der Hook füllt dafür `ctx.geloescht`. Die übrigen Wege (Deck-Aufdecker, deren Spell
-//    im Deck bleibt; Potion/Side Deck) werten weiter NACH der Wirkung aus. Selbst-entsorgende Aufdecker (Chaos Magic, Third Circle, Heart of Cards/Oracle bei Fehlschlag …) lösen Atta nicht aus.
+//    im Deck bleibt) werten weiter NACH der Wirkung aus. Potion Deck und Side Deck zählen als „your deck“ (W85d, `ctx.zone` 'potionDeck'/'sideDeck'). Selbst-entsorgende Aufdecker (Chaos Magic, Third Circle, Heart of Cards/Oracle bei Fehlschlag …) lösen Atta nicht aus.
 //  • Verzoegertes Wirken: gemeinsamer Baustein mit Ghostly Warning (`_verzoegert-zauber-shared.js`) — Pflicht, ohne Stufen-/Status-/Wisdom-Pruefung.
 //  • Loeschen statt Ablage: Hero-Flag `deletesOwnSpellsInsteadOfDiscard`, gelesen von `engine.spellGoesToDeletedInstead` (doPlaySpell, Sofort-Guesse,
 //    Reaktionsketten).
@@ -67,8 +67,9 @@ module.exports = {
       // „Once per turn"
       if (!heldenSperreFrei(gs, HOPT, pi)) return;
       // Wo liegt die Karte jetzt? (Suchergebnis: auf der Hand; oberste Deckkarte: im Deck.)
-      const liegt = (zone) => zone === 'hand' ? (ps.hand || []).includes(name) : (ps.mainDeck || []).includes(name);
-      const reihenfolge = ctx.zone === 'deck' ? ['deck', 'hand'] : ['hand', 'deck'];
+      const liegt = (zone) => zone === 'hand' ? (ps.hand || []).includes(name) : zone === 'potionDeck' ? (ps.potionDeck || []).includes(name) : zone === 'sideDeck' ? (ps.sideDeck || []).includes(name) : (ps.mainDeck || []).includes(name);
+      // W85d (Al): Potion Deck und Side Deck zählen als „your deck" — dort aufgedeckt, wird dort gelöscht (vor dem Hand-Zugang).
+      const reihenfolge = (ctx.zone === 'potionDeck' || ctx.zone === 'sideDeck') ? [ctx.zone] : ctx.zone === 'deck' ? ['deck', 'hand'] : ['hand', 'deck'];
       const wo = reihenfolge.find(liegt) || null;
       if (!wo) return;
 
