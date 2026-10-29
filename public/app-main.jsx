@@ -3287,18 +3287,7 @@ function RotateOverlay() {
     window._ppTapStarted = true; setTapped(true);
     window._ppRequestFullscreen(true).then(r => { if (!r.locked) setFailed(true); });
   };
-  // Kamerafahrt: die 1920x1080-Buehne des Titelbilds so skalieren, dass sie das Fenster deckt (`--rs`); `--ramp` = wie weit
-  // die Fahrt seitlich ausholen darf, ohne den Buehnenrand zu zeigen.
-  useLayoutEffect(() => {
-    const fit = () => {
-      const el = camRef.current; if (!el) return;
-      const w = window.innerWidth, h = window.innerHeight, k = Math.max(w / 1920, h / 1080);
-      el.style.setProperty('--rs', k.toFixed(4));
-      el.style.setProperty('--ramp', Math.max(0, Math.floor((1920 - w / k) / 2 - 40)));
-    };
-    fit(); window.addEventListener('resize', fit); window.addEventListener('orientationchange', fit);
-    return () => { window.removeEventListener('resize', fit); window.removeEventListener('orientationchange', fit); };
-  }, []);
+
   const copyLink = () => {
     const url = window.location.origin;
     const done = () => { setCopied(true); setTimeout(() => setCopied(false), 2200); };
@@ -3313,16 +3302,7 @@ function RotateOverlay() {
   };
   return (
     <div className={'rotate-device-overlay' + (gate ? ' rotate-gate' : '')} id="rotate-overlay" onClick={enter}>
-      <div className="rotate-cam" ref={camRef} aria-hidden="true">
-        <div className="rotate-cam-scale">
-          <div className="rotate-cam-move">
-            <div className="anim-stage-host">
-              <AnimatedTitleBackdrop />
-              <AnimatedTitleCatsOverlay />
-            </div>
-          </div>
-        </div>
-      </div>
+      <div className="rotate-cam" ref={camRef} aria-hidden="true"><TapBackdropCanvas hostRef={camRef} /></div>
       <div className="rotate-content">
         <div className="pp-logo-stack rotate-logo">
           <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />

@@ -16322,17 +16322,8 @@ body:has(.textbox-overlay) .tooltip {
 /* Kamerafahrt ueber das animierte Titelbild (gleiche Buehne, gleiche Effekte wie der Titelbildschirm): die 1920x1080-Kulisse
    wird per --rs aufs Fenster skaliert; --abw/--abh machen aus den Fensterprozenten der Kulisse Buehnenpixel. */
 .rotate-device-overlay .rotate-cam { position: absolute; inset: 0; overflow: hidden; background: #12101f; }
-.rotate-device-overlay .rotate-cam-scale {
-  position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; margin: -540px 0 0 -960px;
-  transform: scale(var(--rs, 0.5)); transform-origin: 50% 50%;
-}
-.rotate-device-overlay .rotate-cam-move { position: absolute; inset: 0; animation: rotCam 80s ease-in-out infinite; will-change: transform; }
-.rotate-device-overlay .anim-stage-host { position: absolute; inset: 0; width: 1920px; height: 1080px; --abw: 19.2px; --abh: 10.8px; }
-.rotate-device-overlay .anim-stage-host .anim-backdrop { zoom: 1; }
-@keyframes rotCam {
-  0%, 100% { transform: translate(calc(var(--ramp, 0) * 1px), -14px) scale(1.12); }
-  50% { transform: translate(calc(var(--ramp, 0) * -1px), 14px) scale(1.0); }
-}
+.rotate-device-overlay .rotate-cam::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 46%, transparent 40%, rgba(8,6,12,.55) 100%); }
+.rotate-device-overlay .tap-backdrop-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .rotate-device-overlay.rotate-gate { display: flex !important; }
 .rotate-device-overlay .rotate-content {
   position: relative;
@@ -16432,6 +16423,15 @@ body:has(.textbox-overlay) .tooltip {
   .rotate-device-overlay .rotate-panel-pc { display: none; }
 }
 }
+
+/* Solange der Tap-/Dreh-Bildschirm steht, laufen die Animationen der Bildschirme dahinter (Login-Kulisse mit 46 Glutpunkten,
+   150 Logo-Partikeln, Blitzen ...) unsichtbar weiter und kosten auf dem Handy Takt. Hier angehalten. */
+@media (orientation: portrait) and (max-width: 900px) {
+  .screen-full *, .screen-center *, .pp-bg-particles * { animation: none !important; }
+}
+body:has(.rotate-device-overlay.rotate-gate) .screen-full *,
+body:has(.rotate-device-overlay.rotate-gate) .screen-center *,
+body:has(.rotate-device-overlay.rotate-gate) .pp-bg-particles * { animation: none !important; }
 
 /* Show overlay + hide ALL screens in portrait on small devices */
 @media (orientation: portrait) and (max-width: 900px) {
