@@ -16390,6 +16390,7 @@ body:has(.textbox-overlay) .tooltip {
 
 .rotate-device-overlay .rotate-tap-text { font-size: 18px; letter-spacing: 2px; animation: rotTapBlink 1.2s steps(1, end) infinite; }
 @keyframes rotTapBlink { 0% { color: var(--accent); } 50% { color: #ffe23d; } }
+.rotate-device-overlay .rotate-diag { font-size: 8px; color: var(--text2); }
 .ios-fs-hint {
   position: fixed;
   left: 50%;

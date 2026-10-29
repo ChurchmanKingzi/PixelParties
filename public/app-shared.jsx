@@ -85,7 +85,10 @@ function _ppRequestFullscreen(force) {
   };
   try {
     const r = req.call(el, { navigationUI: 'hide' });
-    _ppFsPending = Promise.resolve(r).then(() => lock()).then(locked => ({ fs: isFs(), locked }), () => ({ fs: false, locked: false }));
+    window._ppFsLast = null;
+    _ppFsPending = Promise.resolve(r).then(() => lock()).then(
+      locked => { window._ppFsLast = { fs: isFs(), locked, err: locked ? null : 'orientation.lock refused' }; return { fs: isFs(), locked }; },
+      err => { window._ppFsLast = { fs: false, locked: false, err: (err && (err.name || err.message)) || 'rejected' }; return { fs: false, locked: false }; });
   } catch { return Promise.resolve({ fs: false, locked: false }); }
   _ppFsPending.then(() => { _ppFsPending = null; });
   return _ppFsPending;
@@ -93,13 +96,15 @@ function _ppRequestFullscreen(force) {
 window._ppRequestFullscreen = _ppRequestFullscreen;
 window._ppFullscreenSupported = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
 window._ppLandscapeLockSupported = _ppLockSupported();
-// Jede Beruehrung (Antippen) holt das Vollbild, solange es nicht aktiv ist — im Querformat direkt, im Hochformat samt
+// Ausloeser ist `click`, NICHT touchend/pointerup: nur `click` (und tastatur/maus) gilt auf Android-Browsern zuverlaessig als
+// Nutzeraktivierung fuer requestFullscreen — der Knopf-Klick des Vorgaengers (React onClick) hat auf dem Samsung-Handy Vollbild
+// + Querformat geschafft, der Griff auf touchend/pointerup dagegen nicht.
+// Jedes Antippen holt das Vollbild, solange es nicht aktiv ist — im Querformat direkt, im Hochformat samt
 // Querformat-Sperre (das Geraet dreht sich dann von selbst; nur wo `screen.orientation.lock` existiert). Dauerhaft angehaengt:
 // frueher war der Griff einmalig — eine erste Beruehrung im Hochformat verbrauchte ihn, danach kam das Vollbild nie
 // mehr von allein. Nach einem Verlassen (Zurueck-Geste) ruht er 1,5 s.
 let _ppFsCooldownUntil = 0;
 function _ppFullscreenOnTap(e) {
-  if (e.type === 'pointerup' && e.pointerType !== 'touch') return;
   if (!window.matchMedia || !window.matchMedia('(pointer: coarse)').matches) return;   // Touch-Notebooks/Maus: kein Zwangs-Vollbild
   window._isTouchDevice = true;
   if (e.target && e.target.closest && e.target.closest('.rotate-panel-pc')) return;   // Link kopieren / Discord auf dem Hochformat-Bildschirm
@@ -108,8 +113,7 @@ function _ppFullscreenOnTap(e) {
   if (portrait && !(window._ppFullscreenSupported && window._ppLandscapeLockSupported)) return;   // ohne Sperre hilft Vollbild im Hochformat nicht
   _ppRequestFullscreen(portrait);
 }
-window.addEventListener('touchend', _ppFullscreenOnTap, { passive: true, capture: true });
-window.addEventListener('pointerup', _ppFullscreenOnTap, { passive: true, capture: true });
+window.addEventListener('click', _ppFullscreenOnTap, { capture: true });
 const _ppOnFullscreenChange = () => { if (!document.fullscreenElement && !document.webkitFullscreenElement) _ppFsCooldownUntil = Date.now() + 1500; };
 document.addEventListener('fullscreenchange', _ppOnFullscreenChange);
 document.addEventListener('webkitfullscreenchange', _ppOnFullscreenChange);
