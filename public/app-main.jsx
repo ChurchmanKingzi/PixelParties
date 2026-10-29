@@ -2881,24 +2881,6 @@ class GameErrorBoundary extends React.Component {
   }
 }
 
-// ★ Hinweis am Desktop: Browser spielen Ton erst nach einer Geste (Klick/Taste) — „Lädt man das Spiel, ist erst keine Musik da". Das laesst sich
-// nicht umgehen, nur kurz erklaeren: ein dezenter, blinkender Hinweis unten, bis der Ton laeuft (jede Geste startet ihn). Am Handy macht das
-// Tap-to-Play-Bild diese Aufgabe, dort kein Hinweis.
-function AudioHinweis() {
-  const [zeigen, setZeigen] = useState(false);
-  useEffect(() => {
-    if (window._isTouchDevice || (window.ppAudioLaeuft && window.ppAudioLaeuft())) return undefined;
-    const t = setTimeout(() => {
-      if (!window._isTouchDevice && !(window.ppAudioLaeuft && window.ppAudioLaeuft())) setZeigen(true);
-    }, 900);
-    const weg = () => { clearTimeout(t); setZeigen(false); };
-    window.addEventListener('pp-audio-running', weg);
-    return () => { clearTimeout(t); window.removeEventListener('pp-audio-running', weg); };
-  }, []);
-  if (!zeigen) return null;
-  return <div className="audio-hinweis orbit-font" aria-hidden="true">CLICK ANYWHERE FOR MUSIC</div>;
-}
-
 function MusicManager({ bgmMode }) {
   const unlocked = useRef(false);
   const currentTrack = useRef(null); // 'menu' | 'battle' | 'battle:<slug>' | 'puzzle'
@@ -3623,7 +3605,6 @@ function App() {
       <RotateOverlay />
       <IosFullscreenHint />
       <MusicManager bgmMode={user ? bgmMode : 'login'} />
-      <AudioHinweis />
       <TextBox />
       <OpponentUnlockPopup />
       {/* Who's Online / private Chats / Herausforderungen (app-social.jsx) */}
