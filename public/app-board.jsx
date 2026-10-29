@@ -37214,16 +37214,13 @@ function OptionPickerDropdown({ ep, respondToPrompt }) {
   };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <select value={selectedId} onChange={e => setSelectedId(e.target.value)} autoFocus
+      <PPDropdown value={selectedId} onChange={setSelectedId} className=""
         style={{
           width: '100%', padding: '8px 12px', fontSize: 13,
           background: 'var(--bg2)', border: '1px solid var(--accent)', borderRadius: 6,
           color: 'var(--text1)', outline: 'none', boxSizing: 'border-box', cursor: 'pointer',
-        }}>
-        {options.map(opt => (
-          <option key={opt.id} value={opt.id}>{opt.label}</option>
-        ))}
-      </select>
+        }}
+        options={options.map(opt => ({ value: opt.id, label: opt.label }))} />
       <div style={{ display: 'flex', gap: 8 }}>
         <button className="btn" style={{ flex: 1, padding: '10px 18px', fontSize: 12, borderColor: 'var(--accent)', color: 'var(--accent)' }}
           onClick={confirm}>{ep.confirmLabel || 'Confirm'}</button>
@@ -64326,15 +64323,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {!isSpectator && ((decks && decks.length > 0) || (sampleDecks || []).some(d => isDeckLegal(d).legal)) && (
               <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
                 <label style={{ fontSize: 14, color: 'var(--text2)', fontWeight: 600 }}>🃏 Deck:</label>
-                <select className="select" value={selectedDeck || ''} onChange={e => {
-                  const id = e.target.value;
+                {/* Eigenes Dropdown statt `<select>` (Android: das System-Auswahlfenster holt im Vollbild die Systemleiste; Pixel-Emoji). */}
+                <PPDropdown value={selectedDeck || ''} onChange={id => {
                   setSelectedDeck(id);
                   socket.emit('change_deck', { roomId: gameState.roomId, deckId: id });
-                }} style={{ fontSize: 14, minWidth: 240, padding: '8px 14px', borderColor: 'var(--accent)', color: 'var(--text)' }}>
-                  {(decks||[]).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  {(sampleDecks||[]).filter(d => isDeckLegal(d).legal).length > 0 && <option disabled>── Sample Decks ──</option>}
-                  {(sampleDecks||[]).filter(d => isDeckLegal(d).legal).map(d => <option key={d.id} value={d.id}>📋 {d.name}</option>)}
-                </select>
+                }} style={{ fontSize: 14, minWidth: 240, padding: '8px 14px', borderColor: 'var(--accent)', color: 'var(--text)' }}
+                  options={[
+                    ...(decks || []).map(d => ({ value: d.id, label: d.name })),
+                    ...((sampleDecks || []).filter(d => isDeckLegal(d).legal).length > 0 ? [{ value: '__sample_kopf', disabled: true, label: '── Sample Decks ──' }] : []),
+                    ...(sampleDecks || []).filter(d => isDeckLegal(d).legal).map(d => ({ value: d.id, label: '📋 ' + d.name })),
+                  ]} />
               </div>
             )}
             <div className="ergebnis-knoepfe" style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
@@ -64478,15 +64476,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {!stRes && !isSpectator && ((decks && decks.length > 0) || (sampleDecks || []).some(d => isDeckLegal(d).legal)) && (
               <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
                 <label style={{ fontSize: 14, color: 'var(--text2)', fontWeight: 600 }}>🃏 Deck:</label>
-                <select className="select" value={selectedDeck || ''} onChange={e => {
-                  const id = e.target.value;
+                {/* Eigenes Dropdown statt `<select>` (Android: das System-Auswahlfenster holt im Vollbild die Systemleiste; Pixel-Emoji). */}
+                <PPDropdown value={selectedDeck || ''} onChange={id => {
                   setSelectedDeck(id);
                   socket.emit('change_deck', { roomId: gameState.roomId, deckId: id });
-                }} style={{ fontSize: 14, minWidth: 240, padding: '8px 14px', borderColor: 'var(--accent)', color: 'var(--text)' }}>
-                  {(decks||[]).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  {(sampleDecks||[]).filter(d => isDeckLegal(d).legal).length > 0 && <option disabled>── Sample Decks ──</option>}
-                  {(sampleDecks||[]).filter(d => isDeckLegal(d).legal).map(d => <option key={d.id} value={d.id}>📋 {d.name}</option>)}
-                </select>
+                }} style={{ fontSize: 14, minWidth: 240, padding: '8px 14px', borderColor: 'var(--accent)', color: 'var(--text)' }}
+                  options={[
+                    ...(decks || []).map(d => ({ value: d.id, label: d.name })),
+                    ...((sampleDecks || []).filter(d => isDeckLegal(d).legal).length > 0 ? [{ value: '__sample_kopf', disabled: true, label: '── Sample Decks ──' }] : []),
+                    ...(sampleDecks || []).filter(d => isDeckLegal(d).legal).map(d => ({ value: d.id, label: '📋 ' + d.name })),
+                  ]} />
               </div>
             )}
             {/* ★ v1472 (Als Befund 28.9.: „Sind die Buttons für ‚Rematch‘

@@ -5439,6 +5439,17 @@ function SingleplayerScreen() {
     setTimeout(() => setStarting(false), 3000);
   }, [personalDecks, sampleDecks, selectedDeck, starting, notify]);
 
+  // ★ Frisch freigeschaltetes Deck SOFORT waehlbar (Befund: im Victory-Screen fehlte es in der Deckauswahl): schaltet ein Sieg einen Gegner frei und schenkt dem Gast
+  // dessen Deck (`deckAdded`), laedt die Liste der eigenen Decks neu — der Victory-Screen bekommt sie als `sampleDecks`.
+  useEffect(() => {
+    const onUnlocked = async (data) => {
+      if (!data || !(data.opponents || []).some(o => o && o.deckAdded)) return;
+      try { const r = await api('/sample-decks/owned'); if (r && r.decks) setSampleDecks(r.decks); } catch (e) { /* bleibt die alte Liste */ }
+    };
+    socket.on('opponents_unlocked', onUnlocked);
+    return () => socket.off('opponents_unlocked', onUnlocked);
+  }, []);
+
   // ★ DECK VORLADEN (Befund: Starthand und Mulligan ruckeln auf dem Handy): Beim Ziehen werden die Kartenbilder erst gezeichnet (Canvas, mehrere
   // Karten gleichzeitig) — Zeit, die das Ziehen kostet. Darum werden die Karten des GEWAEHLTEN Decks sowie die Figuren seiner Helden schon hier im
   // Leerlauf bereitgelegt (gerendert, im dauerhaften Cache gespeichert, dekodiert); beim Spielstart sind sie nur noch ein Speicher-Treffer.
