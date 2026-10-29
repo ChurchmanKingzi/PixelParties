@@ -188,10 +188,18 @@ if (typeof document !== 'undefined' && !window._ppHandTippAktiv_installiert) {
     start = t ? { x: t.clientX, y: t.clientY, at: performance.now(), el, kartenEl: e.target && e.target.closest && e.target.closest('.board-card'), lang: false } : null;
     if (start && start.kartenEl && start.kartenEl._ppTip) {
       const s1 = start;
-      setTimeout(() => { if (start === s1) s1.lang = true; }, window.LONG_PRESS_MS || 400);
+      setTimeout(() => {
+        if (start !== s1) return;
+        s1.lang = true;
+        // Langdruck auf einer HANDkarte: ihr Tooltip (die Hand faengt die Beruehrung ab, `BoardCard.onTouchStart` bekommt sie nie) — nur ohne Zug/Wisch.
+        if (s1.el && !s1.bewegt && !window.activeDragData && !_isDraggingCard && s1.el._ppTip) { aktiv = s1.el; setBoardTooltip(s1.el._ppTip); }
+      }, window.LONG_PRESS_MS || 400);
     }
-    // Tipp ausserhalb der gezeigten Karte: Tooltip weg
-    if (aktiv && (!el || el !== aktiv)) { aktiv = null; window._boardTooltipSetter?.(null); }
+    // (Der Tooltip bleibt jetzt stehen, bis man ins Leere tippt — der Tipp-Waechter in app-shared schliesst ihn.)
+  }, { capture: true, passive: true });
+  document.addEventListener('touchmove', (e) => {
+    const t = e.touches && e.touches[0];
+    if (start && t && Math.abs(t.clientX - start.x) + Math.abs(t.clientY - start.y) > 12) start.bewegt = true;
   }, { capture: true, passive: true });
   document.addEventListener('touchend', (e) => {
     const s0 = start; start = null;
@@ -2124,10 +2132,14 @@ function ppPlatzierungsKamera() {
     if (window._touchActive || window.activeDragData) return;
     const sc = document.querySelector('.board-center');
     if (!sc) return;
-    const els = Array.from(sc.querySelectorAll('[data-support-zone].zone-pick-target, [data-support-zone].zone-bounce-place-target'));
+    // Support-Zonen-Wahl (Pollution Tokens …) UND „waehle einen Nutzer": sind meine Helden als Ziel markiert (Spell/Attack/Creature per Tipp, mehrere moegliche Wirker),
+    // fahren die Kamera zu ihnen.
+    const els = Array.from(sc.querySelectorAll('[data-support-zone].zone-pick-target, [data-support-zone].zone-bounce-place-target, [data-hero-zone][data-hero-owner="me"].board-zone-play-target, [data-hero-zone][data-hero-owner="me"].attach-pick-target'));
     if (!els.length) { _ppPlatzSchluessel = ''; return; }
     if (document.querySelector('.textbox-overlay')) return;   // im Tutorial hat die Textbox-Kamera Vorrang
-    const schluessel = els.map(e => (e.getAttribute('data-support-owner') || '?') + ':' + e.getAttribute('data-support-hero') + ':' + e.getAttribute('data-support-slot')).join('|');
+    const schluessel = els.map(e => e.hasAttribute('data-hero-zone')
+      ? 'h:' + e.getAttribute('data-hero-idx')
+      : (e.getAttribute('data-support-owner') || '?') + ':' + e.getAttribute('data-support-hero') + ':' + e.getAttribute('data-support-slot')).join('|');
     if (schluessel === _ppPlatzSchluessel) return;
     _ppPlatzSchluessel = schluessel;
     ppTutorialCamFokus(els, { nurFehlende: true });
@@ -3605,7 +3617,10 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
           platz.style.display = 'none';
         }
       }
-      const hover = !!(l && zone.classList.contains('zone-has-card') && zone.matches(':hover')
+      // ★ Touch (Befund: „die eigenen Helden verschwinden in ihren Karten, bis ich irgendwo hintippe"): nach einem Tipp bleibt `:hover` am angetippten
+      // Element haengen (Phasenleiste, Heldenkarte) — das Einfahren der Figur gilt nur fuer eine echte Maus.
+      const beruehrung = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+      const hover = !beruehrung && !!(l && zone.classList.contains('zone-has-card') && zone.matches(':hover')
         && !l.plane.hasAttribute('data-pp-dragging'));
       // v1463 (Dynamic Heroes): während eines Zielwahl-Dialogs klappt die
       // Figur ein wie beim Hover — aber ohne die Hover-Vergrößerung, die
@@ -3617,7 +3632,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       // Phasenleiste unter dem Zeiger UND diese Figur ragt darueber: einfahren. Verglichen wird mit dem Kasten des `Stehers` — er
       // bleibt beim Einfahren stehen (die Bewegung steckt in `.hero-idle-holo`), damit die Antwort nicht hin- und herspringt.
       let phasenHover = false;
-      if (l && !l.plane.hasAttribute('data-pp-dragging')) {
+      if (!beruehrung && l && !l.plane.hasAttribute('data-pp-dragging')) {
         const leiste = document.querySelector('.phase-column');
         if (leiste && leiste.matches(':hover')) {
           const steher = platz.querySelector('.hero-idle-steher');
@@ -37202,16 +37217,13 @@ function OptionPickerDropdown({ ep, respondToPrompt }) {
   };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <select value={selectedId} onChange={e => setSelectedId(e.target.value)} autoFocus
+      <PPDropdown value={selectedId} onChange={setSelectedId} className=""
         style={{
           width: '100%', padding: '8px 12px', fontSize: 13,
           background: 'var(--bg2)', border: '1px solid var(--accent)', borderRadius: 6,
           color: 'var(--text1)', outline: 'none', boxSizing: 'border-box', cursor: 'pointer',
-        }}>
-        {options.map(opt => (
-          <option key={opt.id} value={opt.id}>{opt.label}</option>
-        ))}
-      </select>
+        }}
+        options={options.map(opt => ({ value: opt.id, label: opt.label }))} />
       <div style={{ display: 'flex', gap: 8 }}>
         <button className="btn" style={{ flex: 1, padding: '10px 18px', fontSize: 12, borderColor: 'var(--accent)', color: 'var(--accent)' }}
           onClick={confirm}>{ep.confirmLabel || 'Confirm'}</button>
@@ -45621,6 +45633,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // (Phase schon erreicht), wird still verworfen — und der Verwerfungs-
   // Waechter meldet es nach 2 s als Fehler, obwohl alles geklappt hat.
   // Derselbe Wunsch innerhalb von 1 s wird deshalb gar nicht erst gesendet.
+  // ★ Mobil: Oeffnet sich ein Untermenue (Kartenauswahl wie bei Magic Lamp, Zielwahl, Bestaetigung, Heldenwahl …), verschwindet der festgehaltene Karten-Tooltip.
+  // Er bleibt sonst bis zum Tipp ins Leere stehen und verdeckt das neue Fenster. Tooltips, die der Spieler IM Fenster oeffnet, entstehen danach und bleiben.
+  const dialogSchluessel = [
+    gameState.effectPrompt ? (gameState.effectPrompt.promptId != null ? gameState.effectPrompt.promptId : gameState.effectPrompt.type) : '',
+    gameState.potionTargeting ? 'pt' : '', gameState.mulliganPending ? 'mu' : '', showSurrender ? 'su' : '', showEndTurnConfirm ? 'et' : '',
+    spellHeroPick ? 'sh' : '', pendingAbilityActivation ? 'pa' : '', summonerPick ? 'sm' : '', abilityAttachPick ? 'aa' : '', pendingBouncePick ? 'bp' : '', crossSidePlayPick ? 'cs' : '',
+  ].join('|');
+  useEffect(() => { if (window._isTouchDevice && window._ppTipSchliessen) window._ppTipSchliessen(); }, [dialogSchluessel]);
+
   const letzterPhasenWunsch = useRef({ ziel: -1, zeit: 0 });
   const phasenWunschDoppelt = (ziel) => {
     const jetzt = Date.now();
@@ -64046,7 +64067,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         return (
           <div className="modal-overlay" style={{ zIndex: 10070, background: 'rgba(0,0,0,.55)' }}
             onClick={() => respondToPrompt({ confirmed: true })}>
-            <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }} onClick={e => e.stopPropagation()}>
+            <div className="animate-in pp-aufdeck-fenster" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
               <div className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', textShadow: '0 2px 8px rgba(0,0,0,.8)' }}>
                 {ep.title || 'Card Searched'}
               </div>
@@ -64057,7 +64078,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     boxShadow: '0 0 50px rgba(0,0,0,.9), 0 0 100px rgba(255,255,255,.08)',
                     borderRadius: 8,
                   }}>
-                    <BoardCard cardName={cn} style={{ width: 220, height: 308, borderRadius: 8 }} />
+                    <div className="pp-aufdeck-karte" style={{ width: 220, height: 308 }}><BoardCard cardName={cn} style={{ width: '100%', height: '100%', borderRadius: 8 }} /></div>
                   </div>
                 ))}
               </div>
@@ -64314,15 +64335,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {!isSpectator && ((decks && decks.length > 0) || (sampleDecks || []).some(d => isDeckLegal(d).legal)) && (
               <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
                 <label style={{ fontSize: 14, color: 'var(--text2)', fontWeight: 600 }}>🃏 Deck:</label>
-                <select className="select" value={selectedDeck || ''} onChange={e => {
-                  const id = e.target.value;
+                {/* Eigenes Dropdown statt `<select>` (Android: das System-Auswahlfenster holt im Vollbild die Systemleiste; Pixel-Emoji). */}
+                <PPDropdown value={selectedDeck || ''} onChange={id => {
                   setSelectedDeck(id);
                   socket.emit('change_deck', { roomId: gameState.roomId, deckId: id });
-                }} style={{ fontSize: 14, minWidth: 240, padding: '8px 14px', borderColor: 'var(--accent)', color: 'var(--text)' }}>
-                  {(decks||[]).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  {(sampleDecks||[]).filter(d => isDeckLegal(d).legal).length > 0 && <option disabled>── Sample Decks ──</option>}
-                  {(sampleDecks||[]).filter(d => isDeckLegal(d).legal).map(d => <option key={d.id} value={d.id}>📋 {d.name}</option>)}
-                </select>
+                }} style={{ fontSize: 14, minWidth: 240, padding: '8px 14px', borderColor: 'var(--accent)', color: 'var(--text)' }}
+                  options={[
+                    ...(decks || []).map(d => ({ value: d.id, label: d.name })),
+                    ...((sampleDecks || []).filter(d => isDeckLegal(d).legal).length > 0 ? [{ value: '__sample_kopf', disabled: true, label: '── Sample Decks ──' }] : []),
+                    ...(sampleDecks || []).filter(d => isDeckLegal(d).legal).map(d => ({ value: d.id, label: '📋 ' + d.name })),
+                  ]} />
               </div>
             )}
             <div className="ergebnis-knoepfe" style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
@@ -64466,15 +64488,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {!stRes && !isSpectator && ((decks && decks.length > 0) || (sampleDecks || []).some(d => isDeckLegal(d).legal)) && (
               <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
                 <label style={{ fontSize: 14, color: 'var(--text2)', fontWeight: 600 }}>🃏 Deck:</label>
-                <select className="select" value={selectedDeck || ''} onChange={e => {
-                  const id = e.target.value;
+                {/* Eigenes Dropdown statt `<select>` (Android: das System-Auswahlfenster holt im Vollbild die Systemleiste; Pixel-Emoji). */}
+                <PPDropdown value={selectedDeck || ''} onChange={id => {
                   setSelectedDeck(id);
                   socket.emit('change_deck', { roomId: gameState.roomId, deckId: id });
-                }} style={{ fontSize: 14, minWidth: 240, padding: '8px 14px', borderColor: 'var(--accent)', color: 'var(--text)' }}>
-                  {(decks||[]).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  {(sampleDecks||[]).filter(d => isDeckLegal(d).legal).length > 0 && <option disabled>── Sample Decks ──</option>}
-                  {(sampleDecks||[]).filter(d => isDeckLegal(d).legal).map(d => <option key={d.id} value={d.id}>📋 {d.name}</option>)}
-                </select>
+                }} style={{ fontSize: 14, minWidth: 240, padding: '8px 14px', borderColor: 'var(--accent)', color: 'var(--text)' }}
+                  options={[
+                    ...(decks || []).map(d => ({ value: d.id, label: d.name })),
+                    ...((sampleDecks || []).filter(d => isDeckLegal(d).legal).length > 0 ? [{ value: '__sample_kopf', disabled: true, label: '── Sample Decks ──' }] : []),
+                    ...(sampleDecks || []).filter(d => isDeckLegal(d).legal).map(d => ({ value: d.id, label: '📋 ' + d.name })),
+                  ]} />
               </div>
             )}
             {/* ★ v1472 (Als Befund 28.9.: „Sind die Buttons für ‚Rematch‘

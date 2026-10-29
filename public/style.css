@@ -27214,9 +27214,18 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
    keine Heldenzone mehr; die Area-Zonen (an derselben Naht aufgehaengt) werden nur in einem schmalen Band gekreuzt. */
 @media (pointer: coarse) and (max-height: 600px) {
   .board-mid-row { min-height: 44px !important; }
+  /* Rundenzahl: wieder exakt mittig zwischen den beiden Gelöscht-Stapeln (die Phasenleiste liegt nicht mehr in dieser Spalte, der frühere Ausweich nach oben entfällt). */
+  .board-round-counter { top: 50% !important; bottom: auto !important; transform: translate(-50%, -50%) !important; }
   /* Die Spalte liegt (Portal) IM scrollenden `.board-center` und scrollt damit nativ; `--phase-mid-y` ist die Mitte in Inhaltskoordinaten. */
   .board-center > .phase-column { position: absolute; }
   .phase-column { zoom: 1 !important; left: 50% !important; top: var(--phase-mid-y, 50%) !important; transform: translate(-50%, -50%) !important;
     flex-direction: row !important; align-items: center !important; gap: 4px; width: auto; }
   .phase-buttons-row { margin-top: 0 !important; }
+}
+
+/* Aufdeck-Fenster „Gegner hat die Karte gesucht" (deckSearchReveal): auf niedrigen Bildschirmen (Handy quer) passt die 308-px-Karte samt Text und OK-Knopf nicht
+   ins Bild — der Knopf lag unterhalb des Schirms, das Spiel wartete scheinbar endlos. Karte kleiner, Abstaende enger; ein Tipp irgendwo schliesst es. */
+@media (max-height: 600px) {
+  .pp-aufdeck-fenster { gap: 6px !important; max-height: 96vh; }
+  .pp-aufdeck-karte { width: calc(min(52vh, 308px) * 220 / 308) !important; height: min(52vh, 308px) !important; }
 }

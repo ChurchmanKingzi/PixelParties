@@ -89,6 +89,8 @@ function setupAdditionalAction(engine, pi, heroIdx, feld = pi) {
     allowedCategories: ['spell'],
     heroRestricted: true,
     // Al 27.10.: ein Support Spell setzt STANDARDMÄSSIG die Friendship-Zusatzaktion ein (sonst verfiele sie ungenutzt) und lässt die normale Aktion frei.
+    // Al 29.10.: NICHT bei einer Karte, die inhärent eine Zusatzaktion ist (z. B. Overheal Shock mit Support Magic Lv 2) — sie kostet ohnehin keine Aktion;
+    // dann bleibt Friendships Zusatzaktion unberührt und der Rider (Ziehen ab Lv 2) feuert nicht (Entscheidung in server.js `doPlaySpell`: `matchedPrefersAddl`).
     preferOverMainAction: true,
     filter: buildFilter(engine, pi, heroIdx, feld),
   });

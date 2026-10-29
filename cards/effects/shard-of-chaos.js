@@ -14,6 +14,12 @@
 //  Kartentext in `data/cards.json` nennt jetzt „Attack/Spell/Creature".
 //  Welle 12 (Q97, Al: „Nicht spielbar."): unter der harten Ablage-
 //  Ausgangssperre (Stäbe) ist die Karte nicht spielbar (`canActivate`).
+//
+//  Al 29.10.: Gelöscht werden BIS ZU 3 Karten — aber danach muss man EXAKT so viele Karten
+//  aus der Ablage wählen, wie man gelöscht hat (je Typ; die Handwahl begrenzt die Zahl je
+//  Typ auf das, was die Ablage hergibt, es gibt also immer genug). Die Rückholwahl war eine
+//  Einzelwahl (`cardGallery`: ein Klick beendet sie, `selectCount` wurde nicht beachtet); jetzt
+//  `cardGalleryMulti` mit `minSelect = selectCount`, jede Kopie ein eigener Eintrag.
 // ═══════════════════════════════════════════
 
 const { getCardDB } = require('./_card-db');
@@ -188,7 +194,19 @@ module.exports = {
       if (actualCount <= 0) continue;
 
       const typeLabel = normType === 'Action' ? 'Attack/Spell/Creature' : normType;
-      const galleryResult = await engine.promptGeneric(pi, {
+      // Genau so viele wie gelöscht (Al 29.10.). Eine Karte: Einzelwahl (ein Klick wählt). Mehrere: Mehrfachwahl mit Mindestzahl = Zahl der
+      // gelöschten Karten; jede Kopie ist ein eigener Eintrag (die Wahl läuft nach Index, gleichnamige Karten lassen sich einzeln wählen).
+      const mehrfach = actualCount > 1;
+      const galleryResult = await engine.promptGeneric(pi, mehrfach ? {
+        type: 'cardGalleryMulti',
+        searchToHand: true, searchPile: 'discard',   // v1121
+        cards: available.map(({ name, source, displayLabel }) => ({ name, source, displayLabel })),
+        title: `Shard of Chaos — Retrieve ${typeLabel}`,
+        description: `Choose ${actualCount} ${typeLabel} card(s) from your discard pile.`,
+        selectCount: actualCount,
+        minSelect: actualCount,
+        cancellable: false,
+      } : {
         type: 'cardGallery',
         searchToHand: true, searchPile: 'discard',   // v1121
         cards: deduped,
@@ -198,12 +216,27 @@ module.exports = {
         cancellable: false,
       });
 
-      if (galleryResult && galleryResult.cardName) {
-        retrievedCards.push(galleryResult.cardName);
+      // Antwort auf die verlangte Zahl bringen: nur Namen, die die Ablage (noch) hergibt, höchstens `actualCount`; fehlt etwas (Automat/CPU
+      // wählt zu wenig), mit den stärksten übrigen Karten dieses Typs auffüllen — man bekommt immer genau so viele, wie man gelöscht hat.
+      const frei = available.map(e => e.name);
+      const nimm = (n) => { const i = frei.indexOf(n); if (i < 0) return false; frei.splice(i, 1); return true; };
+      const gewaehlt = [];
+      const antwort = [
+        ...(Array.isArray(galleryResult?.selectedCards) ? galleryResult.selectedCards : []),
+        ...(galleryResult?.cardName ? [galleryResult.cardName] : []),
+      ];
+      for (const cn of antwort) {
+        if (gewaehlt.length >= actualCount) break;
+        if (nimm(cn)) gewaehlt.push(cn);
       }
-      if (galleryResult && galleryResult.selectedCards) {
-        for (const cn of galleryResult.selectedCards) retrievedCards.push(cn);
+      if (gewaehlt.length < actualCount) {
+        const staerke = (cn) => (cardDB[cn]?.level || 0) * 10 + (cardDB[cn]?.cost || 0);
+        for (const cn of frei.slice().sort((a, b) => staerke(b) - staerke(a))) {
+          if (gewaehlt.length >= actualCount) break;
+          gewaehlt.push(cn);
+        }
       }
+      for (const cn of gewaehlt) retrievedCards.push(cn);
     }
 
     // ── Add retrieved cards to hand + stream to opponent ──

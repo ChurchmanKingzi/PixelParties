@@ -5439,6 +5439,43 @@ function SingleplayerScreen() {
     setTimeout(() => setStarting(false), 3000);
   }, [personalDecks, sampleDecks, selectedDeck, starting, notify]);
 
+  // ★ Frisch freigeschaltetes Deck SOFORT waehlbar (Befund: im Victory-Screen fehlte es in der Deckauswahl): schaltet ein Sieg einen Gegner frei und schenkt dem Gast
+  // dessen Deck (`deckAdded`), laedt die Liste der eigenen Decks neu — der Victory-Screen bekommt sie als `sampleDecks`.
+  useEffect(() => {
+    const onUnlocked = async (data) => {
+      if (!data || !(data.opponents || []).some(o => o && o.deckAdded)) return;
+      try { const r = await api('/sample-decks/owned'); if (r && r.decks) setSampleDecks(r.decks); } catch (e) { /* bleibt die alte Liste */ }
+    };
+    socket.on('opponents_unlocked', onUnlocked);
+    return () => socket.off('opponents_unlocked', onUnlocked);
+  }, []);
+
+  // ★ DECK VORLADEN (Befund: Starthand und Mulligan ruckeln auf dem Handy): Beim Ziehen werden die Kartenbilder erst gezeichnet (Canvas, mehrere
+  // Karten gleichzeitig) — Zeit, die das Ziehen kostet. Darum werden die Karten des GEWAEHLTEN Decks sowie die Figuren seiner Helden schon hier im
+  // Leerlauf bereitgelegt (gerendert, im dauerhaften Cache gespeichert, dekodiert); beim Spielstart sind sie nur noch ein Speicher-Treffer.
+  useEffect(() => {
+    const d = personalDecks.find(x => x.id === selectedDeck) || sampleDecks.find(x => x.id === selectedDeck);
+    if (!d) return undefined;
+    let weg = false; const timers = [];
+    const nm = (x) => (typeof x === 'string' ? x : (x && x.name) || null);
+    const t = setTimeout(() => {
+      if (weg) return;
+      const run = () => {
+        if (weg) return;
+        try {
+          const heroes = (d.heroes || []).map(h => h && h.hero).filter(Boolean);
+          const abilities = (d.heroes || []).flatMap(h => h ? [h.ability1, h.ability2] : []).filter(Boolean);
+          const names = Array.from(new Set([...(d.mainDeck || []), ...(d.potionDeck || []), ...heroes, ...abilities].map(nm).filter(Boolean)));
+          if (window.CardImageShim && window.CardImageShim.warmCards) window.CardImageShim.warmCards(names, { heroes, abilities });
+          const H = window.HeroIdleAnims;
+          if (H && H.hole && H.slug) heroes.forEach((n, i) => timers.push(setTimeout(() => { if (!weg) { try { H.hole(H.slug(n)); } catch (e) { /* optional */ } } }, 600 + i * 400)));
+        } catch (e) { /* Vorladen ist optional */ }
+      };
+      if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 2500 }); else run();
+    }, 1500);
+    return () => { weg = true; clearTimeout(t); timers.forEach(clearTimeout); };
+  }, [personalDecks, sampleDecks, selectedDeck]);
+
   const onBattleLeave = useCallback(() => {
     const roomId = cpuBattleRoom.current;
     if (roomId) socket.emit('leave_game', { roomId });

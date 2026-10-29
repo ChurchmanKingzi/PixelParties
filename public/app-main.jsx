@@ -1982,10 +1982,9 @@ function PlayScreen() {
         <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>ONLINE LOBBY</h2>
         <div style={{ flex: 1 }} />
-        <label style={{ fontSize: 12, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
+        <div style={{ fontSize: 12, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
           🃏 Deck:
-          <select className="select" value={selectedDeck} onChange={async e => {
-              const id = e.target.value;
+          <PPDropdown value={selectedDeck} onChange={async id => {
               setSelectedDeck(id);
               // Auto-save as default deck. Custom decks use the per-deck
               // endpoint; starter / structure decks use the sample-default
@@ -2003,12 +2002,13 @@ function PlayScreen() {
                   setUser(u => u ? { ...u, defaultSampleDeckId: id } : u);
                 }
               } catch (err) { notify('Could not save your default deck: ' + (err?.message || 'unknown error'), 'error'); }
-            }} style={{ fontSize: 12, minWidth: 180, padding: '4px 8px', borderColor: 'var(--accent)', color: 'var(--text)' }}>
-            {decks.filter(d => !isCubeDeck(d) && d.mode !== 'drafted').map(d => <option key={d.id} value={d.id}>{d.name} {isDeckLegal(d).legal ? '✓' : '✗'}{d.isDefault ? ' ★' : ''}</option>)}
-            {sampleDecks.filter(d => isDeckLegal(d).legal).length > 0 && <option disabled>── Sample Decks ──</option>}
-            {sampleDecks.filter(d => isDeckLegal(d).legal).map(d => <option key={d.id} value={d.id}>📋 {d.name}{user?.defaultSampleDeckId === d.id ? ' ★' : ''}</option>)}
-          </select>
-        </label>
+            }} style={{ fontSize: 12, minWidth: 180, padding: '4px 8px', borderColor: 'var(--accent)', color: 'var(--text)' }}
+            options={[
+              ...decks.filter(d => !isCubeDeck(d) && d.mode !== 'drafted').map(d => ({ value: d.id, label: `${d.name} ${isDeckLegal(d).legal ? '✓' : '✗'}${d.isDefault ? ' ★' : ''}` })),
+              ...(sampleDecks.filter(d => isDeckLegal(d).legal).length > 0 ? [{ value: '__sample_kopf', disabled: true, label: '── Sample Decks ──' }] : []),
+              ...sampleDecks.filter(d => isDeckLegal(d).legal).map(d => ({ value: d.id, label: `📋 ${d.name}${user?.defaultSampleDeckId === d.id ? ' ★' : ''}` })),
+            ]} />
+        </div>
         <button className="btn" onClick={() => setCreating(true)} style={{ borderColor: 'var(--player-color)', color: 'var(--player-color)', background: 'color-mix(in srgb, var(--player-color) 8%, transparent)' }}>+ CREATE GAME</button>
         <VolumeControl />
       </div>
@@ -3235,7 +3235,7 @@ function OpponentUnlockPopup() {
           {current.deckAdded && (
             <div className="pp-unlock-deck" style={{ margin: '-8px 0 22px', padding: '10px 12px', border: '2px solid #4ceb70', background: '#08060c', color: '#4ceb70', fontSize: 14, lineHeight: 1.5 }}>
               <div className="orbit-font" style={{ fontSize: 13, fontWeight: 800, letterSpacing: 2, marginBottom: 4 }}>🃏 DECK ADDED TO YOUR DECKS!</div>
-              <span style={{ color: 'var(--text)' }}>You can now play the <b>{current.name}</b> deck yourself — find it in your deck list. Register to keep it!</span>
+              <span style={{ color: 'var(--text)' }}>You can now play the <b>{current.name}</b> deck yourself — find it in your deck list.{current.guest ? ' Register to keep it!' : ''}</span>
             </div>
           )}
 

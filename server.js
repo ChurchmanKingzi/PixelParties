@@ -7019,10 +7019,11 @@ function endCpuBattle(room, winnerIdx, reason) {
             const u = await unlockRandomOpponent(humanUserId);
             if (u) newlyUnlocked.push(u);
           }
-          // Gaeste: das Deck der freigeschalteten CPU kommt zu den eigenen Decks (Structure Deck im Besitz, nur fuer die laufende Sitzung —
-          // `purgeGuest` raeumt `user_shop_items` mit weg). Registrierte Konten kaufen Structure Decks weiter im Shop.
-          if (guestRow && guestRow.is_guest) {
+          // Das Deck der freigeschalteten CPU kommt zu den eigenen Decks (Structure Deck im Besitz). Bei Gaesten nur fuer die laufende Sitzung —
+          // `purgeGuest` raeumt `user_shop_items` mit weg. (Fuer alle Konten, nicht nur Gaeste: Als Rueckmeldung bot es das Deck sonst nirgends an.)
+          {
             for (const u of newlyUnlocked) {
+              u.guest = !!(guestRow && guestRow.is_guest);
               if (!u.structureId) continue;
               try {
                 await db.run(
@@ -8413,7 +8414,9 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   const matchedAddlType = isReactionSubtype
     ? null
     : room.engine.findAdditionalActionForCard(pi, cardName, heroIdx, charmedOwner ?? pi);
-  const matchedPrefersAddl = !!matchedAddlType
+  // ★ Al 29.10. (Friendship + Overheal Shock mit Support Magic Lv 2): eine Karte, die INHAERENT eine Zusatzaktion ist, kostet ohnehin keine Aktion —
+  // ein bevorzugter Geber (Friendship, Idej Muras) darf dann NICHT verbraucht werden (und sein Rider, z. B. Friendships Ziehen, feuert nicht).
+  const matchedPrefersAddl = !!matchedAddlType && !isInherentAction
     && !!room.engine._additionalActionTypes?.[matchedAddlType]?.preferOverMainAction;
   // `!isInherentAction` muss BEIDE Terme decken, nicht nur den
   // Main-Phase-Term. Eine inhärente Zusatz-Aktion ist per Definition
