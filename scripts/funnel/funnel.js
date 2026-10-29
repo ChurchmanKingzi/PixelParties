@@ -8,7 +8,8 @@
 //
 //    PP_URL=https://pixelpartiestcg.com FUNNEL_TOKEN=... node scripts/funnel/funnel.js            Oberflaeche: http://127.0.0.1:8787
 //    ... node scripts/funnel/funnel.js --text 14                                                 Tabelle im Terminal (letzte 14 Tage)
-//    ... node scripts/funnel/funnel.js --json 30 > funnel.json                                   Rohdaten (z. B. fuer das Claude-Dashboard)
+//    ... node scripts/funnel/funnel.js --json 30 > funnel.json                                   Rohdaten
+//    ... node scripts/funnel/funnel.js --export 30 ./funnel-export                               sechs flache JSON-Dateien (Zeilenlisten) fuer das Claude-Dashboard
 //
 //  Statt der Umgebungsvariablen geht auch eine Datei ~/.pp-funnel.json: { "url": "...", "token": "..." }.
 //  Auf dem Server selbst (Token steht dort in .env): PP_URL=http://127.0.0.1:3000.
@@ -47,8 +48,24 @@ function text(R) {
   return L.join('\n');
 }
 
+function exportFiles(R, dir) {
+  fs.mkdirSync(dir, { recursive: true });
+  const land = (R.steps[0] || {}).cohort || 0, w = (name, rows) => fs.writeFileSync(path.join(dir, name + '.json'), JSON.stringify(rows, null, 1));
+  w('funnel_steps', R.steps.map((s, i) => ({ order: i + 1, step: s.label, cohort: s.cohort, all_actors: s.all, events: s.events, share_of_landing_pct: land ? Math.round(1000 * s.cohort / land) / 10 : null })));
+  w('funnel_tutorial', R.tutorial.map(t => ({ mission: 'Mission ' + t.n, started: t.started, completed: t.completed, completion_pct: t.started ? Math.round(1000 * t.completed / t.started) / 10 : null })));
+  const S = R.signups;
+  w('funnel_signups', [['Vorher als Gast gespielt', S.viaGuestPlayed], ['Gast geklickt, nicht gespielt', S.viaGuestNoGame], ['Direkt, ohne Gastmodus', S.direct], ['Nicht zuordenbar', S.unattributed]].map(([group, count]) => ({ group, count })));
+  w('funnel_sources', Object.entries(R.bySource).map(([source, v]) => ({ source, landing: v.landing || 0, guest: v.guest || 0, tutorial: v.tutorial_start || 0, guest_game: v.cpu_guest || 0, accounts: v.signup_done || 0 })));
+  const dm = {}; R.daily.forEach(r => { (dm[r.day] = dm[r.day] || { day: r.day, landing: 0, guest: 0, tutorial: 0, accounts: 0 })[{ landing: 'landing', guest_start: 'guest', tutorial_start: 'tutorial', signup_done: 'accounts' }[r.ev]] = r.c; });
+  w('funnel_daily', Object.values(dm).sort((a, b) => a.day.localeCompare(b.day)));
+  w('funnel_range', [{ from: new Date(R.from).toISOString(), to: new Date(R.to).toISOString(), visitors_new: R.newVsReturning.new, visitors_returning: R.newVsReturning.returning, guest_games_finished: R.guestGames.games, guest_games_won: R.guestGames.wins, accounts_total: S.total }]);
+  console.log('Geschrieben nach', path.resolve(dir), '- sechs Dateien (funnel_*.json)');
+}
 const args = process.argv.slice(2);
-if (args[0] === '--text' || args[0] === '--json') {
+if (args[0] === '--export') {
+  const [f, t] = days(Number(args[1]) || 7);
+  fetchReport(f, t).then(R => exportFiles(R, args[2] || './funnel-export')).catch(e => { console.error(e.message); process.exit(1); });
+} else if (args[0] === '--text' || args[0] === '--json') {
   const [f, t] = days(Number(args[1]) || 7);
   fetchReport(f, t).then(R => console.log(args[0] === '--json' ? JSON.stringify(R, null, 1) : text(R))).catch(e => { console.error(e.message); process.exit(1); });
 } else {
