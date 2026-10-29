@@ -211,9 +211,47 @@ function AreaBackgrounds({ areaZones, myIdx, oppIdx, spielstand }) {
 const ppArt = (n) => `calc(${n} * var(--px))`;
 const ppArtX = (x, bezugsbreite) => `calc(50% + ${x - bezugsbreite / 2} * var(--px))`;
 
+// ★ W86z — Randabdunklung der Szenen als Pixelart (Bayer-Dither aus deckendem Schwarz statt Radialverlauf mit Alpha; Bild: ppRandDimUrl in
+// app-shared.jsx). Ein Dither-Punkt ist ein Szenen-Kunstpixel (Szenenhoehe / artH); bei jeder Groessenaenderung neu gemalt.
+function PpRandDim() {
+  const ref = useRef(null);
+  const retro = !!window.PP_RETRO;          // Retro-Modus: bleibt beim alten Verlauf (Retro-Look unveraendert)
+  useLayoutEffect(() => {
+    const el = ref.current; if (!el || retro) return undefined;
+    const szene = el.closest('.pp-pixel-scene') || el.parentElement;
+    const zeichnen = () => {
+      const W = el.clientWidth, H = el.clientHeight;
+      if (!W || !H || !window.ppRandDimUrl) return;
+      const artH = +(szene && szene.getAttribute('data-art-h')) || 0;
+      const px = artH ? Math.max(2, H / artH) : 2;
+      const q = (v) => Math.max(8, Math.round(v / px / 8) * 8);       // Groesse grob gerastert: weniger verschiedene Bilder beim Skalieren
+      el.style.backgroundImage = `url(${window.ppRandDimUrl(q(W), q(H))})`;
+    };
+    zeichnen();
+    const ro = window.ResizeObserver ? new ResizeObserver(zeichnen) : null;
+    if (ro) ro.observe(el);
+    return () => { if (ro) ro.disconnect(); };
+  }, []);
+  return retro
+    ? <div className="pp-rand-dim" style={{ background: 'radial-gradient(ellipse 75% 70% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.3) 100%)' }} />
+    : <div ref={ref} className="pp-rand-dim" data-pp-px="aus" />;
+}
+
 function PixelScene({ artH, bg, className, children }) {
+  // ★ W86z: Pixelart-Bewegung (public/pixel-anim.js) fuer die ganze Szene: Takt, Dither-Fade, Verschiebung/Skalierung auf Szenenpixel.
+  // Ein Szenenpixel ist `Szenenhoehe / artH` px (`--pp-raster`); das Kampfbrett-Raster (2 px) gilt hier nicht.
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const el = ref.current; if (!el) return undefined;
+    const setzen = () => { const px = el.clientHeight / artH; if (px > 0) el.style.setProperty('--pp-raster', px.toFixed(3) + 'px'); };
+    setzen();
+    const ro = window.ResizeObserver ? new ResizeObserver(setzen) : null;
+    if (ro) ro.observe(el);
+    const ab = window.PPPixelAnim ? window.PPPixelAnim.anhaengen(el, { geometrie: false }) : null;
+    return () => { if (ro) ro.disconnect(); if (ab) ab(); };
+  }, []);
   return (
-    <div className={'pp-pixel-scene ' + (className || '')} style={{
+    <div ref={ref} className={'pp-pixel-scene ' + (className || '')} data-art-h={artH} style={{
       position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden',
       containerType: 'size', '--px': `calc(100cqh / ${artH})`,
       background: bg || '#000',
@@ -242,7 +280,7 @@ function PixelScene({ artH, bg, className, children }) {
         }
         @keyframes ppFunkeln { 0%, 60% { opacity: 0; } 64% { opacity: .6; } 70% { opacity: 1; } 80% { opacity: .6; } 84%, 100% { opacity: 0; } }
         /* Leichte Randabdunklung — die Karten bleiben das Hellste */
-        .pp-rand-dim { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 75% 70% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.3) 100%); }
+        .pp-rand-dim { position: absolute; inset: 0; pointer-events: none; background-size: 100% 100%; background-repeat: no-repeat; image-rendering: pixelated; }
         /* Blutstropfen (Blood Rock, Shared Blood Tanks …): haengt, schwillt,
            faellt um --fall. Farben ueber --tropfen / --tropfen-dunkel. */
         .pp-px-tropfen {
@@ -460,7 +498,7 @@ const BloodRockOverlay = React.memo(function BloodRockOverlay() {
           }} />
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         /* Blut läuft: helle Schlieren wandern durch die Ströme nach unten */
         .br-strom {
@@ -668,7 +706,7 @@ const PangaiaOverlay = React.memo(function PangaiaOverlay() {
           </div>
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         ${dinos.map(d => d.css).join('\n')}
         .pgn-dino { position: absolute; background-size: 800% 100%; background-repeat: no-repeat; }
@@ -853,7 +891,7 @@ const BoardOfKingsOverlay = React.memo(function BoardOfKingsOverlay() {
           <i className="bok-taube" style={{ transform: t.rtl ? 'scaleX(-1)' : undefined }} />
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .bok-glanz {
           position: absolute; width: calc(11 * var(--px)); height: calc(11 * var(--px));
@@ -1088,7 +1126,7 @@ const SharedBloodTanksOverlay = React.memo(function SharedBloodTanksOverlay() {
           <i className="sbt-ratte" style={{ transform: r.rtl ? 'scaleX(-1)' : undefined }} />
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .sbt-spiegel { position: absolute; inset: 0; animation: sbtSpiegel ${SBT_LEVEL_S}s steps(1) infinite; }
         @keyframes sbtSpiegel { ${SBT_SPIEGEL_KF} }
@@ -1325,7 +1363,7 @@ const AcidRainOverlay = React.memo(function AcidRainOverlay() {
       ))}
       <div className="pp-pixel-layer pp-area-dyn ar-regen nah" />
       <div className="pp-area-dyn ar-blitzlicht" />
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .ar-wolken {
           position: absolute; left: 0; right: 0; top: 0; height: calc(12 * var(--px));
@@ -1528,7 +1566,7 @@ const CottageOverlay = React.memo(function CottageOverlay() {
           <i className="cot-falter" style={{ '--bob': ppArt(f.bob), transform: f.rtl ? 'scaleX(-1)' : undefined, filter: f.farbe }} />
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .cot-strahlen { animation: cotStrahl 7s steps(1) infinite; }
         @keyframes cotStrahl { 0% { opacity: .7; } 20% { opacity: .85; } 40% { opacity: 1; } 60% { opacity: .9; } 80% { opacity: .75; } }
@@ -1701,7 +1739,7 @@ const CrystalWellOverlay = React.memo(function CrystalWellOverlay() {
           <i className="cwl-falter" style={{ '--bob': ppArt(f.bob), transform: f.rtl ? 'scaleX(-1)' : undefined }} />
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .cwl-atmen { animation: cwlAtmen 3.4s ease-in-out infinite alternate; }
         .cwl-atmen.b { animation-duration: 2.6s; animation-delay: -1.3s; }
@@ -1852,7 +1890,7 @@ const DarkOceanOverlay = React.memo(function DarkOceanOverlay() {
       <div className="pp-pixel-layer pp-area-dyn doc-regen" />
       <PixelBand src={DOC + 'fog.png'} className="doc-nebel" />
       <div className="pp-area-dyn doc-blitz" />
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .doc-see { animation: docSee 8.1s steps(18) infinite; }
         @keyframes docSee { from { background-position: 50% 0; } to { background-position: 50% calc(-1800 * var(--px)); } }
@@ -2043,7 +2081,7 @@ const DeepseaCastleOverlay = React.memo(function DeepseaCastleOverlay() {
           animation: `dscTruhe ${b.dur.toFixed(1)}s steps(88) ${b.delay.toFixed(1)}s infinite`,
         }} />
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .dsc-fahnen { animation: dscFahnen 96s steps(128) infinite, dscAtmen 7s ease-in-out infinite alternate; }
         @keyframes dscFahnen { from { background-position: 50% 0; } to { background-position: calc(50% - 128 * var(--px)) 0; } }
@@ -2209,7 +2247,7 @@ const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], s
       {asche.map((a, i) => (
         <i key={'a' + i} className={'pp-area-dyn dc-asche' + (a.glut ? ' glut' : '')} style={{ left: a.x + '%', animation: `dcAsche ${a.dur}s linear ${a.delay}s infinite` }} />
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         @keyframes dcWolken { from { background-position: 0 0; } to { background-position: calc(128 * var(--px)) 0; } }
         .dc-ferne { animation: dcWolken 300s steps(128) infinite; }
@@ -2364,7 +2402,7 @@ const GraveyardOfLimitedPowerOverlay = React.memo(function GraveyardOfLimitedPow
         }} />
       ))}
       <div className="pp-pixel-layer gyd-nebel b" style={{ top: ppArt(72) }} />
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .gyd-schein { animation: gydPuls 3.4s ease-in-out infinite alternate; }
         .gyd-schein.b { animation-delay: -3.4s; }
@@ -2613,7 +2651,7 @@ const ParaseedGreenhouseOverlay = React.memo(function ParaseedGreenhouseOverlay(
           animation: `psgSpore ${s.dur.toFixed(2)}s steps(40) ${s.delay.toFixed(2)}s infinite`,
         }} />
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .psg-blume {
           position: absolute; width: calc(${B.w} * var(--px)); height: calc(${B.h} * var(--px));
@@ -2863,7 +2901,7 @@ const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
       {asche.map((a, i) => (
         <i key={'x' + i} className="pp-area-dyn rvg-asche" style={{ left: a.x + '%', top: ppArt(a.y), animation: `rvgAsche ${a.dur.toFixed(2)}s steps(60) ${a.delay.toFixed(2)}s infinite` }} />
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .rvg-fern { animation: rvgFern 3.4s steps(1) infinite; }
         @keyframes rvgFern { 0% { opacity: .7; } 20% { opacity: 1; } 45% { opacity: .8; } 70% { opacity: .95; } 85% { opacity: .65; } }
@@ -3047,7 +3085,7 @@ const SlipperyIceOverlay = React.memo(function SlipperyIceOverlay() {
           </div>
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .sli-quer { position: absolute; left: 0; }
         @keyframes sliQuerLtr { from { transform: translateX(calc(-60 * var(--px))); } to { transform: translateX(calc(100cqw + 4 * var(--px))); } }
@@ -3189,7 +3227,7 @@ const SmugglersPierOverlay = React.memo(function SmugglersPierOverlay() {
       {wolken.map((w, i) => (
         <i key={'w' + i} className="pp-area-dyn smp-wolke" style={{ top: ppArt(w.y), animation: `smpWolke ${w.dur.toFixed(1)}s linear ${w.delay.toFixed(1)}s infinite` }} />
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .smp-steg {
           position: absolute; top: 0; bottom: 0; left: 0; width: calc(50% + ${SMP_L} * var(--px));
@@ -3355,7 +3393,7 @@ const SpatialCreviceOverlay = React.memo(function SpatialCreviceOverlay() {
       {blasen.map((b, i) => (
         <i key={'b' + i} className={'pp-area-dyn sc-blase' + (b.gross ? ' gross' : '')} style={{ left: b.x + '%', animation: `scSteigen ${b.dur}s linear ${b.delay}s infinite` }} />
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .sc-strahlen { animation: scStrahlen 5.5s ease-in-out infinite alternate; }
         @keyframes scStrahlen { from { opacity: .35; } to { opacity: 1; } }
@@ -3530,7 +3568,7 @@ const SpiderHiveOverlay = React.memo(function SpiderHiveOverlay() {
           animation: `shAbseilen ${s.dur.toFixed(2)}s steps(${s.tief + 10}) ${s.delay.toFixed(2)}s infinite, ppSprite2 .5s steps(1) infinite`,
         }} />
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .sh-glimmen { animation: shGlimmen 3.4s ease-in-out infinite alternate; }
         .sh-schlund { animation-duration: 4.6s; animation-delay: -1.3s; }
@@ -3689,7 +3727,7 @@ const StinkyStablesOverlay = React.memo(function StinkyStablesOverlay() {
           <i className="ss-schwalbe" style={{ transform: s.rtl ? 'scaleX(-1)' : undefined }} />
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .ss-dunst {
           position: absolute; left: 0; right: 0; height: calc(40 * var(--px));
@@ -3893,7 +3931,7 @@ const FloatingIslandOverlay = React.memo(function FloatingIslandOverlay() {
           <i className="fi-vogel" style={{ transform: v.rtl ? 'scaleX(-1)' : undefined, animationDuration: `${v.schlag.toFixed(2)}s, 2.3s` }} />
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .fi-wolken-hinten { animation: fiZug 150s steps(256) infinite; }
         .fi-wolken-vorn { opacity: .92; animation: fiZug 60s steps(256) infinite; }
@@ -4043,7 +4081,7 @@ const TempleOfSacrificeOverlay = React.memo(function TempleOfSacrificeOverlay() 
           <i className="ts-ara-flug" style={{ transform: f.rtl ? 'scaleX(-1)' : undefined }} />
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .ts-wiegen { animation: tsPendel 3.2s steps(1) infinite; }
         @keyframes tsPendel {
@@ -4206,7 +4244,7 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
           left: s.x + '%', top: ppArt(s.y), animation: `bgSchweben ${s.dur.toFixed(1)}s steps(24) ${s.delay.toFixed(1)}s infinite`,
         }} />
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .bg-schein { animation: bgSchein 2.3s steps(1) infinite; }
         @keyframes bgSchein { 0% { opacity: .85; } 18% { opacity: 1; } 31% { opacity: .75; } 52% { opacity: .95; } 70% { opacity: .8; } 86% { opacity: 1; } }
@@ -4398,7 +4436,7 @@ const CosmicDepthsOverlay = React.memo(function CosmicDepthsOverlay() {
           ))}
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .cd-nebel {
           position: absolute; inset: 0;
@@ -4590,7 +4628,7 @@ const FirstCircleOfHellOverlay = React.memo(function FirstCircleOfHellOverlay() 
         }} />
       ))}
       <div className="pp-pixel-layer fc-staub vorn" style={{ top: ppArt(74) }} />
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .fc-dunst {
           position: absolute; left: 0; right: 0; height: calc(40 * var(--px));
@@ -4796,7 +4834,7 @@ const BigGwenOverlay = React.memo(function BigGwenOverlay() {
           <i className="gw-dohle" style={{ '--bob': ppArt(2), animation: 'ppSprite2 .28s steps(1) infinite, ppBob 1.5s ease-in-out infinite alternate' }} />
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .gw-mond {
           position: absolute;
@@ -4955,7 +4993,7 @@ const WarCouncilOverlay = React.memo(function WarCouncilOverlay() {
           <i className="wc-blatt" style={{ '--bob': ppArt(l.bob) }} />
         </div>
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         @keyframes wcFahnen {
           0% { background-position: 50% 0%; } 25% { background-position: 50% 33.333%; }
@@ -5088,7 +5126,7 @@ const WowhallaOverlay = React.memo(function WowhallaOverlay() {
         <i key={'g' + i} className="pp-area-dyn pp-px-funkeln" style={{ left: ppArtX(g.x - 1, 0), top: ppArt(g.y - 1), animation: `ppFunkeln ${g.dur.toFixed(2)}s steps(1) ${g.delay.toFixed(2)}s infinite` }} />
       ))}
       <div className="pp-pixel-layer pp-area-dyn wh-schnee nah" />
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .wh-wolken { animation: whWolken 140s steps(128) infinite; }
         @keyframes whWolken { from { background-position: 50% 0; } to { background-position: calc(50% - 128 * var(--px)) 0; } }
@@ -5186,7 +5224,7 @@ const SecondCircleOfHellOverlay = React.memo(function SecondCircleOfHellOverlay(
           }} />
         ))}
       </div>
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .lc-wand { animation: lcPuls 3s steps(1) infinite; }
         /* Herzschlag der Augen: Bild 2 kurz, dann wieder Bild 1 */
@@ -5271,7 +5309,7 @@ const ThirdCircleOfHellOverlay = React.memo(function ThirdCircleOfHellOverlay() 
           }} />
         ))}
       </div>
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .tc-wand { animation: tcFlackern 1.5s steps(1) infinite; }
         /* Kerzenflackern: Bild 2 unregelmaessig kurz */
@@ -5361,7 +5399,7 @@ const FourthCircleOfHellOverlay = React.memo(function FourthCircleOfHellOverlay(
           }} />
         ))}
       </div>
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .fc4-volk { position: absolute; inset: 0; }
         .fc4-glut {
@@ -5484,7 +5522,7 @@ const FifthCircleOfHellOverlay = React.memo(function FifthCircleOfHellOverlay() 
           }} />
         ))}
       </div>
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .fi-volk { position: absolute; inset: 0; }
         .fi-fontaene { position: absolute; }
@@ -5578,7 +5616,7 @@ const SixthCircleOfHellOverlay = React.memo(function SixthCircleOfHellOverlay() 
         ))}
       </div>
       <PixelBand src={SXX + 'front.png'} style={{ backgroundPosition: '50% 0' }} />
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .sx-volk { position: absolute; inset: 0; }
         .sx-himmel { position: absolute; top: 0; width: calc(128 * var(--px)); height: calc(46 * var(--px)); background: url(${SXX}sky.png) 0 0 / 800% 100% no-repeat; }
@@ -5667,7 +5705,7 @@ const SeventhCircleOfHellOverlay = React.memo(function SeventhCircleOfHellOverla
         <i className="pp-area-dyn sv-nebel a" />
         <i className="pp-area-dyn sv-nebel b" />
       </div>
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .sv-volk { position: absolute; inset: 0; }
         .sv-see { position: absolute; top: calc(${SV_LAVA - 2} * var(--px)); width: calc(128 * var(--px)); height: calc(26 * var(--px)); background: url(${SVX}lava.png) 0 0 / 2400% 100% no-repeat; }
@@ -5740,7 +5778,7 @@ const EighthCircleOfHellOverlay = React.memo(function EighthCircleOfHellOverlay(
           }} />
         ))}
       </div>
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .eg-volk { position: absolute; inset: 0; }
         .eg-portal { position: absolute; top: 0; width: calc(72 * var(--px)); height: calc(80 * var(--px)); background: url(${EIX}portal.png) 0 0 / 2400% 100% no-repeat; }
@@ -5846,7 +5884,7 @@ const TearingMountainOverlay = React.memo(function TearingMountainOverlay() {
           animation: `tmtSteig ${f.dur}s steps(${f.steig}) ${f.delay}s infinite, tmtFarbe ${f.dur}s steps(1) ${f.delay}s infinite`,
         }} />
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         /* Lavafluss: Kachel 16×16, Zeile 56 der Szene, nur waagerecht gescrollt (16 Schritte in 2,4 s) */
         .tmt-fluss {
@@ -5918,7 +5956,7 @@ const GoldenGateOverlay = React.memo(function GoldenGateOverlay() {
           animation: `ggtSteig ${f.dur}s steps(${f.steig}) ${f.delay}s infinite`,
         }} />
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         /* Wolken: eine Kachel (64 Kunstpixel) pro Umlauf, ganze Pixel */
         .ggt-wolken { animation: ggtWolken 128s steps(64) infinite; }
@@ -5971,7 +6009,7 @@ const TreeOfGoldenApplesOverlay = React.memo(function TreeOfGoldenApplesOverlay(
           animation: `tgaFall ${f.dur}s steps(${f.fall}) ${f.delay}s infinite`,
         }} />
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         /* Wind: die Krone schwankt in ganzen Kunstpixeln (links – Mitte – rechts – Mitte), hinten und vorn mit versetzter Phase */
         .tga-wind-hinten { animation: tgaWind 7s steps(1) infinite; }
@@ -6051,7 +6089,7 @@ const GigalopolisOverlay = React.memo(function GigalopolisOverlay() {
         <i key={'r' + i} className="pp-area-dyn gig-rauch" style={{ left: ppArtX(-4.5, 0), top: ppArt(GIG_ALTAR_Y - 11), animation: `gigRauch 9s steps(24) ${r.delay}s infinite, gigRauchBild 9s steps(1) ${r.delay}s infinite` }} />
       ))}
       <PixelBand src={GIG + 'clouds.png'} className="pp-area-dyn gig-wolken" />
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .gig-mensch { position: absolute; width: var(--px); height: var(--px); }
         @keyframes gigGehH { from { translate: 0 0; } to { translate: var(--len) 0; } }
@@ -6106,7 +6144,7 @@ const BarrelHomeOverlay = React.memo(function BarrelHomeOverlay() {
           animation: `brhFliege ${f.dur}s steps(${Math.abs(f.dy) + 4}) ${f.delay}s infinite alternate, brhBlink ${f.dur / 2}s steps(1) ${f.delay}s infinite`,
         }} />
       ))}
-      <div className="pp-rand-dim" />
+      <PpRandDim />
       <style>{`
         .brh-stern { position: absolute; width: var(--px); height: var(--px); background: #ffffff; opacity: 0; }
         @keyframes brhStern { 0%, 55% { opacity: 1; } 60%, 70% { opacity: 0; } 75%, 100% { opacity: 1; } }

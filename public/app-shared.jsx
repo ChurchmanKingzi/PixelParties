@@ -272,6 +272,9 @@ const PP_BAYER4 = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]
 function ppBayer(x, y) { return (PP_BAYER4[y & 3][x & 3] + 0.5) / 16; }
 window.ppBayer = ppBayer;   // Pixelart-Animationen in app-board.jsx (ppSalve) dithern damit
 
+/** ★ W86z: laeuft die Pixelart-Bewegungs-Pipeline (public/pixel-anim.js)? Im Retro-Modus nicht — dort bleibt alles wie es war. */
+const ppPixelAnimAktiv = () => !!(window.PPPixelAnim && window.PPPixelAnim.KONFIG && window.PPPixelAnim.KONFIG.aktiv);
+
 const _ppPxCache = new Map();
 const PP_PX_CACHE_MAX = 800;
 /**
@@ -307,6 +310,13 @@ function ppPxBild(key, w, h, male, faktor = 4) {
       d[i + 2] = mix(f[2] | 0, d[i + 2]);
       d[i + 3] = Math.round(oa * 255);
     });
+    // ★ W86z: Pixelart-Abschluss — Alpha dazwischen wird Bayer-Dither (deckend oder leer), jede Farbe rastet auf die 256er-Palette ein.
+    if (ppPixelAnimAktiv()) for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+      const a = d[i + 3];
+      if (!a) continue;
+      if (a < 255) { if (a / 255 > ppBayer(p % w, (p / w) | 0)) d[i + 3] = 255; else { d[i + 3] = 0; continue; } }
+      if (window.ppSnapRgb) { const q = window.ppSnapRgb(d[i], d[i + 1], d[i + 2]); d[i] = q[0]; d[i + 1] = q[1]; d[i + 2] = q[2]; }
+    }
     kctx.putImageData(bild, 0, 0);
     const c = document.createElement('canvas');
     c.width = w * faktor; c.height = h * faktor;
@@ -314,6 +324,8 @@ function ppPxBild(key, w, h, male, faktor = 4) {
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(klein, 0, 0, c.width, c.height);
     url = c.toDataURL('image/png');
+    // Das kleine Kunstpixel-Bild merken: `PPPixelAnim.drehen` samplet gedrehte Sprites daraus (kein Dekodieren der data-URL).
+    if (url && ppPixelAnimAktiv()) window.PPPixelAnim.bildRegistrieren(url, klein);
   } catch { url = ''; }
   if (_ppPxCache.size >= PP_PX_CACHE_MAX) _ppPxCache.delete(_ppPxCache.keys().next().value);
   _ppPxCache.set(key, url);
@@ -1531,13 +1543,14 @@ function ppPixelieren(wurzel) {
     a.radius = radProzent ? Math.min(a.w, a.h) * parseFloat(cs.borderTopLeftRadius) / 100 : rad;
     if (!a.verlauf && (!bg || bg === 'none') && bgf[3] > 0.05 && rundGross && a.w > 0 && a.w <= 40) a.partikel = cs.backgroundColor;
     const bw = parseFloat(cs.borderTopWidth) || 0;
+    a.bl = parseFloat(cs.borderLeftWidth) || 0; a.bt = bw;      // ★ W86z: absolut positionierte Kinder (Halo) beziehen sich auf die Innenkante — Halo mittig auf die AUSSENkante setzen
     if (bw > 0 && cs.borderTopStyle === 'solid' && ppFarbe(cs.borderTopColor)[3] > 0.05
         && !_ppKeyframesAendernGroesse(cs.animationName)) {
       a.rahmen = { farbe: cs.borderTopColor, dicke: bw };
     }
     const scheine = _ppScheine(cs.boxShadow).concat(_ppScheine((cs.filter || '').match(/drop-shadow\(.*\)/)?.[0] || ''));
     if (scheine.length) a.schein = scheine.sort((p, q) => q.blur - p.blur)[0];
-    if (a.schein) a.position = cs.position;   // schon HIER lesen: ein Lesen nach den Schreibzugriffen (s. unten) erzwang je Element eine volle Stilberechnung (Layout-Thrashing, ~95 % der Pixelierzeit)
+    a.position = cs.position;                  // (immer lesen: Halo + Glyph-Kasten brauchen es) — schon HIER lesen: ein Lesen nach den Schreibzugriffen (s. unten) erzwang je Element eine volle Stilberechnung (Layout-Thrashing, ~95 % der Pixelierzeit)
     if (cs.boxShadow && cs.boxShadow !== 'none') a.ohneSchatten = true;
     if (/drop-shadow|blur\(/.test(cs.filter || '')) a.filter = _ppFilterOhneSchein(cs.filter);
     // Emoji/Glyphe: genau ein Textkind, das eine Sprite-Entsprechung hat.
@@ -1587,6 +1600,9 @@ function ppPixelieren(wurzel) {
         st.backgroundSize = '1em 1em'; st.backgroundRepeat = 'no-repeat'; st.backgroundPosition = 'center';
         st.color = 'transparent'; st.textShadow = 'none';
         st.imageRendering = 'pixelated';
+        // ★ W86z: frei stehende Glyphen bekommen einen festen Kasten (1em x 1em) statt der Textbreite — sonst haengt die Boxgroesse (und damit
+        // Skalierung, Drehpunkt, Sprite) davon ab, ob die Schrift beim Einblenden schon geladen ist.
+        if (ppPixelAnimAktiv() && (a.position === 'absolute' || a.position === 'fixed')) { const k = Math.max(4, Math.round(a.schrift / 4) * 4) + 'px'; st.width = k; st.height = k; st.lineHeight = k; st.backgroundSize = k + ' ' + k; }
       }
     }
     if (a.emoji) {
@@ -1595,6 +1611,7 @@ function ppPixelieren(wurzel) {
         st.backgroundImage = `url(${u})`;
         st.backgroundSize = '1.1em 1.1em'; st.backgroundRepeat = 'no-repeat'; st.backgroundPosition = 'center';
         st.color = 'transparent'; st.textShadow = 'none'; st.imageRendering = 'pixelated';
+        if (ppPixelAnimAktiv() && (a.position === 'absolute' || a.position === 'fixed')) { const k = Math.max(4, Math.round(a.schrift * 1.1 / 4) * 4) + 'px'; st.width = k; st.height = k; st.lineHeight = k; st.backgroundSize = k + ' ' + k; }
       }
     }
     if (ebenen.length) {
@@ -1618,13 +1635,15 @@ function ppPixelieren(wurzel) {
     if (a.filter !== undefined) st.filter = a.filter;
     if (a.schein && a.w > 0 && a.h > 0) {
       // Halo als erstes Kind, hinter dem Inhalt.
-      const rand = Math.min(40, Math.max(3, Math.round(a.schein.blur * 0.8)));
+      const pa = ppPixelAnimAktiv();
+      // ★ W86z: gerade Randbreite (Halo-Kanten bleiben beim Skalieren auf ganzen Pixeln); Retro-Modus: wie bisher
+      const rand = pa ? Math.min(40, Math.max(4, Math.round(a.schein.blur * 0.4) * 2)) : Math.min(40, Math.max(3, Math.round(a.schein.blur * 0.8)));
       const u = ppPxHaloUrl(a.schein.farbe, a.w, a.h, rand, a.rund || !!a.zeichen || !!a.emoji);
       if (u) {
         const halo = document.createElement('i');
         halo.setAttribute('aria-hidden', 'true');
         halo.className = 'pp-px-halo';
-        halo.style.cssText = `position:absolute;left:${-rand}px;top:${-rand}px;width:${a.w + 2 * rand}px;height:${a.h + 2 * rand}px;`
+        halo.style.cssText = `position:absolute;left:${pa ? -rand - a.bl : -rand}px;top:${pa ? -rand - a.bt : -rand}px;width:${a.w + 2 * rand}px;height:${a.h + 2 * rand}px;`
           + `background:url(${u}) center/100% 100% no-repeat;image-rendering:pixelated;pointer-events:none;z-index:-1;`;
         _ppPxErledigt.add(halo);
         if (a.position === 'static') st.position = 'relative';
@@ -1690,9 +1709,14 @@ function ppPxSpriteGefaerbtUrl(name, farbe, stufe = 0) {
  * jeden spaeter eingehaengten Knoten (Phasen, die erst nach Zeit
  * erscheinen). Gibt die Abmeldung zurueck.
  */
-function ppPixeliererAnhaengen(wurzel) {
+function ppPixeliererAnhaengen(wurzel, opt) {
   if (!wurzel) return () => {};
+  const bewegung = !(opt && opt.bewegung === false);       // false (Vorwaermen): nur Pixelbilder erzeugen, nichts backen
+  try { if (bewegung && window.PPPixelAnim) window.PPPixelAnim.geometrieRunden(wurzel); } catch (err) { console.warn('[PixelAnim]', err?.message); }
   try { ppPixelieren(wurzel); } catch (err) { console.warn('[Pixelierer]', err?.message); }
+  // ★ W86z: danach Statisches (halbe Deckkraft, Alpha-Hintergruende, Drehung) und die Bewegung — Takt, Dither-Fade, Kunstpixel-Skalierung
+  // (public/pixel-anim.js).
+  try { if (bewegung && window.PPPixelAnim) { window.PPPixelAnim.statisch(wurzel); window.PPPixelAnim.backenAlle(wurzel); } } catch (err) { console.warn('[PixelAnim]', err?.message); }
   let wartend = null;
   const neue = new Set();
   const beobachter = new MutationObserver((liste) => {
@@ -1701,13 +1725,36 @@ function ppPixeliererAnhaengen(wurzel) {
     wartend = requestAnimationFrame(() => {
       wartend = null;
       const jetzt = Array.from(neue); neue.clear();
-      for (const n of jetzt) { try { ppPixelieren(n); } catch {} }
+      for (const n of jetzt) {
+        try { if (bewegung && window.PPPixelAnim) window.PPPixelAnim.geometrieRunden(n); } catch {}
+        try { ppPixelieren(n); } catch {}
+        try { if (bewegung && window.PPPixelAnim && n.isConnected) { window.PPPixelAnim.statisch(n); window.PPPixelAnim.backenAlle(n); } } catch {}
+      }
     });
   });
   beobachter.observe(wurzel, { childList: true, subtree: true });
   return () => { beobachter.disconnect(); if (wartend) cancelAnimationFrame(wartend); };
 }
 window.ppPixeliererAnhaengen = ppPixeliererAnhaengen;
+
+/**
+ * ★ W86z — Randabdunklung (Vignette) der Area-Szenen als Pixelart: Bayer-gedithertes Schwarz (deckend) statt Radialverlauf mit Alpha.
+ * Gleiche Form wie vorher (`radial-gradient(ellipse 75% 70%, 0 bei 55 %, 30 % Schwarz am Rand)`), aber jede Kachel ist ein Kunstpixel
+ * (`nx` x `ny` Pixel, vom Aufrufer auf die Szenenpixel gelegt). Wird je Groesse gemerkt.
+ */
+function ppRandDimUrl(nx, ny) {
+  nx = Math.max(8, Math.min(1024, Math.round(nx))); ny = Math.max(8, Math.min(1024, Math.round(ny)));
+  return ppPxBild('rd:' + nx + 'x' + ny, nx, ny, (setze) => {
+    for (let y = 0; y < ny; y++) {
+      for (let x = 0; x < nx; x++) {
+        const t = Math.hypot(((x + 0.5) / nx - 0.5) / 0.75, ((y + 0.5) / ny - 0.5) / 0.70);   // 1 = Ellipsenrand
+        const a = 0.3 * Math.max(0, Math.min(1, (t - 0.55) / 0.45));
+        if (a > 0 && a > ppBayer(x, y)) setze(x, y, [0, 0, 0, 1]);
+      }
+    }
+  }, 1);
+}
+window.ppRandDimUrl = ppRandDimUrl;
 
 window.PxZeichen = PxZeichen;
 window.PxIcon = PxIcon;
