@@ -19937,8 +19937,22 @@ const ANIM_REGISTRY = {
     // GESAMTZAHL bleibt: bei acht Zielen waeren es sonst ueber 200
     // Geschosse mit je drei Knoten, und die Animation wuerde das Brett
     // fuer eine Sekunde ausbremsen. Bis sechs Ziele greift sie nicht.
-    const GESCHOSSE_JE_ZIEL = 26;
-    const GESCHOSSE_GESAMT_MAX = 170;
+    // ★ HANDY-LAG-FIX + PIXELART (Als Befund: „Flame Avalanche ist EXTREM laggy"): vorher bis zu 170 Geschosse mit je drei Knoten (Kopf, Schweif mit
+    // Weichzeichner, Einschlag), `mix-blend-mode: screen` und Radialverlaeufen — beim Einhaengen allein ~2 s Hauptthread auf einem schwachen Handy. Jetzt:
+    // EIN Knoten je Geschoss (Pixel-Funke aus harten Zellen per `box-shadow`, ohne Drehung/Unschaerfe/Mischmodus), Flug im Bildtakt (`steps()`),
+    // Einschlaege nur je Ziel (drei versetzte Pixel-Sterne) und deutlich weniger Geschosse. Rote/gelbe Palette, harte Kanten.
+    const GESCHOSSE_JE_ZIEL = 9;
+    const GESCHOSSE_GESAMT_MAX = 66;
+    const ZELLE = [4, 6];                   // Zellgroesse der zwei Geschoss-Groessen
+    const funke = (z) => `${0}px ${0}px 0 0 #fffbd2, ${z}px 0 0 0 #ffd066, ${-z}px 0 0 0 #ffd066, 0 ${z}px 0 0 #ffd066, 0 ${-z}px 0 0 #ffd066, ${z}px ${z}px 0 0 #ff491a, ${-z}px ${z}px 0 0 #ff491a, ${z}px ${-z}px 0 0 #ff491a, ${-z}px ${-z}px 0 0 #ff491a, ${2 * z}px 0 0 0 #8f0000, ${-2 * z}px 0 0 0 #8f0000, 0 ${2 * z}px 0 0 #8f0000, 0 ${-2 * z}px 0 0 #8f0000`;
+    const stern = (z, k) => {   // Einschlag in drei Bildern: kleines Kreuz, grosser Stern, verstreute Reste
+      const c = [];
+      const add = (x, y, f) => c.push(`${x * z}px ${y * z}px 0 0 ${f}`);
+      if (k === 0) { add(0, 0, '#fffbd2'); add(1, 0, '#ffd066'); add(-1, 0, '#ffd066'); add(0, 1, '#ffd066'); add(0, -1, '#ffd066'); }
+      else if (k === 1) { add(0, 0, '#ffd066'); [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([x, y]) => { add(x, y, '#ff9a1a'); add(2 * x, 2 * y, '#ff491a'); }); [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([x, y]) => add(x, y, '#ff491a')); }
+      else { [[2, 1], [-2, 1], [1, -2], [-1, 2], [3, 0], [-3, 0], [0, 3], [0, -3]].forEach(([x, y]) => add(x, y, '#8f0000')); add(0, 0, '#ff491a'); }
+      return c.join(', ');
+    };
     return function FlameAvalancheEffect({ x, y, w, h, ox, oy, duration, targetPoints }) {
       const W = Math.max(w || 900, 320), H = Math.max(h || 560, 240);
       const links = x - W / 2, oben = y - H / 2;
@@ -19947,10 +19961,8 @@ const ANIM_REGISTRY = {
       const dauer = duration || 1600;
       const flug = 520;                       // Flugzeit eines Geschosses
 
-      const bahnen = useMemo(() => {
+      const { bahnen, treffer } = useMemo(() => {
         const r = zufall(Math.round(W * 11 + H * 7 + oX * 3 + oY));
-        // Ziele in Kastenkoordinaten. Fehlt die Liste, faechert der Strom
-        // nach vorn (weg von der eigenen Bretthaelfte).
         let ziele = Array.isArray(targetPoints) && targetPoints.length
           ? targetPoints.map(p => ({ zx: p.x - links, zy: p.y - oben }))
           : null;
@@ -19960,99 +19972,74 @@ const ANIM_REGISTRY = {
             zx: W * (0.15 + i * 0.175), zy: oY + vor * H * 0.55,
           }));
         }
-        const aus = [];
-        const jeZiel = Math.max(10, Math.min(GESCHOSSE_JE_ZIEL,
-          Math.floor(GESCHOSSE_GESAMT_MAX / ziele.length)));
-        // Die Streuung waechst mit der Strecke: nah am Ziel eng, weit weg
-        // breit — sonst sammelt sich alles auf einem Punkt.
+        const aus = [], tr = [];
+        const jeZiel = Math.max(4, Math.min(GESCHOSSE_JE_ZIEL, Math.floor(GESCHOSSE_GESAMT_MAX / ziele.length)));
         ziele.forEach((z, zi) => {
           const spanne = Math.hypot(z.zx - oX, z.zy - oY);
           for (let i = 0; i < jeZiel; i++) {
             const streuX = (r() - 0.5) * Math.max(48, spanne * 0.26);
             const streuY = (r() - 0.5) * Math.max(34, spanne * 0.17);
             const zx = z.zx + streuX, zy = z.zy + streuY;
-            // Bogenmitte seitlich versetzt — die Seite wechselt mit dem
-            // Geschoss, damit sich der Strom aufblaettert.
             const mx = (oX + zx) / 2 + (r() - 0.5) * spanne * 0.22;
             const my = (oY + zy) / 2 + (r() - 0.5) * spanne * 0.18 - spanne * 0.06;
             aus.push({
-              zx, zy, mx, my,
-              winkel: Math.atan2(zy - oY, zx - oX) * 180 / Math.PI,
-              groesse: 13 + r() * 20,
-              verzug: Math.round(zi * 20 + i * (r() * 22 + 9)),
+              zx, zy, mx, my, gross: r() > 0.55 ? 1 : 0,
+              verzug: Math.round(zi * 20 + i * (r() * 40 + 18)),
               laenge: Math.round(flug * (0.75 + r() * 0.55)),
             });
           }
+          // Drei versetzte Einschlag-Sterne je Ziel (statt eines Feuerballs je Geschoss).
+          for (let k = 0; k < 3; k++) tr.push({ zx: z.zx + (r() - 0.5) * 22, zy: z.zy + (r() - 0.5) * 22, at: Math.round(flug * 0.9 + zi * 20 + k * (jeZiel * 11)) });
         });
-        return aus;
+        return { bahnen: aus, treffer: tr };
       }, [W, H, oX, oY, links, oben, targetPoints, flug]);
 
       return (
-        <div aria-hidden="true" style={{
+        <div aria-hidden="true" data-pp-px="aus" style={{
           position: 'fixed', left: links, top: oben, width: W, height: H,
-          pointerEvents: 'none', zIndex: 10100, overflow: 'hidden',
-          animation: `faBeben ${Math.round(dauer * 0.5)}ms linear 60ms both`,
+          pointerEvents: 'none', zIndex: 10100, overflow: 'hidden', contain: 'layout paint',
+          animation: `faBeben ${Math.round(dauer * 0.5)}ms steps(1) 60ms both`,
         }}>
-          {/* Muendungsfeuer beim Wirker: hier setzt der Strom an. */}
+          {/* Muendungsfeuer beim Wirker: gestapelte harte Quadrat-Ringe, die im Bildtakt aufgehen. */}
           <div style={{
-            position: 'absolute', left: oX - 80, top: oY - 80, width: 160, height: 160,
-            borderRadius: '50%', mixBlendMode: 'screen',
-            background: 'radial-gradient(circle, rgba(255,251,210,.95) 0%, rgba(255,154,26,.75) 34%, rgba(204,43,0,.35) 66%, transparent 80%)',
-            animation: `faMuendung ${Math.round(dauer * 0.8)}ms ease-out forwards`,
+            position: 'absolute', left: oX - 8, top: oY - 8, width: 16, height: 16, background: '#fffbd2',
+            animation: `faMuendung ${Math.round(dauer * 0.6)}ms steps(1) forwards`,
           }} />
           {bahnen.map((b, i) => (
             <div key={'fap' + i} style={{
-              position: 'absolute', left: oX, top: oY, width: 0, height: 0,
-              '--fa-mx': (b.mx - oX).toFixed(1) + 'px', '--fa-my': (b.my - oY).toFixed(1) + 'px',
-              '--fa-zx': (b.zx - oX).toFixed(1) + 'px', '--fa-zy': (b.zy - oY).toFixed(1) + 'px',
-              animation: `faFlug ${b.laenge}ms cubic-bezier(.30,.55,.55,1) ${b.verzug}ms both`,
-            }}>
-              {/* Schweif — laeuft der Flugrichtung hinterher */}
-              <div style={{
-                position: 'absolute', left: -b.groesse * 2.4, top: -b.groesse * 0.34,
-                width: b.groesse * 2.6, height: b.groesse * 0.68,
-                transformOrigin: '100% 50%', transform: `rotate(${b.winkel}deg)`,
-                borderRadius: '50%', mixBlendMode: 'screen', filter: 'blur(2px)',
-                background: `linear-gradient(to right, transparent 0%, rgba(255,73,26,.5) 55%, rgba(251,200,106,.85) 100%)`,
-              }} />
-              {/* Kopf */}
-              <div style={{
-                position: 'absolute', left: -b.groesse / 2, top: -b.groesse / 2,
-                width: b.groesse, height: b.groesse * 0.82,
-                borderRadius: '48% 52% 56% 44% / 54% 46% 54% 46%',
-                background: 'radial-gradient(circle at 42% 38%, #fffbd2 0%, #ffd066 30%, #ff491a 62%, #8f0000 100%)',
-                boxShadow: '0 0 14px rgba(255,125,0,.95)', mixBlendMode: 'screen',
-              }} />
-            </div>
+              position: 'absolute', left: oX, top: oY, width: ZELLE[b.gross], height: ZELLE[b.gross], marginLeft: -ZELLE[b.gross] / 2, marginTop: -ZELLE[b.gross] / 2,
+              background: '#fffbd2', boxShadow: funke(ZELLE[b.gross]),
+              '--fa-mx': Math.round(b.mx - oX) + 'px', '--fa-my': Math.round(b.my - oY) + 'px',
+              '--fa-zx': Math.round(b.zx - oX) + 'px', '--fa-zy': Math.round(b.zy - oY) + 'px',
+              opacity: 0, willChange: 'transform',
+              animation: `faFlug ${b.laenge}ms steps(9, end) ${b.verzug}ms both`,
+            }} />
           ))}
-          {/* Einschlaege: ein Feuerball je Geschoss, sobald es ankommt */}
-          {bahnen.map((b, i) => (
+          {treffer.map((t, i) => (
             <div key={'fae' + i} style={{
-              position: 'absolute', left: b.zx - b.groesse, top: b.zy - b.groesse,
-              width: b.groesse * 2, height: b.groesse * 2, borderRadius: '50%',
-              mixBlendMode: 'screen', opacity: 0,
-              background: 'radial-gradient(circle, rgba(255,251,210,.95) 0%, rgba(255,154,26,.7) 40%, transparent 72%)',
-              animation: `faTreffer ${Math.round(320 + b.groesse * 6)}ms ease-out ${b.verzug + b.laenge}ms forwards`,
+              position: 'absolute', left: t.zx - 3, top: t.zy - 3, width: 6, height: 6, background: '#fffbd2', opacity: 0,
+              animation: `faTreffer 360ms steps(1) ${t.at}ms both`,
+              '--fa-s0': stern(6, 0), '--fa-s1': stern(6, 1), '--fa-s2': stern(6, 2),
             }} />
           ))}
           <style>{`
             @keyframes faFlug {
-              0%   { transform: translate(0, 0) scale(.45); opacity: 0; }
-              12%  { opacity: 1; }
-              50%  { transform: translate(var(--fa-mx), var(--fa-my)) scale(1); }
-              88%  { opacity: 1; }
-              100% { transform: translate(var(--fa-zx), var(--fa-zy)) scale(.85); opacity: 0; }
+              0%   { transform: translate(0, 0); opacity: 1; }
+              50%  { transform: translate(var(--fa-mx), var(--fa-my)); }
+              100% { transform: translate(var(--fa-zx), var(--fa-zy)); opacity: 0; }
             }
             @keyframes faTreffer {
-              0%   { opacity: 0; transform: scale(.35); }
-              30%  { opacity: 1; transform: scale(1); }
-              100% { opacity: 0; transform: scale(1.5); }
+              0%   { opacity: 1; box-shadow: var(--fa-s0); }
+              34%  { box-shadow: var(--fa-s1); }
+              68%  { box-shadow: var(--fa-s2); }
+              100% { opacity: 0; }
             }
             @keyframes faMuendung {
-              0%   { opacity: 0; transform: scale(.35); }
-              14%  { opacity: 1; transform: scale(1.05); }
-              70%  { opacity: .7; transform: scale(.95); }
-              100% { opacity: 0; transform: scale(1.2); }
+              0%   { opacity: 1; box-shadow: 0 0 0 8px #ff9a1a, 0 0 0 16px #cc2b00; }
+              25%  { box-shadow: 0 0 0 16px #ff9a1a, 0 0 0 28px #cc2b00; }
+              55%  { box-shadow: 0 0 0 12px #ff9a1a, 0 0 0 20px #8f0000; }
+              85%  { box-shadow: 0 0 0 4px #ff491a; }
+              100% { opacity: 0; }
             }
             @keyframes faBeben {
               0%, 100% { transform: translate(0, 0); }
