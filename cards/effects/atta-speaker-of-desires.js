@@ -11,9 +11,9 @@
 //  ── Bausteine ─────────────────────────────────────────────────────
 //  • Aufdecken: Hook `onCardsRevealed` (`engine.meldeAufgedeckt`, gesammelt je Wirkung, EIN Aufruf am Ende der Wirkung). Aufdecken durch den Effekt einer
 //    ABILITY (Premonition, Inventing, Navigation …) meldet die Engine gar nicht erst. Quellen: Such-Fenster (`deckSearchReveal`), `revealToOpponent`, Deck-Aufdecker (`_deck-top-shared`)
-//    und Eigenbau-Karten mit `engine.meldeAufgedeckt(…)` bzw. `handZugang(…, { von: 'deck', reveal: true })` (Aurora Borealis, Deepsea Treasure, Bifab, Birthday Present, Magic Lamp, Heart of Cards …;
-//    Tabelle in CARD_API.md, „Welle 85 / W85b"). Die Auswertung laeuft NACH der Wirkung: eine Karte, die die Wirkung selbst schon wieder weggeschickt hat (Oracle of Heaven/Heart of Cards bei
-//    Fehlschlag, Chaos Magic, Third Circle, Rebelliokai Camouflaged Kappa), liegt dann weder auf der Hand noch im Deck — kein Angebot.
+//    und Tutoren, die ihr Aufdecken VOR dem Verschieben melden (`engine.aufdeckEreignis`, Welle 85c; Tabelle in CARD_API.md). „Löschen STATT auf die Hand" (Al 29.10.): bei diesen Wegen löscht Atta
+//    die Karte, solange sie noch im Deck liegt — sie kommt nie auf die Hand (keine Hand-Zugangs-Wirkungen), der Hook füllt dafür `ctx.geloescht`. Die übrigen Wege (Deck-Aufdecker, deren Spell
+//    im Deck bleibt; Potion/Side Deck) werten weiter NACH der Wirkung aus. Selbst-entsorgende Aufdecker (Chaos Magic, Third Circle, Heart of Cards/Oracle bei Fehlschlag …) lösen Atta nicht aus.
 //  • Verzoegertes Wirken: gemeinsamer Baustein mit Ghostly Warning (`_verzoegert-zauber-shared.js`) — Pflicht, ohne Stufen-/Status-/Wisdom-Pruefung.
 //  • Loeschen statt Ablage: Hero-Flag `deletesOwnSpellsInsteadOfDiscard`, gelesen von `engine.spellGoesToDeletedInstead` (doPlaySpell, Sofort-Guesse,
 //    Reaktionsketten).
@@ -46,6 +46,7 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       if (ctx.playerIdx !== pi) return;                       // „you reveal"
+      if (ctx.sourceName === 'Chaos Magic') return;           // W85c (Al): die von Chaos Magic aufgedeckten/reservierten Karten sind für Atta tabu
       const heroIdx = ctx.cardHeroIdx;
       const feld = ctx.cardHeroOwner ?? pi;                   // Brettseite des Helden
       const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
@@ -92,6 +93,7 @@ module.exports = {
         heldenSperreFreigeben(gs, HOPT, pi);
         return;
       }
+      if (Array.isArray(ctx.geloescht)) ctx.geloescht.push(name);   // W85c: Aufdeck-Ereignis VOR dem Verschieben — der Tutor nimmt diese Karte nicht auf die Hand
       engine._broadcastEvent('play_zone_animation', { type: 'atta_books', owner: feld, heroIdx, zoneSlot: -1, phase: 'delete' });
       await engine._delay(700);
       vormerken(engine, {

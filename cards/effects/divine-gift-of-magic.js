@@ -126,7 +126,7 @@ module.exports = {
 
       // Reveal to opponent.
       engine._broadcastEvent('card_reveal', { cardName: chosenName, playerIdx: pi });
-      engine.meldeAufgedeckt(pi, [chosenName], { zone: 'hand', source: CARD_NAME });   // W85b: Aufdecken → Atta (onCardsRevealed)
+      await engine.aufdeckEreignis(pi, [chosenName], { zone: 'hand', source: CARD_NAME });   // W85c (Atta, Al 29.10.): aufgedeckt = EIN Ereignis, sofort (in Textreihenfolge); ein Zuhörer (Atta) darf die Karte löschen
       await engine._delay(400);
 
       // Welle 14 (Q165, Al): Rabatt nur fuer die EINE offenbarte Kopie (Handindex),

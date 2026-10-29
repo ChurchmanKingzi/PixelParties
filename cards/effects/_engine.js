@@ -12511,6 +12511,7 @@ class GameEngine {
         searcherName,
         title,
         cancellable: false,
+        ...(opts._aufdeckGemeldet ? { _aufdeckGemeldet: true } : {}),
       });
     }
     if (opts.together) {
@@ -12522,6 +12523,7 @@ class GameEngine {
         title,
         sourceLabel: from === 'discard' ? 'discard pile' : from === 'deleted' ? 'deleted cards' : 'deck',
         cancellable: false,
+        ...(opts._aufdeckGemeldet ? { _aufdeckGemeldet: true } : {}),
       });
     }
   }
@@ -12756,12 +12758,22 @@ class GameEngine {
     // re-broadcasts deck_search_add and opens the standard reveal
     // prompt for THIS title, which is the original behaviour callers
     // expect.
+    // W85c (Atta): das Aufdecken ist ein Ereignis VOR dem Verschieben (Fenster zuerst, dann Atta, dann erst auf die Hand) — `_aufdeckFenster`/`_aufdeckOut` reichen das an den Tutor-Kern durch.
+    const _out = {};
     const ok = await this.actionAddCardFromDeckToHand(playerIdx, cardName, {
       source: title,
       reveal: false,
+      _aufdeckFenster: () => this.revealSearchedCards(playerIdx, [cardName], title, { _aufdeckGemeldet: true }),
+      _aufdeckOut: _out,
       ...(opts.flugStil ? { flugStil: opts.flugStil } : {}),   // 26.9.
     });
     if (!ok) return null;
+    if (ok === 'geloescht') {   // Atta hat die aufgedeckte Karte gelöscht: sie kam nie auf die Hand (`opts.out.geloescht` sagt es dem Aufrufer, der danach mit der Karte auf der Hand weiterrechnet)
+      if (opts.out) opts.out.geloescht = true;
+      if (opts.shuffle !== false) this.shuffleDeck(playerIdx);
+      this.sync();
+      return cardName;
+    }
     // Krates & Co. haben die Suche umgebaut und selbst aufgedeckt/verteilt.
     if (ok === 'krates') {
       if (opts.shuffle !== false) this.shuffleDeck(playerIdx);
@@ -12769,7 +12781,7 @@ class GameEngine {
       return cardName;
     }
 
-    await this.revealSearchedCards(playerIdx, [cardName], title);
+    if (!_out.fensterGezeigt) await this.revealSearchedCards(playerIdx, [cardName], title);
 
     if (opts.shuffle !== false) this.shuffleDeck(playerIdx);
 
@@ -25023,7 +25035,10 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   validateActionPlay(pi, cardName, handIndex, heroIdx, expectedTypes, opts = {}) {
     const gs = this.gs;
-    if (pi < 0 || pi !== gs.activePlayer) return null;
+    // ★ W85c: ein VERZÖGERTER Zauber (Ghostly Warning, Atta) wirkt am Ende eines Zuges, in dem sein Wirker NICHT am Zug ist (Atta: Ende des GEGNERZUGES) und in der End-Phase. Ein Sofort-Guss
+    // innerhalb davon (Chaos Magic prüft den gefundenen Spell mit `kannSofortWirken`) darf daran nicht scheitern: `gs._verzoegertWirkt` = Sitz des Wirkers, nur während des Gusses gesetzt.
+    const _verzWirkt = !!opts.sofortGuss && gs._verzoegertWirkt === pi;
+    if (pi < 0 || (pi !== gs.activePlayer && !_verzWirkt)) return null;
 
     // Waehrend einer erzwungenen Abwurf-Stapelabfrage ist die Hand
     // GESPERRT — auch in der Luecke zwischen zwei Einzel-Prompts.
@@ -25053,7 +25068,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const isActionPhase = gs.currentPhase === 3;
     const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
-    if (!isActionPhase && !isMainPhase) return null;
+    if (!isActionPhase && !isMainPhase && !_verzWirkt) return null;
 
     const ps = gs.players[pi];
     if (!ps) return null;
@@ -29999,6 +30014,28 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (await this._checkOppDeckSearchInterceptors(pi, cardName, opts)) return 'krates';
     }
 
+    // ★ W85c (Atta, Al 29.10.: „löschen STATT auf die Hand"): das Aufdecken dieser Karte ist ein Ereignis, das VOR dem Verschieben gemeldet wird — löscht Atta die Karte, kommt sie nie
+    // auf die Hand (keine Hand-Zugangs-Wirkungen). Das Such-Fenster für den Gegner kommt dann VOR der Entscheidung. Ohne Zuhörer/Kandidat: alter Weg, nichts ändert sich.
+    // Mehrfach-Tutoren melden ihre Karten selbst als EIN Ereignis (`aufdeckEreignis`) und setzen `_aufdeckGemeldet`.
+    let _fensterSchonGezeigt = false;
+    if ((opts.reveal !== false || opts._aufdeckFenster) && !opts._aufdeckGemeldet) {
+      const _ereignis = await this.aufdeckEreignis(pi, [cardName], {
+        source: opts.source || null, zone: 'deck',
+        fenster: opts._aufdeckFenster || (async () => {
+          await this.promptGeneric(this.opponentOf(pi), {
+            type: 'deckSearchReveal', cardName, searcherName: ps.username, title: opts.source || 'Deck Search', cancellable: false, _aufdeckGemeldet: true,
+          });
+        }),
+      });
+      _fensterSchonGezeigt = _ereignis.fensterGezeigt;
+      if (opts._aufdeckOut) opts._aufdeckOut.fensterGezeigt = _ereignis.fensterGezeigt;
+      if (_ereignis.geloescht.includes(cardName)) {
+        if (opts.shuffle) this.shuffleDeck(pi, 'main');
+        this.sync();
+        return 'geloescht';   // truthy: der Effekt „hat gesucht"; die Karte liegt im Gelöscht-Stapel, NICHT auf der Hand
+      }
+    }
+
     ps.mainDeck.splice(idx, 1);
     // If the spliced card was the top of the deck and that top was
     // publicly known (Premonition stash, Kassaran reveal), shift the
@@ -30055,7 +30092,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (opts.shuffle) this.shuffleDeck(pi, 'main');
     this.sync();
 
-    if (opts.reveal !== false) {
+    if (opts.reveal !== false && !_fensterSchonGezeigt) {
       const delay = opts.revealDelayMs != null ? opts.revealDelayMs : 500;
       if (delay > 0) await this._delay(delay);
       const oi = this.opponentOf(pi);
@@ -30064,6 +30101,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         cardName, searcherName: ps.username,
         title: opts.source || 'Deck Search',
         cancellable: false,
+        ...(opts._aufdeckGemeldet ? { _aufdeckGemeldet: true } : {}),
       });
     }
     return true;
@@ -47894,7 +47932,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const qcd = basis ? this._getCardDB()[basis] : null;
     if (qcd && qcd.cardType === 'Ability') return;   // „except by the effect of an Ability"
     if (!this._aufgedeckt) this._aufgedeckt = [];
-    this._aufgedeckt.push({ pi, names: liste, zone: opts.zone || 'hand', source: quelle });
+    this._aufgedeckt.push({ pi, names: liste, zone: opts.zone || 'hand', source: quelle, ereignis: opts.ereignis || null });   // W85c: `ereignis` trennt Aufdeck-Ereignisse derselben Quelle
     // Genau EINE Auswertung vormerken. W85b: Referenz statt Flag (wie `noteHandZugangAusStapel`, W72a) — `restore()` kappt die Warteschlange der Nach-Ketten-Aktionen; ein
     // Flag `_aufgedecktGeplant` blieb dann fuer den Rest des Spiels gesetzt, und Atta wurde nie wieder gefragt.
     if (!this._aufgedecktFn || !(this._postChainActions || []).includes(this._aufgedecktFn)) {
@@ -47906,6 +47944,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   /** Das Fenster „Gegner sieht die gesuchten Karten" (`deckSearchReveal`) IST ein Aufdecken des Suchenden (aus Deck oder Ablage auf die Hand). */
   _beobachtePrompt(opponentPi, d) {
     if (!d || d.type !== 'deckSearchReveal') return;
+    if (d._aufdeckGemeldet) return;   // W85c: das Aufdeck-Ereignis lief schon VOR dem Verschieben (`aufdeckEreignis`)
     if (/discard|deleted/i.test(String(d.sourceLabel || ''))) return;   // aus Ablage/Geloescht-Stapel: nicht „from your deck or hand"
     const gs = this.gs;
     // W85b: der Suchende heisst `searcherName`; gleichnamige Sitze (zwei Konten/CPU mit demselben Anzeigenamen) duerfen nicht verwechselt werden — der Empfaenger des Fensters
@@ -47923,7 +47962,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!batch.length) return;
     const gruppen = new Map();
     for (const b of batch) {
-      const k = `${b.pi}|${b.source || ''}`;
+      const k = `${b.pi}|${b.source || ''}|${b.ereignis || ''}`;
       if (!gruppen.has(k)) gruppen.set(k, { pi: b.pi, source: b.source, namen: [], zone: b.zone });
       const g = gruppen.get(k);
       g.namen.push(...b.names);
@@ -47934,6 +47973,69 @@ this._deathWatch = (this._deathWatchStack || []).length
         await this.runHooks('onCardsRevealed', { playerIdx: g.pi, cardNames: g.namen, zone: g.zone, sourceName: g.source, _skipReactionCheck: true });
       } catch (err) { console.error('[Engine] onCardsRevealed:', err.message); }
     }
+  }
+
+  /**
+   * ★ W85c (Al 29.10.: „Atta löscht STATT auf die Hand") — AUFDECK-EREIGNIS VOR DEM VERSCHIEBEN.
+   * Ein Tutor, der Karten aus dem Deck (oder einer anderen Zone) aufdeckt UND auf die Hand nimmt, meldet das Aufdecken hier, SOLANGE DIE KARTEN NOCH IM DECK LIEGEN, und nimmt danach
+   * nur die Karten auf die Hand, die nicht gelöscht wurden. Eine gelöschte Karte kommt nie auf die Hand: keine Hand-Zugangs-Wirkungen (`onCardAddedToHand`, `onHandAddFromPile`,
+   * Tutor-Strichliste, Handlimit, Zieh-/Hand-Flug). Das Aufdecken selbst (Fenster für den Gegner) bleibt: `opts.fenster` (async) zeigt es VOR der Entscheidung.
+   *   names   — ALLE Karten dieses EINEN Ereignisses (gleichzeitig aufgedeckt: Aurora-Wahl, Sammelfenster, `together`); Bedingung „exactly 1 Normal Spell" gilt je Ereignis.
+   *   opts    — { zone: 'deck' (Standard) | 'hand', source: Kartenname (Ability-Titel zählt nicht), fenster: async () => {…} }
+   * Gibt { geloescht: [Namen, die ein Zuhörer (Atta) gelöscht hat — sie liegen schon im Gelöscht-Stapel], fensterGezeigt: bool } zurück. Ohne Zuhörer / ohne Normal Spell unter den Karten /
+   * in Rollouts passiert NICHTS (leeres Ergebnis, `fenster` wird nicht aufgerufen) — der Aufrufer läuft dann den alten Weg (erst verschieben, Fenster danach, `meldeAufgedeckt` per Prompt).
+   * Zeigt der Aufrufer sein Fenster später selbst, muss es `_aufdeckGemeldet: true` tragen, sonst meldet `_beobachtePrompt` das Ereignis ein zweites Mal.
+   */
+  async aufdeckEreignis(pi, names, opts = {}) {
+    const leer = { geloescht: [], fensterGezeigt: false };
+    if (this._inMctsSim || this._fastMode) return leer;
+    const liste = (names || []).filter(Boolean);
+    if (!liste.length || !this.gs?.players?.[pi]) return leer;
+    const quelle = opts.source || null;
+    const basis = quelle ? String(quelle).replace(/\s+Lv\s*\d.*$/i, '') : null;
+    const qcd = basis ? this._getCardDB()[basis] : null;
+    if (qcd && qcd.cardType === 'Ability') return leer;   // „except by the effect of an Ability"
+    const db = this._getCardDB();
+    if (!liste.some(n => { const cd = db[n]; return !!cd && cd.cardType === 'Spell' && String(cd.subtype || '').toLowerCase() === 'normal'; })) return leer;
+    if (!this._aufdeckHoerer(pi)) return leer;
+    if (typeof opts.fenster === 'function') await opts.fenster();
+    const geloescht = [];
+    try {
+      await this.runHooks('onCardsRevealed', { playerIdx: pi, cardNames: liste, zone: opts.zone || 'deck', sourceName: quelle, geloescht, _skipReactionCheck: true });
+    } catch (err) { console.error('[Engine] onCardsRevealed:', err.message); }
+    return { geloescht, fensterGezeigt: typeof opts.fenster === 'function' };
+  }
+
+  /**
+   * ★ W85c — Standard-Muster für einen Tutor, der seine Karten vor dem Verschieben kennt: `aufdeckEreignis` mit dem üblichen Such-Fenster des Gegners
+   * (`deckSearchReveal`, je Karte oder `together`; die Fenster tragen `_aufdeckGemeldet`). Gibt { geloescht, fensterGezeigt }. Danach nur die NICHT gelöschten Karten
+   * aufnehmen (`reveal:false`, wenn `fensterGezeigt`), sonst wie bisher (Fenster nach dem Verschieben).
+   */
+  async aufdeckTutorEreignis(pi, names, source, opts = {}) {
+    const ps = this.gs.players[pi];
+    const liste = (names || []).filter(n => (ps?.mainDeck || []).includes(n));
+    return this.aufdeckEreignis(pi, liste, {
+      source, zone: 'deck',
+      fenster: async () => {
+        if (opts.together) {
+          await this.promptGeneric(this.opponentOf(pi), { type: 'deckSearchReveal', cardName: liste[0], cardNames: liste.slice(), searcherName: ps.username, title: source, sourceLabel: 'deck', cancellable: false, _aufdeckGemeldet: true });
+        } else {
+          for (const n of liste) await this.promptGeneric(this.opponentOf(pi), { type: 'deckSearchReveal', cardName: n, searcherName: ps.username, title: source, cancellable: false, _aufdeckGemeldet: true });
+        }
+      },
+    });
+  }
+
+  /** Hört ein wirksamer Held/eine wirksame Karte von `pi` auf `onCardsRevealed` (Atta)? Billige Vorprüfung für `aufdeckEreignis`. */
+  _aufdeckHoerer(pi) {
+    for (const c of this.cardInstances || []) {
+      if (!c || c.zone !== ZONES.HERO) continue;
+      if (this.kontrolleurVonHeld(c.owner, c.heroIdx) !== pi) continue;
+      if (!loadCardEffect(c.counters?._effectOverride || c.name)?.hooks?.onCardsRevealed) continue;
+      if (this.isCardPassiveDormant(c)) continue;
+      return true;
+    }
+    return false;
   }
 
   /** Atta als Wirker eines REAKTIONS-Zaubers (Kettenglied, nicht initial): derselbe Ersatz „gelöscht statt Ablage". */
