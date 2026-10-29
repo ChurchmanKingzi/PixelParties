@@ -26489,3 +26489,35 @@ Repros (lokal, `docs/niche-tests/repro/W84/`): `a-01` (Third nach Vorzug), `a-02
 
 * **`dealsNoAttackDamage: true`** (Attack-Skript): die Attack richtet nie Schaden an (Alliance, Amazing Finding, Breakthrough, Capture, Divine Gift of Coolness, Forceful Revival [Eigenschaden ist kein Treffer], Midnight Assault, Mine! Mine! Mine!, Muscle Training, The Final Trial, YOU'RE ALIVE?!). `arrowTriggerCondition` (`_arrows-shared.js`) bietet dann jeden Pfeil NICHT an, dessen Wirkung am Schaden/Treffer hängt: Angelfeather Arrow, Magic Topaz, Flame, Poisoned, Golden, Hydra Blood (Standard — neue Pfeile sind damit richtig). Pfeile mit eigener, schadenunabhängiger Wirkung setzen `opts.effektOhneAngriffsschaden` und prüfen ihren eigenen Teil: Rainbow's Arrow (zieht 2 Karten — bleibt ankettbar), Racket Arrow (Gegnerkreatur zurück — braucht eine), Bomb Arrow (100 Schaden auf eine Gegnerkreatur — an schadenloser Attack nur mit Gegnerkreatur als Ziel). Eine NEUE Attack ohne Schaden setzt das Flag; die Liste der Attacks ohne Schaden steht im Kommentar von `_arrows-shared.js`.
 * **Senkungen werden UNGEKÜRZT gesammelt:** ein Hook, der Schaden „um N senkt", ruft `ctx.modifyAmount(-N)` (Vorbild Stoneskin) — NICHT `-Math.min(N, aktueller Betrag)`. Die Projektion (`max(0, Basis × Mult + Summe)`) klemmt am Ende bei 0. Mit der Kürzung gewann jeder spätere Zuschlag den Rest zurück: Pfeil-Bonus (kommt NACH der Hook-Runde in die Basis) — „80 ATK + Arrow +10 gegen Tempeste: 90 − 100 = 0, real kamen 10 durch". Korrigiert: Tempeste, the Weather Fairy, Loyal Labradoodle, Psychic Scout. NICHT betroffen: Boden-Regeln wie The Great Wall of Deri („reduced by 10, to a minimum of 10"), die vom Betrag zum Zeitpunkt des Hooks abhängen (offen: ein späterer Pfeil-Bonus wird dort auf den schon gesenkten Betrag gelegt).
+
+## Welle 85 / W85b — Atta × Aufdeck-Inventur, Ghostly Warning (Held-Identität) (29.10.2026)
+
+**Tester-Bericht:** „Atta reagiert nicht, wenn Angry Cheese / Aurora Borealis einen Spell aufdecken." Angry Cheese war im Harness korrekt (Atta braucht die SCHULE des gefundenen Spells in genügender Stufe — „that this Hero can use"); Aurora Borealis und weitere Eigenbau-Karten meldeten ihr Aufdecken nie.
+
+**Regel für neue Karten, deren Text „reveal" sagt:** das Aufdecken von Spells aus Deck/Hand MUSS bei Atta ankommen (`onCardsRevealed`). Kanonisch (nichts zu tun): `actionAddCardFromDeckToHand` ohne `reveal:false`, `searchDeckForNamedCard`, `revealSearchedCards`, `revealToOpponent`, die Helfer in `_deck-top-shared.js` (`decke`, `haltenImZentrum`). Eigenbau (`takeFromPile` + `handZugang`): **`engine.handZugang(ps, name, { von: 'deck', source: CARD_NAME, reveal: true })`** (neu) — ein Aufruf je Karte, gesammelt je Wirkung. Alles andere (Top-Karte, Handkarte, gezeigte Gruppe): `engine.meldeAufgedeckt(pi, [namen], { zone: 'hand' | 'deck', source: CARD_NAME })`. Aufdecken durch eine ABILITY (Titel = Ability-Karte) zählt nie. Wer `reveal:false` setzt, muss das gesammelte Fenster selbst öffnen (`revealSearchedCards` oder ein `deckSearchReveal`-Prompt mit `cardNames`) — Trial of Loyalty hatte nur den Kommentar dazu.
+
+**Engine-Härtung:** `meldeAufgedeckt` plant seine Auswertung über die Referenz `_aufgedecktFn` (wie `noteHandZugangAusStapel`) statt über das Flag `_aufgedecktGeplant` — `restore()` kappt die Nach-Ketten-Warteschlange, das Flag blieb dann für den Rest des Spiels gesetzt und Atta wurde nie wieder gefragt. `_beobachtePrompt` ordnet das Such-Fenster dem SUCHENDEN zu, auch wenn beide Sitze denselben Anzeigenamen tragen (vorher: erster Sitz mit dem Namen).
+
+| Karte | Aufdeckweg | Atta vorher | nachher |
+|---|---|---|---|
+| Angry Cheese, Sickly/Holy Cheese, Brilliant Idea, Magnetic Glove/Potion, Divine Gift of Creation/Edge, Brainstorming, Tanuki Escape, Crushing Defeat, Idol of Crestina, Fiona (Empty Vessel), Riffel, Cute Dog, Steam Dwarf Diver, Soul Shard Ren, Elusive Hind, Hell Fox … | Such-Fenster (`deckSearchReveal`) | ja | ja |
+| Aurora Borealis, Deepsea Treasure, Bifab | `takeFromPile` + `handZugang` | **nein** | ja (`reveal:true`) |
+| Trial of Loyalty | `reveal:false` + (fehlendes) Sammelfenster | **nein** | ja (Sammelfenster `deckSearchReveal` mit allen Karten, auch für den Gegner) |
+| Birthday Present, Magic Lamp | 3 Karten gezeigt, Gegner wählt | **nein** | ja (`meldeAufgedeckt`, alle 3; Karte beim Gegner findet Atta nicht auf der eigenen Hand) |
+| Heart of Cards, The Oracle of Heaven | Top-Karte (Treffer → Hand) | **nein** | ja (Treffer); Fehlschlag: Karte schon weg → kein Angebot |
+| Surprise Party | Top-Karten bis Creature | **nein** | ja (alle aufgedeckten; Rest wird zurückgemischt → Atta löscht aus dem Deck) |
+| Divine Gift of Magic, Future Tech Magic Modifier | Spell aus der Hand aufgedeckt | **nein** | ja |
+| Glimpse of the Future, End of the Future | sich selbst in der Starthand aufdecken | **nein** | ja |
+| Kassaran | gezogene Karte aufdecken (Kopie wird nur hinzugefügt) | **nein** | ja |
+| Codumbus | Top-Karte statt Ziehen | **nein** | ja (Treffer); Fehlschlag: wird gelöscht → kein Angebot |
+| Amazing Finding, Buttap, Sky Archeologist, Slave Trader, Super Fan, Time Tyrant, Thebinxan, Lunatic Cycle - New Moon, Cute Annoyance Mini … | `_deck-top-shared` / Such-Fenster | ja | ja |
+| Premonition, Inventing, Navigation, Trapping, Harpyformer-Abilities | Ability | nein (gewollt) | nein |
+| Madaga, Grasp the Future, Shanty Harpyformer | Handkarte aufdecken + Kopie suchen | nur die Kopie gemeldet | unverändert (Rückfrage: beide Karten zählen?) |
+| Chaos Magic, Third Circle of Hell, Timeless King Zi, Time Distortion | Aufdecken, Spell wird vom Effekt selbst gelöscht/gewirkt/abgelegt | nein | unverändert (Karte ist zur Auswertung weg; Rückfrage) |
+| Meditation, Magic Sapphire, Relic in the Sky | Ablage (nicht „deck or hand") | nein | nein (gewollt) |
+
+**Timing (unverändert):** Atta löscht die Karte erst, wenn sie schon auf der Hand liegt (Auswertung nach der Wirkung). Dadurch feuern vorher: `onCardAddedToHand` (Analyzer/Gatherer from the Cosmic Depths: Change Counter; Skeleton Demon: 50 × Anzahl Schaden; Future Tech Gear: 2 × Gear Karten Mill; Charm of Balance: 7-Karten-Grenze; Coreling: Handstufe), `onHandAddFromPile` (Control Monitors; Lunatic Cycle: Kostensenkung; Cute Annoyance Mini: Beschwörungs-Zusatz) und die Tutor-Strichliste (Koperniko). Löschte Atta „statt auf die Hand", entfielen alle.
+
+**Ghostly Warning / Atta (`_verzoegert-zauber-shared.js`):** „if that Hero is not defeated" verglich den Heldennamen — ein Aufstieg ändert den Namen der Heldenstelle, der Zauber verfiel mit `hero_gone`. Jetzt: gleicher Name ODER einer der beiden Namen ist ein Ascended Hero (Quetzahuitl, der den sterbenden Helden ersetzt, bleibt „anderer Held"). Delayed Casts laufen über `_castSpellImmediately` (`_skipReactionCheck`): kein Reaktionsfenster für den Gegner (wie alle Sofort-Güsse).
+
+Repros (lokal, `docs/niche-tests/repro/W85/`): `b-01` (Angry Cheese/Aurora), `b-02` (Inventur, 29 Zeilen, 14 rot → grün), `b-03` (Varianten: zweiter Held, übernommener Held, gleichnamige Spieler, Stufe/Wisdom, Once-per-turn, zwei Spells), `b-04` (Ghostly Warning).

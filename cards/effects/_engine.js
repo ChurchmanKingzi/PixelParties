@@ -13608,6 +13608,9 @@ class GameEngine {
       });
       this.noteDeckTutor(pi, cardName, opts.source || null, opts.searchSpec || null);
       if (!opts.ohneZugangsFenster) this.noteHandZugangAusStapel(pi, cardName, { pile: 'deck', source: opts.source || null });   // W72a: Control Monitors
+      // W85b (Atta): Eigenbau-Tutoren (`takeFromPile` + `handZugang`), deren Kartentext „reveal" sagt, melden das Aufdecken mit `reveal: true` — wie das Such-Fenster
+      // (`deckSearchReveal`) der kanonischen Wege. Kein `reveal` bei Wegen, die schon ueber `actionAddCardFromDeckToHand`/`revealSearchedCards` melden (sonst doppelt).
+      if (opts.reveal) this.meldeAufgedeckt(pi, [cardName], { zone: 'hand', source: opts.source || null });
     } else if (opts.von === 'ablage') {
       await this.runHooks(HOOKS.ON_CARD_ADDED_FROM_DISCARD_TO_HAND, {
         playerIdx: pi, fromOwnerIdx: opts.fromOwnerIdx ?? pi,
@@ -47892,9 +47895,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (qcd && qcd.cardType === 'Ability') return;   // „except by the effect of an Ability"
     if (!this._aufgedeckt) this._aufgedeckt = [];
     this._aufgedeckt.push({ pi, names: liste, zone: opts.zone || 'hand', source: quelle });
-    if (!this._aufgedecktGeplant) {
-      this._aufgedecktGeplant = true;
-      this.queuePostChainAction(() => this._wertAufgedecktAus());
+    // Genau EINE Auswertung vormerken. W85b: Referenz statt Flag (wie `noteHandZugangAusStapel`, W72a) — `restore()` kappt die Warteschlange der Nach-Ketten-Aktionen; ein
+    // Flag `_aufgedecktGeplant` blieb dann fuer den Rest des Spiels gesetzt, und Atta wurde nie wieder gefragt.
+    if (!this._aufgedecktFn || !(this._postChainActions || []).includes(this._aufgedecktFn)) {
+      this._aufgedecktFn = () => this._wertAufgedecktAus();
+      this.queuePostChainAction(this._aufgedecktFn);
     }
   }
 
@@ -47903,13 +47908,16 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!d || d.type !== 'deckSearchReveal') return;
     if (/discard|deleted/i.test(String(d.sourceLabel || ''))) return;   // aus Ablage/Geloescht-Stapel: nicht „from your deck or hand"
     const gs = this.gs;
-    let searcher = gs?.players ? gs.players.findIndex(p => p && p.username === d.searcherName) : -1;
+    // W85b: der Suchende heisst `searcherName`; gleichnamige Sitze (zwei Konten/CPU mit demselben Anzeigenamen) duerfen nicht verwechselt werden — der Empfaenger des Fensters
+    // (`opponentPi`) ist NIE der Suchende, und im Zweifel ist es sein Gegner.
+    const gleichnamig = gs?.players ? gs.players.map((p, i) => (p && p.username === d.searcherName && i !== opponentPi) ? i : -1).filter(i => i >= 0) : [];
+    let searcher = gleichnamig.length === 1 ? gleichnamig[0] : (gleichnamig.includes(this.opponentOf(opponentPi)) ? this.opponentOf(opponentPi) : (gleichnamig[0] ?? -1));
     if (searcher < 0) searcher = this.opponentOf(opponentPi);
     this.meldeAufgedeckt(searcher, d.cardNames || [d.cardName], { zone: 'hand', source: d.title || null });
   }
 
   async _wertAufgedecktAus() {
-    this._aufgedecktGeplant = false;
+    this._aufgedecktFn = null;
     const batch = this._aufgedeckt || [];
     this._aufgedeckt = [];
     if (!batch.length) return;

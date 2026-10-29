@@ -98,6 +98,7 @@ module.exports = {
 
     // Aufdecken gehoert zum Text und passiert auch ohne Reduktion.
     engine._broadcastEvent('card_reveal', { cardName: name, playerIdx: pi });
+    engine.meldeAufgedeckt(pi, [name], { zone: 'hand', source: CARD_NAME });   // W85b: Aufdecken → Atta (onCardsRevealed)
     await engine._delay(560);
 
     if (abzug > 0) {

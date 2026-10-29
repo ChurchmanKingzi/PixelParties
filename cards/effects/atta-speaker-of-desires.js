@@ -10,7 +10,10 @@
 //
 //  ── Bausteine ─────────────────────────────────────────────────────
 //  • Aufdecken: Hook `onCardsRevealed` (`engine.meldeAufgedeckt`, gesammelt je Wirkung, EIN Aufruf am Ende der Wirkung). Aufdecken durch den Effekt einer
-//    ABILITY (Premonition, Inventing, Navigation …) meldet die Engine gar nicht erst.
+//    ABILITY (Premonition, Inventing, Navigation …) meldet die Engine gar nicht erst. Quellen: Such-Fenster (`deckSearchReveal`), `revealToOpponent`, Deck-Aufdecker (`_deck-top-shared`)
+//    und Eigenbau-Karten mit `engine.meldeAufgedeckt(…)` bzw. `handZugang(…, { von: 'deck', reveal: true })` (Aurora Borealis, Deepsea Treasure, Bifab, Birthday Present, Magic Lamp, Heart of Cards …;
+//    Tabelle in CARD_API.md, „Welle 85 / W85b"). Die Auswertung laeuft NACH der Wirkung: eine Karte, die die Wirkung selbst schon wieder weggeschickt hat (Oracle of Heaven/Heart of Cards bei
+//    Fehlschlag, Chaos Magic, Third Circle, Rebelliokai Camouflaged Kappa), liegt dann weder auf der Hand noch im Deck — kein Angebot.
 //  • Verzoegertes Wirken: gemeinsamer Baustein mit Ghostly Warning (`_verzoegert-zauber-shared.js`) — Pflicht, ohne Stufen-/Status-/Wisdom-Pruefung.
 //  • Loeschen statt Ablage: Hero-Flag `deletesOwnSpellsInsteadOfDiscard`, gelesen von `engine.spellGoesToDeletedInstead` (doPlaySpell, Sofort-Guesse,
 //    Reaktionsketten).

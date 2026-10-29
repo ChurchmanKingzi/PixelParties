@@ -122,6 +122,7 @@ module.exports = {
       oppIdx,
       cards: revealed,
     });
+    engine.meldeAufgedeckt(pi, revealed, { zone: 'hand', source: CARD_NAME });   // W85b: „Reveal the top 3 cards of your deck“ → Atta (onCardsRevealed); Karten, die zum Gegner gehen, findet Atta auf der eigenen Hand nicht
     await engine._delay(REVEAL_ANIM_MS);
 
     // ── Step 4: prompt opp to click one of the floating cards ────────────

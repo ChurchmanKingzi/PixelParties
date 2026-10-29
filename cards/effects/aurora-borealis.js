@@ -168,7 +168,7 @@ module.exports = {
         if (!(await engine.takeFromPile(ps, 'deck', idx, { source: CARD_NAME, shuffle: true, toHand: true }))) continue;
         engine._broadcastEvent('card_reveal', { cardName: name });
         engine._broadcastEvent('deck_search_add', { cardName: name, playerIdx: pi });
-        await engine.handZugang(ps, name, { von: 'deck', source: CARD_NAME });
+        await engine.handZugang(ps, name, { von: 'deck', source: CARD_NAME, reveal: true });   // W85b: „reveal them“ → Atta (onCardsRevealed)
         geholt.push(name);
         engine.sync();
         await engine._delay(320);

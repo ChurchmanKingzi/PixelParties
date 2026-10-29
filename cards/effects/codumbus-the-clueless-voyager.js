@@ -89,6 +89,7 @@ module.exports = {
       const cardName = engine.revealTop(pi, 1)[0];
       if (!cardName) return;
       engine._broadcastEvent('card_reveal', { cardName, playerIdx: pi });
+      engine.meldeAufgedeckt(pi, [cardName], { zone: 'deck', source: CARD_NAME });   // W85b: aufgedeckt → Atta (Treffer: liegt danach auf der Hand; Fehlschlag: wird geloescht)
       await engine._delay(1000);
 
       const cd = engine._getCardDB()[cardName];
