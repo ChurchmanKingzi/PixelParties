@@ -34,31 +34,32 @@ const pct = (a, b) => b ? (100 * a / b).toFixed(1) + ' %' : '–';
 
 function text(R) {
   const L = [], pad = (s, n) => String(s).padEnd(n), num = (s, n) => String(s).padStart(n);
-  L.push(`Zeitraum: ${new Date(R.from).toISOString().slice(0, 16)} bis ${new Date(R.to).toISOString().slice(0, 16)} (UTC)`);
-  L.push('', pad('Schritt', 46) + num('Kohorte', 9) + num('von Landing', 13) + num('alle Akteure', 14));
-  const land = (R.steps[0] || {}).cohort || 0;
-  for (const s of R.steps) L.push(pad(s.label, 46) + num(s.cohort, 9) + num(pct(s.cohort, land), 13) + num(s.all, 14));
-  L.push('', 'Tutorial-Missionen:  gestartet → geschafft (eindeutige Akteure)');
+  L.push(`Zeitraum: ${new Date(R.from).toISOString().slice(0, 10)} bis ${new Date(R.to).toISOString().slice(0, 10)} (UTC, Tageszaehler)`);
+  const land = (R.steps[0] || {}).count || 0;
+  L.push('', pad('Schritt', 62) + num('Anzahl', 8) + num('von Landing', 13));
+  for (const s of R.steps) L.push(pad(s.label, 62) + num(s.count, 8) + num(pct(s.count, land), 13));
+  L.push('', 'Tutorial-Missionen:  gestartet (je Sitzung) → erstmals geschafft (je Konto)');
   for (const t of R.tutorial) L.push(`  Mission ${t.n}: ${num(t.started, 5)} → ${num(t.completed, 5)}   (${pct(t.completed, t.started)})`);
   const s = R.signups;
-  L.push('', `Konten angelegt: ${s.total}`, `  davon vorher als Gast gespielt: ${s.viaGuestPlayed}`, `  davon nur Gast geklickt, nicht gespielt: ${s.viaGuestNoGame}`, `  direkt (ohne Gastmodus): ${s.direct}`, `  ohne Besucher-ID (nicht zuordenbar): ${s.unattributed}`, `  mit Tutorial vorher: ${s.withTutorial}`, `  Weg: ${Object.entries(s.byMethod).map(([k, v]) => k + ' ' + v).join(', ') || '–'}`);
-  L.push('', `Gast-Partien beendet: ${R.guestGames.games}, davon gewonnen: ${R.guestGames.wins}`, `Besucher neu / wiederkehrend: ${R.newVsReturning.new} / ${R.newVsReturning.returning}`);
-  L.push('', 'Quellen (utm_source des Erstkontakts):');
+  L.push('', `Konten angelegt: ${s.total}`, `  aus einer Gast-Sitzung, Gast hatte CPU-Partien gespielt: ${s.viaGuestPlayed}`, `  aus einer Gast-Sitzung, nichts gespielt: ${s.viaGuestOnly}`, `  nicht aus einer Gast-Sitzung (direkt oder spaeter wiedergekommen): ${s.direct}`, `  Weg: Formular ${s.byMethod.form}, Gast-Fenster ${s.byMethod.guest_modal}, Google ${s.byMethod.google}`);
+  L.push('', `Gast-Partien beendet: ${R.guestGames.games}, davon gewonnen: ${R.guestGames.wins}`);
+  L.push('', 'Quellen (utm_source bzw. Referrer-Host der Sitzung):');
   for (const [k, v] of Object.entries(R.bySource).sort((a, b) => (b[1].landing || 0) - (a[1].landing || 0))) L.push(`  ${pad(k, 18)} Landing ${num(v.landing || 0, 5)}  Gast ${num(v.guest || 0, 5)}  Tutorial ${num(v.tutorial_start || 0, 5)}  Gast-Partie ${num(v.cpu_guest || 0, 5)}  Konto ${num(v.signup_done || 0, 4)}`);
+  L.push('', 'Hinweis: Es werden nur Zaehler gespeichert, keine IDs - es gibt keine eindeutigen Besucher.');
   return L.join('\n');
 }
 
 function exportFiles(R, dir) {
   fs.mkdirSync(dir, { recursive: true });
-  const land = (R.steps[0] || {}).cohort || 0, w = (name, rows) => fs.writeFileSync(path.join(dir, name + '.json'), JSON.stringify(rows, null, 1));
-  w('funnel_steps', R.steps.map((s, i) => ({ order: i + 1, step: s.label, cohort: s.cohort, all_actors: s.all, events: s.events, share_of_landing_pct: land ? Math.round(1000 * s.cohort / land) / 10 : null })));
+  const land = (R.steps[0] || {}).count || 0, w = (name, rows) => fs.writeFileSync(path.join(dir, name + '.json'), JSON.stringify(rows, null, 1));
+  w('funnel_steps', R.steps.map((s, i) => ({ order: i + 1, step: s.label, count: s.count, share_of_landing_pct: land ? Math.round(1000 * s.count / land) / 10 : null })));
   w('funnel_tutorial', R.tutorial.map(t => ({ mission: 'Mission ' + t.n, started: t.started, completed: t.completed, completion_pct: t.started ? Math.round(1000 * t.completed / t.started) / 10 : null })));
   const S = R.signups;
-  w('funnel_signups', [['Vorher als Gast gespielt', S.viaGuestPlayed], ['Gast geklickt, nicht gespielt', S.viaGuestNoGame], ['Direkt, ohne Gastmodus', S.direct], ['Nicht zuordenbar', S.unattributed]].map(([group, count]) => ({ group, count })));
+  w('funnel_signups', [['Gast-Sitzung, CPU-Partien gespielt', S.viaGuestPlayed], ['Gast-Sitzung, nichts gespielt', S.viaGuestOnly], ['Nicht aus Gast-Sitzung', S.direct]].map(([group, count]) => ({ group, count })));
   w('funnel_sources', Object.entries(R.bySource).map(([source, v]) => ({ source, landing: v.landing || 0, guest: v.guest || 0, tutorial: v.tutorial_start || 0, guest_game: v.cpu_guest || 0, accounts: v.signup_done || 0 })));
   const dm = {}; R.daily.forEach(r => { (dm[r.day] = dm[r.day] || { day: r.day, landing: 0, guest: 0, tutorial: 0, accounts: 0 })[{ landing: 'landing', guest_start: 'guest', tutorial_start: 'tutorial', signup_done: 'accounts' }[r.ev]] = r.c; });
   w('funnel_daily', Object.values(dm).sort((a, b) => a.day.localeCompare(b.day)));
-  w('funnel_range', [{ from: new Date(R.from).toISOString(), to: new Date(R.to).toISOString(), visitors_new: R.newVsReturning.new, visitors_returning: R.newVsReturning.returning, guest_games_finished: R.guestGames.games, guest_games_won: R.guestGames.wins, accounts_total: S.total }]);
+  w('funnel_range', [{ from: new Date(R.from).toISOString().slice(0, 10), to: new Date(R.to).toISOString().slice(0, 10), guest_games_finished: R.guestGames.games, guest_games_won: R.guestGames.wins, accounts_total: S.total, accounts_via_form: S.byMethod.form, accounts_via_guest_window: S.byMethod.guest_modal, accounts_via_google: S.byMethod.google }]);
   console.log('Geschrieben nach', path.resolve(dir), '- sechs Dateien (funnel_*.json)');
 }
 const args = process.argv.slice(2);

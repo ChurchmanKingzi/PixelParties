@@ -4992,40 +4992,45 @@ window.addDragListeners = addDragListeners;
 // ===== API HELPER =====
 window.AUTH_TOKEN = null;
 
-// ===== SPIELER-TRICHTER (anonyme Statistik, siehe funnel.js) =====
-// Besucher-ID: zufaellige Zeichenfolge im localStorage (`pp_vid`) — keine Person, keine IP, keine E-Mail. Sie wird als Header
-// `x-pp-vid` an jede API-Anfrage gehaengt, damit der Server Gast -> Tutorial -> Konto demselben Besucher zuordnen kann.
-// Aus: ?nostats=1 (merkt sich der Browser, ?nostats=0 hebt auf), Do-Not-Track, Global Privacy Control. Dann geht 'skip' als ID raus.
+// ===== SPIELER-TRICHTER (anonyme Zaehler, siehe funnel.js) =====
+// KEINE Besucher-ID, kein Cookie, nichts Eindeutiges. Nur zwei grobe Etiketten liegen in sessionStorage (Tab-Sitzung) und gehen als
+// Header mit: Quelle (utm_source oder Referrer-Host) und Geraeteklasse (phone | tablet | desktop). Aus: ?nostats=1 (merkt sich der
+// Browser als Einstellung, ?nostats=0 hebt auf), Do-Not-Track, Global Privacy Control. Dann geht nur `x-pp-off: 1` raus.
 const ppFunnel = (() => {
-  const KEY = 'pp_vid', OFF = 'pp_nostats';
-  const rand = () => { try { const a = new Uint8Array(16); crypto.getRandomValues(a); return Array.from(a, b => b.toString(16).padStart(2, '0')).join(''); } catch { return (Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2) + '0000000000000000').slice(0, 24); } };
-  let mem = null, returning = false, existed = false;
-  try { existed = !!localStorage.getItem(KEY); } catch {}
+  const OFF = 'pp_nostats';
+  try { localStorage.removeItem('pp_vid'); } catch {}   // Rest aus einem frueheren Stand dieser Statistik (Besucher-ID): entfernen
   try { const q = new URLSearchParams(location.search).get('nostats'); if (q === '1') localStorage.setItem(OFF, '1'); else if (q === '0') localStorage.removeItem(OFF); } catch {}
   const off = () => { try { if (localStorage.getItem(OFF) === '1') return true; } catch {} return navigator.doNotTrack === '1' || window.doNotTrack === '1' || navigator.globalPrivacyControl === true; };
-  function vid() {
-    if (off()) return 'skip';
-    try { let v = localStorage.getItem(KEY); if (v) { returning = existed; return v; } v = rand(); localStorage.setItem(KEY, v); return v; } catch { return mem || (mem = rand()); }
-  }
+  const label = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, 24);
+  const labels = () => {
+    try {
+      let src = sessionStorage.getItem('pp_src'), dev = sessionStorage.getItem('pp_dev');
+      if (src === null || dev === null) {
+        const q = new URLSearchParams(location.search); let ref = '';
+        try { const h = document.referrer ? new URL(document.referrer).hostname.replace(/^www\./, '') : ''; ref = h && h !== location.hostname ? h : ''; } catch {}
+        src = label(q.get('utm_source')) || label(ref) || '(direkt)';
+        const coarse = matchMedia('(pointer: coarse)').matches, small = Math.min(screen.width, screen.height) <= 700;
+        dev = coarse && small ? 'phone' : coarse ? 'tablet' : 'desktop';
+        sessionStorage.setItem('pp_src', src); sessionStorage.setItem('pp_dev', dev);
+      }
+      return { src, dev };
+    } catch { return { src: '(direkt)', dev: 'desktop' }; }
+  };
+  function headers() { if (off()) return { 'x-pp-off': '1' }; const l = labels(); return { 'x-pp-src': l.src, 'x-pp-dev': l.dev }; }
   function hit() {
     try {
       if (off() || sessionStorage.getItem('pp_hit')) return; sessionStorage.setItem('pp_hit', '1');
-      const id = vid(), q = new URLSearchParams(location.search); let ref = '';
-      try { const h = document.referrer ? new URL(document.referrer).hostname : ''; ref = h && h !== location.hostname ? h : ''; } catch {}
-      const small = Math.min(screen.width, screen.height) <= 700, coarse = matchMedia('(pointer: coarse)').matches;
-      const body = { vid: id, src: q.get('utm_source') || '', med: q.get('utm_medium') || '', camp: q.get('utm_campaign') || '', content: q.get('utm_content') || '', ref,
-        device: coarse && small ? 'phone' : coarse ? 'tablet' : 'desktop', returning, standalone: matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches };
-      fetch('/api/funnel/hit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), keepalive: true }).catch(() => {});
+      const l = labels();
+      fetch('/api/funnel/hit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ src: l.src, device: l.dev }), keepalive: true }).catch(() => {});
     } catch {}
   }
-  return { vid, hit };
+  return { headers, hit };
 })();
 window.ppFunnel = ppFunnel;
-ppFunnel.vid();   // setzt `returning` korrekt, bevor hit() läuft
 ppFunnel.hit();
 
 async function api(path, opts = {}) {
-  const headers = { 'Content-Type': 'application/json', 'x-pp-vid': ppFunnel.vid() };
+  const headers = { 'Content-Type': 'application/json', ...ppFunnel.headers() };
   if (window.AUTH_TOKEN) headers['x-auth-token'] = window.AUTH_TOKEN;
   const res = await fetch('/api' + path, { ...opts, headers: { ...headers, ...opts.headers } });
   const data = await res.json();
