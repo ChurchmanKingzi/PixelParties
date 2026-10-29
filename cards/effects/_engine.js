@@ -578,6 +578,7 @@ function todesWacheAn() {
   return v === '1' || v === 'true' || v === 'ja' || v === 'on';
 }
 
+const _v8Stat = require('v8');   // billige Heap-Statistik für `_crashProbe` (statt process.memoryUsage())
 class GameEngine {
   /**
    * @param {object} room - The room object from server.js
@@ -1283,7 +1284,10 @@ class GameEngine {
     const sink = this._crashTrailSink;
     if (!sink) return;
     try {
-      const used = process.memoryUsage().heapUsed;
+      // `process.memoryUsage()` kostet im laufenden Spiel ~75 µs (RSS-Lesen + Heap-Statistik) und lief hier bei JEDEM Hook und Snapshot —
+      // in Bone Rush rund 6 % der Spielzeit, in der Absturz-Sonde, die laut Doku „eine Zahl-Subtraktion" kosten soll. `heapUsed` ist
+      // exakt `used_heap_size` der V8-Statistik, die ohne RSS-Lesen auskommt.
+      const used = _v8Stat.getHeapStatistics().used_heap_size;
       const step = this._crashProbeStep || (this._crashProbeStep = 100 * 1048576);
       if (this._crashProbeLast == null) { this._crashProbeLast = used; return; }
       if (used - this._crashProbeLast < step) {
