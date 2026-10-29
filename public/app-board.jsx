@@ -188,10 +188,18 @@ if (typeof document !== 'undefined' && !window._ppHandTippAktiv_installiert) {
     start = t ? { x: t.clientX, y: t.clientY, at: performance.now(), el, kartenEl: e.target && e.target.closest && e.target.closest('.board-card'), lang: false } : null;
     if (start && start.kartenEl && start.kartenEl._ppTip) {
       const s1 = start;
-      setTimeout(() => { if (start === s1) s1.lang = true; }, window.LONG_PRESS_MS || 400);
+      setTimeout(() => {
+        if (start !== s1) return;
+        s1.lang = true;
+        // Langdruck auf einer HANDkarte: ihr Tooltip (die Hand faengt die Beruehrung ab, `BoardCard.onTouchStart` bekommt sie nie) — nur ohne Zug/Wisch.
+        if (s1.el && !s1.bewegt && !window.activeDragData && !_isDraggingCard && s1.el._ppTip) { aktiv = s1.el; setBoardTooltip(s1.el._ppTip); }
+      }, window.LONG_PRESS_MS || 400);
     }
-    // Tipp ausserhalb der gezeigten Karte: Tooltip weg
-    if (aktiv && (!el || el !== aktiv)) { aktiv = null; window._boardTooltipSetter?.(null); }
+    // (Der Tooltip bleibt jetzt stehen, bis man ins Leere tippt — der Tipp-Waechter in app-shared schliesst ihn.)
+  }, { capture: true, passive: true });
+  document.addEventListener('touchmove', (e) => {
+    const t = e.touches && e.touches[0];
+    if (start && t && Math.abs(t.clientX - start.x) + Math.abs(t.clientY - start.y) > 12) start.bewegt = true;
   }, { capture: true, passive: true });
   document.addEventListener('touchend', (e) => {
     const s0 = start; start = null;

@@ -140,14 +140,39 @@ function setTapTooltip(cardName) {
 }
 function clearTapTooltip() { setTapTooltip(null); }
 
-// Dismiss tooltip on any touch end (after long-press)
+// Zeitpunkt der letzten Beruehrung: ein Tooltip, der kurz danach erscheint (auch ueber die nachgeschobenen Maus-Ereignisse eines Tipps), gilt als
+// per Touch geoeffnet und bleibt (`_ppTipTouch`) — Maus-Verlassen-Ereignisse und der Sicherheits-Takt raeumen ihn dann nicht mehr ab.
+document.addEventListener('touchstart', () => { window._ppTouchAt = performance.now(); }, { capture: true, passive: true });
+document.addEventListener('touchend', () => { window._ppTouchAt = performance.now(); }, { capture: true, passive: true });
+// Tooltip schliessen, auch wenn er per Touch festgehalten wird.
+window._ppTipSchliessen = () => {
+  window._ppTipTouch = false;
+  window._ppTipForce = true;
+  try { if (window._boardTooltipSetter) window._boardTooltipSetter(null); } finally { window._ppTipForce = false; }
+};
+// Tipp-Waechter: ein TIPP (kaum Bewegung) auf eine Stelle, die weder Karte noch Tooltip ist, schliesst den festgehaltenen Tooltip.
+(function () {
+  const BEHALTEN = '.board-tooltip, .board-card, .card-mini, .hand-slot, .hand-card, .status-badge, .buff-icon, .card-reveal-entry, [data-card-name]';
+  let d = null;
+  document.addEventListener('touchstart', (e) => {
+    const t = e.touches && e.touches[0];
+    d = (t && e.touches.length === 1) ? { x: t.clientX, y: t.clientY, aussen: !(e.target && e.target.closest && e.target.closest(BEHALTEN)) } : null;
+  }, { capture: true, passive: true });
+  document.addEventListener('touchmove', (e) => {
+    const t = e.touches && e.touches[0];
+    if (d && t && Math.abs(t.clientX - d.x) + Math.abs(t.clientY - d.y) > 12) d = null;
+  }, { capture: true, passive: true });
+  document.addEventListener('touchend', () => {
+    const s0 = d; d = null;
+    if (s0 && s0.aussen && window._ppTipTouch) window._ppTipSchliessen();
+  }, { capture: true, passive: true });
+})();
+
+// ★ Mobil: Der Karten-Tooltip BLEIBT nach dem Loslassen stehen (sonst laesst sich ein langer Tooltip nie scrollen) und verschwindet erst, wenn man
+// ins Leere tippt (siehe `_ppTipSchliessen` / der Tipp-Waechter unten). Frueher raeumte das Loslassen nach einem Langdruck ihn nach 50 ms weg.
 document.addEventListener('touchend', () => {
   clearTimeout(window._longPressTimer);
-  if (window._longPressFired) {
-    // Small delay so the tooltip is visible before dismissing
-    setTimeout(clearTapTooltip, 50);
-    window._longPressFired = false;
-  }
+  window._longPressFired = false;
 }, { passive: true });
 document.addEventListener('touchmove', () => {
   // Cancel long-press if finger moves
@@ -9854,16 +9879,20 @@ function useCardTooltip(opts) {
   // Wire global setter so BoardCard / CardMini components trigger this tooltip
   useEffect(() => {
     window._boardTooltipSetter = (card) => {
+      // Per Touch geoeffnet → festhalten: Verlassen-Ereignisse (Maus-Emulation) schliessen ihn nicht, nur `_ppTipSchliessen`.
+      if (!card && window._isTouchDevice && window._ppTipTouch && !window._ppTipForce) return;
+      if (card && window._isTouchDevice && performance.now() - (window._ppTouchAt || 0) < 900) window._ppTipTouch = true;
+      if (!card) window._ppTipTouch = false;
       setTooltipCard(card || null);
       if (card) setTooltipSide(defaultSide); // BoardCard hover → always use defaultSide
     };
-    return () => { window._boardTooltipSetter = null; };
+    return () => { window._boardTooltipSetter = null; window._ppTipTouch = false; };
   }, [defaultSide]);
 
   // Touch: sync with global tap-tooltip state
   useEffect(() => {
     if (!window._isTouchDevice) return;
-    const sync = (activeCard) => { if (!activeCard) setTooltipCard(null); };
+    const sync = (activeCard) => { if (!activeCard && !window._ppTipTouch) setTooltipCard(null); };
     if (window._tapTooltipSetters) window._tapTooltipSetters.add(sync);
     return () => { if (window._tapTooltipSetters) window._tapTooltipSetters.delete(sync); };
   }, []);
