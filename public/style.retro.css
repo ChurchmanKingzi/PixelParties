@@ -7792,7 +7792,7 @@ body:has(.textbox-overlay) .tooltip { z-index: 90003 !important; }
   padding: 16px 22px calc(16px + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
 }
-.rotate-device-overlay .rotate-logo { width: min(78vw, 340px); }
+.rotate-device-overlay .rotate-logo { width: 100vw; max-width: none; flex: none; }
 .rotate-device-overlay .rotate-logo .pp-logo-img { width: 100%; height: auto; max-height: none; }
 .rotate-device-overlay .rotate-phone { position: relative; width: 132px; height: 132px; flex: none; }
 .rotate-device-overlay .rotate-phone svg { position: absolute; left: 50%; top: 50%; image-rendering: pixelated; }
