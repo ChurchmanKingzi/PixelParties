@@ -185,12 +185,21 @@ if (typeof document !== 'undefined' && !window._ppHandTippAktiv_installiert) {
   document.addEventListener('touchstart', (e) => {
     const t = e.touches && e.touches[0];
     const el = handKarte(e.target);
-    start = t ? { x: t.clientX, y: t.clientY, at: performance.now(), el } : null;
+    start = t ? { x: t.clientX, y: t.clientY, at: performance.now(), el, kartenEl: e.target && e.target.closest && e.target.closest('.board-card'), lang: false } : null;
+    if (start && start.kartenEl && start.kartenEl._ppTip) {
+      const s1 = start;
+      setTimeout(() => { if (start === s1) s1.lang = true; }, window.LONG_PRESS_MS || 400);
+    }
     // Tipp ausserhalb der gezeigten Karte: Tooltip weg
     if (aktiv && (!el || el !== aktiv)) { aktiv = null; window._boardTooltipSetter?.(null); }
   }, { capture: true, passive: true });
   document.addEventListener('touchend', (e) => {
     const s0 = start; start = null;
+    // Langdruck auf einer Brettkarte: nur der Tooltip — das nachgeschobene Klick-/Mausereignis (ab ~400 ms moeglich) wird abgesagt.
+    if (window._isTouchDevice && s0 && s0.lang && e.cancelable) {
+      const q = e.changedTouches && e.changedTouches[0];
+      if (q && Math.abs(q.clientX - s0.x) + Math.abs(q.clientY - s0.y) <= 12) e.preventDefault();
+    }
     if (!window._isTouchDevice || !s0 || !s0.el || window.activeDragData || _isDraggingCard) return;
     const t = e.changedTouches && e.changedTouches[0];
     if (!t || Math.abs(t.clientX - s0.x) + Math.abs(t.clientY - s0.y) > 12) return;   // Wisch / Zug
@@ -199,7 +208,7 @@ if (typeof document !== 'undefined' && !window._ppHandTippAktiv_installiert) {
     if (!tip) return;
     aktiv = s0.el;
     setBoardTooltip(tip);
-  }, { capture: true, passive: true });
+  }, { capture: true, passive: false });
 }
 
 // ★ v1478 (Als Vorgabe 28.9.: „Die Karte(n) in der Pop-Up-Box sind jetzt
@@ -42968,7 +42977,42 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
    *   (Als Ruling: kein Ziel fuer Loot the Leftovers & Co.). Danach
    *   laeuft sie durch dieselbe Spielbarkeits- und Ziehmaschine.
    */
+  // ★ Mobil: Ein TIPP spielt/aktiviert die Handkarte wie bisher (und zeigt den Tooltip, s. ppHandTipp), ein LANGES Halten zeigt NUR den Tooltip
+  // und loest nichts aus. Dafuer startet die eigentliche Handlung (`onHandMouseDownJetzt`) auf Touch erst beim Loslassen eines kurzen Tipps —
+  // oder sofort, sobald der Finger zieht (Drag aus der Hand; die ersten 5 px Bewegung entscheiden). Maus: unveraendert sofort.
   const onHandMouseDown = (e, idx, fromCreation = false) => {
+    const t0 = e.type === 'touchstart' && e.touches && e.touches[0];
+    if (!t0) return onHandMouseDownJetzt(e, idx, fromCreation);
+    const x0 = t0.clientX, y0 = t0.clientY;
+    const ersatz = {   // die echte Ereignis-Huelle ist nach dem Handler nicht mehr nutzbar (currentTarget = null)
+      type: 'touchstart', button: 0, cancelable: false, currentTarget: e.currentTarget, target: e.target,
+      touches: [{ clientX: x0, clientY: y0 }], changedTouches: [{ clientX: x0, clientY: y0 }],
+      preventDefault() {}, stopPropagation() {},
+    };
+    let lang = false, erledigt = false;
+    const timer = setTimeout(() => { lang = true; }, window.LONG_PRESS_MS || 400);
+    const bewegt = (ev) => {
+      const q = ev.touches && ev.touches[0];
+      if (erledigt || !q || Math.abs(q.clientX - x0) + Math.abs(q.clientY - y0) <= 5) return;
+      erledigt = true; abbau();
+      onHandMouseDownJetzt(ersatz, idx, fromCreation);   // Zug: Drag beginnt (auch nach langem Halten)
+    };
+    const ende = (ev) => {
+      if (erledigt) return;
+      erledigt = true; abbau();
+      if (ev.type === 'touchend' && !lang) onHandMouseDownJetzt(ersatz, idx, fromCreation);   // kurzer Tipp
+    };
+    function abbau() {
+      clearTimeout(timer);
+      document.removeEventListener('touchmove', bewegt, true);
+      document.removeEventListener('touchend', ende, true);
+      document.removeEventListener('touchcancel', ende, true);
+    }
+    document.addEventListener('touchmove', bewegt, { capture: true, passive: true });
+    document.addEventListener('touchend', ende, { capture: true, passive: true });
+    document.addEventListener('touchcancel', ende, { capture: true, passive: true });
+  };
+  const onHandMouseDownJetzt = (e, idx, fromCreation = false) => {
     if (e.type === 'mousedown' && e.button !== 0) return;
     if (isSpectator) return; // Spectators can't interact with cards
     const cardName = fromCreation ? (me.creationZone || [])[idx] : hand[idx];
@@ -62795,9 +62839,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <button key={pIdx} className={'btn' + (stGezeigt ? ' st-picker-viewed' : '')} style={{ padding: '12px 18px', fontSize: 13, borderColor: clr, color: clr, display: 'flex', alignItems: 'center', gap: 12 }}
                   onMouseEnter={stMulti && !isMe ? () => setStFocusPin(pIdx) : undefined}
                   onClick={() => respondToPrompt({ playerIdx: pIdx })}>
-                  {p.avatar && <img src={p.avatar} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />}
+                  {/* Name und Bild wie oben links in der Handleiste: CPU-Gegner → Kurzname + Heldenbild (statt „CPU" ohne Bild), Tutorial → Monia Bot / Antonia */}
+                  {(() => {
+                    const tg = !isMe && tutorialGegner ? tutorialGegner : null;
+                    const bild = tg ? tg.avatar : p.avatar;
+                    const held = portraetHeld(p);
+                    if (bild) return <img src={bild} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />;
+                    if (held && HeroArtCrop) return <HeroArtCrop heroName={held} width={56} />;
+                    return null;
+                  })()}
                   <div>
-                    <div style={{ fontWeight: 700 }}>{p.username}{isMe ? ' (you)' : ''}</div>
+                    <div style={{ fontWeight: 700 }}>{
+                      !isMe && tutorialGegner ? tutorialGegner.name
+                      : (!isMe && gameState.isCpuBattle && p.username === 'CPU')
+                        ? heroDisplayName(portraetHeld(p) || p.username)
+                        : p.username
+                    }{isMe ? ' (you)' : ''}</div>
                   </div>
                   {stGezeigt && <span className="st-picker-badge" title="This player's board is on screen">ON SCREEN</span>}
                 </button>
