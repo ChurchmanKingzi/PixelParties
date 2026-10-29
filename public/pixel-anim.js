@@ -42,6 +42,8 @@
     ditherSchritt: 2,    // Dither-Stufen der ANIMIERTEN Deckkraft: 1 = alle 16, 2 = 8 Stufen (halb so viele Stilwechsel je Fade; Standard)
     dither: true,        // false: Deckkraft nur ein/aus (ab 50 %), keine Masken (Messung/Notbremse)
     ditherMin: 400,      // Elemente mit kleinerer Flaeche (px², z. B. 20 x 20) blenden nur ein/aus statt zu dithern (billiger, bei Partikeln unsichtbar; 0 = alle dithern)
+    globalMaxBilder: 40, // dokumentweit (Oberflaeche): hoechstens so viele Bilder je Durchlauf (Umgebungsteilchen mit langen Schleifen laufen dann ~10 Bilder/s)
+    globalSofort: 14,    // dokumentweit: Animationen mit mehr Abtastungen werden in Zeitscheiben (~6 ms je ~30 ms) nachgebacken statt sofort
     globalMaxDauer: 8000,// dokumentweit (Oberflaeche) werden nur Animationen/Uebergaenge bis zu dieser Dauer (ms) gebacken (Countdown-Balken u. ae. bleiben)
     direkt: true,        // Blaetter ohne Kinder animieren `mask-image` selbst statt ueber eine vererbte Variable
     aktiv: true,
@@ -581,8 +583,27 @@
   }
 
   /** Eine Animation (CSSAnimation, CSSTransition oder WAAPI) in pixelkonforme gehaltene Bilder umbauen. */
-  function backen(anim, budget, weich) {
-    if (!KONFIG.aktiv || gebacken.has(anim)) return false;
+  // Nachbacken in Zeitscheiben (nur Oberflaeche): viele lange Schleifen auf einmal (Titelbild: ~180 schwebende Teilchen) wuerden den ersten
+  // Frame blockieren. Die Animation laeuft solange unveraendert weiter; beim Nachbacken bleibt ihre Zeitachse erhalten.
+  const _warte = [];
+  let _wartePlan = false;
+  function _arbeiten() {
+    _wartePlan = false;
+    const t0 = performance.now();
+    while (_warte.length && performance.now() - t0 < 6) {
+      const [anim, weich] = _warte.shift();
+      try { if (anim.playState !== 'idle' && anim.playState !== 'finished') backen(anim, null, weich, true); } catch (e) { /* weg */ }
+    }
+    if (_warte.length) _planen();
+  }
+  function _planen() {
+    if (_wartePlan) return;
+    _wartePlan = true;
+    setTimeout(_arbeiten, 24);                 // ~6 ms Arbeit je ~30 ms: rund ein Fuenftel eines Kerns, Titelbild in ~3 s fertig
+  }
+
+  function backen(anim, budget, weich, sofort) {
+    if (!KONFIG.aktiv || (gebacken.has(anim) && !sofort)) return false;
     gebacken.add(anim);
     let eff;
     try { eff = anim.effect; } catch (e) { return false; }
@@ -595,6 +616,7 @@
     const dauer = +t.duration;
     if (!(dauer > 0) || !Number.isFinite(dauer) || kfs.length < 2) return false;
     if (weich && dauer > KONFIG.globalMaxDauer) { stat.uebersprungen++; return false; }
+    if (weich && !sofort && Math.min(KONFIG.globalMaxBilder, Math.ceil(dauer / TAKT_MS())) > KONFIG.globalSofort) { _warte.push([anim, weich]); _planen(); return false; }
     const props = eigenschaften(kfs);
     if (!props.length) return false;
     if (istKonform(kfs, props, dauer)) {
@@ -648,7 +670,7 @@
     const delay2 = Math.round(delay0 / T) * T;
     const D2 = Math.max(T, Math.round(dauer / T) * T);
     // ── Abtastraster ──
-    let stride = Math.max(1, Math.ceil(D2 / T / KONFIG.maxBilder));
+    let stride = Math.max(1, Math.ceil(D2 / T / (weich ? Math.min(KONFIG.maxBilder, KONFIG.globalMaxBilder) : KONFIG.maxBilder)));
     if (budget && budget.rest !== undefined) {
       const anteil = Math.max(6, Math.floor(budget.rest / Math.max(1, budget.offen)));
       stride = Math.max(stride, Math.ceil(D2 / T / anteil));
