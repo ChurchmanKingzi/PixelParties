@@ -69,34 +69,44 @@ window.addEventListener('touchstart', function onFirstTouch() {
 // Geste), scharft sich der Griff nach 1,5 s wieder: die naechste
 // Beruehrung holt es zurueck. Das ist das uebliche Verhalten von
 // Browserspielen im Querformat.
+// Ergebnis: Promise<{ fs, locked }> — fs: Vollbild aktiv, locked: Querformat gesperrt (Android/Chrome). Gleichzeitige Aufrufe
+// (globaler Tipp-Griff + Klick auf dem Dreh-Bildschirm) teilen sich dieselbe Anfrage.
+let _ppFsPending = null;
+function _ppLockSupported() { try { return !!(screen.orientation && typeof screen.orientation.lock === 'function'); } catch { return false; } }
 function _ppRequestFullscreen(force) {
   const el = document.documentElement;
   const req = el.requestFullscreen || el.webkitRequestFullscreen;
-  if (document.fullscreenElement || document.webkitFullscreenElement || !req) return;
-  if (!force && window.innerWidth <= window.innerHeight) return;   // nur im Querformat (force: Knopf auf dem Dreh-Bildschirm)
+  const isFs = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  if (_ppFsPending) return _ppFsPending;
+  if (isFs() || !req) return Promise.resolve({ fs: isFs(), locked: false });
+  if (!force && window.innerWidth <= window.innerHeight) return Promise.resolve({ fs: false, locked: false });   // nur im Querformat (force: Antippen auf dem Hochformat-Bildschirm)
+  const lock = () => {
+    try { return screen.orientation.lock('landscape').then(() => true, () => false); } catch { return Promise.resolve(false); }
+  };
   try {
-    const p = req.call(el, { navigationUI: 'hide' });
-    const lock = () => {
-      try {
-        const o = screen.orientation;
-        if (o && o.lock) o.lock('landscape').catch(() => {});
-      } catch {}
-    };
-    if (p && p.then) p.then(lock).catch(() => {}); else lock();
-  } catch {}
+    const r = req.call(el, { navigationUI: 'hide' });
+    _ppFsPending = Promise.resolve(r).then(() => lock()).then(locked => ({ fs: isFs(), locked }), () => ({ fs: false, locked: false }));
+  } catch { return Promise.resolve({ fs: false, locked: false }); }
+  _ppFsPending.then(() => { _ppFsPending = null; });
+  return _ppFsPending;
 }
 window._ppRequestFullscreen = _ppRequestFullscreen;
 window._ppFullscreenSupported = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
-// Jede Beruehrung (Antippen) im Querformat holt das Vollbild, solange es nicht aktiv ist. Dauerhaft angehaengt:
-// frueher war der Griff einmalig — eine erste Beruehrung im Hochformat (auf dem Dreh-Bildschirm) hat ihn verbraucht,
-// danach kam das Vollbild nie mehr von allein. Nach einem Verlassen (Zurueck-Geste) ruht er 1,5 s.
+window._ppLandscapeLockSupported = _ppLockSupported();
+// Jede Beruehrung (Antippen) holt das Vollbild, solange es nicht aktiv ist — im Querformat direkt, im Hochformat samt
+// Querformat-Sperre (das Geraet dreht sich dann von selbst; nur wo `screen.orientation.lock` existiert). Dauerhaft angehaengt:
+// frueher war der Griff einmalig — eine erste Beruehrung im Hochformat verbrauchte ihn, danach kam das Vollbild nie
+// mehr von allein. Nach einem Verlassen (Zurueck-Geste) ruht er 1,5 s.
 let _ppFsCooldownUntil = 0;
 function _ppFullscreenOnTap(e) {
   if (e.type === 'pointerup' && e.pointerType !== 'touch') return;
   if (!window.matchMedia || !window.matchMedia('(pointer: coarse)').matches) return;   // Touch-Notebooks/Maus: kein Zwangs-Vollbild
   window._isTouchDevice = true;
+  if (e.target && e.target.closest && e.target.closest('.rotate-panel-pc')) return;   // Link kopieren / Discord auf dem Hochformat-Bildschirm
   if (Date.now() < _ppFsCooldownUntil) return;
-  _ppRequestFullscreen();
+  const portrait = window.innerWidth <= window.innerHeight;
+  if (portrait && !(window._ppFullscreenSupported && window._ppLandscapeLockSupported)) return;   // ohne Sperre hilft Vollbild im Hochformat nicht
+  _ppRequestFullscreen(portrait);
 }
 window.addEventListener('touchend', _ppFullscreenOnTap, { passive: true, capture: true });
 window.addEventListener('pointerup', _ppFullscreenOnTap, { passive: true, capture: true });

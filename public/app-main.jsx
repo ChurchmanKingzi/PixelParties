@@ -3271,6 +3271,11 @@ function applyPixelHoverCursor(hex) {
 // Weitergeben des Links (am PC/Tablet spielen). Sichtbar nur im Hochformat (CSS `.rotate-device-overlay`).
 function RotateOverlay() {
   const [copied, setCopied] = useState(false);
+  // Standard (Android/Chrome u. a.): ein Antippen irgendwo startet Vollbild + Querformat-Sperre, das Geraet dreht sich von
+  // selbst — der Bildschirm sagt nur „Tap to play". Wo das nicht geht (iPhone-Safari, Sperre verweigert): die Dreh-Anweisung.
+  const [failed, setFailed] = useState(false);
+  const auto = !!(window._ppFullscreenSupported && window._ppLandscapeLockSupported) && !failed;
+  const enter = () => { if (!auto) return; window._ppRequestFullscreen(true).then(r => { if (!r.locked) setFailed(true); }); };
   const copyLink = () => {
     const url = window.location.origin;
     const done = () => { setCopied(true); setTimeout(() => setCopied(false), 2200); };
@@ -3284,7 +3289,7 @@ function RotateOverlay() {
     done();
   };
   return (
-    <div className="rotate-device-overlay" id="rotate-overlay">
+    <div className="rotate-device-overlay" id="rotate-overlay" onClick={enter}>
       <div className="rotate-art" aria-hidden="true"></div>
       <div className="rotate-dither" aria-hidden="true"></div>
       <div className="rotate-content">
@@ -3316,18 +3321,22 @@ function RotateOverlay() {
             <rect x="14" y="5" width="1" height="1" className="ph-spark" />
           </svg>
         </div>
-        <div className="rotate-panel">
-          <div className="rotate-text">Turn your phone sideways!</div>
-          <div className="rotate-sub">Pixel Parties is played in landscape. Rotate your device and the battle begins.</div>
-          {window._ppFullscreenSupported && (
-            <button type="button" className="rotate-copy rotate-fs" onClick={() => window._ppRequestFullscreen(true)}>FULLSCREEN</button>
-          )}
-        </div>
-        <div className="rotate-panel rotate-panel-pc">
+        {auto ? (
+          <div className="rotate-panel rotate-panel-tap">
+            <div className="rotate-text rotate-tap-text">TAP TO PLAY</div>
+            <div className="rotate-sub">Pixel Parties plays fullscreen in landscape.</div>
+          </div>
+        ) : (
+          <div className="rotate-panel">
+            <div className="rotate-text">Turn your phone sideways!</div>
+            <div className="rotate-sub">Pixel Parties is played in landscape. Rotate your device and the battle begins.</div>
+          </div>
+        )}
+        <div className="rotate-panel rotate-panel-pc" onClick={(e) => e.stopPropagation()}>
           <div className="rotate-sub">Rather play on a PC or tablet? It is free in your browser:</div>
           <div className="rotate-url">pixelpartiestcg.com</div>
           <div className="rotate-actions">
-            <button type="button" className="rotate-copy" onClick={copyLink}>{copied ? 'COPIED!' : 'COPY LINK'}</button>
+            <button type="button" className="rotate-copy" onClick={(e) => { e.stopPropagation(); copyLink(); }}>{copied ? 'COPIED!' : 'COPY LINK'}</button>
             <DiscordButton size={22} label="Discord" />
           </div>
         </div>
