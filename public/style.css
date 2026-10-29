@@ -2131,8 +2131,8 @@ select optgroup {
   --ef: 1;
   /* Tether amplitudes as % of screen (9px / 4px on the 1920x1080 stage) so
      the clash rig scales with the viewport. --sAmp is a unitless scale. */
-  --tH: 0.469vw;
-  --tV: 0.37vh;
+  --tH: calc(var(--abw,1vw) * 0.469);
+  --tV: calc(var(--abh,1vh) * 0.37);
   --sAmp: 0.021;
 }
 .anim-shake {
@@ -2269,32 +2269,32 @@ select optgroup {
 }
 @keyframes ab-floaty {
   0%   { transform: translate(0,0) rotate(0deg); }
-  50%  { transform: translate(calc(var(--mx,0vw) * var(--pf,1)), calc(var(--my,-0.926vh) * var(--pf,1))) rotate(calc(var(--mr,0deg) * var(--pf,1))); }
+  50%  { transform: translate(calc(var(--mx,calc(var(--abw,1vw) * 0)) * var(--pf,1)), calc(var(--my,calc(var(--abh,1vh) * -0.926)) * var(--pf,1))) rotate(calc(var(--mr,0deg) * var(--pf,1))); }
   100% { transform: translate(0,0) rotate(0deg); }
 }
 @keyframes ab-jiggleTether {
   0%, 100% { transform: translate(0, 0); }
-  50%  { transform: translate(calc(var(--tH,0.469vw) * var(--pf,1)), calc(var(--tV,0.37vh) * var(--pf,1))); }
+  50%  { transform: translate(calc(var(--tH,calc(var(--abw,1vw) * 0.469)) * var(--pf,1)), calc(var(--tV,calc(var(--abh,1vh) * 0.37)) * var(--pf,1))); }
 }
 @keyframes ab-broghanTether {
   0%, 100% { transform: translate(0, 0); }
-  50%  { transform: translate(calc(var(--tH,0.469vw) * -1 * var(--pf,1)), calc(var(--tV,0.37vh) * var(--pf,1))); }
+  50%  { transform: translate(calc(var(--tH,calc(var(--abw,1vw) * 0.469)) * -1 * var(--pf,1)), calc(var(--tV,calc(var(--abh,1vh) * 0.37)) * var(--pf,1))); }
 }
 @keyframes ab-coreTether {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  50%  { transform: translate(0, calc(var(--tV,0.37vh) * var(--pf,1))) scale(calc(1 - var(--sAmp,0.021) * var(--pf,1))); }
+  50%  { transform: translate(0, calc(var(--tV,calc(var(--abh,1vh) * 0.37)) * var(--pf,1))) scale(calc(1 - var(--sAmp,0.021) * var(--pf,1))); }
 }
 @keyframes ab-shake {
   0%, 6%, 49%, 56%, 100% { transform: translate(0, 0); }
-  1%  { transform: translate(calc(-0.417vw * var(--shake,1)), calc(0.463vh * var(--shake,1))); }
-  2%  { transform: translate(calc(0.365vw * var(--shake,1)), calc(-0.556vh * var(--shake,1))); }
-  3%  { transform: translate(calc(-0.26vw * var(--shake,1)), calc(0.37vh * var(--shake,1))); }
-  4%  { transform: translate(calc(0.156vw * var(--shake,1)), calc(-0.278vh * var(--shake,1))); }
-  50% { transform: translate(calc(0.469vw * var(--shake,1)), calc(-0.556vh * var(--shake,1))); }
-  51% { transform: translate(calc(-0.417vw * var(--shake,1)), calc(0.556vh * var(--shake,1))); }
-  52% { transform: translate(calc(0.313vw * var(--shake,1)), calc(-0.37vh * var(--shake,1))); }
-  53% { transform: translate(calc(-0.208vw * var(--shake,1)), calc(0.278vh * var(--shake,1))); }
-  54% { transform: translate(calc(0.104vw * var(--shake,1)), calc(-0.185vh * var(--shake,1))); }
+  1%  { transform: translate(calc(calc(var(--abw,1vw) * -0.417) * var(--shake,1)), calc(calc(var(--abh,1vh) * 0.463) * var(--shake,1))); }
+  2%  { transform: translate(calc(calc(var(--abw,1vw) * 0.365) * var(--shake,1)), calc(calc(var(--abh,1vh) * -0.556) * var(--shake,1))); }
+  3%  { transform: translate(calc(calc(var(--abw,1vw) * -0.26) * var(--shake,1)), calc(calc(var(--abh,1vh) * 0.37) * var(--shake,1))); }
+  4%  { transform: translate(calc(calc(var(--abw,1vw) * 0.156) * var(--shake,1)), calc(calc(var(--abh,1vh) * -0.278) * var(--shake,1))); }
+  50% { transform: translate(calc(calc(var(--abw,1vw) * 0.469) * var(--shake,1)), calc(calc(var(--abh,1vh) * -0.556) * var(--shake,1))); }
+  51% { transform: translate(calc(calc(var(--abw,1vw) * -0.417) * var(--shake,1)), calc(calc(var(--abh,1vh) * 0.556) * var(--shake,1))); }
+  52% { transform: translate(calc(calc(var(--abw,1vw) * 0.313) * var(--shake,1)), calc(calc(var(--abh,1vh) * -0.37) * var(--shake,1))); }
+  53% { transform: translate(calc(calc(var(--abw,1vw) * -0.208) * var(--shake,1)), calc(calc(var(--abh,1vh) * 0.278) * var(--shake,1))); }
+  54% { transform: translate(calc(calc(var(--abw,1vw) * 0.104) * var(--shake,1)), calc(calc(var(--abh,1vh) * -0.185) * var(--shake,1))); }
 }
 @keyframes ab-glowpulse {
   0%   { opacity: .6;  transform: translate(-50%,-50%) scale(1.02); }
@@ -2317,10 +2317,10 @@ select optgroup {
   50%      { opacity: .72; }
 }
 @keyframes ab-emberrise {
-  0%   { transform: translateY(1.852vh) translateX(0); opacity: 0; }
+  0%   { transform: translateY(calc(var(--abh,1vh) * 1.852)) translateX(0); opacity: 0; }
   8%   { opacity: .95; }
   78%  { opacity: .7; }
-  100% { transform: translateY(-112vh) translateX(var(--drift, 0vw)); opacity: 0; }
+  100% { transform: translateY(calc(var(--abh,1vh) * -112)) translateX(var(--drift, calc(var(--abw,1vw) * 0))); opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .anim-shake, .anim-shake > *, .anim-shake > * > *,
@@ -16319,17 +16319,21 @@ body:has(.textbox-overlay) .tooltip {
   text-align: center;
   overflow: hidden;
 }
-.rotate-device-overlay .rotate-art {
-  position: absolute;
-  inset: 0;
-  background: url(/title.png) 34% center / cover no-repeat;
-  image-rendering: pixelated;
+/* Kamerafahrt ueber das animierte Titelbild (gleiche Buehne, gleiche Effekte wie der Titelbildschirm): die 1920x1080-Kulisse
+   wird per --rs aufs Fenster skaliert; --abw/--abh machen aus den Fensterprozenten der Kulisse Buehnenpixel. */
+.rotate-device-overlay .rotate-cam { position: absolute; inset: 0; overflow: hidden; background: #12101f; }
+.rotate-device-overlay .rotate-cam-scale {
+  position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; margin: -540px 0 0 -960px;
+  transform: scale(var(--rs, 0.5)); transform-origin: 50% 50%;
 }
-.rotate-device-overlay .rotate-dither {
-  position: absolute;
-  inset: 0;
-  background: repeating-conic-gradient(var(--bg) 0 25%, transparent 0 50%) 0 0 / 4px 4px;
+.rotate-device-overlay .rotate-cam-move { position: absolute; inset: 0; animation: rotCam 80s ease-in-out infinite; will-change: transform; }
+.rotate-device-overlay .anim-stage-host { position: absolute; inset: 0; width: 1920px; height: 1080px; --abw: 19.2px; --abh: 10.8px; }
+.rotate-device-overlay .anim-stage-host .anim-backdrop { zoom: 1; }
+@keyframes rotCam {
+  0%, 100% { transform: translate(calc(var(--ramp, 0) * 1px), -14px) scale(1.12); }
+  50% { transform: translate(calc(var(--ramp, 0) * -1px), 14px) scale(1.0); }
 }
+.rotate-device-overlay.rotate-gate { display: flex !important; }
 .rotate-device-overlay .rotate-content {
   position: relative;
   display: flex;
@@ -16418,6 +16422,14 @@ body:has(.textbox-overlay) .tooltip {
 .ios-fs-hint .rotate-copy {
   font: inherit; font-size: 10px; font-weight: 700; letter-spacing: 1px; color: var(--text); background: #12101f; border: 0; padding: 7px 10px;
   box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px #12101f; cursor: pointer; flex: none;
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+  .rotate-device-overlay .rotate-content { flex-direction: row; flex-wrap: wrap; gap: 10px 24px; padding: 8px 16px; }
+  .rotate-device-overlay .rotate-logo { width: min(34vw, 240px); }
+  .rotate-device-overlay .rotate-play, .rotate-device-overlay .rotate-phone { display: none; }
+  .rotate-device-overlay .rotate-panel { margin: 4px; padding: 10px 14px; width: min(44vw, 300px); }
+  .rotate-device-overlay .rotate-panel-pc { display: none; }
 }
 
 /* Show overlay + hide ALL screens in portrait on small devices */
