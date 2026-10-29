@@ -2058,7 +2058,7 @@ function ppTutorialCamFokus(elemente, opts) {
     const nurFehlende = !!(opts && opts.nurFehlende);   // nur Ziele, die noch NICHT im freien Band stehen (Aufmerksamkeitskamera)
     let l = Infinity, t = Infinity, rr = -Infinity, b = -Infinity;
     for (const e of Array.from(elemente || [])) {
-      if (!e || !e.getBoundingClientRect || !sc.contains(e)) continue;
+      if (!e || !e.getBoundingClientRect || !(sc.contains(e) || (e.closest && e.closest('.phase-column')))) continue;   // die Phasenleiste scrollt auf dem Handy mit dem Brett
       const r = e.getBoundingClientRect();
       if (!r.width && !r.height) continue;
       if (nurFehlende && r.top - scr.top >= bandT - 2 && r.bottom - scr.top <= bandB + 2) continue;
@@ -39462,7 +39462,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const pr = nurPlatte ? null : parent.getBoundingClientRect();
       // Faltlinie, Zeilenhoehe und Inhaltskante nur im VOLLEN Lauf.
       let y = null;
-      if (nurPlatte) { messePlatte(col); return; }
+      if (nurPlatte) {
+        // Handy: die Leiste sitzt im Abstand zwischen den Spielerseiten und scrollt mit dem Brett — die Naht wandert beim Scrollen, also auch jetzt nachziehen.
+        if (window.ppIsPhone && window.ppIsPhone()) {
+          const fold0 = document.querySelector('.board-area-zones-center');
+          const fr0 = fold0 && fold0.getBoundingClientRect();
+          if (fr0 && fr0.width > 0) setzeVar(document.documentElement.style, '--phase-mid-y', ((fr0.top + fr0.bottom) / 2 - parent.getBoundingClientRect().top) + 'px');
+        }
+        messePlatte(col); return;
+      }
       // ERSTE WAHL: `.board-area-zones-center`. Das ist die Faltlinie, an
       // der das ganze Brett haengt — `position: absolute; top: 50%;
       // translateY(-50%); height: 0`, und die Area-Zonen sind daran
@@ -60570,7 +60578,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     data-phase-name={phase}
                     style={isActive ? { borderColor: phaseColor, boxShadow: `0 0 10px ${phaseColor}44` } : undefined}
                     onClick={() => { if (canClick) tryAdvancePhase(i); }}>
-                    {(phase === 'Resource Phase' && window.ppIsPhone && window.ppIsPhone()) ? 'Res.' : (PHASEN_KURZ[phase] || phase)}   {/* Handy: 3×2-Raster, „Resource“ passt nicht in eine Spalte */}
+                    {PHASEN_KURZ[phase] || phase}
                   </div>
                 );
               })}

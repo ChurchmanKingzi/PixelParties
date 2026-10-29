@@ -5539,7 +5539,7 @@ function SingleplayerScreen() {
           <button className="btn" onClick={() => setShowRegister(true)}>★ REGISTER NOW!</button>
         )}
         <h2 className="orbit-font titel-links" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>CHOOSE OPPONENT!</h2>
-        <div style={{ flex: 1 }} />
+        <div className="top-bar-abstand" style={{ flex: 1 }} />
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
           <input
             className="select"

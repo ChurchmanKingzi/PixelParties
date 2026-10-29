@@ -13930,23 +13930,20 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 @keyframes ptLichterSpur { from { transform: translate(0, 0); } to { transform: translate(var(--gsx, 0), var(--gsy, 12px)); } }
 
 /* Handy: die zentrierte Ueberschrift (absolut, Mitte) wuerde von der Gegnersuche ueberdeckt, sobald diese nach links reicht —
-   „CHOOSE OPPONENT!" steht stattdessen im Zeilenfluss links neben den Knoepfen, die Suche rueckt rechts daneben. */
+   „CHOOSE OPPONENT!" steht stattdessen im Zeilenfluss und fuellt die Luecke zwischen REGISTER NOW und der Suche (mittig dazwischen). */
 @media (max-height: 600px) {
-  .top-bar > h2.titel-links { position: static; left: auto; transform: none; transform-origin: left center; margin: 0 8px 0 2px; }
+  .top-bar > h2.titel-links { position: static; left: auto; transform: none; transform-origin: center; margin: 0 8px; flex: 1 1 0; min-width: 0; text-align: center; white-space: nowrap; }
+  .top-bar > .top-bar-abstand { display: none; }
 }
 
-/* ★ HANDY: kompakte Phasenleiste im Streifen links.
-   Vorher lag die 250 px breite Leiste (Phasen + Knoepfe) auf der Brettmitte und verdeckte bei Telefonen die untere Haelfte des linken Gegnerhelden
-   (Zone x 110–150); ein Tipp auf die Kartenmitte traf die Leiste. Jetzt: 104 px breit — die sechs Phasen in einem 3×2-Raster, darunter die zwei
-   Knoepfe nebeneinander und „Confirm end". Sie endet links der ersten Heldenspalte (x < 108) und liegt zwischen der Turnzahl und dem eigenen
-   Ablagestapel. */
+/* ★ HANDY: Phasenleiste EINZEILIG in einem Abstand zwischen den beiden Spielerseiten.
+   Das Brett scrollt auf dem Handy ohnehin senkrecht; zwischen Gegner- und eigener Seite entsteht deshalb ein Streifen (`.board-mid-row`), in dem die
+   Leiste (Phasen + Knoepfe in EINER Zeile) mittig auf der Naht sitzt und mit dem Brett mitscrollt (`--phase-mid-y`, app-board.jsx). Sie verdeckt damit
+   keine Heldenzone mehr; die Area-Zonen (an derselben Naht aufgehaengt) werden nur in einem schmalen Band gekreuzt. */
 @media (pointer: coarse) and (max-height: 600px) {
-  .phase-column { zoom: 1 !important; left: 0 !important; top: calc(50% + 16px) !important; transform: translateY(-50%) !important; width: 104px; }
-  .board-phase-tracker { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px !important; padding: 2px !important; width: 104px; box-sizing: border-box; }
-  .board-phase-item { padding: 1px 0 !important; font-size: 6px !important; text-align: center; min-height: 10px !important; line-height: 1.2; overflow: hidden; }
-  .phase-buttons-row { flex-wrap: wrap !important; width: 104px; box-sizing: border-box; gap: 2px !important; padding: 2px 3px !important; margin-top: 2px !important; justify-content: space-between; }
-  .phase-btn { flex: 1 1 42px; min-width: 0; padding: 1px 0 !important; min-height: 15px !important; font-size: 5px !important; text-align: center; line-height: 1.2; }
-  .phase-end-check { flex-basis: 100%; justify-content: center; margin-left: 0 !important; font-size: 6px !important; }
+  .board-mid-row { min-height: 26px !important; }
+  .phase-column { zoom: 1 !important; left: 50% !important; top: var(--phase-mid-y, 50%) !important; transform: translate(-50%, -50%) !important; flex-direction: row !important; align-items: center !important; gap: 4px; width: auto; }
+  .phase-buttons-row { margin-top: 0 !important; }
 }
 
 
