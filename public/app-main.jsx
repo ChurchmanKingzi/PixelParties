@@ -3299,32 +3299,45 @@ function RotateOverlay() {
           <div className="pp-logo-licht" aria-hidden="true"></div>
           <div className="pp-logo-umriss" aria-hidden="true"></div>
         </div>
-        <div className="rotate-phone" aria-hidden="true">
-          <svg className="rot-phone-p" viewBox="0 0 14 22" shapeRendering="crispEdges">
-            <rect x="0" y="0" width="14" height="22" className="ph-edge" />
-            <rect x="1" y="1" width="12" height="20" className="ph-body" />
-            <rect x="2" y="3" width="10" height="15" className="ph-screen" />
-            <rect x="5" y="1" width="4" height="1" className="ph-edge" />
-            <rect x="6" y="19" width="2" height="1" className="ph-edge" />
-            <rect x="4" y="6" width="2" height="2" className="ph-spark" />
-            <rect x="8" y="11" width="2" height="2" className="ph-spark" />
-            <rect x="5" y="14" width="1" height="1" className="ph-spark" />
-          </svg>
-          <svg className="rot-phone-l" viewBox="0 0 22 14" shapeRendering="crispEdges">
-            <rect x="0" y="0" width="22" height="14" className="ph-edge" />
-            <rect x="1" y="1" width="20" height="12" className="ph-body" />
-            <rect x="3" y="2" width="15" height="10" className="ph-screen" />
-            <rect x="20" y="5" width="1" height="4" className="ph-edge" />
-            <rect x="1" y="6" width="1" height="2" className="ph-edge" />
-            <rect x="6" y="4" width="2" height="2" className="ph-spark" />
-            <rect x="11" y="8" width="2" height="2" className="ph-spark" />
-            <rect x="14" y="5" width="1" height="1" className="ph-spark" />
-          </svg>
-        </div>
+        {auto ? (
+          <div className="rotate-play" aria-hidden="true">
+            <svg viewBox="0 0 14 14" shapeRendering="crispEdges">
+              <rect x="0" y="0" width="14" height="14" className="pl-edge" />
+              <rect x="1" y="1" width="12" height="12" className="pl-body" />
+              <rect x="4" y="3" width="2" height="8" className="pl-tri" />
+              <rect x="6" y="4" width="2" height="6" className="pl-tri" />
+              <rect x="8" y="5" width="2" height="4" className="pl-tri" />
+              <rect x="10" y="6" width="1" height="2" className="pl-tri" />
+            </svg>
+          </div>
+        ) : (
+          <div className="rotate-phone" aria-hidden="true">
+            <svg className="rot-phone-p" viewBox="0 0 14 22" shapeRendering="crispEdges">
+              <rect x="0" y="0" width="14" height="22" className="ph-edge" />
+              <rect x="1" y="1" width="12" height="20" className="ph-body" />
+              <rect x="2" y="3" width="10" height="15" className="ph-screen" />
+              <rect x="5" y="1" width="4" height="1" className="ph-edge" />
+              <rect x="6" y="19" width="2" height="1" className="ph-edge" />
+              <rect x="4" y="6" width="2" height="2" className="ph-spark" />
+              <rect x="8" y="11" width="2" height="2" className="ph-spark" />
+              <rect x="5" y="14" width="1" height="1" className="ph-spark" />
+            </svg>
+            <svg className="rot-phone-l" viewBox="0 0 22 14" shapeRendering="crispEdges">
+              <rect x="0" y="0" width="22" height="14" className="ph-edge" />
+              <rect x="1" y="1" width="20" height="12" className="ph-body" />
+              <rect x="3" y="2" width="15" height="10" className="ph-screen" />
+              <rect x="20" y="5" width="1" height="4" className="ph-edge" />
+              <rect x="1" y="6" width="1" height="2" className="ph-edge" />
+              <rect x="6" y="4" width="2" height="2" className="ph-spark" />
+              <rect x="11" y="8" width="2" height="2" className="ph-spark" />
+              <rect x="14" y="5" width="1" height="1" className="ph-spark" />
+            </svg>
+          </div>
+        )}
         {auto ? (
           <div className="rotate-panel rotate-panel-tap">
             <div className="rotate-text rotate-tap-text">TAP TO PLAY</div>
-            <div className="rotate-sub">Pixel Parties plays fullscreen in landscape.</div>
+            <div className="rotate-sub">Tap anywhere to start the battle.</div>
           </div>
         ) : (
           <div className="rotate-panel">
