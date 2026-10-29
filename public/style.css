@@ -27065,3 +27065,13 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 @media (max-height: 600px) {
   .top-bar > h2.titel-links { position: static; left: auto; transform: none; transform-origin: left center; margin: 0 8px 0 2px; }
 }
+
+/* Desktop: Hinweis, dass die Musik erst nach dem ersten Klick einsetzt (Browser-Regel). Pixelrahmen aus gestapelten Ringen, Blinken im Bildtakt. */
+.audio-hinweis {
+  position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 9000;
+  padding: 6px 12px; font-size: 9px; letter-spacing: 1px; white-space: nowrap; pointer-events: none;
+  color: var(--text); background: var(--bg2);
+  box-shadow: 0 0 0 2px #000, 0 0 0 4px var(--accent);
+  animation: audioHinweisBlink 1200ms steps(1) infinite;
+}
+@keyframes audioHinweisBlink { 0% { visibility: visible; } 70% { visibility: hidden; } 100% { visibility: visible; } }

@@ -2137,6 +2137,9 @@ if (typeof window !== 'undefined') {
   window.ppAudioEntsperren = _entsperren;
   window.ppAudioLaeuft = _laeuft;
   _scharf();
+  // Sofortversuch beim Laden: Browser, die Ton ohne Geste erlauben (hohes Medien-Engagement, Seiteneinstellung „Ton zulassen“), starten die Musik
+  // gleich; alle anderen lassen `resume()` offen, bis die erste Geste kommt (die Horcher oben).
+  try { _entsperren(); } catch {}
   // Kontext schon beim Laden anlegen (startet suspendiert, ohne Warnung): so kann `statechange` beobachtet werden, und der erste Tipp
   // muss nur noch `resume()` rufen. Faellt der Kontext spaeter zurueck (iOS „interrupted", Tab-Wechsel), werden die Horcher neu gescharft.
   try {

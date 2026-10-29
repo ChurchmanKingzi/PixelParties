@@ -39175,6 +39175,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // (`setTutorialGegner` in app-shared). Nur im Tutorial ausgewertet.
   const tutorialGegnerDaten = (window.useTutorialGegner || (() => null))();
   const tutorialGegner = gameState?.isTutorial ? tutorialGegnerDaten : null;
+  // Anzeigename eines Spielers wie in der Handleiste: Tutorial-Gegner → Monia Bot / Antonia, CPU → Kurzname seines mittleren Helden (nicht „CPU"),
+  // sonst der Benutzername. Fuer Statushinweise, Log und Auswahlfenster.
+  const anzeigeName = (pl) => {
+    if (!pl) return '';
+    if (pl === opp && tutorialGegner) return tutorialGegner.name;
+    if (gameState.isCpuBattle && pl.username === 'CPU') return heroDisplayName(portraetHeld(pl) || pl.username);
+    return pl.username;
+  };
 
   // ── Tutorial: Helden-Figuren erst nach dem Gespraech ──
   // Solange die Einleitung laeuft, stehen die animierten Figuren noch nicht
@@ -56479,8 +56487,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const cName = (name) => <span className="log-card-name" style={{ color: logCardColor(name) }}>{name}</span>;
     const p0 = gameState.players[0], p1 = gameState.players[1];
     const getPlayer = (username) => {
-      if (username === p0.username) return { name: p0.username, color: p0.color };
-      if (username === p1.username) return { name: p1.username, color: p1.color };
+      if (username === p0.username) return { name: anzeigeName(p0), color: p0.color };
+      if (username === p1.username) return { name: anzeigeName(p1), color: p1.color };
       return { name: username || '?', color: '#a8a8a8' };
     };
     const playerByName = (n) => getPlayer(n);
@@ -57880,7 +57888,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     steht auf beiden Seiten des Bretts. */}
                 {isPermaControlled && (
                   <div className={'hero-owned-badge' + (hero.permaControlBy === myIdx ? ' hero-owned-mine' : '')}>
-                    {hero.permaControlBy === myIdx ? '⛓ Yours' : '⛓ ' + (opp?.username || 'Opponent') + "'s"}
+                    {hero.permaControlBy === myIdx ? '⛓ Yours' : '⛓ ' + (anzeigeName(opp) || 'Opponent') + "'s"}
                   </div>
                 )}
                 {hero?.name && !isRamming ? (
@@ -60389,30 +60397,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           {(() => {
             const debuffs = [];
             if (me.actionLocked) debuffs.push({ key: 'action-me', icon: '⛔', text: 'You cannot perform any more Actions this turn! (Placing Creatures still works.)', color: '#ec2d62' });
-            if (opp.actionLocked) debuffs.push({ key: 'action-opp', icon: '⛔', text: `${opp.username} cannot perform any more Actions this turn!`, color: '#ae264c' });
+            if (opp.actionLocked) debuffs.push({ key: 'action-opp', icon: '⛔', text: `${anzeigeName(opp)} cannot perform any more Actions this turn!`, color: '#ae264c' });
             if (me.summonLocked) debuffs.push({ key: 'summon-me', text: 'You cannot summon any more Creatures this turn!', color: '#e92f38' });
-            if (opp.summonLocked) debuffs.push({ key: 'summon-opp', text: `${opp.username} cannot summon any more Creatures this turn!`, color: '#c68206' });
+            if (opp.summonLocked) debuffs.push({ key: 'summon-opp', text: `${anzeigeName(opp)} cannot summon any more Creatures this turn!`, color: '#c68206' });
             if (me.damageLocked) debuffs.push({ key: 'damage-me', icon: '🔥', text: 'You cannot deal any more damage to your opponent this turn!', color: '#f03232' });
-            if (opp.damageLocked) debuffs.push({ key: 'damage-opp', icon: '🛡️', text: `${opp.username} cannot deal any more damage to your targets this turn!`, color: '#e37435' });
+            if (opp.damageLocked) debuffs.push({ key: 'damage-opp', icon: '🛡️', text: `${anzeigeName(opp)} cannot deal any more damage to your targets this turn!`, color: '#e37435' });
             if (me.oppHandLocked) debuffs.push({ key: 'opphand-me', icon: '🫲', text: 'You cannot interact with your opponent\'s hand for the rest of this turn!', color: '#a040ff' });
-            if (opp.oppHandLocked) debuffs.push({ key: 'opphand-opp', icon: '🫲', text: `${opp.username} cannot interact with your hand for the rest of this turn!`, color: '#9544d5' });
+            if (opp.oppHandLocked) debuffs.push({ key: 'opphand-opp', icon: '🫲', text: `${anzeigeName(opp)} cannot interact with your hand for the rest of this turn!`, color: '#9544d5' });
             if (me.potionLocked) debuffs.push({ key: 'potion-me', icon: '🧪', text: 'You cannot play any more Potions this turn!', color: '#a040ff' });
-            if (opp.potionLocked) debuffs.push({ key: 'potion-opp', icon: '🧪', text: `${opp.username} cannot play any more Potions this turn!`, color: '#9544d5' });
+            if (opp.potionLocked) debuffs.push({ key: 'potion-opp', icon: '🧪', text: `${anzeigeName(opp)} cannot play any more Potions this turn!`, color: '#9544d5' });
             if (me.supportSpellLocked) debuffs.push({ key: 'support-me', icon: '💚', text: 'You cannot use another Support Spell this turn.', color: '#f03232' });
             if (opp.supportSpellLocked) debuffs.push({ key: 'support-opp', icon: '💚', text: `Your opponent cannot use another Support Spell this turn.`, color: '#e37435' });
             if (me.itemLocked) debuffs.push({ key: 'item-me', icon: '🔨', text: 'You must delete 1 card from your hand to use an Artifact!', color: '#f87420' });
-            if (opp.itemLocked) debuffs.push({ key: 'item-opp', icon: '🔨', text: `${opp.username} must delete 1 card from their hand to use an Artifact!`, color: '#e37435' });
+            if (opp.itemLocked) debuffs.push({ key: 'item-opp', icon: '🔨', text: `${anzeigeName(opp)} must delete 1 card from their hand to use an Artifact!`, color: '#e37435' });
             // Boomerang's "no Artifacts for the rest of this turn"
             // lockout. Distinct icon (🪃) from the 🔨 itemLocked
             // badge — different mechanic, different message.
             if (me.artifactLocked) debuffs.push({ key: 'artifact-me', icon: '🪃', text: 'You cannot use any more Artifacts this turn!', color: '#ff8566' });
-            if (opp.artifactLocked) debuffs.push({ key: 'artifact-opp', icon: '🪃', text: `${opp.username} cannot use any more Artifacts this turn!`, color: '#b06746' });
+            if (opp.artifactLocked) debuffs.push({ key: 'artifact-opp', icon: '🪃', text: `${anzeigeName(opp)} cannot use any more Artifacts this turn!`, color: '#b06746' });
             if (me.forsaken) debuffs.push({ key: 'forsaken-me', icon: '🏴‍☠️', text: 'All cards that would go to your discard pile are deleted for the rest of the turn.', color: '#7e7d9b' });
-            if (opp.forsaken) debuffs.push({ key: 'forsaken-opp', icon: '🏴‍☠️', text: `All cards that would go to ${opp.username}'s discard pile are deleted for the rest of the turn.`, color: '#8066b2' });
+            if (opp.forsaken) debuffs.push({ key: 'forsaken-opp', icon: '🏴‍☠️', text: `All cards that would go to ${anzeigeName(opp)}'s discard pile are deleted for the rest of the turn.`, color: '#8066b2' });
             if (me.handLocked) debuffs.push({ key: 'hand-me', icon: '🔒', text: 'You cannot draw or search any more cards this turn!', color: '#e92f38' });
-            if (opp.handLocked) debuffs.push({ key: 'hand-opp', icon: '🔒', text: `${opp.username} cannot draw or search any more cards this turn!`, color: '#c68206' });
+            if (opp.handLocked) debuffs.push({ key: 'hand-opp', icon: '🔒', text: `${anzeigeName(opp)} cannot draw or search any more cards this turn!`, color: '#c68206' });
             if (me.drawLocked && !me.handLocked) debuffs.push({ key: 'draw-me', icon: '💎', text: 'You cannot draw any more cards this turn (searches still work)!', color: '#e92f38' });
-            if (opp.drawLocked && !opp.handLocked) debuffs.push({ key: 'draw-opp', icon: '💎', text: `${opp.username} cannot draw any more cards this turn (searches still work)!`, color: '#c68206' });
+            if (opp.drawLocked && !opp.handLocked) debuffs.push({ key: 'draw-opp', icon: '💎', text: `${anzeigeName(opp)} cannot draw any more cards this turn (searches still work)!`, color: '#c68206' });
             // v1068: Gegenstueck zum Zieh-Lock — Suchen gesperrt, Ziehen frei.
             // Der Zusatz nennt ausdruecklich, ob der Ablagestapel mitgesperrt
             // ist, weil das der einzige Unterschied der starken Stufe ist.
@@ -60430,18 +60438,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 text: 'You cannot activate any Ability effects while "The Thing in the Ship" is on the board!',
                 color: '#e92f38' });
               debuffs.push({ key: 'abil-opp', icon: '⛔',
-                text: `${opp.username} cannot activate any Ability effects either — the lock hits both players!`,
+                text: `${anzeigeName(opp)} cannot activate any Ability effects either — the lock hits both players!`,
                 color: '#c68206' });
             }
             if (me.searchLocked && !me.handLocked) debuffs.push({ key: 'search-me', icon: '🔒', text: `You cannot search or add cards to your hand this turn${me.searchLockedIncludesDiscard ? ', not even from your discard pile' : ' (your discard pile still works)'} — but you can still draw!`, color: '#e92f38' });
-            if (opp.searchLocked && !opp.handLocked) debuffs.push({ key: 'search-opp', icon: '🔒', text: `${opp.username} cannot search or add cards to their hand this turn${opp.searchLockedIncludesDiscard ? ', not even from their discard pile' : ''} (they can still draw)!`, color: '#c68206' });
+            if (opp.searchLocked && !opp.handLocked) debuffs.push({ key: 'search-opp', icon: '🔒', text: `${anzeigeName(opp)} cannot search or add cards to their hand this turn${opp.searchLockedIncludesDiscard ? ', not even from their discard pile' : ''} (they can still draw)!`, color: '#c68206' });
             // v828: Hand-Spielsperre (Knight of Kings [W]) — zwei Modi.
             if (me.handPlayLock === 'all') debuffs.push({ key: 'handplay-me', icon: '♞', text: 'You cannot play any more cards from your hand this turn!', color: '#e92f38' });
             if (me.handPlayLock === 'of-kings') debuffs.push({ key: 'handplay-me', icon: '♞', text: 'You cannot play any more cards from your hand this turn — except "of Kings" cards (Board of Kings)!', color: '#ff9b3a' });
-            if (opp.handPlayLock === 'all') debuffs.push({ key: 'handplay-opp', icon: '♞', text: `${opp.username} cannot play any more cards from their hand this turn!`, color: '#c68206' });
-            if (opp.handPlayLock === 'of-kings') debuffs.push({ key: 'handplay-opp', icon: '♞', text: `${opp.username} cannot play any more cards from their hand this turn — except "of Kings" cards!`, color: '#c68206' });
+            if (opp.handPlayLock === 'all') debuffs.push({ key: 'handplay-opp', icon: '♞', text: `${anzeigeName(opp)} cannot play any more cards from their hand this turn!`, color: '#c68206' });
+            if (opp.handPlayLock === 'of-kings') debuffs.push({ key: 'handplay-opp', icon: '♞', text: `${anzeigeName(opp)} cannot play any more cards from their hand this turn — except "of Kings" cards!`, color: '#c68206' });
             if (me.flashbanged) debuffs.push({ key: 'flashbanged-me', icon: '⚪', text: 'Flashbanged — your turn will end after your first Action!', color: '#ffffff' });
-            if (opp.flashbanged) debuffs.push({ key: 'flashbanged-opp', icon: '⚪', text: `Flashbanged — ${opp.username}'s turn will end after their first Action!`, color: '#e6e6e6' });
+            if (opp.flashbanged) debuffs.push({ key: 'flashbanged-opp', icon: '⚪', text: `Flashbanged — ${anzeigeName(opp)}'s turn will end after their first Action!`, color: '#e6e6e6' });
             // Giga Steroids — owner-wide second-Action grant for
             // effect activations. Set on resolve, cleared on consume
             // / fizzle / expire by Giga Steroids' hooks.
@@ -60451,7 +60459,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // Ladungen stehen in derselben Leiste. Sie sind Segen und
             // Fluch zugleich: zwei Zusatzaktionen, aber KEINE anderen.
             if (me.missionActions > 0) debuffs.push({ key: 'mission-me', icon: '🎺', text: `Light Brigade — ${me.missionActions} additional Action${me.missionActions === 1 ? '' : 's'} left (no other additional Actions this turn).`, color: '#fad54a' });
-            if (opp.missionActions > 0) debuffs.push({ key: 'mission-opp', icon: '🎺', text: `${opp.username} has ${opp.missionActions} Light Brigade Action${opp.missionActions === 1 ? '' : 's'} left.`, color: '#c79e05' });
+            if (opp.missionActions > 0) debuffs.push({ key: 'mission-opp', icon: '🎺', text: `${anzeigeName(opp)} has ${opp.missionActions} Light Brigade Action${opp.missionActions === 1 ? '' : 's'} left.`, color: '#c79e05' });
             if (debuffs.length === 0) return null;
             return (
               <div className="phase-debuffs">
@@ -62849,12 +62857,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     return null;
                   })()}
                   <div>
-                    <div style={{ fontWeight: 700 }}>{
-                      !isMe && tutorialGegner ? tutorialGegner.name
-                      : (!isMe && gameState.isCpuBattle && p.username === 'CPU')
-                        ? heroDisplayName(portraetHeld(p) || p.username)
-                        : p.username
-                    }{isMe ? ' (you)' : ''}</div>
+                    <div style={{ fontWeight: 700 }}>{isMe ? p.username : anzeigeName(p)}{isMe ? ' (you)' : ''}</div>
                   </div>
                   {stGezeigt && <span className="st-picker-badge" title="This player's board is on screen">ON SCREEN</span>}
                 </button>
