@@ -3235,7 +3235,7 @@ function OpponentUnlockPopup() {
           {current.deckAdded && (
             <div className="pp-unlock-deck" style={{ margin: '-8px 0 22px', padding: '10px 12px', border: '2px solid #4ceb70', background: '#08060c', color: '#4ceb70', fontSize: 14, lineHeight: 1.5 }}>
               <div className="orbit-font" style={{ fontSize: 13, fontWeight: 800, letterSpacing: 2, marginBottom: 4 }}>🃏 DECK ADDED TO YOUR DECKS!</div>
-              <span style={{ color: 'var(--text)' }}>Play <b>{current.name}</b>'s deck yourself — find it in your deck list. Register to keep it!</span>
+              <span style={{ color: 'var(--text)' }}>You can now play the <b>{current.name}</b> deck yourself — find it in your deck list. Register to keep it!</span>
             </div>
           )}
 

@@ -2114,6 +2114,27 @@ function ppTutorialAufmerksamkeit() {
 }
 window.ppTutorialAufmerksamkeit = ppTutorialAufmerksamkeit;
 
+// ★ PLATZIERUNGSKAMERA (Handy, jedes Spiel): Soll der Spieler Karten in Support Zonen legen (Pollution Tokens, Bounce-Platzierung, Zonenwahl),
+// faehrt die Kamera nach unten zu diesen Zonen, falls sie nicht im freien Band stehen. Gleiche Fahrt wie die Tutorial-Kamera; sie meldet sich
+// nur bei einer NEUEN Zielmenge (damit der Spieler danach frei scrollen kann) und nie gegen einen Finger oder eine gezogene Karte.
+let _ppPlatzSchluessel = '';
+function ppPlatzierungsKamera() {
+  try {
+    if (!(window.ppIsPhone && window.ppIsPhone())) return;
+    if (window._touchActive || window.activeDragData) return;
+    const sc = document.querySelector('.board-center');
+    if (!sc) return;
+    const els = Array.from(sc.querySelectorAll('[data-support-zone].zone-pick-target, [data-support-zone].zone-bounce-place-target'));
+    if (!els.length) { _ppPlatzSchluessel = ''; return; }
+    if (document.querySelector('.textbox-overlay')) return;   // im Tutorial hat die Textbox-Kamera Vorrang
+    const schluessel = els.map(e => (e.getAttribute('data-support-owner') || '?') + ':' + e.getAttribute('data-support-hero') + ':' + e.getAttribute('data-support-slot')).join('|');
+    if (schluessel === _ppPlatzSchluessel) return;
+    _ppPlatzSchluessel = schluessel;
+    ppTutorialCamFokus(els, { nurFehlende: true });
+  } catch {}
+}
+window.ppPlatzierungsKamera = ppPlatzierungsKamera;
+
 // ★ v1258 — HAT DIESES PANEL SCROLLBAREN INHALT? (Als Befund 19.9.:
 // „Panels ohne Scrolling, z.B. ‚Mulligan? Yes/No', sollten definitiv
 // noch dragbar sein, damit man sie aus dem Weg schieben kann.")
@@ -39216,6 +39237,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const id = setInterval(() => { if (window.ppTutorialAufmerksamkeit) window.ppTutorialAufmerksamkeit(); }, 450);
     return () => clearInterval(id);
   }, [gameState?.isTutorial]);
+  // Platzierungskamera (Handy): bei Support-Zonen-Wahl nach unten fahren, s. ppPlatzierungsKamera.
+  useEffect(() => {
+    const id = setInterval(() => { if (window.ppPlatzierungsKamera) window.ppPlatzierungsKamera(); }, 350);
+    return () => clearInterval(id);
+  }, []);
   // Anzeigename eines Spielers wie in der Handleiste: Tutorial-Gegner → Monia Bot / Antonia, CPU → Kurzname seines mittleren Helden (nicht „CPU"),
   // sonst der Benutzername. Fuer Statushinweise, Log und Auswahlfenster.
   const anzeigeName = (pl) => {
