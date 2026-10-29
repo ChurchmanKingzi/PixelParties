@@ -467,6 +467,108 @@ function AnimatedTitleCatsOverlay() {
   );
 }
 
+// ═══ KULISSE FUER DEN TAP-BILDSCHIRM (Handy): ein einziges Canvas statt ~25 gestapelter, animierter DOM-Ebenen ═══
+// Die DOM-Kulisse (AnimatedTitleBackdrop) legt 1920x1080-Ebenen mit Blend-Modi, Filtern und Dutzenden CSS-Animationen
+// uebereinander; auf Handys ruckelte das im Hochformat deutlich. Hier werden dieselben Ebenen (data/animated_screen/layers2)
+// einmal auf Handy-Groesse vorskaliert und pro Bild in EIN Canvas gezeichnet (30 Bilder/s, Dithering-frei, ohne Blend-Modi):
+// Schweben, Klammer-Rigs, Beben, Blitze, Glut und die langsame Kamerafahrt wie im Titelbildschirm. Laeuft nur, solange der
+// Bildschirm sichtbar ist, und gibt die Bilder nach 5 s Unsichtbarkeit wieder frei.
+function TapBackdropCanvas({ hostRef }) {
+  const cvRef = useRef(null);
+  useEffect(() => {
+    const cv = cvRef.current; if (!cv) return;
+    const DIR = ANIM_LAYERS_DIR, NAMES = ['background', 'hammer', 'explosion', 'golem', 'horned', 'angel', 'blonde', 'rabbit', 'ninja', 'cat_top', 'cat_mid', 'cat_bottom'];
+    const FRAME = 1000 / 30;
+    let imgs = null, loading = false, disposed = false, raf = 0, timer = 0, hiddenSince = 0, lastDraw = 0, W = 0, H = 0, S = 0, q = 1, ema = 0, frameGap = FRAME, lastAdapt = 0;
+    const lerp = (a, b, u) => a + (b - a) * u;
+    const kfLin = (pts, x) => { for (let i = 0; i + 1 < pts.length; i++) if (x >= pts[i][0] && x <= pts[i + 1][0]) { const u = (x - pts[i][0]) / ((pts[i + 1][0] - pts[i][0]) || 1); return lerp(pts[i][1], pts[i + 1][1], u); } return 0; };
+    const KF_STRIKE = [[0, 0], [0.6, 0], [1, 1], [1.8, 0.12], [2.6, 0.85], [4, 0], [49.5, 0], [50, 1], [50.8, 0.18], [51.6, 0.8], [53, 0], [100, 0]];
+    const KF_AMB = [[0, 0], [29.6, 0], [30, 0.9], [30.7, 0.12], [31.5, 0.72], [32.6, 0], [70.8, 0], [71.2, 0.68], [72.2, 0], [100, 0]];
+    const KF_SHAKE = [[0, 0, 0], [1, -0.417, 0.463], [2, 0.365, -0.556], [3, -0.26, 0.37], [4, 0.156, -0.278], [6, 0, 0], [49, 0, 0], [50, 0.469, -0.556], [51, -0.417, 0.556], [52, 0.313, -0.37], [53, -0.208, 0.278], [54, 0.104, -0.185], [56, 0, 0]];
+    const shakeAt = pc => { let v = [0, 0]; for (const k of KF_SHAKE) if (pc >= k[0]) v = [k[1] * 19.2, k[2] * 10.8]; return v; };
+    const floaty = (tau, dur, delay) => { const c = (((tau - delay) / dur) % 1 + 1) % 1, u = c < 0.5 ? c * 2 : (1 - c) * 2; return u * u * (3 - 2 * u); };
+    const rnd = (n) => { let a = 5000 + n * 7919; a = (a ^ 61) ^ (a >>> 16); a = (a + (a << 3)) | 0; a ^= a >>> 4; a = Math.imul(a, 0x27d4eb2d); a ^= a >>> 15; return (a >>> 0) / 4294967296; };
+    const EMB = Array.from({ length: 46 }, (_, i) => ({ size: 2 + rnd(i * 6) * 5, dur: 7 + rnd(i * 6 + 1) * 9, delay: -rnd(i * 6 + 2) * 16, left: rnd(i * 6 + 3) * 1920, drift: (rnd(i * 6 + 4) * 2 - 1) * 50, col: ['#ffd066', '#e37435', '#fe5154', '#f9ecb3', '#ffffff'][Math.floor(rnd(i * 6 + 5) * 5)] }));
+    const BOLTS = [[288, 173, 'S', [[52, 0], [40, 70], [62, 80], [38, 150], [60, 165], [34, 240], [58, 255], [30, 340], [50, 360], [42, 400]]], [1402, 154, 'S', [[48, 0], [62, 75], [38, 88], [60, 160], [36, 175], [58, 250], [34, 265], [56, 345], [40, 375], [50, 400]]], [1018, 154, 'A', [[50, 0], [58, 80], [40, 92], [60, 175], [38, 190], [56, 270], [36, 285], [52, 370], [46, 400]]]];
+    const load = () => {
+      if (loading || imgs || disposed) return; loading = true;
+      Promise.all(NAMES.map(n => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = DIR + n + '.png'; }))).then(list => {
+        loading = false; if (disposed || list.some(x => !x)) return;
+        // vorskalieren: Bildschirmmass der Buehne (S = Pixel je Buehnenpixel), spart jedem Bild das Herunterrechnen von 1920x1080
+        const sc = Math.min(1, S * 1.25); imgs = {};
+        list.forEach((im, i) => {
+          const n = NAMES[i], rf = ANIM_SPRITE_RAHMEN[n + '.png'];
+          // Figuren auf ihren sichtbaren Kasten zuschneiden (wie die DOM-Kulisse): nur dieser Teil wird pro Bild gezeichnet
+          const x0 = rf ? Math.max(0, rf[0] - 2) : 0, y0 = rf ? Math.max(0, rf[1] - 2) : 0, x1 = rf ? Math.min(1920, rf[2] + 2) : 1920, y1 = rf ? Math.min(1080, rf[3] + 2) : 1080;
+          const c = document.createElement('canvas'); c.width = Math.max(1, Math.round((x1 - x0) * sc)); c.height = Math.max(1, Math.round((y1 - y0) * sc));
+          const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(im, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);
+          imgs[n] = { c, x0, y0, w: x1 - x0, h: y1 - y0 };
+        });
+        imgs._sc = sc;
+      });
+    };
+    const resize = () => {
+      const w = window.innerWidth, h = window.innerHeight, dpr = Math.min(window.devicePixelRatio || 1, 1.5) * q;
+      W = Math.max(1, Math.round(w * dpr)); H = Math.max(1, Math.round(h * dpr)); cv.width = W; cv.height = H; S = Math.max(W / 1920, H / 1080);
+    };
+    const draw = (now) => {
+      if (!imgs) return; const g = cv.getContext('2d'), t = now / 1000, tau = t + 0.1, pc = (tau % 10) / 10 * 100, sc = imgs._sc, k = S / sc;
+      // Kamera: 80 s Hin- und Rueckfahrt, leichter Zoom
+      const ph = (t % 80) / 80, e = 0.5 - 0.5 * Math.cos(ph * Math.PI * 2), zoom = lerp(1.12, 1.0, e);
+      const viewW = W / S, ramp = Math.max(0, (1920 - viewW / zoom) / 2 - 10), camX = lerp(ramp, -ramp, e), camY = lerp(-14, 14, e), sh = shakeAt(pc);
+      g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#12101f'; g.fillRect(0, 0, W, H);
+      g.setTransform(S * zoom, 0, 0, S * zoom, W / 2 - 960 * S * zoom + camX * S * zoom + sh[0] * S * zoom, H / 2 - 540 * S * zoom + camY * S * zoom + sh[1] * S * zoom);
+      g.drawImage(imgs.background.c, -38.4, -21.6, 1996.8, 1123.2);
+      const aI = kfLin(KF_STRIKE, pc), aA = kfLin(KF_AMB, ((tau % 13) / 13) * 100);
+      const glow = (cx, cy, R, a, col) => { if (a < 0.02) return; const gr = g.createRadialGradient(cx, cy, 0, cx, cy, R); gr.addColorStop(0, col + 'ff'); gr.addColorStop(0.45, col + '55'); gr.addColorStop(1, col + '00'); g.globalAlpha = Math.min(1, a); g.globalCompositeOperation = 'screen'; g.fillStyle = gr; g.fillRect(cx - R, cy - R, 2 * R, 2 * R); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; };
+      glow(883, 281, 900, aI * 0.7, '#66b6ff'); glow(1190, 238, 900, aA * 0.6, '#66b6ff');
+      if ((pc >= 1 && pc < 5) || (pc >= 50 && pc < 54)) glow(1075, 443, 700, pc < 5 ? 0.45 : 0.4, '#fffbd2');
+      const fl2 = (dur, delay, mx, my, mr) => { const f = floaty(tau, dur, delay); return [mx * f, my * f, mr * f]; }, tp = floaty(tau, 4.8, 0);
+      const lay = (name, ox, oy, tx, ty, rot, sca, wx, wy) => { g.save(); g.translate(ox * 1920 + tx + (wx || 0), oy * 1080 + ty + (wy || 0)); g.rotate(rot * Math.PI / 180); if (sca && sca !== 1) g.scale(sca, sca); const I = imgs[name]; g.drawImage(I.c, I.x0 - ox * 1920, I.y0 - oy * 1080, I.w, I.h); g.restore(); };
+      let a = fl2(4.2, -0.6, 9, -15, 2); lay('hammer', 0.72, 0.28, a[0], a[1], a[2], 1);
+      lay('explosion', 0.52, 0.42, 0, 4 * tp, 0, 1 - 0.021 * tp);
+      lay('golem', 0.5, 0.5, -9 * tp, 4 * tp, 0, 1, 111, 3);
+      a = fl2(6, -2, -11, -15, 2.6); lay('horned', 0.8, 1, a[0], a[1], a[2], 1, 0, 161);
+      a = fl2(5, 0, 0, -12, -1.4); lay('angel', 0.2, 0.3, a[0], a[1], a[2], 1);
+      a = fl2(6.5, -1.5, 4, -9, 1); lay('blonde', 0.2, 0.5, a[0], a[1], a[2], 1);
+      lay('rabbit', 0.5, 0.5, 9 * tp, 4 * tp, 0, 1);
+      a = fl2(5.5, -2.5, 8, -14, -2); lay('ninja', 0.16, 0.8, a[0], a[1], a[2], 1, 0, 215);
+      for (const [bx, bw, kind, pts] of BOLTS) { const al = kind === 'S' ? aI : aA; if (al < 0.1) continue; const P = pts.map(([px, py]) => [bx + px / 100 * bw, -21.6 + py / 400 * 670]);
+        g.lineJoin = 'round'; g.lineCap = 'round'; for (const [col, lw] of al > 0.5 ? [['#66b6ff', 11], ['#bddcef', 6], ['#e5f5fa', 3]] : [['#66b6ff', 5], ['#e5f5fa', 2]]) { g.strokeStyle = col; g.lineWidth = lw; g.beginPath(); P.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke(); } }
+      for (const m of EMB) { const c = (((tau - m.delay) / m.dur) % 1 + 1) % 1, y = 1080 + 14 - m.size + lerp(20, -1210, c), x = m.left + m.drift * c, op = c < 0.08 ? 0.95 * c / 0.08 : (c < 0.78 ? lerp(0.95, 0.7, (c - 0.08) / 0.7) : lerp(0.7, 0, (c - 0.78) / 0.22)); if (y < -12 || y > 1090 || op < 0.05) continue; g.globalAlpha = op; g.fillStyle = m.col; const z = Math.max(4, Math.round(m.size / 2) * 2); g.fillRect(Math.round(x), Math.round(y), z, z); }
+      g.globalAlpha = 1;
+      a = fl2(3.4, -0.5, 14, -9, 3); lay('cat_top', 0.23, 0.05, a[0], a[1], a[2], 1);
+      a = fl2(2.9, -0.8, -11, 9, -3); lay('cat_mid', 0.37, 0.3, a[0], a[1], a[2], 1);
+      a = fl2(3.0, -1.7, 16, -12, 4); lay('cat_bottom', 0.05, 0.48, a[0], a[1], a[2], 1);
+    };
+    const visible = () => { const host = hostRef && hostRef.current; return !!(host && host.offsetParent !== null && !document.hidden); };
+    const tick = (now) => {
+      raf = 0;
+      if (disposed) return;
+      if (!visible()) {
+        if (!hiddenSince) hiddenSince = now;
+        if (imgs && now - hiddenSince > 5000) imgs = null;   // Speicher zurueckgeben
+        timer = setTimeout(() => { timer = 0; raf = requestAnimationFrame(tick); }, 500); return;
+      }
+      hiddenSince = 0; if (!imgs) { resize(); load(); }
+      if (now - lastDraw >= frameGap - 2) {
+        lastDraw = now; const t0 = performance.now(); draw(now); const dt = performance.now() - t0; ema = ema ? ema * 0.9 + dt * 0.1 : dt;
+        // Adaptive Qualitaet: ist ein Bild teurer als ein Drittel des Bildabstands, erst Aufloesung senken (bis 0,5x), dann auf 20/15 Bilder/s gehen
+        if (now - lastAdapt > 1200 && ema > frameGap * 0.4) { lastAdapt = now; ema = 0;
+          if (q > 0.55) { q = Math.max(0.5, q - 0.25); imgs = null; resize(); }
+          else if (frameGap < 60) frameGap = 1000 / 15; }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    resize(); raf = requestAnimationFrame(tick);
+    const onResize = () => { resize(); if (imgs) { imgs = null; } };
+    window.addEventListener('resize', onResize); window.addEventListener('orientationchange', onResize);
+    return () => { disposed = true; if (raf) cancelAnimationFrame(raf); if (timer) clearTimeout(timer); window.removeEventListener('resize', onResize); window.removeEventListener('orientationchange', onResize); imgs = null; };
+  }, []);
+  return <canvas ref={cvRef} className="tap-backdrop-canvas" aria-hidden="true" />;
+}
+window.TapBackdropCanvas = TapBackdropCanvas;
+
 window.AnimatedTitleBackdrop = AnimatedTitleBackdrop;
 window.AnimatedTitleCatsOverlay = AnimatedTitleCatsOverlay;
 
