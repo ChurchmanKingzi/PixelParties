@@ -69,34 +69,42 @@ window.addEventListener('touchstart', function onFirstTouch() {
 // Geste), scharft sich der Griff nach 1,5 s wieder: die naechste
 // Beruehrung holt es zurueck. Das ist das uebliche Verhalten von
 // Browserspielen im Querformat.
-function _ppRequestFullscreen() {
+function _ppRequestFullscreen(force) {
   const el = document.documentElement;
-  if (document.fullscreenElement || !el.requestFullscreen) return;
-  if (window.innerWidth <= window.innerHeight) return;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (document.fullscreenElement || document.webkitFullscreenElement || !req) return;
+  if (!force && window.innerWidth <= window.innerHeight) return;   // nur im Querformat (force: Knopf auf dem Dreh-Bildschirm)
   try {
-    const p = el.requestFullscreen({ navigationUI: 'hide' });
-    if (p && p.then) p.then(() => {
+    const p = req.call(el, { navigationUI: 'hide' });
+    const lock = () => {
       try {
         const o = screen.orientation;
         if (o && o.lock) o.lock('landscape').catch(() => {});
       } catch {}
-    }).catch(() => {});
+    };
+    if (p && p.then) p.then(lock).catch(() => {}); else lock();
   } catch {}
 }
 window._ppRequestFullscreen = _ppRequestFullscreen;
-function _ppArmFullscreenOnTouch() {
-  window.addEventListener('touchend', function onTouch() {
-    window._isTouchDevice = true;
-    window.removeEventListener('touchend', onTouch);
-    _ppRequestFullscreen();
-  }, { passive: true });
+window._ppFullscreenSupported = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+// Jede Beruehrung (Antippen) im Querformat holt das Vollbild, solange es nicht aktiv ist. Dauerhaft angehaengt:
+// frueher war der Griff einmalig — eine erste Beruehrung im Hochformat (auf dem Dreh-Bildschirm) hat ihn verbraucht,
+// danach kam das Vollbild nie mehr von allein. Nach einem Verlassen (Zurueck-Geste) ruht er 1,5 s.
+let _ppFsCooldownUntil = 0;
+function _ppFullscreenOnTap(e) {
+  if (e.type === 'pointerup' && e.pointerType !== 'touch') return;
+  if (!window.matchMedia || !window.matchMedia('(pointer: coarse)').matches) return;   // Touch-Notebooks/Maus: kein Zwangs-Vollbild
+  window._isTouchDevice = true;
+  if (Date.now() < _ppFsCooldownUntil) return;
+  _ppRequestFullscreen();
 }
-_ppArmFullscreenOnTouch();
-document.addEventListener('fullscreenchange', () => {
-  if (!document.fullscreenElement && window._isTouchDevice) setTimeout(_ppArmFullscreenOnTouch, 1500);
-});
+window.addEventListener('touchend', _ppFullscreenOnTap, { passive: true, capture: true });
+window.addEventListener('pointerup', _ppFullscreenOnTap, { passive: true, capture: true });
+const _ppOnFullscreenChange = () => { if (!document.fullscreenElement && !document.webkitFullscreenElement) _ppFsCooldownUntil = Date.now() + 1500; };
+document.addEventListener('fullscreenchange', _ppOnFullscreenChange);
+document.addEventListener('webkitfullscreenchange', _ppOnFullscreenChange);
 
-// Re-request fullscreen when rotating to landscape (if previously granted)
+// Beim Drehen ins Querformat gleich versuchen (klappt, solange die letzte Beruehrung noch zaehlt)
 window.addEventListener('orientationchange', () => {
   if (!window._isTouchDevice) return;
   setTimeout(_ppRequestFullscreen, 300);
