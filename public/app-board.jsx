@@ -2325,7 +2325,13 @@ function DraggablePanel({ children, className, style, zielwahl }) {
       el.style.left = pos.x + 'px'; el.style.top = pos.y + 'px';
       setAutoPos(prev => (prev && Math.abs(prev.x - pos.x) < 1 && Math.abs(prev.y - pos.y) < 1 && prev.luecke === pos.luecke) ? prev : { x: pos.x, y: pos.y, luecke: pos.luecke });
     };
-    const plane = () => { if (!raf) raf = requestAnimationFrame(setze); };
+    // ★ HANDY (Als Befund: „Pop-ups laggen beim Scrollen hinterher … sollen FIX auf dem Screen sein, damit man durch Scrollen offenlegen kann, was
+    // sie verdecken"): Auf dem Telefon wird die Lage nur EINMAL bestimmt (bis sie steht) und danach eingefroren — kein Nachfuehren beim Scrollen,
+    // kein Sekundentakt. Nur eine Fenstergroessen-Aenderung (Drehen) misst neu.
+    const phone = !!(window.ppIsPhone && window.ppIsPhone());
+    let eingefroren = false;
+    const plane = () => { if (phone && eingefroren) return; if (!raf) raf = requestAnimationFrame(setze); };
+    const planeNeu = () => { eingefroren = false; plane(); };
     setze();
     // ★ Als Befund 29.9. (Strongman-Zielwahl „blendet von links ein"): die
     // Box aendert ihre Breite noch NACH der ersten Messung (Schrift/Inhalt
@@ -2346,17 +2352,17 @@ function DraggablePanel({ children, className, style, zielwahl }) {
         if (s2 === sig) stabil++; else { stabil = 0; sig = s2; }
       }
       bilder++;
-      if (stabil >= 3 || bilder > 30 || hasCustomPosRef.current) { fertig = true; setBereit(true); return; }
+      if (stabil >= 3 || bilder > 30 || hasCustomPosRef.current) { fertig = true; eingefroren = true; setBereit(true); return; }
       stabilRaf = requestAnimationFrame(pruefeStabil);
     };
     stabilRaf = requestAnimationFrame(pruefeStabil);
-    window.addEventListener('resize', plane);
-    window.addEventListener('scroll', plane, true);
+    window.addEventListener('resize', planeNeu);
+    if (!phone) window.addEventListener('scroll', plane, true);
     const ro = (typeof ResizeObserver !== 'undefined' && panelRef.current) ? new ResizeObserver(plane) : null;
     if (ro) ro.observe(panelRef.current);
     const takt = setInterval(plane, 1000);
     return () => {
-      window.removeEventListener('resize', plane);
+      window.removeEventListener('resize', planeNeu);
       window.removeEventListener('scroll', plane, true);
       if (ro) ro.disconnect();
       clearInterval(takt);
@@ -2446,6 +2452,47 @@ function DraggablePanel({ children, className, style, zielwahl }) {
       panelRef.current?.removeAttribute('data-greifbar');
     };
   }, [zielwahl]);
+  // ★ HANDY: Gedrueckt halten (~0,35 s) + Finger bewegen verschiebt das Fenster; ein sofortiger Wisch scrollt stattdessen das Brett darunter
+  // (das Fenster steht fest auf dem Schirm und deckt sonst Ziele ab). Knoepfe/Formularfelder behalten ihren Tipp.
+  const phoneP = !!(window.ppIsPhone && window.ppIsPhone());
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el || !phoneP) return undefined;
+    let st = null;
+    const ende = () => { if (st && st.timer) clearTimeout(st.timer); st = null; };
+    const start = (e) => {
+      if (e.touches.length !== 1) { ende(); return; }
+      const tg = e.target;
+      if (tg && tg.closest && tg.closest(ZW_KNOPF_SEL + ', .panel-zielwahl-aktiv')) return;
+      if (_ppPanelHatScrollbaresKind(el)) return;
+      const t = e.touches[0];
+      st = { x: t.clientX, y: t.clientY, lx: t.clientX, ly: t.clientY, mode: 'warte', timer: 0 };
+      st.timer = setTimeout(() => {
+        if (!st || st.mode !== 'warte') return;
+        st.mode = 'zieht';
+        try { if (navigator.vibrate) navigator.vibrate(12); } catch {}
+        const r = el.getBoundingClientRect();
+        offsetRef.current = { x: st.lx - r.left, y: st.ly - r.top };
+        setDragging(true);
+      }, 350);
+    };
+    const bewegt = (e) => {
+      if (!st) return;
+      const t = e.touches[0]; if (!t) return;
+      if (st.mode === 'warte' && Math.hypot(t.clientX - st.x, t.clientY - st.y) > 10) { clearTimeout(st.timer); st.mode = 'scroll'; }
+      if (st.mode === 'scroll') {
+        const sc = document.querySelector('.board-center');
+        if (sc) { sc.scrollTop -= t.clientY - st.ly; sc.scrollLeft -= t.clientX - st.lx; }
+        if (e.cancelable) e.preventDefault();
+      }
+      st.lx = t.clientX; st.ly = t.clientY;
+    };
+    el.addEventListener('touchstart', start, { passive: true });
+    el.addEventListener('touchmove', bewegt, { passive: false });
+    el.addEventListener('touchend', ende, { passive: true });
+    el.addEventListener('touchcancel', ende, { passive: true });
+    return () => { ende(); el.removeEventListener('touchstart', start); el.removeEventListener('touchmove', bewegt); el.removeEventListener('touchend', ende); el.removeEventListener('touchcancel', ende); };
+  }, [phoneP]);
   const onDown = (e) => {
     // ★ v1258: Auf Touch ist nur noch das Panel unbeweglich, das
     // scrollbaren Inhalt hat (Kartengalerie, lange Listen) — dort gewann
@@ -2488,7 +2535,8 @@ function DraggablePanel({ children, className, style, zielwahl }) {
   const lueckeStyle = (zielwahl && autoPos) ? { '--zielwahl-luecke': autoPos.luecke + 'px' } : {};
   return (
     <div ref={panelRef} className={className + (zielwahl ? ' panel-zielwahl' : '')} style={{ ...style, ...lueckeStyle, ...posStyle, ...(bereit ? null : { visibility: 'hidden' }), cursor: dragging ? 'grabbing' : 'grab' }}
-      onMouseDown={onDown} onTouchStart={onDown} onClick={e => e.stopPropagation()}>
+      data-zieht={dragging ? '1' : undefined}
+      onMouseDown={onDown} onTouchStart={phoneP ? undefined : onDown} onClick={e => e.stopPropagation()}>
       {children}
       {zielwahl && <div className="panel-zielwahl-griff panel-zielwahl-griff-l" />}
       {zielwahl && <div className="panel-zielwahl-griff panel-zielwahl-griff-r" />}

@@ -24958,21 +24958,19 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
   .first-choice-panel.panel-zielwahl { --zw-polster-y: 5px; --zw-polster-x: 20px; max-width: min(620px, calc(94 * var(--vw))); }
   .panel-zielwahl .panel-zielwahl-vorschau { display: none; }
   .panel-zielwahl .btn { min-height: 0; padding: 4px 10px !important; font-size: 10px !important; }
-  /* Knöpfe NEBEN den Text statt darunter: eine Zeile weniger Höhe
-     (hier ohne Mittellücke — die Box ist ohnehin so breit wie das Brett). */
-  .panel-zielwahl .panel-zielwahl-knoepfe { display: flex !important; column-gap: 8px !important; }
-  .panel-zielwahl .panel-zielwahl-spalte {
-    display: grid !important;
-    grid-template-columns: minmax(0, 1fr) auto;
-    column-gap: 10px;
-    align-items: center;
-  }
-  .panel-zielwahl .panel-zielwahl-spalte > * { grid-column: 1; }
-  .panel-zielwahl .panel-zielwahl-spalte > .panel-zielwahl-knoepfe {
-    grid-column: 2;
-    grid-row: 1 / span 6;
-  }
-  .panel-zielwahl .panel-zielwahl-spalte > .panel-zielwahl-text { margin-bottom: 0 !important; }
+  /* Als Vorgabe: Text OBEN, Knöpfe DARUNTER (nicht in einer langen Zeile) — mittig, ohne Mittellücke für die Helden (die Box steht fest und wird
+     bei Bedarf weggescrollt/-geschoben, siehe unten). */
+  .panel-zielwahl .panel-zielwahl-knoepfe { display: flex !important; column-gap: 8px !important; justify-content: center; margin-top: 4px; }
+  .panel-zielwahl .panel-zielwahl-spalte { display: flex !important; flex-direction: column !important; align-items: center; text-align: center; }
+  .panel-zielwahl .panel-zielwahl-spalte > .panel-zielwahl-text { margin-bottom: 6px !important; }
+  .panel-zielwahl .panel-zielwahl-spalte > * { margin-bottom: 4px; }
+  .panel-zielwahl .panel-zielwahl-spalte > .panel-zielwahl-knoepfe { margin-bottom: 0; }
+}
+/* HANDY: Duell-Fenster stehen fest auf dem Schirm, nehmen Tipps an (Körper nicht mehr durchklickbar — man scrollt/verschiebt sie weg) und lassen sich
+   per Gedrückthalten + Wischen verschieben (DraggablePanel); ein sofortiger Wisch scrollt das Brett. Pixel-Rahmen als Zieh-Rückmeldung. */
+@media (pointer: coarse) and (max-height: 600px) {
+  .first-choice-panel, .first-choice-panel.panel-zielwahl { pointer-events: auto; touch-action: none; }
+  .first-choice-panel[data-zieht] { outline: 3px solid var(--player-color, var(--accent)); outline-offset: 2px; }
 }
 
 /* ════════════════════════════════════════════════════════════════════
