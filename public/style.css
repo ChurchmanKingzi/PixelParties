@@ -16388,6 +16388,8 @@ body:has(.textbox-overlay) .tooltip {
   .rotate-device-overlay .rot-phone-l { animation: none; opacity: 1; }
 }
 
+.rotate-device-overlay .rotate-tap-text { font-size: 18px; letter-spacing: 2px; animation: rotTapBlink 1.2s steps(1, end) infinite; }
+@keyframes rotTapBlink { 0% { color: var(--accent); } 50% { color: #ffe23d; } }
 .ios-fs-hint {
   position: fixed;
   left: 50%;
@@ -16410,7 +16412,6 @@ body:has(.textbox-overlay) .tooltip {
   font: inherit; font-size: 10px; font-weight: 700; letter-spacing: 1px; color: var(--text); background: #12101f; border: 0; padding: 7px 10px;
   box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px #12101f; cursor: pointer; flex: none;
 }
-.rotate-device-overlay .rotate-fs { margin-top: 6px; }
 
 /* Show overlay + hide ALL screens in portrait on small devices */
 @media (orientation: portrait) and (max-width: 900px) {
