@@ -2039,19 +2039,11 @@ window.ppBattleCamFocus = ppBattleCamFocus;
 // Overlay-Leisten der Haende und der Textbox (sie sitzt oben und verdeckt sonst die Gegnerreihe). Passt alles schon ins Band, bleibt die
 // Kamera stehen. Rueckgabe: Promise, das nach der Fahrt aufloest — oder null, wenn nichts zu tun ist (Desktop, Ziele ausserhalb des Bretts,
 // schon sichtbar). Die Textbox misst ihre Highlights erst NACH der Fahrt (sie sind feste Klone an der gemessenen Stelle).
-function ppTutorialCamFokus(elemente) {
+function ppTutorialCamFokus(elemente, opts) {
   try {
     if (!(window.ppIsPhone && window.ppIsPhone())) return null;
     const sc = document.querySelector('.board-center');
     if (!sc) return null;
-    let l = Infinity, t = Infinity, rr = -Infinity, b = -Infinity;
-    for (const e of Array.from(elemente || [])) {
-      if (!e || !e.getBoundingClientRect || !sc.contains(e)) continue;
-      const r = e.getBoundingClientRect();
-      if (!r.width && !r.height) continue;
-      l = Math.min(l, r.left); t = Math.min(t, r.top); rr = Math.max(rr, r.right); b = Math.max(b, r.bottom);
-    }
-    if (!isFinite(l)) return null;
     const scr = sc.getBoundingClientRect();
     let bandOben = _ppCamVarPx('--mob-opphand-h'), bandUnten = _ppCamVarPx('--mob-mehand-h');
     const tb = document.querySelector('.textbox');
@@ -2063,6 +2055,16 @@ function ppTutorialCamFokus(elemente) {
       }
     }
     const bandT = bandOben, bandB = Math.max(bandOben + 40, sc.clientHeight - bandUnten);
+    const nurFehlende = !!(opts && opts.nurFehlende);   // nur Ziele, die noch NICHT im freien Band stehen (Aufmerksamkeitskamera)
+    let l = Infinity, t = Infinity, rr = -Infinity, b = -Infinity;
+    for (const e of Array.from(elemente || [])) {
+      if (!e || !e.getBoundingClientRect || !sc.contains(e)) continue;
+      const r = e.getBoundingClientRect();
+      if (!r.width && !r.height) continue;
+      if (nurFehlende && r.top - scr.top >= bandT - 2 && r.bottom - scr.top <= bandB + 2) continue;
+      l = Math.min(l, r.left); t = Math.min(t, r.top); rr = Math.max(rr, r.right); b = Math.max(b, r.bottom);
+    }
+    if (!isFinite(l)) return null;
     const rt = t - scr.top, rb = b - scr.top, rl = l - scr.left, rre = rr - scr.left;
     const maxY = Math.max(0, sc.scrollHeight - sc.clientHeight), maxX = Math.max(0, sc.scrollWidth - sc.clientWidth);
     let zielY = sc.scrollTop, zielX = sc.scrollLeft;
@@ -2088,6 +2090,29 @@ function ppTutorialCamFokus(elemente) {
   } catch { return null; }
 }
 window.ppTutorialCamFokus = ppTutorialCamFokus;
+
+// ★ AUFMERKSAMKEITSKAMERA (Tutorial, Handy): Nach dem Intro blieb die Kamera auf der Gegnerseite stehen — die eigene Kreaturen-/Support-Reihe
+// liegt dort hinter der Handleiste, der Spieler sah weder die anklickbare Kreatur noch die Zielfelder (Befund Kontrolllauf Tutorial 2/3/6/7).
+// Alle ~450 ms schaut der Beobachter nach markierten, bedienbaren Zielen (aktivierbare Kreaturen/Faehigkeiten/Areas, Zielfelder, waehlbare Helden);
+// aendert sich diese Menge und steht etwas davon nicht im freien Band, faehrt die Kamera hin (nur Ziele, die fehlen). Nicht waehrend einer
+// Textbox (deren Highlight-Kamera hat Vorrang), nicht waehrend ein Finger auf dem Schirm liegt oder eine Karte gezogen wird.
+const PP_AUFMERKSAMKEIT_SEL = '.zone-creature-activatable, .zone-bounce-place-target, .zone-pick-target, .zone-ability-activatable, .area-stack-activatable, .zone-equip-activatable, .potion-target-valid, .board-zone-play-target';
+let _ppAufmerkSchluessel = '';
+function ppTutorialAufmerksamkeit() {
+  try {
+    if (!window._currentTutorialNum || !(window.ppIsPhone && window.ppIsPhone())) return;
+    if (document.querySelector('.textbox-overlay')) { _ppAufmerkSchluessel = ''; return; }   // nach der Textbox neu bewerten
+    if (window._touchActive || window.activeDragData) return;
+    const sc = document.querySelector('.board-center');
+    if (!sc) return;
+    const els = Array.from(sc.querySelectorAll(PP_AUFMERKSAMKEIT_SEL));
+    const schluessel = els.map(e => (e.getAttribute('data-support-owner') || e.getAttribute('data-hero-owner') || e.getAttribute('data-ability-owner') || '?') + ':' + (e.getAttribute('data-support-hero') || e.getAttribute('data-hero-idx') || '') + ':' + (e.getAttribute('data-support-slot') || '') + ':' + e.className.split(' ').filter(c => PP_AUFMERKSAMKEIT_SEL.includes('.' + c)).join('.')).join('|');
+    if (schluessel === _ppAufmerkSchluessel) return;
+    _ppAufmerkSchluessel = schluessel;
+    if (els.length) ppTutorialCamFokus(els, { nurFehlende: true });
+  } catch {}
+}
+window.ppTutorialAufmerksamkeit = ppTutorialAufmerksamkeit;
 
 // ★ v1258 — HAT DIESES PANEL SCROLLBAREN INHALT? (Als Befund 19.9.:
 // „Panels ohne Scrolling, z.B. ‚Mulligan? Yes/No', sollten definitiv
@@ -39175,6 +39200,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // (`setTutorialGegner` in app-shared). Nur im Tutorial ausgewertet.
   const tutorialGegnerDaten = (window.useTutorialGegner || (() => null))();
   const tutorialGegner = gameState?.isTutorial ? tutorialGegnerDaten : null;
+  // Aufmerksamkeitskamera im Tutorial (Handy): holt bedienbare Ziele ins Bild, s. ppTutorialAufmerksamkeit.
+  useEffect(() => {
+    if (!gameState?.isTutorial) return undefined;
+    const id = setInterval(() => { if (window.ppTutorialAufmerksamkeit) window.ppTutorialAufmerksamkeit(); }, 450);
+    return () => clearInterval(id);
+  }, [gameState?.isTutorial]);
   // Anzeigename eines Spielers wie in der Handleiste: Tutorial-Gegner → Monia Bot / Antonia, CPU → Kurzname seines mittleren Helden (nicht „CPU"),
   // sonst der Benutzername. Fuer Statushinweise, Log und Auswahlfenster.
   const anzeigeName = (pl) => {

@@ -1512,6 +1512,7 @@ function ppPixelieren(wurzel) {
     }
     const scheine = _ppScheine(cs.boxShadow).concat(_ppScheine((cs.filter || '').match(/drop-shadow\(.*\)/)?.[0] || ''));
     if (scheine.length) a.schein = scheine.sort((p, q) => q.blur - p.blur)[0];
+    if (a.schein) a.position = cs.position;   // schon HIER lesen: ein Lesen nach den Schreibzugriffen (s. unten) erzwang je Element eine volle Stilberechnung (Layout-Thrashing, ~95 % der Pixelierzeit)
     if (cs.boxShadow && cs.boxShadow !== 'none') a.ohneSchatten = true;
     if (/drop-shadow|blur\(/.test(cs.filter || '')) a.filter = _ppFilterOhneSchein(cs.filter);
     // Emoji/Glyphe: genau ein Textkind, das eine Sprite-Entsprechung hat.
@@ -1601,7 +1602,7 @@ function ppPixelieren(wurzel) {
         halo.style.cssText = `position:absolute;left:${-rand}px;top:${-rand}px;width:${a.w + 2 * rand}px;height:${a.h + 2 * rand}px;`
           + `background:url(${u}) center/100% 100% no-repeat;image-rendering:pixelated;pointer-events:none;z-index:-1;`;
         _ppPxErledigt.add(halo);
-        if (getComputedStyle(el).position === 'static') st.position = 'relative';
+        if (a.position === 'static') st.position = 'relative';
         el.insertBefore(halo, el.firstChild);
       }
     }

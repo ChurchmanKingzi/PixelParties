@@ -14357,6 +14357,11 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   z-index: 100;
   pointer-events: none;
 }
+/* Handy: die Hinweise lagen links oben ueber dem Gegnernamen/-Avatar in der oberen Handleiste und bei Textboxen darunter — jetzt unter die Leiste
+   und rechts neben die Turnzahl-/Phasenspalte, so verdecken sie weder Name noch Avatar. */
+@media (pointer: coarse) and (max-height: 600px) {
+  .phase-debuffs { top: calc(var(--mob-opphand-h, 54px) + 4px); left: calc(var(--sidebar-w, 0px) + 150px); max-width: calc(300px * var(--board-scale)); }
+}
 .phase-debuff-item {
   font-size: calc(13px * var(--board-scale));
   font-weight: 700;
