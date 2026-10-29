@@ -19745,7 +19745,7 @@
     "hp": null,
     "atk": null,
     "cost": 4,
-    "effect": "Delete 3 cards from your hand (or as many as possible). Then, choose the same number of cards of the same type (Ability, Attack/Spell/Creature, Artifact, Potion, Hero) from your discard pile and add them to your hand. Delete this card.",
+    "effect": "Delete up to 3 cards from your hand. Then, choose the same number of cards of the same type (Ability, Attack/Spell/Creature, Artifact, Potion, Hero) from your discard pile and add them to your hand. Delete this card.",
     "archetype": "",
     "setID": "PP SET01",
     "banned": "",
