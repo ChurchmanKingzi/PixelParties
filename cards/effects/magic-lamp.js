@@ -144,7 +144,6 @@ module.exports = {
     // flight visual, the reveal popup will always show the correct
     // card the opponent ended up with.
     engine._broadcastEvent('card_reveal', { cardName: oppChoice });
-    engine._broadcastEvent('deck_search_add', { cardName: oppChoice, playerIdx: oppIdx });
     // Reaktionsfenster (Ambush the Scout), Kategorie 'insert'.
     // W5b-B2 (Al, Welle 5; wie Birthday Present): Negiert wird NUR die Gabe an den Gegner (Teileffekt) –
     // die eigenen 2 Karten kommen trotzdem auf die Hand, die entfallene Gabe bleibt im Deck; die Lampe
@@ -152,6 +151,15 @@ module.exports = {
     const gabeNegiert = await engine.checkHandInteractionReaction(oppIdx, 'insert',
           { byPi: pi, count: 1, sourceName: 'Magic Lamp' });
     if (gabeNegiert) engine.log('magic_lamp_negated', { player: gs.players[pi]?.username });
+    // Flug der Gabe: aus dem DECK des Nutzers auf die Hand des GEGNERS (beide sehen die aufgedeckte Karte). Vorher lief hier ein `deck_search_add` fuer den Gegner,
+    // der Client animierte den Zuwachs der Gegnerhand dann von der Hand des Nutzers aus (Tester 30.10.). Vor der Entnahme, damit der Flug noch aus dem vollen Deck startet;
+    // eine negierte Gabe fliegt nicht.
+    if (!gabeNegiert) {
+      engine._broadcastEvent('play_pile_transfer', {
+        owner: pi, fromOwner: pi, toOwner: oppIdx, cardName: oppChoice, from: 'deck', to: 'hand', toHandIdx: oppPs.hand.length,
+      });
+      await engine._delay(700);
+    }
     // Remove chosen cards from deck — erst NACH dem Reaktionsfenster (M02-18): wird das
     // Einfügen negiert, bleibt die Gabe im Deck, nichts geht verloren.
     for (const name of (gabeNegiert ? playerCards : chosenNames)) {
