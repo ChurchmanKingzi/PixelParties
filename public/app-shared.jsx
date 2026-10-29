@@ -4992,8 +4992,40 @@ window.addDragListeners = addDragListeners;
 // ===== API HELPER =====
 window.AUTH_TOKEN = null;
 
+// ===== SPIELER-TRICHTER (anonyme Statistik, siehe funnel.js) =====
+// Besucher-ID: zufaellige Zeichenfolge im localStorage (`pp_vid`) — keine Person, keine IP, keine E-Mail. Sie wird als Header
+// `x-pp-vid` an jede API-Anfrage gehaengt, damit der Server Gast -> Tutorial -> Konto demselben Besucher zuordnen kann.
+// Aus: ?nostats=1 (merkt sich der Browser, ?nostats=0 hebt auf), Do-Not-Track, Global Privacy Control. Dann geht 'skip' als ID raus.
+const ppFunnel = (() => {
+  const KEY = 'pp_vid', OFF = 'pp_nostats';
+  const rand = () => { try { const a = new Uint8Array(16); crypto.getRandomValues(a); return Array.from(a, b => b.toString(16).padStart(2, '0')).join(''); } catch { return (Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2) + '0000000000000000').slice(0, 24); } };
+  let mem = null, returning = false, existed = false;
+  try { existed = !!localStorage.getItem(KEY); } catch {}
+  try { const q = new URLSearchParams(location.search).get('nostats'); if (q === '1') localStorage.setItem(OFF, '1'); else if (q === '0') localStorage.removeItem(OFF); } catch {}
+  const off = () => { try { if (localStorage.getItem(OFF) === '1') return true; } catch {} return navigator.doNotTrack === '1' || window.doNotTrack === '1' || navigator.globalPrivacyControl === true; };
+  function vid() {
+    if (off()) return 'skip';
+    try { let v = localStorage.getItem(KEY); if (v) { returning = existed; return v; } v = rand(); localStorage.setItem(KEY, v); return v; } catch { return mem || (mem = rand()); }
+  }
+  function hit() {
+    try {
+      if (off() || sessionStorage.getItem('pp_hit')) return; sessionStorage.setItem('pp_hit', '1');
+      const id = vid(), q = new URLSearchParams(location.search); let ref = '';
+      try { const h = document.referrer ? new URL(document.referrer).hostname : ''; ref = h && h !== location.hostname ? h : ''; } catch {}
+      const small = Math.min(screen.width, screen.height) <= 700, coarse = matchMedia('(pointer: coarse)').matches;
+      const body = { vid: id, src: q.get('utm_source') || '', med: q.get('utm_medium') || '', camp: q.get('utm_campaign') || '', content: q.get('utm_content') || '', ref,
+        device: coarse && small ? 'phone' : coarse ? 'tablet' : 'desktop', returning, standalone: matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches };
+      fetch('/api/funnel/hit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), keepalive: true }).catch(() => {});
+    } catch {}
+  }
+  return { vid, hit };
+})();
+window.ppFunnel = ppFunnel;
+ppFunnel.vid();   // setzt `returning` korrekt, bevor hit() läuft
+ppFunnel.hit();
+
 async function api(path, opts = {}) {
-  const headers = { 'Content-Type': 'application/json' };
+  const headers = { 'Content-Type': 'application/json', 'x-pp-vid': ppFunnel.vid() };
   if (window.AUTH_TOKEN) headers['x-auth-token'] = window.AUTH_TOKEN;
   const res = await fetch('/api' + path, { ...opts, headers: { ...headers, ...opts.headers } });
   const data = await res.json();
