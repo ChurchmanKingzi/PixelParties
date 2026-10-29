@@ -2833,6 +2833,7 @@ const HeroIdleAnims = (() => {
     },
   };
 })();
+window.HeroIdleAnims = HeroIdleAnims;   // fuer das Vorladen der Tutorial-Helden (app-screens.jsx)
 
 // Die Sprite-Ebene selbst. Ohne `ueber` (Skill Test) letztes Kind von `.board-plane-clip`, direkt hinter `.board-plane` (siehe
 // Kopfkommentar). Mit `ueber` (Gefecht) in einer Huelle als Geschwister des Clips direkt in `.board-center`: `.board-center`

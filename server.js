@@ -3830,6 +3830,28 @@ app.get('/api/render-version', (req, res) => {
 // Aufruf je Seitenaufbau, und neue Animationen gelten sofort (siehe
 // die maxAge-Vorgabe bei den statischen Routen).
 const HERO_ANIM_DIR = path.join(__dirname, 'data', 'hero-animations');
+// Alles, was die Tutorial-Missionen an Karten zeigen (Namen aus den Puzzle-Dateien, Helden getrennt). Der Client laedt das im Gast-Menue
+// im Leerlauf vor (Kartenbilder rendern, Heldenfiguren laden), damit der Start einer Mission nicht ruckelt. Einmal berechnet, dann gemerkt.
+let _tutorialAssets = null;
+app.get('/api/tutorial-assets', authMiddleware, (req, res) => {
+  try {
+    if (!_tutorialAssets) {
+      const db = getCardDB(), dir = path.join(__dirname, 'data', 'puzzles', 'tutorial');
+      const names = new Set();
+      for (const f of fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => f.endsWith('.json')).sort() : []) {
+        try {
+          const puzzle = decryptPuzzle(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8')).data);
+          (function walk(o) { if (typeof o === 'string') { if (db[o]) names.add(o); } else if (Array.isArray(o)) o.forEach(walk); else if (o && typeof o === 'object') Object.values(o).forEach(walk); })(puzzle);
+        } catch (e) { console.error('[tutorial-assets]', f, e.message); }
+      }
+      const all = [...names];
+      _tutorialAssets = { cards: all, heroes: all.filter(n => db[n].cardType === 'Hero'), abilities: all.filter(n => db[n].cardType === 'Ability') };
+    }
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.json(_tutorialAssets);
+  } catch (e) { console.error('[tutorial-assets]', e.message); res.json({ cards: [], heroes: [], abilities: [] }); }
+});
+
 app.get('/api/hero-animations', async (req, res) => {
   const animations = {};
   try {

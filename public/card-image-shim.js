@@ -200,7 +200,7 @@
     await boot();
     for (let job; (job = nextJob());) {
       if (job.warm) {                                                           // Vorwaermen: nur in den Speicher holen, kein <img>
-        if (!failed) { const url = await blobFor(job.m); if (url) pin(job.m.id, url); }
+        if (!failed) { const url = await blobFor(job.m); if (url) pin(job.m.id, url, job.keep); }
         warming.delete(job.m.id); stats.warmed++;
         await new Promise(r => setTimeout(r, 0));
         continue;
@@ -347,7 +347,7 @@
     if (!c || c.cardType !== 'Ability' || !/^\s*1\)/m.test(c.effect || '') || !/^\s*2\)/m.test(c.effect || '') || !/^\s*3\)/m.test(c.effect || '')) return;
     for (let st = 1; st <= 3; st++) {
       const id = 'card:' + m.stem + variantKey({ stufe: st });
-      if (id === m.id || warming.has(id) || (cache.has(id) && pinned.has(id))) continue;
+      if (id === m.id || warming.has(id) || (cache.has(id) && (pinned.has(id) || keepPinned.has(id)))) continue;
       warming.add(id);
       enqueue({ warm: true, m: fromId(id) }, m.stufe != null ? 1 : 3);
     }
@@ -386,10 +386,12 @@
   }
   addEventListener('pagehide', flushRec);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushRec(); });
-  function pin(id, url) {
-    if (pinned.has(id)) return;
+  const keepPinned = new Map();      // Tutorial-Karten (warmCards): bleiben dekodiert im Speicher, unabhaengig vom Deckel PIN_MAX
+  function pin(id, url, keep) {
+    if (pinned.has(id) || keepPinned.has(id)) return;
     const im = new NativeImage();
     setReal(im, url);
+    if (keep) { keepPinned.set(id, im); if (im.decode) im.decode().catch(() => {}); return; }
     pinned.set(id, im);
     if (pinned.size > PIN_MAX) pinned.delete(pinned.keys().next().value);
     if (im.decode) im.decode().catch(() => {});
@@ -418,9 +420,31 @@
   }
   boot().then(scheduleWarm);
 
+  /** Karten fuer ein Tutorial im Voraus rendern und dekodiert halten. `names`: Kartennamen; `opts.board`: Namen, die auf dem Brett als
+   *  Held/Kreatur (ohne gedruckte HP/ATK) bzw. Faehigkeit (Stufen 1-3) vorkommen. Laeuft im Hintergrund (Tier 3: nach allem Sichtbaren). */
+  async function warmCards(names, opts) {
+    await boot(); if (failed) return 0;
+    opts = opts || {};
+    const heroes = new Set(opts.heroes || []), abilities = new Set(opts.abilities || []);
+    let n = 0;
+    for (const name of names || []) {
+      const stem = strippedKey(name); if (!stem) continue;
+      const base = parse('/cards/' + encodeURIComponent(stem) + '.png'); if (!base) continue;
+      const variants = [base.id], url = '/cards/' + encodeURIComponent(stem) + '.png';
+      if (heroes.has(name)) variants.push(parse(url + '?ohne=atk,hp').id);                                   // Brett: ohne gedruckte HP/ATK
+      if (abilities.has(name)) for (let st = 1; st <= 3; st++) variants.push(parse(url + '?stufe=' + st).id); // Faehigkeit: Stufe hervorgehoben
+      for (const id of variants) {
+        if (warming.has(id) || keepPinned.has(id)) continue;
+        warming.add(id); n++;
+        enqueue({ warm: true, keep: true, m: fromId(id) }, 3);
+      }
+    }
+    return n;
+  }
+
   // Für Hintergrund-Aufwärmer: Kunstindex und Rahmen schon vor den ersten Karten holen
   // Skin -> Basiskarte (fuer das Skin-Holo: es braucht den Kartentyp des Helden). Wartet auf boot().
   async function skinBase(skin) { await boot(); return (window.__cardShimSkinBase && window.__cardShimSkinBase[skin]) || null; }
-  window.CardImageShim = { boot, skinBase, parse, cacheSize: () => cache.size, stats, cacheStats: () => CardRender.cacheStats(), queued: () => queues.reduce((n, q) => n + q.length, 0) };
+  window.CardImageShim = { boot, skinBase, parse, warmCards, cacheSize: () => cache.size, stats, cacheStats: () => CardRender.cacheStats(), queued: () => queues.reduce((n, q) => n + q.length, 0) };
   boot();
 })();

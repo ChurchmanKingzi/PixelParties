@@ -5216,6 +5216,24 @@ function SingleplayerScreen() {
   // Antonia-Praesenz auch hier, fuer den Tutorial-Zweig weiter unten.
   const antoniaHere2 = useAntoniaPresent();
   const { user, setUser, setScreen, notify, setBgmMode } = useContext(AppContext);
+  // ★ TUTORIAL VORLADEN (Befund: der Start von Mission 1 ruckelte auf dem Handy, ebenso der erste Treffer): Karten und Heldenfiguren, die die
+  // Missionen zeigen, werden schon hier im Leerlauf bereitgelegt — Kartenbilder gerendert und dekodiert, Heldenfiguren geladen
+  // (inkl. der Umriss-Berechnung, die sonst beim ersten Auftritt im Spiel laeuft). Nichts davon blockiert das Menue: Leerlauf, eine Figur nach der anderen.
+  useEffect(() => {
+    let weg = false; const timers = [];
+    const idle = (fn, ms) => { const t = setTimeout(() => { if (weg) return; if (window.requestIdleCallback) requestIdleCallback(fn, { timeout: 2500 }); else fn(); }, ms); timers.push(t); };
+    idle(async () => {
+      try {
+        const r = await fetch('/api/tutorial-assets', { headers: window.AUTH_TOKEN ? { 'x-auth-token': window.AUTH_TOKEN } : {} });
+        if (!r.ok || weg) return;
+        const a = await r.json();
+        if (window.CardImageShim && window.CardImageShim.warmCards) window.CardImageShim.warmCards(a.cards, { heroes: a.heroes, abilities: a.abilities });
+        const H = window.HeroIdleAnims;
+        if (H && H.hole && H.slug) (a.heroes || []).forEach((n, i) => timers.push(setTimeout(() => { if (!weg) idle(() => { try { H.hole(H.slug(n)); } catch (e) { /* Vorladen ist optional */ } }, 0); }, 400 + i * 350)));
+      } catch (e) { /* Vorladen ist optional */ }
+    }, 800);
+    return () => { weg = true; timers.forEach(clearTimeout); };
+  }, []);
   const [opponents, setOpponents] = useState(null);          // null = loading
   const [personalDecks, setPersonalDecks] = useState([]);
   const [sampleDecks, setSampleDecks] = useState([]);

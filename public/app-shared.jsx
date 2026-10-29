@@ -10704,7 +10704,9 @@ function TextBox() {
       e.stopPropagation();
       if (e.stopImmediatePropagation) e.stopImmediatePropagation();
       if (e.cancelable) e.preventDefault();
-      if (e.type === 'mousedown' || e.type === 'touchstart') handleAdvance();
+      if (e.type === 'touchstart') window._ppTbTouchAt = Date.now();
+      // Ein Fingertipp erzeugt `touchstart` UND danach ein nachgeschobenes `mousedown` (Kompatibilitaets-Ereignis): nur das erste blaettert
+      if (e.type === 'touchstart' || (e.type === 'mousedown' && Date.now() - (window._ppTbTouchAt || 0) > 1000)) handleAdvance();
     };
     const TYPEN = ['mousedown', 'mouseup', 'click', 'dblclick', 'pointerdown', 'pointerup', 'touchstart', 'touchend', 'dragstart', 'contextmenu'];
     TYPEN.forEach(t => window.addEventListener(t, sperren, { capture: true, passive: false }));
@@ -10714,6 +10716,8 @@ function TextBox() {
   useEffect(() => {
     if (!opts) return;
     const onClick = (e) => {
+      if (e.type === 'touchstart') window._ppTbTouchAt = Date.now();
+      else if (Date.now() - (window._ppTbTouchAt || 0) < 1000) return;   // nachgeschobenes mousedown eines Fingertipps: schon behandelt
       if (e.target.closest('.textbox-back')) return;
       if (fensterDarueber()) return;
       handleAdvance();
