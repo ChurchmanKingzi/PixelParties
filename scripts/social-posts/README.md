@@ -25,6 +25,8 @@ und `post.mp4` (mindestens 30 s, der Loop wird wiederholt). Mit `--format reel`:
 | `--accent #rrggbb` | Akzentfarbe statt der aus dem Sprite abgeleiteten |
 | `--feet PX` | Standlinie des Sprites, px ab Kartenoberkante |
 | `--no-video` | nur Einzelbilder und Standbild |
+| `--logo-px N` | Pixelgröße des „Pixel Parties“-Banners (Standard **3**, seit dem Bakhm-Short für alle Posts/Reels; früher 2); je Hero `logoPx` in `hero-themes.json` |
+| `--opener heart\|storm` | Start-Effekt statt der Standard-Explosion (`--punch`): Flammenherz (`--heart-time` für die Dauer) bzw. Gewitterwolke mit Blitzeinschlag |
 
 Abhängigkeiten: Python 3 mit `pillow` und `numpy`, `ffmpeg`, Node mit `playwright` (Karte wird mit dem
 Spiel-Renderer `public/card-render.js` in Chromium gezeichnet).

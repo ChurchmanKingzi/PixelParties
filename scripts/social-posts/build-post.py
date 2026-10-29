@@ -232,7 +232,10 @@ def bevel_frame(size, accent, thick=32):
 
 # ── Ebenen ────────────────────────────────────────────────────────────────────
 
-def tinted_logo(accent, px_per=2):
+LOGO_PX_DEFAULT = 3        # „Pixel Parties“-Banner: 3 px je Logo-Pixel (1017 px breit im Reel), seit dem Bakhm-Short der Standard für alle Posts/Reels
+
+
+def tinted_logo(accent, px_per=LOGO_PX_DEFAULT):
     logo = Image.open(ROOT / 'data' / 'logo.png').convert('RGBA')
     mask = Image.open(ROOT / 'data' / 'logo-tint-mask.png').convert('RGBA').split()[3]
     rgb = np.asarray(logo.convert('RGB'), dtype=np.float32)
@@ -506,7 +509,7 @@ def main():
     ap.add_argument('--intro', choices=['on', 'off'], default=None, help='Einblenden am Anfang (Standard: Reel an, Post aus)')
     ap.add_argument('--feet', type=int, default=None, help='Standlinie des Sprites, px ab Kartenoberkante')
     ap.add_argument('--shadow-dy', type=int, default=None, help='Schatten um so viele px tiefer setzen (überschreibt shadowDy aus hero-themes.json)')
-    ap.add_argument('--logo-px', type=int, default=None, help='Pixelgröße des Logos (px je Logo-Pixel, Standard 2), überschreibt logoPx aus hero-themes.json')
+    ap.add_argument('--logo-px', type=int, default=None, help='Pixelgröße des Logos (px je Logo-Pixel, Standard 3), überschreibt logoPx aus hero-themes.json')
     ap.add_argument('--logo-dy', type=int, default=None, help='Logo um so viele px tiefer setzen (z. B. damit es im 3:4-Ausschnitt des Instagram-Rasters voll sichtbar ist), überschreibt logoDy aus hero-themes.json')
     ap.add_argument('--head-top', type=int, default=None, help='Sprite so setzen, dass seine Oberkante bei y (px ab Bildoberkante) liegt, überschreibt feet/eyeAt')
     ap.add_argument('--px', type=int, default=None, help='Maßstab des Sprites (px je Sprite-Pixel), überschreibt hero-themes.json')
@@ -570,7 +573,7 @@ def main():
     mid_a.alpha_composite(card, (card_x, card_y))
     orn, gems = ornaments.frame_ornaments(plate_x, plate_y, plate.width, plate.height, accent, (W, H))
     mid_a.alpha_composite(orn)
-    logo = tinted_logo(accent, args.logo_px or hero_cfg.get('logoPx', 2))
+    logo = tinted_logo(accent, args.logo_px or hero_cfg.get('logoPx', LOGO_PX_DEFAULT))
     name_front = bool(hero_cfg.get('nameFront'))            # Name/Beiname/Link-Schild vor dem Sprite (bei sehr großen, tiefen Sprites)
     logo_front = bool(hero_cfg.get('logoFront'))            # Logo vor dem Sprite (bei Helden, die es überragen)
     logo_layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
