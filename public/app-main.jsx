@@ -3330,6 +3330,7 @@ function RotateOverlay() {
           <div className="rotate-panel">
             <div className="rotate-text">Turn your phone sideways!</div>
             <div className="rotate-sub">Pixel Parties is played in landscape. Rotate your device and the battle begins.</div>
+            {window._ppFsLast && window._ppFsLast.err && <div className="rotate-diag">Auto-rotate failed: {String(window._ppFsLast.err)}</div>}
           </div>
         )}
         <div className="rotate-panel rotate-panel-pc" onClick={(e) => e.stopPropagation()}>
