@@ -3607,16 +3607,15 @@ function getCpuMessages(deckId) {
 // ═══════════════════════════════════════════════════════════════════
 //  CPU OPPONENT UNLOCK SYSTEM
 //  Accounts start with only the starter-deck opponents unlocked.
-//  More unlock as the player hits win milestones (endCpuBattle):
+//  More unlock through wins (endCpuBattle):
 //    • the first win vs EVERY opponent (starter or structure deck) → +1 random unlock
-//    • reaching THREE_WIN_MILESTONE wins vs ANY opponent → +1 random unlock
-//  Gaeste haben eine eigene, grosszuegigere Regel (jeder erste Sieg gegen
-//  eine CPU) — alles in `unlock-rules.js`.
+//  Guests follow the same rule (for the running session only) — everything
+//  lives in `unlock-rules.js`.
 //  The gallery and the structure-deck shop are both filtered to a user's
 //  unlocked set. Preexisting accounts are re-gated to this same starting
 //  point by a one-time migration (see initDatabase).
 // ═══════════════════════════════════════════════════════════════════
-const { THREE_WIN_MILESTONE, cpuUnlockCount } = require('./unlock-rules');
+const { cpuUnlockCount } = require('./unlock-rules');
 
 // Seed an account with its initial opponent roster — the starter-deck
 // (non-structure) opponents — flagged is_initial=1, and mark the account
@@ -6958,12 +6957,11 @@ function endCpuBattle(room, winnerIdx, reason) {
 
         // Freischaltungen — nur bei einem Sieg. Die Regel selbst steht in
         // `unlock-rules.js`; hier wird nur der Zustand zusammengetragen.
-        // GAESTE schalten seit 8.8. ebenfalls frei: jeder erste Sieg gegen
-        // eine CPU bringt eine zufaellige neue — fuer die laufende Sitzung.
+        // Gaeste (seit 8.8.) und registrierte Konten gleich: jeder erste Sieg
+        // gegen eine CPU bringt eine zufaellige neue.
         const guestRow = await db.get('SELECT is_guest FROM users WHERE id = ?', [humanUserId]);
         if (humanWon) {
-          const isGuest = !!guestRow?.is_guest;
-          const unlockCount = cpuUnlockCount({ isGuest, preWins });
+          const unlockCount = cpuUnlockCount({ preWins });
 
           const newlyUnlocked = [];
           for (let k = 0; k < unlockCount; k++) {
