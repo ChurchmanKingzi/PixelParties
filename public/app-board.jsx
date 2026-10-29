@@ -2114,6 +2114,27 @@ function ppTutorialAufmerksamkeit() {
 }
 window.ppTutorialAufmerksamkeit = ppTutorialAufmerksamkeit;
 
+// ★ PLATZIERUNGSKAMERA (Handy, jedes Spiel): Soll der Spieler Karten in Support Zonen legen (Pollution Tokens, Bounce-Platzierung, Zonenwahl),
+// faehrt die Kamera nach unten zu diesen Zonen, falls sie nicht im freien Band stehen. Gleiche Fahrt wie die Tutorial-Kamera; sie meldet sich
+// nur bei einer NEUEN Zielmenge (damit der Spieler danach frei scrollen kann) und nie gegen einen Finger oder eine gezogene Karte.
+let _ppPlatzSchluessel = '';
+function ppPlatzierungsKamera() {
+  try {
+    if (!(window.ppIsPhone && window.ppIsPhone())) return;
+    if (window._touchActive || window.activeDragData) return;
+    const sc = document.querySelector('.board-center');
+    if (!sc) return;
+    const els = Array.from(sc.querySelectorAll('[data-support-zone].zone-pick-target, [data-support-zone].zone-bounce-place-target'));
+    if (!els.length) { _ppPlatzSchluessel = ''; return; }
+    if (document.querySelector('.textbox-overlay')) return;   // im Tutorial hat die Textbox-Kamera Vorrang
+    const schluessel = els.map(e => (e.getAttribute('data-support-owner') || '?') + ':' + e.getAttribute('data-support-hero') + ':' + e.getAttribute('data-support-slot')).join('|');
+    if (schluessel === _ppPlatzSchluessel) return;
+    _ppPlatzSchluessel = schluessel;
+    ppTutorialCamFokus(els, { nurFehlende: true });
+  } catch {}
+}
+window.ppPlatzierungsKamera = ppPlatzierungsKamera;
+
 // ★ v1258 — HAT DIESES PANEL SCROLLBAREN INHALT? (Als Befund 19.9.:
 // „Panels ohne Scrolling, z.B. ‚Mulligan? Yes/No', sollten definitiv
 // noch dragbar sein, damit man sie aus dem Weg schieben kann.")
@@ -38976,6 +38997,9 @@ function ppKartenWurf({ mode, cardUrl, A, B, dauer }) {
   return abraeumen;
 }
 
+// Haengt die Phasenspalte (Handy) per Portal in das scrollende Brett; ohne `host` bleibt sie an ihrer gewohnten Stelle.
+function PhasenHuelle({ host, children }) { return host ? ReactDOM.createPortal(children, host) : children; }
+
 function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck, setSelectedDeck, cubeMatchInfo }) {
   useHoverDurchSchleier();   // v1270: Tooltips durch den Dialog-Schleier
   const { user, setUser, notify, setBgmMode } = useContext(AppContext);
@@ -39213,6 +39237,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const id = setInterval(() => { if (window.ppTutorialAufmerksamkeit) window.ppTutorialAufmerksamkeit(); }, 450);
     return () => clearInterval(id);
   }, [gameState?.isTutorial]);
+  // Platzierungskamera (Handy): bei Support-Zonen-Wahl nach unten fahren, s. ppPlatzierungsKamera.
+  useEffect(() => {
+    const id = setInterval(() => { if (window.ppPlatzierungsKamera) window.ppPlatzierungsKamera(); }, 350);
+    return () => clearInterval(id);
+  }, []);
   // Anzeigename eines Spielers wie in der Handleiste: Tutorial-Gegner → Monia Bot / Antonia, CPU → Kurzname seines mittleren Helden (nicht „CPU"),
   // sonst der Benutzername. Fuer Statushinweise, Log und Auswahlfenster.
   const anzeigeName = (pl) => {
@@ -39469,14 +39498,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const pr = nurPlatte ? null : parent.getBoundingClientRect();
       // Faltlinie, Zeilenhoehe und Inhaltskante nur im VOLLEN Lauf.
       let y = null;
-      if (nurPlatte) {
-        // Handy: die Leiste sitzt im Abstand zwischen den Spielerseiten und scrollt mit dem Brett — die Naht wandert beim Scrollen, also auch jetzt nachziehen.
-        if (window.ppIsPhone && window.ppIsPhone()) {
-          const fold0 = document.querySelector('.board-area-zones-center');
-          const fr0 = fold0 && fold0.getBoundingClientRect();
-          if (fr0 && fr0.width > 0) setzeVar(document.documentElement.style, '--phase-mid-y', ((fr0.top + fr0.bottom) / 2 - parent.getBoundingClientRect().top) + 'px');
+      if (nurPlatte) { messePlatte(col); return; }
+      // Handy: die Leiste liegt im scrollenden Brett (Portal) und sitzt GENAU mittig zwischen der untersten gegnerischen und der obersten eigenen Heldenzeile.
+      // Die Hoehe wird in Inhaltskoordinaten (plus `scrollTop`) angegeben — sie aendert sich beim Scrollen nicht, also braucht es dort keinen Nachzieh-Lauf.
+      if (window.ppIsPhone && window.ppIsPhone() && parent.classList && parent.classList.contains('board-center')) {
+        let oppUnten = -Infinity, meOben = Infinity;
+        document.querySelectorAll('[data-hero-zone][data-hero-owner="opp"]').forEach(e => { const r = e.getBoundingClientRect(); if (r.height > 0) oppUnten = Math.max(oppUnten, r.bottom); });
+        document.querySelectorAll('[data-hero-zone][data-hero-owner="me"]').forEach(e => { const r = e.getBoundingClientRect(); if (r.height > 0) meOben = Math.min(meOben, r.top); });
+        if (isFinite(oppUnten) && isFinite(meOben)) {
+          setzeVar(document.documentElement.style, '--phase-mid-y', ((oppUnten + meOben) / 2 - parent.getBoundingClientRect().top + parent.scrollTop) + 'px');
+          messePlatte(col); return;
         }
-        messePlatte(col); return;
       }
       // ERSTE WAHL: `.board-area-zones-center`. Das ist die Faltlinie, an
       // der das ganze Brett haengt — `position: absolute; top: 50%;
@@ -39687,6 +39719,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   // Area zone positioning — measure hero zones to find midpoints between columns
   const boardCenterRef = useRef(null);
+  // Handy: die Phasenleiste haengt INNERHALB des scrollenden Bretts (Portal in `.board-center`), damit sie beim Scrollen nativ mitlaeuft — die frueher
+  // per Skript nachgezogene Position hing beim Hoch-/Runterwischen sichtbar hinterher. Desktop: unveraendert ausserhalb (siehe PhasenHuelle).
+  const [phaseHost, setPhaseHost] = useState(null);
+  useEffect(() => {
+    const mq = window.matchMedia ? window.matchMedia('(pointer: coarse) and (max-height: 600px)') : null;
+    const ziel = (mq && mq.matches) ? boardCenterRef.current : null;
+    if (ziel !== phaseHost) setPhaseHost(ziel);
+  });
   // Ebene UNTER den animierten Heldenfiguren (Sprite-Hülle, z-index 51), aber über Brett und Karten: Animationen mit `unterFiguren: true` (You are the Chosen One!!!: die Aura steht
   // HINTER dem Helden) werden per Portal hierher gehängt. Ein State statt Ref, damit der Render nach dem Einhängen des Knotens neu läuft.
   const [unterFigurenEl, setUnterFigurenEl] = useState(null);
@@ -60569,6 +60609,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           {/* Phase tracker — positioned absolutely, left edge */}
           {/* Tutorial (nurActionPhase): Phasenwechsel gesperrt, nur die Action Phase
               ist erlaubt — siehe `tutorialPhaseErlaubt`. */}
+          <PhasenHuelle host={phaseHost}>
           <div className="phase-column">
             {gameState.skillTest && window.StTurnPanel ? <window.StTurnPanel gameState={gameState} myIdx={myIdx} isSpectator={isSpectator} focusSeat={stMulti ? oppIdx : null} onFocus={stMulti ? setStFocusPin : null} /> : <>
             <div className="board-phase-tracker">
@@ -60623,6 +60664,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             })()}
             </>}
           </div>
+          </PhasenHuelle>
 
           {/* v788 (Als Befund 5.9.): der `board-center-spacer` ist HIER
               ENTFERNT. Er war ein reiner Symmetrie-Platzhalter fuer die

@@ -11953,59 +11953,185 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   100% { transform: rotate(3600deg) scale(1); }
 }
 
-/* ===== ICE PROJECTILE TRAIL ===== */
+/* ===== ICE PROJECTILE TRAIL ===== (Pixelart: harte 4-px-Zellen, zwei Bilder im Wechsel per steps(1), kein Weichzeichner) */
 
 .projectile-ice-trail {
   position: absolute;
   inset: -24px;
-  border-radius: 50%;
-  background:
-    radial-gradient(ellipse at 30% 40%, rgba(179,216,249,.5) 0%, transparent 40%),
-    radial-gradient(ellipse at 70% 60%, rgba(123,190,234,.4) 0%, transparent 35%),
-    radial-gradient(ellipse at 50% 50%, rgba(102,182,255,.3) 0%, transparent 50%);
-  box-shadow:
-    -8px -4px 6px rgba(179,216,249,.3),
-    -16px -2px 8px rgba(123,190,234,.2),
-    -24px 4px 10px rgba(102,182,255,.15),
-    -32px -6px 6px rgba(189,220,239,.2),
-    -40px 2px 8px rgba(179,216,249,.12),
-    -48px -3px 5px rgba(179,216,249,.1),
-    -12px 8px 5px rgba(229,237,250,.25),
-    -28px 7px 7px rgba(179,216,249,.15),
-    -36px -8px 4px rgba(189,220,239,.12);
-  animation: iceTrailPulse 80ms ease-in-out infinite alternate;
   pointer-events: none;
 }
-
-@keyframes iceTrailPulse {
-  0%   { opacity: .6; transform: scale(1); }
-  100% { opacity: .9; transform: scale(1.15); }
+.projectile-ice-trail::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  background: #66b6ff;
+  box-shadow:
+    -12px -4px 0 0 #bddcef,
+    -24px 4px 0 0 #66b6ff,
+    -16px 8px 0 0 #ffffff,
+    -32px 0px 0 0 #66b6ff,
+    12px -12px 0 0 #66b6ff,
+    -24px -12px 0 0 #ffffff,
+    16px 12px 0 0 #bddcef,
+    -8px 16px 0 0 #66b6ff,
+    4px -20px 0 0 #bddcef;
+  animation: iceTrailPixel 160ms steps(1) infinite;
 }
 
-/* ===== ICE BOLT PROJECTILE ===== */
+@keyframes iceTrailPixel {
+  0%   { box-shadow:
+    -12px -4px 0 0 #bddcef,
+    -24px 4px 0 0 #66b6ff,
+    -16px 8px 0 0 #ffffff,
+    -32px 0px 0 0 #66b6ff,
+    12px -12px 0 0 #66b6ff,
+    -24px -12px 0 0 #ffffff,
+    16px 12px 0 0 #bddcef,
+    -8px 16px 0 0 #66b6ff,
+    4px -20px 0 0 #bddcef; }
+  50%  { box-shadow:
+    -16px 4px 0 0 #ffffff,
+    -28px -4px 0 0 #bddcef,
+    -12px -8px 0 0 #66b6ff,
+    -36px 4px 0 0 #66b6ff,
+    8px -16px 0 0 #ffffff,
+    -20px 12px 0 0 #66b6ff,
+    12px 12px 0 0 #66b6ff,
+    -4px 16px 0 0 #bddcef,
+    8px -20px 0 0 #66b6ff; }
+}
+
+/* ===== ICE BOLT PROJECTILE ===== (Pixelart-Eissplitter, spitz nach Osten; die Rotation zum Ziel kommt vom Wrapper) */
 
 .projectile-ice-bolt {
   display: block;
+  position: relative;
   width: 20px;
   height: 20px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%,
-    #fff 0%, #bddcef 25%, #7bbeea 55%, #4e82cb 100%);
+  image-rendering: pixelated;
+}
+.projectile-ice-bolt::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  background: #bddcef;
   box-shadow:
-    0 0 14px rgba(102,182,255,.9),
-    0 0 28px rgba(78,119,202,.5),
-    9px -5px 0 3px rgba(179,216,249,.5),
-    -7px 7px 0 2px rgba(123,190,234,.4),
-    13px 4px 0 2px rgba(189,220,239,.45),
-    -11px -9px 0 3px rgba(179,216,249,.35),
-    5px 11px 0 2px rgba(179,216,249,.3),
-    -4px -13px 0 2px rgba(179,216,249,.35);
-  animation: iceBoltPulse 90ms ease-in-out infinite alternate;
+    -16px 0px 0 0 #2f539d,
+    -12px -4px 0 0 #2f539d,
+    -12px 0px 0 0 #66b6ff,
+    -12px 4px 0 0 #2f539d,
+    -8px -8px 0 0 #2f539d,
+    -8px -4px 0 0 #66b6ff,
+    -8px 0px 0 0 #66b6ff,
+    -8px 4px 0 0 #66b6ff,
+    -8px 8px 0 0 #2f539d,
+    -4px -12px 0 0 #2f539d,
+    -4px -8px 0 0 #66b6ff,
+    -4px -4px 0 0 #66b6ff,
+    -4px 0px 0 0 #bddcef,
+    -4px 4px 0 0 #66b6ff,
+    -4px 8px 0 0 #66b6ff,
+    -4px 12px 0 0 #2f539d,
+    0px -12px 0 0 #2f539d,
+    0px -8px 0 0 #66b6ff,
+    0px -4px 0 0 #bddcef,
+    0px 4px 0 0 #bddcef,
+    0px 8px 0 0 #66b6ff,
+    0px 12px 0 0 #2f539d,
+    4px -8px 0 0 #2f539d,
+    4px -4px 0 0 #bddcef,
+    4px 0px 0 0 #ffffff,
+    4px 4px 0 0 #bddcef,
+    4px 8px 0 0 #2f539d,
+    8px -4px 0 0 #2f539d,
+    8px 0px 0 0 #ffffff,
+    8px 4px 0 0 #2f539d,
+    12px -4px 0 0 #2f539d,
+    12px 0px 0 0 #ffffff,
+    12px 4px 0 0 #2f539d,
+    16px 0px 0 0 #2f539d;
+  animation: iceBoltPulse 120ms steps(1) infinite;
 }
 
 @keyframes iceBoltPulse {
-  0%   { transform: scale(1); filter: brightness(1); }
-  100% { transform: scale(1.15); filter: brightness(1.2); }
+  0%   { background: #bddcef; box-shadow:
+    -16px 0px 0 0 #2f539d,
+    -12px -4px 0 0 #2f539d,
+    -12px 0px 0 0 #66b6ff,
+    -12px 4px 0 0 #2f539d,
+    -8px -8px 0 0 #2f539d,
+    -8px -4px 0 0 #66b6ff,
+    -8px 0px 0 0 #66b6ff,
+    -8px 4px 0 0 #66b6ff,
+    -8px 8px 0 0 #2f539d,
+    -4px -12px 0 0 #2f539d,
+    -4px -8px 0 0 #66b6ff,
+    -4px -4px 0 0 #66b6ff,
+    -4px 0px 0 0 #bddcef,
+    -4px 4px 0 0 #66b6ff,
+    -4px 8px 0 0 #66b6ff,
+    -4px 12px 0 0 #2f539d,
+    0px -12px 0 0 #2f539d,
+    0px -8px 0 0 #66b6ff,
+    0px -4px 0 0 #bddcef,
+    0px 4px 0 0 #bddcef,
+    0px 8px 0 0 #66b6ff,
+    0px 12px 0 0 #2f539d,
+    4px -8px 0 0 #2f539d,
+    4px -4px 0 0 #bddcef,
+    4px 0px 0 0 #ffffff,
+    4px 4px 0 0 #bddcef,
+    4px 8px 0 0 #2f539d,
+    8px -4px 0 0 #2f539d,
+    8px 0px 0 0 #ffffff,
+    8px 4px 0 0 #2f539d,
+    12px -4px 0 0 #2f539d,
+    12px 0px 0 0 #ffffff,
+    12px 4px 0 0 #2f539d,
+    16px 0px 0 0 #2f539d; }
+  50%  { background: #ffffff; box-shadow:
+    -16px 0px 0 0 #2f539d,
+    -12px -4px 0 0 #2f539d,
+    -12px 0px 0 0 #66b6ff,
+    -12px 4px 0 0 #2f539d,
+    -8px -8px 0 0 #2f539d,
+    -8px -4px 0 0 #66b6ff,
+    -8px 0px 0 0 #66b6ff,
+    -8px 4px 0 0 #66b6ff,
+    -8px 8px 0 0 #2f539d,
+    -4px -12px 0 0 #2f539d,
+    -4px -8px 0 0 #66b6ff,
+    -4px -4px 0 0 #66b6ff,
+    -4px 0px 0 0 #ffffff,
+    -4px 4px 0 0 #66b6ff,
+    -4px 8px 0 0 #66b6ff,
+    -4px 12px 0 0 #2f539d,
+    0px -12px 0 0 #2f539d,
+    0px -8px 0 0 #66b6ff,
+    0px -4px 0 0 #ffffff,
+    0px 4px 0 0 #ffffff,
+    0px 8px 0 0 #66b6ff,
+    0px 12px 0 0 #2f539d,
+    4px -8px 0 0 #2f539d,
+    4px -4px 0 0 #ffffff,
+    4px 0px 0 0 #bddcef,
+    4px 4px 0 0 #ffffff,
+    4px 8px 0 0 #2f539d,
+    8px -4px 0 0 #2f539d,
+    8px 0px 0 0 #bddcef,
+    8px 4px 0 0 #2f539d,
+    12px -4px 0 0 #2f539d,
+    12px 0px 0 0 #bddcef,
+    12px 4px 0 0 #2f539d,
+    16px 0px 0 0 #2f539d; }
 }
 
 /* ===== LOVE SHOT HEART PROJECTILE =====
@@ -27080,7 +27206,9 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
    Leiste (Phasen + Knoepfe in EINER Zeile) mittig auf der Naht sitzt und mit dem Brett mitscrollt (`--phase-mid-y`, app-board.jsx). Sie verdeckt damit
    keine Heldenzone mehr; die Area-Zonen (an derselben Naht aufgehaengt) werden nur in einem schmalen Band gekreuzt. */
 @media (pointer: coarse) and (max-height: 600px) {
-  .board-mid-row { min-height: 26px !important; }
+  .board-mid-row { min-height: 44px !important; }
+  /* Die Spalte liegt (Portal) IM scrollenden `.board-center` und scrollt damit nativ; `--phase-mid-y` ist die Mitte in Inhaltskoordinaten. */
+  .board-center > .phase-column { position: absolute; }
   .phase-column { zoom: 1 !important; left: 50% !important; top: var(--phase-mid-y, 50%) !important; transform: translate(-50%, -50%) !important;
     flex-direction: row !important; align-items: center !important; gap: 4px; width: auto; }
   .phase-buttons-row { margin-top: 0 !important; }
