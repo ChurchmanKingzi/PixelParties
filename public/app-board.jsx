@@ -3617,7 +3617,10 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
           platz.style.display = 'none';
         }
       }
-      const hover = !!(l && zone.classList.contains('zone-has-card') && zone.matches(':hover')
+      // ★ Touch (Befund: „die eigenen Helden verschwinden in ihren Karten, bis ich irgendwo hintippe"): nach einem Tipp bleibt `:hover` am angetippten
+      // Element haengen (Phasenleiste, Heldenkarte) — das Einfahren der Figur gilt nur fuer eine echte Maus.
+      const beruehrung = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+      const hover = !beruehrung && !!(l && zone.classList.contains('zone-has-card') && zone.matches(':hover')
         && !l.plane.hasAttribute('data-pp-dragging'));
       // v1463 (Dynamic Heroes): während eines Zielwahl-Dialogs klappt die
       // Figur ein wie beim Hover — aber ohne die Hover-Vergrößerung, die
@@ -3629,7 +3632,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       // Phasenleiste unter dem Zeiger UND diese Figur ragt darueber: einfahren. Verglichen wird mit dem Kasten des `Stehers` — er
       // bleibt beim Einfahren stehen (die Bewegung steckt in `.hero-idle-holo`), damit die Antwort nicht hin- und herspringt.
       let phasenHover = false;
-      if (l && !l.plane.hasAttribute('data-pp-dragging')) {
+      if (!beruehrung && l && !l.plane.hasAttribute('data-pp-dragging')) {
         const leiste = document.querySelector('.phase-column');
         if (leiste && leiste.matches(':hover')) {
           const steher = platz.querySelector('.hero-idle-steher');
@@ -64055,7 +64058,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         return (
           <div className="modal-overlay" style={{ zIndex: 10070, background: 'rgba(0,0,0,.55)' }}
             onClick={() => respondToPrompt({ confirmed: true })}>
-            <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }} onClick={e => e.stopPropagation()}>
+            <div className="animate-in pp-aufdeck-fenster" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
               <div className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', textShadow: '0 2px 8px rgba(0,0,0,.8)' }}>
                 {ep.title || 'Card Searched'}
               </div>
@@ -64066,7 +64069,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     boxShadow: '0 0 50px rgba(0,0,0,.9), 0 0 100px rgba(255,255,255,.08)',
                     borderRadius: 8,
                   }}>
-                    <BoardCard cardName={cn} style={{ width: 220, height: 308, borderRadius: 8 }} />
+                    <div className="pp-aufdeck-karte" style={{ width: 220, height: 308 }}><BoardCard cardName={cn} style={{ width: '100%', height: '100%', borderRadius: 8 }} /></div>
                   </div>
                 ))}
               </div>

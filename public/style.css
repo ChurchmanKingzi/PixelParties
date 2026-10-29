@@ -27222,3 +27222,10 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
     flex-direction: row !important; align-items: center !important; gap: 4px; width: auto; }
   .phase-buttons-row { margin-top: 0 !important; }
 }
+
+/* Aufdeck-Fenster „Gegner hat die Karte gesucht" (deckSearchReveal): auf niedrigen Bildschirmen (Handy quer) passt die 308-px-Karte samt Text und OK-Knopf nicht
+   ins Bild — der Knopf lag unterhalb des Schirms, das Spiel wartete scheinbar endlos. Karte kleiner, Abstaende enger; ein Tipp irgendwo schliesst es. */
+@media (max-height: 600px) {
+  .pp-aufdeck-fenster { gap: 6px !important; max-height: 96vh; }
+  .pp-aufdeck-karte { width: calc(min(52vh, 308px) * 220 / 308) !important; height: min(52vh, 308px) !important; }
+}
