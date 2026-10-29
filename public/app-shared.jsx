@@ -2100,22 +2100,50 @@ function _playBuffer(ctx, buf, opts, intrinsic, delaySec) {
   try { src.start(delaySec > 0 ? ctx.currentTime + delaySec : 0); } catch {}
 }
 
-// Resume AudioContext on first user gesture (Chrome/Safari autoplay policy).
-// Also kick off decoding of any SFX bytes fetched before the context existed.
+// ═══ AUDIO ENTSPERREN (Mobil-Befund: Tap-Screen und Login ohne Musik, Textbox-Klang verzoegert) ═══════
+// Chrome/Samsung Internet/Safari lassen einen AudioContext nur aus einer ECHTEN Aktivierungsgeste heraus laufen: `click`, `pointerup`,
+// `touchend`, `keydown`. `touchstart` zaehlt NICHT. Der alte Entsperrer hing an `touchstart`, rief dort `resume()` (wirkungslos) und
+// entfernte sich danach selbst — der Kontext blieb auf dem Handy `suspended`, bis irgendein spaeterer Klick zufaellig ein `playSFX` ausloeste.
+// Folge: Tap-Screen und Login ohne Musik, erste Klaenge verspaetet. Jetzt: die Entsperr-Horcher bleiben, bis der Kontext TATSAECHLICH laeuft
+// (und kommen zurueck, wenn er wieder haengt, z.B. nach Tab-Wechsel / Anruf), und melden den Lauf per `pp-audio-running`.
+// Ausserdem haelt ein unhoerbarer Dauerton den Audio-Ausgang des Handys wach (sonst braucht der erste Klang nach Stille spuerbar laenger).
 if (typeof window !== 'undefined') {
-  const _unlockSfx = () => {
-    const ctx = _getSfxCtx();
-    if (ctx && ctx.state === 'suspended') { try { ctx.resume(); } catch {} }
-    for (const name of SFX_NAMES) {
-      if (_sfxBytes[name] && !_sfxBuffers[name]) _decodeSfxBytes(name);
-    }
-    window.removeEventListener('click', _unlockSfx);
-    window.removeEventListener('keydown', _unlockSfx);
-    window.removeEventListener('touchstart', _unlockSfx);
+  const GESTEN = ['pointerup', 'touchend', 'click', 'keydown', 'mousedown'];
+  let _wach = false;
+  const _haltWach = (ctx) => {
+    if (_wach) return; _wach = true;
+    try {
+      const buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);   // 1 s, kaum messbares Rauschen (-90 dB), laeuft in Schleife
+      const d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() - 0.5) * 6e-5;
+      const q = ctx.createBufferSource(); q.buffer = buf; q.loop = true; q.connect(ctx.destination); q.start(0);
+    } catch {}
   };
-  window.addEventListener('click', _unlockSfx);
-  window.addEventListener('keydown', _unlockSfx);
-  window.addEventListener('touchstart', _unlockSfx);
+  const _laeuft = () => { const c = _sfxCtx; return !!(c && c.state === 'running'); };
+  const _gemeldet = () => {
+    const ctx = _sfxCtx; if (!ctx || ctx.state !== 'running') return;
+    for (const name of SFX_NAMES) { if (_sfxBytes[name] && !_sfxBuffers[name]) _decodeSfxBytes(name); }
+    _haltWach(ctx);
+    GESTEN.forEach(t => window.removeEventListener(t, _entsperren, true));
+    try { window.dispatchEvent(new Event('pp-audio-running')); } catch {}
+  };
+  const _scharf = () => GESTEN.forEach(t => window.addEventListener(t, _entsperren, { capture: true, passive: true }));
+  function _entsperren() {
+    const ctx = _getSfxCtx();
+    if (!ctx) return;
+    if (ctx.state === 'running') { _gemeldet(); return; }
+    let p; try { p = ctx.resume(); } catch {}
+    Promise.resolve(p).then(_gemeldet, () => {});
+  }
+  window.ppAudioEntsperren = _entsperren;
+  window.ppAudioLaeuft = _laeuft;
+  _scharf();
+  // Kontext schon beim Laden anlegen (startet suspendiert, ohne Warnung): so kann `statechange` beobachtet werden, und der erste Tipp
+  // muss nur noch `resume()` rufen. Faellt der Kontext spaeter zurueck (iOS „interrupted", Tab-Wechsel), werden die Horcher neu gescharft.
+  try {
+    const c = _getSfxCtx();
+    if (c) c.addEventListener('statechange', () => { if (c.state === 'running') _gemeldet(); else _scharf(); });
+  } catch {}
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !_laeuft()) _scharf(); });
   _initSoundManager();
 }
 

@@ -3001,21 +3001,33 @@ function MusicManager({ bgmMode }) {
 
   // Unlock audio on first user interaction
   // Chromium/Opera require a direct user gesture to unlock each Audio element.
-  // We "touch" every track (play → immediate pause) to unlock them, then start the real track.
+  // ★ Mit Web Audio (GaplessBgm) entsperrt ein einziger laufender Kontext alles: app-shared.jsx horcht auf echte Gesten (click / touchend /
+  // pointerup / keydown — NICHT touchstart, das zaehlt auf Android nicht) und meldet `pp-audio-running`. Erst dann startet die Musik; so
+  // kommt sie auf dem Handy schon auf Tap-Screen und Login. Die Zielmusik wird ueber einen Ref nachgefuehrt (der Modus kann sich bis zur
+  // ersten Geste mehrfach aendern).
+  const bgmRef = useRef(bgmMode);
+  bgmRef.current = bgmMode;
   useEffect(() => {
     if (unlocked.current) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) {
+      const start = () => {
+        if (unlocked.current) return;
+        unlocked.current = true;
+        for (const audio of Object.values(_bgmTracks)) { if (audio && typeof audio.unlock === 'function') audio.unlock(); }
+        switchTrack(bgmRef.current || 'menu');
+      };
+      window.addEventListener('pp-audio-running', start);
+      if (window.ppAudioLaeuft && window.ppAudioLaeuft()) start();
+      return () => window.removeEventListener('pp-audio-running', start);
+    }
+    // Rueckfall ohne AudioContext: <audio>-Elemente per Play/Pause entsperren (alter Weg).
     const unlock = () => {
       if (unlocked.current) return;
       unlocked.current = true;
       const touchAndUnlock = async () => {
         for (const audio of Object.values(_bgmTracks)) {
           if (!audio) continue;
-          // ★ v1257: Der Web-Audio-Looper braucht keinen Play/Pause-
-          // Tastendruck je Element — EIN ctx.resume() entsperrt den
-          // Kontext fuer alle. (audio.play() wuerde hier ausserdem
-          // 13 Fetch+Decodes anstossen — genau das soll die
-          // Lazy-Ladung ja vermeiden.)
-          if (typeof audio.unlock === 'function') { audio.unlock(); continue; }
           try {
             audio.volume = 0;
             await audio.play();
@@ -3023,22 +3035,22 @@ function MusicManager({ bgmMode }) {
             audio.currentTime = 0;
           } catch {}
         }
-        switchTrack(bgmMode || 'menu');
+        switchTrack(bgmRef.current || 'menu');
       };
       touchAndUnlock();
       window.removeEventListener('click', unlock);
       window.removeEventListener('keydown', unlock);
-      window.removeEventListener('touchstart', unlock);
+      window.removeEventListener('touchend', unlock);
     };
     window.addEventListener('click', unlock);
     window.addEventListener('keydown', unlock);
-    window.addEventListener('touchstart', unlock);
+    window.addEventListener('touchend', unlock);
     return () => {
       window.removeEventListener('click', unlock);
       window.removeEventListener('keydown', unlock);
-      window.removeEventListener('touchstart', unlock);
+      window.removeEventListener('touchend', unlock);
     };
-  }, [bgmMode]);
+  }, []);
 
   // Switch tracks when bgmMode changes
   useEffect(() => {
