@@ -2,9 +2,16 @@
 //  CARD EFFECT: "Shard of Chaos"
 //  Artifact (Normal, Cost 4)
 //
-//  Delete 1-3 cards from hand, then retrieve
-//  the same number of cards of the same types
-//  from the discard pile. Shard is deleted.
+//  Delete EXACTLY 3 cards from hand (or as many as
+//  possible), then retrieve the same number of cards
+//  of the same types from the discard pile. Shard is
+//  deleted.
+//
+//  Al 29.10.: „Es ist nicht ‚up to‘, sondern exakt so
+//  viele (oder so viele wie möglich)." Die Handwahl lässt
+//  sich erst bestätigen, wenn die Höchstzahl gewählt ist:
+//  min(3, wählbare Karten) — wählbar ist je Typ höchstens
+//  so viel, wie die Ablage von diesem Typ hat.
 //
 //  Attack/Spell/Creature count as one type
 //  ("Action"). Ability, Artifact, Potion, Hero
@@ -99,16 +106,21 @@ module.exports = {
     if (!(await engine._discardOutAllowed(pi, { source: 'Shard of Chaos' }))) return { cancelled: true };
 
     // ── Step 1: Hand Pick prompt ──
-    const maxSelect = Math.min(3, eligibleIndices.length);
+    // Exakt so viele wie möglich: je Typ lassen sich höchstens so viele Handkarten wählen, wie die Ablage von diesem Typ hat
+    // (`typeLimits`); `eligibleIndices.length` allein überschätzt das (3 Helden auf der Hand, 1 Held in der Ablage: wählbar ist 1).
+    const handTypeCounts = {};
+    for (const i of eligibleIndices) handTypeCounts[cardTypes[i]] = (handTypeCounts[cardTypes[i]] || 0) + 1;
+    const waehlbar = Object.keys(handTypeCounts).reduce((n, t) => n + Math.min(handTypeCounts[t], discardTypeCounts[t] || 0), 0);
+    const maxSelect = Math.min(3, waehlbar);
     const pickResult = await engine.promptGeneric(pi, {
       type: 'handPick',
       eligibleIndices,
       cardTypes,
       typeLimits: discardTypeCounts,
-      minSelect: 1,
+      minSelect: maxSelect,
       maxSelect,
       title: 'Shard of Chaos',
-      description: `Select up to ${maxSelect} card(s) to delete. You'll retrieve the same types from your discard pile.`,
+      description: `Select ${maxSelect} card(s) to delete. You'll retrieve the same types from your discard pile.`,
       confirmLabel: '🌀 Bring Chaos!',
     });
 
@@ -117,7 +129,18 @@ module.exports = {
     }
 
     // ── Delete selected hand cards ──
-    const selectedCards = pickResult.selectedCards;
+    const selectedCards = [];
+    {
+      const proTyp = {};
+      for (const sel of pickResult.selectedCards) {
+        const cd = cardDB[ps.hand[sel.handIndex]];
+        if (!cd) { selectedCards.push(sel); continue; }
+        const nt = normalizeType(cd.cardType);
+        proTyp[nt] = (proTyp[nt] || 0) + 1;
+        if (proTyp[nt] > (discardTypeCounts[nt] || 0)) continue;     // mehr als die Ablage von diesem Typ hergibt: nicht loeschen
+        selectedCards.push(sel);
+      }
+    }
 
     // Welle 12 (Q92, Al): Item-Lock-Kosten NACH dem Commit (Handwahl bestätigt, nicht mehr abbrechbar), aber VOR dem Löschen. Die Kostenlöschung
     // verschiebt die Handindizes — die gewählten Karten werden deshalb vorher als Namen gemerkt und danach neu zugeordnet (traf die Kostenwahl
