@@ -11528,6 +11528,52 @@ window.handFanCardBox = handFanCardBox;
 window.playCardDragSFX = playCardDragSFX;
 window.zoneLandStyle = zoneLandStyle;
 window.VolumeControl = VolumeControl;
+
+// Eigenes Dropdown statt `<select>`: das native Auswahlfenster malt das Betriebssystem — auf Android holt es im Vollbild die Systemleiste
+// („Programme anzeigen / Zurueck") nach oben, und seine Eintraege nutzen nicht die Pixel-Emoji-Schrift (📋 blieb System-Emoji).
+// `options`: [{ value, label, disabled? }] (disabled = Trennzeile), `onChange(value)`.
+function PPDropdown({ value, options, onChange, style, className = 'select', minWidth }) {
+  const [offen, setOffen] = useState(false);
+  const [pos, setPos] = useState(null);
+  const knopf = useRef(null);
+  const liste = useRef(null);
+  const aktuell = (options || []).find(o => o.value === value);
+  useEffect(() => {
+    if (!offen) return;
+    const zu = (e) => { if (knopf.current && knopf.current.contains(e.target)) return; if (liste.current && liste.current.contains(e.target)) return; setOffen(false); };
+    const esc = (e) => { if (e.key === 'Escape') setOffen(false); };
+    document.addEventListener('pointerdown', zu, true); window.addEventListener('keydown', esc, true); window.addEventListener('resize', () => setOffen(false), { once: true });
+    return () => { document.removeEventListener('pointerdown', zu, true); window.removeEventListener('keydown', esc, true); };
+  }, [offen]);
+  const auf = () => {
+    if (offen) { setOffen(false); return; }
+    const r = knopf.current.getBoundingClientRect();
+    const platzUnten = window.innerHeight - r.bottom - 8;
+    const hoch = Math.max(120, Math.min(window.innerHeight - 16, 320));
+    const nachUnten = platzUnten >= Math.min(hoch, 200) || r.top < platzUnten;
+    const rechts = r.left > window.innerWidth / 2;
+    setPos({ left: rechts ? undefined : Math.max(4, r.left), right: rechts ? Math.max(4, window.innerWidth - r.right) : undefined, width: r.width, top: nachUnten ? r.bottom + 2 : undefined, bottom: nachUnten ? undefined : window.innerHeight - r.top + 2, maxHeight: Math.max(100, (nachUnten ? platzUnten : r.top - 8)) });
+    setOffen(true);
+  };
+  return (
+    <>
+      <button type="button" ref={knopf} className={className} onClick={auf} aria-haspopup="listbox" aria-expanded={offen}
+        style={{ textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth, ...style }}>
+        {aktuell ? aktuell.label : ''}
+      </button>
+      {offen && pos && ReactDOM.createPortal(
+        <div ref={liste} role="listbox" style={{ position: 'fixed', left: pos.left, right: pos.right, top: pos.top, bottom: pos.bottom, minWidth: Math.max(pos.width, 160), maxHeight: pos.maxHeight, overflowY: 'auto', zIndex: 100001, background: 'var(--bg2)', border: '2px solid var(--player-color)', boxSizing: 'border-box' }}>
+          {(options || []).map((o, i) => o.disabled
+            ? <div key={'t' + i} style={{ padding: '4px 10px', fontSize: 11, color: 'var(--text2)', whiteSpace: 'nowrap' }}>{o.label}</div>
+            : <button type="button" key={o.value} role="option" aria-selected={o.value === value} onClick={() => { setOffen(false); if (o.value !== value) onChange(o.value); }}
+                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', fontSize: 12, whiteSpace: 'nowrap', border: 'none', borderBottom: '1px solid var(--bg4)', background: o.value === value ? 'var(--bg4)' : 'transparent', color: o.value === value ? 'var(--player-color)' : 'var(--text)', cursor: 'pointer', fontFamily: 'inherit' }}>
+                {o.label}
+              </button>)}
+        </div>, document.body)}
+    </>
+  );
+}
+window.PPDropdown = PPDropdown;
 window.CardTooltipContent = CardTooltipContent;
 window.useCardTooltip = useCardTooltip;
 window.useStickyHoverFlag = useStickyHoverFlag;
