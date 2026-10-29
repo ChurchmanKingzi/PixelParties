@@ -364,7 +364,7 @@ function AnimatedTitleBackdrop() {
             frames only the background and leaves every sprite at its true colour. */}
         <div className="anim-vignette" />
         {/* 1 — hammer girl */}
-        <div style={layer('hammer.png', { transformOrigin: '72% 28%', '--mx': '0.469vw', '--my': '-1.389vh', '--mr': '2deg', animation: 'ab-floaty 4.2s ease-in-out -0.6s infinite' })} />
+        <div style={layer('hammer.png', { transformOrigin: '72% 28%', '--mx': 'calc(var(--abw,1vw) * 0.469)', '--my': 'calc(var(--abh,1vh) * -1.389)', '--mr': '2deg', animation: 'ab-floaty 4.2s ease-in-out -0.6s infinite' })} />
         {/* 2 — Explosionskern. ★ v1266 (Al 22.9.: „das Login-Menue ist
             nicht schoen"): wieder HIER, in der Kulisse, statt im Kasten ueber
             dessen Flaeche. Dort lag der gelb-rote Kern direkt hinter den
@@ -376,22 +376,22 @@ function AnimatedTitleBackdrop() {
         {/* 3 — central bloom */}
         <div className="anim-bloom" />
         {/* 4 — Broghan (right shooter), nudged flush to the right edge */}
-        <div style={{ position: 'absolute', inset: 0, transform: 'translate(5.781vw, 0.278vh)' }}>
+        <div style={{ position: 'absolute', inset: 0, transform: 'translate(calc(var(--abw,1vw) * 5.781), calc(var(--abh,1vh) * 0.278))' }}>
           <div style={layer('golem.png', { animation: 'ab-broghanTether 4.8s ease-in-out infinite' })} />
         </div>
         {/* 5 — Kyli (tree girl), shifted down */}
-        <div style={{ position: 'absolute', inset: 0, transform: 'translateY(14.907vh)' }}>
-          <div style={layer('horned.png', { transformOrigin: '80% 100%', '--mx': '-0.573vw', '--my': '-1.389vh', '--mr': '2.6deg', animation: 'ab-floaty 6s ease-in-out -2s infinite' })} />
+        <div style={{ position: 'absolute', inset: 0, transform: 'translateY(calc(var(--abh,1vh) * 14.907))' }}>
+          <div style={layer('horned.png', { transformOrigin: '80% 100%', '--mx': 'calc(var(--abw,1vw) * -0.573)', '--my': 'calc(var(--abh,1vh) * -1.389)', '--mr': '2.6deg', animation: 'ab-floaty 6s ease-in-out -2s infinite' })} />
         </div>
         {/* 6 — angel girl */}
-        <div style={layer('angel.png', { transformOrigin: '20% 30%', '--mx': '0vw', '--my': '-1.111vh', '--mr': '-1.4deg', animation: 'ab-floaty 5s ease-in-out infinite' })} />
+        <div style={layer('angel.png', { transformOrigin: '20% 30%', '--mx': 'calc(var(--abw,1vw) * 0)', '--my': 'calc(var(--abh,1vh) * -1.111)', '--mr': '-1.4deg', animation: 'ab-floaty 5s ease-in-out infinite' })} />
         {/* 7 — blonde girl */}
-        <div style={layer('blonde.png', { transformOrigin: '20% 50%', '--mx': '0.208vw', '--my': '-0.833vh', '--mr': '1deg', animation: 'ab-floaty 6.5s ease-in-out -1.5s infinite' })} />
+        <div style={layer('blonde.png', { transformOrigin: '20% 50%', '--mx': 'calc(var(--abw,1vw) * 0.208)', '--my': 'calc(var(--abh,1vh) * -0.833)', '--mr': '1deg', animation: 'ab-floaty 6.5s ease-in-out -1.5s infinite' })} />
         {/* 8 — Jiggles (left shooter) */}
         <div style={layer('rabbit.png', { animation: 'ab-jiggleTether 4.8s ease-in-out infinite' })} />
         {/* 9 — Champion (swordsman), shifted down */}
-        <div style={{ position: 'absolute', inset: 0, transform: 'translateY(19.907vh)' }}>
-          <div style={layer('ninja.png', { transformOrigin: '16% 80%', '--mx': '0.417vw', '--my': '-1.296vh', '--mr': '-2deg', animation: 'ab-floaty 5.5s ease-in-out -2.5s infinite' })} />
+        <div style={{ position: 'absolute', inset: 0, transform: 'translateY(calc(var(--abh,1vh) * 19.907))' }}>
+          <div style={layer('ninja.png', { transformOrigin: '16% 80%', '--mx': 'calc(var(--abw,1vw) * 0.417)', '--my': 'calc(var(--abh,1vh) * -1.296)', '--mr': '-2deg', animation: 'ab-floaty 5.5s ease-in-out -2.5s infinite' })} />
         </div>
         {/* 10-12 — flying cats live in <AnimatedTitleCatsOverlay/> instead, so
             they render ABOVE the login panel (can't rise above it from inside
@@ -415,7 +415,7 @@ function AnimatedTitleBackdrop() {
         <div className="anim-embers" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
           {embers.map((e, i) => (
             <span key={i} style={{
-              position: 'absolute', bottom: '-1.296vh', left: e.left.toFixed(2) + '%',
+              position: 'absolute', bottom: 'calc(var(--abh,1vh) * -1.296)', left: e.left.toFixed(2) + '%',
               width: e.size.toFixed(1) + 'px', height: e.size.toFixed(1) + 'px', borderRadius: '50%',
               background: e.color, boxShadow: '0 0 ' + (e.size * 2.4).toFixed(1) + 'px ' + e.color,
               opacity: 0, animation: 'ab-emberrise ' + e.dur.toFixed(1) + 's linear ' + e.delay.toFixed(1) + 's infinite',
@@ -434,16 +434,16 @@ function AnimatedTitleBackdrop() {
 // — in sync because both mount together. pointer-events:none so clicks still
 // reach the form beneath.
 // Wie weit `cat_mid` nach links rueckt, damit sie den Login-Kasten
-// freigibt. 8vw sind bei 1900px Breite gut 150px — der Kasten ist mit
+// freigibt. calc(var(--abw,1vw) * 8) sind bei 1900px Breite gut 150px — der Kasten ist mit
 // dem v466-Zoom rund 460px breit und beginnt damit bei etwa 38 %.
-const KATZE_LINKS = '8vw';
+const KATZE_LINKS = 'calc(var(--abw,1vw) * 8)';
 
 function AnimatedTitleCatsOverlay() {
   const layer = animEbene;   // v1265: zugeschnittene Ebenen, siehe oben
   return (
     <div className="anim-cats-front" aria-hidden="true">
       <div className="anim-shake">
-        <div style={layer('cat_top.png', { transformOrigin: '23% 5%', '--mx': '0.729vw', '--my': '-0.833vh', '--mr': '3deg', animation: 'ab-floaty 3.4s ease-in-out -0.5s infinite' })} />
+        <div style={layer('cat_top.png', { transformOrigin: '23% 5%', '--mx': 'calc(var(--abw,1vw) * 0.729)', '--my': 'calc(var(--abh,1vh) * -0.833)', '--mr': '3deg', animation: 'ab-floaty 3.4s ease-in-out -0.5s infinite' })} />
         {/* cat_mid sass mit ihrem Bildmittelpunkt bei 37 % genau auf der
             linken Kante des Login-Kastens und lag als Vordergrundebene
             darueber — seit dem groesseren Zoom (v466) zu dominant.
@@ -460,12 +460,15 @@ function AnimatedTitleCatsOverlay() {
 
             KATZE_LINKS ist die einzige Stellschraube: groesser =
             weiter weg vom Kasten. */}
-        <div style={layer('cat_mid.png', { transformOrigin: '37% 30%', '--mx': '-0.573vw', '--my': '0.833vh', '--mr': '-3deg', animation: 'ab-floaty 2.9s ease-in-out -0.8s infinite' }, { versatzX: `-${KATZE_LINKS}` })} />
-        <div style={layer('cat_bottom.png', { transformOrigin: '5% 48%', '--mx': '0.833vw', '--my': '-1.111vh', '--mr': '4deg', animation: 'ab-floaty 3.0s ease-in-out -1.7s infinite' })} />
+        <div style={layer('cat_mid.png', { transformOrigin: '37% 30%', '--mx': 'calc(var(--abw,1vw) * -0.573)', '--my': 'calc(var(--abh,1vh) * 0.833)', '--mr': '-3deg', animation: 'ab-floaty 2.9s ease-in-out -0.8s infinite' }, { versatzX: `calc(-1 * ${KATZE_LINKS})` })} />
+        <div style={layer('cat_bottom.png', { transformOrigin: '5% 48%', '--mx': 'calc(var(--abw,1vw) * 0.833)', '--my': 'calc(var(--abh,1vh) * -1.111)', '--mr': '4deg', animation: 'ab-floaty 3.0s ease-in-out -1.7s infinite' })} />
       </div>
     </div>
   );
 }
+
+window.AnimatedTitleBackdrop = AnimatedTitleBackdrop;
+window.AnimatedTitleCatsOverlay = AnimatedTitleCatsOverlay;
 
 function AuthScreen() {
   const { setUser } = useContext(AppContext);

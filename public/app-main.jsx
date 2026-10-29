@@ -3274,8 +3274,31 @@ function RotateOverlay() {
   // Standard (Android/Chrome u. a.): ein Antippen irgendwo startet Vollbild + Querformat-Sperre, das Geraet dreht sich von
   // selbst — der Bildschirm sagt nur „Tap to play". Wo das nicht geht (iPhone-Safari, Sperre verweigert): die Dreh-Anweisung.
   const [failed, setFailed] = useState(false);
-  const auto = !!(window._ppFullscreenSupported && window._ppLandscapeLockSupported) && !failed;
-  const enter = () => { if (!auto) return; window._ppRequestFullscreen(true).then(r => { if (!r.locked) setFailed(true); }); };
+  const [tapped, setTapped] = useState(!!window._ppTapStarted);
+  const camRef = useRef(null);
+  const canAuto = !!(window._ppFullscreenSupported && window._ppLandscapeLockSupported);
+  const auto = canAuto && !failed;
+  // Tap-Schranke: auf Telefonen (grober Zeiger, kurze Seite <= 700 px) bleibt der Bildschirm in JEDER Ausrichtung stehen, bis
+  // getippt wurde — wer das Handy von Hand kippt, kommt NICHT am Tippen vorbei (das Tippen startet Vollbild + Querformat).
+  const phoneLike = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches && Math.min(window.screen.width, window.screen.height) <= 700);
+  const gate = canAuto && phoneLike && !tapped;
+  const enter = () => {
+    if (!auto) return;
+    window._ppTapStarted = true; setTapped(true);
+    window._ppRequestFullscreen(true).then(r => { if (!r.locked) setFailed(true); });
+  };
+  // Kamerafahrt: die 1920x1080-Buehne des Titelbilds so skalieren, dass sie das Fenster deckt (`--rs`); `--ramp` = wie weit
+  // die Fahrt seitlich ausholen darf, ohne den Buehnenrand zu zeigen.
+  useLayoutEffect(() => {
+    const fit = () => {
+      const el = camRef.current; if (!el) return;
+      const w = window.innerWidth, h = window.innerHeight, k = Math.max(w / 1920, h / 1080);
+      el.style.setProperty('--rs', k.toFixed(4));
+      el.style.setProperty('--ramp', Math.max(0, Math.floor((1920 - w / k) / 2 - 40)));
+    };
+    fit(); window.addEventListener('resize', fit); window.addEventListener('orientationchange', fit);
+    return () => { window.removeEventListener('resize', fit); window.removeEventListener('orientationchange', fit); };
+  }, []);
   const copyLink = () => {
     const url = window.location.origin;
     const done = () => { setCopied(true); setTimeout(() => setCopied(false), 2200); };
@@ -3289,9 +3312,17 @@ function RotateOverlay() {
     done();
   };
   return (
-    <div className="rotate-device-overlay" id="rotate-overlay" onClick={enter}>
-      <div className="rotate-art" aria-hidden="true"></div>
-      <div className="rotate-dither" aria-hidden="true"></div>
+    <div className={'rotate-device-overlay' + (gate ? ' rotate-gate' : '')} id="rotate-overlay" onClick={enter}>
+      <div className="rotate-cam" ref={camRef} aria-hidden="true">
+        <div className="rotate-cam-scale">
+          <div className="rotate-cam-move">
+            <div className="anim-stage-host">
+              <AnimatedTitleBackdrop />
+              <AnimatedTitleCatsOverlay />
+            </div>
+          </div>
+        </div>
+      </div>
       <div className="rotate-content">
         <div className="pp-logo-stack rotate-logo">
           <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
