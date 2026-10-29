@@ -2277,6 +2277,12 @@ function playSFXForLog(entry) {
     case 'inventing_discard_draw':
       playSFX('discard', { dedupe: 40 });
       return;
+    // Elixir of Immortality & Co. („Place openly"-Potions): der Klang haengt NICHT mehr allein an der Permanent-Animation (die ihn wegen der
+    // 400-ms-Effekt-Sperre schlucken konnte — Befund: Elixir stumm). Das Log liefert ihn zusaetzlich; die gemeinsame Dedupe-Zeit (900 ms auf
+    // `revive`) verhindert doppelte Wiedergabe.
+    case 'potion_placed_open':
+      playSFX('revive', { dedupe: 900, category: null });
+      return;
     case 'shuffle_back':
       playSFX('shuffle');
       return;

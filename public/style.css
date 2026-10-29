@@ -6838,6 +6838,11 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   border: 1px solid rgba(255,255,255,.08);
   white-space: nowrap;
   transition: all .2s;
+  /* Beschriftung mittig im Kaestchen (sie klebte links, sobald das Kaestchen breiter war als der Text). */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 .board-phase-item.active {
   color: #fff;
@@ -14390,6 +14395,10 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   padding: calc(3px * var(--board-scale)) calc(10px * var(--board-scale)) !important;
   font-size: calc(9px * var(--board-scale)) !important;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 .phase-end-check {
   display: flex;
@@ -24967,9 +24976,9 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
   .panel-zielwahl .panel-zielwahl-spalte > .panel-zielwahl-knoepfe { margin-bottom: 0; }
 }
 /* HANDY: Duell-Fenster stehen fest auf dem Schirm, nehmen Tipps an (Körper nicht mehr durchklickbar — man scrollt/verschiebt sie weg) und lassen sich
-   per Gedrückthalten + Wischen verschieben (DraggablePanel); ein sofortiger Wisch scrollt das Brett. Pixel-Rahmen als Zieh-Rückmeldung. */
+   per Wischen/Halten verschieben (DraggablePanel); Panels mit scrollbarem Inhalt (Galerie) behalten ihr natives Scrollen. Pixel-Rahmen als Zieh-Rückmeldung. */
 @media (pointer: coarse) and (max-height: 600px) {
-  .first-choice-panel, .first-choice-panel.panel-zielwahl { pointer-events: auto; touch-action: none; }
+  .first-choice-panel, .first-choice-panel.panel-zielwahl { pointer-events: auto; }
   .first-choice-panel[data-zieht] { outline: 3px solid var(--player-color, var(--accent)); outline-offset: 2px; }
 }
 

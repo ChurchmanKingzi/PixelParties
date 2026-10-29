@@ -3381,7 +3381,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * { cursor: url("/cursor
 .board-zone-spacer { width: var(--spacer-w); flex-shrink: 0; }
 .board-mid-row { display: flex; align-items: center; gap: calc(12px * var(--board-scale)); padding: calc(4px * var(--board-scale)) 0; flex-shrink: 0; }
 .board-phase-tracker { display: flex; gap: 2px; flex-shrink: 0; padding: calc(4px * var(--board-scale)) calc(6px * var(--board-scale)); }
-.board-phase-item { font-family: var(--font-display), sans-serif; font-size: var(--board-font); font-weight: 700; color: #59606e; padding: calc(5px * var(--board-scale)) calc(10px * var(--board-scale)); background: transparent; border: 2px solid #08060c; white-space: nowrap; transition: all .2s steps(5, end); }
+.board-phase-item { font-family: var(--font-display), sans-serif; font-size: var(--board-font); font-weight: 700; color: #59606e; padding: calc(5px * var(--board-scale)) calc(10px * var(--board-scale)); background: transparent; border: 2px solid #08060c; white-space: nowrap; transition: all .2s steps(5, end); display: flex; align-items: center; justify-content: center; text-align: center; }
 .board-phase-item.active { color: #ffffff; background: transparent; text-shadow: 1px 1px 0 #3e3e51; }
 .board-phase-item.clickable { cursor: pointer; color: #d2d2db; border-style: dashed; }
 /* Tutorial 1: sobald die Action Phase freigeschaltet ist, leuchtet und
@@ -6988,7 +6988,7 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
    tragen selbst keinen Rahmen mehr. */
 .phase-plate-a { left: calc(var(--phase-plate-a-x, 0px) - 2px); top: calc(var(--phase-plate-a-y, 0px) - 2px); width: calc(var(--phase-plate-a-w, 0px) + 4px); height: calc(var(--phase-plate-a-h, 0px) + 4px); opacity: var(--phase-plate-a-op, 0); }
 .phase-plate-b { left: calc(var(--phase-plate-b-x, 0px) - 2px); top: calc(var(--phase-plate-b-y, 0px) - 2px); width: calc(var(--phase-plate-b-w, 0px) + 4px); height: calc(var(--phase-plate-b-h, 0px) + 4px); opacity: var(--phase-plate-b-op, 0); }
-.phase-btn { padding: calc(3px * var(--board-scale)) calc(10px * var(--board-scale)) !important; font-size: calc(9px * var(--board-scale)) !important; white-space: nowrap; }
+.phase-btn { padding: calc(3px * var(--board-scale)) calc(10px * var(--board-scale)) !important; font-size: calc(9px * var(--board-scale)) !important; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; text-align: center; }
 .phase-end-check { display: flex; align-items: center; gap: calc(4px * var(--board-scale)); font-size: calc(9px * var(--board-scale)); color: var(--text2); cursor: pointer; margin-left: calc(4px * var(--board-scale)); white-space: nowrap; user-select: none; }
 .phase-end-check input { width: calc(12px * var(--board-scale)); height: calc(12px * var(--board-scale)); accent-color: var(--accent); cursor: pointer; }
 .phase-column { --phase-scale-factor: .85; --board-scale: calc(var(--board-scale-live, 1) * var(--phase-scale-factor)); position: absolute; left: var(--phase-col-x, var(--sidebar-w)); top: var(--phase-mid-y, 50%); transform: translateY(calc(var(--phase-tracker-h, 0px) / -2)); display: flex; flex-direction: column; align-items: flex-start; z-index: 50; }
@@ -12557,9 +12557,9 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
   .panel-zielwahl .panel-zielwahl-spalte > .panel-zielwahl-knoepfe { margin-bottom: 0; }
 }
 /* HANDY: Duell-Fenster stehen fest auf dem Schirm, nehmen Tipps an (Körper nicht mehr durchklickbar — man scrollt/verschiebt sie weg) und lassen sich
-   per Gedrückthalten + Wischen verschieben (DraggablePanel); ein sofortiger Wisch scrollt das Brett. Pixel-Rahmen als Zieh-Rückmeldung. */
+   per Wischen/Halten verschieben (DraggablePanel); Panels mit scrollbarem Inhalt (Galerie) behalten ihr natives Scrollen. Pixel-Rahmen als Zieh-Rückmeldung. */
 @media (pointer: coarse) and (max-height: 600px) {
-  .first-choice-panel, .first-choice-panel.panel-zielwahl { pointer-events: auto; touch-action: none; }
+  .first-choice-panel, .first-choice-panel.panel-zielwahl { pointer-events: auto; }
   .first-choice-panel[data-zieht] { outline: 3px solid var(--player-color, var(--accent)); outline-offset: 2px; }
 }
 

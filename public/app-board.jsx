@@ -2452,40 +2452,38 @@ function DraggablePanel({ children, className, style, zielwahl }) {
       panelRef.current?.removeAttribute('data-greifbar');
     };
   }, [zielwahl]);
-  // ★ HANDY: Gedrueckt halten (~0,35 s) + Finger bewegen verschiebt das Fenster; ein sofortiger Wisch scrollt stattdessen das Brett darunter
-  // (das Fenster steht fest auf dem Schirm und deckt sonst Ziele ab). Knoepfe/Formularfelder behalten ihren Tipp.
+  // ★ HANDY: Wisch (ab ~6 px) oder Halten (~0,35 s) auf dem Fenster verschiebt es; das Brett darunter scrollt dabei nie mit (das Fenster steht fest auf
+  // dem Schirm und deckt sonst Ziele ab — wer sie sehen will, wischt daneben oder schiebt das Fenster weg). Knoepfe/Formularfelder behalten ihren Tipp.
   const phoneP = !!(window.ppIsPhone && window.ppIsPhone());
   useEffect(() => {
     const el = panelRef.current;
     if (!el || !phoneP) return undefined;
     let st = null;
     const ende = () => { if (st && st.timer) clearTimeout(st.timer); st = null; };
+    const zieheLos = () => {
+      if (!st || st.mode === 'zieht') return;
+      if (st.timer) clearTimeout(st.timer);
+      st.mode = 'zieht';
+      try { if (navigator.vibrate) navigator.vibrate(12); } catch {}
+      const r = el.getBoundingClientRect();
+      offsetRef.current = { x: st.x - r.left, y: st.y - r.top };   // vom BERUEHRPUNKT aus — das Fenster springt nicht
+      setDragging(true);
+    };
     const start = (e) => {
       if (e.touches.length !== 1) { ende(); return; }
       const tg = e.target;
       if (tg && tg.closest && tg.closest(ZW_KNOPF_SEL + ', .panel-zielwahl-aktiv')) return;
       if (_ppPanelHatScrollbaresKind(el)) return;
       const t = e.touches[0];
-      st = { x: t.clientX, y: t.clientY, lx: t.clientX, ly: t.clientY, mode: 'warte', timer: 0 };
-      st.timer = setTimeout(() => {
-        if (!st || st.mode !== 'warte') return;
-        st.mode = 'zieht';
-        try { if (navigator.vibrate) navigator.vibrate(12); } catch {}
-        const r = el.getBoundingClientRect();
-        offsetRef.current = { x: st.lx - r.left, y: st.ly - r.top };
-        setDragging(true);
-      }, 350);
+      st = { x: t.clientX, y: t.clientY, mode: 'warte', timer: 0 };
+      st.timer = setTimeout(zieheLos, 350);   // Halten allein genuegt (Rueckmeldung per Vibration + Rahmen)
     };
+    // Jede Bewegung ab ~6 px auf dem Fenster verschiebt es — der Wisch landet NIE im Brett darunter (das Fenster steht fest, das Brett scrollt man daneben).
     const bewegt = (e) => {
       if (!st) return;
       const t = e.touches[0]; if (!t) return;
-      if (st.mode === 'warte' && Math.hypot(t.clientX - st.x, t.clientY - st.y) > 10) { clearTimeout(st.timer); st.mode = 'scroll'; }
-      if (st.mode === 'scroll') {
-        const sc = document.querySelector('.board-center');
-        if (sc) { sc.scrollTop -= t.clientY - st.ly; sc.scrollLeft -= t.clientX - st.lx; }
-        if (e.cancelable) e.preventDefault();
-      }
-      st.lx = t.clientX; st.ly = t.clientY;
+      if (st.mode === 'warte' && Math.hypot(t.clientX - st.x, t.clientY - st.y) > 6) zieheLos();
+      if (e.cancelable) e.preventDefault();
     };
     el.addEventListener('touchstart', start, { passive: true });
     el.addEventListener('touchmove', bewegt, { passive: false });
@@ -40066,6 +40064,41 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     return () => { window._ppOppActing = false; };
   }, [isMyTurn, result, isSpectator]);
 
+  // ★ GEGNERZUG-KAMERA (Handy): Sobald der Zug des Gegners beginnt, faehrt die Kamera auf SEINE Brettseite (ganz nach oben); legt er eine Karte in eine
+  // Ability- oder Support-Zone, faehrt sie so, dass diese Zone gut im Bild steht (`ppBattleCamFocus`, nur waehrend der Gegner handelt, nie gegen den Finger).
+  const oppZonenRef = useRef(null);
+  useEffect(() => {
+    if (!(window.ppIsPhone && window.ppIsPhone()) || isSpectator || isMyTurn || result) return undefined;
+    const t = setTimeout(() => {
+      const sc = document.querySelector('.board-center');
+      if (sc && !window._touchActive) _ppCamFahre(sc, sc.scrollLeft, 0);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [isMyTurn, result, isSpectator, gameState.turn]);
+  useEffect(() => {
+    if (!(window.ppIsPhone && window.ppIsPhone())) return undefined;
+    const ps = gameState.players && gameState.players[oppIdx];
+    if (!ps) return undefined;
+    const jetzt = {};
+    (ps.abilityZones || []).forEach((zonen, hi) => (zonen || []).forEach((slot, si) => { jetzt[`a:${hi}:${si}`] = (slot || []).length; }));
+    (ps.supportZones || []).forEach((zonen, hi) => (zonen || []).forEach((slot, si) => { jetzt[`s:${hi}:${si}`] = (slot || []).length; }));
+    const vorher = oppZonenRef.current;
+    oppZonenRef.current = jetzt;
+    if (!vorher) return undefined;
+    const neu = Object.keys(jetzt).filter(k => jetzt[k] > (vorher[k] || 0));
+    if (!neu.length) return undefined;
+    setTimeout(() => {
+      for (const k of neu) {
+        const [art, hi, si] = k.split(':');
+        const el = document.querySelector(art === 'a'
+          ? `[data-ability-zone][data-ability-owner="opp"][data-ability-hero="${hi}"][data-ability-slot="${si}"]`
+          : `[data-support-zone][data-support-owner="opp"][data-support-hero="${hi}"][data-support-slot="${si}"]`);
+        if (el && window.ppBattleCamFocus) window.ppBattleCamFocus(el);
+      }
+    }, 120);   // bewusst ohne Aufraeumen: der naechste Zustand soll die geplante Fahrt nicht kippen
+    return undefined;
+  }, [gameState]);
+
   // Local hand state for reordering
   const [hand, setHand] = useState(me.hand || []);
   // Compute resolving card index from LOCAL hand order + server marker
@@ -49363,7 +49396,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // leise `ability_activate`; die Zonen-Klangtabelle (holy_revival →
       // `revive`) galt nur fuer Zonen-Animationen. Jetzt derselbe Klang
       // wie in der Zone, der leise Auftakt bleibt als Fallback.
-      if (window.playSFX) window.playSFX(type === 'holy_revival' ? 'revive' : 'ability_activate', { category: 'effect' });
+      if (window.playSFX) window.playSFX(type === 'holy_revival' ? 'revive' : 'ability_activate', type === 'holy_revival' ? { dedupe: 900, category: null } : { category: 'effect' });
       const ownerLabel = ownerLbl(owner, myIdx);
       const el = document.querySelector(`[data-perm-id="${permId}"][data-perm-owner="${ownerLabel}"]`);
       if (el) playAnimation(type || 'holy_revival', el, { duration: 1200 });
