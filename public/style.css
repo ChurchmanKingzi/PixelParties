@@ -27059,3 +27059,9 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 /* ─── The Root of all Presents (25.10.): Lichterkette am fliegenden Geschenk — Birnchen blinken hart zwischen zwei Tönen, die Lichtpixel fallen in Schritten ─────────────── */
 @keyframes ptLichterBlink { 0% { background: var(--c1); } 50% { background: var(--c2); } }
 @keyframes ptLichterSpur { from { transform: translate(0, 0); } to { transform: translate(var(--gsx, 0), var(--gsy, 12px)); } }
+
+/* Handy: die zentrierte Ueberschrift (absolut, Mitte) wuerde von der Gegnersuche ueberdeckt, sobald diese nach links reicht —
+   „CHOOSE OPPONENT!" steht stattdessen im Zeilenfluss links neben den Knoepfen, die Suche rueckt rechts daneben. */
+@media (max-height: 600px) {
+  .top-bar > h2.titel-links { position: static; left: auto; transform: none; transform-origin: left center; margin: 0 8px 0 2px; }
+}

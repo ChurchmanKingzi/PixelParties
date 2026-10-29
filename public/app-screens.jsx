@@ -5538,7 +5538,7 @@ function SingleplayerScreen() {
           // (5/16 px) ist raus, beide nehmen das `.btn`-Grundmass (v1260).
           <button className="btn" onClick={() => setShowRegister(true)}>★ REGISTER NOW!</button>
         )}
-        <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>CHOOSE OPPONENT!</h2>
+        <h2 className="orbit-font titel-links" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>CHOOSE OPPONENT!</h2>
         <div style={{ flex: 1 }} />
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
           <input

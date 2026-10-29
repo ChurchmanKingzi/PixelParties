@@ -61779,7 +61779,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               flöge er mit und stünde nicht hinter ihr. Eigene Ebene. */}
           {r.trailType === 'fire' && <MoniaJetTrail r={r} />}
           <div className={'ram-anim-card' + (r.trailType === 'fire_stars' ? ' ram-fire-stars' : '') + (r.trailType === 'fire' ? ' ram-jet' : '') + (r.rueckwaerts ? ' ram-back' : '')} style={{
-            left: r.srcX - 34, top: r.srcY - 48,
+            // Mittig auf der Quellzone: die Karte ist `--zone-w` x `--zone-h` gross (68x96 nur beim Brettmassstab 1) — mit festen -34/-48 begann der Dash auf
+            // dem Handy (Massstab < 1, z.B. Haressassin in Tutorial 2) um die Differenz nach links oben versetzt.
+            left: `calc(${r.srcX}px - var(--zone-w) / 2)`, top: `calc(${r.srcY}px - var(--zone-h) / 2)`,
             '--ramDx': (r.tgtX - r.srcX) + 'px',
             '--ramDy': (r.tgtY - r.srcY) + 'px',
             '--ramAngle': (r.angle || 0) + 'deg',
