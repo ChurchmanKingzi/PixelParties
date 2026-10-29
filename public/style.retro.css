@@ -5879,24 +5879,24 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   100% { transform: rotate(3600deg) scale(1); }
 }
 
-/* ===== ICE PROJECTILE TRAIL ===== */
+/* ===== ICE PROJECTILE TRAIL ===== (Pixelart: harte 4-px-Zellen, zwei Bilder im Wechsel per steps(1), kein Weichzeichner) */
 
-.projectile-ice-trail { position: absolute; inset: -24px; border-radius: 0; background: radial-gradient(ellipse at 30% 40%, transparent 0% 40%),
-    radial-gradient(ellipse at 70% 60%, transparent 0% 35%),
-    radial-gradient(ellipse at 50% 50%, transparent 0% 50%); box-shadow: -4px -2px 0 0 #3e3e51, -4px -1px 0 0 #1a1a2e, -4px -3px 0 0 #3e3e51, -4px 4px 0 0 #3e3e51; animation: iceTrailPulse 80ms steps(2, end) infinite alternate; pointer-events: none; }
+.projectile-ice-trail { position: absolute; inset: -24px; pointer-events: none; }
+.projectile-ice-trail::before { content: ''; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; background: #66b6ff; box-shadow: -12px -4px 0 0 #bddcef, -24px 4px 0 0 #66b6ff, -16px 8px 0 0 #ffffff, -32px 0 0 0 #66b6ff, 12px -12px 0 0 #66b6ff, -24px -12px 0 0 #ffffff, 16px 12px 0 0 #bddcef, -8px 16px 0 0 #66b6ff, 4px -20px 0 0 #bddcef; animation: iceTrailPixel 160ms steps(1) infinite; }
 
-@keyframes iceTrailPulse {
-  0%   { opacity: .6; transform: scale(1); }
-  100% { opacity: .9; transform: scale(1.15); }
+@keyframes iceTrailPixel {
+  0%   { box-shadow: -12px -4px 0 0 #bddcef, -24px 4px 0 0 #66b6ff, -16px 8px 0 0 #ffffff, -32px 0 0 0 #66b6ff, 12px -12px 0 0 #66b6ff, -24px -12px 0 0 #ffffff, 16px 12px 0 0 #bddcef, -8px 16px 0 0 #66b6ff, 4px -20px 0 0 #bddcef; }
+  50%  { box-shadow: -16px 4px 0 0 #ffffff, -28px -4px 0 0 #bddcef, -12px -8px 0 0 #66b6ff, -36px 4px 0 0 #66b6ff, 8px -16px 0 0 #ffffff, -20px 12px 0 0 #66b6ff, 12px 12px 0 0 #66b6ff, -4px 16px 0 0 #bddcef, 8px -20px 0 0 #66b6ff; }
 }
 
-/* ===== ICE BOLT PROJECTILE ===== */
+/* ===== ICE BOLT PROJECTILE ===== (Pixelart-Eissplitter, spitz nach Osten; die Rotation zum Ziel kommt vom Wrapper) */
 
-.projectile-ice-bolt { display: block; width: 20px; height: 20px; border-radius: 0; background: radial-gradient(circle at 35% 35%, #ffffff 0% 12.5%, #bddcef 12.5% 55%, #66b6ff 55% 100%); box-shadow: 0 0 0 2px #66b6ff, 0 0 0 3px #2f539d, 9px -5px 0 3px #59606e, -7px 7px 0 2px #59606e, 13px 4px 0 2px #59606e, -11px -9px 0 3px #59606e, 5px 11px 0 2px #3e3e51, -4px -13px 0 2px #59606e; animation: iceBoltPulse 90ms steps(2, end) infinite alternate; }
+.projectile-ice-bolt { display: block; position: relative; width: 20px; height: 20px; image-rendering: pixelated; }
+.projectile-ice-bolt::before { content: ''; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; background: #bddcef; box-shadow: -16px 0 0 0 #2f539d, -12px -4px 0 0 #2f539d, -12px 0 0 0 #66b6ff, -12px 4px 0 0 #2f539d, -8px -8px 0 0 #2f539d, -8px -4px 0 0 #66b6ff, -8px 0 0 0 #66b6ff, -8px 4px 0 0 #66b6ff, -8px 8px 0 0 #2f539d, -4px -12px 0 0 #2f539d, -4px -8px 0 0 #66b6ff, -4px -4px 0 0 #66b6ff, -4px 0 0 0 #bddcef, -4px 4px 0 0 #66b6ff, -4px 8px 0 0 #66b6ff, -4px 12px 0 0 #2f539d, 0 -12px 0 0 #2f539d, 0 -8px 0 0 #66b6ff, 0 -4px 0 0 #bddcef, 0 4px 0 0 #bddcef, 0 8px 0 0 #66b6ff, 0 12px 0 0 #2f539d, 4px -8px 0 0 #2f539d, 4px -4px 0 0 #bddcef, 4px 0 0 0 #ffffff, 4px 4px 0 0 #bddcef, 4px 8px 0 0 #2f539d, 8px -4px 0 0 #2f539d, 8px 0 0 0 #ffffff, 8px 4px 0 0 #2f539d, 12px -4px 0 0 #2f539d, 12px 0 0 0 #ffffff, 12px 4px 0 0 #2f539d, 16px 0 0 0 #2f539d; animation: iceBoltPulse 120ms steps(1) infinite; }
 
 @keyframes iceBoltPulse {
-  0%   { transform: scale(1); filter: brightness(1); }
-  100% { transform: scale(1.15); filter: brightness(1.2); }
+  0%   { background: #bddcef; box-shadow: -16px 0 0 0 #2f539d, -12px -4px 0 0 #2f539d, -12px 0 0 0 #66b6ff, -12px 4px 0 0 #2f539d, -8px -8px 0 0 #2f539d, -8px -4px 0 0 #66b6ff, -8px 0 0 0 #66b6ff, -8px 4px 0 0 #66b6ff, -8px 8px 0 0 #2f539d, -4px -12px 0 0 #2f539d, -4px -8px 0 0 #66b6ff, -4px -4px 0 0 #66b6ff, -4px 0 0 0 #bddcef, -4px 4px 0 0 #66b6ff, -4px 8px 0 0 #66b6ff, -4px 12px 0 0 #2f539d, 0 -12px 0 0 #2f539d, 0 -8px 0 0 #66b6ff, 0 -4px 0 0 #bddcef, 0 4px 0 0 #bddcef, 0 8px 0 0 #66b6ff, 0 12px 0 0 #2f539d, 4px -8px 0 0 #2f539d, 4px -4px 0 0 #bddcef, 4px 0 0 0 #ffffff, 4px 4px 0 0 #bddcef, 4px 8px 0 0 #2f539d, 8px -4px 0 0 #2f539d, 8px 0 0 0 #ffffff, 8px 4px 0 0 #2f539d, 12px -4px 0 0 #2f539d, 12px 0 0 0 #ffffff, 12px 4px 0 0 #2f539d, 16px 0 0 0 #2f539d; }
+  50%  { background: #ffffff; box-shadow: -16px 0 0 0 #2f539d, -12px -4px 0 0 #2f539d, -12px 0 0 0 #66b6ff, -12px 4px 0 0 #2f539d, -8px -8px 0 0 #2f539d, -8px -4px 0 0 #66b6ff, -8px 0 0 0 #66b6ff, -8px 4px 0 0 #66b6ff, -8px 8px 0 0 #2f539d, -4px -12px 0 0 #2f539d, -4px -8px 0 0 #66b6ff, -4px -4px 0 0 #66b6ff, -4px 0 0 0 #ffffff, -4px 4px 0 0 #66b6ff, -4px 8px 0 0 #66b6ff, -4px 12px 0 0 #2f539d, 0 -12px 0 0 #2f539d, 0 -8px 0 0 #66b6ff, 0 -4px 0 0 #ffffff, 0 4px 0 0 #ffffff, 0 8px 0 0 #66b6ff, 0 12px 0 0 #2f539d, 4px -8px 0 0 #2f539d, 4px -4px 0 0 #ffffff, 4px 0 0 0 #bddcef, 4px 4px 0 0 #ffffff, 4px 8px 0 0 #2f539d, 8px -4px 0 0 #2f539d, 8px 0 0 0 #bddcef, 8px 4px 0 0 #2f539d, 12px -4px 0 0 #2f539d, 12px 0 0 0 #bddcef, 12px 4px 0 0 #2f539d, 16px 0 0 0 #2f539d; }
 }
 
 /* ===== LOVE SHOT HEART PROJECTILE =====
