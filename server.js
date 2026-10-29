@@ -8670,6 +8670,9 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       if (!isInherentAction && !additionalConsumed && !isReactionSubtype && !ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
       if (!heroless && hero._maxActionsPerTurn) hero._actionsThisTurn = (hero._actionsThisTurn || 0) + 1;
       if (isActionPhase && !additionalConsumed && !isInherentAction) {
+        // Die Aufloesung ist zu Ende (der Zauber wurde in der Kette negiert): erst die Tiefe freigeben, sonst weist `advanceToPhase` den Wechsel ab
+        // (`_spellResolutionDepth > 0`) und der Spieler bleibt nach Shamanic Curse / Silence / MOE Shield … in der Action Phase haengen (Tester 29.10.).
+        _releaseSpellDepth();
         await room.engine.advanceToPhase(pi, 4);
       }
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
