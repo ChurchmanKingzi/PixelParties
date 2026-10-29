@@ -125,6 +125,9 @@ module.exports = {
         engine.sync();
         return;
       }
+      // W85c (Atta, Al 29.10.): das Aufdecken ist ein Ereignis VOR dem Verschieben — löscht Atta die Karte, kommt sie nie auf die Hand.
+      const _ereignis = await engine.aufdeckTutorEreignis(pi, [chosen], CARD_NAME);
+      if (_ereignis.geloescht.includes(chosen)) { engine.shuffleDeck(pi); engine.log('life_searcher_search', { player: ps.username, card: chosen, deleted: true }); engine.sync(); return; }
       const _taken_idx = await engine.takeFromPile(ps, 'deck', chosen, { source: CARD_NAME, toHand: true });   // v820: Stapel-Schicht
       if (!_taken_idx) return;
       const inst = await engine.handZugang(ps, chosen, { von: 'deck', source: CARD_NAME });
@@ -141,7 +144,7 @@ module.exports = {
       engine.sync();
 
       const oi = engine.opponentOf(pi);
-      await engine.promptGeneric(oi, {
+      if (!_ereignis.fensterGezeigt) await engine.promptGeneric(oi, {
         type: 'deckSearchReveal',
         searchToHand: true,   // v1119: Suche AUF DIE HAND
         cardName: chosen,

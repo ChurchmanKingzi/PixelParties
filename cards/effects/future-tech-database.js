@@ -89,9 +89,12 @@ module.exports = {
       if (!name) return { cancelled: true };
       gewaehlt.push(name);
     }
+    // W85c (Atta, Al 29.10.): „reveal them" — die gewählten Karten sind EIN Aufdeck-Ereignis VOR dem Verschieben; eine von Atta gelöschte Karte kommt nie auf die Hand.
+    const _ereignis = await engine.aufdeckTutorEreignis(pi, gewaehlt, CARD_NAME);
     for (const name of gewaehlt) {
+      if (_ereignis.geloescht.includes(name)) continue;
       await engine.actionAddCardFromDeckToHand(pi, name, {
-        source: CARD_NAME, reveal: true,
+        source: CARD_NAME, reveal: !_ereignis.fensterGezeigt,
         _noKrates: true,   // Mehrfach-Tutor: Krates greift nur bei Ein-Karten-Suchen
       });
       await engine._delay(200);

@@ -90,14 +90,16 @@ module.exports = {
     if (!oben) return true;
     const treffer = baseCardName(oben) === baseCardName(genannt);
     engine.log('oracle_reveal', { player: ps.username, declared: genannt, revealed: oben, hit: treffer });
-    engine.meldeAufgedeckt(pi, [oben], { zone: 'deck', source: CARD_NAME });   // W85b: aufgedeckt → Atta (Treffer: liegt danach auf der Hand; Fehlschlag: schon in der Ablage)
 
     // ③ Treffer: in die Hand, 2 ziehen — Fehlschlag: die Karte und die zwei darunter in die Ablage.
     let gemillt = [];
     if (treffer) {
       engine._broadcastEvent('mill_center_reveal', { owner: pi, cardNames: [oben], dest: 'hand', revealMs: SCHAU_MS });
       await engine._delay(SCHAU_MS);
-      await engine.actionAddCardFromDeckToHand(pi, oben, { source: CARD_NAME, reveal: false, _skipFlight: true });
+      // W85c (Atta, Al 29.10.): Treffer = die Karte kommt auf die Hand → Aufdeck-Ereignis VOR dem Verschieben; löscht Atta sie, kommt sie nie auf die Hand (die 2 Karten werden trotzdem
+      // gezogen). Beim Fehlschlag legt der Effekt die Karte selbst ab — dort greift Atta nicht.
+      const _ereignis = await engine.aufdeckEreignis(pi, [oben], { source: CARD_NAME, zone: 'deck' });
+      if (!_ereignis.geloescht.includes(oben)) await engine.actionAddCardFromDeckToHand(pi, oben, { source: CARD_NAME, reveal: false, _skipFlight: true });
       engine.sync();
       await engine.actionDrawCards(pi, 2, { source: CARD_NAME });
     } else {

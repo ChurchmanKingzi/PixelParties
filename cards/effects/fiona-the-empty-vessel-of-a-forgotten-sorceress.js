@@ -111,6 +111,7 @@ module.exports = {
     // Deck → Hand, mit Flug, Reveal an den Gegner und Tutor-Hook.
     const ok = await engine.actionAddCardFromDeckToHand(pi, chosen, { source: CARD_NAME });
     if (!ok) return false;
+    if (ok === 'geloescht') { engine.sync(); return true; }   // W85c: Atta hat die aufgedeckte Karte gelöscht — sie kam nie auf die Hand, es gibt keine Kopie zu senken
 
     // „reduced by 3 for the rest of the turn" — fuer GENAU DIESE Kopie
     // (Als Ruling 30.8.), nicht namensweit: transienter Handindex-

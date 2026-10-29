@@ -89,7 +89,6 @@ module.exports = {
       const cardName = engine.revealTop(pi, 1)[0];
       if (!cardName) return;
       engine._broadcastEvent('card_reveal', { cardName, playerIdx: pi });
-      engine.meldeAufgedeckt(pi, [cardName], { zone: 'deck', source: CARD_NAME });   // W85b: aufgedeckt → Atta (Treffer: liegt danach auf der Hand; Fehlschlag: wird geloescht)
       await engine._delay(1000);
 
       const cd = engine._getCardDB()[cardName];
@@ -99,12 +98,17 @@ module.exports = {
       });
 
       if (hit) {
-        const taken = await engine.takeFromPile(pi, 'deck', cardName, { source: CARD_NAME });
-        if (!taken) return;
-        engine._pileFlight(pi, taken.name, 'deck', 'hand',
-          { toHandIdx: ps.hand.length, finalHandSize: ps.hand.length + 1 });
-        await engine.handZugang(pi, taken.name, { von: 'deck', source: CARD_NAME });
-        engine.sync();
+        // W85c (Atta, Al 29.10.): Treffer = die Karte kommt auf die Hand → Aufdeck-Ereignis VOR dem Verschieben; löscht Atta sie, kommt sie nie auf die Hand (die 2 Karten werden trotzdem
+        // gezogen). Beim Fehlschlag löscht der Effekt die Karte selbst — dort greift Atta nicht.
+        const _ereignis = await engine.aufdeckEreignis(pi, [cardName], { source: CARD_NAME, zone: 'deck' });
+        if (!_ereignis.geloescht.includes(cardName)) {
+          const taken = await engine.takeFromPile(pi, 'deck', cardName, { source: CARD_NAME });
+          if (!taken) return;
+          engine._pileFlight(pi, taken.name, 'deck', 'hand',
+            { toHandIdx: ps.hand.length, finalHandSize: ps.hand.length + 1 });
+          await engine.handZugang(pi, taken.name, { von: 'deck', source: CARD_NAME });
+          engine.sync();
+        }
         await engine.actionDrawCards(pi, 2, { source: CARD_NAME });
         return;
       }

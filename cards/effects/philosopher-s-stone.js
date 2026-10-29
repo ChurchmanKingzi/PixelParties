@@ -73,6 +73,19 @@ module.exports = {
       if (wahl?.cardName && karten.some(k => k.name === wahl.cardName)) gewaehlt = wahl.cardName;
     }
 
+    // W85d (Atta, Al: das Potion Deck zählt als „your deck"): das Aufdecken ist ein Ereignis VOR dem Verschieben — Such-Fenster für den Gegner zuerst, dann Atta; löscht Atta die Karte,
+    // kommt sie nie auf die Hand (kein Flug, keine Hand-Zugangs-Wirkung, kein Control-Monitors-Fenster).
+    const _oi = engine.opponentOf(pi);
+    const _ereignis = await engine.aufdeckEreignis(pi, [gewaehlt], {
+      source: CARD_NAME, zone: 'potionDeck',
+      fenster: () => engine.promptGeneric(_oi, { type: 'deckSearchReveal', searchToHand: true, cardName: gewaehlt, searcherName: ps.username, title: CARD_NAME, cancellable: false, _aufdeckGemeldet: true }),
+    });
+    if (_ereignis.geloescht.includes(gewaehlt)) {
+      engine.noteKnownCard?.(_oi, gewaehlt, 'hand');
+      engine.log('philosophers_stone', { player: ps.username, card: CARD_NAME, target: gewaehlt, deleted: true });
+      engine.sync();
+      return;
+    }
     const genommen = await engine.takeFromPile(pi, 'potionDeck', gewaehlt, {
       source: CARD_NAME, toHand: true, shuffle: true,
     });
@@ -100,7 +113,7 @@ module.exports = {
       playerIdx: pi, card: inst, cardName: gewaehlt, _skipReactionCheck: true,
     });
     engine.sync();
-    await engine.promptGeneric(oi, {
+    if (!_ereignis.fensterGezeigt) await engine.promptGeneric(oi, {
       type: 'deckSearchReveal', searchToHand: true,
       cardName: gewaehlt, searcherName: ps.username, title: CARD_NAME, cancellable: false,
     });

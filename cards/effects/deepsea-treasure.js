@@ -93,11 +93,17 @@ module.exports = {
       // Endgroesse landete jede Karte eine halbe Kartenbreite daneben.
       const gezeigt = [];
       const handVorher = (ps.hand || []).length;
-      const wieviele = Math.min(ANZAHL, (ps.mainDeck || []).length);
-      for (let i = 0; i < ANZAHL; i++) {
-        const name = (ps.mainDeck || [])[0];
+      // W85c (Atta, Al 29.10.: „löschen STATT auf die Hand"): die obersten Karten sind EIN Aufdeck-Ereignis, gemeldet BEVOR sie das Deck verlassen; eine von Atta gelöschte Karte kommt nie auf
+      // die Hand (die übrigen schon). Die Karten werden dann beim NAMEN genommen — das Deck hat sich durch die Löschung verschoben, die „obersten 3" sind nicht mehr dieselben.
+      const oben = (ps.mainDeck || []).slice(0, ANZAHL);
+      const _ereignis = await engine.aufdeckEreignis(pi, oben, { source: CARD_NAME, zone: 'deck' });
+      const _weg = _ereignis.geloescht.slice();
+      const zuNehmen = oben.filter(n => { const k = _weg.indexOf(n); if (k >= 0) { _weg.splice(k, 1); return false; } return true; });   // je gelöschter Kopie fällt eine gleichnamige weg
+      const wieviele = Math.min(ANZAHL, zuNehmen.length);
+      for (let i = 0; i < zuNehmen.length; i++) {
+        const name = zuNehmen[i];
         if (!name) break;
-        if (!(await engine.takeFromPile(ps, 'deck', 0, { source: CARD_NAME }))) break;
+        if (!(await engine.takeFromPile(ps, 'deck', name, { source: CARD_NAME }))) break;
         const handIdx = handVorher + gezeigt.length;
         engine._broadcastEvent('treasure_reveal', {
           cardName: name, playerIdx: pi,
@@ -107,7 +113,7 @@ module.exports = {
         // versteckt ihren Handplatz, bis der Flug ankommt. Waere sie
         // erst am Flugende im Zustand, gaebe es den Platz beim Anflug
         // noch gar nicht.
-        await engine.handZugang(ps, name, { von: 'deck', source: CARD_NAME, reveal: true });   // W85b: aufgedeckte Karten → Atta (onCardsRevealed)
+        await engine.handZugang(ps, name, { von: 'deck', source: CARD_NAME });
         gezeigt.push(name);
         engine.sync();
         await engine._delay(VERSATZ_MS);

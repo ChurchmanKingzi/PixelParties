@@ -240,12 +240,15 @@ module.exports = {
     // returning. `await`ing each call serialises the flow — card 1
     // flies in + reveals + opponent confirms, THEN card 2 flies in +
     // reveals — so it reads the same way Wheels' staggered draws do.
+    // W85c (Atta, Al 29.10.): die gewählten Karten sind EIN Aufdeck-Ereignis VOR dem Verschieben; eine von Atta gelöschte Karte kommt nie auf die Hand.
+    const _ereignis = await engine.aufdeckTutorEreignis(pi, picked.selectedCards, CARD_NAME);
     const tutored = [];
     for (const name of picked.selectedCards) {
+      if (_ereignis.geloescht.includes(name)) continue;
       const ok = await engine.actionAddCardFromDeckToHand(pi, name, {
         source: CARD_NAME,
         _noKrates: true,   // Mehrfach-Tutor: Krates greift nur bei Ein-Karten-Suchen
-        reveal: true,
+        reveal: !_ereignis.fensterGezeigt,
       });
       if (ok) tutored.push(name);
     }
