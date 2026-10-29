@@ -5228,6 +5228,8 @@ function SingleplayerScreen() {
         if (!r.ok || weg) return;
         const a = await r.json();
         if (window.CardImageShim && window.CardImageShim.warmCards) window.CardImageShim.warmCards(a.cards, { heroes: a.heroes, abilities: a.abilities });
+        // Pixelbilder der grossen Zauber-Animation (kostet kalt Sekunden auf schwachen Handys, s. app-board.jsx).
+        idle(() => { if (window.ppAnimVorwaermen) window.ppAnimVorwaermen('cataclysm'); }, 3500);
         const H = window.HeroIdleAnims;
         if (H && H.hole && H.slug) (a.heroes || []).forEach((n, i) => timers.push(setTimeout(() => { if (!weg) idle(() => { try { H.hole(H.slug(n)); } catch (e) { /* Vorladen ist optional */ } }, 0); }, 400 + i * 350)));
       } catch (e) { /* Vorladen ist optional */ }

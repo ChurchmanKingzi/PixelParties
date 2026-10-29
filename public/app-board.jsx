@@ -36532,6 +36532,24 @@ function ZielMarkenEbene({ marken, blitze, myIdx }) {
   );
 }
 
+// ★ Vorwaermen ausserhalb des Kampfs: haengt die Animation einmal unsichtbar in einen eigenen React-Baum, damit der Pixelierer ihre
+// Pixelbilder erzeugt (Zwischenspeicher `_ppPxCache`, Schluessel nach Groesse) — bevor ein Kampf, vor allem ein Tutorial, startet.
+// Auf schwachen Handys kostet dieses erste Pixelieren Sekunden; im Menue stoert es niemanden, in Mission 1 verzoegerte es die erste Textbox.
+window._ppAnimWarm = window._ppAnimWarm || {};
+window.ppAnimVorwaermen = function (type, mass) {
+  try {
+    if (window._playAnimations === false || window._ppAnimWarm[type] || !ANIM_REGISTRY[type] || !ReactDOM.createRoot) return;
+    window._ppAnimWarm[type] = true;
+    const host = document.createElement('div');
+    host.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(host);
+    const root = ReactDOM.createRoot(host);
+    const fertig = () => setTimeout(() => { try { root.unmount(); host.remove(); } catch {} }, 300);
+    root.render(<GameAnimationRenderer type={type} x={window.innerWidth / 2} y={window.innerHeight / 2} w={(mass && mass.w) || 100} h={(mass && mass.h) || 100} welt={false} prewarm _gemountet={fertig} />);
+    setTimeout(() => { try { root.unmount(); host.remove(); } catch {} }, 8000);   // Netz
+  } catch (e) { /* Vorwaermen ist optional */ }
+};
+
 function GameAnimationRenderer({ type, x, y, w, h, _gemountet, prewarm, ...rest }) {
   const Component = ANIM_REGISTRY[type];
   // Lebensdauer-Uhr erst NACH dem Pixelieren starten (s. playAnimation).
@@ -54829,6 +54847,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (window._playAnimations === false) return undefined;
     const t = setTimeout(() => {
       for (const type of ['cataclysm']) {
+        // Schon ausserhalb des Kampfs vorgewaermt (Gast-Menue, ppAnimVorwaermen)? Dann liegen die Pixelbilder im Zwischenspeicher.
+        if (window._ppAnimWarm && window._ppAnimWarm[type]) continue;
         const id = Date.now() + Math.random();
         setGameAnims(prev => [...prev, {
           id, type, x: window.innerWidth / 2, y: window.innerHeight / 2, w: 100, h: 100, welt: false, prewarm: true,
