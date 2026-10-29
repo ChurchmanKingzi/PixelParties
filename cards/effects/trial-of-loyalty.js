@@ -161,8 +161,22 @@ module.exports = {
       // Muster von `magic-lamp.js`: je Karte einzeln holen, danach
       // `sync()` und eine kurze Pause, damit der Flug sichtbar wird.
       // Ohne die Pause landen alle fuenf im selben Bild.
+      // W85c (Atta): EIN Aufdeck-Ereignis VOR dem Verschieben (Sammelfenster zuerst, dann Atta); eine gelöschte Karte kommt nie auf die Hand.
+      const _sammelFenster = async () => {
+        const gezeigt = chosen.filter(n => ps.mainDeck.includes(n));
+        if (gezeigt.length > 0) {
+          await engine.promptGeneric(engine.opponentOf(pi), {
+            type: 'deckSearchReveal',
+            cardName: gezeigt[0], cardNames: gezeigt.slice(),
+            searcherName: ps.username, title: CARD_NAME, sourceLabel: 'deck',
+            cancellable: false, _aufdeckGemeldet: true,
+          });
+        }
+      };
+      const _ereignis = await engine.aufdeckEreignis(pi, chosen.filter(n => ps.mainDeck.includes(n)), { source: CARD_NAME, zone: 'deck', fenster: _sammelFenster });
       const added = [];
       for (const name of chosen) {
+        if (_ereignis.geloescht.includes(name)) { added.push(name); continue; }   // gelöscht statt aufgenommen (zählt als gesucht)
         if (ps.mainDeck.indexOf(name) < 0) continue;
         await engine.actionAddCardFromDeckToHand(pi, name, {
           source: CARD_NAME,
@@ -217,7 +231,7 @@ module.exports = {
 
       // „reveal them“ — das gesammelte Aufdecken, das der Kopfkommentar verspricht: EIN Fenster fuer den Gegner mit allen Karten (wie `revealSearchedCards({ together })`,
       // aber ohne die Buchhaltung/Fluege doppelt zu machen). Das Fenster ist zugleich das Aufdecken fuer Atta (`_beobachtePrompt` → `onCardsRevealed`).
-      if (added.length > 0) {
+      if (added.length > 0 && !_ereignis.fensterGezeigt) {
         await engine.promptGeneric(engine.opponentOf(pi), {
           type: 'deckSearchReveal',
           cardName: added[0], cardNames: added.slice(),

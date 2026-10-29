@@ -270,11 +270,15 @@ module.exports = {
             cancellable:  false,
           });
           if (pickDeck && Array.isArray(pickDeck.selectedCards)) {
+            // W85c (Atta, Al 29.10.): „reveal them" ist EIN Aufdeck-Ereignis VOR dem Verschieben (gleichzeitig aufgedeckt → „exactly 1" gilt für die ganze Wahl).
+            const gewaehlt = pickDeck.selectedCards.slice(0, cap).filter(n => (ps.mainDeck || []).includes(n));
+            const _ereignis = await engine.aufdeckTutorEreignis(pi, gewaehlt, CARD_NAME);
             for (const name of pickDeck.selectedCards.slice(0, cap)) {
+              if (_ereignis.geloescht.includes(name)) continue;
               await engine.actionAddCardFromDeckToHand(pi, name, {
                 source: CARD_NAME,
                 _noKrates: true,   // Mehrfach-Tutor: Krates greift nur bei Ein-Karten-Suchen
-                reveal: true,
+                reveal: !_ereignis.fensterGezeigt,   // das Fenster lief schon im Ereignis
               });
             }
             engine.shuffleDeck(pi, 'main');

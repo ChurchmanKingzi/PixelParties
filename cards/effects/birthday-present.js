@@ -102,8 +102,15 @@ module.exports = {
     if ((ps.mainDeck?.length || 0) < REVEAL_COUNT) return { cancelled: true };
 
     // ── Step 1: take the top 3 cards off the deck ────────────────────────
-    const revealed = await engine.takeTop(pi, REVEAL_COUNT, { source: 'Birthday Present' });   // v820: Stapel-Schicht
-    if (revealed.length < REVEAL_COUNT) { for (const n of revealed.reverse()) engine.returnToPile(pi, 'deck', n, 0); return { cancelled: true }; }
+    // W85c (Atta, Al 29.10.: „löschen STATT auf die Hand"): die 3 obersten Karten sind EIN Aufdeck-Ereignis, gemeldet BEVOR sie das Deck verlassen; eine von Atta gelöschte Karte kommt
+    // nie auf eine Hand (der Gegner wählt dann unter den übrigen). Die übrigen Karten werden beim NAMEN genommen (das Deck hat sich durch die Löschung verschoben).
+    const oben = (ps.mainDeck || []).slice(0, REVEAL_COUNT);
+    const _ereignis = await engine.aufdeckEreignis(pi, oben, { source: CARD_NAME, zone: 'deck' });
+    const _weg = _ereignis.geloescht.slice();
+    const zuNehmen = oben.filter(n => { const k = _weg.indexOf(n); if (k >= 0) { _weg.splice(k, 1); return false; } return true; });
+    const revealed = [];
+    for (const n of zuNehmen) { if (await engine.takeFromPile(ps, 'deck', n, { source: 'Birthday Present' })) revealed.push(n); }   // v820: Stapel-Schicht
+    if (revealed.length < zuNehmen.length || revealed.length === 0) { for (const n of revealed.reverse()) engine.returnToPile(pi, 'deck', n, 0); return { cancelled: true }; }
     engine.sync();
 
     // ── Step 2: reveal the Birthday Present artifact itself to opp ───────
@@ -122,7 +129,6 @@ module.exports = {
       oppIdx,
       cards: revealed,
     });
-    engine.meldeAufgedeckt(pi, revealed, { zone: 'hand', source: CARD_NAME });   // W85b: „Reveal the top 3 cards of your deck“ → Atta (onCardsRevealed); Karten, die zum Gegner gehen, findet Atta auf der eigenen Hand nicht
     await engine._delay(REVEAL_ANIM_MS);
 
     // ── Step 4: prompt opp to click one of the floating cards ────────────

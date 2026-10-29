@@ -96,12 +96,14 @@ async function ausfuehren(engine, e) {
 
   let res = null;
   engine._forceNonCancellable = (engine._forceNonCancellable || 0) + 1;   // Pflicht: kein Abbrechen
+  const _verzVorher = gs._verzoegertWirkt;
+  gs._verzoegertWirkt = e.castPi;   // W85c: Sofort-Güsse INNERHALB (Chaos Magic) prüfen weder „am Zug" noch die Phase des Wirkers
   try {
     res = await engine._castSpellImmediately(e.castPi, e.heroIdx, e.spellName, {
       fromZone: 'hand', pool: [e.spellName], poolIndex: 0, by: e.quelle || e.spellName,
       alsZusatzaktion: true, heroOwner: e.wirkerSeite, ohneWisdom: true,
     });
-  } finally { engine._forceNonCancellable--; }
+  } finally { engine._forceNonCancellable--; if (_verzVorher === undefined) delete gs._verzoegertWirkt; else gs._verzoegertWirkt = _verzVorher; }
   const gewirkt = !!res && !res.cancelled;
   if (!gewirkt) {
     // Der Guss kam nicht zustande (kein legales Ziel, Fehler): die Karte geht still zurueck in den Geloescht-Stapel, sofern sie nirgendwo sonst liegt.
