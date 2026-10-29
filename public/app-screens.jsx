@@ -470,7 +470,7 @@ function AnimatedTitleCatsOverlay() {
 // ═══ KULISSE FUER DEN TAP-BILDSCHIRM (Handy): ein einziges Canvas statt ~25 gestapelter, animierter DOM-Ebenen ═══
 // Die DOM-Kulisse (AnimatedTitleBackdrop) legt 1920x1080-Ebenen mit Blend-Modi, Filtern und Dutzenden CSS-Animationen
 // uebereinander; auf Handys ruckelte das im Hochformat deutlich. Hier werden dieselben Ebenen (data/animated_screen/layers2)
-// einmal auf Handy-Groesse vorskaliert und pro Bild in EIN Canvas gezeichnet (30 Bilder/s, Dithering-frei, ohne Blend-Modi):
+// einmal auf Handy-Groesse vorskaliert und pro Bild in EIN Canvas gezeichnet (mit der Bildwiederholrate des Geraets, Dithering-frei, ohne Blend-Modi):
 // Schweben, Klammer-Rigs, Beben, Blitze, Glut und die langsame Kamerafahrt wie im Titelbildschirm. Laeuft nur, solange der
 // Bildschirm sichtbar ist, und gibt die Bilder nach 5 s Unsichtbarkeit wieder frei.
 function TapBackdropCanvas({ hostRef }) {
@@ -478,7 +478,7 @@ function TapBackdropCanvas({ hostRef }) {
   useEffect(() => {
     const cv = cvRef.current; if (!cv) return;
     const DIR = ANIM_LAYERS_DIR, NAMES = ['background', 'hammer', 'explosion', 'golem', 'horned', 'angel', 'blonde', 'rabbit', 'ninja', 'cat_top', 'cat_mid', 'cat_bottom'];
-    const FRAME = 1000 / 30;
+    const FRAME = 1000 / 60;
     let imgs = null, loading = false, disposed = false, raf = 0, timer = 0, hiddenSince = 0, lastDraw = 0, W = 0, H = 0, S = 0, q = 1, ema = 0, frameGap = FRAME, lastAdapt = 0;
     const lerp = (a, b, u) => a + (b - a) * u;
     const kfLin = (pts, x) => { for (let i = 0; i + 1 < pts.length; i++) if (x >= pts[i][0] && x <= pts[i + 1][0]) { const u = (x - pts[i][0]) / ((pts[i + 1][0] - pts[i][0]) || 1); return lerp(pts[i][1], pts[i + 1][1], u); } return 0; };
@@ -514,7 +514,7 @@ function TapBackdropCanvas({ hostRef }) {
     const draw = (now) => {
       if (!imgs) return; const g = cv.getContext('2d'), t = now / 1000, tau = t + 0.1, pc = (tau % 10) / 10 * 100, sc = imgs._sc, k = S / sc;
       // Kamera: 80 s Hin- und Rueckfahrt, leichter Zoom
-      const ph = (t % 80) / 80, e = 0.5 - 0.5 * Math.cos(ph * Math.PI * 2), zoom = lerp(1.12, 1.0, e);
+      const ph = (t % 80) / 80, e = 0.5 - 0.5 * Math.cos(ph * Math.PI * 2), zoom = 1.04;   // fester Zoom: ein sich staendig aenderndes Mass skaliert jede Ebene in jedem Bild neu (Flimmern)
       const viewW = W / S, ramp = Math.max(0, (1920 - viewW / zoom) / 2 - 10), camX = lerp(ramp, -ramp, e), camY = lerp(-14, 14, e), sh = shakeAt(pc);
       g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#12101f'; g.fillRect(0, 0, W, H);
       g.setTransform(S * zoom, 0, 0, S * zoom, W / 2 - 960 * S * zoom + camX * S * zoom + sh[0] * S * zoom, H / 2 - 540 * S * zoom + camY * S * zoom + sh[1] * S * zoom);
@@ -551,12 +551,12 @@ function TapBackdropCanvas({ hostRef }) {
         timer = setTimeout(() => { timer = 0; raf = requestAnimationFrame(tick); }, 500); return;
       }
       hiddenSince = 0; if (!imgs) { resize(); load(); }
-      if (now - lastDraw >= frameGap - 2) {
+      if (frameGap <= FRAME + 1 || now - lastDraw >= frameGap - 4) {
         lastDraw = now; const t0 = performance.now(); draw(now); const dt = performance.now() - t0; ema = ema ? ema * 0.9 + dt * 0.1 : dt;
         // Adaptive Qualitaet: ist ein Bild teurer als ein Drittel des Bildabstands, erst Aufloesung senken (bis 0,5x), dann auf 20/15 Bilder/s gehen
-        if (now - lastAdapt > 1200 && ema > frameGap * 0.4) { lastAdapt = now; ema = 0;
+        if (now - lastAdapt > 1200 && ema > 7) { lastAdapt = now; ema = 0;
           if (q > 0.55) { q = Math.max(0.5, q - 0.25); imgs = null; resize(); }
-          else if (frameGap < 60) frameGap = 1000 / 15; }
+          else if (frameGap < 30) frameGap = 1000 / 30; }
       }
       raf = requestAnimationFrame(tick);
     };
