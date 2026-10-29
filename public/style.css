@@ -15799,11 +15799,14 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   padding-top: 18px;
   background: rgba(0,0,0,.45);
   pointer-events: none;
-  animation: textbox-fade-in .25s ease-out, textbox-puls-takt 1.4s ease-in-out infinite;
+  animation: textbox-fade-in .25s ease-out;
 }
+/* Pulstakt nur, solange Highlights stehen (Klasse vom TextBox-Render): eine dauernd animierte, vererbte Eigenschaft rechnet sonst JEDES Bild den Stil
+   der ganzen Overlay-Ebene neu — auf schwachen Handys fast die halbe Rechenzeit im Tutorial (Kontrolllauf). */
+.textbox-overlay.textbox-puls { animation: textbox-fade-in .25s ease-out, textbox-puls-takt 1.4s ease-in-out infinite; }
 @keyframes textbox-fade-in { from { opacity: 0; } to { opacity: 1; } }
 .textbox-fading {
-  animation: textbox-fade-out 1s ease-in forwards, textbox-puls-takt 1.4s ease-in-out infinite;
+  animation: textbox-fade-out 1s ease-in forwards;
   pointer-events: none !important;
 }
 @keyframes textbox-fade-out { from { opacity: 1; } to { opacity: 0; } }
@@ -27069,4 +27072,18 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
    „CHOOSE OPPONENT!" steht stattdessen im Zeilenfluss links neben den Knoepfen, die Suche rueckt rechts daneben. */
 @media (max-height: 600px) {
   .top-bar > h2.titel-links { position: static; left: auto; transform: none; transform-origin: left center; margin: 0 8px 0 2px; }
+}
+
+/* ★ HANDY: kompakte Phasenleiste im Streifen links.
+   Vorher lag die 250 px breite Leiste (Phasen + Knoepfe) auf der Brettmitte und verdeckte bei Telefonen die untere Haelfte des linken Gegnerhelden
+   (Zone x 110–150); ein Tipp auf die Kartenmitte traf die Leiste. Jetzt: 104 px breit — die sechs Phasen in einem 3×2-Raster, darunter die zwei
+   Knoepfe nebeneinander und „Confirm end". Sie endet links der ersten Heldenspalte (x < 108) und liegt zwischen der Turnzahl und dem eigenen
+   Ablagestapel. */
+@media (pointer: coarse) and (max-height: 600px) {
+  .phase-column { zoom: 1 !important; left: 0 !important; top: calc(50% + 16px) !important; transform: translateY(-50%) !important; width: 104px; }
+  .board-phase-tracker { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px !important; padding: 2px !important; width: 104px; box-sizing: border-box; }
+  .board-phase-item { padding: 1px 0 !important; font-size: 6px !important; text-align: center; min-height: 10px !important; line-height: 1.2; overflow: hidden; }
+  .phase-buttons-row { flex-wrap: wrap !important; width: 104px; box-sizing: border-box; gap: 2px !important; padding: 2px 3px !important; margin-top: 2px !important; justify-content: space-between; }
+  .phase-btn { flex: 1 1 42px; min-width: 0; padding: 1px 0 !important; min-height: 15px !important; font-size: 5px !important; text-align: center; line-height: 1.2; }
+  .phase-end-check { flex-basis: 100%; justify-content: center; margin-left: 0 !important; font-size: 6px !important; }
 }

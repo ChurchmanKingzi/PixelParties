@@ -10870,7 +10870,7 @@ function TextBox() {
   if (rechtsFarbe) farbStil['--tb-rechts'] = rechtsFarbe;
 
   return (
-    <div className={'textbox-overlay' + (fading ? ' textbox-fading' : '')}>
+    <div className={'textbox-overlay' + (fading ? ' textbox-fading' : '') + (highlightRects.some(h => h.pulse) ? ' textbox-puls' : '')}>
       {highlightRects.map((h, i) => {
         const gedreht = h.flat && (h.drehung != null || h.handkarte);
         const inner = (

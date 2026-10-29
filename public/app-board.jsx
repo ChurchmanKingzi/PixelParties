@@ -60570,7 +60570,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     data-phase-name={phase}
                     style={isActive ? { borderColor: phaseColor, boxShadow: `0 0 10px ${phaseColor}44` } : undefined}
                     onClick={() => { if (canClick) tryAdvancePhase(i); }}>
-                    {PHASEN_KURZ[phase] || phase}
+                    {(phase === 'Resource Phase' && window.ppIsPhone && window.ppIsPhone()) ? 'Res.' : (PHASEN_KURZ[phase] || phase)}   {/* Handy: 3×2-Raster, „Resource“ passt nicht in eine Spalte */}
                   </div>
                 );
               })}
