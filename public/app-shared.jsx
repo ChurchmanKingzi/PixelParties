@@ -10311,6 +10311,42 @@ function measureHighlight(el) {
 const TACKLE_FLUG_MS = 700;
 const TACKLE_VORLAUF_MS = 1300;
 
+// ★ Tipp auf eine KARTE waehrend einer Textbox (Mobil): zeigt ihren Tooltip und blaettert die Textbox NICHT weiter. Die Karten legen ihre
+// Tooltip-Daten am Element ab (`el._ppTip`, app-board.jsx: BoardCard und aufgedeckte Gegnerhandkarten). Die gesperrten Brettbereiche der
+// Tutorials schlucken die Beruehrung (touchstart/touchend, preventDefault) — der Tooltip wird deshalb hier gesetzt, nicht von der Karte.
+// Gilt nur fuer Beruehrungen; Mausklicks blaettern wie bisher (am Desktop gibt es den Hover-Tooltip).
+const _tbKarte = { tip: null, x: 0, y: 0 };
+function _tbKartenTipp(t) {
+  const k = t && t.closest && t.closest('.board-card, .hand-slot, .hand-card');
+  if (!k) return null;
+  const el = k.matches('.hand-slot') ? k.querySelector(':scope > .board-card') : k;
+  return (el && el._ppTip) || null;
+}
+function _tbKarteHinweisWeg() {
+  if (window._tbTipAn) { window._tbTipAn = false; if (window._boardTooltipSetter) window._boardTooltipSetter(null); }
+}
+/** true = die Beruehrung gehoert einer Karte (kein Weiterblaettern). */
+function tbKartenTippEreignis(e) {
+  if (e.type === 'touchstart') {
+    const tip = _tbKartenTipp(e.target);
+    if (!tip) { _tbKarte.tip = null; return false; }
+    const t = e.touches && e.touches[0];
+    _tbKarte.tip = tip; _tbKarte.x = t ? t.clientX : 0; _tbKarte.y = t ? t.clientY : 0;
+    window._ppTbTouchAt = Date.now();
+    return true;
+  }
+  if (e.type === 'touchend') {
+    const tip = _tbKarte.tip;
+    if (!tip) return false;
+    _tbKarte.tip = null;
+    const t = e.changedTouches && e.changedTouches[0];
+    if (t && Math.abs(t.clientX - _tbKarte.x) + Math.abs(t.clientY - _tbKarte.y) > 12) return true;   // Wisch: nichts zeigen
+    if (window._boardTooltipSetter) { window._boardTooltipSetter(tip); window._tbTipAn = true; }
+    return true;
+  }
+  return false;
+}
+
 function TextBox() {
   const [opts, setOpts] = useState(null);
   const [pages, setPages] = useState([]);
@@ -10646,6 +10682,7 @@ function TextBox() {
   const handleAdvance = useCallback(() => {
     if (!opts || fading || vorlaufRef.current) return;
     if (window.playSFX) window.playSFX('ui_click', { dedupe: 80, volume: 0.5 });
+    _tbKarteHinweisWeg();
     if (!done) {
       clearInterval(timerRef.current);
       setCharCount(parsedRef.current.plainText.length);
@@ -10749,6 +10786,7 @@ function TextBox() {
       e.stopPropagation();
       if (e.stopImmediatePropagation) e.stopImmediatePropagation();
       if (e.cancelable) e.preventDefault();
+      if (e.type === 'touchstart' || e.type === 'touchend') { if (tbKartenTippEreignis(e)) return; }   // Tipp auf eine Karte: Tooltip, kein Weiterblaettern
       if (e.type === 'touchstart') window._ppTbTouchAt = Date.now();
       // Ein Fingertipp erzeugt `touchstart` UND danach ein nachgeschobenes `mousedown` (Kompatibilitaets-Ereignis): nur das erste blaettert
       if (e.type === 'touchstart' || (e.type === 'mousedown' && Date.now() - (window._ppTbTouchAt || 0) > 1000)) handleAdvance();
@@ -10761,6 +10799,8 @@ function TextBox() {
   useEffect(() => {
     if (!opts) return;
     const onClick = (e) => {
+      if ((e.type === 'touchstart' || e.type === 'touchend') && tbKartenTippEreignis(e)) return;   // Tipp auf eine Karte: Tooltip, kein Weiterblaettern
+      if (e.type === 'touchend') return;
       if (e.type === 'touchstart') window._ppTbTouchAt = Date.now();
       else if (Date.now() - (window._ppTbTouchAt || 0) < 1000) return;   // nachgeschobenes mousedown eines Fingertipps: schon behandelt
       if (e.target.closest('.textbox-back')) return;
@@ -10769,7 +10809,8 @@ function TextBox() {
     };
     window.addEventListener('mousedown', onClick);
     window.addEventListener('touchstart', onClick, { passive: true });
-    return () => { window.removeEventListener('mousedown', onClick); window.removeEventListener('touchstart', onClick); };
+    window.addEventListener('touchend', onClick, { passive: true });
+    return () => { window.removeEventListener('mousedown', onClick); window.removeEventListener('touchstart', onClick); window.removeEventListener('touchend', onClick); _tbKarteHinweisWeg(); };
   }, [opts, handleAdvance]);
 
   if (!opts) return null;

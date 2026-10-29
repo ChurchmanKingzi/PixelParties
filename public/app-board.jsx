@@ -169,6 +169,39 @@ function setBoardTooltip(card) {
   window._boardTooltipSetter?.(card);
 }
 
+// ★ Mobil: EIN TIPP auf eine Handkarte zeigt ihren Tooltip (Als Vorgabe: „wie das Tappen auf eine Board-Karte") — die eigene Hand und die
+// aufgedeckten (face-up) Karten der gegnerischen Hand. Die Hand haengt am Zieh-Griff (touchstart wird dort abgefangen), darum entstehen
+// hier keine Mausereignisse nachtraeglich wie bei Brettkarten; ein Langdruck (>= LONG_PRESS_MS) zeigt ihn ohnehin schon, ein Wisch/Zug nicht.
+// Die Karten legen ihre Tooltip-Daten selbst am Element ab (`el._ppTip`, mit Handstufe/-kosten-Hinweisen). Der naechste Tipp ausserhalb
+// raeumt den Tooltip wieder weg. Die Klick-Aktion der Karte (Spielen, Potion …) bleibt davon unberuehrt.
+if (typeof document !== 'undefined' && !window._ppHandTippAktiv_installiert) {
+  window._ppHandTippAktiv_installiert = true;
+  let start = null, aktiv = null;
+  const handKarte = (t) => {
+    const slot = t && t.closest && t.closest('.game-hand-me .hand-slot, .game-hand-opp .hand-card');
+    if (!slot) return null;
+    return slot._ppTip !== undefined ? slot : (slot.querySelector(':scope > .board-card') || null);
+  };
+  document.addEventListener('touchstart', (e) => {
+    const t = e.touches && e.touches[0];
+    const el = handKarte(e.target);
+    start = t ? { x: t.clientX, y: t.clientY, at: performance.now(), el } : null;
+    // Tipp ausserhalb der gezeigten Karte: Tooltip weg
+    if (aktiv && (!el || el !== aktiv)) { aktiv = null; window._boardTooltipSetter?.(null); }
+  }, { capture: true, passive: true });
+  document.addEventListener('touchend', (e) => {
+    const s0 = start; start = null;
+    if (!window._isTouchDevice || !s0 || !s0.el || window.activeDragData || _isDraggingCard) return;
+    const t = e.changedTouches && e.changedTouches[0];
+    if (!t || Math.abs(t.clientX - s0.x) + Math.abs(t.clientY - s0.y) > 12) return;   // Wisch / Zug
+    if (performance.now() - s0.at >= (window.LONG_PRESS_MS || 400)) return;           // Langdruck zeigt den Tooltip selbst
+    const tip = s0.el._ppTip;
+    if (!tip) return;
+    aktiv = s0.el;
+    setBoardTooltip(tip);
+  }, { capture: true, passive: true });
+}
+
 // ★ v1478 (Als Vorgabe 28.9.: „Die Karte(n) in der Pop-Up-Box sind jetzt
 // deutlich kleiner als vorher" → Variante C: „bis direkt an den Rahmen oder
 // sogar über den Rahmen hinaus zum Rand der Box selbst" — „den (hier roten)
@@ -438,6 +471,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   return (
     <div className={'board-card' + (faceDown ? ' face-down' : '') + (flipped ? ' flipped' : '') + (foilClass ? ' ' + foilClass : '')}
       style={style}
+      ref={(el) => { if (el) el._ppTip = (noTooltip || (faceDown && !revealTooltipWhenFaceDown)) ? null : tooltipTarget; }}   // fuer ppHandTipp (Tipp auf Handkarten)
       onMouseEnter={() => !noTooltip && (revealTooltipWhenFaceDown || !faceDown) && tooltipTarget && setBoardTooltip(tooltipTarget)}
       onMouseLeave={() => setBoardTooltip(null)}
       onTouchStart={() => {
@@ -60167,6 +60201,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 })();
               return (
                 <div key={i}
+                  ref={(el) => {
+                    if (!el) return;
+                    const c = revealEntry && CARDS_BY_NAME[revealEntry.name];
+                    el._ppTip = c ? (revealEntry.handLevel != null ? { ...c, _handNotes: [{ color: '#75f091', text: `Level ${revealEntry.handLevel} in their hand (printed ${c.level}).` }] } : c) : null;   // fuer ppHandTipp
+                  }}
                   className={'board-card hand-card'
                     + (revealEntry ? ' revealed-hand-card' : ' face-down')
                     + (isPermaRevealed ? ' hand-card-perma-revealed' : '')
