@@ -46,6 +46,15 @@ const db = require('./db');
 // Als Vorgabe 26.9.: rot statt des Spieler-Standards Cyan.
 const NICHT_MENSCH_FARBE = '#ff4444';
 const bcrypt = require('bcryptjs');
+// bcryptjs rechnet auf dem Haupt-Thread: hashSync/compareSync blockieren den Event-Loop pro Aufruf ~80 ms
+// (bei Gast-Login-Spitzen stand dadurch der ganze Server). Deshalb: async-Varianten (geben dem Loop zwischen den
+// Runden Luft) und fuer Konten ohne Passwort-Login EINEN gemeinsamen, nie bekannten Hash statt eines Hashes je Konto.
+// Niemand kennt das Klartext-Passwort dahinter, ein Passwort-Login ist damit weiterhin unmoeglich.
+let _unusablePasswordHash = null;
+function unusablePasswordHash() {
+  if (!_unusablePasswordHash) _unusablePasswordHash = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 10);
+  return _unusablePasswordHash;
+}
 // const multer = require('multer'); // Replaced by base64 uploads
 const cookieParser = require('cookie-parser');
 const { v4: uuidv4 } = require('uuid');
@@ -1674,7 +1683,7 @@ app.post('/api/auth/signup', async (req, res) => {
   await db.run('DELETE FROM pending_signups WHERE username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE', [uname, email]);
   await db.run(
     'INSERT INTO pending_signups (id, username, email, password_hash, color, avatar, code_hash, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [uuidv4(), uname, email, bcrypt.hashSync(password, 10), getRandomDefaultColor(), getRandomDefaultAvatar(), hashCode(code), Date.now() + CODE_TTL_MS],
+    [uuidv4(), uname, email, await bcrypt.hash(password, 10), getRandomDefaultColor(), getRandomDefaultAvatar(), hashCode(code), Date.now() + CODE_TTL_MS],
   );
   const { subject, text, html } = codeEmail('signup', code);
   try {
@@ -1783,7 +1792,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
   if (!result.ok) return res.status(400).json({ error: result.error });
   const user = await db.get('SELECT * FROM users WHERE email = ? COLLATE NOCASE AND email_verified = 1', [email]);
   if (!user) return res.status(400).json({ error: 'No account found for this email.' });
-  await db.run('UPDATE users SET password_hash = ? WHERE id = ?', [bcrypt.hashSync(newPassword, 10), user.id]);
+  await db.run('UPDATE users SET password_hash = ? WHERE id = ?', [await bcrypt.hash(newPassword, 10), user.id]);
   // Invalidate any live sessions for this account after a reset.
   for (const [tok, sess] of sessions) if (sess.userId === user.id) sessions.delete(tok);
   try { db.run('DELETE FROM sessions WHERE user_id = ?', [user.id]).catch(() => {}); } catch (_) {}
@@ -1801,7 +1810,7 @@ app.post('/api/auth/login', async (req, res) => {
   const user = looksEmail
     ? await db.get('SELECT * FROM users WHERE email = ? COLLATE NOCASE', [identifier])
     : await db.get('SELECT * FROM users WHERE username = ? COLLATE NOCASE', [identifier]);
-  if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+  if (!user || !(await bcrypt.compare(password, user.password_hash))) {
     return res.status(401).json({ error: 'Invalid username/email or password' });
   }
 
@@ -1860,7 +1869,7 @@ app.post('/api/auth/google', async (req, res) => {
     const username = await uniqueUsernameFrom(payload.name || (payload.given_name) || email.split('@')[0]);
     // Random unusable password so the NOT NULL column holds; password login
     // can never match it (the user authenticates via Google).
-    const unusable = bcrypt.hashSync(uuidv4() + uuidv4(), 10);
+    const unusable = unusablePasswordHash();
     try {
       await db.run(
         'INSERT INTO users (id, username, password_hash, avatar, color, email, email_verified, google_id) VALUES (?, ?, ?, ?, ?, ?, 1, ?)',
@@ -1982,7 +1991,7 @@ app.post('/api/auth/guest', async (req, res) => {
   try {
     const id = uuidv4();
     const username = 'Guest-' + id.slice(0, 8);
-    const passwordHash = bcrypt.hashSync(uuidv4(), 10); // random; guests can't log in by password
+    const passwordHash = unusablePasswordHash(); // nie bekanntes Passwort dahinter: Gaeste koennen sich nicht per Passwort anmelden
     await db.run(
       // Fixed default blue (the login-screen accent, `--accent` in style.css) so the guest UI doesn't flicker a
       // new random colour every session.
@@ -2439,10 +2448,10 @@ app.post('/api/profile/password', authMiddleware, async (req, res) => {
   if (newPassword.length < 3) return res.status(400).json({ error: 'New password must be 3+ characters' });
   const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   if (!user) return res.status(404).json({ error: 'User not found' });
-  if (!bcrypt.compareSync(oldPassword, user.password_hash)) {
+  if (!(await bcrypt.compare(oldPassword, user.password_hash))) {
     return res.status(401).json({ error: 'Current password is incorrect' });
   }
-  const hash = bcrypt.hashSync(newPassword, 10);
+  const hash = await bcrypt.hash(newPassword, 10);
   await db.run('UPDATE users SET password_hash = ? WHERE id = ?', [hash, user.id]);
   res.json({ success: true });
 });

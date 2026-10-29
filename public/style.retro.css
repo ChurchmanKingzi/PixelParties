@@ -7748,15 +7748,90 @@ body:has(.textbox-overlay) .tooltip { z-index: 90003 !important; }
    MOBILE & RESPONSIVE
    ═══════════════════════════════════════════════════════════════ */
 
-/* Portrait orientation blocker — game requires landscape */
-.rotate-device-overlay { display: none; position: fixed; inset: 0; z-index: 999999; background: var(--bg); color: var(--text); flex-direction: column; align-items: center; justify-content: center; gap: 16px; font-family: var(--font-display), sans-serif; text-align: center; padding: 24px; }
-.rotate-device-overlay .rotate-icon { font-size: 64px; animation: rotateHint 2s steps(24, end) infinite; }
-.rotate-device-overlay .rotate-text { font-size: 14px; color: var(--accent); font-weight: 700; }
-.rotate-device-overlay .rotate-sub { font-size: 11px; color: var(--text2); max-width: 280px; }
-@keyframes rotateHint {
-  0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(-15deg); }
-  75% { transform: rotate(15deg); }
+/* Portrait orientation blocker — game requires landscape.
+   Pixel-Look: Titelbild mit 2x2-Dithering abgedunkelt, Logo, ein Handy-Sprite (SVG, harte Kanten), das sich per
+   steps(1) quer legt, und Tafeln mit gestapelten Ringen statt weicher Schatten. */
+.rotate-device-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  background: var(--bg);
+  color: var(--text);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display), sans-serif;
+  text-align: center;
+  overflow: hidden;
+}
+.rotate-device-overlay .rotate-art {
+  position: absolute;
+  inset: 0;
+  background: url(/title.png) 34% center / cover no-repeat;
+  image-rendering: pixelated;
+}
+.rotate-device-overlay .rotate-dither {
+  position: absolute;
+  inset: 0;
+  background: repeating-conic-gradient(var(--bg) 0 25%, transparent 0 50%) 0 0 / 4px 4px;
+}
+.rotate-device-overlay .rotate-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: 100%;
+  max-height: 100%;
+  padding: 16px 22px calc(16px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+}
+.rotate-device-overlay .rotate-logo { width: min(78vw, 340px); }
+.rotate-device-overlay .rotate-logo .pp-logo-img { width: 100%; height: auto; max-height: none; }
+.rotate-device-overlay .rotate-phone { position: relative; width: 132px; height: 132px; flex: none; }
+.rotate-device-overlay .rotate-phone svg { position: absolute; left: 50%; top: 50%; image-rendering: pixelated; }
+.rotate-device-overlay .rot-phone-p { width: 84px; height: 132px; margin: -66px 0 0 -42px; animation: rotPhoneP 1.8s steps(1, end) infinite; }
+.rotate-device-overlay .rot-phone-l { width: 132px; height: 84px; margin: -42px 0 0 -66px; animation: rotPhoneL 1.8s steps(1, end) infinite; }
+.rotate-device-overlay .ph-edge { fill: #12101f; }
+.rotate-device-overlay .ph-body { fill: var(--text2); }
+.rotate-device-overlay .ph-screen { fill: #9a64ff; }
+.rotate-device-overlay .ph-spark { fill: #ffe94d; }
+@keyframes rotPhoneP { 0% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes rotPhoneL { 0% { opacity: 0; } 50% { opacity: 1; } }
+.rotate-device-overlay .rotate-panel {
+  background: var(--bg);
+  box-shadow: 0 0 0 4px #12101f, 0 0 0 8px var(--accent), 0 0 0 12px #12101f;
+  padding: 14px 16px;
+  margin: 12px;
+  width: min(80vw, 330px);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.rotate-device-overlay .rotate-text { font-size: 14px; color: var(--accent); font-weight: 700; line-height: 1.3; }
+.rotate-device-overlay .rotate-sub { font-size: 11px; color: var(--text); line-height: 1.5; }
+.rotate-device-overlay .rotate-url { font-size: 13px; color: #ffe94d; font-weight: 700; }
+.rotate-device-overlay .rotate-actions { display: flex; gap: 14px; align-items: center; justify-content: center; margin-top: 2px; }
+.rotate-device-overlay .rotate-copy {
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text);
+  background: #12101f;
+  border: 0;
+  padding: 9px 12px;
+  box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px #12101f;
+  cursor: pointer;
+}
+.rotate-device-overlay .rotate-copy:active { background: var(--accent); color: #12101f; }
+@media (prefers-reduced-motion: reduce) {
+  .rotate-device-overlay .rot-phone-p { animation: none; opacity: 0; }
+  .rotate-device-overlay .rot-phone-l { animation: none; opacity: 1; }
 }
 
 /* Show overlay + hide ALL screens in portrait on small devices */
