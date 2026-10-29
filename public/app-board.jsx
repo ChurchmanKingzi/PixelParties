@@ -2132,10 +2132,14 @@ function ppPlatzierungsKamera() {
     if (window._touchActive || window.activeDragData) return;
     const sc = document.querySelector('.board-center');
     if (!sc) return;
-    const els = Array.from(sc.querySelectorAll('[data-support-zone].zone-pick-target, [data-support-zone].zone-bounce-place-target'));
+    // Support-Zonen-Wahl (Pollution Tokens …) UND „waehle einen Nutzer": sind meine Helden als Ziel markiert (Spell/Attack/Creature per Tipp, mehrere moegliche Wirker),
+    // fahren die Kamera zu ihnen.
+    const els = Array.from(sc.querySelectorAll('[data-support-zone].zone-pick-target, [data-support-zone].zone-bounce-place-target, [data-hero-zone][data-hero-owner="me"].board-zone-play-target, [data-hero-zone][data-hero-owner="me"].attach-pick-target'));
     if (!els.length) { _ppPlatzSchluessel = ''; return; }
     if (document.querySelector('.textbox-overlay')) return;   // im Tutorial hat die Textbox-Kamera Vorrang
-    const schluessel = els.map(e => (e.getAttribute('data-support-owner') || '?') + ':' + e.getAttribute('data-support-hero') + ':' + e.getAttribute('data-support-slot')).join('|');
+    const schluessel = els.map(e => e.hasAttribute('data-hero-zone')
+      ? 'h:' + e.getAttribute('data-hero-idx')
+      : (e.getAttribute('data-support-owner') || '?') + ':' + e.getAttribute('data-support-hero') + ':' + e.getAttribute('data-support-slot')).join('|');
     if (schluessel === _ppPlatzSchluessel) return;
     _ppPlatzSchluessel = schluessel;
     ppTutorialCamFokus(els, { nurFehlende: true });
