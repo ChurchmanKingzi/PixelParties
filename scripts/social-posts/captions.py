@@ -198,6 +198,11 @@ HEROES = {
         "Whenever Reiza hits exactly one target with an Attack, it is Stunned for 1 turn and receives 1 Stack of Poison. If all targets your opponent controls are Poisoned, she can perform a second Action every turn.",
         "bats, blood drops and dark mist",
         "#Vampire #DarkFantasy"),
+    "Elana, the Rocky Rebel": (
+        "Hate your hand? Shuffle it away. 🎸",
+        "Once per turn, Elana shuffles your entire hand back into your deck, then you draw the same number of cards +1. A fresh start, with a bonus card, every single turn.",
+        "floating music notes, green sparkles and golden glints",
+        "#Rockstar #Guitar"),
     "Santa Klaus": (
         "A present for your opponent. 🎅",
         "Whenever Santa Klaus uses an Attack or Spell, you must add 2 cards from your hand to your opponent's hand. Merry Christmas?",
@@ -316,6 +321,8 @@ TIKTOK = {
                                  "His Support Zones double as Surprise Zones, and every activated Surprise lets you deal 100 damage to a target."),
     "Andras, the Human Weapon": ("Hit one target. Then hit another. 🔥",
                                  "Andras hits exactly one target with a normal Attack of a level below his Fighting level? You may choose a second target for it to hit afterwards."),
+    "Elana, the Rocky Rebel": ("Hate your hand? Shuffle it away. 🎸",
+                               "Once per turn: shuffle your whole hand back into the deck and draw the same number of cards +1."),
     "Reiza, the Chief Tormentor": ("Stun. Poison. Double action. 🦇",
                                    "Every single-target hit Stuns and Poisons. Once all of your opponent's targets are Poisoned, Reiza gets a second Action every turn."),
     "Cute Annoyance Mini": ("Discard a card, find a cute friend. 🐾",

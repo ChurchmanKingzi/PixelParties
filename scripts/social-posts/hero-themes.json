@@ -1258,5 +1258,38 @@
   "feet": 560,
   "logoFront": true,
   "noShadow": true
+ },
+ "Elana, the Rocky Rebel": {
+  "music": "scripts/social-posts/music/bgm_elana.ogg",
+  "particles": [
+   [
+    "glyph",
+    "pinkwing",
+    12,
+    {
+     "g": "note",
+     "move": "rise"
+    }
+   ],
+   [
+    "glyph",
+    "leafgreen",
+    8,
+    {
+     "g": "note",
+     "move": "float"
+    }
+   ],
+   [
+    "spark",
+    "gold",
+    10
+   ],
+   [
+    "mote",
+    "leafgreen",
+    26
+   ]
+  ]
  }
 }
