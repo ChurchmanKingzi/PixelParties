@@ -7,6 +7,7 @@
 //  einen Verlauf geschrieben wird, rastet auf die naechste Palettenfarbe ein (CIE-Lab-Abstand, Alpha bleibt).
 //    window.ppSnap('#12ab34')   → '#xxxxxx'   naechste Palettenfarbe
 //    window.ppSnapCss(text)     → Text, in dem jedes Farb-Literal (#hex, rgb(), rgba(), hsl(), hsla()) ersetzt ist
+//    window.ppSnapRgb(r, g, b)  → [r, g, b] der naechsten Palettenfarbe (Pixelbilder des Pixelierers, W86z)
 //  Eingehaengt wird in: element.style.* / setProperty / cssText, Canvas-2D (fillStyle, strokeStyle, shadowColor, addColorStop), SVG-Attribute fill/stroke/stop-color.
 //  Nicht erfasst (Browser rechnet selbst): Verlaufs-Zwischentoene, Alpha-Mischung, `color-mix()` — sie entstehen aus Palettenfarben.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -73,6 +74,8 @@
   const snapWert = (v) => (typeof v === 'string' && FARBTEXT.test(v) ? ppSnapCss(v) : v);
   window.ppSnapCss = ppSnapCss;
   window.ppSnap = (hex) => { const m = /^#?([0-9a-fA-F]{6})$/.exec(String(hex || '').trim()); if (!m) return hex; const p = naechsteRgb(parseInt(m[1].slice(0, 2), 16), parseInt(m[1].slice(2, 4), 16), parseInt(m[1].slice(4, 6), 16)); return '#' + hex2(p[0]) + hex2(p[1]) + hex2(p[2]); };
+  /** [r, g, b] → naechste Palettenfarbe als [r, g, b] (fuer Pixelbilder, `public/pixel-anim.js` und den Pixelierer in app-shared.jsx). */
+  window.ppSnapRgb = (r, g, b) => naechsteRgb(r, g, b);
   window.PP_PALETTE = PALETTE.slice();
 
   // ── Einhaengen: Stile ──

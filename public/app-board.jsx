@@ -13541,9 +13541,9 @@ const ANIM_REGISTRY = {
             img.data.set(tentakelFrame(gw, gh, fr / 84, 1));
             ctx.putImageData(img, 0, 0);
           }
-          if (t < 1) raf = requestAnimationFrame(schritt);
+          if (t < 1) raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
         };
-        raf = requestAnimationFrame(schritt);
+        raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
         return () => cancelAnimationFrame(raf);
       }, []);
       return (
@@ -13630,9 +13630,9 @@ const ANIM_REGISTRY = {
           const k = Math.min(1, (jetzt - t0) / DAUER);
           const fr = Math.floor(k * 36);                       // ~50 Bilder/s
           if (fr !== letzte) { letzte = fr; zeichne(fr / 36); }
-          if (k < 1) raf = requestAnimationFrame(schritt);
+          if (k < 1) raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
         };
-        raf = requestAnimationFrame(schritt);
+        raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
         return () => cancelAnimationFrame(raf);
       }, []);
       return (
@@ -28963,10 +28963,10 @@ const ANIM_REGISTRY = {
           const t = jetzt - t0;
           const fr = Math.floor(t / 30);                          // ~33 Bilder/s: ruhige Pixelart-Taktung
           if (fr !== letzte) { letzte = fr; zeichne(t); }
-          if (t < ENDE) raf = requestAnimationFrame(schritt);
+          if (t < ENDE) raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
           else { buf.fill(0); ctx.putImageData(img, 0, 0); }
         };
-        raf = requestAnimationFrame(schritt);
+        raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
         return () => cancelAnimationFrame(raf);
       }, []);
       return (
@@ -29115,10 +29115,10 @@ const ANIM_REGISTRY = {
           const t = jetzt - t0;
           const fr = Math.floor(t / TAKT);                        // ~30 Bilder/s: ruhige Pixelart-Taktung
           if (fr !== letzte) { letzte = fr; buf.fill(0); zeichne(t, fr); ctx.putImageData(img, 0, 0); }
-          if (t < ENDE) raf = requestAnimationFrame(schritt);
+          if (t < ENDE) raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
           else { buf.fill(0); ctx.putImageData(img, 0, 0); }
         };
-        raf = requestAnimationFrame(schritt);
+        raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
         return () => cancelAnimationFrame(raf);
       }, []);
       return (
@@ -29238,10 +29238,10 @@ const ANIM_REGISTRY = {
           const t = jetzt - t0;
           const fr = Math.floor(t / TAKT);                        // ~30 Bilder/s: ruhige Pixelart-Taktung
           if (fr !== letzte) { letzte = fr; buf.fill(0); zeichne(t, fr); ctx.putImageData(img, 0, 0); }
-          if (t < ENDE) raf = requestAnimationFrame(schritt);
+          if (t < ENDE) raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
           else { buf.fill(0); ctx.putImageData(img, 0, 0); }
         };
-        raf = requestAnimationFrame(schritt);
+        raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
         return () => cancelAnimationFrame(raf);
       }, []);
       return (
@@ -29387,10 +29387,10 @@ const ANIM_REGISTRY = {
           const t = jetzt - t0;
           const fr = Math.floor(t / TAKT);                        // ~30 Bilder/s: ruhige Pixelart-Taktung
           if (fr !== letzte) { letzte = fr; buf.fill(0); zeichne(t); ctx.putImageData(img, 0, 0); }
-          if (t < ENDE) raf = requestAnimationFrame(schritt);
+          if (t < ENDE) raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
           else { buf.fill(0); ctx.putImageData(img, 0, 0); }
         };
-        raf = requestAnimationFrame(schritt);
+        raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
         return () => cancelAnimationFrame(raf);
       }, []);
       return (
@@ -29542,10 +29542,10 @@ const ANIM_REGISTRY = {
           const t = jetzt - t0;
           const fr = Math.floor(t / TAKT);                        // ~30 Bilder/s: ruhige Pixelart-Taktung
           if (fr !== letzte) { letzte = fr; buf.fill(0); zeichne(t); ctx.putImageData(img, 0, 0); }
-          if (t < ENDE) raf = requestAnimationFrame(schritt);
+          if (t < ENDE) raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
           else { buf.fill(0); ctx.putImageData(img, 0, 0); }
         };
-        raf = requestAnimationFrame(schritt);
+        raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
         return () => cancelAnimationFrame(raf);
       }, []);
       return (
@@ -29772,10 +29772,10 @@ const ANIM_REGISTRY = {
           const t = jetzt - t0;
           const fr = Math.floor(t / TAKT);                        // ~30 Bilder/s: ruhige Pixelart-Taktung
           if (fr !== letzte) { letzte = fr; buf.fill(0); zeichne(t); ctx.putImageData(img, 0, 0); }
-          if (t < ENDE) raf = requestAnimationFrame(schritt);
+          if (t < ENDE) raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
           else { buf.fill(0); ctx.putImageData(img, 0, 0); }
         };
-        raf = requestAnimationFrame(schritt);
+        raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
         return () => cancelAnimationFrame(raf);
       }, []);
       return (
@@ -30798,10 +30798,10 @@ const ANIM_REGISTRY = {
           const t = jetzt - t0;
           const fr = Math.floor(t / TAKT);                        // ~30 Bilder/s: ruhige Pixelart-Taktung
           if (fr !== letzte) { letzte = fr; buf.fill(0); zeichne(t); ctx.putImageData(img, 0, 0); }
-          if (t < ENDE) raf = requestAnimationFrame(schritt);
+          if (t < ENDE) raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
           else { buf.fill(0); ctx.putImageData(img, 0, 0); }
         };
-        raf = requestAnimationFrame(schritt);
+        raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
         return () => cancelAnimationFrame(raf);
       }, []);
       return (
@@ -31051,10 +31051,10 @@ const ANIM_REGISTRY = {
           const t = jetzt - t0;
           const fr = Math.floor(t / TAKT);                        // ~30 Bilder/s: ruhige Pixelart-Taktung
           if (fr !== letzte) { letzte = fr; buf.fill(0); zeichne(t); ctx.putImageData(img, 0, 0); }
-          if (t < ENDE) raf = requestAnimationFrame(schritt);
+          if (t < ENDE) raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
           else { buf.fill(0); ctx.putImageData(img, 0, 0); }
         };
-        raf = requestAnimationFrame(schritt);
+        raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
         return () => cancelAnimationFrame(raf);
       }, []);
       return (
@@ -31167,10 +31167,10 @@ const ANIM_REGISTRY = {
           const t = jetzt - t0;
           const fr = Math.floor(t / TAKT);                        // ~30 Bilder/s: ruhige Pixelart-Taktung
           if (fr !== letzte) { letzte = fr; buf.fill(0); zeichne(t); ctx.putImageData(img, 0, 0); }
-          if (t < ENDE) raf = requestAnimationFrame(schritt);
+          if (t < ENDE) raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
           else { buf.fill(0); ctx.putImageData(img, 0, 0); }
         };
-        raf = requestAnimationFrame(schritt);
+        raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
         return () => cancelAnimationFrame(raf);
       }, []);
       return (
@@ -32456,10 +32456,10 @@ const ANIM_REGISTRY = {
         const schritt = (jetzt) => {
           const t = jetzt - t0, fr = Math.floor(t / TAKT);
           if (fr !== letzte) { letzte = fr; buf.fill(0); malen(g, t, sz, teile); ctx.putImageData(img, 0, 0); }
-          if (t < ENDE) raf = requestAnimationFrame(schritt);
+          if (t < ENDE) raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
           else { buf.fill(0); ctx.putImageData(img, 0, 0); }
         };
-        raf = requestAnimationFrame(schritt);
+        raf = (window.ppTaktRaf || window.requestAnimationFrame)(schritt);
         return () => cancelAnimationFrame(raf);
       }, []);
       return (
@@ -36728,6 +36728,14 @@ window.ppAnimVorwaermen = function (type, mass) {
   } catch (e) { /* Vorwaermen ist optional */ }
 };
 
+// ★ W86z — Huelle fuer Effekt-Ebenen, die nicht ueber die Registry laufen (Tether-/Strahl-SVGs …): haengt den Pixelierer + die
+// Pixelart-Bewegung (public/pixel-anim.js) an ihre Kinder, auch an spaeter eingehaengte (MutationObserver nur an dieser Wurzel).
+function PixelHuelle({ className, style, children }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => window.ppPixeliererAnhaengen ? window.ppPixeliererAnhaengen(ref.current) : undefined, []);
+  return <div ref={ref} className={className} style={style}>{children}</div>;
+}
+
 function GameAnimationRenderer({ type, x, y, w, h, _gemountet, prewarm, ...rest }) {
   const Component = ANIM_REGISTRY[type];
   // Lebensdauer-Uhr erst NACH dem Pixelieren starten (s. playAnimation).
@@ -36736,7 +36744,7 @@ function GameAnimationRenderer({ type, x, y, w, h, _gemountet, prewarm, ...rest 
   // die Grafiken der Animation einmal beim Einblenden in Pixelart mit
   // Dithering um, vor dem ersten Bild (useLayoutEffect).
   const huelle = useRef(null);
-  useLayoutEffect(() => window.ppPixeliererAnhaengen ? window.ppPixeliererAnhaengen(huelle.current) : undefined, []);
+  useLayoutEffect(() => window.ppPixeliererAnhaengen ? window.ppPixeliererAnhaengen(huelle.current, { bewegung: !prewarm }) : undefined, []);
   if (!Component) return null;
   // Forward extra props (intensity, custom payload, etc.) so animations
   // that key off broadcast-side parameters can scale themselves. Extras
@@ -61921,7 +61929,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* v1331: Magische Faeden (mehrere Quellen → ein Ziel) — Welt-Huelle */}
       {tetherAnims.length > 0 && (
-        <div className="tether-animation-container fx-welt-lock">
+        <PixelHuelle className="tether-animation-container fx-welt-lock">
           <svg>
             {tetherAnims.map(t => (
               <g key={t.id} className="tether-gruppe" style={{ '--tDur': t.dur + 'ms', '--tFarbe': t.color, '--tGlow': t.glow }}>
@@ -61943,12 +61951,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               </g>
             ))}
           </svg>
-        </div>
+        </PixelHuelle>
       )}
 
       {/* Beam animations (laser beams, etc.) — Welt-Huelle (v1258) */}
       {beamAnims.length > 0 && (
-        <div className="beam-animation-container fx-welt-lock">
+        <PixelHuelle className="beam-animation-container fx-welt-lock">
           <svg>
             {beamAnims.map(b => {
               // Base widths from CSS: outer=24, glow=12, core=3.
@@ -62012,7 +62020,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               );
             })}
           </svg>
-        </div>
+        </PixelHuelle>
       )}
 
       {/* Ram animations (hero charges to target and back) */}
