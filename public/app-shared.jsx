@@ -10542,88 +10542,105 @@ function TextBox() {
     const page = pages[pageIdx];
     const hl = page?.highlights;
     if (!hl || !hl.length) { setHighlightRects([]); return; }
-    // Solange ein Highlight steht, zoomt die echte Zone unter dem Schleier nicht
-    // mehr beim Hovern (CSS `body[data-tb-hl]`): das Highlight ist ein Klon in
-    // Ruhegroesse, ein daneben hochgezoomtes Original waere ein Doppelbild.
-    // VOR dem Messen setzen, damit ein laufender Hover-Zoom schon abklingt.
-    document.body.setAttribute('data-tb-hl', '1');
     const rects = [];
     const aufraeumen = [];
-    for (const h of hl) {
-      const sel = typeof h === 'string' ? h : h.selector;
-      // Gehighlightete Karten pulsieren immer leicht; `pulse: false` schaltet das ab.
-      const pulse = typeof h === 'object' ? h.pulse !== false : true;
-      if (!sel) continue;
-      document.querySelectorAll(sel).forEach(treffer => {
-        // Die Klone der Vorseite tragen dieselben data-Attribute und stehen
-        // noch im Overlay, wenn die neue Seite misst — ohne diesen Filter
-        // sammelten sich bei gleichem Selektor auf Folgeseiten immer mehr
-        // Highlights an (Seite 6: 3 statt 2, Seite 10: 5 statt 2).
-        if (treffer.closest('.textbox-overlay')) return;
-        const el = highlightZiel(treffer);
-        const m = measureHighlight(el);
-        const box = m.flat ? m.rect : m.local;
-        // Handkarten: die Stapelfolge des Faechers (linke Karte ueber der
-        // rechten, `--fan-z`) gilt auch fuer ihre Highlights.
-        const z = parseInt(getComputedStyle(el).zIndex, 10);
-        // Massstab des Originals mitnehmen. Der Klon steht im Overlay, nicht
-        // mehr in seinem Umfeld: Die Phasenspalte setzt ein eigenes
-        // `--board-scale` (.85 des Brettmassstabs), im Overlay gilt das
-        // globale — der Klon der Phasenleiste bekam dadurch groessere
-        // Schrift und Abstaende als sein Original und lag verzerrt darueber.
-        // Nur abweichende Werte werden gesetzt, alles andere bleibt wie es war.
-        const vars = {};
-        const ovStil = getComputedStyle(document.querySelector('.textbox-overlay') || document.body);
-        const elStil = getComputedStyle(el);
-        for (const n of ['--board-scale', '--board-font']) {
-          const eigen = elStil.getPropertyValue(n).trim();
-          if (eigen && eigen !== ovStil.getPropertyValue(n).trim()) vars[n] = eigen;
-        }
-        if (!(box.width > 0 && box.height > 0)) return;
-        // `an: [Selektoren]`: Teile INNERHALB des Ziels, die im Klon „an" bleiben
-        // (`data-tb-an`, CSS) — der Rest wird ausgegraut. So liegt die ganze
-        // Phasenleiste ueber dem Schleier und nur die genannten Kaesten leuchten.
-        let html = el.outerHTML;
-        const an = typeof h === 'object' && Array.isArray(h.an) ? h.an : null;
-        if (an && an.length) {
-          const kopie = el.cloneNode(true);
-          an.forEach(a => kopie.querySelectorAll(a).forEach(n => n.setAttribute('data-tb-an', '1')));
-          html = kopie.outerHTML;
-        }
-        const basis = { pulse, vars, handkarte: el !== treffer, stapel: Number.isFinite(z) ? z : 0, html, ziel: el };
-        rects.push({ ...m, ...basis });
-        // ── Hover auf einer gehighlighteten HANDKARTE ──
-        // Hebt sich die echte Karte unter dem Zeiger, soll die Highlight-
-        // Version selbst gross werden — nicht darunter noch eine zweite,
-        // normal vergroesserte Karte auftauchen. Die echte Karte bleibt
-        // deshalb beim Hover unsichtbar (`data-tb-hover`, CSS) und der
-        // Klon folgt ihrer Lage und Groesse Bild fuer Bild, auch im
-        // Uebergang beim Heben und Absenken.
-        if (basis.handkarte) {
-          let raf = 0, drauf = false, bis = 0;
-          const folgen = () => {
-            raf = 0;
-            const m2 = measureHighlight(el);
-            setHighlightRects(prev => prev.map(r => (r.ziel === el ? { ...m2, ...basis, hover: drauf } : r)));
-            if (drauf || performance.now() < bis) raf = requestAnimationFrame(folgen);
-            else el.removeAttribute('data-tb-hover');
-          };
-          const rein = () => { drauf = true; el.setAttribute('data-tb-hover', '1'); if (!raf) raf = requestAnimationFrame(folgen); };
-          // Nach dem Verlassen noch kurz nachfuehren (Absenk-Uebergang .16 s).
-          const raus = () => { drauf = false; bis = performance.now() + 300; if (!raf) raf = requestAnimationFrame(folgen); };
-          el.addEventListener('mouseenter', rein);
-          el.addEventListener('mouseleave', raus);
-          aufraeumen.push(() => {
-            el.removeEventListener('mouseenter', rein);
-            el.removeEventListener('mouseleave', raus);
-            if (raf) cancelAnimationFrame(raf);
-            el.removeAttribute('data-tb-hover');
-          });
-        }
-      });
+    let abgebrochen = false;
+    // ★ Tutorial auf dem Handy: gehighlightete Karten, die das Brett nicht im Ausschnitt hat, holt die Kamera erst ins Bild
+    // (app-board.jsx, ppTutorialCamFokus); die Highlight-Klone werden erst NACH der Fahrt vermessen. Waehrenddessen stehen keine
+    // Klone der Vorseite mehr da (sie wuerden an alter Stelle haengen). Ohne Fahrt (Desktop, schon sichtbar) misst es sofort wie bisher.
+    const messen = () => {
+      // Solange ein Highlight steht, zoomt die echte Zone unter dem Schleier nicht
+      // mehr beim Hovern (CSS `body[data-tb-hl]`): das Highlight ist ein Klon in
+      // Ruhegroesse, ein daneben hochgezoomtes Original waere ein Doppelbild.
+      // VOR dem Messen setzen, damit ein laufender Hover-Zoom schon abklingt.
+      document.body.setAttribute('data-tb-hl', '1');
+      for (const h of hl) {
+        const sel = typeof h === 'string' ? h : h.selector;
+        // Gehighlightete Karten pulsieren immer leicht; `pulse: false` schaltet das ab.
+        const pulse = typeof h === 'object' ? h.pulse !== false : true;
+        if (!sel) continue;
+        document.querySelectorAll(sel).forEach(treffer => {
+          // Die Klone der Vorseite tragen dieselben data-Attribute und stehen
+          // noch im Overlay, wenn die neue Seite misst — ohne diesen Filter
+          // sammelten sich bei gleichem Selektor auf Folgeseiten immer mehr
+          // Highlights an (Seite 6: 3 statt 2, Seite 10: 5 statt 2).
+          if (treffer.closest('.textbox-overlay')) return;
+          const el = highlightZiel(treffer);
+          const m = measureHighlight(el);
+          const box = m.flat ? m.rect : m.local;
+          // Handkarten: die Stapelfolge des Faechers (linke Karte ueber der
+          // rechten, `--fan-z`) gilt auch fuer ihre Highlights.
+          const z = parseInt(getComputedStyle(el).zIndex, 10);
+          // Massstab des Originals mitnehmen. Der Klon steht im Overlay, nicht
+          // mehr in seinem Umfeld: Die Phasenspalte setzt ein eigenes
+          // `--board-scale` (.85 des Brettmassstabs), im Overlay gilt das
+          // globale — der Klon der Phasenleiste bekam dadurch groessere
+          // Schrift und Abstaende als sein Original und lag verzerrt darueber.
+          // Nur abweichende Werte werden gesetzt, alles andere bleibt wie es war.
+          const vars = {};
+          const ovStil = getComputedStyle(document.querySelector('.textbox-overlay') || document.body);
+          const elStil = getComputedStyle(el);
+          for (const n of ['--board-scale', '--board-font']) {
+            const eigen = elStil.getPropertyValue(n).trim();
+            if (eigen && eigen !== ovStil.getPropertyValue(n).trim()) vars[n] = eigen;
+          }
+          if (!(box.width > 0 && box.height > 0)) return;
+          // `an: [Selektoren]`: Teile INNERHALB des Ziels, die im Klon „an" bleiben
+          // (`data-tb-an`, CSS) — der Rest wird ausgegraut. So liegt die ganze
+          // Phasenleiste ueber dem Schleier und nur die genannten Kaesten leuchten.
+          let html = el.outerHTML;
+          const an = typeof h === 'object' && Array.isArray(h.an) ? h.an : null;
+          if (an && an.length) {
+            const kopie = el.cloneNode(true);
+            an.forEach(a => kopie.querySelectorAll(a).forEach(n => n.setAttribute('data-tb-an', '1')));
+            html = kopie.outerHTML;
+          }
+          const basis = { pulse, vars, handkarte: el !== treffer, stapel: Number.isFinite(z) ? z : 0, html, ziel: el };
+          rects.push({ ...m, ...basis });
+          // ── Hover auf einer gehighlighteten HANDKARTE ──
+          // Hebt sich die echte Karte unter dem Zeiger, soll die Highlight-
+          // Version selbst gross werden — nicht darunter noch eine zweite,
+          // normal vergroesserte Karte auftauchen. Die echte Karte bleibt
+          // deshalb beim Hover unsichtbar (`data-tb-hover`, CSS) und der
+          // Klon folgt ihrer Lage und Groesse Bild fuer Bild, auch im
+          // Uebergang beim Heben und Absenken.
+          if (basis.handkarte) {
+            let raf = 0, drauf = false, bis = 0;
+            const folgen = () => {
+              raf = 0;
+              const m2 = measureHighlight(el);
+              setHighlightRects(prev => prev.map(r => (r.ziel === el ? { ...m2, ...basis, hover: drauf } : r)));
+              if (drauf || performance.now() < bis) raf = requestAnimationFrame(folgen);
+              else el.removeAttribute('data-tb-hover');
+            };
+            const rein = () => { drauf = true; el.setAttribute('data-tb-hover', '1'); if (!raf) raf = requestAnimationFrame(folgen); };
+            // Nach dem Verlassen noch kurz nachfuehren (Absenk-Uebergang .16 s).
+            const raus = () => { drauf = false; bis = performance.now() + 300; if (!raf) raf = requestAnimationFrame(folgen); };
+            el.addEventListener('mouseenter', rein);
+            el.addEventListener('mouseleave', raus);
+            aufraeumen.push(() => {
+              el.removeEventListener('mouseenter', rein);
+              el.removeEventListener('mouseleave', raus);
+              if (raf) cancelAnimationFrame(raf);
+              el.removeAttribute('data-tb-hover');
+            });
+          }
+        });
+      }
+      setHighlightRects(rects);
+    };
+    let fahrt = null;
+    if (window._currentTutorialNum && window.ppTutorialCamFokus) {
+      const ziele = [];
+      for (const h of hl) {
+        const sel = typeof h === 'string' ? h : h.selector;
+        if (sel) document.querySelectorAll(sel).forEach(tr => { if (!tr.closest('.textbox-overlay')) ziele.push(tr); });
+      }
+      fahrt = window.ppTutorialCamFokus(ziele);
     }
-    setHighlightRects(rects);
-    return () => { aufraeumen.forEach(f => f()); document.body.removeAttribute('data-tb-hl'); };
+    if (fahrt) { setHighlightRects([]); fahrt.then(() => { if (!abgebrochen) messen(); }); }
+    else messen();
+    return () => { abgebrochen = true; aufraeumen.forEach(f => f()); document.body.removeAttribute('data-tb-hl'); };
   }, [pages, pageIdx]);
 
   const handleAdvance = useCallback(() => {

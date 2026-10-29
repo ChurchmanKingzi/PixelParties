@@ -1990,6 +1990,62 @@ function ppBattleCamFocus(el) {
 }
 window.ppBattleCamFocus = ppBattleCamFocus;
 
+// ★ TUTORIAL-KAMERA (Als Vorgabe: „Auf Mobile sieht man im Kampf nicht das ganze Spielfeld. Wenn das Tutorial Karten erwaehnt und
+// highlightet, soll die Kamera hoch und runter fahren, um sie zu fokussieren.")
+// `ppTutorialCamFokus(elemente)` scrollt das Brett (`.board-center`) so, dass die Elemente im FREIEN Band stehen: zwischen den
+// Overlay-Leisten der Haende und der Textbox (sie sitzt oben und verdeckt sonst die Gegnerreihe). Passt alles schon ins Band, bleibt die
+// Kamera stehen. Rueckgabe: Promise, das nach der Fahrt aufloest — oder null, wenn nichts zu tun ist (Desktop, Ziele ausserhalb des Bretts,
+// schon sichtbar). Die Textbox misst ihre Highlights erst NACH der Fahrt (sie sind feste Klone an der gemessenen Stelle).
+function ppTutorialCamFokus(elemente) {
+  try {
+    if (!(window.ppIsPhone && window.ppIsPhone())) return null;
+    const sc = document.querySelector('.board-center');
+    if (!sc) return null;
+    let l = Infinity, t = Infinity, rr = -Infinity, b = -Infinity;
+    for (const e of Array.from(elemente || [])) {
+      if (!e || !e.getBoundingClientRect || !sc.contains(e)) continue;
+      const r = e.getBoundingClientRect();
+      if (!r.width && !r.height) continue;
+      l = Math.min(l, r.left); t = Math.min(t, r.top); rr = Math.max(rr, r.right); b = Math.max(b, r.bottom);
+    }
+    if (!isFinite(l)) return null;
+    const scr = sc.getBoundingClientRect();
+    let bandOben = _ppCamVarPx('--mob-opphand-h'), bandUnten = _ppCamVarPx('--mob-mehand-h');
+    const tb = document.querySelector('.textbox');
+    if (tb) {
+      const q = tb.getBoundingClientRect();
+      if (q.height > 0) {
+        if (q.top + q.height / 2 < window.innerHeight / 2) bandOben = Math.max(bandOben, q.bottom - scr.top + 6);
+        else bandUnten = Math.max(bandUnten, scr.bottom - q.top + 6);
+      }
+    }
+    const bandT = bandOben, bandB = Math.max(bandOben + 40, sc.clientHeight - bandUnten);
+    const rt = t - scr.top, rb = b - scr.top, rl = l - scr.left, rre = rr - scr.left;
+    const maxY = Math.max(0, sc.scrollHeight - sc.clientHeight), maxX = Math.max(0, sc.scrollWidth - sc.clientWidth);
+    let zielY = sc.scrollTop, zielX = sc.scrollLeft;
+    if (rt < bandT - 2 || rb > bandB + 2) {
+      zielY = (rb - rt > bandB - bandT) ? sc.scrollTop + (rt - bandT) : sc.scrollTop + (rt + rb) / 2 - (bandT + bandB) / 2;
+    }
+    if (rl < -2 || rre > sc.clientWidth + 2) zielX = sc.scrollLeft + (rl + rre) / 2 - sc.clientWidth / 2;
+    zielY = Math.max(0, Math.min(maxY, zielY)); zielX = Math.max(0, Math.min(maxX, zielX));
+    const vonX = sc.scrollLeft, vonY = sc.scrollTop;
+    if (Math.abs(zielX - vonX) < 4 && Math.abs(zielY - vonY) < 4) return null;
+    if (_ppCam.raf) { cancelAnimationFrame(_ppCam.raf); _ppCam.raf = 0; }
+    return new Promise((fertig) => {
+      const start = performance.now(), DAUER = 520;
+      const ease = (p) => p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;   // sanft an- und auslaufend
+      const schritt = (jetzt) => {
+        const p = Math.min(1, (jetzt - start) / DAUER), e = ease(p);
+        sc.scrollLeft = vonX + (zielX - vonX) * e;
+        sc.scrollTop = vonY + (zielY - vonY) * e;
+        if (p < 1) _ppCam.raf = requestAnimationFrame(schritt); else { _ppCam.raf = 0; fertig(); }
+      };
+      _ppCam.raf = requestAnimationFrame(schritt);
+    });
+  } catch { return null; }
+}
+window.ppTutorialCamFokus = ppTutorialCamFokus;
+
 // ★ v1258 — HAT DIESES PANEL SCROLLBAREN INHALT? (Als Befund 19.9.:
 // „Panels ohne Scrolling, z.B. ‚Mulligan? Yes/No', sollten definitiv
 // noch dragbar sein, damit man sie aus dem Weg schieben kann.")
