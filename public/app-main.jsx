@@ -3319,6 +3319,9 @@ function RotateOverlay() {
         <div className="rotate-panel">
           <div className="rotate-text">Turn your phone sideways!</div>
           <div className="rotate-sub">Pixel Parties is played in landscape. Rotate your device and the battle begins.</div>
+          {window._ppFullscreenSupported && (
+            <button type="button" className="rotate-copy rotate-fs" onClick={() => window._ppRequestFullscreen(true)}>FULLSCREEN</button>
+          )}
         </div>
         <div className="rotate-panel rotate-panel-pc">
           <div className="rotate-sub">Rather play on a PC or tablet? It is free in your browser:</div>
@@ -3329,6 +3332,24 @@ function RotateOverlay() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// iPhone/iPad-Safari kennen kein Vollbild fuer Webseiten (keine Fullscreen-API) — die Browserleiste bleibt. Einziger Weg:
+// „Zum Home-Bildschirm" (manifest.json: display fullscreen, orientation landscape). Ein einmaliger, wegklickbarer Hinweis.
+function IosFullscreenHint() {
+  const KEY = 'pp_ios_fs_hint';
+  const [hidden, setHidden] = useState(() => { try { return !!localStorage.getItem(KEY); } catch { return false; } });
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = window.navigator.standalone === true || (window.matchMedia && (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches));
+  const hide = () => { setHidden(true); try { localStorage.setItem(KEY, '1'); } catch {} };
+  useEffect(() => { if (!ios || standalone || hidden) return; const t = setTimeout(hide, 20000); return () => clearTimeout(t); }, [ios, standalone, hidden]);
+  if (!ios || standalone || hidden) return null;
+  return (
+    <div className="ios-fs-hint" role="status">
+      <div className="ios-fs-text">Want true fullscreen? Tap Share, then Add to Home Screen.</div>
+      <button type="button" className="rotate-copy" onClick={hide}>OK</button>
     </div>
   );
 }
@@ -3536,6 +3557,7 @@ function App() {
     <AppContext.Provider value={ctx}>
       {/* Global portrait rotation lock — all screens need landscape */}
       <RotateOverlay />
+      <IosFullscreenHint />
       <MusicManager bgmMode={user ? bgmMode : 'login'} />
       <TextBox />
       <OpponentUnlockPopup />
