@@ -185,6 +185,9 @@ module.exports = {
         zurueck.push(name);
       }
 
+      // W85b (Atta): alles, was aufgedeckt wurde (die Treffer-Creature und die zurueckgemischten Karten), ist EIN Aufdecken aus dem Deck.
+      engine.meldeAufgedeckt(pi, gefunden ? [...zurueck, gefunden] : zurueck.slice(), { zone: 'deck', source: CARD_NAME });
+
       /** Rest zurueck ins Deck und mischen (Schritt 4). */
       const zurueckMischen = () => {
         if (zurueck.length === 0) return;

@@ -87,6 +87,7 @@ module.exports = {
     // Stream the card NOW (after player decisions finalized; W64b: zentral, auch für Zuschauer)
     engine.commitAppearance();
     await engine._delay(100);
+    engine.meldeAufgedeckt(pi, chosenNames, { zone: 'hand', source: 'Magic Lamp' });   // W85b: „Choose 3 different cards from your deck and reveal them“ → Atta (onCardsRevealed)
 
     // Step 2: Opponent picks 1 of the 3
     const oppResult = await engine.promptGeneric(oppIdx, {

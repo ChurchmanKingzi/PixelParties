@@ -65,6 +65,7 @@ async function bearbeiteZug(ctx, kartenName) {
   if (!antwort || antwort.cancelled || antwort.confirmed === false) return null;
 
   await engine.showTriggeredEffect(kartenName, { playerIdx: pi });
+  engine.meldeAufgedeckt(pi, [kartenName], { zone: 'hand', source: CARD_NAME });   // W85b: „you may reveal it“ (die gezogene Karte; die Kopie wird nur hinzugefuegt) → Atta (onCardsRevealed)
   const ok = await engine.actionAddCardFromDeckToHand(pi, kopie, { source: CARD_NAME, reveal: false });
   if (!ok) return null;
   engine.markLastStartingCounted(pi, 1);   // genau DIESE Kopie zaehlt als Starthand

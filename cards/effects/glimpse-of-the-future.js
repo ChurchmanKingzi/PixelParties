@@ -44,6 +44,7 @@ module.exports = {
         '👁️ Reveal & draw 2!');
       if (!ok) return null;
       engine.revealHandCopy(pi, CARD_NAME, opts.handIdx);   // DIESE Kopie bleibt aufgedeckt, bis sie die Hand verlaesst
+      engine.meldeAufgedeckt(pi, [CARD_NAME], { zone: 'hand', source: CARD_NAME });   // W85b: aufgedeckt → Atta (onCardsRevealed)
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
       const gezogen = await engine.actionDrawCards(pi, 2, { source: CARD_NAME });
       engine.markLastStartingCounted(pi, gezogen.length);   // zaehlen als Starthand

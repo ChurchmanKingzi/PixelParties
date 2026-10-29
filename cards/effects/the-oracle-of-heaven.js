@@ -90,6 +90,7 @@ module.exports = {
     if (!oben) return true;
     const treffer = baseCardName(oben) === baseCardName(genannt);
     engine.log('oracle_reveal', { player: ps.username, declared: genannt, revealed: oben, hit: treffer });
+    engine.meldeAufgedeckt(pi, [oben], { zone: 'deck', source: CARD_NAME });   // W85b: aufgedeckt → Atta (Treffer: liegt danach auf der Hand; Fehlschlag: schon in der Ablage)
 
     // ③ Treffer: in die Hand, 2 ziehen — Fehlschlag: die Karte und die zwei darunter in die Ablage.
     let gemillt = [];

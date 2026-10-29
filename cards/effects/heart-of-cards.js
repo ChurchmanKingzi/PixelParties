@@ -102,6 +102,7 @@ module.exports = {
     if (oben == null) return true;
     const treffer = baseCardName(oben) === baseCardName(genannt);
     engine.log('heart_of_cards_reveal', { player: ps.username, declared: genannt, revealed: oben, hit: treffer });
+    engine.meldeAufgedeckt(pi, [oben], { zone: 'deck', source: CARD_NAME });   // W85b: aufgedeckt → Atta (Treffer: liegt danach auf der Hand; Fehlschlag: schon geloescht → nichts mehr zu loeschen)
 
     engine._broadcastEvent('mill_center_reveal', {
       owner: pi, cardNames: [oben], dest: treffer ? 'hand' : 'deleted', revealMs: SCHAU_MS,

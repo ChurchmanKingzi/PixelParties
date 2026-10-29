@@ -74,8 +74,11 @@ async function ausfuehren(engine, e) {
   const castPs = gs.players[e.castPi];
   const hero = gs.players[e.wirkerSeite]?.heroes?.[e.heroIdx];
   const log = (grund) => engine.log('delayed_spell_skipped', { kind: e.kind, spell: e.spellName, reason: grund });
-  // „if that Hero is not defeated"
-  if (!castPs || !hero?.name || hero.hp <= 0 || (e.heroName && hero.name !== e.heroName)) return log('hero_gone');
+  // „if that Hero is not defeated" — W85b: ein Aufstieg/Abstieg aendert den NAMEN der Heldenstelle, der Held ist aber derselbe und nicht besiegt (vorher: Zauber verfiel mit `hero_gone`).
+  // Ein ANDERER Held in der Stelle (Quetzahuitl ersetzt den sterbenden Helden) ist dagegen nicht „that Hero": gleicher Name, oder einer der beiden Namen ist ein Ascended Hero.
+  const db = engine._getCardDB();
+  const gleicherHeld = !e.heroName || hero?.name === e.heroName || db[hero?.name]?.cardType === 'Ascended Hero' || db[e.heroName]?.cardType === 'Ascended Hero';
+  if (!castPs || !hero?.name || hero.hp <= 0 || !gleicherHeld) return log('hero_gone');
   // „and that Spell is still deleted" — jetzt, im Geloescht-Stapel des Besitzers
   // (Besitzer des Stapels: der eingetragene, sonst der Zaubernde — eine gestohlene Karte landet im Stapel ihres BESITZERS.)
   const pileOwnerPi = [e.pileOwnerPi, e.castPi].find(i => i != null && (gs.players[i]?.deletedPile || []).includes(e.spellName));

@@ -113,7 +113,7 @@ module.exports = {
     const _taken_deckIdx = kratesUmgebaut ? null
       : await engine.takeFromPile(ps, 'deck', choice.cardName, { source: CARD_NAME, toHand: true });   // v820: Stapel-Schicht
     if (_taken_deckIdx) {
-      await engine.handZugang(ps, choice.cardName, { von: 'deck', source: CARD_NAME });
+      await engine.handZugang(ps, choice.cardName, { von: 'deck', source: CARD_NAME, reveal: true });   // W85b: „reveal it“ → Atta (onCardsRevealed)
       // Shuffle the remaining deck.
       for (let i = ps.mainDeck.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));

@@ -107,7 +107,7 @@ module.exports = {
         // versteckt ihren Handplatz, bis der Flug ankommt. Waere sie
         // erst am Flugende im Zustand, gaebe es den Platz beim Anflug
         // noch gar nicht.
-        await engine.handZugang(ps, name, { von: 'deck', source: CARD_NAME });
+        await engine.handZugang(ps, name, { von: 'deck', source: CARD_NAME, reveal: true });   // W85b: aufgedeckte Karten → Atta (onCardsRevealed)
         gezeigt.push(name);
         engine.sync();
         await engine._delay(VERSATZ_MS);

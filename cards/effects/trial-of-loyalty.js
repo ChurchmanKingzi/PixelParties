@@ -215,6 +215,17 @@ module.exports = {
       // bereits einzeln — der zweite Durchlauf entfaellt ersatzlos.
       engine.shuffleDeck(pi);
 
+      // „reveal them“ — das gesammelte Aufdecken, das der Kopfkommentar verspricht: EIN Fenster fuer den Gegner mit allen Karten (wie `revealSearchedCards({ together })`,
+      // aber ohne die Buchhaltung/Fluege doppelt zu machen). Das Fenster ist zugleich das Aufdecken fuer Atta (`_beobachtePrompt` → `onCardsRevealed`).
+      if (added.length > 0) {
+        await engine.promptGeneric(engine.opponentOf(pi), {
+          type: 'deckSearchReveal',
+          cardName: added[0], cardNames: added.slice(),
+          searcherName: ps.username, title: CARD_NAME, sourceLabel: 'deck',
+          cancellable: false,
+        });
+      }
+
       engine.log('trial_of_loyalty', {
         player: ps.username, found: added.length, cards: added,
       });
