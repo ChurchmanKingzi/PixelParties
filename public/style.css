@@ -27080,7 +27080,9 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
    Leiste (Phasen + Knoepfe in EINER Zeile) mittig auf der Naht sitzt und mit dem Brett mitscrollt (`--phase-mid-y`, app-board.jsx). Sie verdeckt damit
    keine Heldenzone mehr; die Area-Zonen (an derselben Naht aufgehaengt) werden nur in einem schmalen Band gekreuzt. */
 @media (pointer: coarse) and (max-height: 600px) {
-  .board-mid-row { min-height: 26px !important; }
+  .board-mid-row { min-height: 44px !important; }
+  /* Die Spalte liegt (Portal) IM scrollenden `.board-center` und scrollt damit nativ; `--phase-mid-y` ist die Mitte in Inhaltskoordinaten. */
+  .board-center > .phase-column { position: absolute; }
   .phase-column { zoom: 1 !important; left: 50% !important; top: var(--phase-mid-y, 50%) !important; transform: translate(-50%, -50%) !important;
     flex-direction: row !important; align-items: center !important; gap: 4px; width: auto; }
   .phase-buttons-row { margin-top: 0 !important; }
