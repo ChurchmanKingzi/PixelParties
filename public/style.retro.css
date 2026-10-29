@@ -7871,11 +7871,12 @@ body:has(.textbox-overlay) .tooltip { z-index: 90003 !important; }
 }
 
 @media (orientation: landscape) and (max-height: 600px) {
-  .rotate-device-overlay .rotate-content { flex-direction: row; flex-wrap: wrap; gap: 10px 24px; padding: 8px 16px; }
-  .rotate-device-overlay .rotate-logo { width: min(34vw, 240px); }
+  .rotate-device-overlay .rotate-content { flex-direction: column; flex-wrap: nowrap; justify-content: flex-start; gap: 10px; padding: 8px 16px; height: 100%; }
+  .rotate-device-overlay .rotate-logo { width: min(80vw, 660px); margin-top: 0; }
   .rotate-device-overlay .rotate-play, .rotate-device-overlay .rotate-phone { display: none; }
-  .rotate-device-overlay .rotate-panel { margin: 4px; padding: 10px 14px; width: min(44vw, 300px); }
+  .rotate-device-overlay .rotate-panel { margin: 4px; padding: 10px 14px; width: min(60vw, 420px); }
   .rotate-device-overlay .rotate-panel-pc { display: none; }
+}
 }
 
 /* Show overlay + hide ALL screens in portrait on small devices */
