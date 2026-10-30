@@ -30,7 +30,7 @@ Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
   (Stauchung breiter) bzw. am Wangenrand entfernt (Streckung schmaler). Atmen in 12-Frame-Takt, kleiner Hüpfer (Frames 24–31),
   großer Hüpfer (32–47, 3 px) mit Anlauf-Stauchung, gestrecktem Absprung/Fallen und Aufprall.
 * Blinzeln: Frames 19–21 und 44–46 (Augenflecken füllen sich mit dem Körperrot, dunkle Lidlinie).
-* Glut-Partikel: zehn runde Funken/Kügelchen (1 px, 2×2, 4×4; gelb/orange) lösen sich aus den Flammenspitzen und steigen langsam auf.
+* Glut-Partikel: zehn runde Funken/Kügelchen (1 px, 2×2, einzelne 4×4; gelb/orange) lösen sich aus den Flammenspitzen und steigen langsam auf.
 Ergänzungen: keine gezeichnet. Hinweis: Frame 0 weicht in den Flammen vom Original ab (Züngeln und Glut-Fluss laufen von Anfang an); der
 Körper (Zeilen 14–22) entspricht in Frame 0 exakt dem Original.
 Nähte (Regel 11): Feuer und Körper liegen auf Zeile 13/14 vertikal 4-verbunden; jede Flammenspalte bleibt mit der festen Basis verbunden;
@@ -186,7 +186,7 @@ def figur(i):
 EMBERS = [
     dict(x=PAD_L + 3, y=PAD_T + 4, vx=-2, vy=-12, off=0, form='k', wackeln=1),
     dict(x=PAD_L + 14, y=PAD_T + 2, vx=2, vy=-12, off=2, form='s', wackeln=1),
-    dict(x=PAD_L + 8, y=PAD_T + 3, vx=-1, vy=-13, off=5, form='o', wackeln=2),
+    dict(x=PAD_L + 8, y=PAD_T + 3, vx=-1, vy=-13, off=5, form='s', wackeln=2),
     dict(x=PAD_L + 11, y=PAD_T + 4, vx=1, vy=-11, off=7, form='k', wackeln=1),
     dict(x=PAD_L + 1, y=PAD_T + 8, vx=-3, vy=-10, off=9, form='k', wackeln=1),
     dict(x=PAD_L + 16, y=PAD_T + 9, vx=3, vy=-10, off=11, form='s', wackeln=1),
