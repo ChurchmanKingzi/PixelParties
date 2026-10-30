@@ -1158,8 +1158,12 @@ select optgroup { background: var(--bg); color: var(--text); }
 .db-hero-abilities > .card-mini,
 .db-hero-abilities > .ability-slot { flex: 1 1 0; width: 100%; height: auto; min-height: 0; aspect-ratio: 5 / 7; font-size: 10px; }
 
+/* ★ W86u2 (Pixelart): Dither-Kacheln fuer Verdunkler (Vollflaechen-Ebenen hinter Dialogen). `--pp-kachel-N` = dunkle Flaeche (#08060c), N von 16 Zellen
+   (2-px-Zellen, Bayer 4x4, 8-px-Kachel) deckend — Dichte N/16 ersetzt `rgba(0,0,0,N/16)`. Benutzung: `background: var(--pp-kachel-11) 0 0 / 8px 8px;`.
+   Die Punkte sind deckend, es gibt keine Alpha-Mischung. */
+:root { --pp-kachel-1: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%278%27%20height=%278%27%20shape-rendering=%27crispEdges%27%20fill=%27%2308060c%27%3E%3Crect%20x=%270%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3C/svg%3E"); --pp-kachel-2: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%278%27%20height=%278%27%20shape-rendering=%27crispEdges%27%20fill=%27%2308060c%27%3E%3Crect%20x=%270%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3C/svg%3E"); --pp-kachel-3: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%278%27%20height=%278%27%20shape-rendering=%27crispEdges%27%20fill=%27%2308060c%27%3E%3Crect%20x=%270%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3C/svg%3E"); --pp-kachel-4: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%278%27%20height=%278%27%20shape-rendering=%27crispEdges%27%20fill=%27%2308060c%27%3E%3Crect%20x=%270%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%270%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3C/svg%3E"); --pp-kachel-5: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%278%27%20height=%278%27%20shape-rendering=%27crispEdges%27%20fill=%27%2308060c%27%3E%3Crect%20x=%270%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%270%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3C/svg%3E"); --pp-kachel-6: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%278%27%20height=%278%27%20shape-rendering=%27crispEdges%27%20fill=%27%2308060c%27%3E%3Crect%20x=%270%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%270%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%276%27%20width=%272%27%20height=%272%27/%3E%3C/svg%3E"); --pp-kachel-7: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%278%27%20height=%278%27%20shape-rendering=%27crispEdges%27%20fill=%27%2308060c%27%3E%3Crect%20x=%270%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%270%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%276%27%20width=%272%27%20height=%272%27/%3E%3C/svg%3E"); --pp-kachel-8: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%278%27%20height=%278%27%20shape-rendering=%27crispEdges%27%20fill=%27%2308060c%27%3E%3Crect%20x=%270%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%270%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%276%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%276%27%20width=%272%27%20height=%272%27/%3E%3C/svg%3E"); --pp-kachel-9: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%278%27%20height=%278%27%20shape-rendering=%27crispEdges%27%20fill=%27%2308060c%27%3E%3Crect%20x=%270%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%270%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%276%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%276%27%20width=%272%27%20height=%272%27/%3E%3C/svg%3E"); --pp-kachel-10: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%278%27%20height=%278%27%20shape-rendering=%27crispEdges%27%20fill=%27%2308060c%27%3E%3Crect%20x=%270%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%270%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%276%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%276%27%20width=%272%27%20height=%272%27/%3E%3C/svg%3E"); --pp-kachel-11: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%278%27%20height=%278%27%20shape-rendering=%27crispEdges%27%20fill=%27%2308060c%27%3E%3Crect%20x=%270%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%270%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%276%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%276%27%20width=%272%27%20height=%272%27/%3E%3C/svg%3E"); --pp-kachel-12: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%278%27%20height=%278%27%20shape-rendering=%27crispEdges%27%20fill=%27%2308060c%27%3E%3Crect%20x=%270%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%270%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%276%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%276%27%20width=%272%27%20height=%272%27/%3E%3C/svg%3E"); --pp-kachel-13: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%278%27%20height=%278%27%20shape-rendering=%27crispEdges%27%20fill=%27%2308060c%27%3E%3Crect%20x=%270%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%270%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%270%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%276%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%276%27%20width=%272%27%20height=%272%27/%3E%3C/svg%3E"); --pp-kachel-14: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%278%27%20height=%278%27%20shape-rendering=%27crispEdges%27%20fill=%27%2308060c%27%3E%3Crect%20x=%270%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%270%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%270%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%276%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%276%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%276%27%20width=%272%27%20height=%272%27/%3E%3C/svg%3E"); --pp-kachel-15: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%278%27%20height=%278%27%20shape-rendering=%27crispEdges%27%20fill=%27%2308060c%27%3E%3Crect%20x=%270%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%270%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%270%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%272%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%270%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%274%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%272%27%20y=%276%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%274%27%20y=%276%27%20width=%272%27%20height=%272%27/%3E%3Crect%20x=%276%27%20y=%276%27%20width=%272%27%20height=%272%27/%3E%3C/svg%3E"); }
 /* ===== MODALS ===== */
-.modal-overlay { position: fixed; inset: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect x='0' y='0' width='2' height='2' fill='%23000000'/%3E%3Crect x='2' y='0' width='2' height='2' fill='%23000000'/%3E%3Crect x='0' y='2' width='2' height='2' fill='%23000000'/%3E%3C/svg%3E") 0 0 / 4px 4px; display: flex; align-items: safe center; justify-content: safe center; overflow-y: auto; z-index: 1000; }
+.modal-overlay { position: fixed; inset: 0; background: var(--pp-kachel-11) 0 0 / 8px 8px; display: flex; align-items: safe center; justify-content: safe center; overflow-y: auto; z-index: 1000; }
 .result-overlay-fade { animation: result-fade-in .6s steps(14, end); }
 /* Speech-bubble SHOUTING: all-caps-word letters bob slightly up/down so the
    CPU reads as yelling. Per-letter animation-delay (set inline) phase-shifts
@@ -7520,14 +7524,15 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   inherits: true;
   initial-value: 0;
 }
+/* ★ W86u2 (Pixelart): der Takt springt in zwei harten Stufen (0 / 1) statt stufenlos zu gleiten — Ring und Groesse der Highlights wechseln im Blinktakt. */
 @keyframes textbox-puls-takt {
-  0%, 100% { --tb-puls: 0; }
-  50%      { --tb-puls: 1; }
+  0%, 49.99% { --tb-puls: 0; }
+  50%, 100%  { --tb-puls: 1; }
 }
-.textbox-overlay { position: fixed; inset: 0; z-index: 90000; display: flex; align-items: flex-start; justify-content: center; padding-top: 18px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect x='2' y='0' width='2' height='2' fill='%23000000'/%3E%3Crect x='0' y='2' width='2' height='2' fill='%23000000'/%3E%3C/svg%3E") 0 0 / 4px 4px; pointer-events: none; animation: textbox-fade-in .25s steps(6, end); }
+.textbox-overlay { position: fixed; inset: 0; z-index: 90000; display: flex; align-items: flex-start; justify-content: center; padding-top: 18px; background: var(--pp-kachel-7) 0 0 / 8px 8px; pointer-events: none; animation: textbox-fade-in .25s steps(6, end); }
 /* Pulstakt nur, solange Highlights stehen (Klasse vom TextBox-Render): eine dauernd animierte, vererbte Eigenschaft rechnet sonst JEDES Bild den Stil
    der ganzen Overlay-Ebene neu — auf schwachen Handys fast die halbe Rechenzeit im Tutorial (Kontrolllauf). */
-.textbox-overlay.textbox-puls { animation: textbox-fade-in .25s steps(6, end), textbox-puls-takt 1.4s steps(24, end) infinite; }
+.textbox-overlay.textbox-puls { animation: textbox-fade-in .25s ease-out, textbox-puls-takt 1.4s steps(1, end) infinite; }
 @keyframes textbox-fade-in { from { opacity: 0; } to { opacity: 1; } }
 .textbox-fading { animation: textbox-fade-out 1s steps(24, end) forwards; pointer-events: none !important; }
 @keyframes textbox-fade-out { from { opacity: 1; } to { opacity: 0; } }
@@ -7743,8 +7748,8 @@ body:has(.textbox-overlay) .tooltip { z-index: 90003 !important; }
 /* Jedes Highlight pulsiert leicht (TextBox setzt `.textbox-highlight-pulse`):
    ein paar Prozent Groesse und ein atmender Schein — beides aus dem
    gemeinsamen Takt `--tb-puls` des Overlays, also immer synchron. */
-.textbox-highlight-pulse { animation: none; transform: scale(calc(1 + .035 * var(--tb-puls))); box-shadow: 0 0 calc(16px + 10px * var(--tb-puls)) rgba(0,240,255, calc(.6 + .2 * var(--tb-puls))),
-    0 0 calc(30px + 12px * var(--tb-puls)) rgba(0,240,255, calc(.25 + .15 * var(--tb-puls))); }
+.textbox-highlight-pulse { animation: none; box-shadow: 0 0 0 calc(4px + 2px * var(--tb-puls)) #1aedff,
+    0 0 0 calc(8px + 2px * var(--tb-puls)) #59606e; }
 /* ── Responsive ── */
 @media (max-height: 500px) {
   .textbox-overlay { padding-top: 6px; }
@@ -8924,7 +8929,7 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 
 /* 6 ── Modals: square, hard drop shadow, darker dim */
 .modal { border-radius: 0; box-shadow: 6px 6px 0 0 #000000; }
-.modal-overlay { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect x='0' y='0' width='2' height='2' fill='%2308060c'/%3E%3Crect x='2' y='0' width='2' height='2' fill='%2308060c'/%3E%3Crect x='0' y='2' width='2' height='2' fill='%2308060c'/%3E%3C/svg%3E") 0 0 / 4px 4px; }
+.modal-overlay { background: var(--pp-kachel-13) 0 0 / 8px 8px; }
 
 /* ── ★ v1258 — SUBMENUES IM KAMPF SIND HALBTRANSPARENT ─────────────
    (Als Vorgabe 19.9.: „Solche Submenüs sollten generell — nicht nur
@@ -8939,7 +8944,7 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
    `backdrop-filter` haelt die Schrift trotzdem lesbar — auf Telefonen
    nimmt der Lite-Modus ihn wieder heraus (zu teuer pro Bild), dort
    traegt die etwas hoehere Deckkraft des Grundtons. */
-.screen-full:has(> .game-layout) .modal-overlay { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect x='2' y='0' width='2' height='2' fill='%23000000'/%3E%3C/svg%3E") 0 0 / 4px 4px; z-index: 10085; }
+.screen-full:has(> .game-layout) .modal-overlay { background: var(--pp-kachel-5) 0 0 / 8px 8px; z-index: 10085; }
 /* ★ v1453 (Als Befund 27.9.: „das Menü, um im Puzzle-Creator
    Statuseffekte, HP usw. zu setzen, muss VOR der Hand angezeigt werden,
    aktuell überdecken Handkarten es"). Derselbe Fall wie v1259 im Duell:
@@ -9410,13 +9415,13 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 .cmp-choice-time { position: absolute; right: 14px; top: 14px; font-size: 11px; color: #fad54a; }
 
 /* ── Ende / Rücksetzpunkt ────────────────────────────────────────── */
-.cmp-gameover { position: absolute; inset: 0; z-index: 300; background: #000000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; cursor: pointer; }
+.cmp-gameover { position: absolute; inset: 0; z-index: 300; background: var(--pp-kachel-14) 0 0 / 8px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; cursor: pointer; }
 .cmp-gameover-title { font-family: 'Pixel Intv', monospace; font-size: 40px; color: var(--danger); text-shadow: 1px 1px 0 #55011a; }
 .cmp-gameover-text { font-size: 16px; color: var(--text); max-width: 620px; text-align: center; }
 .cmp-gameover-hint { font-size: 12px; color: var(--text2); animation: pulse 1.6s infinite steps(24, end); }
 
 /* ── Fenster (Verlauf, Deck, Menue) ──────────────────────────────── */
-.cmp-modal-overlay { position: absolute; inset: 0; z-index: 260; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect x='0' y='0' width='2' height='2' fill='%23000000'/%3E%3Crect x='2' y='0' width='2' height='2' fill='%23000000'/%3E%3Crect x='0' y='2' width='2' height='2' fill='%23000000'/%3E%3C/svg%3E") 0 0 / 4px 4px; display: flex; align-items: center; justify-content: center; }
+.cmp-modal-overlay { position: absolute; inset: 0; z-index: 260; background: var(--pp-kachel-12) 0 0 / 8px 8px; display: flex; align-items: center; justify-content: center; }
 .cmp-modal { background: linear-gradient(180deg, #1a1a2e 0% 100%); border: 3px solid var(--accent); border-radius: 0; padding: 16px; box-shadow: 0 0 0 3px #000000; display: flex; flex-direction: column; gap: 10px; }
 .cmp-modal-head { display: flex; justify-content: space-between; align-items: center; font-family: 'Pixel Intv', monospace; font-size: 13px; letter-spacing: 2px; color: var(--accent); border-bottom: 2px solid #12101f; padding-bottom: 8px; }
 .cmp-modal-foot { display: flex; justify-content: flex-end; gap: 10px; padding-top: 6px; }
@@ -9496,15 +9501,16 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 .cmp-duel-shutter { position: absolute; left: -6%; right: -6%; height: 60%; background: linear-gradient(180deg, #08060c 60% 100%); box-shadow: 0 0 0 3px #000000; }
 .cmp-duel-shutter-top    { top: -8%; animation: cmp-shutter-top    2.1s steps(24, end) forwards; }
 .cmp-duel-shutter-bottom { bottom: -8%; animation: cmp-shutter-bottom 2.1s steps(24, end) forwards; }
+/* ★ W86u2 (Pixelart): die Klappen fahren gerade (keine Scherung `skewY`) — die Schraege war Vektorkante, die Pipeline schert nicht. */
 @keyframes cmp-shutter-top {
-  0% { transform: translateY(-110%) skewY(-2deg); }
-  17%, 66% { transform: translateY(0) skewY(-2deg); }
-  100% { transform: translateY(-110%) skewY(-2deg); }
+  0% { transform: translateY(-110%); }
+  17%, 66% { transform: translateY(0); }
+  100% { transform: translateY(-110%); }
 }
 @keyframes cmp-shutter-bottom {
-  0% { transform: translateY(110%) skewY(-2deg); }
-  17%, 66% { transform: translateY(0) skewY(-2deg); }
-  100% { transform: translateY(110%) skewY(-2deg); }
+  0% { transform: translateY(110%); }
+  17%, 66% { transform: translateY(0); }
+  100% { transform: translateY(110%); }
 }
 
 .cmp-duel-flash { position: absolute; inset: 0; background: #ffffff; opacity: 0; animation: cmp-duel-flash 2.1s steps(24, end) forwards; }
@@ -9529,9 +9535,9 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 @keyframes cmp-fade-in { from { opacity: 0; } to { opacity: 1; } }
 .cmp-card-reveal-inner { display: flex; flex-direction: column; align-items: center; gap: 12px; animation: cmp-card-pop .55s steps(13, end); }
 @keyframes cmp-card-pop {
-  0% { opacity: 0; transform: scale(.35) rotate(-9deg); }
-  70% { opacity: 1; transform: scale(1.06) rotate(1.5deg); }
-  100% { opacity: 1; transform: scale(1) rotate(0); }
+  0% { opacity: 0; transform: scale(.35); }
+  70% { opacity: 1; transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); }
 }
 .cmp-card-reveal-title { font-family: 'Pixel Intv', monospace; font-size: 18px; letter-spacing: 6px; color: #fad54a; text-shadow: 1px 1px 0 #3a2412, 0 3px 0 #000000; }
 .cmp-card-reveal-card { filter: drop-shadow(1px 0 0 #72541d) drop-shadow(-1px 0 0 #72541d) drop-shadow(0 1px 0 #72541d) drop-shadow(0 -1px 0 #72541d); }
@@ -9633,9 +9639,9 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 .cmp-flight { position: fixed; z-index: 26000; pointer-events: none; width: 64px; margin: 0; transform: translate(-50%, -50%); animation: cmp-flight .68s steps(16, end) forwards; }
 .cmp-flight img { width: 100%; border-radius: 0; display: block; box-shadow: 0 0 0 2px #66b6ff, 0 2px 0 0 #000000; }
 @keyframes cmp-flight {
-  0%   { transform: translate(-50%, -50%) scale(.85) rotate(-6deg); opacity: 0; }
-  18%  { transform: translate(-50%, -50%) scale(1.08) rotate(0deg); opacity: 1; }
-  100% { transform: translate(calc(-50% + var(--fx)), calc(-50% + var(--fy))) scale(.45) rotate(8deg); opacity: 0; }
+  0%   { transform: translate(-50%, -50%) scale(.85); opacity: 0; }
+  18%  { transform: translate(-50%, -50%) scale(1.08); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--fx)), calc(-50% + var(--fy))) scale(.45); opacity: 0; }
 }
 
 /* ── Deck-Editor: Filter- und Sortierleiste ──────────────────────── */

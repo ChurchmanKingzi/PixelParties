@@ -337,18 +337,6 @@
  "kf:clubSmashDrop": {
   "drehung": 2
  },
- "kf:cmp-card-pop": {
-  "drehung": 2
- },
- "kf:cmp-flight": {
-  "drehung": 2
- },
- "kf:cmp-shutter-bottom": {
-  "drehung": 3
- },
- "kf:cmp-shutter-top": {
-  "drehung": 3
- },
  "kf:coolnessPlayablePulse": {
   "blur": 2
  },
