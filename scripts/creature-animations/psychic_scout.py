@@ -21,7 +21,7 @@ Kein Metall, Gold oder Edelstein im Sprite → KEIN Glanz (Regel 14; die blauen 
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Auf und ab (zweistufig, Periode 24): Brust zuerst 1 px (die glatte Bauchzeile 12 wird einmal doppelt eingefügt: Körper, Stab und Kopf steigen, Füße bleiben), der Kopf läuft 3 Frames nach und hebt sich um
   ein weiteres px (Wangenzeile 5, glattes Fell zwischen Augen und Nase, wird verlängert): Kopf 0 → 1 → 2 → 1 → 0 px, Brust 0 → 1 → 0.
-* Schwanzspitze schwingt: die zwei obersten Schwanzzeilen (1–2) schlagen 1 px nach links (Frames 2–7 und 40–45) bzw. nach rechts (Frames 22–27), über der Zeile 3 4-verbunden.
+* Schwanz wedelt kräftig (zwei Wedel je Schleife, Periode 24): die Schwanzspalten 16–19 wandern senkrecht, je weiter vom Ansatz (x 15, bleibt am Kopf), desto weiter (Spitze ±3 px hoch/runter); der Schwanz bleibt immer am Kopf.
 * Kein Kopfneigen und keine seitliche Gewichtsverlagerung (Rückmeldung: auf einigen Frames klaffte eine Lücke zwischen Schwanz und Kopf; Kopf und Schwanz bewegen sich nun immer gemeinsam).
 * Blinzeln (Frames 19–21 und 41–43): beide Augen schließen sich — lilaweißer Pixel und rote Iris ((4–5,4), (8–9,4)) nehmen die umgebende Fellfarbe (52,124,102) an. Kein Farbtausch, kein Augenglanz.
 * Fußtippen: der linke Fuß hebt sich zweimal 1 px hinter den Körper (Frames 14–21), später der rechte (Frames 36–43).
@@ -29,6 +29,7 @@ Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_t
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 Ergänzungen: keine (nichts Verdecktes wird freigelegt; die Füße liegen beim Heben hinter dem Körper).
 """
+import math
 import sys
 
 import numpy as np
@@ -71,10 +72,10 @@ def frame(i):
     # --- Blinzeln ---
     if Hm.folge(i, 19, [1, 1, 1], N) or Hm.folge(i, 41, [1, 1, 1], N):
         Hm.setze(k, {p: FELL for p in AUGEN}, OFF)
-    # --- Schwanzspitze schwingt (Zeilen 1–2, x 14–19) ---
-    st = -1 if (Hm.folge(i, 2, [1] * 6, N) or Hm.folge(i, 40, [1] * 6, N)) else (1 if Hm.folge(i, 22, [1] * 6, N) else 0)
-    if st:
-        Hm.bereich_versatz(k, OFF, {1: st, 2: st}, 14, sw + 1)
+    # --- Schwanz wedelt kräftig: die Spalten 16–19 wandern senkrecht, je weiter vom Ansatz (x 15), desto mehr (Spitze bis ±3 px); zwei Wedel je Schleife ---
+    wedel = math.sin(L.sinus(i, N / 2))
+    sp = {x: (int(round(3.0 * wedel * (x - 15) / 4)), 0, 9) for x in range(16, 20)}
+    Hm.spalten_versatz(k, OFF, sp)
     # --- Kopfneigen (Zeilen 0–8, ohne Schwanz) und Gewichtsverlagerung (Zeilen 0–13) ---
     kn = 0                                                          # kein Kopfneigen: es riss eine Lücke zwischen Schwanz und Kopf (Rückmeldung)
     if kn:

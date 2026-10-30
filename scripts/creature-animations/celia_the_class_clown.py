@@ -23,12 +23,16 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Pferdeschwanz schwingt: die Spitze (Zeilen 0–1) schlägt 1 px nach links (Frames 4–9) bzw. rechts (Frames 16–21), die dünne Strähne (15,6)–(15,7) pendelt gegenläufig (Frames 8–13 nach rechts, 22–27 nach links) — 4-verbunden.
 * GLITZERN: das weiße Plus mit dem dunklen Loch links (x 0–4, y 8–12) ist ein Glitzerstern: zweimal je Schleife (Periode 24) schrumpft er auf 1-px-Arme, verschwindet bis auf den dunklen Kern und wächst wieder.
   Darunterliegende Haarfarben/Umriss kommen aus der Quelle (Pixel (3,9)/(4,9), Umriss (2,10)).
-* Kein Kopfwiegen, kein Armspreizen mehr (Rückmeldung: zu viel Squash & Stretch); nur ein Atemzug je Schleife.
+* ARME SCHLACKERN (Rückmeldung): beide Arme pendeln locker mit drei Schwüngen je Schleife (links/rechts versetzt): jede Zeile unter der Schulter (Zeile 14) wandert waagerecht, je weiter unten (Hand),
+  desto mehr (Hand bis 3 px nach außen, bis 1–2 px nach innen vor den Körper). Dabei wird der Körper darunter prozedural fortgesetzt: unter dem rechten Arm (in der Quelle verdeckt) entstehen Weste, Gürtel
+  und Shorts mit den Farben der sichtbaren Nachbarpixel samt braunem Umriss; links liegt der Körperrand schon in der Quelle. Die Arme liegen vor dem Körper.
+* Kein Kopfwiegen (Rückmeldung: zu viel Squash & Stretch); nur ein Atemzug je Schleife.
 * Blinzeln (Frames 20–22 und 38–40): weißer Pixel und türkise Iris beider Augen nehmen die umgebende Hautfarbe (246,190,158) an (Lid = Hautfarbe); die Wimpern bleiben. Kein Farbtausch, kein Augenglanz.
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 Ergänzungen: keine (nichts Verdecktes wird freigelegt; Pferdeschwanz-Spitze und Strähne bleiben über ihrer Nachbarzeile, die Armlücke füllt die Hautfarbe).
 """
+import math
 import sys
 
 import numpy as np
@@ -37,7 +41,7 @@ import anim_humanoide as Hm
 import anim_lib as L
 
 N, MS = 48, 62
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2          # Figur knapp zugeschnitten: Armspreizung/Kopfwiegen ±1 px seitlich, Kopfhub 2 px oben, Randabstand ≥ 2
+PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 4, 2          # Figur knapp zugeschnitten: Armschlackern bis 3 px seitlich, Kopfhub 1–2 px oben, Randabstand ≥ 2
 
 spr = L.lade('celia-the-class-clown')
 sh, sw = spr.shape[:2]
@@ -56,18 +60,61 @@ HAAR_UMRISS, KOERPER_UMRISS = f(2, 5), f(6, 13)                     # A (35,29,8
 HAUT = f(6, 10)                                                     # (246,190,158), Lidfarbe
 AUGEN = [(5, 9), (6, 9), (9, 9), (10, 9)]
 
-# Arme (zeilenweise Grenze zum Rumpf): links x ≤ XL[y], rechts x ≥ XR[y]
-XL = {14: 4, 15: 4, 16: 4, 17: 4, 18: 3, 19: 3}
-XR = {14: 10, 15: 10, 16: 9, 17: 9, 18: 8, 19: 8}
+# Arme: links alles bis XL[y] (Schulter, Oberarm, Hand samt Umriss), rechts die ausdrücklich gelisteten Pixel (Schulter, Oberarm, Hand am Gürtel samt Umriss und rotem Ärmelband)
+XL = {14: 4, 15: 3, 16: 3, 17: 3, 18: 3, 19: 3}
 arm_l = np.zeros((sh, sw), bool)
+for y, xl in XL.items():
+    arm_l[y, :xl + 1] = True
+ARM_R = [(10, 14), (11, 14), (12, 14), (10, 15), (11, 15), (12, 15), (9, 16), (10, 16), (11, 16), (12, 16), (8, 17), (9, 17), (10, 17), (11, 17), (12, 17),
+         (7, 18), (8, 18), (9, 18), (10, 18), (8, 19), (9, 19)]
 arm_r = np.zeros((sh, sw), bool)
-for y in range(14, 20):
-    arm_l[y, :XL[y] + 1] = True
-    arm_r[y, XR[y]:] = True
+for x, y in ARM_R:
+    arm_r[y, x] = True
 arm_l &= vorhanden
 arm_r &= vorhanden
 rumpf = vorhanden & ~arm_l & ~arm_r
+HAUT_ARM = f(4, 14)                                                 # (248,188,119): Armhaut
+DUNKEL = {f(4, 15), f(5, 14), f(4, 13), f(6, 13)}                   # dunkle Körperpixel (Westenrand, Haarumriss, Braun): daran braucht die Hand keinen eigenen Umriss
+OUTLINE_N4 = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
+
+def arm_zerlegen(m):
+    """Armmaske → (Haut-Pixel, Extras): Extras sind Armpixel, die weder Haut noch 4-Nachbar der Haut sind (rote Ärmelbänder, Umrissecke); der Umriss wird beim Schlackern neu um die Haut gezeichnet."""
+    haut = {(x, y): f(x, y) for y, x in zip(*np.nonzero(m)) if f(x, y) == HAUT_ARM}
+    nachbarn = {(x + dx, y + dy) for (x, y) in haut for dx, dy in OUTLINE_N4}
+    extra = {(x, y): f(x, y) for y, x in zip(*np.nonzero(m)) if f(x, y) != HAUT_ARM and (x, y) not in nachbarn}
+    return haut, extra
+
+
+ARM_L_TEILE, ARM_R_TEILE = arm_zerlegen(arm_l), arm_zerlegen(arm_r)
+
+
+def arm_bauen(teile, dx_zeile, k):
+    """Arm für die Zeilenverschiebungen dx_zeile ({y: dx}) auf einer Leinwandebene: Haut und Extras wandern zeilenweise, der braune Umriss wird um die verschobene Haut neu gezeichnet
+    (nicht dort, wo der Körper `k` schon ein dunkles Pixel hat). Ohne Verschiebung entsteht genau der Originalarm."""
+    haut, extra = teile
+    a = L.leer(H, W)
+    for (x, y), c in extra.items():
+        Hm.setze(a, {(x + dx_zeile.get(y, 0), y): c}, OFF)
+    sk = {(x + dx_zeile.get(y, 0), y) for (x, y) in haut}
+    for (x, y) in sk:
+        Hm.setze(a, {(x, y): HAUT_ARM}, OFF)
+    for (x, y) in sk:
+        for dx, dy in OUTLINE_N4:
+            n = (x + dx, y + dy)
+            if n in sk or a[n[1] + PAD_T, n[0] + PAD_L, 3]:
+                continue
+            kp = k[n[1] + PAD_T, n[0] + PAD_L]
+            if kp[3] and tuple(int(v) for v in kp[:3]) in DUNKEL:
+                continue
+            Hm.setze(a, {n: BRAUN}, OFF)
+    return a
+
+# Körper UNTER dem rechten Arm (in der Quelle verdeckt, wird beim Schlackern frei): Weste, Gürtel und Shorts werden mit den Farben der sichtbaren Nachbarn fortgesetzt,
+# am Rand der Umriss (49,24,0). Alle diese Pixel liegen im Ruhezustand unter dem Arm (Frame 0 = Original).
+BRAUN, WESTE, GUERTEL, SHORTS_H, SHORTS_D, SCHLITZ = f(6, 13), f(7, 15), f(5, 17), f(5, 18), f(4, 18), f(7, 19)
+KOERPER_UNTER = {(10, 14): BRAUN, (10, 15): BRAUN, (9, 16): WESTE, (10, 16): BRAUN, (8, 17): GUERTEL, (9, 17): GUERTEL, (10, 17): GUERTEL, (11, 17): BRAUN,
+                 (7, 18): BRAUN, (8, 18): SHORTS_H, (9, 18): SHORTS_H, (10, 18): SHORTS_H, (8, 19): SCHLITZ, (9, 19): SHORTS_H}
 
 STERN_ARM, STERN_RAND = f(2, 8), f(2, 10)                           # Sternweiß (255,255,255), Kern/Umriss (35,29,85)
 STERN_HAAR_L, STERN_HAAR_R = f(3, 9), f(4, 9)                       # Haarfarben unter den rechten Sternarmen
@@ -77,10 +124,7 @@ STERN = [2] * 8 + [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 2, 2, 2]  # 24 Frames;
 def frame(i):
     t, _ = L.trenne(spr, rumpf)
     k = L.platz(t, H, W, PAD_L, PAD_T)
-    tl, _ = L.trenne(spr, arm_l)
-    al = L.platz(tl, H, W, PAD_L, PAD_T)
-    tr, _ = L.trenne(spr, arm_r)
-    ar = L.platz(tr, H, W, PAD_L, PAD_T)
+    Hm.setze(k, KOERPER_UNTER, OFF)
     # --- Glitzerstern (x 0–4, y 8–12): zweimal je Schleife schrumpft er auf kurze Arme, verschwindet und wächst wieder ---
     sp_stufe = STERN[i % len(STERN)]
     if sp_stufe < 2:
@@ -103,20 +147,19 @@ def frame(i):
     kw = 0                                                          # Köpfe von Humanoiden bewegen sich nicht seitlich (Rückmeldung)
     if kw:
         Hm.bereich_versatz(k, OFF, {y: kw for y in range(0, 13)}, 0, sw - 1)
-    # --- Arme schwingen (rand_dehnen: Schulterzeile 14 bleibt, Zeilen 15–19 weichen 1 px nach außen) ---
-    dl = 1 if (Hm.folge(i, 6, [1] * 12, N) or Hm.folge(i, 32, [1] * 6, N)) else 0
-    dr = 1 if (Hm.folge(i, 18, [1] * 12, N) or Hm.folge(i, 42, [1] * 6, N)) else 0
-    if dl:
-        Hm.rand_dehnen(al, OFF, {y: 1 for y in range(15, 20)}, 'l')
-    if dr:
-        Hm.rand_dehnen(ar, OFF, {y: 1 for y in range(15, 20)}, 'r')
+    # --- Arme schlackern: jede Zeile unter der Schulter (Zeile 14) wandert waagerecht, je weiter unten (Hand), desto mehr; links 3, rechts 2 Schwünge je Schleife (Frame 0 = Ruhe) ---
+    ua, ub = math.sin(L.sinus(i, N / 3)), math.sin(L.sinus(i, N / 2))
+    sl = -3.1 * ua if ua > 0 else -1.4 * ua                         # links: -3,1 (außen) … +1,4 (innen)
+    sr = 3.1 * ub if ub > 0 else 1.4 * ub                           # rechts: +3,1 (außen) … -1,4 (innen)
+    al = arm_bauen(ARM_L_TEILE, {y: int((y - 14) / 5 * sl) for y in range(15, 20)}, k)
+    ar = arm_bauen(ARM_R_TEILE, {y: int((y - 14) / 5 * sr) for y in range(15, 20)}, k)
     # --- Auf und ab: Hüftzeile 20 = Brust (Rumpf und Arme), Kragenzeile 13 läuft 3 Frames nach (nur Rumpf) ---
     brust = Hm.stufe(i, N, 1)                                       # nur ein Atemzug je Schleife (weniger Squash & Stretch)
     kopf = 0
     k = Hm.atmen(k, PAD_T + 20, PAD_T + 13, brust, kopf)
     al = Hm.atmen(al, PAD_T + 20, PAD_T + 13, brust, 0)
     ar = Hm.atmen(ar, PAD_T + 20, PAD_T + 13, brust, 0)
-    fig = L.zusammen(H, W, [(al, 0, 0), (ar, 0, 0), (k, 0, 0)])
+    fig = L.zusammen(H, W, [(k, 0, 0), (al, 0, 0), (ar, 0, 0)])        # Arme vor dem Körper
     # Regel 16: Randpixel in Nicht-Umrissfarbe werden Umriss: oben (Haare) Haarumriss, unten (Körper) Braun
     kk = Hm.kantenmaske(fig)
     for y, x in zip(*np.nonzero(kk)):

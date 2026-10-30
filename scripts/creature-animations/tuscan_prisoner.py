@@ -18,12 +18,13 @@ Was im Sprite ist (x, y im 24×25-Sprite):
 * KÖRPER (y 13–22): dunkler Kittel mit schwarzer Mittelnaht (32,29,30)/(47,44,38), graue Seiten; Beine y 22–24 mit weißen Stiefelspitzen (225,215,217)/(189,189,189) bei (7–9,23) und (14–16,23).
 Metall/Gold/Edelsteine im Sprite: keine (die Augen sind Leuchtpixel, kein Edelstein). Also kein Glanz (Regel 14), kein Farbtausch an den Augen außer dem Blinzeln. Kein Feuer, kein Dampf, keine Partikel.
 
-Ablauf (48 Frames à 125 ms = 6 s, nahtlos; bewusst langsam und traurig — Rückmeldung des Spielgestalters):
-* DIE CYANFARBENEN PIXEL SIND TRÄNEN (nicht Augen): je 2 Pixel (193,255,255) über (73,255,255) unter den schwarzen Augen. Jede Träne rollt einmal pro Schleife die Wange hinab (zwei Schritte à 2 Frames),
-  ist dann kurz weg und sitzt danach wieder an der Ruheposition. Links ab Frame 6, rechts ab Frame 30 (nie gleichzeitig). Nur Farben der Quelle, die Wange wird aus den Originalfarben wiederhergestellt.
-* Langsames Atmen: die glatte Kittelzeile 20 wird in den Frames 4–11 einmal doppelt eingefügt (Körper, Arme, Kopf steigen 1 px, Beine bleiben); die eingefügte Zeile mischt Nachbartextur.
-* Kopf sinkt: Kopf samt Ohren hängt in den Frames 18–39 um 1 px tiefer (traurig, gesenkter Kopf); der Hals wird nicht gedehnt, der Kopf schiebt sich über die Schulterzeile.
-* Langsames Blinzeln (Frames 14–16 und 38–40): die oberen Augenpixel nehmen die Kopffarbe an (Lid), die untere Pixelzeile bleibt.
+Ablauf (72 Frames à 83 ms = 6 s, nahtlos; bewusst langsam und traurig, die Tränen aber flüssig — Rückmeldung des Spielgestalters):
+* DIE CYANFARBENEN PIXEL SIND TRÄNEN (nicht Augen): je 2 Pixel (193,255,255) über (73,255,255) unter den schwarzen Augen. Beide Augen weinen fortlaufend: je Zyklus bildet sich eine Träne (erst das obere Pixel),
+  ruht an der Ruheposition, rollt dann in zwei Schritten à 2 Frames die Wange hinab und ist kurz weg, bevor die nächste entsteht. Links dauert ein Zyklus 12, rechts 18 Frames (nie im Gleichschritt).
+  Nur Farben der Quelle, die Wange wird aus den Originalfarben wiederhergestellt.
+* Langsames Atmen: die glatte Kittelzeile 20 wird in den Frames 6–17 einmal doppelt eingefügt (Körper, Arme, Kopf steigen 1 px, Beine bleiben); die eingefügte Zeile mischt Nachbartextur.
+* Kopf sinkt: Kopf samt Ohren hängt in den Frames 27–59 um 1 px tiefer (traurig, gesenkter Kopf); der Hals wird nicht gedehnt, der Kopf schiebt sich über die Schulterzeile.
+* Langsames Blinzeln (Frames 21–24 und 57–60): die oberen Augenpixel nehmen die Kopffarbe an (Lid), die untere Pixelzeile bleibt.
 * Kein Kopfneigen, keine Gewichtsverlagerung, kein Fußtippen mehr; Ohren und Hände bleiben am Kopf bzw. an den Stäben.
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -36,7 +37,7 @@ import numpy as np
 import anim_humanoide as Hm
 import anim_lib as L
 
-N, MS = 48, 125
+N, MS = 72, 83
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2          # Figur knapp zugeschnitten: Verlagerung/Ohr/Arm ±1 px seitlich, Kopfhub 2 px oben, Randabstand ≥ 2
 
 spr = L.lade('tuscan-prisoner')
@@ -73,38 +74,33 @@ def ebene(m, dy=0):
     return L.platz(t, H, W, PAD_L, PAD_T + dy)
 
 
-def traene(i, start):
-    """Tränen-Phase im Frame i für eine Träne, die in Frame `start` zu rollen beginnt: 0 = Ruhe, 1/2 = fällt, 3 = weg."""
-    k = (i - start) % N
-    if k < 2:
-        return 1
-    if k < 4:
-        return 2
-    if k < 10:
-        return 3
-    return 0
+# Tränenzyklen (0 bildet sich: nur das obere Pixel, 1 ruht = Original, 2/3 rollt die Wange hinab, 4 = weg); links alle 12, rechts alle 18 Frames, damit sie nie im Gleichschritt weinen
+TRAENE_L = [0, 1, 1, 1, 2, 2, 3, 3, 4, 4, 4, 4]
+TRAENE_R = [0, 1, 1, 1, 1, 1, 1, 2, 2, 3, 3, 4, 4, 4, 4, 4, 4, 4]
 
 
 def frame(i):
     k, ol, orr, al, ar = ebene(unterkoerper), ebene(ohr_l), ebene(ohr_r), ebene(arm_l), ebene(arm_r)
     kopf = ebene(kopf_m)
     # --- Tränen: je Seite 2 Pixel (oben hell, unten cyan) rollen die Wange hinab; die Wange wird aus den Originalfarben wiederhergestellt ---
-    for x, start in ((9, 6), (14, 30)):
-        ph = traene(i, start)
-        if ph == 0:
+    for x, zyklus in ((9, TRAENE_L), (14, TRAENE_R)):
+        ph = zyklus[(i + 1) % len(zyklus)]                          # Frame 0 = Ruhe (Phase 1, zweiter Zyklusschritt)
+        if ph == 1:                                                 # Ruheposition = Original
             continue
         wange = {(x, 9): KOPF, (x, 10): KOPF}
-        if ph == 1:
-            wange.update({(x, 10): TRAENE_OBEN, (x, 11): TRAENE_UNTEN})
+        if ph == 0:                                                 # Träne bildet sich unter dem Auge: nur das obere Pixel
+            wange.update({(x, 9): TRAENE_OBEN})
         elif ph == 2:
+            wange.update({(x, 10): TRAENE_OBEN, (x, 11): TRAENE_UNTEN})
+        elif ph == 3:
             wange.update({(x, 11): TRAENE_OBEN, (x, 12): TRAENE_UNTEN})
         Hm.setze(kopf, wange, OFF)
     # --- langsames Blinzeln: obere Augenzeile (y 7) nimmt die Kopffarbe an ---
-    if Hm.folge(i, 14, [1, 1, 1], N) or Hm.folge(i, 38, [1, 1, 1], N):
+    if Hm.folge(i, 21, [1, 1, 1, 1], N) or Hm.folge(i, 57, [1, 1, 1, 1], N):
         Hm.setze(kopf, {p: KOPF for p in LID}, OFF)
     # --- Atmen (Brustzeile 20) und gesenkter Kopf ---
-    brust = 1 if Hm.folge(i, 4, [1] * 8, N) else 0
-    sink = 1 if Hm.folge(i, 18, [1] * 22, N) else 0
+    brust = 1 if Hm.folge(i, 6, [1] * 12, N) else 0
+    sink = 1 if Hm.folge(i, 27, [1] * 33, N) else 0
     k = Hm.atmen(k, PAD_T + 20, PAD_T + 11, brust, 0)
     ol = Hm.atmen(ol, PAD_T + 20, PAD_T + 11, brust, 0)
     orr = Hm.atmen(orr, PAD_T + 20, PAD_T + 11, brust, 0)
