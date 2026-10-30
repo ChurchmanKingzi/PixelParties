@@ -79,8 +79,8 @@ BLINK = {13: 1, 14: 2, 15: 1, 37: 1, 38: 2, 39: 1}
 
 # ── Spritzer: 2×2-Tropfen, Parabelbahn neben dem Kopf (Sprite-Koordinaten der linken oberen Ecke) ──
 TROPFEN = [
-    dict(x0=-2, x1=-3, y0=-2, hoehe=2, ye=1, off=5, flug=15),                         # links
-    dict(x0=14, x1=15, y0=-2, hoehe=2, ye=1, off=9, flug=13),                         # rechts
+    dict(x0=-1, x1=-3, y0=-2, hoehe=2, ye=6, off=0, flug=14),                         # links
+    dict(x0=13, x1=15, y0=-2, hoehe=2, ye=6, off=2, flug=12),                         # rechts
 ]
 
 
