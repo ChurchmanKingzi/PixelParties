@@ -12,8 +12,8 @@ Ablauf (24 Frames à 75 ms = 1,8 s):
 * Schwebe-Bob: der Körper hebt sich beim Abschlag um 1 px.
 * Kopf nickt an den Umkehrpunkten um 1 px, Schwanz schwingt mit Verzögerung, die Beine baumeln.
 * Die weißen Pixel im Maul sind Zähne: sie sitzen fest am Kiefer und gehen nur mit dem Kopf mit.
-* Eiswölkchen (Partikel, Farben des Drachen): Frostatem aus dem Maul, Dunst an Flügel, Schwanz und Beinen — entstehen und
-  zerfallen per Dithering, Lebensdauer = Schleifenlänge (nahtlos). Sie liegen hinter dem Drachen.
+* Kalte Luft (Partikel, Farben des Drachen): runde Dunstwölkchen steigen langsam rund um den Körper auf (auch vom Maul), mit
+  leichtem Wabern; entstehen und zerfallen per Dithering, Lebensdauer = Schleifenlänge (nahtlos). Sie liegen hinter dem Drachen.
 * Blinzeln (Frames 17–19): beide Augen schließen sich über einen Zwischenschritt.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 """
@@ -53,18 +53,14 @@ def px(x, y):
     return PAD_L + x, PAD_T + y
 
 
-PUFFS = [
-    dict(x=px(34, 10)[0], y=px(34, 10)[1], vx=13, vy=4, off=0, form='m'),         # Frostatem aus dem Maul
-    dict(x=px(33, 12)[0], y=px(33, 12)[1], vx=11, vy=7, off=8, form='s'),
-    dict(x=px(34, 11)[0], y=px(34, 11)[1], vx=15, vy=1, off=16, form='l'),
-    dict(x=px(8, 3)[0], y=px(8, 3)[1], vx=-7, vy=-8, off=4, form='m', wackeln=1),  # Dunst über dem Flügel
-    dict(x=px(12, 2)[0], y=px(12, 2)[1], vx=-3, vy=-9, off=15, form='s'),
-    dict(x=px(2, 16)[0], y=px(2, 16)[1], vx=-10, vy=3, off=10, form='m', wackeln=1),  # am Schwanz
-    dict(x=px(4, 19)[0], y=px(4, 19)[1], vx=-7, vy=6, off=21, form='s'),
-    dict(x=px(13, 27)[0], y=px(13, 27)[1], vx=-3, vy=7, off=2, form='m'),         # kalte Luft unter den Beinen
-    dict(x=px(11, 26)[0], y=px(11, 26)[1], vx=3, vy=7, off=14, form='s'),
-    dict(x=px(21, 11)[0], y=px(21, 11)[1], vx=3, vy=-9, off=19, form='k'),        # Funken über dem Nacken
-]
+# Kalte Luft: runde Dunstwölkchen steigen langsam auf (≈ 11–15 px pro Schleife, leichtes Wabern), aus verschiedenen Höhen rund um
+# den Körper; Phasen gleichmäßig über die Schleife verteilt. Kein radiales Wegfliegen, keine Kreuzformen.
+START = [(2, 26), (9, 29), (15, 27), (22, 30), (28, 25), (34, 28), (-3, 22), (6, 31), (19, 29), (26, 24), (38, 26), (12, 30)]
+FORMEN = ['m', 'o', 's', 'l', 'm', 'o', 'm', 's', 'o', 'l', 'm', 's']
+PUFFS = [dict(x=px(x0, y0)[0], y=px(x0, y0)[1], vx=(2 if k % 2 else -2), vy=-(11 + (k * 5) % 5), off=2 * k, form=FORMEN[k], wackeln=1)
+         for k, (x0, y0) in enumerate(START)]
+PUFFS += [dict(x=px(35, 11)[0], y=px(35, 11)[1], vx=3, vy=-7, off=5, form='s', wackeln=1),      # Atem am Maul steigt ebenfalls auf
+          dict(x=px(35, 12)[0], y=px(35, 12)[1], vx=2, vy=-6, off=17, form='o', wackeln=1)]
 
 
 def teil(maske):

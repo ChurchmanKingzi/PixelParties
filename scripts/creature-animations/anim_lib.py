@@ -201,7 +201,8 @@ def dehnen(a, sy=1.0, sx=1.0, anker=None):
 # ── Partikel (Pixelart: kein Alpha, nur Dithering, nur ganze Pixel, nahtlos im Loop) ──────────────────────────
 PUFF_FORMEN = {
     'k': [(0, 0, 'c')],                                                       # Funke
-    's': [(0, 0, 'c'), (-1, 0, 'r'), (1, 0, 'r'), (0, -1, 'r'), (0, 1, 'r')],   # kleines Kreuz
+    's': [(-1, 0, 'r'), (0, 0, 'c'), (1, 0, 'r'), (-1, 1, 'r'), (0, 1, 'r'), (1, 1, 'r')],  # kleiner flacher Klecks 3×2 (rund, nicht kreuzförmig)
+    'o': [(-1, -1, 'r'), (0, -1, 'r'), (-2, 0, 'r'), (-1, 0, 'c'), (0, 0, 'c'), (1, 0, 'r'), (-1, 1, 'r'), (0, 1, 'r')],  # Oval 4×3
     'm': [(x, -1, 'r') for x in (-1, 0, 1)] + [(-2, 0, 'r'), (2, 0, 'r')] + [(x, 0, 'c') for x in (-1, 0, 1)]
          + [(x, 1, 'r') for x in (-1, 0, 1)],                                  # Wölkchen 5×3
     'l': [(x, -2, 'r') for x in (-1, 0, 1)] + [(x, -1, 'r') for x in (-2, 2)] + [(x, -1, 'c') for x in (-1, 0, 1)]
@@ -210,20 +211,40 @@ PUFF_FORMEN = {
 }
 
 
-def puff_ebene(h, w, i, n, puffs, farben):
+SCHRUMPF = {'l': ['m', 's', 'k'], 'm': ['s', 'k'], 'o': ['s', 'k'], 's': ['k'], 'k': []}   # Stufen beim Wachsen/Schrumpfen
+
+
+def _stufe(form, t):
+    """Form eines Wölkchens im Lebenslauf t∈[0,1): Funke → kleiner → volle Form (0,3…0,7) → kleiner → Funke."""
+    kette = [form] + SCHRUMPF[form]
+    n = len(kette) - 1
+    if n == 0 or 0.3 <= t < 0.7:
+        return form
+    if t < 0.3:
+        return kette[n - min(n - 1, int(t / 0.3 * n))]
+    return kette[min(n, int((t - 0.7) / 0.3 * n) + 1)]
+
+
+def puff_ebene(h, w, i, n, puffs, farben, verlauf='groesse'):
     """Ebene mit Wölkchen/Funken. puffs: Liste von dict(x, y, vx, vy, off, form='m', wackeln=0).
     (x, y) = Startpunkt auf der Leinwand, (vx, vy) = Gesamtweg über eine Lebensdauer (= n Frames, daher nahtlos),
     off = Phasenversatz in Frames. farben = {'c': (r,g,b) Kern, 'r': (r,g,b) Rand}.
-    Lebenslauf per Dithering statt Alpha: entsteht schachbrettartig → voll → zerfällt schachbrettartig → verglimmt."""
+    verlauf='groesse' (Standard): Lebenslauf über die Größe — Funke → kleiner Klecks → volle Wolke → wieder kleiner → Funke (rund,
+    keine Rauten/Kreuze). verlauf='dither': entsteht/zerfällt schachbrettartig (nur für größere Wolken sinnvoll). Beides ohne Alpha."""
     ebene = leer(h, w)
     for pf in puffs:
         t = ((i + pf.get('off', 0)) % n) / n
         cx = pf['x'] + pf.get('vx', 0) * t + pf.get('wackeln', 0) * math.sin(2 * math.pi * t)
         cy = pf['y'] + pf.get('vy', 0) * t
         cx, cy = int(round(cx)), int(round(cy))
-        for (dx, dy, k) in PUFF_FORMEN[pf.get('form', 'm')]:
+        form = pf.get('form', 'm')
+        if verlauf == 'groesse':
+            form = _stufe(form, t)
+        for (dx, dy, k) in PUFF_FORMEN[form]:
             x, y = cx + dx, cy + dy
-            if t < 0.2:
+            if verlauf == 'groesse':
+                keep = True
+            elif t < 0.2:
                 keep = (dx + dy) % 2 == 0
             elif t < 0.65:
                 keep = True

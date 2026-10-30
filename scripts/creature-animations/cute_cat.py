@@ -54,7 +54,8 @@ ERGAENZUNG = {
     (8, 8): UMRISS, (9, 8): UMRISS,                         # Rücken-/Hüftkontur, setzt den Umriss (10,8) nach links fort
     (7, 9): UMRISS, (8, 9): FELL, (9, 9): WEISS,            # Hüfte
     (7, 10): SCHATTEN, (8, 10): FELL, (9, 10): FELL,        # Oberschenkel (Umriss (6,10) steht schon)
-    (5, 10): UMRISS,                                        # schließt den Schwanz (3–4, 8–9) an die Hüfte an
+    (5, 10): UMRISS,                                        # Hüftunterkante setzt sich nach links fort
+    (5, 9): UMRISS, (6, 9): UMRISS,                         # Schwanzbalken (2–4, 9) läuft durchgehend in den Hüftrücken (7, 9): keine Lücke
     (9, 5): UMRISS, (9, 6): UMRISS,                         # Wangenumriss links (Gegenstück zu (17,6))
 }
 SCHWANZ_ERG = {(3, 7): UMRISS, (4, 8): UMRISS}              # Umriss um die weiße Schwanzspitze (3,8)
