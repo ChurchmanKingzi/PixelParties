@@ -1,15 +1,15 @@
 {
   "creature": "Resilient Monkee",
   "sheet": "resilient-monkee.png",
-  "frameWidth": 22,
+  "frameWidth": 20,
   "frameHeight": 26,
   "frames": 48,
   "frameMs": 66,
   "loop": true,
   "layout": "horizontal",
   "padTop": 2,
-  "padLeft": 3,
-  "padRight": 3,
+  "padLeft": 2,
+  "padRight": 2,
   "padBottom": 2,
-  "faceX": 11.0
+  "faceX": 10.0
 }
