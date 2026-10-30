@@ -18,7 +18,7 @@ Fest bleiben: Kopf mit Hörnern, Gesicht, Umriss.
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Atmen (Periode 24): der Rumpf streckt sich 1–2 px nach oben (Frames 2–10 und 26–34 wird Rumpfzeile 19, in der Spitze 4–8 und 28–32 zusätzlich Zeile 20 verdoppelt; die Zeilen 18–21 haben gleiche Ränder,
   keine offene Kante); Kopf, Arme und Hörner heben sich mit, die Füße bleiben am Boden. Frame 0 = Original.
-* Arme: beide Arme wiegen sich wie Flügel an der Schulter (Spalten wandern senkrecht, bis ±2 px an den Klauen, Periode 24, die Spitze hinkt nach, gegenläufig); Frame 0 = Quellform.
+* Arme: beide Arme wiegen sich wie Flügel an der Schulter (Spalten wandern senkrecht, bis ±2 px an der Klaue, Periode 24, die Spitze hinkt nach, gegenläufig; die Klaue (x ≤ 5 bzw. x ≥ 32) bewegt sich als starrer Block, ihre Finger bleiben 4-verbunden); Frame 0 = Quellform.
 * Fußtritt: abwechselnd hebt sich die linke Zehenklaue 1 px (Frames 12–15, 36–39) und die rechte (24–27, 44–47).
 * Blinzeln: beide Augen (Frames 15–17 und 39–41, das rechte einen Frame später): Gelb → die umgebende Hautfarbe (je Pixel die häufigste dunkelrote Stufe im 2-px-Umkreis); sonst kein Farbwechsel.
 * Glut (Partikel): sechs runde Wölkchen (2×2 → 4×4 → 2×2, nie einzelne Punkte; Farben O und G des Sprites) steigen in den freien Flächen links und rechts vom Rumpf zwischen Armen und Beinen langsam auf.
@@ -145,8 +145,9 @@ def _arm_ebene(fig, seite, top, i):
         ys = np.nonzero(arm[:, x, 3])[0]
         if not len(ys):
             continue
-        frac = abs(x - piv) / float(maxd)
-        dy = int(round(2.0 * frac * (math.sin(ph + phi - 0.9 * frac) - math.sin(phi - 0.9 * frac))))
+        x_eff = max(x, PAD_L + 5) if seite == 'l' else min(x, PAD_L + 32)                  # die Klaue (x ≤ 5 bzw. x ≥ 32) schwingt als starrer Block mit
+        frac = abs(x_eff - piv) / float(maxd)
+        dy = int(round(2.6 * frac * (math.sin(ph + phi - 0.9 * frac) - math.sin(phi - 0.9 * frac))))
         if ys.min() + dy < 0 or ys.max() + dy >= H:
             raise L.ClipError(f'Armspalte {x} würde um {dy} px aus der Leinwand')
         for y in ys:

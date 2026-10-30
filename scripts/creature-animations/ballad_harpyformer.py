@@ -59,12 +59,12 @@ import anim_flieger_b as B
 
 N, MS = 48, 65
 BEAT, DOWN = 12, 4                                         # Frames je Zug, davon Abwärtszug über die Saiten
-PAD = 2                                                    # Rand um das 45×42-Bild (nichts ragt darüber hinaus)
+PAD, PAD_T = 2, 3                                          # Rand links/rechts, oben/unten um das 45×42-Bild (die Randsterne wachsen bis zu 1 px über das Bild hinaus)
 STERNE_AN = True
 
 spr = L.lade('ballad-harpyformer')                         # Gesamtbild (Ruhepose / Referenz für den Randpixel-Test)
 sh, sw = spr.shape[:2]
-H, W = sh + 2 * PAD, sw + 2 * PAD
+H, W = sh + 2 * PAD_T, sw + 2 * PAD
 yy, xx = np.mgrid[0:sh, 0:sw]
 
 harfe = L.lade('ballad-harpyformer-harfe')
@@ -84,7 +84,7 @@ AUGEN = [(11, 15), (12, 15), (14, 15)]
 
 
 def px(x, y):
-    return PAD + x, PAD + y
+    return PAD + x, PAD_T + y
 
 
 # ── Teile auf die volle Leinwand legen (Regel 3) ───────────────────────────────────────────────────────────────────
@@ -92,12 +92,12 @@ M_FLUEGEL = L.farbmaske(harpyie, FLUEGEL_FARBEN) & (yy >= 16) & (yy <= 23) & (xx
 M_FUESSE = harpyie[..., 3] > 0
 M_FUESSE = M_FUESSE & (yy >= 25)
 M_OBEN = (harpyie[..., 3] > 0) & ~M_FLUEGEL & ~M_FUESSE
-HARFE = L.platz(harfe, H, W, PAD, PAD)
-FUESSE = F.ebene(harpyie, M_FUESSE, H, W, PAD, PAD)
-OBEN = F.ebene(harpyie, M_OBEN, H, W, PAD, PAD)
-FL_WURZEL = F.ebene(harpyie, M_FLUEGEL & (xx <= 13), H, W, PAD, PAD)
-FL_SPITZE = F.ebene(harpyie, M_FLUEGEL & (xx >= 14), H, W, PAD, PAD)
-Y_ENDE = PAD + 24                                          # letzte Haarzeile des Oberkörpers (darunter beginnen die Füße)
+HARFE = L.platz(harfe, H, W, PAD, PAD_T)
+FUESSE = F.ebene(harpyie, M_FUESSE, H, W, PAD, PAD_T)
+OBEN = F.ebene(harpyie, M_OBEN, H, W, PAD, PAD_T)
+FL_WURZEL = F.ebene(harpyie, M_FLUEGEL & (xx <= 13), H, W, PAD, PAD_T)
+FL_SPITZE = F.ebene(harpyie, M_FLUEGEL & (xx >= 14), H, W, PAD, PAD_T)
+Y_ENDE = PAD_T + 24                                          # letzte Haarzeile des Oberkörpers (darunter beginnen die Füße)
 
 # Saiten / Goldrahmen als Masken (Sprite-Koordinaten)
 M_SAITEN = L.farbmaske(harfe, [(203, 219, 252), (155, 173, 183)]) & (xx >= 17) & (xx <= 29) & (yy >= 11) & (yy <= 31)
@@ -139,13 +139,13 @@ def hub(t):
     return int(round(BOB_AMP * (1.0 - math.cos(2 * math.pi * t / BEAT))))
 
 
-HAAR_INNEN = {**{y: PAD + 10 for y in range(PAD + 13, PAD + 19)}, PAD + 19: PAD + 8, PAD + 20: PAD + 8, PAD + 21: PAD + 8, PAD + 22: PAD + 9, PAD + 23: PAD + 11, PAD + 24: PAD + 12}
+HAAR_INNEN = {**{PAD_T + y: PAD + 10 for y in range(13, 19)}, PAD_T + 19: PAD + 8, PAD_T + 20: PAD + 8, PAD_T + 21: PAD + 8, PAD_T + 22: PAD + 9, PAD_T + 23: PAD + 11, PAD_T + 24: PAD + 12}
 HAAR_AMP, HAAR_PERIODE = 1.6, 16.0
 
 
 def haar_dx(t):
     s = math.sin(2 * math.pi * t / HAAR_PERIODE)
-    return lambda y: -HAAR_AMP * s * (((y - (PAD + 13)) / 11.0) ** 1.3)
+    return lambda y: -HAAR_AMP * s * (((y - (PAD_T + 13)) / 11.0) ** 1.3)
 
 
 def blinzeln(i):
@@ -167,10 +167,10 @@ def harfe_ebene(i, glanz=True):
             if tau <= 10 and d <= 1.2:
                 lv = max(lv, 2 if d <= 0.55 else 1)
         if lv:
-            a[PAD + y, PAD + x, :3] = F.heller(a[PAD + y, PAD + x, :3], SAITEN_RAMPE, lv)
+            a[PAD_T + y, PAD + x, :3] = F.heller(a[PAD_T + y, PAD + x, :3], SAITEN_RAMPE, lv)
     # Goldrahmen: diagonales Lichtband, zweimal pro Schleife
     for start in (4, 28):
-        F.lichtband(a, M_GOLD, PAD, PAD, i, N, start, 14, GOLD_RAMPE, stufen=1, breite=3.0, achse=(1.0, 1.0))
+        F.lichtband(a, M_GOLD, PAD, PAD_T, i, N, start, 14, GOLD_RAMPE, stufen=1, breite=3.0, achse=(1.0, 1.0))
     return a
 
 
@@ -186,7 +186,7 @@ def sterne_ebene(i):
     for (mx, my), form, k0 in STERNE:
         st = B.funkel_stufe(i, len(FOLGE), k0, FOLGE)
         if st:
-            B.funkel_stern(e, PAD + mx, PAD + my, st, STERN_WEISS)
+            B.funkel_stern(e, PAD + mx, PAD_T + my, st, STERN_WEISS)
     return e
 
 
@@ -202,12 +202,11 @@ def frame(i, partikel=True, nur=None):
         schichten.append((harfe_ebene(i), 0, 0, 1))
     if 'harpyie' in ebenen:
         n = hub(i)
-        oben = L.zeilen_welle  # (nicht benutzt; Haare über B.zeilen_dehnen_aussen)
-        oben = B.zeilen_dehnen_aussen(OBEN, PAD + 13, PAD + 24, HAAR_INNEN, haar_dx(i))
+        oben = B.zeilen_dehnen_aussen(OBEN, PAD_T + 13, PAD_T + 24, HAAR_INNEN, haar_dx(i))
         if blinzeln(i):
             oben = oben.copy()
             for (x, y) in AUGEN:
-                oben[PAD + y, PAD + x, :3] = HAUT
+                oben[PAD_T + y, PAD + x, :3] = HAUT
         oben = L.streck_zeile(oben, Y_ENDE, n)             # Oberkörper hebt sich, Füße bleiben (letzte Haarzeile doppelt)
         wurzel = FL_WURZEL
         spitze = B.spalten_schub(FL_SPITZE, PAD + X_PIV, dy_fn(i), MAXD)
