@@ -13,7 +13,7 @@ Was ist was (x/y im Sprite):
   Gelb (246,231,14), Hellgelb (247,245,184).
 * Helm (x 3–12, y 13–18): grauer Metallhelm mit senkrechten Sehschlitzen; Gesicht (y 18–21) mit zwei roten Augen (6,19) (10,19) (202,44,41)/(211,58,58) und hellen Pupillen (6,20) (10,20)
   (247,245,184); Haut orange-braun (187,104,49)/(215,123,62).
-* Rumpf (x 3–13, y 22–33): rote/braune Tuchrüstung (85,33,33)/(158,61,61)/(184,71,71), goldene Gürtelschnalle (217,217,64)/(241,241,71) bei (8–9, 29) (Metall: darf glänzen); Arme: links (1–3, 24–28),
+* Rumpf (x 3–13, y 22–33): rote/braune Tuchrüstung (85,33,33)/(158,61,61)/(184,71,71), goldene Gürtelschnalle (217,217,64)/(241,241,71) bei (7–8, 29) (Metall: darf glänzen); Arme: links (1–3, 24–28),
   rechts (12–15, 23–24) mit Hand am Stab (16–18, 23–24); Beine/Stiefel y 31–35.
 Fest bleiben: Stab, Helmform, Rumpfform, Stiefel.
 
@@ -69,10 +69,10 @@ SPERRE1[GPT + 8, GPL + 10] = True                       # Dornspitze unter der K
 SPERRE2 = np.zeros((H, W), bool)
 SPERRE2[GPT + 13, GPL + 17] = True                      # Stabkappe unter der Fackelflamme
 assert vorhanden[8, 10] and vorhanden[13, 17]
-Z1 = [FEU.Zunge(9.0 + GPL, 7 + GPT, 5.5, 1.7), FEU.Zunge(11.5 + GPL, 7 + GPT, 7.5, 2.0)]
-Z2 = [FEU.Zunge(17.5 + GPL, 12 + GPT, 9.0, 1.8), FEU.Zunge(20.5 + GPL, 10 + GPT, 6.0, 1.7)]
-FEUER1 = FEU.Feuer(H, W, Z1, RAMPE, n=N, seed=3, posen=12, amplitude=1.0, sperre=SPERRE1)
-FEUER2 = FEU.Feuer(H, W, Z2, RAMPE, n=N, seed=5, posen=12, amplitude=1.0, sperre=SPERRE2)
+Z1 = [FEU.Zunge(8.6 + GPL, 7 + GPT, 5.0, 1.6), FEU.Zunge(10.6 + GPL, 7 + GPT, 7.0, 1.8)]
+Z2 = [FEU.Zunge(18.0 + GPL, 12 + GPT, 8.0, 1.8), FEU.Zunge(20.8 + GPL, 10 + GPT, 5.5, 1.5)]
+FEUER1 = FEU.Feuer(H, W, Z1, RAMPE, n=N, seed=3, posen=12, amplitude=0.6, sperre=SPERRE1)
+FEUER2 = FEU.Feuer(H, W, Z2, RAMPE, n=N, seed=5, posen=12, amplitude=0.6, sperre=SPERRE2)
 
 HAUT = (187, 104, 49)
 AUGEN = [(6, 19), (10, 19), (6, 20), (10, 20)]
@@ -83,8 +83,8 @@ BLINZ = {15, 16, 17, 38, 39, 40}
 # Metall-Rampe des Helms: die Grautöne des Helms, ein Lichtband hebt jede Farbe zwei Stufen
 HELMGRAU = sorted({col(x, y) for y in range(sh) for x in range(sw) if HELM[y, x]}, key=lambda c: sum(c))
 RAMPE_HELM = {c: HELMGRAU[min(len(HELMGRAU) - 1, k + 2)] for k, c in enumerate(HELMGRAU)}
-SCHNALLE = (9, 29)
-assert col(8, 29) == (217, 217, 64) and col(9, 29) == (241, 241, 71)
+SCHNALLE = (8, 29)
+assert col(7, 29) == (217, 217, 64) and col(8, 29) == (241, 241, 71)
 STERN_MITTE, STERN_ARM = (241, 241, 71), (217, 217, 64)
 
 GLUT1 = {'c': GELB, 'r': ORANGE}
@@ -96,8 +96,8 @@ PUFFS1 = [
     dict(x=P(6, 4)[0], y=P(6, 4)[1], vx=-1, vy=-6, off=34, form='k', wackeln=1),
 ]
 PUFFS2 = [
-    dict(x=P(14, 10)[0], y=P(14, 10)[1], vx=2, vy=-8, off=10, form='o', wackeln=1),
-    dict(x=P(1, 22)[0], y=P(1, 22)[1], vx=-1, vy=-10, off=26, form='o', wackeln=1),         # an der linken Schulter
+    dict(x=P(5, 8)[0], y=P(5, 8)[1], vx=-1, vy=-6, off=10, form='o', wackeln=1),            # links neben dem Helm
+    dict(x=P(2, 22)[0], y=P(2, 22)[1], vx=-1, vy=-10, off=26, form='o', wackeln=1),         # an der linken Schulter
     dict(x=P(13, 24)[0], y=P(13, 24)[1], vx=1, vy=-9, off=42, form='o', wackeln=1),
 ]
 
@@ -130,7 +130,7 @@ def frame_gross(i, nur=None):
     f1 = FEUER1.ebene(i)
     f2 = FEUER2.ebene(i)
     f1 = L.versetze(f1, 0, -n)                                   # Kerzenflamme steigt mit dem Helm
-    funken = L.zusammen(H, W, [(FEUER1.funken(i, dy=-n), 0, 0), (FEUER2.funken(i), 0, 0)])
+    funken = L.zusammen(H, W, [(FEUER1.funken(i, dy=-n, leben=8), 0, 0), (FEUER2.funken(i, leben=8), 0, 0)])
     koerper = L.zusammen(H, W, [(stab, 0, 0), (kb, 0, 0)])
     koerper = U.kontur_schliessen(koerper, UMRISS, (26, 26, 26))
     figur = L.zusammen(H, W, [(koerper, 0, 0), (f2, 0, 0), (f1, 0, 0), (funken, 0, 0)])

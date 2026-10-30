@@ -256,13 +256,15 @@ def umriss_schliessen(frame, erlaubt, hell, dunkel):
 
 
 # ── Federflügel: Spalten schieben (Textur bleibt erhalten), Ebenenkarte, Umriss pro Ebene ───────────────────────────────────
-def spalten_schub(a, pivot_x, dy_fn):
+def spalten_schub(a, pivot_x, dy_fn, maxd=None):
     """Jede Spalte von `a` wandert als Ganzes senkrecht um round(dy_fn(f)) (positiv = nach unten); f = |x − pivot_x| / größter Abstand (0…1).
-    Es wird nichts kopiert oder gestreckt — die Federtextur bleibt Pixel für Pixel erhalten. ClipError, wenn eine Spalte aus der Leinwand ragen würde."""
+    Es wird nichts kopiert oder gestreckt — die Federtextur bleibt Pixel für Pixel erhalten. maxd = fester größter Abstand (damit mehrere Ebenen desselben Flügels
+    — Federn, Edelsteine, Marker — dieselbe Verschiebung bekommen). ClipError, wenn eine Spalte aus der Leinwand ragen würde."""
     out = L.leer(*a.shape[:2])
     h, w = a.shape[:2]
     spalten = [x for x in range(w) if a[:, x, 3].any()]
-    maxd = max(1, max(abs(x - pivot_x) for x in spalten)) if spalten else 1
+    if maxd is None:
+        maxd = max(1, max(abs(x - pivot_x) for x in spalten)) if spalten else 1
     for x in spalten:
         dy = int(round(dy_fn(abs(x - pivot_x) / maxd)))
         ys = np.nonzero(a[:, x, 3])[0]
