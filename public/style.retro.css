@@ -1795,7 +1795,14 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
   100% { opacity: 0; transform: scale(0.9); }
 }
 .game-announcement { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 9500; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect x='2' y='0' width='2' height='2' fill='%23000000'/%3E%3Crect x='0' y='2' width='2' height='2' fill='%23000000'/%3E%3C/svg%3E") 0 0 / 4px 4px; animation: announceFadeIn 3.5s steps(24, end) forwards; cursor: pointer; }
-.game-announcement-text { font-family: 'Press Start 2P', monospace; font-size: 32px; text-shadow: 0 0 30px currentColor, 0 0 60px currentColor; letter-spacing: 3px; }
+/* ★ Schriftzug „YOU GO FIRST/SECOND!" (Al 30.10.): umrandet statt weich leuchtend — Pixelart-Rand aus gestapelten harten
+   Schatten, eine Schriftpixel-Einheit (`--u` = 1/8 der Schrifthoehe) breit: innen schwarz, aussen in der Textfarbe. */
+.game-announcement-text { --u: 4px; font-family: 'Press Start 2P', monospace; font-size: calc(var(--u) * 8); text-shadow: calc(var(--u) * -1) calc(var(--u) * -1) 0 #000000, calc(var(--u) * -1) calc(var(--u) * 0) 0 #000000, calc(var(--u) * -1) calc(var(--u) * 1) 0 #000000, calc(var(--u) * 0) calc(var(--u) * -1) 0 #000000, calc(var(--u) * 0) calc(var(--u) * 1) 0 #000000, calc(var(--u) * 1) calc(var(--u) * -1) 0 #000000, calc(var(--u) * 1) calc(var(--u) * 0) 0 #000000, calc(var(--u) * 1) calc(var(--u) * 1) 0 #000000,
+    calc(var(--u) * -2) calc(var(--u) * -2) 0 currentColor, calc(var(--u) * -2) calc(var(--u) * -1) 0 currentColor, calc(var(--u) * -2) calc(var(--u) * 0) 0 currentColor, calc(var(--u) * -2) calc(var(--u) * 1) 0 currentColor, calc(var(--u) * -2) calc(var(--u) * 2) 0 currentColor, calc(var(--u) * -1) calc(var(--u) * -2) 0 currentColor, calc(var(--u) * -1) calc(var(--u) * 2) 0 currentColor, calc(var(--u) * 0) calc(var(--u) * -2) 0 currentColor, calc(var(--u) * 0) calc(var(--u) * 2) 0 currentColor, calc(var(--u) * 1) calc(var(--u) * -2) 0 currentColor, calc(var(--u) * 1) calc(var(--u) * 2) 0 currentColor, calc(var(--u) * 2) calc(var(--u) * -2) 0 currentColor, calc(var(--u) * 2) calc(var(--u) * -1) 0 currentColor, calc(var(--u) * 2) calc(var(--u) * 0) 0 currentColor, calc(var(--u) * 2) calc(var(--u) * 1) 0 currentColor, calc(var(--u) * 2) calc(var(--u) * 2) 0 currentColor,
+    0 calc(var(--u) * 3) 0 #000000; letter-spacing: var(--u); text-align: center; padding: 0 calc(var(--u) * 3); }
+@media (max-width: 600px) {
+  .game-announcement-text { --u: 2px; }
+}
 @keyframes announceShort {
   0% { opacity: 0; transform: scale(1.3); }
   15% { opacity: 1; transform: scale(1); }
