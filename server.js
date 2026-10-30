@@ -3842,6 +3842,24 @@ app.get('/api/render-version', (req, res) => {
 // Aufruf je Seitenaufbau, und neue Animationen gelten sofort (siehe
 // die maxAge-Vorgabe bei den statischen Routen).
 const HERO_ANIM_DIR = path.join(__dirname, 'data', 'hero-animations');
+// ===== BETRIEBSKENNZAHLEN (Lasttest / Caddy-Check) =====
+// Verzoegerung der Ereignisschleife: je Millisekunde, die sie ueber ihren Takt hinaus belegt ist, wartet jeder Socket-/HTTP-Aufruf. `?reset=1`
+// setzt die Messung zurueck (zwischen Lasttest-Laeufen). Keine Nutzerdaten, nur Zahlen.
+const { monitorEventLoopDelay } = require('perf_hooks');
+const _elHist = monitorEventLoopDelay({ resolution: 10 }); _elHist.enable();
+app.get('/api/health', (req, res) => {
+  const ms = (ns) => Math.round(ns / 1e4) / 100;
+  const out = {
+    ok: true, uptimeS: Math.round(process.uptime()),
+    loopLagMs: { mean: ms(_elHist.mean), p50: ms(_elHist.percentile(50)), p95: ms(_elHist.percentile(95)), p99: ms(_elHist.percentile(99)), max: ms(_elHist.max) },
+    rooms: rooms.size, cpuRooms: [...rooms.values()].filter(r => r && r.type === 'singleplayer').length,
+    rssMb: Math.round(process.memoryUsage().rss / 1048576), heapMb: Math.round(process.memoryUsage().heapUsed / 1048576),
+  };
+  if (req.query.reset) _elHist.reset();
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(out);
+});
+
 // Alles, was die Tutorial-Missionen an Karten zeigen (Namen aus den Puzzle-Dateien, Helden getrennt). Der Client laedt das im Gast-Menue
 // im Leerlauf vor (Kartenbilder rendern, Heldenfiguren laden), damit der Start einer Mission nicht ruckelt. Einmal berechnet, dann gemerkt.
 let _tutorialAssets = null;
