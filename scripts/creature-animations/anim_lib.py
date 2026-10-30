@@ -83,10 +83,12 @@ def versetze(a, dx, dy):
     return einsetzen(leer(*a.shape[:2]), a, dx, dy)
 
 
-def spalten_welle(a, pivot_x, amp, phase, potenz=1.0, nur_rechts=None, bias=0.0):
+def spalten_welle(a, pivot_x, amp, phase, potenz=1.0, nur_rechts=None, bias=0.0, fuell=None):
     """Jede Spalte wandert senkrecht um round((amp · sin(phase) + bias) · (Abstand/maxAbstand)^potenz).
     Positiv = nach unten. Beide Seiten des Gelenks schlagen gleichzeitig (Flügelpaar);
-    nur_rechts: True/False = nur eine Seite bewegen. bias verschiebt die Ruhelage der Flügelspitze."""
+    nur_rechts: True/False = nur eine Seite bewegen. bias verschiebt die Ruhelage der Flügelspitze.
+    fuell: Maske des Restkörpers — hebt sich eine Spalte, wird die Lücke zum Körper darunter mit dem
+    untersten Flügelpixel der Spalte gefüllt (Flügel bleibt am Rumpf „angewachsen")."""
     out = leer(*a.shape[:2])
     h, w = a.shape[:2]
     maxd = max(1, max(abs(x - pivot_x) for x in range(w) if a[:, x, 3].any()) if a[..., 3].any() else 1)
@@ -98,9 +100,16 @@ def spalten_welle(a, pivot_x, amp, phase, potenz=1.0, nur_rechts=None, bias=0.0)
             dy = 0
         else:
             dy = int(round((amp * math.sin(phase) + bias) * (abs(d) / maxd) ** potenz))
-        for y in np.nonzero(a[:, x, 3])[0]:
+        ys = np.nonzero(a[:, x, 3])[0]
+        for y in ys:
             if 0 <= y + dy < h:
                 out[y + dy, x] = a[y, x]
+        if fuell is not None and dy < 0:
+            yb = int(ys.max())
+            if yb + 1 < h and fuell[yb + 1, x]:
+                for y in range(yb + dy + 1, yb + 1):
+                    if 0 <= y < h and not out[y, x, 3]:
+                        out[y, x] = a[yb, x]
     return out
 
 
