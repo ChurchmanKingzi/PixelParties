@@ -15,7 +15,7 @@ Ausgabe:  ../../data/creature-animations/chatty-town-guard.png + .json
 Was im Sprite ist (x, y im 13×22-Sprite):
 * MÜTZE (y 0–4): schwarze Schirmmütze mit grauem Schirm: Umriss (0,0,0), Stoff (41,40,41)/(66,65,66)/(107,105,107), hellster Rand links (189,190,189)/(156,158,156). Stoff, kein Metall: kein Glanz.
 * GESICHT (y 5–9): Haut (247,190,123)/(214,166,99)/(181,121,49), schwarze Augen (5,6) und (6,7) (schräg versetzt, weil der Kopf nach links gedreht ist), schwarzes Haar rechts, braune Umrisslinie links (49,24,0);
-  dunkelrotes Halstuch (68,0,0)/(139,0,0)/(40,0,0) bei (4–5, 9–10).
+  dunkelrotes Maul (68,0,0)/(139,0,0)/(40,0,0) bei (4–5, 9–10) — der Wächter redet.
 * UNIFORM (y 10–18): lila (66,16,123)/(82,16,156)/(49,0,99) mit weißen/lavendelfarbenen Streifen (247,247,247)/(239,215,255)/(214,182,255); Hand (247,190,123)/(214,166,99) auf der Brust bei (5, 13–14).
 * HOSE/STIEFEL (y 19–21): schwarz mit weißen/grauen Stiefelspitzen (247,247,247)/(214,215,214)/(107,105,107).
 Metall oder Gold im Sprite: keines (Mütze = Stoff, Stiefel = Leder) — also kein Glanz (Regel 14). Kein Feuer, kein Dampf, keine Partikel.
@@ -23,8 +23,8 @@ Metall oder Gold im Sprite: keines (Mütze = Stoff, Stiefel = Leder) — also ke
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Auf und ab (zweistufig, Periode 24): Brust zuerst 1 px (Tunikazeile 15, glatt dunkel, wird einmal doppelt eingefügt: Tunika, Hand und Kopf steigen, Stiefel bleiben), der Kopf läuft 3 Frames nach und hebt sich
   um ein weiteres px (Zeile 8 unter den Augen wird verlängert): Kopf 0 → 1 → 2 → 1 → 0 px, Brust 0 → 1 → 0.
-* Gewichtsverlagerung: der Oberkörper (Zeilen 0–18) schiebt sich 1 px nach rechts (Frames 10–21) und später 1 px nach links (Frames 34–45); Hose und Stiefel bleiben stehen.
-* Kopfneigen: Mütze und Kopf (Zeilen 0–9) neigen sich 1 px nach links (Frames 2–7) und 1 px nach rechts (Frames 24–31); die Zeitfenster liegen getrennt von der Verlagerung (nichts stapelt sich).
+* Kein Kopfneigen, keine seitliche Gewichtsverlagerung (Rückmeldung des Spielgestalters).
+* SPRECHEN: das rote Maul (2×2, x 4–5, y 9–10 — kein Halstuch, sondern der offene Mund) öffnet und schließt sich durchgehend (offen → halb → zu → …, 24-Frame-Muster, zweimal je Schleife).
 * Erzählgeste (Frames 4–7 und 28–31): die Hand auf der Brust hebt sich 1 px (Spalte 5, Zeilen 12–14 rotieren: Dunkel, Hand, Hand → Hand, Hand, Dunkel) — der Wächter redet mit den Händen.
 * Blinzeln (Frames 19–21 und 41–43): die beiden Augenpixel nehmen die umgebende Hautfarbe (247,190,123) an. Kein Farbtausch, kein Augenglanz.
 * Fußtippen: der linke Stiefel hebt sich zweimal 1 px hinter den Saum (Frames 12–19), später der rechte (Frames 36–43).
@@ -68,8 +68,17 @@ def ebene(m, dy=0):
     return L.platz(t, H, W, PAD_L, PAD_T + dy)
 
 
+MAUL = [0, 0, 1, 2, 2, 1, 0, 1, 2, 1, 0, 0, 0, 0, 1, 2, 1, 0, 0, 1, 2, 2, 1, 0]   # 0 offen, 1 halb, 2 zu (24 Frames, 2× je Schleife)
+
+
 def frame(i):
     k = ebene(rumpf)
+    # --- Sprechen: das rote 2×2-Maul (4–5, 9–10) geht durchgehend auf und zu (offen → halb → zu); Frame 0 = offen (Original) ---
+    st = MAUL[i % len(MAUL)]
+    if st == 1:
+        Hm.setze(k, {(5, 10): f(6, 10)}, OFF)
+    elif st == 2:
+        Hm.setze(k, {(4, 9): f(4, 10), (5, 9): f(5, 10), (5, 10): f(6, 10)}, OFF)
     # --- Blinzeln: beide Augenpixel nehmen die Hautfarbe an ---
     if Hm.folge(i, 19, [1, 1, 1], N) or Hm.folge(i, 41, [1, 1, 1], N):
         Hm.setze(k, {(5, 6): HAUT, (6, 7): HAUT}, OFF)
@@ -77,10 +86,10 @@ def frame(i):
     if Hm.folge(i, 4, [1] * 4, N) or Hm.folge(i, 28, [1] * 4, N):
         Hm.setze(k, {(5, 12): f(5, 13), (5, 13): f(5, 14), (5, 14): f(5, 12)}, OFF)
     # --- Kopfneigen (Zeilen 0–9) und Gewichtsverlagerung (Zeilen 0–18) in getrennten Zeitfenstern ---
-    kn = -1 if Hm.folge(i, 2, [1] * 6, N) else (1 if Hm.folge(i, 24, [1] * 8, N) else 0)
+    kn = 0                                                          # Köpfe von Humanoiden bewegen sich nicht seitlich (Rückmeldung)
     if kn:
         Hm.bereich_versatz(k, OFF, {y: kn for y in range(0, 10)}, -2, sw + 1)
-    gv = 1 if Hm.folge(i, 10, [1] * 12, N) else (-1 if Hm.folge(i, 34, [1] * 12, N) else 0)
+    gv = 0                                                          # keine seitliche Gewichtsverlagerung
     if gv:
         Hm.bereich_versatz(k, OFF, {y: gv for y in range(0, 19)}, -2, sw + 1)
     # --- Auf und ab: Tunikazeile 15 = Brust, Zeile 8 (unter den Augen) läuft 3 Frames nach ---

@@ -13,17 +13,17 @@ Was im Sprite ist (x, y im 17×25-Sprite):
   (Spitze (13,0)/(12–14,1), Strähnen x 13–16, y 2–5, eine dünne Strähne (15,6)–(15,7)); eine rote Haarspange (212,39,39)/(143,0,50) mit schwarzem Rand bei (11–12, 3–4).
 * GESICHT (y 7–12, x 5–10): Haut (246,190,158), hell (252,231,214); zwei Augen: schwarze Wimpern (5–6, 8) und (9–10, 8), darunter ein weißer Pixel (248,254,255) und eine türkise Iris (0,222,174) bei
   (5–6, 9) und (9–10, 9); rosa Wangen (255,156,153) bei (5,10) und (10,10); ein kleiner dunkelroter Mund (116,0,0)/(150,0,0) bei (6,11), (7–8,12).
-* GLITZERSTERN links (x 0–4, y 8–12): ein weißer vierzackiger Stern (255,255,255) mit dunklem Kern (2,10) — gehört zur Figur (Glanz auf der Wange/Haarspitze) und bleibt unverändert (er wird nur mit dem Kopf bewegt).
+* GLITZERSTERN links (x 0–4, y 8–12): ein weißer vierzackiger Stern (255,255,255) mit dunklem Kern (2,10) — er wird als Sparkle animiert (s. u.).
 * KRAGEN/WESTE (y 13–17): roter Schal/Fliege (212,39,39), (221,76,76), (143,0,50) mit braunem Umriss B (49,24,0), Weste mit hellen Pixeln; Arme in Hautfarbe E (248,188,119) mit braunem Umriss, Hände bei (0–3, 17–19) links und (8–12, 17–19) rechts.
 * HOSE (y 18–21): blaue Shorts N (17,111,249)/P (10,69,152); Beine y 22–24: weiße Socken Q (178,180,177)/(255,255,255) und schwarze Schuhe D (0,2,0).
 Kein Metall, Gold oder Edelstein im Sprite → KEIN Glanz (Regel 14); kein Feuer (Regel 15), kein Dampf, keine Partikel.
 
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
-* Auf und ab (zweistufig, Periode 24 = zweimal pro Schleife): Brust zuerst 1 px (die Hüftzeile 20 wird einmal doppelt eingefügt: Oberkörper, Arme und Kopf steigen, Beine und Schuhe bleiben), der Kopf läuft 3 Frames nach
-  und hebt sich um ein weiteres px (Kragenzeile 13 wird verlängert): Kopf 0 → 1 → 2 → 1 → 0 px, Brust 0 → 1 → 0.
+* Atmen (einmal je Schleife): die Hüftzeile 20 wird einmal doppelt eingefügt (Texturmischung): Oberkörper, Arme und Kopf steigen 1 px, Beine und Schuhe bleiben.
 * Pferdeschwanz schwingt: die Spitze (Zeilen 0–1) schlägt 1 px nach links (Frames 4–9) bzw. rechts (Frames 16–21), die dünne Strähne (15,6)–(15,7) pendelt gegenläufig (Frames 8–13 nach rechts, 22–27 nach links) — 4-verbunden.
-* Kopfwiegen: der ganze Kopf (Zeilen 0–12, samt Stern und Pferdeschwanz) neigt sich 1 px nach rechts (Frames 30–37) und 1 px nach links (Frames 40–46); Kragen/Hals bleibt stehen.
-* Arme schwingen: der linke Arm (Zeilen 15–19) spreizt sich 1 px nach außen (Frames 6–17 und 32–37), der rechte versetzt (Frames 18–29 und 42–47); Schultern bleiben am Körper (`Hm.rand_dehnen`, Lücke in Hautfarbe).
+* GLITZERN: das weiße Plus mit dem dunklen Loch links (x 0–4, y 8–12) ist ein Glitzerstern: zweimal je Schleife (Periode 24) schrumpft er auf 1-px-Arme, verschwindet bis auf den dunklen Kern und wächst wieder.
+  Darunterliegende Haarfarben/Umriss kommen aus der Quelle (Pixel (3,9)/(4,9), Umriss (2,10)).
+* Kein Kopfwiegen, kein Armspreizen mehr (Rückmeldung: zu viel Squash & Stretch); nur ein Atemzug je Schleife.
 * Blinzeln (Frames 20–22 und 38–40): weißer Pixel und türkise Iris beider Augen nehmen die umgebende Hautfarbe (246,190,158) an (Lid = Hautfarbe); die Wimpern bleiben. Kein Farbtausch, kein Augenglanz.
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -69,6 +69,11 @@ arm_r &= vorhanden
 rumpf = vorhanden & ~arm_l & ~arm_r
 
 
+STERN_ARM, STERN_RAND = f(2, 8), f(2, 10)                           # Sternweiß (255,255,255), Kern/Umriss (35,29,85)
+STERN_HAAR_L, STERN_HAAR_R = f(3, 9), f(4, 9)                       # Haarfarben unter den rechten Sternarmen
+STERN = [2] * 8 + [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 2, 2, 2]  # 24 Frames; 2 = voller Stern (Original), 1 = Arme kurz, 0 = nur Kern
+
+
 def frame(i):
     t, _ = L.trenne(spr, rumpf)
     k = L.platz(t, H, W, PAD_L, PAD_T)
@@ -76,6 +81,14 @@ def frame(i):
     al = L.platz(tl, H, W, PAD_L, PAD_T)
     tr, _ = L.trenne(spr, arm_r)
     ar = L.platz(tr, H, W, PAD_L, PAD_T)
+    # --- Glitzerstern (x 0–4, y 8–12): zweimal je Schleife schrumpft er auf kurze Arme, verschwindet und wächst wieder ---
+    sp_stufe = STERN[i % len(STERN)]
+    if sp_stufe < 2:
+        weg = {(2, 8): STERN_RAND, (2, 9): STERN_RAND, (2, 11): STERN_RAND, (2, 12): STERN_RAND, (3, 10): STERN_HAAR_L, (4, 10): STERN_HAAR_R,
+               (0, 10): None, (1, 10): None}
+        Hm.setze(k, weg, OFF)
+        if sp_stufe == 1:                                           # Arme nur 1 px: der innere Ring bleibt weiß
+            Hm.setze(k, {(2, 9): STERN_ARM, (2, 11): STERN_ARM, (1, 10): STERN_ARM, (3, 10): STERN_ARM}, OFF)
     # --- Blinzeln: weißer Pixel und Iris nehmen die Hautfarbe an ---
     if Hm.folge(i, 20, [1, 1, 1], N) or Hm.folge(i, 38, [1, 1, 1], N):
         Hm.setze(k, {p: HAUT for p in AUGEN}, OFF)
@@ -87,7 +100,7 @@ def frame(i):
     if st:
         Hm.bereich_versatz(k, OFF, {6: st, 7: st}, 14, 16)
     # --- Kopfwiegen (Zeilen 0–12 samt Stern und Pferdeschwanz) ---
-    kw = 1 if Hm.folge(i, 30, [1] * 8, N) else (-1 if Hm.folge(i, 40, [1] * 7, N) else 0)
+    kw = 0                                                          # Köpfe von Humanoiden bewegen sich nicht seitlich (Rückmeldung)
     if kw:
         Hm.bereich_versatz(k, OFF, {y: kw for y in range(0, 13)}, 0, sw - 1)
     # --- Arme schwingen (rand_dehnen: Schulterzeile 14 bleibt, Zeilen 15–19 weichen 1 px nach außen) ---
@@ -98,8 +111,8 @@ def frame(i):
     if dr:
         Hm.rand_dehnen(ar, OFF, {y: 1 for y in range(15, 20)}, 'r')
     # --- Auf und ab: Hüftzeile 20 = Brust (Rumpf und Arme), Kragenzeile 13 läuft 3 Frames nach (nur Rumpf) ---
-    brust = Hm.stufe(i, N / 2, 1)
-    kopf = Hm.stufe(i - 3, N / 2, 1)
+    brust = Hm.stufe(i, N, 1)                                       # nur ein Atemzug je Schleife (weniger Squash & Stretch)
+    kopf = 0
     k = Hm.atmen(k, PAD_T + 20, PAD_T + 13, brust, kopf)
     al = Hm.atmen(al, PAD_T + 20, PAD_T + 13, brust, 0)
     ar = Hm.atmen(ar, PAD_T + 20, PAD_T + 13, brust, 0)

@@ -4,12 +4,12 @@
   "frameWidth": 30,
   "frameHeight": 31,
   "frames": 48,
-  "frameMs": 62,
+  "frameMs": 125,
   "loop": true,
   "layout": "horizontal",
   "padTop": 3,
-  "padLeft": 2,
-  "padRight": 2,
+  "padLeft": 3,
+  "padRight": 3,
   "padBottom": 2,
   "faceX": 15.0
 }

@@ -18,16 +18,13 @@ Was im Sprite ist (x, y im 24×25-Sprite):
 * KÖRPER (y 13–22): dunkler Kittel mit schwarzer Mittelnaht (32,29,30)/(47,44,38), graue Seiten; Beine y 22–24 mit weißen Stiefelspitzen (225,215,217)/(189,189,189) bei (7–9,23) und (14–16,23).
 Metall/Gold/Edelsteine im Sprite: keine (die Augen sind Leuchtpixel, kein Edelstein). Also kein Glanz (Regel 14), kein Farbtausch an den Augen außer dem Blinzeln. Kein Feuer, kein Dampf, keine Partikel.
 
-Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
-* Auf und ab (zweistufig, Periode 24): Brust zuerst 1 px (die glatte Kittelzeile 20 wird einmal doppelt eingefügt: Körper, Arme und Kopf steigen, die Beine bleiben), der Kopf läuft 3 Frames nach
-  und hebt sich um ein weiteres px (Halszeile 11): Kopf 0 → 1 → 2 → 1 → 0 px, Brust 0 → 1 → 0.
-* Ohrenwackeln: das linke Ohr schlägt zweimal 1 px nach außen (Frames 14–19, aus–aus–zu–zu–aus–aus), das rechte später (Frames 38–43). Die Ohren sind eigene Ebenen (x ≤ 6 bzw. ≥ 17, y ≤ 12);
-  die Zeile wird mit `Hm.rand_dehnen` um 1 px nach außen gedehnt, innen bleibt alles am Kopf.
-* Gewichtsverlagerung: Körper (Zeilen 0–19) samt Ohren und Armen 1 px nach rechts (Frames 10–21) und später 1 px nach links (Frames 34–45); Hosenbeine und Stiefel bleiben stehen.
-* Kopfneigen: Kopf und Ohren (Zeilen 0–12) neigen sich 1 px nach links (Frames 2–7) und 1 px nach rechts (Frames 24–31), getrennt von der Verlagerung.
-* Hände rutschen an den Stäben: der linke Arm (Zeilen 13–17) spreizt sich 1 px nach außen (Frames 22–33), der rechte (Frames 2–9 und 46–47).
-* Blinzeln (Frames 19–21 und 41–43): die vier Cyan-Pixel nehmen die umgebende Kopffarbe an. Kein Leuchten/Pulsieren, kein Farbtausch.
-* Fußtippen: der linke Stiefel hebt sich zweimal 1 px hinter den Kittelsaum (Frames 12–19), später der rechte (Frames 36–43).
+Ablauf (48 Frames à 125 ms = 6 s, nahtlos; bewusst langsam und traurig — Rückmeldung des Spielgestalters):
+* DIE CYANFARBENEN PIXEL SIND TRÄNEN (nicht Augen): je 2 Pixel (193,255,255) über (73,255,255) unter den schwarzen Augen. Jede Träne rollt einmal pro Schleife die Wange hinab (zwei Schritte à 2 Frames),
+  ist dann kurz weg und sitzt danach wieder an der Ruheposition. Links ab Frame 6, rechts ab Frame 30 (nie gleichzeitig). Nur Farben der Quelle, die Wange wird aus den Originalfarben wiederhergestellt.
+* Langsames Atmen: die glatte Kittelzeile 20 wird in den Frames 4–11 einmal doppelt eingefügt (Körper, Arme, Kopf steigen 1 px, Beine bleiben); die eingefügte Zeile mischt Nachbartextur.
+* Kopf sinkt: Kopf samt Ohren hängt in den Frames 18–39 um 1 px tiefer (traurig, gesenkter Kopf); der Hals wird nicht gedehnt, der Kopf schiebt sich über die Schulterzeile.
+* Langsames Blinzeln (Frames 14–16 und 38–40): die oberen Augenpixel nehmen die Kopffarbe an (Lid), die untere Pixelzeile bleibt.
+* Kein Kopfneigen, keine Gewichtsverlagerung, kein Fußtippen mehr; Ohren und Hände bleiben am Kopf bzw. an den Stäben.
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 Ergänzungen: keine (nichts Verdecktes wird freigelegt; die Stiefel liegen beim Heben hinter dem Saum).
@@ -39,7 +36,7 @@ import numpy as np
 import anim_humanoide as Hm
 import anim_lib as L
 
-N, MS = 48, 62
+N, MS = 48, 125
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2          # Figur knapp zugeschnitten: Verlagerung/Ohr/Arm ±1 px seitlich, Kopfhub 2 px oben, Randabstand ≥ 2
 
 spr = L.lade('tuscan-prisoner')
@@ -57,7 +54,8 @@ def f(x, y):
 ERLAUBT = Hm.umrissfarben(spr)                                      # Farben der Außenkante im Original (Regel 16)
 KOPF = f(10, 10)                                                    # Kopffarbe um die Augen: Lid = umgebende Körperfarbe
 UMRISS = (23, 21, 22)                                                 # Umrissschwarz der Quelle
-AUGEN = [(9, 9), (9, 10), (14, 9), (14, 10)]
+TRAENE_OBEN, TRAENE_UNTEN = f(9, 9), f(9, 10)                          # (193,255,255) über (73,255,255)
+LID = [(9, 7), (10, 7), (13, 7), (14, 7)]                              # obere Zeile der schwarzen Augenblöcke (y 7–8)
 
 ohr_l = vorhanden & (xx <= 6) & (yy <= 12)
 ohr_r = vorhanden & (xx >= 17) & (yy <= 12)
@@ -66,6 +64,8 @@ arm_r = vorhanden & (xx >= 15) & (yy >= 13) & (yy <= 17)
 fuss_l = vorhanden & (xx <= 10) & (yy >= 23)
 fuss_r = vorhanden & (xx >= 13) & (yy >= 23)
 rumpf = vorhanden & ~ohr_l & ~ohr_r & ~arm_l & ~arm_r & ~fuss_l & ~fuss_r
+kopf_m = rumpf & (yy <= 12)
+unterkoerper = rumpf & (yy > 12)
 
 
 def ebene(m, dy=0):
@@ -73,51 +73,48 @@ def ebene(m, dy=0):
     return L.platz(t, H, W, PAD_L, PAD_T + dy)
 
 
+def traene(i, start):
+    """Tränen-Phase im Frame i für eine Träne, die in Frame `start` zu rollen beginnt: 0 = Ruhe, 1/2 = fällt, 3 = weg."""
+    k = (i - start) % N
+    if k < 2:
+        return 1
+    if k < 4:
+        return 2
+    if k < 10:
+        return 3
+    return 0
+
+
 def frame(i):
-    k, ol, orr, al, ar = ebene(rumpf), ebene(ohr_l), ebene(ohr_r), ebene(arm_l), ebene(arm_r)
-    # --- Blinzeln: die Cyan-Augenpixel nehmen die Kopffarbe an ---
-    if Hm.folge(i, 19, [1, 1, 1], N) or Hm.folge(i, 41, [1, 1, 1], N):
-        Hm.setze(k, {p: KOPF for p in AUGEN}, OFF)
-    # --- Ohrenwackeln: Zeile um 1 px nach außen dehnen (Ohren sind eigene Ebenen, innen bleibt der Kopf) ---
-    pat = [1, 1, 0, 0, 1, 1]
-    if Hm.folge(i, 14, pat, N):
-        Hm.rand_dehnen(ol, OFF, {y: 1 for y in range(1, 9)}, 'l')
-    if Hm.folge(i, 38, pat, N):
-        Hm.rand_dehnen(orr, OFF, {y: 1 for y in range(1, 9)}, 'r')
-    # --- Hände rutschen nach außen ---
-    dl = 1 if Hm.folge(i, 22, [1] * 12, N) else 0
-    dr = 1 if (Hm.folge(i, 2, [1] * 8, N) or Hm.folge(i, 46, [1, 1], N)) else 0
-    if dl:
-        Hm.rand_dehnen(al, OFF, {y: 1 for y in range(13, 18)}, 'l')
-    if dr:
-        Hm.rand_dehnen(ar, OFF, {y: 1 for y in range(13, 18)}, 'r')
-    # --- Kopfneigen (Zeilen 0–12 samt Ohren) und Gewichtsverlagerung (Zeilen 0–19 samt Ohren/Armen) in getrennten Zeitfenstern ---
-    kn = -1 if Hm.folge(i, 2, [1] * 6, N) else (1 if Hm.folge(i, 24, [1] * 8, N) else 0)
-    if kn:
-        Hm.bereich_versatz(k, OFF, {y: kn for y in range(0, 13)}, -3, sw + 2)
-        for o in (ol, orr):
-            Hm.bereich_versatz(o, OFF, {y: kn for y in range(0, 13)}, -3, sw + 2)
-    gv = 1 if Hm.folge(i, 10, [1] * 12, N) else (-1 if Hm.folge(i, 34, [1] * 12, N) else 0)
-    if gv:
-        Hm.bereich_versatz(k, OFF, {y: gv for y in range(0, 20)}, -3, sw + 2)
-        for o in (ol, orr):
-            Hm.bereich_versatz(o, OFF, {y: gv for y in range(0, 13)}, -3, sw + 2)
-        for a in (al, ar):
-            Hm.bereich_versatz(a, OFF, {y: gv for y in range(13, 18)}, -3, sw + 2)
-    # --- Auf und ab: glatte Kittelzeile 20 = Brust, Halszeile 11 läuft 3 Frames nach (Ohren steigen mit dem Kopf) ---
-    brust = Hm.stufe(i, N / 2, 1)
-    kopf = Hm.stufe(i - 3, N / 2, 1)
-    k = Hm.atmen(k, PAD_T + 20, PAD_T + 11, brust, kopf)
-    ol = Hm.atmen(ol, PAD_T + 20, PAD_T + 11, brust, kopf)
-    orr = Hm.atmen(orr, PAD_T + 20, PAD_T + 11, brust, kopf)
+    k, ol, orr, al, ar = ebene(unterkoerper), ebene(ohr_l), ebene(ohr_r), ebene(arm_l), ebene(arm_r)
+    kopf = ebene(kopf_m)
+    # --- Tränen: je Seite 2 Pixel (oben hell, unten cyan) rollen die Wange hinab; die Wange wird aus den Originalfarben wiederhergestellt ---
+    for x, start in ((9, 6), (14, 30)):
+        ph = traene(i, start)
+        if ph == 0:
+            continue
+        wange = {(x, 9): KOPF, (x, 10): KOPF}
+        if ph == 1:
+            wange.update({(x, 10): TRAENE_OBEN, (x, 11): TRAENE_UNTEN})
+        elif ph == 2:
+            wange.update({(x, 11): TRAENE_OBEN, (x, 12): TRAENE_UNTEN})
+        Hm.setze(kopf, wange, OFF)
+    # --- langsames Blinzeln: obere Augenzeile (y 7) nimmt die Kopffarbe an ---
+    if Hm.folge(i, 14, [1, 1, 1], N) or Hm.folge(i, 38, [1, 1, 1], N):
+        Hm.setze(kopf, {p: KOPF for p in LID}, OFF)
+    # --- Atmen (Brustzeile 20) und gesenkter Kopf ---
+    brust = 1 if Hm.folge(i, 4, [1] * 8, N) else 0
+    sink = 1 if Hm.folge(i, 18, [1] * 22, N) else 0
+    k = Hm.atmen(k, PAD_T + 20, PAD_T + 11, brust, 0)
+    ol = Hm.atmen(ol, PAD_T + 20, PAD_T + 11, brust, 0)
+    orr = Hm.atmen(orr, PAD_T + 20, PAD_T + 11, brust, 0)
+    kopf = Hm.atmen(kopf, PAD_T + 20, PAD_T + 11, brust, 0)
     al = Hm.atmen(al, PAD_T + 20, PAD_T + 11, brust, 0)
     ar = Hm.atmen(ar, PAD_T + 20, PAD_T + 11, brust, 0)
-    # --- Fußtippen (die Stiefel liegen hinter dem Saum) ---
-    pat2 = [1, 1, 0, 0, 1, 1, 0, 0]
-    hl = 1 if Hm.folge(i, 12, pat2, N) else 0
-    hr = 1 if Hm.folge(i, 36, pat2, N) else 0
-    fl, fr = ebene(fuss_l, -hl), ebene(fuss_r, -hr)
-    fig = L.zusammen(H, W, [(fl, 0, 0), (fr, 0, 0), (al, 0, 0), (ar, 0, 0), (ol, 0, 0), (orr, 0, 0), (k, 0, 0)])
+    if sink:
+        ol, orr, kopf = L.versetze(ol, 0, 1), L.versetze(orr, 0, 1), L.versetze(kopf, 0, 1)
+    fl, fr = ebene(fuss_l), ebene(fuss_r)
+    fig = L.zusammen(H, W, [(fl, 0, 0), (fr, 0, 0), (al, 0, 0), (ar, 0, 0), (k, 0, 0), (ol, 0, 0), (orr, 0, 0), (kopf, 0, 0)])
     # Regel 16: Randpixel in Nicht-Umrissfarbe werden Umriss
     kk = Hm.kantenmaske(fig)
     for y, x in zip(*np.nonzero(kk)):

@@ -22,8 +22,7 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Auf und ab (zweistufig, Periode 24): Brust zuerst 1 px (die glatte Bauchzeile 12 wird einmal doppelt eingefügt: Körper, Stab und Kopf steigen, Füße bleiben), der Kopf läuft 3 Frames nach und hebt sich um
   ein weiteres px (Wangenzeile 5, glattes Fell zwischen Augen und Nase, wird verlängert): Kopf 0 → 1 → 2 → 1 → 0 px, Brust 0 → 1 → 0.
 * Schwanzspitze schwingt: die zwei obersten Schwanzzeilen (1–2) schlagen 1 px nach links (Frames 2–7 und 40–45) bzw. nach rechts (Frames 22–27), über der Zeile 3 4-verbunden.
-* Gewichtsverlagerung: der Oberkörper (Zeilen 0–13) schiebt sich 1 px nach rechts (Frames 10–21) und später 1 px nach links (Frames 34–45); die Füße bleiben stehen.
-* Kopfneigen: der Kopf (Zeilen 0–8) neigt sich 1 px nach links (Frames 12–17) bzw. rechts (Frames 28–33).
+* Kein Kopfneigen und keine seitliche Gewichtsverlagerung (Rückmeldung: auf einigen Frames klaffte eine Lücke zwischen Schwanz und Kopf; Kopf und Schwanz bewegen sich nun immer gemeinsam).
 * Blinzeln (Frames 19–21 und 41–43): beide Augen schließen sich — lilaweißer Pixel und rote Iris ((4–5,4), (8–9,4)) nehmen die umgebende Fellfarbe (52,124,102) an. Kein Farbtausch, kein Augenglanz.
 * Fußtippen: der linke Fuß hebt sich zweimal 1 px hinter den Körper (Frames 14–21), später der rechte (Frames 36–43).
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
@@ -77,10 +76,10 @@ def frame(i):
     if st:
         Hm.bereich_versatz(k, OFF, {1: st, 2: st}, 14, sw + 1)
     # --- Kopfneigen (Zeilen 0–8, ohne Schwanz) und Gewichtsverlagerung (Zeilen 0–13) ---
-    kn = -1 if Hm.folge(i, 12, [1] * 6, N) else (1 if Hm.folge(i, 28, [1] * 6, N) else 0)
+    kn = 0                                                          # kein Kopfneigen: es riss eine Lücke zwischen Schwanz und Kopf (Rückmeldung)
     if kn:
         Hm.bereich_versatz(k, OFF, {y: kn for y in range(0, 9)}, -2, 12)
-    gv = 1 if Hm.folge(i, 10, [1] * 12, N) else (-1 if Hm.folge(i, 34, [1] * 12, N) else 0)
+    gv = 0                                                          # keine seitliche Gewichtsverlagerung
     if gv:
         Hm.bereich_versatz(k, OFF, {y: gv for y in range(0, 14)}, -2, sw + 1)
     # --- Auf und ab: Bauchzeile 12 = Brust, Wangenzeile 5 läuft 3 Frames nach ---
