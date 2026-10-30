@@ -13171,55 +13171,12 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   pointer-events: none;
   z-index: 1;
 }
-.finale-rakete {
+.finale-leinwand {
   position: absolute;
-  top: 102%;
-  width: 4px;
-  height: 28px;
-  margin-left: -2px;
-  border-radius: 2px;
-  background: linear-gradient(to top, rgba(255,208,102,0), #f9ecb3 65%, #fff);
-  box-shadow: 0 0 10px #fbc86a, 0 0 20px rgba(249,172,32,.6);
-  opacity: 0;
-  animation: finaleRakete .7s cubic-bezier(.3,.6,.5,1) both;
-}
-@keyframes finaleRakete {
-  0%   { top: 102%; opacity: 0; }
-  6%   { opacity: 1; }
-  88%  { opacity: 1; }
-  100% { top: var(--fwf-ziel); opacity: 0; }
-}
-.finale-blitz {
-  position: absolute;
-  width: 150px;
-  height: 150px;
-  margin: -75px 0 0 -75px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255,255,255,.95) 0%, var(--fw-color) 28%, rgba(0,0,0,0) 68%);
-  opacity: 0;
-  animation: finaleBlitz .5s ease-out both;
-}
-@keyframes finaleBlitz {
-  0%   { transform: scale(.2); opacity: 0; }
-  8%   { opacity: .95; }
-  100% { transform: scale(1.5); opacity: 0; }
-}
-.finale-teil {
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  margin: -3px 0 0 -3px;
-  border-radius: 50%;
-  background: var(--fw-color);
-  box-shadow: 0 0 8px var(--fw-color), 0 0 18px var(--fw-color);
-  opacity: 0;
-  animation: finaleTeil 1.75s cubic-bezier(.15,.7,.3,1) both;
-}
-@keyframes finaleTeil {
-  0%   { transform: translate(0, 0) scale(1.4); opacity: 0; }
-  4%   { opacity: 1; }
-  65%  { opacity: .9; }
-  100% { transform: translate(var(--dx), calc(var(--dy) + 80px)) scale(.15); opacity: 0; }
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
 }
 .finale-schwarz {
   position: absolute;
@@ -14297,6 +14254,8 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   user-select: none;
 }
 .phase-end-check input { width: calc(12px * var(--board-scale)); height: calc(12px * var(--board-scale)); accent-color: var(--accent); cursor: pointer; }
+/* Beim Brettaufbau unsichtbar, bis die Lage der Leiste feststeht (app-board.jsx, `bereitMelden`): kein Hineingleiten */
+html:not([data-phase-bereit]) .phase-column { visibility: hidden; }
 .phase-column {
   /* ── EIGENER MASSSTAB (v805, Als Vorgabe 5.9.) ─────────────────────
      „Die Elemente fuer die Phase-Buttons (inklusive ihres neuen
@@ -15982,26 +15941,6 @@ body:has(.textbox-overlay) .tooltip {
   image-rendering: pixelated;
   filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, .55));
 }
-/* Funken als Pixel-Kreuze statt weicher Punkte. */
-.textbox-sparkle {
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  background:
-    linear-gradient(#fff, #fff) center / 2px 6px no-repeat,
-    linear-gradient(#fff, #fff) center / 6px 2px no-repeat;
-  filter: drop-shadow(0 0 2px color-mix(in srgb, var(--tb-seite) 85%, transparent));
-  pointer-events: none;
-  animation: textbox-sparkle-anim 2.1s steps(7, end) infinite;
-  opacity: 0;
-}
-@keyframes textbox-sparkle-anim {
-  0%   { opacity: 0; transform: scale(0) translateY(0); }
-  15%  { opacity: 1; transform: scale(1.2) translateY(-2px); }
-  40%  { opacity: 1; transform: scale(0.8) translateY(-6px); }
-  70%  { opacity: 0.4; transform: scale(0.5) translateY(-10px); }
-  100% { opacity: 0; transform: scale(0) translateY(-14px); }
-}
 /* Namensschild: kleines Pixel-Plaettchen in der Seitenfarbe. */
 .textbox-speaker-name {
   font-family: 'Pixel Intv', 'Press Start 2P', monospace;
@@ -16239,7 +16178,7 @@ body:has(.textbox-overlay) .tooltip {
 /* ── Textbox highlight overlays — cloned cards above the veil ── */
 .textbox-highlight {
   z-index: 90001;
-  border-radius: 6px;
+  border-radius: 0 !important;   /* eckig wie das Handkarten-Highlight: Pixelart, keine runden Ringe */
   box-shadow: 0 0 0 2px #405f8c, 0 0 0 4px #2d4362, 0 0 0 6px #2d4362;
   animation: textbox-hl-glow 1.5s ease-in-out infinite;
   overflow: hidden;
@@ -16251,6 +16190,7 @@ body:has(.textbox-overlay) .tooltip {
 }
 .textbox-highlight-clone,
 .textbox-highlight-clone * {
+  border-radius: 0 !important;
   filter: none !important;
   opacity: 1 !important;
   visibility: visible !important;
@@ -16321,7 +16261,6 @@ body:has(.textbox-overlay) .tooltip {
   .textbox { width: min(600px, calc(94 * var(--vw))); }
   .textbox-portrait { width: 88px; padding: 8px 6px 6px; gap: 6px; }
   .textbox-portrait-frame { width: 56px; height: 56px; }
-  .textbox-sparkle { width: 4px; height: 4px; }
   .textbox-speaker-name { font-size: 7px; letter-spacing: 1px; padding: 3px 4px 2px; }
   .textbox-body { padding: 10px 14px 6px; min-height: 80px; }
   .textbox-text { font-size: 14px; }
@@ -20214,12 +20153,14 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   * { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
   /* Partikel: ohne Leuchtschatten, und nur die ersten 60 je Schicht */
   .pp-logo-particle, .pp-bg-particle { box-shadow: none; }
-  .pp-logo-particle:nth-child(n+61), .pp-bg-particle:nth-child(n+61) { display: none; }
+  .pp-logo-particle:nth-child(n+61) { display: none; }
+  /* Hintergrundteilchen der Menues (Gegnerwahl u. a.): 60 laufende DOM-Animationen kosteten dort spuerbar Bilder (gemessen: ~13 fps bei 6x Drosselung) — 18 genuegen */
+  .pp-bg-particle:nth-child(n+19) { display: none; }
   /* Titelkulisse: Blitz/Bloom/Flash-Ebenen (Screen-Blending) aus,
      Glut-Funken auf 15 gedeckelt, Bolt-Filter aus */
   .anim-bloom, .anim-flash, .anim-lightning { display: none; }
   .anim-embers > span:nth-child(n+16) { display: none; }
-  .anim-vignette { animation: none; }
+  .anim-vignette { display: none; }   /* grobes Dither-Schachbrett an den Raendern: auf dem Handy aus (sah pixelig aus, kostet Bilder) */
   /* DAILY-Glimmen: statisch statt animiert */
   .menu-daily-btn.is-available { animation: none; box-shadow: 0 0 10px rgba(250,213,74,.6); border-color: #fad54a; }
   /* Knopf-Glimmen im Hauptmenue nicht pulsieren lassen */
@@ -22047,6 +21988,9 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 @media (pointer: coarse) and (max-height: 600px) {
   .pp-lotse-schein { animation: none; opacity: .75; }
   .pp-sc-glitzer-teil:nth-child(n+11) { display: none; }
+  /* Glanzband: die maskierte Dither-Flanke kostet je Band eine Maskenebene (CPU-Kacheln ruckelten) — auf dem Handy nur der Kern, etwas breiter */
+  .pp-glanz-band::after { display: none; }
+  .pp-glanz-band { --glanz-kern: 2px; }
 }
 
 /* ── GAST-EINSTIEG IM LOGIN (v1264) ───────────────────────────────────
@@ -26454,3 +26398,53 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   inset: 3px;
 }
 .vscpu-kachel:disabled::after { opacity: .6; }
+
+/* ── HANDY: Tippflaechen ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   Gemessen (844×390, Gast-Tutorial): Phasen-Knoepfe 16 px hoch, Popup-Knoepfe (Abbrechen, Schaden-Knoepfe, ✕) 15–31 px, Kopfzeile/Hand-Knoepfe 17–22 px —
+   weit unter einer daumentauglichen Flaeche. Mindesthoehen in BILDSCHIRM-Pixeln: `calc(N / var(--ui-scale, 1))` nimmt den Menue-Zoom (zoom: .7)
+   wieder heraus, auf dem Kampffeld (ui-noscale) ist der Faktor 1. */
+@media (pointer: coarse) and (max-height: 600px) {
+  /* Popups und Fenster: Zielwahl, Fragen, Galerien, Ergebnis, Tutorial-Liste */
+  .panel-zielwahl-knoepfe .btn, .first-choice-panel .btn, .modal .btn, .modal-overlay .btn, .pp-fenster .btn, .attach-pick-panel .btn,
+  .result-overlay-fade .btn, .textbox-overlay .btn {
+    min-height: calc(36px / var(--ui-scale, 1)); padding-top: 4px; padding-bottom: 4px;
+  }
+  .pp-fenster .btn { min-height: calc(32px / var(--ui-scale, 1)); }   /* Listenzeilen (Tutorial-Liste): sieben Zeilen + Regeln sollen ohne Scrollen passen */
+  .pp-fenster-kopf .btn { min-width: calc(38px / var(--ui-scale, 1)); }
+  .panel-zielwahl-knoepfe .btn, .first-choice-panel .btn { min-width: calc(76px / var(--ui-scale, 1)); }
+  /* Phasenleiste (im Brett, 1:1): Knoepfe und Phasen-Eintraege */
+  .phase-column .phase-btn, .phase-buttons-row .phase-btn { min-height: 30px !important; font-size: 9px !important; padding: 3px 12px !important; }
+  /* auch im Tutorial-Highlight (Klon der Leiste ausserhalb von `.phase-column`): sonst fielen die Eintraege dort auf die 6-px-Kompaktregel zurueck */
+  .phase-column .board-phase-item, .textbox-highlight-clone .board-phase-item { font-size: 8px !important; padding: 4px 6px !important; min-height: 26px !important; display: inline-flex; align-items: center; }
+  /* Die Leiste liegt auf der Naht ueber den Area-Zonen (Area-Stapel liegt ein Stueck unter ihr): nur die Knoepfe selbst fangen Tipps ab, die leeren Flaechen drumherum reichen sie durch. */
+  .phase-column, .phase-column .board-phase-tracker, .phase-column .phase-buttons-row { pointer-events: none !important; }
+  .phase-column button, .phase-column .board-phase-item, .phase-column .phase-end-check { pointer-events: auto !important; }
+  .phase-column .phase-end-check { font-size: 8px !important; min-height: 32px; }
+  .phase-column .phase-end-check input { width: 16px !important; height: 16px !important; }
+  /* Kopfzeile, Hand-Leiste, Lautstaerke */
+  .top-bar .btn, .top-bar .volume-btn { min-height: calc(30px / var(--ui-scale, 1)); }
+  .volume-btn { min-width: calc(30px / var(--ui-scale, 1)) !important; min-height: calc(30px / var(--ui-scale, 1)) !important; }
+  .game-hand-quit, .hand-action-btn { min-height: 30px !important; }
+  .menu-logout-btn { min-height: calc(30px / var(--ui-scale, 1)) !important; }
+}
+
+/* ★ Tutorial-Zoom (Desktop): Brettebene und Sprite-Huelle bekommen dieselbe 2D-Verschiebung/Skalierung (Werte setzt `ppTutorialZoom` in app-board.jsx). Ursprung links oben der Box. */
+.board-center.tut-zoom > .board-plane-clip,
+.board-center.tut-zoom > .hero-sprite-huelle {
+  transform-origin: 0 0;
+  transform: translate(var(--tz-x, 0px), var(--tz-y, 0px)) scale(var(--tz-s, 1));
+  transition: transform .52s cubic-bezier(.45, 0, .2, 1);
+}
+
+/* Gehighlightete Handkarte (Tutorial): ~50 % groesser fuer die Dauer des Highlights (`--tb-hoch` = Versatz nach oben, setzt TextBox in app-shared.jsx). */
+@keyframes tbHandGross {
+  from { scale: 1; translate: 0 0; }
+  to   { scale: 1.5; translate: 0 var(--tb-hoch, 0px); }
+}
+
+/* Gehighlightete Phasenleiste (Desktop): ~50 % groesser fuer die Dauer des Highlights, gestuft statt stufenlos. */
+.textbox-highlight.textbox-highlight-phase {
+  transform-origin: 50% 50%;
+  animation: tbPhaseGross .24s steps(4, end) both;
+}
+@keyframes tbPhaseGross { from { scale: 1; } to { scale: 1.5; } }

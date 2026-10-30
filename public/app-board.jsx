@@ -2099,6 +2099,72 @@ function ppTutorialCamFokus(elemente, opts) {
 }
 window.ppTutorialCamFokus = ppTutorialCamFokus;
 
+// ★ TUTORIAL-ZOOM (Desktop, Als Vorgabe: „Kamerafahrten im Tutorial, in Kombination mit Zooms … Wann immer Karten gehighlightet werden, soll die Kamera auch außerhalb von Mobile
+// reinzoomen, sodass die gehighlighteten Karten im Zentrum sind. Am Ende der Erklärung soll sie wieder auf die normale Größe rauszoomen."): Zoom + Schwenk des Bretts (`.board-plane-clip` und
+// die Sprite-Hülle `.hero-sprite-huelle`, die beide die gleiche Box haben, bekommen dieselbe 2D-Transformation, s. style.css `.tut-zoom`). Der Zoom bringt die Ziele in die Mitte der
+// freien Fläche unter der Textbox. Liegt ein Ziel außerhalb der Brettebene (Phasenleiste, Handkarten, Stapel), bleibt die Ansicht normal. Rückgabe: Promise nach der Fahrt (die Highlight-Klone
+// werden erst danach vermessen) oder null, wenn nichts zu tun ist. `window._ppTz` = aktuelle Verschiebung/Skalierung (nur gültig, solange `.board-center` die Klasse trägt).
+function _ppTzStand(bc) { return (bc && bc.classList.contains('tut-zoom') && window._ppTz) ? window._ppTz : { x: 0, y: 0, s: 1 }; }
+function ppTutorialZoomAus() {
+  try {
+    const bc = document.querySelector('.board-center');
+    if (!bc || !bc.classList.contains('tut-zoom') || !window._ppTz) return null;
+    window._ppTz = null;
+    bc.style.setProperty('--tz-x', '0px'); bc.style.setProperty('--tz-y', '0px'); bc.style.setProperty('--tz-s', '1');
+    return new Promise((fertig) => setTimeout(() => { if (!window._ppTz) bc.classList.remove('tut-zoom'); fertig(); }, 560));
+  } catch { return null; }
+}
+function ppTutorialZoom(elemente) {
+  try {
+    if (window.ppIsPhone && window.ppIsPhone()) return null;
+    const bc = document.querySelector('.board-center');
+    const clip = bc && bc.querySelector(':scope > .board-plane-clip');
+    if (!bc || !clip) return null;
+    const alle = Array.from(elemente || []).filter(e => e && e.getBoundingClientRect);
+    // Mischmengen (Brettkarte + Handkarte): gezoomt wird auf die Brettkarten, die Hand steht ohnehin fest unten. Gehoert die Phasenleiste dazu, bleibt die Ansicht normal
+    // (sie liegt ausserhalb der Brettebene und wuerde beim Zoom nicht mitwandern).
+    const liste = alle.filter(e => clip.contains(e));
+    if (!liste.length || alle.some(e => e.closest && e.closest('.phase-column'))) return ppTutorialZoomAus();
+    const cur = _ppTzStand(bc);
+    const bcr = bc.getBoundingClientRect();
+    // Ursprung der (unverzerrten) Clip-Box auf dem Bildschirm — offsetLeft/Top kennen keine Transforms
+    const O = { x: bcr.left + bc.clientLeft + clip.offsetLeft - bc.scrollLeft, y: bcr.top + bc.clientTop + clip.offsetTop - bc.scrollTop };
+    let bl = Infinity, bt = Infinity, br = -Infinity, bb = -Infinity;
+    for (const e of liste) {
+      const r = e.getBoundingClientRect();
+      if (!r.width && !r.height) continue;
+      // zurueck in den unzoomten Zustand: p' = O + T + s·(p − O)
+      const l = O.x + (r.left - O.x - cur.x) / cur.s, t = O.y + (r.top - O.y - cur.y) / cur.s;
+      const rr = O.x + (r.right - O.x - cur.x) / cur.s, b = O.y + (r.bottom - O.y - cur.y) / cur.s;
+      bl = Math.min(bl, l); bt = Math.min(bt, t); br = Math.max(br, rr); bb = Math.max(bb, b);
+    }
+    if (!isFinite(bl)) return null;
+    // freie Fläche: Brettkasten abzüglich der Textbox oben
+    let oben = bcr.top; const unten = bcr.bottom;
+    const tb = document.querySelector('.textbox');
+    if (tb) { const q = tb.getBoundingClientRect(); if (q.height > 0 && q.top + q.height / 2 < window.innerHeight / 2) oben = Math.max(oben, q.bottom + 8); }
+    const Aw = bcr.width, Ah = Math.max(80, unten - oben);
+    const bw = (br - bl) + 28, bh = (bb - bt) + 28;
+    let s = Math.min((Aw * 0.8) / bw, (Ah * 0.8) / bh, 2);
+    if (!(s >= 1.12)) return ppTutorialZoomAus();
+    s = Math.round(s * 20) / 20;
+    const Cx = bcr.left + Aw / 2, Cy = oben + Ah / 2, px = (bl + br) / 2, py = (bt + bb) / 2;
+    let tx = Cx - O.x - s * (px - O.x), ty = Cy - O.y - s * (py - O.y);
+    // das gezoomte Brett soll den Kasten weiter ausfuellen (keine leeren Raender): Kanten begrenzen
+    const W = clip.offsetWidth, H = clip.offsetHeight;
+    const klemme = (v, lo, hi) => (lo <= hi ? Math.min(hi, Math.max(lo, v)) : (lo + hi) / 2);
+    tx = klemme(tx, bcr.right - O.x - s * W, bcr.left - O.x);
+    ty = klemme(ty, bcr.bottom - O.y - s * H, bcr.top - O.y);
+    if (Math.abs(tx - cur.x) < 2 && Math.abs(ty - cur.y) < 2 && Math.abs(s - cur.s) < 0.02) return null;
+    window._ppTz = { x: tx, y: ty, s };
+    bc.classList.add('tut-zoom');
+    bc.style.setProperty('--tz-x', tx.toFixed(1) + 'px'); bc.style.setProperty('--tz-y', ty.toFixed(1) + 'px'); bc.style.setProperty('--tz-s', String(s));
+    return new Promise((fertig) => setTimeout(fertig, 580));
+  } catch { return null; }
+}
+window.ppTutorialZoom = ppTutorialZoom;
+window.ppTutorialZoomAus = ppTutorialZoomAus;
+
 // ★ AUFMERKSAMKEITSKAMERA (Tutorial, Handy): Nach dem Intro blieb die Kamera auf der Gegnerseite stehen — die eigene Kreaturen-/Support-Reihe
 // liegt dort hinter der Handleiste, der Spieler sah weder die anklickbare Kreatur noch die Zielfelder (Befund Kontrolllauf Tutorial 2/3/6/7).
 // Alle ~450 ms schaut der Beobachter nach markierten, bedienbaren Zielen (aktivierbare Kreaturen/Faehigkeiten/Areas, Zielfelder, waehlbare Helden);
@@ -2135,7 +2201,7 @@ function ppPlatzierungsKamera() {
     if (!sc) return;
     // Support-Zonen-Wahl (Pollution Tokens …) UND „waehle einen Nutzer": sind meine Helden als Ziel markiert (Spell/Attack/Creature per Tipp, mehrere moegliche Wirker),
     // fahren die Kamera zu ihnen.
-    const els = Array.from(sc.querySelectorAll('[data-support-zone].zone-pick-target, [data-support-zone].zone-bounce-place-target, [data-hero-zone].board-zone-play-target, [data-hero-zone].attach-pick-target'));
+    const els = Array.from(sc.querySelectorAll('[data-support-zone].zone-pick-target, [data-support-zone].zone-bounce-place-target, [data-support-zone].zone-drag-valid, [data-hero-zone].board-zone-play-target, [data-hero-zone].attach-pick-target'));   // zone-drag-valid: Handkarte angetippt (Artefakt/Kreatur) — die gueltigen Support-Zonen liegen sonst hinter der Handleiste
     if (!els.length) { _ppPlatzSchluessel = ''; return; }
     if (document.querySelector('.textbox-overlay')) return;   // im Tutorial hat die Textbox-Kamera Vorrang
     if (document.querySelector('.panel-zielwahl')) return;    // das Zielwahl-Fenster steuert die Kamera selbst
@@ -3489,6 +3555,45 @@ function HeroStatusPartikel({ effekte, kern, s, mitteX, fw, fh, saat }) {
  * Hat die Zone keine Figur (Held ohne Spritesheet, Kreatur), bleibt es bei
  * der Zonenklasse.
  */
+// Flug einer Karte zu einer Zone, die ihr Ziel in JEDEM Bild neu misst: bewegt sich das Brett waehrend der 0,6 s (Kamerafahrt, Tutorial-Kamera, Layout-Nachruecken),
+// landet die Karte trotzdem auf dem Helden — vorher war das Ziel einmal beim Start gemessen und die Karte flog auf der Handy-Ansicht daneben.
+// `w0` = Weltanker beim Start (`ppFxWeltAnker`); liegt die Karte in der Welt-Huelle, wird der Scrollversatz jedes Bild neu eingerechnet.
+function ppFlugVerfolgen(fly, sourceEl, destEl, w0, ms, opEnd) {
+  const sr = sourceEl.getBoundingClientRect();
+  const sx = sr.left + sr.width / 2, sy = sr.top + sr.height / 2;
+  const raf = window.ppTaktRaf || requestAnimationFrame;
+  const t0 = performance.now();
+  fly.style.transition = 'none';
+  const ease = (q) => 1 - Math.pow(1 - q, 3);
+  const schritt = () => {
+    if (!fly.isConnected) return;
+    const q = Math.min(1, (performance.now() - t0) / ms), e = ease(q);
+    let dr = null;
+    try { dr = destEl.isConnected ? destEl.getBoundingClientRect() : null; } catch (err) { dr = null; }
+    if (dr && dr.width > 0) {
+      // Liegt die Karte in der Welt-Huelle, wandert ihr Grundpunkt mit dem Scrollstand des Bretts davon (`drift`). Die Karte soll aber bildschirmfest an der Handkarte
+      // starten und erst von dort zum Helden gleiten: Position = Start + e · (Ziel − Start), die Huellenverschiebung wird herausgerechnet.
+      const wJetzt = (w0 && w0.welt && window.ppFxWeltAnker) ? window.ppFxWeltAnker(destEl) : { dx: 0, dy: 0 };
+      const driftX = (w0 && w0.welt) ? (w0.dx - wJetzt.dx) : 0, driftY = (w0 && w0.welt) ? (w0.dy - wJetzt.dy) : 0;
+      const tx = dr.left + dr.width / 2, ty = dr.top + dr.height / 2;
+      fly.style.transform = `translate(${(tx - sx) * e - driftX}px, ${(ty - sy) * e - driftY}px) scale(${1 + (dr.width / sr.width - 1) * e})`;
+      fly.style.opacity = String(1 - (1 - opEnd) * e);
+    }
+    if (q < 1) raf(schritt);
+  };
+  raf(schritt);
+}
+/**
+ * Lage aller Heldenzonen/Support-Zonen im Moment des Aufrufs (Element -> Rechteck). Einschlag-Animationen (Magic Hammer, Keule, Dino …) suchen ihr Ziel
+ * erst nach 300–500 ms; Verschiebt sich das Brett dazwischen (Handy: Kamerafahrt), lag der naechste Treffer ploetzlich ueber einem anderen Helden.
+ */
+// Einschlag-Animationen, die ihre Zielzone selbst quetschen: bekommen das Zonen-Element direkt (`zoneEl`)
+const PP_SQUASH_ANIMS = new Set(['stranglehold_squeeze', 'magic_hammer', 'shattering_strike', 'spiked_club_smash', 'giant_dino_stomp', 'mammoth_stomp', 'ankylo_tail_smash']);
+function ppZonenFrost() {
+  const m = new Map();
+  try { document.querySelectorAll('[data-hero-zone],[data-support-zone]').forEach(el => m.set(el, el.getBoundingClientRect())); } catch (e) { /* ohne Frost: live messen */ }
+  return m;
+}
 function ppZonenSquash(zone, klasse, ms) {
   zone.classList.add(klasse);
   const platz = zone._ppFigurPlatz;
@@ -11929,6 +12034,9 @@ function ppR1Pinsel(buf, gw, gh) {
   };
   return g;
 }
+// Welt-Animationen tragen FELD-Koordinaten (Fenster + Scrollstand des Brettes, s. ppFxWeltAnker). Ursprung (`ox`/`oy`) und Ziele (`targetPoints`) kommen als FENSTERpunkte aus dem
+// Brett-Zweig von `onZoneAnim` — ohne diesen Versatz lagen sie bei gescrolltem Brett (Handy) um den Scrollstand daneben (Flame Avalanche startete viel zu hoch).
+function ppR1FeldVersatz(p) { return (p && p.welt && window.ppFxScrollOffset) ? window.ppFxScrollOffset() : { dx: 0, dy: 0 }; }
 function ppR1Leinwand(malen, ende, mass, opt) {
   const o = opt || {}, S = 3, TAKT = 1000 / 30;
   return function R1Effekt(props) {
@@ -12983,10 +13091,11 @@ const ppR1FlameAvalanche = ppR1Leinwand((g, t, sz, teile) => {
   z: 10100,
   vorbereiten: (sz) => {
     const p = sz.props, W = Math.max(p.w || 900, 320), H = Math.max(p.h || 560, 240), links = p.x - W / 2, oben = p.y - H / 2;
-    const oX = (typeof p.ox === 'number' ? p.ox : p.x) - links, oY = (typeof p.oy === 'number' ? p.oy : p.y + H * 0.35) - oben, dauer = p.duration || 1600, flug = 520;
+    const _v = ppR1FeldVersatz(p);
+    const oX = (typeof p.ox === 'number' ? p.ox + _v.dx : p.x) - links, oY = (typeof p.oy === 'number' ? p.oy + _v.dy : p.y + H * 0.35) - oben, dauer = p.duration || 1600, flug = 520;
     let t0 = Math.round(W * 11 + H * 7 + oX * 3 + oY) >>> 0;
     const r = () => { t0 = (t0 * 1664525 + 1013904223) >>> 0; return t0 / 4294967296; };
-    let ziele = Array.isArray(p.targetPoints) && p.targetPoints.length ? p.targetPoints.map(q => ({ zx: q.x - links, zy: q.y - oben })) : null;
+    let ziele = Array.isArray(p.targetPoints) && p.targetPoints.length ? p.targetPoints.map(q => ({ zx: q.x + _v.dx - links, zy: q.y + _v.dy - oben })) : null;
     if (!ziele) { const vor = oY > H / 2 ? -1 : 1; ziele = Array.from({ length: 5 }, (_, i) => ({ zx: W * (0.15 + i * 0.175), zy: oY + vor * H * 0.55 })); }
     const bahnen = [], treffer = [], jeZiel = Math.max(4, Math.min(9, Math.floor(66 / ziele.length)));
     ziele.forEach((z, zi) => {
@@ -13070,7 +13179,8 @@ const R1HoleLeinwand = ppR1Leinwand((g, t, sz, teile) => {
   z: 10100,
   vorbereiten: (sz) => {
     const p = sz.props, W = Math.max(p.w || 900, 320), H = Math.max(p.h || 560, 240), links = p.x - W / 2, oben = p.y - H / 2, mx = W / 2, my = H / 2;
-    const ziele = (Array.isArray(p.targetPoints) ? p.targetPoints : []).map(q => ({ zx: q.x - links, zy: q.y - oben }));
+    const _v = ppR1FeldVersatz(p);
+    const ziele = (Array.isArray(p.targetPoints) ? p.targetPoints : []).map(q => ({ zx: q.x + _v.dx - links, zy: q.y + _v.dy - oben }));
     let s0 = Math.round(W * 13 + H * 5 + ziele.length * 97) >>> 0;
     const r = () => { s0 = (s0 * 1664525 + 1013904223) >>> 0; return s0 / 4294967296; };
     const splitter = [];
@@ -13101,7 +13211,8 @@ function HoleInTheSkyPullEffekt(props) {
   const { x, y, w, h, duration, targetPoints } = props;
   const W = Math.max(w || 900, 320), H = Math.max(h || 560, 240), links = x - W / 2, oben = y - H / 2, mx = W / 2, my = H / 2;
   const dauer = duration || 2400, Z = PP_R1_HOLE_ZUSCHNAPP;
-  const ziele = useMemo(() => (Array.isArray(targetPoints) ? targetPoints : []).map(p => ({ ...p, zx: p.x - links, zy: p.y - oben })), [targetPoints, links, oben]);
+  const _v = ppR1FeldVersatz(props);
+  const ziele = useMemo(() => (Array.isArray(targetPoints) ? targetPoints : []).map(p => ({ ...p, zx: p.x + _v.dx - links, zy: p.y + _v.dy - oben })), [targetPoints, links, oben]);
   // Die eingesogenen Karten: nur Kreaturen (Support-Platz + Name); Helden bleiben stehen. Die Zone wird SOFORT verborgen, der Notnagel gibt sie frei, falls die Rückreise (Engine) ausbleibt.
   const karten = useMemo(() => {
     let s0 = Math.round(W * 7 + H * 3 + ziele.length * 31) >>> 0;
@@ -17316,17 +17427,20 @@ const ANIM_REGISTRY = {
     };
   })(),
   stranglehold_squeeze: (() => {
-    return function StrangleholdSqueezeEffect({ x, y }) {
+    return function StrangleholdSqueezeEffect({ x, y, zoneEl }) {
       useEffect(() => {
+        const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken: bis der Einschlag kommt, kann die Kamera das Brett verschoben haben (Handy) — sonst traf der Squash den falschen Helden
         const timer = setTimeout(() => {
           const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
           let best = null, bestDist = Infinity;
           els.forEach(el => {
-            const r = el.getBoundingClientRect();
+            const r = (_frost.get(el) || el.getBoundingClientRect());
             const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
+          // Das Ziel-Element kommt direkt aus playAnimation: x/y liegen bei Weltverankerung im Welt-Koordinatensystem und passen nach einer Kamerafahrt nicht mehr zu den Bildschirm-Rechtecken (Tutorial 1: der Hammer quetschte die ausfuehrende Ida)
+          if (zoneEl && zoneEl.isConnected) { best = zoneEl; bestDist = 0; }
           if (best && bestDist < 80) {
             best.classList.add('stranglehold-squeezed');
             setTimeout(() => best.classList.remove('stranglehold-squeezed'), 1200);
@@ -21646,7 +21760,7 @@ const ANIM_REGISTRY = {
   })(),
   coffee_steam: ppR1CoffeeSteam,   // W86r1: Pixelart-Leinwand
   magic_hammer: (() => {
-    return function MagicHammerEffect({ x, y, w, h }) {
+    return function MagicHammerEffect({ x, y, w, h, zoneEl }) {
       const targetW = w || 70;
       const targetH = h || 90;
       const hammerW = 55;
@@ -21666,16 +21780,19 @@ const ANIM_REGISTRY = {
       }), []);
       // Apply squash class to actual target DOM element
       useEffect(() => {
+        const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken (Kamerafahrt vor dem Einschlag darf das Ziel nicht verschieben)
         const timer = setTimeout(() => {
           // Find the hero or support zone element under this animation
           const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
           let best = null, bestDist = Infinity;
           els.forEach(el => {
-            const r = el.getBoundingClientRect();
+            const r = (_frost.get(el) || el.getBoundingClientRect());
             const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
+          // Das Ziel-Element kommt direkt aus playAnimation: x/y liegen bei Weltverankerung im Welt-Koordinatensystem und passen nach einer Kamerafahrt nicht mehr zu den Bildschirm-Rechtecken (Tutorial 1: der Hammer quetschte die ausfuehrende Ida)
+          if (zoneEl && zoneEl.isConnected) { best = zoneEl; bestDist = 0; }
           if (best && bestDist < 80) ppZonenSquash(best, 'magic-hammer-squashed', 650);
         }, 330);
         return () => clearTimeout(timer);
@@ -21750,16 +21867,19 @@ const ANIM_REGISTRY = {
         return { dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed * 0.35, size: 3 + Math.random() * 5, color: DUST[Math.floor(Math.random() * DUST.length)], delay: 310 + Math.random() * 60, dur: 380 + Math.random() * 220 }; }),
     }), { radius: (p) => [130, (p.h || 90) / 2 + 280], z: 10100 });
     return function ShatteringStrikeEffect(props) {
-      const { x, y } = props;
+      const { x, y, zoneEl } = props;
       useEffect(() => {
+        const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken: bis der Einschlag kommt, kann die Kamera das Brett verschoben haben (Handy) — sonst traf der Squash den falschen Helden
         const timer = setTimeout(() => {
           const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
           let best = null, bestDist = Infinity;
           els.forEach(el => {
-            const r = el.getBoundingClientRect();
+            const r = (_frost.get(el) || el.getBoundingClientRect());
             const d = Math.abs(r.left + r.width / 2 - x) + Math.abs(r.top + r.height / 2 - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
+          // Das Ziel-Element kommt direkt aus playAnimation: x/y liegen bei Weltverankerung im Welt-Koordinatensystem und passen nach einer Kamerafahrt nicht mehr zu den Bildschirm-Rechtecken (Tutorial 1: der Hammer quetschte die ausfuehrende Ida)
+          if (zoneEl && zoneEl.isConnected) { best = zoneEl; bestDist = 0; }
           if (best && bestDist < 80) ppZonenSquash(best, 'magic-hammer-squashed', 550);
         }, 300);
         return () => clearTimeout(timer);
@@ -21777,7 +21897,7 @@ const ANIM_REGISTRY = {
   //  synchron mit dem `_delay(480)` in 3-headed-giant.js, das
   //  die 100 ms Mount-Vorlauf mitrechnet.
   spiked_club_smash: (() => {
-    return function SpikedClubSmashEffect({ x, y, w, h }) {
+    return function SpikedClubSmashEffect({ x, y, w, h, zoneEl }) {
       const targetH = h || 90;
       const clubW = 46;
       const clubH = 132;
@@ -21807,15 +21927,18 @@ const ANIM_REGISTRY = {
       // Ziel-Stauchung auf das echte DOM-Element legen — gleiche
       // Nächster-Nachbar-Suche wie beim magic_hammer.
       useEffect(() => {
+        const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken: bis der Einschlag kommt, kann die Kamera das Brett verschoben haben (Handy) — sonst traf der Squash den falschen Helden
         const timer = setTimeout(() => {
           const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
           let best = null, bestDist = Infinity;
           els.forEach(el => {
-            const r = el.getBoundingClientRect();
+            const r = (_frost.get(el) || el.getBoundingClientRect());
             const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
+          // Das Ziel-Element kommt direkt aus playAnimation: x/y liegen bei Weltverankerung im Welt-Koordinatensystem und passen nach einer Kamerafahrt nicht mehr zu den Bildschirm-Rechtecken (Tutorial 1: der Hammer quetschte die ausfuehrende Ida)
+          if (zoneEl && zoneEl.isConnected) { best = zoneEl; bestDist = 0; }
           if (best && bestDist < 80) {
             best.classList.add('club-smash-squashed');
             setTimeout(() => best.classList.remove('club-smash-squashed'), 700);
@@ -21856,7 +21979,7 @@ const ANIM_REGISTRY = {
   //  from 820px up, and the squash on the target lingers
   //  longer before bouncing back.
   giant_dino_stomp: (() => {
-    return function GiantDinoStompEffect({ x, y, w, h }) {
+    return function GiantDinoStompEffect({ x, y, w, h, zoneEl }) {
       const targetH = h || 90;
       const legW = 120;
       const legH = 250;
@@ -21875,15 +21998,18 @@ const ANIM_REGISTRY = {
       }), []);
       // Apply heavy squash to the actual target element on impact.
       useEffect(() => {
+        const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken: bis der Einschlag kommt, kann die Kamera das Brett verschoben haben (Handy) — sonst traf der Squash den falschen Helden
         const timer = setTimeout(() => {
           const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
           let best = null, bestDist = Infinity;
           els.forEach(el => {
-            const r = el.getBoundingClientRect();
+            const r = (_frost.get(el) || el.getBoundingClientRect());
             const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
+          // Das Ziel-Element kommt direkt aus playAnimation: x/y liegen bei Weltverankerung im Welt-Koordinatensystem und passen nach einer Kamerafahrt nicht mehr zu den Bildschirm-Rechtecken (Tutorial 1: der Hammer quetschte die ausfuehrende Ida)
+          if (zoneEl && zoneEl.isConnected) { best = zoneEl; bestDist = 0; }
           if (best && bestDist < 100) {
             best.classList.add('giant-dino-stomp-squashed');
             setTimeout(() => best.classList.remove('giant-dino-stomp-squashed'), 850);
@@ -21981,18 +22107,21 @@ const ANIM_REGISTRY = {
       return { dx: Math.cos(angle) * speed, dy: -Math.abs(Math.sin(angle) * speed) - 6, size: 4 + Math.random() * 9, color: STAUB[Math.floor(Math.random() * 6)], delay: 360 + Math.random() * 130, dur: 380 + Math.random() * 340 };
     }) }), { radius: (p) => [200, 1200], z: 10100 });
     return function MammothStompEffect(props) {
-      const { x, y } = props;
+      const { x, y, zoneEl } = props;
       // Schwerer Squash des Zielhelden — dieselbe Klasse wie beim Dino-Stampfer; die Stauchung selbst macht die Pipeline im Kunstpixelraster.
       useEffect(() => {
+        const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken: bis der Einschlag kommt, kann die Kamera das Brett verschoben haben (Handy) — sonst traf der Squash den falschen Helden
         const timer = setTimeout(() => {
           const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
           let best = null, bestDist = Infinity;
           els.forEach(el => {
-            const r = el.getBoundingClientRect();
+            const r = (_frost.get(el) || el.getBoundingClientRect());
             const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
+          // Das Ziel-Element kommt direkt aus playAnimation: x/y liegen bei Weltverankerung im Welt-Koordinatensystem und passen nach einer Kamerafahrt nicht mehr zu den Bildschirm-Rechtecken (Tutorial 1: der Hammer quetschte die ausfuehrende Ida)
+          if (zoneEl && zoneEl.isConnected) { best = zoneEl; bestDist = 0; }
           if (best && bestDist < 100) {
             best.classList.add('giant-dino-stomp-squashed');
             setTimeout(() => best.classList.remove('giant-dino-stomp-squashed'), 850);
@@ -22131,7 +22260,7 @@ const ANIM_REGISTRY = {
   //  point (left edge of the assembly) so the heavy club lands
   //  cleanly on the target while the tail trails offscreen.
   ankylo_tail_smash: (() => {
-    return function AnkyloTailSmashEffect({ x, y }) {
+    return function AnkyloTailSmashEffect({ x, y, zoneEl }) {
       const tailLength    = 460;
       const tailThickness = 50;
       const clubSize      = 130;
@@ -22152,15 +22281,18 @@ const ANIM_REGISTRY = {
 
       // Squash the actual target element on impact (~440ms in).
       useEffect(() => {
+        const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken: bis der Einschlag kommt, kann die Kamera das Brett verschoben haben (Handy) — sonst traf der Squash den falschen Helden
         const timer = setTimeout(() => {
           const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
           let best = null, bestDist = Infinity;
           els.forEach(el => {
-            const r = el.getBoundingClientRect();
+            const r = (_frost.get(el) || el.getBoundingClientRect());
             const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
+          // Das Ziel-Element kommt direkt aus playAnimation: x/y liegen bei Weltverankerung im Welt-Koordinatensystem und passen nach einer Kamerafahrt nicht mehr zu den Bildschirm-Rechtecken (Tutorial 1: der Hammer quetschte die ausfuehrende Ida)
+          if (zoneEl && zoneEl.isConnected) { best = zoneEl; bestDist = 0; }
           if (best && bestDist < 100) {
             best.classList.add('giant-dino-stomp-squashed');
             setTimeout(() => best.classList.remove('giant-dino-stomp-squashed'), 850);
@@ -37776,6 +37908,7 @@ const FINALE_FEUERWERK_MS = 8500;
 const FINALE_AUSBLENDEN_MS = 3200;
 const FINALE_FARBEN = ['#fad54a', '#fc1c5f', '#4ceb70', '#1ca9fd', '#ff8b1a', '#a952ff', '#1aedff', '#ffffff'];
 function TutorialFinaleFeuerwerk() {
+  const leinwand = useRef(null);
   const salven = useMemo(() => {
     const anzahlSalven = 17;
     return Array.from({ length: anzahlSalven }, (_, i) => {
@@ -37784,7 +37917,7 @@ function TutorialFinaleFeuerwerk() {
       return {
         // Zeitpunkt des Starts (s): gleichmaessig ueber die Dauer, leicht verwackelt.
         zeit: 0.15 + i * ((FINALE_FEUERWERK_MS / 1000 - 2.4) / anzahlSalven) + Math.random() * 0.25,
-        x: 10 + Math.random() * 80, y: 13 + Math.random() * 38,
+        x: 0.1 + Math.random() * 0.8, y: 0.13 + Math.random() * 0.38,
         farbe: FINALE_FARBEN[(i * 3 + Math.floor(Math.random() * 3)) % FINALE_FARBEN.length],
         teile: Array.from({ length: anzahl }, (_, k) => {
           const w = (k / anzahl) * Math.PI * 2 + Math.random() * 0.18;
@@ -37803,21 +37936,69 @@ function TutorialFinaleFeuerwerk() {
     }
     return () => timer.forEach(clearTimeout);
   }, [salven]);
+  // Pixelart auf EINER kleinen Leinwand (Rasterpixel = 3 Bildschirmpixel, ~30 Bilder/s): Raketen als Pixelsaeule, Funken als Bloecke mit kurzem Schweif, Blitz als Pixelring, Ausblenden per Raster
+  // statt Alpha. Ersetzt ~480 einzeln animierte DOM-Funken mit Blur-Schein (ruckelte auf schwachen Rechnern).
+  useEffect(() => {
+    const cv = leinwand.current;
+    if (!cv || window._playAnimations === false) return undefined;
+    const S = 3;
+    const r0 = cv.parentElement.getBoundingClientRect();
+    const W = Math.max(40, Math.ceil(r0.width / S)), H = Math.max(40, Math.ceil(r0.height / S));
+    cv.width = W; cv.height = H;
+    const g = cv.getContext('2d');
+    const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+    const zeigen = (x, y, a) => a >= 1 || (a > 0 && BAYER[(y & 3) * 4 + (x & 3)] < a * 16);
+    const block = (x, y, n, farbe, a) => {
+      x = Math.round(x); y = Math.round(y);
+      if (a < 1) { g.fillStyle = farbe; for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (zeigen(x + i, y + j, a)) g.fillRect(x + i, y + j, 1, 1); return; }
+      g.fillStyle = farbe; g.fillRect(x, y, n, n);
+    };
+    const t0 = performance.now(); let letzt = -1e9, raf = 0, ende = false;
+    const schritt = (jetzt) => {
+      if (ende) return;
+      raf = requestAnimationFrame(schritt);
+      if (jetzt - letzt < 32) return;
+      letzt = jetzt;
+      const t = (jetzt - t0) / 1000;
+      g.clearRect(0, 0, W, H);
+      for (const sv of salven) {
+        const cx = sv.x * W, cy = sv.y * H;
+        // Rakete (0,7 s): steigt von unten zur Platzstelle, Pixelsaeule mit Schweif
+        const fr = (t - sv.zeit) / 0.7;
+        if (fr >= 0 && fr <= 1) {
+          const e = 1 - Math.pow(1 - fr, 2), y = H * 1.02 + (cy - H * 1.02) * e;
+          for (let k = 0; k < 6; k++) block(cx, y + k * 2, 1, k < 2 ? '#ffffff' : k < 4 ? '#f9ecb3' : '#fbc86a', 1 - k / 7);
+        }
+        const fb = (t - sv.zeit - 0.7);
+        if (fb < 0) continue;
+        // Blitz (0,5 s): gedithertes Leuchten (Scheibe, innen weiss) und ein Pixelring, der sich weitet
+        if (fb < 0.5) {
+          const f = fb / 0.5, R = 4 + 16 * f, a = (1 - f) * 0.8, R2 = R * R;
+          for (let y = -Math.ceil(R); y <= R; y++) for (let x = -Math.ceil(R); x <= R; x++) {
+            const d = x * x + y * y; if (d > R2) continue;
+            const px = Math.round(cx) + x, py = Math.round(cy) + y;
+            if (zeigen(px, py, a * (1 - d / R2 * 0.6))) { g.fillStyle = d < R2 * 0.25 && f < 0.6 ? '#ffffff' : sv.farbe; g.fillRect(px, py, 1, 1); }
+          }
+        }
+        // Funken (1,9 s): fliegen auseinander, fallen leicht, werden kleiner und dithern aus
+        if (fb > 1.9) continue;
+        const f = fb / 1.9, e = 1 - Math.pow(1 - f, 3), a = f < 0.6 ? 1 : 1 - (f - 0.6) / 0.4, n = f < 0.22 ? 3 : f < 0.6 ? 2 : 1;
+        sv.teile.forEach((tl, k) => {
+          const x = cx + tl.dx * e / S, y = cy + (tl.dy + 80 * e) / S;
+          for (const [vz, ga] of [[0.1, 0.35], [0.05, 0.6]]) { const e2 = 1 - Math.pow(1 - Math.max(0, f - vz), 3); if (f < 0.55) block(cx + tl.dx * e2 / S, cy + (tl.dy + 80 * e2) / S, Math.max(1, n - 1), sv.farbe, a * ga); }
+          block(x, y, n, sv.farbe, a);
+          if (f > 0.12 && f < 0.6 && ((k + Math.floor(t * 20)) & 3) === 0) block(x, y, n, '#ffffff', 1);   // Glitzern
+        });
+      }
+      if (t > FINALE_FEUERWERK_MS / 1000 + 1) ende = true;
+    };
+    raf = requestAnimationFrame(schritt);
+    return () => { ende = true; cancelAnimationFrame(raf); };
+  }, [salven]);
   if (window._playAnimations === false) return null;
   return (
     <div className="finale-feuerwerk">
-      {salven.map((sv, i) => (
-        <React.Fragment key={i}>
-          <div className="finale-rakete" style={{ left: sv.x + '%', '--fwf-ziel': sv.y + '%', animationDelay: sv.zeit + 's' }} />
-          <div className="finale-blitz" style={{ left: sv.x + '%', top: sv.y + '%', '--fw-color': sv.farbe, animationDelay: (sv.zeit + 0.7) + 's' }} />
-          {sv.teile.map((t, k) => (
-            <div key={k} className="finale-teil" style={{
-              left: sv.x + '%', top: sv.y + '%', '--dx': t.dx + 'px', '--dy': t.dy + 'px',
-              '--fw-color': sv.farbe, animationDelay: (sv.zeit + 0.7) + 's',
-            }} />
-          ))}
-        </React.Fragment>
-      ))}
+      <canvas ref={leinwand} className="finale-leinwand" data-pp-px="aus" />
     </div>
   );
 }
@@ -38387,6 +38568,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   // ── Tutorial outro: show textbox before victory screen ──
   const [tutorialOutroPending, setTutorialOutroPending] = useState(false);
+  // Abschlussmonolog gesprochen? Der Siegerschirm bleibt bis dahin weg — ueber diesen Zustand statt ueber `tutorialOutroPending`: das wird erst im Effekt NACH dem ersten Render mit Ergebnis gesetzt, dazwischen stand der Schirm (je nach Geraet Sekundenbruchteile bis eine halbe Sekunde) da.
+  const [tutorialOutroDone, setTutorialOutroDone] = useState(false);
   const [resultFading, setResultFading] = useState(false);
   const tutorialOutroFiredRef = useRef(null);
   // Synchronous mirror of tutorialOutroPending — written alongside the
@@ -38411,7 +38594,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           speakerName: 'Monia Bot',
           ...(outroPages ? { pages: outroPages } : { text: outroText }),
           ...(script.opts || {}),
-          onDismiss: () => { outroPendingRef.current = false; setTutorialOutroPending(false); },
+          onDismiss: () => { outroPendingRef.current = false; setTutorialOutroPending(false); setTutorialOutroDone(true); },
         });
       }, 300);
     }
@@ -38431,6 +38614,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     tutorialOutroFiredRef.current = null;
     outroPendingRef.current = false;
     setTutorialOutroPending(false);
+    setTutorialOutroDone(false);
   }, [result, lobby?.id]);
 
   // Victory / defeat fanfare — fires exactly once when result first appears.
@@ -38599,12 +38783,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
      * misst die aber alle mit und schreibt drei weitere Variablen.
      * Beim Scrollen wird deshalb nur noch die Platte nachgezogen.
      */
+    // Die Leiste bleibt unsichtbar (`html:not([data-phase-bereit]) .phase-column`, style.css), bis ihre Lage zweimal hintereinander gleich gemessen wurde:
+    // beim Brettaufbau rueckt das Layout in 2–3 Schritten zurecht, und die Leiste glitt sonst sichtbar an ihren Platz. Netz: nach 1,5 s erscheint sie in jedem Fall.
+    const wurzel = document.documentElement;
+    wurzel.removeAttribute('data-phase-bereit');
+    let bereitSig = null;
+    const bereitMelden = (col, midY) => {
+      if (wurzel.hasAttribute('data-phase-bereit')) return;
+      const q = col.getBoundingClientRect();
+      const sig = Math.round(midY) + '|' + Math.round(q.left) + '|' + Math.round(q.top) + '|' + Math.round(q.width);
+      if (sig === bereitSig && q.width > 0) wurzel.setAttribute('data-phase-bereit', '1');
+      bereitSig = sig;
+    };
+    const bereitNetz = setTimeout(() => wurzel.setAttribute('data-phase-bereit', '1'), 1500);
     const apply = (nurPlatte = false) => {
       // Waehrend ein Kartenzug laeuft, aendert sich die Brettgeometrie
       // nicht — jede Messung hier waere ein erzwungener Umbruch pro
       // Mausbewegung. Nach dem Loslassen laeuft ohnehin ein Render und
       // der 400-ms-Takt darunter.
       if (document.body.classList.contains('pp-dragging-card')) return;
+      // Tutorial-Zoom (Desktop): die Naht (`.board-area-zones-center`) wird im gezoomten Brett gemessen — die Leiste liefe sonst mit dem Zoom davon und ihr Highlight stuende
+      // an der falschen Stelle. Waehrend des Zooms bleibt die Lage stehen; nach dem Herauszoomen (Klasse faellt) misst der naechste Lauf wieder normal.
+      if (document.querySelector('.board-center.tut-zoom')) return;
       const col = document.querySelector('.phase-column');
       if (!col) return;
       const parent = col.offsetParent || document.documentElement;
@@ -38619,7 +38819,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         document.querySelectorAll('[data-hero-zone][data-hero-owner="opp"]').forEach(e => { const r = e.getBoundingClientRect(); if (r.height > 0) oppUnten = Math.max(oppUnten, r.bottom); });
         document.querySelectorAll('[data-hero-zone][data-hero-owner="me"]').forEach(e => { const r = e.getBoundingClientRect(); if (r.height > 0) meOben = Math.min(meOben, r.top); });
         if (isFinite(oppUnten) && isFinite(meOben)) {
-          setzeVar(document.documentElement.style, '--phase-mid-y', ((oppUnten + meOben) / 2 - parent.getBoundingClientRect().top + parent.scrollTop) + 'px');
+          const midY = (oppUnten + meOben) / 2 - parent.getBoundingClientRect().top + parent.scrollTop;
+          setzeVar(document.documentElement.style, '--phase-mid-y', midY + 'px');
+          bereitMelden(col, midY);
           messePlatte(col); return;
         }
       }
@@ -38659,6 +38861,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       if (y == null) return;
       setzeVar(document.documentElement.style, '--phase-mid-y', (y - pr.top) + 'px');
+      bereitMelden(col, y - pr.top);
       // Hoehe NUR der Phasenzeile — das CSS verschiebt die Spalte um die
       // Haelfte davon nach oben, damit genau diese Zeile auf der Linie
       // liegt und die Button-Reihe darunter haengt.
@@ -38730,6 +38933,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     if (center) center.addEventListener('scroll', onScroll, { passive: true });
     return () => {
+      clearTimeout(bereitNetz);
+      wurzel.removeAttribute('data-phase-bereit');
       cancelAnimationFrame(raf);
       if (ro) ro.disconnect();
       window.removeEventListener('resize', apply);
@@ -45461,10 +45666,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       fly.style.cssText = `position:fixed;left:${sr.left + _w.dx}px;top:${sr.top + _w.dy}px;width:${sr.width}px;height:${sr.height}px;z-index:10150;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 20px rgba(255,208,102,.6);transition:transform 600ms cubic-bezier(.22,.8,.3,1),opacity 600ms ease-out;`;
       (_w.welt && window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(fly);
       // Next frame: kick off the transform so the transition plays.
-      requestAnimationFrame(() => {
-        fly.style.transform = `translate(${dx}px, ${dy}px) scale(${dr.width / sr.width})`;
-        fly.style.opacity = '0.2';
-      });
+      ppFlugVerfolgen(fly, sourceEl, destEl, _w, 600, 0.2);
       setTimeout(() => { fly.remove(); }, 700);
     };
     socket.on('hand_to_board_fly', onHandToBoard);
@@ -45583,10 +45785,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const _w = _wa.welt ? _wa : _ws;
       fly.style.cssText = `position:fixed;left:${sr.left + _w.dx}px;top:${sr.top + _w.dy}px;width:${sr.width}px;height:${sr.height}px;z-index:10150;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 24px rgba(244,174,100,.7);transition:transform 600ms cubic-bezier(.22,.8,.3,1),opacity 600ms ease-out;`;
       (_w.welt && window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(fly);
-      requestAnimationFrame(() => {
-        fly.style.transform = `translate(${dx}px, ${dy}px) scale(${dr.width / sr.width})`;
-        fly.style.opacity = '0.3';
-      });
+      ppFlugVerfolgen(fly, sourceEl, destEl, _w, 600, 0.3);
       setTimeout(() => { fly.remove(); }, 700);
     };
     socket.on('attach_hero_fly', onAttachHeroFly);
@@ -54213,7 +54412,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const entfernen = () => setGameAnims(prev => prev.filter(a => a.id !== id));
     let gestartet = false;
     const _gemountet = () => { if (gestartet) return; gestartet = true; setTimeout(entfernen, dur); };
-    setGameAnims(prev => [...prev, { id, type, x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height / 2 + _wo.dy, w: r.width, h: r.height, welt: _wo.welt, ...options, _gemountet }]);
+    setGameAnims(prev => [...prev, { id, type, x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height / 2 + _wo.dy, w: r.width, h: r.height, welt: _wo.welt, ...(PP_SQUASH_ANIMS.has(type) ? { zoneEl: el } : null), ...options, _gemountet }]);
     setTimeout(() => { if (!gestartet) { gestartet = true; entfernen(); } }, dur + 6000);
   };
 
@@ -61901,6 +62100,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           showTextBox(null);
           setShowSurrender(false);
           if (window.stopSFX) { window.stopSFX('victory'); window.stopSFX('defeat'); }   // v1146
+          if (gameState.isTutorial) window._ppTutorialRetry = true;   // Neuer Versuch: die Einleitung nicht noch einmal abspielen (app-screens)
           socket.emit('retry_puzzle', { roomId: gameState.roomId });
         };
         return (
@@ -63449,7 +63649,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       )}
 
       {/* ── Puzzle / Tutorial Result Overlay ── */}
-      {result && result.isPuzzle && !tutorialOutroPending && (() => {
+      {/* Siegerschirm erst nach dem Abschlussmonolog (`tutorialOutroDone`) — ohne diese Sperre stand er zwischen Ergebnis und Monolog kurz im Bild. */}
+      {result && result.isPuzzle && !tutorialOutroPending
+        && !(result.isTutorial && result.puzzleResult === 'success' && (window.TUTORIAL_SCRIPTS || {})[window._currentTutorialNum]?.outro && !tutorialOutroDone)
+        && (() => {
         // The final tutorial (script flagged `isFinalTutorial: true`) gets
         // a celebratory upgrade: big multi-colored fireworks + a beefier
         // "TUTORIAL CLEARED!" banner instead of the usual "STAGE CLEARED!".
@@ -63503,7 +63706,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
                 <button className="btn" style={{ padding: '10px 28px', fontSize: 13, width: 220, borderColor: 'var(--accent)', color: 'var(--accent)' }}
-                  onClick={() => { if (window.stopSFX) { window.stopSFX('victory'); window.stopSFX('defeat'); } socket.emit('retry_puzzle', { roomId: gameState.roomId }); }}>
+                  onClick={() => { if (window.stopSFX) { window.stopSFX('victory'); window.stopSFX('defeat'); } if (result?.isTutorial) window._ppTutorialRetry = true; socket.emit('retry_puzzle', { roomId: gameState.roomId }); }}>
                   🔄 Retry
                 </button>
                 <button className="btn btn-danger" style={{ padding: '10px 28px', fontSize: 13, width: 220 }}

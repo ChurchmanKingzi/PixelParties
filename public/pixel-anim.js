@@ -1114,6 +1114,8 @@
     const pos = cs.position;
     if (pos !== 'absolute' && pos !== 'fixed') return false;
     if (cs.display === 'none' || cs.display === 'contents') return false;
+    // `malen` malt nur Hintergruende/Rahmen, nie <img>/<canvas>/<video>-Inhalt — ein Element mit Kartenbild darin (fliegende Karten: Ziehen, Suchen) wuerde zum leeren Sprite und seine echten Kinder verschwaenden.
+    if (el.querySelector('img, canvas, video')) return false;
     return true;
   }
 

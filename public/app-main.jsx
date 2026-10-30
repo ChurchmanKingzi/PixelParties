@@ -2629,6 +2629,12 @@ for (const t of Object.values(_bgmTracks)) {
   }
 }
 
+// Musikstueck vorab laden + dekodieren (Web Audio): das erste Umschalten auf ein ungeladenes Stueck dekodiert 1,5 MB Ogg zu ~30 MB PCM — auf Handys ein Ruckler
+// genau in dem Moment, in dem es umschaltet (Tutorial 5: Antonia crasht Monia Bot aus dem Bild). Aufruf vor dem Auftritt, in einer ruhigen Textseite.
+window.ppBgmVorwaermen = (modus) => {
+  try { const t = _bgmTracks[modus]; if (t && typeof t._ensureBuffer === 'function') t._ensureBuffer().catch(() => {}); } catch (e) { /* optional */ }
+};
+
 // Volume control bridge — VolumeControl sets this
 window._ppSetMusicVolume = (vol) => {
   let cur = null;
@@ -3118,6 +3124,7 @@ function OpponentUnlockPopup() {
   useEffect(() => {
     const onUnlocked = (data) => {
       const list = (data && data.opponents) || [];
+      list.forEach(o => o && window.ppDeckVorwaermen && window.ppDeckVorwaermen(o.warm, true));
       if (list.length) setQueue(q => [...q, ...list]);
     };
     // Skin-Game gewonnen: derselbe Popup-Rahmen, nur mit Skin-Bild und -Text.
@@ -3557,6 +3564,9 @@ function App() {
       // `challengeStart`: eine angenommene Herausforderung (social.js) schickt beide Spieler aus dem Menü ins Spiel.
       if (state.reconnected || state.challengeStart) {
         // Puzzle games are ephemeral — don't reconnect, just clean up
+        // Ausnahme: ein LAUFENDES Tutorial dieser Seitensitzung (`_currentTutorialNum`) bleibt — ein kurzer Netz-/App-Wechsel am Handy darf es nicht beenden;
+        // der Tutorial-Hook (app-screens) nimmt den frisch gesendeten Zustand selbst entgegen. Nach einem Neuladen (keine Tutorialnummer) wird wie bisher geraeumt.
+        if (state.isPuzzle && state.isTutorial && window._currentTutorialNum && !window._tutorialGaveUp) return;
         if (state.isPuzzle) {
           socket.emit('leave_game', { roomId: state.roomId });
           return;

@@ -95,12 +95,31 @@ function useTutorialFlow(open) {
   // Receive the board state for a running tutorial attempt.
   useEffect(() => {
     if (!open) return;
+    // Verbindungswaechter: nach einem Wiederverbinden muss der Server binnen 5 s den Tutorial-Zustand neu senden (Raum bleibt 3 min erhalten).
+    // Kommt nichts (Raum weg, z. B. Server neu gestartet), wuerde das Brett weiter stehen und jede Eingabe ins Leere gehen — dann klar abbrechen.
+    let waechter = 0;
+    const onConnect = () => {
+      if (!tutorialAttemptRoom.current) return;
+      clearTimeout(waechter);
+      waechter = setTimeout(() => {
+        if (!tutorialAttemptRoom.current) return;
+        notify('Connection lost — the tutorial ended. Please start it again.', 'error');
+        setTutorialAttemptState(null);
+        tutorialAttemptRoom.current = null;
+        tutorialIntroShownRef.current = null;
+        window._currentTutorialNum = null;
+        if (window.setTutorialFigurenGesperrt) window.setTutorialFigurenGesperrt(false);
+        socket.emit('get_tutorials');
+      }, 5000);
+    };
     const onGameState = (state) => {
+      clearTimeout(waechter);
       if (state.isPuzzle && state.isTutorial && !window._tutorialGaveUp) {
         tutorialAttemptRoom.current = state.roomId;
         setTutorialAttemptState(state);
       }
     };
+    socket.on('connect', onConnect);
     const onError = (msg) => {
       // Der Start ist gescheitert: die Figuren-Sperre (s. startTutorialAttempt)
       // darf nicht auf ein Gespraech warten, das nie kommt.
@@ -109,7 +128,7 @@ function useTutorialFlow(open) {
     };
     socket.on('game_state', onGameState);
     socket.on('puzzle_error', onError);
-    return () => { socket.off('game_state', onGameState); socket.off('puzzle_error', onError); };
+    return () => { clearTimeout(waechter); socket.off('connect', onConnect); socket.off('game_state', onGameState); socket.off('puzzle_error', onError); };
   }, [open, notify]);
 
   // Show the Monia-Bot intro textbox when a stage's board first loads (and
@@ -128,13 +147,17 @@ function useTutorialFlow(open) {
     if (tutorialAttemptState.roomId !== tutorialRoomIdRef.current) {
       tutorialRoomIdRef.current = tutorialAttemptState.roomId;
       tutorialIntroShownRef.current = null;
+      // Retry: derselbe Versuch von vorn, aber OHNE die Einleitung noch einmal abzuspielen (Marke setzt der Retry-Knopf im Kampffeld).
+      const retry = !!window._ppTutorialRetry;
+      window._ppTutorialRetry = false;
+      if (retry && window._currentTutorialNum) tutorialIntroShownRef.current = window._currentTutorialNum;
       // Neuer Durchgang (auch ein Retry): Gegner ist, wer zuerst spricht.
       if (window.setTutorialGegner && window.tutorialErsterSprecher) {
         window.setTutorialGegner(window.tutorialErsterSprecher(window._currentTutorialNum));
       }
       // ... und die Helden-Figuren warten wieder auf das Ende der Einleitung.
       if (window.setTutorialFigurenGesperrt) {
-        window.setTutorialFigurenGesperrt(!!(window.TUTORIAL_SCRIPTS || {})[window._currentTutorialNum]?.intro);
+        window.setTutorialFigurenGesperrt(!retry && !!(window.TUTORIAL_SCRIPTS || {})[window._currentTutorialNum]?.intro);
       }
     }
     const num = window._currentTutorialNum;
@@ -363,7 +386,7 @@ function AnimatedTitleBackdrop() {
             dim golem's beam while the central burst (in the panel, above the
             vignette) stays bright, breaking the seam. Below the characters it
             frames only the background and leaves every sprite at its true colour. */}
-        <PpVerlauf className="anim-vignette" gradient="radial-gradient(circle at 50% 44%, transparent 40%, rgba(8,6,12,.4) 80%, rgba(8,6,12,.64) 100%)" />
+        <PpVerlauf className="anim-vignette" px={2} gradient="radial-gradient(circle at 50% 44%, transparent 48%, rgba(8,6,12,.2) 82%, rgba(8,6,12,.36) 100%)" />
         {/* 1 — hammer girl */}
         <div style={layer('hammer.png', { transformOrigin: '72% 28%', '--mx': 'calc(var(--abw,1vw) * 0.469)', '--my': 'calc(var(--abh,1vh) * -1.389)', '--mr': '2deg', animation: 'ab-floaty 4.2s ease-in-out -0.6s infinite' })} />
         {/* 2 — Explosionskern. ★ v1266 (Al 22.9.: „das Login-Menue ist
@@ -505,7 +528,7 @@ function TapBackdropCanvas({ hostRef }) {
           // Figuren auf ihren sichtbaren Kasten zuschneiden (wie die DOM-Kulisse): nur dieser Teil wird pro Bild gezeichnet
           const x0 = rf ? Math.max(0, rf[0] - 2) : 0, y0 = rf ? Math.max(0, rf[1] - 2) : 0, x1 = rf ? Math.min(1920, rf[2] + 2) : 1920, y1 = rf ? Math.min(1080, rf[3] + 2) : 1080;
           const c = document.createElement('canvas'); c.width = Math.max(1, Math.round((x1 - x0) * sc)); c.height = Math.max(1, Math.round((y1 - y0) * sc));
-          const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(im, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);   // ★ W86u2: Naechster-Nachbar (keine Mischfarben)
+          const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(im, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);   // Vorskalieren GEGLAETTET: 1920 px auf Handybreite per Naechster-Nachbar zerreisst das Motiv (Tap-Bildschirm sah kaputt aus)
           imgs[n] = { c, x0, y0, w: x1 - x0, h: y1 - y0 };
         });
         imgs._sc = sc;
@@ -514,7 +537,7 @@ function TapBackdropCanvas({ hostRef }) {
     // ★ W86u2 (Pixelart): die Kulisse wird in KUNSTPIXEL-Aufloesung gemalt (1 Canvas-Pixel = 2 CSS-px, per `image-rendering: pixelated` vergroessert):
     // keine Glaettung (`imageSmoothingEnabled = false`), Versatz nur in ganzen Pixeln, keine Drehung, Schein als Dither-Muster statt Radialverlauf
     // mit Alpha, Blitze als Pixellinien, Glut als Quadrate mit Dither-Ausblendung. (Vorher: weiche Verlaeufe, `globalAlpha`, gedrehte Ebenen.)
-    const KP = 2;
+    const KP = 1;   // 1 Leinwandpixel = 1 CSS-px (auf 2x-Displays 2x2 Geraetepixel, scharf): bei 2 CSS-px waren die Motive zu grob
     const resize = () => {
       const w = window.innerWidth, h = window.innerHeight;
       W = Math.max(1, Math.round(w / KP * q)); H = Math.max(1, Math.round(h / KP * q)); cv.width = W; cv.height = H; S = Math.max(W / 1920, H / 1080);
@@ -576,12 +599,12 @@ function TapBackdropCanvas({ hostRef }) {
       // Blitze: Pixellinien (Bresenham) in drei Lagen — aussen blau, Mitte hell, Kern weiss
       { const m = g.getTransform(); g.setTransform(1, 0, 0, 1, 0, 0);
         for (const [bx, bw, kind, pts] of BOLTS) { const al = kind === 'S' ? aI : aA; if (al < 0.1) continue; const P = pts.map(([px, py]) => [m.a * (bx + px / 100 * bw) + m.e, m.d * (-21.6 + py / 400 * 670) + m.f]);
-          for (const [col, dk] of al > 0.5 ? [['#66b6ff', 4], ['#bddcef', 2], ['#e5f5fa', 1]] : [['#66b6ff', 2], ['#e5f5fa', 1]]) { g.fillStyle = col; for (let i = 0; i + 1 < P.length; i++) pixelLinie(g, P[i][0], P[i][1], P[i + 1][0], P[i + 1][1], dk); } }
+          for (const [col, dk] of al > 0.5 ? [['#66b6ff', 4], ['#bddcef', 2], ['#e5f5fa', 1]] : [['#66b6ff', 2], ['#e5f5fa', 1]]) { g.fillStyle = col; for (let i = 0; i + 1 < P.length; i++) pixelLinie(g, P[i][0], P[i][1], P[i + 1][0], P[i + 1][1], dk * 2); } }
         g.setTransform(m); }
       // Glut: Quadrate, Ausblenden per Dither-Muster statt Alpha
       { const m = g.getTransform(); g.setTransform(1, 0, 0, 1, 0, 0);
         for (const em of EMB) { const c = (((tau - em.delay) / em.dur) % 1 + 1) % 1, y = 1080 + 14 - em.size + lerp(20, -1210, c), x = em.left + em.drift * c, op = c < 0.08 ? 0.95 * c / 0.08 : (c < 0.78 ? lerp(0.95, 0.7, (c - 0.08) / 0.7) : lerp(0.7, 0, (c - 0.78) / 0.22)); if (y < -12 || y > 1090 || op < 0.05) continue;
-          const z = Math.max(1, Math.round(em.size / 2 * S * zoom)); g.fillStyle = muster(g, em.col, Math.max(1, Math.round(op * 16))); g.fillRect(Math.round(m.a * x + m.e), Math.round(m.d * y + m.f), z, z); }
+          const z = Math.max(2, Math.round(em.size * S * zoom)); g.fillStyle = muster(g, em.col, Math.max(1, Math.round(op * 16))); g.fillRect(Math.round(m.a * x + m.e), Math.round(m.d * y + m.f), z, z); }
         g.setTransform(m); }
       a = fl2(3.4, -0.5, 14, -9, 3); lay('cat_top', 0.23, 0.05, a[0], a[1], a[2], 1);
       a = fl2(2.9, -0.8, -11, 9, -3); lay('cat_mid', 0.37, 0.3, a[0], a[1], a[2], 1);
@@ -1886,6 +1909,8 @@ function MainMenu() {
   // Tutorial state — the flow itself lives in the shared useTutorialFlow hook.
   const [tutorialBrowserOpen, setTutorialBrowserOpen] = useState(false);
   const { tutorialList, tutorialAttemptState, startTutorialAttempt, onTutorialAttemptLeave } = useTutorialFlow(tutorialBrowserOpen);
+  // Tutorial-Karten schon im Hauptmenue tropfenweise bereitlegen (der Start einer Mission soll nicht ruckeln).
+  useEffect(() => { const t = setTimeout(() => { if (window.ppTutorialVorwaermen) window.ppTutorialVorwaermen(); }, 3000); return () => clearTimeout(t); }, []);
 
   // Singleplayer lives in its own screen now (see SingleplayerScreen).
   // MainMenu just routes to it via setScreen('singleplayer').
@@ -5213,6 +5238,7 @@ function GuestRegisterModal({ onClose, starterDeckId }) {
   );
 }
 
+let _ppTutorialAssetsCache = null;   // Antwort von /api/tutorial-assets, fuer die Heldenfiguren unten
 function SingleplayerScreen() {
   // Antonia-Praesenz auch hier, fuer den Tutorial-Zweig weiter unten.
   const antoniaHere2 = useAntoniaPresent();
@@ -5225,12 +5251,13 @@ function SingleplayerScreen() {
     const idle = (fn, ms) => { const t = setTimeout(() => { if (weg) return; if (window.requestIdleCallback) requestIdleCallback(fn, { timeout: 2500 }); else fn(); }, ms); timers.push(t); };
     idle(async () => {
       try {
-        const r = await fetch('/api/tutorial-assets', { headers: window.AUTH_TOKEN ? { 'x-auth-token': window.AUTH_TOKEN } : {} });
-        if (!r.ok || weg) return;
-        const a = await r.json();
-        if (window.CardImageShim && window.CardImageShim.warmCards) window.CardImageShim.warmCards(a.cards, { heroes: a.heroes, abilities: a.abilities });
+        const a = (await window.ppTutorialVorwaermen()) || _ppTutorialAssetsCache;
+        if (!a || weg) return;
+        _ppTutorialAssetsCache = a;
         // Pixelbilder der grossen Zauber-Animation (kostet kalt Sekunden auf schwachen Handys, s. app-board.jsx).
         idle(() => { if (window.ppAnimVorwaermen) window.ppAnimVorwaermen('cataclysm'); }, 3500);
+        // Magic Hammer (Mission 1, Magic Hammer/Heavy Hit der Starterdecks): das erste Pixelieren kostete mitten im Kampf 0,3–0,4 s (Ruckler vor Beatos Tod).
+        idle(() => { if (window.ppAnimVorwaermen) window.ppAnimVorwaermen('magic_hammer', { w: 70, h: 90 }); }, 6500);
         const H = window.HeroIdleAnims;
         if (H && H.hole && H.slug) (a.heroes || []).forEach((n, i) => timers.push(setTimeout(() => { if (!weg) idle(() => { try { H.hole(H.slug(n)); } catch (e) { /* Vorladen ist optional */ } }, 0); }, 400 + i * 350)));
       } catch (e) { /* Vorladen ist optional */ }
@@ -5293,6 +5320,7 @@ function SingleplayerScreen() {
         const personal = mine?.decks || [];
         const sampleList = samples?.decks || [];
         setOpponents(gal?.opponents || []);
+        (gal?.opponents || []).slice(0, 3).forEach(o => window.ppDeckVorwaermen(o.warm, false));
         setPersonalDecks(personal);
         setSampleDecks(sampleList);
         // Bootstrap the dropdown from the user's saved default (custom
@@ -5340,8 +5368,11 @@ function SingleplayerScreen() {
         setCpuBattleState(state);
       }
     };
-    const onError = (msg) => {
+    const onError = (msg, meta) => {
       console.error('[SP cpu_battle_error]', msg);
+      setStarting(false);
+      // Server ausgelastet (Zulassungsgrenze): ein ruhiger Hinweis im Spielstil statt der roten Fehlermeldung.
+      if (meta && meta.busy && window.ppHinweis) { window.ppHinweis('The arena is packed right now!\nPlease try again in a minute.', { okText: 'OK' }); return; }
       notify('CPU battle error: ' + msg, 'error');
     };
     socket.on('game_state', onGameState);
@@ -5463,6 +5494,7 @@ function SingleplayerScreen() {
   // dessen Deck (`deckAdded`), laedt die Liste der eigenen Decks neu — der Victory-Screen bekommt sie als `sampleDecks`.
   useEffect(() => {
     const onUnlocked = async (data) => {
+      (data && data.opponents || []).forEach(o => o && window.ppDeckVorwaermen(o.warm, true));
       if (!data || !(data.opponents || []).some(o => o && o.deckAdded)) return;
       try { const r = await api('/sample-decks/owned'); if (r && r.decks) setSampleDecks(r.decks); } catch (e) { /* bleibt die alte Liste */ }
     };
@@ -5486,7 +5518,7 @@ function SingleplayerScreen() {
           const heroes = (d.heroes || []).map(h => h && h.hero).filter(Boolean);
           const abilities = (d.heroes || []).flatMap(h => h ? [h.ability1, h.ability2] : []).filter(Boolean);
           const names = Array.from(new Set([...(d.mainDeck || []), ...(d.potionDeck || []), ...heroes, ...abilities].map(nm).filter(Boolean)));
-          if (window.CardImageShim && window.CardImageShim.warmCards) window.CardImageShim.warmCards(names, { heroes, abilities });
+          if (window.CardImageShim && window.CardImageShim.warmDrip) window.CardImageShim.warmDrip(names, { heroes, abilities, front: true });
           const H = window.HeroIdleAnims;
           if (H && H.hole && H.slug) heroes.forEach((n, i) => timers.push(setTimeout(() => { if (!weg) { try { H.hole(H.slug(n)); } catch (e) { /* optional */ } } }, 600 + i * 400)));
         } catch (e) { /* Vorladen ist optional */ }

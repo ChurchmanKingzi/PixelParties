@@ -9934,6 +9934,9 @@ function getRolloutBrain() { return _rolloutBrain; }
 // the last few points of decision quality out of each turn. Read once at
 // module load; live games simply don't set them.
 const MCTS_RANK_BUDGET_MS = parseInt(process.env.PP_MCTS_BUDGET_MS || '20000', 10);
+// Unter Last (Verzoegerung der Ereignisschleife) schrumpft das Budget bis auf ein Viertel — siehe _cpu-last.js.
+const { budgetFaktor: _lastFaktor } = require('./_cpu-last');
+const mctsRankBudgetMs = (engine) => Math.round(MCTS_RANK_BUDGET_MS * _lastFaktor(engine));
 // UCB1 total-pull cap per decision. Hard ceiling on how many rollouts a
 // single decision can burn; typically cut short by the wall-clock budget.
 const MCTS_UCB1_TOTAL_PULLS = parseInt(process.env.PP_MCTS_PULLS || '80', 10);
@@ -14057,7 +14060,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
     }
   };
   for (const candidate of candidates) {
-    if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS || cpuPastDeadline(engine)) {
+    if ((Date.now() - t0) >= mctsRankBudgetMs(engine) || cpuPastDeadline(engine)) {
       budgetExceeded = true;
       break;
     }
@@ -14125,7 +14128,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
   // ── Ensure-min-pulls phase: pull each zero-visit arm once ──
   for (const arm of arms) {
     if (arm.visits > 0) continue;
-    if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS || cpuPastDeadline(engine)) {
+    if ((Date.now() - t0) >= mctsRankBudgetMs(engine) || cpuPastDeadline(engine)) {
       budgetExceeded = true;
       break;
     }
@@ -14183,7 +14186,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
   // infinite UCB (they'd have been pulled in the min-pulls phase — this
   // is defensive).
   while (ucb1Lohnt && !budgetExceeded && totalRollouts < MCTS_UCB1_TOTAL_PULLS) {
-    if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS || cpuPastDeadline(engine)) {
+    if ((Date.now() - t0) >= mctsRankBudgetMs(engine) || cpuPastDeadline(engine)) {
       budgetExceeded = true;
       break;
     }
@@ -14227,7 +14230,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
   // truly-equal case without spending more pulls on it.
   let extensionPulls = 0;
   while (!budgetExceeded && extensionPulls < MCTS_EXT_PULLS_MAX) {
-    if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS || cpuPastDeadline(engine)) {
+    if ((Date.now() - t0) >= mctsRankBudgetMs(engine) || cpuPastDeadline(engine)) {
       budgetExceeded = true;
       break;
     }

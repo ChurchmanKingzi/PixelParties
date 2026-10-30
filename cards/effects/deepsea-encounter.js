@@ -169,7 +169,7 @@ module.exports = {
     // Prompt replacement.
     const picked = await promptCtx.promptCardGallery(replacements, {
       title: CARD_NAME,
-      description: `Pick a different-named Creature with level ≤ ${maxLevel} to place.`,
+      description: `Pick a different-named Creature with level ${maxLevel} or lower to place.`,
       cancellable: false,
     });
     if (!picked?.cardName) return null;

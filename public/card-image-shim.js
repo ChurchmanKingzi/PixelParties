@@ -436,15 +436,55 @@
       for (const id of variants) {
         if (warming.has(id) || keepPinned.has(id)) continue;
         warming.add(id); n++;
-        enqueue({ warm: true, keep: true, m: fromId(id) }, 3);
+        enqueue({ warm: true, keep: opts.keep !== false, m: fromId(id) }, 3);
       }
     }
     return n;
   }
 
+  /** Wie warmCards, aber TROPFENWEISE: je Takt eine Karte, und nur, wenn nichts Sichtbares auf Rendern wartet und der Tab im Vordergrund ist —
+   *  das Vorwaermen selbst darf nie ruckeln (auf schwachen Handys kostet jede Karte einige 10 ms Zeichnen + Dekodieren). `opts.keep` falsch:
+   *  nur zeichnen und im dauerhaften Cache ablegen, nicht dauerhaft dekodiert im Speicher halten (fuer Gegner-Decks). Doppelte Namen werden verworfen. */
+  const dripQueue = [], dripSeen = new Set(); let dripTimer = 0;
+  function warmDrip(names, opts) {
+    opts = opts || {};
+    const heroes = new Set(opts.heroes || []), abilities = new Set(opts.abilities || []);
+    const neu = [];
+    for (const name of names || []) {
+      const key = (opts.keep === false ? 'c:' : 'k:') + name;
+      if (typeof name !== 'string' || dripSeen.has(key)) continue;
+      dripSeen.add(key);
+      neu.push({ name, keep: opts.keep !== false, heroes: heroes.has(name) ? [name] : [], abilities: abilities.has(name) ? [name] : [] });
+    }
+    if (opts.front) dripQueue.unshift(...neu); else dripQueue.push(...neu);   // `front`: vor die wartenden (z. B. Deck der naechsten Partie vor die Tutorial-Karten)
+    dripPlane(opts.delay || 800);
+  }
+  function dripPlane(ms) { if (dripTimer || !dripQueue.length) return; dripTimer = setTimeout(dripSchritt, ms); }
+  // Eingaben der letzten Sekunde: waehrenddessen wird nicht gezeichnet (Tippen, Wischen, Scrollen sollen nie auf eine Karte warten).
+  let letzteEingabe = 0, dripBusy = 0;
+  for (const ev of ['pointerdown', 'pointermove', 'touchstart', 'touchmove', 'keydown', 'wheel', 'scroll']) addEventListener(ev, () => { letzteEingabe = performance.now(); }, { passive: true, capture: true });
+  function dripSchritt() {
+    dripTimer = 0;
+    if (!dripQueue.length) return;
+    const frei = !document.hidden && queues.every(q => q.length === 0) && workers === 0 && performance.now() - letzteEingabe > 1000;
+    if (!frei) { dripPlane(700); return; }
+    // Nur in einer ECHTEN Leerlaufluecke anfangen (>= 25 ms am Stueck frei) — eine Karte kostet auf schwachen Handys einige 10 ms.
+    const los = () => {
+      if (!dripQueue.length) return;
+      const it = dripQueue.shift();
+      warmCards([it.name], { heroes: it.heroes, abilities: it.abilities, keep: it.keep }).finally(() => {
+        const weiter = () => dripPlane(260);          // naechste Karte frueh genug, aber mit Mindestabstand
+        if (window.requestIdleCallback) requestIdleCallback(weiter, { timeout: 1500 }); else weiter();
+      });
+    };
+    // Auf einer animierten Seite gibt es nie 25 ms am Stueck — nach drei Fehlversuchen (je 400 ms Pause) faengt eine Karte trotzdem an.
+    if (window.requestIdleCallback) requestIdleCallback((d) => { if (!d.didTimeout && d.timeRemaining() < 25 && dripBusy++ < 3) dripPlane(400); else { dripBusy = 0; los(); } }, { timeout: 2000 });
+    else los();
+  }
+
   // Für Hintergrund-Aufwärmer: Kunstindex und Rahmen schon vor den ersten Karten holen
   // Skin -> Basiskarte (fuer das Skin-Holo: es braucht den Kartentyp des Helden). Wartet auf boot().
   async function skinBase(skin) { await boot(); return (window.__cardShimSkinBase && window.__cardShimSkinBase[skin]) || null; }
-  window.CardImageShim = { boot, skinBase, parse, warmCards, cacheSize: () => cache.size, stats, cacheStats: () => CardRender.cacheStats(), queued: () => queues.reduce((n, q) => n + q.length, 0) };
+  window.CardImageShim = { boot, skinBase, parse, warmCards, warmDrip, cacheSize: () => cache.size, stats, cacheStats: () => CardRender.cacheStats(), queued: () => queues.reduce((n, q) => n + q.length, 0) };
   boot();
 })();

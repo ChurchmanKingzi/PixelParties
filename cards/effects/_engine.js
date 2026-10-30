@@ -32459,8 +32459,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     const defaultDescParts = [];
-    if (spec.minMaxHp) defaultDescParts.push(`combined max HP ≥ ${spec.minMaxHp}`);
-    if (spec.minSumLevel) defaultDescParts.push(`combined levels ≥ ${spec.minSumLevel}`);
+    if (spec.minMaxHp) defaultDescParts.push(`combined max HP of ${spec.minMaxHp} or more`);
+    if (spec.minSumLevel) defaultDescParts.push(`combined levels of ${spec.minSumLevel} or more`);
     const defaultDesc = `Sacrifice ${spec.minCount}+ of your Creatures (not summoned this turn)` +
       (defaultDescParts.length ? ' with ' + defaultDescParts.join(' and ') : '') + '.';
 
