@@ -3708,6 +3708,15 @@ app.get('/api/sample-decks/owned', authMiddleware, async (req, res) => {
   res.json({ decks });
 });
 
+// Kartenlisten eines Beispiel-Decks fuer das Vorwaermen im Client (Kartenbilder im Leerlauf rendern, siehe CardImageShim.warmDrip).
+function deckWarmInfo(d) {
+  const nm = (x) => (typeof x === 'string' ? x : (x && x.name) || null);
+  const heroes = (d.heroes || []).map(h => h && h.hero).filter(Boolean);
+  const abilities = (d.heroes || []).flatMap(h => h ? [h.ability1, h.ability2] : []).filter(Boolean);
+  const cards = Array.from(new Set([...(d.mainDeck || []), ...(d.potionDeck || []), ...heroes, ...abilities].map(nm).filter(Boolean)));
+  return { cards, heroes, abilities };
+}
+
 // Singleplayer opponent-gallery feed. Returns every sample deck the caller
 // can face (all Starter + all Structure decks, regardless of shop-ownership),
 // each enriched with the middle-hero name and the caller's W/L record vs
@@ -3761,6 +3770,9 @@ app.get('/api/sample-decks/gallery', authMiddleware, async (req, res) => {
     if (aInit) return baseIndex.get(a.id) - baseIndex.get(b.id); // starters: roster order
     return (unlockRank.get(a.id) ?? 0) - (unlockRank.get(b.id) ?? 0); // rest: unlock order
   });
+  // Die ersten drei Gegner (zuerst sichtbar, meist zuerst gespielt): ihre Kartenlisten fuers Vorwaermen mitliefern.
+  const deckById = new Map(decks.map(d => [d.id, d]));
+  enriched.slice(0, 3).forEach(o => { const d = deckById.get(o.id); if (d) o.warm = deckWarmInfo(d); });
   res.json({ opponents: enriched });
 });
 
@@ -7034,6 +7046,7 @@ function endCpuBattle(room, winnerIdx, reason) {
               } catch (err) { console.error('[CPU battle] Gast-Deck-Geschenk fehlgeschlagen:', err.message); }
             }
           }
+          for (const u of newlyUnlocked) { try { const d = loadSampleDecks().find(x => x.id === u.id); if (d) u.warm = deckWarmInfo(d); } catch (e) { /* Vorwaermen ist optional */ } }
           if (newlyUnlocked.length && humanSid) {
             io.to(humanSid).emit('opponents_unlocked', { opponents: newlyUnlocked });
           }

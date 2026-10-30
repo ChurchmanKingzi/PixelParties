@@ -3118,6 +3118,7 @@ function OpponentUnlockPopup() {
   useEffect(() => {
     const onUnlocked = (data) => {
       const list = (data && data.opponents) || [];
+      list.forEach(o => o && window.ppDeckVorwaermen && window.ppDeckVorwaermen(o.warm, true));
       if (list.length) setQueue(q => [...q, ...list]);
     };
     // Skin-Game gewonnen: derselbe Popup-Rahmen, nur mit Skin-Bild und -Text.

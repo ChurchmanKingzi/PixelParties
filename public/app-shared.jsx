@@ -12028,6 +12028,26 @@ function _ppDialogOeffnen(props) {
   });
 }
 window.ppConfirm = (text, opts) => _ppDialogOeffnen({ text, ...(opts || {}) });
+// ── KARTEN VORWAERMEN (tropfenweise, siehe CardImageShim.warmDrip) ───────────────────────────────────────────────────────────────────────
+// Tutorial-Karten: einmal pro Sitzung holen (Server rechnet die Liste aus den Missionen) und im Leerlauf nach und nach bereitlegen.
+let _ppTutorialWarm = false;
+window.ppTutorialVorwaermen = async () => {
+  if (_ppTutorialWarm) return null;
+  _ppTutorialWarm = true;
+  try {
+    const r = await fetch('/api/tutorial-assets', { headers: window.AUTH_TOKEN ? { 'x-auth-token': window.AUTH_TOKEN } : {} });
+    if (!r.ok) { _ppTutorialWarm = false; return null; }
+    const a = await r.json();
+    if (window.CardImageShim && window.CardImageShim.warmDrip) window.CardImageShim.warmDrip(a.cards, { heroes: a.heroes, abilities: a.abilities, delay: 1200 });
+    return a;
+  } catch (e) { _ppTutorialWarm = false; return null; }
+};
+// Kartenliste eines Gegner-/Beispiel-Decks (`{cards, heroes, abilities}` vom Server, Feld `warm`): `keep` falsch = nur zeichnen und merken.
+window.ppDeckVorwaermen = (w, keep) => {
+  if (!w || !Array.isArray(w.cards) || !(window.CardImageShim && window.CardImageShim.warmDrip)) return;
+  window.CardImageShim.warmDrip(w.cards, { heroes: w.heroes, abilities: w.abilities, keep: keep !== false, delay: 1500, front: true });
+};
+
 window.ppPrompt = (text, vorgabe, opts) => _ppDialogOeffnen({ text, eingabe: true, vorgabe, ...(opts || {}) });
 window.CardTooltipContent = CardTooltipContent;
 window.useCardTooltip = useCardTooltip;
