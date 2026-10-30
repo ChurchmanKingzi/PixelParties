@@ -2319,6 +2319,29 @@ const ZW_AKTIV_SEL = ZW_KNOPF_SEL + ', .panel-zielwahl-aktiv, .panel-zielwahl-gr
 const ZW_KARTE_SEL = '.zone-has-card, .board-card, [data-card-name], .zone-pick-target, '
   + '.potion-target-valid, .board-zone-play-target, .chain-pick-valid';
 
+// ★ Drop-Zone eines Helden beim Ziehen einer Handkarte: der Heldenkasten PLUS ein Rand (Als Befund: der Held war als Ablagefläche zu klein, Drops daneben gingen verloren).
+// Genau getroffen zählt immer; sonst zählt der Rand — nie über eine Support-/Ability-/Surprise-/Area-Zone (deren genaue Fläche behält Vorrang: dort legt man gezielt ab) und nie, wenn ein anderer
+// Held näher liegt.
+function _ppAbstandZuRechteck(r, x, y) { return Math.hypot(Math.max(r.left - x, 0, x - r.right), Math.max(r.top - y, 0, y - r.bottom)); }
+function ppHeroTreffer(el, mx, my) {
+  const r = el.getBoundingClientRect();
+  if (!r.width || !r.height) return false;
+  if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) return true;
+  const rand = Math.max(24, Math.round(Math.min(r.width, r.height) * 0.8));
+  const mein = _ppAbstandZuRechteck(r, mx, my);
+  if (mein > rand) return false;
+  for (const z of document.querySelectorAll('[data-support-zone], [data-ability-zone], [data-surprise-zone], [data-area-zone]')) {
+    const q = z.getBoundingClientRect();
+    if (mx >= q.left && mx <= q.right && my >= q.top && my <= q.bottom) return false;
+  }
+  for (const h of document.querySelectorAll('[data-hero-zone]')) {
+    if (h === el) continue;
+    const q = h.getBoundingClientRect();
+    if (q.width && q.height && _ppAbstandZuRechteck(q, mx, my) < mein) return false;
+  }
+  return true;
+}
+
 // ★ v1489: Liegt unter dem Zielwahl-Panel an (x, y) eine Karte? Geprüft
 // wird das oberste Element, das nicht zum Panel gehört — also genau das,
 // was ein Klick durch die durchsichtige Box treffen würde.
@@ -13417,6 +13440,62 @@ const ppR1CosmicSummon = ppR1Leinwand((g, t, sz, teile) => {
     staub: Array.from({ length: ppFxN(12) }, () => { const w = Math.random() * Math.PI * 2, v = 20 + Math.random() * 50; return { dx: Math.cos(w) * v, dy: Math.sin(w) * v, size: 3 + Math.random() * 5, farbe: ppHex(['#c98aff', '#a040ff', '#d6b3f9', '#ffffff', '#7a2bd0'][Math.floor(Math.random() * 5)]), delay: 350 + Math.random() * 150, dur: 400 + Math.random() * 300 }; }),
   }),
 });
+// ═════════════════════════════════════════════════════════════════
+//  Flame Strike / Flame Engulf (`flame_strike`, `flame_engulf`; Divine Gift of Fire, Flame Strike …) — PIXELART auf EINER Leinwand je Ziel.
+//  Vorher ~30 einzeln CSS-animierte Elemente je Ziel (Flammen-Emojis, Funken, Schein): bei Divine Gift of Fire (jede Kreatur und jeder Held) hunderte Animationen, die die Pixel-Pipeline
+//  einzeln buk — unter Last Sekunden-Ruckler. Ablauf wie zuvor: Flammensplitter fliegen von allen Seiten zur Mitte (200–350 ms, ab 0–180 ms), ab 250 ms der Feuerschein (600 ms: wächst
+//  .3 → 1,5 → 2, dithert aus), ab 300 ms stieben Funken nach außen (300–550 ms). `skala` vergrößert Abstände und Größen (Flame Engulf: 1,4).
+// ═════════════════════════════════════════════════════════════════
+const PP_R1_FLAMMENFARBEN = { o: ppHex('#ff491a'), r: ppHex('#ff8b1a'), Y: ppHex('#fad54a'), W: ppHex('#f9ecb3') };
+const PP_R1_FSCHLAG_BILD = {
+  gross: ['...o...', '..oro..', '..orro.', '.orYro.', '.orYYo.', 'orrYYro', 'orYYWYo', 'orYWWYo', '.orYYo.'],
+  klein: ['..o..', '.orr.', '.orYo', 'orYYo', 'orYWo', '.ooo.'],
+  stern: ['..Y..', '..Y..', 'YYWYY', '..Y..', '..Y..'],
+};
+function ppR1FlammenSchlag(skala) {
+  const S = 3, R = Math.ceil(130 * skala + 30);
+  const FUNKEN = ['#ff491a', '#ff8b1a', '#fad54a', '#ff1a1a', '#f9ac20'].map(ppHex);
+  return ppR1Leinwand((g, t, sz, teile) => {
+    const cx = sz.cx, cy = sz.cy;
+    // Feuerschein (ab 250 ms, 600 ms)
+    const fk = (t - 250) / 600;
+    if (fk >= 0 && fk <= 1) {
+      const sk = fk < 0.5 ? 0.3 + 1.2 * (fk / 0.5) : 1.5 + 0.5 * ((fk - 0.5) / 0.5), a = fk < 0.5 ? 1 - 0.3 * (fk / 0.5) : 0.7 * (1 - (fk - 0.5) / 0.5);
+      const r = 35 * skala * sk * 0.75 / S;
+      g.glow(cx, cy, r, r, [FUNKEN[0], FUNKEN[1], FUNKEN[2]], a * 0.85, 0.9);
+    }
+    // Flammensplitter: von außen zur Mitte
+    for (const f of teile.flammen) {
+      const u = (t - f.delay) / f.dur;
+      if (u < 0 || u > 1) continue;
+      const e = u * u, x = cx + f.sx * (1 - e) / S, y = cy + f.sy * (1 - e) / S, a = u < 0.7 ? 1 : 1 - (u - 0.7) / 0.3;
+      const gr = f.size / S * (1.2 - 0.9 * u);
+      if (f.zeichen === '🔥' && gr >= 3.2) g.spr(PP_R1_FSCHLAG_BILD[gr >= 6 ? 'gross' : 'klein'], PP_R1_FLAMMENFARBEN, x, y, a);
+      else if (f.zeichen === '✦' && gr >= 3) g.spr(PP_R1_FSCHLAG_BILD.stern, PP_R1_FLAMMENFARBEN, x, y, a);
+      else g.block(x - 1, y - 1, gr >= 2 ? 2 : 1, gr >= 2 ? 2 : 1, PP_R1_FLAMMENFARBEN.Y, a);
+    }
+    // Funken: stieben nach außen
+    for (const sp of teile.funken) {
+      const u = (t - sp.delay) / sp.dur;
+      if (u < 0 || u > 1) continue;
+      const e = 1 - (1 - u) * (1 - u), a = u < 0.2 ? 1 : 1 - (u - 0.2) / 0.8, n = Math.max(1, Math.round(sp.size / S * (1.2 - 1.2 * u)));
+      g.block(cx + sp.dx * e / S - n / 2, cy + sp.dy * e / S - n / 2, n, n, sp.farbe, a);
+    }
+  }, 1100, { breite: R * 2, hoehe: R * 2 }, {
+    z: 10100,
+    vorbereiten: () => ({
+      flammen: Array.from({ length: ppFxN(18) }, () => {
+        const w = Math.random() * Math.PI * 2, d = (55 + Math.random() * 45) * skala;
+        return { sx: Math.cos(w) * d, sy: Math.sin(w) * d, size: (10 + Math.random() * 12) * skala, delay: Math.random() * 180, dur: 200 + Math.random() * 150, zeichen: ['🔥', '🔥', '🔥', '✦', '·'][Math.floor(Math.random() * 5)] };
+      }),
+      funken: Array.from({ length: ppFxN(12) }, () => {
+        const w = Math.random() * Math.PI * 2, v = (15 + Math.random() * 30) * skala;
+        return { dx: Math.cos(w) * v, dy: Math.sin(w) * v, size: (2 + Math.random() * 5) * skala, farbe: FUNKEN[Math.floor(Math.random() * FUNKEN.length)], delay: 300 + Math.random() * 150, dur: 300 + Math.random() * 250 };
+      }),
+    }),
+  });
+}
+const ppR1FlameStrike = ppR1FlammenSchlag(1), ppR1FlameEngulf = ppR1FlammenSchlag(1.4);
 // <<W86r1-END>>
 
 const ANIM_REGISTRY = {
@@ -14898,7 +14977,7 @@ const ANIM_REGISTRY = {
   ice_encase: IceEncaseEffect,
   spider_avalanche: SpiderAvalancheEffect,
   electric_strike: ElectricStrikeEffect,
-  flame_strike: FlameStrikeEffect,
+  flame_strike: ppR1FlameStrike,   // Pixelart-Leinwand (statt ~30 CSS-animierter Elemente je Ziel)
   // ★ v1261 (Als Befund 21.9.): die v1215-Salve (`flame_avalanche`,
   // Geschosse vom Caster zu den Zielen) gehoert NUR der Karte Flame
   // Avalanche. Alle anderen Nutzer (Phoenix Tackle, Victory Phoenix
@@ -14906,7 +14985,7 @@ const ANIM_REGISTRY = {
   // bekommen wieder „Flammen auf dem Ziel selbst": der Flammenschlag,
   // um 1,4 vergroessert. Die Huelle ist fixed am Zielpunkt und skaliert
   // um genau diesen Punkt; der Schlag darin sitzt bei 0/0.
-  flame_engulf: ({ x, y }) => <FlameStrikeEffect x={x} y={y} skala={1.4} />,   // W86r1: vergrößerte Fassung statt skaliertem Wrapper (halbe Pixel)
+  flame_engulf: ppR1FlameEngulf,   // vergrößerte Fassung (skala 1,4)
   black_flame_strike: BlackFlameStrikeEffect,
   demon_fire_pillar: DemonFirePillarEffect,
   cavalry_charge: CavalryChargeEffect,
@@ -42869,7 +42948,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const heroEls = document.querySelectorAll('[data-hero-zone]');
           for (const el of heroEls) {
             const r = el.getBoundingClientRect();
-            if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+            if (ppHeroTreffer(el, mx, my)) {
               if (el.dataset.heroOwner !== 'me') continue;
               const hi = parseInt(el.dataset.heroIdx);
               const hostsForHero = pickHandCardHosts.filter(h => h.heroIdx === hi);
@@ -42913,7 +42992,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const heroEls = document.querySelectorAll('[data-hero-zone]');
           for (const el of heroEls) {
             const r = el.getBoundingClientRect();
-            if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+            if (ppHeroTreffer(el, mx, my)) {
               if (el.dataset.heroOwner === 'me') {
                 const hi = parseInt(el.dataset.heroIdx);
                 if (canReceive(hi, cardName)) { targetHero = hi; targetZone = -1; targetOpp = false; }
@@ -43205,7 +43284,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             const heroEls3 = document.querySelectorAll('[data-hero-zone]');
             for (const el of heroEls3) {
               const r = el.getBoundingClientRect();
-              if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+              if (ppHeroTreffer(el, mx, my)) {
                 const hi = parseInt(el.dataset.heroIdx);
                 if (el.dataset.heroOwner === 'me') {
                   if (heroActionHeroIdx !== undefined && hi !== heroActionHeroIdx) continue;
@@ -43287,7 +43366,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const heroEls = document.querySelectorAll('[data-hero-zone]');
         for (const el of heroEls) {
           const r = el.getBoundingClientRect();
-          if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+          if (ppHeroTreffer(el, mx, my)) {
             const side = sideFor(el.dataset.heroOwner);
             if (side) {
               const hi = parseInt(el.dataset.heroIdx);
@@ -43366,7 +43445,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const heroEls3 = document.querySelectorAll('[data-hero-zone]');
           for (const el of heroEls3) {
             const r = el.getBoundingClientRect();
-            if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+            if (ppHeroTreffer(el, mx, my)) {
               if (el.dataset.heroOwner === 'me') {
                 const hi = parseInt(el.dataset.heroIdx);
                 const hero = me.heroes[hi];
@@ -43559,7 +43638,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (gameState.heroPlayableCards?.stufen?.[cardName]) {
           for (const el of document.querySelectorAll('[data-hero-zone][data-hero-owner="me"]')) {
             const r = el.getBoundingClientRect();
-            if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+            if (ppHeroTreffer(el, mx, my)) {
               hoverHero = parseInt(el.dataset.heroIdx);
               hoverHeroRect = { left: r.left, top: r.top, width: r.width, height: r.height };
             }
@@ -43571,7 +43650,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const heroEls2 = document.querySelectorAll('[data-hero-zone]');
         for (const el of heroEls2) {
           const r = el.getBoundingClientRect();
-          if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+          if (ppHeroTreffer(el, mx, my)) {
             const hi = parseInt(el.dataset.heroIdx);
             // ★ W78 (Backstab, Al 26.10.): eine Karte OHNE Wirker-Helden lässt sich direkt auf den GEGNERHELDEN ziehen, der die Attack ausführen soll (Liste vom Server: `herolessAngreifer`).
             const _hlAngreifer = (me.herolessAngreifer || {})[cardName];
@@ -43640,7 +43719,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const heroEls4 = document.querySelectorAll('[data-hero-zone]');
         for (const el of heroEls4) {
           const r = el.getBoundingClientRect();
-          if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+          if (ppHeroTreffer(el, mx, my)) {
             if (el.dataset.heroOwner === 'me') {
               const hi = parseInt(el.dataset.heroIdx);
               const hero = me.heroes[hi];
