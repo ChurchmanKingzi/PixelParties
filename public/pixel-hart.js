@@ -64,7 +64,7 @@
     return null;
   }
   const LEN = /^(-?\d*\.?\d+)(px)?$/;
-  const DYN = /^(?:calc|min|max|clamp)\(/;
+  const DYN = /^(?:calc|min|max|clamp|round)\(/;
   /** Ein Schatten (`inset? x y blur? spread? farbe`) → { inset, x, y, xr, yr, blur, spread, f } oder null (unbekannte Schreibweise → Wert bleibt).
    *  Laengen mit calc()/min()/max() sind dynamisch: x/y bleiben als Text (`xr`/`yr`) erhalten, eine dynamische Unschaerfe zaehlt als 12 px. */
   function schicht(item) {
@@ -380,36 +380,41 @@
   const EIGENSCHAFTEN = ['box-shadow', 'text-shadow', 'filter', '-webkit-filter', 'backdrop-filter', '-webkit-backdrop-filter', 'mix-blend-mode'];
   let stat = { regeln: 0, geaendert: 0, blaetter: 0, ms: 0 };
   const gesehen = new WeakSet();
+  const INTERESSANT = new Set(['box-shadow', 'text-shadow', 'filter', '-webkit-filter', 'backdrop-filter', '-webkit-backdrop-filter', 'mix-blend-mode', 'background-color']);
   function styleRegel(r, ausName) {
     const st = r.style; if (!st) return;
     stat.regeln++;
-    const aus = ausName || (r.selectorText && REGEL_AUS.test(r.selectorText));
-    for (const n of EIGENSCHAFTEN) {
-      if (aus && n === 'mix-blend-mode') continue;
-      const v = st.getPropertyValue(n);
-      if (!v) continue;
-      const w = eigenschaft(n, v);
-      if (w !== v) { st.setProperty(n, w, st.getPropertyPriority(n)); stat.geaendert++; }
-    }
-    if (!ausName && r.selectorText && BRETT.test(r.selectorText) && !REGEL_AUS.test(r.selectorText)) { if (alphaHintergrund(st, /::?(?:before|after)/.test(r.selectorText))) stat.geaendert++; }
-    // Eigene Eigenschaften (--x-shadow / --x-glow): Name enthaelt shadow/glow/schein
+    // Nur die DEKLARIERTEN Eigenschaften ansehen (getPropertyValue je Regel und Eigenschaft waere ~7x teurer)
+    let aus = null, bgFarbe = false;
     for (let i = 0, n = st.length; i < n; i++) {
       const name = st[i];
-      if (name.charCodeAt(0) !== 45 || name.charCodeAt(1) !== 45 || !/(schatten|shadow|glow|schein)/i.test(name)) continue;
-      const v = st.getPropertyValue(name), w = eigenschaft(name, v.trim());
-      if (w !== v.trim()) { st.setProperty(name, w, st.getPropertyPriority(name)); stat.geaendert++; }
+      if (INTERESSANT.has(name)) {
+        if (name === 'background-color') { bgFarbe = true; continue; }
+        if (aus === null) aus = ausName || !!(r.selectorText && REGEL_AUS.test(r.selectorText));
+        if (aus && name === 'mix-blend-mode') continue;
+        const v = st.getPropertyValue(name);
+        if (!v) continue;
+        const w = eigenschaft(name, v);
+        if (w !== v) { st.setProperty(name, w, st.getPropertyPriority(name)); stat.geaendert++; }
+      } else if (name.charCodeAt(0) === 45 && name.charCodeAt(1) === 45 && /(schatten|shadow|glow|schein)/i.test(name)) {   // eigene Eigenschaften (--x-shadow / --x-glow)
+        const v = st.getPropertyValue(name), w = eigenschaft(name, v.trim());
+        if (w !== v.trim()) { st.setProperty(name, w, st.getPropertyPriority(name)); stat.geaendert++; }
+      }
     }
+    if (bgFarbe && !ausName && r.selectorText && BRETT.test(r.selectorText) && !REGEL_AUS.test(r.selectorText)) { if (alphaHintergrund(st, /::?(?:before|after)/.test(r.selectorText))) stat.geaendert++; }
   }
   let _verlaufPass = false;                              // true, sobald pxHintergrund (app-shared.jsx) da ist: dann auch Verlaeufe in Regeln
-  function regeln(liste) {
+  /** @param nurVerlauf  zweiter Durchgang: nur Verlaufsregeln (der erste hat Schatten/Filter/Alpha schon erledigt) */
+  function regeln(liste, nurVerlauf) {
     for (const r of liste) {
-      if (r.type === 1) { styleRegel(r); if (_verlaufPass && verlaufRegel(r)) stat.geaendert++; }                // CSSStyleRule
+      if (r.type === 1) { if (!nurVerlauf) styleRegel(r); if (_verlaufPass && verlaufRegel(r)) stat.geaendert++; }   // CSSStyleRule
       else if (r.type === 7) {                            // @keyframes: auch hier harte Werte — bis pixel-anim.js die Animation gebacken hat (Zeitscheiben), laeuft sie sonst weich
+        if (nurVerlauf) continue;
         const aus = REGEL_AUS.test(r.name || '');
         for (const k of r.cssRules) styleRegel(k, aus);
       }
       else if (r.type === 8 || r.type === 5) continue;    // @font-face
-      else if (r.cssRules) regeln(r.cssRules);            // @media / @supports / @layer …
+      else if (r.cssRules) regeln(r.cssRules, nurVerlauf);   // @media / @supports / @layer …
     }
   }
   function blatt(sh) {
@@ -429,7 +434,7 @@
     alleBlaetter();
     // Blaetter, die erst spaeter fertig werden (<link>) bzw. neu eingehaengt werden (<style> aus Komponenten)
     document.addEventListener('load', (e) => { const t = e.target; if (t && t.tagName === 'LINK' && t.sheet) blatt(t.sheet); }, true);
-    const verlaufPass = () => { if (_verlaufPass || typeof root.pxHintergrund !== 'function') return; _verlaufPass = true; try { for (const sh of document.styleSheets) { let rl; try { rl = sh.cssRules; } catch (e) { continue; } if (rl) regeln(rl); } } catch (e) { /* ohne */ } };
+    const verlaufPass = () => { if (_verlaufPass || typeof root.pxHintergrund !== 'function') return; _verlaufPass = true; try { for (const sh of document.styleSheets) { let rl; try { rl = sh.cssRules; } catch (e) { continue; } if (rl) regeln(rl, true); } } catch (e) { /* ohne */ } };
     document.addEventListener('DOMContentLoaded', () => { alleBlaetter(); verlaufPass(); });
     root.addEventListener('load', verlaufPass);
     try {

@@ -3810,6 +3810,10 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
 @keyframes heroIdleKlipp {
   from, to { clip-path: inset(-400px -400px 0 -400px); }
 }
+/* W86u1: der Schlagschatten liegt auf GANZEN Pixeln (die Brettskala ist gebrochen; ein Versatz von 0,68 px malt die Schattenkante weich) */
+@supports (width: round(up, 1.5px, 1px)) {
+  .hero-idle-steher { filter: drop-shadow(0 round(up, calc(1px * var(--board-scale)), 1px) 0 #08060c); }
+}
 .hero-idle-canvas {
   position: absolute;
   left: 0; top: 0;
@@ -26080,6 +26084,9 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
 .hero-idle-platz.hero-idle-abgeblendet .hero-idle-steher {
   filter: grayscale(.85) brightness(.5) drop-shadow(0 calc(1px * var(--board-scale)) 0 #08060c);
   opacity: .55;
+}
+@supports (width: round(up, 1.5px, 1px)) {
+  .hero-idle-platz.hero-idle-abgeblendet .hero-idle-steher { filter: grayscale(.85) brightness(.5) drop-shadow(0 round(up, calc(1px * var(--board-scale)), 1px) 0 #08060c); }
 }
 .hero-idle-platz.hero-idle-abgeblendet .hero-idle-fx { opacity: .4; }   /* der Schatten liegt im Steher und blendet mit */
 
