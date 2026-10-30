@@ -38,7 +38,7 @@ import anim_flieger_b as B
 
 N, MS = 48, 65
 BEAT, DOWN = 12, 5                                         # Frames je Schlag, davon Abschlag
-PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 9, 5
+PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 6, 5
 
 spr = L.lade('assault-eagle')
 sh, sw = spr.shape[:2]
