@@ -155,8 +155,7 @@ def _fuss(sp_ebene, name, i):
         if not len(xs):
             continue
         frac = (y - (PAD_T + y0)) / float(max(1, y1 - y0))
-        wert = 0.5 * (1.0 + math.sin(2 * math.pi * i / 24 + phi)) - 0.5 * (1.0 + math.sin(phi))          # 0 in Frame 0, in [−1, 1]
-        dx = richtung * int(round(1.5 * frac * max(0.0, wert + (0.5 * (1.0 + math.sin(phi))) - (0.5 * (1.0 + math.sin(phi))))))
+        dx = richtung * int(round(0.7 * frac * (math.sin(2 * math.pi * i / 24 + phi) - math.sin(phi))))      # 0 in Frame 0
         if xs.min() + dx < 0 or xs.max() + dx >= W:
             raise L.ClipError(f'Fuß {name}: Zeile {y} würde um {dx} px aus der Leinwand')
         for x in xs:
@@ -217,7 +216,8 @@ def figur(i):
         ebenen.append((_fuss(sp, name, i), 0, dyb))
     for name in DRAEHTE:
         ebenen.append((_draht(sp, name, i), 0, dyb))
-    ebenen.append((L.platz(np.where(FUNKE[..., None] | (sp[..., 3:4] > 0) & ~OPAK[..., None], sp, 0).astype(np.uint8) * 0 + np.where((FUNKE | (~OPAK & (sp[..., 3] > 0)))[..., None], sp, 0).astype(np.uint8), H, W, PAD_L, PAD_T), 0, dyb))
+    neu = FUNKE | (~OPAK & (sp[..., 3] > 0))                                      # Funkengarbe (Original und neu gesetzte Pixel)
+    ebenen.append((L.platz(np.where(neu[..., None], sp, 0).astype(np.uint8), H, W, PAD_L, PAD_T), 0, dyb))
     fig = L.zusammen(H, W, ebenen)
     fig, brueck = A.verbinde4(fig)
     fig, pfad, offen = A.verbinde_luecken(fig, 3)
