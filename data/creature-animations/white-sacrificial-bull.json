@@ -1,7 +1,7 @@
 {
   "creature": "White Sacrificial Bull",
   "sheet": "white-sacrificial-bull.png",
-  "frameWidth": 43,
+  "frameWidth": 42,
   "frameHeight": 35,
   "frames": 56,
   "frameMs": 66,
@@ -11,5 +11,5 @@
   "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,
-  "faceX": 21.5
+  "faceX": 21.0
 }
