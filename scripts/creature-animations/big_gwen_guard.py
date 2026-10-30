@@ -41,7 +41,7 @@ import anim_humanoide as Hm
 import anim_lib as L
 
 N, MS = 48, 62
-PAD_L, PAD_R, PAD_T, PAD_B = 2, 2, 2, 2          # Figuren knapp zugeschnitten: Hellebarden stehen fest (Oberkante y 0), Kopf hebt sich innerhalb ihrer Höhe
+PAD_L, PAD_R, PAD_T, PAD_B = 2, 2, 3, 2          # Figuren knapp zugeschnitten: Hellebarden stehen fest (Oberkante y 0), Kopf hebt sich innerhalb ihrer Höhe
 
 spr = L.lade('big-gwen-guard')
 sh, sw = spr.shape[:2]
@@ -105,9 +105,7 @@ def seite(i, s, gl):
     for start in p['blatt_start']:
         Hm.lichtband(hb, p['blatt'], OFF, i, N, start, 14, STAHL, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
     Hm.lichtband(g, p['schnalle'], OFF, i, N, p['schnalle_start'], 6, GOLD, stufen=1, breite=2.0, achse=(1.0, 0.0), kern=1)
-    # --- Kopfwiegen (Zeilen 4–17 seitlich 1 px, Kinn/Hals bleibt) ---
-    if Hm.folge(i, p['kopf_start'], [1] * 12, N):
-        Hm.bereich_versatz(g, OFF, {y: p['kopf_dx'] for y in range(4, 18)}, 0, sw - 1)
+    # (Nutzer-Feedback: die Köpfe bewegen sich nicht nach links/rechts – Kopfwiegen entfällt)
     # --- Hellebardenspitze zuckt (Zeilen 0–1 kippen 1 px) ---
     start, d = p['spitze']
     if Hm.folge(i, start, [1, 1, 0, 1], N):
@@ -116,10 +114,13 @@ def seite(i, s, gl):
     brust = Hm.stufe(i, p['atem'], 1)
     kopf = Hm.stufe(i - 3, p['atem'], 1)
     g = Hm.atmen(g, PAD_T + 28, PAD_T + 18, brust, kopf)
-    # --- Glitzer-Stern an der Blattspitze (feststehend wie die Hellebarde) ---
+    # Nutzer-Feedback: die Waffe bewegt sich mit der haltenden Hand mit (Schaftzeile 28 wird eingefügt: Blatt und Hand steigen
+    # gemeinsam, der Schaftfuß bleibt am Boden)
+    hb = Hm.atmen(hb, PAD_T + 28, PAD_T + 18, brust, 0)
+    # --- Glitzer-Stern an der Blattspitze (steigt mit der Hellebarde) ---
     sx, sy, sstart = p['stern']
     st = Hm.folge(i, sstart, [0, 1, 2, 1], N)
-    Hm.stern4(gl, sx, sy, st, WEISS, HELL, MITTEL, OFF)
+    Hm.stern4(gl, sx, sy - brust, st, WEISS, HELL, MITTEL, OFF)
     return g, hb
 
 

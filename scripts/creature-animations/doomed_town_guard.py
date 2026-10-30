@@ -93,10 +93,10 @@ def frame(i):
     if dr:
         Hm.rand_dehnen_innen(ar, OFF, {y: 1 for y in range(13, 19)}, 'r')
     # --- Kopfneigen (Zeilen 0–8) und Gewichtsverlagerung (Zeilen 0–18 samt Armen) in getrennten Zeitfenstern ---
-    kn = -1 if Hm.folge(i, 2, [1] * 6, N) else (1 if Hm.folge(i, 24, [1] * 8, N) else 0)
+    kn = 0                                           # Nutzer-Feedback: Kopf bewegt sich nicht seitwärts
     if kn:
         Hm.bereich_versatz(k, OFF, {y: kn for y in range(0, 9)}, -2, sw + 1)
-    gv = 1 if Hm.folge(i, 10, [1] * 12, N) else (-1 if Hm.folge(i, 34, [1] * 12, N) else 0)
+    gv = 0                                           # Nutzer-Feedback: keine seitliche Verlagerung des Oberkörpers/Kopfes
     if gv:
         Hm.bereich_versatz(k, OFF, {y: gv for y in range(0, 19)}, -2, sw + 1)
         for a in (al, ar):

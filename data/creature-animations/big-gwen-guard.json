@@ -2,7 +2,7 @@
   "creature": "Big Gwen Guard",
   "sheet": "big-gwen-guard.png",
   "frameWidth": 52,
-  "frameHeight": 38,
+  "frameHeight": 39,
   "frames": 48,
   "frameMs": 62,
   "loop": true,

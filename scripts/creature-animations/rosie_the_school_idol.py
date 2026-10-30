@@ -91,10 +91,12 @@ def hand_innen(a, links):
 def frame(i):
     k, hl, hr = ebene(rumpf), ebene(haar_l), ebene(haar_r)
     # --- Augen: zugekniffenes Auge geht auf (Frames 8–13, 40–44), Blinzeln (Frames 29–31) ---
-    if Hm.folge(i, 8, [1] * 6, N) or Hm.folge(i, 40, [1] * 5, N):
-        Hm.setze(k, OFFEN, OFF)
-    elif Hm.folge(i, 29, [1] * 3, N):
+    # Nutzer-Feedback: Rosie soll nicht böse gucken → Ruhezustand = beide Augen offen (freundlich); nur kurz zwinkert sie
+    # (Frames 8–13, 40–44: das zugekniffene Auge der Karte), Blinzeln in den Frames 29–31
+    if Hm.folge(i, 29, [1] * 3, N):
         Hm.setze(k, ZU, OFF)
+    elif not (Hm.folge(i, 8, [1] * 6, N) or Hm.folge(i, 40, [1] * 5, N)):
+        Hm.setze(k, OFFEN, OFF)
     # --- Händchen rutschen nach innen ---
     if Hm.folge(i, 4, [1] * 4, N):
         hand_innen(k, True)
@@ -107,12 +109,12 @@ def frame(i):
     if Hm.folge(i, 38, pat, N):
         Hm.rand_dehnen(hr, OFF, {y: 1 for y in range(6, 13)}, 'r')
     # --- Kopfneigen (Zeilen 0–11 samt Mähne) und Gewichtsverlagerung (Zeilen 0–18 samt Mähne) in getrennten Zeitfenstern ---
-    kn = -1 if Hm.folge(i, 2, [1] * 6, N) else (1 if Hm.folge(i, 24, [1] * 8, N) else 0)
+    kn = 0                                           # Nutzer-Feedback: Kopf bewegt sich nicht seitwärts
     if kn:
         Hm.bereich_versatz(k, OFF, {y: kn for y in range(0, 12)}, -3, sw + 2)
         for h in (hl, hr):
             Hm.bereich_versatz(h, OFF, {y: kn for y in range(5, 12)}, -3, sw + 2)
-    gv = 1 if Hm.folge(i, 10, [1] * 12, N) else (-1 if Hm.folge(i, 34, [1] * 12, N) else 0)
+    gv = 0                                           # Nutzer-Feedback: keine seitliche Verlagerung des Oberkörpers/Kopfes
     if gv:
         Hm.bereich_versatz(k, OFF, {y: gv for y in range(0, 19)}, -3, sw + 2)
         for h in (hl, hr):

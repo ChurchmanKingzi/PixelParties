@@ -54,7 +54,7 @@ def frame(i):
     k, _ = L.trenne(spr, rumpf)
     k = L.platz(k, H, W, PAD_L, PAD_T)
     # --- Kopfwiegen: Zeilen 0–9 gemeinsam 1 px seitlich (Hals Zeile 10 bleibt) ---
-    dx = 1 if Hm.folge(i, 6, [1] * 8, N) else (-1 if Hm.folge(i, 30, [1] * 8, N) else 0)
+    dx = 0                                           # Nutzer-Feedback: Kopf bewegt sich nicht seitwärts
     if dx:
         Hm.bereich_versatz(k, OFF, {y: dx for y in range(0, 10)}, 0, sw - 1)
     # --- Auf und ab: Jackensaum (Zeile 17) = Brust, Hals (Zeile 10) läuft 3 Frames nach ---

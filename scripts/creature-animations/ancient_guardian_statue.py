@@ -78,9 +78,8 @@ def frame(i):
     elif Hm.folge(i, 26, [1] * 6, N):
         augen_setzen(gs, -1)
     # --- Kamm wackelt (Zeilen 0–5) und Helm gleitet (Zeilen 0–13) in getrennten Zeitfenstern ---
-    if Hm.folge(i, 24, [1] * 6, N):
-        Hm.bereich_versatz(hl, OFF, {y: 1 for y in range(0, 6)}, -2, sw + 1)
-    gv = 1 if Hm.folge(i, 10, [1] * 12, N) else (-1 if Hm.folge(i, 34, [1] * 12, N) else 0)
+    # (Nutzer-Feedback: die Statue bewegt sich nicht nach links/rechts – Kammwackeln und Helmgleiten entfallen)
+    gv = 0                                           # Nutzer-Feedback: keine seitliche Verlagerung des Oberkörpers/Kopfes
     if gv:
         Hm.bereich_versatz(hl, OFF, {y: gv for y in range(0, 14)}, -2, sw + 1)
     # --- Helm hebt sich: Bandzeile 12 doppelt, Gesicht bleibt ---
