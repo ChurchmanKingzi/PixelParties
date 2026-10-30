@@ -13511,6 +13511,29 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .vscpu-kachel::after { content: ''; position: absolute; z-index: 3; pointer-events: none; --eck-e: 3px; inset: 3px; }
 .vscpu-kachel:disabled::after { opacity: .6; }
 
+/* ── HANDY: Tippflaechen ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   Gemessen (844×390, Gast-Tutorial): Phasen-Knoepfe 16 px hoch, Popup-Knoepfe (Abbrechen, Schaden-Knoepfe, ✕) 15–31 px, Kopfzeile/Hand-Knoepfe 17–22 px —
+   weit unter einer daumentauglichen Flaeche. Mindesthoehen in BILDSCHIRM-Pixeln: `calc(N / var(--ui-scale, 1))` nimmt den Menue-Zoom (zoom: .7)
+   wieder heraus, auf dem Kampffeld (ui-noscale) ist der Faktor 1. */
+@media (pointer: coarse) and (max-height: 600px) {
+  /* Popups und Fenster: Zielwahl, Fragen, Galerien, Ergebnis, Tutorial-Liste */
+  .panel-zielwahl-knoepfe .btn, .first-choice-panel .btn, .modal .btn, .modal-overlay .btn, .pp-fenster .btn, .attach-pick-panel .btn,
+  .result-overlay-fade .btn, .textbox-overlay .btn { min-height: calc(36px / var(--ui-scale, 1)); padding-top: 4px; padding-bottom: 4px; }
+  .pp-fenster .btn { min-height: calc(32px / var(--ui-scale, 1)); }   /* Listenzeilen (Tutorial-Liste): sieben Zeilen + Regeln sollen ohne Scrollen passen */
+  .pp-fenster-kopf .btn { min-width: calc(38px / var(--ui-scale, 1)); }
+  .panel-zielwahl-knoepfe .btn, .first-choice-panel .btn { min-width: calc(76px / var(--ui-scale, 1)); }
+  /* Phasenleiste (im Brett, 1:1): Knoepfe und Phasen-Eintraege */
+  .phase-column .phase-btn, .phase-buttons-row .phase-btn { min-height: 32px !important; font-size: 9px !important; padding: 3px 12px !important; }
+  .phase-column .board-phase-item { font-size: 8px !important; padding: 5px 6px !important; min-height: 28px !important; display: inline-flex; align-items: center; }
+  .phase-column .phase-end-check { font-size: 8px !important; min-height: 32px; }
+  .phase-column .phase-end-check input { width: 16px !important; height: 16px !important; }
+  /* Kopfzeile, Hand-Leiste, Lautstaerke */
+  .top-bar .btn, .top-bar .volume-btn { min-height: calc(30px / var(--ui-scale, 1)); }
+  .volume-btn { min-width: calc(30px / var(--ui-scale, 1)) !important; min-height: calc(30px / var(--ui-scale, 1)) !important; }
+  .game-hand-quit, .hand-action-btn { min-height: 30px !important; }
+  .menu-logout-btn { min-height: calc(30px / var(--ui-scale, 1)) !important; }
+}
+
 
 /* ── RETRO-ZUSATZ (scripts/retro/retro-extra.css) ── */
 /* ════════════════════════════════════════════════════════════════════════════
