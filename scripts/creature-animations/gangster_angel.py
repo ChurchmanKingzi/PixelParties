@@ -157,8 +157,8 @@ def frame(i, partikel=True, effekte=True):
     kp = L.versetze(L.streck_zeile(kp, zeile, n_str), 0, low)
 
     # ── Flügel: ECHTER Schlag — jeder Flügel dreht sich als Ganzes um den Schulteransatz (am Körperumriss); der Oberkörper trägt ihn (Versatz `up`) ───────
-    wl = F.drehen(F.ebene(spr_f, fl_links, H, W, PAD_L, PAD_T), PAD_L + 9, PAD_T + 10, theta)
-    wr = F.drehen(F.ebene(spr_f, fl_rechts_k, H, W, PAD_L, PAD_T), PAD_L + 25, PAD_T + 10, -theta)
+    wl = F.drehen(F.ebene(spr_f, fl_links, H, W, PAD_L, PAD_T), PAD_L + 9, PAD_T + 10, theta, glatt=True)
+    wr = F.drehen(F.ebene(spr_f, fl_rechts_k, H, W, PAD_L, PAD_T), PAD_L + 25, PAD_T + 10, -theta, glatt=True)
     wl, wr = L.versetze(wl, 0, up), L.versetze(wr, 0, up)
 
     # ── Füße baumeln ───────────────────────────────────────────────────────────────────────────────────────────────

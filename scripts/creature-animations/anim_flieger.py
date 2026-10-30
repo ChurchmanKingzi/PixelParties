@@ -462,10 +462,12 @@ def zeilen_stauchen(a, achse_x, s_zeile):
     return out
 
 
-def drehen(a, pivot_x, pivot_y, winkel):
+def drehen(a, pivot_x, pivot_y, winkel, glatt=False):
     """Die ganze Ebene um (pivot_x, pivot_y) (Pixelmittelpunkt) drehen: positiv = im Uhrzeigersinn auf dem Bildschirm (y zeigt nach unten).
     Rückwärtsabbildung mit Nächster-Nachbar: keine Mischfarben, Alpha bleibt 0/255, jede Zielposition holt sich ein Quellpixel (keine Löcher im Inneren).
-    Pixel, die aus der Leinwand gedreht würden, lösen ClipError aus."""
+    Pixel, die aus der Leinwand gedreht würden, lösen ClipError aus.
+    glatt=True: Die Silhouette wird einmal bereinigt — einzelne Spitzenpixel (weniger als 2 belegte 4er-Nachbarn) entfallen, einzelne Kerben
+    (leeres Pixel mit ≥ 3 belegten 4er-Nachbarn) werden mit der häufigsten Nachbarfarbe gefüllt — das beseitigt das Ausfransen der Drehkanten."""
     h, w = a.shape[:2]
     out = L.leer(h, w)
     c, s_ = math.cos(winkel), math.sin(winkel)
@@ -487,6 +489,22 @@ def drehen(a, pivot_x, pivot_y, winkel):
             sy = int(math.floor(pivot_y - dx * s_ + dy * c + 0.5))
             if 0 <= sx < w and 0 <= sy < h and a[sy, sx, 3]:
                 out[y, x] = a[sy, sx]
+    if glatt:
+        m = out[..., 3] > 0
+        p = np.pad(m, 1)
+        n4 = p[:-2, 1:-1].astype(int) + p[2:, 1:-1] + p[1:-1, :-2] + p[1:-1, 2:]
+        neu = out.copy()
+        neu[m & (n4 < 2)] = 0                                        # Spitzenpixel weg
+        for y, x in zip(*np.nonzero(~m & (n4 >= 3))):                # Kerben füllen
+            farben = []
+            for dy_, dx_ in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                yy_, xx_ = y + dy_, x + dx_
+                if 0 <= yy_ < h and 0 <= xx_ < w and out[yy_, xx_, 3]:
+                    farben.append(tuple(int(v) for v in out[yy_, xx_, :3]))
+            c = max(set(farben), key=farben.count)
+            neu[y, x, :3] = c
+            neu[y, x, 3] = 255
+        out = neu
     return out
 
 
