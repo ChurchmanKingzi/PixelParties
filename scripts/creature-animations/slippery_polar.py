@@ -20,14 +20,13 @@ Bleibt fest: Kopfform, Nase, Mundumriss, Rückenlinie, Hüfte, Reifenränder.
 Ablauf (60 Frames à 66 ms = 3,96 s), alle Bewegungen unabhängig:
 * Räder drehen: der weiße Lichtbogen wandert Position für Position um den Radring (10 Positionen, 1 Schritt alle 2 Frames = 3 Umdrehungen pro Schleife), beide Räder gegen den
   Uhrzeigersinn (der Bär rollt nach links). Nur die Ringpixel wechseln zwischen Weiß und Reifenschwarz.
-* Holpern: der Bär hebt sich ruckartig 1 px über den Rädern (Zeile 15 wird eingefügt, 4× pro Schleife, Frames 2–8 + 15 k), die Räder bleiben am Boden.
+* Holpern: der Bär hebt sich ruckartig 1 px über den Rädern (Zeile 15 wird eingefügt, 4× pro Schleife, Frames 2–8, 17–23, 32–38, 47–53), die Räder bleiben am Boden.
 * Ohrzucken: die Ohrspitzen (Zeilen 0–1) schnippen 1 px nach hinten (rechts), 3× pro Schleife (Frames 6, 26, 47).
 * Blinzeln (Frames 12–15 und 37–40): das Auge (6–7, 4–5) wird erst oben, dann ganz zur Fellfarbe A (247,240,230) des Kopfes, dann wieder offen.
-* Schneestaub: vier kleine runde Schneewölkchen (Fellfarben) stieben hinter dem hinteren Rad auf (entstehen am Radboden, steigen schräg nach rechts oben und vergehen); sie liegen
-  hinter dem Bären. Der Rahmen ist dafür nur 2 px breiter als der Bär allein.
+* Keine Partikel (ein erster Versuch mit Schneestaub hinter dem Hinterrad ist wieder entfernt: einzelne helle Pixel neben dem Rad wirkten wie Fehlpixel).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
-Ergänzungen: der Schneestaub ist eine Zutat (keine Vorlage im Bild); Randpixel-Korrektur (Regel 16): wo das Holpern oder der Ohrschnipser eine Füllfarbe an den Rand schiebt, wird ein
+Ergänzungen: keine gemalten Pixel außer der Randpixel-Korrektur (Regel 16): wo das Holpern oder der Ohrschnipser eine Füllfarbe an den Rand schiebt, wird ein
 Umrisspixel ergänzt (anim_tiere.umriss_schliessen).
 """
 import sys
@@ -38,7 +37,7 @@ import anim_lib as L
 import anim_tiere as T
 
 N, MS = 60, 66
-PAD_L, PAD_R, PAD_T, PAD_B = 2, 3, 3, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 2, 2, 3, 2
 
 spr = L.lade('slippery-polar')
 sh, sw = spr.shape[:2]
@@ -58,11 +57,6 @@ RING = [(-1, -2), (0, -2), (1, -2), (2, -1), (2, 0), (1, 1), (0, 1), (-1, 1), (-
 RAEDER_X = (20, 36)
 AUGE = [(6, 4), (7, 4), (6, 5), (7, 5)]
 ZEILE = 15                                                         # hier wird beim Holpern eine Zeile eingefügt
-STAUB = {'schnee': ((250, 247, 238), (228, 221, 205))}             # C (Kern) / I (Rand)
-STAUBFLOCKEN = [dict(x=PAD_L + 41, y=PAD_T + 21, vx=2.8, vy=-2.4, off=0, form='s', farbe='schnee', wackeln=0.0),
-                dict(x=PAD_L + 41, y=PAD_T + 21, vx=2.2, vy=-3.0, off=15, form='s', farbe='schnee', wackeln=0.0),
-                dict(x=PAD_L + 41, y=PAD_T + 21, vx=2.6, vy=-2.0, off=30, form='s', farbe='schnee', wackeln=0.0),
-                dict(x=PAD_L + 41, y=PAD_T + 21, vx=2.4, vy=-2.8, off=45, form='s', farbe='schnee', wackeln=0.0)]
 TEST_EBENEN = ['koerper', 'ohr']
 
 
@@ -98,14 +92,10 @@ def frame(i, nur=None):
     ohr_t = T.zucken_zeilen(teil(ohr), PAD_T + 2, 1.2 * ohr_h, {PAD_T + 0: 1.0, PAD_T + 1: 1.0}, innen='links')
     k = L.streck_zeile(k, PAD_T + ZEILE, holper)
     ohr_t = L.streck_zeile(ohr_t, PAD_T + ZEILE, holper)
-    staub = T.funken_ebene(H, W, i, N, STAUBFLOCKEN, STAUB)
-    ebenen = {'staub': staub, 'koerper': k, 'ohr': ohr_t}
-    wahl = nur or ('staub', 'koerper', 'ohr')
-    ganz = L.zusammen(H, W, [(ebenen[n], 0, 0) for n in wahl if n != 'staub'])
-    ganz = T.umriss_schliessen(ganz, RAND, REGEL)                  # Randpixel-Test (Regel 16)
-    if 'staub' in wahl:
-        ganz = L.zusammen(H, W, [(ebenen['staub'], 0, 0), (ganz, 0, 0)])
-    return ganz
+    ebenen = {'koerper': k, 'ohr': ohr_t}
+    wahl = nur or ('koerper', 'ohr')
+    ganz = L.zusammen(H, W, [(ebenen[n], 0, 0) for n in wahl])
+    return T.umriss_schliessen(ganz, RAND, REGEL)                  # Randpixel-Test (Regel 16)
 
 
 if __name__ == '__main__':
