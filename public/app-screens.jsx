@@ -1286,7 +1286,7 @@ function MenuCardBackground() {
         {tile}
         {tile}
       </div>
-      <PpVerlauf className="menu-card-bg-veil" px={4} retroGradient="radial-gradient(ellipse at center, rgba(8,6,12,.58) 0%, rgba(8,6,12,.78) 70%, rgba(8,6,12,.9) 100%)" gradient="radial-gradient(ellipse at center, rgba(8,6,12,.52) 0%, rgba(8,6,12,.76) 70%, rgba(8,6,12,.9) 100%)" />
+      <PpVerlauf className="menu-card-bg-veil" px={4} retroGradient="radial-gradient(ellipse at center, rgba(8,6,12,.58) 0%, rgba(8,6,12,.78) 70%, rgba(8,6,12,.9) 100%)" gradient="radial-gradient(ellipse at center, rgba(8,6,12,.22) 0%, rgba(8,6,12,.34) 70%, rgba(8,6,12,.5) 100%)" />
     </div>
   );
 }

@@ -92,7 +92,7 @@
   function farbText(f, k) {
     if (f.v) {
       if (k >= 0.85) return f.v;
-      return /^currentcolor$/i.test(f.v) ? f.v : `color-mix(in srgb, ${f.v} ${Math.round(k * 100)}%, #000)`;
+      return `color-mix(in srgb, ${f.v} ${Math.round(k * 100)}%, #000)`;                          // auch currentColor: dunkler Ton (der Schein in genau der Textfarbe verklumpt die Ziffern, Al 30.10.)
     }
     let r = f.r * k, g = f.g * k, b = f.b * k;
     if (root.ppSnapRgb) { const p = root.ppSnapRgb(r, g, b); r = p[0]; g = p[1]; b = p[2]; }

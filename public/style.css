@@ -140,6 +140,8 @@
 body {
   color: var(--text);
   font-family: var(--font-body), sans-serif;
+  /* ★ 30.10. (Al: Menue-Zahlen kaum lesbar): die Pixelschriften haben nur EIN Gewicht — `font-weight: 700/800` erzeugte einen unscharfen Schein-Fettschnitt (Ziffern verschmiert). */
+  font-synthesis-weight: none;
   /* Die Anwendung bleibt eine feste Flaeche — gescrollt wird INNERHALB
      der Bildschirme, nicht mit der Seite. `dvh` statt `vh`, damit auf
      Mobilgeraeten die ein- und ausfahrende Browserleiste die Hoehe
@@ -16640,7 +16642,7 @@ body:has(.rotate-device-overlay.rotate-gate) .pp-bg-particles * { animation: non
      desaturate so individual cards stop competing with the foreground
      panels for attention. The blur also softens the grid seams. */
   /* ★ W86u2 (Pixelart): kein Weichzeichner mehr (war blur(1.5px)) — die Abdunklung uebernimmt der geditherte Schleier. */
-  filter: brightness(.85) saturate(.95);
+  filter: brightness(.7) saturate(.95);   /* ★ 30.10. (Al): Wand leserlicher — hellere Bilder, dafuer ein duenner Schleier (vorher .85 + dichter Dither) */
 }
 /* Dark veil so the menu stays readable over the bright card art. The
    centre is kept darker (not lighter) than before so the three panels —

@@ -29,7 +29,7 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-body { color: var(--text); font-family: var(--font-body), sans-serif; overflow: hidden; height: 100dvh; background: linear-gradient(135deg, #08060c 0% 16.67%, #12101f 16.67% 33.33%, #291f3d 33.33% 66.67%, #12101f 66.67% 83.33%, #08060c 83.33% 100%) var(--bg); }
+body { color: var(--text); font-family: var(--font-body), sans-serif; font-synthesis-weight: none; overflow: hidden; height: 100dvh; background: linear-gradient(135deg, #08060c 0% 16.67%, #12101f 16.67% 33.33%, #291f3d 33.33% 66.67%, #12101f 66.67% 83.33%, #08060c 83.33% 100%) var(--bg); }
 
 #root { height: 100dvh; position: relative; }
 
@@ -7897,7 +7897,7 @@ body:has(.rotate-device-overlay.rotate-gate) .pp-bg-particles * { animation: non
 .menu-card-bg-scroller { position: absolute; left: 0; top: 0; width: 100%; display: flex; flex-direction: column; will-change: transform; animation-name: menu-card-bg-scroll; animation-timing-function: steps(6, end); animation-iteration-count: infinite; }
 .menu-card-bg-tile { display: grid; grid-template-columns: repeat(10, 1fr); width: 100%; }
 .menu-card-bg-cell { position: relative; width: 100%; aspect-ratio: 750 / 1050; }
-.menu-card-bg-cell img { width: 100%; height: 100%; object-fit: cover; display: block; -webkit-user-drag: none; user-select: none; filter: brightness(.85) saturate(.95); }
+.menu-card-bg-cell img { width: 100%; height: 100%; object-fit: cover; display: block; -webkit-user-drag: none; user-select: none; filter: brightness(.7) saturate(.95); }
 /* Dark veil so the menu stays readable over the bright card art. The
    centre is kept darker (not lighter) than before so the three panels —
    which sit over the middle of the screen — clearly read as on top. */
