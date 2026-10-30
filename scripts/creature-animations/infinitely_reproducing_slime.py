@@ -17,7 +17,7 @@ Fest bleiben: Umriss, Kuppelform, Fußform, Lichter (sie wandern nur mit dem Gel
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Gel-Körper (Squash & Stretch, Periode 24): beim Strecken (Frames 2–10 und 26–34 eine Körperzeile 6 mehr, in der Spitze 4–8 und 28–32 zusätzlich Zeile 7) wird der Schleim 1–2 px höher; beim Stauchen (Frames 15–21
   und 39–45) wird er je Zeile 1 Spalte je Seite breiter (die Spalte neben dem Umriss wird verdoppelt, nie der Umriss). Die Unterkante sitzt fest am Boden.
-* Schleimperlen (Partikel): fünf runde Wölkchen (2×2 → 4×4 → 2×2, nie einzelne Punkte; Farben D und C des Sprites) quellen aus dem Schleim und steigen in der freien oberen rechten Ecke des Sprite-Rechtecks
+* Schleimperlen (Partikel): zwei runde Wölkchen (2×2 → 4×4 → 2×2, nie einzelne Punkte; Farben D und C des Sprites, immer nur eines sichtbar groß) quellen aus dem Schleim und steigen 8 px in der freien oberen rechten Ecke des Sprite-Rechtecks
   langsam auf — der Schleim „vermehrt“ sich in kleinen Perlen.
 Ergänzungen: keine (der Umriss wird nie verändert; beim Verdoppeln bleibt jede Randstufe ≤ 1 px).
 Frame: Sprite plus 3 px links/rechts, 4 px oben (Strecken), 2 px unten — Figur zentriert; die Perlen liegen innerhalb des Sprite-Rechtecks (keine zusätzliche Frame-Vergrößerung).
@@ -74,8 +74,7 @@ assert S[0] == 0
 
 # ── Perlen (nur 2×2 / 4×4) in der freien Ecke oben rechts im Sprite-Rechteck (x 13–16, y 0–8) ──
 PERLEN = [
-    dict(x=14, y=8, vx=0, vy=-5, off=0), dict(x=15, y=7, vx=-1, vy=-5, off=10), dict(x=14, y=9, vx=1, vy=-6, off=20),
-    dict(x=15, y=8, vx=0, vy=-6, off=5), dict(x=14, y=7, vx=0, vy=-5, off=15),
+    dict(x=15, y=9, vx=0, vy=-8, off=0), dict(x=14, y=9, vx=1, vy=-8, off=12),
 ]
 
 

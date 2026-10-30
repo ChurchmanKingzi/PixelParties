@@ -1,0 +1,15 @@
+{
+  "creature": "Stellin, the Calm Dictator",
+  "sheet": "stellin-the-calm-dictator.png",
+  "frameWidth": 24,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 62,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 12.0
+}
