@@ -53,7 +53,7 @@ assert n_teile == 4, n_teile
 BATS = [
     dict(name='A', typ='V', auge=(7, 5), T=12, tief=75.0, blinz=(14, 15, 16)),
     dict(name='B', typ='V', auge=(29, 14), T=8, tief=70.0, blinz=(33, 34, 35)),
-    dict(name='C', typ='flat', auge=(13, 20), T=12, amp=4.0, blinz=(25, 26, 27)),
+    dict(name='C', typ='flat', auge=(13, 20), T=12, amp=4.0, amp_hoch=2.0, blinz=(25, 26, 27)),
 ]
 for b in BATS:
     ax, ay = b['auge']
@@ -154,7 +154,7 @@ def bat_ebenen(b, i, effekte=True):
     if b['typ'] == 'V':
         fl = F.drehen(b['P_fl'], b['piv'][0], b['piv'][1], math.radians(delta), glatt=False)
     else:                                                      # Rautenflügel: Spaltenversatz um die Schulter (Raute bleibt unverändert), Frame 0: waagerecht (Original), erst nach unten, dann nach oben
-        fl = F.fluegel_welle(b['P_fl'], b['piv'][0], b['amp'], ph2, 1.0, None, 0.0, True)
+        fl = F.fluegel_welle(b['P_fl'], b['piv'][0], b['amp'] if math.sin(ph2) >= 0 else b['amp_hoch'], ph2, 1.0, None, 0.0, True)
     rumpf = b['P_rumpf'].copy()
     if effekte and i in b['blinz']:
         for (x, y) in b['eyes']:
