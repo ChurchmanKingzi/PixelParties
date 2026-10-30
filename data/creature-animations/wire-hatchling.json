@@ -1,0 +1,15 @@
+{
+  "creature": "Wire Hatchling",
+  "sheet": "wire-hatchling.png",
+  "frameWidth": 32,
+  "frameHeight": 26,
+  "frames": 48,
+  "frameMs": 60,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 16.0
+}
