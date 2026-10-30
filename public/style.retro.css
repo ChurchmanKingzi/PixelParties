@@ -1562,7 +1562,7 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
 .profile-avatar-frame:hover .profile-avatar-upload-overlay { opacity: 1; }
 
 .profile-rank-badge { display: flex; align-items: center; gap: 5px; padding: 4px 18px; font-weight: 800; letter-spacing: 2px; position: relative; overflow: hidden; }
-.profile-rank-badge::after { content: ''; position: absolute; top: 0; left: -100%; right: -100%; bottom: 0; background: linear-gradient(90deg, transparent 0% 100%); background-size: 50% 100%; animation: badgeShine 3s steps(24, end) infinite; }
+.profile-rank-badge::after { content: ''; position: absolute; top: 0; left: -100%; right: -100%; bottom: 0; background: linear-gradient(90deg, transparent 0% 40%, #ffffff 40% 60%, transparent 60% 100%); background-size: 50% 100%; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect width='2' height='2'/%3E%3Crect x='2' y='2' width='2' height='2'/%3E%3C/svg%3E") 0 0 / 4px 4px; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect width='2' height='2'/%3E%3Crect x='2' y='2' width='2' height='2'/%3E%3C/svg%3E") 0 0 / 4px 4px; animation: badgeShine 3s steps(24, end) infinite; }
 
 .profile-section { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect x='2' y='0' width='2' height='2' fill='%23000000'/%3E%3C/svg%3E") 0 0 / 4px 4px; border: 2px solid var(--bg4); padding: 14px 16px; }
 .profile-section-wide { padding: calc(var(--pv, 1vh) * 1.6) 22px; }
@@ -11349,8 +11349,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
    lagen aber vor allem Figurenteile (Hammer, Fluegel), der Kern selbst
    sitzt tiefer, hinter dem Formular. Die Glut in den Farben des Kerns
    haelt das Fenster ruhig und unabhaengig davon, was die Szene zeigt. */
-.auth-screen .auth-header { padding: 22px 16px 16px; background: radial-gradient(ellipse 50% 70% at 50% 50%, #fad54a 0% 0%, transparent 0% 100%),
-    linear-gradient(180deg, #12101f 0% 100%); }
+.auth-screen .auth-header { padding: 22px 16px 16px; position: relative; isolation: isolate; background: #12101f; }
 .auth-screen .auth-logo { width: 80%; }
 .auth-screen .auth-subtitle { margin-bottom: 4px; }
 

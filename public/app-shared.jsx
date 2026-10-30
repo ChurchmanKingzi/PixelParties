@@ -391,17 +391,19 @@ function ppVerlaufLesen(g) {
   const m = String(g || '').match(/radial-gradient\((.*)\)\s*$/s);
   if (!m) return null;
   const teile = _ppTeile(m[1]);
-  let kreis = false, cx = 0.5, cy = 0.5;
+  let kreis = false, cx = 0.5, cy = 0.5, rxp = null, ryp = null;
   const istForm = (t) => /^(circle|ellipse|closest|farthest|at\s)/.test(t) || /\sat\s/.test(' ' + t);
   if (teile.length && istForm(teile[0])) {
     const kopf = teile.shift();
     kreis = /circle/.test(kopf);
+    const rr = kopf.match(/ellipse\s+(-?[\d.]+)%\s+(-?[\d.]+)%/);            // ★ W86u2: explizite Ellipsenradien (in % der Breite/Hoehe)
+    if (rr) { rxp = parseFloat(rr[1]) / 100; ryp = parseFloat(rr[2]) / 100; }
     const at = kopf.match(/at\s+(-?[\d.]+)%\s+(-?[\d.]+)%/);
     if (at) { cx = parseFloat(at[1]) / 100; cy = parseFloat(at[2]) / 100; }
     else if (/at\s+center/.test(kopf)) { cx = 0.5; cy = 0.5; }
   }
   const stopps = _ppStopps(teile);
-  return stopps ? { kreis, cx, cy, stopps } : null;
+  return stopps ? { kreis, cx, cy, stopps, rxp, ryp } : null;
 }
 
 /** Farbstopps lesen und ohne Lage gleichmaessig verteilen (CSS-Regel, vereinfacht). */
@@ -477,7 +479,7 @@ function ppPxVerlaufUrl(gradient, breitePx = 0, hoehePx = 0, pxGroesse = 0) {
     const cx = v.linear ? 0.5 : v.cx, cy = v.linear ? 0.5 : v.cy;
     const fx = Math.max(cx, 1 - cx) * W, fy = Math.max(cy, 1 - cy) * H;
     const rk = Math.hypot(fx, fy);                                  // Kreis: fernste Ecke
-    const rx = Math.SQRT2 * fx, ry = Math.SQRT2 * fy;               // Ellipse: fernste Ecke
+    const rx = v.rxp != null ? v.rxp * W : Math.SQRT2 * fx, ry = v.ryp != null ? v.ryp * H : Math.SQRT2 * fy;   // Ellipse: fernste Ecke bzw. die angegebenen Radien
     // Linear: CSS-Winkel (0deg = nach oben, 90deg = nach rechts); die
     // Verlaufslinie ist |W sin| + |H cos| lang.
     const wr = (v.winkel || 0) * Math.PI / 180, sn = Math.sin(wr), cs = Math.cos(wr);

@@ -22581,10 +22581,9 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
    haelt das Fenster ruhig und unabhaengig davon, was die Szene zeigt. */
 .auth-screen .auth-header {
   padding: 22px 16px 16px;
-  background:
-    radial-gradient(ellipse 50% 70% at 50% 50%,
-      rgba(251,200,106,.62), rgba(227,116,53,.34) 40%, rgba(240,50,50,.12) 68%, transparent 100%),
-    linear-gradient(180deg, #12101f, #12101f);
+  position: relative; isolation: isolate;
+  /* ★ W86u2 (Pixelart): die Glut kommt aus `<PpVerlauf className="auth-header-glut">` (app-screens.jsx) als Dither-Pixelbild. */
+  background: #12101f;
 }
 .auth-screen .auth-logo { width: 80%; }
 .auth-screen .auth-subtitle { margin-bottom: 4px; }

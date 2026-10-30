@@ -866,6 +866,9 @@ function AuthScreen() {
   // erreichbar.
   const Header = (
     <div className="auth-header">
+      {/* ★ W86u2 (Pixelart): die Glut hinter dem Logo als Dither-Pixelbild statt Radialverlauf mit Alpha (Ebene hinter dem Inhalt, `.auth-header` ist ein Stapelkontext) */}
+      <PpVerlauf className="auth-header-glut" px={4} gradient="radial-gradient(ellipse 46% 58% at 50% 46%, rgba(251,200,106,.5), rgba(227,116,53,.2) 38%, rgba(240,50,50,.06) 64%, transparent 92%)"
+        style={{ position: 'absolute', inset: 0, zIndex: -1, pointerEvents: 'none' }} />
       {/* Same wordmark logo as the main menu (data/logo.png), tinted + haloed
           with drifting particles. Scoped .auth-logo just fits it to the panel
           width (the menu sizes it for a full-width header). */}
@@ -3255,7 +3258,7 @@ function ProfileScreen() {
                   <span>{nextRank.name} ({nextMin})</span>
                 </div>
                 <div className="profile-elo-bar">
-                  <div className="profile-elo-fill" style={{ width: eloProgress + '%', background: `linear-gradient(90deg, ${rank.color}, ${nextRank.color})` }} />
+                  <div className="profile-elo-fill" style={{ width: eloProgress + '%', ...pxHintergrund(`linear-gradient(90deg, ${rank.color}, ${nextRank.color})`, 200, 6) }} />   {/* W86u2: Dither statt stufenlosem Rangverlauf */}
                 </div>
               </div>
             )}

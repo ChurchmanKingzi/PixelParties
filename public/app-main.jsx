@@ -3456,6 +3456,31 @@ function IosFullscreenHint() {
   );
 }
 
+/**
+ * ★ W86u2 (Pixelart): der Seitenhintergrund (`body`, Diagonalverlauf Schwarz → Dunkelviolett → Grau) als Dither-Pixelbild (4-px-Punkte, Bayer
+ * zwischen den Farbstopps) statt stufenlosem Verlauf. Wird bei Groessenaenderung neu gemalt (Groesse grob gerastert, Bilder werden gemerkt).
+ * Retro-Modus: bleibt der CSS-Verlauf.
+ */
+function PpSeitenGrund() {
+  useEffect(() => {
+    if (window.PP_RETRO || !window.ppPxVerlaufUrl) return undefined;
+    const verlauf = 'linear-gradient(135deg, #08060c 0%, #19062d 50%, #141414 100%)';
+    const setzen = () => {
+      const q = (v) => Math.max(64, Math.round(v / 64) * 64);
+      const url = ppPxVerlaufUrl(verlauf, q(window.innerWidth), q(window.innerHeight), 4);
+      if (!url) return;
+      const st = document.body.style;
+      st.backgroundImage = `url(${url})`; st.backgroundSize = '100% 100%'; st.backgroundRepeat = 'no-repeat'; st.imageRendering = 'pixelated';
+    };
+    setzen();
+    let t = 0;
+    const spaeter = () => { clearTimeout(t); t = setTimeout(setzen, 200); };
+    window.addEventListener('resize', spaeter);
+    return () => { clearTimeout(t); window.removeEventListener('resize', spaeter); document.body.style.backgroundImage = ''; };
+  }, []);
+  return null;
+}
+
 function App() {
   const [user, setUser] = useState(null);
   const [screen, setScreen] = useState('menu');
@@ -3675,6 +3700,7 @@ function App() {
           Sobald ein Kampffeld im Baum haengt, blendet CSS die Schicht
           aus — dort deckt das Brett sie ohnehin ab, und laufende
           Animationen waehrend einer Partie kosten nur Bildrate. */}
+      <PpSeitenGrund />
       <MenuBackgroundParticles />
       <GameErrorBoundary>
         {!user ? <AuthScreen /> :
