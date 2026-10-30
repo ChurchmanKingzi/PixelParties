@@ -65,7 +65,8 @@ m_koerper = vorhanden & m239
 m_auge = vorhanden & L.farbmaske(spr, AUGEN_FARBEN)
 m_haube = m_kopf & (yy <= 21) & (xx <= 27)                     # Haube + Horn (obere Zeilen) wippen
 m_fuss = m_koerper & (xx >= 38) & (yy >= 40)                    # Füße am Rumpf
-m_rumpf = m_koerper & ~m_fuss
+m_wurzel = m_fluegel & ((xx - 42.0) ** 2 + (yy - 31.0) ** 2 <= 5.6 ** 2)      # Schulter: bleibt am Rumpf (der Flügel dreht dahinter heraus)
+m_rumpf = (m_koerper & ~m_fuss) | m_wurzel
 m_kopf_rest = m_kopf & ~m_haube
 assert int(m_auge.sum()) == 3, int(m_auge.sum())
 
@@ -78,7 +79,7 @@ P_FL, P_RUMPF, P_FUSS, P_KOPF, P_HAUBE = ebene(m_fluegel), ebene(m_rumpf), ebene
 assert (L.zusammen(H, W, [(p, 0, 0) for p in (P_FL, P_RUMPF, P_FUSS, P_KOPF, P_HAUBE)])[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] == spr).all()
 UMRISS = F.umriss_farben(spr)
 
-PIV = (PAD_L + 41.0, PAD_T + 33.0)                             # Flügelwurzel im Rücken
+PIV = (PAD_L + 42.0, PAD_T + 31.0)                             # Flügelwurzel im Rücken (Schulter)
 TIEF = 40.0                                                    # Abschlag in Grad nach unten
 BLINZ = {32, 33, 34}
 Y_FUSS = PAD_T + 40                                            # Füße pendeln unterhalb dieser Zeile
