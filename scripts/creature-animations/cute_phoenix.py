@@ -25,8 +25,9 @@ Ablauf (36 Frames à 70 ms = 2,52 s):
 * Feuer wie Feuer (Regel 15): Die FLÜGEL-Zungen flackern unverändert unregelmäßig in 12 Posen à 3 Frames; jede Zunge (Gipfel der Silhouette) hat ihre eigene Pose-Tabelle und
   einen eigenen Versatz. Der Teil über dem hellen Kern (rote Spitze, orange Mitte) wird gestreckt/gestaucht, die Farbfolge wandert mit der Zunge; Kern und Basis bleiben ruhig.
   Kein Lichtband, keine Sterne.
-* Der Flammenfächer (Körper, Mitte) flackert stärker (Nutzerwunsch): F.feuer_schichten — die Farbschichten Rot-Außenhaut / Orange / Gelb / heller Creme-Kern schwanken je Spalte mit
-  eigener Höhe und Neigung gegeneinander (12 Posen à 3 Frames je Zunge und Schicht), der helle Kern wandert also mit auf und ab; die Basis (ab Zeile 22) bleibt ruhig.
+* Der Flammenfächer (Körper, Mitte) flackert stärker (Nutzerwunsch): Zungen wie bisher (F.feuer_zungen) und zusätzlich F.feuer_schichten — die Farbschichten
+  Rot-Außenhaut / Orange / Gelb / heller Creme-Kern schwanken je Spalte mit eigener Höhe und Neigung gegeneinander (12 Posen à 3 Frames je Zunge und Schicht, ±2 px je
+  Stufe), der helle Kern wandert also mit auf und ab; die Basis (ab Zeile 22) bleibt ruhig.
 * Abreißende Funken: von den Zungenspitzen steigen kleine runde Funken (Rot/Orange/Gelb) langsam auf (Formen k, s) — 14 vom Körper (vorher 8) + 6 von den Flügeln = 20 Partikel.
 * Blinzeln (Frames 28–30).
 
@@ -55,6 +56,7 @@ DUNKELROT = (159, 35, 32)
 KERN = [GELB, CREME]                                         # heller Kern: hier setzt die Zunge an
 HEISS = {ROT: 0, ORANGE: 1, GELB: 2, CREME: 3}                # Farbschichten von außen (kühl) nach innen (heiß)
 Y_ENDE = PAD_T + 22                                          # ab hier (Creme-Band) steht die Basis des Fächers ruhig
+SCHICHT_AMP = (2.4, 2.4, 2.2, 2.0)                           # Pixel je Stufe −2…+2 für Rot / Orange / Gelb / Creme-Kern
 
 wing_l = vorhanden & (xx <= 9)
 wing_r = vorhanden & (xx >= 26)
@@ -90,6 +92,9 @@ PUFFS1 = funken(SPITZEN_F, 0, 5, ('k', 's'), -13) + funken(SPITZEN_L, 5, 2, ('k'
 PUFFS2 = funken(SPITZEN_F[1:], 17, 3, ('k', 's'), -14) + funken(SPITZEN_L[1:], 23, 1, ('k',), -12, -1) + funken(SPITZEN_R[1:], 29, 1, ('k',), -12, 1)
 
 
+GRUPPEN_F = F.schichten_gruppen(F.ebene(spr, koerper, H, W, PAD_L, PAD_T), HEISS, Y_ENDE)   # Zungeneinteilung der Ruhepose (bleibt fest)
+
+
 def fan_funken(spalten, ab, formen, vy, abstand=6):
     """Zusätzliche Funken vom Fächer: Start an der obersten Pixelzeile der angegebenen Fächerspalten (Ruhepose)."""
     top = F.ebene(spr, koerper, H, W, PAD_L, PAD_T)
@@ -123,7 +128,8 @@ def frame(i, partikel=True):
                                    **{p: ROT for p in (AUG_L[2], AUG_L[3], AUG_R[2], AUG_R[3])}})
 
     # Feuer: Zungen flackern (Regel 15), je Teil eigene Zufallsfolge
-    kp = F.feuer_schichten(kp, i, N, HEISS, Y_ENDE, seed=11, amp=(4.5, 3.5, 3.0, 2.5))      # Fächer: Farbschichten schwanken gegeneinander, Kern wandert
+    kp = F.feuer_zungen(kp, i, N, KERN, pose_frames=3, seed=11, hub=0.34)                  # Fächer: Zungen wie im Vorstand …
+    kp = F.feuer_schichten(kp, i, N, HEISS, Y_ENDE, seed=53, amp=SCHICHT_AMP, neigung=0.5, gruppen=GRUPPEN_F)   # … dazu schwanken die Farbschichten gegeneinander, Kern wandert
     wl = F.feuer_zungen(wl, i, N, KERN, pose_frames=3, seed=23, hub=0.34)
     wr = F.feuer_zungen(wr, i, N, KERN, pose_frames=3, seed=37, hub=0.34)
 

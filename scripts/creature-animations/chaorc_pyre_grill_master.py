@@ -80,7 +80,7 @@ for k in range(N_ZUNGEN):
         continue
     oben = sum(prof[x][0] for x in xs) / len(xs)
     unten = max(prof[x][1] for x in xs)
-    ZUNGEN.append(FEU.Zunge(x0 + PAD_L, unten + PAD_T, round(unten - oben + 1), 2.9))
+    ZUNGEN.append(FEU.Zunge(x0 + PAD_L, unten + PAD_T, round(unten - oben + 1), 4.0))
 # Koch ist fest im Weg (Feuer wird nicht über ihn gezeichnet); der Spieß liegt davor und wird nicht ausgespart (Feuer darunter, kein Loch beim Gleiten)
 sperre = np.zeros((H, W), bool)
 for y in range(KOCH.shape[0]):
@@ -97,7 +97,7 @@ class FeuerKompakt(FEU.Feuer):
     h_bereich   Höhenfaktoren der Posen (Standard 0.86 … 1.14), lean/bend/dk wie das Original, aber gemäßigt."""
 
     def __init__(self, h, w, zungen, rampe, n=48, seed=1, posen=12, amplitude=1.0, sperre=None, tempo=(2, 3),
-                 min_breite=2, faden_max=2, spalten=0.10, spalt_ab=2.8, h_bereich=(0.86, 1.14)):
+                 min_breite=2, faden_max=2, spalten=0.06, spalt_ab=3.8, h_bereich=(0.86, 1.14)):
         import random
         self.min_breite, self.faden_max, self.spalten, self.spalt_ab, self.h_bereich = min_breite, faden_max, spalten, spalt_ab, h_bereich
         self.h, self.w, self.zungen, self.rampe, self.n, self.amp = h, w, list(zungen), rampe, n, amplitude
@@ -125,12 +125,12 @@ class FeuerKompakt(FEU.Feuer):
         h = rnd.choice([lo, (lo + 1) / 2, 1.0, 1.0, (hi + 1) / 2, hi])
         return dict(
             h=1.0 + (h - 1.0) * a,
-            lean=rnd.uniform(-1.9, 1.9) * a, bend=rnd.uniform(-1.0, 1.0) * a,
+            lean=rnd.uniform(-1.3, 1.3) * a, bend=rnd.uniform(-0.6, 0.6) * a,
             w=1.0 + rnd.uniform(-0.16, 0.16) * a,
             u=[1.0, rnd.uniform(0.94, 1.0), rnd.uniform(0.78, 0.96), rnd.uniform(0.42, 0.7), rnd.uniform(0.14, 0.42)],
             wk=[1.0, 0.8 * (1 + rnd.uniform(-0.08, 0.08)), 0.58 * (1 + rnd.uniform(-0.15, 0.15)),
                 0.38 * (1 + rnd.uniform(-0.2, 0.2)), 0.22 * (1 + rnd.uniform(-0.3, 0.3))],
-            dk=[0.0, rnd.uniform(-0.5, 0.5) * a, rnd.uniform(-1.0, 1.0) * a, rnd.uniform(-1.1, 1.1) * a, rnd.uniform(-1.3, 1.3) * a],
+            dk=[0.0, rnd.uniform(-0.4, 0.4) * a, rnd.uniform(-0.8, 0.8) * a, rnd.uniform(-1.0, 1.0) * a, rnd.uniform(-1.2, 1.2) * a],
             split=(rnd.uniform(0.7, 1.0) if (z.breite >= self.spalt_ab and rnd.random() < self.spalten) else 0.0),
             split_u=rnd.uniform(0.62, 0.74))
 
@@ -145,7 +145,7 @@ class FeuerKompakt(FEU.Feuer):
                 continue
             u = dy / float(Hh)
             c = self._mitte(z, p, u)
-            ho = w0 * (1 - u ** 2.4) ** 0.6
+            ho = w0 * (1 - u ** 1.35) ** 0.85                                      # läuft über die ganze Höhe spitz zu
             spitze = dy >= Hh - 1                                              # die letzten beiden Zeilen laufen spitz zu
             if not spitze:
                 ho = max(ho, mb)
@@ -194,11 +194,30 @@ class FeuerKompakt(FEU.Feuer):
             if not gekappt:
                 break
 
+    def _luecken_fuellen(self, idx):
+        """Füllt 1-px-Schlitze (links+rechts oder oben+unten belegt) und eingeschlossene Löcher mit Rot — keine Gabeln mit hauchdünner Kerbe."""
+        import cv2
+        for _ in range(3):
+            m = (idx >= 0) | self.sperre
+            pad = np.pad(m, 1)
+            schlitz = ~m & ((pad[1:-1, :-2] & pad[1:-1, 2:]) | (pad[:-2, 1:-1] & pad[2:, 1:-1]))
+            schlitz &= ~self.sperre
+            if not schlitz.any():
+                break
+            idx[schlitz & (idx < 0)] = 1
+        m = ((idx >= 0) | self.sperre).astype(np.uint8)
+        n, lab = cv2.connectedComponents(1 - m, connectivity=4)
+        rand_labels = set(lab[0, :]) | set(lab[-1, :]) | set(lab[:, 0]) | set(lab[:, -1])
+        for c in range(1, n):
+            if c not in rand_labels:
+                idx[(lab == c) & ~self.sperre] = 1
+
     def ebene(self, i, hoehen_bonus=0):
         idx = np.full((self.h, self.w), -1, np.int8)
         for g, z in enumerate(self.zungen):
             p = self.bank[g][self.folge[g][i % self.n]]
             self._zeichne(idx, z, p, hoehen_bonus)
+        self._luecken_fuellen(idx)
         self._faeden_kuerzen(idx)
         belegt = (idx >= 0) | self.sperre
         pad = np.pad(belegt, 1)

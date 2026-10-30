@@ -513,14 +513,26 @@ def drehen(a, pivot_x, pivot_y, winkel, glatt=False):
     return out
 
 
-def feuer_schichten(a, i, n, heiss, y_ende, pose_frames=3, seed=11, amp=(4.0, 3.0, 2.5, 2.0), neigung=1.0, min_zunge=3):
+def schichten_gruppen(a, heiss, y_ende, min_zunge=3):
+    """Zungengruppen (Gipfel, Zuordnung Spalte → Gipfel) des Ausgangsbildes `a` für feuer_schichten(gruppen=…): bleibt die Gruppierung fest,
+    obwohl das Feuer vorher (z. B. durch feuer_zungen) die Spaltenoberkanten verschoben hat, springen die Pose-Tabellen nicht um."""
+    info = {}
+    for x in range(a.shape[1]):
+        ys = [y for y in np.nonzero(a[:, x, 3])[0] if y < y_ende]
+        if len(ys) >= min_zunge:
+            info[x] = (int(min(ys)), y_ende)
+    return _zungen_gipfel(info) if info else ([], {})
+
+
+def feuer_schichten(a, i, n, heiss, y_ende, pose_frames=3, seed=11, amp=(4.0, 3.0, 2.5, 2.0), neigung=1.0, min_zunge=3, gruppen=None):
     """Feuer mit UNABHÄNGIGEN Farbschichten. `heiss` = {Farbe: Stufe} (0 = kühlste Außenhaut, z. B. Rot … 3 = heißer Kern, z. B. Creme).
     Je Spalte (oberhalb der festen Basis ab Zeile y_ende) liegen die Schichtgrenzen G_j = erste Zeile von oben mit Stufe ≥ j. Jede Grenze bekommt ihre
     eigene Verschiebung d_j (Zungen = Gipfel der Silhouette, je Zunge und je Grenze eine eigene Pose-Tabelle, Posen à `pose_frames` Frames, Stufen −2…+2,
     mal amp[j] Pixel; dazu je Zunge/Grenze eine eigene Neigung, die die Verschiebung quer zur Zunge ansteigen lässt): Außenhaut, orange Mitte, gelb und
     heller Kern schwanken also gegeneinander und auch der helle Kern wandert. Zwischen den Grenzen wird die Spalte linear (Nächster-Nachbar) gedehnt/gestaucht,
     ab y_ende bleibt alles stehen. Die Grenzen bleiben in Reihenfolge (mindestens 1 px Abstand), jede Spalte reicht durchgehend bis zur Basis → 4-verbunden;
-    die oberste Zeile jeder Zunge behält die Quellfarbe der Spitze (Umriss)."""
+    die oberste Zeile jeder Zunge behält die Quellfarbe der Spitze (Umriss).
+    gruppen=(gipfel, zuordnung) (aus schichten_gruppen am Ruhebild) hält die Zungeneinteilung fest, wenn `a` schon bewegt wurde."""
     out = a.copy()
     h, w = a.shape[:2]
     kern = list(heiss)
@@ -540,7 +552,12 @@ def feuer_schichten(a, i, n, heiss, y_ende, pose_frames=3, seed=11, amp=(4.0, 3.
     if not spalten:
         return out
     info = {x: (v[0], y_ende) for x, v in spalten.items()}
-    gipfel, zu = _zungen_gipfel(info)
+    gipfel, zu = gruppen if gruppen is not None else _zungen_gipfel(info)
+    if gruppen is not None:                                       # Spalten, die in der Ruhepose keine Zunge waren: nächster Gipfel
+        zu = dict(zu)
+        for x in spalten:
+            if x not in zu:
+                zu[x] = min(range(len(gipfel)), key=lambda g: (abs(x - gipfel[g]), g))
     k_posen = max(1, n // pose_frames)
     rng = np.random.RandomState(seed)
     tab = []
