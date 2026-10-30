@@ -50,111 +50,13 @@
  "area:TempleOfSacrificeOverlay": {
   "blur": 1
  },
- "jsxkf:app-board:areaBgFlash": {
-  "verlauf": 3
- },
- "jsxkf:app-board:areaCardFall": {
-  "blur": 3,
-  "drehung": 4
- },
- "jsxkf:app-board:areaPileFly": {
-  "blur": 2,
-  "drehung": 3
- },
  "jsxkf:app-board:bb-dive-streak": {
-  "drehung": 3
- },
- "jsxkf:app-board:bgClockFadeIn": {
-  "drehung": 3
- },
- "jsxkf:app-board:bgClockFadeOut": {
-  "blur": 1
- },
- "jsxkf:app-board:bgHourTick": {
-  "drehung": 5
- },
- "jsxkf:app-board:bgMinuteTick": {
-  "drehung": 5
- },
- "jsxkf:app-board:bodySwapGhostHalo": {
-  "blur": 2
- },
- "jsxkf:app-board:boulderDrop": {
-  "drehung": 4
- },
- "jsxkf:app-board:butterflyFly": {
-  "drehung": 4
- },
- "jsxkf:app-board:cardFlightTilt": {
-  "drehung": 2
- },
- "jsxkf:app-board:divineMagicRune": {
-  "blur": 4
- },
- "jsxkf:app-board:divineMagicSparkle": {
-  "drehung": 1
- },
- "jsxkf:app-board:divineMagicStreak": {
-  "drehung": 3
- },
- "jsxkf:app-board:dtFragment": {
-  "drehung": 3
- },
- "jsxkf:app-board:eraserBeamBolt": {
-  "drehung": 3
- },
- "jsxkf:app-board:forbiddenZonePulse": {
-  "drehung": 2
- },
- "jsxkf:app-board:iceageFlake": {
-  "drehung": 2
- },
- "jsxkf:app-board:moeConfetti": {
-  "drehung": 1
- },
- "jsxkf:app-board:moePart": {
-  "drehung": 1
- },
- "jsxkf:app-board:moePulse": {
-  "blur": 3
- },
- "jsxkf:app-board:pileTransferWindstorm": {
-  "drehung": 7
- },
- "jsxkf:app-board:ptGlitzerFunkeln": {
-  "drehung": 2
- },
- "jsxkf:app-board:punchImpact": {
-  "drehung": 2
- },
- "jsxkf:app-board:punchSwing": {
-  "drehung": 3
- },
- "jsxkf:app-board:pusherFling": {
-  "drehung": 4
- },
- "jsxkf:app-board:sdaCardGlow": {
-  "blur": 4
- },
- "jsxkf:app-board:sdaShineSweep": {
-  "drehung": 4
- },
- "jsxkf:app-board:sdaSparkle": {
-  "drehung": 6
- },
- "jsxkf:app-board:smugCoinFall": {
   "drehung": 3
  },
  "jsxkf:app-board:spiderSummonCrawl": {
   "drehung": 2
  },
  "jsxkf:app-board:spiderSummonWebBurst": {
-  "drehung": 2
- },
- "jsxkf:app-board:yukiGust": {
-  "drehung": 2
- },
- "jsxkf:app-board:yukiStreak": {
   "drehung": 2
  },
  "jsxkf:app-main:ppUnlockGlow": {
@@ -169,29 +71,11 @@
  "kf:abilityBoltBounce": {
   "drehung": 2
  },
- "kf:abilityPulse": {
-  "blur": 2
- },
- "kf:accentGreenPulse": {
-  "blur": 2
- },
- "kf:additionalActionPulse": {
-  "blur": 2
- },
  "kf:alliancePulse": {
   "blur": 2
  },
- "kf:animBiomancyBloom": {
-  "drehung": 2
- },
- "kf:animBiomancyVine": {
-  "drehung": 2
- },
  "kf:animCannibalismMeat": {
   "drehung": 8
- },
- "kf:animConcertBeam": {
-  "drehung": 4
  },
  "kf:animConcertNote": {
   "drehung": 2
@@ -214,44 +98,17 @@
  "kf:animPoisonSkullUpright": {
   "drehung": 2
  },
- "kf:animScrRunen": {
-  "drehung": 1
- },
- "kf:animSnakeFangLeft": {
-  "drehung": 5
- },
- "kf:animSnakeFangRight": {
-  "drehung": 5
- },
  "kf:animStunBolt": {
   "drehung": 2
  },
  "kf:animThicketLeaf": {
   "drehung": 4
  },
- "kf:anklageAder": {
-  "drehung": 2
- },
- "kf:anklageAusruf": {
-  "drehung": 1
- },
- "kf:anklageKarte": {
-  "drehung": 2
- },
- "kf:anklageStrich": {
-  "drehung": 3
- },
- "kf:anklageZittern": {
-  "drehung": 8
- },
  "kf:ankyloTailSwing": {
   "drehung": 4
  },
  "kf:annoyCatFlap": {
   "drehung": 2
- },
- "kf:applauseGlow": {
-  "blur": 2
  },
  "kf:area-drop-pulse": {
   "blur": 2
@@ -262,20 +119,11 @@
  "kf:armaFlamme": {
   "drehung": 4
  },
- "kf:ascendDropPulse": {
-  "blur": 2
- },
  "kf:ascendPulse": {
   "blur": 2
  },
  "kf:assassinSpark": {
   "drehung": 1
- },
- "kf:attachPickPanelPulse": {
-  "blur": 2
- },
- "kf:avatar-pulse": {
-  "blur": 2
  },
  "kf:avatarPulse": {
   "blur": 2
@@ -286,9 +134,6 @@
  "kf:bday-present-highlight": {
   "blur": 3
  },
- "kf:beerPulse": {
-  "blur": 2
- },
  "kf:berserkedShimmer": {
   "blur": 2
  },
@@ -298,20 +143,8 @@
  "kf:bleedingPulse": {
   "verlauf": 2
  },
- "kf:bleedingShimmer": {
-  "blur": 2
- },
  "kf:bloodMoonRay": {
   "drehung": 3
- },
- "kf:buffIconPulse": {
-  "blur": 2
- },
- "kf:burnedShimmer": {
-  "blur": 2
- },
- "kf:cardDiscardFly": {
-  "drehung": 1
  },
  "kf:cardDrawFly": {
   "drehung": 1
@@ -319,26 +152,8 @@
  "kf:chainGlitch": {
   "drehung": 2
  },
- "kf:chainGlowPulse": {
-  "blur": 2
- },
  "kf:chainIceCrystalPop": {
   "drehung": 1
- },
- "kf:chainPickPulse": {
-  "blur": 2
- },
- "kf:chainResolveFlash": {
-  "blur": 2
- },
- "kf:chainThiefKey": {
-  "drehung": 2
- },
- "kf:charmedPulse": {
-  "blur": 2
- },
- "kf:ckStern": {
-  "drehung": 3
  },
  "kf:clawSlash": {
   "drehung": 2
@@ -355,25 +170,10 @@
  "kf:cmp-flight": {
   "drehung": 2
  },
- "kf:cmp-shutter-bottom": {
-  "drehung": 3
- },
- "kf:cmp-shutter-top": {
-  "drehung": 3
- },
- "kf:coolnessPlayablePulse": {
-  "blur": 2
- },
- "kf:coolnessPulse": {
-  "blur": 2
- },
  "kf:cosmicWarp": {
   "drehung": 11
  },
  "kf:coverCardGlow": {
-  "blur": 2
- },
- "kf:creatureEffectPulse": {
   "blur": 2
  },
  "kf:crescentReapSkull": {
@@ -385,29 +185,14 @@
  "kf:criticalSlashB": {
   "drehung": 2
  },
- "kf:crossSideBolt": {
-  "drehung": 2
- },
  "kf:daily-glow": {
   "blur": 2
- },
- "kf:darkControlPulse": {
-  "blur": 1
- },
- "kf:darkGearSpinCCW": {
-  "drehung": 2
- },
- "kf:darkGearSpinCW": {
-  "drehung": 2
  },
  "kf:darkRitualGlyph": {
   "drehung": 2
  },
  "kf:darkRitualRing": {
   "drehung": 2
- },
- "kf:ddgManifest": {
-  "blur": 3
  },
  "kf:deckShuffleCard": {
   "drehung": 1
@@ -418,31 +203,10 @@
  "kf:deepseaTendrilGrow": {
   "drehung": 3
  },
- "kf:dekaFleck": {
-  "drehung": 4
- },
- "kf:dekaKlinge": {
-  "drehung": 2
- },
- "kf:dekaSchnitt": {
-  "drehung": 3
- },
- "kf:discardPulse": {
-  "blur": 2
- },
- "kf:earthChunk": {
-  "drehung": 1
- },
  "kf:earthClod": {
   "drehung": 2
  },
- "kf:earthCrack": {
-  "drehung": 3
- },
  "kf:effectSourceGlow": {
-  "blur": 2
- },
- "kf:equipEffectPulse": {
   "blur": 2
  },
  "kf:escapeDodge": {
@@ -482,26 +246,11 @@
  "kf:foilDiamondBorderPulse": {
   "blur": 4
  },
- "kf:foilSweepLoop": {
-  "drehung": 3
- },
- "kf:freeAbilityPulse": {
-  "blur": 2
- },
  "kf:frozenParticleDrift": {
-  "drehung": 1
- },
- "kf:frozenShimmer": {
-  "blur": 2
- },
- "kf:frozenSnowflake": {
   "drehung": 1
  },
  "kf:giftRise": {
   "drehung": 1
- },
- "kf:glow": {
-  "blur": 2
  },
  "kf:goldGiftFly": {
   "drehung": 3
@@ -512,20 +261,11 @@
  "kf:googleBtnPulse": {
   "blur": 2
  },
- "kf:guardian-pulse": {
-  "blur": 2
- },
- "kf:gweBrocken": {
-  "drehung": 1
- },
  "kf:handHighlightPulse": {
   "blur": 2
  },
  "kf:handStealFly": {
   "drehung": 2
- },
- "kf:heroEffectPulse": {
-  "blur": 2
  },
  "kf:hfxBlitz": {
   "drehung": 7
@@ -539,16 +279,10 @@
  "kf:hwWabern": {
   "drehung": 2
  },
- "kf:iceBlockFly": {
-  "drehung": 2
- },
  "kf:jumpscareBoxShake": {
   "drehung": 4
  },
  "kf:kassaran-flight": {
-  "drehung": 1
- },
- "kf:kassaran-flight-out": {
   "drehung": 1
  },
  "kf:loveHeartPulse": {
@@ -556,12 +290,6 @@
  },
  "kf:menu-badge-wippen": {
   "drehung": 2
- },
- "kf:moeHeartRing": {
-  "drehung": 3
- },
- "kf:mummifiedPulse": {
-  "blur": 2
  },
  "kf:musicNoteFloat": {
   "drehung": 3
@@ -575,22 +303,7 @@
  "kf:negatedShimmer": {
   "blur": 2
  },
- "kf:nsScherbe": {
-  "drehung": 1
- },
- "kf:oppTargetPulse": {
-  "blur": 2
- },
- "kf:pengueDestPulse": {
-  "blur": 2
- },
  "kf:pengueSrcPulse": {
-  "blur": 2
- },
- "kf:permanentActivatablePulse": {
-  "blur": 2
- },
- "kf:permanentPulse": {
   "blur": 2
  },
  "kf:pfRanke": {
@@ -602,26 +315,11 @@
  "kf:pfSiegel2": {
   "drehung": 3
  },
- "kf:phase-hinweis-puls": {
-  "blur": 2
- },
  "kf:pileUsablePulse": {
   "blur": 2
  },
- "kf:pingFlash": {
-  "blur": 1
- },
  "kf:pinkGlassPane": {
   "drehung": 1
- },
- "kf:pinkGlassShard": {
-  "drehung": 1
- },
- "kf:poisonedShimmer": {
-  "blur": 2
- },
- "kf:potionPulse": {
-  "blur": 2
  },
  "kf:pp-banana-fall": {
   "drehung": 1
@@ -629,32 +327,14 @@
  "kf:pp-debt-coin-rise": {
   "drehung": 1
  },
- "kf:pp-glitzer-flug": {
-  "drehung": 1
- },
  "kf:pp-invest-coin-drop": {
-  "drehung": 2
- },
- "kf:ppCerBand": {
-  "drehung": 2
- },
- "kf:ppCerDreh": {
-  "blur": 1
- },
- "kf:ppCerFunke": {
   "drehung": 2
  },
  "kf:ppCerGlanz": {
   "drehung": 1
  },
- "kf:ppCerPop": {
-  "drehung": 2
- },
  "kf:ppPxBuffPuls": {
   "blur": 2
- },
- "kf:ppSpinneBein": {
-  "drehung": 2
  },
  "kf:profileGlow": {
   "blur": 2
@@ -662,14 +342,8 @@
  "kf:promptMarkedPulse": {
   "blur": 2
  },
- "kf:providerPulse": {
-  "blur": 2
- },
  "kf:ptFlammeTanz": {
   "drehung": 3
- },
- "kf:pwSchlund": {
-  "drehung": 2
  },
  "kf:ramBackCharge": {
   "drehung": 14
@@ -686,16 +360,7 @@
  "kf:rocketFistFlame": {
   "blur": 2
  },
- "kf:rtorKarte": {
-  "drehung": 2
- },
  "kf:sandStrahlFlug": {
-  "drehung": 2
- },
- "kf:sbBrocken": {
-  "drehung": 1
- },
- "kf:sbRiss": {
   "drehung": 2
  },
  "kf:scytheSlash": {
@@ -706,12 +371,6 @@
  },
  "kf:sdShard": {
   "drehung": 1
- },
- "kf:sfFunke": {
-  "drehung": 2
- },
- "kf:shieldedPulse": {
-  "blur": 2
  },
  "kf:shop-reveal-appear": {
   "drehung": 2
@@ -725,26 +384,11 @@
  "kf:shop-zier-regenbogen": {
   "blur": 2
  },
- "kf:skatesCreaturePulse": {
-  "blur": 2
- },
- "kf:skatesDestPulse": {
-  "blur": 2
- },
  "kf:skbFall": {
   "drehung": 1
  },
  "kf:skinHoloBand": {
   "drehung": 2
- },
- "kf:slipperyCreaturePulse": {
-  "blur": 2
- },
- "kf:slipperyDestPulse": {
-  "blur": 2
- },
- "kf:sparkle": {
-  "drehung": 3
  },
  "kf:sparkleGlow": {
   "blur": 2
@@ -767,66 +411,17 @@
  "kf:structure-deck-equipped-pulse": {
   "blur": 6
  },
- "kf:styxTorStrudel": {
-  "drehung": 3
- },
- "kf:summonGlow": {
-  "blur": 3
- },
- "kf:summonSickPulse": {
-  "blur": 2
- },
  "kf:surprise-eligible-pulse": {
-  "blur": 2
- },
- "kf:surprise-flip-anim": {
-  "blur": 1
- },
- "kf:surprise-reset-anim": {
   "blur": 2
  },
  "kf:syringeStab": {
   "drehung": 4
  },
- "kf:targetValidPulse": {
-  "blur": 2
- },
  "kf:textbox-hl-glow": {
   "blur": 2
  },
- "kf:tgeKreisDreh": {
-  "drehung": 1
- },
- "kf:tgeKreisDrehZurueck": {
-  "drehung": 1
- },
- "kf:tgeStrom": {
-  "drehung": 1
- },
- "kf:tharxianHorseGallop": {
-  "drehung": 2
- },
  "kf:tharxianHorseRoll": {
   "drehung": 2
- },
- "kf:tharxianImpactChunk": {
-  "drehung": 1
- },
- "kf:tharxianImpactSplinter": {
-  "drehung": 1
- },
- "kf:tkinStein": {
-  "drehung": 5
- },
- "kf:tkinWackeln": {
-  "drehung": 5
- },
- "kf:torchureFackel": {
-  "drehung": 6
- },
- "kf:torchureKauen": {
-  "blur": 1,
-  "drehung": 1
  },
  "kf:treacherousCrystalPulse": {
   "blur": 2
@@ -847,30 +442,6 @@
   "drehung": 1
  },
  "kf:willyParticle": {
-  "drehung": 2
- },
- "kf:yolomungandrManifest": {
-  "blur": 5
- },
- "kf:zhuSkipIconBob": {
-  "drehung": 2
- },
- "kf:zhuSkipZzzFloat": {
-  "drehung": 4
- },
- "kf:zoneExplode": {
-  "blur": 2
- },
- "kf:zonePickPulse": {
-  "blur": 2
- },
- "kf:zoneSummonDreh": {
-  "drehung": 1
- },
- "kf:zoneSummonDrehGegen": {
-  "drehung": 1
- },
- "kf:zoneSummonShine": {
   "drehung": 2
  },
  "reg:angel_revival": {
