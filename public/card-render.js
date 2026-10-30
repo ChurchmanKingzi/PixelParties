@@ -142,8 +142,11 @@
   const linC = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
   const leucht = c => 0.2126 * linC(c[0]) + 0.7152 * linC(c[1]) + 0.0722 * linC(c[2]);
   const kontrast = (a, b) => { const x = leucht(a), y = leucht(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  // Farbton in Grad (null bei Grau): `gleicherFarbton` = beide grau oder hoechstens 25 Grad Abstand (Poison auf Lila, Burn auf Braun, Negate auf Grau)
+  const farbton = c => { const [r, g, b] = c.map(v => v / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; if (d < 0.12) return null; const h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return (h * 60 + 360) % 360; };
+  const gleicherFarbton = (a, b) => { const x = farbton(a), y = farbton(b); if (x == null || y == null) return x == null && y == null; const dd = Math.abs(x - y); return Math.min(dd, 360 - dd) < 25; };
   const STATUS_MIN_CONTRAST = 4.5, STATUS_MAX_DARKEN = 0.6;      // so weit darf ein dunkler Ton abgedunkelt werden, bevor die helle Fassung gilt
-  const STATUS_DISTINCT = 2.2, STATUS_EDGE = 3;                  // Mindestabstand des hellen Tons zum Untergrund; Mindestkontrast der Kontur zum Untergrund
+  const STATUS_DISTINCT = 2.2, STATUS_DISTINCT_AUFGEHELLT = 2.6, STATUS_DUNKEL_TRAEGT = 1.6, STATUS_EDGE = 3;   // Mindestabstand des hellen Tons zum Untergrund; des aufgehellten Tons auf gleichfarbigem Untergrund; ab diesem Kontrast traegt der tiefe Ton das Wort selbst; Mindestkontrast der Kontur zum Untergrund
   const OUT_DARK = 'rgb(8,6,12)', OUT_LIGHT = 'rgb(255,248,232)', OUT_DARK_RGB = [8, 6, 12], OUT_LIGHT_RGB = [255, 248, 232];
   /** Mittlere Farbe der Textbox, BEVOR Text darauf kommt (Fuellung des Rahmens); null, wenn nicht lesbar (Textmaske, kein Rahmen). */
   function boxHintergrund(ctx, o) {
@@ -160,7 +163,12 @@
   /** Darstellung eines Begriffs auf diesem Untergrund: { color, outline: null | OUT_DARK | OUT_LIGHT }. Der Reihe nach:
    *   1. heller Untergrund (Artifacts): der tiefe Ton, bei Bedarf abgedunkelt, ohne Kontur;
    *   2. der helle Ton mit dunkler Kontur, wenn er sich vom Untergrund abhebt (der Normalfall auf dunklen und mittleren Boxen);
-   *   3. gleicher Farbton wie der Untergrund (Bleed auf Rot, Poison auf Lila, Negate auf Grau): der tiefe Ton mit heller Kontur;
+   *   3. gleicher Farbton wie der Untergrund UND der tiefe Ton hebt sich kaum ab (Poison auf Lila, Burn auf Braun, Negate auf Grau): der
+   *      AUFGEHELLTE helle Ton (mit Weiss gemischt, so wenig wie fuer den Abstand noetig) mit dunkler Kontur. Dort hatte die helle Kontur
+   *      den tiefen Ton umrahmt, der fast die Farbe des Untergrunds hat, und das Wort las sich als hohle Umrandung (Poison auf Medeas
+   *      lila Box, Al 30.10.);
+   *   3b. sonst, wenn die helle Kontur sich abhebt: wie bisher der tiefe Ton mit heller Kontur (Freeze/Burn auf Rot, Bleed auf Rot oder
+   *      Lila: dort traegt der Farbunterschied bzw. der dunklere Ton das Wort);
    *   4. Rueckfall: der helle Ton mit dunkler Kontur.
    *  `fest` (Blind, weiss) behaelt Ton und dunkle Kontur immer. `light`: Rueckfall ohne Messung. */
   function statusDarstellung(term, bg, light) {
@@ -171,7 +179,15 @@
     const tief = abgedunkelt(1, STATUS_MAX_DARKEN);
     if (tief) return { color: 'rgb(' + tief.join(',') + ')', outline: null };
     if (kontrast(hexRgb(term.hell), bg) >= STATUS_DISTINCT) return { color: term.hell, outline: OUT_DARK };
-    if (kontrast(OUT_LIGHT_RGB, bg) >= STATUS_EDGE && kontrast(dunkel, OUT_LIGHT_RGB) >= STATUS_MIN_CONTRAST - 1) return { color: term.dunkel, outline: OUT_LIGHT };
+    const hell = hexRgb(term.hell);
+    if (gleicherFarbton(hell, bg) && kontrast(dunkel, bg) < STATUS_DUNKEL_TRAEGT) {
+      for (let f = 0.15; f <= 0.7 + 1e-9; f += 0.05) {
+        const c = hell.map(v => Math.round(v + (255 - v) * f));
+        if (kontrast(c, bg) >= STATUS_DISTINCT_AUFGEHELLT) return { color: 'rgb(' + c.join(',') + ')', outline: OUT_DARK };
+      }
+    } else if (kontrast(OUT_LIGHT_RGB, bg) >= STATUS_EDGE && kontrast(dunkel, OUT_LIGHT_RGB) >= STATUS_MIN_CONTRAST - 1) {
+      return { color: term.dunkel, outline: OUT_LIGHT };
+    }
     return { color: term.hell, outline: OUT_DARK };
   }
   /** Stil je Zeichen eines Absatzes (Index in STATUS_TERMS + 1, sonst 0); null ohne Treffer. */
