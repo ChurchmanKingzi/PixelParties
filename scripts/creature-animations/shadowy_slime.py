@@ -37,7 +37,7 @@ import anim_amorph as A
 
 N, MS = 48, 65
 PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2
-BLINZELN = True
+BLINZELN = False                                                                         # Augen im Sprite nicht eindeutig → keine Augeneffekte
 
 spr = L.lade('shadowy-slime')
 sh, sw = spr.shape[:2]
@@ -130,6 +130,10 @@ def kopf_dx(i):
 
 def sprite_mit_effekten(i):
     sp = spr.copy()
+    if S[i] >= 1:                                                                    # Lichtpunkte (4,9)/(9,9) wandern beim Strecken 1 px nach innen (Tausch mit dem Nachbarpixel)
+        for (a, b) in (((9, 4), (9, 5)), ((9, 9), (9, 8))):
+            ca, cb = sp[a[0], a[1], :3].copy(), sp[b[0], b[1], :3].copy()
+            sp[a[0], a[1], :3], sp[b[0], b[1], :3] = cb, ca
     if BLINZELN:
         for k, a in enumerate(AUGEN):
             if i in (BLINZELN_L if k == 0 else BLINZELN_R):
@@ -143,7 +147,6 @@ def figur(i):
     doppeln, p = POSEN[S[i]]
     koerper = A.zeilen_von(sp, 0, sh - 1, H, W, PAD_L, PAD_T)
     z, quelle = A.koerper_pose(koerper, doppeln=doppeln, p=p, paare_je_zeile=PAARE_ZEILE, x0=PAD_L)
-    z = A.verschiebe_zeilen(z, quelle, kopf_dx(i))
     fig, top = A.auf_leinwand(z, H, BODEN, 0)
     # Ergänzung (Regel 16): durch den Kopfversatz kann ein helles Innenpixel (Lichtpunkt, „V“) am Rand frei liegen — das leere Nachbarfeld bekommt den Umriss A
     fig, neu = A.umriss_ergaenzen(fig, RAND_FARBEN, lambda x, y: UMRISS)

@@ -22,7 +22,7 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Haarzipfel schwingt: der Zipfel (Zeilen 17–18) pendelt ±1 px (Periode 24); die freigelegte Shirtfläche dahinter ist grün (J (158,181,53)), die Naht bleibt 4-verbunden.
 * Gewichtsverlagerung: der Oberkörper (Zeilen 0–19: Haare, Arme, Shirt) schiebt sich 1 px nach rechts (Frames 10–21) und später 1 px nach links (Frames 34–45); Rock und Schuhe bleiben stehen.
 * Kopfneigen: der Kopf (Zeilen 0–9) neigt sich 1 px nach links (Frames 2–9) und 1 px nach rechts (Frames 24–31), Ohren und Scheitel gehen mit.
-* Arme schwingen: der linke Ärmel (Zeilen 13–17) spreizt sich 1 px nach außen (Frames 4–15 und 28–33), der rechte versetzt (Frames 16–27 und 40–45); Schulterzeile 12 bleibt (`Hm.rand_dehnen`, Lücke in Ärmelfarbe).
+* Arme schwingen: der linke Ärmel (Zeilen 13–17) spreizt sich 1 px nach außen (Frames 4–15 und 28–33), der rechte versetzt (Frames 22–33 und 40–45; nie in derselben Richtung wie die Gewichtsverlagerung, damit höchstens 1 px Ausschlag bleibt); Schulterzeile 12 bleibt (`Hm.rand_dehnen`, Lücke in Ärmelfarbe).
 * Fußtippen: der linke Fuß hebt sich 1 px hinter den Rock (Frames 12–19, zwei Mal), später der rechte (Frames 36–43); beim Heben verschwindet die Socke hinter dem schwarzen Rock.
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -87,7 +87,7 @@ def frame(i):
     k = zipfel(k, int(round(1.2 * math.sin(L.sinus(i, N / 2)))))
     # --- Arme schwingen (Ärmel Zeilen 13–17 weichen 1 px nach außen) ---
     dl = 1 if (Hm.folge(i, 4, [1] * 12, N) or Hm.folge(i, 28, [1] * 6, N)) else 0
-    dr = 1 if (Hm.folge(i, 16, [1] * 12, N) or Hm.folge(i, 40, [1] * 6, N)) else 0
+    dr = 1 if (Hm.folge(i, 22, [1] * 12, N) or Hm.folge(i, 40, [1] * 6, N)) else 0
     if dl:
         Hm.rand_dehnen(al, OFF, {y: 1 for y in range(13, 18)}, 'l')
     if dr:
@@ -100,7 +100,7 @@ def frame(i):
     if gv:
         Hm.bereich_versatz(k, OFF, {y: gv for y in range(0, 20)}, 0, sw - 1)
         for a in (al, ar):
-            Hm.bereich_versatz(a, OFF, {y: gv for y in range(13, 18)}, 0, sw - 1)
+            Hm.bereich_versatz(a, OFF, {y: gv for y in range(13, 18)}, -2, sw + 1)       # inkl. der 1 px nach außen gespreizten Ärmelpixel
     # --- Auf und ab: Shirtzeile 18 = Brust (Rumpf und Arme), Haarzeile 10 läuft 3 Frames nach (nur Rumpf) ---
     brust = Hm.stufe(i, N / 2, 1)
     kopf = Hm.stufe(i - 3, N / 2, 1)
