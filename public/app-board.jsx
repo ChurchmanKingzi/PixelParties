@@ -3489,6 +3489,32 @@ function HeroStatusPartikel({ effekte, kern, s, mitteX, fw, fh, saat }) {
  * Hat die Zone keine Figur (Held ohne Spritesheet, Kreatur), bleibt es bei
  * der Zonenklasse.
  */
+// Flug einer Karte zu einer Zone, die ihr Ziel in JEDEM Bild neu misst: bewegt sich das Brett waehrend der 0,6 s (Kamerafahrt, Tutorial-Kamera, Layout-Nachruecken),
+// landet die Karte trotzdem auf dem Helden — vorher war das Ziel einmal beim Start gemessen und die Karte flog auf der Handy-Ansicht daneben.
+// `w0` = Weltanker beim Start (`ppFxWeltAnker`); liegt die Karte in der Welt-Huelle, wird der Scrollversatz jedes Bild neu eingerechnet.
+function ppFlugVerfolgen(fly, sourceEl, destEl, w0, ms, opEnd) {
+  const sr = sourceEl.getBoundingClientRect();
+  const sx = sr.left + sr.width / 2, sy = sr.top + sr.height / 2;
+  const raf = window.ppTaktRaf || requestAnimationFrame;
+  const t0 = performance.now();
+  fly.style.transition = 'none';
+  const ease = (q) => 1 - Math.pow(1 - q, 3);
+  const schritt = () => {
+    if (!fly.isConnected) return;
+    const q = Math.min(1, (performance.now() - t0) / ms), e = ease(q);
+    let dr = null;
+    try { dr = destEl.isConnected ? destEl.getBoundingClientRect() : null; } catch (err) { dr = null; }
+    if (dr && dr.width > 0) {
+      const wJetzt = (w0 && w0.welt && window.ppFxWeltAnker) ? window.ppFxWeltAnker(destEl) : { dx: 0, dy: 0 };
+      const baseX = sx + ((w0 && w0.welt) ? (w0.dx - wJetzt.dx) : 0), baseY = sy + ((w0 && w0.welt) ? (w0.dy - wJetzt.dy) : 0);
+      const tx = dr.left + dr.width / 2, ty = dr.top + dr.height / 2;
+      fly.style.transform = `translate(${(tx - baseX) * e}px, ${(ty - baseY) * e}px) scale(${1 + (dr.width / sr.width - 1) * e})`;
+      fly.style.opacity = String(1 - (1 - opEnd) * e);
+    }
+    if (q < 1) raf(schritt);
+  };
+  raf(schritt);
+}
 /**
  * Lage aller Heldenzonen/Support-Zonen im Moment des Aufrufs (Element -> Rechteck). Einschlag-Animationen (Magic Hammer, Keule, Dino …) suchen ihr Ziel
  * erst nach 300–500 ms; Verschiebt sich das Brett dazwischen (Handy: Kamerafahrt), lag der naechste Treffer ploetzlich ueber einem anderen Helden.
@@ -45514,10 +45540,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       fly.style.cssText = `position:fixed;left:${sr.left + _w.dx}px;top:${sr.top + _w.dy}px;width:${sr.width}px;height:${sr.height}px;z-index:10150;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 20px rgba(255,208,102,.6);transition:transform 600ms cubic-bezier(.22,.8,.3,1),opacity 600ms ease-out;`;
       (_w.welt && window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(fly);
       // Next frame: kick off the transform so the transition plays.
-      requestAnimationFrame(() => {
-        fly.style.transform = `translate(${dx}px, ${dy}px) scale(${dr.width / sr.width})`;
-        fly.style.opacity = '0.2';
-      });
+      ppFlugVerfolgen(fly, sourceEl, destEl, _w, 600, 0.2);
       setTimeout(() => { fly.remove(); }, 700);
     };
     socket.on('hand_to_board_fly', onHandToBoard);
@@ -45636,10 +45659,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const _w = _wa.welt ? _wa : _ws;
       fly.style.cssText = `position:fixed;left:${sr.left + _w.dx}px;top:${sr.top + _w.dy}px;width:${sr.width}px;height:${sr.height}px;z-index:10150;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 24px rgba(244,174,100,.7);transition:transform 600ms cubic-bezier(.22,.8,.3,1),opacity 600ms ease-out;`;
       (_w.welt && window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(fly);
-      requestAnimationFrame(() => {
-        fly.style.transform = `translate(${dx}px, ${dy}px) scale(${dr.width / sr.width})`;
-        fly.style.opacity = '0.3';
-      });
+      ppFlugVerfolgen(fly, sourceEl, destEl, _w, 600, 0.3);
       setTimeout(() => { fly.remove(); }, 700);
     };
     socket.on('attach_hero_fly', onAttachHeroFly);
