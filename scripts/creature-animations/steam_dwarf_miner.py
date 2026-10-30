@@ -115,8 +115,8 @@ def frame(i, dampf=True):
     # --- Umhang weht (spreizt sich nur nach außen, am Bart bleibt er angewachsen) ---
     vl = max(0.0, math.sin(L.sinus(i, N)))
     vr = max(0.0, math.sin(L.sinus(i, N) + math.pi))
-    Hm.rand_dehnen(al, OFF, {y: umhang_dx(y, 17, 26, vl) for y in range(18, 27)}, 'l')
-    Hm.rand_dehnen(ar, OFF, {y: umhang_dx(y, 17, 26, vr) for y in range(18, 27)}, 'r')
+    Hm.rand_dehnen_innen(al, OFF, {y: umhang_dx(y, 17, 26, vl) for y in range(18, 27)}, 'l')
+    Hm.rand_dehnen_innen(ar, OFF, {y: umhang_dx(y, 17, 26, vr) for y in range(18, 27)}, 'r')
     # --- Auf und ab: Brust zuerst (Bartzeile 22), Kopf 3 Frames später (Brillenband-Zeile 15, nur Kopfteil) ---
     brust = Hm.stufe(i, N / 2, 1)
     kopf = Hm.stufe(i - 3, N / 2, 1)
