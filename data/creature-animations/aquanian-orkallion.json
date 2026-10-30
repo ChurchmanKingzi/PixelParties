@@ -1,0 +1,15 @@
+{
+  "creature": "Aquanian Orkallion",
+  "sheet": "aquanian-orkallion.png",
+  "frameWidth": 52,
+  "frameHeight": 44,
+  "frames": 32,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 5,
+  "faceX": 26.0
+}

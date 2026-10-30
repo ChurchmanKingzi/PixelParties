@@ -83,12 +83,13 @@ def versetze(a, dx, dy):
     return einsetzen(leer(*a.shape[:2]), a, dx, dy)
 
 
-def spalten_welle(a, pivot_x, amp, phase, potenz=1.0, nur_rechts=None, bias=0.0, fuell=None):
+def spalten_welle(a, pivot_x, amp, phase, potenz=1.0, nur_rechts=None, bias=0.0, fuell=None, lauf=0.0):
     """Jede Spalte wandert senkrecht um round((amp · sin(phase) + bias) · (Abstand/maxAbstand)^potenz).
     Positiv = nach unten. Beide Seiten des Gelenks schlagen gleichzeitig (Flügelpaar);
     nur_rechts: True/False = nur eine Seite bewegen. bias verschiebt die Ruhelage der Flügelspitze.
     fuell: Maske des Restkörpers — hebt sich eine Spalte, wird die Lücke zum Körper darunter mit dem
-    untersten Flügelpixel der Spalte gefüllt (Flügel bleibt am Rumpf „angewachsen")."""
+    untersten Flügelpixel der Spalte gefüllt (Flügel bleibt am Rumpf „angewachsen").
+    lauf: Wellenlauf — die Phase hinkt mit wachsendem Abstand hinterher (Schwimmwelle, Schlangenkörper)."""
     out = leer(*a.shape[:2])
     h, w = a.shape[:2]
     maxd = max(1, max(abs(x - pivot_x) for x in range(w) if a[:, x, 3].any()) if a[..., 3].any() else 1)
@@ -99,7 +100,8 @@ def spalten_welle(a, pivot_x, amp, phase, potenz=1.0, nur_rechts=None, bias=0.0,
         if nur_rechts is True and d < 0 or nur_rechts is False and d > 0:
             dy = 0
         else:
-            dy = int(round((amp * math.sin(phase) + bias) * (abs(d) / maxd) ** potenz))
+            frac = abs(d) / maxd
+            dy = int(round((amp * math.sin(phase - lauf * frac) + bias) * frac ** potenz))
         ys = np.nonzero(a[:, x, 3])[0]
         for y in ys:
             if 0 <= y + dy < h:
