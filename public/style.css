@@ -14297,6 +14297,8 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   user-select: none;
 }
 .phase-end-check input { width: calc(12px * var(--board-scale)); height: calc(12px * var(--board-scale)); accent-color: var(--accent); cursor: pointer; }
+/* Beim Brettaufbau unsichtbar, bis die Lage der Leiste feststeht (app-board.jsx, `bereitMelden`): kein Hineingleiten */
+html:not([data-phase-bereit]) .phase-column { visibility: hidden; }
 .phase-column {
   /* ── EIGENER MASSSTAB (v805, Als Vorgabe 5.9.) ─────────────────────
      „Die Elemente fuer die Phase-Buttons (inklusive ihres neuen
@@ -16239,7 +16241,7 @@ body:has(.textbox-overlay) .tooltip {
 /* ── Textbox highlight overlays — cloned cards above the veil ── */
 .textbox-highlight {
   z-index: 90001;
-  border-radius: 6px;
+  border-radius: 0 !important;   /* eckig wie das Handkarten-Highlight: Pixelart, keine runden Ringe */
   box-shadow: 0 0 0 2px #405f8c, 0 0 0 4px #2d4362, 0 0 0 6px #2d4362;
   animation: textbox-hl-glow 1.5s ease-in-out infinite;
   overflow: hidden;
@@ -16251,6 +16253,7 @@ body:has(.textbox-overlay) .tooltip {
 }
 .textbox-highlight-clone,
 .textbox-highlight-clone * {
+  border-radius: 0 !important;
   filter: none !important;
   opacity: 1 !important;
   visibility: visible !important;
@@ -20214,7 +20217,9 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   * { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
   /* Partikel: ohne Leuchtschatten, und nur die ersten 60 je Schicht */
   .pp-logo-particle, .pp-bg-particle { box-shadow: none; }
-  .pp-logo-particle:nth-child(n+61), .pp-bg-particle:nth-child(n+61) { display: none; }
+  .pp-logo-particle:nth-child(n+61) { display: none; }
+  /* Hintergrundteilchen der Menues (Gegnerwahl u. a.): 60 laufende DOM-Animationen kosteten dort spuerbar Bilder (gemessen: ~13 fps bei 6x Drosselung) — 18 genuegen */
+  .pp-bg-particle:nth-child(n+19) { display: none; }
   /* Titelkulisse: Blitz/Bloom/Flash-Ebenen (Screen-Blending) aus,
      Glut-Funken auf 15 gedeckelt, Bolt-Filter aus */
   .anim-bloom, .anim-flash, .anim-lightning { display: none; }

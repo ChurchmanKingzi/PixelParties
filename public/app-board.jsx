@@ -38419,6 +38419,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   // ── Tutorial outro: show textbox before victory screen ──
   const [tutorialOutroPending, setTutorialOutroPending] = useState(false);
+  // Abschlussmonolog gesprochen? Der Siegerschirm bleibt bis dahin weg — ueber diesen Zustand statt ueber `tutorialOutroPending`: das wird erst im Effekt NACH dem ersten Render mit Ergebnis gesetzt, dazwischen stand der Schirm (je nach Geraet Sekundenbruchteile bis eine halbe Sekunde) da.
+  const [tutorialOutroDone, setTutorialOutroDone] = useState(false);
   const [resultFading, setResultFading] = useState(false);
   const tutorialOutroFiredRef = useRef(null);
   // Synchronous mirror of tutorialOutroPending — written alongside the
@@ -38443,7 +38445,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           speakerName: 'Monia Bot',
           ...(outroPages ? { pages: outroPages } : { text: outroText }),
           ...(script.opts || {}),
-          onDismiss: () => { outroPendingRef.current = false; setTutorialOutroPending(false); },
+          onDismiss: () => { outroPendingRef.current = false; setTutorialOutroPending(false); setTutorialOutroDone(true); },
         });
       }, 300);
     }
@@ -38463,6 +38465,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     tutorialOutroFiredRef.current = null;
     outroPendingRef.current = false;
     setTutorialOutroPending(false);
+    setTutorialOutroDone(false);
   }, [result, lobby?.id]);
 
   // Victory / defeat fanfare — fires exactly once when result first appears.
@@ -38631,6 +38634,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
      * misst die aber alle mit und schreibt drei weitere Variablen.
      * Beim Scrollen wird deshalb nur noch die Platte nachgezogen.
      */
+    // Die Leiste bleibt unsichtbar (`html:not([data-phase-bereit]) .phase-column`, style.css), bis ihre Lage zweimal hintereinander gleich gemessen wurde:
+    // beim Brettaufbau rueckt das Layout in 2–3 Schritten zurecht, und die Leiste glitt sonst sichtbar an ihren Platz. Netz: nach 1,5 s erscheint sie in jedem Fall.
+    const wurzel = document.documentElement;
+    wurzel.removeAttribute('data-phase-bereit');
+    let bereitSig = null;
+    const bereitMelden = (col, midY) => {
+      if (wurzel.hasAttribute('data-phase-bereit')) return;
+      const q = col.getBoundingClientRect();
+      const sig = Math.round(midY) + '|' + Math.round(q.left) + '|' + Math.round(q.top) + '|' + Math.round(q.width);
+      if (sig === bereitSig && q.width > 0) wurzel.setAttribute('data-phase-bereit', '1');
+      bereitSig = sig;
+    };
+    const bereitNetz = setTimeout(() => wurzel.setAttribute('data-phase-bereit', '1'), 1500);
     const apply = (nurPlatte = false) => {
       // Waehrend ein Kartenzug laeuft, aendert sich die Brettgeometrie
       // nicht — jede Messung hier waere ein erzwungener Umbruch pro
@@ -38651,7 +38667,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         document.querySelectorAll('[data-hero-zone][data-hero-owner="opp"]').forEach(e => { const r = e.getBoundingClientRect(); if (r.height > 0) oppUnten = Math.max(oppUnten, r.bottom); });
         document.querySelectorAll('[data-hero-zone][data-hero-owner="me"]').forEach(e => { const r = e.getBoundingClientRect(); if (r.height > 0) meOben = Math.min(meOben, r.top); });
         if (isFinite(oppUnten) && isFinite(meOben)) {
-          setzeVar(document.documentElement.style, '--phase-mid-y', ((oppUnten + meOben) / 2 - parent.getBoundingClientRect().top + parent.scrollTop) + 'px');
+          const midY = (oppUnten + meOben) / 2 - parent.getBoundingClientRect().top + parent.scrollTop;
+          setzeVar(document.documentElement.style, '--phase-mid-y', midY + 'px');
+          bereitMelden(col, midY);
           messePlatte(col); return;
         }
       }
@@ -38691,6 +38709,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       if (y == null) return;
       setzeVar(document.documentElement.style, '--phase-mid-y', (y - pr.top) + 'px');
+      bereitMelden(col, y - pr.top);
       // Hoehe NUR der Phasenzeile — das CSS verschiebt die Spalte um die
       // Haelfte davon nach oben, damit genau diese Zeile auf der Linie
       // liegt und die Button-Reihe darunter haengt.
@@ -38762,6 +38781,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     if (center) center.addEventListener('scroll', onScroll, { passive: true });
     return () => {
+      clearTimeout(bereitNetz);
+      wurzel.removeAttribute('data-phase-bereit');
       cancelAnimationFrame(raf);
       if (ro) ro.disconnect();
       window.removeEventListener('resize', apply);
@@ -63481,9 +63502,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       )}
 
       {/* ── Puzzle / Tutorial Result Overlay ── */}
-      {/* Der Abschlussmonolog wird erst im Effekt nach dem Ergebnis angemeldet (tutorialOutroPending): fuer genau diesen einen Render stand der Stage-Cleared-Schirm kurz da. Deshalb hier synchron mitpruefen. */}
+      {/* Siegerschirm erst nach dem Abschlussmonolog (`tutorialOutroDone`) — ohne diese Sperre stand er zwischen Ergebnis und Monolog kurz im Bild. */}
       {result && result.isPuzzle && !tutorialOutroPending
-        && !(result.isTutorial && result.puzzleResult === 'success' && (window.TUTORIAL_SCRIPTS || {})[window._currentTutorialNum]?.outro && tutorialOutroFiredRef.current !== window._currentTutorialNum)
+        && !(result.isTutorial && result.puzzleResult === 'success' && (window.TUTORIAL_SCRIPTS || {})[window._currentTutorialNum]?.outro && !tutorialOutroDone)
         && (() => {
         // The final tutorial (script flagged `isFinalTutorial: true`) gets
         // a celebratory upgrade: big multi-colored fireworks + a beefier
