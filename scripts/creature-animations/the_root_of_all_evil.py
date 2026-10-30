@@ -20,7 +20,7 @@ Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Wiegen (Periode 48): der Baum neigt sich langsam — Zeilenversatz mit nach oben wachsendem Gewicht (Wipfelspitze ±3 px, Stamm in Augenhöhe ±1, Wurzeln fest); wo der Versatz zweier Nachbarzeilen
   sie nicht mehr 4-verbunden ließe, teilen sie sich den Versatz.
 * Äste (Periode 24, links/rechts gegenläufig): die äußeren Astspalten (links x 0–7, rechts x 23–31, Zeilen 10–46) wippen senkrecht (bis ±2 px an den Astspitzen, die Spitze hinkt nach).
-* Blinzeln (zweimal je Schleife, Frames 13–15 und 37–39: halb – zu – halb): die roten Augenpixel beider Augen nehmen die umgebende Rindenfarbe an (je Pixel häufigste Graustufe im Umkreis von 2 px); das Maul bleibt.
+* Blinzeln (zweimal je Schleife, Frames 13–15 und 37–39: halb – zu – halb): die roten Augenpixel beider Augen nehmen die umgebende Rindenfarbe an (je Pixel häufigste Graustufe im Umkreis von 2 px, mitten im Auge bis 4 px); das Maul bleibt.
 Ergänzungen: wo der Ast-/Wiegeversatz ein Astende nur noch über eine Pixelecke hängen lässt, ein Brückenpixel in der Farbe des Astendes (siehe `brueck`), und Umrisspixel A=(24,24,24) an freigelegten Kanten (siehe `ergaenzt`).
 Frame: Sprite plus 4 px links/rechts, 2 px oben, 2 px unten — Figur zentriert.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -107,19 +107,21 @@ def _augen_zu(sp, stufe):
         for (y, x) in pix:
             if stufe == 1 and y > mitte:
                 continue
-            cnt, dist = {}, {}
-            for dy in range(-2, 3):
-                for dx in range(-2, 3):
-                    yy, xx = y + dy, x + dx
-                    if not (0 <= yy < sh and 0 <= xx < sw) or not sp[yy, xx, 3]:
-                        continue
-                    c = tuple(int(v) for v in sp[yy, xx, :3])
-                    if c not in GRAUS or c == UMRISS:
-                        continue
-                    cnt[c] = cnt.get(c, 0) + 1
-                    dist[c] = min(dist.get(c, 9), max(abs(dy), abs(dx)))
-            if cnt:
-                out[y, x, :3] = max(cnt, key=lambda q: (cnt[q], -dist[q]))
+            for rad in (2, 3, 4):                                                    # Umkreis von 2 px, bei Bedarf (mitten im Auge) weiter
+                cnt, dist = {}, {}
+                for dy in range(-rad, rad + 1):
+                    for dx in range(-rad, rad + 1):
+                        yy, xx = y + dy, x + dx
+                        if not (0 <= yy < sh and 0 <= xx < sw) or not sp[yy, xx, 3]:
+                            continue
+                        c = tuple(int(v) for v in sp[yy, xx, :3])
+                        if c not in GRAUS or c == UMRISS:
+                            continue
+                        cnt[c] = cnt.get(c, 0) + 1
+                        dist[c] = min(dist.get(c, 9), max(abs(dy), abs(dx)))
+                if cnt:
+                    out[y, x, :3] = max(cnt, key=lambda q: (cnt[q], -dist[q]))
+                    break
     return out
 
 

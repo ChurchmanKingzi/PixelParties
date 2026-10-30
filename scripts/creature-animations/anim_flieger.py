@@ -27,6 +27,7 @@ Bausteine, die bei mehreren Fliegern gebraucht werden:
                                                je Zunge versetzt; die Farbfolge (Spitze rot, Mitte orange, Kern hell) wandert mit der Zunge
     zungen_spitzen(a, kern_farben, max_y)      Spitzen (Spalte, Zeile) der Zungen — Startpunkte für abreißende Funken
     kanten(a), umriss_farben(spr)              Randpixel (Alpha > 0 mit freiem 4er-Nachbarn) bzw. deren Farben im Quell-Sprite (= Umrissfarben)
+    drehen_haut_knochen(a, pivot_x, pivot_y, winkel, knochen_farben)   Flügel mit dünnen Knochen drehen, ohne zu zerfasern: Haut als Fläche (Rückwärtsabbildung), Knochen als Linien (Vorwärtsabbildung + Linien)
     umranden(f, teile, erlaubt, oben, seite, unten)   Randpixel-Test (Regel 16): sichtbare Randpixel bewegter Teile, die nicht in einer Umrissfarbe
                                                stehen (Spaltenversatz legt Innenfarben frei), werden in die Umrissfarbe der jeweiligen Kante gesetzt
     zeilen_stauchen(a, achse_x, s_zeile)       jede Zeile um die senkrechte Achse achse_x auf den Faktor s_zeile[y] ≤ 1 zusammenschieben (Nächster-Nachbar) —
@@ -614,4 +615,82 @@ def feuer_schichten(a, i, n, heiss, y_ende, pose_frames=3, seed=11, amp=(4.0, 3.
                 sy = min(max(sy, y0), y1 - 1)
                 if a[sy, x, 3]:
                     out[yn, x] = a[sy, x]
+    return out
+
+
+# ── Flügel mit dünnen Knochen drehen (Fruit Bat, Gigantisaur Pteranos, …) ─────────────────────────────────────────────────────────
+def _haut_fuellen(a, knochen):
+    """Knochenpixel mit der Farbe des nächsten Hautpixels füllen (Haut unter dem Knochen), damit die Haut beim Drehen ein geschlossenes Feld bleibt."""
+    out = a.copy()
+    haut = (a[..., 3] > 0) & ~knochen
+    hy, hx = np.nonzero(haut)
+    if not len(hy):
+        return out
+    for y, x in zip(*np.nonzero(knochen)):
+        k = int(np.argmin((hy - y) ** 2 + (hx - x) ** 2))
+        out[y, x] = a[hy[k], hx[k]]
+    return out
+
+
+def _linie8(p, q):
+    """Pixel einer 8-verbundenen Linie von p nach q (Bresenham), ohne p, mit q."""
+    (x0, y0), (x1, y1) = p, q
+    dx, dy = abs(x1 - x0), abs(y1 - y0)
+    sx, sy = (1 if x1 > x0 else -1), (1 if y1 > y0 else -1)
+    err = dx - dy
+    pts = []
+    while (x0, y0) != (x1, y1):
+        e2 = 2 * err
+        if e2 > -dy:
+            err -= dy
+            x0 += sx
+        if e2 < dx:
+            err += dx
+            y0 += sy
+        pts.append((x0, y0))
+    return pts
+
+
+def drehen_haut_knochen(a, pivot_x, pivot_y, winkel, knochen_farben, splitter=3):
+    """Flügel um (pivot_x, pivot_y) drehen (positiv = im Uhrzeigersinn, wie `drehen`), ohne ihn zu zerfasern. `drehen` (Rückwärtsabbildung) zerlegt dünne 1-px-Linien
+    (Fingerknochen, Umrisslinien) in Treppen und Pixelstaub. Hier wird getrennt gerechnet:
+      * Haut (alles außer den Pixeln in `knochen_farben`, Liste von RGB; die Knochenpixel werden vorher mit der nächsten Hautfarbe gefüllt) per Rückwärtsabbildung gedreht;
+      * Knochen: jedes Knochenpixel wandert per Vorwärtsabbildung (Nächster Nachbar), zwischen den gedrehten Positionen benachbarter Knochenpixel wird eine 8-verbundene
+        Linie in der Knochenfarbe gezogen — die Knochen bleiben durchgehende Linien;
+      * danach fallen lose Splitter (4-verbundene Teile ≤ `splitter` px) weg.
+    Nur Farben der Eingabe, Alpha 0/255, Ruhelage (winkel = 0) bleibt unverändert. Pixel, die aus der Leinwand gedreht würden, lösen ClipError aus."""
+    import cv2
+    if abs(winkel) < 1e-9:
+        return a.copy()
+    h, w = a.shape[:2]
+    knochen = L.farbmaske(a, knochen_farben)
+    haut = drehen(_haut_fuellen(a, knochen), pivot_x, pivot_y, winkel, glatt=False)
+    c, s_ = math.cos(winkel), math.sin(winkel)
+
+    def rot(x, y):
+        dx, dy = x - pivot_x, y - pivot_y
+        return (int(math.floor(pivot_x + dx * c - dy * s_ + 0.5)), int(math.floor(pivot_y + dx * s_ + dy * c + 0.5)))
+    out = haut.copy()
+    ys, xs = np.nonzero(knochen)
+    pts = set(zip(xs.tolist(), ys.tolist()))
+    kf = [tuple(k) for k in knochen_farben]
+    for (x, y) in sorted(pts):
+        px, py = rot(x, y)
+        if not (0 <= px < w and 0 <= py < h):
+            raise L.ClipError('Knochenpixel würde aus der Leinwand gedreht')
+        out[py, px, :3] = a[y, x, :3]
+        out[py, px, 3] = 255
+        for dy_, dx_ in ((0, 1), (1, -1), (1, 0), (1, 1)):          # jedes Nachbarpaar einmal
+            q = (x + dx_, y + dy_)
+            if q in pts:
+                qx, qy = rot(*q)
+                for (lx, ly) in _linie8((px, py), (qx, qy))[:-1]:
+                    if not out[ly, lx, 3] or tuple(out[ly, lx, :3]) not in kf:
+                        out[ly, lx, :3] = a[y, x, :3]
+                        out[ly, lx, 3] = 255
+    n, lab = cv2.connectedComponents((out[..., 3] > 0).astype(np.uint8), connectivity=4)
+    for k in range(1, n):
+        m = lab == k
+        if int(m.sum()) <= splitter:
+            out[m] = 0
     return out
