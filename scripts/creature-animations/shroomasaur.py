@@ -25,7 +25,7 @@ Ablauf (48 Frames à 66 ms = 3,2 s), alle Bewegungen unabhängig:
   die Zähne gehen mit. Das Maul ist hinten offen (Luft), es muss nichts ergänzt werden.
 * Atmen/Heben (Periode 24, Frames 6–17): Kopf, Rumpf und Schwanzansatz heben sich 1 px — Zeile 21 (Beinansatz) wird einmal eingefügt (die Beine werden 1 px länger, nichts wird zum Block).
 * Schwanz schlägt (Periode 16, 3× pro Schleife): die Schwanzspalten (x ≤ 17) wandern senkrecht, je weiter vom Körper desto mehr (Spitze ca. ±3 px); der Ansatz bleibt.
-* Pilzsprosse wiegen (Periode 16, versetzt): die Zeilen 7–9 des Sprosses und der Stacheln wandern waagerecht um höchstens 1 px (Zeile 10 bleibt).
+* Pilzsprosse wiegen (Periode 12, 4× pro Schleife): die Zeilen 7–9 des Sprosses und der Stacheln wandern waagerecht um höchstens 1 px (Zeile 10 bleibt).
 * Hörner zucken (Frames 12–14 und 36–38): die Hornzeilen 0–1 kippen 1 px nach hinten.
 * Blinzeln (Frames 18–20 und 42–44): das Augenpixel (45,5) wird kurz zur Gesichtsfarbe (Lid = Körperfarbe).
 * Randpixel-Korrektur (Regel 16): anim_tiere.umriss_schliessen.
@@ -103,7 +103,7 @@ def frame(i, nur=None):
     k = L.streck_zeile(k, PAD_T + 21, heben)                       # Beinansatz verlängern → Oberkörper hebt sich, Füße bleiben
     kf = kiefer_biegen(teil(kiefer), PAD_L + 39, 3.0, L.sinus(i, 24))
     sw_ = T.biegen_spalten(teil(schwanz), PAD_L + 18, 3.2, L.sinus(i, 16))
-    sp = T.scherung_zeilen(teil(spross), PAD_T + 7, PAD_T + 9, PAD_T + 10, 1.4, math.sin(L.sinus(i, 16) + 1.0) - math.sin(1.0))
+    sp = T.scherung_zeilen(teil(spross), PAD_T + 7, PAD_T + 9, PAD_T + 10, 1.4, math.sin(L.sinus(i, 12)))
     ho = teil(horn)
     if i in HORN:
         ho = L.versetze(ho, -1, 0)

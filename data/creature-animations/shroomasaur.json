@@ -1,0 +1,15 @@
+{
+  "creature": "Shroomasaur",
+  "sheet": "shroomasaur.png",
+  "frameWidth": 57,
+  "frameHeight": 40,
+  "frames": 48,
+  "frameMs": 66,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 4,
+  "faceX": 28.5
+}
