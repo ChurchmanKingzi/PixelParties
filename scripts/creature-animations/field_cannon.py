@@ -66,8 +66,8 @@ assert (wischer | kanone | flamme_alt).sum() == vorhanden.sum() and not (wischer
 RAMPE = {'rand': GELB, 'rot': GELB, 'orange': GELB, 'gelb': GELB, 'hell': HELL}
 SPERRE = np.zeros((H, W), bool)
 SPERRE[GPT:GPT + sh, GPL:GPL + sw] = kanone & (xx <= 17) & (yy <= 8)       # nur das oberste Lunten-Pixel (15, 8) trägt die Flamme (die schräge Lunte darunter bleibt unberührt: anim_feuer würde sie sonst mit Brückenpixeln 4-verbinden)
-ZUNGEN = [FEU.Zunge(15.0 + GPL, 7 + GPT, 4.6, 1.6)]
-FEUER = FEU.Feuer(H, W, ZUNGEN, RAMPE, n=N, seed=3, posen=12, amplitude=0.6, sperre=SPERRE)
+ZUNGEN = [FEU.Zunge(15.0 + GPL, 7 + GPT, 5.5, 1.8)]
+FEUER = FEU.Feuer(H, W, ZUNGEN, RAMPE, n=N, seed=3, posen=12, amplitude=0.7, sperre=SPERRE)
 
 # --- Glanz auf dem Lauf (Eisen) ---
 LAUF = kanone & (xx >= 18) & ~((xx >= 27) & (xx <= 37) & (yy >= 10))     # ohne Lunte und ohne das Rad

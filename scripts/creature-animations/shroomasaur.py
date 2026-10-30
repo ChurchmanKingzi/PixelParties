@@ -42,7 +42,7 @@ import anim_lib as L
 import anim_tiere as T
 
 N, MS = 48, 66
-PAD_L, PAD_R, PAD_T, PAD_B = 2, 2, 3, 4
+PAD_L, PAD_R, PAD_T, PAD_B = 2, 2, 3, 2
 
 spr = L.lade('shroomasaur')
 sh, sw = spr.shape[:2]
