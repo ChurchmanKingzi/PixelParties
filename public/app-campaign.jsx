@@ -1372,25 +1372,25 @@ function CampaignDeckEditor({ state, onSave, onClose }) {
               <input className="cmp-search" placeholder="search…" value={filter} onChange={e => setFilter(e.target.value)} />
             </div>
             <div className="cmp-filters">
-              <select className="cmp-filter" value={fType} onChange={e => setFType(e.target.value)}>
+              <PPSelect className="cmp-filter" value={fType} onChange={e => setFType(e.target.value)}>
                 <option value="">All types</option>
                 {facets.types.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-              <select className="cmp-filter" value={fSub} onChange={e => setFSub(e.target.value)}>
+              </PPSelect>
+              <PPSelect className="cmp-filter" value={fSub} onChange={e => setFSub(e.target.value)}>
                 <option value="">All subtypes</option>
                 {facets.subs.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-              <select className="cmp-filter" value={fArch} onChange={e => setFArch(e.target.value)}>
+              </PPSelect>
+              <PPSelect className="cmp-filter" value={fArch} onChange={e => setFArch(e.target.value)}>
                 <option value="">All archetypes</option>
                 {facets.archs.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-              <select className="cmp-filter" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+              </PPSelect>
+              <PPSelect className="cmp-filter" value={sortBy} onChange={e => setSortBy(e.target.value)}>
                 <option value="name">Sort: Name</option>
                 <option value="cost">Sort: Cost</option>
                 <option value="level">Sort: Level</option>
                 <option value="atk">Sort: ATK</option>
                 <option value="hp">Sort: HP</option>
-              </select>
+              </PPSelect>
               <button className="cmp-filter cmp-sort-dir" disabled={sortBy === 'name'}
                 title={sortDesc ? 'Highest first' : 'Lowest first'}
                 onClick={() => { cmpSfx('hotspot', { volume: 0.4 }); setSortDesc(v => !v); }}>
@@ -1504,16 +1504,16 @@ function CampaignDevPanel({ story, state, onJump, onScene, onTime, onFlag, onCle
       )}
       <div className="cmp-dev-row">
         <label>Place</label>
-        <select value={state.location || ''} onChange={e => onJump(e.target.value)}>
+        <PPSelect value={state.location || ''} onChange={e => onJump(e.target.value)}>
           {Object.entries(story.world.locations).map(([id, l]) => <option key={id} value={id}>{l.name || id}</option>)}
-        </select>
+        </PPSelect>
       </div>
       <div className="cmp-dev-row">
         <label>Scene</label>
-        <select value={sceneId} onChange={e => setSceneId(e.target.value)}>
+        <PPSelect value={sceneId} onChange={e => setSceneId(e.target.value)}>
           <option value="">—</option>
           {Object.keys(story.scenes).sort().map(id => <option key={id} value={id}>{id}</option>)}
-        </select>
+        </PPSelect>
         <button onClick={() => sceneId && onScene(sceneId)}>▶</button>
       </div>
       <div className="cmp-dev-row">

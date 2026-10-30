@@ -135,6 +135,12 @@ module.exports = {
     for (let n = 1; n <= count; n++) {
       options.push({ id: `n-${n}`, label: `${n} counter${n > 1 ? 's' : ''} → ${50 * n} damage` });
     }
+    // Tutorial (Mission 6): die Option mit ZWEI Zaehlern steht oben (und ist damit vorgewaehlt), sobald sie verfuegbar ist — die Option mit einem Zaehler bleibt
+    // waehlbar und wird NICHT ausgegraut, damit niemand den Effekt fuer schwach haelt, bloss weil er zuerst nur eine ausgegraute Option sieht.
+    if (gs.isTutorial && count >= 2) {
+      const zwei = options.findIndex(o => o.id === 'n-2');
+      if (zwei > 0) options.unshift(options.splice(zwei, 1)[0]);
+    }
     const optRes = await engine.promptGeneric(pi, {
       type: 'optionPicker',
       renderAs: 'dropdown',

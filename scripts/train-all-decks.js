@@ -33,6 +33,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { autoJobs } = require('./train-jobs');
 
 const ROOT = path.join(__dirname, '..');
 const DECK_DIR = path.join(ROOT, 'data', 'SampleDecks');
@@ -126,6 +127,7 @@ for (const deck of decks) {
         PP_TRAIN_HORIZON: '1',
         PP_TRAIN_OUT: outPath,
         PP_TRAIN_HEAP_MB: process.env.PP_TRAIN_HEAP_MB || '2000',
+        PP_TRAIN_JOBS: String(autoJobs()),   // parallele Sammlung (siehe scripts/train-jobs.js; PP_TRAIN_JOBS=1 = ein Prozess)
       };
       if (FAST) { env.PP_MCTS_BUDGET_MS = '4000'; env.PP_MCTS_PULLS = '24'; }
       if (EXPLORE > 0) env.PP_TRAIN_EXPLORE = String(EXPLORE);
@@ -172,6 +174,7 @@ for (const deck of decks) {
         PP_TRAIN_HORIZON: '1',
         PP_TRAIN_OUT: abOut,
         PP_TRAIN_HEAP_MB: process.env.PP_TRAIN_HEAP_MB || '2000',
+        PP_TRAIN_JOBS: String(autoJobs()),   // parallele Sammlung (siehe scripts/train-jobs.js; PP_TRAIN_JOBS=1 = ein Prozess)
       };
       delete env.PP_TRAIN_EXPLORE; // A/B misst die echte Policy
       if (FAST) { env.PP_MCTS_BUDGET_MS = '4000'; env.PP_MCTS_PULLS = '24'; }

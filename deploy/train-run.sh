@@ -15,6 +15,11 @@
 #  · Er läuft unter systemd statt in deiner Shell. Verbindung trennen ist
 #    gefahrlos, und der Lauf bleibt überwach- und abbrechbar.
 #
+#  PARALLELE SAMMLUNG: train-iterative.js und train-all-decks.js teilen die Spiele einer Sammelrunde auf mehrere Worker-Prozesse
+#  auf (PP_TRAIN_JOBS, Standard automatisch aus Kernen/Speicher — hier 3 bei vier Kernen und CPUQuota=300%; PP_TRAIN_JOBS=1 = ein
+#  Prozess). Ein Worker braucht mitten im Spiel typisch 0,3–1,5 GB; MemoryMax der Slice (4800M) reicht für drei, solange keiner
+#  an sein 4096-MB-Heap-Limit läuft. Stirbt ein Worker, startet der Orchestrator ihn neu; fehlende Spiele holt der Wiederanlauf nach.
+#
 #  ZUR HEAP-GRENZE — 4096 IST KEIN ZUFALLSWERT:
 #  In v389 stand hier 3072, um unter die Slice-Grenze zu passen. Das war
 #  ein Fehler mit Folgen für die Ergebnisse: _engine.js leitet die

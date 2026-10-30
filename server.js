@@ -1348,6 +1348,27 @@ function getRandomDefaultAvatar() {
   } catch { return null; }
 }
 
+/** Gast-Namen und -Avatare: „Guest <Heldenname>" mit dem zugeschnittenen Kartenbild des Helden (public/avatars/gast/<Name>.png, gebaut von
+ *  scripts/guest-avatars/build.py). Doppelte Namen (gleichzeitig mehrere Gaeste mit demselben Helden) bekommen eine Zahl: „Guest Elana 2". */
+let _gastHelden = null;
+function gastHelden() {
+  if (_gastHelden) return _gastHelden;
+  try { _gastHelden = fs.readdirSync(path.join(__dirname, 'public', 'avatars', 'gast')).filter(f => f.endsWith('.png')).map(f => f.slice(0, -4)); }
+  catch { _gastHelden = []; }
+  return _gastHelden;
+}
+async function neuerGastName(id) {
+  const namen = gastHelden();
+  if (!namen.length) return { username: 'Guest-' + id.slice(0, 8), avatar: getRandomDefaultAvatar() };
+  const held = namen[Math.floor(Math.random() * namen.length)];
+  const avatar = '/avatars/gast/' + encodeURIComponent(held) + '.png';
+  for (let n = 1; n <= 30; n++) {
+    const username = 'Guest ' + held + (n > 1 ? ' ' + n : '');
+    if (!(await db.get('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE', [username]))) return { username, avatar };
+  }
+  return { username: 'Guest-' + id.slice(0, 8), avatar };
+}
+
 /** Pick a random vivid hex color for a brand-new player. The schema's
  *  static `#00f0ff` default made every fresh account share the same
  *  cyan in lobby lists / chat / hero accents — this hand-tuned palette
@@ -2005,13 +2026,13 @@ async function purgeAllGuests() {
 app.post('/api/auth/guest', async (req, res) => {
   try {
     const id = uuidv4();
-    const username = 'Guest-' + id.slice(0, 8);
+    const { username, avatar: gastAvatar } = await neuerGastName(id);
     const passwordHash = unusablePasswordHash(); // nie bekanntes Passwort dahinter: Gaeste koennen sich nicht per Passwort anmelden
     await db.run(
       // Fixed default blue (the login-screen accent, `--accent` in style.css) so the guest UI doesn't flicker a
       // new random colour every session.
       'INSERT INTO users (id, username, password_hash, avatar, color, is_guest) VALUES (?, ?, ?, ?, ?, 1)',
-      [id, username, passwordHash, getRandomDefaultAvatar(), STANDARD_FARBE]
+      [id, username, passwordHash, gastAvatar, STANDARD_FARBE]
     );
     try { await seedInitialOpponents(id); } catch (err) { console.error('[guest] seedInitialOpponents failed:', err.message); }
     // Pin a random Starter Deck as the guest's default so a deck is preselected.
@@ -3708,6 +3729,15 @@ app.get('/api/sample-decks/owned', authMiddleware, async (req, res) => {
   res.json({ decks });
 });
 
+// Kartenlisten eines Beispiel-Decks fuer das Vorwaermen im Client (Kartenbilder im Leerlauf rendern, siehe CardImageShim.warmDrip).
+function deckWarmInfo(d) {
+  const nm = (x) => (typeof x === 'string' ? x : (x && x.name) || null);
+  const heroes = (d.heroes || []).map(h => h && h.hero).filter(Boolean);
+  const abilities = (d.heroes || []).flatMap(h => h ? [h.ability1, h.ability2] : []).filter(Boolean);
+  const cards = Array.from(new Set([...(d.mainDeck || []), ...(d.potionDeck || []), ...heroes, ...abilities].map(nm).filter(Boolean)));
+  return { cards, heroes, abilities };
+}
+
 // Singleplayer opponent-gallery feed. Returns every sample deck the caller
 // can face (all Starter + all Structure decks, regardless of shop-ownership),
 // each enriched with the middle-hero name and the caller's W/L record vs
@@ -3761,6 +3791,9 @@ app.get('/api/sample-decks/gallery', authMiddleware, async (req, res) => {
     if (aInit) return baseIndex.get(a.id) - baseIndex.get(b.id); // starters: roster order
     return (unlockRank.get(a.id) ?? 0) - (unlockRank.get(b.id) ?? 0); // rest: unlock order
   });
+  // Die ersten drei Gegner (zuerst sichtbar, meist zuerst gespielt): ihre Kartenlisten fuers Vorwaermen mitliefern.
+  const deckById = new Map(decks.map(d => [d.id, d]));
+  enriched.slice(0, 3).forEach(o => { const d = deckById.get(o.id); if (d) o.warm = deckWarmInfo(d); });
   res.json({ opponents: enriched });
 });
 
@@ -3830,6 +3863,26 @@ app.get('/api/render-version', (req, res) => {
 // Aufruf je Seitenaufbau, und neue Animationen gelten sofort (siehe
 // die maxAge-Vorgabe bei den statischen Routen).
 const HERO_ANIM_DIR = path.join(__dirname, 'data', 'hero-animations');
+// ===== BETRIEBSKENNZAHLEN (Lasttest / Caddy-Check) =====
+// Verzoegerung der Ereignisschleife: je Millisekunde, die sie ueber ihren Takt hinaus belegt ist, wartet jeder Socket-/HTTP-Aufruf. `?reset=1`
+// setzt die Messung zurueck (zwischen Lasttest-Laeufen). Keine Nutzerdaten, nur Zahlen.
+const { monitorEventLoopDelay } = require('perf_hooks');
+const _elHist = monitorEventLoopDelay({ resolution: 10 }); _elHist.enable();
+app.get('/stats', (req, res) => res.sendFile(path.join(__dirname, 'public', 'stats.html')));   // Statistik-Seite fuer den Betreiber (Token wird im Browser eingegeben)
+app.get('/api/health', (req, res) => {
+  const ms = (ns) => Math.round(ns / 1e4) / 100;
+  const out = {
+    ok: true, uptimeS: Math.round(process.uptime()),
+    loopLagMs: { mean: ms(_elHist.mean), p50: ms(_elHist.percentile(50)), p95: ms(_elHist.percentile(95)), p99: ms(_elHist.percentile(99)), max: ms(_elHist.max) },
+    cpuAktiv: aktiveCpuPartien(), cpuGrenze: MAX_CPU_PARTIEN, budgetFaktor: Math.round(require('./cards/effects/_cpu-last')._debug().faktor * 100) / 100,
+    rooms: rooms.size, cpuRooms: [...rooms.values()].filter(r => r && r.type === 'singleplayer').length,
+    rssMb: Math.round(process.memoryUsage().rss / 1048576), heapMb: Math.round(process.memoryUsage().heapUsed / 1048576),
+  };
+  if (req.query.reset) _elHist.reset();
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(out);
+});
+
 // Alles, was die Tutorial-Missionen an Karten zeigen (Namen aus den Puzzle-Dateien, Helden getrennt). Der Client laedt das im Gast-Menue
 // im Leerlauf vor (Kartenbilder rendern, Heldenfiguren laden), damit der Start einer Mission nicht ruckelt. Einmal berechnet, dann gemerkt.
 let _tutorialAssets = null;
@@ -7034,6 +7087,7 @@ function endCpuBattle(room, winnerIdx, reason) {
               } catch (err) { console.error('[CPU battle] Gast-Deck-Geschenk fehlgeschlagen:', err.message); }
             }
           }
+          for (const u of newlyUnlocked) { try { const d = loadSampleDecks().find(x => x.id === u.id); if (d) u.warm = deckWarmInfo(d); } catch (e) { /* Vorwaermen ist optional */ } }
           if (newlyUnlocked.length && humanSid) {
             io.to(humanSid).emit('opponents_unlocked', { opponents: newlyUnlocked });
           }
@@ -7343,6 +7397,15 @@ function makeCpuDriver(room) {
   };
 }
 
+// Laufende CPU-Partien mit verbundenem Spieler (getrennte warten nur im Speicher auf ihren Ablauf und rechnen nicht).
+const MAX_CPU_PARTIEN = parseInt(process.env.PP_MAX_CPU_GAMES || '30', 10);
+function aktiveCpuPartien() {
+  let n = 0;
+  for (const r of rooms.values()) {
+    if (r && r.type === 'singleplayer' && r.gameState && !r.gameState.result && !(r.gameState.players || []).some(p => p && p.disconnected)) n++;
+  }
+  return n;
+}
 function cleanupRoom(roomId) {
   const room = rooms.get(roomId);
   if (!room) return;
@@ -16922,6 +16985,10 @@ io.on('connection', (socket) => {
     // sie brauchen den Riegel eigens — Als Befund 5.8.: waehrend Ambush
     // aufloeste, liess sich per Spam-Klick eine Waflav-Form ascenden.
     if (gs._chainResolvingLock || gs._forceDiscardLock === pi) return;
+    // Ein Aufstieg laeuft bis zum Ende seiner Aufloesung (Bonus-Auswahl, Reaktionsfenster, Trample Sounds …) — ein zweiter Befehl in dieser Zeit
+    // (Doppeltipp, ruckelndes Handy) startete eine ZWEITE Aufloesung: Bonus und Reaktion doppelt, und der Handindex der zweiten Karte zeigte
+    // nach dem ersten Spleiss auf eine andere Handkarte, die verschwand (Tutorial 7: Flame Avalanche).
+    if (gs._aufstiegLaeuft) return;
     // Als Vorgabe 29.9.: `heroOwner` = Spalte des Helden. Ein geliehener
     // Held (Gegnerspalte) darf aufsteigen, solange `pi` ihn kontrolliert;
     // ein eigener Held, den gerade der Gegner kontrolliert, nicht.
@@ -16929,6 +16996,7 @@ io.on('connection', (socket) => {
     const _aufHeld = gs.players[hs]?.heroes?.[heroIdx];
     if (!_aufHeld?.name || room.engine.heroSideOf(hs, _aufHeld) !== pi) return;
     // Perform ascension via engine
+    gs._aufstiegLaeuft = true;
     try {
       const result = await room.engine.performAscension(pi, heroIdx, cardName, handIndex, { fromCreation, heroOwner: hs });
       if (!result.success) return;
@@ -16942,6 +17010,8 @@ io.on('connection', (socket) => {
       }
     } catch (err) {
       console.error('[Engine] ascend_hero error:', err.message, err.stack);
+    } finally {
+      gs._aufstiegLaeuft = false;
     }
     for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i);
     sendSpectatorGameState(room);
@@ -18099,6 +18169,13 @@ io.on('connection', (socket) => {
   async function createCpuBattle({ playerDeckId, cpuDeckId, campaign }) {
     if (!currentUser) { socket.emit('cpu_battle_error', 'Not authenticated'); return; }
     if (activeGames.has(currentUser.userId)) { socket.emit('cpu_battle_error', 'Already in a game'); return; }
+    // Zulassungsgrenze: jede laufende CPU-Partie rechnet im selben Prozess (Lasttest: ab ~10 gleichzeitigen wird der Server traege). Lieber einer
+    // wartet kurz, als dass alle ruckeln. Kampagne und Tutorials (kein MCTS) sind ausgenommen.
+    if (!campaign && aktiveCpuPartien() >= MAX_CPU_PARTIEN) {
+      console.warn(`[createCpuBattle] abgelehnt: ${aktiveCpuPartien()} laufende CPU-Partien (Grenze ${MAX_CPU_PARTIEN})`);
+      socket.emit('cpu_battle_error', 'The server is very busy right now — please try again in a minute.', { busy: true });
+      return;
+    }
 
     // Player deck must be owned (their own custom deck or owned sample).
     // CPU deck can be ANY sample — the CPU playing a structure deck
@@ -20225,12 +20302,9 @@ io.on('connection', (socket) => {
           skillTest.onSeatLeft(room, currentUser, socket, skillTestHost);
           return;
         }
-        // Puzzle rooms: preserve existing immediate cleanup.
-        if (room.type === 'puzzle') {
-          activeGames.delete(currentUser.userId);
-          destroyRoom(activeRoomId);
-          return;
-        }
+        // Puzzle-/Tutorial-Raeume: frueher sofortiger Abbau — auf dem Handy reicht ein kurzer Netz- oder App-Wechsel, und der Raum war weg,
+        // waehrend der Client weiter das Brett zeigte: jede Eingabe ging ins Leere („Action Phase leuchtet, aber nichts passiert").
+        // Jetzt dieselbe Wiederverbindungsfrist wie bei Einzelspieler-Partien (Zweig darunter; der auth-Handler stellt den Raum wieder her).
         // Singleplayer rooms: F5 / browser refresh fires `disconnect`
         // and then re-runs `auth` once the new socket comes up — if we
         // tear the room down immediately, the reconnect grace window
@@ -20241,7 +20315,7 @@ io.on('connection', (socket) => {
         // and restores socketId on return. There's no opponent to
         // declare a winner against, so the only thing that fires on
         // expiry is the room cleanup itself.
-        if (room.type === 'singleplayer') {
+        if (room.type === 'singleplayer' || room.type === 'puzzle') {
           const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
           if (pi < 0) { cleanupRoom(activeRoomId); return; }
           // Dual-tab guard: ignore if a newer connection already took
@@ -20249,10 +20323,10 @@ io.on('connection', (socket) => {
           // closing after `superseded`).
           if (room.players[pi]?.socketId !== socket.id) return;
           room.gameState.players[pi].disconnected = true;
-          // Hold onto the room for 5 minutes — plenty for a refresh
+          // Hold onto the room for 3 minutes — plenty for a refresh
           // / brief network blip. Anything longer than that is "the
           // user closed the tab" and we'd rather reclaim resources.
-          const SP_RECONNECT_GRACE_MS = 5 * 60 * 1000;
+          const SP_RECONNECT_GRACE_MS = 3 * 60 * 1000;
           const timer = setTimeout(() => {
             disconnectTimers.delete(currentUser.userId);
             cleanupRoom(activeRoomId);
@@ -20500,6 +20574,7 @@ function sanitizeRoom(room, forUser) {
 //  training data).
 // ═══════════════════════════════════════════════════════════════════
 const { attachTrainingRecorder } = require('./cards/effects/_train-recorder');
+const valueEnc = require('./cards/effects/_value-encode');   // Zustandslog fürs CPU-Wertnetz (PP_VALUE_NET=log)
 
 // Tatsächliches V8-Heap-Limit in MB (respektiert --max-old-space-size).
 // Grundlage der Trainings-Heap-Wächter: feste Schwellen passten weder zu
@@ -20805,6 +20880,127 @@ async function runHeadlessTrainingGame(pinnedDeck, oppDeck, pinnedIdx, gameOpts 
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  PARALLELE SAMMLUNG (PP_TRAIN_JOBS=K)
+//
+//  Ein Spiel ist single-threaded, die Spiele einer Sammelrunde sind aber voneinander unabhängig. Der Orchestrator startet K Worker-
+//  prozesse (derselbe server.js mit PP_TRAIN_WORKER=1) und führt ihre Ergebnisse zusammen. Gearbeitet wird an Spiel-INDIZES: Index i
+//  bestimmt wie im sequentiellen Lauf Gegner (`i % Gegnerzahl`) und Sitz (`i % 2`), die Rotation bleibt also exakt dieselbe. Jeder
+//  Worker holt sich den nächsten freien Index, indem er eine Datei `<claims>/<i>` exklusiv anlegt — dynamische Lastverteilung ohne
+//  Absprache, kein Worker wartet auf einen langsamen Gegner.
+//
+//  Die Ausgabedatei (`PP_TRAIN_OUT`) bleibt die einzige Wahrheit: Jeder Datensatz trägt `gameIdx` (letztes Feld). Der Orchestrator
+//  legt vor dem Start fest, welche Indizes schon fertig sind (inkl. liegengebliebener Worker-Dateien einer abgebrochenen Runde und
+//  alter Dateien ohne `gameIdx`, die positionsweise gelten), und schreibt am Ende alles nach Index sortiert zurück. Stirbt ein
+//  Worker (OOM), startet er neu; das Match, das ihn tötete, bleibt in dieser Runde beansprucht (kein Dauerabsturz) und fehlt danach
+//  in der Datei — Exit-Code 1, der Wiederanlauf von train-iterative holt es nach. Die Brotkrume des Absturzes wird nach
+//  `<out>.inflight.json` kopiert, dort liest train-iterative sie.
+//
+//  ε-Exploration (PP_TRAIN_EXPLORE): der Neuheits-Zähler lebt je Worker; er teilt sich nicht über Prozesse.
+// ═══════════════════════════════════════════════════════════════════
+async function collectTrainingSharded({ jobs, count, outPath }) {
+  const { spawn } = require('child_process');
+  const dir = path.dirname(outPath), base = path.basename(outPath);
+  const idxOf = (line) => { const m = /"gameIdx":(\d+)\}\s*$/.exec(line); return m ? +m[1] : null; };
+  const workerFiles = () => fs.readdirSync(dir).filter(f => f.startsWith(base + '.w') && /^\.w\d+$/.test(f.slice(base.length)))
+    .map(f => path.join(dir, f));
+  // Alle Datensätze (Ausgabedatei + Worker-Dateien) → Map Index → Zeile. Alte Zeilen ohne gameIdx zählen positionsweise.
+  const pool = () => {
+    const recs = new Map();
+    let legacy = 0;
+    const take = (file, isMain) => {
+      let txt = '';
+      try { txt = fs.readFileSync(file, { encoding: 'utf-8' }); } catch { return; }
+      for (const line of txt.split('\n')) {
+        if (!line.trim()) continue;
+        let idx = idxOf(line);
+        let out = line;
+        if (idx == null) {
+          if (!isMain) continue;                       // Worker-Zeilen tragen immer ein gameIdx
+          idx = legacy++;
+          out = line.replace(/\}\s*$/, `,"gameIdx":${idx}}`);
+        }
+        if (!recs.has(idx)) recs.set(idx, out);
+      }
+    };
+    take(outPath, true);
+    for (const f of workerFiles()) take(f, false);
+    return recs;
+  };
+  // Zustandslog (PP_VALUE_NET=log): die Worker-Dateien `<out>.w<k>.states` wandern nach gameIdx in `<out>.states`, genau wie die jsonl-Zeilen.
+  // Nur Blöcke von Spielen, die die jsonl enthält (`keep`) — ein Spiel ohne Zeile zählt als nicht gespielt und wird beim Wiederanlauf neu gesammelt.
+  const logOn = valueEnc.enabled();
+  const mainStates = valueEnc.statesPath(outPath);
+  const workerStateFiles = () => fs.readdirSync(dir).filter(f => f.startsWith(base + '.w') && /^\.w\d+\.states$/.test(f.slice(base.length)))
+    .map(f => path.join(dir, f));
+  const mergeStates = (keep) => {
+    if (!logOn) return;
+    const parts = workerStateFiles();
+    try { valueEnc.mergeFiles(mainStates, [mainStates, ...parts], keep); }
+    catch (err) { console.warn('[train] Zustandslog: Zusammenführen fehlgeschlagen —', err.message); return; }   // Worker-Dateien bleiben liegen
+    for (const f of parts) { try { fs.unlinkSync(f); } catch { /* weg */ } }
+  };
+  const writeMerged = (recs) => {
+    const keys = [...recs.keys()].sort((a, b) => a - b);
+    const tmp = outPath + '.merge.tmp';
+    fs.writeFileSync(tmp, keys.map(k => recs.get(k) + '\n').join(''), { encoding: 'utf-8' });
+    fs.renameSync(tmp, outPath);
+  };
+
+  try { fs.unlinkSync(outPath + '.inflight.json'); } catch { /* keine alte Brotkrume */ }   // eine Absturz-Brotkrume gilt nur für DIESE Runde
+  const before = pool();
+  if (before.size > 0) writeMerged(before);            // legt gameIdx auch in alte Zeilen und holt liegengebliebene Worker-Zeilen heim
+  if (before.size > 0) mergeStates(new Set(before.keys())); else if (logOn) { for (const f of workerStateFiles()) { try { fs.unlinkSync(f); } catch { /* weg */ } } }
+  for (const f of workerFiles()) { try { fs.unlinkSync(f); } catch { /* weg */ } }
+  const done = [...before.keys()].filter(k => k < count);
+  const todo = count - done.length;
+  if (todo <= 0) { console.log(`[train] parallel: alle ${count} Spiele liegen schon vor`); return { failed: false }; }
+
+  const claimDir = outPath + '.claims', doneFile = outPath + '.done.json';
+  fs.rmSync(claimDir, { recursive: true, force: true });
+  fs.mkdirSync(claimDir, { recursive: true });
+  fs.writeFileSync(doneFile, JSON.stringify(done), { encoding: 'utf-8' });
+  const n = Math.max(1, Math.min(jobs, todo));
+  console.log(`[train] parallel: ${todo} von ${count} Spielen auf ${n} Worker verteilt (${done.length} lagen schon vor)`);
+
+  const kids = new Set();
+  const killAll = () => { for (const k of kids) { try { k.kill('SIGTERM'); } catch { /* weg */ } } };
+  process.on('exit', killAll);
+  for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { killAll(); process.exit(130); });
+
+  let crashes = 0;
+  const maxRespawns = 2 * n;
+  const startWorker = (k) => new Promise((resolve) => {
+    const env = { ...process.env, PP_TRAIN_WORKER: '1', PP_TRAIN_JOBS: '1', PP_TRAIN_OUT: `${outPath}.w${k}`,
+      PP_TRAIN_DONE_FILE: doneFile, PP_TRAIN_CLAIM_DIR: claimDir, PP_TRAIN_GAMES: String(count) };
+    delete env.PP_TRAIN_GAMES_MULT;                      // `count` steht fest — der Worker rechnet es nicht neu aus
+    const kid = spawn(process.execPath, [...process.execArgv, process.argv[1]], { env, stdio: 'inherit' });
+    kids.add(kid);
+    kid.on('exit', async (code, signal) => {
+      kids.delete(kid);
+      if (code === 0) return resolve();
+      crashes++;
+      console.warn(`[train] parallel: Worker ${k} beendet mit ${code ?? signal}`);
+      try { fs.copyFileSync(`${outPath}.w${k}.inflight.json`, outPath + '.inflight.json'); } catch { /* keine Brotkrume */ }
+      const claimed = fs.readdirSync(claimDir).length;
+      if (crashes <= maxRespawns && claimed < todo) { console.warn(`[train] parallel: Worker ${k} startet neu`); await startWorker(k); }
+      resolve();
+    });
+  });
+  await Promise.all(Array.from({ length: n }, (_, k) => startWorker(k)));
+  process.removeListener('exit', killAll);
+
+  const after = pool();
+  writeMerged(after);
+  mergeStates(new Set(after.keys()));
+  for (const f of workerFiles()) { try { fs.unlinkSync(f); } catch { /* weg */ } }
+  try { fs.rmSync(claimDir, { recursive: true, force: true }); fs.unlinkSync(doneFile); } catch { /* weg */ }
+  const missing = count - [...after.keys()].filter(k => k < count).length;
+  if (missing > 0) console.warn(`[train] parallel: ${missing} Spiel(e) fehlen (Worker-Absturz) — Wiederanlauf holt sie nach`);
+  else { try { fs.unlinkSync(outPath + '.inflight.json'); } catch { /* war nie da */ } }
+  return { failed: missing > 0 };
+}
+
 async function runTrainingBatch() {
   // Force-off learned profiles during data collection (see header note) —
   // EXCEPT in eval mode (PP_TRAIN_EVAL=1), which runs the identical batch
@@ -20898,6 +21094,29 @@ async function runTrainingBatch() {
   const outPath = process.env.PP_TRAIN_OUT
     || path.join(outDir, `${norm(pinned.name)}-${abMode ? 'AB-' : evalMode ? 'EVAL-' : ''}${stamp}.jsonl`);
   console.log(`[train] ${abMode ? 'A/B MODE (Profil vs Baseline im Spiegel)' : evalMode ? 'EVAL MODE (profiles ON)' : 'data collection (profiles OFF)'} — writing → ${outPath}`);
+  // Zustandslog fürs Wertnetz (PP_VALUE_NET=log): Binärdatei neben der jsonl, ein Block je Partie, Schlüssel gameIdx. Ein beim Absturz
+  // abgeschnittener letzter Block wird vor dem Weiterschreiben entfernt, sonst läge der nächste hinter Müll.
+  const statesFile = valueEnc.enabled() ? valueEnc.statesPath(outPath) : null;
+  if (statesFile) {
+    const cut = valueEnc.repairFile(statesFile);
+    if (!process.env.PP_TRAIN_WORKER) console.log(`[train] Zustandslog AN → ${statesFile}${cut ? ` (${cut} Bytes eines abgebrochenen Blocks entfernt)` : ''}`);
+  }
+
+  // ── Parallele Sammlung ──
+  // PP_TRAIN_JOBS=K startet K Worker (siehe collectTrainingSharded); ein Worker (PP_TRAIN_WORKER=1) holt sich seine Spiel-Indizes
+  // per Claim-Datei und liest die schon fertigen aus PP_TRAIN_DONE_FILE.
+  const shardWorker = process.env.PP_TRAIN_WORKER === '1';
+  const jobsWanted = shardWorker ? 1 : Math.max(1, parseInt(process.env.PP_TRAIN_JOBS || '1', 10) || 1);
+  let parallelFailed = false;
+  let workerDone = null;
+  if (shardWorker) {
+    try { workerDone = new Set(JSON.parse(fs.readFileSync(process.env.PP_TRAIN_DONE_FILE, { encoding: 'utf-8' }))); }
+    catch { workerDone = new Set(); }
+  }
+  const workerClaim = (i) => {
+    try { fs.closeSync(fs.openSync(path.join(process.env.PP_TRAIN_CLAIM_DIR, String(i)), 'wx')); return true; }
+    catch { return false; }
+  };
 
   // ── Resumability ──
   // If the output file already exists, continue from its line count.
@@ -20951,7 +21170,22 @@ async function runTrainingBatch() {
 
   let wins = resumedWins, losses = resumedLosses, ties = resumedTies;
   const t0 = Date.now();
+  if (shardWorker) startIdx = 0;               // der Worker arbeitet über Claims, nicht über die Zeilenzahl seiner Datei
+  if (jobsWanted > 1) {
+    const r = await collectTrainingSharded({ jobs: jobsWanted, count, outPath });
+    parallelFailed = r.failed;
+    wins = losses = ties = 0; resumedWins = resumedLosses = resumedTies = 0;
+    try {
+      for (const line of fs.readFileSync(outPath, { encoding: 'utf-8' }).split('\n')) {
+        if (!line.trim()) continue;
+        const g = JSON.parse(line);
+        if (g.outcome === 1) wins++; else if (g.outcome === 0) losses++; else ties++;
+      }
+    } catch { /* leere Datei */ }
+    startIdx = count;                          // die Schleife unten läuft nicht — die Worker haben alles erledigt
+  }
   for (let i = startIdx; i < count; i++) {
+    if (shardWorker && (workerDone.has(i) || !workerClaim(i))) continue;   // fertig oder von einem anderen Worker beansprucht
     // Round-robin opponents so every archetype contributes equally;
     // alternate the pinned deck's seat so first-player advantage and
     // seat-dependent quirks average out.
@@ -21010,7 +21244,15 @@ async function runTrainingBatch() {
     // Sicht der Profil-Seite gelabelt (pinnedIdx = profiledIdx).
     if (abMode) { record.abMode = true; record.profiledIdx = pinnedIdx; }
     if (oppProfiles) record.oppProfiles = true;
+    record.gameIdx = i;   // Spielindex als LETZTES Feld (Orchestrator: collectTrainingSharded liest ihn vom Zeilenende)
     fs.appendFileSync(outPath, JSON.stringify(record) + '\n', { encoding: 'utf-8' });
+    // Zustandslog NACH der Zeile: ein Absturz dazwischen lässt ein Spiel ohne Zustände (nur schlechter nutzbar), nie Zustände ohne Spiel.
+    if (record._valueLog) {
+      try {
+        const blk = record._valueLog.pack(i, record.winnerIdx, record.pinnedIdx);
+        if (blk) valueEnc.appendBlock(statesFile, blk);
+      } catch (err) { console.error('[train] Zustandslog nicht geschrieben:', err.message); }
+    }
     // Spiel ist sicher auf der Platte → Brotkrume weg. Bleibt sie
     // liegen, war dieses Match der Prozess-Killer.
     try { fs.unlinkSync(inflightPath); } catch { /* schon weg */ }
@@ -21018,9 +21260,12 @@ async function runTrainingBatch() {
     else if (record.outcome === 0) losses++;
     else ties++;
     const msg = record.outcome === 1 ? 'WIN ' : record.outcome === 0 ? 'LOSS' : 'TIE ';
-    console.log(`[train] ${i + 1}/${count} ${msg} vs ${opp.name} (${record.turns}t, ${record.reason}) — running ${wins}W-${losses}L-${ties}T`);
+    const logInfo = record._valueLog ? ` [Zustandslog: ${record._valueLog.states.length} Zustände, ${Math.round(record._valueLog.ms)} ms]` : '';
+    console.log(`[train] ${i + 1}/${count} ${msg} vs ${opp.name} (${record.turns}t, ${record.reason}) — running ${wins}W-${losses}L-${ties}T${logInfo}`);
     if (typeof global.gc === 'function' && i % 10 === 9) { try { global.gc(); } catch {} }
   }
+  if (parallelFailed) process.exitCode = 1;   // Spiele fehlen (Worker-Absturz): train-iterative/train-all-decks starten die Sammlung neu
+  if (shardWorker) { console.log('[train] Worker fertig'); return; }   // Zusammenfassung, A/B-Ergebnis und Profilschreiben macht allein der Orchestrator
   const mins = ((Date.now() - t0) / 60000).toFixed(1);
   if (process.env.PP_COVERAGE === '1' && global.__ppCoverage) {
     const covPath = (process.env.PP_TRAIN_OUT || 'training.jsonl').replace(/\.jsonl$/, '') + '.coverage.json';
@@ -22632,7 +22877,7 @@ app.get('*', (req, res, next) => {
 // injected room._currentDecks, so the whole batch runs engine-only.
 if (process.env.PP_TRAIN) {
   runTrainingBatch()
-    .then(() => process.exit(0))
+    .then(() => process.exit(process.exitCode || 0))
     .catch(err => { console.error('[train] batch failed:', err); process.exit(1); });
 } else if (process.env.PP_ST_SIM === '1') {
   // Skill-Test-Simulation (skilltest/sim.js): Modul nur laden, nichts starten.
@@ -22651,6 +22896,21 @@ initDatabase().then(async () => {
   // gar nicht erst in die Map kommen.
   await restoreSessions();
   server.listen(PORT, HOST, () => {
+    // Kartenskripte im Leerlauf vorladen (Profil: ~5 s Ladezeit, sonst beim ersten Spieler nach einem Neustart/Deploy). Kleine Scheiben mit Pausen,
+    // damit Sockets waehrenddessen bedient werden.
+    if (process.env.PP_NO_PRELOAD !== '1') setTimeout(() => {
+      try {
+        const { loadCardEffect } = require('./cards/effects/_loader');
+        const namen = Object.keys(getCardDB()); let i = 0; const t0 = Date.now();
+        const schritt = () => {
+          const t = Date.now();
+          while (i < namen.length && Date.now() - t < 8) { try { loadCardEffect(namen[i]); } catch { /* fehlendes Skript: egal */ } i++; }
+          if (i < namen.length) setTimeout(schritt, 10);
+          else console.log(`[preload] ${namen.length} Kartenskripte geladen (${Date.now() - t0} ms)`);
+        };
+        schritt();
+      } catch (e) { console.error('[preload]', e.message); }
+    }, 3000);
     // ── DIAGNOSE-SCHALTER BEIM START ANZEIGEN ─────────────────────
     // Zum ZWEITEN Mal ist eine Umgebungsvariable still nicht
     // angekommen (erst PP_DEMO_RECORD, jetzt PP_CHAIN_DEBUG /

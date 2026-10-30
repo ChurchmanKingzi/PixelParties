@@ -7,7 +7,7 @@ const { api, socket, AppContext, CardMini, cardImageUrl,
         typeColor, skinImageUrl, CardTooltipContent, isDeckLegal } = window;
 const { ALL_CARDS, CARDS_BY_NAME, AVAILABLE_CARDS, AVAILABLE_MAP, SKINS_DB } = window;
 const { useAntoniaPresent, setAntoniaPresent, tutorialStartsWithAntonia } = window;
-const { GlanzBand, LotsenGlanz } = window;   // v1264: Glanzband + Lotsen-Schein
+const { GlanzBand, LotsenGlanz, PpVerlauf } = window;   // v1264: Glanzband + Lotsen-Schein; W86u2: Pixel-Schleier (Dither)
 
 // Eye / eye-off glyphs for the password show/hide toggle.
 const EyeIcon = () => (
@@ -95,12 +95,31 @@ function useTutorialFlow(open) {
   // Receive the board state for a running tutorial attempt.
   useEffect(() => {
     if (!open) return;
+    // Verbindungswaechter: nach einem Wiederverbinden muss der Server binnen 5 s den Tutorial-Zustand neu senden (Raum bleibt 3 min erhalten).
+    // Kommt nichts (Raum weg, z. B. Server neu gestartet), wuerde das Brett weiter stehen und jede Eingabe ins Leere gehen — dann klar abbrechen.
+    let waechter = 0;
+    const onConnect = () => {
+      if (!tutorialAttemptRoom.current) return;
+      clearTimeout(waechter);
+      waechter = setTimeout(() => {
+        if (!tutorialAttemptRoom.current) return;
+        notify('Connection lost — the tutorial ended. Please start it again.', 'error');
+        setTutorialAttemptState(null);
+        tutorialAttemptRoom.current = null;
+        tutorialIntroShownRef.current = null;
+        window._currentTutorialNum = null;
+        if (window.setTutorialFigurenGesperrt) window.setTutorialFigurenGesperrt(false);
+        socket.emit('get_tutorials');
+      }, 5000);
+    };
     const onGameState = (state) => {
+      clearTimeout(waechter);
       if (state.isPuzzle && state.isTutorial && !window._tutorialGaveUp) {
         tutorialAttemptRoom.current = state.roomId;
         setTutorialAttemptState(state);
       }
     };
+    socket.on('connect', onConnect);
     const onError = (msg) => {
       // Der Start ist gescheitert: die Figuren-Sperre (s. startTutorialAttempt)
       // darf nicht auf ein Gespraech warten, das nie kommt.
@@ -109,7 +128,7 @@ function useTutorialFlow(open) {
     };
     socket.on('game_state', onGameState);
     socket.on('puzzle_error', onError);
-    return () => { socket.off('game_state', onGameState); socket.off('puzzle_error', onError); };
+    return () => { clearTimeout(waechter); socket.off('connect', onConnect); socket.off('game_state', onGameState); socket.off('puzzle_error', onError); };
   }, [open, notify]);
 
   // Show the Monia-Bot intro textbox when a stage's board first loads (and
@@ -128,13 +147,17 @@ function useTutorialFlow(open) {
     if (tutorialAttemptState.roomId !== tutorialRoomIdRef.current) {
       tutorialRoomIdRef.current = tutorialAttemptState.roomId;
       tutorialIntroShownRef.current = null;
+      // Retry: derselbe Versuch von vorn, aber OHNE die Einleitung noch einmal abzuspielen (Marke setzt der Retry-Knopf im Kampffeld).
+      const retry = !!window._ppTutorialRetry;
+      window._ppTutorialRetry = false;
+      if (retry && window._currentTutorialNum) tutorialIntroShownRef.current = window._currentTutorialNum;
       // Neuer Durchgang (auch ein Retry): Gegner ist, wer zuerst spricht.
       if (window.setTutorialGegner && window.tutorialErsterSprecher) {
         window.setTutorialGegner(window.tutorialErsterSprecher(window._currentTutorialNum));
       }
       // ... und die Helden-Figuren warten wieder auf das Ende der Einleitung.
       if (window.setTutorialFigurenGesperrt) {
-        window.setTutorialFigurenGesperrt(!!(window.TUTORIAL_SCRIPTS || {})[window._currentTutorialNum]?.intro);
+        window.setTutorialFigurenGesperrt(!retry && !!(window.TUTORIAL_SCRIPTS || {})[window._currentTutorialNum]?.intro);
       }
     }
     const num = window._currentTutorialNum;
@@ -196,12 +219,12 @@ function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="menu-popup-dither pp-fenster" style={{ background: 'var(--bg2)', width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
-        <div className="pp-fenster-kopf" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' }}>
+      <div className="menu-popup-dither pp-fenster" style={{ background: 'var(--bg2)', width: 'min(440px, calc(94 * var(--vw)))', maxHeight: 'calc(94 * var(--vh))', display: 'flex', flexDirection: 'column' }}>
+        <div className="pp-fenster-kopf" style={{ padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative', flexShrink: 0 }}>
           <h3 className="orbit-font title-outline" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)', margin: 0, whiteSpace: 'nowrap', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>HOW TO PLAY</h3>
           <button className="btn" onClick={onClose} style={{ padding: '2px 10px', fontSize: 10 }}>✕</button>
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '10px 20px 20px' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 20px 18px' }}>
           {tutorialList === null ? (
             <div style={{ color: 'var(--text2)', textAlign: 'center', padding: 30, fontSize: 13 }}>Loading tutorials...</div>
           ) : tutorialList.length === 0 ? (
@@ -210,7 +233,7 @@ function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
             tutorialList.map((t) => (
               <button key={t.tutorialId} className="btn" disabled={t.locked}
                 onClick={() => { if (!t.locked) onStart(t); }}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginBottom: 4, borderColor: 'rgba(251,30,169,.25)', color: t.locked ? 'var(--text2)' : 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start', opacity: t.locked ? 0.55 : 1, cursor: t.locked ? 'not-allowed' : 'pointer' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', fontSize: 13, marginBottom: 3, borderColor: 'rgba(251,30,169,.25)', color: t.locked ? 'var(--text2)' : 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start', opacity: t.locked ? 0.55 : 1, cursor: t.locked ? 'not-allowed' : 'pointer' }}>
                 <span style={{ color: t.locked ? 'var(--text2)' : (t.completed ? '#4ceb70' : 'var(--bg4)'), fontSize: 16, width: 20, textAlign: 'center' }}>
                   {t.locked ? '🔒' : (t.completed ? '✓' : '○')}
                 </span>
@@ -224,7 +247,7 @@ function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
           )}
           {/* Always-available rules entry — bottom-most, never locked. */}
           <button className="btn" onClick={onViewRules}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginTop: 10, borderColor: 'rgba(251,30,169,.45)', color: 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start', cursor: 'pointer' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', fontSize: 13, marginTop: 8, borderColor: 'rgba(251,30,169,.45)', color: 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start', cursor: 'pointer' }}>
             <span style={{ color: '#fb1ea9', fontSize: 16, width: 20, textAlign: 'center' }}>📜</span>
             <span style={{ flex: 1, fontWeight: 700 }}>View Rules</span>
           </button>
@@ -327,6 +350,7 @@ function AnimatedTitleBackdrop() {
       const size = 2 + Math.random() * 5;
       return {
         size,
+        px: Math.max(2, Math.round(size / 2) * 2),   // W86u2: Pixelart — Quadrat in ganzen Kunstpixeln (2/4/6 px), kein Rundkorn mit Schein
         dur: 7 + Math.random() * 9,
         delay: -Math.random() * 16,
         left: Math.random() * 100,
@@ -352,17 +376,17 @@ function AnimatedTitleBackdrop() {
             panel and gets no flash either — so the whole laser reads as one uniform
             piece. (The jagged bolts render ABOVE the characters — see below.) */}
         <div className="anim-lightning">
-          <div className="anim-lflash anim-lflash-impact" />
-          <div className="anim-lflash anim-lflash-ambient" />
+          <PpVerlauf className="anim-lflash anim-lflash-impact" retroBlend="screen" gradient="radial-gradient(circle at 46% 26%, rgba(189,220,239,.95), rgba(102,182,255,.35) 42%, transparent 72%)" />
+          <PpVerlauf className="anim-lflash anim-lflash-ambient" retroBlend="screen" gradient="radial-gradient(circle at 62% 22%, rgba(179,216,249,.9), rgba(102,182,255,.3) 40%, transparent 70%)" />
         </div>
-        <div className="anim-flash" />
+        <PpVerlauf className="anim-flash" retroBlend="screen" gradient="radial-gradient(circle at 56% 41%, #fff, rgba(255,251,210,.55) 30%, transparent 58%)" />
         {/* Vignette also renders BELOW the characters, for the same reason as the
             flash: it's a full-screen dark radial, and golem is pinned to the right
             edge where the vignette is darkest — so above the characters it would
             dim golem's beam while the central burst (in the panel, above the
             vignette) stays bright, breaking the seam. Below the characters it
             frames only the background and leaves every sprite at its true colour. */}
-        <div className="anim-vignette" />
+        <PpVerlauf className="anim-vignette" px={2} gradient="radial-gradient(circle at 50% 44%, transparent 48%, rgba(8,6,12,.2) 82%, rgba(8,6,12,.36) 100%)" />
         {/* 1 — hammer girl */}
         <div style={layer('hammer.png', { transformOrigin: '72% 28%', '--mx': 'calc(var(--abw,1vw) * 0.469)', '--my': 'calc(var(--abh,1vh) * -1.389)', '--mr': '2deg', animation: 'ab-floaty 4.2s ease-in-out -0.6s infinite' })} />
         {/* 2 — Explosionskern. ★ v1266 (Al 22.9.: „das Login-Menue ist
@@ -374,7 +398,7 @@ function AnimatedTitleBackdrop() {
             Drehpunkt und Takt wie zuvor. */}
         <div className="anim-explosion" style={layer('explosion.png', { transformOrigin: '52% 42%', animation: 'ab-coreTether 4.8s ease-in-out infinite' })} />
         {/* 3 — central bloom */}
-        <div className="anim-bloom" />
+        <PpVerlauf className="anim-bloom" retroBlend="screen" gradient="radial-gradient(circle, rgba(255,241,150,.4), rgba(255,155,58,.12) 24%, transparent 46%)" />
         {/* 4 — Broghan (right shooter), nudged flush to the right edge */}
         <div style={{ position: 'absolute', inset: 0, transform: 'translate(calc(var(--abw,1vw) * 5.781), calc(var(--abh,1vh) * 0.278))' }}>
           <div style={layer('golem.png', { animation: 'ab-broghanTether 4.8s ease-in-out infinite' })} />
@@ -402,12 +426,15 @@ function AnimatedTitleBackdrop() {
             character, so they jolt in sync with the scene. */}
         <div className="anim-lightning">
           <svg className="anim-bolt anim-bolt-a" viewBox="0 0 100 400" preserveAspectRatio="none" aria-hidden="true">
+            <polyline className="anim-bolt-rand" points="52,0 40,70 62,80 38,150 60,165 34,240 58,255 30,340 50,360 42,400" />
             <polyline points="52,0 40,70 62,80 38,150 60,165 34,240 58,255 30,340 50,360 42,400" />
           </svg>
           <svg className="anim-bolt anim-bolt-b" viewBox="0 0 100 400" preserveAspectRatio="none" aria-hidden="true">
+            <polyline className="anim-bolt-rand" points="48,0 62,75 38,88 60,160 36,175 58,250 34,265 56,345 40,375 50,400" />
             <polyline points="48,0 62,75 38,88 60,160 36,175 58,250 34,265 56,345 40,375 50,400" />
           </svg>
           <svg className="anim-bolt anim-bolt-c" viewBox="0 0 100 400" preserveAspectRatio="none" aria-hidden="true">
+            <polyline className="anim-bolt-rand" points="50,0 58,80 40,92 60,175 38,190 56,270 36,285 52,370 46,400" />
             <polyline points="50,0 58,80 40,92 60,175 38,190 56,270 36,285 52,370 46,400" />
           </svg>
         </div>
@@ -416,8 +443,8 @@ function AnimatedTitleBackdrop() {
           {embers.map((e, i) => (
             <span key={i} style={{
               position: 'absolute', bottom: 'calc(var(--abh,1vh) * -1.296)', left: e.left.toFixed(2) + '%',
-              width: e.size.toFixed(1) + 'px', height: e.size.toFixed(1) + 'px', borderRadius: '50%',
-              background: e.color, boxShadow: '0 0 ' + (e.size * 2.4).toFixed(1) + 'px ' + e.color,
+              width: e.px + 'px', height: e.px + 'px',
+              background: e.color,
               opacity: 0, animation: 'ab-emberrise ' + e.dur.toFixed(1) + 's linear ' + e.delay.toFixed(1) + 's infinite',
               '--drift': e.drift + 'vw',
             }} />
@@ -495,48 +522,90 @@ function TapBackdropCanvas({ hostRef }) {
       Promise.all(NAMES.map(n => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = DIR + n + '.png'; }))).then(list => {
         loading = false; if (disposed || list.some(x => !x)) return;
         // vorskalieren: Bildschirmmass der Buehne (S = Pixel je Buehnenpixel), spart jedem Bild das Herunterrechnen von 1920x1080
-        const sc = Math.min(1, S * 1.25); imgs = {};
+        const sc = Math.min(1, S); imgs = {};   // ★ W86u2: genau Bildschirmmass (1 : 1 auf die Kunstpixel-Leinwand), keine Zwischenverkleinerung
         list.forEach((im, i) => {
           const n = NAMES[i], rf = ANIM_SPRITE_RAHMEN[n + '.png'];
           // Figuren auf ihren sichtbaren Kasten zuschneiden (wie die DOM-Kulisse): nur dieser Teil wird pro Bild gezeichnet
           const x0 = rf ? Math.max(0, rf[0] - 2) : 0, y0 = rf ? Math.max(0, rf[1] - 2) : 0, x1 = rf ? Math.min(1920, rf[2] + 2) : 1920, y1 = rf ? Math.min(1080, rf[3] + 2) : 1080;
           const c = document.createElement('canvas'); c.width = Math.max(1, Math.round((x1 - x0) * sc)); c.height = Math.max(1, Math.round((y1 - y0) * sc));
-          const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(im, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);
+          const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(im, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);   // Vorskalieren GEGLAETTET: 1920 px auf Handybreite per Naechster-Nachbar zerreisst das Motiv (Tap-Bildschirm sah kaputt aus)
           imgs[n] = { c, x0, y0, w: x1 - x0, h: y1 - y0 };
         });
         imgs._sc = sc;
       });
     };
+    // ★ W86u2 (Pixelart): die Kulisse wird in KUNSTPIXEL-Aufloesung gemalt (1 Canvas-Pixel = 2 CSS-px, per `image-rendering: pixelated` vergroessert):
+    // keine Glaettung (`imageSmoothingEnabled = false`), Versatz nur in ganzen Pixeln, keine Drehung, Schein als Dither-Muster statt Radialverlauf
+    // mit Alpha, Blitze als Pixellinien, Glut als Quadrate mit Dither-Ausblendung. (Vorher: weiche Verlaeufe, `globalAlpha`, gedrehte Ebenen.)
+    const KP = 1;   // 1 Leinwandpixel = 1 CSS-px (auf 2x-Displays 2x2 Geraetepixel, scharf): bei 2 CSS-px waren die Motive zu grob
     const resize = () => {
-      const w = window.innerWidth, h = window.innerHeight, dpr = Math.min(window.devicePixelRatio || 1, 1.5) * q;
-      W = Math.max(1, Math.round(w * dpr)); H = Math.max(1, Math.round(h * dpr)); cv.width = W; cv.height = H; S = Math.max(W / 1920, H / 1080);
+      const w = window.innerWidth, h = window.innerHeight;
+      W = Math.max(1, Math.round(w / KP * q)); H = Math.max(1, Math.round(h / KP * q)); cv.width = W; cv.height = H; S = Math.max(W / 1920, H / 1080);
+      cv.style.imageRendering = 'pixelated';
+      const g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
+    };
+    // Dither-Kachel (4x4) in Farbe `col`, Stufe 0..16 → CanvasPattern (gemerkt)
+    const muster = (() => {
+      const cache = new Map();
+      return (g, col, stufe) => {
+        const k = col + stufe; let m = cache.get(k); if (m) return m;
+        const t = document.createElement('canvas'); t.width = 4; t.height = 4; const c = t.getContext('2d'); c.fillStyle = col;
+        for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) if (window.ppBayer(x, y) < stufe / 16) c.fillRect(x, y, 1, 1);
+        m = g.createPattern(t, 'repeat'); cache.set(k, m); return m;
+      };
+    })();
+    // Pixelkreis aus Zeilenbalken (kein Vektorrand): Muster `stufe` fuellt alle Pixel innerhalb `r`
+    const scheibe = (g, cx, cy, r, mus) => {
+      g.fillStyle = mus; cx = Math.round(cx); cy = Math.round(cy); r = Math.round(r);
+      for (let y = -r; y <= r; y++) { const hw = Math.floor(Math.sqrt(r * r - y * y)); g.fillRect(cx - hw, cy + y, 2 * hw + 1, 1); }
+    };
+    const pixelLinie = (g, x0, y0, x1, y1, dick) => {
+      x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
+      const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let err = dx + dy;
+      for (;;) { g.fillRect(x0 - (dick >> 1), y0 - (dick >> 1), dick, dick); if (x0 === x1 && y0 === y1) break; const e2 = 2 * err; if (e2 >= dy) { err += dy; x0 += sx; } if (e2 <= dx) { err += dx; y0 += sy; } }
     };
     const draw = (now) => {
       if (!imgs) return; const g = cv.getContext('2d'), t = now / 1000, tau = t + 0.1, pc = (tau % 10) / 10 * 100, sc = imgs._sc, k = S / sc;
+      g.imageSmoothingEnabled = false;
       // Kamera: 80 s Hin- und Rueckfahrt, leichter Zoom
-      const ph = (t % 80) / 80, e = 0.5 - 0.5 * Math.cos(ph * Math.PI * 2), zoom = 1.04;   // fester Zoom: ein sich staendig aenderndes Mass skaliert jede Ebene in jedem Bild neu (Flimmern)
+      const ph = (t % 80) / 80, e = 0.5 - 0.5 * Math.cos(ph * Math.PI * 2), zoom = 1;   // fester Zoom (★ W86u2: 1 — ein Zoom ≠ 1 vergroessert die Kunstpixel ungleichmaessig); ein sich aenderndes Mass wuerde jede Ebene in jedem Bild neu skalieren (Flimmern)
       const viewW = W / S, ramp = Math.max(0, (1920 - viewW / zoom) / 2 - 10), camX = lerp(ramp, -ramp, e), camY = lerp(-14, 14, e), sh = shakeAt(pc);
       g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#12101f'; g.fillRect(0, 0, W, H);
-      g.setTransform(S * zoom, 0, 0, S * zoom, W / 2 - 960 * S * zoom + camX * S * zoom + sh[0] * S * zoom, H / 2 - 540 * S * zoom + camY * S * zoom + sh[1] * S * zoom);
+      // Versatz der ganzen Buehne nur in ganzen Pixeln
+      g.setTransform(S * zoom, 0, 0, S * zoom, Math.round(W / 2 - 960 * S * zoom + camX * S * zoom + sh[0] * S * zoom), Math.round(H / 2 - 540 * S * zoom + camY * S * zoom + sh[1] * S * zoom));
       g.drawImage(imgs.background.c, -38.4, -21.6, 1996.8, 1123.2);
       const aI = kfLin(KF_STRIKE, pc), aA = kfLin(KF_AMB, ((tau % 13) / 13) * 100);
-      const glow = (cx, cy, R, a, col) => { if (a < 0.02) return; const gr = g.createRadialGradient(cx, cy, 0, cx, cy, R); gr.addColorStop(0, col + 'ff'); gr.addColorStop(0.45, col + '55'); gr.addColorStop(1, col + '00'); g.globalAlpha = Math.min(1, a); g.globalCompositeOperation = 'screen'; g.fillStyle = gr; g.fillRect(cx - R, cy - R, 2 * R, 2 * R); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; };
+      // Schein: fuenf Pixelringe, Dichte nach aussen abnehmend (Bayer-Dither) — Bildschirmpixel, daher ohne Buehnen-Transformation
+      const glow = (cx, cy, R, a, col) => {
+        if (a < 0.04) return; const m = g.getTransform(); g.setTransform(1, 0, 0, 1, 0, 0);
+        const px = m.a * cx + m.e, py = m.d * cy + m.f, pr = R * m.a, G = [0.9, 0.55, 0.3, 0.14, 0.05];
+        for (let i = 4; i >= 0; i--) { const stufe = Math.round(Math.min(1, a * G[i]) * 16); if (stufe > 0) scheibe(g, px, py, pr * (i + 1) / 5, muster(g, col, stufe)); }
+        g.setTransform(m);
+      };
       glow(883, 281, 900, aI * 0.7, '#66b6ff'); glow(1190, 238, 900, aA * 0.6, '#66b6ff');
       if ((pc >= 1 && pc < 5) || (pc >= 50 && pc < 54)) glow(1075, 443, 700, pc < 5 ? 0.45 : 0.4, '#fffbd2');
       const fl2 = (dur, delay, mx, my, mr) => { const f = floaty(tau, dur, delay); return [mx * f, my * f, mr * f]; }, tp = floaty(tau, 4.8, 0);
-      const lay = (name, ox, oy, tx, ty, rot, sca, wx, wy) => { g.save(); g.translate(ox * 1920 + tx + (wx || 0), oy * 1080 + ty + (wy || 0)); g.rotate(rot * Math.PI / 180); if (sca && sca !== 1) g.scale(sca, sca); const I = imgs[name]; g.drawImage(I.c, I.x0 - ox * 1920, I.y0 - oy * 1080, I.w, I.h); g.restore(); };
+      // Ebene: nur Versatz (ganze Bildschirmpixel), keine Drehung/Skalierung — die Schwebebewegung bleibt, die Neigung (+-4 Grad) entfaellt
+      const lay = (name, ox, oy, tx, ty, rot, sca, wx, wy) => { g.save(); const m = g.getTransform(); const X = ox * 1920 + tx + (wx || 0), Y = oy * 1080 + ty + (wy || 0);
+        g.setTransform(m.a, 0, 0, m.d, Math.round(m.a * X + m.e), Math.round(m.d * Y + m.f)); const I = imgs[name]; g.drawImage(I.c, I.x0 - ox * 1920, I.y0 - oy * 1080, I.w, I.h); g.restore(); };
       let a = fl2(4.2, -0.6, 9, -15, 2); lay('hammer', 0.72, 0.28, a[0], a[1], a[2], 1);
-      lay('explosion', 0.52, 0.42, 0, 4 * tp, 0, 1 - 0.021 * tp);
+      lay('explosion', 0.52, 0.42, 0, 4 * tp, 0, 1);
       lay('golem', 0.5, 0.5, -9 * tp, 4 * tp, 0, 1, 111, 3);
       a = fl2(6, -2, -11, -15, 2.6); lay('horned', 0.8, 1, a[0], a[1], a[2], 1, 0, 161);
       a = fl2(5, 0, 0, -12, -1.4); lay('angel', 0.2, 0.3, a[0], a[1], a[2], 1);
       a = fl2(6.5, -1.5, 4, -9, 1); lay('blonde', 0.2, 0.5, a[0], a[1], a[2], 1);
       lay('rabbit', 0.5, 0.5, 9 * tp, 4 * tp, 0, 1);
       a = fl2(5.5, -2.5, 8, -14, -2); lay('ninja', 0.16, 0.8, a[0], a[1], a[2], 1, 0, 215);
-      for (const [bx, bw, kind, pts] of BOLTS) { const al = kind === 'S' ? aI : aA; if (al < 0.1) continue; const P = pts.map(([px, py]) => [bx + px / 100 * bw, -21.6 + py / 400 * 670]);
-        g.lineJoin = 'round'; g.lineCap = 'round'; for (const [col, lw] of al > 0.5 ? [['#66b6ff', 11], ['#bddcef', 6], ['#e5f5fa', 3]] : [['#66b6ff', 5], ['#e5f5fa', 2]]) { g.strokeStyle = col; g.lineWidth = lw; g.beginPath(); P.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke(); } }
-      for (const m of EMB) { const c = (((tau - m.delay) / m.dur) % 1 + 1) % 1, y = 1080 + 14 - m.size + lerp(20, -1210, c), x = m.left + m.drift * c, op = c < 0.08 ? 0.95 * c / 0.08 : (c < 0.78 ? lerp(0.95, 0.7, (c - 0.08) / 0.7) : lerp(0.7, 0, (c - 0.78) / 0.22)); if (y < -12 || y > 1090 || op < 0.05) continue; g.globalAlpha = op; g.fillStyle = m.col; const z = Math.max(4, Math.round(m.size / 2) * 2); g.fillRect(Math.round(x), Math.round(y), z, z); }
-      g.globalAlpha = 1;
+      // Blitze: Pixellinien (Bresenham) in drei Lagen — aussen blau, Mitte hell, Kern weiss
+      { const m = g.getTransform(); g.setTransform(1, 0, 0, 1, 0, 0);
+        for (const [bx, bw, kind, pts] of BOLTS) { const al = kind === 'S' ? aI : aA; if (al < 0.1) continue; const P = pts.map(([px, py]) => [m.a * (bx + px / 100 * bw) + m.e, m.d * (-21.6 + py / 400 * 670) + m.f]);
+          for (const [col, dk] of al > 0.5 ? [['#66b6ff', 4], ['#bddcef', 2], ['#e5f5fa', 1]] : [['#66b6ff', 2], ['#e5f5fa', 1]]) { g.fillStyle = col; for (let i = 0; i + 1 < P.length; i++) pixelLinie(g, P[i][0], P[i][1], P[i + 1][0], P[i + 1][1], dk * 2); } }
+        g.setTransform(m); }
+      // Glut: Quadrate, Ausblenden per Dither-Muster statt Alpha
+      { const m = g.getTransform(); g.setTransform(1, 0, 0, 1, 0, 0);
+        for (const em of EMB) { const c = (((tau - em.delay) / em.dur) % 1 + 1) % 1, y = 1080 + 14 - em.size + lerp(20, -1210, c), x = em.left + em.drift * c, op = c < 0.08 ? 0.95 * c / 0.08 : (c < 0.78 ? lerp(0.95, 0.7, (c - 0.08) / 0.7) : lerp(0.7, 0, (c - 0.78) / 0.22)); if (y < -12 || y > 1090 || op < 0.05) continue;
+          const z = Math.max(2, Math.round(em.size * S * zoom)); g.fillStyle = muster(g, em.col, Math.max(1, Math.round(op * 16))); g.fillRect(Math.round(m.a * x + m.e), Math.round(m.d * y + m.f), z, z); }
+        g.setTransform(m); }
       a = fl2(3.4, -0.5, 14, -9, 3); lay('cat_top', 0.23, 0.05, a[0], a[1], a[2], 1);
       a = fl2(2.9, -0.8, -11, 9, -3); lay('cat_mid', 0.37, 0.3, a[0], a[1], a[2], 1);
       a = fl2(3.0, -1.7, 16, -12, 4); lay('cat_bottom', 0.05, 0.48, a[0], a[1], a[2], 1);
@@ -548,7 +617,7 @@ function TapBackdropCanvas({ hostRef }) {
       if (!visible()) {
         if (!hiddenSince) hiddenSince = now;
         if (imgs && now - hiddenSince > 5000) imgs = null;   // Speicher zurueckgeben
-        timer = setTimeout(() => { timer = 0; raf = requestAnimationFrame(tick); }, 500); return;
+        timer = setTimeout(() => { timer = 0; raf = (window.ppTaktRaf || requestAnimationFrame)(tick); }, 500); return;
       }
       hiddenSince = 0; if (!imgs) { resize(); load(); }
       if (frameGap <= FRAME + 1 || now - lastDraw >= frameGap - 4) {
@@ -558,9 +627,9 @@ function TapBackdropCanvas({ hostRef }) {
           if (q > 0.55) { q = Math.max(0.5, q - 0.25); imgs = null; resize(); }
           else if (frameGap < 30) frameGap = 1000 / 30; }
       }
-      raf = requestAnimationFrame(tick);
+      raf = (window.ppTaktRaf || requestAnimationFrame)(tick);      // ★ W86u2: 30 Hz im globalen Takt (Pixelart-Pipeline)
     };
-    resize(); raf = requestAnimationFrame(tick);
+    resize(); raf = (window.ppTaktRaf || requestAnimationFrame)(tick);
     const onResize = () => { resize(); if (imgs) { imgs = null; } };
     window.addEventListener('resize', onResize); window.addEventListener('orientationchange', onResize);
     return () => { disposed = true; if (raf) cancelAnimationFrame(raf); if (timer) clearTimeout(timer); window.removeEventListener('resize', onResize); window.removeEventListener('orientationchange', onResize); imgs = null; };
@@ -820,15 +889,15 @@ function AuthScreen() {
   // erreichbar.
   const Header = (
     <div className="auth-header">
+      {/* ★ W86u2 (Pixelart): die Glut hinter dem Logo als Dither-Pixelbild statt Radialverlauf mit Alpha (Ebene hinter dem Inhalt, `.auth-header` ist ein Stapelkontext) */}
+      <PpVerlauf className="auth-header-glut" px={4} gradient="radial-gradient(ellipse 46% 58% at 50% 46%, rgba(251,200,106,.5), rgba(227,116,53,.2) 38%, rgba(240,50,50,.06) 64%, transparent 92%)"
+        style={{ position: 'absolute', inset: 0, zIndex: -1, pointerEvents: 'none' }} />
       {/* Same wordmark logo as the main menu (data/logo.png), tinted + haloed
           with drifting particles. Scoped .auth-logo just fits it to the panel
           width (the menu sizes it for a full-width header). */}
       <div className="pp-logo-stack auth-logo">
         <LogoParticles />
-        <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
-        <div className="pp-logo-tint" aria-hidden="true"></div>
-        <div className="pp-logo-licht" aria-hidden="true"></div>
-        <div className="pp-logo-umriss" aria-hidden="true"></div>
+        <PpLogoBild />
       </div>
       <div className="orbit-font auth-subtitle">
         TRADING CARD GAME
@@ -1192,6 +1261,13 @@ function MenuCardBackground() {
 
   // Constant scroll speed: ~5s per row regardless of tile height.
   const duration = rows * 5;
+  // ★ W86u2 (Pixelart): die Kartenwand laeuft in 2-px-Schritten (steps) statt stufenlos — eine stufenlose Verschiebung malt jedes Bild auf
+  // Zwischenpixeln (Mischfarben); ausserdem backt die Pipeline Animationen > 8 s nicht. Schrittzahl = Kachelhoehe / 2 px.
+  const ppWandSchritte = (el) => {
+    if (!el || window.PP_RETRO) return;
+    const h = el.offsetHeight / 2;
+    if (h > 8) el.style.animationTimingFunction = 'steps(' + Math.max(2, Math.round(h / 2)) + ', end)';
+  };
   const tile = (
     <div className="menu-card-bg-tile">
       {grid.map((row, r) =>
@@ -1206,11 +1282,11 @@ function MenuCardBackground() {
 
   return (
     <div ref={rootRef} className="menu-card-bg" aria-hidden="true">
-      <div className="menu-card-bg-scroller" style={{ animationDuration: duration + 's' }}>
+      <div className="menu-card-bg-scroller" ref={ppWandSchritte} style={{ animationDuration: duration + 's' }}>
         {tile}
         {tile}
       </div>
-      <div className="menu-card-bg-veil" />
+      <PpVerlauf className="menu-card-bg-veil" px={4} retroGradient="radial-gradient(ellipse at center, rgba(8,6,12,.58) 0%, rgba(8,6,12,.78) 70%, rgba(8,6,12,.9) 100%)" gradient="radial-gradient(ellipse at center, rgba(8,6,12,.52) 0%, rgba(8,6,12,.76) 70%, rgba(8,6,12,.9) 100%)" />
     </div>
   );
 }
@@ -1484,6 +1560,7 @@ function PixelParticles({
   // Ohne beide Angaben verhaelt sich die Komponente exakt wie bisher.
   radial = false,
   farben = null,
+  gerade = true,      // ★ W86u2: Groesse auf gerade px runden (ganze Kunstpixel, 2 px) — auch fuer Quadrate; `false` = alte Zufallsgroesse
 }) {
   const particles = useMemo(() => {
     const arr = [];
@@ -1505,7 +1582,8 @@ function PixelParticles({
       }
       arr.push({
         top, left,
-        size:  minGroesse + Math.floor(Math.random() * (maxGroesse - minGroesse)),
+        size:  gerade ? Math.max(2, Math.round((minGroesse + Math.random() * (maxGroesse - minGroesse)) / 2) * 2)
+                      : minGroesse + Math.floor(Math.random() * (maxGroesse - minGroesse)),
         dur,
         delay: -Math.random() * dur,                     // negativ → mitten im Zyklus starten
         dx, dy,
@@ -1565,6 +1643,7 @@ function ScGlitzer() {
     anzahl={22}
     klasse="pp-sc-glitzer"
     teilchenKlasse="pp-sc-glitzer-teil"
+    gerade
     radial
     farben={SC_GLITZER_FARBEN}
     minGroesse={4}
@@ -1830,6 +1909,8 @@ function MainMenu() {
   // Tutorial state — the flow itself lives in the shared useTutorialFlow hook.
   const [tutorialBrowserOpen, setTutorialBrowserOpen] = useState(false);
   const { tutorialList, tutorialAttemptState, startTutorialAttempt, onTutorialAttemptLeave } = useTutorialFlow(tutorialBrowserOpen);
+  // Tutorial-Karten schon im Hauptmenue tropfenweise bereitlegen (der Start einer Mission soll nicht ruckeln).
+  useEffect(() => { const t = setTimeout(() => { if (window.ppTutorialVorwaermen) window.ppTutorialVorwaermen(); }, 3000); return () => clearTimeout(t); }, []);
 
   // Singleplayer lives in its own screen now (see SingleplayerScreen).
   // MainMenu just routes to it via setScreen('singleplayer').
@@ -2105,10 +2186,7 @@ function MainMenu() {
       <div className="pp-logo-wrap" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: panelTop != null ? panelTop : 160, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5, pointerEvents: 'none' }}>
         <div className="pp-logo-stack">
           <LogoParticles />
-          <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
-          <div className="pp-logo-tint" aria-hidden="true"></div>
-          <div className="pp-logo-licht" aria-hidden="true"></div>
-          <div className="pp-logo-umriss" aria-hidden="true"></div>
+          <PpLogoBild />
           {/* ★ v1264 (Al 22.9.): wandernder Foil-Glanz ueber dem
               Schriftzug, auf die Buchstaben maskiert (style.css,
               `.pp-glanz--logo`). */}
@@ -2348,7 +2426,7 @@ function MainMenu() {
                       </div>
                       {puzzles.map(p => (
                         <button key={p.puzzleId} className="btn" onClick={() => startPuzzleAttempt(p)}
-                          style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginBottom: 4, borderColor: diffColors[diff] + '44', color: 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start' }}>
+                          style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', fontSize: 13, marginBottom: 3, borderColor: diffColors[diff] + '44', color: 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start' }}>
                           <span style={{ color: p.completed ? '#4ceb70' : 'var(--bg4)', fontSize: 16, width: 20, textAlign: 'center' }}>{p.completed ? '✓' : '○'}</span>
                           <span style={{ flex: 1 }}>{p.name}</span>
                           {p.completed && <span style={{ fontSize: 9, color: 'var(--text2)' }}>CLEARED</span>}
@@ -3205,7 +3283,7 @@ function ProfileScreen() {
                   <span>{nextRank.name} ({nextMin})</span>
                 </div>
                 <div className="profile-elo-bar">
-                  <div className="profile-elo-fill" style={{ width: eloProgress + '%', background: `linear-gradient(90deg, ${rank.color}, ${nextRank.color})` }} />
+                  <div className="profile-elo-fill" style={{ width: eloProgress + '%', ...pxHintergrund(`linear-gradient(90deg, ${rank.color}, ${nextRank.color})`, 200, 6) }} />   {/* W86u2: Dither statt stufenlosem Rangverlauf */}
                 </div>
               </div>
             )}
@@ -3296,8 +3374,7 @@ function ProfileScreen() {
                 <div style={{ paddingTop: 9, paddingBottom: 9, borderBottom: '1px solid var(--bg4)' }}>
                   <div className="profile-section-label">NAME COLOR</div>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                    <input type="color" value={window.ppSnap ? window.ppSnap(color) : color} onChange={e => setColor(window.ppSnap ? window.ppSnap(e.target.value) : e.target.value)}
-                      style={{ width: 44, height: 34, border: '1px solid var(--bg4)', cursor: 'pointer', background: 'none', padding: 0 }} />
+                    <PPColorPicker value={window.ppSnap ? window.ppSnap(color) : color} onChange={c => setColor(window.ppSnap ? window.ppSnap(c) : c)} />
                     <span style={{ color, fontWeight: 700, fontSize: 18 }}>{user.username}</span>
                     <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 4 }}>Preview</span>
                   </div>
@@ -3718,11 +3795,8 @@ function PurchaseCelebration({ cx, cy, onDone }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    const ox = cx ?? canvas.width / 2;
-    const oy = cy ?? canvas.height / 2;
+    const ox = cx ?? window.innerWidth / 2;
+    const oy = cy ?? window.innerHeight / 2;
     const particles = [];
     const colors = ['#fad54a', '#f9ac20', '#f7f7ad', '#fb1ea9', '#1aedff', '#b1ff1a', '#f87420', '#ffffff'];
     const shapes = ['star', 'circle', 'diamond', 'spark'];
@@ -3752,49 +3826,10 @@ function PurchaseCelebration({ cx, cy, onDone }) {
         rotation: 0, rotSpeed: 0, gravity: 0,
       });
     }
-    let frame;
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      let alive = false;
-      for (const p of particles) {
-        if (p.life <= 0) continue;
-        alive = true;
-        p.x += p.vx; p.y += p.vy; p.vy += p.gravity;
-        p.life -= p.decay; p.rotation += p.rotSpeed;
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.rotation);
-        ctx.globalAlpha = Math.max(0, p.life);
-        ctx.fillStyle = p.color;
-        ctx.shadowColor = p.color;
-        ctx.shadowBlur = 8;
-        const s = p.size * (0.5 + p.life * 0.5);
-        if (p.shape === 'circle') {
-          ctx.beginPath(); ctx.arc(0, 0, s, 0, Math.PI * 2); ctx.fill();
-        } else if (p.shape === 'diamond') {
-          ctx.beginPath(); ctx.moveTo(0, -s); ctx.lineTo(s * 0.6, 0); ctx.lineTo(0, s); ctx.lineTo(-s * 0.6, 0); ctx.closePath(); ctx.fill();
-        } else if (p.shape === 'star') {
-          ctx.beginPath();
-          for (let j = 0; j < 5; j++) {
-            const a = (j * Math.PI * 2 / 5) - Math.PI / 2;
-            const r = j % 2 === 0 ? s : s * 0.4;
-            j === 0 ? ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r) : ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-            const a2 = ((j + 0.5) * Math.PI * 2 / 5) - Math.PI / 2;
-            ctx.lineTo(Math.cos(a2) * s * 0.4, Math.sin(a2) * s * 0.4);
-          }
-          ctx.closePath(); ctx.fill();
-        } else {
-          ctx.fillRect(-s, -1, s * 2, 2);
-          ctx.fillRect(-1, -s, 2, s * 2);
-        }
-        ctx.restore();
-      }
-      if (alive) frame = requestAnimationFrame(draw);
-      else onDone();
-    };
-    frame = requestAnimationFrame(draw);
+    // ★ W86u2 (Pixelart): gezeichnet von `ppPixelPartikel` (app-shared.jsx) — ganze Kunstpixel, 30 Hz, Dither statt Alpha, keine Drehung/Weichzeichner.
+    const stopp = window.ppPixelPartikel(canvas, particles, { px: 2, onFertig: onDone, maxMs: 2500 });
     const timer = setTimeout(onDone, 2500);
-    return () => { cancelAnimationFrame(frame); clearTimeout(timer); };
+    return () => { stopp(); clearTimeout(timer); };
   }, []);
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 99999, pointerEvents: 'none' }}>
@@ -4434,7 +4469,7 @@ function ShopScreen() {
       {randomReveal && (
         <div className="modal-overlay" style={{ zIndex: 90000 }} onClick={() => setRandomReveal(null)}>
           <div className="shop-reveal-modal animate-in" onClick={e => e.stopPropagation()}>
-            <div className="shop-reveal-glow" />
+            <PpVerlauf className="shop-reveal-glow" px={4} gradient="radial-gradient(circle, rgba(250,213,74,.25) 0%, rgba(249,172,32,.1) 40%, transparent 70%)" />
             <div className="shop-reveal-img-wrap">
               <img src={randomReveal.imgUrl} draggable={false} />
             </div>
@@ -4993,73 +5028,64 @@ function RulesScreen({ onBack }) {
 //  Kachel nutzt denselben Baustein mit Goldton und einem Bild, das wie
 //  ein Spielautomat durch die freigeschalteten Gegner laeuft.
 // ═══════════════════════════════════════════════════════════════
-function VsCpuKachel({ farbe, zufall, disabled, onClick, bild, name, fuss }) {
+function VsCpuKachel({ farbe, zufall, disabled, onClick, bild, name, fuss, klasse, zusatz, stempel }) {
   const [hover, setHover] = useState(false);
   // Jede Kachel glaenzt zu ihrer eigenen Zeit, nicht alle im Gleichschritt.
   const verzug = useMemo(() => (0.4 + Math.random() * 5).toFixed(2) + 's', []);
   return (
-    <button className={'vscpu-kachel' + (zufall ? ' vscpu-kachel--zufall' : '')}
+    <button className={'vscpu-kachel' + (zufall ? ' vscpu-kachel--zufall' : '') + (klasse ? ' ' + klasse : '')}
       disabled={disabled} onClick={onClick}
       style={{ '--kachel-farbe': farbe }}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
-      <span className="vscpu-ecken" aria-hidden="true"><i /><i /><i /><i /></span>
+      {zusatz}
       <div className="vscpu-bild" style={{ '--glanz-verzug': verzug }}>
         {bild(hover && !disabled)}
         <span className="vscpu-bild-vignette" aria-hidden="true" />
         <GlanzBand klasse="vscpu-glanz" />
+        {stempel && <span className="vscpu-stempel">{stempel}</span>}
       </div>
-      <div className="vscpu-name orbit-font">{name}</div>
+      <div className="vscpu-name-band">
+        <div className="vscpu-name orbit-font">{name}</div>
+      </div>
       <div className="vscpu-fuss">{fuss}</div>
     </button>
   );
 }
 
-// ★ v1408 (Al 25.9.): ein ECHTER Würfel — 3D-Würfel aus sechs Seiten mit
-// Augen. Beim Hover wird immer wieder geworfen: Er hüpft hoch, über-
-// schlägt sich mehrfach und landet auf einer zufälligen Zahl, liegt kurz
-// still und wird erneut geworfen. Ohne Hover ruht er schräg auf seiner
-// letzten Zahl.
+// ★ v1408 (Al 25.9.): ein Würfel, der beim Hover immer wieder geworfen wird: er hüpft hoch, zeigt im Flug rasch wechselnde Augenzahlen und
+// landet auf einer zufälligen Zahl, liegt kurz still und wird erneut geworfen. Ohne Hover ruht er auf seiner letzten Zahl.
+// ★ W86u2 (Pixelart): FLACHER Pixelwürfel statt 3D-Quader (rotateX/rotateY, Perspektive, Rundungen) — die Überschläge sind Augenwechsel im
+// 80-ms-Takt, der Sprung eine reine Verschiebung; Flächen, Ränder und Augen sind harte Rechtecke (Palette).
 const WUERFEL_AUGEN = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
-// Seite → Drehung des Würfels, die sie nach vorn bringt (Grad, x/y).
-const WUERFEL_LAGE = { 1: [0, 0], 6: [0, 180], 3: [0, -90], 4: [0, 90], 5: [-90, 0], 2: [90, 0] };
-const WUERFEL_SEITEN = [
-  ['vorn', 1], ['hinten', 6], ['rechts', 3], ['links', 4], ['oben', 5], ['unten', 2],
-];
 function RollenderWuerfel({ rollt }) {
   const ruhig = typeof window !== 'undefined' && window.matchMedia
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const [wurf, setWurf] = useState({ x: 0, y: 0, n: 0, zahl: 5 });
+  const [wurf, setWurf] = useState({ n: 0, zahl: 5 });
   useEffect(() => {
     if (!rollt || ruhig) return;
-    const werfen = () => setWurf(w => {
-      let zahl = 1 + Math.floor(Math.random() * 6);
-      if (zahl === w.zahl) zahl = (zahl % 6) + 1;      // jedes Mal eine andere Zahl
-      const [zx, zy] = WUERFEL_LAGE[zahl];
-      // Immer vorwärts drehen: zur nächsten vollen Umdrehung aufrunden,
-      // ein bis zwei Extra-Überschläge je Achse, dann die Ziellage.
-      const weiter = (alt, ziel, extra) => Math.ceil(alt / 360) * 360 + extra * 360 + ziel;
-      return {
-        x: weiter(w.x, zx, 1 + Math.floor(Math.random() * 2)),
-        y: weiter(w.y, zy, 1 + Math.floor(Math.random() * 2)),
-        n: w.n + 1, zahl,
-      };
-    });
+    let timers = [], letzte = 0;
+    const werfen = () => {
+      timers.forEach(clearTimeout); timers = [];
+      setWurf(w => {
+        let zahl = 1 + Math.floor(Math.random() * 6);
+        if (zahl === w.zahl) zahl = (zahl % 6) + 1;      // jedes Mal eine andere Zahl
+        letzte = zahl;
+        return { n: w.n + 1, zahl: 1 + Math.floor(Math.random() * 6) };
+      });
+      // Flug: drei wechselnde Zahlen, dann die Ziel-Zahl (ein Bild je 80 ms)
+      for (let k = 1; k <= 3; k++) timers.push(setTimeout(() => setWurf(w => ({ n: w.n, zahl: k < 3 ? 1 + Math.floor(Math.random() * 6) : (letzte || w.zahl) })), 80 * k));
+    };
     werfen();
-    // v1409 (Al 25.9.): drastisch schneller — ein Wurf alle 0,4 s; Flug-
-    // und Sprungdauer in style.css (.vscpu-wuerfel / vscpuSprung) passen dazu.
+    // v1409 (Al 25.9.): drastisch schneller — ein Wurf alle 0,4 s; Sprungdauer in style.css (.vscpu-wuerfel-sprung / vscpuSprung) passt dazu.
     const iv = setInterval(werfen, 400);
-    return () => clearInterval(iv);
+    return () => { clearInterval(iv); timers.forEach(clearTimeout); };
   }, [rollt, ruhig]);
   return (
     <span className="vscpu-wuerfel-buehne" aria-hidden="true">
       <span key={wurf.n} className={'vscpu-wuerfel-sprung' + (wurf.n > 0 ? ' vscpu-wuerfel-sprung--an' : '')}>
-        <span className="vscpu-wuerfel" style={{ transform: `rotateX(${wurf.x}deg) rotateY(${wurf.y}deg)` }}>
-          {WUERFEL_SEITEN.map(([seite, zahl]) => (
-            <span key={seite} className={'vscpu-wuerfel-seite vscpu-wuerfel-' + seite}>
-              {Array.from({ length: 9 }, (_, i) => (
-                <i key={i} className={WUERFEL_AUGEN[zahl].includes(i) ? 'an' : ''} />
-              ))}
-            </span>
+        <span className={'vscpu-wuerfel vscpu-wuerfel-z' + wurf.zahl}>
+          {Array.from({ length: 9 }, (_, i) => (
+            <i key={i} className={WUERFEL_AUGEN[wurf.zahl].includes(i) ? 'an' : ''} />
           ))}
         </span>
       </span>
@@ -5212,6 +5238,7 @@ function GuestRegisterModal({ onClose, starterDeckId }) {
   );
 }
 
+let _ppTutorialAssetsCache = null;   // Antwort von /api/tutorial-assets, fuer die Heldenfiguren unten
 function SingleplayerScreen() {
   // Antonia-Praesenz auch hier, fuer den Tutorial-Zweig weiter unten.
   const antoniaHere2 = useAntoniaPresent();
@@ -5224,12 +5251,13 @@ function SingleplayerScreen() {
     const idle = (fn, ms) => { const t = setTimeout(() => { if (weg) return; if (window.requestIdleCallback) requestIdleCallback(fn, { timeout: 2500 }); else fn(); }, ms); timers.push(t); };
     idle(async () => {
       try {
-        const r = await fetch('/api/tutorial-assets', { headers: window.AUTH_TOKEN ? { 'x-auth-token': window.AUTH_TOKEN } : {} });
-        if (!r.ok || weg) return;
-        const a = await r.json();
-        if (window.CardImageShim && window.CardImageShim.warmCards) window.CardImageShim.warmCards(a.cards, { heroes: a.heroes, abilities: a.abilities });
+        const a = (await window.ppTutorialVorwaermen()) || _ppTutorialAssetsCache;
+        if (!a || weg) return;
+        _ppTutorialAssetsCache = a;
         // Pixelbilder der grossen Zauber-Animation (kostet kalt Sekunden auf schwachen Handys, s. app-board.jsx).
         idle(() => { if (window.ppAnimVorwaermen) window.ppAnimVorwaermen('cataclysm'); }, 3500);
+        // Magic Hammer (Mission 1, Magic Hammer/Heavy Hit der Starterdecks): das erste Pixelieren kostete mitten im Kampf 0,3–0,4 s (Ruckler vor Beatos Tod).
+        idle(() => { if (window.ppAnimVorwaermen) window.ppAnimVorwaermen('magic_hammer', { w: 70, h: 90 }); }, 6500);
         const H = window.HeroIdleAnims;
         if (H && H.hole && H.slug) (a.heroes || []).forEach((n, i) => timers.push(setTimeout(() => { if (!weg) idle(() => { try { H.hole(H.slug(n)); } catch (e) { /* Vorladen ist optional */ } }, 0); }, 400 + i * 350)));
       } catch (e) { /* Vorladen ist optional */ }
@@ -5245,6 +5273,25 @@ function SingleplayerScreen() {
   const [search, setSearch] = useState('');
   const [showRegister, setShowRegister] = useState(false); // guest registration modal
   const [tutorialBrowserOpen, setTutorialBrowserOpen] = useState(false); // Tutorial Raccoon
+  // Kachelbreite: so viele Spalten wie passen, die Kacheln wachsen bis 300 px,
+  // damit der Rahmen auch bei wenigen Gegnern gefuellt wirkt. Gemessen wird in
+  // Layout-Pixeln (auf dem Handy liegt ein Zoom von .7 darueber).
+  const gitterRef = useRef(null);
+  const [kachel, setKachel] = useState({ breite: 248, spalten: 4 });
+  useEffect(() => {
+    const el = gitterRef.current; if (!el) return;
+    const rechne = () => {
+      const w = el.offsetWidth - 44;   // Innenabstand links/rechts
+      const mind = window.ppIsPhone && window.ppIsPhone() ? 204 : 248, luecke = 20;
+      const spalten = Math.max(1, Math.floor((w + luecke) / (mind + luecke)));
+      const breite = Math.max(mind, Math.min(304, Math.floor((w - (spalten - 1) * luecke) / spalten)));
+      setKachel(k => (k.breite === breite && k.spalten === spalten) ? k : { breite, spalten });
+    };
+    rechne();
+    const ro = (typeof ResizeObserver !== 'undefined') ? new ResizeObserver(rechne) : null;
+    if (ro) ro.observe(el); else window.addEventListener('resize', rechne);
+    return () => { if (ro) ro.disconnect(); else window.removeEventListener('resize', rechne); };
+  }, []);
   const [showRules, setShowRules] = useState(false); // in-place Rules overlay (guests)
   const cpuBattleRoom = useRef(null);
   const { tutorialList, tutorialAttemptState, startTutorialAttempt, onTutorialAttemptLeave } = useTutorialFlow(tutorialBrowserOpen);
@@ -5273,6 +5320,7 @@ function SingleplayerScreen() {
         const personal = mine?.decks || [];
         const sampleList = samples?.decks || [];
         setOpponents(gal?.opponents || []);
+        (gal?.opponents || []).slice(0, 3).forEach(o => window.ppDeckVorwaermen(o.warm, false));
         setPersonalDecks(personal);
         setSampleDecks(sampleList);
         // Bootstrap the dropdown from the user's saved default (custom
@@ -5320,8 +5368,11 @@ function SingleplayerScreen() {
         setCpuBattleState(state);
       }
     };
-    const onError = (msg) => {
+    const onError = (msg, meta) => {
       console.error('[SP cpu_battle_error]', msg);
+      setStarting(false);
+      // Server ausgelastet (Zulassungsgrenze): ein ruhiger Hinweis im Spielstil statt der roten Fehlermeldung.
+      if (meta && meta.busy && window.ppHinweis) { window.ppHinweis('The arena is packed right now!\nPlease try again in a minute.', { okText: 'OK' }); return; }
       notify('CPU battle error: ' + msg, 'error');
     };
     socket.on('game_state', onGameState);
@@ -5443,6 +5494,7 @@ function SingleplayerScreen() {
   // dessen Deck (`deckAdded`), laedt die Liste der eigenen Decks neu — der Victory-Screen bekommt sie als `sampleDecks`.
   useEffect(() => {
     const onUnlocked = async (data) => {
+      (data && data.opponents || []).forEach(o => o && window.ppDeckVorwaermen(o.warm, true));
       if (!data || !(data.opponents || []).some(o => o && o.deckAdded)) return;
       try { const r = await api('/sample-decks/owned'); if (r && r.decks) setSampleDecks(r.decks); } catch (e) { /* bleibt die alte Liste */ }
     };
@@ -5466,7 +5518,7 @@ function SingleplayerScreen() {
           const heroes = (d.heroes || []).map(h => h && h.hero).filter(Boolean);
           const abilities = (d.heroes || []).flatMap(h => h ? [h.ability1, h.ability2] : []).filter(Boolean);
           const names = Array.from(new Set([...(d.mainDeck || []), ...(d.potionDeck || []), ...heroes, ...abilities].map(nm).filter(Boolean)));
-          if (window.CardImageShim && window.CardImageShim.warmCards) window.CardImageShim.warmCards(names, { heroes, abilities });
+          if (window.CardImageShim && window.CardImageShim.warmDrip) window.CardImageShim.warmDrip(names, { heroes, abilities, front: true });
           const H = window.HeroIdleAnims;
           if (H && H.hole && H.slug) heroes.forEach((n, i) => timers.push(setTimeout(() => { if (!weg) { try { H.hole(H.slug(n)); } catch (e) { /* optional */ } } }, 600 + i * 400)));
         } catch (e) { /* Vorladen ist optional */ }
@@ -5628,7 +5680,7 @@ function SingleplayerScreen() {
           scrollt INNEN (`.vscpu-content`) — vorher scrollte die ganze
           Seite und der Kasten lief ohne Abschluss unten aus dem Bild. */}
       <div className="vscpu-rahmen ornate-frame pp-menuekasten">
-      <div className="vscpu-content" style={{ padding: '22px 22px 30px', boxSizing: 'border-box', width: '100%' }}>
+      <div className="vscpu-content" ref={gitterRef} style={{ padding: '22px 22px 30px', boxSizing: 'border-box', width: '100%' }}>
         {!hasAnyLegal && (
           <div style={{ color: '#fe7476', textAlign: 'center', padding: '12px 16px', marginBottom: 20, border: '1px solid #fe7476', borderRadius: 4, background: 'rgba(254,116,118,.08)', fontSize: 12 }}>
             You need at least one legal deck to play. Edit a deck or pick a starter deck first.
@@ -5643,51 +5695,40 @@ function SingleplayerScreen() {
           const showRaccoon = !!user?.isGuest && (!q || 'tutorial raccoon how to play smug mastermind antonia'.includes(q));
           const oppTiles = (opponents && visibleOpponents) ? visibleOpponents : [];
           const racColor = '#fb1ea9';
+          const bildB = kachel.breite - 32;   // Bildbreite = Kachel minus Rand und Innenabstand
           return (
-          <>
+          <div className="vscpu-mitte">
+          {/* Zierleiste ueber dem Gitter: Pixel-Streifen links und rechts, in der Mitte die Zahl der Gegner. */}
+          {oppTiles.length > 0 && (
+            <div className="vscpu-leiste" aria-hidden="true">
+              <span className="vscpu-leiste-streifen" />
+              <span className="vscpu-leiste-text orbit-font">{oppTiles.length} OPPONENT{oppTiles.length === 1 ? '' : 'S'} UNLOCKED</span>
+              <span className="vscpu-leiste-streifen" />
+            </div>
+          )}
           <div style={{
             display: 'grid',
-            // Kachel 232 px (Bild 208): im breiten Rahmen passen 6 je Zeile.
-            gridTemplateColumns: 'repeat(auto-fill, 232px)',
+            // Spaltenbreite kommt aus der Messung oben (`kachel`).
+            gridTemplateColumns: 'repeat(auto-fit, ' + kachel.breite + 'px)',
             justifyContent: 'center',
-            gap: 14,
+            gap: 20,
           }}>
             {showRaccoon && (
-              <button
-                key="__tutorial_raccoon"
-                // ★ v1264 (Al 22.9.): im Gastmodus genauso hervorgehoben
-                // wie der Gast-Knopf im Login — Schein + Foil-Glanz, damit
-                // der neue Spieler vom ersten Klick an derselben Spur folgt.
-                // Die Kachel ist ohnehin nur fuer Gaeste sichtbar.
-                className="pp-lotse vscpu-raccoon"
+              // ★ v1264 (Al 22.9.): im Gastmodus genauso hervorgehoben wie der
+              // Gast-Knopf im Login — Schein + Foil-Glanz, damit der neue Spieler
+              // vom ersten Klick an derselben Spur folgt. Die Kachel ist ohnehin
+              // nur fuer Gaeste sichtbar. Seit der Gegnerwahl-Ueberarbeitung im
+              // selben Rahmen wie die Gegner (Pink statt Rot).
+              <VsCpuKachel key="__tutorial_raccoon" farbe={racColor}
+                klasse="pp-lotse vscpu-raccoon vscpu-kachel--lotse"
                 disabled={starting}
                 onClick={() => setTutorialBrowserOpen(true)}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center',
-                  gap: 6, padding: 8,
-                  // Opaque (tint mixed into --bg2) so the dithered content
-                  // behind the tile doesn't show through it.
-                  background: 'color-mix(in srgb, ' + racColor + ' 8%, var(--bg2))',
-                  border: '2px solid ' + racColor,
-                  borderRadius: 6,
-                  boxShadow: '0 0 10px ' + racColor + '44',
-                  cursor: starting ? 'not-allowed' : 'pointer',
-                  opacity: starting ? 0.55 : 1,
-                  transition: 'transform .15s ease, box-shadow .15s ease',
-                  fontFamily: 'inherit', color: 'inherit',
-                }}
-                onMouseEnter={e => { if (!starting) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 0 18px ' + racColor + '88'; } }}
-                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 0 10px ' + racColor + '44'; }}
-              >
-                <LotsenGlanz />
-                <HeroArtCrop heroName="Smug Mastermind Antonia" width={208} />
-                <div className="orbit-font" style={{ fontSize: 16, color: racColor, textAlign: 'center', fontWeight: 700, lineHeight: 1.2, minHeight: '2.4em', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  Tutorial Raccoon
-                </div>
-                <div style={{ display: 'flex', gap: 6, fontSize: 13, marginTop: 'auto', color: racColor, fontWeight: 700 }}>
-                  ★ Learn to Play
-                </div>
-              </button>
+                zusatz={<LotsenGlanz />}
+                stempel="GUIDE"
+                bild={() => <HeroArtCrop heroName="Smug Mastermind Antonia" width={bildB} />}
+                name="Tutorial Raccoon"
+                fuss={<span className="vscpu-chip vscpu-chip--breit">★ Learn to Play</span>}
+              />
             )}
             {/* ★ v1370 (Als Wunsch): ZUFALLS-GEGNER als erste Kachel (oben
                 links). Zieht aus ALLEN freigeschalteten Gegnern — die Galerie
@@ -5703,8 +5744,9 @@ function SingleplayerScreen() {
                     const op = opponents[Math.floor(Math.random() * opponents.length)];
                     if (op) startBattle(op.id);
                   }}
-                  bild={(schnell) => <ZufallsGegnerBild gegner={opponents} schnell={schnell} width={208} />}
+                  bild={(schnell) => <ZufallsGegnerBild gegner={opponents} schnell={schnell} width={bildB} />}
                   name="Random Opponent"
+                  stempel="?"
                   fuss={<span className="vscpu-chip">{opponents.length} unlocked</span>}
                 />
               );
@@ -5715,7 +5757,8 @@ function SingleplayerScreen() {
                 <VsCpuKachel key={op.id} farbe="#f03232"
                   disabled={!hasAnyLegal || starting}
                   onClick={() => startBattle(op.id)}
-                  bild={() => <HeroArtCrop heroName={op.middleHero} width={208} />}
+                  bild={() => <HeroArtCrop heroName={op.middleHero} width={bildB} />}
+                  stempel={(op.wins || 0) > 0 ? '★ BEATEN' : null}
                   name={op.middleHero || op.name}
                   fuss={<>
                     {total > 0 ? (
@@ -5740,7 +5783,15 @@ function SingleplayerScreen() {
           {opponents !== null && opponents.length > 0 && visibleOpponents.length === 0 && (
             <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 40, fontSize: 13 }}>No opponents match “{search.trim()}”.</div>
           )}
-          </>
+          {/* Gast: Hinweis, wie es weitergeht (siehe unlockRandomOpponent im Server). */}
+          {user?.isGuest && oppTiles.length > 0 && (
+            <div className="vscpu-leiste vscpu-leiste--fuss" aria-hidden="true">
+              <span className="vscpu-leiste-streifen" />
+              <span className="vscpu-leiste-text orbit-font">WIN A DUEL TO UNLOCK THE NEXT FOE</span>
+              <span className="vscpu-leiste-streifen" />
+            </div>
+          )}
+          </div>
           );
         })()}
       </div>

@@ -272,6 +272,9 @@ const PP_BAYER4 = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]
 function ppBayer(x, y) { return (PP_BAYER4[y & 3][x & 3] + 0.5) / 16; }
 window.ppBayer = ppBayer;   // Pixelart-Animationen in app-board.jsx (ppSalve) dithern damit
 
+/** ★ W86z: laeuft die Pixelart-Bewegungs-Pipeline (public/pixel-anim.js)? Im Retro-Modus nicht — dort bleibt alles wie es war. */
+const ppPixelAnimAktiv = () => !!(window.PPPixelAnim && window.PPPixelAnim.KONFIG && window.PPPixelAnim.KONFIG.aktiv);
+
 const _ppPxCache = new Map();
 const PP_PX_CACHE_MAX = 800;
 /**
@@ -307,6 +310,13 @@ function ppPxBild(key, w, h, male, faktor = 4) {
       d[i + 2] = mix(f[2] | 0, d[i + 2]);
       d[i + 3] = Math.round(oa * 255);
     });
+    // ★ W86z: Pixelart-Abschluss — Alpha dazwischen wird Bayer-Dither (deckend oder leer), jede Farbe rastet auf die 256er-Palette ein.
+    if (ppPixelAnimAktiv()) for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+      const a = d[i + 3];
+      if (!a) continue;
+      if (a < 255) { if (a / 255 > ppBayer(p % w, (p / w) | 0)) d[i + 3] = 255; else { d[i + 3] = 0; continue; } }
+      if (window.ppSnapRgb) { const q = window.ppSnapRgb(d[i], d[i + 1], d[i + 2]); d[i] = q[0]; d[i + 1] = q[1]; d[i + 2] = q[2]; }
+    }
     kctx.putImageData(bild, 0, 0);
     const c = document.createElement('canvas');
     c.width = w * faktor; c.height = h * faktor;
@@ -314,6 +324,8 @@ function ppPxBild(key, w, h, male, faktor = 4) {
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(klein, 0, 0, c.width, c.height);
     url = c.toDataURL('image/png');
+    // Das kleine Kunstpixel-Bild merken: `PPPixelAnim.drehen` samplet gedrehte Sprites daraus (kein Dekodieren der data-URL).
+    if (url && ppPixelAnimAktiv()) window.PPPixelAnim.bildRegistrieren(url, klein);
   } catch { url = ''; }
   if (_ppPxCache.size >= PP_PX_CACHE_MAX) _ppPxCache.delete(_ppPxCache.keys().next().value);
   _ppPxCache.set(key, url);
@@ -379,17 +391,19 @@ function ppVerlaufLesen(g) {
   const m = String(g || '').match(/radial-gradient\((.*)\)\s*$/s);
   if (!m) return null;
   const teile = _ppTeile(m[1]);
-  let kreis = false, cx = 0.5, cy = 0.5;
+  let kreis = false, cx = 0.5, cy = 0.5, rxp = null, ryp = null;
   const istForm = (t) => /^(circle|ellipse|closest|farthest|at\s)/.test(t) || /\sat\s/.test(' ' + t);
   if (teile.length && istForm(teile[0])) {
     const kopf = teile.shift();
     kreis = /circle/.test(kopf);
+    const rr = kopf.match(/ellipse\s+(-?[\d.]+)%\s+(-?[\d.]+)%/);            // ★ W86u2: explizite Ellipsenradien (in % der Breite/Hoehe)
+    if (rr) { rxp = parseFloat(rr[1]) / 100; ryp = parseFloat(rr[2]) / 100; }
     const at = kopf.match(/at\s+(-?[\d.]+)%\s+(-?[\d.]+)%/);
     if (at) { cx = parseFloat(at[1]) / 100; cy = parseFloat(at[2]) / 100; }
     else if (/at\s+center/.test(kopf)) { cx = 0.5; cy = 0.5; }
   }
   const stopps = _ppStopps(teile);
-  return stopps ? { kreis, cx, cy, stopps } : null;
+  return stopps ? { kreis, cx, cy, stopps, rxp, ryp } : null;
 }
 
 /** Farbstopps lesen und ohne Lage gleichmaessig verteilen (CSS-Regel, vereinfacht). */
@@ -451,19 +465,21 @@ function _ppAufloesung(v, laengePx) {
  * (Elementgroesse) halten die Pixel quadratisch und ~2 px gross; ohne
  * Angabe wird ein Quadrat angenommen.
  */
-function ppPxVerlaufUrl(gradient, breitePx = 0, hoehePx = 0) {
+function ppPxVerlaufUrl(gradient, breitePx = 0, hoehePx = 0, pxGroesse = 0) {
   const v = ppVerlaufLesen(gradient);
   if (!v) return '';
   const W = breitePx > 0 ? breitePx : (hoehePx > 0 ? hoehePx : 1);
   const H = hoehePx > 0 ? hoehePx : W;
   const q = (x) => Math.max(1, Math.round(x / 4) * 4);           // Merk-Schluessel groeber
-  const nx = _ppAufloesung(v, breitePx > 0 ? q(W) : 0);
+  // ★ W86u2: `pxGroesse` (Kunstpixel in CSS-px, z. B. 4) — Bildschirmgrosse Schleier/Scheine (Titelkulisse) bekommen ein festes Raster
+  // statt der 160-Pixel-Obergrenze; die Pixel bleiben quadratisch und ganzzahlig gross.
+  const nx = pxGroesse > 0 ? Math.max(2, Math.min(720, Math.round(W / pxGroesse))) : _ppAufloesung(v, breitePx > 0 ? q(W) : 0);
   const ny = breitePx > 0 || hoehePx > 0 ? Math.max(2, Math.round(nx * H / W)) : nx;
   return ppPxBild('vl:' + nx + 'x' + ny + ':' + gradient, nx, ny, (setze) => {
     const cx = v.linear ? 0.5 : v.cx, cy = v.linear ? 0.5 : v.cy;
     const fx = Math.max(cx, 1 - cx) * W, fy = Math.max(cy, 1 - cy) * H;
     const rk = Math.hypot(fx, fy);                                  // Kreis: fernste Ecke
-    const rx = Math.SQRT2 * fx, ry = Math.SQRT2 * fy;               // Ellipse: fernste Ecke
+    const rx = v.rxp != null ? v.rxp * W : Math.SQRT2 * fx, ry = v.ryp != null ? v.ryp * H : Math.SQRT2 * fy;   // Ellipse: fernste Ecke bzw. die angegebenen Radien
     // Linear: CSS-Winkel (0deg = nach oben, 90deg = nach rechts); die
     // Verlaufslinie ist |W sin| + |H cos| lang.
     const wr = (v.winkel || 0) * Math.PI / 180, sn = Math.sin(wr), cs = Math.cos(wr);
@@ -1531,13 +1547,14 @@ function ppPixelieren(wurzel) {
     a.radius = radProzent ? Math.min(a.w, a.h) * parseFloat(cs.borderTopLeftRadius) / 100 : rad;
     if (!a.verlauf && (!bg || bg === 'none') && bgf[3] > 0.05 && rundGross && a.w > 0 && a.w <= 40) a.partikel = cs.backgroundColor;
     const bw = parseFloat(cs.borderTopWidth) || 0;
+    a.bl = parseFloat(cs.borderLeftWidth) || 0; a.bt = bw;      // ★ W86z: absolut positionierte Kinder (Halo) beziehen sich auf die Innenkante — Halo mittig auf die AUSSENkante setzen
     if (bw > 0 && cs.borderTopStyle === 'solid' && ppFarbe(cs.borderTopColor)[3] > 0.05
         && !_ppKeyframesAendernGroesse(cs.animationName)) {
       a.rahmen = { farbe: cs.borderTopColor, dicke: bw };
     }
     const scheine = _ppScheine(cs.boxShadow).concat(_ppScheine((cs.filter || '').match(/drop-shadow\(.*\)/)?.[0] || ''));
     if (scheine.length) a.schein = scheine.sort((p, q) => q.blur - p.blur)[0];
-    if (a.schein) a.position = cs.position;   // schon HIER lesen: ein Lesen nach den Schreibzugriffen (s. unten) erzwang je Element eine volle Stilberechnung (Layout-Thrashing, ~95 % der Pixelierzeit)
+    a.position = cs.position;                  // (immer lesen: Halo + Glyph-Kasten brauchen es) — schon HIER lesen: ein Lesen nach den Schreibzugriffen (s. unten) erzwang je Element eine volle Stilberechnung (Layout-Thrashing, ~95 % der Pixelierzeit)
     if (cs.boxShadow && cs.boxShadow !== 'none') a.ohneSchatten = true;
     if (/drop-shadow|blur\(/.test(cs.filter || '')) a.filter = _ppFilterOhneSchein(cs.filter);
     // Emoji/Glyphe: genau ein Textkind, das eine Sprite-Entsprechung hat.
@@ -1545,7 +1562,7 @@ function ppPixelieren(wurzel) {
     if (kinder.length === 1 && kinder[0].nodeType === 3) {
       const z = kinder[0].nodeValue.trim();
       if (PP_PX_ZEICHEN[z]) { a.zeichen = z; a.farbe = cs.color; a.schrift = parseFloat(cs.fontSize) || 16; }
-      else if (PP_EMOJI_MUSTER.test(z)) { a.emoji = z; a.schrift = parseFloat(cs.fontSize) || 16; }
+      else if (PP_EMOJI_MUSTER.test(z) || ppPxSchriftSymbol(z)) { a.emoji = z; a.farbe = cs.color; a.schrift = parseFloat(cs.fontSize) || 16; }
       else if (z.length > 1 && /\S/.test(z) && cs.textShadow && cs.textShadow !== 'none') {
         a.text = { schatten: cs.textShadow, groesse: parseFloat(cs.fontSize) || 16 };
       }
@@ -1587,14 +1604,20 @@ function ppPixelieren(wurzel) {
         st.backgroundSize = '1em 1em'; st.backgroundRepeat = 'no-repeat'; st.backgroundPosition = 'center';
         st.color = 'transparent'; st.textShadow = 'none';
         st.imageRendering = 'pixelated';
+        // ★ W86z: frei stehende Glyphen bekommen einen festen Kasten (1em x 1em) statt der Textbreite — sonst haengt die Boxgroesse (und damit
+        // Skalierung, Drehpunkt, Sprite) davon ab, ob die Schrift beim Einblenden schon geladen ist.
+        if (ppPixelAnimAktiv() && (a.position === 'absolute' || a.position === 'fixed')) { const k = Math.max(4, Math.round(a.schrift / 4) * 4) + 'px'; st.width = k; st.height = k; st.lineHeight = k; st.backgroundSize = k + ' ' + k; }
       }
     }
     if (a.emoji) {
-      const u = ppPxEmojiUrl(a.emoji, a.schrift);
+      const fu = ppPxSchriftBildUrl(a.emoji, a.farbe);            // ★ W86p: das Zeichen der Pixel-Emoji-Schrift selbst (1 em, ohne Rand) statt eines Systememojis
+      const u = fu || ppPxEmojiUrl(a.emoji, a.schrift);
+      const gr = fu ? 1 : 1.1;
       if (u) {
         st.backgroundImage = `url(${u})`;
-        st.backgroundSize = '1.1em 1.1em'; st.backgroundRepeat = 'no-repeat'; st.backgroundPosition = 'center';
+        st.backgroundSize = `${gr}em ${gr}em`; st.backgroundRepeat = 'no-repeat'; st.backgroundPosition = 'center';
         st.color = 'transparent'; st.textShadow = 'none'; st.imageRendering = 'pixelated';
+        if (ppPixelAnimAktiv() && (a.position === 'absolute' || a.position === 'fixed')) { const k = Math.max(4, Math.round(a.schrift * gr / 4) * 4) + 'px'; st.width = k; st.height = k; st.lineHeight = k; st.backgroundSize = k + ' ' + k; }
       }
     }
     if (ebenen.length) {
@@ -1618,13 +1641,15 @@ function ppPixelieren(wurzel) {
     if (a.filter !== undefined) st.filter = a.filter;
     if (a.schein && a.w > 0 && a.h > 0) {
       // Halo als erstes Kind, hinter dem Inhalt.
-      const rand = Math.min(40, Math.max(3, Math.round(a.schein.blur * 0.8)));
+      const pa = ppPixelAnimAktiv();
+      // ★ W86z: gerade Randbreite (Halo-Kanten bleiben beim Skalieren auf ganzen Pixeln); Retro-Modus: wie bisher
+      const rand = pa ? Math.min(40, Math.max(4, Math.round(a.schein.blur * 0.4) * 2)) : Math.min(40, Math.max(3, Math.round(a.schein.blur * 0.8)));
       const u = ppPxHaloUrl(a.schein.farbe, a.w, a.h, rand, a.rund || !!a.zeichen || !!a.emoji);
       if (u) {
         const halo = document.createElement('i');
         halo.setAttribute('aria-hidden', 'true');
         halo.className = 'pp-px-halo';
-        halo.style.cssText = `position:absolute;left:${-rand}px;top:${-rand}px;width:${a.w + 2 * rand}px;height:${a.h + 2 * rand}px;`
+        halo.style.cssText = `position:absolute;left:${pa ? -rand - a.bl : -rand}px;top:${pa ? -rand - a.bt : -rand}px;width:${a.w + 2 * rand}px;height:${a.h + 2 * rand}px;`
           + `background:url(${u}) center/100% 100% no-repeat;image-rendering:pixelated;pointer-events:none;z-index:-1;`;
         _ppPxErledigt.add(halo);
         if (a.position === 'static') st.position = 'relative';
@@ -1641,7 +1666,78 @@ function ppPixelieren(wurzel) {
  * vergroessert. Rueckfall fuer alle Zeichen ohne eigenes Sprite.
  */
 const PP_EMOJI_SCHRIFT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Twemoji Mozilla",sans-serif';
+
+/**
+ * ★ W86p: Zeichen aus der Pixel-Emoji-Schrift (`PP Pixel Emoji`, Raster 16 x 16, jede Zelle ein Rechteck) als Pixelbild.
+ * Die Schrift zeichnet ihre Zellen als Vektorrechtecke: bei Schriftgroessen, die kein Vielfaches von 16 sind, malt der Browser jede Zellkante
+ * mit Teildeckkraft (Mischfarben ausserhalb der 256er-Palette). Hier wird das Zeichen EINMAL mit 16 px (Zelle = genau 1 Bildpunkt) auf ein
+ * Canvas gemalt und das Bild danach hart (`image-rendering: pixelated`) auf die Zielgroesse gestreckt — Palettenfarben bleiben Palettenfarben.
+ * `farbe`: Vordergrundfarbe fuer einfarbige Zeichen (Pfeile, Sterne …). '' = Schrift noch nicht geladen / Zeichen nicht in der Schrift.
+ */
+function ppPxSchriftBildUrl(z, farbe) {
+  if (!ppPixelAnimAktiv() || !z) return '';
+  try {
+    if (!document.fonts || !document.fonts.check('16px "PP Pixel Emoji"', z)) {
+      if (document.fonts && document.fonts.load) document.fonts.load('16px "PP Pixel Emoji"', z).catch(() => {});
+      return '';
+    }
+  } catch { return ''; }
+  const f = ppFarbe(farbe || '#ffffff');
+  const q = window.ppSnapRgb ? window.ppSnapRgb(f[0] | 0, f[1] | 0, f[2] | 0) : [f[0] | 0, f[1] | 0, f[2] | 0];
+  const key = 'fg:' + z + ':' + q.join(',');
+  if (_ppSchriftLeer.has(key)) return '';
+  let leer = true;
+  const url = ppPxBild(key, 16, 16, (setze) => {
+    const c = document.createElement('canvas');
+    c.width = 16; c.height = 16;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.font = '16px "PP Pixel Emoji"';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = `rgb(${q[0]},${q[1]},${q[2]})`;
+    ctx.fillText(z, 0, 14);                                   // Aufstieg 896/1024 em = 14 px: Oberkante des Rasters liegt bei y = 0
+    const d = ctx.getImageData(0, 0, 16, 16).data;
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const i = (y * 16 + x) * 4;
+      if (d[i + 3] >= 128) { setze(x, y, [d[i], d[i + 1], d[i + 2], 1]); leer = false; }
+    }
+    if (leer) _ppSchriftLeer.add(key);
+  }, 2);
+  return _ppSchriftLeer.has(key) ? '' : url;
+}
+const _ppSchriftLeer = new Set();      // Zeichen, die die Schrift nicht zeichnet (leeres Bild): nicht noch einmal versuchen
+let _ppSchriftBereiche = null;
+/** Codepunkt-Bereiche der Pixel-Emoji-Schrift (aus ihrer `@font-face`-Regel in style.css). */
+function ppPxSchriftBereiche() {
+  if (_ppSchriftBereiche) return _ppSchriftBereiche;
+  const lst = [];
+  try {
+    for (const blatt of Array.from(document.styleSheets)) {
+      let regeln; try { regeln = blatt.cssRules; } catch { continue; }
+      for (const r of Array.from(regeln || [])) {
+        if (r.type !== 5 || !/PP Pixel Emoji/.test(r.style.getPropertyValue('font-family'))) continue;
+        r.style.getPropertyValue('unicode-range').split(',').forEach((t) => {
+          const m = /U\+([0-9A-F]+)(?:-([0-9A-F]+))?/i.exec(t.trim());
+          if (m) lst.push([parseInt(m[1], 16), parseInt(m[2] || m[1], 16)]);
+        });
+        break;
+      }
+      if (lst.length) break;
+    }
+  } catch {}
+  if (lst.length) _ppSchriftBereiche = lst;
+  return lst;
+}
+/** Einzelnes Symbol ausserhalb von Latin (Pfeile, Sterne, Dingbats …), das die Pixel-Emoji-Schrift zeichnet? */
+function ppPxSchriftSymbol(z) {
+  const cps = [...String(z).replace(/\uFE0F/g, '')];
+  if (cps.length !== 1) return false;
+  const c = cps[0].codePointAt(0);
+  return c >= 0x2000 && ppPxSchriftBereiche().some(([a, b]) => c >= a && c <= b);
+}
+
 function ppPxEmojiUrl(z, groessePx) {
+  const fu = ppPxSchriftBildUrl(z, '#ffffff');
+  if (fu) return fu;
   const n = Math.max(10, Math.min(28, Math.round((groessePx || 16) / 2.4)));
   return ppPxBild('em:' + n + ':' + z, n + 2, n + 2, (setze) => {
     const c = document.createElement('canvas');
@@ -1690,9 +1786,14 @@ function ppPxSpriteGefaerbtUrl(name, farbe, stufe = 0) {
  * jeden spaeter eingehaengten Knoten (Phasen, die erst nach Zeit
  * erscheinen). Gibt die Abmeldung zurueck.
  */
-function ppPixeliererAnhaengen(wurzel) {
+function ppPixeliererAnhaengen(wurzel, opt) {
   if (!wurzel) return () => {};
+  const bewegung = !(opt && opt.bewegung === false);       // false (Vorwaermen): nur Pixelbilder erzeugen, nichts backen
+  try { if (bewegung && window.PPPixelAnim) window.PPPixelAnim.geometrieRunden(wurzel); } catch (err) { console.warn('[PixelAnim]', err?.message); }
   try { ppPixelieren(wurzel); } catch (err) { console.warn('[Pixelierer]', err?.message); }
+  // ★ W86z: danach Statisches (halbe Deckkraft, Alpha-Hintergruende, Drehung) und die Bewegung — Takt, Dither-Fade, Kunstpixel-Skalierung
+  // (public/pixel-anim.js).
+  try { if (bewegung && window.PPPixelAnim) { window.PPPixelAnim.statisch(wurzel); window.PPPixelAnim.backenAlle(wurzel); } } catch (err) { console.warn('[PixelAnim]', err?.message); }
   let wartend = null;
   const neue = new Set();
   const beobachter = new MutationObserver((liste) => {
@@ -1701,13 +1802,139 @@ function ppPixeliererAnhaengen(wurzel) {
     wartend = requestAnimationFrame(() => {
       wartend = null;
       const jetzt = Array.from(neue); neue.clear();
-      for (const n of jetzt) { try { ppPixelieren(n); } catch {} }
+      for (const n of jetzt) {
+        try { if (bewegung && window.PPPixelAnim) window.PPPixelAnim.geometrieRunden(n); } catch {}
+        try { ppPixelieren(n); } catch {}
+        try { if (bewegung && window.PPPixelAnim && n.isConnected) { window.PPPixelAnim.statisch(n); window.PPPixelAnim.backenAlle(n); } } catch {}
+      }
     });
   });
   beobachter.observe(wurzel, { childList: true, subtree: true });
   return () => { beobachter.disconnect(); if (wartend) cancelAnimationFrame(wartend); };
 }
 window.ppPixeliererAnhaengen = ppPixeliererAnhaengen;
+
+/**
+ * ★ W86z — Randabdunklung (Vignette) der Area-Szenen als Pixelart: Bayer-gedithertes Schwarz (deckend) statt Radialverlauf mit Alpha.
+ * Gleiche Form wie vorher (`radial-gradient(ellipse 75% 70%, 0 bei 55 %, 30 % Schwarz am Rand)`), aber jede Kachel ist ein Kunstpixel
+ * (`nx` x `ny` Pixel, vom Aufrufer auf die Szenenpixel gelegt). Wird je Groesse gemerkt.
+ */
+function ppRandDimUrl(nx, ny) {
+  nx = Math.max(8, Math.min(1024, Math.round(nx))); ny = Math.max(8, Math.min(1024, Math.round(ny)));
+  return ppPxBild('rd:' + nx + 'x' + ny, nx, ny, (setze) => {
+    for (let y = 0; y < ny; y++) {
+      for (let x = 0; x < nx; x++) {
+        const t = Math.hypot(((x + 0.5) / nx - 0.5) / 0.75, ((y + 0.5) / ny - 0.5) / 0.70);   // 1 = Ellipsenrand
+        const a = 0.3 * Math.max(0, Math.min(1, (t - 0.55) / 0.45));
+        if (a > 0 && a > ppBayer(x, y)) setze(x, y, [0, 0, 0, 1]);
+      }
+    }
+  }, 1);
+}
+window.ppRandDimUrl = ppRandDimUrl;
+
+/**
+ * ★ W86u2 — Schein/Schleier als Pixelbild in Elementgroesse (Titelkulisse, Menuehintergrund): `gradient` ist ein `radial-gradient(...)`/
+ * `linear-gradient(...)` wie in CSS; zwischen den Farbstopps wird gedithert (Bayer), Alpha wird deckend/leer (`ppPxVerlaufUrl`), jede Farbe rastet
+ * auf die Palette. `px` = Kunstpixel in CSS-px (Standard 4). Das Element behaelt Groesse/Lage/Animation aus CSS (Klasse); nur der Hintergrund kommt
+ * von hier und wird bei Groessenaenderung neu gemalt. Retro-Modus: der Verlauf bleibt, wie er war.
+ */
+function PpVerlauf({ gradient, px = 4, className, style, retroBlend, retroGradient }) {
+  const ref = useRef(null);
+  const retro = !!window.PP_RETRO;
+  useLayoutEffect(() => {
+    const el = ref.current; if (!el || retro) return undefined;
+    const zeichnen = () => {
+      const W = el.offsetWidth, H = el.offsetHeight;
+      if (!W || !H) return;
+      const raster = px * 8;                                          // Groesse grob gerastert: wenige verschiedene Bilder beim Skalieren
+      const url = ppPxVerlaufUrl(gradient, Math.max(raster, Math.round(W / raster) * raster), Math.max(raster, Math.round(H / raster) * raster), px);
+      if (url) el.style.backgroundImage = `url(${url})`;
+    };
+    zeichnen();
+    const ro = window.ResizeObserver ? new ResizeObserver(zeichnen) : null;
+    if (ro) ro.observe(el);
+    return () => { if (ro) ro.disconnect(); };
+  }, [gradient, px, retro]);
+  return retro
+    ? <div className={className} style={{ ...style, background: retroGradient || gradient, ...(retroBlend ? { mixBlendMode: retroBlend } : {}) }} />
+    : <div ref={ref} className={className} data-pp-px="aus" style={{ ...style, backgroundSize: '100% 100%', backgroundRepeat: 'no-repeat', imageRendering: 'pixelated' }} />;
+}
+window.PpVerlauf = PpVerlauf;
+
+/**
+ * ★ W86u2 — Pixel-Partikelmaschine fuer Konfetti/Funken (Canvas): alles in ganzen Kunstpixeln (Zelle `px` CSS-px), 30 Hz (`ppTaktRaf`),
+ * keine Drehung, kein `shadowBlur`, keine `globalAlpha`-Mischung — Ausblenden per Bayer-Dither, Formen als Pixelsprites (Kreis, Raute,
+ * Stern, Funke), Farben auf die Palette gerastet. Das Canvas wird in Zellaufloesung gemalt und per `image-rendering: pixelated` vergroessert.
+ *
+ *   const stopp = ppPixelPartikel(canvas, teile, { px: 2, onFertig, maxMs })
+ *   teile: [{ x, y, vx, vy, gravity, size, color, shape: 'circle'|'diamond'|'star'|'spark', life: 1, decay }]  (x/y/vx/vy in CSS-px, vx/vy je 60-Hz-Bild)
+ */
+const _ppPtSprites = new Map();
+function _ppPtSprite(form, r) {
+  const key = form + r;
+  let l = _ppPtSprites.get(key); if (l) return l;
+  l = [];
+  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    let an;
+    if (form === 'circle') an = dx * dx + dy * dy <= r * r + r * 0.6;
+    else if (form === 'diamond') an = Math.abs(dx) + Math.abs(dy) <= r;
+    else if (form === 'star') an = (dx === 0 || dy === 0) || (Math.abs(dx) === 1 && Math.abs(dy) === 1 && r >= 2);
+    else an = dx === 0 || dy === 0;                                   // 'spark': duenne Kreuzarme
+    if (an) l.push(dx, dy);
+  }
+  _ppPtSprites.set(key, l);
+  return l;
+}
+function ppPixelPartikel(canvas, teile, opt) {
+  opt = opt || {};
+  const px = opt.px || 2;
+  const W = Math.max(8, Math.ceil(window.innerWidth / px)), H = Math.max(8, Math.ceil(window.innerHeight / px));
+  canvas.width = W; canvas.height = H;
+  canvas.style.imageRendering = 'pixelated';
+  const g = canvas.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  const farbe = {};
+  const rgb = (hex) => {
+    if (farbe[hex]) return farbe[hex];
+    const sn = window.ppSnap ? window.ppSnap(hex) : hex;
+    const m = /^#?([0-9a-f]{6})$/i.exec(sn) || /^#?([0-9a-f]{6})$/i.exec('#ffffff');
+    const n = parseInt(m[1], 16);
+    return (farbe[hex] = [(n >> 16) & 255, (n >> 8) & 255, n & 255]);
+  };
+  const raf = window.ppTaktRaf || window.requestAnimationFrame;
+  const caf = window.cancelAnimationFrame;
+  let id = 0, letzt = 0, aus = false;
+  const t0 = performance.now();
+  const bild = g.createImageData(W, H), d = bild.data;
+  const schritt = (t) => {
+    id = 0; if (aus) return;
+    const dt = letzt ? Math.min(3, (t - letzt) / 16.667) : 1; letzt = t;
+    d.fill(0);
+    let lebt = false;
+    for (const p of teile) {
+      if (p.life <= 0) continue;
+      lebt = true;
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vy += (p.gravity || 0) * dt; p.life -= p.decay * dt;
+      if (p.life <= 0) continue;
+      const r = Math.max(1, Math.round(p.size * (0.5 + Math.min(1, p.life) * 0.5) / (px * 2)));
+      const sp = _ppPtSprite(p.shape || 'circle', r), c = rgb(p.color);
+      const cx = Math.floor(p.x / px), cy = Math.floor(p.y / px), voll = p.life >= 1 ? 1 : p.life * 1.2;
+      for (let i = 0; i < sp.length; i += 2) {
+        const x = cx + sp[i], y = cy + sp[i + 1];
+        if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        if (voll < 1 && voll <= ppBayer(x, y)) continue;
+        const o = (y * W + x) * 4; d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255;
+      }
+    }
+    g.putImageData(bild, 0, 0);
+    if (lebt && (!opt.maxMs || t - t0 < opt.maxMs + 500)) id = raf(schritt);
+    else if (opt.onFertig) opt.onFertig();
+  };
+  id = raf(schritt);
+  return () => { aus = true; if (id) caf(id); };
+}
+window.ppPixelPartikel = ppPixelPartikel;
 
 window.PxZeichen = PxZeichen;
 window.PxIcon = PxIcon;
@@ -6908,6 +7135,88 @@ function ppUmrissFarbe(farbe) {
 }
 window.ppUmrissFarbe = ppUmrissFarbe;
 
+// ── LOGO IN SPIELERFARBE ALS EIN FERTIGES PIXELBILD (W86u2) ─────────────────────────
+// Bisher: graustufiges `logo.png` + drei Deckschichten (`.pp-logo-tint` mit `mix-blend-mode: multiply`, `-licht`, `-umriss`). Die Farbmischung
+// mit dem Hintergrund ist nie Pixelart — und faellt mit abgeschaltetem Mischmodus auseinander (die Tint-Flaeche deckt das Bild dann flach zu).
+// Jetzt wird dasselbe Ergebnis EINMAL pro Farbe in ein Canvas gerechnet: Tint = Bild × Spielerfarbe innerhalb der Maske, Licht = aufgehellte
+// Spielerfarbe, Umriss = `--pp-umriss`; jede Farbe rastet auf die 256er-Palette. Ergebnis: eine Bild-URL, ohne Blend-Modus, ohne Schichten.
+let _ppLogoQuellen = null;
+const _ppLogoBilder = new Map();
+function _ppLogoLaden() {
+  if (_ppLogoQuellen) return _ppLogoQuellen;
+  const laden = (url) => new Promise((ok, fehl) => { const im = new Image(); im.onload = () => ok(im); im.onerror = fehl; im.src = url; });
+  const daten = (im) => { const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight; const g = c.getContext('2d'); g.drawImage(im, 0, 0); return g.getImageData(0, 0, c.width, c.height); };
+  _ppLogoQuellen = Promise.all(['/data/logo.png', '/data/logo-tint-mask.png', '/data/logo-licht-mask.png', '/data/logo-umriss-mask.png'].map(u => laden(u).then(daten)))
+    .catch((e) => { _ppLogoQuellen = null; throw e; });
+  return _ppLogoQuellen;
+}
+/** → Promise<data-URL> des Logos in `farbe` (CSS) mit Umrissfarbe `umriss`; bei Fehlern wird abgelehnt (Aufrufer faellt auf die Deckschichten zurueck). */
+function ppLogoUrl(farbe, umriss) {
+  const f = ppFarbe(farbe), u = ppFarbe(umriss || '#000');
+  const key = [f[0] | 0, f[1] | 0, f[2] | 0, u[0] | 0, u[1] | 0, u[2] | 0].join(',');
+  if (_ppLogoBilder.has(key)) return _ppLogoBilder.get(key);
+  const p = _ppLogoLaden().then(([logo, tint, licht, umr]) => {
+    const w = logo.width, h = logo.height, c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d'), out = g.createImageData(w, h), d = out.data, L = logo.data, T = tint.data, H = licht.data, U = umr.data;
+    const hell = [0, 1, 2].map(i => f[i] * 0.45 + 255 * 0.55);
+    const snapCache = new Map();
+    const snap = (r, gg, b) => {
+      const k = (r << 16) | (gg << 8) | b; let v = snapCache.get(k);
+      if (!v) { v = window.ppSnapRgb ? window.ppSnapRgb(r, gg, b) : [r, gg, b]; snapCache.set(k, v); }
+      return v;
+    };
+    for (let i = 0; i < w * h; i++) {
+      const o = i * 4;
+      let r = L[o], gg = L[o + 1], b = L[o + 2], a = L[o + 3];
+      if (T[o + 3] > 127) { if (a > 0) { r = r * f[0] / 255; gg = gg * f[1] / 255; b = b * f[2] / 255; } else { r = f[0]; gg = f[1]; b = f[2]; } a = 255; }   // multiply
+      if (H[o + 3] > 127) { r = hell[0]; gg = hell[1]; b = hell[2]; a = 255; }
+      if (U[o + 3] > 127) { r = u[0]; gg = u[1]; b = u[2]; a = 255; }
+      if (a > 127) { const q = snap(Math.round(r), Math.round(gg), Math.round(b)); d[o] = q[0]; d[o + 1] = q[1]; d[o + 2] = q[2]; d[o + 3] = 255; }
+    }
+    g.putImageData(out, 0, 0);
+    return c.toDataURL('image/png');
+  });
+  _ppLogoBilder.set(key, p);
+  p.catch(() => _ppLogoBilder.delete(key));
+  return p;
+}
+window.ppLogoUrl = ppLogoUrl;
+
+/**
+ * Das Logo im Pixelart-Stil: `<img>` mit dem fertig gerechneten Bild (siehe oben); der Elternknoten liefert `--player-color` / `--pp-umriss`.
+ * Retro-Modus und Fehlerfall: das alte graue Bild samt Deckschichten (CSS `.pp-logo-tint` & Co.).
+ */
+function PpLogoBild() {
+  const ref = useRef(null);
+  const retro = !!window.PP_RETRO;
+  const [url, setUrl] = useState(null);
+  const [fehler, setFehler] = useState(false);
+  useEffect(() => {
+    if (retro) return undefined;
+    let tot = false;
+    const lesen = () => {
+      const el = ref.current; if (!el) return;
+      const cs = getComputedStyle(el);
+      const farbe = cs.getPropertyValue('--player-color').trim() || '#66b6ff', umr = cs.getPropertyValue('--pp-umriss').trim() || '#000';
+      ppLogoUrl(farbe, umr).then(u => { if (!tot) setUrl(u); }, () => { if (!tot) setFehler(true); });
+    };
+    lesen();
+    // Spielerfarbe aendert sich im Profil → beim Zurueckkehren ins Menue wird das Logo neu eingehaengt; zusaetzlich bei Farbwechsel waehrend der Anzeige.
+    const iv = setInterval(lesen, 2000);
+    return () => { tot = true; clearInterval(iv); };
+  }, [retro]);
+  if (retro || fehler) return (
+    <>
+      <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
+      <div className="pp-logo-tint" aria-hidden="true"></div>
+      <div className="pp-logo-licht" aria-hidden="true"></div>
+      <div className="pp-logo-umriss" aria-hidden="true"></div>
+    </>
+  );
+  return <img ref={ref} src={url || undefined} alt="Pixel Parties" className="pp-logo-img" style={url ? undefined : { visibility: 'hidden' }} />;
+}
+window.PpLogoBild = PpLogoBild;
+
 // ── PIXEL-ICONS ─────────────────────────────────────────────────────────
 // Kleine handgesetzte Sinnbilder: Ueberschriften der Menue-Seitenkaesten,
 // Hover-Pfeil der Menueknoepfe (die Knoepfe selbst tragen bewusst keine
@@ -10304,10 +10613,22 @@ function measureHighlight(el) {
   }
   // Transform kurz aus -> beide Rects sind jetzt Layout-Koordinaten.
   clip.classList.add(TB_FLAT_CLASS);
-  const cr = clip.getBoundingClientRect();
-  const pr = plane.getBoundingClientRect();
+  let cr = clip.getBoundingClientRect();
+  let pr = plane.getBoundingClientRect();
   let er = el.getBoundingClientRect();
   clip.classList.remove(TB_FLAT_CLASS);
+  // Tutorial-Zoom (Desktop, `.tut-zoom` am Brettkasten): Clip, Ebene und Ziel sind um `kz` skaliert gemessen. Die Kette wird in Layoutmassen nachgebaut und als Ganzes um `kz`
+  // vergroessert (Ursprung links oben) — wie die echte Ebene unter der Zoom-Transformation.
+  let kz = 1;
+  { const bcz = clip.parentElement; if (bcz && bcz.classList && bcz.classList.contains('tut-zoom') && clip.offsetWidth > 0) { const q = cr.width / clip.offsetWidth; if (Number.isFinite(q) && q > 0.2) kz = q; } }
+  if (kz !== 1) {
+    const N = (b) => ({ left: b.left, top: b.top, width: b.width / kz, height: b.height / kz });
+    const cr0 = cr, pr0 = pr, er0 = er;
+    cr = { left: cr0.left, top: cr0.top, width: cr0.width / kz, height: cr0.height / kz };
+    pr = { left: cr0.left + (pr0.left - cr0.left) / kz, top: cr0.top + (pr0.top - cr0.top) / kz, width: pr0.width / kz, height: pr0.height / kz };
+    er = { left: cr0.left + (er0.left - cr0.left) / kz, top: cr0.top + (er0.top - cr0.top) / kz, width: er0.width / kz, height: er0.height / kz };
+    void N;
+  }
   // ★ Hovert der Zeiger gerade ueber der Zone, ist sie hochgezoomt (`scale`,
   // `--board-hover-scale`, mit Uebergang) — das Highlight bekam diese Hover-
   // Groesse, das geklonte Kartenbild aber blieb in Ruhegroesse: der Rahmen
@@ -10335,6 +10656,7 @@ function measureHighlight(el) {
   // andere Projektion als die Karte darunter.
   return {
     flat: false,
+    kz,
     clip: { left: cr.left, top: cr.top, width: cr.width, height: cr.height },
     plane: { left: pr.left - cr.left, top: pr.top - cr.top, width: pr.width, height: pr.height },
     local: { left: er.left - pr.left, top: er.top - pr.top, width: er.width, height: er.height },
@@ -10518,6 +10840,13 @@ function TextBox() {
     return () => { clearInterval(timerRef.current); if (vorT) clearTimeout(vorT); vorlaufRef.current = false; };
   }, [pages, pageIdx]);
 
+  // Seiten mit Tackle-Szene: Antonias Musik schon vorher dekodieren (siehe `ppBgmVorwaermen`), nicht erst im Augenblick ihres Auftritts.
+  useEffect(() => {
+    if (!pages.some(p => p && p.tackle) || !window.ppBgmVorwaermen) return undefined;
+    const t = setTimeout(() => window.ppBgmVorwaermen('tutorialAntonia'), 800);
+    return () => clearTimeout(t);
+  }, [pages]);
+
   // ── Tackle-Szene (Tutorial 5, Epilog) ────────────────────────────
   // „Antonia fliegt von rechts ueber die Textbox, rammt Monia Bot und wirft
   // sie aus dem Bild; Antonia steht danach links, wo Monia stand."
@@ -10545,7 +10874,7 @@ function TextBox() {
     const mx = r.left + r.width / 2, my = r.top + r.height / 2;
     const flieger = document.createElement('img');
     flieger.src = ANTONIA_PORTRAIT; flieger.draggable = false;
-    fest(flieger, { width: '104px', height: '104px', imageRendering: 'pixelated', filter: 'drop-shadow(3px 3px 0 rgba(0,0,0,.55))' });
+    fest(flieger, { width: '104px', height: '104px', imageRendering: 'pixelated' });   // ohne `filter`: ein Filter auf einem bewegten Bild wird jedes Bild neu gerastert
     // Die Textbox sitzt am oberen Bildrand — der Flug bleibt auf Hoehe des Portraets.
     const startX = window.innerWidth + 60, zielX = mx - 52, y0 = my - 52 - 8, y1 = my - 52;
     if (window.playSFX) window.playSFX('attack_ram', { dedupe: 100 });
@@ -10613,10 +10942,10 @@ function TextBox() {
 
   // Highlights
   useEffect(() => {
-    if (!pages.length) { setHighlightRects([]); return; }
+    if (!pages.length) { setHighlightRects([]); if (window.ppTutorialZoomAus) window.ppTutorialZoomAus(); return; }   // Textbox zu: aus dem Zoom wieder heraus
     const page = pages[pageIdx];
     const hl = page?.highlights;
-    if (!hl || !hl.length) { setHighlightRects([]); return; }
+    if (!hl || !hl.length) { setHighlightRects([]); if (window.ppTutorialZoomAus) window.ppTutorialZoomAus(); return; }
     const rects = [];
     const aufraeumen = [];
     let abgebrochen = false;
@@ -10670,7 +10999,9 @@ function TextBox() {
             an.forEach(a => kopie.querySelectorAll(a).forEach(n => n.setAttribute('data-tb-an', '1')));
             html = kopie.outerHTML;
           }
-          const basis = { pulse, vars, handkarte: el !== treffer, stapel: Number.isFinite(z) ? z : 0, html, ziel: el };
+          // Phasenleiste (nicht auf dem Handy — dort ist sie schon so gross wie moeglich): waehrend des Highlights groesser dargestellt
+          const phasenleiste = !(window.ppIsPhone && window.ppIsPhone()) && !!(el.closest && (el.matches('.phase-column') || el.closest('.phase-column')));
+          const basis = { pulse, vars, handkarte: el !== treffer, phasenleiste, stapel: Number.isFinite(z) ? z : 0, html, ziel: el };
           rects.push({ ...m, ...basis });
           // ── Hover auf einer gehighlighteten HANDKARTE ──
           // Hebt sich die echte Karte unter dem Zeiger, soll die Highlight-
@@ -10712,6 +11043,7 @@ function TextBox() {
         if (sel) document.querySelectorAll(sel).forEach(tr => { if (!tr.closest('.textbox-overlay')) ziele.push(tr); });
       }
       fahrt = window.ppTutorialCamFokus(ziele);
+      if (!fahrt && window.ppTutorialZoom) fahrt = window.ppTutorialZoom(ziele);   // Desktop: hineinzoomen, Ziele in die Mitte (Handy: Kamerafahrt oben)
     }
     if (fahrt) { setHighlightRects([]); fahrt.then(() => { if (!abgebrochen) messen(); }); }
     else messen();
@@ -10772,6 +11104,10 @@ function TextBox() {
         setTutorialFigurenGesperrt(false);
       }
       // Fade out then dismiss
+      // Die Erklaerung ist zu Ende: Highlights und Zoom enden JETZT — die Figuren steigen schon waehrend des Ausblendens aus den Karten (s. oben) und wuerden sonst von den
+      // noch stehenden Highlight-Klonen auf den Heldenkarten ueberdeckt (Befund Ende Status-Tutorial).
+      setHighlightRects([]);
+      if (window.ppTutorialZoomAus) window.ppTutorialZoomAus();
       setFading(true);
       const cb = opts.onDismiss;
       setTimeout(() => {
@@ -10909,7 +11245,7 @@ function TextBox() {
       {highlightRects.map((h, i) => {
         const gedreht = h.flat && (h.drehung != null || h.handkarte);
         const inner = (
-          <div className={'textbox-highlight' + (h.pulse ? ' textbox-highlight-pulse' : '') + (h.handkarte ? ' textbox-highlight-hand' : '')}
+          <div className={'textbox-highlight' + (h.pulse ? ' textbox-highlight-pulse' : '') + (h.handkarte ? ' textbox-highlight-hand' : '') + (h.phasenleiste ? ' textbox-highlight-phase' : '')}
             style={gedreht
               ? { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', pointerEvents: 'none' }
               : h.flat
@@ -10930,7 +11266,11 @@ function TextBox() {
             left: h.rect.left, top: h.rect.top,
             width: h.rect.width, height: h.rect.height,
             transform: `rotate(${h.drehung || 0}deg) scale(${h.skala || 1})`,
-            pointerEvents: 'none', zIndex: 90001 + h.stapel + (h.hover ? 1000 : 0),
+            // Gehighlightete HANDKARTE: waehrend des Highlights ~50 % groesser (eigene Eigenschaften `scale`/`translate`, damit Faecherdrehung und Hover-Massstab darunter bleiben);
+            // nach oben versetzt, damit die Karte nicht unten aus dem Bild waechst. Gestuft statt stufenlos (Pixelart).
+            ...(h.handkarte ? { '--tb-hoch': `${Math.round(Math.min(0, window.innerHeight - 8 - (h.rect.top + h.rect.height * 1.25)))}px`,   // unterer Rand nach dem Wachsen (Mitte + 0,75·Hoehe) bleibt im Bild
+             animation: 'tbHandGross .24s steps(4, end) both' } : null),
+            pointerEvents: 'none', zIndex: 90001 + h.stapel + (h.hover ? 1000 : 0) + (h.handkarte ? 500 : 0),
           }}>{inner}</div>
         );
         if (h.flat) return <div key={i} style={{ display: 'contents' }}>{inner}</div>;
@@ -10944,6 +11284,7 @@ function TextBox() {
             left: h.clip.left, top: h.clip.top,
             width: h.clip.width, height: h.clip.height,
             perspective: h.perspective, perspectiveOrigin: h.perspectiveOrigin,
+            ...(h.kz && h.kz !== 1 ? { transform: `scale(${h.kz})`, transformOrigin: '0 0' } : null),
             pointerEvents: 'none', zIndex: 90001,
           }}>
             <div style={{
@@ -10963,7 +11304,6 @@ function TextBox() {
           <div className={'textbox-portrait textbox-portrait-left' + (hasRight && activeSide !== 'left' ? ' textbox-portrait-inactive' : '') + (leftExiting ? ' textbox-portrait-exit-left' : '')}>
             <div className={'textbox-portrait-frame' + (page?.tackle && tackleAus ? ' textbox-portrait-ankunft' : '')}>
               <img src={linksPortrait} alt={leftName || ''} draggable={false} />
-              {[...Array(8)].map((_, i) => <span key={i} className="textbox-sparkle" style={{ animationDelay: (i * 0.35) + 's', top: [10,60,5,50,30,65,15,45][i] + '%', left: [5,70,55,10,80,35,90,60][i] + '%' }} />)}
             </div>
             {leftName && <span className="textbox-speaker-name">{leftName}</span>}
           </div>
@@ -10987,7 +11327,6 @@ function TextBox() {
           <div className={'textbox-portrait textbox-portrait-right' + (activeSide !== 'right' ? ' textbox-portrait-inactive' : '') + (rightExiting ? ' textbox-portrait-exit' : '')}>
             <div className="textbox-portrait-frame">
               <img src={opts.rightSpeaker} alt={opts.rightSpeakerName || ''} draggable={false} />
-              {[...Array(8)].map((_, i) => <span key={i} className="textbox-sparkle" style={{ animationDelay: (i * 0.25 + 0.1) + 's', top: [15,55,8,48,35,62,20,42][i] + '%', left: [8,65,50,15,75,30,85,55][i] + '%' }} />)}
             </div>
             {rightName && <span className="textbox-speaker-name">{rightName}</span>}
           </div>
@@ -11567,7 +11906,7 @@ window.VolumeControl = VolumeControl;
 // Eigenes Dropdown statt `<select>`: das native Auswahlfenster malt das Betriebssystem — auf Android holt es im Vollbild die Systemleiste
 // („Programme anzeigen / Zurueck") nach oben, und seine Eintraege nutzen nicht die Pixel-Emoji-Schrift (📋 blieb System-Emoji).
 // `options`: [{ value, label, disabled? }] (disabled = Trennzeile), `onChange(value)`.
-function PPDropdown({ value, options, onChange, style, className = 'select', minWidth }) {
+function PPDropdown({ value, options, onChange, style, className = 'select', minWidth, disabled, title }) {
   const [offen, setOffen] = useState(false);
   const [pos, setPos] = useState(null);
   const knopf = useRef(null);
@@ -11581,6 +11920,7 @@ function PPDropdown({ value, options, onChange, style, className = 'select', min
     return () => { document.removeEventListener('pointerdown', zu, true); window.removeEventListener('keydown', esc, true); };
   }, [offen]);
   const auf = () => {
+    if (disabled) return;
     if (offen) { setOffen(false); return; }
     const r = knopf.current.getBoundingClientRect();
     const platzUnten = window.innerHeight - r.bottom - 8;
@@ -11592,7 +11932,7 @@ function PPDropdown({ value, options, onChange, style, className = 'select', min
   };
   return (
     <>
-      <button type="button" ref={knopf} className={className} onClick={auf} aria-haspopup="listbox" aria-expanded={offen}
+      <button type="button" ref={knopf} className={className} onClick={auf} aria-haspopup="listbox" aria-expanded={offen} disabled={disabled} title={title}
         style={{ textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth, ...style }}>
         {aktuell ? aktuell.label : ''}
       </button>
@@ -11609,6 +11949,138 @@ function PPDropdown({ value, options, onChange, style, className = 'select', min
   );
 }
 window.PPDropdown = PPDropdown;
+
+// Drop-in-Ersatz fuer `<select>` MIT `<option>`-Kindern (und `<optgroup>`): gleiche Props (`value`, `onChange(e)` mit `e.target.value`, `className`, `style`,
+// `disabled`, `title`), aber das eigene Pixel-Auswahlfenster statt des nativen — kein Android-Systemfenster im Vollbild, Pixel-Emoji in den Eintraegen.
+function _ppSelectText(n) {
+  if (n == null || n === false || n === true) return '';
+  if (Array.isArray(n)) return n.map(_ppSelectText).join('');
+  if (typeof n === 'object' && n.props) return _ppSelectText(n.props.children);
+  return String(n);
+}
+function _ppSelectOptionen(children, aus) {
+  React.Children.forEach(children, (c) => {
+    if (!c || typeof c !== 'object') return;
+    if (c.type === React.Fragment) { _ppSelectOptionen(c.props.children, aus); return; }
+    if (c.type === 'optgroup') { aus.push({ value: '__gruppe' + aus.length, disabled: true, label: c.props.label || '' }); _ppSelectOptionen(c.props.children, aus); return; }
+    if (c.type === 'option') {
+      const label = _ppSelectText(c.props.children);
+      aus.push({ value: String(c.props.value != null ? c.props.value : label), disabled: !!c.props.disabled, label });
+    }
+  });
+  return aus;
+}
+function PPSelect({ value, onChange, children, className, style, disabled, title }) {
+  const options = _ppSelectOptionen(children, []);
+  return (
+    <PPDropdown value={value == null ? '' : String(value)} options={options} className={className} style={style} disabled={disabled} title={title}
+      onChange={(v) => { if (onChange) onChange({ target: { value: v }, currentTarget: { value: v } }); }} />
+  );
+}
+window.PPSelect = PPSelect;
+
+// Farbwahl aus der Spielpalette statt `<input type="color">` (das System-Farbfenster: auf Android ausserhalb des Spiels, nicht Pixelart, freie Farben).
+// Es gibt nur die 256 Palettenfarben — genau die, auf die das Profil die Namensfarbe ohnehin einrastet (`ppSnap`).
+function PPColorPicker({ value, onChange, style }) {
+  const [offen, setOffen] = useState(false);
+  const [pos, setPos] = useState(null);
+  const knopf = useRef(null);
+  const feld = useRef(null);
+  const palette = window.PP_PALETTE || [];
+  const aktuell = String(value || '').toLowerCase();
+  useEffect(() => {
+    if (!offen) return undefined;
+    const zu = (e) => { if (knopf.current && knopf.current.contains(e.target)) return; if (feld.current && feld.current.contains(e.target)) return; setOffen(false); };
+    const esc = (e) => { if (e.key === 'Escape') setOffen(false); };
+    document.addEventListener('pointerdown', zu, true); window.addEventListener('keydown', esc, true);
+    return () => { document.removeEventListener('pointerdown', zu, true); window.removeEventListener('keydown', esc, true); };
+  }, [offen]);
+  const auf = () => {
+    if (offen) { setOffen(false); return; }
+    const r = knopf.current.getBoundingClientRect();
+    const untenPlatz = window.innerHeight - r.bottom - 8;
+    const nachUnten = untenPlatz >= 260 || r.top < untenPlatz;
+    setPos({ left: Math.max(4, Math.min(r.left, window.innerWidth - 300)), top: nachUnten ? r.bottom + 2 : undefined, bottom: nachUnten ? undefined : window.innerHeight - r.top + 2, maxHeight: Math.max(120, nachUnten ? untenPlatz : r.top - 8) });
+    setOffen(true);
+  };
+  return (
+    <>
+      <button type="button" ref={knopf} onClick={auf} aria-haspopup="dialog" aria-expanded={offen} title="Pick a colour"
+        style={{ width: 44, height: 34, border: '2px solid var(--bg4)', padding: 3, cursor: 'pointer', background: 'var(--bg)', ...style }}>
+        <span style={{ display: 'block', width: '100%', height: '100%', background: value || '#000000' }} />
+      </button>
+      {offen && pos && ReactDOM.createPortal(
+        <div ref={feld} role="dialog" style={{ position: 'fixed', left: pos.left, top: pos.top, bottom: pos.bottom, maxHeight: pos.maxHeight, overflowY: 'auto', zIndex: 100001, background: 'var(--bg2)', border: '2px solid var(--player-color)', padding: 6, boxSizing: 'border-box', display: 'grid', gridTemplateColumns: 'repeat(16, 18px)', gap: 2 }}>
+          {palette.map((c) => (
+            <button type="button" key={c} onClick={() => { setOffen(false); if (c.toLowerCase() !== aktuell && onChange) onChange(c); }} title={c}
+              style={{ width: 18, height: 18, padding: 0, cursor: 'pointer', background: c, border: 'none', boxShadow: c.toLowerCase() === aktuell ? '0 0 0 2px #ffffff, 0 0 0 4px #000000' : 'none', position: 'relative', zIndex: c.toLowerCase() === aktuell ? 1 : 0 }} />
+          ))}
+        </div>, document.body)}
+    </>
+  );
+}
+window.PPColorPicker = PPColorPicker;
+
+// Eigene Rueckfrage-/Eingabefenster statt `window.confirm` / `window.prompt` (System-Dialoge verlassen auf Android das Vollbild). Beide liefern ein Promise:
+// `ppConfirm(text, opts)` → true/false, `ppPrompt(text, vorgabe, opts)` → Text oder null (Abbrechen).
+function PPDialogBox({ text, eingabe, vorgabe, okText, abbruchText, gefahr, fertig }) {
+  const [wert, setWert] = useState(vorgabe || '');
+  const eingabeRef = useRef(null);
+  useEffect(() => { if (eingabe && eingabeRef.current) { eingabeRef.current.focus(); eingabeRef.current.select(); } }, [eingabe]);
+  const ok = () => fertig(eingabe ? wert : true);
+  const nein = () => fertig(eingabe ? null : false);
+  useEffect(() => {
+    const k = (e) => { if (e.key === 'Escape') { e.preventDefault(); nein(); } else if (e.key === 'Enter') { e.preventDefault(); ok(); } };
+    window.addEventListener('keydown', k, true);
+    return () => window.removeEventListener('keydown', k, true);
+  });
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 100002, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(8,6,12,.8)' }} onClick={nein}>
+      <div onClick={(e) => e.stopPropagation()} style={{ minWidth: 260, maxWidth: 'min(92vw, 420px)', padding: '16px 18px', background: 'var(--bg2)', border: '3px solid ' + (gefahr ? 'var(--danger)' : 'var(--accent)'), textAlign: 'center' }}>
+        <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5, marginBottom: 12, whiteSpace: 'pre-wrap' }}>{text}</div>
+        {eingabe && <input ref={eingabeRef} className="input" value={wert} onChange={(e) => setWert(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', marginBottom: 12, fontSize: 13 }} />}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+          <button className={'btn' + (gefahr ? ' btn-danger' : ' btn-success')} style={{ padding: '8px 22px', fontSize: 12 }} onClick={ok}>{okText || 'OK'}</button>
+          {abbruchText !== false && <button className="btn" style={{ padding: '8px 22px', fontSize: 12 }} onClick={nein}>{abbruchText || 'Cancel'}</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+function _ppDialogOeffnen(props) {
+  return new Promise((aufloesen) => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root = null;
+    const zu = (v) => { try { if (root && root.unmount) root.unmount(); else ReactDOM.unmountComponentAtNode(host); } catch (e) {} host.remove(); aufloesen(v); };
+    const el = React.createElement(PPDialogBox, { ...props, fertig: zu });
+    if (ReactDOM.createRoot) { root = ReactDOM.createRoot(host); root.render(el); } else ReactDOM.render(el, host);
+  });
+}
+window.ppConfirm = (text, opts) => _ppDialogOeffnen({ text, ...(opts || {}) });
+// Hinweis mit nur einem OK-Knopf (z. B. „Server ist voll“).
+window.ppHinweis = (text, opts) => _ppDialogOeffnen({ text, abbruchText: false, ...(opts || {}) });
+// ── KARTEN VORWAERMEN (tropfenweise, siehe CardImageShim.warmDrip) ───────────────────────────────────────────────────────────────────────
+// Tutorial-Karten: einmal pro Sitzung holen (Server rechnet die Liste aus den Missionen) und im Leerlauf nach und nach bereitlegen.
+let _ppTutorialWarm = false;
+window.ppTutorialVorwaermen = async () => {
+  if (_ppTutorialWarm) return null;
+  _ppTutorialWarm = true;
+  try {
+    const r = await fetch('/api/tutorial-assets', { headers: window.AUTH_TOKEN ? { 'x-auth-token': window.AUTH_TOKEN } : {} });
+    if (!r.ok) { _ppTutorialWarm = false; return null; }
+    const a = await r.json();
+    if (window.CardImageShim && window.CardImageShim.warmDrip) window.CardImageShim.warmDrip(a.cards, { heroes: a.heroes, abilities: a.abilities, delay: 1200 });
+    return a;
+  } catch (e) { _ppTutorialWarm = false; return null; }
+};
+// Kartenliste eines Gegner-/Beispiel-Decks (`{cards, heroes, abilities}` vom Server, Feld `warm`): `keep` falsch = nur zeichnen und merken.
+window.ppDeckVorwaermen = (w, keep) => {
+  if (!w || !Array.isArray(w.cards) || !(window.CardImageShim && window.CardImageShim.warmDrip)) return;
+  window.CardImageShim.warmDrip(w.cards, { heroes: w.heroes, abilities: w.abilities, keep: keep !== false, delay: 1500, front: true });
+};
+
+window.ppPrompt = (text, vorgabe, opts) => _ppDialogOeffnen({ text, eingabe: true, vorgabe, ...(opts || {}) });
 window.CardTooltipContent = CardTooltipContent;
 window.useCardTooltip = useCardTooltip;
 window.useStickyHoverFlag = useStickyHoverFlag;

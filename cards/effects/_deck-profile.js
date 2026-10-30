@@ -161,6 +161,10 @@ function loadAllProfiles(dir = PROFILE_DIR) {
  * deck arrived as a sample deck, user copy, or self-play snapshot.
  */
 function profileFor(engine, pi) {
+  // Heisser Pfad (mehrere Millionen Aufrufe je Lastlauf): ein gemerktes Ergebnis kommt VOR dem `process.env`-Zugriff (~0,45 µs je Lesen). Der Schalter wird
+  // nur beim Trainingsstart gesetzt (server.js), nie mitten in einer Partie — fuer eine laufende Engine aendert sich also nichts.
+  const gemerkt = engine._deckProfileCache && engine._deckProfileCache[pi];
+  if (gemerkt !== undefined && (engine._profileAllowedSide == null || pi === engine._profileAllowedSide)) return gemerkt;
   if (process.env.PP_DISABLE_PROFILES === '1') return null;
   // Seiten-Maske für Spiegel-A/B-Läufe (PP_TRAIN_AB): Im Mirror-Match
   // matcht das Helden-Trio BEIDE Seiten — die Maske beschränkt das
