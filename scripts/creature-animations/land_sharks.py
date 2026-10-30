@@ -19,7 +19,7 @@ Ablauf (56 Frames à 66 ms = 3,7 s), alle Bewegungen unabhängig:
 * Flosse taucht auf (Periode 28, 2× pro Schleife): die Flossenspitze hebt sich in zwei Stufen — erst 1 px (Zeile 7 wird in der Flosse eingefügt, Frames 3–16 und 31–44), 3 Frames später
   noch 1 px (Zeile 3, Frames 6–19 und 34–47); der Ansatz bleibt im Hügel. Die Flosse wird dabei etwas höher.
 * Flosse wiegt sich: die Flossenzeilen 0–9 neigen sich als wandernde Welle bis ±2 px (Spitze am meisten), 2 Wellen pro Schleife.
-* Hügel bebt: zweimal pro Schleife (Frames 6–21 und 34–49) schüttelt sich der Erdhügel (Zeilen 8–16 wandern zweimal bis ±1 px hin und her, benachbarte Zeilen im Gegentakt).
+* Hügel bebt: zweimal pro Schleife (Frames 6–21 und 34–49) schüttelt sich der Erdhügel (Zeilen 12–16 wandern zweimal bis ±1 px hin und her, benachbarte Zeilen im Gegentakt; die Erde um den Flossenansatz bleibt).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
 Ergänzungen: Randpixel-Korrektur (Regel 16): wo die Flossenbewegung eine Füllfarbe an den Rand schiebt, wird ein Umrisspixel (Farbe aus dem Original) ergänzt (anim_tiere.umriss_schliessen).
@@ -79,13 +79,16 @@ def flosse_wiegen(t, i):
 
 
 def huegel_beben(t, u):
-    """Hügelzeilen 8–16: benachbarte Zeilen im Gegentakt bis ±1 px, nur im Bebenfenster; sonst wie im Original."""
+    """Hügelzeilen 12–16: benachbarte Zeilen im Gegentakt bis ±1 px, nur im Bebenfenster; sonst wie im Original."""
     if u is None:
         return t
     out = L.leer(H, W)
     for y in range(0, sh):
         xs_ = np.nonzero(t[PAD_T + y, :, 3])[0]
         if not len(xs_):
+            continue
+        if y < 12:                                                 # die Erde direkt um den Flossenansatz (Zeilen 7–11) bleibt, sonst entstünden Lücken neben der Flosse
+            out[PAD_T + y, xs_] = t[PAD_T + y, xs_]
             continue
         dx = int(round(1.0 * math.sin(math.pi * u) * math.sin(4 * math.pi * u + 1.7 * y)))
         for x in xs_:
