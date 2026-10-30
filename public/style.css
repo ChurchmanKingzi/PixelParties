@@ -13877,7 +13877,7 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   justify-content: flex-end;
   padding: 6px;
   pointer-events: none;
-  background: linear-gradient(180deg, rgba(8,6,12,.05) 0%, rgba(8,6,12,.45) 100%);
+  background: var(--pp-kachel-4) 0 0 / 8px 8px;   /* ★ W86u2 (Pixelart): Dither-Abdunklung statt Verlauf mit Alpha */
   transition: opacity .2s;
 }
 .shop-unowned-skin:hover .shop-lock-overlay { opacity: .55; }

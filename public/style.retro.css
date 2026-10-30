@@ -6830,7 +6830,7 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 /* Lock overlay on unowned skins — a soft scrim + padlock badge so the tile
    reads as a desirable thing to unlock rather than a disabled entry. The
    scrim lifts on hover to preview the art in fuller colour. */
-.shop-lock-overlay { position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: flex-end; padding: 6px; pointer-events: none; background: linear-gradient(180deg, transparent 0% 100%); transition: opacity .2s steps(5, end); }
+.shop-lock-overlay { position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: flex-end; padding: 6px; pointer-events: none; background: var(--pp-kachel-4) 0 0 / 8px 8px; transition: opacity .2s steps(5, end); }
 .shop-unowned-skin:hover .shop-lock-overlay { opacity: .55; }
 .shop-lock-badge { font-size: 13px; line-height: 1; padding: 3px 5px; border-radius: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect x='0' y='0' width='2' height='2' fill='%2308060c'/%3E%3Crect x='2' y='0' width='2' height='2' fill='%2308060c'/%3E%3Crect x='0' y='2' width='2' height='2' fill='%2308060c'/%3E%3C/svg%3E") 0 0 / 4px 4px; border: 2px solid #72541d; box-shadow: 0 1px 0 0 #000000; }
 
