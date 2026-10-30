@@ -24,7 +24,7 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
   der Rand unten (y 22/23) bleibt am Boden. Die Kuppelzeile 9 läuft 3 Frames nach und wird ebenfalls einmal verlängert (Kopf-Stufe): Rohre und Kuppel steigen um ein weiteres px —
   Kuppel/Rohre 0 → 1 → 2 → 1 → 0 px, Helm/Fenster 0 → 1 → 0. Das Bullauge selbst wird nicht gestreckt.
 * Dampfrohre zittern (Dampfdruck): die obersten drei Rohrzeilen (0–2) jedes Rohrs schlagen gemeinsam ±1 px seitlich aus (links Periode 12, rechts Periode 16, gegenphasig), jedes Rohr bleibt 4-verbunden.
-* Dampf: aus beiden Rohrspitzen steigen kleine runde Dampfwölkchen (Form 'm', Wachsen/Schrumpfen über L.puff_ebene, Pixel in Hellgrün-Weiß H (185,221,209) mit Rand F (108,108,108)) langsam bis 3 px auf,
+* Dampf: aus beiden Rohrspitzen steigen kleine runde Dampfwölkchen (Form 'm', Wachsen/Schrumpfen über L.puff_ebene, Pixel in Hellgrün-Weiß H (185,221,209) mit Rand F (108,108,108)) langsam bis 2 px auf (über einer Lücke von 1 px zur Rohrspitze),
   je Rohr zwei Wölkchen um eine halbe Periode versetzt (Periode 24 Frames), hinter der Figur. Höchstens 2 px über der Figur (Frame knapp zugeschnitten).
 * Metall glänzt (Regel 12/14: Metall, Gold und Glas): ein Lichtband läuft zweimal pro Schleife diagonal von links oben nach rechts unten — zuerst über die Rohre (Frames 2–9 und 26–33), dann über den Helm
   (Frames 6–19 und 30–43: Messing und olivfarbener Rahmen 1–2 Stufen heller auf der Rampe des Sprites, das Glas D → H). Nur Innenpixel, Umrisse bleiben. Dazu je ein vierzackiger Glitzer-Stern an einer Messingkante
@@ -63,7 +63,7 @@ PIPE_RAMPE = [B, C, F]
 MESSING = [(109, 84, 20), (169, 115, 25), (206, 133, 28), (205, 156, 80), (234, 194, 107), (250, 245, 143)]   # E < L < G < K < I < J
 OLIV = [(129, 114, 31), (156, 134, 12), (169, 141, 6)]                         # Q < N < S (Fensterrahmen)
 GLAS = [GLAS_D, GLAS_H]
-KERN, ARM1, ARM2 = (250, 245, 143), (234, 194, 107), (205, 156, 80)
+KERN, ARM1, ARM2 = (250, 245, 143), GLAS_H, GLAS_D                              # Stern: heller Kern, helle Glasfarben als Arme (heben sich vom Messing ab)
 UMRISS = f(8, 7)                                                              # A (16,32,0)
 
 KANTE0 = Hm.kantenmaske(spr)
@@ -115,11 +115,11 @@ def frame(i, dampf=True):
         Hm.stern4(gl, sx, sy - (hub if hubart == 'kopf' else brust), st, KERN, ARM1, ARM2, OFF)
     ebenen = []
     if dampf:
-        py = PAD_T - 1
+        py = PAD_T - 2                                                        # Dampf startet 1 px über der Rohrspitze (Lücke), steigt bis 2 px höher
         spec = []
         for cx, dx2, off0 in ((PAD_L + 11, 1, 0), (PAD_L + 19, 0, 6)):        # Mitte der Rohrspitzen (links x 11, rechts x 19–20)
-            spec.append(dict(x=cx, y=py, vx=0, vy=-3, off=off0, form='m', wackeln=0.6))
-            spec.append(dict(x=cx + dx2, y=py, vx=0, vy=-3, off=off0 + 12, form='m', wackeln=-0.6))
+            spec.append(dict(x=cx, y=py, vx=0, vy=-2, off=off0, form='m', wackeln=0.6))
+            spec.append(dict(x=cx + dx2, y=py, vx=0, vy=-2, off=off0 + 12, form='m', wackeln=-0.6))
         ebenen.append((L.puff_ebene(H, W, i % 24, 24, spec, {'c': GLAS_H, 'r': F}), 0, 0))
     ebenen += [(k, 0, 0), (gl, 0, 0)]
     return L.zusammen(H, W, ebenen)

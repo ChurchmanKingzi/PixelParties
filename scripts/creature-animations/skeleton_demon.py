@@ -21,7 +21,7 @@ Was ist was (x/y im Sprite, linke Seite; die rechte ist gespiegelt x ↔ 19 − 
 Fest bleiben: Schädelform, Hörner, Beine/Füße, Rippenmuster, Umrisse.
 
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, Partikel ausgenommen):
-* Atmen zweistufig 0-1-2-1-0 px (Periode 24, also zweimal pro Schleife): die Rumpfzeile y 12 wird 1–2× eingefügt, alles oberhalb (Schädel samt Hörnern, Schultern, Flügel) hebt
+* Atmen zweistufig 0-1-2-1-0 px (Periode 24, also zweimal pro Schleife): erst wird die Rumpfzeile y 12 einmal eingefügt, in der zweiten Stufe zusätzlich y 14; alles oberhalb (Schädel samt Hörnern, Schultern, Flügel) hebt
   sich starr, Becken, Beine, Füße und Hände bleiben am Boden.
 * Blinzeln (Regel „Lidfarbe = umgebende Körperfarbe“): die roten Augenpixel werden für 4 Frames schwarz (9,9,9, die Schädelfarbe) — erst die oberen zwei Pixel, dann alle, dann
   wieder die oberen —, zweimal pro Schleife (Frame 15–18 und 38–41). Sonst KEIN Farbwechsel/Glühen der Augen.
@@ -133,8 +133,12 @@ def frame_gross(i, nur=None):
     hr = teil(HAND_R)
     dxl, dxr = -U.stufe(i, 16, 2), U.stufe(i, 24, 2)
     dyl, dyr = (-1 if i in ZUCK_L else 0), (-1 if i in ZUCK_R else 0)
-    basis = L.streck_zeile(basis, GPT + 12, n)
-    fl = L.streck_zeile(fl, GPT + 12, n)
+    # Atmen: erste Stufe = Zeile y 12 doppelt, zweite Stufe zusätzlich Zeile y 14 doppelt (verteilt die Streckung, keine Dreifach-Zeile im Rippenkorb)
+    if n >= 2:
+        basis, fl = L.streck_zeile(basis, GPT + 14, 1), L.streck_zeile(fl, GPT + 14, 1)
+    if n >= 1:
+        z = GPT + (11 if n >= 2 else 12)
+        basis, fl = L.streck_zeile(basis, z, 1), L.streck_zeile(fl, z, 1)
     koerper = L.zusammen(H, W, [(fl, 0, 0), (basis, 0, 0), (hl, dxl, dyl), (hr, dxr, dyr)])
     koerper = U.kontur_schliessen(koerper, UMRISS, SCHWARZ)       # Regel 16: Umriss an Flügelspalten und Händen in jeder Pose geschlossen
     if nur == 'koerper':
