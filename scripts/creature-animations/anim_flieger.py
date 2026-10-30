@@ -23,6 +23,9 @@ Bausteine, die bei mehreren Fliegern gebraucht werden:
     zeilen_pendel(a, pivot_y, amp, phase, …)   nur Zeilen UNTER dem Pivot pendeln waagerecht (Beine/Schwanz/Hinterleib), je tiefer, desto mehr
     kipp_dy(x, pivot_x, amp, phase, maxd)      Versatz der Spalte x beim Kippen (Wippe um pivot_x, vorzeichenbehaftet)
     spalten_kippen(a, pivot_x, amp, phase)     ganze Figur wippt um pivot_x (links hoch, rechts runter und umgekehrt), Spalten bleiben ganz
+    feuer_zungen(a, i, n, kern_farben, …)      Feuer (Regel 15): breite ruhige Basis, Zungen steigen auf und flackern unregelmäßig in Posen à 2–3 Frames,
+                                               je Zunge versetzt; die Farbfolge (Spitze rot, Mitte orange, Kern hell) wandert mit der Zunge
+    zungen_spitzen(a, kern_farben, max_y)      Spitzen (Spalte, Zeile) der Zungen — Startpunkte für abreißende Funken
     kacheln(frames, x0, x1, y0, y1, sc)        Ausschnitt mehrerer Frames nebeneinander, ganzzahlig vergrößert (Nahaufnahme für Nähte)
     stapeln(bilder)                            PIL-Bilder untereinander zu einem Kontrollbild
 """
@@ -316,4 +319,84 @@ def spalten_kippen(a, pivot_x, amp, phase, maxd=None):
             raise L.ClipError(f'Spalte {x} würde um {dy} px aus der Leinwand (Höhe {h}) geschoben')
         for y in ys:
             out[y + dy, x] = a[y, x]
+    return out
+
+
+def _zungen_spalten(a, kern_farben, min_zunge):
+    """Je Spalte: (y_oben, y_anker) — oberstes Pixel und erste Kernzeile (Farbe in kern_farben) darunter; nur Spalten mit Zunge ≥ min_zunge."""
+    h, w = a.shape[:2]
+    kern = {tuple(c) for c in kern_farben}
+    info = {}
+    for x in range(w):
+        ys = np.nonzero(a[:, x, 3])[0]
+        if not len(ys):
+            continue
+        yt = int(ys.min())
+        ya = None
+        for y in ys:
+            if tuple(int(v) for v in a[y, x, :3]) in kern:
+                ya = int(y)
+                break
+        if ya is not None and ya - yt >= min_zunge:
+            info[x] = (yt, ya)
+    return info
+
+
+def _zungen_gipfel(info):
+    """Zungen = lokale Gipfel der Silhouette (Spaltenoberkante); jede Spalte gehört zum nächsten Gipfel. Gibt (gipfel_liste, zuordnung) zurück."""
+    xs = sorted(info)
+    gipfel = []
+    for k, x in enumerate(xs):
+        yt = info[x][0]
+        links = info[xs[k - 1]][0] if k > 0 and xs[k - 1] == x - 1 else 10 ** 6
+        rechts = info[xs[k + 1]][0] if k + 1 < len(xs) and xs[k + 1] == x + 1 else 10 ** 6
+        if yt < links and yt <= rechts:
+            gipfel.append(x)
+    if not gipfel:
+        gipfel = [xs[len(xs) // 2]] if xs else []
+    zu = {x: min(range(len(gipfel)), key=lambda g: (abs(x - gipfel[g]), g)) for x in xs}
+    return gipfel, zu
+
+
+def zungen_spitzen(a, kern_farben, min_zunge=3):
+    """Spitzen der Zungen (Spalte, oberste Zeile) im Ausgangsbild: Startpunkte für abreißende Funken."""
+    info = _zungen_spalten(a, kern_farben, min_zunge)
+    gipfel, _ = _zungen_gipfel(info)
+    return [(x, info[x][0]) for x in gipfel]
+
+
+def feuer_zungen(a, i, n, kern_farben, pose_frames=3, seed=11, hub=0.3, min_zunge=3):
+    """Feuer wie Feuer: Der Teil jeder Spalte über dem hellen Kern (Spitze rot, Mitte orange) wird gestreckt/gestaucht (Nächster-Nachbar,
+    keine Mischfarben) — die Zunge wird länger oder kürzer, die Farbfolge wandert mit. Die Zungen (Gipfel der Silhouette) flackern
+    unabhängig: jede hat eine eigene Pose-Tabelle (Stufen −2…+2, in Posen à `pose_frames` Frames, n/pose_frames Posen pro Schleife,
+    nahtlos) und einen eigenen Versatz. Der helle Kern darunter und die Basis bleiben unverändert. Jede Spalte reicht weiter bis zum Kern,
+    daher bleibt die Figur 4-verbunden."""
+    out = a.copy()
+    h, w = a.shape[:2]
+    info = _zungen_spalten(a, kern_farben, min_zunge)
+    if not info:
+        return out
+    gipfel, zu = _zungen_gipfel(info)
+    k_posen = max(1, n // pose_frames)
+    rng = np.random.RandomState(seed)
+    tabellen = []
+    for g in range(len(gipfel)):
+        t, v = [], int(rng.randint(-2, 3))
+        for _ in range(k_posen):
+            v = int(np.clip(v + int(rng.randint(-2, 3)), -2, 2))
+            t.append(v)
+        tabellen.append((t, int(rng.randint(0, k_posen))))
+    for x, (yt, ya) in info.items():
+        t, off = tabellen[zu[x]]
+        stufe = t[((i // pose_frames) + off) % k_posen]
+        s = 1.0 + hub * stufe / 2.0
+        h0 = ya - yt
+        h1 = max(1, int(round(h0 * s)))
+        top = ya - h1
+        if top < 0:
+            raise L.ClipError(f'Feuerzunge in Spalte {x} würde oben aus der Leinwand ragen')
+        out[:ya, x] = 0                                   # Zunge neu aufbauen (alles über dem Kern)
+        for k in range(h1):
+            src = yt + int(k * h0 / h1)
+            out[top + k, x] = a[src, x]
     return out
