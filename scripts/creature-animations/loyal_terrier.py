@@ -26,14 +26,15 @@ Ablauf (56 Frames à 65 ms = 3,64 s), alle Bewegungen unabhängig; der Kopf blei
 * Atmen (Periode 28, 2× pro Schleife; oben in Frames 3–16 und 31–44): Zeile 11 wird eingefügt — Kopf, Ohren und Halsband heben sich
   1 px, die Füße bleiben am Boden.
 * Spitzohren zucken: jedes Ohr 4× pro Schleife (links Frames 2/16/30/44, rechts 9/23/37/50, je 6 Frames): die Ohrspitze (Zeilen 0–1)
-  schnippt 1 px nach außen und zurück, die Ohrbasis (Zeile 2) bleibt, die Zeilen überlappen sich (4-verbunden).
+  schnippt 1 px nach außen und zurück, die Ohrbasis (Zeile 2) bleibt, die Zeilen überlappen sich (4-verbunden). Der innere Umrisspixel
+  der Zeile 1 ((4,1) bzw. (7,1)) bleibt zusätzlich stehen, sonst läge das Ohrpixel darunter beim Zucken offen (Umriss geschlossen in jeder Pose).
 * Blick: nur die dunklen Augen wandern 1 px — Frames 14–21 nach rechts, 26–33 nach links, 45–52 nach rechts.
 * Blinzeln, deutlich sichtbar (Frames 9–12 und 37–40, alle 28 Frames ≈ 1,8 s): die Augenpixel werden hellgrau (H) — erst das obere,
   dann beide (zwei Frames), dann wieder das obere.
 * Halsbandglanz (Regel 12): ein Lichtband läuft über die U-Linie (links → rechts, jedes Pixel 2 Frames in H = hellste Stufe der
   Fellrampe), in den Frames 18–25 und 46–53.
 * Pfoten tippen: linker Fuß in Frames 5–6, 21–22 und 36–37, rechter Fuß in Frames 13–14, 29–30 und 44–45 (Zeile 11 des Fußes entfällt,
-  die Fußlinie rückt 1 px hoch).
+  die Fußlinie rückt 1 px hoch; die Innenumrisse (5,11) und (6,11) zwischen den Beinen bleiben am Körper, damit das Halsband unten nicht offen liegt).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
 Ergänzungen: keine gemalten Pixel.
@@ -116,13 +117,14 @@ def frame(i, nur=None):
     r = L.streck_zeile(k, PAD_T + FUSSZEILE, atem)
     cols = np.arange(W)[None, :]
     fuss = (np.arange(H)[:, None] >= PAD_T + FUSSZEILE) & (cols >= PAD_L + 2) & (cols <= PAD_L + 9)
-    fl, rest = L.trenne(r, fuss & (cols <= PAD_L + 5))
-    fr_, rest = L.trenne(rest, fuss & (cols >= PAD_L + 6))
+    # die beiden Innenumrisse zwischen den Beinen (5,11) und (6,11) bleiben am Körper: sie sind der Umriss unter dem Halsband
+    fl, rest = L.trenne(r, fuss & (cols <= PAD_L + 4))
+    fr_, rest = L.trenne(rest, fuss & (cols >= PAD_L + 7))
     fl = L.heben_unten(fl, PAD_T + FUSSZEILE, tipp_l)
     fr_ = L.heben_unten(fr_, PAD_T + FUSSZEILE, tipp_r)
     # Ohren: Spitze (Zeilen 0–1) schnippt 1 px nach außen, mit dem Atem-Hub
-    ol = L.versetze(T.zucken_zeilen(teil(ohr_l), PAD_T + 2, -1.2 * ohr_li, {PAD_T + 0: 1.0, PAD_T + 1: 1.0}), 0, -atem)
-    orr = L.versetze(T.zucken_zeilen(teil(ohr_r), PAD_T + 2, 1.2 * ohr_re, {PAD_T + 0: 1.0, PAD_T + 1: 1.0}), 0, -atem)
+    ol = L.versetze(T.zucken_zeilen(teil(ohr_l), PAD_T + 2, -1.2 * ohr_li, {PAD_T + 0: 1.0, PAD_T + 1: 1.0}, innen='rechts'), 0, -atem)
+    orr = L.versetze(T.zucken_zeilen(teil(ohr_r), PAD_T + 2, 1.2 * ohr_re, {PAD_T + 0: 1.0, PAD_T + 1: 1.0}, innen='links'), 0, -atem)
     ebenen = {'rumpf': rest, 'fuss_l': fl, 'fuss_r': fr_, 'ohr_l': ol, 'ohr_r': orr}
     wahl = nur or ('rumpf', 'fuss_l', 'fuss_r', 'ohr_l', 'ohr_r')
     return L.zusammen(H, W, [(ebenen[n], 0, 0) for n in wahl])

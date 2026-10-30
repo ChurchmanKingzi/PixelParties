@@ -8,7 +8,7 @@ Aufruf:   python3 elven_archer.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/elven-archer.png + .json
 
 Was im Sprite ist (Koordinaten x, y im 18×26-Sprite):
-* Bogen (x 2–4, y 6/7–25): brauner Schaft mit dunklem Umriss, schwarz-grauer Griff y 14–17. Steht fest (Bogen am Boden/in der Hand).
+* Bogen (x 2–4, y 6/7–25): brauner Schaft mit dunklem Umriss, schwarz-grauer Griff y 14–17. Hebt sich als Einheit mit Arm/Hand (Brust).
 * Linke Elfenohrspitze (0–1, 8–9): nur ein dunkler Keil, der Rest steckt hinter dem Bogen. Rechtes Ohr (14–17, 8–10).
 * FEDER (13–15, 0–4): hellblau mit weißer Kante, steckt hinter dem Kopf im Haar (Haarschmuck, kein Pfeil).
 * Haar (x 4–13, y 3–14): gelb/orange, Pony y 7–9, zwei Seitenlocken (links x 5, rechts x 12–13). Gesicht y 9–13.
@@ -21,8 +21,8 @@ Was im Sprite ist (Koordinaten x, y im 18×26-Sprite):
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Auf und ab (zweistufig, Periode 24 = zweimal pro Schleife): Die Brust hebt sich zuerst um 1 px (die dunkle Gürtelzeile 18 wird
   einmal doppelt eingefügt: Brust, Hand, Kopf und Feder steigen, die Beine bleiben). Der Kopf läuft 3 Frames nach und hebt sich um ein
-  weiteres px (Halszeile 14 verlängert): Der Kopf hebt sich also 0 → 1 → 2 → 1 → 0 px, die Brust 0 → 1 → 0. Der Bogen steht fest, die Hand
-  rutscht am Griff mit. Wo sich dabei der Kopf von der Bogenspitze löst, wird die Lücke mit Haar gefüllt (Lücke (4,5)/(4,6) → Farbe der
+  weiteres px (Halszeile 14 verlängert): Der Kopf hebt sich also 0 → 1 → 2 → 1 → 0 px, die Brust 0 → 1 → 0. Der Bogen steigt als Einheit mit Arm/Hand und
+  Brust (starr um dieselben 0 → 1 → 0 px, die Hand rutscht nicht am Griff); nur der Kopf-Nachlauf kommt obendrauf. Wo sich dabei der Kopf von der Bogenspitze löst, wird die Lücke mit Haar gefüllt (Lücke (4,5)/(4,6) → Farbe der
   anliegenden Locke (5,y), siehe Funktion luecke_bogen).
 * Haare im Wind (drei Böen, alle 16 Frames, Start 4/20/36; die Welle läuft von der Locke zur Strähnenspitze, je Stufe 2 Frames später):
   1. Spitze der rechten Locke (12,14): blasser Pixel schlägt nach außen auf (13,14) über die Schulter, (12,14) wird Umrissbraun.
@@ -102,11 +102,11 @@ def teil(maske):
     return L.platz(t, H, W, PAD_L, PAD_T)                      # sofort auf die volle Leinwand
 
 
-def luecke_bogen(k):
-    """Hebt sich der Kopf, löst sich die linke Haarkante von der Bogenspitze: In Spalte x = 4 (rechter Bogenumriss) fehlen dann
-    Pixel zwischen dem obersten Haarpixel und der ersten Bogenzeile (7). Sie werden in der Farbe der anliegenden Locke (x = 5)
-    gefüllt, damit Kopf und Bogen 4-verbunden bleiben."""
-    xc, yb = PAD_L + 4, PAD_T + BOGEN_OBEN
+def luecke_bogen(k, bogen_hub=0):
+    """Hebt sich der Kopf schneller als der Bogen (Kopf-Nachlauf), löst sich die linke Haarkante von der Bogenspitze: In Spalte x = 4
+    (rechter Bogenumriss) fehlen dann Pixel zwischen dem obersten Haarpixel und der ersten Bogenzeile (7 − bogen_hub). Sie werden in der
+    Farbe der anliegenden Locke (x = 5) gefüllt, damit Kopf und Bogen 4-verbunden bleiben."""
+    xc, yb = PAD_L + 4, PAD_T + BOGEN_OBEN - bogen_hub
     ys = [y for y in range(yb) if k[y, xc, 3]]
     if not ys:
         return k
@@ -158,7 +158,9 @@ def frame(i):
         # Unter der Hand (x 5–7) soll nicht der dunkle Handumriss (Zeile 18) doppelt stehen, sondern der Saum (Zeile 19) —
         # die eingefügte Zeile 18 wird dort mit der Zeile 19 überschrieben (Hand bleibt einfach hoch, Umriss einfach dick).
         k[PAD_T + 18, PAD_L + 5:PAD_L + 8] = k[PAD_T + 19, PAD_L + 5:PAD_L + 8]
-    k = luecke_bogen(k)
+    # Der Bogen steigt mit Arm/Hand und Brust (Einheit: Hand sitzt am Griff, rutscht nicht), nur der Kopf-Nachlauf kommt obendrauf
+    b = L.versetze(b, 0, -brust)
+    k = luecke_bogen(k, brust)
     return L.zusammen(H, W, [(k, 0, 0), (b, 0, 0)])
 
 

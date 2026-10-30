@@ -21,15 +21,16 @@ Identifikation (Sprite-Koordinaten x, y):
 * Fest bleibt: das Grau der Bomben (kein Glanz, nur Gold/Gelb glänzt), der Rest der Hummel.
 
 Ablauf (48 Frames à 60 ms = 2,88 s):
-* Flügel der Hummel schwirren: die kleinen Flügel schlagen bis 2 px nach unten und zurück (Periode 6 Frames, 8× pro Schleife); nur nach unten, weil darunter
+* Flügel der Hummel schlagen kräftiger: die kleinen Flügel schwirren bis 3 px nach unten und zurück (Periode 6 Frames, 8× pro Schleife); nur nach unten, weil darunter
   Körper/Teppich liegen (keine Lücke); die Nachbarspalten gleiten mit (Zusammenhang geprüft).
 * Teppich wippt (Seitenwippe um die Mitte, Spalten als Ganzes, ±2 px an den Enden, Periode 16) und schwebt (Bob ±1 px, Periode 12). Die Fransen (y ≥ 21) flattern
   seitlich 1–2 px (Periode 24, nur Zeilen unter y 20).
 * Bomben wippen mit dem Teppich und hüpfen zusätzlich 0…1 px nach oben (links/rechts versetzt, Periode 8); darunter liegt der vollständige Teppich.
-* Glanz (nur Gold/Gelb): ein Lichtband läuft über Borte und Fransen (Goldrampe (228,147,40) … (254,214,104) … (255,255,203), Gelb (234,229,48) → (255,255,0) → hell),
-  die gelben Sternfunken der Lunten und die Funkelpixel der Flügel pulsieren (Gelb ↔ hellgelb); vier vierzackige Glitzer-Sterne blitzen an Borte, Fransen und Flügel auf.
+* Die vier gelben Sternfunken an den Bomben sind das FEUER DER LUNTEN (Nutzerhinweis aus Bomblebee): sie brennen. Über jeder Marke wachsen Flammenzungen (0…3 px,
+  Posen à 4 Frames, je Spalte eigene Zufallsfolge, nahtlos), die Farbe wandert mit: unten hellgold (254,214,104), Mitte gold (237,195,67), Spitze orange (228,147,40);
+  der Kern blitzt bei hohen Zungen hellgelb. Die Marke selbst bleibt als Basis stehen. Von den Flammen reißen kleine runde Funken ab und steigen langsam auf (12 Partikel).
+* KEIN Glanz, keine Glitzersterne (Regel 14): Teppich und Hummel sind Stoff/Fell, die Bomben schwarzes Eisen ohne Glanzeffekt.
 * Blinzeln (Frames 20–22 und 44–46): die roten Augen werden braun.
-* Aufsteigende Funken (Partikel): zehn runde gelbe/orange Funken und Punkte steigen langsam von Lunten, Borte und Hummel auf.
 
 Ergänzungen: keine nötig — Teppich, Hummel und Bomben liegen als getrennte Ebenen vor; der Teppich ist unter den Bomben vollständig.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -54,27 +55,41 @@ H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
 yy, xx = np.mgrid[0:sh, 0:sw]
 
 # ── Farben (alle aus dem Sprite) ──────────────────────────────────────────────────────────────────────────────────
-ROT_A, ROT_B, ROT_D = (149, 47, 49), (192, 63, 66), (94, 29, 31)
-GELB, GELB_C, GELB_HELL = (255, 255, 0), (234, 229, 48), (255, 255, 203)
-G_R, G_F, G_T, G_M, G_O = (228, 147, 40), (218, 155, 41), (228, 174, 59), (237, 195, 67), (254, 214, 104)
-AUGE, KOPF = (187, 10, 10), (150, 83, 36)
-GOLDR = [G_R, G_F, G_T, G_M, G_O, GELB_HELL]
-GELBR = [GELB_C, GELB, GELB_HELL]
+ROT_D = (94, 29, 31)
+GELB, GELB_HELL = (255, 255, 0), (255, 255, 203)
+G_R, G_M, G_O = (228, 147, 40), (237, 195, 67), (254, 214, 104)             # Flamme: Spitze orange, Mitte gold, unten hellgold
+KOPF = (150, 83, 36)
 
 # ── Masken (Sprite-Koordinaten; Teppich-Ebene ist um 6 Zeilen nach unten versetzt) ──────────────────────────────────────
 tv = L.deckend(tep)
-gold_m = L.farbmaske(tep, [G_R, G_F, G_T, G_M, G_O])
-gelb_m = L.farbmaske(tep, [GELB_C])
-flu_l = tv & (xx >= 16) & (xx <= 19) & (yy >= 8) & (yy <= 14) & ~L.farbmaske(tep, [ROT_D])
-flu_r = tv & (xx >= 27) & (xx <= 30) & (yy >= 8) & (yy <= 14) & ~L.farbmaske(tep, [ROT_D])
+flu_l = tv & (xx >= 16) & (xx <= 19) & (yy >= 7) & (yy <= 14) & ~L.farbmaske(tep, [ROT_D])
+flu_r = tv & (xx >= 27) & (xx <= 30) & (yy >= 7) & (yy <= 14) & ~L.farbmaske(tep, [ROT_D])
 rest = tv & ~flu_l & ~flu_r
-FUNKEL_B = {'L1': L.farbmaske(bol, [GELB]) & (yy <= 5), 'L2': L.farbmaske(bol, [GELB]) & (yy >= 7),
-            'R1': L.farbmaske(bor, [GELB]) & (yy <= 6), 'R2': L.farbmaske(bor, [GELB]) & (yy >= 7)}
-funkel_t = L.farbmaske(tep, [GELB])
 AUGEN = [(22, 10), (24, 10)]
 
+# Lunten: die gelben Sternfunken der vier Bomben (je Spalte die oberste Marke) sind das Feuer — sie brennen.
+def _lunten(ebene, rows, xs):
+    gelb = L.farbmaske(ebene, [GELB, GELB_HELL])
+    res = []
+    for x in range(sw):
+        if not (xs[0] <= x <= xs[1]):
+            continue
+        ys = [y for y in range(rows[0], rows[1] + 1) if gelb[y, x]]
+        if ys:
+            res.append((x, min(ys)))
+    return res
+
+
+LUNTEN = {'L1': _lunten(bol, (0, 5), (0, 8)), 'L2': _lunten(bol, (7, 13), (0, 8)),
+          'R1': _lunten(bor, (0, 6), (33, 40)), 'R2': _lunten(bor, (7, 12), (28, 34))}
+_rng = np.random.RandomState(9)
+_K = N // 4
+FLAMMEN = {}
+for _name, _sp in LUNTEN.items():
+    for _x, _y in _sp:
+        FLAMMEN[(_name, _x)] = ([int(_rng.randint(0, 4)) for _ in range(_K)], int(_rng.randint(0, _K)), _y)
+
 PIVOT, MAXD = 23, 23
-STERNE = [((3, 14), 3), ((23, 23), 15), ((43, 14), 27), ((19, 11), 39)]            # (x, y) im Sprite, Start-Frame
 
 
 def px(x, y):
@@ -87,22 +102,25 @@ def puffs(liste):
 
 FUNKEN1 = {'c': GELB, 'r': G_R}
 FUNKEN2 = {'c': GELB_HELL, 'r': G_O}
-PUFFS1 = puffs([(4, 1, -1, -11, 0, 'k', 1), (5, 9, -1, -10, 10, 's', 1), (35, 3, 1, -11, 20, 'k', 1), (31, 9, 1, -10, 30, 's', 1),
-                (3, 12, -1, -10, 40, 'k', 1), (43, 12, 1, -10, 6, 'k', 1), (23, 6, 0, -12, 26, 's', 1)])
-PUFFS2 = puffs([(10, 0, 0, -12, 14, 'k', 1), (38, 0, 0, -12, 36, 'k', 1), (21, 20, 0, -9, 44, 'k', 1)])
+PUFFS1 = puffs([(4, 0, -1, -11, 0, 'k', 1), (5, 8, -1, -10, 10, 's', 1), (35, 1, 1, -11, 20, 'k', 1), (31, 7, 1, -10, 30, 's', 1),
+                (3, 1, -1, -12, 24, 's', 1), (36, 2, 1, -12, 40, 'k', 1)])
+PUFFS2 = puffs([(4, 7, 0, -11, 5, 'k', 1), (31, 8, 0, -11, 15, 'k', 1), (3, 0, -1, -12, 34, 'k', 1), (35, 0, 1, -12, 44, 'k', 1),
+                (5, 9, -1, -10, 19, 'k', 1), (32, 8, 1, -10, 27, 'k', 1)])
 
 
-def gold_licht(ebene, i):
-    F.lichtband(ebene, gold_m, PAD_L, PAD_T, i, N // 2, 4, 14, GOLDR, stufen=1, breite=5.0, achse=(1.0, 0.25), kern_stufen=2)
-    F.lichtband(ebene, gelb_m, PAD_L, PAD_T, i, N // 2, 4, 14, GELBR, stufen=1, breite=5.0, achse=(1.0, 0.25), kern_stufen=2)
-
-
-def funkeln(ebene, maske, t, farbe=GELB):
-    """Gelber Sternfunke pulsiert gelb → hellgelb → gelb über 6 Frames (t = Frames seit Start, sonst unverändert)."""
-    if 0 <= t < 6:
-        stufe = (0, 1, 2, 2, 1, 0)[t]
-        for (x, y) in zip(*np.nonzero(maske)[::-1]):
-            ebene[PAD_T + y, PAD_L + x, :3] = F.heller(ebene[PAD_T + y, PAD_L + x, :3], GELBR, stufe)
+def lunten_feuer(ebene, name, i):
+    """Brennende Lunten (Regel 15) auf einer Bomben-Ebene: über der Marke wachsen Flammenzungen 0…3 px, Farbe wandert mit (unten hellgold, Mitte gold,
+    Spitze orange); bei hohen Zungen blitzt die Marke hellgelb. Die Marke bleibt als Basis stehen."""
+    for (nm, x), (tab, off, y0) in FLAMMEN.items():
+        if nm != name:
+            continue
+        e = tab[((i // 4) + off) % _K]
+        farben = {0: [], 1: [G_R], 2: [G_O, G_R], 3: [G_O, G_M, G_R]}[e]
+        for k, c in enumerate(farben):
+            ebene[PAD_T + y0 - 1 - k, PAD_L + x, :3] = c
+            ebene[PAD_T + y0 - 1 - k, PAD_L + x, 3] = 255
+        if e == 3:
+            ebene[PAD_T + y0, PAD_L + x, :3] = GELB_HELL
 
 
 def schwirren(ebene, maske, xs, wurzel_x, s):
@@ -112,7 +130,7 @@ def schwirren(ebene, maske, xs, wurzel_x, s):
     dys = {}
     for x in xs:
         frac = abs(x - wurzel_x) / 4.0
-        dys[x] = int(round(2.0 * frac * s))
+        dys[x] = int(round(3.0 * frac * s))
     vorher = None
     for x in xs:
         ys = [y for y in range(sh) if maske[y, x]]
@@ -130,7 +148,7 @@ def schwirren(ebene, maske, xs, wurzel_x, s):
 
 def frame(i, partikel=True):
     pb = L.sinus(i, N / 4)                                    # Schweben: Periode 12
-    bob = int(round(-1.3 * math.sin(pb)))
+    bob = int(round(-1.8 * math.sin(pb)))
     kippen = L.sinus(i, N / 3)                                # Seitenwippe: Periode 16
     ph = L.sinus(i, N / 8)                                    # Flügelschwirren: Periode 6
     s_fl = (1 - math.cos(ph)) / 2
@@ -143,39 +161,28 @@ def frame(i, partikel=True):
         F.setze(T, PAD_L, PAD_T, {p: KOPF for p in AUGEN[:1]})
     if i in (21, 45):                                         # ganz zu
         F.setze(T, PAD_L, PAD_T, {p: KOPF for p in AUGEN})
-    # Glanz: Gold/Gelb am Teppich und an den Flügeln, Sternfunkel der Flügel
-    gold_licht(T, i)
-    t_fl = (i - 9) % N
-    for e_ in (wl, wr):
-        funkeln(e_, funkel_t & (flu_l | flu_r), t_fl)
     # Flügel schwirren (nur nach unten, 0…2 px); Spalten mit Zusammenhang (Nachbar zur Körpermitte hin)
     wl_ = schwirren(wl, flu_l, range(19, 15, -1), 20, s_fl)
     wr_ = schwirren(wr, flu_r, range(27, 31), 26, s_fl)
     # Fransen flattern, danach wippt der ganze Teppich samt Hummel
     T = F.zeilen_pendel(T, PAD_T + 20, 2.2, L.sinus(i, N / 2), 1.0)
     T = L.zusammen(H, W, [(T, 0, 0), (wl_, 0, 0), (wr_, 0, 0)])
-    T = F.spalten_kippen(T, PAD_L + PIVOT, 1.6, kippen, MAXD)
+    T = F.spalten_kippen(T, PAD_L + PIVOT, 2.2, kippen, MAXD)
 
     # ── Bomben: wippen mit, hüpfen zusätzlich 0…1 px nach oben; Sternfunken pulsieren ─────────────────────────────────────
     bl = F.ebene(bol, L.deckend(bol), H, W, PAD_L, PAD_T)
     br = F.ebene(bor, L.deckend(bor), H, W, PAD_L, PAD_T)
-    for k, (name, m) in enumerate(FUNKEL_B.items()):
-        e_ = bl if name[0] == 'L' else br
-        funkeln(e_, m, (i - 2 - 11 * k) % N)
+    for name in LUNTEN:                                       # Feuer der Lunten
+        lunten_feuer(bl if name[0] == 'L' else br, name, i)
     hop_l = -int(round(1.2 * max(0.0, math.sin(L.sinus(i, N / 6)))))
     hop_r = -int(round(1.2 * max(0.0, math.sin(L.sinus(i, N / 6) - 3.0))))
-    kd_l = F.kipp_dy(8, PIVOT, 1.6, kippen, MAXD)
-    kd_r = F.kipp_dy(37, PIVOT, 1.6, kippen, MAXD)
+    kd_l = F.kipp_dy(8, PIVOT, 2.2, kippen, MAXD)
+    kd_r = F.kipp_dy(37, PIVOT, 2.2, kippen, MAXD)
 
     pol = L.zusammen(H, W, [(L.puff_ebene(H, W, i, N, PUFFS1, FUNKEN1), 0, 0), (L.puff_ebene(H, W, i, N, PUFFS2, FUNKEN2), 0, 0)]) \
         if partikel else L.leer(H, W)
     f = L.zusammen(H, W, [(pol, 0, 0), (T, 0, bob), (bl, 0, bob + kd_l + hop_l), (br, 0, bob + kd_r + hop_r)])
 
-    # ── Glitzer-Sterne (bleiben AM Objekt) ──────────────────────────────────────────────────────────────────────────────
-    for (cx, cy), start in STERNE:
-        st = F.stern_stufe(i, N, start)
-        if st is not None:
-            F.stern(f, PAD_L + cx, PAD_T + cy + F.kipp_dy(cx, PIVOT, 1.6, kippen, MAXD) + bob, st, GELB_HELL, GELB, G_O)
     return f
 
 

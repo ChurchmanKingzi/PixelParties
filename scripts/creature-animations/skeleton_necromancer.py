@@ -58,23 +58,23 @@ vorhanden = L.deckend(spr)
 c = lambda x, y: tuple(int(v) for v in spr[y, x, :3])
 SEELE_KERN = c(6, 17)                     # E (213,213,213) Knochenweiß
 SEELE_RAND = (128, 102, 178)              # #8066b2 aus data/palette.json (Ausnahme, kaltes Violett)
-K_, H_, E_, I_ = c(7, 15), c(9, 14), c(7, 14), c(8, 14)    # Knochenrampe: (82,82,82) → (189,189,189) → (213,213,213) → (246,255,255)
-RAMPE = {K_: H_, H_: E_, E_: I_}
+SCHWARZ = c(10, 33)                       # A (0,0,0): Loch
 
+schwarz = vorhanden & (spr[..., :3] == np.array(SCHWARZ)).all(axis=2)
 aermel_l = vorhanden & (xx <= 4) & (yy >= 8) & (yy <= 12)
 aermel_r = vorhanden & (xx >= 15) & (yy >= 8) & (yy <= 12)
 haube = vorhanden & (yy <= 12) & ~aermel_l & ~aermel_r          # Kapuze + Robe
 rippen = vorhanden & (yy >= 13) & (yy <= 20)
-unterkoerper = vorhanden & (yy >= 24)
-assert (aermel_l | aermel_r | haube | rippen | unterkoerper).sum() == vorhanden.sum()
-knochen = [(x, y) for y in range(13, 21) for x in range(sw) if vorhanden[y, x] and tuple(spr[y, x, :3]) in RAMPE or (vorhanden[y, x] and tuple(spr[y, x, :3]) == I_ and 13 <= y <= 20)]
-knauf = [(x, y) for y in range(24, 31) for x in range(sw) if vorhanden[y, x] and (tuple(spr[y, x, :3]) in RAMPE or tuple(spr[y, x, :3]) == I_)]
+arm = vorhanden & (yy >= 24) & ~schwarz                          # Faust + Unterarmknochen aus dem Loch
+loch = vorhanden & (yy >= 24) & schwarz                          # schwarze Raute am Boden
+assert (aermel_l | aermel_r | haube | rippen | arm | loch).sum() == vorhanden.sum()
+LOCH_ERG = [(9, 28), (10, 28), (11, 28), (9, 29), (10, 29), (11, 29), (10, 30)]    # ERGÄNZUNG: schwarz hinter dem Arm
 
 SEELEN = {'c': SEELE_KERN, 'r': SEELE_RAND}
 P = lambda x, y: (PAD_L + x, PAD_T + y)
 PUFFS = [
-    dict(x=P(2, 27)[0], y=P(2, 27)[1], vx=-2, vy=-16, off=0, form='l', wackeln=1),        # groß, links vom Unterkörper
-    dict(x=P(17, 29)[0], y=P(17, 29)[1], vx=2, vy=-17, off=14, form='l', wackeln=1),      # groß, rechts
+    dict(x=P(1, 19)[0], y=P(1, 19)[1], vx=-3, vy=-14, off=0, form='l', wackeln=1),        # groß, links vom Rippenring
+    dict(x=P(18, 20)[0], y=P(18, 20)[1], vx=3, vy=-15, off=14, form='l', wackeln=1),      # groß, rechts
     dict(x=P(0, 9)[0], y=P(0, 9)[1], vx=-2, vy=-10, off=26, form='m', wackeln=1),         # über dem linken Ärmel
     dict(x=P(19, 9)[0], y=P(19, 9)[1], vx=2, vy=-10, off=6, form='m', wackeln=1),         # über dem rechten Ärmel
     dict(x=P(3, 17)[0], y=P(3, 17)[1], vx=-3, vy=-11, off=20, form='o', wackeln=1),       # aus dem Rippenring nach links
@@ -82,9 +82,10 @@ PUFFS = [
     dict(x=P(10, -3)[0], y=P(10, -3)[1], vx=0, vy=-9, off=38, form='k', wackeln=1),       # Funke über der Kapuze
     dict(x=P(8, 19)[0], y=P(8, 19)[1], vx=0, vy=-4, off=3, form='k', wackeln=0.5),        # Funken im hohlen Rippenring
     dict(x=P(11, 19)[0], y=P(11, 19)[1], vx=0, vy=-4, off=22, form='k', wackeln=0.5),
-    dict(x=P(6, 34)[0], y=P(6, 34)[1], vx=-2, vy=-9, off=10, form='o', wackeln=1),        # neben der Rautenspitze
-    dict(x=P(14, 33)[0], y=P(14, 33)[1], vx=2, vy=-9, off=30, form='o', wackeln=1),
+    dict(x=P(4, 22)[0], y=P(4, 22)[1], vx=-2, vy=-9, off=10, form='o', wackeln=1),        # an den unteren Rippen
+    dict(x=P(15, 22)[0], y=P(15, 22)[1], vx=2, vy=-9, off=30, form='o', wackeln=1),
 ]
+ZUCK = {6, 7, 17, 18, 31, 32}                                    # kurze Zuckungen des Arms (+1 px)
 
 
 def teil(maske):
@@ -99,38 +100,28 @@ def stufe2(i):
 
 
 def frame(i):
-    # --- Schweben: Rippenring (Brust) zuerst, Kapuze + Ärmel 3 Frames später (nie höher als die Brust, höchstens 1 px tiefer — der Saum
-    #     taucht dann über den Rippenring, es entsteht nie ein Spalt), Unterkörper 5 Frames später ---
+    # --- Schweben (oberer Teil): Rippenring (Brust) zuerst, Kapuze + Ärmel 3 Frames später (nie höher als die Brust, höchstens 1 px tiefer) ---
     r_r = stufe2(i)
     r_h = max(min(r_r, stufe2(i - 3)), r_r - 1)
-    r_t = stufe2(i - 5)
     r_c = U.stufe(i, N / 2, 1)                                   # Kapuze atmet (0/1)
-    spitze = 1.8 * math.sin(L.sinus(i, N / 4))                   # Spitzenpendel (Periode 10), 0 bei Frame 0
     hump = U.buckel(i, 0, 20, n=20)                              # Ärmel-Geste (Periode 20), Frame 0 = Ruhe
     ph = L.sinus(i, 10)
+    n_arm = min(3, stufe2(i) + (1 if i in ZUCK else 0))          # Arm reckt sich aus dem Loch (0 … 3 px)
+    kipp = 1.4 * math.sin(L.sinus(i, 16))                        # Handgelenk kippt (Periode 16), 0 bei Frame 0
 
     hb = L.streck_zeile(teil(haube), PAD_T + 5, r_c)
     ri = teil(rippen)
-    # Lichtband über den Rippenring (alle 20 Frames, diagonal von oben links nach unten rechts)
-    k = i % 20
-    U.band_diagonal(ri, knochen, RAMPE, 19 + k, 2, PAD_L, PAD_T)
-    un = U.haengen(teil(unterkoerper), PAD_T + 30, spitze)
-    if 10 <= k <= 18:                                            # Lichtband über den Knochenknauf (versetzt)
-        U.band_diagonal(un, knauf, RAMPE, 33 + (k - 10), 2, PAD_L, PAD_T)
     al = L.spalten_welle(teil(aermel_l), PAD_L + 5, 1.6 * hump, ph, bias=-4.0 * hump, lauf=1.0, nur_rechts=False)
     ar = L.spalten_welle(teil(aermel_r), PAD_L + 14, 1.6 * hump, ph, bias=-4.0 * hump, lauf=1.0, nur_rechts=True)
+    # Loch fest am Boden (mit schwarzer Ergänzung hinter dem Arm), Arm wächst aus dem Loch
+    lo = teil(loch)
+    for (x, y) in LOCH_ERG:
+        lo[PAD_T + y, PAD_L + x, :3] = SCHWARZ
+        lo[PAD_T + y, PAD_L + x, 3] = 255
+    am = U.haengen(teil(arm), PAD_T + 28, kipp, nach_unten=False)         # Faust y 24–27 neigt sich um das Handgelenk (Pivot y 28)
+    am = L.streck_zeile(am, PAD_T + 29, n_arm)                            # Unterarmzeile y 29 wird eingefügt: Arm wird länger, Faust steigt
     seelen = U.glut_ebene(H, W, i, N, PUFFS, SEELEN)
-
-    # Glitzersterne (nach der Figur; bleiben am Knochen und gehen mit Rippen bzw. Unterkörper mit)
-    sterne = L.leer(H, W)
-    plan = [((5, 16), {6: 1, 7: 2, 8: 1}, r_r), ((14, 19), {26: 1, 27: 2, 28: 1}, r_r),
-            ((9, 25), {16: 1, 17: 2, 18: 1}, r_t), ((10, 28), {36: 1, 37: 2, 38: 1}, r_t)]
-    for (px, py), zeiten, r in plan:
-        st = zeiten.get(i, 0)
-        if st:
-            L.einsetzen(sterne, U.stern_ebene(H, W, PAD_L + px, PAD_T + py - r, st, I_, E_))
-
-    return L.zusammen(H, W, [(seelen, 0, 0), (un, 0, -r_t), (ri, 0, -r_r), (hb, 0, -r_h), (al, 0, -r_h), (ar, 0, -r_h), (sterne, 0, 0)])
+    return L.zusammen(H, W, [(seelen, 0, 0), (lo, 0, 0), (am, 0, 0), (ri, 0, -r_r), (hb, 0, -r_h), (al, 0, -r_h), (ar, 0, -r_h)])
 
 
 if __name__ == '__main__':

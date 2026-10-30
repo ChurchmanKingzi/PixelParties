@@ -23,12 +23,11 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Auf und ab (zweistufig, Periode 24 = zweimal pro Schleife): Die Brust hebt sich zuerst um 1 px (Hosenzeile 20 wird einmal doppelt
   eingefügt: Kapuze, Gesicht, Arme, Umhang steigen, Beine/Stiefel bleiben), der Kopf läuft 3 Frames nach und hebt sich um ein weiteres px
   (Halszeile 14 verlängert) — Kopf 0 → 1 → 2 → 1 → 0 px, Brust 0 → 1 → 0 (das ist zugleich das leichte Nicken).
-* Laubwogen: Eine fortlaufende Welle läuft dreimal pro Schleife (Periode 16 Frames) diagonal (s = x + 0,6·y) von links oben nach rechts
-  unten über Kapuze und Umhang, mit weicher Hüllkurve (in Frame 0 überall 0). Auf der Welle (a) stehen Blattspitzen am Rand der Kapuze
-  (Oberkante, Seiten, 1–2 px lang, `KETTEN`, aus der Randlinie des Sprites errechnet, jede 4-verbunden mit dem Rand, in A/C/D) und (b) ist
-  das Laub eine bzw. zwei Stufen der vorhandenen Grünrampe heller.
-* Saum wedelt: Die äußeren Blätter des Umhangsaums (y 20–23) spreizen sich auf beiden Seiten abwechselnd 1–2 px nach außen (links und
-  rechts gegenphasig, von oben nach unten mit Verzögerung), ebenfalls dreimal pro Schleife.
+* Laubbüschel (ruhig, blattartig): Es gibt KEINE durchlaufende Welle und KEINE wandernde Aufhellung. Vier feste Büschel aus je 3 Randblättern (oben links,
+  rechts oben, links unten, oben rechts; `BUESCHEL`) neigen sich nacheinander je einmal pro Schleife um 1 px nach außen (9 Frames: erst das mittlere Blatt, dann die ganze
+  Gruppe, dann wieder das mittlere) und kehren zurück; dazwischen ruht jedes Büschel lange. Die Blätter sind 4-verbunden mit dem Rand, nur A/C.
+* Saum wedelt dezent: Die äußeren Blätter des Umhangsaums (y 20–23) spreizen sich auf beiden Seiten abwechselnd um höchstens 1 px nach außen (links und rechts gegenphasig,
+  von oben nach unten leicht verzögert, zweimal pro Schleife).
 * Blinzeln (Frames 20–22 und 41–43): Lid über der oberen Augenreihe, dann zu (schwarzer Strich auf Zeile 10).
 * Blick: kurz nach links (Frames 8–13: linkes Auge tauscht Pupille/Iris mit Hellblau/Weiß) und später nach rechts (Frames 31–35, rechtes Auge).
 * Acht Blätter lösen sich vom Umhang und segeln langsam herab (4 links, 4 rechts; 3 Ovale 'o' und 5 Funken 'k', L.puff_ebene, wachsen/schrumpfen,
@@ -68,43 +67,36 @@ BLICK_LINKS = {(5, 9): SCHWARZ, (6, 9): HELLBLAU, (5, 10): IRIS, (6, 10): WEISS}
 BLICK_RECHTS = {(9, 9): HELLBLAU, (10, 9): SCHWARZ, (9, 10): WEISS, (10, 10): IRIS}
 
 
-def farbe_fuer(x, y, spitze):
-    """Spitzenfarbe aus der Grünrampe, deterministisch (erstes Pixel dunkler, Spitze heller)."""
-    h = (x * 5 + y * 3) % 4
-    erst = (A, C, A, C)[h]
-    zweit = (C, D, D, A)[h]
-    return erst if spitze == 0 else zweit
-
-
-def baue_ketten():
-    """Blattspitzen-Ketten (je 2 Pixel nach außen) an der Randlinie des Sprites. Jede Kette hängt 4-verbunden am Rand."""
-    ketten = []
-    top = [x for x in range(2, 14) if vorhanden[:5, x].any()]
-    for x in top:
-        yt = int(np.nonzero(vorhanden[:, x])[0].min())
-        if yt <= 3:
-            ketten.append([(x, yt - 1), (x, yt - 2)])
-    for y in (1, 2, 3, 4, 10, 11, 12):                      # links (Ohr-/Armzeilen 5–9 und ab 13 bleiben aus)
-        xs = np.nonzero(vorhanden[y])[0]
-        ketten.append([(int(xs.min()) - 1, y), (int(xs.min()) - 2, y)])
-    for y in (1, 2, 3, 4, 5, 6, 10, 11, 12):                # rechts
-        xs = np.nonzero(vorhanden[y])[0]
-        ketten.append([(int(xs.max()) + 1, y), (int(xs.max()) + 2, y)])
+def rand_pixel(typ, werte):
+    """Randpixel eine Stelle außerhalb des Sprites, 4-verbunden mit dem Rand: typ 'o' = oberhalb der Spalten x (werte), 'l'/'r' = links/rechts der Zeilen y."""
     out = []
-    for ch in ketten:
-        (x0, y0), (x1, y1) = ch
-        assert not (0 <= x0 < sw and 0 <= y0 < sh and vorhanden[y0, x0]) and not (0 <= x1 < sw and 0 <= y1 < sh and vorhanden[y1, x1])
-        dx, dy = x0 - x1, y0 - y1                            # Richtung nach innen (vom zweiten zum ersten Pixel)
-        nb = (x0 + dx, y0 + dy)                              # das Randpixel, an dem die Kette hängt
-        assert 0 <= nb[0] < sw and 0 <= nb[1] < sh and vorhanden[nb[1], nb[0]], ('Kette ohne Randpixel', ch)
-        out.append({'px': [(x0, y0, farbe_fuer(x0, y0, 0)), (x1, y1, farbe_fuer(x1, y1, 1))], 's': x0 + 0.6 * y0})
+    for w in werte:
+        if typ == 'o':
+            yt = int(np.nonzero(vorhanden[:, w])[0].min())
+            x0, y0 = w, yt - 1
+        elif typ == 'l':
+            x0, y0 = int(np.nonzero(vorhanden[w])[0].min()) - 1, w
+        else:
+            x0, y0 = int(np.nonzero(vorhanden[w])[0].max()) + 1, w
+        assert not (0 <= x0 < sw and 0 <= y0 < sh and vorhanden[y0, x0])
+        nb = [(x0 + dx, y0 + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))]
+        assert any(0 <= x < sw and 0 <= y < sh and vorhanden[y, x] for x, y in nb), ('Büschelblatt ohne Randpixel', x0, y0)
+        out.append((x0, y0, (A, C)[(x0 + y0) % 2]))
     return out
 
 
-KETTEN = baue_ketten()
+# Vier Laubbüschel (je 3 Randblätter): Start-Frame und Pixelgruppe. Jedes Büschel neigt sich einmal pro Schleife (9 Frames: Mitte → ganze Gruppe 7 Frames → Mitte),
+# dazwischen ruht es lange; die Büschel wechseln sich zeitlich ab (nie zwei gleichzeitig).
+BUESCHEL = {
+    'oben_links': (4, rand_pixel('o', (5, 6, 7))),
+    'rechts_oben': (16, rand_pixel('r', (3, 4, 5))),
+    'links_unten': (28, rand_pixel('l', (10, 11, 12))),
+    'oben_rechts': (39, rand_pixel('o', (10, 11, 12))),
+}
+BUESCHEL_VERLAUF = [1, 2, 2, 2, 2, 2, 2, 2, 1]
 
 # Saum (Zeilen 20–23, unterhalb der Atemzeile, daher nach dem Atmen gesetzt): äußerstes Blatt je Zeile, Kette 2 px nach außen
-SAUM_MAX = {20: 1, 21: 2, 22: 2, 23: 2}                      # maximale Länge je Zeile (oben kürzer)
+SAUM_MAX = {20: 1, 21: 1, 22: 1, 23: 1}                      # dezent: höchstens 1 px je Zeile
 SAUM = {'l': [], 'r': []}
 for r in SAUM_MAX:
     xs = np.nonzero(vorhanden[r, :])[0]
@@ -123,23 +115,21 @@ def teil(maske):
 
 
 def saum_stufe(r, i, seite):
-    """Länge (0–2) der Saumspitze in Zeile r: gegenphasige Welle links/rechts, 3 Zyklen pro Schleife, von oben nach unten verzögert."""
+    """Länge (0–1) der Saumspitze in Zeile r: gegenphasige Welle links/rechts, 2 Zyklen pro Schleife, von oben nach unten verzögert (dezent)."""
     env = math.sin(math.pi * i / N) ** 2
-    ph = L.sinus(i, N / 3.0) - (r - 20) * 0.7 + (0.0 if seite == 'l' else math.pi)
+    ph = L.sinus(i, N / 2.0) - (r - 20) * 0.7 + (0.0 if seite == 'l' else math.pi)
     v = env * max(0.0, math.sin(ph))
-    return 0 if v < 0.2 else (1 if v < 0.6 else 2)
+    return 0 if v < 0.45 else 1
 
 
 def frame(i, blaetter=True):
     k = teil(vorhanden)
-    # --- Laubwogen: Welle über die Diagonale s = x + 0,6·y ---
-    Hm.heller(k, lambda x, y: Hm.laubwelle(x + 0.6 * y, i, N, 11.0, 3) > 0.55, RAMPE, OFF)
-    Hm.heller(k, lambda x, y: Hm.laubwelle(x + 0.6 * y, i, N, 11.0, 3) > 0.88, RAMPE, OFF)
-    for ch in KETTEN:
-        v = Hm.laubwelle(ch['s'], i, N, 9.0, 3)
-        n = 0 if v < 0.22 else (1 if v < 0.62 else 2)
-        if n:
-            Hm.setze(k, {(x, y): c for (x, y, c) in ch['px'][:n]}, OFF)
+    # --- Laubbüschel: wenige feste Gruppen von Randblättern, die sich selten und langsam um 1 px nach außen neigen und zurückkehren ---
+    for name, (start, gruppe) in BUESCHEL.items():
+        stufe = Hm.folge(i, start, BUESCHEL_VERLAUF, N)
+        if stufe:
+            px = gruppe if stufe == 2 else [gruppe[len(gruppe) // 2]]
+            Hm.setze(k, {(x, y): c for (x, y, c) in px}, OFF)
     # --- Blinzeln, Blick ---
     bl = Hm.folge(i, 20, [LID, AUGE_ZU, LID], N) or Hm.folge(i, 41, [LID, AUGE_ZU, LID], N)
     if bl:

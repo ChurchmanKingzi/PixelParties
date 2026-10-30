@@ -1,0 +1,15 @@
+{
+  "creature": "Loyal Pinpom",
+  "sheet": "loyal-pinpom.png",
+  "frameWidth": 19,
+  "frameHeight": 18,
+  "frames": 54,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 4,
+  "padRight": 3,
+  "padBottom": 3,
+  "faceX": 9.5
+}

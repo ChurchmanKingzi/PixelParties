@@ -125,10 +125,12 @@ def haengend_schwingen(a, blocker, pivot_y, amp, phase, umriss_farben, lauf=0.0,
     return neu
 
 
-def zucken_zeilen(a, pivot_y, dx_oben, anteile=None):
+def zucken_zeilen(a, pivot_y, dx_oben, anteile=None, innen=None):
     """Ohr/Fühler zuckt: Zeilen oberhalb von `pivot_y` (nur Zeilen < pivot_y) weichen um dx_oben · Anteil seitlich aus.
     anteile = {Zeile: Anteil 0…1}; Standard: linear vom Ansatz (0) zur Spitze (1). Ganze Pixel, Zeilen bleiben zusammenhängend,
-    solange sich benachbarte Zeilen um höchstens 1 px unterscheiden."""
+    solange sich benachbarte Zeilen um höchstens 1 px unterscheiden.
+    innen = 'rechts' / 'links': Der innerste Randpixel der untersten verschobenen Zeile (Ohr links vom Kopf: rechter Rand) bleibt ZUSÄTZLICH an
+    seinem Platz — er ist der Umriss über dem Kopfpixel darunter; ohne ihn läge dieses Pixel beim Zucken offen (fehlender Umriss)."""
     h, w = a.shape[:2]
     out = np.zeros_like(a)
     ys = [y for y in range(h) if a[y, :, 3].any()]
@@ -144,6 +146,9 @@ def zucken_zeilen(a, pivot_y, dx_oben, anteile=None):
             raise L.ClipError(f'Zeile {y} würde um {d} px aus der Leinwand geschoben')
         for x in xs_:
             out[y, x + d] = a[y, x]
+        if innen and d and y == pivot_y - 1:
+            xi = int(xs_.max() if innen == 'rechts' else xs_.min())
+            out[y, xi] = a[y, xi]
     return out
 
 

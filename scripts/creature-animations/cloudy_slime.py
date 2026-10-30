@@ -25,12 +25,12 @@ Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
   nur verschoben, nicht kopiert; beim Verbreitern/Verschmälern des Körpers wandern die Flügel mit der Schulter nach außen/innen.
 * Gel-Körper: Zeile 6 (Stirn) und Zeile 10 (Wangenband) werden verdoppelt/entfernt, dazu Spalten in der Mitte verdoppelt (Stauchung
   breiter) bzw. am Wangenrand entfernt (Streckung schmaler); Pulsieren in 12-Frame-Takt, Streckung bis +2, Stauchung bis −2.
-* Blinzeln: Frames 14–16 und 38–40; Lichtpunkte funkeln (Mini-Stern) in den Frames 22–23 und 44–45.
-* Glanz (Regel 12): zweimal pro Schleife (Frames 4–16 und 30–42) zieht ein helles Band diagonal über Flügel (1 Stufe) und Körper (1–2 Stufen);
-  vierzackige Glitzersterne (5 Frames) blitzen an den Flügelkanten (sie folgen dem Flügelschlag), am Stirnglanz und in den Augen auf.
+* Blinzeln: Frames 14–16 und 38–40; die weißen Lichtpunkte sind in den Frames 22–23 und 44–45 kurz gedimmt (normaler Augenfunke).
+* Kein Glanz/Glitzer: Wolken und Schleim glänzen nicht (Regel 14) — kein Lichtband, keine Sterne.
 * Wolkendunst (Partikel): zehn runde Wölkchen/Punkte (`'m'`, `'o'`, `'s'`, `'k'`) steigen langsam seitlich der Flügel und unter dem
   Körper auf (hinter der Figur).
-Ergänzungen: keine gezeichnet. Nähte (Regel 11): Flügel und Körper berühren sich nur über (10,5)↔(11,5) bzw. (23,5)↔(22,5); das Gelenk
+Ergänzungen: Nach dem Spaltenversatz liegt hier und da ein Federpixel ohne Umriss frei (in der Quelle ist der Rand immer A bzw. B); die leeren
+Nachbarfelder bekommen dann den Umriss (Flügel A=(12,116,107), Körper B=(27,130,137)), 2–25 Pixel je Frame. Sonst nichts. Nähte (Regel 11): Flügel und Körper berühren sich nur über (10,5)↔(11,5) bzw. (23,5)↔(22,5); das Gelenk
 bleibt beim Schlag (Versatz 0 an der Schulter) und folgt der Körperkuppel; je Frame prüft das Skript, dass die Figur aus genau einem
 4-zusammenhängenden Teil besteht und kein Körperrandpixel ohne Umrissfarbe frei liegt.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -63,8 +63,6 @@ CA, CB, CC, CD, CE, CF, CG, CH, CI, CJ, CK, CL, CM, CN, CO, CP, CQ = (12, 116, 1
 _farben = {tuple(int(v) for v in p[:3]) for p in spr.reshape(-1, 4) if p[3]}
 for c in (CA, CB, CC, CD, CE, CF, CG, CH, CI, CJ, CK, CL, CM, CN, CO, CP, CQ):
     assert c in _farben
-BAND = {CB: CF, CF: CC, CC: CD, CE: CH, CD: CJ, CH: CJ, CI: CJ, CJ: CG, CL: CC}       # eine Stufe heller
-STERN_FARBEN = {'m': CQ, 'a': CG, 's': CJ}
 UMRISS_KOERPER = {tuple(int(v) for v in spr[y, x, :3]) for y, x in zip(*np.nonzero(A.randpixel(spr))) if KOERPER[y, x]}
 AUGEN_L, AUGEN_R = [(14, 8), (15, 8), (14, 9), (15, 9)], [(18, 8), (19, 8), (18, 9), (19, 9)]
 GLINTS = [(15, 9), (18, 9)]
@@ -73,9 +71,8 @@ GLINTS = [(15, 9), (18, 9)]
 BOB = [int(round(2 * math.sin(2 * math.pi * i / 24))) for i in range(N)]               # + = hoch
 S = [int(round(1.7 * math.sin(2 * math.pi * i / 12))) for i in range(N)]
 BLINZELN = {14: 1, 15: 2, 16: 1, 38: 1, 39: 2, 40: 1}
-FUNKELN = {22, 23, 44, 45}
-SWEEPS = [4, 30]
-FLAP_AMP, FLAP_N = 3.8, 16
+AUGEN_DIMM = {22, 23, 44, 45}                                                   # Augenlichtpunkte kurz gedimmt (normaler Augenfunke, ohne Stern)
+FLAP_AMP, FLAP_N = 2.8, 16
 assert len(S) == N
 
 POSEN = {                                                                       # s → (löschen, doppeln, p)
@@ -84,42 +81,9 @@ POSEN = {                                                                       
 PAARE_BREIT = ((16, 17), (15, 18))
 PAARE_SCHMAL = ((11, 22),)
 
-# ── Glitzer ──
-ORTE = {'fl_l1': (1, 1), 'fl_l2': (4, 3), 'fl_r1': (30, 1), 'fl_r2': (28, 3), 'stirn': (16, 6), 'auge_l': (15, 9), 'auge_r': (18, 9)}
-STERN_LAUF = [0, 1, 2, 1, 0]
-
-
-def _zeitplan():
-    plan = []
-    for s0, orte in ((4, ['fl_l1', 'fl_r1', 'fl_l2', 'stirn', 'fl_r2']), (30, ['fl_r2', 'fl_l2', 'stirn', 'fl_r1', 'fl_l1'])):
-        for o in orte:
-            d = sum(ORTE[o])
-            plan.append((int(round(s0 + (d - 4) / 3.0)) - 2, o))
-    plan += [(18, 'fl_l1'), (21, 'fl_r2'), (26, 'stirn'), (34, 'fl_l2'), (46, 'fl_r1')]
-    return plan
-
-
-STERNE = _zeitplan()
-
-
-def aktive_sterne(i):
-    out = []
-    for (start, ort) in STERNE:
-        k = (i - start) % N
-        if k < len(STERN_LAUF):
-            out.append((ort, STERN_LAUF[k]))
-    if i in FUNKELN and not BLINZELN.get(i):
-        out += [('auge_l', 1), ('auge_r', 1)]
-    return out
-
-
 def sprite_mit_effekten(i):
+    """Sprite (Quellkoordinaten) mit Blinzeln und Augenfunkeln. Kein Lichtband/Glitzer: Wolken glänzen nicht (Regel 14)."""
     sp = spr.copy()
-    for s0 in SWEEPS:
-        if 0 <= i - s0 <= 12:
-            t = 2 + 3 * (i - s0)
-            sp = A.farb_schritt(sp, BAND, (xx + yy >= t) & (xx + yy < t + 4))
-            sp = A.farb_schritt(sp, BAND, (xx + yy >= t + 1) & (xx + yy < t + 3) & KOERPER)       # Kern nur am Körper (Flügel hell genug)
     b = BLINZELN.get(i, 0)
     if b:
         for (x, y) in AUGEN_L + AUGEN_R:
@@ -127,15 +91,30 @@ def sprite_mit_effekten(i):
                 sp[y, x, :3] = CM
             elif b == 2:
                 sp[y, x, :3] = CP
+    elif i in AUGEN_DIMM:
+        for (x, y) in GLINTS:
+            sp[y, x, :3] = CH
     return sp
 
 
-def fluegel_dy(x_sp, i, links):
-    """Senkrechter Versatz der Flügelspalte x (Sprite-Koordinate) — dieselbe Rechnung wie L.spalten_welle (Gelenk 10 bzw. 23, maxd 10)."""
-    d = abs(x_sp - (10 if links else 23))
-    frac = d / 10.0
+def fluegel_welle(a, pivot_x, i):
+    """Flügelschlag wie L.spalten_welle (Versatz wächst mit dem Abstand zum Gelenk, die Spitze hinkt nach), aber so verschoben, dass
+    Frame 0 genau die Quellform ist: dy = round(amp · frac · (sin(φ − lauf·frac) − sin(−lauf·frac))), positiv = nach unten."""
+    out = L.leer(*a.shape[:2])
+    h, w = a.shape[:2]
+    maxd = max(abs(x - pivot_x) for x in range(w) if a[:, x, 3].any())
     ph = L.sinus(i, FLAP_N)
-    return int(round((FLAP_AMP * math.sin(ph - 0.9 * frac)) * frac ** 1.0))
+    for x in range(w):
+        ys = np.nonzero(a[:, x, 3])[0]
+        if not len(ys):
+            continue
+        frac = abs(x - pivot_x) / maxd
+        dy = int(round(FLAP_AMP * frac * (math.sin(ph - 0.9 * frac) - math.sin(-0.9 * frac))))
+        if ys.min() + dy < 0 or ys.max() + dy >= h:
+            raise L.ClipError(f'Flügelspalte {x} würde um {dy} px aus der Leinwand (Höhe {h}) geschoben')
+        for y in ys:
+            out[y + dy, x] = a[y, x]
+    return out
 
 
 PUFFS = [
@@ -157,27 +136,16 @@ def figur(i):
     sp = sprite_mit_effekten(i)
     s = S[i]
     loesch, dopp, p = POSEN[s]
-    marken = {}
-    for k, (ort, stufe) in enumerate(aktive_sterne(i)):
-        if ort in ('stirn', 'auge_l', 'auge_r'):
-            x, y = ORTE[ort]
-            m = (1, 2, 10 + k)
-            marken[ort] = (m, tuple(int(v) for v in sp[y, x, :3]))
-            sp[y, x, :3] = m
     kspr = np.where(KOERPER[..., None], sp, 0).astype(np.uint8)
     koerper = A.zeilen_von(kspr, KOERPER_Y0, sh - 1, H, W, PAD_L, PAD_T)
     z, quelle = A.koerper_pose(koerper, loeschen=loesch, doppeln=dopp, p=p,
                                paare=PAARE_BREIT if p >= 0 else PAARE_SCHMAL, x0=PAD_L)
     kb, top = A.auf_leinwand(z, H, BODEN, BOB[i])
-    orte = {}
-    for ort, (m, orig) in marken.items():
-        orte[ort] = A.suche_marke(kb, m)
-        kb[L.farbmaske(kb, [m]), :3] = orig
     wdy = top - KOERPER_Y0 - PAD_T                                              # Flügelgelenk folgt der Kuppel
     schicht = [(kb, 0, 0)]
     for links, maske, pivot in ((True, FLUEGEL_L, 10), (False, FLUEGEL_R, 23)):
         fl = L.platz(np.where(maske[..., None], sp, 0).astype(np.uint8), H, W, PAD_L, PAD_T)
-        fl = L.spalten_welle(fl, PAD_L + pivot, FLAP_AMP, L.sinus(i, FLAP_N), lauf=0.9)
+        fl = fluegel_welle(fl, PAD_L + pivot, i)
         fl, _ = A.verbinde4(fl)
         schicht.append((fl, -p if links else p, wdy))
     fig = L.zusammen(H, W, schicht)
@@ -187,30 +155,13 @@ def figur(i):
     # Ergänzung: nach dem Spaltenversatz liegt hier und da ein Federpixel ohne Umriss frei (in der Quelle ist der Rand immer A bzw. B):
     # die leeren Nachbarfelder bekommen den Umriss (Flügel: A, Körper: B)
     fig, neu = A.umriss_ergaenzen(fig, {CA, CB}, lambda x, y: CA if flm[y, x] else CB)
-    return dict(fig=fig, top=top, kb=kb, orte=orte, wdy=wdy, p=p, flm=flm, neu=neu)
-
-
-def sterne_ebene(i, f):
-    e = L.leer(H, W)
-    for ort, stufe in aktive_sterne(i):
-        x, y = ORTE[ort]
-        if ort.startswith('fl_'):
-            links = ort.startswith('fl_l')
-            cx = PAD_L + x + (-f['p'] if links else f['p'])
-            cy = PAD_T + y + f['wdy'] + fluegel_dy(x, i, links)
-        else:
-            pos = f['orte'].get(ort)
-            if pos is None:
-                continue
-            cx, cy = pos
-        A.stern(e, cx, cy, stufe, STERN_FARBEN)
-    return e
+    return dict(fig=fig, top=top, kb=kb, wdy=wdy, p=p, flm=flm, neu=neu)
 
 
 def frame(i):
     f = figur(i)
     dunst = L.puff_ebene(H, W, i, 24, PUFFS, PUFFFARBEN)
-    return L.zusammen(H, W, [(dunst, 0, 0), (f['fig'], 0, 0), (sterne_ebene(i, f), 0, 0)])
+    return L.zusammen(H, W, [(dunst, 0, 0), (f['fig'], 0, 0)])
 
 
 def koerper_offen(f):
@@ -236,7 +187,7 @@ if __name__ == '__main__':
     offen = [(i, koerper_offen(fs[i])) for i in range(N) if koerper_offen(fs[i])]
     print('offene Körperkanten (Frame, [(x, y, Farbe)]):', offen if offen else 'keine')
     print('ergänzte Umrisspixel je Frame:', [len(f['neu']) for f in fs])
-    A.ausdruck_pruefen(figs, spr, 'cloudy-slime', erlaubt=list(BAND.values()))
+    A.ausdruck_pruefen(figs, spr, 'cloudy-slime')
     L.speichern('cloudy-slime', 'Cloudy Slime', frames, MS, prev)
     if prev:
         L.streifen(prev + '/cloudy-slime-strip.png', frames[::2], spalten=12, scale=4)

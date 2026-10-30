@@ -2,14 +2,14 @@
   "creature": "Fiery Slime",
   "sheet": "fiery-slime.png",
   "frameWidth": 34,
-  "frameHeight": 40,
+  "frameHeight": 44,
   "frames": 48,
   "frameMs": 65,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 4,
-  "padLeft": 6,
-  "padRight": 6,
+  "padTop": 7,
+  "padLeft": 5,
+  "padRight": 5,
   "padBottom": 3,
   "faceX": 17.0
 }

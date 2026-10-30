@@ -1,39 +1,37 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Burning Skeleton“ (Creature).
+"""Idle-Animation für „Burning Skeleton“ (Creature) — Fassung 2 (Feuer wie Feuer, Beine intakt).
 
 Quelle: src/burning-skeleton.png — Ebene „Burning Skele“ (20×30 px, 16 Farben) aus Motive.xcf.
 PICK: [["Motive", 814, 1]]
-  Die Ebene hat unten halbtransparente Beine (Alpha 204 = Skelett steht in Lava, Zeilen 24–29: 38 Pixel). `creature_show.py extract` übernimmt nur Alpha ≥ 250
-  (Zeilen 0–24); ich habe die Beinpixel der Ebene in src/ als DECKEND ergänzt (Farben alle aus dem Sprite, (48,48,48) → (38,38,38)) und blende sie im
-  Skript per Dither (75 % sichtbar) wieder aus: Ruhepose = Muster 0 (jedes Pixel mit ungeradem x UND ungeradem y entfällt). Ohne diese Zeilen endete die Figur
-  abrupt über den Hüften.
+  Die Ebene hat unten halbtransparente Beine (Alpha 204 = Skelett steht in Lava, Zeilen 24–29: 52 Pixel). `creature_show.py extract` übernimmt nur Alpha ≥ 250
+  (Zeilen 0–24); ich habe die Beinpixel der Ebene in src/ als DECKEND ergänzt (Farben alle aus dem Sprite, (48,48,48) → (38,38,38)). Die Beine bleiben in
+  JEDEM Frame vollständig und deckend (kein Dither, kein Flimmern).
 
 Aufruf:   python3 burning_skeleton.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/burning-skeleton.png + .json
 
 Was ist was (Koordinaten im Sprite, x/y):
-* Flamme y 0–8 auf dem Schädel: Flammenrampe M (150,0,0) < E rot (202,44,41) < G orange (244,123,34) < P gelb (246,231,14). Heißer Kern P bei (9,8), Zungen
-  rot bei (9,4–6), (11,6), (8/10/12,7); die drei roten Pixel (11,0) (12,1) (12,2) sind ein losgelöster Funke über der Flamme.
+* Flamme y 0–8 auf dem Schädel: Flammenrampe M (150,0,0) < E rot (202,44,41) < G orange (244,123,34) < P gelb (246,231,14). Breite, ruhige Basis y 7–8
+  (heißer Kern P bei (9,8)), Zungen rot bei (9,4–6), (11,6); die drei roten Pixel (11,0) (12,1) (12,2) sind ein aufsteigender Funke über der Flamme.
 * Schädel y 9–15: schwarz/dunkelbraun (A, B, C, D, F); Augenhöhlen F schwarz bei (7,13/14) und (12,13/14); rote Glutaugen M bei (8,14) und (11,14).
 * Rumpf: Schultern y 16–18, Rippen y 17–20 (dunkelrote Muster B/C/D/L/N), Becken y 21–23.
 * Arme: oben an den Schultern (x 2–5, y 16–18), dann frei hängend: Unterarm x 1–3 y 19–20, graue Hände/Handschuhe H/I/O/K bei y 21–23, Spitze y 24.
-* Beine y 24–29 (halbtransparent in der Kunst, hier als Dither; „Halbpixel“ = alle Beinpixel ab y 25 und (8–11, 24)): dunkel A/D/B/C mit grauen Knöcheln.
+* Beine y 24–29: dunkel A/D/B/C mit grauen Knöcheln (in der Kunst halbtransparent, hier deckend).
 Fest bleiben: Schädel, Rippenmuster, Beine, Hände.
 
-Ablauf (48 Frames à 60 ms = 2,88 s; Frame 0 = Original mit Bein-Dither 0, Funken/Glut/Sterne ausgenommen):
-* Lava-Flimmern: die halbtransparenten Beine wechseln alle 3 Frames zwischen vier Dither-Mustern (je ein Viertel der Pixel fehlt, die Lücken wandern
-  kriechend: ungerade/ungerade → gerade/ungerade → gerade/gerade → ungerade/gerade), Hitzeflimmern der Lava.
-* Flamme züngelt: 7 handgezeichnete Flammenposen (Ruhepose = Original), gemischt nach einem unregelmäßigen Takt (2–3 Frames je Pose); Zungen wachsen/schrumpfen,
-  lehnen sich links/rechts, ein Funke löst sich oben. Alle Pixel in E/G/P. Hitzewelle (Lichtband in der Flammenrampe): alle 24 Frames wandert ein
-  heißeres Band (E → G, G → P) von der Flammenbasis (y 8) bis zur Spitze (y 0).
+Ablauf (48 Frames à 60 ms = 2,88 s; Frame 0 = Original, Glutfunken ausgenommen):
+* FEUER (Regel 15): breite, ruhige Basis (nur der Kern flackert: P wandert kurz auf (10,8) und (8,8)); fünf Zungen bei x 8–12 steigen jede für sich auf und
+  flackern unregelmäßig — je Zunge eine eigene Folge aus 2–3 Frames langen Posen (insgesamt 11–13 Posen je Zunge, Höhe 0–6 px, spitz zulaufend: 1 px breit,
+  unten orange G, oben rot E, einzelne Zungen lehnen sich links/rechts). Frame 0 = Originalzungen. Aus hohen Zungen reißt die Spitze ab und steigt als
+  Funke auf (orange → rot, 6 Frames, 5 px, mit Seitendrift). Der Ur-Funke (11,0)/(12,1)/(12,2) steigt in den ersten Frames weg.
+  Kein Lichtband, keine Sterne (Regel 14).
 * Atmen zweistufig (Periode 48, 0-1-2-1-0 px): im Rumpf-Layer wird Zeile y 20 eingefügt; Brust (Rippen, Schultern) und Arme steigen zuerst, Becken/Beine
   bleiben. Der Schädel samt Flamme folgt 2 Frames später, nie höher als die Brust (sinkt höchstens 1 px in die Schultern, nie ein Spalt).
 * Arme schwingen synchron und gespiegelt nach außen (Periode 24, bis 2,5 px, wächst von der Schulter y 18 zur Hand); Schulterzeilen y 16–18 bleiben am Rumpf.
-* Rote Augen glühen (Periode 12: M → E → G → E → M, G = orangefarbenes Auflodern), Blinzeln Frame 18–20 und 42–44; Glitzerstern (Mitte G, Arme E) am
-  linken Auge Frame 6–8, am rechten Frame 30–32 (Regel 12: Augen-Glanzpunkte).
+* Rote Augen glühen sanft (Periode 12: M → E → M), Blinzeln Frame 18–20 und 42–44. Kein Stern.
 * Glut-Partikel (hinter der Figur, 10 Stück, Lebensdauer 48 Frames, langsam aufsteigend, leichtes Wabern, Formen k, o): Funken über der Flamme,
   runde Glutkugeln neben Kopf und Schultern, Lavafunken rechts/links der Beine. Farben aus der Flammenrampe (P/G/E).
-ERGÄNZUNG: die Beinzeilen 24–29 (38 Halbpixel, deckend in src, siehe oben). Sonst nichts gemalt; die Flammenposen sind Neuzeichnungen derselben Pixelfarben (Ruhepose = Original).
+ERGÄNZUNG: die Beinzeilen 24–29 (52 Halbpixel, deckend in src, siehe oben). Die Flamme ist aus denselben Pixelfarben neu gezeichnet (Frame 0 = Original, per assert geprüft).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
@@ -58,7 +56,6 @@ B_ = (47, 18, 18)
 _vorh = {tuple(int(v) for v in p[:3]) for p in spr.reshape(-1, 4) if p[3]}
 assert all(col in _vorh for col in (M_, E_, G_, P_, B_))
 FARBE = {'E': E_, 'G': G_, 'P': P_}
-HEISSER = {E_: G_, G_: P_}                        # Flammenrampe: eine Stufe heißer
 
 flamme = vorhanden & (yy <= 8)
 kopf = vorhanden & (yy >= 9) & (yy <= 15)
@@ -66,35 +63,126 @@ arm_l = vorhanden & (xx <= 4) & (yy >= 19) & (yy <= 24)
 arm_r = vorhanden & (xx >= 15) & (yy >= 19) & (yy <= 24)
 rumpf = vorhanden & (yy >= 16) & (yy <= 23) & ~arm_l & ~arm_r
 beine = vorhanden & (yy >= 24) & ~arm_l & ~arm_r
-halb = vorhanden & (((yy >= 25)) | ((yy == 24) & (xx >= 8) & (xx <= 11)))      # in der Kunst halbtransparente Beinpixel (Alpha 204)
 assert (flamme | kopf | arm_l | arm_r | rumpf | beine).sum() == vorhanden.sum()
 
-# Flammenposen: x = 6..14 (9 Zeichen), y = 0..8; E rot, G orange, P gelb. Pose 0 = Original.
-POSEN = [
-    [".....E...", "......E..", "......E..", ".........", "...E.....", "...E.....", "...E.E...", "..EGEGE..", ".EGPGGE.."],   # 0 Original
-    [".........", "....E....", "....E....", ".........", "..E......", "..E.E....", "..E.E.E..", "..EGEGE..", ".EGPGGE.."],   # 1 lehnt links
-    ["...E.....", ".........", "...E.....", "...E.....", "...E.....", "...E.E...", "...E.E...", "..EGEGE..", ".EGPGGE.."],   # 2 hohe Mitte
-    [".........", ".........", ".........", ".........", "...E.....", "...E.E...", "..EGEG...", "..GGGGE..", ".EGPPGE.."],   # 3 Aufflackern (heiß)
-    [".........", "......E..", "......E..", ".........", ".........", ".........", "...E.....", "..EGEGE..", ".EGPGGE.."],   # 4 niedrig
-    [".........", ".......E.", ".......E.", "......E..", "......E..", "...E..E..", "...E.EE..", "..EGEGE..", ".EGPGGE.."],   # 5 lehnt rechts
-    [".........", ".........", "......E..", "..E...E..", "..E.E.E..", "..E.E.E..", "..E.E.E..", "..EGEGE..", ".EGPGGE.."],   # 6 drei Zungen
-]
-PLAN = [0, 0, 1, 1, 2, 2, 5, 3, 3, 1, 4, 4, 6, 2, 2, 5, 5, 1, 3, 3, 2, 4, 0, 1,
-        0, 1, 5, 5, 2, 3, 3, 4, 6, 6, 1, 2, 2, 5, 1, 3, 4, 4, 0, 1, 2, 5, 3, 0]
-assert len(PLAN) == N
+# --- FEUER (Regel 15) ---------------------------------------------------------------------------------------
+# Basis (Zeilen 7–8) breit und ruhig = Originalpixel; darüber fünf Zungen bei x 8–12 mit eigenen Posenfolgen (2–3 Frames je Pose).
+# Zungenformen relativ zum Fußpunkt (x0, Zeile 7): (dx, dy, Farbe), dy < 0 = aufwärts; unten orange G, oben rot E, 1 px breit (spitz zulaufend).
+FARBE = {'E': E_, 'G': G_, 'P': P_}
+FORMEN = {
+    'N0': [],
+    'S1': [(0, -1, 'E')],
+    'S2': [(0, -1, 'G'), (0, -2, 'E')],
+    'S3': [(0, -1, 'G'), (0, -2, 'E'), (0, -3, 'E')],
+    'S4': [(0, -1, 'G'), (0, -2, 'G'), (0, -3, 'E'), (0, -4, 'E')],
+    'S5': [(0, -1, 'G'), (0, -2, 'G'), (0, -3, 'E'), (0, -4, 'E'), (0, -5, 'E')],
+    'S6': [(0, -1, 'G'), (0, -2, 'G'), (0, -3, 'G'), (0, -4, 'E'), (0, -5, 'E'), (0, -6, 'E')],
+    'R3': [(0, -1, 'G'), (0, -2, 'G'), (1, -2, 'E'), (1, -3, 'E')],            # Spitze lehnt rechts (4-verbunden über (0,-2)-(1,-2))
+    'R4': [(0, -1, 'G'), (0, -2, 'G'), (0, -3, 'G'), (1, -3, 'E'), (1, -4, 'E')],
+    'L3': [(0, -1, 'G'), (0, -2, 'G'), (-1, -2, 'E'), (-1, -3, 'E')],
+    'L4': [(0, -1, 'G'), (0, -2, 'G'), (0, -3, 'G'), (-1, -3, 'E'), (-1, -4, 'E')],
+    'O3': [(0, -1, 'E'), (0, -2, 'E'), (0, -3, 'E')],                          # Originalzunge bei x 9
+}
+FOLGEN = {          # Zunge bei x0: Liste (Form, Dauer in Frames); Summe je Zunge = 48
+    8: [('N0', 3), ('S1', 2), ('S2', 3), ('S3', 2), ('L3', 2), ('S2', 3), ('S1', 2), ('N0', 2), ('S2', 2), ('S3', 3), ('S2', 2), ('L3', 2),
+        ('S1', 3), ('S2', 2), ('S3', 3), ('S2', 2), ('N0', 2), ('S1', 2), ('S2', 3), ('N0', 3)],
+    9: [('O3', 2), ('S4', 3), ('S3', 2), ('R4', 3), ('S5', 2), ('S4', 3), ('S6', 2), ('S4', 2), ('L4', 3), ('S3', 2), ('S5', 3), ('S4', 2), ('R3', 2),
+        ('S2', 2), ('S4', 3), ('S5', 2), ('L3', 3), ('S4', 2), ('S3', 2), ('S2', 3)],
+    10: [('N0', 2), ('S2', 3), ('S3', 2), ('S1', 2), ('S2', 3), ('R3', 2), ('S3', 3), ('S4', 2), ('S2', 2), ('N0', 2), ('S3', 3), ('S2', 2), ('L3', 3),
+         ('S4', 3), ('S3', 2), ('S2', 3), ('S1', 2), ('S3', 2), ('S2', 2), ('N0', 3)],
+    11: [('S1', 2), ('S2', 3), ('S3', 2), ('R3', 3), ('S2', 2), ('S4', 3), ('S3', 2), ('S1', 2), ('S3', 3), ('L3', 2), ('S4', 3), ('S2', 3), ('S5', 2),
+         ('S3', 3), ('S2', 2), ('S1', 2), ('S4', 3), ('S2', 3), ('S1', 3)],
+    12: [('N0', 2), ('S1', 3), ('S2', 2), ('S3', 3), ('R3', 2), ('S2', 3), ('S1', 2), ('S3', 2), ('S4', 3), ('S3', 2), ('S2', 3), ('S1', 2), ('N0', 3),
+         ('S2', 2), ('S3', 3), ('R3', 2), ('S2', 2), ('S1', 2), ('S2', 3), ('N0', 2)],
+}
+for _x, _f in FOLGEN.items():
+    assert sum(d for _, d in _f) == N, (_x, sum(d for _, d in _f))
 
 
-def flammenpixel(pose):
-    return [(6 + xi, y, FARBE[ch]) for y, zeile in enumerate(POSEN[pose]) for xi, ch in enumerate(zeile) if ch != '.']
+def zunge(x0, i):
+    """(Form, Frames seit Posenbeginn, Posenbeginn) der Zunge x0 im Frame i."""
+    t = i % N
+    acc = 0
+    for form, d in FOLGEN[x0]:
+        if t < acc + d:
+            return form, t - acc, acc
+        acc += d
 
 
-# Ruhepose muss dem Sprite entsprechen
+HOCH = {'S4', 'S5', 'S6', 'R4', 'L4'}                  # nach diesen Formen reißt die Spitze ab (Funken)
+ABREISS = []                                           # (Startframe, Zunge x0, Drift)
+for _x, _f in FOLGEN.items():
+    _acc = 0
+    for _k, (_form, _d) in enumerate(_f):
+        if _form in HOCH and _acc > 0:
+            ABREISS.append((_acc, _x, {'R4': 1, 'L4': -1}.get(_form, (1, -1)[_k % 2])))
+        _acc += _d
+
+
+def basis_pixel(i):
+    """Basis y 7–8 = Originalpixel (ruhig); der heiße Kern flackert nur kurz: P wandert nach (10,8) bzw. (8,8)."""
+    px = {(x, y): tuple(int(v) for v in spr[y, x, :3]) for y in (7, 8) for x in range(sw) if spr[y, x, 3]}
+    if i % N:
+        if i % 12 in (6, 7):
+            px[(10, 8)] = P_
+        if i % 12 in (9, 10):
+            px[(8, 8)] = P_
+    return px
+
+
+def hoehe(form):
+    return -min((dy for _, dy, _ in FORMEN[form]), default=0)
+
+
+def formen_tal(i):
+    """Form jeder Zunge im Frame i mit „Tälern“: eine Zunge von ≥ 2 px lässt ihre unmittelbaren Nachbarn nicht ebenfalls ≥ 2 px hoch werden
+    (höhere Zunge zuerst, bei Gleichstand die linke) — die Zungen erscheinen einzeln und spitz und verschmelzen nicht zu einem Block."""
+    formen = {x0: zunge(x0, i)[0] for x0 in FOLGEN}
+    frei = []
+    for x0 in sorted(formen, key=lambda x: (-hoehe(formen[x]), x)):
+        if hoehe(formen[x0]) >= 2:
+            if any(abs(x0 - a) == 1 for a in frei):
+                formen[x0] = 'S1'
+            else:
+                frei.append(x0)
+    return formen
+
+
+def flamme_pixel(i):
+    """Alle Flammenpixel (x, y) → Farbe im Frame i: Basis + Zungen + abreißende Funken + Ur-Funke."""
+    px = dict(basis_pixel(i))
+    abgerissen = {(x0, f0) for (f0, x0, _) in ABREISS if i % N == f0}
+    formen = formen_tal(i)
+    for x0 in FOLGEN:
+        form = formen[x0]
+        pts = FORMEN[form]
+        if (x0, i % N) in abgerissen and pts:                    # Spitze reißt in diesem Frame ab
+            pts = pts[:-1]
+        for dx, dy, ch in pts:
+            px[(x0 + dx, 7 + dy)] = FARBE[ch]
+    for (f0, x0, drift) in ABREISS:                              # aufsteigende Funken (6 Frames, 5 px): orange → rot, mit Seitendrift
+        for kk in range(6):
+            if (i - f0) % N == kk:
+                form = formen_tal(f0)[x0]
+                if not FORMEN[form]:
+                    continue
+                top = min(FORMEN[form], key=lambda t: t[1])
+                x = x0 + top[0] + (drift * (kk // 3))
+                y = 7 + top[1] - 1 - int(round(0.85 * kk))
+                px[(x, y)] = G_ if kk < 3 else E_
+    t = i % N                                                    # Ur-Funke (11,0)/(12,1)/(12,2) steigt in den ersten Frames weg
+    if t < 7:
+        for (x, y) in ((11, 0), (12, 1), (12, 2)):
+            px[(x, y - t)] = E_
+    return px
+
+
 _orig = {(x, y): tuple(int(v) for v in spr[y, x, :3]) for y in range(9) for x in range(sw) if spr[y, x, 3]}
-assert {(x, y): col for x, y, col in flammenpixel(0)} == _orig, 'Flammenpose 0 weicht vom Sprite ab'
+assert flamme_pixel(0) == _orig, 'Flamme in Frame 0 weicht vom Sprite ab'
 
-GLOW12 = [0, 0, 0, 0, 1, 2, 2, 1, 0, 0, 0, 0]       # Augenglühen (Periode 12), 0 = Original (M)
+GLOW12 = [0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0]       # Augenglühen sanft (Periode 12): M → E → M, 0 = Original
 AUGEN = [(8, 14), (11, 14)]
-AUGENFARBE = [M_, E_, G_]
+AUGENFARBE = [M_, E_]
 
 HEISS = {'c': P_, 'r': G_}                          # heiße Funken/Kugeln: Kern gelb, Rand orange
 GLUT = {'c': G_, 'r': E_}                           # Glut: Kern orange, Rand rot
@@ -115,12 +203,6 @@ PUFFS_GLUT = [
 ]
 
 
-def flimmern(i):
-    """Dithermuster der Halbpixel: (ungerade x, ungerade y) fällt im Ruhebild aus (Muster 0); alle 3 Frames wandern die Lücken weiter."""
-    p = (i // 3) % 4
-    return (xx % 2 == (1, 0, 0, 1)[p]) & (yy % 2 == (1, 1, 0, 0)[p]) & halb
-
-
 def teil(maske):
     t, _ = L.trenne(spr, maske)
     return L.platz(t, H, W, PAD_L, PAD_T)                       # sofort auf die volle Leinwand
@@ -135,36 +217,26 @@ def frame(i):
     r_b = stufe2(i)
     r_k = max(min(r_b, stufe2(i - 2)), r_b - 1)                   # Schädel + Flamme folgen der Brust, nie höher
     aus = 2.5 * U.buckel(i, 0, 24, n=24)
-    k = i % 24
     glut = GLOW12[i % 12]
     blink = {18: 1, 19: 2, 20: 1, 42: 1, 43: 2, 44: 1}.get(i, 0)
 
-    # --- Flamme (neu gezeichnet aus Posen; Hitzewelle als Lichtband in der Flammenrampe) ---
+    # --- Feuer: Basis, Zungen, abreißende Funken (alle Pixel aus E/G/P) ---
     fl = L.leer(H, W)
-    for (x, y, col) in flammenpixel(PLAN[i]):
-        if 9 - k <= y < 11 - k and col in HEISSER:                # Welle: Zeilen y ∈ [9−k, 11−k)
-            col = HEISSER[col]
+    for (x, y), col in flamme_pixel(i).items():
         fl[PAD_T + y, PAD_L + x, :3] = col
         fl[PAD_T + y, PAD_L + x, 3] = 255
     # --- Schädel mit Glutaugen ---
     kp = teil(kopf)
     for (x, y) in AUGEN:
         kp[PAD_T + y, PAD_L + x, :3] = B_ if blink == 2 else (AUGENFARBE[0] if blink == 1 else AUGENFARBE[glut])
-    # --- Rumpf, Arme, Beine ---
+    # --- Rumpf, Arme, Beine (Beine intakt, jeder Frame vollständig und deckend) ---
     rp = L.streck_zeile(teil(rumpf), PAD_T + 20, r_b)
     al = U.haengen(teil(arm_l), PAD_T + 18, -aus)
     ar = U.haengen(teil(arm_r), PAD_T + 18, aus)
-    bn = teil(beine & ~flimmern(i))
+    bn = teil(beine)
     heiss = U.glut_ebene(H, W, i, N, PUFFS_HEISS, HEISS)
     kalt = U.glut_ebene(H, W, i, N, PUFFS_GLUT, GLUT)
-
-    # --- Glitzersterne an den Augen (nach der Figur; bleiben am Auge) ---
-    sterne = L.leer(H, W)
-    for ((ex, ey), start) in ((AUGEN[0], 6), (AUGEN[1], 30)):
-        st = {0: 1, 1: 2, 2: 1}.get(i - start, 0)
-        if st:
-            L.einsetzen(sterne, U.stern_ebene(H, W, PAD_L + ex, PAD_T + ey - r_k, st, G_, E_))
-    return L.zusammen(H, W, [(kalt, 0, 0), (heiss, 0, 0), (bn, 0, 0), (rp, 0, 0), (al, 0, -r_b), (ar, 0, -r_b), (kp, 0, -r_k), (fl, 0, -r_k), (sterne, 0, 0)])
+    return L.zusammen(H, W, [(kalt, 0, 0), (heiss, 0, 0), (bn, 0, 0), (rp, 0, 0), (al, 0, -r_b), (ar, 0, -r_b), (kp, 0, -r_k), (fl, 0, -r_k)])
 
 
 if __name__ == '__main__':
