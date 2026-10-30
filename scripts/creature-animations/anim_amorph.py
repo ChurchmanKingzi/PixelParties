@@ -88,15 +88,18 @@ def koerper_pose(zeilen, loeschen=(), doppeln=(), p=0, paare=((8, 9), (7, 10), (
     p_je_zeile = p_je_zeile or {}
     def lv(liste):
         return [(a + x0, b + x0) for a, b in liste]
-    out, quelle = [], []
+    out, quelle, proc, kopien = [], [], {}, []
     for k in range(zeilen.shape[0]):
         if k in loeschen:
             continue
         r = zeile_umbauen(zeilen[k], p_je_zeile.get(k, p), lv(paare_je_zeile.get(k, paare)))
-        out.append(r); quelle.append(k)
+        out.append(r); quelle.append(k); proc[k] = r
         extra = doppeln.get(k, 0) if isinstance(doppeln, dict) else (1 if k in doppeln else 0)
-        for _ in range(extra):
-            out.append(r.copy()); quelle.append(k)
+        for n_ in range(extra):
+            out.append(r.copy()); quelle.append(k); kopien.append((len(out) - 1, k, n_ + 1))
+    # Nutzer-Feedback: eingefügte Zeilen nicht 1:1 kopieren — Textur mit der ähnlichsten Nachbarzeile mischen (L.misch_kopie)
+    for j, k, n_ in kopien:
+        out[j] = L.misch_kopie(proc[k], [proc.get(k - 1), proc.get(k + 1)], n_)
     return np.stack(out), quelle
 
 

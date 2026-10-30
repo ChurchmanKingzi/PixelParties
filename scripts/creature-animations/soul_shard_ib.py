@@ -15,7 +15,7 @@ Fest bleiben: Umriss, Kopfform, Gesicht, Gliedmaßen (der Körper streckt sich n
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Atmen (Periode 24): unterhalb des Kopfes werden im Rippenkorb 1–2 Zeilen eingefügt (Quellzeile 22, in der Spitze zusätzlich 23; Zeilen gleicher Breite, keine Randstufe) — Kopf, Arme und Rumpf heben sich um 1–2 px, die Füße bleiben fest am Boden.
-* Goldschimmer (zweimal je Schleife, Frames 2–18 und 26–42): ein diagonales Lichtband (x+y, 6 px) läuft über die goldenen Innenpixel (eine Stufe heller auf der Gold-Rampe R→S→K→N und Q→V→T→K; Umrisspixel bleiben).
+* Goldschimmer (zweimal je Schleife, Frames 2–18 und 26–42; NICHT auf den Augen): ein diagonales Lichtband (x+y, 6 px) läuft über die goldenen Innenpixel (eine Stufe heller auf der Gold-Rampe R→S→K→N und Q→V→T→K; Umrisspixel bleiben).
 * Glitzersterne (Gold): vierzackige Sterne (Lauf 0-1-2-1-0 über 5 Frames) blitzen im Henkel und auf dem Querbalken des Henkelkreuzes auf (Farben N, K, T des Sprites; Frames 6–10, 14–18, 30–34, 38–42).
 Frame: Sprite plus 3 px links/rechts, 4 px oben (Atmen), 2 px unten, Figur zentriert.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -72,7 +72,7 @@ def _maske(*cs):
 GOLDFARBEN = [(169, 123, 48), (224, 174, 75), (255, 226, 98), (255, 245, 201), (217, 122, 0), (255, 153, 0), (255, 217, 0)]    # R, S, K, N, Q, V, T
 for _c in GOLDFARBEN:
     assert _c in {tuple(int(v) for v in p[:3]) for p in spr.reshape(-1, 4) if p[3]}, _c
-GOLD = INNEN & _maske(*GOLDFARBEN)
+GOLD = INNEN & _maske(*GOLDFARBEN) & ~((yy >= 10) & (yy <= 12))      # die gelb-orangen AUGEN (Zeilen 10–12) bekommen keinen Goldschein (Rückmeldung des Spielgestalters)
 HELLER = {(169, 123, 48): (224, 174, 75), (224, 174, 75): (255, 226, 98), (255, 226, 98): (255, 245, 201), (217, 122, 0): (255, 153, 0), (255, 153, 0): (255, 217, 0), (255, 217, 0): (255, 226, 98)}
 STERN_FARBEN = {'m': (255, 245, 201), 'a': (255, 226, 98), 's': (255, 217, 0)}
 SWEEPS = [2, 26]

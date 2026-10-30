@@ -150,6 +150,33 @@ def zeilen_welle(a, pivot_y, amp, phase, potenz=1.0, richtung=1, signiert=False)
     return out
 
 
+def misch_kopie(roh, nachbarn, k):
+    """Texturmischung für eine eingefügte Kopie (k = 1, 2, …) der Zeile `roh`: sie nimmt auf jeder zweiten Spalte (je Kopie versetzt) das Pixel der ähnlichsten Nachbarzeile
+    aus `nachbarn` (Liste von Zeilen oder None); Randpixel bleiben, gleichmäßige Zeilen bleiben unverändert (Nutzer-Feedback: Strecken darf nicht „Zeile kopieren“ sein)."""
+    op = roh[:, 3] > 0
+    xs = np.nonzero(op)[0]
+    if len(xs) <= 2:
+        return roh.copy()
+    beste, bestwert = None, None
+    for nb in nachbarn:
+        if nb is None:
+            continue
+        ov = op & (nb[:, 3] > 0)
+        if ov.sum() < 0.6 * op.sum():
+            continue
+        gleich = float((roh[ov, :3] == nb[ov, :3]).all(axis=1).mean())
+        if 0.35 <= gleich < 0.98 and (bestwert is None or gleich > bestwert):
+            beste, bestwert = nb, gleich
+    neu = roh.copy()
+    if beste is None:
+        return neu
+    ov = op & (beste[:, 3] > 0)
+    ov[xs[0]] = ov[xs[-1]] = False
+    spalten = np.nonzero(ov & (((np.arange(len(roh)) + k) % 2) == 1))[0]
+    neu[spalten] = beste[spalten]
+    return neu
+
+
 def streck_zeile(a, zeile, n=1):
     """Zeile `zeile` n-mal zusätzlich einfügen (n<0: die |n| Zeilen bis einschließlich `zeile` entfernen).
     Alles darüber rückt hoch bzw. runter, alles darunter bleibt stehen (Atmen: der Oberkörper hebt sich, die
