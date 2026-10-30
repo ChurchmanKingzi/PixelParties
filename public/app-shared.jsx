@@ -10827,6 +10827,13 @@ function TextBox() {
     return () => { clearInterval(timerRef.current); if (vorT) clearTimeout(vorT); vorlaufRef.current = false; };
   }, [pages, pageIdx]);
 
+  // Seiten mit Tackle-Szene: Antonias Musik schon vorher dekodieren (siehe `ppBgmVorwaermen`), nicht erst im Augenblick ihres Auftritts.
+  useEffect(() => {
+    if (!pages.some(p => p && p.tackle) || !window.ppBgmVorwaermen) return undefined;
+    const t = setTimeout(() => window.ppBgmVorwaermen('tutorialAntonia'), 800);
+    return () => clearTimeout(t);
+  }, [pages]);
+
   // ── Tackle-Szene (Tutorial 5, Epilog) ────────────────────────────
   // „Antonia fliegt von rechts ueber die Textbox, rammt Monia Bot und wirft
   // sie aus dem Bild; Antonia steht danach links, wo Monia stand."
@@ -10854,7 +10861,7 @@ function TextBox() {
     const mx = r.left + r.width / 2, my = r.top + r.height / 2;
     const flieger = document.createElement('img');
     flieger.src = ANTONIA_PORTRAIT; flieger.draggable = false;
-    fest(flieger, { width: '104px', height: '104px', imageRendering: 'pixelated', filter: 'drop-shadow(3px 3px 0 rgba(0,0,0,.55))' });
+    fest(flieger, { width: '104px', height: '104px', imageRendering: 'pixelated' });   // ohne `filter`: ein Filter auf einem bewegten Bild wird jedes Bild neu gerastert
     // Die Textbox sitzt am oberen Bildrand — der Flug bleibt auf Hoehe des Portraets.
     const startX = window.innerWidth + 60, zielX = mx - 52, y0 = my - 52 - 8, y1 = my - 52;
     if (window.playSFX) window.playSFX('attack_ram', { dedupe: 100 });

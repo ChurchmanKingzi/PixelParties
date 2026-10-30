@@ -2629,6 +2629,12 @@ for (const t of Object.values(_bgmTracks)) {
   }
 }
 
+// Musikstueck vorab laden + dekodieren (Web Audio): das erste Umschalten auf ein ungeladenes Stueck dekodiert 1,5 MB Ogg zu ~30 MB PCM — auf Handys ein Ruckler
+// genau in dem Moment, in dem es umschaltet (Tutorial 5: Antonia crasht Monia Bot aus dem Bild). Aufruf vor dem Auftritt, in einer ruhigen Textseite.
+window.ppBgmVorwaermen = (modus) => {
+  try { const t = _bgmTracks[modus]; if (t && typeof t._ensureBuffer === 'function') t._ensureBuffer().catch(() => {}); } catch (e) { /* optional */ }
+};
+
 // Volume control bridge — VolumeControl sets this
 window._ppSetMusicVolume = (vol) => {
   let cur = null;
