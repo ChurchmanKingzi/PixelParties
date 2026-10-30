@@ -1,0 +1,15 @@
+{
+  "creature": "Cute Cat",
+  "sheet": "cute-cat.png",
+  "frameWidth": 31,
+  "frameHeight": 21,
+  "frames": 24,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 2,
+  "faceX": 15.5
+}
