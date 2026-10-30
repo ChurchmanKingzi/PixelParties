@@ -19,11 +19,14 @@ Fest bleiben: Kopf-/Schädelform, Hörner, Augenform im Ruhebild, Schaft der Sen
 
 Ablauf (48 Frames à 70 ms = 3,36 s; Frame 0 = Original, Partikel ausgenommen):
 * Flügelschlag: beide Flügel schlagen gleichzeitig, jeweils 2 Spalten gemeinsam bis ±2 px senkrecht (wächst mit dem Abstand zum Gelenk bei x 8 bzw. 23, die Gelenkspalten stehen); Periode 24, zweimal pro Schleife.
+  Die dünnen Flügelspitzen bleiben im 4er-Zusammenhang: reißt ein waagerechter Kontakt zwischen zwei Spaltenpaaren, wird die äußere Spalte um 1–2 Pixel (Farbe ihres nächsten Pixels) bis zur inneren verlängert (Körperpixel 554–561 statt 556).
 * Schweben: der ganze Körper (Kopf, Rumpf, Sense) hebt sich 1 px beim Abschlag der Flügel und sinkt beim Aufschlag zurück (gegenläufig).
 * Saumfetzen: die drei Fetzen (y 17–21) pendeln unabhängig ±1 px zur Seite (Periode 16, versetzte Phasen).
 * Sense: die Klinge (y ≥ 24) pendelt ±1 px, ihre untere Hälfte (y ≥ 27) mit Verzögerung (Periode 24). Stahlglanz (Regel 14: Metall): ein heller Lichtpunkt läuft an der Schneide (Weiß (246,255,255)) entlang; zweimal pro Schleife.
 * Blinzeln (Lid = schwarz (0,0,0), die Farbe der Augenhöhle): beide Augen, zweimal (Frame 14–16 und 38–40).
-* Partikel (hinter der Figur): graue Seelen-Wölkchen 2×2 → 3×3 → 2×2 (`U.wolke_ebene`), nie ein Einzelpixel; siehe PUFFS.
+* Partikel (hinter der Figur): zwei graue Seelen-Wölkchen 2×2 → 3×3 → 2×2 (`U.wolke_ebene`, Kern (189,189,189), Rand (106,106,106)), nie ein Einzelpixel; sie steigen je 8 px links und rechts neben dem Rumpf auf
+  (Lebensdauer 24 Frames, zweimal pro Schleife, links/rechts um 12 versetzt). Flügel, Saum und Sense füllen das Feld, deshalb ist nur diese Bahn frei: in jeder Pose ≥ 2 px Abstand zur Figur und nie teilweise verdeckt
+  (per Skript über alle 48 Frames geprüft).
 Kein Glanz außer der Klinge (Schädel/Hörner = Knochen, kein Metall), kein Feuer (Regel 15). Randpixel-Test (Regel 16): `U.kontur_schliessen` (Randfarben der Quelle) in jeder Pose; im Ruhebild nichts.
 Keine gemalten Pixel außer Farben der Quelle.
 Zuschnitt: Frame auf die Figur zugeschnitten (symmetrisch um die Ruhefigur; Partikel vergrößern ihn höchstens 2 px darüber hinaus, dazu 1 px leerer Rand). Alle Bewegungen laufen auf der vollen Leinwand
