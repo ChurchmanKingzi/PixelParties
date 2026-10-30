@@ -1,0 +1,15 @@
+{
+  "creature": "3-Headed Giant",
+  "sheet": "3-headed-giant.png",
+  "frameWidth": 46,
+  "frameHeight": 41,
+  "frames": 32,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 5,
+  "padRight": 5,
+  "padBottom": 3,
+  "faceX": 23.0
+}

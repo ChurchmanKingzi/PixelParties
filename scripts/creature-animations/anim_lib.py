@@ -113,19 +113,38 @@ def spalten_welle(a, pivot_x, amp, phase, potenz=1.0, nur_rechts=None, bias=0.0,
     return out
 
 
-def zeilen_welle(a, pivot_y, amp, phase, potenz=1.0, richtung=1):
+def zeilen_welle(a, pivot_y, amp, phase, potenz=1.0, richtung=1, signiert=False):
     """Jede Zeile wandert waagerecht um round(amp · (Abstand/maxAbstand)^potenz · sin(phase)).
-    Hängt etwas unterhalb des Pivots (Schwanz, Haare), richtung=-1 für nach oben."""
+    Hängt etwas unterhalb des Pivots (Schwanz, Haare), richtung=-1 für nach oben.
+    signiert=True: oberhalb des Pivots wandert es entgegengesetzt zu unterhalb (Pendel um den Pivot, z. B. eine
+    Keule, die an der Hand hängt)."""
     out = leer(*a.shape[:2])
     h, w = a.shape[:2]
     maxd = max(1, max((abs(y - pivot_y) for y in range(h) if a[y, :, 3].any()), default=1))
     for y in range(h):
         if not a[y, :, 3].any():
             continue
-        dx = int(round(amp * (abs(y - pivot_y) / maxd) ** potenz * math.sin(phase)))
+        f = ((y - pivot_y) / maxd) if signiert else (abs(y - pivot_y) / maxd)
+        f = math.copysign(abs(f) ** potenz, f)
+        dx = int(round(amp * f * math.sin(phase)))
         for x in np.nonzero(a[y, :, 3])[0]:
             if 0 <= x + dx < w:
                 out[y, x + dx] = a[y, x]
+    return out
+
+
+def streck_zeile(a, zeile, n=1):
+    """Zeile `zeile` n-mal zusätzlich einfügen (n<0: die |n| Zeilen bis einschließlich `zeile` entfernen).
+    Alles darüber rückt hoch bzw. runter, alles darunter bleibt stehen (Atmen: der Oberkörper hebt sich, die
+    Füße bleiben am Boden). Das Feld behält seine Größe; oben wird abgeschnitten bzw. leer aufgefüllt."""
+    h = a.shape[0]
+    if n >= 0:
+        rows = list(range(zeile)) + [zeile] * (n + 1) + list(range(zeile + 1, h))
+        return a[rows[n:]].copy()
+    m = -n
+    rows = list(range(zeile - m + 1)) + list(range(zeile + 1, h))
+    out = np.zeros_like(a)
+    out[m:] = a[rows]
     return out
 
 
