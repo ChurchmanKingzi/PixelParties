@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Winged Skeleton“ (Creature).
+"""Idle-Animation für „Winged Skeleton“ (Creature) — Skelett-Flügelschlag (zweite Fassung).
 
 PICK: [["Motive", 297, 1]]
 Quelle: src/winged-skeleton.png — Ebene „Winged Skele“ (20×24 px, 17 Farben) aus Motive.xcf, Figur 1.
@@ -8,27 +8,32 @@ Aufruf:   python3 winged_skeleton.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/winged-skeleton.png + .json
 
 Identifikation (x, y; Figur ist spiegelsymmetrisch um x = 9,5, Spiegel x ↔ 19 − x):
-* Skelett von vorn, braune (49,24,0) Umrisse/Bandagen, Knochen weiß/hellgrau.
-  - Schädel: Stirn (8–11, 4), weiße Schädelkappe (7–12, 5), schräge dunkle Augenhöhlen (7–8, 6–8) / (11–12, 6–8), brauner
-    Oberrand (7–12, 3), Seitenumriss braun bei x = 5 / 14 (y 7–9).
-  - Rippenkorb / Wirbelsäule (y 10–14, x 5–14): schwarze Lücken (6,10), (7,11), (9–10, 11–12), (12,11), (13,10) zwischen den Rippen.
-  - Becken und Beine (y 15–22), Zehen tan (5–6, 22) / (13–14, 22).
-* Flügel/Arm-Bänder links (x 1–4, y 5–19) und rechts (x 15–18): senkrechte Streifen aus grauer Außenkante (x 1), zwei weißen Knochen/
-  Falten und braunen Binden, unten Hand mit tan Fingern (1–3, 15–18) und brauner Manschette; oben setzen sich die Flügel als
-  dunkle Krallenspitzen (3–7, 0–4) fort, deren Innenkante (6, 2–4) knapp neben dem Schädeloberrand liegt. Die Bänder liegen NEBEN dem Körper
-  (Trennlinie: brauner Umriss bei x = 5 / 14), nirgends darüber; unten ist zwischen Hand und Becken eine Lücke (x = 5, y 15–17).
+* Schädel (x 5–14, y 3–9): weiße Kappe, schräge dunkle Augenhöhlen (7–8, 6–8) / (11–12, 6–8), brauner Oberrand (7–12, 3).
+* Hörner/Krallen OBEN (x 3–7, y 0–4, gespiegelt 12–16): dunkelgrau umrandete, gebogene Knochenspitzen — gehören FEST zum Schädel
+  (bewegen sich nur mit dem Schädel, nie mit den Flügeln).
+* Rippenkorb / Wirbelsäule (y 10–14) mit schwarzen Lücken, Becken (y 15–18), Beine (y 19–23), tan Zehen (5–6, 22) / (13–14, 22).
+* Schultergürtel: die innere Knochenspalte x = 4 (y 5–14, gespiegelt x = 15) mit braunen Binden liegt eng am Rippenkorb und bleibt am Körper.
+* Flügel (gefaltet, x 0–3 / 16–19, y 3–19; bei x 4 / 15 nur die Hand y 15–17): senkrechtes Bündel aus Knochen — graue Außenkante (x 1),
+  weißer Knochen (x 2), grauer Schatten (x 3), braune Binden, unten Hand = brauner Wulst mit tan Fingern (y 15–17), darunter graue Spitze.
+  Die Flügel liegen NEBEN dem Körper, nirgends darüber.
 
-Ablauf (24 Frames à 70 ms = 1,68 s):
-* Flügel spreizen sich: zweimal pro Schleife klappen die beiden Bänder nach außen auf (Zeilenversatz wächst mit dem Abstand zur
-  Pivotzeile 14: Krallenspitzen oben bis 2 px, Hand unten bis 1 px) und wieder an — Ruhe = angelegt = Original. Die Zeilen wandern
-  ganze Zeilen, der Anschluss an Zeile 14 bleibt stehen.
-* Rippenkorb atmet: einmal pro Schleife wird Zeile 13 (nur Rippen, keine Lücken) verdoppelt; Schädel und Krallenspitzen heben sich
-  dabei starr mit, die Füße bleiben am Boden. Körper UND Bänder werden gemeinsam gestreckt (nichts doppelt gezeichnet, was woanders bewegt wird).
-* Der rechte Flügel spreizt sich etwa ein Frame später als der linke (nicht im Gleichtakt).
-* Knochenstaub (Partikel): vier einzelne graue Staubkörner rieseln langsam von den Flügelenden und den Händen.
+Ablauf (48 Frames à 65 ms = 3,12 s):
+* Skelettflügel schlagen zweimal pro Schleife: erst ein großer Schlag (gefaltet → gelüftet → halb offen → weit offen oben → Abschlag
+  waagerecht → Abschlag unten → Rückholen → gefaltet), dann ein kleinerer. Die Posen sind Schlüsselposen (Posenblatt im Check-Bild),
+  dazwischen läuft ein weicher Spline. Der Flügel besteht aus Armknochen (Schulter → Handgelenk), vier Fingerknochen, die vom
+  Handgelenk fächerförmig auseinanderlaufen (mit Knick, die Spitzen hinken nach), und gezackter, zerrissener Flügelhaut dazwischen.
+  Die Fingerknochen tragen die Farben der gefalteten Spalten (Knochen weiß/grau, tan Hand-Spitze, braune Binden am Arm/Handgelenk).
+  Gefaltet (Ruhe) sind es exakt die Originalpixel; beim Aufklappen werden die Fingerpixel aus den Originalspalten x = 1, 2, 2, 3 gezogen
+  und pixelweise (Dithering) zu sauberen Knochen. Der rechte Flügel schlägt ~1 Frame später als der linke.
+* Rippenkorb atmet zweistufig bis 2 px (Zeile 13, dann Zeile 14 wird zusätzlich verdoppelt); Schädel samt Hörnern hebt sich starr mit, die
+  Füße bleiben am Boden; die Flügelwurzeln (Schulter, Handgelenk) heben sich mit.
+* Glanz: zweimal pro Schleife wandert ein Lichtband diagonal über Knochen, Binden und Flügelhaut (Pixel eine/zwei Stufen heller auf der
+  Grau- bzw. Braunrampe des Sprites); an den Hornspitzen, am Schädel und an den Handgelenken blitzen vierzackige Glitzer-Sterne auf.
+* Knochenstaub: runde, langsame Partikel ('k', 'o', 'm') rieseln von den Flügeln, am Boden wölkt flach Staub.
 
-Ergänzungen: Körper und Bänder überlappen sich im Original nirgends. Nur am Schädel fehlt der dunkle Umriss, sobald das Band
-wegspreizt: (6,3), (6,4), (5,4), (4,5) und gespiegelt (13,3), (13,4), (14,4), (15,5) = (32,32,32), unter den Bändern gezeichnet. Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError, wenn etwas herausragen würde).
+Ergänzungen (fertiggezeichnet, nur Farben des Sprites): siehe ERG unten — Körper wird ohne Flügelspalten gerendert; alle Flügelposen außer
+der gefalteten sind neu gezeichnet (Arm, Finger, Haut, Handgelenkswulst).
+Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError, wenn etwas herausragen würde).
 Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
@@ -38,70 +43,185 @@ import numpy as np
 
 import anim_lib as L
 import anim_flieger as F
+import anim_flieger_b as B
 
-N, MS = 24, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 7, 7, 5, 8
+N, MS = 48, 65
+PAD_L, PAD_R, PAD_T, PAD_B = 15, 15, 9, 5
 
 spr = L.lade('winged-skeleton')
 sh, sw = spr.shape[:2]
 H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
 yy, xx = np.mgrid[0:sh, 0:sw]
 vorhanden = L.deckend(spr)
-
-# ── Masken: Bänder (Flügel/Arm) links und rechts, Rest = Körper ──────────────────────────────────────────────────────
-band_l = vorhanden & (((yy <= 2) & (xx <= 7)) | ((yy >= 3) & (yy <= 4) & (xx <= 6)) | ((yy >= 5) & (yy <= 17) & (xx <= 4))
-                      | ((yy >= 18) & (yy <= 19) & (xx <= 3)))      # Zeile 18–19: x = 4 ist schon das Bein (Umriss), nicht Hand/Flügel
-band_r = vorhanden & band_l[:, ::-1]                                           # Spiegel x ↔ 19 − x
-assert not (band_l & band_r).any()
-koerper = vorhanden & ~band_l & ~band_r
-
-# Ergänzung (Regel 2): Am Schädel liegt links/rechts der Flügel-Innenkante direkt an; spreizen sich die Bänder, bleibt dort die Schädelkante
-# ohne dunklen Umriss stehen ((7,4) mittelgrau, (5,5)/(6,5) hellgrau). Fertiggezeichnet wird der dunkle Umriss (Farbe (32,32,32) wie die
-# Flügelspitzen): (6,3), (6,4), (5,4), (4,5) und gespiegelt (13,3), (13,4), (14,4), (15,5). Die Pixel liegen UNTER den Bändern
-# (sie verdecken sie in Ruhe, Frame 0 = Original) und kommen erst beim Spreizen zum Vorschein.
-DUNKEL = (32, 32, 32)
-ERG = {(6, 3): DUNKEL, (6, 4): DUNKEL, (5, 4): DUNKEL, (4, 5): DUNKEL,
-       (13, 3): DUNKEL, (13, 4): DUNKEL, (14, 4): DUNKEL, (15, 5): DUNKEL}
-spr_k, erg_maske = F.ergaenzen(spr, ERG)
-koerper_k = koerper | erg_maske
-# Symmetrie-Kontrolle: Form (Alpha) des Sprites ist spiegelsymmetrisch
 assert (vorhanden == vorhanden[:, ::-1]).all()
 
-STAUB = {'c': (213, 213, 213), 'r': (156, 156, 156)}
+# ── Masken: gefaltete Flügel (links/rechts), Rest = Körper (inkl. Hörner, Schulterspalte x = 4/15) ─────────────────────
+wing_l = vorhanden & (((yy >= 3) & (yy <= 4) & (xx <= 2)) | ((yy >= 5) & (yy <= 14) & (xx <= 3))
+                      | ((yy >= 15) & (yy <= 17) & (xx <= 4)) | ((yy >= 18) & (yy <= 19) & (xx <= 3)))
+wing_r = vorhanden & wing_l[:, ::-1]
+assert not (wing_l & wing_r).any()
+koerper = vorhanden & ~wing_l & ~wing_r
+
+# ── Farben (alle aus dem Sprite) ───────────────────────────────────────────────────────────────────────────────────
+Q, P, Nn, Lg = (246, 255, 255), (213, 213, 213), (189, 189, 189), (156, 156, 156)
+KG, IG = (123, 123, 123), (106, 106, 106)
+BR_D, BR_E, BR_F, BR_J, BR_M = (49, 24, 0), (63, 46, 26), (88, 66, 42), (150, 119, 88), (212, 178, 150)
+PAL = dict(knochen=[Q, P, Nn], haut=(BR_F, BR_E, BR_D, BR_E), binde=(BR_D, BR_F),
+           rein=dict(knochen=[Q, P, Nn], manschette=(Lg, BR_J, BR_M)))
+RAMPE_KNOCHEN = [IG, KG, Lg, Nn, P, Q]
+RAMPE_BRAUN = [BR_D, BR_E, BR_F, BR_J, BR_M]
 
 
 def px(x, y):
     return PAD_L + x, PAD_T + y
 
 
-PUFFS = [                                                    # einzelne Staubkörner, rieseln langsam von den Flügelenden
-    dict(x=px(-2, 19)[0], y=px(-2, 19)[1], vx=-1, vy=7, off=0, form='k', wackeln=1),
-    dict(x=px(21, 19)[0], y=px(21, 19)[1], vx=1, vy=7, off=12, form='k', wackeln=1),
-    dict(x=px(-2, 16)[0], y=px(-2, 16)[1], vx=-1, vy=6, off=8, form='k', wackeln=1),
-    dict(x=px(21, 16)[0], y=px(21, 16)[1], vx=1, vy=6, off=20, form='k', wackeln=1),
+# ── Schlüsselposen (linker Flügel, Sprite-Koordinaten; Winkel in Grad: 90° = unten, 180° = links, 270° = oben) ──────────────
+def pose(S, Wr, ang, ln, knick, hueft, zacke=0.3, rho=0.0, rein=1.0, wulst=1.0, haut=1.0):
+    return dict(S=S, W=Wr, ang=list(ang), len=list(ln), knick=knick, hueft=hueft, zacke=zacke, rho=rho, rein=rein, wulst=wulst, haut=haut)
+
+
+S0, HUEFT = (3, 8), (6.5, 16.5)
+POSEN = {
+    'ruhe':    pose(S0, (3, 6),     (90, 90, 90, 90),        (13, 12, 12, 12),        0, HUEFT, rho=1.0, rein=0.0, wulst=0.0, haut=0.0),
+    'lueften': pose(S0, (3, 5.5),   (100, 94, 88, 82),       (13, 12, 12, 12),        0, HUEFT, rho=0.8, rein=0.15, wulst=0.0, haut=0.0),
+    'luft2':   pose(S0, (2.5, 5),   (118, 106, 94, 84),      (13, 12, 12, 11.5),      4, HUEFT, rho=0.5, rein=0.6, wulst=0.0, haut=1.0),
+    'halb':    pose(S0, (1, 4.5),   (162, 142, 121, 100),    (12.5, 12, 12, 11),     10, HUEFT, rho=0.1),
+    'weit':    pose(S0, (-1, 2.5),  (222, 190, 160, 128),    (12.5, 12, 11, 10),     14, HUEFT),
+    'weit2':   pose(S0, (-1.5, 2), (228, 194, 162, 130),     (12.5, 12, 11, 10),     18, HUEFT),
+    'mitte':   pose(S0, (-1, 4.5),  (198, 168, 142, 114),    (12, 11.5, 10.5, 9.5),  18, HUEFT),
+    'unten':   pose(S0, (-1, 7),    (142, 121, 104, 90),     (11.5, 11.5, 10.5, 9),  22, HUEFT, zacke=0.25),
+}
+SPALTEN = [1, 2, 2, 3]            # Quellspalten der vier Fingerknochen (Leitfinger = Außenkante x = 1)
+RISSE = [(0.45, 0.8), (0.75, 0.7)]
+REST_VEC = B.pose_vektor(POSEN['ruhe'])
+
+
+def _v(name, **kw):
+    p = dict(POSEN[name]); p.update(kw)
+    return B.pose_vektor(p)
+
+
+def _mix(a, b, t):
+    return B.pose_vektor(B.pose_mix(POSEN[a], POSEN[b], t))
+
+
+# Zeitleiste: (Frame, Vektor, Halt). Großer Schlag 0–27, kleiner Schlag 28–47.
+SCHLUESSEL = [
+    (0, _v('ruhe'), True), (2, _v('ruhe'), True),
+    (4, _v('lueften'), False), (6, _v('luft2'), False), (8, _v('halb'), False), (11, _v('weit'), False), (13.5, _v('weit2'), False),
+    (16, _v('mitte'), False), (18.5, _v('unten'), False), (21.5, _v('halb'), False), (24, _v('luft2'), False), (26, _v('lueften'), False),
+    (28, _v('ruhe'), True), (30, _v('ruhe'), True),
+    (32, _v('lueften'), False), (34, _v('halb'), False), (37, _mix('halb', 'mitte', 0.7), False), (40, _mix('halb', 'unten', 0.75), False),
+    (43, _v('luft2'), False), (45.5, _v('lueften'), False),
+]
+ZEIT_VORLAGE = POSEN['ruhe']
+FINGER_LAG = 0.55                 # Frames, um die jeder weiter außen liegende Finger der Wurzel hinterherhinkt (Wellenlauf)
+RECHTS_LAG = 1.0                  # der rechte Flügel schlägt 1 Frame später
+
+
+def pose_zu(t, finger_phase=0.0):
+    """Pose zur Zeit t (Frames). Finger k hinkt um FINGER_LAG·k hinterher, kleines Flattern der Spitzen (je Finger andere Phase)."""
+    basis = B.vektor_pose(B.spline(SCHLUESSEL, t, N), ZEIT_VORLAGE)
+    for k in range(4):
+        v = B.vektor_pose(B.spline(SCHLUESSEL, t - FINGER_LAG * k, N), ZEIT_VORLAGE)
+        basis['ang'][k] = v['ang'][k]
+    basis['rho'] = min(1.0, max(0.0, basis['rho']))
+    basis['rein'] = min(1.0, max(0.0, basis['rein']))
+    offen = 1.0 - basis['rho']
+    for k in range(4):
+        basis['ang'][k] += 2.2 * offen * math.sin(L.sinus(t, N / 3.0, 1.1 * k + finger_phase))
+    return basis
+
+
+def ist_ruhe(p):
+    v = B.pose_vektor(p)
+    return max(abs(a - b) for a, b in zip(v, REST_VEC)) < 0.35
+
+
+def atem_stufe(i):
+    """0 / 1 / 2 Zeilen: zweimal pro Schleife (Periode 24), Gipfel (2) bei Frame 19 und 43 (um die Abschläge)."""
+    s = math.cos(2 * math.pi * (i - 19) / (N / 2.0))
+    return 2 if s > 0.62 else (1 if s > -0.2 else 0)
+
+
+# ── Körper ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+def dehne(a, n):
+    """Rippenkorb atmet: n = 1 → Zeile 13 doppelt; n = 2 → zusätzlich Zeile 14 doppelt (alles darüber hebt sich, Füße bleiben)."""
+    if n >= 1:
+        a = L.streck_zeile(a, PAD_T + 14, 1) if n >= 2 else a
+        a = L.streck_zeile(a, PAD_T + (12 if n >= 2 else 13), 1)
+    return a
+
+
+def ebene(maske):
+    return F.ebene(spr, maske, H, W, PAD_L, PAD_T)
+
+
+BODY = ebene(koerper)
+WING_L0, WING_R0 = ebene(wing_l), ebene(wing_r)
+
+# ── Glanz: Sterne (Ort, Frame-Start, Teil) ────────────────────────────────────────────────────────────────────────────
+STERNE = [((6, 1), 5, 'kopf'), ('hand_l', 12, 'hand'), ((13, 1), 17, 'kopf'), ((12, 4), 21, 'kopf'), ('hand_r', 31, 'hand'), ((7, 4), 38, 'kopf')]
+
+# ── Partikel: Knochenstaub ────────────────────────────────────────────────────────────────────────────────────────────
+STAUB = {'c': P, 'r': Lg}
+PUFFS = [
+    dict(x=px(3, 22)[0], y=px(3, 22)[1], vx=-5, vy=-3, off=0, form='m', wackeln=0),     # Bodenstaub, flach, driftet nach außen
+    dict(x=px(16, 22)[0], y=px(16, 22)[1], vx=5, vy=-3, off=24, form='m', wackeln=0),
+    dict(x=px(-5, 12)[0], y=px(-5, 12)[1], vx=-2, vy=8, off=8, form='o', wackeln=1),    # rieselt von den Flügeln
+    dict(x=px(24, 12)[0], y=px(24, 12)[1], vx=2, vy=8, off=32, form='o', wackeln=1),
+    dict(x=px(-9, 5)[0], y=px(-9, 5)[1], vx=-1, vy=9, off=16, form='k', wackeln=1),
+    dict(x=px(28, 5)[0], y=px(28, 5)[1], vx=1, vy=9, off=40, form='k', wackeln=1),
+    dict(x=px(2, 15)[0], y=px(2, 15)[1], vx=-2, vy=7, off=4, form='k', wackeln=1),
+    dict(x=px(17, 15)[0], y=px(17, 15)[1], vx=2, vy=7, off=28, form='k', wackeln=1),
 ]
 
 
-def frame(i, partikel=True):
-    ph = L.sinus(i, N / 2)
-    s_l = (1 - math.cos(ph)) / 2                              # 0 … 1: Flügel spreizen sich, in Frame 0 angelegt
-    s_r = (1 - math.cos(ph - 0.5)) / 2                        # rechter Flügel etwa ein Frame später (nie ganz im Gleichtakt)
-    atem = 1 if math.sin(L.sinus(i, N, -0.6)) > 0.2 else 0    # Rippenkorb atmet (eine Zeile)
-    zeile = PAD_T + 13
+def fluegel_ebene(t, links, n_atem):
+    """Eine Flügelebene (links gezeichnet; rechts = Spiegelung) zur Zeit t. Die Wurzel (Schulter, Handgelenk) hebt sich mit dem Rippenkorb."""
+    p = pose_zu(t, 0.0 if links else 0.7)
+    if ist_ruhe(p):
+        w0 = WING_L0 if links else WING_R0
+        return dehne(w0, n_atem), None
+    pp = dict(p)
+    pp['S'] = (PAD_L + p['S'][0], PAD_T + p['S'][1] - n_atem)               # Wurzel hebt sich mit dem Rippenkorb
+    pp['W'] = (PAD_L + p['W'][0], PAD_T + p['W'][1] - n_atem)
+    pp['hueft'] = (PAD_L + p['hueft'][0], PAD_T + p['hueft'][1])
+    pp['haut'] = 1 if p['haut'] > 0.5 else 0
+    pp['wulst'] = 1 if p['wulst'] > 0.5 else 0
+    a = B.knochenflügel(H, W, pp, PAL, spr, SPALTEN, 3, 6, risse=RISSE)
+    if not links:
+        a = B.spiegeln(a)
+    return a, pp
 
-    hand_l, hand_r = int(round(1.2 * s_l)), int(round(1.2 * s_r))   # Hand/Unterarm (Zeile ≥ 15) schwingt starr 0…1 px nach außen
-    kopf_l = band_l & (yy <= 14)
-    kopf_r = band_r & (yy <= 14)
-    wl = F.zeilen_schub(F.ebene(spr, kopf_l, H, W, PAD_L, PAD_T), PAD_T + 14, -2.4, s_l, 1.3)
-    wr = F.zeilen_schub(F.ebene(spr, kopf_r, H, W, PAD_L, PAD_T), PAD_T + 14, 2.4, s_r, 1.3)
-    hl = L.versetze(F.ebene(spr, band_l & (yy >= 15), H, W, PAD_L, PAD_T), -hand_l, 0)
-    hr = L.versetze(F.ebene(spr, band_r & (yy >= 15), H, W, PAD_L, PAD_T), hand_r, 0)
-    wl = L.zusammen(H, W, [(wl, 0, 0), (hl, 0, 0)])
-    wr = L.zusammen(H, W, [(wr, 0, 0), (hr, 0, 0)])
-    kp = F.ebene(spr_k, koerper_k, H, W, PAD_L, PAD_T)
-    wl, wr, kp = (L.streck_zeile(a, zeile, atem) for a in (wl, wr, kp))
-    staub = L.puff_ebene(H, W, i, N, PUFFS, STAUB) if partikel else L.leer(H, W)
-    return L.zusammen(H, W, [(staub, 0, 0), (kp, 0, 0), (wl, 0, 0), (wr, 0, 0)])        # Körper unten, Bänder obenauf
+
+def frame(i, partikel=True, glanz=True):
+    n = atem_stufe(i)
+    body = dehne(BODY, n)
+    wl, pl = fluegel_ebene(i, True, n)
+    wr, pr = fluegel_ebene(i - RECHTS_LAG, False, n)
+    f = L.zusammen(H, W, [(wl, 0, 0), (wr, 0, 0), (body, 0, 0)])           # Flügel hinter dem Körper
+    if glanz:
+        B.band_hell(f, i, N, 6, 12, [RAMPE_KNOCHEN, RAMPE_BRAUN], stufen=1, kern=2, achse=(1.0, 0.7), x_bereich=(PAD_L - 12 + 0.7 * PAD_T, PAD_L + 32 + 0.7 * (PAD_T + 24)))
+        B.band_hell(f, i, N, 30, 12, [RAMPE_KNOCHEN, RAMPE_BRAUN], stufen=1, kern=2, achse=(1.0, 0.7), x_bereich=(PAD_L - 12 + 0.7 * PAD_T, PAD_L + 32 + 0.7 * (PAD_T + 24)))
+        for (ort, start, teil) in STERNE:
+            st = F.stern_stufe(i, N, start)
+            if st is None:
+                continue
+            if teil == 'kopf':
+                x, y = PAD_L + ort[0], PAD_T + ort[1] - n
+            else:
+                q = pl if ort == 'hand_l' else pr
+                if q is None:
+                    continue
+                wx, wy = int(round(q['W'][0])), int(round(q['W'][1]))
+                x, y = (wx - 1, wy) if ort == 'hand_l' else (W - 1 - (wx - 1), wy)
+            F.stern(f, x, y, st, Q, P, Nn)
+    if partikel:
+        staub = L.puff_ebene(H, W, i, N, PUFFS, STAUB)
+        f = L.zusammen(H, W, [(staub, 0, 0), (f, 0, 0)])
+    return f
 
 
 if __name__ == '__main__':
@@ -111,4 +231,4 @@ if __name__ == '__main__':
     print('Pixel je Frame:', n)
     L.speichern('winged-skeleton', 'Winged Skeleton', frames, MS, prev)
     if prev:
-        L.streifen(prev + '/winged-skeleton-strip.png', frames, spalten=6, scale=8)
+        L.streifen(prev + '/winged-skeleton-strip.png', frames, spalten=8, scale=5)
