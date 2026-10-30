@@ -126,6 +126,12 @@ def bird_ebenen(b, i, effekte=True):
         for (x, y) in b['eyes']:
             rumpf[PAD_T + y, PAD_L + x, :3] = KOPF
     ganz = L.zusammen(H, W, [(rumpf, 0, 0), (fl, 0, 0)])
+    m_ = ganz[..., 3] > 0                                       # einzelne Flügelpixel ohne 4er-Nachbarn (Drehstaub an den Spitzen) entfernen
+    p_ = np.pad(m_, 1)
+    n4 = p_[:-2, 1:-1].astype(int) + p_[2:, 1:-1] + p_[1:-1, :-2] + p_[1:-1, 2:]
+    stub = m_ & (n4 == 0) & (fl[..., 3] > 0)
+    fl[stub] = 0
+    ganz = L.zusammen(H, W, [(rumpf, 0, 0), (fl, 0, 0)])
     ys, xs = np.nonzero(rumpf[..., 3])
     start = (int(xs[len(xs) // 2]), int(ys[len(ys) // 2]))
     mit = bruecken8(ganz.copy(), start)

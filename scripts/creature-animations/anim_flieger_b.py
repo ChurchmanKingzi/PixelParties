@@ -415,15 +415,28 @@ def kleine_inseln_weg(a, min_px=4):
 
 def zeilen_klappen(a, y_piv, dx_fn, richtung=1):
     """Aufrecht stehender Flügel (Engelsflügel, Klinge) klappt zur Seite: jede Zeile OBERHALB der Pivotzeile y_piv wandert als Ganzes waagerecht um
-    richtung · round(dx_fn(f)), f = (y_piv − y) / größter Abstand (0…1; die Pivotzeile und alles darunter bleiben stehen). Benachbarte Zeilen unterscheiden sich
-    nur um wenige Pixel, die Federtextur jeder Zeile bleibt (nichts wird kopiert). richtung = +1 nach rechts, −1 nach links. ClipError, wenn etwas herausragt."""
+    richtung · round(dx_fn(f)), f = (y_piv − y) / größter Abstand (0…1; die Pivotzeile und alles darunter bleiben stehen). Die Federtextur jeder Zeile bleibt (nichts wird
+    kopiert). Zusammenhang: war eine Zeile in der Ruhepose mit der Zeile darunter (8er-Nachbarschaft) verbunden, muss sie es nach dem Versatz bleiben — sonst übernimmt sie
+    den Versatz der Zeile darunter (dünne Bögen und Spitzen reißen nicht ab). richtung = +1 nach rechts, −1 nach links. ClipError, wenn etwas herausragt."""
     out = L.leer(*a.shape[:2])
     h, w = a.shape[:2]
     ys = [y for y in range(h) if a[y, :, 3].any()]
     oben = [y for y in ys if y < y_piv]
     maxd = max(1, y_piv - min(oben)) if oben else 1
-    for y in ys:
+    dxs = {}
+    prev = 0
+    for y in sorted(ys, reverse=True):                                  # von unten (Ansatz) nach oben
         dx = 0 if y >= y_piv else int(round(dx_fn((y_piv - y) / maxd))) * richtung
+        if y < y_piv and y + 1 in dxs:
+            xs_ = set(np.nonzero(a[y, :, 3])[0].tolist())
+            unten = set(np.nonzero(a[y + 1, :, 3])[0].tolist())
+            war = any((x + d) in unten for x in xs_ for d in (-1, 0, 1))
+            neu = any((x + dx + 0) in {u + dxs[y + 1] for u in unten} or (x + dx - 1) in {u + dxs[y + 1] for u in unten} or (x + dx + 1) in {u + dxs[y + 1] for u in unten} for x in xs_)
+            if war and not neu:
+                dx = dxs[y + 1]
+        dxs[y] = dx
+    for y in ys:
+        dx = dxs[y]
         xs_ = np.nonzero(a[y, :, 3])[0]
         if xs_.min() + dx < 0 or xs_.max() + dx >= w:
             raise L.ClipError(f'Zeile {y} würde um {dx} px aus der Leinwand (Breite {w}) geschoben')
