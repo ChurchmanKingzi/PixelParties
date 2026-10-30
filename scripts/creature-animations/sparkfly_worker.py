@@ -109,7 +109,7 @@ if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     frames = zuschneiden(frames, koerper_frames)
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    n = L.pruefe(frames, quelle=spr, min_rand=1)
+    n = L.pruefe(frames, quelle=spr, erlaubt=[(33, 30, 5)], min_rand=1)      # (33,30,5): dunkler Flügelrand aus Ebene 165, im Ruhebild vom Körper verdeckt
     print('Pixel je Frame:', n)
     L.speichern('sparkfly-worker', 'Sparkfly Worker', frames, MS, prev)
     if prev:

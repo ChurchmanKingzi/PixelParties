@@ -1,0 +1,15 @@
+{
+  "creature": "Sparkfly Worker",
+  "sheet": "sparkfly-worker.png",
+  "frameWidth": 19,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 60,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 1,
+  "padLeft": 1,
+  "padRight": 1,
+  "padBottom": 1,
+  "faceX": 9.5
+}

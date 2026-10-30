@@ -129,8 +129,6 @@ def frame_gross(i, nur=None):
     if nur == 'koerper':
         return koerper
     sterne = L.leer(H, W)
-    for (pos, nach), start in zip(STERNE, ((BAND_START[0], BAND_START[0]), (BAND_START[0], BAND_START[1]), (BAND_START[0], BAND_START[1]))):
-        pass
     for (pos, nach) in STERNE:
         for start in BAND_START:
             k = i - (start + nach)
