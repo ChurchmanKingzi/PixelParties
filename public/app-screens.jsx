@@ -5252,6 +5252,8 @@ function SingleplayerScreen() {
         _ppTutorialAssetsCache = a;
         // Pixelbilder der grossen Zauber-Animation (kostet kalt Sekunden auf schwachen Handys, s. app-board.jsx).
         idle(() => { if (window.ppAnimVorwaermen) window.ppAnimVorwaermen('cataclysm'); }, 3500);
+        // Magic Hammer (Mission 1, Magic Hammer/Heavy Hit der Starterdecks): das erste Pixelieren kostete mitten im Kampf 0,3–0,4 s (Ruckler vor Beatos Tod).
+        idle(() => { if (window.ppAnimVorwaermen) window.ppAnimVorwaermen('magic_hammer', { w: 70, h: 90 }); }, 6500);
         const H = window.HeroIdleAnims;
         if (H && H.hole && H.slug) (a.heroes || []).forEach((n, i) => timers.push(setTimeout(() => { if (!weg) idle(() => { try { H.hole(H.slug(n)); } catch (e) { /* Vorladen ist optional */ } }, 0); }, 400 + i * 350)));
       } catch (e) { /* Vorladen ist optional */ }
