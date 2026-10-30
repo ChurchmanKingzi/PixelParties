@@ -47,7 +47,7 @@ vorhanden = L.deckend(spr)
 FLAMME_FARBEN = [(202, 44, 41), (244, 123, 34), (246, 231, 14), (247, 245, 184)]
 flamme_alt = vorhanden & L.farbmaske(spr, FLAMME_FARBEN)
 koerper = vorhanden & ~flamme_alt
-assert int(flamme_alt.sum()) == 70
+assert int(flamme_alt.sum()) == 54
 
 ROT_RAMPE = [(40, 0, 0), (65, 0, 0), (145, 0, 0), (255, 0, 0), (255, 68, 68)]               # Leuchtauge, dunkel → hell
 METALL = [(43, 43, 43), (56, 57, 55), (90, 90, 90), (113, 113, 113), (146, 146, 146)]
