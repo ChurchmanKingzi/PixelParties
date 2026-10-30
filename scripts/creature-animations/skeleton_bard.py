@@ -51,7 +51,7 @@ UMRISS = U.umrissfarben(spr)
 SCHWARZ = (1, 3, 7)
 assert SCHWARZ in {col(x, y) for y in range(sh) for x in range(sw) if vorhanden[y, x]}
 
-hand = vorhanden & (xx >= 16) & (yy <= 8)
+hand = vorhanden & (xx >= 16) & (yy <= 8) & ~((xx == 16) & (yy >= 7))     # Finger + Handmanschette; die Ärmelpixel (16,7) (16,8) bleiben am Ärmel
 kopf = vorhanden & ~hand & ((yy <= 9) | ((yy <= 12) & (xx >= 5) & (xx <= 12)))
 fuss = vorhanden & (xx >= 10) & (yy >= 22)
 rest = vorhanden & ~hand & ~kopf & ~fuss
