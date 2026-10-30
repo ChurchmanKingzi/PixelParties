@@ -93,18 +93,16 @@ GRUPPEN = [(0, 3), (4, 5), (6, 7), (8, 9), (10, 13), (14, 16), (17, 18)]      # 
 
 
 def wiegen(a, aus):
-    """Kippen um die Füße (Zeile y 19): der Versatz wächst mit dem Abstand der Zeilengruppe zu den Füßen; die Zeilen einer Gruppe verschieben sich gleich. Rock/Füße (y ≥ 19) stehen."""
+    """Kippen um die Füße (Zeile y 19): der Versatz wächst mit dem Abstand der Zeilengruppe zu den Füßen; die Zeilen einer Gruppe verschieben sich gleich (Zeilen über dem Sprite laufen mit der obersten Gruppe).
+    Rock/Füße (y ≥ 19) stehen."""
     out = L.leer(*a.shape[:2])
-    for (y0, y1) in GRUPPEN:
-        dx = int(round(aus * (19 - (y0 + y1) / 2.0) / 19.0))
-        for y in range(y0 - 2, y1 + 1):                          # y0 - 2: Zeilen oberhalb des Sprites (Wulst-Spitze / angehobener Kopf) laufen mit der obersten Gruppe
-            if y < 0 and y0 != 0:
-                continue
-            gy = GPT + y
-            for x in np.nonzero(a[gy, :, 3])[0]:
-                out[gy, x + dx] = a[gy, x]
-    for y in range(19, sh + 3):                                   # Zeilen y ≥ 19 (Rock) stehen
-        out[GPT + y] = a[GPT + y]
+    dxg = [int(round(aus * (19 - (y0 + y1) / 2.0) / 19.0)) for (y0, y1) in GRUPPEN]
+    for cy in range(0, GPT + 19):
+        y = cy - GPT
+        k = 0 if y < 0 else next(j for j, (y0, y1) in enumerate(GRUPPEN) if y0 <= y <= y1)
+        for x in np.nonzero(a[cy, :, 3])[0]:
+            out[cy, x + dxg[k]] = a[cy, x]
+    out[GPT + 19:] = a[GPT + 19:]
     return out
 
 
