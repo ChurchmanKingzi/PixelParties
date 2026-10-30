@@ -1,0 +1,15 @@
+{
+  "creature": "The Root of all Evil",
+  "sheet": "the-root-of-all-evil.png",
+  "frameWidth": 40,
+  "frameHeight": 64,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 20.0
+}

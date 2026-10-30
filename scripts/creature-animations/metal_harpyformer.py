@@ -49,7 +49,7 @@ import anim_flieger_b as B
 
 N, MS = 48, 65
 BEAT, DOWN = 12, 5                                         # Frames je Flügelschlag, davon Abschlag
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 10, 2                   # oben: Feuer-Funken steigen auf, Hub 2 px
+PAD_L, PAD_R, PAD_T, PAD_B = 2, 2, 10, 2                   # oben: Feuer-Funken steigen auf, Hub 2 px
 
 spr = L.lade('metal-harpyformer')                          # Ebene 165 (Ruhepose / Referenz für den Randpixel-Test)
 sh, sw = spr.shape[:2]
@@ -184,10 +184,11 @@ def frame(i, partikel=True, nur=None):
             fuesse = L.streck_zeile(fuesse, PAD_T + 45, n - k)             # Füße: Lücke füllen doppelte oberste Zehenzeile
         fl_l = B.spalten_schub(FL_L, PAD_L + X_L, dy_fn(i, A_L), MAXD_L)
         fl_r = B.spalten_schub(FL_R, PAD_L + X_R, dy_fn(i, A_R, 0.3), MAXD_R)
-        str_l = _strang(STR_L, PAD_T + 38, PAD_T + 44, i, 16.0, 0.0)
-        str_r = _strang(STR_R[:, ::-1].copy(), PAD_T + 38, PAD_T + 44, i, 24.0, 1.0)[:, ::-1].copy()
+        str_l = _strang(STR_L, PAD_T + 38, PAD_T + 41, i, 16.0, 0.0)
+        str_r = _strang(STR_R[:, ::-1].copy(), PAD_T + 38, PAD_T + 40, i, 24.0, 1.0)[:, ::-1].copy()
         feuer = F.feuer_zungen(FEUER, i, N, KERN, pose_frames=3, seed=11, hub=0.34)
         feuer = F.feuer_schichten(feuer, i, N, HEISS, Y_ENDE, seed=53, amp=SCHICHT_AMP, neigung=0.5, gruppen=GRUPPEN)
+        feuer = B.kleine_inseln_weg(feuer, 4)                              # abgerissene Einzelpixel am Feuerrand entfallen (keine 1-px-Punkte)
         schichten += [(fl_l, 0, -n, 1), (fl_r, 0, -n, 2), (str_l, 0, -n, 3), (str_r, 0, -n, 4), (fuesse, 0, -k, 5), (rest, 0, -n, 6), (feuer, 0, -n, 8)]
     f, karte = B.zusammen_mit_karte(H, W, schichten)
     B.umriss_je_ebene(f, karte, ERLAUBT, UMRISS)

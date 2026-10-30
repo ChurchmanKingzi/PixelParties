@@ -396,3 +396,18 @@ def spalten_schub_gefuellt(a, pivot_x, dy_fn, maxd=None, ab_x=None):
             if not out[y, x, 3]:
                 out[y, x] = a[int(ys.min()), x]
     return out
+
+
+def kleine_inseln_weg(a, min_px=4):
+    """Entfernt von der Ebene `a` alle Pixelinseln (8er-Nachbarschaft) mit weniger als `min_px` Pixeln — z. B. Feuerränder, an denen ein Flackern einzelne Pixel
+    abgetrennt hat (keine isolierten 1-px-Punkte). Gibt eine Kopie zurück; die größte Insel bleibt immer."""
+    import cv2
+    out = a.copy()
+    n, lab, st, _ = cv2.connectedComponentsWithStats((a[..., 3] > 0).astype(np.uint8), connectivity=8)
+    if n <= 2:
+        return out
+    gross = max(range(1, n), key=lambda k: st[k, 4])
+    for k in range(1, n):
+        if k != gross and st[k, 4] < min_px:
+            out[lab == k] = 0
+    return out
