@@ -34,6 +34,7 @@ Ergänzungen: Randpixel-Korrektur (Regel 16); sonst keine gemalten Pixel.
 import math
 import sys
 
+import cv2
 import numpy as np
 
 import anim_lib as L
@@ -52,6 +53,10 @@ r_, g_, b_ = (spr[..., k].astype(int) for k in range(3))
 purpur = vorhanden & (b_ > g_ + 15) & (r_ >= g_ - 3) & (b_ >= r_ - 5) & (g_ < 130)          # Violett inkl. dunkler Schattenstufen (Blau der Feder hat r < g)
 fl_l = vorhanden & (((xx <= 8) & (yy >= 15)) | ((xx == 9) & (yy >= 25)))
 fl_r = (purpur & (xx >= 18) & (yy >= 14)) | ((xx == 23) & (yy == 27))              # + einzelnes dunkelrotes Randpixel (23,27) am unteren Lappen
+_n, _lab = cv2.connectedComponents(fl_r.astype(np.uint8), connectivity=4)
+for _k in range(1, _n):                                          # einzelne Streupixel der Farbregel (Halsschatten) gehören nicht zum Flügel
+    if (_lab == _k).sum() < 5:
+        fl_r &= ~(_lab == _k)
 antenne = vorhanden & (yy <= 12)
 koerper = vorhanden & ~fl_l & ~fl_r & ~antenne
 

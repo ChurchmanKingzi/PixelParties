@@ -22,7 +22,7 @@ Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Glitzersterne (Gold): vierzackige Sterne blitzen an drei Stellen auf dem Ei (ganz im Inneren; Lauf 0–1–2–1–0 über 5 Frames, wachsen/schrumpfen) und in den beiden freien oberen Ecken außerhalb des Eis
   (Lauf 1–2–1 über 3 Frames, nie ein einzelner Punkt) auf (Farben G, K, J des Sprites; die Eck-Sterne berühren das Ei nie — das Skript prüft es in jedem Frame).
 Ergänzungen: keine (der Rand wird nie verändert).
-Frame: Sprite plus 3 px links/rechts, 5 px oben (Strecken + Hüpfer + Eck-Sterne), 2 px unten — Figur zentriert.
+Frame: Sprite plus 4 px links/rechts (Eck-Sterne), 5 px oben (Strecken + Hüpfer + Eck-Sterne), 2 px unten — Figur zentriert.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
@@ -34,7 +34,7 @@ import anim_lib as L
 import anim_amorph as A
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 5, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 5, 2
 
 spr = L.lade('the-egg-of-god')
 sh, sw = spr.shape[:2]
@@ -70,7 +70,7 @@ SWEEP_N = 15
 STERN_LAUF = [0, 1, 2, 1, 0]                                                           # auf dem Ei (Oberflächenfunkeln)
 STERN_LAUF_ECKE = [1, 2, 1]                                                            # in den Ecken: nie ein einzelner Punkt (kleinster Stern = Plus aus 5 Pixeln)
 ORTE = {'e1': (7, 9), 'e2': (10, 12), 'e3': (5, 15),                                    # auf dem Ei (ganz im Inneren)
-        'c1': (1, -1), 'c2': (16, -1)}                                                    # freie obere Ecken (außerhalb des Eis)
+        'c1': (0, -1), 'c2': (17, -1)}                                                    # freie obere Ecken (außerhalb des Eis)
 for _k in ('e1', 'e2', 'e3'):
     _x, _y = ORTE[_k]
     for (_dx, _dy) in [(d, 0) for d in range(-2, 3)] + [(0, d) for d in (-2, -1, 1, 2)]:

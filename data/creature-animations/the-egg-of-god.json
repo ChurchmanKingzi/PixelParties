@@ -1,7 +1,7 @@
 {
   "creature": "The Egg of God",
   "sheet": "the-egg-of-god.png",
-  "frameWidth": 24,
+  "frameWidth": 26,
   "frameHeight": 28,
   "frames": 48,
   "frameMs": 65,
@@ -11,5 +11,5 @@
   "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,
-  "faceX": 12.0
+  "faceX": 13.0
 }
