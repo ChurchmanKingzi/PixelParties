@@ -1,15 +1,15 @@
 {
   "creature": "Hell Fox",
   "sheet": "hell-fox.png",
-  "frameWidth": 61,
-  "frameHeight": 42,
-  "frames": 40,
-  "frameMs": 70,
+  "frameWidth": 65,
+  "frameHeight": 45,
+  "frames": 48,
+  "frameMs": 65,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 6,
-  "padLeft": 5,
-  "padRight": 6,
+  "padTop": 8,
+  "padLeft": 6,
+  "padRight": 3,
   "padBottom": 3,
-  "faceX": 30.5
+  "faceX": 32.5
 }
