@@ -27,9 +27,7 @@ Ablauf (48 Frames à 65 ms = 3,12 s), alle Bewegungen unabhängig:
   geschlossenes Lid auf dem Schädel), dann wieder oben — der Wechsel schwarz → grauweiß ist deutlich.
 * Pfoten tippen: linker Fuß in Frames 6–7, 20–21 und 40–41, rechter Fuß in 12–13, 27–28 und 45–46 (die Beinzeile 13 des Fußes entfällt, die Fußlinie rückt
   1 px hoch; die Innenumrisse (4,12) und (7,12) bleiben am Körper).
-* Knochenstaub: vier einzelne helle Staubkörnchen (1 px, Farben B/C aus dem Sprite) rieseln langsam zwischen den Hinterbeinen nach unten (≈ 0,1 px/Frame,
-  insgesamt ~4 px, höchstens 2 px unter die Fußlinie), verglimmen flackernd und sind am Schleifenende aus; sie liegen hinter dem Skelett. Kein Glanz,
-  keine Kreuz-/Rautenform. Der Rahmen ist auf die Figur zugeschnitten (18×23 px, Rand 3–4 px rundum, Figur zentriert); der Staub vergrößert ihn nicht.
+* Kein Staub, keine Partikel (früherer Knochenstaub auf Nutzerwunsch entfernt). Der Rahmen ist auf die Figur zugeschnitten (18×21 px, Rand 3 px rundum).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
 Ergänzungen: keine gemalten Pixel.
@@ -42,7 +40,7 @@ import anim_lib as L
 import anim_tiere as T
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 4                         # Figur zentriert; der Staub rieselt höchstens 2 px unter die Füße, der Rahmen wächst dafür nicht
+PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 3, 3                         # Rahmen auf die Figur zugeschnitten und zentriert (Atem-Hub oben: 2 px frei)
 
 spr = L.lade('loyal-bone-dog')
 sh, sw = spr.shape[:2]
@@ -54,8 +52,7 @@ KIEFER = (156, 156, 156)                                          # G
 KNOCHEN = (123, 123, 123)                                         # E: Knochenfarbe für das geschlossene Lid
 RAND = T.rand_farben(spr)
 BEINZEILE = 13                                                    # hier wird beim Atmen eine Zeile eingefügt
-STAUB = {'rot': ((189, 189, 189), (213, 213, 213))}               # B (Kern) / C (Rand) — einzelne Körnchen nutzen nur den Kern
-TEST_EBENEN = ['rumpf', 'fuss_l', 'fuss_r']                       # Körper ohne Staub (für randtest.py)
+TEST_EBENEN = ['rumpf', 'fuss_l', 'fuss_r']
 
 PFOTE_L = (6, 7, 20, 21, 40, 41)
 PFOTE_R = (12, 13, 27, 28, 45, 46)
@@ -76,12 +73,6 @@ def zustand(i):
         if 0 <= i - s < 4:
             lid = (1, 2, 2, 1)[i - s]
     return atem, kiefer, lid, 1 if i in PFOTE_L else 0, 1 if i in PFOTE_R else 0
-
-
-STAUBKOERNER = [dict(x=PAD_L + 5, y=PAD_T + 12, vx=0, vy=4.2, off=0, form='k', farbe='rot', wackeln=0.6, ph=0.0),
-                dict(x=PAD_L + 6, y=PAD_T + 12, vx=1, vy=4.6, off=12, form='k', farbe='rot', wackeln=0.6, ph=1.5),
-                dict(x=PAD_L + 5, y=PAD_T + 12, vx=-1, vy=4.2, off=24, form='k', farbe='rot', wackeln=0.6, ph=3.0),
-                dict(x=PAD_L + 6, y=PAD_T + 12, vx=0, vy=4.6, off=36, form='k', farbe='rot', wackeln=0.6, ph=4.5)]
 
 
 def frame(i, nur=None):
@@ -110,9 +101,8 @@ def frame(i, nur=None):
     fr_, rest = L.trenne(rest, fuss & (cols >= PAD_L + 7))
     fl = L.heben_unten(fl, PAD_T + 13, tipp_l)
     fr_ = L.heben_unten(fr_, PAD_T + 13, tipp_r)
-    staub = T.funken_ebene(H, W, i, N, STAUBKOERNER, STAUB)
-    ebenen = {'staub': staub, 'rumpf': rest, 'fuss_l': fl, 'fuss_r': fr_}
-    wahl = nur or ('staub', 'rumpf', 'fuss_l', 'fuss_r')
+    ebenen = {'rumpf': rest, 'fuss_l': fl, 'fuss_r': fr_}
+    wahl = nur or ('rumpf', 'fuss_l', 'fuss_r')
     return L.zusammen(H, W, [(ebenen[n], 0, 0) for n in wahl])
 
 
