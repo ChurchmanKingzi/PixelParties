@@ -43668,7 +43668,13 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
 
       // Consume from hand + pay gold
+      // ★ Flug (Al 30.10.: Trample Sounds „verschwindet einfach aus der Hand und taucht dann später einfach im Discard auf"): der Client leitet
+      // Flüge zur Ablage aus Handverlust UND Ablagezuwachs im SELBEN Zustand ab; hier liegen aber die ganze Reaktion samt freier Aktion dazwischen,
+      // beide Hälften kommen nie zusammen an. Darum zwei ausdrückliche Flüge: jetzt Hand → Brettmitte (VOR der Entnahme, der Handplatz muss
+      // noch stehen), am Ende Brettmitte → Ablage (vor dem Ablegen, `play_pile_transfer`-Vertrag wie überall).
+      this._broadcastEvent('play_pile_transfer', { owner: pi, cardName, from: 'hand', to: 'boardCenter', fromHandIdx: hi });
       ps.hand.splice(hi, 1);
+      this.sync();   // sofort abgleichen: die Hand rückt auf, während die Karte fliegt (Wächter `check-hand-flight-sync`)
       await this._rxPay(ps, cost, { cardName });
       this.notePlayedFromHand(pi);
 
@@ -43724,7 +43730,14 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       // Discard the spent card
       const _aszPs = this.handKartenBesitzerPs(ps, cardName);   // W63c: Ablage des permanenten Besitzers (gestohlene Handkarte)
-      if (!_aszBuddy.token) _aszPs.discardPile.push(cardName);   // W67a: Inyas Fantasy Buddy ersetzt die Ablage
+      if (!_aszBuddy.token) {   // W67a: Inyas Fantasy Buddy ersetzt die Ablage
+        const _aszBesitzer = this.gs.players.indexOf(_aszPs);
+        this._broadcastEvent('play_pile_transfer', {
+          owner: pi, cardName, from: 'boardCenter', to: 'discard',
+          ...(_aszBesitzer >= 0 && _aszBesitzer !== pi ? { fromOwner: pi, toOwner: _aszBesitzer } : {}),
+        });
+        _aszPs.discardPile.push(cardName);
+      }
       this.sync();
       // (Wisdom discard was paid earlier — see comment above.)
 
