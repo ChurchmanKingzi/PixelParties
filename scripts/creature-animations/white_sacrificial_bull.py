@@ -21,8 +21,8 @@ Ablauf (56 Frames à 66 ms = 3,7 s), alle Bewegungen unabhängig:
   (Zeile 12 wird eingefügt, Frames 6–19): Kopf und Hörner steigen insgesamt 2 px, der Rücken 1 px, die Hufe bleiben am Boden. Der Schwanz wird mit gestreckt.
 * Wiederkäuen: das Maul (rosa Block samt Kinnumriss, x 25–33, Zeilen 15–18) senkt sich 1 px und hebt sich wieder, 2× pro Schleife als Folge von 6 Kaubewegungen
   (Frames 8–19 und 36–47, je 2 Frames unten/oben); die Lücke wird mit der darüberliegenden Zeile geschlossen.
-* Schwanz wedelt: der Schwanzstreifen schwingt nach außen (links) bis 2 px und zurück, unten am meisten (Periode 14, 4× pro Schleife, mit Phasenversatz nach unten); der Umriss wird
-  danach nachgezogen (Regel 16).
+* Schwanz wedelt: zweimal pro Schleife (Frames 22–35 und 42–55) schwingt der Schwanzstreifen zweimal nach außen (links) bis 2 px und zurück, unten am meisten, als wandernde Welle;
+  dazwischen hängt er wie im Original. Der Umriss wird danach nachgezogen (Regel 16).
 * Hufe tippen: hinten außen (x 2–7) in Frames 5–6, 31–32; hinten innen (8–12) in 17–18, 44–45; vorn innen (15–19) in 11–12, 38–39; vorn außen (20–25) in 24–25, 50–51. Die Fußzeile 24
   entfällt kurz, der Huf rückt 1 px hoch.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle. Kein Glanz (Regel 14: die Hörner sind nur gelb eingefärbt, nicht Gold im Sinne
@@ -78,16 +78,26 @@ def zustand(i):
     return a, b, kau, huf
 
 
+SCHWANZ_FENSTER = [(22, 36), (42, 56)]
+
+
 def schwanz_schwingen(t, i):
-    """Schwanzstreifen (Zeilen 12–22) schwingt nach links: je tiefer, desto weiter (bis 2 px), wandernde Welle."""
+    """Schwanzstreifen (Zeilen 12–22) schwingt zweimal nach links und zurück (bis 2 px, je tiefer desto weiter, wandernde Welle) — nur in zwei Wedelphasen
+    je Schleife (14 Frames), dazwischen hängt er ruhig wie im Original."""
     out = L.leer(H, W)
+    u = None
+    for s_, e_ in SCHWANZ_FENSTER:
+        if s_ <= i < e_:
+            u = (i - s_) / float(e_ - s_)
     for y in range(12, 23):
         xs_ = np.nonzero(t[PAD_T + y, :, 3])[0]
         if not len(xs_):
             continue
-        f = (y - 12) / 10.0
-        s = 0.5 - 0.5 * math.cos(2 * math.pi * i / 14.0 - 1.6 * f)
-        dx = -int(round(2.0 * f * s))
+        dx = 0
+        if u is not None:
+            f = (y - 12) / 10.0
+            g = 0.5 - 0.5 * math.cos(4 * math.pi * u - 1.4 * f)
+            dx = -int(round(2.3 * f * math.sin(math.pi * u) * max(0.0, g)))
         if xs_.min() + dx < 0:
             raise L.ClipError(f'Schwanzzeile {y} würde aus der Leinwand geschoben')
         for x in xs_:
