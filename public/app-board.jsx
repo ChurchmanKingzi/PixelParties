@@ -22722,7 +22722,7 @@ const ANIM_REGISTRY = {
               animation: `ankhFloat ${a.dur}ms ease-out ${a.delay}ms forwards`,
               opacity: 0,
               '--endY': a.endY + 'px',
-            }}>𓋹</div>
+            }}>☥</div>
           ))}
           {sparkles.map((s, i) => (
             <div key={'as'+i} style={{
@@ -23633,11 +23633,14 @@ const ANIM_REGISTRY = {
             }} />
           ))}
           {splats.map((s, i) => (
-            <div key={'as'+i} className="anim-beer-bubble" style={{
-              '--xOff': s.xOff + 'px', '--size': s.size + 'px', '--wobble': '0px',
-              '--color': 'rgba(200,0,0,.7)', animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
-              fontSize: s.size, opacity: 0, left: s.yOff,
-            }}>🧪</div>
+            <div key={'as'+i} style={{
+              position: 'absolute', left: s.yOff, bottom: -10, width: s.size, height: s.size, opacity: 0, '--wobble': '0px',
+              animation: `animBeerBubble ${s.dur}ms ease-out ${s.delay}ms forwards`,
+            }}>
+              {/* ★ W86p: Blase und Reagenzglas getrennt — ein Textkind in der maskierten Partikelklasse blieb beim Pixelieren unbehandelt (Schrift mit Mischfarben) */}
+              <i style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: '#8f0000' }} />
+              <span style={{ position: 'absolute', left: 0, top: 0, fontSize: s.size, lineHeight: 1 }}>🧪</span>
+            </div>
           ))}
         </div>
       );
