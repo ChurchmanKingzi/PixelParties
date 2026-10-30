@@ -32,8 +32,8 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
   vom Bart ab. Nach innen geht nichts (da liegt der Bart).
 * Dampf steigt aus allen drei Rohren auf (Partikel): neun runde Dampfwolken ('m' Wölkchen, 'o' Oval, 'k' Funke) in Weiß/Hellgrau steigen langsam auf (16–19 px pro Schleife),
   mit leichtem Wackeln, wachsen/schrumpfen (L.puff_ebene), hinter der Figur.
-* Metall glänzt (Regel 12): ein Lichtband läuft zweimal pro Schleife (Frames 3–16 und 27–40) diagonal über Rohre, Metallstreifen, Bart (K→D) und den roten Umhang (Tuchglanz),
-  jeweils 1–2 Stufen heller auf der Rampe des Sprites; je ein vierzackiger Glitzer-Stern an der linken Rohrspitze (Frames 10–13), an der rechten (Frames 26–29) und am Metallstreifen
+* Metall glänzt (Regel 12/14: nur Metall): ein Lichtband läuft zweimal pro Schleife (Frames 3–16 und 27–40) diagonal über Rohre und Metallstreifen, 1–2 Stufen heller auf der Rampe des Sprites
+  (Bart, Umhang und Dampf glänzen nicht); je ein vierzackiger Glitzer-Stern an der linken Rohrspitze (Frames 10–13), an der rechten (Frames 26–29) und am Metallstreifen
   rechts (Frames 40–43).
 Frame 0 = Original (Ruhepose), der Dampf ausgenommen. Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -116,13 +116,10 @@ def frame(i, dampf=True):
     kp = teil(kopfteil)
     al = teil(arm_l)
     ar = teil(arm_r)
-    # --- Metallglanz: Lichtband zweimal pro Schleife ---
+    # --- Metallglanz (Regel 14: nur Metall = Rohre und Metallstreifen; Bart, Umhang und Dampf glänzen NICHT) ---
     for start in (3, 27):
         Hm.lichtband(kp, m_rohr, OFF, i, N, start, 14, PIPE_RAMPE, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
         Hm.lichtband(kp, m_band, OFF, i, N, start, 14, BAND_RAMPE, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
-        Hm.lichtband(kp, m_bart, OFF, i, N, start, 14, BART_RAMPE, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
-        Hm.lichtband(al, m_tuch, OFF, i, N, start, 14, UMHANG_RAMPE, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
-        Hm.lichtband(ar, m_tuch, OFF, i, N, start, 14, UMHANG_RAMPE, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
     # --- Dampfrohre zittern (je Rohr eigener Ausschlag) ---
     for name, (x0, x1) in ROHRE.items():
         a = rohr_stufe(i, name)

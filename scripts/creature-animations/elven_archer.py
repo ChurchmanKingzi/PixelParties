@@ -68,6 +68,8 @@ ORANGE, ROTBRAUN = (230, 131, 16), (115, 41, 16)
 HAARRAMPE = [(115, 41, 16), (189, 57, 8), (213, 98, 16), (230, 131, 16), (255, 180, 24), (255, 222, 90), (255, 246, 172)]
 HELLGELB = HAARRAMPE[-1]
 
+KANTE0 = Hm.kantenmaske(spr)
+ERLAUBT = Hm.umrissfarben(spr)                                  # Farben der Außenkante im Original (Regel 16)
 # Teile: der Bogen steht fest, alles andere (Körper samt Kopf, Ohren, Feder) wird bewegt
 bogen = vorhanden & (xx >= 2) & (xx <= 4) & (yy >= 7) | ((xx == 3) & (yy == 6))
 koerper = vorhanden & ~bogen
@@ -83,9 +85,17 @@ OHR_L_RUNTER = {(0, 8): None, (0, 9): UMRISS}
 # Haare im Wind: Locken-Spitzen und freie Strähne (Zustände 4-verbunden, siehe Kopf)
 SPITZE_R = {(12, 14): UMRISS, (13, 14): HELLGELB}
 SPITZE_L = {(5, 14): UMRISS, (6, 14): HELLGELB}
-STRAEHNE_14 = {1: {(15, 14): ORANGE, (16, 14): ROTBRAUN},
-               2: {(15, 14): ORANGE, (16, 14): ORANGE, (17, 14): ROTBRAUN}}
-STRAEHNE_15 = {1: {(16, 15): ROTBRAUN}, 2: {(16, 15): ROTBRAUN, (17, 15): ROTBRAUN}}
+def straehne(l14, l15):
+    """Freie Haarsträhne über der rechten Schulter mit geschlossener Kontur (Regel 16): Zeile 14 orange von x 14 bis 14 + l14, rotbrauner Abschluss rechts,
+    rotbraune Oberkante in Zeile 13 (x 15 … 14 + l14) und rotbraune Unterkante in Zeile 15 (x 15 … 15 + max(l14, l15))."""
+    px = {}
+    for x in range(15, 15 + l14):
+        px[(x, 14)] = ORANGE
+        px[(x, 13)] = ROTBRAUN
+    px[(15 + l14, 14)] = ROTBRAUN
+    for x in range(15, 16 + max(l14, l15)):
+        px[(x, 15)] = ROTBRAUN
+    return px
 # Feder biegt sich mit der Böe (Ruhe: weiß (15,0),(14,1),(13,2); hellblau (15,1),(14,2),(13,3),(14,3),(13,4))
 FEDER = {1: {(15, 0): None, (16, 0): WEISS, (16, 1): HELLBLAU},
          2: {(15, 0): None, (14, 1): None, (16, 0): WEISS, (15, 1): WEISS, (16, 1): HELLBLAU, (14, 2): WEISS, (15, 2): HELLBLAU}}
@@ -112,7 +122,11 @@ def luecke_bogen(k, bogen_hub=0):
         return k
     for y in range(min(ys) + 1, yb):
         if not k[y, xc, 3] and k[y, xc + 1, 3]:
-            k[y, xc] = k[y, xc + 1]
+            if k[y, xc - 1, 3]:                                  # links liegt die Bogenspitze (Nubbel): Lücke in Haarfarbe der anliegenden Locke
+                k[y, xc] = k[y, xc + 1]
+            else:                                                # links frei: Außenkante → Umrissfarbe (Regel 16)
+                k[y, xc, :3] = UMRISS
+                k[y, xc, 3] = 255
     return k
 
 
@@ -123,8 +137,8 @@ def frame(i):
     for start in (1, 25):
         mitte = Hm.boe_mitte(i, N, start, 12, 3.0, 24.0)
         if mitte is not None:
-            Hm.heller(k, lambda x, y: Hm.boe_aktiv(x, y, mitte, 1.3), HAARRAMPE, OFF)
-            Hm.heller(k, lambda x, y: Hm.boe_aktiv(x, y, mitte, 0.6), HAARRAMPE, OFF)
+            Hm.heller(k, lambda x, y: (not KANTE0[y, x]) and Hm.boe_aktiv(x, y, mitte, 1.3), HAARRAMPE, OFF)      # Randpixel (Umriss) bleiben unverändert
+            Hm.heller(k, lambda x, y: (not KANTE0[y, x]) and Hm.boe_aktiv(x, y, mitte, 0.6), HAARRAMPE, OFF)
     # --- Pixel-Ereignisse am Körper (vor dem Atmen, damit sie mit dem Kopf steigen) ---
     bl = Hm.folge(i, 17, [AUGE_HALB, AUGE_ZU, AUGE_HALB], N) or Hm.folge(i, 38, [AUGE_HALB, AUGE_ZU, AUGE_HALB], N)
     if bl:
@@ -136,18 +150,17 @@ def frame(i):
     if Hm.folge(i, 28, [1, 1, 1], N):
         Hm.setze(k, OHR_L_RUNTER, OFF)
     # --- Böen: Locke → Strähne → Strähnenspitze, Feder ---
+    l14 = l15 = 0
     for start in BOEN:
         if Hm.folge(i, start, BOE_SPITZE, N):
             Hm.setze(k, SPITZE_R, OFF)
-        s14 = Hm.folge(i, start, BOE_S14, N)
-        if s14:
-            Hm.setze(k, STRAEHNE_14[s14], OFF)
-        s15 = Hm.folge(i, start, BOE_S15, N)
-        if s15:
-            Hm.setze(k, STRAEHNE_15[s15], OFF)
+        l14 = max(l14, Hm.folge(i, start, BOE_S14, N) or 0)
+        l15 = max(l15, Hm.folge(i, start, BOE_S15, N) or 0)
         f = Hm.folge(i, start - 1, BOE_FEDER, N)
         if f:
             Hm.setze(k, FEDER[f], OFF)
+    if l14 or l15:
+        Hm.setze(k, straehne(l14, l15), OFF)
     if Hm.takt(i, N, 10, 3) or Hm.takt(i, N, 26, 3) or Hm.takt(i, N, 42, 3):     # linke Lockenspitze schlägt nach innen
         Hm.setze(k, SPITZE_L, OFF)
     # --- Auf und ab: Brust zuerst, Kopf 3 Frames später ---
@@ -161,7 +174,8 @@ def frame(i):
     # Der Bogen steigt mit Arm/Hand und Brust (Einheit: Hand sitzt am Griff, rutscht nicht), nur der Kopf-Nachlauf kommt obendrauf
     b = L.versetze(b, 0, -brust)
     k = luecke_bogen(k, brust)
-    return L.zusammen(H, W, [(k, 0, 0), (b, 0, 0)])
+    fig = L.zusammen(H, W, [(k, 0, 0), (b, 0, 0)])
+    return Hm.kontur_schliessen(fig, ERLAUBT, UMRISS)
 
 
 if __name__ == '__main__':

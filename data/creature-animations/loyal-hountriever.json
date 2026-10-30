@@ -1,0 +1,15 @@
+{
+  "creature": "Loyal Hountriever",
+  "sheet": "loyal-hountriever.png",
+  "frameWidth": 20,
+  "frameHeight": 22,
+  "frames": 58,
+  "frameMs": 62,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 3,
+  "faceX": 10.0
+}

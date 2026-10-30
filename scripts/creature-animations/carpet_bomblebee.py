@@ -89,6 +89,7 @@ for _name, _sp in LUNTEN.items():
     for _x, _y in _sp:
         FLAMMEN[(_name, _x)] = ([int(_rng.randint(0, 4)) for _ in range(_K)], int(_rng.randint(0, _K)), _y)
 
+UMRISS = F.umriss_farben(spr)                                # Umrissfarben der Quelle (Randpixel-Test, Regel 16)
 PIVOT, MAXD = 23, 23
 
 
@@ -146,7 +147,7 @@ def schwirren(ebene, maske, xs, wurzel_x, s):
     return out
 
 
-def frame(i, partikel=True):
+def frame(i, partikel=True, effekte=True):
     pb = L.sinus(i, N / 4)                                    # Schweben: Periode 12
     bob = int(round(-1.8 * math.sin(pb)))
     kippen = L.sinus(i, N / 3)                                # Seitenwippe: Periode 16
@@ -172,7 +173,7 @@ def frame(i, partikel=True):
     # ── Bomben: wippen mit, hüpfen zusätzlich 0…1 px nach oben; Sternfunken pulsieren ─────────────────────────────────────
     bl = F.ebene(bol, L.deckend(bol), H, W, PAD_L, PAD_T)
     br = F.ebene(bor, L.deckend(bor), H, W, PAD_L, PAD_T)
-    for name in LUNTEN:                                       # Feuer der Lunten
+    for name in (LUNTEN if effekte else []):                  # Feuer der Lunten
         lunten_feuer(bl if name[0] == 'L' else br, name, i)
     hop_l = -int(round(1.2 * max(0.0, math.sin(L.sinus(i, N / 6)))))
     hop_r = -int(round(1.2 * max(0.0, math.sin(L.sinus(i, N / 6) - 3.0))))
@@ -182,6 +183,8 @@ def frame(i, partikel=True):
     pol = L.zusammen(H, W, [(L.puff_ebene(H, W, i, N, PUFFS1, FUNKEN1), 0, 0), (L.puff_ebene(H, W, i, N, PUFFS2, FUNKEN2), 0, 0)]) \
         if partikel else L.leer(H, W)
     f = L.zusammen(H, W, [(pol, 0, 0), (T, 0, bob), (bl, 0, bob + kd_l + hop_l), (br, 0, bob + kd_r + hop_r)])
+    # Randpixel-Test (Regel 16): die Seitenwippe legt an den Teppichkanten helles Rot frei → Kante in Umrissrot (149,47,49)
+    F.umranden(f, [L.versetze(T, 0, bob)], UMRISS, (149, 47, 49), (149, 47, 49), (149, 47, 49))
 
     return f
 

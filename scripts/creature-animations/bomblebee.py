@@ -75,6 +75,7 @@ RINGR = [ORANGE, GOLD, HELLGOLD, GELB_HELL]
 LUNTEN = [[(21, 8), (22, 7), (23, 6), (24, 6), (25, 6)],     # links
           [(30, 3), (31, 2), (32, 3)],                       # oben
           [(38, 6), (39, 6), (40, 7)]]                       # rechts
+UMRISS = F.umriss_farben(spr)                                # Umrissfarben der Quelle (Randpixel-Test, Regel 16)
 ZEILE = PAD_T + 19
 
 
@@ -115,7 +116,7 @@ def lunten_feuer(kp, i):
             kp[PAD_T + y0, PAD_L + x, :3] = GELB_HELL
 
 
-def frame(i, partikel=True):
+def frame(i, partikel=True, effekte=True):
     ph = L.sinus(i, N / 6)                                    # kräftiger Flügelschlag: sechsmal pro Schleife (Periode 8)
     pb = L.sinus(i, N / 4)                                    # Schwebe-Bob: Periode 12
     haupt = int(round(-1.3 * math.sin(pb)))                   # Körper/Flügel zuerst …
@@ -128,8 +129,9 @@ def frame(i, partikel=True):
     wr = F.ebene(spr, wing_r, H, W, PAD_L, PAD_T)
 
     # ── Glanz nur am goldenen Ring (Metall, dezent) und brennende Lunten ───────────────────────────────────────────────────
-    F.lichtband(kp, ring, PAD_L, PAD_T, i, N // 2, 10, 9, RINGR, stufen=1, breite=3.0, achse=(1.0, 0.8))
-    lunten_feuer(kp, i)
+    if effekte:
+        F.lichtband(kp, ring, PAD_L, PAD_T, i, N // 2, 10, 9, RINGR, stufen=1, breite=3.0, achse=(1.0, 0.8))
+        lunten_feuer(kp, i)
 
     # ── Bewegung: Beine/Hinterleib pendeln, Flügel surren ────────────────────────────────────────────────────────────
     kp = F.zeilen_pendel(kp, PAD_T + 18, 2.4, L.sinus(i, N / 2), 1.0)
@@ -144,6 +146,8 @@ def frame(i, partikel=True):
     pol = L.zusammen(H, W, [(L.puff_ebene(H, W, i, N, PUFFS1, FUNKEN1), 0, 0), (L.puff_ebene(H, W, i, N, PUFFS2, FUNKEN2), 0, 0)]) \
         if partikel else L.leer(H, W)
     f = L.zusammen(H, W, [(pol, 0, 0), (wl, 0, 0), (wr, 0, 0), (kp, 0, 0)])
+    # Randpixel-Test (Regel 16): Spaltenversatz legt an den Flügelkanten helle Innenfarbe frei → Kante in Umrissfarbe (dunkelgrau oben, braun sonst)
+    F.umranden(f, [wl, wr], UMRISS, (47, 59, 59), (135, 100, 60), (135, 100, 60))
 
     return f
 

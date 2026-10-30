@@ -53,6 +53,8 @@ vorhanden = L.deckend(spr)
 
 M_, E_, G_, P_ = (150, 0, 0), (202, 44, 41), (244, 123, 34), (246, 231, 14)
 B_ = (47, 18, 18)
+A_ = (12, 12, 12)                                 # Umrissschwarz
+UMRISS = U.umrissfarben(spr * np.where(np.arange(spr.shape[0])[:, None, None] >= 9, 1, 0).astype(np.uint8))   # Randfarben des Körpers (ohne Flamme y 0–8)
 _vorh = {tuple(int(v) for v in p[:3]) for p in spr.reshape(-1, 4) if p[3]}
 assert all(col in _vorh for col in (M_, E_, G_, P_, B_))
 FARBE = {'E': E_, 'G': G_, 'P': P_}
@@ -213,7 +215,7 @@ def stufe2(i):
     return int(round(2 * (1 - abs(2 * t - 1))))                  # 0-1-2-1-0
 
 
-def frame(i):
+def frame(i, nur=None):
     r_b = stufe2(i)
     r_k = max(min(r_b, stufe2(i - 2)), r_b - 1)                   # Schädel + Flamme folgen der Brust, nie höher
     aus = 2.5 * U.buckel(i, 0, 24, n=24)
@@ -234,9 +236,13 @@ def frame(i):
     al = U.haengen(teil(arm_l), PAD_T + 18, -aus)
     ar = U.haengen(teil(arm_r), PAD_T + 18, aus)
     bn = teil(beine)
+    koerper = L.zusammen(H, W, [(bn, 0, 0), (rp, 0, 0), (al, 0, -r_b), (ar, 0, -r_b), (kp, 0, -r_k)])
+    koerper = U.kontur_schliessen(koerper, UMRISS, A_)             # Regel 16: Umriss an Armen/Händen in jeder Pose geschlossen
+    if nur == 'koerper':                                           # Randpixel-Test: Körper ohne Flamme (Feuer hat keinen Umriss) und Partikel
+        return koerper
     heiss = U.glut_ebene(H, W, i, N, PUFFS_HEISS, HEISS)
     kalt = U.glut_ebene(H, W, i, N, PUFFS_GLUT, GLUT)
-    return L.zusammen(H, W, [(kalt, 0, 0), (heiss, 0, 0), (bn, 0, 0), (rp, 0, 0), (al, 0, -r_b), (ar, 0, -r_b), (kp, 0, -r_k), (fl, 0, -r_k)])
+    return L.zusammen(H, W, [(kalt, 0, 0), (heiss, 0, 0), (koerper, 0, 0), (fl, 0, -r_k)])
 
 
 if __name__ == '__main__':

@@ -13,6 +13,7 @@ bereits auf der VOLLEN Leinwand liegen (L.platz) und werfen ClipError, wenn etwa
     band_diagonal(a, punkte, rampe, d)        # Lichtband wandert diagonal über ein glänzendes Objekt (eine Stufe heller)
     stern_ebene(h, w, cx, cy, stufe, mitte, arm)   # vierzackiger Glitzerstern am Objekt (Stufe 1 → 2 → 1)
     blitz_ebene(h, w, ax, ay, muster, spiegel, kern, akzent)   # kleiner Zickzack-Blitz (2–5 px) an einer Hand
+    kontur_schliessen(f, erlaubt, standard)   # Regel 16: fehlende Umrisspixel an bewegten Teilen ergänzen (Randpixel-Test)
     glanz_pfad(a, pfad, hell, basis, pos)     # ein Lichtpunkt wandert an einem Horn/Knochen/Klinge entlang
     glut_ebene(h, w, i, n, puffs, farben)     # Funken/Glut aufsteigend (puff_ebene, aber mit Verglimmen an Anfang und Ende)
 """
@@ -188,6 +189,50 @@ def blitz_ebene(h, w, ax, ay, muster, spiegel, kern, akzent, laenge=None):
         e[y, x, :3] = akzent if (k == len(pf) - 1 or k == 2) else kern
         e[y, x, 3] = 255
     return e
+
+
+def kanten(a):
+    """Maske der deckenden Pixel, die an Transparentes grenzen (4er-Nachbarschaft)."""
+    m = a[..., 3] > 0
+    q = np.pad(m, 1)
+    frei = (~q[:-2, 1:-1]) | (~q[2:, 1:-1]) | (~q[1:-1, :-2]) | (~q[1:-1, 2:])
+    return m & frei
+
+
+def umrissfarben(spr):
+    """Farben der Randpixel des Quell-Sprites (= Umriss- und Randfarben, an denen der Randpixel-Test nichts beanstandet)."""
+    e = kanten(spr)
+    return {tuple(int(v) for v in spr[y, x, :3]) for y, x in zip(*np.nonzero(e))}
+
+
+def kontur_schliessen(f, erlaubt, standard):
+    """Randpixel-Test (Regel 16): Ein deckendes Randpixel in einer Farbe, die im Quell-Sprite nie am Rand liegt (Fell, Füllung …), bekommt an seinen freien
+    4er-Nachbarplätzen ein Umrisspixel. Farbe = häufigste Umrissfarbe (aus `erlaubt`) in der 3×3-Umgebung des neuen Pixels, sonst `standard`.
+    Im Ruhebild (Randfarben = Quellrand) tut die Funktion nichts. Gibt eine neue Ebene zurück; ClipError, wenn ein Umrisspixel aus der Leinwand ragen würde."""
+    h, w = f.shape[:2]
+    out = f.copy()
+    neu = {}
+    for y, x in zip(*np.nonzero(kanten(f))):
+        if tuple(int(v) for v in f[y, x, :3]) in erlaubt:
+            continue
+        for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            ty, tx = y + dy, x + dx
+            if not (0 <= ty < h and 0 <= tx < w):
+                raise L.ClipError(f'Umrisspixel bei ({tx},{ty}) liegt außerhalb der Leinwand {w}×{h}')
+            if f[ty, tx, 3]:
+                continue
+            zaehl = {}
+            for ny in range(max(0, ty - 1), min(h, ty + 2)):
+                for nx in range(max(0, tx - 1), min(w, tx + 2)):
+                    if f[ny, nx, 3]:
+                        col = tuple(int(v) for v in f[ny, nx, :3])
+                        if col in erlaubt:
+                            zaehl[col] = zaehl.get(col, 0) + 1
+            neu[(ty, tx)] = max(zaehl, key=zaehl.get) if zaehl else tuple(standard)
+    for (ty, tx), col in neu.items():
+        out[ty, tx, :3] = col
+        out[ty, tx, 3] = 255
+    return out
 
 
 def glanz_pfad(a, pfad, hell, basis, pos):

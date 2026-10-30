@@ -20,6 +20,9 @@ abgeschnitten wird.
                                         (seite 'l' = nach links, 'r' = nach rechts), die Lücke dazwischen wird mit der Farbe des anliegenden Pixels gefüllt —
                                         die Zeile bleibt am Anker durchgehend 4-verbunden (nichts reißt ab)
     spalten_versatz(a, off, {spalte: (dy, y0, y1)})   Spalte x nur in den Zeilen y0…y1 senkrecht verschieben (Krempenende flattert)
+    umrissfarben(spr)                   Menge der Farben, die im Original an der Außenkante (4-Nachbar leer) liegen (Randpixel-Test, Regel 16)
+    kantenmaske(a)                      Maske der Randpixel einer Ebene (mindestens ein 4-Nachbar leer)
+    kontur_schliessen(a, erlaubt, farbe)  Randpixel in Nicht-Umrissfarbe (z. B. durch Scherung/Versatz freigelegt) werden in `farbe` gesetzt → Kontur in jeder Pose geschlossen
     farbe_stufe(farbe, rampe, stufen)   Farbe um `stufen` Stufen auf einer Rampe (dunkel → hell, Farben des Sprites) verschieben
     lichtband(a, maske, off, i, n, start, dauer, rampe, stufen, breite, achse, kern)
                                         Rule 12: diagonales Lichtband wandert über die Pixel von `maske` (Metall, Gold, Rahmen): die Pixel
@@ -162,6 +165,26 @@ def spalten_versatz(a, off, spalten):
             if not 0 <= y + dy + off[1] < a.shape[0]:
                 raise L.ClipError(f'Spalte {x} würde aus der Leinwand geschoben')
             a[y + dy + off[1], X] = px
+    return a
+
+
+def kantenmaske(a):
+    m = a[..., 3] > 0
+    p = np.pad(m, 1)
+    frei = (~p[:-2, 1:-1]) | (~p[2:, 1:-1]) | (~p[1:-1, :-2]) | (~p[1:-1, 2:])
+    return m & frei
+
+
+def umrissfarben(spr):
+    kk = kantenmaske(spr)
+    return {tuple(int(v) for v in spr[y, x, :3]) for y, x in zip(*np.nonzero(kk))}
+
+
+def kontur_schliessen(a, erlaubt, farbe):
+    kk = kantenmaske(a)
+    for y, x in zip(*np.nonzero(kk)):
+        if tuple(int(v) for v in a[y, x, :3]) not in erlaubt:
+            a[y, x, :3] = farbe
     return a
 
 

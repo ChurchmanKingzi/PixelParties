@@ -28,12 +28,15 @@ Ablauf (40 Frames à 65 ms = 2,6 s; Frame 0 = Original, Wölkchen ausgenommen):
 * Ärmel-Geste größer und öfter (Periode 20, beide Seiten SYNCHRON und gespiegelt): Spitzen heben sich bis 4 px, dazu flattert eine Welle
   (Periode 10, Spitze hinkt hinterher) mit bis ±1,6 px → insgesamt bis ca. ±5–6 px; Spaltenversatz wächst von der Schulter (x 5 / x 14) zur Hand.
 * ARM aus dem Loch: er reckt sich (Periode 40, 0-1-2-1-0 px, dazu kurze Zuckungen +1 px bei Frame 6–7, 17–18, 31–32; höchstens 3 px): im Arm-Layer
-  wird die Unterarmzeile y 29 eingefügt, die Faust steigt, das Armende (10,30) bleibt im Loch; das Handgelenk kippt (Periode 16): die Fauststeigerung y 24–26
-  neigt sich ±1 px (Scherung um y 28). Das Loch hinter dem Arm ist schwarz A (ERGÄNZUNG, siehe unten).
+  wird die Unterarmzeile y 29 eingefügt, die Faust steigt, das Armende (10,30) bleibt im Loch. Die Faust öffnet und schließt sich (dreimal pro Schleife,
+  Frame 9–11, 23–25, 35–37): die Faustzeile y 26 wird einmal eingefügt (Faust 1 px höher, Umrissenden wandern mit). Das Loch hinter dem Arm ist schwarz A
+  (ERGÄNZUNG, siehe unten).
 * Seelenwölkchen (Partikel, hinter der Figur, 11 Stück, Lebensdauer 40 Frames, langsam aufsteigend, leichtes Wabern, Formen l, m, o, k): aus dem Ärmelbereich,
   den Seiten des Rippenrings und über der Kapuze (nicht aus dem Loch). Kern Knochenweiß E (213,213,213) aus dem Sprite, Rand kaltes Violett
   (128,102,178) = #8066b2 aus data/palette.json (AUSNAHME: neue Farbe, in L.pruefe freigegeben; mit SEELE_RAND schnell tauschbar).
 Kein Glanz an Knochen (Regel 14): Lichtband und Glitzersterne sind entfallen.
+Randpixel-Test (Regel 16): `U.kontur_schliessen` ergänzt in jedem Frame fehlende Umrisspixel an Ärmeln und Armkanten (Farbe: häufigste Randfarbe der
+Umgebung, meist Schwarz A); im Ruhebild ändert es nichts.
 ERGÄNZUNG: 7 schwarze Pixel (A) im Loch hinter dem Arm bei (9,28) (10,28) (11,28) (9,29) (10,29) (11,29) (10,30) — im Ruhebild liegen dort die Armpixel,
 sie werden erst sichtbar, wenn der Arm steigt. Sonst nichts gemalt.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel.
@@ -68,6 +71,7 @@ rippen = vorhanden & (yy >= 13) & (yy <= 20)
 arm = vorhanden & (yy >= 24) & ~schwarz                          # Faust + Unterarmknochen aus dem Loch
 loch = vorhanden & (yy >= 24) & schwarz                          # schwarze Raute am Boden
 assert (aermel_l | aermel_r | haube | rippen | arm | loch).sum() == vorhanden.sum()
+UMRISS = U.umrissfarben(spr)
 LOCH_ERG = [(9, 28), (10, 28), (11, 28), (9, 29), (10, 29), (11, 29), (10, 30)]    # ERGÄNZUNG: schwarz hinter dem Arm
 
 SEELEN = {'c': SEELE_KERN, 'r': SEELE_RAND}
@@ -107,7 +111,7 @@ def frame(i):
     hump = U.buckel(i, 0, 20, n=20)                              # Ärmel-Geste (Periode 20), Frame 0 = Ruhe
     ph = L.sinus(i, 10)
     n_arm = min(3, stufe2(i) + (1 if i in ZUCK else 0))          # Arm reckt sich aus dem Loch (0 … 3 px)
-    kipp = 1.4 * math.sin(L.sinus(i, 16))                        # Handgelenk kippt (Periode 16), 0 bei Frame 0
+    griff = 1 if i in {9, 10, 11, 23, 24, 25, 35, 36, 37} else 0     # Faust öffnet/schließt sich
 
     hb = L.streck_zeile(teil(haube), PAD_T + 5, r_c)
     ri = teil(rippen)
@@ -118,10 +122,12 @@ def frame(i):
     for (x, y) in LOCH_ERG:
         lo[PAD_T + y, PAD_L + x, :3] = SCHWARZ
         lo[PAD_T + y, PAD_L + x, 3] = 255
-    am = U.haengen(teil(arm), PAD_T + 28, kipp, nach_unten=False)         # Faust y 24–27 neigt sich um das Handgelenk (Pivot y 28)
+    am = L.streck_zeile(teil(arm), PAD_T + 26, griff)                     # Faustzeile y 26 wird eingefügt: Faust öffnet sich (1 px höher)
     am = L.streck_zeile(am, PAD_T + 29, n_arm)                            # Unterarmzeile y 29 wird eingefügt: Arm wird länger, Faust steigt
+    koerper = L.zusammen(H, W, [(lo, 0, 0), (am, 0, 0), (ri, 0, -r_r), (hb, 0, -r_h), (al, 0, -r_h), (ar, 0, -r_h)])
+    koerper = U.kontur_schliessen(koerper, UMRISS, SCHWARZ)               # Regel 16: Umriss an Ärmeln/Armkanten in jeder Pose geschlossen
     seelen = U.glut_ebene(H, W, i, N, PUFFS, SEELEN)
-    return L.zusammen(H, W, [(seelen, 0, 0), (lo, 0, 0), (am, 0, 0), (ri, 0, -r_r), (hb, 0, -r_h), (al, 0, -r_h), (ar, 0, -r_h)])
+    return L.zusammen(H, W, [(seelen, 0, 0), (koerper, 0, 0)])
 
 
 if __name__ == '__main__':

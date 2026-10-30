@@ -1,0 +1,15 @@
+{
+  "creature": "Analyzer from the Cosmic Depths",
+  "sheet": "analyzer-from-the-cosmic-depths.png",
+  "frameWidth": 59,
+  "frameHeight": 64,
+  "frames": 48,
+  "frameMs": 60,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 8,
+  "padRight": 5,
+  "padBottom": 6,
+  "faceX": 29.5
+}

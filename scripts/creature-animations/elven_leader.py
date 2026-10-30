@@ -25,7 +25,7 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
   (Halszeile 14 verlängert) — Kopf 0 → 1 → 2 → 1 → 0 px, Brust 0 → 1 → 0 (das ist zugleich das leichte Nicken).
 * Laubbüschel (ruhig, blattartig): Es gibt KEINE durchlaufende Welle und KEINE wandernde Aufhellung. Vier feste Büschel aus je 3 Randblättern (oben links,
   rechts oben, links unten, oben rechts; `BUESCHEL`) neigen sich nacheinander je einmal pro Schleife um 1 px nach außen (9 Frames: erst das mittlere Blatt, dann die ganze
-  Gruppe, dann wieder das mittlere) und kehren zurück; dazwischen ruht jedes Büschel lange. Die Blätter sind 4-verbunden mit dem Rand, nur A/C.
+  Gruppe, dann wieder das mittlere) und kehren zurück; dazwischen ruht jedes Büschel lange. Die Blätter sind 4-verbunden mit dem Rand und haben die Umrissfarbe A (Regel 16).
 * Saum wedelt dezent: Die äußeren Blätter des Umhangsaums (y 20–23) spreizen sich auf beiden Seiten abwechselnd um höchstens 1 px nach außen (links und rechts gegenphasig,
   von oben nach unten leicht verzögert, zweimal pro Schleife).
 * Blinzeln (Frames 20–22 und 41–43): Lid über der oberen Augenreihe, dann zu (schwarzer Strich auf Zeile 10).
@@ -52,6 +52,7 @@ sh, sw = spr.shape[:2]
 H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
 OFF = (PAD_L, PAD_T)
 vorhanden = L.deckend(spr)
+ERLAUBT = Hm.umrissfarben(spr)
 
 A, C, D, E = (77, 109, 44), (94, 149, 21), (151, 203, 66), (175, 232, 91)       # Laubrampe dunkel → hell
 RAMPE = [A, C, D, E]
@@ -81,7 +82,7 @@ def rand_pixel(typ, werte):
         assert not (0 <= x0 < sw and 0 <= y0 < sh and vorhanden[y0, x0])
         nb = [(x0 + dx, y0 + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))]
         assert any(0 <= x < sw and 0 <= y < sh and vorhanden[y, x] for x, y in nb), ('Büschelblatt ohne Randpixel', x0, y0)
-        out.append((x0, y0, (A, C)[(x0 + y0) % 2]))
+        out.append((x0, y0, A))                              # Außenkante des Laubs ist im Original durchgehend A (Regel 16)
     return out
 
 
@@ -147,8 +148,8 @@ def frame(i, blaetter=True):
         for (r, xe, pixel) in liste:
             n = min(SAUM_MAX[r], saum_stufe(r, i, seite))
             if n:
-                col = (C, D)
-                Hm.setze(k, {(x, y): col[j] for j, (x, y) in enumerate(pixel[:n])}, OFF)
+                Hm.setze(k, {(x, y): A for (x, y) in pixel[:n]}, OFF)
+    Hm.kontur_schliessen(k, ERLAUBT, A)                          # Regel 16: Außenkante in jeder Pose in Umrissfarbe
     ebenen = []
     if blaetter:
         # acht Blätter: vier links, vier rechts; 'o' = Oval, 'k' = Funke; Lebensdauer = Schleife, gleichmäßig versetzt

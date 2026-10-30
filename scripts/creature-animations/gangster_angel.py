@@ -29,7 +29,7 @@ Ablauf (40 Frames à 70 ms = 2,8 s):
 * Diamant glänzt und glitzert: Lichtband diagonal über die Facetten (Rampe (72,89,105) … (255,255,255)), Facetten pulsieren, an seinen Ecken
   blitzen vierzackige Sterne (Mitte + 4 Arme, wachsen/schrumpfen, bleiben AM Diamanten).
 * Hellblaue Funkelpixel blinken reihum WEISS (je 5 Frames), an der Mitte blitzt ein weißer Stern. Alle Glitzersterne (Diamant, Gold, Bauch, Funkelpixel) sind weiß.
-* Füße baumeln, Blinzeln (zweimal pro Schleife), Augenbrauen zucken hoch, Lichtreflex wandert über beide Brillengläser (zweimal pro Schleife).
+* Füße baumeln (Ansatz Zeile 20 steht, damit der Bauchrand darüber nicht frei liegt), Blinzeln (zweimal pro Schleife), Augenbrauen zucken hoch, Lichtreflex wandert über beide Brillengläser (zweimal pro Schleife).
 * Glitzer-Partikel (acht kleine weiße/goldene Funken und Punkte) steigen langsam hinter den Flügeln auf.
 
 Ergänzungen (fertiggezeichnet, nur Farben der Quelle):
@@ -67,6 +67,8 @@ BRAUE = (97, 99, 98)
 GOLDR = [GOLD_DUNKEL, GOLD, GOLD_HELL, FL_B]                                  # Goldrampe dunkel → hell
 BLAUR = [BLAU, BLAU_HELL, BLAU_WEISS, FL_B]                                   # Funkelblau (Rampe, nicht mehr für die Funkelpixel benutzt)
 GEMR = [(72, 89, 105), (129, 161, 186), (149, 184, 206), BLAU_HELL, BLAU_WEISS, FL_B]   # Diamantrampe dunkel → hell
+
+UMRISS = F.umriss_farben(spr)                                  # Umrissfarben der Quelle (Randpixel-Test, Regel 16)
 
 # ── Masken ────────────────────────────────────────────────────────────────────────────────────────────────────────
 fl_farben = L.farbmaske(spr, [FL_A, FL_B, FL_C, FL_D])
@@ -123,7 +125,7 @@ PUFFS = puffs([
 ])
 
 
-def frame(i, partikel=True):
+def frame(i, partikel=True, effekte=True):
     ph = L.sinus(i, N / 4)                                   # Flügelschlag: viermal pro Schleife (Periode 10)
     low = int(round(-1.3 * math.sin(ph)))                    # Unterkörper/Füße zuerst …
     up_roh = int(round(-1.3 * (math.sin(ph - 0.9) + math.sin(0.9))))   # … Oberkörper (Kopf, Flügel, Rute) hinterher; Frame 0 = Ruhe
@@ -146,7 +148,8 @@ def frame(i, partikel=True):
             F.setze(kp, PAD_L, PAD_T, {GLAS_L[j]: FL_D})
         for j in F.glanz_pfad(i, N, start + 2, GLAS_R, 1):
             F.setze(kp, PAD_L, PAD_T, {GLAS_R[j]: FL_D})
-    F.lichtband(kp, bauch, PAD_L, PAD_T, i, N // 2, 6, 6, GOLDR, stufen=1, breite=2.0, achse=(0.0, 1.0), kern_stufen=2)
+    if effekte:
+        F.lichtband(kp, bauch, PAD_L, PAD_T, i, N // 2, 6, 6, GOLDR, stufen=1, breite=2.0, achse=(0.0, 1.0), kern_stufen=2)
     kp = L.versetze(L.streck_zeile(kp, zeile, n_str), 0, low)
 
     # ── Flügel: strecken wie der Körper, dann schlagen; Schulterspalten stehen ─────────────────────────────────────────
@@ -158,13 +161,14 @@ def frame(i, partikel=True):
     wl, wr = L.versetze(wl, 0, low), L.versetze(wr, 0, low)
 
     # ── Füße baumeln ───────────────────────────────────────────────────────────────────────────────────────────────
-    fl_ = L.zeilen_welle(F.ebene(spr, fuss_l, H, W, PAD_L, PAD_T), PAD_T + 19, 2.4, L.sinus(i, N / 2))
-    fr_ = L.zeilen_welle(F.ebene(spr, fuss_r, H, W, PAD_L, PAD_T), PAD_T + 19, 2.4, L.sinus(i, N / 2))
+    fl_ = L.zeilen_welle(F.ebene(spr, fuss_l, H, W, PAD_L, PAD_T), PAD_T + 20, 2.6, L.sinus(i, N / 2))
+    fr_ = L.zeilen_welle(F.ebene(spr, fuss_r, H, W, PAD_L, PAD_T), PAD_T + 20, 2.6, L.sinus(i, N / 2))
 
     # ── Rute + Schnur (Gold glänzt), Funkelpixel ───────────────────────────────────────────────────────────────────────
     hl = F.ebene(spr, halo, H, W, PAD_L, PAD_T)
-    F.lichtband(hl, gold_rute, PAD_L, PAD_T, i, N // 2, 4, 9, GOLDR, stufen=1, breite=2.4, achse=(1.0, 0.4), kern_stufen=2)
-    for k, p in enumerate(HALO_BLAU):                        # Funkelpixel funkeln reihum über die Blau-Rampe
+    if effekte:
+        F.lichtband(hl, gold_rute, PAD_L, PAD_T, i, N // 2, 4, 9, GOLDR, stufen=1, breite=2.4, achse=(1.0, 0.4), kern_stufen=2)
+    for k, p in enumerate(HALO_BLAU if effekte else []):                        # Funkelpixel funkeln reihum über die Blau-Rampe
         t = (i - 2 - 3 * k) % N
         if t < 5:
             F.setze(hl, PAD_L, PAD_T, {p: (BLAU_WEISS, FL_B, FL_B, FL_B, BLAU_WEISS)[t]})
@@ -174,11 +178,12 @@ def frame(i, partikel=True):
     dy_g = int(round(1.0 * (1 - math.cos(ph))))              # 0 … 2 px nach unten (Frame 0: 0)
     dx_g = 1 if math.sin(L.sinus(i, N / 2)) > 0.35 else 0    # pendelt 1 px nach außen
     ed = F.ebene(spr, edelstein, H, W, PAD_L, PAD_T)
-    if i % 10 >= 3:                                          # Facetten pulsieren leicht (Hellphase wandert diagonal)
+    if effekte and i % 10 >= 3:                              # Facetten pulsieren leicht (Hellphase wandert diagonal)
         for (x, y) in zip(*np.nonzero(edelstein)[::-1]):
             if F.puls(i, N, int(x), int(y), periode=4, versatz=0.9):
                 ed[PAD_T + y, PAD_L + x, :3] = F.heller(ed[PAD_T + y, PAD_L + x, :3], GEMR, 1)
-    F.lichtband(ed, edelstein, PAD_L, PAD_T, i, N // 2, 5, 9, GEMR, stufen=1, breite=2.6, achse=(1.0, 1.0), kern_stufen=2)
+    if effekte:
+        F.lichtband(ed, edelstein, PAD_L, PAD_T, i, N // 2, 5, 9, GEMR, stufen=1, breite=2.6, achse=(1.0, 1.0), kern_stufen=2)
     schnur_ext = L.leer(H, W)
     for k in range(dy_g):                                    # Schnur reicht bis zum abgesenkten Köder
         schnur_ext[PAD_T + 9 + k, PAD_L + 27, :3] = GOLD_HELL
@@ -188,6 +193,11 @@ def frame(i, partikel=True):
     f = L.zusammen(H, W, [(glitzer, 0, 0), (wl, 0, 0), (wr, 0, 0), (fl_, 0, low), (fr_, 0, low), (kp, 0, 0),
                           (hl, 0, off_rute), (schnur_ext, 0, off_rute), (ed, dx_g, off_rute + dy_g)])
 
+    # Randpixel-Test (Regel 16): der Spaltenversatz legt an den Flügelkanten Innenfarbe frei → Kante in Umrissgrau (208,208,208) schließen
+    F.umranden(f, [wl, wr], UMRISS, FL_A, FL_A, FL_A)
+    F.umranden(f, [L.versetze(fl_, 0, low), L.versetze(fr_, 0, low)], UMRISS, (40, 40, 40), (40, 40, 40), (40, 40, 40))   # Stiefel: Innengrau → Umrissschwarz
+    if not effekte:
+        return f
     # ── Glitzer-Sterne (bleiben AM Objekt, folgen dessen Bewegung) ─────────────────────────────────────────────────────
     for (cx, cy), start in STERNE_GEM:
         st = F.stern_stufe(i, N, start)

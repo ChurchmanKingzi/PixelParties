@@ -1,0 +1,15 @@
+{
+  "creature": "Afflicted Vermin",
+  "sheet": "afflicted-vermin.png",
+  "frameWidth": 30,
+  "frameHeight": 33,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 8,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 4,
+  "faceX": 15.0
+}

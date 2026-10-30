@@ -58,6 +58,7 @@ koerper = vorhanden & ~wing_l & ~wing_r
 
 AUG_L = [(15, 27), (16, 27), (15, 28), (16, 28)]
 AUG_R = [(19, 27), (20, 27), (19, 28), (20, 28)]
+UMRISS = F.umriss_farben(spr)                                # Umrissfarben der Quelle (Randpixel-Test, Regel 16)
 ZEILE = PAD_T + 25                                           # reines Creme-Band: hier wird ausgeglichen
 
 
@@ -116,7 +117,10 @@ def frame(i, partikel=True):
 
     glut = L.zusammen(H, W, [(L.puff_ebene(H, W, i, N, PUFFS1, FUNKEN1), 0, 0), (L.puff_ebene(H, W, i, N, PUFFS2, FUNKEN2), 0, 0)]) \
         if partikel else L.leer(H, W)
-    return L.zusammen(H, W, [(glut, 0, 0), (kp, 0, 0), (wl, 0, 0), (wr, 0, 0)])
+    f = L.zusammen(H, W, [(glut, 0, 0), (kp, 0, 0), (wl, 0, 0), (wr, 0, 0)])
+    # Randpixel-Test (Regel 16): Spaltenversatz legt an den Flügelrändern Innenfarbe (Creme) frei → Kante in Umrissfarbe (Gelb unten/seitlich, Orange oben)
+    F.umranden(f, [wl, wr], UMRISS, ORANGE, GELB, GELB)
+    return f
 
 
 if __name__ == '__main__':

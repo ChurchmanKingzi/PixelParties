@@ -38,6 +38,10 @@ Ablauf (48 Frames à 65 ms = 3,12 s), alle Bewegungen unabhängig, nie länger a
   Funke → Klecks → Wölkchen → schrumpft → Funke flackert → aus, am Schleifenende ist nichts sichtbar, kein Sprung. Hinter dem Fuchs.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
+Randpixel-Korrektur (Regel 16): Wo beim Bewegen (Ohrzucken, Wiegen/Atmen-Stufen im Rücken, Schwanz, gehobene Pfote) eine Füllfarbe an freien Hintergrund
+grenzen würde, wird dort ein Umrisspixel ergänzt (anim_tiere.umriss_schliessen; Farbe aus dem Original, Füllfarbe → Umrissfarbe). Nur Umrisspixel
+kommen hinzu; Bewegung, Frames, Perioden und Partikel sind unverändert.
+
 Ergänzungen: keine gemalten Pixel nötig — der Kopf liegt über dem Rumpf (nur Absenken, nie über den Rumpf hinaus), die Beine werden
 nur um duplizierte/entfernte Zeilen verändert, der Schwanzumriss entsteht aus Quellfarben (A/D), siehe anim_tiere.haengend_schwingen.
 """
@@ -76,6 +80,9 @@ HOF = [(4, 10), (5, 11), (7, 10), (9, 11)]                       # Hautpixel neb
 GLUT = {'rot': ((255, 34, 34), (196, 26, 26)),                   # Kern knallrot, Rand dunkleres Rot
         'glut': ((232, 193, 152), (227, 76, 76))}                # Kern beige (heiß), Rand rosarot
 
+TEST_EBENEN = ['schwanz', 'rumpf', 'pfote', 'kopf', 'ohr_l', 'ohr_r']                 # Körper-Ebenen ohne Partikel (für randtest.py)
+RAND = T.rand_farben(spr)                                         # Umrissfarben der Quelle (Randpixel-Test, Regel 16)
+REGEL = T.umriss_regeln(spr, RAND)[2]                             # Füllfarbe → Umrissfarbe aus dem Original
 BAUCHZEILE = 22                                                    # hier werden beim Atmen/Wiegen Zeilen eingefügt/entfernt
 PIVOT_SCHWANZ = 14
 SCHWANZ_AMP, SCHWANZ_LAUF = 5.4, 2.2                                # Schwanzspitze: bis ±5 px, die Welle läuft zur Spitze
@@ -207,7 +214,9 @@ def frame(i, nur=None):
     glut = T.funken_ebene(H, W, i, N, GLUTFUNKEN, GLUT)
     ebenen = {'glut': glut, 'schwanz': s, 'rumpf': r, 'pfote': p, 'kopf': k, 'ohr_l': ol, 'ohr_r': orr}
     wahl = nur or ('glut', 'schwanz', 'rumpf', 'pfote', 'kopf', 'ohr_l', 'ohr_r')
-    return L.zusammen(H, W, [(ebenen[n], 0, 0) for n in wahl])
+    koerper_ = L.zusammen(H, W, [(ebenen[n], 0, 0) for n in wahl if n != 'glut'])
+    koerper_ = T.umriss_schliessen(koerper_, RAND, REGEL)             # nur Umrisspixel ergänzen, wo eine Füllfarbe frei läge (Ohrbasis, Schwanz, Pfote)
+    return L.zusammen(H, W, [(ebenen['glut'], 0, 0)] * ('glut' in wahl) + [(koerper_, 0, 0)])
 
 
 if __name__ == '__main__':

@@ -26,6 +26,11 @@ Bausteine, die bei mehreren Fliegern gebraucht werden:
     feuer_zungen(a, i, n, kern_farben, …)      Feuer (Regel 15): breite ruhige Basis, Zungen steigen auf und flackern unregelmäßig in Posen à 2–3 Frames,
                                                je Zunge versetzt; die Farbfolge (Spitze rot, Mitte orange, Kern hell) wandert mit der Zunge
     zungen_spitzen(a, kern_farben, max_y)      Spitzen (Spalte, Zeile) der Zungen — Startpunkte für abreißende Funken
+    kanten(a), umriss_farben(spr)              Randpixel (Alpha > 0 mit freiem 4er-Nachbarn) bzw. deren Farben im Quell-Sprite (= Umrissfarben)
+    umranden(f, teile, erlaubt, oben, seite, unten)   Randpixel-Test (Regel 16): sichtbare Randpixel bewegter Teile, die nicht in einer Umrissfarbe
+                                               stehen (Spaltenversatz legt Innenfarben frei), werden in die Umrissfarbe der jeweiligen Kante gesetzt
+    zeilen_stauchen(a, achse_x, s_zeile)       jede Zeile um die senkrechte Achse achse_x auf den Faktor s_zeile[y] ≤ 1 zusammenschieben (Nächster-Nachbar) —
+                                               Schmetterlingsflügel klappen zur Körpermitte, je Zeile mit eigenem Faktor (Welle durch den Flügel)
     kacheln(frames, x0, x1, y0, y1, sc)        Ausschnitt mehrerer Frames nebeneinander, ganzzahlig vergrößert (Nahaufnahme für Nähte)
     stapeln(bilder)                            PIL-Bilder untereinander zu einem Kontrollbild
 """
@@ -399,4 +404,57 @@ def feuer_zungen(a, i, n, kern_farben, pose_frames=3, seed=11, hub=0.3, min_zung
         for k in range(h1):
             src = yt + int(k * h0 / h1)
             out[top + k, x] = a[src, x]
+    return out
+
+
+def kanten(a):
+    """Randpixel: deckende Pixel mit mindestens einem 4er-Nachbarn ohne Pixel (oder am Bildrand)."""
+    m = a[..., 3] > 0
+    p = np.pad(m, 1)
+    frei = (~p[:-2, 1:-1]) | (~p[2:, 1:-1]) | (~p[1:-1, :-2]) | (~p[1:-1, 2:])
+    return m & frei
+
+
+def umriss_farben(spr):
+    """Menge der RGB-Farben, die im Quell-Sprite an der Außenkante liegen (= die Umrissfarben der Figur)."""
+    e = kanten(spr)
+    return {tuple(int(v) for v in spr[y, x, :3]) for y, x in zip(*np.nonzero(e))}
+
+
+def umranden(f, teile, erlaubt, oben, seite, unten):
+    """Randpixel-Test (Regel 16) am fertigen Frame `f`: Jedes sichtbare Randpixel, das von einem der `teile` (Ebenen auf der Leinwand, z. B. die fertig
+    bewegten Flügel) stammt und dessen Farbe keine Umrissfarbe (`erlaubt`) ist — typisch: ein Spaltenversatz hat Innenfarbe an der Kante freigelegt —
+    bekommt die Umrissfarbe seiner Kante: `oben` (freier Nachbar darüber), `unten` (darunter) oder `seite`. Nur Randpixel werden verändert."""
+    e = kanten(f)
+    h, w = f.shape[:2]
+    for y, x in zip(*np.nonzero(e)):
+        c = tuple(int(v) for v in f[y, x, :3])
+        if c in erlaubt:
+            continue
+        if not any(t[y, x, 3] and tuple(int(v) for v in t[y, x, :3]) == c for t in teile):
+            continue
+        if y == 0 or not f[y - 1, x, 3]:
+            neu = oben
+        elif y == h - 1 or not f[y + 1, x, 3]:
+            neu = unten
+        else:
+            neu = seite
+        f[y, x, :3] = neu
+    return f
+
+
+def zeilen_stauchen(a, achse_x, s_zeile):
+    """Jede Zeile y wird um die senkrechte Achse `achse_x` (Leinwand-Spalte, kann .5 sein) auf den Faktor s_zeile[y] (0 < s ≤ 1) zusammengeschoben:
+    Ausgabepixel x holt sich die Quellspalte round((x − achse)/s + achse) (Nächster-Nachbar, keine Mischfarben, nichts wird breiter). So klappen
+    Flügel zur Körpermitte, ohne dass Texturen kopiert werden. Zeilen ohne Pixel bleiben leer."""
+    out = L.leer(*a.shape[:2])
+    h, w = a.shape[:2]
+    for y in range(h):
+        if not a[y, :, 3].any():
+            continue
+        s = float(s_zeile[y])
+        for x in range(w):
+            sx = int(math.floor((x - achse_x) / s + achse_x + 0.5))
+            if 0 <= sx < w and a[y, sx, 3]:
+                out[y, x] = a[y, sx]
     return out

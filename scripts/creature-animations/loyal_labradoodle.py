@@ -29,8 +29,9 @@ Ablauf (50 Frames à 70 ms = 3,5 s), alle Bewegungen unabhängig; der Kopf bleib
   nicht wegrutschen (das legte den Ohrrand frei). Stattdessen kringelt sich jede Locke unabhängig: ein zweites Pixel erscheint 1 px seitlich
   (über dem Umrisspixel von Zeile 1) und verschwindet wieder (Frames 4–8, 30–34 links/rechts, 16–20, 37–41, 8–12, 23–27).
 * Blick nur mit den Augen, hoch/runter (Frames 12–17 hoch, 26–31 runter, 44–48 hoch); die frei werdende Stelle bekommt die Fellfarbe.
-* Blinzeln, deutlich sichtbar (Frames 9–12 und 34–37, alle 25 Frames ≈ 1,75 s): die braunen Augenpixel werden hellgrau (I, die helle
-  Halsbandfarbe): oberes, beide (zwei Frames), oberes.
+* Blinzeln (Frames 9–12 und 34–37, alle 25 Frames ≈ 1,75 s): Die braunen Augen schließen sich mit dem DUNKLEN Lid in der Fellfarbe des Gesichts
+  (B (51,47,44), wie das Fell neben den Augen): erst nur das obere Augenpixel (halb), dann beide (ganz, zwei Frames), dann wieder das obere. Der
+  Wechsel ist gut sichtbar, weil die braunen Augen für diese Frames verschwinden.
 * Halsbandglanz (Regel 12): ein Lichtband läuft in Frames 14–25 und 40–51 über die U-Linie von links nach rechts (jedes Pixel 2 Frames
   in der jeweils anderen Stufe H ↔ I der silbergrauen Rampe).
 * Pfoten tippen: linker Fuß in Frames 5–6, 19–20 und 36–37, rechter Fuß in 12–13, 29–30 und 45–46 (die Beinzeile 14 des Fußes entfällt,
@@ -60,7 +61,8 @@ ohr_l = vorhanden & (xx <= 3) & (yy >= 1) & (yy <= 6)          # inkl. Unterkant
 ohr_r = vorhanden & (xx >= 10) & (yy >= 1) & (yy <= 6)
 koerper = vorhanden & ~ohr_l & ~ohr_r & (yy >= 1)
 
-HELL, MITTEL = (169, 165, 154), (137, 130, 122)                   # I / H: silbergraue Rampe (Lid, Halsbandglanz)
+HELL, MITTEL = (169, 165, 154), (137, 130, 122)                   # I / H: silbergraue Rampe (Halsbandglanz)
+LID = (51, 47, 44)                                                # B: dunkle Fellfarbe des Gesichts neben den Augen (geschlossenes Lid)
 AUGE_OBEN, AUGE_UNTEN = (102, 65, 47), (84, 45, 28)               # K, L
 AUGEN_X = (5, 8)
 # Beim Blick frei werdende Augenpixel bekommen die Farbe des Fellnachbarn auf der Seite, von der das Auge weggeht:
@@ -125,9 +127,9 @@ def frame(i, nur=None):
     if lid:
         y0 = 3 if blick > 0 else (5 if blick < 0 else 4)
         for x in AUGEN_X:
-            k[PAD_T + y0, PAD_L + x, :3] = HELL
+            k[PAD_T + y0, PAD_L + x, :3] = LID
             if lid == 2:
-                k[PAD_T + y0 + 1, PAD_L + x, :3] = HELL
+                k[PAD_T + y0 + 1, PAD_L + x, :3] = LID
     if glanz >= 0:
         x, y = HALSBAND[glanz]
         alt = tuple(int(v) for v in spr[y, x, :3])

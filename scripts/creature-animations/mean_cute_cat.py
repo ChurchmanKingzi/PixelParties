@@ -36,6 +36,10 @@ Ablauf (48 Frames à 65 ms = 3,12 s), alle Bewegungen unabhängig:
   rechts in 9–10, 26–27, 40–42.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
+Randpixel-Korrektur (Regel 16): Die Spaltenverschiebung der Flügel legt an den Außenkanten stellenweise helle Füllpixel (E/D) frei. Dort wird ein Umrisspixel
+ergänzt (anim_tiere.umriss_schliessen; Farbe aus dem Original: Füllfarbe → Flügelumriss A). Nur Umrisspixel kommen hinzu; Flügelschlag, Frames und
+Perioden sind unverändert (die Pixelzahl je Frame ist daher nicht mehr konstant 172).
+
 Ergänzungen: keine gemalten Pixel.
 """
 import math
@@ -60,6 +64,8 @@ fl_l = vorhanden & ((xx <= 5) | ((xx == 6) & UMRISS_A))
 fl_r = vorhanden & ((xx >= 14) | ((xx == 13) & UMRISS_A))
 koerper = vorhanden & ~fl_l & ~fl_r
 
+RAND = T.rand_farben(spr)                                         # Umrissfarben der Quelle (Randpixel-Test, Regel 16)
+REGEL = T.umriss_regeln(spr, RAND)[2]                             # Füllfarbe → Umrissfarbe aus dem Original
 AUGE_HELL, AUGE_DUNKEL = (255, 0, 0), (152, 0, 0)                 # L / M
 GESICHT = (56, 56, 56)                                            # C
 AUGEN_X = (8, 11)
@@ -117,7 +123,8 @@ def frame(i, nur=None):
     fr_ = L.spalten_welle(teil(fl_r), PAD_L + 12.5, 3.2, ph, potenz=1.1, bias=0.4)
     ebenen = {'koerper': k, 'fl_l': fl, 'fl_r': fr_}
     wahl = nur or ('koerper', 'fl_l', 'fl_r')
-    return L.zusammen(H, W, [(ebenen[n], 0, dy) for n in wahl])
+    ganz = L.zusammen(H, W, [(ebenen[n], 0, dy) for n in wahl])
+    return T.umriss_schliessen(ganz, RAND, REGEL)                  # Flügelumriss nachziehen, wo die Spaltenverschiebung eine Füllfarbe freilegt
 
 
 if __name__ == '__main__':

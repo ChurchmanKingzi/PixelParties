@@ -24,13 +24,11 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
   nicht); benachbarte Zeilen unterscheiden sich um höchstens 1 px und die einpixelige Spitze (Zeilen 0–1) bewegt sich gemeinsam — alle Zustände sind
   4-verbunden (Eckkontakt-Kontrolle in der Prüfung).
 * Krempenenden flattern: die äußersten Spalten (x 0 und x 14) gehen ±1 px auf und ab, gegenphasig (Periode 24).
-* Sterne funkeln (Regel 12): jeder der 9 gelben Hutsterne blitzt reihum 2 Frames weiß (N). An der Hutspitze und an der rechten Krempenkante
-  blitzt zusätzlich je ein vierzackiger Glitzer-Stern (Frames 10–13 / 34–37 Spitze, 22–25 Krempe).
-* Eisglanz (Regel 12): ein Lichtband läuft zweimal pro Schleife diagonal (Frames 4–17 und 28–41) über den Hut (Rampe C < A < B < E < G), den lavendelfarbenen
-  Rand (H < K < J < N) und das graue Schachbrett (D < F < M): 1–2 Stufen heller.
-* Kältedunst: acht runde Dunstwolken ('m' Wölkchen, 'o' Oval, 'k' Funke) in Weiß/Lavendel steigen langsam links und rechts vom Körper auf (L.puff_ebene,
-  wachsen/schrumpfen, langsames Wackeln, hinter der Figur).
-Frame 0 = Original (Ruhepose), der Dunst ausgenommen. Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen.
+* KEIN Glanz (Regel 14): Hut, Sterne und Eisrand glänzen/funkeln NICHT (kein Lichtband, keine Glitzersterne, keine blinkenden Hutsterne).
+* Magiefunken (6 kreisende + 2 auf und ab): acht kleine runde Funken (1 px, einige wachsen in Ellipsenmitte zu 2×2) in Hutblau B/G, Weiß/Lavendel N/J und Gelb I (alles Farben des Sprites)
+  kreisen langsam (eine Runde pro Schleife) in flachen Ellipsen um Hut (drei, Rechtslauf) und Körper (drei, Linkslauf); zwei weitere steigen links/rechts neben der Krempe sanft auf und ab. Die Funken
+  auf der Rückseite der Ellipse liegen hinter der Figur, die auf der Vorderseite davor; Hut-Funken steigen mit dem Hut, Körper-Funken mit dem Körper.
+Frame 0 = Original (Ruhepose), die Funken ausgenommen. Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 Ergänzungen: keine (es wird nichts verschoben, was Verdecktes freilegt).
 """
@@ -88,17 +86,42 @@ def teil(maske):
     return L.platz(t, H, W, PAD_L, PAD_T)
 
 
-def frame(i, dunst=True):
+# Magiefunken: kleine runde Funken (1 px oder 2×2) kreisen langsam in flachen Ellipsen um Hut und Körper (eine Runde pro Schleife) und bobben sanft auf und ab.
+# (cx, cy) Mittelpunkt in Spritekoordinaten, (rx, ry) Halbachsen, Phase (0–1), Richtung ±1, Farbe, Bezug: 'hut' steigt mit dem Hut, 'koerper' mit dem Körper
+FUNKEN = [
+    dict(cx=7.5, cy=6.0, rx=9.5, ry=2.5, ph=0.00, r=+1, farbe=GELB, bez='hut', gross=True),
+    dict(cx=7.5, cy=6.0, rx=9.5, ry=2.5, ph=0.34, r=+1, farbe=LN, bez='hut', gross=False),
+    dict(cx=7.5, cy=6.0, rx=9.5, ry=2.5, ph=0.67, r=+1, farbe=CG, bez='hut', gross=True),
+    dict(cx=7.5, cy=19.0, rx=10.0, ry=2.0, ph=0.12, r=-1, farbe=LJ, bez='koerper', gross=False),
+    dict(cx=7.5, cy=19.0, rx=10.0, ry=2.0, ph=0.46, r=-1, farbe=GELB, bez='koerper', gross=True),
+    dict(cx=7.5, cy=19.0, rx=10.0, ry=2.0, ph=0.79, r=-1, farbe=LN, bez='koerper', gross=False),
+    dict(cx=-2.0, cy=11.0, rx=1.0, ry=5.0, ph=0.25, r=+1, farbe=CB, bez='hut', gross=False),      # steigt und sinkt links neben der Krempe
+    dict(cx=17.0, cy=14.0, rx=1.0, ry=5.0, ph=0.75, r=+1, farbe=GELB, bez='hut', gross=False),    # … und rechts
+]
+
+
+def funken_ebenen(i, brust, hub):
+    """(hinten, vorn): zwei Leinwandebenen; Funken auf der Rückseite der Ellipse (sin < 0) liegen hinter der Figur, die auf der Vorderseite davor."""
+    hinten, vorn = L.leer(H, W), L.leer(H, W)
+    for sp in FUNKEN:
+        th = 2 * math.pi * (sp['r'] * i / N + sp['ph'])
+        x = sp['cx'] + sp['rx'] * math.cos(th)
+        y = sp['cy'] + sp['ry'] * math.sin(th)
+        y -= hub if sp['bez'] == 'hut' else brust
+        ebene = vorn if math.sin(th) > 0 else hinten
+        X, Y = PAD_L + int(round(x)), PAD_T + int(round(y))
+        gross = sp['gross'] and abs(math.sin(th)) > 0.6                        # 2×2 nur in Ellipsenmitte-Nähe oben/unten (wächst/schrumpft)
+        pts = [(X, Y)] + ([(X + 1, Y), (X, Y + 1), (X + 1, Y + 1)] if gross else [])
+        for (px, py) in pts:
+            if not (0 <= px < W and 0 <= py < H):
+                raise L.ClipError(f'Funke bei ({px},{py}) außerhalb der Leinwand {W}×{H}')
+            ebene[py, px, :3] = sp['farbe']
+            ebene[py, px, 3] = 255
+    return hinten, vorn
+
+
+def frame(i, funken=True):
     k = teil(koerper)
-    # --- Eisglanz: Lichtband zweimal pro Schleife über Hut, Rand und Grau ---
-    for start in (4, 28):
-        Hm.lichtband(k, m_hut, OFF, i, N, start, 14, HUT_RAMPE, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
-        Hm.lichtband(k, m_rand, OFF, i, N, start, 14, RAND_RAMPE, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
-        Hm.lichtband(k, m_grau, OFF, i, N, start, 14, GRAU_RAMPE, stufen=1, breite=3.0, achse=(1.0, 1.0), kern=2)
-    # --- Sterne am Hut funkeln reihum ---
-    for j, (sx, sy) in enumerate(STERNE):
-        if Hm.folge(i, (5 * j + 6) % N, [1, 1], N):
-            Hm.setze(k, {(sx, sy): LN}, OFF)
     # --- Krempenenden flattern (gegenphasig) ---
     dl = int(round(1.0 * math.sin(L.sinus(i, N / 2))))
     dr = -int(round(1.0 * math.sin(L.sinus(i, N / 2))))
@@ -112,41 +135,27 @@ def frame(i, dunst=True):
     kopf = Hm.stufe(i - 3, N / 2, 1)
     k = Hm.atmen(k, PAD_T + 20, PAD_T + 15, brust, kopf)
     hub = brust + kopf
-    # --- Glitzer-Sterne an Hutspitze und rechter Krempenkante (nach dem Atmen, mit dem Hut mitgehoben) ---
-    tipp_x = PAD_L + 7 + (int(math.copysign(SCHWUNG[abs(a)][0], a)) if a else 0)
-    st = Hm.folge(i, 10, [0, 1, 2, 1], N)
-    if st is None:
-        st = Hm.folge(i, 34, [0, 1, 2, 1], N)
-    Hm.stern4(k, tipp_x, PAD_T - hub, st, LN, LJ, LH)
-    st2 = Hm.folge(i, 22, [0, 1, 2, 1], N)
-    Hm.stern4(k, PAD_L + 15, PAD_T + 11 - hub, st2, LN, LJ, LH)
     ebenen = []
-    if dunst:
-        px, py = PAD_L, PAD_T
-        spec = [dict(x=px - 2, y=py + 21, vx=-1, vy=-14, off=0, form='m', wackeln=1.2),
-                dict(x=px - 1, y=py + 23, vx=0, vy=-12, off=16, form='o', wackeln=1.0),
-                dict(x=px - 3, y=py + 19, vx=-1, vy=-13, off=32, form='k', wackeln=1.5),
-                dict(x=px + 16, y=py + 22, vx=1, vy=-14, off=8, form='m', wackeln=1.2),
-                dict(x=px + 15, y=py + 24, vx=0, vy=-12, off=24, form='o', wackeln=1.0),
-                dict(x=px + 17, y=py + 20, vx=1, vy=-13, off=40, form='k', wackeln=1.5),
-                dict(x=px - 1, y=py + 12, vx=-1, vy=-11, off=4, form='k', wackeln=1.2),
-                dict(x=px + 15, y=py + 12, vx=1, vy=-11, off=28, form='k', wackeln=1.2)]
-        ebenen.append((L.puff_ebene(H, W, i, N, spec, {'c': LN, 'r': LK}), 0, 0))
+    if funken:
+        hinten, vorn = funken_ebenen(i, brust, hub)
+        ebenen.append((hinten, 0, 0))
     ebenen.append((k, 0, 0))
+    if funken:
+        ebenen.append((vorn, 0, 0))
     return L.zusammen(H, W, ebenen)
 
 
 if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    diff = Hm.ruhepose(frame(0, dunst=False), spr, OFF)
-    print('Ruhepose (ohne Dunst) weicht vom Original ab bei:', diff if diff else 'nichts')
+    diff = Hm.ruhepose(frame(0, funken=False), spr, OFF)
+    print('Ruhepose (ohne Funken) weicht vom Original ab bei:', diff if diff else 'nichts')
     n = L.pruefe(frames, quelle=spr)
     print('Pixel je Frame:', n)
-    ohne = [frame(i, dunst=False) for i in range(N)]
+    ohne = [frame(i, funken=False) for i in range(N)]
     e0 = Hm.eckkontakt_typen(ohne[0])
     neu = {i: dict(Hm.eckkontakt_typen(g) - e0) for i, g in enumerate(ohne) if Hm.eckkontakt_typen(g) - e0}
-    print('neue Eckkontakte (Figur ohne Dunst) gegenüber Frame 0:', neu if neu else 'keine')
+    print('neue Eckkontakte (Figur ohne Funken) gegenüber Frame 0:', neu if neu else 'keine')
     L.speichern('mischief-militia-chilly-wizard', 'Mischief Militia - Chilly Wizard', frames, MS, prev)
     if prev:
         import os

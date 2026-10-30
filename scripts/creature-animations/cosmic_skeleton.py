@@ -30,6 +30,8 @@ Ablauf (48 Frames à 60 ms = 2,88 s; Frame 0 = Original, Staub ausgenommen) — 
 * Sternenstaub (Partikel, hinter der Figur, 12 Stück, Lebensdauer 48 Frames, langsam aufsteigend, Formen k, o): gelbe Funken (Kern F, Rand E) und
   violette Kugeln (Kern B, Rand C) rund um die Figur. Alle Farben aus dem Sprite.
 ERGÄNZUNG: keine gemalten Pixel (Kopf sinkt nur über Rumpfpixel; Arme/Beine lösen sich nur seitlich bei überlappender Naht).
+Randpixel-Test (Regel 16): `U.kontur_schliessen` ergänzt in jeder Pose fehlende Umrisspixel (Schwarzviolett A) an Armen, Beinen und Wallkanten; im Ruhebild
+ändert es nichts.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
@@ -54,6 +56,7 @@ GE_, GF_, GG_ = (255, 255, 9), (255, 255, 99), (255, 255, 164)
 _vorh = {tuple(int(v) for v in p[:3]) for p in spr.reshape(-1, 4) if p[3]}
 assert all(col in _vorh for col in (A_, D_, C_, B_, GE_, GF_, GG_))
 
+UMRISS = U.umrissfarben(spr)
 arm_l = vorhanden & (xx <= 4) & (yy >= 10) & (yy <= 15)
 arm_r = vorhanden & (xx >= 15) & (yy >= 10) & (yy <= 15)
 kopf = vorhanden & (yy <= 6)
@@ -126,9 +129,11 @@ def frame(i):
     # Kopf + Rumpf (breite Teile) wallen durch eine Welle; Arme und Beine bewegen sich nur mit ihren eigenen Pendeln (dünne Teile würden reißen)
     oben = L.zusammen(H, W, [(rp, 0, -r_b), (kp, 0, -r_k)])
     oben = wallen(oben, 1.4 * U.buckel(i, 0, 24, n=24), L.sinus(i, 24))
+    koerper = L.zusammen(H, W, [(bn, 0, -r_b), (oben, 0, 0), (al, 0, -r_b), (ar, 0, -r_b)])
+    koerper = U.kontur_schliessen(koerper, UMRISS, A_)             # Regel 16: Umriss an allen bewegten Kanten in jeder Pose geschlossen
     gelb = U.glut_ebene(H, W, i, N, PUFFS_GELB, STAUB)
     purpur = U.glut_ebene(H, W, i, N, PUFFS_PURPUR, PURPUR)
-    return L.zusammen(H, W, [(purpur, 0, 0), (gelb, 0, 0), (bn, 0, -r_b), (oben, 0, 0), (al, 0, -r_b), (ar, 0, -r_b)])
+    return L.zusammen(H, W, [(purpur, 0, 0), (gelb, 0, 0), (koerper, 0, 0)])
 
 
 if __name__ == '__main__':

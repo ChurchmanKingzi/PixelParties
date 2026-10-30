@@ -1,0 +1,15 @@
+{
+  "creature": "Moonlight Butterfly",
+  "sheet": "moonlight-butterfly.png",
+  "frameWidth": 37,
+  "frameHeight": 45,
+  "frames": 40,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 3,
+  "padRight": 4,
+  "padBottom": 9,
+  "faceX": 18.5
+}
