@@ -183,3 +183,14 @@ def ausdruck_pruefen(frames, spr, name='', erlaubt=()):
     print(f'{name} Randprüfung: {len(frames) - len(schlecht)}/{len(frames)} Frames ohne Befund' +
           ('' if not schlecht else '; Befunde (Frame, Teile, offene Randpixel): ' + str(schlecht[:8])))
     return schlecht
+
+
+def offene_koerperkanten(fig, ausnahme, y0, umriss):
+    """Silhouettenrand-Pixel ab Zeile y0, die nicht die Umrissfarbe haben und nicht in `ausnahme` (Bool-Maske, z. B. die Krone) liegen:
+    jede solche Stelle ist eine offene Kante (Füllfarbe ohne Umriss nach außen). Liste (x, y, Farbe)."""
+    r = randpixel(fig)
+    out = []
+    for y, x in zip(*np.nonzero(r)):
+        if y >= y0 and not ausnahme[y, x] and tuple(int(v) for v in fig[y, x, :3]) != tuple(umriss):
+            out.append((int(x), int(y), tuple(int(v) for v in fig[y, x, :3])))
+    return out
