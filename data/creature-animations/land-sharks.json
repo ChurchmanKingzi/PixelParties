@@ -1,15 +1,15 @@
 {
   "creature": "Land Sharks",
   "sheet": "land-sharks.png",
-  "frameWidth": 27,
+  "frameWidth": 26,
   "frameHeight": 23,
   "frames": 56,
   "frameMs": 66,
   "loop": true,
   "layout": "horizontal",
   "padTop": 2,
-  "padLeft": 3,
+  "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,
-  "faceX": 13.5
+  "faceX": 13.0
 }

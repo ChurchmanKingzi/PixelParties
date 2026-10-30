@@ -33,7 +33,7 @@ import anim_lib as L
 import anim_tiere as T
 
 N, MS = 56, 66
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 2, 3, 4, 2
 
 spr = L.lade('land-sharks')
 sh, sw = spr.shape[:2]
