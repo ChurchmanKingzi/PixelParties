@@ -1,0 +1,15 @@
+{
+  "creature": "Ska Harpyformer",
+  "sheet": "ska-harpyformer.png",
+  "frameWidth": 38,
+  "frameHeight": 40,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 19.0
+}

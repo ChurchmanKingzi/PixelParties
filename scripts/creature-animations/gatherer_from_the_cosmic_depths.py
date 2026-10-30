@@ -22,7 +22,7 @@ Ablauf (48 Frames à 70 ms = 3,36 s; Frame 0 = Original):
   Periode 12, viermal pro Schleife; Leib und Beine stehen dabei.
 * Schweben: die ganze Figur hebt und senkt sich ±1 px (Periode 24, zweimal pro Schleife).
 * Hinterleib wippt: die Hinterleibspitze (x ≥ 27, y ≤ 19) hebt/senkt sich ±1 px (Periode 16).
-* Brocken schwingt wie ein Pendel: ±1 px waagerecht (Periode 24) und ±1 px senkrecht (Periode 16); wo er die Beine verdeckte, kommt das Bein darunter wieder zum Vorschein (Beine aus der Körperebene).
+* Brocken schwingt wie ein Pendel: ±1 px waagerecht (Periode 24) und ±1 px senkrecht (Periode 16), solange er die Beine (4er-Kontakt) berührt, sonst bleibt er in der berührenden Lage; wo er die Beine verdeckte, kommt das Bein darunter wieder zum Vorschein (Beine aus der Körperebene).
 * Beine zucken: das rechte Beinbündel (x 17–26, y ≥ 26) und das mittlere (x 12–16) ziehen sich abwechselnd 1 px hoch (je 3 Frames, Periode 16: rechts Frame 2–4, Mitte Frame 10–12).
 * Blinzeln (Lid = Schwarz (11,8,1), die Kopffarbe): die gelben Augenpixel werden 3 Frames lang schwarz, zweimal pro Schleife (Frame 13–15 und 37–39).
 Keine Partikel (die schwebenden Brocken der Karte sind Dekor, nicht Teil der Figur). Kein Glanz (Regel 14: Chitin/Flügelhaut, kein Metall), kein Feuer (Regel 15). Randpixel-Test (Regel 16): `U.kontur_schliessen`
@@ -33,6 +33,7 @@ Zuschnitt: Frame auf die Figur zugeschnitten (symmetrisch um die Ruhefigur, dazu
 import math
 import sys
 
+import cv2
 import numpy as np
 
 import anim_lib as L
@@ -97,6 +98,10 @@ def fluegel_flattern(a, aus):
     return out
 
 
+def _k4(a):
+    return cv2.connectedComponents((a[..., 3] > 0).astype(np.uint8), connectivity=4)[0] - 1
+
+
 def frame_gross(i, nur=None):
     aus = 2.2 * sinz(i, 12)                                       # 0 bei Frame 0
     fl = fluegel_flattern(FL_A, aus)
@@ -111,7 +116,13 @@ def frame_gross(i, nur=None):
     sy = int(round(sinz(i, 16)))
     koerper = L.zusammen(H, W, [(BR_A, 0, br), (BM_A, 0, bm), (RE_A, 0, 0), (au, 0, 0), (fl, 0, 0), (SCH_A, 0, sw_)])
     koerper = U.kontur_schliessen(koerper, UMRISS, KOPF_SCHWARZ)
-    figur = L.zusammen(H, W, [(koerper, 0, 0), (ST_A, sx, sy)])
+    # Brocken: gewünschter Pendelversatz; reißt dabei der 4er-Kontakt zu den Beinen ab (Brocken würde schweben), nimmt er den nächstbesten Versatz, der die Beine berührt
+    ohne = _k4(koerper)
+    figur = None
+    for (ax, ay) in ((sx, sy), (sx, 0), (0, sy), (0, 0)):
+        figur = L.zusammen(H, W, [(koerper, 0, 0), (ST_A, ax, ay)])
+        if _k4(figur) <= ohne:
+            break
     figur = L.versetze(figur, 0, bob) if bob else figur
     return figur
 

@@ -52,7 +52,7 @@ import anim_flieger_b as B
 
 N, MS = 48, 65
 BEAT, DOWN = 12, 5                                         # Frames je Flügelschlag, davon Abschlag
-PAD_L, PAD_R, PAD_T, PAD_B = 2, 4, 4, 2                    # oben: Hub 2 px + Noten; rechts: Haarschleppe schwingt bis 1,5 px
+PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2                    # oben: Hub 2 px + Noten; rechts: Haarschleppe schwingt bis 1,5 px
 
 spr = L.lade('ska-harpyformer')                            # Gesamtbild (Ruhepose / Referenz für den Randpixel-Test)
 harpyie = L.lade('ska-harpyformer-harpyie')
@@ -148,7 +148,7 @@ def note_versatz(k, t):
     py, fy, ay, px_, fx = NOTEN_PAR[k]
     dy = int(round(ay * math.sin(2 * math.pi * t / py + fy))) - int(round(ay * math.sin(fy)))
     dx = int(round(1.0 * math.sin(2 * math.pi * t / px_ + fx))) - int(round(1.0 * math.sin(fx)))
-    return dx, dy
+    return max(-1, min(1, dx)), dy
 
 
 TEST_EBENEN = ('figur',)                                    # für den Randpixel-Test: ohne Noten
