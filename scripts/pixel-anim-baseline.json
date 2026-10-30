@@ -187,9 +187,6 @@
  "kf:animBiomancyVine": {
   "drehung": 2
  },
- "kf:animCannibalismMeat": {
-  "drehung": 8
- },
  "kf:animConcertBeam": {
   "drehung": 4
  },
@@ -229,38 +226,14 @@
  "kf:animThicketLeaf": {
   "drehung": 4
  },
- "kf:anklageAder": {
-  "drehung": 2
- },
- "kf:anklageAusruf": {
-  "drehung": 1
- },
- "kf:anklageKarte": {
-  "drehung": 2
- },
- "kf:anklageStrich": {
-  "drehung": 3
- },
- "kf:anklageZittern": {
-  "drehung": 8
- },
  "kf:ankyloTailSwing": {
   "drehung": 4
- },
- "kf:annoyCatFlap": {
-  "drehung": 2
  },
  "kf:applauseGlow": {
   "blur": 2
  },
  "kf:area-drop-pulse": {
   "blur": 2
- },
- "kf:armaFall": {
-  "drehung": 2
- },
- "kf:armaFlamme": {
-  "drehung": 4
  },
  "kf:ascendDropPulse": {
   "blur": 2
@@ -367,9 +340,6 @@
  "kf:coolnessPulse": {
   "blur": 2
  },
- "kf:cosmicWarp": {
-  "drehung": 11
- },
  "kf:coverCardGlow": {
   "blur": 2
  },
@@ -444,9 +414,6 @@
  },
  "kf:equipEffectPulse": {
   "blur": 2
- },
- "kf:escapeDodge": {
-  "drehung": 4
  },
  "kf:faZeichen": {
   "drehung": 7
@@ -843,9 +810,6 @@
  "kf:waflavEvoParticle": {
   "drehung": 1
  },
- "kf:whirlwindSpin": {
-  "drehung": 1
- },
  "kf:willyParticle": {
   "drehung": 2
  },
@@ -877,24 +841,8 @@
   "blur": 2,
   "drehung": 1
  },
- "reg:annoying_cats": {
-  "blur": 1,
-  "drehung": 1
- },
- "reg:aquatic_arrow_rain": {
-  "blur": 1,
-  "drehung": 1
- },
- "reg:aquatic_spear_strike": {
-  "blur": 6,
-  "drehung": 3
- },
  "reg:arrow_impact": {
   "blur": 2
- },
- "reg:arrow_rain": {
-  "blur": 1,
-  "drehung": 1
  },
  "reg:assassination_cut": {
   "blur": 1,
@@ -908,11 +856,6 @@
   "blur": 5,
   "drehung": 4,
   "mischmodus": 2
- },
- "reg:blessed_skill_burst": {
-  "blur": 7,
-  "drehung": 9,
-  "mischmodus": 1
  },
  "reg:blood_hearts": {
   "blur": 1
@@ -972,10 +915,6 @@
  "reg:cosmic_counter_remove": {
   "blur": 1
  },
- "reg:cosmic_distortion": {
-  "blur": 4,
-  "drehung": 5
- },
  "reg:cosmic_invader_strike": {
   "blur": 1,
   "drehung": 4
@@ -986,17 +925,9 @@
  "reg:crescent_reap": {
   "blur": 1
  },
- "reg:critical_slash": {
-  "blur": 6,
-  "drehung": 2
- },
  "reg:cute_hearts": {
   "blur": 1,
   "drehung": 3
- },
- "reg:dark_deal": {
-  "blur": 2,
-  "drehung": 4
  },
  "reg:dark_swarm": {
   "blur": 1
@@ -1040,9 +971,6 @@
   "blur": 1
  },
  "reg:dive_down": {
-  "blur": 1
- },
- "reg:divine_punishment": {
   "blur": 1
  },
  "reg:dog_bite": {
@@ -1109,10 +1037,6 @@
   "blur": 2,
   "mischmodus": 1
  },
- "reg:forgetting_question_mark": {
-  "blur": 2,
-  "drehung": 4
- },
  "reg:gate_shield": {
   "blur": 2
  },
@@ -1144,11 +1068,6 @@
  },
  "reg:golden_scale": {
   "blur": 1
- },
- "reg:golden_wings": {
-  "blur": 4,
-  "drehung": 2,
-  "mischmodus": 1
  },
  "reg:goldify_transmute": {
   "blur": 3,
@@ -1183,17 +1102,6 @@
   "blur": 1,
   "drehung": 1
  },
- "reg:hell_fox_death": {
-  "blur": 3
- },
- "reg:hole_in_the_sky_pull": {
-  "blur": 4,
-  "drehung": 16,
-  "mischmodus": 1
- },
- "reg:holy_revival": {
-  "drehung": 1
- },
  "reg:hydra_goo": {
   "blur": 4,
   "drehung": 5
@@ -1201,9 +1109,6 @@
  "reg:icy_grave_strike": {
   "blur": 7,
   "drehung": 8
- },
- "reg:invest_counters_lost": {
-  "blur": 1
  },
  "reg:johanna_cleanse": {
   "blur": 2,
@@ -1228,9 +1133,6 @@
   "blur": 5,
   "drehung": 4
  },
- "reg:level_down": {
-  "blur": 2
- },
  "reg:love_burst": {
   "blur": 1,
   "drehung": 4
@@ -1244,10 +1146,6 @@
  },
  "reg:lure_beacon": {
   "drehung": 1
- },
- "reg:maelstrom": {
-  "blur": 4,
-  "drehung": 4
  },
  "reg:massacre": {
   "blur": 2,

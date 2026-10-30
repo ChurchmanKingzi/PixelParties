@@ -8319,14 +8319,14 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
    along with the dodge. Animating the inner card only keeps the
    zone's layout box pinned in place. */
 @keyframes escapeDodge {
-  0%   { transform: translateX(0) rotate(0deg); }
-  12%  { transform: translateX(-26px) rotate(-6deg); }
-  25%  { transform: translateX(0)     rotate(0deg);  }
-  38%  { transform: translateX(26px)  rotate(6deg);  }
-  52%  { transform: translateX(0)     rotate(0deg);  }
-  66%  { transform: translateX(-18px) rotate(-3deg); }
-  80%  { transform: translateX(18px)  rotate(3deg);  }
-  100% { transform: translateX(0)     rotate(0deg);  }
+  0%   { transform: translateX(0); }
+  12%  { transform: translateX(-26px); }
+  25%  { transform: translateX(0); }
+  38%  { transform: translateX(26px); }
+  52%  { transform: translateX(0); }
+  66%  { transform: translateX(-18px); }
+  80%  { transform: translateX(18px); }
+  100% { transform: translateX(0); }
 }
 /* All direct visual children dodge together. Targeting the children
    rather than the [data-hero-zone] wrapper keeps the wrapper's layout
@@ -9053,7 +9053,6 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
     rgba(61,220,87,.35) 40%,
     rgba(32,172,55,.15) 65%,
     transparent 80%);
-  box-shadow: 0 0 22px rgba(117,240,145,.85);
   animation: animCannibalismFlash .65s ease-out forwards;
   opacity: 0;
 }
@@ -9073,23 +9072,23 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   font-size: 64px;
   line-height: 1;
   transform: translate(-50%, -50%);
-  filter: drop-shadow(0 0 10px rgba(251,200,106,.85)) drop-shadow(0 0 4px rgba(0,0,0,.6));
+  text-shadow: 3px 0 0 #fbc86a, -3px 0 0 #fbc86a, 0 3px 0 #fbc86a, 0 -3px 0 #fbc86a;   /* W86r1: harte Kontur statt Weichzeichner-Schein */
   animation: animCannibalismMeat .9s cubic-bezier(.4,0,.55,1) forwards;
   opacity: 0;
 }
 @keyframes animCannibalismMeat {
-  0%   { transform: translate(-50%, -50%) scale(0.3) rotate(-18deg); opacity: 0; }
-  15%  { transform: translate(-50%, -50%) scale(1.2) rotate(-8deg); opacity: 1; }
+  0%   { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+  15%  { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
   /* Bite 1 */
-  28%  { transform: translate(-50%, -50%) scale(1.0) rotate(6deg); opacity: 1; }
-  35%  { transform: translate(-50%, -52%) scale(0.85) rotate(-4deg); opacity: 1; }
+  28%  { transform: translate(-50%, -50%) scale(1.0); opacity: 1; }
+  35%  { transform: translate(-50%, -52%) scale(0.85); opacity: 1; }
   /* Bite 2 */
-  48%  { transform: translate(-50%, -50%) scale(0.85) rotate(-4deg); opacity: 1; }
-  55%  { transform: translate(-50%, -52%) scale(0.65) rotate(8deg); opacity: 1; }
+  48%  { transform: translate(-50%, -50%) scale(0.85); opacity: 1; }
+  55%  { transform: translate(-50%, -52%) scale(0.65); opacity: 1; }
   /* Bite 3 — gone */
-  72%  { transform: translate(-50%, -50%) scale(0.65) rotate(8deg); opacity: 1; }
-  82%  { transform: translate(-50%, -54%) scale(0.4) rotate(-6deg); opacity: .85; }
-  100% { transform: translate(-50%, -60%) scale(0.15) rotate(0deg); opacity: 0; }
+  72%  { transform: translate(-50%, -50%) scale(0.65); opacity: 1; }
+  82%  { transform: translate(-50%, -54%) scale(0.4); opacity: .85; }
+  100% { transform: translate(-50%, -60%) scale(0.15); opacity: 0; }
 }
 
 /* Two chomp-impact sparks that flash on each bite, faked by re-using
@@ -9098,7 +9097,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   position: absolute;
   font-size: 26px;
   color: #fff;
-  text-shadow: 0 0 8px #f9ecb3, 0 0 4px #fff;
+  text-shadow: 1px 1px 0 #f9ecb3;
   opacity: 0;
 }
 .anim-cannibalism-bite-1 {
@@ -11922,7 +11921,8 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 }
 
 /* Realmniversal Emperor (v941) — die getroffene Heldenkarte wird durch
-   die Verzerrung gezogen: gekippt, gestaucht, geschert, dann zurueck.
+   die Verzerrung gezogen: gestaucht, gestreckt, seitlich geruettelt (Pixelart:
+   keine Kippung/Scherung der Karte), dann zurueck.
    Bewusst auf die KINDER der Zone, nicht auf die Zone selbst: deren
    Layoutbox berechnen die Area Zones mit (dieselbe Lehre wie bei
    `.escape-dodging > *`). Die Klasse haengt `cosmic_distortion` in
@@ -11933,12 +11933,12 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 }
 @keyframes cosmicWarp {
   0%   { transform: none; }
-  14%  { transform: perspective(420px) rotateY(16deg) skewY(-5deg) scale(1.06, .9); }
-  30%  { transform: perspective(420px) rotateY(-26deg) skewY(7deg) scale(.8, 1.18); }
-  46%  { transform: perspective(420px) rotateY(30deg) skewX(10deg) scale(1.16, .76); }
-  62%  { transform: perspective(420px) rotateY(-15deg) skewX(-7deg) scale(.88, 1.12); }
-  78%  { transform: perspective(420px) rotateY(9deg) skewY(4deg) scale(1.06, .94); }
-  90%  { transform: perspective(420px) rotateY(-4deg) scale(.98, 1.02); }
+  14%  { transform: translateX(6px) scale(1.06, .9); }
+  30%  { transform: translateX(-10px) scale(.8, 1.18); }
+  46%  { transform: translateX(10px) scale(1.16, .76); }
+  62%  { transform: translateX(-6px) scale(.88, 1.12); }
+  78%  { transform: translateX(4px) scale(1.06, .94); }
+  90%  { transform: translateX(-2px) scale(.98, 1.02); }
   100% { transform: none; }
 }
 
@@ -11954,7 +11954,7 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   25%  { transform: rotate(1080deg) scale(1.1); }
   50%  { transform: rotate(2160deg) scale(1.05); }
   75%  { transform: rotate(3060deg) scale(1); }
-  90%  { transform: rotate(3500deg) scale(1); }
+  90%  { transform: rotate(3510deg) scale(1); }
   100% { transform: rotate(3600deg) scale(1); }
 }
 
@@ -19765,8 +19765,8 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 }
 /* Fluegelschlag — schneller als die Bahn, sonst wirkt es traege. */
 @keyframes annoyCatFlap {
-  from { transform: scaleY(1)   rotate(-12deg); }
-  to   { transform: scaleY(.55) rotate(10deg); }
+  from { transform: translateY(-2px); }
+  to   { transform: translateY(2px); }
 }
 
 /* Trial of Knowledge: Herzchen und Partikel treiben nach aussen und
@@ -21499,29 +21499,25 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   border-radius: 50%; opacity: 0; transform: scale(.02);
   background: radial-gradient(circle, #fff8e8 0%, #fbe181 8%, #f9ac20 20%, #f87420 36%,
     #cc2b00 54%, rgba(120,0,0,.85) 72%, rgba(42,4,4,.55) 86%, transparent 100%);
-  filter: blur(2px) saturate(1.25);
 }
 .arma-ring {
-  border-radius: 50%; border-style: solid; border-color: rgba(255,208,102,.9);
-  box-shadow: 0 0 40px rgba(255,125,0,.9), inset 0 0 40px rgba(255,73,26,.7);
+  border-radius: 50%; border-style: solid; border-color: #ffd066;
+  box-shadow: inset 0 0 0 6px #ff7d00, inset 0 0 0 12px #ff491a;   /* W86r1: harte Ringe statt Weichzeichner-Schein */
   opacity: 0; transform: scale(.02);
 }
 .arma-kern {
   width: 90px; height: 90px; margin-left: -45px; margin-top: -45px; border-radius: 50%;
   background: radial-gradient(circle, #ffffff 0%, #f9ecb3 30%, #f9ac20 60%, transparent 75%);
-  box-shadow: 0 0 60px 30px rgba(255,208,102,.85);
   opacity: 0;
 }
 .arma-flamme {
   border-radius: 50% 50% 45% 45% / 62% 62% 38% 38%;
   background: radial-gradient(ellipse at 50% 78%, #fffbd2 0%, #fad54a 22%, #f87420 48%, rgba(204,43,0,.85) 72%, transparent 100%);
-  filter: drop-shadow(0 0 10px rgba(248,116,32,.9)) blur(.4px);
   transform-origin: 50% 90%; opacity: 0;
 }
 .arma-tropfen {
   border-radius: 50% 50% 50% 50% / 20% 20% 80% 80%;
   background: linear-gradient(to bottom, rgba(255,73,26,0) 0%, rgba(255,125,0,.55) 45%, #ffd066 85%, #fff8e8 100%);
-  filter: drop-shadow(0 0 6px rgba(255,139,26,.95));
   opacity: 0;
 }
 .arma-einschlag {
@@ -21530,7 +21526,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   opacity: 0;
 }
 .arma-glut {
-  border-radius: 50%; background: #f9ac20; box-shadow: 0 0 6px #f87420; opacity: 0;
+  border-radius: 50%; background: #f9ac20; box-shadow: 0 0 0 2px #f87420; opacity: 0;
 }
 @keyframes armaBeben {
   0%, 100% { transform: translate(0, 0); }
@@ -21561,16 +21557,16 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   100% { opacity: 0; transform: scale(calc(var(--arma-kern) * 1.4)); }
 }
 @keyframes armaFlamme {
-  0% { opacity: 0; transform: rotate(var(--arma-kipp)) scale(.2, .1); }
-  18% { opacity: 1; transform: rotate(var(--arma-kipp)) scale(1, 1.15); }
-  40% { transform: rotate(calc(var(--arma-kipp) * -1)) scale(.85, 1.3); }
-  62% { opacity: .9; transform: rotate(var(--arma-kipp)) scale(1.05, 1); }
-  100% { opacity: 0; transform: rotate(0deg) translateY(-30%) scale(.5, 1.4); }
+  0% { opacity: 0; transform: scale(.2, .1); }
+  18% { opacity: 1; transform: scale(1, 1.15); }
+  40% { transform: scale(.85, 1.3); }
+  62% { opacity: .9; transform: scale(1.05, 1); }
+  100% { opacity: 0; transform: translateY(-30%) scale(.5, 1.4); }
 }
 @keyframes armaFall {
-  0% { opacity: 0; transform: translate(var(--arma-vonx), var(--arma-vony)) rotate(var(--arma-dreh)); }
+  0% { opacity: 0; transform: translate(var(--arma-vonx), var(--arma-vony)); }
   12% { opacity: 1; }
-  100% { opacity: 1; transform: translate(0, 0) rotate(var(--arma-dreh)); }
+  100% { opacity: 1; transform: translate(0, 0); }
 }
 @keyframes armaEinschlag {
   0% { opacity: 1; transform: scale(.2); }
@@ -25065,28 +25061,15 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 
 /* ── Accusation: wuetende Sprechblase ─────────────────────────────── */
 .anklage { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10205; }
-.anklage-glut {
-  position: absolute; border-radius: 18%;
-  background: radial-gradient(ellipse at 50% 55%, rgba(255,26,26,.5) 0%, rgba(233,47,56,.22) 45%, transparent 70%);
-  opacity: 0; animation: anklageGlut 2200ms ease-out forwards;
-}
+/* W86r1: Blase, „!", Schreistriche, Adern und Glut sind Pixel auf der Leinwand (`AnklageEffect` in app-board.jsx); hier nur Rahmen und Kartenbild. */
 .anklage-blase { position: absolute; width: 0; height: 0; transform-origin: -8px 10px; animation: anklageBlase 2200ms cubic-bezier(.2,.9,.3,1.2) forwards; }
 .anklage-zittern { position: absolute; left: 0; top: 0; width: 0; height: 0; animation: anklageZittern 2200ms linear forwards; }
-.anklage-ausruf { transform-origin: 50% 50%; animation: anklageAusruf 2200ms ease-out forwards; }
 .anklage-karte {
-  position: absolute; border-radius: 3px; overflow: hidden;
-  border: 2px solid #141414; box-shadow: 0 0 0 2px #ffffff, 0 0 10px rgba(190,14,14,.7);
-  opacity: 0; transform: scale(.2) rotate(-12deg); animation: anklageKarte 2200ms cubic-bezier(.2,.9,.3,1.3) forwards;
+  position: absolute; border-radius: 0; overflow: hidden;
+  border: 2px solid #141414; box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #be0e0e;
+  opacity: 0; transform: scale(.2); animation: anklageKarte 2200ms cubic-bezier(.2,.9,.3,1.3) forwards;
 }
 .anklage-karte img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.anklage-strich {
-  position: absolute; margin-top: -4.5px; transform-origin: 0 50%;
-  background: #141414; clip-path: polygon(0 40%, 100% 0, 100% 100%, 0 60%);
-  transform: rotate(var(--ag)) translateX(var(--ar)) scaleX(0); opacity: 0;
-  animation: anklageStrich 420ms ease-out forwards;
-}
-.anklage-ader { position: absolute; opacity: 0; transform: scale(.2); animation: anklageAder 700ms cubic-bezier(.2,1.2,.4,1) forwards; overflow: visible; }
-@keyframes anklageGlut { 0% { opacity: 0; } 12% { opacity: 1; } 60% { opacity: .75; } 75% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes anklageBlase {
   0% { transform: scale(0); opacity: 0; }
   9% { transform: scale(1.18); opacity: 1; }
@@ -25096,43 +25079,30 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
   100% { transform: scale(0); opacity: 0; }
 }
 @keyframes anklageZittern {
-  0%, 56% { transform: translate(0, 0) rotate(0); }
-  58% { transform: translate(-4px, 1px) rotate(-3deg); }
-  60% { transform: translate(4px, -1px) rotate(3deg); }
-  62% { transform: translate(-4px, 0) rotate(-2deg); }
-  64% { transform: translate(3px, 1px) rotate(3deg); }
-  66% { transform: translate(-3px, -1px) rotate(-2deg); }
-  68% { transform: translate(3px, 0) rotate(2deg); }
-  70% { transform: translate(-2px, 1px) rotate(-1deg); }
-  72% { transform: translate(2px, 0) rotate(1deg); }
-  75%, 100% { transform: translate(0, 0) rotate(0); }
-}
-@keyframes anklageAusruf {
-  0% { transform: scale(.4); opacity: 0; }
-  8% { transform: scale(1.25); opacity: 1; }
-  13% { transform: scale(.95); }
-  18% { transform: scale(1.12); }
-  23% { transform: scale(.98); }
-  28% { transform: scale(1.08); opacity: 1; }
-  34% { transform: scale(0) rotate(40deg); opacity: 0; }
-  100% { transform: scale(0); opacity: 0; }
+  0%, 56% { transform: translate(0, 0); }
+  58% { transform: translate(-4px, 1px); }
+  60% { transform: translate(4px, -1px); }
+  62% { transform: translate(-4px, 0); }
+  64% { transform: translate(3px, 1px); }
+  66% { transform: translate(-3px, -1px); }
+  68% { transform: translate(3px, 0); }
+  70% { transform: translate(-2px, 1px); }
+  72% { transform: translate(2px, 0); }
+  75%, 100% { transform: translate(0, 0); }
 }
 @keyframes anklageKarte {
-  0%, 29% { opacity: 0; transform: scale(.2) rotate(-12deg); }
-  38% { opacity: 1; transform: scale(1.12) rotate(4deg); }
-  44%, 100% { opacity: 1; transform: scale(1) rotate(0); }
+  0%, 29% { opacity: 0; transform: scale(.2); }
+  38% { opacity: 1; transform: scale(1.12); }
+  44%, 100% { opacity: 1; transform: scale(1); }
 }
-@keyframes anklageStrich {
-  0% { opacity: 0; transform: rotate(var(--ag)) translateX(var(--ar)) scaleX(0); }
-  35% { opacity: 1; transform: rotate(var(--ag)) translateX(var(--ar)) scaleX(1); }
-  100% { opacity: 0; transform: rotate(var(--ag)) translateX(calc(var(--ar) + 14px)) scaleX(.6); }
-}
-@keyframes anklageAder {
-  0% { opacity: 0; transform: scale(.2) rotate(-20deg); }
-  35% { opacity: 1; transform: scale(1.25) rotate(8deg); }
-  55% { transform: scale(.95) rotate(0); }
-  70% { transform: scale(1.1); opacity: 1; }
-  100% { opacity: 0; transform: scale(1); }
+
+/* W86r1 · Looming Threat (`level_down`): die Handkarte schwillt kurz an — nur Größe (das Abdunkeln malt die Pixel-Leinwand der Animation als Dither). */
+.pp-r1-ld-swell { animation: ppR1LdSwell 1100ms ease-in-out; z-index: 50; position: relative; }
+@keyframes ppR1LdSwell {
+  0%   { scale: 1; }
+  40%  { scale: 1.38; }
+  60%  { scale: 1.38; }
+  100% { scale: 1; }
 }
 
 /* ── Baby Spider: Kokon, Faden, Netz, Aktivierung ────────────────── */
