@@ -20,7 +20,7 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos; bewusst ruckelig-unheimlich):
 * Auf und ab (zweistufig, Periode 24): Brust zuerst 1 px (Hemdzeile 16, glatt, wird einmal doppelt eingefügt: Oberkörper, Arme und Kopf steigen, Stiefel bleiben), der Kopf läuft 3 Frames nach und hebt sich um
   ein weiteres px (Halszeile 10 wird verlängert): Kopf 0 → 1 → 2 → 1 → 0 px, Brust 0 → 1 → 0.
 * Gewichtsverlagerung: der Oberkörper (Zeilen 0–17) schiebt sich 1 px nach rechts (Frames 10–21) und später 1 px nach links (Frames 34–45); Stiefel bleiben stehen.
-* Kopfzucken: der Kopf (Zeilen 0–9) zuckt kurz (je 2 Frames) 1 px zur Seite: nach links (Frames 14–15 und 44–45), nach rechts (Frames 26–27) — ein ruckartiges, unheimliches Zucken (4-verbunden über den Hals).
+* Kopfzucken: der Kopf (Zeilen 0–9) zuckt kurz (je 2 Frames) 1 px zur Seite: nach links (Frames 14–15 und 46–47), nach rechts (Frames 26–27) — ein ruckartiges, unheimliches Zucken (4-verbunden über den Hals).
 * Arme schwingen: der linke Arm (Zeilen 12–14) spreizt sich 1 px nach außen (Frames 2–9 und 22–33), der rechte (Frames 24–33 und 40–45); nie in derselben Richtung wie die Gewichtsverlagerung.
 * Blinzeln (Frames 16–19 und 38–41, langsam): die weißen Augen schließen sich — die vier Augenpixel (3–4, 7), (7–8, 7) nehmen die umgebende Hautfarbe (188,172,154) an; schwarze Lider bleiben.
   Kein Farbtausch, kein Augenglanz.
@@ -71,7 +71,7 @@ def frame(i):
     if Hm.folge(i, 16, [1, 1, 1, 1], N) or Hm.folge(i, 38, [1, 1, 1, 1], N):
         Hm.setze(k, {p: HAUT for p in AUGEN}, OFF)
     # --- Kopfzucken (Zeilen 0–9, je 2 Frames) ---
-    kz = -1 if (Hm.folge(i, 14, [1, 1], N) or Hm.folge(i, 44, [1, 1], N)) else (1 if Hm.folge(i, 26, [1, 1], N) else 0)
+    kz = -1 if (Hm.folge(i, 14, [1, 1], N) or Hm.folge(i, 46, [1, 1], N)) else (1 if Hm.folge(i, 26, [1, 1], N) else 0)
     if kz:
         Hm.bereich_versatz(k, OFF, {y: kz for y in range(0, 10)}, -2, sw + 1)
     # --- Arme schwingen (nach außen) ---
