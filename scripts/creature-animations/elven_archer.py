@@ -32,8 +32,7 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
   Alle Zustände sind 4-verbunden (Eckkontakt-Kontrolle in der Prüfung).
 * Linke Lockenspitze (5,14): außen liegt der Bogenumriss (4,14), nach außen geht nichts — sie schlägt dreimal pro Schleife kurz nach
   innen ((5,14) wird Umrissbraun, der blasse Pixel steht auf (6,14)).
-* Haarglanz (zwei Lichtbänder pro Schleife, Frames 1–12 und 25–36): ein diagonales Band läuft über das Haar; die Haarpixel dort sind
-  eine (im Kern zwei) Stufe(n) der Haarrampe heller (nur Farben des Sprites).
+* KEIN Haarglanz und KEIN Federglanz (Regel 14: Glanz nur bei Metall/Gold/Edelsteinen; Haare, Feder gehören nicht dazu).
 * Augenglanz (Frames 13–15 und 37–39): Hellblau und Weiß des offenen Auges tauschen kurz den Platz (der Glanzpunkt „wandert“).
 * Ohrenzucken: rechtes Ohr Frames 7–11 und 40–42 (Spitze (17,8) → (17,9)), linkes Ohr Frames 28–30 (Keil (0,8) → (0,9)); beide
   Umrisse bleiben 4-verbunden.
@@ -65,8 +64,7 @@ vorhanden = L.deckend(spr)
 HAUT, SCHWARZ, HELLBLAU, WEISS = (246, 205, 139), (0, 0, 0), (172, 213, 255), (246, 255, 255)
 UMRISS = (49, 24, 0)
 ORANGE, ROTBRAUN = (230, 131, 16), (115, 41, 16)
-HAARRAMPE = [(115, 41, 16), (189, 57, 8), (213, 98, 16), (230, 131, 16), (255, 180, 24), (255, 222, 90), (255, 246, 172)]
-HELLGELB = HAARRAMPE[-1]
+HELLGELB = (255, 246, 172)
 
 KANTE0 = Hm.kantenmaske(spr)
 ERLAUBT = Hm.umrissfarben(spr)                                  # Farben der Außenkante im Original (Regel 16)
@@ -133,12 +131,6 @@ def luecke_bogen(k, bogen_hub=0):
 def frame(i):
     k = teil(koerper)
     b = teil(bogen)
-    # --- Haarglanz: zwei diagonale Lichtbänder (Position s = x + 0,6·y), Haarpixel 1–2 Stufen heller ---
-    for start in (1, 25):
-        mitte = Hm.boe_mitte(i, N, start, 12, 3.0, 24.0)
-        if mitte is not None:
-            Hm.heller(k, lambda x, y: (not KANTE0[y, x]) and Hm.boe_aktiv(x, y, mitte, 1.3), HAARRAMPE, OFF)      # Randpixel (Umriss) bleiben unverändert
-            Hm.heller(k, lambda x, y: (not KANTE0[y, x]) and Hm.boe_aktiv(x, y, mitte, 0.6), HAARRAMPE, OFF)
     # --- Pixel-Ereignisse am Körper (vor dem Atmen, damit sie mit dem Kopf steigen) ---
     bl = Hm.folge(i, 17, [AUGE_HALB, AUGE_ZU, AUGE_HALB], N) or Hm.folge(i, 38, [AUGE_HALB, AUGE_ZU, AUGE_HALB], N)
     if bl:

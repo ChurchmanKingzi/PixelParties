@@ -19,7 +19,7 @@ Schnittstelle
     feuer = Feuer(h, w, zungen, rampe={'rand': (r,g,b), 'rot': …, 'orange': …, 'gelb': …, 'hell': …},
                   n=48, seed=7, posen=12, amplitude=1.0, sperre=maske)
     ebene = feuer.ebene(i, hoehen_bonus=0)      # RGBA-Feld h×w: die Flamme in Frame i (0 ≤ i < n); hoehen_bonus: ± Pixel auf alle Zungen
-    funken = feuer.funken(i, dy=0)              # RGBA-Feld h×w: abgerissene, aufsteigende Funken (dy: Versatz der Figur)
+    funken = feuer.funken(i, dy=0)              # RGBA-Feld h×w: abgerissene, aufsteigende Funken (dy: Versatz der Figur, auch Funktion frame → dy)
     feuer.ereignisse                            # [(frame, x, y, drift)] abgerissene Spitzen (Debug/Anzeige)
 
     feuer = Feuer.aus_maske(maske, rampe, h, w, n_zungen=None, …)   # Zungen automatisch aus einer Flammenmaske (Bool h×w, Ruhepose) ableiten
@@ -53,9 +53,9 @@ def _pose(rnd, z, amp):
         lean=rnd.uniform(-2.6, 2.6) * amp * min(1.0, 0.45 + z.breite * 0.3),
         bend=rnd.uniform(-1.3, 1.3) * amp,
         w=1.0 + rnd.uniform(-0.28, 0.28) * amp,
-        u=[1.0, rnd.uniform(0.8, 0.97), rnd.uniform(0.55, 0.92), rnd.uniform(0.3, 0.72), rnd.uniform(0.1, 0.45)],
-        wk=[1.0, 0.84 * (1 + rnd.uniform(-0.12, 0.12)), 0.6 * (1 + rnd.uniform(-0.2, 0.2)),
-            0.4 * (1 + rnd.uniform(-0.25, 0.25)), 0.22 * (1 + rnd.uniform(-0.3, 0.3))],
+        u=[1.0, rnd.uniform(0.84, 1.0), rnd.uniform(0.62, 0.96), rnd.uniform(0.4, 0.8), rnd.uniform(0.16, 0.55)],
+        wk=[1.0, 0.86 * (1 + rnd.uniform(-0.1, 0.1)), 0.68 * (1 + rnd.uniform(-0.15, 0.15)),
+            0.5 * (1 + rnd.uniform(-0.2, 0.2)), 0.3 * (1 + rnd.uniform(-0.3, 0.3))],
         dk=[0.0, rnd.uniform(-0.5, 0.5) * amp, rnd.uniform(-1.0, 1.0) * amp, rnd.uniform(-1.1, 1.1) * amp, rnd.uniform(-1.3, 1.3) * amp],
         split=(rnd.uniform(0.5, 1.1) * amp if rnd.random() < 0.28 else 0.0),
         split_u=rnd.uniform(0.5, 0.72),
@@ -173,7 +173,7 @@ class Feuer:
             if a >= leben:
                 continue
             x = x0 + int(round(drift * a / 4.0)) + int(round(0.8 * math.sin(2 * math.pi * a / 8.0)))
-            y = y0 + dy - int(round(0.55 * a))
+            y = y0 + (dy(f) if callable(dy) else dy) - int(round(0.55 * a))
             if not (0 <= y < self.h and 0 <= x < self.w):
                 raise L.ClipError(f'Funke bei ({x},{y}) außerhalb der Leinwand {self.w}×{self.h}')
             e[y, x, :3] = farben[min(len(farben) - 1, a * len(farben) // leben)]

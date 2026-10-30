@@ -18,13 +18,14 @@ Identifikation (x, y):
 * Die Kunst enthält zwei weitere Gesichter (Ebenen 224 und 414); sie werden nicht verwendet.
 
 Ablauf (36 Frames à 70 ms = 2,52 s):
-* Kräftiger Flügelschlag: viermal pro Schleife (Periode 9 Frames); jede Flügelspalte wandert senkrecht, je weiter außen, desto mehr: Spitze etwa −7 … +9 px
-  (F.fluegel_welle mit Wellenlauf, Spalten bleiben ganz, Zusammenhang erzwungen). Die Spalten am Körperrand (links x ≥ 10, rechts x ≤ 25) stehen fest.
-* Der Rest hebt sich beim Abschlag mit: Fächer und Flügel steigen bis 2–3 px, das Gesicht (ab Zeile 26) folgt etwas später; der Unterschied wird an Zeile 25
-  (reines Creme-Band) durch Verdoppeln/Entfernen einer Zeile an Körper UND Flügeln ausgeglichen.
-* Feuer wie Feuer (Regel 15): Fächer- und Flügelzungen flackern unregelmäßig in 12 Posen à 3 Frames; jede Zunge (Gipfel der Silhouette) hat ihre eigene Pose-Tabelle und
-  einen eigenen Versatz. Der Teil über dem hellen Kern (rote Spitze, orange Mitte) wird gestreckt/gestaucht, die Farbfolge wandert mit der Zunge; Kern und Basis bleiben ruhig.
-  Kein Lichtband, keine Sterne.
+* ECHTER Flügelschlag (Nutzerwunsch): Jeder Flügel (die Flammenschwinge) dreht sich als Ganzes um den Schulteransatz (links Pixel (9, 24), rechts (26, 24) — das
+  Creme-Band am Körperrand; die Wurzel bleibt dort 4-verbunden), viermal pro Schleife (Periode 9 Frames): Abschlag ca. 40° unter die Waagerechte, Aufschlag
+  ca. 65° darüber (Flügelspitze beschreibt einen großen Bogen); der Aufschlag ist langsamer als der Abschlag (Rückholen). Ruhepose = waagerecht = Original. Drehung
+  per Rückwärtsabbildung (Nächster-Nachbar, keine Mischfarben, Alpha 0/255); die Kanten werden nachgezeichnet (Randpixel-Test, Regel 16).
+* Der Körper hebt sich beim Abschlag mit (bis 3 px, Fächer/Flügelansatz zuerst, Gesicht etwas später; Ausgleich an Zeile 25).
+* Feuer wie Feuer, Farbschichten UNABHÄNGIG (Regel 15, Nutzerwunsch): Je Spalte schwanken die Schichtgrenzen Rot-Außenhaut / Orange / Gelb / Creme-Kern jeweils mit eigener
+  Höhe und Neigung (je Zunge und Grenze eine eigene Pose-Tabelle, 12 Posen à 3 Frames, gegeneinander versetzt); die Spalte wird zwischen den Grenzen linear gedehnt/gestaucht.
+  So bewegen sich auch die hellen Farben und der cremefarbene Kern, nicht nur die Spitzen. Die Basis (ab Zeile 22: Creme-Band, Gesicht) bleibt ruhig. Kein Lichtband, keine Sterne.
 * Abreißende Funken: von den Zungenspitzen steigen kleine runde Funken (Rot/Orange/Gelb) langsam auf (14 Partikel, Formen k, s).
 * Blinzeln (Frames 28–30).
 
@@ -40,7 +41,7 @@ import anim_lib as L
 import anim_flieger as F
 
 N, MS = 36, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 6, 6, 20, 16
+PAD_L, PAD_R, PAD_T, PAD_B = 16, 16, 22, 14
 
 spr = L.lade('cute-phoenix')
 sh, sw = spr.shape[:2]
@@ -51,6 +52,8 @@ vorhanden = L.deckend(spr)
 ROT, ORANGE, GELB, CREME = (202, 44, 41), (244, 123, 34), (246, 231, 14), (247, 245, 184)
 DUNKELROT = (159, 35, 32)
 KERN = [GELB, CREME]                                         # heller Kern: hier setzt die Zunge an
+HEISS = {ROT: 0, ORANGE: 1, GELB: 2, CREME: 3}                # Farbschichten von außen (kühl) nach innen (heiß)
+Y_ENDE = PAD_T + 22                                          # ab hier (Creme-Band) steht die Basis ruhig
 
 wing_l = vorhanden & (xx <= 9)
 wing_r = vorhanden & (xx >= 26)
@@ -88,8 +91,13 @@ PUFFS2 = funken(SPITZEN_F[1:], 17, 3, ('k', 's'), -14) + funken(SPITZEN_L[1:], 2
 
 def frame(i, partikel=True):
     ph = L.sinus(i, N / 4)                                    # Flügelschlag: viermal pro Schleife (Periode 9)
-    haupt = int(round(-2.2 * math.sin(ph)))                   # Fächer/Flügel steigen beim Abschlag …
-    kopf = int(round(-2.2 * math.sin(ph - 0.9)))              # … das Gesicht hinterher
+    ph2 = ph + 0.4 * math.sin(ph)                             # Abschlag schneller als Aufschlag (Rückholen)
+    C, A = math.radians(12.5), math.radians(52.5)             # Winkel: −40° … +65° gegenüber waagerecht (Ruhe = 0)
+    phi0 = math.asin(-C / A)
+    theta = C + A * math.sin(ph2 + phi0)                      # im Uhrzeigersinn positiv = linke Spitze steigt
+    c0 = math.cos(phi0 - 0.3)
+    haupt = int(round(1.6 * (math.cos(ph2 + phi0 - 0.3) - c0)))        # Körper hebt sich beim Abschlag (negativ = hoch) …
+    kopf = int(round(1.6 * (math.cos(ph2 + phi0 - 1.1) - math.cos(phi0 - 1.1))))   # … das Gesicht hinterher
     n_str = max(-2, min(2, kopf - haupt))
 
     kp = F.ebene(spr, koerper, H, W, PAD_L, PAD_T)
@@ -103,14 +111,14 @@ def frame(i, partikel=True):
         F.setze(kp, PAD_L, PAD_T, {**{p: GELB for p in (AUG_L[0], AUG_L[1], AUG_R[0], AUG_R[1])},
                                    **{p: ROT for p in (AUG_L[2], AUG_L[3], AUG_R[2], AUG_R[3])}})
 
-    # Feuer: Zungen flackern (Regel 15), je Teil eigene Zufallsfolge
-    kp = F.feuer_zungen(kp, i, N, KERN, pose_frames=3, seed=11, hub=0.34)
-    wl = F.feuer_zungen(wl, i, N, KERN, pose_frames=3, seed=23, hub=0.34)
-    wr = F.feuer_zungen(wr, i, N, KERN, pose_frames=3, seed=37, hub=0.34)
+    # Feuer: Farbschichten schwanken unabhängig (Regel 15), je Teil eigene Zufallsfolge
+    kp = F.feuer_schichten(kp, i, N, HEISS, Y_ENDE, seed=11)
+    wl = F.feuer_schichten(wl, i, N, HEISS, Y_ENDE, seed=23)
+    wr = F.feuer_schichten(wr, i, N, HEISS, Y_ENDE, seed=37)
 
-    # kräftiger Flügelschlag: Spitze etwa −7 … +9 px
-    wl = F.fluegel_welle(wl, PAD_L + 10, 8.0, ph, potenz=1.1, nur_rechts=False, lauf=0.1, zusammenhang=True)
-    wr = F.fluegel_welle(wr, PAD_L + 25, 8.0, ph, potenz=1.1, nur_rechts=True, lauf=0.1, zusammenhang=True)
+    # Flügelschlag: ganze Schwinge dreht sich um den Schulteransatz
+    wl = F.drehen(wl, PAD_L + 9, PAD_T + 24, theta)
+    wr = F.drehen(wr, PAD_L + 26, PAD_T + 24, -theta)
 
     # Bob: Zeile 25 gleichmäßig an allen Ebenen strecken/kürzen, dann alles um die Gesichtsbewegung verschieben
     kp, wl, wr = (L.versetze(L.streck_zeile(a, ZEILE, n_str), 0, kopf) for a in (kp, wl, wr))
@@ -118,7 +126,7 @@ def frame(i, partikel=True):
     glut = L.zusammen(H, W, [(L.puff_ebene(H, W, i, N, PUFFS1, FUNKEN1), 0, 0), (L.puff_ebene(H, W, i, N, PUFFS2, FUNKEN2), 0, 0)]) \
         if partikel else L.leer(H, W)
     f = L.zusammen(H, W, [(glut, 0, 0), (kp, 0, 0), (wl, 0, 0), (wr, 0, 0)])
-    # Randpixel-Test (Regel 16): Spaltenversatz legt an den Flügelrändern Innenfarbe (Creme) frei → Kante in Umrissfarbe (Gelb unten/seitlich, Orange oben)
+    # Randpixel-Test (Regel 16): Drehung/Dehnung legt Innenfarbe an den Rändern frei → Kante in Umrissfarbe (Gelb unten/seitlich, Orange oben)
     F.umranden(f, [wl, wr], UMRISS, ORANGE, GELB, GELB)
     return f
 
