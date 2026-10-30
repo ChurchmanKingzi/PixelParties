@@ -22,6 +22,8 @@ Bausteine für weiche Körper (Schleime) — alles Pixelart, nur ganze Pixel, nu
     farb_schritt(a, rampe, maske)                    Edelstein pulsiert: Farben eine Rampenstufe heller/dunkler
     suche_marke(a, farbe)                            Punkt des Sprites durch Zeilen-/Spaltenumbau verfolgen (Markierfarbe)
     offene_koerperkanten(fig, ausnahme, y0, umriss) Randpixel ohne Umrissfarbe = offene Kanten (nach Squash/Wabbeln prüfen!)
+    pose_folge(rnd, n_posen, n, tempo)               Folge von Posenindizes je Frame (Pose 0 am Anfang, jede Pose 2–3 Frames, nahtlos wiederholbar)
+    strahlenfunke(rnd, mitte, kern, strahl, …)       Funkengarbe (weißer Kern + gelbe Strahlen unterschiedlicher Länge) als {(x, y): Farbe} — Zündfunke am Schnurende
 """
 import math
 
@@ -376,4 +378,50 @@ def offene_koerperkanten(fig, ausnahme, y0, umriss):
     for y, x in zip(*np.nonzero(r)):
         if y >= y0 and not ausnahme[y, x] and tuple(int(v) for v in fig[y, x, :3]) != tuple(umriss):
             out.append((int(x), int(y), tuple(int(v) for v in fig[y, x, :3])))
+    return out
+
+
+# ── Funkenposen (additiv; für die Zündfunken der Schädel) ───────────────────────────────────────────────────
+
+def pose_folge(rnd, n_posen, n=48, tempo=(2, 3), start=3):
+    """Posenindex je Frame: Pose 0 (= Original) steht am Anfang `start` Frames lang, danach kommen die Posen 1…n_posen−1 in Zufallsreihenfolge, jede
+    `tempo[0]`–`tempo[1]` Frames; nahtlos über n Frames (die Folge wird auf n abgeschnitten)."""
+    ablauf, rest = [0] * start, []
+    while len(ablauf) < n:
+        if not rest:
+            rest = list(range(1, n_posen))
+            rnd.shuffle(rest)
+        ablauf += [rest.pop()] * rnd.randint(*tempo)
+    return ablauf[:n]
+
+
+def strahlenfunke(rnd, mitte, kern, strahl, kern_pixel=None, n_strahlen=(5, 7), laenge=(2, 5), box=(0, 0, 99, 99), dick=0.4):
+    """Eine Funkengarbe um `mitte` = (x, y): Kern aus `kern_pixel` (Liste (dx, dy), Standard: 2×2 um die Mitte) in der Farbe `kern`, dazu n Strahlen in zufälligen,
+    ungefähr gleichmäßig verteilten Richtungen (Länge `laenge`, 8-verbundene Pixellinie) in der Farbe `strahl`; jeder Strahlpixel wird mit Wahrscheinlichkeit `dick`
+    um ein Nachbarpixel verdickt (kein Strichkreuz, sondern eine unregelmäßige Garbe). Alle Pixel liegen innerhalb von box = (x0, y0, x1, y1). Gibt {(x, y): Farbe}.
+    Die Strahlen der ersten Pixel am Kern werden zur Kernfarbe, wenn sie dicht am Kern liegen (wirkt wie ein Glühen)."""
+    kern_pixel = kern_pixel or [(0, 0), (1, 0), (0, 1), (1, 1)]
+    cx, cy = mitte
+    x0, y0, x1, y1 = box
+    out = {}
+
+    def setze(x, y, c):
+        if x0 <= x <= x1 and y0 <= y <= y1:
+            out[(x, y)] = c
+
+    n = rnd.randint(*n_strahlen)
+    w0 = rnd.uniform(0, 2 * math.pi)
+    for k in range(n):
+        w = w0 + 2 * math.pi * k / n + rnd.uniform(-0.35, 0.35)
+        ln = rnd.randint(*laenge)
+        px, py = cx, cy
+        for t in range(1, ln + 1):
+            qx, qy = int(round(cx + math.cos(w) * t)), int(round(cy + math.sin(w) * t))
+            if (qx, qy) != (px, py):
+                setze(qx, qy, strahl)
+                if rnd.random() < dick:
+                    setze(qx + (1 if math.cos(w) < 0 else -1) * (abs(math.cos(w)) < abs(math.sin(w))), qy + (1 if math.sin(w) < 0 else -1) * (abs(math.sin(w)) <= abs(math.cos(w))), strahl)
+                px, py = qx, qy
+    for (dx, dy) in kern_pixel:
+        setze(cx + dx, cy + dy, kern)
     return out

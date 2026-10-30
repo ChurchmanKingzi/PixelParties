@@ -37,7 +37,7 @@ import anim_lib as L
 import anim_tiere as T
 
 N, MS = 60, 64
-PAD_L, PAD_R, PAD_T, PAD_B = 4, 2, 5, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 3, 2, 5, 2
 
 spr = L.lade('pinaxolotl')
 sh, sw = spr.shape[:2]
