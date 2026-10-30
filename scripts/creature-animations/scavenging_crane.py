@@ -40,7 +40,7 @@ import anim_flieger as F
 import anim_flieger_b as B
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 3, 4
+PAD_L, PAD_R, PAD_T, PAD_B = 6, 7, 3, 4
 
 spr = L.lade('scavenging-crane')
 sh, sw = spr.shape[:2]
@@ -113,10 +113,10 @@ def bein(a, k):
 # ── Partikel: Wasserringe um die Füße ──────────────────────────────────────────────────────────────────────────────────
 RING = {'c': (255, 255, 255), 'r': (190, 190, 190)}
 PUFFS = [
-    dict(x=px(5, 20)[0], y=px(5, 20)[1], vx=-3, vy=0, off=0, form='m', wackeln=0),
-    dict(x=px(5, 20)[0], y=px(5, 20)[1], vx=-3, vy=0, off=24, form='m', wackeln=0),
-    dict(x=px(14, 20)[0], y=px(14, 20)[1], vx=3, vy=0, off=12, form='m', wackeln=0),
-    dict(x=px(14, 20)[0], y=px(14, 20)[1], vx=3, vy=0, off=36, form='m', wackeln=0),
+    dict(x=px(5, 21)[0], y=px(5, 21)[1], vx=-5, vy=0, off=0, form='m', wackeln=0),
+    dict(x=px(5, 21)[0], y=px(5, 21)[1], vx=-5, vy=0, off=24, form='m', wackeln=0),
+    dict(x=px(14, 21)[0], y=px(14, 21)[1], vx=5, vy=0, off=12, form='m', wackeln=0),
+    dict(x=px(14, 21)[0], y=px(14, 21)[1], vx=5, vy=0, off=36, form='m', wackeln=0),
 ]
 TEST_EBENEN = ('koerper', 'hals', 'beine')                  # für den Randpixel-Test: ohne Partikel
 
