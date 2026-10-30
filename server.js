@@ -20805,6 +20805,112 @@ async function runHeadlessTrainingGame(pinnedDeck, oppDeck, pinnedIdx, gameOpts 
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  PARALLELE SAMMLUNG (PP_TRAIN_JOBS=K)
+//
+//  Ein Spiel ist single-threaded, die Spiele einer Sammelrunde sind aber voneinander unabhängig. Der Orchestrator startet K Worker-
+//  prozesse (derselbe server.js mit PP_TRAIN_WORKER=1) und führt ihre Ergebnisse zusammen. Gearbeitet wird an Spiel-INDIZES: Index i
+//  bestimmt wie im sequentiellen Lauf Gegner (`i % Gegnerzahl`) und Sitz (`i % 2`), die Rotation bleibt also exakt dieselbe. Jeder
+//  Worker holt sich den nächsten freien Index, indem er eine Datei `<claims>/<i>` exklusiv anlegt — dynamische Lastverteilung ohne
+//  Absprache, kein Worker wartet auf einen langsamen Gegner.
+//
+//  Die Ausgabedatei (`PP_TRAIN_OUT`) bleibt die einzige Wahrheit: Jeder Datensatz trägt `gameIdx` (letztes Feld). Der Orchestrator
+//  legt vor dem Start fest, welche Indizes schon fertig sind (inkl. liegengebliebener Worker-Dateien einer abgebrochenen Runde und
+//  alter Dateien ohne `gameIdx`, die positionsweise gelten), und schreibt am Ende alles nach Index sortiert zurück. Stirbt ein
+//  Worker (OOM), startet er neu; das Match, das ihn tötete, bleibt in dieser Runde beansprucht (kein Dauerabsturz) und fehlt danach
+//  in der Datei — Exit-Code 1, der Wiederanlauf von train-iterative holt es nach. Die Brotkrume des Absturzes wird nach
+//  `<out>.inflight.json` kopiert, dort liest train-iterative sie.
+//
+//  ε-Exploration (PP_TRAIN_EXPLORE): der Neuheits-Zähler lebt je Worker; er teilt sich nicht über Prozesse.
+// ═══════════════════════════════════════════════════════════════════
+async function collectTrainingSharded({ jobs, count, outPath }) {
+  const { spawn } = require('child_process');
+  const dir = path.dirname(outPath), base = path.basename(outPath);
+  const idxOf = (line) => { const m = /"gameIdx":(\d+)\}\s*$/.exec(line); return m ? +m[1] : null; };
+  const workerFiles = () => fs.readdirSync(dir).filter(f => f.startsWith(base + '.w') && /^\.w\d+$/.test(f.slice(base.length)))
+    .map(f => path.join(dir, f));
+  // Alle Datensätze (Ausgabedatei + Worker-Dateien) → Map Index → Zeile. Alte Zeilen ohne gameIdx zählen positionsweise.
+  const pool = () => {
+    const recs = new Map();
+    let legacy = 0;
+    const take = (file, isMain) => {
+      let txt = '';
+      try { txt = fs.readFileSync(file, { encoding: 'utf-8' }); } catch { return; }
+      for (const line of txt.split('\n')) {
+        if (!line.trim()) continue;
+        let idx = idxOf(line);
+        let out = line;
+        if (idx == null) {
+          if (!isMain) continue;                       // Worker-Zeilen tragen immer ein gameIdx
+          idx = legacy++;
+          out = line.replace(/\}\s*$/, `,"gameIdx":${idx}}`);
+        }
+        if (!recs.has(idx)) recs.set(idx, out);
+      }
+    };
+    take(outPath, true);
+    for (const f of workerFiles()) take(f, false);
+    return recs;
+  };
+  const writeMerged = (recs) => {
+    const keys = [...recs.keys()].sort((a, b) => a - b);
+    const tmp = outPath + '.merge.tmp';
+    fs.writeFileSync(tmp, keys.map(k => recs.get(k) + '\n').join(''), { encoding: 'utf-8' });
+    fs.renameSync(tmp, outPath);
+  };
+
+  try { fs.unlinkSync(outPath + '.inflight.json'); } catch { /* keine alte Brotkrume */ }   // eine Absturz-Brotkrume gilt nur für DIESE Runde
+  const before = pool();
+  if (before.size > 0) writeMerged(before);            // legt gameIdx auch in alte Zeilen und holt liegengebliebene Worker-Zeilen heim
+  for (const f of workerFiles()) { try { fs.unlinkSync(f); } catch { /* weg */ } }
+  const done = [...before.keys()].filter(k => k < count);
+  const todo = count - done.length;
+  if (todo <= 0) { console.log(`[train] parallel: alle ${count} Spiele liegen schon vor`); return { failed: false }; }
+
+  const claimDir = outPath + '.claims', doneFile = outPath + '.done.json';
+  fs.rmSync(claimDir, { recursive: true, force: true });
+  fs.mkdirSync(claimDir, { recursive: true });
+  fs.writeFileSync(doneFile, JSON.stringify(done), { encoding: 'utf-8' });
+  const n = Math.max(1, Math.min(jobs, todo));
+  console.log(`[train] parallel: ${todo} von ${count} Spielen auf ${n} Worker verteilt (${done.length} lagen schon vor)`);
+
+  const kids = new Set();
+  const killAll = () => { for (const k of kids) { try { k.kill('SIGTERM'); } catch { /* weg */ } } };
+  process.on('exit', killAll);
+  for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { killAll(); process.exit(130); });
+
+  let crashes = 0;
+  const maxRespawns = 2 * n;
+  const startWorker = (k) => new Promise((resolve) => {
+    const env = { ...process.env, PP_TRAIN_WORKER: '1', PP_TRAIN_JOBS: '1', PP_TRAIN_OUT: `${outPath}.w${k}`,
+      PP_TRAIN_DONE_FILE: doneFile, PP_TRAIN_CLAIM_DIR: claimDir, PP_TRAIN_GAMES: String(count) };
+    delete env.PP_TRAIN_GAMES_MULT;                      // `count` steht fest — der Worker rechnet es nicht neu aus
+    const kid = spawn(process.execPath, [...process.execArgv, process.argv[1]], { env, stdio: 'inherit' });
+    kids.add(kid);
+    kid.on('exit', async (code, signal) => {
+      kids.delete(kid);
+      if (code === 0) return resolve();
+      crashes++;
+      console.warn(`[train] parallel: Worker ${k} beendet mit ${code ?? signal}`);
+      try { fs.copyFileSync(`${outPath}.w${k}.inflight.json`, outPath + '.inflight.json'); } catch { /* keine Brotkrume */ }
+      const claimed = fs.readdirSync(claimDir).length;
+      if (crashes <= maxRespawns && claimed < todo) { console.warn(`[train] parallel: Worker ${k} startet neu`); await startWorker(k); }
+      resolve();
+    });
+  });
+  await Promise.all(Array.from({ length: n }, (_, k) => startWorker(k)));
+  process.removeListener('exit', killAll);
+
+  const after = pool();
+  writeMerged(after);
+  for (const f of workerFiles()) { try { fs.unlinkSync(f); } catch { /* weg */ } }
+  try { fs.rmSync(claimDir, { recursive: true, force: true }); fs.unlinkSync(doneFile); } catch { /* weg */ }
+  const missing = count - [...after.keys()].filter(k => k < count).length;
+  if (missing > 0) console.warn(`[train] parallel: ${missing} Spiel(e) fehlen (Worker-Absturz) — Wiederanlauf holt sie nach`);
+  else { try { fs.unlinkSync(outPath + '.inflight.json'); } catch { /* war nie da */ } }
+  return { failed: missing > 0 };
+}
+
 async function runTrainingBatch() {
   // Force-off learned profiles during data collection (see header note) —
   // EXCEPT in eval mode (PP_TRAIN_EVAL=1), which runs the identical batch
@@ -20899,6 +21005,22 @@ async function runTrainingBatch() {
     || path.join(outDir, `${norm(pinned.name)}-${abMode ? 'AB-' : evalMode ? 'EVAL-' : ''}${stamp}.jsonl`);
   console.log(`[train] ${abMode ? 'A/B MODE (Profil vs Baseline im Spiegel)' : evalMode ? 'EVAL MODE (profiles ON)' : 'data collection (profiles OFF)'} — writing → ${outPath}`);
 
+  // ── Parallele Sammlung ──
+  // PP_TRAIN_JOBS=K startet K Worker (siehe collectTrainingSharded); ein Worker (PP_TRAIN_WORKER=1) holt sich seine Spiel-Indizes
+  // per Claim-Datei und liest die schon fertigen aus PP_TRAIN_DONE_FILE.
+  const shardWorker = process.env.PP_TRAIN_WORKER === '1';
+  const jobsWanted = shardWorker ? 1 : Math.max(1, parseInt(process.env.PP_TRAIN_JOBS || '1', 10) || 1);
+  let parallelFailed = false;
+  let workerDone = null;
+  if (shardWorker) {
+    try { workerDone = new Set(JSON.parse(fs.readFileSync(process.env.PP_TRAIN_DONE_FILE, { encoding: 'utf-8' }))); }
+    catch { workerDone = new Set(); }
+  }
+  const workerClaim = (i) => {
+    try { fs.closeSync(fs.openSync(path.join(process.env.PP_TRAIN_CLAIM_DIR, String(i)), 'wx')); return true; }
+    catch { return false; }
+  };
+
   // ── Resumability ──
   // If the output file already exists, continue from its line count.
   // Completed games are appendFileSync'd one-by-one, so a crash (OOM,
@@ -20951,7 +21073,22 @@ async function runTrainingBatch() {
 
   let wins = resumedWins, losses = resumedLosses, ties = resumedTies;
   const t0 = Date.now();
+  if (shardWorker) startIdx = 0;               // der Worker arbeitet über Claims, nicht über die Zeilenzahl seiner Datei
+  if (jobsWanted > 1) {
+    const r = await collectTrainingSharded({ jobs: jobsWanted, count, outPath });
+    parallelFailed = r.failed;
+    wins = losses = ties = 0; resumedWins = resumedLosses = resumedTies = 0;
+    try {
+      for (const line of fs.readFileSync(outPath, { encoding: 'utf-8' }).split('\n')) {
+        if (!line.trim()) continue;
+        const g = JSON.parse(line);
+        if (g.outcome === 1) wins++; else if (g.outcome === 0) losses++; else ties++;
+      }
+    } catch { /* leere Datei */ }
+    startIdx = count;                          // die Schleife unten läuft nicht — die Worker haben alles erledigt
+  }
   for (let i = startIdx; i < count; i++) {
+    if (shardWorker && (workerDone.has(i) || !workerClaim(i))) continue;   // fertig oder von einem anderen Worker beansprucht
     // Round-robin opponents so every archetype contributes equally;
     // alternate the pinned deck's seat so first-player advantage and
     // seat-dependent quirks average out.
@@ -21010,6 +21147,7 @@ async function runTrainingBatch() {
     // Sicht der Profil-Seite gelabelt (pinnedIdx = profiledIdx).
     if (abMode) { record.abMode = true; record.profiledIdx = pinnedIdx; }
     if (oppProfiles) record.oppProfiles = true;
+    record.gameIdx = i;   // Spielindex als LETZTES Feld (Orchestrator: collectTrainingSharded liest ihn vom Zeilenende)
     fs.appendFileSync(outPath, JSON.stringify(record) + '\n', { encoding: 'utf-8' });
     // Spiel ist sicher auf der Platte → Brotkrume weg. Bleibt sie
     // liegen, war dieses Match der Prozess-Killer.
@@ -21021,6 +21159,8 @@ async function runTrainingBatch() {
     console.log(`[train] ${i + 1}/${count} ${msg} vs ${opp.name} (${record.turns}t, ${record.reason}) — running ${wins}W-${losses}L-${ties}T`);
     if (typeof global.gc === 'function' && i % 10 === 9) { try { global.gc(); } catch {} }
   }
+  if (parallelFailed) process.exitCode = 1;   // Spiele fehlen (Worker-Absturz): train-iterative/train-all-decks starten die Sammlung neu
+  if (shardWorker) { console.log('[train] Worker fertig'); return; }   // Zusammenfassung, A/B-Ergebnis und Profilschreiben macht allein der Orchestrator
   const mins = ((Date.now() - t0) / 60000).toFixed(1);
   if (process.env.PP_COVERAGE === '1' && global.__ppCoverage) {
     const covPath = (process.env.PP_TRAIN_OUT || 'training.jsonl').replace(/\.jsonl$/, '') + '.coverage.json';
@@ -22632,7 +22772,7 @@ app.get('*', (req, res, next) => {
 // injected room._currentDecks, so the whole batch runs engine-only.
 if (process.env.PP_TRAIN) {
   runTrainingBatch()
-    .then(() => process.exit(0))
+    .then(() => process.exit(process.exitCode || 0))
     .catch(err => { console.error('[train] batch failed:', err); process.exit(1); });
 } else if (process.env.PP_ST_SIM === '1') {
   // Skill-Test-Simulation (skilltest/sim.js): Modul nur laden, nichts starten.
