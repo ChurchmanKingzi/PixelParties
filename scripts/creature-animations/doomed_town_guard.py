@@ -26,7 +26,8 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Arme schwingen: der linke Arm (Zeilen 12–18) spreizt sich 1 px nach außen (Frames 22–33), der rechte (Frames 2–9 und 46–47); nie in derselben Richtung wie die Gewichtsverlagerung (`Hm.rand_dehnen`).
 * Blinzeln (Frames 19–21 und 41–43): beide Augen schließen sich — die Pupillen (4,5), (7,5) und die weißen Pixel (4,7), (8,7) nehmen die umgebende Hautfarbe an ((246,189,123) bzw. (255,213,164)); die
   dunklen Lidbalken bleiben als Wimpernlinie. Kein Farbtausch, kein Augenglanz.
-* Gold glänzt (Regel 12/14, nur die Schnalle): zweimal pro Schleife läuft ein Glanz über die Gürtelschnalle (Frames 6–11 und 30–35; 1 Stufe heller auf der Rampe des Sprites).
+* Gold glänzt (Regel 12/14, nur die Schnalle): zweimal pro Schleife blitzt die Gürtelschnalle auf (Frames 7–10 und 31–34): erst wird die rechte Hälfte hell (205,49), dann sitzt ein weißer Glanzpunkt
+  (Weiß der Quelle) links auf dem Gold, danach zurück zum Original.
 * Fußtippen: der linke Stiefel hebt sich zweimal 1 px hinter den Rock (Frames 12–19), später der rechte (Frames 36–43).
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -56,16 +57,15 @@ def f(x, y):
 
 ERLAUBT = Hm.umrissfarben(spr)                                      # Farben der Außenkante im Original (Regel 16)
 HAUT_AUGE_OBEN, HAUT_AUGE_UNTEN = f(5, 4), f(5, 7)                  # (246,189,123), (255,213,164)
-HAAR_UMRISS, KOERPER_UMRISS = f(1, 1) if False else (0, 0, 0), (0, 0, 24)
+HAAR_UMRISS, KOERPER_UMRISS = (0, 0, 0), (0, 0, 24)
 GOLD = [(255, 180, 24), (255, 205, 49)]
+WEISS = f(4, 7)                                                     # (246,255,255), Weiß der Quelle
 
 arm_l = vorhanden & (xx <= 2) & (yy >= 12) & (yy <= 18)
 arm_r = vorhanden & (xx >= 10) & (yy >= 12) & (yy <= 18)
 fuss_l = vorhanden & (xx <= 5) & (yy >= 21)
 fuss_r = vorhanden & (xx >= 6) & (yy >= 21)
 rumpf = vorhanden & ~arm_l & ~arm_r & ~fuss_l & ~fuss_r
-m_schnalle = np.zeros((sh, sw), bool)
-m_schnalle[15, 5:7] = True
 
 
 def ebene(m, dy=0):
@@ -79,8 +79,12 @@ def frame(i):
     if Hm.folge(i, 19, [1, 1, 1], N) or Hm.folge(i, 41, [1, 1, 1], N):
         Hm.setze(k, {(4, 5): HAUT_AUGE_OBEN, (7, 5): HAUT_AUGE_OBEN, (4, 7): HAUT_AUGE_UNTEN, (8, 7): HAUT_AUGE_UNTEN}, OFF)
     # --- Gold glänzt (Gürtelschnalle) ---
-    for start in (6, 30):
-        Hm.lichtband(k, m_schnalle, OFF, i, N, start, 6, GOLD, stufen=1, breite=2.0, achse=(1.0, 0.0), kern=1)
+    for start in (7, 31):
+        d = i - start
+        if d in (0, 3):                                              # Ansatz/Abklingen: rechte Schnallenhälfte wird hell
+            Hm.setze(k, {(6, 15): GOLD[1]}, OFF)
+        elif d in (1, 2):                                            # Höhepunkt: weißer Glanzpunkt links (Weiß aus den Augen/Stiefeln der Quelle)
+            Hm.setze(k, {(5, 15): WEISS, (6, 15): GOLD[1]}, OFF)
     # --- Arme schwingen (nach außen) ---
     dl = 1 if Hm.folge(i, 22, [1] * 12, N) else 0
     dr = 1 if (Hm.folge(i, 2, [1] * 8, N) or Hm.folge(i, 46, [1, 1], N)) else 0

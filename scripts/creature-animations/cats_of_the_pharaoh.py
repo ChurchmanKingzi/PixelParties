@@ -24,13 +24,14 @@ Bleibt fest: Kopf-/Rumpfmuster, hinteres Beinpaar.
 Ablauf (48 Frames à 70 ms = 3,4 s), alle Bewegungen unabhängig:
 * Schwanzwedeln (Periode 16, 3× pro Schleife, Hub wächst zur Mitte der Schleife von ±1 auf ±2 px): die drei Schwanzspalten links des Ansatzes (x 0–2) wandern senkrecht,
   je weiter vom Körper desto mehr; die Spalte am Ansatz (x 3) und die Hüfte bleiben stehen. Die äußerste Spalte bekommt den Anteil ihrer Nachbarin (Spitze bleibt am Schwanz hängen).
-* Atmen (Periode 24): Zeile 9 (Bauch) wird einmal dupliziert und der Oberkörper (Kopf, Rücken, Ohr, Schwanzansatz) hebt sich 1 px (Frames 6–17), die Beine bleiben am Boden.
+* Atmen (Periode 24, Frames 6–17): Brust und Kopf heben sich 1 px — nur in den Spalten x ≥ 9 (Kopf, Hals, Brust) wird eine Zeile eingefügt (anim_tiere.spalten_hub, Zeile 9 = Brust, nur dort);
+  Hüfte, Rücken hinten, Schwanz und Beine bleiben stehen. Die Rumpfhöhe an der Hüfte ändert sich nicht, der Körper wird nicht zum Block: es hebt sich nur der Vorderteil wie beim Einatmen.
 * Ohrzucken (Frames 5–7, 29–31 und 41–42): die zwei Ohrzeilen kippen 1 px nach hinten (links).
 * Vorderpfote hebt sich (Frames 14–17 und 38–40): die Vorderbeinzeile 10 entfällt, die Pfote zieht 1 px nach oben (heben_unten); die Hinterbeine bleiben.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
 Ergänzungen: Randpixel-Korrektur (Regel 16, anim_tiere.umriss_schliessen: wo der Schwanz von der Hüfte wegrückt, bekommt die freigelegte Hüftkante einen Umrisspixel);
-die Duplikatzeile beim Atmen (Bauchzeile 9 — vorhandene Pixel). Sonst keine gemalten Pixel.
+die eingefügte Brustzeile beim Atmen (Zeile 9, nur Spalten x ≥ 9 — Duplikat vorhandener Pixel). Sonst keine gemalten Pixel.
 """
 import math
 import sys
@@ -57,6 +58,7 @@ koerper = vorhanden & ~ohr & ~schwanz & ~pfote
 RAND = T.rand_farben(spr)
 REGEL = T.umriss_regeln(spr, RAND)[2]
 
+ATEM_ZEILE = 9                                                                 # Zeile, die in den Kopf-/Brustspalten eingefügt wird
 ATMEN = [0] * 6 + [1] * 12 + [0] * 6                                           # Periode 24
 OHR = {5, 6, 7, 29, 30, 31, 41, 42}
 PFOTE = {14, 15, 16, 17, 38, 39, 40}
@@ -87,7 +89,7 @@ def biegen(a, pivot, amp, phase):
 def frame(i, nur=None):
     atmen = ATMEN[i % 24]
     amp = 1.6 + 0.8 * (0.5 - 0.5 * math.cos(2 * math.pi * i / N))               # Hub ±1 … ±2 px, nahtlos
-    k = L.streck_zeile(teil(koerper), PAD_T + 9, atmen)                       # Bauchzeile duplizieren → Oberkörper hebt sich, Beine bleiben
+    k = T.spalten_hub(teil(koerper), PAD_T + ATEM_ZEILE, lambda x: atmen if x >= PAD_L + 9 else 0)   # nur Vorderteil (Kopf/Hals/Brust) hebt sich 1 px; Hüfte bleibt
     o = teil(ohr)
     if i in OHR:
         o = T.zucken_zeilen(o, PAD_T + 2, -1.0, {PAD_T + 0: 1.0, PAD_T + 1: 1.0})
@@ -95,7 +97,7 @@ def frame(i, nur=None):
     p = teil(pfote)
     if i in PFOTE:
         p = L.heben_unten(p, PAD_T + 10, 1)
-    ebenen = {'koerper': (k, 0), 'ohr': (o, -atmen), 'schwanz': (s, -atmen), 'pfote': (p, 0)}
+    ebenen = {'koerper': (k, 0), 'ohr': (o, -atmen), 'schwanz': (s, 0), 'pfote': (p, 0)}
     wahl = nur or ('koerper', 'ohr', 'schwanz', 'pfote')
     ganz = L.zusammen(H, W, [(ebenen[n][0], 0, ebenen[n][1]) for n in wahl])
     return T.umriss_schliessen(ganz, RAND, REGEL)                              # Randpixel-Test (Regel 16)
