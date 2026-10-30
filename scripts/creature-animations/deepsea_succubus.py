@@ -70,7 +70,13 @@ rest = vorhanden & ~FLUEGEL_L & ~FLUEGEL_R & ~FUSS_L & ~FUSS_R
 
 BLASE = {'c': PINK_K, 'r': PINK_R}
 P = lambda x, y: (GPL + x, GPT + y)
-PUFFS = []
+# Die Flügel füllen das Feld: freie Bahnen (Abstand ≥ 2 px in jeder Pose, Partikel höchstens +2 px über den Körper-Rand hinaus) liegen links und rechts unterhalb der Flügel.
+PUFFS = [
+    dict(x=P(4, 28)[0], y=P(4, 28)[1], vx=0, vy=-11, off=0, wackeln=0.4),
+    dict(x=P(4, 28)[0], y=P(4, 28)[1], vx=0, vy=-11, off=24, wackeln=0.4),
+    dict(x=P(41, 28)[0], y=P(41, 28)[1], vx=0, vy=-11, off=12, wackeln=0.4),
+    dict(x=P(41, 28)[0], y=P(41, 28)[1], vx=0, vy=-11, off=36, wackeln=0.4),
+]
 
 
 def teil(maske):

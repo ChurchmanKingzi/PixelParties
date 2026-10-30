@@ -89,9 +89,9 @@ def frame(i):
     dl = 1 if Hm.folge(i, 22, [1] * 12, N) else 0
     dr = 1 if (Hm.folge(i, 2, [1] * 8, N) or Hm.folge(i, 46, [1, 1], N)) else 0
     if dl:
-        Hm.rand_dehnen(al, OFF, {y: 1 for y in range(13, 19)}, 'l')
+        Hm.rand_dehnen_innen(al, OFF, {y: 1 for y in range(13, 19)}, 'l')
     if dr:
-        Hm.rand_dehnen(ar, OFF, {y: 1 for y in range(13, 19)}, 'r')
+        Hm.rand_dehnen_innen(ar, OFF, {y: 1 for y in range(13, 19)}, 'r')
     # --- Kopfneigen (Zeilen 0–8) und Gewichtsverlagerung (Zeilen 0–18 samt Armen) in getrennten Zeitfenstern ---
     kn = -1 if Hm.folge(i, 2, [1] * 6, N) else (1 if Hm.folge(i, 24, [1] * 8, N) else 0)
     if kn:

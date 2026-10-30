@@ -152,6 +152,47 @@ def rand_dehnen(a, off, zeilen, seite):
     return a
 
 
+def rand_dehnen_innen(a, off, zeilen, seite):
+    """Wie rand_dehnen, aber der entstehende Zwischenraum wird mit dem inneren Ankerpixel der Zeile gefüllt (Hand/Ärmel),
+    nicht mit dem Umrisspixel: der Umriss wandert mit dem Arm nach außen und bleibt 1 px breit (kein 2-px-Umrissblock neben dem Arm)."""
+    for y, d in zeilen.items():
+        Y = y + off[1]
+        xs = list(np.nonzero(a[Y, :, 3])[0])
+        if not xs or not d:
+            continue
+        if seite == 'l':
+            xa = max(xs)
+            ausen = [x for x in xs if x < xa]
+            if not ausen:
+                continue
+            if min(ausen) - d < 0:
+                raise L.ClipError(f'Zeile {y} würde um {d} px aus der Leinwand gedehnt')
+            anker = a[Y, xa].copy()
+            alt = {x: a[Y, x].copy() for x in ausen}
+            for x in ausen:
+                a[Y, x] = 0
+            for x, px in alt.items():
+                a[Y, x - d] = px
+            for x in range(xa - d, xa):
+                a[Y, x] = anker
+        else:
+            xa = min(xs)
+            ausen = [x for x in xs if x > xa]
+            if not ausen:
+                continue
+            if max(ausen) + d >= a.shape[1]:
+                raise L.ClipError(f'Zeile {y} würde um {d} px aus der Leinwand gedehnt')
+            anker = a[Y, xa].copy()
+            alt = {x: a[Y, x].copy() for x in ausen}
+            for x in ausen:
+                a[Y, x] = 0
+            for x, px in alt.items():
+                a[Y, x + d] = px
+            for x in range(xa + 1, xa + 1 + d):
+                a[Y, x] = anker
+    return a
+
+
 def spalten_versatz(a, off, spalten):
     for x, (dy, y0, y1) in spalten.items():
         X = x + off[0]
