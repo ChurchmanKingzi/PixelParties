@@ -30,6 +30,8 @@ Ablauf (52 Frames à 70 ms = 3,64 s), alle Bewegungen unabhängig; der Kopf blei
   (5,2) und (8,2) wandern mit; frei werdende Stellen bekommen die Farbe des Fellnachbarn.
 * Blinzeln, deutlich sichtbar (Frames 10–13 und 36–39, alle 26 Frames ≈ 1,8 s): die Augenpixel werden hell (C = Stirnstreifenfarbe): erst
   das obere, dann beide (zwei Frames), dann wieder das obere.
+* Glanzblitz (Regel 12): der blaue Glanzpunkt G (3,10) am schwarzen Block links blitzt in Frames 22–24 und 48–50 kurz auf (G → D → C → D → G;
+  im Maximum wird auch E (3,11) kurz zu G).
 * Pfoten tippen: linker Fuß in Frames 5–6, 20–21 und 41–42, rechter Fuß in 13–14, 32–33 und 48–49 (die Beinzeile 15 des Fußes entfällt,
   die Fußlinie rückt 1 px hoch).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -91,11 +93,15 @@ def zustand(i):
     for s in (10, 36):
         if 0 <= i - s < 4:
             lid = (1, 2, 2, 1)[i - s]
-    return atem, blick, ohr_li, ohr_re, lid, 1 if i in PFOTE_L else 0, 1 if i in PFOTE_R else 0
+    glanz = -1                                                    # Glanzpunkt am schwarzen Block links: 0 = D, 1 = C (Maximum), 2 = D
+    for s in (22, 48):
+        if 0 <= i - s < 3:
+            glanz = i - s
+    return atem, blick, ohr_li, ohr_re, lid, 1 if i in PFOTE_L else 0, 1 if i in PFOTE_R else 0, glanz
 
 
 def frame(i, nur=None):
-    atem, blick, ohr_li, ohr_re, lid, tipp_l, tipp_r = zustand(i)
+    atem, blick, ohr_li, ohr_re, lid, tipp_l, tipp_r, glanz = zustand(i)
     k = teil(koerper)
     # Blick (Augen und Brauenpunkte wandern 1 px) und Blinzeln — auf dem Körper-Layer, bevor er gestreckt wird
     if blick:
@@ -114,6 +120,10 @@ def frame(i, nur=None):
             k[PAD_T + 3, PAD_L + x, :3] = HELL
             if lid == 2:
                 k[PAD_T + 4, PAD_L + x, :3] = HELL
+    if glanz >= 0:                                                    # Glanzblitz auf dem schwarzen Block: (3,10) G → D → C → D, (3,11) E → G im Maximum
+        k[PAD_T + 10, PAD_L + 3, :3] = ((171, 160, 156), HELL, (171, 160, 156))[glanz]
+        if glanz == 1:
+            k[PAD_T + 11, PAD_L + 3, :3] = (85, 87, 100)
     r = L.streck_zeile(k, PAD_T + BAUCHZEILE, atem)
     cols = np.arange(W)[None, :]
     fuss = (np.arange(H)[:, None] >= PAD_T + 15) & (cols >= PAD_L + 3) & (cols <= PAD_L + 10)

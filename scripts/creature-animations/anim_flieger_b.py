@@ -219,7 +219,7 @@ def knochenflügel(h, w, pose, pal, quelle, spalten, x0, y0, risse=(), adern=Tru
         scale = lens[k] / lq
         sg = lens[k] * 0.55
         sel = {}
-        v = float(lo - y0)
+        v = float(lo - y0) if rho > 0.5 else 0.0                 # Teil hinter dem Gelenk nur beim gefalteten Flügel (sonst Zacken)
         while v <= lq + 1e-9:
             s_ = v * scale
             p = _pt(starts[k], angs[k], s_) if s_ <= sg else _pt(gel[k], angs[k] - knick, s_ - sg)
@@ -262,8 +262,7 @@ def knochenflügel(h, w, pose, pal, quelle, spalten, x0, y0, risse=(), adern=Tru
         elif ader_m[y, x]:
             c = pal['haut'][3]
         else:
-            nah = any(0 <= y + dy < h and 0 <= x + dx < w and bone_m[y + dy, x + dx] for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)))
-            c = haut_nah if nah else haut_innen
+            c = haut_innen
         a[y, x, :3] = c
         a[y, x, 3] = 255
 

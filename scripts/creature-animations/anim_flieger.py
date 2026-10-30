@@ -21,6 +21,8 @@ Bausteine, die bei mehreren Fliegern gebraucht werden:
     stern(ebene, x, y, stufe, kern, arm1, arm2)  vierzackiger Glitzer-Stern (Mitte + 4 Arme) auf eine fertige Leinwand-Ebene
     puls(i, n, x, y, versatz, periode)         0/1-Puls pro Pixel (Facetten pulsieren, wandern über das Objekt)
     zeilen_pendel(a, pivot_y, amp, phase, …)   nur Zeilen UNTER dem Pivot pendeln waagerecht (Beine/Schwanz/Hinterleib), je tiefer, desto mehr
+    kipp_dy(x, pivot_x, amp, phase, maxd)      Versatz der Spalte x beim Kippen (Wippe um pivot_x, vorzeichenbehaftet)
+    spalten_kippen(a, pivot_x, amp, phase)     ganze Figur wippt um pivot_x (links hoch, rechts runter und umgekehrt), Spalten bleiben ganz
     kacheln(frames, x0, x1, y0, y1, sc)        Ausschnitt mehrerer Frames nebeneinander, ganzzahlig vergrößert (Nahaufnahme für Nähte)
     stapeln(bilder)                            PIL-Bilder untereinander zu einem Kontrollbild
 """
@@ -272,4 +274,29 @@ def zeilen_pendel(a, pivot_y, amp, phase, potenz=1.0):
             raise L.ClipError(f'Zeile {y} würde um {dx} px aus der Leinwand (Breite {w}) geschoben')
         for x in xs_:
             out[y, x + dx] = a[y, x]
+    return out
+
+
+def kipp_dy(x, pivot_x, amp, phase, maxd):
+    """Senkrechter Versatz der Spalte x beim Kippen (Wippe): amp · sin(phase) · (x − pivot_x)/maxd, gerundet; positiv = nach unten."""
+    return int(round(amp * math.sin(phase) * (x - pivot_x) / maxd))
+
+
+def spalten_kippen(a, pivot_x, amp, phase, maxd=None):
+    """Die ganze Figur wippt um die senkrechte Achse pivot_x: Spalten rechts davon wandern bei sin(phase) > 0 nach unten, Spalten links
+    nach oben (linear mit dem Abstand, an den Enden ±amp). Jede Spalte wird als Ganzes verschoben (Texturen bleiben), benachbarte Spalten
+    unterscheiden sich um höchstens 1 Pixel. maxd = größter Abstand (Standard: aus der Ebene)."""
+    out = L.leer(*a.shape[:2])
+    h, w = a.shape[:2]
+    if maxd is None:
+        maxd = max(1, max(abs(x - pivot_x) for x in range(w) if a[:, x, 3].any()))
+    for x in range(w):
+        ys = np.nonzero(a[:, x, 3])[0]
+        if not len(ys):
+            continue
+        dy = kipp_dy(x, pivot_x, amp, phase, maxd)
+        if ys.min() + dy < 0 or ys.max() + dy >= h:
+            raise L.ClipError(f'Spalte {x} würde um {dy} px aus der Leinwand (Höhe {h}) geschoben')
+        for y in ys:
+            out[y + dy, x] = a[y, x]
     return out
