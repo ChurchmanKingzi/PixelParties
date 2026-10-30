@@ -1,0 +1,15 @@
+{
+  "creature": "Slippery Polar",
+  "sheet": "slippery-polar.png",
+  "frameWidth": 49,
+  "frameHeight": 28,
+  "frames": 60,
+  "frameMs": 66,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 24.5
+}

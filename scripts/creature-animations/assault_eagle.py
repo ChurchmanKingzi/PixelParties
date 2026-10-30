@@ -111,12 +111,12 @@ def blink(i):
 # ── Partikel: graue Federflocken, sinken langsam ────────────────────────────────────────────────────────────────────────
 FEDER = {'c': (127, 127, 127), 'r': (63, 63, 63)}
 PUFFS = [
-    dict(x=px(4, 22)[0], y=px(4, 22)[1], vx=-2, vy=14, off=0, form='k', wackeln=2),
-    dict(x=px(13, 24)[0], y=px(13, 24)[1], vx=1, vy=12, off=12, form='k', wackeln=2),
-    dict(x=px(34, 24)[0], y=px(34, 24)[1], vx=-1, vy=12, off=24, form='k', wackeln=2),
-    dict(x=px(43, 22)[0], y=px(43, 22)[1], vx=2, vy=14, off=36, form='k', wackeln=2),
-    dict(x=px(0, 26)[0], y=px(0, 26)[1], vx=-1, vy=10, off=18, form='k', wackeln=1),
-    dict(x=px(46, 26)[0], y=px(46, 26)[1], vx=1, vy=10, off=42, form='k', wackeln=1),
+    dict(x=px(1, 8)[0], y=px(1, 8)[1], vx=-1, vy=14, off=0, form='k', wackeln=1),
+    dict(x=px(10, 22)[0], y=px(10, 22)[1], vx=1, vy=7, off=12, form='k', wackeln=2),
+    dict(x=px(36, 22)[0], y=px(36, 22)[1], vx=-1, vy=7, off=24, form='k', wackeln=2),
+    dict(x=px(45, 8)[0], y=px(45, 8)[1], vx=1, vy=14, off=36, form='k', wackeln=1),
+    dict(x=px(2, 16)[0], y=px(2, 16)[1], vx=-1, vy=12, off=18, form='k', wackeln=1),
+    dict(x=px(44, 16)[0], y=px(44, 16)[1], vx=1, vy=12, off=42, form='k', wackeln=1),
 ]
 TEST_EBENEN = ('fluegel', 'koerper')                        # für den Randpixel-Test: ohne Partikel
 

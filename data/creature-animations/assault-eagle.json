@@ -1,0 +1,15 @@
+{
+  "creature": "Assault Eagle",
+  "sheet": "assault-eagle.png",
+  "frameWidth": 55,
+  "frameHeight": 41,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 3,
+  "padRight": 4,
+  "padBottom": 2,
+  "faceX": 27.5
+}

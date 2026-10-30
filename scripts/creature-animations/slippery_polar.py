@@ -38,7 +38,7 @@ import anim_lib as L
 import anim_tiere as T
 
 N, MS = 60, 66
-PAD_L, PAD_R, PAD_T, PAD_B = 2, 4, 3, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 2, 3, 3, 2
 
 spr = L.lade('slippery-polar')
 sh, sw = spr.shape[:2]
