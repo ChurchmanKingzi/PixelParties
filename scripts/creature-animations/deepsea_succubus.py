@@ -18,12 +18,13 @@ Was ist was (x/y im Sprite):
 Fest bleiben: Kopf-/Haarmasse, Rumpf, Augen-/Herzform im Ruhebild, Karomuster der Membran/Haut.
 
 Ablauf (48 Frames à 70 ms = 3,36 s; Frame 0 = Original, Partikel ausgenommen):
-* Flügelschlag: beide Flügel schlagen gleichzeitig, Spalte für Spalte um bis zu ±3 px senkrecht (wächst mit dem Abstand zum Gelenk bei x 15 bzw. 30, Gelenkspalten stehen); Periode 24, zweimal pro Schleife.
+* Flügelschlag: beide Flügel schlagen gleichzeitig, jeweils 2 Spalten gemeinsam um bis zu ±3 px senkrecht (wächst mit dem Abstand zum Gelenk bei x 15 bzw. 30, die Gelenkspalten stehen; Spaltenpaare, damit die 1-px-dünne Flügelspitze im 4er-Zusammenhang bleibt); Periode 24, zweimal pro Schleife.
 * Schweben: der ganze Körper (Kopf, Rumpf, Beine) hebt sich beim Abschlag der Flügel 1 px und sinkt beim Aufschlag zurück (gegenläufig zum Flügelschlag).
 * Füße baumeln: die beiden Fußzeilen (y 26) versetzen sich abwechselnd 1 px zur Seite (Periode 16).
 * Blinzeln (Lid = dunkle Umgebungsfarbe (13,16,49)): das weiße Auge und das Herz-Auge schließen sich zusammen: erst die obere Zeile, dann alles; zweimal (Frame 11–13 und 35–37).
 * Edelstein im Haar glitzert (Regel 14: nur Edelstein): ein weißer Lichtpunkt läuft diagonal über die 2×2-Fläche, dann die Gegendiagonale; zweimal pro Schleife (Frame 20–22 und 44–46).
-* Partikel (hinter der Figur): rosa runde Wölkchen 2×2 → 3×3 → 2×2 (`U.wolke_ebene`), Kern (255,147,208), Rand (210,82,154) (= Farben des Herzens), nie ein Einzelpixel, in jeder Pose ≥ 2 px Abstand zur Figur.
+* Partikel (hinter der Figur): vier rosa runde Wölkchen 2×2 → 3×3 → 2×2 (`U.wolke_ebene`), Kern (255,147,208), Rand (210,82,154) (= Farben des Herzens), nie ein Einzelpixel; sie steigen links und rechts unterhalb der
+  Flügel je 11 px auf (Lebensdauer 48 Frames, je zwei um 24 Frames versetzt; links und rechts um 12 versetzt). Nur diese Bahnen sind frei: in jeder Pose ≥ 2 px Abstand zur Figur und nie teilweise verdeckt (per Skript über alle 48 Frames geprüft).
 Kein Glanz außer dem Edelstein, kein Feuer (Regel 15). Randpixel-Test (Regel 16): `U.kontur_schliessen` (Randfarben der Quelle) in jeder Pose; im Ruhebild nichts. Keine gemalten Pixel außer Farben der Quelle.
 Zuschnitt: Frame auf die Figur zugeschnitten (symmetrisch um die Ruhefigur; Partikel vergrößern ihn höchstens 2 px darüber hinaus, dazu 1 px leerer Rand). Alle Bewegungen laufen auf der vollen Leinwand
 (anim_lib wirft ClipError). Nur ganze Pixel.

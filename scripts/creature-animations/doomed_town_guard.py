@@ -23,7 +23,7 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
   nach und hebt sich um ein weiteres px (Kinnzeile 9, glatte Haut unter den Augen, wird verlängert): Kopf 0 → 1 → 2 → 1 → 0 px, Brust 0 → 1 → 0.
 * Gewichtsverlagerung: der Oberkörper (Zeilen 0–18) schiebt sich 1 px nach rechts (Frames 10–21) und später 1 px nach links (Frames 34–45); Beine und Stiefel bleiben stehen.
 * Kopfneigen: der Kopf (Zeilen 0–8) neigt sich 1 px nach links (Frames 2–7) und 1 px nach rechts (Frames 24–31).
-* Arme schwingen: der linke Arm (Zeilen 12–18) spreizt sich 1 px nach außen (Frames 22–33), der rechte (Frames 2–9 und 46–47); nie in derselben Richtung wie die Gewichtsverlagerung (`Hm.rand_dehnen`).
+* Arme schwingen: der linke Arm (Zeilen 12–18) spreizt sich 1 px nach außen (Frames 22–33), der rechte (Frames 2–9 und 46–47); nie in derselben Richtung wie die Gewichtsverlagerung (`Hm.rand_dehnen_innen`: der Umriss wandert mit dem Arm, die Lücke füllt die Hand — kein 2-px-Umrissblock).
 * Blinzeln (Frames 19–21 und 41–43): beide Augen schließen sich — die Pupillen (4,5), (7,5) und die weißen Pixel (4,7), (8,7) nehmen die umgebende Hautfarbe an ((246,189,123) bzw. (255,213,164)); die
   dunklen Lidbalken bleiben als Wimpernlinie. Kein Farbtausch, kein Augenglanz.
 * Gold glänzt (Regel 12/14, nur die Schnalle): zweimal pro Schleife blitzt die Gürtelschnalle auf (Frames 7–10 und 31–34): erst wird die rechte Hälfte hell (205,49), dann sitzt ein weißer Glanzpunkt
