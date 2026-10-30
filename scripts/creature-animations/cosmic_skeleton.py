@@ -25,8 +25,8 @@ Ablauf (48 Frames à 60 ms = 2,88 s; Frame 0 = Original, Staub ausgenommen) — 
 * Arme schwingen synchron und gespiegelt nach außen (Periode 24, bis 3 px, wächst von der Schulter y 9 zur Hand), die Unterarme pendeln zusätzlich
   mit einer Welle (Periode 12, Spitze hinkt hinterher, ±1 px, nur während der Schwingung).
 * Beine baumeln: beide Beine pendeln gleichgerichtet (Periode 16, ±1,6 px, wächst vom Becken y 15 zum Fuß); die Naht zum Becken bleibt über Kanten verbunden.
-* Wallen: eine langsame Welle läuft durch Kopf und Rumpf (Zeilenversatz ±1 px, Periode 24, wandert von oben nach unten, Stärke 0 bei Frame 0) — der
-  Kosmoskörper wabert wie Nebel. Arme und Beine wallen nicht mit (dünne Teile würden reißen), sie haben ihre eigenen Pendel.
+* Atmen (Periode 24, 0/1 px): im Rumpf-Layer wird Zeile y 12 einmal eingefügt; Schultern, Kopf und Arme heben sich 1 px über Becken und Beine. Kopf und Rumpf
+  bleiben sonst starr (kein Wallen/Scheren mehr, das hatte den Kopf neben die Schultern gekippt).
 * Sternenstaub (Partikel, hinter der Figur, 12 Stück, Lebensdauer 48 Frames, langsam aufsteigend, Formen k, o): gelbe Funken (Kern F, Rand E) und
   violette Kugeln (Kern B, Rand C) rund um die Figur. Alle Farben aus dem Sprite.
 ERGÄNZUNG: keine gemalten Pixel (Kopf sinkt nur über Rumpfpixel; Arme/Beine lösen sich nur seitlich bei überlappender Naht).
@@ -95,21 +95,6 @@ def stufe2(i):
     return int(round(2 * (1 - abs(2 * t - 1))))                  # 0-1-2-1-0
 
 
-def wallen(a, amp, ph0, lauf=0.5):
-    """Wallen: jede Zeile y wandert waagerecht um round(amp · sin(ph0 − lauf · y)) (Welle läuft von oben nach unten). ClipError bei Überlauf."""
-    out = L.leer(*a.shape[:2])
-    h, w = a.shape[:2]
-    for y in range(h):
-        xs_ = np.nonzero(a[y, :, 3])[0]
-        if not len(xs_):
-            continue
-        dx = int(round(amp * math.sin(ph0 - lauf * y)))
-        if xs_.min() + dx < 0 or xs_.max() + dx >= w:
-            raise L.ClipError(f'Zeile {y} würde um {dx} px aus der Leinwand geschoben')
-        out[y, xs_ + dx] = a[y, xs_]
-    return out
-
-
 def frame(i):
     r_b = stufe2(i)
     r_k = max(min(r_b, stufe2(i - 2)), r_b - 1)                   # Schädel folgt dem Rumpf, nie höher
@@ -118,18 +103,16 @@ def frame(i):
     bein = 1.6 * math.sin(L.sinus(i, 16))
     ph = L.sinus(i, 12)
 
+    atem = U.stufe(i, N / 2, 1)                                  # Atmen: 0/1 px (Periode 24)
     kp = teil(kopf)
-    rp = teil(rumpf)
+    rp = L.streck_zeile(teil(rumpf), PAD_T + 12, atem)           # Zeile y 12 wird eingefügt: Schultern/Kopf heben sich über Becken und Beine
     al, ar = teil(arm_l), teil(arm_r)
     al = L.spalten_welle(al, PAD_L + 4, 1.0 * hump, ph, lauf=1.0, nur_rechts=False)     # Unterarmwelle (Periode 12)
     ar = L.spalten_welle(ar, PAD_L + 15, 1.0 * hump, ph, lauf=1.0, nur_rechts=True)
     al = U.haengen(al, PAD_T + 9, -aus)
     ar = U.haengen(ar, PAD_T + 9, aus)
     bn = U.haengen(teil(beine), PAD_T + 15, bein)
-    # Kopf + Rumpf (breite Teile) wallen durch eine Welle; Arme und Beine bewegen sich nur mit ihren eigenen Pendeln (dünne Teile würden reißen)
-    oben = L.zusammen(H, W, [(rp, 0, -r_b), (kp, 0, -r_k)])
-    oben = wallen(oben, 1.4 * U.buckel(i, 0, 24, n=24), L.sinus(i, 24))
-    koerper = L.zusammen(H, W, [(bn, 0, -r_b), (oben, 0, 0), (al, 0, -r_b), (ar, 0, -r_b)])
+    koerper = L.zusammen(H, W, [(bn, 0, -r_b), (rp, 0, -r_b), (al, 0, -r_b - atem), (ar, 0, -r_b - atem), (kp, 0, -r_k - atem)])
     koerper = U.kontur_schliessen(koerper, UMRISS, A_)             # Regel 16: Umriss an allen bewegten Kanten in jeder Pose geschlossen
     gelb = U.glut_ebene(H, W, i, N, PUFFS_GELB, STAUB)
     purpur = U.glut_ebene(H, W, i, N, PUFFS_PURPUR, PURPUR)

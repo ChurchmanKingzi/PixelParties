@@ -23,8 +23,8 @@ Ablauf (36 Frames à 65 ms = 2,34 s; Frame 0 = Original, die Partikel ausgenomme
   der Kopf samt Hörnern folgt 2 Frames später und nie höher als die Brust (er „sinkt“ höchstens 1 px in die Schultern, nie entsteht ein Hals-Spalt).
   Dazu drei kurze Hüpfer des Oberkörpers (Frame 2/3, 9/10, 27/28, 34): +1 px, bis höchstens 2 px. Beine/Stiefel bleiben stehen.
 * Ohren zucken öfter: links Doppelzucken Frame 4 und 22, rechts Frame 13 und 31 (Lappen y 7–9 klappt 1 px nach außen, Innenumriss geht mit).
-* Augen glühen schneller (Periode 12: Pfirsich → H → I → zurück), Blinzeln Frame 30–32; Glanz: Lichtblitz (L) und vierzackiger
-  Glitzerstern (Mitte L, Arme J) am linken Auge Frame 18–20, am rechten Frame 24–26 — der Stern bleibt am Auge.
+* Augen glühen schneller (Periode 12: Pfirsich → H → I → zurück), Blinzeln Frame 30–32; kurzer Lichtblitz (L) am linken Auge Frame 18–20, am rechten Frame 24–26.
+  Keine Glitzersterne an den Augen (Regel 14: nur Metall/Gold/Edelsteine glitzern).
 * Arme schwingen ruhig nach außen (nur noch bis 1 px, Spaltenversatz wächst von der Schulter zur Hand): beide Seiten synchron und gespiegelt,
   zweimal pro Schleife (Periode 24); Innenumriss geht als Kopie mit.
 * Gold glänzt: Lichtband über jeden Armreif (links Frame 6–7, rechts Frame 22–23: das helle Pixel wandert von außen nach innen,
@@ -78,7 +78,7 @@ LID = c(7, 8)                        # A (83,35,23)  Gesichtsfarbe
 LID_DUNKEL = c(4, 9)                 # E (38,14,12)  geschlossenes Lid = dunkler Strich
 GOLD_DUNKEL, GOLD_HELL = c(1, 21), c(2, 21)     # T (115,67,19), U (177,122,42)
 PFIRSICH = c(5, 10)                  # J
-GLANZ = c(6, 15)                     # L (229,205,203) — hellste Farbe des Sprites (Hauer), Mitte der Glitzersterne
+GLANZ = c(6, 15)                     # L (229,205,203) — hellste Farbe des Sprites (Hauer), Mitte der Armreif-Glitzersterne
 STIEFEL_GLANZ = c(6, 26)             # V (98,99,101)
 OHR_UMRISS = c(1, 7)                 # B (31,9,1)
 OHR_ERG = [(2, 7), (13, 7)]          # ERGÄNZUNG: Deckelpixel zwischen Ohrumriss und Hornansatz (sonst 1-px-Loch beim Ohrzucken)
@@ -180,13 +180,8 @@ def frame(i):
     glut = U.glut_ebene(H, W, i, N, GLUT_PUFFS, GLUT)
     rauch = U.glut_ebene(H, W, i, N, RAUCH_PUFFS, RAUCH)
 
-    # --- Glitzersterne (nach der Figur gelegt; sie bleiben an Auge bzw. Armreif) ---
+    # --- Glitzersterne nur an den goldenen Armreifen (nach der Figur gelegt; sie bleiben am Reif) ---
     sterne = L.leer(H, W)
-    st_aug_l = {18: 1, 19: 2, 20: 1}.get(i, 0)
-    st_aug_r = {24: 1, 25: 2, 26: 1}.get(i, 0)
-    for (st, ex, ey) in ((st_aug_l, 5, 10), (st_aug_r, 10, 10)):
-        if st:
-            L.einsetzen(sterne, U.stern_ebene(H, W, PAD_L + ex, PAD_T + ey - r_k, st, GLANZ, PFIRSICH))
     sr_l = {12: 1, 13: 2, 14: 1}.get(i, 0)
     sr_r = {30: 1, 31: 2, 32: 1}.get(i, 0)
     for (st, bx, aus) in ((sr_l, 2, arm_l_aus), (sr_r, 13, arm_r_aus)):
