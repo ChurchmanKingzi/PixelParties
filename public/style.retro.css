@@ -2637,41 +2637,7 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
   100% { opacity: 0; transform: translate(var(--gsDx), var(--gsDy)) scale(0.7) rotate(520deg); }
 }
 
-/* Critical Strike — huge cross-cut slash with shockwave, glint, text,
-   and a fan of sparks. Front-loaded so the hit lands heavy and fast. */
-@keyframes criticalSlashA {
-  0%   { opacity: 0; transform: rotate(-35deg) translateX(-130%); }
-  30%  { opacity: 1; }
-  100% { opacity: 0; transform: rotate(-35deg) translateX(130%); }
-}
-@keyframes criticalSlashB {
-  0%   { opacity: 0; transform: rotate(35deg) translateX(-130%); }
-  30%  { opacity: 1; }
-  100% { opacity: 0; transform: rotate(35deg) translateX(130%); }
-}
-@keyframes criticalGlint {
-  0%   { opacity: 0; transform: scale(0.2); }
-  40%  { opacity: 1; transform: scale(1.4); }
-  100% { opacity: 0; transform: scale(2.4); }
-}
-@keyframes criticalShockwave {
-  0%   { opacity: 0; transform: scale(0.25); }
-  25%  { opacity: 1; transform: scale(1.05); }
-  65%  { opacity: 0.7; transform: scale(1.35); }
-  100% { opacity: 0; transform: scale(1.7); }
-}
-@keyframes criticalText {
-  0%   { opacity: 0; transform: scale(0.3) translateY(8px); }
-  35%  { opacity: 1; transform: scale(1.15) translateY(0); }
-  75%  { opacity: 1; transform: scale(1) translateY(-2px); }
-  100% { opacity: 0; transform: scale(0.95) translateY(-14px); }
-}
-@keyframes criticalSpark {
-  0%   { opacity: 0; transform: translate(0, 0) scale(1); }
-  20%  { opacity: 1; }
-  100% { opacity: 0; transform: translate(calc(cos(var(--csAngle)) * var(--csDist)), calc(sin(var(--csAngle)) * var(--csDist)))
-    scale(0.15); }
-}
+/* Critical Strike (`critical_slash`): jetzt Pixelart-Leinwand in app-board.jsx (W86r1) — die Keyframes hier sind entfallen. */
 
 /* Siphem orbital laser — charge-up, falling beam, impact flash, sparks. */
 @keyframes orbitalLaserCharge {
@@ -4085,14 +4051,14 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * { cursor: url("/cursor
    along with the dodge. Animating the inner card only keeps the
    zone's layout box pinned in place. */
 @keyframes escapeDodge {
-  0%   { transform: translateX(0) rotate(0deg); }
-  12%  { transform: translateX(-26px) rotate(-6deg); }
-  25%  { transform: translateX(0)     rotate(0deg); }
-  38%  { transform: translateX(26px)  rotate(6deg); }
-  52%  { transform: translateX(0)     rotate(0deg); }
-  66%  { transform: translateX(-18px) rotate(-3deg); }
-  80%  { transform: translateX(18px)  rotate(3deg); }
-  100% { transform: translateX(0)     rotate(0deg); }
+  0%   { transform: translateX(0); }
+  12%  { transform: translateX(-26px); }
+  25%  { transform: translateX(0); }
+  38%  { transform: translateX(26px); }
+  52%  { transform: translateX(0); }
+  66%  { transform: translateX(-18px); }
+  80%  { transform: translateX(18px); }
+  100% { transform: translateX(0); }
 }
 /* All direct visual children dodge together. Targeting the children
    rather than the [data-hero-zone] wrapper keeps the wrapper's layout
@@ -4429,7 +4395,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * { cursor: url("/cursor
 /* Cannibalism (Mao's starting Ability): meat drumstick "chomp" plus
    green healing particles rising from the eating Hero. Tuned to
    ~900ms total. */
-.anim-cannibalism-flash { position: absolute; width: 110px; height: 110px; left: -55px; top: -55px; border-radius: 0; background: radial-gradient(circle, #f7f7ad 0% 13.33%, transparent 13.33% 80%); box-shadow: 0 0 0 2px #4ceb70; animation: animCannibalismFlash .65s steps(16, end) forwards; opacity: 0; }
+.anim-cannibalism-flash { position: absolute; width: 110px; height: 110px; left: -55px; top: -55px; border-radius: 0; background: radial-gradient(circle, #f7f7ad 0% 13.33%, transparent 13.33% 80%); animation: animCannibalismFlash .65s steps(16, end) forwards; opacity: 0; }
 @keyframes animCannibalismFlash {
   0%   { transform: scale(0.4); opacity: 0; }
   30%  { transform: scale(1.15); opacity: .9; }
@@ -4439,25 +4405,25 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * { cursor: url("/cursor
 
 /* The drumstick — wobbles in, then "shrinks in bites" through
    three discrete scale-down keyframes that read as chomps. */
-.anim-cannibalism-meat { position: absolute; left: 0; top: 0; font-size: 64px; line-height: 1; transform: translate(-50%, -50%); filter: drop-shadow(1px 0 0 #e0c085) drop-shadow(-1px 0 0 #e0c085) drop-shadow(0 1px 0 #e0c085) drop-shadow(0 -1px 0 #e0c085) drop-shadow(1px 0 0 #000000) drop-shadow(-1px 0 0 #000000) drop-shadow(0 1px 0 #000000) drop-shadow(0 -1px 0 #000000); animation: animCannibalismMeat .9s steps(22, end) forwards; opacity: 0; }
+.anim-cannibalism-meat { position: absolute; left: 0; top: 0; font-size: 64px; line-height: 1; transform: translate(-50%, -50%); text-shadow: 3px 0 0 #fad54a, -3px 0 0 #fad54a; animation: animCannibalismMeat .9s steps(22, end) forwards; opacity: 0; }
 @keyframes animCannibalismMeat {
-  0%   { transform: translate(-50%, -50%) scale(0.3) rotate(-18deg); opacity: 0; }
-  15%  { transform: translate(-50%, -50%) scale(1.2) rotate(-8deg); opacity: 1; }
+  0%   { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+  15%  { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
   /* Bite 1 */
-  28%  { transform: translate(-50%, -50%) scale(1.0) rotate(6deg); opacity: 1; }
-  35%  { transform: translate(-50%, -52%) scale(0.85) rotate(-4deg); opacity: 1; }
+  28%  { transform: translate(-50%, -50%) scale(1.0); opacity: 1; }
+  35%  { transform: translate(-50%, -52%) scale(0.85); opacity: 1; }
   /* Bite 2 */
-  48%  { transform: translate(-50%, -50%) scale(0.85) rotate(-4deg); opacity: 1; }
-  55%  { transform: translate(-50%, -52%) scale(0.65) rotate(8deg); opacity: 1; }
+  48%  { transform: translate(-50%, -50%) scale(0.85); opacity: 1; }
+  55%  { transform: translate(-50%, -52%) scale(0.65); opacity: 1; }
   /* Bite 3 — gone */
-  72%  { transform: translate(-50%, -50%) scale(0.65) rotate(8deg); opacity: 1; }
-  82%  { transform: translate(-50%, -54%) scale(0.4) rotate(-6deg); opacity: .85; }
-  100% { transform: translate(-50%, -60%) scale(0.15) rotate(0deg); opacity: 0; }
+  72%  { transform: translate(-50%, -50%) scale(0.65); opacity: 1; }
+  82%  { transform: translate(-50%, -54%) scale(0.4); opacity: .85; }
+  100% { transform: translate(-50%, -60%) scale(0.15); opacity: 0; }
 }
 
 /* Two chomp-impact sparks that flash on each bite, faked by re-using
    one element with two animation delays on independent keyframes. */
-.anim-cannibalism-bite { position: absolute; font-size: 26px; color: #ffffff; text-shadow: 1px 1px 0 #3a2412, 1px 1px 0 #3e3e51; opacity: 0; }
+.anim-cannibalism-bite { position: absolute; font-size: 26px; color: #ffffff; text-shadow: 1px 1px 0 #f7f7ad; opacity: 0; }
 .anim-cannibalism-bite-1 { left: -28px; top: -10px; animation: animCannibalismBite .25s steps(6, end) 270ms forwards; }
 .anim-cannibalism-bite-2 { left: 14px; top: -6px; animation: animCannibalismBite .25s steps(6, end) 490ms forwards; }
 @keyframes animCannibalismBite {
@@ -4704,7 +4670,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * { cursor: url("/cursor
 }
 
 /* Flammen von Missing Parts: aufsteigend, kurz groesser werdend, dann
-   ausduennend. Gegenstueck zu `pp-invest-coin-drop` (fallend/entfaerbend). */
+   ausduennend. Gegenstueck: `invest_counters_lost` (fallend/entfaerbend, Pixel-Leinwand). */
 @keyframes pp-debt-flame-rise {
   0%   { transform: translate(0, 6px) scale(.55); opacity: 0; }
   18%  { transform: translate(calc(var(--pp-flame-drift, 0px) * .25), -4px) scale(1.12); opacity: 1; }
@@ -4712,12 +4678,6 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * { cursor: url("/cursor
   100% { transform: translate(var(--pp-flame-drift, 0px), var(--pp-flame-rise, -60px)) scale(.5); opacity: 0; }
 }
 
-@keyframes pp-invest-coin-drop {
-  0%   { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 0; filter: none; }
-  10%  { transform: translate(0, -9px) rotate(calc(var(--pp-invest-spin, 180deg) * .12)) scale(1.05); opacity: 1; }
-  55%  { opacity: .85; filter: grayscale(.55) saturate(.7); }
-  100% { transform: translate(var(--pp-invest-drift, 0px), 74px) rotate(var(--pp-invest-spin, 180deg)) scale(.72); opacity: 0; filter: grayscale(1) saturate(.3); }
-}
 
 .anim-gold-flash { position: absolute; width: 40px; height: 40px; left: -20px; top: -20px; border-radius: 0; background: radial-gradient(circle, #f7f7ad 0% 22%, #fad54a 22% 46%, #f29a3e 46% 68%); animation: animGoldFlash .5s steps(12, end) forwards; }
 @keyframes animGoldFlash {
@@ -5812,7 +5772,8 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 }
 
 /* Realmniversal Emperor (v941) — die getroffene Heldenkarte wird durch
-   die Verzerrung gezogen: gekippt, gestaucht, geschert, dann zurueck.
+   die Verzerrung gezogen: gestaucht, gestreckt, seitlich geruettelt (Pixelart:
+   keine Kippung/Scherung der Karte), dann zurueck.
    Bewusst auf die KINDER der Zone, nicht auf die Zone selbst: deren
    Layoutbox berechnen die Area Zones mit (dieselbe Lehre wie bei
    `.escape-dodging > *`). Die Klasse haengt `cosmic_distortion` in
@@ -5820,26 +5781,27 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 .cosmic-warped > * { animation: cosmicWarp 900ms steps(22, end) forwards; transform-origin: center center; }
 @keyframes cosmicWarp {
   0%   { transform: none; }
-  14%  { transform: perspective(420px) rotateY(16deg) skewY(-5deg) scale(1.06, .9); }
-  30%  { transform: perspective(420px) rotateY(-26deg) skewY(7deg) scale(.8, 1.18); }
-  46%  { transform: perspective(420px) rotateY(30deg) skewX(10deg) scale(1.16, .76); }
-  62%  { transform: perspective(420px) rotateY(-15deg) skewX(-7deg) scale(.88, 1.12); }
-  78%  { transform: perspective(420px) rotateY(9deg) skewY(4deg) scale(1.06, .94); }
-  90%  { transform: perspective(420px) rotateY(-4deg) scale(.98, 1.02); }
+  14%  { transform: translateX(6px) scale(1.06, .9); }
+  30%  { transform: translateX(-10px) scale(.8, 1.18); }
+  46%  { transform: translateX(10px) scale(1.16, .76); }
+  62%  { transform: translateX(-6px) scale(.88, 1.12); }
+  78%  { transform: translateX(4px) scale(1.06, .94); }
+  90%  { transform: translateX(-2px) scale(.98, 1.02); }
   100% { transform: none; }
 }
 
 /* Whirlwind Strike spin effect on attacker */
 .whirlwind-spinning { animation: whirlwindSpin 2s steps(24, end) forwards !important; transform-origin: center center !important; }
 @keyframes whirlwindSpin {
+  /* W86r1: nur Vierteldrehungen (Vielfache von 90°, die Karte bleibt verlustfrei) und vier statt zehn Umdrehungen — bei 30 Bildern/s bleibt die Drehung so lesbar */
   0%   { transform: rotate(0deg) scale(1); }
   8%   { transform: rotate(180deg) scale(1.05); }
-  15%  { transform: rotate(540deg) scale(1.1); }
-  25%  { transform: rotate(1080deg) scale(1.1); }
-  50%  { transform: rotate(2160deg) scale(1.05); }
-  75%  { transform: rotate(3060deg) scale(1); }
-  90%  { transform: rotate(3510deg) scale(1); }
-  100% { transform: rotate(3600deg) scale(1); }
+  15%  { transform: rotate(360deg) scale(1.1); }
+  25%  { transform: rotate(630deg) scale(1.1); }
+  50%  { transform: rotate(990deg) scale(1.05); }
+  75%  { transform: rotate(1260deg) scale(1); }
+  90%  { transform: rotate(1350deg) scale(1); }
+  100% { transform: rotate(1440deg) scale(1); }
 }
 
 /* ===== ICE PROJECTILE TRAIL ===== (Pixelart: harte 4-px-Zellen, zwei Bilder im Wechsel per steps(1), kein Weichzeichner) */
@@ -9666,8 +9628,8 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 }
 /* Fluegelschlag — schneller als die Bahn, sonst wirkt es traege. */
 @keyframes annoyCatFlap {
-  from { transform: scaleY(1)   rotate(-12deg); }
-  to   { transform: scaleY(.55) rotate(10deg); }
+  from { transform: translateY(-2px); }
+  to   { transform: translateY(2px); }
 }
 
 /* Trial of Knowledge: Herzchen und Partikel treiben nach aussen und
@@ -10591,13 +10553,13 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 .arma-root { position: fixed; pointer-events: none; z-index: 10150; overflow: visible; }
 .arma-root > div { position: absolute; }
 .arma-tint { inset: -6%; opacity: 0; }
-.arma-feuerball { border-radius: 0; opacity: 0; transform: scale(.02); background: radial-gradient(circle, #ffffff 0% 1.6%, #f7f7ad 1.6% 6.4%, #fff196 6.4% 11%, #fad54a 11% 17%, #f9ac20 17% 24%, #ff8b1a 24% 36%, #ee6428 36% 48%, #b62600 48% 64.8%, #8c0014 64.8% 76.67%, #55011a 76.67% 83.67%, transparent 83.67% 100%); filter: saturate(1.25); }
-.arma-ring { border-radius: 0; border-style: solid; border-color: #e0c085; box-shadow: 0 0 0 3px #ff8b1a, inset 0 0 0 3px #ee6428; opacity: 0; transform: scale(.02); }
-.arma-kern { width: 90px; height: 90px; margin-left: -45px; margin-top: -45px; border-radius: 0; background: radial-gradient(circle, #ffffff 0% 20%, #f7f7ad 20% 35%, #fff196 35% 45%, #fad54a 45% 50%, #f9ac20 50% 66%, transparent 66% 75%); box-shadow: 0 0 0 18px #fad54a; opacity: 0; }
-.arma-flamme { border-radius: 0; background: radial-gradient(ellipse at 50% 78%, #f7f7ad 0% 7.33%, #fff196 7.33% 14.67%, #fad54a 14.67% 26.33%, #f9ac20 26.33% 35%, #f29a3e 35% 39.33%, #ff8b1a 39.33% 48%, #ee6428 48% 66%, #b62600 66% 80.4%, transparent 80.4% 100%); filter: drop-shadow(1px 0 0 #ee6428) drop-shadow(-1px 0 0 #ee6428) drop-shadow(0 1px 0 #ee6428) drop-shadow(0 -1px 0 #ee6428); transform-origin: 50% 90%; opacity: 0; }
-.arma-tropfen { border-radius: 0; background: linear-gradient(to bottom, transparent 0% 50%, #ff8b1a 50% 55%, #f9ac20 55% 75%, #fad54a 75% 85%, #fff196 85% 90%, #e0c085 90% 92.5%, #f7f7ad 92.5% 97.5%, #ffffff 97.5% 100%); filter: drop-shadow(1px 0 0 #ff8b1a) drop-shadow(-1px 0 0 #ff8b1a) drop-shadow(0 1px 0 #ff8b1a) drop-shadow(0 -1px 0 #ff8b1a); opacity: 0; }
+.arma-feuerball { border-radius: 0; opacity: 0; transform: scale(.02); background: radial-gradient(circle, #ffffff 0% 1.6%, #f7f7ad 1.6% 6.4%, #fff196 6.4% 11%, #fad54a 11% 17%, #f9ac20 17% 24%, #ff8b1a 24% 36%, #ee6428 36% 48%, #b62600 48% 64.8%, #8c0014 64.8% 76.67%, #55011a 76.67% 83.67%, transparent 83.67% 100%); }
+.arma-ring { border-radius: 0; border-style: solid; border-color: #fad54a; box-shadow: inset 0 0 0 6px #ff8b1a, inset 0 0 0 12px #ee6428; opacity: 0; transform: scale(.02); }
+.arma-kern { width: 90px; height: 90px; margin-left: -45px; margin-top: -45px; border-radius: 0; background: radial-gradient(circle, #ffffff 0% 20%, #f7f7ad 20% 35%, #fff196 35% 45%, #fad54a 45% 50%, #f9ac20 50% 66%, transparent 66% 75%); opacity: 0; }
+.arma-flamme { border-radius: 0; background: radial-gradient(ellipse at 50% 78%, #f7f7ad 0% 7.33%, #fff196 7.33% 14.67%, #fad54a 14.67% 26.33%, #f9ac20 26.33% 35%, #f29a3e 35% 39.33%, #ff8b1a 39.33% 48%, #ee6428 48% 66%, #b62600 66% 80.4%, transparent 80.4% 100%); transform-origin: 50% 90%; opacity: 0; }
+.arma-tropfen { border-radius: 0; background: linear-gradient(to bottom, transparent 0% 50%, #ff8b1a 50% 55%, #f9ac20 55% 75%, #fad54a 75% 85%, #fff196 85% 90%, #e0c085 90% 92.5%, #f7f7ad 92.5% 97.5%, #ffffff 97.5% 100%); opacity: 0; }
 .arma-einschlag { border-radius: 0; background: radial-gradient(ellipse, #ffffff 0% 3.75%, #f7f7ad 3.75% 7.5%, #e0c085 7.5% 18.75%, #fad54a 18.75% 22.5%, #f9ac20 22.5% 37.14%, #ff8b1a 37.14% 44.29%, #ee6428 44.29% 57.3%, transparent 57.3% 78%); opacity: 0; }
-.arma-glut { border-radius: 0; background: #f9ac20; box-shadow: 0 0 0 1px #ee6428; opacity: 0; }
+.arma-glut { border-radius: 0; background: #f9ac20; box-shadow: 0 0 0 2px #ee6428; opacity: 0; }
 @keyframes armaBeben {
   0%, 100% { transform: translate(0, 0); }
   10% { transform: translate(calc(var(--arma-amp) * -1), calc(var(--arma-amp) * .6)); }
@@ -10627,16 +10589,16 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   100% { opacity: 0; transform: scale(calc(var(--arma-kern) * 1.4)); }
 }
 @keyframes armaFlamme {
-  0% { opacity: 0; transform: rotate(var(--arma-kipp)) scale(.2, .1); }
-  18% { opacity: 1; transform: rotate(var(--arma-kipp)) scale(1, 1.15); }
-  40% { transform: rotate(calc(var(--arma-kipp) * -1)) scale(.85, 1.3); }
-  62% { opacity: .9; transform: rotate(var(--arma-kipp)) scale(1.05, 1); }
-  100% { opacity: 0; transform: rotate(0deg) translateY(-30%) scale(.5, 1.4); }
+  0% { opacity: 0; transform: scale(.2, .1); }
+  18% { opacity: 1; transform: scale(1, 1.15); }
+  40% { transform: scale(.85, 1.3); }
+  62% { opacity: .9; transform: scale(1.05, 1); }
+  100% { opacity: 0; transform: translateY(-30%) scale(.5, 1.4); }
 }
 @keyframes armaFall {
-  0% { opacity: 0; transform: translate(var(--arma-vonx), var(--arma-vony)) rotate(var(--arma-dreh)); }
+  0% { opacity: 0; transform: translate(var(--arma-vonx), var(--arma-vony)); }
   12% { opacity: 1; }
-  100% { opacity: 1; transform: translate(0, 0) rotate(var(--arma-dreh)); }
+  100% { opacity: 1; transform: translate(0, 0); }
 }
 @keyframes armaEinschlag {
   0% { opacity: 1; transform: scale(.2); }
@@ -12351,15 +12313,11 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 
 /* ── Accusation: wuetende Sprechblase ─────────────────────────────── */
 .anklage { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10205; }
-.anklage-glut { position: absolute; border-radius: 0; background: radial-gradient(ellipse at 50% 55%, transparent 0% 70%); opacity: 0; animation: anklageGlut 2200ms steps(24, end) forwards; }
+/* W86r1: Blase, „!", Schreistriche, Adern und Glut sind Pixel auf der Leinwand (`AnklageEffect` in app-board.jsx); hier nur Rahmen und Kartenbild. */
 .anklage-blase { position: absolute; width: 0; height: 0; transform-origin: -8px 10px; animation: anklageBlase 2200ms steps(24, end) forwards; }
 .anklage-zittern { position: absolute; left: 0; top: 0; width: 0; height: 0; animation: anklageZittern 2200ms steps(24, end) forwards; }
-.anklage-ausruf { transform-origin: 50% 50%; animation: anklageAusruf 2200ms steps(24, end) forwards; }
-.anklage-karte { position: absolute; border-radius: 0; overflow: hidden; border: 2px solid #08060c; box-shadow: 0 0 0 2px #ffffff, 0 0 0 2px #b62600; opacity: 0; transform: scale(.2) rotate(-12deg); animation: anklageKarte 2200ms steps(24, end) forwards; }
+.anklage-karte { position: absolute; border-radius: 0; overflow: hidden; border: 2px solid #08060c; box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #b62600; opacity: 0; transform: scale(.2); animation: anklageKarte 2200ms steps(24, end) forwards; }
 .anklage-karte img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.anklage-strich { position: absolute; margin-top: -4.5px; transform-origin: 0 50%; background: #08060c; clip-path: polygon(0 40%, 100% 0, 100% 100%, 0 60%); transform: rotate(var(--ag)) translateX(var(--ar)) scaleX(0); opacity: 0; animation: anklageStrich 420ms steps(10, end) forwards; }
-.anklage-ader { position: absolute; opacity: 0; transform: scale(.2); animation: anklageAder 700ms steps(17, end) forwards; overflow: visible; }
-@keyframes anklageGlut { 0% { opacity: 0; } 12% { opacity: 1; } 60% { opacity: .75; } 75% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes anklageBlase {
   0% { transform: scale(0); opacity: 0; }
   9% { transform: scale(1.18); opacity: 1; }
@@ -12369,43 +12327,30 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
   100% { transform: scale(0); opacity: 0; }
 }
 @keyframes anklageZittern {
-  0%, 56% { transform: translate(0, 0) rotate(0); }
-  58% { transform: translate(-4px, 1px) rotate(-3deg); }
-  60% { transform: translate(4px, -1px) rotate(3deg); }
-  62% { transform: translate(-4px, 0) rotate(-2deg); }
-  64% { transform: translate(3px, 1px) rotate(3deg); }
-  66% { transform: translate(-3px, -1px) rotate(-2deg); }
-  68% { transform: translate(3px, 0) rotate(2deg); }
-  70% { transform: translate(-2px, 1px) rotate(-1deg); }
-  72% { transform: translate(2px, 0) rotate(1deg); }
-  75%, 100% { transform: translate(0, 0) rotate(0); }
-}
-@keyframes anklageAusruf {
-  0% { transform: scale(.4); opacity: 0; }
-  8% { transform: scale(1.25); opacity: 1; }
-  13% { transform: scale(.95); }
-  18% { transform: scale(1.12); }
-  23% { transform: scale(.98); }
-  28% { transform: scale(1.08); opacity: 1; }
-  34% { transform: scale(0) rotate(40deg); opacity: 0; }
-  100% { transform: scale(0); opacity: 0; }
+  0%, 56% { transform: translate(0, 0); }
+  58% { transform: translate(-4px, 1px); }
+  60% { transform: translate(4px, -1px); }
+  62% { transform: translate(-4px, 0); }
+  64% { transform: translate(3px, 1px); }
+  66% { transform: translate(-3px, -1px); }
+  68% { transform: translate(3px, 0); }
+  70% { transform: translate(-2px, 1px); }
+  72% { transform: translate(2px, 0); }
+  75%, 100% { transform: translate(0, 0); }
 }
 @keyframes anklageKarte {
-  0%, 29% { opacity: 0; transform: scale(.2) rotate(-12deg); }
-  38% { opacity: 1; transform: scale(1.12) rotate(4deg); }
-  44%, 100% { opacity: 1; transform: scale(1) rotate(0); }
+  0%, 29% { opacity: 0; transform: scale(.2); }
+  38% { opacity: 1; transform: scale(1.12); }
+  44%, 100% { opacity: 1; transform: scale(1); }
 }
-@keyframes anklageStrich {
-  0% { opacity: 0; transform: rotate(var(--ag)) translateX(var(--ar)) scaleX(0); }
-  35% { opacity: 1; transform: rotate(var(--ag)) translateX(var(--ar)) scaleX(1); }
-  100% { opacity: 0; transform: rotate(var(--ag)) translateX(calc(var(--ar) + 14px)) scaleX(.6); }
-}
-@keyframes anklageAder {
-  0% { opacity: 0; transform: scale(.2) rotate(-20deg); }
-  35% { opacity: 1; transform: scale(1.25) rotate(8deg); }
-  55% { transform: scale(.95) rotate(0); }
-  70% { transform: scale(1.1); opacity: 1; }
-  100% { opacity: 0; transform: scale(1); }
+
+/* W86r1 · Looming Threat (`level_down`): die Handkarte schwillt kurz an — nur Größe (das Abdunkeln malt die Pixel-Leinwand der Animation als Dither). */
+.pp-r1-ld-swell { animation: ppR1LdSwell 1100ms steps(24, end); z-index: 50; position: relative; }
+@keyframes ppR1LdSwell {
+  0%   { scale: 1; }
+  40%  { scale: 1.38; }
+  60%  { scale: 1.38; }
+  100% { scale: 1; }
 }
 
 /* ── Baby Spider: Kokon, Faden, Netz, Aktivierung ────────────────── */
@@ -12478,47 +12423,6 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 }
 
 /* ── Crimson Web: Netzschuss + bleibendes Netz ───────────────────── */
-.cweb { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10204; }
-.cweb > span, .cweb > div { position: absolute; display: block; }
-.cweb-faden line { stroke: #8c0014; stroke-width: 2; stroke-dasharray: 100; stroke-dashoffset: 100; filter: drop-shadow(1px 0 0 #8c0014) drop-shadow(-1px 0 0 #8c0014) drop-shadow(0 1px 0 #8c0014) drop-shadow(0 -1px 0 #8c0014); animation: cwebFaden 1100ms steps(24, end) forwards; }
-.cweb-ballen { left: -11px; top: -11px; width: 22px; height: 22px; border-radius: 0; background: radial-gradient(circle at 40% 35%, #fe5154 0% 30%, #e92f38 30% 45%, #8c0014 45% 89%, #55011a 89% 100%); box-shadow: 0 0 0 2px #e92f38, 0 0 0 2px #8c0014; opacity: 0; animation: cwebBallen 420ms steps(10, end) forwards; }
-.cweb-netz-huelle { left: 0; top: 0; width: 0; height: 0; animation: cwebRuck 1000ms steps(24, end) forwards; }
-.cweb-netz path { fill: none; stroke: #b62600; stroke-width: 1.8; stroke-linecap: round; filter: drop-shadow(1px 0 0 #e92f38) drop-shadow(-1px 0 0 #e92f38) drop-shadow(0 1px 0 #e92f38) drop-shadow(0 -1px 0 #e92f38) drop-shadow(1px 0 0 #3a2412) drop-shadow(-1px 0 0 #3a2412) drop-shadow(0 1px 0 #3a2412) drop-shadow(0 -1px 0 #3a2412); stroke-dasharray: 100; stroke-dashoffset: 100; animation: cwebNetz 1400ms steps(24, end) forwards; }
-.cweb-verpufft .cweb-netz path { animation-name: cwebNetzVerpufft; animation-duration: 2000ms; }
-.cweb-glut { border-radius: 0; mix-blend-mode: screen; background: radial-gradient(ellipse, transparent 0% 72%); opacity: 0; animation: cwebGlut 900ms steps(22, end) 330ms forwards; }
-@keyframes cwebFaden {
-  0% { stroke-dashoffset: 100; opacity: 1; }
-  33% { stroke-dashoffset: 0; opacity: 1; }
-  60% { opacity: .7; }
-  100% { stroke-dashoffset: 0; opacity: 0; }
-}
-@keyframes cwebBallen {
-  0% { opacity: 1; transform: translate(var(--cx), var(--cy)) scale(.6); }
-  85% { opacity: 1; transform: translate(0, 0) scale(1.1); }
-  100% { opacity: 0; transform: translate(0, 0) scale(2.4); }
-}
-@keyframes cwebRuck {
-  0%, 60% { transform: scale(1); }
-  66% { transform: scale(1.06, .95); }
-  74% { transform: scale(.97, 1.03); }
-  82%, 100% { transform: scale(1); }
-}
-@keyframes cwebNetz {
-  0% { stroke-dashoffset: 100; opacity: 0; }
-  8% { opacity: 1; }
-  35% { stroke-dashoffset: 0; opacity: 1; }
-  70% { stroke-dashoffset: 0; opacity: 1; }
-  100% { stroke-dashoffset: 0; opacity: 0; }
-}
-@keyframes cwebNetzVerpufft {
-  0% { stroke-dashoffset: 100; opacity: 0; }
-  5% { opacity: 1; }
-  24% { stroke-dashoffset: 0; opacity: 1; }
-  40% { stroke-dashoffset: 0; opacity: 1; }
-  100% { stroke-dashoffset: 0; opacity: 0; }
-}
-@keyframes cwebGlut { 0% { opacity: 0; } 30% { opacity: 1; } 100% { opacity: 0; } }
-
 .crimson-web-overlay { position: absolute; inset: 0; z-index: 5; pointer-events: none; background: radial-gradient(ellipse at 50% 50%, transparent 0% 100%); opacity: 0; animation: cwebOverlayAn 420ms steps(10, end) 450ms forwards; }
 .crimson-web-overlay svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
 .crimson-web-overlay path { fill: none; stroke: #b62600; stroke-width: 1.8; stroke-linecap: round; vector-effect: non-scaling-stroke; filter: drop-shadow(1px 0 0 #8c0014) drop-shadow(-1px 0 0 #8c0014) drop-shadow(0 1px 0 #8c0014) drop-shadow(0 -1px 0 #8c0014); animation: cwebSchimmer 2600ms steps(24, end) infinite; }

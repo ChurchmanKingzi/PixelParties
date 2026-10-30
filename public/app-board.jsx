@@ -4815,109 +4815,7 @@ function NecroFlickerAura() {
 //  1950–2200  sie ploppt weg
 // Der Held glueht dabei rot. Klang aus der Komponente (Regel ⑤),
 // Keyframes in style.css (Regel ④).
-function AnklageEffect({ x, y, w = 80, h = 110, cardName }) {
-  const B = Math.max(64, w * 0.95);                 // Blasenbreite
-  const H = B * 0.78;                              // Blasenhoehe (ohne Spitze)
-  const bild = cardName && window.cardImageUrl ? window.cardImageUrl(cardName) : null;
-  const striche = useMemo(() => [-32, 0, 32, 148, 180, 212].map((g, i) => ({ g, verzug: 1250 + (i % 3) * 45 })), []);
-  useEffect(() => {
-    const spiel = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
-    spiel('ping', { rate: 0.75, volume: 0.8 }, 0);
-    spiel('critical_strike', { rate: 1.35, volume: 0.55 }, 60);
-    if (bild) spiel('reveal', { rate: 1.1, volume: 0.8 }, 660);
-    spiel('attack_ram', { rate: 1.4, volume: 0.5 }, 1260);
-  }, []);
-  // Blasenumriss mit Spitze nach unten links (zum Helden).
-  const uid = useMemo(() => 'ankl' + Math.random().toString(36).slice(2, 8), []);
-  const r = H * 0.42;
-  const pfad = `M ${-B / 2 + r} ${-H} H ${B / 2 - r} Q ${B / 2} ${-H} ${B / 2} ${-H + r} V ${-r} Q ${B / 2} 0 ${B / 2 - r} 0`
-    + ` H ${-B * 0.02} L ${-B * 0.2} ${H * 0.34} L ${-B * 0.16} 0 H ${-B / 2 + r} Q ${-B / 2} 0 ${-B / 2} ${-r}`
-    + ` V ${-H + r} Q ${-B / 2} ${-H} ${-B / 2 + r} ${-H} Z`;
-  const kw = H * 0.62, kh = kw * 1.4;               // Kartenbild in der Blase
-  const oben = -h * 0.5 - H * 0.38;                // Blasenfuss knapp ueber dem Helden
-  return (
-    <div className="anklage" style={{ left: x, top: y }} aria-hidden="true">
-      <span className="anklage-glut" style={{ width: w * 1.25, height: h * 1.15, left: -w * 0.625, top: -h * 0.575 }} />
-      <div className="anklage-blase" style={{ left: 0, top: oben }}>
-        <div className="anklage-zittern">
-          <svg width={B + 12} height={H * 1.4 + 12} viewBox={`${-B / 2 - 6} ${-H - 6} ${B + 12} ${H * 1.4 + 12}`}
-            style={{ position: 'absolute', left: -B / 2 - 6, top: -H - 6, overflow: 'visible' }}>
-            {/* Pixel-Schattierung (Als Wunsch 26.9.: „mehr Shading/Dithering"):
-                harter Versatzschatten, darin zwei Dither-Stufen, die zur
-                Ecke unten rechts dichter werden, und ein Lichtpunkt oben
-                links. Alles an der Blasenform abgeschnitten. */}
-            <defs>
-              <clipPath id={`${uid}-form`}><path d={pfad} /></clipPath>
-              <pattern id={`${uid}-d1`} width="4" height="4" patternUnits="userSpaceOnUse">
-                <rect x="0" y="0" width="2" height="2" fill="#c5b7a0" />
-                <rect x="2" y="2" width="2" height="2" fill="#c5b7a0" />
-              </pattern>
-              <pattern id={`${uid}-d2`} width="4" height="4" patternUnits="userSpaceOnUse">
-                <rect x="0" y="0" width="4" height="4" fill="#c5b7a0" />
-                <rect x="2" y="0" width="2" height="2" fill="#a89370" />
-                <rect x="0" y="2" width="2" height="2" fill="#a89370" />
-              </pattern>
-              <pattern id={`${uid}-d3`} width="4" height="4" patternUnits="userSpaceOnUse">
-                <rect x="0" y="0" width="4" height="4" fill="#a89370" />
-                <rect x="0" y="0" width="2" height="2" fill="#535353" />
-                <rect x="2" y="2" width="2" height="2" fill="#535353" />
-              </pattern>
-              <mask id={`${uid}-m1`} maskUnits="userSpaceOnUse" x={-B} y={-H * 2} width={B * 2} height={H * 3}>
-                <rect x={-B} y={-H * 2} width={B * 2} height={H * 3} fill="#fff" />
-                <ellipse cx={-B * 0.14} cy={-H * 0.66} rx={B * 0.42} ry={H * 0.44} fill="#000" />
-              </mask>
-              <mask id={`${uid}-m2`} maskUnits="userSpaceOnUse" x={-B} y={-H * 2} width={B * 2} height={H * 3}>
-                <rect x={-B} y={-H * 2} width={B * 2} height={H * 3} fill="#fff" />
-                <ellipse cx={-B * 0.16} cy={-H * 0.7} rx={B * 0.58} ry={H * 0.62} fill="#000" />
-              </mask>
-              <mask id={`${uid}-m3`} maskUnits="userSpaceOnUse" x={-B} y={-H * 2} width={B * 2} height={H * 3}>
-                <rect x={-B} y={-H * 2} width={B * 2} height={H * 3} fill="#fff" />
-                <ellipse cx={-B * 0.18} cy={-H * 0.74} rx={B * 0.7} ry={H * 0.78} fill="#000" />
-              </mask>
-            </defs>
-            <path d={pfad} fill="#141414" opacity=".55" transform="translate(3 4)" />
-            <path d={pfad} fill="#fff8e8" />
-            <g clipPath={`url(#${uid}-form)`} shapeRendering="crispEdges">
-              <rect x={-B} y={-H * 2} width={B * 2} height={H * 3} fill={`url(#${uid}-d1)`} mask={`url(#${uid}-m1)`} />
-              <rect x={-B} y={-H * 2} width={B * 2} height={H * 3} fill={`url(#${uid}-d2)`} mask={`url(#${uid}-m2)`} />
-              <rect x={-B} y={-H * 2} width={B * 2} height={H * 3} fill={`url(#${uid}-d3)`} mask={`url(#${uid}-m3)`} />
-              <ellipse cx={-B * 0.16} cy={-H * 0.7} rx={B * 0.22} ry={H * 0.2} fill="#ffffff" />
-              <rect x={-B * 0.38} y={-H * 0.88} width="8" height="4" fill="#ffffff" />
-              <rect x={-B * 0.38 + 10} y={-H * 0.88} width="4" height="4" fill="#ffffff" />
-              <rect x={-B * 0.38} y={-H * 0.88 + 6} width="4" height="6" fill="#ffffff" />
-            </g>
-            <path d={pfad} fill="none" stroke="#141414" strokeWidth="3.2" strokeLinejoin="round" />
-          </svg>
-          <svg className="anklage-ausruf" width={H} height={H} viewBox="-10 -10 20 20"
-            style={{ position: 'absolute', left: -H / 2, top: -H * 0.5 - H / 2 }}>
-            <rect x="-2.6" y="-8" width="5.2" height="10.5" fill="#be0e0e" stroke="#5b0102" strokeWidth=".8" />
-            <rect x="-2.6" y="4.2" width="5.2" height="4.4" fill="#be0e0e" stroke="#5b0102" strokeWidth=".8" />
-          </svg>
-          {bild && (
-            <div className="anklage-karte" style={{ width: kw, height: kh, left: -kw / 2, top: -H * 0.5 - kh / 2 }}>
-              <img src={bild} alt="" draggable="false" />
-            </div>
-          )}
-          {striche.map((s, i) => (
-            <span key={i} className="anklage-strich" style={{
-              left: 0, top: -H * 0.5, height: 9, width: H * 0.34,
-              '--ag': s.g + 'deg', '--ar': (B * 0.5 + 8) + 'px', animationDelay: s.verzug + 'ms',
-            }} />
-          ))}
-        </div>
-      </div>
-      {[300, 1250].map((t, i) => (
-        <svg key={'ad' + i} className="anklage-ader" width="34" height="34" viewBox="-17 -17 34 34"
-          style={{ left: (i ? -1 : 1) * B * 0.5 - 17, top: oben - H - 10 - 17 + i * 6, animationDelay: t + 'ms' }}>
-          {[0, 90, 180, 270].map(g => (
-            <path key={g} d="M 3 -13 Q 3 -4 12 -3" fill="none" stroke="#ef2929" strokeWidth="4.2" strokeLinecap="round"
-              transform={`rotate(${g})`} />
-          ))}
-        </svg>
-      ))}
-    </div>
-  );
-}
+// (Umsetzung: `AnklageEffect` im W86r1-Block weiter oben — Pixelart-Leinwand + Kartenbild)
 
 // ── Spinnennetz-Geometrie (Baby Spider, Crimson Web) ───────────────
 // Radiales Netz um (0,0): `speichen` gerade Faeden nach aussen, dazu
@@ -5039,32 +4937,7 @@ function BabySpiderOpferEffect({ x, y, w = 70, h = 100, vonDx = 0, vonDy = -140,
 //             (`CrimsonWebOverlay`, gleiche Geometrie) liegt da schon;
 //             `bleibt: false` (kein Platz zum Anlegen) → das Netz
 //             blendet ueber eine Sekunde aus.
-function CrimsonWebShotEffect({ x, y, w = 80, h = 110, vonDx = 0, vonDy = 160, bleibt = true }) {
-  const netz = useMemo(() => ppNetzPfade(w * 0.52, h * 0.514, 12, 6), [w, h]);
-  useEffect(() => {
-    const spiel = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
-    spiel('projectile', { rate: 0.8, volume: 0.7 }, 0);
-    spiel('elem_dark', { rate: 1.25, volume: 0.6 }, 330);
-    spiel('debuff', { rate: 0.85, volume: 0.8 }, 420);
-    if (!bleibt) spiel('status_remove', { rate: 0.9, volume: 0.5 }, 1050);
-  }, []);
-  return (
-    <div className={'cweb' + (bleibt ? '' : ' cweb-verpufft')} style={{ left: x, top: y }} aria-hidden="true">
-      <svg className="cweb-faden" width="2" height="2" style={{ position: 'absolute', left: 0, top: 0, overflow: 'visible' }}>
-        <line x1={vonDx} y1={vonDy} x2="0" y2="0" pathLength="100" />
-      </svg>
-      <span className="cweb-ballen" style={{ '--cx': vonDx + 'px', '--cy': vonDy + 'px' }} />
-      <div className="cweb-netz-huelle">
-        <svg className="cweb-netz" width={w * 1.1} height={h * 1.1} viewBox={`${-w * 0.55} ${-h * 0.55} ${w * 1.1} ${h * 1.1}`}
-          style={{ position: 'absolute', left: -w * 0.55, top: -h * 0.55, overflow: 'visible' }}>
-          {netz.speichen.map((d, i) => <path key={'s' + i} d={d} pathLength="100" style={{ animationDelay: (340 + i * 16) + 'ms' }} />)}
-          {netz.ringe.map((d, i) => <path key={'r' + i} d={d} pathLength="100" style={{ animationDelay: (520 + i * 60) + 'ms' }} />)}
-        </svg>
-      </div>
-      <span className="cweb-glut" style={{ width: w * 1.3, height: h * 1.2, left: -w * 0.65, top: -h * 0.6 }} />
-    </div>
-  );
-}
+// (Umsetzung: `ppR1CrimsonWeb` im W86r1-Block weiter oben — Pixelart-Leinwand; `ppNetzPfade` bleibt für Baby Spider.)
 
 // ── Divine Gift of Death: die grosse Erweckung (Als Vorgabe 26.9.) ─
 // „Eine grosse Revival-Animation" — und ausdruecklich MAGIE, keine
@@ -5364,14 +5237,14 @@ function MeteorCrashEffect({ x, y, w = 80, intensity = 1 }) {
   );
 }
 
-function FlameStrikeEffect({ x, y }) {
+function FlameStrikeEffect({ x, y, skala = 1 }) {   // W86r1: `skala` vergrößert Abstände/Größen in ganzen Pixeln (Flame Engulf: 1,4) statt den Wrapper mit 1,4 zu skalieren
   const flames = useMemo(() => Array.from({ length: ppFxN(18) }, () => {
     const angle = Math.random() * Math.PI * 2;
-    const dist = 55 + Math.random() * 45;
+    const dist = Math.round((55 + Math.random() * 45) * skala);
     return {
-      startX: Math.cos(angle) * dist,
-      startY: Math.sin(angle) * dist,
-      size: 10 + Math.random() * 12,
+      startX: Math.round(Math.cos(angle) * dist / 2) * 2,
+      startY: Math.round(Math.sin(angle) * dist / 2) * 2,
+      size: Math.round((10 + Math.random() * 12) * skala / 2) * 2,
       delay: Math.random() * 180,
       dur: 200 + Math.random() * 150,
       char: ['🔥','🔥','🔥','✦','·'][Math.floor(Math.random() * 5)],
@@ -5379,10 +5252,10 @@ function FlameStrikeEffect({ x, y }) {
   }), []);
   const sparks = useMemo(() => Array.from({ length: ppFxN(12) }, () => {
     const angle = Math.random() * Math.PI * 2;
-    const speed = 15 + Math.random() * 30;
+    const speed = (15 + Math.random() * 30) * skala;
     return {
-      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
-      size: 2 + Math.random() * 5,
+      dx: Math.round(Math.cos(angle) * speed / 2) * 2, dy: Math.round(Math.sin(angle) * speed / 2) * 2,
+      size: Math.round((2 + Math.random() * 5) * skala / 2) * 2,
       color: ['#ff491a','#ff8b1a','#fad54a','#ff1a1a','#f9ac20'][Math.floor(Math.random() * 5)],
       delay: 300 + Math.random() * 150,
       dur: 300 + Math.random() * 250,
@@ -5390,7 +5263,7 @@ function FlameStrikeEffect({ x, y }) {
   }), []);
   return (
     <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-      <div className="anim-flame-flash" />
+      <div className="anim-flame-flash" style={skala === 1 ? undefined : { width: Math.round(70 * skala / 4) * 4, height: Math.round(70 * skala / 4) * 4, left: -Math.round(70 * skala / 4) * 2, top: -Math.round(70 * skala / 4) * 2 }} />
       {flames.map((f, i) => (
         <div key={'fl'+i} className="anim-flame-shard" style={{
           '--startX': f.startX + 'px', '--startY': f.startY + 'px', '--size': f.size + 'px',
@@ -6953,123 +6826,7 @@ function PoisonedWellEffect({ x, y, w, h }) {
   );
 }
 
-// Cosmic Summon — a black-and-purple portal tears open in the summon
-// slot: void expands from the centre, star-sparkles converge inward
-// from the rim, a lilac core flashes white, then everything collapses
-// back to let the freshly-placed creature render. Pure dark-theme, no
-// fire/ice colour families so it reads as "pulled from the depths of
-// space" rather than any existing elemental strike.
-function CosmicSummonEffect({ x, y }) {
-  const sparkles = useMemo(() => Array.from({ length: ppFxN(18) }, () => {
-    const angle = Math.random() * Math.PI * 2;
-    // Start somewhere between 70–130px from centre; each sparkle
-    // converges all the way to the middle at peak.
-    const startDist = 70 + Math.random() * 60;
-    return {
-      startX: Math.cos(angle) * startDist,
-      startY: Math.sin(angle) * startDist,
-      size: 4 + Math.random() * 6,
-      delay: Math.random() * 220,
-      dur: 420 + Math.random() * 260,
-    };
-  }), []);
-  const dust = useMemo(() => Array.from({ length: ppFxN(12) }, () => {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 20 + Math.random() * 50;
-    return {
-      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
-      size: 3 + Math.random() * 5,
-      color: ['#c98aff','#a040ff','#d6b3f9','#ffffff','#7a2bd0'][Math.floor(Math.random() * 5)],
-      delay: 350 + Math.random() * 150,
-      dur: 400 + Math.random() * 300,
-    };
-  }), []);
-  return (
-    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-      {/* Void portal — black core with purple nebula halo. Grows then
-          collapses. */}
-      <div className="anim-cosmic-void" />
-      {/* Ring flash — a quick purple/white halo at peak expansion. */}
-      <div className="anim-cosmic-ring" />
-      {/* Converging star sparkles: each starts offset, shrinks to centre. */}
-      {sparkles.map((s, i) => (
-        <div key={'cs' + i} className="anim-cosmic-star" style={{
-          '--cstartX': s.startX + 'px', '--cstartY': s.startY + 'px',
-          '--csize': s.size + 'px',
-          animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
-        }} />
-      ))}
-      {/* Outward dust burst at the peak — uses the shared explosion
-          particle keyframes (CSS var-driven). */}
-      {dust.map((d, i) => (
-        <div key={'cd' + i} className="anim-explosion-particle" style={{
-          '--dx': d.dx + 'px', '--dy': d.dy + 'px', '--size': d.size + 'px',
-          '--color': d.color,
-          animationDelay: d.delay + 'ms', animationDuration: d.dur + 'ms',
-        }} />
-      ))}
-      <style>{`
-        @keyframes cosmic-void-pulse {
-          0%   { opacity: 0;   transform: translate(-50%, -50%) scale(0.15); }
-          35%  { opacity: 0.95; transform: translate(-50%, -50%) scale(1.0); }
-          65%  { opacity: 0.85; transform: translate(-50%, -50%) scale(1.15); }
-          100% { opacity: 0;   transform: translate(-50%, -50%) scale(0.4); }
-        }
-        @keyframes cosmic-ring-expand {
-          0%   { opacity: 0;   transform: translate(-50%, -50%) scale(0.3); }
-          30%  { opacity: 0.9; transform: translate(-50%, -50%) scale(0.95); }
-          60%  { opacity: 0.5; transform: translate(-50%, -50%) scale(1.35); }
-          100% { opacity: 0;   transform: translate(-50%, -50%) scale(1.75); }
-        }
-        @keyframes cosmic-star-converge {
-          0%   { opacity: 0; transform: translate(calc(-50% + var(--cstartX)), calc(-50% + var(--cstartY))) scale(0.6); }
-          25%  { opacity: 1; }
-          100% { opacity: 0; transform: translate(-50%, -50%) scale(0.15); }
-        }
-        .anim-cosmic-void {
-          position: absolute; left: 0; top: 0;
-          width: 140px; height: 140px;
-          border-radius: 50%;
-          background:
-            radial-gradient(circle at 50% 50%,
-              #000 0%,
-              rgba(46,10,81,0.95) 30%,
-              rgba(110,0,204,0.55) 60%,
-              rgba(102,24,180,0.0) 100%);
-          box-shadow:
-            0 0 40px rgba(160,64,255,0.75),
-            inset 0 0 30px rgba(26,10,58,0.9);
-          transform: translate(-50%, -50%) scale(0.1);
-          animation: cosmic-void-pulse 900ms ease-out forwards;
-          filter: blur(0.5px);
-        }
-        .anim-cosmic-ring {
-          position: absolute; left: 0; top: 0;
-          width: 100px; height: 100px;
-          border-radius: 50%;
-          border: 3px solid rgba(214,179,249,0.9);
-          box-shadow:
-            0 0 20px rgba(184,102,255,0.9),
-            inset 0 0 14px rgba(255, 255, 255, 0.65);
-          transform: translate(-50%, -50%) scale(0.3);
-          animation: cosmic-ring-expand 700ms ease-out forwards;
-          animation-delay: 120ms;
-        }
-        .anim-cosmic-star {
-          position: absolute; left: 0; top: 0;
-          width: var(--csize); height: var(--csize);
-          border-radius: 50%;
-          background: radial-gradient(circle, #fff 0%, rgba(214,187,241,0.95) 45%, rgba(201,138,255,0) 100%);
-          box-shadow:
-            0 0 10px rgba(255, 255, 255, 0.95),
-            0 0 20px rgba(186,116,255,0.75);
-          transform: translate(calc(-50% + var(--cstartX)), calc(-50% + var(--cstartY))) scale(0.6);
-          animation: cosmic-star-converge ease-in forwards;
-        }
-      `}</style>
-    </div>
-  );
-}
+// Cosmic Summon (`cosmic_summon`): ein schwarz-violettes Portal reisst im Beschwoerungsplatz auf — Umsetzung `ppR1CosmicSummon` im W86r1-Block (Pixelart-Leinwand).
 
 // ═══════════════════════════════════════════
 //  BOMBLEBEE ARCHETYPE ANIMATIONS
@@ -7825,7 +7582,7 @@ function CannibalismChompEffect({ x, y }) {
           top: p.startY + 'px',
           fontSize: p.size + 'px',
           color: p.color,
-          textShadow: `0 0 6px ${p.color}, 0 0 3px #fff`,
+          textShadow: '1px 1px 0 #167927',
           '--endY': p.endY + 'px',
           animationDelay: p.delay + 'ms',
           animationDuration: p.dur + 'ms',
@@ -10591,13 +10348,14 @@ const HotPotatoThrowEffect = (() => {
             }
             if (tq > ENDE - 80) el.style.visibility = 'hidden';
           } else { el.style.visibility = 'hidden'; }
+          // W86r1: Splitter nur im Bildtakt abräumen (vorher bei jedem 60-Hz-Bild → mehr als 30 Bildwechsel/s)
+          const jetzt = performance.now();
+          for (let i = teile.length - 1; i >= 0; i--) if (jetzt >= teile[i].ende) { teile[i].f.remove(); teile.splice(i, 1); }
         }
-        const jetzt = performance.now();
-        for (let i = teile.length - 1; i >= 0; i--) if (jetzt >= teile[i].ende) { teile[i].f.remove(); teile.splice(i, 1); }
-        if (t < ENDE + 400) raf = requestAnimationFrame(bild);
+        if (t < ENDE + 400) raf = (window.ppTaktRaf || requestAnimationFrame)(bild);
       };
       setze(A.x, A.y, 0);
-      raf = requestAnimationFrame(bild);
+      raf = (window.ppTaktRaf || requestAnimationFrame)(bild);
       return () => { cancelAnimationFrame(raf); for (const e of teile) e.f.remove(); };
     }, []);
     if (!geo) return null;
@@ -11986,6 +11744,1501 @@ const DeadlyPoisonHealEffect = (() => {
   return ppPunktBild(malen, ENDE + 40, 280, 330, vorbereiten);
 })();
 
+// ── W86r1 · Pixel-Pfeil (Rain of Arrows, Aquatic Arrows) ─────────────────────────────────────────────────────────────────
+// Senkrechter Pfeil ohne Drehung, Verlauf und Schein: Schaft aus drei harten Farbstufen (Schweif hell → dunkel), Spitze aus drei Pixelzeilen
+// (6 / 4 / 2 px breit, je 2 px hoch) UNTEN — er fällt mit der Spitze voran. Maße in geraden Pixeln, Farben aus der Palette.
+function ppR1Pfeil(laenge, f, breite = 2) {
+  const L = Math.max(12, Math.round(laenge / 2) * 2), b = breite;
+  const t = Math.round(L * 0.3 / 2) * 2, m = Math.round(L * 0.45 / 2) * 2, d = L - t - m;
+  const reihe = (w, y, farbe) => (
+    <div style={{ position: 'absolute', left: -(w - b) / 2, top: y, width: w, height: 2, background: farbe }} />
+  );
+  return (
+    <div style={{ position: 'relative', width: b, height: L + 6 }}>
+      <div style={{ position: 'absolute', left: 0, top: 0, width: b, height: t, background: f[0] }} />
+      <div style={{ position: 'absolute', left: 0, top: t, width: b, height: m, background: f[1] }} />
+      <div style={{ position: 'absolute', left: 0, top: t + m, width: b, height: d, background: f[2] }} />
+      {reihe(b * 3, L, f[3])}{reihe(b * 2, L + 2, f[3])}{reihe(b, L + 4, f[3])}
+    </div>
+  );
+}
+
+// <<W86r1-BEGIN>> (gemeinsame Pixelart-Bausteine und Animationen dieses Pakets; Quelle: nur dieser Block)
+// ═══════════════════════════════════════════════════════════════════
+//  WELLE 86 / W86r1 — Pixelart-Leinwand für Registry-Animationen (Al 29.10.2026: ALLE Animationen sind Pixelart)
+//
+//  Wie `ppPunktBild`/`ppSalve` (ein Rasterpixel = 3 Bildschirmpixel, `image-rendering: pixelated`, feste Paletten, Bayer-Dithering statt Alpha, ~30 Bilder/s,
+//  Wurzel `data-pp-px="aus"`), aber für Animationen, die ihre Eigenschaften selbst mitbringen (`x/y/w/h` plus eigene Felder wie `vonDx`, `count` …) und deren
+//  Fläche sich aus diesen Eigenschaften ergibt.
+//    ppR1Leinwand(malen, ende, mass, opt?) → Komponente
+//      mass: { breite, hoehe, ankerX?, ankerY? } in Bildschirmpixeln, oder Funktion (props) → solche; (ankerX/Y = Lage von (x, y) im Bild, Standard Mitte)
+//      opt.vorbereiten(sz) → Zufallsdaten (einmal gewürfelt); opt.z → Ebene (Standard 10100); opt.wirkung(props) → Nebenwirkung beim Einhängen (z. B. Klasse am Brettelement), gibt die Aufräumfunktion zurück
+//      malen(g, t, sz, teile): zeichnet das Bild zur Zeit `t` (ms seit Einhängen). `sz` { gw, gh, cx, cy (Anker in Rasterpixeln), hw, hh (halbe Karte), props, S }
+//    Pinsel `g` (alles in RASTERkoordinaten; Deckung < 1 = Bayer-gedithert, nie Alpha):
+//      put(x, y, c, a) · block(x, y, w, h, c, a) · disc(cx, cy, r, c, a) · ring(cx, cy, r0, r1, c, a) · ell(cx, cy, rx, ry, c, a) · ellRing(cx, cy, rx, ry, dicke, c, a)
+//      line(x0, y0, x1, y1, c, a, dicke) · spr(zeilen, pal, cx, cy, a, spiegeln) · txt(text, x, y, c, a, mass) · glow(cx, cy, rx, ry, stufen[], a, p) (p > 1: steilerer Abfall nach außen)
+// ═══════════════════════════════════════════════════════════════════
+const ppR1Hex = (h) => ppHex(h);
+const PP_R1_SCHRIFT = {   // 3×5-Pixelschrift (Großbuchstaben, Ziffern, + − ! ?)
+  A: '010101111101101', B: '110101110101110', C: '011100100100011', D: '110101101101110', E: '111100110100111', F: '111100110100100',
+  G: '011100101101011', H: '101101111101101', I: '111010010010111', J: '001001001101010', K: '101101110101101', L: '100100100100111',
+  M: '101111111101101', N: '110101101101101', O: '010101101101010', P: '110101110100100', Q: '010101101111011', R: '110101110101101',
+  S: '011100010001110', T: '111010010010010', U: '101101101101111', V: '101101101101010', W: '101101111111101', X: '101101010101101',
+  Y: '101101010010010', Z: '111001010100111',
+  0: '111101101101111', 1: '010110010010111', 2: '111001111100111', 3: '111001111001111', 4: '101101111001001', 5: '111100111001111',
+  6: '111100111101111', 7: '111001001010010', 8: '111101111101111', 9: '111101111001111',
+  '+': '000010111010000', '-': '000000111000000', '!': '010010010000010', '?': '111001011000010', ' ': '000000000000000',
+};
+function ppR1Pinsel(buf, gw, gh) {
+  const put = (px, py, c, a = 1) => {
+    const X = Math.round(px), Y = Math.round(py);
+    if (X < 0 || Y < 0 || X >= gw || Y >= gh || a <= 0) return;
+    if (a < 1 && ppBayer(X, Y) >= a) return;
+    const i = (Y * gw + X) * 4;
+    buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
+  };
+  const g = {
+    put,
+    block(px, py, w, h, c, a = 1) { px = Math.round(px); py = Math.round(py); for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) put(px + i, py + j, c, a); },
+    disc(cx, cy, r, c, a = 1) {
+      cx = Math.round(cx); cy = Math.round(cy);
+      const R = Math.ceil(r), r2 = r * r + r * 0.6;
+      for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) if (i * i + j * j <= r2) put(cx + i, cy + j, c, a);
+    },
+    ring(cx, cy, r0, r1, c, a = 1) {
+      cx = Math.round(cx); cy = Math.round(cy);
+      const R = Math.ceil(r1), o2 = r1 * r1 + r1 * 0.6, i2 = r0 * r0 + r0 * 0.6;
+      for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) { const d = i * i + j * j; if (d <= o2 && d > i2) put(cx + i, cy + j, c, a); }
+    },
+    ell(cx, cy, rx, ry, c, a = 1) {
+      cx = Math.round(cx); cy = Math.round(cy);
+      const RX = Math.ceil(rx), RY = Math.ceil(ry);
+      for (let j = -RY; j <= RY; j++) for (let i = -RX; i <= RX; i++) if ((i * i) / (rx * rx + rx * 0.6) + (j * j) / (ry * ry + ry * 0.6) <= 1) put(cx + i, cy + j, c, a);
+    },
+    ellRing(cx, cy, rx, ry, dicke, c, a = 1) {
+      cx = Math.round(cx); cy = Math.round(cy);
+      const RX = Math.ceil(rx), RY = Math.ceil(ry), rx2 = Math.max(0.5, rx - dicke), ry2 = Math.max(0.5, ry - dicke);
+      for (let j = -RY; j <= RY; j++) for (let i = -RX; i <= RX; i++) {
+        const o = (i * i) / (rx * rx + rx * 0.6) + (j * j) / (ry * ry + ry * 0.6);
+        if (o <= 1 && (i * i) / (rx2 * rx2) + (j * j) / (ry2 * ry2) > 1) put(cx + i, cy + j, c, a);
+      }
+    },
+    line(x0, y0, x1, y1, c, a = 1, dicke = 1) {
+      const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
+      for (let k = 0; k <= n; k++) {
+        const x = Math.round(x0 + (x1 - x0) * (k / n)), y = Math.round(y0 + (y1 - y0) * (k / n));
+        if (dicke <= 1) put(x, y, c, a); else g.block(x - Math.floor((dicke - 1) / 2), y - Math.floor((dicke - 1) / 2), dicke, dicke, c, a);
+      }
+    },
+    /** Pixelbild: `zeilen` aus Zeichen, `pal` { Zeichen: [r,g,b] }, Mittelpunkt (cx, cy); `spiegeln` kehrt links/rechts um. */
+    spr(zeilen, pal, cx, cy, a = 1, spiegeln = false) {
+      const h = zeilen.length, w = zeilen[0].length, x0 = Math.round(cx - w / 2), y0 = Math.round(cy - h / 2);
+      for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const c = pal[zeilen[j][i]]; if (c) put(x0 + (spiegeln ? w - 1 - i : i), y0 + j, c, a); }
+    },
+    /** Text in der 3×5-Pixelschrift, `mass` = Pixel je Schriftpunkt (ganzzahlig), (x, y) = linke obere Ecke. Gibt die Breite zurück. */
+    txt(text, x, y, c, a = 1, mass = 1) {
+      let px = Math.round(x);
+      for (const ch of String(text).toUpperCase()) {
+        const m = PP_R1_SCHRIFT[ch] || PP_R1_SCHRIFT[' '];
+        for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) if (m[j * 3 + i] === '1') g.block(px + i * mass, Math.round(y) + j * mass, mass, mass, c, a);
+        px += 4 * mass;
+      }
+      return px - Math.round(x) - mass;
+    },
+    /** Weicher Schein als Dither-Stufen: `stufen` von außen nach innen (Farben), nie Alpha. */
+    glow(cx, cy, rx, ry, stufen, a = 1, p = 1) {
+      cx = Math.round(cx); cy = Math.round(cy);
+      const RX = Math.ceil(rx), RY = Math.ceil(ry), n = stufen.length;
+      for (let j = -RY; j <= RY; j++) for (let i = -RX; i <= RX; i++) {
+        const d = Math.hypot(i / rx, j / ry);
+        if (d >= 1) continue;
+        const s = Math.pow(1 - d, p) * n, k = Math.floor(s), neu = (s - k) > ppBayer(cx + i, cy + j) ? k + 1 : k;
+        if (neu <= 0) continue;
+        put(cx + i, cy + j, stufen[Math.min(n, neu) - 1], a);
+      }
+    },
+  };
+  return g;
+}
+function ppR1Leinwand(malen, ende, mass, opt) {
+  const o = opt || {}, S = 3, TAKT = 1000 / 30;
+  return function R1Effekt(props) {
+    const cvs = useRef(null);
+    const m = useMemo(() => {
+      const q = typeof mass === 'function' ? mass(props) : mass;
+      const breite = Math.ceil(q.breite / S) * S, hoehe = Math.ceil(q.hoehe / S) * S;
+      return { breite, hoehe, ax: q.ankerX != null ? q.ankerX : breite / 2, ay: q.ankerY != null ? q.ankerY : hoehe / 2 };
+    }, []);
+    const sz = useMemo(() => {
+      // Das Bild beginnt auf einem Vielfachen von S, damit die Rasterpixel auf ganzen Bildschirmpixeln liegen.
+      const lx = Math.round(props.x - m.ax), ly = Math.round(props.y - m.ay);
+      return { gw: m.breite / S, gh: m.hoehe / S, cx: (props.x - lx) / S, cy: (props.y - ly) / S, S, lx, ly,
+        hw: ((props.w || 64) / S) / 2, hh: ((props.h || 90) / S) / 2, props };
+    }, []);
+    const teile = useMemo(() => (o.vorbereiten ? o.vorbereiten(sz) : null), []);
+    useEffect(() => (o.wirkung ? o.wirkung(props) : undefined), []);
+    useEffect(() => {
+      const el = cvs.current;
+      if (!el || window._playAnimations === false) return undefined;
+      const ctx = el.getContext('2d');
+      const img = ctx.createImageData(sz.gw, sz.gh);
+      const g = ppR1Pinsel(img.data, sz.gw, sz.gh);
+      const t0 = performance.now();
+      let raf = 0, letzte = -1;
+      const takt = window.ppTaktRaf || window.requestAnimationFrame;
+      const schritt = (jetzt) => {
+        if (typeof jetzt !== 'number') jetzt = performance.now();
+        const t = jetzt - t0;
+        const fr = Math.floor(jetzt / TAKT);              // 30 Bilder/s auf dem GLOBALEN Raster (wie alle gebackenen CSS-Animationen und `ppTaktRaf`), nicht relativ zum Start — mehrere Animationen wechseln im Gleichschritt
+        if (fr !== letzte) { letzte = fr; img.data.fill(0); malen(g, Math.max(0, t), sz, teile); ctx.putImageData(img, 0, 0); }
+        if (t < ende) raf = takt(schritt);
+        else { img.data.fill(0); ctx.putImageData(img, 0, 0); }
+      };
+      raf = takt(schritt);
+      return () => cancelAnimationFrame(raf);
+    }, []);
+    return (
+      <div aria-hidden="true" data-pp-px="aus"
+        style={{ position: 'fixed', left: sz.lx, top: sz.ly, pointerEvents: 'none', zIndex: o.z || 10100 }}>
+        <canvas ref={cvs} width={sz.gw} height={sz.gh}
+          style={{ width: m.breite, height: m.hoehe, imageRendering: 'pixelated', display: 'block' }} />
+      </div>
+    );
+  };
+}
+/** Kurven: gleichmäßig verteilte Werte 0..1 → sanfte Beschleunigung (für Flugbahnen im Raster). */
+const ppR1Weich = (k) => { k = Math.max(0, Math.min(1, k)); return k * k * (3 - 2 * k); };
+const ppR1Klemme = (v, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
+/** Ausblenden: Deckung 1 → 0 zwischen `von` und `bis` (ms). */
+const ppR1Aus = (t, von, bis) => (t <= von ? 1 : t >= bis ? 0 : 1 - (t - von) / (bis - von));
+/** Einblenden/Halten/Ausblenden: Deckung 0 → 1 (`a0`..`a1`), halten bis `b0`, 1 → 0 bis `b1`. */
+const ppR1Huelle = (t, a0, a1, b0, b1) => (t < a0 ? 0 : t < a1 ? (t - a0) / (a1 - a0) : t <= b0 ? 1 : t < b1 ? 1 - (t - b0) / (b1 - b0) : 0);
+/** Band entlang einer Strecke (Raster): `form(t)` → { w: Breite in Rasterpixeln, c: Farbe, a?: Deckung } für t 0..1 (null = auslassen); keine Lücken, harte Kanten. */
+function ppR1Band(g, x0, y0, x1, y1, form, a = 1) {
+  const L = Math.hypot(x1 - x0, y1 - y0) || 1, n = Math.max(1, Math.ceil(L * 1.5));
+  const ux = (x1 - x0) / L, uy = (y1 - y0) / L, nx = -uy, ny = ux;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, f = form(t);
+    if (!f) continue;
+    const px = x0 + (x1 - x0) * t, py = y0 + (y1 - y0) * t, hw = f.w / 2;
+    for (let q = -hw; q <= hw + 1e-6; q += 0.6) g.put(px + nx * q, py + ny * q, f.c, a * (f.a == null ? 1 : f.a));
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  W86r1 · Crimson Web (`crimson_web`) — PIXELART. Netzschuss + bleibendes Netz, wie vorher:
+//    0–360 ms   der Faden spannt sich von der Quelle (vonDx, vonDy) zum Ziel (dunkelrote Pixelreihe), der Ballen (Kugel) fliegt entlang und schlägt ein (420 ms)
+//    340 ms ff. die Speichen des Netzes werden nacheinander gezogen (je 490 ms), ab 520 ms die Ringe (die zwischen zwei Speichen zur Mitte durchhängen)
+//    600–820    das Netz „zuckt" kurz (Stauchen/Strecken in ganzen Pixeln); dann hält es, ab ~980 ms (bei `bleibt: false` ~800 ms) dithert es weg
+//  Dazu ein roter Schein (Dither-Stufen) hinter dem Netz. Kein Alpha, kein Weichzeichner; Linien sind Pixelketten.
+// ═════════════════════════════════════════════════════════════════
+const PP_R1_NETZ_ROT = ['#8c0014', '#b5171c', '#e92f38', '#ff6666'].map(ppHex);
+function ppR1Kette(pts) {   // Eckpunkte (Rasterpixel) → dichte Pixelkette ohne Lücken
+  const out = [];
+  for (let i = 1; i < pts.length; i++) {
+    const [x0, y0] = pts[i - 1], [x1, y1] = pts[i];
+    const n = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))));
+    for (let k = i === 1 ? 0 : 1; k <= n; k++) {
+      const x = Math.round(x0 + (x1 - x0) * k / n), y = Math.round(y0 + (y1 - y0) * k / n), l = out[out.length - 1];
+      if (!l || l[0] !== x || l[1] !== y) out.push([x, y]);
+    }
+  }
+  return out;
+}
+function ppR1NetzEcken(rx, ry, speichen, ringe) {   // wie `ppNetzPfade`, nur als Zahlen (px um die Mitte)
+  const winkel = Array.from({ length: speichen }, (_, i) => (i / speichen) * Math.PI * 2 + (((i * 37) % 10) - 5) * 0.025 - Math.PI / 2);
+  const sp = winkel.map(a => [[0, 0], [Math.cos(a) * rx * 1.04, Math.sin(a) * ry * 1.04]]);
+  const rg = [];
+  for (let k = 1; k <= ringe; k++) {
+    const f = k / ringe, pts = [];
+    let p0 = null;
+    for (let i = 0; i <= speichen; i++) {
+      const a = winkel[i % speichen], s = f * (0.94 + (((i * 13 + k * 7) % 10) / 100));
+      const p = [Math.cos(a) * rx * s, Math.sin(a) * ry * s];
+      if (i === 0) { pts.push(p); p0 = p; continue; }
+      const am = (winkel[(i - 1) % speichen] + a + (i === speichen ? Math.PI * 2 : 0)) / 2, durch = s * 0.8;
+      const c = [Math.cos(am) * rx * durch, Math.sin(am) * ry * durch];
+      for (let q = 1; q <= 8; q++) {
+        const u = q / 8, v = 1 - u;
+        pts.push([v * v * p0[0] + 2 * v * u * c[0] + u * u * p[0], v * v * p0[1] + 2 * v * u * c[1] + u * u * p[1]]);
+      }
+      p0 = p;
+    }
+    rg.push(pts);
+  }
+  return { speichen: sp, ringe: rg };
+}
+const ppR1CrimsonWeb = ppR1Leinwand((g, t, sz, teile) => {
+  const { vonDx, vonDy, bleibt, w, h } = teile, S = sz.S, cx = sz.cx, cy = sz.cy;
+  const vx = vonDx / S, vy = vonDy / S;
+  // Schein hinter dem Netz (330 ms, 900 ms lang)
+  const glut = ppR1Huelle(t, 330, 600, 600, 1230);
+  if (glut > 0.05) g.glow(cx, cy, w * 0.65 / S, h * 0.6 / S, [PP_R1_NETZ_ROT[0], PP_R1_NETZ_ROT[1]], glut * 0.55);
+  // Faden: wird in 363 ms von der Quelle zum Ziel gezogen, hält, blendet 660–1100 aus
+  if (t < 1100) {
+    const f = ppR1Klemme(t / 363), a = t < 660 ? 1 : ppR1Aus(t, 660, 1100);
+    const k = ppR1Kette([[cx + vx, cy + vy], [cx + vx * (1 - f), cy + vy * (1 - f)]]);
+    k.forEach(([x, y]) => g.put(x, y, PP_R1_NETZ_ROT[0], a));
+  }
+  // Ballen: fliegt 420 ms, bei 85 % angekommen, danach groß und weg
+  if (t < 460) {
+    const k = ppR1Klemme(t / 420), e = ppR1Klemme(k / 0.85), r = (k < 0.85 ? 0.6 + 0.5 * e : 1.1 + (k - 0.85) / 0.15 * 1.3) * 11 / S;
+    const bx = cx + vx * (1 - ppR1Weich(e)), by = cy + vy * (1 - ppR1Weich(e));
+    ppW76Kugel(g, bx, by, Math.max(1.5, r), { rand: PP_R1_NETZ_ROT[0], t: [PP_R1_NETZ_ROT[3], PP_R1_NETZ_ROT[2], PP_R1_NETZ_ROT[1], PP_R1_NETZ_ROT[0]] }, k < 0.85 ? 1 : 1 - (k - 0.85) / 0.15);
+  }
+  // Netz: Speichen ab 340 ms (je 16 ms versetzt), Ringe ab 520 ms (je 60 ms versetzt); Zucken 600–820 ms
+  const dauer = bleibt ? 1400 : 2000, ziehen = bleibt ? 0.35 : 0.24, halten = bleibt ? 0.70 : 0.40;
+  let sx = 1, sy = 1;
+  if (t >= 600 && t < 820) {
+    const u = (t - 600) / 220;
+    if (u < 0.27) { sx = 1 + 0.06 * (u / 0.27); sy = 1 - 0.05 * (u / 0.27); } else if (u < 0.63) { sx = 1.06 - 0.09 * ((u - 0.27) / 0.36); sy = 0.95 + 0.08 * ((u - 0.27) / 0.36); } else { sx = 0.97 + 0.03 * ((u - 0.63) / 0.37); sy = 1.03 - 0.03 * ((u - 0.63) / 0.37); }
+  }
+  const zeichne = (eck, versatz) => {
+    const lt = t - versatz;
+    if (lt < 0 || lt > dauer) return;
+    const f = ppR1Klemme(lt / (dauer * ziehen)), a = lt > dauer * halten ? ppR1Aus(lt, dauer * halten, dauer) : 1;
+    if (a <= 0) return;
+    const kette = ppR1Kette(eck.map(([x, y]) => [cx + x * sx / S, cy + y * sy / S]));
+    const n = Math.ceil(kette.length * f);
+    for (let i = 0; i < n; i++) g.put(kette[i][0], kette[i][1], PP_R1_NETZ_ROT[1], a);
+  };
+  teile.netz.speichen.forEach((e, i) => zeichne(e, 340 + i * 16));
+  teile.netz.ringe.forEach((e, i) => zeichne(e, 520 + i * 60));
+}, 2500, (p) => {
+  const w = p.w || 80, h = p.h || 110, vdx = p.vonDx || 0, vdy = p.vonDy == null ? 160 : p.vonDy;
+  const l = Math.min(-w * 0.62, vdx - 18) - 6, r = Math.max(w * 0.62, vdx + 18) + 6, o = Math.min(-h * 0.62, vdy - 18) - 6, u = Math.max(h * 0.62, vdy + 18) + 6;
+  return { breite: r - l, hoehe: u - o, ankerX: -l, ankerY: -o };
+}, {
+  z: 10204,
+  vorbereiten: (sz) => {
+    const p = sz.props, w = p.w || 80, h = p.h || 110;
+    return { w, h, vonDx: p.vonDx || 0, vonDy: p.vonDy == null ? 160 : p.vonDy, bleibt: p.bleibt !== false, netz: ppR1NetzEcken(w * 0.52, h * 0.514, 12, 6) };
+  },
+});
+
+// ═════════════════════════════════════════════════════════════════
+//  W86r1 · Divine Punishment (`divine_punishment`) — PIXELART. Rote Blitze regnen von oben auf den negierten Helden; jeder Blitz ist ein gezackter Pixelstreifen
+//  (Kern rosaweiß, Rand rot, Spitze leuchtet), der sich von oben herunter zieht, hält und ausdithert; unten ein roter Einschlagschein (Dither-Stufen).
+// ═════════════════════════════════════════════════════════════════
+const PP_R1_BLITZROT = ['#780014', '#b5171c', '#e92f38', '#ff1a1a', '#fae5eb', '#ffffff'].map(ppHex);
+const ppR1DivinePunishment = ppR1Leinwand((g, t, sz, teile) => {
+  const S = sz.S, cx = sz.cx, cy = sz.cy, C = PP_R1_BLITZROT;
+  teile.blitze.forEach((b) => {
+    const k = (t - b.delay) / b.dur;
+    if (k < 0 || k > 1) return;
+    const reveal = ppR1Klemme(k / 0.25), a = k < 0.6 ? 1 : 1 - (k - 0.6) / 0.4;
+    const top = cy - b.hoehe / S, hoehe = b.hoehe / S, breit = Math.max(2, Math.round(b.breite / S) + 1);
+    const bis = Math.round(hoehe * reveal);
+    for (let j = 0; j <= bis; j++) {
+      const f = j / hoehe, seg = f * (b.zacken.length - 1), i0 = Math.min(b.zacken.length - 2, Math.floor(seg)), fr = seg - i0;
+      const px = cx + (b.links + b.zacken[i0] + (b.zacken[i0 + 1] - b.zacken[i0]) * fr) / S, py = top + j;
+      const spitze = j > bis - 3 && reveal < 1;
+      for (let q = 0; q < breit; q++) {
+        const rand = q === 0 || q === breit - 1;
+        // Farbe nach Höhe: oben dunkelrot, Mitte hell, unten rot; der Kern ist heller als der Rand
+        const h = f < 0.25 ? 1 : f < 0.6 ? 2 : f < 0.85 ? 4 : 3;
+        const ci = spitze ? 5 : rand && breit > 1 ? Math.max(0, h - 1) : h;
+        g.put(px + q, py, C[ci], a);
+      }
+    }
+    if (reveal >= 1) g.glow(cx + (b.links + b.zacken[b.zacken.length - 1]) / S, cy, 3, 2, [C[2], C[4]], a * 0.8);
+  });
+  // Einschlag am Helden: 180 ms, 420 ms lang
+  const f = (t - 180) / 420;
+  if (f >= 0 && f <= 1) {
+    const sk = f < 0.3 ? 0.4 + 0.7 * (f / 0.3) : 1.1 + 0.4 * ((f - 0.3) / 0.7), a = f < 0.3 ? f / 0.3 : 1 - (f - 0.3) / 0.7;
+    g.glow(cx, cy, teile.ww * 0.6 * sk / S, 18 * sk / S, [C[1], C[2], C[4]], a);
+  }
+}, 1200, (p) => {
+  const ww = Math.max(p.w || 80, 80);
+  return { breite: ww * 1.4 + 60, hoehe: 440, ankerX: (ww * 1.4 + 60) / 2, ankerY: 400 };
+}, {
+  z: 10120,
+  vorbereiten: (sz) => {
+    const ww = Math.max(sz.props.w || 80, 80);
+    const blitze = Array.from({ length: ppFxN(7) }, (_, i) => {
+      const zacken = [];
+      let px = 0;
+      for (let seg = 0; seg <= 6; seg++) { px += -14 + Math.random() * 28; zacken.push(px); }
+      return { links: -ww * 0.55 + Math.random() * ww * 1.1, hoehe: 200 + Math.random() * 160, breite: 3 + Math.random() * 4, delay: i * 70 + Math.random() * 60, dur: 260 + Math.random() * 160, zacken };
+    });
+    return { ww, blitze };
+  },
+});
+
+// ═════════════════════════════════════════════════════════════════
+//  W86r1 · Forgetting Question Mark (`forgetting_question_mark`) — PIXELART. Vier, fünf weiße Fragezeichen (Pixelzeichen mit dunkler Kontur, zwei Größen)
+//  poppen über dem Helden auf, zittern in ganzen Pixeln, steigen langsam und dithern aus; ein heller Dither-Schein verankert den Ausbruch auf der Karte.
+// ═════════════════════════════════════════════════════════════════
+const PP_R1_FRAGE_GROSS = ['.#####.', '##...##', '##...##', '....##.', '...##..', '...##..', '.......', '...##..', '...##..'];
+const PP_R1_FRAGE_KLEIN = ['.###.', '#...#', '....#', '..##.', '.#...', '.....', '.#...'];
+function ppR1Frage(g, cx, cy, gross, a) {
+  const z = gross ? PP_R1_FRAGE_GROSS : PP_R1_FRAGE_KLEIN, w = z[0].length, h = z.length, x0 = Math.round(cx - w / 2), y0 = Math.round(cy - h / 2);
+  const dunkel = ppHex('#141414'), hell = ppHex('#ffffff'), lila = ppHex('#d6b3f9');
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1]]) {
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (z[j][i] === '#') g.put(x0 + i + dx, y0 + j + dy, dunkel, a);
+  }
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (z[j][i] === '#') g.put(x0 + i, y0 + j, j >= h - 2 || i > w - 3 ? lila : hell, a);
+}
+const ppR1ForgettingQuestionMark = ppR1Leinwand((g, t, sz, teile) => {
+  const S = sz.S, cx = sz.cx, cy = sz.cy - 30 / S;      // die Marken sitzen 30 px über dem Ankerpunkt
+  const halo = ppR1Huelle(t, 0, 240, 240, 800) * (t < 800 ? 1 : 0);
+  if (halo > 0) g.glow(cx, cy, 45 * (0.5 + 0.8 * ppR1Klemme(t / 800)) / S, 45 * (0.5 + 0.8 * ppR1Klemme(t / 800)) / S, [ppHex('#d6b3f9'), ppHex('#f1e5fa')], halo * 0.55);
+  teile.marken.forEach((m, i) => {
+    const k = (t - m.delay) / m.dur;
+    if (k < 0 || k > 1) return;
+    // Hüllkurve wie vorher: hoch 20 %, halten bis 60 %, aus bis 100 %; Größe .4 → 1,15 → 1 → .85
+    const a = k < 0.2 ? k / 0.2 : k < 0.6 ? 1 : 1 - (k - 0.6) / 0.4;
+    const gr = k < 0.2 ? 0.4 + 0.75 * (k / 0.2) : k < 0.6 ? 1.15 - 0.15 * ((k - 0.2) / 0.4) : 1 - 0.15 * ((k - 0.6) / 0.4);
+    const f = k < 0.2 ? 0.3 * (k / 0.2) : k < 0.6 ? 0.3 + 0.4 * ((k - 0.2) / 0.4) : 0.7 + 0.3 * ((k - 0.6) / 0.4);
+    const zit = (ppHash(i, Math.floor(t / 66), 3) < 0.5 ? -1 : 1) * (k < 0.6 ? 1 : 0);
+    ppR1Frage(g, cx + (m.startX + m.driftX * f) / S + zit, cy + (m.startY + m.riseY * f) / S, gr > 0.62 && m.size > 30, a);
+  });
+}, 2000, { breite: 240, hoehe: 260, ankerX: 120, ankerY: 200 }, {
+  z: 10100,
+  vorbereiten: () => ({
+    marken: Array.from({ length: 4 + Math.floor(Math.random() * 2) }, () => ({
+      startX: -28 + Math.random() * 56, startY: -10 + Math.random() * 20, riseY: -50 - Math.random() * 40, driftX: -20 + Math.random() * 40,
+      size: 26 + Math.random() * 12, delay: Math.random() * 420, dur: 900 + Math.random() * 500,
+    })),
+  }),
+});
+
+// ═════════════════════════════════════════════════════════════════
+//  W86r1 · Realmniversal Emperor (`cosmic_distortion`) — PIXELART. Über der Heldenkarte öffnet sich eine gekippte Spiralgalaxie (drei Arme, per Pixel aus Polarkoordinaten
+//  gerechnet und im Bayer-Raster gestuft, dreht sich 520°, wächst .25 → 1,12 → .35), ein Kern flammt auf, Sterne stürzen ein, ein Verzerrungsring läuft nach außen.
+//  Die Karte selbst wird über `.cosmic-warped` verzerrt (Klasse am Heldenfeld, s. u.). Keine Weichzeichner, kein Alpha, keine 3D-Kippung (die Scheibe ist flach als Ellipse gerechnet).
+// ═════════════════════════════════════════════════════════════════
+const PP_R1_GALAXIE = ['#2b0b47', '#47117e', '#7a2bd0', '#a952ff', '#d6b3f9', '#f1e5fa'].map(ppHex);
+const ppR1CosmicDistortion = ppR1Leinwand((g, t, sz, teile) => {
+  const S = sz.S, cx = sz.cx, cy = sz.cy, C = PP_R1_GALAXIE, ww = teile.ww, hh = teile.hh;
+  const k = ppR1Klemme(t / 1000);
+  // Scheibe: Drehung 0 → 150 (22 %) → 330 (55 %) → 520°, Größe .25 → 1 → 1,12 → .35, Deckung 0 → .95 → 1 → 0
+
+  const dreh = (k < 0.22 ? 150 * (k / 0.22) : k < 0.55 ? 150 + 180 * ((k - 0.22) / 0.33) : 330 + 190 * ((k - 0.55) / 0.45)) * Math.PI / 180;
+  const gr = k < 0.22 ? 0.25 + 0.75 * (k / 0.22) : k < 0.55 ? 1 + 0.12 * ((k - 0.22) / 0.33) : 1.12 - 0.77 * ((k - 0.55) / 0.45);
+  const al = k < 0.22 ? 0.95 * (k / 0.22) : k < 0.55 ? 0.95 + 0.05 * ((k - 0.22) / 0.33) : 1 - ((k - 0.55) / 0.45);
+  if (al > 0.03 && t < 1000) {
+    const rx = (teile.scheibe / 2) * gr / S, ry = rx * 0.34;     // gekippte Scheibe: die Höhe ist ein Drittel der Breite
+    const RX = Math.ceil(rx), RY = Math.ceil(ry);
+    for (let j = -RY; j <= RY; j++) for (let i = -RX; i <= RX; i++) {
+      const u = i / rx, v = j / ry, r = Math.hypot(u, v);
+      if (r >= 1) continue;
+      const th = Math.atan2(v, u) - dreh;
+      const arm = 0.5 + 0.5 * Math.cos(3 * th + 6.5 * r);        // drei Spiralarme
+      const dichte = Math.pow(arm, 1.5) * (1 - r * 0.9) + (1 - r) * 0.25;
+      const s = dichte * 5.2 - 0.3 + (ppBayer(i + 99, j + 99) - 0.5) * 0.9;
+      const ci = Math.floor(s);
+      if (ci < 0) continue;
+      g.put(cx + i, cy + j, C[Math.min(C.length - 1, ci)], al);
+    }
+  }
+  // Kern: gleißend, flammt auf (.2 → 1 → 1,25 → .8 → .1) und kollabiert
+  const kg = k < 0.18 ? 0.2 + 0.8 * (k / 0.18) : k < 0.45 ? 1 + 0.25 * ((k - 0.18) / 0.27) : k < 0.7 ? 1.25 - 0.45 * ((k - 0.45) / 0.25) : 0.8 - 0.7 * ((k - 0.7) / 0.3);
+  const ka = k < 0.18 ? k / 0.18 : k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3;
+  if (ka > 0.03 && t < 1000) {
+    const R = ww * 0.28 * kg / S;
+    g.glow(cx, cy, R * 1.5, R * 1.5, [C[1], C[2], C[3]], ka);
+    g.disc(cx, cy, R * 0.85, C[4], ka);
+    g.disc(cx, cy, R * 0.5, C[5], ka);
+    g.disc(cx, cy, R * 0.22, ppHex('#ffffff'), ka);
+  }
+  // Einstürzende Sterne
+  teile.sterne.forEach((s) => {
+    const q = (t - s.delay) / s.dur;
+    if (q < 0 || q > 1) return;
+    const e = q * q, a = q < 0.2 ? q / 0.2 : 1 - (q - 0.2) / 0.8, r = Math.max(1, Math.round(s.groesse / S));
+    g.block(cx + s.sx * (1 - e) / S - r / 2, cy + s.sy * (1 - e) / S - r / 2, r, r, s.farbe, a);
+  });
+  // Verzerrungsring (260 ms, 620 ms lang): Größe .3 → 1,15 → 2,4
+  const q = (t - 260) / 620;
+  if (q >= 0 && q <= 1) {
+    const sk = q < 0.35 ? 0.3 + 0.85 * (q / 0.35) : 1.15 + 1.25 * ((q - 0.35) / 0.65), a = q < 0.35 ? q / 0.35 : 1 - (q - 0.35) / 0.65;
+    g.ellRing(cx, cy, ww * 0.5 * sk / S, hh * 0.34 * sk / S, 1, C[4], a);
+    if (sk < 1.9) g.ellRing(cx, cy, ww * 0.5 * sk / S - 1, hh * 0.34 * sk / S - 1, 1, C[2], a * 0.8);
+  }
+}, 1100, (p) => {
+  const ww = Math.max(p.w || 90, 90), hh = Math.max(p.h || 120, 120);
+  const bw = Math.max(ww * 1.3, ww * 1.25) * 2 + 40, bh = Math.max(hh * 0.4 * 2.4 + 40, ww * 2.1 * 0.34 * 1.12 + 40);
+  return { breite: bw, hoehe: bh };
+}, {
+  z: 10140,
+  // Die Karte selbst verzerren: das naechstgelegene Heldenfeld bekommt `.cosmic-warped` (kleiner Vorlauf, damit das Brett nach dem Zustands-Update steht).
+  wirkung: ({ x, y }) => {
+    let beste = null, ende = 0;
+    const t = setTimeout(() => {
+      let abstand = Infinity;
+      document.querySelectorAll('[data-hero-zone]').forEach(el => {
+        const r = el.getBoundingClientRect(), d = Math.abs(r.left + r.width / 2 - x) + Math.abs(r.top + r.height / 2 - y);
+        if (d < abstand) { abstand = d; beste = el; }
+      });
+      if (beste && abstand < 90) { beste.classList.add('cosmic-warped'); ende = setTimeout(() => beste.classList.remove('cosmic-warped'), 950); } else beste = null;
+    }, 40);
+    return () => { clearTimeout(t); clearTimeout(ende); if (beste) beste.classList.remove('cosmic-warped'); };
+  },
+  vorbereiten: (sz) => {
+    const ww = Math.max(sz.props.w || 90, 90), hh = Math.max(sz.props.h || 120, 120);
+    const sterne = Array.from({ length: ppFxN(22) }, () => {
+      const winkel = Math.random() * Math.PI * 2, weite = ww * (0.55 + Math.random() * 0.75);
+      return { sx: Math.cos(winkel) * weite, sy: Math.sin(winkel) * weite * 0.5, groesse: 2 + Math.random() * 4,
+        farbe: ['#ffffff', '#d6b3f9', '#7fdfff', '#c98aff'][Math.floor(Math.random() * 4)], delay: Math.random() * 320, dur: 420 + Math.random() * 320 };
+    });
+    sterne.forEach(s => { s.farbe = ppHex(s.farbe); });
+    return { ww, hh, scheibe: ww * 2.1, sterne };
+  },
+});
+
+// ═════════════════════════════════════════════════════════════════
+//  W86r1 · Critical Strike (`critical_slash`) — PIXELART. Zwei schräge Schnitte (±35°) fegen im Kreuz über die Karte (gold-weiße Pixelbalken mit orangen Enden),
+//  dazu Druckwelle, Kreuzungsblitz, „CRITICAL!" in 3×5-Pixelschrift mit dunkelroter Kontur und ein Funkenfächer (gold/rot, Kunstpixel-Quadrate).
+// ═════════════════════════════════════════════════════════════════
+const PP_R1_SCHNITT = ['#f87420', '#f9ac20', '#ffe469', '#fff8e8', '#ffffff'].map(ppHex);
+const ppR1CriticalSlash = ppR1Leinwand((g, t, sz, teile) => {
+  const S = sz.S, cx = sz.cx, cy = sz.cy, C = PP_R1_SCHNITT, len = teile.len / S;
+  // Druckwelle (480 ms): Größe .25 → 1,05 → 1,35 → 1,7, Deckung 0 → 1 → .7 → 0 — als Dither-Scheibe in drei Farbringen
+  const q = t / 480;
+  if (q >= 0 && q <= 1) {
+    const sk = q < 0.25 ? 0.25 + 0.8 * (q / 0.25) : q < 0.65 ? 1.05 + 0.3 * ((q - 0.25) / 0.4) : 1.35 + 0.35 * ((q - 0.65) / 0.35);
+    const a = q < 0.25 ? q / 0.25 : q < 0.65 ? 1 - 0.3 * ((q - 0.25) / 0.4) : 0.7 * (1 - (q - 0.65) / 0.35);
+    g.glow(cx, cy, 80 * sk / S, 80 * sk / S, [ppHex('#e92f38'), C[0], C[1], C[3]], a * 0.3, 1.4);
+  }
+  // Zwei Schnitte: A (−35°) ab 0 ms, B (+35°) ab 110 ms; 220 ms; der Balken gleitet von −130 % auf +130 % seiner Länge entlang seiner Achse
+  [[-35, 0], [35, 110]].forEach(([grad, delay]) => {
+    const k = (t - delay) / 220;
+    if (k < 0 || k > 1) return;
+    const e = 1 - Math.pow(1 - k, 3), a = k < 0.3 ? k / 0.3 : 1 - (k - 0.3) / 0.7;
+    const w = grad * Math.PI / 180, dx = Math.cos(w), dy = Math.sin(w), c0 = len * (-1.3 + 2.6 * e);
+    const mx = cx + dx * c0, my = cy + dy * c0;
+    const bandPass = (extra, farbeFn) => ppR1Band(g, mx - dx * len / 2, my - dy * len / 2, mx + dx * len / 2, my + dy * len / 2, (u) => {
+      if (u < 0.08 || u > 0.92) return null;
+      const m = Math.abs(u - 0.5) * 2;                        // 0 Mitte … 1 Ende
+      return { w: (m < 0.12 ? 6 : m < 0.6 ? 5 : 3) + extra, c: farbeFn(m), a: m > 0.84 ? 0.5 : 1 };
+    }, a);
+    bandPass(3, () => C[0]);                                  // orange Hof (statt Schein), dann der helle Balken
+    bandPass(0, (m) => m < 0.12 ? C[4] : m < 0.35 ? C[3] : m < 0.6 ? C[2] : m < 0.8 ? C[1] : C[0]);
+  });
+  // Kreuzungsblitz (360 ms ab 180 ms): Größe .2 → 1,4 → 2,4
+  const b = (t - 180) / 360;
+  if (b >= 0 && b <= 1) {
+    const sk = b < 0.4 ? 0.2 + 1.2 * (b / 0.4) : 1.4 + (b - 0.4) / 0.6, a = b < 0.4 ? b / 0.4 : 1 - (b - 0.4) / 0.6;
+    g.glow(cx, cy, 30 * sk / S, 30 * sk / S, [C[1], C[2], C[3]], a);
+    g.disc(cx, cy, 8 * sk / S, C[4], a);
+  }
+  // „CRITICAL!" (620 ms ab 180 ms): Größe .3 → 1,15 → 1; steigt zuletzt 14 px
+  if (!teile.noLabel) {
+    const u = (t - 180) / 620;
+    if (u >= 0 && u <= 1) {
+      const a = u < 0.35 ? u / 0.35 : u < 0.75 ? 1 : 1 - (u - 0.75) / 0.25;
+      const gr = u < 0.35 ? 0.3 + 0.85 * (u / 0.35) : u < 0.75 ? 1.15 - 0.15 * ((u - 0.35) / 0.4) : 0.95;
+      const dy = u < 0.35 ? 8 * (1 - u / 0.35) : u < 0.75 ? -2 * ((u - 0.35) / 0.4) : -2 - 12 * ((u - 0.75) / 0.25);
+      const mass = gr < 0.5 ? 1 : 2, text = 'CRITICAL!', breite = text.length * 4 * mass - mass;
+      const x0 = Math.round(cx - breite / 2), y0 = Math.round(cy - 56 / S + dy / S - 5 * mass / 2 + 4);
+      const dunkel = ppHex('#780014');
+      for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]) g.txt(text, x0 + ox, y0 + oy, dunkel, a, mass);
+      g.txt(text, x0, y0 + 0, ppHex('#f8f8bd'), a, mass);
+    }
+  }
+  // Funkenfächer: 24 Funken, gold oder rot
+  teile.funken.forEach((s) => {
+    const k = (t - s.delay) / s.dur;
+    if (k < 0 || k > 1) return;
+    const e = 1 - Math.pow(1 - k, 2), a = k < 0.2 ? k / 0.2 : 1 - (k - 0.2) / 0.8, r = Math.max(1, Math.round(s.size * (1 - 0.85 * k) / S));
+    g.block(cx + Math.cos(s.angle) * s.dist * e / S - r / 2, cy + Math.sin(s.angle) * s.dist * e / S - r / 2, r, r, s.gold ? C[2] : ppHex('#ef2929'), a);
+  });
+}, 1100, (p) => {
+  const half = Math.min(380, Math.max(260, Math.hypot(Math.max(p.w || 80, 80), Math.max(p.h || 110, 110)) * 2.1 * 0.75));
+  return { breite: half * 2, hoehe: half * 2 };
+}, {
+  z: 10120,
+  vorbereiten: (sz) => {
+    const ww = Math.max(sz.props.w || 80, 80), hh = Math.max(sz.props.h || 110, 110);
+    return { noLabel: !!sz.props.noLabel, len: Math.hypot(ww, hh) * 2.1,
+      funken: Array.from({ length: ppFxN(24) }, () => ({ angle: Math.random() * Math.PI * 2, dist: 50 + Math.random() * 120, delay: 120 + Math.random() * 180, dur: 400 + Math.random() * 260, size: 3 + Math.random() * 6, gold: Math.random() < 0.55 })) };
+  },
+});
+
+// ═════════════════════════════════════════════════════════════════
+//  W86r1 · Aquatic Spear (`aquatic_spear_strike`) — PIXELART. Ein türkiser Wasserspeer stürzt steil von oben (20° aus der Senkrechten, +70/−190 → Spitze auf dem Ziel, 280 ms) und
+//  SPIESST es auf: Einschlagblitz, Wasserscherben, enger Splash-Ring; der Speer bleibt zitternd stecken (4 × 90 ms) und dithert ab 650 ms weg. Der Speer wird Pixel für Pixel
+//  aus Achsenkoordinaten gerechnet (Klinge = Raute, Schaft, Wasserschweif als Dither) — nichts wird gedreht oder weichgezeichnet.
+// ═════════════════════════════════════════════════════════════════
+const PP_R1_SPEER = ['#2f539d', '#4e77ca', '#66b6ff', '#66d9ff', '#b3e8f9', '#e5f5fa'].map(ppHex);
+function ppR1Speer(g, tx, ty, a, S) {
+  // Spitze bei (tx, ty); Achse zeigt von der Spitze nach hinten-oben (20° aus der Senkrechten, nach rechts oben)
+  const w = 20 * Math.PI / 180, ux = Math.sin(w), uy = -Math.cos(w), nx = Math.cos(w), ny = Math.sin(w), C = PP_R1_SPEER;
+  const R = Math.ceil(150 / S), cx = Math.round(tx), cy = Math.round(ty);
+  for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) {
+    const s = (i * ux + j * uy) * S, q = (i * nx + j * ny) * S;          // s: Abstand hinter der Spitze (px), q: seitlich (px)
+    if (s < 0 || s > 142 || Math.abs(q) > 10) continue;
+    let c = null, al = 1;
+    if (s <= 30) {                                                       // Klinge: Raute, am breitesten bei s = 24
+      const hb = s <= 24 ? 9 * (s / 24) : 9 * ((30 - s) / 6);
+      if (Math.abs(q) <= hb) c = Math.abs(q) < 1.6 ? C[5] : q > 0 ? C[2] : C[3];
+      else if (Math.abs(q) <= hb + 2.2) c = C[1];                        // Kontur
+    } else if (s <= 120) {                                               // Schaft 6 px breit
+      if (Math.abs(q) <= 3) c = s < 52 ? (q > 0 ? C[1] : C[2]) : (q > 0 ? C[0] : C[1]);
+      else if (Math.abs(q) <= 4.6) c = C[0];
+    } else {                                                             // Wasserschweif: lockerer Dither
+      const f = (s - 120) / 22, br = 7 * (1 - f * 0.4);
+      if (Math.abs(q) <= br) { c = C[3]; al = 0.55 * (1 - f); }
+    }
+    if (c) g.put(cx + i, cy + j, c, a * al);
+  }
+}
+const ppR1AquaticSpearStrike = ppR1Leinwand((g, t, sz, teile) => {
+  const S = sz.S, cx = sz.cx, cy = sz.cy, C = PP_R1_SPEER;
+  // Sturz 0–280 ms: von (+70, −190) zur Spitze auf (0, 0), langsam anfangs, dann schnell (ease-in); Deckung 0 → 1 in den ersten 12 %
+  const fall = ppR1Klemme(t / 280), e = Math.pow(fall, 2.2);
+  let a = t < 280 ? ppR1Klemme(fall / 0.12) : t < 650 ? 1 : ppR1Aus(t, 650, 900);
+  if (a > 0.02) {
+    let ox = 70 * (1 - e), oy = -190 * (1 - e), zit = 0;
+    if (t >= 280 && t < 640) zit = [0, 1, 0, -1][Math.floor((t - 280) / 45) % 4] * 0.34;     // Zittern: ganze Rasterpixel quer zur Achse
+    ppR1Speer(g, cx + ox / S + zit, cy + oy / S, a, S);
+  }
+  // Einschlagblitz (260 ms ab 280 ms): Scheibe 44 px
+  const f = (t - 280) / 260;
+  if (f >= 0 && f <= 1) {
+    const sk = f < 0.3 ? 0.3 + 0.85 * (f / 0.3) : 1.15 + 0.35 * ((f - 0.3) / 0.7), al = f < 0.3 ? f / 0.3 : 1 - (f - 0.3) / 0.7;
+    g.glow(cx, cy, 22 * sk / S, 22 * sk / S, [C[2], C[3], C[5]], al);
+  }
+  // Splash-Ring (420 ms ab 290 ms): 52 px, Größe .25 → 1,6
+  const r = (t - 290) / 420;
+  if (r >= 0 && r <= 1) {
+    const sk = 0.25 + 1.35 * r, al = r < 0.1 ? 0.9 : 0.9 * (1 - (r - 0.1) / 0.9);
+    g.ring(cx, cy, Math.max(0.5, 26 * sk / S - 1.5), 26 * sk / S, C[3], al);
+  }
+  // Wasserscherben
+  teile.scherben.forEach((s) => {
+    const k = (t - s.delay) / s.dur;
+    if (k < 0 || k > 1) return;
+    const e2 = 1 - Math.pow(1 - k, 2), al = k < 0.05 ? 0.95 : 0.95 * (1 - k), sk = 1 - 0.65 * k;
+    const px = cx + (Math.cos(s.rad) * s.dist * e2) / S, py = cy + (Math.sin(s.rad) * s.dist - 14) * e2 / S;
+    g.block(px, py, Math.max(1, Math.round(s.size * sk / S)), Math.max(1, Math.round(s.size * 1.6 * sk / S)), k < 0.5 ? C[4] : C[2], al);
+  });
+}, 1000, { breite: 300, hoehe: 480, ankerX: 120, ankerY: 360 }, {
+  z: 9999,
+  vorbereiten: () => ({
+    scherben: Array.from({ length: ppFxN(10) }, (_, i) => ({ rad: (200 + (i / 10) * 140 + Math.random() * 12) * Math.PI / 180, dist: 30 + Math.random() * 45, size: 4 + Math.random() * 6, delay: 280 + Math.random() * 60, dur: 380 + Math.random() * 220 })),
+  }),
+});
+
+// ═════════════════════════════════════════════════════════════════
+//  W86r1 · Golden Wings (`golden_wings`) — PIXELART. Das Ziel bekommt einen goldenen Glanz (diagonales Dither-Band über die Karte) und zwei Flügel, die einschwingen,
+//  einmal schlagen und kurz stehen bleiben (Buff, kein Angriff). Die Flügel sind aus Pixelfedern gemalt (Kontur, Gold in vier Tönen, Lichtkante) statt aus dem Taubenzeichen
+//  mit Farbfilter; „Schlagen" = Breite in ganzen Pixeln. Dazu Funken in Gold/Weiß, die nach außen treiben.
+// ═════════════════════════════════════════════════════════════════
+const PP_R1_GOLD = ['#8b5b04', '#c68206', '#f9ac20', '#fad54a', '#fbe181', '#fffbd2'].map(ppHex);
+function ppR1Feder(g, sx, sy, dir, ang, laenge, breitenFaktor, a) {
+  const C = PP_R1_GOLD, bog = 22 * Math.PI / 180, schritte = Math.ceil(laenge * 1.4);
+  const punkt = (t) => { const w = ang * Math.PI / 180 + bog * t; return [sx + dir * Math.cos(w) * laenge * t * breitenFaktor, sy + Math.sin(w) * laenge * t]; };
+  // Kontur, Körper, Mitte, Lichtkante (jeweils über die ganze Feder)
+  for (let pass = 0; pass < 4; pass++) for (let i = 0; i <= schritte; i++) {
+    const t = i / schritte, [px, py] = punkt(t), r0 = 2.6 * (1 - t) + 0.9;
+    if (pass === 0) g.disc(px, py, r0 + 1, C[0], a);
+    else if (pass === 1) g.disc(px, py, r0, t < 0.55 ? C[2] : C[1], a);
+    else if (pass === 2) g.disc(px, py - 0.6, Math.max(0.6, r0 * 0.62), t < 0.7 ? C[3] : C[2], a);
+    else if (t < 0.85) g.put(px, py - Math.max(1, r0 * 0.7), t < 0.4 ? C[5] : C[4], a);
+  }
+}
+function ppR1Fluegel(g, sx, sy, dir, breite, a, skala) {
+  if (breite <= 0.05) return;
+  const lang = [22, 26, 28, 27, 24, 19].map(v => v * skala), winkel = [-78, -62, -46, -30, -14, 2];
+  winkel.forEach((w, i) => ppR1Feder(g, sx, sy, dir, w, lang[i], breite, a));
+  [-60, -36, -12].forEach((w, i) => ppR1Feder(g, sx, sy + 1, dir, w, [13, 15, 12][i] * skala, breite, a));
+}
+const ppR1GoldenWings = ppR1Leinwand((g, t, sz, teile) => {
+  const S = sz.S, cx = sz.cx, cy = sz.cy, C = PP_R1_GOLD, cw = teile.cw / S, ch = teile.ch / S;
+  // Glanz (1100 ms ab 100 ms): diagonales Dither-Band über die Karte, Deckung 0 → 1 → .9 → 0
+  const gl = (t - 100) / 1100;
+  if (gl >= 0 && gl <= 1) {
+    const a = gl < 0.3 ? gl / 0.3 : gl < 0.7 ? 1 - 0.1 * ((gl - 0.3) / 0.4) : 0.9 * (1 - (gl - 0.7) / 0.3);
+    for (let j = 0; j < ch; j++) for (let i = 0; i < cw; i++) {
+      const u = (i / cw + j / ch) / 2, band = 1 - Math.abs(u - 0.5) * 3.3;     // Band um die Diagonale, wie `linear-gradient(135deg, 0 20 %, .55 50 %, 0 80 %)`
+      if (band <= 0) continue;
+      g.put(cx - cw / 2 + i, cy - ch / 2 + j, C[4], a * band * 0.45);
+    }
+    // Kartenrand golden
+    if (a > 0.3) { g.block(cx - cw / 2, cy - ch / 2, cw, 1, C[3], a * 0.8); g.block(cx - cw / 2, cy + ch / 2 - 1, cw, 1, C[3], a * 0.8); g.block(cx - cw / 2, cy - ch / 2, 1, ch, C[3], a * 0.8); g.block(cx + cw / 2 - 1, cy - ch / 2, 1, ch, C[3], a * 0.8); }
+  }
+  // Flügel (1100 ms): Breite .3 → 1,15 (35 %) → .95 (55 %) → 1,05 (75 %) → 1 (90 %); schwingt von außen ein (40 px), Deckung 0 → 1 → 0
+  const k = t / 1100;
+  if (k >= 0 && k <= 1) {
+    const br = k < 0.35 ? 0.3 + 0.85 * (k / 0.35) : k < 0.55 ? 1.15 - 0.2 * ((k - 0.35) / 0.2) : k < 0.75 ? 0.95 + 0.1 * ((k - 0.55) / 0.2) : k < 0.9 ? 1.05 - 0.05 * ((k - 0.75) / 0.15) : 1;
+    const ein = k < 0.35 ? 40 * (1 - k / 0.35) : k < 0.9 ? 0 : 8 * ((k - 0.9) / 0.1);
+    const a = k < 0.35 ? k / 0.35 : k < 0.9 ? 1 : 1 - (k - 0.9) / 0.1;
+    const skala = Math.max(0.8, Math.max(teile.cw, teile.ch) / 140);
+    const sy = cy - ch * 0.04;
+    ppR1Fluegel(g, cx + cw * 0.2 + ein / S, sy, 1, br, a, skala);
+    ppR1Fluegel(g, cx - cw * 0.2 - ein / S, sy, -1, br, a, skala);
+  }
+  // Funken
+  teile.funken.forEach((s) => {
+    const q = (t - s.delay) / s.dur;
+    if (q < 0 || q > 1) return;
+    const e = 1 - Math.pow(1 - q, 2), a = q < 0.3 ? q / 0.3 : 1 - (q - 0.3) / 0.7, r = Math.max(1, Math.round(s.size / S));
+    g.block(cx + s.dx * e / S - r / 2, cy + s.dy * e / S - r / 2, r, r, s.farbe, a);
+  });
+}, 1700, (p) => ({ breite: Math.max(p.w || 100, 100) * 3.2 + 60, hoehe: Math.max(p.h || 140, 140) * 1.9 + 60 }), {
+  z: 10100,
+  vorbereiten: (sz) => ({
+    cw: sz.props.w || 100, ch: sz.props.h || 140,
+    funken: Array.from({ length: ppFxN(14) }, () => {
+      const ang = Math.random() * Math.PI * 2, dist = 35 + Math.random() * 40;
+      return { dx: Math.cos(ang) * dist, dy: Math.sin(ang) * dist * 0.7 - 10, size: 3 + Math.random() * 5, delay: 250 + Math.random() * 600, dur: 600 + Math.random() * 400,
+        farbe: ppHex(['#fad54a', '#fffbd2', '#fbe181', '#ffffff'][Math.floor(Math.random() * 4)]) };
+    }),
+  }),
+});
+
+// ═════════════════════════════════════════════════════════════════
+//  W86r1 · Hell Fox Death (`hell_fox_death`) — PIXELART. Eine Säule aus pechschwarzen Flammen bricht aus dem Zonenplatz: 18 Pixelflammen (schwarzer Körper, karminroter Rand und
+//  Kern — auf dem dunklen Brett nur so lesbar) steigen mit Versatz auf und dithern aus, am Boden ein dunkelroter Dither-Ring, dazu karminrote Funken, die im Bogen nach außen fliegen.
+// ═════════════════════════════════════════════════════════════════
+const PP_R1_SCHWARZFLAMME = ['....R....', '...ROR...', '...ROR..R', '..ROYOR.R', '..ROYYORR', '.ROYWYYOR', '.ROYWWYOR', 'ROYYWWYOR', 'ROYWWWYOR', 'DROYYYORD', '.DRROORD.'];
+const PP_R1_SCHWARZ_PAL = { R: ppHex('#b5171c'), O: ppHex('#141414'), Y: ppHex('#2a0404'), W: ppHex('#780014'), D: ppHex('#8c0014') };
+const ppR1HellFoxDeath = ppR1Leinwand((g, t, sz, teile) => {
+  const S = sz.S, cx = sz.cx, cy = sz.cy;
+  // Bodenring (760 ms): Größe .4 → 1 → 1,6, Deckung 0 → 1 (25 %) → 0
+  const h = t / 760;
+  if (h >= 0 && h <= 1) {
+    const sk = h < 0.25 ? 0.4 + 0.6 * (h / 0.25) : 1 + 0.6 * ((h - 0.25) / 0.75), a = h < 0.25 ? h / 0.25 : 1 - (h - 0.25) / 0.75;
+    g.glow(cx, cy, 42 * sk / S, 18 * sk / S, [ppHex('#3a0000'), ppHex('#780014')], a);
+  }
+  teile.flammen.forEach((f) => {
+    const k = (t - f.delay) / f.dur;
+    if (k < 0 || k > 1) return;
+    const a = k < 0.3 ? k / 0.3 : 1 - (k - 0.3) / 0.7;
+    const e = k < 0.3 ? 16 + (f.riseY * 0.35 - 16) * (k / 0.3) : f.riseY * 0.35 + (f.riseY - f.riseY * 0.35) * ((k - 0.3) / 0.7);
+    g.spr(PP_R1_SCHWARZFLAMME, PP_R1_SCHWARZ_PAL, cx + f.startX / S, cy + e / S - 6, a, f.spiegeln);
+  });
+  teile.funken.forEach((s) => {
+    const q = (t - s.delay) / s.dur;
+    if (q < 0 || q > 1) return;
+    const ee = 1 - Math.pow(1 - q, 2), a = q < 0.25 ? q / 0.25 : 1 - (q - 0.25) / 0.75, r = Math.max(1, Math.round(s.size * (1 - 0.5 * q) / S));
+    g.block(cx + s.dx * ee / S, cy + s.dy * ee / S, r, r, q < 0.5 ? ppHex('#ef2929') : ppHex('#c80000'), a);
+  });
+}, 1300, { breite: 240, hoehe: 280, ankerX: 120, ankerY: 200 }, {
+  z: 10100,
+  vorbereiten: () => ({
+    flammen: Array.from({ length: ppFxN(18) }, (_, i) => ({ startX: -22 + Math.random() * 44, riseY: -(60 + Math.random() * 70), delay: i * 28 + Math.random() * 90, dur: 520 + Math.random() * 320, spiegeln: Math.random() < 0.5 })),
+    funken: Array.from({ length: ppFxN(22) }, () => {
+      const winkel = -Math.PI + Math.random() * Math.PI, v = 26 + Math.random() * 36;
+      return { dx: Math.cos(winkel) * v, dy: Math.sin(winkel) * v * 0.6 - 6, size: 3 + Math.random() * 4, delay: 60 + Math.random() * 280, dur: 460 + Math.random() * 260 };
+    }),
+  }),
+});
+
+// ═════════════════════════════════════════════════════════════════
+//  W86r1 · Coffee Steam (`coffee_steam`) — PIXELART. Dunkelbraune Blasen und kleine Dampfwolken steigen aus der Tasse auf (wackeln seitlich, wachsen, dithern aus); am Boden ein brauner
+//  Dither-Schein. Vorher steckten die Zeichen (~ ≈ ☕ ♨) als weich gestreckte Schrift in den Blasen — jetzt sind es Pixelkugeln und ein 7×4-Wolken-Sprite.
+// ═════════════════════════════════════════════════════════════════
+const PP_R1_WOLKE = ['..WW...', '.WWWW.W', 'WWWWWWW', '.GGGGG.'];
+const ppR1CoffeeSteam = ppR1Leinwand((g, t, sz, teile) => {
+  const S = sz.S, cx = sz.cx, cy = sz.cy;
+  // Schein (500 ms): Größe .3 → 1,3 → 1,6, Deckung 1 → .6 → 0
+  const f = t / 500;
+  if (f >= 0 && f <= 1) {
+    const sk = f < 0.5 ? 0.3 + 1.0 * (f / 0.5) : 1.3 + 0.3 * ((f - 0.5) / 0.5), a = f < 0.5 ? 1 - 0.4 * (f / 0.5) : 0.6 * (1 - (f - 0.5) / 0.5);
+    g.glow(cx, cy, 20 * sk / S, 20 * sk / S, [ppHex('#27180c'), ppHex('#3a2412'), ppHex('#5a3c14')], a);
+  }
+  teile.blasen.forEach((b) => {
+    const k = (t - b.delay) / b.dur;
+    if (k < 0 || k > 1) return;
+    // translateY 0 → −15 (20 %) → −45 (60 %) → −80; seitlich 0 → w → −w/2 → w; Größe .5 → 1 → 1,1 → .4; Deckung 0 → .9 → .7 → 0
+    const dy = k < 0.2 ? -15 * (k / 0.2) : k < 0.6 ? -15 - 30 * ((k - 0.2) / 0.4) : -45 - 35 * ((k - 0.6) / 0.4);
+    const dx = k < 0.2 ? b.wobble * (k / 0.2) : k < 0.6 ? b.wobble - 1.5 * b.wobble * ((k - 0.2) / 0.4) : -0.5 * b.wobble + 1.5 * b.wobble * ((k - 0.6) / 0.4);
+    const gr = k < 0.2 ? 0.5 + 0.5 * (k / 0.2) : k < 0.6 ? 1 + 0.1 * ((k - 0.2) / 0.4) : 1.1 - 0.7 * ((k - 0.6) / 0.4);
+    const a = k < 0.2 ? 0.9 * (k / 0.2) : k < 0.6 ? 0.9 - 0.2 * ((k - 0.2) / 0.4) : 0.7 * (1 - (k - 0.6) / 0.4);
+    const px = cx + (b.xOff + dx) / S, py = cy + (dy + 4) / S;
+    if (b.wolke) {
+      g.spr(PP_R1_WOLKE, { W: ppHex('#ebdcc1'), G: ppHex('#886c44') }, px, py, a);
+    } else {
+      const r = Math.max(1, (b.size * gr) / S / 2 + 0.4);
+      g.disc(px, py, r, b.farbe, a);
+      if (r >= 1.6) g.put(px - r * 0.45, py - r * 0.45, ppHex('#c5b7a0'), a);
+    }
+  });
+}, 1100, { breite: 150, hoehe: 150, ankerX: 75, ankerY: 110 }, {
+  z: 10100,
+  vorbereiten: () => ({
+    blasen: Array.from({ length: ppFxN(16) }, (_, i) => ({
+      xOff: -22 + Math.random() * 44, size: 5 + Math.random() * 7, delay: Math.random() * 300, dur: 500 + Math.random() * 500,
+      farbe: ppHex(['#3a2412', '#5a3c14', '#27180c', '#886c44', '#3a2412'][Math.floor(Math.random() * 5)]), wobble: -8 + Math.random() * 16, wolke: i % 3 === 0,
+    })),
+  }),
+});
+
+// ═════════════════════════════════════════════════════════════════
+//  W86r1 · Wütende Anklage (`anklage`, Accusation) — PIXELART. Wie vorher: eine weiße Sprechblase über dem Helden ploppt auf, das rote „!" pocht, Zornesadern (💢) springen an den Ecken
+//  auf, das „!" schrumpft weg und die ANGESAGTE Karte erscheint in der Blase, die Blase zittert vor Wut (Schreistriche blitzen), dann ploppt sie weg; der Held glüht rot.
+//  Blase, „!", Schreistriche, Adern und Glut sind jetzt PIXEL (Blasenform und Schattierung werden je Pixel gerechnet: Kontur, harter Versatzschatten, drei Dither-Stufen
+//  zur Ecke unten rechts, Lichtpunkt oben links — vorher SVG-Pfade mit Kurven und Masken); nur das Kartenbild bleibt ein <img> (`.anklage-karte`, ohne Drehung, harter Ring).
+//  Klang aus der Komponente (Regel ⑤), Zeiten wie in den alten Keyframes (2200 ms).
+// ═════════════════════════════════════════════════════════════════
+const PP_R1_ADER = ['....R....', '.R..R..R.', '..R.R.R..', '...RRR...', 'RRRR.RRRR', '...RRR...', '..R.R.R..', '.R..R..R.', '....R....'];
+const PP_R1_ADER_PAL = { R: ppHex('#ef2929') };
+function ppR1Lerp(punkte, k) {   // [[k0, v0], [k1, v1] …] → linear
+  if (k <= punkte[0][0]) return punkte[0][1];
+  for (let i = 1; i < punkte.length; i++) if (k <= punkte[i][0]) { const [k0, v0] = punkte[i - 1], [k1, v1] = punkte[i]; return v0 + (v1 - v0) * ((k - k0) / (k1 - k0 || 1)); }
+  return punkte[punkte.length - 1][1];
+}
+const R1AnklageLeinwand = ppR1Leinwand((g, t, sz, teile) => {
+  const S = sz.S, cx = sz.cx, cy = sz.cy, p = t / 2200, { B, H, oben, w, h } = teile;
+  const dunkel = ppHex('#141414'), weiss = ppHex('#fff8e8'), grau1 = ppHex('#c5b7a0'), grau2 = ppHex('#a89370'), grau3 = ppHex('#535353'), rot = ppHex('#be0e0e'), rotDunkel = ppHex('#5b0102');
+  // Glut hinter dem Helden
+  const glut = ppR1Lerp([[0, 0], [0.12, 1], [0.6, 0.75], [0.75, 1], [1, 0]], p);
+  if (glut > 0.03) g.glow(cx, cy, w * 0.625 / S, h * 0.575 / S, [ppHex('#780014'), ppHex('#b5171c'), ppHex('#e92f38')], glut * 0.6);
+  if (p > 1) return;
+  // Blase: Größe 0 → 1,18 (9 %) → .94 (14 %) → 1 (18–86 %) → 1,12 (91 %) → 0; Zittern 56–75 %
+  const sc = ppR1Lerp([[0, 0], [0.09, 1.18], [0.14, 0.94], [0.18, 1], [0.86, 1], [0.91, 1.12], [1, 0]], p);
+  if (sc > 0.02) {
+    const ZIT = [[0.58, -4, 1], [0.6, 4, -1], [0.62, -4, 0], [0.64, 3, 1], [0.66, -3, -1], [0.68, 3, 0], [0.7, -2, 1], [0.72, 2, 0], [0.75, 0, 0]];
+    let zx = 0, zy = 0;
+    if (p >= 0.56 && p < 0.75) { const z = ZIT.find(q => p < q[0]) || ZIT[ZIT.length - 1]; zx = z[1]; zy = z[2]; }
+    const gx = cx + zx / S, gy = cy + (oben + zy) / S;                    // Ursprung der Blase (Mitte unten)
+    const ox = -8, oy = 10, r = H * 0.42, hx = B / 2;
+    const lokal = (X, Y) => [((X - gx) * S + 0.5 * S + 8) / sc - 8, ((Y - gy) * S + 0.5 * S - 10) / sc + 10];
+    const innen = (u, v) => {
+      if (v >= -H && v <= 0 && u >= -hx && u <= hx) {
+        const dx = Math.abs(u) > hx - r ? Math.abs(u) - (hx - r) : 0, dy = v < -H + r ? -H + r - v : v > -r ? v + r : 0;
+        if (dx * dx + dy * dy <= r * r) return true;
+      }
+      // Schwanz: schmales Dreieck (−.02B,0) (−.2B,.34H) (−.16B,0)
+      if (v >= 0 && v <= H * 0.34) { const f = v / (H * 0.34), l = -B * 0.16 + (-B * 0.2 + B * 0.16) * f, rr = -B * 0.02 + (-B * 0.2 + B * 0.02) * f; if (u >= Math.min(l, rr) && u <= Math.max(l, rr)) return true; }
+      return false;
+    };
+    const X0 = Math.floor(gx - (B * 0.5 * 1.3 + 14) / S), X1 = Math.ceil(gx + (B * 0.5 * 1.3 + 14) / S), Y0 = Math.floor(gy - (H * 1.3 + 8) / S), Y1 = Math.ceil(gy + (H * 0.5 + 12) / S);
+    for (let Y = Y0; Y <= Y1; Y++) for (let X = X0; X <= X1; X++) {
+      const [u, v] = lokal(X, Y);
+      if (innen(u, v)) {
+        const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => { const [u2, v2] = lokal(X + a, Y + b); return !innen(u2, v2); });
+        if (nb) { g.put(X, Y, dunkel); continue; }
+        // Schattierung: drei Dither-Stufen, nach außen (rechts unten) dichter; Lichtpunkt oben links
+        const e1 = ((u + B * 0.14) / (B * 0.42)) ** 2 + ((v + H * 0.66) / (H * 0.44)) ** 2, e2 = ((u + B * 0.16) / (B * 0.58)) ** 2 + ((v + H * 0.7) / (H * 0.62)) ** 2, e3 = ((u + B * 0.18) / (B * 0.7)) ** 2 + ((v + H * 0.74) / (H * 0.78)) ** 2;
+        const sch = (X + Y) & 1;
+        let c = weiss;
+        if (e3 > 1) c = sch ? grau3 : grau2; else if (e2 > 1) c = sch ? grau2 : grau1; else if (e1 > 1) c = sch ? grau1 : weiss;
+        const hl = ((u + B * 0.16) / (B * 0.22)) ** 2 + ((v + H * 0.7) / (H * 0.2)) ** 2 <= 1;
+        g.put(X, Y, hl ? ppHex('#ffffff') : c);
+      } else {
+        const [u2, v2] = lokal(X - 1, Y - 1);                              // harter Versatzschatten (3 px rechts, 4 px unten)
+        if (innen(u2, v2) && ((X + Y) & 1)) g.put(X, Y, dunkel, 0.7);
+      }
+    }
+    // „!" (Blasenmitte): pocht 0 → 1,25 → … → 1,08 (28 %) → weg (34 %)
+    const sa = ppR1Lerp([[0, 0.4], [0.08, 1.25], [0.13, 0.95], [0.18, 1.12], [0.23, 0.98], [0.28, 1.08], [0.34, 0], [1, 0]], p);
+    if (sa > 0.05) {
+      const k = H / 20 * sc * sa, mx = gx + (0 * sc) / S, my = gy + (-H * 0.5 * sc + 0 * sc) / S;
+      const kasten = (x0, y0, x1, y1) => [Math.round(mx + (x0 * k) / S), Math.round(my + (y0 * k) / S), Math.round(mx + (x1 * k) / S), Math.round(my + (y1 * k) / S)];
+      const bal = [kasten(-2.6, -8, 2.6, 2.5), kasten(-2.6, 4.2, 2.6, 8.6)];
+      bal.forEach(([a, b, c, d]) => g.block(a - 1, b - 1, c - a + 2, d - b + 2, rotDunkel));     // erst beide Konturen, dann beide Füllungen
+      bal.forEach(([a, b, c, d]) => { g.block(a, b, c - a, d - b, rot); g.put(a, b, ppHex('#ef2929')); });
+    }
+    // Schreistriche (ab 1250 ms + je 45 ms, 420 ms): zeigen aus der Blasenmitte nach außen
+    teile.striche.forEach((s) => {
+      const k = (t - s.verzug) / 420;
+      if (k < 0 || k > 1) return;
+      const a = k < 0.35 ? k / 0.35 : 1 - (k - 0.35) / 0.65, len = (H * 0.34) * (k < 0.35 ? k / 0.35 : 1 - 0.4 * ((k - 0.35) / 0.65)), r0 = B * 0.5 + 8 + (k < 0.35 ? 0 : 14 * ((k - 0.35) / 0.65));
+      const wk = s.g * Math.PI / 180, dx = Math.cos(wk), dy = Math.sin(wk), mx = gx, my = gy + (-H * 0.5) / S;
+      ppR1Band(g, mx + dx * r0 / S, my + dy * r0 / S, mx + dx * (r0 + len) / S, my + dy * (r0 + len) / S, (u) => ({ w: 1 + 2 * u, c: dunkel }), a);
+    });
+  }
+  // Zornesadern an den oberen Ecken: 300 ms und 1250 ms, je 700 ms; Größe .2 → 1,25 → .95 → 1,1, Deckung 0 → 1 → 0
+  [300, 1250].forEach((t0, i) => {
+    const k = (t - t0) / 700;
+    if (k < 0 || k > 1) return;
+    const a = k < 0.35 ? k / 0.35 : k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3;
+    g.spr(PP_R1_ADER, PP_R1_ADER_PAL, cx + (i ? -1 : 1) * B * 0.5 / S, cy + (oben - H - 10 + i * 6) / S, a);
+  });
+}, 2300, (p) => {
+  const w = p.w || 80, h = p.h || 110, B = Math.max(64, w * 0.95), H = B * 0.78, oben = -h * 0.5 - H * 0.38;
+  const half = B * 0.9 + 60, top = -oben + H + 60, bottom = h * 0.6 + 24;
+  return { breite: half * 2, hoehe: top + bottom, ankerX: half, ankerY: top };
+}, {
+  z: 10205,
+  vorbereiten: (sz) => {
+    const w = sz.props.w || 80, h = sz.props.h || 110, B = Math.max(64, w * 0.95), H = B * 0.78;
+    return { w, h, B, H, oben: -h * 0.5 - H * 0.38, striche: [-32, 0, 32, 148, 180, 212].map((g, i) => ({ g, verzug: 1250 + (i % 3) * 45 })) };
+  },
+});
+function AnklageEffect(props) {
+  const { x, y, w = 80, h = 110, cardName } = props;
+  const B = Math.max(64, w * 0.95), H = B * 0.78;
+  const bild = cardName && window.cardImageUrl ? window.cardImageUrl(cardName) : null;
+  useEffect(() => {
+    const spiel = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
+    spiel('ping', { rate: 0.75, volume: 0.8 }, 0);
+    spiel('critical_strike', { rate: 1.35, volume: 0.55 }, 60);
+    if (bild) spiel('reveal', { rate: 1.1, volume: 0.8 }, 660);
+    spiel('attack_ram', { rate: 1.4, volume: 0.5 }, 1260);
+  }, []);
+  const kw = Math.round(H * 0.62 / 2) * 2, kh = Math.round(kw * 1.4 / 2) * 2;     // Kartenbild in der Blase (gerade Pixel)
+  const oben = -h * 0.5 - H * 0.38;
+  return (
+    <>
+      <R1AnklageLeinwand x={x} y={y} w={w} h={h} />
+      {bild && (
+        <div className="anklage" style={{ left: x, top: y }} aria-hidden="true">
+          <div className="anklage-blase" style={{ left: 0, top: oben }}>
+            <div className="anklage-zittern">
+              <div className="anklage-karte" style={{ width: kw, height: kh, left: -kw / 2, top: -H * 0.5 - kh / 2 }}>
+                <img src={bild} alt="" draggable="false" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  W86r1 · Holy Revival (`holy_revival`, auch `divine_awakening`) — PIXELART. Goldweißes Licht steigt auf: zwei Lichtblitze (Dither-Scheiben), 16 Strahlen (von außen nach innen wachsende Pixelstriche
+//  in Gold/Weiß), 24 aufsteigende Funken. Vorher: gedrehte Verlaufsbalken mit Rundung (halbe Pixel am Rand) — jetzt Pixelketten, nichts wird gedreht oder weichgezeichnet.
+// ═════════════════════════════════════════════════════════════════
+const ppR1HolyRevival = ppR1Leinwand((g, t, sz, teile) => {
+  const S = sz.S, cx = sz.cx, cy = sz.cy, gold = ppHex('#fad54a'), creme = ppHex('#fff8e8'), blass = ppHex('#f8f8bd'), weiss = ppHex('#ffffff');
+  // Blitz 1: 160 px, 800 ms ab 250 ms; Blitz 2: 100 px, 600 ms ab 200 ms; Größe .3 → 1,5 → 2, Deckung 1 → .7 → 0
+  [[250, 800, 80, [blass, gold, creme]], [200, 600, 50, [creme, ppHex('#f9ecb3'), weiss]]].forEach(([d, dur, rad, farben]) => {
+    const k = (t - d) / dur;
+    if (k < 0 || k > 1) return;
+    const sk = k < 0.5 ? 0.3 + 1.2 * (k / 0.5) : 1.5 + 0.5 * ((k - 0.5) / 0.5), a = k < 0.5 ? 1 - 0.3 * (k / 0.5) : 0.7 * (1 - (k - 0.5) / 0.5);
+    g.glow(cx, cy, rad * sk / S, rad * sk / S, farben, a * 0.9, 2.2);
+  });
+  // Strahlen: wachsen 600–1000 ms; sichtbar ist das Stück [len·(1−s), len] vom Mittelpunkt aus, außen hell, innen blass
+  teile.strahlen.forEach((r) => {
+    const k = (t - r.delay) / r.dur;
+    if (k < 0 || k > 1) return;
+    const s = k, a = k < 0.3 ? 0.9 * (k / 0.3) : 0.9 * (1 - (k - 0.3) / 0.7);
+    const w = r.angle * Math.PI / 180, dx = Math.sin(w), dy = -Math.cos(w), von = r.len * (1 - s), bis = r.len;
+    ppR1Band(g, cx + dx * von / S, cy + dy * von / S, cx + dx * bis / S, cy + dy * bis / S, (u) => (u > 0.65 ? { w: r.breit, c: gold } : u > 0.3 ? { w: r.breit, c: creme, a: 0.6 } : { w: r.breit, c: creme, a: 0.3 }), a);
+  });
+  teile.funken.forEach((s) => {
+    const k = (t - s.delay) / s.dur;
+    if (k < 0 || k > 1) return;
+    const y = s.startY + (k < 0.2 ? -10 * (k / 0.2) : -10 - 90 * ((k - 0.2) / 0.8)), sc = k < 0.2 ? 0.3 + 0.7 * (k / 0.2) : 1 - 0.8 * ((k - 0.2) / 0.8);
+    const a = k < 0.2 ? k / 0.2 : 1 - (k - 0.2) / 0.8, r = Math.max(1, Math.round(s.size * sc / S));
+    g.block(cx + s.xOff / S - r / 2, cy + y / S - r / 2, r, r, s.farbe, a);
+  });
+}, 1700, { breite: 360, hoehe: 400, ankerX: 180, ankerY: 280 }, {
+  z: 10100,
+  vorbereiten: () => ({
+    strahlen: Array.from({ length: ppFxN(16) }, () => ({ angle: Math.random() * 360, len: 60 + Math.random() * 80, breit: Math.random() < 0.5 ? 1 : 2, delay: Math.random() * 400, dur: 600 + Math.random() * 400 })),
+    funken: Array.from({ length: ppFxN(24) }, () => ({
+      xOff: -50 + Math.random() * 100, startY: 20 + Math.random() * 30, delay: 200 + Math.random() * 600, dur: 500 + Math.random() * 500, size: 4 + Math.random() * 8,
+      farbe: ppHex(['#fff8e8', '#fad54a', '#ffffff', '#fbe181', '#f8f8bd'][Math.floor(Math.random() * 5)]),
+    })),
+  }),
+});
+
+// ═════════════════════════════════════════════════════════════════
+//  W86r1 · Münzen (`hell_coins`, `invest_counters_lost`, `dark_deal`) — PIXELART. Münze = 5×5- bzw. 7×7-Pixelscheibe in den festen Gold-Farben des Spielgestalters
+//  (data/palette-fest.json: Rand, Fläche, Glanz, Schatten); das Kippen ist eine Breitenfolge 5-3-1-3 (ganze Pixel), keine 3D-Drehung. `invest_counters_lost`: die Münzen entfärben sich im Fallen
+//  per Dither von Gold zu Grau (vorher `filter: grayscale()`).
+// ═════════════════════════════════════════════════════════════════
+const PP_R1_MUENZE_GRAU = ['#b9b9b9', '#929292', '#686868', '#323232', '#e6e6e6', '#ffffff'].map(ppHex);
+function ppR1Muenze(g, cx, cy, breite, gross, a, graue) {
+  cx = Math.round(cx); cy = Math.round(cy);
+  const R = gross ? 3 : 2, hb = Math.max(0, Math.floor(breite / 2));
+  for (let j = -R; j <= R; j++) {
+    const b = Math.abs(j) === R ? Math.max(0, hb - 1) : hb;
+    for (let i = -b; i <= b; i++) {
+      const rand = Math.abs(i) === b || Math.abs(j) === R, k = rand ? 3 : (i === -b + 1 && j === -R + 1 && b >= 2) ? 4 : (i > 0 && b >= 2) ? 1 : 0;
+      const grau = graue > 0 && ppBayer(cx + i, cy + j) < graue;
+      g.put(cx + i, cy + j, (grau ? PP_R1_MUENZE_GRAU : GG_FARBE)[k], a);
+    }
+  }
+}
+const ppR1HellCoins = ppR1Leinwand((g, t, sz, teile) => {
+  const S = sz.S, cx = sz.cx, cy = sz.cy;
+  // Goldschein (1200 ms): Größe .5 → 1 → 1,2, Deckung 0 → 1 (30 %) → 0
+  const f = t / 1200;
+  if (f >= 0 && f <= 1) {
+    const sk = f < 0.3 ? 0.5 + 0.5 * (f / 0.3) : 1 + 0.2 * ((f - 0.3) / 0.7), a = f < 0.3 ? f / 0.3 : 1 - (f - 0.3) / 0.7;
+    g.glow(cx, cy, 50 * sk / S, 30 * sk / S, [ppHex('#f29a3e'), ppHex('#fad54a'), ppHex('#f7f7ad')], a * 0.5);
+  }
+  teile.muenzen.forEach((m) => {
+    const k = (t - m.delay) / m.dur;
+    if (k < 0 || k > 1) return;
+    // hoch bis 50 % (dx·.6, hoch), dann fällt sie nach (dx, +22); Deckung 0 → 1 (10 %) → 1 → 0
+    const e1 = k < 0.5 ? Math.sin((k / 0.5) * Math.PI / 2) : 1, e2 = k < 0.5 ? 0 : Math.pow((k - 0.5) / 0.5, 2);
+    const x = m.dx * (k < 0.5 ? 0.6 * (k / 0.5) : 0.6 + 0.4 * ((k - 0.5) / 0.5)), y = k < 0.5 ? -m.hoch * e1 : -m.hoch + (m.hoch + 22) * e2;
+    const a = k < 0.1 ? k / 0.1 : k < 0.5 ? 1 : 1 - (k - 0.5) / 0.5;
+    const breite = [5, 3, 1, 3][Math.floor(k * 12 + m.phase) % 4];
+    ppR1Muenze(g, cx + x / S, cy + y / S, breite, false, a, 0);
+  });
+}, 1500, { breite: 220, hoehe: 200, ankerX: 110, ankerY: 150 }, {
+  z: 10100,
+  vorbereiten: () => ({
+    muenzen: Array.from({ length: ppFxN(18) }, () => ({ dx: Math.round((Math.random() - 0.5) * 120), hoch: 30 + Math.random() * 60, delay: Math.round(Math.random() * 380), dur: Math.round(760 + Math.random() * 300), phase: Math.floor(Math.random() * 4) })),
+  }),
+});
+
+const ppR1InvestCountersLost = ppR1Leinwand((g, t, sz, teile) => {
+  const S = sz.S, cx = sz.cx, cy = sz.cy;
+  // aschgrauer Blitz (500 ms): .3 → 1,3 → 1,6
+  const f = t / 500;
+  if (f >= 0 && f <= 1) {
+    const sk = f < 0.5 ? 0.3 + 1.0 * (f / 0.5) : 1.3 + 0.3 * ((f - 0.5) / 0.5), a = f < 0.5 ? 1 - 0.4 * (f / 0.5) : 0.6 * (1 - (f - 0.5) / 0.5);
+    g.glow(cx, cy, 20 * sk / S, 20 * sk / S, [ppHex('#686868'), ppHex('#a8a8a8'), ppHex('#c5b7a0')], a * 0.55);
+  }
+  teile.muenzen.forEach((m) => {
+    const k = (t - m.delay) / m.dur;
+    if (k < 0 || k > 1) return;
+    // 0 → −9 (10 %) → +74 (100 %), langsam anfangs, dann beschleunigt; Deckung 0 → 1 → .85 (55 %) → 0; entfärbt sich ab 10 % (Grau 55 % bei 55 %, 100 % am Ende)
+    const y = k < 0.1 ? -9 * (k / 0.1) : -9 + 83 * Math.pow((k - 0.1) / 0.9, 2);
+    const x = m.drift * (k < 0.1 ? 0 : Math.pow((k - 0.1) / 0.9, 1.5));
+    const a = k < 0.1 ? k / 0.1 : k < 0.55 ? 1 - 0.15 * ((k - 0.1) / 0.45) : 0.85 * (1 - (k - 0.55) / 0.45);
+    const grau = k < 0.1 ? 0 : k < 0.55 ? 0.55 * ((k - 0.1) / 0.45) : 0.55 + 0.45 * ((k - 0.55) / 0.45);
+    const sc = k < 0.1 ? 1 + 0.05 * (k / 0.1) : 1.05 - 0.33 * ((k - 0.1) / 0.9);
+    const gross = m.size * sc > 15;
+    ppR1Muenze(g, cx + (m.xOff + x) / S, cy + y / S, gross ? (sc < 0.85 ? 5 : 7) : 5, gross, a, grau);
+  });
+}, 1500, { breite: 200, hoehe: 200, ankerX: 100, ankerY: 80 }, {
+  z: 10100,
+  vorbereiten: (sz) => {
+    const anzahl = Math.max(3, Math.min(12, sz.props.count || 5));
+    return { muenzen: Array.from({ length: anzahl }, () => ({ xOff: -22 + Math.random() * 44, size: 13 + Math.random() * 9, delay: Math.random() * 260, dur: 620 + Math.random() * 300, drift: -26 + Math.random() * 52 })) };
+  },
+});
+
+const PP_R1_DUNKEL = ['#2e0a51', '#170b28', '#08060c'].map(ppHex);
+const ppR1DarkDeal = ppR1Leinwand((g, t, sz, teile) => {
+  const S = sz.S, cx = sz.cx, cy = sz.cy, C = PP_R1_DUNKEL, cw = teile.cw, ch = teile.ch;
+  // Schatten über der Karte (1500 ms): 0 → 1 (30 %) → .85 (70 %) → 0
+  const f = t / 1500;
+  if (f >= 0 && f <= 1) {
+    const a = f < 0.3 ? f / 0.3 : f < 0.7 ? 1 - 0.15 * ((f - 0.3) / 0.4) : 0.85 * (1 - (f - 0.7) / 0.3);
+    g.glow(cx, cy, (cw / 2 + 8) / S, (ch / 2 + 8) / S, [C[1], C[2]], a * 0.88, 0.6);
+  }
+  // Nebelballen: wachsen von .4 auf 1,5, treiben, werden dunkel und dithern weg
+  teile.nebel.forEach((n) => {
+    const k = (t - n.delay) / n.dur;
+    if (k < 0 || k > 1) return;
+    const a = k < 0.3 ? k / 0.3 : 1 - (k - 0.3) / 0.7, sc = 0.4 + 1.1 * k;
+    g.glow(cx + (n.sx + n.dx * k) / S, cy + (n.sy + n.dy * k) / S, n.size * sc / 2 / S, n.size * sc / 2 / S, [C[1], C[2]], a * 0.8, 1.4);
+  });
+  // Goldmünzen kreisen um die Karte und blitzen auf (kippen 5-3-1-3)
+  teile.muenzen.forEach((m) => {
+    const k = (t - m.delay) / m.dur;
+    if (k < 0 || k > 1) return;
+    const e = ppR1Weich;
+    const x = k < 0.15 ? m.x0 : k < 0.55 ? m.x0 + (m.x1 - m.x0) * e((k - 0.15) / 0.4) : m.x1 + (m.x2 - m.x1) * e((k - 0.55) / 0.45);
+    const y = k < 0.15 ? m.y0 : k < 0.55 ? m.y0 + (m.y1 - m.y0) * e((k - 0.15) / 0.4) : m.y1 + (m.y2 - m.y1) * e((k - 0.55) / 0.45);
+    const a = k < 0.15 ? k / 0.15 : k < 0.55 ? 1 : 1 - (k - 0.55) / 0.45;
+    ppR1Muenze(g, cx + x / S, cy + y / S, [5, 3, 1, 3][Math.floor(k * 14 + m.phase) % 4], false, a, 0);
+  });
+}, 2000, (p) => ({ breite: Math.max(p.w || 100, 100) * 2.2 + 120, hoehe: Math.max(p.h || 140, 140) * 2.0 + 120 }), {
+  z: 10100,
+  vorbereiten: (sz) => {
+    const cw = sz.props.w || 100, ch = sz.props.h || 140;
+    return {
+      cw, ch,
+      nebel: Array.from({ length: ppFxN(14) }, (_, i) => { const a = (i / 14) * Math.PI * 2 + Math.random() * 0.4; return { sx: Math.cos(a) * cw * 0.5, sy: Math.sin(a) * ch * 0.5, dx: Math.cos(a + 1.1) * 38, dy: -20 - Math.random() * 40, size: 46 + Math.random() * 44, delay: Math.round(Math.random() * 450), dur: Math.round(1100 + Math.random() * 600) }; }),
+      muenzen: Array.from({ length: ppFxN(16) }, (_, i) => {
+        const a = (i / 16) * Math.PI * 2 + Math.random() * 0.3, rx = cw * 0.62, ry = ch * 0.56;
+        return { x0: Math.cos(a) * rx, y0: Math.sin(a) * ry, x1: Math.cos(a + 0.9) * rx, y1: Math.sin(a + 0.9) * ry, x2: Math.cos(a + 1.8) * rx * 1.15, y2: Math.sin(a + 1.8) * ry * 1.15 - 18, delay: Math.round(Math.random() * 500), dur: Math.round(900 + Math.random() * 400), phase: Math.floor(Math.random() * 4) };
+      }),
+    };
+  },
+});
+
+// ═════════════════════════════════════════════════════════════════
+//  W86r1 · Looming Threat (`level_down`) — PIXELART. Die STUFE einer Handkreatur sinkt am Zugende: dunkelviolette Pfeile (Pixeldreiecke) sinken über der Karte ab, ein „-1" (3×5-Pixelschrift mit dunkler
+//  Kante) schwebt nach unten und dithert aus, ein violetter Dither-Schein liegt hinter allem. Die Handkarte schwillt kurz an (`.pp-r1-ld-swell`, nur Größe) und wird per Dither-Schwarz abgedunkelt
+//  (vorher `filter: brightness()`).
+// ═════════════════════════════════════════════════════════════════
+const PP_R1_PFEIL_GROSS = ['#######', '.#####.', '..###..', '...#...'], PP_R1_PFEIL_KLEIN = ['#####', '.###.', '..#..'];
+const ppR1LevelDown = ppR1Leinwand((g, t, sz, teile) => {
+  const S = sz.S, cx = sz.cx, cy = sz.cy, lila = ppHex('#ba74ff'), dunkel = ppHex('#401a66'), hell = ppHex('#d6b3f9');
+  // Abdunkeln der Handkarte: Größe 1 → 1,38 (40 %) → 1,38 (60 %) → 1 über 1100 ms; Schwarz-Dither bis .62
+  const q = t / 1100;
+  if (q >= 0 && q <= 1) {
+    const gr = q < 0.4 ? 1 + 0.38 * (q / 0.4) : q < 0.6 ? 1.38 : 1.38 - 0.38 * ((q - 0.6) / 0.4), a = (gr - 1) / 0.38 * 0.62;
+    if (a > 0.04) {
+      const bw = teile.cw * gr / S, bh = teile.ch * gr / S;
+      g.block(cx - bw / 2, cy - bh / 2, Math.round(bw), Math.round(bh), ppHex('#08060c'), a);
+    }
+  }
+  // Schein (800 ms): .4 → 1 → 1,5, Deckung 0 → 1 → 0
+  const f = t / 800;
+  if (f >= 0 && f <= 1) {
+    const sk = f < 0.3 ? 0.4 + 0.6 * (f / 0.3) : 1 + 0.5 * ((f - 0.3) / 0.7), a = f < 0.3 ? f / 0.3 : 1 - (f - 0.3) / 0.7;
+    g.glow(cx, cy, 46 * sk / S, 46 * sk / S, [ppHex('#47117e'), ppHex('#7a2bd0'), ppHex('#9544d5')], a * 0.6);
+  }
+  teile.pfeile.forEach((p) => {
+    const k = (t - p.delay) / 700;
+    if (k < 0 || k > 1) return;
+    const e = Math.pow(k, 1.6), y = -30 + (-22 + 68 * e) + 8, a = k < 0.25 ? k / 0.25 : 1 - (k - 0.25) / 0.75;
+    const rows = p.size < 18 ? PP_R1_PFEIL_KLEIN : PP_R1_PFEIL_GROSS, w = rows[0].length, x0 = Math.round(cx + p.dx / S), y0 = Math.round(cy + y / S);
+    for (let j = 0; j < rows.length; j++) for (let i = 0; i < w; i++) if (rows[j][i] === '#') { g.put(x0 + i + 1, y0 + j + 1, dunkel, a); g.put(x0 + i, y0 + j, lila, a); }
+  });
+  // „-1": 900 ms; Größe .6 → 1,15 → 1; Höhe −14 → 0 → +30
+  const u = t / 900;
+  if (u >= 0 && u <= 1) {
+    const a = u < 0.25 ? u / 0.25 : 1 - (u - 0.25) / 0.75, dy = u < 0.25 ? -14 * (1 - u / 0.25) : 30 * ((u - 0.25) / 0.75);
+    const mass = (u < 0.25 ? 0.6 + 0.55 * (u / 0.25) : 1.15 - 0.15 * ((u - 0.25) / 0.75)) < 0.8 ? 1 : 2;
+    const breite = 2 * 4 * mass - mass, x0 = Math.round(cx - breite / 2), y0 = Math.round(cy + (dy - 3) / S - 5 * mass / 2);
+    g.txt('-1', x0 + 1, y0 + 1, dunkel, a, mass);
+    g.txt('-1', x0, y0, hell, a, mass);
+  }
+}, 1300, (p) => ({ breite: 220, hoehe: 260, ankerX: 110, ankerY: 130 }), {
+  z: 10100,
+  // Die Handkarte unter (x, y) schwillt an (Klasse am echten Handkarten-Element, 1250 ms)
+  wirkung: ({ x, y }) => {
+    let best = null, bestD = Infinity;
+    document.querySelectorAll('.game-hand-me [data-hand-idx], .game-hand-opp [data-hand-idx]').forEach(el => {
+      const r = el.getBoundingClientRect(), d = Math.abs(r.left + r.width / 2 - x) + Math.abs(r.top + r.height / 2 - y);
+      if (d < bestD) { bestD = d; best = el; }
+    });
+    if (!best || bestD > 120) return undefined;
+    best.classList.add('pp-r1-ld-swell');
+    const t = setTimeout(() => best && best.classList.remove('pp-r1-ld-swell'), 1250);
+    return () => { clearTimeout(t); best && best.classList.remove('pp-r1-ld-swell'); };
+  },
+  vorbereiten: (sz) => ({
+    cw: sz.props.w || 74, ch: sz.props.h || 104,
+    pfeile: Array.from({ length: ppFxN(7) }, (_, i) => ({ dx: (i - 3) * 11 + (Math.random() - 0.5) * 6 - 4, delay: i * 70 + Math.round(Math.random() * 40), size: 14 + Math.round(Math.random() * 8) })),
+  }),
+});
+
+// ═════════════════════════════════════════════════════════════════
+//  W86r1 · Maelstrom (`maelstrom`) — PIXELART. Ein Wasserstrudel über das ganze Brett: flacher Wasserteller (Dither-Stufen von Dunkelblau außen nach Hellblau), fünf gestrichelte Ellipsen-Ringe,
+//  die sich gegenläufig immer schneller drehen (die Striche wandern per Winkel um die Ellipse), ein Trichter in der Mitte, Gischt fliegt über die Scheibe hinaus. Vorher: gekippte (3D-)
+//  Scheibe mit gestrichelten Rahmen, Weichzeichner-Schein und Verläufen — jetzt alles Pixel, ohne Kippung (die Ellipsen sind flach gerechnet).
+// ═════════════════════════════════════════════════════════════════
+const PP_R1_STRUDEL = ['#4e82cb', '#2f539d', '#2b457e', '#00213f'].map(ppHex);
+const ppR1Maelstrom = ppR1Leinwand((g, t, sz, teile) => {
+  const S = sz.S, cx = sz.cx, cy = sz.cy, C = PP_R1_STRUDEL, D = teile.durch, FL = 0.36;
+  const k = t / 2000;
+  // Wasserteller: Größe .2 → 1 (18 %) → 1,04 (72 %) → .35, Deckung 0 → 1 → 0
+  if (k >= 0 && k <= 1) {
+    const sk = k < 0.18 ? 0.2 + 0.8 * (k / 0.18) : k < 0.72 ? 1 + 0.04 * ((k - 0.18) / 0.54) : 1.04 - 0.69 * ((k - 0.72) / 0.28), a = k < 0.18 ? k / 0.18 : k < 0.72 ? 1 : 1 - (k - 0.72) / 0.28;
+    g.glow(cx, cy, D / 2 * sk / S, D / 2 * FL * sk / S, C, a * 0.9);
+  }
+  // Ringe
+  teile.ringe.forEach((r, i) => {
+    const q = (t - i * 60) / r.dur;
+    if (q < 0 || q > 1) return;
+    const sk = q < 0.15 ? 0.25 + 0.75 * (q / 0.15) : q < 0.7 ? 1 - 0.08 * ((q - 0.15) / 0.55) : 0.92 - 0.72 * ((q - 0.7) / 0.3);
+    const a = q < 0.15 ? q / 0.15 : q < 0.7 ? 1 : 1 - (q - 0.7) / 0.3;
+    const dreh = r.richtung * (q < 0.15 ? 180 * (q / 0.15) : q < 0.7 ? 180 + 720 * ((q - 0.15) / 0.55) : 900 + 500 * ((q - 0.7) / 0.3)) * Math.PI / 180;
+    const rx = D * r.anteil / 2 * sk / S, ry = rx * FL, umfang = Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)));
+    const n = Math.max(24, Math.ceil(umfang * 2.2)), dicke = r.dicke;
+    const striche = r.voll ? 0 : Math.max(4, Math.round(umfang * S / (3 * r.dicke * S / 1)));
+    for (let j = 0; j < n; j++) {
+      const th = (j / n) * Math.PI * 2;
+      if (!r.voll && Math.floor(((th + dreh) / (Math.PI * 2)) * striche * 2) % 2 !== 0) continue;
+      const px = cx + Math.cos(th) * rx, py = cy + Math.sin(th) * ry;
+      if (dicke > 1) g.block(px - dicke / 2 + 0.5, py - dicke / 2 + 0.5, dicke, dicke, r.farbe, a * r.deckung); else g.put(px, py, r.farbe, a * r.deckung);
+    }
+  });
+  // Trichter: Größe .3 → 1,6 (22 %) → 2,1 (60 %) → .4, Deckung 0 → 1 → 0
+  if (k >= 0 && k <= 1) {
+    const sk = k < 0.22 ? 0.3 + 1.3 * (k / 0.22) : k < 0.6 ? 1.6 + 0.5 * ((k - 0.22) / 0.38) : 2.1 - 1.7 * ((k - 0.6) / 0.4), a = k < 0.22 ? k / 0.22 : k < 0.6 ? 1 : 1 - (k - 0.6) / 0.4;
+    g.glow(cx, cy, D * 0.1 * sk / S, D * 0.05 * sk / S, [C[1], C[3], ppHex('#08060c')], a);
+  }
+  // Gischt
+  teile.gischt.forEach((s) => {
+    const q = (t - s.delay) / s.dur;
+    if (q < 0 || q > 1) return;
+    const e = 1 - Math.pow(1 - q, 2), a = q < 0.25 ? q / 0.25 : 1 - (q - 0.25) / 0.75, sc = q < 0.25 ? 0.5 + 0.5 * (q / 0.25) : 1 - 0.7 * ((q - 0.25) / 0.75);
+    const r = Math.max(1, s.groesse * sc / S / 2 + 0.3);
+    g.disc(cx + s.dx * e / S, cy + s.dy * e / S, r, q < 0.6 ? ppHex('#ffffff') : ppHex('#b6eff7'), a);
+  });
+}, 2100, (p) => {
+  const breite = Math.max(p.w || 600, 280), hoehe = Math.max(p.h || 360, 200), durch = Math.min(breite * 0.98, hoehe * 2.0);
+  return { breite: durch * 1.05 + 40, hoehe: durch * 0.55 + 40 };
+}, {
+  z: 10150,
+  vorbereiten: (sz) => {
+    const breite = Math.max(sz.props.w || 600, 280), hoehe = Math.max(sz.props.h || 360, 200), durch = Math.min(breite * 0.98, hoehe * 2.0);
+    return {
+      durch,
+      ringe: [
+        { anteil: 1.00, dur: 2000, richtung: 1, dicke: 1, farbe: ppHex('#b6eff7'), deckung: 0.5 },
+        { anteil: 0.82, dur: 1650, richtung: -1, dicke: 1, farbe: ppHex('#7fdfff'), deckung: 0.65 },
+        { anteil: 0.63, dur: 1300, richtung: 1, dicke: 2, farbe: ppHex('#b6eff7'), deckung: 0.8 },
+        { anteil: 0.45, dur: 1000, richtung: -1, dicke: 1, farbe: ppHex('#e5f5fa'), deckung: 0.85, voll: true },
+        { anteil: 0.28, dur: 780, richtung: 1, dicke: 1, farbe: ppHex('#ffffff'), deckung: 0.9 },
+      ],
+      gischt: Array.from({ length: ppFxN(22) }, () => { const w = Math.random() * Math.PI * 2, weite = durch * (0.45 + Math.random() * 0.35); return { dx: Math.cos(w) * weite, dy: Math.sin(w) * weite * 0.4 * 0.5, groesse: 4 + Math.random() * 10, delay: 260 + Math.random() * 700, dur: 520 + Math.random() * 420 }; }),
+    };
+  },
+});
+
+// ═════════════════════════════════════════════════════════════════
+//  W86r1 · Flame Avalanche (`flame_avalanche`) — PIXELART. Etliche Flammenfunken schießen vom Wirker auf die Ziele wie ein sehr breiter Flammenwerfer: je Ziel bis zu neun Funken (Kreuz aus vier Tönen),
+//  alle aus demselben Punkt, fächerförmig gestreut und versetzt; jeder fliegt in 2 × 9 Hüpfern (Bahn mit Durchhang) und verschwindet am Ziel; dort schlagen drei Pixel-Sterne ein
+//  (Kreuz → Stern → Reste), am Wirker blitzt ein Mündungsfeuer aus gestapelten Quadratringen, das Brett bebt kurz. Vorher: DOM-Knoten mit `box-shadow`-Zellen, die zwischen den Hüpfern
+//  auf halben Pixeln lagen (Alpha am Rand) — jetzt alles ganzzahlig auf der Leinwand.
+// ═════════════════════════════════════════════════════════════════
+const PP_R1_FLAMME = ['#fffbd2', '#ffd066', '#ff491a', '#8f0000', '#ff9a1a', '#cc2b00'].map(ppHex);
+const ppR1FlameAvalanche = ppR1Leinwand((g, t, sz, teile) => {
+  const S = sz.S, C = PP_R1_FLAMME, dauer = teile.dauer;
+  // Beben (50 % der Dauer, ab 60 ms): kleine Versätze in ganzen Rasterpixeln
+  let bx = 0, by = 0;
+  const bk = (t - 60) / (dauer * 0.5);
+  if (bk >= 0 && bk < 1) { const st = [[0, 0], [-1, 1], [1, -1], [-1, -1], [1, 1], [0, 0]]; [bx, by] = st[Math.min(5, Math.floor(bk * 6))]; }
+  const OX = teile.oX / S + bx, OY = teile.oY / S + by;
+  // Mündungsfeuer: gestapelte Quadratringe, im Bildtakt (60 % der Dauer): Ringe 16/24 → 24/36 → 20/28 → 12, dann aus
+  const mk = t / (dauer * 0.6);
+  if (mk >= 0 && mk < 1) {
+    const sq = (h, c) => { const q = Math.round(h / S); g.block(OX - q, OY - q, 2 * q + 1, 2 * q + 1, c); };
+    if (mk < 0.85) { const [r1, r2, c2] = mk < 0.25 ? [16, 24, C[5]] : mk < 0.55 ? [24, 36, C[5]] : [20, 28, C[3]]; sq(r2, c2); sq(r1, C[4]); } else sq(12, C[2]);
+    sq(8, C[0]);
+  }
+  // Funken
+  teile.bahnen.forEach((b) => {
+    const k = (t - b.verzug) / b.laenge;
+    if (k < 0 || k >= 1) return;
+    const seg = k < 0.5 ? 0 : 1, u = Math.floor(((k - seg * 0.5) / 0.5) * 9) / 9;
+    const [x0, y0, x1, y1] = seg === 0 ? [0, 0, b.mx - teile.oX, b.my - teile.oY] : [b.mx - teile.oX, b.my - teile.oY, b.zx - teile.oX, b.zy - teile.oY];
+    const px = Math.round(OX + (x0 + (x1 - x0) * u) / S), py = Math.round(OY + (y0 + (y1 - y0) * u) / S), z = b.gross ? 2 : 1;
+    // Kreuz: Mitte hell, Arme gelb, Ecken rot, äußere Spitzen dunkelrot
+    g.block(px - z + 0, py - z + 0, 2 * z + 1, 2 * z + 1, C[2]);
+    g.block(px - z, py, 2 * z + 1, 1, C[1]); g.block(px, py - z, 1, 2 * z + 1, C[1]);
+    g.put(px, py, C[0]);
+    [[2 * z, 0], [-2 * z, 0], [0, 2 * z], [0, -2 * z]].forEach(([a, c]) => g.put(px + a, py + c, C[3]));
+  });
+  // Einschläge: drei Bilder (Kreuz → Stern → Reste), 360 ms je
+  teile.treffer.forEach((e) => {
+    const k = (t - e.at) / 360;
+    if (k < 0 || k >= 1) return;
+    const zx = Math.round((e.zx + bx * S) / S), zy = Math.round((e.zy + by * S) / S), z = 2, add = (x, y, f) => g.block(zx + x * z, zy + y * z, z, z, f);
+    if (k < 0.34) { add(0, 0, C[0]); [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([x, y]) => add(x, y, C[1])); }
+    else if (k < 0.68) { add(0, 0, C[1]); [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([x, y]) => { add(x, y, C[4]); add(2 * x, 2 * y, C[2]); }); [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([x, y]) => add(x, y, C[2])); }
+    else { [[2, 1], [-2, 1], [1, -2], [-1, 2], [3, 0], [-3, 0], [0, 3], [0, -3]].forEach(([x, y]) => add(x, y, C[3])); add(0, 0, C[2]); }
+  });
+}, 3000, (p) => { const W = Math.max(p.w || 900, 320), H = Math.max(p.h || 560, 240); return { breite: W, hoehe: H, ankerX: W / 2, ankerY: H / 2 }; }, {
+  z: 10100,
+  vorbereiten: (sz) => {
+    const p = sz.props, W = Math.max(p.w || 900, 320), H = Math.max(p.h || 560, 240), links = p.x - W / 2, oben = p.y - H / 2;
+    const oX = (typeof p.ox === 'number' ? p.ox : p.x) - links, oY = (typeof p.oy === 'number' ? p.oy : p.y + H * 0.35) - oben, dauer = p.duration || 1600, flug = 520;
+    let t0 = Math.round(W * 11 + H * 7 + oX * 3 + oY) >>> 0;
+    const r = () => { t0 = (t0 * 1664525 + 1013904223) >>> 0; return t0 / 4294967296; };
+    let ziele = Array.isArray(p.targetPoints) && p.targetPoints.length ? p.targetPoints.map(q => ({ zx: q.x - links, zy: q.y - oben })) : null;
+    if (!ziele) { const vor = oY > H / 2 ? -1 : 1; ziele = Array.from({ length: 5 }, (_, i) => ({ zx: W * (0.15 + i * 0.175), zy: oY + vor * H * 0.55 })); }
+    const bahnen = [], treffer = [], jeZiel = Math.max(4, Math.min(9, Math.floor(66 / ziele.length)));
+    ziele.forEach((z, zi) => {
+      const spanne = Math.hypot(z.zx - oX, z.zy - oY);
+      for (let i = 0; i < jeZiel; i++) {
+        const zx = z.zx + (r() - 0.5) * Math.max(48, spanne * 0.26), zy = z.zy + (r() - 0.5) * Math.max(34, spanne * 0.17);
+        bahnen.push({ zx, zy, mx: (oX + zx) / 2 + (r() - 0.5) * spanne * 0.22, my: (oY + zy) / 2 + (r() - 0.5) * spanne * 0.18 - spanne * 0.06, gross: r() > 0.55, verzug: Math.round(zi * 20 + i * (r() * 40 + 18)), laenge: Math.round(flug * (0.75 + r() * 0.55)) });
+      }
+      for (let k = 0; k < 3; k++) treffer.push({ zx: z.zx + (r() - 0.5) * 22, zy: z.zy + (r() - 0.5) * 22, at: Math.round(flug * 0.9 + zi * 20 + k * (jeZiel * 11)) });
+    });
+    return { oX, oY, dauer, bahnen, treffer };
+  },
+});
+
+// ═════════════════════════════════════════════════════════════════
+//  W86r1 · Hole in the Sky (`hole_in_the_sky_pull`) — PIXELART. Das Loch saugt ALLE Zielkreaturen gleichzeitig hinein (Kartenbild als Vorlage: tiefrot, pixelige Risse, dunkler Kern).
+//  Leinwand (Pixel): rote Pixelrahmen um jede gepackte Zone, der Pixelkranz um den dunklen Kern (Speichen, die sich drehen), der Kern (gestufte Scheiben), Pixelsplitter, die ins Loch
+//  strudeln, der Zuschnapp-Blitz; die Karten selbst bleiben <div>s mit Kartenbild: jede fährt ihre Spiralbahn als Reihe fester Positionen (translate + scale in den Keyframes, 24 Stützstellen) —
+//  ohne Drehung der Karte (Karten werden nicht gedreht), mit hartem Ring statt Schein. Zeitplan (2400 ms): Loch öffnet sich → Karten kreisen ein → bei 1900 ms (ZUSCHNAPP_MS) schnappt das Loch zu.
+//  Die Rückreise macht die ENGINE (Tote zu ihrem Stapel, Überlebende zurück in ihre Zone). Die Zone wird per `data-pp-im-sog` verborgen (Datenattribut, nicht `className`, siehe CARD_API v1232).
+// ═════════════════════════════════════════════════════════════════
+const PP_R1_HOLE_ZUSCHNAPP = 1900;
+const PP_R1_HOLE_FARBEN = ['#ef2929', '#c0141c', '#ff8566', '#8b0d0d', '#f0bfbc'].map(ppHex);
+const R1HoleLeinwand = ppR1Leinwand((g, t, sz, teile) => {
+  const S = sz.S, W = teile.W, H = teile.H, dauer = teile.dauer, Z = PP_R1_HOLE_ZUSCHNAPP, kern = teile.kern;
+  let bx = 0, by = 0;
+  const bk = (t - (Z - 40)) / 420;
+  if (bk >= 0 && bk < 1) { const st = [[0, 0], [-2, 1], [2, -1], [-1, -1], [1, 1], [0, 0]]; [bx, by] = st[Math.min(5, Math.floor(bk * 6))]; }
+  const mx = W / 2 / S + bx, my = H / 2 / S + by, rot = ppHex('#ef2929'), rot2 = ppHex('#c0141c');
+  // Das Gepackt-Werden: Pixelrahmen um jede Zone (760 ms ab 20 ms): Größe 1,3 → 1 (25 %) → .8, Deckung 0 → 1 → 0
+  teile.ziele.forEach((z) => {
+    const k = (t - 20) / 760;
+    if (k < 0 || k > 1) return;
+    const sk = k < 0.25 ? 1.3 - 0.3 * (k / 0.25) : 1 - 0.2 * ((k - 0.25) / 0.75), a = k < 0.25 ? k / 0.25 : 1 - (k - 0.25) / 0.75;
+    const w = Math.round(80 * sk / S), h = Math.round(108 * sk / S), x0 = Math.round(z.zx / S - w / 2 + bx), y0 = Math.round(z.zy / S - h / 2 + by);
+    g.block(x0, y0, w, 1, rot, a); g.block(x0, y0 + h - 1, w, 1, rot, a); g.block(x0, y0, 1, h, rot, a); g.block(x0 + w - 1, y0, 1, h, rot, a);
+    g.block(x0 + 1, y0 + 1, w - 2, 1, rot2, a * 0.7); g.block(x0 + 1, y0 + h - 2, w - 2, 1, rot2, a * 0.7); g.block(x0 + 1, y0 + 1, 1, h - 2, rot2, a * 0.7); g.block(x0 + w - 2, y0 + 1, 1, h - 2, rot2, a * 0.7);
+  });
+  // Der Pixelkranz: Speichen (7° an, 15° aus), dreht sich gegen den Uhrzeigersinn; Größe .2 → 1 (9 %) → 1,1 → .1 → 0
+  const q = t / dauer;
+  if (q >= 0 && q <= 1) {
+    const zk = Z / dauer;
+    const sc = q < 0.09 ? 0.2 + 0.8 * (q / 0.09) : q < zk ? 1 + 0.1 * ((q - 0.09) / (zk - 0.09)) : q < (Z + 90) / dauer ? 1.1 - 1.0 * ((q - zk) / (90 / dauer)) : Math.max(0, 0.1 * (1 - (q - (Z + 90) / dauer) / (1 - (Z + 90) / dauer)));
+    const dreh = -(q < 0.09 ? 160 * (q / 0.09) : q < zk ? 160 + 660 * ((q - 0.09) / (zk - 0.09)) : 820 + 160 * Math.min(1, (q - zk) / ((Z + 90) / dauer - zk))) * Math.PI / 180;
+    const a = q < 0.09 ? 0.95 * (q / 0.09) : q < (Z + 90) / dauer ? 1 : 1 - (q - (Z + 90) / dauer) / (1 - (Z + 90) / dauer);
+    const r1 = kern * 0.8 * 0.43 * sc / S * 1.0, r2 = kern * 0.8 * 0.724 * sc / S * 1.0, R = Math.ceil(r2);
+    if (sc > 0.05 && a > 0.03) for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) {
+      const d = Math.hypot(i, j);
+      if (d < r1 || d > r2) continue;
+      const w = ((Math.atan2(j, i) - dreh) * 180 / Math.PI % 22 + 22) % 22;
+      if (w < 7) g.put(Math.round(mx) + i, Math.round(my) + j, rot, a * 0.95);
+    }
+    // Kern: gestufte Scheiben (Rand rot, innen dunkel), pocht .1 → 1 → .92 → 1,16 → 1,22 → .08 → 0
+    const ks = q < 0.09 ? 0.1 + 0.9 * (q / 0.09) : q < 0.45 ? 1 - 0.08 * ((q - 0.09) / 0.36) : q < (Z - 150) / dauer ? 0.92 + 0.24 * ((q - 0.45) / ((Z - 150) / dauer - 0.45)) : q < (Z - 20) / dauer ? 1.16 + 0.06 * ((q - (Z - 150) / dauer) / (130 / dauer)) : q < (Z + 90) / dauer ? 1.22 - 1.14 * ((q - (Z - 20) / dauer) / (110 / dauer)) : 0.08 * Math.max(0, 1 - (q - (Z + 90) / dauer) / (1 - (Z + 90) / dauer));
+    const ka = q < 0.09 ? q / 0.09 : q < (Z + 90) / dauer ? 1 : Math.max(0, 1 - (q - (Z + 90) / dauer) / (1 - (Z + 90) / dauer));
+    const KR = kern / 2 * ks / S;
+    if (KR > 0.4 && ka > 0.03) {
+      g.disc(mx, my, KR, rot, ka * 0.9);
+      g.disc(mx, my, KR * 0.86, ppHex('#780014'), ka);
+      g.disc(mx, my, KR * 0.64, ppHex('#270d0c'), ka);
+      g.disc(mx, my, KR * 0.42, ppHex('#000000'), ka);
+    }
+  }
+  // Splitter: strudeln ins Loch (Zickzack über den Mittelpunkt der Bahn), werden kleiner
+  teile.splitter.forEach((s) => {
+    const k = (t - s.verzug) / s.flug;
+    if (k < 0 || k > 1) return;
+    const e = Math.pow(k, 1.7), mid = e < 0.5 ? e / 0.5 : 1;
+    const px = e < 0.5 ? s.kx * mid : s.kx + (s.ex - s.kx) * ((e - 0.5) / 0.5), py = e < 0.5 ? s.ky * mid : s.ky + (s.ey - s.ky) * ((e - 0.5) / 0.5);
+    const a = k < 0.1 ? k / 0.1 : k < 0.92 ? 1 : 1 - (k - 0.92) / 0.08, sc = k < 0.1 ? 1.3 : k < 0.5 ? 1 : 1 - 0.8 * ((k - 0.5) / 0.5);
+    const r = Math.max(1, Math.round(s.g * sc / S));
+    g.block(s.sx / S + px / S - r / 2 + bx, s.sy / S + py / S - r / 2 + by, r, r, s.farbe, a);
+  });
+  // Zuschnappen: Blitz (560 ms ab 1870 ms), Größe .15 → 1 (24 %) → 1,9
+  const f = (t - (Z - 30)) / 560;
+  if (f >= 0 && f <= 1) {
+    const sk = f < 0.24 ? 0.15 + 0.85 * (f / 0.24) : 1 + 0.9 * ((f - 0.24) / 0.76), a = f < 0.24 ? f / 0.24 : 1 - (f - 0.24) / 0.76;
+    g.glow(mx, my, kern * sk / S, kern * sk / S, [ppHex('#8f0000'), ppHex('#ff491a'), ppHex('#fff8e8')], a, 1.5);
+  }
+}, 3200, (p) => { const W = Math.max(p.w || 900, 320), H = Math.max(p.h || 560, 240); return { breite: W, hoehe: H, ankerX: W / 2, ankerY: H / 2 }; }, {
+  z: 10100,
+  vorbereiten: (sz) => {
+    const p = sz.props, W = Math.max(p.w || 900, 320), H = Math.max(p.h || 560, 240), links = p.x - W / 2, oben = p.y - H / 2, mx = W / 2, my = H / 2;
+    const ziele = (Array.isArray(p.targetPoints) ? p.targetPoints : []).map(q => ({ zx: q.x - links, zy: q.y - oben }));
+    let s0 = Math.round(W * 13 + H * 5 + ziele.length * 97) >>> 0;
+    const r = () => { s0 = (s0 * 1664525 + 1013904223) >>> 0; return s0 / 4294967296; };
+    const splitter = [];
+    if (ziele.length) {
+      const jeZiel = Math.max(5, Math.min(ppFxN(12), Math.floor(90 / ziele.length)));
+      ziele.forEach((z, zi) => {
+        for (let i = 0; i < jeZiel; i++) {
+          const sx = z.zx + (r() - 0.5) * 60, sy = z.zy + (r() - 0.5) * 78, dx = mx - sx, dy = my - sy, lang = Math.hypot(dx, dy) || 1, quer = lang * (0.22 + r() * 0.12);
+          const flug = Math.round(680 + r() * 320), verzug = Math.max(120, Math.min(PP_R1_HOLE_ZUSCHNAPP - flug - 40, Math.round(160 + zi * 25 + r() * 520)));
+          splitter.push({ sx, sy, kx: dx * 0.5 + (-dy / lang) * quer, ky: dy * 0.5 + (dx / lang) * quer, ex: dx, ey: dy, g: Math.round(5 + r() * 6), farbe: PP_R1_HOLE_FARBEN[Math.floor(r() * PP_R1_HOLE_FARBEN.length)], verzug, flug });
+        }
+      });
+    }
+    return { W, H, ziele, splitter, dauer: p.duration || 2400, kern: Math.round(Math.min(W, H) * 0.26) };
+  },
+});
+function ppR1SogKeyframes(name, winkel0, r0) {   // Spiralbahn einer Karte als feste Stützstellen (kein rotate, nur translate + scale)
+  const N = 24, punkte = [[0, 1], [0.12, 1.06], [0.55, 0.55], [0.85, 0.22], [0.96, 0.08], [1, 0.04]], rad = [[0, 1], [0.12, 1.04], [0.55, 0.62], [0.85, 0.22], [1, 0]];
+  const lerp = (tab, u) => { for (let i = 1; i < tab.length; i++) if (u <= tab[i][0]) { const [a, va] = tab[i - 1], [b, vb] = tab[i]; return va + (vb - va) * ((u - a) / (b - a)); } return tab[tab.length - 1][1]; };
+  let css = '';
+  for (let k = 0; k <= N; k++) {
+    const u = k / N, ea = Math.pow(u, 1.7), a = (winkel0 - 560 * ea) * Math.PI / 180, rr = r0 * lerp(rad, u);
+    css += `${(u * 100).toFixed(2)}% { transform: translate(${(Math.cos(a) * rr).toFixed(1)}px, ${(Math.sin(a) * rr).toFixed(1)}px) scale(${lerp(punkte, u).toFixed(3)}); opacity: ${u >= 1 ? 0 : 1}; }\n`;
+  }
+  return `@keyframes ${name} {\n${css}}\n`;
+}
+function HoleInTheSkyPullEffekt(props) {
+  const { x, y, w, h, duration, targetPoints } = props;
+  const W = Math.max(w || 900, 320), H = Math.max(h || 560, 240), links = x - W / 2, oben = y - H / 2, mx = W / 2, my = H / 2;
+  const dauer = duration || 2400, Z = PP_R1_HOLE_ZUSCHNAPP;
+  const ziele = useMemo(() => (Array.isArray(targetPoints) ? targetPoints : []).map(p => ({ ...p, zx: p.x - links, zy: p.y - oben })), [targetPoints, links, oben]);
+  // Die eingesogenen Karten: nur Kreaturen (Support-Platz + Name); Helden bleiben stehen. Die Zone wird SOFORT verborgen, der Notnagel gibt sie frei, falls die Rückreise (Engine) ausbleibt.
+  const karten = useMemo(() => {
+    let s0 = Math.round(W * 7 + H * 3 + ziele.length * 31) >>> 0;
+    const r = () => { s0 = (s0 * 1664525 + 1013904223) >>> 0; return s0 / 4294967296; };
+    const aus = [];
+    ziele.forEach((z, i) => {
+      if (!z.cardName || !z.el || z.zoneSlot == null || z.zoneSlot < 0) return;
+      const url = window.cardImageUrl ? window.cardImageUrl(z.cardName) : null;
+      if (!url) return;
+      try {
+        z.el.setAttribute('data-pp-im-sog', '1');
+        const el = z.el;
+        setTimeout(() => el.removeAttribute('data-pp-im-sog'), dauer + 3600);
+      } catch {}
+      const mass = (typeof kartenMassAmBildschirm === 'function') ? kartenMassAmBildschirm(z.el, 'brett') : null;
+      const b = 2 * Math.round((mass?.b || Math.min(z.w || 64, 90)) / 2), hh = 2 * Math.round((mass?.h || b * 1.4) / 2);
+      const dx = z.zx - mx, dy = z.zy - my, verzug = Math.round(i * 55 + r() * 60);
+      aus.push({ url, b, h: hh, radius: Math.hypot(dx, dy), winkel: Math.atan2(dy, dx) * 180 / Math.PI, verzug, flug: Z - 60 - verzug, name: 'ppR1Sog' + i });
+    });
+    return aus;
+  }, [ziele, W, H, mx, my, dauer]);
+  return (
+    <>
+      <R1HoleLeinwand {...props} />
+      <div aria-hidden="true" style={{ position: 'fixed', left: links, top: oben, width: W, height: H, pointerEvents: 'none', zIndex: 10101, overflow: 'hidden', animation: `hitsBeben 420ms steps(1) ${Z - 40}ms both` }}>
+        {karten.map((k) => (
+          <div key={k.name} style={{
+            position: 'absolute', left: mx - k.b / 2, top: my - k.h / 2, width: k.b, height: k.h,
+            backgroundImage: `url("${k.url}")`, backgroundSize: '100% 100%', boxShadow: '0 0 0 2px #ef2929',
+            animation: `${k.name} ${k.flug}ms linear ${k.verzug}ms both`,
+          }} />
+        ))}
+        <style>{`
+          ${karten.map(k => ppR1SogKeyframes(k.name, k.winkel, k.radius)).join('\n')}
+          @keyframes hitsBeben {
+            0%, 100% { transform: translate(0, 0); }
+            16% { transform: translate(-6px, 4px); }
+            34% { transform: translate(6px, -4px); }
+            56% { transform: translate(-4px, -4px); }
+            78% { transform: translate(4px, 4px); }
+          }
+        `}</style>
+      </div>
+    </>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  W86r1 · Divine Gift of Skill (`blessed_skill_burst`) — PIXELART. Eine strahlende Gelehrten-Kaskade um den gewählten Helden (~1,6 s): ein gold-violetter Dither-Schein, eine goldene Lichtsäule,
+//  zwei sich weitende Pixelringe und aufsteigende Goldfunken, dazu das große Doktorhut-Sprite (Platte, Körper, Troddel; poppt .4 → 1,25 → 1 auf), die kreisenden Gelehrtenzeichen (Schriftrolle, Feder,
+//  Atom, Hexagramm, Sterne — als kleine Pixelbilder mit Goldkontur) und das Funkenfeuerwerk. Alles auf einer Leinwand, ohne Drehung und ohne Schein.
+// ═════════════════════════════════════════════════════════════════
+const PP_R1_SEGEN = ['#7a2bd0', '#a952ff', '#d6b3f9', '#fbe181', '#f9ecb3', '#fffbd2'].map(ppHex);
+function ppR1Doktorhut(g, cx, cy, hb, a) {   // hb = halbe Breite der Platte in Rasterpixeln; Gold-Rand, dunkle Fläche (auf dem Brett lesbar), Troddel
+  cx = Math.round(cx); cy = Math.round(cy);
+  const gold = ppHex('#fad54a'), dunkel = ppHex('#323232'), hell = ppHex('#686868'), tr = ppHex('#f9ac20');
+  const h = Math.max(2, Math.round(hb * 0.36)), bh = Math.round(hb * 0.42), bw = Math.round(hb * 0.52);
+  for (let j = 0; j <= bh; j++) for (let i = -bw; i <= bw; i++) g.put(cx + i, cy + h - 1 + j, Math.abs(i) === bw || j === bh ? gold : (i < -bw / 3 ? hell : dunkel), a);   // Körper unter der Platte
+  for (let j = -h; j <= h; j++) {
+    const w = Math.round(hb * (1 - Math.abs(j) / (h + 0.6)));
+    for (let i = -w; i <= w; i++) g.put(cx + i, cy + j, (Math.abs(i) >= w - 1 && w > 1) || Math.abs(j) === h ? gold : (j < 0 && i < 0 ? hell : dunkel), a);
+  }
+  const ex = cx + Math.round(hb * 0.85), ey = cy + h + Math.round(hb * 0.45);                                                                                                                 // Troddel
+  g.line(cx, cy, ex, ey, tr, a);
+  g.block(ex - 1, ey, 3, 3, gold, a);
+}
+const PP_R1_ZEICHEN = {   // kleine Gelehrtenzeichen (Zeichen → Zeilen), '#' = Hauptfarbe, '+' = Zweitfarbe
+  rolle: ['.#####.', '#+++++#', '#+###+#', '#+++++#', '#+##++#', '#+++++#', '.#####.'],
+  feder: ['......###', '....####+', '...###++#', '..###++#.', '.###++#..', '###+##...', '.##+#....', '##.......', '#........'],
+  stern: ['....#....', '....#....', '...###...', '#########', '.#######.', '..#####..', '..##.##..', '.##...##.', '.#.....#.'],
+  funke: ['...#...', '...#...', '..###..', '#######', '..###..', '...#...', '...#...'],
+  hohl: ['...#...', '...#...', '..#+#..', '##+++##', '..#+#..', '...#...', '...#...'],
+  punkt: ['.#.', '###', '.#.'],
+};
+function ppR1Zeichen(g, art, cx, cy, farbe, kante, a) {
+  const rows = PP_R1_ZEICHEN[art];
+  if (rows) {
+    const w = rows[0].length, h = rows.length, x0 = Math.round(cx - w / 2), y0 = Math.round(cy - h / 2);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (rows[j][i] !== '.') g.put(x0 + i + dx, y0 + j + dy, kante, a);
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (rows[j][i] !== '.') g.put(x0 + i, y0 + j, rows[j][i] === '#' ? farbe : ppHex('#fbe181'), a);
+  } else if (art === 'atom') {
+    g.ellRing(cx, cy, 5, 2, 1, kante, a); g.ellRing(cx, cy, 2, 5, 1, kante, a); g.disc(cx, cy, 1.4, farbe, a); g.ellRing(cx, cy, 4, 1.5, 1, farbe, a * 0.8);
+  } else if (art === 'hexagramm') {
+    const R = 5, p = (k, d) => [cx + Math.cos(k * Math.PI / 1.5 + d) * R, cy + Math.sin(k * Math.PI / 1.5 + d) * R];
+    for (const d of [-Math.PI / 2, Math.PI / 2]) for (let k = 0; k < 3; k++) { const [x0, y0] = p(k, d), [x1, y1] = p(k + 1, d); g.line(x0 + 1, y0 + 1, x1 + 1, y1 + 1, kante, a); }
+    for (const d of [-Math.PI / 2, Math.PI / 2]) for (let k = 0; k < 3; k++) { const [x0, y0] = p(k, d), [x1, y1] = p(k + 1, d); g.line(x0, y0, x1, y1, farbe, a); }
+  }
+}
+const R1BlessedLeinwand = ppR1Leinwand((g, t, sz, teile) => {
+  const S = sz.S, cx = sz.cx, cy = sz.cy, C = PP_R1_SEGEN, cw = teile.cw, ch = teile.ch;
+  // Schein: .4 → 1 (25 %) → 1,08 (80 %) → 1,15; Deckung 0 → 1 → .85 → 0 (1500 ms)
+  const k = t / 1500;
+  if (k >= 0 && k <= 1) {
+    const sk = k < 0.25 ? 0.4 + 0.6 * (k / 0.25) : k < 0.8 ? 1 + 0.08 * ((k - 0.25) / 0.55) : 1.08 + 0.07 * ((k - 0.8) / 0.2), a = k < 0.25 ? k / 0.25 : k < 0.8 ? 1 - 0.15 * ((k - 0.25) / 0.55) : 0.85 * (1 - (k - 0.8) / 0.2);
+    g.glow(cx, cy, cw * sk / S, ch * sk / S, [C[1], C[2], C[3]], a * 0.65, 1.5);
+  }
+  // Lichtsäule (100 ms Versatz): Höhe .3 → 1,1 (25 %) → 1 (70 %) → .95, Deckung 0 → 1 → .85 → 0
+  const q = (t - 100) / 1500;
+  if (q >= 0 && q <= 1) {
+    const sy = q < 0.25 ? 0.3 + 0.8 * (q / 0.25) : q < 0.7 ? 1.1 - 0.1 * ((q - 0.25) / 0.45) : 0.95, a = q < 0.25 ? q / 0.25 : q < 0.7 ? 1 - 0.15 * ((q - 0.25) / 0.45) : 0.85 * (1 - (q - 0.7) / 0.3);
+    const hw = cw * 0.45 / S, hh = ch * 1.1 * sy / S;
+    for (let j = -Math.ceil(hh); j <= Math.ceil(hh); j++) {
+      const u = (hh - j) / (2 * hh);                       // 0 unten … 1 oben? (j = +hh ist unten)
+      const prof = u < 0.35 ? (u / 0.35) * 0.5 : u < 0.6 ? 0.5 + 0.2 * ((u - 0.35) / 0.25) : u < 0.85 ? 0.7 - 0.3 * ((u - 0.6) / 0.25) : 0.4 * (1 - (u - 0.85) / 0.15);
+      const farbe = u < 0.4 ? C[3] : u < 0.7 ? C[4] : C[5];
+      for (let i = -Math.ceil(hw); i <= Math.ceil(hw); i++) {
+        const f = 1 - Math.pow(Math.abs(i) / hw, 2);
+        if (f > 0 && u >= 0 && u <= 1) g.put(cx + i, cy + j, farbe, a * prof * f * 1.2);
+      }
+    }
+  }
+  // Ringe: Größe .3 → .85 (25 %) → 2,4; Deckung 0 → 1 → 0
+  teile.ringe.forEach((r) => {
+    const f = (t - r.delay) / r.dur;
+    if (f < 0 || f > 1) return;
+    const sk = f < 0.25 ? 0.3 + 0.55 * (f / 0.25) : 0.85 + 1.55 * ((f - 0.25) / 0.75), a = f < 0.25 ? f / 0.25 : 1 - (f - 0.25) / 0.75, R = r.size * sk / S;
+    g.ring(cx, cy, Math.max(0, R - 1.4), R, C[3], a);
+    g.ring(cx, cy, Math.max(0, R - 2.6), Math.max(0, R - 1.4), C[4], a * 0.6);
+  });
+  // Goldfunken steigen unter der Karte auf
+  teile.aura.forEach((m) => {
+    const f = (t - m.delay) / m.dur;
+    if (f < 0 || f > 1) return;
+    const e = 1 - Math.pow(1 - f, 2), a = f < 0.2 ? f / 0.2 : f < 0.8 ? 1 - 0.1 * ((f - 0.2) / 0.6) : 0.9 * (1 - (f - 0.8) / 0.2), sc = f < 0.2 ? 0.5 + 0.6 * (f / 0.2) : f < 0.8 ? 1.1 - 0.1 * ((f - 0.2) / 0.6) : 1 - 0.6 * ((f - 0.8) / 0.2);
+    g.disc(cx + m.startX / S, cy + (ch * 0.5 + 10 + m.riseY * e) / S, Math.max(0.8, m.size * sc / S / 2), m.farbe, a);
+  });
+  // Großer Doktorhut (1400 ms ab 80 ms): Größe .4 → 1,25 (35 %) → 1 (65 %) → .85; Deckung 0 → 1 → 0
+  const hk = (t - 80) / 1400;
+  if (hk >= 0 && hk <= 1) {
+    const sk = hk < 0.35 ? 0.4 + 0.85 * (hk / 0.35) : hk < 0.65 ? 1.25 - 0.25 * ((hk - 0.35) / 0.3) : 1 - 0.15 * ((hk - 0.65) / 0.35), a = hk < 0.35 ? hk / 0.35 : hk < 0.65 ? 1 : 1 - (hk - 0.65) / 0.35;
+    ppR1Doktorhut(g, cx, cy - 2, 17 * sk, a);
+  }
+  // Kreisende Gelehrtenzeichen: wachsen, ziehen leicht nach innen und dithern aus
+  teile.zeichen.forEach((o) => {
+    const f = (t - o.delay) / o.dur;
+    if (f < 0 || f > 1) return;
+    const a = f < 0.3 ? f / 0.3 : f < 0.8 ? 1 - 0.1 * ((f - 0.3) / 0.5) : 0.9 * (1 - (f - 0.8) / 0.2), e = f < 0.3 ? 0 : f < 0.8 ? 0.8 * ((f - 0.3) / 0.5) : 0.8 + 0.2 * ((f - 0.8) / 0.2);
+    if (f < 0.12) return;                                    // bei Größe < .5 noch nicht zeichnen (die Zeichen sind nur ein Pixelbild)
+    ppR1Zeichen(g, o.art, cx + (o.ox - o.ox * 0.2 * e) / S, cy + (o.oy - o.oy * 0.2 * e) / S, ppHex('#fffbd2'), ppHex('#c68206'), a);
+  });
+  // Funkenfeuerwerk
+  teile.funken.forEach((s) => {
+    const f = (t - s.delay) / s.dur;
+    if (f < 0 || f > 1) return;
+    const e = f < 0.25 ? 0.3 * (f / 0.25) : f < 0.8 ? 0.3 + 0.55 * ((f - 0.25) / 0.55) : 0.85 + 0.15 * ((f - 0.8) / 0.2), a = f < 0.25 ? f / 0.25 : f < 0.8 ? 1 : 1 - (f - 0.8) / 0.2;
+    ppR1Zeichen(g, s.art, cx + s.dx * e / S, cy + s.dy * e / S, s.farbe, ppHex('#7a2bd0'), a);
+  });
+}, 1900, (p) => { const cw = p.w || 100, ch = p.h || 140; return { breite: Math.max(cw * 2 * 1.2, 150 * 2.4) + 60, hoehe: Math.max(ch * 2.4, 130 * 2.4) + 60 }; }, {
+  z: 10100,
+  vorbereiten: (sz) => {
+    const cw = sz.props.w || 100, ch = sz.props.h || 140;
+    return {
+      cw, ch,
+      ringe: [0, 1].map(i => ({ size: 90 + i * 40, delay: i * 100, dur: 1100 + i * 150 })),
+      zeichen: ['rolle', 'feder', 'funke', 'hohl', 'atom', 'hexagramm', 'stern', 'funke'].map((art, i) => { const w = (i / 8) * Math.PI * 2, r = 75 + Math.random() * 18; return { art, ox: Math.cos(w) * r, oy: Math.sin(w) * r, delay: 60 + i * 55, dur: 1500 + Math.random() * 300 }; }),
+      funken: Array.from({ length: ppFxN(32) }, () => { const w = Math.random() * Math.PI * 2, d = 75 + Math.random() * 90, sz = 10 + Math.random() * 16; return { dx: Math.cos(w) * d, dy: Math.sin(w) * d, art: sz < 13 ? 'punkt' : sz < 19 ? 'funke' : Math.random() < 0.5 ? 'hohl' : 'stern', delay: 100 + Math.random() * 400, dur: 800 + Math.random() * 500, farbe: ppHex(['#fad54a', '#fbe181', '#d6bbf1', '#f9ecb3', '#d6b3f9', '#ffffff'][Math.floor(Math.random() * 6)]) }; }),
+      aura: Array.from({ length: ppFxN(14) }, () => ({ startX: -cw / 2 + Math.random() * cw, riseY: -ch * 1.0 - Math.random() * 30, size: 6 + Math.random() * 10, delay: 50 + Math.random() * 600, dur: 1100 + Math.random() * 400, farbe: ppHex(['#ffd066', '#f9ecb3', '#fffbd2', '#fad54a'][Math.floor(Math.random() * 4)]) })),
+    };
+  },
+});
+// ═════════════════════════════════════════════════════════════════
+//  W86r1 · Cosmic Summon (`cosmic_summon`) — PIXELART. Ein schwarz-violettes Portal reißt im Beschwörungsplatz auf: die Leere wächst aus der Mitte (gestufte Dither-Scheibe, schwarzer Kern, violetter
+//  Rand), Sternfunken laufen von außen zur Mitte, ein flieder-weißer Ring weitet sich, am Höhepunkt stiebt Staub nach außen, dann fällt alles zusammen. Reine Dunkelfarben — „aus der Tiefe des Alls
+//  gezogen", keine Feuer-/Eisfamilie.
+// ═════════════════════════════════════════════════════════════════
+const PP_R1_ALL = ['#2e0a51', '#47117e', '#6618b4', '#a040ff', '#d6b3f9', '#ffffff'].map(ppHex);
+const ppR1CosmicSummon = ppR1Leinwand((g, t, sz, teile) => {
+  const S = sz.S, cx = sz.cx, cy = sz.cy, C = PP_R1_ALL, schwarz = ppHex('#000000');
+  // Leere (900 ms): Größe .15 → 1 (35 %) → 1,15 (65 %) → .4; Deckung 0 → .95 → .85 → 0
+  const k = t / 900;
+  if (k >= 0 && k <= 1) {
+    const sk = k < 0.35 ? 0.15 + 0.85 * (k / 0.35) : k < 0.65 ? 1 + 0.15 * ((k - 0.35) / 0.3) : 1.15 - 0.75 * ((k - 0.65) / 0.35), a = k < 0.35 ? 0.95 * (k / 0.35) : k < 0.65 ? 0.95 - 0.1 * ((k - 0.35) / 0.3) : 0.85 * (1 - (k - 0.65) / 0.35);
+    const R = 70 * sk / S;
+    g.glow(cx, cy, R, R, [C[1], C[2], C[0], schwarz], a, 0.9);
+    g.ring(cx, cy, Math.max(0, R - 1.2), R, C[3], a * 0.8);                         // violetter Rand
+  }
+  // Ring (700 ms ab 120 ms): 100 px, Größe .3 → .95 → 1,35 → 1,75; Deckung 0 → .9 → .5 → 0
+  const q = (t - 120) / 700;
+  if (q >= 0 && q <= 1) {
+    const sk = q < 0.3 ? 0.3 + 0.65 * (q / 0.3) : q < 0.6 ? 0.95 + 0.4 * ((q - 0.3) / 0.3) : 1.35 + 0.4 * ((q - 0.6) / 0.4), a = q < 0.3 ? 0.9 * (q / 0.3) : q < 0.6 ? 0.9 - 0.4 * ((q - 0.3) / 0.3) : 0.5 * (1 - (q - 0.6) / 0.4), R = 50 * sk / S;
+    g.ring(cx, cy, Math.max(0, R - 1.2), R, C[4], a);
+    g.ring(cx, cy, Math.max(0, R - 2.4), Math.max(0, R - 1.2), C[5], a * 0.55);
+  }
+  // Sternfunken laufen zur Mitte
+  teile.sterne.forEach((s) => {
+    const f = (t - s.delay) / s.dur;
+    if (f < 0 || f > 1) return;
+    const e = f * f, a = f < 0.25 ? f / 0.25 : 1 - (f - 0.25) / 0.75, r = Math.max(1, Math.round(s.size * (0.6 - 0.45 * f) / S * 1.6));
+    g.block(cx + s.sx * (1 - e) / S - r / 2, cy + s.sy * (1 - e) / S - r / 2, r, r, f < 0.6 ? C[5] : C[4], a);
+  });
+  // Staub (350–500 ms ab): stiebt nach außen
+  teile.staub.forEach((d) => {
+    const f = (t - d.delay) / d.dur;
+    if (f < 0 || f > 1) return;
+    const e = 1 - Math.pow(1 - f, 2), a = f < 0.2 ? 1 : 1 - (f - 0.2) / 0.8, r = Math.max(1, Math.round(d.size * (1.2 - 1.2 * f) / S));
+    g.block(cx + d.dx * e / S - r / 2, cy + d.dy * e / S - r / 2, r, r, d.farbe, a);
+  });
+}, 1200, { breite: 360, hoehe: 360 }, {
+  z: 10100,
+  vorbereiten: () => ({
+    sterne: Array.from({ length: ppFxN(18) }, () => { const w = Math.random() * Math.PI * 2, d = 70 + Math.random() * 60; return { sx: Math.cos(w) * d, sy: Math.sin(w) * d, size: 4 + Math.random() * 6, delay: Math.random() * 220, dur: 420 + Math.random() * 260 }; }),
+    staub: Array.from({ length: ppFxN(12) }, () => { const w = Math.random() * Math.PI * 2, v = 20 + Math.random() * 50; return { dx: Math.cos(w) * v, dy: Math.sin(w) * v, size: 3 + Math.random() * 5, farbe: ppHex(['#c98aff', '#a040ff', '#d6b3f9', '#ffffff', '#7a2bd0'][Math.floor(Math.random() * 5)]), delay: 350 + Math.random() * 150, dur: 400 + Math.random() * 300 }; }),
+  }),
+});
+// <<W86r1-END>>
+
 const ANIM_REGISTRY = {
   // ── Kernschlag ueber dem ganzen Brett (Doomsday Bomb, v580) ───────
   // [Als Vorgabe 22.8.: „Eine zentrale, gewaltige Explosion in der
@@ -13135,7 +14388,7 @@ const ANIM_REGISTRY = {
     }), { radius: 90, z: 10100 });
   })(),
   cannibalism_chomp: CannibalismChompEffect,
-  cosmic_summon: CosmicSummonEffect,
+  cosmic_summon: ppR1CosmicSummon,   // W86r1: Pixelart-Leinwand
   // Mini's tutor-summon flair — small purple hearts orbit and rise
   // around the just-placed Creature, signalling "Cute Annoyance Mini
   // pulled this one in for you". Triggered by the rider step in
@@ -13473,11 +14726,7 @@ const ANIM_REGISTRY = {
   // bekommen wieder „Flammen auf dem Ziel selbst": der Flammenschlag,
   // um 1,4 vergroessert. Die Huelle ist fixed am Zielpunkt und skaliert
   // um genau diesen Punkt; der Schlag darin sitzt bei 0/0.
-  flame_engulf: ({ x, y }) => (
-    <div style={{ position: 'fixed', left: x, top: y, width: 0, height: 0, transform: 'scale(1.4)', pointerEvents: 'none', zIndex: 10100 }}>
-      <FlameStrikeEffect x={0} y={0} />
-    </div>
-  ),
+  flame_engulf: ({ x, y }) => <FlameStrikeEffect x={x} y={y} skala={1.4} />,   // W86r1: vergrößerte Fassung statt skaliertem Wrapper (halbe Pixel)
   black_flame_strike: BlackFlameStrikeEffect,
   demon_fire_pillar: DemonFirePillarEffect,
   cavalry_charge: CavalryChargeEffect,
@@ -13537,7 +14786,7 @@ const ANIM_REGISTRY = {
     };
   })(),
   furious_anger: FuriousAngerEffect,     // v1336
-  anklage: AnklageEffect,                // Accusation, 26.9.
+  anklage: AnklageEffect,                // Accusation, 26.9. — W86r1: Pixelart (Blase auf der Leinwand, Kartenbild als <img>)
   // Torchure (26.9.): das Schwein frisst die Fackel — PIXELART (W86r2, Canvas-Szene `ppSzene`; Pixelbilder von Schwein und Fackel wie zuvor, jetzt Pixel fuer Pixel gezeichnet,
   // die Fackel dreht sich als Pixelsprite ins Maul, Giftflamme und Blasen als Pixelscheiben).
   torchure: (() => {
@@ -13607,7 +14856,7 @@ const ANIM_REGISTRY = {
     };
   })(),
   baby_spider_opfer: BabySpiderOpferEffect,   // Baby Spider, 26.9.
-  crimson_web: CrimsonWebShotEffect,          // Crimson Web, 26.9. (Name war ungenutzt vergeben)
+  crimson_web: ppR1CrimsonWeb,          // Crimson Web, 26.9. — W86r1: Pixelart-Leinwand
   // Divine Gift of Death: die grosse Erweckung (Als Vorgabe 26.9.) — PIXELART (W86r2, Canvas-Szene `ppSzene`). „Eine grosse Revival-Animation", ausdruecklich MAGIE, keine Gestalt.
   //     0–600   das Brett um den Gefallenen verdunkelt sich (Dither-Schatten), unter ihm ein flacher violetter Magiekreis, darueber ein zweiter, aufrechter mit Hexagramm
   //   150–1050  Lichtpartikel stroemen spiralig in den oberen Kreis und verdichten sich zu einer Seelenflamme
@@ -16442,7 +17691,7 @@ const ANIM_REGISTRY = {
           const abstand = Math.hypot(fx - oX, fy - oY) / R;
           const groesse = (22 + r() * 40) * (0.6 + 0.8 * p);
           return { fx, fy, groesse, verzug: Math.round(welle * abstand * 0.9 + r() * 140),
-            laenge: Math.round(650 + r() * 520), kipp: Math.round((r() - 0.5) * 24) };
+            laenge: Math.round(650 + r() * 520) };
         });
         const tropfen = Array.from({ length: Math.round(8 + 44 * p) }, () => {
           const zx = r() * W, zy = H * 0.1 + r() * H * 0.9;
@@ -16488,7 +17737,6 @@ const ANIM_REGISTRY = {
             <div key={'af' + i} className="arma-flamme" style={{
               left: f.fx, top: f.fy, width: f.groesse, height: f.groesse * 1.7,
               marginLeft: -f.groesse / 2, marginTop: -f.groesse * 1.5,
-              '--arma-kipp': f.kipp + 'deg',
               animation: `armaFlamme ${f.laenge}ms ease-out ${f.verzug}ms both`,
             }} />
           ))}
@@ -16498,7 +17746,6 @@ const ANIM_REGISTRY = {
                 left: t.zx, top: t.zy, width: t.groesse, height: t.groesse * 5,
                 marginLeft: -t.groesse / 2, marginTop: -t.groesse * 5,
                 '--arma-vonx': (-t.drift) + 'px', '--arma-vony': (-(t.zy + 120)) + 'px',
-                '--arma-dreh': Math.round(Math.atan2(t.drift, t.zy + 120) * -57.3) + 'deg',
                 animation: `armaFall ${t.fall}ms cubic-bezier(.5,0,1,1) ${t.verzug}ms both`,
               }} />
               <div className="arma-einschlag" style={{
@@ -16892,70 +18139,7 @@ const ANIM_REGISTRY = {
   // Bildes herunterschlaegt; unten ein kurzer Einschlagblitz.
   // Klang: `divine_punishment` in ZONE_ANIM_SFX (`elem_lightning`,
   // tiefer und lauter als der Standardblitz).
-  divine_punishment: (() => {
-    return function DivinePunishmentEffect({ x, y, w, h }) {
-      const ww = Math.max(w || 80, 80);
-      // Zufall EINMAL einfrieren, sonst zucken die Blitze bei jedem
-      // Re-Render neu (Muster aller Animationen).
-      const blitze = useMemo(() => Array.from({ length: ppFxN(7) }, (_, i) => {
-        const zacken = [];
-        let px = 0;
-        for (let seg = 0; seg <= 6; seg++) {
-          px += -14 + Math.random() * 28;
-          zacken.push(`${px.toFixed(1)}px ${(seg * 16).toFixed(0)}%`);
-        }
-        return {
-          links: -ww * 0.55 + Math.random() * ww * 1.1,
-          hoehe: 200 + Math.random() * 160,
-          breite: 3 + Math.random() * 4,
-          delay: i * 70 + Math.random() * 60,
-          dur: 260 + Math.random() * 160,
-          zacken,
-        };
-      }), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10120 }}>
-          {blitze.map((b, i) => (
-            <div key={'dp' + i} style={{
-              position: 'absolute',
-              left: b.links, top: -b.hoehe,
-              width: b.breite + 'px', height: b.hoehe + 'px',
-              background: 'linear-gradient(180deg, rgba(254,116,118,0) 0%, rgba(233,47,56,.85) 25%,'
-                + ' rgba(250,229,235,1) 70%, rgba(255,26,26,.9) 100%)',
-              boxShadow: '0 0 10px rgba(240,50,50,.95), 0 0 26px rgba(190,14,14,.7)',
-              clipPath: `polygon(${b.zacken.map(z => z).join(', ')}, ${b.zacken.slice().reverse().map(z => {
-                const [px, py] = z.split(' ');
-                return `calc(${px} + ${b.breite}px) ${py}`;
-              }).join(', ')})`,
-              animation: `divinePunishBolt ${b.dur}ms steps(3, end) ${b.delay}ms forwards`,
-              opacity: 0,
-            }} />
-          ))}
-          {/* Einschlag am Helden */}
-          <div style={{
-            position: 'absolute', left: -ww * 0.6, top: -18,
-            width: ww * 1.2, height: 36, borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(250,229,235,.95) 0%, rgba(240,50,50,.6) 45%, transparent 78%)',
-            animation: 'divinePunishFlash 420ms ease-out 180ms forwards',
-            opacity: 0,
-          }} />
-          <style>{`
-            @keyframes divinePunishBolt {
-              0%   { opacity: 0; transform: translateY(-24px) scaleY(.6); }
-              20%  { opacity: 1; transform: translateY(0) scaleY(1); }
-              60%  { opacity: .85; }
-              100% { opacity: 0; transform: translateY(6px) scaleY(1); }
-            }
-            @keyframes divinePunishFlash {
-              0%   { opacity: 0; transform: scale(.4); }
-              30%  { opacity: 1; transform: scale(1.1); }
-              100% { opacity: 0; transform: scale(1.5); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
+  divine_punishment: ppR1DivinePunishment,   // v919 — W86r1: Pixelart-Leinwand (rote Pixelblitze)
 
   // ── „Realmniversal Emperor" (v941) ────────────────────────────────
   // Als Vorgabe: Galaxie-/Kosmos-Thema, und die getroffenen Helden
@@ -16978,141 +18162,7 @@ const ANIM_REGISTRY = {
   //
   // Klang: `cosmic_distortion` in ZONE_ANIM_SFX (dunkles Aufreissen
   // sofort, Verzerrungsschlag auf dem Hoehepunkt).
-  cosmic_distortion: (() => {
-    return function CosmicDistortionEffect({ x, y, w, h }) {
-      const ww = Math.max(w || 90, 90);
-      const hh = Math.max(h || 120, 120);
-      const scheibe = ww * 2.1;
-
-      // Die Karte selbst verzerren. Kleiner Vorlauf wie bei den anderen
-      // Element-Verformern, damit das Brett nach dem Zustands-Update
-      // steht, bevor die Klasse haengt.
-      useEffect(() => {
-        const t = setTimeout(() => {
-          const zonen = document.querySelectorAll('[data-hero-zone]');
-          let beste = null, abstand = Infinity;
-          zonen.forEach(el => {
-            const r = el.getBoundingClientRect();
-            const d = Math.abs(r.left + r.width / 2 - x) + Math.abs(r.top + r.height / 2 - y);
-            if (d < abstand) { abstand = d; beste = el; }
-          });
-          if (beste && abstand < 90) {
-            beste.classList.add('cosmic-warped');
-            setTimeout(() => beste.classList.remove('cosmic-warped'), 950);
-          }
-        }, 40);
-        return () => clearTimeout(t);
-      }, []);
-
-      // Zufall EINMAL einfrieren (Muster aller Animationen).
-      const sterne = useMemo(() => Array.from({ length: ppFxN(22) }, () => {
-        const winkel = Math.random() * Math.PI * 2;
-        const weite = ww * (0.55 + Math.random() * 0.75);
-        return {
-          sx: Math.cos(winkel) * weite,
-          sy: Math.sin(winkel) * weite * 0.5,
-          groesse: 2 + Math.random() * 4,
-          farbe: ['#ffffff', '#d6b3f9', '#7fdfff', '#c98aff'][Math.floor(Math.random() * 4)],
-          delay: Math.random() * 320,
-          dur: 420 + Math.random() * 320,
-        };
-      }), [ww]);
-
-      const arme = [0, 120, 240];
-
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10140 }}>
-          {/* Gekippte Scheibe — die Kippung steht fest, gedreht wird im Keyframe */}
-          <div style={{
-            position: 'absolute', left: -scheibe / 2, top: -scheibe / 4,
-            width: scheibe, height: scheibe / 2,
-            transform: 'perspective(520px) rotateX(58deg)',
-            transformStyle: 'preserve-3d',
-          }}>
-            <div style={{
-              position: 'absolute', inset: 0,
-              animation: 'cosmicDiscSpin 1000ms cubic-bezier(.25,.6,.3,1) forwards',
-              opacity: 0,
-            }}>
-              {arme.map((rot, i) => (
-                <div key={'arm' + i} style={{
-                  position: 'absolute', left: '50%', top: '50%',
-                  width: scheibe * 0.92, height: scheibe * 0.3,
-                  marginLeft: -scheibe * 0.46, marginTop: -scheibe * 0.15,
-                  borderRadius: '50%',
-                  background: i % 2
-                    ? 'radial-gradient(ellipse at 30% 50%, rgba(163,106,251,.75) 0%, rgba(122,43,208,.4) 38%, rgba(102,217,255,.18) 62%, transparent 82%)'
-                    : 'radial-gradient(ellipse at 70% 50%, rgba(214,179,249,.8) 0%, rgba(169,82,255,.42) 36%, rgba(104,198,253,.2) 64%, transparent 84%)',
-                  filter: 'blur(7px)',
-                  transform: `rotate(${rot}deg)`,
-                }} />
-              ))}
-            </div>
-          </div>
-
-          {/* Kern — gleissend, kollabiert am Ende */}
-          <div style={{
-            position: 'absolute', left: -ww * 0.28, top: -ww * 0.28,
-            width: ww * 0.56, height: ww * 0.56, borderRadius: '50%',
-            background: 'radial-gradient(circle, #ffffff 0%, #f1e5fa 22%, rgba(169,82,255,.85) 48%, rgba(71,17,126,.55) 70%, transparent 84%)',
-            boxShadow: '0 0 28px rgba(186,116,255,.9), 0 0 70px rgba(102,24,180,.7)',
-            animation: 'cosmicCoreFlare 1000ms ease-out forwards',
-            opacity: 0,
-          }} />
-
-          {/* Einstuerzende Sterne */}
-          {sterne.map((s, i) => (
-            <div key={'cd' + i} style={{
-              position: 'absolute', left: 0, top: 0,
-              width: s.groesse, height: s.groesse, borderRadius: '50%',
-              marginLeft: -s.groesse / 2, marginTop: -s.groesse / 2,
-              background: s.farbe,
-              boxShadow: `0 0 8px ${s.farbe}`,
-              '--csx': s.sx + 'px', '--csy': s.sy + 'px',
-              animation: `cosmicStarFall ${s.dur}ms ease-in ${s.delay}ms forwards`,
-              opacity: 0,
-            }} />
-          ))}
-
-          {/* Verzerrungsring — laeuft auf dem Hoehepunkt nach aussen */}
-          <div style={{
-            position: 'absolute', left: -ww * 0.5, top: -hh * 0.34,
-            width: ww, height: hh * 0.68, borderRadius: '50%',
-            border: '2px solid rgba(214,179,249,.85)',
-            boxShadow: '0 0 22px rgba(144,58,230,.8), inset 0 0 18px rgba(127,223,255,.55)',
-            animation: 'cosmicWarpRing 620ms ease-out 260ms forwards',
-            opacity: 0,
-          }} />
-
-          <style>{`
-            @keyframes cosmicDiscSpin {
-              0%   { opacity: 0; transform: rotate(0deg) scale(.25); }
-              22%  { opacity: .95; transform: rotate(150deg) scale(1); }
-              55%  { opacity: 1; transform: rotate(330deg) scale(1.12); }
-              100% { opacity: 0; transform: rotate(520deg) scale(.35); }
-            }
-            @keyframes cosmicCoreFlare {
-              0%   { opacity: 0; transform: scale(.2); }
-              18%  { opacity: 1; transform: scale(1); }
-              45%  { opacity: 1; transform: scale(1.25); }
-              70%  { opacity: .85; transform: scale(.8); }
-              100% { opacity: 0; transform: scale(.1); }
-            }
-            @keyframes cosmicStarFall {
-              0%   { opacity: 0; transform: translate(var(--csx), var(--csy)) scale(1); }
-              20%  { opacity: 1; }
-              100% { opacity: 0; transform: translate(0, 0) scale(.2); }
-            }
-            @keyframes cosmicWarpRing {
-              0%   { opacity: 0; transform: scale(.3); }
-              35%  { opacity: 1; transform: scale(1.15); }
-              100% { opacity: 0; transform: scale(2.4); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
+  cosmic_distortion: ppR1CosmicDistortion,   // v941 — W86r1: Pixelart-Leinwand (Galaxie in Pixeln); die Karte verzerrt `.cosmic-warped` (style.css)
 
   // ── „Wavilion" (v943) ─────────────────────────────────────────────
   // Als Vorgabe: ein BUFFENDER Wasserzauber auf dem Helden — Wavilion
@@ -17190,119 +18240,7 @@ const ANIM_REGISTRY = {
   // erst sehen), in der Mitte steht der dunkle Trichter, aussen fliegt
   // Gischt weg.
   // Klang: `maelstrom` in ZONE_ANIM_SFX.
-  maelstrom: (() => {
-    return function MaelstromEffect({ x, y, w, h }) {
-      const breite = Math.max(w || 600, 280);
-      const hoehe = Math.max(h || 360, 200);
-      // Aussendurchmesser: fuellt das Brett, ohne ueber den Rand zu laufen.
-      const durch = Math.min(breite * 0.98, hoehe * 2.0);
-
-      const ringe = [
-        { anteil: 1.00, dur: 2000, richtung: 1, strich: '3px dashed rgba(182,239,247,.5)' },
-        { anteil: 0.82, dur: 1650, richtung: -1, strich: '4px dashed rgba(127,223,255,.65)' },
-        { anteil: 0.63, dur: 1300, richtung: 1, strich: '5px dashed rgba(182,239,247,.8)' },
-        { anteil: 0.45, dur: 1000, richtung: -1, strich: '4px solid rgba(229,245,250,.85)' },
-        { anteil: 0.28, dur: 780, richtung: 1, strich: '3px dashed rgba(255,255,255,.9)' },
-      ];
-
-      const gischt = useMemo(() => Array.from({ length: ppFxN(22) }, () => {
-        const winkel = Math.random() * Math.PI * 2;
-        const weite = durch * (0.45 + Math.random() * 0.35);
-        return {
-          dx: Math.cos(winkel) * weite,
-          dy: Math.sin(winkel) * weite * 0.4,
-          groesse: 4 + Math.random() * 10,
-          delay: 260 + Math.random() * 700,
-          dur: 520 + Math.random() * 420,
-        };
-      }), [durch]);
-
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10150 }}>
-          {/* Gekippte Scheibe — Kippung fest, Drehung im Keyframe */}
-          <div style={{
-            position: 'absolute', left: -durch / 2, top: -durch / 4,
-            width: durch, height: durch / 2,
-            transform: 'perspective(900px) rotateX(58deg)',
-          }}>
-            {/* Wasserteller unter den Ringen */}
-            <div style={{
-              position: 'absolute', left: 0, top: 0, width: '100%', height: '100%',
-              borderRadius: '50%',
-              background: 'radial-gradient(ellipse at 50% 50%, rgba(0,33,63,.88) 0%, rgba(43,69,126,.7) 34%,'
-                + ' rgba(78,130,203,.45) 62%, rgba(104,198,253,.22) 82%, transparent 96%)',
-              boxShadow: 'inset 0 0 60px rgba(107,233,250,.35)',
-              animation: 'maelstromPool 2000ms ease-out forwards',
-              opacity: 0,
-            }} />
-            {ringe.map((r, i) => (
-              <div key={'mr' + i} style={{
-                position: 'absolute', left: '50%', top: '50%',
-                width: durch * r.anteil, height: durch * r.anteil * 0.5,
-                marginLeft: -durch * r.anteil / 2, marginTop: -durch * r.anteil * 0.25,
-                borderRadius: '50%', border: r.strich,
-                boxShadow: '0 0 18px rgba(127,223,255,.5)',
-                '--mdir': String(r.richtung),
-                animation: `maelstromSpin ${r.dur}ms linear ${i * 60}ms forwards`,
-                opacity: 0,
-              }} />
-            ))}
-            {/* Trichter — saugt in der Mitte nach unten */}
-            <div style={{
-              position: 'absolute', left: '50%', top: '50%',
-              width: durch * 0.2, height: durch * 0.1,
-              marginLeft: -durch * 0.1, marginTop: -durch * 0.05,
-              borderRadius: '50%',
-              background: 'radial-gradient(ellipse, #08060c 0%, rgba(0,33,63,.92) 45%, rgba(47,83,157,.5) 78%, transparent 100%)',
-              boxShadow: '0 0 40px rgba(20,40,90,.9)',
-              animation: 'maelstromFunnel 2000ms ease-in-out forwards',
-              opacity: 0,
-            }} />
-          </div>
-
-          {/* Gischt fliegt ueber die Scheibe hinaus */}
-          {gischt.map((g, i) => (
-            <div key={'mg' + i} style={{
-              position: 'absolute', left: 0, top: 0,
-              width: g.groesse, height: g.groesse, borderRadius: '50%',
-              marginLeft: -g.groesse / 2, marginTop: -g.groesse / 2,
-              background: 'radial-gradient(circle at 35% 30%, #ffffff 0%, rgba(182,239,247,.8) 50%, rgba(104,198,253,.3) 100%)',
-              boxShadow: '0 0 8px rgba(182,239,247,.85)',
-              '--mgdx': g.dx + 'px', '--mgdy': g.dy + 'px',
-              animation: `maelstromSpray ${g.dur}ms ease-out ${g.delay}ms forwards`,
-              opacity: 0,
-            }} />
-          ))}
-
-          <style>{`
-            @keyframes maelstromPool {
-              0%   { opacity: 0; transform: scale(.2); }
-              18%  { opacity: 1; transform: scale(1); }
-              72%  { opacity: 1; transform: scale(1.04); }
-              100% { opacity: 0; transform: scale(.35); }
-            }
-            @keyframes maelstromSpin {
-              0%   { opacity: 0; transform: rotate(0deg) scale(.25); }
-              15%  { opacity: 1; transform: rotate(calc(180deg * var(--mdir))) scale(1); }
-              70%  { opacity: 1; transform: rotate(calc(900deg * var(--mdir))) scale(.92); }
-              100% { opacity: 0; transform: rotate(calc(1400deg * var(--mdir))) scale(.2); }
-            }
-            @keyframes maelstromFunnel {
-              0%   { opacity: 0; transform: scale(.3); }
-              22%  { opacity: 1; transform: scale(1.6); }
-              60%  { opacity: 1; transform: scale(2.1); }
-              100% { opacity: 0; transform: scale(.4); }
-            }
-            @keyframes maelstromSpray {
-              0%   { opacity: 0; transform: translate(0, 0) scale(.5); }
-              25%  { opacity: 1; transform: translate(calc(var(--mgdx) * .45), calc(var(--mgdy) * .45)) scale(1); }
-              100% { opacity: 0; transform: translate(var(--mgdx), var(--mgdy)) scale(.3); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
+  maelstrom: ppR1Maelstrom,   // W86r1: Pixelart-Leinwand
 
   // ── „Skullmael's Greatsword" (v954) ───────────────────────────────
   // Als Vorgabe: schwarze Magie und Nekromantie — die Kreatur wird
@@ -18474,91 +19412,7 @@ const ANIM_REGISTRY = {
     };
   })(),
 
-  critical_slash: (() => {
-    return function CriticalSlashEffect({ x, y, w, h, noLabel }) {
-      const ww = Math.max(w || 80, 80);
-      const hh = Math.max(h || 110, 110);
-      const len = Math.hypot(ww, hh) * 2.1;
-      const sparks = useMemo(() => Array.from({ length: ppFxN(24) }, () => ({
-        angle: Math.random() * 360,
-        dist: 50 + Math.random() * 120,
-        delay: 120 + Math.random() * 180,
-        dur: 400 + Math.random() * 260,
-        size: 3 + Math.random() * 6,
-        gold: Math.random() < 0.55,
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10120 }}>
-          {/* Bright radial shockwave pulse behind the cuts */}
-          <div style={{
-            position: 'absolute', left: -80, top: -80, width: 160, height: 160,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,248,232,.9) 0%, rgba(255,198,28,.55) 35%, rgba(233,47,56,.35) 65%, transparent 85%)',
-            boxShadow: '0 0 45px rgba(255,217,102,.9), 0 0 90px rgba(255,73,26,.55)',
-            animation: 'criticalShockwave 480ms ease-out forwards',
-            opacity: 0,
-          }} />
-          {/* First slash — NE → SW, rotated -35deg */}
-          <div style={{
-            position: 'absolute', left: -len / 2, top: -4,
-            width: len, height: 8,
-            background: 'linear-gradient(90deg, transparent 0%, rgba(255,248,232,.15) 10%, rgba(255,228,105,.95) 44%, rgba(255,255,255,1) 50%, rgba(255,198,28,.95) 56%, rgba(248,116,32,.5) 85%, transparent 100%)',
-            boxShadow: '0 0 18px rgba(255,228,105,.95), 0 0 34px rgba(255,73,26,.75)',
-            transform: 'rotate(-35deg) translateX(-130%)',
-            transformOrigin: 'center center',
-            animation: 'criticalSlashA 220ms cubic-bezier(0.15, 0.95, 0.25, 1) forwards',
-            opacity: 0,
-          }} />
-          {/* Second slash — NW → SE, rotated +35deg, staggered */}
-          <div style={{
-            position: 'absolute', left: -len / 2, top: -4,
-            width: len, height: 8,
-            background: 'linear-gradient(90deg, transparent 0%, rgba(255,248,232,.15) 10%, rgba(255,228,105,.95) 44%, rgba(255,255,255,1) 50%, rgba(255,198,28,.95) 56%, rgba(248,116,32,.5) 85%, transparent 100%)',
-            boxShadow: '0 0 18px rgba(255,228,105,.95), 0 0 34px rgba(255,73,26,.75)',
-            transform: 'rotate(35deg) translateX(-130%)',
-            transformOrigin: 'center center',
-            animation: 'criticalSlashB 220ms cubic-bezier(0.15, 0.95, 0.25, 1) 110ms forwards',
-            opacity: 0,
-          }} />
-          {/* Intersection glint — giant white burst at the crossing */}
-          <div style={{
-            position: 'absolute', left: -30, top: -30, width: 60, height: 60,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(249,236,179,.85) 45%, transparent 80%)',
-            boxShadow: '0 0 50px rgba(255,251,210,1), 0 0 90px rgba(255,208,102,.7)',
-            animation: 'criticalGlint 360ms ease-out 180ms forwards',
-            opacity: 0,
-          }} />
-          {/* "CRITICAL!" text pulse — punchy gold-red */}
-          {!noLabel && <div style={{
-            position: 'absolute', left: -90, top: -56, width: 180,
-            textAlign: 'center',
-            fontFamily: '"Orbitron", "Rajdhani", sans-serif',
-            fontSize: 28, fontWeight: 900, letterSpacing: '2px',
-            color: '#f8f8bd',
-            textShadow: '0 0 8px rgba(255,73,26,.95), 0 0 18px rgba(248,116,32,.85), 2px 2px 0 #780014, -2px 2px 0 #780014, 2px -2px 0 #780014, -2px -2px 0 #780014',
-            animation: 'criticalText 620ms cubic-bezier(0.2, 1.4, 0.4, 1) 180ms forwards',
-            opacity: 0,
-            transform: 'scale(0.3)',
-            pointerEvents: 'none',
-          }}>CRITICAL!</div>}
-          {/* Spark fan radiating out of the impact */}
-          {sparks.map((s, i) => (
-            <div key={'cs'+i} style={{
-              position: 'absolute', left: 0, top: 0,
-              width: s.size, height: s.size, borderRadius: '50%',
-              background: s.gold ? '#ffe469' : '#ef2929',
-              boxShadow: `0 0 ${s.size * 2}px ${s.gold ? 'rgba(255,217,102,.9)' : 'rgba(255,73,26,.9)'}`,
-              animation: `criticalSpark ${s.dur}ms ease-out ${s.delay}ms forwards`,
-              opacity: 0,
-              '--csAngle': s.angle + 'deg',
-              '--csDist': s.dist + 'px',
-            }} />
-          ))}
-        </div>
-      );
-    };
-  })(),
+  critical_slash: ppR1CriticalSlash,   // W86r1: Pixelart-Leinwand
 
   // Siphem orbital laser — a tall red beam lances down from the top
   // of the viewport onto the target slot. Charge-up dot appears above,
@@ -19579,59 +20433,7 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
-  holy_revival: (() => {
-    // Golden-white holy light rising upward — revival/resurrection effect
-    return function HolyRevivalEffect({ x, y }) {
-      const rays = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
-        angle: Math.random() * 360,
-        len: 60 + Math.random() * 80,
-        width: 2 + Math.random() * 3,
-        delay: Math.random() * 400,
-        dur: 600 + Math.random() * 400,
-      })), []);
-      const sparkles = useMemo(() => Array.from({ length: ppFxN(24) }, () => ({
-        xOff: -50 + Math.random() * 100,
-        startY: 20 + Math.random() * 30,
-        endY: -60 - Math.random() * 80,
-        delay: 200 + Math.random() * 600,
-        dur: 500 + Math.random() * 500,
-        size: 4 + Math.random() * 8,
-        color: ['#fff8e8','#fad54a','#fff','#fbe181','#f8f8bd'][Math.floor(Math.random() * 5)],
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ width: 160, height: 160, marginLeft: -80, marginTop: -80, background: 'radial-gradient(circle, rgba(255,248,232,.9) 0%, rgba(250,213,74,.4) 35%, rgba(248,248,189,.1) 60%, transparent 80%)', animationDuration: '800ms' }} />
-          <div className="anim-flame-flash" style={{ width: 100, height: 100, marginLeft: -50, marginTop: -50, background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(249,236,179,.5) 40%, transparent 70%)', animationDelay: '200ms', animationDuration: '600ms' }} />
-          {rays.map((r, i) => (
-            <div key={'hr'+i} style={{
-              position: 'absolute', left: 0, top: 0,
-              transform: `rotate(${r.angle}deg)`,
-              transformOrigin: 'center center',
-            }}>
-              <div style={{
-                width: r.width, height: r.len, marginLeft: -r.width/2,
-                background: 'linear-gradient(to top, rgba(250,213,74,.8), rgba(255,248,232,.3) 70%, transparent)',
-                borderRadius: r.width,
-                transformOrigin: 'center bottom',
-                animation: `holyRayGrow ${r.dur}ms ease-out ${r.delay}ms forwards`,
-                opacity: 0,
-              }} />
-            </div>
-          ))}
-          {sparkles.map((s, i) => (
-            <div key={'hs'+i} style={{
-              position: 'absolute', left: s.xOff, top: s.startY,
-              width: s.size, height: s.size, borderRadius: '50%',
-              background: s.color,
-              boxShadow: `0 0 ${s.size}px ${s.color}`,
-              animation: `holySparkleRise ${s.dur}ms ease-out ${s.delay}ms forwards`,
-              opacity: 0,
-            }} />
-          ))}
-        </div>
-      );
-    };
-  })(),
+  holy_revival: ppR1HolyRevival,   // W86r1: Pixelart-Leinwand (`divine_awakening` ist ein Alias)
   arrow_rain: (() => {
     // Sharp arrow projectiles raining down from above — Rain of Arrows
     return function ArrowRainEffect({ x, y }) {
@@ -19640,7 +20442,6 @@ const ANIM_REGISTRY = {
         startY: -150 - Math.random() * 100,
         delay: Math.random() * 600,
         dur: 200 + Math.random() * 200,
-        rot: 170 + Math.random() * 20,
         len: 18 + Math.random() * 14,
       })), []);
       const impacts = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
@@ -19659,16 +20460,7 @@ const ANIM_REGISTRY = {
               animation: `arrowFall ${a.dur}ms ease-in ${a.delay}ms forwards`,
               opacity: 0,
             }}>
-              <div style={{
-                width: 2, height: a.len,
-                background: 'linear-gradient(to bottom, transparent 0%, #ffd966 20%, #f9ac20 80%, #ff8b1a 100%)',
-                borderRadius: '0 0 1px 1px',
-                boxShadow: '0 0 4px rgba(255,198,28,.6)',
-                transform: `rotate(${a.rot}deg)`,
-                transformOrigin: 'center top',
-              }}>
-                <div style={{ position: 'absolute', bottom: -4, left: -3, width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: '6px solid #ff8b1a' }} />
-              </div>
+              {ppR1Pfeil(a.len, ['#ffd066', '#f9ac20', '#ff8b1a', '#ff8b1a'], 2)}
             </div>
           ))}
           {impacts.map((imp, i) => (
@@ -19681,431 +20473,8 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
-  flame_avalanche: (() => {
-    // ═══════════════════════════════════════════════════════════════
-    //  ★★ v1215 — „Flame Avalanche" (Als Vorgabe 18.9., zweiter Anlauf)
-    //
-    //  „Etliche Flammen pro Ziel sollen auf dem Caster beginnen und dann
-    //  auf die verschiedenen Ziele schiessen wie unzaehlige Projektile —
-    //  wie man z.B. einen Flammenwerfer animieren wuerde, nur in sehr
-    //  viel breiter, wie eine Lawine!"
-    //
-    //  Der erste Anlauf (v1213) war eine WAND, die ueber das Brett rollt.
-    //  Das ist nicht dasselbe: eine Wand kommt von nirgendwo, ein
-    //  Flammenwerfer hat eine QUELLE und ein ZIEL. Jetzt laeuft je Ziel
-    //  ein eigener Strom aus 16 Geschossen, alle aus demselben Punkt beim
-    //  Wirker, faecherfoermig gestreut und versetzt losgeschickt. Viele
-    //  Ziele gleichzeitig ergeben die Breite, die Al meint: aus dem
-    //  einzelnen Strahl wird eine Lawine.
-    //
-    //  Aufbau je Geschoss:
-    //    • Kopf     — heller Flammenklumpen, auf die Flugbahn gedreht
-    //    • Schweif  — laenglicher Glutstreifen dahinter
-    //    • Bogen    — die Bahn haengt leicht durch (`--fa-bx/--fa-by`
-    //                 als Mittelpunkt), sonst sieht ein Faecher aus
-    //                 lauter Geraden nach Speichenrad aus
-    //    • Einschlag — kleiner Feuerball am Ziel, wenn das Geschoss ankommt
-    //
-    //  Ohne Zielliste (alte Aufrufe, Negations-Bilder) faellt die
-    //  Komponente auf einen breiten Faecher nach vorn zurueck.
-    // ═══════════════════════════════════════════════════════════════
-    const zufall = (start) => {
-      let t = start >>> 0;
-      return () => { t = (t * 1664525 + 1013904223) >>> 0; return t / 4294967296; };
-    };
-    // ★ v1216 (Als Vorgabe): „mache sie noch breiter — mehr Feuerbaelle
-    // pro Ziel, die leicht gespreadet sind." 26 statt 16, und die
-    // Streuung um gut die Haelfte weiter. Eine Obergrenze fuer die
-    // GESAMTZAHL bleibt: bei acht Zielen waeren es sonst ueber 200
-    // Geschosse mit je drei Knoten, und die Animation wuerde das Brett
-    // fuer eine Sekunde ausbremsen. Bis sechs Ziele greift sie nicht.
-    // ★ HANDY-LAG-FIX + PIXELART (Als Befund: „Flame Avalanche ist EXTREM laggy"): vorher bis zu 170 Geschosse mit je drei Knoten (Kopf, Schweif mit
-    // Weichzeichner, Einschlag), `mix-blend-mode: screen` und Radialverlaeufen — beim Einhaengen allein ~2 s Hauptthread auf einem schwachen Handy. Jetzt:
-    // EIN Knoten je Geschoss (Pixel-Funke aus harten Zellen per `box-shadow`, ohne Drehung/Unschaerfe/Mischmodus), Flug im Bildtakt (`steps()`),
-    // Einschlaege nur je Ziel (drei versetzte Pixel-Sterne) und deutlich weniger Geschosse. Rote/gelbe Palette, harte Kanten.
-    const GESCHOSSE_JE_ZIEL = 9;
-    const GESCHOSSE_GESAMT_MAX = 66;
-    const ZELLE = [4, 6];                   // Zellgroesse der zwei Geschoss-Groessen
-    const funke = (z) => `${0}px ${0}px 0 0 #fffbd2, ${z}px 0 0 0 #ffd066, ${-z}px 0 0 0 #ffd066, 0 ${z}px 0 0 #ffd066, 0 ${-z}px 0 0 #ffd066, ${z}px ${z}px 0 0 #ff491a, ${-z}px ${z}px 0 0 #ff491a, ${z}px ${-z}px 0 0 #ff491a, ${-z}px ${-z}px 0 0 #ff491a, ${2 * z}px 0 0 0 #8f0000, ${-2 * z}px 0 0 0 #8f0000, 0 ${2 * z}px 0 0 #8f0000, 0 ${-2 * z}px 0 0 #8f0000`;
-    const stern = (z, k) => {   // Einschlag in drei Bildern: kleines Kreuz, grosser Stern, verstreute Reste
-      const c = [];
-      const add = (x, y, f) => c.push(`${x * z}px ${y * z}px 0 0 ${f}`);
-      if (k === 0) { add(0, 0, '#fffbd2'); add(1, 0, '#ffd066'); add(-1, 0, '#ffd066'); add(0, 1, '#ffd066'); add(0, -1, '#ffd066'); }
-      else if (k === 1) { add(0, 0, '#ffd066'); [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([x, y]) => { add(x, y, '#ff9a1a'); add(2 * x, 2 * y, '#ff491a'); }); [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([x, y]) => add(x, y, '#ff491a')); }
-      else { [[2, 1], [-2, 1], [1, -2], [-1, 2], [3, 0], [-3, 0], [0, 3], [0, -3]].forEach(([x, y]) => add(x, y, '#8f0000')); add(0, 0, '#ff491a'); }
-      return c.join(', ');
-    };
-    return function FlameAvalancheEffect({ x, y, w, h, ox, oy, duration, targetPoints }) {
-      const W = Math.max(w || 900, 320), H = Math.max(h || 560, 240);
-      const links = x - W / 2, oben = y - H / 2;
-      const oX = (typeof ox === 'number' ? ox : x) - links;
-      const oY = (typeof oy === 'number' ? oy : y + H * 0.35) - oben;
-      const dauer = duration || 1600;
-      const flug = 520;                       // Flugzeit eines Geschosses
-
-      const { bahnen, treffer } = useMemo(() => {
-        const r = zufall(Math.round(W * 11 + H * 7 + oX * 3 + oY));
-        let ziele = Array.isArray(targetPoints) && targetPoints.length
-          ? targetPoints.map(p => ({ zx: p.x - links, zy: p.y - oben }))
-          : null;
-        if (!ziele) {
-          const vor = oY > H / 2 ? -1 : 1;
-          ziele = Array.from({ length: 5 }, (_, i) => ({
-            zx: W * (0.15 + i * 0.175), zy: oY + vor * H * 0.55,
-          }));
-        }
-        const aus = [], tr = [];
-        const jeZiel = Math.max(4, Math.min(GESCHOSSE_JE_ZIEL, Math.floor(GESCHOSSE_GESAMT_MAX / ziele.length)));
-        ziele.forEach((z, zi) => {
-          const spanne = Math.hypot(z.zx - oX, z.zy - oY);
-          for (let i = 0; i < jeZiel; i++) {
-            const streuX = (r() - 0.5) * Math.max(48, spanne * 0.26);
-            const streuY = (r() - 0.5) * Math.max(34, spanne * 0.17);
-            const zx = z.zx + streuX, zy = z.zy + streuY;
-            const mx = (oX + zx) / 2 + (r() - 0.5) * spanne * 0.22;
-            const my = (oY + zy) / 2 + (r() - 0.5) * spanne * 0.18 - spanne * 0.06;
-            aus.push({
-              zx, zy, mx, my, gross: r() > 0.55 ? 1 : 0,
-              verzug: Math.round(zi * 20 + i * (r() * 40 + 18)),
-              laenge: Math.round(flug * (0.75 + r() * 0.55)),
-            });
-          }
-          // Drei versetzte Einschlag-Sterne je Ziel (statt eines Feuerballs je Geschoss).
-          for (let k = 0; k < 3; k++) tr.push({ zx: z.zx + (r() - 0.5) * 22, zy: z.zy + (r() - 0.5) * 22, at: Math.round(flug * 0.9 + zi * 20 + k * (jeZiel * 11)) });
-        });
-        return { bahnen: aus, treffer: tr };
-      }, [W, H, oX, oY, links, oben, targetPoints, flug]);
-
-      return (
-        <div aria-hidden="true" data-pp-px="aus" style={{
-          position: 'fixed', left: links, top: oben, width: W, height: H,
-          pointerEvents: 'none', zIndex: 10100, overflow: 'hidden', contain: 'layout paint',
-          animation: `faBeben ${Math.round(dauer * 0.5)}ms steps(1) 60ms both`,
-        }}>
-          {/* Muendungsfeuer beim Wirker: gestapelte harte Quadrat-Ringe, die im Bildtakt aufgehen. */}
-          <div style={{
-            position: 'absolute', left: oX - 8, top: oY - 8, width: 16, height: 16, background: '#fffbd2',
-            animation: `faMuendung ${Math.round(dauer * 0.6)}ms steps(1) forwards`,
-          }} />
-          {bahnen.map((b, i) => (
-            <div key={'fap' + i} style={{
-              position: 'absolute', left: oX, top: oY, width: ZELLE[b.gross], height: ZELLE[b.gross], marginLeft: -ZELLE[b.gross] / 2, marginTop: -ZELLE[b.gross] / 2,
-              background: '#fffbd2', boxShadow: funke(ZELLE[b.gross]),
-              '--fa-mx': Math.round(b.mx - oX) + 'px', '--fa-my': Math.round(b.my - oY) + 'px',
-              '--fa-zx': Math.round(b.zx - oX) + 'px', '--fa-zy': Math.round(b.zy - oY) + 'px',
-              opacity: 0, willChange: 'transform',
-              animation: `faFlug ${b.laenge}ms steps(9, end) ${b.verzug}ms both`,
-            }} />
-          ))}
-          {treffer.map((t, i) => (
-            <div key={'fae' + i} style={{
-              position: 'absolute', left: t.zx - 3, top: t.zy - 3, width: 6, height: 6, background: '#fffbd2', opacity: 0,
-              animation: `faTreffer 360ms steps(1) ${t.at}ms both`,
-              '--fa-s0': stern(6, 0), '--fa-s1': stern(6, 1), '--fa-s2': stern(6, 2),
-            }} />
-          ))}
-          <style>{`
-            @keyframes faFlug {
-              0%   { transform: translate(0, 0); opacity: 1; }
-              50%  { transform: translate(var(--fa-mx), var(--fa-my)); }
-              100% { transform: translate(var(--fa-zx), var(--fa-zy)); opacity: 0; }
-            }
-            @keyframes faTreffer {
-              0%   { opacity: 1; box-shadow: var(--fa-s0); }
-              34%  { box-shadow: var(--fa-s1); }
-              68%  { box-shadow: var(--fa-s2); }
-              100% { opacity: 0; }
-            }
-            @keyframes faMuendung {
-              0%   { opacity: 1; box-shadow: 0 0 0 8px #ff9a1a, 0 0 0 16px #cc2b00; }
-              25%  { box-shadow: 0 0 0 16px #ff9a1a, 0 0 0 28px #cc2b00; }
-              55%  { box-shadow: 0 0 0 12px #ff9a1a, 0 0 0 20px #8f0000; }
-              85%  { box-shadow: 0 0 0 4px #ff491a; }
-              100% { opacity: 0; }
-            }
-            @keyframes faBeben {
-              0%, 100% { transform: translate(0, 0); }
-              14% { transform: translate(-3px, 2px); }
-              32% { transform: translate(4px, -2px); }
-              54% { transform: translate(-2px, -3px); }
-              76% { transform: translate(3px, 2px); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
-  hole_in_the_sky_pull: (() => {
-    // ═══════════════════════════════════════════════════════════════
-    //  ★★ v1346/v1347 — „Hole in the Sky": das Loch saugt ALLE
-    //  Zielkreaturen gleichzeitig hinein (Kartenbild als Vorlage:
-    //  tiefrot, pixelige Risse, dunkler Kern). Laeuft als
-    //  `waveAnimation` UEBER den Karten; der rote Himmel mit dem Rissnetz
-    //  ist die Kulisse darunter (`.pp-bg-anim-hole-in-the-sky`).
-    //
-    //  ★ v1347 (Als Vorgabe): DIE KARTEN SELBST werden eingesogen. Jede
-    //  Kreatur verlaesst sichtbar ihre Zone (die Zone wird per
-    //  `data-pp-im-sog` verborgen — Datenattribut, nicht `className`,
-    //  siehe CARD_API v1232), dreht sich um sich selbst, zieht eine
-    //  Spirale um das Loch und wird kleiner, je naeher sie kommt. Die
-    //  Rueckreise macht die ENGINE: Tote fliegen von der Brettmitte zu
-    //  ihrem Stapel, Ueberlebende zurueck in ihre Zone (`boardCenter` im
-    //  Flughandler) und wachsen dabei wieder auf ihre Groesse.
-    //
-    //  Bauform der Spirale: drei verschachtelte Ebenen, nur `transform`.
-    //    aussen  — sitzt im Loch, dreht sich (die Umlaufbahn)
-    //    mitte   — schiebt die Karte um den Radius nach aussen; der Radius
-    //              schrumpft auf 0 (aus dem Kreis wird eine Spirale)
-    //    innen   — die Karte: gleicht beim Start die Bahnrotation aus
-    //              (steht also genau wie in ihrer Zone), dreht sich dann
-    //              selbst und schrumpft.
-    //
-    //  Zeitplan (Dauer 2400 ms): Loch oeffnet sich → Karten heben ab und
-    //  kreisen ein → um 1900 ms (ZUSCHNAPP_MS, = `delay` der Karte) sind
-    //  alle drin, das Loch schnappt zu, der Schaden faellt.
-    // ═══════════════════════════════════════════════════════════════
-    const zufall = (start) => {
-      let t = start >>> 0;
-      return () => { t = (t * 1664525 + 1013904223) >>> 0; return t / 4294967296; };
-    };
-    const FARBEN = ['#ef2929', '#c0141c', '#ff8566', '#8b0d0d', '#f0bfbc'];
-    const SPLITTER_GESAMT_MAX = 90;
-    const ZUSCHNAPP_MS = 1900;
-    const UMLAUF_GRAD = 560;           // wie weit die Bahn um das Loch dreht
-    const EIGENDREHUNG_GRAD = 900;     // wie oft sich die Karte selbst dreht
-    return function HoleInTheSkyPullEffect({ x, y, w, h, duration, targetPoints }) {
-      const W = Math.max(w || 900, 320), H = Math.max(h || 560, 240);
-      const links = x - W / 2, oben = y - H / 2;
-      const mx = W / 2, my = H / 2;                       // das Loch: Brettmitte
-      const dauer = duration || 2400;
-      const kern = Math.round(Math.min(W, H) * 0.26);
-      const anteil = (ms) => (ms / dauer * 100).toFixed(1) + '%';
-
-      const ziele = useMemo(() => (Array.isArray(targetPoints) ? targetPoints : [])
-        .map(p => ({ ...p, zx: p.x - links, zy: p.y - oben })), [targetPoints, links, oben]);
-
-      // Die eingesogenen Karten. Nur Kreaturen (Support-Platz + Name);
-      // Helden bleiben stehen. Die Zone wird SOFORT verborgen, damit nie
-      // beide Bilder zugleich zu sehen sind; der Notnagel gibt sie frei,
-      // falls die Rueckreise (Engine) aus irgendeinem Grund ausbleibt —
-      // bewusst ein freier Zeitgeber, der das Ende der Komponente
-      // ueberlebt, denn die Rueckreise beginnt erst danach.
-      // Die Kreaturen liegen auf der GENEIGTEN Brettebene, die Kopien
-      // nicht — ohne Ausgleich klappten sie im ersten Bild flach um (Als
-      // Befund 19.8. bei Trial of Dominance). Sie starten also mit der
-      // Brettneigung und richten sich beim Abheben auf.
-      const kippen = useMemo(() => {
-        try { return readBoardTiltDeg(document) || 0; } catch { return 0; }
-      }, []);
-      const karten = useMemo(() => {
-        const r = zufall(Math.round(W * 7 + H * 3 + ziele.length * 31));
-        const aus = [];
-        ziele.forEach((z, i) => {
-          if (!z.cardName || !z.el || z.zoneSlot == null || z.zoneSlot < 0) return;
-          const url = window.cardImageUrl ? window.cardImageUrl(z.cardName) : null;
-          if (!url) return;
-          try {
-            z.el.setAttribute('data-pp-im-sog', '1');
-            const el = z.el;
-            setTimeout(() => el.removeAttribute('data-pp-im-sog'), dauer + 3600);
-          } catch {}
-          const mass = (typeof kartenMassAmBildschirm === 'function')
-            ? kartenMassAmBildschirm(z.el, 'brett') : null;
-          const b = Math.round(mass?.b || Math.min(z.w || 64, 90));
-          const hh = Math.round(mass?.h || b * 1.4);
-          const dx = z.zx - mx, dy = z.zy - my;
-          const verzug = Math.round(i * 55 + r() * 60);
-          aus.push({
-            url, b, h: hh,
-            radius: Math.hypot(dx, dy),
-            winkel: Math.atan2(dy, dx) * 180 / Math.PI,
-            verzug, flug: ZUSCHNAPP_MS - 60 - verzug,
-          });
-        });
-        return aus;
-      }, [ziele, W, H, mx, my, dauer]);
-
-      const splitter = useMemo(() => {
-        if (!ziele.length) return [];
-        const r = zufall(Math.round(W * 13 + H * 5 + ziele.length * 97));
-        const jeZiel = Math.max(5, Math.min(ppFxN(12), Math.floor(SPLITTER_GESAMT_MAX / ziele.length)));
-        const aus = [];
-        ziele.forEach((z, zi) => {
-          for (let i = 0; i < jeZiel; i++) {
-            const sx = z.zx + (r() - 0.5) * 60, sy = z.zy + (r() - 0.5) * 78;
-            const dx = mx - sx, dy = my - sy;
-            const lang = Math.hypot(dx, dy) || 1;
-            // Strudel: die Bahnmitte weicht quer zur Flugrichtung aus,
-            // immer zur selben Seite — so dreht alles gemeinsam ein.
-            const quer = lang * (0.22 + r() * 0.12);
-            const kx = sx + dx * 0.5 + (-dy / lang) * quer;
-            const ky = sy + dy * 0.5 + (dx / lang) * quer;
-            const flug = Math.round(680 + r() * 320);
-            const verzug = Math.max(120, Math.min(ZUSCHNAPP_MS - flug - 40, Math.round(160 + zi * 25 + r() * 520)));
-            aus.push({
-              sx, sy, kx: kx - sx, ky: ky - sy, ex: mx - sx, ey: my - sy,
-              g: Math.round(5 + r() * 6), farbe: FARBEN[Math.floor(r() * FARBEN.length)],
-              verzug, flug,
-            });
-          }
-        });
-        return aus;
-      }, [ziele, W, H, mx, my]);
-
-      return (
-        <div aria-hidden="true" style={{
-          position: 'fixed', left: links, top: oben, width: W, height: H,
-          pointerEvents: 'none', zIndex: 10100, overflow: 'hidden',
-          animation: `hitsBeben 420ms linear ${ZUSCHNAPP_MS - 40}ms both`,
-        }}>
-          {/* Das Gepackt-Werden: ein roter Pixelrahmen um jede Zone */}
-          {ziele.map((z, i) => (
-            <div key={'hsg' + i} style={{
-              position: 'absolute', left: z.zx - 40, top: z.zy - 54, width: 80, height: 108,
-              border: '4px solid #ef2929', boxShadow: '0 0 16px rgba(255,26,26,.9), inset 0 0 14px rgba(192,20,28,.7)',
-              opacity: 0,
-              animation: `hitsGepackt 760ms ease-out 20ms forwards`,
-            }} />
-          ))}
-          {/* Das Loch: drehender Pixelkranz um einen dunklen Kern */}
-          <div style={{
-            position: 'absolute', left: mx - kern * 0.8, top: my - kern * 0.8,
-            width: kern * 1.6, height: kern * 1.6, borderRadius: '50%',
-            background: 'repeating-conic-gradient(from 0deg, rgba(239,41,41,.9) 0deg 7deg, rgba(0,0,0,0) 7deg 22deg)',
-            WebkitMaskImage: 'radial-gradient(circle, transparent 38%, #000 41%, #000 60%, transparent 64%)',
-            maskImage: 'radial-gradient(circle, transparent 38%, #000 41%, #000 60%, transparent 64%)',
-            opacity: 0,
-            animation: `hitsKranz ${dauer}ms linear forwards`,
-          }} />
-          <div style={{
-            position: 'absolute', left: mx - kern / 2, top: my - kern / 2, width: kern, height: kern,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, #000000 0%, #270d0c 44%, #780014 60%, rgba(239,41,41,.9) 68%, rgba(239,41,41,0) 78%)',
-            boxShadow: '0 0 40px rgba(255,26,26,.7)', opacity: 0,
-            animation: `hitsKern ${dauer}ms ease-in-out forwards`,
-          }} />
-          {/* Pixelsplitter, die ins Loch strudeln */}
-          {splitter.map((s, i) => (
-            <div key={'hss' + i} style={{
-              position: 'absolute', left: s.sx - s.g / 2, top: s.sy - s.g / 2, width: s.g, height: s.g,
-              background: s.farbe, boxShadow: `0 0 6px ${s.farbe}`, opacity: 0,
-              '--hs-kx': s.kx.toFixed(1) + 'px', '--hs-ky': s.ky.toFixed(1) + 'px',
-              '--hs-ex': s.ex.toFixed(1) + 'px', '--hs-ey': s.ey.toFixed(1) + 'px',
-              animation: `hitsSog ${s.flug}ms cubic-bezier(.55,.05,.75,.5) ${s.verzug}ms forwards`,
-            }} />
-          ))}
-          {/* Die Kreaturen selbst: Spirale ins Loch */}
-          {karten.map((k, i) => (
-            <div key={'hsk' + i} style={{
-              position: 'absolute', left: mx, top: my, width: 0, height: 0,
-              '--hs-w0': k.winkel.toFixed(1) + 'deg',
-              '--hs-w1': (k.winkel - UMLAUF_GRAD).toFixed(1) + 'deg',
-              transform: 'rotate(var(--hs-w0))',
-              animation: `hitsUmlauf ${k.flug}ms cubic-bezier(.45,0,.8,.6) ${k.verzug}ms forwards`,
-            }}>
-              <div style={{
-                position: 'absolute', left: 0, top: 0, width: 0, height: 0,
-                '--hs-r0': k.radius.toFixed(1) + 'px',
-                transform: 'translateX(var(--hs-r0))',
-                animation: `hitsRadius ${k.flug}ms cubic-bezier(.5,0,.85,.7) ${k.verzug}ms forwards`,
-              }}>
-                <div style={{
-                  position: 'absolute', left: -k.b / 2, top: -k.h / 2, width: k.b, height: k.h,
-                  perspective: (typeof FLIGHT_TILT_PERSPECTIVE_PX === 'number' ? FLIGHT_TILT_PERSPECTIVE_PX : 900) + 'px',
-                  '--hs-g0': (-k.winkel).toFixed(1) + 'deg',
-                  '--hs-g1': (-k.winkel - EIGENDREHUNG_GRAD).toFixed(1) + 'deg',
-                  transform: 'rotate(var(--hs-g0)) scale(1)',
-                  animation: `hitsKarte ${k.flug}ms cubic-bezier(.5,0,.85,.7) ${k.verzug}ms forwards`,
-                }}>
-                  {/* Neigungsebene (perspective sitzt auf dem Eltern) */}
-                  <div style={{
-                    width: '100%', height: '100%', borderRadius: 4, overflow: 'hidden',
-                    backgroundImage: `url("${k.url}")`, backgroundSize: '100% 100%',
-                    boxShadow: '0 0 14px rgba(255,26,26,.9), 0 0 4px rgba(120,0,0,.8)',
-                    '--hs-kipp': kippen.toFixed(1) + 'deg',
-                    transform: 'rotateX(var(--hs-kipp))',
-                    animation: `hitsAufrichten ${Math.round(k.flug * 0.35)}ms ease-out ${k.verzug}ms forwards`,
-                  }} />
-                </div>
-              </div>
-            </div>
-          ))}
-          {/* Zuschnappen: der Blitz, wenn sich das Loch schliesst */}
-          <div style={{
-            position: 'absolute', left: mx - kern, top: my - kern, width: kern * 2, height: kern * 2,
-            borderRadius: '50%', mixBlendMode: 'screen', opacity: 0,
-            background: 'radial-gradient(circle, rgba(255,248,232,.95) 0%, rgba(255,73,26,.8) 30%, rgba(143,0,0,.35) 58%, transparent 74%)',
-            animation: `hitsBlitz 560ms ease-out ${ZUSCHNAPP_MS - 30}ms forwards`,
-          }} />
-          <style>{`
-            @keyframes hitsKern {
-              0%   { opacity: 0; transform: scale(.1); }
-              9%   { opacity: 1; transform: scale(1); }
-              45%  { opacity: 1; transform: scale(.92); }
-              ${anteil(ZUSCHNAPP_MS - 150)} { opacity: 1; transform: scale(1.16); }
-              ${anteil(ZUSCHNAPP_MS - 20)}  { opacity: 1; transform: scale(1.22); }
-              ${anteil(ZUSCHNAPP_MS + 90)}  { opacity: 1; transform: scale(.08); }
-              100% { opacity: 0; transform: scale(0); }
-            }
-            @keyframes hitsKranz {
-              0%   { opacity: 0; transform: rotate(0deg) scale(.2); }
-              9%   { opacity: .95; transform: rotate(-160deg) scale(1); }
-              ${anteil(ZUSCHNAPP_MS - 20)} { opacity: 1; transform: rotate(-820deg) scale(1.1); }
-              ${anteil(ZUSCHNAPP_MS + 90)} { opacity: 1; transform: rotate(-940deg) scale(.1); }
-              100% { opacity: 0; transform: rotate(-980deg) scale(0); }
-            }
-            @keyframes hitsAufrichten {
-              from { transform: rotateX(var(--hs-kipp)); }
-              to   { transform: rotateX(0deg); }
-            }
-            @keyframes hitsUmlauf {
-              from { transform: rotate(var(--hs-w0)); }
-              to   { transform: rotate(var(--hs-w1)); }
-            }
-            @keyframes hitsRadius {
-              0%   { transform: translateX(var(--hs-r0)); }
-              12%  { transform: translateX(calc(var(--hs-r0) * 1.04)); }
-              55%  { transform: translateX(calc(var(--hs-r0) * .62)); }
-              85%  { transform: translateX(calc(var(--hs-r0) * .22)); }
-              100% { transform: translateX(0); }
-            }
-            @keyframes hitsKarte {
-              0%   { opacity: 1; transform: rotate(var(--hs-g0)) scale(1); }
-              12%  { opacity: 1; transform: rotate(calc(var(--hs-g0) - 40deg)) scale(1.06); }
-              55%  { opacity: 1; transform: rotate(calc((var(--hs-g0) + var(--hs-g1)) / 2)) scale(.55); }
-              85%  { opacity: 1; transform: rotate(calc(var(--hs-g1) + 90deg)) scale(.22); }
-              96%  { opacity: 1; transform: rotate(var(--hs-g1)) scale(.08); }
-              100% { opacity: 0; transform: rotate(var(--hs-g1)) scale(.04); }
-            }
-            @keyframes hitsSog {
-              0%   { opacity: 0; transform: translate(0, 0) scale(1.3); }
-              10%  { opacity: 1; }
-              50%  { transform: translate(var(--hs-kx), var(--hs-ky)) scale(1); }
-              92%  { opacity: 1; }
-              100% { opacity: 0; transform: translate(var(--hs-ex), var(--hs-ey)) scale(.2); }
-            }
-            @keyframes hitsGepackt {
-              0%   { opacity: 0; transform: scale(1.3); }
-              25%  { opacity: 1; transform: scale(1); }
-              100% { opacity: 0; transform: scale(.8); }
-            }
-            @keyframes hitsBlitz {
-              0%   { opacity: 0; transform: scale(.15); }
-              24%  { opacity: 1; transform: scale(1); }
-              100% { opacity: 0; transform: scale(1.9); }
-            }
-            @keyframes hitsBeben {
-              0%, 100% { transform: translate(0, 0); }
-              16% { transform: translate(-5px, 3px); }
-              34% { transform: translate(5px, -3px); }
-              56% { transform: translate(-3px, -4px); }
-              78% { transform: translate(3px, 3px); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
+  flame_avalanche: ppR1FlameAvalanche,   // v1215 — W86r1: Pixelart-Leinwand (ganzzahlige Hüpfer, keine halben Pixel)
+  hole_in_the_sky_pull: HoleInTheSkyPullEffekt,   // v1346/v1347 — W86r1: Pixelart (Leinwand fürs Loch, Karten als <div>s auf fester Spiralbahn)
   guillotine_drop: (() => {
     // ★★ v1349 — „Madame Guillotine": ein Fallbeil saust auf die Zone der
     // gewaehlten Ability. Zwei Pfosten mit Querbalken rahmen die Zone, das
@@ -20617,73 +20986,7 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
-  level_down: (() => {
-    // ★ Looming Threat: die STUFE einer Handkreatur sinkt am Zugende — dunkelviolette Pfeile
-    // sinken ueber der Karte ab, ein „-1" schwebt nach unten und verblasst. Eigene Keyframes im
-    // eigenen <style> (siehe check-anim-keyframes). Gespielt ueber `play_hand_card_animation`.
-    return function LevelDownEffect({ x, y }) {
-      // Auch hier schwillt die Handkarte voruebergehend an und wird dunkler (wie `loom_swell`).
-      useEffect(() => {
-        let best = null, bestD = Infinity;
-        document.querySelectorAll('.game-hand-me [data-hand-idx], .game-hand-opp [data-hand-idx]').forEach(el => {
-          const r = el.getBoundingClientRect();
-          const d = Math.abs(r.left + r.width / 2 - x) + Math.abs(r.top + r.height / 2 - y);
-          if (d < bestD) { bestD = d; best = el; }
-        });
-        if (!best || bestD > 120) return undefined;
-        best.classList.add('loom-swell-card');
-        const t = setTimeout(() => best && best.classList.remove('loom-swell-card'), 1250);
-        return () => { clearTimeout(t); best && best.classList.remove('loom-swell-card'); };
-      }, []);
-      const pfeile = useMemo(() => Array.from({ length: ppFxN(7) }, (_, i) => ({
-        dx: (i - 3) * 11 + (Math.random() - 0.5) * 6,
-        delay: i * 70 + Math.round(Math.random() * 40),
-        size: 14 + Math.round(Math.random() * 8),
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div style={{ position: 'absolute', left: -46, top: -46, width: 92, height: 92, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(149,68,213,.55) 0%, rgba(71,17,126,.3) 50%, rgba(71,17,126,0) 72%)',
-            animation: 'levelDownGlow 800ms ease-out forwards' }} />
-          {pfeile.map((a, i) => (
-            <span key={'ld' + i} style={{
-              position: 'absolute', left: a.dx, top: -30, fontSize: a.size, lineHeight: 1,
-              color: '#ba74ff', textShadow: '0 0 6px #7a2bd0',
-              animation: `levelDownArrow 700ms ease-in ${a.delay}ms forwards`, opacity: 0,
-            }}>▼</span>
-          ))}
-          <span className="orbit-font" style={{
-            position: 'absolute', left: -18, top: -16, fontSize: 26, fontWeight: 800, color: '#d6b3f9',
-            textShadow: '0 0 8px #903ae6, 0 2px 0 #401a66', animation: 'levelDownText 900ms ease-out forwards',
-          }}>-1</span>
-          <style>{`
-            .loom-swell-card { animation: loomSwellCard 1100ms ease-in-out; z-index: 50; position: relative; }
-            @keyframes loomSwellCard {
-              0%   { scale: 1;    filter: brightness(1)   saturate(1); }
-              40%  { scale: 1.38; filter: brightness(.38) saturate(.7); }
-              60%  { scale: 1.38; filter: brightness(.38) saturate(.7); }
-              100% { scale: 1;    filter: brightness(1)   saturate(1); }
-            }
-            @keyframes levelDownGlow {
-              0%   { opacity: 0; transform: scale(.4); }
-              30%  { opacity: 1; transform: scale(1); }
-              100% { opacity: 0; transform: scale(1.5); }
-            }
-            @keyframes levelDownArrow {
-              0%   { opacity: 0; transform: translateY(-22px); }
-              25%  { opacity: 1; }
-              100% { opacity: 0; transform: translateY(46px); }
-            }
-            @keyframes levelDownText {
-              0%   { opacity: 0; transform: translateY(-14px) scale(.6); }
-              25%  { opacity: 1; transform: translateY(0) scale(1.15); }
-              100% { opacity: 0; transform: translateY(30px) scale(1); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
+  level_down: ppR1LevelDown,   // Looming Threat — W86r1: Pixelart-Leinwand
   loom_swell: (() => {
     // ★ Looming Threat (erste Aktivierung): die HANDKARTE selbst schwillt voruebergehend an und
     // wird dunkler, ehe sie in ihre normale Form zurueckkehrt. Der Effekt faehrt die echte
@@ -20914,58 +21217,7 @@ const ANIM_REGISTRY = {
     };
   })(),
   // ★ Dark Deal: schwarzer Nebel wabert um die Creature, Goldmuenzen kreisen um sie und blitzen auf — der Pakt.
-  dark_deal: (() => {
-    return function DarkDealEffect({ x, y, w, h }) {
-      const cw = w || 100, ch = h || 140;
-      const nebel = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => {
-        const a = (i / 14) * Math.PI * 2 + Math.random() * 0.4;
-        return {
-          sx: Math.cos(a) * cw * 0.5, sy: Math.sin(a) * ch * 0.5,
-          dx: Math.cos(a + 1.1) * 38, dy: -20 - Math.random() * 40,
-          size: 46 + Math.random() * 44, delay: Math.round(Math.random() * 450), dur: Math.round(1100 + Math.random() * 600),
-        };
-      }), [cw, ch]);
-      const muenzen = useMemo(() => Array.from({ length: ppFxN(16) }, (_, i) => {
-        const a = (i / 16) * Math.PI * 2 + Math.random() * 0.3;
-        const rx = cw * 0.62, ry = ch * 0.56;
-        return {
-          x0: Math.cos(a) * rx, y0: Math.sin(a) * ry,
-          x1: Math.cos(a + 0.9) * rx, y1: Math.sin(a + 0.9) * ry,
-          x2: Math.cos(a + 1.8) * rx * 1.15, y2: Math.sin(a + 1.8) * ry * 1.15 - 18,
-          size: 9 + Math.round(Math.random() * 5), delay: Math.round(Math.random() * 500), dur: Math.round(900 + Math.random() * 400),
-        };
-      }), [cw, ch]);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div style={{ position: 'absolute', left: -cw / 2 - 8, top: -ch / 2 - 8, width: cw + 16, height: ch + 16, borderRadius: 8,
-            background: 'radial-gradient(ellipse at center, rgba(8,6,12,.88) 0%, rgba(23,11,40,.6) 55%, rgba(23,11,40,0) 100%)',
-            opacity: 0, animation: 'ddShade 1500ms ease-in-out forwards' }} />
-          {nebel.map((n, i) => (
-            <i key={'n' + i} style={{ position: 'absolute', left: n.sx - n.size / 2, top: n.sy - n.size / 2, width: n.size, height: n.size, borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(8,6,12,.95) 0%, rgba(25,6,45,.7) 50%, rgba(25,6,45,0) 76%)', filter: 'blur(5px)',
-              opacity: 0, '--dx': n.dx + 'px', '--dy': n.dy + 'px', animation: `ddMist ${n.dur}ms ease-in-out ${n.delay}ms forwards` }} />
-          ))}
-          {muenzen.map((m, i) => (
-            <b key={'c' + i} style={{ position: 'absolute', left: -m.size / 2, top: -m.size / 2, width: m.size, height: m.size, borderRadius: '50%',
-              background: 'radial-gradient(circle at 35% 30%, #f8f8bd 0%, #ffeb1a 40%, #f9ac20 75%, #8b5b04 100%)', border: '1px solid #72541d',
-              boxShadow: '0 0 6px rgba(255,235,26,.8)', opacity: 0,
-              '--x0': m.x0 + 'px', '--y0': m.y0 + 'px', '--x1': m.x1 + 'px', '--y1': m.y1 + 'px', '--x2': m.x2 + 'px', '--y2': m.y2 + 'px',
-              animation: `ddCoin ${m.dur}ms ease-in-out ${m.delay}ms forwards` }} />
-          ))}
-          <style>{`
-            @keyframes ddShade { 0% { opacity: 0; } 30% { opacity: 1; } 70% { opacity: .85; } 100% { opacity: 0; } }
-            @keyframes ddMist { 0% { opacity: 0; transform: translate(0, 0) scale(.4); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.5) rotate(40deg); } }
-            @keyframes ddCoin {
-              0%   { opacity: 0; transform: translate(var(--x0), var(--y0)) rotateY(0deg) scale(.4); }
-              15%  { opacity: 1; transform: translate(var(--x0), var(--y0)) rotateY(120deg) scale(1); }
-              55%  { opacity: 1; transform: translate(var(--x1), var(--y1)) rotateY(520deg) scale(1.1); }
-              100% { opacity: 0; transform: translate(var(--x2), var(--y2)) rotateY(1000deg) scale(.7); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
+  dark_deal: ppR1DarkDeal,   // W86r1: Pixelart-Leinwand
   // ★ The Root of all Evil: schwarzer, unheilvoller Nebel legt sich ueber die Creature, die geloescht wird — dichte Schwaden,
   // ein dunkelroter Schimmer und aufsteigende Aschefunken.
   root_evil_mist: (() => {
@@ -21006,34 +21258,7 @@ const ANIM_REGISTRY = {
     };
   })(),
   // ★ The Fourth Circle: Goldrausch — Muenzen springen aus der Area-Zone und fallen klimpernd zurueck.
-  hell_coins: (() => {
-    return function HellCoinsEffect({ x, y }) {
-      const muenzen = useMemo(() => Array.from({ length: ppFxN(18) }, () => ({
-        dx: Math.round((Math.random() - .5) * 120), hoch: 30 + Math.random() * 60, delay: Math.round(Math.random() * 380),
-        dur: Math.round(760 + Math.random() * 300), size: 9 + Math.round(Math.random() * 4),
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div style={{ position: 'absolute', left: -50, top: -30, width: 100, height: 60, borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(255,235,26,.65), rgba(249,172,32,.3) 55%, rgba(249,172,32,0) 76%)',
-            opacity: 0, animation: 'hcnGlow 1200ms ease-out forwards' }} />
-          {muenzen.map((m, i) => (
-            <b key={'c' + i} style={{ position: 'absolute', left: -m.size / 2, top: 0, width: m.size, height: m.size, borderRadius: '50%',
-              background: 'radial-gradient(circle at 35% 30%, #f8f8bd 0%, #ffeb1a 40%, #f9ac20 75%, #8b5b04 100%)', border: '1px solid #72541d',
-              opacity: 0, '--dx': m.dx + 'px', '--hoch': -m.hoch + 'px', animation: `hcnCoin ${m.dur}ms cubic-bezier(.3,.7,.5,1) ${m.delay}ms forwards` }} />
-          ))}
-          <style>{`
-            @keyframes hcnGlow { 0% { opacity: 0; transform: scale(.5); } 30% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.2); } }
-            @keyframes hcnCoin {
-              0% { opacity: 0; transform: translate(0, 0) rotateY(0deg); } 10% { opacity: 1; }
-              50% { opacity: 1; transform: translate(calc(var(--dx) * .6), var(--hoch)) rotateY(540deg); }
-              100% { opacity: 0; transform: translate(var(--dx), 22px) rotateY(1080deg); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
+  hell_coins: ppR1HellCoins,   // The Fourth Circle — W86r1: Pixelart-Leinwand
   doom_counter: DoomCounterEffect,   // v1421
   diamond_sparkle: DiamondSparkleEffect,
   // ── Puppets (v706): Aliase mit eigenem Klang je Token (ZONE_ANIM_SFX) ──
@@ -21245,65 +21470,7 @@ const ANIM_REGISTRY = {
     };
   })(),
 
-  invest_counters_lost: (() => {
-    // Logan, the Investment Monkee: seine Invest Counter sind verfallen
-    // („If you ever have 0 Gold, remove all Invest Counters").
-    //
-    // Bewusst das GEGENSTUECK zum goldenen Bananenregen derselben Karte:
-    // dort faellt Gold AUF ein Ziel und blitzt golden, hier faellt es
-    // VOM Helden weg und die Muenzen entfaerben sich im Fallen. Nach der
-    // Hausregel fuer Effekte bedeutet ABWAERTS „etwas ist weg".
-    //
-    // Die Muenzen starten MITTIG auf der Heldenkarte und fallen von dort
-    // weg. Erster Wurf haengte sie ans Zaehler-Abzeichen oben rechts —
-    // das sass im Spiel auf der rechten Kante statt auf der Karte (Als
-    // Korrektur 16.8.).
-    // `count` ist die Zahl der verlorenen Counter; gedeckelt, damit ein
-    // 40-Counter-Logan keine Muenzlawine ausloest.
-    return function InvestCountersLostEffect({ x, y, count }) {
-      const anzahl = Math.max(3, Math.min(12, count || 5));
-      const muenzen = useMemo(() => Array.from({ length: anzahl }, () => ({
-        xOff: -22 + Math.random() * 44,
-        size: 13 + Math.random() * 9,
-        delay: Math.random() * 260,
-        dur: 620 + Math.random() * 300,
-        spin: -160 + Math.random() * 320,
-        drift: -26 + Math.random() * 52,
-      })), [anzahl]);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          {/* Kurzer aschgrauer Blitz statt des goldenen. KEIN left/top
-              hier — `.anim-gold-flash` zentriert sich selbst ueber den
-              Ankerpunkt (left/top -20 bei 40x40). Ein Ueberschreiben
-              haette den Blitz an seiner oberen linken Ecke aufgehaengt. */}
-          <div className="anim-gold-flash" style={{
-            background: 'radial-gradient(circle, rgba(197,183,160,.55) 0%, rgba(104,104,104,.22) 45%, transparent 72%)',
-          }} />
-          {muenzen.map((m, i) => (
-            <div key={i}
-              style={{
-                position: 'absolute',
-                // Mittig auf der Karte (16.8., Als Korrektur). Der erste
-                // Wurf setzte den Ursprung ans Zaehler-Abzeichen oben
-                // rechts — im Spiel sass die Animation damit auf der
-                // rechten KANTE statt auf der Karte. Anker ist jetzt der
-                // Mittelpunkt der Heldenzone, den `playAnimation` als
-                // x/y liefert; `-size/2` zentriert das Glyph darauf,
-                // sonst haenge es an seiner oberen linken Ecke.
-                left: m.xOff - m.size / 2,
-                top: -m.size / 2,
-                fontSize: m.size,
-                filter: 'drop-shadow(0 0 5px rgba(224,192,133,.7))',
-                animation: `pp-invest-coin-drop ${m.dur}ms cubic-bezier(.35,.02,.6,1) ${m.delay}ms both`,
-                ['--pp-invest-spin']: `${m.spin}deg`,
-                ['--pp-invest-drift']: `${m.drift}px`,
-              }}
-            >🪙</div>
-          ))}
-        </div>
-      );
-    };
-  })(),
+  invest_counters_lost: ppR1InvestCountersLost,   // Logan — W86r1: Pixelart-Leinwand (Münzen entfärben sich per Dither)
   juice_bubbles: (() => {
     // Orange juice bubbles — same as beer but orange palette
     return function JuiceBubblesEffect({ x, y }) {
@@ -21408,31 +21575,7 @@ const ANIM_REGISTRY = {
       art: ARTEN[Math.floor(Math.random() * 6)], color: ['#80bf59', '#92d3a9', '#80bf59', '#ebdcc1', '#b3f9b8'].map(ppHex)[Math.floor(Math.random() * 5)], wobble: -8 + Math.random() * 16 })) }),
     { radius: 110, z: 10100 });
   })(),
-  coffee_steam: (() => {
-    return function CoffeeSteamEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
-        xOff: -22 + Math.random() * 44,
-        size: 5 + Math.random() * 7,
-        delay: Math.random() * 300,
-        dur: 500 + Math.random() * 500,
-        char: ['☕','~','≈','☁','·','♨'][Math.floor(Math.random() * 6)],
-        color: ['#3a2412','#5a3c14','#27180c','#886c44','#3a2412'][Math.floor(Math.random() * 5)],
-        wobble: -8 + Math.random() * 16,
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(58,36,18,.8) 0%, rgba(39,24,12,.4) 40%, transparent 70%)' }} />
-          {particles.map((p, i) => (
-            <div key={'cs'+i} className="anim-beer-bubble" style={{
-              '--xOff': p.xOff + 'px', '--size': p.size + 'px', '--wobble': p.wobble + 'px',
-              '--color': p.color, animationDelay: p.delay + 'ms', animationDuration: p.dur + 'ms',
-              fontSize: p.size,
-            }}>{p.char}</div>
-          ))}
-        </div>
-      );
-    };
-  })(),
+  coffee_steam: ppR1CoffeeSteam,   // W86r1: Pixelart-Leinwand
   magic_hammer: (() => {
     return function MagicHammerEffect({ x, y, w, h }) {
       const targetW = w || 70;
@@ -22312,7 +22455,6 @@ const ANIM_REGISTRY = {
         ry:    16 + i * 5 + Math.random() * 6,
         dauer: 900 + i * 160 + Math.random() * 200,
         delay: i * 120 + Math.random() * 90,
-        dreh:  (i / 3) * 360,
         size:  15 + Math.random() * 6,
       })), []);
       return (
@@ -22325,8 +22467,8 @@ const ANIM_REGISTRY = {
             }}>
               <div style={{
                 fontSize: k.size,
-                transform: `rotate(${k.dreh}deg)`,
-                filter: 'drop-shadow(0 0 3px rgba(127,223,255,.75))',
+                // W86r1: harte 1-px-Kontur statt Weichzeichner-Schein, keine Drehung der Glyphen (die Katzen unterscheiden sich über ihre Bahn).
+                textShadow: '1px 0 0 #7fdfff, -1px 0 0 #7fdfff, 0 1px 0 #7fdfff, 0 -1px 0 #7fdfff',
               }}>
                 {/* Fluegel als eigenes Zeichen daneben — flattert schneller
                     als die Bahn, damit es lebendig wirkt. */}
@@ -23588,7 +23730,6 @@ const ANIM_REGISTRY = {
         startY: -150 - Math.random() * 100,
         delay: Math.random() * 550,
         dur: 200 + Math.random() * 200,
-        rot: 172 + Math.random() * 16,
         len: 18 + Math.random() * 14,
       })), []);
       const drops = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
@@ -23607,16 +23748,7 @@ const ANIM_REGISTRY = {
               animation: `arrowFall ${a.dur}ms ease-in ${a.delay}ms forwards`,
               opacity: 0,
             }}>
-              <div style={{
-                width: 2.5, height: a.len,
-                background: 'linear-gradient(to bottom, transparent 0%, #b3e8f9 20%, #68c6fd 75%, #399edf 100%)',
-                borderRadius: '0 0 1px 1px',
-                boxShadow: '0 0 5px rgba(104,198,253,.75)',
-                transform: `rotate(${a.rot}deg)`,
-                transformOrigin: 'center top',
-              }}>
-                <div style={{ position: 'absolute', bottom: -4, left: -3, width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: '6px solid #399edf' }} />
-              </div>
+              {ppR1Pfeil(a.len, ['#b3e8f9', '#68c6fd', '#399edf', '#399edf'], 2)}
             </div>
           ))}
           {drops.map((d, i) => (
@@ -23718,138 +23850,7 @@ const ANIM_REGISTRY = {
   // NEBEN dem whirlpool derselben Karte (Als Vorgabe: Wasser UND
   // Speer). Einschlag bei ~280 ms — der Klang (ZONE_ANIM_SFX,
   // 'projectile' tiefer gefahren) sitzt genau dort.
-  aquatic_spear_strike: (() => {
-    return function AquaticSpearStrike({ x, y }) {
-      // v699 (Als Befund „fliegt schief"): der Sturz-Translate sass auf
-      // dem SCHAFT im rotierten Container — Kind-Transforms werden vom
-      // Eltern-Rotate mitgedreht, die BILDSCHIRM-Flugbahn stand also
-      // ~44° aus der Senkrechten, waehrend der Speer nur 24° geneigt
-      // war: Spitze nicht in Flugrichtung. Jetzt liegt der Sturz auf
-      // einem UNROTIERTEN Wrapper (Bildschirmkoordinaten), und WINKEL
-      // ist exakt der Winkel des Flugvektors: Start (+70, −190) →
-      // atan(70/190) ≈ 20° aus der Senkrechten, nach links unten.
-      const WINKEL = 20;
-      const scherben = useMemo(() => Array.from({ length: ppFxN(10) }, (_, i) => ({
-        angle: 200 + (i / 10) * 140 + Math.random() * 12,
-        dist: 30 + Math.random() * 45,
-        size: 4 + Math.random() * 6,
-        delay: 280 + Math.random() * 60,
-        dur: 380 + Math.random() * 220,
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
-          {/* Speer: Ankerpunkt ist die SPITZE — sie landet exakt auf (x,y).
-              REIHENFOLGE der Ebenen (v699): aussen der Sturz-Wrapper in
-              Bildschirmkoordinaten, darin die feste Rotation, darin der
-              Schaft mit Zittern+Verglimmen — so bleibt die Spitze in
-              Flugrichtung vorne. */}
-          <div style={{
-            position: 'absolute', left: 0, top: 0, width: 0, height: 0,
-            opacity: 0,
-            animation: 'aquaSpearFall 280ms cubic-bezier(.5,0,.9,.4) forwards',
-          }}>
-          <div style={{
-            position: 'absolute', left: 0, top: 0, width: 0, height: 0,
-            transform: `rotate(${WINKEL}deg)`,
-          }}>
-            <div style={{
-              position: 'absolute', left: -3, bottom: 0, width: 6, height: 120,
-              transformOrigin: '50% 100%',
-              animation: 'aquaSpearQuiver 90ms linear 280ms 4, aquaSpearFade 250ms ease-in 650ms forwards',
-            }}>
-              {/* Klinge */}
-              <div style={{
-                position: 'absolute', left: -6, bottom: -2, width: 18, height: 30,
-                clipPath: 'polygon(50% 100%, 0 18%, 50% 0, 100% 18%)',
-                background: 'linear-gradient(180deg, #e5f5fa 0%, #66d9ff 45%, #4e82cb 100%)',
-                boxShadow: '0 0 10px rgba(104,198,253,.9)',
-                filter: 'drop-shadow(0 0 4px rgba(127,223,255,.8))',
-              }} />
-              {/* Schaft */}
-              <div style={{
-                position: 'absolute', left: 0, bottom: 26, width: 6, height: 94,
-                borderRadius: 3,
-                background: 'linear-gradient(180deg, rgba(127,223,255,.25) 0%, #399edf 30%, #4e82cb 100%)',
-                boxShadow: '0 0 8px rgba(104,198,253,.7)',
-              }} />
-              {/* Wasserschweif am Schaftende */}
-              <div style={{
-                position: 'absolute', left: -4, bottom: 96, width: 14, height: 46,
-                borderRadius: '50% 50% 40% 40% / 70% 70% 30% 30%',
-                background: 'linear-gradient(180deg, rgba(127,223,255,0) 0%, rgba(119,200,238,.55) 70%, rgba(104,198,253,.8) 100%)',
-                filter: 'blur(2px)',
-              }} />
-            </div>
-          </div>
-          </div>
-          {/* Einschlagblitz */}
-          <div style={{
-            position: 'absolute', left: -22, top: -22, width: 44, height: 44,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(127,223,255,.8) 40%, rgba(28,169,253,0) 75%)',
-            opacity: 0,
-            animation: 'aquaSpearFlash 260ms ease-out 280ms forwards',
-          }} />
-          {/* enger Splash-Ring */}
-          <div style={{
-            position: 'absolute', left: -26, top: -26, width: 52, height: 52,
-            borderRadius: '50%',
-            border: '3px solid rgba(104,198,253,.85)',
-            boxShadow: '0 0 12px rgba(104,198,253,.7), inset 0 0 8px rgba(127,223,255,.5)',
-            opacity: 0,
-            animation: 'aquaSpearRing 420ms ease-out 290ms forwards',
-          }} />
-          {scherben.map((sc, i) => {
-            const rad = (sc.angle * Math.PI) / 180;
-            return (
-              <span key={'s'+i} style={{
-                position: 'absolute', left: -sc.size/2, top: -sc.size/2,
-                width: sc.size, height: sc.size * 1.6,
-                borderRadius: '50% 50% 60% 60%',
-                background: 'linear-gradient(180deg, #bddcef 0%, #68c6fd 100%)',
-                boxShadow: '0 0 5px rgba(119,200,238,.8)',
-                opacity: 0,
-                animation: `aquaSpearShard ${sc.dur}ms ease-out ${sc.delay}ms forwards`,
-                '--as-tx': `${Math.cos(rad) * sc.dist}px`,
-                '--as-ty': `${Math.sin(rad) * sc.dist - 14}px`,
-              }} />
-            );
-          })}
-          <style>{`
-            @keyframes aquaSpearFall {
-              0%   { opacity: 0; transform: translate(70px, -190px); }
-              12%  { opacity: 1; }
-              100% { opacity: 1; transform: translate(0, 0); }
-            }
-            @keyframes aquaSpearQuiver {
-              0% { transform: translate(0,0) rotate(0deg); }
-              /* (Zittern liegt auf dem Schaft IM rotierten Rahmen —
-                 kleine Auslenkungen quer zur Speerachse.) */
-              25% { transform: translate(0.5px,-1px) rotate(1.4deg); }
-              75% { transform: translate(-0.5px,0.5px) rotate(-1.2deg); }
-              100% { transform: translate(0,0) rotate(0deg); }
-            }
-            @keyframes aquaSpearFade {
-              0% { opacity: 1; } 100% { opacity: 0; }
-            }
-            @keyframes aquaSpearFlash {
-              0% { opacity: 0; transform: scale(.3); }
-              30% { opacity: 1; transform: scale(1.15); }
-              100% { opacity: 0; transform: scale(1.5); }
-            }
-            @keyframes aquaSpearRing {
-              0% { opacity: .9; transform: scale(.25); }
-              100% { opacity: 0; transform: scale(1.6); }
-            }
-            @keyframes aquaSpearShard {
-              0% { opacity: .95; transform: translate(0,0) scale(1); }
-              100% { opacity: 0; transform: translate(var(--as-tx), var(--as-ty)) scale(.35); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
+  aquatic_spear_strike: ppR1AquaticSpearStrike,   // v698 — W86r1: Pixelart-Leinwand
   whirlpool: (() => {
     return function WhirlpoolEffect({ x, y }) {
       const rings = useMemo(() => Array.from({ length: ppFxN(9) }, (_, i) => ({
@@ -26318,61 +26319,7 @@ const ANIM_REGISTRY = {
   //  out. Used when a hero loses one or more abilities — the
   //  hero is "forgetting" what they knew. Layers a brief soft
   //  white glow halo to anchor the burst on the hero card.
-  forgetting_question_mark: (() => {
-    return function ForgettingQuestionMarkEffect({ x, y }) {
-      const marks = useMemo(() => Array.from({ length: 4 + Math.floor(Math.random() * 2) }, () => ({
-        startX: -28 + Math.random() * 56,
-        startY: -10 + Math.random() * 20,
-        riseY: -50 - Math.random() * 40,
-        driftX: -20 + Math.random() * 40,
-        size: 26 + Math.random() * 12,
-        rotStart: -25 + Math.random() * 50,
-        rotEnd: -45 + Math.random() * 90,
-        delay: Math.random() * 420,
-        dur: 900 + Math.random() * 500,
-      })), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y - 30, pointerEvents: 'none', zIndex: 10100 }}>
-          {/* Soft halo to anchor the burst on the hero */}
-          <div style={{
-            position: 'absolute', left: -45, top: -45,
-            width: 90, height: 90, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,0.55) 0%, rgba(241,229,250,0.25) 50%, transparent 80%)',
-            filter: 'blur(4px)',
-            opacity: 0,
-            animation: 'forgettingHalo 800ms ease-out 0ms forwards',
-          }} />
-          {marks.map((m, i) => (
-            <div key={'fqm' + i} style={{
-              position: 'absolute', left: m.startX, top: m.startY,
-              fontSize: m.size, fontWeight: 'bold', color: '#ffffff',
-              textShadow: '0 0 8px rgba(255,255,255,0.95), 0 0 16px rgba(214,179,249,0.7), 0 2px 4px rgba(0,0,0,0.8)',
-              transform: `rotate(${m.rotStart}deg)`,
-              opacity: 0,
-              fontFamily: 'serif',
-              animation: `forgettingMark ${m.dur}ms ease-out ${m.delay}ms forwards`,
-              '--fqmDx': m.driftX + 'px',
-              '--fqmDy': m.riseY + 'px',
-              '--fqmRotEnd': m.rotEnd + 'deg',
-            }}>?</div>
-          ))}
-          <style>{`
-            @keyframes forgettingHalo {
-              0%   { opacity: 0; transform: scale(0.5); }
-              30%  { opacity: 1; transform: scale(1); }
-              100% { opacity: 0; transform: scale(1.3); }
-            }
-            @keyframes forgettingMark {
-              0%   { opacity: 0; transform: translate(0, 0) rotate(var(--fqmRotEnd)) scale(0.4); }
-              20%  { opacity: 1; transform: translate(calc(var(--fqmDx) * 0.3), calc(var(--fqmDy) * 0.2)) scale(1.15) rotate(0deg); }
-              60%  { opacity: 1; transform: translate(calc(var(--fqmDx) * 0.7), calc(var(--fqmDy) * 0.65)) scale(1) rotate(var(--fqmRotEnd)); }
-              100% { opacity: 0; transform: translate(var(--fqmDx), var(--fqmDy)) scale(0.85) rotate(var(--fqmRotEnd)); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
+  forgetting_question_mark: ppR1ForgettingQuestionMark,   // W86r1: Pixelart-Leinwand
 
   // ── Divine Gift of the Deepsea — replacement summon ───────
   //  A black-water whirlpool spins around the newly placed
@@ -26506,182 +26453,7 @@ const ANIM_REGISTRY = {
   //  hero, a confetti-like burst of star + book sparkles
   //  bursting outward, and a final settling pulse. ~1.6s
   //  total runtime.
-  blessed_skill_burst: (() => {
-    return function BlessedSkillBurstEffect({ x, y, w, h }) {
-      const cw = w || 100;
-      const ch = h || 140;
-      // 2 large concentric rings expanding outward
-      const rings = useMemo(() => Array.from({ length: 2 }, (_, i) => ({
-        size: 90 + i * 40,
-        delay: i * 100,
-        dur: 1100 + i * 150,
-      })), []);
-      // Orbital glyphs around the hero — books, scrolls, runes
-      const orbitalGlyphs = ['📜', '🪶', '✦', '✧', '⚛', '🔯', '★', '✶'];
-      const orbitals = useMemo(() => orbitalGlyphs.map((g, i) => ({
-        glyph: g,
-        angle: (i / orbitalGlyphs.length) * Math.PI * 2,
-        radius: 75 + Math.random() * 18,
-        delay: 60 + i * 55,
-        dur: 1500 + Math.random() * 300,
-      })), []);
-      // Star + sparkle confetti bursting outward
-      const sparkles = useMemo(() => Array.from({ length: ppFxN(32) }, () => {
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 75 + Math.random() * 90;
-        return {
-          dx: Math.cos(angle) * dist,
-          dy: Math.sin(angle) * dist,
-          glyph: ['✦', '✧', '⋆', '·', '★', '✩'][Math.floor(Math.random() * 6)],
-          size: 10 + Math.random() * 16,
-          delay: 100 + Math.random() * 400,
-          dur: 800 + Math.random() * 500,
-          color: ['#fad54a', '#fbe181', '#d6bbf1', '#f9ecb3', '#d6b3f9', '#ffffff'][Math.floor(Math.random() * 6)],
-          rot: Math.random() * 720 - 360,
-        };
-      }), []);
-      // Rising aura motes — golden sparks lifting up from the bottom of the card
-      const aura = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
-        startX: -cw / 2 + Math.random() * cw,
-        riseY: -ch * 1.0 - Math.random() * 30,
-        size: 6 + Math.random() * 10,
-        delay: 50 + Math.random() * 600,
-        dur: 1100 + Math.random() * 400,
-        color: ['#ffd066', '#f9ecb3', '#fffbd2', '#fad54a'][Math.floor(Math.random() * 4)],
-      })), [cw, ch]);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          {/* Warm gold-violet halo bathes the hero */}
-          <div style={{
-            position: 'absolute', left: -cw, top: -ch,
-            width: cw * 2, height: ch * 2, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(251,225,129,0.85) 0%, rgba(214,179,249,0.55) 35%, rgba(178,120,237,0.3) 65%, transparent 95%)',
-            filter: 'blur(4px)',
-            mixBlendMode: 'screen',
-            opacity: 0,
-            animation: 'blessedHalo 1500ms ease-out 0ms both',
-          }} />
-          {/* Vertical aura column behind the card — beam of gold light from below to above */}
-          <div style={{
-            position: 'absolute', left: -cw * 0.45, top: -ch * 1.1,
-            width: cw * 0.9, height: ch * 2.2,
-            background: 'linear-gradient(to top, rgba(255,208,102,0) 0%, rgba(251,225,129,0.5) 35%, rgba(249,236,179,0.7) 60%, rgba(255,251,210,0.4) 85%, transparent 100%)',
-            filter: 'blur(3px)',
-            opacity: 0,
-            animation: 'blessedColumn 1500ms ease-out 100ms both',
-          }} />
-          {/* Concentric expanding gold rings */}
-          {rings.map((r, i) => (
-            <div key={'bsr' + i} style={{
-              position: 'absolute', left: -r.size, top: -r.size,
-              width: r.size * 2, height: r.size * 2, borderRadius: '50%',
-              border: '4px solid rgba(255,217,102,0.95)',
-              boxShadow: '0 0 20px rgba(255,217,102,0.85), inset 0 0 14px rgba(255,241,150,0.6)',
-              opacity: 0, transform: 'scale(0.3)',
-              animation: `blessedRing ${r.dur}ms ease-out ${r.delay}ms both`,
-            }} />
-          ))}
-          {/* Big rotating mortarboard / scholar emoji at the center */}
-          <div style={{
-            position: 'absolute', left: -50, top: -55,
-            fontSize: 100, lineHeight: 1,
-            filter: 'drop-shadow(0 0 18px rgba(255,217,102,1)) drop-shadow(0 0 36px rgba(214,179,249,0.85))',
-            opacity: 0, transform: 'rotate(-30deg) scale(0.4)',
-            animation: 'blessedGlyph 1400ms cubic-bezier(0.34, 1.56, 0.64, 1) 80ms both',
-          }}>🎓</div>
-          {/* Orbital scholar glyphs */}
-          {orbitals.map((o, i) => {
-            const ox = Math.cos(o.angle) * o.radius;
-            const oy = Math.sin(o.angle) * o.radius;
-            return (
-              <div key={'bso' + i} style={{
-                position: 'absolute', left: ox - 14, top: oy - 14,
-                fontSize: 26,
-                color: '#fffbd2',
-                textShadow: '0 0 8px rgba(255,217,102,0.95), 0 0 16px rgba(214,179,249,0.7)',
-                opacity: 0,
-                animation: `blessedOrbital ${o.dur}ms ease-in-out ${o.delay}ms both`,
-                '--bsoStartX': '0px',
-                '--bsoStartY': '0px',
-                '--bsoEndX': (-ox * 0.2) + 'px',
-                '--bsoEndY': (-oy * 0.2) + 'px',
-              }}>{o.glyph}</div>
-            );
-          })}
-          {/* Sparkle confetti bursting outward */}
-          {sparkles.map((s, i) => (
-            <div key={'bss' + i} style={{
-              position: 'absolute', left: 0, top: 0,
-              fontSize: s.size,
-              color: s.color,
-              textShadow: `0 0 6px ${s.color}, 0 0 12px rgba(251,225,129,0.7)`,
-              opacity: 0, transform: 'translate(0,0) scale(0.3)',
-              animation: `blessedSparkle ${s.dur}ms ease-out ${s.delay}ms both`,
-              '--bsDx': s.dx + 'px',
-              '--bsDy': s.dy + 'px',
-              '--bsRot': s.rot + 'deg',
-            }}>{s.glyph}</div>
-          ))}
-          {/* Rising gold motes from below the card */}
-          {aura.map((a, i) => (
-            <div key={'bsa' + i} style={{
-              position: 'absolute', left: a.startX - a.size / 2,
-              top: ch * 0.5 + 10,
-              width: a.size, height: a.size, borderRadius: '50%',
-              background: a.color,
-              boxShadow: `0 0 10px ${a.color}, 0 0 20px rgba(251,225,129,0.7)`,
-              opacity: 0,
-              animation: `blessedAura ${a.dur}ms ease-out ${a.delay}ms both`,
-              '--bsaRise': a.riseY + 'px',
-            }} />
-          ))}
-          <style>{`
-            @keyframes blessedHalo {
-              0%   { opacity: 0; transform: scale(0.4); }
-              25%  { opacity: 1; transform: scale(1); }
-              80%  { opacity: 0.85; transform: scale(1.08); }
-              100% { opacity: 0; transform: scale(1.15); }
-            }
-            @keyframes blessedColumn {
-              0%   { opacity: 0; transform: scaleY(0.3); }
-              25%  { opacity: 1; transform: scaleY(1.1); }
-              70%  { opacity: 0.85; transform: scaleY(1); }
-              100% { opacity: 0; transform: scaleY(0.95); }
-            }
-            @keyframes blessedRing {
-              0%   { opacity: 0; transform: scale(0.3); }
-              25%  { opacity: 1; transform: scale(0.85); }
-              100% { opacity: 0; transform: scale(2.4); }
-            }
-            @keyframes blessedGlyph {
-              0%   { opacity: 0; transform: rotate(-30deg) scale(0.4); }
-              35%  { opacity: 1; transform: rotate(15deg) scale(1.25); }
-              65%  { opacity: 1; transform: rotate(-5deg) scale(1); }
-              100% { opacity: 0; transform: rotate(8deg) scale(0.85); }
-            }
-            @keyframes blessedOrbital {
-              0%   { opacity: 0; transform: translate(var(--bsoStartX), var(--bsoStartY)) scale(0.4) rotate(0deg); }
-              30%  { opacity: 1; transform: translate(var(--bsoStartX), var(--bsoStartY)) scale(1.15) rotate(180deg); }
-              80%  { opacity: 0.9; transform: translate(calc(var(--bsoEndX) * 0.8), calc(var(--bsoEndY) * 0.8)) scale(1) rotate(360deg); }
-              100% { opacity: 0; transform: translate(var(--bsoEndX), var(--bsoEndY)) scale(0.7) rotate(420deg); }
-            }
-            @keyframes blessedSparkle {
-              0%   { opacity: 0; transform: translate(0,0) scale(0.3) rotate(0deg); }
-              25%  { opacity: 1; transform: translate(calc(var(--bsDx) * 0.3), calc(var(--bsDy) * 0.3)) scale(1.1) rotate(calc(var(--bsRot) * 0.3)); }
-              80%  { opacity: 1; transform: translate(calc(var(--bsDx) * 0.85), calc(var(--bsDy) * 0.85)) scale(0.9) rotate(calc(var(--bsRot) * 0.85)); }
-              100% { opacity: 0; transform: translate(var(--bsDx), var(--bsDy)) scale(0.5) rotate(var(--bsRot)); }
-            }
-            @keyframes blessedAura {
-              0%   { opacity: 0; transform: translateY(0) scale(0.5); }
-              20%  { opacity: 1; transform: translateY(calc(var(--bsaRise) * 0.2)) scale(1.1); }
-              80%  { opacity: 0.9; transform: translateY(calc(var(--bsaRise) * 0.85)) scale(1); }
-              100% { opacity: 0; transform: translateY(var(--bsaRise)) scale(0.4); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
+  blessed_skill_burst: R1BlessedLeinwand,   // Divine Gift of Skill — W86r1: Pixelart-Leinwand
 
   // ── Petrify (Medusa's Curse) ──────────────────────────────
   //  Target gains a grey stone overlay with a subtle speckle/
@@ -27062,104 +26834,7 @@ const ANIM_REGISTRY = {
   //  sweep into place on either side, flap once, and linger as
   //  a protective buff visual. This is a BUFF visual, not an
   //  attack — slower, gentler, and holds on the target.
-  golden_wings: (() => {
-    return function GoldenWingsEffect({ x, y, w, h }) {
-      const cw = w || 100;
-      const ch = h || 140;
-      const sparkles = useMemo(() => Array.from({ length: ppFxN(14) }, () => {
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 35 + Math.random() * 40;
-        return {
-          dx: Math.cos(angle) * dist,
-          dy: Math.sin(angle) * dist * 0.7 - 10,
-          size: 3 + Math.random() * 5,
-          delay: 250 + Math.random() * 600,
-          dur: 600 + Math.random() * 400,
-          color: ['#fad54a','#fffbd2','#fbe181','#ffffff'][Math.floor(Math.random() * 4)],
-        };
-      }), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          {/* Golden sheen overlay on the target */}
-          <div style={{
-            position: 'absolute',
-            left: -cw / 2, top: -ch / 2,
-            width: cw, height: ch, borderRadius: 4,
-            background: 'linear-gradient(135deg, rgba(255,228,105,0.0) 20%, rgba(255,228,105,0.55) 50%, rgba(255,228,105,0.0) 80%)',
-            boxShadow: 'inset 0 0 22px rgba(250,213,74,0.5), 0 0 16px rgba(255,198,28,0.6)',
-            mixBlendMode: 'screen',
-            opacity: 0,
-            animation: 'goldenWingsSheen 1100ms ease-in-out 100ms forwards',
-          }} />
-          {/* Left wing — emoji dove mirrored horizontally via scaleX(-1) */}
-          <div style={{
-            position: 'absolute',
-            left: -cw * 0.55, top: -ch * 0.15,
-            fontSize: Math.max(cw, ch) * 0.55,
-            transformOrigin: 'right center',
-            filter: 'drop-shadow(0 0 10px rgba(250,213,74,0.9)) drop-shadow(0 0 18px rgba(255,241,150,0.55)) hue-rotate(30deg) saturate(1.4) brightness(1.2)',
-            color: '#fad54a',
-            opacity: 0,
-            animation: 'goldenWingLeft 1100ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards',
-          }}>
-            <span style={{ display: 'inline-block', transform: 'scaleX(-1)' }}>🕊️</span>
-          </div>
-          {/* Right wing */}
-          <div style={{
-            position: 'absolute',
-            left: cw * 0.05, top: -ch * 0.15,
-            fontSize: Math.max(cw, ch) * 0.55,
-            transformOrigin: 'left center',
-            filter: 'drop-shadow(0 0 10px rgba(250,213,74,0.9)) drop-shadow(0 0 18px rgba(255,241,150,0.55)) hue-rotate(30deg) saturate(1.4) brightness(1.2)',
-            color: '#fad54a',
-            opacity: 0,
-            animation: 'goldenWingRight 1100ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards',
-          }}>🕊️</div>
-          {/* Sparkles around the target */}
-          {sparkles.map((s, i) => (
-            <div key={'gw'+i} style={{
-              position: 'absolute', left: 0, top: 0,
-              width: s.size, height: s.size, borderRadius: '50%',
-              background: s.color,
-              boxShadow: `0 0 ${s.size + 3}px ${s.color}`,
-              opacity: 0,
-              animation: `goldenWingsSpark ${s.dur}ms ease-out ${s.delay}ms forwards`,
-              '--gwDx': s.dx + 'px', '--gwDy': s.dy + 'px',
-            }} />
-          ))}
-          <style>{`
-            @keyframes goldenWingsSheen {
-              0%   { opacity: 0; transform: scale(0.95); }
-              30%  { opacity: 1; transform: scale(1.02); }
-              70%  { opacity: 0.9; transform: scale(1.02); }
-              100% { opacity: 0; transform: scale(1.08); }
-            }
-            @keyframes goldenWingLeft {
-              0%   { opacity: 0; transform: translateX(40px) scaleX(0.3); }
-              35%  { opacity: 1; transform: translateX(0) scaleX(1.15); }
-              55%  { transform: translateX(0) scaleX(0.95); }
-              75%  { transform: translateX(0) scaleX(1.05); }
-              90%  { opacity: 1; transform: translateX(0) scaleX(1); }
-              100% { opacity: 0; transform: translateX(-8px) scaleX(1); }
-            }
-            @keyframes goldenWingRight {
-              0%   { opacity: 0; transform: translateX(-40px) scaleX(0.3); }
-              35%  { opacity: 1; transform: translateX(0) scaleX(1.15); }
-              55%  { transform: translateX(0) scaleX(0.95); }
-              75%  { transform: translateX(0) scaleX(1.05); }
-              90%  { opacity: 1; transform: translateX(0) scaleX(1); }
-              100% { opacity: 0; transform: translateX(8px) scaleX(1); }
-            }
-            @keyframes goldenWingsSpark {
-              0%   { opacity: 0; transform: translate(0,0) scale(0.4); }
-              30%  { opacity: 1; }
-              100% { opacity: 0; transform: translate(var(--gwDx), var(--gwDy)) scale(0.3); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
+  golden_wings: ppR1GoldenWings,   // W86r1: Pixelart-Leinwand
   // ── Null Zone ────────────────────────────────────────────────────
   // Purple cosmic void that opens on every affected target: a dark
   // event-horizon disc, concentric violet spiral rings, and a swarm of
@@ -35220,89 +34895,7 @@ const ANIM_REGISTRY = {
   // from its support slot. Stacks a few jagged flame sprites with
   // upward jitter + a brief shadow halo so the eruption reads as
   // hellish rather than ordinary fire.
-  hell_fox_death: (() => {
-    return function HellFoxDeathEffect({ x, y }) {
-      const flames = useMemo(() => Array.from({ length: ppFxN(18) }, (_, i) => ({
-        startX: -22 + Math.random() * 44,
-        riseY:  -(60 + Math.random() * 70),
-        scale:  0.7 + Math.random() * 0.7,
-        delay:  i * 28 + Math.random() * 90,
-        dur:    520 + Math.random() * 320,
-        glyph:  ['🔥', '🔥', '🜲', '∆'][Math.floor(Math.random() * 4)],
-      })), []);
-      const sparks = useMemo(() => Array.from({ length: ppFxN(22) }, () => {
-        const angle = -Math.PI + Math.random() * Math.PI;
-        const speed = 26 + Math.random() * 36;
-        return {
-          dx: Math.cos(angle) * speed,
-          dy: Math.sin(angle) * speed * 0.6 - 6,
-          size: 3 + Math.random() * 4,
-          delay: 60 + Math.random() * 280,
-          dur: 460 + Math.random() * 260,
-        };
-      }), []);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          {/* Ground halo — deep crimson-into-black ring on the slot. */}
-          <div style={{
-            position: 'absolute', left: -42, top: -18,
-            width: 84, height: 36, borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(58,0,0,0.85) 0%, rgba(8,6,12,0.7) 50%, rgba(0,0,0,0) 90%)',
-            filter: 'blur(2px)',
-            opacity: 0,
-            animation: 'hellFoxHalo 760ms ease-out forwards',
-          }} />
-          {/* Black flame sprites — each is a darkened emoji + crimson
-              under-glow that rises and dissipates. We stack 'em close to
-              the centre so the column reads as one belching pyre. */}
-          {flames.map((f, i) => (
-            <div key={'hff' + i} style={{
-              position: 'absolute',
-              left: f.startX,
-              top: 0,
-              fontSize: 32 * f.scale,
-              lineHeight: '32px',
-              filter: 'brightness(0.35) drop-shadow(0 0 6px rgba(120,0,0,0.95)) drop-shadow(0 0 14px rgba(190,14,14,0.5))',
-              '--hffRise': f.riseY + 'px',
-              opacity: 0,
-              animation: `hellFoxFlame ${f.dur}ms ease-out ${f.delay}ms forwards`,
-            }}>{f.glyph}</div>
-          ))}
-          {/* Crimson sparks — outward burst on impact. */}
-          {sparks.map((s, i) => (
-            <div key={'hfs' + i} style={{
-              position: 'absolute', left: 0, top: 0,
-              width: s.size + 'px', height: s.size + 'px',
-              borderRadius: '50%',
-              background: 'radial-gradient(circle, #ef2929 0%, #c80000 60%, transparent 100%)',
-              boxShadow: '0 0 8px #c80000aa',
-              '--hfsDx': s.dx + 'px',
-              '--hfsDy': s.dy + 'px',
-              opacity: 0,
-              animation: `hellFoxSpark ${s.dur}ms ease-out ${s.delay}ms forwards`,
-            }} />
-          ))}
-          <style>{`
-            @keyframes hellFoxHalo {
-              0%   { opacity: 0; transform: scale(0.4); }
-              25%  { opacity: 1; transform: scale(1); }
-              100% { opacity: 0; transform: scale(1.6); }
-            }
-            @keyframes hellFoxFlame {
-              0%   { opacity: 0; transform: translate(0, 16px) scale(0.5); }
-              30%  { opacity: 1; transform: translate(0, calc(var(--hffRise) * 0.35)) scale(1); }
-              100% { opacity: 0; transform: translate(0, var(--hffRise)) scale(0.7); }
-            }
-            @keyframes hellFoxSpark {
-              0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
-              25%  { opacity: 1; transform: translate(calc(var(--hfsDx) * 0.3), calc(var(--hfsDy) * 0.3)) scale(1); }
-              100% { opacity: 0; transform: translate(var(--hfsDx), var(--hfsDy)) scale(0.5); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
+  hell_fox_death: ppR1HellFoxDeath,   // W86r1: Pixelart-Leinwand
   // ── Dog bite (Loyal Terrier, future fang-tribe cards) ──────────────
   // Two fang silhouettes snap shut on the target's slot, paired with a
   // shock-line halo and a couple of saliva droplets that fly outward
