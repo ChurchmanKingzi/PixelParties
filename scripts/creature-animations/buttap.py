@@ -154,7 +154,7 @@ def aktive_sterne(i):
 
 
 # ── Zeitachsen ──
-BOB = [int(round(2 * math.sin(2 * math.pi * i / 24))) for i in range(N)]        # + = hoch
+BOB = [0] * N                                                                    # Nutzer-Feedback: Buttap steht und schwebt nicht (Gel-Körper wächst/staucht vom Boden aus)
 S = []
 for _i in range(N):
     _v = math.sin(2 * math.pi * _i / 24)

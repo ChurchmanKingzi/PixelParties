@@ -92,9 +92,9 @@ def teil(maske):
 
 
 def frame_gross(i, nur=None):
-    n = U.stufe(i, 24, 2)                                        # Schweben 0-1-2-1-0
+    n = 0                                                        # Nutzer-Feedback: Chosen Sacrifice schwebt nicht, er steht
     hump = U.buckel(i, 0, 24, n=24)                              # Hüllkurve des Rockwehens (0 bei Frame 0)
-    drift = U.stufe(i, N, 2, form='sin') - 1                     # Kopf treibt −1/0/+1 seitlich
+    drift = 0                                                    # Nutzer-Feedback: kein seitliches Treiben des Kopfes
     hp = teil(helm)
     if i in BLINZ:
         for (x, y) in AUGEN:

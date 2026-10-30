@@ -77,11 +77,11 @@ def gesicht(k, i):
 
 def frame(i, nur=None):
     ph = L.sinus(i, 12)
-    dy = int(round(-1.0 * math.sin(ph)))                         # Bob: Abschlag → Körper hebt sich
+    dy = 0                                                       # Nutzer-Feedback: er hält sich fest – kein Hüpfen/Bob
     k = teil(koerper)
     gesicht(k, i)
-    k = T.scherung_zeilen(k, PAD_T + 0, PAD_T + 8, PAD_T + 9, 1.4, math.sin(L.sinus(i, 24)))      # Kopfwackeln
-    ar = T.biegen_spalten(teil(arm_r), PAD_L + 11, 2.4, ph)                                      # Winken
+    k = T.scherung_zeilen(k, PAD_T + 16, PAD_T + 21, PAD_T + 15, 1.6, math.sin(L.sinus(i, 16)))   # Beine baumeln (er hängt)
+    ar = teil(arm_r)                                              # Nutzer-Feedback: die vom Betrachter rechte Hand hält sich fest → stationär
     al = T.scherung_zeilen(teil(arm_l), PAD_T + 14, PAD_T + 18, PAD_T + 13, 1.2, math.sin(L.sinus(i, 16)))   # linker Arm pendelt
     ebenen = {'koerper': k, 'arm_r': ar, 'arm_l': al}
     wahl = nur or ('koerper', 'arm_r', 'arm_l')

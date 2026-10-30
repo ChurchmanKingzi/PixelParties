@@ -89,10 +89,10 @@ def augen(k, i):
 
 
 def frame(i, nur=None):
-    dy = int(round(-1.0 * math.sin(L.sinus(i, 12))))              # Wippen
+    dy = 0                                                        # Nutzer-Feedback: Criminal Monkee schwebt nicht, er steht
     k = teil(koerper)
     augen(k, i)
-    k = T.scherung_zeilen(k, PAD_T + 0, PAD_T + 8, PAD_T + 9, 1.4, math.sin(L.sinus(i, 24)))   # Kopf wackelt
+    # (Nutzer-Feedback: nicht so viel seitwärts – das Kopfwackeln entfällt)
     ar = T.scherung_zeilen(teil(arm_r), PAD_T + 16, PAD_T + 18, PAD_T + 15, 1.2, math.sin(L.sinus(i, 16)))   # Hand wippt
     fl = teil(fuss_l)
     fr_ = teil(fuss_r)

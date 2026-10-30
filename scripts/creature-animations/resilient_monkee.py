@@ -96,10 +96,10 @@ def augen(k, i):
 
 def frame(i, nur=None):
     ph = L.sinus(i, 12)
-    dy = int(round(-1.0 * math.sin(ph)))                         # Bob: Abschlag → Körper hebt sich
+    dy = 0                                                       # Nutzer-Feedback: steht am Boden, kein Hüpfen
     k = teil(koerper)
     augen(k, i)
-    k = T.scherung_zeilen(k, PAD_T + 0, PAD_T + 9, PAD_T + 10, 1.3, math.sin(L.sinus(i, 24)))      # Kopf mit Fez wackelt
+    # (Nutzer-Feedback: der Kopf bewegt sich nicht nach links/rechts)
     al = T.biegen_spalten(teil(arm_l), PAD_L + 4, 2.4, ph)                                       # Arme pumpen
     ar = T.biegen_spalten(teil(arm_r), PAD_L + 11, 2.4, ph)
     fl = teil(fuss_l)

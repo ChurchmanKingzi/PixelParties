@@ -2,7 +2,7 @@
   "creature": "Explosive Drone",
   "sheet": "explosive-drone.png",
   "frameWidth": 28,
-  "frameHeight": 15,
+  "frameHeight": 13,
   "frames": 48,
   "frameMs": 60,
   "loop": true,

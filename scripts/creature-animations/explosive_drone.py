@@ -55,11 +55,13 @@ ZITTERN = {40: 1, 41: -1, 42: 1, 43: -1}                      # kurzes Beben (dx
 
 def frame(i, partikel=True, effekte=True):
     u = lambda t: (1 - math.cos(2 * math.pi * t / (N / 4))) / 2     # Bob: Periode 12
-    bob = -int(round(2 * u(i)))                               # 0 → −1 → −2 → −1 → 0 (nur nach oben, zweistufig)
+    bob = 0                                                   # Nutzer-Feedback: die Drohne schwebt nicht, sie steht auf ihren Spinnenbeinen
     dx = ZITTERN.get(i, 0) if effekte else 0
 
     kp = F.ebene(spr, koerper, H, W, PAD_L, PAD_T)
-    bn = F.ebene(spr, beine, H, W, PAD_L, PAD_T)
+    mitte = sw / 2.0
+    bn_l = F.ebene(spr, beine & (xx < mitte), H, W, PAD_L, PAD_T)
+    bn_r = F.ebene(spr, beine & (xx >= mitte), H, W, PAD_L, PAD_T)
     if effekte:
         st = BLINK[i % 12]
         if st:
@@ -67,8 +69,11 @@ def frame(i, partikel=True, effekte=True):
                 kp[PAD_T + y, PAD_L + x, :3] = F.heller(kp[PAD_T + y, PAD_L + x, :3], ROT, st)
         F.lichtband(kp, metall_maske, PAD_L, PAD_T, i, N // 2, 5, 8, METALL, stufen=1, breite=3.0, achse=(1.0, 0.5))
 
-    bn = F.zeilen_pendel(bn, PAD_T + 5, 1.5, L.sinus(i, N / 2), 1.0)          # Beine baumeln (Zeilen ab 6)
-    kp, bn = (L.versetze(a, dx, bob) for a in (kp, bn))
+    # Nutzer-Feedback: die Spinnenbeine bewegen sich – linke und rechte Beinseite trippeln gegenläufig (Periode 12, bis ±2 px an den Fußspitzen)
+    bn_l = F.zeilen_pendel(bn_l, PAD_T + 5, 2.0, L.sinus(i, N / 4), 1.0)
+    bn_r = F.zeilen_pendel(bn_r, PAD_T + 5, 2.0, L.sinus(i, N / 4) + math.pi, 1.0)
+    kp, bn_l, bn_r = (L.versetze(a, dx, bob) for a in (kp, bn_l, bn_r))
+    bn = L.zusammen(H, W, [(bn_l, 0, 0), (bn_r, 0, 0)])
     f = L.zusammen(H, W, [(bn, 0, 0), (kp, 0, 0)])
     F.umranden(f, [bn], UMRISS, BEIN, BEIN, BEIN)                                # Randpixel-Test (Regel 16)
     return f

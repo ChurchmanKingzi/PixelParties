@@ -35,7 +35,7 @@ import numpy as np
 import anim_lib as L
 import anim_untote as U
 
-N, MS = 48, 65
+N, MS = 48, 100                                              # Nutzer-Feedback: viel langsamer (100 ms je Frame, einmal pro Schleife wiegen)
 GPL, GPR, GPT, GPB = 7, 7, 7, 5
 
 spr = L.lade('deepsea-zombie')
@@ -98,8 +98,8 @@ def wiegen(a, aus):
 
 
 def frame_gross(i, nur=None):
-    aus = 1.6 * math.sin(2 * math.pi * i / 24)                    # Wiegen (0 bei Frame 0)
-    drift = int(round(1.0 * math.sin(2 * math.pi * i / 16)))      # senkrecht ±1
+    aus = 1.3 * math.sin(2 * math.pi * i / 48)                    # Wiegen (0 bei Frame 0), nur einmal pro Schleife
+    drift = 0                                                     # Nutzer-Feedback: der Zombie schwebt nicht, er steht
     kb = teil(rest)
     if i in BLINZ:
         for (x, y) in AUGEN:
@@ -112,8 +112,8 @@ def frame_gross(i, nur=None):
                 kb[GPT + y, GPL + x, :3] = haut(x, y)
     # Wiegen um die Füße: Zeilenversatz wächst mit dem Abstand zu Zeile y 19 (nur Rumpf/Kopf; die Füße y ≥ 19 stehen)
     kb = wiegen(kb, aus)
-    bl = 1 if (i % 16) in (3, 4, 5) else 0
-    br = 1 if (i % 16) in (11, 12, 13) else 0
+    bl = 1 if 6 <= i <= 13 else 0                                 # Füße heben langsam im Wechsel (je 8 Frames)
+    br = 1 if 30 <= i <= 37 else 0
     koerper = L.zusammen(H, W, [(teil(fuss_l), 0, -bl), (teil(fuss_r), 0, -br), (kb, 0, 0)])
     koerper = L.versetze(koerper, 0, drift) if drift else koerper
     koerper = U.kontur_schliessen(koerper, UMRISS, KONTUR)

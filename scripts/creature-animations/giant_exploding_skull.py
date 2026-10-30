@@ -49,7 +49,7 @@ import anim_lib as L
 import anim_amorph as A
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 4, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 4, 2
 
 spr = L.lade('giant-exploding-skull')
 sh, sw = spr.shape[:2]
@@ -131,7 +131,7 @@ for (y, x) in _augpix:
     LID[(y, x)] = max(cnt, key=lambda c: (cnt[c], -dist[c]))
 
 # ── Zeitachsen ──
-HOP = [-1 if 4 <= i <= 20 else 0 for i in range(N)]                                   # − = hoch (schwer: ein langsamer Zyklus)
+HOP = [0] * N                                                                         # Nutzer-Feedback: der Riese schwebt/hüpft nicht, er steht
 BLINZELN_L = {14: 1, 15: 2, 16: 2, 17: 1, 38: 1, 39: 2, 40: 2, 41: 1}
 BLINZELN_R = {15: 1, 16: 2, 17: 2, 18: 1, 39: 1, 40: 2, 41: 2, 42: 1}
 MUND_RAMPE = [CI, CS, CO, CR, CQ, CP, CH]                                             # dunkel → hell (Oliv → Pastellgelb)
@@ -155,7 +155,7 @@ def _fuss(sp_ebene, name, i):
         if not len(xs):
             continue
         frac = (y - (PAD_T + y0)) / float(max(1, y1 - y0))
-        dx = richtung * int(round(0.7 * frac * (math.sin(2 * math.pi * i / 24 + phi) - math.sin(phi))))      # 0 in Frame 0
+        dx = richtung * int(round(1.5 * frac * (math.sin(2 * math.pi * i / 24 + phi) - math.sin(phi))))      # 0 in Frame 0
         if xs.min() + dx < 0 or xs.max() + dx >= W:
             raise L.ClipError(f'Fuß {name}: Zeile {y} würde um {dx} px aus der Leinwand')
         for x in xs:

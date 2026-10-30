@@ -204,9 +204,9 @@ def schiebe_zeilen(a, dx_je_zeile):
 
 def frame(i, partikel=True, effekte=True):
     u = lambda t: (1 - math.cos(2 * math.pi * t / (N / 4))) / 2     # Bob: Periode 12
-    bob = -int(round(2 * u(i)))                                # 0 → −1 → −2 → −1 → 0 (nur nach oben, zweistufig)
-    streck = 1 if bob == -2 else 0                             # auf dem höchsten Punkt streckt sich die Spule
-    ph = L.sinus(i, N / 8)                                     # Flügelschlag: achtmal pro Schleife (Periode 6)
+    bob = 0                                                    # Nutzer-Feedback: das Küken springt/schwebt nicht, es bleibt am Boden
+    streck = 1 if 10 <= i % 24 <= 15 else 0                    # die Spule streckt sich langsam (zweimal pro Schleife) vom Boden aus
+    ph = L.sinus(i, N / 2)                                     # Nutzer-Feedback: der gelbe Schweif winkt viel langsamer (zweimal pro Schleife, Periode 24)
 
     fl, st, ol, orr, kp = P_FL.copy(), P_ST.copy(), P_OL.copy(), P_OR.copy(), P_KP.copy()
     if effekte:

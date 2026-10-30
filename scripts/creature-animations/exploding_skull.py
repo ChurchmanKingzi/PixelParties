@@ -71,6 +71,8 @@ def _col(y, x):
 _gelb = OPAK & ((spr[..., 0] == 255) & (spr[..., 1] == 255) & (spr[..., 2] == 0) | (spr[..., 0] == 255) & (spr[..., 1] == 255) & (spr[..., 2] == 255))   # A (gelb) und E (weiß)
 BOLT_L = _gelb & (yy >= 9) & (yy <= 14) & (xx <= 6)                                  # beweglicher Teil des linken Bogens (Füße ab Zeile 15 fest)
 BOLT_R = _gelb & (yy >= 7) & (yy <= 13) & (xx >= 21)                                 # beweglicher Teil des rechten Bogens
+FUSS_L = _gelb & (yy >= 15) & (xx <= 12)                                             # unterer Teil des linken Bogens (Nutzer-Feedback: auch er knistert)
+FUSS_R = _gelb & (yy >= 14) & (xx >= 15)                                             # unterer Teil des rechten Bogens
 FUNKE = _gelb & (yy <= 3) & (xx <= 11)                                               # Zündfunke am Schnurende
 MUND = [(12, 13), (12, 14), (13, 13), (13, 14)]                                      # (y, x) des Kieferglühens: N, O / O, N
 assert [_col(y, x) for (y, x) in MUND] == [CN, CO, CO, CN], [_col(y, x) for (y, x) in MUND]
@@ -147,6 +149,30 @@ def _bogen(rnd, seite):
     return out
 
 
+def _fuss(rnd, seite):
+    """Neuer unterer Teil eines Blitzbogens: fester Anschluss an den oberen Bogen → Zickzack → fester Endpunkt am Fuß; 2 px dick nach innen; weiße Kerne."""
+    if seite == 'l':
+        start, ende, innen, lo, hi = (6, 15), (10, 18), 1, 5, 11
+    else:
+        start, ende, innen, lo, hi = (22, 14), (17, 18), -1, 16, 22
+    n = rnd.choice([1, 2])
+    ys = sorted(rnd.sample([start[1] + 1, start[1] + 2, ende[1] - 1], n))
+    verts = []
+    for y in ys:
+        t = (y - start[1]) / max(1, ende[1] - start[1])
+        x = int(round(start[0] + (ende[0] - start[0]) * t)) + rnd.choice([-1, 0, 1])
+        verts.append((min(hi, max(lo, x)), y))
+    way = [start] + verts + [ende]
+    out = {}
+    for p, q in zip(way[:-1], way[1:]):
+        for (x, y) in _linie(p, q):
+            out[(x, y)] = CA
+            out.setdefault((x + innen, y), CA)
+    for p in [v for v in verts if rnd.random() < 0.6] + [start, ende]:
+        out[p] = CE
+    return out
+
+
 def _funke(rnd):
     """Gelb-weiße Gruppe am Schnurende (Spitze bei (10,1)); unregelmäßig, keine Kreuzform."""
     muster = rnd.choice([
@@ -176,16 +202,20 @@ _rnd = random.Random(2024)
 BOGEN_L = [None] + [_bogen(_rnd, 'l') for _ in range(7)]                              # None = Original (Pose 0)
 BOGEN_R = [None] + [_bogen(_rnd, 'r') for _ in range(7)]
 FUNKEN_POSE = [None] + [_funke(_rnd) for _ in range(7)]
+FUSS_POSE_L = [None] + [_fuss(_rnd, 'l') for _ in range(5)]
+FUSS_POSE_R = [None] + [_fuss(_rnd, 'r') for _ in range(5)]
 FOLGE_L = _pose_folge(random.Random(5), 8)
 FOLGE_R = _pose_folge(random.Random(9), 8)
 FOLGE_F = _pose_folge(random.Random(13), 8, tempo=(1, 2))
+FOLGE_FL = _pose_folge(random.Random(21), 6)
+FOLGE_FR = _pose_folge(random.Random(34), 6)
 MUND_ZUSTAENDE = [[CN, CO, CO, CN], [CO, CN, CN, CO], [CA, CO, CO, CA], [CO, CE, CE, CO], [CN, CA, CA, CN]]
 FOLGE_M = [0, 0, 0] + sum([[k] * d for k, d in zip([1, 2, 4, 1, 3, 0, 2, 1, 4, 3, 0, 2, 4, 1, 0, 3, 2, 0], [2, 3, 2, 2, 1, 3, 2, 3, 2, 1, 3, 2, 2, 3, 2, 2, 3, 2])], [])
 FOLGE_M = (FOLGE_M + [0] * N)[:N]
-HOP = [-1 if math.sin(2 * math.pi * i / 24) > 0.3 else 0 for i in range(N)]       # − = hoch
+HOP = [0] * N                                                                       # Nutzer-Feedback: der Skull schwebt/hüpft nicht, er steht
 BLINZELN_L = {15: 1, 16: 2, 17: 1, 39: 1, 40: 2, 41: 1}
 BLINZELN_R = {16: 1, 17: 2, 18: 1, 40: 1, 41: 2, 42: 1}
-assert HOP[0] == 0 and FOLGE_L[0] == 0 and FOLGE_R[0] == 0 and FOLGE_F[0] == 0 and FOLGE_M[0] == 0
+assert HOP[0] == 0 and FOLGE_FL[0] == 0 and FOLGE_FR[0] == 0 and FOLGE_L[0] == 0 and FOLGE_R[0] == 0 and FOLGE_F[0] == 0 and FOLGE_M[0] == 0
 
 # Zündfunken (steigen vom Schnurende auf): Startframe, seitlicher Weg
 ZUENDFUNKEN = [(3, -1), (9, 0), (15, 1), (21, -1), (27, 0), (33, 1), (39, -1), (45, 0)]
@@ -211,6 +241,10 @@ def sprite_mit_effekten(i):
         _setze(sp, BOGEN_L[FOLGE_L[i]], BOLT_L)
     if FOLGE_R[i]:
         _setze(sp, BOGEN_R[FOLGE_R[i]], BOLT_R)
+    if FOLGE_FL[i]:
+        _setze(sp, FUSS_POSE_L[FOLGE_FL[i]], FUSS_L)
+    if FOLGE_FR[i]:
+        _setze(sp, FUSS_POSE_R[FOLGE_FR[i]], FUSS_R)
     if FOLGE_F[i]:
         _setze(sp, FUNKEN_POSE[FOLGE_F[i]], FUNKE)
     for (y, x), c in zip(MUND, MUND_ZUSTAENDE[FOLGE_M[i]]):

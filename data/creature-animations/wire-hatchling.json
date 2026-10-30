@@ -2,7 +2,7 @@
   "creature": "Wire Hatchling",
   "sheet": "wire-hatchling.png",
   "frameWidth": 32,
-  "frameHeight": 26,
+  "frameHeight": 25,
   "frames": 48,
   "frameMs": 60,
   "loop": true,
