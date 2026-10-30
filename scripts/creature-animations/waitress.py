@@ -22,8 +22,8 @@ Kein Metall, Gold (Haare sind Haarfarbe) oder Edelstein → KEIN Glanz (Regel 14
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Auf und ab (zweistufig, Periode 24): Brust zuerst 1 px (Zeile 17 wird einmal doppelt eingefügt: Bluse, Arme, Hände und Kopf steigen, Saum/Gürtel bleibt), der Kopf läuft 3 Frames nach und hebt sich um ein
   weiteres px (Kinnzeile 10 wird verlängert): Kopf 0 → 1 → 2 → 1 → 0 px, Brust 0 → 1 → 0.
-* Zöpfe schwingen: die Zopfspitzen (Zeilen 17–18) schwingen 1 px nach außen: links Frames 6–11 und 28–33, rechts Frames 22–27 und 40–45 (4-verbunden über die Zeile 16).
-* Gewichtsverlagerung: der Oberkörper (Zeilen 0–19) schiebt sich 1 px nach rechts (Frames 10–21) und später 1 px nach links (Frames 34–45); die Hüftzeilen 20–22 bleiben stehen.
+* Zöpfe schwingen: die Zopfspitzen (Zeilen 17–19) schwingen 1 px nach außen: links Frames 6–11 und 28–33, rechts Frames 3–8 und 22–27 (4-verbunden über die Zeile 16).
+* Gewichtsverlagerung: der Oberkörper (Zeilen 0–18) schiebt sich 1 px nach rechts (Frames 10–21) und später 1 px nach links (Frames 34–45); die Hüftzeilen 19–22 bleiben stehen.
 * Kopfneigen: der Kopf (Zeilen 0–9) neigt sich 1 px nach links (Frames 2–7) und rechts (Frames 24–31); Kinn und Hals bleiben stehen.
 Kein Blinzeln: die Augen sind im Sprite schmale geschlossene Striche (kein Auge, das sich schließen könnte).
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
@@ -54,16 +54,16 @@ def frame(i):
     k = L.platz(spr, H, W, PAD_L, PAD_T)
     # --- Zöpfe schwingen (Zopfspitzen Zeilen 17–18 nach außen) ---
     if Hm.folge(i, 6, [1] * 6, N) or Hm.folge(i, 28, [1] * 6, N):
-        Hm.bereich_versatz(k, OFF, {17: -1, 18: -1}, -2, 4)
-    if Hm.folge(i, 22, [1] * 6, N) or Hm.folge(i, 40, [1] * 6, N):
-        Hm.bereich_versatz(k, OFF, {17: 1, 18: 1}, 15, sw + 1)
-    # --- Kopfneigen (Zeilen 0–9) und Gewichtsverlagerung (Zeilen 0–19) in getrennten Zeitfenstern ---
+        Hm.bereich_versatz(k, OFF, {17: -1, 18: -1, 19: -1}, -2, 4)
+    if Hm.folge(i, 22, [1] * 6, N) or Hm.folge(i, 3, [1] * 6, N):
+        Hm.bereich_versatz(k, OFF, {17: 1, 18: 1, 19: 1}, 15, sw + 1)
+    # --- Kopfneigen (Zeilen 0–9) und Gewichtsverlagerung (Zeilen 0–18) in getrennten Zeitfenstern ---
     kn = -1 if Hm.folge(i, 2, [1] * 6, N) else (1 if Hm.folge(i, 24, [1] * 8, N) else 0)
     if kn:
         Hm.bereich_versatz(k, OFF, {y: kn for y in range(0, 10)}, -2, sw + 1)
     gv = 1 if Hm.folge(i, 10, [1] * 12, N) else (-1 if Hm.folge(i, 34, [1] * 12, N) else 0)
     if gv:
-        Hm.bereich_versatz(k, OFF, {y: gv for y in range(0, 20)}, -2, sw + 1)
+        Hm.bereich_versatz(k, OFF, {y: gv for y in range(0, 19)}, -2, sw + 1)
     # --- Auf und ab: Zeile 17 = Brust, Kinnzeile 10 läuft 3 Frames nach ---
     brust = Hm.stufe(i, N / 2, 1)
     kopf = Hm.stufe(i - 3, N / 2, 1)

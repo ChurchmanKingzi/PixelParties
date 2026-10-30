@@ -107,7 +107,7 @@ ZUPF_Y = [21, 17, 24, 19]                                  # Höhe des Zupfpunkt
 
 
 # ── Flügel zupft ────────────────────────────────────────────────────────────────────────────────────────────────────
-A_AMP, POT, LAG = 3.0, 1.2, 1.0
+A_AMP, POT, LAG = 4.0, 1.2, 1.0
 X_PIV, MAXD = 13, 5                                        # Spitzen-Spalten x 14…18: Abstand 1…5 von der Wurzelkante
 
 
@@ -207,10 +207,11 @@ def frame(i, partikel=True, nur=None):
             oben = oben.copy()
             for (x, y) in AUGEN:
                 oben[PAD_T + y, PAD + x, :3] = HAUT
-        oben = L.streck_zeile(oben, Y_ENDE, n)             # Oberkörper hebt sich, Füße bleiben (letzte Haarzeile doppelt)
+        k = n // 2                                         # Füße heben sich nur halb so weit (Fußwippen), die Lücke füllt die doppelte letzte Haarzeile
+        oben = L.streck_zeile(oben, Y_ENDE, n - k)
         wurzel = FL_WURZEL
         spitze = B.spalten_schub(FL_SPITZE, PAD + X_PIV, dy_fn(i), MAXD)
-        schichten += [(FUESSE, 0, 0, 2), (oben, 0, 0, 3), (wurzel, 0, -n, 4), (spitze, 0, -n, 4)]
+        schichten += [(FUESSE, 0, -k, 2), (oben, 0, -k, 3), (wurzel, 0, -n, 4), (spitze, 0, -n, 4)]
     f, karte = B.zusammen_mit_karte(H, W, schichten)
     B.umriss_je_ebene(f, karte, ERLAUBT, EBENEN_FARBE)
     if partikel and STERNE_AN:
