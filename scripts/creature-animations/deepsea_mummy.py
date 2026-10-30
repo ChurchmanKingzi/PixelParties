@@ -76,12 +76,30 @@ assert not (P0 & P1).any() and not (AL & AR).any()
 
 BLASE = {'c': C_, 'r': B_}
 P = lambda x, y: (GPL + x, GPT + y)
-PUFFS = [
-    dict(x=P(0, 17)[0], y=P(0, 17)[1], vx=-1, vy=-9, off=0, wackeln=0.5),
-    dict(x=P(17, 16)[0], y=P(17, 16)[1], vx=1, vy=-9, off=22, wackeln=0.5),
-    dict(x=P(1, 8)[0], y=P(1, 8)[1], vx=-1, vy=-6, off=35, wackeln=0.5),
-    dict(x=P(12, 1)[0], y=P(12, 1)[1], vx=1, vy=-3, off=12, wackeln=0.5),
-]
+# Die Figur füllt ihr Feld fast ganz (18 px breit, Arme/Wulst/Ende schlagen aus): Partikel dürfen sie nie berühren und nie teilweise verdecken (kein „Splitter“), und Effekte dürfen den Frame nur 2 px vergrößern.
+# Freie Bahnen (aus der Vereinigung aller Körperposen, Abstand ≥ 2 px): links oben neben dem Kopf (Blase steigt auf) und rechts unten neben dem Binden-Ende (Staub sinkt).
+BLASEN_N = 24                                                   # Lebensdauer 24 Frames, zweimal pro Schleife
+PUFFS = [dict(x=P(-2, 5)[0], y=P(-2, 5)[1], vx=1, vy=-7, off=0, wackeln=0)]
+STAUB_N = 24
+STAUB = [dict(x=P(19, 19)[0], y=P(19, 19)[1], vx=0, vy=6, off=2), dict(x=P(19, 19)[0], y=P(19, 19)[1], vx=0, vy=6, off=14)]
+STAUBFARBE = {'c': C_, 'r': B_}
+
+
+def _staub(h, w, i, n, puffs, farben, rand=0.08):
+    """Staubflöckchen: bleiben 2×2 (Kern + 3 Randpixel), sinken langsam; am Anfang/Ende ihrer Lebensdauer unsichtbar (nie ein Einzelpixel)."""
+    out = L.leer(h, w)
+    for pf in puffs:
+        t = ((i + pf.get('off', 0)) % n) / n
+        if t < rand or t > 1 - rand:
+            continue
+        cx, cy = int(round(pf['x'] + pf.get('vx', 0) * t)), int(round(pf['y'] + pf.get('vy', 0) * t))
+        for (dx, dy, k) in U.WOLKE_FORMEN['s']:
+            x, y = cx + dx, cy + dy
+            if not (0 <= y < h and 0 <= x < w):
+                raise L.ClipError(f'Staub bei ({x},{y}) liegt außerhalb der Leinwand {w}×{h}')
+            out[y, x, :3] = farben[k]
+            out[y, x, 3] = 255
+    return out
 
 
 def teil(maske):
@@ -152,8 +170,9 @@ def frame_gross(i, nur=None):
     koerper = U.kontur_schliessen(koerper, UMRISS, KONTUR)
     if nur == 'koerper':
         return koerper
-    blasen = _glut(H, W, i, N, PUFFS, BLASE)
-    return L.zusammen(H, W, [(blasen, 0, 0), (koerper, 0, 0)])
+    blasen = _glut(H, W, i, BLASEN_N, PUFFS, BLASE)
+    staub = L.leer(H, W) if _OHNE_PARTIKEL[0] else _staub(H, W, i, STAUB_N, STAUB, STAUBFARBE)
+    return L.zusammen(H, W, [(blasen, 0, 0), (staub, 0, 0), (koerper, 0, 0)])
 
 
 _OHNE_PARTIKEL = [False]

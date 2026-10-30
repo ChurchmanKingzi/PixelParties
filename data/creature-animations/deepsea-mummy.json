@@ -1,15 +1,15 @@
 {
   "creature": "Deepsea Mummy",
   "sheet": "deepsea-mummy.png",
-  "frameWidth": 24,
+  "frameWidth": 26,
   "frameHeight": 31,
   "frames": 48,
   "frameMs": 70,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 1,
+  "padTop": 2,
   "padLeft": 1,
   "padRight": 1,
-  "padBottom": 3,
-  "faceX": 12.0
+  "padBottom": 1,
+  "faceX": 13.0
 }
