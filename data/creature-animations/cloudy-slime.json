@@ -1,0 +1,15 @@
+{
+  "creature": "Cloudy Slime",
+  "sheet": "cloudy-slime.png",
+  "frameWidth": 50,
+  "frameHeight": 35,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 6,
+  "padRight": 7,
+  "padBottom": 2,
+  "faceX": 25.0
+}

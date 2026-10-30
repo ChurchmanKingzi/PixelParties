@@ -175,9 +175,9 @@ def rein_farbe(pr, ab_wurzel, ab_spitze):
         return pr['manschette'][1]
     if ab_spitze == 2:
         return pr['manschette'][0]
-    if ab_wurzel < 5:
+    if ab_wurzel < 4:
         return pr['knochen'][0]
-    return pr['knochen'][1] if ab_spitze > 3 else pr['knochen'][2]
+    return pr['knochen'][1] if ab_spitze > 5 else pr['knochen'][2]
 
 
 def knochenflügel(h, w, pose, pal, quelle, spalten, x0, y0, risse=(), adern=True):
@@ -258,6 +258,7 @@ def knochenflügel(h, w, pose, pal, quelle, spalten, x0, y0, risse=(), adern=Tru
         scale = lens[k] / lq
         sg = lens[k] * 0.55
         sel = {}
+        steil = abs(math.sin(math.radians(angs[k]))) > 1.7 * abs(math.cos(math.radians(angs[k])))   # annähernd senkrecht (≥ 60° zur Waagerechten)
         v = float(lo - y0) if rho > 0.5 else 0.0                 # Teil hinter dem Gelenk nur beim gefalteten Flügel (sonst Zacken)
         while v <= lq + 1e-9:
             s_ = v * scale
@@ -267,7 +268,12 @@ def knochenflügel(h, w, pose, pal, quelle, spalten, x0, y0, risse=(), adern=Tru
                 c = tuple(int(c) for c in quelle[row, col, :3])
                 if rein > ((row * 7 + k * 3) % 10) / 10.0 + 0.04:          # Übergang roh → sauber pixelweise (Dithering, kein Alpha)
                     c = rein_farbe(pal['rein'], row - lo, hi - row)
-                sel[(int(round(p[0])), int(round(p[1])))] = c
+                pos = (int(round(p[0])), int(round(p[1])))
+                if steil and sel:
+                    px_, py_ = list(sel)[-1]
+                    if pos[0] != px_ and pos[1] != py_:             # steiler Finger: Ecke dazu, damit er über Kanten zusammenhängt
+                        sel.setdefault((px_, pos[1]), sel[(px_, py_)])
+                sel[pos] = c
             v += 0.5 / scale
         fing_px.append(sel)
     bone_m = np.zeros((h, w), bool)
@@ -328,13 +334,15 @@ def knochenflügel(h, w, pose, pal, quelle, spalten, x0, y0, risse=(), adern=Tru
             for j, ((x, y), c) in enumerate(pts[:int(len(pts) * dick)]):
                 sx, sy = (x, y + 1) if flach else (x + 1, y)
                 if (sx, sy) not in fing_px[k] and 0 <= sy < h and 0 <= sx < w and not bone_m[sy, sx]:
-                    setze(sx, sy, pal['knochen'][2])
-    # ---- Handgelenk: Wulst aus Binde (2×2) mit hellem Knöchel
+                    setze(sx, sy, pal.get('schatten', pal['knochen'][2]))
+    # ---- Handgelenk: Wulst aus Binde (3×3: dunkle Wicklung, Ecken mittelbraun, Mitte tan) — verdeckt, wo die Fingerwurzeln zusammenlaufen
     if pose.get('wulst', 0):
         wx, wy = int(round(Wr[0])), int(round(Wr[1]))
-        for dx, dy in ((0, 0), (-1, 0), (0, 1), (-1, 1)):
-            setze(wx + dx, wy + dy, binde[0] if (dx + dy) % 2 == 0 else binde[1])
-        setze(wx - 1, wy, pal['knochen'][0])
+        muster = {(-1, -1): binde[1], (0, -1): binde[0], (1, -1): binde[1],
+                  (-1, 0): binde[0], (0, 0): pal['rein']['manschette'][1], (1, 0): binde[0],
+                  (-1, 1): binde[1], (0, 1): binde[0], (1, 1): binde[1]}
+        for (dx, dy), c in muster.items():
+            setze(wx + dx, wy + dy, c)
     return a
 
 

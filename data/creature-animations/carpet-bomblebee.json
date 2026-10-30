@@ -1,0 +1,15 @@
+{
+  "creature": "Carpet Bomblebee",
+  "sheet": "carpet-bomblebee.png",
+  "frameWidth": 65,
+  "frameHeight": 51,
+  "frames": 48,
+  "frameMs": 60,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 6,
+  "padLeft": 9,
+  "padRight": 9,
+  "padBottom": 7,
+  "faceX": 32.5
+}

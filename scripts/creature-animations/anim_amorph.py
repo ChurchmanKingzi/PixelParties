@@ -15,6 +15,7 @@ Bausteine für weiche Körper (Schleime) — alles Pixelart, nur ganze Pixel, nu
     glanzband(a, t, rampe, maske)                    Lichtreflex wandert diagonal über den Sprite (Farben eine Stufe heller)
     ausdruck_pruefen(frames, spr, …)                 4-Verbundenheit der Figur (ein Teil je Frame) und Randpixel-Farben
     verbinde4(a)                                     Eckkontakte durch Brückenpixel 4-verbinden (dünne, schräg gestellte Spitzen)
+    umriss_ergaenzen(fig, erlaubt, umriss)          frei liegende Füllpixel am Rand mit Umrissfarbe einfassen
     stern(ebene, x, y, stufe, farben)                vierzackiger Glitzerstern am Objekt (Mitte + 4 Arme, wächst/schrumpft)
     farb_schritt(a, rampe, maske)                    Edelstein pulsiert: Farben eine Rampenstufe heller/dunkler
     suche_marke(a, farbe)                            Punkt des Sprites durch Zeilen-/Spaltenumbau verfolgen (Markierfarbe)
@@ -248,6 +249,24 @@ def verbinde4(a, max_iter=12):
         if not gesetzt:
             break
     return out, brueck
+
+
+def umriss_ergaenzen(fig, erlaubt, umriss):
+    """Randpixel, deren Farbe nicht zu den Umrissfarben `erlaubt` gehört (z. B. eine Federfüllung, die nach dem Spaltenversatz frei liegt),
+    bekommen auf ihren leeren 4-Nachbarfeldern die Umrissfarbe. umriss = Funktion (x, y) → RGB (Farbe für die Stelle des Randpixels).
+    Gibt (Bild, [(x, y), …] ergänzter Pixel) zurück — in der Quelle liegt am Rand immer der Umriss."""
+    out = fig.copy()
+    h, w = out.shape[:2]
+    neu = []
+    for y, x in zip(*np.nonzero(randpixel(fig))):
+        if tuple(int(v) for v in fig[y, x, :3]) in erlaubt:
+            continue
+        for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+            if 0 <= nx < w and 0 <= ny < h and not out[ny, nx, 3]:
+                out[ny, nx, :3] = umriss(x, y)
+                out[ny, nx, 3] = 255
+                neu.append((int(nx), int(ny)))
+    return out, neu
 
 
 def stern(ebene, x, y, stufe, farben):

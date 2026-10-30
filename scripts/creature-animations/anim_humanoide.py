@@ -15,6 +15,10 @@ abgeschnitten wird.
                                         `zyklen` volle Wellenperioden pro Schleife. Für wogendes Laub/Haar/Umhang.
     zeilen_versatz(a, off, {zeile: dx})   ganze Zeilen (Spritezeilen) waagerecht verschieben (Hutspitze/Zipfel biegt sich); Unterschied benachbarter
                                         Zeilen ≤ 1 und gleich bei einpixeligen Spitzenzeilen halten, sonst bleibt nur ein Eckkontakt
+    bereich_versatz(a, off, {zeile: dx}, x0, x1)   wie zeilen_versatz, aber nur die Pixel mit x0 ≤ x ≤ x1 (eine von mehreren Röhren/Antennen in derselben Zeile)
+    rand_dehnen(a, off, {zeile: d}, seite)   Umhang/Fahne spreizt sich: in jeder Zeile rücken alle Pixel außerhalb des innersten (Anker) um d px nach außen
+                                        (seite 'l' = nach links, 'r' = nach rechts), die Lücke dazwischen wird mit der Farbe des anliegenden Pixels gefüllt —
+                                        die Zeile bleibt am Anker durchgehend 4-verbunden (nichts reißt ab)
     spalten_versatz(a, off, {spalte: (dy, y0, y1)})   Spalte x nur in den Zeilen y0…y1 senkrecht verschieben (Krempenende flattert)
     farbe_stufe(farbe, rampe, stufen)   Farbe um `stufen` Stufen auf einer Rampe (dunkel → hell, Farben des Sprites) verschieben
     lichtband(a, maske, off, i, n, start, dauer, rampe, stufen, breite, achse, kern)
@@ -86,6 +90,62 @@ def zeilen_versatz(a, off, zeilen):
         a[Y] = 0
         for x in xs:
             a[Y, x + dx] = zeile[x]
+    return a
+
+
+def bereich_versatz(a, off, zeilen, x0, x1):
+    X0, X1 = x0 + off[0], x1 + off[0]
+    for y, dx in zeilen.items():
+        Y = y + off[1]
+        xs = [x for x in range(X0, X1 + 1) if a[Y, x, 3]]
+        if not xs or not dx:
+            continue
+        if min(xs) + dx < 0 or max(xs) + dx >= a.shape[1]:
+            raise L.ClipError(f'Zeile {y} würde um {dx} px aus der Leinwand geschoben')
+        zeile = {x: a[Y, x].copy() for x in xs}
+        for x in xs:
+            a[Y, x] = 0
+        for x, px in zeile.items():
+            a[Y, x + dx] = px
+    return a
+
+
+def rand_dehnen(a, off, zeilen, seite):
+    for y, d in zeilen.items():
+        Y = y + off[1]
+        xs = list(np.nonzero(a[Y, :, 3])[0])
+        if not xs or not d:
+            continue
+        if seite == 'l':
+            xa = max(xs)
+            ausen = [x for x in xs if x < xa]
+            if not ausen:
+                continue
+            if min(ausen) - d < 0:
+                raise L.ClipError(f'Zeile {y} würde um {d} px aus der Leinwand gedehnt')
+            alt = {x: a[Y, x].copy() for x in ausen}
+            fuell = alt[max(ausen)]
+            for x in ausen:
+                a[Y, x] = 0
+            for x, px in alt.items():
+                a[Y, x - d] = px
+            for x in range(max(ausen) - d + 1, max(ausen) + 1):
+                a[Y, x] = fuell
+        else:
+            xa = min(xs)
+            ausen = [x for x in xs if x > xa]
+            if not ausen:
+                continue
+            if max(ausen) + d >= a.shape[1]:
+                raise L.ClipError(f'Zeile {y} würde um {d} px aus der Leinwand gedehnt')
+            alt = {x: a[Y, x].copy() for x in ausen}
+            fuell = alt[min(ausen)]
+            for x in ausen:
+                a[Y, x] = 0
+            for x, px in alt.items():
+                a[Y, x + d] = px
+            for x in range(min(ausen), min(ausen) + d):
+                a[Y, x] = fuell
     return a
 
 

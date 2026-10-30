@@ -46,7 +46,7 @@ import anim_flieger as F
 import anim_flieger_b as B
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 15, 15, 9, 5
+PAD_L, PAD_R, PAD_T, PAD_B = 15, 15, 10, 3
 
 spr = L.lade('winged-skeleton')
 sh, sw = spr.shape[:2]
@@ -58,6 +58,7 @@ assert (vorhanden == vorhanden[:, ::-1]).all()
 # ── Masken: gefaltete Flügel (links/rechts), Rest = Körper (inkl. Hörner, Schulterspalte x = 4/15) ─────────────────────
 wing_l = vorhanden & (((yy >= 3) & (yy <= 4) & (xx <= 2)) | ((yy >= 5) & (yy <= 14) & (xx <= 3))
                       | ((yy >= 15) & (yy <= 17) & (xx <= 4)) | ((yy >= 18) & (yy <= 19) & (xx <= 3)))
+wing_l[6, 3] = False                    # (3,6) = dunkler Schädelumriss (32,32,32) bleibt am Körper (gespiegelt (16,6)); in Ruhe identisch zum Original
 wing_r = vorhanden & wing_l[:, ::-1]
 assert not (wing_l & wing_r).any()
 koerper = vorhanden & ~wing_l & ~wing_r
@@ -66,10 +67,11 @@ koerper = vorhanden & ~wing_l & ~wing_r
 Q, P, Nn, Lg = (246, 255, 255), (213, 213, 213), (189, 189, 189), (156, 156, 156)
 KG, IG = (123, 123, 123), (106, 106, 106)
 BR_D, BR_E, BR_F, BR_J, BR_M = (49, 24, 0), (63, 46, 26), (88, 66, 42), (150, 119, 88), (212, 178, 150)
-PAL = dict(knochen=[Q, P, Nn], haut=(BR_F, BR_E, BR_D, BR_E), binde=(BR_D, BR_F),
+PAL = dict(knochen=[Q, P, Nn], schatten=Lg, haut=(BR_F, BR_E, BR_D, BR_E), binde=(BR_D, BR_F),
            rein=dict(knochen=[Q, P, Nn], manschette=(Lg, BR_J, BR_M)))
-RAMPE_KNOCHEN = [IG, KG, Lg, Nn, P, Q]
-RAMPE_BRAUN = [BR_D, BR_E, BR_F, BR_J, BR_M]
+DG, GG = (32, 32, 32), (82, 82, 82)
+RAMPE_KNOCHEN = [DG, GG, IG, KG, Lg, Nn, P, Q]
+RAMPE_BRAUN = [BR_D, BR_E, BR_F]            # Binden/Umrisse glänzen; die Flügelhaut (F) bleibt oben auf der Rampe
 
 
 def px(x, y):
@@ -86,11 +88,11 @@ POSEN = {
     'ruhe':    pose(S0, (3, 6),     (90, 90, 90, 90),        (13, 12, 12, 12),        0, HUEFT, rho=1.0, rein=0.0, wulst=0.0, haut=0.0),
     'lueften': pose(S0, (3, 5.5),   (100, 94, 88, 82),       (13, 12, 12, 12),        0, HUEFT, rho=0.8, rein=0.15, wulst=0.0, haut=0.0),
     'luft2':   pose(S0, (2.5, 5),   (118, 106, 94, 84),      (13, 12, 12, 11.5),      4, HUEFT, rho=0.5, rein=0.6, wulst=0.0, haut=1.0),
-    'halb':    pose(S0, (1, 4.5),   (162, 142, 121, 100),    (12.5, 12, 12, 11),     10, HUEFT, rho=0.1),
+    'halb':    pose(S0, (1, 4.5),   (168, 144, 120, 97),    (12.5, 12, 12, 11),     10, HUEFT, rho=0.1),
     'weit':    pose(S0, (-1, 2.5),  (222, 190, 160, 128),    (12.5, 12, 11, 10),     14, HUEFT),
     'weit2':   pose(S0, (-1.5, 2), (228, 194, 162, 130),     (12.5, 12, 11, 10),     18, HUEFT),
     'mitte':   pose(S0, (-1, 4.5),  (198, 168, 142, 114),    (12, 11.5, 10.5, 9.5),  18, HUEFT),
-    'unten':   pose(S0, (-1, 7),    (142, 121, 104, 90),     (11.5, 11.5, 10.5, 9),  22, HUEFT, zacke=0.25),
+    'unten':   pose(S0, (-1, 7),    (150, 124, 102, 84),     (11.5, 11.5, 10.5, 9),  22, HUEFT, zacke=0.25),
 }
 SPALTEN = [1, 2, 2, 3]            # Quellspalten der vier Fingerknochen (Leitfinger = Außenkante x = 1)
 RISSE = [(0.45, 0.8), (0.75, 0.7)]
@@ -111,12 +113,12 @@ SCHLUESSEL = [
     (0, _v('ruhe'), True), (2, _v('ruhe'), True),
     (4, _v('lueften'), False), (6, _v('luft2'), False), (8, _v('halb'), False), (11, _v('weit'), False), (13.5, _v('weit2'), False),
     (16, _v('mitte'), False), (18.5, _v('unten'), False), (21.5, _v('halb'), False), (24, _v('luft2'), False), (26, _v('lueften'), False),
-    (28, _v('ruhe'), True), (30, _v('ruhe'), True),
-    (32, _v('lueften'), False), (34, _v('halb'), False), (37, _mix('halb', 'mitte', 0.7), False), (40, _mix('halb', 'unten', 0.75), False),
-    (43, _v('luft2'), False), (45.5, _v('lueften'), False),
+    (28, _v('ruhe'), True), (29.5, _v('ruhe'), True),
+    (32, _v('lueften'), False), (34, _v('halb'), False), (36.5, _mix('halb', 'mitte', 0.7), False), (39, _mix('halb', 'unten', 0.75), False),
+    (41.5, _v('luft2'), False), (43, _v('lueften'), False), (44.5, _v('ruhe'), True),
 ]
 ZEIT_VORLAGE = POSEN['ruhe']
-FINGER_LAG = 0.55                 # Frames, um die jeder weiter außen liegende Finger der Wurzel hinterherhinkt (Wellenlauf)
+FINGER_LAG = 0.4                  # Frames, um die jeder weiter außen liegende Finger der Wurzel hinterherhinkt (Wellenlauf)
 RECHTS_LAG = 1.0                  # der rechte Flügel schlägt 1 Frame später
 
 
@@ -126,6 +128,7 @@ def pose_zu(t, finger_phase=0.0):
     for k in range(4):
         v = B.vektor_pose(B.spline(SCHLUESSEL, t - FINGER_LAG * k, N), ZEIT_VORLAGE)
         basis['ang'][k] = v['ang'][k]
+    basis['hueft'] = (basis['hueft'][0], basis['hueft'][1] + 0.55 * math.sin(L.sinus(t, N / 3.0, 0.4 + finger_phase)) * (1.0 - basis['rho']))  # Hautansatz wogt
     basis['rho'] = min(1.0, max(0.0, basis['rho']))
     basis['rein'] = min(1.0, max(0.0, basis['rein']))
     offen = 1.0 - basis['rho']
@@ -140,9 +143,9 @@ def ist_ruhe(p):
 
 
 def atem_stufe(i):
-    """0 / 1 / 2 Zeilen: zweimal pro Schleife (Periode 24), Gipfel (2) bei Frame 19 und 43 (um die Abschläge)."""
-    s = math.cos(2 * math.pi * (i - 19) / (N / 2.0))
-    return 2 if s > 0.62 else (1 if s > -0.2 else 0)
+    """0 / 1 / 2 Zeilen: zweimal pro Schleife (Periode 24), Gipfel (2) bei Frame 13 und 37 (Flügel weit offen = Einatmen; Frame 0 = Ruhe ohne Dehnung)."""
+    s = math.cos(2 * math.pi * (i - 13) / (N / 2.0))
+    return 2 if s > 0.55 else (1 if s > -0.45 else 0)
 
 
 # ── Körper ───────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -162,7 +165,7 @@ BODY = ebene(koerper)
 WING_L0, WING_R0 = ebene(wing_l), ebene(wing_r)
 
 # ── Glanz: Sterne (Ort, Frame-Start, Teil) ────────────────────────────────────────────────────────────────────────────
-STERNE = [((6, 1), 5, 'kopf'), ('hand_l', 12, 'hand'), ((13, 1), 17, 'kopf'), ((12, 4), 21, 'kopf'), ('hand_r', 31, 'hand'), ((7, 4), 38, 'kopf')]
+STERNE = [((6, 1), 5, 'kopf'), ('hand_l', 12, 'hand'), ((13, 1), 17, 'kopf'), ((12, 4), 21, 'kopf'), ('hand_r', 36, 'hand'), ((7, 4), 41, 'kopf')]
 
 # ── Partikel: Knochenstaub ────────────────────────────────────────────────────────────────────────────────────────────
 STAUB = {'c': P, 'r': Lg}
@@ -203,8 +206,8 @@ def frame(i, partikel=True, glanz=True):
     wr, pr = fluegel_ebene(i - RECHTS_LAG, False, n)
     f = L.zusammen(H, W, [(wl, 0, 0), (wr, 0, 0), (body, 0, 0)])           # Flügel hinter dem Körper
     if glanz:
-        B.band_hell(f, i, N, 6, 12, [RAMPE_KNOCHEN, RAMPE_BRAUN], stufen=1, kern=2, achse=(1.0, 0.7), x_bereich=(PAD_L - 12 + 0.7 * PAD_T, PAD_L + 32 + 0.7 * (PAD_T + 24)))
-        B.band_hell(f, i, N, 30, 12, [RAMPE_KNOCHEN, RAMPE_BRAUN], stufen=1, kern=2, achse=(1.0, 0.7), x_bereich=(PAD_L - 12 + 0.7 * PAD_T, PAD_L + 32 + 0.7 * (PAD_T + 24)))
+        B.band_hell(f, i, N, 22, 12, [RAMPE_KNOCHEN, RAMPE_BRAUN], stufen=2, kern=3, breite=3.4, achse=(1.0, 0.7), x_bereich=(PAD_L - 12 + 0.7 * PAD_T, PAD_L + 32 + 0.7 * (PAD_T + 24)))
+        B.band_hell(f, i, N, 1, 12, [RAMPE_KNOCHEN, RAMPE_BRAUN], stufen=2, kern=3, breite=3.4, achse=(1.0, 0.7), x_bereich=(PAD_L - 12 + 0.7 * PAD_T, PAD_L + 32 + 0.7 * (PAD_T + 24)))
         for (ort, start, teil) in STERNE:
             st = F.stern_stufe(i, N, start)
             if st is None:
