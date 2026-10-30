@@ -22,15 +22,16 @@ Fest bleiben: Kapuze samt Gesicht, Robe, Rippenring (starr mit dem Oberkörper),
 
 Ablauf (48 Frames à 75 ms = 3,6 s; Frame 0 = Original, die Wölkchen ausgenommen):
 * Schweben (Periode 48): Oberkörper (Kapuze, Robe, Rippen) und Ärmel wiegen sich ±1 px senkrecht, starr (keine Naht reißt).
-* Unterkörper hinkt hinterher (Periode 24, gegenläufig): ±1 px senkrecht, dazu pendelt die schwarze Spitze (y 32–33) ±1 px seitlich.
+* Unterkörper hinkt hinterher (Periode 24, gegenläufig): ±1 px senkrecht, dazu pendelt die schwarze Spitze (y 32–33, Periode 16) ±1 px seitlich.
   Die Lücke zum Rippenring (3 Zeilen) bleibt immer ≥ 1 Zeile.
 * Beschwörungsgeste: beide Ärmel heben sich langsam (Spitze bis 3 px, Spaltenversatz wächst von der Schulter x 5 / x 14 zur Hand),
   halten und senken sich wieder; links Frame 4–31, rechts Frame 14–41 (zeitversetzt).
-* Seelenwölkchen (Partikel, hinter der Figur): 5 runde Wölkchen/Funken steigen langsam auf (Funke → Klecks → Wölkchen → Funke),
-  zwei seitlich vom Unterkörper, zwei über den Ärmeln, ein Funke über der Kapuze. Kern Knochenweiß E (213,213,213) aus dem Sprite,
+* Seelenwölkchen (Partikel, hinter der Figur): 5 runde Wölkchen/Funken steigen langsam auf (Funke → Klecks → Wölkchen → Funke; Formen l, m, k),
+  zwei große seitlich vom Unterkörper, zwei über den Ärmeln, ein Funke über der Kapuze. Kern Knochenweiß E (213,213,213) aus dem Sprite,
   Rand kaltes Violett (128,102,178) = #8066b2 aus data/palette.json (AUSNAHME: neue Farbe, in L.pruefe freigegeben; passt zum
   dunkelvioletten L des Sprites — mit SEELE_RAND schnell tauschbar).
-ERGÄNZUNG: keine gemalten Pixel (nichts liegt unter bewegten Teilen).
+ERGÄNZUNG: keine gemalten Pixel (nichts liegt unter bewegten Teilen). Pixelzahl der Figur 297–300: beim Heben legen sich die Ärmel
+über bis zu 3 Kapuzenpixel an den Unterkanten ((4,8), (15,8) …), das ist gewollt (Arm vor der Kapuze).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel.
 """
 import math
@@ -62,9 +63,9 @@ assert (aermel_l | aermel_r | unterkoerper | oberkoerper).sum() == vorhanden.sum
 
 SEELEN = {'c': SEELE_KERN, 'r': SEELE_RAND}
 PUFFS = [
-    dict(x=PAD_L + 2, y=PAD_T + 26, vx=-2, vy=-15, off=0, form='m', wackeln=1),       # links vom Unterkörper
-    dict(x=PAD_L + 17, y=PAD_T + 28, vx=2, vy=-16, off=16, form='o', wackeln=1),      # rechts vom Unterkörper
-    dict(x=PAD_L + 0, y=PAD_T + 8, vx=-1, vy=-10, off=30, form='o', wackeln=1),       # über dem linken Ärmel
+    dict(x=PAD_L + 2, y=PAD_T + 26, vx=-2, vy=-15, off=0, form='l', wackeln=1),       # links vom Unterkörper
+    dict(x=PAD_L + 17, y=PAD_T + 28, vx=2, vy=-16, off=16, form='l', wackeln=1),      # rechts vom Unterkörper
+    dict(x=PAD_L + 0, y=PAD_T + 8, vx=-1, vy=-10, off=30, form='m', wackeln=1),       # über dem linken Ärmel
     dict(x=PAD_L + 19, y=PAD_T + 8, vx=1, vy=-10, off=8, form='m', wackeln=1),        # über dem rechten Ärmel
     dict(x=PAD_L + 10, y=PAD_T - 3, vx=0, vy=-9, off=38, form='k', wackeln=1),        # Funke über der Kapuze
 ]
@@ -79,7 +80,7 @@ def frame(i):
     ph = L.sinus(i, N)
     dy_ob = int(round(1.0 * math.sin(ph)))                       # Schweben des Oberkörpers (−1 … 1, + = nach unten)
     dy_un = int(round(-1.4 * math.sin(2 * ph)))                  # Unterkörper hinkt gegenläufig
-    spitze = 1.4 * math.sin(L.sinus(i, N / 2, 0.0) + 1.0) - 1.4 * math.sin(1.0)   # Spitzenpendel, 0 bei Frame 0
+    spitze = 1.4 * math.sin(L.sinus(i, N / 3))                    # Spitzenpendel (Periode 16), 0 bei Frame 0
     heben_l = -3.2 * U.buckel(i, 4, 28)                          # negativ = nach oben
     heben_r = -3.2 * U.buckel(i, 14, 28)
 

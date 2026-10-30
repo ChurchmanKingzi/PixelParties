@@ -13,6 +13,8 @@ Bausteine, die bei mehreren Fliegern gebraucht werden:
     fluegel_welle(a, pivot_x, amp, phase, …)   wie L.spalten_welle, aber mit Wellenlauf UND Ruhepose bei phase = 0 (Spitze hinkt nach)
     zeilen_schub(a, pivot_y, amp, s, potenz)   Zeilen wandern waagerecht um round(amp·f^potenz·s), f = Abstand zur Pivotzeile (0…1), s ∈ [0,1]:
                                                ein Teil klappt NUR in eine Richtung auf (Flügel/Arm spreizt sich nach außen), Ruhe bei s = 0
+    flammen_spitzen(a, phase, farbe, …)        Flammenzungen züngeln: die oberste Pixelreihe jeder Spalte (Farbe `farbe`) wird 0…2 px länger/kürzer,
+                                               je Spalte andere Phase (nur Spaltenenden, bleibt 4-verbunden)
     kacheln(frames, x0, x1, y0, y1, sc)        Ausschnitt mehrerer Frames nebeneinander, ganzzahlig vergrößert (Nahaufnahme für Nähte)
     stapeln(bilder)                            PIL-Bilder untereinander zu einem Kontrollbild
 """
@@ -139,4 +141,35 @@ def zeilen_schub(a, pivot_y, amp, s, potenz=1.0):
             raise L.ClipError(f'Zeile {y} würde um {dx} px aus der Leinwand (Breite {w}) geschoben')
         for x in xs_:
             out[y, x + dx] = a[y, x]
+    return out
+
+
+def flammen_spitzen(a, phase, farbe, lauf=1.3, amp=1.6, min_hoehe=3):
+    """Flammenzungen züngeln: Jede Spalte, deren oberstes Pixel die Farbe `farbe` hat (äußerer Flammenrand), wird um
+    round(amp·sin(phase + lauf·x)) Pixel länger (oben wird ein Pixel derselben Farbe angefügt) oder kürzer (oberste Pixel
+    entfallen, die Spalte behält mindestens `min_hoehe` Pixel). Nur an den Spaltenenden — der Rest bleibt, daher bleibt jede
+    Spalte (und damit die Figur) 4-verbunden. Phasen je Spalte versetzt (`lauf`), so tanzen die Zungen unabhängig."""
+    out = a.copy()
+    h, w = a.shape[:2]
+    for x in range(w):
+        ys = np.nonzero(a[:, x, 3])[0]
+        if not len(ys):
+            continue
+        yt = int(ys.min())
+        if tuple(int(v) for v in a[yt, x, :3]) != tuple(farbe):
+            continue
+        d = int(round(amp * math.sin(phase + lauf * x)))
+        if d > 0:
+            if yt - d < 0:
+                raise L.ClipError(f'Flammenspitze in Spalte {x} würde oben aus der Leinwand ragen')
+            for k in range(1, d + 1):
+                out[yt - k, x] = a[yt, x]
+        elif d < 0:
+            kuerzen = min(-d, max(0, len(ys) - min_hoehe))
+            # nur zusammenhängende oberste Pixel entfernen
+            for k in range(kuerzen):
+                if yt + k in ys:
+                    out[yt + k, x] = 0
+                else:
+                    break
     return out

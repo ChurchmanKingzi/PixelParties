@@ -25,7 +25,7 @@ Ablauf (36 Frames à 90 ms = 3,24 s), alle Bewegungen unabhängig (andere Period
 * Blick: die Augen schauen mit der Neigung mit (Frames 9–15 rechts, Frames 27–31 links), 1 px.
 * Schlappohren: das linke schwingt in Frames 11–17, das rechte in Frames 29–35 nach außen und zurück (erst Zeile 4, dann Zeilen 3–4
   1 px, oben bleiben sie am Kopf; Lücke zum Kopf mit dem Randpixel des Ohres geschlossen).
-* Blinzeln (Frames 20–22): oberes Augenpixel schließt sich, dann beide Augen zu (schwarzer Lidstrich), dann wieder halb offen.
+* Blinzeln (Frames 20–22): oberes Augenpixel schließt sich, dann beide Augen zu (beide Augenpixel werden Fellfarbe), dann wieder halb offen.
 * Pfote tippt: der linke Fuß hebt sich in Frames 1–2 und 5–6 um 1 px (die Beinzeile 11 des Fußes entfällt), der rechte in 31–32.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
@@ -53,7 +53,7 @@ kopf_o = vorhanden & (yy <= 4) & ~ohr_l & ~ohr_r                # Stirn/Augen/Wa
 unten = vorhanden & (yy >= 5)                                    # Schnauze, Kinn, Halsband, Brust, Beine
 
 AUGE_OBEN, AUGE_UNTEN = (16, 65, 156), (0, 8, 74)                # blau
-FELL_F, FELL_H, SCHWARZ = (97, 95, 96), (78, 67, 61), (0, 0, 0)
+FELL_F, FELL_H = (97, 95, 96), (78, 67, 61)
 BRUSTZEILE = 11
 
 
@@ -88,8 +88,8 @@ def augen(k, blick, lid):
         for x0 in (5, 8):
             x1 = x0 + blick
             k[PAD_T + 3, PAD_L + x1, :3] = FELL_H if x0 == 5 else FELL_F
-            if lid == 2:
-                k[PAD_T + 4, PAD_L + x1, :3] = SCHWARZ
+            if lid == 2:                                     # zu: beide Augenpixel werden Fell (kein schwarzer Punkt, der wie Pupille wirkt)
+                k[PAD_T + 4, PAD_L + x1, :3] = FELL_H
     return k
 
 

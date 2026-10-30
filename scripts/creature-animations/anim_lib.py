@@ -201,8 +201,9 @@ def dehnen(a, sy=1.0, sx=1.0, anker=None):
 # ── Partikel (Pixelart: kein Alpha, nur Dithering, nur ganze Pixel, nahtlos im Loop) ──────────────────────────
 PUFF_FORMEN = {
     'k': [(0, 0, 'c')],                                                       # Funke
-    's': [(-1, 0, 'r'), (0, 0, 'c'), (1, 0, 'r'), (-1, 1, 'r'), (0, 1, 'r'), (1, 1, 'r')],  # kleiner flacher Klecks 3×2 (rund, nicht kreuzförmig)
-    'o': [(-1, -1, 'r'), (0, -1, 'r'), (-2, 0, 'r'), (-1, 0, 'c'), (0, 0, 'c'), (1, 0, 'r'), (-1, 1, 'r'), (0, 1, 'r')],  # Oval 4×3
+    's': [(0, 0, 'c'), (1, 0, 'r'), (0, 1, 'r'), (1, 1, 'r')],                    # kleiner runder Punkt 2×2
+    'o': [(-1, -1, 'r'), (0, -1, 'r'), (-2, 0, 'r'), (-1, 0, 'c'), (0, 0, 'c'), (1, 0, 'r'),
+          (-2, 1, 'r'), (-1, 1, 'c'), (0, 1, 'c'), (1, 1, 'r'), (-1, 2, 'r'), (0, 2, 'r')],   # Kreis 4×4 (Achteck, keine Plusform)
     'm': [(x, -1, 'r') for x in (-1, 0, 1)] + [(-2, 0, 'r'), (2, 0, 'r')] + [(x, 0, 'c') for x in (-1, 0, 1)]
          + [(x, 1, 'r') for x in (-1, 0, 1)],                                  # Wölkchen 5×3
     'l': [(x, -2, 'r') for x in (-1, 0, 1)] + [(x, -1, 'r') for x in (-2, 2)] + [(x, -1, 'c') for x in (-1, 0, 1)]
