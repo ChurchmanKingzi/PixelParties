@@ -23,7 +23,7 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Hutspitze schwingt (Periode 16, dreimal pro Schleife): Die Zeilen 0–5 des Kegels verschieben sich waagerecht um bis zu ±2 px (Spitze mehr, Kegelfuß
   nicht); benachbarte Zeilen unterscheiden sich um höchstens 1 px und die einpixelige Spitze (Zeilen 0–1) bewegt sich gemeinsam — alle Zustände sind
   4-verbunden (Eckkontakt-Kontrolle in der Prüfung).
-* Krempenenden flattern: die äußersten Spalten (x 0 und x 14) gehen ±1 px auf und ab, gegenphasig (Periode 24).
+* Krempenenden flattern: das linke (x 0, C) und rechte (x 14, A) Krempenende wächst gegenphasig um 1 Umrisspixel nach oben bzw. unten (Periode 24), 4-verbunden mit der Nachbarspalte.
 * KEIN Glanz (Regel 14): Hut, Sterne und Eisrand glänzen/funkeln NICHT (kein Lichtband, keine Glitzersterne, keine blinkenden Hutsterne).
 * Magiefunken (6 kreisende + 2 auf und ab): acht kleine runde Funken (1 px, einige wachsen in Ellipsenmitte zu 2×2) in Hutblau B/G, Weiß/Lavendel N/J und Gelb I (alles Farben des Sprites)
   kreisen langsam (eine Runde pro Schleife) in flachen Ellipsen um Hut (drei, Rechtslauf) und Körper (drei, Linkslauf); zwei weitere steigen links/rechts neben der Krempe sanft auf und ab. Die Funken
@@ -49,6 +49,7 @@ H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
 OFF = (PAD_L, PAD_T)
 yy, xx = np.mgrid[0:sh, 0:sw]
 vorhanden = L.deckend(spr)
+ERLAUBT = Hm.umrissfarben(spr)                                   # Farben der Außenkante im Original (Regel 16)
 
 
 def f(x, y):
@@ -78,7 +79,7 @@ m_rand = np.array([[(vorhanden[y, x] and y >= 16 and f(x, y) in RAND_RAMPE) for 
 m_grau = np.array([[(vorhanden[y, x] and y >= 16 and f(x, y) in GRAU_RAMPE) for x in range(sw)] for y in range(sh)])
 
 # Hutspitze: Zeilenversatz nach Stufe (Betrag); benachbarte Zeilen ≤ 1 Unterschied, Zeilen 0–1 (einpixelig) gleich
-SCHWUNG = {0: {}, 1: {0: 1, 1: 1, 2: 1, 3: 1, 4: 1}, 2: {0: 2, 1: 2, 2: 1, 3: 1, 4: 1, 5: 1}}
+SCHWUNG = {0: {}, 1: {0: 1, 1: 1, 2: 1, 3: 1, 4: 1}, 2: {0: 2, 1: 2, 2: 2, 3: 1, 4: 1, 5: 1}}      # Zeilen 0–2 (einpixelige Spitze + 3-px-Zeile) gleich, sonst bliebe ein Mittelpixel oben ohne Umriss
 
 
 def teil(maske):
@@ -123,9 +124,15 @@ def funken_ebenen(i, brust, hub):
 def frame(i, funken=True):
     k = teil(koerper)
     # --- Krempenenden flattern (gegenphasig) ---
+    # Statt die Randspalten zu verschieben (das legt Innenpixel an der Außenkante frei), wächst das Krempenende um 1 Umrisspixel nach oben oder unten:
+    # links (0,10)/(0,13) in C, rechts (14,10)/(14,13) in A, jeweils 4-verbunden an der Nachbarspalte; gegenphasig.
     dl = int(round(1.0 * math.sin(L.sinus(i, N / 2))))
-    dr = -int(round(1.0 * math.sin(L.sinus(i, N / 2))))
-    Hm.spalten_versatz(k, OFF, {0: (dl, 10, 13), 14: (dr, 10, 13)})
+    wuchs = {}
+    if dl > 0:
+        wuchs.update({(0, 13): CC, (14, 10): CA})
+    elif dl < 0:
+        wuchs.update({(0, 10): CC, (14, 13): CA})
+    Hm.setze(k, wuchs, OFF)
     # --- Hutspitze schwingt (Periode 16) ---
     a = int(round(2.0 * math.sin(L.sinus(i, N / 3))))
     if a:
@@ -135,6 +142,7 @@ def frame(i, funken=True):
     kopf = Hm.stufe(i - 3, N / 2, 1)
     k = Hm.atmen(k, PAD_T + 20, PAD_T + 15, brust, kopf)
     hub = brust + kopf
+    Hm.kontur_schliessen(k, ERLAUBT, CC)                          # Regel 16: Außenkante in jeder Pose in Umrissfarbe
     ebenen = []
     if funken:
         hinten, vorn = funken_ebenen(i, brust, hub)

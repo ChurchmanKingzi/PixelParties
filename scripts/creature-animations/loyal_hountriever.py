@@ -26,8 +26,9 @@ Ablauf (58 Frames à 62 ms = 3,6 s), alle Bewegungen unabhängig; der Kopf bleib
   4–6, dann 3–6 gemeinsam je 1 px nach außen und zurück (glatte Außenkante); die Lücke zum Kopfumriss wird mit dem inneren Randpixel der Zeile
   geschlossen, Kappen oben/unten wandern mit — der Ohrumriss ist in jeder Pose geschlossen.
 * Blick, nur die Augen: 1 px — Frames 16–22 nach rechts, 26–32 nach links, 47–52 nach rechts; frei werdende Stellen bekommen die Gesichtsfarbe.
-* Blinzeln, deutlich sichtbar (Frames 12–15 und 41–44, alle 29 Frames ≈ 1,8 s): die dunklen Augenpixel werden hell (L = hellste Farbe des Sprites): oben,
-  beide (zwei Frames), oben.
+* Blinzeln (Frames 12–15 und 41–44, alle 29 Frames ≈ 1,8 s): die dunklen Augenpixel schließen sich in der Fellfarbe des Gesichts (B (159,117,101), die
+  Farbe des umgebenden Fells): erst das obere Pixel (halb), dann beide (ganz, zwei Frames), dann wieder das obere — gut sichtbar, weil die dunklen
+  Augen auf dem hellbraunen Gesicht verschwinden.
 * Markenglanz (Regel 14, Metall): ein Lichtpunkt läuft über die Metallmarke — (5,11) in Frames 22–23 und (6,11) in 24–25, ebenso 50–53 (J → L).
 * Pfoten tippen: linker Fuß in Frames 6–7, 21–22 und 44–45, rechter Fuß in 14–15, 35–36 und 54–55 (die Beinzeile 13 des Fußes entfällt, die Fußlinie rückt
   1 px hoch; die Innenumrisse (5,13) (6,13) zwischen den Beinen bleiben am Körper).
@@ -55,7 +56,7 @@ ohr_l = vorhanden & (xx <= 1) & (yy >= 1) & (yy <= 6)
 ohr_r = vorhanden & (xx >= 10) & (yy >= 1) & (yy <= 6)
 koerper = vorhanden & ~ohr_l & ~ohr_r
 
-HELL = (157, 166, 175)                                            # L: hellste Farbe des Sprites (Lid, Markenglanz)
+HELL = (157, 166, 175)                                            # L: hellste Farbe des Sprites (Markenglanz an der Metallmarke)
 GESICHT = (159, 117, 101)                                         # B
 AUGE_OBEN, AUGE_UNTEN = (49, 31, 29), (36, 22, 19)                # H, I
 AUGEN_X = (4, 7)
@@ -108,9 +109,9 @@ def frame(i, nur=None):
     if lid:
         for x0 in AUGEN_X:
             x = x0 + blick
-            k[PAD_T + 3, PAD_L + x, :3] = HELL
+            k[PAD_T + 3, PAD_L + x, :3] = GESICHT                     # Lid = Fellfarbe des Gesichts: die dunklen Augenpixel verschwinden
             if lid == 2:
-                k[PAD_T + 4, PAD_L + x, :3] = HELL
+                k[PAD_T + 4, PAD_L + x, :3] = GESICHT
     if glanz >= 0:
         x, y = MARKE[glanz]
         k[PAD_T + y, PAD_L + x, :3] = HELL
