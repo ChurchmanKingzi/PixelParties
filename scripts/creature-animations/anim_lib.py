@@ -311,8 +311,10 @@ def pruefe(frames, quelle=None, erlaubt=(), min_rand=2):
     return n
 
 
-def speichern(slug, karte, frames, ms, vorschau=None, face_x=None, hintergrund=(40, 30, 70)):
-    """Streifen-PNG + JSON (Format wie data/hero-animations / mr-jiggles) schreiben, optional GIF-Vorschau."""
+def speichern(slug, karte, frames, ms, vorschau=None, face_x=None, hintergrund=(40, 30, 70), extra=None):
+    """Streifen-PNG + JSON (Format wie data/hero-animations / mr-jiggles) schreiben, optional GIF-Vorschau.
+    extra: optionale zusätzliche JSON-Felder, z. B. {'deckkraft': 0.5} (halbtransparente Darstellung im Spiel, per Dither-Raster)
+    oder {'kern': {'x': .., 'y': .., 'w': .., 'h': ..}} (Körperkern in Frame-Pixeln, für die Platzierung im Spiel)."""
     rand_pruefen(frames, slug)
     H, W = frames[0].shape[:2]
     sheet = np.concatenate(frames, axis=1).astype(np.uint8)
@@ -326,6 +328,8 @@ def speichern(slug, karte, frames, ms, vorschau=None, face_x=None, hintergrund=(
     meta = {'creature': karte, 'sheet': slug + '.png', 'frameWidth': W, 'frameHeight': H, 'frames': len(frames),
             'frameMs': ms, 'loop': True, 'layout': 'horizontal', 'padTop': top, 'padLeft': left, 'padRight': right,
             'padBottom': bottom, 'faceX': W / 2 if face_x is None else face_x}
+    if extra:
+        meta.update(extra)
     with open(os.path.join(OUT, slug + '.json'), 'w', encoding='utf-8') as fh:
         json.dump(meta, fh, ensure_ascii=False, indent=2)
         fh.write('\n')
