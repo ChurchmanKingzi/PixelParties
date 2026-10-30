@@ -48,6 +48,8 @@
     stufenMax: 800,      // Szenen: reine Stufenfolgen (`steps(n)`) bis zu so vielen Stufen je Durchlauf werden exakt an den Stufengrenzen gebacken
     globalMaxDauer: 8000,// dokumentweit (Oberflaeche) werden nur Animationen/Uebergaenge bis zu dieser Dauer (ms) gebacken (Countdown-Balken u. ae. bleiben)
     direkt: true,        // Blaetter ohne Kinder animieren `mask-image` selbst statt ueber eine vererbte Variable
+    hauptfaden: true,    // W86p: gebackene Animationen mit einer wirkungslosen, nicht kompositierbaren Eigenschaft (scroll-margin-top, wechselt je Bild) auf den Hauptthread zwingen —
+                         // Compositor-Animationen malen die Ebene mit festem Raster und skalieren/verschieben sie bilinear: Mischfarben und Halbalpha an jeder Kante (Palettenverstoss)
     aktiv: true,
   };
   const TAKT_MS = () => 1000 / KONFIG.takt;
@@ -771,11 +773,14 @@
     const offs = zeiten.map(z => z / D2).concat([1]);
     const frames = [];
     let letzte = null;
+    // W86p: nur Animationen, die skalieren (Faktor != 1): Ebenen mit reiner Verschiebung ganzer Pixel bleiben auch als Compositor-Animation scharf
+    const hauptfaden = KONFIG.hauptfaden && (roh.some(w => { const m = matrixLesen(w.transform || 'none'); const z = m && zerlegen(m); return z && (Math.abs(Math.abs(z.sx) - 1) > 0.02 || Math.abs(Math.abs(z.sy) - 1) > 0.02); })
+      || roh.some(w => w.scale && w.scale !== 'none' && w.scale !== '1') || roh.some(w => w.rotate && w.rotate !== 'none' && w.rotate !== '0deg'));
     for (let j = 0; j < rahmen.length; j++) {
       const s = JSON.stringify(rahmen[j]);
       const ende = j === rahmen.length - 1;
       if (s === letzte && !ende) continue;
-      frames.push(Object.assign({ offset: offs[j], easing: 'steps(1, end)', composite: 'replace' }, rahmen[j]));
+      frames.push(Object.assign({ offset: offs[j], easing: 'steps(1, end)', composite: 'replace' }, hauptfaden ? { scrollMarginTop: (frames.length % 2) + 'px' } : null, rahmen[j]));
       letzte = s;
     }
     if (frames.length < 2) frames.push(Object.assign({}, frames[0], { offset: 1 }));
@@ -1208,6 +1213,11 @@
       if (!cs.backgroundImage || cs.backgroundImage === 'none') {
         const bc = farbeRgba(cs.backgroundColor);
         if (bc && bc[3] > 0.03 && bc[3] < 0.97) a.bg = bc;
+      } else {
+        // ★ W86p: Bild UND halbdurchsichtige Grundfarbe (z. B. Partikel-Regel `background: url(schatten), var(--color) !important` mit rgba-Farbe): die Farbe
+        // mischte sich mit dem Untergrund (Farbe ausserhalb der Palette). Wie bei SVG-Formen: ab 50 % deckend in der Farbe, darunter weg.
+        const bc = farbeRgba(cs.backgroundColor);
+        if (bc && bc[3] > 0.03 && bc[3] < 0.97) a.bgUnter = bc;
       }
       if (animTr.has(el)) {
         // Die Animation uebernimmt die Transformation — der ruhende Inline-Wert vor ihrem Start (Delay) darf trotzdem nicht gedreht stehen.
@@ -1235,7 +1245,7 @@
         if (mm && bildVon(mm[2]) && bcol && bcol[3] >= 0.5) a.maskBild = { url: mm[2], farbe: bcol, groesse: cs.maskSize, lage: cs.maskPosition, wdh: cs.maskRepeat };
       }
       if (el.classList.contains('pp-px') && cs.display === 'inline-block' && /em\)?$|calc\(/.test((el.getAttribute('style') || '').match(/width:\s*([^;]*)/) ? el.getAttribute('style').match(/width:\s*([^;]*)/)[1] : '')) a.pxBox = [el.offsetWidth, el.offsetHeight];
-      if (a.opa !== undefined || a.bg || a.tr || a.basis || a.maskBild || a.pxBox || a.misch || a.farbFilter) auftraege.push(a);
+      if (a.opa !== undefined || a.bg || a.bgUnter || a.tr || a.basis || a.maskBild || a.pxBox || a.misch || a.farbFilter) auftraege.push(a);
     }
     let n = 0;
     for (const a of auftraege) {                                 // ── Schreiben ──
@@ -1296,6 +1306,11 @@
           const z = maskeVorbereiten(el, cs);
           el.style.setProperty('opacity', stufe === 0 ? '0' : '1');
           el.style.setProperty(z.vn, ditherMaske(stufe === 0 ? 1 : stufe));
+          n++;
+        }
+        if (a.bgUnter) {
+          const c = a.bgUnter;
+          el.style.setProperty('background-color', c[3] >= 0.5 ? snapFarben(`rgb(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])})`) : 'transparent', 'important');
           n++;
         }
         if (a.bg) {
