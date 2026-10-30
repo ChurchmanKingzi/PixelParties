@@ -2,7 +2,7 @@
   "creature": "Burning Skeleton",
   "sheet": "burning-skeleton.png",
   "frameWidth": 26,
-  "frameHeight": 46,
+  "frameHeight": 52,
   "frames": 48,
   "frameMs": 60,
   "loop": true,
@@ -10,6 +10,6 @@
   "padTop": 1,
   "padLeft": 1,
   "padRight": 1,
-  "padBottom": 5,
+  "padBottom": 11,
   "faceX": 13.0
 }

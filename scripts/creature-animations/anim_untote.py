@@ -269,5 +269,10 @@ def zuschnitt(frames_voll, frames_koerper, ruhe, zugabe=2, rand=1):
 
 
 def beschneiden(f, box):
+    """Zuschneiden auf `box`; liegt die Box teils außerhalb der Leinwand (symmetrischer Rand um die Ruhefigur), wird dort leer (transparent) aufgefüllt."""
     x0, y0, x1, y1 = box
-    return f[y0:y1, x0:x1].copy()
+    h, w = f.shape[:2]
+    out = np.zeros((y1 - y0, x1 - x0, f.shape[2]), f.dtype)
+    sx0, sy0, sx1, sy1 = max(x0, 0), max(y0, 0), min(x1, w), min(y1, h)
+    out[sy0 - y0:sy1 - y0, sx0 - x0:sx1 - x0] = f[sy0:sy1, sx0:sx1]
+    return out

@@ -2,7 +2,7 @@
   "creature": "Horned Demon",
   "sheet": "horned-demon.png",
   "frameWidth": 24,
-  "frameHeight": 38,
+  "frameHeight": 39,
   "frames": 36,
   "frameMs": 65,
   "loop": true,
@@ -10,6 +10,6 @@
   "padTop": 1,
   "padLeft": 1,
   "padRight": 2,
-  "padBottom": 4,
+  "padBottom": 5,
   "faceX": 12.0
 }
