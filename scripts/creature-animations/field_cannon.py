@@ -14,7 +14,7 @@ Was ist was (x/y im Sprite):
 * Am Heck links (x 14–19, y 3–13) sitzt die LUNTE: eine dünne dunkle Schnur (15,8)–(18,13), die oben brennt: eine kleine gelbe Flamme (255,255,0) mit hellem Kern (255,255,203) bei (14–16, 3–7) (Feuer, Regel 15).
 * Links daneben steht ein eigenes Gerät (x 0–10, y 0–19, nicht mit der Kanone verbunden): oben ein runder grauer Kopf (x 1–9, y 1–8) mit „n“-Bogen, darunter ein schwarz-weißer Zickzack-Schaft — ich lese es als Ladestock/Wischer
   (Sponge/Rammer) der Kanone; es ist Zubehör, kein Lebewesen.
-Fest bleiben: Rad, Mittelstück des Laufs (x 27–38), Schaftform des Wischers, Lunte (starr).
+Fest bleiben: Rad, Lauf-Rumpf (x 18–38), Schaftform des Wischers, Lunten-Form (starr als Ganzes).
 
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, Flamme und Funken ausgenommen):
 * Mündung nickt (Periode 48, einmal pro Schleife): die Mündung (x ≥ 39) hebt sich bis 2 px und senkt sich; Rad und Lauf-Rumpf (x 18–38) stehen.
@@ -23,7 +23,7 @@ Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, Flamme und Funken ausge
 * Brennende Lunte (Regel 15): die Flamme (Gelb (255,255,0) mit hellem Kern (255,255,203); mehr Farben hat der Sprite nicht, Rand/Rot/Orange im Modul gleich Gelb) wird mit anim_feuer.py NEU gezeichnet, Fuß fest auf der Lunte,
   Spitzen reißen als runde Funken ab; die Flamme steigt/sinkt mit der Lunte. Frame 0 weicht in der Flamme vom Original ab (acht Pixel → kleine bewegte Flamme); der Rest ist exakt das Original.
 * Der Wischer nickt: der Kopf (y 0–8) schiebt sich als Block 1 px nach links/rechts (Periode 24, zweimal pro Schleife), der Schaft steht.
-* Glanz auf dem Eisenlauf (Regel 14: Metall): ein Lichtband läuft diagonal über den Lauf (zweimal pro Schleife, Start Frame 4 und 28, 14 Frames, zwei Stufen heller auf der Rampe der Grautöne des Laufs); Rad und Wischer glänzen nicht.
+* Glanz auf dem Eisenlauf (Regel 14: Metall): ein Lichtband läuft diagonal über den Lauf (zweimal pro Schleife, Start Frame 4 und 28, 14 Frames, zwei Stufen heller auf der Rampe der Grautöne des Laufs, nur auf Innenpixeln, die Umrisspixel am Rand bleiben dunkel); Rad und Wischer glänzen nicht.
 Keine zusätzlichen Partikel (nur die zur Flamme gehörenden Funken). Randpixel-Test (Regel 16): `U.kontur_schliessen` (Randfarben der Quelle) am Gerät und der Kanone; die Flammenränder sind die Randfarbe Gelb der Quelle.
 ERGÄNZUNG: keine gemalten Pixel außer der neu gezeichneten Flamme (Farben der Quelle).
 Zuschnitt: der Frame ist auf die Figur (samt Flamme und abgerissenen Funken) zugeschnitten, symmetrisch um die Ruhefigur; die Funken vergrößern ihn höchstens 2 px darüber hinaus, dazu 1 px leerer Rand.
