@@ -1,0 +1,15 @@
+{
+  "creature": "Swift Eagle Warrior",
+  "sheet": "swift-eagle-warrior.png",
+  "frameWidth": 64,
+  "frameHeight": 44,
+  "frames": 24,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 5,
+  "padRight": 6,
+  "padBottom": 7,
+  "faceX": 32.0
+}
