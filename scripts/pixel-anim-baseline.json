@@ -94,12 +94,6 @@
  "jsxkf:app-board:smugCoinFall": {
   "drehung": 3
  },
- "jsxkf:app-board:spiderSummonCrawl": {
-  "drehung": 2
- },
- "jsxkf:app-board:spiderSummonWebBurst": {
-  "drehung": 2
- },
  "jsxkf:app-board:yukiGust": {
   "drehung": 2
  },
@@ -162,9 +156,6 @@
  },
  "kf:animPoisonSkullUpright": {
   "drehung": 2
- },
- "kf:animScrRunen": {
-  "drehung": 1
  },
  "kf:animSnakeFangLeft": {
   "drehung": 5
@@ -515,9 +506,6 @@
  "kf:musicNoteFloat": {
   "drehung": 3
  },
- "kf:mwRune": {
-  "drehung": 3
- },
  "kf:negatedGlyphFade": {
   "drehung": 2
  },
@@ -541,15 +529,6 @@
  },
  "kf:permanentPulse": {
   "blur": 2
- },
- "kf:pfRanke": {
-  "drehung": 3
- },
- "kf:pfSiegel": {
-  "drehung": 2
- },
- "kf:pfSiegel2": {
-  "drehung": 3
  },
  "kf:phase-hinweis-puls": {
   "blur": 2
@@ -641,20 +620,11 @@
  "kf:sandStrahlFlug": {
   "drehung": 2
  },
- "kf:sbBrocken": {
-  "drehung": 1
- },
- "kf:sbRiss": {
-  "drehung": 2
- },
  "kf:scytheSlash": {
   "drehung": 2
  },
  "kf:scytheWound": {
   "drehung": 3
- },
- "kf:sdShard": {
-  "drehung": 1
  },
  "kf:sfFunke": {
   "drehung": 2
@@ -679,9 +649,6 @@
  },
  "kf:skatesDestPulse": {
   "blur": 2
- },
- "kf:skbFall": {
-  "drehung": 1
  },
  "kf:skinHoloBand": {
   "drehung": 2
@@ -716,9 +683,6 @@
  "kf:structure-deck-equipped-pulse": {
   "blur": 6
  },
- "kf:styxTorStrudel": {
-  "drehung": 3
- },
  "kf:summonGlow": {
   "blur": 3
  },
@@ -743,15 +707,6 @@
  "kf:textbox-hl-glow": {
   "blur": 2
  },
- "kf:tgeKreisDreh": {
-  "drehung": 1
- },
- "kf:tgeKreisDrehZurueck": {
-  "drehung": 1
- },
- "kf:tgeStrom": {
-  "drehung": 1
- },
  "kf:tharxianHorseGallop": {
   "drehung": 2
  },
@@ -762,19 +717,6 @@
   "drehung": 1
  },
  "kf:tharxianImpactSplinter": {
-  "drehung": 1
- },
- "kf:tkinStein": {
-  "drehung": 5
- },
- "kf:tkinWackeln": {
-  "drehung": 5
- },
- "kf:torchureFackel": {
-  "drehung": 6
- },
- "kf:torchureKauen": {
-  "blur": 1,
   "drehung": 1
  },
  "kf:treacherousCrystalPulse": {
@@ -790,9 +732,6 @@
   "drehung": 3
  },
  "kf:waflavEvoParticle": {
-  "drehung": 1
- },
- "kf:whirlwindSpin": {
   "drehung": 1
  },
  "kf:willyParticle": {
@@ -1237,9 +1176,6 @@
   "blur": 3,
   "drehung": 2
  },
- "reg:null_zone_spiral": {
-  "blur": 4
- },
  "reg:orbital_laser_red": {
   "blur": 5
  },
@@ -1253,10 +1189,6 @@
  "reg:petrify": {
   "blur": 2,
   "mischmodus": 1
- },
- "reg:phoenix_bombardment": {
-  "blur": 3,
-  "drehung": 1
  },
  "reg:piranha_bite": {
   "blur": 3
@@ -1276,11 +1208,6 @@
   "drehung": 1,
   "mischmodus": 1
  },
- "reg:pollution_place": {
-  "blur": 6,
-  "drehung": 1,
-  "mischmodus": 1
- },
  "reg:pressed_skill_rain": {
   "blur": 2,
   "drehung": 3
@@ -1292,10 +1219,6 @@
   "blur": 4,
   "drehung": 2
  },
- "reg:quick_slash": {
-  "blur": 3,
-  "drehung": 8
- },
  "reg:rain_of_death": {
   "blur": 3,
   "drehung": 2
@@ -1303,20 +1226,8 @@
  "reg:rain_of_spores_rain": {
   "blur": 1
  },
- "reg:red_cut": {
-  "blur": 1,
-  "drehung": 9
- },
  "reg:red_lightning": {
   "blur": 2
- },
- "reg:rolling_boulder": {
-  "blur": 3,
-  "drehung": 6
- },
- "reg:rool_disrupt": {
-  "blur": 4,
-  "drehung": 9
  },
  "reg:root_evil_mist": {
   "blur": 2,
@@ -1333,15 +1244,7 @@
  "reg:shield_block": {
   "blur": 3
  },
- "reg:silence_cut": {
-  "blur": 1,
-  "drehung": 9
- },
  "reg:silence_seal": {
-  "blur": 1,
-  "drehung": 3
- },
- "reg:sleep_zzz": {
   "blur": 1,
   "drehung": 3
  },
@@ -1371,9 +1274,6 @@
  "reg:steam_puff": {
   "blur": 1
  },
- "reg:stowaway_tentacles": {
-  "blur": 1
- },
  "reg:sun_beam": {
   "blur": 4
  },
@@ -1400,25 +1300,9 @@
   "blur": 3,
   "mischmodus": 1
  },
- "reg:undead_revival": {
-  "blur": 4,
-  "drehung": 7
- },
- "reg:unwanted_audience_zzz": {
-  "blur": 1,
-  "drehung": 2
- },
  "reg:victorica_holy_cleanse": {
   "blur": 3,
   "drehung": 4
- },
- "reg:warlord_bite": {
-  "blur": 1,
-  "drehung": 4
- },
- "reg:water_blessing": {
-  "blur": 5,
-  "drehung": 3
  },
  "reg:water_wave": {
   "blur": 4
