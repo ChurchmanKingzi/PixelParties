@@ -302,7 +302,7 @@
     const stops = teile(inner, ',');
     let prev = null;
     for (const st of stops) {
-      const cm = /^(rgba?\([^)]*\)|hsla?\([^)]*\)|#[0-9a-fA-F]{3,8}|transparent)\s*(.*)$/.exec(st.trim());
+      const cm = /^(rgba?\([^)]*\)|hsla?\([^)]*\)|#[0-9a-fA-F]{3,8}|transparent|currentcolor|var\((?:[^()]|\([^()]*\))*\)|color-mix\((?:[^()]|\([^()]*\))*\))\s*(.*)$/i.exec(st.trim());
       if (!cm) continue;                                              // Richtung/Form
       const pos = (cm[2].match(/-?[\d.]+(?:%|px)?/g) || []).map(parseFloat);
       const col = cm[1].replace(/\s+/g, '');
@@ -312,6 +312,41 @@
     }
     return false;
   }
+  /** Verlauf → harte Baender (jede Stoppfarbe hoelt ihr Band bis zur Mitte zum Nachbarn; keine Zwischenfarben). Fuer Farben, die nur zur Laufzeit feststehen
+   *  (currentColor, var(), color-mix): dort kennt der Pixelierer die Farbe nicht. Positionen nur in %, sonst bleibt der Verlauf unveraendert. */
+  function verlaufBaender(v) {
+    const m = /^((?:repeating-)?)(linear|radial)-gradient\(/.exec(v.trim());
+    if (!m || m[1]) return null;
+    const inner = v.trim().slice(m[0].length, -1);
+    const teilePos = teile(inner, ',');
+    let kopf = '';
+    const stops = [];
+    for (let i = 0; i < teilePos.length; i++) {
+      const t = teilePos[i].trim();
+      const cm = /^(rgba?\([^)]*\)|hsla?\([^)]*\)|#[0-9a-fA-F]{3,8}|transparent|currentcolor|var\((?:[^()]|\([^()]*\))*\)|color-mix\((?:[^()]|\([^()]*\))*\))\s*(.*)$/i.exec(t);
+      if (!cm) { if (i === 0 && !stops.length) { kopf = t; continue; } return null; }
+      const pos = cm[2].trim() ? cm[2].trim().split(/\s+/) : [];
+      if (pos.length > 1 || pos.some(p => !/^-?[\d.]+%$/.test(p))) return null;
+      stops.push({ c: cm[1], p: pos.length ? parseFloat(pos[0]) : null });
+    }
+    if (stops.length < 2) return null;
+    if (stops[0].p === null) stops[0].p = 0;
+    if (stops[stops.length - 1].p === null) stops[stops.length - 1].p = 100;
+    for (let i = 1; i < stops.length - 1; i++) {
+      if (stops[i].p !== null) continue;
+      let j = i; while (stops[j].p === null) j++;
+      for (let k = i; k < j; k++) stops[k].p = stops[i - 1].p + (stops[j].p - stops[i - 1].p) * (k - i + 1) / (j - i + 1);
+    }
+    for (let i = 1; i < stops.length; i++) stops[i].p = Math.max(stops[i].p, stops[i - 1].p);
+    const out = [];
+    for (let i = 0; i < stops.length; i++) {
+      const von = i === 0 ? 0 : (stops[i - 1].p + stops[i].p) / 2;
+      const bis = i === stops.length - 1 ? 100 : (stops[i].p + stops[i + 1].p) / 2;
+      if (bis <= von) continue;
+      out.push(`${stops[i].c} ${zk(von)}% ${zk(bis)}%`);
+    }
+    return `${m[2]}-gradient(${kopf ? kopf + ', ' : ''}${out.join(', ')})`;
+  }
   /** Regel mit weichem Verlauf (nur Brett-Selektoren, nur explizite Farben) → Pixelbild des Pixelierers; laeuft erst, wenn app-shared.jsx geladen ist. */
   function verlaufRegel(r) {
     const st = r.style; if (!st || !r.selectorText || !BRETT.test(r.selectorText) || REGEL_AUS.test(r.selectorText)) return false;
@@ -319,11 +354,16 @@
     let n = false;
     for (const prop of ['background-image', 'background']) {
       const v = st.getPropertyValue(prop);
-      if (!v || v.indexOf('gradient(') < 0 || !einzelVerlauf(v) || !verlaufWeich(v)) continue;
+      if (!v || v.indexOf('gradient(') < 0 || !verlaufWeich(v) || !(KEIN_PIXEL_VERLAUF.test(v) || einzelVerlauf(v))) continue;
       if (prop === 'background' && st.getPropertyValue('background-image') !== v && st.getPropertyValue('background-image') !== 'initial') { /* Kurzform mit weiteren Teilen */ }
+      const prio = st.getPropertyPriority(prop);
+      if (KEIN_PIXEL_VERLAUF.test(v)) {                                      // Laufzeitfarben: harte Baender statt Pixelbild
+        const hb = verlaufBaender(v);
+        if (hb) { st.setProperty(prop, hb, prio); n = true; }
+        continue;
+      }
       const o = verlaufStil(v, 0, 0);
       if (!o) continue;
-      const prio = st.getPropertyPriority(prop);
       for (const [k, val] of Object.entries(o)) st.setProperty(kebab(k), String(val), prio);
       n = true;
     }
@@ -473,7 +513,7 @@
     } catch (e) { /* ohne */ }
   }
 
-  const rein = { ditherKachel, alphaHintergrund, teile, farbe, schicht, box, text, filter, eigenschaft, cssText, boxHartUngecacht, textHartUngecacht, filterHartUngecacht, ringBreite };
+  const rein = { verlaufBaender, verlaufWeich, ditherKachel, alphaHintergrund, teile, farbe, schicht, box, text, filter, eigenschaft, cssText, boxHartUngecacht, textHartUngecacht, filterHartUngecacht, ringBreite };
   const api = { KONFIG, stat: () => stat, rein, box, text, filter, eigenschaft, cssText, setzen, blatt, alleBlaetter, starten };
   root.PPPixelHart = api;
   if (typeof document !== 'undefined') starten();

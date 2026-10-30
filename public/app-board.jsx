@@ -54501,9 +54501,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           Math.round(start[0] + (ziel[0] - start[0]) * p),
           Math.round(start[1] + (ziel[1] - start[1]) * p),
         ]);
-        goldCrashRaf.current = requestAnimationFrame(step);
+        goldCrashRaf.current = (window.ppTaktRaf || requestAnimationFrame)(step);     // Pixelart: Zaehlerschritte im 30-Hz-Takt
       };
-      goldCrashRaf.current = requestAnimationFrame(step);
+      goldCrashRaf.current = (window.ppTaktRaf || requestAnimationFrame)(step);
     };
     socket.on('play_gold_crash', onGoldCrash);
     const onDeckToDeleted = ({ owner, cards }) => {
