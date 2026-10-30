@@ -24,6 +24,16 @@ OUT = os.path.normpath(os.path.join(HERE, '..', '..', 'data', 'creature-animatio
 SRC = os.path.join(HERE, 'src')
 
 
+class ClipError(RuntimeError):
+    """Ein deckendes Pixel würde aus dem Feld geschoben (und still abgeschnitten). Leinwand vergrößern oder
+    die Ebene VOR der Bewegung auf die volle Leinwand legen (platz)."""
+
+
+def platz(a, h, w, dx=0, dy=0):
+    """Ebene auf eine Leinwand h×w legen (Versatz dx, dy). Alle Bewegungen danach auf DIESER Leinwand ausführen."""
+    return einsetzen(leer(h, w), a, dx, dy)
+
+
 def lade(slug):
     return np.array(Image.open(os.path.join(SRC, slug + '.png')).convert('RGBA'))
 
@@ -58,16 +68,18 @@ def leer(h, w):
 
 
 def einsetzen(ziel, quelle, dx=0, dy=0):
-    """Deckende Pixel von `quelle` an (dx, dy) in `ziel` schreiben (außerhalb abgeschnitten)."""
+    """Deckende Pixel von `quelle` an (dx, dy) in `ziel` schreiben. Liegt ein deckendes Pixel außerhalb von `ziel`,
+    gibt es ClipError (nichts wird still abgeschnitten)."""
     h, w = ziel.shape[:2]; qh, qw = quelle.shape[:2]
     for y in range(qh):
         ty = y + dy
-        if not 0 <= ty < h:
+        xs_ = np.nonzero(quelle[y, :, 3])[0]
+        if not len(xs_):
             continue
-        for x in np.nonzero(quelle[y, :, 3])[0]:
-            tx = x + dx
-            if 0 <= tx < w:
-                ziel[ty, tx] = quelle[y, x]
+        if not 0 <= ty < h or xs_.min() + dx < 0 or xs_.max() + dx >= w:
+            raise ClipError(f'Zeile {y} der Ebene läge außerhalb der Leinwand (dx={dx}, dy={dy}, Leinwand {w}×{h})')
+        for x in xs_:
+            ziel[ty, x + dx] = quelle[y, x]
     return ziel
 
 
@@ -103,9 +115,10 @@ def spalten_welle(a, pivot_x, amp, phase, potenz=1.0, nur_rechts=None, bias=0.0,
             frac = abs(d) / maxd
             dy = int(round((amp * math.sin(phase - lauf * frac) + bias) * frac ** potenz))
         ys = np.nonzero(a[:, x, 3])[0]
+        if ys.min() + dy < 0 or ys.max() + dy >= h:
+            raise ClipError(f'Spalte {x} würde um {dy} px aus der Leinwand (Höhe {h}) geschoben')
         for y in ys:
-            if 0 <= y + dy < h:
-                out[y + dy, x] = a[y, x]
+            out[y + dy, x] = a[y, x]
         if fuell is not None and dy < 0:
             yb = int(ys.max())
             if yb + 1 < h and fuell[yb + 1, x]:
@@ -129,9 +142,11 @@ def zeilen_welle(a, pivot_y, amp, phase, potenz=1.0, richtung=1, signiert=False)
         f = ((y - pivot_y) / maxd) if signiert else (abs(y - pivot_y) / maxd)
         f = math.copysign(abs(f) ** potenz, f)
         dx = int(round(amp * f * math.sin(phase)))
-        for x in np.nonzero(a[y, :, 3])[0]:
-            if 0 <= x + dx < w:
-                out[y, x + dx] = a[y, x]
+        xs_ = np.nonzero(a[y, :, 3])[0]
+        if xs_.min() + dx < 0 or xs_.max() + dx >= w:
+            raise ClipError(f'Zeile {y} würde um {dx} px aus der Leinwand (Breite {w}) geschoben')
+        for x in xs_:
+            out[y, x + dx] = a[y, x]
     return out
 
 
@@ -142,11 +157,25 @@ def streck_zeile(a, zeile, n=1):
     h = a.shape[0]
     if n >= 0:
         rows = list(range(zeile)) + [zeile] * (n + 1) + list(range(zeile + 1, h))
+        if n and a[:n, :, 3].any():
+            raise ClipError(f'streck_zeile würde {n} belegte Zeile(n) am oberen Rand abschneiden')
         return a[rows[n:]].copy()
     m = -n
     rows = list(range(zeile - m + 1)) + list(range(zeile + 1, h))
     out = np.zeros_like(a)
     out[m:] = a[rows]
+    return out
+
+
+def heben_unten(a, zeile, k):
+    """Die k Zeilen bis einschließlich `zeile` entfernen und alles darunter um k nach OBEN rücken (Oberkante bleibt stehen):
+    ein hängender Arm wird kürzer, die Hand hebt sich. Unten wird leer aufgefüllt."""
+    if k <= 0:
+        return a.copy()
+    h = a.shape[0]
+    rows = list(range(zeile - k + 1)) + list(range(zeile + 1, h))
+    out = np.zeros_like(a)
+    out[:len(rows)] = a[rows]
     return out
 
 
@@ -167,6 +196,48 @@ def dehnen(a, sy=1.0, sx=1.0, anker=None):
             if 0 <= xx < w:
                 out[y, x] = a[yy, xx]
     return out
+
+
+# ── Partikel (Pixelart: kein Alpha, nur Dithering, nur ganze Pixel, nahtlos im Loop) ──────────────────────────
+PUFF_FORMEN = {
+    'k': [(0, 0, 'c')],                                                       # Funke
+    's': [(0, 0, 'c'), (-1, 0, 'r'), (1, 0, 'r'), (0, -1, 'r'), (0, 1, 'r')],   # kleines Kreuz
+    'm': [(x, -1, 'r') for x in (-1, 0, 1)] + [(-2, 0, 'r'), (2, 0, 'r')] + [(x, 0, 'c') for x in (-1, 0, 1)]
+         + [(x, 1, 'r') for x in (-1, 0, 1)],                                  # Wölkchen 5×3
+    'l': [(x, -2, 'r') for x in (-1, 0, 1)] + [(x, -1, 'r') for x in (-2, 2)] + [(x, -1, 'c') for x in (-1, 0, 1)]
+         + [(-3, 0, 'r'), (3, 0, 'r')] + [(x, 0, 'c') for x in (-2, -1, 0, 1, 2)]
+         + [(x, 1, 'r') for x in (-2, 2)] + [(x, 1, 'c') for x in (-1, 0, 1)] + [(x, 2, 'r') for x in (-1, 0, 1)],  # Wolke 7×5
+}
+
+
+def puff_ebene(h, w, i, n, puffs, farben):
+    """Ebene mit Wölkchen/Funken. puffs: Liste von dict(x, y, vx, vy, off, form='m', wackeln=0).
+    (x, y) = Startpunkt auf der Leinwand, (vx, vy) = Gesamtweg über eine Lebensdauer (= n Frames, daher nahtlos),
+    off = Phasenversatz in Frames. farben = {'c': (r,g,b) Kern, 'r': (r,g,b) Rand}.
+    Lebenslauf per Dithering statt Alpha: entsteht schachbrettartig → voll → zerfällt schachbrettartig → verglimmt."""
+    ebene = leer(h, w)
+    for pf in puffs:
+        t = ((i + pf.get('off', 0)) % n) / n
+        cx = pf['x'] + pf.get('vx', 0) * t + pf.get('wackeln', 0) * math.sin(2 * math.pi * t)
+        cy = pf['y'] + pf.get('vy', 0) * t
+        cx, cy = int(round(cx)), int(round(cy))
+        for (dx, dy, k) in PUFF_FORMEN[pf.get('form', 'm')]:
+            x, y = cx + dx, cy + dy
+            if t < 0.2:
+                keep = (dx + dy) % 2 == 0
+            elif t < 0.65:
+                keep = True
+            elif t < 0.82:
+                keep = (dx + dy) % 2 != 0
+            else:
+                keep = dx % 2 == 0 and dy % 2 == 0
+            if not keep:
+                continue
+            if not (0 <= y < h and 0 <= x < w):
+                raise ClipError(f'Partikel bei ({x},{y}) liegt außerhalb der Leinwand {w}×{h}')
+            ebene[y, x, :3] = farben[k]
+            ebene[y, x, 3] = 255
+    return ebene
 
 
 def tausche(a, abbild, maske=None):

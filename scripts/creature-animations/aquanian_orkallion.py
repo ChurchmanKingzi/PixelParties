@@ -11,7 +11,8 @@ Ablauf (32 Frames à 80 ms = 2,56 s):
   die Phase hinkt nach hinten hinterher — der ganze Körper schlängelt sich einmal pro Schleife.
 * Die drei unten hängenden Flossen pendeln zusätzlich verzögert hin und her (Zeilenversatz, Aufhängung bei Zeile 25).
 * Blinzeln (Frames 22–24): Lid schließt sich über die helle Augenraute (halb → zu → halb).
-Maulnaht, Rückenmuster (rotes Kreuz) und Rückenflosse bleiben, wie sie sind. Nur ganze Pixel, nur Quellfarben.
+Maulnaht, Rückenmuster (rotes Kreuz) und Rückenflosse bleiben, wie sie sind. Alle Bewegungen laufen auf der vollen Leinwand (7 px Rand oben/unten); anim_lib wirft ClipError statt still abzuschneiden.
+Nur ganze Pixel, nur Quellfarben.
 """
 import sys
 
@@ -20,7 +21,7 @@ import numpy as np
 import anim_lib as L
 
 N, MS = 32, 80
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 5, 5
+PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 7, 7
 
 spr = L.lade('aquanian-orkallion')
 sh, sw = spr.shape[:2]
@@ -37,22 +38,26 @@ AUGE_HELL = [(11, 15), (10, 16), (11, 16)]
 AUGE_PUPILLE = [(10, 17), (11, 17), (10, 18)]
 
 
+def teil(maske):
+    t, _ = L.trenne(spr, maske)
+    return L.platz(t, H, W, PAD_L, PAD_T)                    # sofort auf die volle Leinwand (nichts wird abgeschnitten)
+
+
 def frame(i):
     ph = L.sinus(i, N)
-    r, _ = L.trenne(spr, rumpf)
-    f, _ = L.trenne(spr, flossen)
+    r = teil(rumpf)
+    f = teil(flossen)
     if i in (22, 24):                                       # halb zu: Lid deckt Pupille und oberes Weiß
         for (x, y) in AUGE_PUPILLE + [AUGE_HELL[0]]:
-            r[y, x, :3] = ROT
+            r[PAD_T + y, PAD_L + x, :3] = ROT
     if i == 23:                                             # zu: dunkler Strich
         for (x, y) in AUGE_PUPILLE + [AUGE_HELL[0]]:
-            r[y, x, :3] = ROT
+            r[PAD_T + y, PAD_L + x, :3] = ROT
         for (x, y) in AUGE_HELL[1:]:
-            r[y, x, :3] = UMRISS
-    f = L.zeilen_welle(f, 25, 1.6, ph - 1.2)
-    ganz = L.zusammen(sh, sw, [(r, 0, 0), (f, 0, 0)])
-    ganz = L.spalten_welle(ganz, 0, 3.2, ph, lauf=2.2)
-    return L.zusammen(H, W, [(ganz, PAD_L, PAD_T)])
+            r[PAD_T + y, PAD_L + x, :3] = UMRISS
+    f = L.zeilen_welle(f, PAD_T + 25, 1.6, ph - 1.2)
+    ganz = L.zusammen(H, W, [(r, 0, 0), (f, 0, 0)])
+    return L.spalten_welle(ganz, PAD_L, 3.2, ph, lauf=2.2)
 
 
 if __name__ == '__main__':
