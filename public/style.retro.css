@@ -2653,41 +2653,7 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
   100% { opacity: 0; transform: translate(var(--gsDx), var(--gsDy)) scale(0.7) rotate(520deg); }
 }
 
-/* Critical Strike — huge cross-cut slash with shockwave, glint, text,
-   and a fan of sparks. Front-loaded so the hit lands heavy and fast. */
-@keyframes criticalSlashA {
-  0%   { opacity: 0; transform: rotate(-35deg) translateX(-130%); }
-  30%  { opacity: 1; }
-  100% { opacity: 0; transform: rotate(-35deg) translateX(130%); }
-}
-@keyframes criticalSlashB {
-  0%   { opacity: 0; transform: rotate(35deg) translateX(-130%); }
-  30%  { opacity: 1; }
-  100% { opacity: 0; transform: rotate(35deg) translateX(130%); }
-}
-@keyframes criticalGlint {
-  0%   { opacity: 0; transform: scale(0.2); }
-  40%  { opacity: 1; transform: scale(1.4); }
-  100% { opacity: 0; transform: scale(2.4); }
-}
-@keyframes criticalShockwave {
-  0%   { opacity: 0; transform: scale(0.25); }
-  25%  { opacity: 1; transform: scale(1.05); }
-  65%  { opacity: 0.7; transform: scale(1.35); }
-  100% { opacity: 0; transform: scale(1.7); }
-}
-@keyframes criticalText {
-  0%   { opacity: 0; transform: scale(0.3) translateY(8px); }
-  35%  { opacity: 1; transform: scale(1.15) translateY(0); }
-  75%  { opacity: 1; transform: scale(1) translateY(-2px); }
-  100% { opacity: 0; transform: scale(0.95) translateY(-14px); }
-}
-@keyframes criticalSpark {
-  0%   { opacity: 0; transform: translate(0, 0) scale(1); }
-  20%  { opacity: 1; }
-  100% { opacity: 0; transform: translate(calc(cos(var(--csAngle)) * var(--csDist)), calc(sin(var(--csAngle)) * var(--csDist)))
-    scale(0.15); }
-}
+/* Critical Strike (`critical_slash`): jetzt Pixelart-Leinwand in app-board.jsx (W86r1) — die Keyframes hier sind entfallen. */
 
 /* Siphem orbital laser — charge-up, falling beam, impact flash, sparks. */
 @keyframes orbitalLaserCharge {
@@ -4720,7 +4686,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * { cursor: url("/cursor
 }
 
 /* Flammen von Missing Parts: aufsteigend, kurz groesser werdend, dann
-   ausduennend. Gegenstueck zu `pp-invest-coin-drop` (fallend/entfaerbend). */
+   ausduennend. Gegenstueck: `invest_counters_lost` (fallend/entfaerbend, Pixel-Leinwand). */
 @keyframes pp-debt-flame-rise {
   0%   { transform: translate(0, 6px) scale(.55); opacity: 0; }
   18%  { transform: translate(calc(var(--pp-flame-drift, 0px) * .25), -4px) scale(1.12); opacity: 1; }
@@ -4728,12 +4694,6 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * { cursor: url("/cursor
   100% { transform: translate(var(--pp-flame-drift, 0px), var(--pp-flame-rise, -60px)) scale(.5); opacity: 0; }
 }
 
-@keyframes pp-invest-coin-drop {
-  0%   { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 0; filter: none; }
-  10%  { transform: translate(0, -9px) rotate(calc(var(--pp-invest-spin, 180deg) * .12)) scale(1.05); opacity: 1; }
-  55%  { opacity: .85; filter: grayscale(.55) saturate(.7); }
-  100% { transform: translate(var(--pp-invest-drift, 0px), 74px) rotate(var(--pp-invest-spin, 180deg)) scale(.72); opacity: 0; filter: grayscale(1) saturate(.3); }
-}
 
 .anim-gold-flash { position: absolute; width: 40px; height: 40px; left: -20px; top: -20px; border-radius: 0; background: radial-gradient(circle, #f7f7ad 0% 22%, #fad54a 22% 46%, #f29a3e 46% 68%); animation: animGoldFlash .5s steps(12, end) forwards; }
 @keyframes animGoldFlash {
@@ -5870,14 +5830,15 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 /* Whirlwind Strike spin effect on attacker */
 .whirlwind-spinning { animation: whirlwindSpin 2s steps(24, end) forwards !important; transform-origin: center center !important; }
 @keyframes whirlwindSpin {
+  /* W86r1: nur Vierteldrehungen (Vielfache von 90°, die Karte bleibt verlustfrei) und vier statt zehn Umdrehungen — bei 30 Bildern/s bleibt die Drehung so lesbar */
   0%   { transform: rotate(0deg) scale(1); }
   8%   { transform: rotate(180deg) scale(1.05); }
-  15%  { transform: rotate(540deg) scale(1.1); }
-  25%  { transform: rotate(1080deg) scale(1.1); }
-  50%  { transform: rotate(2160deg) scale(1.05); }
-  75%  { transform: rotate(3060deg) scale(1); }
-  90%  { transform: rotate(3510deg) scale(1); }
-  100% { transform: rotate(3600deg) scale(1); }
+  15%  { transform: rotate(360deg) scale(1.1); }
+  25%  { transform: rotate(630deg) scale(1.1); }
+  50%  { transform: rotate(990deg) scale(1.05); }
+  75%  { transform: rotate(1260deg) scale(1); }
+  90%  { transform: rotate(1350deg) scale(1); }
+  100% { transform: rotate(1440deg) scale(1); }
 }
 
 /* ===== ICE PROJECTILE TRAIL ===== (Pixelart: harte 4-px-Zellen, zwei Bilder im Wechsel per steps(1), kein Weichzeichner) */
@@ -12738,47 +12699,6 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 }
 
 /* ── Crimson Web: Netzschuss + bleibendes Netz ───────────────────── */
-.cweb { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10204; }
-.cweb > span, .cweb > div { position: absolute; display: block; }
-.cweb-faden line { stroke: #8c0014; stroke-width: 2; stroke-dasharray: 100; stroke-dashoffset: 100; filter: drop-shadow(1px 0 0 #8c0014) drop-shadow(-1px 0 0 #8c0014) drop-shadow(0 1px 0 #8c0014) drop-shadow(0 -1px 0 #8c0014); animation: cwebFaden 1100ms steps(24, end) forwards; }
-.cweb-ballen { left: -11px; top: -11px; width: 22px; height: 22px; border-radius: 0; background: radial-gradient(circle at 40% 35%, #fe5154 0% 30%, #e92f38 30% 45%, #8c0014 45% 89%, #55011a 89% 100%); box-shadow: 0 0 0 2px #e92f38, 0 0 0 2px #8c0014; opacity: 0; animation: cwebBallen 420ms steps(10, end) forwards; }
-.cweb-netz-huelle { left: 0; top: 0; width: 0; height: 0; animation: cwebRuck 1000ms steps(24, end) forwards; }
-.cweb-netz path { fill: none; stroke: #b62600; stroke-width: 1.8; stroke-linecap: round; filter: drop-shadow(1px 0 0 #e92f38) drop-shadow(-1px 0 0 #e92f38) drop-shadow(0 1px 0 #e92f38) drop-shadow(0 -1px 0 #e92f38) drop-shadow(1px 0 0 #3a2412) drop-shadow(-1px 0 0 #3a2412) drop-shadow(0 1px 0 #3a2412) drop-shadow(0 -1px 0 #3a2412); stroke-dasharray: 100; stroke-dashoffset: 100; animation: cwebNetz 1400ms steps(24, end) forwards; }
-.cweb-verpufft .cweb-netz path { animation-name: cwebNetzVerpufft; animation-duration: 2000ms; }
-.cweb-glut { border-radius: 0; mix-blend-mode: screen; background: radial-gradient(ellipse, transparent 0% 72%); opacity: 0; animation: cwebGlut 900ms steps(22, end) 330ms forwards; }
-@keyframes cwebFaden {
-  0% { stroke-dashoffset: 100; opacity: 1; }
-  33% { stroke-dashoffset: 0; opacity: 1; }
-  60% { opacity: .7; }
-  100% { stroke-dashoffset: 0; opacity: 0; }
-}
-@keyframes cwebBallen {
-  0% { opacity: 1; transform: translate(var(--cx), var(--cy)) scale(.6); }
-  85% { opacity: 1; transform: translate(0, 0) scale(1.1); }
-  100% { opacity: 0; transform: translate(0, 0) scale(2.4); }
-}
-@keyframes cwebRuck {
-  0%, 60% { transform: scale(1); }
-  66% { transform: scale(1.06, .95); }
-  74% { transform: scale(.97, 1.03); }
-  82%, 100% { transform: scale(1); }
-}
-@keyframes cwebNetz {
-  0% { stroke-dashoffset: 100; opacity: 0; }
-  8% { opacity: 1; }
-  35% { stroke-dashoffset: 0; opacity: 1; }
-  70% { stroke-dashoffset: 0; opacity: 1; }
-  100% { stroke-dashoffset: 0; opacity: 0; }
-}
-@keyframes cwebNetzVerpufft {
-  0% { stroke-dashoffset: 100; opacity: 0; }
-  5% { opacity: 1; }
-  24% { stroke-dashoffset: 0; opacity: 1; }
-  40% { stroke-dashoffset: 0; opacity: 1; }
-  100% { stroke-dashoffset: 0; opacity: 0; }
-}
-@keyframes cwebGlut { 0% { opacity: 0; } 30% { opacity: 1; } 100% { opacity: 0; } }
-
 .crimson-web-overlay { position: absolute; inset: 0; z-index: 5; pointer-events: none; background: radial-gradient(ellipse at 50% 50%, transparent 0% 100%); opacity: 0; animation: cwebOverlayAn 420ms steps(10, end) 450ms forwards; }
 .crimson-web-overlay svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
 .crimson-web-overlay path { fill: none; stroke: #b62600; stroke-width: 1.8; stroke-linecap: round; vector-effect: non-scaling-stroke; filter: drop-shadow(1px 0 0 #8c0014) drop-shadow(-1px 0 0 #8c0014) drop-shadow(0 1px 0 #8c0014) drop-shadow(0 -1px 0 #8c0014); animation: cwebSchimmer 2600ms steps(24, end) infinite; }

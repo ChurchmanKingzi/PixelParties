@@ -5111,32 +5111,7 @@ function BabySpiderOpferEffect({ x, y, w = 70, h = 100, vonDx = 0, vonDy = -140,
 //             (`CrimsonWebOverlay`, gleiche Geometrie) liegt da schon;
 //             `bleibt: false` (kein Platz zum Anlegen) → das Netz
 //             blendet ueber eine Sekunde aus.
-function CrimsonWebShotEffect({ x, y, w = 80, h = 110, vonDx = 0, vonDy = 160, bleibt = true }) {
-  const netz = useMemo(() => ppNetzPfade(w * 0.52, h * 0.514, 12, 6), [w, h]);
-  useEffect(() => {
-    const spiel = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
-    spiel('projectile', { rate: 0.8, volume: 0.7 }, 0);
-    spiel('elem_dark', { rate: 1.25, volume: 0.6 }, 330);
-    spiel('debuff', { rate: 0.85, volume: 0.8 }, 420);
-    if (!bleibt) spiel('status_remove', { rate: 0.9, volume: 0.5 }, 1050);
-  }, []);
-  return (
-    <div className={'cweb' + (bleibt ? '' : ' cweb-verpufft')} style={{ left: x, top: y }} aria-hidden="true">
-      <svg className="cweb-faden" width="2" height="2" style={{ position: 'absolute', left: 0, top: 0, overflow: 'visible' }}>
-        <line x1={vonDx} y1={vonDy} x2="0" y2="0" pathLength="100" />
-      </svg>
-      <span className="cweb-ballen" style={{ '--cx': vonDx + 'px', '--cy': vonDy + 'px' }} />
-      <div className="cweb-netz-huelle">
-        <svg className="cweb-netz" width={w * 1.1} height={h * 1.1} viewBox={`${-w * 0.55} ${-h * 0.55} ${w * 1.1} ${h * 1.1}`}
-          style={{ position: 'absolute', left: -w * 0.55, top: -h * 0.55, overflow: 'visible' }}>
-          {netz.speichen.map((d, i) => <path key={'s' + i} d={d} pathLength="100" style={{ animationDelay: (340 + i * 16) + 'ms' }} />)}
-          {netz.ringe.map((d, i) => <path key={'r' + i} d={d} pathLength="100" style={{ animationDelay: (520 + i * 60) + 'ms' }} />)}
-        </svg>
-      </div>
-      <span className="cweb-glut" style={{ width: w * 1.3, height: h * 1.2, left: -w * 0.65, top: -h * 0.6 }} />
-    </div>
-  );
-}
+// (Umsetzung: `ppR1CrimsonWeb` im W86r1-Block weiter oben — Pixelart-Leinwand; `ppNetzPfade` bleibt für Baby Spider.)
 
 // ── Divine Gift of Death: die grosse Erweckung (Als Vorgabe 26.9.) ─
 // „Eine grosse Revival-Animation" — und ausdruecklich MAGIE, keine
@@ -7551,115 +7526,7 @@ function PoisonedWellEffect({ x, y, w, h }) {
   );
 }
 
-// Cosmic Summon — a black-and-purple portal tears open in the summon
-// slot: void expands from the centre, star-sparkles converge inward
-// from the rim, a lilac core flashes white, then everything collapses
-// back to let the freshly-placed creature render. Pure dark-theme, no
-// fire/ice colour families so it reads as "pulled from the depths of
-// space" rather than any existing elemental strike.
-function CosmicSummonEffect({ x, y }) {
-  const sparkles = useMemo(() => Array.from({ length: ppFxN(18) }, () => {
-    const angle = Math.random() * Math.PI * 2;
-    // Start somewhere between 70–130px from centre; each sparkle
-    // converges all the way to the middle at peak.
-    const startDist = 70 + Math.random() * 60;
-    return {
-      startX: Math.round(Math.cos(angle) * startDist / 2) * 2,       // W86r1: gerade Pixel und Größen in Vielfachen von 4 (Kunstpixel-Raster)
-      startY: Math.round(Math.sin(angle) * startDist / 2) * 2,
-      size: Math.random() < 0.5 ? 4 : 8,
-      delay: Math.random() * 220,
-      dur: 420 + Math.random() * 260,
-    };
-  }), []);
-  const dust = useMemo(() => Array.from({ length: ppFxN(12) }, () => {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 20 + Math.random() * 50;
-    return {
-      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
-      size: 3 + Math.random() * 5,
-      color: ['#c98aff','#a040ff','#d6b3f9','#ffffff','#7a2bd0'][Math.floor(Math.random() * 5)],
-      delay: 350 + Math.random() * 150,
-      dur: 400 + Math.random() * 300,
-    };
-  }), []);
-  return (
-    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-      {/* Void portal — black core with purple nebula halo. Grows then
-          collapses. */}
-      <div className="anim-cosmic-void" />
-      {/* Ring flash — a quick purple/white halo at peak expansion. */}
-      <div className="anim-cosmic-ring" />
-      {/* Converging star sparkles: each starts offset, shrinks to centre. */}
-      {sparkles.map((s, i) => (
-        <div key={'cs' + i} className="anim-cosmic-star" style={{
-          '--cstartX': s.startX + 'px', '--cstartY': s.startY + 'px',
-          '--csize': s.size + 'px',
-          animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
-        }} />
-      ))}
-      {/* Outward dust burst at the peak — uses the shared explosion
-          particle keyframes (CSS var-driven). */}
-      {dust.map((d, i) => (
-        <div key={'cd' + i} className="anim-explosion-particle" style={{
-          '--dx': d.dx + 'px', '--dy': d.dy + 'px', '--size': d.size + 'px',
-          '--color': d.color,
-          animationDelay: d.delay + 'ms', animationDuration: d.dur + 'ms',
-        }} />
-      ))}
-      <style>{`
-        @keyframes cosmic-void-pulse {
-          0%   { opacity: 0;   transform: translate(-50%, -50%) scale(0.15); }
-          35%  { opacity: 0.95; transform: translate(-50%, -50%) scale(1.0); }
-          65%  { opacity: 0.85; transform: translate(-50%, -50%) scale(1.15); }
-          100% { opacity: 0;   transform: translate(-50%, -50%) scale(0.4); }
-        }
-        @keyframes cosmic-ring-expand {
-          0%   { opacity: 0;   transform: translate(-50%, -50%) scale(0.3); }
-          30%  { opacity: 0.9; transform: translate(-50%, -50%) scale(0.95); }
-          60%  { opacity: 0.5; transform: translate(-50%, -50%) scale(1.35); }
-          100% { opacity: 0;   transform: translate(-50%, -50%) scale(1.75); }
-        }
-        @keyframes cosmic-star-converge {
-          0%   { opacity: 0; transform: translate(calc(-50% + var(--cstartX)), calc(-50% + var(--cstartY))) scale(0.5); }
-          25%  { opacity: 1; }
-          100% { opacity: 0; transform: translate(-50%, -50%) scale(0.25); }
-        }
-        .anim-cosmic-void {
-          position: absolute; left: 0; top: 0;
-          width: 140px; height: 140px;
-          border-radius: 50%;
-          background:
-            radial-gradient(circle at 50% 50%,
-              #000 0%,
-              rgba(46,10,81,0.95) 30%,
-              rgba(110,0,204,0.55) 60%,
-              rgba(102,24,180,0.0) 100%);
-          box-shadow: inset 0 0 0 8px #1a0a3a;        /* W86r1: harter Innenring statt Weichzeichner-Schein */
-          transform: translate(-50%, -50%) scale(0.1);
-          animation: cosmic-void-pulse 900ms ease-out forwards;
-        }
-        .anim-cosmic-ring {
-          position: absolute; left: 0; top: 0;
-          width: 100px; height: 100px;
-          border-radius: 50%;
-          border: 3px solid #d6b3f9;
-          box-shadow: inset 0 0 0 3px #ffffff;
-          transform: translate(-50%, -50%) scale(0.3);
-          animation: cosmic-ring-expand 700ms ease-out forwards;
-          animation-delay: 120ms;
-        }
-        .anim-cosmic-star {
-          position: absolute; left: 0; top: 0;
-          width: var(--csize); height: var(--csize);
-          border-radius: 50%;
-          background: radial-gradient(circle, #fff 0%, rgba(214,187,241,0.95) 45%, rgba(201,138,255,0) 100%);
-          transform: translate(calc(-50% + var(--cstartX)), calc(-50% + var(--cstartY))) scale(0.5);
-          animation: cosmic-star-converge ease-in forwards;
-        }
-      `}</style>
-    </div>
-  );
-}
+// Cosmic Summon (`cosmic_summon`): ein schwarz-violettes Portal reisst im Beschwoerungsplatz auf — Umsetzung `ppR1CosmicSummon` im W86r1-Block (Pixelart-Leinwand).
 
 // ═══════════════════════════════════════════
 //  BOMBLEBEE ARCHETYPE ANIMATIONS
@@ -12515,7 +12382,7 @@ function ppR1Pinsel(buf, gw, gh) {
   return g;
 }
 function ppR1Leinwand(malen, ende, mass, opt) {
-  const o = opt || {}, S = 3, TAKT = 33;
+  const o = opt || {}, S = 3, TAKT = 1000 / 30;
   return function R1Effekt(props) {
     const cvs = useRef(null);
     const m = useMemo(() => {
@@ -12541,8 +12408,9 @@ function ppR1Leinwand(malen, ende, mass, opt) {
       let raf = 0, letzte = -1;
       const takt = window.ppTaktRaf || window.requestAnimationFrame;
       const schritt = (jetzt) => {
-        const t = (typeof jetzt === 'number' ? jetzt : performance.now()) - t0;
-        const fr = Math.floor(t / TAKT);                  // ~30 Bilder/s: ruhige Pixelart-Taktung
+        if (typeof jetzt !== 'number') jetzt = performance.now();
+        const t = jetzt - t0;
+        const fr = Math.floor(jetzt / TAKT);              // 30 Bilder/s auf dem GLOBALEN Raster (wie alle gebackenen CSS-Animationen und `ppTaktRaf`), nicht relativ zum Start — mehrere Animationen wechseln im Gleichschritt
         if (fr !== letzte) { letzte = fr; img.data.fill(0); malen(g, Math.max(0, t), sz, teile); ctx.putImageData(img, 0, 0); }
         if (t < ende) raf = takt(schritt);
         else { img.data.fill(0); ctx.putImageData(img, 0, 0); }
@@ -12853,7 +12721,7 @@ const ppR1CriticalSlash = ppR1Leinwand((g, t, sz, teile) => {
   if (q >= 0 && q <= 1) {
     const sk = q < 0.25 ? 0.25 + 0.8 * (q / 0.25) : q < 0.65 ? 1.05 + 0.3 * ((q - 0.25) / 0.4) : 1.35 + 0.35 * ((q - 0.65) / 0.35);
     const a = q < 0.25 ? q / 0.25 : q < 0.65 ? 1 - 0.3 * ((q - 0.25) / 0.4) : 0.7 * (1 - (q - 0.65) / 0.35);
-    g.glow(cx, cy, 80 * sk / S, 80 * sk / S, [ppHex('#e92f38'), C[0], C[1], C[3]], a * 0.45);
+    g.glow(cx, cy, 80 * sk / S, 80 * sk / S, [ppHex('#e92f38'), C[0], C[1], C[3]], a * 0.3, 1.4);
   }
   // Zwei Schnitte: A (−35°) ab 0 ms, B (+35°) ab 110 ms; 220 ms; der Balken gleitet von −130 % auf +130 % seiner Länge entlang seiner Achse
   [[-35, 0], [35, 110]].forEach(([grad, delay]) => {
@@ -12862,12 +12730,13 @@ const ppR1CriticalSlash = ppR1Leinwand((g, t, sz, teile) => {
     const e = 1 - Math.pow(1 - k, 3), a = k < 0.3 ? k / 0.3 : 1 - (k - 0.3) / 0.7;
     const w = grad * Math.PI / 180, dx = Math.cos(w), dy = Math.sin(w), c0 = len * (-1.3 + 2.6 * e);
     const mx = cx + dx * c0, my = cy + dy * c0;
-    ppR1Band(g, mx - dx * len / 2, my - dy * len / 2, mx + dx * len / 2, my + dy * len / 2, (u) => {
+    const bandPass = (extra, farbeFn) => ppR1Band(g, mx - dx * len / 2, my - dy * len / 2, mx + dx * len / 2, my + dy * len / 2, (u) => {
       if (u < 0.08 || u > 0.92) return null;
       const m = Math.abs(u - 0.5) * 2;                        // 0 Mitte … 1 Ende
-      const farbe = m < 0.12 ? C[4] : m < 0.35 ? C[3] : m < 0.6 ? C[2] : m < 0.8 ? C[1] : C[0];
-      return { w: m < 0.12 ? 5 : m < 0.6 ? 4 : 3, c: farbe, a: m > 0.84 ? 0.5 : 1 };
+      return { w: (m < 0.12 ? 6 : m < 0.6 ? 5 : 3) + extra, c: farbeFn(m), a: m > 0.84 ? 0.5 : 1 };
     }, a);
+    bandPass(3, () => C[0]);                                  // orange Hof (statt Schein), dann der helle Balken
+    bandPass(0, (m) => m < 0.12 ? C[4] : m < 0.35 ? C[3] : m < 0.6 ? C[2] : m < 0.8 ? C[1] : C[0]);
   });
   // Kreuzungsblitz (360 ms ab 180 ms): Größe .2 → 1,4 → 2,4
   const b = (t - 180) / 360;
@@ -13731,6 +13600,164 @@ function HoleInTheSkyPullEffekt(props) {
     </>
   );
 }
+
+// ═════════════════════════════════════════════════════════════════
+//  W86r1 · Divine Gift of Skill (`blessed_skill_burst`) — PIXELART. Eine strahlende Gelehrten-Kaskade um den gewählten Helden (~1,6 s): ein gold-violetter Dither-Schein, eine goldene Lichtsäule,
+//  zwei sich weitende Pixelringe und aufsteigende Goldfunken, dazu das große Doktorhut-Sprite (Platte, Körper, Troddel; poppt .4 → 1,25 → 1 auf), die kreisenden Gelehrtenzeichen (Schriftrolle, Feder,
+//  Atom, Hexagramm, Sterne — als kleine Pixelbilder mit Goldkontur) und das Funkenfeuerwerk. Alles auf einer Leinwand, ohne Drehung und ohne Schein.
+// ═════════════════════════════════════════════════════════════════
+const PP_R1_SEGEN = ['#7a2bd0', '#a952ff', '#d6b3f9', '#fbe181', '#f9ecb3', '#fffbd2'].map(ppHex);
+function ppR1Doktorhut(g, cx, cy, hb, a) {   // hb = halbe Breite der Platte in Rasterpixeln; Gold-Rand, dunkle Fläche (auf dem Brett lesbar), Troddel
+  cx = Math.round(cx); cy = Math.round(cy);
+  const gold = ppHex('#fad54a'), dunkel = ppHex('#323232'), hell = ppHex('#686868'), tr = ppHex('#f9ac20');
+  const h = Math.max(2, Math.round(hb * 0.36)), bh = Math.round(hb * 0.42), bw = Math.round(hb * 0.52);
+  for (let j = 0; j <= bh; j++) for (let i = -bw; i <= bw; i++) g.put(cx + i, cy + h - 1 + j, Math.abs(i) === bw || j === bh ? gold : (i < -bw / 3 ? hell : dunkel), a);   // Körper unter der Platte
+  for (let j = -h; j <= h; j++) {
+    const w = Math.round(hb * (1 - Math.abs(j) / (h + 0.6)));
+    for (let i = -w; i <= w; i++) g.put(cx + i, cy + j, (Math.abs(i) >= w - 1 && w > 1) || Math.abs(j) === h ? gold : (j < 0 && i < 0 ? hell : dunkel), a);
+  }
+  const ex = cx + Math.round(hb * 0.85), ey = cy + h + Math.round(hb * 0.45);                                                                                                                 // Troddel
+  g.line(cx, cy, ex, ey, tr, a);
+  g.block(ex - 1, ey, 3, 3, gold, a);
+}
+const PP_R1_ZEICHEN = {   // kleine Gelehrtenzeichen (Zeichen → Zeilen), '#' = Hauptfarbe, '+' = Zweitfarbe
+  rolle: ['.#####.', '#+++++#', '#+###+#', '#+++++#', '#+##++#', '#+++++#', '.#####.'],
+  feder: ['......###', '....####+', '...###++#', '..###++#.', '.###++#..', '###+##...', '.##+#....', '##.......', '#........'],
+  stern: ['....#....', '....#....', '...###...', '#########', '.#######.', '..#####..', '..##.##..', '.##...##.', '.#.....#.'],
+  funke: ['...#...', '...#...', '..###..', '#######', '..###..', '...#...', '...#...'],
+  hohl: ['...#...', '...#...', '..#+#..', '##+++##', '..#+#..', '...#...', '...#...'],
+  punkt: ['.#.', '###', '.#.'],
+};
+function ppR1Zeichen(g, art, cx, cy, farbe, kante, a) {
+  const rows = PP_R1_ZEICHEN[art];
+  if (rows) {
+    const w = rows[0].length, h = rows.length, x0 = Math.round(cx - w / 2), y0 = Math.round(cy - h / 2);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (rows[j][i] !== '.') g.put(x0 + i + dx, y0 + j + dy, kante, a);
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (rows[j][i] !== '.') g.put(x0 + i, y0 + j, rows[j][i] === '#' ? farbe : ppHex('#fbe181'), a);
+  } else if (art === 'atom') {
+    g.ellRing(cx, cy, 5, 2, 1, kante, a); g.ellRing(cx, cy, 2, 5, 1, kante, a); g.disc(cx, cy, 1.4, farbe, a); g.ellRing(cx, cy, 4, 1.5, 1, farbe, a * 0.8);
+  } else if (art === 'hexagramm') {
+    const R = 5, p = (k, d) => [cx + Math.cos(k * Math.PI / 1.5 + d) * R, cy + Math.sin(k * Math.PI / 1.5 + d) * R];
+    for (const d of [-Math.PI / 2, Math.PI / 2]) for (let k = 0; k < 3; k++) { const [x0, y0] = p(k, d), [x1, y1] = p(k + 1, d); g.line(x0 + 1, y0 + 1, x1 + 1, y1 + 1, kante, a); }
+    for (const d of [-Math.PI / 2, Math.PI / 2]) for (let k = 0; k < 3; k++) { const [x0, y0] = p(k, d), [x1, y1] = p(k + 1, d); g.line(x0, y0, x1, y1, farbe, a); }
+  }
+}
+const R1BlessedLeinwand = ppR1Leinwand((g, t, sz, teile) => {
+  const S = sz.S, cx = sz.cx, cy = sz.cy, C = PP_R1_SEGEN, cw = teile.cw, ch = teile.ch;
+  // Schein: .4 → 1 (25 %) → 1,08 (80 %) → 1,15; Deckung 0 → 1 → .85 → 0 (1500 ms)
+  const k = t / 1500;
+  if (k >= 0 && k <= 1) {
+    const sk = k < 0.25 ? 0.4 + 0.6 * (k / 0.25) : k < 0.8 ? 1 + 0.08 * ((k - 0.25) / 0.55) : 1.08 + 0.07 * ((k - 0.8) / 0.2), a = k < 0.25 ? k / 0.25 : k < 0.8 ? 1 - 0.15 * ((k - 0.25) / 0.55) : 0.85 * (1 - (k - 0.8) / 0.2);
+    g.glow(cx, cy, cw * sk / S, ch * sk / S, [C[1], C[2], C[3]], a * 0.65, 1.5);
+  }
+  // Lichtsäule (100 ms Versatz): Höhe .3 → 1,1 (25 %) → 1 (70 %) → .95, Deckung 0 → 1 → .85 → 0
+  const q = (t - 100) / 1500;
+  if (q >= 0 && q <= 1) {
+    const sy = q < 0.25 ? 0.3 + 0.8 * (q / 0.25) : q < 0.7 ? 1.1 - 0.1 * ((q - 0.25) / 0.45) : 0.95, a = q < 0.25 ? q / 0.25 : q < 0.7 ? 1 - 0.15 * ((q - 0.25) / 0.45) : 0.85 * (1 - (q - 0.7) / 0.3);
+    const hw = cw * 0.45 / S, hh = ch * 1.1 * sy / S;
+    for (let j = -Math.ceil(hh); j <= Math.ceil(hh); j++) {
+      const u = (hh - j) / (2 * hh);                       // 0 unten … 1 oben? (j = +hh ist unten)
+      const prof = u < 0.35 ? (u / 0.35) * 0.5 : u < 0.6 ? 0.5 + 0.2 * ((u - 0.35) / 0.25) : u < 0.85 ? 0.7 - 0.3 * ((u - 0.6) / 0.25) : 0.4 * (1 - (u - 0.85) / 0.15);
+      const farbe = u < 0.4 ? C[3] : u < 0.7 ? C[4] : C[5];
+      for (let i = -Math.ceil(hw); i <= Math.ceil(hw); i++) {
+        const f = 1 - Math.pow(Math.abs(i) / hw, 2);
+        if (f > 0 && u >= 0 && u <= 1) g.put(cx + i, cy + j, farbe, a * prof * f * 1.2);
+      }
+    }
+  }
+  // Ringe: Größe .3 → .85 (25 %) → 2,4; Deckung 0 → 1 → 0
+  teile.ringe.forEach((r) => {
+    const f = (t - r.delay) / r.dur;
+    if (f < 0 || f > 1) return;
+    const sk = f < 0.25 ? 0.3 + 0.55 * (f / 0.25) : 0.85 + 1.55 * ((f - 0.25) / 0.75), a = f < 0.25 ? f / 0.25 : 1 - (f - 0.25) / 0.75, R = r.size * sk / S;
+    g.ring(cx, cy, Math.max(0, R - 1.4), R, C[3], a);
+    g.ring(cx, cy, Math.max(0, R - 2.6), Math.max(0, R - 1.4), C[4], a * 0.6);
+  });
+  // Goldfunken steigen unter der Karte auf
+  teile.aura.forEach((m) => {
+    const f = (t - m.delay) / m.dur;
+    if (f < 0 || f > 1) return;
+    const e = 1 - Math.pow(1 - f, 2), a = f < 0.2 ? f / 0.2 : f < 0.8 ? 1 - 0.1 * ((f - 0.2) / 0.6) : 0.9 * (1 - (f - 0.8) / 0.2), sc = f < 0.2 ? 0.5 + 0.6 * (f / 0.2) : f < 0.8 ? 1.1 - 0.1 * ((f - 0.2) / 0.6) : 1 - 0.6 * ((f - 0.8) / 0.2);
+    g.disc(cx + m.startX / S, cy + (ch * 0.5 + 10 + m.riseY * e) / S, Math.max(0.8, m.size * sc / S / 2), m.farbe, a);
+  });
+  // Großer Doktorhut (1400 ms ab 80 ms): Größe .4 → 1,25 (35 %) → 1 (65 %) → .85; Deckung 0 → 1 → 0
+  const hk = (t - 80) / 1400;
+  if (hk >= 0 && hk <= 1) {
+    const sk = hk < 0.35 ? 0.4 + 0.85 * (hk / 0.35) : hk < 0.65 ? 1.25 - 0.25 * ((hk - 0.35) / 0.3) : 1 - 0.15 * ((hk - 0.65) / 0.35), a = hk < 0.35 ? hk / 0.35 : hk < 0.65 ? 1 : 1 - (hk - 0.65) / 0.35;
+    ppR1Doktorhut(g, cx, cy - 2, 17 * sk, a);
+  }
+  // Kreisende Gelehrtenzeichen: wachsen, ziehen leicht nach innen und dithern aus
+  teile.zeichen.forEach((o) => {
+    const f = (t - o.delay) / o.dur;
+    if (f < 0 || f > 1) return;
+    const a = f < 0.3 ? f / 0.3 : f < 0.8 ? 1 - 0.1 * ((f - 0.3) / 0.5) : 0.9 * (1 - (f - 0.8) / 0.2), e = f < 0.3 ? 0 : f < 0.8 ? 0.8 * ((f - 0.3) / 0.5) : 0.8 + 0.2 * ((f - 0.8) / 0.2);
+    if (f < 0.12) return;                                    // bei Größe < .5 noch nicht zeichnen (die Zeichen sind nur ein Pixelbild)
+    ppR1Zeichen(g, o.art, cx + (o.ox - o.ox * 0.2 * e) / S, cy + (o.oy - o.oy * 0.2 * e) / S, ppHex('#fffbd2'), ppHex('#c68206'), a);
+  });
+  // Funkenfeuerwerk
+  teile.funken.forEach((s) => {
+    const f = (t - s.delay) / s.dur;
+    if (f < 0 || f > 1) return;
+    const e = f < 0.25 ? 0.3 * (f / 0.25) : f < 0.8 ? 0.3 + 0.55 * ((f - 0.25) / 0.55) : 0.85 + 0.15 * ((f - 0.8) / 0.2), a = f < 0.25 ? f / 0.25 : f < 0.8 ? 1 : 1 - (f - 0.8) / 0.2;
+    ppR1Zeichen(g, s.art, cx + s.dx * e / S, cy + s.dy * e / S, s.farbe, ppHex('#7a2bd0'), a);
+  });
+}, 1900, (p) => { const cw = p.w || 100, ch = p.h || 140; return { breite: Math.max(cw * 2 * 1.2, 150 * 2.4) + 60, hoehe: Math.max(ch * 2.4, 130 * 2.4) + 60 }; }, {
+  z: 10100,
+  vorbereiten: (sz) => {
+    const cw = sz.props.w || 100, ch = sz.props.h || 140;
+    return {
+      cw, ch,
+      ringe: [0, 1].map(i => ({ size: 90 + i * 40, delay: i * 100, dur: 1100 + i * 150 })),
+      zeichen: ['rolle', 'feder', 'funke', 'hohl', 'atom', 'hexagramm', 'stern', 'funke'].map((art, i) => { const w = (i / 8) * Math.PI * 2, r = 75 + Math.random() * 18; return { art, ox: Math.cos(w) * r, oy: Math.sin(w) * r, delay: 60 + i * 55, dur: 1500 + Math.random() * 300 }; }),
+      funken: Array.from({ length: ppFxN(32) }, () => { const w = Math.random() * Math.PI * 2, d = 75 + Math.random() * 90, sz = 10 + Math.random() * 16; return { dx: Math.cos(w) * d, dy: Math.sin(w) * d, art: sz < 13 ? 'punkt' : sz < 19 ? 'funke' : Math.random() < 0.5 ? 'hohl' : 'stern', delay: 100 + Math.random() * 400, dur: 800 + Math.random() * 500, farbe: ppHex(['#fad54a', '#fbe181', '#d6bbf1', '#f9ecb3', '#d6b3f9', '#ffffff'][Math.floor(Math.random() * 6)]) }; }),
+      aura: Array.from({ length: ppFxN(14) }, () => ({ startX: -cw / 2 + Math.random() * cw, riseY: -ch * 1.0 - Math.random() * 30, size: 6 + Math.random() * 10, delay: 50 + Math.random() * 600, dur: 1100 + Math.random() * 400, farbe: ppHex(['#ffd066', '#f9ecb3', '#fffbd2', '#fad54a'][Math.floor(Math.random() * 4)]) })),
+    };
+  },
+});
+// ═════════════════════════════════════════════════════════════════
+//  W86r1 · Cosmic Summon (`cosmic_summon`) — PIXELART. Ein schwarz-violettes Portal reißt im Beschwörungsplatz auf: die Leere wächst aus der Mitte (gestufte Dither-Scheibe, schwarzer Kern, violetter
+//  Rand), Sternfunken laufen von außen zur Mitte, ein flieder-weißer Ring weitet sich, am Höhepunkt stiebt Staub nach außen, dann fällt alles zusammen. Reine Dunkelfarben — „aus der Tiefe des Alls
+//  gezogen", keine Feuer-/Eisfamilie.
+// ═════════════════════════════════════════════════════════════════
+const PP_R1_ALL = ['#2e0a51', '#47117e', '#6618b4', '#a040ff', '#d6b3f9', '#ffffff'].map(ppHex);
+const ppR1CosmicSummon = ppR1Leinwand((g, t, sz, teile) => {
+  const S = sz.S, cx = sz.cx, cy = sz.cy, C = PP_R1_ALL, schwarz = ppHex('#000000');
+  // Leere (900 ms): Größe .15 → 1 (35 %) → 1,15 (65 %) → .4; Deckung 0 → .95 → .85 → 0
+  const k = t / 900;
+  if (k >= 0 && k <= 1) {
+    const sk = k < 0.35 ? 0.15 + 0.85 * (k / 0.35) : k < 0.65 ? 1 + 0.15 * ((k - 0.35) / 0.3) : 1.15 - 0.75 * ((k - 0.65) / 0.35), a = k < 0.35 ? 0.95 * (k / 0.35) : k < 0.65 ? 0.95 - 0.1 * ((k - 0.35) / 0.3) : 0.85 * (1 - (k - 0.65) / 0.35);
+    const R = 70 * sk / S;
+    g.glow(cx, cy, R, R, [C[1], C[2], C[0], schwarz], a, 0.9);
+    g.ring(cx, cy, Math.max(0, R - 1.2), R, C[3], a * 0.8);                         // violetter Rand
+  }
+  // Ring (700 ms ab 120 ms): 100 px, Größe .3 → .95 → 1,35 → 1,75; Deckung 0 → .9 → .5 → 0
+  const q = (t - 120) / 700;
+  if (q >= 0 && q <= 1) {
+    const sk = q < 0.3 ? 0.3 + 0.65 * (q / 0.3) : q < 0.6 ? 0.95 + 0.4 * ((q - 0.3) / 0.3) : 1.35 + 0.4 * ((q - 0.6) / 0.4), a = q < 0.3 ? 0.9 * (q / 0.3) : q < 0.6 ? 0.9 - 0.4 * ((q - 0.3) / 0.3) : 0.5 * (1 - (q - 0.6) / 0.4), R = 50 * sk / S;
+    g.ring(cx, cy, Math.max(0, R - 1.2), R, C[4], a);
+    g.ring(cx, cy, Math.max(0, R - 2.4), Math.max(0, R - 1.2), C[5], a * 0.55);
+  }
+  // Sternfunken laufen zur Mitte
+  teile.sterne.forEach((s) => {
+    const f = (t - s.delay) / s.dur;
+    if (f < 0 || f > 1) return;
+    const e = f * f, a = f < 0.25 ? f / 0.25 : 1 - (f - 0.25) / 0.75, r = Math.max(1, Math.round(s.size * (0.6 - 0.45 * f) / S * 1.6));
+    g.block(cx + s.sx * (1 - e) / S - r / 2, cy + s.sy * (1 - e) / S - r / 2, r, r, f < 0.6 ? C[5] : C[4], a);
+  });
+  // Staub (350–500 ms ab): stiebt nach außen
+  teile.staub.forEach((d) => {
+    const f = (t - d.delay) / d.dur;
+    if (f < 0 || f > 1) return;
+    const e = 1 - Math.pow(1 - f, 2), a = f < 0.2 ? 1 : 1 - (f - 0.2) / 0.8, r = Math.max(1, Math.round(d.size * (1.2 - 1.2 * f) / S));
+    g.block(cx + d.dx * e / S - r / 2, cy + d.dy * e / S - r / 2, r, r, d.farbe, a);
+  });
+}, 1200, { breite: 360, hoehe: 360 }, {
+  z: 10100,
+  vorbereiten: () => ({
+    sterne: Array.from({ length: ppFxN(18) }, () => { const w = Math.random() * Math.PI * 2, d = 70 + Math.random() * 60; return { sx: Math.cos(w) * d, sy: Math.sin(w) * d, size: 4 + Math.random() * 6, delay: Math.random() * 220, dur: 420 + Math.random() * 260 }; }),
+    staub: Array.from({ length: ppFxN(12) }, () => { const w = Math.random() * Math.PI * 2, v = 20 + Math.random() * 50; return { dx: Math.cos(w) * v, dy: Math.sin(w) * v, size: 3 + Math.random() * 5, farbe: ppHex(['#c98aff', '#a040ff', '#d6b3f9', '#ffffff', '#7a2bd0'][Math.floor(Math.random() * 5)]), delay: 350 + Math.random() * 150, dur: 400 + Math.random() * 300 }; }),
+  }),
+});
 // <<W86r1-END>>
 
 const ANIM_REGISTRY = {
@@ -14890,7 +14917,7 @@ const ANIM_REGISTRY = {
   snake_bite: SnakeBiteEffect,
   shark_bite: SharkBiteEffect,
   cannibalism_chomp: CannibalismChompEffect,
-  cosmic_summon: CosmicSummonEffect,
+  cosmic_summon: ppR1CosmicSummon,   // W86r1: Pixelart-Leinwand
   // Mini's tutor-summon flair — small purple hearts orbit and rise
   // around the just-placed Creature, signalling "Cute Annoyance Mini
   // pulled this one in for you". Triggered by the rider step in
@@ -26840,176 +26867,7 @@ const ANIM_REGISTRY = {
   //  hero, a confetti-like burst of star + book sparkles
   //  bursting outward, and a final settling pulse. ~1.6s
   //  total runtime.
-  blessed_skill_burst: (() => {
-    return function BlessedSkillBurstEffect({ x, y, w, h }) {
-      const cw = w || 100;
-      const ch = h || 140;
-      // 2 large concentric rings expanding outward
-      const rings = useMemo(() => Array.from({ length: 2 }, (_, i) => ({
-        size: 90 + i * 40,
-        delay: i * 100,
-        dur: 1100 + i * 150,
-      })), []);
-      // Orbital glyphs around the hero — books, scrolls, runes
-      const orbitalGlyphs = ['📜', '🪶', '✦', '✧', '⚛', '🔯', '★', '✶'];
-      const orbitals = useMemo(() => orbitalGlyphs.map((g, i) => ({
-        glyph: g,
-        angle: (i / orbitalGlyphs.length) * Math.PI * 2,
-        radius: 75 + Math.random() * 18,
-        delay: 60 + i * 55,
-        dur: 1500 + Math.random() * 300,
-      })), []);
-      // Star + sparkle confetti bursting outward
-      const sparkles = useMemo(() => Array.from({ length: ppFxN(32) }, () => {
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 75 + Math.random() * 90;
-        return {
-          dx: Math.cos(angle) * dist,
-          dy: Math.sin(angle) * dist,
-          glyph: ['✦', '✧', '⋆', '·', '★', '✩'][Math.floor(Math.random() * 6)],
-          size: 10 + Math.random() * 16,
-          delay: 100 + Math.random() * 400,
-          dur: 800 + Math.random() * 500,
-          color: ['#fad54a', '#fbe181', '#d6bbf1', '#f9ecb3', '#d6b3f9', '#ffffff'][Math.floor(Math.random() * 6)],
-        };
-      }), []);
-      // Rising aura motes — golden sparks lifting up from the bottom of the card
-      const aura = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
-        startX: -cw / 2 + Math.random() * cw,
-        riseY: -ch * 1.0 - Math.random() * 30,
-        size: 6 + Math.random() * 10,
-        delay: 50 + Math.random() * 600,
-        dur: 1100 + Math.random() * 400,
-        color: ['#ffd066', '#f9ecb3', '#fffbd2', '#fad54a'][Math.floor(Math.random() * 4)],
-      })), [cw, ch]);
-      return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          {/* Warm gold-violet halo bathes the hero */}
-          <div style={{
-            position: 'absolute', left: -cw, top: -ch,
-            width: cw * 2, height: ch * 2, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(251,225,129,0.85) 0%, rgba(214,179,249,0.55) 35%, rgba(178,120,237,0.3) 65%, transparent 95%)',
-            opacity: 0,
-            animation: 'blessedHalo 1500ms ease-out 0ms both',
-          }} />
-          {/* Vertical aura column behind the card — beam of gold light from below to above */}
-          <div style={{
-            position: 'absolute', left: -cw * 0.45, top: -ch * 1.1,
-            width: cw * 0.9, height: ch * 2.2,
-            background: 'linear-gradient(to top, rgba(255,208,102,0) 0%, rgba(251,225,129,0.5) 35%, rgba(249,236,179,0.7) 60%, rgba(255,251,210,0.4) 85%, transparent 100%)',
-            opacity: 0,
-            animation: 'blessedColumn 1500ms ease-out 100ms both',
-          }} />
-          {/* Concentric expanding gold rings */}
-          {rings.map((r, i) => (
-            <div key={'bsr' + i} style={{
-              position: 'absolute', left: -r.size, top: -r.size,
-              width: r.size * 2, height: r.size * 2, borderRadius: '50%',
-              border: '4px solid #fad54a',
-              boxShadow: 'inset 0 0 0 4px #fbe181',          // W86r1: harter Innenring statt Weichzeichner-Schein
-              opacity: 0, transform: 'scale(0.3)',
-              animation: `blessedRing ${r.dur}ms ease-out ${r.delay}ms both`,
-            }} />
-          ))}
-          {/* Big rotating mortarboard / scholar emoji at the center */}
-          <div style={{
-            position: 'absolute', left: -50, top: -55,
-            fontSize: 100, lineHeight: 1,
-            textShadow: '4px 0 0 #fad54a, -4px 0 0 #fad54a, 0 4px 0 #fad54a, 0 -4px 0 #fad54a, 8px 0 0 #d6b3f9, -8px 0 0 #d6b3f9, 0 8px 0 #d6b3f9, 0 -8px 0 #d6b3f9',
-            opacity: 0, transform: 'scale(0.4)',
-            animation: 'blessedGlyph 1400ms cubic-bezier(0.34, 1.56, 0.64, 1) 80ms both',
-          }}>🎓</div>
-          {/* Orbital scholar glyphs */}
-          {orbitals.map((o, i) => {
-            const ox = Math.cos(o.angle) * o.radius;
-            const oy = Math.sin(o.angle) * o.radius;
-            return (
-              <div key={'bso' + i} style={{
-                position: 'absolute', left: ox - 14, top: oy - 14,
-                fontSize: 26,
-                color: '#fffbd2',
-                textShadow: '2px 0 0 #fad54a, -2px 0 0 #fad54a, 0 2px 0 #fad54a, 0 -2px 0 #fad54a',
-                opacity: 0,
-                animation: `blessedOrbital ${o.dur}ms ease-in-out ${o.delay}ms both`,
-                '--bsoStartX': '0px',
-                '--bsoStartY': '0px',
-                '--bsoEndX': (-ox * 0.2) + 'px',
-                '--bsoEndY': (-oy * 0.2) + 'px',
-              }}>{o.glyph}</div>
-            );
-          })}
-          {/* Sparkle confetti bursting outward */}
-          {sparkles.map((s, i) => (
-            <div key={'bss' + i} style={{
-              position: 'absolute', left: 0, top: 0,
-              fontSize: s.size,
-              color: s.color,
-              textShadow: '1px 1px 0 #7a2bd0',
-              opacity: 0, transform: 'translate(0,0) scale(0.3)',
-              animation: `blessedSparkle ${s.dur}ms ease-out ${s.delay}ms both`,
-              '--bsDx': s.dx + 'px',
-              '--bsDy': s.dy + 'px',
-            }}>{s.glyph}</div>
-          ))}
-          {/* Rising gold motes from below the card */}
-          {aura.map((a, i) => (
-            <div key={'bsa' + i} style={{
-              position: 'absolute', left: a.startX - a.size / 2,
-              top: ch * 0.5 + 10,
-              width: a.size, height: a.size, borderRadius: '50%',
-              background: a.color,
-              opacity: 0,
-              animation: `blessedAura ${a.dur}ms ease-out ${a.delay}ms both`,
-              '--bsaRise': a.riseY + 'px',
-            }} />
-          ))}
-          <style>{`
-            @keyframes blessedHalo {
-              0%   { opacity: 0; transform: scale(0.4); }
-              25%  { opacity: 1; transform: scale(1); }
-              80%  { opacity: 0.85; transform: scale(1.08); }
-              100% { opacity: 0; transform: scale(1.15); }
-            }
-            @keyframes blessedColumn {
-              0%   { opacity: 0; transform: scaleY(0.3); }
-              25%  { opacity: 1; transform: scaleY(1.1); }
-              70%  { opacity: 0.85; transform: scaleY(1); }
-              100% { opacity: 0; transform: scaleY(0.95); }
-            }
-            @keyframes blessedRing {
-              0%   { opacity: 0; transform: scale(0.3); }
-              25%  { opacity: 1; transform: scale(0.85); }
-              100% { opacity: 0; transform: scale(2.4); }
-            }
-            @keyframes blessedGlyph {
-              0%   { opacity: 0; transform: scale(0.4); }
-              35%  { opacity: 1; transform: scale(1.25); }
-              65%  { opacity: 1; transform: scale(1); }
-              100% { opacity: 0; transform: scale(0.85); }
-            }
-            @keyframes blessedOrbital {
-              0%   { opacity: 0; transform: translate(var(--bsoStartX), var(--bsoStartY)) scale(0.4); }
-              30%  { opacity: 1; transform: translate(var(--bsoStartX), var(--bsoStartY)) scale(1.15); }
-              80%  { opacity: 0.9; transform: translate(calc(var(--bsoEndX) * 0.8), calc(var(--bsoEndY) * 0.8)) scale(1); }
-              100% { opacity: 0; transform: translate(var(--bsoEndX), var(--bsoEndY)) scale(0.7); }
-            }
-            @keyframes blessedSparkle {
-              0%   { opacity: 0; transform: translate(0,0) scale(0.3); }
-              25%  { opacity: 1; transform: translate(calc(var(--bsDx) * 0.3), calc(var(--bsDy) * 0.3)) scale(1.1); }
-              80%  { opacity: 1; transform: translate(calc(var(--bsDx) * 0.85), calc(var(--bsDy) * 0.85)) scale(0.9); }
-              100% { opacity: 0; transform: translate(var(--bsDx), var(--bsDy)) scale(0.5); }
-            }
-            @keyframes blessedAura {
-              0%   { opacity: 0; transform: translateY(0) scale(0.5); }
-              20%  { opacity: 1; transform: translateY(calc(var(--bsaRise) * 0.2)) scale(1.1); }
-              80%  { opacity: 0.9; transform: translateY(calc(var(--bsaRise) * 0.85)) scale(1); }
-              100% { opacity: 0; transform: translateY(var(--bsaRise)) scale(0.4); }
-            }
-          `}</style>
-        </div>
-      );
-    };
-  })(),
+  blessed_skill_burst: R1BlessedLeinwand,   // Divine Gift of Skill — W86r1: Pixelart-Leinwand
 
   // ── Petrify (Medusa's Curse) ──────────────────────────────
   //  Target gains a grey stone overlay with a subtle speckle/

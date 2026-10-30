@@ -349,12 +349,6 @@
  "kf:crescentReapSkull": {
   "drehung": 3
  },
- "kf:criticalSlashA": {
-  "drehung": 2
- },
- "kf:criticalSlashB": {
-  "drehung": 2
- },
  "kf:crossSideBolt": {
   "drehung": 2
  },
@@ -598,9 +592,6 @@
  },
  "kf:pp-glitzer-flug": {
   "drehung": 1
- },
- "kf:pp-invest-coin-drop": {
-  "drehung": 2
  },
  "kf:ppCerBand": {
   "drehung": 2
