@@ -16,7 +16,7 @@ Was im Sprite ist (Koordinaten im Sprite 27×28, x/y ab 0):
 Fest bleiben: Umriss, Form der Arme (nur ganze Zeilen werden versetzt), Augen.
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
-* Tentakel (Periode 24, rechts um ~46° versetzt zur linken Gruppe — rein gegenläufig würden sich die Gruppen berühren): jede Gruppe pendelt für sich — Zeilenversatz mit nach unten wachsendem Gewicht (oben am „Kopf“ fest, an den Spitzen ±2 px, die Spitze hinkt nach); wo zwei Nachbarzeilen
+* Tentakel (Periode 24, rechts um ~40° versetzt zur linken Gruppe — rein gegenläufig würden sich die Gruppen berühren): jede Gruppe pendelt für sich — Zeilenversatz mit nach unten wachsendem Gewicht (oben am „Kopf“ fest, an den Spitzen ±2 px, die Spitze hinkt nach); wo zwei Nachbarzeilen
   einer Gruppe bei verschiedenem Versatz nicht 4-verbunden blieben, teilen sie sich den Versatz. Jede Gruppe bleibt ein 4-verbundenes Teil.
 * Blinzeln (zweimal je Schleife, Frames 13–15 und 37–39: halb – Linie – halb): die Augen haben keinen Körper hinter sich (der Hintergrund ist leer, also keine Lidfarbe), deshalb verengen sie sich auf einen
   4×2-Streifen (Kreiszeilen 0 und 3 entfallen) und dann auf eine 4×1-Linie (nur Kreiszeile 1) und gehen wieder auf; der helle Kern (F) wird dabei zum Ringrot E, denn er läge sonst am Rand — nur Augenpixel, nur Farben der Quelle. Beide Augen blinzeln gemeinsam.
@@ -57,7 +57,7 @@ Y_TOP = int(np.nonzero(GRP['L'].any(axis=1))[0].min())                          
 Y_BOT = int(np.nonzero(GRP['L'].any(axis=1))[0].max())
 
 AMP = 1.0
-PHASE_R = 0.8                                                                       # Phasenversatz der rechten Gruppe (gegenläufig würden sich die Gruppen berühren: Lücke nur 3 px)
+PHASE_R = 0.7                                                                       # Phasenversatz der rechten Gruppe (gegenläufig würden sich die Gruppen berühren: Lücke nur 3 px)
 LAG = 1.0
 BLINK = {13: 1, 14: 3, 15: 1, 37: 1, 38: 3, 39: 1}                                   # 1 = halb (Kreiszeilen 1–2), 3 = Linie (Kreiszeile 1)
 
@@ -130,7 +130,13 @@ if __name__ == '__main__':
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
     ref = L.platz(spr, H, W, PAD_L, PAD_T)
     print('Frame 0 weicht vom Original in', int((frames[0] != ref).any(axis=2).sum()), 'Pixeln ab')
-    # die beiden Tentakelgruppen dürfen sich nie berühren (mindestens 1 leere Spalte zwischen ihnen in jeder Zeile)
+    # die beiden Tentakelgruppen dürfen sich nie berühren (auch nicht über die Ecke): 4 getrennte 8-Komponenten je Frame
+    import cv2 as _cv2
+    for i in range(N):
+        n8 = _cv2.connectedComponents((figs[i][..., 3] > 0).astype(np.uint8), connectivity=8)[0] - 1
+        if n8 != 4:
+            print('Teile berühren sich in Frame', i, '(8-Komponenten:', n8, ')')
+    # zusätzlich: mindestens 1 leere Spalte zwischen den Gruppen in jeder Zeile
     for i in range(N):
         dl, dr = _dx_gruppe('L', i), _dx_gruppe('R', i)
         for y in range(sh):

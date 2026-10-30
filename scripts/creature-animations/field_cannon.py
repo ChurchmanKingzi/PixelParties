@@ -18,7 +18,7 @@ Fest bleiben: Rad, Mittelstück des Laufs (x 27–38), Schaftform des Wischers, 
 
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, Flamme und Funken ausgenommen):
 * Lauf wippt wie auf einer Wippe um das Rad (Periode 48, einmal pro Schleife): die Mündung (x ≥ 39) hebt sich bis 2 px und senkt sich, das Heck samt Lunte (x ≤ 26) macht 1 px gegenläufig mit; Rad und Lauf über dem Rad stehen.
-  Die Mündungsspalten verschieben sich gestaffelt (Abstand zum Rad), der Lauf ist mehr als 2 Zeilen dick, so bleibt er im 4er-Zusammenhang.
+  Die Mündungsspalten verschieben sich gestaffelt in 3er-Gruppen (Abstand zum Rad; kein 1-px-Zacken an der Oberkante), der Lauf ist mehr als 2 Zeilen dick, so bleibt er im 4er-Zusammenhang.
 * Brennende Lunte (Regel 15): die Flamme (Gelb (255,255,0) mit hellem Kern (255,255,203); mehr Farben hat der Sprite nicht, Rand/Rot/Orange im Modul gleich Gelb) wird mit anim_feuer.py NEU gezeichnet, Fuß fest auf der Lunte,
   Spitzen reißen als runde Funken ab; die Flamme steigt/sinkt mit dem Heck. Frame 0 weicht in der Flamme vom Original ab (acht Pixel → kleine bewegte Flamme); der Rest ist exakt das Original.
 * Der Wischer nickt: der Kopf (y 0–8) schiebt sich als Block 1 px nach links/rechts (Periode 24, zweimal pro Schleife), der Schaft steht.
@@ -65,7 +65,7 @@ assert (wischer | kanone | flamme_alt).sum() == vorhanden.sum() and not (wischer
 # --- Flamme an der Lunte (anim_feuer): nur Gelb und helles Gelb stehen im Sprite ---
 RAMPE = {'rand': GELB, 'rot': GELB, 'orange': GELB, 'gelb': GELB, 'hell': HELL}
 SPERRE = np.zeros((H, W), bool)
-SPERRE[GPT:GPT + sh, GPL:GPL + sw] = kanone                               # Lunte und Kanone stehen fest, die Flamme sitzt darüber
+SPERRE[GPT:GPT + sh, GPL:GPL + sw] = kanone & (xx <= 17) & (yy <= 8)       # nur das oberste Lunten-Pixel (15, 8) trägt die Flamme (die schräge Lunte darunter bleibt unberührt: anim_feuer würde sie sonst mit Brückenpixeln 4-verbinden)
 ZUNGEN = [FEU.Zunge(15.0 + GPL, 7 + GPT, 4.6, 1.6)]
 FEUER = FEU.Feuer(H, W, ZUNGEN, RAMPE, n=N, seed=3, posen=12, amplitude=0.6, sperre=SPERRE)
 
@@ -88,12 +88,13 @@ KOPF_A, SCHAFT_A, KANONE_A = teil(wischer_kopf), teil(wischer_schaft), teil(kano
 
 
 def front_wippe(a, s):
-    """Mündungsspalten (x ≥ 39) heben sich gestaffelt: Versatz round(2·s·(Abstand zum Rad)/Breite), aufwärts positiv."""
+    """Mündungsspalten (x ≥ 39) heben sich gestaffelt in 3er-Gruppen (kein 1-px-Zacken an der Oberkante): Versatz round(2·s·Gruppe/3), aufwärts positiv."""
     out = L.leer(*a.shape[:2])
     cols = [x for x in range(a.shape[1]) if a[:, x, 3].any()]
-    x0, x1 = min(cols), max(cols)
+    x0 = min(cols)
     for x in cols:
-        dy = -int(round(2.0 * s * (x - x0 + 1) / (x1 - x0 + 1)))
+        g = (x - x0) // 3 + 1
+        dy = -int(round(2.0 * s * min(g, 3) / 3.0))
         for y in np.nonzero(a[:, x, 3])[0]:
             out[y + dy, x] = a[y, x]
     return out
