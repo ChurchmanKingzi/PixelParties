@@ -21,7 +21,7 @@ Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Blinzeln (zweimal je Schleife, Frames 13–15 und 37–39: halb – Linie – halb): die Augen haben keinen Körper hinter sich (der Hintergrund ist leer, also keine Lidfarbe), deshalb verengen sie sich auf einen
   4×2-Streifen (Kreiszeilen 0 und 3 entfallen) und dann auf eine 4×1-Linie (nur Kreiszeile 1) und gehen wieder auf; der helle Kern (F) wird dabei zum Ringrot E, denn er läge sonst am Rand — nur Augenpixel, nur Farben der Quelle. Beide Augen blinzeln gemeinsam.
 Ergänzungen: keine (Umriss und Verbindungen entstehen nur aus Zeilenversatz).
-Frame: Sprite plus 4 px links/rechts (Pendeln ±2 + 2 px Rand), 2 px oben, 2 px unten — Figur zentriert.
+Frame: Sprite plus 3 px links/rechts (die Spitzen schwingen höchstens 1 px nach außen), 2 px oben, 2 px unten — Figur zentriert.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
@@ -33,7 +33,7 @@ import anim_lib as L
 import anim_amorph as A
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 2, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 2, 2
 
 spr = L.lade('the-thing-in-the-ship')
 sh, sw = spr.shape[:2]
