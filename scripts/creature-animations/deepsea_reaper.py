@@ -94,16 +94,39 @@ SAUM_A = [teil(m) for m in SAUM]
 
 
 def fluegel(a, pivot_x, amp, ph, breite=2):
-    """Flügelschlag wie `L.spalten_welle`, aber je `breite` Spalten (vom Gelenk aus gezählt) mit gleichem Versatz: so zerreißt keine 1-px-dünne Stelle im 4er-Zusammenhang."""
+    """Flügelschlag wie `L.spalten_welle`, aber je `breite` Spalten (vom Gelenk aus gezählt) mit gleichem Versatz. Verliert ein Spaltenpaar, das im Ruhebild waagerecht aneinander lag, durch die
+    verschiedenen Versätze den 4er-Zusammenhang (dünne Flügelspitzen), wird die äußere Spalte um ein Pixel bis zur inneren verlängert (Farbe = ihr nächstes Pixel) — die Spitze reißt nicht ab."""
     out = L.leer(*a.shape[:2])
     cols = [x for x in range(a.shape[1]) if a[:, x, 3].any()]
     maxd = max(abs(x - pivot_x) for x in cols)
+    dys = {}
     for x in cols:
         d = abs(x - pivot_x)
         frac = min(1.0, ((d // breite) * breite + breite / 2.0) / maxd) if d >= breite else 0.0
-        dy = int(round(amp * math.sin(ph) * frac))
+        dys[x] = int(round(amp * math.sin(ph) * frac))
         for y in np.nonzero(a[:, x, 3])[0]:
-            out[y + dy, x] = a[y, x]
+            out[y + dys[x], x] = a[y, x]
+    # Reparatur: von innen nach außen
+    step = -1 if min(cols) < pivot_x else 1
+    for x in sorted(cols, key=lambda c: abs(c - pivot_x)):
+        xi = x - step                                              # innere Nachbarspalte
+        if xi not in dys or dys[xi] == dys[x]:
+            continue
+        r_in = set(np.nonzero(a[:, xi, 3])[0].tolist())
+        r_out = set(np.nonzero(a[:, x, 3])[0].tolist())
+        if not (r_in & r_out):
+            continue                                               # lag im Ruhebild nicht waagerecht aneinander
+        s_in = {y + dys[xi] for y in r_in}
+        s_out = {y + dys[x] for y in r_out}
+        if s_in & s_out:
+            continue
+        # nächstes Paar (Zeile außen, Zeile innen) suchen und die Lücke in der äußeren Spalte füllen
+        yo, yi = min(((o, i_) for o in s_out for i_ in s_in), key=lambda t: abs(t[0] - t[1]))
+        lo, hi = sorted((yo, yi))
+        quelle = yo - dys[x]
+        for y in range(lo, hi + 1):
+            if not out[y, x, 3]:
+                out[y, x] = a[quelle, x]
     return out
 
 

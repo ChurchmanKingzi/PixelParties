@@ -294,3 +294,39 @@ def kontakt(pfad, tafeln, scale=10, hintergrund=(40, 30, 70), spalten=3, zoom=No
         sh.paste(im, ((k % spalten) * (bw + 4), (k // spalten) * (bh + 4)))
     sh.save(pfad)
     return pfad
+
+
+# ── Scherungen mit Spitzenschutz (Monkees, Flügel, Arme) ────────────────────────────────────────────────────
+def biegen_spalten(a, pivot_x, amp, phase, potenz=1.0, bias=0.0):
+    """Wie L.spalten_welle (Spalte wandert um round((amp · sin(phase) + bias) · Abstandsanteil^potenz), positiv = nach unten), aber die äußerste Spalte
+    bekommt den Anteil ihrer Nachbarspalte: ein einzelnes Spitzenpixel (Flügel-/Armspitze) bliebe sonst bei einem Rundungsunterschied nur diagonal hängen."""
+    out = L.leer(*a.shape[:2])
+    h = a.shape[0]
+    cols = [x for x in range(a.shape[1]) if a[:, x, 3].any()]
+    maxd = max(abs(x - pivot_x) for x in cols)
+    for x in cols:
+        frac = min(abs(x - pivot_x), max(1, maxd - 1)) / float(maxd)
+        dy = int(round((amp * math.sin(phase) + bias) * frac ** potenz))
+        ys = np.nonzero(a[:, x, 3])[0]
+        if ys.min() + dy < 0 or ys.max() + dy >= h:
+            raise L.ClipError(f'Spalte {x} würde um {dy} px aus der Leinwand geschoben')
+        for y in ys:
+            out[y + dy, x] = a[y, x]
+    return out
+
+
+def scherung_zeilen(a, y_lo, y_hi, pivot_y, amp, v):
+    """Zeilen y_lo…y_hi wandern waagerecht um round(amp · f · v), f = |y − pivot|/größter Abstand in diesem Bereich; alle anderen Zeilen bleiben stehen."""
+    out = L.leer(*a.shape[:2])
+    h, w = a.shape[:2]
+    maxd = max(1, max(abs(y - pivot_y) for y in range(y_lo, y_hi + 1)))
+    for y in range(h):
+        xs_ = np.nonzero(a[y, :, 3])[0]
+        if not len(xs_):
+            continue
+        dx = int(round(amp * (abs(y - pivot_y) / maxd) * v)) if y_lo <= y <= y_hi else 0
+        if xs_.min() + dx < 0 or xs_.max() + dx >= w:
+            raise L.ClipError(f'Zeile {y} würde um {dx} px aus der Leinwand geschoben')
+        for x in xs_:
+            out[y, x + dx] = a[y, x]
+    return out
