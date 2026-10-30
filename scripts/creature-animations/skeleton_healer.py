@@ -74,7 +74,7 @@ PUFFS1 = [
     dict(x=P(28, 19)[0], y=P(28, 19)[1], vx=-8, vy=-8, off=0, form='o', wackeln=1),      # aus der Brust des Patienten zur Hand des Heilers
     dict(x=P(24, 19)[0], y=P(24, 19)[1], vx=-5, vy=-6, off=24, form='o', wackeln=1),
     dict(x=P(18, 13)[0], y=P(18, 13)[1], vx=2, vy=-9, off=6, form='o', wackeln=1),       # von der erhobenen Hand
-    dict(x=P(1, 22)[0], y=P(1, 22)[1], vx=-1, vy=-7, off=30, form='o', wackeln=1),       # vom Handschuh unten links
+    dict(x=P(3, 22)[0], y=P(3, 22)[1], vx=-1, vy=-7, off=30, form='o', wackeln=1),       # vom Handschuh unten links
 ]
 PUFFS2 = [
     dict(x=P(32, 19)[0], y=P(32, 19)[1], vx=-6, vy=-9, off=12, form='k', wackeln=1),
