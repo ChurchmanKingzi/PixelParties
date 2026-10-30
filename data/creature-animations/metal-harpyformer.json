@@ -1,0 +1,15 @@
+{
+  "creature": "Metal Harpyformer",
+  "sheet": "metal-harpyformer.png",
+  "frameWidth": 34,
+  "frameHeight": 61,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 17.0
+}
