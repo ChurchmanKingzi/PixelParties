@@ -19,6 +19,7 @@ Identifikation (Sprite 24×23, goldgelbe Hirschkuh im Profil, schaut nach RECHTS
 Bleibt fest: Rumpf, Hinterbeine, Nase, Halsstreifen.
 
 Ablauf (48 Frames à 66 ms = 3,2 s), alle Bewegungen unabhängig:
+* Kopf nickt (Periode 16, 3× pro Schleife): die Kopfzeilen 0–7 wandern waagerecht, je höher desto mehr (bis ±1 px; benachbarte Zeilen höchstens 1 px Unterschied); Rücken (ab Zeile 8) bleibt.
 * Ohr zuckt (Frames 4–6, 20–22 und 36–38): die Ohrzeilen 0–1 kippen 1 px nach hinten (links); Ohr (Zeile 2) und Kopf bleiben.
 * Blinzeln (Frames 12–15 und 30–33): die Augenpixel (weiß + grün) schließen sich in der Fellfarbe (oben D, unten C) — Lid = Fellfarbe; erst die untere Augenzeile, dann beide, dann wieder auf.
 * Schreckhüpfer (Frames 8–10 und 26–28): das ganze Tier hebt kurz 1–2 px ab (Pattern 1-2-1) und landet wieder; „elusive“ = scheu.
@@ -28,6 +29,7 @@ Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur g
 
 Ergänzungen: Randpixel-Korrektur (Regel 16); sonst keine gemalten Pixel.
 """
+import math
 import sys
 
 import numpy as np
@@ -36,7 +38,7 @@ import anim_lib as L
 import anim_tiere as T
 
 N, MS = 48, 66
-PAD_L, PAD_R, PAD_T, PAD_B = 2, 2, 4, 2
+PAD_L, PAD_R, PAD_T, PAD_B = 2, 3, 4, 2
 
 spr = L.lade('elusive-hind')
 sh, sw = spr.shape[:2]
@@ -79,9 +81,11 @@ def gesicht(k, i):
 
 def frame(i, nur=None):
     hub = HUEPF.get(i, 0)
+    v = math.sin(L.sinus(i, 16))
     k = teil(koerper)
     gesicht(k, i)
-    o = teil(ohr)
+    k = T.scherung_zeilen(k, PAD_T + 0, PAD_T + 7, PAD_T + 8, 1.4, v)                          # Kopf nickt (Zeilen 0–7 wandern, Zeile 8 bleibt)
+    o = T.scherung_zeilen(teil(ohr), PAD_T + 0, PAD_T + 7, PAD_T + 8, 1.4, v)
     if i in OHR:
         o = L.versetze(o, -1, 0)
     bv = teil(bein_v)
