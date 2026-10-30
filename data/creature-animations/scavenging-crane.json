@@ -1,15 +1,15 @@
 {
   "creature": "Scavenging Crane",
   "sheet": "scavenging-crane.png",
-  "frameWidth": 43,
-  "frameHeight": 30,
+  "frameWidth": 36,
+  "frameHeight": 28,
   "frames": 48,
   "frameMs": 65,
   "loop": true,
   "layout": "horizontal",
   "padTop": 2,
-  "padLeft": 5,
-  "padRight": 7,
-  "padBottom": 4,
-  "faceX": 21.5
+  "padLeft": 3,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 18.0
 }

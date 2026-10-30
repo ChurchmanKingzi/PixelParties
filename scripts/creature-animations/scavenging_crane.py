@@ -40,7 +40,7 @@ import anim_flieger as F
 import anim_flieger_b as B
 
 N, MS = 48, 65
-PAD_L, PAD_R, PAD_T, PAD_B = 6, 7, 3, 4
+PAD_L, PAD_R, PAD_T, PAD_B = 4, 2, 3, 2
 
 spr = L.lade('scavenging-crane')
 sh, sw = spr.shape[:2]
