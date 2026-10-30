@@ -11272,7 +11272,6 @@ function TextBox() {
           <div className={'textbox-portrait textbox-portrait-left' + (hasRight && activeSide !== 'left' ? ' textbox-portrait-inactive' : '') + (leftExiting ? ' textbox-portrait-exit-left' : '')}>
             <div className={'textbox-portrait-frame' + (page?.tackle && tackleAus ? ' textbox-portrait-ankunft' : '')}>
               <img src={linksPortrait} alt={leftName || ''} draggable={false} />
-              {[...Array(8)].map((_, i) => <span key={i} className="textbox-sparkle" style={{ animationDelay: (i * 0.35) + 's', top: [10,60,5,50,30,65,15,45][i] + '%', left: [5,70,55,10,80,35,90,60][i] + '%' }} />)}
             </div>
             {leftName && <span className="textbox-speaker-name">{leftName}</span>}
           </div>
@@ -11296,7 +11295,6 @@ function TextBox() {
           <div className={'textbox-portrait textbox-portrait-right' + (activeSide !== 'right' ? ' textbox-portrait-inactive' : '') + (rightExiting ? ' textbox-portrait-exit' : '')}>
             <div className="textbox-portrait-frame">
               <img src={opts.rightSpeaker} alt={opts.rightSpeakerName || ''} draggable={false} />
-              {[...Array(8)].map((_, i) => <span key={i} className="textbox-sparkle" style={{ animationDelay: (i * 0.25 + 0.1) + 's', top: [15,55,8,48,35,62,20,42][i] + '%', left: [8,65,50,15,75,30,85,55][i] + '%' }} />)}
             </div>
             {rightName && <span className="textbox-speaker-name">{rightName}</span>}
           </div>

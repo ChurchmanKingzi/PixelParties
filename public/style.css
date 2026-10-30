@@ -15984,26 +15984,6 @@ body:has(.textbox-overlay) .tooltip {
   image-rendering: pixelated;
   filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, .55));
 }
-/* Funken als Pixel-Kreuze statt weicher Punkte. */
-.textbox-sparkle {
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  background:
-    linear-gradient(#fff, #fff) center / 2px 6px no-repeat,
-    linear-gradient(#fff, #fff) center / 6px 2px no-repeat;
-  filter: drop-shadow(0 0 2px color-mix(in srgb, var(--tb-seite) 85%, transparent));
-  pointer-events: none;
-  animation: textbox-sparkle-anim 2.1s steps(7, end) infinite;
-  opacity: 0;
-}
-@keyframes textbox-sparkle-anim {
-  0%   { opacity: 0; transform: scale(0) translateY(0); }
-  15%  { opacity: 1; transform: scale(1.2) translateY(-2px); }
-  40%  { opacity: 1; transform: scale(0.8) translateY(-6px); }
-  70%  { opacity: 0.4; transform: scale(0.5) translateY(-10px); }
-  100% { opacity: 0; transform: scale(0) translateY(-14px); }
-}
 /* Namensschild: kleines Pixel-Plaettchen in der Seitenfarbe. */
 .textbox-speaker-name {
   font-family: 'Pixel Intv', 'Press Start 2P', monospace;
@@ -16324,7 +16304,6 @@ body:has(.textbox-overlay) .tooltip {
   .textbox { width: min(600px, calc(94 * var(--vw))); }
   .textbox-portrait { width: 88px; padding: 8px 6px 6px; gap: 6px; }
   .textbox-portrait-frame { width: 56px; height: 56px; }
-  .textbox-sparkle { width: 4px; height: 4px; }
   .textbox-speaker-name { font-size: 7px; letter-spacing: 1px; padding: 3px 4px 2px; }
   .textbox-body { padding: 10px 14px 6px; min-height: 80px; }
   .textbox-text { font-size: 14px; }
