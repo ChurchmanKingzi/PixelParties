@@ -91,6 +91,23 @@ def zustand(i):
     return hub, streck, ohr_li, ohr_re, ph, ZUNGE.get(i, 0)
 
 
+def biegen(a, pivot, amp, phase):
+    """Wie L.spalten_welle (Spalte wandert um round(amp · sin(phase) · Abstandsanteil)), aber die äußerste Spalte bekommt den Anteil ihrer Nachbarspalte: das einzelne
+    Spitzenpixel des Stabs bliebe sonst bei einem Rundungsunterschied nur diagonal am Stab hängen (4er-Zusammenhang)."""
+    out = L.leer(*a.shape[:2])
+    h = a.shape[0]
+    cols = [x for x in range(a.shape[1]) if a[:, x, 3].any()]
+    maxd = max(abs(x - pivot) for x in cols)
+    for x in cols:
+        dy = int(round(amp * math.sin(phase) * min(abs(x - pivot), maxd - 1) / maxd))
+        ys = np.nonzero(a[:, x, 3])[0]
+        if ys.min() + dy < 0 or ys.max() + dy >= h:
+            raise L.ClipError(f'Spalte {x} würde um {dy} px aus der Leinwand geschoben')
+        for y in ys:
+            out[y + dy, x] = a[y, x]
+    return out
+
+
 def ohr_biegen(t, pivot, dy_amp):
     """Ohrspitzen wandern senkrecht: je weiter vom Ansatz (pivot), desto stärker (round(amp · Abstandsanteil)); Ansatz bleibt."""
     return L.spalten_welle(t, pivot, dy_amp, math.pi / 2)
@@ -105,8 +122,8 @@ def frame(i, nur=None):
     k = L.streck_zeile(k, ZEILE_STRECK, streck)                    # Hocke (−1) / Strecken (+1); alles darüber bewegt sich, die Füße bleiben
     ol = ohr_biegen(teil(ohr_l), PAD_L + 10, 2.0 * ohr_li) if ohr_li else teil(ohr_l)
     orr = ohr_biegen(teil(ohr_r), PAD_L + 17, 2.0 * ohr_re) if ohr_re else teil(ohr_r)
-    al = L.spalten_welle(teil(arm_l), PAD_L + 9, 3.0, ph)
-    ar = L.spalten_welle(teil(arm_r), PAD_L + 18, 3.0, ph + math.pi)
+    al = biegen(teil(arm_l), PAD_L + 9, 3.0, ph)
+    ar = biegen(teil(arm_r), PAD_L + 18, 3.0, ph + math.pi)
     ebenen = {'koerper': (k, 0, 0), 'ohr_l': (ol, 0, -streck), 'ohr_r': (orr, 0, -streck), 'arm_l': (al, 0, -streck), 'arm_r': (ar, 0, -streck)}
     wahl = nur or ('koerper', 'ohr_l', 'ohr_r', 'arm_l', 'arm_r')
     ganz = L.zusammen(H, W, [(ebenen[n][0], 0, ebenen[n][2] - hub) for n in wahl])

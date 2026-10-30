@@ -154,7 +154,7 @@ def _arm_ebene(fig, seite, top, i):
     return rest, out
 
 
-def _fuss_ebene(fig, seite, hoch):
+def _fuss_ebene(fig, seite):
     """Zehenklaue (Zeilen 29–32 der Quelle am Boden) um 1 px heben."""
     boden = BODEN
     y0, y1 = boden - (FUSS_ZEILEN[1] - FUSS_ZEILEN[0]), boden
@@ -174,19 +174,14 @@ def figur(i):
     koerper = A.zeilen_von(sp, 0, sh - 1, H, W, PAD_L, PAD_T)
     z, quelle = A.koerper_pose(koerper, doppeln=POSEN[S[i]], p=0, x0=PAD_L)
     fig, top = A.auf_leinwand(z, H, BODEN, 0)
-    fig_start = fig
-    ebenen_roh = []
+    rest, teile = fig, []
     for seite in ('l', 'r'):
-        fig_start, arm = _arm_ebene(fig_start, seite, top, i)
-        ebenen_roh.append(arm)
+        rest, arm = _arm_ebene(rest, seite, top, i)
+        teile.append((arm, 0, 0))
     for seite, lift in (('l', LIFT_L), ('r', LIFT_R)):
-        fig_start, fuss = _fuss_ebene(fig_start, seite, i in lift)
-        ebenen_roh.append((fuss, -1 if i in lift else 0))
-    ebenen = [(fig_start, 0, 0), (ebenen_roh[0], 0, 0), (ebenen_roh[1], 0, 0), (ebenen_roh[2][0], 0, ebenen_roh[2][1]), (ebenen_roh[3][0], 0, ebenen_roh[3][1])]
-    fin = L.zusammen(H, W, ebenen)
-    klaue = np.zeros((H, W), bool)
-    for (_, _, _) in ebenen[3:]:
-        pass
+        rest, fuss = _fuss_ebene(rest, seite)
+        teile.append((fuss, 0, -1 if i in lift else 0))
+    fin = L.zusammen(H, W, [(rest, 0, 0)] + teile)
     fin, neu = A.umriss_ergaenzen(fin, RAND_FARBEN, lambda x, y: UMRISS_KLAUE if (y >= BODEN - 4 or x < PAD_L + 6 or x > PAD_L + sw - 7) else UMRISS_ROT)
     fin, pfad, offen = A.verbinde_luecken8(fin, 3)
     return dict(fig=fin, top=top, neu=neu, pfad=pfad, offen=offen)
