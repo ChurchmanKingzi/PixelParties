@@ -1,0 +1,15 @@
+{
+  "creature": "Cats of the Pharaoh",
+  "sheet": "cats-of-the-pharaoh.png",
+  "frameWidth": 20,
+  "frameHeight": 18,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 10.0
+}

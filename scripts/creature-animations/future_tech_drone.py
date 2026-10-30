@@ -17,13 +17,15 @@ Ablauf (48 Frames à 60 ms = 2,88 s):
 * Feuer (Regel 15) mit dem Modul anim_feuer.py (unverändert benutzt): beide Düsenflammen werden neu gezeichnet — verschachtelte Zungen aus fünf Farbschichten (Außenhaut/rot, orange, gelb, cremeweißer Kern),
   jede Schicht mit eigener Höhe, Breite und seitlicher Verschiebung je Pose; die Zungen biegen sich, wachsen und schrumpfen, je Zunge eine eigene Posenfolge (12 Posen à 2–3 Frames, nahtlos).
   Weil die Flamme nach unten brennt, läuft das Modul auf einer senkrecht gespiegelten Leinwand (Fuß oben am Gehäuse) und das Ergebnis wird zurückgespiegelt; abgerissene Spitzen fallen als Funken (1 px, Feuerfunken)
-  nach unten und kühlen ab (cremeweiß → gelb → orange → rot). Das Gehäuse und die Flammenfüße (Zeile 2) stehen fest. Frame 0 weicht in der Flamme vom Original ab (neu gezeichnet), das Gehäuse ist exakt das Original.
+  nach unten und kühlen ab (cremeweiß → gelb → orange → rot). Das Gehäuse steht fest; die Fußzeile der Flammen (Sprite-Zeile 2, direkt unter dem grauen Band) hat immer genau die Breite der Original-Düsen
+  (x 1–6 und 10–15), damit das Band nie freiliegt (Regel 16). Die Brückenpixel, die das Feuermodul unter dem Gehäuse setzen würde (es macht alles 4-verbunden), werden entfernt: die Standbeine hängen im Original nur
+  diagonal (8-verbunden) am Gehäuse und bleiben so. Frame 0 weicht in der Flamme vom Original ab (neu gezeichnet; Feuer ist ausgenommen), das Gehäuse in Frame 0 ist exakt das Original.
 * Schwebe-Bob zweistufig bis 2 px nach oben (0 → 1 → 2 → 1 → 0, Periode 12) mit Flamme und Funken; die Standbeine bleiben am Gehäuse.
 * Glanz nur auf dem Metall (Regel 14): ein dezentes Lichtband (eine Stufe heller) läuft alle 24 Frames über die grauen Gehäuseflächen (Querband und Linsenrahmen). Rand, Flammen und Auge glänzen nicht.
-* Das rote Leuchtauge pulsiert im Takt der Bob-Periode (eine Stufe heller/dunkler auf der Rot-Rampe, Warnlampe), Rand bleibt unverändert. Keine Flügel im Sprite (die Flammen sind die Antriebe), keine weiteren Partikel.
+* Das rote Leuchtauge pulsiert im Takt der Bob-Periode (eine Stufe heller/dunkler auf der Rot-Rampe, Warnlampe), Rand bleibt unverändert. Keine Flügel im Sprite (die Flammen sind die Antriebe, kein Flügelschlag); als Partikel gibt es nur die 1-px-Feuerfunken.
 
 Rahmen: auf die Figur zugeschnitten (Vereinigung aller Frames + 2 px Rand, zentriert); die Funken gehören zum Feuer und sind in der Vereinigung enthalten.
-Randpixel-Test (Regel 16): Gehäuse in Frame i bleibt unverändert; Flammenränder sind die Umrissfarbe `rand` des Feuermoduls (202,44,41); zusätzlich randtest.py.
+Randpixel-Test (Regel 16): Flammenränder sind die Umrissfarbe `rand` des Feuermoduls (202,44,41) (F.umranden sichert das nach der Fußregel nochmals ab); Glanz/Auge-Puls bleiben im Inneren; zusätzlich randtest.py (0 Frames, mit und ohne Effekte).
 Alle Bewegungen laufen auf der vollen (größeren) Arbeitsleinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle, Alpha nur 0/255.
 """
 import math
@@ -81,6 +83,9 @@ def fuss_festlegen(fl):
         for x in (x0 - 1, x1 + 1):
             if 0 <= PAD_L + x < W and not (7 <= x <= 9):
                 fl[y, PAD_L + x, 3] = 0
+    # Brückenpixel des Feuermoduls (macht alles 4-verbunden) unter dem Gehäuse wieder entfernen: die Standbeine hängen im Original nur diagonal
+    # (8-verbunden) am Gehäuse; dort darf nichts Rotes dazukommen.
+    fl[PAD_T + 10:PAD_T + sh, PAD_L + 6:PAD_L + 11, 3] = 0
     return fl
 
 
