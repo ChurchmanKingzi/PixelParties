@@ -17,7 +17,7 @@ Was ist was (x/y im Sprite):
 Fest bleiben: Kopf-/Körperform, Augen-/Mundform im Ruhebild, alle Linien (Lage und Form), Schachbrettmuster.
 
 Ablauf (48 Frames à 70 ms = 3,36 s; Frame 0 = Original, Partikel ausgenommen):
-* Atmen: alles oberhalb der Hüfte (Kopf, Ohren, Arme, Rumpf, die oberen Linienteile) hebt sich 1 px (Zeile y 27 wird einmal wiederholt: die Linien bleiben dadurch durchgehend), die Beine bleiben am Boden;
+* Atmen: alles oberhalb der Hüfte (Kopf, Ohren, Arme, Rumpf, die oberen Linienteile) hebt sich 1 px (Zeile y 28 wird einmal wiederholt: die Linien bleiben dadurch durchgehend), die Beine bleiben am Boden;
   Periode 24, zweimal pro Schleife (oben in Frame 7–18 und 31–42).
 * Ohren zucken: linkes Ohr (Zeile 9–10) 1 px nach links (Frame 3–5) bzw. 1 px nach rechts (Frame 22–24); rechtes Ohr 1 px nach rechts (Frame 10–12 und 33–35) — die rote Schnur bleibt unverändert.
 * Blinzeln (Lid = Schachbrett-Haut): erst die obere Augenzeile, dann beide Zeilen; zweimal (Frame 6–8 und 27–29).
@@ -32,6 +32,7 @@ Zuschnitt: Frame auf die Figur zugeschnitten (symmetrisch um die Ruhefigur; Part
 import math
 import sys
 
+import cv2
 import numpy as np
 
 import anim_lib as L
@@ -76,8 +77,14 @@ for (x, y) in [(20, 9), (21, 9), (22, 9), (19, 10), (20, 10), (21, 10), (22, 10)
 OHRR &= vorhanden
 BEIN_L = vorhanden & (xx >= 11) & (xx <= 15) & (yy >= 30)
 BEIN_R = vorhanden & (xx >= 18) & (xx <= 22) & (yy >= 30)
-rest = vorhanden & ~OHRL & ~OHRR & ~BEIN_L & ~BEIN_R
-assert not (BEIN_L & BEIN_R).any() and OHRR.sum() == 7 and OHRL.sum() == 7
+# Kern = größte 4-verbundene Fläche (Körper samt anliegendem Linienansatz); Ranken = die übrigen, nur diagonal hängenden Linienstücke
+_n, _lab = cv2.connectedComponents(vorhanden.astype(np.uint8), connectivity=4)
+_gr = [int((_lab == k).sum()) for k in range(1, _n)]
+KERN = _lab == (1 + int(np.argmax(_gr)))
+RANKEN = vorhanden & ~KERN
+ABST = cv2.distanceTransform((~KERN).astype(np.uint8), cv2.DIST_C, 3)         # Schachbrett-Abstand zum Kern
+rest = KERN & ~OHRL & ~OHRR & ~BEIN_L & ~BEIN_R
+assert not (BEIN_L & BEIN_R).any() and OHRR.sum() == 7 and OHRL.sum() == 7 and int(RANKEN.sum()) == 64
 
 BLASE = {'c': TL_, 'r': TD_}
 P = lambda x, y: (GPL + x, GPT + y)
@@ -90,6 +97,65 @@ def teil(maske):
 
 
 REST_A, OHRL_A, OHRR_A, BEINL_A, BEINR_A = teil(rest), teil(OHRL), teil(OHRR), teil(BEIN_L), teil(BEIN_R)
+
+
+RP = [(x, y) for y in range(sh) for x in range(sw) if RANKEN[y, x]]                 # Rankenpixel (x, y)
+RGEW = {p: min(1.0, max(0.0, (ABST[p[1], p[0]] - 1) / 3.0)) for p in RP}              # Gewicht: 0 am Kern, 1 ab 4 px Abstand
+
+
+def _reihenfolge():
+    """Breitensuche vom Kern nach außen über 8er-Nachbarn der Ranken (gleichfarbige Nachbarn zuerst): Liste (Pixel, Elternpixel); Eltern am Kern sind Kernpixel (bleiben stehen)."""
+    rest_ = set(RP)
+    fertig, ordnung = set(), []
+    front = []
+    for (x, y) in sorted(RP):
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                q = (x + dx, y + dy)
+                if (dx, dy) != (0, 0) and 0 <= q[0] < sw and 0 <= q[1] < sh and KERN[q[1], q[0]]:
+                    front.append(((x, y), q))
+                    break
+            else:
+                continue
+            break
+    while front:
+        nxt = []
+        for (p, par) in front:
+            if p in fertig:
+                continue
+            fertig.add(p)
+            ordnung.append((p, par))
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    q = (p[0] + dx, p[1] + dy)
+                    if (dx, dy) != (0, 0) and q in rest_ and q not in fertig:
+                        nxt.append((q, p))
+        # gleichfarbige Eltern zuerst: stabil nach (Farbgleichheit, Lage) sortieren
+        nxt.sort(key=lambda t: (col(*t[0]) != col(*t[1]), t[0][1], t[0][0]))
+        front = nxt
+    assert len(ordnung) == len(RP) and fertig == rest_
+    return ordnung
+
+
+RORD = _reihenfolge()
+
+
+def ranken(i):
+    """Ranken-Enden wogen (nur die Pixel abseits des Kerns): waagerechter Versatz ≤ 1 px, Gewicht wächst mit dem Abstand zum Kern, die Welle läuft spaltenweise von links nach rechts (Phase 0,12 rad je Spalte).
+    Von innen nach außen wird jedes Pixel so versetzt, dass es 8er-Nachbar seines (verschobenen) Elternpixels bleibt — so reißt nichts, und es entstehen keine Brückenpixel/Klumpen."""
+    a = L.leer(H, W)
+    pos = {}
+    for (p, par) in RORD:
+        x, y = p
+        wunsch = RGEW[p] * (math.sin(2 * math.pi * i / 24 - 0.12 * x) - math.sin(-0.12 * x))
+        wunsch = max(-1, min(1, int(round(wunsch))))
+        pp = pos.get(par, par)                                    # verschobenes Elternpixel (Kernpixel stehen)
+        ok = [o for o in (-1, 0, 1) if max(abs(x + o - pp[0]), abs(y - pp[1])) <= 1 and (x + o, y) != pp]
+        o = wunsch if wunsch in ok else (0 if 0 in ok else min(ok, key=lambda v: abs(v - wunsch)))
+        pos[p] = (x + o, y)
+    for p in RP:
+        set_px(a, pos[p][0], pos[p][1], col(*p))
+    return a
 
 
 def set_px(a, x, y, farbe):
@@ -117,10 +183,10 @@ def frame_gross(i, nur=None):
             if y >= 19 - (st - 1):
                 set_px(kb, x, y, haut(x, y))
     dl, dr = OHR_L.get(i, 0), OHR_R.get(i, 0)
-    oben = L.zusammen(H, W, [(kb, 0, 0), (OHRL_A, dl, 0), (OHRR_A, dr, 0)])
-    # Atmen: alles oberhalb der Hüfte hebt sich 1 px (Zeile y 27 wird einmal wiederholt)
+    oben = L.zusammen(H, W, [(ranken(i), 0, 0), (kb, 0, 0), (OHRL_A, dl, 0), (OHRR_A, dr, 0)])
+    # Atmen: alles oberhalb der Hüfte hebt sich 1 px (Zeile y 28 wird einmal wiederholt)
     if U.stufe(i, 24, 1) == 1:
-        oben = L.streck_zeile(oben, GPT + 27, 1)
+        oben = L.streck_zeile(oben, GPT + 28, 1)
     bl_ = 1 if (i % 16) in (3, 4, 5) else 0
     br_ = 1 if (i % 16) in (11, 12, 13) else 0
     koerper = L.zusammen(H, W, [(oben, 0, 0), (BEINL_A, 0, -bl_), (BEINR_A, 0, -br_)])

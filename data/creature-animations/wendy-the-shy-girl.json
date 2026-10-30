@@ -1,0 +1,15 @@
+{
+  "creature": "Wendy, the Shy Girl",
+  "sheet": "wendy-the-shy-girl.png",
+  "frameWidth": 18,
+  "frameHeight": 29,
+  "frames": 48,
+  "frameMs": 62,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 9.0
+}
