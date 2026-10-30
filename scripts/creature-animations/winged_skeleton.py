@@ -24,7 +24,8 @@ Ablauf (24 Frames à 70 ms = 1,68 s):
   ganze Zeilen, der Anschluss an Zeile 14 bleibt stehen.
 * Rippenkorb atmet: einmal pro Schleife wird Zeile 13 (nur Rippen, keine Lücken) verdoppelt; Schädel und Krallenspitzen heben sich
   dabei starr mit, die Füße bleiben am Boden. Körper UND Bänder werden gemeinsam gestreckt (nichts doppelt gezeichnet, was woanders bewegt wird).
-* Knochenstaub (Partikel): wenige graue Staubkörner rieseln langsam von den Flügelenden (Klekse/Funken, wachsen und schrumpfen).
+* Der rechte Flügel spreizt sich etwa ein Frame später als der linke (nicht im Gleichtakt).
+* Knochenstaub (Partikel): vier einzelne graue Staubkörner rieseln langsam von den Flügelenden und den Händen.
 
 Ergänzungen: keine nötig — Körper und Bänder überlappen sich im Original nirgends (Körper allein: Umriss ringsum geschlossen,
 siehe Kontrollbild). Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError, wenn etwas herausragen würde).
@@ -63,27 +64,28 @@ def px(x, y):
     return PAD_L + x, PAD_T + y
 
 
-PUFFS = [
-    dict(x=px(0, 19)[0], y=px(0, 19)[1], vx=-1, vy=7, off=0, form='s', wackeln=1),
-    dict(x=px(19, 19)[0], y=px(19, 19)[1], vx=1, vy=7, off=12, form='s', wackeln=1),
-    dict(x=px(2, 17)[0], y=px(2, 17)[1], vx=-1, vy=6, off=6, form='k', wackeln=1),
-    dict(x=px(17, 17)[0], y=px(17, 17)[1], vx=1, vy=6, off=18, form='k', wackeln=1),
+PUFFS = [                                                    # einzelne Staubkörner, rieseln langsam von den Flügelenden
+    dict(x=px(0, 19)[0], y=px(0, 19)[1], vx=-1, vy=7, off=0, form='k', wackeln=1),
+    dict(x=px(19, 19)[0], y=px(19, 19)[1], vx=1, vy=7, off=12, form='k', wackeln=1),
+    dict(x=px(1, 18)[0], y=px(1, 18)[1], vx=-1, vy=6, off=8, form='k', wackeln=1),
+    dict(x=px(18, 18)[0], y=px(18, 18)[1], vx=1, vy=6, off=20, form='k', wackeln=1),
 ]
 
 
 def frame(i, partikel=True):
     ph = L.sinus(i, N / 2)
-    s = (1 - math.cos(ph)) / 2                                # 0 … 1: Flügel spreizen sich, in Frame 0 angelegt
+    s_l = (1 - math.cos(ph)) / 2                              # 0 … 1: Flügel spreizen sich, in Frame 0 angelegt
+    s_r = (1 - math.cos(ph - 0.5)) / 2                        # rechter Flügel etwa ein Frame später (nie ganz im Gleichtakt)
     atem = 1 if math.sin(L.sinus(i, N, -0.6)) > 0.2 else 0    # Rippenkorb atmet (eine Zeile)
     zeile = PAD_T + 13
 
-    hand = int(round(1.2 * s))                                # Hand/Unterarm (Zeile ≥ 15) schwingt starr 0…1 px nach außen
+    hand_l, hand_r = int(round(1.2 * s_l)), int(round(1.2 * s_r))   # Hand/Unterarm (Zeile ≥ 15) schwingt starr 0…1 px nach außen
     kopf_l = band_l & (yy <= 14)
     kopf_r = band_r & (yy <= 14)
-    wl = F.zeilen_schub(F.ebene(spr, kopf_l, H, W, PAD_L, PAD_T), PAD_T + 14, -2.4, s, 1.3)
-    wr = F.zeilen_schub(F.ebene(spr, kopf_r, H, W, PAD_L, PAD_T), PAD_T + 14, 2.4, s, 1.3)
-    hl = L.versetze(F.ebene(spr, band_l & (yy >= 15), H, W, PAD_L, PAD_T), -hand, 0)
-    hr = L.versetze(F.ebene(spr, band_r & (yy >= 15), H, W, PAD_L, PAD_T), hand, 0)
+    wl = F.zeilen_schub(F.ebene(spr, kopf_l, H, W, PAD_L, PAD_T), PAD_T + 14, -2.4, s_l, 1.3)
+    wr = F.zeilen_schub(F.ebene(spr, kopf_r, H, W, PAD_L, PAD_T), PAD_T + 14, 2.4, s_r, 1.3)
+    hl = L.versetze(F.ebene(spr, band_l & (yy >= 15), H, W, PAD_L, PAD_T), -hand_l, 0)
+    hr = L.versetze(F.ebene(spr, band_r & (yy >= 15), H, W, PAD_L, PAD_T), hand_r, 0)
     wl = L.zusammen(H, W, [(wl, 0, 0), (hl, 0, 0)])
     wr = L.zusammen(H, W, [(wr, 0, 0), (hr, 0, 0)])
     kp = F.ebene(spr, koerper, H, W, PAD_L, PAD_T)
