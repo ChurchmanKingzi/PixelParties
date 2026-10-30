@@ -1,0 +1,15 @@
+{
+  "creature": "Cybug LOCUST",
+  "sheet": "cybug-locust.png",
+  "frameWidth": 49,
+  "frameHeight": 33,
+  "frames": 48,
+  "frameMs": 60,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 24.5
+}

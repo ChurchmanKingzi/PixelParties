@@ -1,0 +1,15 @@
+{
+  "creature": "Shimmering Dragonegg",
+  "sheet": "shimmering-dragonegg.png",
+  "frameWidth": 40,
+  "frameHeight": 48,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 20.0
+}
