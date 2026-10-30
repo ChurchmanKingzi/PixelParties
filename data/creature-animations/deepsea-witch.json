@@ -1,15 +1,15 @@
 {
   "creature": "Deepsea Witch",
   "sheet": "deepsea-witch.png",
-  "frameWidth": 23,
-  "frameHeight": 35,
+  "frameWidth": 27,
+  "frameHeight": 37,
   "frames": 48,
   "frameMs": 70,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 1,
+  "padTop": 2,
   "padLeft": 1,
-  "padRight": 2,
-  "padBottom": 2,
-  "faceX": 11.5
+  "padRight": 3,
+  "padBottom": 1,
+  "faceX": 13.5
 }

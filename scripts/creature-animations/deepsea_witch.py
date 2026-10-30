@@ -18,7 +18,7 @@ Was ist was (x/y im Sprite):
 Fest bleiben: Kopfform, Augen-/Mundform im Ruhebild, Gesichtshaut, Rumpf, Stielspalte.
 
 Ablauf (48 Frames à 70 ms = 3,36 s; Frame 0 = Original, Partikel ausgenommen):
-* Atmen: alles oberhalb der Hüfte (Hut, Haar, Gesicht, Hand, Stiel) hebt sich 1 px (Zeile y 21 wird einmal wiederholt), Beine und Borsten bleiben am Boden; Periode 24, zweimal pro Schleife.
+* Atmen: alles oberhalb der Hüfte (Hut, Haar, Gesicht, Hand, Stiel) hebt sich 1 px (Zeile y 21 wird einmal wiederholt), Beine und Borsten bleiben am Boden; Periode 24, zweimal pro Schleife (oben in Frame 7–18 und 31–42).
 * Hutkrone schwingt: die Spitze neigt sich nach links/rechts, bis ±2 px an der Spitze, in Zeilengruppen (0–1, 2–4, 5–6, 7–8 — die Einrollung (Loch bei (8,3)) bleibt heil), die Krempe steht;
   benachbarte Gruppen unterscheiden sich um höchstens 1 px (runde Spitze); Periode 16, dreimal pro Schleife.
 * Hutband (Gold): das Licht wandert langsam hin und her (der helle Streifen verschiebt sich um bis zu ±1 px); Periode 24. Nur auf dem Band, nicht auf Haar, Stoff oder Besen.
@@ -27,8 +27,11 @@ Ablauf (48 Frames à 70 ms = 3,36 s; Frame 0 = Original, Partikel ausgenommen):
 * Besen: die Borsten (y ≥ 23) pendeln ±1 px (Periode 24), die unteren zwei Reihen (y 29–30) mit Verzögerung; der Stiel bleibt in der Hand.
 * Beine/Füße heben abwechselnd 1 px (je 3 Frames, Periode 16: links Frame 3–5, rechts 11–13).
 * Blinzeln (Lid = Gesichtshaut im Karomuster): erst die obere Augenzeile, dann beide Zeilen; zweimal (Frame 9–11 und 34–36).
-* Mund: schließt sich von unten (Zeile y 17, dann y 16–17 werden Haut inkl. Zahnpixel — wie ein Lippenschluss), dreimal pro Schleife (Frame 20–23, 28–31, 44–47... je 4 Frames, siehe MUNDZU).
-* Partikel (hinter der Figur): runde Wölkchen 2×2 → 3×3 → 2×2 (`U.wolke_ebene`), nie ein Einzelpixel, nie verdeckt; siehe PUFFS/ZAUBER.
+* Mund: schließt sich von unten (Zeile y 17, dann y 16–17 werden Haut inkl. Zahnpixel — wie ein Lippenschluss), dreimal pro Schleife (Frame 18–21, 26–29 und 42–45, je 4 Frames).
+* Partikel (hinter der Figur; runde Wölkchen 2×2 → 3×3 → 2×2 mit `U.wolke_ebene`, nie ein Einzelpixel; in jeder Pose ≥ 2 px Abstand zur Figur und nie teilweise verdeckt — per Skript über alle 48 Frames geprüft):
+  – zwei Teal-Blasen links neben Besen/Körper/Hut, steigen 20 px auf (Lebensdauer 48 Frames, um 24 Frames versetzt), Kern (77,137,154), Rand (51,93,119);
+  – ein violettes Zauberwölkchen rechts neben der Hutspitze, steigt 7 px (Lebensdauer 24 Frames, zweimal pro Schleife), Kern (213,82,197), Rand (131,8,115) = Haarfarben;
+  – eine kleine Teal-Blase rechts unten neben den Beinen, steigt 6 px (Lebensdauer 24 Frames).
 Glanz nur auf dem Gold des Hutbands (Regel 14; Besenborsten sind Stroh, Haar/Stoff/Haut kein Metall), kein Feuer (Regel 15). Randpixel-Test (Regel 16): `U.kontur_schliessen` (Randfarben der Quelle) in jeder Pose; im Ruhebild nichts.
 Keine gemalten Pixel außer Farben der Quelle (Lider/Mundzuklappung im Haut-Karo, verdecktes Haar aus vorhandenen Haarfarben).
 Zuschnitt: Frame auf die Figur zugeschnitten (symmetrisch um die Ruhefigur; Partikel vergrößern ihn höchstens 2 px darüber hinaus, dazu 1 px leerer Rand). Alle Bewegungen laufen auf der vollen Leinwand
@@ -146,8 +149,13 @@ def sinz(i, per, ph=0.0):
 BLASE = {'c': TL_, 'r': TD_}
 ZAUBER = {'c': (213, 82, 197), 'r': (131, 8, 115)}
 P = lambda x, y: (GPL + x, GPT + y)
-PUFFS = []
-ZPUFFS = []
+# Die Figur lässt nur wenige freie Bahnen (Abstand ≥ 2 px in jeder Pose, Effekte höchstens +2 px über den Körper-Rand hinaus): links neben Hut/Körper (Blasen steigen auf),
+# rechts neben der Hutspitze (Zauberwölkchen) und rechts unten neben den Beinen (kleine Blase).
+PUFFS = [dict(x=P(-2, 20)[0], y=P(-2, 20)[1], vx=0, vy=-20, off=0, wackeln=0.4), dict(x=P(-2, 20)[0], y=P(-2, 20)[1], vx=0, vy=-20, off=24, wackeln=0.4)]
+ZPUFFS = [dict(x=P(18, 5)[0], y=P(18, 5)[1], vx=0, vy=-7, off=0, wackeln=0.4)]
+ZN = 24
+KPUFFS = [dict(x=P(18, 31)[0], y=P(18, 31)[1], vx=0, vy=-6, off=12, wackeln=0.4)]
+KN = 24
 
 
 def frame_gross(i, nur=None):
@@ -194,9 +202,10 @@ def frame_gross(i, nur=None):
     koerper = U.kontur_schliessen(koerper, UMRISS, KONTUR)
     if nur == 'koerper':
         return koerper
-    zauber = _glut(H, W, i, N, ZPUFFS, ZAUBER)
+    zauber = _glut(H, W, i, ZN, ZPUFFS, ZAUBER)
     blasen = _glut(H, W, i, N, PUFFS, BLASE)
-    return L.zusammen(H, W, [(blasen, 0, 0), (zauber, 0, 0), (koerper, 0, 0)])
+    klein = _glut(H, W, i, KN, KPUFFS, BLASE)
+    return L.zusammen(H, W, [(blasen, 0, 0), (zauber, 0, 0), (klein, 0, 0), (koerper, 0, 0)])
 
 
 _OHNE_PARTIKEL = [False]

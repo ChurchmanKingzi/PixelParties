@@ -1,0 +1,15 @@
+{
+  "creature": "Slippery Snowman",
+  "sheet": "slippery-snowman.png",
+  "frameWidth": 21,
+  "frameHeight": 36,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 10.5
+}
