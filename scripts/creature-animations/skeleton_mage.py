@@ -139,9 +139,8 @@ def frame(i):
     un = teil(unten)
     # Knochenglanz: Lichtband über Schultern/Rippen/Beine (alle 20 Frames, diagonal von links oben nach rechts unten)
     k = i % 20
-    U.band_diagonal(un, [p for p in knochen if p[1] >= 15], RAMPE, D_MIN - 1 + k, 2, PAD_L, PAD_T)
-    if D_MIN - 1 + k < D_MAX:
-        U.band_diagonal(ob, [p for p in knochen if p[1] < 15], RAMPE, D_MIN - 1 + k, 2, PAD_L, PAD_T - r_b)
+    U.band_diagonal(un, [p for p in knochen if p[1] >= 15], RAMPE, D_MIN - 2 + k, 2, PAD_L, PAD_T)
+    U.band_diagonal(ob, [p for p in knochen if p[1] < 15], RAMPE, D_MIN - 2 + k, 2, PAD_L, PAD_T - r_b)
     funken = U.glut_ebene(H, W, i, N, PUFFS, FUNKEN)
 
     # Blitze an den Ärmelspitzen (vorn)

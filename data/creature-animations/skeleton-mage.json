@@ -1,15 +1,15 @@
 {
   "creature": "Skeleton Mage",
   "sheet": "skeleton-mage.png",
-  "frameWidth": 36,
-  "frameHeight": 44,
-  "frames": 48,
-  "frameMs": 75,
+  "frameWidth": 40,
+  "frameHeight": 45,
+  "frames": 40,
+  "frameMs": 65,
   "loop": true,
   "layout": "horizontal",
   "padTop": 5,
-  "padLeft": 3,
+  "padLeft": 5,
   "padRight": 4,
   "padBottom": 4,
-  "faceX": 18.0
+  "faceX": 20.0
 }

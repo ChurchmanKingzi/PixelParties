@@ -1,15 +1,15 @@
 {
   "creature": "Tamed Hell Fox",
   "sheet": "tamed-hell-fox.png",
-  "frameWidth": 60,
-  "frameHeight": 42,
-  "frames": 40,
-  "frameMs": 70,
+  "frameWidth": 64,
+  "frameHeight": 45,
+  "frames": 48,
+  "frameMs": 65,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 6,
-  "padLeft": 5,
-  "padRight": 5,
+  "padTop": 8,
+  "padLeft": 6,
+  "padRight": 6,
   "padBottom": 3,
-  "faceX": 30.0
+  "faceX": 32.0
 }

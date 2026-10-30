@@ -89,7 +89,7 @@ BAUCHZEILE = 22                                                    # hier werden
 PIVOT_SCHWANZ = 14
 SCHWANZ_AMP, SCHWANZ_LAUF = 5.4, 2.2                                # Schwanzspitze: bis ±5 px, die Welle läuft zur Spitze
 NICKEN = [(2, 3), (8, 2), (15, 3), (24, 2), (29, 3), (36, 2), (41, 3)]     # (Start, Länge): Schnüffeln
-OHR_L, OHR_R = (5, 17, 30, 41), (11, 23, 36, 47)                   # Startframes der Ohrzucker (je 4 Frames)
+OHR_L, OHR_R = (5, 17, 30, 41), (11, 23, 36, 44)                   # Startframes der Ohrzucker (je 4 Frames)
 BLINZELN = (11, 33)                                                # Startframes (5 Frames: Ecken, oben, zu, oben, Ecken)
 PFOTE = {}                                                         # keine Pfotenbewegung
 
@@ -216,6 +216,6 @@ if __name__ == '__main__':
     n = L.pruefe(frames, quelle=spr, erlaubt=[])
     print('Pixel je Frame:', n)
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    L.speichern('hell-fox', 'Hell Fox', frames, MS, prev)
+    L.speichern('tamed-hell-fox', 'Tamed Hell Fox', frames, MS, prev)
     if prev:
-        L.streifen(prev + '/hell-fox-strip.png', frames, spalten=12, scale=3)
+        L.streifen(prev + '/tamed-hell-fox-strip.png', frames, spalten=12, scale=3)
