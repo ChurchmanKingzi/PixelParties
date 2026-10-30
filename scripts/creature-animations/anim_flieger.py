@@ -38,10 +38,13 @@ def ergaenzen(spr, pixel):
     return out, m
 
 
-def spalte_dy(a, pivot_x, amp, phase, x, potenz=1.0, bias=0.0, lauf=0.0):
+def spalte_dy(a, pivot_x, amp, phase, x, potenz=1.0, bias=0.0, lauf=0.0, nur_rechts=None):
     """Senkrechter Versatz der Spalte x — exakt die Rechnung von L.spalten_welle (gleiches maxd aus der Ebene `a`)."""
     h, w = a.shape[:2]
     maxd = max(1, max(abs(c - pivot_x) for c in range(w) if a[:, c, 3].any()))
+    d = x - pivot_x
+    if nur_rechts is True and d < 0 or nur_rechts is False and d > 0:
+        return 0
     frac = abs(x - pivot_x) / maxd
     return int(round((amp * math.sin(phase - lauf * frac) + bias) * frac ** potenz))
 

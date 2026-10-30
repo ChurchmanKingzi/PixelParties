@@ -17,17 +17,23 @@ Was ist was (Koordinaten im Sprite, x/y):
 * Arme: stummelige Arme x 1–2 bzw. 13–14, y 20–23, mit goldenem Armreif (T/U) in y 21; Innenumriss x 3 bzw. 12 gehört zum Rumpf.
 Fest bleiben: Nasenlöcher, Mundlücke, Hauer (am Kopf), Stiefel, Beine, Rumpffarben.
 
-Ablauf (48 Frames à 70 ms = 3,36 s):
+Ablauf (48 Frames à 70 ms = 3,36 s; Frame 0 = Original):
 * Atmen (Periode 48): im Rumpf wird eine Bauchzeile (y 22) bis zu zweimal eingefügt — Brust, Kopf, Hörner, Schultern und Arme steigen bis
   zu 2 px, Beine/Stiefel bleiben stehen. Nur der Rumpf-Layer wird gestreckt (Arme/Kopf werden mitgehoben, nicht gedoppelt).
-* Kopf reckt sich (Periode 24, versetzt): im Gesicht wird eine Zeile (y 12) bis zu einmal eingefügt — Stirn, Augen, Ohren, Hörner
-  heben sich um 1 px gegenüber Kiefer/Hauern (die bleiben am Rumpf).
-* Hörnerspitzen wiegen (Periode 16): die oberen Hornzeilen (y 0–3) neigen sich um ±1 px (Scherung um y 6), beide Hörner gleichgerichtet.
-* Ohrenzucken: linkes Ohr Doppelzucken Frame 10–15, rechtes Frame 33–38 (Ohr klappt 1 px nach außen; Innenumriss wandert mit).
-* Augenglühen (Periode 24): Pfirsich → Braunstufe der Augenrampe (H, I) und zurück; Blinzeln Frame 42–44 (zwei Stufen).
-* Arme schwingen nach außen (Periode 48, links/rechts versetzt): Zeilenversatz wächst von der Schulter (y 19) zur Hand (bis 2 px).
-* Armreife glänzen: dunkles und helles Gold tauschen kurz die Plätze (links Frame 6–9, rechts Frame 28–31).
-Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
+* Kopf reckt sich (zweimal pro Schleife, je 12 Frames: Frame 3–14 und 27–38): im Gesicht wird eine Zeile (y 12) eingefügt — Stirn,
+  Augen, Ohren, Hörner heben sich um 1 px gegenüber Kiefer/Hauern/Nasenlöchern (die bleiben am Rumpf).
+* Hörnerspitzen wiegen (Periode 16): nur die obersten Hornzeilen (y 0–1, Gewicht quadratisch zur Spitze) neigen sich um ±1 px, beide
+  Hörner gleichgerichtet; die Zeilen bleiben über Kanten verbunden.
+* Ohrenzucken: linkes Ohr Doppelzucken Frame 14–19, rechtes Frame 36–41 (Ohrlappen y 7–9 klappt 1 px nach außen; Innenumriss wandert mit).
+* Augen: zwei kurze Dunkelphasen pro Schleife (Frame 3–10 und 26–33: Pfirsich → H → I und zurück), sonst volles Leuchten;
+  Blinzeln Frame 44–46 (halb zu → zu: dunkler Strich → halb zu).
+* Arme schwingen nach außen (links Frame 2–27, rechts Frame 22–47, je Buckel bis 2 px): Zeilenversatz wächst von der Schulter (y 19)
+  zur Hand; Innenumriss (x 3 / x 12) geht als Kopie mit, der Rumpf behält seinen eigenen — kein offener Rand.
+* Armreife glänzen: dunkles und helles Gold tauschen kurz die Plätze (links Frame 6/8, rechts Frame 28/30).
+ERGÄNZUNG (1 Pixel je Seite): Deckelpixel (2,7) links und (13,7) rechts in Umrissfarbe B (31,9,1) — verhindert beim Ohrzucken ein
+1-px-Loch zwischen Ohrumriss und Hornansatz (im Ruhebild liegt dort schon B, Frame 0 bleibt identisch).
+Keine Partikel (der Sprite gibt keinen Rauch/Funken her). Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError).
+Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
 import sys
@@ -47,8 +53,8 @@ yy, xx = np.mgrid[0:sh, 0:sw]
 vorhanden = L.deckend(spr)
 
 # ── Teile (Masken im Sprite-Koordinatensystem) ────────────────────────────────────────────────────────────────
-horn_l = vorhanden & (yy <= 6) & (xx <= 5)
-horn_r = vorhanden & (yy <= 6) & (xx >= 10)
+horn_l = vorhanden & (((yy <= 5) & (xx <= 6)) | ((yy == 6) & (xx <= 5)))      # Hornspitze y 0–1 reicht bis x 6 (Umriss)
+horn_r = vorhanden & (((yy <= 5) & (xx >= 9)) | ((yy == 6) & (xx >= 10)))
 horn = horn_l | horn_r
 ohr_l_kern = vorhanden & (yy >= 7) & (yy <= 9) & (xx <= 2)             # Lappen ohne Innenumriss
 ohr_r_kern = vorhanden & (yy >= 7) & (yy <= 9) & (xx >= 13)
@@ -69,8 +75,11 @@ AUGE_RAND_FARBE = c(5, 9)            # I (138,84,48)
 STUFE1 = c(4, 1)                     # H (157,112,91)   – Hornglanz, nächste Stufe der Pfirsich-Rampe
 STUFE2 = AUGE_RAND_FARBE             # I (138,84,48)
 LID = c(7, 8)                        # A (83,35,23)  Gesichtsfarbe
-LID_DUNKEL = c(5, 11)                # C (64,22,10)
+LID_DUNKEL = c(4, 9)                 # E (38,14,12)  geschlossenes Lid = dunkler Strich
 GOLD_DUNKEL, GOLD_HELL = c(1, 21), c(2, 21)
+
+OHR_UMRISS = c(1, 7)                 # B (31,9,1)
+OHR_ERG = [(2, 7), (13, 7)]          # ERGÄNZUNG: Deckelpixel zwischen Ohrumriss und Hornansatz (sonst entsteht beim Ohrzucken ein 1-px-Loch)
 
 AUGEN = [
     dict(hell=[(5, 10), (6, 11)], rand=[(5, 9), (6, 10)]),
@@ -98,10 +107,10 @@ def frame(i):
     if i == 0:
         recken = 0
     horn_pend = math.sin(L.sinus(i, N / 3))                      # −1 … 1
-    ohr_l = U.puls(i, 10, [1, 1, 0, 1, 1, 0])
-    ohr_r = U.puls(i, 33, [1, 1, 0, 1, 1, 0])
-    glut = U.stufe(i, N / 2, 2)
-    blink = {42: 1, 43: 2, 44: 1}.get(i, 0)
+    ohr_l = U.puls(i, 14, [1, 1, 0, 1, 1, 0])
+    ohr_r = U.puls(i, 36, [1, 1, 0, 1, 1, 0])
+    glut = int(round(2 * max(U.buckel(i, 3, 8), U.buckel(i, 26, 8))))   # zwei kurze Dunkelphasen pro Schleife, sonst volles Leuchten
+    blink = {44: 1, 45: 2, 46: 1}.get(i, 0)
     arm_l_aus = -2.0 * U.buckel(i, 2, 26)                      # nach links (außen), 0 … −2 px
     arm_r_aus = 2.0 * U.buckel(i, 22, 26)
     reif_l = U.puls(i, 6, [1, 0, 1, 0])
@@ -110,9 +119,11 @@ def frame(i):
     # --- Kopf (Hörner, Ohren, Gesicht) auf der vollen Leinwand ---
     kopf = teil(kopf_teil)
     kopf = U.augen(kopf, AUGEN_C, glut if not blink else 0, blink, AUGEN_FARBEN)
-    h = U.haengen(teil(horn), PAD_T + 6, 1.0 * horn_pend, nach_unten=False)          # Hornspitzen y 0–5 (oberhalb des Pivots y 6)
+    h = U.haengen(teil(horn), PAD_T + 6, 1.0 * horn_pend, potenz=2.0, nach_unten=False)          # Hornspitzen y 0–5 (oberhalb des Pivots y 6)
     o_l = L.versetze(teil(ohr_l_kopie), -ohr_l, 0)
     o_r = L.versetze(teil(ohr_r_kopie), ohr_r, 0)
+    for (o, (ex, ey)) in ((o_l, OHR_ERG[0]), (o_r, OHR_ERG[1])):          # Ergänzung: Ohrdeckel-Pixel, wenn das Ohr nach außen klappt
+        o[PAD_T + ey, PAD_L + ex] = [*OHR_UMRISS, 255]
     kopf_ges = L.zusammen(H, W, [(kopf, 0, 0), (h, 0, 0), (o_l, 0, 0), (o_r, 0, 0)])
     kopf_ges = L.streck_zeile(kopf_ges, PAD_T + 12, recken)
 

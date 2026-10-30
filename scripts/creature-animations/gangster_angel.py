@@ -22,7 +22,9 @@ Identifikation (Sprite-Koordinaten x, y):
 
 Ablauf (24 Frames à 70 ms = 1,68 s):
 * Flügelschlag: zweimal pro Schleife; jede Flügelspalte wandert senkrecht, je weiter vom Körper, desto mehr
-  (Spitze etwa −3 … +4 px), beide Flügel gleichzeitig. Der Edelstein wandert starr mit der Flügelspalte unter seiner Mitte.
+  (Spitze etwa −3 … +4 px), beide Flügel gleichzeitig. Die Schulterspalten, die am Körperumriss anliegen (links x ≥ 9,
+  rechts x ≤ 25), bleiben stehen — sonst reißt zwischen Flügel und Körper ein Hintergrundpixel (Tasche) auf.
+  Der Edelstein wandert starr mit der Flügelspalte unter seiner Mitte (x = 27).
 * Schwebe-Bob: die ganze Figur (Körper, Flügel, Heiligenschein, Edelstein) hebt sich beim Abschlag um 1 px.
 * Atmen: der Oberkörper samt Flügeln dehnt sich einmal pro Schleife um 1 Zeile (Zeile 13 wird verdoppelt; Körper UND Flügel
   gemeinsam, damit der Anschluss nicht aufreißt); Heiligenschein und Edelstein heben sich starr mit.
@@ -36,7 +38,8 @@ Ablauf (24 Frames à 70 ms = 1,68 s):
 Ergänzungen (fertiggezeichnet, nur Farben der Quelle):
 * Unter dem Heiligenschein (er bewegt sich getrennt vom Kopf/Flügel): Kopf (17,5)=(233,134,184), (17,6)=(235,205,220);
   rechter Flügel (26,5), (26,6), (27,7), (27,8)=(245,245,245).
-* Unter dem Edelstein (rechter Flügel): (25–26, 10–11), (26, 9), (26, 12), (25–26, 13)=(208,208,208), der Rest (245,245,245).
+* Unter dem Edelstein (rechter Flügel, alle 19 Edelsteinpixel): x ≤ 26 → (208,208,208) [(26,9), (25–26,10), (25–26,11), (26,12)],
+  x ≥ 27 → (245,245,245) [Rest inkl. (27,13)].
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError, wenn etwas herausragen würde).
 """
 import math
@@ -103,7 +106,7 @@ def px(x, y):
     return PAD_L + x, PAD_T + y
 
 
-GLITZER = {'c': FL_B, 'r': GOLD_HELL}
+GLITZER = {'c': FL_B, 'r': GOLD}
 PUFFS = [                                                    # rund (k = Funke, s = kleiner Klecks), steigen langsam auf
     dict(x=px(-2, 10)[0], y=px(-2, 10)[1], vx=0, vy=-7, off=0, form='s', wackeln=1),   # links neben dem Flügel
     dict(x=px(34, 9)[0], y=px(34, 9)[1], vx=0, vy=-7, off=12, form='s', wackeln=1),    # rechts neben dem Flügel
@@ -112,7 +115,7 @@ PUFFS = [                                                    # rund (k = Funke, 
 ]
 
 
-def frame(i):
+def frame(i, partikel=True):
     ph = L.sinus(i, N / 2)                                   # Flügelschlag: zweimal pro Schleife
     bob = int(round(-0.7 * math.sin(ph)))                    # Abschlag → Figur hebt sich
     atem = 1 if math.sin(L.sinus(i, N, -0.6)) > 0.3 else 0   # Oberkörper dehnt sich (1 Zeile)
@@ -135,13 +138,15 @@ def frame(i):
     kp = L.streck_zeile(kp, zeile, atem)
 
     # Flügel: erst dehnen (wie der Körper), dann schlagen
-    fl_amp, fl_bias, fl_pot = 3.6, 0.5, 1.1
+    fl_amp, fl_bias, fl_pot = 3.6, 0.5, 1.2
     wl = L.streck_zeile(F.ebene(spr_f, fl_links, H, W, PAD_L, PAD_T), zeile, atem)
     wr = L.streck_zeile(F.ebene(spr_f, fl_rechts_k, H, W, PAD_L, PAD_T), zeile, atem)
-    piv_l, piv_r = PAD_L + 12, PAD_L + 21.5
-    dy_gem = F.spalte_dy(wr, piv_r, fl_amp, ph, PAD_L + 27, fl_pot, fl_bias)
-    wl_s = L.spalten_welle(wl, piv_l, fl_amp, ph, potenz=fl_pot, bias=fl_bias)
-    wr_s = L.spalten_welle(wr, piv_r, fl_amp, ph, potenz=fl_pot, bias=fl_bias)
+    # Schultern: die Spalten, die am Körperumriss anliegen (links x ≥ 9, rechts x ≤ 25), bleiben stehen; erst weiter außen
+    # biegt sich der Flügel (sonst reißt zwischen Flügel und Körper eine Tasche auf).
+    piv_l, piv_r = PAD_L + 9, PAD_L + 25
+    dy_gem = F.spalte_dy(wr, piv_r, fl_amp, ph, PAD_L + 27, fl_pot, fl_bias, nur_rechts=True)
+    wl_s = L.spalten_welle(wl, piv_l, fl_amp, ph, potenz=fl_pot, bias=fl_bias, nur_rechts=False)
+    wr_s = L.spalten_welle(wr, piv_r, fl_amp, ph, potenz=fl_pot, bias=fl_bias, nur_rechts=True)
 
     # Füße baumeln (Ansatz Zeile 19 steht)
     fl_ = L.zeilen_welle(F.ebene(spr, fuss_l, H, W, PAD_L, PAD_T), PAD_T + 19, 2.2, L.sinus(i, N))
@@ -162,7 +167,7 @@ def frame(i):
     if i in (12, 13):
         F.setze(ed, PAD_L, PAD_T, {(28, 10): FL_B, (27, 10): BLAU_WEISS})
 
-    glitzer = L.puff_ebene(H, W, i, N, PUFFS, GLITZER)
+    glitzer = L.puff_ebene(H, W, i, N, PUFFS, GLITZER) if partikel else L.leer(H, W)
     dy_hal = bob - atem + halo_f
     return L.zusammen(H, W, [(glitzer, 0, 0), (wl_s, 0, bob), (wr_s, 0, bob), (fl_, 0, bob), (fr_, 0, bob), (kp, 0, bob),
                              (hl, 0, dy_hal), (ed, 0, bob - atem + dy_gem)])

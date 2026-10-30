@@ -14,7 +14,7 @@ abgeschnitten wird.
                                         Oberkörper hebt sich: Zeile „brustzeile“ wird `brust`-mal, Zeile „halszeile“ (Hals)
                                         `kopf`-mal zusätzlich eingefügt; alles darüber steigt, alles darunter (Beine, Boden,
                                         Waffe am Boden) bleibt stehen. Der Kopf läuft der Brust nach (Sekundärbewegung).
-    stern(a, cx, cy, groesse, kern, arm)  kleines Funkeln: 1 = Punkt, 2 = Kreuz (Dithering-frei, ganze Pixel)
+    klecks(a, x, y, groesse, kern, rand) kleines Funkeln als runder Klecks: 1 = Punkt, 2 = 2×2 (keine Kreuz-/Rautenform)
     ruhepose(frame, spr, off)           Pflichtkontrolle: Frame 0 muss dem Original entsprechen (Regel 9); gibt Abweichungen
     kontaktbogen(pfad, frames, idx, …)  Schlüsselposen groß als Bild (Regel 10)
 """
@@ -76,12 +76,13 @@ def atmen(a, brustzeile, halszeile, brust, kopf):
     return a
 
 
-def stern(a, cx, cy, groesse, kern, arm, off=(0, 0)):
-    """Funkeln um (cx, cy) in Spritekoordinaten: groesse 1 = ein Pixel (kern), 2 = kleines Kreuz (kern + arm)."""
-    if groesse >= 1:
-        setze(a, {(cx, cy): kern}, off)
-    if groesse >= 2:
-        setze(a, {(cx - 1, cy): arm, (cx + 1, cy): arm, (cx, cy - 1): arm, (cx, cy + 1): arm}, off)
+def klecks(a, x, y, groesse, kern, rand, off=(0, 0)):
+    """Funkeln als runder Klecks (Spritekoordinaten, Ecke oben links): groesse 1 = ein Pixel (kern),
+    2 = 2×2 (kern oben links, rand sonst). Bewusst KEINE Kreuz-/Rautenform."""
+    if groesse == 1:
+        setze(a, {(x, y): kern}, off)
+    elif groesse >= 2:
+        setze(a, {(x, y): kern, (x + 1, y): rand, (x, y + 1): rand, (x + 1, y + 1): rand}, off)
     return a
 
 
