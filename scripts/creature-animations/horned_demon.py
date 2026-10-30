@@ -25,8 +25,8 @@ Ablauf (36 Frames à 65 ms = 2,34 s; Frame 0 = Original, die Partikel ausgenomme
 * Ohren zucken öfter: links Doppelzucken Frame 4 und 22, rechts Frame 13 und 31 (Lappen y 7–9 klappt 1 px nach außen, Innenumriss geht mit).
 * Augen glühen schneller (Periode 12: Pfirsich → H → I → zurück), Blinzeln Frame 30–32; Glanz: Lichtblitz (L) und vierzackiger
   Glitzerstern (Mitte L, Arme J) am linken Auge Frame 18–20, am rechten Frame 24–26 — der Stern bleibt am Auge.
-* Arme schwingen kräftig nach außen (±3 px, Spaltenversatz wächst von der Schulter zur Hand): links dreimal pro Schleife (Periode 12),
-  rechts zweimal (Periode 18, versetzt); Innenumriss geht als Kopie mit.
+* Arme schwingen ruhig nach außen (nur noch bis 1 px, Spaltenversatz wächst von der Schulter zur Hand): beide Seiten synchron und gespiegelt,
+  zweimal pro Schleife (Periode 24); Innenumriss geht als Kopie mit.
 * Gold glänzt: Lichtband über jeden Armreif (links Frame 6–7, rechts Frame 22–23: das helle Pixel wandert von außen nach innen,
   Farben T/U/J aus dem Sprite) und Glitzerstern am Armreif (links Frame 12–14, rechts Frame 30–32, folgt dem Arm).
 * Stiefelglanz: ein helles Pixel (V) wandert diagonal über jeden Stiefel (links Frame 14–19, rechts 28–33).
@@ -143,8 +143,8 @@ def frame(i):
     ohr_r = max(U.puls(i, 13, [1, 1, 0, 1, 1, 0]), U.puls(i, 31, [1, 1, 0, 1, 1, 0]))
     glut_stufe = GLOW12[i % 12]
     blink = {30: 1, 31: 2, 32: 1}.get(i, 0)
-    arm_l_aus = -3.0 * U.buckel(i, 0, 12, n=12)                  # nach links (außen), 0 … −3 px, dreimal pro Schleife
-    arm_r_aus = 3.0 * U.buckel(i, 3, 15, n=18)                   # zweimal pro Schleife, versetzt (Frame 0 = Ruhe)
+    arm_l_aus = -1.0 * U.buckel(i, 0, 24, n=24)                  # nach links (außen), 0 … −1 px, zweimal pro Schleife
+    arm_r_aus = 1.0 * U.buckel(i, 0, 24, n=24)                   # synchron und gespiegelt (Frame 0 = Ruhe)
     reif_l = {6: (PFIRSICH, GOLD_HELL), 7: (GOLD_HELL, PFIRSICH)}.get(i)     # (außen, innen): Lichtband
     reif_r = {22: (PFIRSICH, GOLD_HELL), 23: (GOLD_HELL, PFIRSICH)}.get(i)
 

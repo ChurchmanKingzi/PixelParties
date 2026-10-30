@@ -30,12 +30,10 @@ Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Atmen (Frames 0–23, 40–47): Körper streckt sich/staucht sich um 1–2 Zeilen (Steinkrone hebt/senkt sich mit), Periode ≈ 12–16 Frames.
 * Stampfer (24–39): Anlauf-Stauchung (−1, −2), Absprung gestreckt (+2), 2 px Höhe, Aufprall (−2, 1 px breiter), Nachfedern.
 * Steinkrone federt: sie hinkt beim Strecken 1 px hinterher (sinkt ein) und überschwingt danach (springt 1 px hoch) — Gel wackelt, Steine klappern.
-* Wabbeln: Kopfblock und obere Körperzeilen lehnen sich 1–2 px seitlich (im Leerlauf Periode 24, nach dem Aufprall schnell abklingend);
-  die unteren Körperzeilen gehen halb mit (Pfütze rutscht höchstens 1 px).
-* Blinzeln/Augenfunkeln: die weißen Lichtpunkte gehen kurz aus (Frames 20–21 und 44–45) und funkeln (Mini-Stern in Frames 9–10 und 33–34).
-* Glanz (Regel 12): zweimal pro Schleife wandert ein Lichtband diagonal über den Sprite (Frames 3–13 und 28–38): Lehmbraun 1–2 Stufen
-  heller (D→B→J→K), Steine 1–2 Stufen heller (I→C→E→H). Vierzackige Glitzersterne (5 Frames) blitzen an den hellen Steinkanten und
-  den goldenen Glanzlichtern auf, wenn das Band vorbeizieht, dazu einzeln dazwischen. Die goldenen Glanzlichter glimmern (K↔J).
+* Wabbeln: der Körper pendelt als Ganzes bis ±1 px, der Kopfblock (Steinkrone) lehnt sich bis ±2 px — also bis 1 px gegen den Körper
+  (im Leerlauf Periode 24, nach dem Aufprall schnell abklingend); kein Zeilenscher, weil die Seitensteine waagerechte Umrisskanten haben.
+* Blinzeln: die weißen Augen-Lichtpunkte gehen kurz aus (Frames 20–21 und 44–45) bzw. sind gedimmt (Frames 9–10 und 33–34).
+* Kein Glanz/Glitzer: Fels und Lehm glänzen nicht (Regel 14) — kein Lichtband, keine Glitzersterne, kein Glimmern der K-Pixel.
 * Steinstaub (Partikel, Farben der Steine): acht winzige Krümel rieseln langsam an Schultern und Krone herab.
 Ergänzungen: Beim Hochfedern des Kopfblocks entsteht zwischen Block (Zeile 6) und Körper (Zeile 7) eine 1 px hohe Fuge: sie wird mit der
 Umrissfarbe (26,22,13) gefüllt, überall dort, wo über und unter der Fuge ein Pixel liegt (die schwarzen Lücken zwischen den Steinen der
@@ -70,13 +68,7 @@ for c in (A_, SB, SD, SF, SG, SJ, SK, SL, WEISS, SC, SE, SH, SI):
     assert c in _farben, f'Farbe {c} nicht im Sprite'
 SCHLEIM = {SB, SD, SF, SG, SJ, SK, SL}
 STEINE = {SC, SE, SH, SI}
-LEHM_RAMPE = {SF: SD, SG: SD, SD: SB, SB: SJ, SJ: SK}
-STEIN_RAMPE = {SI: SC, SC: SE, SE: SH}
-RAMPE = {**LEHM_RAMPE, **STEIN_RAMPE}
-STERN_STEIN = {'m': WEISS, 'a': SH, 's': SE}
-STERN_GOLD = {'m': WEISS, 'a': SK, 's': SJ}
 GLINT = [(7, 9), (12, 9)]
-GOLD_FLECKEN = [(9, 6), (12, 13), (11, 14), (12, 14), (6, 15), (7, 15)]
 
 # ── Zeitachsen (Frame → Wert), N = 48 ──
 S = [0, 0, 1, 1, 1, 1, 0, 0, 0, -1, -1, -1, -1, 0, 0, 0,                       # 0–15 Atmen
@@ -86,8 +78,7 @@ S = [0, 0, 1, 1, 1, 1, 0, 0, 0, -1, -1, -1, -1, 0, 0, 0,                       #
 LIFT = {28: 1, 29: 2, 30: 2, 31: 2, 32: 1}
 KOPF_DY = {2: 1, 4: -1, 9: -1, 11: 1, 16: 1, 18: -1, 28: 1, 29: 1, 33: 1, 34: -1, 35: -1, 40: 1, 42: -1, 45: -1}   # + = Block sinkt ein, − = federt hoch
 BLINZELN = {20, 21, 44, 45}
-FUNKELN = {9: 0, 10: 2, 33: 0, 34: 2}                                         # Augenlichtpunkte: 0 gedimmt, 2 Mini-Stern
-SWEEPS = [3, 28]
+AUGEN_DIMM = {9, 10, 33, 34}                                                   # Augenlichtpunkte kurz gedimmt
 assert len(S) == N
 
 # Körperzeilen: Index 0 = Sprite-Zeile 7 … 10 = Zeile 17
@@ -109,56 +100,13 @@ def lehnen(i):
     return 1.4 * math.sin(2 * math.pi * i / 24)
 
 
-# ── Glitzer ──
-ORTE = {'stein1': (5, 1), 'stein2': (9, 1), 'stein3': (15, 1), 'stein4': (2, 4), 'stein5': (17, 4), 'gold1': (9, 6),
-        'stein6': (3, 13), 'stein7': (18, 11), 'stein8': (15, 15), 'gold2': (12, 13), 'gold3': (7, 15), 'gold4': (11, 14),
-        'auge_l': (7, 9), 'auge_r': (12, 9)}
-STERN_LAUF = [0, 1, 2, 1, 0]
-
-
-def _zeitplan():
-    plan = []
-    for s0, orte in ((3, ['stein4', 'stein1', 'stein2', 'gold1', 'stein3', 'stein5', 'stein7', 'gold2', 'stein8']),
-                     (28, ['stein1', 'stein4', 'stein2', 'stein3', 'gold1', 'stein6', 'gold4', 'gold3'])):
-        for o in orte:
-            d = sum(ORTE[o])
-            plan.append((int(round(s0 + (d - 4) / 3.0)) - 2, o))
-    plan += [(16, 'stein2'), (19, 'gold2'), (22, 'stein3'), (24, 'stein5'), (41, 'stein1'), (43, 'gold3'), (46, 'stein4'), (14, 'gold1')]
-    return plan
-
-
-STERNE = _zeitplan()
-
-
-def aktive_sterne(i):
-    out = []
-    for (start, ort) in STERNE:
-        k = (i - start) % N
-        if k < len(STERN_LAUF):
-            out.append((ort, STERN_LAUF[k]))
-    if FUNKELN.get(i) == 2:
-        out += [('auge_l', 1), ('auge_r', 1)]
-    return out
-
-
 def sprite_mit_effekten(i):
+    """Sprite (Quellkoordinaten) mit Blinzeln/Augenfunkeln. Kein Lichtband/Glitzer: Fels und Lehm glänzen nicht (Regel 14)."""
     sp = spr.copy()
-    yy, xx = np.mgrid[0:sh, 0:sw]
-    # Lichtband (zweimal pro Schleife): 4 px breit 1 Stufe, Kern 2 px eine weitere Stufe
-    for s0 in SWEEPS:
-        if 0 <= i - s0 <= 10:
-            t = 2 + 3 * (i - s0)
-            sp = A.farb_schritt(sp, RAMPE, (xx + yy >= t) & (xx + yy < t + 4))
-            sp = A.farb_schritt(sp, RAMPE, (xx + yy >= t + 1) & (xx + yy < t + 3))
-    # goldene Glanzlichter glimmern (K ↔ J)
-    for k, (x, y) in enumerate(GOLD_FLECKEN):
-        if i > 0 and (i + 5 * k) % 12 in (3, 4) and tuple(int(v) for v in sp[y, x, :3]) == SK:
-            sp[y, x, :3] = SJ
-    # Augen-Lichtpunkte: aus (Blinzeln) bzw. gedimmt (Funkeln)
-    if i in BLINZELN:
+    if i in BLINZELN:                                     # Augen-Lichtpunkte gehen aus
         for (x, y) in GLINT:
             sp[y, x, :3] = SF
-    elif FUNKELN.get(i) == 0:
+    elif i in AUGEN_DIMM:                                 # …oder sind kurz gedimmt (normaler Augenfunke, ohne Stern)
         for (x, y) in GLINT:
             sp[y, x, :3] = SH
     return sp
@@ -181,13 +129,6 @@ def figur(i):
     """Kopfblock + Körper (ohne Partikel/Sterne) → dict(fig, kr, top, kb, kdx, kdy, orte)."""
     sp = sprite_mit_effekten(i)
     loesch, dopp, p = POSEN[S[i]]
-    marken = {}
-    for k, (ort, stufe) in enumerate(aktive_sterne(i)):
-        x, y = ORTE[ort]
-        if y >= KOERPER_Y0:
-            m = (1, 2, 10 + k)
-            marken[ort] = (m, tuple(int(v) for v in sp[y, x, :3]))
-            sp[y, x, :3] = m
     koerper = A.zeilen_von(sp, KOERPER_Y0, sh - 1, H, W, PAD_L, PAD_T)
     if p >= 0:
         # Beim Stauchen (Zeilen entfallen) wächst die Umrissstufe zwischen Nachbarzeilen; Zeile 7 bleibt deshalb schmal, die Zeilen darunter
@@ -197,15 +138,13 @@ def figur(i):
     else:
         z, quelle = A.koerper_pose(koerper, loeschen=loesch, doppeln=dopp, p=p, paare=((9, 10),), paare_je_zeile=PAARE_SCHMAL, x0=PAD_L)
     lean = lehnen(i)
-    dxq = [int(round(lean * (1.0 if q <= 3 else 0.5))) for q in quelle]
+    # Der Körper schwankt als Ganzes (kein Zeilenscher: die Seitensteine haben waagerechte Umrisskanten, die sonst aufrissen); der Kopfblock
+    # lehnt sich gegen ihn um höchstens 1 px (Steine wackeln auf dem Gel) — Eckpixel ohne Unterkante werden unten ergänzt (siehe Ergänzungen).
+    dxq = [int(round(lean * 0.5))] * len(quelle)
     z = A.verschiebe_ausgabezeilen(z, dxq)
     kb, top = A.auf_leinwand(z, H, BODEN, LIFT.get(i, 0))
-    orte = {}
-    for ort, (m, orig) in marken.items():
-        orte[ort] = A.suche_marke(kb, m)
-        kb[L.farbmaske(kb, [m]), :3] = orig
     kr = L.platz(np.where((np.arange(sh)[:, None, None] < KOERPER_Y0), sp, 0).astype(np.uint8), H, W, PAD_L, PAD_T)
-    kdx, kdy = dxq[0], top - KOERPER_Y0 - PAD_T + KOPF_DY.get(i, 0)
+    kdx, kdy = int(round(lean)), top - KOERPER_Y0 - PAD_T + KOPF_DY.get(i, 0)
     kr = L.versetze(kr, kdx, kdy)
     fig = L.zusammen(H, W, [(kb, 0, 0), (kr, 0, 0)])
     # Ergänzung: Fuge zwischen Kopfblock (unterste Zeile) und Körper (oberste Zeile) beim Hochfedern mit Umrissfarbe füllen
@@ -224,29 +163,13 @@ def figur(i):
         if tuple(int(v) for v in fig[y, x, :3]) in STEINE and y + 1 < H and not fig[y + 1, x, 3]:
             fig[y + 1, x, :3] = A_
             fig[y + 1, x, 3] = 255
-    return dict(fig=fig, kr=kr, top=top, kb=kb, kdx=kdx, kdy=kdy, orte=orte)
-
-
-def sterne_ebene(i, f):
-    e = L.leer(H, W)
-    for ort, stufe in aktive_sterne(i):
-        x, y = ORTE[ort]
-        if y < KOERPER_Y0:
-            cx, cy = PAD_L + x + f['kdx'], PAD_T + y + f['kdy']
-        else:
-            pos = f['orte'].get(ort)
-            if pos is None:
-                continue
-            cx, cy = pos
-        farben = STERN_GOLD if ort.startswith('gold') else STERN_STEIN
-        A.stern(e, cx, cy, stufe, farben)
-    return e
+    return dict(fig=fig, kr=kr, top=top, kb=kb, kdx=kdx, kdy=kdy)
 
 
 def frame(i):
     f = figur(i)
     staub = L.puff_ebene(H, W, i, 24, STAUB, STAUBFARBEN)
-    return L.zusammen(H, W, [(staub, 0, 0), (f['fig'], 0, 0), (sterne_ebene(i, f), 0, 0)])
+    return L.zusammen(H, W, [(staub, 0, 0), (f['fig'], 0, 0)])
 
 
 def steine_haengen(fig):
@@ -273,7 +196,7 @@ if __name__ == '__main__':
     print('freiliegender Lehm am Rand (Frame, Pixel):', offen if offen else 'keiner')
     haengt = [(i, steine_haengen(figs[i])) for i in range(N) if steine_haengen(figs[i])]
     print('Steinpixel ohne Unterumriss (Frame, Pixel):', haengt if haengt else 'keine')
-    A.ausdruck_pruefen(figs, spr, 'rocky-slime', erlaubt=list(RAMPE.values()) + [A_])
+    A.ausdruck_pruefen(figs, spr, 'rocky-slime', erlaubt=[A_])
     L.speichern('rocky-slime', 'Rocky Slime', frames, MS, prev)
     if prev:
         L.streifen(prev + '/rocky-slime-strip.png', frames[::2], spalten=12, scale=5)

@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Skeleton Necromancer“ (Creature) — Fassung 2 (lebendiger, mit Glanz und mehr Seelenwölkchen).
+"""Idle-Animation für „Skeleton Necromancer“ (Creature) — Fassung 3 (Loch im Boden mit Arm, kein Knochenglanz).
 
 Quelle: src/skeleton-necromancer.png — Ebene „Skeleton Necromancer“ (20×34 px, 15 Farben) aus Motive.xcf.
 PICK: [["Motive", 813, 1], ["Motive", 813, 2]]
-  Figur 1 = Kapuzenfigur mit Rippenring, Figur 2 = „Unterkörper“ (Knochen + schwarzer Zipfel). Figur 2 gehört dazu: gleiche Ebene,
-  gleicher Name, exakt auf der Mittelachse (x 38/38,5 in der Kartenkunst) und 2 px unter dem Rippenring; der lila Grabkreuz-Hintergrund
-  der Karte ist dagegen nicht Teil der Ebene.
+  Figur 1 = Kapuzenfigur mit Rippenring (schwebt), Figur 2 = LOCH IM BODEN, aus dem ein ARM ragt (Kartenbild: schwarze Raute am Boden, darin ein
+  Knochenarm mit Faust, der nach oben zeigt). Gleiche Ebene, Mittelachse, 2 px unter dem Rippenring; der lila Grabkreuz-Hintergrund der Karte ist nicht Teil der Ebene.
 
 Aufruf:   python3 skeleton_necromancer.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/skeleton-necromancer.png + .json
@@ -15,28 +14,28 @@ Was ist was (Koordinaten im Sprite, x/y):
   nur matte Andeutungen (J bei (9/10,7), (8–11,8), (9/10,9), M/L darunter) — Augen/Kiefer sind NICHT sicher zu erkennen und bleiben fest.
 * Ärmel: links x 0–4, rechts x 15–19, y 8–12 (schwarz A, graue Lichter C/N/D); darüber je ein brauner Punkt (2,8) und (17,8),
   dazwischen Robe/Körper. Braune Knochenpunkte (5,11) und (14,11) sitzen am Körper (Handgelenk/Knochen) und bleiben fest.
-* Robe: y 9–12 (C, L dunkelviolett, M, A), Saum mit braunen Knochenkanten bei (6/7,12) und (12/13,12).
-* Rippenring: y 13–20, Knochen E/H/I/K (Rampe K → H → E → I) mit braunem Umriss B; Mitte (x 9–10, y 16–19) ist hohl, bei y 18 verbindet ein Steg die Hälften.
-* Unterkörper (Figur 2): y 24–33 — Knochenknauf (B/E/H) y 24–27, Schaft (I) y 28–30, schwarze Raute A (breit bei y 29–30, Spitze y 33).
-Fest bleiben: Gesicht, Robe, alle Knochenpunkte (nur starr mit ihrem Teil).
+* Robe: y 9–12, Saum mit braunen Knochenkanten bei (6/7,12) und (12/13,12). Rippenring: y 13–20, Knochen E/H/I/K mit braunem Umriss B,
+  Mitte (x 9–10, y 16–19) hohl.
+* LOCH (Figur 2, schwarz A): Raute y 28–33, breit bei y 29–30 (x 6–14), Spitze y 33 — sitzt fest am Boden (bleibt in jedem Frame unverändert).
+* ARM (Figur 2, nicht-schwarze Pixel y 24–30): Faust y 24–27 (Umriss B, Fläche E/H; 4 px breit, rundlich) auf dem Unterarmknochen y 28–30
+  (B I B, 1 px weißer Knochen I mit braunem Umriss), dessen unteres Ende (10,30) im Loch steckt.
+Fest bleiben: Gesicht, Robe, alle Knochenpunkte (nur starr mit ihrem Teil), das Loch.
 
-Ablauf (40 Frames à 65 ms = 2,6 s; Frame 0 = Original, die Wölkchen und der Glanz ausgenommen):
-* Schweben zweistufig (Periode 40, 0-1-2-1-0 px): der Rippenring (Brust) steigt zuerst, Kapuze + Robe + Ärmel folgen 3 Frames später und
-  liegen nie höher als die Brust (der Saum taucht höchstens 1 px über den Rippenring, nie entsteht ein Spalt); der Unterkörper hinkt
-  5 Frames hinterher und steigt ebenfalls bis 2 px — die Lücke zum Rippenring bleibt immer ≥ 1 Zeile.
-* Kapuze atmet (Periode 20): die Zeile y 5 wird einmal eingefügt, die Kuppe hebt sich 1 px (Gesicht/Ärmel bleiben).
-* Unterkörper stärker: dazu pendelt die schwarze Spitze (y 31–33) bis ±2 px (Periode 10).
+Ablauf (40 Frames à 65 ms = 2,6 s; Frame 0 = Original, Wölkchen ausgenommen):
+* Schweben zweistufig (Periode 40, 0-1-2-1-0 px, nur OBERER Teil): der Rippenring steigt zuerst, Kapuze + Robe + Ärmel folgen 3 Frames später und
+  liegen nie höher als die Brust (der Saum taucht höchstens 1 px über den Ringansatz, nie entsteht ein Spalt).
+* Kapuze atmet (Periode 20): die Zeile y 5 wird einmal eingefügt, die Kuppe hebt sich 1 px.
 * Ärmel-Geste größer und öfter (Periode 20, beide Seiten SYNCHRON und gespiegelt): Spitzen heben sich bis 4 px, dazu flattert eine Welle
-  (Periode 10, Spitze hinkt hinterher) mit bis ±1,6 px → insgesamt bis ca. ±5 px; Spaltenversatz wächst von der Schulter (x 5 / x 14) zur Hand.
-* Glanz (Regel 12): Lichtband wandert alle 20 Frames diagonal über den Rippenring (Knochenrampe K → H → E → I), alle 20 Frames über den
-  Knochenknauf; vierzackige Glitzersterne (Mitte I, Arme E) blitzen für 3 Frames an Rippenpunkten (5,16) Frame 6–8, (14,19) Frame 26–28,
-  am Knauf (9,25) Frame 16–18 und (10,28) Frame 36–38 auf und bleiben am Objekt.
-* Seelenwölkchen (Partikel, hinter der Figur, 11 Stück, Lebensdauer 40 Frames, langsam aufsteigend, leichtes Wabern, Formen l, m, o, k):
-  zwei große seitlich vom Unterkörper, zwei über den Ärmeln, zwei seitlich aus dem Rippenring, zwei kleine Kugeln neben der Rautenspitze,
-  zwei Funken im hohlen Rippenring, ein Funke über der Kapuze. Kern Knochenweiß E (213,213,213) aus dem Sprite, Rand kaltes Violett
+  (Periode 10, Spitze hinkt hinterher) mit bis ±1,6 px → insgesamt bis ca. ±5–6 px; Spaltenversatz wächst von der Schulter (x 5 / x 14) zur Hand.
+* ARM aus dem Loch: er reckt sich (Periode 40, 0-1-2-1-0 px, dazu kurze Zuckungen +1 px bei Frame 6–7, 17–18, 31–32; höchstens 3 px): im Arm-Layer
+  wird die Unterarmzeile y 29 eingefügt, die Faust steigt, das Armende (10,30) bleibt im Loch; das Handgelenk kippt (Periode 16): die Fauststeigerung y 24–26
+  neigt sich ±1 px (Scherung um y 28). Das Loch hinter dem Arm ist schwarz A (ERGÄNZUNG, siehe unten).
+* Seelenwölkchen (Partikel, hinter der Figur, 11 Stück, Lebensdauer 40 Frames, langsam aufsteigend, leichtes Wabern, Formen l, m, o, k): aus dem Ärmelbereich,
+  den Seiten des Rippenrings und über der Kapuze (nicht aus dem Loch). Kern Knochenweiß E (213,213,213) aus dem Sprite, Rand kaltes Violett
   (128,102,178) = #8066b2 aus data/palette.json (AUSNAHME: neue Farbe, in L.pruefe freigegeben; mit SEELE_RAND schnell tauschbar).
-ERGÄNZUNG: keine gemalten Pixel (nichts liegt unter bewegten Teilen). Die Figur hat 296–301 Pixel: beim Heben legen sich Ärmel über
-Kapuzenränder und der Rippenring taucht unter den Saum; das ist gewollt (Arm vor Kapuze, Saum vor Rippen).
+Kein Glanz an Knochen (Regel 14): Lichtband und Glitzersterne sind entfallen.
+ERGÄNZUNG: 7 schwarze Pixel (A) im Loch hinter dem Arm bei (9,28) (10,28) (11,28) (9,29) (10,29) (11,29) (10,30) — im Ruhebild liegen dort die Armpixel,
+sie werden erst sichtbar, wenn der Arm steigt. Sonst nichts gemalt.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel.
 """
 import math

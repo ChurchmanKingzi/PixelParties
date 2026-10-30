@@ -25,14 +25,20 @@ Ablauf (48 Frames à 65 ms = 3,12 s):
   Die Fingerknochen tragen die Farben der gefalteten Spalten (Knochen weiß/grau, tan Hand-Spitze, braune Binden am Arm/Handgelenk).
   Gefaltet (Ruhe) sind es exakt die Originalpixel; beim Aufklappen werden die Fingerpixel aus den Originalspalten x = 1, 2, 2, 3 gezogen
   und pixelweise (Dithering) zu sauberen Knochen. Der rechte Flügel schlägt ~1 Frame später als der linke.
-* Rippenkorb atmet zweistufig bis 2 px (Zeile 13, dann Zeile 14 wird zusätzlich verdoppelt); Schädel samt Hörnern hebt sich starr mit, die
+* Rippenkorb atmet zweistufig bis 2 px (Zeile 13, dann zusätzlich Zeile 14 verdoppelt; zweimal pro Schleife, Gipfel bei Frame 13 und 37); Schädel samt Hörnern hebt sich starr mit, die
   Füße bleiben am Boden; die Flügelwurzeln (Schulter, Handgelenk) heben sich mit.
-* Glanz: zweimal pro Schleife wandert ein Lichtband diagonal über Knochen, Binden und Flügelhaut (Pixel eine/zwei Stufen heller auf der
-  Grau- bzw. Braunrampe des Sprites); an den Hornspitzen, am Schädel und an den Handgelenken blitzen vierzackige Glitzer-Sterne auf.
-* Knochenstaub: runde, langsame Partikel ('k', 'o', 'm') rieseln von den Flügeln, am Boden wölkt flach Staub.
+* Kein Glanz/Glitzer: Knochen sind kein Metall (Nutzerregel: Glanz nur bei Metall, Gold, Edelsteinen).
+* Knochenstaub: runde, langsame Partikel ('k', 'o', 'm') steigen vom Boden/den Füßen in leichten Wellen auf (Dunst/Staub steigt langsam).
 
-Ergänzungen (fertiggezeichnet, nur Farben des Sprites): siehe ERG unten — Körper wird ohne Flügelspalten gerendert; alle Flügelposen außer
-der gefalteten sind neu gezeichnet (Arm, Finger, Haut, Handgelenkswulst).
+Ergänzungen / Neugezeichnetes (nur Farben des Sprites, keine neuen Farben):
+* Alle Flügelposen außer der gefalteten (Frame 0–2, 28–31, 44–47 = exakt die Originalpixel) sind neu gezeichnet: Armknochen (Schulter (3, 8) →
+  Handgelenk, 2 px dick, weiß/hellgrau mit brauner Binde (49,24,0)/(88,66,42)), vier Fingerknochen (Wurzel am Handgelenk, Farben aus den Spalten
+  x = 1, 2, 2, 3 des gefalteten Flügels → weiß (246,255,255) / hellgrau (213/189) mit tan Spitze (150,119,88)/(212,178,150)),
+  Flügelhaut in den Brauntönen des Sprites ((88,66,42) Fläche, (49,24,0) Rand, (63,46,26) Adern; gezackt, mit Löchern), Handgelenkswulst 3×3.
+  Die Haut setzt am Becken an ((6,16)/(6,17) bis zum Rippenkorb) und liegt HINTER dem Körper.
+* Körper-Umriss bei offenen Flügeln: (3,6) = (32,32,32) bzw. gespiegelt (16,6) (im Original Teil des Flügelbands, in Ruhe identisch) bleibt am Körper,
+  ebenso die ganze Schultergürtel-Spalte x = 4 / 15 (y 5–14) — damit ist der Schädelumriss und der Rippenkorb auch bei weit offenen Flügeln komplett.
+  Sonst musste nichts erfunden werden: Körper und Flügel überlappen sich im Original nirgends.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError, wenn etwas herausragen würde).
 Nur ganze Pixel, nur Farben der Quelle.
 """
@@ -65,13 +71,10 @@ koerper = vorhanden & ~wing_l & ~wing_r
 
 # ── Farben (alle aus dem Sprite) ───────────────────────────────────────────────────────────────────────────────────
 Q, P, Nn, Lg = (246, 255, 255), (213, 213, 213), (189, 189, 189), (156, 156, 156)
-KG, IG = (123, 123, 123), (106, 106, 106)
 BR_D, BR_E, BR_F, BR_J, BR_M = (49, 24, 0), (63, 46, 26), (88, 66, 42), (150, 119, 88), (212, 178, 150)
 PAL = dict(knochen=[Q, P, Nn], schatten=Lg, haut=(BR_F, BR_E, BR_D, BR_E), binde=(BR_D, BR_F),
            rein=dict(knochen=[Q, P, Nn], manschette=(Lg, BR_J, BR_M)))
 DG, GG = (32, 32, 32), (82, 82, 82)
-RAMPE_KNOCHEN = [DG, GG, IG, KG, Lg, Nn, P, Q]
-RAMPE_BRAUN = [BR_D, BR_E, BR_F]            # Binden/Umrisse glänzen; die Flügelhaut (F) bleibt oben auf der Rampe
 
 
 def px(x, y):
@@ -164,20 +167,18 @@ def ebene(maske):
 BODY = ebene(koerper)
 WING_L0, WING_R0 = ebene(wing_l), ebene(wing_r)
 
-# ── Glanz: Sterne (Ort, Frame-Start, Teil) ────────────────────────────────────────────────────────────────────────────
-STERNE = [((6, 1), 5, 'kopf'), ('hand_l', 12, 'hand'), ((13, 1), 17, 'kopf'), ((12, 4), 21, 'kopf'), ('hand_r', 36, 'hand'), ((7, 4), 41, 'kopf')]
-
 # ── Partikel: Knochenstaub ────────────────────────────────────────────────────────────────────────────────────────────
 STAUB = {'c': P, 'r': Lg}
-PUFFS = [
-    dict(x=px(3, 22)[0], y=px(3, 22)[1], vx=-5, vy=-3, off=0, form='m', wackeln=0),     # Bodenstaub, flach, driftet nach außen
-    dict(x=px(16, 22)[0], y=px(16, 22)[1], vx=5, vy=-3, off=24, form='m', wackeln=0),
-    dict(x=px(-5, 12)[0], y=px(-5, 12)[1], vx=-2, vy=8, off=8, form='o', wackeln=1),    # rieselt von den Flügeln
-    dict(x=px(24, 12)[0], y=px(24, 12)[1], vx=2, vy=8, off=32, form='o', wackeln=1),
-    dict(x=px(-9, 5)[0], y=px(-9, 5)[1], vx=-1, vy=9, off=16, form='k', wackeln=1),
-    dict(x=px(28, 5)[0], y=px(28, 5)[1], vx=1, vy=9, off=40, form='k', wackeln=1),
-    dict(x=px(2, 15)[0], y=px(2, 15)[1], vx=-2, vy=7, off=4, form='k', wackeln=1),
-    dict(x=px(17, 15)[0], y=px(17, 15)[1], vx=2, vy=7, off=28, form='k', wackeln=1),
+PUFFS = [                                                    # alles steigt langsam auf (kleines vy, leichtes Wackeln), nahtlos
+    dict(x=px(4, 22)[0], y=px(4, 22)[1], vx=-3, vy=-9, off=0, form='m', wackeln=1),      # Bodenstaub an den Füßen
+    dict(x=px(15, 22)[0], y=px(15, 22)[1], vx=3, vy=-9, off=24, form='m', wackeln=1),
+    dict(x=px(-3, 21)[0], y=px(-3, 21)[1], vx=-1, vy=-10, off=8, form='o', wackeln=1),   # steigt neben dem Körper
+    dict(x=px(22, 21)[0], y=px(22, 21)[1], vx=1, vy=-10, off=32, form='o', wackeln=1),
+    dict(x=px(-7, 17)[0], y=px(-7, 17)[1], vx=-1, vy=-8, off=16, form='k', wackeln=1),
+    dict(x=px(26, 17)[0], y=px(26, 17)[1], vx=1, vy=-8, off=40, form='k', wackeln=1),
+    dict(x=px(9, 23)[0], y=px(9, 23)[1], vx=0, vy=-8, off=12, form='k', wackeln=1),
+    dict(x=px(1, 23)[0], y=px(1, 23)[1], vx=-1, vy=-7, off=4, form='k', wackeln=1),
+    dict(x=px(18, 23)[0], y=px(18, 23)[1], vx=1, vy=-7, off=28, form='k', wackeln=1),
 ]
 
 
@@ -199,28 +200,12 @@ def fluegel_ebene(t, links, n_atem):
     return a, pp
 
 
-def frame(i, partikel=True, glanz=True):
+def frame(i, partikel=True):
     n = atem_stufe(i)
     body = dehne(BODY, n)
     wl, pl = fluegel_ebene(i, True, n)
     wr, pr = fluegel_ebene(i - RECHTS_LAG, False, n)
     f = L.zusammen(H, W, [(wl, 0, 0), (wr, 0, 0), (body, 0, 0)])           # Flügel hinter dem Körper
-    if glanz:
-        B.band_hell(f, i, N, 22, 12, [RAMPE_KNOCHEN, RAMPE_BRAUN], stufen=2, kern=3, breite=3.4, achse=(1.0, 0.7), x_bereich=(PAD_L - 12 + 0.7 * PAD_T, PAD_L + 32 + 0.7 * (PAD_T + 24)))
-        B.band_hell(f, i, N, 1, 12, [RAMPE_KNOCHEN, RAMPE_BRAUN], stufen=2, kern=3, breite=3.4, achse=(1.0, 0.7), x_bereich=(PAD_L - 12 + 0.7 * PAD_T, PAD_L + 32 + 0.7 * (PAD_T + 24)))
-        for (ort, start, teil) in STERNE:
-            st = F.stern_stufe(i, N, start)
-            if st is None:
-                continue
-            if teil == 'kopf':
-                x, y = PAD_L + ort[0], PAD_T + ort[1] - n
-            else:
-                q = pl if ort == 'hand_l' else pr
-                if q is None:
-                    continue
-                wx, wy = int(round(q['W'][0])), int(round(q['W'][1]))
-                x, y = (wx - 1, wy) if ort == 'hand_l' else (W - 1 - (wx - 1), wy)
-            F.stern(f, x, y, st, Q, P, Nn)
     if partikel:
         staub = L.puff_ebene(H, W, i, N, PUFFS, STAUB)
         f = L.zusammen(H, W, [(staub, 0, 0), (f, 0, 0)])

@@ -1,15 +1,19 @@
 # -*- coding: utf-8 -*-
-"""Hilfscode der Gruppe „Flieger“ (zweiter Animator) — baut auf anim_lib / anim_flieger auf, ändert beides nicht.
+"""Hilfscode der Gruppe „Flieger“ (zweiter Animator) — baut auf anim_lib auf, ändert nichts daran.
 
-Skelett-/Fledermausflügel, die aus Schlüsselpunkten neu gezeichnet werden (Pixelart, nur ganze Pixel, nur übergebene Farben):
+Skelett-/Fledermausflügel, die aus Schlüsselpunkten neu gezeichnet werden (Pixelart, nur ganze Pixel, nur Farben aus Palette/Quell-Sprite):
 
-    pose_mix(a, b, t)                       Schlüsselposen (dict) linear mischen
-    knochenflügel(h, w, pose, pal, ...)     einen linken Flügel auf eine Leinwand h×w zeichnen: Armknochen Schulter → Handgelenk,
-                                            Fingerknochen (fächerförmig, mit Knick) vom Handgelenk, gezackte Flügelhaut dazwischen,
-                                            Handgelenkswulst (Binde), Fingerkrallen
+    pose_mix(a, b, t)                       zwei Schlüsselposen (dict) linear mischen
+    pose_vektor(p) / vektor_pose(v, vorlage)   Pose ↔ flache Float-Liste (zum Splinen)
+    spline(schluessel, t, periode)          periodischer kubischer Hermite-Spline durch Schlüsselposen (nahtlose Schleife, Halt-Posen)
+    knochenflügel(h, w, pose, pal, quelle, spalten, x0, y0, ...)
+                                            einen linken Flügel auf eine Leinwand h×w zeichnen: Armknochen Schulter → Handgelenk, vier
+                                            Fingerknochen (fächerförmig, mit Knick; Farben aus Spalten des gefalteten Flügels, beim Aufklappen
+                                            pixelweise zu sauberen Knochen), gezackte, zerrissene Flügelhaut dazwischen, Handgelenkswulst
+    rein_farbe(pr, ab_wurzel, ab_spitze)    saubere Fingerfarbe (Knochenrampe, Manschette + tan Spitze)
     spiegeln(a)                             Ebene an der senkrechten Mittelachse der Leinwand spiegeln (rechter Flügel = gespiegelter linker)
     verbunden4(a, start)                    Maske aller deckenden Pixel, die über KANTEN (4er-Nachbarschaft) mit `start` zusammenhängen
-    band_hell(frame, i, n, start, dauer, rampen, ...)   diagonales Lichtband über ein fertig zusammengesetztes Bild (Glanz)
+    linie(p0, p1) / linie4(p0, p1)          Bresenham (8er- bzw. 4er-verbunden)
 Koordinaten der Posen sind Leinwandkoordinaten (Float); gezeichnet wird auf die nächsten ganzen Pixel.
 """
 import math
@@ -344,37 +348,3 @@ def knochenflügel(h, w, pose, pal, quelle, spalten, x0, y0, risse=(), adern=Tru
         for (dx, dy), c in muster.items():
             setze(wx + dx, wy + dy, c)
     return a
-
-
-# ── Glanz: Lichtband über ein fertiges Bild ──────────────────────────────────────────────────────────────────────────
-def band_hell(frame, i, n, start, dauer, rampen, stufen=1, breite=2.6, achse=(1.0, 0.6), kern=None, maske=None, x_bereich=None):
-    """Ein Lichtband wandert diagonal über alle Pixel von `frame` (Leinwand), deren Farbe in einer der `rampen` (Listen dunkel → hell)
-    steht; sie werden `stufen` Stufen heller (im Bandkern `kern`). Läuft von x_bereich[0] bis x_bereich[1] (u = achse·(x, y)).
-    Wirkt nur im Zeitfenster [start, start+dauer) (zyklisch mod n). Ändert `frame` an Ort und Stelle."""
-    k = (i - start) % n
-    if k >= dauer:
-        return frame
-    H, W = frame.shape[:2]
-    ys, xs = np.nonzero(frame[..., 3] > 0)
-    if maske is not None:
-        sel = maske[ys, xs]
-        ys, xs = ys[sel], xs[sel]
-    if not len(ys):
-        return frame
-    u = achse[0] * xs + achse[1] * ys
-    if x_bereich is None:
-        umin, umax = float(u.min()), float(u.max())
-    else:
-        umin, umax = x_bereich
-    mitte = umin - breite + (k + 0.5) / dauer * (umax - umin + 2 * breite)
-    for y, x, uu in zip(ys, xs, u):
-        d = abs(uu - mitte)
-        if d > breite / 2.0 + 0.001:
-            continue
-        c = tuple(int(v) for v in frame[y, x, :3])
-        st = kern if (kern is not None and d <= breite / 4.0) else stufen
-        for r in rampen:
-            if c in r:
-                frame[y, x, :3] = r[max(0, min(len(r) - 1, r.index(c) + st))]
-                break
-    return frame

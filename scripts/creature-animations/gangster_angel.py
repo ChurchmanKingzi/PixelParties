@@ -28,7 +28,7 @@ Ablauf (40 Frames à 70 ms = 2,8 s):
   (230,205,87) → (250,225,98) → (244,239,157) → Weiß), am Rutenende und am Bauchstreifen blitzen vierzackige Glitzer-Sterne auf.
 * Diamant glänzt und glitzert: Lichtband diagonal über die Facetten (Rampe (72,89,105) … (255,255,255)), Facetten pulsieren, an seinen Ecken
   blitzen vierzackige Sterne (Mitte + 4 Arme, wachsen/schrumpfen, bleiben AM Diamanten).
-* Hellblaue Funkelpixel funkeln reihum über die Blau-Rampe, an der Mitte blitzt ein Stern.
+* Hellblaue Funkelpixel blinken reihum WEISS (je 5 Frames), an der Mitte blitzt ein weißer Stern. Alle Glitzersterne (Diamant, Gold, Bauch, Funkelpixel) sind weiß.
 * Füße baumeln, Blinzeln (zweimal pro Schleife), Augenbrauen zucken hoch, Lichtreflex wandert über beide Brillengläser (zweimal pro Schleife).
 * Glitzer-Partikel (acht kleine weiße/goldene Funken und Punkte) steigen langsam hinter den Flügeln auf.
 
@@ -65,7 +65,7 @@ BLAU, BLAU_HELL, BLAU_WEISS = (140, 192, 239), (181, 208, 238), (238, 247, 254)
 AUGE_DUNKEL = (91, 169, 88)
 BRAUE = (97, 99, 98)
 GOLDR = [GOLD_DUNKEL, GOLD, GOLD_HELL, FL_B]                                  # Goldrampe dunkel → hell
-BLAUR = [BLAU, BLAU_HELL, BLAU_WEISS, FL_B]                                   # Funkelblau
+BLAUR = [BLAU, BLAU_HELL, BLAU_WEISS, FL_B]                                   # Funkelblau (Rampe, nicht mehr für die Funkelpixel benutzt)
 GEMR = [(72, 89, 105), (129, 161, 186), (149, 184, 206), BLAU_HELL, BLAU_WEISS, FL_B]   # Diamantrampe dunkel → hell
 
 # ── Masken ────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -102,7 +102,7 @@ GLAS_R = [(18, 11), (19, 11), (20, 11), (23, 11)]
 AUGEN = [(15, 10), (16, 10), (19, 10), (20, 10)]
 BRAUEN = {(15, 8): HELLROSA, (16, 8): HELLROSA, (19, 8): KOPF_G, (20, 8): KOPF_G}
 # Glitzer-Sterne: (x, y) in Sprite-Koordinaten, Start-Frame; Farben (Mitte, Arm 1, Arm 2)
-STERNE_GEM = [((29, 10), 3), ((25, 11), 13), ((27, 13), 23), ((26, 9), 33)]
+STERNE_GEM = [((25, 10), 3), ((27, 9), 13), ((29, 11), 23), ((27, 13), 33)]   # Ecken des Diamanten (weiß, auf dem Körper/Gold sichtbar)
 STERNE_GOLD = [((26, 5), 8), ((18, 3), 28)]
 STERN_BLAU = ((22, 0), 18)
 STERN_BAUCH = ((19, 17), 15)
@@ -167,7 +167,7 @@ def frame(i, partikel=True):
     for k, p in enumerate(HALO_BLAU):                        # Funkelpixel funkeln reihum über die Blau-Rampe
         t = (i - 2 - 3 * k) % N
         if t < 5:
-            F.setze(hl, PAD_L, PAD_T, {p: BLAUR[(0, 1, 2, 3, 2)[t]]})
+            F.setze(hl, PAD_L, PAD_T, {p: (BLAU_WEISS, FL_B, FL_B, FL_B, BLAU_WEISS)[t]})
     off_rute = up + halo_f
 
     # ── Köder (Diamant) an der Schnur: federt, pendelt, glänzt ───────────────────────────────────────────────────────
@@ -192,17 +192,17 @@ def frame(i, partikel=True):
     for (cx, cy), start in STERNE_GEM:
         st = F.stern_stufe(i, N, start)
         if st is not None:
-            F.stern(f, PAD_L + cx + dx_g, PAD_T + cy + off_rute + dy_g, st, FL_B, BLAU_HELL, BLAU)
+            F.stern(f, PAD_L + cx + dx_g, PAD_T + cy + off_rute + dy_g, st, FL_B, FL_B, FL_B)
     for (cx, cy), start in STERNE_GOLD:
         st = F.stern_stufe(i, N, start)
         if st is not None:
-            F.stern(f, PAD_L + cx, PAD_T + cy + off_rute, st, FL_B, GOLD_HELL, GOLD)
+            F.stern(f, PAD_L + cx, PAD_T + cy + off_rute, st, FL_B, FL_B, FL_B)
     st = F.stern_stufe(i, N, STERN_BLAU[1])
     if st is not None:
-        F.stern(f, PAD_L + STERN_BLAU[0][0], PAD_T + STERN_BLAU[0][1] + off_rute, st, FL_B, BLAU_WEISS, BLAU)
+        F.stern(f, PAD_L + STERN_BLAU[0][0], PAD_T + STERN_BLAU[0][1] + off_rute, st, FL_B, FL_B, FL_B)
     st = F.stern_stufe(i, N, STERN_BAUCH[1], (0, 1, 1, 0))
     if st is not None:
-        F.stern(f, PAD_L + STERN_BAUCH[0][0], PAD_T + STERN_BAUCH[0][1] + low, st, FL_B, GOLD_HELL)
+        F.stern(f, PAD_L + STERN_BAUCH[0][0], PAD_T + STERN_BAUCH[0][1] + low, st, FL_B, FL_B)
     return f
 
 

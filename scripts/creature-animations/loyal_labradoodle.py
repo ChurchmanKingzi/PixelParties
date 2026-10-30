@@ -23,10 +23,11 @@ Ablauf (50 Frames à 70 ms = 3,5 s), alle Bewegungen unabhängig; der Kopf bleib
 * Atmen (Periode 25, 2× pro Schleife; oben in Frames 3–14 und 28–39): Zeile 12 (Brust) wird eingefügt — Kopf, Ohren und Halsband heben
   sich 1 px, die Füße bleiben am Boden.
 * Lockige Ohren schwingen: links in Frames 2, 14, 27, 39, rechts in 8, 20, 33, 44 (je 6 Frames) nach außen und zurück: erst nur die
-  Spitzenzeile 5, dann die Zeilen 4–5 gemeinsam je 1 px (glatte, schmaler werdende Kontur); oben bleiben sie am Kopf, die Lücke zum
-  Kopf wird mit dem Randpixel des Ohres geschlossen.
-* Locken wippen: die drei Fellbüschel oben (3,0) (7,0) (10,0) rutschen unabhängig voneinander 1 px nach links bzw. rechts und zurück
-  (Frames 4–8, 30–34 links/rechts, 16–20, 37–41, 8–12, 23–27); sie bleiben dabei über Kopfzeile 1 (4-verbunden).
+  Unterkante (Zeile 6 = Umrisspixel (2–3, 6) gehören zum Ohr), dann die Zeilen 4–6 gemeinsam je 1 px (glatte Außenkante); der Umriss außen,
+  unten und an der Spitze wandert mit, die Lücke zum Kopf wird mit dem Randpixel des Ohres geschlossen. Kein Quell-Umrisspixel fehlt.
+* Locken wippen: die drei Fellbüschel oben (3,0) (7,0) (10,0) sind zugleich der Umriss über der Kopf-/Ohroberkante (Zeile 1) — sie dürfen deshalb
+  nicht wegrutschen (das legte den Ohrrand frei). Stattdessen kringelt sich jede Locke unabhängig: ein zweites Pixel erscheint 1 px seitlich
+  (über dem Umrisspixel von Zeile 1) und verschwindet wieder (Frames 4–8, 30–34 links/rechts, 16–20, 37–41, 8–12, 23–27).
 * Blick nur mit den Augen, hoch/runter (Frames 12–17 hoch, 26–31 runter, 44–48 hoch); die frei werdende Stelle bekommt die Fellfarbe.
 * Blinzeln, deutlich sichtbar (Frames 9–12 und 34–37, alle 25 Frames ≈ 1,75 s): die braunen Augenpixel werden hellgrau (I, die helle
   Halsbandfarbe): oberes, beide (zwei Frames), oberes.
@@ -55,8 +56,8 @@ yy, xx = np.mgrid[0:sh, 0:sw]
 vorhanden = L.deckend(spr)
 
 locke = {x: vorhanden & (xx == x) & (yy == 0) for x in (3, 7, 10)}
-ohr_l = vorhanden & (xx <= 3) & (yy >= 1) & (yy <= 5)
-ohr_r = vorhanden & (xx >= 10) & (yy >= 1) & (yy <= 5)
+ohr_l = vorhanden & (xx <= 3) & (yy >= 1) & (yy <= 6)          # inkl. Unterkante (2–3, 6): gehört zum Ohrumriss
+ohr_r = vorhanden & (xx >= 10) & (yy >= 1) & (yy <= 6)
 koerper = vorhanden & ~ohr_l & ~ohr_r & (yy >= 1)
 
 HELL, MITTEL = (169, 165, 154), (137, 130, 122)                   # I / H: silbergraue Rampe (Lid, Halsbandglanz)
@@ -75,9 +76,10 @@ def teil(maske):
 
 
 def ohr_profil(env, richtung):
-    """Lockenohr schwingt nach außen: erst nur die Spitzenzeile (5), dann Zeilen 4–5 gemeinsam (glatte Kontur)."""
-    stufe = 0 if env < 0.2 else (1 if env < 0.5 else 2)
-    return {PAD_T + y: richtung for y in range(6 - stufe, 6)} if stufe else {}
+    """Lockenohr schwingt nach außen: erst nur die Unterkante (Zeile 6), dann Zeilen 4–6 gemeinsam. Die Außenkante des Ohres läuft im
+    Original bei x = 1, 0, 1, 1, 2 (Zeilen 2–6): nach Stufe 2 bei 1, 0, 0, 0, 1 — glatt; Umriss und Unterkante wandern mit."""
+    stufe = 0 if env < 0.2 else (1 if env < 0.5 else 3)
+    return {PAD_T + y: richtung for y in range(7 - stufe, 7)} if stufe else {}
 
 
 def im_fenster(i, *fenster):
@@ -141,7 +143,9 @@ def frame(i, nur=None):
     orr = L.streck_zeile(T.ohr_haengend(teil(ohr_r), ohr_profil(ohr_re, 1), 'rechts'), PAD_T + BAUCHZEILE, atem)
     lo = L.leer(H, W)
     for x, m in locke.items():
-        lo = L.zusammen(H, W, [(lo, 0, 0), (L.versetze(teil(m), locken[x], -atem), 0, 0)])
+        lo = L.zusammen(H, W, [(lo, 0, 0), (L.versetze(teil(m), 0, -atem), 0, 0)])
+        if locken[x]:                                              # zweites Pixel seitlich, über dem Umrisspixel von Zeile 1 (Umriss bleibt geschlossen)
+            lo = L.zusammen(H, W, [(lo, 0, 0), (L.versetze(teil(m), locken[x], -atem), 0, 0)])
     ebenen = {'rumpf': rest, 'fuss_l': fl, 'fuss_r': fr_, 'ohr_l': ol, 'ohr_r': orr, 'locken': lo}
     wahl = nur or ('rumpf', 'fuss_l', 'fuss_r', 'ohr_l', 'ohr_r', 'locken')
     return L.zusammen(H, W, [(ebenen[n], 0, 0) for n in wahl])
