@@ -3376,10 +3376,7 @@ function RotateOverlay() {
       <div className="rotate-cam" ref={camRef} aria-hidden="true"><TapBackdropCanvas hostRef={camRef} /></div>
       <div className="rotate-content">
         <div className="pp-logo-stack rotate-logo">
-          <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
-          <div className="pp-logo-tint" aria-hidden="true"></div>
-          <div className="pp-logo-licht" aria-hidden="true"></div>
-          <div className="pp-logo-umriss" aria-hidden="true"></div>
+          <PpLogoBild />
         </div>
         {auto ? (
           <div className="rotate-play" aria-hidden="true">

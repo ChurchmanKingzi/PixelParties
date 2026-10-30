@@ -871,10 +871,7 @@ function AuthScreen() {
           width (the menu sizes it for a full-width header). */}
       <div className="pp-logo-stack auth-logo">
         <LogoParticles />
-        <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
-        <div className="pp-logo-tint" aria-hidden="true"></div>
-        <div className="pp-logo-licht" aria-hidden="true"></div>
-        <div className="pp-logo-umriss" aria-hidden="true"></div>
+        <PpLogoBild />
       </div>
       <div className="orbit-font auth-subtitle">
         TRADING CARD GAME
@@ -1238,6 +1235,13 @@ function MenuCardBackground() {
 
   // Constant scroll speed: ~5s per row regardless of tile height.
   const duration = rows * 5;
+  // ★ W86u2 (Pixelart): die Kartenwand laeuft in 2-px-Schritten (steps) statt stufenlos — eine stufenlose Verschiebung malt jedes Bild auf
+  // Zwischenpixeln (Mischfarben); ausserdem backt die Pipeline Animationen > 8 s nicht. Schrittzahl = Kachelhoehe / 2 px.
+  const ppWandSchritte = (el) => {
+    if (!el || window.PP_RETRO) return;
+    const h = el.offsetHeight / 2;
+    if (h > 8) el.style.animationTimingFunction = 'steps(' + Math.max(2, Math.round(h / 2)) + ', end)';
+  };
   const tile = (
     <div className="menu-card-bg-tile">
       {grid.map((row, r) =>
@@ -1252,7 +1256,7 @@ function MenuCardBackground() {
 
   return (
     <div ref={rootRef} className="menu-card-bg" aria-hidden="true">
-      <div className="menu-card-bg-scroller" style={{ animationDuration: duration + 's' }}>
+      <div className="menu-card-bg-scroller" ref={ppWandSchritte} style={{ animationDuration: duration + 's' }}>
         {tile}
         {tile}
       </div>
@@ -2154,10 +2158,7 @@ function MainMenu() {
       <div className="pp-logo-wrap" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: panelTop != null ? panelTop : 160, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5, pointerEvents: 'none' }}>
         <div className="pp-logo-stack">
           <LogoParticles />
-          <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
-          <div className="pp-logo-tint" aria-hidden="true"></div>
-          <div className="pp-logo-licht" aria-hidden="true"></div>
-          <div className="pp-logo-umriss" aria-hidden="true"></div>
+          <PpLogoBild />
           {/* ★ v1264 (Al 22.9.): wandernder Foil-Glanz ueber dem
               Schriftzug, auf die Buchstaben maskiert (style.css,
               `.pp-glanz--logo`). */}

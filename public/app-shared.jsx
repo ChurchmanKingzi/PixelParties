@@ -7060,6 +7060,88 @@ function ppUmrissFarbe(farbe) {
 }
 window.ppUmrissFarbe = ppUmrissFarbe;
 
+// ── LOGO IN SPIELERFARBE ALS EIN FERTIGES PIXELBILD (W86u2) ─────────────────────────
+// Bisher: graustufiges `logo.png` + drei Deckschichten (`.pp-logo-tint` mit `mix-blend-mode: multiply`, `-licht`, `-umriss`). Die Farbmischung
+// mit dem Hintergrund ist nie Pixelart — und faellt mit abgeschaltetem Mischmodus auseinander (die Tint-Flaeche deckt das Bild dann flach zu).
+// Jetzt wird dasselbe Ergebnis EINMAL pro Farbe in ein Canvas gerechnet: Tint = Bild × Spielerfarbe innerhalb der Maske, Licht = aufgehellte
+// Spielerfarbe, Umriss = `--pp-umriss`; jede Farbe rastet auf die 256er-Palette. Ergebnis: eine Bild-URL, ohne Blend-Modus, ohne Schichten.
+let _ppLogoQuellen = null;
+const _ppLogoBilder = new Map();
+function _ppLogoLaden() {
+  if (_ppLogoQuellen) return _ppLogoQuellen;
+  const laden = (url) => new Promise((ok, fehl) => { const im = new Image(); im.onload = () => ok(im); im.onerror = fehl; im.src = url; });
+  const daten = (im) => { const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight; const g = c.getContext('2d'); g.drawImage(im, 0, 0); return g.getImageData(0, 0, c.width, c.height); };
+  _ppLogoQuellen = Promise.all(['/data/logo.png', '/data/logo-tint-mask.png', '/data/logo-licht-mask.png', '/data/logo-umriss-mask.png'].map(u => laden(u).then(daten)))
+    .catch((e) => { _ppLogoQuellen = null; throw e; });
+  return _ppLogoQuellen;
+}
+/** → Promise<data-URL> des Logos in `farbe` (CSS) mit Umrissfarbe `umriss`; bei Fehlern wird abgelehnt (Aufrufer faellt auf die Deckschichten zurueck). */
+function ppLogoUrl(farbe, umriss) {
+  const f = ppFarbe(farbe), u = ppFarbe(umriss || '#000');
+  const key = [f[0] | 0, f[1] | 0, f[2] | 0, u[0] | 0, u[1] | 0, u[2] | 0].join(',');
+  if (_ppLogoBilder.has(key)) return _ppLogoBilder.get(key);
+  const p = _ppLogoLaden().then(([logo, tint, licht, umr]) => {
+    const w = logo.width, h = logo.height, c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d'), out = g.createImageData(w, h), d = out.data, L = logo.data, T = tint.data, H = licht.data, U = umr.data;
+    const hell = [0, 1, 2].map(i => f[i] * 0.45 + 255 * 0.55);
+    const snapCache = new Map();
+    const snap = (r, gg, b) => {
+      const k = (r << 16) | (gg << 8) | b; let v = snapCache.get(k);
+      if (!v) { v = window.ppSnapRgb ? window.ppSnapRgb(r, gg, b) : [r, gg, b]; snapCache.set(k, v); }
+      return v;
+    };
+    for (let i = 0; i < w * h; i++) {
+      const o = i * 4;
+      let r = L[o], gg = L[o + 1], b = L[o + 2], a = L[o + 3];
+      if (T[o + 3] > 127) { if (a > 0) { r = r * f[0] / 255; gg = gg * f[1] / 255; b = b * f[2] / 255; } else { r = f[0]; gg = f[1]; b = f[2]; } a = 255; }   // multiply
+      if (H[o + 3] > 127) { r = hell[0]; gg = hell[1]; b = hell[2]; a = 255; }
+      if (U[o + 3] > 127) { r = u[0]; gg = u[1]; b = u[2]; a = 255; }
+      if (a > 127) { const q = snap(Math.round(r), Math.round(gg), Math.round(b)); d[o] = q[0]; d[o + 1] = q[1]; d[o + 2] = q[2]; d[o + 3] = 255; }
+    }
+    g.putImageData(out, 0, 0);
+    return c.toDataURL('image/png');
+  });
+  _ppLogoBilder.set(key, p);
+  p.catch(() => _ppLogoBilder.delete(key));
+  return p;
+}
+window.ppLogoUrl = ppLogoUrl;
+
+/**
+ * Das Logo im Pixelart-Stil: `<img>` mit dem fertig gerechneten Bild (siehe oben); der Elternknoten liefert `--player-color` / `--pp-umriss`.
+ * Retro-Modus und Fehlerfall: das alte graue Bild samt Deckschichten (CSS `.pp-logo-tint` & Co.).
+ */
+function PpLogoBild() {
+  const ref = useRef(null);
+  const retro = !!window.PP_RETRO;
+  const [url, setUrl] = useState(null);
+  const [fehler, setFehler] = useState(false);
+  useEffect(() => {
+    if (retro) return undefined;
+    let tot = false;
+    const lesen = () => {
+      const el = ref.current; if (!el) return;
+      const cs = getComputedStyle(el);
+      const farbe = cs.getPropertyValue('--player-color').trim() || '#66b6ff', umr = cs.getPropertyValue('--pp-umriss').trim() || '#000';
+      ppLogoUrl(farbe, umr).then(u => { if (!tot) setUrl(u); }, () => { if (!tot) setFehler(true); });
+    };
+    lesen();
+    // Spielerfarbe aendert sich im Profil → beim Zurueckkehren ins Menue wird das Logo neu eingehaengt; zusaetzlich bei Farbwechsel waehrend der Anzeige.
+    const iv = setInterval(lesen, 2000);
+    return () => { tot = true; clearInterval(iv); };
+  }, [retro]);
+  if (retro || fehler) return (
+    <>
+      <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
+      <div className="pp-logo-tint" aria-hidden="true"></div>
+      <div className="pp-logo-licht" aria-hidden="true"></div>
+      <div className="pp-logo-umriss" aria-hidden="true"></div>
+    </>
+  );
+  return <img ref={ref} src={url || undefined} alt="Pixel Parties" className="pp-logo-img" style={url ? undefined : { visibility: 'hidden' }} />;
+}
+window.PpLogoBild = PpLogoBild;
+
 // ── PIXEL-ICONS ─────────────────────────────────────────────────────────
 // Kleine handgesetzte Sinnbilder: Ueberschriften der Menue-Seitenkaesten,
 // Hover-Pfeil der Menueknoepfe (die Knoepfe selbst tragen bewusst keine
