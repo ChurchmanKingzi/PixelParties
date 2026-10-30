@@ -112,7 +112,7 @@ module.exports = {
         type: 'cardGallery',
         cards: eligible.map(cn => ({ name: cn, source: 'hand' })),
         title: CARD_NAME,
-        description: `Place a Creature from your hand (level < ${spellLevel}) onto ${hero.name}.`,
+        description: `Place a Creature from your hand (level below ${spellLevel}) onto ${hero.name}.`,
         cancellable: true,
       });
       if (!picked || picked.cancelled || !picked.cardName) return;

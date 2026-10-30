@@ -101,7 +101,7 @@ async function waehleAusruestungUndPlatz(engine, pi) {
     type: 'cardGallery',
     cards: gallery,
     title: CARD_NAME,
-    description: `Choose an equippable Artifact (Cost ≤ ${MAX_EQUIP_COST}) from your deck.`,
+    description: `Choose an equippable Artifact (Cost ${MAX_EQUIP_COST} or lower) from your deck.`,
     cancellable: true,
   });
   if (!picked || picked.cancelled || !picked.cardName) return null;
@@ -132,7 +132,7 @@ module.exports = {
   getValidTargets: () => [],
 
   targetingConfig: {
-    description: 'Search your deck for an equippable Artifact (Cost ≤ 50).',
+    description: 'Search your deck for an equippable Artifact (Cost 50 or lower).',
     confirmLabel: '🎒 Unpack!',
     confirmClass: 'btn-info',
     cancellable: true,

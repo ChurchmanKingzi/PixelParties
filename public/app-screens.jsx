@@ -196,12 +196,12 @@ function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="menu-popup-dither pp-fenster" style={{ background: 'var(--bg2)', width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
-        <div className="pp-fenster-kopf" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' }}>
+      <div className="menu-popup-dither pp-fenster" style={{ background: 'var(--bg2)', width: 'min(440px, calc(94 * var(--vw)))', maxHeight: 'calc(94 * var(--vh))', display: 'flex', flexDirection: 'column' }}>
+        <div className="pp-fenster-kopf" style={{ padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative', flexShrink: 0 }}>
           <h3 className="orbit-font title-outline" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)', margin: 0, whiteSpace: 'nowrap', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>HOW TO PLAY</h3>
           <button className="btn" onClick={onClose} style={{ padding: '2px 10px', fontSize: 10 }}>✕</button>
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '10px 20px 20px' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 20px 18px' }}>
           {tutorialList === null ? (
             <div style={{ color: 'var(--text2)', textAlign: 'center', padding: 30, fontSize: 13 }}>Loading tutorials...</div>
           ) : tutorialList.length === 0 ? (
@@ -210,7 +210,7 @@ function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
             tutorialList.map((t) => (
               <button key={t.tutorialId} className="btn" disabled={t.locked}
                 onClick={() => { if (!t.locked) onStart(t); }}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginBottom: 4, borderColor: 'rgba(251,30,169,.25)', color: t.locked ? 'var(--text2)' : 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start', opacity: t.locked ? 0.55 : 1, cursor: t.locked ? 'not-allowed' : 'pointer' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', fontSize: 13, marginBottom: 3, borderColor: 'rgba(251,30,169,.25)', color: t.locked ? 'var(--text2)' : 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start', opacity: t.locked ? 0.55 : 1, cursor: t.locked ? 'not-allowed' : 'pointer' }}>
                 <span style={{ color: t.locked ? 'var(--text2)' : (t.completed ? '#4ceb70' : 'var(--bg4)'), fontSize: 16, width: 20, textAlign: 'center' }}>
                   {t.locked ? '🔒' : (t.completed ? '✓' : '○')}
                 </span>
@@ -224,7 +224,7 @@ function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
           )}
           {/* Always-available rules entry — bottom-most, never locked. */}
           <button className="btn" onClick={onViewRules}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginTop: 10, borderColor: 'rgba(251,30,169,.45)', color: 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start', cursor: 'pointer' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', fontSize: 13, marginTop: 8, borderColor: 'rgba(251,30,169,.45)', color: 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start', cursor: 'pointer' }}>
             <span style={{ color: '#fb1ea9', fontSize: 16, width: 20, textAlign: 'center' }}>📜</span>
             <span style={{ flex: 1, fontWeight: 700 }}>View Rules</span>
           </button>
@@ -1886,6 +1886,8 @@ function MainMenu() {
   // Tutorial state — the flow itself lives in the shared useTutorialFlow hook.
   const [tutorialBrowserOpen, setTutorialBrowserOpen] = useState(false);
   const { tutorialList, tutorialAttemptState, startTutorialAttempt, onTutorialAttemptLeave } = useTutorialFlow(tutorialBrowserOpen);
+  // Tutorial-Karten schon im Hauptmenue tropfenweise bereitlegen (der Start einer Mission soll nicht ruckeln).
+  useEffect(() => { const t = setTimeout(() => { if (window.ppTutorialVorwaermen) window.ppTutorialVorwaermen(); }, 3000); return () => clearTimeout(t); }, []);
 
   // Singleplayer lives in its own screen now (see SingleplayerScreen).
   // MainMenu just routes to it via setScreen('singleplayer').
@@ -2401,7 +2403,7 @@ function MainMenu() {
                       </div>
                       {puzzles.map(p => (
                         <button key={p.puzzleId} className="btn" onClick={() => startPuzzleAttempt(p)}
-                          style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginBottom: 4, borderColor: diffColors[diff] + '44', color: 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start' }}>
+                          style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', fontSize: 13, marginBottom: 3, borderColor: diffColors[diff] + '44', color: 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start' }}>
                           <span style={{ color: p.completed ? '#4ceb70' : 'var(--bg4)', fontSize: 16, width: 20, textAlign: 'center' }}>{p.completed ? '✓' : '○'}</span>
                           <span style={{ flex: 1 }}>{p.name}</span>
                           {p.completed && <span style={{ fontSize: 9, color: 'var(--text2)' }}>CLEARED</span>}
@@ -5003,22 +5005,25 @@ function RulesScreen({ onBack }) {
 //  Kachel nutzt denselben Baustein mit Goldton und einem Bild, das wie
 //  ein Spielautomat durch die freigeschalteten Gegner laeuft.
 // ═══════════════════════════════════════════════════════════════
-function VsCpuKachel({ farbe, zufall, disabled, onClick, bild, name, fuss }) {
+function VsCpuKachel({ farbe, zufall, disabled, onClick, bild, name, fuss, klasse, zusatz, stempel }) {
   const [hover, setHover] = useState(false);
   // Jede Kachel glaenzt zu ihrer eigenen Zeit, nicht alle im Gleichschritt.
   const verzug = useMemo(() => (0.4 + Math.random() * 5).toFixed(2) + 's', []);
   return (
-    <button className={'vscpu-kachel' + (zufall ? ' vscpu-kachel--zufall' : '')}
+    <button className={'vscpu-kachel' + (zufall ? ' vscpu-kachel--zufall' : '') + (klasse ? ' ' + klasse : '')}
       disabled={disabled} onClick={onClick}
       style={{ '--kachel-farbe': farbe }}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
-      <span className="vscpu-ecken" aria-hidden="true"><i /><i /><i /><i /></span>
+      {zusatz}
       <div className="vscpu-bild" style={{ '--glanz-verzug': verzug }}>
         {bild(hover && !disabled)}
         <span className="vscpu-bild-vignette" aria-hidden="true" />
         <GlanzBand klasse="vscpu-glanz" />
+        {stempel && <span className="vscpu-stempel">{stempel}</span>}
       </div>
-      <div className="vscpu-name orbit-font">{name}</div>
+      <div className="vscpu-name-band">
+        <div className="vscpu-name orbit-font">{name}</div>
+      </div>
       <div className="vscpu-fuss">{fuss}</div>
     </button>
   );
@@ -5210,6 +5215,7 @@ function GuestRegisterModal({ onClose, starterDeckId }) {
   );
 }
 
+let _ppTutorialAssetsCache = null;   // Antwort von /api/tutorial-assets, fuer die Heldenfiguren unten
 function SingleplayerScreen() {
   // Antonia-Praesenz auch hier, fuer den Tutorial-Zweig weiter unten.
   const antoniaHere2 = useAntoniaPresent();
@@ -5222,10 +5228,9 @@ function SingleplayerScreen() {
     const idle = (fn, ms) => { const t = setTimeout(() => { if (weg) return; if (window.requestIdleCallback) requestIdleCallback(fn, { timeout: 2500 }); else fn(); }, ms); timers.push(t); };
     idle(async () => {
       try {
-        const r = await fetch('/api/tutorial-assets', { headers: window.AUTH_TOKEN ? { 'x-auth-token': window.AUTH_TOKEN } : {} });
-        if (!r.ok || weg) return;
-        const a = await r.json();
-        if (window.CardImageShim && window.CardImageShim.warmCards) window.CardImageShim.warmCards(a.cards, { heroes: a.heroes, abilities: a.abilities });
+        const a = (await window.ppTutorialVorwaermen()) || _ppTutorialAssetsCache;
+        if (!a || weg) return;
+        _ppTutorialAssetsCache = a;
         // Pixelbilder der grossen Zauber-Animation (kostet kalt Sekunden auf schwachen Handys, s. app-board.jsx).
         idle(() => { if (window.ppAnimVorwaermen) window.ppAnimVorwaermen('cataclysm'); }, 3500);
         const H = window.HeroIdleAnims;
@@ -5243,6 +5248,25 @@ function SingleplayerScreen() {
   const [search, setSearch] = useState('');
   const [showRegister, setShowRegister] = useState(false); // guest registration modal
   const [tutorialBrowserOpen, setTutorialBrowserOpen] = useState(false); // Tutorial Raccoon
+  // Kachelbreite: so viele Spalten wie passen, die Kacheln wachsen bis 300 px,
+  // damit der Rahmen auch bei wenigen Gegnern gefuellt wirkt. Gemessen wird in
+  // Layout-Pixeln (auf dem Handy liegt ein Zoom von .7 darueber).
+  const gitterRef = useRef(null);
+  const [kachel, setKachel] = useState({ breite: 248, spalten: 4 });
+  useEffect(() => {
+    const el = gitterRef.current; if (!el) return;
+    const rechne = () => {
+      const w = el.offsetWidth - 44;   // Innenabstand links/rechts
+      const mind = window.ppIsPhone && window.ppIsPhone() ? 204 : 248, luecke = 20;
+      const spalten = Math.max(1, Math.floor((w + luecke) / (mind + luecke)));
+      const breite = Math.max(mind, Math.min(304, Math.floor((w - (spalten - 1) * luecke) / spalten)));
+      setKachel(k => (k.breite === breite && k.spalten === spalten) ? k : { breite, spalten });
+    };
+    rechne();
+    const ro = (typeof ResizeObserver !== 'undefined') ? new ResizeObserver(rechne) : null;
+    if (ro) ro.observe(el); else window.addEventListener('resize', rechne);
+    return () => { if (ro) ro.disconnect(); else window.removeEventListener('resize', rechne); };
+  }, []);
   const [showRules, setShowRules] = useState(false); // in-place Rules overlay (guests)
   const cpuBattleRoom = useRef(null);
   const { tutorialList, tutorialAttemptState, startTutorialAttempt, onTutorialAttemptLeave } = useTutorialFlow(tutorialBrowserOpen);
@@ -5271,6 +5295,7 @@ function SingleplayerScreen() {
         const personal = mine?.decks || [];
         const sampleList = samples?.decks || [];
         setOpponents(gal?.opponents || []);
+        (gal?.opponents || []).slice(0, 3).forEach(o => window.ppDeckVorwaermen(o.warm, false));
         setPersonalDecks(personal);
         setSampleDecks(sampleList);
         // Bootstrap the dropdown from the user's saved default (custom
@@ -5441,6 +5466,7 @@ function SingleplayerScreen() {
   // dessen Deck (`deckAdded`), laedt die Liste der eigenen Decks neu — der Victory-Screen bekommt sie als `sampleDecks`.
   useEffect(() => {
     const onUnlocked = async (data) => {
+      (data && data.opponents || []).forEach(o => o && window.ppDeckVorwaermen(o.warm, true));
       if (!data || !(data.opponents || []).some(o => o && o.deckAdded)) return;
       try { const r = await api('/sample-decks/owned'); if (r && r.decks) setSampleDecks(r.decks); } catch (e) { /* bleibt die alte Liste */ }
     };
@@ -5464,7 +5490,7 @@ function SingleplayerScreen() {
           const heroes = (d.heroes || []).map(h => h && h.hero).filter(Boolean);
           const abilities = (d.heroes || []).flatMap(h => h ? [h.ability1, h.ability2] : []).filter(Boolean);
           const names = Array.from(new Set([...(d.mainDeck || []), ...(d.potionDeck || []), ...heroes, ...abilities].map(nm).filter(Boolean)));
-          if (window.CardImageShim && window.CardImageShim.warmCards) window.CardImageShim.warmCards(names, { heroes, abilities });
+          if (window.CardImageShim && window.CardImageShim.warmDrip) window.CardImageShim.warmDrip(names, { heroes, abilities, front: true });
           const H = window.HeroIdleAnims;
           if (H && H.hole && H.slug) heroes.forEach((n, i) => timers.push(setTimeout(() => { if (!weg) { try { H.hole(H.slug(n)); } catch (e) { /* optional */ } } }, 600 + i * 400)));
         } catch (e) { /* Vorladen ist optional */ }
@@ -5626,7 +5652,7 @@ function SingleplayerScreen() {
           scrollt INNEN (`.vscpu-content`) — vorher scrollte die ganze
           Seite und der Kasten lief ohne Abschluss unten aus dem Bild. */}
       <div className="vscpu-rahmen ornate-frame pp-menuekasten">
-      <div className="vscpu-content" style={{ padding: '22px 22px 30px', boxSizing: 'border-box', width: '100%' }}>
+      <div className="vscpu-content" ref={gitterRef} style={{ padding: '22px 22px 30px', boxSizing: 'border-box', width: '100%' }}>
         {!hasAnyLegal && (
           <div style={{ color: '#fe7476', textAlign: 'center', padding: '12px 16px', marginBottom: 20, border: '1px solid #fe7476', borderRadius: 4, background: 'rgba(254,116,118,.08)', fontSize: 12 }}>
             You need at least one legal deck to play. Edit a deck or pick a starter deck first.
@@ -5641,51 +5667,40 @@ function SingleplayerScreen() {
           const showRaccoon = !!user?.isGuest && (!q || 'tutorial raccoon how to play smug mastermind antonia'.includes(q));
           const oppTiles = (opponents && visibleOpponents) ? visibleOpponents : [];
           const racColor = '#fb1ea9';
+          const bildB = kachel.breite - 32;   // Bildbreite = Kachel minus Rand und Innenabstand
           return (
-          <>
+          <div className="vscpu-mitte">
+          {/* Zierleiste ueber dem Gitter: Pixel-Streifen links und rechts, in der Mitte die Zahl der Gegner. */}
+          {oppTiles.length > 0 && (
+            <div className="vscpu-leiste" aria-hidden="true">
+              <span className="vscpu-leiste-streifen" />
+              <span className="vscpu-leiste-text orbit-font">{oppTiles.length} OPPONENT{oppTiles.length === 1 ? '' : 'S'} UNLOCKED</span>
+              <span className="vscpu-leiste-streifen" />
+            </div>
+          )}
           <div style={{
             display: 'grid',
-            // Kachel 232 px (Bild 208): im breiten Rahmen passen 6 je Zeile.
-            gridTemplateColumns: 'repeat(auto-fill, 232px)',
+            // Spaltenbreite kommt aus der Messung oben (`kachel`).
+            gridTemplateColumns: 'repeat(auto-fit, ' + kachel.breite + 'px)',
             justifyContent: 'center',
-            gap: 14,
+            gap: 20,
           }}>
             {showRaccoon && (
-              <button
-                key="__tutorial_raccoon"
-                // ★ v1264 (Al 22.9.): im Gastmodus genauso hervorgehoben
-                // wie der Gast-Knopf im Login — Schein + Foil-Glanz, damit
-                // der neue Spieler vom ersten Klick an derselben Spur folgt.
-                // Die Kachel ist ohnehin nur fuer Gaeste sichtbar.
-                className="pp-lotse vscpu-raccoon"
+              // ★ v1264 (Al 22.9.): im Gastmodus genauso hervorgehoben wie der
+              // Gast-Knopf im Login — Schein + Foil-Glanz, damit der neue Spieler
+              // vom ersten Klick an derselben Spur folgt. Die Kachel ist ohnehin
+              // nur fuer Gaeste sichtbar. Seit der Gegnerwahl-Ueberarbeitung im
+              // selben Rahmen wie die Gegner (Pink statt Rot).
+              <VsCpuKachel key="__tutorial_raccoon" farbe={racColor}
+                klasse="pp-lotse vscpu-raccoon vscpu-kachel--lotse"
                 disabled={starting}
                 onClick={() => setTutorialBrowserOpen(true)}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center',
-                  gap: 6, padding: 8,
-                  // Opaque (tint mixed into --bg2) so the dithered content
-                  // behind the tile doesn't show through it.
-                  background: 'color-mix(in srgb, ' + racColor + ' 8%, var(--bg2))',
-                  border: '2px solid ' + racColor,
-                  borderRadius: 6,
-                  boxShadow: '0 0 10px ' + racColor + '44',
-                  cursor: starting ? 'not-allowed' : 'pointer',
-                  opacity: starting ? 0.55 : 1,
-                  transition: 'transform .15s ease, box-shadow .15s ease',
-                  fontFamily: 'inherit', color: 'inherit',
-                }}
-                onMouseEnter={e => { if (!starting) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 0 18px ' + racColor + '88'; } }}
-                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 0 10px ' + racColor + '44'; }}
-              >
-                <LotsenGlanz />
-                <HeroArtCrop heroName="Smug Mastermind Antonia" width={208} />
-                <div className="orbit-font" style={{ fontSize: 16, color: racColor, textAlign: 'center', fontWeight: 700, lineHeight: 1.2, minHeight: '2.4em', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  Tutorial Raccoon
-                </div>
-                <div style={{ display: 'flex', gap: 6, fontSize: 13, marginTop: 'auto', color: racColor, fontWeight: 700 }}>
-                  ★ Learn to Play
-                </div>
-              </button>
+                zusatz={<LotsenGlanz />}
+                stempel="GUIDE"
+                bild={() => <HeroArtCrop heroName="Smug Mastermind Antonia" width={bildB} />}
+                name="Tutorial Raccoon"
+                fuss={<span className="vscpu-chip vscpu-chip--breit">★ Learn to Play</span>}
+              />
             )}
             {/* ★ v1370 (Als Wunsch): ZUFALLS-GEGNER als erste Kachel (oben
                 links). Zieht aus ALLEN freigeschalteten Gegnern — die Galerie
@@ -5701,8 +5716,9 @@ function SingleplayerScreen() {
                     const op = opponents[Math.floor(Math.random() * opponents.length)];
                     if (op) startBattle(op.id);
                   }}
-                  bild={(schnell) => <ZufallsGegnerBild gegner={opponents} schnell={schnell} width={208} />}
+                  bild={(schnell) => <ZufallsGegnerBild gegner={opponents} schnell={schnell} width={bildB} />}
                   name="Random Opponent"
+                  stempel="?"
                   fuss={<span className="vscpu-chip">{opponents.length} unlocked</span>}
                 />
               );
@@ -5713,7 +5729,8 @@ function SingleplayerScreen() {
                 <VsCpuKachel key={op.id} farbe="#f03232"
                   disabled={!hasAnyLegal || starting}
                   onClick={() => startBattle(op.id)}
-                  bild={() => <HeroArtCrop heroName={op.middleHero} width={208} />}
+                  bild={() => <HeroArtCrop heroName={op.middleHero} width={bildB} />}
+                  stempel={(op.wins || 0) > 0 ? '★ BEATEN' : null}
                   name={op.middleHero || op.name}
                   fuss={<>
                     {total > 0 ? (
@@ -5738,7 +5755,15 @@ function SingleplayerScreen() {
           {opponents !== null && opponents.length > 0 && visibleOpponents.length === 0 && (
             <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 40, fontSize: 13 }}>No opponents match “{search.trim()}”.</div>
           )}
-          </>
+          {/* Gast: Hinweis, wie es weitergeht (siehe unlockRandomOpponent im Server). */}
+          {user?.isGuest && oppTiles.length > 0 && (
+            <div className="vscpu-leiste vscpu-leiste--fuss" aria-hidden="true">
+              <span className="vscpu-leiste-streifen" />
+              <span className="vscpu-leiste-text orbit-font">WIN A DUEL TO UNLOCK THE NEXT FOE</span>
+              <span className="vscpu-leiste-streifen" />
+            </div>
+          )}
+          </div>
           );
         })()}
       </div>

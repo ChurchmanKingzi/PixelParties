@@ -225,7 +225,7 @@ module.exports = {
         const picked = await engine.promptGeneric(pi, {
           type: 'pickHandCard',
           title: CARD_NAME,
-          description: 'Click a Level ≤ 1 Creature in your hand to summon. SnowItAll will Freeze it for 2 turns.',
+          description: 'Click a Level 1 or lower Creature in your hand to summon. SnowItAll will Freeze it for 2 turns.',
           eligibleIndices,
           confirmLabel: '❄️ Summon!',
           cancellable: true,

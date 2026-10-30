@@ -1562,7 +1562,7 @@ function ppPixelieren(wurzel) {
     if (kinder.length === 1 && kinder[0].nodeType === 3) {
       const z = kinder[0].nodeValue.trim();
       if (PP_PX_ZEICHEN[z]) { a.zeichen = z; a.farbe = cs.color; a.schrift = parseFloat(cs.fontSize) || 16; }
-      else if (PP_EMOJI_MUSTER.test(z)) { a.emoji = z; a.schrift = parseFloat(cs.fontSize) || 16; }
+      else if (PP_EMOJI_MUSTER.test(z) || ppPxSchriftSymbol(z)) { a.emoji = z; a.farbe = cs.color; a.schrift = parseFloat(cs.fontSize) || 16; }
       else if (z.length > 1 && /\S/.test(z) && cs.textShadow && cs.textShadow !== 'none') {
         a.text = { schatten: cs.textShadow, groesse: parseFloat(cs.fontSize) || 16 };
       }
@@ -1610,12 +1610,14 @@ function ppPixelieren(wurzel) {
       }
     }
     if (a.emoji) {
-      const u = ppPxEmojiUrl(a.emoji, a.schrift);
+      const fu = ppPxSchriftBildUrl(a.emoji, a.farbe);            // ★ W86p: das Zeichen der Pixel-Emoji-Schrift selbst (1 em, ohne Rand) statt eines Systememojis
+      const u = fu || ppPxEmojiUrl(a.emoji, a.schrift);
+      const gr = fu ? 1 : 1.1;
       if (u) {
         st.backgroundImage = `url(${u})`;
-        st.backgroundSize = '1.1em 1.1em'; st.backgroundRepeat = 'no-repeat'; st.backgroundPosition = 'center';
+        st.backgroundSize = `${gr}em ${gr}em`; st.backgroundRepeat = 'no-repeat'; st.backgroundPosition = 'center';
         st.color = 'transparent'; st.textShadow = 'none'; st.imageRendering = 'pixelated';
-        if (ppPixelAnimAktiv() && (a.position === 'absolute' || a.position === 'fixed')) { const k = Math.max(4, Math.round(a.schrift * 1.1 / 4) * 4) + 'px'; st.width = k; st.height = k; st.lineHeight = k; st.backgroundSize = k + ' ' + k; }
+        if (ppPixelAnimAktiv() && (a.position === 'absolute' || a.position === 'fixed')) { const k = Math.max(4, Math.round(a.schrift * gr / 4) * 4) + 'px'; st.width = k; st.height = k; st.lineHeight = k; st.backgroundSize = k + ' ' + k; }
       }
     }
     if (ebenen.length) {
@@ -1664,7 +1666,78 @@ function ppPixelieren(wurzel) {
  * vergroessert. Rueckfall fuer alle Zeichen ohne eigenes Sprite.
  */
 const PP_EMOJI_SCHRIFT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Twemoji Mozilla",sans-serif';
+
+/**
+ * ★ W86p: Zeichen aus der Pixel-Emoji-Schrift (`PP Pixel Emoji`, Raster 16 x 16, jede Zelle ein Rechteck) als Pixelbild.
+ * Die Schrift zeichnet ihre Zellen als Vektorrechtecke: bei Schriftgroessen, die kein Vielfaches von 16 sind, malt der Browser jede Zellkante
+ * mit Teildeckkraft (Mischfarben ausserhalb der 256er-Palette). Hier wird das Zeichen EINMAL mit 16 px (Zelle = genau 1 Bildpunkt) auf ein
+ * Canvas gemalt und das Bild danach hart (`image-rendering: pixelated`) auf die Zielgroesse gestreckt — Palettenfarben bleiben Palettenfarben.
+ * `farbe`: Vordergrundfarbe fuer einfarbige Zeichen (Pfeile, Sterne …). '' = Schrift noch nicht geladen / Zeichen nicht in der Schrift.
+ */
+function ppPxSchriftBildUrl(z, farbe) {
+  if (!ppPixelAnimAktiv() || !z) return '';
+  try {
+    if (!document.fonts || !document.fonts.check('16px "PP Pixel Emoji"', z)) {
+      if (document.fonts && document.fonts.load) document.fonts.load('16px "PP Pixel Emoji"', z).catch(() => {});
+      return '';
+    }
+  } catch { return ''; }
+  const f = ppFarbe(farbe || '#ffffff');
+  const q = window.ppSnapRgb ? window.ppSnapRgb(f[0] | 0, f[1] | 0, f[2] | 0) : [f[0] | 0, f[1] | 0, f[2] | 0];
+  const key = 'fg:' + z + ':' + q.join(',');
+  if (_ppSchriftLeer.has(key)) return '';
+  let leer = true;
+  const url = ppPxBild(key, 16, 16, (setze) => {
+    const c = document.createElement('canvas');
+    c.width = 16; c.height = 16;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.font = '16px "PP Pixel Emoji"';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = `rgb(${q[0]},${q[1]},${q[2]})`;
+    ctx.fillText(z, 0, 14);                                   // Aufstieg 896/1024 em = 14 px: Oberkante des Rasters liegt bei y = 0
+    const d = ctx.getImageData(0, 0, 16, 16).data;
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const i = (y * 16 + x) * 4;
+      if (d[i + 3] >= 128) { setze(x, y, [d[i], d[i + 1], d[i + 2], 1]); leer = false; }
+    }
+    if (leer) _ppSchriftLeer.add(key);
+  }, 2);
+  return _ppSchriftLeer.has(key) ? '' : url;
+}
+const _ppSchriftLeer = new Set();      // Zeichen, die die Schrift nicht zeichnet (leeres Bild): nicht noch einmal versuchen
+let _ppSchriftBereiche = null;
+/** Codepunkt-Bereiche der Pixel-Emoji-Schrift (aus ihrer `@font-face`-Regel in style.css). */
+function ppPxSchriftBereiche() {
+  if (_ppSchriftBereiche) return _ppSchriftBereiche;
+  const lst = [];
+  try {
+    for (const blatt of Array.from(document.styleSheets)) {
+      let regeln; try { regeln = blatt.cssRules; } catch { continue; }
+      for (const r of Array.from(regeln || [])) {
+        if (r.type !== 5 || !/PP Pixel Emoji/.test(r.style.getPropertyValue('font-family'))) continue;
+        r.style.getPropertyValue('unicode-range').split(',').forEach((t) => {
+          const m = /U\+([0-9A-F]+)(?:-([0-9A-F]+))?/i.exec(t.trim());
+          if (m) lst.push([parseInt(m[1], 16), parseInt(m[2] || m[1], 16)]);
+        });
+        break;
+      }
+      if (lst.length) break;
+    }
+  } catch {}
+  if (lst.length) _ppSchriftBereiche = lst;
+  return lst;
+}
+/** Einzelnes Symbol ausserhalb von Latin (Pfeile, Sterne, Dingbats …), das die Pixel-Emoji-Schrift zeichnet? */
+function ppPxSchriftSymbol(z) {
+  const cps = [...String(z).replace(/\uFE0F/g, '')];
+  if (cps.length !== 1) return false;
+  const c = cps[0].codePointAt(0);
+  return c >= 0x2000 && ppPxSchriftBereiche().some(([a, b]) => c >= a && c <= b);
+}
+
 function ppPxEmojiUrl(z, groessePx) {
+  const fu = ppPxSchriftBildUrl(z, '#ffffff');
+  if (fu) return fu;
   const n = Math.max(10, Math.min(28, Math.round((groessePx || 16) / 2.4)));
   return ppPxBild('em:' + n + ':' + z, n + 2, n + 2, (setze) => {
     const c = document.createElement('canvas');
@@ -11955,6 +12028,26 @@ function _ppDialogOeffnen(props) {
   });
 }
 window.ppConfirm = (text, opts) => _ppDialogOeffnen({ text, ...(opts || {}) });
+// ── KARTEN VORWAERMEN (tropfenweise, siehe CardImageShim.warmDrip) ───────────────────────────────────────────────────────────────────────
+// Tutorial-Karten: einmal pro Sitzung holen (Server rechnet die Liste aus den Missionen) und im Leerlauf nach und nach bereitlegen.
+let _ppTutorialWarm = false;
+window.ppTutorialVorwaermen = async () => {
+  if (_ppTutorialWarm) return null;
+  _ppTutorialWarm = true;
+  try {
+    const r = await fetch('/api/tutorial-assets', { headers: window.AUTH_TOKEN ? { 'x-auth-token': window.AUTH_TOKEN } : {} });
+    if (!r.ok) { _ppTutorialWarm = false; return null; }
+    const a = await r.json();
+    if (window.CardImageShim && window.CardImageShim.warmDrip) window.CardImageShim.warmDrip(a.cards, { heroes: a.heroes, abilities: a.abilities, delay: 1200 });
+    return a;
+  } catch (e) { _ppTutorialWarm = false; return null; }
+};
+// Kartenliste eines Gegner-/Beispiel-Decks (`{cards, heroes, abilities}` vom Server, Feld `warm`): `keep` falsch = nur zeichnen und merken.
+window.ppDeckVorwaermen = (w, keep) => {
+  if (!w || !Array.isArray(w.cards) || !(window.CardImageShim && window.CardImageShim.warmDrip)) return;
+  window.CardImageShim.warmDrip(w.cards, { heroes: w.heroes, abilities: w.abilities, keep: keep !== false, delay: 1500, front: true });
+};
+
 window.ppPrompt = (text, vorgabe, opts) => _ppDialogOeffnen({ text, eingabe: true, vorgabe, ...(opts || {}) });
 window.CardTooltipContent = CardTooltipContent;
 window.useCardTooltip = useCardTooltip;
