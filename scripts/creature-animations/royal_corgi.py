@@ -39,6 +39,9 @@ Ablauf (60 Frames à 65 ms = 3,9 s), alle Bewegungen unabhängig; der Kopf bleib
   die Innenumrisse zwischen den Beinen bleiben am Körper).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
+Randpixel-Test: 0 Frames mit offener Kante an Körper/Ohren/Füßen, bis auf das Monokel-Ringpixel (9,6) (türkis), sobald das Glanzkreuz eingezogen ist — es liegt in der Vorlage
+selbst auf dem Kopfumriss (Ebene 211 über 213) und ist dort die Außenkante.
+
 Ergänzungen: (1) Hecheln: (5,9) (6,9) in Mundschwarz F und (5,10) (6,10) in Ohrrosa M — vorhandene Farben, neue Pixelstellen; (2) die Pixel unter dem
 Glanzkreuz, wenn dessen Arme eingezogen sind: (10,3) orange E, (10,4) Umriss A, (9,5) Ringfarbe S, (8,5) Glasglanz C — so sähe die Vorlage ohne Kreuz aus
 (Ebenen 210/211 getrennt); (3) die Glitzersterne an der Krone (Pixel in Weißtönen der Quelle, L/G).

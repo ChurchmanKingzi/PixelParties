@@ -18,8 +18,9 @@ Identifikation (Sprite-Koordinaten x, y; spiegelsymmetrisch um x = 10):
 Ablauf (40 Frames à 70 ms = 2,8 s):
 * Flügelschlag: viermal pro Schleife (Periode 10 Frames) klappen die Flügel zur Körpermitte zu und wieder auf (Zeilen um x = 10 gestaucht, Faktor bis 0,5, Nächster-Nachbar,
   keine Textur kopiert). Der Faktor läuft mit Verzögerung von oben nach unten durch den Flügel: die oberen Flügel schlagen vor, die unteren hinterher (Welle),
-  linker und rechter Flügel leicht gegeneinander versetzt. Ruhepose = ganz aufgeklappt = Original.
-* Körper bleibt fest in der Mitte (Säule x 9–11) und liegt über den Flügeln; hebt sich beim Zuklappen um bis 2 px, dazu langsame Seitenwippe (±1 px, Periode 20).
+  linker und rechter Flügel SYNCHRON (gleiche Phase, gleiche Verzögerung, spiegelsymmetrisch um x = 10; Rundung am Betrag, F.zeilen_stauchen(symmetrisch=True)).
+  Ruhepose = ganz aufgeklappt = Original.
+* Körper bleibt fest in der Mitte (Säule x 9–11) und liegt über den Flügeln; hebt sich beim Zuklappen um bis 2 px (senkrecht, symmetrisch — keine Seitenwippe mehr).
 * Mondstaub (Partikel): zehn kleine runde helle Punkte steigen langsam auf und schwanken (Formen k, s). Kein Glanz/Glitzer (Schuppen sind kein Metall).
 
 Ergänzungen: keine nötig — die Flügel überdecken den Körper nicht (er liegt als Säule dazwischen). Beim Zuklappen schieben sich die inneren Flügelränder unter den Körper (er wird obenauf gelegt).
@@ -77,8 +78,8 @@ def frame(i, partikel=True):
             w1 = (1 - math.cos(ph - 1.1 * frac - versatz)) / 2
             arr[PAD_T + y] = min(1.0, 1.0 - 0.5 * (w1 - w0))
     fl = F.ebene(spr, fluegel, H, W, PAD_L, PAD_T)
-    # linke Hälfte (x < Achse) und rechte Hälfte getrennt stauchen
-    links = fl.copy(); links[:, int(ACHSE):] = 0
+    # linke Hälfte (x ≤ Achse) und rechte Hälfte (x ≥ Achse) getrennt, aber mit gleichem Faktor stauchen → exakte Spiegelbilder
+    links = fl.copy(); links[:, int(ACHSE) + 1:] = 0
     rechts = fl.copy(); rechts[:, :int(ACHSE)] = 0
     links = F.zeilen_stauchen(links, ACHSE, s_l, symmetrisch=True)
     rechts = F.zeilen_stauchen(rechts, ACHSE, s_r, symmetrisch=True)
