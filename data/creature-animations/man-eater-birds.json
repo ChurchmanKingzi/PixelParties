@@ -1,0 +1,15 @@
+{
+  "creature": "Man-Eater Birds",
+  "sheet": "man-eater-birds.png",
+  "frameWidth": 61,
+  "frameHeight": 53,
+  "frames": 48,
+  "frameMs": 60,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 30.5
+}
