@@ -121,9 +121,9 @@ def frame(i, partikel=True):
 
     # Flügel: Schulterspalten stehen, weiter außen schlägt es aus; Spitze hinkt nach
     fl_amp, fl_pot, lauf = 4.2, 1.3, 0.7
-    wl = L.spalten_welle(F.ebene(spr, fl_links, H, W, PAD_L, PAD_T), PAD_L + 19, fl_amp, ph, potenz=fl_pot,
+    wl = F.fluegel_welle(F.ebene(spr, fl_links, H, W, PAD_L, PAD_T), PAD_L + 19, fl_amp, ph, potenz=fl_pot,
                          nur_rechts=False, lauf=lauf)
-    wr = L.spalten_welle(F.ebene(spr, fl_rechts, H, W, PAD_L, PAD_T), PAD_L + 32, fl_amp, ph, potenz=fl_pot,
+    wr = F.fluegel_welle(F.ebene(spr, fl_rechts, H, W, PAD_L, PAD_T), PAD_L + 32, fl_amp, ph, potenz=fl_pot,
                          nur_rechts=True, lauf=lauf)
     wl = L.versetze(wl, 0, -lift)
     wr = L.versetze(wr, 0, -lift)

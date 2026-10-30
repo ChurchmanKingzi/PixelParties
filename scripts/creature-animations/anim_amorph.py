@@ -12,8 +12,11 @@ Bausteine für weiche Körper (Schleime) — alles Pixelart, nur ganze Pixel, nu
     verschiebe_zeilen(zeilen, dxs)                   Zeilen waagerecht versetzen (ClipError statt stillem Abschneiden)
     auf_leinwand(zeilen, h, w, boden, dy)            Zeilenfeld auf die Leinwand setzen — die Unterkante bleibt am Boden
     glanzband(a, t, rampe, maske)                    Lichtreflex wandert diagonal über den Sprite (Farben eine Stufe heller)
-    ausdruck_pruefen(frames, ...)                    4-Verbundenheit der Figur und offene Kanten (Randpixel ohne Umrissfarbe)
+    ausdruck_pruefen(frames, spr, …)                 4-Verbundenheit der Figur (ein Teil je Frame) und Randpixel-Farben
+    offene_koerperkanten(fig, ausnahme, y0, umriss) Randpixel ohne Umrissfarbe = offene Kanten (nach Squash/Wabbeln prüfen!)
 """
+import math
+
 import numpy as np
 
 import anim_lib as L
@@ -86,7 +89,6 @@ def dx_zeilen(gewichte, amp, phase, kappa=0.0):
     """Versatz je Quellzeile: round(amp · gewicht · sin(phase − kappa · k)); gewichte[k] ∈ [0,1] (oben groß, am Boden 0).
     Benachbarte Quellzeilen sollen sich um höchstens 1 Pixel unterscheiden, und Zeilen mit schrägem Umriss (Schultern, Fuß)
     teilen sich den Versatz mit ihrer Nachbarzeile (gleiches Gewicht), sonst bliebe eine Umrisslücke."""
-    import math
     return [int(round(amp * g * math.sin(phase - kappa * k))) for k, g in enumerate(gewichte)]
 
 

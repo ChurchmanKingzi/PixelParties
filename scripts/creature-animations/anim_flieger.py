@@ -10,6 +10,7 @@ Bausteine, die bei mehreren Fliegern gebraucht werden:
                                                starre Anbauteile (Edelstein, Spange), die auf dem Flügel mitwandern
     setze(ebene, pad_l, pad_t, {(x, y): farbe}, dy=0)   einzelne Pixel überschreiben (Blinzeln, Glanz, Funkeln)
     glanz_pfad(i, n, start, pfad, laenge)      welche Pfadpunkte zum Frame i „aufglänzen“ (Lichtreflex wandert an einer Linie entlang)
+    fluegel_welle(a, pivot_x, amp, phase, …)   wie L.spalten_welle, aber mit Wellenlauf UND Ruhepose bei phase = 0 (Spitze hinkt nach)
     kacheln(frames, x0, x1, y0, y1, sc)        Ausschnitt mehrerer Frames nebeneinander, ganzzahlig vergrößert (Nahaufnahme für Nähte)
     stapeln(bilder)                            PIL-Bilder untereinander zu einem Kontrollbild
 """
@@ -93,4 +94,28 @@ def stapeln(bilder):
     for b in bilder:
         out.paste(b, (0, y))
         y += b.height + 8
+    return out
+
+
+def fluegel_welle(a, pivot_x, amp, phase, potenz=1.0, nur_rechts=None, lauf=0.0):
+    """Wie L.spalten_welle (senkrechter Spaltenversatz wächst mit dem Abstand zum Gelenk, Positiv = nach unten), aber der
+    Wellenlauf (`lauf`: die Spitze hinkt der Wurzel hinterher) ist so verschoben, dass bei phase = 0 JEDE Spalte genau auf
+    ihrer Originalposition steht (Ruhepose = Original). Spalten auf der nicht bewegten Seite des Gelenks (nur_rechts) bleiben stehen."""
+    out = L.leer(*a.shape[:2])
+    h, w = a.shape[:2]
+    maxd = max(1, max(abs(x - pivot_x) for x in range(w) if a[:, x, 3].any()))
+    for x in range(w):
+        if not a[:, x, 3].any():
+            continue
+        d = x - pivot_x
+        if nur_rechts is True and d < 0 or nur_rechts is False and d > 0:
+            dy = 0
+        else:
+            frac = abs(d) / maxd
+            dy = int(round(amp * (math.sin(phase - lauf * frac) - math.sin(-lauf * frac)) * frac ** potenz))
+        ys = np.nonzero(a[:, x, 3])[0]
+        if ys.min() + dy < 0 or ys.max() + dy >= h:
+            raise L.ClipError(f'Spalte {x} würde um {dy} px aus der Leinwand (Höhe {h}) geschoben')
+        for y in ys:
+            out[y + dy, x] = a[y, x]
     return out
