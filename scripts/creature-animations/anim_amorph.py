@@ -68,7 +68,10 @@ def koerper_pose(zeilen, loeschen=(), doppeln=(), p=0, paare=((8, 9), (7, 10), (
     """Squash & Stretch eines Körpers. zeilen: (n, w, 4) wie von zeilen_von; loeschen/doppeln: Zeilenindizes (0 = oberste Körperzeile);
     p: Spalten je Seite (siehe zeile_umbauen); paare: Standard-Spaltenpaare; paare_je_zeile: {Zeilenindex: [Paare]} für Zeilen, in denen die
     Standardspalten etwas Wichtiges (Glanz, Auge) träfen. Gibt (n', w, 4) und die Liste der Quellzeilen-Indizes je Ausgabezeile zurück —
-    damit Wabbeln/Schräglage dieselbe Quellzeile immer gleich versetzen."""
+    damit Wabbeln/Schräglage dieselbe Quellzeile immer gleich versetzen. Spaltenpaare gelten in Sprite-Koordinaten, x0 = pad_l.
+    Regel gegen offene Kanten: p für ALLE Körperzeilen gleich wählen (sonst wird eine Umrissstufe größer als 1 px und die
+    Füllfarbe liegt frei); Zeilen, die frei über einem schmaleren Teil (z. B. Kopfoberkante unter einer Krone) liegen, brauchen
+    nach dem Umbau einen ergänzten Umriss (siehe shiny_slime.py)."""
     paare_je_zeile = paare_je_zeile or {}
     def lv(liste):
         return [(a + x0, b + x0) for a, b in liste]

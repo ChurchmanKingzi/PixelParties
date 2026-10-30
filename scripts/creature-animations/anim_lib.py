@@ -211,7 +211,7 @@ PUFF_FORMEN = {
 }
 
 
-SCHRUMPF = {'l': ['m', 's', 'k'], 'm': ['s', 'k'], 'o': ['s', 'k'], 's': ['k'], 'k': []}   # Stufen beim Wachsen/Schrumpfen
+SCHRUMPF = {'l': ['m', 's', 'k'], 'm': ['s', 'k'], 'o': ['k'], 's': ['k'], 'k': []}   # Stufen beim Wachsen/Schrumpfen
 
 
 def _stufe(form, t):

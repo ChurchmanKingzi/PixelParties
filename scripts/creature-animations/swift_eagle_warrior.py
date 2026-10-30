@@ -20,16 +20,15 @@ Identifikation (Sprite-Koordinaten x, y; Figur ist fast spiegelsymmetrisch um x 
   mit türkisem Stein (25–26, 27–28), Schulter-Edelsteine (22, 24) und (29, 24). Die unteren Zeilen (29–30) sind der Rock/Rand der Kunst.
 
 Ablauf (24 Frames à 70 ms = 1,68 s):
-* Flügelschlag: zweimal pro Schleife; jede Flügelspalte wandert senkrecht (Spitze etwa −4 … +4 px), je weiter außen, desto mehr,
-  die Spitze hinkt leicht nach (Wellenlauf). Die Schulterspalten am Körperumriss (links x ≥ 19, rechts x ≤ 32) bleiben stehen,
+* Flügelschlag: zweimal pro Schleife; jede Flügelspalte wandert senkrecht (Spitze etwa −2 … +5 px; Ruhepose = Original = angehobener Flügel), je weiter
+  außen, desto mehr, die Spitze hinkt leicht nach (Wellenlauf). Die Schulterspalten am Körperumriss (links x ≥ 19, rechts x ≤ 32) bleiben stehen,
   sonst reißt zwischen Flügel und Körper eine Tasche auf. Beide Flügel gleichzeitig.
 * Abschlag hebt den Oberkörper: Zeile 26 (Brustplatten) wird bei kräftigem Abschlag einmal verdoppelt; Kopf, Helmzier und Flügel
   heben sich starr um 1 px mit, der untere Rand (Rock) bleibt am Boden. Nichts wird doppelt gezeichnet, was woanders bewegt wird.
 * Helmzier weht: die Federn (y 0–8 ohne Helmrand) lehnen sich zeilenweise 0 … 2 px zur Seite (Periode = Schleife), der Ansatz
   am Helmrand steht; ein Lichtreflex läuft an der weißen Mittelfeder herab (Frames 8–13).
 * Blinzeln (Frames 16–18), Schulter-Edelsteine und Gürtelstein funkeln (Frames 4–6, 9–10, 14–15).
-* Federflaum (Partikel): zwei, drei kleine Federflocken lösen sich von den Flügelspitzen und sinken langsam (Klekse/Funken,
-  wachsen und schrumpfen), hinter der Figur.
+* Keine Partikel: braune Federflocken auf dunklem Grund sahen wie Krümel aus (verworfen), sonst gibt die Figur nichts her.
 
 Ergänzungen: keine nötig — Flügel und Körper überlappen sich im Original nirgends (Körper allein: Umriss ringsum geschlossen).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError, wenn etwas herausragen würde).
@@ -44,7 +43,7 @@ import anim_lib as L
 import anim_flieger as F
 
 N, MS = 24, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 6, 6, 6, 7
+PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 5, 7
 
 spr = L.lade('swift-eagle-warrior')
 sh, sw = spr.shape[:2]
@@ -73,21 +72,7 @@ AUGEN_R = [(27, 14), (28, 14), (27, 15), (28, 15)]
 FEDER_PFAD = [(y) for y in range(3, 8)]                      # Mittelfeder: Zeilen 3–7, Spalten 25/26
 
 
-# ── Partikel: Federflaum, sinkt langsam von den Flügelspitzen ────────────────────────────────────────────────────
-def px(x, y):
-    return PAD_L + x, PAD_T + y
-
-
-FLAUM = {'c': (91, 63, 41), 'r': (69, 43, 23)}
-PUFFS = [
-    dict(x=px(2, 17)[0], y=px(2, 17)[1], vx=-1, vy=7, off=0, form='s', wackeln=1),    # links, Flügelspitze
-    dict(x=px(49, 17)[0], y=px(49, 17)[1], vx=1, vy=7, off=12, form='s', wackeln=1),  # rechts, Flügelspitze
-    dict(x=px(8, 16)[0], y=px(8, 16)[1], vx=-1, vy=6, off=6, form='k', wackeln=1),
-    dict(x=px(43, 16)[0], y=px(43, 16)[1], vx=1, vy=6, off=18, form='k', wackeln=1),
-]
-
-
-def frame(i, partikel=True):
+def frame(i):
     ph = L.sinus(i, N / 2)                                    # Flügelschlag: zweimal pro Schleife
     lift = 1 if math.sin(ph) > 0.45 else 0                    # kräftiger Abschlag → Oberkörper hebt sich
     zeile = PAD_T + 26
@@ -120,7 +105,7 @@ def frame(i, partikel=True):
     zr = L.versetze(zr, 0, -lift)
 
     # Flügel: Schulterspalten stehen, weiter außen schlägt es aus; Spitze hinkt nach
-    fl_amp, fl_pot, lauf = 4.2, 1.3, 0.7
+    fl_amp, fl_pot, lauf = 3.4, 1.3, 0.5
     wl = F.fluegel_welle(F.ebene(spr, fl_links, H, W, PAD_L, PAD_T), PAD_L + 19, fl_amp, ph, potenz=fl_pot,
                          nur_rechts=False, lauf=lauf)
     wr = F.fluegel_welle(F.ebene(spr, fl_rechts, H, W, PAD_L, PAD_T), PAD_L + 32, fl_amp, ph, potenz=fl_pot,
@@ -128,8 +113,7 @@ def frame(i, partikel=True):
     wl = L.versetze(wl, 0, -lift)
     wr = L.versetze(wr, 0, -lift)
 
-    flaum = L.puff_ebene(H, W, i, N, PUFFS, FLAUM) if partikel else L.leer(H, W)
-    return L.zusammen(H, W, [(flaum, 0, 0), (wl, 0, 0), (wr, 0, 0), (kp, 0, 0), (zr, 0, 0)])
+    return L.zusammen(H, W, [(wl, 0, 0), (wr, 0, 0), (kp, 0, 0), (zr, 0, 0)])
 
 
 if __name__ == '__main__':

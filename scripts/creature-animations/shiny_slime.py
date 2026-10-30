@@ -28,12 +28,17 @@ Ablauf (40 Frames à 75 ms = 3,0 s, nahtlos):
   Umriss teilen sich den Versatz mit der Nachbarzeile, damit keine Umrisslücke entsteht) — im Leerlauf langsam (Periode 20 Frames),
   nach der Landung schnell und abklingend.
 * Krone: starr; sie folgt dem Kopf seitlich exakt und sinkt beim Absprung (22–23) und beim Aufprall (28) 1 px in den Kopf.
-* Blinzeln: Frames 8–10 und 34–36 (Lid oben → Augenlinie → Lid oben).
+* Blinzeln: Frames 16–18 und 34–36 (Lid oben halb → Augenlinie zu → Lid halb).
 * Lichtreflex: Frames 2–15 wandert ein diagonales Glanzband über Krone und Körper (Goldtöne eine bzw. zwei Stufen heller,
   Farben der Sprite-Rampe E→C→B→D→G).
 * Goldstaub (Partikel, Farben des Sprites): vier winzige runde Glitzerpunkte steigen langsam neben Krone und Körper auf
   (wachsen/schrumpfen, hinter der Figur).
-Ergänzungen: keine (alle Teile bleiben über Kanten verbunden; Krone und Kopf überlappen nur oder liegen genau aufeinander).
+Ergänzungen: Ist der Kopf (Stauchung −1/−2) breiter als die Krone, läge seine Oberkante neben der Krone ohne Umriss frei.
+Dann wird die Umrissfarbe (96,83,0) in die Zeile über der Kopfoberkante gesetzt (Frames 12–14, 20, 21, 28, 29: 1–2 px beiderseits der
+Krone, 4-verbunden an Kopf und Kronenumriss; Quelle: Umriss des Originals). Sonst nichts.
+Nähte (Regel 11): Krone und Kopf bewegen sich seitlich immer um denselben Wert und liegen vertikal 4-verbunden aufeinander
+(Überlappung 8–10 px; beim Einsinken überdeckt die Krone die Kopfoberkante); je Frame prüft das Skript, dass die Figur aus genau
+einem 4-zusammenhängenden Teil besteht und kein Randpixel außer der Umrissfarbe frei liegt.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
 """
 import math
@@ -121,10 +126,10 @@ def sprite_mit_augen(i):
 
 
 GLITZER = [
-    dict(x=PAD_L - 2, y=PAD_T + 12, vx=-1, vy=-7, off=0, form='s', wackeln=1),
+    dict(x=PAD_L - 2, y=PAD_T + 12, vx=-1, vy=-7, off=0, form='o', wackeln=1),
     dict(x=PAD_L + 19, y=PAD_T + 9, vx=1, vy=-7, off=10, form='k', wackeln=1),
     dict(x=PAD_L - 1, y=PAD_T + 4, vx=-2, vy=-6, off=5, form='k', wackeln=1),
-    dict(x=PAD_L + 17, y=PAD_T + 2, vx=2, vy=-6, off=15, form='s', wackeln=1),
+    dict(x=PAD_L + 17, y=PAD_T + 2, vx=2, vy=-6, off=15, form='o', wackeln=1),
 ]
 STAUB = {'c': WEISS, 'r': GOLD_G}
 
