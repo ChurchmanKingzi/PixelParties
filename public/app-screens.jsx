@@ -95,12 +95,31 @@ function useTutorialFlow(open) {
   // Receive the board state for a running tutorial attempt.
   useEffect(() => {
     if (!open) return;
+    // Verbindungswaechter: nach einem Wiederverbinden muss der Server binnen 5 s den Tutorial-Zustand neu senden (Raum bleibt 3 min erhalten).
+    // Kommt nichts (Raum weg, z. B. Server neu gestartet), wuerde das Brett weiter stehen und jede Eingabe ins Leere gehen — dann klar abbrechen.
+    let waechter = 0;
+    const onConnect = () => {
+      if (!tutorialAttemptRoom.current) return;
+      clearTimeout(waechter);
+      waechter = setTimeout(() => {
+        if (!tutorialAttemptRoom.current) return;
+        notify('Connection lost — the tutorial ended. Please start it again.', 'error');
+        setTutorialAttemptState(null);
+        tutorialAttemptRoom.current = null;
+        tutorialIntroShownRef.current = null;
+        window._currentTutorialNum = null;
+        if (window.setTutorialFigurenGesperrt) window.setTutorialFigurenGesperrt(false);
+        socket.emit('get_tutorials');
+      }, 5000);
+    };
     const onGameState = (state) => {
+      clearTimeout(waechter);
       if (state.isPuzzle && state.isTutorial && !window._tutorialGaveUp) {
         tutorialAttemptRoom.current = state.roomId;
         setTutorialAttemptState(state);
       }
     };
+    socket.on('connect', onConnect);
     const onError = (msg) => {
       // Der Start ist gescheitert: die Figuren-Sperre (s. startTutorialAttempt)
       // darf nicht auf ein Gespraech warten, das nie kommt.
@@ -109,7 +128,7 @@ function useTutorialFlow(open) {
     };
     socket.on('game_state', onGameState);
     socket.on('puzzle_error', onError);
-    return () => { socket.off('game_state', onGameState); socket.off('puzzle_error', onError); };
+    return () => { clearTimeout(waechter); socket.off('connect', onConnect); socket.off('game_state', onGameState); socket.off('puzzle_error', onError); };
   }, [open, notify]);
 
   // Show the Monia-Bot intro textbox when a stage's board first loads (and

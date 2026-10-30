@@ -3558,6 +3558,9 @@ function App() {
       // `challengeStart`: eine angenommene Herausforderung (social.js) schickt beide Spieler aus dem Menü ins Spiel.
       if (state.reconnected || state.challengeStart) {
         // Puzzle games are ephemeral — don't reconnect, just clean up
+        // Ausnahme: ein LAUFENDES Tutorial dieser Seitensitzung (`_currentTutorialNum`) bleibt — ein kurzer Netz-/App-Wechsel am Handy darf es nicht beenden;
+        // der Tutorial-Hook (app-screens) nimmt den frisch gesendeten Zustand selbst entgegen. Nach einem Neuladen (keine Tutorialnummer) wird wie bisher geraeumt.
+        if (state.isPuzzle && state.isTutorial && window._currentTutorialNum && !window._tutorialGaveUp) return;
         if (state.isPuzzle) {
           socket.emit('leave_game', { roomId: state.roomId });
           return;

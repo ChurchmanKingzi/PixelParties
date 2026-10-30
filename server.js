@@ -20295,12 +20295,9 @@ io.on('connection', (socket) => {
           skillTest.onSeatLeft(room, currentUser, socket, skillTestHost);
           return;
         }
-        // Puzzle rooms: preserve existing immediate cleanup.
-        if (room.type === 'puzzle') {
-          activeGames.delete(currentUser.userId);
-          destroyRoom(activeRoomId);
-          return;
-        }
+        // Puzzle-/Tutorial-Raeume: frueher sofortiger Abbau — auf dem Handy reicht ein kurzer Netz- oder App-Wechsel, und der Raum war weg,
+        // waehrend der Client weiter das Brett zeigte: jede Eingabe ging ins Leere („Action Phase leuchtet, aber nichts passiert").
+        // Jetzt dieselbe Wiederverbindungsfrist wie bei Einzelspieler-Partien (Zweig darunter; der auth-Handler stellt den Raum wieder her).
         // Singleplayer rooms: F5 / browser refresh fires `disconnect`
         // and then re-runs `auth` once the new socket comes up — if we
         // tear the room down immediately, the reconnect grace window
@@ -20311,7 +20308,7 @@ io.on('connection', (socket) => {
         // and restores socketId on return. There's no opponent to
         // declare a winner against, so the only thing that fires on
         // expiry is the room cleanup itself.
-        if (room.type === 'singleplayer') {
+        if (room.type === 'singleplayer' || room.type === 'puzzle') {
           const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
           if (pi < 0) { cleanupRoom(activeRoomId); return; }
           // Dual-tab guard: ignore if a newer connection already took
