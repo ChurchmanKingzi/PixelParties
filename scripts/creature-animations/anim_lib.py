@@ -262,6 +262,33 @@ def rand_pruefen(frames, name):
         assert not (a[0].any() or a[-1].any() or a[:, 0].any() or a[:, -1].any()), f'{name}: Frame {k} berührt den Rand'
 
 
+def pruefe(frames, quelle=None, erlaubt=(), min_rand=2):
+    """Pflichtprüfung vor dem Zeigen. Gibt eine Zusammenfassung aus und wirft AssertionError bei:
+    * Randabstand < min_rand (Sprite/Partikel zu nah am Leinwandrand → Gefahr des Abschneidens),
+    * Farben, die weder in `quelle` (Sprite-RGBA) noch in `erlaubt` (Liste von RGB) vorkommen (neue Farben nur bewusst),
+    * halbtransparente Pixel (Alpha nur 0/255).
+    Die Pixelzahl je Frame wird gemeldet: schwankt sie ohne Absicht (Zeilen einfügen/entfernen, Partikel ausgenommen), wurde
+    etwas abgeschnitten oder doppelt gezeichnet."""
+    H, W = frames[0].shape[:2]
+    rand = min(min(int(np.nonzero(f[..., 3].any(axis=1))[0].min()), H - 1 - int(np.nonzero(f[..., 3].any(axis=1))[0].max()),
+                   int(np.nonzero(f[..., 3].any(axis=0))[0].min()), W - 1 - int(np.nonzero(f[..., 3].any(axis=0))[0].max())) for f in frames)
+    n = [int((f[..., 3] > 0).sum()) for f in frames]
+    halb = sum(int(((f[..., 3] > 0) & (f[..., 3] < 255)).sum()) for f in frames)
+    fremd = set()
+    if quelle is not None:
+        ok = {tuple(int(v) for v in p[:3]) for p in quelle.reshape(-1, 4) if p[3]} | {tuple(c) for c in erlaubt}
+        for f in frames:
+            for p in f.reshape(-1, 4):
+                if p[3] and tuple(int(v) for v in p[:3]) not in ok:
+                    fremd.add(tuple(int(v) for v in p[:3]))
+    print(f'prüfe: Leinwand {W}×{H}, {len(frames)} Frames, kleinster Randabstand {rand}, Pixel je Frame {min(n)}…{max(n)}, '
+          f'fremde Farben {sorted(fremd) if fremd else "keine"}, halbtransparent {halb}')
+    assert rand >= min_rand, f'Randabstand {rand} < {min_rand}: Leinwand vergrößern'
+    assert not fremd, f'Farben nicht aus der Quelle: {sorted(fremd)}'
+    assert halb == 0, 'Alpha darf nur 0 oder 255 sein (Pixelart, keine Überblendung)'
+    return n
+
+
 def speichern(slug, karte, frames, ms, vorschau=None, face_x=None, hintergrund=(40, 30, 70)):
     """Streifen-PNG + JSON (Format wie data/hero-animations / mr-jiggles) schreiben, optional GIF-Vorschau."""
     rand_pruefen(frames, slug)

@@ -25,7 +25,7 @@ import numpy as np
 import anim_lib as L
 
 N, MS = 24, 75
-PAD_L, PAD_R, PAD_T, PAD_B = 12, 16, 12, 10
+PAD_L, PAD_R, PAD_T, PAD_B = 12, 20, 12, 10
 
 spr = L.lade('blue-ice-dragon')
 sh, sw = spr.shape[:2]
