@@ -202,6 +202,18 @@ def eckkontakte(frame):
     return paare
 
 
+def eckkontakt_typen(frame):
+    """Wie eckkontakte, aber als Zähler nach Farbpaar (RGB, RGB) statt nach Koordinaten — robust, wenn Teile des Körpers beim Atmen
+    verschoben werden (dieselben Kontakte liegen dann woanders). Zum Vergleich mit Frame 0: Eintrag mit höherem Zähler = neuer Eckkontakt."""
+    from collections import Counter
+    z = Counter()
+    for (p, q) in eckkontakte(frame):
+        a = tuple(int(v) for v in frame[p[1], p[0], :3])
+        b = tuple(int(v) for v in frame[q[1], q[0], :3])
+        z[tuple(sorted((a, b)))] += 1
+    return z
+
+
 def ruhepose(frame, spr, off):
     """Vergleicht `frame` (volle Leinwand) mit dem Original-Sprite an Versatz off. Gibt die abweichenden Koordinaten zurück
     (leer = Ruhepose entspricht dem Original)."""

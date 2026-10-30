@@ -20,6 +20,7 @@ Bausteine, die bei mehreren Fliegern gebraucht werden:
     stern_stufe(i, n, start, folge)            Phase eines Glitzer-Sterns (0 = nur Mitte, 1 = Arme 1 px, 2 = Arme 2 px) oder None
     stern(ebene, x, y, stufe, kern, arm1, arm2)  vierzackiger Glitzer-Stern (Mitte + 4 Arme) auf eine fertige Leinwand-Ebene
     puls(i, n, x, y, versatz, periode)         0/1-Puls pro Pixel (Facetten pulsieren, wandern über das Objekt)
+    zeilen_pendel(a, pivot_y, amp, phase, …)   nur Zeilen UNTER dem Pivot pendeln waagerecht (Beine/Schwanz/Hinterleib), je tiefer, desto mehr
     kacheln(frames, x0, x1, y0, y1, sc)        Ausschnitt mehrerer Frames nebeneinander, ganzzahlig vergrößert (Nahaufnahme für Nähte)
     stapeln(bilder)                            PIL-Bilder untereinander zu einem Kontrollbild
 """
@@ -243,3 +244,32 @@ def stern(ebene, x, y, stufe, kern, arm1, arm2=None):
 def puls(i, n, x, y, periode=1, versatz=0.9):
     """0 oder 1: Facetten pulsieren, die Hellphase wandert diagonal über das Objekt (je Pixel anderer Phasenversatz)."""
     return 1 if math.sin(2 * math.pi * periode * i / n + versatz * (x + y)) > 0.55 else 0
+
+
+def zeilen_pendel(a, pivot_y, amp, phase, potenz=1.0):
+    """Wie L.zeilen_welle, aber nur Zeilen UNTERHALB von pivot_y wandern (Beine, Hinterleib, Schwanz): dx = round(amp · f^potenz · sin(phase)),
+    f = (y − pivot_y) / maxAbstand. Die Zeilen oberhalb und die Pivotzeile bleiben stehen.
+    Zusammenhang: Ändert sich dx von einer Zeile zur nächsten so, dass ein Pixel seinen senkrechten Nachbarn darüber verlöre (dünne Beine,
+    Spitzen), behält die Zeile das dx der Zeile darüber — die Figur bleibt 4-verbunden."""
+    out = L.leer(*a.shape[:2])
+    h, w = a.shape[:2]
+    maxd = max(1, max((y - pivot_y for y in range(h) if a[y, :, 3].any() and y > pivot_y), default=1))
+    prev = 0
+    for y in range(h):
+        xs_ = np.nonzero(a[y, :, 3])[0]
+        if not len(xs_):
+            continue
+        dx = 0 if y <= pivot_y else int(round(amp * ((y - pivot_y) / maxd) ** potenz * math.sin(phase)))
+        if y > pivot_y and dx != prev:
+            for x in xs_:
+                if a[y - 1, x, 3]:                            # war oben angeschlossen: das muss nach dem Versatz so bleiben
+                    xa = x + dx - prev
+                    if not (0 <= xa < w and a[y - 1, xa, 3]):
+                        dx = prev
+                        break
+        prev = dx
+        if xs_.min() + dx < 0 or xs_.max() + dx >= w:
+            raise L.ClipError(f'Zeile {y} würde um {dx} px aus der Leinwand (Breite {w}) geschoben')
+        for x in xs_:
+            out[y, x + dx] = a[y, x]
+    return out
