@@ -10613,10 +10613,22 @@ function measureHighlight(el) {
   }
   // Transform kurz aus -> beide Rects sind jetzt Layout-Koordinaten.
   clip.classList.add(TB_FLAT_CLASS);
-  const cr = clip.getBoundingClientRect();
-  const pr = plane.getBoundingClientRect();
+  let cr = clip.getBoundingClientRect();
+  let pr = plane.getBoundingClientRect();
   let er = el.getBoundingClientRect();
   clip.classList.remove(TB_FLAT_CLASS);
+  // Tutorial-Zoom (Desktop, `.tut-zoom` am Brettkasten): Clip, Ebene und Ziel sind um `kz` skaliert gemessen. Die Kette wird in Layoutmassen nachgebaut und als Ganzes um `kz`
+  // vergroessert (Ursprung links oben) — wie die echte Ebene unter der Zoom-Transformation.
+  let kz = 1;
+  { const bcz = clip.parentElement; if (bcz && bcz.classList && bcz.classList.contains('tut-zoom') && clip.offsetWidth > 0) { const q = cr.width / clip.offsetWidth; if (Number.isFinite(q) && q > 0.2) kz = q; } }
+  if (kz !== 1) {
+    const N = (b) => ({ left: b.left, top: b.top, width: b.width / kz, height: b.height / kz });
+    const cr0 = cr, pr0 = pr, er0 = er;
+    cr = { left: cr0.left, top: cr0.top, width: cr0.width / kz, height: cr0.height / kz };
+    pr = { left: cr0.left + (pr0.left - cr0.left) / kz, top: cr0.top + (pr0.top - cr0.top) / kz, width: pr0.width / kz, height: pr0.height / kz };
+    er = { left: cr0.left + (er0.left - cr0.left) / kz, top: cr0.top + (er0.top - cr0.top) / kz, width: er0.width / kz, height: er0.height / kz };
+    void N;
+  }
   // ★ Hovert der Zeiger gerade ueber der Zone, ist sie hochgezoomt (`scale`,
   // `--board-hover-scale`, mit Uebergang) — das Highlight bekam diese Hover-
   // Groesse, das geklonte Kartenbild aber blieb in Ruhegroesse: der Rahmen
@@ -10644,6 +10656,7 @@ function measureHighlight(el) {
   // andere Projektion als die Karte darunter.
   return {
     flat: false,
+    kz,
     clip: { left: cr.left, top: cr.top, width: cr.width, height: cr.height },
     plane: { left: pr.left - cr.left, top: pr.top - cr.top, width: pr.width, height: pr.height },
     local: { left: er.left - pr.left, top: er.top - pr.top, width: er.width, height: er.height },
@@ -10929,10 +10942,10 @@ function TextBox() {
 
   // Highlights
   useEffect(() => {
-    if (!pages.length) { setHighlightRects([]); return; }
+    if (!pages.length) { setHighlightRects([]); if (window.ppTutorialZoomAus) window.ppTutorialZoomAus(); return; }   // Textbox zu: aus dem Zoom wieder heraus
     const page = pages[pageIdx];
     const hl = page?.highlights;
-    if (!hl || !hl.length) { setHighlightRects([]); return; }
+    if (!hl || !hl.length) { setHighlightRects([]); if (window.ppTutorialZoomAus) window.ppTutorialZoomAus(); return; }
     const rects = [];
     const aufraeumen = [];
     let abgebrochen = false;
@@ -11028,6 +11041,7 @@ function TextBox() {
         if (sel) document.querySelectorAll(sel).forEach(tr => { if (!tr.closest('.textbox-overlay')) ziele.push(tr); });
       }
       fahrt = window.ppTutorialCamFokus(ziele);
+      if (!fahrt && window.ppTutorialZoom) fahrt = window.ppTutorialZoom(ziele);   // Desktop: hineinzoomen, Ziele in die Mitte (Handy: Kamerafahrt oben)
     }
     if (fahrt) { setHighlightRects([]); fahrt.then(() => { if (!abgebrochen) messen(); }); }
     else messen();
@@ -11260,6 +11274,7 @@ function TextBox() {
             left: h.clip.left, top: h.clip.top,
             width: h.clip.width, height: h.clip.height,
             perspective: h.perspective, perspectiveOrigin: h.perspectiveOrigin,
+            ...(h.kz && h.kz !== 1 ? { transform: `scale(${h.kz})`, transformOrigin: '0 0' } : null),
             pointerEvents: 'none', zIndex: 90001,
           }}>
             <div style={{

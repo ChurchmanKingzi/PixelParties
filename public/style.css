@@ -26470,3 +26470,11 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   .game-hand-quit, .hand-action-btn { min-height: 30px !important; }
   .menu-logout-btn { min-height: calc(30px / var(--ui-scale, 1)) !important; }
 }
+
+/* ★ Tutorial-Zoom (Desktop): Brettebene und Sprite-Huelle bekommen dieselbe 2D-Verschiebung/Skalierung (Werte setzt `ppTutorialZoom` in app-board.jsx). Ursprung links oben der Box. */
+.board-center.tut-zoom > .board-plane-clip,
+.board-center.tut-zoom > .hero-sprite-huelle {
+  transform-origin: 0 0;
+  transform: translate(var(--tz-x, 0px), var(--tz-y, 0px)) scale(var(--tz-s, 1));
+  transition: transform .52s cubic-bezier(.45, 0, .2, 1);
+}

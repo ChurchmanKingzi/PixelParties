@@ -2099,6 +2099,72 @@ function ppTutorialCamFokus(elemente, opts) {
 }
 window.ppTutorialCamFokus = ppTutorialCamFokus;
 
+// ★ TUTORIAL-ZOOM (Desktop, Als Vorgabe: „Kamerafahrten im Tutorial, in Kombination mit Zooms … Wann immer Karten gehighlightet werden, soll die Kamera auch außerhalb von Mobile
+// reinzoomen, sodass die gehighlighteten Karten im Zentrum sind. Am Ende der Erklärung soll sie wieder auf die normale Größe rauszoomen."): Zoom + Schwenk des Bretts (`.board-plane-clip` und
+// die Sprite-Hülle `.hero-sprite-huelle`, die beide die gleiche Box haben, bekommen dieselbe 2D-Transformation, s. style.css `.tut-zoom`). Der Zoom bringt die Ziele in die Mitte der
+// freien Fläche unter der Textbox. Liegt ein Ziel außerhalb der Brettebene (Phasenleiste, Handkarten, Stapel), bleibt die Ansicht normal. Rückgabe: Promise nach der Fahrt (die Highlight-Klone
+// werden erst danach vermessen) oder null, wenn nichts zu tun ist. `window._ppTz` = aktuelle Verschiebung/Skalierung (nur gültig, solange `.board-center` die Klasse trägt).
+function _ppTzStand(bc) { return (bc && bc.classList.contains('tut-zoom') && window._ppTz) ? window._ppTz : { x: 0, y: 0, s: 1 }; }
+function ppTutorialZoomAus() {
+  try {
+    const bc = document.querySelector('.board-center');
+    if (!bc || !bc.classList.contains('tut-zoom') || !window._ppTz) return null;
+    window._ppTz = null;
+    bc.style.setProperty('--tz-x', '0px'); bc.style.setProperty('--tz-y', '0px'); bc.style.setProperty('--tz-s', '1');
+    return new Promise((fertig) => setTimeout(() => { if (!window._ppTz) bc.classList.remove('tut-zoom'); fertig(); }, 560));
+  } catch { return null; }
+}
+function ppTutorialZoom(elemente) {
+  try {
+    if (window.ppIsPhone && window.ppIsPhone()) return null;
+    const bc = document.querySelector('.board-center');
+    const clip = bc && bc.querySelector(':scope > .board-plane-clip');
+    if (!bc || !clip) return null;
+    const alle = Array.from(elemente || []).filter(e => e && e.getBoundingClientRect);
+    // Mischmengen (Brettkarte + Handkarte): gezoomt wird auf die Brettkarten, die Hand steht ohnehin fest unten. Gehoert die Phasenleiste dazu, bleibt die Ansicht normal
+    // (sie liegt ausserhalb der Brettebene und wuerde beim Zoom nicht mitwandern).
+    const liste = alle.filter(e => clip.contains(e));
+    if (!liste.length || alle.some(e => e.closest && e.closest('.phase-column'))) return ppTutorialZoomAus();
+    const cur = _ppTzStand(bc);
+    const bcr = bc.getBoundingClientRect();
+    // Ursprung der (unverzerrten) Clip-Box auf dem Bildschirm — offsetLeft/Top kennen keine Transforms
+    const O = { x: bcr.left + bc.clientLeft + clip.offsetLeft - bc.scrollLeft, y: bcr.top + bc.clientTop + clip.offsetTop - bc.scrollTop };
+    let bl = Infinity, bt = Infinity, br = -Infinity, bb = -Infinity;
+    for (const e of liste) {
+      const r = e.getBoundingClientRect();
+      if (!r.width && !r.height) continue;
+      // zurueck in den unzoomten Zustand: p' = O + T + s·(p − O)
+      const l = O.x + (r.left - O.x - cur.x) / cur.s, t = O.y + (r.top - O.y - cur.y) / cur.s;
+      const rr = O.x + (r.right - O.x - cur.x) / cur.s, b = O.y + (r.bottom - O.y - cur.y) / cur.s;
+      bl = Math.min(bl, l); bt = Math.min(bt, t); br = Math.max(br, rr); bb = Math.max(bb, b);
+    }
+    if (!isFinite(bl)) return null;
+    // freie Fläche: Brettkasten abzüglich der Textbox oben
+    let oben = bcr.top; const unten = bcr.bottom;
+    const tb = document.querySelector('.textbox');
+    if (tb) { const q = tb.getBoundingClientRect(); if (q.height > 0 && q.top + q.height / 2 < window.innerHeight / 2) oben = Math.max(oben, q.bottom + 8); }
+    const Aw = bcr.width, Ah = Math.max(80, unten - oben);
+    const bw = (br - bl) + 28, bh = (bb - bt) + 28;
+    let s = Math.min((Aw * 0.8) / bw, (Ah * 0.8) / bh, 2);
+    if (!(s >= 1.12)) return ppTutorialZoomAus();
+    s = Math.round(s * 20) / 20;
+    const Cx = bcr.left + Aw / 2, Cy = oben + Ah / 2, px = (bl + br) / 2, py = (bt + bb) / 2;
+    let tx = Cx - O.x - s * (px - O.x), ty = Cy - O.y - s * (py - O.y);
+    // das gezoomte Brett soll den Kasten weiter ausfuellen (keine leeren Raender): Kanten begrenzen
+    const W = clip.offsetWidth, H = clip.offsetHeight;
+    const klemme = (v, lo, hi) => (lo <= hi ? Math.min(hi, Math.max(lo, v)) : (lo + hi) / 2);
+    tx = klemme(tx, bcr.right - O.x - s * W, bcr.left - O.x);
+    ty = klemme(ty, bcr.bottom - O.y - s * H, bcr.top - O.y);
+    if (Math.abs(tx - cur.x) < 2 && Math.abs(ty - cur.y) < 2 && Math.abs(s - cur.s) < 0.02) return null;
+    window._ppTz = { x: tx, y: ty, s };
+    bc.classList.add('tut-zoom');
+    bc.style.setProperty('--tz-x', tx.toFixed(1) + 'px'); bc.style.setProperty('--tz-y', ty.toFixed(1) + 'px'); bc.style.setProperty('--tz-s', String(s));
+    return new Promise((fertig) => setTimeout(fertig, 580));
+  } catch { return null; }
+}
+window.ppTutorialZoom = ppTutorialZoom;
+window.ppTutorialZoomAus = ppTutorialZoomAus;
+
 // ★ AUFMERKSAMKEITSKAMERA (Tutorial, Handy): Nach dem Intro blieb die Kamera auf der Gegnerseite stehen — die eigene Kreaturen-/Support-Reihe
 // liegt dort hinter der Handleiste, der Spieler sah weder die anklickbare Kreatur noch die Zielfelder (Befund Kontrolllauf Tutorial 2/3/6/7).
 // Alle ~450 ms schaut der Beobachter nach markierten, bedienbaren Zielen (aktivierbare Kreaturen/Faehigkeiten/Areas, Zielfelder, waehlbare Helden);
