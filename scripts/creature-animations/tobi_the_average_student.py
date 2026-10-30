@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Tobi, the Average Student“ (Creature) — der Schüler mit den blonden Stachelhaaren, der dunklen Neon-Jacke und dem schwebenden Fragezeichen.
+"""Idle-Animation für „Tobi, the Average Student“ (Creature) — der Schüler mit den blonden Stachelhaaren, der dunklen Neon-Jacke (das Fragezeichen der Kartenvorlage entfällt in der Animation).
 
 Quelle: src/tobi-the-average-student.png (16×40 px, 35 Farben): die ganze Ebene „Tobi“ (zwei Figuren derselben Ebene mit ihrer Originallage: oben das Fragezeichen, darunter der Schüler).
 PICK: [["MotiveArcanum", 134, 2], ["MotiveArcanum", 134, 1]]      (Ebene „Tobi“, Figur 2 = Schüler (16×25), Figur 1 = Fragezeichen (10×14); nur in dieser Karte)
@@ -20,7 +20,7 @@ Kein Metall, Gold oder Edelstein im Sprite → KEIN Glanz (Regel 14; Haare glän
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Auf und ab (zweistufig, Periode 24 = zweimal pro Schleife): Brust zuerst 1 px (die dunkle Jackensaumzeile 36 wird einmal doppelt eingefügt: Jacke, Arme, Kopf steigen, Beine/Schuhe bleiben), der Kopf läuft 3 Frames
   nach und hebt sich um ein weiteres px (Halszeile 26, glatte Haut, wird verlängert): Kopf 0 → 1 → 2 → 1 → 0 px, Brust 0 → 1 → 0.
-* Fragezeichen schwebt: es hebt und senkt sich zweimal pro Schleife um 1 px (Periode 24) und pendelt einmal pro Schleife 1 px nach links/rechts; es bleibt immer mindestens 1 px vom Kopf entfernt.
+* Das Fragezeichen wird NICHT animiert und nicht gezeichnet (Rückmeldung des Spielgestalters); der Kopf hebt sich beim Atmen nicht mehr in einem zweiten Schritt (kein verlängerter Hals/Kinn).
 * Haarstachel wippt: der einzelne Stachel (7,16) kippt 1 px nach links (Frames 8–11) und rechts (Frames 30–33), bleibt über der Haarzeile 17.
 * Gewichtsverlagerung: der Oberkörper (Zeilen 16–35 samt Armen) schiebt sich 1 px nach rechts (Frames 10–21) und später 1 px nach links (Frames 34–45); Hose und Schuhe bleiben stehen.
 * Arme schwingen: der linke Arm (Zeilen 30–33) spreizt sich 1 px nach außen (Frames 22–33), der rechte (Frames 2–9 und 46–47) — nie in derselben Richtung wie die Gewichtsverlagerung.
@@ -39,9 +39,10 @@ import anim_humanoide as Hm
 import anim_lib as L
 
 N, MS = 48, 62
-PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 3, 2          # Figur knapp zugeschnitten: Armspreizung/Verlagerung ±1 px seitlich, Fragezeichen ±1 px oben, Randabstand ≥ 2
+PAD_L, PAD_R, PAD_T, PAD_B = 3, 3, 3, 2          # Figur knapp zugeschnitten: Armspreizung/Verlagerung ±1 px seitlich, Randabstand ≥ 2
 
 spr = L.lade('tobi-the-average-student')
+spr[:15] = 0                                                        # Fragezeichen entfällt (Rückmeldung: kein Fragezeichen über Tobi)
 sh, sw = spr.shape[:2]
 H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
 OFF = (PAD_L, PAD_T)
@@ -105,12 +106,6 @@ def frame(i):
     hl = 1 if Hm.folge(i, 12, pat, N) else 0
     hr = 1 if Hm.folge(i, 36, pat, N) else 0
     fl, fr = ebene(fuss_l, -hl), ebene(fuss_r, -hr)
-    # --- Fragezeichen schwebt (nur 0 oder 1 px hoch, ±1 px seitlich) ---
-    hoch = int(round(Hm.welle01(i, N / 2)))
-    seit = int(round(math.sin(L.sinus(i, N))))
-    q = ebene(frage, -hoch)
-    if seit:
-        Hm.bereich_versatz(q, OFF, {y: seit for y in range(-2, 15)}, -2, sw + 1)
     fig = L.zusammen(H, W, [(fl, 0, 0), (fr, 0, 0), (al, 0, 0), (ar, 0, 0), (k, 0, 0)])
     # Regel 16: Randpixel in Nicht-Umrissfarbe werden Umriss (Haare → Haarumriss, Körper → Schwarzgrau)
     kk = Hm.kantenmaske(fig)
@@ -118,7 +113,7 @@ def frame(i):
         c = tuple(int(v) for v in fig[y, x, :3])
         if c not in ERLAUBT:
             fig[y, x, :3] = HAAR_UMRISS if y - PAD_T < 27 else KOERPER_UMRISS
-    return L.zusammen(H, W, [(fig, 0, 0), (q, 0, 0)])
+    return fig
 
 
 if __name__ == '__main__':
@@ -126,7 +121,8 @@ if __name__ == '__main__':
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
     diff = Hm.ruhepose(frames[0], spr, OFF)
     print('Ruhepose weicht vom Original ab bei:', diff if diff else 'nichts')
-    n = L.pruefe(frames, quelle=spr)
+    frames = [g[16:] for g in frames]                               # leere Zeilen über dem Kopf (früher Fragezeichen) abschneiden: Haarstachel liegt 3 Zeilen unter dem Rand
+    n = L.pruefe(frames, quelle=spr[16:])
     print('Pixel je Frame:', n)
     e0 = Hm.eckkontakt_typen(frames[0])
     neu = {i: dict(Hm.eckkontakt_typen(g) - e0) for i, g in enumerate(frames) if Hm.eckkontakt_typen(g) - e0}

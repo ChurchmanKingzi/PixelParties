@@ -2,7 +2,7 @@
   "creature": "Tobi, the Average Student",
   "sheet": "tobi-the-average-student.png",
   "frameWidth": 22,
-  "frameHeight": 45,
+  "frameHeight": 29,
   "frames": 48,
   "frameMs": 62,
   "loop": true,

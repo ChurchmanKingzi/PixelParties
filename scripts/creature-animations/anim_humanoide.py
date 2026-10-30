@@ -114,6 +114,12 @@ def bereich_versatz(a, off, zeilen, x0, x1):
 
 
 def rand_dehnen(a, off, zeilen, seite):
+    """NUTZER-FEEDBACK: Arme, Haare und Säume dürfen beim Bewegen nicht „einfach dicker“ werden (kopierte Spalte). Die seitliche
+    Verbreiterung ist deshalb abgeschaltet (die Funktion lässt die Ebene unverändert); die Aufrufe bleiben im Skript stehen."""
+    return a
+
+
+def _rand_dehnen_alt(a, off, zeilen, seite):
     for y, d in zeilen.items():
         Y = y + off[1]
         xs = list(np.nonzero(a[Y, :, 3])[0])
@@ -153,6 +159,11 @@ def rand_dehnen(a, off, zeilen, seite):
 
 
 def rand_dehnen_innen(a, off, zeilen, seite):
+    """NUTZER-FEEDBACK: abgeschaltet (siehe rand_dehnen) – die Ebene bleibt unverändert."""
+    return a
+
+
+def _rand_dehnen_innen_alt(a, off, zeilen, seite):
     """Wie rand_dehnen, aber der entstehende Zwischenraum wird mit dem inneren Ankerpixel der Zeile gefüllt (Hand/Ärmel),
     nicht mit dem Umrisspixel: der Umriss wandert mit dem Arm nach außen und bleibt 1 px breit (kein 2-px-Umrissblock neben dem Arm)."""
     for y, d in zeilen.items():
@@ -328,8 +339,8 @@ def atmen(a, brustzeile, halszeile, brust, kopf):
     einen ClipError."""
     if brust:
         a = L.streck_zeile(a, brustzeile, brust)
-    if kopf:
-        a = L.streck_zeile(a, halszeile - brust, kopf)
+    # NUTZER-FEEDBACK (Tobi/Kai/Healer: Hals und Kinn werden zu groß; allgemein: nicht einfach Zeilen kopieren): der zweite Schritt, bei dem die
+    # Halszeile kopiert wurde und das Gesicht länger wurde, entfällt – der Kopf hebt sich nur noch mit der Brust (starr), `kopf` wird ignoriert.
     return a
 
 

@@ -159,7 +159,34 @@ def streck_zeile(a, zeile, n=1):
         rows = list(range(zeile)) + [zeile] * (n + 1) + list(range(zeile + 1, h))
         if n and a[:n, :, 3].any():
             raise ClipError(f'streck_zeile würde {n} belegte Zeile(n) am oberen Rand abschneiden')
-        return a[rows[n:]].copy()
+        out = a[rows[n:]].copy()
+        if n and 0 < zeile < h - 1:
+            # Nutzer-Feedback: Strecken darf nicht „eine Zeile einfach kopieren“ sein. Die eingefügten Zeilen werden deshalb mit der
+            # ähnlichsten Nachbarzeile schachbrettartig gemischt (Textur bleibt lebendig, nur Pixel beider Zeilen, Randpixel bleiben).
+            # Gleichmäßige Zeilen (Saum, Haut) bleiben unverändert, denn eine Mischung gleicher Zeilen ändert nichts.
+            roh = a[zeile]
+            op = roh[:, 3] > 0
+            xs = np.nonzero(op)[0]
+            if len(xs) > 2:
+                beste, bestwert = None, None
+                for nb in (zeile - 1, zeile + 1):
+                    ov = op & (a[nb, :, 3] > 0)
+                    if ov.sum() < 0.6 * op.sum():
+                        continue
+                    gleich = float((roh[ov, :3] == a[nb, ov, :3]).all(axis=1).mean())
+                    if 0.35 <= gleich < 0.98 and (bestwert is None or gleich > bestwert):
+                        beste, bestwert = nb, gleich
+                if beste is not None:
+                    part = a[beste]
+                    ov = op & (part[:, 3] > 0)
+                    ov[xs[0]] = ov[xs[-1]] = False                       # Randpixel (Umriss) bleiben die der Zeile selbst
+                    for k in range(1, n + 1):
+                        j = zeile - n + k                                  # Ausgabezeile der k-ten eingefügten Kopie
+                        neu = roh.copy()
+                        spalten = np.nonzero(ov & (((np.arange(len(roh)) + k) % 2) == 1))[0]
+                        neu[spalten] = part[spalten]
+                        out[j] = neu
+        return out
     m = -n
     rows = list(range(zeile - m + 1)) + list(range(zeile + 1, h))
     out = np.zeros_like(a)
