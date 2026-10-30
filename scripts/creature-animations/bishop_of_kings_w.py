@@ -14,7 +14,7 @@ Ausgabe:  ../../data/creature-animations/bishop-of-kings-w.png + .json
 Was im Sprite ist (x, y im 19×26-Sprite):
 * MITRA (y 0–10): Umriss (26,26,26), Stoff in Grautönen (153,153,153)/(179,179,179)/(204,204,204)/(230,230,230)/(255,255,255); Goldspitze (255,198,0)/(210,145,0) bei (11–12, 0–1); goldene Zierpunkte bei (9,8–9) und (12,8–9).
 * KRUMMSTAB (gold, x 0–5 oben, x 3 unten): Spirale (0–5, 2–7), Stab (3, 8–25) in (255,198,0)/(210,145,0)/(181,125,0); er verschwindet hinter der Hand bei (2–6, 11–15).
-* KÖRPER (y 11–22): grauer Rock mit dunkler Bandzeile (0,0,0) bei y 18, linker Arm mit Hand am Stab (2–8, 11–15), rechter Ärmel (15–18, 12–21).
+* KÖRPER (y 11–22): heller Rock mit dunkler Bandzeile (26,26,26) bei y 18, linker Arm mit Hand am Stab (2–8, 11–15), rechter Ärmel (15–18, 12–21).
 * FÜSSE (y 23–25): zwei helle Stiefel (7–10) und (13–17) mit dunkler Sohle.
 Metall/Gold: nur der Krummstab und die goldenen Zierpunkte/Spitze der Mitra. Nur sie glänzen (Regel 14); der helle Stoff nicht (auch die weißen Pixel sind Stoff, kein Glanz). Kein Feuer, kein Dampf, keine Partikel. Keine Augen (Schachfigur): kein Blinzeln.
 

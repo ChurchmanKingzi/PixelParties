@@ -2,14 +2,14 @@
   "creature": "Field Cannon",
   "sheet": "field-cannon.png",
   "frameWidth": 52,
-  "frameHeight": 27,
+  "frameHeight": 25,
   "frames": 48,
   "frameMs": 65,
   "loop": true,
   "layout": "horizontal",
   "padTop": 1,
   "padLeft": 1,
-  "padRight": 1,
-  "padBottom": 3,
+  "padRight": 2,
+  "padBottom": 2,
   "faceX": 26.0
 }

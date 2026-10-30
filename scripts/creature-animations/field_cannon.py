@@ -17,10 +17,11 @@ Was ist was (x/y im Sprite):
 Fest bleiben: Rad, Mittelstück des Laufs (x 27–38), Schaftform des Wischers, Lunte (starr).
 
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, Flamme und Funken ausgenommen):
-* Lauf wippt wie auf einer Wippe um das Rad (Periode 48, einmal pro Schleife): die Mündung (x ≥ 39) hebt sich bis 2 px und senkt sich, das Heck samt Lunte (x ≤ 26) macht 1 px gegenläufig mit; Rad und Lauf über dem Rad stehen.
+* Mündung nickt (Periode 48, einmal pro Schleife): die Mündung (x ≥ 39) hebt sich bis 2 px und senkt sich; Rad und Lauf-Rumpf (x 18–38) stehen.
   Die Mündungsspalten verschieben sich gestaffelt in 3er-Gruppen (Abstand zum Rad; kein 1-px-Zacken an der Oberkante), der Lauf ist mehr als 2 Zeilen dick, so bleibt er im 4er-Zusammenhang.
+* Die Lunte (x ≤ 17, starr) mit der Flamme wippt unabhängig ±1 px (Periode 16, dreimal pro Schleife); sie bleibt an der Heckkante des Laufs (x 18) in Kontakt.
 * Brennende Lunte (Regel 15): die Flamme (Gelb (255,255,0) mit hellem Kern (255,255,203); mehr Farben hat der Sprite nicht, Rand/Rot/Orange im Modul gleich Gelb) wird mit anim_feuer.py NEU gezeichnet, Fuß fest auf der Lunte,
-  Spitzen reißen als runde Funken ab; die Flamme steigt/sinkt mit dem Heck. Frame 0 weicht in der Flamme vom Original ab (acht Pixel → kleine bewegte Flamme); der Rest ist exakt das Original.
+  Spitzen reißen als runde Funken ab; die Flamme steigt/sinkt mit der Lunte. Frame 0 weicht in der Flamme vom Original ab (acht Pixel → kleine bewegte Flamme); der Rest ist exakt das Original.
 * Der Wischer nickt: der Kopf (y 0–8) schiebt sich als Block 1 px nach links/rechts (Periode 24, zweimal pro Schleife), der Schaft steht.
 * Glanz auf dem Eisenlauf (Regel 14: Metall): ein Lichtband läuft diagonal über den Lauf (zweimal pro Schleife, Start Frame 4 und 28, 14 Frames, zwei Stufen heller auf der Rampe der Grautöne des Laufs); Rad und Wischer glänzen nicht.
 Keine zusätzlichen Partikel (nur die zur Flamme gehörenden Funken). Randpixel-Test (Regel 16): `U.kontur_schliessen` (Randfarben der Quelle) am Gerät und der Kanone; die Flammenränder sind die Randfarbe Gelb der Quelle.
@@ -70,7 +71,7 @@ ZUNGEN = [FEU.Zunge(15.0 + GPL, 7 + GPT, 5.5, 1.8)]
 FEUER = FEU.Feuer(H, W, ZUNGEN, RAMPE, n=N, seed=3, posen=12, amplitude=0.7, sperre=SPERRE)
 
 # --- Glanz auf dem Lauf (Eisen) ---
-LAUF = kanone & (xx >= 18) & ~((xx >= 27) & (xx <= 37) & (yy >= 10))     # ohne Lunte und ohne das Rad
+LAUF = kanone & (xx >= 18) & ~((xx >= 27) & (xx <= 37) & (yy >= 10)) & ~U.kanten(spr)     # ohne Lunte, ohne das Rad und ohne die Umrisspixel am Rand (sonst verliert der Umriss Kontrast)
 GRAU = sorted({col(x, y) for y in range(sh) for x in range(sw) if LAUF[y, x] and col(x, y)[0] == col(x, y)[1] == col(x, y)[2]}, key=lambda c: sum(c))
 RAMPE_B = {c: GRAU[min(len(GRAU) - 1, k + 2)] for k, c in enumerate(GRAU)}
 
@@ -102,7 +103,7 @@ def front_wippe(a, s):
 
 def frame_gross(i, nur=None):
     s = sinz(i, 48)
-    heck_dy = int(round(1.0 * s))                                 # Heck gegenläufig (abwärts, wenn die Mündung steigt)
+    heck_dy = -int(round(1.0 * sinz(i, 16)))                      # Lunte samt Flamme wippt ±1 px (Periode 16, unabhängig von der Mündung)
     ka = KANONE_A.copy()
     # Lichtband über den Lauf (zwei Stufen heller auf der Grau-Rampe), in Quellkoordinaten vor dem Versatz
     for start in (4, 28):
@@ -114,10 +115,10 @@ def frame_gross(i, nur=None):
                     if LAUF[y, x] and d <= x + y < d + 4 and col(x, y) in RAMPE_B:
                         ka[GPT + y, GPL + x, :3] = RAMPE_B[col(x, y)]
     he, mi, fa = ka.copy(), ka.copy(), ka.copy()
-    he[:, GPL + 27:] = 0
-    mi[:, :GPL + 27] = 0
-    mi[:, GPL + 39:] = 0
-    fa[:, :GPL + 39] = 0
+    he[:, GPL + 18:] = 0                                         # Lunte (x ≤ 17, starr als Ganzes)
+    mi[:, :GPL + 18] = 0
+    mi[:, GPL + 39:] = 0                                         # Lauf-Rumpf samt Rad (x 18–38) steht
+    fa[:, :GPL + 39] = 0                                         # Mündung (x ≥ 39) wippt
     fr = front_wippe(fa, s)
     # Wischer-Kopf nickt
     kx = int(round(sinz(i, 24)))
