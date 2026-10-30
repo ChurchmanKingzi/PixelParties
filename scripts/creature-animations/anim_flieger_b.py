@@ -189,29 +189,24 @@ def knochenflügel(h, w, pose, pal, quelle, spalten, x0, y0, risse=(), adern=Tru
             if 0 <= py_ < h and 0 <= px_ < w:
                 haut_m[py_, px_] = False
 
-    # Fingerpixel (Farbe aus der Quellspalte)
+    # Fingerpixel (Farbe aus der Quellspalte): v = Zeilenabstand zur Pivotzeile in der Quelle, s = Weg entlang des Fingers
     fing_px = []
     for k in range(n):
         col = spalten[k]
         ys = np.nonzero(quelle[:, col, 3])[0]
-        ys = ys[ys >= 0]
-        lo, hi = int(ys.min()), int(ys.max())                    # Zeilenbereich der Quellspalte
-        lang = hi - y0                                           # Länge ab Zeile y0
+        lo, hi = int(ys.min()), int(ys.max())
+        lq = max(1, hi - y0)                                      # Quelllänge ab Pivotzeile
+        scale = lens[k] / lq
         sg = lens[k] * 0.55
         sel = {}
-        smin = lo - y0
-        smax = lens[k] * (lang / max(1.0, lang))                  # Fingerlänge ℓ entspricht der Quelllänge
-        st = smin * lens[k] / max(1.0, lang)
-        s_ = st
-        while s_ <= smax + 1e-9:
-            if s_ <= sg:
-                p = _pt(starts[k], angs[k], s_)
-            else:
-                p = _pt(gel[k], angs[k] - knick, s_ - sg)
-            row = y0 + int(round(s_ * lang / max(1.0, lens[k])))
-            row = max(lo, min(hi, row))
-            sel[(int(round(p[0])), int(round(p[1])))] = tuple(int(v) for v in quelle[row, col, :3]) if quelle[row, col, 3] else None
-            s_ += 0.5
+        v = float(lo - y0)
+        while v <= lq + 1e-9:
+            s_ = v * scale
+            p = _pt(starts[k], angs[k], s_) if s_ <= sg else _pt(gel[k], angs[k] - knick, s_ - sg)
+            row = max(lo, min(hi, y0 + int(round(v))))
+            if quelle[row, col, 3]:
+                sel[(int(round(p[0])), int(round(p[1])))] = tuple(int(c) for c in quelle[row, col, :3])
+            v += 0.5 / scale
         fing_px.append(sel)
     bone_m = np.zeros((h, w), bool)
     arm = linie4(S, Wr)
@@ -220,7 +215,7 @@ def knochenflügel(h, w, pose, pal, quelle, spalten, x0, y0, risse=(), adern=Tru
             bone_m[y, x] = True
     for sel in fing_px:
         for (x, y), c in sel.items():
-            if c is not None and 0 <= y < h and 0 <= x < w:
+            if 0 <= y < h and 0 <= x < w:
                 bone_m[y, x] = True
 
     ader_m = np.zeros((h, w), bool)
@@ -258,8 +253,7 @@ def knochenflügel(h, w, pose, pal, quelle, spalten, x0, y0, risse=(), adern=Tru
     # ---- Finger: hinten (letzter) zuerst, damit die Vorderkante oben liegt
     for k in range(n - 1, -1, -1):
         for (x, y), c in fing_px[k].items():
-            if c is not None:
-                setze(x, y, c)
+            setze(x, y, c)
     # ---- Handgelenk: Wulst aus Binde (2×2) mit hellem Knöchel
     if pose.get('wulst', 0):
         wx, wy = int(round(Wr[0])), int(round(Wr[1]))
