@@ -375,21 +375,41 @@
     return true;
   }
 
+  // ═════════════════ Ruhende Deckkraft (Abdunklungs-Zustaende) ═════════════════
+  // `opacity: .45` an Zonen/Karten im Wahl-Modus (Beschwoeren, Ausgelaugt, Ungueltig …) ist Alpha-Ueberblendung. Ersatz: Deckkraft 1 + Bayer-Dither-Maske der Stufe
+  // `round(opacity*16)` (`--pp-dither-N` aus pixel-anim.js). Nur fuer die Auswahl unten: eine Maske schneidet Ueberstehendes ab (Abzeichen), das gilt dort nicht.
+  const OPA_LISTE = /summon-pick|zone-ability-exhausted|zone-friendship-spent|facedown|hand-card-attach-dimmed|zone-drag-invalid|zone-provider-dimmed|game-board-dimmed|potion-target-ineligible|board-zone-empty|deck-empty-label|phase-btn|deck-peek-card\.dimmed|hero-idle-abgeblendet|hero-idle-unsichtbar/;
+  function opacityRegel(r) {
+    const st = r.style; if (!st || !r.selectorText || !OPA_LISTE.test(r.selectorText) || REGEL_AUS.test(r.selectorText)) return false;
+    const v = st.getPropertyValue('opacity'); if (!v) return false;
+    const op = parseFloat(v);
+    if (!(op > 0.05 && op < 0.9)) return false;
+    if (st.getPropertyValue('mask-image') || st.getPropertyValue('-webkit-mask-image') || st.getPropertyValue('mask')) return false;
+    const prio = st.getPropertyPriority('opacity');
+    const stufe = Math.max(2, Math.min(14, Math.round(op * 16)));
+    st.setProperty('opacity', '1', prio);
+    st.setProperty('mask-image', `var(--pp-dither-${stufe})`, prio);
+    st.setProperty('mask-size', '8px 8px', prio);
+    st.setProperty('mask-repeat', 'repeat', prio);
+    return true;
+  }
+
   // ═════════════════ Stylesheets ═════════════════
   const REGEL_AUS = /foil|pp-glanz/;                    // Kartenglanz (Kartengestalter): unberuehrt
   const EIGENSCHAFTEN = ['box-shadow', 'text-shadow', 'filter', '-webkit-filter', 'backdrop-filter', '-webkit-backdrop-filter', 'mix-blend-mode'];
   let stat = { regeln: 0, geaendert: 0, blaetter: 0, ms: 0 };
   const gesehen = new WeakSet();
-  const INTERESSANT = new Set(['box-shadow', 'text-shadow', 'filter', '-webkit-filter', 'backdrop-filter', '-webkit-backdrop-filter', 'mix-blend-mode', 'background-color']);
+  const INTERESSANT = new Set(['box-shadow', 'text-shadow', 'filter', '-webkit-filter', 'backdrop-filter', '-webkit-backdrop-filter', 'mix-blend-mode', 'background-color', 'opacity']);
   function styleRegel(r, ausName) {
     const st = r.style; if (!st) return;
     stat.regeln++;
     // Nur die DEKLARIERTEN Eigenschaften ansehen (getPropertyValue je Regel und Eigenschaft waere ~7x teurer)
-    let aus = null, bgFarbe = false;
+    let aus = null, bgFarbe = false, hatOpacity = false;
     for (let i = 0, n = st.length; i < n; i++) {
       const name = st[i];
       if (INTERESSANT.has(name)) {
         if (name === 'background-color') { bgFarbe = true; continue; }
+        if (name === 'opacity') { hatOpacity = true; continue; }
         if (aus === null) aus = ausName || !!(r.selectorText && REGEL_AUS.test(r.selectorText));
         if (aus && name === 'mix-blend-mode') continue;
         const v = st.getPropertyValue(name);
@@ -401,6 +421,7 @@
         if (w !== v.trim()) { st.setProperty(name, w, st.getPropertyPriority(name)); stat.geaendert++; }
       }
     }
+    if (hatOpacity && !ausName && r.selectorText && opacityRegel(r)) stat.geaendert++;
     if (bgFarbe && !ausName && r.selectorText && BRETT.test(r.selectorText) && !REGEL_AUS.test(r.selectorText)) { if (alphaHintergrund(st, /::?(?:before|after)/.test(r.selectorText))) stat.geaendert++; }
   }
   let _verlaufPass = false;                              // true, sobald pxHintergrund (app-shared.jsx) da ist: dann auch Verlaeufe in Regeln
