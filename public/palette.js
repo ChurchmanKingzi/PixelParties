@@ -94,13 +94,14 @@
     }
     // W86u1: weiche Schatten/Filter in Inline-Stilen → harte Pixelkanten (public/pixel-hart.js, laedt nach diesem Skript → Aufruf erst zur Laufzeit)
     const hartE = (n, v) => { const h = window.PPPixelHart; return h && typeof v === 'string' ? h.eigenschaft(n, v) : v; };
+    const hartSetzen = (t, n, v) => { const h = window.PPPixelHart; return !!(h && h.setzen && typeof v === 'string' && v.indexOf('gradient(') >= 0 && h.setzen(t, n, v)); };
     const hartText = (v) => { const h = window.PPPixelHart; return h && typeof v === 'string' ? h.cssText(v) : v; };
     const huelle = (decl) => {
       let px = proxies.get(decl);
       if (px) return px;
       px = new Proxy(decl, {
         get(t, k) {
-          if (k === 'setProperty') return (n, v, pr) => (RC && typeof v === 'string' && v ? retroSchreiben(t, n, v, pr) : t.setProperty(n, snapWert(hartE(n, v)), pr));
+          if (k === 'setProperty') return (n, v, pr) => (RC && typeof v === 'string' && v ? retroSchreiben(t, n, v, pr) : (hartSetzen(t, n, v) || t.setProperty(n, snapWert(hartE(n, v)), pr)));
           const v = Reflect.get(t, k, t);
           return typeof v === 'function' ? v.bind(t) : v;
         },
@@ -109,6 +110,7 @@
             if (k === 'cssText') { t.cssText = RC.deklarationen(v); return true; }
             if (v && typeof k === 'string' && k in t && typeof t[k] === 'string' && k !== 'cssFloat') { retroSchreiben(t, kebab(k), v, ''); return true; }
           }
+          if (k !== 'cssText' && hartSetzen(t, k, v)) return true;
           t[k] = (k === 'cssText') ? ppSnapCss(hartText(v)) : snapWert(hartE(k, v)); return true;
         },
       });

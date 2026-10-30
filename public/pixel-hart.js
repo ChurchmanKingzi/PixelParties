@@ -230,7 +230,9 @@
   /** `style.cssText` / `style`-Attribut: die betroffenen Deklarationen umwandeln. */
   const RE_ZEIT = /box-shadow|text-shadow|filter|blend-mode|(?:--[\w-]*(?:schatten|shadow|glow|schein))/i;
   function cssText(t) {
-    if (!KONFIG.aktiv || typeof t !== 'string' || !RE_ZEIT.test(t)) return t;
+    if (!KONFIG.aktiv || typeof t !== 'string') return t;
+    if (t.indexOf('gradient(') >= 0) { const r = cssTextVerlauf(t, teile(t, ';')); if (r) t = r; }
+    if (!RE_ZEIT.test(t)) return t;
     const teileDekl = teile(t, ';');
     let geaendert = false;
     const neu = teileDekl.map((d) => {
@@ -243,6 +245,134 @@
       return n + ': ' + w + (imp ? ' !important' : '');
     });
     return geaendert ? neu.join('; ') + ';' : t;
+  }
+
+  // ═════════════════ Verlaeufe in Inline-Stilen ═════════════════
+  // `background: radial-/linear-gradient(...)` (ein einzelner Verlauf, deckende oder durchsichtige Farben) in Inline-Stilen und `cssText` von Skript-Effekten
+  // wird zum Pixelbild des Pixelierers (`pxHintergrund` in app-shared.jsx: Bayer-Dither zwischen den Stoppfarben, Alpha gedithert, Palette) — Groesse aus
+  // `width`/`height` in px, sonst quadratisch. Mehrere Ebenen, var()/currentColor/color-mix bleiben unveraendert.
+  const KEIN_PIXEL_VERLAUF = /var\(|currentcolor|color-mix\(|calc\(|env\(/i;
+  const kebab = (k) => k.replace(/^webkit/i, '-webkit').replace(/[A-Z]/g, (m) => '-' + m.toLowerCase());
+  function einzelVerlauf(w) {
+    w = w.trim();
+    if (!/^(?:radial|linear)-gradient\(/.test(w) || KEIN_PIXEL_VERLAUF.test(w)) return false;
+    let d = 0;
+    for (let i = 0; i < w.length; i++) { if (w[i] === '(') d++; else if (w[i] === ')') { d--; if (d === 0 && i < w.length - 1) return false; } }
+    return d === 0;
+  }
+  /** Stil-Objekt des Pixelierers fuer einen Verlauf (oder null, wenn nicht umbaubar). */
+  function verlaufStil(wert, w, h) {
+    if (!einzelVerlauf(wert) || typeof root.pxHintergrund !== 'function') return null;
+    try {
+      const o = root.pxHintergrund(wert.trim(), w > 0 ? w : 0, h > 0 ? h : 0);
+      return o && o.backgroundImage ? o : null;
+    } catch (e) { return null; }
+  }
+  const pxWert = (v) => { const m = /^\s*(-?[\d.]+)px\s*$/.exec(v || ''); return m ? parseFloat(m[1]) : 0; };
+  /** Inline-Zuweisung `decl[name] = wert` abfangen. true = erledigt (Aufrufer weist nicht selbst zu). */
+  function setzen(decl, name, wert) {
+    if (!KONFIG.aktiv || typeof wert !== 'string' || wert.indexOf('gradient(') < 0) return false;
+    if (name !== 'background' && name !== 'backgroundImage' && name !== 'background-image') return false;
+    const o = verlaufStil(wert, pxWert(decl.width), pxWert(decl.height));
+    if (!o) return false;
+    for (const [k, v] of Object.entries(o)) decl.setProperty(kebab(k), String(v));
+    return true;
+  }
+  /** Skript-Effekt-Stile (`el.style.cssText = '…background:radial-gradient(…)…'`): Verlauf-Deklarationen durch das Pixelbild ersetzen. */
+  function cssTextVerlauf(t, teileDekl) {
+    if (!/gradient\(/.test(t)) return null;
+    const w = pxWert((/(?:^|;)\s*width\s*:\s*([^;]*)/.exec(t) || [])[1]), h = pxWert((/(?:^|;)\s*height\s*:\s*([^;]*)/.exec(t) || [])[1]);
+    let geaendert = false;
+    const neu = teileDekl.map((d) => {
+      const i = d.indexOf(':'); if (i < 0) return d;
+      const n = d.slice(0, i).trim().toLowerCase(), v = d.slice(i + 1).trim().replace(/\s*!important\s*$/i, '');
+      if (n !== 'background' && n !== 'background-image') return d;
+      const o = verlaufStil(v, w, h); if (!o) return d;
+      geaendert = true;
+      return Object.entries(o).map(([k, val]) => kebab(k) + ': ' + val).join('; ');
+    });
+    return geaendert ? neu.join('; ') + ';' : null;
+  }
+
+  /** Ist ein Verlauf weich? (aufeinanderfolgende Stopps mit verschiedener Farbe UND Abstand > 1,6) — harte Baender (`a 0 28%, b 28% 52%`) bleiben, wie sie sind. */
+  function verlaufWeich(v) {
+    const m = /^(?:repeating-)?(?:linear|radial)-gradient\(/.exec(v.trim());
+    if (!m) return false;
+    const inner = v.trim().slice(m[0].length, -1);
+    const stops = teile(inner, ',');
+    let prev = null;
+    for (const st of stops) {
+      const cm = /^(rgba?\([^)]*\)|hsla?\([^)]*\)|#[0-9a-fA-F]{3,8}|transparent)\s*(.*)$/.exec(st.trim());
+      if (!cm) continue;                                              // Richtung/Form
+      const pos = (cm[2].match(/-?[\d.]+(?:%|px)?/g) || []).map(parseFloat);
+      const col = cm[1].replace(/\s+/g, '');
+      const p0 = pos.length ? pos[0] : null;
+      if (prev && prev.col !== col && (p0 === null || prev.p1 === null || Math.abs(p0 - prev.p1) > 1.6)) return true;
+      prev = { col, p1: pos.length > 1 ? pos[1] : p0 };
+    }
+    return false;
+  }
+  /** Regel mit weichem Verlauf (nur Brett-Selektoren, nur explizite Farben) → Pixelbild des Pixelierers; laeuft erst, wenn app-shared.jsx geladen ist. */
+  function verlaufRegel(r) {
+    const st = r.style; if (!st || !r.selectorText || !BRETT.test(r.selectorText) || REGEL_AUS.test(r.selectorText)) return false;
+    if (typeof root.pxHintergrund !== 'function') return false;
+    let n = false;
+    for (const prop of ['background-image', 'background']) {
+      const v = st.getPropertyValue(prop);
+      if (!v || v.indexOf('gradient(') < 0 || !einzelVerlauf(v) || !verlaufWeich(v)) continue;
+      if (prop === 'background' && st.getPropertyValue('background-image') !== v && st.getPropertyValue('background-image') !== 'initial') { /* Kurzform mit weiteren Teilen */ }
+      const o = verlaufStil(v, 0, 0);
+      if (!o) continue;
+      const prio = st.getPropertyPriority(prop);
+      for (const [k, val] of Object.entries(o)) st.setProperty(kebab(k), String(val), prio);
+      n = true;
+    }
+    return n;
+  }
+
+  // ═════════════════ Alpha-Hintergruende ═════════════════
+  // Ruhende `background-color: rgba(…)` an Brett-Selektoren (Zonen, Phasenleiste, Abdunklungen …) sind Alpha-Ueberblendungen: helle Toenung / dichte Flaeche →
+  // deckende Farbe (Mischung mit dem dunklen Brettgrund), Abdunklung mittlerer Staerke → Bayer-Dither-Kachel in der Farbe (Zellen = Kunstpixel, 2 px).
+  const BAYER4 = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+  const _kachel = new Map();
+  /** Dither-Kachel (8x8 px, Zellen 2 px) als data-URL: `stufe` 1..15 von 16 Zellen in der Farbe `rgb` (hex). */
+  function ditherKachel(hex, stufe, zelle) {
+    zelle = zelle || 2;
+    const k = hex + stufe + 'z' + zelle; let u = _kachel.get(k);
+    if (u) return u;
+    let r = '';
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) if (BAYER4[y][x] < stufe) r += `<rect x='${x * zelle}' y='${y * zelle}' width='${zelle}' height='${zelle}'/>`;
+    const g = 4 * zelle;
+    u = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${g}' height='${g}' shape-rendering='crispEdges' fill='${hex.replace('#', '%23')}'%3E${r.replace(/</g, '%3C').replace(/>/g, '%3E')}%3C/svg%3E")`;
+    _kachel.set(k, u);
+    return u;
+  }
+  const BRETT = /\.(?:board-|phase-|game-|hand-|deck-|chat-log|zone-|hero-|status-|buff-|poison-|damage|gold-|chain-|reaction|card-reveal|card-flight|potion-target|area-)/;
+  const GRUND = [8, 6, 12];                                           // dunkler Brettgrund (#08060c)
+  /** Alpha-Hintergrundfarbe einer Regel umbauen. Gibt true zurueck, wenn die Regel geaendert wurde. */
+  function alphaHintergrund(st, ueberlagerung) {
+    const bg = st.getPropertyValue('background-color');
+    if (!bg || !/^rgba?\(/.test(bg)) return false;
+    const c = farbe(bg);
+    if (!c || c.v || c.a >= 0.97) return false;
+    const prio = st.getPropertyPriority('background-color');
+    const bi = st.getPropertyValue('background-image');
+    const hatBild = bi && bi !== 'none' && bi !== 'initial';
+    const lum = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+    if (c.a < 0.04) { st.setProperty('background-color', 'transparent', prio); return true; }
+    if (!ueberlagerung && (c.a >= 0.6 || c.a <= 0.35 || (hatBild && c.a >= 0.5))) {      // deckend (Mischung mit dem Brettgrund); Ueberlagerungen (::before/::after) liegen ueber Inhalt → Dither
+      const m = (i, v) => v * c.a + GRUND[i] * (1 - c.a);
+      st.setProperty('background-color', farbText({ r: m(0, c.r), g: m(1, c.g), b: m(2, c.b) }, 1), prio); return true;
+    }
+    if (hatBild) { if (!ueberlagerung) st.setProperty('background-color', c.a >= 0.5 ? farbText(c, 1) : 'transparent', prio); return !ueberlagerung; }
+    const stufe = Math.max(1, Math.min(15, Math.round(c.a * 16)));
+    st.setProperty('background-color', 'transparent', prio);
+    const zelle = ueberlagerung ? 1 : 2;                              // Abdunklungen ueber Karten: feines Raster (1 px), sonst stoert das 2-px-Gitter den Kartentext
+    st.setProperty('background-image', ditherKachel(farbText(c, 1), stufe, zelle), prio);
+    st.setProperty('background-size', (4 * zelle) + 'px ' + (4 * zelle) + 'px', prio);
+    st.setProperty('background-repeat', 'repeat', prio);
+    st.setProperty('image-rendering', 'pixelated', prio);
+    return true;
   }
 
   // ═════════════════ Stylesheets ═════════════════
@@ -261,6 +391,7 @@
       const w = eigenschaft(n, v);
       if (w !== v) { st.setProperty(n, w, st.getPropertyPriority(n)); stat.geaendert++; }
     }
+    if (!ausName && r.selectorText && BRETT.test(r.selectorText) && !REGEL_AUS.test(r.selectorText)) { if (alphaHintergrund(st, /::?(?:before|after)/.test(r.selectorText))) stat.geaendert++; }
     // Eigene Eigenschaften (--x-shadow / --x-glow): Name enthaelt shadow/glow/schein
     for (let i = 0, n = st.length; i < n; i++) {
       const name = st[i];
@@ -269,9 +400,10 @@
       if (w !== v.trim()) { st.setProperty(name, w, st.getPropertyPriority(name)); stat.geaendert++; }
     }
   }
+  let _verlaufPass = false;                              // true, sobald pxHintergrund (app-shared.jsx) da ist: dann auch Verlaeufe in Regeln
   function regeln(liste) {
     for (const r of liste) {
-      if (r.type === 1) styleRegel(r);                    // CSSStyleRule
+      if (r.type === 1) { styleRegel(r); if (_verlaufPass && verlaufRegel(r)) stat.geaendert++; }                // CSSStyleRule
       else if (r.type === 7) {                            // @keyframes: auch hier harte Werte — bis pixel-anim.js die Animation gebacken hat (Zeitscheiben), laeuft sie sonst weich
         const aus = REGEL_AUS.test(r.name || '');
         for (const k of r.cssRules) styleRegel(k, aus);
@@ -297,7 +429,9 @@
     alleBlaetter();
     // Blaetter, die erst spaeter fertig werden (<link>) bzw. neu eingehaengt werden (<style> aus Komponenten)
     document.addEventListener('load', (e) => { const t = e.target; if (t && t.tagName === 'LINK' && t.sheet) blatt(t.sheet); }, true);
-    document.addEventListener('DOMContentLoaded', alleBlaetter);
+    const verlaufPass = () => { if (_verlaufPass || typeof root.pxHintergrund !== 'function') return; _verlaufPass = true; try { for (const sh of document.styleSheets) { let rl; try { rl = sh.cssRules; } catch (e) { continue; } if (rl) regeln(rl); } } catch (e) { /* ohne */ } };
+    document.addEventListener('DOMContentLoaded', () => { alleBlaetter(); verlaufPass(); });
+    root.addEventListener('load', verlaufPass);
     try {
       const mo = new MutationObserver((liste) => {
         for (const m of liste) {
@@ -313,8 +447,8 @@
     } catch (e) { /* ohne */ }
   }
 
-  const rein = { teile, farbe, schicht, box, text, filter, eigenschaft, cssText, boxHartUngecacht, textHartUngecacht, filterHartUngecacht, ringBreite };
-  const api = { KONFIG, stat: () => stat, rein, box, text, filter, eigenschaft, cssText, blatt, alleBlaetter, starten };
+  const rein = { ditherKachel, alphaHintergrund, teile, farbe, schicht, box, text, filter, eigenschaft, cssText, boxHartUngecacht, textHartUngecacht, filterHartUngecacht, ringBreite };
+  const api = { KONFIG, stat: () => stat, rein, box, text, filter, eigenschaft, cssText, setzen, blatt, alleBlaetter, starten };
   root.PPPixelHart = api;
   if (typeof document !== 'undefined') starten();
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

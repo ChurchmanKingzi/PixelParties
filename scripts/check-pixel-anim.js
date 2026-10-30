@@ -51,6 +51,19 @@ function hatUnschaerfe(wert) {
 }
 const RE_FILTER_BLUR = /(?:^|[^\w-])(?:-webkit-)?(?:filter|backdrop-filter|backdropFilter)\s*[:=][^;\n}]*?(?:blur|drop-shadow)\s*\(|(?:^|[^\w-])backdrop-?[Ff]ilter\s*[:=]\s*[`'"]?\s*[a-z]/;
 const RE_FILTER_IN_WERT = /\b(?:blur|drop-shadow)\(/;
+/** W86u1: `drop-shadow(x y 0 farbe)` (harter Versatz/Kontur, Unschaerfe 0) ist Pixelart — nur blur() und drop-shadow mit Unschaerfe > 0 zaehlen. */
+function filterWeich(code) {
+  if (/\bblur\s*\(/.test(code)) return true;
+  let re = /drop-shadow\(/g, m, weich = false;
+  while ((m = re.exec(code))) {
+    let dep = 1, j = m.index + m[0].length;
+    for (; j < code.length && dep > 0; j++) { if (code[j] === '(') dep++; else if (code[j] === ')') dep--; }
+    const arg = code.slice(m.index + m[0].length, j - 1).replace(/rgba?\([^)]*\)|hsla?\([^)]*\)|var\([^)]*\)|\$\{[^}]*\}/g, '');
+    const nums = (arg.match(/-?\d*\.?\d+(?:px|em|rem)?(?=[\s,;)]|$)/g) || []).map(parseFloat);
+    if (nums.length >= 3 && nums[2] > 0) weich = true;
+  }
+  return weich;
+}
 const RE_VERLAUF = /\b(?:repeating-)?(?:radial|linear|conic)-gradient\(|createLinearGradient\(|createRadialGradient\(|createConicGradient\(/;
 const RE_DREHUNG = /\b(?:rotate|rotateX|rotateY|rotateZ|rotate3d|skew|skewX|skewY)\s*\(|(?:^|[\s;{'"`])rotate\s*:/;
 const RE_MISCH = /mix-blend-mode|mixBlendMode/;
@@ -75,7 +88,7 @@ function zeileZaehlen(zeile, inKeyframesOderAus) {
   let blur = 0;
   for (const m of code.matchAll(RE_SCHATTEN)) if (hatUnschaerfe(m[2])) blur++;
   for (const m of code.matchAll(RE_SCHEIN_ANDERS)) if (hatUnschaerfe(m[2])) blur++;
-  if (RE_FILTER_BLUR.test(code) || (/\bfilter\b/.test(code) && RE_FILTER_IN_WERT.test(code))) blur++;
+  if ((RE_FILTER_BLUR.test(code) || (/\bfilter\b/.test(code) && RE_FILTER_IN_WERT.test(code))) && (/backdrop-?[Ff]ilter/.test(code) || filterWeich(code))) blur++;
   if (blur && !ok.has('blur')) r.blur = blur;
   if (RE_VERLAUF.test(code) && inKeyframesOderAus && !ok.has('verlauf')) r.verlauf = (code.match(new RegExp(RE_VERLAUF.source, 'g')) || []).length;
   if (RE_DREHUNG.test(code) && !ok.has('drehung')) {
