@@ -195,7 +195,8 @@ def knochenflügel(h, w, pose, pal, quelle, spalten, x0, y0, risse=(), adern=Tru
           oben; erster Finger = Vorderkante), len=[ℓ1..ℓn] Fingerlängen in px, knick=Grad (Fingerspitzen krümmen sich nach unten),
           hueft=(x,y) Ansatz der Flügelhaut am Körper, zacke=Tiefe der Zacken (0…0,5), wulst=0/1 Handgelenkswulst zeichnen,
           haut=0/1 Flügelhaut zeichnen).
-    pal: dict(knochen=[hell, mittel, grau], haut=(innen, nah am Knochen, Rand, Ader), binde=(dunkel, mittel)).
+    pal: dict(knochen=[hell, mittel, grau], schatten=graue Außenkante der Knochen, haut=(innen, –, Rand, Ader), binde=(dunkel, mittel),
+         knoten=Mittelfarbe des Handgelenkswulstes, rein=dict(knochen=[…], manschette=(Spitze-2, Spitze-1, Spitze))).
     Reihenfolge: Haut (unten) → Adern → Arm → Finger → Handgelenk. Wirft ClipError, wenn etwas über die Leinwand ragen würde."""
     a = L.leer(h, w)
     S, Wr = pose['S'], pose['W']
@@ -315,36 +316,50 @@ def knochenflügel(h, w, pose, pal, quelle, spalten, x0, y0, risse=(), adern=Tru
         a[y, x, :3] = c
         a[y, x, 3] = 255
 
-    # ---- Armknochen (2 px dick, oben hell, darunter grau), 4-verbunden — nur wenn der Arm eine Länge hat; braune Binden darauf
+    # ---- Flügel-Armknochen (Rückenansatz → Handgelenk), 2 px dick: innen weiß, auf der Außenseite (oben) die graue Kante wie im Original
+    #      (x = 1 grau, x = 2 weiß); 4-verbunden. Er endet am Handgelenk des FLÜGELS — er hat nichts mit der Hand des Skeletts zu tun.
     if len(arm) > 2:
         for (x, y) in arm:
-            setze(x, y + 1, pal['knochen'][2])
-        for k, (x, y) in enumerate(arm):
             setze(x, y, pal['knochen'][0])
-        for k in (len(arm) // 3, 2 * len(arm) // 3):
-            if 0 < k < len(arm) - 1:
-                setze(arm[k][0], arm[k][1] + 1, binde[0])
-                if k + 1 < len(arm):
-                    setze(arm[k + 1][0], arm[k + 1][1] + 1, binde[1])
-    # ---- Finger: hinten (letzter) zuerst, damit die Vorderkante oben liegt; Wurzelhälfte 2 px dick (Schattenpixel daneben)
+        for (x, y) in arm:
+            if 0 <= y - 1 < h and not bone_m[y - 1, x] and not a[y - 1, x, 3]:
+                setze(x, y - 1, pal['schatten'])
+    # ---- Finger: hinten (letzter) zuerst, damit die Vorderkante oben liegt; Wurzel der Vorderkante 2 px dick (graue Außenkante daneben)
     for k in range(n - 1, -1, -1):
         pts = list(fing_px[k].items())
-        dick = pose.get('dick', 0.4)
-        for j, ((x, y), c) in enumerate(pts):
+        for (x, y), c in pts:
             setze(x, y, c)
-        if rein >= 0.5 and dick > 0 and k == 0:
+        if rein >= 0.5 and k == 0 and pose.get('dick', 0.4) > 0:
             ang = math.radians(angs[k])
             flach = abs(math.cos(ang)) > abs(math.sin(ang))
-            for j, ((x, y), c) in enumerate(pts[:int(len(pts) * dick)]):
-                sx, sy = (x, y + 1) if flach else (x + 1, y)
+            for (x, y), c in pts[:int(len(pts) * pose.get('dick', 0.4))]:
+                sx, sy = (x, y - 1) if flach else (x - 1, y)          # Außenseite der Vorderkante
                 if (sx, sy) not in fing_px[k] and 0 <= sy < h and 0 <= sx < w and not bone_m[sy, sx]:
-                    setze(sx, sy, pal.get('schatten', pal['knochen'][2]))
+                    setze(sx, sy, pal['schatten'])
     # ---- Handgelenk: Wulst aus Binde (3×3: dunkle Wicklung, Ecken mittelbraun, Mitte tan) — verdeckt, wo die Fingerwurzeln zusammenlaufen
     if pose.get('wulst', 0):
         wx, wy = int(round(Wr[0])), int(round(Wr[1]))
         muster = {(-1, -1): binde[1], (0, -1): binde[0], (1, -1): binde[1],
-                  (-1, 0): binde[0], (0, 0): pal['rein']['manschette'][1], (1, 0): binde[0],
+                  (-1, 0): binde[0], (0, 0): pal['knoten'], (1, 0): binde[0],
                   (-1, 1): binde[1], (0, 1): binde[0], (1, 1): binde[1]}
         for (dx, dy), c in muster.items():
             setze(wx + dx, wy + dy, c)
     return a
+
+
+def umriss_schliessen(frame, erlaubt, hell, dunkel):
+    """Randpixel-Test/-Reparatur: Jedes deckende Pixel mit einem transparenten Nachbarn (4er-Nachbarschaft, auch am Leinwandrand) muss eine der
+    Umrissfarben `erlaubt` tragen. Andere Randpixel werden umgefärbt: helle (Knochen) → `hell`, dunkle/braune (Haut, Hand) → `dunkel`.
+    Gibt die Zahl der umgefärbten Pixel zurück; ändert `frame` an Ort und Stelle."""
+    h, w = frame.shape[:2]
+    deck = frame[..., 3] > 0
+    p = np.pad(deck, 1)
+    rand = deck & (~p[:-2, 1:-1] | ~p[2:, 1:-1] | ~p[1:-1, :-2] | ~p[1:-1, 2:])
+    n = 0
+    for y, x in zip(*np.nonzero(rand)):
+        c = tuple(int(v) for v in frame[y, x, :3])
+        if c in erlaubt:
+            continue
+        frame[y, x, :3] = hell if sum(c) / 3.0 > 120 else dunkel
+        n += 1
+    return n

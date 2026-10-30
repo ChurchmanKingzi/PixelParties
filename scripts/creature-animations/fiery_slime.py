@@ -17,22 +17,26 @@ Was im Sprite ist (Koordinaten im Sprite, x/y ab 0):
 * Schleimkörper (Zeilen 14–22): roter Gelkörper mit sehr dunklem Umriss F=(31,15,15); Augen = zwei dunkle 3×2-Flecken (5–7, 15–16) und
   (10–12, 15–16) ohne Lichtpunkt; Mund = breites dunkles Band (6–13, 18–19); orange Glanzlichter K bei (4–6, 20) und (9–11, 21) (nasse
   Schleimlichter, kein Metallglanz); unten die breite Pfütze (Zeilen 19–22).
-Fest bleiben: Mund, Pfützenkontur, die Basis des Feuers ab Zeile 10 und die Kuppel (Zeilen 10–13: breit und ruhig).
+Fest bleiben: Mund, Pfützenkontur, die Fußpunkte der Flammenzungen und die Kuppel (Zeilen 10–13).
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
-* Feuer (Regel 15): Die Basis (ab Zeile 10) steht breit und ruhig; zehn Zungen steigen daraus spitz nach oben und flackern unregelmäßig:
-  jede Zunge hat ihre eigene Folge von etwa 18 Höhenposen (−3 … +4 px gegenüber dem Original) zu je 2–3 Frames, gegeneinander versetzt
-  und mit festem Zufallsstart (Frame 0 = Original). Jede Spalte wird dabei nur gestreckt oder gestaucht (Pixel nahe der Basis bleiben),
-  so wandern Farben mit der Zunge: gelber Kern unten, oranger Körper, roter Rand an der Spitze. Beim Strecken des Körpers werden alle
-  Zungen etwas länger, beim Stauchen kürzer.
-* Funken: Fällt eine hohe Zunge (≥ +2 px) um ≥ 3 px zurück, reißt ihre Spitze ab und steigt als runder Funke (1 px) langsam auf (12 Frames, leicht pendelnd);
-  er kühlt dabei ab: gelb → gelb-orange → orange → rot (Farben I, G, B, A des Sprites).
+* Feuer (Regel 15), ganz neu gezeichnet mit dem wiederverwendbaren Modul anim_feuer.py (Schnittstelle im Kopf dieser Datei):
+  neun Flammenzungen (Fuß und Breite wie im Original, Höhe 8–13 px), jede aus fünf verschachtelten Farbschichten — dunkelrote Außenhaut A,
+  rote Haut C, oranger Körper B, gelb-orange G, gelber Kern I. JEDE Schicht hat in jeder Pose eigene Höhe, Breite und seitliche Verschiebung:
+  die Kerne wandern auf und ab und hin und her, die Farbgrenzen steigen und fallen (auch in den unteren Flammenzeilen 6–13), die Zungen biegen
+  sich nach links/rechts (Neigung + S-Kurve), wachsen und schrumpfen, schmale Zungen spalten ihre Spitze kurz und verschmelzen wieder.
+  Jede Zunge hat eine eigene Folge aus 12 Posen zu je 2–3 Frames (Zufallsfolge, gegeneinander versetzt, nahtlos über 48 Frames).
+  Die Basis steht fest: die Fußpunkte der Zungen und die orange Schleimkuppel (feste Pixel, Zeilen 10–13 des Sprites) ändern sich nicht.
+  Beim Strecken des Körpers werden alle Zungen etwas länger, beim Stauchen kürzer.
+* Funken: Fällt eine hohe Zunge um ≥ 4 px zurück, reißt ihre Spitze ab und steigt als runder Funke (1 px) langsam auf (12 Frames,
+  leicht pendelnd); er kühlt ab: gelb → gelb-orange → orange → rot (Farben I, G, B, A des Sprites).
 * Körper (Gel): Zeile 17 (zwischen Augen und Mund) und Zeile 14 werden verdoppelt/entfernt, dazu Spalten in der Mitte verdoppelt
   (Stauchung breiter); beim Strecken bleibt die Breite (das Feuer darüber ist so breit wie der Körper). Atmen im 12-Frame-Takt, kleiner Hüpfer (Frames 24–31), großer
   Hüpfer (32–47, 3 px) mit Anlauf-Stauchung, gestrecktem Absprung/Fallen und Aufprall.
 * Blinzeln: Frames 19–21 und 44–46 (Augenflecken füllen sich mit dem Körperrot, dunkle Lidlinie).
 * Kein Lichtband, keine Glitzersterne (Regel 14: Feuer glänzt nicht, es flackert).
-Ergänzungen: keine gezeichnet. Hinweis: Das Feuer weicht ab Frame 2 vom Original ab (Zungen flackern), Frame 0 ist das Original.
+Ergänzungen: Brückenpixel in Außenhautfarbe A, wo eine schräg gestellte dünne Spitze nur über eine Pixelecke hängt (anim_feuer). Hinweis: Das
+Feuer wird neu gezeichnet und weicht deshalb schon in Frame 0 vom Original ab; der Körper (Zeilen 14–22) ist in Frame 0 exakt das Original.
 Nähte (Regel 11): Feuer und Körper liegen auf Zeile 13/14 vertikal 4-verbunden; jede Flammenspalte bleibt mit der festen Basis verbunden;
 je Frame prüft das Skript, dass die Figur aus genau einem 4-zusammenhängenden Teil besteht und kein Körperrandpixel ohne Umrissfarbe frei liegt.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib/anim_amorph werfen ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -94,10 +98,10 @@ def koerper_dy(i):
 import anim_feuer as FEU
 
 # Zungen in Sprite-Koordinaten (x, Fußzeile, Höhe, Halbbreite am Fuß); Höhe/Lage entsprechen den Zungen des Originals
-ZUNGEN_SPRITE = [(1.0, 13, 9, 2.4), (3.0, 12, 11, 2.8), (4.5, 11, 11, 1.2), (6.5, 10, 7.5, 2.8), (9.0, 10, 6.5, 2.8),
-                 (11.5, 10, 8.5, 2.8), (13.5, 11, 9.5, 2.6), (15.5, 13, 11, 2.8), (16.8, 13, 7, 1.8)]
+ZUNGEN_SPRITE = [(1.2, 12, 10, 2.0), (3.4, 12, 12, 2.0), (4.6, 11, 12, 0.9), (6.8, 10, 9, 2.0), (9.0, 10, 8, 2.0),
+                 (11.2, 10, 10, 2.0), (13.2, 11, 11.5, 2.0), (15.2, 12, 12, 2.0), (16.9, 12, 8, 1.5)]
 yy_, xx_ = np.mgrid[0:sh, 0:sw]
-KUPPEL = (((yy_ >= 11) & (yy_ <= 13) & (xx_ >= 4) & (xx_ <= 13)) | ((yy_ == 10) & (xx_ >= 6) & (xx_ <= 11))) & (spr[..., 3] > 0)   # feste Schleimkuppel im Feuer
+KUPPEL = (((yy_ >= 11) & (yy_ <= 12) & (xx_ >= 4) & (xx_ <= 13)) | ((yy_ == 10) & (xx_ >= 6) & (xx_ <= 11)) | (yy_ == 13)) & (spr[..., 3] > 0)   # feste Schleimkuppel im Feuer (Zeile 13 ganz)
 KUPPEL_C = np.zeros((H, W), bool)
 KUPPEL_C[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] = KUPPEL
 RAMPE = {'rand': FA, 'rot': FC, 'orange': FB, 'gelb': FG, 'hell': FI}

@@ -24,9 +24,9 @@ Ablauf (48 Frames à 60 ms = 2,88 s; Frame 0 = Original, Staub und Sterne ausgen
   zusätzlich bis ±1 px mit Nachlauf (also bis ±2 px) —, oberer und unterer Fächer mit leicht versetzter Phase (Periode 12 innerhalb der Schlagphase Frame 0–24 und
   24–48), die drei Augen mit 1/3-Phasenversatz. Warum starr statt Spaltenversatz: die Flossen bestehen aus 1–2 px dünnen Linien, jede Spaltenscherung riss sie auf;
   die Aufteilung bei x = 4 / x = 9 hält alle Kombinationen 4-verbunden.
-* Glanz am Edelstein (Regel 12/14): ein Lichtband (Rampe F → G → I) läuft diagonal über die Iris, zweimal pro Schleife je Auge (Augen 1/2/3: Start Frame 2+24,
-  10+21, 18+19); ein vierzackiger Glitzerstern (Mitte I, Arme G; 3 Frames) blitzt am Glanzpunkt (17,7) auf (Auge 1 Frame 14–16 und 40–42, Auge 2 Frame 22–24 und 6–8
-  ab Frame 6, Auge 3 Frame 30–32 und 4–6). Er bleibt am Edelstein.
+* Glanz am Edelstein (Regel 12/14; nur der Smaragd, nicht Augapfel oder Flossen): ein Lichtband (Rampe F → G → I) läuft diagonal über die Iris, zweimal pro Schleife je Auge
+  (je 10 Frames; Auge 1 ab Frame 2 und 24, Auge 2 ab 10 und 31, Auge 3 ab 18 und 37); ein vierzackiger Glitzerstern (Mitte I, Arme G; 3 Frames, Arme 1 → 2 → 1 px) blitzt am Glanzpunkt (17,7) auf
+  (Auge 1 Frame 14–16 und 40–42, Auge 2 Frame 6–8 und 22–24, Auge 3 Frame 4–6 und 30–32). Er bleibt am Edelstein und geht mit dem Auge mit.
 * Kosmosstaub (Partikel, hinter den Augen, 9 Stück, Lebensdauer 48 Frames, langsam aufsteigend, leichtes Wabern, Formen k, o): hellcyan Funken (Kern I) und grüne
   Kugeln (Kern G, Rand F), alle Farben aus dem Sprite.
 Randpixel-Test (Regel 16): `U.kontur_schliessen` ergänzt in jeder Pose fehlende Umrisspixel (A) an den schlagenden Flossen; im Ruhebild ändert es nichts.
@@ -69,7 +69,7 @@ for (ox, oy), m in zip(AUGEN, masken):
     assert FLOSSEN[-1][0].any() and FLOSSEN[-1][3].any()
 BOB_START = [0, 12, 24]                               # Start des Schwimm-Hubs je Auge (Dauer 24 Frames)
 BAND = [(2, 24), (10, 31), (18, 37)]                  # Start der zwei Lichtband-Läufe je Auge (je 10 Frames, enden vor Frame 48)
-STERN = [{14: 1, 15: 2, 16: 1, 40: 1, 41: 2, 42: 1}, {22: 1, 23: 2, 24: 1, 6: 1, 7: 2, 8: 1}, {30: 1, 31: 2, 32: 1, 4: 1, 5: 2, 6: 1}]
+STERN = [{14: 2, 15: 3, 16: 2, 40: 2, 41: 3, 42: 2}, {22: 2, 23: 3, 24: 2, 6: 2, 7: 3, 8: 2}, {30: 2, 31: 3, 32: 2, 4: 2, 5: 3, 6: 2}]
 GLANZPUNKT = (17, 7)                                  # I (Glanzpunkt der Iris), relativ zum Auge
 
 STAUB = {'c': I_, 'r': G_}                            # Cyan-Funken

@@ -18,9 +18,9 @@ Identifikation (x, y):
 * Die Kunst enthält zwei weitere Gesichter (Ebenen 224 und 414); sie werden nicht verwendet.
 
 Ablauf (36 Frames à 70 ms = 2,52 s):
-* ECHTER Flügelschlag (Nutzerwunsch): Jeder Flügel (die Flammenschwinge) dreht sich als Ganzes um den Schulteransatz (links Pixel (9, 24), rechts (26, 24) — das
-  Creme-Band am Körperrand; die Wurzel bleibt dort 4-verbunden), viermal pro Schleife (Periode 9 Frames): Abschlag ca. 40° unter die Waagerechte, Aufschlag
-  ca. 65° darüber (Flügelspitze beschreibt einen großen Bogen); der Aufschlag ist langsamer als der Abschlag (Rückholen). Ruhepose = waagerecht = Original. Drehung
+* ECHTER Flügelschlag (Nutzerwunsch): Jeder Flügel (die Flammenschwinge) dreht sich als Ganzes um den Schulteransatz (links Pixel (9, 17), rechts (26, 17) — Flügelrand
+  auf halber Höhe am Fächer; die Wurzel bleibt dort 4-verbunden), viermal pro Schleife (Periode 9 Frames): Abschlag ca. 45° unter die Ruhelage, Aufschlag
+  ca. 55° darüber (Flügelspitze beschreibt einen großen Bogen); der Aufschlag ist langsamer als der Abschlag (Rückholen). Ruhepose = waagerecht = Original. Drehung
   per Rückwärtsabbildung (Nächster-Nachbar, keine Mischfarben, Alpha 0/255); die Kanten werden nachgezeichnet (Randpixel-Test, Regel 16).
 * Der Körper hebt sich beim Abschlag mit (bis 3 px, Fächer/Flügelansatz zuerst, Gesicht etwas später; Ausgleich an Zeile 25).
 * Feuer wie Feuer, Farbschichten UNABHÄNGIG (Regel 15, Nutzerwunsch): Je Spalte schwanken die Schichtgrenzen Rot-Außenhaut / Orange / Gelb / Creme-Kern jeweils mit eigener
@@ -89,10 +89,20 @@ PUFFS1 = funken(SPITZEN_F, 0, 5, ('k', 's'), -13) + funken(SPITZEN_L, 5, 2, ('k'
 PUFFS2 = funken(SPITZEN_F[1:], 17, 3, ('k', 's'), -14) + funken(SPITZEN_L[1:], 23, 1, ('k',), -12, -1) + funken(SPITZEN_R[1:], 29, 1, ('k',), -12, 1)
 
 
+def anker_sichern(lay, x, y):
+    """Ist das Pixel (x, y) leer (Feuer hat die Spalte oben verkürzt), wird es mit dem nächsten Pixel darunter in derselben Spalte gefüllt."""
+    if lay[y, x, 3]:
+        return
+    for yy_ in range(y + 1, lay.shape[0]):
+        if lay[yy_, x, 3]:
+            lay[y, x] = lay[yy_, x]
+            return
+
+
 def frame(i, partikel=True):
     ph = L.sinus(i, N / 4)                                    # Flügelschlag: viermal pro Schleife (Periode 9)
     ph2 = ph + 0.4 * math.sin(ph)                             # Abschlag schneller als Aufschlag (Rückholen)
-    C, A = math.radians(12.5), math.radians(52.5)             # Winkel: −40° … +65° gegenüber waagerecht (Ruhe = 0)
+    C, A = math.radians(5.0), math.radians(50.0)              # Winkel: −45° … +55° gegenüber der Ruhelage (Ruhe = 0)
     phi0 = math.asin(-C / A)
     theta = C + A * math.sin(ph2 + phi0)                      # im Uhrzeigersinn positiv = linke Spitze steigt
     c0 = math.cos(phi0 - 0.3)
@@ -116,9 +126,12 @@ def frame(i, partikel=True):
     wl = F.feuer_schichten(wl, i, N, HEISS, Y_ENDE, seed=23)
     wr = F.feuer_schichten(wr, i, N, HEISS, Y_ENDE, seed=37)
 
+    # Das Feuer kann die Spaltenoberkante unter die Gelenkzeile ziehen: das Gelenkpixel (Flügel) und sein Nachbar am Körper müssen bestehen bleiben
+    for lay, gx in ((wl, 9), (wr, 26), (kp, 10), (kp, 25)):
+        anker_sichern(lay, PAD_L + gx, PAD_T + 17)
     # Flügelschlag: ganze Schwinge dreht sich um den Schulteransatz
-    wl = F.drehen(wl, PAD_L + 9, PAD_T + 24, theta)
-    wr = F.drehen(wr, PAD_L + 26, PAD_T + 24, -theta)
+    wl = F.drehen(wl, PAD_L + 9, PAD_T + 17, theta)
+    wr = F.drehen(wr, PAD_L + 26, PAD_T + 17, -theta)
 
     # Bob: Zeile 25 gleichmäßig an allen Ebenen strecken/kürzen, dann alles um die Gesichtsbewegung verschieben
     kp, wl, wr = (L.versetze(L.streck_zeile(a, ZEILE, n_str), 0, kopf) for a in (kp, wl, wr))
@@ -128,6 +141,7 @@ def frame(i, partikel=True):
     f = L.zusammen(H, W, [(glut, 0, 0), (wl, 0, 0), (wr, 0, 0), (kp, 0, 0)])        # Flügel hinter Fächer/Körper
     # Randpixel-Test (Regel 16): Drehung/Dehnung legt Innenfarbe an den Rändern frei → Kante in Umrissfarbe (Gelb unten/seitlich, Orange oben)
     F.umranden(f, [wl, wr], UMRISS, ORANGE, GELB, GELB)
+    F.umranden(f, [kp], UMRISS, ORANGE, GELB, GELB)           # auch die Körperkanten (Creme-Band hört an den Flügelansätzen auf)
     return f
 
 

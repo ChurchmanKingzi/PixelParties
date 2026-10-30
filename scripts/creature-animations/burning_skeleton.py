@@ -20,17 +20,21 @@ Was ist was (Koordinaten im Sprite, x/y):
 Fest bleiben: Schädel, Rippenmuster, Beine, Hände.
 
 Ablauf (48 Frames à 60 ms = 2,88 s; Frame 0 = Original, Glutfunken ausgenommen):
-* FEUER (Regel 15): breite, ruhige Basis (nur der Kern flackert: P wandert kurz auf (10,8) und (8,8)); fünf Zungen bei x 8–12 steigen jede für sich auf und
-  flackern unregelmäßig — je Zunge eine eigene Folge aus 2–3 Frames langen Posen (insgesamt 11–13 Posen je Zunge, Höhe 0–6 px, spitz zulaufend: 1 px breit,
-  unten orange G, oben rot E, einzelne Zungen lehnen sich links/rechts). Frame 0 = Originalzungen. Aus hohen Zungen reißt die Spitze ab und steigt als
-  Funke auf (orange → rot, 6 Frames, 5 px, mit Seitendrift). Der Ur-Funke (11,0)/(12,1)/(12,2) steigt in den ersten Frames weg.
-  Kein Lichtband, keine Sterne (Regel 14).
+* FEUER (Regel 15, Farbschichten unabhängig): sechs Flammenspalten x 7–12; je Spalte drei verschachtelte Schichten — rote Außenhaut, orange Mitte, gelber Kern — mit
+  EIGENER Höhe, die unabhängig schwankt (Summe zweier Sinus mit eigener Periode, in 2–3-Frame-Stufen gehalten; Frame 0 = Originalflamme). Die Spitzen
+  lehnen sich links/rechts (Knick mit Verbindungspixel), die hohe Mittelzunge spaltet sich kurz in zwei Spitzen (Frame 10–12 und 30–32) und verschmilzt wieder,
+  der gelbe Kern wandert seitlich (P ↔ G auf Zeile 8), Aufhellblitze (Frame 14–15, 36–37) heben Orange und Gelb um eine Stufe, die breite Basis y 7–8 bleibt
+  immer stehen, neben jeder hohen Zunge sind die Nachbarn niedriger (spitze Profile statt Block). Aus hohen Zungen reißen Spitzen ab und steigen als Funken
+  auf (orange → rot, 6 Frames, 5 px, mit Seitendrift). Der Ur-Funke (11,0)/(12,1)/(12,2) steigt in den ersten Frames weg. Kein Lichtband, keine Sterne (Regel 14).
+  anim_feuer.py gab es nicht — dasselbe Prinzip ist hier selbst umgesetzt (`hoehen`, `flamme_basis`, `flamme_pixel`).
 * Atmen zweistufig (Periode 48, 0-1-2-1-0 px): im Rumpf-Layer wird Zeile y 20 eingefügt; Brust (Rippen, Schultern) und Arme steigen zuerst, Becken/Beine
   bleiben. Der Schädel samt Flamme folgt 2 Frames später, nie höher als die Brust (sinkt höchstens 1 px in die Schultern, nie ein Spalt).
 * Arme schwingen synchron und gespiegelt nach außen (Periode 24, bis 2,5 px, wächst von der Schulter y 18 zur Hand); Schulterzeilen y 16–18 bleiben am Rumpf.
 * Rote Augen glühen sanft (Periode 12: M → E → M), Blinzeln Frame 18–20 und 42–44. Kein Stern.
 * Glut-Partikel (hinter der Figur, 10 Stück, Lebensdauer 48 Frames, langsam aufsteigend, leichtes Wabern, Formen k, o): Funken über der Flamme,
   runde Glutkugeln neben Kopf und Schultern, Lavafunken rechts/links der Beine. Farben aus der Flammenrampe (P/G/E).
+Randpixel-Test (Regel 16): `U.kontur_schliessen` ergänzt in jeder Pose fehlende Umrisspixel (A) an Armen/Händen; die Flamme (Feuer) hat keinen Umriss und ist davon
+ausgenommen (`frame(i, nur='koerper')` liefert für den Test den Körper ohne Flamme und Partikel).
 ERGÄNZUNG: die Beinzeilen 24–29 (52 Halbpixel, deckend in src, siehe oben). Die Flamme ist aus denselben Pixelfarben neu gezeichnet (Frame 0 = Original, per assert geprüft).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 """
@@ -76,8 +80,8 @@ assert (flamme | kopf | arm_l | arm_r | rumpf | beine).sum() == vorhanden.sum()
 BASIS_R = {7: 1, 8: 2, 9: 5, 10: 2, 11: 3, 12: 2}
 BASIS_O = {7: 0, 8: 1, 9: 2, 10: 1, 11: 2, 12: 0}
 BASIS_Y = {7: 0, 8: 0, 9: 1, 10: 0, 11: 0, 12: 0}
-MIN_R = {7: 1, 8: 2, 9: 2, 10: 2, 11: 2, 12: 2}          # die breite Basis (Zeilen 7–8) bleibt immer stehen
-MAX_R = {7: 1, 8: 4, 9: 8, 10: 5, 11: 6, 12: 4}
+MIN_R = {7: 1, 8: 2, 9: 3, 10: 2, 11: 2, 12: 2}          # die breite Basis (Zeilen 7–8) bleibt immer stehen
+MAX_R = {7: 1, 8: 4, 9: 7, 10: 5, 11: 6, 12: 4}
 SCHWANK = {                                              # (Spalte, Schicht): [(Amplitude in px, Periode in Frames, Haltedauer in Frames), …]
     (8, 'R'): [(1.4, 12, 2), (0.8, 8, 3)], (9, 'R'): [(2.6, 16, 2), (1.4, 6, 3)], (10, 'R'): [(1.6, 24, 3), (1.0, 8, 2)],
     (11, 'R'): [(2.2, 12, 2), (1.2, 16, 3)], (12, 'R'): [(1.4, 16, 3), (0.9, 6, 2)],
@@ -105,15 +109,17 @@ def hoehen(i):
         r = min(MAX_R[x], max(MIN_R[x], BASIS_R[x] + _delta(x, 'R', t)))
         o = BASIS_O[x] + _delta(x, 'O', t) + (1 if t in BLITZ and x in (8, 9, 10, 11) else 0)
         y = BASIS_Y[x] + _delta(x, 'Y', t) + (1 if t in BLITZ and x in (8, 9, 10, 11) else 0)
+        o = max(1 if x in (8, 9, 10, 11) else 0, r // 3, o)    # die Zunge behält einen orangen Kern, der mit der Höhe wächst
         o = max(0, min(o, r - 1 if r > 1 else r))              # Orange immer unterhalb der roten Spitze
         y = max(0, min(y, o))                                  # Gelb im Orange
         hr[x], ho[x], hy[x] = r, o, y
-    for x in sorted(hr, key=lambda c: (-hr[c], c)):            # „Täler“: neben einer Zunge ≥ 3 px bleiben Nachbarn ≤ 2 px (Zungen bleiben einzeln)
+    for x in sorted(hr, key=lambda c: (-hr[c], c)):            # Spitzenprofil: neben einer Zunge ≥ 3 px ist jede Nachbarzunge niedriger (keine flachen Blöcke)
         if hr[x] >= 3:
             for nb in (x - 1, x + 1):
-                if nb in hr and hr[nb] > 2 and hr[nb] <= hr[x] and (hr[nb] < hr[x] or nb > x):
-                    hr[nb] = 2
-                    ho[nb], hy[nb] = min(ho[nb], 1), min(hy[nb], 1)
+                if nb in hr and hr[nb] >= hr[x]:
+                    hr[nb] = max(MIN_R[nb], hr[x] - 1)
+                    ho[nb] = min(ho[nb], hr[nb] - 1)
+                    hy[nb] = min(hy[nb], ho[nb])
     return hr, ho, hy
 
 

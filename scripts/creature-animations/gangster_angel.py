@@ -48,7 +48,7 @@ import anim_lib as L
 import anim_flieger as F
 
 N, MS = 40, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 9, 9, 12, 9
+PAD_L, PAD_R, PAD_T, PAD_B = 12, 12, 14, 10
 
 spr = L.lade('gangster-angel')
 sh, sw = spr.shape[:2]
@@ -127,8 +127,12 @@ PUFFS = puffs([
 
 def frame(i, partikel=True, effekte=True):
     ph = L.sinus(i, N / 4)                                   # Flügelschlag: viermal pro Schleife (Periode 10)
-    low = int(round(-1.3 * math.sin(ph)))                    # Unterkörper/Füße zuerst …
-    up_roh = int(round(-1.3 * (math.sin(ph - 0.9) + math.sin(0.9))))   # … Oberkörper (Kopf, Flügel, Rute) hinterher; Frame 0 = Ruhe
+    ph2 = ph + 0.5 * math.sin(ph)                            # Abschlag schneller als Aufschlag (Rückholen langsamer)
+    C, A = math.radians(53.0), math.radians(65.0)            # Drehwinkel gegenüber der Ruhelage: −12° (unten) … +118° (oben, Flügel zeigt ~50° über der Waagerechten)
+    phi0 = math.asin(-C / A)                                 # Frame 0 = Ruhelage (Winkel 0)
+    theta = C + A * math.sin(ph2 + phi0)                     # im Uhrzeigersinn positiv: linker Flügel schlägt nach oben
+    low = int(round(1.5 * (math.cos(ph2 + phi0 - 0.2) - math.cos(phi0 - 0.2))))        # Körper hebt sich beim Abschlag (negativ = hoch): Unterkörper/Füße zuerst …
+    up_roh = int(round(1.5 * (math.cos(ph2 + phi0 - 1.0) - math.cos(phi0 - 1.0))))     # … Oberkörper (Kopf, Flügelansatz, Rute) hinterher
     n_str = max(-1, min(2, low - up_roh))                    # Ausgleich an Zeile 13: höchstens 2 Zeilen dazu, 1 weg
     up = low - n_str
     halo_f = int(round(math.sin(L.sinus(i, N / 2))))         # Rute schwebt zusätzlich ±1
@@ -152,13 +156,10 @@ def frame(i, partikel=True, effekte=True):
         F.lichtband(kp, bauch, PAD_L, PAD_T, i, N // 2, 6, 6, GOLDR, stufen=1, breite=2.0, achse=(0.0, 1.0), kern_stufen=2)
     kp = L.versetze(L.streck_zeile(kp, zeile, n_str), 0, low)
 
-    # ── Flügel: strecken wie der Körper, dann schlagen; Schulterspalten stehen ─────────────────────────────────────────
-    fl_amp, fl_pot, lauf = 4.4, 1.2, 0.3
-    wl = L.streck_zeile(F.ebene(spr_f, fl_links, H, W, PAD_L, PAD_T), zeile, n_str)
-    wr = L.streck_zeile(F.ebene(spr_f, fl_rechts_k, H, W, PAD_L, PAD_T), zeile, n_str)
-    wl = F.fluegel_welle(wl, PAD_L + 9, fl_amp, ph, potenz=fl_pot, nur_rechts=False, lauf=lauf)
-    wr = F.fluegel_welle(wr, PAD_L + 25, fl_amp, ph, potenz=fl_pot, nur_rechts=True, lauf=lauf)
-    wl, wr = L.versetze(wl, 0, low), L.versetze(wr, 0, low)
+    # ── Flügel: ECHTER Schlag — jeder Flügel dreht sich als Ganzes um den Schulteransatz (am Körperumriss); der Oberkörper trägt ihn (Versatz `up`) ───────
+    wl = F.drehen(F.ebene(spr_f, fl_links, H, W, PAD_L, PAD_T), PAD_L + 9, PAD_T + 10, theta)
+    wr = F.drehen(F.ebene(spr_f, fl_rechts_k, H, W, PAD_L, PAD_T), PAD_L + 25, PAD_T + 10, -theta)
+    wl, wr = L.versetze(wl, 0, up), L.versetze(wr, 0, up)
 
     # ── Füße baumeln ───────────────────────────────────────────────────────────────────────────────────────────────
     fl_ = L.zeilen_welle(F.ebene(spr, fuss_l, H, W, PAD_L, PAD_T), PAD_T + 20, 2.6, L.sinus(i, N / 2))

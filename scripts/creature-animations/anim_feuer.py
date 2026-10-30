@@ -46,16 +46,16 @@ class Zunge:
 
 def _pose(rnd, z, amp):
     """Eine zufällige Flammenpose (Höhe, Neigung, S-Kurve, Breite, Höhen/Breiten/Seitenversatz je Schicht, Spaltung)."""
-    h = rnd.choice([0.6, 0.75, 0.9, 1.0, 1.1, 1.25, 1.45])
+    h = rnd.choice([0.65, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3])
     h = 1.0 + (h - 1.0) * amp
     p = dict(
         h=h,
         lean=rnd.uniform(-2.6, 2.6) * amp * min(1.0, 0.45 + z.breite * 0.3),
         bend=rnd.uniform(-1.3, 1.3) * amp,
         w=1.0 + rnd.uniform(-0.28, 0.28) * amp,
-        u=[1.0, rnd.uniform(0.84, 1.0), rnd.uniform(0.62, 0.96), rnd.uniform(0.4, 0.8), rnd.uniform(0.16, 0.55)],
-        wk=[1.0, 0.86 * (1 + rnd.uniform(-0.1, 0.1)), 0.68 * (1 + rnd.uniform(-0.15, 0.15)),
-            0.5 * (1 + rnd.uniform(-0.2, 0.2)), 0.3 * (1 + rnd.uniform(-0.3, 0.3))],
+        u=[1.0, rnd.uniform(0.94, 1.0), rnd.uniform(0.76, 0.96), rnd.uniform(0.4, 0.7), rnd.uniform(0.14, 0.42)],
+        wk=[1.0, 0.8 * (1 + rnd.uniform(-0.08, 0.08)), 0.58 * (1 + rnd.uniform(-0.15, 0.15)),
+            0.38 * (1 + rnd.uniform(-0.2, 0.2)), 0.22 * (1 + rnd.uniform(-0.3, 0.3))],
         dk=[0.0, rnd.uniform(-0.5, 0.5) * amp, rnd.uniform(-1.0, 1.0) * amp, rnd.uniform(-1.1, 1.1) * amp, rnd.uniform(-1.3, 1.3) * amp],
         split=(rnd.uniform(0.5, 1.1) * amp if rnd.random() < 0.28 else 0.0),
         split_u=rnd.uniform(0.5, 0.72),
@@ -105,7 +105,7 @@ class Feuer:
                 continue
             u = dy / float(H)
             c = self._mitte(z, p, u)
-            ho = w0 * (1 - u) ** 0.85
+            ho = w0 * (1 - u ** 2.4) ** 0.6                                       # bleibt breit und läuft erst oben spitz zu
             lobes = [(c, ho, 1.0)]
             if p['split'] > 0 and u > p['split_u']:
                 d = p['split'] * (u - p['split_u']) * H * 0.55
@@ -133,7 +133,7 @@ class Feuer:
         return int(round(c)), z.basis - H
 
     def _spitzen_ereignisse(self):
-        """Abgerissene Spitzen: fällt eine hohe Zunge um ≥ 3 px, bleibt ihre alte Spitze als Funke zurück."""
+        """Abgerissene Spitzen: fällt eine hohe Zunge um ≥ 4 px, bleibt ihre alte Spitze als Funke zurück."""
         for g, z in enumerate(self.zungen):
             bank, folge = self.bank[g], self.folge[g]
             for i in range(self.n):
@@ -142,7 +142,7 @@ class Feuer:
                 if folge[i] == folge[(i - 1) % self.n]:
                     continue
                 Ha, Hn = self._hoehe(z, alt, 0), self._hoehe(z, neu, 0)
-                if Ha >= z.hoehe * 1.0 and Ha - Hn >= 3:
+                if Ha >= z.hoehe * 1.0 and Ha - Hn >= 4:
                     x, y = self._tip(z, alt, 0)
                     self.ereignisse.append((i, x, y, [-1, 0, 1][(g + i) % 3]))
 
@@ -162,6 +162,20 @@ class Feuer:
             m = idx == k
             out[m, :3] = self.farben[k]
             out[m, 3] = 255
+        return self._verbinden(out)
+
+    def _verbinden(self, out):
+        """Schräg gestellte dünne Spitzen hängen nur über eine Pixelecke: Brückenpixel (Außenhautfarbe) machen alles 4-verbunden — auch zu den
+        festen Pixeln (sperre)."""
+        import anim_amorph as A
+        tmp = out.copy()
+        tmp[self.sperre, :3] = self.farben[0]
+        tmp[self.sperre, 3] = 255
+        tmp, brueck = A.verbinde4(tmp)
+        for (x, y) in brueck:
+            if not self.sperre[y, x] and not out[y, x, 3]:
+                out[y, x, :3] = self.farben[0]
+                out[y, x, 3] = 255
         return out
 
     def funken(self, i, dy=0, leben=12, farben=None):
