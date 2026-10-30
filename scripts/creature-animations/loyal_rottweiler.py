@@ -22,8 +22,9 @@ Bleibt fest: Augenbrauen, Nase, Schnauze/Kinn, Halsband, Brust.
 Ablauf (40 Frames à 80 ms = 3,2 s), alle Bewegungen unabhängig:
 * Atmen (Periode 40, Frames 8–27 oben): Brustzeile 12 wird eingefügt — Kopf, Ohren, Halsband und Brust heben sich 1 px, die Füße
   bleiben am Boden.
-* Schlappohren: das linke schwingt in Frames 4–11, das rechte in Frames 22–29 unten 1 px nach außen und zurück (oben am Ansatz
-  bleiben sie angewachsen, die Lücke zum Kopf wird mit dem inneren Randpixel geschlossen).
+* Schlappohren: das linke schwingt in Frames 4–11, das rechte in Frames 22–29 nach außen und zurück: erst nur die Spitzenzeile
+  (Zeile 5), dann die Zeilen 3–5 gemeinsam je 1 px (so entsteht keine Beule an der verjüngten Spitze). Oben am Ansatz (Zeilen 0–2)
+  bleiben sie am Kopf; die Lücke zum Kopf wird mit dem inneren Randpixel der Zeile geschlossen.
 * Blick: die Augen wandern 1 px nach links (Frames 14–21) und 1 px nach rechts (Frames 32–36); beide Augen gemeinsam.
 * Blinzeln (Frames 25–27): oberes Augenpixel verschwindet, dann beide Augen zu (Fellfarbe, unten dunkler Lidstrich), dann halb offen.
 * Pfote tippt: die rechte Vorderpfote hebt sich zweimal um 1 px (Frames 12–13 und 16–17), die linke einmal (Frames 33–34) —
