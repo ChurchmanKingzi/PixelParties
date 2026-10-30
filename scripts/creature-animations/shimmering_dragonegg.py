@@ -14,7 +14,7 @@ Was im Sprite ist (Koordinaten im Sprite 34×41, x/y ab 0):
 Fest bleiben: Eiform, Randkranz und das Raster (das Raster wird nie verschoben).
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
-* Atmen (Periode 24): das Ei streckt sich 2 px (Frames 2–10 und 26–34 werden die Zeilen 20 und 21 verdoppelt — zwei Zeilen = eine Rasterperiode, das Raster bleibt lückenlos; beide Zeilen haben die volle Breite
+* Atmen (Periode 24): das Ei streckt sich 2 px (Frames 2–10 und 26–34 wird der Zeilenblock 20/21 ein zweites Mal eingefügt (20, 21, 20, 21) — zwei Zeilen = eine Rasterperiode, das Schachbrett bleibt lückenlos; beide Zeilen haben die volle Breite
   (0–33), es entsteht keine Randstufe) und hüpft in der Spitze (Frames 4–8 und 28–32) 1 px nach oben; unten bleibt der Boden fest. Frame 0 = Original.
 * Goldschimmer (Regel 14, Gold): zweimal pro Schleife (Frames 2–17 und 26–41) läuft ein breites diagonales Lichtband über das Ei (eine Stufe heller auf der Gold-Rampe A→C→B→E, nur Innenpixel);
   dazu funkeln einzelne Rasterpixel: in jedem Frame schalten acht Gelb-Pixel (C) für 2 Frames auf Weiß (E) (feste Zufallsfolge, nahtlos).
@@ -116,7 +116,11 @@ def sprite_mit_effekten(i):
 def figur(i):
     sp = sprite_mit_effekten(i)
     koerper = A.zeilen_von(sp, 0, sh - 1, H, W, PAD_L, PAD_T)
-    z, quelle = A.koerper_pose(koerper, doppeln={20: 1, 21: 1} if S[i] else {}, p=0, x0=PAD_L)
+    if S[i]:                                                                          # die Zeilen 20, 21 als Block einfügen (20, 21, 20, 21): das Schachbrett bleibt lückenlos
+        z = np.concatenate([koerper[:22], koerper[20:22], koerper[22:]])
+        quelle = list(range(22)) + [20, 21] + list(range(22, sh))
+    else:
+        z, quelle = koerper, list(range(sh))
     fig, top = A.auf_leinwand(z, H, BODEN, HOP[i])
     return dict(fig=fig, top=top, quelle=quelle)
 

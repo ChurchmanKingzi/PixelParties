@@ -105,7 +105,7 @@ def frame(i):
     if brust:
         st = L.versetze(st, 0, -brust)
     # --- Glitzer-Sterne am Brecheisen (mit Eisen mitbewegt) ---
-    for (sx, sy, start) in ((23, 14, 22), (1, 22, 44)):
+    for (sx, sy, start) in ((23, 14, 22), (2, 21, 44)):
         sstufe = Hm.folge(i, start, [0, 1, 2, 1], N)
         Hm.stern4(gl, sx + gv, sy - brust, sstufe, WEISS, HELL, MITTEL, OFF)
     # --- Fußtippen (die Stiefel liegen hinter der Jacke) ---

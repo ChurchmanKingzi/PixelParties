@@ -1,0 +1,15 @@
+{
+  "creature": "Cold-Hearted Yuki-Onna",
+  "sheet": "cold-hearted-yuki-onna.png",
+  "frameWidth": 44,
+  "frameHeight": 54,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 4,
+  "padRight": 2,
+  "padBottom": 4,
+  "faceX": 22.0
+}
