@@ -1,0 +1,15 @@
+{
+  "creature": "Infected Squirrel",
+  "sheet": "infected-squirrel.png",
+  "frameWidth": 33,
+  "frameHeight": 27,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 4,
+  "padRight": 3,
+  "padBottom": 3,
+  "faceX": 16.5
+}
