@@ -20219,7 +20219,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
      Glut-Funken auf 15 gedeckelt, Bolt-Filter aus */
   .anim-bloom, .anim-flash, .anim-lightning { display: none; }
   .anim-embers > span:nth-child(n+16) { display: none; }
-  .anim-vignette { animation: none; }
+  .anim-vignette { display: none; }   /* grobes Dither-Schachbrett an den Raendern: auf dem Handy aus (sah pixelig aus, kostet Bilder) */
   /* DAILY-Glimmen: statisch statt animiert */
   .menu-daily-btn.is-available { animation: none; box-shadow: 0 0 10px rgba(250,213,74,.6); border-color: #fad54a; }
   /* Knopf-Glimmen im Hauptmenue nicht pulsieren lassen */
@@ -22047,6 +22047,9 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 @media (pointer: coarse) and (max-height: 600px) {
   .pp-lotse-schein { animation: none; opacity: .75; }
   .pp-sc-glitzer-teil:nth-child(n+11) { display: none; }
+  /* Glanzband: die maskierte Dither-Flanke kostet je Band eine Maskenebene (CPU-Kacheln ruckelten) — auf dem Handy nur der Kern, etwas breiter */
+  .pp-glanz-band::after { display: none; }
+  .pp-glanz-band { --glanz-kern: 2px; }
 }
 
 /* ── GAST-EINSTIEG IM LOGIN (v1264) ───────────────────────────────────

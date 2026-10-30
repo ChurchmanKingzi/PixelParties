@@ -3489,6 +3489,15 @@ function HeroStatusPartikel({ effekte, kern, s, mitteX, fw, fh, saat }) {
  * Hat die Zone keine Figur (Held ohne Spritesheet, Kreatur), bleibt es bei
  * der Zonenklasse.
  */
+/**
+ * Lage aller Heldenzonen/Support-Zonen im Moment des Aufrufs (Element -> Rechteck). Einschlag-Animationen (Magic Hammer, Keule, Dino …) suchen ihr Ziel
+ * erst nach 300–500 ms; Verschiebt sich das Brett dazwischen (Handy: Kamerafahrt), lag der naechste Treffer ploetzlich ueber einem anderen Helden.
+ */
+function ppZonenFrost() {
+  const m = new Map();
+  try { document.querySelectorAll('[data-hero-zone],[data-support-zone]').forEach(el => m.set(el, el.getBoundingClientRect())); } catch (e) { /* ohne Frost: live messen */ }
+  return m;
+}
 function ppZonenSquash(zone, klasse, ms) {
   zone.classList.add(klasse);
   const platz = zone._ppFigurPlatz;
@@ -17318,11 +17327,12 @@ const ANIM_REGISTRY = {
   stranglehold_squeeze: (() => {
     return function StrangleholdSqueezeEffect({ x, y }) {
       useEffect(() => {
+        const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken: bis der Einschlag kommt, kann die Kamera das Brett verschoben haben (Handy) — sonst traf der Squash den falschen Helden
         const timer = setTimeout(() => {
           const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
           let best = null, bestDist = Infinity;
           els.forEach(el => {
-            const r = el.getBoundingClientRect();
+            const r = (_frost.get(el) || el.getBoundingClientRect());
             const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
@@ -21666,12 +21676,13 @@ const ANIM_REGISTRY = {
       }), []);
       // Apply squash class to actual target DOM element
       useEffect(() => {
+        const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken (Kamerafahrt vor dem Einschlag darf das Ziel nicht verschieben)
         const timer = setTimeout(() => {
           // Find the hero or support zone element under this animation
           const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
           let best = null, bestDist = Infinity;
           els.forEach(el => {
-            const r = el.getBoundingClientRect();
+            const r = (_frost.get(el) || el.getBoundingClientRect());
             const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
@@ -21752,11 +21763,12 @@ const ANIM_REGISTRY = {
     return function ShatteringStrikeEffect(props) {
       const { x, y } = props;
       useEffect(() => {
+        const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken: bis der Einschlag kommt, kann die Kamera das Brett verschoben haben (Handy) — sonst traf der Squash den falschen Helden
         const timer = setTimeout(() => {
           const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
           let best = null, bestDist = Infinity;
           els.forEach(el => {
-            const r = el.getBoundingClientRect();
+            const r = (_frost.get(el) || el.getBoundingClientRect());
             const d = Math.abs(r.left + r.width / 2 - x) + Math.abs(r.top + r.height / 2 - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
@@ -21807,11 +21819,12 @@ const ANIM_REGISTRY = {
       // Ziel-Stauchung auf das echte DOM-Element legen — gleiche
       // Nächster-Nachbar-Suche wie beim magic_hammer.
       useEffect(() => {
+        const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken: bis der Einschlag kommt, kann die Kamera das Brett verschoben haben (Handy) — sonst traf der Squash den falschen Helden
         const timer = setTimeout(() => {
           const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
           let best = null, bestDist = Infinity;
           els.forEach(el => {
-            const r = el.getBoundingClientRect();
+            const r = (_frost.get(el) || el.getBoundingClientRect());
             const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
@@ -21875,11 +21888,12 @@ const ANIM_REGISTRY = {
       }), []);
       // Apply heavy squash to the actual target element on impact.
       useEffect(() => {
+        const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken: bis der Einschlag kommt, kann die Kamera das Brett verschoben haben (Handy) — sonst traf der Squash den falschen Helden
         const timer = setTimeout(() => {
           const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
           let best = null, bestDist = Infinity;
           els.forEach(el => {
-            const r = el.getBoundingClientRect();
+            const r = (_frost.get(el) || el.getBoundingClientRect());
             const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
@@ -21984,11 +21998,12 @@ const ANIM_REGISTRY = {
       const { x, y } = props;
       // Schwerer Squash des Zielhelden — dieselbe Klasse wie beim Dino-Stampfer; die Stauchung selbst macht die Pipeline im Kunstpixelraster.
       useEffect(() => {
+        const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken: bis der Einschlag kommt, kann die Kamera das Brett verschoben haben (Handy) — sonst traf der Squash den falschen Helden
         const timer = setTimeout(() => {
           const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
           let best = null, bestDist = Infinity;
           els.forEach(el => {
-            const r = el.getBoundingClientRect();
+            const r = (_frost.get(el) || el.getBoundingClientRect());
             const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
@@ -22152,11 +22167,12 @@ const ANIM_REGISTRY = {
 
       // Squash the actual target element on impact (~440ms in).
       useEffect(() => {
+        const _frost = ppZonenFrost();   // Lage der Zonen JETZT merken: bis der Einschlag kommt, kann die Kamera das Brett verschoben haben (Handy) — sonst traf der Squash den falschen Helden
         const timer = setTimeout(() => {
           const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
           let best = null, bestDist = Infinity;
           els.forEach(el => {
-            const r = el.getBoundingClientRect();
+            const r = (_frost.get(el) || el.getBoundingClientRect());
             const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
