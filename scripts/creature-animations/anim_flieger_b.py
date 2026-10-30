@@ -240,10 +240,6 @@ def knochenflügel(h, w, pose, pal, quelle, spalten, x0, y0, risse=(), adern=Tru
                 rand[y, x] = True
     for y, x in zip(*np.nonzero(haut_m)):
         if rand[y, x]:
-            c = haut_rand = haut_rand if False else haut_rand if False else None
-        a[y, x, 3] = 0
-    for y, x in zip(*np.nonzero(haut_m)):
-        if rand[y, x]:
             c = pal['haut'][2]
         elif ader_m[y, x]:
             c = pal['haut'][3]
