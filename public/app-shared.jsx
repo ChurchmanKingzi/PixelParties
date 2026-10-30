@@ -1633,7 +1633,7 @@ function ppPixelieren(wurzel) {
       const dunkel = farben.map(ppFarbe).sort((p, q) => (p[0] + p[1] + p[2]) - (q[0] + q[1] + q[2]))[0] || [0, 0, 0, 1];
       const k = `rgb(${dunkel[0]},${dunkel[1]},${dunkel[2]})`;
       st.fontFamily = PP_PX_SCHRIFT;
-      st.fontSize = Math.max(8, Math.round(a.text.groesse * 0.72 / 8) * 8) + 'px';   // ★ W86p: Vielfache von 8 — nur dann liegt jedes Pixel der Pixelschrift auf ganzen Bildpunkten (sonst Mischfarben an allen Buchstabenkanten)
+      st.fontSize = Math.round(a.text.groesse * 0.72) + 'px';
       st.textShadow = `2px 0 0 ${k}, -2px 0 0 ${k}, 0 2px 0 ${k}, 0 -2px 0 ${k}, 3px 3px 0 ${k}`;
       st.webkitFontSmoothing = 'none';
     }
