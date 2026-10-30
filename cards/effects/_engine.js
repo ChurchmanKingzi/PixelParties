@@ -37,6 +37,7 @@ const ASCENSION_GRANT_TESTFENSTER = false;
 // Sync nach `hero_ascension` aus — der Kartenwechsel faellt in den weissen Hoehepunkt
 // bei ~45 % der Animation.
 const ASCENSION_MORPH_SYNC_MS = 900;
+const ASCENSION_REAKTION_ABLAGE_VORLAUF_MS = 260;   // Trample Sounds fliegt zuerst, der gewählte Zauber folgt nach so vielen ms (Al 30.10.)
 
 const MAX_CHAIN_DEPTH = 10;   // Prevent infinite chain loops
 // Safety caps to terminate runaway trigger fan-out / infinite summons
@@ -26164,6 +26165,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         fromZone: 'hand', pool: quelle, poolIndex: handIndex, by: config.title, excludeTargets: config.excludeTargets,
         zusageEintrag: zusage,   // v1303: Auftritt beim BEGINN der Aufloesung
         alsZusatzaktion: true,   // v1352: als ausgefuehrte Aktion melden
+        ...(typeof config.ablageVorspann === 'function' ? { ablageVorspann: config.ablageVorspann } : {}),   // Trample Sounds: legt sich VOR dem Flug dieses Zaubers ab
         ...(_leihSeite != null ? { heroOwner: _leihSeite } : {}),   // Als Vorgabe 29.9.
       });
       if (r.cancelled) { this._zusageAuftrittVerwerfen(zusage); return { retry: true }; }
@@ -26586,6 +26588,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
       if (_attaLoescht) ps.deletedPile.push(cardName); else ps.discardPile.push(cardName);
     } else {
+      // ★ Vorlauf (Trample Sounds in the Forest, Al 30.10.): eine Karte, die mit diesem Zauber ablaufen soll, fliegt ZUERST (kurzer Abstand), dann der Zauber.
+      // Vor der Indexbestimmung: ihre Entnahme verschiebt die Handplätze.
+      if (typeof opts.ablageVorspann === 'function') { const _v = opts.ablageVorspann; opts.ablageVorspann = null; await _v(); }
       const _endIdx = (pool[poolIndex] === cardName) ? poolIndex : pool.indexOf(cardName);   // Ancient Guardian Statue: die GEWÄHLTE Kopie verlässt die Hand (Handindex-Felder hängen an der Kopie), nicht die erste gleichen Namens
       if (_endIdx >= 0) {
         // W63c: gestohlene Handkarte (Sofort-Guss: Hu, Coffee, Learning …) → Ablage des permanenten Besitzers; Herkunft VOR dem Splice
@@ -43667,19 +43672,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         castingSeite = _plan.casterSeite ?? pi;
       }
 
-      // Consume from hand + pay gold
-      // ★ Flug (Al 30.10.: Trample Sounds „verschwindet einfach aus der Hand und taucht dann später einfach im Discard auf", dann: „sofort von der
-      // Hand zum Discard"): die Karte geht GLEICH beim Ausspielen in die Ablage — Flug VOR der Entnahme (der Handplatz muss noch stehen), dann
-      // Entnahme, Ablage und Abgleich in einem Zug (Hausregel wie beim Sofort-Guss). Vorher lag die ganze Reaktion samt freier Aktion zwischen
-      // Handverlust und Ablagezuwachs, der Client (leitet Ablage-Flüge aus beiden im SELBEN Zustand ab) zeigte keinen Flug.
-      const _aszBesitzer = this._consumeHandCardOrigin(pi, cardName, hi);   // gestohlene Handkarte → Ablage des permanenten Besitzers (VOR dem Splice)
-      this._broadcastEvent('play_pile_transfer', {
-        owner: pi, cardName, from: 'hand', to: 'discard', fromHandIdx: hi,
-        ...(_aszBesitzer !== pi ? { fromOwner: pi, toOwner: _aszBesitzer } : {}),
-      });
-      ps.hand.splice(hi, 1);
-      (this.gs.players[_aszBesitzer] || ps).discardPile.push(cardName);
-      this.sync();   // sofort abgleichen: die Hand rückt auf, während die Karte fliegt (Wächter `check-hand-flight-sync`)
+      // Pay gold. ★ Die Karte BLEIBT sichtbar in der Hand (Al 30.10.: „bleibt sichtbar auf der Hand, bis ihr gewählter Spell confirmed ist, dann fliegen sie
+      // UND ihr gewählter Spell mit kurzem Delay — erst Trample Sounds, dann der Spell — zum Discard"). Solange sie dort liegt, zählt sie nicht als Handkarte
+      // (`mitZusatzAufloesung`, siehe unten); abgelegt wird sie in `_aszAblegen` — im Vorlauf des Flugs des gewählten Zaubers (`ablageVorspann`) oder, wenn
+      // kein Zauber aus der Hand gewirkt wird (Kreatur, Ability, Abbruch), am Ende der freien Aktion.
       await this._rxPay(ps, cost, { cardName });
       this.notePlayedFromHand(pi);
 
@@ -43689,27 +43685,51 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       this.log('ascension_reaction', { card: cardName, player: ps.username, hero: ascendedName });
 
+      // Ablegen der ausgespielten Karte: Flug Hand → Ablage VOR der Entnahme, dann Entnahme, Ablage und Abgleich in einem Zug (Hausregel wie beim
+      // Sofort-Guss; eine gestohlene Handkarte geht in die Ablage ihres Besitzers). Idempotent. `mitVorlauf`: nach dem Flug kurz warten, damit der
+      // Flug des gewählten Zaubers gleich danach als zweiter folgt.
+      let _aszAbgelegt = false;
+      const _aszAblegen = async (mitVorlauf) => {
+        if (_aszAbgelegt) return;
+        _aszAbgelegt = true;
+        const idx = ps.hand[hi] === cardName ? hi : ps.hand.indexOf(cardName);
+        if (idx < 0) return;   // während der Aktion schon aus der Hand verschwunden (abgeworfen, gestohlen …)
+        const besitzer = this._consumeHandCardOrigin(pi, cardName, idx);   // VOR dem Splice
+        this._broadcastEvent('play_pile_transfer', {
+          owner: pi, cardName, from: 'hand', to: 'discard', fromHandIdx: idx,
+          ...(besitzer !== pi ? { fromOwner: pi, toOwner: besitzer } : {}),
+        });
+        ps.hand.splice(idx, 1);
+        (this.gs.players[besitzer] || ps).discardPile.push(cardName);
+        this.sync();   // sofort abgleichen: die Hand rückt auf, während die Karte fliegt (Wächter `check-hand-flight-sync`)
+        if (mitVorlauf) await this._delay(ASCENSION_REAKTION_ABLAGE_VORLAUF_MS);
+      };
+
       // Wisdom (level-gap coverage) — same contract as post-target
       // reactions. Pay BEFORE resolution so a turn-end fired during
       // the reaction (Flashbang / Terror) can't skip the cost.
-      const wisdomCost = (!isArtifact && castingHeroIdx >= 0)
-        ? this._rxWisdomKosten(pi, castingSeite, castingHeroIdx, cardData)
-        : 0;
-      if (wisdomCost > 0) {
-        await this.actionPromptForceDiscard(pi, wisdomCost, {
-          title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
-        });
-      }
-
-      // Resolve
-      this._inAscensionReactionCheck = true;
-      try {
-        if (script.ascensionReactionResolve) {
-          await script.ascensionReactionResolve(this, pi, castingHeroIdx, ascendedHeroIdx, heroOwner);
+      // Die Karte liegt dabei noch in der Hand: sie ist keine abwerfbare Handkarte (`mitZusatzaufloesung`).
+      await require('./_hand-resolve').mitZusatzAufloesung(ps, cardName, async () => {
+        const wisdomCost = (!isArtifact && castingHeroIdx >= 0)
+          ? this._rxWisdomKosten(pi, castingSeite, castingHeroIdx, cardData)
+          : 0;
+        if (wisdomCost > 0) {
+          await this.actionPromptForceDiscard(pi, wisdomCost, {
+            title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
+          });
         }
-      } finally {
-        this._inAscensionReactionCheck = false;
-      }
+
+        // Resolve
+        this._inAscensionReactionCheck = true;
+        try {
+          if (script.ascensionReactionResolve) {
+            await script.ascensionReactionResolve(this, pi, castingHeroIdx, ascendedHeroIdx, heroOwner, { vorspann: () => _aszAblegen(true) });
+          }
+        } finally {
+          this._inAscensionReactionCheck = false;
+        }
+        await _aszAblegen(false);   // Rückfall: kein Zauber aus der Hand gewirkt (Kreatur, Ability, Abbruch) → jetzt ablegen
+      });
 
       // Parity with post-target reactions: fire afterSpellResolved for
       // Spell-type ascension reactions so hero passives like Zsos'Ssar

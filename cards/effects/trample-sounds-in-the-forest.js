@@ -24,9 +24,10 @@ const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 //  turn total.
 // ═══════════════════════════════════════════
 
-// Al 30.10.: Die Karte geht beim Ausspielen SOFORT von der Hand in die Ablage (`_checkAscensionHandReactions` in _engine.js sendet den Flug
-// `play_pile_transfer` Hand → Ablage vor der Entnahme und legt sie gleich ab). Vorher lag sie bis nach der freien Aktion nirgends: Handverlust und
-// Ablagezuwachs kamen nie im selben Zustand an, und der Client zeigte keinen Flug.
+// Al 30.10.: Die Karte BLEIBT sichtbar in der Hand, bis der gewählte Zauber der freien Aktion bestätigt/aufgelöst ist; dann fliegt zuerst sie, kurz danach
+// der Zauber zur Ablage. `_checkAscensionHandReactions` (_engine.js) reicht dafür `ablage.vorspann` herein; die freie Aktion ruft ihn unmittelbar vor dem
+// Flug des gewählten Zaubers auf (`ablageVorspann`). Wird kein Zauber aus der Hand gewirkt (Kreatur, Ability, Abbruch), legt die Engine die Karte
+// am Ende der freien Aktion ab.
 const CARD_NAME = 'Trample Sounds in the Forest';
 const HOPT_KEY = 'trample-sounds';
 
@@ -66,7 +67,7 @@ module.exports = {
    */
   // Als Vorgabe 29.9.: `heroOwner` = Brettseite eines GELIEHENEN
   // aufgestiegenen Helden (fehlt er, ist es die eigene Spalte).
-  ascensionReactionResolve: async (engine, pi, castingHeroIdx, ascendedHeroIdx, heroOwner) => {
+  ascensionReactionResolve: async (engine, pi, castingHeroIdx, ascendedHeroIdx, heroOwner, ablage) => {
     if (!engine.claimHOPT(HOPT_KEY, pi)) return;
 
     // The free Action is locked to the Hero that just Ascended — matches
@@ -75,6 +76,7 @@ module.exports = {
     await engine.performImmediateAction(pi, ascendedHeroIdx, {
       title: CARD_NAME,
       description: 'Perform one free additional Action with the Ascended Hero!',
+      ...(ablage && typeof ablage.vorspann === 'function' ? { ablageVorspann: ablage.vorspann } : {}),   // Trample Sounds fliegt vor dem gewählten Zauber zur Ablage
       ...((isSeat(engine, heroOwner)) && heroOwner !== pi ? { heroOwner } : {}),
     });
   },
