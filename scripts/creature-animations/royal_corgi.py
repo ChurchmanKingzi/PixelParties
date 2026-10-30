@@ -31,8 +31,11 @@ Ablauf (60 Frames à 65 ms = 3,9 s), alle Bewegungen unabhängig; der Kopf bleib
 * Blinzeln: das linke Auge schließt sich 3 Frames lang in der umgebenden Fellfarbe (orange B) — bei 22, 41 und 57.
 * Hecheln (Zugabe, 2× pro Schleife, Frames 20–33 und 46–59): die Kinnpartie (5–6,9) wird Mundschwarz, dazu erscheint die Zunge in Ohrrosa (5–6,10), im
   Wechsel zweimal drei Stufen (zu/offen/Zunge), je 2 Frames — beide Farben stehen schon im Sprite.
-* Krone (Gold, Regel 12/14): ein Lichtband läuft diagonal über die Zacken (Frames 4–17 und 36–49, jedes Pixel 2 Frames eine Stufe heller), dazu blitzt je
-  5 Frames lang ein kleiner Glitzerstern an der linken Zacke (Frame 24), der rechten Zacke (30) und der Kronenspitze (52).
+* Krone (Gold, Regel 12/14): ein Lichtband läuft diagonal über die Zacken (dreimal pro Schleife: Frames 4–17, 24–37, 44–57, jedes Pixel 2 Frames eine Stufe
+  heller), dazu blitzt je 5 Frames lang ein Glitzerstern an der linken Zacke (Frames 8 und 38), der rechten Zacke (16 und 46) und der Kronenspitze (30 und 54, dort
+  mit 2 px langen Armen im Höhepunkt).
+* Monokel-Glas (Glas/Monokel zählt für den Nutzer als glänzend): ein Lichtband läuft diagonal über das Glas (Frames 6–15, 28–37, 50–59; jedes Pixel 2 Frames eine
+  Stufe heller auf der Türkis-/Glasrampe der Quelle) und ein vierzackiger Glitzerstern blitzt mitten auf dem Glas (Frames 16–20, 38–42, 55–59), zusätzlich zum Glanzkreuz.
 * Monokel-Glanz: das weiße Glanzkreuz der Vorlage funkelt dreimal pro Schleife (Frames 58–3, 20–25, 42–47): Arme wachsen von 1 auf 2 px und schrumpfen
   wieder; dazwischen ist nur das Glas zu sehen.
 * Pfoten tippen: linker Fuß in Frames 7–8, 26–27 und 49–50, rechter Fuß in 16–17, 36–37 und 56–57 (Zeile 14 des Fußes entfällt, die Fußlinie rückt 1 px hoch;
@@ -109,6 +112,14 @@ PFOTE_R = (16, 17, 36, 37, 56, 57)
 PANT = (1, 1, 2, 2, 1, 1, 2, 2, 1, 1, 2, 2, 1, 1)
 STERN_BLITZ = (1, 2, 2, 2, 2, 1)
 KRONE_STERN = (1, 2, 2, 2, 1)
+KRONE_STERN_GROSS = (1, 2, 3, 2, 1)
+LINSE_STERN = (1, 2, 2, 2, 1)
+# Monokel-Glas (Ring + Innenfläche, 12 Pixel); Lichtband läuft diagonal („/“, links unten → rechts oben) darüber
+LINSE = [(7, 4), (8, 4), (6, 5), (7, 5), (8, 5), (9, 5), (6, 6), (7, 6), (8, 6), (9, 6), (7, 7), (8, 7)]
+LICHT_LINSE = {(40, 177, 169): (69, 217, 212), (64, 194, 178): (69, 217, 212), (66, 196, 181): (69, 217, 212), (69, 203, 190): (69, 217, 212),
+               (69, 217, 212): (214, 239, 226), (163, 204, 204): (177, 218, 218), (177, 218, 218): (214, 239, 226),
+               (214, 239, 226): (255, 255, 255), (254, 244, 220): (255, 255, 255)}      # je eine Stufe heller, alles Farben der Quelle
+GLAS_HELL = (214, 239, 226)
 
 
 def zustand(i):
@@ -121,10 +132,15 @@ def zustand(i):
     pant = muster(i, (20, 46), PANT)
     stern = muster(i, (58, 20, 42), STERN_BLITZ)
     band = -1
-    for s in (4, 36):
+    for s in (4, 24, 44):
         if 0 <= i - s < 14:
             band = (i - s) // 2
-    ks = {n: muster(i, (s,), KRONE_STERN) for n, s in (('links', 24), ('rechts', 30), ('spitze', 52))}
+    lband = -1
+    for s in (6, 28, 50):
+        if 0 <= i - s < 10:
+            lband = (i - s) // 2
+    ks = {'links': muster(i, (8, 38), KRONE_STERN), 'rechts': muster(i, (16, 46), KRONE_STERN), 'spitze': muster(i, (30, 54), KRONE_STERN_GROSS),
+          'linse': muster(i, (16, 38, 55), LINSE_STERN), 'lband': lband}
     return a, b, blick, lid, pant, stern, band, ks, ohr_li, ohr_re, 1 if i in PFOTE_L else 0, 1 if i in PFOTE_R else 0
 
 
@@ -187,27 +203,47 @@ def frame(i, nur=None):
 
 
 def glanz(f, band, ks, lift):
-    """Krone: Lichtband + Glitzersterne (Gold, Regel 12/14). Liegt über dem Kopf und steigt mit ihm."""
+    """Krone (Gold) und Monokel-Glas: Lichtband + Glitzersterne (Regel 12/14, vom Nutzer für Krone UND Glas bestätigt). Liegt über dem Kopf und steigt mit ihm."""
     def px(x, y):
         return PAD_T + y - lift, PAD_L + x
+
+    def setz(x, y, farbe):
+        yy_, xx_ = px(x, y)
+        f[yy_, xx_, :3] = farbe
+        f[yy_, xx_, 3] = 255
+
     if band >= 0:
         for (x, y) in KRONE:
             if (x + (3 - y)) - 3 == band:
                 yy_, xx_ = px(x, y)
                 c = tuple(int(v) for v in f[yy_, xx_, :3])
                 f[yy_, xx_, :3] = WEISS_L if c == GOLD_HELL else GOLD_HELL
-    for name, st in ks.items():
+    for name in ('links', 'rechts', 'spitze'):
+        st = ks[name]
         if not st:
             continue
         (cx, cy), arme = KRONENSTERN[name]
-        yy_, xx_ = px(cx, cy)
-        f[yy_, xx_, :3] = WEISS_G
-        f[yy_, xx_, 3] = 255
-        if st == 2:
+        setz(cx, cy, WEISS_G)
+        if st >= 2:
             for (x, y) in arme:
+                setz(x, y, WEISS_L)
+        if st == 3:                                                 # größte Stufe: Arme 2 px lang (nur an der Kronenspitze, dort ist Platz)
+            for (dx, dy) in ((0, -2), (-2, 0), (2, 0)):
+                setz(cx + dx, cy + dy, WEISS_L)
+    # Monokel: Lichtband über das Glas (jedes Pixel eine Stufe heller auf der Türkis-/Glasrampe der Quelle)
+    if ks['lband'] >= 0:
+        for (x, y) in LINSE:
+            if x + (7 - y) - 7 == ks['lband']:
                 yy_, xx_ = px(x, y)
-                f[yy_, xx_, :3] = WEISS_L
-                f[yy_, xx_, 3] = 255
+                c = tuple(int(v) for v in f[yy_, xx_, :3])
+                if c in LICHT_LINSE:
+                    f[yy_, xx_, :3] = LICHT_LINSE[c]
+    # Monokel: vierzackiger Glitzerstern auf dem Glas (zusätzlich zum Glanzkreuz der Vorlage)
+    if ks['linse']:
+        setz(7, 5, WEISS_G)
+        if ks['linse'] >= 2:
+            for (x, y) in ((7, 4), (6, 5), (8, 5), (7, 6)):
+                setz(x, y, GLAS_HELL)
     return f
 
 

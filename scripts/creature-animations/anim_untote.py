@@ -243,3 +243,30 @@ def glanz_pfad(a, pfad, hell, basis, pos):
     if a[y, x, 3] and tuple(int(v) for v in a[y, x, :3]) == tuple(basis):
         a[y, x, :3] = hell
     return a
+
+
+def zuschnitt(frames_voll, frames_koerper, ruhe, zugabe=2):
+    """Frame auf die Figur zuschneiden (Nutzerwunsch): Box (x0, y0, x1, y1; x1/y1 exklusiv) auf der Leinwand, SYMMETRISCH um die Ruhefigur `ruhe` = (x0, y0, x1, y1)
+    (Sprite-Rechteck auf der Leinwand). Rand je Achse = größter Überstand der Figur selbst (alle Frames ohne Effekte, `frames_koerper`) über die Ruhefigur hinaus;
+    Effekte/Partikel (`frames_voll`) dürfen den Frame höchstens um `zugabe` px über diesen Körper-Rand hinaus vergrößern (sonst AssertionError: Partikel enger führen)."""
+    rx0, ry0, rx1, ry1 = ruhe
+
+    def ueberstand(frames):
+        mx = my = 0
+        for f in frames:
+            ys, xs = np.nonzero(f[..., 3])
+            if len(xs):
+                mx = max(mx, rx0 - int(xs.min()), int(xs.max()) + 1 - rx1)
+                my = max(my, ry0 - int(ys.min()), int(ys.max()) + 1 - ry1)
+        return mx, my
+
+    kx, ky = ueberstand(frames_koerper)
+    ex, ey = ueberstand(frames_voll)
+    assert ex - kx <= zugabe and ey - ky <= zugabe, f'Effekte vergrößern den Frame um {ex - kx} px (x) / {ey - ky} px (y) > {zugabe}'
+    mx, my = max(kx, ex), max(ky, ey)
+    return rx0 - mx, ry0 - my, rx1 + mx, ry1 + my
+
+
+def beschneiden(f, box):
+    x0, y0, x1, y1 = box
+    return f[y0:y1, x0:x1].copy()
