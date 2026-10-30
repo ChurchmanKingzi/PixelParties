@@ -11444,42 +11444,54 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
 
 /* ═══════════════════════════════════════════════════════════════
    ★ v1404 (Al 25.9.) — KACHELN DER CPU-AUSWAHL
-   Doppelkante (dunkle Innenfuge + getoente Innenlinie), Eckwinkel,
-   eingerahmtes Portrait mit Vignette und gelegentlichem Glanzband,
-   Pixel-Schlagschatten. Farbe kommt aus `--kachel-farbe`.
+   ★ Gegnerwahl-Ueberarbeitung: wie die Menuekaesten gebaut — Lichtkante,
+   dreifacher harter Ring, Eck-Schnoerkel + Kronenstueck + Seitenkeile
+   (Maske, siehe ganz unten), Bildrahmen, Namensband mit Nieten, gestrichelte
+   Trennlinie vor der Fusszeile. Schachbrett-Dither statt Verlauf, keine
+   Weichzeichner; Bewegung nur in ganzen Pixeln. Farbe: `--kachel-farbe`.
    ═══════════════════════════════════════════════════════════════ */
-.vscpu-kachel { --k: var(--kachel-farbe, #e92f38); position: relative; display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 10px 10px 9px; font-family: inherit; color: inherit; cursor: pointer; border-radius: 0; border: 2px solid color-mix(in srgb, var(--k) 88%, #000000); background: linear-gradient(180deg,
-      color-mix(in srgb, var(--k) 16%, var(--bg2)) 0%,
-      color-mix(in srgb, var(--k) 6%, var(--bg2)) 55%,
-      var(--bg2) 100%); box-shadow: inset 0 0 0 2px #08060c, inset 0 0 0 3px color-mix(in srgb, var(--k) 32%, transparent), 0 0 12px color-mix(in srgb, var(--k) 22%, transparent), 4px 4px 0 0 #000000; transition: transform .15s steps(4, end), box-shadow .15s steps(4, end), filter .15s steps(4, end); }
-.vscpu-kachel:not(:disabled):hover { transform: translateY(-3px); box-shadow: inset 0 0 0 2px #08060c, inset 0 0 0 3px color-mix(in srgb, var(--k) 55%, transparent), 0 0 22px color-mix(in srgb, var(--k) 45%, transparent), 4px 7px 0 0 #000000; }
+.vscpu-kachel { --k: var(--kachel-farbe, #e92f38); --k-dunkel: color-mix(in srgb, var(--k) 52%, #08060c); --k-hell: color-mix(in srgb, var(--k) 58%, #ffffff); --zier: var(--k); position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 16px 13px; font-family: inherit; color: inherit; cursor: pointer; border-radius: 0; border: 3px solid; border-color: var(--k-hell) var(--k-dunkel) var(--k-dunkel) var(--k-hell); background: conic-gradient(color-mix(in srgb, var(--k) 15%, var(--bg2)) 25%, color-mix(in srgb, var(--k) 7%, var(--bg2)) 0 50%, color-mix(in srgb, var(--k) 15%, var(--bg2)) 0 75%, color-mix(in srgb, var(--k) 7%, var(--bg2)) 0) 0 0 / 4px 4px; box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px var(--k-dunkel), 0 0 0 6px var(--pp-kontur), inset 0 0 0 2px var(--pp-kontur), inset 0 0 0 4px color-mix(in srgb, var(--k) 26%, var(--bg2)), 8px 8px 0 0 #000000; }
+.vscpu-kachel:not(:disabled):hover { --zier: var(--k-hell); transform: translateY(-4px); border-color: #ffffff var(--k) var(--k) #ffffff; box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px var(--k), 0 0 0 6px var(--pp-kontur), inset 0 0 0 2px var(--pp-kontur), inset 0 0 0 4px color-mix(in srgb, var(--k) 45%, var(--bg2)), 8px 12px 0 0 #000000; }
 .vscpu-kachel:not(:disabled):active { transform: translateY(0); }
 .vscpu-kachel:disabled { cursor: not-allowed; opacity: .55; filter: saturate(.6); }
 
-/* Eckwinkel — rücken beim Hover ein Stück nach außen. */
-.vscpu-ecken { position: absolute; inset: 0; pointer-events: none; }
-.vscpu-ecken i { position: absolute; width: 12px; height: 12px; border: 0 solid var(--k); filter: drop-shadow(0 0 3px color-mix(in srgb, var(--k) 70%, transparent)); transition: transform .18s steps(4, end); }
-.vscpu-ecken i:nth-child(1) { left: -5px; top: -5px; border-top-width: 3px; border-left-width: 3px; }
-.vscpu-ecken i:nth-child(2) { right: -5px; top: -5px; border-top-width: 3px; border-right-width: 3px; }
-.vscpu-ecken i:nth-child(3) { left: -5px; bottom: -5px; border-bottom-width: 3px; border-left-width: 3px; }
-.vscpu-ecken i:nth-child(4) { right: -5px; bottom: -5px; border-bottom-width: 3px; border-right-width: 3px; }
-.vscpu-kachel:not(:disabled):hover .vscpu-ecken i:nth-child(1) { transform: translate(-3px, -3px); }
-.vscpu-kachel:not(:disabled):hover .vscpu-ecken i:nth-child(2) { transform: translate(3px, -3px); }
-.vscpu-kachel:not(:disabled):hover .vscpu-ecken i:nth-child(3) { transform: translate(-3px, 3px); }
-.vscpu-kachel:not(:disabled):hover .vscpu-ecken i:nth-child(4) { transform: translate(3px, 3px); }
-
-/* Portrait im eigenen Rahmen */
-.vscpu-bild { position: relative; line-height: 0; border: 2px solid #000000; box-shadow: 0 0 0 1px color-mix(in srgb, var(--k) 65%, transparent); overflow: hidden; }
-.vscpu-bild-vignette { position: absolute; inset: 0; pointer-events: none; z-index: 1; background: radial-gradient(ellipse at 50% 40%, transparent 55% 100%),
-    linear-gradient(180deg, transparent 65%, color-mix(in srgb, var(--k) 22%, transparent) 100%); }
+/* Portrait im eigenen Rahmen: schwarz, Farbring, schwarz. */
+.vscpu-bild { position: relative; line-height: 0; margin: 2px 2px 0; border: 3px solid var(--pp-kontur); box-shadow: 0 0 0 2px var(--k), 0 0 0 4px var(--pp-kontur); overflow: hidden; }
+.vscpu-bild-vignette { position: absolute; inset: 0; pointer-events: none; z-index: 1; background: var(--pp-kachel-5) 0 0 / 8px 8px; -webkit-mask: linear-gradient(180deg, transparent 0 88%, #000000 88% 100%); mask: linear-gradient(180deg, transparent 0 88%, #000000 88% 100%); }
 .vscpu-glanz { z-index: 2; --glanz-dauer: 6.5s; --glanz-staerke: .5; --glanz-breite: 26%; }
 .vscpu-kachel:disabled .vscpu-glanz { display: none; }
 
-.vscpu-name { font-size: 16px; font-weight: 700; line-height: 1.2; text-align: center; min-height: 2.4em; display: flex; align-items: center; justify-content: center; color: var(--k); text-shadow: 0 0 8px color-mix(in srgb, var(--k) 55%, transparent), 2px 2px 0 #000000; }
-.vscpu-fuss { display: flex; gap: 8px; margin-top: auto; }
-.vscpu-chip { font-size: 12px; font-weight: 700; letter-spacing: .5px; padding: 2px 8px; color: var(--k); background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect x='2' y='0' width='2' height='2' fill='%23000000'/%3E%3C/svg%3E") 0 0 / 4px 4px; border: 2px solid color-mix(in srgb, var(--k) 55%, transparent); box-shadow: 2px 2px 0 0 #08060c; }
+/* Stempel auf dem Bild (links unten): kleines Plakat in der Kachelfarbe. */
+.vscpu-stempel { position: absolute; left: 6px; bottom: 6px; z-index: 3; padding: 2px 6px 1px; line-height: 1.2; font-size: 11px; font-weight: 700; letter-spacing: 1px; color: #ffffff; background: var(--k-dunkel); border: 2px solid var(--pp-kontur); box-shadow: 0 0 0 2px var(--k), 3px 3px 0 2px var(--pp-kontur); text-shadow: 1px 1px 0 var(--pp-kontur); }
+
+/* Namensband: dunkle Schachbrett-Flaeche, doppelter Rand, je eine Niete links und rechts. */
+.vscpu-name-band { position: relative; align-self: stretch; margin-top: 2px; padding: 4px 22px; background: conic-gradient(#08060c 25%, color-mix(in srgb, var(--k) 12%, #08060c) 0 50%, #08060c 0 75%, color-mix(in srgb, var(--k) 12%, #08060c) 0) 0 0 / 4px 4px; border: 2px solid var(--k-dunkel); box-shadow: 0 0 0 2px var(--pp-kontur), inset 0 0 0 2px var(--pp-kontur), 4px 4px 0 2px #08060c; }
+.vscpu-name-band::before, .vscpu-name-band::after { content: ''; position: absolute; top: 50%; width: 6px; height: 6px; margin-top: -3px; background: var(--k-hell); box-shadow: 0 0 0 2px var(--pp-kontur), 2px 2px 0 2px var(--k-dunkel); }
+.vscpu-name-band::before { left: 7px; }
+.vscpu-name-band::after  { right: 7px; }
+.vscpu-name { font-size: 16px; font-weight: 700; line-height: 1.2; text-align: center; min-height: 2.4em; display: flex; align-items: center; justify-content: center; color: var(--k); text-shadow: 2px 2px 0 var(--pp-kontur); }
+.vscpu-kachel:not(:disabled):hover .vscpu-name { color: var(--k-hell); }
+
+/* Fusszeile: gestrichelte Pixel-Trennlinie, darunter die Plaketten. */
+.vscpu-fuss { display: flex; gap: 8px; margin-top: auto; align-self: stretch; justify-content: center; padding-top: 9px; background: repeating-linear-gradient(90deg, var(--k-dunkel) 0 6px, transparent 6px 10px) 0 0 / 100% 2px no-repeat; }
+.vscpu-chip { font-size: 12px; font-weight: 700; letter-spacing: .5px; padding: 2px 8px; color: var(--k-hell); background: var(--pp-kontur); border: 2px solid var(--k-dunkel); box-shadow: 2px 2px 0 0 #000000; }
 .vscpu-chip--leise { opacity: .75; font-weight: 600; }
+.vscpu-chip--breit { letter-spacing: 1px; padding: 2px 12px; }
 .vscpu-chip--sleeve { color: #fad54a; border-color: #a87c00; }
+
+/* Gitter samt Leisten sitzt mittig im Rahmen, solange es nicht scrollt. */
+.vscpu-content { display: flex; flex-direction: column; }
+.vscpu-mitte { margin: auto 0; }
+.vscpu-leiste.vscpu-leiste--fuss { margin: 30px auto 0; }
+.vscpu-leiste--fuss .vscpu-leiste-text { font-size: 11px; letter-spacing: 2px; opacity: .85; }
+
+/* Zierleiste ueber dem Gitter. */
+.vscpu-leiste { display: flex; align-items: center; gap: 16px; margin: 2px auto 24px; max-width: 900px; }
+.vscpu-leiste-streifen { --z: var(--player-color, #66b6ff); flex: 1; height: 14px; background: linear-gradient(var(--z), var(--z)) 0 5px / 100% 4px no-repeat,
+    repeating-linear-gradient(90deg, color-mix(in srgb, var(--z) 55%, #000000) 0 4px, transparent 4px 12px) 0 0 / 100% 2px no-repeat,
+    repeating-linear-gradient(90deg, transparent 0 8px, color-mix(in srgb, var(--z) 55%, #000000) 8px 12px) 0 12px / 100% 2px no-repeat; }
+.vscpu-leiste-streifen:last-child { transform: scaleX(-1); }
+.vscpu-leiste-text { font-size: 13px; font-weight: 700; letter-spacing: 3px; white-space: nowrap; color: var(--player-color, #66b6ff); text-shadow: 2px 2px 0 var(--pp-kontur); }
 
 /* ── Zufalls-Kachel: Spielautomat durch die Gegner ── */
 .vscpu-zufall { position: relative; overflow: hidden; background: #08060c; }
@@ -11723,6 +11735,7 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
    schlichten Ecken. */
 .main-menu-screen .ornate-frame::after,
 .pp-menuekasten.ornate-frame::after,
+.vscpu-kachel::after,
 .auth-screen .auth-panel.pp-eckzier::after { --eck-e: 4px; --eck-gr: calc(var(--eck-e) * 8); inset: 4px; background: color-mix(in srgb, var(--zier) 72%, #ffffff); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM0 1h2v1h-2zM0 2h1v1h-1zM2 2h4v1h-4zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM0 6h1v1h-1zM0 7h1v1h-1z'/%3E%3C/svg%3E") left top / var(--eck-gr) var(--eck-gr) no-repeat,
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM6 1h2v1h-2zM2 2h4v1h-4zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM7 5h1v1h-1zM7 6h1v1h-1zM7 7h1v1h-1z'/%3E%3C/svg%3E") right top / var(--eck-gr) var(--eck-gr) no-repeat,
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h1v1h-1zM0 2h1v1h-1zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM2 5h4v1h-4zM0 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") left bottom / var(--eck-gr) var(--eck-gr) no-repeat,
@@ -13493,6 +13506,10 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   .pp-aufdeck-fenster { gap: 6px !important; max-height: 96vh; }
   .pp-aufdeck-karte { width: calc(min(52vh, 308px) * 220 / 308) !important; height: min(52vh, 308px) !important; }
 }
+
+/* ── Gegnerwahl: Zier der Kacheln (Maske kommt aus der Liste der Menuekaesten oben) ── */
+.vscpu-kachel::after { content: ''; position: absolute; z-index: 3; pointer-events: none; --eck-e: 3px; inset: 3px; }
+.vscpu-kachel:disabled::after { opacity: .6; }
 
 
 /* ── RETRO-ZUSATZ (scripts/retro/retro-extra.css) ── */

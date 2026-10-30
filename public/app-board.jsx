@@ -2110,6 +2110,7 @@ function ppTutorialAufmerksamkeit() {
   try {
     if (!window._currentTutorialNum || !(window.ppIsPhone && window.ppIsPhone())) return;
     if (document.querySelector('.textbox-overlay')) { _ppAufmerkSchluessel = ''; return; }   // nach der Textbox neu bewerten
+    if (document.querySelector('.panel-zielwahl')) return;   // ein Zielwahl-Fenster steuert die Kamera selbst (_ppZielwahlLage) — keine zweite Fahrt dagegen
     if (window._touchActive || window.activeDragData) return;
     const sc = document.querySelector('.board-center');
     if (!sc) return;
@@ -2134,11 +2135,12 @@ function ppPlatzierungsKamera() {
     if (!sc) return;
     // Support-Zonen-Wahl (Pollution Tokens …) UND „waehle einen Nutzer": sind meine Helden als Ziel markiert (Spell/Attack/Creature per Tipp, mehrere moegliche Wirker),
     // fahren die Kamera zu ihnen.
-    const els = Array.from(sc.querySelectorAll('[data-support-zone].zone-pick-target, [data-support-zone].zone-bounce-place-target, [data-hero-zone][data-hero-owner="me"].board-zone-play-target, [data-hero-zone][data-hero-owner="me"].attach-pick-target'));
+    const els = Array.from(sc.querySelectorAll('[data-support-zone].zone-pick-target, [data-support-zone].zone-bounce-place-target, [data-hero-zone].board-zone-play-target, [data-hero-zone].attach-pick-target'));
     if (!els.length) { _ppPlatzSchluessel = ''; return; }
     if (document.querySelector('.textbox-overlay')) return;   // im Tutorial hat die Textbox-Kamera Vorrang
+    if (document.querySelector('.panel-zielwahl')) return;    // das Zielwahl-Fenster steuert die Kamera selbst
     const schluessel = els.map(e => e.hasAttribute('data-hero-zone')
-      ? 'h:' + e.getAttribute('data-hero-idx')
+      ? 'h:' + e.getAttribute('data-hero-owner') + ':' + e.getAttribute('data-hero-idx')
       : (e.getAttribute('data-support-owner') || '?') + ':' + e.getAttribute('data-support-hero') + ':' + e.getAttribute('data-support-slot')).join('|');
     if (schluessel === _ppPlatzSchluessel) return;
     _ppPlatzSchluessel = schluessel;
@@ -2264,6 +2266,52 @@ function _ppKarteUnterPanel(panel, x, y) {
   return false;
 }
 
+// ★ Zielwahl-Fenster ueber/unter den MOEGLICHEN ZIELEN (Helden, Creatures, Support-/Ability-Zonen, Permanents ...) statt mittendrin. Alle markierten Ziele im Brett bilden ein Rechteck;
+// das Fenster sitzt direkt darueber (oder darunter), solange dort im freien Band Platz ist — nie naeher als `ZW_RAND` an Bildschirmrand oder Hand-Leisten. Handy: reicht der Platz nicht,
+// faehrt die Kamera das Rechteck einmalig so, dass Ziele + Fenster ins Band passen; gerechnet wird mit der ENDlage nach der Fahrt (`st.ziel`), das Fenster springt also nicht mit. Passt
+// es auch dann nicht (Ziele ueber das ganze Brett verstreut), sitzt es auf der Seite mit mehr freiem Platz und deckt moeglichst wenig ab. Ohne markierte Ziele: `null` (alte Lage).
+// Desktop (`phone` falsch): keine Kamera; nur bei NICHT-Helden-Zielen (Helden-Zielwahl bleibt zwischen den mittleren Helden, siehe `_ppZielwahlMitte`).
+const ZW_ZIEL_SEL = '.potion-target-valid, .board-zone-play-target, .attach-pick-target, .chain-pick-valid, .zone-pick-target, .zone-bounce-place-target';
+const ZW_RAND = 10;
+function _ppZielwahlLage(el, st, phone) {
+  const sc = document.querySelector('.board-center');
+  if (!sc) return null;
+  let l = Infinity, t = Infinity, rr = -Infinity, b = -Infinity, nurHelden = true;
+  sc.querySelectorAll(ZW_ZIEL_SEL).forEach((z) => {
+    if (el.contains(z)) return;
+    const q = _ppUnskaliertesRechteck(z);
+    if (!q.height || !q.width) return;
+    if (!z.hasAttribute('data-hero-zone')) nurHelden = false;
+    l = Math.min(l, q.left); t = Math.min(t, q.top); rr = Math.max(rr, q.right); b = Math.max(b, q.bottom);
+  });
+  if (!isFinite(l)) return null;
+  if (!phone && nurHelden) return null;
+  const pr = el.getBoundingClientRect();
+  const ph = pr.height;
+  const bandT = (phone ? _ppCamVarPx('--mob-opphand-h') : 0) + ZW_RAND, bandB = window.innerHeight - (phone ? _ppCamVarPx('--mob-mehand-h') : 0) - ZW_RAND;
+  const rand = 6, hoch = ph + rand * 2;
+  const rest = (phone && st.ziel != null) ? st.ziel - sc.scrollTop : 0;   // noch ausstehende Kamerafahrt
+  let tt = t - rest, bb = b - rest;
+  const oben = tt - bandT, unten = bandB - bb;
+  let y;
+  if (oben >= hoch) y = tt - rand - ph / 2;
+  else if (unten >= hoch) y = bb + rand + ph / 2;
+  else if (phone && st.ziel == null && (bb - tt) + hoch <= bandB - bandT) {
+    const maxY = Math.max(0, sc.scrollHeight - sc.clientHeight);
+    const ziel = Math.max(0, Math.min(maxY, sc.scrollTop + (bb - (bandB - rand))));
+    if (Math.abs(ziel - sc.scrollTop) >= 4) { st.ziel = ziel; if (!window._touchActive) _ppCamFahre(sc, sc.scrollLeft, ziel); }
+    const rest2 = (st.ziel != null) ? st.ziel - sc.scrollTop : 0;
+    y = (t - rest2) - rand - ph / 2;
+  } else y = (oben >= unten) ? tt - rand - ph / 2 : bb + rand + ph / 2;
+  // nie zu nah am Rand: Fenster komplett im freien Band halten
+  y = Math.max(bandT + ph / 2, Math.min(bandB - ph / 2, y));
+  const scr = sc.getBoundingClientRect();
+  // waagerecht ueber den Zielen, aber im Brett und mit Abstand zu dessen Rand (Seitenleisten/Stapel bleiben frei)
+  const halb = pr.width / 2, xMin = scr.left + halb + ZW_RAND, xMax = scr.right - halb - ZW_RAND;
+  const x0 = phone ? (scr.left + scr.right) / 2 : (l + rr) / 2;
+  return { x: xMin <= xMax ? Math.max(xMin, Math.min(xMax, x0)) : (scr.left + scr.right) / 2, y, luecke: 8 };
+}
+
 function DraggablePanel({ children, className, style, zielwahl }) {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
@@ -2283,8 +2331,19 @@ function DraggablePanel({ children, className, style, zielwahl }) {
     let raf = 0;
     // Messung der Zielwahl-Lage (rein, ohne State). Gibt `null`, wenn es
     // (noch) keine mittleren Helden gibt.
+    const kst = { ziel: null, genutzt: false };
     const messen = () => {
       const el = panelRef.current;
+      if (el) {
+        const phone = !!(window.ppIsPhone && window.ppIsPhone());
+        const p = _ppZielwahlLage(el, kst, phone);
+        if (p) {
+          if (phone) kst.genutzt = true;
+          const rand = 8, bw = el.getBoundingClientRect().width;
+          const x = Math.max(bw / 2 + rand, Math.min(window.innerWidth - bw / 2 - rand, p.x));
+          return { x: Math.round(x), y: Math.round(p.y), luecke: p.luecke };
+        }
+      }
       const m = _ppZielwahlMitte();
       if (!el || !m) return null;
       const r = el.getBoundingClientRect();
@@ -2352,7 +2411,7 @@ function DraggablePanel({ children, className, style, zielwahl }) {
     // bleibt sie unsichtbar (`visibility`), waehrend jedes Bild neu gemessen
     // wird; gezeigt wird sie erst, wenn Lage und Groesse drei Bilder in
     // Folge unveraendert sind (Notausstieg nach 30 Bildern).
-    let stabilRaf = 0, sig = null, stabil = 0, bilder = 0, fertig = false;
+    let stabilRaf = 0, sig = null, stabil = 0, bilder = 0, fertig = false, bereitGemeldet = false, scrollZuletzt = -1, scrollRuhe = 0;
     const pruefeStabil = () => {
       stabilRaf = 0;
       if (fertig) return;
@@ -2363,8 +2422,13 @@ function DraggablePanel({ children, className, style, zielwahl }) {
         const s2 = `${Math.round(q.left)}|${Math.round(q.top)}|${Math.round(q.width)}|${Math.round(q.height)}`;
         if (s2 === sig) stabil++; else { stabil = 0; sig = s2; }
       }
+      // Heldenzeilen-Lage (Handy): die Kamera faehrt noch — erst einfrieren, wenn das Brett ~20 Bilder lang still steht (hoechstens ~2,5 s), sonst steht das Fenster falsch.
+      const sc0 = kst.genutzt ? document.querySelector('.board-center') : null;
+      if (sc0) { if (Math.abs(sc0.scrollTop - scrollZuletzt) < 0.5) scrollRuhe++; else { scrollRuhe = 0; scrollZuletzt = sc0.scrollTop; } }
       bilder++;
-      if (stabil >= 3 || bilder > 30 || hasCustomPosRef.current) { fertig = true; eingefroren = true; setBereit(true); return; }
+      const ruhig = !sc0 || scrollRuhe >= 20;
+      if ((stabil >= 3 || bilder > 30) && !bereitGemeldet) { bereitGemeldet = true; setBereit(true); }
+      if (hasCustomPosRef.current || (bereitGemeldet && ruhig) || bilder > (sc0 ? 150 : 30)) { fertig = true; eingefroren = true; setBereit(true); return; }
       stabilRaf = requestAnimationFrame(pruefeStabil);
     };
     stabilRaf = requestAnimationFrame(pruefeStabil);
