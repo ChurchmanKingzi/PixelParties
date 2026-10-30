@@ -41,7 +41,7 @@ import anim_lib as L
 import anim_untote as U
 
 N, MS = 48, 60
-PAD_L, PAD_R, PAD_T, PAD_B = 8, 8, 10, 5
+PAD_L, PAD_R, PAD_T, PAD_B = 9, 8, 9, 5
 SCHATTEN = True
 
 spr = L.lade('arcane-eyes')
@@ -162,7 +162,7 @@ def auge(k, i):
     t = lidstufe(k, i)
     if t:
         for y, x in zip(*np.nonzero(INNEN[k])):
-            top = {1: 3, 2: 4, 3: 5}[t] if not (k == 1 and i in KNEIF and t == 1) else 3
+            top = {1: 3, 2: 4, 3: 5}[t]
             if y < top:
                 img[y, x, :3] = A_
             elif y == top:

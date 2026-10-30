@@ -101,8 +101,8 @@ def fan_funken(spalten, ab, formen, vy, abstand=6):
     return res
 
 
-PUFFS1 = PUFFS1 + fan_funken((12, 14, 17, 22, 24, 27 - 1), 3, ('k', 's', 'k'), -12, 6)           # mehr abreißende Funken am Fächer
-PUFFS2 = PUFFS2 + fan_funken((11, 13, 15, 18, 21, 23), 9, ('k', 'k', 's'), -13, 6)
+PUFFS1 = PUFFS1 + fan_funken((12, 14, 17, 22, 24, 20), 3, ('k', 's', 'k'), -12, 6)           # mehr abreißende Funken am Fächer
+PUFFS2 = PUFFS2 + fan_funken((11, 15, 19, 21, 23, 16), 9, ('k', 'k', 's'), -13, 6)
 
 
 def frame(i, partikel=True):

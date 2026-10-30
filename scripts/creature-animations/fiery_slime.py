@@ -21,10 +21,12 @@ Fest bleiben: Mund, Pfützenkontur, die Fußpunkte der Flammenzungen und die Kup
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
 * Feuer (Regel 15), ganz neu gezeichnet mit dem wiederverwendbaren Modul anim_feuer.py (Schnittstelle im Kopf dieser Datei):
-  neun Flammenzungen (Fuß und Breite wie im Original, Höhe 8–13 px), jede aus fünf verschachtelten Farbschichten — dunkelrote Außenhaut A,
+  neun Flammenzungen (Fuß wie im Original, Höhe 9–14 px, unten 3–5 px breit), jede aus fünf verschachtelten Farbschichten — dunkelrote Außenhaut A,
   rote Haut C, oranger Körper B, gelb-orange G, gelber Kern I. JEDE Schicht hat in jeder Pose eigene Höhe, Breite und seitliche Verschiebung:
   die Kerne wandern auf und ab und hin und her, die Farbgrenzen steigen und fallen (auch in den unteren Flammenzeilen 6–13), die Zungen biegen
-  sich nach links/rechts (Neigung + S-Kurve), wachsen und schrumpfen, schmale Zungen spalten ihre Spitze kurz und verschmelzen wieder.
+  sich nach links/rechts (mäßige Neigung + S-Kurve), wachsen und schrumpfen; breite Zungen spalten selten kurz ihre Spitze.
+  Kompakte Formen (Nutzerwunsch): alles, was dünner als 2 px ist, wird abgeschnitten (anim_feuer `faden`): die dunkelrote Außenhaut ist nie
+  ein 1-px-Faden länger als 2 px (geprüft über alle 48 Frames: längster Faden 2), die Zungen laufen oben spitz zu.
   Jede Zunge hat eine eigene Folge aus 12 Posen zu je 2–3 Frames (Zufallsfolge, gegeneinander versetzt, nahtlos über 48 Frames).
   Die Basis steht fest: die Fußpunkte der Zungen und die orange Schleimkuppel (feste Pixel, Zeilen 10–13 des Sprites) ändern sich nicht.
   Beim Strecken des Körpers werden alle Zungen etwas länger, beim Stauchen kürzer.
