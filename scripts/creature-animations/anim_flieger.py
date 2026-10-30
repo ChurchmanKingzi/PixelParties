@@ -31,6 +31,8 @@ Bausteine, die bei mehreren Fliegern gebraucht werden:
                                                stehen (Spaltenversatz legt Innenfarben frei), werden in die Umrissfarbe der jeweiligen Kante gesetzt
     zeilen_stauchen(a, achse_x, s_zeile)       jede Zeile um die senkrechte Achse achse_x auf den Faktor s_zeile[y] ≤ 1 zusammenschieben (Nächster-Nachbar) —
                                                Schmetterlingsflügel klappen zur Körpermitte, je Zeile mit eigenem Faktor (Welle durch den Flügel)
+    drehen(a, pivot_x, pivot_y, winkel)        Ebene als Ganzes um einen Pivot drehen (Nächster-Nachbar, binäres Alpha, nur Quellfarben); positiv = im Uhrzeigersinn auf dem Bild
+    feuer_schichten(a, i, n, heiss, y_ende)    Feuer mit unabhängigen Farbschichten (Regel 15 verschärft): Grenze Rot/Orange/Gelb/Creme je Spalte mit eigener Höhe und Neigung
     kacheln(frames, x0, x1, y0, y1, sc)        Ausschnitt mehrerer Frames nebeneinander, ganzzahlig vergrößert (Nahaufnahme für Nähte)
     stapeln(bilder)                            PIL-Bilder untereinander zu einem Kontrollbild
 """
@@ -457,4 +459,109 @@ def zeilen_stauchen(a, achse_x, s_zeile):
             sx = int(math.floor((x - achse_x) / s + achse_x + 0.5))
             if 0 <= sx < w and a[y, sx, 3]:
                 out[y, x] = a[y, sx]
+    return out
+
+
+def drehen(a, pivot_x, pivot_y, winkel):
+    """Die ganze Ebene um (pivot_x, pivot_y) (Pixelmittelpunkt) drehen: positiv = im Uhrzeigersinn auf dem Bildschirm (y zeigt nach unten).
+    Rückwärtsabbildung mit Nächster-Nachbar: keine Mischfarben, Alpha bleibt 0/255, jede Zielposition holt sich ein Quellpixel (keine Löcher im Inneren).
+    Pixel, die aus der Leinwand gedreht würden, lösen ClipError aus."""
+    h, w = a.shape[:2]
+    out = L.leer(h, w)
+    c, s_ = math.cos(winkel), math.sin(winkel)
+    ys, xs = np.nonzero(a[..., 3])
+    if not len(ys):
+        return out
+    # Vorwärts: wohin würden die Quellpixel wandern (nur zur Randprüfung)
+    for y, x in zip(ys, xs):
+        dx, dy = x - pivot_x, y - pivot_y
+        fx = pivot_x + dx * c - dy * s_
+        fy = pivot_y + dx * s_ + dy * c
+        if not (-0.5 <= fx < w - 0.5 and -0.5 <= fy < h - 0.5):
+            raise L.ClipError(f'Pixel ({x},{y}) würde bei Drehung um {math.degrees(winkel):.0f}° aus der Leinwand {w}×{h} wandern')
+    x0, x1 = int(max(0, xs.min() - 40)), int(min(w, xs.max() + 41))
+    for y in range(h):
+        for x in range(w):
+            dx, dy = x - pivot_x, y - pivot_y
+            sx = int(math.floor(pivot_x + dx * c + dy * s_ + 0.5))
+            sy = int(math.floor(pivot_y - dx * s_ + dy * c + 0.5))
+            if 0 <= sx < w and 0 <= sy < h and a[sy, sx, 3]:
+                out[y, x] = a[sy, sx]
+    return out
+
+
+def feuer_schichten(a, i, n, heiss, y_ende, pose_frames=3, seed=11, amp=(4.0, 3.0, 2.5, 2.0), neigung=1.0, min_zunge=3):
+    """Feuer mit UNABHÄNGIGEN Farbschichten. `heiss` = {Farbe: Stufe} (0 = kühlste Außenhaut, z. B. Rot … 3 = heißer Kern, z. B. Creme).
+    Je Spalte (oberhalb der festen Basis ab Zeile y_ende) liegen die Schichtgrenzen G_j = erste Zeile von oben mit Stufe ≥ j. Jede Grenze bekommt ihre
+    eigene Verschiebung d_j (Zungen = Gipfel der Silhouette, je Zunge und je Grenze eine eigene Pose-Tabelle, Posen à `pose_frames` Frames, Stufen −2…+2,
+    mal amp[j] Pixel; dazu je Zunge/Grenze eine eigene Neigung, die die Verschiebung quer zur Zunge ansteigen lässt): Außenhaut, orange Mitte, gelb und
+    heller Kern schwanken also gegeneinander und auch der helle Kern wandert. Zwischen den Grenzen wird die Spalte linear (Nächster-Nachbar) gedehnt/gestaucht,
+    ab y_ende bleibt alles stehen. Die Grenzen bleiben in Reihenfolge (mindestens 1 px Abstand), jede Spalte reicht durchgehend bis zur Basis → 4-verbunden;
+    die oberste Zeile jeder Zunge behält die Quellfarbe der Spitze (Umriss)."""
+    out = a.copy()
+    h, w = a.shape[:2]
+    kern = list(heiss)
+    stufe_von = lambda y, x: heiss.get(tuple(int(v) for v in a[y, x, :3]), None)
+    spalten = {}
+    for x in range(w):
+        ys = [y for y in np.nonzero(a[:, x, 3])[0] if y < y_ende]
+        if len(ys) < min_zunge:
+            continue
+        yt = int(min(ys))
+        anker = [(yt, 0)]
+        for j in range(1, 4):
+            yj = next((int(y) for y in ys if (stufe_von(y, x) is not None and stufe_von(y, x) >= j)), None)
+            if yj is not None and yj > anker[-1][0]:
+                anker.append((yj, j))
+        spalten[x] = (yt, anker)
+    if not spalten:
+        return out
+    info = {x: (v[0], y_ende) for x, v in spalten.items()}
+    gipfel, zu = _zungen_gipfel(info)
+    k_posen = max(1, n // pose_frames)
+    rng = np.random.RandomState(seed)
+    tab = []
+    for g in range(len(gipfel)):
+        je = []
+        for j in range(4):
+            lv, v = [], int(rng.randint(-2, 3))
+            for _ in range(k_posen):
+                v = int(np.clip(v + int(rng.randint(-2, 3)), -2, 2))
+                lv.append(v)
+            nv, v2 = [], int(rng.randint(-1, 2))
+            for _ in range(k_posen):
+                v2 = int(np.clip(v2 + int(rng.randint(-1, 2)), -1, 1))
+                nv.append(v2)
+            je.append((lv, nv, int(rng.randint(0, k_posen))))
+        tab.append(je)
+    for x, (yt, anker) in spalten.items():
+        g = zu[x]
+        d = []
+        for (yj, j) in anker:
+            lv, nv, off = tab[g][j]
+            p = ((i // pose_frames) + off) % k_posen
+            d.append(int(round(amp[j] * lv[p] / 2.0 + neigung * nv[p] * (x - gipfel[g]) / 3.0)))
+        neu = []
+        for k, (yj, j) in enumerate(anker):
+            v = yj + d[k]
+            if k > 0:
+                v = max(v, neu[-1] + 1)
+            neu.append(v)
+        for k in range(len(neu) - 1, -1, -1):                     # unten begrenzen (Platz bis zur Basis lassen)
+            neu[k] = min(neu[k], y_ende - (len(neu) - k))
+        for k in range(1, len(neu)):
+            neu[k] = max(neu[k], neu[k - 1] + 1)
+        if neu[0] < 0:
+            raise L.ClipError(f'Feuer in Spalte {x} würde oben aus der Leinwand ragen')
+        pk = [(neu[k], anker[k][0]) for k in range(len(anker))] + [(y_ende, y_ende)]
+        out[:y_ende, x] = 0
+        for k in range(len(pk) - 1):
+            y0n, y0 = pk[k]
+            y1n, y1 = pk[k + 1]
+            for yn in range(y0n, y1n):
+                src = y0 + (yn - y0n) * (y1 - y0) / float(y1n - y0n)
+                sy = int(math.floor(src + 0.5))
+                sy = min(max(sy, y0), y1 - 1)
+                if a[sy, x, 3]:
+                    out[yn, x] = a[sy, x]
     return out

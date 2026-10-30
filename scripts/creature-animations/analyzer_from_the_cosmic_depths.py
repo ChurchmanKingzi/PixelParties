@@ -19,9 +19,11 @@ Was ist was (je Auge, Koordinaten relativ zum Auge 0..17 × 0..16; die drei Auge
 Fest bleiben: Kugelform, Fassungsring, die Edelsteinform.
 
 Ablauf (48 Frames à 60 ms = 2,88 s; Frame 0 = Original, Staub und Sterne ausgenommen):
-* Jedes Auge schwimmt für sich: es steigt und sinkt starr bis 2 px (zweistufig 0-1-2-1-0 innerhalb von 24 Frames), die Augen zeitversetzt (Start Frame 0, 12, 24).
-* Der Schwanz (Flossen links vom Augapfel, x < 10) schlägt wie ein Fischschwanz: Spaltenversatz wächst mit dem Abstand zum Augapfel (bis ±2,6 px) mit Wellenlauf
-  (die Spitze hinkt hinterher), Periode 12 innerhalb der Schlagphase (Frame 0–24 jeder Hälfte), die drei Augen mit 1/3-Phasenversatz.
+* Jedes Auge schwimmt für sich: es steigt (Auge 3: sinkt, damit es Auge 2 nie berührt) starr bis 2 px (zweistufig 0-1-2-1-0 innerhalb von 24 Frames), die Augen zeitversetzt (Start Frame 0, 12, 24).
+* Der Schwanz (Flossen links vom Augapfel, x < 10) schlägt wie ein Fischschwanz: je Fächer (oben/unten) zwei STARRE Teile — Basis (x 5–9) bis ±1 px, Spitze (x 0–4)
+  zusätzlich bis ±1 px mit Nachlauf (also bis ±2 px) —, oberer und unterer Fächer mit leicht versetzter Phase (Periode 12 innerhalb der Schlagphase Frame 0–24 und
+  24–48), die drei Augen mit 1/3-Phasenversatz. Warum starr statt Spaltenversatz: die Flossen bestehen aus 1–2 px dünnen Linien, jede Spaltenscherung riss sie auf;
+  die Aufteilung bei x = 4 / x = 9 hält alle Kombinationen 4-verbunden.
 * Glanz am Edelstein (Regel 12/14): ein Lichtband (Rampe F → G → I) läuft diagonal über die Iris, zweimal pro Schleife je Auge (Augen 1/2/3: Start Frame 2+24,
   10+21, 18+19); ein vierzackiger Glitzerstern (Mitte I, Arme G; 3 Frames) blitzt am Glanzpunkt (17,7) auf (Auge 1 Frame 14–16 und 40–42, Auge 2 Frame 22–24 und 6–8
   ab Frame 6, Auge 3 Frame 30–32 und 4–6). Er bleibt am Edelstein.
@@ -58,6 +60,13 @@ AUGEN = [(0, 0), (24, 11), (10, 29)]                  # linke obere Ecke jedes A
 masken = [vorhanden & (xx >= ox) & (xx < ox + 18) & (yy >= oy) & (yy < oy + 17) for (ox, oy) in AUGEN]
 assert sum(int(m.sum()) for m in masken) == int(vorhanden.sum())
 gem = [[(x, y) for y in range(sh) for x in range(sw) if m[y, x] and tuple(spr[y, x, :3]) in (F_, G_, I_)] for m in masken]
+# Schwanzflossen als vier starre Teile je Auge (Regel 11): oberer Fächer (y ≤ 11) und unterer (y ≥ 12), jeder in Spitze (x ≤ 4) und Basis (5 ≤ x ≤ 9);
+# alle Kombinationen von je ±2 px Versatz bleiben 4-verbunden (für diese Aufteilung vorab geprüft). Der Augapfel (x ≥ 10) bleibt am Auge.
+FLOSSEN = []
+for (ox, oy), m in zip(AUGEN, masken):
+    lx, ly = xx - ox, yy - oy
+    FLOSSEN.append([m & (ly <= 11) & (lx <= 4), m & (ly <= 11) & (lx >= 5) & (lx <= 9), m & (ly >= 12) & (lx <= 4), m & (ly >= 12) & (lx >= 5) & (lx <= 9)])
+    assert FLOSSEN[-1][0].any() and FLOSSEN[-1][3].any()
 BOB_START = [0, 12, 24]                               # Start des Schwimm-Hubs je Auge (Dauer 24 Frames)
 BAND = [(2, 24), (10, 31), (18, 37)]                  # Start der zwei Lichtband-Läufe je Auge (je 10 Frames, enden vor Frame 48)
 STERN = [{14: 1, 15: 2, 16: 1, 40: 1, 41: 2, 42: 1}, {22: 1, 23: 2, 24: 1, 6: 1, 7: 2, 8: 1}, {30: 1, 31: 2, 32: 1, 4: 1, 5: 2, 6: 1}]
@@ -92,16 +101,21 @@ def frame(i, nur=None):
     sterne = L.leer(H, W)
     bobs = []
     for k, (ox, oy) in enumerate(AUGEN):
-        lay = teil(masken[k])
+        lay = teil(masken[k] & ~(FLOSSEN[k][0] | FLOSSEN[k][1] | FLOSSEN[k][2] | FLOSSEN[k][3]))   # Augapfel samt Edelstein
         b0, b1 = BAND[k][0], BAND[k][1]
         for start in (b0, b1):                                  # Lichtband über den Edelstein
             if 0 <= i - start <= 10:
                 U.band_diagonal(lay, gem[k], RAMPE, ox + oy + 19 + (i - start), 2, PAD_L, PAD_T)
-        ph = L.sinus(i, 12, 2 * math.pi * k / 3)
-        lay = L.spalten_welle(lay, PAD_L + ox + 10, 2.6 * env, ph, nur_rechts=False, lauf=1.2)
-        bob = int(round(2 * U.buckel(i, BOB_START[k], 24, n=48)))
+        bob = int(round(2 * U.buckel(i, BOB_START[k], 24, n=48))) * (-1 if k == 2 else 1)      # Auge 3 sinkt statt zu steigen (Abstand zu Auge 2)
         bobs.append(bob)
         augen.append((lay, 0, -bob))
+        # Schwanzflossen: starre Teile, Fächer oben/unten mit leicht versetzter Phase (Wellenlauf: die Spitze hinkt hinterher)
+        ph = L.sinus(i, 12, 2 * math.pi * k / 3)
+        for fan, (basis_ph, spitzen_ph) in ((0, (ph, ph - 0.9)), (1, (ph + 0.8, ph - 0.1))):
+            d_basis = int(round(1.4 * env * math.sin(basis_ph)))
+            d_spitze = d_basis + int(round(1.0 * env * math.sin(spitzen_ph)))
+            for teilmaske, dy in ((FLOSSEN[k][2 * fan], d_spitze), (FLOSSEN[k][2 * fan + 1], d_basis)):
+                augen.append((teil(teilmaske), 0, dy - bob))
     koerper = L.zusammen(H, W, augen)
     koerper = U.kontur_schliessen(koerper, UMRISS, A_)           # Regel 16: Umriss an den Flossen in jeder Pose geschlossen
     if nur == 'koerper':

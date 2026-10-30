@@ -78,13 +78,16 @@ for m in (arm_l, arm_r):                                   # nur dunkle Umhangfa
             m[y, x] = False
 kopfteil = vorhanden & ~arm_l & ~arm_r
 
+KANTE0 = Hm.kantenmaske(spr)
+ERLAUBT = Hm.umrissfarben(spr)                                   # Farben der Außenkante im Original (Regel 16)
+
 # Masken für das Lichtband
 def maske(bed):
     return np.array([[bool(vorhanden[y, x] and bed(x, y)) for x in range(sw)] for y in range(sh)])
 
 
-m_rohr = maske(lambda x, y: y <= 10 and f(x, y) in PIPE_RAMPE)
-m_band = maske(lambda x, y: 13 <= y <= 16 and f(x, y) in BAND_RAMPE and x not in range(9, 13))
+m_rohr = maske(lambda x, y: y <= 10 and f(x, y) in PIPE_RAMPE and not KANTE0[y, x])            # nur Innenpixel (Randpixel = Umriss bleiben)
+m_band = maske(lambda x, y: 13 <= y <= 16 and f(x, y) in BAND_RAMPE and x not in range(9, 13) and not KANTE0[y, x])
 m_bart = maske(lambda x, y: y >= 16 and 6 <= x <= 15 and f(x, y) in BART_RAMPE)
 m_tuch = maske(lambda x, y: (arm_l[y, x] or arm_r[y, x]) and f(x, y) in UMHANG_RAMPE)
 
@@ -141,10 +144,13 @@ def frame(i, dampf=True):
     if kopf:
         kp = L.streck_zeile(kp, PAD_T + 16 - brust, kopf)
     hub = brust + kopf
-    # --- Glitzer-Sterne an den Rohrspitzen und am Metallstreifen (mit dem Kopf mitgehoben) ---
+    fig = L.zusammen(H, W, [(al, 0, 0), (ar, 0, 0), (kp, 0, 0)])
+    Hm.kontur_schliessen(fig, ERLAUBT, (0, 0, 0))                 # Regel 16: Außenkante in jeder Pose in Umrissfarbe (z. B. am Umhang)
+    # --- Glitzer-Sterne an den Rohrspitzen und am Metallstreifen (Effekt über der Figur, mit dem Kopf mitgehoben) ---
+    gl = L.leer(H, W)
     for (sx, sy, start) in ((2, 1, 10), (19, 1, 26), (16, 13, 40)):
         st = Hm.folge(i, start, [0, 1, 2, 1], N)
-        Hm.stern4(kp, sx, sy - hub, st, WEISS, HELLGRAU, MITTELGRAU, OFF)
+        Hm.stern4(gl, sx, sy - hub, st, WEISS, HELLGRAU, MITTELGRAU, OFF)
     ebenen = []
     if dampf:
         px, py = PAD_L, PAD_T - 1
@@ -158,7 +164,7 @@ def frame(i, dampf=True):
                 dict(x=px + 18, y=py, vx=0, vy=-15, off=20, form='o', wackeln=1.0),
                 dict(x=px + 19, y=py, vx=1, vy=-18, off=36, form='k', wackeln=1.5)]
         ebenen.append((L.puff_ebene(H, W, i, N, spec, {'c': WEISS, 'r': HELLGRAU}), 0, 0))
-    ebenen += [(al, 0, 0), (ar, 0, 0), (kp, 0, 0)]
+    ebenen += [(fig, 0, 0), (gl, 0, 0)]
     return L.zusammen(H, W, ebenen)
 
 
