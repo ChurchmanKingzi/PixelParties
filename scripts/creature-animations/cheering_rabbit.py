@@ -19,6 +19,7 @@ Identifikation (Sprite 30×24, weißer Hase von vorn in violettem Kleid mit je e
 * Körper (x 8–20, Zeilen 12–21): violett/rosa/blaues Kleid, Umrisse R/Z; unten Füße B/E (9–11, 22) (16–18, 22).
 * Arme (links (6–8, 12–14), rechts (19–21, 12–14), lavendelweiß) halten je einen Stab: links x 0–7 Zeilen 7–14, rechts x 20–29 Zeilen 7–17, Cyan J / Türkis K / Marine G.
 * Kein Glanz (Stoff/Fell; die Stäbe sind Plüsch-/Leuchtstoff, keine Edelsteine — Regel 14); keine Partikel. Augen sind schon geschlossen (Lachaugen) → kein Blinzeln, kein Blick.
+Der rechte Pompon wurde in der Quelle doppelt gezeichnet; der untere/äußere zweite wird entfernt (s. DOPPELT im Skript).
 Bleibt fest: Gesicht (außer Zunge), Kleid unter der Taille, Füße am Boden.
 
 Ablauf (48 Frames à 66 ms = 3,2 s), alle Bewegungen unabhängig:
@@ -46,6 +47,10 @@ N, MS = 48, 66
 PAD_L, PAD_R, PAD_T, PAD_B = 2, 2, 4, 2
 
 spr = L.lade('cheering-rabbit')
+# Der rechte Pompon war doppelt (Rückmeldung des Spielgestalters): der untere/äußere zweite Pompon (Rest des Nachbarhasen, 20 Pixel) wird entfernt — übrig bleibt, gespiegelt zum linken, ein einzelner Pompon.
+DOPPELT = [(26, 12), (27, 12), (25, 13), (26, 13), (27, 13), (22, 14), (24, 14), (25, 14), (26, 14), (27, 14), (28, 14), (24, 15), (25, 15), (26, 15), (27, 15), (25, 16), (26, 16), (26, 17), (28, 13), (29, 13)]
+for _x, _y in DOPPELT:
+    spr[_y, _x] = 0
 sh, sw = spr.shape[:2]
 H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
 yy, xx = np.mgrid[0:sh, 0:sw]

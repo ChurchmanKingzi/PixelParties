@@ -17,7 +17,7 @@ Was ist was (x/y im Sprite):
 Fest bleiben: Rad, Lauf-Rumpf (x 18–38), Schaftform des Wischers, Lunten-Form (starr als Ganzes).
 
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, Flamme und Funken ausgenommen):
-* Mündung nickt (Periode 48, einmal pro Schleife): die Mündung (x ≥ 39) hebt sich bis 2 px und senkt sich; Rad und Lauf-Rumpf (x 18–38) stehen.
+* Mündung nickt (Periode 48, einmal pro Schleife): die Mündung (x ≥ 39) hebt sich bis 2 px und senkt sich nur bis 1 px unter die Ruhelage; Rad und Lauf-Rumpf (x 18–38) stehen.
   Die Mündungsspalten verschieben sich gestaffelt in 3er-Gruppen (Abstand zum Rad; kein 1-px-Zacken an der Oberkante), der Lauf ist mehr als 2 Zeilen dick, so bleibt er im 4er-Zusammenhang.
 * Die Lunte (x ≤ 17, starr) mit der Flamme wippt unabhängig ±1 px (Periode 16, dreimal pro Schleife); sie bleibt an der Heckkante des Laufs (x 18) in Kontakt.
 * Brennende Lunte (Regel 15): die Flamme (Gelb (255,255,0) mit hellem Kern (255,255,203); mehr Farben hat der Sprite nicht, Rand/Rot/Orange im Modul gleich Gelb) wird mit anim_feuer.py NEU gezeichnet, Fuß fest auf der Lunte,
@@ -103,6 +103,7 @@ def front_wippe(a, s):
 
 def frame_gross(i, nur=None):
     s = sinz(i, 48)
+    s = s if s > 0 else 0.45 * s                                  # Mündung hebt sich bis 2 px, senkt sich aber nur bis 1 px (Rückmeldung: nicht so weit nach unten schlackern)
     heck_dy = -int(round(1.0 * sinz(i, 16)))                      # Lunte samt Flamme wippt ±1 px (Periode 16, unabhängig von der Mündung)
     ka = KANONE_A.copy()
     # Lichtband über den Lauf (zwei Stufen heller auf der Grau-Rampe), in Quellkoordinaten vor dem Versatz

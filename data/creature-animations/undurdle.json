@@ -4,7 +4,7 @@
   "frameWidth": 23,
   "frameHeight": 17,
   "frames": 48,
-  "frameMs": 66,
+  "frameMs": 100,
   "loop": true,
   "layout": "horizontal",
   "padTop": 2,

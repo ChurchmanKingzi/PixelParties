@@ -18,10 +18,11 @@ Identifikation (Sprite 19×11, weißes Schädel-Schildkrötchen auf dunklem Hint
 Bleibt fest: Schädelpanzer, Augenhöhlen.
 
 Ablauf (48 Frames à 66 ms = 3,2 s), alle Bewegungen unabhängig:
-* Schweben (Periode 12): das ganze Wesen hebt/senkt sich um 1 px.
-* Kopf nickt (Periode 12, 4× pro Schleife): die Kopfspalten x ≤ 4 wandern senkrecht, je weiter vom Panzer desto mehr (Schnabelspitze bis ±2 px); der Ansatz am Panzer bleibt.
-* Schwanz wippt (Periode 16, 3× pro Schleife): die Schwanzspalten x ≥ 15 wandern senkrecht, je weiter vom Panzer desto mehr (Spitze bis ±1 px); der Panzer bleibt.
-* Beine tippen (Frames 10–13 links, 34–37 rechts): das Bein verkürzt sich um eine Zeile (hebt sich 1 px), das andere bleibt.
+* Alles deutlich langsamer (Rückmeldung: zu schnell/hektisch): 100 ms je Frame statt 66, Perioden verdoppelt.
+* Schweben (Periode 24): das ganze Wesen hebt/senkt sich um 1 px.
+* Kopf nickt (Periode 24, 2× pro Schleife): die Kopfspalten x ≤ 4 wandern senkrecht, je weiter vom Panzer desto mehr (Schnabelspitze bis ±2 px); der Ansatz am Panzer bleibt.
+* Schwanz wippt (Periode 48, 1× pro Schleife): die Schwanzspalten x ≥ 15 wandern senkrecht, je weiter vom Panzer desto mehr (Spitze bis ±1 px); der Panzer bleibt.
+* Beine tippen (Frames 8–15 links, 32–39 rechts): das Bein verkürzt sich um eine Zeile (hebt sich 1 px), das andere bleibt.
 * Randpixel-Korrektur (Regel 16): anim_tiere.umriss_schliessen.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
@@ -35,7 +36,7 @@ import numpy as np
 import anim_lib as L
 import anim_tiere as T
 
-N, MS = 48, 66
+N, MS = 48, 100
 PAD_L, PAD_R, PAD_T, PAD_B = 2, 2, 3, 3
 
 spr = L.lade('undurdle')
@@ -53,7 +54,7 @@ koerper = vorhanden & ~kopf & ~schwanz & ~bein_l & ~bein_r
 RAND = T.rand_farben(spr)
 REGEL = T.umriss_regeln(spr, RAND)[2]
 
-BEIN_L, BEIN_R = {10, 11, 12, 13}, {34, 35, 36, 37}
+BEIN_L, BEIN_R = set(range(8, 16)), set(range(32, 40))
 
 
 def teil(maske):
@@ -62,11 +63,11 @@ def teil(maske):
 
 
 def frame(i, nur=None):
-    ph = L.sinus(i, 12)
+    ph = L.sinus(i, 24)
     dy = int(round(-1.0 * math.sin(ph)))                         # Schweben
     k = teil(koerper)
     ko = T.biegen_spalten(teil(kopf), PAD_L + 5, 2.6, ph)
-    sw_ = T.biegen_spalten(teil(schwanz), PAD_L + 14, 1.5, L.sinus(i, 16))
+    sw_ = T.biegen_spalten(teil(schwanz), PAD_L + 14, 1.5, L.sinus(i, 48))
     bl, br = teil(bein_l), teil(bein_r)
     if i in BEIN_L:
         bl = L.heben_unten(bl, PAD_T + 9, 1)

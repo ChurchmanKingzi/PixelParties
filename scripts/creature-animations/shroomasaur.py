@@ -27,7 +27,7 @@ Ablauf (48 Frames à 66 ms = 3,2 s), alle Bewegungen unabhängig:
 * Schwanz schlägt (Periode 16, 3× pro Schleife): die Schwanzspalten (x ≤ 17) wandern senkrecht, je weiter vom Körper desto mehr (Spitze ca. ±3 px); der Ansatz bleibt.
 * Pilzsprosse wiegen (Periode 12, 4× pro Schleife): die Zeilen 7–9 des Sprosses und der Stacheln wandern waagerecht um höchstens 1 px (Zeile 10 bleibt).
 * Hörner zucken (Frames 12–14 und 36–38): die Hornzeilen 0–1 kippen 1 px nach hinten.
-* Blinzeln (Frames 18–20 und 42–44): das Augenpixel (45,5) wird kurz zur Gesichtsfarbe (Lid = Körperfarbe).
+* KEIN Blinzeln: die dunklen Pixel (45,5)/(49,5) sind Nasenlöcher (Rückmeldung des Spielgestalters) und bleiben unverändert.
 * Randpixel-Korrektur (Regel 16): anim_tiere.umriss_schliessen.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
@@ -64,7 +64,7 @@ GESICHT = (131, 194, 228)                                        # F
 AUGE = (45, 5)
 HEBEN = [0] * 6 + [1] * 12 + [0] * 6                             # Periode 24
 HORN = {12, 13, 14, 36, 37, 38}
-BLINK = {18, 19, 20, 42, 43, 44}
+BLINK = set()                                                    # kein Blinzeln: die dunklen Pixel (45,5)/(49,5) sind Nasenlöcher, keine Augen (Rückmeldung)
 
 
 def teil(maske):

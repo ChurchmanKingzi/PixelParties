@@ -17,9 +17,9 @@ Fest bleiben: Helm-/Visierform, Augengröße, Brustpanzer, Becken, Ruhepose.
 Ablauf (48 Frames à 70 ms = 3,36 s; Frame 0 = Original):
 * Scannerblick: das rote Auge wandert im schwarzen Visier hin und her (Frame 0 → 12 rechts, 24 zurück in der Mitte, 36 links; Versatz 0/±1/±2 px, einmal pro Schleife), der Kopf (y 0–8) dreht sich dabei als Block 1 px mit
   (nur bei Versatz ±2: Frame 8–16 nach rechts, 32–40 nach links). Das Auge besteht nur aus den Quellfarben (130,0,0)/(190,0,0), der frei gewordene Platz wird wieder Visier-Schwarz (0,1,0).
-* Blinzeln (Lid = Visier-Schwarz): die obere, dann beide Augenzeilen werden schwarz; zweimal (Frame 17–19 und 41–43).
+* KEIN Blinzeln (Rückmeldung des Spielgestalters); der Scannerblick (Auge wandert) bleibt.
 * Arme: Fäuste/Kolben (x ≤ 4 bzw. ≥ 13, y ≥ 9) heben und senken sich im Gegentakt ±1 px (Periode 16, dreimal pro Schleife) — wie Servos.
-* Beine heben abwechselnd 1 px (Füße y 19–22, je 3 Frames, Periode 24: links Frame 3–5, rechts Frame 15–17).
+* KEIN Fußheben (Rückmeldung des Spielgestalters): beide Füße bleiben am Boden.
 * Metallglanz (Regel 14: der ganze Roboter ist Metall): ein diagonales Lichtband läuft über den Körper (zweimal pro Schleife, Start Frame 6 und 30, 14 Frames, zwei Stufen heller auf der Rampe der Grautöne); Umrisspixel am Rand,
   das Visier und das Auge glänzen nicht.
 Keine Partikel (Roboter: im Zweifel weglassen). Kein Feuer (Regel 15). Randpixel-Test (Regel 16): `U.kontur_schliessen` (Randfarben der Quelle) in jeder Pose; im Ruhebild nichts. Keine gemalten Pixel außer Farben der Quelle.
@@ -120,7 +120,7 @@ def frame_gross(i, nur=None):
     kopf, arml, armr, beinl, beinr, kb = (L.trenne(ganz, _gross(m))[0] for m in (KOPF, ARM_L, ARM_R, BEIN_L, BEIN_R, rest))
     # Auge: Scannerblick und Blinzeln (auf dem Kopf)
     e = blick(i)
-    bl = BLINZ.get(i, 0)
+    bl = 0                                                       # kein Blinzeln (Rückmeldung: der Mech blinzelt nicht)
     for (x, y) in AUGE:
         set_px(kopf, x, y, VISIER)
     farben = {(8, 6): ROT_D, (9, 6): ROT_H, (8, 7): ROT_D, (9, 7): ROT_H}
@@ -132,8 +132,7 @@ def frame_gross(i, nur=None):
     # Arme (Servos im Gegentakt)
     dyl = int(round(sinz(i, 16)))
     dyr = -dyl
-    bl_ = 1 if (i % 24) in (3, 4, 5) else 0
-    br_ = 1 if (i % 24) in (15, 16, 17) else 0
+    bl_ = br_ = 0                                                # kein Fußheben (Rückmeldung: beide Füße bleiben am Boden)
     koerper = L.zusammen(H, W, [(kb, 0, 0), (kopf, hk, 0), (arml, 0, dyl), (armr, 0, dyr), (beinl, 0, -bl_), (beinr, 0, -br_)])
     koerper = U.kontur_schliessen(koerper, UMRISS, KONTUR)
     return koerper
