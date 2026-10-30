@@ -15,9 +15,11 @@ Identifikation (Sprite-Koordinaten x, y):
 * Rechter Flügel (x 27–39, y 0–18, 124 px): ebenso, Wurzel bei (31, 16–18); er ist im Original nicht spiegelgleich zum linken (steht höher), das bleibt so.
 
 Ablauf (48 Frames à 60 ms = 2,88 s):
-* Durchgehender Flügelschlag (Periode 12, viermal pro Schleife): jeder Flügel dreht sich als ganzer Fächer um seine Wurzel am Apfel von der Ausgangshaltung (nach oben-außen, Frame 0 = Original) 62° nach unten; beide
-  Flügel schlagen gleichzeitig und gegengleich (links gegen den Uhrzeigersinn, rechts im Uhrzeigersinn). Der Fächer bleibt beim Drehen offen (keine Spaltenscherung, die ihn flachdrückt), die Pixeltextur der Knochen und der Haut bleibt
-  (Rückwärtsabbildung, Nächster Nachbar); der Abschlag ist etwas schneller als der Aufschlag.
+* Durchgehender Flügelschlag (Periode 12, viermal pro Schleife): jeder Flügel dreht sich als ganzer Fächer um seine Wurzel am Apfel von der Ausgangshaltung (nach oben-außen, Frame 0 = Original) 38° nach unten; beide
+  Flügel schlagen gleichzeitig und gegengleich (links gegen den Uhrzeigersinn, rechts im Uhrzeigersinn); der Abschlag ist etwas schneller als der Aufschlag. Der Fächer bleibt beim Drehen offen (keine Spaltenscherung, die ihn flachdrückt).
+  Damit die Flügel nicht zerfasern, wird die Drehung getrennt gerechnet: Die Flughaut (dicke Fläche, die Knochenpixel darin mit Hautfarbe gefüllt) per Rückwärtsabbildung (Nächster Nachbar), die grauen Fingerknochen
+  (1-px-Linien) per Vorwärtsabbildung ihrer Punkte, zwischen gedrehten Nachbarpunkten wird mit Linien (Bresenham) verbunden — die Knochen bleiben durchgehende Linien. Danach fallen lose Splitter (≤ 3 px, nicht 4-verbunden
+  mit dem Flügel) weg. Nur Farben der Quelle; Pixeltextur der Haut bleibt (Spitzenpixel je Frame 5–15, Original 11; nie ein isoliertes Pixel).
 * Schwebe-Bob zweistufig bis 2 px nach oben (0 → 1 → 2 → 1 → 0, Periode 12): der Körper hebt sich im Abschlag.
 * Der Stiel (die zwei Spitzen) schwingt mit Verzögerung leicht seitlich nach (um die Apfeloberkante, bis 1–2 px an den Spitzen, Periode 12).
 * Blinzeln: die Augen schließen sich für 3 Frames (Frame 26–28), das Lid ist die Apfelfarbe (154,98,114).
@@ -25,7 +27,7 @@ Ablauf (48 Frames à 60 ms = 2,88 s):
 
 Ergänzungen: keine nötig — die Flügel sitzen außen am Körper, nichts Verdecktes wird sichtbar. Wo das Drehen den Flügel von der Wurzel lösen würde, schließt ein Pixel in der Flughautfarbe (95,55,74) die Lücke; Teile, die nur über eine Pixelecke hängen, bekommen ein Eckpixel in der Farbe ihres Randpixels (das Original ist durchgehend 4-verbunden).
 Rahmen: auf die Figur zugeschnitten (Vereinigung aller Frames + 2 px freier Rand, zentriert), keine Effekte außerhalb der Figur.
-Randpixel-Test (Regel 16): Drehen legt nur Farben des Flügels an dessen Ränder, die Flügelrandfarben sind alle in der Quelle Randfarben; zusätzlich randtest.py.
+Randpixel-Test (Regel 16): Drehen legt nur Farben des Flügels an dessen Ränder, die Flügelrandfarben sind alle in der Quelle Randfarben; zusätzlich randtest.py (0 Frames).
 Alle Bewegungen laufen auf der vollen (größeren) Arbeitsleinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle, Alpha nur 0/255.
 """
 import math
