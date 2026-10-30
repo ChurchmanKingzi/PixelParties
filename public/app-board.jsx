@@ -2110,7 +2110,7 @@ function ppTutorialAufmerksamkeit() {
   try {
     if (!window._currentTutorialNum || !(window.ppIsPhone && window.ppIsPhone())) return;
     if (document.querySelector('.textbox-overlay')) { _ppAufmerkSchluessel = ''; return; }   // nach der Textbox neu bewerten
-    if (document.querySelector('.panel-zielwahl')) return;   // ein Zielwahl-Fenster steuert die Kamera selbst (_ppZielwahlPhonelage) — keine zweite Fahrt dagegen
+    if (document.querySelector('.panel-zielwahl')) return;   // ein Zielwahl-Fenster steuert die Kamera selbst (_ppZielwahlLage) — keine zweite Fahrt dagegen
     if (window._touchActive || window.activeDragData) return;
     const sc = document.querySelector('.board-center');
     if (!sc) return;
@@ -2266,37 +2266,50 @@ function _ppKarteUnterPanel(panel, x, y) {
   return false;
 }
 
-// ★ HANDY: Zielwahl-Fenster ueber/unter der HELDENZEILE statt mittendrin. Die markierten Helden (Nutzer/Ziele) bilden ein Rechteck; das Fenster sitzt direkt darueber
-// (oder darunter), solange dort im freien Band zwischen den Hand-Leisten Platz ist. Reicht der Platz nicht, faehrt die Kamera die Zeile einmalig an den unteren Bandrand, das
-// Fenster steht dann darueber — gerechnet wird mit der ENDlage nach der Fahrt (`st.ziel`), das Fenster springt also nicht mit. Ohne markierte Helden: `null` (alte Lage).
-function _ppZielwahlPhonelage(el, st) {
+// ★ Zielwahl-Fenster ueber/unter den MOEGLICHEN ZIELEN (Helden, Creatures, Support-/Ability-Zonen, Permanents ...) statt mittendrin. Alle markierten Ziele im Brett bilden ein Rechteck;
+// das Fenster sitzt direkt darueber (oder darunter), solange dort im freien Band Platz ist — nie naeher als `ZW_RAND` an Bildschirmrand oder Hand-Leisten. Handy: reicht der Platz nicht,
+// faehrt die Kamera das Rechteck einmalig so, dass Ziele + Fenster ins Band passen; gerechnet wird mit der ENDlage nach der Fahrt (`st.ziel`), das Fenster springt also nicht mit. Passt
+// es auch dann nicht (Ziele ueber das ganze Brett verstreut), sitzt es auf der Seite mit mehr freiem Platz und deckt moeglichst wenig ab. Ohne markierte Ziele: `null` (alte Lage).
+// Desktop (`phone` falsch): keine Kamera; nur bei NICHT-Helden-Zielen (Helden-Zielwahl bleibt zwischen den mittleren Helden, siehe `_ppZielwahlMitte`).
+const ZW_ZIEL_SEL = '.potion-target-valid, .board-zone-play-target, .attach-pick-target, .chain-pick-valid, .zone-pick-target, .zone-bounce-place-target';
+const ZW_RAND = 10;
+function _ppZielwahlLage(el, st, phone) {
   const sc = document.querySelector('.board-center');
   if (!sc) return null;
-  let l = Infinity, t = Infinity, rr = -Infinity, b = -Infinity;
-  document.querySelectorAll('[data-hero-zone].potion-target-valid, [data-hero-zone].board-zone-play-target, [data-hero-zone].attach-pick-target, [data-hero-zone].chain-pick-valid').forEach((z) => {
+  let l = Infinity, t = Infinity, rr = -Infinity, b = -Infinity, nurHelden = true;
+  sc.querySelectorAll(ZW_ZIEL_SEL).forEach((z) => {
+    if (el.contains(z)) return;
     const q = _ppUnskaliertesRechteck(z);
-    if (!q.height) return;
+    if (!q.height || !q.width) return;
+    if (!z.hasAttribute('data-hero-zone')) nurHelden = false;
     l = Math.min(l, q.left); t = Math.min(t, q.top); rr = Math.max(rr, q.right); b = Math.max(b, q.bottom);
   });
   if (!isFinite(l)) return null;
+  if (!phone && nurHelden) return null;
   const pr = el.getBoundingClientRect();
   const ph = pr.height;
-  const bandT = _ppCamVarPx('--mob-opphand-h'), bandB = window.innerHeight - _ppCamVarPx('--mob-mehand-h');
+  const bandT = (phone ? _ppCamVarPx('--mob-opphand-h') : 0) + ZW_RAND, bandB = window.innerHeight - (phone ? _ppCamVarPx('--mob-mehand-h') : 0) - ZW_RAND;
   const rand = 6, hoch = ph + rand * 2;
-  const rest = (st.ziel != null) ? st.ziel - sc.scrollTop : 0;   // noch ausstehende Kamerafahrt
+  const rest = (phone && st.ziel != null) ? st.ziel - sc.scrollTop : 0;   // noch ausstehende Kamerafahrt
   let tt = t - rest, bb = b - rest;
+  const oben = tt - bandT, unten = bandB - bb;
   let y;
-  if (tt - bandT >= hoch) y = tt - rand - ph / 2;
-  else if (bandB - bb >= hoch) y = bb + rand + ph / 2;
-  else if (st.ziel == null && (bb - tt) + hoch <= bandB - bandT) {
+  if (oben >= hoch) y = tt - rand - ph / 2;
+  else if (unten >= hoch) y = bb + rand + ph / 2;
+  else if (phone && st.ziel == null && (bb - tt) + hoch <= bandB - bandT) {
     const maxY = Math.max(0, sc.scrollHeight - sc.clientHeight);
     const ziel = Math.max(0, Math.min(maxY, sc.scrollTop + (bb - (bandB - rand))));
     if (Math.abs(ziel - sc.scrollTop) >= 4) { st.ziel = ziel; if (!window._touchActive) _ppCamFahre(sc, sc.scrollLeft, ziel); }
     const rest2 = (st.ziel != null) ? st.ziel - sc.scrollTop : 0;
     y = (t - rest2) - rand - ph / 2;
-  } else y = bandT + rand + ph / 2;
+  } else y = (oben >= unten) ? tt - rand - ph / 2 : bb + rand + ph / 2;
+  // nie zu nah am Rand: Fenster komplett im freien Band halten
+  y = Math.max(bandT + ph / 2, Math.min(bandB - ph / 2, y));
   const scr = sc.getBoundingClientRect();
-  return { x: (scr.left + scr.right) / 2, y, luecke: 8 };
+  // waagerecht ueber den Zielen, aber im Brett und mit Abstand zu dessen Rand (Seitenleisten/Stapel bleiben frei)
+  const halb = pr.width / 2, xMin = scr.left + halb + ZW_RAND, xMax = scr.right - halb - ZW_RAND;
+  const x0 = phone ? (scr.left + scr.right) / 2 : (l + rr) / 2;
+  return { x: xMin <= xMax ? Math.max(xMin, Math.min(xMax, x0)) : (scr.left + scr.right) / 2, y, luecke: 8 };
 }
 
 function DraggablePanel({ children, className, style, zielwahl }) {
@@ -2321,12 +2334,13 @@ function DraggablePanel({ children, className, style, zielwahl }) {
     const kst = { ziel: null, genutzt: false };
     const messen = () => {
       const el = panelRef.current;
-      if (el && window.ppIsPhone && window.ppIsPhone()) {
-        const p = _ppZielwahlPhonelage(el, kst);
+      if (el) {
+        const phone = !!(window.ppIsPhone && window.ppIsPhone());
+        const p = _ppZielwahlLage(el, kst, phone);
         if (p) {
-          kst.genutzt = true;
-          const rand = 4;
-          const x = Math.max(el.getBoundingClientRect().width / 2 + rand, Math.min(window.innerWidth - el.getBoundingClientRect().width / 2 - rand, p.x));
+          if (phone) kst.genutzt = true;
+          const rand = 8, bw = el.getBoundingClientRect().width;
+          const x = Math.max(bw / 2 + rand, Math.min(window.innerWidth - bw / 2 - rand, p.x));
           return { x: Math.round(x), y: Math.round(p.y), luecke: p.luecke };
         }
       }
