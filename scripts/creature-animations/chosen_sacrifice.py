@@ -21,8 +21,8 @@ Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, Partikel und Glanz ausg
 * Blinzeln (Lid = umgebendes Gold): die blauen Augenpixel werden 3 Frames lang zu Gold, zweimal pro Schleife (Frame 15–17 und 39–41). Kein Glühen, kein Farbtausch sonst.
 * Glanz auf dem Gold (Regel 12/14: Gold glänzt): ein diagonales Lichtband (x + y, 3 px) läuft zweimal pro Schleife über den Helm (Start Frame 4 und 28, 12 Frames, jede Goldfarbe zwei Stufen heller), dazu blitzen
   vierzackige Glitzersterne (Mitte (251,242,120), Arme (228,178,30); 3 Frames, Arme 1 → 2 → 1 px) an den Helmlichtern (8,3) und (1,3) (Frame 10–12 / 14–16 und 34–36 / 38–40) und am Gürtel (7,20) (Frame 22–24 und 43–45); sie gehen mit dem Schweben mit.
-* Goldstaub (Partikel, hinter der Figur, 7 Stück, Lebensdauer 48 Frames, langsam aufsteigend, leichtes Wabern, wachsen/schrumpfen, Form k = 1-px-Funke): goldene (228,178,30) und helle (251,242,120) Funken umschweben die Figur
-  (keine größeren Kugeln, damit nichts wie ein schwebender Ball wirkt).
+* Goldwölkchen (Partikel, hinter der Figur, 5 Stück, Lebensdauer 48 Frames, langsam aufsteigend, leichtes Wabern): kleine runde goldene Wölkchen, die 2×2 → 3×3 → 2×2 wachsen und schrumpfen (nie kleiner als 2×2,
+  keine einzelnen Pixel; `U.wolke_ebene`), Kern (228,178,30)/(251,242,120), Rand (179,119,0)/(228,178,30); sie steigen links/rechts am Helm und am Körper auf, nicht abseits.
 Regel 15 entfällt (das Feuer der Karte ist nicht im Sprite). Randpixel-Test (Regel 16): `U.kontur_schliessen` (Umrissfarbe (49,24,0)) in jeder Pose; im Ruhebild nichts. ERGÄNZUNG: keine gemalten Pixel.
 Zuschnitt: der Frame ist auf die Figur zugeschnitten (symmetrisch um die Ruhefigur; Partikel und Sterne vergrößern ihn höchstens 2 px darüber hinaus, dazu 1 px leerer Rand). Alle Bewegungen laufen auf der
 vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
@@ -72,19 +72,17 @@ STERN_MITTE, STERN_ARM = (251, 242, 120), (228, 178, 30)
 assert col(8, 3) == STERN_MITTE and col(1, 3) == STERN_MITTE and col(7, 20) == STERN_MITTE
 STERNE = [((8, 3), (10, 34)), ((1, 3), (14, 38)), ((7, 20), (22, 43))]      # (Position, (Start 1, Start 2))
 
-GOLD1 = {'c': (228, 178, 30), 'r': (179, 119, 0)}
-GOLD2 = {'c': (251, 242, 120), 'r': (251, 242, 120)}
+GOLD1 = {'c': (228, 178, 30), 'r': (179, 119, 0)}                # Wölkchen: Kern Gold, Rand dunkles Gold
+GOLD2 = {'c': (251, 242, 120), 'r': (228, 178, 30)}               # Wölkchen: Kern hell, Rand Gold
 P = lambda x, y: (GPL + x, GPT + y)
-PUFFS1 = [
-    dict(x=P(0, 14)[0], y=P(0, 14)[1], vx=-1, vy=-9, off=0, form='k', wackeln=1),
-    dict(x=P(13, 18)[0], y=P(13, 18)[1], vx=1, vy=-9, off=22, form='k', wackeln=1),
-    dict(x=P(3, 4)[0], y=P(3, 4)[1], vx=-1, vy=-5, off=36, form='k', wackeln=1),
+PUFFS1 = [                                                         # 2×2 → 3×3 → 2×2, langsam aufsteigend; Startpunkte am Rand der Figur, damit sie nicht hinter dem Körper verschwinden
+    dict(x=P(0, 15)[0], y=P(0, 15)[1], vx=-1, vy=-8, off=0, wackeln=0.3),
+    dict(x=P(13, 18)[0], y=P(13, 18)[1], vx=1, vy=-8, off=20, wackeln=0.3),
+    dict(x=P(0, 7)[0], y=P(0, 7)[1], vx=-1, vy=-5, off=34, wackeln=0.3),
 ]
 PUFFS2 = [
-    dict(x=P(11, 5)[0], y=P(11, 5)[1], vx=1, vy=-6, off=8, form='k', wackeln=1),
-    dict(x=P(-1, 22)[0], y=P(-1, 22)[1], vx=-1, vy=-10, off=18, form='k', wackeln=1),
-    dict(x=P(14, 10)[0], y=P(14, 10)[1], vx=1, vy=-8, off=30, form='k', wackeln=1),
-    dict(x=P(7, 1)[0], y=P(7, 1)[1], vx=0, vy=-4, off=42, form='k', wackeln=1),
+    dict(x=P(13, 6)[0], y=P(13, 6)[1], vx=1, vy=-5, off=8, wackeln=0.3),
+    dict(x=P(13, 24)[0], y=P(13, 24)[1], vx=1, vy=-9, off=28, wackeln=0.3),
 ]
 
 
@@ -136,7 +134,7 @@ def _glut(*a, **k):
     """Partikelebene (leer, wenn nur die Figur gerendert wird — für den Zuschnitt)."""
     if _OHNE_PARTIKEL[0]:
         return L.leer(a[0], a[1])
-    return U.glut_ebene(*a, **k)
+    return U.wolke_ebene(*a, **k)
 
 
 # Zuschnitt auf die Figur: symmetrisch um die Ruhefigur; Partikel und Sterne dürfen den Frame höchstens 2 px über den Figurenrand hinaus vergrößern

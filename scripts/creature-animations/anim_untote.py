@@ -276,3 +276,31 @@ def beschneiden(f, box):
     sx0, sy0, sx1, sy1 = max(x0, 0), max(y0, 0), min(x1, w), min(y1, h)
     out[sy0 - y0:sy1 - y0, sx0 - x0:sx1 - x0] = f[sy0:sy1, sx0:sx1]
     return out
+
+
+# Runde Wölkchen ohne 1-px-Stufen (Nutzerkonvention: keine einzelnen Fehlpixel): 2×2 → 3×3 → 2×2
+WOLKE_FORMEN = {
+    's': L.PUFF_FORMEN['s'],                                                         # 2×2: Kern (0,0), Rand 3 Pixel
+    'd': [(dx, dy, 'c' if (dx, dy) == (0, 0) else 'r') for dy in (-1, 0, 1) for dx in (-1, 0, 1)],     # 3×3
+}
+
+
+def wolke_ebene(h, w, i, n, puffs, farben, rand=0.08):
+    """Wie `glut_ebene`, aber die Wölkchen sind nie kleiner als 2×2: sie wachsen 2×2 → 3×3 → 2×2 (fehlen in den ersten/letzten `rand` ihrer Lebensdauer ganz).
+    puffs: dict(x, y, vx, vy, off, wackeln) wie bei L.puff_ebene; farben = {'c': Kern, 'r': Rand}. ClipError, wenn ein Wölkchen aus der Leinwand ragt."""
+    out = L.leer(h, w)
+    for pf in puffs:
+        t = ((i + pf.get('off', 0)) % n) / n
+        if t < rand or t > 1 - rand:
+            continue
+        cx = pf['x'] + pf.get('vx', 0) * t + pf.get('wackeln', 0) * math.sin(2 * math.pi * t)
+        cy = pf['y'] + pf.get('vy', 0) * t
+        cx, cy = int(round(cx)), int(round(cy))
+        form = 'd' if 0.3 <= t < 0.7 else 's'
+        for (dx, dy, k) in WOLKE_FORMEN[form]:
+            x, y = cx + dx, cy + dy
+            if not (0 <= y < h and 0 <= x < w):
+                raise L.ClipError(f'Wölkchen bei ({x},{y}) liegt außerhalb der Leinwand {w}×{h}')
+            out[y, x, :3] = farben[k]
+            out[y, x, 3] = 255
+    return out
