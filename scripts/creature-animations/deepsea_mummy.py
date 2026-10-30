@@ -81,7 +81,7 @@ P = lambda x, y: (GPL + x, GPT + y)
 BLASEN_N = 24                                                   # Lebensdauer 24 Frames, zweimal pro Schleife
 PUFFS = [dict(x=P(-2, 5)[0], y=P(-2, 5)[1], vx=1, vy=-7, off=0, wackeln=0)]
 STAUB_N = 24
-STAUB = [dict(x=P(19, 19)[0], y=P(19, 19)[1], vx=0, vy=6, off=2), dict(x=P(19, 19)[0], y=P(19, 19)[1], vx=0, vy=6, off=14)]
+STAUB = [dict(x=P(19, 18)[0], y=P(19, 18)[1], vx=0, vy=8, off=2), dict(x=P(19, 18)[0], y=P(19, 18)[1], vx=0, vy=8, off=14)]
 STAUBFARBE = {'c': C_, 'r': B_}
 
 
