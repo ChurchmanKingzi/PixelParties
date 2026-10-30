@@ -22,8 +22,8 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos) — der Künstler MALT sein Gemäl
   (heranführen, auftupfen = Pinsel 1 px nach rechts, zurück); im Auftupf-Frame färbt sich die Farbzeile (x 8–10) um: Zeile 4 blau→grün, 5 blau→orange, 6 rot→blau, 7 rot→grün, 8 rot→orange,
   9 rot→blau. Frames 25–42: derselbe Weg von unten nach oben, dabei übermalt der Künstler die Zeilen wieder in den Originalfarben. Frames 43–47: der Arm senkt sich zurück zur Hüfte,
   der Pinsel hängt wieder; Frame 48 = Frame 0 (nahtlos).
-* Der Arm ist neu gezeichnet (nur Quellfarben: Hautbraun J/Y, Hand/Pinsel aus dem Sprite): Hand und Pinsel sind die Original-Pixel (der Pinsel gedreht), der Unterarm eine 2 px breite Linie
-  von der Ärmelmanschette (1–2, 21) zur Hand. Ergänzt wird der Körperumriss, der sonst vom Pinsel verdeckt war: (6,26), (6,30), (6,31) in Umrissfarbe A (23,21,22).
+* Der Arm ist neu gezeichnet (nur Quellfarben: Hautbraun J/Y, Hand/Pinsel aus dem Sprite): Hand und Pinsel sind die Original-Pixel (der Pinsel gedreht), der Arm eine 3 px breite Linie
+  von der Schulter (links neben dem Puffärmel) zur Hand (unten grauer Ärmel A|B|C, ab dem Ellbogen brauner Unterarm J|Y|J). Ergänzt wird der Körperumriss, der sonst vom Pinsel verdeckt war: (6,26), (6,30), (6,31) in Umrissfarbe A (23,21,22).
 * Auf und ab (zweistufig, Periode 24 = zweimal pro Schleife): Brust zuerst 1 px (Zeile 32 des Anzugs wird einmal doppelt eingefügt: Schultern, Arme, Pinsel und Bild steigen, Beine/Schuhe bleiben),
   das Bild läuft 3 Frames nach und hebt sich um ein weiteres px (Zeile 13, Schulterlinie, wird verlängert): Bild 0 → 1 → 2 → 1 → 0 px, Brust 0 → 1 → 0. Der Malarm folgt dem Bild (Hand und Pinsel
   steigen mit dem Gemälde, der Unterarm streckt sich dabei).
@@ -58,6 +58,7 @@ def f(x, y):
 # Farben des Sprites
 Z, V, UMRISS = f(7, 35), f(8, 35), f(3, 28)         # Z (225,215,217) weiß, V (189,189,189) silber, A (23,21,22) Umriss
 HAUT_J, HAUT_Y = f(2, 21), f(3, 23)                 # J (156,105,62) Hautbraun, Y (245,203,161) Hautlicht
+ARMEL_B, ARMEL_C = f(4, 27) if False else (124, 112, 112), (91, 82, 83)     # Ärmel grau (Puffärmel-Farben B/C des Sprites)
 GOLD = [(63, 31, 15), (103, 64, 32), (136, 95, 49), (156, 105, 62), (175, 127, 64), (199, 159, 97), (232, 200, 136)]
 G_HELL, P_GOLD = GOLD[-1], GOLD[-2]
 
@@ -160,14 +161,22 @@ def arm_zeichnen(k, c, dab, brust, kopf):
         px[(hx + (x - 2), hy + (y - 21) + dy)] = col
     for (x, y), col in pinsel_waagerecht(hx + 4, hy + 1).items():
         px[(x, y + dy)] = col
-    # Unterarm: 2 px breite Linie von der Handunterkante (hy + 5) zur Manschette (Zeile 21 − brust), links neben der Schulter
-    y_oben, y_unten = hy + 5 + dy, 21 - brust
-    ax, bx = hx + 1.5, 1.0                                   # Handmitte unten → Manschette
+    # Arm: 3 px breite Linie von der Schulter (links neben dem Puffärmel, Zeile 16 − brust) zur Handunterkante: unten der graue Ärmel (A | B | C), ab dem Ellbogen
+    # (55 %) der braune Unterarm (J | Y/J | J). Beide Teile aus Sprite-Farben.
+    y_oben, y_unten = hy + 5 + dy, 16 - brust
+    ax, bx = hx + 1.5, 2.0                                   # Handmitte unten → Schulter
+    grenze = y_oben + 0.55 * (y_unten - y_oben)
     for y in range(y_oben, y_unten + 1):
         s = 0.0 if y_unten == y_oben else (y - y_oben) / float(y_unten - y_oben)
         x = int(round(ax + (bx - ax) * s))
-        px[(x, y)] = HAUT_J
-        px[(x + 1, y)] = HAUT_Y if (y % 2 == 0) else HAUT_J
+        if y <= grenze:                                      # Unterarm (nackt)
+            px[(x - 1, y)] = HAUT_J
+            px[(x, y)] = HAUT_Y if (y % 2 == 0) else HAUT_J
+            px[(x + 1, y)] = HAUT_J
+        else:                                                # Ärmel
+            px[(x - 1, y)] = UMRISS
+            px[(x, y)] = ARMEL_B
+            px[(x + 1, y)] = ARMEL_C
     return px
 
 

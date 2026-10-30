@@ -125,6 +125,35 @@ def haengend_schwingen(a, blocker, pivot_y, amp, phase, umriss_farben, lauf=0.0,
     return neu
 
 
+def rand_farben(spr):
+    """Farben aller Außenkanten-Pixel des Original-Sprites (Pixel mit einer 4er-Kante zum Hintergrund) = die Umrissfarben."""
+    m = L.deckend(spr)
+    p = np.pad(m, 1)
+    an_frei = (~p[:-2, 1:-1]) | (~p[2:, 1:-1]) | (~p[1:-1, :-2]) | (~p[1:-1, 2:])
+    return sorted({rgb(spr, x, y) for y, x in zip(*np.nonzero(m & an_frei))})
+
+
+def umriss_schliessen(a, umriss_farben, regel):
+    """Randpixel-Test (Regel 16) als Korrektur: Jedes Pixel in einer FÜLLfarbe (nicht in `umriss_farben`), das mit einer 4er-Kante an freien
+    Hintergrund grenzt, bekommt dort einen Umrisspixel (Farbe regel[Füllfarbe], aus dem Original abgeleitet, siehe umriss_regeln).
+    Es werden NUR Umrisspixel ergänzt; an einem Frame ohne offene Kante ändert sich nichts. Auf die Körper-Ebenen anwenden (ohne Partikel)."""
+    out = a.copy()
+    m = L.deckend(a)
+    h, w = m.shape
+    ok = {tuple(c) for c in umriss_farben}
+    for y, x in zip(*np.nonzero(m)):
+        c = rgb(a, x, y)
+        if c in ok:
+            continue
+        uc = regel.get(c, umriss_farben[0])
+        for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            yy, xx = y + dy, x + dx
+            if 0 <= yy < h and 0 <= xx < w and not m[yy, xx] and not out[yy, xx, 3]:
+                out[yy, xx, :3] = uc
+                out[yy, xx, 3] = 255
+    return out
+
+
 def zucken_zeilen(a, pivot_y, dx_oben, anteile=None, innen=None):
     """Ohr/Fühler zuckt: Zeilen oberhalb von `pivot_y` (nur Zeilen < pivot_y) weichen um dx_oben · Anteil seitlich aus.
     anteile = {Zeile: Anteil 0…1}; Standard: linear vom Ansatz (0) zur Spitze (1). Ganze Pixel, Zeilen bleiben zusammenhängend,
