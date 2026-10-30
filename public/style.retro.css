@@ -11256,7 +11256,8 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 /* Lotse: pulsierender Schein aussen um den Wirt. Fester Schatten, es
    pulsiert nur seine Deckkraft (Compositor statt Neuzeichnen). */
 .pp-lotse { --lotse-farbe: #58238c; position: relative; }
-.pp-lotse-schein { position: absolute; inset: 0; pointer-events: none; border-radius: 0; box-shadow: 0 0 0 4px var(--lotse-farbe), 0 0 0 8px color-mix(in srgb, var(--lotse-farbe) 45%, #08060c); opacity: .45; animation: pp-lotse-puls 2.4s steps(24, end) infinite; }
+.pp-lotse-schein { position: absolute; inset: -16px; pointer-events: none; opacity: .45; animation: pp-lotse-puls 2.4s steps(24, end) infinite; }
+.pp-lotse-schein::before { content: ''; position: absolute; inset: 16px; box-shadow: 0 0 0 4px var(--lotse-farbe), 0 0 0 8px color-mix(in srgb, var(--lotse-farbe) 45%, #08060c); }
 @keyframes pp-lotse-puls {
   0%, 100% { opacity: var(--lotse-min, .3); }
   50%      { opacity: 1; }
@@ -11270,18 +11271,18 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
    klassische „hier klicken"-Zeichen. Der Ring waechst ueber `inset`
    (feste Pixel ringsum, bei breiten wie hohen Wirten gleich) — ein
    einzelner kleiner Kasten, das kostet nichts Nennenswertes. */
-.pp-lotse-schein::after { content: ''; position: absolute; inset: 0; border: 2px solid var(--lotse-farbe); border-radius: 0; opacity: 0; animation: pp-lotse-ping 2.4s steps(24, end) infinite; }
+.pp-lotse-schein::after { content: ''; position: absolute; inset: 16px; border: 2px solid var(--lotse-farbe); opacity: 0; animation: pp-lotse-ping 2.4s steps(8, end) infinite; }
 @keyframes pp-lotse-ping {
-  0%   { inset: 0; opacity: .95; }
-  70%  { inset: -16px; opacity: 0; }
-  100% { inset: -16px; opacity: 0; }
+  0%   { inset: 16px; opacity: .95; }
+  70%  { inset: 0; opacity: 0; }
+  100% { inset: 0; opacity: 0; }
 }
 /* ★ v1265, zweiter Anlauf (Al 22.9.: „die Glow-Umrandung des Tutorial-
    Raccoons sollte noch deutlicher sein"). Die Kachel ist gross und steht
    zwischen vielen gleichartigen — sie bekommt einen harten Ring in der
    Lotsenfarbe, einen breiteren Schein und faellt im Puls nie unter 65 %. */
 .vscpu-raccoon { --lotse-min: .35; }
-.vscpu-raccoon > .pp-lotse-schein { box-shadow: 0 0 0 4px var(--lotse-farbe), 0 0 0 8px var(--lotse-farbe), 0 0 0 12px color-mix(in srgb, var(--lotse-farbe) 45%, #08060c); }
+.vscpu-raccoon > .pp-lotse-schein::before { box-shadow: 0 0 0 4px var(--lotse-farbe), 0 0 0 8px var(--lotse-farbe), 0 0 0 12px color-mix(in srgb, var(--lotse-farbe) 45%, #08060c); }
 .pp-lotse:disabled > .pp-lotse-schein,
 .pp-lotse:disabled > .pp-glanz { display: none; }
 @media (prefers-reduced-motion: reduce) {

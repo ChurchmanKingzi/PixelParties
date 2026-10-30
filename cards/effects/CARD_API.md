@@ -26595,3 +26595,16 @@ Zählt im Quelltext je Einheit (`reg:<Schlüssel>` = `ANIM_REGISTRY`-Eintrag, `k
 ### Bekannte Grenzen
 
 Kreis-/Ring-Animationen, deren **Größe** animiert wird (`border-radius: 50%` + `border`): der Browser malt den Bogen als Vektor (Alpha am Rand) — eigenes Pixel-Ring-Sprite nötig. Drehender Text (`?`, Schrift) und SVG-Formen mit `opacity`-Attribut. `filter: brightness()/hue-rotate()` und `mix-blend-mode` (Farbmischung mit dem Hintergrund) bleiben Sache der einzelnen Animation. Glyphen außerhalb der Pixel-Emoji-Schrift (z. B. das Symbol in `ox_impact`) rendert das System. Das erste Backen einer großen Animation kostet Hauptthread-Zeit (Explosion: ~70 Elemente ≈ 100–200 ms auf dem Desktop; das Telefon rechnet mit 40 % der Teilchen).
+
+## Welle 86 / W86u2 – Pixelart ausserhalb des Duells (Titel, Menue, Shop, Dialoge, Konfetti)
+
+Bausteine in `public/app-shared.jsx`, die neue Oberflaechen-Animationen nutzen sollen (die Pipeline aus W86z backt nur Bewegung; diese Teile ersetzen, was sie nicht loest):
+
+* **`<PpVerlauf gradient="radial-gradient(...)" px={4} className style retroGradient retroBlend />`** — Schein/Schleier als Dither-Pixelbild in Elementgroesse (Bayer zwischen den Farbstopps, Alpha wird deckend/leer, Palette). Gross-/Vollflaechen, die frueher `radial-gradient` mit Alpha (+ `mix-blend-mode: screen`) trugen. `ppPxVerlaufUrl(gradient, W, H, px)` hat dafuer den vierten Parameter `px` (Kunstpixel in CSS-px, bis 720 Pixel je Seite); `ellipse RX% RY% at X% Y%` wird gelesen. Eine Dither-MASKE (Pipeline-Fade) schneidet alles ausserhalb der Elementbox ab: Ringe/`box-shadow` einer Ebene, die per `opacity` blendet, gehoeren auf ein KIND innerhalb ihrer Box (Beispiel `.pp-lotse-schein::before`).
+* **`ppPixelPartikel(canvas, teile, { px, onFertig, maxMs })`** — Canvas-Partikelmaschine fuer Konfetti/Funken: ganze Kunstpixel (Zelle `px`), 30 Hz (`ppTaktRaf`), Dither statt `globalAlpha`, Formen `circle|diamond|star|spark` als Pixelsprites, keine Drehung, kein `shadowBlur`. Beispiel: `PurchaseCelebration` (app-screens.jsx).
+* **`<PpLogoBild />`** — das Logo in Spielerfarbe als EIN fertig gerechnetes Pixelbild (Tint = Bild × Farbe in der Maske, Licht, Umriss, Palette; `ppLogoUrl(farbe, umriss)`). Ersetzt die drei Deckschichten mit `mix-blend-mode: multiply` (die fallen ohne Mischmodus auseinander).
+* **`--pp-kachel-N`** (style.css, `N` = 1…15) — dunkle Dither-Kachel (8 px) fuer Verdunkler hinter Dialogen: `background: var(--pp-kachel-11) 0 0 / 8px 8px;` ersetzt `rgba(0,0,0,.7)` (Dichte N/16). Genutzt von `.modal-overlay`, `.textbox-overlay`, `.cmp-gameover`, `.cmp-modal-overlay`.
+* **`PixelParticles`** (app-screens.jsx): Parameter `gerade` (Standard `true`) rundet Teilchengroessen auf gerade px; die Schein-Schatten der Teilchen sind weg (harte Quadrate).
+* **Glanzband** (`.pp-glanz-band`): Neigung steckt im Verlaufswinkel (`calc(90deg + var(--band-rot))`), Kern + Schachbrett-Flanken, `ppGlanzFahrt` blendet hart ein/aus; Stellschrauben `--glanz-kern`, `--glanz-flanke`. Kein `rotate()`, kein Blend.
+* Lade-Anzeige (`#boot-splash .bs-ring` in `index.html`): acht 6-px-Quadrate, `steps()` — kein gedrehter Vektorring.
+* Schein in Keyframes: statt `0 0 12px C` gestufte harte Ringe `0 0 0 2px C, 0 0 0 4px C(gedaempft)`; gedaempft = Farbe gemischt mit dem dunklen Grund `#08060c` (deckend, kein Alpha).

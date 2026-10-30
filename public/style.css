@@ -22435,15 +22435,21 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 .pp-lotse { --lotse-farbe: #7e41ba; position: relative; }
 .pp-lotse-schein {
   position: absolute;
-  inset: 0;
+  /* ★ W86u2 (Pixelart): der Schein sind harte Ringe (war 0 0 16px 2px + 0 0 40px 10px). Die Pipeline blendet diese Ebene per Dither-MASKE ein und
+     aus — eine Maske schneidet alles ausserhalb der Elementbox ab, ein `box-shadow` AUF der Ebene waere dann unsichtbar. Darum ist die Ebene
+     16 px groesser als der Wirt und die Ringe sitzen auf einem Kind (`::before`, 16 px eingerueckt), also INNERHALB ihrer Box. */
+  inset: -16px;
   pointer-events: none;
-  border-radius: inherit;
-  /* ★ W86u2 (Pixelart): harte Ringe statt Weichzeichner-Schein (war 0 0 16px 2px + 0 0 40px 10px) — innen voll, aussen gedaempft. */
+  opacity: .45;
+  animation: pp-lotse-puls 2.4s ease-in-out infinite;
+}
+.pp-lotse-schein::before {
+  content: '';
+  position: absolute;
+  inset: 16px;
   box-shadow:
     0 0 0 4px var(--lotse-farbe),
     0 0 0 8px color-mix(in srgb, var(--lotse-farbe) 45%, #08060c);
-  opacity: .45;
-  animation: pp-lotse-puls 2.4s ease-in-out infinite;
 }
 @keyframes pp-lotse-puls {
   0%, 100% { opacity: var(--lotse-min, .3); }
@@ -22461,23 +22467,22 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 .pp-lotse-schein::after {
   content: '';
   position: absolute;
-  inset: 0;
+  inset: 16px;
   border: 2px solid var(--lotse-farbe);
-  border-radius: inherit;
   opacity: 0;
-  animation: pp-lotse-ping 2.4s ease-out infinite;
+  animation: pp-lotse-ping 2.4s steps(8, end) infinite;
 }
 @keyframes pp-lotse-ping {
-  0%   { inset: 0;     opacity: .95; }
-  70%  { inset: -16px; opacity: 0; }
-  100% { inset: -16px; opacity: 0; }
+  0%   { inset: 16px; opacity: .95; }
+  70%  { inset: 0;    opacity: 0; }
+  100% { inset: 0;    opacity: 0; }
 }
 /* ★ v1265, zweiter Anlauf (Al 22.9.: „die Glow-Umrandung des Tutorial-
    Raccoons sollte noch deutlicher sein"). Die Kachel ist gross und steht
    zwischen vielen gleichartigen — sie bekommt einen harten Ring in der
    Lotsenfarbe, einen breiteren Schein und faellt im Puls nie unter 65 %. */
 .vscpu-raccoon { --lotse-min: .35; }
-.vscpu-raccoon > .pp-lotse-schein {
+.vscpu-raccoon > .pp-lotse-schein::before {
   box-shadow:
     0 0 0 4px var(--lotse-farbe),
     0 0 0 8px var(--lotse-farbe),

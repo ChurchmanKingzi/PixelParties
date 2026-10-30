@@ -1537,7 +1537,7 @@ function PixelParticles({
   // Ohne beide Angaben verhaelt sich die Komponente exakt wie bisher.
   radial = false,
   farben = null,
-  gerade = false,     // ★ W86u2: Groesse auf gerade px runden (Pixelart-Kreuz, ganze Kunstpixel)
+  gerade = true,      // ★ W86u2: Groesse auf gerade px runden (ganze Kunstpixel, 2 px) — auch fuer Quadrate; `false` = alte Zufallsgroesse
 }) {
   const particles = useMemo(() => {
     const arr = [];
