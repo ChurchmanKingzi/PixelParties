@@ -80,6 +80,17 @@ def teil(maske):
     return L.platz(t, H, W, GPL, GPT)                           # sofort auf die volle Leinwand
 
 
+def wiegen(a, aus):
+    """Zeilenversatz um die Füße (Zeile y 19): wächst linear mit dem Abstand; die Zeilen 0 und 1 bekommen denselben Versatz (die einzelnen Schopf-Spitzen in Zeile 0 hängen nur senkrecht an Zeile 1)."""
+    out = L.leer(*a.shape[:2])
+    for y in range(sh):
+        gy = GPT + y
+        dx = int(round(aus * (19 - max(y, 1)) / 18.0)) if y < 19 else 0
+        for x in np.nonzero(a[gy, :, 3])[0]:
+            out[gy, x + dx] = a[gy, x]
+    return out
+
+
 def frame_gross(i, nur=None):
     aus = 1.6 * math.sin(2 * math.pi * i / 24)                    # Wiegen (0 bei Frame 0)
     drift = int(round(1.0 * math.sin(2 * math.pi * i / 16)))      # senkrecht ±1
@@ -94,7 +105,7 @@ def frame_gross(i, nur=None):
             if y >= 12 - (st - 1):
                 kb[GPT + y, GPL + x, :3] = haut(x, y)
     # Wiegen um die Füße: Zeilenversatz wächst mit dem Abstand zu Zeile y 19 (nur Rumpf/Kopf; die Füße y ≥ 19 stehen)
-    kb = U.haengen(kb, GPT + 19, aus, nach_unten=False)
+    kb = wiegen(kb, aus)
     bl = 1 if (i % 16) in (3, 4, 5) else 0
     br = 1 if (i % 16) in (11, 12, 13) else 0
     koerper = L.zusammen(H, W, [(teil(fuss_l), 0, -bl), (teil(fuss_r), 0, -br), (kb, 0, 0)])

@@ -24,7 +24,7 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos; ruhig und würdevoll):
   (Wangenzeile 8, glatte Haut unter den Augen, wird verlängert): Kopf 0 → 1 → 2 → 1 → 0 px, Brust 0 → 1 → 0.
 * Hände schweben: beide Hände (Spalten 0–3 links und 14–17 rechts) heben und senken sich ±1 px gegeneinander (Periode 24, gegenphasig) — eine ruhige, segnende Geste; die Ärmel bleiben am Körper.
 * Gewichtsverlagerung: der Oberkörper (Zeilen 0–20) schiebt sich 1 px nach rechts (Frames 10–21) und später 1 px nach links (Frames 34–45); die Füße bleiben stehen.
-* Kopfneigen: der Kopf (Zeilen 0–8) neigt sich 1 px nach links (Frames 2–7) und rechts (Frames 26–31); der Bart (Zeilen 9–10) bleibt hängen.
+* Kopfneigen: der Kopf (Zeilen 0–8) neigt sich 1 px nach links (Frames 2–7) und rechts (Frames 22–25); der Bart (Zeilen 9–10) bleibt hängen.
 * Fußtippen: der linke Fuß hebt sich zweimal 1 px hinter den Saum (Frames 12–19), später der rechte (Frames 36–43).
 Kein Blinzeln: die Augen sind im Sprite bereits geschlossen (ruhiger Ausdruck); die offene Variante (Ebene 142) gehört nicht zur Karten-Optik und wird nicht gezeigt.
 Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
@@ -76,7 +76,7 @@ def frame(i):
         Hm.spalten_versatz(k, OFF, {x: (dl, 9, 16) for x in range(0, 4)})
         Hm.spalten_versatz(k, OFF, {x: (dr, 9, 16) for x in range(14, 18)})
     # --- Kopfneigen (Zeilen 0–8) und Gewichtsverlagerung (Zeilen 0–20) in getrennten Zeitfenstern ---
-    kn = -1 if Hm.folge(i, 2, [1] * 6, N) else (1 if Hm.folge(i, 26, [1] * 6, N) else 0)
+    kn = -1 if Hm.folge(i, 2, [1] * 6, N) else (1 if Hm.folge(i, 22, [1] * 4, N) else 0)
     if kn:
         Hm.bereich_versatz(k, OFF, {y: kn for y in range(0, 9)}, -2, sw + 1)
     gv = 1 if Hm.folge(i, 10, [1] * 12, N) else (-1 if Hm.folge(i, 34, [1] * 12, N) else 0)

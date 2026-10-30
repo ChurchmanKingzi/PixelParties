@@ -1,32 +1,38 @@
 # -*- coding: utf-8 -*-
 """Idle-Animation für „Cheering Rabbit“ (Creature).
 
-Quelle: src/cheering-rabbit.png — der linke von drei Jubel-Hasen (30×24 px, 28 Farben) aus MotiveMoe.xcf, Ebene 447 „Cheering Rabbit“ (72×27 px; die Ebene zeigt drei Hasen nebeneinander, wie
-auf der Karte). Die drei Exemplare sind zusammengebacken (die Pompons zwischen ihnen überlappen sich); ich habe den linken ausgeschnitten, die wenigen Pixel der mittleren Figur (Ohr-/Körperumriss
-bei x ≥ 27) entfernt und den Pompon rechts von ihm (x 22–29), den er mit dem Nachbarn teilt, behalten. Linker und rechter Hase der Ebene sind gleich gezeichnet; der mittlere ist eine tiefere
-Pose desselben Hasen (nicht verwendet).
-PICK: [["MotiveMoe", 447, 1]]   (Figur = linker Hase der Ebene, bbox (0,0)–(29,23))
+Quelle: src/cheering-rabbit.png — der linke von drei Jubel-Hasen (30×24 px, 28 Farben) der Ebene 447 „Cheering Rabbit“ (72×27 px) aus MotiveMoe.xcf. Die Ebene zeigt drei Hasen
+nebeneinander (wie auf der Karte), deren Leuchtstäbe (rechts vom linken, links vom mittleren Hasen) ineinanderlaufen. Gewählt: der LINKE — er ist als einziger vollständig und
+frei (der rechte Hase ist gleich gezeichnet, der mittlere eine kleinere Pose desselben Hasen). Von Hand ausgeschnitten: Spalten 0–30 der Ebene, die wenigen Pixel des mittleren
+Hasen (Ohr-/Körperumriss bei x ≥ 27 und die Stabreste unten rechts) entfernt, der eigene rechte Stab (x 20–29) bleibt komplett.
+PICK: [["MotiveMoe", 447, 1]]   (Figur = linker Hase der Ebene, bbox (0,0)–(29,23); die Datei in src/ ist dieser Ausschnitt)
 
 Aufruf:   python3 cheering_rabbit.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/cheering-rabbit.png + .json
 
-Identifikation (Sprite 30×24, lavendelweißer Hase von vorn in Cheerleader-Kleid, mit zwei cyanfarbenen Pompons, Stil wie der Cute Bunny):
-* Ohren (Zeilen 0–4, links x 5–11, rechts x 14–22): lange Schlappohren mit braunem Umriss A (49,24,0) und lavendelweißer Fläche B (210,210,248) / J, nach außen hängend.
-* Gesicht (x 9–18, Zeilen 4–11): lavendelweiß mit schwarzen Zeichnungspixeln (K) für die geschlossenen, lachenden Augen, rosa Wangenpunkten (10,9) (17,9), rosa/lila offenem Mund U (217,0,255) (13–14,11).
-* Körper (x 8–20, Zeilen 11–23): Kleid in Lila/Rosa/Blau (H, N, P, Q, L, I, M …), Füße unten lavendelweiß (9–11, 22) (15–18, 22).
-* Arme (lavendelweiß B/D): links (6–8, 12–14), rechts (19–21, 12–14), jeweils am Pompon: links ein Pompon (x 0–7, Zeilen 7–14), rechts ein größerer Pompon (x 22–29, Zeilen 7–17) in Cyan F (0,217,255) /
-  Türkis G (0,96,134) / I mit dunkelblauem Umriss C (0,0,38).
-* Kein Glanz (Stoff/Fell, Regel 14); die Pompons sind Stoff, kein Metall — kein Lichtband/Stern. Keine Partikel.
-Bleibt fest: Gesicht (bis auf die Hüpfbewegung), Kleid, Füße.
+Identifikation (Sprite 30×24, weißer Hase von vorn in violettem Kleid mit je einem cyanfarbenen Leuchtstab/Pompon in jeder Hand, symmetrisch um x = 13,5):
+* Ohren (Zeilen 0–4, links x 5–10, rechts x 17–22): zwei seitlich abstehende Schlappohren (brauner Umriss A, lavendelweiße Fläche B, graue Schatten C/D), nur über (10–11, 2–4) /
+  (16–17, 2–4) mit dem Kopf verbunden; zwischen Ohrspitze und Wange ist Luft (Pixel (8–9, 4) frei).
+* Kopf (x 9–18, Zeilen 4–11): lavendelweiß; Augen = geschlossene Lachaugen aus schwarzen Balken F (11–12,5) (15–16,5) (11–12,8) (10,6) (17,6) (15–16,7) (17,8), rechts ein
+  helles Tränenpixel I (16,8); rosa Wangen L (10,9) (17,9); Schnäuzchen M/N/O/P (13–16, 9); offener Mund = dunkles G (12–14, 10) mit magentafarbener Zunge Q (13–14, 11), links/rechts
+  davon lavendelweiß E.
+* Körper (x 8–20, Zeilen 12–21): violett/rosa/blaues Kleid, Umrisse R/Z; unten Füße B/E (9–11, 22) (16–18, 22).
+* Arme (links (6–8, 12–14), rechts (19–21, 12–14), lavendelweiß) halten je einen Stab: links x 0–7 Zeilen 7–14, rechts x 20–29 Zeilen 7–17, Cyan J / Türkis K / Marine G.
+* Kein Glanz (Stoff/Fell; die Stäbe sind Plüsch-/Leuchtstoff, keine Edelsteine — Regel 14); keine Partikel. Augen sind schon geschlossen (Lachaugen) → kein Blinzeln, kein Blick.
+Bleibt fest: Gesicht (außer Zunge), Kleid unter der Taille, Füße am Boden.
 
 Ablauf (48 Frames à 66 ms = 3,2 s), alle Bewegungen unabhängig:
-* Hüpfen (Periode 12, 4× pro Schleife): der ganze Hase springt 2 px hoch (Pattern 0-1-2-2-1-0) und landet wieder; die Füße verlassen den Boden.
-* Pompon-Wippen: beide Arme samt Pompon (links x ≤ 8, rechts x ≥ 19, Zeilen 7–18) wandern im Gegentakt bis ±2 px auf und ab (Periode 12, rechts gegenläufig) — der Hase jubelt.
-* Ohrenwippen: die Ohrspitzen (Spalten außen, Zeilen 0–4) heben/senken sich bis ±1 px (Periode 24, 2 Wellen pro Schleife); der Ohransatz bleibt.
-* Randpixel-Korrektur (Regel 16): wo ein Arm samt Pompon vom Rumpf wegrückt, entsteht eine Lücke; dort wird ein Umrisspixel ergänzt (anim_tiere.umriss_schliessen).
+* Jubelsprung (Periode 16, 3× pro Schleife): Hocke (Kleidzeile 19 entfernt, Oberkörper sinkt 1 px) → Absprung (Zeile 19 verdoppelt, Oberkörper streckt sich 1 px, Füße noch am Boden)
+  → 2 px Höhe (Füße lösen sich 1-2-2-1) → Landung in der Hocke → Ruhe. Die Füße bleiben unten am Boden, bis der Hase wirklich abhebt.
+* Stäbe schwenken (Periode 12, 4× pro Schleife): beide Arme samt Stab werden spaltenweise gebogen — je weiter vom Körper, desto höher/tiefer (Stabspitze bis ±3 px), links und rechts
+  im Gegentakt. Die Armwurzel am Körper bleibt stehen, der Arm bleibt am Körperumriss.
+* Ohren hängen nach: beim Absprung sacken die Ohrspitzen 1–2 px ab, beim Fallen/Landen fliegen sie 1–2 px hoch (die äußeren 4 Spalten, innen bleibt der Ansatz); zusätzlich flickt
+  das linke Ohr bei Frame 12–14 und 43–45, das rechte bei 28–30 kurz nach oben.
+* Zungenwackeln (Frames 9–16 und 33–40): die Zunge rutscht 1 px nach links und zurück (Q wandert auf das lavendelweiße E, das E auf den Platz von Q; sie bleibt unter dem dunklen Mund).
+* Randpixel-Korrektur (Regel 16): wo das Biegen eine Füllfläche am Rand freilegt, wird ein Umrisspixel ergänzt (anim_tiere.umriss_schliessen).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
-Ergänzungen: Randpixel-Korrektur (Regel 16, siehe oben); sonst keine gemalten Pixel.
+Ergänzungen: Randpixel-Korrektur (Regel 16, siehe oben) und die verdoppelte Kleidzeile beim Strecken; sonst keine gemalten Pixel.
 """
 import math
 import sys
@@ -45,14 +51,26 @@ H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
 yy, xx = np.mgrid[0:sh, 0:sw]
 vorhanden = L.deckend(spr)
 
-einheit_l = vorhanden & (yy >= 7) & (yy <= 16) & ((xx <= 7) | ((xx == 8) & (yy >= 13) & (yy <= 14)))
-einheit_r = vorhanden & (yy >= 7) & (yy <= 18) & ((xx >= 20) | ((xx == 19) & (yy >= 13) & (yy <= 14)))
-ohr_l = vorhanden & (yy <= 4) & (xx <= 9)
-ohr_r = vorhanden & (yy <= 4) & (xx >= 17)
-rest = vorhanden & ~einheit_l & ~einheit_r & ~ohr_l & ~ohr_r
+arm_l = vorhanden & (xx <= 8) & (yy >= 7) & (yy <= 14)
+arm_r = vorhanden & (((xx >= 19) & (yy >= 7) & (yy <= 14)) | ((xx >= 22) & (yy >= 15)))
+ohr_l = vorhanden & (yy <= 4) & (xx <= 10) & ~((xx == 10) & (yy == 4))
+ohr_r = vorhanden & (yy <= 4) & (xx >= 17) & ~((xx == 17) & (yy == 4))
+koerper = vorhanden & ~arm_l & ~arm_r & ~ohr_l & ~ohr_r
+
 RAND = T.rand_farben(spr)
 REGEL = T.umriss_regeln(spr, RAND)[2]
-HOPS = (0, 1, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0)                        # Hüpfhöhe je Frame der Periode 12
+
+ZEILE_STRECK = PAD_T + 19                                          # Kleidzeile, die beim Strecken/Hocken verdoppelt/entfernt wird
+Q = tuple(int(v) for v in spr[11, 13, :3])                         # Zunge (217,0,255)
+E_LI = tuple(int(v) for v in spr[11, 12, :3])                      # lavendelweißes Mundfeld links der Zunge
+E_RE = tuple(int(v) for v in spr[11, 15, :3])
+
+# Sprung, Periode 16: (Hub der Füße, Strecken(+)/Hocke(−) des Oberkörpers, Ohr-Nachhängen: + = Spitzen sacken, − = Spitzen fliegen hoch)
+SPRUNG = [(0, 0, 0), (0, -1, -1), (0, -1, 0), (0, 1, 1), (1, 1, 1), (2, 0, 0), (2, 0, 0), (1, 0, -1),
+          (0, -1, -1), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)]
+FLICK_LI = {12: -1, 13: -1, 14: 0, 43: -1, 44: -1, 45: 0}          # Ohrflick links (zusätzlich zum Nachhängen)
+FLICK_RE = {28: -1, 29: -1, 30: 0}
+ZUNGE = {9: 0, 10: 1, 11: 0, 12: 1, 13: 0, 14: 1, 15: 0, 16: 0, 33: 0, 34: 1, 35: 0, 36: 1, 37: 0, 38: 1, 39: 0, 40: 0}   # 1 = Zunge links
 
 
 def teil(maske):
@@ -60,42 +78,39 @@ def teil(maske):
     return L.platz(t, H, W, PAD_L, PAD_T)                         # sofort auf die volle Leinwand
 
 
+def setze(k, x, y, farbe):
+    k[PAD_T + y, PAD_L + x, :3] = farbe
+    k[PAD_T + y, PAD_L + x, 3] = 255
+
+
 def zustand(i):
-    hop = HOPS[i % 12]
-    arm = int(round(2.0 * math.sin(2 * math.pi * i / 12.0)))
-    return hop, arm, i
+    hub, streck, ohr = SPRUNG[i % 16]
+    ohr_li = max(-1, min(1, ohr + FLICK_LI.get(i, 0)))
+    ohr_re = max(-1, min(1, ohr + FLICK_RE.get(i, 0)))
+    ph = L.sinus(i, 12)
+    return hub, streck, ohr_li, ohr_re, ph, ZUNGE.get(i, 0)
 
 
-def ohr_wippen(t, pivot, i, seite):
-    """Ohrspalten wandern senkrecht um round(1,4 · f · sin(φ − 0,4 f)), f = Abstand vom Ansatz / größter Abstand (Spitze am meisten, Frame 0 = Original)."""
-    out = L.leer(H, W)
-    ph = 2 * math.pi * i / 24.0 + 0.2 + (math.pi if seite < 0 else 0.0)
-    xs_all = [x for x in range(W) if t[:, x, 3].any()]
-    maxd = max(abs(x - pivot) for x in xs_all)
-    for x in xs_all:
-        f = abs(x - pivot) / float(maxd)
-        dy = int(round(1.4 * f * math.sin(ph - 0.4 * f)))
-        ys_ = np.nonzero(t[:, x, 3])[0]
-        for y in ys_:
-            out[y + dy, x] = t[y, x]
-    return out
+def ohr_biegen(t, pivot, dy_amp):
+    """Ohrspitzen wandern senkrecht: je weiter vom Ansatz (pivot), desto stärker (round(amp · Abstandsanteil)); Ansatz bleibt."""
+    return L.spalten_welle(t, pivot, dy_amp, math.pi / 2)
 
 
 def frame(i, nur=None):
-    hop, arm, _ = zustand(i)
-    ebenen = {
-        'rest': teil(rest),
-        'ohr_l': ohr_wippen(teil(ohr_l), PAD_L + 10, i, -1),
-        'ohr_r': ohr_wippen(teil(ohr_r), PAD_L + 16, i, 1),
-        'arm_l': L.versetze(teil(einheit_l), 0, arm),
-        'arm_r': L.versetze(teil(einheit_r), 0, -arm),
-    }
-    wahl = nur or tuple(ebenen)
-    ganz = L.zusammen(H, W, [(ebenen[n], 0, -hop) for n in wahl])
+    hub, streck, ohr_li, ohr_re, ph, zunge = zustand(i)
+    k = teil(koerper)
+    if zunge:                                                      # Zunge 1 px nach links (bleibt unter dem dunklen Mund (12–14, 10))
+        setze(k, 12, 11, Q)
+        setze(k, 14, 11, E_RE)
+    k = L.streck_zeile(k, ZEILE_STRECK, streck)                    # Hocke (−1) / Strecken (+1); alles darüber bewegt sich, die Füße bleiben
+    ol = ohr_biegen(teil(ohr_l), PAD_L + 10, 2.0 * ohr_li) if ohr_li else teil(ohr_l)
+    orr = ohr_biegen(teil(ohr_r), PAD_L + 17, 2.0 * ohr_re) if ohr_re else teil(ohr_r)
+    al = L.spalten_welle(teil(arm_l), PAD_L + 9, 3.0, ph)
+    ar = L.spalten_welle(teil(arm_r), PAD_L + 18, 3.0, ph + math.pi)
+    ebenen = {'koerper': (k, 0, 0), 'ohr_l': (ol, 0, -streck), 'ohr_r': (orr, 0, -streck), 'arm_l': (al, 0, -streck), 'arm_r': (ar, 0, -streck)}
+    wahl = nur or ('koerper', 'ohr_l', 'ohr_r', 'arm_l', 'arm_r')
+    ganz = L.zusammen(H, W, [(ebenen[n][0], 0, ebenen[n][2] - hub) for n in wahl])
     return T.umriss_schliessen(ganz, RAND, REGEL)                  # Randpixel-Test (Regel 16)
-
-
-TEST_EBENEN = None
 
 
 if __name__ == '__main__':
@@ -105,4 +120,4 @@ if __name__ == '__main__':
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
     L.speichern('cheering-rabbit', 'Cheering Rabbit', frames, MS, prev)
     if prev:
-        L.streifen(prev + '/cheering-rabbit-strip.png', frames, spalten=12, scale=6)
+        L.streifen(prev + '/cheering-rabbit-strip.png', frames, spalten=12, scale=5)

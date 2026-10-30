@@ -1,0 +1,15 @@
+{
+  "creature": "Cheering Rabbit",
+  "sheet": "cheering-rabbit.png",
+  "frameWidth": 34,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 66,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 17.0
+}
