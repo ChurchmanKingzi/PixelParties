@@ -122,6 +122,25 @@ def _pt(p, ang, laenge):
     return (p[0] + laenge * math.cos(r), p[1] + laenge * math.sin(r))
 
 
+def rein_farbe(pr, ab_wurzel, ab_spitze):
+    """Saubere Fingerfarbe (statt der rohen Quellspalte): helle Knochenrampe von der Wurzel, braune Binde (zwei Pixel) in der Mitte,
+    am Ende eine Manschette (dunkel) mit tan Spitze wie die Hand im Original. pr = dict(knochen=[hell, mittel, grau], binde=(a, b),
+    manschette=(dunkel, tan_mittel, tan_hell))."""
+    if ab_spitze == 0:
+        return pr['manschette'][2]
+    if ab_spitze == 1:
+        return pr['manschette'][1]
+    if ab_spitze == 2:
+        return pr['manschette'][0]
+    if ab_spitze == 6:
+        return pr['binde'][0]
+    if ab_spitze == 7:
+        return pr['binde'][1]
+    if ab_wurzel < 5:
+        return pr['knochen'][0]
+    return pr['knochen'][1] if ab_spitze > 3 else pr['knochen'][2]
+
+
 def knochenflügel(h, w, pose, pal, quelle, spalten, x0, y0, risse=(), adern=True):
     """Linker Flügel (Außenseite = kleineres x) auf eine leere Leinwand h×w. Die Fingerknochen tragen die Textur des gefalteten Flügels:
     Jeder Finger k ist eine Spalte `spalten[k]` des Quell-Sprites `quelle` (von Zeile y0 abwärts, Pixel für Pixel dieselben Farben: Knochen,
@@ -142,6 +161,7 @@ def knochenflügel(h, w, pose, pal, quelle, spalten, x0, y0, risse=(), adern=Tru
     hueft = pose['hueft']
     zacke = pose.get('zacke', 0.3)
     rho = pose.get('rho', 0.0)
+    rein = pose.get('rein', 0.0)
     n = len(angs)
     haut_innen, haut_nah, haut_rand, haut_ader = pal['haut']
     binde = pal['binde']
@@ -205,7 +225,10 @@ def knochenflügel(h, w, pose, pal, quelle, spalten, x0, y0, risse=(), adern=Tru
             p = _pt(starts[k], angs[k], s_) if s_ <= sg else _pt(gel[k], angs[k] - knick, s_ - sg)
             row = max(lo, min(hi, y0 + int(round(v))))
             if quelle[row, col, 3]:
-                sel[(int(round(p[0])), int(round(p[1])))] = tuple(int(c) for c in quelle[row, col, :3])
+                c = tuple(int(c) for c in quelle[row, col, :3])
+                if rein > ((row * 7 + k * 3) % 10) / 10.0 + 0.04:          # Übergang roh → sauber pixelweise (Dithering, kein Alpha)
+                    c = rein_farbe(pal['rein'], row - lo, hi - row)
+                sel[(int(round(p[0])), int(round(p[1])))] = c
             v += 0.5 / scale
         fing_px.append(sel)
     bone_m = np.zeros((h, w), bool)
