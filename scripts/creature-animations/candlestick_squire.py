@@ -69,10 +69,13 @@ SPERRE1[GPT + 8, GPL + 10] = True                       # Dornspitze unter der K
 SPERRE2 = np.zeros((H, W), bool)
 SPERRE2[GPT + 13, GPL + 17] = True                      # Stabkappe unter der Fackelflamme
 assert vorhanden[8, 10] and vorhanden[13, 17]
-Z1 = [FEU.Zunge(8.6 + GPL, 7 + GPT, 5.0, 1.6), FEU.Zunge(10.6 + GPL, 7 + GPT, 7.0, 1.8)]
-Z2 = [FEU.Zunge(18.0 + GPL, 12 + GPT, 8.0, 1.8), FEU.Zunge(20.8 + GPL, 10 + GPT, 5.5, 1.5)]
-FEUER1 = FEU.Feuer(H, W, Z1, RAMPE, n=N, seed=3, posen=12, amplitude=0.6, sperre=SPERRE1)
-FEUER2 = FEU.Feuer(H, W, Z2, RAMPE, n=N, seed=5, posen=12, amplitude=0.6, sperre=SPERRE2)
+# Zungen (x, Fußzeile, Höhe, Halbbreite am Fuß): breite Basis wie im Original (Helmflamme ~8 px, Fackelflamme ~7 px), je drei Zungen mit Halbbreite ≥ 1,5 (Fuß ≥ 3 px);
+# Seeds und Amplitude sind so gewählt, dass in allen 48 Frames (a) kein Flammenteil dünner als 2 px über 2 px Länge hinausgeht, (b) die beiden Flammen sich nie berühren (auch nicht diagonal),
+# (c) die Flamme im Frame 0 dem Original möglichst nahe liegt (Überdeckung ~0,75).
+Z1 = [FEU.Zunge(7.6 + GPL, 7 + GPT, 6.0, 1.7), FEU.Zunge(9.8 + GPL, 7 + GPT, 7.5, 2.0), FEU.Zunge(12.0 + GPL, 7 + GPT, 5.5, 1.7)]
+Z2 = [FEU.Zunge(17.0 + GPL, 12 + GPT, 7.0, 1.7), FEU.Zunge(19.2 + GPL, 12 + GPT, 10.0, 2.0), FEU.Zunge(21.0 + GPL, 11 + GPT, 6.5, 1.5)]
+FEUER1 = FEU.Feuer(H, W, Z1, RAMPE, n=N, seed=26, posen=12, amplitude=0.6, sperre=SPERRE1)
+FEUER2 = FEU.Feuer(H, W, Z2, RAMPE, n=N, seed=28, posen=12, amplitude=0.6, sperre=SPERRE2)
 
 HAUT = (187, 104, 49)
 AUGEN = [(6, 19), (10, 19), (6, 20), (10, 20)]
@@ -96,9 +99,9 @@ PUFFS1 = [
     dict(x=P(6, 4)[0], y=P(6, 4)[1], vx=-1, vy=-6, off=34, form='k', wackeln=1),
 ]
 PUFFS2 = [
-    dict(x=P(5, 8)[0], y=P(5, 8)[1], vx=-1, vy=-6, off=10, form='o', wackeln=1),            # links neben dem Helm
-    dict(x=P(2, 22)[0], y=P(2, 22)[1], vx=-1, vy=-10, off=26, form='o', wackeln=1),         # an der linken Schulter
-    dict(x=P(13, 24)[0], y=P(13, 24)[1], vx=1, vy=-9, off=42, form='o', wackeln=1),
+    dict(x=P(5, 8)[0], y=P(5, 8)[1], vx=-1, vy=-6, off=10, form='k', wackeln=1),            # links neben dem Helm
+    dict(x=P(2, 22)[0], y=P(2, 22)[1], vx=-1, vy=-10, off=26, form='k', wackeln=1),         # an der linken Schulter
+    dict(x=P(13, 24)[0], y=P(13, 24)[1], vx=1, vy=-9, off=42, form='k', wackeln=1),
 ]
 
 
