@@ -17820,16 +17820,21 @@ const ANIM_REGISTRY = {
       if (_maske) return _maske;
       const N = 192, m = new Uint8Array(N * N);
       try {
-        const cv = document.createElement('canvas'); cv.width = cv.height = N;
-        const c = cv.getContext('2d'); c.scale(N / 32, N / 32);
-        const pf = new Path2D(HERZ_D);
-        for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-          const x = i + 0.5, y = j + 0.5;
-          c.lineWidth = 1.1;
-          if (c.isPointInStroke(pf, x, y)) { m[j * N + i] = 1; continue; }
-          if (c.isPointInPath(pf, x, y)) { m[j * N + i] = 2; continue; }
-          c.lineWidth = 3.4;
-          if (c.isPointInStroke(pf, x, y)) m[j * N + i] = 3;
+        // EINMAL je Ebene zeichnen und die Pixel lesen (vorher je Pixel `isPointInPath`/`isPointInStroke`: ~110 000 Geometrietests, ein Hänger von ~300 ms beim ersten Herz).
+        // Rangfolge wie zuvor: Rand (1) vor Fläche (2) vor Schein (3); Deckkraft >= 50 % zählt als „getroffen" (Mittelpunkt-Test).
+        const ebene = (zeichne) => {
+          const cv = document.createElement('canvas'); cv.width = cv.height = N;
+          const c = cv.getContext('2d', { willReadFrequently: true }); c.scale(N / 32, N / 32);
+          c.fillStyle = c.strokeStyle = '#000'; zeichne(c, new Path2D(HERZ_D));
+          return c.getImageData(0, 0, N, N).data;
+        };
+        const rand = ebene((c, pf) => { c.lineWidth = 1.1; c.stroke(pf); });
+        const flaeche = ebene((c, pf) => { c.fill(pf); });
+        const schein = ebene((c, pf) => { c.lineWidth = 3.4; c.stroke(pf); });
+        for (let k = 0; k < N * N; k++) {
+          if (rand[k * 4 + 3] >= 128) m[k] = 1;
+          else if (flaeche[k * 4 + 3] >= 128) m[k] = 2;
+          else if (schein[k * 4 + 3] >= 128) m[k] = 3;
         }
       } catch {}
       _maske = { N, m };

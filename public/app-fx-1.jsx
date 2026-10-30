@@ -1107,8 +1107,10 @@ const ppFx1Armageddon = ppR1Leinwand((g, t, sz, d) => {
     g.block(x, y, n, n, C.glut, al);
   }
 }, 3300, (p) => {
-  const m = ppFx1ArmaMass(p), mx = m.W * 0.12, my = m.H * 0.12;
-  return { breite: m.W + 2 * mx, hoehe: m.H + 2 * my };
+  // Die Leinwand deckt das ganze FENSTER ab (der alte Feuerball reichte weit ueber das Brett hinaus; eine Brett-Leinwand schnitt ihn als Rechteck ab). Anker = Wirker-/Brettmitte in Fensterpunkten
+  // (`ppR1FeldVersatz`: bei Welt-Animationen — gescrolltes Brett auf dem Handy — liegt die Leinwand im Feld, ihre linke obere Ecke ist dann der Fensterursprung im Feld).
+  const o = ppR1FeldVersatz(p);
+  return { breite: window.innerWidth, hoehe: window.innerHeight, ankerX: p.x - o.dx, ankerY: p.y - o.dy };
 }, {
   z: 10150,
   vorbereiten: (sz) => {
