@@ -38373,6 +38373,24 @@ function ppKartenWurf({ mode, cardUrl, A, B, dauer }) {
 // Haengt die Phasenspalte (Handy) per Portal in das scrollende Brett; ohne `host` bleibt sie an ihrer gewohnten Stelle.
 function PhasenHuelle({ host, children }) { return host ? ReactDOM.createPortal(children, host) : children; }
 
+// ★ Startansage (Al 30.10.): hellerer / dunklerer Ton der Textfarbe fuer Shading und Dithering (`.game-announcement-text`),
+// auf die 256-Farben-Palette gerastet. `farbe` ist `var(--...)` oder ein Hex-Wert.
+function ansageToene(farbe) {
+  try {
+    let hex = String(farbe || '').trim();
+    const v = /^var\((--[\w-]+)\)$/.exec(hex);
+    if (v) hex = getComputedStyle(document.documentElement).getPropertyValue(v[1]).trim();
+    const m = /^#([0-9a-f]{6})$/i.exec(hex);
+    if (!m) return {};
+    const c = [0, 2, 4].map(i => parseInt(m[1].slice(i, i + 2), 16));
+    const snap = (r, g, b) => (window.ppSnapRgb ? window.ppSnapRgb(r, g, b) : [r, g, b]);
+    const css = (a) => 'rgb(' + a.join(',') + ')';
+    const hell = snap(...c.map(x => Math.round(x + (255 - x) * 0.45)));
+    const dunkel = snap(...c.map(x => Math.round(x * 0.5)));
+    return { '--ann-hell': css(hell), '--ann-dunkel': css(dunkel) };
+  } catch (e) { return {}; }
+}
+
 function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck, setSelectedDeck, cubeMatchInfo }) {
   useHoverDurchSchleier();   // v1270: Tooltips durch den Dialog-Schleier
   const { user, setUser, notify, setBgmMode } = useContext(AppContext);
@@ -63598,7 +63616,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {announcement && (
         <div className={'game-announcement' + (announcement.short ? ' game-announcement-short' : '')}
           onClick={() => setAnnouncement(null)} style={{ cursor: 'pointer' }}>
-          <div className="game-announcement-text" data-text={announcement.text} style={{ color: announcement.color }}>
+          <div className="game-announcement-text" data-text={announcement.text} style={{ color: announcement.color, ...ansageToene(announcement.color) }}>
             {announcement.text}
           </div>
         </div>
