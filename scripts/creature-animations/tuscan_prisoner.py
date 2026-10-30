@@ -56,7 +56,7 @@ def f(x, y):
 
 ERLAUBT = Hm.umrissfarben(spr)                                      # Farben der Außenkante im Original (Regel 16)
 KOPF = f(10, 10)                                                    # Kopffarbe um die Augen: Lid = umgebende Körperfarbe
-UMRISS = f(8, 12) if False else (23, 21, 22)
+UMRISS = (23, 21, 22)                                                 # Umrissschwarz der Quelle
 AUGEN = [(9, 9), (9, 10), (14, 9), (14, 10)]
 
 ohr_l = vorhanden & (xx <= 6) & (yy <= 12)
