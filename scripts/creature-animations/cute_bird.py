@@ -53,7 +53,7 @@ import anim_flieger_b as B
 
 N, MS = 48, 65
 BEAT, DOWN = 16, 6                                         # Frames je Schlag, davon Abschlag
-PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 7, 6
+PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 3, 4
 
 spr = L.lade('cute-bird')                                  # Gesamtbild (Ruhepose / Referenz für den Randpixel-Test)
 sh, sw = spr.shape[:2]
@@ -158,8 +158,6 @@ def frame(i, partikel=True, nur=None):
     if 'figur' in ebenen:
         # Mädchen: Körper um dy_u, Beine um dy_f, Lücke dazwischen füllen doppelte Beinzeilen
         maed = MAED_OBEN.copy()
-        bz = lambda e: e
-        bl = (i, )
         beine = MAED_BEINE
         if dy_f - dy_u > 0:
             beine = L.streck_zeile(beine, CUT + 1, dy_f - dy_u)
@@ -197,7 +195,8 @@ def frame(i, partikel=True, nur=None):
 if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    n = L.pruefe(frames, quelle=spr)
+    quelle = np.concatenate([a.reshape(-1, 4) for a in (spr, fl, L.lade('cute-bird-maedchen'), L.lade('cute-bird-hut'), arme)])   # alle Ebenen (auch Verdecktes)
+    n = L.pruefe(frames, quelle=quelle)
     print('Pixel je Frame:', n)
     L.speichern('cute-bird', 'Cute Bird', frames, MS, prev)
     if prev:
