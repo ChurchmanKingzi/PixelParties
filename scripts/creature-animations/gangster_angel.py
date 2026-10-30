@@ -31,7 +31,7 @@ Ablauf (24 Frames à 70 ms = 1,68 s):
 * Füße baumeln (Stiefel pendeln um 1–2 px, Ansatz am Körper steht).
 * Blinzeln (Frames 16–18), Augenbraue zuckt hoch (Frames 6–9), Lichtreflex wandert über die Brillengläser (Frames 8–14),
   Edelstein funkelt (Frames 12–13).
-* Goldene und weiße Glitzerfunken (Partikel) steigen hinter den Flügeln auf (Dithering statt Alpha, nahtlos).
+* Goldene und weiße Glitzer-Klekse (Partikel: kleine Klekse/Funken, wachsen und schrumpfen, steigen langsam auf) hinter den Flügeln, nahtlos.
 
 Ergänzungen (fertiggezeichnet, nur Farben der Quelle):
 * Unter dem Heiligenschein (er bewegt sich getrennt vom Kopf/Flügel): Kopf (17,5)=(233,134,184), (17,6)=(235,205,220);
@@ -104,11 +104,11 @@ def px(x, y):
 
 
 GLITZER = {'c': FL_B, 'r': GOLD_HELL}
-PUFFS = [
-    dict(x=px(-2, 8)[0], y=px(-2, 8)[1], vx=-1, vy=-9, off=0, form='s'),         # links neben der Flügelspitze
-    dict(x=px(34, 7)[0], y=px(34, 7)[1], vx=1, vy=-9, off=12, form='s'),         # rechts neben der Flügelspitze
-    dict(x=px(26, -1)[0], y=px(26, -1)[1], vx=3, vy=-6, off=6, form='k'),        # über dem Heiligenschein
-    dict(x=px(8, 2)[0], y=px(8, 2)[1], vx=-3, vy=-7, off=18, form='k'),          # über dem linken Flügel
+PUFFS = [                                                    # rund (k = Funke, s = kleiner Klecks), steigen langsam auf
+    dict(x=px(-2, 10)[0], y=px(-2, 10)[1], vx=0, vy=-7, off=0, form='s', wackeln=1),   # links neben dem Flügel
+    dict(x=px(34, 9)[0], y=px(34, 9)[1], vx=0, vy=-7, off=12, form='s', wackeln=1),    # rechts neben dem Flügel
+    dict(x=px(28, 1)[0], y=px(28, 1)[1], vx=0, vy=-6, off=6, form='k', wackeln=1),     # über dem Heiligenschein
+    dict(x=px(8, 3)[0], y=px(8, 3)[1], vx=0, vy=-6, off=18, form='k', wackeln=1),      # über dem linken Flügel
 ]
 
 
