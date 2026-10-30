@@ -17,16 +17,18 @@ Identifikation (Sprite 14×13, Hund von vorn, dunkel):
   (nichts davon erfunden).
 Bleibt fest: Nase, Schnauze, Kinn, Halsband, Brust, Beine.
 
-Ablauf (36 Frames à 90 ms = 3,24 s), alle Bewegungen unabhängig (andere Perioden/Reihenfolge als beim Rottweiler):
-* Atmen (Periode 36, Frames 4–21 oben): die Brustzeile 11 wird eingefügt; Kopf, Ohren und Halsband heben sich 1 px, die Füße bleiben.
-* Kopf neigt sich (kleiner Kopfwackler): Frames 8–15 nach rechts, Frames 26–31 nach links. Die Zeilen 0–4 (Stirn, Augen, Ohren) wandern
-  als Block 1 px seitlich, Schnauze/Kinn/Halsband bleiben stehen — die Naht liegt zwischen Zeile 4 und 5 (Zeile 5 ist 8 px breit
-  und überlappt Zeile 4 vollständig, also 4-verbunden).
-* Blick: die Augen schauen mit der Neigung mit (Frames 9–15 rechts, Frames 27–31 links), 1 px.
-* Schlappohren: das linke schwingt in Frames 11–17, das rechte in Frames 29–35 nach außen und zurück (erst Zeile 4, dann Zeilen 3–4
-  1 px, oben bleiben sie am Kopf; Lücke zum Kopf mit dem Randpixel des Ohres geschlossen).
-* Blinzeln (Frames 20–22): oberes Augenpixel schließt sich, dann beide Augen zu (beide Augenpixel werden Fellfarbe), dann wieder halb offen.
-* Pfote tippt: der linke Fuß hebt sich in Frames 1–2 und 5–6 um 1 px (die Beinzeile 11 des Fußes entfällt), der rechte in 31–32.
+Ablauf (44 Frames à 70 ms = 3,08 s), alle Bewegungen unabhängig (andere Perioden/Reihenfolge als beim Rottweiler); der Kopf bleibt
+dabei als Ganzes stehen (kein Kopfblock, keine Neigung) — nur Augen und Brauen blicken:
+* Atmen (Periode 22, 2× pro Schleife; oben in Frames 3–13 und 25–35): die Brustzeile 11 wird eingefügt; Kopf, Ohren und Halsband
+  heben sich 1 px, die Füße bleiben.
+* Blick: nur die blauen Augen und die grauen Brauenflecken (5,2) und (8,2) wandern seitlich um 1 px — Frames 13–18 nach rechts,
+  24–29 nach links, 35–40 nach rechts; die frei werdende Stelle bekommt die Farbe des Fellnachbarn.
+* Schlappohren: das linke schwingt in Frames 4, 19, 34, das rechte in 11, 26, 37 (je 7 Frames) nach außen und zurück (erst Zeile 4,
+  dann Zeilen 3–4 1 px, oben bleiben sie am Kopf; Lücke zum Kopf mit dem Randpixel des Ohres geschlossen).
+* Blinzeln (Frames 9–12 und 31–34, alle 22 Frames ≈ 1,5 s): oberes Augenpixel schließt sich, dann beide Augenpixel (Fellfarbe, zwei
+  Frames lang), dann wieder halb offen.
+* Pfoten tippen: der linke Fuß hebt sich um 1 px in Frames 16–17, 20 und 38–39, der rechte in 28–29, 32 und 6–7 (die Beinzeile 11 des
+  Fußes entfällt, die Fußzeile rückt hoch).
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
 Ergänzungen: keine gemalten Pixel (Ohr-Lücken werden mit dem Randpixel des Ohres geschlossen, siehe anim_tiere.ohr_haengend).
@@ -38,7 +40,7 @@ import numpy as np
 import anim_lib as L
 import anim_tiere as T
 
-N, MS = 36, 90
+N, MS = 44, 70
 PAD_L, PAD_R, PAD_T, PAD_B = 5, 5, 4, 3
 
 spr = L.lade('loyal-beagle')
@@ -74,14 +76,20 @@ FELL_NEBEN = {  # (x, y) → Farbe der Stelle, wenn dort kein Auge sitzt
 FELL_RECHTS = {(5, 3): FELL_F, (5, 4): FELL_F, (8, 3): FELL_F, (8, 4): FELL_H}
 
 
+BRAUE = {5: (78, 67, 61), 8: (73, 69, 68)}                       # graue Brauenflecken über den Augen (5,2) H und (8,2) C
+STIRN = (28, 19, 14)                                              # dunkle Stirnfarbe B (Farbe der Stelle neben den Brauen)
+
+
 def augen(k, blick, lid):
-    """Blick: -1 links, 0 mittig, +1 rechts. lid: 0 offen, 1 halb, 2 zu."""
+    """Blick: -1 links, 0 mittig, +1 rechts. lid: 0 offen, 1 halb, 2 zu. Die Brauenflecken wandern mit den Augen."""
     if blick:
         neben = FELL_NEBEN if blick < 0 else FELL_RECHTS
         for x0 in (5, 8):
             for y in (3, 4):
                 k[PAD_T + y, PAD_L + x0, :3] = neben[(x0, y)]
+            k[PAD_T + 2, PAD_L + x0, :3] = STIRN
             x1 = x0 + blick
+            k[PAD_T + 2, PAD_L + x1, :3] = BRAUE[x0]
             k[PAD_T + 3, PAD_L + x1, :3] = AUGE_OBEN
             k[PAD_T + 4, PAD_L + x1, :3] = AUGE_UNTEN
     if lid:
@@ -99,25 +107,29 @@ def ohr_profil(env, richtung):
     return {PAD_T + y: richtung for y in range(5 - stufe, 5)} if stufe else {}
 
 
+PFOTE_L = (16, 17, 20, 38, 39)
+PFOTE_R = (28, 29, 32, 6, 7)
+
+
 def zustand(i):
-    atem = 1 if 4 <= i < 22 else 0
-    neigung = 1 if 8 <= i < 16 else (-1 if 26 <= i < 32 else 0)
-    blick = 1 if 9 <= i < 16 else (-1 if 27 <= i < 32 else 0)
-    ohr_li = T.huellkurve(i, N, 11, 7)
-    ohr_re = T.huellkurve(i, N, 29, 7)
-    lid = {20: 1, 21: 2, 22: 1}.get(i, 0)
-    tipp_l = 1 if i in (1, 2, 5, 6) else 0
-    tipp_r = 1 if i in (31, 32) else 0
-    return atem, neigung, blick, ohr_li, ohr_re, lid, tipp_l, tipp_r
+    atem = 1 if (i % 22) in range(3, 14) else 0
+    blick = 1 if 13 <= i < 19 else (-1 if 24 <= i < 30 else (1 if 35 <= i < 41 else 0))
+    ohr_li = max(T.huellkurve(i, N, s, 7) for s in (4, 19, 34))
+    ohr_re = max(T.huellkurve(i, N, s, 7) for s in (11, 26, 37))
+    lid = 0
+    for s in (9, 31):
+        if 0 <= i - s < 4:
+            lid = (1, 2, 2, 1)[i - s]
+    return atem, blick, ohr_li, ohr_re, lid, 1 if i in PFOTE_L else 0, 1 if i in PFOTE_R else 0
 
 
 def frame(i, nur=None):
-    atem, neigung, blick, ohr_li, ohr_re, lid, tipp_l, tipp_r = zustand(i)
-    # Kopf oben (Zeilen 0–4) und Ohren: Augen/Lider, Neigung, Atem-Hub
+    atem, blick, ohr_li, ohr_re, lid, tipp_l, tipp_r = zustand(i)
+    # Kopf oben (Zeilen 0–4) und Ohren: nur Augen/Brauen/Lider ändern sich, dazu der Atem-Hub (der Kopf bleibt als Ganzes stehen)
     ko = augen(teil(kopf_o), blick, lid)
-    ko = L.versetze(ko, neigung, -atem)
-    ol = L.versetze(T.ohr_haengend(teil(ohr_l), ohr_profil(ohr_li, -1), 'links'), neigung, -atem)
-    orr = L.versetze(T.ohr_haengend(teil(ohr_r), ohr_profil(ohr_re, 1), 'rechts'), neigung, -atem)
+    ko = L.versetze(ko, 0, -atem)
+    ol = L.versetze(T.ohr_haengend(teil(ohr_l), ohr_profil(ohr_li, -1), 'links'), 0, -atem)
+    orr = L.versetze(T.ohr_haengend(teil(ohr_r), ohr_profil(ohr_re, 1), 'rechts'), 0, -atem)
     # Rumpf: Brustzeile 11 einfügen, danach die Füße (Zeilen ≥ 11 an den Beinen) einzeln heben
     r = L.streck_zeile(teil(unten), PAD_T + BRUSTZEILE, atem)
     fuss = (np.arange(H)[:, None] >= PAD_T + BRUSTZEILE) & ((np.arange(W)[None, :] <= PAD_L + 5) | (np.arange(W)[None, :] >= PAD_L + 8))

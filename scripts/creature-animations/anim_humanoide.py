@@ -13,6 +13,11 @@ abgeschnitten wird.
     laubwelle(s, i, n, wellenlaenge, zyklen)  fortlaufende Welle 0…1 über die Diagonale s = x + 0,6·y (läuft mit i nach s+), mit Hüllkurve
                                         sin²(π·i/n) → in Frame 0 und am Schleifenende überall 0 (Ruhepose), dazwischen kräftig;
                                         `zyklen` volle Wellenperioden pro Schleife. Für wogendes Laub/Haar/Umhang.
+    farbe_stufe(farbe, rampe, stufen)   Farbe um `stufen` Stufen auf einer Rampe (dunkel → hell, Farben des Sprites) verschieben
+    lichtband(a, maske, off, i, n, start, dauer, rampe, stufen, breite, achse, kern)
+                                        Rule 12: diagonales Lichtband wandert über die Pixel von `maske` (Metall, Gold, Rahmen): die Pixel
+                                        im Band sind `stufen` (im Kern `kern`) Stufen heller auf der Farbrampe
+    stern4(a, x, y, stufe, kern, arm1, arm2, off)  vierzackiger Glitzer-Stern AM Objekt (Mitte + 4 Arme, stufe 0/1/2)
     boe_mitte(i, n, start, laenge, von, bis)  Mitte einer diagonalen Windfront (Koordinate s = x + neigung·y), die im Fenster von `von`
                                         nach `bis` wandert, sonst None. Laub-/Umhang-Böe: erst die Spitzen oben, die Wellenfront läuft
                                         nach unten (Saum), „Spitze hinterher".
@@ -64,6 +69,50 @@ def laubwelle(s, i, n, wellenlaenge, zyklen):
     """Wert 0 … 1: max(0, sin(2π·(s/wellenlaenge − zyklen·i/n))) · sin²(π·i/n). Nahtlos (ganzzahlige zyklen), in Frame 0 = 0."""
     env = math.sin(math.pi * i / n) ** 2
     return env * max(0.0, math.sin(2 * math.pi * (s / wellenlaenge - zyklen * i / n)))
+
+
+def farbe_stufe(farbe, rampe, stufen):
+    f = tuple(int(v) for v in farbe)
+    if f not in rampe:
+        return f
+    return rampe[max(0, min(len(rampe) - 1, rampe.index(f) + stufen))]
+
+
+def lichtband(a, maske, off, i, n, start, dauer, rampe, stufen=1, breite=2.4, achse=(1.0, 1.0), kern=None):
+    """Lichtband über die Pixel von `maske` (Spritekoordinaten) im Zeitfenster [start, start+dauer) mod n. Bearbeitet `a` (Leinwand)
+    an Ort und Stelle, bevor Teile verschoben werden. Nur Pixel, deren Farbe auf `rampe` steht, ändern sich."""
+    k = (i - start) % n
+    if k >= dauer:
+        return a
+    ys, xs = np.nonzero(maske)
+    if not len(ys):
+        return a
+    u = achse[0] * xs + achse[1] * ys
+    umin, umax = float(u.min()), float(u.max())
+    mitte = umin - breite + (k + 0.5) / dauer * (umax - umin + 2 * breite)
+    for y, x, uu in zip(ys, xs, u):
+        d = abs(uu - mitte)
+        if d > breite / 2.0 + 0.001:
+            continue
+        Y, X = int(y) + off[1], int(x) + off[0]
+        if a[Y, X, 3]:
+            st = kern if (kern is not None and d <= breite / 4.0) else stufen
+            a[Y, X, :3] = farbe_stufe(a[Y, X, :3], rampe, st)
+    return a
+
+
+def stern4(a, x, y, stufe, kern, arm1, arm2=None, off=(0, 0)):
+    """Vierzackiger Glitzer-Stern um (x, y) (Spritekoordinaten): stufe 0 = nur Mitte, 1 = Arme 1 px, 2 = Arme 2 px. Er sitzt am
+    Objekt (Kante/Ecke) und fliegt nicht weg. stufe None = nichts."""
+    if stufe is None:
+        return a
+    pts = {(x, y): kern}
+    if stufe >= 1:
+        pts.update({(x + 1, y): arm1, (x - 1, y): arm1, (x, y + 1): arm1, (x, y - 1): arm1})
+    if stufe >= 2:
+        a2 = arm2 or arm1
+        pts.update({(x + 2, y): a2, (x - 2, y): a2, (x, y + 2): a2, (x, y - 2): a2})
+    return setze(a, pts, off)
 
 
 def boe_mitte(i, n, start, laenge, von, bis):
