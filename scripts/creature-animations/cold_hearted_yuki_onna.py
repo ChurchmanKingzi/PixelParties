@@ -18,8 +18,9 @@ Was ist was (im 16×23-Raster; Ausgabe = ×2):
 Fest bleiben: Gesicht, Kimonoform, Kragen, Brustmitte.
 
 Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original, Nebel ausgenommen) — Eis glänzt nicht (Regel 14), kein Feuer (Regel 15):
-* Atmen (Periode 24, 0/1 Rasterpixel = 2 Ausgabepixel): die Brustzeile y 14 wird eingefügt, Kopf mit Haaren und Schultern heben sich, Hände, Kimono unten und Saum bleiben stehen.
-* Haare wehen: die beiden äußeren Strähnen (x 2–3 und x 12–13, y 4–10; starre Teile, vorab auf 4-Verbundenheit geprüft) schwingen ±1 Rasterpixel nach links/rechts (Periode 24, die rechte Strähne 2 Frames später).
+* Atmen (Periode 24, 0/1 Rasterpixel = 2 Ausgabepixel): die dunkle Kragenzeile y 13 wird eingefügt, Kopf mit Haaren und Schultern heben sich, Hände, Kimono unten und Saum bleiben stehen.
+* Haare wehen: die beiden äußeren Strähnen (x 2–3 und x 12–13, y 4–10; starre Teile, vorab auf 4-Verbundenheit geprüft) schwingen ±1 Rasterpixel (Periode 24, die rechte Strähne 2 Frames später): nach innen überlappen sie das Haar, nach außen bleibt das Original stehen und die verschobene Kopie liegt daneben
+  (die Strähne wird 1 Rasterpixel breiter, keine Lücke zum Haar).
 * Ärmel/Hände schwingen starr ±1 Rasterpixel (links Periode 16, rechts Periode 24), der Saum (y ≥ 21) weht ±1 Rasterpixel mit Nachlauf (Periode 16).
 * Eisnebel (Partikel, hinter der Figur, 6 Stück, Lebensdauer 48 Frames, langsam aufsteigend, leichtes Wabern): runde Eiswölkchen aus 1×1 bis 2×2 Rasterpixeln (= 2×2 bis 4×4 Ausgabepixel, nie kleiner als 2×2),
   Kern (198,225,234) bzw. (243,254,255), Rand (188,198,233) bzw. (198,225,234); sie steigen an den Seiten der Figur auf.
@@ -95,9 +96,16 @@ def frame_gross(i, nur=None):
     d_hl, d_hr = pend(i, 1.0, 0, 24), pend(i, 1.0, 2, 24)         # Haarsträhnen
     d_al, d_ar = pend(i, 1.0, 0, 16), pend(i, 1.0, 5, 24)         # Hände
     d_s = pend(i, 1.0, 3, 16)                                    # Saum
-    bs = L.streck_zeile(teil(basis_m), GPT + 14, n)
-    koerper = L.zusammen(H, W, [(teil(saum), d_s, 0), (teil(hand_l), d_al, 0), (teil(hand_r), d_ar, 0), (bs, 0, 0),
-                                (teil(haar_l), d_hl, -n), (teil(haar_r), d_hr, -n)])
+    bs = L.streck_zeile(teil(basis_m), GPT + 13, n)
+    hl, hr = teil(haar_l), teil(haar_r)
+    # Strähne nach außen: Original bleibt stehen, die verschobene Kopie liegt darüber (Strähne wird 1 Rasterpixel breiter, keine Lücke); nach innen: nur die verschobene Strähne
+    ebenen = [(teil(saum), d_s, 0), (teil(hand_l), d_al, 0), (teil(hand_r), d_ar, 0), (bs, 0, 0)]
+    if d_hl < 0:
+        ebenen.append((hl, 0, -n))
+    if d_hr > 0:
+        ebenen.append((hr, 0, -n))
+    ebenen += [(hl, d_hl, -n), (hr, d_hr, -n)]
+    koerper = L.zusammen(H, W, ebenen)
     koerper = U.kontur_schliessen(koerper, UMRISS, KONTUR)
     if nur == 'koerper':
         return koerper
