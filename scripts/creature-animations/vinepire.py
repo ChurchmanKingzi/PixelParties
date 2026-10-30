@@ -15,10 +15,11 @@ Was im Sprite ist (Koordinaten im Sprite 16×22, x/y ab 0):
   Wesen, linker Arm).
 * Gesicht: zwei Augen — je 1×2 px leuchtendes Violett G=(70,0,102) über H=(113,0,164) bei (7,10–11) und (9,10–11), darüber/dazwischen schwarze Höhlen E=(0,0,0); leuchtend rote Punkte I=(236,28,36) bei (8,14) und (8,17).
 * Material: Pflanze/Ranke — KEIN Glanz und keine Glitzersterne (Regel 14); kein Feuer (Regel 15). Rot ist hier Laub, keine Flamme.
-Fest bleiben: Umriss, Gesicht, Rumpf, Rosette (der Rumpf streckt sich nur durch eine eingefügte Zeile).
+Fest bleiben: Umriss, Gesicht, Rosette (der Rumpf streckt sich nur durch eine eingefügte Zeile unterhalb des Gesichts).
 
 Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
-* Atmen (Periode 24): im Rumpf (Quellzeile 13, in der Spitze zusätzlich 12) wird 1–2 Zeilen eingefügt — Kopf, Arme und Fühler heben sich um 1–2 px, die Rosette bleibt fest am Boden.
+* Atmen (Periode 24): unterhalb des Gesichts im Rumpf (Quellzeile 16, in der Spitze zusätzlich 15; Mund und Augen werden nie verdoppelt) wird 1–2 Zeilen eingefügt — Kopf, Arme und Fühler heben sich um 1–2 px,
+  die Rosette bleibt fest am Boden.
 * Armewiegen (Periode 24, gegenläufig): die Arme schwingen — Spaltenversatz je Armspalte (bis ±2 px an den Armspitzen, die Spitze hinkt nach), Armgelenke an Kopf bzw. Rumpf fest.
 * Fühlerblatt (Frames 8–19 und 32–43): das Blatt (Zeilen 0–3) lehnt sich 1 px nach rechts (wird dabei fest mit dem Stiel verbunden).
 * Blinzeln (zweimal je Schleife, Frames 19–21 und 43–45: halb – zu – halb): die violetten Augenpixel (je 2) nehmen die umgebende Körperfarbe an (häufigste Rotstufe im Umkreis von 2 px, ohne Schwarz/Violett).
@@ -62,7 +63,7 @@ S = []
 for _i in range(N):
     _v = math.sin(2 * math.pi * _i / 24)
     S.append(2 if _v >= 0.9 else 1 if _v >= 0.35 else 0)
-POSEN = {0: {}, 1: {13: 1}, 2: {13: 1, 12: 1}}
+POSEN = {0: {}, 1: {16: 1}, 2: {16: 1, 15: 1}}                                    # unterhalb des Gesichts (Mund y 12–14): Rumpfzeilen 15/16 (gleiche Breite x 5–10)
 assert S[0] == 0
 BLINK = {19: 1, 20: 2, 21: 1, 43: 1, 44: 2, 45: 1}
 LEAF = set(range(8, 20)) | set(range(32, 44))
