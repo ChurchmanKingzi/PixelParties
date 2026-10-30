@@ -489,7 +489,7 @@ def drehen(a, pivot_x, pivot_y, winkel, glatt=False):
             sy = int(math.floor(pivot_y - dx * s_ + dy * c + 0.5))
             if 0 <= sx < w and 0 <= sy < h and a[sy, sx, 3]:
                 out[y, x] = a[sy, sx]
-    if glatt:
+    if glatt and abs(winkel) > 1e-6:                          # Ruhelage (Winkel 0) bleibt unverändert
         m = out[..., 3] > 0
         p = np.pad(m, 1)
         n4 = p[:-2, 1:-1].astype(int) + p[2:, 1:-1] + p[1:-1, :-2] + p[1:-1, 2:]
