@@ -31,7 +31,9 @@ Ablauf (48 Frames à 65 ms = 3,12 s, nahtlos):
   großer Hüpfer (32–47, 3 px) mit Anlauf-Stauchung, gestrecktem Absprung/Fallen und Aufprall.
 * Blinzeln: Frames 19–21 und 44–46 (Augenflecken füllen sich mit dem Körperrot, dunkle Lidlinie).
 * Glut-Partikel: zehn runde Funken/Kügelchen (1 px, 2×2, einzelne 4×4; gelb/orange) lösen sich aus den Flammenspitzen und steigen langsam auf.
-Ergänzungen: keine gezeichnet. Hinweis: Frame 0 weicht in den Flammen vom Original ab (Züngeln und Glut-Fluss laufen von Anfang an); der
+Ergänzungen: Brückenpixel an den dünnen Flammenspitzen: wenn sich eine 1-px-Spitze beim seitlichen Lehnen nur noch über eine Pixelecke an die
+Flamme hängt, kommt ein Pixel in der Farbe der Spitze auf eines der beiden gemeinsamen Nachbarfelder (anim_amorph.verbinde4; insgesamt 27
+Pixel über die ganze Schleife, höchstens 3 je Frame, nur oberhalb der Zeile 10). Sonst nichts gezeichnet. Hinweis: Frame 0 weicht in den Flammen vom Original ab (Züngeln und Glut-Fluss laufen von Anfang an); der
 Körper (Zeilen 14–22) entspricht in Frame 0 exakt dem Original.
 Nähte (Regel 11): Feuer und Körper liegen auf Zeile 13/14 vertikal 4-verbunden; jede Flammenspalte bleibt mit der festen Basis verbunden;
 je Frame prüft das Skript, dass die Figur aus genau einem 4-zusammenhängenden Teil besteht und kein Körperrandpixel ohne Umrissfarbe frei liegt.
