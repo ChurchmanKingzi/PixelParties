@@ -1,0 +1,15 @@
+{
+  "creature": "Albrecht, the Nerd",
+  "sheet": "albrecht-the-nerd.png",
+  "frameWidth": 20,
+  "frameHeight": 29,
+  "frames": 48,
+  "frameMs": 62,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 10.0
+}
