@@ -3852,6 +3852,7 @@ app.get('/api/health', (req, res) => {
   const out = {
     ok: true, uptimeS: Math.round(process.uptime()),
     loopLagMs: { mean: ms(_elHist.mean), p50: ms(_elHist.percentile(50)), p95: ms(_elHist.percentile(95)), p99: ms(_elHist.percentile(99)), max: ms(_elHist.max) },
+    cpuAktiv: aktiveCpuPartien(), cpuGrenze: MAX_CPU_PARTIEN, budgetFaktor: Math.round(require('./cards/effects/_cpu-last')._debug().faktor * 100) / 100,
     rooms: rooms.size, cpuRooms: [...rooms.values()].filter(r => r && r.type === 'singleplayer').length,
     rssMb: Math.round(process.memoryUsage().rss / 1048576), heapMb: Math.round(process.memoryUsage().heapUsed / 1048576),
   };
@@ -7374,6 +7375,15 @@ function makeCpuDriver(room) {
   };
 }
 
+// Laufende CPU-Partien mit verbundenem Spieler (getrennte warten nur im Speicher auf ihren Ablauf und rechnen nicht).
+const MAX_CPU_PARTIEN = parseInt(process.env.PP_MAX_CPU_GAMES || '30', 10);
+function aktiveCpuPartien() {
+  let n = 0;
+  for (const r of rooms.values()) {
+    if (r && r.type === 'singleplayer' && r.gameState && !r.gameState.result && !(r.gameState.players || []).some(p => p && p.disconnected)) n++;
+  }
+  return n;
+}
 function cleanupRoom(roomId) {
   const room = rooms.get(roomId);
   if (!room) return;
@@ -18130,6 +18140,13 @@ io.on('connection', (socket) => {
   async function createCpuBattle({ playerDeckId, cpuDeckId, campaign }) {
     if (!currentUser) { socket.emit('cpu_battle_error', 'Not authenticated'); return; }
     if (activeGames.has(currentUser.userId)) { socket.emit('cpu_battle_error', 'Already in a game'); return; }
+    // Zulassungsgrenze: jede laufende CPU-Partie rechnet im selben Prozess (Lasttest: ab ~10 gleichzeitigen wird der Server traege). Lieber einer
+    // wartet kurz, als dass alle ruckeln. Kampagne und Tutorials (kein MCTS) sind ausgenommen.
+    if (!campaign && aktiveCpuPartien() >= MAX_CPU_PARTIEN) {
+      console.warn(`[createCpuBattle] abgelehnt: ${aktiveCpuPartien()} laufende CPU-Partien (Grenze ${MAX_CPU_PARTIEN})`);
+      socket.emit('cpu_battle_error', 'The server is very busy right now — please try again in a minute.');
+      return;
+    }
 
     // Player deck must be owned (their own custom deck or owned sample).
     // CPU deck can be ANY sample — the CPU playing a structure deck
@@ -20280,10 +20297,10 @@ io.on('connection', (socket) => {
           // closing after `superseded`).
           if (room.players[pi]?.socketId !== socket.id) return;
           room.gameState.players[pi].disconnected = true;
-          // Hold onto the room for 5 minutes — plenty for a refresh
+          // Hold onto the room for 3 minutes — plenty for a refresh
           // / brief network blip. Anything longer than that is "the
           // user closed the tab" and we'd rather reclaim resources.
-          const SP_RECONNECT_GRACE_MS = 5 * 60 * 1000;
+          const SP_RECONNECT_GRACE_MS = 3 * 60 * 1000;
           const timer = setTimeout(() => {
             disconnectTimers.delete(currentUser.userId);
             cleanupRoom(activeRoomId);
@@ -22853,6 +22870,21 @@ initDatabase().then(async () => {
   // gar nicht erst in die Map kommen.
   await restoreSessions();
   server.listen(PORT, HOST, () => {
+    // Kartenskripte im Leerlauf vorladen (Profil: ~5 s Ladezeit, sonst beim ersten Spieler nach einem Neustart/Deploy). Kleine Scheiben mit Pausen,
+    // damit Sockets waehrenddessen bedient werden.
+    if (process.env.PP_NO_PRELOAD !== '1') setTimeout(() => {
+      try {
+        const { loadCardEffect } = require('./cards/effects/_loader');
+        const namen = Object.keys(getCardDB()); let i = 0; const t0 = Date.now();
+        const schritt = () => {
+          const t = Date.now();
+          while (i < namen.length && Date.now() - t < 8) { try { loadCardEffect(namen[i]); } catch { /* fehlendes Skript: egal */ } i++; }
+          if (i < namen.length) setTimeout(schritt, 10);
+          else console.log(`[preload] ${namen.length} Kartenskripte geladen (${Date.now() - t0} ms)`);
+        };
+        schritt();
+      } catch (e) { console.error('[preload]', e.message); }
+    }, 3000);
     // ── DIAGNOSE-SCHALTER BEIM START ANZEIGEN ─────────────────────
     // Zum ZWEITEN Mal ist eine Umgebungsvariable still nicht
     // angekommen (erst PP_DEMO_RECORD, jetzt PP_CHAIN_DEBUG /
