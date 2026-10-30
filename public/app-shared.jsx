@@ -1684,8 +1684,10 @@ function ppPxSchriftBildUrl(z, farbe) {
   } catch { return ''; }
   const f = ppFarbe(farbe || '#ffffff');
   const q = window.ppSnapRgb ? window.ppSnapRgb(f[0] | 0, f[1] | 0, f[2] | 0) : [f[0] | 0, f[1] | 0, f[2] | 0];
+  const key = 'fg:' + z + ':' + q.join(',');
+  if (_ppSchriftLeer.has(key)) return '';
   let leer = true;
-  const url = ppPxBild('fg:' + z + ':' + q.join(','), 16, 16, (setze) => {
+  const url = ppPxBild(key, 16, 16, (setze) => {
     const c = document.createElement('canvas');
     c.width = 16; c.height = 16;
     const ctx = c.getContext('2d', { willReadFrequently: true });
@@ -1698,9 +1700,11 @@ function ppPxSchriftBildUrl(z, farbe) {
       const i = (y * 16 + x) * 4;
       if (d[i + 3] >= 128) { setze(x, y, [d[i], d[i + 1], d[i + 2], 1]); leer = false; }
     }
+    if (leer) _ppSchriftLeer.add(key);
   }, 2);
-  return leer ? '' : url;
+  return _ppSchriftLeer.has(key) ? '' : url;
 }
+const _ppSchriftLeer = new Set();      // Zeichen, die die Schrift nicht zeichnet (leeres Bild): nicht noch einmal versuchen
 let _ppSchriftBereiche = null;
 /** Codepunkt-Bereiche der Pixel-Emoji-Schrift (aus ihrer `@font-face`-Regel in style.css). */
 function ppPxSchriftBereiche() {
