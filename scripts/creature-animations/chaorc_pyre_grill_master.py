@@ -33,6 +33,7 @@ Frame 0 = Ruhepose bis auf das neu gezeichnete Feuer. Kontrolle: anim_humanoide.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 Ergänzungen: keine (der Koch liegt vollständig als eigene Ebene vor; der Spieß ist drei Kopien der Originalebene).
 """
+import math
 import sys
 
 import numpy as np
@@ -42,7 +43,7 @@ import anim_humanoide as Hm
 import anim_lib as L
 
 N, MS = 48, 62
-PAD_L, PAD_R, PAD_T, PAD_B = 6, 8, 26, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 6, 8, 14, 3
 
 spr = L.lade('chaorc-pyre-grill-master')                     # zusammengesetzte Ruhepose (Referenz, Randpixel-Test)
 FEUER0 = L.lade('chaorc-pyre-grill-master-feuer')
@@ -62,28 +63,156 @@ ERLAUBT_KOCH = Hm.umrissfarben(KOCH)
 ERLAUBT = Hm.umrissfarben(spr)                               # Außenkantenfarben der Ruhepose (Randpixel-Test)
 FEUERFARBEN = {ROT, ORANGE, GELB, CREME}
 
-# ── Feuer: Zungen aus dem Profil des Originalfächers ──
+# ── Feuer: Zungen aus dem Profil des Originalfächers (ohne dessen 1-px-Spitzen: Oberkante der mindestens 2 px breiten Teile) ──
 fm = np.zeros((sh, sw), bool)
 for y in range(FEUER0.shape[0]):
     for x in range(FEUER0.shape[1]):
         if FEUER0[y, x, 3]:
             fm[y + FEUER_POS[1], x + FEUER_POS[0]] = True
-prof = {x: (int(np.nonzero(fm[:, x])[0].min()), int(np.nonzero(fm[:, x])[0].max())) for x in range(sw) if fm[:, x].any()}
+fm2 = fm & (np.roll(fm, 1, 1) | np.roll(fm, -1, 1))                  # einzelne 1-px-Spitzen/-Fäden fallen heraus
+prof = {x: (int(np.nonzero(fm2[:, x])[0].min()), int(np.nonzero(fm[:, x])[0].max())) for x in range(sw) if fm2[:, x].any()}
+N_ZUNGEN, X_ERSTE, X_LETZTE = 10, 15.0, 59.0                          # 10 breite Zungen statt 16 schmaler
 ZUNGEN = []
-for x0 in range(14, 61, 3):
-    xs = [x for x in range(x0 - 1, x0 + 2) if x in prof]
+for k in range(N_ZUNGEN):
+    x0 = X_ERSTE + (X_LETZTE - X_ERSTE) * k / (N_ZUNGEN - 1)
+    xs = [x for x in range(int(round(x0)) - 2, int(round(x0)) + 3) if x in prof]
     if not xs:
         continue
-    oben = min(prof[x][0] for x in xs)
+    oben = sum(prof[x][0] for x in xs) / len(xs)
     unten = max(prof[x][1] for x in xs)
-    ZUNGEN.append(FEU.Zunge(x0 + PAD_L, unten + PAD_T, unten - oben + 1, 3.4))
+    ZUNGEN.append(FEU.Zunge(x0 + PAD_L, unten + PAD_T, round(unten - oben + 1), 2.9))
 # Koch ist fest im Weg (Feuer wird nicht über ihn gezeichnet); der Spieß liegt davor und wird nicht ausgespart (Feuer darunter, kein Loch beim Gleiten)
 sperre = np.zeros((H, W), bool)
 for y in range(KOCH.shape[0]):
     for x in range(KOCH.shape[1]):
         if KOCH[y, x, 3]:
             sperre[y + KOCH_POS[1] + PAD_T, x + KOCH_POS[0] + PAD_L] = True
-FEUER = FEU.Feuer(H, W, ZUNGEN, RAMPE, n=N, seed=5, posen=12, amplitude=1.0, sperre=sperre)
+
+
+class FeuerKompakt(FEU.Feuer):
+    """anim_feuer.Feuer mit kompakten Zungen (Parameter wie sie sich in anim_feuer.py abbilden ließen):
+    min_breite  Mindestbreite jeder Zunge / jedes Spaltastes in px (Standard 2: keine 1-px-Fäden),
+    faden_max   längste erlaubte 1-px-breite Spitze in Zeilen (Standard 2; längere Fäden werden an der Spitze gekappt),
+    spalten     Wahrscheinlichkeit, dass eine Pose die Spitze spaltet (nur Zungen mit Halbbreite ≥ spalt_ab; Standard 0.10),
+    h_bereich   Höhenfaktoren der Posen (Standard 0.86 … 1.14), lean/bend/dk wie das Original, aber gemäßigt."""
+
+    def __init__(self, h, w, zungen, rampe, n=48, seed=1, posen=12, amplitude=1.0, sperre=None, tempo=(2, 3),
+                 min_breite=2, faden_max=2, spalten=0.10, spalt_ab=2.8, h_bereich=(0.86, 1.14)):
+        import random
+        self.min_breite, self.faden_max, self.spalten, self.spalt_ab, self.h_bereich = min_breite, faden_max, spalten, spalt_ab, h_bereich
+        self.h, self.w, self.zungen, self.rampe, self.n, self.amp = h, w, list(zungen), rampe, n, amplitude
+        self.sperre = np.zeros((h, w), bool) if sperre is None else sperre.astype(bool)
+        self.farben = [tuple(rampe[k]) for k in FEU.SCHICHTEN]
+        self.bank, self.folge, self.ereignisse = [], [], []
+        for g, z in enumerate(self.zungen):
+            rnd = random.Random(seed * 1009 + 37 * g)
+            bank = [self._pose(rnd, z) for _ in range(posen)]
+            ablauf, summe, ordnung = [], 0, []
+            while summe < n:
+                if not ordnung:
+                    ordnung = list(range(posen))
+                    rnd.shuffle(ordnung)
+                d = rnd.randint(tempo[0], tempo[1])
+                ablauf += [ordnung.pop()] * d
+                summe += d
+            self.bank.append(bank)
+            self.folge.append(ablauf[:n])
+        self._spitzen_ereignisse()
+
+    def _pose(self, rnd, z):
+        a = self.amp
+        lo, hi = self.h_bereich
+        h = rnd.choice([lo, (lo + 1) / 2, 1.0, 1.0, (hi + 1) / 2, hi])
+        return dict(
+            h=1.0 + (h - 1.0) * a,
+            lean=rnd.uniform(-1.9, 1.9) * a, bend=rnd.uniform(-1.0, 1.0) * a,
+            w=1.0 + rnd.uniform(-0.16, 0.16) * a,
+            u=[1.0, rnd.uniform(0.94, 1.0), rnd.uniform(0.78, 0.96), rnd.uniform(0.42, 0.7), rnd.uniform(0.14, 0.42)],
+            wk=[1.0, 0.8 * (1 + rnd.uniform(-0.08, 0.08)), 0.58 * (1 + rnd.uniform(-0.15, 0.15)),
+                0.38 * (1 + rnd.uniform(-0.2, 0.2)), 0.22 * (1 + rnd.uniform(-0.3, 0.3))],
+            dk=[0.0, rnd.uniform(-0.5, 0.5) * a, rnd.uniform(-1.0, 1.0) * a, rnd.uniform(-1.1, 1.1) * a, rnd.uniform(-1.3, 1.3) * a],
+            split=(rnd.uniform(0.7, 1.0) if (z.breite >= self.spalt_ab and rnd.random() < self.spalten) else 0.0),
+            split_u=rnd.uniform(0.62, 0.74))
+
+    def _zeichne(self, idx, z, p, bonus):
+        Hh = self._hoehe(z, p, bonus)
+        b = z.basis
+        w0 = z.breite * p['w']
+        mb = self.min_breite / 2.0                                              # Mindest-Halbbreite
+        for dy in range(0, Hh + 1):
+            y = b - dy
+            if not 0 <= y < self.h:
+                continue
+            u = dy / float(Hh)
+            c = self._mitte(z, p, u)
+            ho = w0 * (1 - u ** 2.4) ** 0.6
+            spitze = dy >= Hh - 1                                              # die letzten beiden Zeilen laufen spitz zu
+            if not spitze:
+                ho = max(ho, mb)
+            lobes = [(c, ho)]
+            if p['split'] > 0 and u > p['split_u'] and not spitze:
+                d = min(2.3, 1.0 + p['split'] * (u - p['split_u']) * Hh * 0.35)
+                lobes = [(c - d, max(ho * 0.75, mb)), (c + d, max(ho * 0.75, mb))]
+            for (cc, hw0) in lobes:
+                for k in range(5):
+                    uk = p['u'][k]
+                    if u > uk:
+                        continue
+                    hw = hw0 * p['wk'][k] * (1 - 0.3 * (u / uk) ** 2)
+                    ck = cc + p['dk'][k] * (1 - u / uk)
+                    x0 = int(math.ceil(ck - hw - 0.01))
+                    x1 = int(math.floor(ck + hw + 0.01))
+                    if x1 < x0:
+                        x0 = x1 = int(round(ck))
+                    for x in range(x0, x1 + 1):
+                        if 0 <= x < self.w and not self.sperre[y, x] and idx[y, x] < k:
+                            idx[y, x] = k
+
+    def _faeden_kuerzen(self, idx):
+        """Kürzt 1-px-breite Spitzen auf höchstens `faden_max` Zeilen (schneidet überlange Fäden an der Spitze ab)."""
+        for _ in range(60):
+            m = idx >= 0
+            pad = np.pad(m, 1)
+            links, rechts = pad[1:-1, :-2], pad[1:-1, 2:]
+            duenn = m & ~links & ~rechts                                        # Zeile mit Lauflänge 1
+            oben = ~pad[:-2, 1:-1] & ~pad[:-2, :-2] & ~pad[:-2, 2:]             # nichts darüber (auch nicht schräg)
+            gekappt = False
+            for y, x in zip(*np.nonzero(duenn & oben)):
+                lang, cx = 1, x                                                 # Kettenlänge nach unten
+                yy = y
+                while yy + 1 < self.h and lang <= self.faden_max:
+                    nxt = [xx for xx in (cx - 1, cx, cx + 1) if 0 <= xx < self.w and m[yy + 1, xx]]
+                    if len(nxt) == 1 and duenn[yy + 1, nxt[0]]:
+                        yy += 1
+                        cx = nxt[0]
+                        lang += 1
+                    else:
+                        break
+                if lang > self.faden_max:
+                    idx[y, x] = -1
+                    gekappt = True
+            if not gekappt:
+                break
+
+    def ebene(self, i, hoehen_bonus=0):
+        idx = np.full((self.h, self.w), -1, np.int8)
+        for g, z in enumerate(self.zungen):
+            p = self.bank[g][self.folge[g][i % self.n]]
+            self._zeichne(idx, z, p, hoehen_bonus)
+        self._faeden_kuerzen(idx)
+        belegt = (idx >= 0) | self.sperre
+        pad = np.pad(belegt, 1)
+        voll = pad[:-2, 1:-1] & pad[2:, 1:-1] & pad[1:-1, :-2] & pad[1:-1, 2:]
+        idx[(idx >= 0) & ~voll] = 0
+        out = L.leer(self.h, self.w)
+        for k in range(5):
+            mk = idx == k
+            out[mk, :3] = self.farben[k]
+            out[mk, 3] = 255
+        return self._verbinden(out)
+
+
+FEUER = FeuerKompakt(H, W, ZUNGEN, RAMPE, n=N, seed=5, posen=12, amplitude=1.0, sperre=sperre)
 
 
 def bruecken(fig):

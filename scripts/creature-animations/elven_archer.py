@@ -33,7 +33,7 @@ Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Linke Lockenspitze (5,14): außen liegt der Bogenumriss (4,14), nach außen geht nichts — sie schlägt dreimal pro Schleife kurz nach
   innen ((5,14) wird Umrissbraun, der blasse Pixel steht auf (6,14)).
 * KEIN Haarglanz und KEIN Federglanz (Regel 14: Glanz nur bei Metall/Gold/Edelsteinen; Haare, Feder gehören nicht dazu).
-* Augenglanz (Frames 13–15 und 37–39): Hellblau und Weiß des offenen Auges tauschen kurz den Platz (der Glanzpunkt „wandert“).
+* KEIN Augenglanz: das offene Auge behält in jedem Frame außer beim Blinzeln exakt die Original-Anordnung von Weiß und Blaugrau (kein Farbtausch).
 * Ohrenzucken: rechtes Ohr Frames 7–11 und 40–42 (Spitze (17,8) → (17,9)), linkes Ohr Frames 28–30 (Keil (0,8) → (0,9)); beide
   Umrisse bleiben 4-verbunden.
 * Blinzeln (Frames 17–19 und 38–40): das offene linke Auge schließt sich über eine Zwischenstufe zum Strich wie das zwinkernde rechte.
@@ -76,7 +76,6 @@ BOGEN_OBEN = 7                                                # erste Zeile mit 
 # Blinzeln des offenen linken Auges: offen (6,9) schwarz, (6,10) Iris, (7,10) Pupille, (6,11) Glanz, (7,11) rotbraun.
 AUGE_HALB = {(6, 9): HAUT, (6, 11): SCHWARZ}
 AUGE_ZU = {(6, 9): HAUT, (6, 10): HAUT, (7, 10): HAUT, (6, 11): SCHWARZ, (7, 11): SCHWARZ}
-AUGE_GLANZ = {(6, 10): WEISS, (6, 11): HELLBLAU}              # Hellblau und Weiß tauschen den Platz
 # Ohren zucken nach unten (Spitze 1 px tiefer); die Umrisse bleiben 4-verbunden
 OHR_R_RUNTER = {(17, 8): None, (17, 9): UMRISS}
 OHR_L_RUNTER = {(0, 8): None, (0, 9): UMRISS}
@@ -135,8 +134,6 @@ def frame(i):
     bl = Hm.folge(i, 17, [AUGE_HALB, AUGE_ZU, AUGE_HALB], N) or Hm.folge(i, 38, [AUGE_HALB, AUGE_ZU, AUGE_HALB], N)
     if bl:
         Hm.setze(k, bl, OFF)
-    elif Hm.takt(i, N, 13, 3) or Hm.takt(i, N, 37, 3):
-        Hm.setze(k, AUGE_GLANZ, OFF)
     if Hm.folge(i, 7, [1, 1, 0, 1, 1], N) or Hm.folge(i, 40, [1, 1, 1], N):
         Hm.setze(k, OHR_R_RUNTER, OFF)
     if Hm.folge(i, 28, [1, 1, 1], N):

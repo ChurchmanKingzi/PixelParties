@@ -98,8 +98,8 @@ def koerper_dy(i):
 import anim_feuer as FEU
 
 # Zungen in Sprite-Koordinaten (x, Fußzeile, Höhe, Halbbreite am Fuß); Höhe/Lage entsprechen den Zungen des Originals
-ZUNGEN_SPRITE = [(1.2, 12, 10, 2.0), (3.4, 12, 12, 2.0), (4.6, 11, 12, 0.9), (6.8, 10, 9, 2.0), (9.0, 10, 8, 2.0),
-                 (11.2, 10, 10, 2.0), (13.2, 11, 11.5, 2.0), (15.2, 12, 12, 2.0), (16.9, 12, 8, 1.5)]
+ZUNGEN_SPRITE = [(1.2, 12, 11, 2.0), (3.4, 12, 14, 2.0), (4.8, 11, 11, 1.6), (6.8, 10, 11, 2.0), (9.0, 10, 10, 2.0),
+                 (11.2, 10, 12, 2.0), (13.2, 11, 13.5, 2.0), (15.2, 12, 14, 2.0), (16.9, 12, 9, 1.6)]
 yy_, xx_ = np.mgrid[0:sh, 0:sw]
 KUPPEL = (((yy_ >= 11) & (yy_ <= 12) & (xx_ >= 4) & (xx_ <= 13)) | ((yy_ == 10) & (xx_ >= 6) & (xx_ <= 11)) | (yy_ == 13)) & (spr[..., 3] > 0)   # feste Schleimkuppel im Feuer (Zeile 13 ganz)
 KUPPEL_C = np.zeros((H, W), bool)

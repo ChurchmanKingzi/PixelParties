@@ -7,7 +7,7 @@ Das Feuer wird aus verschachtelten Flammenzungen neu gezeichnet. Jede Zunge hat 
 
 Jede Schicht hat pro Pose ihre EIGENE Höhe, Breite und seitliche Verschiebung (Kerne wandern auf und ab und hin und her, Farbgrenzen steigen
 und fallen); die ganze Zunge biegt sich (Seitenneigung + S-Kurve), wächst und schrumpft, schmale Zungen spalten ihre Spitze kurz und
-verschmelzen wieder. Jede Zunge hat eine eigene Folge aus `posen` Posen (Standard 12), jede Pose hält 2–3 Frames, die Zungen sind
+verschmelzen wieder (selten, nur breite Zungen). Jede Zunge hat eine eigene Folge aus `posen` Posen (Standard 12), jede Pose hält 2–3 Frames, die Zungen sind
 gegeneinander versetzt (Zufallsfolge je Zunge, nahtlos über n Frames). Die Basis steht fest (x und Fußzeile je Zunge), darüber bewegt sich alles.
 Fällt eine hohe Zunge zurück, reißt ihre Spitze ab und steigt als Funke auf (kühlt ab: hell → gelb → orange → rot).
 
@@ -27,6 +27,9 @@ Schnittstelle
 Parameter: `amplitude` (1.0 = kräftiges Züngeln, 0.5 = ruhig), `posen` (Zahl verschiedener Posen je Zunge), `sperre` (Bool-Maske: dort steht
 schon etwas Festes — Flammen werden nicht darübergezeichnet und der Rand dort nicht eingefasst), `n` (Schleifenlänge), `tempo` (Haltedauer (min, max)).
 Die Randpixel der Flamme sind immer die Umrissfarbe `rand` (Regel 16); es werden nur Farben der übergebenen Rampe verwendet.
+Kompakte Flammen: Nach dem Zeichnen werden alle Teile, die dünner als 2 px sind (Fäden, Äste, Mini-Zacken), abgeschnitten (Öffnung mit einem
+2×2-Block); nur die Spitze darf bis zu `faden` (Standard 2) Pixel als 1-px-Spitze überstehen. Die Zungen sind unten mindestens 3 px breit
+(`breite` ≥ 1,5), laufen oben spitz zu und neigen sich nur mäßig; Spaltung kommt selten vor und nur bei breiten Zungen (`breite` ≥ 1,8).
 """
 import math
 import random
@@ -50,22 +53,23 @@ def _pose(rnd, z, amp):
     h = 1.0 + (h - 1.0) * amp
     p = dict(
         h=h,
-        lean=rnd.uniform(-2.6, 2.6) * amp * min(1.0, 0.45 + z.breite * 0.3),
-        bend=rnd.uniform(-1.3, 1.3) * amp,
+        lean=rnd.uniform(-1.9, 1.9) * amp * min(1.0, 0.45 + z.breite * 0.3),
+        bend=rnd.uniform(-0.9, 0.9) * amp,
         w=1.0 + rnd.uniform(-0.28, 0.28) * amp,
         u=[1.0, rnd.uniform(0.94, 1.0), rnd.uniform(0.76, 0.96), rnd.uniform(0.4, 0.7), rnd.uniform(0.14, 0.42)],
         wk=[1.0, 0.8 * (1 + rnd.uniform(-0.08, 0.08)), 0.58 * (1 + rnd.uniform(-0.15, 0.15)),
             0.38 * (1 + rnd.uniform(-0.2, 0.2)), 0.22 * (1 + rnd.uniform(-0.3, 0.3))],
         dk=[0.0, rnd.uniform(-0.5, 0.5) * amp, rnd.uniform(-1.0, 1.0) * amp, rnd.uniform(-1.1, 1.1) * amp, rnd.uniform(-1.3, 1.3) * amp],
-        split=(rnd.uniform(0.5, 1.1) * amp if rnd.random() < 0.28 else 0.0),
+        split=(rnd.uniform(0.5, 0.9) * amp if (rnd.random() < 0.12 and z.breite >= 1.8) else 0.0),
         split_u=rnd.uniform(0.5, 0.72),
     )
     return p
 
 
 class Feuer:
-    def __init__(self, h, w, zungen, rampe, n=48, seed=1, posen=12, amplitude=1.0, sperre=None, tempo=(2, 3)):
+    def __init__(self, h, w, zungen, rampe, n=48, seed=1, posen=12, amplitude=1.0, sperre=None, tempo=(2, 3), faden=2):
         self.h, self.w, self.zungen, self.rampe, self.n, self.amp = h, w, list(zungen), rampe, n, amplitude
+        self.faden = faden
         self.sperre = np.zeros((h, w), bool) if sperre is None else sperre.astype(bool)
         self.farben = [tuple(rampe[k]) for k in SCHICHTEN]
         self.folge = []                                                         # je Zunge: [(Posenindex je Frame)], Bank
@@ -105,11 +109,11 @@ class Feuer:
                 continue
             u = dy / float(H)
             c = self._mitte(z, p, u)
-            ho = w0 * (1 - u ** 2.4) ** 0.6                                       # bleibt breit und läuft erst oben spitz zu
+            ho = w0 * (1 - u ** 2.0) ** 0.7                                      # bleibt breit und läuft erst oben spitz zu
             lobes = [(c, ho, 1.0)]
             if p['split'] > 0 and u > p['split_u']:
                 d = p['split'] * (u - p['split_u']) * H * 0.55
-                lobes = [(c - d, ho * 0.62, 1.0), (c + d, ho * 0.62, 1.0)]
+                lobes = [(c - d, ho * 0.7, 1.0), (c + d, ho * 0.7, 1.0)]
             for (cc, hw0, _) in lobes:
                 for k in range(5):
                     uk = p['u'][k]
@@ -146,11 +150,36 @@ class Feuer:
                     x, y = self._tip(z, alt, 0)
                     self.ereignisse.append((i, x, y, [-1, 0, 1][(g + i) % 3]))
 
+    def _kompakt(self, idx):
+        """Alles, was dünner als 2 px ist, abschneiden (2×2-Öffnung); Spitzen dürfen `faden` px als 1-px-Spitze überstehen. Teile, die nach dem
+        Abschneiden nicht mehr 4-verbunden an Basis/fester Kuppel hängen, entfallen. Die feste Kuppel (sperre) zählt als Material."""
+        import cv2
+        m = (idx >= 0) | self.sperre
+        pad = np.pad(m, ((0, 1), (0, 1)))
+        e = pad[:-1, :-1] & pad[:-1, 1:] & pad[1:, :-1] & pad[1:, 1:]            # e[y,x]: 2×2-Block mit Ecke links oben (x,y) voll
+        ep = np.pad(e, ((1, 0), (1, 0)))
+        o = ep[1:, 1:] | ep[1:, :-1] | ep[:-1, 1:] | ep[:-1, :-1]                 # Öffnung: jedes Pixel eines vollen Blocks
+        r = o.copy()
+        for _ in range(self.faden):
+            q = np.pad(r, 1)
+            d = r | q[:-2, 1:-1] | q[2:, 1:-1] | q[1:-1, :-2] | q[1:-1, 2:]
+            r = d & m
+        basis_zeile = max(z.basis for z in self.zungen)
+        n, lab = cv2.connectedComponents(r.astype(np.uint8), connectivity=4)
+        keep = np.zeros_like(r)
+        for k in range(1, n):
+            comp = lab == k
+            if (comp & self.sperre).any() or comp[basis_zeile - 1:].any():
+                keep |= comp
+        idx[~keep & ~self.sperre] = -1
+        return idx
+
     def ebene(self, i, hoehen_bonus=0):
         idx = np.full((self.h, self.w), -1, np.int8)
         for g, z in enumerate(self.zungen):
             p = self.bank[g][self.folge[g][i % self.n]]
             self._zeichne(idx, z, p, hoehen_bonus)
+        idx = self._kompakt(idx)
         # Randpixel (4-Nachbar leer) sind immer die Außenhaut (Umriss); feste Pixel (sperre) zählen als belegt
         belegt = (idx >= 0) | self.sperre
         pad = np.pad(belegt, 1)
