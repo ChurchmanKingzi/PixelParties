@@ -5290,6 +5290,7 @@ function FlameStrikeEffect({ x, y, skala = 1 }) {   // W86r1: `skala` vergröße
 //     float just above the cards (z-index) so they're actually visible.
 // Both layers are pointer-events:none and respect prefers-reduced-motion.
 // The colour comes in as the player's chosen colour.
+const ppAmbGerade = (v) => Math.round(v / 2) * 2;   // gerade Pixel (Pixelart: Teilchen liegen auf dem 2-px-Kunstpixelraster)
 function HandAmbiance({ color }) {
   const motes = useMemo(() => {
     const N = 80;   // doubled from 40 — denser pixel rain over the hand
@@ -5299,11 +5300,11 @@ function HandAmbiance({ color }) {
       arr.push({
         top:   Math.random() * 100,
         left:  Math.random() * 100,
-        size:  2 + Math.floor(Math.random() * 3),        // 2–4px pixel squares
+        size:  2 + 2 * Math.floor(Math.random() * 2),    // 2 oder 4 px (ganze Kunstpixel)
         dur,
         delay: -Math.random() * dur,                     // mid-cycle stagger
-        dx:    (Math.random() * 2 - 1) * 26,             // -26..26px horizontal drift
-        dy:    -(24 + Math.random() * 90),               // rise far enough to leave the hand
+        dx:    ppAmbGerade((Math.random() * 2 - 1) * 26),     // -26..26px horizontal drift (gerade Pixel: Pixelart)
+        dy:    ppAmbGerade(-(24 + Math.random() * 90)),       // rise far enough to leave the hand
         max:   0.22 + Math.random() * 0.3,               // subtle peak opacity
         // Mostly the player's colour; ~30% white for a sparkle.
         color: Math.random() < 0.3 ? '#ffffff' : 'var(--amb-me)',
@@ -5325,6 +5326,8 @@ function HandAmbiance({ color }) {
             '--p-delay': p.delay + 's',
             '--p-dx': p.dx + 'px',
             '--p-dy': p.dy + 'px',
+            '--p-dx2': ppAmbGerade(p.dx * 1.6) + 'px',
+            '--p-dy2': ppAmbGerade(p.dy * 1.8) + 'px',
             '--p-max': p.max,
           }} />
         ))}
@@ -5351,16 +5354,16 @@ function BoardAmbiance({ colorMe, colorOpp }) {
     const N = 56;
     const arr = [];
     for (let i = 0; i < N; i++) {
-      const dur = 4 + Math.random() * 5;                 // 4–9s — calmer than the hand
+      const dur = 4 + Math.random() * 3.9;               // 4–7,9s — calmer than the hand (Pixelart: unter 8 s, sonst backt pixel-anim.js die Schleife nicht → weiches Alpha)
       const top = Math.random() * 100;
       arr.push({
         top,
         left: Math.random() * 100,
-        size: 2 + Math.floor(Math.random() * 3),         // 2–4px pixel squares
+        size: 2 + 2 * Math.floor(Math.random() * 2),     // 2 oder 4 px (ganze Kunstpixel)
         dur,
         delay: -Math.random() * dur,                     // mid-cycle stagger
-        dx:   (Math.random() * 2 - 1) * 34,              // -34..34px horizontal drift
-        dy:   -(40 + Math.random() * 130),               // long rise across the field
+        dx:   ppAmbGerade((Math.random() * 2 - 1) * 34),      // -34..34px horizontal drift (gerade Pixel: Pixelart)
+        dy:   ppAmbGerade(-(40 + Math.random() * 130)),       // long rise across the field
         max:  0.14 + Math.random() * 0.22,               // dim — background layer
         color: Math.random() < 0.25 ? '#ffffff'
              : (top > 50 ? 'var(--amb-board-me)' : 'var(--amb-board-opp)'),
@@ -5380,6 +5383,8 @@ function BoardAmbiance({ colorMe, colorOpp }) {
           '--p-delay': p.delay + 's',
           '--p-dx': p.dx + 'px',
           '--p-dy': p.dy + 'px',
+          '--p-dx2': ppAmbGerade(p.dx * 1.6) + 'px',
+          '--p-dy2': ppAmbGerade(p.dy * 1.8) + 'px',
           '--p-max': p.max,
         }} />
       ))}
@@ -37080,21 +37085,21 @@ function playSideDeckAppearOverlay(targetEl) {
     style.id = 'side-deck-appear-keyframes';
     style.textContent = `
       @keyframes sdaShineSweep {
-        0%   { opacity: 0; transform: translateX(-120%) skewX(-25deg); }
+        0%   { opacity: 0; transform: translateX(-120%) skewX(-25deg); } /* pp-ok: drehung */
         25%  { opacity: 1; }
-        100% { opacity: 0; transform: translateX(220%) skewX(-25deg); }
+        100% { opacity: 0; transform: translateX(220%) skewX(-25deg); } /* pp-ok: drehung */
       }
       @keyframes sdaCardGlow {
         0%   { box-shadow: 0 0 0 0 rgba(255,241,150,0); filter: brightness(1); }
-        25%  { box-shadow: 0 0 28px 6px rgba(251,225,129,0.95), 0 0 48px 14px rgba(214,179,249,0.7); filter: brightness(1.3); }
-        70%  { box-shadow: 0 0 22px 4px rgba(251,225,129,0.7); filter: brightness(1.1); }
+        25%  { box-shadow: 0 0 0 12px #fbe181, 0 0 0 14px #7e7d9b; filter: brightness(1.3); }
+        70%  { box-shadow: 0 0 0 8px #fbe181; filter: brightness(1.1); }
         100% { box-shadow: 0 0 0 0 rgba(251,225,129,0); filter: brightness(1); }
       }
       @keyframes sdaSparkle {
         0%   { opacity: 0; transform: translate(0,0) scale(0.3) rotate(0deg); }
-        20%  { opacity: 1; transform: translate(calc(var(--sdaDx) * 0.25), calc(var(--sdaDy) * 0.25)) scale(1.1) rotate(60deg); }
-        70%  { opacity: 1; transform: translate(calc(var(--sdaDx) * 0.8), calc(var(--sdaDy) * 0.8)) scale(0.95) rotate(280deg); }
-        100% { opacity: 0; transform: translate(var(--sdaDx), var(--sdaDy)) scale(0.5) rotate(420deg); }
+        20%  { opacity: 1; transform: translate(calc(var(--sdaDx) * 0.25), calc(var(--sdaDy) * 0.25)) scale(1.1) rotate(60deg); } /* pp-ok: drehung */
+        70%  { opacity: 1; transform: translate(calc(var(--sdaDx) * 0.8), calc(var(--sdaDy) * 0.8)) scale(0.95) rotate(280deg); } /* pp-ok: drehung */
+        100% { opacity: 0; transform: translate(var(--sdaDx), var(--sdaDy)) scale(0.5) rotate(420deg); } /* pp-ok: drehung */
       }
     `;
     document.head.appendChild(style);
@@ -46593,10 +46598,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           @keyframes pusherFling {
             0%   { transform: translate(0,0) rotate(0deg) scale(1); opacity: 1; }
             16%  { transform: translate(34px, calc(-1 * var(--pfUp))) rotate(360deg) scale(1.12); opacity: 1; }
-            50%  { transform: translate(-22px, calc(-1 * var(--pfUp) - 50px)) rotate(680deg) scale(1.06); opacity: 1; }
-            82%  { transform: translate(0, 20px) rotate(940deg) scale(1.14, 0.86); opacity: 1; }
-            92%  { transform: translate(0, -6px) rotate(948deg) scale(0.94, 1.08); opacity: 1; }
-            100% { transform: translate(0,0) rotate(948deg) scale(1); opacity: 1; }
+            50%  { transform: translate(-22px, calc(-1 * var(--pfUp) - 50px)) rotate(680deg) scale(1.06); opacity: 1; } /* pp-ok: drehung */
+            82%  { transform: translate(0, 20px) rotate(940deg) scale(1.14, 0.86); opacity: 1; } /* pp-ok: drehung */
+            92%  { transform: translate(0, -6px) rotate(948deg) scale(0.94, 1.08); opacity: 1; } /* pp-ok: drehung */
+            100% { transform: translate(0,0) rotate(948deg) scale(1); opacity: 1; } /* pp-ok: drehung */
           }
         `;
         document.head.appendChild(st);
@@ -46874,17 +46879,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         style.id = 'area-descend-kf';
         style.textContent = `
           @keyframes areaCardFall {
-            0%   { transform: translate(-50%, -720px) rotateZ(-14deg) scale(1.45); opacity: 0; filter: brightness(2.2) drop-shadow(0 0 24px rgba(251,225,129,.8)); }
+            0%   { transform: translate(-50%, -720px) rotateZ(-14deg) scale(1.45); opacity: 0; filter: brightness(2.2) drop-shadow(4px 0 0 #fbe181) drop-shadow(-4px 0 0 #fbe181) drop-shadow(0 4px 0 #fbe181) drop-shadow(0 -4px 0 #fbe181); } /* pp-ok: drehung */
             20%  { opacity: 1; }
-            75%  { transform: translate(-50%, 0) rotateZ(4deg) scale(1.35); filter: brightness(1.9) drop-shadow(0 0 28px rgba(255,241,150,.9)); }
-            82%  { transform: translate(-50%, 12px) rotateZ(-2deg) scale(1.18); filter: brightness(1.4) drop-shadow(0 0 18px rgba(251,225,129,.6)); }
-            90%  { transform: translate(-50%, -4px) rotateZ(1deg) scale(1.22); filter: brightness(1.3); }
+            75%  { transform: translate(-50%, 0) rotateZ(4deg) scale(1.35); filter: brightness(1.9) drop-shadow(4px 0 0 #fff196) drop-shadow(-4px 0 0 #fff196) drop-shadow(0 4px 0 #fff196) drop-shadow(0 -4px 0 #fff196); } /* pp-ok: drehung */
+            82%  { transform: translate(-50%, 12px) rotateZ(-2deg) scale(1.18); filter: brightness(1.4) drop-shadow(4px 0 0 #e0c085) drop-shadow(-4px 0 0 #e0c085) drop-shadow(0 4px 0 #e0c085) drop-shadow(0 -4px 0 #e0c085); } /* pp-ok: drehung */
+            90%  { transform: translate(-50%, -4px) rotateZ(1deg) scale(1.22); filter: brightness(1.3); } /* pp-ok: drehung */
             100% { transform: translate(-50%, 0) rotateZ(0deg) scale(1); opacity: 1; filter: brightness(1); }
           }
           @keyframes areaPileFly {
-            0%   { transform: translate(calc(-50% + var(--fdx)), var(--fdy)) rotateZ(-10deg) scale(var(--fsc)); opacity: 1; filter: brightness(1.3) drop-shadow(0 0 10px rgba(251,200,106,.6)); }
-            70%  { transform: translate(-50%, 0) rotateZ(3deg) scale(1.3); filter: brightness(1.8) drop-shadow(0 0 26px rgba(255,241,150,.9)); }
-            85%  { transform: translate(-50%, 6px) rotateZ(-1deg) scale(1.12); filter: brightness(1.3); }
+            0%   { transform: translate(calc(-50% + var(--fdx)), var(--fdy)) rotateZ(-10deg) scale(var(--fsc)); opacity: 1; filter: brightness(1.3) drop-shadow(4px 0 0 #d1a148) drop-shadow(-4px 0 0 #d1a148) drop-shadow(0 4px 0 #d1a148) drop-shadow(0 -4px 0 #d1a148); } /* pp-ok: drehung */
+            70%  { transform: translate(-50%, 0) rotateZ(3deg) scale(1.3); filter: brightness(1.8) drop-shadow(4px 0 0 #fff196) drop-shadow(-4px 0 0 #fff196) drop-shadow(0 4px 0 #fff196) drop-shadow(0 -4px 0 #fff196); } /* pp-ok: drehung */
+            85%  { transform: translate(-50%, 6px) rotateZ(-1deg) scale(1.12); filter: brightness(1.3); } /* pp-ok: drehung */
             100% { transform: translate(-50%, 0) rotateZ(0deg) scale(1); opacity: 1; filter: brightness(1); }
           }
           @keyframes areaImpactRing {
@@ -46903,9 +46908,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             100% { opacity: 0; transform: translate(calc(-50% + var(--adx)), calc(-50% + var(--ady))) scale(1.4); }
           }
           @keyframes areaBgFlash {
-            0%   { background: radial-gradient(ellipse at center, rgba(255,241,150,0) 0%, transparent 60%); }
-            30%  { background: radial-gradient(ellipse at center, rgba(255,241,150,.55) 0%, rgba(249,172,32,.25) 30%, transparent 70%); }
-            100% { background: radial-gradient(ellipse at center, rgba(255,241,150,0) 0%, transparent 60%); }
+            0%   { opacity: 0; }
+            30%  { opacity: 1; }
+            100% { opacity: 0; }
           }
         `;
         document.head.appendChild(style);
@@ -46913,7 +46918,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       // Full-viewport flash dimming (feels "important")
       const flashBg = document.createElement('div');
-      flashBg.style.cssText = `position:fixed;inset:0;pointer-events:none;z-index:9995;animation:areaBgFlash 1.1s ease-out forwards;`;
+      // Pixelart: der Verlauf steht fest im Stil (das Netz in pixel-hart.js macht ihn zum gedithertem Pixelbild, Groesse aus width/height), nur die Deckkraft laeuft
+      flashBg.style.cssText = `position:fixed;left:0;top:0;width:${window.innerWidth}px;height:${window.innerHeight}px;pointer-events:none;z-index:9995;background:radial-gradient(ellipse at center, rgba(255,241,150,.55) 0%, rgba(249,172,32,.25) 30%, transparent 70%);animation:areaBgFlash 1.1s ease-out forwards;`;
       document.body.appendChild(flashBg);
       setTimeout(() => flashBg.remove(), 1200);
 
@@ -47284,10 +47290,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             100% { opacity: 0; transform: translate(var(--ebeDx), var(--ebeDy)) scale(0.2); }
           }
           @keyframes eraserBeamBolt {
-            0%   { opacity: 0; transform: translate(-50%,-50%) rotate(var(--ebbRot)) scaleX(0); }
-            30%  { opacity: 1; transform: translate(-50%,-50%) rotate(var(--ebbRot)) scaleX(1); }
+            0%   { opacity: 0; transform: translate(-50%,-50%) rotate(var(--ebbRot)) scaleX(0); } /* pp-ok: drehung */
+            30%  { opacity: 1; transform: translate(-50%,-50%) rotate(var(--ebbRot)) scaleX(1); } /* pp-ok: drehung */
             60%  { opacity: 1; }
-            100% { opacity: 0; transform: translate(-50%,-50%) rotate(var(--ebbRot)) scaleX(1); }
+            100% { opacity: 0; transform: translate(-50%,-50%) rotate(var(--ebbRot)) scaleX(1); } /* pp-ok: drehung */
           }
         `;
         document.head.appendChild(style);
@@ -47534,33 +47540,33 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         style.id = 'big-gwen-clock-kf';
         style.textContent = `
           @keyframes bgClockFadeIn {
-            0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3) rotate(-18deg); }
-            40%  { opacity: 1; transform: translate(-50%, -50%) scale(1.08) rotate(4deg); }
-            60%  { transform: translate(-50%, -50%) scale(0.98) rotate(-2deg); }
+            0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3) rotate(-18deg); } /* pp-ok: drehung */
+            40%  { opacity: 1; transform: translate(-50%, -50%) scale(1.08) rotate(4deg); } /* pp-ok: drehung */
+            60%  { transform: translate(-50%, -50%) scale(0.98) rotate(-2deg); } /* pp-ok: drehung */
             100% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0deg); }
           }
           @keyframes bgClockFadeOut {
             0%   { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: brightness(1); }
-            40%  { opacity: 1; transform: translate(-50%, -50%) scale(1.12); filter: brightness(1.8) drop-shadow(0 0 40px #f8ca21); }
+            40%  { opacity: 1; transform: translate(-50%, -50%) scale(1.12); filter: brightness(1.8) drop-shadow(4px 0 0 #f8ca21) drop-shadow(-4px 0 0 #f8ca21) drop-shadow(0 4px 0 #f8ca21) drop-shadow(0 -4px 0 #f8ca21); }
             100% { opacity: 0; transform: translate(-50%, -50%) scale(0.7); filter: brightness(1); }
           }
           @keyframes bgHourTick {
-            0%   { transform: translate(-50%, -100%) rotate(-30deg); }
+            0%   { transform: translate(-50%, -100%) rotate(-30deg); } /* pp-ok: drehung */
             /* tick at each minute from 55 → 60 (= hour 11 → 12) */
-            20%  { transform: translate(-50%, -100%) rotate(-24deg); }
-            40%  { transform: translate(-50%, -100%) rotate(-18deg); }
-            60%  { transform: translate(-50%, -100%) rotate(-12deg); }
-            80%  { transform: translate(-50%, -100%) rotate(-6deg); }
+            20%  { transform: translate(-50%, -100%) rotate(-24deg); } /* pp-ok: drehung */
+            40%  { transform: translate(-50%, -100%) rotate(-18deg); } /* pp-ok: drehung */
+            60%  { transform: translate(-50%, -100%) rotate(-12deg); } /* pp-ok: drehung */
+            80%  { transform: translate(-50%, -100%) rotate(-6deg); } /* pp-ok: drehung */
             100% { transform: translate(-50%, -100%) rotate(0deg); }
           }
           @keyframes bgMinuteTick {
             /* Minute hand sweeps from 11 (−30°) to 12 (0°) in 5 discrete
                one-second ticks. */
-            0%,  19% { transform: translate(-50%, -100%) rotate(-30deg); }
-            20%, 39% { transform: translate(-50%, -100%) rotate(-24deg); }
-            40%, 59% { transform: translate(-50%, -100%) rotate(-18deg); }
-            60%, 79% { transform: translate(-50%, -100%) rotate(-12deg); }
-            80%, 99% { transform: translate(-50%, -100%) rotate(-6deg); }
+            0%,  19% { transform: translate(-50%, -100%) rotate(-30deg); } /* pp-ok: drehung */
+            20%, 39% { transform: translate(-50%, -100%) rotate(-24deg); } /* pp-ok: drehung */
+            40%, 59% { transform: translate(-50%, -100%) rotate(-18deg); } /* pp-ok: drehung */
+            60%, 79% { transform: translate(-50%, -100%) rotate(-12deg); } /* pp-ok: drehung */
+            80%, 99% { transform: translate(-50%, -100%) rotate(-6deg); } /* pp-ok: drehung */
             100%     { transform: translate(-50%, -100%) rotate(0deg); }
           }
           @keyframes bgBell {
@@ -47651,11 +47657,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         style.id = 'boulder-fall-kf';
         style.textContent = `
           @keyframes boulderDrop {
-            0%   { transform: translateY(-220px) rotate(-15deg) scale(0.6); opacity: 0; }
+            0%   { transform: translateY(-220px) rotate(-15deg) scale(0.6); opacity: 0; } /* pp-ok: drehung */
             20%  { opacity: 1; }
-            80%  { transform: translateY(0px) rotate(10deg) scale(1.1); opacity: 1; }
-            90%  { transform: translateY(8px) rotate(12deg) scale(1.15); }
-            100% { transform: translateY(0px) rotate(8deg) scale(0); opacity: 0; }
+            80%  { transform: translateY(0px) rotate(10deg) scale(1.1); opacity: 1; } /* pp-ok: drehung */
+            90%  { transform: translateY(8px) rotate(12deg) scale(1.15); } /* pp-ok: drehung */
+            100% { transform: translateY(0px) rotate(8deg) scale(0); opacity: 0; } /* pp-ok: drehung */
           }
           @keyframes boulderCrash {
             0%   { transform: scale(0); opacity: 0.9; }
@@ -48160,8 +48166,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             100% { opacity: 0; transform: translate(var(--bsDx), var(--bsDy)) scale(0.9); }
           }
           @keyframes bodySwapGhostHalo {
-            0%, 100% { box-shadow: 0 0 18px rgba(179,216,249,0.55), 0 0 38px rgba(102,182,255,0.35); }
-            50%      { box-shadow: 0 0 30px rgba(229,237,250,0.85), 0 0 60px rgba(180,207,248,0.5);  }
+            0%, 100% { box-shadow: 0 0 0 4px #808898, 0 0 0 6px #282834; }
+            50%      { box-shadow: 0 0 0 6px #e5edfa, 0 0 0 8px #3e3e51;  }
           }
         `;
         document.head.appendChild(style);
@@ -48248,8 +48254,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             100% { opacity: 0; }
           }
           @keyframes forbiddenZonePulse {
-            0%, 100% { filter: hue-rotate(-6deg) saturate(1.15) brightness(0.95); }
-            50%      { filter: hue-rotate(8deg)  saturate(1.4)  brightness(1.05); }
+            0%, 100% { filter: hue-rotate(-6deg) saturate(1.15) brightness(0.95); } /* pp-ok: drehung */
+            50%      { filter: hue-rotate(8deg)  saturate(1.4)  brightness(1.05); } /* pp-ok: drehung */
           }
         `;
         document.head.appendChild(style);
@@ -49093,10 +49099,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         style.textContent = `
           @keyframes butterflyFly {
             0% { transform: translate(0,0) scale(0.3) rotate(0deg); opacity: 0; }
-            15% { opacity: 1; transform: translate(calc(var(--bfDx)*0.15 + var(--bfWobble1)), calc(var(--bfDy)*0.15 + var(--bfWobble2))) scale(0.8) rotate(var(--bfSpin1)); }
-            50% { transform: translate(calc(var(--bfDx)*0.5 + var(--bfWobble2)*1.5), calc(var(--bfDy)*0.5 + var(--bfWobble1)*-1)) scale(1) rotate(var(--bfSpin2)); }
-            85% { opacity: 1; transform: translate(calc(var(--bfDx)*0.85 + var(--bfWobble1)*-0.5), calc(var(--bfDy)*0.85 + var(--bfWobble2)*0.5)) scale(0.9) rotate(var(--bfSpin3)); }
-            100% { transform: translate(var(--bfDx), var(--bfDy)) scale(0.4) rotate(var(--bfSpin4)); opacity: 0; }
+            15% { opacity: 1; transform: translate(calc(var(--bfDx)*0.15 + var(--bfWobble1)), calc(var(--bfDy)*0.15 + var(--bfWobble2))) scale(0.8) rotate(var(--bfSpin1)); } /* pp-ok: drehung */
+            50% { transform: translate(calc(var(--bfDx)*0.5 + var(--bfWobble2)*1.5), calc(var(--bfDy)*0.5 + var(--bfWobble1)*-1)) scale(1) rotate(var(--bfSpin2)); } /* pp-ok: drehung */
+            85% { opacity: 1; transform: translate(calc(var(--bfDx)*0.85 + var(--bfWobble1)*-0.5), calc(var(--bfDy)*0.85 + var(--bfWobble2)*0.5)) scale(0.9) rotate(var(--bfSpin3)); } /* pp-ok: drehung */
+            100% { transform: translate(var(--bfDx), var(--bfDy)) scale(0.4) rotate(var(--bfSpin4)); opacity: 0; } /* pp-ok: drehung */
           }
           @keyframes butterflyBurst {
             0% { transform: scale(0); opacity: 0.9; }
@@ -49175,10 +49181,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         style.id = 'smug-coin-keyframes';
         style.textContent = `
           @keyframes smugCoinFall {
-            0% { transform: translateY(var(--scStartY)) rotate(var(--scRot1)) scale(0.6); opacity: 0; }
+            0% { transform: translateY(var(--scStartY)) rotate(var(--scRot1)) scale(0.6); opacity: 0; } /* pp-ok: drehung */
             10% { opacity: 1; }
-            70% { opacity: 1; transform: translateY(var(--scMidY)) rotate(var(--scRot2)) scale(1); }
-            100% { transform: translateY(var(--scEndY)) rotate(var(--scRot3)) scale(0.8); opacity: 0; }
+            70% { opacity: 1; transform: translateY(var(--scMidY)) rotate(var(--scRot2)) scale(1); } /* pp-ok: drehung */
+            100% { transform: translateY(var(--scEndY)) rotate(var(--scRot3)) scale(0.8); opacity: 0; } /* pp-ok: drehung */
           }
           @keyframes smugCoinFlash {
             0% { transform: scale(0); opacity: 0.9; }
@@ -49315,9 +49321,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         style.id = 'iceage-keyframes';
         style.textContent = `
           @keyframes iceageFlake {
-            0%   { transform: translate(0, -12vh) rotate(-18deg); opacity: 0; }
+            0%   { transform: translate(0, -12vh) rotate(-18deg); opacity: 0; } /* pp-ok: drehung */
             10%  { opacity: 1; }
-            100% { transform: translate(-24vw, 118vh) rotate(-18deg); opacity: 0; }
+            100% { transform: translate(-24vw, 118vh) rotate(-18deg); opacity: 0; } /* pp-ok: drehung */
           }
           @keyframes iceageVeil {
             0%   { opacity: 0; }
@@ -49423,9 +49429,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const st = document.createElement('style');
         st.id = 'yuki-blizzard-keyframes';
         st.textContent = `
-          @keyframes yukiStreak { 0% { transform: translate(0,0) rotate(var(--w)); opacity: 0; } 12% { opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) rotate(var(--w)); opacity: 0; } }
+          @keyframes yukiStreak { 0% { transform: translate(0,0) rotate(var(--w)); opacity: 0; } 12% { opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) rotate(var(--w)); opacity: 0; } } /* pp-ok: drehung */
           @keyframes yukiFlake { 0% { transform: translate(0,0); opacity: 0; } 15% { opacity: .95; } 100% { transform: translate(var(--dx), var(--dy)); opacity: 0; } }
-          @keyframes yukiGust { 0% { transform: translateX(-60%) skewX(-18deg); opacity: 0; } 20% { opacity: var(--o); } 80% { opacity: var(--o); } 100% { transform: translateX(160%) skewX(-18deg); opacity: 0; } }
+          @keyframes yukiGust { 0% { transform: translateX(-60%) skewX(-18deg); opacity: 0; } 20% { opacity: var(--o); } 80% { opacity: var(--o); } 100% { transform: translateX(160%) skewX(-18deg); opacity: 0; } } /* pp-ok: drehung */
           @keyframes yukiVeil { 0% { opacity: 0; } 20% { opacity: var(--o); } 75% { opacity: calc(var(--o) * .8); } 100% { opacity: 0; } }
           @keyframes yukiShake { 0%,100% { transform: translate(0,0); } 20% { transform: translate(-3px,1px); } 40% { transform: translate(3px,-2px); } 60% { transform: translate(-2px,2px); } 80% { transform: translate(2px,-1px); } }
           @keyframes yukiFlash { 0% { opacity: 0; } 8% { opacity: .6; } 25% { opacity: 0; } 100% { opacity: 0; } }
@@ -49520,10 +49526,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             35% { transform: scale(0.95); }
             50% { transform: scale(1.5); }
             60% { transform: scale(1.0); }
-            75% { transform: scale(1.8); filter: brightness(1.5) drop-shadow(0 0 30px rgba(254,81,84,0.9)); }
+            75% { transform: scale(1.8); filter: brightness(1.5) drop-shadow(4px 0 0 #fe5154) drop-shadow(-4px 0 0 #fe5154) drop-shadow(0 4px 0 #fe5154) drop-shadow(0 -4px 0 #fe5154); }
             85% { transform: scale(1.6); }
-            95% { transform: scale(2.2); filter: brightness(2) drop-shadow(0 0 60px rgba(254,81,84,1)); }
-            100% { transform: scale(6); opacity: 0; filter: brightness(3) drop-shadow(0 0 100px white); }
+            95% { transform: scale(2.2); filter: brightness(2) drop-shadow(4px 0 0 #fe5154) drop-shadow(-4px 0 0 #fe5154) drop-shadow(0 4px 0 #fe5154) drop-shadow(0 -4px 0 #fe5154); }
+            100% { transform: scale(6); opacity: 0; filter: brightness(3) drop-shadow(4px 0 0 #ffffff) drop-shadow(-4px 0 0 #ffffff) drop-shadow(0 4px 0 #ffffff) drop-shadow(0 -4px 0 #ffffff); }
           }
           @keyframes moeFlash {
             0% { opacity: 0; }
@@ -49533,11 +49539,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           @keyframes moePart {
             0% { transform: translate(0,0) rotate(0deg) scale(1); opacity: 1; }
             60% { opacity: 1; }
-            100% { transform: translate(var(--mpDx), var(--mpDy)) rotate(var(--mpRot)) scale(var(--mpScale)); opacity: 0; }
+            100% { transform: translate(var(--mpDx), var(--mpDy)) rotate(var(--mpRot)) scale(var(--mpScale)); opacity: 0; } /* pp-ok: drehung */
           }
           @keyframes moeConfetti {
-            0% { transform: translateY(0) rotateZ(0deg) rotateX(0deg); opacity: 1; }
-            100% { transform: translateY(var(--mcFall)) rotateZ(var(--mcSpin)) rotateX(720deg); opacity: 0; }
+            0% { transform: translateY(0) rotateZ(0deg); opacity: 1; }
+            100% { transform: translateY(var(--mcFall)) rotateZ(var(--mcSpin)); opacity: 0; } /* pp-ok: drehung */
           }
           @keyframes moeGlitter {
             0% { transform: translate(0,0) scale(0); opacity: 1; }
@@ -49683,20 +49689,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
           @keyframes divineMagicSparkle {
             0%   { opacity: 0; transform: translate(0,0) scale(0.3) rotate(0deg); }
-            15%  { opacity: 1; transform: translate(calc(var(--dmgDx) * 0.2), calc(var(--dmgDy) * 0.2)) scale(1.2) rotate(60deg); }
+            15%  { opacity: 1; transform: translate(calc(var(--dmgDx) * 0.2), calc(var(--dmgDy) * 0.2)) scale(1.2) rotate(60deg); } /* pp-ok: drehung */
             70%  { opacity: 1; transform: translate(calc(var(--dmgDx) * 0.85), calc(var(--dmgDy) * 0.85)) scale(0.9) rotate(360deg); }
             100% { opacity: 0; transform: translate(var(--dmgDx), var(--dmgDy)) scale(0.5) rotate(720deg); }
           }
           @keyframes divineMagicRune {
-            0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3); filter: blur(8px); }
-            20%  { opacity: 0.9; transform: translate(-50%, -50%) scale(1.05); filter: blur(0px); }
-            80%  { opacity: 0.7; transform: translate(-50%, -50%) scale(1.1); filter: blur(0px); }
-            100% { opacity: 0; transform: translate(-50%, -50%) scale(1.4); filter: blur(6px); }
+            0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3); filter: none; }
+            20%  { opacity: 0.9; transform: translate(-50%, -50%) scale(1.05); filter: none; }
+            80%  { opacity: 0.7; transform: translate(-50%, -50%) scale(1.1); filter: none; }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1.4); filter: none; }
           }
           @keyframes divineMagicStreak {
-            0%   { opacity: 0; transform: translate(-50%, -50%) rotate(var(--dmgRot)) translateY(0) scaleY(0); }
-            25%  { opacity: 1; transform: translate(-50%, -50%) rotate(var(--dmgRot)) translateY(0) scaleY(1); }
-            100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--dmgRot)) translateY(-200vh) scaleY(1); }
+            0%   { opacity: 0; transform: translate(-50%, -50%) rotate(var(--dmgRot)) translateY(0) scaleY(0); } /* pp-ok: drehung */
+            25%  { opacity: 1; transform: translate(-50%, -50%) rotate(var(--dmgRot)) translateY(0) scaleY(1); } /* pp-ok: drehung */
+            100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--dmgRot)) translateY(-200vh) scaleY(1); } /* pp-ok: drehung */
           }
           @keyframes divineMagicVignette {
             0%   { opacity: 0; }
@@ -49890,9 +49896,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
           @keyframes dtFragment {
             0%   { opacity: 0; transform: translate(0,0) scale(0.4) rotate(0deg); }
-            20%  { opacity: 1; transform: translate(calc(var(--dtfDx) * 0.25), calc(var(--dtfDy) * 0.25)) scale(1.1) rotate(60deg); }
-            70%  { opacity: 0.95; transform: translate(calc(var(--dtfDx) * 0.85), calc(var(--dtfDy) * 0.85)) scale(0.9) rotate(280deg); }
-            100% { opacity: 0; transform: translate(var(--dtfDx), var(--dtfDy)) scale(0.5) rotate(420deg); }
+            20%  { opacity: 1; transform: translate(calc(var(--dtfDx) * 0.25), calc(var(--dtfDy) * 0.25)) scale(1.1) rotate(60deg); } /* pp-ok: drehung */
+            70%  { opacity: 0.95; transform: translate(calc(var(--dtfDx) * 0.85), calc(var(--dtfDy) * 0.85)) scale(0.9) rotate(280deg); } /* pp-ok: drehung */
+            100% { opacity: 0; transform: translate(var(--dtfDx), var(--dtfDy)) scale(0.5) rotate(420deg); } /* pp-ok: drehung */
           }
         `;
         document.head.appendChild(style);
@@ -50646,13 +50652,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
              board → deck bounce. */
           @keyframes pileTransferWindstorm {
             0%   { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
-            8%   { transform: translate(calc(var(--ptDx) * 0.04 + 55px), calc(var(--ptDy) * 0.08 - 40px)) rotate(-30deg) scale(1.12); opacity: 1; }
-            18%  { transform: translate(calc(var(--ptDx) * 0.18 - 70px), calc(var(--ptDy) * 0.16 + 50px)) rotate(45deg) scale(1.05); opacity: 1; }
-            30%  { transform: translate(calc(var(--ptDx) * 0.30 + 80px), calc(var(--ptDy) * 0.28 - 60px)) rotate(-55deg) scale(1.0); opacity: 1; }
-            42%  { transform: translate(calc(var(--ptDx) * 0.42 - 85px), calc(var(--ptDy) * 0.42 + 65px)) rotate(75deg) scale(max(var(--ptMin, 1), 0.95)); opacity: 1; }
-            55%  { transform: translate(calc(var(--ptDx) * 0.55 + 70px), calc(var(--ptDy) * 0.55 - 55px)) rotate(-65deg) scale(max(var(--ptMin, 1), 0.9)); opacity: 1; }
-            68%  { transform: translate(calc(var(--ptDx) * 0.70 - 50px), calc(var(--ptDy) * 0.70 + 40px)) rotate(55deg) scale(max(var(--ptMin, 1), 0.85)); opacity: 1; }
-            80%  { transform: translate(calc(var(--ptDx) * 0.82 + 35px), calc(var(--ptDy) * 0.82 - 28px)) rotate(-40deg) scale(max(var(--ptMin, 1), 0.78)); opacity: 0.95; }
+            8%   { transform: translate(calc(var(--ptDx) * 0.04 + 55px), calc(var(--ptDy) * 0.08 - 40px)) rotate(-30deg) scale(1.12); opacity: 1; } /* pp-ok: drehung */
+            18%  { transform: translate(calc(var(--ptDx) * 0.18 - 70px), calc(var(--ptDy) * 0.16 + 50px)) rotate(45deg) scale(1.05); opacity: 1; } /* pp-ok: drehung */
+            30%  { transform: translate(calc(var(--ptDx) * 0.30 + 80px), calc(var(--ptDy) * 0.28 - 60px)) rotate(-55deg) scale(1.0); opacity: 1; } /* pp-ok: drehung */
+            42%  { transform: translate(calc(var(--ptDx) * 0.42 - 85px), calc(var(--ptDy) * 0.42 + 65px)) rotate(75deg) scale(max(var(--ptMin, 1), 0.95)); opacity: 1; } /* pp-ok: drehung */
+            55%  { transform: translate(calc(var(--ptDx) * 0.55 + 70px), calc(var(--ptDy) * 0.55 - 55px)) rotate(-65deg) scale(max(var(--ptMin, 1), 0.9)); opacity: 1; } /* pp-ok: drehung */
+            68%  { transform: translate(calc(var(--ptDx) * 0.70 - 50px), calc(var(--ptDy) * 0.70 + 40px)) rotate(55deg) scale(max(var(--ptMin, 1), 0.85)); opacity: 1; } /* pp-ok: drehung */
+            80%  { transform: translate(calc(var(--ptDx) * 0.82 + 35px), calc(var(--ptDy) * 0.82 - 28px)) rotate(-40deg) scale(max(var(--ptMin, 1), 0.78)); opacity: 0.95; } /* pp-ok: drehung */
             90%  { transform: translate(calc(var(--ptDx) * 0.92 - 18px), calc(var(--ptDy) * 0.92 + 14px)) rotate(180deg) scale(max(var(--ptMin, 1), 0.7)); opacity: 0.85; }
             100% { transform: translate(var(--ptDx), var(--ptDy)) rotate(720deg) scale(max(var(--ptMin, 1), 0.45)); opacity: 0; }
           }
@@ -50662,8 +50668,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
              Trial of Dominance verlieren beim Abheben ihre
              Perspektive). Werte kommen je Flug als --ftFrom/--ftTo. */
           @keyframes cardFlightTilt {
-            from { transform: rotateX(var(--ftFrom, 0deg)); }
-            to   { transform: rotateX(var(--ftTo, 0deg)); }
+            from { transform: rotateX(var(--ftFrom, 0deg)); } /* pp-ok: drehung */
+            to   { transform: rotateX(var(--ftTo, 0deg)); } /* pp-ok: drehung */
           }
           /* v1347 — AUS DEM SOG (Brettmitte -> Stapel/Zone). Die Karte
              startet winzig und noch drehend im Loch und waechst ueber den
@@ -50678,8 +50684,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
              Karte (fliegt mit) und eine Spur, die hinter ihr zurueckbleibt. */
           @keyframes ptGlitzerFunkeln {
             0%, 100% { opacity: 0; transform: scale(.2) rotate(0deg); }
-            45%      { opacity: 1; transform: scale(1.15) rotate(45deg); }
-            70%      { opacity: .6; transform: scale(.8) rotate(80deg); }
+            45%      { opacity: 1; transform: scale(1.15) rotate(45deg); } /* pp-ok: drehung */
+            70%      { opacity: .6; transform: scale(.8) rotate(80deg); } /* pp-ok: drehung */
           }
           @keyframes ptGlitzerSpur {
             0%   { opacity: 1; transform: translate(0, 0) scale(1); }
@@ -52431,21 +52437,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         style.id = 'side-deck-appear-keyframes';
         style.textContent = `
           @keyframes sdaShineSweep {
-            0%   { opacity: 0; transform: translateX(-120%) skewX(-25deg); }
+            0%   { opacity: 0; transform: translateX(-120%) skewX(-25deg); } /* pp-ok: drehung */
             25%  { opacity: 1; }
-            100% { opacity: 0; transform: translateX(220%) skewX(-25deg); }
+            100% { opacity: 0; transform: translateX(220%) skewX(-25deg); } /* pp-ok: drehung */
           }
           @keyframes sdaCardGlow {
             0%   { box-shadow: 0 0 0 0 rgba(255,241,150,0); filter: brightness(1); }
-            25%  { box-shadow: 0 0 28px 6px rgba(251,225,129,0.95), 0 0 48px 14px rgba(214,179,249,0.7); filter: brightness(1.3); }
-            70%  { box-shadow: 0 0 22px 4px rgba(251,225,129,0.7); filter: brightness(1.1); }
+            25%  { box-shadow: 0 0 0 12px #fbe181, 0 0 0 14px #7e7d9b; filter: brightness(1.3); }
+            70%  { box-shadow: 0 0 0 8px #fbe181; filter: brightness(1.1); }
             100% { box-shadow: 0 0 0 0 rgba(251,225,129,0); filter: brightness(1); }
           }
           @keyframes sdaSparkle {
             0%   { opacity: 0; transform: translate(0,0) scale(0.3) rotate(0deg); }
-            20%  { opacity: 1; transform: translate(calc(var(--sdaDx) * 0.25), calc(var(--sdaDy) * 0.25)) scale(1.1) rotate(60deg); }
-            70%  { opacity: 1; transform: translate(calc(var(--sdaDx) * 0.8), calc(var(--sdaDy) * 0.8)) scale(0.95) rotate(280deg); }
-            100% { opacity: 0; transform: translate(var(--sdaDx), var(--sdaDy)) scale(0.5) rotate(420deg); }
+            20%  { opacity: 1; transform: translate(calc(var(--sdaDx) * 0.25), calc(var(--sdaDy) * 0.25)) scale(1.1) rotate(60deg); } /* pp-ok: drehung */
+            70%  { opacity: 1; transform: translate(calc(var(--sdaDx) * 0.8), calc(var(--sdaDy) * 0.8)) scale(0.95) rotate(280deg); } /* pp-ok: drehung */
+            100% { opacity: 0; transform: translate(var(--sdaDx), var(--sdaDy)) scale(0.5) rotate(420deg); } /* pp-ok: drehung */
           }
         `;
         document.head.appendChild(style);
@@ -52852,17 +52858,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         style.id = 'punch-box-keyframes';
         style.textContent = `
           @keyframes punchSwing {
-            0% { transform: translateX(-250px) rotate(15deg) scale(0.5); opacity: 0; }
-            20% { opacity: 1; transform: translateX(-180px) rotate(10deg) scale(0.9); }
-            45% { transform: translateX(0px) rotate(-5deg) scale(1.3); }
+            0% { transform: translateX(-250px) rotate(15deg) scale(0.5); opacity: 0; } /* pp-ok: drehung */
+            20% { opacity: 1; transform: translateX(-180px) rotate(10deg) scale(0.9); } /* pp-ok: drehung */
+            45% { transform: translateX(0px) rotate(-5deg) scale(1.3); } /* pp-ok: drehung */
             55% { transform: translateX(-10px) rotate(0deg) scale(1.1); }
             70% { transform: translateX(0px) scale(1.0); opacity: 1; }
             100% { transform: translateX(30px) scale(0.6); opacity: 0; }
           }
           @keyframes punchImpact {
             0% { transform: scale(0) rotate(0deg); opacity: 1; }
-            30% { transform: scale(1.5) rotate(10deg); opacity: 1; }
-            100% { transform: scale(2.5) rotate(-5deg); opacity: 0; }
+            30% { transform: scale(1.5) rotate(10deg); opacity: 1; } /* pp-ok: drehung */
+            100% { transform: scale(2.5) rotate(-5deg); opacity: 0; } /* pp-ok: drehung */
           }
           @keyframes punchStar {
             0% { transform: translate(0,0) scale(1); opacity: 1; }
@@ -53483,9 +53489,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           Math.round(start[0] + (ziel[0] - start[0]) * p),
           Math.round(start[1] + (ziel[1] - start[1]) * p),
         ]);
-        goldCrashRaf.current = requestAnimationFrame(step);
+        goldCrashRaf.current = (window.ppTaktRaf || requestAnimationFrame)(step);     // Pixelart: Zaehlerschritte im 30-Hz-Takt
       };
-      goldCrashRaf.current = requestAnimationFrame(step);
+      goldCrashRaf.current = (window.ppTaktRaf || requestAnimationFrame)(step);
     };
     socket.on('play_gold_crash', onGoldCrash);
     const onDeckToDeleted = ({ owner, cards }) => {

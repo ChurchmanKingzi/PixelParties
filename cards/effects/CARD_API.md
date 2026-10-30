@@ -26629,3 +26629,22 @@ Bausteine in `public/app-shared.jsx`, die neue Oberflaechen-Animationen nutzen s
 ### W86r2: `ppSzene` — Pixelart-Canvas für Registry-Animationen an einem Punkt (app-board.jsx)
 
 Für Animationen, die nur `x`/`y` (Zielmitte) und `w`/`h` kennen und sich nicht sauber über die Pipeline lösen lassen (Ringe mit animierter Größe, Verläufe, drehende Texte/Sprites, Emoji/Systemglyphen, Schein): `ppSzene(malen, ende, vorbereiten?, { radius, S?, z? })` (neben `ppSalve`; ein Rasterpixel = 3 Bildschirmpixel, `data-pp-px="aus"`, ~30 Bilder/s, Bayer-Dither). Pinsel `g`: `put/rect/block/frame/ring/disc/ellipse/band(…, dash, rot)/line/poly/shape/sprite(…, k, ky)/spriteDreh/radial(Verlauf als Dither-Stufen)`; Zeitkurven `ppKf(u, stops, ease?)`; Farben `ppSzeneFarbe([r,g,b])` rasten auf die Palette. Vorlage: `memory_wipe`, `phoenix_bombardment`, `todesgabe_erweckung`. Karten-Bilder (`<img>`, z. B. in `telekinese`, `ruestkammer_tor`) bleiben DOM-Elemente über/unter der Szene — ihre Kartenmotive sind nicht palettiert (Kartengestalter), das Messwerkzeug meldet dort OFFPAL.
+## Welle 86 / W86u1 – Pixel-Hart-Netz (Kampf-Oberfläche): harte Kanten statt Weichzeichner, Pseudoelemente, Brett-Alpha
+
+`public/pixel-hart.js` (global `window.PPPixelHart`, in `index.html` nach `pixel-anim.js`) fängt ab, was die Bewegungs-Pipeline nicht anfasst — **ruhende** Stile und alles, was Skripte per `style.cssText`/Inline-Stil schreiben. Ausgenommen: Retro-Modus (`PP_RETRO`), `foil`-/`pp-glanz`-Regeln (Kartenglanz). Zum Vergleich ohne das Netz: `?hart=0` an die Adresse.
+
+| Eingabe | Ergebnis |
+|---|---|
+| `box-shadow` mit Unschärfe | Schein → 1–2 harte Ringe (`0 0 0 Npx`, N gerade, 2–8; innen kräftig, außen abgedunkelt; schwache/dunkle Scheine fallen weg), Fall-Schatten → harter Versatz (`calc()`-Versatz auf gerade px gerundet), Innenschein → harter Innenring |
+| `text-shadow` mit Unschärfe | Schein → Pixelkontur (8 Richtungen, dunkler Ton der Farbe), Schlagschatten → harter Versatz |
+| `filter: blur()` / `drop-shadow(… Unschärfe …)` | `blur()` weg; `drop-shadow` → harter Versatz bzw. Kontur aus vier harten `drop-shadow`s; harte (Unschärfe 0) bleiben |
+| `backdrop-filter`, `mix-blend-mode` | `none` / `normal` |
+| ruhende `background-color: rgba(…)` an Brett-Selektoren (`.board-`, `.phase-`, `.hand-`, `.zone-`, `.status-` …) | helle Tönung/dichte Fläche → deckende Palettenfarbe (Mischung mit dem Brettgrund `#08060c`); Abdunklungen (`::before/::after` über Karten) → Bayer-Dither-Kachel (1 px Zelle), sonst 2 px |
+| `background: radial-/linear-gradient(…)` in Inline-Stilen und Skript-`cssText` (ein Verlauf, explizite Farben) | Pixelbild des Pixelierers (`pxHintergrund`: Bayer-Dither zwischen den Stoppfarben, Alpha gedithert); Größe aus `width`/`height` in px, sonst quadratisch |
+| weiche Verläufe in Stilregeln an Brett-Selektoren | wie oben (nur Regeln mit expliziten Farben; harte Bänder `a 0 28%, b 28% 52%` bleiben) |
+
+Wo: alle Regeln der Stylesheets (auch `@media`, **auch `@keyframes`** — bis `pixel-anim.js` eine Schleife gebacken hat, läuft sie sonst weich), später eingehängte `<style>`/`<link>`, Inline-Stile über `palette.js` (`el.style.*`, `setProperty`, `cssText`, `setAttribute('style')`). Die Backer-Funktion (`pixel-anim.js`) benutzt dieselben Umwandlungen (`PPPixelHart.box/text/filter`). **Neue Animationen trotzdem hart bauen** — das Netz ist die Absicherung, nicht der Plan (Quellen der Keyframes stehen im Wächter).
+
+Weitere Änderungen an `pixel-anim.js` (W86u1): Animationen auf `::before/::after` werden mitgebacken (`eff.pseudoElement`; Dither-Maske über die Keyframes, kein Sprite, keine Inline-Eingriffe am Wirt); **einmalige** Animationen (Schadensblitz, Ringe, Markierungen) werden sofort gebacken (Zeitfenster `KONFIG.sofortMs`), die Warteschlange der Schleifen arbeitet „zuletzt gestartet zuerst" — eine Zielmarkierung wartet nicht mehr hinter 130 Umgebungsteilchen.
+
+Grenzen: ruhende `opacity < 1` an Brettzonen (Maske würde Abzeichen/Zeichen abschneiden), Drehungen von Karten im Handfächer/3D-Brett (Brettperspektive), Pixel-Symbole (`PxIcon`) bei gebrochener Brettskala, per Skript je Bild gesetzte Drehungen (`karte.style.transform = rotate(…)` in einzelnen Effekten) sind nicht zentral lösbar.

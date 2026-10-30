@@ -43,6 +43,7 @@
     dither: true,        // false: Deckkraft nur ein/aus (ab 50 %), keine Masken (Messung/Notbremse)
     ditherMin: 400,      // Elemente mit kleinerer Flaeche (px², z. B. 20 x 20) blenden nur ein/aus statt zu dithern (billiger, bei Partikeln unsichtbar; 0 = alle dithern)
     globalMaxBilder: 40, // dokumentweit (Oberflaeche): hoechstens so viele Bilder je Durchlauf (Umgebungsteilchen mit langen Schleifen laufen dann ~10 Bilder/s)
+    sofortMs: 10,        // dokumentweit: Zeitfenster (ms je Takt) fuer sofortiges Backen einmaliger Animationen mit vielen Abtastungen (W86u1)
     globalSofort: 14,    // dokumentweit: Animationen mit mehr Abtastungen werden in Zeitscheiben (~6 ms je ~30 ms) nachgebacken statt sofort
     stufenMax: 800,      // Szenen: reine Stufenfolgen (`steps(n)`) bis zu so vielen Stufen je Durchlauf werden exakt an den Stufengrenzen gebacken
     globalMaxDauer: 8000,// dokumentweit (Oberflaeche) werden nur Animationen/Uebergaenge bis zu dieser Dauer (ms) gebacken (Countdown-Balken u. ae. bleiben)
@@ -381,6 +382,12 @@
   const TRANSFORM = new Set(['transform', 'translate', 'scale', 'rotate']);
 
   function istSvgInnen(el) { return el instanceof SVGElement && el.tagName.toLowerCase() !== 'svg'; }
+  /** Groesse eines Pseudoelements (px aus dem berechneten Stil; sonst die des Wirts). */
+  function pseudoGroesse(cs, el) {
+    const w = parseFloat(cs.width), h = parseFloat(cs.height);
+    const [ew, eh] = groesseVon(el);
+    return [Number.isFinite(w) && w > 0 ? w : ew, Number.isFinite(h) && h > 0 ? h : eh];
+  }
   function groesseVon(el) {
     if (el instanceof HTMLElement) return [el.offsetWidth, el.offsetHeight];
     try { const r = el.getBoundingClientRect(); return [r.width, r.height]; } catch (e) { return [0, 0]; }
@@ -609,7 +616,7 @@
   // Nachbacken in Zeitscheiben (nur Oberflaeche): viele lange Schleifen auf einmal (Titelbild: ~180 schwebende Teilchen) wuerden den ersten
   // Frame blockieren. Die Animation laeuft solange unveraendert weiter; beim Nachbacken bleibt ihre Zeitachse erhalten.
   const _warte = [];
-  let _wartePlan = false;
+  let _wartePlan = false, _fenster = 0, _verbraucht = 0;
   function _arbeiten() {
     _wartePlan = false;
     const t0 = performance.now();
@@ -630,7 +637,7 @@
     gebacken.add(anim);
     let eff;
     try { eff = anim.effect; } catch (e) { return false; }
-    if (!eff || typeof eff.getKeyframes !== 'function' || !eff.target || eff.pseudoElement) return false;
+    if (!eff || typeof eff.getKeyframes !== 'function' || !eff.target) return false;   // W86u1: ::before/::after (eff.pseudoElement) werden mitgebacken
     const el = eff.target;
     if (!(el instanceof Element) || !el.isConnected) return false;
     if (el.closest('[data-pp-px="aus"]')) { stat.uebersprungen++; return false; }
@@ -639,7 +646,14 @@
     const dauer = +t.duration;
     if (!(dauer > 0) || !Number.isFinite(dauer) || kfs.length < 2) return false;
     if (weich && dauer > KONFIG.globalMaxDauer) { stat.uebersprungen++; return false; }
-    if (weich && !sofort && Math.min(KONFIG.globalMaxBilder, Math.ceil(dauer / TAKT_MS())) > KONFIG.globalSofort) { _warte.push([anim, weich]); _planen(); return false; }
+    if (weich && !sofort && Math.min(KONFIG.globalMaxBilder, Math.ceil(dauer / TAKT_MS())) > KONFIG.globalSofort) {
+      // W86u1: einmalige Animationen (Schadensblitz, Ringe, Zielmarkierungen …) sofort backen — sie sind vorbei, bevor eine Warteschlange voller Schleifen
+      // (Umgebungsteilchen) sie erreicht, und liefen sonst ganz weich. Nur ein Zeitfenster von ~10 ms je Takt; der Rest wartet (einmalige vorn).
+      const jetzt = performance.now();
+      if (jetzt - _fenster > TAKT_MS()) { _fenster = jetzt; _verbraucht = 0; }
+      const schleife = !(+t.iterations <= 1);
+      if (schleife || _verbraucht > KONFIG.sofortMs) { _warte.unshift([anim, weich]); _planen(); return false; }   // zuletzt gestartet = zuerst gebacken (Zielmarkierung vor 100 Umgebungsteilchen)
+    }
     const props = eigenschaften(kfs);
     if (!props.length) return false;
     const strikt = !!(el.closest && el.closest('.pp-pixel-scene'));       // Szenen (Areas): strengere Pruefung, Stufenfolgen exakt (W86a)
@@ -657,6 +671,7 @@
     let ok = false;
     try { ok = backenInnen(anim, eff, el, kfs, props, dauer, budget, weich, strikt); } catch (e) { if (KONFIG.debug) console.warn('[PPPixelAnim]', e); }
     stat.ms += performance.now() - t0;
+    if (weich && !sofort) _verbraucht += performance.now() - t0;
     if (ok) stat.gebacken++;
     return ok;
   }
@@ -709,8 +724,9 @@
   }
 
   function backenInnen(anim, eff, el, kfs, props, dauer, budget, weich, strikt) {
-    const cs = getComputedStyle(el);
-    const [W, H] = groesseVon(el);
+    const pe = eff.pseudoElement || null;                       // W86u1: Animation auf ::before/::after — gleiche Pipeline, nur ohne Inline-Eingriffe am Wirt
+    const cs = pe ? getComputedStyle(el, pe) : getComputedStyle(el);
+    const [W, H] = pe ? pseudoGroesse(cs, el) : groesseVon(el);
     const raster = rasterVon(cs);
     const svgInnen = istSvgInnen(el);
     const T = TAKT_MS();
@@ -733,7 +749,7 @@
     // ── Probe: gleiche Keyframes als eigene WAAPI-Animation → abtasten ──
     const probeKfs = kfs.map(k => { const o = Object.assign({}, k); o.offset = k.computedOffset != null ? k.computedOffset : k.offset; delete o.computedOffset; return o; });
     let probe;
-    try { probe = new Animation(new KeyframeEffect(el, probeKfs, { duration: D2, fill: 'both', easing: 'linear' }), document.timeline); }
+    try { probe = new Animation(new KeyframeEffect(el, probeKfs, Object.assign({ duration: D2, fill: 'both', easing: 'linear' }, pe ? { pseudoElement: pe } : {})), document.timeline); }
     catch (e) { return false; }
     const tp0 = performance.now();
     probe.pause();
@@ -748,7 +764,7 @@
     probe.cancel();
     const tp1 = performance.now(); stat.t_probe += tp1 - tp0;
     // ── Quantisieren ──
-    const rahmen = frameBauen(roh, props, el, cs, W, H, raster, svgInnen, weich, anim);
+    const rahmen = frameBauen(roh, props, el, cs, W, H, raster, svgInnen, weich, anim, pe);
     const tp2 = performance.now(); stat.t_bauen += tp2 - tp1;
     if (!rahmen) return false;
     // ── Gleiche Bilder zusammenfassen, Keyframes setzen ──
@@ -779,13 +795,13 @@
   const t0Timing = (eff) => eff.getTiming();
 
   /** Rohwerte je Bild → quantisierte Keyframe-Eigenschaften (camelCase). */
-  function frameBauen(roh, props, el, cs, W, H, raster, svgInnen, weich, anim) {
+  function frameBauen(roh, props, el, cs, W, H, raster, svgInnen, weich, anim, pe) {
     const n = roh.length;
     const aus = roh.map(() => ({}));
     const hatT = props.includes('transform');
     // ── Transformationen ──
     let sprite = null;
-    if (hatT && !svgInnen && !props.includes('rotate') && !props.includes('translate') && !props.includes('scale')) {
+    if (hatT && !svgInnen && !pe && !props.includes('rotate') && !props.includes('translate') && !props.includes('scale')) {
       // Drehung, die nicht in Viertelschritten liegt: Blatt-Element als gedrehtes Sprite (siehe Abschnitt 6) — sonst unten Viertelschritt-Rueckfall.
       const mats = roh.map(w => matrixLesen(w.transform));
       if (mats.every(Boolean) && mats.some(m => { const z = zerlegen(m); return z && !rechtwinklig(z.rot); }) && spriteMoeglich(el, cs)) {
@@ -805,7 +821,7 @@
     if (!sprite && props.some(p => TRANSFORM.has(p))) {
       // Skaliert das Element irgendwann (Faktor != 1)? Dann Groesse auf Vielfache von 4 (ganze Pixelkanten, s. groesseAusrichten)
       if ((roh.some(w => { const m = matrixLesen(w.transform || 'none'); const z = m && zerlegen(m); return z && (Math.abs(Math.abs(z.sx) - 1) > 0.02 || Math.abs(Math.abs(z.sy) - 1) > 0.02); })
-          || roh.some(w => w.scale && w.scale !== 'none' && w.scale !== '1')) && !weich) { const tg = performance.now(); groesseAusrichten(el, cs); stat.t_groesse += performance.now() - tg; }
+          || roh.some(w => w.scale && w.scale !== 'none' && w.scale !== '1')) && !weich && !pe) { const tg = performance.now(); groesseAusrichten(el, cs); stat.t_groesse += performance.now() - tg; }
       for (let j = 0; j < n; j++) {
         const w = roh[j];
         if (hatT) {
@@ -837,16 +853,18 @@
       const q = KONFIG.ditherSchritt || 1;
       const stufen = roh.map(w => { const st = ditherStufe(parseFloat(w.opacity)); return st > 0 && st < 16 && q > 1 ? Math.max(q, Math.min(16 - q, Math.round(st / q) * q)) : st; });
       // Oberflaeche (weich): Elemente mit Kindern oder eigener Maske bekommen keine Dither-Maske (sie schneidet ueberstehende Kinder ab) — dort nur ein/aus
-      const mitKindern = weich && (Array.from(el.children).some(x => !MALT_NICHT.has(x.tagName)) || !!origMaske(el, cs));
-      const brauchtMaske = KONFIG.dither && !svgInnen && !mitKindern && W * H >= KONFIG.ditherMin && stufen.some(s => s > 0 && s < 16);
+      const peMaske = pe && cs.maskImage && cs.maskImage !== 'none';   // Pseudoelement mit eigener Maske: nur ein/aus
+      const mitKindern = weich && !pe && (Array.from(el.children).some(x => !MALT_NICHT.has(x.tagName)) || !!origMaske(el, cs));
+      const brauchtMaske = KONFIG.dither && !svgInnen && !mitKindern && !peMaske && W * H >= KONFIG.ditherMin && stufen.some(s => s > 0 && s < 16);
       if (brauchtMaske) {
-        const tm = performance.now(); const z = maskeVorbereiten(el, cs, weich); stat.t_maske += performance.now() - tm;
-        if (weich) maskeBenutzt(el, z, anim);
+        const tm = performance.now(); const z = pe ? { direkt: true, orig: null } : maskeVorbereiten(el, cs, weich); stat.t_maske += performance.now() - tm;
+        if (weich && !pe) maskeBenutzt(el, z, anim);
         for (let j = 0; j < n; j++) {
           const s = stufen[j];
           aus[j].opacity = s === 0 ? '0' : '1';
           const tile = ditherMaske(s === 0 ? 1 : s);
           if (z.direkt) aus[j].maskImage = z.orig ? tile + ', ' + z.orig : tile; else aus[j][z.vn] = tile;
+          if (pe) { aus[j].maskSize = `${4 * KONFIG.ditherPx}px ${4 * KONFIG.ditherPx}px`; aus[j].maskRepeat = 'repeat'; aus[j].maskPosition = '0 0'; }   // am Pseudoelement nur ueber die Keyframes setzbar
         }
       } else {
         for (let j = 0; j < n; j++) aus[j].opacity = (svgInnen ? parseFloat(roh[j].opacity) >= 0.5 : stufen[j] >= 8) ? '1' : '0';
@@ -860,9 +878,10 @@
         let v = roh[j][p];
         if (v == null) continue;
         if (LAYOUT.test(k)) v = laengenRunden(v, /^(width|height|min-|max-)/.test(k) ? 4 : /^(left|top|right|bottom|margin|inset)/.test(k) ? 2 : 1);
-        else if (k === 'filter' || k === '-webkit-filter') v = filterBereinigen(v);
+        else if (k === 'filter' || k === '-webkit-filter') v = root.PPPixelHart ? root.PPPixelHart.filter(v) : filterBereinigen(v);   // W86u1: harte drop-shadows bleiben, Weichzeichner weg
         else if (k === 'backdrop-filter' || k === '-webkit-backdrop-filter') v = 'none';
-        else if (k === 'box-shadow' || k === 'text-shadow') v = schattenHart(v, raster);
+        else if (k === 'box-shadow') v = root.PPPixelHart ? root.PPPixelHart.box(v) : schattenHart(v, raster);
+        else if (k === 'text-shadow') v = root.PPPixelHart ? root.PPPixelHart.text(v) : schattenHart(v, raster);
         if (FARBE.test(k) || k === 'box-shadow' || k === 'text-shadow' || k === 'filter') v = snapFarben(v);
         aus[j][p] = v;
       }
@@ -1452,7 +1471,7 @@
     const behandeln = (e, art) => {
       if (!KONFIG.aktiv || root._playAnimations === false) return;
       const el = e.target; if (!(el instanceof Element) || !el.getAnimations) return;
-      let liste; try { liste = el.getAnimations(); } catch (x) { return; }
+      let liste; try { liste = e.pseudoElement ? el.getAnimations({ subtree: true }).filter(x => x.effect && x.effect.target === el && x.effect.pseudoElement === e.pseudoElement) : el.getAnimations(); } catch (x) { return; }   // W86u1: ::before/::after
       for (const a of liste) {
         if (gebacken.has(a)) continue;
         if (art === 'a' ? (a.animationName === e.animationName) : (a.transitionProperty === e.propertyName)) backen(a, null, true);
