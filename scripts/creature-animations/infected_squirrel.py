@@ -40,7 +40,7 @@ import anim_lib as L
 import anim_tiere as T
 
 N, MS = 48, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 4, 4, 5, 3
+PAD_L, PAD_R, PAD_T, PAD_B = 2, 3, 5, 2
 
 spr = L.lade('infected-squirrel')
 sh, sw = spr.shape[:2]
