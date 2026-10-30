@@ -20513,6 +20513,7 @@ function sanitizeRoom(room, forUser) {
 //  training data).
 // ═══════════════════════════════════════════════════════════════════
 const { attachTrainingRecorder } = require('./cards/effects/_train-recorder');
+const valueEnc = require('./cards/effects/_value-encode');   // Zustandslog fürs CPU-Wertnetz (PP_VALUE_NET=log)
 
 // Tatsächliches V8-Heap-Limit in MB (respektiert --max-old-space-size).
 // Grundlage der Trainings-Heap-Wächter: feste Schwellen passten weder zu
@@ -20865,6 +20866,19 @@ async function collectTrainingSharded({ jobs, count, outPath }) {
     for (const f of workerFiles()) take(f, false);
     return recs;
   };
+  // Zustandslog (PP_VALUE_NET=log): die Worker-Dateien `<out>.w<k>.states` wandern nach gameIdx in `<out>.states`, genau wie die jsonl-Zeilen.
+  // Nur Blöcke von Spielen, die die jsonl enthält (`keep`) — ein Spiel ohne Zeile zählt als nicht gespielt und wird beim Wiederanlauf neu gesammelt.
+  const logOn = valueEnc.enabled();
+  const mainStates = valueEnc.statesPath(outPath);
+  const workerStateFiles = () => fs.readdirSync(dir).filter(f => f.startsWith(base + '.w') && /^\.w\d+\.states$/.test(f.slice(base.length)))
+    .map(f => path.join(dir, f));
+  const mergeStates = (keep) => {
+    if (!logOn) return;
+    const parts = workerStateFiles();
+    try { valueEnc.mergeFiles(mainStates, [mainStates, ...parts], keep); }
+    catch (err) { console.warn('[train] Zustandslog: Zusammenführen fehlgeschlagen —', err.message); return; }   // Worker-Dateien bleiben liegen
+    for (const f of parts) { try { fs.unlinkSync(f); } catch { /* weg */ } }
+  };
   const writeMerged = (recs) => {
     const keys = [...recs.keys()].sort((a, b) => a - b);
     const tmp = outPath + '.merge.tmp';
@@ -20875,6 +20889,7 @@ async function collectTrainingSharded({ jobs, count, outPath }) {
   try { fs.unlinkSync(outPath + '.inflight.json'); } catch { /* keine alte Brotkrume */ }   // eine Absturz-Brotkrume gilt nur für DIESE Runde
   const before = pool();
   if (before.size > 0) writeMerged(before);            // legt gameIdx auch in alte Zeilen und holt liegengebliebene Worker-Zeilen heim
+  if (before.size > 0) mergeStates(new Set(before.keys())); else if (logOn) { for (const f of workerStateFiles()) { try { fs.unlinkSync(f); } catch { /* weg */ } } }
   for (const f of workerFiles()) { try { fs.unlinkSync(f); } catch { /* weg */ } }
   const done = [...before.keys()].filter(k => k < count);
   const todo = count - done.length;
@@ -20916,6 +20931,7 @@ async function collectTrainingSharded({ jobs, count, outPath }) {
 
   const after = pool();
   writeMerged(after);
+  mergeStates(new Set(after.keys()));
   for (const f of workerFiles()) { try { fs.unlinkSync(f); } catch { /* weg */ } }
   try { fs.rmSync(claimDir, { recursive: true, force: true }); fs.unlinkSync(doneFile); } catch { /* weg */ }
   const missing = count - [...after.keys()].filter(k => k < count).length;
@@ -21017,6 +21033,13 @@ async function runTrainingBatch() {
   const outPath = process.env.PP_TRAIN_OUT
     || path.join(outDir, `${norm(pinned.name)}-${abMode ? 'AB-' : evalMode ? 'EVAL-' : ''}${stamp}.jsonl`);
   console.log(`[train] ${abMode ? 'A/B MODE (Profil vs Baseline im Spiegel)' : evalMode ? 'EVAL MODE (profiles ON)' : 'data collection (profiles OFF)'} — writing → ${outPath}`);
+  // Zustandslog fürs Wertnetz (PP_VALUE_NET=log): Binärdatei neben der jsonl, ein Block je Partie, Schlüssel gameIdx. Ein beim Absturz
+  // abgeschnittener letzter Block wird vor dem Weiterschreiben entfernt, sonst läge der nächste hinter Müll.
+  const statesFile = valueEnc.enabled() ? valueEnc.statesPath(outPath) : null;
+  if (statesFile) {
+    const cut = valueEnc.repairFile(statesFile);
+    if (!process.env.PP_TRAIN_WORKER) console.log(`[train] Zustandslog AN → ${statesFile}${cut ? ` (${cut} Bytes eines abgebrochenen Blocks entfernt)` : ''}`);
+  }
 
   // ── Parallele Sammlung ──
   // PP_TRAIN_JOBS=K startet K Worker (siehe collectTrainingSharded); ein Worker (PP_TRAIN_WORKER=1) holt sich seine Spiel-Indizes
@@ -21162,6 +21185,13 @@ async function runTrainingBatch() {
     if (oppProfiles) record.oppProfiles = true;
     record.gameIdx = i;   // Spielindex als LETZTES Feld (Orchestrator: collectTrainingSharded liest ihn vom Zeilenende)
     fs.appendFileSync(outPath, JSON.stringify(record) + '\n', { encoding: 'utf-8' });
+    // Zustandslog NACH der Zeile: ein Absturz dazwischen lässt ein Spiel ohne Zustände (nur schlechter nutzbar), nie Zustände ohne Spiel.
+    if (record._valueLog) {
+      try {
+        const blk = record._valueLog.pack(i, record.winnerIdx, record.pinnedIdx);
+        if (blk) valueEnc.appendBlock(statesFile, blk);
+      } catch (err) { console.error('[train] Zustandslog nicht geschrieben:', err.message); }
+    }
     // Spiel ist sicher auf der Platte → Brotkrume weg. Bleibt sie
     // liegen, war dieses Match der Prozess-Killer.
     try { fs.unlinkSync(inflightPath); } catch { /* schon weg */ }
@@ -21169,7 +21199,8 @@ async function runTrainingBatch() {
     else if (record.outcome === 0) losses++;
     else ties++;
     const msg = record.outcome === 1 ? 'WIN ' : record.outcome === 0 ? 'LOSS' : 'TIE ';
-    console.log(`[train] ${i + 1}/${count} ${msg} vs ${opp.name} (${record.turns}t, ${record.reason}) — running ${wins}W-${losses}L-${ties}T`);
+    const logInfo = record._valueLog ? ` [Zustandslog: ${record._valueLog.states.length} Zustände, ${Math.round(record._valueLog.ms)} ms]` : '';
+    console.log(`[train] ${i + 1}/${count} ${msg} vs ${opp.name} (${record.turns}t, ${record.reason}) — running ${wins}W-${losses}L-${ties}T${logInfo}`);
     if (typeof global.gc === 'function' && i % 10 === 9) { try { global.gc(); } catch {} }
   }
   if (parallelFailed) process.exitCode = 1;   // Spiele fehlen (Worker-Absturz): train-iterative/train-all-decks starten die Sammlung neu
