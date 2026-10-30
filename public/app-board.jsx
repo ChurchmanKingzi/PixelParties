@@ -63598,7 +63598,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {announcement && (
         <div className={'game-announcement' + (announcement.short ? ' game-announcement-short' : '')}
           onClick={() => setAnnouncement(null)} style={{ cursor: 'pointer' }}>
-          <div className="game-announcement-text" style={{ color: announcement.color }}>
+          <div className="game-announcement-text" data-text={announcement.text} style={{ color: announcement.color }}>
             {announcement.text}
           </div>
         </div>
