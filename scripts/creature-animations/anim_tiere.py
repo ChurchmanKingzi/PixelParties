@@ -75,13 +75,15 @@ def umriss_regeln(a, umriss_farben, blocker=None):
     return fuell, umriss, regel
 
 
-def haengend_schwingen(a, blocker, pivot_y, amp, phase, umriss_farben, lauf=0.0, potenz=1.0, huelle=1.0):
+def haengend_schwingen(a, blocker, pivot_y, amp, phase, umriss_farben, lauf=0.0, potenz=1.0, huelle=1.0, satt_y=None):
     """Hängendes Teil (Schwanz, Zipfel, Flosse) schwingt seitlich. Jede Zeile der FÜLLUNG wandert um
     round(amp · f^potenz · sin(phase − lauf·f)) mit f = (y − pivot_y)/maxAbstand (unterhalb des Pivots), der Außenumriss wird
     danach um die verschobene Füllung NEU gezogen (4er-Rand, Farbe nach der Regel aus dem Original) — so reißt die Kontur an
     den Stufen nicht auf und es fehlt kein Umrisspixel.
     blocker: Maske der anderen Teile (Rumpf). Sie werden nie überschrieben; die Füllung gleitet bei Linksversatz UNTER den Rumpf, bei
     Rechtsversatz wird die Lücke zum Rumpf mit dem Randpixel der Zeile geschlossen (Teil bleibt angewachsen).
+    satt_y: ab dieser Zeile ist der Ausschlag voll (f = 1) und bleibt es — die Spitze bewegt sich dann starr als Block statt sich
+    zu einer Nadel zu verzerren (sinnvoll bei großem Ausschlag, wenn die Spitze eine eigene Form hat).
     Der Nullzustand (alle dx = 0) gibt das Original unverändert zurück."""
     h, w = a.shape[:2]
     fuell, umriss, regel = umriss_regeln(a, umriss_farben, blocker)
@@ -93,7 +95,7 @@ def haengend_schwingen(a, blocker, pivot_y, amp, phase, umriss_farben, lauf=0.0,
         xs_ = np.nonzero(fuell[y])[0]
         if not len(xs_):
             continue
-        f = max(0.0, (y - pivot_y) / maxd)
+        f = max(0.0, (y - pivot_y) / maxd) if satt_y is None else max(0.0, min(1.0, (y - pivot_y) / max(1, satt_y - pivot_y)))
         dx = int(round(amp * (f ** potenz) * math.sin(phase - lauf * f) * huelle))
         dxs[y] = dx
         if xs_.min() + dx < 0 or xs_.max() + dx >= w:

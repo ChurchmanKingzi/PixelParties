@@ -20,15 +20,15 @@ Identifikation (Sprite 48×32, Fuchs im Profil nach links, Kopf links):
   die dunklen Pixel bei (43–44, 23) und (45, 22) sind die Binnenlinie zwischen rotem Schwanz und beiger Spitze (Füllung, kein Umriss).
 
 Ablauf (48 Frames à 65 ms = 3,12 s), alle Bewegungen unabhängig, nie länger als wenige Frames ohne Bewegung:
-* Atmen, zweistufig (Periode 24): Brust/Vorderkörper steigt bis 2 px (0 → 1 → 2 → 1 → 0), der Hinterkörper bis 1 px; der Kopf folgt
+* Atmen, zweistufig (Periode 16, 3× pro Schleife): Brust/Vorderkörper steigt bis 2 px (0 → 1 → 2 → 1 → 0), der Hinterkörper bis 1 px; der Kopf folgt
   der Brust 3 Frames später (beim Einatmen zuerst die Brust, dann der Kopf). Spaltenweise eingefügte Zeilen (Zeile 22) heben den
   Körper, die Füße bleiben am Boden.
 * Wiegen/Gewichtsverlagerung (Periode 48): Der Körper kippt langsam um ±1 px — vorn tiefer/hinten höher und umgekehrt; die Beine
   werden dabei spaltenweise etwas länger/kürzer (Vorderbeine x ≤ 20 gemeinsam, Hinterbeine x ≥ 24 gemeinsam, Bauch dazwischen).
 * Schnüffeln: der Kopf senkt sich 1 px relativ zum Körper, 7× pro Schleife (Doppelnicker).
-* Ohrzucken: jedes Ohr 4× pro Schleife (links Frames 2/14/27/38, rechts 8/20/33/44), Spitze bis 2 px nach außen.
-* Schwanzwedeln (Periode 12 = 4× pro Schleife, Amplitude bis ±6 px, Spitze schleudert nach, Frame 0 = Original): die Zeilen wandern
-  seitlich, der Außenumriss wird neu gezogen (4-verbunden), die Lücke zum Rumpf wird geschlossen.
+* Ohrzucken: jedes Ohr 4× pro Schleife (links Frames 2/14/27/38, rechts 8/20/33/44), Spitze bis 1 px nach außen (kleiner, dafür öfter).
+* Schwanzwedeln (Periode 12 = 4× pro Schleife, Amplitude bis ±5 px, Spitze schleudert nach, Frame 0 = Original): die Zeilen wandern
+  seitlich; je weiter die Spitze ausschlägt, desto mehr steigt sie (bis 2 Zeilen entfallen, der Schwanz bleibt gleich lang), der Außenumriss wird neu gezogen (4-verbunden), die Lücke zum Rumpf wird geschlossen.
 * Vorderpfote (linkes Vorderbein im Bild) scharrt: das Bein wird um bis zu 2 px kürzer (Zeilen 27–28 entfallen), Frames 16–20 und 38–40.
 * Augenglühen (Periode 12, schnell): dunkler → normal → heller → Maximum (alle drei Pixel Q plus vier rosa Glutpixel (P) auf der
   Haut neben den Augen, Hof) → normal; alle Farben aus dem Sprite.
@@ -73,11 +73,12 @@ AUGEN_O, AUGEN_Q, ROSA = (196, 26, 26), (255, 34, 34), (227, 76, 76)
 AUGE_L = [(3, 10), (3, 11), (4, 11)]
 AUGE_R = [(8, 10), (7, 11), (8, 11)]
 HOF = [(4, 10), (5, 11), (7, 10), (9, 11)]                       # Hautpixel neben den Augen (Hell Fox glüht dort rosa)
-GLUT = {'rot': ((255, 34, 34), (227, 76, 76)),                   # Kern knallrot, Rand rosarot
+GLUT = {'rot': ((255, 34, 34), (196, 26, 26)),                   # Kern knallrot, Rand dunkleres Rot
         'glut': ((232, 193, 152), (227, 76, 76))}                # Kern beige (heiß), Rand rosarot
 
 BAUCHZEILE = 22                                                    # hier werden beim Atmen/Wiegen Zeilen eingefügt/entfernt
 PIVOT_SCHWANZ = 14
+SCHWANZ_AMP, SCHWANZ_LAUF = 5.4, 2.2                                # Schwanzspitze: bis ±5 px, die Welle läuft zur Spitze
 NICKEN = [(4, 3), (9, 2), (18, 3), (23, 2), (30, 3), (35, 2), (43, 3)]     # (Start, Länge): Schnüffeln
 OHR_L, OHR_R = (2, 14, 27, 38), (8, 20, 33, 44)                   # Startframes der Ohrzucker (je 4 Frames)
 BLINZELN = (13, 37)                                                # Startframes (3 Frames: halb, zu, halb)
@@ -94,12 +95,20 @@ def teil(maske):
 
 
 def hub(i):
-    """(kf, kr): eingefügte Zeilen vorn (Brust/Vorderbeine) und hinten (Hüfte/Hinterbeine) — Atmen plus Wiegen."""
-    b = 0.5 - 0.5 * math.cos(L.sinus(i % N, 24))
+    """(kf, kr): eingefügte Zeilen vorn (Brust/Vorderbeine) und hinten (Hüfte/Hinterbeine) — Atmen (Periode 16, zweistufig) plus
+    Wiegen (Periode 48: Gewicht vorn → vorn 1 px tiefer, hinten 1 px höher; Gewicht hinten → hinten 1 px tiefer)."""
+    b = 0.5 - 0.5 * math.cos(L.sinus(i % N, 16))
     bf = 0 if b < 0.25 else (1 if b < 0.75 else 2)
     br = 1 if b > 0.5 else 0
     wiegen = int(round(1.2 * math.sin(L.sinus(i % N, N))))
-    return max(-1, min(2, bf + wiegen)), max(-1, min(1, br - wiegen))
+    if wiegen > 0:
+        kf, kr = bf - 1, br
+    elif wiegen < 0:
+        kf, kr = bf, br - 1
+    else:
+        kf, kr = bf, br
+    kf = max(kr - 2, min(kr + 2, kf))                              # Neigung vorn/hinten höchstens 2 px (sonst reißt der Bauchfleck)
+    return kf, kr
 
 
 def k_von_x(kf, kr):
@@ -120,8 +129,12 @@ def schwanz_ebene(i):
     r = T.spalten_hub(teil(rumpf), z, k_von_x(kf, kr))
     env = min(1.0, min(i, N - i) / 5.0)                            # Schwanzamplitude: 0 bei Frame 0, nach 5 Frames voll
     ph = L.sinus(i, 12)
-    return T.haengend_schwingen(s, L.deckend(r), PAD_T + PIVOT_SCHWANZ - kr, 6.0, ph, [UMRISS_A, UMRISS_D],
-                                lauf=2.4, potenz=1.4, huelle=env), r
+    # Pendel statt Dehnen: je weiter die Spitze ausschlägt, desto mehr steigt sie (Zeilen 24… entfallen) — der Schwanz behält seine Länge
+    ausschlag = SCHWANZ_AMP * env * math.sin(ph - SCHWANZ_LAUF)
+    zeilen_weg = int(round(0.3 * abs(ausschlag)))
+    s = L.heben_unten(s, PAD_T + 23 + zeilen_weg, zeilen_weg)
+    return T.haengend_schwingen(s, L.deckend(r), PAD_T + PIVOT_SCHWANZ - kr, SCHWANZ_AMP, ph, [UMRISS_A, UMRISS_D],
+                                lauf=SCHWANZ_LAUF, potenz=1.3, huelle=env, satt_y=PAD_T + 26), r
 
 
 SCHWANZ_EB = [schwanz_ebene(i) for i in range(N)]
@@ -138,12 +151,12 @@ def spitze(i):
 def partikel():
     p = []
     # vom Rücken (Startpunkte an der Rückenlinie, zunächst hinter dem Körper verborgen)
-    for (x, y, off, form, farbe, vx, w) in [(19, 10, 0, 'm', 'rot', -1, 1.2), (24, 11, 7, 'k', 'glut', 1, 1.0), (28, 12, 14, 'o', 'rot', 1, 1.4),
-                                           (32, 13, 21, 'k', 'rot', 2, 1.0), (21, 10, 28, 'o', 'glut', -1, 1.2), (26, 11, 35, 'k', 'glut', 0, 1.0),
-                                           (30, 12, 41, 'm', 'rot', 1, 1.2)]:
+    for (x, y, off, form, farbe, vx, w) in [(23, 11, 0, 'o', 'glut', 1, 1.2), (26, 11, 7, 'k', 'rot', 0, 1.0), (29, 12, 14, 's', 'rot', 1, 1.3),
+                                           (32, 13, 21, 'k', 'glut', 1, 1.0), (25, 11, 28, 'm', 'glut', -1, 1.4), (28, 12, 35, 'k', 'rot', 1, 1.0),
+                                           (31, 13, 41, 's', 'glut', 1, 1.2)]:
         p.append(dict(x=PAD_L + x, y=PAD_T + y, vx=vx, vy=-12, off=off, form=form, farbe=farbe, wackeln=w, ph=off * 0.5))
     # von der Schwanzspitze: Startpunkt = Spitze im Spawn-Frame (Frame, in dem t = 0 ist)
-    for (off, form, farbe, vx) in [(3, 'k', 'glut', 1), (17, 'o', 'rot', 1), (31, 'k', 'rot', 2), (44, 'k', 'glut', 1)]:
+    for (off, form, farbe, vx) in [(3, 'k', 'glut', 1), (17, 's', 'glut', 1), (31, 'k', 'rot', 2), (44, 'o', 'glut', 1)]:
         sx, sy = spitze((-off) % N)
         p.append(dict(x=sx, y=sy, vx=vx, vy=-10, off=off, form=form, farbe=farbe, wackeln=1.0, ph=off * 0.7))
     return p
@@ -189,8 +202,8 @@ def frame(i, nur=None):
     dy_kopf = -kopf_hub + nicken
     k = L.versetze(k, 0, dy_kopf)
     ant = {PAD_T + y: a for y, a in EAR_ANT.items()}
-    ol = L.versetze(T.zucken_zeilen(teil(ohr_l), PAD_T + 5, -2.0 * ohr_li, ant), 0, dy_kopf)
-    orr = L.versetze(T.zucken_zeilen(teil(ohr_r), PAD_T + 5, 2.0 * ohr_re, ant), 0, dy_kopf)
+    ol = L.versetze(T.zucken_zeilen(teil(ohr_l), PAD_T + 5, -1.2 * ohr_li, ant), 0, dy_kopf)
+    orr = L.versetze(T.zucken_zeilen(teil(ohr_r), PAD_T + 5, 1.2 * ohr_re, ant), 0, dy_kopf)
     glut = T.funken_ebene(H, W, i, N, GLUTFUNKEN, GLUT)
     ebenen = {'glut': glut, 'schwanz': s, 'rumpf': r, 'pfote': p, 'kopf': k, 'ohr_l': ol, 'ohr_r': orr}
     wahl = nur or ('glut', 'schwanz', 'rumpf', 'pfote', 'kopf', 'ohr_l', 'ohr_r')

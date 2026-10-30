@@ -1,42 +1,48 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animation für „Tamed Hell Fox“ (Creature).
+"""Idle-Animation für „Tamed Hell Fox“ (Creature) — Version 2 (lebendiger).
 
 Quelle: src/tamed-hell-fox.png — 47×32 px, 15 Farben, aus Motive.xcf, Ebene 846 (96×73 px, trägt zwei Posen desselben Fuchses
 übereinander: oben Figur 1, unten Figur 2).
 PICK: [["Motive", 846, 2]]   (Figur 2 = untere Pose, offene weiße Augen — so steht er auf der Karte; Figur 1 ist dieselbe Pose
 mit zugekniffenen Augenecken und gefaltetem linken Ohr und dient nur als Referenz für den Zwischenschritt beim Blinzeln.)
 Gefunden über die Pixelkarte: creature_show.py kennt die Ebene nicht (die Suche lieferte nur den Menschen/Zügel „Tamed Hell Fox #1“,
-Ebene 845); der Fuchs steht in der Nachbarebene 846 und stimmt farblich/formal mit der Karte überein (weiße Augenblöcke).
-Es ist KEIN umgefärbter Hell Fox, sondern eine eigene Zeichnung (265 Pixel weichen vom Hell Fox ab).
+Ebene 845); der Fuchs steht in der Nachbarebene 846. Es ist KEIN umgefärbter Hell Fox, sondern eine eigene Zeichnung.
 
 Aufruf:   python3 tamed_hell_fox.py [--preview <ordner>]
 Ausgabe:  ../../data/creature-animations/tamed-hell-fox.png + .json
 
 Identifikation (Sprite 47×32, Fuchs im Profil nach links, Kopf links):
 * Kopf (x 0–15, y 1–16): hellbeige Schnauze/Gesicht (H/I/J/N), zwei rote Ohren mit dunklem Umriss (links x 4–7, rechts x 10–14,
-  Zeilen 0–4), zwei WEISSE Augenblöcke ohne Pupille (links 2×3: x 3–4, y 9–11; rechts 3×3: x 7–9, y 9–11), Nase = fast schwarze
+  Zeilen 1–4), zwei WEISSE Augenblöcke ohne Pupille (links 2×3: x 3–4, y 9–11; rechts 3×3: x 7–9, y 9–11), Nase = fast schwarze
   Pixel an der Schnauzenspitze (0–2, 14–16), braune Wangen-/Mähnenpartie (C) hinten am Kopf, Unterkieferlinie braun (3–10, 16).
 * Zwei weiße Reißzähne ragen aus dem Unterkiefer (3,17) und (6,17) — Zähne, keine Partikel: sie sitzen fest am Kiefer und
   gehen nur mit dem Kopf mit.
 * Schwarzer Fleck unter dem Kinn (9–15, 15–19; L/M/O): Halsband/Schatten zwischen Kinn und Vorderbein (an dieser Stelle läuft auf
   der Karte die Leine zum Menschen) — bleibt fest am Rumpf.
 * Rumpf: roter Körper mit dunklem Umriss (A), beige Bauchfellpartie (20–29, 18–21), vier Beine (vorn x 6–13 und 14–20, hinten
-  x 25–35), dunkelrote Schattierung (E/G) an den Füßen. Dunkle Binnenlinien (35–37, 19–20) = Kruppen-/Schenkelkante, Füllung.
+  x 25–35, die Beinpaare berühren sich), dunkelrote Schattierung (E/G) an den Füßen. Dunkle Binnenlinien (35–37, 19–20) = Kruppen-/
+  Schenkelkante, Füllung.
 * Schwanz (x ≥ 37, Zeilen 15–31): hängt vom Rücken diagonal nach rechts unten, beige Spitze (43–46, 22–30); Binnenlinie zwischen
   rotem Schwanz und Spitze (38–42, 19–23) ist Füllung, kein Außenumriss.
-* Fest: Kinn-/Halsband, Nase, Zähne, Bauchfell, Beine/Füße.
+* Fest: Kinn-/Halsband, Nase, Zähne, Bauchfell, Füße.
 
-Ablauf (40 Frames à 70 ms = 2,8 s) — gleiche Mechanik wie Hell Fox, aber ein zahmer, freudiger Fuchs:
-* Atmen (Periode 40): Rumpf hebt sich 1 px (Zeile 22 wird eingefügt), Füße bleiben, Kopf/Ohren/Schwanzansatz steigen mit.
-* Kopfnicken (Periode 40, versetzt): Kopf senkt sich 1 px relativ zum Rumpf; die Zähne gehen mit dem Kopf.
-* Ohrzucken: links Frames 6–9, rechts Frames 22–25 (Zeilen oberhalb des Ansatzes weichen 1 px nach außen aus).
-* Schwanzwedeln (Periode 10 = 4× pro Schleife, schneller als beim wilden Hell Fox; Spitze läuft nach, Amplitude blendet über die
-  Schleife ein/aus, Frame 0 = Original): Zeilen wandern seitlich, der Außenumriss wird neu gezogen (4-verbunden), Lücke zum Rumpf
-  wird geschlossen.
-* Blinzeln (Frames 30–34): die weißen Augenblöcke schließen sich in drei Stufen (Augenecken zu — aus Figur 1 des Quell-Bildes —,
-  obere Zeile zu, ganz zu mit braunem Lidstrich) und öffnen sich wieder.
-* Glut: vier einzelne Funken (1 px; helles Beige und Fellrot aus dem Sprite) steigen langsam vom Rücken auf, verglimmen flackernd,
-  hinter dem Fuchs (anim_tiere.funken_ebene). Keine Kreuz-/Rautenformen.
+Ablauf (48 Frames à 65 ms = 3,12 s) — gleiche Mechanik wie Hell Fox, aber freudiger (Schwanz schneller), Ereignisse zeitversetzt:
+* Atmen, zweistufig (Periode 16, 3× pro Schleife): Brust/Vorderkörper steigt bis 2 px, der Hinterkörper bis 1 px; der Kopf folgt der
+  Brust 3 Frames später. Spaltenweise eingefügte Zeilen (Zeile 22) heben den Körper, die Füße bleiben am Boden.
+* Wiegen/Gewichtsverlagerung (Periode 48): Körper kippt um ±1 px (vorn tiefer oder hinten tiefer), Beine werden spaltenweise länger/
+  kürzer; Neigung vorn/hinten höchstens 2 px.
+* Schnüffeln: Kopf senkt sich 1 px relativ zum Körper, 7× pro Schleife; die Zähne gehen mit dem Kopf.
+* Ohrzucken: jedes Ohr 4× pro Schleife, Spitze bis 1 px nach außen.
+* Schwanzwedeln (Periode 8 = 6× pro Schleife, Spitze schleudert nach, Amplitude bis ±5 px, Frame 0 = Original): Zeilen wandern
+  seitlich, die Spitze (ab Zeile 26) bewegt sich starr als Block, je weiter der Ausschlag, desto mehr steigt sie (Zeilen entfallen,
+  der Schwanz behält seine Länge); der Außenumriss wird neu gezogen (4-verbunden), die Lücke zum Rumpf geschlossen.
+* Blinzeln zweimal (Frames 11–15 und 33–37): die weißen Augenblöcke schließen sich in Stufen (Augenecken zu — aus Figur 1 des
+  Quell-Bildes —, obere Zeile zu, ganz zu mit braunem Lidstrich) und öffnen sich wieder.
+* Glut/Funken (11 Partikel, langsam aufsteigend): Funken und kleine Glutwölkchen (Formen k/s/o/m; Kern hellbeige oder rot, Rand
+  rot/rosarot, nur Spritefarben) vom Rücken und von der Schwanzspitze; Lebenslauf Funke → Klecks → Wölkchen → schrumpft → Funke
+  flackert → aus, am Schleifenende nichts sichtbar. Hinter dem Fuchs.
+* Keine Vorderpfote: die Beinpaare des Sprites berühren sich (gemeinsame Umrisslinie); ein gehobener Fuß würde dem Nachbarbein den
+  Umriss nehmen (hier müsste gemalt werden) — bewusst weggelassen.
 Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
 
 Ergänzungen: keine gemalten Pixel nötig (Kopf liegt über dem Rumpf; der Schwanzumriss entsteht aus den Quellfarben A/C).
@@ -49,8 +55,8 @@ import numpy as np
 import anim_lib as L
 import anim_tiere as T
 
-N, MS = 40, 70
-PAD_L, PAD_R, PAD_T, PAD_B = 5, 8, 7, 3
+N, MS = 48, 65
+PAD_L, PAD_R, PAD_T, PAD_B = 6, 11, 10, 3
 
 spr = L.lade('tamed-hell-fox')
 sh, sw = spr.shape[:2]
@@ -65,7 +71,8 @@ ohr_l = kopf_alles & (xx <= 8) & (yy <= 4)
 ohr_r = kopf_alles & (xx >= 10) & (xx <= 14) & (yy <= 4)
 kopf = kopf_alles & ~ohr_l & ~ohr_r
 schwanz = vorhanden & (xx >= 37)
-rumpf = vorhanden & ~kopf_alles & ~schwanz
+pfote = np.zeros_like(vorhanden)                                 # keine Pfotenbewegung (Beine berühren sich, siehe Kopf)
+rumpf = vorhanden & ~kopf_alles & ~schwanz & ~pfote
 
 UMRISS_A, UMRISS_D = (51, 12, 12), (104, 84, 58)
 HELL, FELL2, LIDSTRICH = (232, 193, 152), (224, 182, 126), UMRISS_D          # Fell (Lid) / Wange / brauner Lidstrich
@@ -75,10 +82,16 @@ ECKEN = {(4, 9): HELL, (7, 9): UMRISS_D, (9, 11): FELL2}                        
 OBEN = {(3, 9): HELL, (4, 9): HELL, (7, 9): UMRISS_D, (8, 9): HELL, (9, 9): HELL, (9, 11): FELL2}
 ZU = {p: HELL for p in AUGE_L + AUGE_R}
 ZU.update({p: LIDSTRICH for p in [(3, 11), (4, 11), (7, 11), (8, 11), (9, 11)]})
-GLUT = {'c': (232, 193, 152), 'r': (213, 71, 71)}
+GLUT = {'rot': ((213, 71, 71), (137, 32, 32)),                   # Kern Fellrot, Rand dunkelrot
+        'glut': ((232, 193, 152), (213, 71, 71))}                # Kern beige (heiß), Rand Fellrot
 
-BAUCHZEILE = 22                                                    # hier wird beim Atmen eine Zeile eingefügt
+BAUCHZEILE = 22                                                    # hier werden beim Atmen/Wiegen Zeilen eingefügt/entfernt
 PIVOT_SCHWANZ = 14
+SCHWANZ_AMP, SCHWANZ_LAUF = 5.4, 2.2                                # Schwanzspitze: bis ±5 px, die Welle läuft zur Spitze
+NICKEN = [(2, 3), (8, 2), (15, 3), (24, 2), (29, 3), (36, 2), (41, 3)]     # (Start, Länge): Schnüffeln
+OHR_L, OHR_R = (5, 17, 30, 41), (11, 23, 36, 47)                   # Startframes der Ohrzucker (je 4 Frames)
+BLINZELN = (11, 33)                                                # Startframes (5 Frames: Ecken, oben, zu, oben, Ecken)
+PFOTE = {}                                                         # keine Pfotenbewegung
 
 
 def px(x, y):
@@ -90,58 +103,119 @@ def teil(maske):
     return L.platz(t, H, W, PAD_L, PAD_T)                          # sofort auf die volle Leinwand
 
 
-GLUTFUNKEN = [                                                    # Start = Rückenlinie (liegt zuerst hinter dem Körper)
-    dict(x=px(19, 10)[0], y=px(19, 10)[1], vx=-1, vy=-11, off=0, farbe='c', wackeln=1),
-    dict(x=px(26, 11)[0], y=px(26, 11)[1], vx=1, vy=-12, off=10, farbe='r', wackeln=1),
-    dict(x=px(31, 13)[0], y=px(31, 13)[1], vx=2, vy=-11, off=20, farbe='c', wackeln=1),
-    dict(x=px(23, 11)[0], y=px(23, 11)[1], vx=-1, vy=-10, off=30, farbe='r', wackeln=1),
-]
+def hub(i):
+    """(kf, kr): eingefügte Zeilen vorn (Brust/Vorderbeine) und hinten (Hüfte/Hinterbeine) — Atmen (Periode 16, zweistufig) plus
+    Wiegen (Periode 48: Gewicht vorn → vorn 1 px tiefer, hinten 1 px höher; Gewicht hinten → hinten 1 px tiefer)."""
+    b = 0.5 - 0.5 * math.cos(L.sinus(i % N, 16))
+    bf = 0 if b < 0.25 else (1 if b < 0.75 else 2)
+    br = 1 if b > 0.5 else 0
+    wiegen = int(round(1.2 * math.sin(L.sinus(i % N, N))))
+    if wiegen > 0:
+        kf, kr = bf - 1, br
+    elif wiegen < 0:
+        kf, kr = bf, br - 1
+    else:
+        kf, kr = bf, br
+    kf = max(kr - 2, min(kr + 2, kf))                              # Neigung vorn/hinten höchstens 2 px (sonst reißt der Bauchfleck)
+    return kf, kr
+
+
+def k_von_x(kf, kr):
+    def k(x):                                                      # x = Leinwandspalte
+        sx = x - PAD_L
+        if sx <= 20:
+            return kf
+        if sx >= 24:
+            return kr
+        return int(round(kf + (kr - kf) * (sx - 20) / 4.0))        # nur Bauch dazwischen
+    return k
+
+
+def schwanz_ebene(i):
+    kf, kr = hub(i)
+    z = PAD_T + BAUCHZEILE
+    s = T.spalten_hub(teil(schwanz), z, lambda x: kr)
+    r = T.spalten_hub(teil(rumpf), z, k_von_x(kf, kr))
+    env = min(1.0, min(i, N - i) / 5.0)                            # Schwanzamplitude: 0 bei Frame 0, nach 5 Frames voll
+    ph = L.sinus(i, 8)                                              # Wedeln: 6× pro Schleife (freudiger Fuchs)
+    # Pendel statt Dehnen: je weiter die Spitze ausschlägt, desto mehr steigt sie (Zeilen 24… entfallen) — der Schwanz behält seine Länge
+    ausschlag = SCHWANZ_AMP * env * math.sin(ph - SCHWANZ_LAUF)
+    zeilen_weg = int(round(0.3 * abs(ausschlag)))
+    s = L.heben_unten(s, PAD_T + 23 + zeilen_weg, zeilen_weg)
+    return T.haengend_schwingen(s, L.deckend(r), PAD_T + PIVOT_SCHWANZ - kr, SCHWANZ_AMP, ph, [UMRISS_A, UMRISS_D],
+                                lauf=SCHWANZ_LAUF, potenz=1.3, huelle=env, satt_y=PAD_T + 26), r
+
+
+SCHWANZ_EB = [schwanz_ebene(i) for i in range(N)]
+
+
+def spitze(i):
+    """Schwanzspitze (Leinwandkoordinate) in Frame i: rechtester Pixel in den untersten Zeilen."""
+    s = SCHWANZ_EB[i % N][0]
+    ys, xs_ = np.nonzero(s[PAD_T + 25:, :, 3])
+    k = int(np.argmax(xs_))
+    return int(xs_[k]), int(ys[k]) + PAD_T + 25
+
+
+def partikel():
+    p = []
+    # vom Rücken (Startpunkte an der Rückenlinie, zunächst hinter dem Körper verborgen)
+    for (x, y, off, form, farbe, vx, w) in [(23, 11, 0, 'o', 'glut', 1, 1.2), (26, 11, 7, 'k', 'rot', 0, 1.0), (29, 12, 14, 's', 'rot', 1, 1.3),
+                                           (32, 13, 21, 'k', 'glut', 1, 1.0), (25, 11, 28, 'm', 'glut', -1, 1.4), (28, 12, 35, 'k', 'rot', 1, 1.0),
+                                           (31, 13, 41, 's', 'glut', 1, 1.2)]:
+        p.append(dict(x=PAD_L + x, y=PAD_T + y, vx=vx, vy=-12, off=off, form=form, farbe=farbe, wackeln=w, ph=off * 0.5))
+    # von der Schwanzspitze: Startpunkt = Spitze im Spawn-Frame (Frame, in dem t = 0 ist)
+    for (off, form, farbe, vx) in [(3, 'k', 'glut', 1), (17, 's', 'glut', 1), (31, 'k', 'rot', 2), (44, 'o', 'glut', 1)]:
+        sx, sy = spitze((-off) % N)
+        p.append(dict(x=sx, y=sy, vx=vx, vy=-10, off=off, form=form, farbe=farbe, wackeln=1.0, ph=off * 0.7))
+    return p
+
+
+GLUTFUNKEN = partikel()
 
 
 def zustand(i):
-    """Alle Steuergrößen eines Frames."""
-    atem = 1 if 6 <= i < 26 else 0                                   # Rumpf gehoben
-    nicken = 1 if 17 <= i < 23 else 0                                # Kopf relativ zum Rumpf gesenkt
-    ohr_li = [0, 1, 1, 0][i - 6] if 6 <= i < 10 else 0
-    ohr_re = [0, 1, 1, 0][i - 22] if 22 <= i < 26 else 0
-    ph20 = L.sinus(i, 10)                                            # Wedeln: 4× pro Schleife
+    kf, kr = hub(i)
+    kopf_hub = min(kf, hub(i - 3)[0])                                 # Kopf folgt der Brust 3 Frames später (nie über den Rumpf hinaus)
+    nicken = 1 if any((i - s) % N < l for s, l in NICKEN) else 0
+    ohr_li = max(T.huellkurve(i, N, s, 4) for s in OHR_L)
+    ohr_re = max(T.huellkurve(i, N, s, 4) for s in OHR_R)
     glueh = 0
-    lid = {30: 1, 31: 2, 32: 3, 33: 2, 34: 1}.get(i, 0)
-    env = 0.5 - 0.5 * math.cos(L.sinus(i, N))                        # Schwanzamplitude: 0 bei Frame 0
-    return atem, nicken, ohr_li, ohr_re, ph20, glueh, lid, env
+    lid = 0
+    for s in BLINZELN:
+        if 0 <= i - s < 5:
+            lid = (1, 2, 3, 2, 1)[i - s]
+    return kf, kr, kopf_hub, nicken, ohr_li, ohr_re, glueh, lid, PFOTE.get(i, 0)
+
+
+EAR_ANT = {0: 1.0, 1: 0.9, 2: 0.65, 3: 0.3, 4: 0.1}
 
 
 def frame(i, nur=None):
-    atem, nicken, ohr_li, ohr_re, ph20, glueh, lid, env = zustand(i)
-    z = PAD_T + BAUCHZEILE
-    r = L.platz(L.trenne(spr, rumpf)[0], H, W, PAD_L, PAD_T)
-    r = L.streck_zeile(r, z, atem)
-    s = L.streck_zeile(teil(schwanz), z, atem)
-    s = T.haengend_schwingen(s, L.deckend(r), PAD_T + PIVOT_SCHWANZ - atem, 3.8, ph20, [UMRISS_A, UMRISS_D],
-                             lauf=1.6, potenz=1.1, huelle=env)
+    kf, kr, kopf_hub, nicken, ohr_li, ohr_re, glueh, lid, pf = zustand(i)
+    s, r = SCHWANZ_EB[i]
+    p = L.heben_unten(teil(pfote), PAD_T + 26 + pf, pf)
     k = teil(kopf)
     # Augen: Blinzeln (Stufen 1 = Ecken zu, 2 = obere Zeile zu, 3 = zu)
     if lid:
         stufe = {1: ECKEN, 2: OBEN, 3: ZU}[lid]
-        k = T.pixel_tauschen(k, {px(*p): c for p, c in stufe.items()})
-    dy_kopf = -atem + nicken
+        k = T.pixel_tauschen(k, {px(*p_): c for p_, c in stufe.items()})
+    dy_kopf = -kopf_hub + nicken
     k = L.versetze(k, 0, dy_kopf)
-    ol = L.versetze(T.zucken_zeilen(teil(ohr_l), PAD_T + 5, -1.2 * ohr_li), 0, dy_kopf)
-    orr = L.versetze(T.zucken_zeilen(teil(ohr_r), PAD_T + 5, 1.2 * ohr_re), 0, dy_kopf)
+    ant = {PAD_T + y: a for y, a in EAR_ANT.items()}
+    ol = L.versetze(T.zucken_zeilen(teil(ohr_l), PAD_T + 5, -1.2 * ohr_li, ant), 0, dy_kopf)
+    orr = L.versetze(T.zucken_zeilen(teil(ohr_r), PAD_T + 5, 1.2 * ohr_re, ant), 0, dy_kopf)
     glut = T.funken_ebene(H, W, i, N, GLUTFUNKEN, GLUT)
-    ebenen = {'glut': glut, 'schwanz': s, 'rumpf': r, 'kopf': k, 'ohr_l': ol, 'ohr_r': orr}
-    if nur is not None:
-        return L.zusammen(H, W, [(ebenen[n], 0, 0) for n in nur])
-    return L.zusammen(H, W, [(ebenen[n], 0, 0) for n in ('glut', 'schwanz', 'rumpf', 'kopf', 'ohr_l', 'ohr_r')])
+    ebenen = {'glut': glut, 'schwanz': s, 'rumpf': r, 'pfote': p, 'kopf': k, 'ohr_l': ol, 'ohr_r': orr}
+    wahl = nur or ('glut', 'schwanz', 'rumpf', 'pfote', 'kopf', 'ohr_l', 'ohr_r')
+    return L.zusammen(H, W, [(ebenen[n], 0, 0) for n in wahl])
 
 
 if __name__ == '__main__':
     frames = [frame(i) for i in range(N)]
-    quelle = np.zeros((H, W, 4), np.uint8)
-    quelle[PAD_T:PAD_T + sh, PAD_L:PAD_L + sw] = spr
     n = L.pruefe(frames, quelle=spr, erlaubt=[])
     print('Pixel je Frame:', n)
     prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
-    L.speichern('tamed-hell-fox', 'Tamed Hell Fox', frames, MS, prev)
+    L.speichern('hell-fox', 'Hell Fox', frames, MS, prev)
     if prev:
-        L.streifen(prev + '/tamed-hell-fox-strip.png', frames, spalten=10, scale=4)
+        L.streifen(prev + '/hell-fox-strip.png', frames, spalten=12, scale=3)

@@ -10,6 +10,9 @@ abgeschnitten wird.
     folge(i, start, werte, n)           Ereignis-Fenster: werte[k] im Frame start+k, sonst None (Blinzeln, Ohrzucken, Funkeln)
     takt(i, n, start, laenge)           1, wenn Frame i im Fenster [start, start+laenge) (alle n Frames wiederholt), sonst 0 —
                                         z. B. Windstöße für Haarsträhnen: pro Strähne ein um 2 Frames versetztes Fenster = laufende Welle
+    laubwelle(s, i, n, wellenlaenge, zyklen)  fortlaufende Welle 0…1 über die Diagonale s = x + 0,6·y (läuft mit i nach s+), mit Hüllkurve
+                                        sin²(π·i/n) → in Frame 0 und am Schleifenende überall 0 (Ruhepose), dazwischen kräftig;
+                                        `zyklen` volle Wellenperioden pro Schleife. Für wogendes Laub/Haar/Umhang.
     boe_mitte(i, n, start, laenge, von, bis)  Mitte einer diagonalen Windfront (Koordinate s = x + neigung·y), die im Fenster von `von`
                                         nach `bis` wandert, sonst None. Laub-/Umhang-Böe: erst die Spitzen oben, die Wellenfront läuft
                                         nach unten (Saum), „Spitze hinterher".
@@ -55,6 +58,12 @@ def folge(i, start, werte, n=None):
 def takt(i, n, start, laenge):
     """1, wenn Frame i im Fenster [start, start + laenge) liegt (Fenster wiederholt sich alle n Frames, nahtlos), sonst 0."""
     return 1 if 0 <= (i - start) % n < laenge else 0
+
+
+def laubwelle(s, i, n, wellenlaenge, zyklen):
+    """Wert 0 … 1: max(0, sin(2π·(s/wellenlaenge − zyklen·i/n))) · sin²(π·i/n). Nahtlos (ganzzahlige zyklen), in Frame 0 = 0."""
+    env = math.sin(math.pi * i / n) ** 2
+    return env * max(0.0, math.sin(2 * math.pi * (s / wellenlaenge - zyklen * i / n)))
 
 
 def boe_mitte(i, n, start, laenge, von, bis):

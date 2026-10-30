@@ -12,6 +12,7 @@ bereits auf der VOLLEN Leinwand liegen (L.platz) und werfen ClipError, wenn etwa
     kiefer(a, zaehne, farbe, innen, tiefe)    # Kiefer klappt auf/zu (Zähne rutschen nach unten, Mundinneres füllt nach)
     band_diagonal(a, punkte, rampe, d)        # Lichtband wandert diagonal über ein glänzendes Objekt (eine Stufe heller)
     stern_ebene(h, w, cx, cy, stufe, mitte, arm)   # vierzackiger Glitzerstern am Objekt (Stufe 1 → 2 → 1)
+    blitz_ebene(h, w, ax, ay, muster, spiegel, kern, akzent)   # kleiner Zickzack-Blitz (2–5 px) an einer Hand
     glanz_pfad(a, pfad, hell, basis, pos)     # ein Lichtpunkt wandert an einem Horn/Knochen/Klinge entlang
     glut_ebene(h, w, i, n, puffs, farben)     # Funken/Glut aufsteigend (puff_ebene, aber mit Verglimmen an Anfang und Ende)
 """
@@ -155,6 +156,36 @@ def stern_ebene(h, w, cx, cy, stufe, mitte, arm):
         if not (0 <= x < w and 0 <= y < h):
             raise L.ClipError(f'Stern bei ({x},{y}) liegt außerhalb der Leinwand {w}×{h}')
         e[y, x, :3] = col
+        e[y, x, 3] = 255
+    return e
+
+
+# Kleine Pixel-Blitze: 4-verbundene Zickzack-Pfade aus 3–6 Pixeln (Länge 2–5 px), keine Kreuzform.
+BLITZ_MUSTER = [
+    [(0, 0), (1, 0), (1, 1), (2, 1), (2, 2), (3, 2)],            # Treppe nach rechts unten
+    [(0, 0), (0, 1), (1, 1), (1, 2), (0, 2), (0, 3)],            # Zickzack nach unten
+    [(0, 0), (1, 0), (1, -1), (2, -1), (2, 0), (3, 0)],          # Zickzack waagerecht
+    [(0, 0), (0, -1), (1, -1), (1, -2), (2, -2), (2, -3)],       # Treppe nach rechts oben
+    [(0, 0), (-1, 0), (-1, -1), (-2, -1)],                       # kurz, nach links oben
+    [(0, 0), (0, 1), (-1, 1), (-1, 2), (0, 2)],                  # Zickzack nach unten links
+    [(0, 0), (1, 0), (1, 1), (1, 2), (2, 2)],                    # Haken
+    [(0, 0), (0, -1), (-1, -1), (-1, -2), (0, -2), (0, -3)],     # Zickzack nach oben
+]
+
+
+def blitz_ebene(h, w, ax, ay, muster, spiegel, kern, akzent, laenge=None):
+    """Kleiner Zickzack-Blitz ab (ax, ay): `muster` (Index in BLITZ_MUSTER), spiegel=True spiegelt waagerecht (rechte Hand).
+    kern = Hauptfarbe, akzent = Farbe für Spitze und ein Zwischenpixel (beides Farben des Sprites). laenge kürzt auf die ersten n Pixel.
+    ClipError, wenn der Blitz aus der Leinwand ragen würde."""
+    e = L.leer(h, w)
+    pf = BLITZ_MUSTER[muster % len(BLITZ_MUSTER)]
+    if laenge:
+        pf = pf[:laenge]
+    for k, (dx, dy) in enumerate(pf):
+        x, y = ax + (-dx if spiegel else dx), ay + dy
+        if not (0 <= x < w and 0 <= y < h):
+            raise L.ClipError(f'Blitz bei ({x},{y}) liegt außerhalb der Leinwand {w}×{h}')
+        e[y, x, :3] = akzent if (k == len(pf) - 1 or k == 2) else kern
         e[y, x, 3] = 255
     return e
 

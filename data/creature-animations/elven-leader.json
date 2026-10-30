@@ -1,15 +1,15 @@
 {
   "creature": "Elven Leader",
   "sheet": "elven-leader.png",
-  "frameWidth": 33,
-  "frameHeight": 34,
-  "frames": 40,
-  "frameMs": 90,
+  "frameWidth": 35,
+  "frameHeight": 35,
+  "frames": 48,
+  "frameMs": 62,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 4,
-  "padLeft": 2,
+  "padTop": 2,
+  "padLeft": 3,
   "padRight": 3,
   "padBottom": 3,
-  "faceX": 16.5
+  "faceX": 17.5
 }

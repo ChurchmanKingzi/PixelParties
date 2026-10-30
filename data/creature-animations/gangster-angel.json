@@ -1,15 +1,15 @@
 {
   "creature": "Gangster Angel",
   "sheet": "gangster-angel.png",
-  "frameWidth": 47,
-  "frameHeight": 38,
-  "frames": 24,
+  "frameWidth": 51,
+  "frameHeight": 44,
+  "frames": 40,
   "frameMs": 70,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 4,
+  "padTop": 2,
   "padLeft": 4,
-  "padRight": 3,
-  "padBottom": 5,
-  "faceX": 23.5
+  "padRight": 4,
+  "padBottom": 8,
+  "faceX": 25.5
 }
