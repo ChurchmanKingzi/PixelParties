@@ -22,10 +22,10 @@ Metall/Gold im Sprite: nur das goldene Brustband und der goldene Handschuh (Rege
 
 Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos):
 * Auf und ab (zweistufig, Periode 24 = zweimal pro Schleife): Brust zuerst 1 px (Rockzeile 24 wird einmal doppelt eingefügt: Brustband, Oberkörper, Gesicht und Haare steigen, Saum und Fuß bleiben; die Faust steigt mit,
-  der Stab wird dabei um 1 px länger), der Kopf läuft 3 Frames nach und hebt sich um ein weiteres px (Halszeile 14, glatte Haut, wird verlängert): Kopf 0 → 1 → 2 → 1 → 0 px, Brust 0 → 1 → 0.
+  der Stab wird dabei länger), der Kopf läuft 3 Frames nach und hebt sich um ein weiteres px (Halszeile 14, glatte Haut, wird verlängert): Kopf 0 → 1 → 2 → 1 → 0 px, Brust 0 → 1 → 0.
 * Stachelhaare wehen: die Haarspitzen (Zeilen 0–1) wehen als Welle 1 px nach links (Frames 6–11 und 28–33) bzw. rechts (Frames 17–22 und 39–44), die Spitzen in Zeile 0 bleiben über ihrem Stachel; Randpixel
   werden in Umrissfarbe (Schwarz) geschlossen.
-* Gras-Rock weht: die zwei unteren Rockzeilen (24–25) wehen sanft ±1 px (Periode 24, gegen den Atem), 4-verbunden, Randpixel in Umrissgrün geschlossen.
+* Gras-Rock weht: der linke Saum der zwei unteren Rockzeilen (24–25) spreizt sich zweimal pro Schleife sanft 1 px nach außen (Periode 24, `Hm.rand_dehnen`, Lücke in Grasfarbe), Randpixel in Umrissgrün geschlossen.
 * Stab neigt sich: die oberen drei Stabzeilen (7–9) kippen 1 px nach rechts und zurück (Frames 14–19 und 38–43) wie eine locker gehaltene Waffe, Faust bleibt am Stab.
 * Blinzeln (Frames 19–21 und 41–43): hellblaue Iris (9,10) und weißer Pixel (9,11) nehmen die umgebende Hautfarbe (180,123,49) an (Lid = Hautfarbe); kein Farbtausch, kein Augenglanz.
 * Gold glänzt (Regel 12/14: nur das Brustband): ein Lichtband läuft zweimal pro Schleife diagonal über das Band (Frames 5–18 und 29–42, 1–2 Stufen heller auf der Goldrampe des Sprites, nur Innenpixel), dazu je ein
@@ -104,17 +104,17 @@ def frame(i):
     s = -1 if (Hm.folge(i, 6, [1] * 6, N) or Hm.folge(i, 28, [1] * 6, N)) else (1 if (Hm.folge(i, 17, [1] * 6, N) or Hm.folge(i, 39, [1] * 6, N)) else 0)
     k = haare_wehen(k, s)
     # --- Gras-Rock weht (untere zwei Rockzeilen) ---
-    rs = max(-1, min(1, int(round(1.3 * math.sin(L.sinus(i, N / 2))))))
+    rs = max(0, int(round(1.3 * math.sin(L.sinus(i, N / 2)))))        # 0 oder 1: der linke Saum spreizt sich 1 px nach außen (rechts liegt der Stab)
     if rs:
-        Hm.bereich_versatz(k, OFF, {24: rs, 25: rs}, 0, 10)
+        Hm.rand_dehnen(k, OFF, {24: rs, 25: rs}, 'l')
     # --- Stab neigt sich (obere drei Stabzeilen 1 px nach rechts) ---
     if Hm.folge(i, 14, [1] * 6, N) or Hm.folge(i, 38, [1] * 6, N):
         Hm.bereich_versatz(st, OFF, {7: 1, 8: 1, 9: 1}, 11, 14)
-    # --- Auf und ab: Rockzeile 24 = Brust, Halszeile 14 läuft 3 Frames nach (Stab nur Brust) ---
+    # --- Auf und ab: Rockzeile 24 = Brust, Halszeile 14 läuft 3 Frames nach (Stab: auch der obere Teil steigt mit dem Kopf, die Faust nur mit der Brust) ---
     brust = Hm.stufe(i, N / 2, 1)
     kopf = Hm.stufe(i - 3, N / 2, 1)
     k = Hm.atmen(k, PAD_T + 24, PAD_T + 14, brust, kopf)
-    st = Hm.atmen(st, PAD_T + 24, PAD_T + 14, brust, 0)
+    st = Hm.atmen(st, PAD_T + 24, PAD_T + 14, brust, kopf)
     # --- Glitzer-Sterne an den Bandenden (mit der Brust gehoben) ---
     for (sx, sy, start) in ((2, 16, 10), (9, 17, 34)):
         sstufe = Hm.folge(i, start, [0, 1, 2, 1], N)
