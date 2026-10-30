@@ -807,9 +807,10 @@
         let v = roh[j][p];
         if (v == null) continue;
         if (LAYOUT.test(k)) v = laengenRunden(v, /^(width|height|min-|max-)/.test(k) ? 4 : /^(left|top|right|bottom|margin|inset)/.test(k) ? 2 : 1);
-        else if (k === 'filter' || k === '-webkit-filter') v = filterBereinigen(v);
+        else if (k === 'filter' || k === '-webkit-filter') v = root.PPPixelHart ? root.PPPixelHart.filter(v) : filterBereinigen(v);   // W86u1: harte drop-shadows bleiben, Weichzeichner weg
         else if (k === 'backdrop-filter' || k === '-webkit-backdrop-filter') v = 'none';
-        else if (k === 'box-shadow' || k === 'text-shadow') v = schattenHart(v, raster);
+        else if (k === 'box-shadow') v = root.PPPixelHart ? root.PPPixelHart.box(v) : schattenHart(v, raster);
+        else if (k === 'text-shadow') v = root.PPPixelHart ? root.PPPixelHart.text(v) : schattenHart(v, raster);
         if (FARBE.test(k) || k === 'box-shadow' || k === 'text-shadow' || k === 'filter') v = snapFarben(v);
         aus[j][p] = v;
       }

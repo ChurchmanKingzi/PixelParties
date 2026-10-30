@@ -3801,7 +3801,7 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
   transform-origin: 50% 100%;
   transform: rotateX(calc(-1 * var(--sprite-kipp, 0deg))) scaleY(var(--sprite-streck, 1));
   /* harter 1-px-Pixelschatten löst die Figur von der Kulisse */
-  filter: drop-shadow(0 calc(1px * var(--board-scale)) 0 rgba(0,0,0,.6));
+  filter: drop-shadow(0 calc(1px * var(--board-scale)) 0 #08060c);
   transition: opacity .4s ease;
   animation: heroIdleKlipp .55s linear backwards;
 }
@@ -4025,7 +4025,7 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
 .hero-idle-schatten {
   position: absolute;
   height: calc(3px * var(--board-scale));
-  background: radial-gradient(ellipse at center, rgba(0,0,0,.5) 0 45%, rgba(0,0,0,.22) 46% 70%, transparent 71%);
+  background: radial-gradient(ellipse at center, #08060c 0 70%, transparent 71%);   /* W86u1: deckend (Pixelart, kein Alpha-Schleier) */
   animation: heroIdleSchatten .55s ease-out backwards;
   transition: opacity .3s ease;
 }
@@ -6597,16 +6597,18 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   inset: 0;
   z-index: -1;
   pointer-events: none;
+  /* W86u1 Pixelart: harte Farbbänder (deckende Mischungen mit dem dunklen Handgrund) statt Alpha-Verlauf + Screen-Mischmodus */
   background:
     radial-gradient(120% 150% at 50% 100%,
-      color-mix(in srgb, var(--amb-me, #66b6ff) 42%, transparent) 0%, transparent 68%);
-  mix-blend-mode: screen;
-  opacity: .55;
+      color-mix(in srgb, var(--amb-me, #66b6ff) 26%, #08060c) 0 20%,
+      color-mix(in srgb, var(--amb-me, #66b6ff) 17%, #08060c) 20% 38%,
+      color-mix(in srgb, var(--amb-me, #66b6ff) 9%, #08060c) 38% 54%,
+      transparent 54%);
   animation: hand-bloom-pulse 6s ease-in-out infinite;
 }
 @keyframes hand-bloom-pulse {
-  0%, 100% { opacity: .45; }
-  50%      { opacity: .7; }
+  0%, 100% { opacity: .75; }
+  50%      { opacity: 1; }
 }
 /* PIXEL PARTICLES — pixel motes floating just above the hand cards. No
    overflow clip, so they're free to drift up out of the hand and into the
@@ -6619,25 +6621,26 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 }
 .hand-mote {
   position: absolute;
-  width: var(--p-size, 3px);
-  height: var(--p-size, 3px);
-  background: var(--p-color, var(--amb-me, #66b6ff));
-  box-shadow: 0 0 6px var(--p-color, var(--amb-me, #66b6ff));
+  width: var(--p-size, 4px);
+  height: var(--p-size, 4px);
+  /* W86u1 Pixelart: deckende, gedämpfte Farbe (Mischung mit dem dunklen Grund) statt Alpha + Leuchtschatten; die Bewegung läuft in
+     gehaltenen Stufen (`steps`), Lagen auf ganzen Pixeln (gerade Werte aus dem JSX) — so muss pixel-anim.js sie nicht erst abtasten. */
+  background: color-mix(in srgb, var(--p-color, var(--amb-me, #66b6ff)) calc(var(--p-max, .4) * 100%), #08060c);
   image-rendering: pixelated;
   opacity: 0;
-  transform: translate(0, 0) scale(.6);
-  animation: hand-mote-float var(--p-dur, 8s) ease-in-out var(--p-delay, 0s) infinite;
+  transform: translate(0, 0) scale(.5);
+  animation: hand-mote-float var(--p-dur, 8s) steps(var(--p-st, 10), end) var(--p-delay, 0s) infinite;
   will-change: transform, opacity;
 }
 @keyframes hand-mote-float {
   0%   { opacity: 0; transform: translate(0, 0) scale(.5); }
-  18%  { opacity: var(--p-max, .4); }
+  18%  { opacity: 1; }
   50%  { transform: translate(var(--p-dx, 0), var(--p-dy, -30px)) scale(1); }
-  82%  { opacity: var(--p-max, .4); }
-  100% { opacity: 0; transform: translate(calc(var(--p-dx, 0) * 1.6), calc(var(--p-dy, -30px) * 1.8)) scale(.7); }
+  82%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--p-dx2, 0), var(--p-dy2, -54px)) scale(.5); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hand-bloom { animation: none; opacity: .55; }
+  .hand-bloom { animation: none; opacity: 1; }
   .hand-mote  { animation: none; opacity: calc(var(--p-max, .4) * .5); transform: none; }
 }
 
@@ -6656,14 +6659,13 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 }
 .board-mote {
   position: absolute;
-  width: var(--p-size, 3px);
-  height: var(--p-size, 3px);
-  background: var(--p-color, #ffffff);
-  box-shadow: 0 0 6px var(--p-color, #ffffff);
+  width: var(--p-size, 4px);
+  height: var(--p-size, 4px);
+  background: color-mix(in srgb, var(--p-color, #ffffff) calc(var(--p-max, .3) * 100%), #08060c);   /* W86u1: deckend gedämpft statt Alpha/Schein (s. .hand-mote) */
   image-rendering: pixelated;
   opacity: 0;
-  transform: translate(0, 0) scale(.6);
-  animation: hand-mote-float var(--p-dur, 8s) ease-in-out var(--p-delay, 0s) infinite;
+  transform: translate(0, 0) scale(.5);
+  animation: hand-mote-float var(--p-dur, 8s) steps(var(--p-st, 10), end) var(--p-delay, 0s) infinite;
   will-change: transform, opacity;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -26076,7 +26078,7 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
 /* Helden-Sprite ausgegraut, wenn seine Heldenzone ausgegraut ist (Als Vorgabe 2.10.). Filter nur auf Steher/Schatten/Effekte,
    nicht auf Ebene und Platz (sie muessen das 3D behalten). */
 .hero-idle-platz.hero-idle-abgeblendet .hero-idle-steher {
-  filter: grayscale(.85) brightness(.5) drop-shadow(0 calc(1px * var(--board-scale)) 0 rgba(0,0,0,.6));
+  filter: grayscale(.85) brightness(.5) drop-shadow(0 calc(1px * var(--board-scale)) 0 #08060c);
   opacity: .55;
 }
 .hero-idle-platz.hero-idle-abgeblendet .hero-idle-fx { opacity: .4; }   /* der Schatten liegt im Steher und blendet mit */

@@ -1827,7 +1827,7 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
    beschneidet NICHT mehr dauerhaft (`overflow: hidden`) — was unter der Standlinie hängt (Flammen, Schlangen, Glühen, Eis), bleibt
    sichtbar. Beschnitten wird nur noch beim AUFTRITT (`heroIdleKlipp`, unten): der Held steigt dabei aus der Karte empor, statt
    über dem Brett einzuschweben. */
-.hero-idle-steher { position: absolute; transform-origin: 50% 100%; transform: rotateX(calc(-1 * var(--sprite-kipp, 0deg))) scaleY(var(--sprite-streck, 1)); filter: drop-shadow(0 calc(1px * var(--board-scale)) 0 #000000); transition: opacity .4s steps(10, end); animation: heroIdleKlipp .55s steps(13, end) backwards; }
+.hero-idle-steher { position: absolute; transform-origin: 50% 100%; transform: rotateX(calc(-1 * var(--sprite-kipp, 0deg))) scaleY(var(--sprite-streck, 1)); filter: drop-shadow(0 calc(1px * var(--board-scale)) 0 #08060c); transition: opacity .4s steps(10, end); animation: heroIdleKlipp .55s steps(13, end) backwards; }
 /* Beschnitt nur für die Dauer des Auftritts (gleiche Dauer wie `heroIdleAuftritt` am Canvas): unten an der Steherkante, ringsum
    großzügig offen. `backwards`: danach gilt wieder der normale Stil ohne Beschnitt. */
 @keyframes heroIdleKlipp {
@@ -1995,7 +1995,7 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
    ★ 11.10. (Als Befund, siehe `.hero-idle-steher`): liegt jetzt IM Steher, hinter der Figur (Lage `left`/`top` inline, `HeroIdleSprite`).
    Vorher lag er flach in der Brettebene — dort durchschnitt ihn die aufrecht stehende Figur an der Standlinie, und alles, was
    darunter hing, wurde als dunkler Strich über die ganze Schattenbreite überdeckt (bei Andras quer durch beide Flammen). */
-.hero-idle-schatten { position: absolute; height: calc(3px * var(--board-scale)); background: radial-gradient(ellipse at center, transparent 0% 71%); animation: heroIdleSchatten .55s steps(13, end) backwards; transition: opacity .3s steps(7, end); }
+.hero-idle-schatten { position: absolute; height: calc(3px * var(--board-scale)); background: radial-gradient(ellipse at center, #08060c 0% 70.5%, transparent 70.5% 71%); animation: heroIdleSchatten .55s steps(13, end) backwards; transition: opacity .3s steps(7, end); }
 .hero-idle-platz.hero-idle-weg .hero-idle-schatten { opacity: 0; }
 @keyframes heroIdleSchatten {
   from { opacity: 0; transform: scaleX(.3); }
@@ -3306,25 +3306,28 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * { cursor: url("/cursor
    z-index:-1 keeps it BEHIND the (statically-positioned) hand cards while
    still sitting above the hand's own background fill. */
 .hand-bloom { position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(120% 150% at 50% 100%,
-      color-mix(in srgb, var(--amb-me, #66b6ff) 42%, transparent) 0%, transparent 68%); mix-blend-mode: screen; opacity: .55; animation: hand-bloom-pulse 6s steps(24, end) infinite; }
+      color-mix(in srgb, var(--amb-me, #66b6ff) 26%, #08060c) 0 20%,
+      color-mix(in srgb, var(--amb-me, #66b6ff) 17%, #08060c) 20% 38%,
+      color-mix(in srgb, var(--amb-me, #66b6ff) 9%, #08060c) 38% 54%,
+      transparent 54%); animation: hand-bloom-pulse 6s steps(24, end) infinite; }
 @keyframes hand-bloom-pulse {
-  0%, 100% { opacity: .45; }
-  50%      { opacity: .7; }
+  0%, 100% { opacity: .75; }
+  50%      { opacity: 1; }
 }
 /* PIXEL PARTICLES — pixel motes floating just above the hand cards. No
    overflow clip, so they're free to drift up out of the hand and into the
    board above (the hand row sits at z-index 10000, so they ride over it). */
 .hand-particles { position: absolute; inset: 0; z-index: 7; pointer-events: none; }
-.hand-mote { position: absolute; width: var(--p-size, 3px); height: var(--p-size, 3px); background: var(--p-color, var(--amb-me, #66b6ff)); box-shadow: 0 0 0 1px var(--p-color, var(--amb-me, #66b6ff)); image-rendering: pixelated; opacity: 0; transform: translate(0, 0) scale(.6); animation: hand-mote-float var(--p-dur, 8s) ease-in-out var(--p-delay, 0s) infinite; will-change: transform, opacity; }
+.hand-mote { position: absolute; width: var(--p-size, 4px); height: var(--p-size, 4px); background: color-mix(in srgb, var(--p-color, var(--amb-me, #66b6ff)) calc(var(--p-max, .4) * 100%), #08060c); image-rendering: pixelated; opacity: 0; transform: translate(0, 0) scale(.5); animation: hand-mote-float var(--p-dur, 8s) steps(var(--p-st, 10), end) var(--p-delay, 0s) infinite; will-change: transform, opacity; }
 @keyframes hand-mote-float {
   0%   { opacity: 0; transform: translate(0, 0) scale(.5); }
-  18%  { opacity: var(--p-max, .4); }
+  18%  { opacity: 1; }
   50%  { transform: translate(var(--p-dx, 0), var(--p-dy, -30px)) scale(1); }
-  82%  { opacity: var(--p-max, .4); }
-  100% { opacity: 0; transform: translate(calc(var(--p-dx, 0) * 1.6), calc(var(--p-dy, -30px) * 1.8)) scale(.7); }
+  82%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--p-dx2, 0), var(--p-dy2, -54px)) scale(.5); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hand-bloom { animation: none; opacity: .55; }
+  .hand-bloom { animation: none; opacity: 1; }
   .hand-mote  { animation: none; opacity: calc(var(--p-max, .4) * .5); transform: none; }
 }
 
@@ -3335,7 +3338,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * { cursor: url("/cursor
    dimmer + slower than the hand layer — it is a background, not an
    effect. See BoardAmbiance in app-board.jsx. */
 .board-ambiance { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
-.board-mote { position: absolute; width: var(--p-size, 3px); height: var(--p-size, 3px); background: var(--p-color, #ffffff); box-shadow: 0 0 0 1px var(--p-color, #ffffff); image-rendering: pixelated; opacity: 0; transform: translate(0, 0) scale(.6); animation: hand-mote-float var(--p-dur, 8s) ease-in-out var(--p-delay, 0s) infinite; will-change: transform, opacity; }
+.board-mote { position: absolute; width: var(--p-size, 4px); height: var(--p-size, 4px); background: color-mix(in srgb, var(--p-color, #ffffff) calc(var(--p-max, .3) * 100%), #08060c); image-rendering: pixelated; opacity: 0; transform: translate(0, 0) scale(.5); animation: hand-mote-float var(--p-dur, 8s) steps(var(--p-st, 10), end) var(--p-delay, 0s) infinite; will-change: transform, opacity; }
 @media (prefers-reduced-motion: reduce) {
   .board-mote { animation: none; opacity: calc(var(--p-max, .3) * .5); transform: none; }
 }
@@ -13264,7 +13267,7 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
 
 /* Helden-Sprite ausgegraut, wenn seine Heldenzone ausgegraut ist (Als Vorgabe 2.10.). Filter nur auf Steher/Schatten/Effekte,
    nicht auf Ebene und Platz (sie muessen das 3D behalten). */
-.hero-idle-platz.hero-idle-abgeblendet .hero-idle-steher { filter: grayscale(.85) brightness(.5) drop-shadow(0 calc(1px * var(--board-scale)) 0 #000000); opacity: .55; }
+.hero-idle-platz.hero-idle-abgeblendet .hero-idle-steher { filter: grayscale(.85) brightness(.5) drop-shadow(0 calc(1px * var(--board-scale)) 0 #08060c); opacity: .55; }
 .hero-idle-platz.hero-idle-abgeblendet .hero-idle-fx { opacity: .4; }   /* der Schatten liegt im Steher und blendet mit */
 
 /* ★ Surprise-Creature-Aufdecken — gruener Beschwoerungskreis um die Zone, dehnt sich aus und verblasst, dazu Partikel */

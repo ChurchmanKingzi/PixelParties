@@ -5994,6 +5994,7 @@ function FlameStrikeEffect({ x, y }) {
 //     float just above the cards (z-index) so they're actually visible.
 // Both layers are pointer-events:none and respect prefers-reduced-motion.
 // The colour comes in as the player's chosen colour.
+const ppAmbGerade = (v) => Math.round(v / 2) * 2;   // gerade Pixel (Pixelart: Teilchen liegen auf dem 2-px-Kunstpixelraster)
 function HandAmbiance({ color }) {
   const motes = useMemo(() => {
     const N = 80;   // doubled from 40 — denser pixel rain over the hand
@@ -6003,11 +6004,11 @@ function HandAmbiance({ color }) {
       arr.push({
         top:   Math.random() * 100,
         left:  Math.random() * 100,
-        size:  2 + Math.floor(Math.random() * 3),        // 2–4px pixel squares
+        size:  2 + 2 * Math.floor(Math.random() * 2),    // 2 oder 4 px (ganze Kunstpixel)
         dur,
         delay: -Math.random() * dur,                     // mid-cycle stagger
-        dx:    (Math.random() * 2 - 1) * 26,             // -26..26px horizontal drift
-        dy:    -(24 + Math.random() * 90),               // rise far enough to leave the hand
+        dx:    ppAmbGerade((Math.random() * 2 - 1) * 26),     // -26..26px horizontal drift (gerade Pixel: Pixelart)
+        dy:    ppAmbGerade(-(24 + Math.random() * 90)),       // rise far enough to leave the hand
         max:   0.22 + Math.random() * 0.3,               // subtle peak opacity
         // Mostly the player's colour; ~30% white for a sparkle.
         color: Math.random() < 0.3 ? '#ffffff' : 'var(--amb-me)',
@@ -6029,6 +6030,8 @@ function HandAmbiance({ color }) {
             '--p-delay': p.delay + 's',
             '--p-dx': p.dx + 'px',
             '--p-dy': p.dy + 'px',
+            '--p-dx2': ppAmbGerade(p.dx * 1.6) + 'px',
+            '--p-dy2': ppAmbGerade(p.dy * 1.8) + 'px',
             '--p-max': p.max,
           }} />
         ))}
@@ -6055,16 +6058,16 @@ function BoardAmbiance({ colorMe, colorOpp }) {
     const N = 56;
     const arr = [];
     for (let i = 0; i < N; i++) {
-      const dur = 4 + Math.random() * 5;                 // 4–9s — calmer than the hand
+      const dur = 4 + Math.random() * 3.9;               // 4–7,9s — calmer than the hand (Pixelart: unter 8 s, sonst backt pixel-anim.js die Schleife nicht → weiches Alpha)
       const top = Math.random() * 100;
       arr.push({
         top,
         left: Math.random() * 100,
-        size: 2 + Math.floor(Math.random() * 3),         // 2–4px pixel squares
+        size: 2 + 2 * Math.floor(Math.random() * 2),     // 2 oder 4 px (ganze Kunstpixel)
         dur,
         delay: -Math.random() * dur,                     // mid-cycle stagger
-        dx:   (Math.random() * 2 - 1) * 34,              // -34..34px horizontal drift
-        dy:   -(40 + Math.random() * 130),               // long rise across the field
+        dx:   ppAmbGerade((Math.random() * 2 - 1) * 34),      // -34..34px horizontal drift (gerade Pixel: Pixelart)
+        dy:   ppAmbGerade(-(40 + Math.random() * 130)),       // long rise across the field
         max:  0.14 + Math.random() * 0.22,               // dim — background layer
         color: Math.random() < 0.25 ? '#ffffff'
              : (top > 50 ? 'var(--amb-board-me)' : 'var(--amb-board-opp)'),
@@ -6084,6 +6087,8 @@ function BoardAmbiance({ colorMe, colorOpp }) {
           '--p-delay': p.delay + 's',
           '--p-dx': p.dx + 'px',
           '--p-dy': p.dy + 'px',
+          '--p-dx2': ppAmbGerade(p.dx * 1.6) + 'px',
+          '--p-dy2': ppAmbGerade(p.dy * 1.8) + 'px',
           '--p-max': p.max,
         }} />
       ))}
