@@ -272,6 +272,9 @@ const PP_BAYER4 = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]
 function ppBayer(x, y) { return (PP_BAYER4[y & 3][x & 3] + 0.5) / 16; }
 window.ppBayer = ppBayer;   // Pixelart-Animationen in app-board.jsx (ppSalve) dithern damit
 
+/** ★ W86z: laeuft die Pixelart-Bewegungs-Pipeline (public/pixel-anim.js)? Im Retro-Modus nicht — dort bleibt alles wie es war. */
+const ppPixelAnimAktiv = () => !!(window.PPPixelAnim && window.PPPixelAnim.KONFIG && window.PPPixelAnim.KONFIG.aktiv);
+
 const _ppPxCache = new Map();
 const PP_PX_CACHE_MAX = 800;
 /**
@@ -307,6 +310,13 @@ function ppPxBild(key, w, h, male, faktor = 4) {
       d[i + 2] = mix(f[2] | 0, d[i + 2]);
       d[i + 3] = Math.round(oa * 255);
     });
+    // ★ W86z: Pixelart-Abschluss — Alpha dazwischen wird Bayer-Dither (deckend oder leer), jede Farbe rastet auf die 256er-Palette ein.
+    if (ppPixelAnimAktiv()) for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+      const a = d[i + 3];
+      if (!a) continue;
+      if (a < 255) { if (a / 255 > ppBayer(p % w, (p / w) | 0)) d[i + 3] = 255; else { d[i + 3] = 0; continue; } }
+      if (window.ppSnapRgb) { const q = window.ppSnapRgb(d[i], d[i + 1], d[i + 2]); d[i] = q[0]; d[i + 1] = q[1]; d[i + 2] = q[2]; }
+    }
     kctx.putImageData(bild, 0, 0);
     const c = document.createElement('canvas');
     c.width = w * faktor; c.height = h * faktor;
@@ -314,6 +324,8 @@ function ppPxBild(key, w, h, male, faktor = 4) {
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(klein, 0, 0, c.width, c.height);
     url = c.toDataURL('image/png');
+    // Das kleine Kunstpixel-Bild merken: `PPPixelAnim.drehen` samplet gedrehte Sprites daraus (kein Dekodieren der data-URL).
+    if (url && ppPixelAnimAktiv()) window.PPPixelAnim.bildRegistrieren(url, klein);
   } catch { url = ''; }
   if (_ppPxCache.size >= PP_PX_CACHE_MAX) _ppPxCache.delete(_ppPxCache.keys().next().value);
   _ppPxCache.set(key, url);
@@ -379,17 +391,19 @@ function ppVerlaufLesen(g) {
   const m = String(g || '').match(/radial-gradient\((.*)\)\s*$/s);
   if (!m) return null;
   const teile = _ppTeile(m[1]);
-  let kreis = false, cx = 0.5, cy = 0.5;
+  let kreis = false, cx = 0.5, cy = 0.5, rxp = null, ryp = null;
   const istForm = (t) => /^(circle|ellipse|closest|farthest|at\s)/.test(t) || /\sat\s/.test(' ' + t);
   if (teile.length && istForm(teile[0])) {
     const kopf = teile.shift();
     kreis = /circle/.test(kopf);
+    const rr = kopf.match(/ellipse\s+(-?[\d.]+)%\s+(-?[\d.]+)%/);            // ★ W86u2: explizite Ellipsenradien (in % der Breite/Hoehe)
+    if (rr) { rxp = parseFloat(rr[1]) / 100; ryp = parseFloat(rr[2]) / 100; }
     const at = kopf.match(/at\s+(-?[\d.]+)%\s+(-?[\d.]+)%/);
     if (at) { cx = parseFloat(at[1]) / 100; cy = parseFloat(at[2]) / 100; }
     else if (/at\s+center/.test(kopf)) { cx = 0.5; cy = 0.5; }
   }
   const stopps = _ppStopps(teile);
-  return stopps ? { kreis, cx, cy, stopps } : null;
+  return stopps ? { kreis, cx, cy, stopps, rxp, ryp } : null;
 }
 
 /** Farbstopps lesen und ohne Lage gleichmaessig verteilen (CSS-Regel, vereinfacht). */
@@ -451,19 +465,21 @@ function _ppAufloesung(v, laengePx) {
  * (Elementgroesse) halten die Pixel quadratisch und ~2 px gross; ohne
  * Angabe wird ein Quadrat angenommen.
  */
-function ppPxVerlaufUrl(gradient, breitePx = 0, hoehePx = 0) {
+function ppPxVerlaufUrl(gradient, breitePx = 0, hoehePx = 0, pxGroesse = 0) {
   const v = ppVerlaufLesen(gradient);
   if (!v) return '';
   const W = breitePx > 0 ? breitePx : (hoehePx > 0 ? hoehePx : 1);
   const H = hoehePx > 0 ? hoehePx : W;
   const q = (x) => Math.max(1, Math.round(x / 4) * 4);           // Merk-Schluessel groeber
-  const nx = _ppAufloesung(v, breitePx > 0 ? q(W) : 0);
+  // ★ W86u2: `pxGroesse` (Kunstpixel in CSS-px, z. B. 4) — Bildschirmgrosse Schleier/Scheine (Titelkulisse) bekommen ein festes Raster
+  // statt der 160-Pixel-Obergrenze; die Pixel bleiben quadratisch und ganzzahlig gross.
+  const nx = pxGroesse > 0 ? Math.max(2, Math.min(720, Math.round(W / pxGroesse))) : _ppAufloesung(v, breitePx > 0 ? q(W) : 0);
   const ny = breitePx > 0 || hoehePx > 0 ? Math.max(2, Math.round(nx * H / W)) : nx;
   return ppPxBild('vl:' + nx + 'x' + ny + ':' + gradient, nx, ny, (setze) => {
     const cx = v.linear ? 0.5 : v.cx, cy = v.linear ? 0.5 : v.cy;
     const fx = Math.max(cx, 1 - cx) * W, fy = Math.max(cy, 1 - cy) * H;
     const rk = Math.hypot(fx, fy);                                  // Kreis: fernste Ecke
-    const rx = Math.SQRT2 * fx, ry = Math.SQRT2 * fy;               // Ellipse: fernste Ecke
+    const rx = v.rxp != null ? v.rxp * W : Math.SQRT2 * fx, ry = v.ryp != null ? v.ryp * H : Math.SQRT2 * fy;   // Ellipse: fernste Ecke bzw. die angegebenen Radien
     // Linear: CSS-Winkel (0deg = nach oben, 90deg = nach rechts); die
     // Verlaufslinie ist |W sin| + |H cos| lang.
     const wr = (v.winkel || 0) * Math.PI / 180, sn = Math.sin(wr), cs = Math.cos(wr);
@@ -1531,13 +1547,14 @@ function ppPixelieren(wurzel) {
     a.radius = radProzent ? Math.min(a.w, a.h) * parseFloat(cs.borderTopLeftRadius) / 100 : rad;
     if (!a.verlauf && (!bg || bg === 'none') && bgf[3] > 0.05 && rundGross && a.w > 0 && a.w <= 40) a.partikel = cs.backgroundColor;
     const bw = parseFloat(cs.borderTopWidth) || 0;
+    a.bl = parseFloat(cs.borderLeftWidth) || 0; a.bt = bw;      // ★ W86z: absolut positionierte Kinder (Halo) beziehen sich auf die Innenkante — Halo mittig auf die AUSSENkante setzen
     if (bw > 0 && cs.borderTopStyle === 'solid' && ppFarbe(cs.borderTopColor)[3] > 0.05
         && !_ppKeyframesAendernGroesse(cs.animationName)) {
       a.rahmen = { farbe: cs.borderTopColor, dicke: bw };
     }
     const scheine = _ppScheine(cs.boxShadow).concat(_ppScheine((cs.filter || '').match(/drop-shadow\(.*\)/)?.[0] || ''));
     if (scheine.length) a.schein = scheine.sort((p, q) => q.blur - p.blur)[0];
-    if (a.schein) a.position = cs.position;   // schon HIER lesen: ein Lesen nach den Schreibzugriffen (s. unten) erzwang je Element eine volle Stilberechnung (Layout-Thrashing, ~95 % der Pixelierzeit)
+    a.position = cs.position;                  // (immer lesen: Halo + Glyph-Kasten brauchen es) — schon HIER lesen: ein Lesen nach den Schreibzugriffen (s. unten) erzwang je Element eine volle Stilberechnung (Layout-Thrashing, ~95 % der Pixelierzeit)
     if (cs.boxShadow && cs.boxShadow !== 'none') a.ohneSchatten = true;
     if (/drop-shadow|blur\(/.test(cs.filter || '')) a.filter = _ppFilterOhneSchein(cs.filter);
     // Emoji/Glyphe: genau ein Textkind, das eine Sprite-Entsprechung hat.
@@ -1587,6 +1604,9 @@ function ppPixelieren(wurzel) {
         st.backgroundSize = '1em 1em'; st.backgroundRepeat = 'no-repeat'; st.backgroundPosition = 'center';
         st.color = 'transparent'; st.textShadow = 'none';
         st.imageRendering = 'pixelated';
+        // ★ W86z: frei stehende Glyphen bekommen einen festen Kasten (1em x 1em) statt der Textbreite — sonst haengt die Boxgroesse (und damit
+        // Skalierung, Drehpunkt, Sprite) davon ab, ob die Schrift beim Einblenden schon geladen ist.
+        if (ppPixelAnimAktiv() && (a.position === 'absolute' || a.position === 'fixed')) { const k = Math.max(4, Math.round(a.schrift / 4) * 4) + 'px'; st.width = k; st.height = k; st.lineHeight = k; st.backgroundSize = k + ' ' + k; }
       }
     }
     if (a.emoji) {
@@ -1595,6 +1615,7 @@ function ppPixelieren(wurzel) {
         st.backgroundImage = `url(${u})`;
         st.backgroundSize = '1.1em 1.1em'; st.backgroundRepeat = 'no-repeat'; st.backgroundPosition = 'center';
         st.color = 'transparent'; st.textShadow = 'none'; st.imageRendering = 'pixelated';
+        if (ppPixelAnimAktiv() && (a.position === 'absolute' || a.position === 'fixed')) { const k = Math.max(4, Math.round(a.schrift * 1.1 / 4) * 4) + 'px'; st.width = k; st.height = k; st.lineHeight = k; st.backgroundSize = k + ' ' + k; }
       }
     }
     if (ebenen.length) {
@@ -1618,13 +1639,15 @@ function ppPixelieren(wurzel) {
     if (a.filter !== undefined) st.filter = a.filter;
     if (a.schein && a.w > 0 && a.h > 0) {
       // Halo als erstes Kind, hinter dem Inhalt.
-      const rand = Math.min(40, Math.max(3, Math.round(a.schein.blur * 0.8)));
+      const pa = ppPixelAnimAktiv();
+      // ★ W86z: gerade Randbreite (Halo-Kanten bleiben beim Skalieren auf ganzen Pixeln); Retro-Modus: wie bisher
+      const rand = pa ? Math.min(40, Math.max(4, Math.round(a.schein.blur * 0.4) * 2)) : Math.min(40, Math.max(3, Math.round(a.schein.blur * 0.8)));
       const u = ppPxHaloUrl(a.schein.farbe, a.w, a.h, rand, a.rund || !!a.zeichen || !!a.emoji);
       if (u) {
         const halo = document.createElement('i');
         halo.setAttribute('aria-hidden', 'true');
         halo.className = 'pp-px-halo';
-        halo.style.cssText = `position:absolute;left:${-rand}px;top:${-rand}px;width:${a.w + 2 * rand}px;height:${a.h + 2 * rand}px;`
+        halo.style.cssText = `position:absolute;left:${pa ? -rand - a.bl : -rand}px;top:${pa ? -rand - a.bt : -rand}px;width:${a.w + 2 * rand}px;height:${a.h + 2 * rand}px;`
           + `background:url(${u}) center/100% 100% no-repeat;image-rendering:pixelated;pointer-events:none;z-index:-1;`;
         _ppPxErledigt.add(halo);
         if (a.position === 'static') st.position = 'relative';
@@ -1690,9 +1713,14 @@ function ppPxSpriteGefaerbtUrl(name, farbe, stufe = 0) {
  * jeden spaeter eingehaengten Knoten (Phasen, die erst nach Zeit
  * erscheinen). Gibt die Abmeldung zurueck.
  */
-function ppPixeliererAnhaengen(wurzel) {
+function ppPixeliererAnhaengen(wurzel, opt) {
   if (!wurzel) return () => {};
+  const bewegung = !(opt && opt.bewegung === false);       // false (Vorwaermen): nur Pixelbilder erzeugen, nichts backen
+  try { if (bewegung && window.PPPixelAnim) window.PPPixelAnim.geometrieRunden(wurzel); } catch (err) { console.warn('[PixelAnim]', err?.message); }
   try { ppPixelieren(wurzel); } catch (err) { console.warn('[Pixelierer]', err?.message); }
+  // ★ W86z: danach Statisches (halbe Deckkraft, Alpha-Hintergruende, Drehung) und die Bewegung — Takt, Dither-Fade, Kunstpixel-Skalierung
+  // (public/pixel-anim.js).
+  try { if (bewegung && window.PPPixelAnim) { window.PPPixelAnim.statisch(wurzel); window.PPPixelAnim.backenAlle(wurzel); } } catch (err) { console.warn('[PixelAnim]', err?.message); }
   let wartend = null;
   const neue = new Set();
   const beobachter = new MutationObserver((liste) => {
@@ -1701,13 +1729,139 @@ function ppPixeliererAnhaengen(wurzel) {
     wartend = requestAnimationFrame(() => {
       wartend = null;
       const jetzt = Array.from(neue); neue.clear();
-      for (const n of jetzt) { try { ppPixelieren(n); } catch {} }
+      for (const n of jetzt) {
+        try { if (bewegung && window.PPPixelAnim) window.PPPixelAnim.geometrieRunden(n); } catch {}
+        try { ppPixelieren(n); } catch {}
+        try { if (bewegung && window.PPPixelAnim && n.isConnected) { window.PPPixelAnim.statisch(n); window.PPPixelAnim.backenAlle(n); } } catch {}
+      }
     });
   });
   beobachter.observe(wurzel, { childList: true, subtree: true });
   return () => { beobachter.disconnect(); if (wartend) cancelAnimationFrame(wartend); };
 }
 window.ppPixeliererAnhaengen = ppPixeliererAnhaengen;
+
+/**
+ * ★ W86z — Randabdunklung (Vignette) der Area-Szenen als Pixelart: Bayer-gedithertes Schwarz (deckend) statt Radialverlauf mit Alpha.
+ * Gleiche Form wie vorher (`radial-gradient(ellipse 75% 70%, 0 bei 55 %, 30 % Schwarz am Rand)`), aber jede Kachel ist ein Kunstpixel
+ * (`nx` x `ny` Pixel, vom Aufrufer auf die Szenenpixel gelegt). Wird je Groesse gemerkt.
+ */
+function ppRandDimUrl(nx, ny) {
+  nx = Math.max(8, Math.min(1024, Math.round(nx))); ny = Math.max(8, Math.min(1024, Math.round(ny)));
+  return ppPxBild('rd:' + nx + 'x' + ny, nx, ny, (setze) => {
+    for (let y = 0; y < ny; y++) {
+      for (let x = 0; x < nx; x++) {
+        const t = Math.hypot(((x + 0.5) / nx - 0.5) / 0.75, ((y + 0.5) / ny - 0.5) / 0.70);   // 1 = Ellipsenrand
+        const a = 0.3 * Math.max(0, Math.min(1, (t - 0.55) / 0.45));
+        if (a > 0 && a > ppBayer(x, y)) setze(x, y, [0, 0, 0, 1]);
+      }
+    }
+  }, 1);
+}
+window.ppRandDimUrl = ppRandDimUrl;
+
+/**
+ * ★ W86u2 — Schein/Schleier als Pixelbild in Elementgroesse (Titelkulisse, Menuehintergrund): `gradient` ist ein `radial-gradient(...)`/
+ * `linear-gradient(...)` wie in CSS; zwischen den Farbstopps wird gedithert (Bayer), Alpha wird deckend/leer (`ppPxVerlaufUrl`), jede Farbe rastet
+ * auf die Palette. `px` = Kunstpixel in CSS-px (Standard 4). Das Element behaelt Groesse/Lage/Animation aus CSS (Klasse); nur der Hintergrund kommt
+ * von hier und wird bei Groessenaenderung neu gemalt. Retro-Modus: der Verlauf bleibt, wie er war.
+ */
+function PpVerlauf({ gradient, px = 4, className, style, retroBlend, retroGradient }) {
+  const ref = useRef(null);
+  const retro = !!window.PP_RETRO;
+  useLayoutEffect(() => {
+    const el = ref.current; if (!el || retro) return undefined;
+    const zeichnen = () => {
+      const W = el.offsetWidth, H = el.offsetHeight;
+      if (!W || !H) return;
+      const raster = px * 8;                                          // Groesse grob gerastert: wenige verschiedene Bilder beim Skalieren
+      const url = ppPxVerlaufUrl(gradient, Math.max(raster, Math.round(W / raster) * raster), Math.max(raster, Math.round(H / raster) * raster), px);
+      if (url) el.style.backgroundImage = `url(${url})`;
+    };
+    zeichnen();
+    const ro = window.ResizeObserver ? new ResizeObserver(zeichnen) : null;
+    if (ro) ro.observe(el);
+    return () => { if (ro) ro.disconnect(); };
+  }, [gradient, px, retro]);
+  return retro
+    ? <div className={className} style={{ ...style, background: retroGradient || gradient, ...(retroBlend ? { mixBlendMode: retroBlend } : {}) }} />
+    : <div ref={ref} className={className} data-pp-px="aus" style={{ ...style, backgroundSize: '100% 100%', backgroundRepeat: 'no-repeat', imageRendering: 'pixelated' }} />;
+}
+window.PpVerlauf = PpVerlauf;
+
+/**
+ * ★ W86u2 — Pixel-Partikelmaschine fuer Konfetti/Funken (Canvas): alles in ganzen Kunstpixeln (Zelle `px` CSS-px), 30 Hz (`ppTaktRaf`),
+ * keine Drehung, kein `shadowBlur`, keine `globalAlpha`-Mischung — Ausblenden per Bayer-Dither, Formen als Pixelsprites (Kreis, Raute,
+ * Stern, Funke), Farben auf die Palette gerastet. Das Canvas wird in Zellaufloesung gemalt und per `image-rendering: pixelated` vergroessert.
+ *
+ *   const stopp = ppPixelPartikel(canvas, teile, { px: 2, onFertig, maxMs })
+ *   teile: [{ x, y, vx, vy, gravity, size, color, shape: 'circle'|'diamond'|'star'|'spark', life: 1, decay }]  (x/y/vx/vy in CSS-px, vx/vy je 60-Hz-Bild)
+ */
+const _ppPtSprites = new Map();
+function _ppPtSprite(form, r) {
+  const key = form + r;
+  let l = _ppPtSprites.get(key); if (l) return l;
+  l = [];
+  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    let an;
+    if (form === 'circle') an = dx * dx + dy * dy <= r * r + r * 0.6;
+    else if (form === 'diamond') an = Math.abs(dx) + Math.abs(dy) <= r;
+    else if (form === 'star') an = (dx === 0 || dy === 0) || (Math.abs(dx) === 1 && Math.abs(dy) === 1 && r >= 2);
+    else an = dx === 0 || dy === 0;                                   // 'spark': duenne Kreuzarme
+    if (an) l.push(dx, dy);
+  }
+  _ppPtSprites.set(key, l);
+  return l;
+}
+function ppPixelPartikel(canvas, teile, opt) {
+  opt = opt || {};
+  const px = opt.px || 2;
+  const W = Math.max(8, Math.ceil(window.innerWidth / px)), H = Math.max(8, Math.ceil(window.innerHeight / px));
+  canvas.width = W; canvas.height = H;
+  canvas.style.imageRendering = 'pixelated';
+  const g = canvas.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  const farbe = {};
+  const rgb = (hex) => {
+    if (farbe[hex]) return farbe[hex];
+    const sn = window.ppSnap ? window.ppSnap(hex) : hex;
+    const m = /^#?([0-9a-f]{6})$/i.exec(sn) || /^#?([0-9a-f]{6})$/i.exec('#ffffff');
+    const n = parseInt(m[1], 16);
+    return (farbe[hex] = [(n >> 16) & 255, (n >> 8) & 255, n & 255]);
+  };
+  const raf = window.ppTaktRaf || window.requestAnimationFrame;
+  const caf = window.cancelAnimationFrame;
+  let id = 0, letzt = 0, aus = false;
+  const t0 = performance.now();
+  const bild = g.createImageData(W, H), d = bild.data;
+  const schritt = (t) => {
+    id = 0; if (aus) return;
+    const dt = letzt ? Math.min(3, (t - letzt) / 16.667) : 1; letzt = t;
+    d.fill(0);
+    let lebt = false;
+    for (const p of teile) {
+      if (p.life <= 0) continue;
+      lebt = true;
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vy += (p.gravity || 0) * dt; p.life -= p.decay * dt;
+      if (p.life <= 0) continue;
+      const r = Math.max(1, Math.round(p.size * (0.5 + Math.min(1, p.life) * 0.5) / (px * 2)));
+      const sp = _ppPtSprite(p.shape || 'circle', r), c = rgb(p.color);
+      const cx = Math.floor(p.x / px), cy = Math.floor(p.y / px), voll = p.life >= 1 ? 1 : p.life * 1.2;
+      for (let i = 0; i < sp.length; i += 2) {
+        const x = cx + sp[i], y = cy + sp[i + 1];
+        if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        if (voll < 1 && voll <= ppBayer(x, y)) continue;
+        const o = (y * W + x) * 4; d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255;
+      }
+    }
+    g.putImageData(bild, 0, 0);
+    if (lebt && (!opt.maxMs || t - t0 < opt.maxMs + 500)) id = raf(schritt);
+    else if (opt.onFertig) opt.onFertig();
+  };
+  id = raf(schritt);
+  return () => { aus = true; if (id) caf(id); };
+}
+window.ppPixelPartikel = ppPixelPartikel;
 
 window.PxZeichen = PxZeichen;
 window.PxIcon = PxIcon;
@@ -6907,6 +7061,88 @@ function ppUmrissFarbe(farbe) {
   return L < 0.179 ? '#fff' : '#000';
 }
 window.ppUmrissFarbe = ppUmrissFarbe;
+
+// ── LOGO IN SPIELERFARBE ALS EIN FERTIGES PIXELBILD (W86u2) ─────────────────────────
+// Bisher: graustufiges `logo.png` + drei Deckschichten (`.pp-logo-tint` mit `mix-blend-mode: multiply`, `-licht`, `-umriss`). Die Farbmischung
+// mit dem Hintergrund ist nie Pixelart — und faellt mit abgeschaltetem Mischmodus auseinander (die Tint-Flaeche deckt das Bild dann flach zu).
+// Jetzt wird dasselbe Ergebnis EINMAL pro Farbe in ein Canvas gerechnet: Tint = Bild × Spielerfarbe innerhalb der Maske, Licht = aufgehellte
+// Spielerfarbe, Umriss = `--pp-umriss`; jede Farbe rastet auf die 256er-Palette. Ergebnis: eine Bild-URL, ohne Blend-Modus, ohne Schichten.
+let _ppLogoQuellen = null;
+const _ppLogoBilder = new Map();
+function _ppLogoLaden() {
+  if (_ppLogoQuellen) return _ppLogoQuellen;
+  const laden = (url) => new Promise((ok, fehl) => { const im = new Image(); im.onload = () => ok(im); im.onerror = fehl; im.src = url; });
+  const daten = (im) => { const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight; const g = c.getContext('2d'); g.drawImage(im, 0, 0); return g.getImageData(0, 0, c.width, c.height); };
+  _ppLogoQuellen = Promise.all(['/data/logo.png', '/data/logo-tint-mask.png', '/data/logo-licht-mask.png', '/data/logo-umriss-mask.png'].map(u => laden(u).then(daten)))
+    .catch((e) => { _ppLogoQuellen = null; throw e; });
+  return _ppLogoQuellen;
+}
+/** → Promise<data-URL> des Logos in `farbe` (CSS) mit Umrissfarbe `umriss`; bei Fehlern wird abgelehnt (Aufrufer faellt auf die Deckschichten zurueck). */
+function ppLogoUrl(farbe, umriss) {
+  const f = ppFarbe(farbe), u = ppFarbe(umriss || '#000');
+  const key = [f[0] | 0, f[1] | 0, f[2] | 0, u[0] | 0, u[1] | 0, u[2] | 0].join(',');
+  if (_ppLogoBilder.has(key)) return _ppLogoBilder.get(key);
+  const p = _ppLogoLaden().then(([logo, tint, licht, umr]) => {
+    const w = logo.width, h = logo.height, c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d'), out = g.createImageData(w, h), d = out.data, L = logo.data, T = tint.data, H = licht.data, U = umr.data;
+    const hell = [0, 1, 2].map(i => f[i] * 0.45 + 255 * 0.55);
+    const snapCache = new Map();
+    const snap = (r, gg, b) => {
+      const k = (r << 16) | (gg << 8) | b; let v = snapCache.get(k);
+      if (!v) { v = window.ppSnapRgb ? window.ppSnapRgb(r, gg, b) : [r, gg, b]; snapCache.set(k, v); }
+      return v;
+    };
+    for (let i = 0; i < w * h; i++) {
+      const o = i * 4;
+      let r = L[o], gg = L[o + 1], b = L[o + 2], a = L[o + 3];
+      if (T[o + 3] > 127) { if (a > 0) { r = r * f[0] / 255; gg = gg * f[1] / 255; b = b * f[2] / 255; } else { r = f[0]; gg = f[1]; b = f[2]; } a = 255; }   // multiply
+      if (H[o + 3] > 127) { r = hell[0]; gg = hell[1]; b = hell[2]; a = 255; }
+      if (U[o + 3] > 127) { r = u[0]; gg = u[1]; b = u[2]; a = 255; }
+      if (a > 127) { const q = snap(Math.round(r), Math.round(gg), Math.round(b)); d[o] = q[0]; d[o + 1] = q[1]; d[o + 2] = q[2]; d[o + 3] = 255; }
+    }
+    g.putImageData(out, 0, 0);
+    return c.toDataURL('image/png');
+  });
+  _ppLogoBilder.set(key, p);
+  p.catch(() => _ppLogoBilder.delete(key));
+  return p;
+}
+window.ppLogoUrl = ppLogoUrl;
+
+/**
+ * Das Logo im Pixelart-Stil: `<img>` mit dem fertig gerechneten Bild (siehe oben); der Elternknoten liefert `--player-color` / `--pp-umriss`.
+ * Retro-Modus und Fehlerfall: das alte graue Bild samt Deckschichten (CSS `.pp-logo-tint` & Co.).
+ */
+function PpLogoBild() {
+  const ref = useRef(null);
+  const retro = !!window.PP_RETRO;
+  const [url, setUrl] = useState(null);
+  const [fehler, setFehler] = useState(false);
+  useEffect(() => {
+    if (retro) return undefined;
+    let tot = false;
+    const lesen = () => {
+      const el = ref.current; if (!el) return;
+      const cs = getComputedStyle(el);
+      const farbe = cs.getPropertyValue('--player-color').trim() || '#66b6ff', umr = cs.getPropertyValue('--pp-umriss').trim() || '#000';
+      ppLogoUrl(farbe, umr).then(u => { if (!tot) setUrl(u); }, () => { if (!tot) setFehler(true); });
+    };
+    lesen();
+    // Spielerfarbe aendert sich im Profil → beim Zurueckkehren ins Menue wird das Logo neu eingehaengt; zusaetzlich bei Farbwechsel waehrend der Anzeige.
+    const iv = setInterval(lesen, 2000);
+    return () => { tot = true; clearInterval(iv); };
+  }, [retro]);
+  if (retro || fehler) return (
+    <>
+      <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
+      <div className="pp-logo-tint" aria-hidden="true"></div>
+      <div className="pp-logo-licht" aria-hidden="true"></div>
+      <div className="pp-logo-umriss" aria-hidden="true"></div>
+    </>
+  );
+  return <img ref={ref} src={url || undefined} alt="Pixel Parties" className="pp-logo-img" style={url ? undefined : { visibility: 'hidden' }} />;
+}
+window.PpLogoBild = PpLogoBild;
 
 // ── PIXEL-ICONS ─────────────────────────────────────────────────────────
 // Kleine handgesetzte Sinnbilder: Ueberschriften der Menue-Seitenkaesten,

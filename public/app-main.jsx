@@ -1241,9 +1241,8 @@ function CubeDraftFinalStandings({ lobby, tournament, leaveRoom }) {
     left: Math.round(Math.random() * 100),
     delay: (Math.random() * 3).toFixed(2),
     dur: (3.2 + Math.random() * 2.6).toFixed(2),
-    size: 6 + Math.round(Math.random() * 7),
+    size: Math.round((6 + Math.random() * 7) / 2) * 2,   // W86u2: gerade px (ganze Kunstpixel)
     color: ['#fad54a', '#fe6794', '#1aedff', '#66ff71', '#c98aff', '#ffffff'][i % 6],
-    rot: Math.round(Math.random() * 360),
   })), []);
   useEffect(() => {
     const play = (n, o) => { if (window.playSFX) window.playSFX(n, o); };
@@ -1267,14 +1266,18 @@ function CubeDraftFinalStandings({ lobby, tournament, leaveRoom }) {
           <div className="orbit-font" style={{ fontSize: place === 1 ? 17 : 13, fontWeight: 800, color, wordBreak: 'break-word' }}>{e.username}</div>
           {me && <div style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700 }}>★ YOU</div>}
         </div>
-        <div className="podium-block" style={{ height, background: `linear-gradient(180deg, ${color}55, ${color}18)`, borderTop: `3px solid ${color}`, boxShadow: shown ? `0 0 22px ${color}66` : 'none' }}>
+        <div className="podium-block" style={{ height, background: `color-mix(in srgb, ${color} 24%, #08060c)`, borderTop: `4px solid ${color}`, boxShadow: shown ? `0 0 0 4px color-mix(in srgb, ${color} 45%, #08060c)` : 'none' }}>
           <div className="orbit-font" style={{ fontSize: 26, fontWeight: 800, color }}>{label}</div>
         </div>
       </div>
     );
   };
   return (
-    <div className="screen-full" style={{ background: 'radial-gradient(ellipse at 50% 30%, rgba(250,213,74,.16) 0%, var(--bg) 70%)', position: 'relative', overflow: 'hidden' }}>
+    <div className="screen-full" style={{ background: 'var(--bg)', position: 'relative', overflow: 'hidden', isolation: 'isolate' }}>
+      {/* ★ W86u2 (Pixelart): goldener Schein hinter dem Podest als Dither-Pixelbild statt Radialverlauf mit Alpha */}
+      <PpVerlauf px={4} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: -1 }}
+        gradient="radial-gradient(ellipse at 50% 30%, rgba(250,213,74,.16) 0%, transparent 70%)"
+        retroGradient="radial-gradient(ellipse at 50% 30%, rgba(250,213,74,.16) 0%, var(--bg) 70%)" />
       <div className="top-bar">
         <button className="btn" onClick={leaveRoom}>← LEAVE</button>
         <h2 className="orbit-font" style={{ fontSize: 14, color: '#fad54a' }}>🏆 TOURNAMENT COMPLETE</h2>
@@ -1283,8 +1286,8 @@ function CubeDraftFinalStandings({ lobby, tournament, leaveRoom }) {
       {stage >= 4 && (
         <div className="podium-confetti" aria-hidden="true">
           {confetti.map((c, i) => (
-            <span key={i} style={{ left: c.left + '%', width: c.size, height: Math.round(c.size * 1.6), background: c.color,
-              animationDelay: c.delay + 's', animationDuration: c.dur + 's', transform: `rotate(${c.rot}deg)` }} />
+            <span key={i} style={{ left: c.left + '%', width: c.size, height: Math.round(c.size * 1.6 / 2) * 2, background: c.color,
+              animationDelay: c.delay + 's', animationDuration: c.dur + 's' }} />
           ))}
         </div>
       )}
@@ -3089,6 +3092,26 @@ function MusicManager({ bgmMode }) {
 //  each newly-unlocked opponent in turn. Queues multiple unlocks so they
 //  display one after another.
 // ═══════════════════════════════════════════
+/**
+ * ★ W86u2 (Pixelart): der drehende Strahlenring hinter dem Unlock-Dialog als Pixelbild — drei goldene Keulen (Winkelverlauf wie vorher
+ * der `conic-gradient`), Bayer-gedithert, deckend; 310 × 310 Kunstpixel (= 620 px bei 2 px je Pixel), `PPPixelAnim` dreht das Sprite in
+ * Winkelstufen. Ersetzt `conic-gradient` + `filter: blur(6px)` + stufenlose Drehung.
+ */
+function ppUnlockRingUrl() {
+  const N = 310, M = N / 2;
+  return ppPxBild('unlock-ring:' + N, N, N, (setze) => {
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const dx = x + 0.5 - M, dy = y + 0.5 - M, r = Math.hypot(dx, dy);
+      if (r > M) continue;
+      const grad = ((Math.atan2(dy, dx) * 180 / Math.PI) + 450) % 360;          // 0° = oben, im Uhrzeigersinn (wie CSS conic-gradient)
+      const keule = 1 - Math.abs((grad % 120) - 60) / 60;                         // 0 an den Kanten, 1 in der Mitte jeder Keule
+      const rand = r > M * 0.8 ? Math.max(0, 1 - (r - M * 0.8) / (M * 0.2)) : 1;  // zum Rand hin auslaufen (ersetzt den Weichzeichner)
+      const a = 0.32 * keule * rand;
+      if (Math.pow(a, 0.62) > ppBayer(x + 2, y + 1)) setze(x, y, [255, 217, 102, 1]);
+    }
+  }, 1);
+}
+
 function OpponentUnlockPopup() {
   const [queue, setQueue] = useState([]);
 
@@ -3128,11 +3151,13 @@ function OpponentUnlockPopup() {
       style={{
         position: 'fixed', inset: 0, zIndex: 100000,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'radial-gradient(circle at 50% 45%, rgba(39,24,12,.55), rgba(8,6,12,.9))',
-        backdropFilter: 'blur(3px)',
         animation: 'ppUnlockFade .3s ease both',
       }}
     >
+      {/* ★ W86u2 (Pixelart): Abdunklung als Dither-Pixelbild statt Radialverlauf mit Alpha + Hintergrund-Weichzeichner */}
+      <PpVerlauf px={4} style={{ position: 'absolute', inset: 0 }}
+        gradient="radial-gradient(circle at 50% 45%, rgba(39,24,12,.42), rgba(8,6,12,.84))"
+        retroGradient="radial-gradient(circle at 50% 45%, rgba(39,24,12,.55), rgba(8,6,12,.9))" />
       <style>{`
         @keyframes ppUnlockFade { from { opacity: 0; } to { opacity: 1; } }
         @keyframes ppUnlockPop {
@@ -3142,8 +3167,8 @@ function OpponentUnlockPopup() {
         }
         @keyframes ppUnlockSpin { to { transform: rotate(360deg); } }
         @keyframes ppUnlockGlow {
-          0%,100% { box-shadow: 0 0 28px rgba(255,198,28,.55), 0 0 70px rgba(255,154,26,.35), inset 0 0 24px rgba(255,198,28,.18); }
-          50% { box-shadow: 0 0 44px rgba(251,225,129,.85), 0 0 110px rgba(249,172,32,.55), inset 0 0 34px rgba(255,217,102,.3); }
+          0%,100% { box-shadow: 0 0 0 4px #8b5b04, 0 0 0 8px #5a3c14, 0 0 0 12px #27180c; }
+          50% { box-shadow: 0 0 0 4px #fbe181, 0 0 0 8px #a87c00, 0 0 0 12px #72541d, 0 0 0 16px #332300; }
         }
         @keyframes ppUnlockKonfetti { from { transform: translateY(-24px); } to { transform: translateY(calc(100vh + 24px)); } }
         /* Handy quer (niedrige Hoehe): Bild links, Text rechts — sonst sprengt der Dialog den Bildschirm */
@@ -3158,8 +3183,8 @@ function OpponentUnlockPopup() {
           .pp-unlock-ring { width: min(620px, 92vh) !important; height: min(620px, 92vh) !important; }
         }
         @keyframes ppUnlockTitle {
-          0%,100% { text-shadow: 0 0 10px rgba(255,217,102,.8), 0 0 22px rgba(255,154,26,.5); }
-          50% { text-shadow: 0 0 18px rgba(255,241,150,1), 0 0 40px rgba(249,172,32,.8); }
+          0%,100% { text-shadow: 2px 0 0 #72541d, -2px 0 0 #72541d, 0 2px 0 #72541d, 0 -2px 0 #72541d; }
+          50% { text-shadow: 2px 0 0 #a87c00, -2px 0 0 #a87c00, 0 2px 0 #a87c00, 0 -2px 0 #a87c00; }
         }
       `}</style>
 
@@ -3181,9 +3206,10 @@ function OpponentUnlockPopup() {
       <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
            onClick={e => e.stopPropagation()}>
         <div className="pp-unlock-ring" style={{
-          position: 'absolute', width: 620, height: 620, borderRadius: '50%',
-          background: 'conic-gradient(from 0deg, rgba(255,198,28,0) 0deg, rgba(255,217,102,.32) 60deg, rgba(255,198,28,0) 120deg, rgba(255,217,102,.32) 180deg, rgba(255,198,28,0) 240deg, rgba(255,217,102,.32) 300deg, rgba(255,198,28,0) 360deg)',
-          filter: 'blur(6px)', animation: 'ppUnlockSpin 14s linear infinite', pointerEvents: 'none',
+          position: 'absolute', width: 620, height: 620,
+          ...(window.PP_RETRO ? { borderRadius: '50%', background: 'conic-gradient(from 0deg, rgba(255,198,28,0) 0deg, rgba(255,217,102,.32) 60deg, rgba(255,198,28,0) 120deg, rgba(255,217,102,.32) 180deg, rgba(255,198,28,0) 240deg, rgba(255,217,102,.32) 300deg, rgba(255,198,28,0) 360deg)', filter: 'blur(6px)' }
+            : { backgroundImage: `url(${ppUnlockRingUrl()})`, backgroundSize: '100% 100%', imageRendering: 'pixelated' }),
+          animation: 'ppUnlockSpin 14s linear infinite', pointerEvents: 'none',
         }} />
 
         {/* Ornate frame */}
@@ -3192,18 +3218,17 @@ function OpponentUnlockPopup() {
           width: 'min(90vw, 460px)',
           padding: '34px 36px 30px',
           textAlign: 'center',
-          borderRadius: 18,
-          border: '3px solid #fad54a',
-          outline: '1px solid rgba(251,225,129,.6)',
-          outlineOffset: 6,
-          background: 'linear-gradient(160deg, #291f3d 0%, #12101f 55%, #170b28 100%)',
+          border: '4px solid #fad54a',
+          outline: '2px solid #72541d',
+          outlineOffset: 8,
+          background: '#12101f',
           animation: 'ppUnlockPop .5s cubic-bezier(.18,.9,.3,1.2) both, ppUnlockGlow 2.6s ease-in-out infinite',
         }}>
           {/* Ornamental corner flourishes */}
           {[['top','left'],['top','right'],['bottom','left'],['bottom','right']].map(([v,h]) => (
             <div key={v+h} style={{
               position: 'absolute', [v]: 6, [h]: 10, color: '#ffd966',
-              fontSize: 20, lineHeight: 1, textShadow: '0 0 8px rgba(249,172,32,.8)', pointerEvents: 'none',
+              fontSize: 20, lineHeight: 1, pointerEvents: 'none',
             }}>✦</div>
           ))}
 
@@ -3214,9 +3239,9 @@ function OpponentUnlockPopup() {
 
           {/* Hero portrait in a gold frame */}
           <div className="pp-unlock-bild" style={{
-            display: 'inline-block', padding: 4, borderRadius: 10,
+            display: 'inline-block', padding: 4,
             border: '2px solid #fad54a', background: '#08060c',
-            boxShadow: '0 0 18px rgba(255,185,26,.5)', marginBottom: 18,
+            boxShadow: '0 0 0 4px #72541d', marginBottom: 18,
           }}>
             {heroArt
               ? <HeroArtCrop heroName={current.kind === 'skin' ? current.heroName : current.middleHero} skinName={current.kind === 'skin' ? current.skinName : null} width={(window.ppIsPhone && window.ppIsPhone()) ? 190 : 300} />
@@ -3227,7 +3252,7 @@ function OpponentUnlockPopup() {
             You unlocked{' '}
             <span className="orbit-font" style={{
               color: '#fbe181', fontWeight: 800, fontSize: 20,
-              textShadow: '0 0 12px rgba(255,185,26,.7)',
+              textShadow: '2px 2px 0 #72541d',
             }}>{current.kind === 'skin' ? current.skinName : (current.middleHero || current.name)}</span>{' '}
             {current.kind === 'skin' ? <>as a new skin for <b>{current.heroName}</b>!</> : 'as a new opponent!'}
           </div>
@@ -3244,13 +3269,13 @@ function OpponentUnlockPopup() {
             className="orbit-font pp-unlock-weiter"
             style={{
               padding: '10px 34px', fontSize: 14, fontWeight: 800, letterSpacing: 2,
-              color: '#332300', cursor: 'pointer', borderRadius: 8, border: 'none',
-              background: 'linear-gradient(180deg, #fbe181 0%, #ffb91a 60%, #f9ac20 100%)',
-              boxShadow: '0 0 16px rgba(255,185,26,.7), 0 3px 0 #c68206',
+              color: '#332300', cursor: 'pointer', border: 'none',
+              background: '#ffb91a',
+              boxShadow: 'inset 0 4px 0 #fbe181, inset 0 -4px 0 #f9ac20, 0 4px 0 #c68206',
               transition: 'transform .12s ease, box-shadow .12s ease',
             }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 0 26px rgba(255,217,102,.9), 0 5px 0 #c68206'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 0 16px rgba(255,185,26,.7), 0 3px 0 #c68206'; }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'inset 0 4px 0 #f9ecb3, inset 0 -4px 0 #f9ac20, 0 6px 0 #c68206'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = 'inset 0 4px 0 #fbe181, inset 0 -4px 0 #f9ac20, 0 4px 0 #c68206'; }}
           >CONTINUE</button>
         </div>
       </div>
@@ -3351,10 +3376,7 @@ function RotateOverlay() {
       <div className="rotate-cam" ref={camRef} aria-hidden="true"><TapBackdropCanvas hostRef={camRef} /></div>
       <div className="rotate-content">
         <div className="pp-logo-stack rotate-logo">
-          <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
-          <div className="pp-logo-tint" aria-hidden="true"></div>
-          <div className="pp-logo-licht" aria-hidden="true"></div>
-          <div className="pp-logo-umriss" aria-hidden="true"></div>
+          <PpLogoBild />
         </div>
         {auto ? (
           <div className="rotate-play" aria-hidden="true">
@@ -3432,6 +3454,31 @@ function IosFullscreenHint() {
       <button type="button" className="rotate-copy" onClick={hide}>OK</button>
     </div>
   );
+}
+
+/**
+ * ★ W86u2 (Pixelart): der Seitenhintergrund (`body`, Diagonalverlauf Schwarz → Dunkelviolett → Grau) als Dither-Pixelbild (4-px-Punkte, Bayer
+ * zwischen den Farbstopps) statt stufenlosem Verlauf. Wird bei Groessenaenderung neu gemalt (Groesse grob gerastert, Bilder werden gemerkt).
+ * Retro-Modus: bleibt der CSS-Verlauf.
+ */
+function PpSeitenGrund() {
+  useEffect(() => {
+    if (window.PP_RETRO || !window.ppPxVerlaufUrl) return undefined;
+    const verlauf = 'linear-gradient(135deg, #08060c 0%, #19062d 50%, #141414 100%)';
+    const setzen = () => {
+      const q = (v) => Math.max(64, Math.round(v / 64) * 64);
+      const url = ppPxVerlaufUrl(verlauf, q(window.innerWidth), q(window.innerHeight), 4);
+      if (!url) return;
+      const st = document.body.style;
+      st.backgroundImage = `url(${url})`; st.backgroundSize = '100% 100%'; st.backgroundRepeat = 'no-repeat'; st.imageRendering = 'pixelated';
+    };
+    setzen();
+    let t = 0;
+    const spaeter = () => { clearTimeout(t); t = setTimeout(setzen, 200); };
+    window.addEventListener('resize', spaeter);
+    return () => { clearTimeout(t); window.removeEventListener('resize', spaeter); document.body.style.backgroundImage = ''; };
+  }, []);
+  return null;
 }
 
 function App() {
@@ -3653,6 +3700,7 @@ function App() {
           Sobald ein Kampffeld im Baum haengt, blendet CSS die Schicht
           aus — dort deckt das Brett sie ohnehin ab, und laufende
           Animationen waehrend einer Partie kosten nur Bildrate. */}
+      <PpSeitenGrund />
       <MenuBackgroundParticles />
       <GameErrorBoundary>
         {!user ? <AuthScreen /> :
