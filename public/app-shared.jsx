@@ -10999,7 +10999,9 @@ function TextBox() {
             an.forEach(a => kopie.querySelectorAll(a).forEach(n => n.setAttribute('data-tb-an', '1')));
             html = kopie.outerHTML;
           }
-          const basis = { pulse, vars, handkarte: el !== treffer, stapel: Number.isFinite(z) ? z : 0, html, ziel: el };
+          // Phasenleiste (nicht auf dem Handy — dort ist sie schon so gross wie moeglich): waehrend des Highlights groesser dargestellt
+          const phasenleiste = !(window.ppIsPhone && window.ppIsPhone()) && !!(el.closest && (el.matches('.phase-column') || el.closest('.phase-column')));
+          const basis = { pulse, vars, handkarte: el !== treffer, phasenleiste, stapel: Number.isFinite(z) ? z : 0, html, ziel: el };
           rects.push({ ...m, ...basis });
           // ── Hover auf einer gehighlighteten HANDKARTE ──
           // Hebt sich die echte Karte unter dem Zeiger, soll die Highlight-
@@ -11102,6 +11104,10 @@ function TextBox() {
         setTutorialFigurenGesperrt(false);
       }
       // Fade out then dismiss
+      // Die Erklaerung ist zu Ende: Highlights und Zoom enden JETZT — die Figuren steigen schon waehrend des Ausblendens aus den Karten (s. oben) und wuerden sonst von den
+      // noch stehenden Highlight-Klonen auf den Heldenkarten ueberdeckt (Befund Ende Status-Tutorial).
+      setHighlightRects([]);
+      if (window.ppTutorialZoomAus) window.ppTutorialZoomAus();
       setFading(true);
       const cb = opts.onDismiss;
       setTimeout(() => {
@@ -11239,7 +11245,7 @@ function TextBox() {
       {highlightRects.map((h, i) => {
         const gedreht = h.flat && (h.drehung != null || h.handkarte);
         const inner = (
-          <div className={'textbox-highlight' + (h.pulse ? ' textbox-highlight-pulse' : '') + (h.handkarte ? ' textbox-highlight-hand' : '')}
+          <div className={'textbox-highlight' + (h.pulse ? ' textbox-highlight-pulse' : '') + (h.handkarte ? ' textbox-highlight-hand' : '') + (h.phasenleiste ? ' textbox-highlight-phase' : '')}
             style={gedreht
               ? { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', pointerEvents: 'none' }
               : h.flat
@@ -11260,7 +11266,11 @@ function TextBox() {
             left: h.rect.left, top: h.rect.top,
             width: h.rect.width, height: h.rect.height,
             transform: `rotate(${h.drehung || 0}deg) scale(${h.skala || 1})`,
-            pointerEvents: 'none', zIndex: 90001 + h.stapel + (h.hover ? 1000 : 0),
+            // Gehighlightete HANDKARTE: waehrend des Highlights ~50 % groesser (eigene Eigenschaften `scale`/`translate`, damit Faecherdrehung und Hover-Massstab darunter bleiben);
+            // nach oben versetzt, damit die Karte nicht unten aus dem Bild waechst. Gestuft statt stufenlos (Pixelart).
+            ...(h.handkarte ? { '--tb-hoch': `${Math.round(Math.min(0, window.innerHeight - 8 - (h.rect.top + h.rect.height * 1.25)))}px`,   // unterer Rand nach dem Wachsen (Mitte + 0,75·Hoehe) bleibt im Bild
+             animation: 'tbHandGross .24s steps(4, end) both' } : null),
+            pointerEvents: 'none', zIndex: 90001 + h.stapel + (h.hover ? 1000 : 0) + (h.handkarte ? 500 : 0),
           }}>{inner}</div>
         );
         if (h.flat) return <div key={i} style={{ display: 'contents' }}>{inner}</div>;

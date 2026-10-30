@@ -26478,3 +26478,16 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   transform: translate(var(--tz-x, 0px), var(--tz-y, 0px)) scale(var(--tz-s, 1));
   transition: transform .52s cubic-bezier(.45, 0, .2, 1);
 }
+
+/* Gehighlightete Handkarte (Tutorial): ~50 % groesser fuer die Dauer des Highlights (`--tb-hoch` = Versatz nach oben, setzt TextBox in app-shared.jsx). */
+@keyframes tbHandGross {
+  from { scale: 1; translate: 0 0; }
+  to   { scale: 1.5; translate: 0 var(--tb-hoch, 0px); }
+}
+
+/* Gehighlightete Phasenleiste (Desktop): ~50 % groesser fuer die Dauer des Highlights, gestuft statt stufenlos. */
+.textbox-highlight.textbox-highlight-phase {
+  transform-origin: 50% 50%;
+  animation: tbPhaseGross .24s steps(4, end) both;
+}
+@keyframes tbPhaseGross { from { scale: 1; } to { scale: 1.5; } }

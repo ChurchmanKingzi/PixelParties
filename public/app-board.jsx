@@ -38753,6 +38753,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Mausbewegung. Nach dem Loslassen laeuft ohnehin ein Render und
       // der 400-ms-Takt darunter.
       if (document.body.classList.contains('pp-dragging-card')) return;
+      // Tutorial-Zoom (Desktop): die Naht (`.board-area-zones-center`) wird im gezoomten Brett gemessen — die Leiste liefe sonst mit dem Zoom davon und ihr Highlight stuende
+      // an der falschen Stelle. Waehrend des Zooms bleibt die Lage stehen; nach dem Herauszoomen (Klasse faellt) misst der naechste Lauf wieder normal.
+      if (document.querySelector('.board-center.tut-zoom')) return;
       const col = document.querySelector('.phase-column');
       if (!col) return;
       const parent = col.offsetParent || document.documentElement;
