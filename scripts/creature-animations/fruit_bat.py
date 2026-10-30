@@ -73,8 +73,79 @@ UMRISS = F.umriss_farben(spr)
 
 PIV_L = (PAD_L + 13.0, PAD_T + 21.0)                          # Flügelwurzeln am Apfel
 PIV_R = (PAD_L + 31.0, PAD_T + 17.0)
-TIEF = 62.0                                                   # Abschlag in Grad nach unten
+TIEF = 38.0                                                   # Abschlag in Grad nach unten
+KNOCHEN = [(115, 110, 112), (140, 143, 138)]                  # graue Fingerknochen (1-px-Linien) — werden als Linien gedreht, nicht als Pixelfeld
 BLINZ = {26, 27, 28}
+
+
+def _naechste_haut(layer, bone):
+    """Füllt die Knochenpixel einer Flügelebene mit der Farbe des nächsten Hautpixels (Haut unter dem Knochen), damit die Haut beim Drehen ein geschlossenes Feld bleibt."""
+    out = layer.copy()
+    haut = (layer[..., 3] > 0) & ~bone
+    hy, hx = np.nonzero(haut)
+    for y, x in zip(*np.nonzero(bone)):
+        k = int(np.argmin((hy - y) ** 2 + (hx - x) ** 2))
+        out[y, x] = layer[hy[k], hx[k]]
+    return out
+
+
+def _linie(p, q):
+    """Pixel einer 8-verbundenen Linie von p nach q (Bresenham), ohne p, mit q."""
+    (x0, y0), (x1, y1) = p, q
+    dx, dy = abs(x1 - x0), abs(y1 - y0)
+    sx, sy = (1 if x1 > x0 else -1), (1 if y1 > y0 else -1)
+    err = dx - dy
+    pts = []
+    while (x0, y0) != (x1, y1):
+        e2 = 2 * err
+        if e2 > -dy:
+            err -= dy
+            x0 += sx
+        if e2 < dx:
+            err += dx
+            y0 += sy
+        pts.append((x0, y0))
+    return pts
+
+
+def drehe_fluegel(layer, piv, winkel):
+    """Flügel drehen, ohne ihn zu zerfasern: Die Haut (dicke Fläche) wird per Rückwärtsabbildung gedreht, die grauen Knochen (1-px-Linien) per Vorwärtsabbildung der Linienpunkte
+    und mit Linien zwischen den gedrehten Nachbarpunkten neu gezogen (bleiben durchgehend). Danach fallen lose Splitter (≤ 3 px, nicht 4-verbunden mit dem Flügel) weg."""
+    if abs(winkel) < 1e-9:
+        return layer.copy()
+    bone = L.farbmaske(layer, KNOCHEN)
+    haut_layer = _naechste_haut(layer, bone)
+    haut = F.drehen(haut_layer, piv[0], piv[1], winkel, glatt=False)
+    c, s_ = math.cos(winkel), math.sin(winkel)
+
+    def rot(x, y):
+        dx, dy = x - piv[0], y - piv[1]
+        return (int(math.floor(piv[0] + dx * c - dy * s_ + 0.5)), int(math.floor(piv[1] + dx * s_ + dy * c + 0.5)))
+    out = haut.copy()
+    ys, xs = np.nonzero(bone)
+    pts = set(zip(xs.tolist(), ys.tolist()))
+    h, w = layer.shape[:2]
+    for (x, y) in sorted(pts):
+        px, py = rot(x, y)
+        if not (0 <= px < w and 0 <= py < h):
+            raise L.ClipError('Knochenpixel außerhalb der Leinwand')
+        out[py, px, :3] = layer[y, x, :3]
+        out[py, px, 3] = 255
+        for dy_, dx_ in ((0, 1), (1, -1), (1, 0), (1, 1)):          # jedes Nachbarpaar einmal
+            q = (x + dx_, y + dy_)
+            if q in pts:
+                qx, qy = rot(*q)
+                for (lx, ly) in _linie((px, py), (qx, qy))[:-1]:
+                    if not out[ly, lx, 3] or tuple(out[ly, lx, :3]) not in [tuple(k) for k in KNOCHEN]:
+                        out[ly, lx, :3] = layer[y, x, :3]
+                        out[ly, lx, 3] = 255
+    # Splitter entfernen (4-Komponenten ≤ 3 px)
+    n, lab_ = cv2.connectedComponents((out[..., 3] > 0).astype(np.uint8), connectivity=4)
+    for k in range(1, n):
+        m = lab_ == k
+        if int(m.sum()) <= 3:
+            out[m] = 0
+    return out
 
 
 def bruecken8(f, start):
@@ -144,8 +215,8 @@ def frame(i, partikel=True, effekte=True):
     delta = math.radians(TIEF) * u
     bob = -int(round(2 * (1 - math.cos(ph)) / 2))              # 0 → −1 → −2 → −1 → 0 (nur nach oben, zweistufig)
 
-    fl = F.drehen(P_FL, PIV_L[0], PIV_L[1], -delta, glatt=False)     # links: gegen den Uhrzeigersinn = Flügel senkt sich
-    fr = F.drehen(P_FR, PIV_R[0], PIV_R[1], delta, glatt=False)      # rechts: im Uhrzeigersinn
+    fl = drehe_fluegel(P_FL, PIV_L, -delta)                          # links: gegen den Uhrzeigersinn = Flügel senkt sich
+    fr = drehe_fluegel(P_FR, PIV_R, delta)                           # rechts: im Uhrzeigersinn
     ap = P_AP.copy()
     if effekte and i in BLINZ:
         for (x, y) in AUGEN_PX:

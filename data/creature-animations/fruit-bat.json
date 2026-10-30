@@ -1,7 +1,7 @@
 {
   "creature": "Fruit Bat, Nosferapple",
   "sheet": "fruit-bat.png",
-  "frameWidth": 64,
+  "frameWidth": 61,
   "frameHeight": 36,
   "frames": 48,
   "frameMs": 60,
@@ -11,5 +11,5 @@
   "padLeft": 2,
   "padRight": 2,
   "padBottom": 2,
-  "faceX": 32.0
+  "faceX": 30.5
 }
