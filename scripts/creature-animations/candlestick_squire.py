@@ -19,14 +19,15 @@ Fest bleiben: Stab, Helmform, Rumpfform, Stiefel.
 
 Ablauf (48 Frames à 65 ms = 3,12 s):
 * Beide Flammen werden mit dem wiederverwendbaren Modul anim_feuer.py NEU gezeichnet (verschachtelte Zungen: rote Außenhaut, orange Körper, gelber und heller Kern, jede Schicht mit eigener Höhe,
-  Kerne wandern, Spitzen neigen sich und reißen als Funken ab). Zwei Zungen je Flamme, Fuß fest auf Dorn bzw. Stab. Frame 0 weicht deshalb in den Flammen vom Original ab; der Rest ist exakt das Original.
+  Kerne wandern, Spitzen neigen sich und reißen als runde Funken ab). Je DREI breite Zungen mit Fuß ≥ 3 px (Helmflamme ~8 px, Fackelflamme ~7 px breit wie im Original), Fuß fest auf Dorn bzw. Stab;
+  Seeds/Amplitude (0,6) per Suche gewählt: nie ein 1-px-Teil länger als 2 px, die beiden Flammen berühren sich in keinem Frame, Frame 0 deckt das Original zu ~75 %. Frame 0 weicht deshalb in den Flammen vom Original ab; der Rest ist exakt das Original.
 * Atmen zweistufig 0-1-2-1-0 px (Periode 24): die Rumpfzeile y 26 wird 1–2× eingefügt, Helm, Dorn samt Kerzenflamme, Schultern und rechte Hand heben sich, Beine/Stiefel und Stab bleiben stehen
   (die Hand gleitet am Stab).
 * Blinzeln (Lid = Hautfarbe (187,104,49)): die roten Augen samt Pupillen werden 3 Frames zu Haut, zweimal pro Schleife (Frame 15–17 und 38–40). Kein Glühen und kein Farbwechsel sonst.
 * Glanz nur auf Metall (Regel 12/14): ein Lichtband läuft diagonal über den grauen Helm (zweimal pro Schleife, Start Frame 6 und 30, 10 Frames), dazu blitzt ein vierzackiger Glitzerstern an der
   goldenen Gürtelschnalle (Mitte (241,241,71), Arme (217,217,64); 3 Frames, Frame 10–12 und 34–36). Feuer glänzt nicht (kein Stern/Band auf den Flammen).
-* Glutpünktchen (Partikel, hinter der Figur, 6 Stück, Lebensdauer 48 Frames, langsam aufsteigend, leichtes Wabern, wachsen/schrumpfen, Formen k, o): runde orange/gelbe Funken (Kern (246,231,14),
-  Rand (244,123,34)) und rote Glutkugeln (Kern (244,123,34), Rand (202,44,41)) bei den Flammen und am Rumpf; dazu die vom Feuermodul abgerissenen Funken (Teil der Flammen).
+* Glutpünktchen (Partikel, hinter der Figur, 6 Stück, Lebensdauer 48 Frames, langsam aufsteigend, leichtes Wabern, Form k = 1-px-Funke): gelbe und orange Funken (Farben der Flammen) bei den Flammen
+  und am Rumpf (keine großen Glutkugeln mehr); dazu die vom Feuermodul abgerissenen Funken (Teil der Flammen).
 Randpixel-Test (Regel 16): `U.kontur_schliessen` am Körper (Umrissfarbe aus dem Sprite); die Flammenränder sind immer die Außenhautfarbe (202,44,41) = eine Randfarbe der Quelle.
 ERGÄNZUNG: keine gemalten Pixel außer der neu gezeichneten Flamme (Farben der Quelle). Zuschnitt: der Frame ist auf die Figur (samt Flammen und abgerissenen Funken) zugeschnitten,
 symmetrisch um die Ruhefigur; die runden Partikel vergrößern ihn höchstens 2 px darüber hinaus, dazu 1 px leerer Rand. Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError).
