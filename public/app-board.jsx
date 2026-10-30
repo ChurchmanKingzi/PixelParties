@@ -37908,6 +37908,7 @@ const FINALE_FEUERWERK_MS = 8500;
 const FINALE_AUSBLENDEN_MS = 3200;
 const FINALE_FARBEN = ['#fad54a', '#fc1c5f', '#4ceb70', '#1ca9fd', '#ff8b1a', '#a952ff', '#1aedff', '#ffffff'];
 function TutorialFinaleFeuerwerk() {
+  const leinwand = useRef(null);
   const salven = useMemo(() => {
     const anzahlSalven = 17;
     return Array.from({ length: anzahlSalven }, (_, i) => {
@@ -37916,7 +37917,7 @@ function TutorialFinaleFeuerwerk() {
       return {
         // Zeitpunkt des Starts (s): gleichmaessig ueber die Dauer, leicht verwackelt.
         zeit: 0.15 + i * ((FINALE_FEUERWERK_MS / 1000 - 2.4) / anzahlSalven) + Math.random() * 0.25,
-        x: 10 + Math.random() * 80, y: 13 + Math.random() * 38,
+        x: 0.1 + Math.random() * 0.8, y: 0.13 + Math.random() * 0.38,
         farbe: FINALE_FARBEN[(i * 3 + Math.floor(Math.random() * 3)) % FINALE_FARBEN.length],
         teile: Array.from({ length: anzahl }, (_, k) => {
           const w = (k / anzahl) * Math.PI * 2 + Math.random() * 0.18;
@@ -37935,21 +37936,69 @@ function TutorialFinaleFeuerwerk() {
     }
     return () => timer.forEach(clearTimeout);
   }, [salven]);
+  // Pixelart auf EINER kleinen Leinwand (Rasterpixel = 3 Bildschirmpixel, ~30 Bilder/s): Raketen als Pixelsaeule, Funken als Bloecke mit kurzem Schweif, Blitz als Pixelring, Ausblenden per Raster
+  // statt Alpha. Ersetzt ~480 einzeln animierte DOM-Funken mit Blur-Schein (ruckelte auf schwachen Rechnern).
+  useEffect(() => {
+    const cv = leinwand.current;
+    if (!cv || window._playAnimations === false) return undefined;
+    const S = 3;
+    const r0 = cv.parentElement.getBoundingClientRect();
+    const W = Math.max(40, Math.ceil(r0.width / S)), H = Math.max(40, Math.ceil(r0.height / S));
+    cv.width = W; cv.height = H;
+    const g = cv.getContext('2d');
+    const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+    const zeigen = (x, y, a) => a >= 1 || (a > 0 && BAYER[(y & 3) * 4 + (x & 3)] < a * 16);
+    const block = (x, y, n, farbe, a) => {
+      x = Math.round(x); y = Math.round(y);
+      if (a < 1) { g.fillStyle = farbe; for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (zeigen(x + i, y + j, a)) g.fillRect(x + i, y + j, 1, 1); return; }
+      g.fillStyle = farbe; g.fillRect(x, y, n, n);
+    };
+    const t0 = performance.now(); let letzt = -1e9, raf = 0, ende = false;
+    const schritt = (jetzt) => {
+      if (ende) return;
+      raf = requestAnimationFrame(schritt);
+      if (jetzt - letzt < 32) return;
+      letzt = jetzt;
+      const t = (jetzt - t0) / 1000;
+      g.clearRect(0, 0, W, H);
+      for (const sv of salven) {
+        const cx = sv.x * W, cy = sv.y * H;
+        // Rakete (0,7 s): steigt von unten zur Platzstelle, Pixelsaeule mit Schweif
+        const fr = (t - sv.zeit) / 0.7;
+        if (fr >= 0 && fr <= 1) {
+          const e = 1 - Math.pow(1 - fr, 2), y = H * 1.02 + (cy - H * 1.02) * e;
+          for (let k = 0; k < 6; k++) block(cx, y + k * 2, 1, k < 2 ? '#ffffff' : k < 4 ? '#f9ecb3' : '#fbc86a', 1 - k / 7);
+        }
+        const fb = (t - sv.zeit - 0.7);
+        if (fb < 0) continue;
+        // Blitz (0,5 s): gedithertes Leuchten (Scheibe, innen weiss) und ein Pixelring, der sich weitet
+        if (fb < 0.5) {
+          const f = fb / 0.5, R = 4 + 16 * f, a = (1 - f) * 0.8, R2 = R * R;
+          for (let y = -Math.ceil(R); y <= R; y++) for (let x = -Math.ceil(R); x <= R; x++) {
+            const d = x * x + y * y; if (d > R2) continue;
+            const px = Math.round(cx) + x, py = Math.round(cy) + y;
+            if (zeigen(px, py, a * (1 - d / R2 * 0.6))) { g.fillStyle = d < R2 * 0.25 && f < 0.6 ? '#ffffff' : sv.farbe; g.fillRect(px, py, 1, 1); }
+          }
+        }
+        // Funken (1,9 s): fliegen auseinander, fallen leicht, werden kleiner und dithern aus
+        if (fb > 1.9) continue;
+        const f = fb / 1.9, e = 1 - Math.pow(1 - f, 3), a = f < 0.6 ? 1 : 1 - (f - 0.6) / 0.4, n = f < 0.22 ? 3 : f < 0.6 ? 2 : 1;
+        sv.teile.forEach((tl, k) => {
+          const x = cx + tl.dx * e / S, y = cy + (tl.dy + 80 * e) / S;
+          for (const [vz, ga] of [[0.1, 0.35], [0.05, 0.6]]) { const e2 = 1 - Math.pow(1 - Math.max(0, f - vz), 3); if (f < 0.55) block(cx + tl.dx * e2 / S, cy + (tl.dy + 80 * e2) / S, Math.max(1, n - 1), sv.farbe, a * ga); }
+          block(x, y, n, sv.farbe, a);
+          if (f > 0.12 && f < 0.6 && ((k + Math.floor(t * 20)) & 3) === 0) block(x, y, n, '#ffffff', 1);   // Glitzern
+        });
+      }
+      if (t > FINALE_FEUERWERK_MS / 1000 + 1) ende = true;
+    };
+    raf = requestAnimationFrame(schritt);
+    return () => { ende = true; cancelAnimationFrame(raf); };
+  }, [salven]);
   if (window._playAnimations === false) return null;
   return (
     <div className="finale-feuerwerk">
-      {salven.map((sv, i) => (
-        <React.Fragment key={i}>
-          <div className="finale-rakete" style={{ left: sv.x + '%', '--fwf-ziel': sv.y + '%', animationDelay: sv.zeit + 's' }} />
-          <div className="finale-blitz" style={{ left: sv.x + '%', top: sv.y + '%', '--fw-color': sv.farbe, animationDelay: (sv.zeit + 0.7) + 's' }} />
-          {sv.teile.map((t, k) => (
-            <div key={k} className="finale-teil" style={{
-              left: sv.x + '%', top: sv.y + '%', '--dx': t.dx + 'px', '--dy': t.dy + 'px',
-              '--fw-color': sv.farbe, animationDelay: (sv.zeit + 0.7) + 's',
-            }} />
-          ))}
-        </React.Fragment>
-      ))}
+      <canvas ref={leinwand} className="finale-leinwand" data-pp-px="aus" />
     </div>
   );
 }
