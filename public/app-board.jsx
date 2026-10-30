@@ -61954,6 +61954,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           showTextBox(null);
           setShowSurrender(false);
           if (window.stopSFX) { window.stopSFX('victory'); window.stopSFX('defeat'); }   // v1146
+          if (gameState.isTutorial) window._ppTutorialRetry = true;   // Neuer Versuch: die Einleitung nicht noch einmal abspielen (app-screens)
           socket.emit('retry_puzzle', { roomId: gameState.roomId });
         };
         return (
@@ -63559,7 +63560,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
                 <button className="btn" style={{ padding: '10px 28px', fontSize: 13, width: 220, borderColor: 'var(--accent)', color: 'var(--accent)' }}
-                  onClick={() => { if (window.stopSFX) { window.stopSFX('victory'); window.stopSFX('defeat'); } socket.emit('retry_puzzle', { roomId: gameState.roomId }); }}>
+                  onClick={() => { if (window.stopSFX) { window.stopSFX('victory'); window.stopSFX('defeat'); } if (result?.isTutorial) window._ppTutorialRetry = true; socket.emit('retry_puzzle', { roomId: gameState.roomId }); }}>
                   🔄 Retry
                 </button>
                 <button className="btn btn-danger" style={{ padding: '10px 28px', fontSize: 13, width: 220 }}

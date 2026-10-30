@@ -147,13 +147,17 @@ function useTutorialFlow(open) {
     if (tutorialAttemptState.roomId !== tutorialRoomIdRef.current) {
       tutorialRoomIdRef.current = tutorialAttemptState.roomId;
       tutorialIntroShownRef.current = null;
+      // Retry: derselbe Versuch von vorn, aber OHNE die Einleitung noch einmal abzuspielen (Marke setzt der Retry-Knopf im Kampffeld).
+      const retry = !!window._ppTutorialRetry;
+      window._ppTutorialRetry = false;
+      if (retry && window._currentTutorialNum) tutorialIntroShownRef.current = window._currentTutorialNum;
       // Neuer Durchgang (auch ein Retry): Gegner ist, wer zuerst spricht.
       if (window.setTutorialGegner && window.tutorialErsterSprecher) {
         window.setTutorialGegner(window.tutorialErsterSprecher(window._currentTutorialNum));
       }
       // ... und die Helden-Figuren warten wieder auf das Ende der Einleitung.
       if (window.setTutorialFigurenGesperrt) {
-        window.setTutorialFigurenGesperrt(!!(window.TUTORIAL_SCRIPTS || {})[window._currentTutorialNum]?.intro);
+        window.setTutorialFigurenGesperrt(!retry && !!(window.TUTORIAL_SCRIPTS || {})[window._currentTutorialNum]?.intro);
       }
     }
     const num = window._currentTutorialNum;
