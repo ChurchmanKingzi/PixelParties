@@ -24,9 +24,9 @@ const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 //  turn total.
 // ═══════════════════════════════════════════
 
-// Al 30.10.: Die Karte verlässt die Hand beim Ausspielen und kommt erst nach der freien Aktion in die Ablage. Damit man das sieht, schickt
-// `_checkAscensionHandReactions` (_engine.js) zwei ausdrückliche Flüge: Hand → Brettmitte (beim Ausspielen) und Brettmitte → Ablage (beim Ablegen).
-// Der Client leitet Ablage-Flüge sonst aus Handverlust + Ablagezuwachs im SELBEN Zustand ab — hier liegt die ganze Reaktion dazwischen.
+// Al 30.10.: Die Karte geht beim Ausspielen SOFORT von der Hand in die Ablage (`_checkAscensionHandReactions` in _engine.js sendet den Flug
+// `play_pile_transfer` Hand → Ablage vor der Entnahme und legt sie gleich ab). Vorher lag sie bis nach der freien Aktion nirgends: Handverlust und
+// Ablagezuwachs kamen nie im selben Zustand an, und der Client zeigte keinen Flug.
 const CARD_NAME = 'Trample Sounds in the Forest';
 const HOPT_KEY = 'trample-sounds';
 

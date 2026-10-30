@@ -43668,12 +43668,17 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
 
       // Consume from hand + pay gold
-      // ★ Flug (Al 30.10.: Trample Sounds „verschwindet einfach aus der Hand und taucht dann später einfach im Discard auf"): der Client leitet
-      // Flüge zur Ablage aus Handverlust UND Ablagezuwachs im SELBEN Zustand ab; hier liegen aber die ganze Reaktion samt freier Aktion dazwischen,
-      // beide Hälften kommen nie zusammen an. Darum zwei ausdrückliche Flüge: jetzt Hand → Brettmitte (VOR der Entnahme, der Handplatz muss
-      // noch stehen), am Ende Brettmitte → Ablage (vor dem Ablegen, `play_pile_transfer`-Vertrag wie überall).
-      this._broadcastEvent('play_pile_transfer', { owner: pi, cardName, from: 'hand', to: 'boardCenter', fromHandIdx: hi });
+      // ★ Flug (Al 30.10.: Trample Sounds „verschwindet einfach aus der Hand und taucht dann später einfach im Discard auf", dann: „sofort von der
+      // Hand zum Discard"): die Karte geht GLEICH beim Ausspielen in die Ablage — Flug VOR der Entnahme (der Handplatz muss noch stehen), dann
+      // Entnahme, Ablage und Abgleich in einem Zug (Hausregel wie beim Sofort-Guss). Vorher lag die ganze Reaktion samt freier Aktion zwischen
+      // Handverlust und Ablagezuwachs, der Client (leitet Ablage-Flüge aus beiden im SELBEN Zustand ab) zeigte keinen Flug.
+      const _aszBesitzer = this._consumeHandCardOrigin(pi, cardName, hi);   // gestohlene Handkarte → Ablage des permanenten Besitzers (VOR dem Splice)
+      this._broadcastEvent('play_pile_transfer', {
+        owner: pi, cardName, from: 'hand', to: 'discard', fromHandIdx: hi,
+        ...(_aszBesitzer !== pi ? { fromOwner: pi, toOwner: _aszBesitzer } : {}),
+      });
       ps.hand.splice(hi, 1);
+      (this.gs.players[_aszBesitzer] || ps).discardPile.push(cardName);
       this.sync();   // sofort abgleichen: die Hand rückt auf, während die Karte fliegt (Wächter `check-hand-flight-sync`)
       await this._rxPay(ps, cost, { cardName });
       this.notePlayedFromHand(pi);
@@ -43710,7 +43715,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Spell-type ascension reactions so hero passives like Zsos'Ssar
       // (Decay-Spell Poison cost), Beato's orb collector, etc., still
       // trigger on this cast. Artifacts don't fire spell hooks.
-      const _aszBuddy = this.reaktionsBuddyTicket(pi, cardName, script, { inDerAblage: false });   // W67a: diese Karte wird erst NACH dem Hook abgelegt
+      const _aszBuddy = this.reaktionsBuddyTicket(pi, cardName, script, { inDerAblage: true });   // W67a: die Karte liegt seit dem Ausspielen in der Ablage (Inyas Buddy nimmt sie von dort)
       if (!isArtifact && (cardData?.cardType === 'Spell' || cardData?.cardType === 'Attack') && castingHeroIdx >= 0) {   // v1154: auch Attacks
         try {
           await this.runHooks('afterSpellResolved', {
@@ -43728,16 +43733,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // v1157: Handlung des Wirkers („performs an Action")
       await this._rxAufgeloest(ps, cardName, castingHeroIdx, { spellHook: false, heroOwner: castingSeite });
 
-      // Discard the spent card
-      const _aszPs = this.handKartenBesitzerPs(ps, cardName);   // W63c: Ablage des permanenten Besitzers (gestohlene Handkarte)
-      if (!_aszBuddy.token) {   // W67a: Inyas Fantasy Buddy ersetzt die Ablage
-        const _aszBesitzer = this.gs.players.indexOf(_aszPs);
-        this._broadcastEvent('play_pile_transfer', {
-          owner: pi, cardName, from: 'boardCenter', to: 'discard',
-          ...(_aszBesitzer >= 0 && _aszBesitzer !== pi ? { fromOwner: pi, toOwner: _aszBesitzer } : {}),
-        });
-        _aszPs.discardPile.push(cardName);
-      }
+      // (Die ausgespielte Karte liegt schon in der Ablage — siehe oben; Inyas Fantasy Buddy nimmt sie über `_aszBuddy` von dort.)
       this.sync();
       // (Wisdom discard was paid earlier — see comment above.)
 
